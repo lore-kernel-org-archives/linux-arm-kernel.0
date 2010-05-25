@@ -1,11 +1,19 @@
 From: apatard@mandriva.com (apatard at mandriva.com)
-Date: Tue, 25 May 2010 14:22:41 +0200
-Subject: [patch 5/5] kirkwood: Add audio support to openrd client platforms
-References: <20100525122236.841941526@mandriva.com>
-Message-ID: <20100525122341.749472226@mandriva.com>
+Date: Tue, 25 May 2010 14:22:36 +0200
+Subject: [patch 0/5] kirkwood openrd client audio support - v3
+Message-ID: <20100525122236.841941526@mandriva.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An embedded and charset-unspecified text was scrubbed...
-Name: openrd_audio.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100525/d4538c73/attachment.el>
+
+Hi,
+
+It's a new try to get merged kirkwood openrd client support.
+
+The changes are :
+- set window configuration according to dma address
+- namespaced all cs42l51 #define
+- modified cs42l51_dac_names array according to what proposed Mark Brown
+- use SOC_DOUBLE_TLV for mic boost
+
+Arnaud
