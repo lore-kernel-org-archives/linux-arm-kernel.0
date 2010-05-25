@@ -1,70 +1,20 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 25 May 2010 16:52:31 +0200 (CEST)
-Subject: [PATCH v2 0/3] Driver for the i.MX2x CMOS Sensor Interface
-In-Reply-To: <cover.1274706733.git.baruch@tkos.co.il>
-References: <cover.1274706733.git.baruch@tkos.co.il>
-Message-ID: <Pine.LNX.4.64.1005241757380.2611@axis700.grange>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Tue, 25 May 2010 16:57:59 +0200
+Subject: [PATCH 1/2] mc13783: add LED support
+In-Reply-To: <201005181327.29529.philippe.retornaz@epfl.ch>
+References: <1274114423-30020-1-git-send-email-philippe.retornaz@epfl.ch>
+	<1274114423-30020-2-git-send-email-philippe.retornaz@epfl.ch>
+	<20100517190242.GA17604@pengutronix.de>
+	<201005181327.29529.philippe.retornaz@epfl.ch>
+Message-ID: <20100525145759.GJ30801@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 May 2010, Baruch Siach wrote:
+On Tue, May 18, 2010 at 01:27:29PM +0200, Philippe R?tornaz wrote:
+> Thank you for the review, I will post a v2 patch with the appropriates fixes 
+> soon.
 
-> This series contains a soc_camera driver for the i.MX25/i.MX27 CSI device, and
-> platform code for the i.MX25 and i.MX27 chips. This driver is based on a 
-> driver for i.MX27 CSI from Sascha Hauer, that  Alan Carvalho de Assis has 
-> posted in linux-media last December[1]. I tested the mx2_camera driver on the 
-> i.MX25 PDK. Sascha Hauer has tested a earlier version of this driver on an 
-> i.MX27 based board. I included in this version some fixes from Sascha that 
-> enable i.MX27 support.
-> 
-> [1] https://patchwork.kernel.org/patch/67636/
-> 
-> Changes v1 -> v2
->     Addressed the comments of Guennadi Liakhovetski except from the following:
-> 
->     1. The mclk_get_divisor implementation, since I don't know what this code 
->        is good for
+Just curious - is there a v2 of this patches coming?
 
-AFAIU, it should select a divisor to provide the user-requested frequency. 
-But now we know, that it can go.
-
->     2. mx2_videobuf_release should not set pcdev->active on i.MX27, because 
->        mx27_camera_frame_done needs this pointer
-
-Right, that's what you have locking for. Either the ISR comes first and 
-uses the pointer, or you take the spinlock and stop IRQs, while 
-deactivating the hardware and clearing the pointer. So that after you 
-release the lock you're sure no more interrupts can come.
-
->     3. In mx27_camera_emma_buf_init I don't know the meaning of those hard 
->        coded magic numbers
-> 
->     Applied i.MX27 fixes from Sascha.
-> 
-> Baruch Siach (3):
->   mx2_camera: Add soc_camera support for i.MX25/i.MX27
->   mx27: add support for the CSI device
->   mx25: add support for the CSI device
-> 
->  arch/arm/mach-mx2/clock_imx27.c          |    2 +-
->  arch/arm/mach-mx2/devices.c              |   31 +
->  arch/arm/mach-mx2/devices.h              |    1 +
->  arch/arm/mach-mx25/clock.c               |   14 +-
->  arch/arm/mach-mx25/devices.c             |   22 +
->  arch/arm/mach-mx25/devices.h             |    1 +
->  arch/arm/plat-mxc/include/mach/memory.h  |    4 +-
->  arch/arm/plat-mxc/include/mach/mx25.h    |    2 +
->  arch/arm/plat-mxc/include/mach/mx2_cam.h |   46 +
->  drivers/media/video/Kconfig              |   13 +
->  drivers/media/video/Makefile             |    1 +
->  drivers/media/video/mx2_camera.c         | 1471 ++++++++++++++++++++++++++++++
->  12 files changed, 1603 insertions(+), 5 deletions(-)
->  create mode 100644 arch/arm/plat-mxc/include/mach/mx2_cam.h
->  create mode 100644 drivers/media/video/mx2_camera.c
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Thanks,
+Daniel
