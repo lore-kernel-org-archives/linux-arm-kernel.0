@@ -1,30 +1,36 @@
-From: felipe.balbi@nokia.com (Felipe Balbi)
-Date: Tue, 25 May 2010 08:49:47 +0300
-Subject: [PATCH v3 14/14] omap: mailbox: reorganize headers
-In-Reply-To: <AANLkTimEtI3pDJKJOCyiBK8f0y1p0nyyIeptcS2eyy_v@mail.gmail.com>
-References: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
-	<1274548465-20208-15-git-send-email-felipe.contreras@gmail.com>
-	<20100524171634.GA23202@nokia.com>
-	<AANLkTimEtI3pDJKJOCyiBK8f0y1p0nyyIeptcS2eyy_v@mail.gmail.com>
-Message-ID: <20100525054947.GA26007@nokia.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 25 May 2010 14:52:29 +0900
+Subject: samsung merge window over
+In-Reply-To: <20100525044214.GE7248@trinity.fluff.org>
+References: <20100525044214.GE7248@trinity.fluff.org>
+Message-ID: <004b01cafbce$7b249430$716dbc90$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Ben Dooks wrote:
+> 
+> Thankyou to all who contributed to this round of updates, I am officially
+> calling the end of any new development work for this merge window.
+> 
+> Special thanks to all at Samsung for their help.
+> 
+> I will now be preparing a defconfig, documentation and any other bugfixes
+> tree to send to Linus as soon as possible.
+> 
+> As a note, this is the shortlog of the patches merged via my tree:
 
-On Mon, May 24, 2010 at 09:14:24PM +0200, ext Felipe Contreras wrote:
->Now, regarding device.h:
+Thanks for your review and merging.
 
-which was my only concern
+And ok, we will continue our development and submit patches for the next
+merge window. Also, if we find any issues, we will submit patches for those
+also.
 
->Now, I am pretty sure that platform_device.h will always depend on
->device.h that's why I removed them, but I can add them again if
->somebody wants to, but again, the situation is already bad.
+Thanks.
 
-so there's platform_device.h on that file, a little comment on the 
-changelog would suffice to avoid this kind of mis-understanding.
+(snip)
 
--- 
-balbi
-
-DefectiveByDesign.org
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
