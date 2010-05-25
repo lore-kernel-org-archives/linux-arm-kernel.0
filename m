@@ -1,36 +1,67 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 25 May 2010 18:45:47 +0200
-Subject: [PATCH] ARM: TCM memory bug on newer compilers
-Message-ID: <1274805947-414-1-git-send-email-linus.walleij@stericsson.com>
+From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
+Date: Tue, 25 May 2010 18:54:45 +0200
+Subject: zImage works, but not vmlinux
+In-Reply-To: <4BFBF015.6000008@gmail.com>
+References: <4BFBF015.6000008@gmail.com>
+Message-ID: <20100525165445.GB3085@boggieman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apparently newer compilers don't like you to refer to linker
-symbols as extern char *foo, we must use char foo and refer to
-the address of the char instead.
+On Tue, May 25, 2010 at 11:43:17AM -0400, f. achkar wrote:
+> Hi,
+> I have tried to send this message some part of it was ignored, resending
+> sorry ...
+> 
+> greetings,
+> I'm newbie to arm linux, so pls if my issue is already addressed just
+> point me to that reference. I'm trying to learn, but couldn't pass the
+> following stage:
+> I have a s3c245 based board, I have a working compressed kernel image
+> zImage, this image boots properly via u-boot-1.1.6, however I simply
+> failed to load (i.e., boot vmlinux) via u-boot directly from SDRAM.
+> 
+> more details:
+> 
+>    1. I let the target boot until the message of "  Hit any key to stop
+>       autoboot: " for which I hit enter, (this initialized the board
+>       enables MMU, I-Cache, .. etc);
+>    2. board info as seen by u-boot
+>       # bdinfo
+>       arch_number = 0x00000648
+>       env_t       = 0x00000000
+>       boot_params = 0x30000100
+>       DRAM bank   = 0x00000000
+>       -> start    = 0x30000000
+>       -> size     = 0x04000000
+>       DRAM bank   = 0x00000001
+>       -> start    = 0x38000000
+>       -> size     = 0x04000000
+>       ethaddr     = ...:5B
+>       ip_addr     = ...200
+>       baudrate    = 115200 bps
+>    3. laod vmlinux to SDRAM :
+>       tftp 30008000 vmlinux
+>       TFTP from server ...210; our IP address is ...200
+>       Filename 'vmlinux'.
+>       Load address: 0x30008000
+>       Loading: T ############ .....
+>    4. # bootm 30008000
+>       ## Booting image at 30008000 ...
+>       Boot with Image
+>       do not support this address : 30008000
+> 
+>       Starting kernel ...
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- arch/arm/mm/init.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+Is that kernel compiled with early printk? 
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 1ba6cf5..f6a9994 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -678,10 +678,10 @@ void __init mem_init(void)
- void free_initmem(void)
- {
- #ifdef CONFIG_HAVE_TCM
--	extern char *__tcm_start, *__tcm_end;
-+	extern char __tcm_start, __tcm_end;
- 
--	totalram_pages += free_area(__phys_to_pfn(__pa(__tcm_start)),
--				    __phys_to_pfn(__pa(__tcm_end)),
-+	totalram_pages += free_area(__phys_to_pfn(__pa(&__tcm_start)),
-+				    __phys_to_pfn(__pa(&__tcm_end)),
- 				    "TCM link");
- #endif
- 
--- 
-1.6.3.3
+> 
+> and nothing happens it probably crashed somewhere, why zImage works
+> while vmlinux does not?
+> thanks,
+> ferar
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
