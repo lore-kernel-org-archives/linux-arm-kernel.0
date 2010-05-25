@@ -1,219 +1,263 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 25 May 2010 17:02:21 +0200
-Subject: vpack270 and sleep mode
-In-Reply-To: <4BFBD01E.8010101@papillon.ru>
-References: <1272311167-576-1-git-send-email-marek.vasut@gmail.com>
-	<201005251439.50508.marek.vasut@gmail.com>
-	<4BFBD01E.8010101@papillon.ru>
-Message-ID: <201005251702.21204.marek.vasut@gmail.com>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Tue, 25 May 2010 10:06:18 -0500
+Subject: [PATCHv1 2.6.34] mx5: Add i2c to Freescale MX51 Babbage HW
+Message-ID: <1274799978-6448-1-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 25. kv?tna 2010 15:26:54 237 Rumjantsev Egor (PROG) napsal(a):
-> 25.05.2010 18:39, Marek Vasut ?????:
-> > Dne ?t 25. kv?tna 2010 14:38:09 Marek Vasut napsal(a):
-> >> Dne ?t 25. kv?tna 2010 14:13:01 237 Rumjantsev Egor (PROG) napsal(a):
-> >>> Hello, Marek
-> >> 
-> >> Hi,
-> >> 
-> >>> Could you help to solve the following problem:
-> >>> I try to move my board based on Voipac PXA270 module to sleep state.
-> >>> I'm running kernel 2.6.28.10 on it.
-> >> 
-> >> CCed Voipac and linux-arm-kernel. Btw. that's not Voipac official
-> >> kernel, is it?
-> 
-> Yes it isn't. I patched vanilla kernel to get basic Voipac module
-> support and add some my code for our board.
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-Please, use what's in mainline then. (git.kernel.org, search for ycmiao, use -
-devel branch).
-> 
-> > My bad, CCed wrong linux-arm-kernel, fixed now :)
-> > 
-> >>> When i try echo mem>  /sys/power/state i see messages that system goes
-> >>> to sleep state but after pushing wake-up button (GPIO0) i don't see
-> >>> that a bootloader is running (i set up some GPIOs as flags in
-> >>> bootloader and see on them whith oscilloscope).
-> >> 
-> >> The bootloader checks RCSR once you wake it up and it sets-up SDRAM. If
-> >> there's a sleep-wakeup bit, it branches to location in PSPR and there's
-> >> linux kernel already.
-> 
-> i know that as i have to use U-boot 1.3.0 for my board. It's also not
-> Voipac's u-boot version.
+This patch adds I2C functionality to the Freescale MX51 Babbage HW.
+The patch adds device structures, i2c board slave device defines,
+IOMUX pin defines, and clocks.
 
-Can't you use u-boot-pxa from git.denx.de ?
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx51_babbage.c      |   45 +++++++++++++++++++++
+ arch/arm/mach-mx5/clock-mx51.c              |   11 +++++
+ arch/arm/mach-mx5/devices.c                 |   58 +++++++++++++++++++++++++++
+ arch/arm/mach-mx5/devices.h                 |    3 +
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h |   14 ++++---
+ 5 files changed, 125 insertions(+), 6 deletions(-)
 
-> I set or clear some of GPIO depending of reason we enter on bootloader.
-> And after pushing wake-up button my flags state doen't change.
-> 
-> >>> This is a part of kernel output when the system goes to sleep mode:
-> >>> 
-> >>> dm9000 dm9000.0: LATE suspend
-> >>> platform pxa27x-pwm.1: LATE suspend
-> >>> platform pxa27x-pwm.0: LATE suspend
-> >>> platform pxa27x-ssp.2: LATE suspend
-> >>> platform pxa27x-ssp.1: LATE suspend
-> >>> platform pxa27x-ssp.0: LATE suspend
-> >>> pxa2xx-i2c pxa2xx-i2c.1: LATE suspend
-> >>> platform sa1100-rtc: LATE suspend
-> >>> platform pxa2xx-i2s: LATE suspend
-> >>> pxa2xx-uart pxa2xx-uart.2: LATE suspend
-> >>> pxa2xx-uart pxa2xx-uart.1: LATE suspend
-> >>> pxa2xx-uart pxa2xx-uart.0: LATE suspend
-> >>> platform pxa27x-udc: LATE suspend
-> >>> pxa_pm_enter(): RCSR value: 0x00000000
-> >>> pxa_pm_enter(): state: 3
-> >>> pxa_pm_enter(): Power regs:
-> >>> pxa_pm_enter(): GPDR0: 0x0070E200
-> >>> pxa_pm_enter(): PWER: 0x00000001
-> >>> pxa_pm_enter(): PFER: 0x00000000
-> >>> pxa_pm_enter(): PRER: 0x00000001
-> >>> pxa_pm_enter(): PGSR0: 0x00010000
-> >>> pxa_pm_enter(): PGSR1: 0x000F2000
-> >>> pxa_pm_enter(): PGSR2: 0x0404C000
-> >>> pxa_pm_enter(): PGSR3: 0x00000020
-> >>> pxa27x_cpu_pm_enter(): go to suspend : 3
-> >>> pxa27x_cpu_pm_enter(): PCFR : 0x61
-> >>> pxa27x_cpu_pm_enter(): PSSR : 0x0
-> >>> pxa27x_cpu_pm_enter(): PSLR : 0xCC100004
-> >>> pxa27x_cpu_pm_enter(): OSCC : 0x3
-> >>> 
-> >>> but if i type command echo standby>  /sys/power/state
-> >>> the system reacts on wake-up button but hangs after some messages about
-> >>> null dereferencing pointers.
-> >>> 
-> >>> is there any possibility to trace such problem?
-> >> 
-> >> Try CONFIG_PM_ADVANCED_DEBUG.
-> 
-> i've looked through kernel sources and didn't such identifer
-> 
-Maybe you need newer kernel, see above.
-> 
->   Enable that and check if the tests work, one
-> 
-> >> by one. What are the messages you get once the kernel crashes?
-> 
-> i've tryied to run tests.
-> echo devices > /sys/power/pm_test works fine
-> echo core > /sys/power/pm_test hangs with:
-> 
-> suspend debug: Waiting for 5 seconds.
-> platform pxa27x-udc: EARLY resume
-> pxa2xx-uart pxa2xx-uart.0: EARLY resume
-> pxa2xx-uart pxa2xx-uart.1: EARLY resume
-> pxa2xx-uart pxa2xx-uart.2: EARLY resume
-> platform pxa2xx-i2s: EARLY resume
-> platform sa1100-rtc: EARLY resume
-> platform pxa2xx-i2c.1: EARLY resume
-> platform pxa27x-ssp.0: EARLY resume
-> platform pxa27x-ssp.1: EARLY resume
-> platform pxa27x-ssp.2: EARLY resume
-> platform pxa27x-pwm.0: EARLY resume
-> platform pxa27x-pwm.1: EARLY resume
-> dm9000 dm9000.0: EARLY resume
-> vpac270-ssp vpac270-ssp.0: EARLY resume
-> platform vpac270-pm.0: EARLY resume
-> platform pxa_g64_driver.0: EARLY resume
-> platform pxa2xx_dir_keypad.0: EARLY resume
-> platform pxa_capture.0: EARLY resume
-> platform pxa2xx-ac97: EARLY resume
-> platform mfrc531-ssp.0: EARLY resume
-> pxa2xx-flash pxa2xx-flash.0: EARLY resume
-> Unable to handle kernel paging request at virtual address a03ab26f
-> pgd = c7b10000
-> [a03ab26f] *pgd=8020040e(bad)
-> Internal error: Oops: 803 [#1] PREEMPT
-> Modules linked in: ipv6 pxa_reg
-> Unable to handle kernel paging request at virtual address a03ab26f
-> pgd = c7b10000
-> [a03ab26f] *pgd=8020040e(bad)
-> Internal error: Oops: 803 [#1] PREEMPT
-> Modules linked in: ipv6 pxa_reg
-> CPU: 0    Not tainted  (2.6.28.10-vpac3-splash #90)
-> PC is at bad_channel+0x80166/0x91f28
-> LR is at platform_pm_resume_noirq+0x48/0x54
-> pc : [<a03ab23e>]    lr : [<a01cb758>]    psr: a00000b3
-> sp : c6b3be64  ip : c6b3be74  fp : c6b3be70
-> r10: 00000004  r9 : c79711b4  r8 : c7a1e000
-> r7 : 00000005  r6 : a03da1b0  r5 : a03f22e4  r4 : a03dd328
-> r3 : a03ab23b  r2 : 00000000  r1 : a03f22e4  r0 : a03dd320
-> Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA Thumb  Segment user
-> Control: 0000397f  Table: a7b10000  DAC: 00000015
-> Process sh (pid: 309, stack limit = 0xc6b3a268)
-> Stack: (0xc6b3be64 to 0xc6b3c000)
-> be60:          c6b3be88 c6b3be74 a01cd9b0 a01cb71c a03dd328 00000010
-> c6b3bea8
-> be80: c6b3be8c a01ce248 a01cd968 00000010 00000000 00000003 a030d660
-> c6b3bebc
-> bea0: c6b3beac a01ce8c8 a01ce1e4 00000000 c6b3bed8 c6b3bec0 a006fd10
-> a01ce8b8
-> bec0: 0000db96 a038c7db 00000003 c6b3bef4 c6b3bedc a006ff20 a006fc10
-> a038c7db
-> bee0: 00000003 00000003 c6b3bf1c c6b3bef8 a0070040 a006fdfc c780dc14
-> 00000004
-> bf00: c79711a0 c781ada0 a03eeea4 c6b3bf80 c6b3bf2c c6b3bf20 a018afe8
-> a006ffb0
-> bf20: c6b3bf58 c6b3bf30 a00e1da8 a018afd0 c7ab1b20 4001d000 c6b3bf80
-> 00000004
-> bf40: a00300a4 c6b3a000 00000000 c6b3bf7c c6b3bf5c a0099b58 a00e1ca8
-> c6b3bf80
-> bf60: 00000000 00000000 c7ab1b20 00000004 c6b3bfa4 c6b3bf80 a0099cb8
-> a0099ab0
-> bf80: 00000000 00000000 00000000 00000004 4001d000 401565f8 00000000
-> c6b3bfa8
-> bfa0: a002ff00 a0099c78 00000004 4001d000 00000001 4001d000 00000004
-> 00000000
-> bfc0: 00000004 4001d000 401565f8 00000004 00000001 9ef94b58 00000000
-> 9ef94a44
-> bfe0: 00000000 9ef9498c 4008df64 400e28b4 60000010 00000001 80936021
-> 80936421
-> Backtrace:
-> [<a01cb710>] (platform_pm_resume_noirq+0x0/0x54) from [<a01cd9b0>]
-> (pm_noirq_op+0x54/0x88)
-> [<a01cd95c>] (pm_noirq_op+0x0/0x88) from [<a01ce248>]
-> (dpm_power_up+0x70/0xec)
->   r5:00000010 r4:a03dd328
-> [<a01ce1d8>] (dpm_power_up+0x0/0xec) from [<a01ce8c8>]
-> (device_power_up+0x1c/0x20)
->   r7:a030d660 r6:00000003 r5:00000000 r4:00000010
-> [<a01ce8ac>] (device_power_up+0x0/0x20) from [<a006fd10>]
-> (suspend_devices_and_enter+0x10c/0x1b4)
->   r4:00000000
-> [<a006fc04>] (suspend_devices_and_enter+0x0/0x1b4) from [<a006ff20>]
-> (enter_state+0x130/0x1b4)
->   r6:00000003 r5:a038c7db r4:0000db96
-> [<a006fdf0>] (enter_state+0x0/0x1b4) from [<a0070040>]
-> (state_store+0x9c/0xc4)
->   r6:00000003 r5:00000003 r4:a038c7db
-> [<a006ffa4>] (state_store+0x0/0xc4) from [<a018afe8>]
-> (kobj_attr_store+0x24/0x28)
-> [<a018afc4>] (kobj_attr_store+0x0/0x28) from [<a00e1da8>]
-> (sysfs_write_file+0x10c/0x144)
-> [<a00e1c9c>] (sysfs_write_file+0x0/0x144) from [<a0099b58>]
-> (vfs_write+0xb4/0x140)
-> [<a0099aa4>] (vfs_write+0x0/0x140) from [<a0099cb8>] (sys_write+0x4c/0x80)
->   r7:00000004 r6:c7ab1b20 r5:00000000 r4:00000000
-> [<a0099c6c>] (sys_write+0x0/0x80) from [<a002ff00>]
-> (ret_fast_syscall+0x0/0x2c)
->   r6:401565f8 r5:4001d000 r4:00000004
-> Code: 74732820 20657461 0a296425 69666300 (646d635f)
-> ---[ end trace 213b55b29148afbf ]---
-> eth0: link down
-
-What's pxa_reg module? Does it have proper suspend/resume functions?
-> 
-> >> There was also a way to keep the console enabled until the kernel didn't
-> >> totally suspend, but I can't find that option now, maybe someone will be
-> >> more successful. And maybe I'm mistaking this with an option to don't
-> >> blank consoles until then, it's been some time since I needed that.
-> >> 
-> >>> P.S.: sorry if i disturb you, but you the only man in ARM linux mailing
-> >>> list who posted messages about Voipac modules.
-> >> 
-> >> You're welcome.
-> >> 
-> >>> Best regards !!!
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index ee67a71..49fafa5 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -12,11 +12,13 @@
+ 
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
++#include <linux/i2c.h>
+ 
+ #include <mach/common.h>
+ #include <mach/hardware.h>
+ #include <mach/imx-uart.h>
+ #include <mach/iomux-mx51.h>
++#include <mach/i2c.h>
+ 
+ #include <asm/irq.h>
+ #include <asm/setup.h>
+@@ -46,6 +48,18 @@ static struct pad_desc mx51babbage_pads[] = {
+ 	MX51_PAD_EIM_D26__UART3_TXD,
+ 	MX51_PAD_EIM_D27__UART3_RTS,
+ 	MX51_PAD_EIM_D24__UART3_CTS,
++
++	/* I2C1 */
++	MX51_PAD_EIM_D16__I2C1_SDA,
++	MX51_PAD_EIM_D19__I2C1_SCL,
++
++	/* I2C2 */
++	MX51_PAD_KEY_COL4__I2C2_SCL,
++	MX51_PAD_KEY_COL5__I2C2_SDA,
++
++	/* HSI2C */
++	MX51_PAD_I2C1_CLK__HSI2C_CLK,
++	MX51_PAD_I2C1_DAT__HSI2C_DAT,
+ };
+ 
+ /* Serial ports */
+@@ -66,6 +80,28 @@ static inline void mxc_init_imx_uart(void)
+ }
+ #endif /* SERIAL_IMX */
+ 
++static struct imxi2c_platform_data babbage_i2c_data = {
++	.bitrate = 100000,
++};
++
++static struct imxi2c_platform_data babbage_hsi2c_data = {
++	.bitrate = 400000,
++};
++
++static struct i2c_board_info babbage_hsi2c_board_info[] = {
++	{
++		I2C_BOARD_INFO("sii9022", 0x39),
++	}, {
++		I2C_BOARD_INFO("ch7026", 0x75),
++	}
++};
++
++static struct i2c_board_info babbage_i2c1_board_info[] = {
++	{
++		I2C_BOARD_INFO("sgtl5000-i2c", 0x0a),
++	}
++};
++
+ /*
+  * Board specific initialization.
+  */
+@@ -75,6 +111,15 @@ static void __init mxc_board_init(void)
+ 					ARRAY_SIZE(mx51babbage_pads));
+ 	mxc_init_imx_uart();
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
++
++	mxc_register_device(&mxc_i2c_device0, &babbage_i2c_data);
++	mxc_register_device(&mxc_i2c_device1, &babbage_i2c_data);
++	mxc_register_device(&mxc_hsi2c_device, &babbage_hsi2c_data);
++
++	i2c_register_board_info(1, babbage_i2c1_board_info,
++			ARRAY_SIZE(babbage_i2c1_board_info));
++	i2c_register_board_info(2, babbage_hsi2c_board_info,
++			ARRAY_SIZE(babbage_hsi2c_board_info));
+ }
+ 
+ static void __init mx51_babbage_timer_init(void)
+diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
+index 1ee6ce4..9a7dba8 100644
+--- a/arch/arm/mach-mx5/clock-mx51.c
++++ b/arch/arm/mach-mx5/clock-mx51.c
+@@ -762,6 +762,14 @@ DEFINE_CLOCK(gpt_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG9_OFFSET,
+ DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG10_OFFSET,
+ 	NULL,  NULL, &ipg_clk, NULL);
+ 
++/* I2C */
++DEFINE_CLOCK(i2c1_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG9_OFFSET,
++	NULL, NULL, &ipg_clk, NULL);
++DEFINE_CLOCK(i2c2_clk, 1, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG10_OFFSET,
++	NULL, NULL, &ipg_clk, NULL);
++DEFINE_CLOCK(hsi2c_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG11_OFFSET,
++	NULL, NULL, &ipg_clk, NULL);
++
+ /* FEC */
+ DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
+ 	NULL,  NULL, &ipg_clk, NULL);
+@@ -779,6 +787,9 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
+ 	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
+ 	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
++	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
++	_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
++	_REGISTER_CLOCK("imx-i2c.2", NULL, hsi2c_clk)
+ };
+ 
+ static void clk_tree_init(void)
+diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
+index d6fd396..f6d5fbc 100644
+--- a/arch/arm/mach-mx5/devices.c
++++ b/arch/arm/mach-mx5/devices.c
+@@ -89,6 +89,64 @@ struct platform_device mxc_fec_device = {
+ 	.resource = mxc_fec_resources,
+ };
+ 
++static struct resource mxc_i2c0_resources[] = {
++	{
++		.start = MX51_I2C1_BASE_ADDR,
++		.end = MX51_I2C1_BASE_ADDR + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = MX51_MXC_INT_I2C1,
++		.end = MX51_MXC_INT_I2C1,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device mxc_i2c_device0 = {
++	.name = "imx-i2c",
++	.id = 0,
++	.num_resources = ARRAY_SIZE(mxc_i2c0_resources),
++	.resource = mxc_i2c0_resources,
++};
++
++static struct resource mxc_i2c1_resources[] = {
++	{
++		.start = MX51_I2C2_BASE_ADDR,
++		.end = MX51_I2C2_BASE_ADDR + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = MX51_MXC_INT_I2C2,
++		.end = MX51_MXC_INT_I2C2,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device mxc_i2c_device1 = {
++	.name = "imx-i2c",
++	.id = 1,
++	.num_resources = ARRAY_SIZE(mxc_i2c1_resources),
++	.resource = mxc_i2c1_resources,
++};
++
++static struct resource mxc_hsi2c_resources[] = {
++	{
++		.start = MX51_HSI2C_DMA_BASE_ADDR,
++		.end = MX51_HSI2C_DMA_BASE_ADDR + SZ_16K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.start = MX51_MXC_INT_HS_I2C,
++		.end = MX51_MXC_INT_HS_I2C,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device mxc_hsi2c_device = {
++	.name = "imx-i2c",
++	.id = 2,
++	.num_resources = ARRAY_SIZE(mxc_hsi2c_resources),
++	.resource = mxc_hsi2c_resources
++};
++
+ /* Dummy definition to allow compiling in AVIC and TZIC simultaneously */
+ int __init mxc_register_gpios(void)
+ {
+diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
+index f339ab8..f6289cf 100644
+--- a/arch/arm/mach-mx5/devices.h
++++ b/arch/arm/mach-mx5/devices.h
+@@ -2,3 +2,6 @@ extern struct platform_device mxc_uart_device0;
+ extern struct platform_device mxc_uart_device1;
+ extern struct platform_device mxc_uart_device2;
+ extern struct platform_device mxc_fec_device;
++extern struct platform_device mxc_i2c_device0;
++extern struct platform_device mxc_i2c_device1;
++extern struct platform_device mxc_hsi2c_device;
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+index b4f975e..003afe4 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+@@ -37,6 +37,8 @@ typedef enum iomux_config {
+ 				PAD_CTL_SRE_FAST)
+ #define MX51_UART3_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_DSE_HIGH | \
+ 				PAD_CTL_SRE_FAST)
++#define MX51_I2C_PAD_CTRL		(PAD_CTL_SRE_FAST | PAD_CTL_ODE | \
++				PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP | PAD_CTL_HYS)
+ 
+ /*
+  * The naming convention for the pad modes is MX51_PAD_<padname>__<padmode>
+@@ -51,10 +53,10 @@ typedef enum iomux_config {
+ 
+ /*						PAD      MUX   ALT INPSE PATH PADCTRL */
+ 
+-#define MX51_PAD_GPIO_2_0__EIM_D16	IOMUX_PAD(0x3f0, 0x05c, 1, 0x0,   0, NO_PAD_CTRL)
++#define MX51_PAD_EIM_D16__I2C1_SDA	IOMUX_PAD(0x3f0, 0x05c, IOMUX_CONFIG_ALT4 | IOMUX_CONFIG_SION, 0x09b4, 0, MX51_I2C_PAD_CTRL)
+ #define MX51_PAD_GPIO_2_1__EIM_D17	IOMUX_PAD(0x3f4, 0x060, 1, 0x0,   0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO_2_2__EIM_D18	IOMUX_PAD(0x3f8, 0x064, 1, 0x0,   0, NO_PAD_CTRL)
+-#define MX51_PAD_GPIO_2_3__EIM_D19	IOMUX_PAD(0x3fc, 0x068, 1, 0x0,   0, NO_PAD_CTRL)
++#define MX51_PAD_EIM_D19__I2C1_SCL	IOMUX_PAD(0x3fc, 0x068, IOMUX_CONFIG_ALT4 | IOMUX_CONFIG_SION, 0x09b0, 0, MX51_I2C_PAD_CTRL)
+ #define MX51_PAD_GPIO_2_4__EIM_D20	IOMUX_PAD(0x400, 0x06c, 1, 0x0,   0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO_2_5__EIM_D21	IOMUX_PAD(0x404, 0x070, 1, 0x0,   0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO_2_6__EIM_D22	IOMUX_PAD(0x408, 0x074, 1, 0x0,   0, NO_PAD_CTRL)
+@@ -172,8 +174,8 @@ typedef enum iomux_config {
+ #define MX51_PAD_GPIO_4_14__CSI2_HSYNC	IOMUX_PAD(0x5E0, 0x1F0, 3, 0x0, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO_4_15__CSI2_PIXCLK	IOMUX_PAD(0x5E4, 0x1F4, 3, 0x0, 0, NO_PAD_CTRL)
+ #define MX51_PAD_CSI2_PKE0__CSI2_PKE0	IOMUX_PAD(0x81C, 0x0, 0, 0x0, 0, NO_PAD_CTRL)
+-#define MX51_PAD_GPIO_4_16__I2C1_CLK	IOMUX_PAD(0x5E8, 0x1F8, 3, 0x0, 0, NO_PAD_CTRL)
+-#define MX51_PAD_GPIO_4_17__I2C1_DAT	IOMUX_PAD(0x5EC, 0x1FC, 3, 0x0, 0, NO_PAD_CTRL)
++#define MX51_PAD_I2C1_CLK__HSI2C_CLK	IOMUX_PAD(0x5E8, 0x1F8, IOMUX_CONFIG_ALT0, 0x0, 0, NO_PAD_CTRL)
++#define MX51_PAD_I2C1_DAT__HSI2C_DAT	IOMUX_PAD(0x5EC, 0x1FC, IOMUX_CONFIG_ALT0, 0x0, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO_4_18__AUD3_BB_TXD	IOMUX_PAD(0x5F0, 0x200, 3, 0x0, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO_4_19__AUD3_BB_RXD	IOMUX_PAD(0x5F4, 0x204, 3, 0x0, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO_4_20__AUD3_BB_CK	IOMUX_PAD(0x5F8, 0x208, 3, 0x0, 0, NO_PAD_CTRL)
+@@ -206,8 +208,8 @@ typedef enum iomux_config {
+ #define MX51_PAD_KEY_COL1__KEY_COL1	IOMUX_PAD(0x650, 0x260, 0, 0x0, 0, NO_PAD_CTRL)
+ #define MX51_PAD_KEY_COL2__KEY_COL2	IOMUX_PAD(0x654, 0x264, 0, 0x0, 0, NO_PAD_CTRL)
+ #define MX51_PAD_KEY_COL3__KEY_COL3	IOMUX_PAD(0x658, 0x268, 0, 0x0, 0, NO_PAD_CTRL)
+-#define MX51_PAD_KEY_COL4__KEY_COL4	IOMUX_PAD(0x65C, 0x26C, 0, 0x0, 0, NO_PAD_CTRL)
+-#define MX51_PAD_KEY_COL5__KEY_COL5	IOMUX_PAD(0x660, 0x270, 0, 0x0, 0, NO_PAD_CTRL)
++#define MX51_PAD_KEY_COL4__I2C2_SCL	IOMUX_PAD(0x65C, 0x26C, IOMUX_CONFIG_ALT3 | IOMUX_CONFIG_SION, 0x09b8, 1, MX51_I2C_PAD_CTRL)
++#define MX51_PAD_KEY_COL5__I2C2_SDA	IOMUX_PAD(0x660, 0x270, IOMUX_CONFIG_ALT3 | IOMUX_CONFIG_SION, 0x09bc, 1, MX51_I2C_PAD_CTRL)
+ #define MX51_PAD_GPIO_1_25__USBH1_CLK	IOMUX_PAD(0x678, 0x278, 2, 0x0, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO_1_26__USBH1_DIR	IOMUX_PAD(0x67C, 0x27C, 2, 0x0, 0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO_1_27__USBH1_STP	IOMUX_PAD(0x680, 0x280, 2, 0x0, 0, NO_PAD_CTRL)
+-- 
+1.6.0.4
