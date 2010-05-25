@@ -1,74 +1,118 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Tue, 25 May 2010 14:39:17 +0530
-Subject: [PATCH] ARM:VFPv3:enable {d16-d31} access
-In-Reply-To: <1274818736-26597-1-git-send-email-tarun.kanti@ti.com>
-References: <Tarun Kanti DebBarma <tarun.kanti@ti.com>
-	<1274818736-26597-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0322FA884E@dbde02.ent.ti.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 25 May 2010 17:14:23 +0800
+Subject: [PATCH 6/6] [ARM] pxa/cm-x2xx: encode IRQ number into .nr_irqs
+In-Reply-To: <4BFB8C1C.5000408@compulab.co.il>
+References: <1274682949-25915-1-git-send-email-eric.y.miao@gmail.com>
+	<1274682949-25915-7-git-send-email-eric.y.miao@gmail.com>
+	<4BFA2BD1.5040005@compulab.co.il>
+	<AANLkTildk7al5cPAGDIiCnDNM7xg0Bl587F5e7fIiqof@mail.gmail.com>
+	<4BFB8C1C.5000408@compulab.co.il>
+Message-ID: <AANLkTikOpWUTzBstbsPuwlbd2J2PaqQ8L1IIUbMLOa53@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Including ARM mailing list)
+On Tue, May 25, 2010 at 4:36 PM, Mike Rapoport <mike@compulab.co.il> wrote:
+> Hi Eric,
+>
+> Eric Miao wrote:
+>>
+>> Should be in my irq_cleanup branch, test welcome
+>
+> works with the below patch on top your irq_cleanup branch:
+>
 
-From: Tarun Kanti Debbarma <a0876346@a0876346-desktop.(none)>
+Thanks Mike, looks like a fix. You mind if I merge this into the previous patch
+with your Signed-off-by?
 
-This patch attempts to fix two related problems:
-
-(1) vfp_get_double(), vfp_put_double() functions have VFPv3 specific implementation
-guarded within CONFIG_VFPv3 macro. The intent is to access {d16-d31} additional registers
-provided in VFPv3. However, it still wrongly refers to {d0-d15}. This has been corrected.
-
-(2) While compiling the above changes, it produced compilation error because arch/arm/vfp/Makefile
-had the -mfpu=vfp option which could not recognize VFPv3 registers. This has been corrected to
--mfpu=vfp3. With this option we are also able to compile pre-VFPv3 code.
-
-Signed-off-by: Tarun Kanti Debbarma <tarun.kanti@ti.com>
----
- arch/arm/vfp/Makefile |    2 +-
- arch/arm/vfp/vfphw.S  |    8 ++++----
- 2 files changed, 5 insertions(+), 5 deletions(-)
- mode change 100644 => 100755 arch/arm/vfp/vfphw.S
-
-diff --git a/arch/arm/vfp/Makefile b/arch/arm/vfp/Makefile
-index 39f6d8e..75855c0 100644
---- a/arch/arm/vfp/Makefile
-+++ b/arch/arm/vfp/Makefile
-@@ -7,7 +7,7 @@
- # EXTRA_CFLAGS := -DDEBUG
- # EXTRA_AFLAGS := -DDEBUG
- 
--KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=softvfp+vfp)
-+KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=vfp3 -mfloat-abi=softfp)
- LDFLAGS		+=--no-warn-mismatch
- 
- obj-y			+= vfp.o
-diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
-old mode 100644
-new mode 100755
-index 66dc2d0..b034076
---- a/arch/arm/vfp/vfphw.S
-+++ b/arch/arm/vfp/vfphw.S
-@@ -254,8 +254,8 @@ ENTRY(vfp_get_double)
- 	.endr
- #ifdef CONFIG_VFPv3
- 	@ d16 - d31 registers
--	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
--1:	mrrc	p11, 3, r0, r1, c\dr	@ fmrrd	r0, r1, d\dr
-+	.irp	dr,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31
-+1:	fmrrd	r0, r1, d\dr
- 	mov	pc, lr
- 	.org	1b + 8
- 	.endr
-@@ -276,8 +276,8 @@ ENTRY(vfp_put_double)
- 	.endr
- #ifdef CONFIG_VFPv3
- 	@ d16 - d31 registers
--	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
--1:	mcrr	p11, 3, r1, r2, c\dr	@ fmdrr	r1, r2, d\dr
-+	.irp	dr,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31
-+1:	fmdrr	d\dr, r1, r2
- 	mov	pc, lr
- 	.org	1b + 8
- 	.endr
--- 
-1.6.0.4
+> -
+> From: Mike Rapoport <mike@compulab.co.il>
+> Date: Tue, 25 May 2010 11:28:08 +0300
+> Subject: [PATCH] [ARM] it8152: update interrupts numbering to work with
+> sparse irqs
+>
+> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+> ---
+> ?arch/arm/include/asm/hardware/it8152.h | ? ?3 ++-
+> ?1 files changed, 2 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/hardware/it8152.h
+> b/arch/arm/include/asm/hardware/it8152.h
+> index 6700c7f..b2f95c7 100644
+> --- a/arch/arm/include/asm/hardware/it8152.h
+> +++ b/arch/arm/include/asm/hardware/it8152.h
+> @@ -75,7 +75,8 @@ extern unsigned long it8152_base_address;
+> ? IT8152_PD_IRQ(1) ?USB (USBR)
+> ? IT8152_PD_IRQ(0) ?Audio controller (ACR)
+> ?*/
+> -#define IT8152_IRQ(x) ? (IRQ_BOARD_END + (x))
+> +#define IT8152_IRQ(x) ? (IRQ_BOARD_START + (x))
+> +#define IT8152_LAST_IRQ ? ? ? ?(IRQ_BOARD_START + 40)
+>
+> ?/* IRQ-sources in 3 groups - local devices, LPC (serial), and external PCI
+> */
+> ?#define IT8152_LD_IRQ_COUNT ? ? 9
+> --
+> 1.6.4.4
+>
+>>> On May 24, 2010 3:34 PM, "Mike Rapoport" <mike@compulab.co.il
+>>> <mailto:mike@compulab.co.il>> wrote:
+>>>
+>>> Hi Eric,
+>>>
+>>>
+>>>
+>>> Eric Miao wrote:
+>>> >
+>>> > Cc: Mike Rapoport <mike at compulab.co.il <mailto:mike@compulab.co.il>>
+>>> > Signed-off-by: Eric Miao <eric.y.mi...
+>>>
+>>> Looks Ok to me. Do you have a tree I can pull to test your changes?
+>>>
+>>>
+>>>
+>>> > diff --git a/arch/arm/mach-pxa/cm-x2xx-pci.h
+>>> > b/arch/arm/mach-pxa/cm-x2xx-pci.h
+>>> > index e24aad2.....
+>>>
+>>> Sincerely yours,
+>>> Mike.
+>>
+>
+>
+> --
+> Sincerely yours,
+> Mike.
+>
+>
+> From ec3ae629d9844ea5f6d7588ca7451377e640a960 Mon Sep 17 00:00:00 2001
+> From: Mike Rapoport <mike@compulab.co.il>
+> Date: Tue, 25 May 2010 11:28:08 +0300
+> Subject: [PATCH] [ARM] it8152: update interrupts numbering to work with
+> sparse irqs
+>
+> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+> ---
+> ?arch/arm/include/asm/hardware/it8152.h | ? ?3 ++-
+> ?1 files changed, 2 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/hardware/it8152.h
+> b/arch/arm/include/asm/hardware/it8152.h
+> index 6700c7f..b2f95c7 100644
+> --- a/arch/arm/include/asm/hardware/it8152.h
+> +++ b/arch/arm/include/asm/hardware/it8152.h
+> @@ -75,7 +75,8 @@ extern unsigned long it8152_base_address;
+> ? IT8152_PD_IRQ(1) ?USB (USBR)
+> ? IT8152_PD_IRQ(0) ?Audio controller (ACR)
+> ?*/
+> -#define IT8152_IRQ(x) ? (IRQ_BOARD_END + (x))
+> +#define IT8152_IRQ(x) ? (IRQ_BOARD_START + (x))
+> +#define IT8152_LAST_IRQ ? ? ? ?(IRQ_BOARD_START + 40)
+>
+> ?/* IRQ-sources in 3 groups - local devices, LPC (serial), and external PCI
+> */
+> ?#define IT8152_LD_IRQ_COUNT ? ? 9
+> --
+> 1.6.4.4
+>
+>
+>
