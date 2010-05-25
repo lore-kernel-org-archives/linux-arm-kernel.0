@@ -1,85 +1,69 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Tue, 25 May 2010 13:21:46 +0300
-Subject: [PATCH 01/20] mtd: pxa3xx_nand: refuse the flash definition get
-	from platform
-In-Reply-To: <AANLkTil1mq5FBePSexz80DyT80DGqshqyJEi6Pfp0kV7@mail.gmail.com>
-References: <AANLkTinVBXhT77Zd-LNpufgJAl7WZdic0oxDFwvNkvJg@mail.gmail.com>	
-	<4BFA2B5B.4080105@compulab.co.il>	
-	<AANLkTilLYFVPcel-rE8RbuTWEir4RJOBqmyxirb6Vozn@mail.gmail.com>	
-	<4BFA5C58.7050109@compulab.co.il>	
-	<AANLkTimYwQa5aJ2wuuBvPQ6O6hgYKaQcCcb3jwTcgFcD@mail.gmail.com>	
-	<4BFA7D60.6020703@compulab.co.il>
-	<AANLkTil1mq5FBePSexz80DyT80DGqshqyJEi6Pfp0kV7@mail.gmail.com>
-Message-ID: <4BFBA4BA.9020502@compulab.co.il>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 25 May 2010 12:26:29 +0200
+Subject: [PATCH 1/6] Driver for the watchdog timer on Freescale IMX2
+	(and later) processors.
+In-Reply-To: <20100525101233.GY3972@infomag.iguana.be>
+References: <1272528202-24159-1-git-send-email-w.sang@pengutronix.de>
+	<1272528202-24159-2-git-send-email-w.sang@pengutronix.de>
+	<20100514024915.GE30794@pengutronix.de>
+	<20100521215211.GV3972@infomag.iguana.be>
+	<20100525091840.GA25521@pengutronix.de>
+	<20100525101233.GY3972@infomag.iguana.be>
+Message-ID: <20100525102629.GB25521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lei Wen wrote:
-> On Mon, May 24, 2010 at 9:21 PM, Mike Rapoport <mike@compulab.co.il> wrote:
->> Lei Wen wrote:
->>> Hi Mike,
->>>
->>> On Mon, May 24, 2010 at 7:00 PM, Mike Rapoport <mike@compulab.co.il>
->>> wrote:
->>>> Hi Lei,
->>>>
->>>> Lei Wen wrote:
->>>>> Hi Mike,
->>>>>
->>>> 2) I don't like hadrcoding of NAND parameters into the driver. You remove
->>>> *deprecetad* CONFIG_MTD_NAND_PXA3xx_BUILTIN configuration option and
->>>> instead
->>>> you enforce use of built-in definitions. The driver in its current state
->>>> is
->>>> robust enough to allow platforms to define optimized NAND timings either
->>>> in
->>>> the bootloader or in the kernel. If you don't like that multiple
->>>> platforms
->>>> define the same flash chip create an enumeration of built-in types and
->>>> let
->>>> platforms to use this enumeration to select the NAND chip. But, anyway,
->>>> there should be a fallback mode that will support NAND chips that are not
->>>> defined in the driver, probably with suboptimal timings.
->>> Original driver also use hardcoding. And in bootloader, this timing
->>> parameter is also hard coding.
->>> We cannot deduce a parameter set only from the nand id, that is why we
->>> need a table to preset it.
->>> If one nand chip is not listed in that table, the chip id would still
->>> be printed out, so that we can do something for that.
->>> If we encourage people to continue on this, we would not able to
->>> really "driver" that nand.
->> Currently pxa3xx-nand has three operational modes:
->> - use NAND parameters supplied by the platform
->> - use presets configured by the bootloader chain
->> - use built-in NAND parameters, marked as deprecated in favor of the first
->> two
->> You remove the first two modes completely and require that each and every
->> NAND chip used on pxa3xx based platform will be added to the driver. This
->> way you make the driver less robust and harder to use for platform
->> developers, not mentioning you're breaking the existing platforms.
->> In my opinion, the driver *may* support built-in definitions for certain
->> NAND flashes and *must* support configuration of the NAND parameters by the
->> platform code and bootloader.
->>
-> 
-> Hi Mike,
-> 
-> Well... I would submit another patch set which would reserve a way
-> that platform could pass its parameter setting.
-> Like specify the certain type of nand chip parameter for each chip
-> select. Is that ok for you?
-> 
-> For bootloader pass parameter method, I think this way should be
-> dropped... For there is attributed which we could not tell from
-> registers...
-> What do you think of this?
 
-Can you please elaborate what are the attributes that cannot be detected?
+> > > * the code is ready for when we change to the generic watchdog api.
+> > 
+> > Cool, any concrete plans for this happening?
+> 
+> I'm reviewing it with Alan, we discussed some smaal changes. Once they are
+> applied, Alan will review the code again. After that we will sent it out for
+> review on the mailing-lists. So I expect within 2 weeks.
 
-> Thanks,
-> Lei
+Awesome news! \o/
 
+> > The new driver-rule should apply here, no?
+> 
+> Normally yes, but this should have been reviewed earlier by myself. If we
+> have something working and after all the reviews we allready did, I think it
+	> is time that user's can start using this watchdog.
+
+Uhm, yes, but they can still have it with rc2? Doesn't matter, the sooner the
+better ;)
+
+> > > #define WDOG_SEC_TO_COUNT(s)	((s * 2) << 8)
+> > 
+> > Any reason you dropped the '- 1' from my version here?
+> 
+> If you want a timeout of 1 second, and you subtract the -1 then you only get
+> 0.5 seconds according to the reference manual.
+
+Which one? MX27 and MX31 refman say the range is 0.5 to 128 seconds.
+So, 0x00 = 0.5s, 0x01 = 1.0s... The MX35 refman even has a table confirming this.
+
+> > This is too excessive IMO. The bootloader might already have setup the
+> > watchdog according to the board.
+> 
+> imho timeout should be set, watchdog should reset and not generate an
+> interrupt and WDE bit should be used. All the rest should indeed be set by a
+> boot-loader.
+
+ACK.
+
+> Will sent you the changed code and a test-program (so that I can see what the
+> output is :-) ).
+
+Okay.
 
 -- 
-Sincerely yours,
-Mike.
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100525/18dff0a8/attachment.sig>
