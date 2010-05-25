@@ -1,87 +1,444 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 25 May 2010 14:39:50 +0200
-Subject: vpack270 and sleep mode
-In-Reply-To: <201005251438.09494.marek.vasut@gmail.com>
-References: <1272311167-576-1-git-send-email-marek.vasut@gmail.com>
-	<4BFBBECD.70803@papillon.ru>
-	<201005251438.09494.marek.vasut@gmail.com>
-Message-ID: <201005251439.50508.marek.vasut@gmail.com>
+From: wim@iguana.be (Wim Van Sebroeck)
+Date: Tue, 25 May 2010 14:51:44 +0200
+Subject: Fw: Re: [WATCHDOG] v2.6.35-rc1 patches
+Message-ID: <20100525125144.GA26366@infomag.iguana.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 25. kv?tna 2010 14:38:09 Marek Vasut napsal(a):
-> Dne ?t 25. kv?tna 2010 14:13:01 237 Rumjantsev Egor (PROG) napsal(a):
-> > Hello, Marek
-> 
-> Hi,
-> 
-> > Could you help to solve the following problem:
-> > I try to move my board based on Voipac PXA270 module to sleep state.
-> > I'm running kernel 2.6.28.10 on it.
-> 
-> CCed Voipac and linux-arm-kernel. Btw. that's not Voipac official kernel,
-> is it?
+----- Forwarded message from Wim Van Sebroeck <wim@iguana.be> -----
 
-My bad, CCed wrong linux-arm-kernel, fixed now :)
-> 
-> > When i try echo mem > /sys/power/state i see messages that system goes
-> > to sleep state but after pushing wake-up button (GPIO0) i don't see that
-> > a bootloader is running (i set up some GPIOs as flags in bootloader and
-> > see on them whith oscilloscope).
-> 
-> The bootloader checks RCSR once you wake it up and it sets-up SDRAM. If
-> there's a sleep-wakeup bit, it branches to location in PSPR and there's
-> linux kernel already.
-> 
-> > This is a part of kernel output when the system goes to sleep mode:
-> > 
-> > dm9000 dm9000.0: LATE suspend
-> > platform pxa27x-pwm.1: LATE suspend
-> > platform pxa27x-pwm.0: LATE suspend
-> > platform pxa27x-ssp.2: LATE suspend
-> > platform pxa27x-ssp.1: LATE suspend
-> > platform pxa27x-ssp.0: LATE suspend
-> > pxa2xx-i2c pxa2xx-i2c.1: LATE suspend
-> > platform sa1100-rtc: LATE suspend
-> > platform pxa2xx-i2s: LATE suspend
-> > pxa2xx-uart pxa2xx-uart.2: LATE suspend
-> > pxa2xx-uart pxa2xx-uart.1: LATE suspend
-> > pxa2xx-uart pxa2xx-uart.0: LATE suspend
-> > platform pxa27x-udc: LATE suspend
-> > pxa_pm_enter(): RCSR value: 0x00000000
-> > pxa_pm_enter(): state: 3
-> > pxa_pm_enter(): Power regs:
-> > pxa_pm_enter(): GPDR0: 0x0070E200
-> > pxa_pm_enter(): PWER: 0x00000001
-> > pxa_pm_enter(): PFER: 0x00000000
-> > pxa_pm_enter(): PRER: 0x00000001
-> > pxa_pm_enter(): PGSR0: 0x00010000
-> > pxa_pm_enter(): PGSR1: 0x000F2000
-> > pxa_pm_enter(): PGSR2: 0x0404C000
-> > pxa_pm_enter(): PGSR3: 0x00000020
-> > pxa27x_cpu_pm_enter(): go to suspend : 3
-> > pxa27x_cpu_pm_enter(): PCFR : 0x61
-> > pxa27x_cpu_pm_enter(): PSSR : 0x0
-> > pxa27x_cpu_pm_enter(): PSLR : 0xCC100004
-> > pxa27x_cpu_pm_enter(): OSCC : 0x3
-> > 
-> > but if i type command echo standby > /sys/power/state
-> > the system reacts on wake-up button but hangs after some messages about
-> > null dereferencing pointers.
-> > 
-> > is there any possibility to trace such problem?
-> 
-> Try CONFIG_PM_ADVANCED_DEBUG. Enable that and check if the tests work, one
-> by one. What are the messages you get once the kernel crashes?
-> 
-> There was also a way to keep the console enabled until the kernel didn't
-> totally suspend, but I can't find that option now, maybe someone will be
-> more successful. And maybe I'm mistaking this with an option to don't
-> blank consoles until then, it's been some time since I needed that.
-> 
-> > P.S.: sorry if i disturb you, but you the only man in ARM linux mailing
-> > list who posted messages about Voipac modules.
-> 
-> You're welcome.
-> 
-> > Best regards !!!
+From: Wim Van Sebroeck <wim@iguana.be>
+To: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Andrew Morton <akpm@linux-foundation.org>,
+	LKML <linux-kernel@vger.kernel.org>,
+	Wolfram Sang <w.sang@pengutronix.de>
+Subject: Re: [WATCHDOG] v2.6.35-rc1 patches
+
+Hi Linus,
+
+> There still is one new watchdog driver sitting in my queue (imx2_wdt.c for freescale i.MX platform) but I'm not sure if I can sent that out on time.
+
+The new driver is ready for inclusion. I added it to the same tree:
+ 	git://git.kernel.org/pub/scm/linux/kernel/git/wim/linux-2.6-watchdog.git
+
+The commit looks like:
+
+commit bb2fd8a844d3a9209599b5fb694b30ac46a56ef0
+Author: Wolfram Sang <w.sang@pengutronix.de>
+Date:   Thu Apr 29 10:03:17 2010 +0200
+
+    watchdog: Driver for the watchdog timer on Freescale IMX2 (and later) processors.
+    
+    This is the driver for the hardware watchdog on the Freescale IMX2 and later processors.
+    
+    Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+    Cc: Vladimir Zapolskiy <vzapolskiy@gmail.com>
+    Cc: Sascha Hauer <s.hauer@pengutronix.de>
+    Tested-by: Juergen Beisert <jbe@pengutronix.de>
+    Signed-off-by: Wim Van Sebroeck <wim@iguana.be>
+
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index c57ecff..afcfacc 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -312,6 +312,18 @@ config MAX63XX_WATCHDOG
+ 	help
+ 	  Support for memory mapped max63{69,70,71,72,73,74} watchdog timer.
+ 
++config IMX2_WDT
++	tristate "IMX2+ Watchdog"
++	depends on ARCH_MX2 || ARCH_MX25 || ARCH_MX3 || ARCH_MX5
++	help
++	  This is the driver for the hardware watchdog
++	  on the Freescale IMX2 and later processors.
++	  If you have one of these processors and wish to have
++	  watchdog support enabled, say Y, otherwise say N.
++
++	  To compile this driver as a module, choose M here: the
++	  module will be called imx2_wdt.
++
+ # AVR32 Architecture
+ 
+ config AT32AP700X_WDT
+diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+index 5e3cb95..72f3e20 100644
+--- a/drivers/watchdog/Makefile
++++ b/drivers/watchdog/Makefile
+@@ -47,6 +47,7 @@ obj-$(CONFIG_STMP3XXX_WATCHDOG) += stmp3xxx_wdt.o
+ obj-$(CONFIG_NUC900_WATCHDOG) += nuc900_wdt.o
+ obj-$(CONFIG_ADX_WATCHDOG) += adx_wdt.o
+ obj-$(CONFIG_TS72XX_WATCHDOG) += ts72xx_wdt.o
++obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
+ 
+ # AVR32 Architecture
+ obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+new file mode 100644
+index 0000000..ea25885
+--- /dev/null
++++ b/drivers/watchdog/imx2_wdt.c
+@@ -0,0 +1,358 @@
++/*
++ * Watchdog driver for IMX2 and later processors
++ *
++ *  Copyright (C) 2010 Wolfram Sang, Pengutronix e.K. <w.sang@pengutronix.de>
++ *
++ * some parts adapted by similar drivers from Darius Augulis and Vladimir
++ * Zapolskiy, additional improvements by Wim Van Sebroeck.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * NOTE: MX1 has a slightly different Watchdog than MX2 and later:
++ *
++ *			MX1:		MX2+:
++ *			----		-----
++ * Registers:		32-bit		16-bit
++ * Stopable timer:	Yes		No
++ * Need to enable clk:	No		Yes
++ * Halt on suspend:	Manual		Can be automatic
++ */
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/miscdevice.h>
++#include <linux/module.h>
++#include <linux/moduleparam.h>
++#include <linux/platform_device.h>
++#include <linux/watchdog.h>
++#include <linux/clk.h>
++#include <linux/fs.h>
++#include <linux/io.h>
++#include <linux/uaccess.h>
++#include <linux/timer.h>
++#include <linux/jiffies.h>
++#include <mach/hardware.h>
++
++#define DRIVER_NAME "imx2-wdt"
++
++#define IMX2_WDT_WCR		0x00		/* Control Register */
++#define IMX2_WDT_WCR_WT		(0xFF << 8)	/* -> Watchdog Timeout Field */
++#define IMX2_WDT_WCR_WRE	(1 << 3)	/* -> WDOG Reset Enable */
++#define IMX2_WDT_WCR_WDE	(1 << 2)	/* -> Watchdog Enable */
++
++#define IMX2_WDT_WSR		0x02		/* Service Register */
++#define IMX2_WDT_SEQ1		0x5555		/* -> service sequence 1 */
++#define IMX2_WDT_SEQ2		0xAAAA		/* -> service sequence 2 */
++
++#define IMX2_WDT_MAX_TIME	128
++#define IMX2_WDT_DEFAULT_TIME	60		/* in seconds */
++
++#define WDOG_SEC_TO_COUNT(s)	((s * 2 - 1) << 8)
++
++#define IMX2_WDT_STATUS_OPEN	0
++#define IMX2_WDT_STATUS_STARTED	1
++#define IMX2_WDT_EXPECT_CLOSE	2
++
++static struct {
++	struct clk *clk;
++	void __iomem *base;
++	unsigned timeout;
++	unsigned long status;
++	struct timer_list timer;	/* Pings the watchdog when closed */
++} imx2_wdt;
++
++static struct miscdevice imx2_wdt_miscdev;
++
++static int nowayout = WATCHDOG_NOWAYOUT;
++module_param(nowayout, int, 0);
++MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
++				__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
++
++
++static unsigned timeout = IMX2_WDT_DEFAULT_TIME;
++module_param(timeout, uint, 0);
++MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default="
++				__MODULE_STRING(IMX2_WDT_DEFAULT_TIME) ")");
++
++static const struct watchdog_info imx2_wdt_info = {
++	.identity = "imx2+ watchdog",
++	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
++};
++
++static inline void imx2_wdt_setup(void)
++{
++	u16 val = __raw_readw(imx2_wdt.base + IMX2_WDT_WCR);
++
++	/* Strip the old watchdog Time-Out value */
++	val &= ~IMX2_WDT_WCR_WT;
++	/* Generate reset if WDOG times out */
++	val &= ~IMX2_WDT_WCR_WRE;
++	/* Keep Watchdog Disabled */
++	val &= ~IMX2_WDT_WCR_WDE;
++	/* Set the watchdog's Time-Out value */
++	val |= WDOG_SEC_TO_COUNT(imx2_wdt.timeout);
++
++	__raw_writew(val, imx2_wdt.base + IMX2_WDT_WCR);
++
++	/* enable the watchdog */
++	val |= IMX2_WDT_WCR_WDE;
++	__raw_writew(val, imx2_wdt.base + IMX2_WDT_WCR);
++}
++
++static inline void imx2_wdt_ping(void)
++{
++	__raw_writew(IMX2_WDT_SEQ1, imx2_wdt.base + IMX2_WDT_WSR);
++	__raw_writew(IMX2_WDT_SEQ2, imx2_wdt.base + IMX2_WDT_WSR);
++}
++
++static void imx2_wdt_timer_ping(unsigned long arg)
++{
++	/* ping it every imx2_wdt.timeout / 2 seconds to prevent reboot */
++	imx2_wdt_ping();
++	mod_timer(&imx2_wdt.timer, jiffies + imx2_wdt.timeout * HZ / 2);
++}
++
++static void imx2_wdt_start(void)
++{
++	if (!test_and_set_bit(IMX2_WDT_STATUS_STARTED, &imx2_wdt.status)) {
++		/*@our first start we enable clock and do initialisations */
++		clk_enable(imx2_wdt.clk);
++
++		imx2_wdt_setup();
++	} else	/* delete the timer that pings the watchdog after close */
++		del_timer_sync(&imx2_wdt.timer);
++
++	/* Watchdog is enabled - time to reload the timeout value */
++	imx2_wdt_ping();
++}
++
++static void imx2_wdt_stop(void)
++{
++	/* we don't need a clk_disable, it cannot be disabled once started.
++	 * We use a timer to ping the watchdog while /dev/watchdog is closed */
++	imx2_wdt_timer_ping(0);
++}
++
++static void imx2_wdt_set_timeout(int new_timeout)
++{
++	u16 val = __raw_readw(imx2_wdt.base + IMX2_WDT_WCR);
++
++	/* set the new timeout value in the WSR */
++	val &= ~IMX2_WDT_WCR_WT;
++	val |= WDOG_SEC_TO_COUNT(new_timeout);
++	__raw_writew(val, imx2_wdt.base + IMX2_WDT_WCR);
++}
++
++static int imx2_wdt_open(struct inode *inode, struct file *file)
++{
++	if (test_and_set_bit(IMX2_WDT_STATUS_OPEN, &imx2_wdt.status))
++		return -EBUSY;
++
++	imx2_wdt_start();
++	return nonseekable_open(inode, file);
++}
++
++static int imx2_wdt_close(struct inode *inode, struct file *file)
++{
++	if (test_bit(IMX2_WDT_EXPECT_CLOSE, &imx2_wdt.status) && !nowayout)
++		imx2_wdt_stop();
++	else {
++		dev_crit(imx2_wdt_miscdev.parent,
++			"Unexpected close: Expect reboot!\n");
++		imx2_wdt_ping();
++	}
++
++	clear_bit(IMX2_WDT_EXPECT_CLOSE, &imx2_wdt.status);
++	clear_bit(IMX2_WDT_STATUS_OPEN, &imx2_wdt.status);
++	return 0;
++}
++
++static long imx2_wdt_ioctl(struct file *file, unsigned int cmd,
++							unsigned long arg)
++{
++	void __user *argp = (void __user *)arg;
++	int __user *p = argp;
++	int new_value;
++
++	switch (cmd) {
++	case WDIOC_GETSUPPORT:
++		return copy_to_user(argp, &imx2_wdt_info,
++			sizeof(struct watchdog_info)) ? -EFAULT : 0;
++
++	case WDIOC_GETSTATUS:
++	case WDIOC_GETBOOTSTATUS:
++		return put_user(0, p);
++
++	case WDIOC_KEEPALIVE:
++		imx2_wdt_ping();
++		return 0;
++
++	case WDIOC_SETTIMEOUT:
++		if (get_user(new_value, p))
++			return -EFAULT;
++		if ((new_value < 1) || (new_value > IMX2_WDT_MAX_TIME))
++			return -EINVAL;
++		imx2_wdt_set_timeout(new_value);
++		imx2_wdt.timeout = new_value;
++		imx2_wdt_ping();
++
++		/* Fallthrough to return current value */
++	case WDIOC_GETTIMEOUT:
++		return put_user(imx2_wdt.timeout, p);
++
++	default:
++		return -ENOTTY;
++	}
++}
++
++static ssize_t imx2_wdt_write(struct file *file, const char __user *data,
++						size_t len, loff_t *ppos)
++{
++	size_t i;
++	char c;
++
++	if (len == 0)	/* Can we see this even ? */
++		return 0;
++
++	clear_bit(IMX2_WDT_EXPECT_CLOSE, &imx2_wdt.status);
++	/* scan to see whether or not we got the magic character */
++	for (i = 0; i != len; i++) {
++		if (get_user(c, data + i))
++			return -EFAULT;
++		if (c == 'V')
++			set_bit(IMX2_WDT_EXPECT_CLOSE, &imx2_wdt.status);
++	}
++
++	imx2_wdt_ping();
++	return len;
++}
++
++static const struct file_operations imx2_wdt_fops = {
++	.owner = THIS_MODULE,
++	.llseek = no_llseek,
++	.unlocked_ioctl = imx2_wdt_ioctl,
++	.open = imx2_wdt_open,
++	.release = imx2_wdt_close,
++	.write = imx2_wdt_write,
++};
++
++static struct miscdevice imx2_wdt_miscdev = {
++	.minor = WATCHDOG_MINOR,
++	.name = "watchdog",
++	.fops = &imx2_wdt_fops,
++};
++
++static int __init imx2_wdt_probe(struct platform_device *pdev)
++{
++	int ret;
++	int res_size;
++	struct resource *res;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "can't get device resources\n");
++		return -ENODEV;
++	}
++
++	res_size = resource_size(res);
++	if (!devm_request_mem_region(&pdev->dev, res->start, res_size,
++		res->name)) {
++		dev_err(&pdev->dev, "can't allocate %d bytes at %d address\n",
++			res_size, res->start);
++		return -ENOMEM;
++	}
++
++	imx2_wdt.base = devm_ioremap_nocache(&pdev->dev, res->start, res_size);
++	if (!imx2_wdt.base) {
++		dev_err(&pdev->dev, "ioremap failed\n");
++		return -ENOMEM;
++	}
++
++	imx2_wdt.clk = clk_get_sys("imx-wdt.0", NULL);
++	if (IS_ERR(imx2_wdt.clk)) {
++		dev_err(&pdev->dev, "can't get Watchdog clock\n");
++		return PTR_ERR(imx2_wdt.clk);
++	}
++
++	imx2_wdt.timeout = clamp_t(unsigned, timeout, 1, IMX2_WDT_MAX_TIME);
++	if (imx2_wdt.timeout != timeout)
++		dev_warn(&pdev->dev, "Initial timeout out of range! "
++			"Clamped from %u to %u\n", timeout, imx2_wdt.timeout);
++
++	setup_timer(&imx2_wdt.timer, imx2_wdt_timer_ping, 0);
++
++	imx2_wdt_miscdev.parent = &pdev->dev;
++	ret = misc_register(&imx2_wdt_miscdev);
++	if (ret)
++		goto fail;
++
++	dev_info(&pdev->dev,
++		"IMX2+ Watchdog Timer enabled. timeout=%ds (nowayout=%d)\n",
++						imx2_wdt.timeout, nowayout);
++	return 0;
++
++fail:
++	imx2_wdt_miscdev.parent = NULL;
++	clk_put(imx2_wdt.clk);
++	return ret;
++}
++
++static int __exit imx2_wdt_remove(struct platform_device *pdev)
++{
++	misc_deregister(&imx2_wdt_miscdev);
++
++	if (test_bit(IMX2_WDT_STATUS_STARTED, &imx2_wdt.status)) {
++		del_timer_sync(&imx2_wdt.timer);
++
++		dev_crit(imx2_wdt_miscdev.parent,
++			"Device removed: Expect reboot!\n");
++	} else
++		clk_put(imx2_wdt.clk);
++
++	imx2_wdt_miscdev.parent = NULL;
++	return 0;
++}
++
++static void imx2_wdt_shutdown(struct platform_device *pdev)
++{
++	if (test_bit(IMX2_WDT_STATUS_STARTED, &imx2_wdt.status)) {
++		/* we are running, we need to delete the timer but will give
++		 * max timeout before reboot will take place */
++		del_timer_sync(&imx2_wdt.timer);
++		imx2_wdt_set_timeout(IMX2_WDT_MAX_TIME);
++		imx2_wdt_ping();
++
++		dev_crit(imx2_wdt_miscdev.parent,
++			"Device shutdown: Expect reboot!\n");
++	}
++}
++
++static struct platform_driver imx2_wdt_driver = {
++	.probe		= imx2_wdt_probe,
++	.remove		= __exit_p(imx2_wdt_remove),
++	.shutdown	= imx2_wdt_shutdown,
++	.driver		= {
++		.name	= DRIVER_NAME,
++		.owner	= THIS_MODULE,
++	},
++};
++
++static int __init imx2_wdt_init(void)
++{
++	return platform_driver_probe(&imx2_wdt_driver, imx2_wdt_probe);
++}
++module_init(imx2_wdt_init);
++
++static void __exit imx2_wdt_exit(void)
++{
++	platform_driver_unregister(&imx2_wdt_driver);
++}
++module_exit(imx2_wdt_exit);
++
++MODULE_AUTHOR("Wolfram Sang");
++MODULE_DESCRIPTION("Watchdog driver for IMX2 and later");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
++MODULE_ALIAS("platform:" DRIVER_NAME);
+
+Kind regards,
+Wim.
+
+
+----- End forwarded message -----
