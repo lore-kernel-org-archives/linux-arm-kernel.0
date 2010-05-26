@@ -1,82 +1,56 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 26 May 2010 11:10:45 +0200
-Subject: [PATCH v2 1/3] mx2_camera: Add soc_camera support for
-	i.MX25/i.MX27
-In-Reply-To: <20100525132049.GE27702@jasper.tkos.co.il>
-References: <cover.1274706733.git.baruch@tkos.co.il>
-	<4c15903511a5c4e6997b190d321b6fdf15bb6579.1274706733.git.baruch@tkos.co.il>
-	<20100525131624.GM17272@pengutronix.de>
-	<20100525132049.GE27702@jasper.tkos.co.il>
-Message-ID: <20100526091044.GO17272@pengutronix.de>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 26 May 2010 12:13:15 +0300
+Subject: [PATCH v3 0/3] Driver for the i.MX2x CMOS Sensor Interface
+Message-ID: <cover.1274865040.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 25, 2010 at 04:20:49PM +0300, Baruch Siach wrote:
-> Hi Sascha,
-> 
-> On Tue, May 25, 2010 at 03:16:24PM +0200, Sascha Hauer wrote:
-> > On Mon, May 24, 2010 at 04:20:39PM +0300, Baruch Siach wrote:
-> > > This is the soc_camera support developed by Sascha Hauer for the i.MX27.  Alan
-> > > Carvalho de Assis modified the original driver to get it working on more recent
-> > > kernels. I modified it further to add support for i.MX25. This driver has been
-> > > tested on i.MX25 and i.MX27 based platforms.
-> > > 
-> > > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > > ---
-> > >  arch/arm/plat-mxc/include/mach/memory.h  |    4 +-
-> > >  arch/arm/plat-mxc/include/mach/mx2_cam.h |   46 +
-> > >  drivers/media/video/Kconfig              |   13 +
-> > >  drivers/media/video/Makefile             |    1 +
-> > >  drivers/media/video/mx2_camera.c         | 1471 ++++++++++++++++++++++++++++++
-> > >  5 files changed, 1533 insertions(+), 2 deletions(-)
-> > >  create mode 100644 arch/arm/plat-mxc/include/mach/mx2_cam.h
-> > >  create mode 100644 drivers/media/video/mx2_camera.c
-> > > 
-> > 
-> > [snip]
-> > 
-> > > +
-> > > +static int mclk_get_divisor(struct mx2_camera_dev *pcdev)
-> > > +{
-> > > +	dev_info(pcdev->dev, "%s not implemented. Running at max speed\n",
-> > > +			__func__);
-> > > +
-> > > +#if 0
-> > > +	unsigned int mclk = pcdev->pdata->clk_csi;
-> > > +	unsigned int pclk = clk_get_rate(pcdev->clk_csi);
-> > > +	int i;
-> > > +
-> > > +	dev_dbg(pcdev->dev, "%s: %ld %ld\n", __func__, mclk, pclk);
-> > > +
-> > > +	for (i = 0; i < 0xf; i++)
-> > > +		if ((i + 1) * 2 * mclk <= pclk)
-> > > +			break;
-> > > +	return i;
-> > > +#endif
-> > > +	return 0;
-> > > +}
-> > 
-> > This function, if implemented properly, can be used to add an additional
-> > divider for the sensors master clock. On i.MX27 we can adjust the master
-> > clock using the clk_set_rate below which is sufficient, so you can
-> > remove this function completely.
-> 
-> Very good. I'll do this in the next version of this driver.
-> 
-> I guess I can also remove the mclk_get_divisor call at mx2_camera_add_device 
-> and just leave:
-> 
-> csicr1 = CSICR1_MCLKEN;
-> 
-> Right?
+This series contains a soc_camera driver for the i.MX25/i.MX27 CSI device, and
+platform code for the i.MX25 and i.MX27 chips. This driver is based on a 
+driver for i.MX27 CSI from Sascha Hauer, that  Alan Carvalho de Assis has 
+posted in linux-media last December[1]. I tested the mx2_camera driver on the 
+i.MX25 PDK. Sascha Hauer has tested a earlier version of this driver on an 
+i.MX27 based board. I included in this version some fixes from Sascha that 
+enable i.MX27 support.
 
-Yes.
+[1] https://patchwork.kernel.org/patch/67636/
 
-Sascha
+Changes v2 -> v3
+    Address more comments from Guennadi Liakhovetski.
 
+    Applied part of Sashca's patch that I forgot in v2.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Changes v1 -> v2
+    Addressed the comments of Guennadi Liakhovetski except from the following:
+
+    1. The mclk_get_divisor implementation, since I don't know what this code 
+       is good for
+
+    2. mx2_videobuf_release should not set pcdev->active on i.MX27, because 
+       mx27_camera_frame_done needs this pointer
+
+    3. In mx27_camera_emma_buf_init I don't know the meaning of those hard 
+       coded magic numbers
+
+    Applied i.MX27 fixes from Sascha.
+
+Baruch Siach (3):
+  mx2_camera: Add soc_camera support for i.MX25/i.MX27
+  mx27: add support for the CSI device
+  mx25: add support for the CSI device
+
+ arch/arm/mach-mx2/clock_imx27.c          |    2 +-
+ arch/arm/mach-mx2/devices.c              |   31 +
+ arch/arm/mach-mx2/devices.h              |    1 +
+ arch/arm/mach-mx25/clock.c               |   14 +-
+ arch/arm/mach-mx25/devices.c             |   22 +
+ arch/arm/mach-mx25/devices.h             |    1 +
+ arch/arm/plat-mxc/include/mach/memory.h  |    4 +-
+ arch/arm/plat-mxc/include/mach/mx25.h    |    2 +
+ arch/arm/plat-mxc/include/mach/mx2_cam.h |   46 +
+ drivers/media/video/Kconfig              |   13 +
+ drivers/media/video/Makefile             |    1 +
+ drivers/media/video/mx2_camera.c         | 1488 ++++++++++++++++++++++++++++++
+ 12 files changed, 1620 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/include/mach/mx2_cam.h
+ create mode 100644 drivers/media/video/mx2_camera.c
