@@ -1,51 +1,31 @@
-From: fachkar.datawind@gmail.com (f. achkar)
-Date: Wed, 26 May 2010 15:51:27 -0400
-Subject: using openocd + gdb to debug linux kernel on arm926ejs
-In-Reply-To: <AANLkTikwrs3PUS2zNR8daxfVkSCKLUvRtDYkXicXcTXq@mail.gmail.com>
-References: <4BFD72AD.4010005@gmail.com>
-	<AANLkTikwrs3PUS2zNR8daxfVkSCKLUvRtDYkXicXcTXq@mail.gmail.com>
-Message-ID: <4BFD7BBF.1090100@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 May 2010 21:10:17 +0100
+Subject: [PATCH] ARM:VFPv3:enable {d16-d31} access
+In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB0322FA8E37@dbde02.ent.ti.com>
+References: <tarun.kanti@ti.com>
+	<1274818736-26597-1-git-send-email-tarun.kanti@ti.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0322FA884E@dbde02.ent.ti.com>
+	<20100525185741.GB16204@n2100.arm.linux.org.uk>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0322FA8E37@dbde02.ent.ti.com>
+Message-ID: <20100526201017.GE6232@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2010 03:41 PM, Steve Chen wrote:
-> On Wed, May 26, 2010 at 2:12 PM, f. achkar <fachkar.datawind@gmail.com> wrote:
->   
->> hi,
->> This is my second posting (I'm not sure the first one passed the filter) sorry for that ...
->>
->> I'm newbie and have a s3c2450 based board (arm926ejs), I have a working compressed kernel image
->> zImage, this image boots properly via u-boot-1.1.6, however I simply
->> failed to debug remotely the vmlinux (root directory of linux source tree) via openocd-0.4.0 with a j-link segger.
->> is there a good reference on how to properly debug the linux kernel via openocd/gdb for an arm target on a linux hot machine?
->>     
-> Actually, Nicolas Pitre posted an response in your first try.  In
-> summary, use uImage for uboot.  vmlinux won't work.
->
-> Regards,
->
-> Steve
->   
-Steve,
-thanks,  I'm not sure I got what you mean!  if I do the following:
-gdb arch/arm/boot/uImage
-GNU gdb (GDB) 6.8.50.20090417
-...
-"/home/ferar/DW-SB02-linux-final/arch/arm/boot/uImage": not in
-executable format: File format not recognized
-(gdb) target remote localhost:3333
-Remote debugging using localhost:3333
-0xc0008164 in ?? ()
-0xc0008164:    b    0xc0008160
-(gdb) set remote hardware-breakpoint-limit 2
-(gdb) set remote hardware-watchpoint-limit 2
-(gdb) load
-No executable file specified.
-Use the "file" or "exec-file" command.
+On Wed, May 26, 2010 at 05:13:24PM +0530, DebBarma, Tarun Kanti wrote:
+> 1) With the existing implementation I am not able to correctly
+> write/read {d0-d15} but not the {d16-d31} set
+> 
+> 2) With my changes I am able to write/read correctly.
 
-Note it is not executable format, I need to load and debug the kernel
-not just boot (I don't have booting issues) I'm having trouble trying to
-debug the kernel via jtag (openocd)  gdb as outlined in the detail part
-of my previous post! I wonder if you people got that portion of the post?
-thanks,
-ferar
+The reason this happens is simple.  In vfp_get_double(), we have:
+
+1:      fmrrd   r0, r1, d\dr
+1:      mrrc    p11, 3, r0, r1, c\dr    @ fmrrd r0, r1, d\dr
+
+but in vfp_put_double(), we have:
+
+1:      fmdrr   d\dr, r0, r1
+1:      mcrr    p11, 3, r1, r2, c\dr    @ fmdrr r1, r2, d\dr
+
+Note the different registers.  Change "r1, r2" to "r0, r1" and it
+should work.
