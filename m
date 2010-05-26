@@ -1,42 +1,31 @@
 From: rpurdie@rpsys.net (Richard Purdie)
-Date: Wed, 26 May 2010 13:01:08 +0100
+Date: Wed, 26 May 2010 13:03:20 +0100
 Subject: [PATCH 1/2] mc13783: add LED support
-In-Reply-To: <20100517200017.GA25262@sirena.org.uk>
+In-Reply-To: <201005251706.54665.philippe.retornaz@epfl.ch>
 References: <1274114423-30020-1-git-send-email-philippe.retornaz@epfl.ch>
-	<1274114423-30020-2-git-send-email-philippe.retornaz@epfl.ch>
-	<20100517190242.GA17604@pengutronix.de>
-	<20100517200017.GA25262@sirena.org.uk>
-Message-ID: <1274875268.24079.1.camel@rex>
+	<201005181327.29529.philippe.retornaz@epfl.ch>
+	<20100525145759.GJ30801@buzzloop.caiaq.de>
+	<201005251706.54665.philippe.retornaz@epfl.ch>
+Message-ID: <1274875400.24079.2.camel@rex>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-05-17 at 21:00 +0100, Mark Brown wrote:
-> On Mon, May 17, 2010 at 09:02:42PM +0200, Uwe Kleine-K?nig wrote:
-> > On Mon, May 17, 2010 at 06:40:22PM +0200, Philippe R?tornaz wrote:
+On Tue, 2010-05-25 at 17:06 +0200, Philippe R?tornaz wrote:
+> Le mardi, 25 mai 2010 16.57:59, Daniel Mack a ?crit :
+> > On Tue, May 18, 2010 at 01:27:29PM +0200, Philippe R?tornaz wrote:
+> > > Thank you for the review, I will post a v2 patch with the appropriates
+> > > fixes soon.
+> > 
+> > Just curious - is there a v2 of this patches coming?
+> > 
 > 
-> > > +static void mc13783_led_set(struct led_classdev *led_cdev,
-> > > +			   enum led_brightness value)
-> > > +{
-> > > +	struct mc13783_led *led;
-> > > +
-> > > +	led = container_of(led_cdev, struct mc13783_led, cdev);
-> > > +	led->new_brightness = value;
-> > > +	schedule_work(&led->work);
-> > > +}
+> It has been posted the 19 May 2010. I'm sorry, I forgot to put you in CC.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-May/015777.html
 > 
-> > I wonder why you don't set the registers directly here, but use a work
-> > struct instead.
-> 
-> The LED API allows clients to configure the LEDs from interrupt context
-> so for devices on blocking buses (like this) the driver needs to defer
-> the actual implementation of the change.
-> 
-> It'd be nice to add helpers for this to the LED core, there's quite a
-> few drivers implementing this idiom now - a flag that does the deferring
-> of the set() for example.
+> BTW, what is the merge status of thoses patches ?
 
-Agreed, or a wrapper around the core which deferred implementations
-could just use. I'm open to patches :)
+The patch looks reasonable to me so I've queued them both in the leds
+tree since its more an LED change than any of the other subsystems.
 
 Cheers,
 
