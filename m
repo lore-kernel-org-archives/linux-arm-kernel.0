@@ -1,191 +1,112 @@
 From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
-Date: Wed, 26 May 2010 21:16:54 +0200
-Subject: [PATCH 2/4] soc/imx: add eukrea-tlv320
-Message-ID: <mailman.470.1274924681.2170.linux-arm-kernel@lists.infradead.org>
+Date: Wed, 26 May 2010 21:18:35 +0200
+Subject: [PATCH 3/4] eukrea_mbimx27: add audio codec
+Message-ID: <mailman.471.1274924681.2170.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the necessary files to support the TLV320AIC23B wired in I2S
-on our i.MX platforms.
-
 Signed-off-by: Eric B?nard <eric@eukrea.com>
 ---
- sound/soc/imx/Kconfig         |    8 +++
- sound/soc/imx/Makefile        |    2 +
- sound/soc/imx/eukrea-tlv320.c |  131 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 141 insertions(+), 0 deletions(-)
- create mode 100644 sound/soc/imx/eukrea-tlv320.c
+ arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c |   44 +++++++++++++++++++++++++-
+ 1 files changed, 43 insertions(+), 1 deletions(-)
 
-diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
-index 7174b4c..3e27b16 100644
---- a/sound/soc/imx/Kconfig
-+++ b/sound/soc/imx/Kconfig
-@@ -11,3 +11,11 @@ config SND_IMX_SOC
- config SND_MXC_SOC_SSI
- 	tristate
+diff --git a/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c b/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
+index 34bdc26..471dbd2 100644
+--- a/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
++++ b/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2009 Eric Benard - eric at eukrea.com
++ * Copyright (C) 2009-2010 Eric Benard - eric at eukrea.com
+  *
+  * Based on pcm970-baseboard.c which is :
+  * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
+@@ -37,6 +37,8 @@
+ #include <mach/mmc.h>
+ #include <mach/imx-uart.h>
+ #include <mach/spi.h>
++#include <mach/ssi.h>
++#include <mach/audmux.h>
  
-+config SND_SOC_EUKREA_TLV320
-+	bool "Eukrea TLV320"
-+	depends on MACH_EUKREA_MBIMX27_BASEBOARD
-+	select SND_IMX_SOC
-+	select SND_SOC_TLV320AIC23
-+	help
-+	  Enable I2S based access to the TLV320AIC23B codec attached
-+	  to the SSI4 interface
-diff --git a/sound/soc/imx/Makefile b/sound/soc/imx/Makefile
-index 9f8bb92..28d4b1e 100644
---- a/sound/soc/imx/Makefile
-+++ b/sound/soc/imx/Makefile
-@@ -10,3 +10,5 @@ obj-$(CONFIG_SND_IMX_SOC) += snd-soc-imx.o
- # i.MX Machine Support
- snd-soc-phycore-ac97-objs := phycore-ac97.o
- obj-$(CONFIG_SND_SOC_PHYCORE_AC97) += snd-soc-phycore-ac97.o
-+snd-soc-eukrea-tlv320-objs := eukrea-tlv320.o
-+obj-$(CONFIG_SND_SOC_EUKREA_TLV320) += snd-soc-eukrea-tlv320.o
-diff --git a/sound/soc/imx/eukrea-tlv320.c b/sound/soc/imx/eukrea-tlv320.c
-new file mode 100644
-index 0000000..e368787
---- /dev/null
-+++ b/sound/soc/imx/eukrea-tlv320.c
-@@ -0,0 +1,131 @@
-+/*
-+ * eukrea-tlv320.c  --  SoC audio for eukrea_cpuimxXX in I2S mode
-+ *
-+ * Copyright 2010 Eric B?nard, Eukr?a Electromatique <eric@eukrea.com>
-+ *
-+ * based on sound/soc/s3c24xx/s3c24xx_simtec_tlv320aic23.c
-+ * which is Copyright 2009 Simtec Electronics
-+ * and on sound/soc/imx/phycore-ac97.c which is
-+ * Copyright 2009 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
-+ *
-+ *  This program is free software; you can redistribute  it and/or modify it
-+ *  under  the terms of  the GNU General  Public License as published by the
-+ *  Free Software Foundation;  either version 2 of the  License, or (at your
-+ *  option) any later version.
-+ *
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/moduleparam.h>
-+#include <linux/device.h>
-+#include <linux/i2c.h>
-+#include <sound/core.h>
-+#include <sound/pcm.h>
-+#include <sound/soc.h>
-+#include <sound/soc-dapm.h>
-+#include <asm/mach-types.h>
-+
-+#include "../codecs/tlv320aic23.h"
-+#include "imx-ssi.h"
-+
-+#define CODEC_CLOCK 12000000
-+
-+static int eukrea_tlv320_hw_params(struct snd_pcm_substream *substream,
-+			    struct snd_pcm_hw_params *params)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct snd_soc_dai *codec_dai = rtd->dai->codec_dai;
-+	struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
-+	int ret;
-+
-+	/* Set the CODEC as the bus clock master, I2S */
-+	ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_I2S |
-+				  SND_SOC_DAIFMT_NB_NF |
-+				  SND_SOC_DAIFMT_CBM_CFM);
-+	if (ret) {
-+		pr_err("%s: failed set cpu dai format\n", __func__);
-+		return ret;
-+	}
-+
-+	/* Set the CODEC as the bus clock master */
-+	ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_I2S |
-+				  SND_SOC_DAIFMT_NB_NF |
-+				  SND_SOC_DAIFMT_CBM_CFM);
-+	if (ret) {
-+		pr_err("%s: failed set codec dai format\n", __func__);
-+		return ret;
-+	}
-+
-+	/* Set the codec system clock for DAC and ADC */
-+	ret = snd_soc_dai_set_sysclk(codec_dai, 0,
-+				     CODEC_CLOCK, SND_SOC_CLOCK_IN);
-+	if (ret) {
-+		pr_err("%s: failed setting codec sysclk\n", __func__);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct snd_soc_ops eukrea_tlv320_snd_ops = {
-+	.hw_params	= eukrea_tlv320_hw_params,
+ #include "devices.h"
+ 
+@@ -93,6 +95,13 @@ static int eukrea_mbimx27_pins[] = {
+ 	PD29_PF_CSPI1_SCLK,
+ 	PD30_PF_CSPI1_MISO,
+ 	PD31_PF_CSPI1_MOSI,
++	/* SSI4 */
++#if defined(CONFIG_SND_SOC_EUKREA_TLV320)
++	PC16_PF_SSI4_FS,
++	PC17_PF_SSI4_RXD | GPIO_PUEN,
++	PC18_PF_SSI4_TXD | GPIO_PUEN,
++	PC19_PF_SSI4_CLK,
++#endif
+ };
+ 
+ static const uint32_t eukrea_mbimx27_keymap[] = {
+@@ -287,6 +296,12 @@ static struct spi_board_info eukrea_mbimx27_spi_board_info[] __initdata = {
+ 	},
+ };
+ 
++static struct i2c_board_info eukrea_mbimx27_i2c_devices[] = {
++	{
++		I2C_BOARD_INFO("tlv320aic23", 0x1a),
++	},
 +};
 +
-+static struct snd_soc_dai_link eukrea_tlv320_dai = {
-+	.name		= "tlv320aic23",
-+	.stream_name	= "TLV320AIC23",
-+	.codec_dai	= &tlv320aic23_dai,
-+	.ops		= &eukrea_tlv320_snd_ops,
+ static int eukrea_mbimx27_spi_cs[] = {GPIO_PORTD | 28};
+ 
+ static struct spi_imx_master eukrea_mbimx27_spi_0_data = {
+@@ -303,6 +318,10 @@ static struct imxmmc_platform_data sdhc_pdata = {
+ 	.dat3_card_detect = 1,
+ };
+ 
++struct imx_ssi_platform_data eukrea_mbimx27_ssi_pdata = {
++	.flags = IMX_SSI_DMA,
 +};
 +
-+static struct snd_soc_card eukrea_tlv320 = {
-+	.name		= "cpuimx-audio",
-+	.platform	= &imx_soc_platform,
-+	.dai_link	= &eukrea_tlv320_dai,
-+	.num_links	= 1,
-+};
+ /*
+  * system init for baseboard usage. Will be called by cpuimx27 init.
+  *
+@@ -314,6 +333,24 @@ void __init eukrea_mbimx27_baseboard_init(void)
+ 	mxc_gpio_setup_multiple_pins(eukrea_mbimx27_pins,
+ 		ARRAY_SIZE(eukrea_mbimx27_pins), "MBIMX27");
+ 
++#if defined(CONFIG_SND_SOC_EUKREA_TLV320)
++	/* SSI unit master I2S codec connected to SSI_PINS_4*/
++	mxc_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
++			MXC_AUDMUX_V1_PCR_SYN |
++			MXC_AUDMUX_V1_PCR_TFSDIR |
++			MXC_AUDMUX_V1_PCR_TCLKDIR |
++			MXC_AUDMUX_V1_PCR_RFSDIR |
++			MXC_AUDMUX_V1_PCR_RCLKDIR |
++			MXC_AUDMUX_V1_PCR_TFCSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4) |
++			MXC_AUDMUX_V1_PCR_RFCSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4) |
++			MXC_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4)
++	);
++	mxc_audmux_v1_configure_port(MX27_AUDMUX_HPCR3_SSI_PINS_4,
++			MXC_AUDMUX_V1_PCR_SYN |
++			MXC_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR1_SSI0)
++	);
++#endif
 +
-+static struct snd_soc_device eukrea_tlv320_snd_devdata = {
-+	.card		= &eukrea_tlv320,
-+	.codec_dev	= &soc_codec_dev_tlv320aic23,
-+};
+ 	mxc_register_device(&mxc_uart_device1, &uart_pdata[0]);
+ 	mxc_register_device(&mxc_uart_device2, &uart_pdata[1]);
+ #if !defined(MACH_EUKREA_CPUIMX27_USEUART4)
+@@ -323,6 +360,11 @@ void __init eukrea_mbimx27_baseboard_init(void)
+ 	mxc_register_device(&mxc_fb_device, &eukrea_mbimx27_fb_data);
+ 	mxc_register_device(&mxc_sdhc_device0, &sdhc_pdata);
+ 
++	i2c_register_board_info(0, eukrea_mbimx27_i2c_devices,
++				ARRAY_SIZE(eukrea_mbimx27_i2c_devices));
 +
-+static struct platform_device *eukrea_tlv320_snd_device;
++	mxc_register_device(&imx_ssi_device0, &eukrea_mbimx27_ssi_pdata);
 +
-+static int __init eukrea_tlv320_init(void)
-+{
-+	int ret;
-+
-+	if (!machine_is_eukrea_cpuimx27())
-+		/* return happy. We might run on a totally different machine */
-+		return 0;
-+
-+	eukrea_tlv320_snd_device = platform_device_alloc("soc-audio", -1);
-+	if (!eukrea_tlv320_snd_device)
-+		return -ENOMEM;
-+
-+	eukrea_tlv320_dai.cpu_dai = &imx_ssi_pcm_dai[0];
-+
-+	platform_set_drvdata(eukrea_tlv320_snd_device, &eukrea_tlv320_snd_devdata);
-+	eukrea_tlv320_snd_devdata.dev = &eukrea_tlv320_snd_device->dev;
-+	ret = platform_device_add(eukrea_tlv320_snd_device);
-+
-+	if (ret) {
-+		printk(KERN_ERR "ASoC: Platform device allocation failed\n");
-+		platform_device_put(eukrea_tlv320_snd_device);
-+	}
-+
-+	return ret;
-+}
-+
-+static void __exit eukrea_tlv320_exit(void)
-+{
-+	platform_device_unregister(eukrea_tlv320_snd_device);
-+}
-+
-+module_init(eukrea_tlv320_init);
-+module_exit(eukrea_tlv320_exit);
-+
-+MODULE_AUTHOR("Eric B?nard <eric@eukrea.com>");
-+MODULE_DESCRIPTION("CPUIMX ALSA SoC driver");
-+MODULE_LICENSE("GPL");
+ #if defined(CONFIG_TOUCHSCREEN_ADS7846) \
+ 	|| defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
+ 	/* ADS7846 Touchscreen controller init */
 -- 
 1.6.3.3
 
 
---------------010207020109090402010001
-Content-Type: text/x-patch;
- name="0003-eukrea_mbimx27-add-audio-codec.patch"
-Content-Transfer-Encoding: 8bit
-Content-Disposition: attachment;
- filename="0003-eukrea_mbimx27-add-audio-codec.patch"
+--------------010207020109090402010001--
