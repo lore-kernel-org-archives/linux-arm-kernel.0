@@ -1,46 +1,66 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 26 May 2010 13:02:32 -0400 (EDT)
-Subject: [patch 4/5] orion/kirkwood: Add i2s support
-In-Reply-To: <m34ohvgjcx.fsf@anduin.mandriva.com>
-References: <20100525122236.841941526@mandriva.com>
-	<20100525122341.443140710@mandriva.com>
-	<alpine.LFD.2.00.1005252025210.24526@xanadu.home>
-	<m34ohvgjcx.fsf@anduin.mandriva.com>
-Message-ID: <alpine.LFD.2.00.1005261257260.24526@xanadu.home>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 26 May 2010 19:07:06 +0200
+Subject: [PATCH 7/17] arch/arm/common: Add missing spin_unlock_irqrestore
+In-Reply-To: <Pine.LNX.4.64.1005261756000.23743@ask.diku.dk>
+References: <Pine.LNX.4.64.1005261756000.23743@ask.diku.dk>
+Message-ID: <201005261907.06198.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 May 2010, Arnaud Patard wrote:
-
-> Nicolas Pitre <nico@fluxnic.net> writes:
+Dne St 26. kv?tna 2010 17:56:14 Julia Lawall napsal(a):
+> From: Julia Lawall <julia@diku.dk>
 > 
-> Hi,
+> Add a spin_unlock_irqrestore missing on the error path.  Although the lock
+> is destroyed with the rest of the sachip structure in the function
+> __sa1111_remove, it still seems useful to restore the interrupt state.
 > 
-> > On Tue, 25 May 2010, apatard at mandriva.com wrote:
-> >
-> >> This patch enables support for the i2s controller available on orion/kirkwood platforms
-> >> 
-> >> Signed-off-by: Arnaud Patard <apatard@mandriva.com>
-> >
-> > The actual Orion processor family has no I2S/audio support.  It would be 
-> > better if all the audio related stuff was renamed to "kirkwood" and 
-> > "KIRKWOOD_*" instead.
+> The semantic match that finds this problem is as follows:
+> (http://coccinelle.lip6.fr/)
 > 
-> I've been told there was some orion with audio. As I've never looked at
-> the orion family in details, I assumed this is right and I've changed the
-> naming accordingly.
+> // <smpl>
+> @@
+> expression E1;
+> @@
+> 
+> * spin_lock_irqsave(E1,...);
+>   <+... when != E1
+>   if (...) {
+>     ... when != E1
+> *   return ...;
+>   }
+>   ...+>
+> * spin_unlock_irqrestore(E1,...);
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <julia@diku.dk>
+> 
+> ---
+> Perhaps the unlock is now too early?
+> 
+>  arch/arm/common/sa1111.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
+> index a52a27c..59e38ff 100644
+> --- a/arch/arm/common/sa1111.c
+> +++ b/arch/arm/common/sa1111.c
+> @@ -959,6 +959,7 @@ static int sa1111_resume(struct platform_device *dev)
+>  	 */
+>  	id = sa1111_readl(sachip->base + SA1111_SKID);
+>  	if ((id & SKID_ID_MASK) != SKID_SA1111_ID) {
+> +		spin_unlock_irqrestore(&sachip->lock, flags);
+>  		__sa1111_remove(sachip);
+>  		platform_set_drvdata(dev, NULL);
+>  		kfree(save);
 
-Most Orion flavours don't.  And the one that does is not supported in 
-mainline (most probably because hardware is not widely 
-available/interesting).
+Why are "readl"s protected by spinlock anyway ? Can't we just move the locking 
+past the code above ?
 
-> I can change again but it would be nice to have an
-> agreement here. Who's/what's right ? orion can or can not have i2s audio ?
+I'm no sa1111 expert though, Russell ?
 
-Given that Kirkwood is the first (and perhaps the only one) SOC to make 
-use of this in mainline Linux, I think it is less confusing to name it 
-"kirkwood".  That won't prevent the Orion90L from using Kirkwood I2S if 
-that ever happens.
-
-
-Nicolas
+Cheers
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
