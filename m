@@ -1,23 +1,20 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 26 May 2010 18:58:33 +0000
-Subject: [PATCH 05/25] msm: generalize clock support.
-In-Reply-To: <20100526173753.GD9069@elf.ucw.cz>
-References: <> <1273700754-10256-6-git-send-email-dwalker@codeaurora.org>
-	<20100524185540.GA1292@ucw.cz>
-	<20100525005115.GA7791@huya.qualcomm.com>
-	<20100526173753.GD9069@elf.ucw.cz>
-Message-ID: <20100526185833.GA5548@huya.qualcomm.com>
+From: rob@emanuele.us (Robert Emanuele)
+Date: Wed, 26 May 2010 12:08:26 -0700
+Subject: Controlling Driver Load Order
+Message-ID: <AANLkTikzDvWakd7JW3DzTHinjS3dAlqzPx6K8V2qMDG7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 26, 2010 at 07:37:54PM +0200, Pavel Machek wrote:
+Greetings,
 
-> > Um, this is a standard 3-clause BSD license.  There are nearly
-> > 900 existing files in the kernel that have this license on them.
-> 
-> Are you sure? I believe that Dual GPL/BSD is ok, just BSD is not.
+Hopefully this is an easy question but I haven't found a solution yet.
 
-It is, according to the FSF
-<http://www.gnu.org/licenses/license-list.html>
+On my at91sam9g45 platform I need my i2c drivers to load before the
+framebuffer driver.  The i2c drivers control a power management IC
+which is needed to enable the graphics controller.
 
-David
+Is there a way to set up that order?
+
+Thank you,
+
+Rob Emanuele
