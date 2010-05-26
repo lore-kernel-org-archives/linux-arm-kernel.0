@@ -1,32 +1,153 @@
-From: chasedouglas@gmail.com (Chase Douglas)
-Date: Wed, 26 May 2010 08:59:40 -0400
-Subject: [RFC PATCH v2 0/3] ep93xx i2s audio
-In-Reply-To: <1274850588-30460-1-git-send-email-ryan@bluewatersys.com>
-References: <1274850588-30460-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <1274878780.9346.41.camel@cndougla-ubuntu>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 26 May 2010 14:06:35 +0100
+Subject: [PATCH 0/4] Patches for -next
+In-Reply-To: <1274706410.4720.34.camel@e102109-lin.cambridge.arm.com>
+References: <1274706410.4720.34.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <1274879195.6879.15.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-05-26 at 17:09 +1200, Ryan Mallon wrote:
-> The following patch series adds support for i2s audio on the ep93xx,
-> with the Snapper CL15 used as an example implementation. 
+On Mon, 2010-05-24 at 14:06 +0100, Catalin Marinas wrote:
+> On Mon, 2010-05-24 at 13:08 +0100, Russell King - ARM Linux wrote:
+> > Not sure what the right fix for this is at the moment - and if we're
+> > going to make set_pte_at() more complicated, it should be moved out
+> > of line.
 > 
-> I have created psuedo clocks for sclk and lrclk as suggested by
-> Hartley/Mark. This moves the sdiv/lrdiv calculation into
-> ep93xx_i2s_hw_parms. The ep93xx documentation implies that lrclk is
-> gated for unused bits (ie if lrdiv > word length). If this is true for
-> all ep93xx i2s setups then the lrclk/sclk's could be replaced by a
-> single audio rate clock.
-> 
-> I have fixed the enabling/disabling of the i2s peripheral, which
-> corrects the problem I was having with playback sometimes resulting in
-> noise.
+> The only way I can think of is to do the cache flushing in set_pte_at().
 
-Cool!
+Here's a new variant dealing with cache flushing via set_pte_at(). It
+could be optimised to avoid whole I-cache flushing on non-aliasing VIPT
+(well, all SMP systems). We could even make this method the default for
+UP v6+ systems.
 
-As I looked through the patches briefly, I noticed that the first patch
-depends on the second. I think they should be swapped in order so that
-it is compilable after each commit. This is important when using tools
-like git bisect.
+If you are OK with this approach, I'll repost the patches I have for
+-next.
 
--- Chase
+Thanks.
+
+
+ARM: Synchronise the I and D caches via set_pte_at() on SMP systems
+
+From: Catalin Marinas <catalin.marinas@arm.com>
+
+On SMP systems, there is a small chance of a PTE becoming visible to a
+different CPU before the cache maintenance operations in
+update_mmu_cache(). This patch follows the IA-64 and PowerPC approach of
+synchronising the I and D caches via the set_pte_at() function. In this
+case, there is no need for update_mmu_cache() to be implemented since
+lazy cache flushing is already handled by the time this function is
+called.
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/include/asm/pgtable.h  |   21 ++++++++++++++++++---
+ arch/arm/include/asm/tlbflush.h |   10 +++++++++-
+ arch/arm/mm/fault-armv.c        |    2 ++
+ arch/arm/mm/flush.c             |   13 +++++++++++++
+ 4 files changed, 42 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index ab68cf1..9043f60 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -278,9 +278,24 @@ extern struct page *empty_zero_page;
+ 
+ #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
+ 
+-#define set_pte_at(mm,addr,ptep,pteval) do { \
+-	set_pte_ext(ptep, pteval, (addr) >= TASK_SIZE ? 0 : PTE_EXT_NG); \
+- } while (0)
++#ifndef CONFIG_SMP
++static inline void __sync_icache_dcache(pte_t pteval)
++{
++}
++#else
++extern void __sync_icache_dcache(pte_t pteval);
++#endif
++
++static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
++			      pte_t *ptep, pte_t pteval)
++{
++	if (addr >= TASK_SIZE)
++		set_pte_ext(ptep, pteval, 0);
++	else {
++		__sync_icache_dcache(pteval);
++		set_pte_ext(ptep, pteval, PTE_EXT_NG);
++	}
++}
+ 
+ /*
+  * The following only work if pte_present() is true.
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index 40a7092..6aabedd 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -554,10 +554,18 @@ extern void flush_tlb_kernel_range(unsigned long start, unsigned long end);
+ /*
+  * If PG_dcache_clean is not set for the page, we need to ensure that any
+  * cache entries for the kernels virtual memory range are written
+- * back to the page.
++ * back to the page. On SMP systems, the cache coherency is handled in the
++ * set_pte_at() function.
+  */
++#ifndef CONFIG_SMP
+ extern void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
+ 	pte_t *ptep);
++#else
++static inline void update_mmu_cache(struct vm_area_struct *vma,
++				    unsigned long addr, pte_t *ptep)
++{
++}
++#endif
+ 
+ #endif
+ 
+diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
+index 91a691f..030f1da 100644
+--- a/arch/arm/mm/fault-armv.c
++++ b/arch/arm/mm/fault-armv.c
+@@ -28,6 +28,7 @@
+ 
+ static unsigned long shared_pte_mask = L_PTE_MT_BUFFERABLE;
+ 
++#ifndef CONFIG_SMP
+ /*
+  * We take the easy way out of this problem - we make the
+  * PTE uncacheable.  However, we leave the write buffer on.
+@@ -177,6 +178,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
+ 			__flush_icache_all();
+ 	}
+ }
++#endif	/* !CONFIG_SMP */
+ 
+ /*
+  * Check whether the write buffer has physical address aliasing
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 6f55e36..90a6c60 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -212,6 +212,19 @@ static void __flush_dcache_aliases(struct address_space *mapping, struct page *p
+ 	flush_dcache_mmap_unlock(mapping);
+ }
+ 
++#ifdef CONFIG_SMP
++void __sync_icache_dcache(pte_t pteval)
++{
++	struct page *page = pte_page(pteval);
++	struct address_space *mapping = page_mapping(page);
++
++	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
++		__flush_dcache_page(mapping, page);
++	if (pte_val(pteval) & L_PTE_EXEC)
++		__flush_icache_all();
++}
++#endif
++
+ /*
+  * Ensure cache coherency between kernel mapping and userspace mapping
+  * of this page.
+
+
+
+-- 
+Catalin
