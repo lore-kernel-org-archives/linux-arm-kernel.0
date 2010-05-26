@@ -1,8 +1,8 @@
 From: adrian.wenl@gmail.com (Lei Wen)
-Date: Wed, 26 May 2010 21:35:07 +0800
+Date: Wed, 26 May 2010 21:42:28 +0800
 Subject: [PATCH 01/20] mtd: pxa3xx_nand: refuse the flash definition get
 	from platform
-In-Reply-To: <AANLkTilCjPI194k6ROoVIjw9r9cKO5HtSyl2KtsDPqPz@mail.gmail.com>
+In-Reply-To: <4BFCF06E.5010809@compulab.co.il>
 References: <AANLkTinVBXhT77Zd-LNpufgJAl7WZdic0oxDFwvNkvJg@mail.gmail.com>
 	<4BFA2B5B.4080105@compulab.co.il>
 	<AANLkTilLYFVPcel-rE8RbuTWEir4RJOBqmyxirb6Vozn@mail.gmail.com>
@@ -12,88 +12,17 @@ References: <AANLkTinVBXhT77Zd-LNpufgJAl7WZdic0oxDFwvNkvJg@mail.gmail.com>
 	<AANLkTil1mq5FBePSexz80DyT80DGqshqyJEi6Pfp0kV7@mail.gmail.com>
 	<4BFBA4BA.9020502@compulab.co.il>
 	<AANLkTimOGbp6m2v4574ZR-74zbUA-dSAZl3BhlkOBqr3@mail.gmail.com>
-	<AANLkTilCjPI194k6ROoVIjw9r9cKO5HtSyl2KtsDPqPz@mail.gmail.com>
-Message-ID: <AANLkTilzc5hx1tDACnlavZgVn5FTzY4otpnGOH75JdGb@mail.gmail.com>
+	<4BFCF06E.5010809@compulab.co.il>
+Message-ID: <AANLkTinaQdD7z2JWrh-LVKbviFsHHDMA4iCXawonlocy@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 25, 2010 at 9:21 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Tue, May 25, 2010 at 9:01 PM, Lei Wen <adrian.wenl@gmail.com> wrote:
->> On Tue, May 25, 2010 at 6:21 PM, Mike Rapoport <mike@compulab.co.il> wrote:
->>> Lei Wen wrote:
->>>>
->>>> On Mon, May 24, 2010 at 9:21 PM, Mike Rapoport <mike@compulab.co.il>
->>>> wrote:
->>>>>
->>>>> Lei Wen wrote:
->>>>>>
->>>>>> Hi Mike,
->>>>>>
->>>>>> On Mon, May 24, 2010 at 7:00 PM, Mike Rapoport <mike@compulab.co.il>
->>>>>> wrote:
->>>>>>>
->>>>>>> Hi Lei,
->>>>>>>
->>>>>>> Lei Wen wrote:
->>>>>>>>
->>>>>>>> Hi Mike,
->>>>>>>>
->>>>>>> 2) I don't like hadrcoding of NAND parameters into the driver. You
->>>>>>> remove
->>>>>>> *deprecetad* CONFIG_MTD_NAND_PXA3xx_BUILTIN configuration option and
->>>>>>> instead
->>>>>>> you enforce use of built-in definitions. The driver in its current
->>>>>>> state
->>>>>>> is
->>>>>>> robust enough to allow platforms to define optimized NAND timings
->>>>>>> either
->>>>>>> in
->>>>>>> the bootloader or in the kernel. If you don't like that multiple
->>>>>>> platforms
->>>>>>> define the same flash chip create an enumeration of built-in types and
->>>>>>> let
->>>>>>> platforms to use this enumeration to select the NAND chip. But, anyway,
->>>>>>> there should be a fallback mode that will support NAND chips that are
->>>>>>> not
->>>>>>> defined in the driver, probably with suboptimal timings.
->>>>>>
->>>>>> Original driver also use hardcoding. And in bootloader, this timing
->>>>>> parameter is also hard coding.
->>>>>> We cannot deduce a parameter set only from the nand id, that is why we
->>>>>> need a table to preset it.
->>>>>> If one nand chip is not listed in that table, the chip id would still
->>>>>> be printed out, so that we can do something for that.
->>>>>> If we encourage people to continue on this, we would not able to
->>>>>> really "driver" that nand.
->>>>>
->>>>> Currently pxa3xx-nand has three operational modes:
->>>>> - use NAND parameters supplied by the platform
->>>>> - use presets configured by the bootloader chain
->>>>> - use built-in NAND parameters, marked as deprecated in favor of the
->>>>> first
->>>>> two
->>>>> You remove the first two modes completely and require that each and every
->>>>> NAND chip used on pxa3xx based platform will be added to the driver. This
->>>>> way you make the driver less robust and harder to use for platform
->>>>> developers, not mentioning you're breaking the existing platforms.
->>>>> In my opinion, the driver *may* support built-in definitions for certain
->>>>> NAND flashes and *must* support configuration of the NAND parameters by
->>>>> the
->>>>> platform code and bootloader.
->>>>>
->>>>
->>>> Hi Mike,
->>>>
->>>> Well... I would submit another patch set which would reserve a way
->>>> that platform could pass its parameter setting.
->>>> Like specify the certain type of nand chip parameter for each chip
->>>> select. Is that ok for you?
->>>>
->>>> For bootloader pass parameter method, I think this way should be
->>>> dropped... For there is attributed which we could not tell from
->>>> registers...
->>>> What do you think of this?
->>>
+On Wed, May 26, 2010 at 5:57 PM, Mike Rapoport <mike@compulab.co.il> wrote:
+> Lei Wen wrote:
+>>
+>> On Tue, May 25, 2010 at 6:21 PM, Mike Rapoport <mike@compulab.co.il>
+>> wrote:
+>
 >>> Can you please elaborate what are the attributes that cannot be detected?
 >>
 >> The attributes comes from two new features that would be included into
@@ -138,23 +67,22 @@ On Tue, May 25, 2010 at 9:21 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
 >> not distinguish properly, nand would not be able to work functional.
 >> And obviously, the two features cannot get from register reading, and
 >> that is the reason why I suggest drop the feature.
->>
 >
-> Then would it be possible to just drop the feature for pxa168 and onward?
-> I guess there might be some existing usages out there for pxa3xx already,
-> so not to affect existing systems.
+> Why not make the ECC type and strength part of the
+> pxa3xx_nand_platform_data? This way you can ensure NAND layout consistency
+> for particular platform without reduction in the driver robustness.
 >
-> Actually, it's now quite easy for a single driver to distinguish this, through
-> platform_device_id table please, see drivers/i2c/busses/i2c-pxa.c for an
-> example. I'd like to call the device pxa168-nand or something.
 
-Yes, that is also what I want. Just put another attributes like ecc
-strength into flash_info structure.
-This info could be revealed in the built_in_table or flash info passed
-from platform data.
+The reason why we need define different ecc type and ecc strength is
+for those different kind of ecc strength could give different
+performance cost. For data safe consideration, the higher of ecc
+strength would be safer. But you must notice that the higher ecc
+strength would bring to us more performance downgrade. For flash that
+only need 1bit correction per 512 bytes, we certainly don't
+need the 8bit ECC, or we would suffer from the performance.
 
-Also this ecc strength could take place the ecc type used in the flash
-info structure.
+One table with the ECC strength description would solve all the
+problem we have, and also no risk in the driver robustness.
 
 Thanks,
 Lei
