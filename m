@@ -1,10 +1,10 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 26 May 2010 21:49:34 +0800
-Subject: [PATCH 4/5] pxa/vpac270: Convert to use PATA PXA driver
-In-Reply-To: <1274404366-26304-4-git-send-email-marek.vasut@gmail.com>
+Date: Wed, 26 May 2010 21:50:03 +0800
+Subject: [PATCH 5/5] pxa/vpac270: Add VGA modes for ADV7125
+In-Reply-To: <1274404366-26304-5-git-send-email-marek.vasut@gmail.com>
 References: <1274404366-26304-1-git-send-email-marek.vasut@gmail.com>
-	<1274404366-26304-4-git-send-email-marek.vasut@gmail.com>
-Message-ID: <AANLkTilkJpaIGLj1NAxtzqGfQzUmxbYCQKsHWdIjQQwe@mail.gmail.com>
+	<1274404366-26304-5-git-send-email-marek.vasut@gmail.com>
+Message-ID: <AANLkTikR62CIASihEmtac9aa2zZAZqzLgNFKxpDeeQLR@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,72 +14,70 @@ On Fri, May 21, 2010 at 9:12 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
 Applied.
 
 > ---
-> ?arch/arm/mach-pxa/vpac270.c | ? 20 +++++++++++++-------
-> ?1 files changed, 13 insertions(+), 7 deletions(-)
+> ?arch/arm/mach-pxa/vpac270.c | ? 50 ++++++++++++++++++++++++++++++++++++++++++-
+> ?1 files changed, 49 insertions(+), 1 deletions(-)
 >
 > diff --git a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
-> index 1192e2b..d4bf54a 100644
+> index d4bf54a..207a1e5 100644
 > --- a/arch/arm/mach-pxa/vpac270.c
 > +++ b/arch/arm/mach-pxa/vpac270.c
-> @@ -24,7 +24,6 @@
-> ?#include <linux/mtd/onenand.h>
-> ?#include <linux/dm9000.h>
-> ?#include <linux/ucb1400.h>
-> -#include <linux/ata_platform.h>
-> ?#include <linux/regulator/max1586.h>
+> @@ -492,7 +492,55 @@ static struct pxafb_mode_info vpac270_lcd_modes[] = {
+> ? ? ? ?.vsync_len ? ? ?= 2,
 >
-> ?#include <asm/mach-types.h>
-> @@ -38,6 +37,7 @@
-> ?#include <mach/ohci.h>
-> ?#include <mach/pxa27x-udc.h>
-> ?#include <mach/udc.h>
-> +#include <mach/pata_pxa.h>
->
-> ?#include <plat/i2c.h>
->
-> @@ -538,10 +538,10 @@ static inline void vpac270_lcd_init(void) {}
-> ?/******************************************************************************
-> ?* PATA IDE
-> ?******************************************************************************/
-> -#if defined(CONFIG_PATA_PLATFORM) || \
-> - ? ? ? defined(CONFIG_PATA_PLATFORM_MODULE)
-> -static struct pata_platform_info vpac270_pata_pdata = {
-> - ? ? ? .ioport_shift ? = 1,
-> +#if defined(CONFIG_PATA_PXA) || ? ? ? ?defined(CONFIG_PATA_PXA_MODULE)
-> +static struct pata_pxa_pdata vpac270_pata_pdata = {
-> + ? ? ? .reg_shift ? ? ?= 1,
-> + ? ? ? .dma_dreq ? ? ? = 1,
-> ? ? ? ?.irq_flags ? ? ?= IRQF_TRIGGER_RISING,
+> ? ? ? ?.sync ? ? ? ? ? = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+> -},
+> +}, { ? /* CRT 640x480 */
+> + ? ? ? .pixclock ? ? ? = 35000,
+> + ? ? ? .xres ? ? ? ? ? = 640,
+> + ? ? ? .yres ? ? ? ? ? = 480,
+> + ? ? ? .bpp ? ? ? ? ? ?= 16,
+> + ? ? ? .depth ? ? ? ? ?= 16,
+> +
+> + ? ? ? .left_margin ? ?= 96,
+> + ? ? ? .right_margin ? = 48,
+> + ? ? ? .upper_margin ? = 33,
+> + ? ? ? .lower_margin ? = 10,
+> +
+> + ? ? ? .hsync_len ? ? ?= 48,
+> + ? ? ? .vsync_len ? ? ?= 1,
+> +
+> + ? ? ? .sync ? ? ? ? ? = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+> +}, { ? /* CRT 800x600 H=30kHz V=48HZ */
+> + ? ? ? .pixclock ? ? ? = 25000,
+> + ? ? ? .xres ? ? ? ? ? = 800,
+> + ? ? ? .yres ? ? ? ? ? = 600,
+> + ? ? ? .bpp ? ? ? ? ? ?= 16,
+> + ? ? ? .depth ? ? ? ? ?= 16,
+> +
+> + ? ? ? .left_margin ? ?= 50,
+> + ? ? ? .right_margin ? = 1,
+> + ? ? ? .upper_margin ? = 21,
+> + ? ? ? .lower_margin ? = 12,
+> +
+> + ? ? ? .hsync_len ? ? ?= 8,
+> + ? ? ? .vsync_len ? ? ?= 1,
+> +
+> + ? ? ? .sync ? ? ? ? ? = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+> +}, { ? /* CRT 1024x768 H=40kHz V=50Hz */
+> + ? ? ? .pixclock ? ? ? = 15000,
+> + ? ? ? .xres ? ? ? ? ? = 1024,
+> + ? ? ? .yres ? ? ? ? ? = 768,
+> + ? ? ? .bpp ? ? ? ? ? ?= 16,
+> + ? ? ? .depth ? ? ? ? ?= 16,
+> +
+> + ? ? ? .left_margin ? ?= 220,
+> + ? ? ? .right_margin ? = 8,
+> + ? ? ? .upper_margin ? = 33,
+> + ? ? ? .lower_margin ? = 2,
+> +
+> + ? ? ? .hsync_len ? ? ?= 48,
+> + ? ? ? .vsync_len ? ? ?= 1,
+> +
+> + ? ? ? .sync ? ? ? ? ? = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+> +}
 > ?};
 >
-> @@ -556,7 +556,12 @@ static struct resource vpac270_ide_resources[] = {
-> ? ? ? ? ? ? ? .end ? ? = PXA_CS3_PHYS + 0x15f,
-> ? ? ? ? ? ? ? .flags ? = IORESOURCE_MEM
-> ? ? ? ?},
-> - ? ? ? [2] = { /* IDE IRQ pin */
-> + ? ? ? [2] = { /* DMA Base address */
-> + ? ? ? ? ? ? ?.start ? = PXA_CS3_PHYS + 0x20,
-> + ? ? ? ? ? ? ?.end ? ? = PXA_CS3_PHYS + 0x2f,
-> + ? ? ? ? ? ? ?.flags ? = IORESOURCE_DMA
-> + ? ? ? },
-> + ? ? ? [3] = { /* IDE IRQ pin */
-> ? ? ? ? ? ? ? .start ? = gpio_to_irq(GPIO36_VPAC270_IDE_IRQ),
-> ? ? ? ? ? ? ? .end ? ? = gpio_to_irq(GPIO36_VPAC270_IDE_IRQ),
-> ? ? ? ? ? ? ? .flags ? = IORESOURCE_IRQ
-> @@ -564,11 +569,12 @@ static struct resource vpac270_ide_resources[] = {
-> ?};
->
-> ?static struct platform_device vpac270_ide_device = {
-> - ? ? ? .name ? ? ? ? ? = "pata_platform",
-> + ? ? ? .name ? ? ? ? ? = "pata_pxa",
-> ? ? ? ?.num_resources ?= ARRAY_SIZE(vpac270_ide_resources),
-> ? ? ? ?.resource ? ? ? = vpac270_ide_resources,
-> ? ? ? ?.dev ? ? ? ? ? ?= {
-> ? ? ? ? ? ? ? ?.platform_data ?= &vpac270_pata_pdata,
-> + ? ? ? ? ? ? ? .coherent_dma_mask ? ? ?= 0xffffffff,
-> ? ? ? ?}
-> ?};
->
+> ?static struct pxafb_mach_info vpac270_lcd_screen = {
 > --
 > 1.7.0
 >
