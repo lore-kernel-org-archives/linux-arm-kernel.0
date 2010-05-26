@@ -1,42 +1,81 @@
-From: peter.ujfalusi@nokia.com (Peter Ujfalusi)
-Date: Wed, 26 May 2010 14:16:49 +0300
-Subject: [alsa-devel] [RFC PATCH v2 1/3] ep93xx i2s audio driver
-In-Reply-To: <1274850588-30460-2-git-send-email-ryan@bluewatersys.com>
-References: <1274850588-30460-1-git-send-email-ryan@bluewatersys.com>
-	<1274850588-30460-2-git-send-email-ryan@bluewatersys.com>
-Message-ID: <201005261416.49362.peter.ujfalusi@nokia.com>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Wed, 26 May 2010 17:13:24 +0530
+Subject: [PATCH] ARM:VFPv3:enable {d16-d31} access
+In-Reply-To: <20100525185741.GB16204@n2100.arm.linux.org.uk>
+References: <tarun.kanti@ti.com>
+	<1274818736-26597-1-git-send-email-tarun.kanti@ti.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0322FA884E@dbde02.ent.ti.com>
+	<20100525185741.GB16204@n2100.arm.linux.org.uk>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0322FA8E37@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Russell,
 
-On Wednesday 26 May 2010 08:09:46 ext Ryan Mallon wrote:
-> Add ep93xx i2s audio driver
+-----Original Message-----
+From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+Sent: Wednesday, May 26, 2010 12:28 AM
+To: DebBarma, Tarun Kanti
+Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH] ARM:VFPv3:enable {d16-d31} access
 
-..
+On Tue, May 25, 2010 at 02:39:17PM +0530, DebBarma, Tarun Kanti wrote:
+>  #ifdef CONFIG_VFPv3
+>  	@ d16 - d31 registers
+> -	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+> -1:	mrrc	p11, 3, r0, r1, c\dr	@ fmrrd	r0, r1, d\dr
+> +	.irp	dr,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31
+> +1:	fmrrd	r0, r1, d\dr
 
-> +static void ep93xx_i2s_disable(struct ep93xx_i2s_info *info)
-> +{
-> +       int i;
-> +
-> +       /* Disable fifos */
-> +       for (i = 0; i < 3; i++) {
-> +               ep93xx_i2s_write_reg(info, EP93XX_I2S_RX0EN + (i * 4), 0);
-> +               ep93xx_i2s_write_reg(info, EP93XX_I2S_TX0EN + (i * 4), 0);
-> +       }
-> +
-> +       /* Disable i2s */
-> +       ep93xx_i2s_write_reg(info, EP93XX_I2S_GLCTRL, 0);
-> +
-> +       /* Disable clocks */
-> +       clk_disable(info->lrclk);
-> +       clk_disable(info->sclk);
-> +       clk_disable(info->mclk);
-> +}
+The existing code is correct.
 
-I think this will break the other stream in duplex case, since you stop both 
-FIFOs, and also disable the clocks.
-Does the ep93xx supports duplex audio?
+For every fmrrd instruction, there is a corresponding mrrc version which
+assembles to exactly the same opcode.
 
--- 
-P?ter
+mrrc instructions take:
+
+1. Co-processor number, range 0-15.
+2. Opcode number N, range 0-15.
+3. Destination register 1, range 0-15.
+4. Destination register 2, range 0-15.
+5. Co-processor register number R, range 0-15.
+
+For fmrrd encodings, the first 16 registers are encoded using N=1 with
+R=0 to 15.  The second 16 registers are encoded using N=3 with R=0 to 15.
+Specifying a co-processor register number greater than 15 is illegal,
+hence why the 'irp' specifies the numbers 0 to 15.
+
+If we look at the instruction encodings, for MRRC:
+
+ 3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1
+ 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+|  cond |1 1 0 0 0 1 0 1|  Rn   |  Rm   |CP Num |   N   |   R   |
+
+For FMRRD:
+
+ 3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1
+ 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+|  cond |1 1 0 0 0 1 0 1|  Rn   |  Rm   |1 0 1 1 0 0 M 1|   R   |
+
+where "M" and "R" together define the register.
+
+As I said above, the existing code is correct.  What problem are you
+actually trying to solve here?
+
+######################
+I have a test case which exercise all VFP general purpose registers by writing a known value and reading it back using vfp_put_double() and vfp_get_double() APIs.
+
+	long long d1=777, d2=0;
+	int i=31;
+	for (; i>=0; i--){
+		vfp_put_double(d1, i);
+		d2 = vfp_get_double(i);
+		printk("D%d read=%lld\n",i, (long long)d2);
+		d2 = 0.0;
+	}
+
+1) With the existing implementation I am not able to correctly write/read {d0-d15} but not the {d16-d31} set
+
+2) With my changes I am able to write/read correctly.
+
+Tarun
