@@ -1,22 +1,34 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 26 May 2010 00:18:32 +0100
-Subject: [patch 0/5] kirkwood openrd client audio support - v3
-In-Reply-To: <20100525122236.841941526@mandriva.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 25 May 2010 20:31:00 -0400 (EDT)
+Subject: [patch 4/5] orion/kirkwood: Add i2s support
+In-Reply-To: <20100525122341.443140710@mandriva.com>
 References: <20100525122236.841941526@mandriva.com>
-Message-ID: <20100525231831.GA11785@sirena.org.uk>
+	<20100525122341.443140710@mandriva.com>
+Message-ID: <alpine.LFD.2.00.1005252025210.24526@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 25, 2010 at 02:22:36PM +0200, apatard at mandriva.com wrote:
+On Tue, 25 May 2010, apatard at mandriva.com wrote:
 
-> It's a new try to get merged kirkwood openrd client support.
+> This patch enables support for the i2s controller available on orion/kirkwood platforms
+> 
+> Signed-off-by: Arnaud Patard <apatard@mandriva.com>
 
-> The changes are :
-> - set window configuration according to dma address
-> - namespaced all cs42l51 #define
-> - modified cs42l51_dac_names array according to what proposed Mark Brown
-> - use SOC_DOUBLE_TLV for mic boost
+The actual Orion processor family has no I2S/audio support.  It would be 
+better if all the audio related stuff was renamed to "kirkwood" and 
+"KIRKWOOD_*" instead.
 
-This looks mostly OK to me - I had a few comments on the CODEC driver
-but they're fairly minor.  It'd be good to get some input from the
-Kirkwood guys, particularly with regard to the merge path here.
+> Index: sound-2.6/sound/soc/orion/Kconfig
+> ===================================================================
+> --- /dev/null	1970-01-01 00:00:00.000000000 +0000
+> +++ sound-2.6/sound/soc/orion/Kconfig	2010-05-25 10:31:24.601080937 +0200
+> @@ -0,0 +1,11 @@
+> +config SND_ORION_SOC
+> +	tristate "SoC Audio for the Marvell Orion/Kirkwood chip"
+> +	depends on ARCH_KIRKWOOD || ARCH_ARCH_ORION5X
+
+ARCH_ARCH_ORION5X should probably be ARCH_ORION5X.  But again, this is 
+wrong to add ARCH_ORION5X anyway.
+
+
+Nicolas
