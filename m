@@ -1,73 +1,57 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 27 May 2010 00:35:54 +0200
-Subject: [PATCH] sa1111: Prevent deadlock in resume path
-In-Reply-To: <20100526222530.GD16418@n2100.arm.linux.org.uk>
-References: <1274901104-22133-1-git-send-email-marek.vasut@gmail.com>
-	<201005262352.34052.marek.vasut@gmail.com>
-	<20100526222530.GD16418@n2100.arm.linux.org.uk>
-Message-ID: <201005270035.54509.marek.vasut@gmail.com>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Thu, 27 May 2010 01:10:02 +0200
+Subject: Git pull request: ARM LPC32XX architecture
+In-Reply-To: <20100525172106.GA16204@n2100.arm.linux.org.uk>
+References: <a08234131003121244t6f914926s3ea75e98c017686a@mail.gmail.com>
+	<20100312210353.GB1146@n2100.arm.linux.org.uk>
+	<083DF309106F364B939360100EC290F80AC2FF1AE8@eu1rdcrdc1wx030.exi.nxp.com>
+	<20100525172106.GA16204@n2100.arm.linux.org.uk>
+Message-ID: <083DF309106F364B939360100EC290F80AC2FF21ED@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 27. kv?tna 2010 00:25:30 Russell King - ARM Linux napsal(a):
-> On Wed, May 26, 2010 at 11:52:33PM +0200, Marek Vasut wrote:
-> > You don't want the patch? Fine by me ... Anyway, please, open your eyes,
-> > look around, noone in the whole community does such complications. Why
-> > do you do that? What does it help? Why can't you just pick patches as
-> > everyone else does -- from email. That's why git supports it.
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Tuesday, May 25, 2010 10:21 AM
+> To: Kevin Wells
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: Re: Git pull request: ARM LPC32XX architecture
 > 
-> What you're saying is that *everyone* has to conform to your way of
-> working. 
-
-Come on, you know it's not what I said.
-
-> Sorry, the human race isn't like that.  Humans are individuals,
-> and each one has their own quirks.
-
-Fine by me, there aren't many people I have problems with.
+> On Tue, May 25, 2010 at 05:27:12PM +0200, Kevin Wells wrote:
+> > It's been a few months since I've posted this patch set and I'd still
+> > like to get it pulled.
 > 
-> Mine is that I'm dreadful at dealing with patches in email.  Unless I
-> deal with a message at the point I've read it, it basically doesn't
-> exist. 
-
-Why don't you set up a mailbox for that ? You read the emails anyway and you can 
-drop the patches you Ack into that mailbox ... then run git am on that once in a 
-while.
-> So I created the patch system 10 years ago to solve that problem
-> - to keep patches around and visible, *and* to make them easier for me
-> to merge.
-
-Things changed ever since then ...
+> Sorry, it got buried beneath _lots_ of email.
 > 
-> So your choice is:
+> However, I've sent my second and final pull request to Linus yesterday
+> evening.  So far Linus hasn't pulled my tree, so I can't touch it at
+> the moment.
 > 
-> 1. send patches by email, but have to repeatedly send them to get them
->    applied.
+> I think this stuff has missed this window as well. ;(
 > 
-> 2. send the patch to the patch system so that it's easily visible and
->    doesn't get buried beneath a mountain of email.
+
+Thanks, I figured you probably had your hands full.
+
+> > Can you pull the original series plus the slab.h patch? (breaks
+> bisect)?
+> > Or do you want the slab.h fix included in the correct order in the
+> > Series to be bisect friendly?
 > 
-> Lastly, I don't do kernel work 7 days a week. 
-
-Neither do I, nor am I paid for it. I do it in my free time.
-
-> I do have time off when I
-> don't look at the kernel tree, but I still read email. Maybe you'd
-> prefer me to ignore all email on those days I'm not working instead?
-
-See above please.
+> Well, there's two ways to get around that - both of which you need to
+> ensure that no one's pulled your tree yet.
 > 
-> The patch system is there to _solve_ a problem. 
-
-And it's there to create another one.
-
-> If you don't want to use it, the fine, don't expect that problem to be solved 
-> for your patches.
-
-The problem should be solved already. This discussion was here already, it 
-repeats and people complain.
+> 1. Re-do the patches such that the missing include(s) are added.
 > 
-> And now, at this point I really don't have any more time for you and
-> these stupid, idiotic and childish politics.
+> 2. rebase the series on something more recent and fix the slab.h thing
+>    along the way.
+> 
+> Either way means that the series remains bisect-able after merging.
+> 
+> This is not something that should be done lightly however - these kinds
+> of changes mean that anyone who has pulled your tree is in for some
+> grief.
 
-I'm just trying to solve a real problem here.
+The updated full series is available from:
+git://git.lpclinux.com/linux-2.6-lpc wells/lpc32xx-arch
+
+This has been rebased on 2.6.34.
+A pull of this series should play nice with the previous series if someone has already pulled it..
