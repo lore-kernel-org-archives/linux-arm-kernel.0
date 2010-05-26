@@ -1,25 +1,48 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 26 May 2010 08:58:32 -0700
-Subject: [PATCH 1/2] mc13783: add LED support
-In-Reply-To: <1274875268.24079.1.camel@rex>
-References: <1274114423-30020-1-git-send-email-philippe.retornaz@epfl.ch>
-	<1274114423-30020-2-git-send-email-philippe.retornaz@epfl.ch>
-	<20100517190242.GA17604@pengutronix.de>
-	<20100517200017.GA25262@sirena.org.uk>
-	<1274875268.24079.1.camel@rex>
-Message-ID: <20100526155831.GA18834@opensource.wolfsonmicro.com>
+From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
+Date: Wed, 26 May 2010 18:37:53 +0200
+Subject: [PATCH] imx-ssi.c: fix I2S slave setup
+Message-ID: <1274891873-3704-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 26, 2010 at 01:01:08PM +0100, Richard Purdie wrote:
-> On Mon, 2010-05-17 at 21:00 +0100, Mark Brown wrote:
+* without this fix, the waveform on the SSI port are not real
+I2S signal (at least on i.MX27's SSI4)
 
-> > It'd be nice to add helpers for this to the LED core, there's quite a
-> > few drivers implementing this idiom now - a flag that does the deferring
-> > of the set() for example.
+* original Freescale's driver has
+	if (((fmt & SND_SOC_DAIFMT_FORMAT_MASK) == SND_SOC_DAIFMT_I2S)
+	    && ssi_mode->network_mode) {
+		scr &= ~SSI_SCR_I2S_MODE_MASK;
+		scr |= SSI_SCR_I2S_MODE_SLAVE;
+	}
+So as now the SSI is set in network mode as a default when running in
+I2S format, it seems reasonable to also set I2S_MODE_SLAVE
 
-> Agreed, or a wrapper around the core which deferred implementations
-> could just use. I'm open to patches :)
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+---
+ sound/soc/imx/imx-ssi.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
-In my copious free time, perhaps.  I was kind of hoping someone actively
-working on a driver could be inspired to do the work :)
+diff --git a/sound/soc/imx/imx-ssi.c b/sound/soc/imx/imx-ssi.c
+index 80b4fee..c5e1626 100644
+--- a/sound/soc/imx/imx-ssi.c
++++ b/sound/soc/imx/imx-ssi.c
+@@ -83,8 +83,6 @@ static int imx_ssi_set_dai_tdm_slot(struct snd_soc_dai *cpu_dai,
+ /*
+  * SSI DAI format configuration.
+  * Should only be called when port is inactive (i.e. SSIEN = 0).
+- * Note: We don't use the I2S modes but instead manually configure the
+- * SSI for I2S because the I2S mode is only a register preset.
+  */
+ static int imx_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
+ {
+@@ -98,7 +96,7 @@ static int imx_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
+ 	case SND_SOC_DAIFMT_I2S:
+ 		/* data on rising edge of bclk, frame low 1clk before data */
+ 		strcr |= SSI_STCR_TFSI | SSI_STCR_TEFS | SSI_STCR_TXBIT0;
+-		scr |= SSI_SCR_NET;
++		scr |= SSI_SCR_NET | SSI_SCR_I2S_MODE_SLAVE;
+ 		break;
+ 	case SND_SOC_DAIFMT_LEFT_J:
+ 		/* data on rising edge of bclk, frame high with data */
+-- 
+1.6.3.3
