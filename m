@@ -1,78 +1,55 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Wed, 26 May 2010 12:57:02 +0300
-Subject: [PATCH 01/20] mtd: pxa3xx_nand: refuse the flash definition get
-	from platform
-In-Reply-To: <AANLkTimOGbp6m2v4574ZR-74zbUA-dSAZl3BhlkOBqr3@mail.gmail.com>
-References: <AANLkTinVBXhT77Zd-LNpufgJAl7WZdic0oxDFwvNkvJg@mail.gmail.com>	
-	<4BFA2B5B.4080105@compulab.co.il>	
-	<AANLkTilLYFVPcel-rE8RbuTWEir4RJOBqmyxirb6Vozn@mail.gmail.com>	
-	<4BFA5C58.7050109@compulab.co.il>	
-	<AANLkTimYwQa5aJ2wuuBvPQ6O6hgYKaQcCcb3jwTcgFcD@mail.gmail.com>	
-	<4BFA7D60.6020703@compulab.co.il>	
-	<AANLkTil1mq5FBePSexz80DyT80DGqshqyJEi6Pfp0kV7@mail.gmail.com>	
-	<4BFBA4BA.9020502@compulab.co.il>
-	<AANLkTimOGbp6m2v4574ZR-74zbUA-dSAZl3BhlkOBqr3@mail.gmail.com>
-Message-ID: <4BFCF06E.5010809@compulab.co.il>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 26 May 2010 11:16:59 +0100
+Subject: request pull of bjdooks' for-linus/2634-git-updates
+Message-ID: <20100526101659.GH4720@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lei Wen wrote:
-> On Tue, May 25, 2010 at 6:21 PM, Mike Rapoport <mike@compulab.co.il> wrote:
+Two cleanups for post merging to mainline and a defconfig update
+for all the defconfigs to bring them up to latest kernel.
 
->> Can you please elaborate what are the attributes that cannot be detected?
-> 
-> The attributes comes from two new features that would be included into
-> pxa3xx_nand: BCH support and 8bit per 512bytes ECC.
-> Originally, our pxa3xx_nand only support Hamming ECC way. So no doubt
-> just read the timing register, and just set use ecc bit in NDCR is
-> enough.
-> But for now there is two type of ECC type. For distinguish, we
-> introduce a new register called NDECCCTRL. NDECCCTRL_BCH_EN in the bit
-> 0 of that register control whether use the BCH ECC.
-> You may ask me why not just read from NDECCCTRL to know the ECC type.
-> It is right, but not always to be true. It the last command executed
-> for nand before kernel take control is not read or write operation,
-> the bootloader has no reason to set the NDECCCTRL register. So our
-> kernel also unable to detect whether to use BCH or HAMMING ECC.
-> 
-> This two type of ecc has different character, if use hamming ecc for
-> reading while that page is written by BCH, it would instant report of
-> DB error...
-> This is not the worst case., for we may ask the bootloader to always
-> set the NDECCCTRL. (There is no reason to apply ECC when do command
-> except the read and write although)
-> 
-> The worst would comes at the supporting of 8bit per 512 bytes ECC. Our
-> BCH engine only support 16bit corroction per 2k data, aka 4bit per
-> 512bytes.
-> If we need to support 8bit per 512bytes feature, which is needed by a
-> lot of newest flash which require such high ecc strength.
-> Then we have to apply the BCH to 1k data instead of 2k. The layout of
-> content on flash would change.
-> Original BCH apply to 2k nand, the layout may like: | 2k data | + | 30
-> bytes ECC |
-> Now after apply BCH to 1k range, the layout would be like: | 1k data |
-> + | 30 bytes ECC| + | 1k data| + |30 bytes ECC|.
-> Even as I said let the bootloader to always set the NDECCCTRL. The
-> kernel would still cannot distinguish the two use case of 4bit per
-> 512bytes and 8bit per 512 bytes ECC strength requirement.
-> For they both use BCH, the only difference could be told on the nand
-> layout, not by register reading.
-> 
-> Those two new feature would lead different nand content layout. So if
-> not distinguish properly, nand would not be able to work functional.
-> And obviously, the two features cannot get from register reading, and
-> that is the reason why I suggest drop the feature.
+The following changes since commit b1cdc4670b9508fcd47a15fbd12f70d269880b37:
+  Linus Torvalds (1):
+        Merge git://git.kernel.org/.../davem/net-2.6
 
-Why not make the ECC type and strength part of the 
-pxa3xx_nand_platform_data? This way you can ensure NAND layout 
-consistency for particular platform without reduction in the driver 
-robustness.
+are available in the git repository at:
 
-> Thanks,
-> Lei
+  git://git.fluff.org/bjdooks/linux.git for-linus/2634-git-updates
 
+Ben Dooks (9):
+      ARM: s3c2410_defconfig: Update s3c2410_defconfig to v2.6.34-git
+      ARM: s3c6400_defconfig: Update s3c6400_defconfig to v2.6.34-git
+      ARM: s5p6440_defconfig: Update s5p6440_defconfig to v2.6.34-git
+      ARM: s5p6442_defconfig: Update s5p6442_defconfig to v2.6.34-git
+      ARM: s5pc100_defconfig: Update s5pc100_defconfig to v2.6.34-git
+      ARM: s5pc110_defconfig: Update s5pc110_defconfig to v2.6.34-git
+      ARM: s5pv210_defconfig: Update s5pv210_defconfig to v2.6.34-git
+      ARM: S5PC100: Fixup cross tree merge problems
+      ARM: Merge next-samsung
+
+Pannaga Bhushan (1):
+      ARM: S5P: Fix the platform external interrupt issues.
+
+ arch/arm/configs/s3c2410_defconfig             |   70 ++++++-
+ arch/arm/configs/s3c6400_defconfig             |   35 +++-
+ arch/arm/configs/s5p6440_defconfig             |   29 +++-
+ arch/arm/configs/s5p6442_defconfig             |   24 ++-
+ arch/arm/configs/s5pc100_defconfig             |  233 +++++++++++++++++++-----
+ arch/arm/configs/s5pc110_defconfig             |   30 +++-
+ arch/arm/configs/s5pv210_defconfig             |   33 +++-
+ arch/arm/mach-s5p6440/include/mach/irqs.h      |    9 +-
+ arch/arm/mach-s5p6442/include/mach/irqs.h      |    5 +-
+ arch/arm/mach-s5pc100/include/mach/irqs.h      |    3 -
+ arch/arm/mach-s5pc100/include/mach/regs-gpio.h |    7 +-
+ arch/arm/mach-s5pv210/include/mach/irqs.h      |   14 +--
+ arch/arm/mach-s5pv210/include/mach/regs-gpio.h |   14 +-
+ arch/arm/plat-s5p/Kconfig                      |    1 +
+ arch/arm/plat-s5p/include/plat/irqs.h          |    7 +
+ arch/arm/plat-s5p/irq-eint.c                   |   15 +-
+ 16 files changed, 407 insertions(+), 122 deletions(-)
 
 -- 
-Sincerely yours,
-Mike.
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
