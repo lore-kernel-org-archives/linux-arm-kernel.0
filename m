@@ -1,35 +1,19 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 24 May 2010 15:53:55 +0800
-Subject: [PATCH 6/6] [ARM] pxa/cm-x2xx: encode IRQ number into .nr_irqs
-In-Reply-To: <4BFA2BD1.5040005@compulab.co.il>
-References: <1274682949-25915-1-git-send-email-eric.y.miao@gmail.com>
-	<1274682949-25915-7-git-send-email-eric.y.miao@gmail.com>
-	<4BFA2BD1.5040005@compulab.co.il>
-Message-ID: <AANLkTildk7al5cPAGDIiCnDNM7xg0Bl587F5e7fIiqof@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 25 May 2010 21:21:52 -0400 (EDT)
+Subject: [PATCH] Kirkwood: Fix explanation of MPP45 for QNAP TS41x
+Message-ID: <alpine.LFD.2.00.1005252114100.24526@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Should be in my irq_cleanup branch, test welcome
+On Tue, 25 May 2010, Martin Michlmayr wrote:
 
-On May 24, 2010 3:34 PM, "Mike Rapoport" <mike@compulab.co.il> wrote:
+> On the QNAP TS-41x, MPP45 is used to show the setting of jumper JP1.
+> Fix the documentation to explain what the settings really indicate.
+> 
+> Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
 
-Hi Eric,
-
-
-
-Eric Miao wrote:
->
-> Cc: Mike Rapoport <mike@compulab.co.il>
-> Signed-off-by: Eric Miao <eric.y.mi...
-Looks Ok to me. Do you have a tree I can pull to test your changes?
+I've applied your one-liners to the orion.git repo on git.kernel.org.  I 
+should push them toward mainline after -rc1 is out.
 
 
-
-> diff --git a/arch/arm/mach-pxa/cm-x2xx-pci.h
-b/arch/arm/mach-pxa/cm-x2xx-pci.h
-> index e24aad2.....
-Sincerely yours,
-Mike.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100524/246da28a/attachment.htm>
+Nicolas
