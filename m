@@ -1,81 +1,43 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Wed, 26 May 2010 12:07:21 +0100
-Subject: [alsa-devel] [RFC PATCH v2 1/3] ep93xx i2s audio driver
-In-Reply-To: <1274850588-30460-2-git-send-email-ryan@bluewatersys.com>
-References: <1274850588-30460-1-git-send-email-ryan@bluewatersys.com>
-	<1274850588-30460-2-git-send-email-ryan@bluewatersys.com>
-Message-ID: <1274872041.3240.158.camel@odin>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 26 May 2010 21:20:08 +1000
+Subject: [PATCH 5/5] leds-gpio: Change blink_set callback to be able to
+	turn off blinking
+In-Reply-To: <1274871937.16229.79.camel@rex>
+References: <1274525695.1931.143.camel@pasglop> <1274871937.16229.79.camel@rex>
+Message-ID: <1274872808.1931.310.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-05-26 at 17:09 +1200, Ryan Mallon wrote:
-> Add ep93xx i2s audio driver
+On Wed, 2010-05-26 at 12:05 +0100, Richard Purdie wrote:
+> On Sat, 2010-05-22 at 20:54 +1000, Benjamin Herrenschmidt wrote:
+> > The leds-gpio blink_set() callback follows the same prototype as the
+> > main leds subsystem blink_set() one.
+> > 
+> > The problem is that to stop blink, normally, a leds driver does it
+> > in the brightness_set() callback when asked to set a new fixed value.
+> > 
+> > However, with leds-gpio, the platform has no hook to do so, as this
+> > later callback results in a standard GPIO manipulation.
+> > 
+> > This changes the leds-gpio specific callback to take a new argument
+> > that indicates whether the LED should be blinking or not and in what
+> > state it should be set if not. We also update the dns323 platform
+> > which seems to be the only user of this so far.
+> > 
+> > Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> > CC: Richard Purdie <rpurdie@rpsys.net>
+> > CC: Grant Likely <grant.likely@secretlab.ca>
+> > ---
+> >  arch/arm/mach-orion5x/dns323-setup.c |   23 +++++++++++++----------
+> >  drivers/leds/leds-gpio.c             |   31 ++++++++++++++++++++++++-------
+> >  include/linux/leds.h                 |   12 ++++++++----
+> >  3 files changed, 45 insertions(+), 21 deletions(-)
 > 
-> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
-> ---
->  sound/soc/Kconfig             |    1 +
->  sound/soc/Makefile            |    1 +
->  sound/soc/ep93xx/Kconfig      |    9 +
->  sound/soc/ep93xx/Makefile     |    8 +
->  sound/soc/ep93xx/ep93xx-i2s.c |  489 +++++++++++++++++++++++++++++++++++++++++
->  sound/soc/ep93xx/ep93xx-i2s.h |   25 ++
->  sound/soc/ep93xx/ep93xx-pcm.c |  323 +++++++++++++++++++++++++++
->  sound/soc/ep93xx/ep93xx-pcm.h |   22 ++
->  8 files changed, 878 insertions(+), 0 deletions(-)
->  create mode 100644 sound/soc/ep93xx/Kconfig
->  create mode 100644 sound/soc/ep93xx/Makefile
->  create mode 100644 sound/soc/ep93xx/ep93xx-i2s.c
->  create mode 100644 sound/soc/ep93xx/ep93xx-i2s.h
->  create mode 100644 sound/soc/ep93xx/ep93xx-pcm.c
->  create mode 100644 sound/soc/ep93xx/ep93xx-pcm.h
-> 
+> Queued in the leds tree, thanks.
 
-Overall looks OK, just some comments below.
+You may need to fixup the dns323 bit if you apply before my dns323 rev C
+patches ... but I suppose you figured that out already ;-) It should be
+minor.
 
-> +static void ep93xx_i2s_enable(struct ep93xx_i2s_info *info)
-> +{
-> +	int i;
-> +
-> +	/* Enable clocks */
-> +	clk_enable(info->mclk);
-> +	clk_enable(info->sclk);
-> +	clk_enable(info->lrclk);
-> +
-> +	/* Enable i2s */
-> +	ep93xx_i2s_write_reg(info, EP93XX_I2S_GLCTRL, 1);
-> +
-> +	/* Enable fifos */
-> +	for (i = 0; i < 3; i++) {
-> +		ep93xx_i2s_write_reg(info, EP93XX_I2S_RX0EN + (i * 4), 1);
-> +		ep93xx_i2s_write_reg(info, EP93XX_I2S_TX0EN + (i * 4), 1);
-
-Just curious, do we always need to enable both the RX and TX FIFOs ? Is
-there unnecessary system overhead here when we have playback only or
-capture only use cases ?
-
-
-> +static void ep93xx_pcm_buffer_started(void *cookie,
-> +				      struct ep93xx_dma_buffer *buf)
-> +{
-> +}
-
-Do we need this ?
-
-
-
-> +
-> +static int ep93xx_pcm_prepare(struct snd_pcm_substream *substream)
-> +{
-> +	return 0;
-> +}
-
-This can be removed
-
-Thanks
-
-Liam
-
--- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+Cheers,
+Ben.
