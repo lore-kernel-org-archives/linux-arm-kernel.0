@@ -1,56 +1,49 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 26 May 2010 23:23:01 +0200 (CEST)
-Subject: [PATCH 9/9] ARM: add DMA support to sh7372, enable DMA for SDHI
-In-Reply-To: <20100526141231.38e85b58.akpm@linux-foundation.org>
-References: <Pine.LNX.4.64.1005041318200.4925@axis700.grange>
-	<Pine.LNX.4.64.1005041424330.4925@axis700.grange>
-	<20100512155224.65eba9ee.akpm@linux-foundation.org>
-	<Pine.LNX.4.64.1005130851030.4671@axis700.grange>
-	<20100526141231.38e85b58.akpm@linux-foundation.org>
-Message-ID: <Pine.LNX.4.64.1005262316330.22516@axis700.grange>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 26 May 2010 23:33:46 +0200
+Subject: [PATCH] sa1111: Prevent deadlock in resume path
+In-Reply-To: <20100526201824.GA16418@n2100.arm.linux.org.uk>
+References: <1274901104-22133-1-git-send-email-marek.vasut@gmail.com>
+	<201005262115.57282.marek.vasut@gmail.com>
+	<20100526201824.GA16418@n2100.arm.linux.org.uk>
+Message-ID: <201005262333.47046.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew
-
-On Wed, 26 May 2010, Andrew Morton wrote:
-
-> On Thu, 13 May 2010 08:57:06 +0200 (CEST)
-> Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> 
-> > On Wed, 12 May 2010, Andrew Morton wrote:
-> > 
-> > > On Tue, 4 May 2010 16:07:15 +0200 (CEST)
-> > > Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+Dne St 26. kv?tna 2010 22:18:24 Russell King - ARM Linux napsal(a):
+> On Wed, May 26, 2010 at 09:15:57PM +0200, Marek Vasut wrote:
+> > Dne St 26. kv?tna 2010 21:14:25 Russell King - ARM Linux napsal(a):
+> > > On Wed, May 26, 2010 at 09:11:44PM +0200, Marek Vasut wrote:
+> > > > This patch reorganises the sa1111_resume() function in a manner the
+> > > > spinlock happens after calling the sa1111_wake(). This fixes two
+> > > > bugs:
+> > > > 
+> > > > 1) This function called sa1111_wake() which tried to claim the same
+> > > > spinlock
+> > > > 
+> > > >    the sa1111_resume() already claimed. This would result in certain
+> > > >    deadlock.
+> > > >    
+> > > >    Original idea for this part: Russell King <linux@arm.linux.org.uk>
+> > > > 
+> > > > 2) The function didn't unlock the spinlock in case the chip didn't
+> > > > report
+> > > > 
+> > > >    correct ID.
+> > > >    
+> > > >    Original idea for this part: Julia Lawall <julia@diku.dk>
+> > > > 
+> > > > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 > > > 
-> > > > This patch depends on patch series from Magnus for shmobile, adding INTC 
-> > > > and clock support. This patch wasn't there in the first version of this 
-> > > > series.
-> > > 
-> > > Where is that patch series now?
+> > > Yea, good enough.
 > > 
-> > AFAIU, these are two patch series - for the interrupt controller and for 
-> > the clock framework, and they are not upstream yet. So, I think, we can 
-> > leave patch 9/9 for later to be merged via the respective platform tree.
-> > 
+> > You want me to fight your patch tracking system or will you just merge it
+> > into your tree ?
 > 
-> Again, because of your lack of specificity in identifying patches I am
-> unable to determine whether
-> arm-add-dma-support-to-sh7372-enable-dma-for-sdhi.patch is presently
-> mergeable.
-> 
-> So I won't merge it.
+> What do you mean "fight" ?  Just send a standard git formatted patch
+> to the email address with an additional KernelVersion: tag.  It's
+> not at all hard.
 
-Thanks for keeping an eye on these patches! Actually, my above sentence "I 
-think, we can leave patch 9/9 for later to be merged via the respective 
-platform tree" was supposed to mean, that you can drop _this_ specific 
-patch, because it will be merged via the platform tree - in this case this 
-is the "genesis-2.6" tree, maintained by Paul Mundt. Sorry for not being 
-clear enough, please drop this patch.
+What address, how, any howto?
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+btw. why ?! Look at Eric, he doesn't need such crap, why do you complicate it so 
+much ?
