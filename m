@@ -1,35 +1,24 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 26 May 2010 21:15:57 +0200
-Subject: [PATCH] sa1111: Prevent deadlock in resume path
-In-Reply-To: <20100526191425.GD6232@n2100.arm.linux.org.uk>
-References: <1274901104-22133-1-git-send-email-marek.vasut@gmail.com>
-	<20100526191425.GD6232@n2100.arm.linux.org.uk>
-Message-ID: <201005262115.57282.marek.vasut@gmail.com>
+From: schen@mvista.com (Steve Chen)
+Date: Wed, 26 May 2010 14:41:34 -0500
+Subject: using openocd + gdb to debug linux kernel on arm926ejs
+In-Reply-To: <4BFD72AD.4010005@gmail.com>
+References: <4BFD72AD.4010005@gmail.com>
+Message-ID: <AANLkTikwrs3PUS2zNR8daxfVkSCKLUvRtDYkXicXcTXq@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne St 26. kv?tna 2010 21:14:25 Russell King - ARM Linux napsal(a):
-> On Wed, May 26, 2010 at 09:11:44PM +0200, Marek Vasut wrote:
-> > This patch reorganises the sa1111_resume() function in a manner the
-> > spinlock happens after calling the sa1111_wake(). This fixes two bugs:
-> > 
-> > 1) This function called sa1111_wake() which tried to claim the same
-> > spinlock
-> > 
-> >    the sa1111_resume() already claimed. This would result in certain
-> >    deadlock.
-> >    
-> >    Original idea for this part: Russell King <linux@arm.linux.org.uk>
-> > 
-> > 2) The function didn't unlock the spinlock in case the chip didn't report
-> > 
-> >    correct ID.
-> >    
-> >    Original idea for this part: Julia Lawall <julia@diku.dk>
-> > 
-> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> 
-> Yea, good enough.
+On Wed, May 26, 2010 at 2:12 PM, f. achkar <fachkar.datawind@gmail.com> wrote:
+> hi,
+> This is my second posting (I'm not sure the first one passed the filter) sorry for that ...
+>
+> I'm newbie and have a s3c2450 based board (arm926ejs), I have a working compressed kernel image
+> zImage, this image boots properly via u-boot-1.1.6, however I simply
+> failed to debug remotely the vmlinux (root directory of linux source tree) via openocd-0.4.0 with a j-link segger.
+> is there a good reference on how to properly debug the linux kernel via openocd/gdb for an arm target on a linux hot machine?
 
-You want me to fight your patch tracking system or will you just merge it into 
-your tree ?
+Actually, Nicolas Pitre posted an response in your first try.  In
+summary, use uImage for uboot.  vmlinux won't work.
+
+Regards,
+
+Steve
