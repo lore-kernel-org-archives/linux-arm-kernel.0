@@ -1,51 +1,25 @@
-From: julia@diku.dk (Julia Lawall)
-Date: Wed, 26 May 2010 17:56:14 +0200 (CEST)
-Subject: [PATCH 7/17] arch/arm/common: Add missing spin_unlock_irqrestore
-Message-ID: <Pine.LNX.4.64.1005261756000.23743@ask.diku.dk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 26 May 2010 08:58:32 -0700
+Subject: [PATCH 1/2] mc13783: add LED support
+In-Reply-To: <1274875268.24079.1.camel@rex>
+References: <1274114423-30020-1-git-send-email-philippe.retornaz@epfl.ch>
+	<1274114423-30020-2-git-send-email-philippe.retornaz@epfl.ch>
+	<20100517190242.GA17604@pengutronix.de>
+	<20100517200017.GA25262@sirena.org.uk>
+	<1274875268.24079.1.camel@rex>
+Message-ID: <20100526155831.GA18834@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <julia@diku.dk>
+On Wed, May 26, 2010 at 01:01:08PM +0100, Richard Purdie wrote:
+> On Mon, 2010-05-17 at 21:00 +0100, Mark Brown wrote:
 
-Add a spin_unlock_irqrestore missing on the error path.  Although the lock
-is destroyed with the rest of the sachip structure in the function
-__sa1111_remove, it still seems useful to restore the interrupt state.
+> > It'd be nice to add helpers for this to the LED core, there's quite a
+> > few drivers implementing this idiom now - a flag that does the deferring
+> > of the set() for example.
 
-The semantic match that finds this problem is as follows:
-(http://coccinelle.lip6.fr/)
+> Agreed, or a wrapper around the core which deferred implementations
+> could just use. I'm open to patches :)
 
-// <smpl>
-@@
-expression E1;
-@@
-
-* spin_lock_irqsave(E1,...);
-  <+... when != E1
-  if (...) {
-    ... when != E1
-*   return ...;
-  }
-  ...+>
-* spin_unlock_irqrestore(E1,...);
-// </smpl>
-
-Signed-off-by: Julia Lawall <julia@diku.dk>
-
----
-Perhaps the unlock is now too early?
-
- arch/arm/common/sa1111.c |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-index a52a27c..59e38ff 100644
---- a/arch/arm/common/sa1111.c
-+++ b/arch/arm/common/sa1111.c
-@@ -959,6 +959,7 @@ static int sa1111_resume(struct platform_device *dev)
- 	 */
- 	id = sa1111_readl(sachip->base + SA1111_SKID);
- 	if ((id & SKID_ID_MASK) != SKID_SA1111_ID) {
-+		spin_unlock_irqrestore(&sachip->lock, flags);
- 		__sa1111_remove(sachip);
- 		platform_set_drvdata(dev, NULL);
- 		kfree(save);
+In my copious free time, perhaps.  I was kind of hoping someone actively
+working on a driver could be inspired to do the work :)
