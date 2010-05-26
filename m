@@ -1,48 +1,32 @@
-From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
-Date: Wed, 26 May 2010 18:37:53 +0200
-Subject: [PATCH] imx-ssi.c: fix I2S slave setup
-Message-ID: <1274891873-3704-1-git-send-email-eric@eukrea.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 26 May 2010 12:55:43 -0400 (EDT)
+Subject: [patch 4/5] orion/kirkwood: Add i2s support
+In-Reply-To: <AANLkTim0m_zJ0J_9FMmXgKfS8ovQZpV-qxtHyOS2D3ZL@mail.gmail.com>
+References: <20100525122236.841941526@mandriva.com>
+	<20100525122341.443140710@mandriva.com>
+	<alpine.LFD.2.00.1005252025210.24526@xanadu.home>
+	<AANLkTim0m_zJ0J_9FMmXgKfS8ovQZpV-qxtHyOS2D3ZL@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1005261253470.24526@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* without this fix, the waveform on the SSI port are not real
-I2S signal (at least on i.MX27's SSI4)
+On Wed, 26 May 2010, saeed bishara wrote:
 
-* original Freescale's driver has
-	if (((fmt & SND_SOC_DAIFMT_FORMAT_MASK) == SND_SOC_DAIFMT_I2S)
-	    && ssi_mode->network_mode) {
-		scr &= ~SSI_SCR_I2S_MODE_MASK;
-		scr |= SSI_SCR_I2S_MODE_SLAVE;
-	}
-So as now the SSI is set in network mode as a default when running in
-I2S format, it seems reasonable to also set I2S_MODE_SLAVE
+> On Wed, May 26, 2010 at 3:31 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> > On Tue, 25 May 2010, apatard at mandriva.com wrote:
+> >
+> >> This patch enables support for the i2s controller available on orion/kirkwood platforms
+> >>
+> >> Signed-off-by: Arnaud Patard <apatard@mandriva.com>
+> >
+> > The actual Orion processor family has no I2S/audio support. ?It would be
+> > better if all the audio related stuff was renamed to "kirkwood" and
+> > "KIRKWOOD_*" instead.
+> This i2s was first included in orion90L (6183).
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
----
- sound/soc/imx/imx-ssi.c |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+This has no presence in the mainline source tree, nor any hardware that 
+people may care about at this point.  So it is probably best to refer to 
+it as being kirkwood related more than orion related.
 
-diff --git a/sound/soc/imx/imx-ssi.c b/sound/soc/imx/imx-ssi.c
-index 80b4fee..c5e1626 100644
---- a/sound/soc/imx/imx-ssi.c
-+++ b/sound/soc/imx/imx-ssi.c
-@@ -83,8 +83,6 @@ static int imx_ssi_set_dai_tdm_slot(struct snd_soc_dai *cpu_dai,
- /*
-  * SSI DAI format configuration.
-  * Should only be called when port is inactive (i.e. SSIEN = 0).
-- * Note: We don't use the I2S modes but instead manually configure the
-- * SSI for I2S because the I2S mode is only a register preset.
-  */
- static int imx_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
- {
-@@ -98,7 +96,7 @@ static int imx_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
- 	case SND_SOC_DAIFMT_I2S:
- 		/* data on rising edge of bclk, frame low 1clk before data */
- 		strcr |= SSI_STCR_TFSI | SSI_STCR_TEFS | SSI_STCR_TXBIT0;
--		scr |= SSI_SCR_NET;
-+		scr |= SSI_SCR_NET | SSI_SCR_I2S_MODE_SLAVE;
- 		break;
- 	case SND_SOC_DAIFMT_LEFT_J:
- 		/* data on rising edge of bclk, frame high with data */
--- 
-1.6.3.3
+
+Nicolas
