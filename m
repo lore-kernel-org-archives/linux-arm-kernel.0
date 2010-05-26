@@ -1,36 +1,44 @@
-From: hjk@linutronix.de (Hans J. Koch)
-Date: Wed, 26 May 2010 19:31:11 +0200
-Subject: [PATCH 2/7 v5] Add the clock framework for Telechips TCC8xxx
-	processors.
-In-Reply-To: <20100422111917.GE20008@n2100.arm.linux.org.uk>
-References: <20100421123814.GC1995@bluebox.local>
-	<20100421124159.GE1995@bluebox.local>
-	<20100422111917.GE20008@n2100.arm.linux.org.uk>
-Message-ID: <20100526173111.GB2006@bluebox.local>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 26 May 2010 19:37:54 +0200
+Subject: [PATCH 05/25] msm: generalize clock support.
+In-Reply-To: <20100525005115.GA7791@huya.qualcomm.com>
+References: <> <1273700754-10256-6-git-send-email-dwalker@codeaurora.org>
+	<20100524185540.GA1292@ucw.cz>
+	<20100525005115.GA7791@huya.qualcomm.com>
+Message-ID: <20100526173753.GD9069@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 22, 2010 at 12:19:17PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Apr 21, 2010 at 02:42:01PM +0200, Hans J. Koch wrote:
-> > +static int __set_parent(struct clk *clock, struct clk *parent)
-> > +{
-> > +	if (clock->parent && (clock->parent != parent)) {
-> > +		clock->parent->refcount--;
-> > +		if ((clock->parent->refcount == 0) && clock->parent->disable)
-> > +			clock->parent->disable(clock->parent);
-> > +	}
-> > +
-> > +	clock->parent = parent;
-> > +	if (clock->parent)
-> > +		clock->parent->refcount++;
+On Tue 2010-05-25 00:51:15, David Brown wrote:
+> On Mon, May 24, 2010 at 11:55:40AM -0700, Pavel Machek wrote:
 > 
-> Is this left over from the old clk_set_parent() implementation - with
-> the handling of refcounting in the main clk_set_parent(), this refcounting
-> seems unnecessary (and seems buggy.)
+> > > + * Redistribution and use in source and binary forms, with or without
+> > > + * modification, are permitted provided that the following conditions are
+> > > + * met:
+> > 
+> > Is this even GPL compatible?
+> 
+> Um, this is a standard 3-clause BSD license.  There are nearly
+> 900 existing files in the kernel that have this license on them.
 
-Right. All refcounting is already done in plat-tcc/clock.c, so this
-__set_parent() became obsolete. I removed it completely, because the initial
-parent setting is already done elsewhere.
+Are you sure? I believe that Dual GPL/BSD is ok, just BSD is not.
 
-Thanks,
-Hans
+pavel at amd:/data/l/linux-good$ less ./include/linux/license.h
+#ifndef __LICENSE_H
+#define __LICENSE_H
+
+static inline int license_is_gpl_compatible(const char *license)
+{
+        return (strcmp(license, "GPL") == 0
+                || strcmp(license, "GPL v2") == 0
+                || strcmp(license, "GPL and additional rights") == 0
+                || strcmp(license, "Dual BSD/GPL") == 0
+                || strcmp(license, "Dual MIT/GPL") == 0
+                || strcmp(license, "Dual MPL/GPL") == 0);
+}
+
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
