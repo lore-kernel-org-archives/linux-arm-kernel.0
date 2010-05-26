@@ -1,24 +1,37 @@
-From: fachkar.datawind@gmail.com (f. achkar)
-Date: Wed, 26 May 2010 17:11:22 -0400
-Subject: defining ARM machine type properly
-Message-ID: <4BFD8E7A.6050103@gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 26 May 2010 14:12:31 -0700
+Subject: [PATCH 9/9] ARM: add DMA support to sh7372, enable DMA for SDHI
+In-Reply-To: <Pine.LNX.4.64.1005130851030.4671@axis700.grange>
+References: <Pine.LNX.4.64.1005041318200.4925@axis700.grange>
+	<Pine.LNX.4.64.1005041424330.4925@axis700.grange>
+	<20100512155224.65eba9ee.akpm@linux-foundation.org>
+	<Pine.LNX.4.64.1005130851030.4671@axis700.grange>
+Message-ID: <20100526141231.38e85b58.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
-I'm trying to port smdk2450 arch to the a new kernel 2.6.32-9, I did the
-initial work as per various googled documents, but somehow the current
-initial Image is failing at arch/arm/kernel/head-common.S :
-'__lookup_processor_type', and eventually goes to '__error_a' of the
-same file! this seems to be related to the definition of machine_type as
-defined in :
-include/asm-arm/mach-types.h  and arch/arm/tools/mach-types*
-I checked where the definition goes in  include/asm-arm/mach-types.h by
-inserting
-#error 2223XX
-into various parts of that header and seems fine at the point.
-nevertheless I'm not 100 sure
-I wonder if the is a definitive reference to guide in this matter,
-better yet a check-list like procedure??
-thanks,
-ferar
+On Thu, 13 May 2010 08:57:06 +0200 (CEST)
+Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+
+> On Wed, 12 May 2010, Andrew Morton wrote:
+> 
+> > On Tue, 4 May 2010 16:07:15 +0200 (CEST)
+> > Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> > 
+> > > This patch depends on patch series from Magnus for shmobile, adding INTC 
+> > > and clock support. This patch wasn't there in the first version of this 
+> > > series.
+> > 
+> > Where is that patch series now?
+> 
+> AFAIU, these are two patch series - for the interrupt controller and for 
+> the clock framework, and they are not upstream yet. So, I think, we can 
+> leave patch 9/9 for later to be merged via the respective platform tree.
+> 
+
+Again, because of your lack of specificity in identifying patches I am
+unable to determine whether
+arm-add-dma-support-to-sh7372-enable-dma-for-sdhi.patch is presently
+mergeable.
+
+So I won't merge it.
