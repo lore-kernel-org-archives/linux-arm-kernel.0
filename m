@@ -1,7 +1,7 @@
-From: rumjantsev@papillon.ru (237 Rumjantsev Egor (PROG))
-Date: Wed, 26 May 2010 15:50:19 +0600
+From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
+Date: Wed, 26 May 2010 11:50:10 +0200
 Subject: vpack270 and sleep mode
-In-Reply-To: <20100526092756.GA6232@n2100.arm.linux.org.uk>
+In-Reply-To: <4BFCE794.9000306@papillon.ru>
 References: <1272311167-576-1-git-send-email-marek.vasut@gmail.com>
 	<4BFBD01E.8010101@papillon.ru>
 	<20100525202447.GD16204@n2100.arm.linux.org.uk>
@@ -9,30 +9,37 @@ References: <1272311167-576-1-git-send-email-marek.vasut@gmail.com>
 	<4BFC99CB.2090902@papillon.ru>
 	<20100526090748.GB25435@n2100.arm.linux.org.uk>
 	<4BFCE794.9000306@papillon.ru>
-	<20100526092756.GA6232@n2100.arm.linux.org.uk>
-Message-ID: <4BFCEEDB.4030408@papillon.ru>
+Message-ID: <19452.61138.172496.920965@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-26.05.2010 15:27, Russell King - ARM Linux ?????:
-> On Wed, May 26, 2010 at 03:19:16PM +0600, 237 Rumjantsev Egor (PROG) wrote:
->> no they doesn't, but here is a part of pxa2xx-flash.c and driver
->> structure registered by driver_register call. Is it problem ?
->>
->>
->> static struct device_driver pxa2xx_flash_driver = {
->>          .name           = "pxa2xx-flash",
->>          .bus            =&platform_bus_type,
->>          .probe          = pxa2xx_flash_probe,
->>          .remove         = __exit_p(pxa2xx_flash_remove),
->>          .suspend        = pxa2xx_flash_suspend,
->>          .resume         = pxa2xx_flash_resume,
->
-> The suspend and resume callbacks are removed in later kernels - could you
-> try commenting these two out and seeing what the effect is please?
->
-i commented suspend/resume functions and inserted return 0 but it didn't 
-help
+Hi,
 
+> static struct device_driver pxa2xx_flash_driver = {
+                ^^^^^^^^^^^^1
+>          .name           = "pxa2xx-flash",
+>          .bus            = &platform_bus_type,
+                             ^^^^^^^^^^^^^^^^^^
+This is WRONG!
+platform drivers require a struct platform_driver and MUST be
+registered using platform_driver_register()!
+The platform suspend/resume expects the struct device_driver to be
+embedded within a struct platform_driver.
+
+See https://patchwork.kernel.org/patch/5894/
+
+We should probably add some code to driver_register() to let it refuse
+to register drivers with a 'platform_bus_type'.
+
+
+Lothar Wa?mann
 -- 
-Rumjantsev Egor
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
