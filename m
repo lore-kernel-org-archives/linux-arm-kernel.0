@@ -1,23 +1,72 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 27 May 2010 07:38:46 +1000
-Subject: [PATCH 5/5] leds-gpio: Change blink_set callback to be able to
-	turn off blinking
-In-Reply-To: <1274874250.16229.87.camel@rex>
-References: <1274525695.1931.143.camel@pasglop>
-	<1274871937.16229.79.camel@rex>  <1274872808.1931.310.camel@pasglop>
-	<1274874250.16229.87.camel@rex>
-Message-ID: <1274909926.1931.331.camel@pasglop>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 May 2010 22:40:37 +0100
+Subject: [RFC] Initial attempt to make ARM use LMB
+In-Reply-To: <20100526135128.GN9645@atomide.com>
+References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
+	<20100522215848.GB29889@n2100.arm.linux.org.uk>
+	<20100526004418.GM9645@atomide.com>
+	<20100526075059.GA25435@n2100.arm.linux.org.uk>
+	<20100526135128.GN9645@atomide.com>
+Message-ID: <20100526214037.GB16418@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-05-26 at 12:44 +0100, Richard Purdie wrote:
-> Yes, I noticed just after I hit send and applied. I'd rather get the
-> core change in sooner than later and the reject doesn't look serious
-> so
-> I'm assuming you can fix up the missing active_low bit for the new
-> addition easily enough? 
+On Wed, May 26, 2010 at 06:51:29AM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [100526 00:45]:
+> > On Tue, May 25, 2010 at 05:44:18PM -0700, Tony Lindgren wrote:
+> > 
+> > > After applying the next patch in your lmb branch "ARM: OMAP: Convert
+> > > to use ->reserve method to reserve boot time memory" tux still works
+> > > on 5912osk, but not on n900. The difference is that osk5912 uses
+> > > the old omapfb code.
+> > 
+> > I guess this is because I don't have board-n900.c in my tree.  All OMAP
+> > boards need a ".reserve = omap_reserve," line added in their machine
+> > descriptor.
+> 
+> It's there but well hidden, board-rx51.c is the one for n900.
+>  
+> > I just noticed that board-n8x0.c contains more than one machine descriptor,
+> > which I've now fixed up.
+> 
+> OK good catch.
+> 
+> > > Anyways, I've picked the patches from lmb branch up to the one below
+> > > into omap-testing. Will add more of them once we get them working.
+> > 
+> > You should now be able to pick all but the last patch.
+> 
+> Yeah I'll do that once the dss2 code has been verified to work.
 
-Yup. No big deal.
+It'd help with this patch - it seems rx51 needs some additional stuff.
+Any other OMAP platforms with this kind of thing?
 
-Cheers,
-Ben.
+diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
+index 3bd956f..e3a42d1 100644
+--- a/arch/arm/mach-omap2/board-rx51.c
++++ b/arch/arm/mach-omap2/board-rx51.c
+@@ -144,17 +144,22 @@ static void __init rx51_init(void)
+ static void __init rx51_map_io(void)
+ {
+ 	omap2_set_globals_343x();
+-	rx51_video_mem_init();
+ 	omap34xx_map_common_io();
+ }
+ 
++static void __init rx51_reserve(void)
++{
++	rx51_video_mem_init();
++	omap_reserve();
++}
++
+ MACHINE_START(NOKIA_RX51, "Nokia RX-51 board")
+ 	/* Maintainer: Lauri Leukkunen <lauri.leukkunen@nokia.com> */
+ 	.phys_io	= 0x48000000,
+ 	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
+ 	.boot_params	= 0x80000100,
+ 	.map_io		= rx51_map_io,
+-	.reserve	= omap_reserve,
++	.reserve	= rx51_reserve,
+ 	.init_irq	= rx51_init_irq,
+ 	.init_machine	= rx51_init,
+ 	.timer		= &omap_timer,
