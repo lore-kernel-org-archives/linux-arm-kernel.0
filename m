@@ -1,55 +1,99 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 May 2010 22:42:36 +0100
-Subject: [PATCH] sa1111: Prevent deadlock in resume path
-In-Reply-To: <201005262333.47046.marek.vasut@gmail.com>
-References: <1274901104-22133-1-git-send-email-marek.vasut@gmail.com>
-	<201005262115.57282.marek.vasut@gmail.com>
-	<20100526201824.GA16418@n2100.arm.linux.org.uk>
-	<201005262333.47046.marek.vasut@gmail.com>
-Message-ID: <20100526214236.GC16418@n2100.arm.linux.org.uk>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 27 May 2010 00:41:16 +0300
+Subject: [PATCH 6/8] Input: s3c24xx_ts - Add FEAT for Samsung touchscreen
+	support
+In-Reply-To: <1274249542-28795-7-git-send-email-ben-linux@fluff.org>
+References: <1274249542-28795-1-git-send-email-ben-linux@fluff.org>
+	<1274249542-28795-7-git-send-email-ben-linux@fluff.org>
+Message-ID: <201005270041.26758.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 26, 2010 at 11:33:46PM +0200, Marek Vasut wrote:
-> Dne St 26. kv?tna 2010 22:18:24 Russell King - ARM Linux napsal(a):
-> > On Wed, May 26, 2010 at 09:15:57PM +0200, Marek Vasut wrote:
-> > > Dne St 26. kv?tna 2010 21:14:25 Russell King - ARM Linux napsal(a):
-> > > > On Wed, May 26, 2010 at 09:11:44PM +0200, Marek Vasut wrote:
-> > > > > This patch reorganises the sa1111_resume() function in a manner the
-> > > > > spinlock happens after calling the sa1111_wake(). This fixes two
-> > > > > bugs:
-> > > > > 
-> > > > > 1) This function called sa1111_wake() which tried to claim the same
-> > > > > spinlock
-> > > > > 
-> > > > >    the sa1111_resume() already claimed. This would result in certain
-> > > > >    deadlock.
-> > > > >    
-> > > > >    Original idea for this part: Russell King <linux@arm.linux.org.uk>
-> > > > > 
-> > > > > 2) The function didn't unlock the spinlock in case the chip didn't
-> > > > > report
-> > > > > 
-> > > > >    correct ID.
-> > > > >    
-> > > > >    Original idea for this part: Julia Lawall <julia@diku.dk>
-> > > > > 
-> > > > > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> > > > 
-> > > > Yea, good enough.
-> > > 
-> > > You want me to fight your patch tracking system or will you just merge it
-> > > into your tree ?
-> > 
-> > What do you mean "fight" ?  Just send a standard git formatted patch
-> > to the email address with an additional KernelVersion: tag.  It's
-> > not at all hard.
+? ????????? ?? 19 ??? 2010 09:12:20 ????? Ben Dooks ???????:
+> From: Naveen Krishna <ch.naveen@samsung.com>
 > 
-> What address, how, any howto?
+> This patch adds a feature bit field in the touchscreen driver for Samsung
+> SoCs. Which can be used to distinguish the TSADC module features.
 > 
-> btw. why ?! Look at Eric, he doesn't need such crap, why do you complicate it so 
-> much ?
+> Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> [ben-linux at fluff.org: minor fix to title]
+> Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+> ---
+>  drivers/input/touchscreen/s3c2410_ts.c |   15 ++++++++++++---
+>  1 files changed, 12 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/input/touchscreen/s3c2410_ts.c
+> b/drivers/input/touchscreen/s3c2410_ts.c index 86086a4..e0b7c83 100644
+> --- a/drivers/input/touchscreen/s3c2410_ts.c
+> +++ b/drivers/input/touchscreen/s3c2410_ts.c
+> @@ -55,6 +55,8 @@
+>  			 S3C2410_ADCTSC_AUTO_PST | \
+>  			 S3C2410_ADCTSC_XY_PST(0))
+> 
+> +#define FEAT_PEN_IRQ	(1 << 0)	/* HAS ADCCLRINTPNDNUP */
+> +
+>  /* Per-touchscreen data. */
+> 
+>  /**
+> @@ -69,6 +71,7 @@
+>   * @irq_tc: The interrupt number for pen up/down interrupt
+>   * @count: The number of samples collected.
+>   * @shift: The log2 of the maximum count to read in one go.
+> + * @features: The features supported by the TSADC MOdule.
+>   */
+>  struct s3c2410ts {
+>  	struct s3c_adc_client *client;
+> @@ -81,6 +84,7 @@ struct s3c2410ts {
+>  	int irq_tc;
+>  	int count;
+>  	int shift;
+> +	int features;
+>  };
+> 
+>  static struct s3c2410ts ts;
+> @@ -171,6 +175,11 @@ static irqreturn_t stylus_irq(int irq, void *dev_id)
+>  	else
+>  		dev_info(ts.dev, "%s: count=%d\n", __func__, ts.count);
+> 
+> +	if (ts.features & FEAT_PEN_IRQ) {
+> +		/* Clear pen down/up interrupt */
+> +		writel(0x0, ts.io + S3C64XX_ADCCLRINTPNDNUP);
+> +	}
+> +
+>  	return IRQ_HANDLED;
+>  }
+> 
+> @@ -317,6 +326,7 @@ static int __devinit s3c2410ts_probe(struct
+> platform_device *pdev) ts.input->id.version = 0x0102;
+> 
+>  	ts.shift = info->oversampling_shift;
+> +	ts.features = platform_get_device_id(pdev)->driver_data;
+> 
+>  	ret = request_irq(ts.irq_tc, stylus_irq, IRQF_DISABLED,
+>  			  "s3c2410_ts_pen", ts.input);
+> @@ -403,15 +413,14 @@ static struct dev_pm_ops s3c_ts_pmops = {
+>  #endif
+> 
+>  static struct platform_device_id s3cts_driver_ids[] = {
+> -	{ "s3c2410-ts", 0 },
+> -	{ "s3c2440-ts", 1 },
+> +	{ "s3c64xx-ts", FEAT_PEN_IRQ },
 
-You expect a helpful reply with such an attitude.  Sorry, I'm not going
-to bother with attacks like this.  You earn the prize of figuring it out
-yourself.
+Why s3c24xx ids was removed? This driver doesn't attach on my rx1950 anymore
+:\
+
+Adding new devices is good thing, but breaking compatibility is evil :(
+
+I'm a bit surprised that _this_ patch series was merged but was not tested on 
+s3c24xx-devices.
+
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100527/06a9e7e9/attachment-0001.sig>
