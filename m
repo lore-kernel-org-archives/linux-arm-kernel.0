@@ -1,55 +1,72 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 26 May 2010 11:16:59 +0100
-Subject: request pull of bjdooks' for-linus/2634-git-updates
-Message-ID: <20100526101659.GH4720@trinity.fluff.org>
+From: rumjantsev@papillon.ru (237 Rumjantsev Egor (PROG))
+Date: Wed, 26 May 2010 16:43:51 +0600
+Subject: vpack270 and sleep mode
+In-Reply-To: <19452.61138.172496.920965@ipc1.ka-ro>
+References: <1272311167-576-1-git-send-email-marek.vasut@gmail.com>	<4BFBD01E.8010101@papillon.ru>	<20100525202447.GD16204@n2100.arm.linux.org.uk>	<201005252247.57688.marek.vasut@gmail.com>	<4BFC99CB.2090902@papillon.ru>	<20100526090748.GB25435@n2100.arm.linux.org.uk>	<4BFCE794.9000306@papillon.ru>
+	<19452.61138.172496.920965@ipc1.ka-ro>
+Message-ID: <4BFCFB67.6040104@papillon.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two cleanups for post merging to mainline and a defconfig update
-for all the defconfigs to bring them up to latest kernel.
+26.05.2010 15:50, Lothar Wa?mann ?????:
+> Hi,
+>
+>> static struct device_driver pxa2xx_flash_driver = {
+>                  ^^^^^^^^^^^^1
+>>           .name           = "pxa2xx-flash",
+>>           .bus            =&platform_bus_type,
+>                               ^^^^^^^^^^^^^^^^^^
+> This is WRONG!
+> platform drivers require a struct platform_driver and MUST be
+> registered using platform_driver_register()!
+> The platform suspend/resume expects the struct device_driver to be
+> embedded within a struct platform_driver.
+>
+> See https://patchwork.kernel.org/patch/5894/
+>
+> We should probably add some code to driver_register() to let it refuse
+> to register drivers with a 'platform_bus_type'.
+>
+>
+> Lothar Wa?mann
 
-The following changes since commit b1cdc4670b9508fcd47a15fbd12f70d269880b37:
-  Linus Torvalds (1):
-        Merge git://git.kernel.org/.../davem/net-2.6
+Thank you! This patch helped to pass core test but my board still 
+doesn't resume from sleep mode
 
-are available in the git repository at:
+May be some of Power Manager registers set up not correctly ?
 
-  git://git.fluff.org/bjdooks/linux.git for-linus/2634-git-updates
+dm9000 dm9000.0: LATE suspend
+platform pxa27x-pwm.1: LATE suspend
+platform pxa27x-pwm.0: LATE suspend
+platform pxa27x-ssp.2: LATE suspend
+platform pxa27x-ssp.1: LATE suspend
+platform pxa27x-ssp.0: LATE suspend
+platform pxa2xx-i2c.1: LATE suspend
+platform sa1100-rtc: LATE suspend
+platform pxa2xx-i2s: LATE suspend
+pxa2xx-uart pxa2xx-uart.2: LATE suspend
+pxa2xx-uart pxa2xx-uart.1: LATE suspend
+pxa2xx-uart pxa2xx-uart.0: LATE suspend
+platform pxa27x-udc: LATE suspend
+pxa_pm_enter(): RCSR value: 0x00000000
+pxa_pm_enter(): state: 3
+pxa_pm_enter(): Power regs:
+pxa_pm_enter(): GPDR0: 0x0070E200
+pxa_pm_enter(): PWER: 0x00000001
+pxa_pm_enter(): PFER: 0x00000000
+pxa_pm_enter(): PRER: 0x00000001
+pxa_pm_enter(): PGSR0: 0x00010000
+pxa_pm_enter(): PGSR1: 0x000F2000
+pxa_pm_enter(): PGSR2: 0x0404C000
+pxa_pm_enter(): PGSR3: 0x00000020
+pxa27x_cpu_pm_enter(): go to suspend : 3
+pxa27x_cpu_pm_enter(): PCFR: 0x21
+pxa27x_cpu_pm_enter(): PSSR: 0x0
+pxa27x_cpu_pm_enter(): PSLR: 0xCC100004
+pxa27x_cpu_pm_enter(): PSPR: 0x803503E0
+pxa27x_cpu_pm_enter(): CKEN: 0x500226
+pxa27x_cpu_pm_enter(): OSCC: 0x3
 
-Ben Dooks (9):
-      ARM: s3c2410_defconfig: Update s3c2410_defconfig to v2.6.34-git
-      ARM: s3c6400_defconfig: Update s3c6400_defconfig to v2.6.34-git
-      ARM: s5p6440_defconfig: Update s5p6440_defconfig to v2.6.34-git
-      ARM: s5p6442_defconfig: Update s5p6442_defconfig to v2.6.34-git
-      ARM: s5pc100_defconfig: Update s5pc100_defconfig to v2.6.34-git
-      ARM: s5pc110_defconfig: Update s5pc110_defconfig to v2.6.34-git
-      ARM: s5pv210_defconfig: Update s5pv210_defconfig to v2.6.34-git
-      ARM: S5PC100: Fixup cross tree merge problems
-      ARM: Merge next-samsung
-
-Pannaga Bhushan (1):
-      ARM: S5P: Fix the platform external interrupt issues.
-
- arch/arm/configs/s3c2410_defconfig             |   70 ++++++-
- arch/arm/configs/s3c6400_defconfig             |   35 +++-
- arch/arm/configs/s5p6440_defconfig             |   29 +++-
- arch/arm/configs/s5p6442_defconfig             |   24 ++-
- arch/arm/configs/s5pc100_defconfig             |  233 +++++++++++++++++++-----
- arch/arm/configs/s5pc110_defconfig             |   30 +++-
- arch/arm/configs/s5pv210_defconfig             |   33 +++-
- arch/arm/mach-s5p6440/include/mach/irqs.h      |    9 +-
- arch/arm/mach-s5p6442/include/mach/irqs.h      |    5 +-
- arch/arm/mach-s5pc100/include/mach/irqs.h      |    3 -
- arch/arm/mach-s5pc100/include/mach/regs-gpio.h |    7 +-
- arch/arm/mach-s5pv210/include/mach/irqs.h      |   14 +--
- arch/arm/mach-s5pv210/include/mach/regs-gpio.h |   14 +-
- arch/arm/plat-s5p/Kconfig                      |    1 +
- arch/arm/plat-s5p/include/plat/irqs.h          |    7 +
- arch/arm/plat-s5p/irq-eint.c                   |   15 +-
- 16 files changed, 407 insertions(+), 122 deletions(-)
 
 -- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Rumjantsev Egor
