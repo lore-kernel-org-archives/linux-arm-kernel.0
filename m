@@ -1,72 +1,55 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 May 2010 22:40:37 +0100
-Subject: [RFC] Initial attempt to make ARM use LMB
-In-Reply-To: <20100526135128.GN9645@atomide.com>
-References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
-	<20100522215848.GB29889@n2100.arm.linux.org.uk>
-	<20100526004418.GM9645@atomide.com>
-	<20100526075059.GA25435@n2100.arm.linux.org.uk>
-	<20100526135128.GN9645@atomide.com>
-Message-ID: <20100526214037.GB16418@n2100.arm.linux.org.uk>
+Date: Wed, 26 May 2010 22:42:36 +0100
+Subject: [PATCH] sa1111: Prevent deadlock in resume path
+In-Reply-To: <201005262333.47046.marek.vasut@gmail.com>
+References: <1274901104-22133-1-git-send-email-marek.vasut@gmail.com>
+	<201005262115.57282.marek.vasut@gmail.com>
+	<20100526201824.GA16418@n2100.arm.linux.org.uk>
+	<201005262333.47046.marek.vasut@gmail.com>
+Message-ID: <20100526214236.GC16418@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 26, 2010 at 06:51:29AM -0700, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [100526 00:45]:
-> > On Tue, May 25, 2010 at 05:44:18PM -0700, Tony Lindgren wrote:
+On Wed, May 26, 2010 at 11:33:46PM +0200, Marek Vasut wrote:
+> Dne St 26. kv?tna 2010 22:18:24 Russell King - ARM Linux napsal(a):
+> > On Wed, May 26, 2010 at 09:15:57PM +0200, Marek Vasut wrote:
+> > > Dne St 26. kv?tna 2010 21:14:25 Russell King - ARM Linux napsal(a):
+> > > > On Wed, May 26, 2010 at 09:11:44PM +0200, Marek Vasut wrote:
+> > > > > This patch reorganises the sa1111_resume() function in a manner the
+> > > > > spinlock happens after calling the sa1111_wake(). This fixes two
+> > > > > bugs:
+> > > > > 
+> > > > > 1) This function called sa1111_wake() which tried to claim the same
+> > > > > spinlock
+> > > > > 
+> > > > >    the sa1111_resume() already claimed. This would result in certain
+> > > > >    deadlock.
+> > > > >    
+> > > > >    Original idea for this part: Russell King <linux@arm.linux.org.uk>
+> > > > > 
+> > > > > 2) The function didn't unlock the spinlock in case the chip didn't
+> > > > > report
+> > > > > 
+> > > > >    correct ID.
+> > > > >    
+> > > > >    Original idea for this part: Julia Lawall <julia@diku.dk>
+> > > > > 
+> > > > > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> > > > 
+> > > > Yea, good enough.
+> > > 
+> > > You want me to fight your patch tracking system or will you just merge it
+> > > into your tree ?
 > > 
-> > > After applying the next patch in your lmb branch "ARM: OMAP: Convert
-> > > to use ->reserve method to reserve boot time memory" tux still works
-> > > on 5912osk, but not on n900. The difference is that osk5912 uses
-> > > the old omapfb code.
-> > 
-> > I guess this is because I don't have board-n900.c in my tree.  All OMAP
-> > boards need a ".reserve = omap_reserve," line added in their machine
-> > descriptor.
+> > What do you mean "fight" ?  Just send a standard git formatted patch
+> > to the email address with an additional KernelVersion: tag.  It's
+> > not at all hard.
 > 
-> It's there but well hidden, board-rx51.c is the one for n900.
->  
-> > I just noticed that board-n8x0.c contains more than one machine descriptor,
-> > which I've now fixed up.
+> What address, how, any howto?
 > 
-> OK good catch.
-> 
-> > > Anyways, I've picked the patches from lmb branch up to the one below
-> > > into omap-testing. Will add more of them once we get them working.
-> > 
-> > You should now be able to pick all but the last patch.
-> 
-> Yeah I'll do that once the dss2 code has been verified to work.
+> btw. why ?! Look at Eric, he doesn't need such crap, why do you complicate it so 
+> much ?
 
-It'd help with this patch - it seems rx51 needs some additional stuff.
-Any other OMAP platforms with this kind of thing?
-
-diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
-index 3bd956f..e3a42d1 100644
---- a/arch/arm/mach-omap2/board-rx51.c
-+++ b/arch/arm/mach-omap2/board-rx51.c
-@@ -144,17 +144,22 @@ static void __init rx51_init(void)
- static void __init rx51_map_io(void)
- {
- 	omap2_set_globals_343x();
--	rx51_video_mem_init();
- 	omap34xx_map_common_io();
- }
- 
-+static void __init rx51_reserve(void)
-+{
-+	rx51_video_mem_init();
-+	omap_reserve();
-+}
-+
- MACHINE_START(NOKIA_RX51, "Nokia RX-51 board")
- 	/* Maintainer: Lauri Leukkunen <lauri.leukkunen@nokia.com> */
- 	.phys_io	= 0x48000000,
- 	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
- 	.boot_params	= 0x80000100,
- 	.map_io		= rx51_map_io,
--	.reserve	= omap_reserve,
-+	.reserve	= rx51_reserve,
- 	.init_irq	= rx51_init_irq,
- 	.init_machine	= rx51_init,
- 	.timer		= &omap_timer,
+You expect a helpful reply with such an attitude.  Sorry, I'm not going
+to bother with attacks like this.  You earn the prize of figuring it out
+yourself.
