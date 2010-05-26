@@ -1,153 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 26 May 2010 14:06:35 +0100
-Subject: [PATCH 0/4] Patches for -next
-In-Reply-To: <1274706410.4720.34.camel@e102109-lin.cambridge.arm.com>
-References: <1274706410.4720.34.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <1274879195.6879.15.camel@e102109-lin.cambridge.arm.com>
+From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
+Date: Wed, 26 May 2010 15:08:26 +0200
+Subject: [RFC PATCH v2 1/3] ep93xx i2s audio driver
+In-Reply-To: <1274878490.9346.38.camel@cndougla-ubuntu>
+References: <1274850588-30460-1-git-send-email-ryan@bluewatersys.com>
+	<1274850588-30460-2-git-send-email-ryan@bluewatersys.com>
+	<1274878490.9346.38.camel@cndougla-ubuntu>
+Message-ID: <19453.7498.815423.705243@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-05-24 at 14:06 +0100, Catalin Marinas wrote:
-> On Mon, 2010-05-24 at 13:08 +0100, Russell King - ARM Linux wrote:
-> > Not sure what the right fix for this is at the moment - and if we're
-> > going to make set_pte_at() more complicated, it should be moved out
-> > of line.
+Hi,
+
+> > +#define EP93XX_I2S_LRDIV	17
+> > +#define EP93XX_I2S_SDIV		16
 > 
-> The only way I can think of is to do the cache flushing in set_pte_at().
-
-Here's a new variant dealing with cache flushing via set_pte_at(). It
-could be optimised to avoid whole I-cache flushing on non-aliasing VIPT
-(well, all SMP systems). We could even make this method the default for
-UP v6+ systems.
-
-If you are OK with this approach, I'll repost the patches I have for
--next.
-
-Thanks.
+> Looks like a minor ugly whitespace issue above.
+> 
+Only in the indentation of the patch...
+If you look at the code with the leading '+' removed, indentation is
+OK.
 
 
-ARM: Synchronise the I and D caches via set_pte_at() on SMP systems
-
-From: Catalin Marinas <catalin.marinas@arm.com>
-
-On SMP systems, there is a small chance of a PTE becoming visible to a
-different CPU before the cache maintenance operations in
-update_mmu_cache(). This patch follows the IA-64 and PowerPC approach of
-synchronising the I and D caches via the set_pte_at() function. In this
-case, there is no need for update_mmu_cache() to be implemented since
-lazy cache flushing is already handled by the time this function is
-called.
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/include/asm/pgtable.h  |   21 ++++++++++++++++++---
- arch/arm/include/asm/tlbflush.h |   10 +++++++++-
- arch/arm/mm/fault-armv.c        |    2 ++
- arch/arm/mm/flush.c             |   13 +++++++++++++
- 4 files changed, 42 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index ab68cf1..9043f60 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -278,9 +278,24 @@ extern struct page *empty_zero_page;
- 
- #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
- 
--#define set_pte_at(mm,addr,ptep,pteval) do { \
--	set_pte_ext(ptep, pteval, (addr) >= TASK_SIZE ? 0 : PTE_EXT_NG); \
-- } while (0)
-+#ifndef CONFIG_SMP
-+static inline void __sync_icache_dcache(pte_t pteval)
-+{
-+}
-+#else
-+extern void __sync_icache_dcache(pte_t pteval);
-+#endif
-+
-+static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
-+			      pte_t *ptep, pte_t pteval)
-+{
-+	if (addr >= TASK_SIZE)
-+		set_pte_ext(ptep, pteval, 0);
-+	else {
-+		__sync_icache_dcache(pteval);
-+		set_pte_ext(ptep, pteval, PTE_EXT_NG);
-+	}
-+}
- 
- /*
-  * The following only work if pte_present() is true.
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index 40a7092..6aabedd 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -554,10 +554,18 @@ extern void flush_tlb_kernel_range(unsigned long start, unsigned long end);
- /*
-  * If PG_dcache_clean is not set for the page, we need to ensure that any
-  * cache entries for the kernels virtual memory range are written
-- * back to the page.
-+ * back to the page. On SMP systems, the cache coherency is handled in the
-+ * set_pte_at() function.
-  */
-+#ifndef CONFIG_SMP
- extern void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
- 	pte_t *ptep);
-+#else
-+static inline void update_mmu_cache(struct vm_area_struct *vma,
-+				    unsigned long addr, pte_t *ptep)
-+{
-+}
-+#endif
- 
- #endif
- 
-diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
-index 91a691f..030f1da 100644
---- a/arch/arm/mm/fault-armv.c
-+++ b/arch/arm/mm/fault-armv.c
-@@ -28,6 +28,7 @@
- 
- static unsigned long shared_pte_mask = L_PTE_MT_BUFFERABLE;
- 
-+#ifndef CONFIG_SMP
- /*
-  * We take the easy way out of this problem - we make the
-  * PTE uncacheable.  However, we leave the write buffer on.
-@@ -177,6 +178,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
- 			__flush_icache_all();
- 	}
- }
-+#endif	/* !CONFIG_SMP */
- 
- /*
-  * Check whether the write buffer has physical address aliasing
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 6f55e36..90a6c60 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -212,6 +212,19 @@ static void __flush_dcache_aliases(struct address_space *mapping, struct page *p
- 	flush_dcache_mmap_unlock(mapping);
- }
- 
-+#ifdef CONFIG_SMP
-+void __sync_icache_dcache(pte_t pteval)
-+{
-+	struct page *page = pte_page(pteval);
-+	struct address_space *mapping = page_mapping(page);
-+
-+	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
-+		__flush_dcache_page(mapping, page);
-+	if (pte_val(pteval) & L_PTE_EXEC)
-+		__flush_icache_all();
-+}
-+#endif
-+
- /*
-  * Ensure cache coherency between kernel mapping and userspace mapping
-  * of this page.
-
-
-
+Lothar Wa?mann
 -- 
-Catalin
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
