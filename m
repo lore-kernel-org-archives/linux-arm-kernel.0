@@ -1,45 +1,78 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Wed, 26 May 2010 11:50:10 +0200
-Subject: vpack270 and sleep mode
-In-Reply-To: <4BFCE794.9000306@papillon.ru>
-References: <1272311167-576-1-git-send-email-marek.vasut@gmail.com>
-	<4BFBD01E.8010101@papillon.ru>
-	<20100525202447.GD16204@n2100.arm.linux.org.uk>
-	<201005252247.57688.marek.vasut@gmail.com>
-	<4BFC99CB.2090902@papillon.ru>
-	<20100526090748.GB25435@n2100.arm.linux.org.uk>
-	<4BFCE794.9000306@papillon.ru>
-Message-ID: <19452.61138.172496.920965@ipc1.ka-ro>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Wed, 26 May 2010 12:57:02 +0300
+Subject: [PATCH 01/20] mtd: pxa3xx_nand: refuse the flash definition get
+	from platform
+In-Reply-To: <AANLkTimOGbp6m2v4574ZR-74zbUA-dSAZl3BhlkOBqr3@mail.gmail.com>
+References: <AANLkTinVBXhT77Zd-LNpufgJAl7WZdic0oxDFwvNkvJg@mail.gmail.com>	
+	<4BFA2B5B.4080105@compulab.co.il>	
+	<AANLkTilLYFVPcel-rE8RbuTWEir4RJOBqmyxirb6Vozn@mail.gmail.com>	
+	<4BFA5C58.7050109@compulab.co.il>	
+	<AANLkTimYwQa5aJ2wuuBvPQ6O6hgYKaQcCcb3jwTcgFcD@mail.gmail.com>	
+	<4BFA7D60.6020703@compulab.co.il>	
+	<AANLkTil1mq5FBePSexz80DyT80DGqshqyJEi6Pfp0kV7@mail.gmail.com>	
+	<4BFBA4BA.9020502@compulab.co.il>
+	<AANLkTimOGbp6m2v4574ZR-74zbUA-dSAZl3BhlkOBqr3@mail.gmail.com>
+Message-ID: <4BFCF06E.5010809@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Lei Wen wrote:
+> On Tue, May 25, 2010 at 6:21 PM, Mike Rapoport <mike@compulab.co.il> wrote:
 
-> static struct device_driver pxa2xx_flash_driver = {
-                ^^^^^^^^^^^^1
->          .name           = "pxa2xx-flash",
->          .bus            = &platform_bus_type,
-                             ^^^^^^^^^^^^^^^^^^
-This is WRONG!
-platform drivers require a struct platform_driver and MUST be
-registered using platform_driver_register()!
-The platform suspend/resume expects the struct device_driver to be
-embedded within a struct platform_driver.
+>> Can you please elaborate what are the attributes that cannot be detected?
+> 
+> The attributes comes from two new features that would be included into
+> pxa3xx_nand: BCH support and 8bit per 512bytes ECC.
+> Originally, our pxa3xx_nand only support Hamming ECC way. So no doubt
+> just read the timing register, and just set use ecc bit in NDCR is
+> enough.
+> But for now there is two type of ECC type. For distinguish, we
+> introduce a new register called NDECCCTRL. NDECCCTRL_BCH_EN in the bit
+> 0 of that register control whether use the BCH ECC.
+> You may ask me why not just read from NDECCCTRL to know the ECC type.
+> It is right, but not always to be true. It the last command executed
+> for nand before kernel take control is not read or write operation,
+> the bootloader has no reason to set the NDECCCTRL register. So our
+> kernel also unable to detect whether to use BCH or HAMMING ECC.
+> 
+> This two type of ecc has different character, if use hamming ecc for
+> reading while that page is written by BCH, it would instant report of
+> DB error...
+> This is not the worst case., for we may ask the bootloader to always
+> set the NDECCCTRL. (There is no reason to apply ECC when do command
+> except the read and write although)
+> 
+> The worst would comes at the supporting of 8bit per 512 bytes ECC. Our
+> BCH engine only support 16bit corroction per 2k data, aka 4bit per
+> 512bytes.
+> If we need to support 8bit per 512bytes feature, which is needed by a
+> lot of newest flash which require such high ecc strength.
+> Then we have to apply the BCH to 1k data instead of 2k. The layout of
+> content on flash would change.
+> Original BCH apply to 2k nand, the layout may like: | 2k data | + | 30
+> bytes ECC |
+> Now after apply BCH to 1k range, the layout would be like: | 1k data |
+> + | 30 bytes ECC| + | 1k data| + |30 bytes ECC|.
+> Even as I said let the bootloader to always set the NDECCCTRL. The
+> kernel would still cannot distinguish the two use case of 4bit per
+> 512bytes and 8bit per 512 bytes ECC strength requirement.
+> For they both use BCH, the only difference could be told on the nand
+> layout, not by register reading.
+> 
+> Those two new feature would lead different nand content layout. So if
+> not distinguish properly, nand would not be able to work functional.
+> And obviously, the two features cannot get from register reading, and
+> that is the reason why I suggest drop the feature.
 
-See https://patchwork.kernel.org/patch/5894/
+Why not make the ECC type and strength part of the 
+pxa3xx_nand_platform_data? This way you can ensure NAND layout 
+consistency for particular platform without reduction in the driver 
+robustness.
 
-We should probably add some code to driver_register() to let it refuse
-to register drivers with a 'platform_bus_type'.
+> Thanks,
+> Lei
 
 
-Lothar Wa?mann
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Sincerely yours,
+Mike.
