@@ -1,57 +1,110 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 May 2010 08:50:59 +0100
-Subject: [RFC] Initial attempt to make ARM use LMB
-In-Reply-To: <20100526004418.GM9645@atomide.com>
-References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
-	<20100522215848.GB29889@n2100.arm.linux.org.uk>
-	<20100526004418.GM9645@atomide.com>
-Message-ID: <20100526075059.GA25435@n2100.arm.linux.org.uk>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 26 May 2010 11:13:31 +0300
+Subject: [PATCH v2 1/3] mx2_camera: Add soc_camera support for
+	i.MX25/i.MX27
+In-Reply-To: <Pine.LNX.4.64.1005241754220.2611@axis700.grange>
+References: <cover.1274706733.git.baruch@tkos.co.il>
+	<4c15903511a5c4e6997b190d321b6fdf15bb6579.1274706733.git.baruch@tkos.co.il>
+	<Pine.LNX.4.64.1005241754220.2611@axis700.grange>
+Message-ID: <20100526081331.GB10306@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 25, 2010 at 05:44:18PM -0700, Tony Lindgren wrote:
-> > So, below is a patch to sanitize the code in arch/arm/plat-omap/fb.c.
-> > The logic in this file is rather convoluted, but essentially:
+Hi Guennadi,
+
+Thanks for your comments. A question below.
+
+On Tue, May 25, 2010 at 05:34:52PM +0200, Guennadi Liakhovetski wrote:
+> On Mon, 24 May 2010, Baruch Siach wrote:
+
+[snip]
+
+> > +static void mx2_camera_deactivate(struct mx2_camera_dev *pcdev)
+> > +{
+> > +	unsigned long flags;
+> > +
+> > +	clk_disable(pcdev->clk_csi);
+> > +	writel(0, pcdev->base_csi + CSICR1);
+> > +	if (mx27_camera_emma(pcdev))
+> > +		writel(0, pcdev->base_emma + PRP_CNTL);
+> > +	else if (cpu_is_mx25()) {
 > 
-> I've tried the patch below with the patches from your lmb branch
-> up to this one and I can see tux on my osk5912 and n900:
+> Missing braces in the "if" case.
+
+Which braces are missing?
+
+> > +		spin_lock_irqsave(&pcdev->lock, flags);
+> > +		pcdev->fb1_active = NULL;
+> > +		pcdev->fb2_active = NULL;
+> > +		writel(0, pcdev->base_csi + CSIDMASA_FB1);
+> > +		writel(0, pcdev->base_csi + CSIDMASA_FB2);
+> > +		spin_unlock_irqrestore(&pcdev->lock, flags);
+> > +	}
+> > +}
+
+[snip]
+
+> > +static void mx2_videobuf_queue(struct videobuf_queue *vq,
+> > +			       struct videobuf_buffer *vb)
+> > +{
+> > +	struct soc_camera_device *icd = vq->priv_data;
+> > +	struct soc_camera_host *ici =
+> > +		to_soc_camera_host(icd->dev.parent);
+> > +	struct mx2_camera_dev *pcdev = ici->priv;
+> > +	struct mx2_buffer *buf = container_of(vb, struct mx2_buffer, vb);
+> > +	unsigned long flags;
+> > +	int ret;
+> > +
+> > +	dev_dbg(&icd->dev, "%s (vb=0x%p) 0x%08lx %d\n", __func__,
+> > +		vb, vb->baddr, vb->bsize);
+> > +
+> > +	spin_lock_irqsave(&pcdev->lock, flags);
+> > +
+> > +	vb->state = VIDEOBUF_QUEUED;
+> > +	list_add_tail(&vb->queue, &pcdev->capture);
+> > +
+> > +	if (mx27_camera_emma(pcdev))
+> > +		goto out;
+> > +	else if (cpu_is_mx27()) {
+> > +		if (pcdev->active != NULL) {
 > 
-> Acked-by: Tony Lindgren <tony@atomide.com>
-
-Interesting patch name!
-
-> After applying the next patch in your lmb branch "ARM: OMAP: Convert
-> to use ->reserve method to reserve boot time memory" tux still works
-> on 5912osk, but not on n900. The difference is that osk5912 uses
-> the old omapfb code.
-
-I guess this is because I don't have board-n900.c in my tree.  All OMAP
-boards need a ".reserve = omap_reserve," line added in their machine
-descriptor.
-
-I just noticed that board-n8x0.c contains more than one machine descriptor,
-which I've now fixed up.
-
-> Then, looks like reordering of the patches now causes patch
-> "ARM: initial LMB trial" to fail with:
+> In v1 you had
 > 
-> arch/arm/mm/init.c:301: error: conflicting types for 'bootmem_init'
-> arch/arm/mm/mm.h:32: error: previous declaration of 'bootmem_init' was here
-> arch/arm/mm/init.c: In function 'bootmem_init':
-> arch/arm/mm/init.c:312: error: 'mdesc' undeclared (first use in this function)
-> arch/arm/mm/init.c:312: error: (Each undeclared identifier is reported only once
-> arch/arm/mm/init.c:312: error: for each function it appears in.)
-> make[1]: *** [arch/arm/mm/init.o] Error 1
+> > +		if (!pcdev->active) {
+> 
+> i.e., opposite logic. v2 seems to be wrong.
 
-Now fixed, thanks.
+Right. I'll fix this.
 
-> Also, the last patch in lmb branch "ARM: use LMB to allocate system
-> memory MMIO resource structures" causes both osk5912 and n900
-> to hang very early. Maybe I'm missing some patch again..
+> > +			ret = imx_dma_setup_single(pcdev->dma,
+> > +					videobuf_to_dma_contig(vb), vb->size,
+> > +					(u32)pcdev->base_dma + 0x10,
+> > +					DMA_MODE_READ);
+> > +			if (ret) {
+> > +				vb->state = VIDEOBUF_ERROR;
+> > +				wake_up(&vb->done);
+> > +				goto out;
+> > +			}
+> > +
+> > +			vb->state = VIDEOBUF_ACTIVE;
+> 
+> This is different from v1 of your patch. I meant not below this if, but 3 
+> lines down:
+> 
+> > +			pcdev->active = buf;
+> > +		}
+> 
+> ...here. Otherwise, if you don't enter the "active == NULL" if, your state 
+> remains at "QUEUED." OTOH, maybe this is deliberate and you want to only 
+> set the buffer to "ACTIVE" if it's really becomming active?
 
-Hmm, I'll take a look later today.
+Yes, this is intentional.
 
-> Anyways, I've picked the patches from lmb branch up to the one below
-> into omap-testing. Will add more of them once we get them working.
+> > +	} else { /* cpu_is_mx25() */
 
-You should now be able to pick all but the last patch.
+baruch
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
