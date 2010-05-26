@@ -1,94 +1,35 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Wed, 26 May 2010 14:00:15 +0530
-Subject: Should we pass amba device peripheral id with device structure
-	or	not?
-In-Reply-To: <AANLkTimIDuNPo0t-GNIODjz-rpMvlEYqmUq7PbilxIhv@mail.gmail.com>
-References: <4BECF57A.4050802@st.com>
-	<AANLkTimIDuNPo0t-GNIODjz-rpMvlEYqmUq7PbilxIhv@mail.gmail.com>
-Message-ID: <4BFCDC17.1010700@st.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 May 2010 10:07:48 +0100
+Subject: vpack270 and sleep mode
+In-Reply-To: <4BFC99CB.2090902@papillon.ru>
+References: <1272311167-576-1-git-send-email-marek.vasut@gmail.com>
+	<4BFBD01E.8010101@papillon.ru>
+	<20100525202447.GD16204@n2100.arm.linux.org.uk>
+	<201005252247.57688.marek.vasut@gmail.com>
+	<4BFC99CB.2090902@papillon.ru>
+Message-ID: <20100526090748.GB25435@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/25/2010 1:44 AM, Linus Walleij wrote:
-> 2010/5/14 Viresh KUMAR <viresh.kumar@st.com>:
-> 
->> amba_device_register function reads and updates peripheral id from hardware
->> registers, whenever we register any amba device. If clock to device is disabled,
->> then amba_device_register will not be able to read and update this value.
->>
->> Thus device registration will fail.
->> (...)
-> 
-> In the U300 arch/arm/mach-u300/clock.c we have this code:
-> 
-> /*
->  * These are the clocks for cells registered as primecell drivers
->  * on the AMBA bus. These must be on during AMBA device registration
->  * since the bus probe will attempt to read magic configuration
->  * registers for these devices. If they are deactivated these probes
->  * will fail.
->  *
->  *
->  * Please note that on emif, both RAM and NAND is connected in dual
->  * RAM phones. On single RAM phones, ram is on semi and NAND on emif.
->  *
->  */
-> void u300_clock_primecells(void)
-> {
->         clk_enable(&intcon_clk);
->         clk_enable(&uart_clk);
-> #ifdef CONFIG_MACH_U300_BS335
->         clk_enable(&uart1_clk);
-> #endif
->         clk_enable(&spi_clk);
-> 
->         clk_enable(&mmcsd_clk);
-> 
-> }
-> EXPORT_SYMBOL(u300_clock_primecells);
-> 
-> void u300_unclock_primecells(void)
-> {
-> 
->         clk_disable(&intcon_clk);
->         clk_disable(&uart_clk);
-> #ifdef CONFIG_MACH_U300_BS335
->         clk_disable(&uart1_clk);
-> #endif
->         clk_disable(&spi_clk);
->         clk_disable(&mmcsd_clk);
-> 
-> }
-> EXPORT_SYMBOL(u300_unclock_primecells);
-> 
-> 
-> When we add the primecells we have this piece:
-> 
->         /* Register the AMBA devices in the AMBA bus abstraction layer */
->         u300_clock_primecells();
->         for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
->                 struct amba_device *d = amba_devs[i];
->                 amba_device_register(d, &iomem_resource);
->         }
->         u300_unclock_primecells();
-> 
-> This way the reference counter is still zero and the clocks are off
-> when the drivers probe, so they need to enable their own clocks
-> at the latter stage.
-> 
-> It's a bit brutal but it works. (And yes, we shouldn't be exporting the
-> symbols, no point, will fix it someday.) However it messes with the
-> internals of your clock implementation indeed.
-> 
-> One more elegant way would be to pass the master clock along
-> in struct amba_device like we do with IRQs, so the probe code in
-> drivers/amba/bus.c know how to clock the device before attempting
-> to read the PrimeCell IDs. I don't know if that's particularly elegant
-> though.
-> 
+On Wed, May 26, 2010 at 09:47:23AM +0600, 237 Rumjantsev Egor (PROG) wrote:
+> platform vpac270-pm.0: EARLY resume
+> platform pxa_g64_driver.0: EARLY resume
+> platform pxa2xx_dir_keypad.0: EARLY resume
+> platform pxa_capture.0: EARLY resume
+> platform pxa2xx-ac97: EARLY resume
+> platform mfrc531-ssp.0: EARLY resume
+> pxa2xx-flash pxa2xx-flash.0: EARLY resume
+> Unable to handle kernel paging request at virtual address a03ab26f
+> pgd = c6aac000
+> [a03ab26f] *pgd=8020040e(bad)
+> Internal error: Oops: 803 [#1] PREEMPT
+> Modules linked in: ipv6
+> CPU: 0    Not tainted  (2.6.28.10-vpac3-splash #90)
+> PC is at bad_channel+0x80166/0x91f28
+> LR is at platform_pm_resume_noirq+0x48/0x54
 
-Thanks Linus,
+This seems to point at pxa2xx-flash.c being the culpret - which brings
+up the question why no one else is seeing a problem here.
 
-I will check which one will be more suitable for us.
-
-viresh.
+Does your vpac270 patches touch this file?  If yes, please show those
+changes.
