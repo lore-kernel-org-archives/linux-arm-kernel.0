@@ -1,35 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 May 2010 10:07:48 +0100
-Subject: vpack270 and sleep mode
-In-Reply-To: <4BFC99CB.2090902@papillon.ru>
-References: <1272311167-576-1-git-send-email-marek.vasut@gmail.com>
-	<4BFBD01E.8010101@papillon.ru>
-	<20100525202447.GD16204@n2100.arm.linux.org.uk>
-	<201005252247.57688.marek.vasut@gmail.com>
-	<4BFC99CB.2090902@papillon.ru>
-Message-ID: <20100526090748.GB25435@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 26 May 2010 11:10:45 +0200
+Subject: [PATCH v2 1/3] mx2_camera: Add soc_camera support for
+	i.MX25/i.MX27
+In-Reply-To: <20100525132049.GE27702@jasper.tkos.co.il>
+References: <cover.1274706733.git.baruch@tkos.co.il>
+	<4c15903511a5c4e6997b190d321b6fdf15bb6579.1274706733.git.baruch@tkos.co.il>
+	<20100525131624.GM17272@pengutronix.de>
+	<20100525132049.GE27702@jasper.tkos.co.il>
+Message-ID: <20100526091044.GO17272@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 26, 2010 at 09:47:23AM +0600, 237 Rumjantsev Egor (PROG) wrote:
-> platform vpac270-pm.0: EARLY resume
-> platform pxa_g64_driver.0: EARLY resume
-> platform pxa2xx_dir_keypad.0: EARLY resume
-> platform pxa_capture.0: EARLY resume
-> platform pxa2xx-ac97: EARLY resume
-> platform mfrc531-ssp.0: EARLY resume
-> pxa2xx-flash pxa2xx-flash.0: EARLY resume
-> Unable to handle kernel paging request at virtual address a03ab26f
-> pgd = c6aac000
-> [a03ab26f] *pgd=8020040e(bad)
-> Internal error: Oops: 803 [#1] PREEMPT
-> Modules linked in: ipv6
-> CPU: 0    Not tainted  (2.6.28.10-vpac3-splash #90)
-> PC is at bad_channel+0x80166/0x91f28
-> LR is at platform_pm_resume_noirq+0x48/0x54
+On Tue, May 25, 2010 at 04:20:49PM +0300, Baruch Siach wrote:
+> Hi Sascha,
+> 
+> On Tue, May 25, 2010 at 03:16:24PM +0200, Sascha Hauer wrote:
+> > On Mon, May 24, 2010 at 04:20:39PM +0300, Baruch Siach wrote:
+> > > This is the soc_camera support developed by Sascha Hauer for the i.MX27.  Alan
+> > > Carvalho de Assis modified the original driver to get it working on more recent
+> > > kernels. I modified it further to add support for i.MX25. This driver has been
+> > > tested on i.MX25 and i.MX27 based platforms.
+> > > 
+> > > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > > ---
+> > >  arch/arm/plat-mxc/include/mach/memory.h  |    4 +-
+> > >  arch/arm/plat-mxc/include/mach/mx2_cam.h |   46 +
+> > >  drivers/media/video/Kconfig              |   13 +
+> > >  drivers/media/video/Makefile             |    1 +
+> > >  drivers/media/video/mx2_camera.c         | 1471 ++++++++++++++++++++++++++++++
+> > >  5 files changed, 1533 insertions(+), 2 deletions(-)
+> > >  create mode 100644 arch/arm/plat-mxc/include/mach/mx2_cam.h
+> > >  create mode 100644 drivers/media/video/mx2_camera.c
+> > > 
+> > 
+> > [snip]
+> > 
+> > > +
+> > > +static int mclk_get_divisor(struct mx2_camera_dev *pcdev)
+> > > +{
+> > > +	dev_info(pcdev->dev, "%s not implemented. Running at max speed\n",
+> > > +			__func__);
+> > > +
+> > > +#if 0
+> > > +	unsigned int mclk = pcdev->pdata->clk_csi;
+> > > +	unsigned int pclk = clk_get_rate(pcdev->clk_csi);
+> > > +	int i;
+> > > +
+> > > +	dev_dbg(pcdev->dev, "%s: %ld %ld\n", __func__, mclk, pclk);
+> > > +
+> > > +	for (i = 0; i < 0xf; i++)
+> > > +		if ((i + 1) * 2 * mclk <= pclk)
+> > > +			break;
+> > > +	return i;
+> > > +#endif
+> > > +	return 0;
+> > > +}
+> > 
+> > This function, if implemented properly, can be used to add an additional
+> > divider for the sensors master clock. On i.MX27 we can adjust the master
+> > clock using the clk_set_rate below which is sufficient, so you can
+> > remove this function completely.
+> 
+> Very good. I'll do this in the next version of this driver.
+> 
+> I guess I can also remove the mclk_get_divisor call at mx2_camera_add_device 
+> and just leave:
+> 
+> csicr1 = CSICR1_MCLKEN;
+> 
+> Right?
 
-This seems to point at pxa2xx-flash.c being the culpret - which brings
-up the question why no one else is seeing a problem here.
+Yes.
 
-Does your vpac270 patches touch this file?  If yes, please show those
-changes.
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
