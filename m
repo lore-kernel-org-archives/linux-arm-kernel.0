@@ -1,34 +1,33 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Wed, 26 May 2010 15:08:26 +0200
-Subject: [RFC PATCH v2 1/3] ep93xx i2s audio driver
-In-Reply-To: <1274878490.9346.38.camel@cndougla-ubuntu>
-References: <1274850588-30460-1-git-send-email-ryan@bluewatersys.com>
-	<1274850588-30460-2-git-send-email-ryan@bluewatersys.com>
-	<1274878490.9346.38.camel@cndougla-ubuntu>
-Message-ID: <19453.7498.815423.705243@ipc1.ka-ro>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 26 May 2010 15:18:46 +0200
+Subject: [PATCH] atmel_serial: Atmel RS485 support v2
+In-Reply-To: <4BBDD71D.1010700@evidence.eu.com>
+References: <4BB053C4.7050700@evidence.eu.com>	<4BB10304.6090006@bluewatersys.com>	<4BB1BF49.2000609@evidence.eu.com>	<4BB252E3.3030703@bluewatersys.com>	<4BBD8C9D.3070401@evidence.eu.com>	<20100408111310.524f7354@lxorguk.ukuu.org.uk>
+	<4BBDD71D.1010700@evidence.eu.com>
+Message-ID: <4BFD1FB6.8050405@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Le 08/04/2010 15:16, Claudio Scordino :
 
-> > +#define EP93XX_I2S_LRDIV	17
-> > +#define EP93XX_I2S_SDIV		16
+[..]
+
+> atmel_serial: Atmel RS485 support
 > 
-> Looks like a minor ugly whitespace issue above.
-> 
-Only in the indentation of the patch...
-If you look at the code with the leading '+' removed, indentation is
-OK.
+> Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
+> Signed-off-by: Michael Trimarchi <michael@evidence.eu.com>
+> Signed-off-by: Rick Bronson <rick@efn.org>
+> Signed-off-by: Sebastian Heutling <Sebastian.Heutling@who-ing.de>
+> Tested-by: Sebastian Heutling <Sebastian.Heutling@who-ing.de>
+> Reviewed-by: Ryan Mallon <ryan@bluewatersys.com>
 
+Even though I personally did not test this patch I think it is time to
+go forward with this very good work.
 
-Lothar Wa?mann
+Considering the number of people involved in this testing and review I
+think that we can submit this patch for mainline. Who will handle it?
+- do we submit to ARM or serial subsystem ?
+
+Best regards,
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Nicolas Ferre
