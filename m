@@ -1,924 +1,239 @@
 From: hjk@linutronix.de (Hans J. Koch)
-Date: Wed, 26 May 2010 19:48:47 +0200
-Subject: [PATCH 2/7 v6] Add the clock framework for Telechips TCC8xxx
-	processors.
+Date: Wed, 26 May 2010 19:49:44 +0200
+Subject: [PATCH 3/7 v6] Introduce plat-tcc irq framework
 In-Reply-To: <20100526174240.GC2006@bluebox.local>
 References: <20100526174240.GC2006@bluebox.local>
-Message-ID: <20100526174846.GE2006@bluebox.local>
+Message-ID: <20100526174943.GF2006@bluebox.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds definitions and low-level functions to handle clocks in
-TCC8xxx processors.
+Introduce lowlevel interrupt routines.
 
 Signed-off-by: "Hans J. Koch" <hjk@linutronix.de>
 ---
- arch/arm/mach-tcc8k/Makefile                |    6 +
- arch/arm/mach-tcc8k/clock.c                 |  578 +++++++++++++++++++++++++++
- arch/arm/plat-tcc/Makefile                  |    2 +-
- arch/arm/plat-tcc/clock.c                   |  180 +++++++++
- arch/arm/plat-tcc/include/mach/clkdev.h     |    7 +
- arch/arm/plat-tcc/include/mach/clock.h      |   48 +++
- arch/arm/plat-tcc/include/mach/tcc8k-regs.h |   17 +-
- 7 files changed, 828 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm/mach-tcc8k/Makefile
- create mode 100644 arch/arm/mach-tcc8k/clock.c
- create mode 100644 arch/arm/plat-tcc/clock.c
- create mode 100644 arch/arm/plat-tcc/include/mach/clkdev.h
- create mode 100644 arch/arm/plat-tcc/include/mach/clock.h
+ arch/arm/mach-tcc8k/Makefile          |    3 +-
+ arch/arm/mach-tcc8k/irq.c             |  110 +++++++++++++++++++++++++++++++++
+ arch/arm/plat-tcc/include/mach/irqs.h |   84 +++++++++++++++++++++++++
+ 3 files changed, 196 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-tcc8k/irq.c
+ create mode 100644 arch/arm/plat-tcc/include/mach/irqs.h
 
 diff --git a/arch/arm/mach-tcc8k/Makefile b/arch/arm/mach-tcc8k/Makefile
-new file mode 100644
-index 0000000..805d850
---- /dev/null
+index 805d850..24356e9 100644
+--- a/arch/arm/mach-tcc8k/Makefile
 +++ b/arch/arm/mach-tcc8k/Makefile
-@@ -0,0 +1,6 @@
-+#
-+# Makefile for TCC8K boards and common files.
-+#
+@@ -3,4 +3,5 @@
+ #
+ 
+ # Common support
+-obj-y += clock.o
++obj-y += clock.o irq.o
 +
-+# Common support
-+obj-y += clock.o
-diff --git a/arch/arm/mach-tcc8k/clock.c b/arch/arm/mach-tcc8k/clock.c
+diff --git a/arch/arm/mach-tcc8k/irq.c b/arch/arm/mach-tcc8k/irq.c
 new file mode 100644
-index 0000000..b25f3e1
+index 0000000..6427425
 --- /dev/null
-+++ b/arch/arm/mach-tcc8k/clock.c
-@@ -0,0 +1,578 @@
++++ b/arch/arm/mach-tcc8k/irq.c
+@@ -0,0 +1,110 @@
 +/*
-+ * Lowlevel clock handling for Telechips TCC8xxx SoCs
++ * Copyright (C) Telechips, Inc.
++ * Copyright (C) 2009-2010 Hans J. Koch <hjk@linutronix.de>
 + *
-+ * Copyright (C) 2010 by Hans J. Koch <hjk@linutronix.de>
-+ *
-+ * Licensed under the terms of the GPL v2
++ * Licensed under the terms of the GNU GPL version 2.
 + */
 +
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
 +#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/spinlock.h>
 +
-+#include <asm/clkdev.h>
++#include <asm/irq.h>
++#include <asm/mach/irq.h>
 +
-+#include <mach/clock.h>
-+#include <mach/irqs.h>
 +#include <mach/tcc8k-regs.h>
++#include <mach/irqs.h>
 +
-+extern int __init tcc8k_timer_init(struct clk *clock,
-+					void __iomem *base, int irq);
-+
-+#define BCLKCTR0	(CKC_BASE + BCLKCTR0_OFFS)
-+#define BCLKCTR1	(CKC_BASE + BCLKCTR1_OFFS)
-+
-+#define ACLKREF		(CKC_BASE + ACLKREF_OFFS)
-+#define ACLKUART0	(CKC_BASE + ACLKUART0_OFFS)
-+#define ACLKUART1	(CKC_BASE + ACLKUART1_OFFS)
-+#define ACLKUART2	(CKC_BASE + ACLKUART2_OFFS)
-+#define ACLKUART3	(CKC_BASE + ACLKUART3_OFFS)
-+#define ACLKUART4	(CKC_BASE + ACLKUART4_OFFS)
-+#define ACLKI2C		(CKC_BASE + ACLKI2C_OFFS)
-+#define ACLKADC		(CKC_BASE + ACLKADC_OFFS)
-+#define ACLKUSBH	(CKC_BASE + ACLKUSBH_OFFS)
-+#define ACLKLCD		(CKC_BASE + ACLKLCD_OFFS)
-+#define ACLKSDH0	(CKC_BASE + ACLKSDH0_OFFS)
-+#define ACLKSDH1	(CKC_BASE + ACLKSDH1_OFFS)
-+#define ACLKSPI0	(CKC_BASE + ACLKSPI0_OFFS)
-+#define ACLKSPI1	(CKC_BASE + ACLKSPI1_OFFS)
-+#define ACLKSPDIF	(CKC_BASE + ACLKSPDIF_OFFS)
-+#define ACLKC3DEC	(CKC_BASE + ACLKC3DEC_OFFS)
-+#define ACLKCAN0	(CKC_BASE + ACLKCAN0_OFFS)
-+#define ACLKCAN1	(CKC_BASE + ACLKCAN1_OFFS)
-+#define ACLKGSB0	(CKC_BASE + ACLKGSB0_OFFS)
-+#define ACLKGSB1	(CKC_BASE + ACLKGSB1_OFFS)
-+#define ACLKGSB2	(CKC_BASE + ACLKGSB2_OFFS)
-+#define ACLKGSB3	(CKC_BASE + ACLKGSB3_OFFS)
-+#define ACLKUSBH	(CKC_BASE + ACLKUSBH_OFFS)
-+#define ACLKTCT		(CKC_BASE + ACLKTCT_OFFS)
-+#define ACLKTCX		(CKC_BASE + ACLKTCX_OFFS)
-+#define ACLKTCZ		(CKC_BASE + ACLKTCZ_OFFS)
-+
-+/* Crystal frequencies */
-+static unsigned long xi_rate, xti_rate;
-+
-+static int index_of_root_clk(struct clk *clock);
-+
-+static void __iomem *pll_cfg_addr(int pll)
++/* Disable IRQ */
++static void tcc8000_mask_ack_irq0(unsigned int irq)
 +{
-+	switch (pll) {
-+	case 0: return (CKC_BASE + PLL0CFG_OFFS);
-+	case 1: return (CKC_BASE + PLL1CFG_OFFS);
-+	case 2: return (CKC_BASE + PLL2CFG_OFFS);
-+	default:
-+		BUG();
-+	}
++	PIC0_IEN &= ~(1 << irq);
++	PIC0_CREQ |=  (1 << irq);
 +}
 +
-+static int pll_enable(int pll, int enable)
++static void tcc8000_mask_ack_irq1(unsigned int irq)
 +{
-+	u32 reg;
-+	void __iomem *addr = pll_cfg_addr(pll);
-+
-+	reg = __raw_readl(addr);
-+	if (enable)
-+		reg &= ~PLLxCFG_PD;
-+	else
-+		reg |= PLLxCFG_PD;
-+
-+	__raw_writel(reg, addr);
-+	return 0;
++	PIC1_IEN &= ~(1 << (irq - 32));
++	PIC1_CREQ |= (1 << (irq - 32));
 +}
 +
-+static int xi_enable(int enable)
++static void tcc8000_mask_irq0(unsigned int irq)
 +{
-+	u32 reg;
-+
-+	reg = __raw_readl(CKC_BASE + CLKCTRL_OFFS);
-+	if (enable)
-+		reg |= CLKCTRL_XE;
-+	else
-+		reg &= ~CLKCTRL_XE;
-+
-+	__raw_writel(reg, CKC_BASE + CLKCTRL_OFFS);
-+	return 0;
++	PIC0_IEN &= ~(1 << irq);
 +}
 +
-+static int root_clk_enable(enum root_clks src)
++static void tcc8000_mask_irq1(unsigned int irq)
 +{
-+	switch (src) {
-+	case CLK_SRC_PLL0: return pll_enable(0, 1);
-+	case CLK_SRC_PLL1: return pll_enable(1, 1);
-+	case CLK_SRC_PLL2: return pll_enable(2, 1);
-+	case CLK_SRC_XI: return xi_enable(1);
-+	default:
-+		BUG();
-+	}
-+	return 0;
++	PIC1_IEN &= ~(1 << (irq - 32));
 +}
 +
-+static int root_clk_disable(enum root_clks root_src)
++static void tcc8000_ack_irq0(unsigned int irq)
 +{
-+	switch (root_src) {
-+	case CLK_SRC_PLL0: return pll_enable(0, 0);
-+	case CLK_SRC_PLL1: return pll_enable(1, 0);
-+	case CLK_SRC_PLL2: return pll_enable(2, 0);
-+	case CLK_SRC_XI: return xi_enable(0);
-+	default:
-+		BUG();
-+	}
-+	return 0;
++	PIC0_CREQ |=  (1 << irq);
 +}
 +
-+static int enable_clk(struct clk *clk)
++static void tcc8000_ack_irq1(unsigned int irq)
 +{
-+	u32 reg;
-+
-+	if (clk->root_id)
-+		return root_clk_enable(clk->root_id - 1);
-+
-+	if (clk->aclkreg) {
-+		reg = __raw_readl(clk->aclkreg);
-+		reg |= ACLK_EN;
-+		__raw_writel(reg, clk->aclkreg);
-+	}
-+	if (clk->bclkctr) {
-+		reg = __raw_readl(clk->bclkctr);
-+		reg |= 1 << clk->bclk_shift;
-+		__raw_writel(reg, clk->bclkctr);
-+	}
-+	return 0;
++	PIC1_CREQ |= (1 << (irq - 32));
 +}
 +
-+static void disable_clk(struct clk *clk)
++/* Enable IRQ */
++static void tcc8000_unmask_irq0(unsigned int irq)
 +{
-+	u32 reg;
-+
-+	if (clk->root_id) {
-+		root_clk_disable(clk->root_id - 1);
-+		return;
-+	}
-+
-+	if (clk->bclkctr) {
-+		reg = __raw_readl(clk->bclkctr);
-+		reg &= ~(1 << clk->bclk_shift);
-+		__raw_writel(reg, clk->bclkctr);
-+	}
-+	if (clk->aclkreg) {
-+		reg = __raw_readl(clk->aclkreg);
-+		reg &= ~ACLK_EN;
-+		__raw_writel(reg, clk->aclkreg);
-+	}
++	PIC0_IEN |= (1 << irq);
++	PIC0_INTOEN |= (1 << irq);
 +}
 +
-+static unsigned long get_rate_pll(int pll)
++static void tcc8000_unmask_irq1(unsigned int irq)
 +{
-+	u32 reg;
-+	unsigned long s, m, p;
-+	void __iomem *addr = pll_cfg_addr(pll);
-+
-+	reg = __raw_readl(addr);
-+	s = (reg >> 16) & 0x07;
-+	m = (reg >> 8) & 0xff;
-+	p = reg & 0x3f;
-+
-+	return (m * xi_rate) / (p * (1 << s));
++	PIC1_IEN |= (1 << (irq - 32));
++	PIC1_INTOEN |= (1 << (irq - 32));
 +}
 +
-+static unsigned long get_rate_pll_div(int pll)
-+{
-+	u32 reg;
-+	unsigned long div = 0;
-+	void __iomem *addr;
-+
-+	switch (pll) {
-+	case 0:
-+		addr = CKC_BASE + CLKDIVC0_OFFS;
-+		reg = __raw_readl(addr);
-+		if (reg & CLKDIVC0_P0E)
-+			div = (reg >> 24) & 0x3f;
-+		break;
-+	case 1:
-+		addr = CKC_BASE + CLKDIVC0_OFFS;
-+		reg = __raw_readl(addr);
-+		if (reg & CLKDIVC0_P1E)
-+			div = (reg >> 16) & 0x3f;
-+		break;
-+	case 2:
-+		addr = CKC_BASE + CLKDIVC1_OFFS;
-+		reg = __raw_readl(addr);
-+		if (reg & CLKDIVC1_P2E)
-+			div = __raw_readl(addr) & 0x3f;
-+		break;
-+	}
-+	return get_rate_pll(pll) / (div + 1);
-+}
-+
-+static unsigned long get_rate_xi_div(void)
-+{
-+	unsigned long div = 0;
-+	u32 reg = __raw_readl(CKC_BASE + CLKDIVC0_OFFS);
-+
-+	if (reg & CLKDIVC0_XE)
-+		div = (reg >> 8) & 0x3f;
-+
-+	return xi_rate / (div + 1);
-+}
-+
-+static unsigned long get_rate_xti_div(void)
-+{
-+	unsigned long div = 0;
-+	u32 reg = __raw_readl(CKC_BASE + CLKDIVC0_OFFS);
-+
-+	if (reg & CLKDIVC0_XTE)
-+		div = reg & 0x3f;
-+
-+	return xti_rate / (div + 1);
-+}
-+
-+static unsigned long root_clk_get_rate(enum root_clks src)
-+{
-+	switch (src) {
-+	case CLK_SRC_PLL0: return get_rate_pll(0);
-+	case CLK_SRC_PLL1: return get_rate_pll(1);
-+	case CLK_SRC_PLL2: return get_rate_pll(2);
-+	case CLK_SRC_PLL0DIV: return get_rate_pll_div(0);
-+	case CLK_SRC_PLL1DIV: return get_rate_pll_div(1);
-+	case CLK_SRC_PLL2DIV: return get_rate_pll_div(2);
-+	case CLK_SRC_XI: return xi_rate;
-+	case CLK_SRC_XTI: return xti_rate;
-+	case CLK_SRC_XIDIV: return get_rate_xi_div();
-+	case CLK_SRC_XTIDIV: return get_rate_xti_div();
-+	default: return 0;
-+	}
-+}
-+
-+static unsigned long aclk_get_rate(struct clk *clk)
-+{
-+	u32 reg;
-+	unsigned long div;
-+	unsigned int src;
-+
-+	reg = __raw_readl(clk->aclkreg);
-+	div = reg & 0x0fff;
-+	src = (reg >> ACLK_SEL_SHIFT) & CLK_SRC_MASK;
-+	return root_clk_get_rate(src) / (div + 1);
-+}
-+
-+static unsigned long aclk_best_div(struct clk *clk, unsigned long rate)
-+{
-+	unsigned long div, src, freq, r1, r2;
-+
-+	src = __raw_readl(clk->aclkreg) >> ACLK_SEL_SHIFT;
-+	src &= CLK_SRC_MASK;
-+	freq = root_clk_get_rate(src);
-+	div = freq / rate + 1;
-+	r1 = freq / div;
-+	r2 = freq / (div + 1);
-+	if (r2 >= rate)
-+		return div + 1;
-+	if ((rate - r2) < (r1 - rate))
-+		return div + 1;
-+
-+	return div;
-+}
-+
-+static unsigned long aclk_round_rate(struct clk *clk, unsigned long rate)
-+{
-+	unsigned int src;
-+
-+	src = __raw_readl(clk->aclkreg) >> ACLK_SEL_SHIFT;
-+	src &= CLK_SRC_MASK;
-+
-+	return root_clk_get_rate(src) / aclk_best_div(clk, rate);
-+}
-+
-+static int aclk_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	u32 reg;
-+
-+	reg = __raw_readl(clk->aclkreg) & ~ACLK_DIV_MASK;
-+	reg |= aclk_best_div(clk, rate);
-+	return 0;
-+}
-+
-+static unsigned long get_rate_sys(struct clk *clk)
-+{
-+	unsigned int src;
-+
-+	src = __raw_readl(CKC_BASE + CLKCTRL_OFFS) & CLK_SRC_MASK;
-+		return root_clk_get_rate(src);
-+}
-+
-+static unsigned long get_rate_bus(struct clk *clk)
-+{
-+	unsigned int div;
-+
-+	div = (__raw_readl(CKC_BASE + CLKCTRL_OFFS) >> 4) & 0xff;
-+	return get_rate_sys(clk) / (div + 1);
-+}
-+
-+static unsigned long get_rate_cpu(struct clk *clk)
-+{
-+	unsigned int reg, div, fsys, fbus;
-+
-+	fbus = get_rate_bus(clk);
-+	reg = __raw_readl(CKC_BASE + CLKCTRL_OFFS);
-+	if (reg & (1 << 29))
-+		return fbus;
-+	fsys = get_rate_sys(clk);
-+	div = (reg >> 16) & 0x0f;
-+	return fbus + ((fsys - fbus) * (div + 1)) / 16;
-+}
-+
-+static unsigned long get_rate_root(struct clk *clk)
-+{
-+	return root_clk_get_rate(clk->root_id - 1);
-+}
-+
-+static int aclk_set_parent(struct clk *clock, struct clk *parent)
-+{
-+	int new_src;
-+	u32 reg;
-+
-+	if (clock->parent == parent)
-+		return 0;
-+
-+	clock->parent = parent;
-+
-+	if (!parent)
-+		return 0;
-+
-+	new_src = index_of_root_clk(parent);
-+	if (new_src < 0)
-+		return 0;
-+	reg = __raw_readl(clock->aclkreg);
-+	reg &= ~ACLK_SEL_MASK;
-+	reg |= (new_src << ACLK_SEL_SHIFT) & ACLK_SEL_MASK;
-+	__raw_writel(reg, clock->aclkreg);
-+
-+	return 0;
-+}
-+
-+#define DEFINE_ROOT_CLOCK(name, ri, p)	\
-+	static struct clk name = {		\
-+		.root_id = ri,			\
-+		.get_rate = get_rate_root,			\
-+		.enable = enable_clk,		\
-+		.disable = disable_clk,		\
-+		.parent = p,			\
-+	};
-+
-+#define DEFINE_SPECIAL_CLOCK(name, gr, p)	\
-+	static struct clk name = {		\
-+		.get_rate = gr,			\
-+		.parent = p,			\
-+	};
-+
-+#define DEFINE_ACLOCK(name, bc, bs, ar)		\
-+	static struct clk name = {		\
-+		.bclkctr = bc,			\
-+		.bclk_shift = bs,		\
-+		.aclkreg = ar,			\
-+		.get_rate = aclk_get_rate,	\
-+		.set_rate = aclk_set_rate,	\
-+		.round_rate = aclk_round_rate,	\
-+		.enable = enable_clk,		\
-+		.disable = disable_clk,		\
-+		.set_parent = aclk_set_parent,	\
-+	};
-+
-+#define DEFINE_BCLOCK(name, bc, bs, gr, p)	\
-+	static struct clk name = {		\
-+		.bclkctr = bc,			\
-+		.bclk_shift = bs,		\
-+		.get_rate = gr,			\
-+		.enable = enable_clk,		\
-+		.disable = disable_clk,		\
-+		.parent = p,			\
-+	};
-+
-+DEFINE_ROOT_CLOCK(xi, CLK_SRC_XI + 1, NULL)
-+DEFINE_ROOT_CLOCK(xti, CLK_SRC_XTI + 1, NULL)
-+DEFINE_ROOT_CLOCK(xidiv, CLK_SRC_XIDIV + 1, &xi)
-+DEFINE_ROOT_CLOCK(xtidiv, CLK_SRC_XTIDIV + 1, &xti)
-+DEFINE_ROOT_CLOCK(pll0, CLK_SRC_PLL0 + 1, &xi)
-+DEFINE_ROOT_CLOCK(pll1, CLK_SRC_PLL1 + 1, &xi)
-+DEFINE_ROOT_CLOCK(pll2, CLK_SRC_PLL2 + 1, &xi)
-+DEFINE_ROOT_CLOCK(pll0div, CLK_SRC_PLL0DIV + 1, &pll0)
-+DEFINE_ROOT_CLOCK(pll1div, CLK_SRC_PLL1DIV + 1, &pll1)
-+DEFINE_ROOT_CLOCK(pll2div, CLK_SRC_PLL2DIV + 1, &pll2)
-+
-+/* The following 3 clocks are special and are initialized explicitly later */
-+DEFINE_SPECIAL_CLOCK(sys, get_rate_sys, NULL)
-+DEFINE_SPECIAL_CLOCK(bus, get_rate_bus, &sys)
-+DEFINE_SPECIAL_CLOCK(cpu, get_rate_cpu, &sys)
-+
-+DEFINE_ACLOCK(tct, NULL, 0, ACLKTCT)
-+DEFINE_ACLOCK(tcx, NULL, 0, ACLKTCX)
-+DEFINE_ACLOCK(tcz, NULL, 0, ACLKTCZ)
-+DEFINE_ACLOCK(ref, NULL, 0, ACLKREF)
-+DEFINE_ACLOCK(uart0, BCLKCTR0, 5, ACLKUART0)
-+DEFINE_ACLOCK(uart1, BCLKCTR0, 23, ACLKUART1)
-+DEFINE_ACLOCK(uart2, BCLKCTR0, 6, ACLKUART2)
-+DEFINE_ACLOCK(uart3, BCLKCTR0, 8, ACLKUART3)
-+DEFINE_ACLOCK(uart4, BCLKCTR1, 6, ACLKUART4)
-+DEFINE_ACLOCK(i2c, BCLKCTR0, 7, ACLKI2C)
-+DEFINE_ACLOCK(adc, BCLKCTR0, 10, ACLKADC)
-+DEFINE_ACLOCK(usbh0, BCLKCTR0, 11, ACLKUSBH)
-+DEFINE_ACLOCK(lcd, BCLKCTR0, 13, ACLKLCD)
-+DEFINE_ACLOCK(sd0, BCLKCTR0, 17, ACLKSDH0)
-+DEFINE_ACLOCK(sd1, BCLKCTR1, 5, ACLKSDH1)
-+DEFINE_ACLOCK(spi0, BCLKCTR0, 24, ACLKSPI0)
-+DEFINE_ACLOCK(spi1, BCLKCTR0, 30, ACLKSPI1)
-+DEFINE_ACLOCK(spdif, BCLKCTR1, 2, ACLKSPDIF)
-+DEFINE_ACLOCK(c3dec, BCLKCTR1, 9, ACLKC3DEC)
-+DEFINE_ACLOCK(can0, BCLKCTR1, 10, ACLKCAN0)
-+DEFINE_ACLOCK(can1, BCLKCTR1, 11, ACLKCAN1)
-+DEFINE_ACLOCK(gsb0, BCLKCTR1, 13, ACLKGSB0)
-+DEFINE_ACLOCK(gsb1, BCLKCTR1, 14, ACLKGSB1)
-+DEFINE_ACLOCK(gsb2, BCLKCTR1, 15, ACLKGSB2)
-+DEFINE_ACLOCK(gsb3, BCLKCTR1, 16, ACLKGSB3)
-+DEFINE_ACLOCK(usbh1, BCLKCTR1, 20, ACLKUSBH)
-+
-+DEFINE_BCLOCK(dai0, BCLKCTR0, 0, NULL, NULL)
-+DEFINE_BCLOCK(pic, BCLKCTR0, 1, NULL, NULL)
-+DEFINE_BCLOCK(tc, BCLKCTR0, 2, NULL, NULL)
-+DEFINE_BCLOCK(gpio, BCLKCTR0, 3, NULL, NULL)
-+DEFINE_BCLOCK(usbd, BCLKCTR0, 4, NULL, NULL)
-+DEFINE_BCLOCK(ecc, BCLKCTR0, 9, NULL, NULL)
-+DEFINE_BCLOCK(gdma0, BCLKCTR0, 12, NULL, NULL)
-+DEFINE_BCLOCK(rtc, BCLKCTR0, 15, NULL, NULL)
-+DEFINE_BCLOCK(nfc, BCLKCTR0, 16, NULL, NULL)
-+DEFINE_BCLOCK(g2d, BCLKCTR0, 18, NULL, NULL)
-+DEFINE_BCLOCK(gdma1, BCLKCTR0, 22, NULL, NULL)
-+DEFINE_BCLOCK(mscl, BCLKCTR0, 25, NULL, NULL)
-+DEFINE_BCLOCK(bdma, BCLKCTR1, 0, NULL, NULL)
-+DEFINE_BCLOCK(adma0, BCLKCTR1, 1, NULL, NULL)
-+DEFINE_BCLOCK(scfg, BCLKCTR1, 3, NULL, NULL)
-+DEFINE_BCLOCK(cid, BCLKCTR1, 4, NULL, NULL)
-+DEFINE_BCLOCK(dai1, BCLKCTR1, 7, NULL, NULL)
-+DEFINE_BCLOCK(adma1, BCLKCTR1, 8, NULL, NULL)
-+DEFINE_BCLOCK(gps, BCLKCTR1, 12, NULL, NULL)
-+DEFINE_BCLOCK(gdma2, BCLKCTR1, 17, NULL, NULL)
-+DEFINE_BCLOCK(gdma3, BCLKCTR1, 18, NULL, NULL)
-+DEFINE_BCLOCK(ddrc, BCLKCTR1, 19, NULL, NULL)
-+
-+#define _REGISTER_CLOCK(d, n, c) \
-+	{ \
-+		.dev_id = d, \
-+		.con_id = n, \
-+		.clk = &c, \
-+	},
-+
-+static struct clk_lookup lookups[] = {
-+	_REGISTER_CLOCK(NULL, "bus", bus)
-+	_REGISTER_CLOCK(NULL, "cpu", cpu)
-+	_REGISTER_CLOCK(NULL, "tct", tct)
-+	_REGISTER_CLOCK(NULL, "tcx", tcx)
-+	_REGISTER_CLOCK(NULL, "tcz", tcz)
-+	_REGISTER_CLOCK(NULL, "ref", ref)
-+	_REGISTER_CLOCK(NULL, "dai0", dai0)
-+	_REGISTER_CLOCK(NULL, "pic", pic)
-+	_REGISTER_CLOCK(NULL, "tc", tc)
-+	_REGISTER_CLOCK(NULL, "gpio", gpio)
-+	_REGISTER_CLOCK(NULL, "usbd", usbd)
-+	_REGISTER_CLOCK("tcc-uart.0", NULL, uart0)
-+	_REGISTER_CLOCK("tcc-uart.2", NULL, uart2)
-+	_REGISTER_CLOCK("tcc-i2c", NULL, i2c)
-+	_REGISTER_CLOCK("tcc-uart.3", NULL, uart3)
-+	_REGISTER_CLOCK(NULL, "ecc", ecc)
-+	_REGISTER_CLOCK(NULL, "adc", adc)
-+	_REGISTER_CLOCK("tcc-usbh.0", "usb", usbh0)
-+	_REGISTER_CLOCK(NULL, "gdma0", gdma0)
-+	_REGISTER_CLOCK(NULL, "lcd", lcd)
-+	_REGISTER_CLOCK(NULL, "rtc", rtc)
-+	_REGISTER_CLOCK(NULL, "nfc", nfc)
-+	_REGISTER_CLOCK("tcc-mmc.0", NULL, sd0)
-+	_REGISTER_CLOCK(NULL, "g2d", g2d)
-+	_REGISTER_CLOCK(NULL, "gdma1", gdma1)
-+	_REGISTER_CLOCK("tcc-uart.1", NULL, uart1)
-+	_REGISTER_CLOCK("tcc-spi.0", NULL, spi0)
-+	_REGISTER_CLOCK(NULL, "mscl", mscl)
-+	_REGISTER_CLOCK("tcc-spi.1", NULL, spi1)
-+	_REGISTER_CLOCK(NULL, "bdma", bdma)
-+	_REGISTER_CLOCK(NULL, "adma0", adma0)
-+	_REGISTER_CLOCK(NULL, "spdif", spdif)
-+	_REGISTER_CLOCK(NULL, "scfg", scfg)
-+	_REGISTER_CLOCK(NULL, "cid", cid)
-+	_REGISTER_CLOCK("tcc-mmc.1", NULL, sd1)
-+	_REGISTER_CLOCK("tcc-uart.4", NULL, uart4)
-+	_REGISTER_CLOCK(NULL, "dai1", dai1)
-+	_REGISTER_CLOCK(NULL, "adma1", adma1)
-+	_REGISTER_CLOCK(NULL, "c3dec", c3dec)
-+	_REGISTER_CLOCK("tcc-can.0", NULL, can0)
-+	_REGISTER_CLOCK("tcc-can.1", NULL, can1)
-+	_REGISTER_CLOCK(NULL, "gps", gps)
-+	_REGISTER_CLOCK("tcc-gsb.0", NULL, gsb0)
-+	_REGISTER_CLOCK("tcc-gsb.1", NULL, gsb1)
-+	_REGISTER_CLOCK("tcc-gsb.2", NULL, gsb2)
-+	_REGISTER_CLOCK("tcc-gsb.3", NULL, gsb3)
-+	_REGISTER_CLOCK(NULL, "gdma2", gdma2)
-+	_REGISTER_CLOCK(NULL, "gdma3", gdma3)
-+	_REGISTER_CLOCK(NULL, "ddrc", ddrc)
-+	_REGISTER_CLOCK("tcc-usbh.1", "usb", usbh1)
++static struct irq_chip tcc8000_irq_chip0 = {
++	.name		= "tcc_irq0",
++	.mask		= tcc8000_mask_irq0,
++	.ack		= tcc8000_ack_irq0,
++	.mask_ack	= tcc8000_mask_ack_irq0,
++	.unmask		= tcc8000_unmask_irq0,
 +};
 +
-+static struct clk *root_clk_by_index(enum root_clks src)
++static struct irq_chip tcc8000_irq_chip1 = {
++	.name		= "tcc_irq1",
++	.mask		= tcc8000_mask_irq1,
++	.ack		= tcc8000_ack_irq1,
++	.mask_ack	= tcc8000_mask_ack_irq1,
++	.unmask		= tcc8000_unmask_irq1,
++};
++
++void __init tcc8k_init_irq(void)
 +{
-+	switch (src) {
-+	case CLK_SRC_PLL0: return &pll0;
-+	case CLK_SRC_PLL1: return &pll1;
-+	case CLK_SRC_PLL2: return &pll2;
-+	case CLK_SRC_PLL0DIV: return &pll0div;
-+	case CLK_SRC_PLL1DIV: return &pll1div;
-+	case CLK_SRC_PLL2DIV: return &pll2div;
-+	case CLK_SRC_XI: return &xi;
-+	case CLK_SRC_XTI: return &xti;
-+	case CLK_SRC_XIDIV: return &xidiv;
-+	case CLK_SRC_XTIDIV: return &xtidiv;
-+	default: return NULL;
++	int irqno;
++
++	/* Mask and clear all interrupts */
++	PIC0_IEN = 0x00000000;
++	PIC0_CREQ = 0xffffffff;
++	PIC1_IEN = 0x00000000;
++	PIC1_CREQ = 0xffffffff;
++
++	PIC0_MEN0 = 0x00000003;
++	PIC1_MEN1 = 0x00000003;
++	PIC1_MEN = 0x00000003;
++
++	/* let all IRQs be level triggered */
++	PIC0_TMODE = 0xffffffff;
++	PIC1_TMODE = 0xffffffff;
++	/* all IRQs are IRQs (not FIQs) */
++	PIC0_IRQSEL = 0xffffffff;
++	PIC1_IRQSEL = 0xffffffff;
++
++	for (irqno = 0; irqno < NR_IRQS; irqno++) {
++		if (irqno < 32)
++			set_irq_chip(irqno, &tcc8000_irq_chip0);
++		else
++			set_irq_chip(irqno, &tcc8000_irq_chip1);
++		set_irq_handler(irqno, handle_level_irq);
++		set_irq_flags(irqno, IRQF_VALID);
 +	}
 +}
 +
-+static int index_of_root_clk(struct clk *clock)
-+{
-+	if (clock->root_id)
-+		return clock->root_id - 1;
-+
-+	return -1;
-+}
-+
-+static void find_aclk_parent(struct clk *clk)
-+{
-+	unsigned int src;
-+	struct clk *clock;
-+
-+	if (!clk->aclkreg)
-+		return;
-+
-+	src = __raw_readl(clk->aclkreg) >> ACLK_SEL_SHIFT;
-+	src &= CLK_SRC_MASK;
-+
-+	clock = root_clk_by_index(src);
-+	if (!clock)
-+		return;
-+
-+	clk->parent = clock;
-+	clk->set_parent = aclk_set_parent;
-+}
-+
-+int __init tcc_clocks_init(unsigned long xi_freq, unsigned long xti_freq)
-+{
-+	int i;
-+
-+	xi_rate = xi_freq;
-+	xti_rate = xti_freq;
-+
-+	/* fixup parents and add the clock */
-+	for (i = 0; i < ARRAY_SIZE(lookups); i++) {
-+		find_aclk_parent(lookups[i].clk);
-+		clkdev_add(&lookups[i]);
-+	}
-+
-+	return tcc8k_timer_init(&tcz, (void __iomem *)TIMER_BASE, INT_TC32);
-+}
-diff --git a/arch/arm/plat-tcc/Makefile b/arch/arm/plat-tcc/Makefile
-index 3f2e4fe..eceabc8 100644
---- a/arch/arm/plat-tcc/Makefile
-+++ b/arch/arm/plat-tcc/Makefile
-@@ -1,3 +1,3 @@
- # "Telechips Platform Common Modules"
- 
--obj-y := system.o
-+obj-y := clock.o system.o
-diff --git a/arch/arm/plat-tcc/clock.c b/arch/arm/plat-tcc/clock.c
+diff --git a/arch/arm/plat-tcc/include/mach/irqs.h b/arch/arm/plat-tcc/include/mach/irqs.h
 new file mode 100644
-index 0000000..31b3ee8
+index 0000000..2e6bed8
 --- /dev/null
-+++ b/arch/arm/plat-tcc/clock.c
-@@ -0,0 +1,180 @@
++++ b/arch/arm/plat-tcc/include/mach/irqs.h
+@@ -0,0 +1,84 @@
 +/*
-+ * Clock framework for Telechips SoCs
-+ * Based on arch/arm/plat-mxc/clock.c
++ * IRQ definitions for TCC8xxx
 + *
-+ * Copyright (C) 2004 - 2005 Nokia corporation
-+ * Written by Tuukka Tikkanen <tuukka.tikkanen@elektrobit.com>
-+ * Modified for omap shared clock framework by Tony Lindgren <tony@atomide.com>
-+ * Copyright 2007 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
-+ * Copyright 2010 Hans J. Koch, hjk at linutronix.de
++ * Copyright (C) 2008-2009 Telechips
++ * Copyright (C) 2009 Hans J. Koch <hjk@linutronix.de>
 + *
 + * Licensed under the terms of the GPL v2.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/errno.h>
-+#include <linux/module.h>
-+#include <linux/mutex.h>
-+#include <linux/string.h>
-+
-+#include <mach/clock.h>
-+#include <mach/hardware.h>
-+
-+static DEFINE_MUTEX(clocks_mutex);
-+
-+/*-------------------------------------------------------------------------
-+ * Standard clock functions defined in include/linux/clk.h
-+ *-------------------------------------------------------------------------*/
-+
-+static void __clk_disable(struct clk *clk)
-+{
-+	BUG_ON(clk->refcount == 0);
-+
-+	if (!(--clk->refcount) && clk->disable) {
-+		/* Unconditionally disable the clock in hardware */
-+		clk->disable(clk);
-+		/* recursively disable parents */
-+		if (clk->parent)
-+			__clk_disable(clk->parent);
-+	}
-+}
-+
-+static int __clk_enable(struct clk *clk)
-+{
-+	int ret = 0;
-+
-+	if (clk->refcount++ == 0 && clk->enable) {
-+		if (clk->parent)
-+			ret = __clk_enable(clk->parent);
-+		if (ret)
-+			return ret;
-+		else
-+			return clk->enable(clk);
-+	}
-+
-+	return 0;
-+}
-+
-+/* This function increments the reference count on the clock and enables the
-+ * clock if not already enabled. The parent clock tree is recursively enabled
-+ */
-+int clk_enable(struct clk *clk)
-+{
-+	int ret = 0;
-+
-+	if (!clk)
-+		return -EINVAL;
-+
-+	mutex_lock(&clocks_mutex);
-+	ret = __clk_enable(clk);
-+	mutex_unlock(&clocks_mutex);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(clk_enable);
-+
-+/* This function decrements the reference count on the clock and disables
-+ * the clock when reference count is 0. The parent clock tree is
-+ * recursively disabled
-+ */
-+void clk_disable(struct clk *clk)
-+{
-+	if (!clk)
-+		return;
-+
-+	mutex_lock(&clocks_mutex);
-+	__clk_disable(clk);
-+	mutex_unlock(&clocks_mutex);
-+}
-+EXPORT_SYMBOL_GPL(clk_disable);
-+
-+/* Retrieve the *current* clock rate. If the clock itself
-+ * does not provide a special calculation routine, ask
-+ * its parent and so on, until one is able to return
-+ * a valid clock rate
-+ */
-+unsigned long clk_get_rate(struct clk *clk)
-+{
-+	if (!clk)
-+		return 0UL;
-+
-+	if (clk->get_rate)
-+		return clk->get_rate(clk);
-+
-+	return clk_get_rate(clk->parent);
-+}
-+EXPORT_SYMBOL_GPL(clk_get_rate);
-+
-+/* Round the requested clock rate to the nearest supported
-+ * rate that is less than or equal to the requested rate.
-+ * This is dependent on the clock's current parent.
-+ */
-+long clk_round_rate(struct clk *clk, unsigned long rate)
-+{
-+	if (!clk)
-+		return 0;
-+	if (!clk->round_rate)
-+		return 0;
-+
-+	return clk->round_rate(clk, rate);
-+}
-+EXPORT_SYMBOL_GPL(clk_round_rate);
-+
-+/* Set the clock to the requested clock rate. The rate must
-+ * match a supported rate exactly based on what clk_round_rate returns
-+ */
-+int clk_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	int ret = -EINVAL;
-+
-+	if (!clk)
-+		return ret;
-+	if (!clk->set_rate || !rate)
-+		return ret;
-+
-+	mutex_lock(&clocks_mutex);
-+	ret = clk->set_rate(clk, rate);
-+	mutex_unlock(&clocks_mutex);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(clk_set_rate);
-+
-+/* Set the clock's parent to another clock source */
-+int clk_set_parent(struct clk *clk, struct clk *parent)
-+{
-+	struct clk *old;
-+	int ret = -EINVAL;
-+
-+	if (!clk)
-+		return ret;
-+	if (!clk->set_parent || !parent)
-+		return ret;
-+
-+	mutex_lock(&clocks_mutex);
-+	old = clk->parent;
-+	if (clk->refcount)
-+		__clk_enable(parent);
-+	ret = clk->set_parent(clk, parent);
-+	if (ret)
-+		old = parent;
-+	if (clk->refcount)
-+		__clk_disable(old);
-+	mutex_unlock(&clocks_mutex);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(clk_set_parent);
-+
-+/* Retrieve the clock's parent clock source */
-+struct clk *clk_get_parent(struct clk *clk)
-+{
-+	if (!clk)
-+		return NULL;
-+
-+	return clk->parent;
-+}
-+EXPORT_SYMBOL_GPL(clk_get_parent);
-+
-diff --git a/arch/arm/plat-tcc/include/mach/clkdev.h b/arch/arm/plat-tcc/include/mach/clkdev.h
-new file mode 100644
-index 0000000..04b37a8
---- /dev/null
-+++ b/arch/arm/plat-tcc/include/mach/clkdev.h
-@@ -0,0 +1,7 @@
-+#ifndef __ASM_MACH_CLKDEV_H
-+#define __ASM_MACH_CLKDEV_H
-+
-+#define __clk_get(clk) ({ 1; })
-+#define __clk_put(clk) do { } while (0)
-+
-+#endif
-diff --git a/arch/arm/plat-tcc/include/mach/clock.h b/arch/arm/plat-tcc/include/mach/clock.h
-new file mode 100644
-index 0000000..a12f58a
---- /dev/null
-+++ b/arch/arm/plat-tcc/include/mach/clock.h
-@@ -0,0 +1,48 @@
-+/*
-+ * Low level clock header file for Telechips TCC architecture
-+ * (C) 2010 Hans J. Koch <hjk@linutronix.de>
 + *
-+ * Licensed under the GPL v2.
 + */
 +
-+#ifndef __ASM_ARCH_TCC_CLOCK_H__
-+#define __ASM_ARCH_TCC_CLOCK_H__
++#ifndef __ASM_ARCH_TCC_IRQS_H
++#define __ASM_ARCH_TCC_IRQS_H
 +
-+#ifndef __ASSEMBLY__
++#define NR_IRQS 64
 +
-+struct clk {
-+	struct clk *parent;
-+	/* id number of a root clock, 0 for normal clocks */
-+	int root_id;
-+	/* Reference count of clock enable/disable */
-+	int refcount;
-+	/* Address of associated BCLKCTRx register. Must be set. */
-+	void __iomem *bclkctr;
-+	/* Bit position for BCLKCTRx. Must be set. */
-+	int bclk_shift;
-+	/* Address of ACLKxxx register, if any. */
-+	void __iomem *aclkreg;
-+	/* get the current clock rate (always a fresh value) */
-+	unsigned long (*get_rate) (struct clk *);
-+	/* Function ptr to set the clock to a new rate. The rate must match a
-+	   supported rate returned from round_rate. Leave blank if clock is not
-+	   programmable */
-+	int (*set_rate) (struct clk *, unsigned long);
-+	/* Function ptr to round the requested clock rate to the nearest
-+	   supported rate that is less than or equal to the requested rate. */
-+	unsigned long (*round_rate) (struct clk *, unsigned long);
-+	/* Function ptr to enable the clock. Leave blank if clock can not
-+	   be gated. */
-+	int (*enable) (struct clk *);
-+	/* Function ptr to disable the clock. Leave blank if clock can not
-+	   be gated. */
-+	void (*disable) (struct clk *);
-+	/* Function ptr to set the parent clock of the clock. */
-+	int (*set_parent) (struct clk *, struct clk *);
-+};
++/* PIC0 interrupts */
++#define INT_ADMA1	0
++#define INT_BDMA	1
++#define INT_ADMA0	2
++#define INT_GDMA1	3
++#define INT_I2S0RX	4
++#define INT_I2S0TX	5
++#define INT_TC		6
++#define INT_UART0	7
++#define INT_USBD	8
++#define INT_SPI0TX	9
++#define INT_UDMA	10
++#define INT_LIRQ	11
++#define INT_GDMA2	12
++#define INT_GDMA0	13
++#define INT_TC32	14
++#define INT_LCD		15
++#define INT_ADC		16
++#define INT_I2C		17
++#define INT_RTCP	18
++#define INT_RTCA	19
++#define INT_NFC		20
++#define INT_SD0		21
++#define INT_GSB0	22
++#define INT_PK		23
++#define INT_USBH0	24
++#define INT_USBH1	25
++#define INT_G2D		26
++#define INT_ECC		27
++#define INT_SPI0RX	28
++#define INT_UART1	29
++#define INT_MSCL	30
++#define INT_GSB1	31
++/* PIC1 interrupts */
++#define INT_E0		32
++#define INT_E1		33
++#define INT_E2		34
++#define INT_E3		35
++#define INT_E4		36
++#define INT_E5		37
++#define INT_E6		38
++#define INT_E7		39
++#define INT_UART2	40
++#define INT_UART3	41
++#define INT_SPI1TX	42
++#define INT_SPI1RX	43
++#define INT_GSB2	44
++#define INT_SPDIF	45
++#define INT_CDIF	46
++#define INT_VBON	47
++#define INT_VBOFF	48
++#define INT_SD1		49
++#define INT_UART4	50
++#define INT_GDMA3	51
++#define INT_I2S1RX	52
++#define INT_I2S1TX	53
++#define INT_CAN0	54
++#define INT_CAN1	55
++#define INT_GSB3	56
++#define INT_KRST	57
++#define INT_UNUSED	58
++#define INT_SD0D3	59
++#define INT_SD1D3	60
++#define INT_GPS0	61
++#define INT_GPS1	62
++#define INT_GPS2	63
 +
-+int clk_register(struct clk *clk);
-+void clk_unregister(struct clk *clk);
++#endif  /* ASM_ARCH_TCC_IRQS_H */
 +
-+#endif /* __ASSEMBLY__ */
-+#endif /* __ASM_ARCH_MXC_CLOCK_H__ */
-diff --git a/arch/arm/plat-tcc/include/mach/tcc8k-regs.h b/arch/arm/plat-tcc/include/mach/tcc8k-regs.h
-index f3243eb..7a40aef 100644
---- a/arch/arm/plat-tcc/include/mach/tcc8k-regs.h
-+++ b/arch/arm/plat-tcc/include/mach/tcc8k-regs.h
-@@ -30,13 +30,13 @@
- #define EXT_MEM_CTRL_BASE	0xf0000000
- #define EXT_MEM_CTRL_SIZE	SZ_4K
- 
--#define CS1_BASE_VIRT		0xf7000000
--#define AHB_PERI_BASE_VIRT	0xf4000000
--#define APB0_PERI_BASE_VIRT	0xf1000000
--#define APB1_PERI_BASE_VIRT	0xf2000000
--#define EXT_MEM_CTRL_BASE_VIRT	0xf3000000
--#define INT_SRAM_BASE_VIRT	0xf5000000
--#define DATA_TCM_BASE_VIRT	0xf6000000
-+#define CS1_BASE_VIRT		(void __iomem *)0xf7000000
-+#define AHB_PERI_BASE_VIRT	(void __iomem *)0xf4000000
-+#define APB0_PERI_BASE_VIRT	(void __iomem *)0xf1000000
-+#define APB1_PERI_BASE_VIRT	(void __iomem *)0xf2000000
-+#define EXT_MEM_CTRL_BASE_VIRT	(void __iomem *)0xf3000000
-+#define INT_SRAM_BASE_VIRT	(void __iomem *)0xf5000000
-+#define DATA_TCM_BASE_VIRT	(void __iomem *)0xf6000000
- 
- #define __REG(x)     (*((volatile u32 *)(x)))
- 
-@@ -649,8 +649,7 @@
- #define PMGPIO_APB_OFFS		0x800
- 
- /* Clock controller registers */
--#define CKC_BASE		(APB1_PERI_BASE_VIRT + 0x6000)
--#define CKC_BASE_PHYS		(APB1_PERI_BASE + 0x6000)
-+#define CKC_BASE	((void __iomem *)(APB1_PERI_BASE_VIRT + 0x6000))
- 
- #define CLKCTRL_OFFS		0x00
- #define PLL0CFG_OFFS		0x04
 -- 
 1.6.3.3
