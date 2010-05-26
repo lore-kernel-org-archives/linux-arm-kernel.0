@@ -1,49 +1,23 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 26 May 2010 23:33:46 +0200
-Subject: [PATCH] sa1111: Prevent deadlock in resume path
-In-Reply-To: <20100526201824.GA16418@n2100.arm.linux.org.uk>
-References: <1274901104-22133-1-git-send-email-marek.vasut@gmail.com>
-	<201005262115.57282.marek.vasut@gmail.com>
-	<20100526201824.GA16418@n2100.arm.linux.org.uk>
-Message-ID: <201005262333.47046.marek.vasut@gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Thu, 27 May 2010 07:38:46 +1000
+Subject: [PATCH 5/5] leds-gpio: Change blink_set callback to be able to
+	turn off blinking
+In-Reply-To: <1274874250.16229.87.camel@rex>
+References: <1274525695.1931.143.camel@pasglop>
+	<1274871937.16229.79.camel@rex>  <1274872808.1931.310.camel@pasglop>
+	<1274874250.16229.87.camel@rex>
+Message-ID: <1274909926.1931.331.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne St 26. kv?tna 2010 22:18:24 Russell King - ARM Linux napsal(a):
-> On Wed, May 26, 2010 at 09:15:57PM +0200, Marek Vasut wrote:
-> > Dne St 26. kv?tna 2010 21:14:25 Russell King - ARM Linux napsal(a):
-> > > On Wed, May 26, 2010 at 09:11:44PM +0200, Marek Vasut wrote:
-> > > > This patch reorganises the sa1111_resume() function in a manner the
-> > > > spinlock happens after calling the sa1111_wake(). This fixes two
-> > > > bugs:
-> > > > 
-> > > > 1) This function called sa1111_wake() which tried to claim the same
-> > > > spinlock
-> > > > 
-> > > >    the sa1111_resume() already claimed. This would result in certain
-> > > >    deadlock.
-> > > >    
-> > > >    Original idea for this part: Russell King <linux@arm.linux.org.uk>
-> > > > 
-> > > > 2) The function didn't unlock the spinlock in case the chip didn't
-> > > > report
-> > > > 
-> > > >    correct ID.
-> > > >    
-> > > >    Original idea for this part: Julia Lawall <julia@diku.dk>
-> > > > 
-> > > > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> > > 
-> > > Yea, good enough.
-> > 
-> > You want me to fight your patch tracking system or will you just merge it
-> > into your tree ?
-> 
-> What do you mean "fight" ?  Just send a standard git formatted patch
-> to the email address with an additional KernelVersion: tag.  It's
-> not at all hard.
+On Wed, 2010-05-26 at 12:44 +0100, Richard Purdie wrote:
+> Yes, I noticed just after I hit send and applied. I'd rather get the
+> core change in sooner than later and the reject doesn't look serious
+> so
+> I'm assuming you can fix up the missing active_low bit for the new
+> addition easily enough? 
 
-What address, how, any howto?
+Yup. No big deal.
 
-btw. why ?! Look at Eric, he doesn't need such crap, why do you complicate it so 
-much ?
+Cheers,
+Ben.
