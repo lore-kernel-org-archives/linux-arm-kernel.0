@@ -1,31 +1,57 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Thu, 27 May 2010 15:14:17 +0100
-Subject: [alsa-devel] [PATCH v2 2/4] soc/imx: add eukrea-tlv320
-In-Reply-To: <4BFE7BFF.7010400@eukrea.com>
-References: <1274950737-26498-1-git-send-email-eric@eukrea.com>
-	<1274950737-26498-2-git-send-email-eric@eukrea.com>
-	<1274968205.3542.283.camel@odin>  <4BFE7BFF.7010400@eukrea.com>
-Message-ID: <1274969657.3542.303.camel@odin>
+From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
+Date: Thu, 27 May 2010 16:19:49 +0200
+Subject: [PATCH v3] net/fec: fix pm to survive to suspend/resume
+In-Reply-To: <4BFE4B4F.4090405@ru.mvista.com>
+References: <4BFE4B4F.4090405@ru.mvista.com>
+Message-ID: <1274969989-4280-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-05-27 at 16:04 +0200, Eric B?nard wrote:
-> Hi Liam,
-> 
-> Le 27/05/2010 15:50, Liam Girdwood a ?crit :
-> >> +
-> >> +	eukrea_tlv320_dai.cpu_dai =&imx_ssi_pcm_dai[0];
-> >
-> > Any reason why this is not defined above ?
-> >
-> I plan to reuse this driver for iMX25, 35 & 51 based boards so this 
-> parameter may change depending on machine_is_xxx macro.
+* with this patch, if the connection if active before suspend, it
+will be active after resume.
+* before this patch, it was necessary to close the interface and
+reopen it to recover the connection.
 
-Ok, I see. You will have a machine_is_blah() statement to select the
-correct DAI.
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+---
+v3 : fix following Sergei Shtylyov's comments
 
-Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
+ drivers/net/fec.c |   10 +++++++---
+ 1 files changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/net/fec.c b/drivers/net/fec.c
+index 9b4e8f7..1521972 100644
+--- a/drivers/net/fec.c
++++ b/drivers/net/fec.c
+@@ -1974,10 +1974,11 @@ fec_suspend(struct platform_device *dev, pm_message_t state)
+ 	struct fec_enet_private *fep;
+ 
+ 	if (ndev) {
+-		fep = netdev_priv(ndev);
+ 		if (netif_running(ndev)) {
++			fep = netdev_priv(ndev);
++			netif_stop_queue(ndev);
+ 			netif_device_detach(ndev);
+-			fec_stop(ndev);
++			clk_disable(fep->clk);
+ 		}
+ 	}
+ 	return 0;
+@@ -1987,11 +1988,14 @@ static int
+ fec_resume(struct platform_device *dev)
+ {
+ 	struct net_device *ndev = platform_get_drvdata(dev);
++	struct fec_enet_private *fep;
+ 
+ 	if (ndev) {
+ 		if (netif_running(ndev)) {
+-			fec_enet_init(ndev, 0);
++			fep = netdev_priv(ndev);
++			clk_enable(fep->clk);
+ 			netif_device_attach(ndev);
++			netif_start_queue(ndev);
+ 		}
+ 	}
+ 	return 0;
 -- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+1.6.3.3
