@@ -1,82 +1,67 @@
-From: fachkar.datawind@gmail.com (f. achkar)
-Date: Thu, 27 May 2010 11:18:41 -0400
-Subject: [not solved yet] debugging linux kernel on arm926ejs target
-Message-ID: <4BFE8D51.2020708@gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 27 May 2010 20:50:47 +0530
+Subject: [PATCH] ARM: change definition of cpu_relax() for ARM11MPCore
+In-Reply-To: <1274973118-11874-1-git-send-email-will.deacon@arm.com>
+References: <1274973118-11874-1-git-send-email-will.deacon@arm.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C57A6E03@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-anyone successfully debugged linux kernel via openocd + gdb pls read on:
+Will,
 
-greetings,
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Will Deacon
+> Sent: Thursday, May 27, 2010 8:42 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Russell King - ARM Linux; Will Deacon
+> Subject: [PATCH] ARM: change definition of cpu_relax() for ARM11MPCore
+> 
+> The cpu_relax() macro is often used in the body of busy-wait loops to ensure
+> that the variable being spun on is re-loaded for each iteration. On the
+> ARM11MPCore processor [where loads are prioritised over stores], spinning in
+> such a loop will prevent the write buffer from draining. If a write contained
+> in the write buffer indirectly affects the variable being spun on, there is a
+> potential for deadlock. This deadlock is experienced when executing the KGDB
+> testsuite on an SMP ARM11MPCore configuration.
+> 
+> This patch changes the definition of cpu_relax() to smp_mb() for ARMv6 cores,
+> forcing a flushing of the write buffer on SMP systems before the next load
+> takes place. If the Kernel is not compiled for SMP support, this will expand
+> to a barrier() as before.
+>
+I have missed this thread. Is this not applicable for ARMv7 MP Cores as well??
+ 
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> 
+> Russell - the discussion on this last month seemed to draw to a close.
+> Can I submit this to the patch system please, or are there any outstanding
+> issues?
+> 
+>  arch/arm/include/asm/processor.h |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
+> index 6a89567..7bed3da 100644
+> --- a/arch/arm/include/asm/processor.h
+> +++ b/arch/arm/include/asm/processor.h
+> @@ -91,7 +91,11 @@ extern void release_thread(struct task_struct *);
+> 
+>  unsigned long get_wchan(struct task_struct *p);
+> 
+> +#if __LINUX_ARM_ARCH__ == 6
+> +#define cpu_relax()			smp_mb()
+> +#else
+>  #define cpu_relax()			barrier()
+> +#endif
+> 
+>  /*
+>   * Create a new kernel thread
+> --
+> 1.6.3.3
 
-I'm newbie and have a s3c2450 based board (arm926ejs), I have a working compressed kernel image
-zImage, this image boots properly via u-boot-1.1.6, however I simply 
-failed to debug remotely the vmlinux (root directory of linux source tree) via openocd-0.4.0 with a j-link segger.
-is there a good reference on how to properly debug the linux kernel via openocd/gdb for an arm target on a linux hot machine?
-
-details:
-1. let u-boot start the board;
-2. I get the u-boot command prompt:
-
-# bdinfo
-      arch_number = 0x00000648
-      env_t       = 0x00000000
-      boot_params = 0x30000100
-      DRAM bank   = 0x00000000
-      -> start    = 0x30000000
-      -> size     = 0x04000000
-      DRAM bank   = 0x00000001
-      -> start    = 0x38000000
-      -> size     = 0x04000000
-      ethaddr     = 00:40:5C:26:0A:5B
-      ip_addr     = 192.168.3.5
-      baudrate    = 115200 bps
-
-3. halt the target via openocd/telnet;
-4. cd to root directory of linux source code and issue:
-gdb vmlinux
-GNU gdb (GDB) 6.8.50.20090417
-Copyright (C) 2009 Free Software Foundation, Inc.
-License GPLv3+: GNU GPL version 3 or later
-<http://gnu.org/licenses/gpl.html>
-This is free software: you are free to change and redistribute it.
-There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
-and "show warranty" for details.
-This GDB was configured as "--host=i686-pc-linux-gnu
---target=arm-none-linux-gnueabi".
-For bug reporting instructions, please see:
-<http://www.gnu.org/software/gdb/bugs/>...
-(gdb)
-
-5.
-(gdb) target remote localhost:3333
-Remote debugging using localhost:3333
-0xc3e01874 in ?? ()
-0xc3e01874:    ldr    r3, [r0, #16]
-(gdb)
-
-6.
-(gdb) set remote hardware-breakpoint-limit 2
-(gdb) set remote hardware-watchpoint-limit 2
-
-7.
-(gdb) load
-Loading section .init, size 0x7b000 lma 0xc0008000
-Loading section .text, size 0x2bb618 lma 0xc0083000
-Loading section __ksymtab, size 0x4a58 lma 0xc033f000
-Loading section __ksymtab_gpl, size 0x1360 lma 0xc0343a58
-Loading section __ksymtab_gpl_future, size 0x18 lma 0xc0344db8
-Loading section __ksymtab_strings, size 0xcab7 lma 0xc0344dd0
-Loading section __param, size 0x654 lma 0xc0351888
-Loading section .data, size 0x21538 lma 0xc0352000
-Start address 0xc0008000, load size 3582507
-Transfer rate: 35 KB/sec, 15922 bytes/write.
-(gdb)
-
-8. if I do continue (gdb) c, then I don't see any output on the serial
-console (as normally do during zImage booting process!)
-
-where I'm messing up? or how should I get on with debugging the linux kernel at jtag level?
-
-thanks,
-ferar
+Regards,
+Santosh
