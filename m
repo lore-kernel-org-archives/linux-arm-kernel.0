@@ -1,50 +1,44 @@
-From: fachkar.datawind@gmail.com (f. achkar)
-Date: Thu, 27 May 2010 10:29:04 -0400
-Subject: defining ARM machine type properly
-In-Reply-To: <20100527010742.GH7248@trinity.fluff.org>
-References: <4BFD8E7A.6050103@gmail.com>
-	<20100527010742.GH7248@trinity.fluff.org>
-Message-ID: <4BFE81B0.4010003@gmail.com>
+From: zql@glomationinc.com (zql at glomationinc.com)
+Date: Thu, 27 May 2010 09:39:47 -0500 (CDT)
+Subject: Problem with at91_mci and AT91RM9200
+In-Reply-To: <1274966669.2465.105.camel@arcturus>
+References: <1274966669.2465.105.camel@arcturus>
+Message-ID: <52497.72.68.115.39.1274971187.squirrel@webmail.hostgator.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2010 09:07 PM, Ben Dooks wrote:
-> On Wed, May 26, 2010 at 05:11:22PM -0400, f. achkar wrote:
->   
->> hi,
->> I'm trying to port smdk2450 arch to the a new kernel 2.6.32-9, I did the
->>     
-> I suspect what you are doing is trying to port it to a machine that
-> was loosley based on the SMDK2450 and that whoever did the uboot port
-> failed to understand that when the hardware changes then the machine
-> number needs to change too.
->   
-u-boot came with the evaluation board so it is samsung's doing! however,
-the u-boot correctly reports the machine type of 0x648 (corresponding to
-1608 ), I suspect me wrong doing :( in setting the correct mach_type in
-the linux-2.6.32-9.
->   
->> initial work as per various googled documents, but somehow the current
->> initial Image is failing at arch/arm/kernel/head-common.S :
->> '__lookup_processor_type', and eventually goes to '__error_a' of the
->> same file! this seems to be related to the definition of machine_type as
->> defined in :
->> include/asm-arm/mach-types.h  and arch/arm/tools/mach-types*
->> I checked where the definition goes in  include/asm-arm/mach-types.h by
->> inserting
->>     
-> you probably wanted to enable the debugging in the head code.
+> Recently I bough a cheap board with Atmel AT92RM9200 CPU and
+> preinstalled patched kernel 2.6.21 to play with. Board is NGX Blueboard
+> ARM9 and it's based (almost a 1:1 copy) on ECB_AT91
+> ( http://en.wikipedia.org/wiki/ECB_AT91 ) which is supported in kernel.
+> I was able to do basic things with it (boot from SD, Ethernet).
 >
->   
->> #error 2223XX
->> into various parts of that header and seems fine at the point.
->> nevertheless I'm not 100 sure
->> I wonder if the is a definitive reference to guide in this matter,
->> better yet a check-list like procedure??
->> thanks,
->> ferar
->>     
-> How about downloading the latest kernel, with nice fresh S3C2450 support
-> in it?
->   
-excellent, I'll check that ... thaks
+> I compiled newest kernel (2.6.33.4 and 2.6.32 with at91 patches
+> http://www.at91.com/linux4sam/bin/view/Linux4SAM/LinuxKernel#AT91_Linux_kernel_sources_summar
+> )
+> which boots but fails to detect SD Card (Sandisk microSD 2 GB through SD
+> adapter). A the end there's a debugging output (stripped, full:
+> http://liku.ayz.pl/at91mmc ).
+>
+> I started to look for a cause of the problem but asking here may save me
+> some time:
+> * does anybody still, successfully, uses this CPU and newest at_mci
+> driver?
+> * What might be the cause of this error?
+> * Perhaps CPU is it too obsolete and I should stay with old kernel
+> (+errata has a lot of problems for mci subsystem)?
+>
+> What I have already tried:
+> * I checked hardware connections between card socket and CPU (as well as
+> other possible hardware causes),
+> * tried at91 and atmel mci driver, on atmel mci driver nothing happens,
+> * tried different kernel versions (patched .32 and unpatched .33),
+> * started to patch new kernel with old patches from ECB but whole mci
+> subsystem changed.
+>
+> Regards,
+> Lukasz.
+>
+
+The MMC/SD card driver is broken for Atmel 9G20 as well since 2.6.30.  It
+no longer detect cards that used to work on 2.6.27.
