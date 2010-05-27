@@ -1,2750 +1,1669 @@
 From: philippe.langlais@stericsson.com (Philippe Langlais)
-Date: Thu, 27 May 2010 10:27:28 +0200
-Subject: [PATCH 2/6] U6715 clocks gating management U6 clock generic driver &
-	U6715 cgu clock specific (V2)
+Date: Thu, 27 May 2010 10:27:29 +0200
+Subject: [PATCH 3/6] U6715 gpio platform driver This driver is U6 platform
+	generic (V2)
 In-Reply-To: <1274948852-9179-1-git-send-email-philippe.langlais@stericsson.com>
 References: <1274948852-9179-1-git-send-email-philippe.langlais@stericsson.com>
-Message-ID: <1274948852-9179-3-git-send-email-philippe.langlais@stericsson.com>
+Message-ID: <1274948852-9179-4-git-send-email-philippe.langlais@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Philippe Langlais <philippe.langlais@stericsson.com>
 ---
- arch/arm/mach-u67xx/Makefile             |    2 +-
- arch/arm/mach-u67xx/cgu.c                |  760 ++++++++++++++++++++++++++
- arch/arm/mach-u67xx/clock_u67xx.h        |  876 ++++++++++++++++++++++++++++++
- arch/arm/plat-u6xxx/Makefile             |    2 +-
- arch/arm/plat-u6xxx/clock.c              |  650 ++++++++++++++++++++++
- arch/arm/plat-u6xxx/include/mach/clock.h |  376 +++++++++++++
- arch/arm/plat-u6xxx/timer.c              |    1 +
- 7 files changed, 2665 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-u67xx/cgu.c
- create mode 100644 arch/arm/mach-u67xx/clock_u67xx.h
- create mode 100644 arch/arm/plat-u6xxx/clock.c
- create mode 100644 arch/arm/plat-u6xxx/include/mach/clock.h
+ arch/arm/mach-u67xx/board_u67xx_wavex.c |  469 ++++++++++++++++++++
+ arch/arm/mach-u67xx/devices.c           |   12 +-
+ arch/arm/plat-u6xxx/Makefile            |    2 +-
+ arch/arm/plat-u6xxx/gpio.c              |  716 +++++++++++++++++++++++++++++++
+ arch/arm/plat-u6xxx/include/mach/gpio.h |  396 +++++++++++++++++
+ 5 files changed, 1588 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/plat-u6xxx/gpio.c
+ create mode 100644 arch/arm/plat-u6xxx/include/mach/gpio.h
 
-diff --git a/arch/arm/mach-u67xx/Makefile b/arch/arm/mach-u67xx/Makefile
-index 38cf624..0572db8 100644
---- a/arch/arm/mach-u67xx/Makefile
-+++ b/arch/arm/mach-u67xx/Makefile
-@@ -5,7 +5,7 @@
- ## Object file lists.
- 
- # Common support
--obj-y			:= devices.o
-+obj-y			:= devices.o cgu.o
- 
- # Specific board support
- obj-$(CONFIG_MACH_U67XX_WAVEC_2GB) += board_u67xx_wavex.o
-diff --git a/arch/arm/mach-u67xx/cgu.c b/arch/arm/mach-u67xx/cgu.c
-new file mode 100644
-index 0000000..58a6a7a
---- /dev/null
-+++ b/arch/arm/mach-u67xx/cgu.c
-@@ -0,0 +1,760 @@
-+/*
-+ *  arch/arm/mach-u67xx/cgu.c
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Arnaud Troel <arnaud.troel@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ *
-+ * U67XX Clock Gating Unit basic driver/wrapper
-+ * Based on the code from Michel Jaouen
+diff --git a/arch/arm/mach-u67xx/board_u67xx_wavex.c b/arch/arm/mach-u67xx/board_u67xx_wavex.c
+index 2a806e7..a21e465 100644
+--- a/arch/arm/mach-u67xx/board_u67xx_wavex.c
++++ b/arch/arm/mach-u67xx/board_u67xx_wavex.c
+@@ -24,6 +24,474 @@
+ #include <asm/mach/arch.h>
+ #include <mach/irqs.h>
+ #include <mach/timer.h>
++#include <mach/gpio.h>
++
++#include <mach/scon.h>
++
++/**
++ * SCON initial settings
++ * Allows to define the PIN multiplexing for all the platform (Linux and Modem)
 + */
-+
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/device.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/string.h>
-+#include <linux/delay.h>
-+#include <mach/hardware.h>
-+#include <mach/clock.h>
-+
-+#include "clock_u67xx.h"
-+
-+#define MODULE_NAME "U6_CGU"
-+#define PKMOD MODULE_NAME ": "
-+
-+#if defined(DEBUG_CGU)
-+#define debug(fmt, args...)                                          \
-+	printk(PKMOD fmt, ## args)
++struct u6_scon_config u6_scon_init_config[SCON_REGISTER_NB] = {
++ {
++	(void __iomem *) SCON_SYSMUX0_REG,
++	0 |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A0  & 0xF))) | /* FM IRQ */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_A1  & 0xF))) | /* UART 2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_A2  & 0xF))) | /* UART 2 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A3  & 0xF))) |
++	(GPIO_MODE_MUX3 << (2 * (GPIO_A4  & 0xF))) | /* SIMOFF_copy for modem */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A5  & 0xF))) | /* for AGPS */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A6  & 0xF))) | /* LCD backlight
++							-> ressource backligth*/
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A7  & 0xF))) | /* Bluetooth */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A8  & 0xF))) | /* Reserved for mode DPWS*/
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A9  & 0xF))) | /* Reserved for mode DPWS*/
++	(GPIO_MODE_MUX1 << (2 * (GPIO_A10 & 0xF))) | /* UART2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_A11 & 0xF))) | /* UART2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_A12 & 0xF))) | /* UART 1, configured
++							by boot, don't touch */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A13 & 0xF))) | /* free */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A14 & 0xF))) | /* PMU irq */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A15 & 0xF)))
++ },
++ {
++	(void __iomem *) SCON_SYSMUX1_REG,
++	0 |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A16 & 0xF))) | /* FCI data 3 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A17 & 0xF))) | /* free */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A18 & 0xF))) | /* FCI data 2 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A19 & 0xF))) | /* FCI data 1 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A20 & 0xF))) | /* Cam Ligth copy */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A21 & 0xF))) | /* RF on -> GPIO */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_A22 & 0xF))) | /* RF RF_DPN */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A23 & 0xF))) | /* RF reset -> GPIO */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A24 & 0xF))) | /* AGPS reset */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A25 & 0xF))) | /* AGPS wake up */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A26 & 0xF))) | /* free */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A27 & 0xF))) | /* SPI1 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A28 & 0xF))) | /* SPI1 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_A29 & 0xF))) | /* Audio IIS */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A30 & 0xF))) | /* AGPS pwr on */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A31 & 0xF)))  /* free */
++ },
++ {
++	(void __iomem *) SCON_SYSMUX2_REG,
++	0 |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B0  & 0xF))) | /* RF DD */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B1  & 0xF))) | /* RF DU */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B2  & 0xF))) | /* RF FSC */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B3  & 0xF))) | /* RF DCL */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B4  & 0xF))) | /* UART RTS1 -> console */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B5  & 0xF))) | /* UART TXD1 -> console */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B6  & 0xF))) | /* NFI ready -> for NFI */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B7  & 0xF))) | /* VDE_EOFI -> VDE already
++						configured by splashscreen */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B8  & 0xF))) | /* RFEN0 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_B9  & 0xF))) | /* FCICMD -> for FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_B10 & 0xF))) | /* FCICLK -> for FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_B11 & 0xF))) | /* FCIDATA0 -> for FCI */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B12 & 0xF))) | /* RFSIG6 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B13 & 0xF))) | /* RFSIG7 */
++	(GPIO_MODE_MUX3 << (2 * (GPIO_B14 & 0xF))) |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B15 & 0xF)))  /* RFDATA */
++ },
++ {
++	(void __iomem *) SCON_SYSMUX3_REG,
++	0
++ },
++ {
++	(void __iomem *) SCON_SYSMUX4_REG,
++	0 |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C0  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C1  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C2  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C3  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C4  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C5  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C6  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C7  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C8  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C9  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C10 & 0xF))) | /* VDE */
++#ifdef CONFIG_EBI_BUS
++	(GPIO_MODE_MUX2 << (2 * (GPIO_C11 & 0xF))) | /* EBI_CS0 */
 +#else
-+#define debug(fmt, args...)
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C11 & 0xF))) | /* VDE */
 +#endif
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C12 & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C13 & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C14 & 0xF))) | /* KCOL0 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C15 & 0xF)))  /* KCOL1 -> keypad */
 +
-+/**
-+ * U6 hw low level access clock functions
-+ **/
-+static void u6_clk_disable(struct clk *clk);
-+static int u6_clk_enable(struct clk *clk);
-+
-+/**
-+ * HW enable clock function.
-+ **/
-+
-+static int u67xx_cgu_enable_fake_clock(struct clk *clk)
++ },
++ {
++	(void __iomem *) SCON_SYSMUX5_REG,
++	0 |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C16 & 0xF))) | /* KCOL2 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C17 & 0xF))) | /* KCOL3 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C18 & 0xF))) | /* KCOL4 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C19 & 0xF))) | /* KROW0 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C20 & 0xF))) | /* KROW1 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C21 & 0xF))) | /* KROW2 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C22 & 0xF))) | /* KROW3 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C23 & 0xF))) | /* KROW4 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C24 & 0xF))) | /* RF3GSPIEN0 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C25 & 0xF))) | /* RF3GSPIDATA */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C26 & 0xF))) | /* RF3GSPICLK */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C27 & 0xF))) | /* RFSM_OUT0 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C28 & 0xF))) | /* RFSM_OUT1 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C29 & 0xF))) | /* RFSM_OUT2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_C30 & 0xF))) | /* I2C -> ressource */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_C31 & 0xF)))  /* I2C -> ressource */
++ },
++ {
++	(void __iomem *) SCON_SYSMUX6_REG,
++	0 |
++	(GPIO_MODE_MUX1 << (2 * (GPIO_D0  & 0xF))) | /* CAM PWRDN1 -> CAM */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D1  & 0xF))) | /* CAM DATA 0 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D2  & 0xF))) | /* CAM DATA 1 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D3  & 0xF))) | /* CAM DATA 2 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D4  & 0xF))) | /* CAM DATA 3 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D5  & 0xF))) | /* CAM DATA 4 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D6  & 0xF))) | /* CAM DATA 5 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D7  & 0xF))) | /* CAM DATA 6 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D8  & 0xF))) | /* CAM DATA 7 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D9  & 0xF))) | /* CAM DATA 8 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D10 & 0xF))) | /* CAM DATA 9 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D11 & 0xF))) | /* CAMVS */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D12 & 0xF))) | /* CAMHS */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D13 & 0xF))) | /* CAMCLKI */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D14 & 0xF))) | /* CAMCLKO */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_D15 & 0xF)))  /* VDDC2EN */
++ },
++ {
++	(void __iomem *) SCON_SYSMUX7_REG,
++	0 |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D16 & 0xF))) | /* RF3GGPO9 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D17 & 0xF))) | /* RF3GGPO8 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_D18 & 0xF))) | /* FCI card detect, FCI */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_D19 & 0xF))) | /* CAM_Prelight copy, CAM*/
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D20 & 0xF))) | /* UART1 RXD1 -> Console */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D21 & 0xF))) | /* DIISWS */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D22 & 0xF))) | /* DIISSDO */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D23 & 0xF))) | /* DIISCK */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_D24 & 0xF))) | /* GPIOD24 ->FM Reset */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_D25 & 0xF))) | /* RFSIG3 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D26 & 0xF))) | /* RF3GGPO6 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D27 & 0xF))) | /* RF3GGPO7 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D28 & 0xF))) | /* RF3GGPO5 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_D29 & 0xF))) | /* GPIOD29 USB suspend */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D30 & 0xF))) | /* RF3GGPO4 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D31 & 0xF)))  /* RFCLK */
++ },
++#ifdef CONFIG_MACH_U67XX_V2_WAVEB_2GB
 +{
-+	debug("u67xx_cgu_enable_fake_clock for %s\n", clk->name);
-+	return 0;
-+}
-+
-+static int u67xx_cgu_enable_hw_clock(struct clk *clk)
++	(void __iomem *) SCON_SYSMUX8_REG,
++	0 |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E0  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E1  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E2  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E3  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E4  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E5  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E6  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E7  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E8  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E9  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E10 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E11 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E12 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E13 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E14 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E15 & 0xF)))  /* DEBUG */
++ },
++ {
++	(void __iomem *) SCON_SYSMUX9_REG,
++	0 |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E16 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E17 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E18 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E19 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E20 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E21 & 0xF))) | /* SDATO2 -> SPI2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E22 & 0xF))) | /* SDATIN2 -> SPI2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E23 & 0xF))) | /* SCLK2 -> SPI2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E24 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E25 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E26 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E27 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E28 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E29 & 0xF))) | /* FCI_copy
++							-> FCI USB suspend */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E30 & 0xF))) | /* RFSM_OUT3 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E31 & 0xF)))  /* GPIO CAM */
++ },
++#else
 +{
-+	unsigned long value;
-+	debug("u67xx_cgu_enable_hw_clock for %s\n", clk->name);
-+
-+	if (unlikely(clk->enable_reg == 0)) {
-+		printk(KERN_ERR "Enable for %s without enable register\n",
-+		       clk->name);
-+		return 0;
-+	}
-+
-+	value = readl(clk->enable_reg);
-+	value |= 1 << clk->enable_bit;
-+	writel(value, clk->enable_reg);
-+
-+	return 0;
-+}
-+
-+static int u67xx_cgu_enable_tvo_pll_clock(struct clk *clk)
-+{
-+	unsigned long value;
-+
-+	debug("u67xx_cgu_enable_tvo_pll_clock for %s\n", clk->name);
-+
-+	if (unlikely(clk->enable_reg == 0)) {
-+		printk(KERN_ERR "Enable for %s without enable register\n",
-+		       clk->name);
-+		return 0;
-+	}
-+
-+	value = readl(clk->enable_reg);
-+	value |= 1 << clk->enable_bit;
-+	writel(value, clk->enable_reg);
-+
-+	/* wait pll lock */
-+	do {
-+		value = readl(clk->enable_reg);
-+	} while (!(value & (0x1 << 16)));
-+
-+	return 0;
-+}
-+
-+static int u67xx_cgu_enable_shared_clock(struct clk *clk)
-+{
-+	unsigned long value;
-+
-+	debug("u67xx_cgu_enable_shared_clock for %s\n", clk->name);
-+
-+	if (unlikely(clk->enable_reg == 0)) {
-+		printk(KERN_ERR "Enable for %s without enable register\n",
-+		       clk->name);
-+		return 0;
-+	}
-+
-+	value = readl(clk->enable_reg);
-+	value |= 1 << clk->enable_bit;
-+	writel(value, clk->enable_reg);
-+
-+	return 0;
-+}
-+
-+static int u67xx_cgu_enable_clock(struct clk *clk)
-+{
-+	printk(PKMOD "No enable clock method for %s."
-+	       " You should use new one !!!\n", clk->name);
-+	return 0;
-+}
-+
-+static int u67xx_cgu_enable_camout(struct clk *clk)
-+{
-+	unsigned long value;
-+	debug("u67xx_cgu_enable_hw_clock for %s\n", clk->name);
-+
-+	if (unlikely(clk->enable_reg == 0)) {
-+		printk(KERN_ERR "Enable for %s without enable register\n",
-+		       clk->name);
-+		return 0;
-+	}
-+
-+	u6_clk_enable(&fix_ck);
-+	u6_clk_enable(&plltv_ck);
-+
-+	value = readl(clk->enable_reg);
-+	value |= 1 << clk->enable_bit;
-+	writel(value, clk->enable_reg);
-+
-+	udelay(1);
-+
-+	u6_clk_disable(&fix_ck);
-+	u6_clk_disable(&plltv_ck);
-+
-+	return 0;
-+}
-+
-+/**
-+ * HW disable clock function.
-+ **/
-+
-+static void u67xx_cgu_disable_fake_clock(struct clk *clk)
-+{
-+	debug("u67xx_cgu_disable_fake_clock for %s\n", clk->name);
-+}
-+
-+static void u67xx_cgu_disable_hw_clock(struct clk *clk)
-+{
-+	unsigned long value;
-+
-+	debug("u67xx_cgu_disable_hw_clock for %s\n", clk->name);
-+
-+	if (unlikely(clk->enable_reg == 0)) {
-+		printk(KERN_ERR "Disable for %s without enable register\n",
-+		       clk->name);
-+		return;
-+	}
-+
-+	value = readl(clk->enable_reg);
-+	value &= ~(1 << clk->enable_bit);
-+	writel(value, clk->enable_reg);
-+
-+	return;
-+}
-+
-+static void u67xx_cgu_disable_shared_clock(struct clk *clk)
-+{
-+	unsigned long value;
-+
-+	debug("u67xx_cgu_disable_shared_clock for %s\n", clk->name);
-+
-+	if (unlikely(clk->enable_reg == 0)) {
-+		printk(KERN_ERR "Disable for %s without enable register\n",
-+		       clk->name);
-+		return;
-+	}
-+
-+	value = readl(clk->enable_reg);
-+	value &= ~(1 << clk->enable_bit);
-+	writel(value, clk->enable_reg);
-+}
-+
-+static void u67xx_cgu_disable_clock(struct clk *clk)
-+{
-+	printk(PKMOD
-+	       " No disable clock method for %s. You should use one !!!\n",
-+	       clk->name);
-+}
-+
-+/**
-+ * set rate clock function.
-+ **/
-+
-+static int u6_clk_set_rate_fci(struct clk *clk, unsigned long rate)
-+{
-+	int ret = 0;
-+	unsigned long ratio = 0;
-+	unsigned long reg;
-+
-+	if (!rate)
-+		ratio = 31;
-+	else {
-+		if (rate > CLK_FC_CLK_MAX_FREQ)
-+			rate = CLK_FC_CLK_MAX_FREQ;
-+
-+		/* compute diviser ratio */
-+		ratio = (clk->parent->rate / rate) - 1;
-+		if (ratio < 2)
-+			ratio = 2;
-+		if (ratio > 31)
-+			ratio = 31;
-+	}
-+	clk->rate = clk->parent->rate / (ratio + 1);
-+
-+	/* for voltage working point only */
-+	/* u67xx_set_freq(FC_CLK, clk->rate/1000 , clk->rate/1000); */
-+
-+	reg = readl(CGU_FIXCON_REG);
-+	reg &= ~(0x1F << 22);
-+	reg |= (ratio << 22);
-+	writel(reg, CGU_FIXCON_REG);
-+
-+	reg = readl(CGU_SCCON_REG);
-+	writel(reg, CGU_SCCON_REG);
-+
-+	return ret;
-+}
-+
-+static int u6_clk_set_rate_camout(struct clk *clk, unsigned long rate)
-+{
-+	int ret = 0;
-+	unsigned long ratio = 0;
-+	unsigned long reg;
-+
-+	if (!rate)
-+		return -EINVAL;
-+
-+	if (rate > CLK_CAM_CLK_MAX_FREQ)
-+		rate = CLK_CAM_CLK_MAX_FREQ;
-+
-+	/* compute diviser ratio */
-+	ratio = (clk->parent->rate / rate) - 1;
-+	if (ratio < 1)
-+		ratio = 1;
-+	if (ratio > 63)
-+		ratio = 63;
-+
-+	clk->rate = clk->parent->rate / (ratio + 1);
-+
-+	/* for voltage working point only */
-+	/* u67xx_set_freq(CAM_CLK, clk->rate/1000 , clk->rate/1000); */
-+
-+	reg = readl(CGU_CAMCON_REG);
-+
-+	reg &= ~(0x3F << 0);
-+	reg |= (ratio << 0);
-+
-+	writel(reg, CGU_CAMCON_REG);
-+
-+	return ret;
-+}
-+
-+/**
-+ * set parent clock function.
-+ **/
-+static int u6_clk_set_parent_camout(struct clk *clk, struct clk *parent)
-+{
-+	int ret = 0;
-+	unsigned long srce = 0;
-+	unsigned long reg;
-+
-+	if (!strcmp(parent->name, "TVOPLL"))
-+		srce = 0;
-+	else if (!strcmp(parent->name, "fix_ck"))
-+		srce = 1;
-+	else
-+		return -EINVAL;
-+
-+	u6_clk_enable(&fix_ck);
-+	u6_clk_enable(&plltv_ck);
-+
-+	reg = readl(CGU_CAMCON_REG);
-+
-+	reg &= ~(0x1 << 6);
-+	reg |= (srce << 6);
-+
-+	writel(reg, CGU_CAMCON_REG);
-+
-+	udelay(1);
-+
-+	u6_clk_disable(&fix_ck);
-+	u6_clk_disable(&plltv_ck);
-+
-+	clk->parent = parent;
-+
-+	return ret;
-+}
-+
-+static int u6_clk_set_parent_uart(struct clk *clk, struct clk *parent)
-+{
-+
-+	if (!strcmp(parent->name, "pclk2_ck")) {
-+		clk->parent = parent;
-+		return 0;
-+	} else if (!strcmp(parent->name, "clk26m_ck")) {
-+		clk->parent = parent;
-+		return 0;
-+	} else if (!strcmp(parent->name, "clk13m_ck")) {
-+		clk->parent = parent;
-+		return 0;
-+	} else {
-+		return -1;
-+	}
-+}
-+
-+/**
-+ * HW init clock function.
-+ **/
-+
-+static void u6_clk_dflt_init(struct clk *clk)
-+{
-+	if (clk->usecount == 0)
-+		u67xx_cgu_disable_hw_clock(clk);
-+	else
-+		u67xx_cgu_enable_hw_clock(clk);
-+	/* default rate to parent one */
-+	clk->rate = clk->parent->rate;
-+}
-+
-+static void u6_clk_init_hclk2(struct clk *clk)
-+{
-+	/* nothing to do */
-+}
-+
-+static void u6_clk_init_fci(struct clk *clk)
-+{
-+	u6_clk_set_rate_fci(clk, clk->rate);
-+}
-+
-+static void u6_clk_init_camout(struct clk *clk)
-+{
-+	u6_clk_set_parent_camout(clk, &fix_ck);
-+	u6_clk_set_rate_camout(clk, clk->rate);
-+}
-+
-+/*
-+ * Update clock rate
-+ */
-+static void followparent_ivs_recalc(struct clk *clk)
-+{
-+	clk->rate = clk->parent->rate;
-+	propagate_rate(clk);
-+}
-+
-+/*
-+ * U6 platform access clock functions
-+ */
-+
-+/**
-+ * @brief Disable a device clock.
-+ * @param clk clock description structure
-+ */
-+static void u6_clk_disable(struct clk *clk)
-+{
-+	/*    BUG_ON(!clk->ref_count); */
-+	if ((clk->flags & ALWAYS_ENABLED) == ALWAYS_ENABLED)
-+		return;
-+
-+	if (clk->usecount > 0 && !(--clk->usecount)) {
-+		if (clk->disable)
-+			clk->disable(clk);
-+		else
-+			u67xx_cgu_disable_clock(clk);
-+
-+		if (likely((u32) clk->parent))
-+			u6_clk_disable(clk->parent);
-+	}
-+}
-+
-+/**
-+ * @brief Enable a device clock.
-+ * @param clk clock description structure
-+ */
-+static int u6_clk_enable(struct clk *clk)
-+{
-+	int ret = 0;
-+
-+	/*   BUG_ON(!clk->ref_count); */
-+	if ((clk->flags & ALWAYS_ENABLED) == ALWAYS_ENABLED)
-+		return 0;
-+
-+	if (clk->usecount++ == 0) {
-+		if (likely((u32) clk->parent))
-+			ret = u6_clk_enable(clk->parent);
-+
-+		if (unlikely(ret != 0)) {
-+			clk->usecount--;
-+			return ret;
-+		}
-+
-+		if (clk->enable)
-+			ret = clk->enable(clk);
-+		else
-+			ret = u67xx_cgu_enable_clock(clk);
-+
-+		if (unlikely(ret != 0) && clk->parent) {
-+			u6_clk_disable(clk->parent);
-+			clk->usecount--;
-+		}
-+	}
-+	return 0;
-+}
-+
-+static long u6_clk_round_rate(struct clk *clk, unsigned long rate)
-+{
-+	if (clk->round_rate)
-+		return clk->round_rate(clk, rate);
-+	else
-+		return rate;
-+}
-+
-+static int u6_clk_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	int ret = 0;
-+
-+	/*   BUG_ON(!clk->ref_count); */
-+	if (clk->usecount > 0) {
-+		if (clk->disable)
-+			clk->disable(clk);
-+		else
-+			u67xx_cgu_disable_clock(clk);
-+	}
-+
-+	if (clk->set_rate)
-+		ret = clk->set_rate(clk, rate);
-+	else
-+		ret = -EINVAL;
-+
-+	if (clk->usecount > 0) {
-+		if (clk->enable)
-+			clk->enable(clk);
-+		else
-+			u67xx_cgu_enable_clock(clk);
-+	}
-+
-+	/* propagate rate */
-+	propagate_rate(clk);
-+
-+	return ret;
-+}
-+
-+static int u6_clk_set_parent(struct clk *clk, struct clk *parent)
-+{
-+	int ret = 0;
-+	int old_rate;
-+
-+	if (clk->usecount > 0) {
-+		if (clk->disable)
-+			clk->disable(clk);
-+		else
-+			u67xx_cgu_disable_clock(clk);
-+
-+		if (likely((u32) clk->parent))
-+			u6_clk_disable(clk->parent);
-+	}
-+
-+	old_rate = clk->rate;
-+
-+	if (clk->set_parent)
-+		ret = clk->set_parent(clk, parent);
-+	else
-+		ret = -EINVAL;
-+
-+	if (clk->round_rate)
-+		old_rate = clk->round_rate(clk, old_rate);
-+
-+	u6_clk_set_rate(clk, old_rate);
-+
-+	if (clk->usecount > 0) {
-+		if (likely((u32) clk->parent))
-+			u6_clk_enable(clk->parent);
-+
-+		if (clk->enable)
-+			ret = clk->enable(clk);
-+		else
-+			ret = u67xx_cgu_enable_clock(clk);
-+	}
-+
-+	/* propagate rate */
-+	if (clk->flags & RATE_PROPAGATES)
-+		propagate_rate(clk);
-+
-+	return ret;
-+}
-+
-+static struct clk *u6_clk_get_parent(struct clk *clk)
-+{
-+	return clk->parent;
-+}
-+
-+/*
-+ * U6 platform clock constraint functions
-+ */
-+
-+unsigned long clk_get_hw_constraint(unsigned long reg_addr)
-+{
-+	unsigned long reg;
-+
-+	reg = readl(reg_addr);
-+
-+	return reg;
-+}
-+
-+ssize_t u6_clk_show_hw_rates(struct kobject *kobj, char *buf)
-+{
-+	int size = 0;
-+	unsigned long reg, rate, msc, psc, mclk;
-+
-+	size += sprintf(&buf[size], "--HW-- : \n");
-+
-+	mclk = clk_get_hw_constraint(CGU_FIXCON_REG);
-+	mclk = osc_ck.rate / 1000000 / (((mclk & (0x3 << 17)) >> 17) + 1);
-+
-+	reg = clk_get_hw_constraint(CGU_SCCON_REG);
-+
-+	msc = (((reg & (0xF << 25)) >> 25) + 1);
-+	psc = (((reg & (0x3 << 15)) >> 15) + 1);
-+	size += sprintf(&buf[size], "arm_ck is ");
-+	if (reg & (1 << 17)) {
-+		if (reg & (1 << 18))
-+			rate = 312;
-+		else
-+			rate = 156;
-+		rate = rate / msc / psc;
-+		size += sprintf(&buf[size], "%lu", rate);
-+		size += sprintf(&buf[size], "Mhz fix_ck pll\n");
-+	} else {
-+		rate = mclk * (((reg & (0xFF << 3)) >> 3) + 1)
-+		    / (((reg & (0xF << 11)) >> 11) + 1);
-+		rate = rate / msc / psc;
-+		size += sprintf(&buf[size], "%lu", rate);
-+		size += sprintf(&buf[size], "Mhz sc_ck pll\n");
-+	}
-+
-+	rate = rate / (((reg & (0xF << 21)) >> 21) + 1);
-+
-+	size += sprintf(&buf[size], "hclk_ck is %luMhz\n", rate);
-+
-+	reg = clk_get_hw_constraint(CGU_FIXCON_REG);
-+
-+	rate = 13 * (((reg & (0x3 << 20)) >> 20) + 1);
-+
-+	size += sprintf(&buf[size], "pclk2_ck is %luMhz\n", rate);
-+
-+	if (reg & (1 << 31)) {
-+		if (reg & (1 << 29))
-+			rate = 104;
-+		else
-+			rate = 78;
-+	} else
-+		rate = 13 + (13 * ((reg & (0x7 << 29)) >> 29));
-+
-+	size += sprintf(&buf[size], "hclk2_ck is %luMhz\n", rate);
-+
-+	reg = clk_get_hw_constraint(CGU_SDMCON_REG);
-+
-+	msc = (((reg & (0x7 << 0)) >> 0) + 1);
-+
-+	size += sprintf(&buf[size], "sdm_ck is ");
-+	if (reg & (1 << 17)) {
-+		if (reg & (1 << 18))
-+			rate = 312;
-+		else
-+			rate = 156;
-+		size += sprintf(&buf[size], "%lu", rate / msc);
-+		size += sprintf(&buf[size], "Mhz fix_ck pll\n");
-+	} else {
-+		rate = mclk * 2 * (((reg & (0xFF << 3)) >> 3) + 1)
-+		    / (((reg & (0x3F << 11)) >> 11) + 1);
-+		size += sprintf(&buf[size], "%lu", rate / msc);
-+		size += sprintf(&buf[size], "Mhz sdm pll\n");
-+	}
-+
-+	if (reg & (1 << 23))
-+		size += sprintf(&buf[size], "ivs-sdm concentrator is enable\n");
-+	else
-+		size += sprintf(&buf[size],
-+				"ivs-sdm concentrator is disable\n");
-+
-+	return size;
-+}
-+
-+unsigned char *cgu_name_sc1[32] = {
-+	"EBI", "01", "NFI", "SDI", "04", "MSI", "UCC", "JDI",
-+	"08", "09", "10", "DMAU", "RFSM1", "IIS", "USBD", "FCI",
-+	"USIM", "GEAC", "PWM3", "PWM2", "PWM1", "KBS", "GPIO", "UART2",
-+	"UART1", "IIC2", "IIC1", "SPI2", "SPI1", "SCTU", "EXTINT", "INTC"
-+};
-+
-+unsigned char *cgu_name_sc2[32] = {
-+	"32", "33", "34", "35", "36", "37", "38", "39",
-+	"40", "41", "42", "43", "44", "45", "46", "47",
-+	"48", "49", "50", "51", "52", "53", "BBIP", "55",
-+	"56", "57", "58", "ETB", "60", "MMTU", "62", "CAE"
-+};
-+
-+ssize_t u6_clk_show_sc_constraints(struct kobject *kobj, char *buf)
-+{
-+	int i, size = 0;
-+	unsigned long reg;
-+
-+	size += sprintf(&buf[size], "--SC-- : \n");
-+
-+	reg = clk_get_hw_constraint(CGU_GATESC1_REG);
-+
-+	for (i = 0; i < 32; i++) {
-+		if ((reg >> i) & 0x1)
-+			size +=
-+			    sprintf(&buf[size], "%s ,", cgu_name_sc1[31 - i]);
-+	}
-+
-+	size += sprintf(&buf[size], "\n");
-+
-+	reg = clk_get_hw_constraint(CGU_GATESC2_REG);
-+
-+	for (i = 0; i < 32; i++) {
-+		if ((reg >> i) & 0x1)
-+			size +=
-+			    sprintf(&buf[size], "%s ,", cgu_name_sc2[31 - i]);
-+	}
-+
-+	size += sprintf(&buf[size], "\n");
-+
-+	return size;
-+}
-+
-+unsigned char *cgu_name_ivs[32] = {
-+	"", "", "", "", "", "", "", "",
-+	"", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
-+	"CAMJPE", "TVO", "JDU", "VDC", "VEC", "IPP", "VDE", "CAM"
-+};
-+
-+ssize_t u6_clk_show_ivs_constraints(struct kobject *kobj, char *buf)
-+{
-+	int i, size = 0;
-+	unsigned long reg;
-+
-+	size += sprintf(&buf[size], "--IVS-- : \n");
-+
-+	reg = clk_get_hw_constraint(CGU_GATEIVS_REG);
-+
-+	for (i = 0; i < 32; i++) {
-+		if ((reg >> i) & 0x1)
-+			size +=
-+			    sprintf(&buf[size], "%s ,", cgu_name_ivs[31 - i]);
-+	}
-+
-+	size += sprintf(&buf[size], "\n");
-+
-+	return size;
-+}
-+
-+ssize_t u6_clk_show_tvo_constraints(struct kobject *kobj, char *buf)
-+{
-+	int size = 0;
-+	unsigned long reg;
-+
-+	size += sprintf(&buf[size], "--TVO-- : \n");
-+
-+	reg = clk_get_hw_constraint(CGU_TVCON_REG);
-+
-+	if ((reg >> 15) & 0x1)
-+		size += sprintf(&buf[size], "tvclk_ck pll enable\n");
-+	else
-+		size += sprintf(&buf[size], "tvclk_ck pll disable\n");
-+
-+	if ((reg >> 12) & 0x1)
-+		size += sprintf(&buf[size], "TVOPLL enable\n");
-+	else
-+		size += sprintf(&buf[size], "TVOPLL disable\n");
-+
-+	return size;
-+}
-+
-+ssize_t u6_clk_show_cam_constraints(struct kobject *kobj, char *buf)
-+{
-+	int size = 0;
-+	unsigned long reg, rate, div;
-+
-+	size += sprintf(&buf[size], "--CAM-- : \n");
-+
-+	reg = clk_get_hw_constraint(CGU_CAMCON_REG);
-+
-+	if ((reg >> 6) & 0x1) {
-+		size += sprintf(&buf[size], "fix_clock is source\n");
-+		rate = 312;
-+	} else {
-+		size += sprintf(&buf[size], "TVOPLL is source\n");
-+		rate = 216;
-+	}
-+
-+	div = ((reg & (0x3F << 0)) >> 0);
-+
-+	size += sprintf(&buf[size], "camo_ck is %luMhz\n", rate / (div + 1));
-+
-+	if ((reg >> 7) & 0x1)
-+		size += sprintf(&buf[size], "camo_ck enable\n");
-+	else
-+		size += sprintf(&buf[size], "camo_ck disable\n");
-+
-+	return size;
-+}
-+
-+/*
-+ * U6 clock reset and init functions
-+ */
-+
-+static struct clk_functions u6_clk_functions = {
-+	.clk_enable = u6_clk_enable,
-+	.clk_disable = u6_clk_disable,
-+	.clk_round_rate = u6_clk_round_rate,
-+	.clk_set_rate = u6_clk_set_rate,
-+	.clk_set_parent = u6_clk_set_parent,
-+	.clk_get_parent = u6_clk_get_parent,
-+};
-+
-+/**
-+ * @brief Attempts to connect the primary description structure for DMA case.
-+ *
-+ * We don't do any initialization since we expect the primary OS to have done
-+ * it for us.
-+ */
-+static int __init u67xx_cgu_init(void)
-+{
-+	struct clk **clkp;
-+	printk(PKMOD "clk management init\n");
-+
-+	if (mpurate)
-+		sc_ck.rate = mpurate;
-+
-+	/* init clock function pointer table */
-+	clk_init(&u6_clk_functions);
-+
-+	/* register and init clock elements */
-+	for (clkp = onchip_clks; clkp < onchip_clks + ARRAY_SIZE(onchip_clks);
-+	     clkp++) {
-+		clk_register(*clkp);
-+	}
-+
-+	return 0;
-+}
-+
-+arch_initcall(u67xx_cgu_init);
-diff --git a/arch/arm/mach-u67xx/clock_u67xx.h b/arch/arm/mach-u67xx/clock_u67xx.h
-new file mode 100644
-index 0000000..d92e454
---- /dev/null
-+++ b/arch/arm/mach-u67xx/clock_u67xx.h
-@@ -0,0 +1,876 @@
-+/*
-+ * linux/arch/arm/mach-u67xx/clock_u67xx.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Loic Pallardy <loic.pallardy at stericsson.com for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ *
-+ * Based on clocks.h by Tony Lindgren, Gordon McNutt and RidgeRun, Inc
-+ */
-+
-+#ifndef __ARCH_ARM_MACH_U67XX_CLOCK_H
-+#define __ARCH_ARM_MACH_U67XX_CLOCK_H
-+
-+static int u67xx_cgu_enable_fake_clock(struct clk *clk);
-+static int u67xx_cgu_enable_hw_clock(struct clk *clk);
-+static int u67xx_cgu_enable_shared_clock(struct clk *clk);
-+static int u67xx_cgu_enable_tvo_pll_clock(struct clk *clk);
-+static int u67xx_cgu_enable_camout(struct clk *clk);
-+
-+static void u67xx_cgu_disable_fake_clock(struct clk *clk);
-+static void u67xx_cgu_disable_hw_clock(struct clk *clk);
-+static void u67xx_cgu_disable_shared_clock(struct clk *clk);
-+
-+static void u6_clk_dflt_init(struct clk *clk);
-+static void u6_clk_init_hclk2(struct clk *clk);
-+static void u6_clk_init_fci(struct clk *clk);
-+static void u6_clk_init_camout(struct clk *clk);
-+
-+static int u6_clk_set_rate_fci(struct clk *clk, unsigned long rate);
-+static int u6_clk_set_rate_camout(struct clk *clk, unsigned long rate);
-+
-+static int u6_clk_set_parent_camout(struct clk *clk, struct clk *parent);
-+static int u6_clk_set_parent_uart(struct clk *clk, struct clk *parent);
-+
-+static void followparent_ivs_recalc(struct clk *clk);
-+
-+/* used to remove useless clock cells */
-+#undef U6_OPTIMIZED_TREE
-+
-+/*
-+ * U6 clock tree.
-+ *
-+ * NOTE:In many cases here we are assigning a 'default' parent.	In many
-+ *	cases the parent is selectable.	The get/set parent calls will also
-+ *	switch sources.
-+ *
-+ *	Many some clocks say always_enabled, but they can be auto idled for
-+ *	power savings. They will always be available upon clock request.
-+ *
-+ *	Several sources are given initial rates which may be wrong, this will
-+ *	be fixed up in the init func.
-+ *
-+ *	Things are broadly separated below by clock domains. It is
-+ *	noteworthy that most periferals have dependencies on multiple clock
-+ *	domains. Many get their interface clocks from the L4 domain, but get
-+ *	functional clocks from fixed sources or other core domain derived
-+ *	clock.
-+ */
-+
-+/*** Basic clocks ***/
-+
-+/* Base external input clocks */
-+static struct clk func_32k_ck = {
-+	.name = "func_32k_ck",
-+	.rate = 32000,
-+	.flags = RATE_FIXED | ALWAYS_ENABLED,
-+	.usecount = 1,
-+};
-+
-+/* Typical 26MHz in standalone mode */
-+static struct clk osc_ck = {	/* (*12, *13, 19.2, *26, 38.4)MHz */
-+	.name = "osc_ck",
-+	.rate = 26000000,	/* fixed up in clock init */
-+	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
-+	.usecount = 1,
-+};
-+
-+/* System clock MCLK */
-+/* With out modem likely 12MHz, with modem likely 13MHz */
-+static struct clk sys_ck = {	/* (*12, *13, 19.2, 26, 38.4)MHz */
-+	.name = "sys_ck",	/* ~ ref_clk also */
-+	.parent = &osc_ck,
-+	.rate = 13000000,
-+	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
-+	.usecount = 1,
-+};
-+
-+/*** System PLLs ***/
-+
-+static struct clk sc_ck = {	/* 275-550MHz */
-+	.name = "sc_ck",
-+	.parent = &sys_ck,
-+	.rate = 416000000,
-+	.flags = RATE_PROPAGATES,
-+	.enable = u67xx_cgu_enable_fake_clock,
-+	.disable = u67xx_cgu_disable_fake_clock,
-+};
-+
-+static struct clk fix_ck = {	/* 312MHz */
-+	.name = "fix_ck",
-+	.parent = &sys_ck,
-+	.rate = 312000000,
-+	.flags = RATE_FIXED,
-+	.enable = u67xx_cgu_enable_fake_clock,
-+	.disable = u67xx_cgu_disable_fake_clock,
-+	.enable_bit = 0,
-+};
-+
-+static struct clk tv_ck = {	/* 216MHz */
-+	.name = "tv_ck",
-+	.parent = &fix_ck,
-+	.rate = 216000000,
-+	.flags = RATE_FIXED,
-+	.enable = u67xx_cgu_enable_fake_clock,
-+	.disable = u67xx_cgu_disable_fake_clock,
-+};
-+
-+#ifndef U6_OPTIMIZED_TREE
-+static struct clk dsp2_ck = {	/* 156-320MHz */
-+	.name = "dsp2_ck",
-+	.parent = &sys_ck,
-+	.rate = 208000000,
-+	.flags = RATE_PROPAGATES,
-+	.enable = u67xx_cgu_enable_fake_clock,
-+	.disable = u67xx_cgu_disable_fake_clock,
-+	.enable_bit = 8,
-+};
-+#endif
-+
-+static struct clk sdm_ck = {	/* 275-550MHz */
-+	.name = "sdm_ck",
-+	.parent = &sys_ck,
-+	.rate = 200000000,
-+/*      .flags          = RATE_PROPAGATES,*/
-+	.enable = u67xx_cgu_enable_fake_clock,
-+	.disable = u67xx_cgu_disable_fake_clock,
-+	.enable_bit = 3,
-+};
-+
-+/*** Master clock sources ***/
-+
-+static struct clk arm_ck = {
-+	.name = "arm_ck",
-+	.rate = 416000000,
-+	.parent = &sc_ck,
-+/*	.flags          = RATE_PROPAGATES,*/
-+	.enable = u67xx_cgu_enable_fake_clock,
-+	.disable = u67xx_cgu_disable_fake_clock,
-+};
-+
-+static struct clk hclk_ck = {
-+	.name = "hclk_ck",
-+	.rate = 208000000,
-+	.parent = &arm_ck,
-+	.flags = RATE_PROPAGATES,
-+	.enable = u67xx_cgu_enable_fake_clock,
-+	.disable = u67xx_cgu_disable_fake_clock,
-+	.enable_bit = 1,
-+};
-+
-+static struct clk hclk2_ck = {
-+	.name = "hclk2_ck",
-+/*	.rate           = 104000000,*/
-+	.rate = 52000000,
-+	.parent = &fix_ck,
-+	.flags = RATE_PROPAGATES,
-+	.init = u6_clk_init_hclk2,
-+	.enable = u67xx_cgu_enable_fake_clock,
-+	.disable = u67xx_cgu_disable_fake_clock,
-+	.enable_bit = 2,
-+};
-+
-+static struct clk sdm_ivs_ck = {
-+	.name = "sdm_ivs_ck",
-+	.parent = &hclk2_ck,
-+	.rate = 104000000,
-+	.flags = RATE_PROPAGATES,
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_ivs_recalc,
-+	.enable_reg = CGU_SDMCON_REG,
-+	.enable_bit = 23,
-+};
-+
-+static struct clk pclk1_ck = {
-+	.name = "pclk1_ck",
-+	.rate = 104000000,
-+	.parent = &hclk2_ck,
-+	.flags = RATE_PROPAGATES,
-+	.enable = u67xx_cgu_enable_fake_clock,
-+	.disable = u67xx_cgu_disable_fake_clock,
-+};
-+
-+static struct clk tvclk_ck = {
-+	.name = "tvclk_ck",
-+	.rate = 27000000,
-+	.parent = &tv_ck,
-+	.flags = RATE_FIXED,
-+	.enable = u67xx_cgu_enable_tvo_pll_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.enable_reg = CGU_TVCON_REG,
-+	.enable_bit = 15,
-+};
-+
-+static struct clk pclk2_ck = {
-+	.name = "pclk2_ck",
-+	.rate = 52000000,
-+	.parent = &fix_ck,
-+	.flags = RATE_PROPAGATES,
-+	.enable = u67xx_cgu_enable_fake_clock,
-+	.disable = u67xx_cgu_disable_fake_clock,
-+	.enable_bit = 4,
-+};
-+
-+static struct clk clk24m_ck = {
-+	.name = "clk24m_ck",
-+	.rate = 24000000,
-+	.parent = &fix_ck,
-+	.flags = RATE_FIXED,
-+	.enable = u67xx_cgu_enable_fake_clock,
-+	.disable = u67xx_cgu_disable_fake_clock,
-+	.enable_bit = 5,
-+};
-+
-+static struct clk clk26m_ck = {
-+	.name = "clk26m_ck",
-+	.rate = 26000000,
-+	.parent = &fix_ck,
-+	.flags = RATE_FIXED,
-+	.enable = u67xx_cgu_enable_fake_clock,
-+	.disable = u67xx_cgu_disable_fake_clock,
-+	.enable_bit = 6,
-+};
-+
-+static struct clk clk13m_ck = {
-+	.name = "clk13m_ck",
-+	.rate = 13000000,
-+	.parent = &fix_ck,
-+	.flags = RATE_FIXED,
-+	.enable = u67xx_cgu_enable_fake_clock,
-+	.disable = u67xx_cgu_disable_fake_clock,
-+	.enable_bit = 7,
-+};
-+
-+static struct clk clk4m_ck = {
-+	.name = "clk4m_ck",
-+	.rate = 4000000,
-+	.parent = &fix_ck,
-+	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
-+	.enable = u67xx_cgu_enable_fake_clock,
-+	.disable = u67xx_cgu_disable_fake_clock,
-+};
-+
-+#ifndef U6_OPTIMIZED_TREE
-+static struct clk sioy1clk_ck = {
-+	.name = "sioy1clk_ck",
-+	.rate = 208000000,
-+	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
-+};
-+
-+static struct clk sioy2clk_ck = {
-+	.name = "sioy2clk_ck",
-+	.rate = 208000000,
-+	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
-+};
-+
-+static struct clk rfclk_ck = {
-+	.name = "rfclk_ck",
-+	.rate = 208000000,
-+	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
-+};
-+#endif
-+
-+static struct clk fc_ck = {
-+	.name = "fc_ck",
-+/*	.rate = 104000000,*/
-+	.rate = 52000000,
-+	.init = u6_clk_init_fci,
-+	.enable = u67xx_cgu_enable_fake_clock,
-+	.disable = u67xx_cgu_disable_fake_clock,
-+	.set_rate = u6_clk_set_rate_fci,
-+	.parent = &fix_ck,
-+};
-+
-+static struct clk usb_d_ck = {
-+	.name = "usb_d_ck",
-+	.rate = 24000000,
-+	.parent = &clk24m_ck,
-+	.enable = u67xx_cgu_enable_fake_clock,
-+	.disable = u67xx_cgu_disable_fake_clock,
-+};
-+
-+static struct clk usb_h_ck = {
-+	.name = "usb_h_ck",
-+	.rate = 24000000,
-+	.parent = &clk24m_ck,
-+	.flags = RATE_FIXED,
-+	.enable = u67xx_cgu_enable_fake_clock,
-+	.disable = u67xx_cgu_disable_fake_clock,
-+};
-+
-+#ifndef U6_OPTIMIZED_TREE
-+static struct clk dcclk1_ck = {
-+	.name = "dcclk1_ck",
-+	.rate = 130000000,
-+	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
-+};
-+
-+static struct clk diclk1_ck = {
-+	.name = "diclk1_ck",
-+	.rate = 130000000,
-+	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
-+};
-+
-+static struct clk dcclk2_ck = {
-+	.name = "dcclk2_ck",
-+	.rate = 130000000,
-+	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
-+};
-+
-+static struct clk diclk2_ck = {
-+	.name = "dicl2_ck",
-+	.rate = 130000000,
-+	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
-+};
-+#endif
-+
-+static struct clk camo_ck = {
-+	.name = "camo_ck",
-+	.rate = 12000000,
-+	.parent = &fix_ck,
-+	.flags = RATE_PROPAGATES,
-+	.init = u6_clk_init_camout,
-+	.enable = u67xx_cgu_enable_camout,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.set_rate = u6_clk_set_rate_camout,
-+	.set_parent = u6_clk_set_parent_camout,
-+	.enable_reg = CGU_CAMCON_REG,
-+	.enable_bit = 7,
-+};
-+
-+/*** Peripheral clocks ***/
-+
-+/* CGUTVCON */
-+static struct clk plltv_ck = {
-+	.name = "TVOPLL",
-+	.enable_reg = CGU_TVCON_REG,
-+	.enable_bit = 12,
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.parent = &tvclk_ck,
-+};
-+
-+/* CGUGATESC1 */
-+#ifndef U6_OPTIMIZED_TREE
-+static struct clk intc_ck = {
-+	.name = "INTC",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 0,
-+	.parent = &hclk2_ck,
-+	.usecount = 1,
-+};
-+
-+static struct clk extint_ck = {
-+	.name = "EXTINT",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 1,
-+	.parent = &pclk2_ck,
-+	.usecount = 1,
-+};
-+
-+static struct clk sctu_ck = {
-+	.name = "SCTU",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 2,
-+	.parent = &clk13m_ck,
-+};
-+#endif
-+
-+static struct clk spi1_ck = {
-+	.name = "SPI1",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 3,
-+	.parent = &pclk1_ck,
-+};
-+
-+static struct clk spi2_ck = {
-+	.name = "SPI2",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 4,
-+	.parent = &pclk1_ck,
-+};
-+
-+static struct clk iic1_ck = {
-+	.name = "IIC1",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 5,
-+	.parent = &pclk2_ck,
-+};
-+
-+static struct clk iic2_ck = {
-+	.name = "IIC2",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 6,
-+	.parent = &pclk2_ck,
-+};
-+
-+static struct clk uart1_ck = {
-+	.name = "UART1",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.set_parent = u6_clk_set_parent_uart,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 7,
-+	.parent = &clk13m_ck,
-+	.usecount = 1,
-+};
-+
-+static struct clk uart2_ck = {
-+	.name = "UART2",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.set_parent = u6_clk_set_parent_uart,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 8,
-+	.parent = &clk13m_ck,
-+};
-+
-+#ifndef U6_OPTIMIZED_TREE
-+static struct clk gpio_ck = {
-+	.name = "GPIO",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 9,
-+	.parent = &pclk2_ck,
-+	.usecount = 1,
-+};
-+#endif
-+
-+static struct clk kbs_ck = {
-+	.name = "KBS",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 10,
-+	.parent = &func_32k_ck,
-+};
-+
-+static struct clk pwm1_ck = {
-+	.name = "PWM1",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 11,
-+	.parent = &clk13m_ck,
-+};
-+
-+static struct clk pwm2_ck = {
-+	.name = "PWM2",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 12,
-+	.parent = &clk13m_ck,
-+};
-+
-+static struct clk pwm3_ck = {
-+	.name = "PWM3",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 13,
-+	.parent = &clk13m_ck,
-+};
-+
-+static struct clk geac_ck = {
-+	.name = "GEAC",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 14,
-+	.parent = &pclk1_ck,
-+};
-+
-+#ifndef U6_OPTIMIZED_TREE
-+static struct clk usim_ck = {
-+	.name = "USIM",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 15,
-+	.parent = &pclk2_ck,
-+};
-+#endif
-+
-+static struct clk fci_ck = {
-+	.name = "FCI",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 16,
-+	.parent = &fc_ck,
-+};
-+
-+static struct clk usbd_ck = {
-+	.name = "USBD",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 17,
-+	.parent = &hclk2_ck,
-+};
-+
-+#ifndef U6_OPTIMIZED_TREE
-+static struct clk iis_ck = {
-+	.name = "IIS",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 18,
-+	.parent = &clk24m_ck,
-+};
-+
-+static struct clk rfsm1_ck = {
-+	.name = "RFSM1",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 19,
-+	.parent = &pclk1_ck,
-+};
-+#endif
-+
-+static struct clk dmau_ck = {
-+	.name = "DMAU",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_shared_clock,
-+	.disable = u67xx_cgu_disable_shared_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 20,
-+	.parent = &hclk2_ck,
-+};
-+
-+static struct clk jdi_ck = {
-+	.name = "JDI",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 24,
-+	.parent = &pclk2_ck,
-+};
-+
-+#ifndef U6_OPTIMIZED_TREE
-+static struct clk ucc_ck = {
-+	.name = "UCC",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 25,
-+	.parent = &pclk1_ck,
-+};
-+#endif
-+
-+static struct clk msi_ck = {
-+	.name = "MSI",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 26,
-+	.parent = &fc_ck,
-+};
-+
-+static struct clk sdi_ck = {
-+	.name = "SDI",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 28,
-+	.parent = &hclk2_ck,
-+};
-+
-+static struct clk nfi_ck = {
-+	.name = "NFI",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 29,
-+	.parent = &hclk2_ck,
-+
-+};
-+
-+static struct clk ebi_ck = {
-+	.name = "EBI",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATESC1_REG,
-+	.enable_bit = 31,
-+	.parent = &hclk2_ck,
-+
-+};
-+
-+/* CGUGATESC2 */
-+static struct clk cae_ck = {
-+	.name = "CAE",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.enable_reg = CGU_GATESC2_REG,
-+	.enable_bit = 0,
-+	.parent = &pclk1_ck,
-+};
-+
-+static struct clk mmtu_ck = {
-+	.name = "MMTU",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_shared_clock,
-+	.disable = u67xx_cgu_disable_shared_clock,
-+	.enable_reg = CGU_GATESC2_REG,
-+	.enable_bit = 2,
-+	.parent = &clk13m_ck,
-+	.usecount = 1,
-+};
-+
-+/* OCL-2008-07-02: how to manage etbclk ? */
-+/* static struct clk ETB_ck = */
-+/* { */
-+/* 	.name = "ETB", */
-+/* 	.enable_reg = CGU_GATESC2_REG, */
-+/* 	.enable_bit = 4, */
-+/* 	.parent = &etbclk_ck, */
-+/* }; */
-+
-+/* CGUGATEIVS */
-+static struct clk cam_ck = {
-+	.name = "CAM",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATEIVS_REG,
-+	.enable_bit = 0,
-+	.parent = &sdm_ivs_ck,
-+};
-+
-+static struct clk vde_ck = {
-+	.name = "VDE",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATEIVS_REG,
-+	.enable_bit = 1,
-+	.parent = &hclk2_ck,
-+};
-+
-+static struct clk ipp_ck = {
-+	.name = "IPP",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATEIVS_REG,
-+	.enable_bit = 2,
-+	.parent = &sdm_ivs_ck,
-+};
-+
-+static struct clk vec_ck = {
-+	.name = "VEC",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATEIVS_REG,
-+	.enable_bit = 3,
-+	.parent = &sdm_ivs_ck,
-+};
-+
-+static struct clk vdc_ck = {
-+	.name = "VDC",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATEIVS_REG,
-+	.enable_bit = 4,
-+	.parent = &sdm_ivs_ck,
-+};
-+
-+static struct clk jdu_ck = {
-+	.name = "JDU",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATEIVS_REG,
-+	.enable_bit = 5,
-+	.parent = &sdm_ivs_ck,
-+};
-+
-+static struct clk tvoclk_ck = {
-+	.name = "TVO",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATEIVS_REG,
-+	.enable_bit = 6,
-+	.parent = &sdm_ivs_ck,
-+};
-+
-+static struct clk camjpe_ck = {
-+	.name = "CAMJPE",
-+	.init = u6_clk_dflt_init,
-+	.enable = u67xx_cgu_enable_hw_clock,
-+	.disable = u67xx_cgu_disable_hw_clock,
-+	.recalc = followparent_recalc,
-+	.enable_reg = CGU_GATEIVS_REG,
-+	.enable_bit = 7,
-+	.parent = &hclk_ck,
-+};
-+
-+static struct clk *onchip_clks[] = {
-+	/* external root sources */
-+	&func_32k_ck,
-+	&osc_ck,
-+	&sys_ck,
-+	&sc_ck,
-+	&fix_ck,
-+	&tv_ck,
-+#ifndef U6_OPTIMIZED_TREE
-+	&dsp2_ck,
-+#endif
-+	&sdm_ck,
-+	&arm_ck,
-+	&hclk_ck,
-+	&hclk2_ck,
-+	&pclk1_ck,
-+	&pclk2_ck,
-+	&tvclk_ck,
-+	&clk24m_ck,
-+	&clk26m_ck,
-+	&clk13m_ck,
-+	&clk4m_ck,
-+	&fc_ck,
-+#ifndef U6_OPTIMIZED_TREE
-+	&sioy1clk_ck,
-+	&sioy2clk_ck,
-+	&rfclk_ck,
-+#endif
-+	&usb_h_ck,
-+	&usb_d_ck,
-+#ifndef U6_OPTIMIZED_TREE
-+	&dcclk1_ck,
-+	&diclk1_ck,
-+	&dcclk2_ck,
-+	&diclk2_ck,
-+#endif
-+	&camo_ck,
-+	&tvoclk_ck,
-+	&plltv_ck,
-+#ifndef U6_OPTIMIZED_TREE
-+	&intc_ck,
-+	&extint_ck,
-+	&sctu_ck,
-+#endif
-+	&spi1_ck,
-+	&spi2_ck,
-+	&iic1_ck,
-+	&iic2_ck,
-+	&uart1_ck,
-+	&uart2_ck,
-+#ifndef U6_OPTIMIZED_TREE
-+	&gpio_ck,
-+#endif
-+	&kbs_ck,
-+	&pwm1_ck,
-+	&pwm2_ck,
-+	&pwm3_ck,
-+	&geac_ck,
-+#ifndef U6_OPTIMIZED_TREE
-+	&usim_ck,
-+#endif
-+	&fci_ck,
-+	&usbd_ck,
-+#ifndef U6_OPTIMIZED_TREE
-+	&iis_ck,
-+	&rfsm1_ck,
-+#endif
-+	&dmau_ck,
-+	&jdi_ck,
-+#ifndef U6_OPTIMIZED_TREE
-+	&ucc_ck,
-+#endif
-+	&msi_ck,
-+	&sdi_ck,
-+	&nfi_ck,
-+	&ebi_ck,
-+	&cae_ck,
-+	&mmtu_ck,
-+	&sdm_ivs_ck,
-+	&cam_ck,
-+	&vde_ck,
-+	&vdc_ck,
-+	&vec_ck,
-+	&ipp_ck,
-+	&jdu_ck,
-+	&camjpe_ck
-+};
++	(void __iomem *) SCON_SYSMUX8_REG,
++	0 |
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E0  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E1  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E2  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E3  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E4  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E5  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E6  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E7  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E8  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E9  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E10 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E11 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E12 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E13 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E14 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E15 & 0xF)))  /* DEBUG */
++ },
++ {
++	(void __iomem *) SCON_SYSMUX9_REG,
++	0 |
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E16 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E17 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E18 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E19 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E20 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E21 & 0xF))) | /* SDATO2 -> SPI2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E22 & 0xF))) | /* SDATIN2 -> SPI2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E23 & 0xF))) | /* SCLK2 -> SPI2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E24 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E25 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E26 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E27 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E28 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E29 & 0xF))) | /* FCI_copy
++							-> FCI USB suspend */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E30 & 0xF))) | /* RFSM_OUT3 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E31 & 0xF)))  /* GPIO CAM */
++ },
 +
 +#endif
++ {
++	(void __iomem *) SCON_SYSMUX10_REG,
++	0 |
++#ifdef CONFIG_EBI_BUS
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F0  & 0xF))) | /* EBI_IO0_copy */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F1  & 0xF))) | /* EBI_OE_RW_copy */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F2  & 0xF))) | /* EBI_WE_E_copy */
++#else
++	(GPIO_MODE_MUX1 << (2 * (GPIO_F0  & 0xF))) | /* CAM_PWR_REG -> CAM */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_F1  & 0xF))) | /* AGPS FRAME_SYNC, AGPS */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F2  & 0xF))) | /* free */
++#endif
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F3  & 0xF))) | /* KCOL5 -> Keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F4  & 0xF))) | /* KCOL6 -> Keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F5  & 0xF))) | /* KCOL7 -> Keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F6  & 0xF))) | /* KROW5 -> Keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F7  & 0xF))) | /* KROW6 -> Keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F8  & 0xF))) | /* KROW7 -> Keypad */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_F9  & 0xF))) | /* eMMC_PDn -> FCI */
++#ifdef CONFIG_EBI_BUS
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F10 & 0xF))) | /* VDE_CS0_copy */
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F11 & 0xF))) | /* EBI_IO1_copy */
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F12 & 0xF))) | /* EBI_IO2_copy */
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F13 & 0xF))) | /* EBI_IO3_copy */
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F14 & 0xF))) | /* EBI_IO4_copy */
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F15 & 0xF)))  /* EBI_IO5_copy */
++#else
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F10 & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F11 & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F12 & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F13 & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F14 & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F15 & 0xF)))  /* VDE */
++#endif
++ },
++ {
++	(void __iomem *) SCON_SYSMUX11_REG,
++	0 |
++#ifdef CONFIG_EBI_BUS
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F16 & 0xF))) | /* EBI_IO6_copy */
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F17 & 0xF))) | /* EBI_IO7_copy */
++#else
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F16 & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F17 & 0xF))) | /* VDE */
++#endif
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F18 & 0xF)))  /* NFI_CE_n -> NFI */
++ },
++ /* Configure PAD Value */
++ {
++	(void __iomem *) SCON_SYSPAD0_REG,
++	0 |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A0   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A1   & 0xF))) |
++	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A2   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A3   & 0xF))) |
++	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A4   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A5   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A6   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A7   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A8   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A9   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A10  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A11  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A12  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A13  & 0xF))) |
++	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A14  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A15  & 0xF)))
++ },
++ {
++	(void __iomem *) SCON_SYSPAD1_REG,
++	0 |
++	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A16  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A17  & 0xF))) |
++	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A18  & 0xF))) |
++	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A19  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A20  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A21  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A22  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A23  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A24  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A25  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A26  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A27  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A28  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A29  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A30  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A31  & 0xF)))
++ },
++ {
++	(void __iomem *) SCON_SYSPAD2_REG,
++	0 |
++	(SCON_PAD_PULL_DOWN   << (2 * (GPIO_B0   & 0xF))) |
++	(SCON_PAD_PULL_DOWN   << (2 * (GPIO_B1   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B2   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B3   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B4   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B5   & 0xF))) |
++	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_B6   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B7   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B8   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B9   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B10  & 0xF))) |
++	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_B11  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B12  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B13  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B14  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B15  & 0xF)))
++ },
++};
++
++/* GPIO def settings to avoid HW issue */
++struct u6_gpio_config u6_gpio_init_config[] = {
++	/* GPIO A bank */
++	{
++		.gpio = GPIO_A5,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 1,
++	},
++	{
++		.gpio = GPIO_A6,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 1,
++	},
++	{
++		.gpio = GPIO_A7,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_A8,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 1,
++	},
++	{
++		.gpio = GPIO_A9,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 1,
++	},
++	{
++		.gpio = GPIO_A13,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_A17,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_A21,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_A23,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_A24,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 1,
++	},
++	{
++		.gpio = GPIO_A25,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_A30,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 0,
++	},
++	/* GPIO B bank */
++	/* GPIO C bank */
++	/* GPIO D bank */
++	{
++		.gpio = GPIO_D0,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_D24,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_D29,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 0,
++	},
++	/* GPIO E bank */
++	{
++		.gpio = GPIO_E31,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 0,
++	},
++	/* GPIO F bank */
++	{
++		.gpio = GPIO_F0,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_F1,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_F2,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_F9,
++		.dir = GPIO_DIR_OUTPUT	,
++		.value = 0,
++	}
++};
++
++u32 gpio_to_configure = ARRAY_SIZE(u6_gpio_init_config);
+ 
+ /* List of board specific devices */
+ static struct platform_device *devices[] __initdata = {
+@@ -31,6 +499,7 @@ static struct platform_device *devices[] __initdata = {
+ 
+ void __init u67xx_init(void)
+ {
++	u6_gpio_init();
+ 	/* Add specific board devices */
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ }
+diff --git a/arch/arm/mach-u67xx/devices.c b/arch/arm/mach-u67xx/devices.c
+index 0ead380..8e812fb 100644
+--- a/arch/arm/mach-u67xx/devices.c
++++ b/arch/arm/mach-u67xx/devices.c
+@@ -48,12 +48,12 @@ unsigned char extint_to_gpio[NR_EXTINT] = {
+ EXPORT_SYMBOL(extint_to_gpio);
+ 
+ struct gpio_bank u6_gpio_bank[6] = {
+-	{(void __iomem *)GPIOA_PINS_REG, (void __iomem *)SCON_SYSMUX0_REG},
+-	{(void __iomem *)GPIOB_PINS_REG, (void __iomem *)SCON_SYSMUX2_REG},
+-	{(void __iomem *)GPIOC_PINS_REG, (void __iomem *)SCON_SYSMUX4_REG},
+-	{(void __iomem *)GPIOD_PINS_REG, (void __iomem *)SCON_SYSMUX6_REG},
+-	{(void __iomem *)GPIOE_PINS_REG, (void __iomem *)SCON_SYSMUX8_REG},
+-	{(void __iomem *)GPIOF_PINS_REG, (void __iomem *)SCON_SYSMUX10_REG},
++	{GPIOA_PINS_REG, SCON_SYSMUX0_REG},
++	{GPIOB_PINS_REG, SCON_SYSMUX2_REG},
++	{GPIOC_PINS_REG, SCON_SYSMUX4_REG},
++	{GPIOD_PINS_REG, SCON_SYSMUX6_REG},
++	{GPIOE_PINS_REG, SCON_SYSMUX8_REG},
++	{GPIOF_PINS_REG, SCON_SYSMUX10_REG},
+ };
+ 
+ static struct gpio_data u6_gpio_data = {
 diff --git a/arch/arm/plat-u6xxx/Makefile b/arch/arm/plat-u6xxx/Makefile
-index 12c832c..afdf82b 100644
+index afdf82b..3d6898e 100644
 --- a/arch/arm/plat-u6xxx/Makefile
 +++ b/arch/arm/plat-u6xxx/Makefile
 @@ -3,6 +3,6 @@
  #
  
  # Common support
--obj-y := io.o irq.o
-+obj-y := io.o irq.o clock.o
+-obj-y := io.o irq.o clock.o
++obj-y := io.o irq.o clock.o gpio.o
  
  obj-$(CONFIG_U6_MTU_TIMER) += timer.o
-diff --git a/arch/arm/plat-u6xxx/clock.c b/arch/arm/plat-u6xxx/clock.c
+diff --git a/arch/arm/plat-u6xxx/gpio.c b/arch/arm/plat-u6xxx/gpio.c
 new file mode 100644
-index 0000000..dd8fc02
+index 0000000..40e25fc
 --- /dev/null
-+++ b/arch/arm/plat-u6xxx/clock.c
-@@ -0,0 +1,650 @@
++++ b/arch/arm/plat-u6xxx/gpio.c
+@@ -0,0 +1,716 @@
 +/*
-+ * linux/arch/arm/plat-u6xxx/clock.c
-+ *
-+ *  Copyright (C) 2004 - 2005 Nokia corporation
-+ *  Written by Tuukka Tikkanen <tuukka.tikkanen@elektrobit.com>
-+ *  Copyright (C) 2010 ST-Ericsson SA
-+ *
-+ *  Modified for omap shared clock framework by Tony Lindgren <tony@atomide.com>
-+ *
-+ *  Modified for u6 shared clock framework by Loic Pallardy @ ST-Ericsson.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/version.h>
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/list.h>
-+#include <linux/errno.h>
-+#include <linux/err.h>
-+#include <linux/string.h>
-+#include <linux/clk.h>
-+#include <linux/mutex.h>
-+#include <linux/notifier.h>
-+
-+#include <linux/io.h>
-+
-+#include <mach/clock.h>
-+
-+#ifdef CONFIG_U6_POWER_SYSFS
-+#include "power_sysfs.h"
-+#endif
-+
-+LIST_HEAD(clocks);
-+
-+static DEFINE_MUTEX(clocks_mutex);
-+DEFINE_SPINLOCK(clockfw_lock);
-+
-+static struct clk_functions *arch_clock;
-+
-+/*
-+ * Additionnal specific clock functions define in include/mach/clock.h
-+ */
-+
-+/**
-+ *	clk_register_notifier - register a driver with clock mngt
-+ *	@nb: notifier function to register
-+ *  @clk: clock element rate change to be notified
-+ *
-+ *	Add a driver to one of two lists: either a list of drivers that
-+ *      are notified about clock rate changes (once before and once after
-+ *      the transition),
-+ *	This function may sleep, and has the same return conditions as
-+ *	sru_blocking_notifier_chain_register.
-+ */
-+int clk_register_notifier(struct notifier_block *nb, struct clk *clk)
-+{
-+	int ret;
-+
-+	if (clk == ERR_PTR(-ENOENT))
-+		return -EINVAL;
-+
-+	mutex_lock(&clocks_mutex);
-+	if (clk->notifier)
-+		ret = srcu_notifier_chain_register(clk->notifier, nb);
-+	else
-+		ret = -EINVAL;
-+	mutex_unlock(&clocks_mutex);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(clk_register_notifier);
-+
-+/**
-+ *	clk_unregister_notifier - unregister a driver with clock mngt
-+ *	@nb: notifier function to be unregistered
-+ *  @clk: clock element rate change to be notified
-+ *
-+ *	Remove a driver from the clock mngt notifier list.
-+ *
-+ *	This function may sleep, and has the same return conditions as
-+ *	sru_blocking_notifier_chain_unregister.
-+ */
-+int clk_unregister_notifier(struct notifier_block *nb, struct clk *clk)
-+{
-+	int ret;
-+
-+	if (clk == ERR_PTR(-ENOENT))
-+		return -EINVAL;
-+
-+	mutex_lock(&clocks_mutex);
-+	if (clk->notifier)
-+		ret = srcu_notifier_chain_unregister(clk->notifier, nb);
-+	else
-+		ret = -EINVAL;
-+	mutex_unlock(&clocks_mutex);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(clk_unregister_notifier);
-+
-+/**
-+ * clk_notify_transition - call notifier chain
-+ *
-+ * This function calls the transition notifiers and the and set rate
-+ * It is called twice on all frequency changes that have
-+ * external effects.
-+ */
-+int clk_notify_transition(struct clk *clk, unsigned int state, void *data)
-+{
-+	BUG_ON(irqs_disabled());
-+
-+	if (clk == ERR_PTR(-ENOENT))
-+		return NOTIFY_BAD;
-+
-+	switch (state) {
-+
-+	case CLK_RATE_PRECHANGE:
-+	case CLK_RATE_POSTCHANGE:
-+/*		printk("notif %u of frequency transition of %s to %lu Hz\n",
-+			state, clk->name, (unsigned long)data);
-+*/
-+		break;
-+
-+	case CLK_SRCE_PRECHANGE:
-+	case CLK_SRCE_POSTCHANGE:
-+/*              printk("notif %u of srce transition of %s to %s\n",
-+			state, clk->name, ((struct clk *)data)->name);
-+*/
-+		break;
-+	default:
-+		printk(KERN_ERR "Unknown notification srce transition\n");
-+		return NOTIFY_BAD;
-+		break;
-+	}
-+
-+	return srcu_notifier_call_chain(clk->notifier, state, data);
-+}
-+
-+/*
-+ * Standard clock functions defined in include/linux/clk.h
-+ */
-+
-+struct clk *clk_get(struct device *dev, const char *id)
-+{
-+	struct clk *p, *clk = ERR_PTR(-ENOENT);
-+
-+	mutex_lock(&clocks_mutex);
-+	list_for_each_entry(p, &clocks, node) {
-+		if (strcmp(id, p->name) == 0 && try_module_get(p->owner)) {
-+			clk = p;
-+			break;
-+		}
-+	}
-+	mutex_unlock(&clocks_mutex);
-+
-+	return clk;
-+}
-+EXPORT_SYMBOL(clk_get);
-+
-+int clk_enable(struct clk *clk)
-+{
-+	unsigned long flags;
-+	int ret = 0;
-+
-+	if (clk == ERR_PTR(-ENOENT))
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&clockfw_lock, flags);
-+	if (arch_clock->clk_enable)
-+		ret = arch_clock->clk_enable(clk);
-+	spin_unlock_irqrestore(&clockfw_lock, flags);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(clk_enable);
-+
-+void clk_disable(struct clk *clk)
-+{
-+	unsigned long flags;
-+
-+	if (clk == ERR_PTR(-ENOENT))
-+		return;
-+
-+	spin_lock_irqsave(&clockfw_lock, flags);
-+	if (arch_clock->clk_disable)
-+		arch_clock->clk_disable(clk);
-+	spin_unlock_irqrestore(&clockfw_lock, flags);
-+}
-+EXPORT_SYMBOL(clk_disable);
-+
-+int clk_get_usecount(struct clk *clk)
-+{
-+	unsigned long flags;
-+	int ret = 0;
-+
-+	if (clk == ERR_PTR(-ENOENT))
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&clockfw_lock, flags);
-+	ret = clk->usecount;
-+	spin_unlock_irqrestore(&clockfw_lock, flags);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(clk_get_usecount);
-+
-+unsigned long clk_get_rate(struct clk *clk)
-+{
-+	unsigned long flags;
-+	unsigned long ret = 0;
-+
-+	if (clk == ERR_PTR(-ENOENT))
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&clockfw_lock, flags);
-+	ret = clk->rate;
-+	spin_unlock_irqrestore(&clockfw_lock, flags);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(clk_get_rate);
-+
-+void clk_put(struct clk *clk)
-+{
-+	if (clk && !IS_ERR(clk))
-+		module_put(clk->owner);
-+}
-+EXPORT_SYMBOL(clk_put);
-+
-+/*
-+ * Optional clock functions defined in include/linux/clk.h
-+ */
-+
-+long clk_round_rate(struct clk *clk, unsigned long rate)
-+{
-+	unsigned long flags;
-+	long ret = rate;
-+
-+	if (clk == ERR_PTR(-ENOENT))
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&clockfw_lock, flags);
-+	if (arch_clock->clk_round_rate)
-+		ret = arch_clock->clk_round_rate(clk, rate);
-+	spin_unlock_irqrestore(&clockfw_lock, flags);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(clk_round_rate);
-+
-+int clk_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	unsigned long flags;
-+	int ret = 0;
-+
-+	if (clk == ERR_PTR(-ENOENT))
-+		return -EINVAL;
-+
-+	/* notification pre change */
-+	if (clk->notifier)
-+		ret = clk_notify_transition(clk,
-+					    CLK_RATE_PRECHANGE, (void *)rate);
-+
-+	if (!(ret & NOTIFY_STOP_MASK)) {
-+		spin_lock_irqsave(&clockfw_lock, flags);
-+		if (arch_clock->clk_set_rate)
-+			ret = arch_clock->clk_set_rate(clk, rate);
-+		spin_unlock_irqrestore(&clockfw_lock, flags);
-+
-+		/* notification post change */
-+		if (clk->notifier)
-+			clk_notify_transition(clk,
-+					      CLK_RATE_POSTCHANGE,
-+					      (void *)clk->rate);
-+	}
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(clk_set_rate);
-+
-+int clk_set_parent(struct clk *clk, struct clk *parent)
-+{
-+	unsigned long flags;
-+	int ret = 0;
-+
-+	if (clk == ERR_PTR(-ENOENT))
-+		return -EINVAL;
-+
-+	/* notification pre change */
-+	if (clk->notifier)
-+		ret = clk_notify_transition(clk,
-+					    CLK_SRCE_PRECHANGE, (void *)parent);
-+
-+	if (!(ret & NOTIFY_STOP_MASK)) {
-+		spin_lock_irqsave(&clockfw_lock, flags);
-+		if (arch_clock->clk_set_parent)
-+			ret = arch_clock->clk_set_parent(clk, parent);
-+		spin_unlock_irqrestore(&clockfw_lock, flags);
-+
-+		/* notification post change */
-+		if (clk->notifier)
-+			clk_notify_transition(clk,
-+					      CLK_SRCE_POSTCHANGE,
-+					      (void *)clk->parent);
-+	}
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(clk_set_parent);
-+
-+struct clk *clk_get_parent(struct clk *clk)
-+{
-+	unsigned long flags;
-+	struct clk *ret = ERR_PTR(-ENOENT);
-+
-+	if (clk == ERR_PTR(-ENOENT))
-+		return ret;
-+
-+	spin_lock_irqsave(&clockfw_lock, flags);
-+	if (arch_clock->clk_get_parent)
-+		ret = arch_clock->clk_get_parent(clk);
-+	spin_unlock_irqrestore(&clockfw_lock, flags);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(clk_get_parent);
-+
-+/*
-+ * Internal clock functions
-+ */
-+
-+unsigned int __initdata mpurate;
-+/*
-+ * By default we use the rate set by the bootloader.
-+ * You can override this with mpurate= cmdline option.
-+ */
-+static int __init u6_clk_setup(char *str)
-+{
-+	unsigned int tmp_rate;
-+
-+	get_option(&str, &tmp_rate);
-+
-+	if (!tmp_rate)
-+		return 1;
-+
-+	mpurate = tmp_rate;
-+
-+	return 1;
-+}
-+
-+__setup("mpurate=", u6_clk_setup);
-+
-+/* Used for clocks that always have same value as the parent clock */
-+void followparent_recalc(struct clk *clk)
-+{
-+	clk->rate = clk->parent->rate;
-+}
-+
-+/* Propagate rate to children */
-+void propagate_rate(struct clk *tclk)
-+{
-+	struct clk *clkp;
-+
-+	list_for_each_entry(clkp, &clocks, node) {
-+		if (likely(clkp->parent != tclk))
-+			continue;
-+		if (likely((u32) clkp->recalc))
-+			clkp->recalc(clkp);
-+	}
-+}
-+
-+int clk_register(struct clk *clk)
-+{
-+	mutex_lock(&clocks_mutex);
-+	list_add(&clk->node, &clocks);
-+	if (clk->init)
-+		clk->init(clk);
-+	mutex_unlock(&clocks_mutex);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(clk_register);
-+
-+void clk_unregister(struct clk *clk)
-+{
-+	mutex_lock(&clocks_mutex);
-+	list_del(&clk->node);
-+	mutex_unlock(&clocks_mutex);
-+}
-+EXPORT_SYMBOL(clk_unregister);
-+
-+void clk_deny_idle(struct clk *clk)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&clockfw_lock, flags);
-+	if (arch_clock->clk_deny_idle)
-+		arch_clock->clk_deny_idle(clk);
-+	spin_unlock_irqrestore(&clockfw_lock, flags);
-+}
-+EXPORT_SYMBOL(clk_deny_idle);
-+
-+void clk_allow_idle(struct clk *clk)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&clockfw_lock, flags);
-+	if (arch_clock->clk_allow_idle)
-+		arch_clock->clk_allow_idle(clk);
-+	spin_unlock_irqrestore(&clockfw_lock, flags);
-+}
-+EXPORT_SYMBOL(clk_allow_idle);
-+
-+#ifdef CONFIG_U6_POWER_SYSFS
-+/*
-+ * SysFs interface
-+ */
-+
-+/*** Clock mngt sysfs interface **/
-+static char clk_name[64] = "MMTU";
-+
-+static ssize_t show_select(struct kobject *kobj, char *buf)
-+{
-+	return sprintf(buf, "%s \n", clk_name);
-+}
-+
-+static ssize_t store_select(struct kobject *kobj, const char *buf, size_t size)
-+{
-+	strcpy(clk_name, buf);
-+
-+	clk_name[strlen(clk_name) - 1] = 0;
-+
-+	return size;
-+}
-+
-+static ssize_t show_enable(struct kobject *kobj, char *buf)
-+{
-+	struct clk *clk;
-+	clk = clk_get(NULL, clk_name);
-+	if (clk == ERR_PTR(-ENOENT))
-+		return sprintf(buf, "unable to get clk\n");
-+	clk_put(clk);
-+	return sprintf(buf, "%d \n", clk_get_usecount(clk));
-+}
-+
-+static ssize_t store_enable(struct kobject *kobj, const char *buf, size_t size)
-+{
-+	struct clk *clk;
-+	clk = clk_get(NULL, clk_name);
-+	if (clk == ERR_PTR(-ENOENT))
-+		return size;
-+	clk_enable(clk);
-+	clk_put(clk);
-+	return size;
-+}
-+
-+static ssize_t show_disable(struct kobject *kobj, char *buf)
-+{
-+	struct clk *clk;
-+	clk = clk_get(NULL, clk_name);
-+	if (clk == ERR_PTR(-ENOENT))
-+		return sprintf(buf, "unable to get clk\n");
-+	clk_put(clk);
-+	return sprintf(buf, "%d \n", clk_get_usecount(clk));
-+}
-+
-+static ssize_t store_disable(struct kobject *kobj, const char *buf, size_t size)
-+{
-+	struct clk *clk;
-+	clk = clk_get(NULL, clk_name);
-+	if (clk == ERR_PTR(-ENOENT))
-+		return size;
-+	clk_disable(clk);
-+	clk_put(clk);
-+	return size;
-+}
-+
-+static ssize_t show_usecount(struct kobject *kobj, char *buf)
-+{
-+	struct clk *clk;
-+	clk = clk_get(NULL, clk_name);
-+	if (clk == ERR_PTR(-ENOENT))
-+		return sprintf(buf, "unable to get clk\n");
-+	clk_put(clk);
-+	return sprintf(buf, "%d \n", clk_get_usecount(clk));
-+}
-+
-+static ssize_t show_rate(struct kobject *kobj, char *buf)
-+{
-+	struct clk *clk;
-+	clk = clk_get(NULL, clk_name);
-+	if (clk == ERR_PTR(-ENOENT))
-+		return sprintf(buf, "unable to get clk\n");
-+	clk_put(clk);
-+	return sprintf(buf, "%lu \n", clk_get_rate(clk));
-+}
-+
-+static ssize_t store_rate(struct kobject *kobj, const char *buf, size_t size)
-+{
-+	struct clk *clk;
-+	unsigned long rate;
-+	if (strict_strtoul(buf, 10, &rate) == 0) {
-+		clk = clk_get(NULL, clk_name);
-+		if (clk == ERR_PTR(-ENOENT))
-+			return size;
-+		clk_set_rate(clk, rate);
-+		clk_put(clk);
-+	}
-+	return size;
-+}
-+
-+static ssize_t show_parent(struct kobject *kobj, char *buf)
-+{
-+	struct clk *clk, *pclk;
-+	clk = clk_get(NULL, clk_name);
-+	if (clk == ERR_PTR(-ENOENT))
-+		return sprintf(buf, "unable to get clk\n");
-+	pclk = clk_get_parent(clk);
-+	clk_put(clk);
-+	if ((pclk) && (pclk->name))
-+		return sprintf(buf, "%s\n", pclk->name);
-+	else
-+		return sprintf(buf, "root\n");
-+}
-+
-+static ssize_t store_parent(struct kobject *kobj, const char *buf, size_t size)
-+{
-+	struct clk *clk, *pclk;
-+	char parent[32];
-+	strcpy(parent, buf);
-+	parent[strlen(parent) - 1] = 0;
-+
-+	clk = clk_get(NULL, clk_name);
-+	if (clk == ERR_PTR(-ENOENT))
-+		return size;
-+
-+	pclk = clk_get(NULL, parent);
-+	if (pclk == ERR_PTR(-ENOENT)) {
-+		clk_put(clk);
-+		return size;
-+	}
-+	clk_put(pclk);
-+	clk_set_parent(clk, pclk);
-+	clk_put(clk);
-+	return size;
-+}
-+
-+static ssize_t show_list(struct kobject *kobj, char *buf)
-+{
-+	int size = 0;
-+
-+	struct clk *p;
-+
-+	list_for_each_entry(p, &clocks, node) {
-+		size += sprintf(&buf[size], "%s\n", p->name);
-+	}
-+	return size;
-+}
-+
-+/*** Clock mngt hw debug ***/
-+static ssize_t show_hw_constraints(struct kobject *kobj, char *buf)
-+{
-+	int size = 0;
-+
-+	size += u6_clk_show_hw_rates(kobj, &buf[size]);
-+
-+	size += u6_clk_show_sc_constraints(kobj, &buf[size]);
-+
-+	size += u6_clk_show_ivs_constraints(kobj, &buf[size]);
-+
-+	size += u6_clk_show_tvo_constraints(kobj, &buf[size]);
-+
-+	size += u6_clk_show_cam_constraints(kobj, &buf[size]);
-+
-+	return size;
-+}
-+
-+static ssize_t show_hw_rates(struct kobject *kobj, char *buf)
-+{
-+	int size = 0;
-+
-+	size += u6_clk_show_hw_rates(kobj, buf);
-+
-+	return size;
-+}
-+
-+define_one_ro(hw_rates);
-+define_one_ro(hw_constraints);
-+define_one_rw(parent);
-+define_one_rw(rate);
-+define_one_ro(usecount);
-+define_one_rw(disable);
-+define_one_rw(enable);
-+define_one_rw(select);
-+define_one_ro(list);
-+
-+static struct attribute *dbs_attributes_clock[] = {
-+
-+	&hw_rates.attr,
-+	&hw_constraints.attr,
-+	&parent.attr,
-+	&rate.attr,
-+	&usecount.attr,
-+	&disable.attr,
-+	&enable.attr,
-+	&select.attr,
-+	&list.attr,
-+	NULL
-+};
-+
-+static struct attribute_group dbs_attr_clock_group = {
-+	.attrs = dbs_attributes_clock,
-+	.name = "clk_mngt",
-+};
-+
-+#endif
-+
-+/*
-+ * Init functions
-+ */
-+
-+int __init clk_init(struct clk_functions *custom_clocks)
-+{
-+	if (!custom_clocks) {
-+		printk(KERN_ERR "No custom clock functions registered\n");
-+		BUG();
-+	}
-+
-+	arch_clock = custom_clocks;
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_U6_POWER_SYSFS
-+static int __init u6_clock_init_sysfs(void)
-+{
-+	if (sysfs_create_group(&u6_power_kobj, &dbs_attr_clock_group))
-+		printk(KERN_ERR "Unable to register %s in sysfs\n",
-+		       dbs_attr_clock_group.name);
-+
-+	return 0;
-+}
-+
-+module_init(u6_clock_init_sysfs);
-+#endif
-+
-diff --git a/arch/arm/plat-u6xxx/include/mach/clock.h b/arch/arm/plat-u6xxx/include/mach/clock.h
-new file mode 100644
-index 0000000..bc83414
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/clock.h
-@@ -0,0 +1,376 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/clock.h
++ * linux/arch/arm/plat-u6xxx/gpio.c
 + *
 + * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Loic Pallardy <loic.pallardy@stericsson.com> for ST-Ericsson
++ * Author: Loic Pallardy <loic.pallardy@stericsson.com> for ST-Ericsson.
 + * License terms:  GNU General Public License (GPL), version 2
-+ *
-+ * Based on clocks.h by Tony Lindgren, Gordon McNutt and RidgeRun, Inc
++ * Support functions for GPIO
 + */
 +
-+#ifndef __PLAT_CLOCK_H
-+#define __PLAT_CLOCK_H
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/sched.h>
++#include <linux/interrupt.h>
++#include <linux/ptrace.h>
++#include <linux/sysdev.h>
++#include <linux/err.h>
++#include <linux/clk.h>
++#include <linux/io.h>
 +
-+struct module;
++#include <mach/hardware.h>
++#include <asm/irq.h>
++#include <mach/irqs.h>
++#include <mach/gpio.h>
++#include <asm/mach/irq.h>
++#include <mach/scon.h>
 +
-+struct clk {
-+	struct list_head	node;
-+	struct module		*owner;
-+	const char		*name;
-+	struct clk		*parent;
-+	unsigned long		rate;
-+	__u32			flags;
-+	u32			enable_reg;
-+	__u8			enable_bit;
-+	__u8			rate_offset;
-+	__u8			src_offset;
-+	__s8			usecount;
-+	void			(*recalc)(struct clk *);
-+	int			(*set_rate)(struct clk *, unsigned long);
-+	long			(*round_rate)(struct clk *, unsigned long);
-+	void			(*init)(struct clk *);
-+	int			(*enable)(struct clk *);
-+	void			(*disable)(struct clk *);
-+	int			(*set_parent)(struct clk *, struct clk *);
-+	struct srcu_notifier_head *notifier;
++/*
++ * PN5220 GPIO/MUX registers
++ * defined in asm/arch/registers.h
++ */
++
++#define U6_GPIO_PINS_OFFSET	0
++#define U6_GPIO_OUTPUT_OFFSET	4
++#define U6_GPIO_DIR_OFFSET	8
++
++#define U6_MUX2_OFFSET		4
++
++static struct gpio_bank *gpio_bank_desc;
++static int gpio_bank_count;
++
++static inline struct gpio_bank *get_gpio_bank(int gpio)
++{
++	/* 32 GPIOs per bank */
++	return &(gpio_bank_desc[gpio >> 5]);
++}
++
++static inline int get_gpio_index(int gpio)
++{
++	return gpio & 0x1f;
++}
++
++static int check_gpio(int gpio)
++{
++	int retval = ((unsigned int)gpio) < GPIO_COUNT;
++	if (unlikely(!retval)) {
++		printk(KERN_ERR "u6-gpio: invalid GPIO %d\n", gpio);
++		dump_stack();
++	}
++	return retval;
++}
++
++static inline int gpio_is_requested(struct gpio_bank *bank, unsigned long mask)
++{
++	return bank->reserved_map & mask;
++}
++
++static int check_gpio_requested(struct gpio_bank *bank, int index)
++{
++	int retval = gpio_is_requested(bank, 1 << index);
++	if (unlikely(!retval)) {
++		char c = 'A' + (bank - get_gpio_bank(0));
++		printk(KERN_ERR "u6-gpio: GPIO %c%d is not requested yet\n",
++		       c, index);
++		dump_stack();
++	}
++	return retval;
++}
++
++static int check_gpio_unrequested(struct gpio_bank *bank, int index)
++{
++	int retval = !gpio_is_requested(bank, 1 << index);
++	if (unlikely(!retval)) {
++		char c = 'A' + (bank - get_gpio_bank(0));
++		printk(KERN_ERR "u6-gpio: GPIO %c%d is already requested\n",
++		       c, index);
++		dump_stack();
++	}
++	return retval;
++}
++
++static int check_gpio_irq(int gpio_irq)
++{
++	int retval = ((unsigned int)gpio_irq) < NR_EXTINT;
++	if (unlikely(!retval)) {
++		printk(KERN_ERR "u6-gpio: invalid GPIO-IRQ %d\n", gpio_irq);
++		dump_stack();
++	}
++	return retval;
++}
++
++static void _set_gpio_direction(struct gpio_bank *bank, int gpio, int is_input)
++{
++	u32 reg = bank->gpio_base;
++	u32 l;
++
++	/* select direction register */
++	reg += U6_GPIO_DIR_OFFSET;
++
++	/* in register 0 = input, 1 = output */
++	l = inl(reg);
++	if (is_input)
++		l &= ~(1 << gpio);
++	else
++		l |= (1 << gpio);
++	outl(l, reg);
++}
++
++int u6_gpio_set_direction(int gpio, int is_input)
++{
++	unsigned long flags, index;
++	struct gpio_bank *bank;
++
++	if (!check_gpio(gpio))
++		return -EINVAL;
++
++	bank = get_gpio_bank(gpio);
++	index = get_gpio_index(gpio);
++	if (!check_gpio_requested(bank, index))
++		return -EINVAL;
++
++	spin_lock_irqsave(&bank->lock, flags);
++	_set_gpio_direction(bank, index, is_input);
++	spin_unlock_irqrestore(&bank->lock, flags);
++
++	return 0;
++}
++EXPORT_SYMBOL(u6_gpio_set_direction);
++
++static void _set_gpio_mode(struct gpio_bank *bank, int gpio, int mode)
++{
++	u32 reg = bank->mux_base;
++	unsigned long flags;
++	unsigned long l;
++
++	/* select direction register */
++	if (gpio >= 16) {
++		reg += U6_MUX2_OFFSET;
++		gpio -= 16;
++	}
++
++	hw_raw_local_irq_save(flags);
++	/* apply mux mode */
++	/* width 2 bit */
++	l = inl(reg);
++	l &= ~(3 << (gpio * 2));
++	l |= (mode << (gpio * 2));
++	outl(l, reg);
++	hw_raw_local_irq_restore(flags);
++}
++
++int u6_gpio_set_mode(int gpio, int mode)
++{
++	struct gpio_bank *bank;
++	int index;
++
++	if (!check_gpio(gpio))
++		return -EINVAL;
++
++	bank = get_gpio_bank(gpio);
++	index = get_gpio_index(gpio);
++	if (!check_gpio_requested(bank, index))
++		return -EINVAL;
++
++	spin_lock(&bank->lock);
++	_set_gpio_mode(bank, get_gpio_index(gpio), mode);
++	spin_unlock(&bank->lock);
++
++	return 0;
++}
++EXPORT_SYMBOL(u6_gpio_set_mode);
++
++int u6_gpio_set_mode_gpio(int gpio)
++{
++	int muxmode = gpio >= GPIO_B0 ? GPIO_MODE_MUX1 : GPIO_MODE_MUX0;
++	return u6_gpio_set_mode(gpio, muxmode);
++}
++EXPORT_SYMBOL(u6_gpio_set_mode_gpio);
++
++static void _write_gpio_pin(struct gpio_bank *bank, int gpio, int gpio_value)
++{
++	u32 reg = bank->gpio_base;
++	unsigned long flags;
++	unsigned long l = 0;
++
++	reg += U6_GPIO_OUTPUT_OFFSET;
++	hw_raw_local_irq_save(flags);
++	l = inl(reg);
++	if (gpio_value)
++		l |= 1 << gpio;
++	else
++		l &= ~(1 << gpio);
++	outl(l, reg);
++	hw_raw_local_irq_restore(flags);
++
++}
++
++static int u6_gpio_to_extint(int gpio)
++{
++	int extint_idx;
++
++	for (extint_idx = 0; extint_idx < NR_EXTINT; extint_idx++)
++		if (extint_to_gpio[extint_idx] == gpio)
++			return extint_idx;
++
++	return -1;
++}
++
++int u6_gpio_write_pin(int gpio, int gpio_value)
++{
++	struct gpio_bank *bank;
++	unsigned long index;
++
++	if (!check_gpio(gpio))
++		return -EINVAL;
++
++	bank = get_gpio_bank(gpio);
++	index = get_gpio_index(gpio);
++	if (!check_gpio_requested(bank, index))
++		return -EINVAL;
++
++	spin_lock(&bank->lock);
++	_write_gpio_pin(bank, index, gpio_value);
++	spin_unlock(&bank->lock);
++
++	return 0;
++}
++EXPORT_SYMBOL(u6_gpio_write_pin);
++
++int u6_gpio_read_pin(int gpio)
++{
++	struct gpio_bank *bank;
++	u32 reg;
++	u32 l = 0;
++	int irq, index;
++
++	if (!check_gpio(gpio))
++		return -EINVAL;
++
++	bank = get_gpio_bank(gpio);
++	index = get_gpio_index(gpio);
++	if (!check_gpio_requested(bank, index))
++		return -EINVAL;
++
++	/* check if the GPIO is used as extint */
++	irq = u6_gpio_to_extint(gpio);
++	if (irq >= 0) {
++		/* and if it's an alternate internal signal */
++		/* (cf U67xx datasheet table 444) */
++		reg = EXTINT_CFGx(irq);
++		l = inl(reg);
++		if (l & EXTINT_SEL_ALTERNATE) {
++			reg = EXTINT_SIGNAL_REG;
++			return (inl(reg) & (1 << irq)) != 0;
++		}
++	}
++
++	reg = bank->gpio_base;
++	reg += U6_GPIO_PINS_OFFSET;
++	return (inl(reg) & (1 << index)) != 0;
++}
++EXPORT_SYMBOL(u6_gpio_read_pin);
++
++static int _u6_gpio_request(struct gpio_bank *bank, int index)
++{
++	int retval = 0;
++	unsigned long mask = 1 << index;
++	unsigned long flags;
++
++	spin_lock_irqsave(&bank->lock, flags);
++	if (unlikely(!check_gpio_unrequested(bank, index)))
++		retval = -EINVAL;
++	else
++		bank->reserved_map |= mask;
++	spin_unlock_irqrestore(&bank->lock, flags);
++
++	return retval;
++}
++
++static int u6_gpio_acquire(struct gpio_chip *chip, unsigned offset)
++{
++	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
++
++	return _u6_gpio_request(bank, offset);
++}
++
++int u6_gpio_request(int gpio)
++{
++	int index;
++	struct gpio_bank *bank;
++
++	if (!check_gpio(gpio))
++		return -EINVAL;
++
++	index = get_gpio_index(gpio);
++	bank = get_gpio_bank(gpio);
++
++	return _u6_gpio_request(bank, index);
++}
++EXPORT_SYMBOL(u6_gpio_request);
++
++static void _u6_gpio_free(struct gpio_bank *bank, int index)
++{
++	unsigned long mask = 1 << index;
++	unsigned long flags;
++
++	spin_lock_irqsave(&bank->lock, flags);
++	if (likely(check_gpio_requested(bank, index)))
++		bank->reserved_map &= ~mask;
++	spin_unlock_irqrestore(&bank->lock, flags);
++}
++
++static void u6_gpio_release(struct gpio_chip *chip, unsigned offset)
++{
++	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
++
++	return _u6_gpio_free(bank, offset);
++}
++
++void u6_gpio_free(int gpio)
++{
++	int index;
++	struct gpio_bank *bank;
++
++	if (!check_gpio(gpio))
++		return;
++
++	index = get_gpio_index(gpio);
++	bank = get_gpio_bank(gpio);
++	_u6_gpio_free(bank, index);
++}
++EXPORT_SYMBOL(u6_gpio_free);
++
++/* New GPIO_GENERIC interface */
++
++static int gpio_input(struct gpio_chip *chip, unsigned offset)
++{
++	struct gpio_bank *bank;
++	unsigned long flags;
++
++	bank = container_of(chip, struct gpio_bank, chip);
++	spin_lock_irqsave(&bank->lock, flags);
++	_set_gpio_direction(bank, offset, 1);
++	spin_unlock_irqrestore(&bank->lock, flags);
++	return 0;
++}
++
++static int gpio_get(struct gpio_chip *chip, unsigned offset)
++{
++	return u6_gpio_read_pin(chip->base + offset);
++}
++
++static int gpio_output(struct gpio_chip *chip, unsigned offset, int value)
++{
++	struct gpio_bank *bank;
++	unsigned long flags;
++
++	bank = container_of(chip, struct gpio_bank, chip);
++	spin_lock_irqsave(&bank->lock, flags);
++	_write_gpio_pin(bank, offset, value);
++	_set_gpio_direction(bank, offset, 0);
++	spin_unlock_irqrestore(&bank->lock, flags);
++	return 0;
++}
++
++static void gpio_set(struct gpio_chip *chip, unsigned offset, int value)
++{
++	struct gpio_bank *bank;
++	unsigned long flags;
++
++	bank = container_of(chip, struct gpio_bank, chip);
++	spin_lock_irqsave(&bank->lock, flags);
++	_write_gpio_pin(bank, offset, value);
++	spin_unlock_irqrestore(&bank->lock, flags);
++}
++
++static int gpio_2irq(struct gpio_chip *chip, unsigned offset)
++{
++	return u6_gpio_to_extint(chip->base + offset);
++}
++
++/*
++ * U6 EXTINT : only EXTINT 3 is managed by Linux
++ * We need to unmask the GPIO bank interrupt as soon as possible to
++ * avoid missing GPIO interrupts for other lines in the bank.
++ * Then we need to mask-read-clear-unmask the triggered GPIO lines
++ * in the bank to avoid missing nested interrupts for a GPIO line.
++ * If we wait to unmask individual GPIO lines in the bank after the
++ * line's interrupt handler has been run, we may miss some nested
++ * interrupts.
++ */
++static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
++{
++	unsigned long isr;
++	unsigned long flags;
++	unsigned int gpio_irq;
++
++	/* LPA TBD */
++	desc->chip->ack(irq);
++
++	/* read status */
++	hw_raw_local_irq_save(flags);
++	isr = inl(EXTINT_STATUS_REG) & inl(EXTINT_ENABLE3_REG);
++	/* clear IRQ source(s) */
++	outl(~isr, EXTINT_STATUS_REG);
++	hw_raw_local_irq_restore(flags);
++
++	gpio_irq = IRQ_COUNT;
++	for (; isr != 0; isr >>= 1, gpio_irq++) {
++		struct irq_desc *d;
++		if (!(isr & 1))
++			continue;
++		d = irq_desc + gpio_irq;
++#ifdef CONFIG_DEBUG_EXTINT
++		printk(KERN_ERR "got something from EXTINT#%i line\n",
++		       gpio_irq - IRQ_COUNT);
++#endif
++		desc_handle_irq(gpio_irq, d);
++	}
++
++}
++
++static void gpio_ack_irq(unsigned int irq)
++{
++	unsigned int gpio_irq = irq - IRQ_COUNT;
++	unsigned long flags;
++	hw_raw_local_irq_save(flags);
++	outl(~(1 << gpio_irq), EXTINT_STATUS_REG);
++	hw_raw_local_irq_restore(flags);
++}
++
++static void gpio_mask_irq(unsigned int irq)
++{
++	unsigned int gpio_irq = irq - IRQ_COUNT;
++	outl(inl(EXTINT_ENABLE3_REG) & ~(1 << gpio_irq),
++		     EXTINT_ENABLE3_REG);
++}
++
++static void gpio_unmask_irq(unsigned int irq)
++{
++	unsigned int gpio_irq = irq - IRQ_COUNT;
++	outl(inl(EXTINT_ENABLE3_REG) | (1 << gpio_irq),
++		     EXTINT_ENABLE3_REG);
++}
++
++int u6_gpio_clear_irq(unsigned int irq)
++{
++	unsigned int gpio_irq;
++	unsigned long flags;
++	gpio_irq = irq - IRQ_COUNT;
++	if (!check_gpio_irq(gpio_irq))
++		return -EINVAL;
++	hw_raw_local_irq_save(flags);
++	outl(~(1 << gpio_irq), EXTINT_STATUS_REG);
++	hw_raw_local_irq_restore(flags);
++	return 0;
++}
++EXPORT_SYMBOL(u6_gpio_clear_irq);
++
++int u6_gpio_set_irq_debounce(int irq, int cycles)
++{
++	int gpio;
++	struct gpio_bank *bank;
++	u32 reg;
++	int mode;
++	u32 l = 0;
++
++	gpio = EXTINT_TO_GPIO(irq);
++	irq -= IRQ_COUNT;
++	if (!check_gpio_irq(irq))
++		goto err;
++
++	bank = get_gpio_bank(gpio);
++	if (!check_gpio_requested(bank, get_gpio_index(gpio)))
++		return -EINVAL;
++
++	reg = EXTINT_CFGx(irq);
++	l = inl(reg);
++
++	mode = l & (3 << EXTINT_MODE_SHIFT);
++	if (mode == EXTINT_MODE_BYPASS)
++		goto err;
++
++	/* clear mode and set streching to debounce */
++	if (mode == EXTINT_MODE_STRETCHING) {
++		l &= ~(3 << EXTINT_MODE_SHIFT);
++		l |= EXTINT_MODE_DEBOUNCE;
++	}
++	/* clear and set the debounce field */
++	l &= ~(7 << EXTINT_DEBOUNCE_SHIFT);
++	l |= ((cycles & 0x7) << EXTINT_DEBOUNCE_SHIFT);
++	outl(l, reg);
++
++	return 0;
++err:
++	return -EINVAL;
++}
++EXPORT_SYMBOL(u6_gpio_set_irq_debounce);
++
++int u6_gpio_set_irq_selection(int irq, int selection)
++{
++	int gpio, index;
++	struct gpio_bank *bank;
++	u32 l = 0;
++	u32 reg;
++
++	gpio = EXTINT_TO_GPIO(irq);
++	irq -= IRQ_COUNT;
++	if (!check_gpio_irq(irq))
++		return -EINVAL;
++
++	bank = get_gpio_bank(gpio);
++	index = get_gpio_index(gpio);
++	if (!check_gpio_requested(bank, index))
++		return -EINVAL;
++
++	reg = EXTINT_CFGx(irq);
++	l = inl(reg);
++
++	if (selection == EXTINT_SEL_ALTERNATE)
++		l |= EXTINT_SEL_ALTERNATE;
++	else
++		l &= ~EXTINT_SEL_ALTERNATE;
++	outl(l, reg);
++
++	return 0;
++}
++EXPORT_SYMBOL(u6_gpio_set_irq_selection);
++
++/*
++ * -the level type set the bypass mode
++ * -and by default the edge type select the stretching mode.
++ * if you would a debounce you must defined your nb
++ * cycle with u6_set_gpio_debounce
++ */
++static int _set_gpio_triggering(int gpio_irq, int trigger)
++{
++	u32 reg = EXTINT_CFGx(gpio_irq);
++	u32 l = 0;
++
++	l = inl(reg);
++	l &= ~(3 << 6 | 1 << 2);
++
++	if (trigger == IRQ_TYPE_LEVEL_LOW)
++		l |= EXTINT_POL_NEGATIVE;
++	else if (trigger == IRQ_TYPE_LEVEL_HIGH)
++		l |= EXTINT_POL_POSITIVE;
++	else if (trigger == IRQ_TYPE_EDGE_RISING)
++		l |= (EXTINT_MODE_STRETCHING | EXTINT_POL_POSITIVE);
++	else if (trigger == IRQ_TYPE_EDGE_FALLING)
++		l |= (EXTINT_MODE_STRETCHING | EXTINT_POL_NEGATIVE);
++	else if (trigger == IRQ_TYPE_EDGE_BOTH)
++		l |= EXTINT_MODE_DUAL_EDGE;
++	else
++		goto err;
++
++	outl(l, reg);
++
++	return 0;
++err:
++	return -EINVAL;
++}
++
++static int gpio_irq_type(unsigned irq, unsigned type)
++{
++	unsigned gpio_irq;
++	int retval;
++
++	gpio_irq = irq - IRQ_COUNT;
++
++	if (!check_gpio_irq(gpio_irq))
++		return -EINVAL;
++
++	if (type & (IRQF_TRIGGER_PROBE))
++		return -EINVAL;
++
++	retval = _set_gpio_triggering(gpio_irq, type);
++	return retval;
++}
++
++static struct irq_chip gpio_irq_chip = {
++	.ack = gpio_ack_irq,
++	.disable = gpio_mask_irq,
++	.enable = gpio_unmask_irq,
++	.mask = gpio_mask_irq,
++	.unmask = gpio_unmask_irq,
++	.set_type = gpio_irq_type,
++	/*.set_wake     = gpio_wake_enable, */
 +};
 +
-+struct clk_functions {
-+	int		(*clk_enable)(struct clk *clk);
-+	void		(*clk_disable)(struct clk *clk);
-+	long		(*clk_round_rate)(struct clk *clk, unsigned long rate);
-+	int		(*clk_set_rate)(struct clk *clk, unsigned long rate);
-+	int		(*clk_set_parent)(struct clk *clk, struct clk *parent);
-+	struct clk *	(*clk_get_parent)(struct clk *clk);
-+	void		(*clk_allow_idle)(struct clk *clk);
-+	void		(*clk_deny_idle)(struct clk *clk);
++static int initialized;
++
++static int __init u6_gpio_probe(struct platform_device *pdev)
++{
++	int i, j;
++	int gpio = 0;
++	struct gpio_bank *bank;
++	struct gpio_data *data = pdev->dev.platform_data;
++	unsigned long flags;
++
++	initialized = 1;
++
++	printk(KERN_INFO "U6 GPIO\n");
++	gpio_bank_desc = data->gpio_bank_desc;
++	gpio_bank_count = data->nb_banks;
++
++	for (i = 0; i < gpio_bank_count; i++) {
++		int gpio_count = 32;	/* 32 GPIO per bank */
++		bank = &gpio_bank_desc[i];
++		bank->reserved_map = 0;
++		spin_lock_init(&bank->lock);
++
++		bank->chip.request = u6_gpio_acquire;
++		bank->chip.free = u6_gpio_release;
++		bank->chip.direction_input = gpio_input;
++		bank->chip.get = gpio_get;
++		bank->chip.direction_output = gpio_output;
++		bank->chip.set = gpio_set;
++		bank->chip.to_irq = gpio_2irq;
++		bank->chip.label = "gpio";
++		bank->chip.base = gpio;
++		gpio += gpio_count;
++
++		bank->chip.ngpio = gpio_count;
++
++		gpiochip_add(&bank->chip);
++
++	}
++
++	/* for extint */
++	for (j = IRQ_COUNT; j < IRQ_COUNT + NR_EXTINT; j++) {
++		set_irq_chip(j, &gpio_irq_chip);
++		set_irq_handler(j, handle_simple_irq);
++		set_irq_flags(j, IRQF_VALID);
++	}
++
++	hw_raw_local_irq_save(flags);
++	/* mask all EXT IRQ sources before registring handler */
++	/* read status */
++	j = inl(EXTINT_STATUS_REG) & inl(EXTINT_ENABLE3_REG);
++	/* clear IRQ source(s) */
++	outl(j, EXTINT_STATUS_REG);
++
++	outl(0, EXTINT_ENABLE3_REG);
++
++	/* set irq in low level */
++	set_irq_type(IRQ_EXTINT3, IRQF_TRIGGER_LOW);
++
++	/* chained GPIO-IRQ on EXTINT3 */
++	set_irq_chained_handler(IRQ_EXTINT3, gpio_irq_handler);
++	hw_raw_local_irq_restore(flags);
++
++	return 0;
++}
++
++static struct platform_driver u6_gpio_driver = {
++	.probe = u6_gpio_probe,
++	.remove = NULL,
++	.suspend = NULL,
++	.resume = NULL,
++	.driver = {
++		   .name = "u6-gpio",
++		   },
 +};
 +
-+extern unsigned int mpurate;
-+extern struct list_head clocks;
-+extern spinlock_t clockfw_lock;
++static struct sysdev_class u6_gpio_sysclass = {
++	.name = "gpio",
++	.suspend = 0,		/*u6_gpio_suspend, */
++	.resume = 0,		/*u6_gpio_resume, */
++};
 +
-+extern int clk_init(struct clk_functions *custom_clocks);
-+extern int clk_register(struct clk *clk);
-+extern void clk_unregister(struct clk *clk);
++static struct sys_device u6_gpio_device = {
++	.id = 0,
++	.cls = &u6_gpio_sysclass,
++};
 +
-+extern void propagate_rate(struct clk *clk);
-+extern void followparent_recalc(struct clk *clk);
-+extern void clk_allow_idle(struct clk *clk);
-+extern void clk_deny_idle(struct clk *clk);
-+extern int clk_get_usecount(struct clk *clk);
-+
-+extern ssize_t u6_clk_show_hw_rates(struct kobject *kobj, char *buf);
-+extern ssize_t u6_clk_show_sc_constraints(struct kobject *kobj, char *buf);
-+extern ssize_t u6_clk_show_usb_constraints(struct kobject *kobj, char *buf);
-+extern ssize_t u6_clk_show_ivs_constraints(struct kobject *kobj, char *buf);
-+extern ssize_t u6_clk_show_tvo_constraints(struct kobject *kobj, char *buf);
-+extern ssize_t u6_clk_show_cam_constraints(struct kobject *kobj, char *buf);
-+
-+extern unsigned long clk_get_hw_constraint(unsigned long reg_addr);
-+
-+
-+/* Clock flags */
-+#define RATE_CKCTL		(1 << 0)	/* Main fixed ratio clocks */
-+#define RATE_FIXED		(1 << 1)	/* Fixed clock rate */
-+#define RATE_PROPAGATES		(1 << 2)	/* Program children too */
-+#define VIRTUAL_CLOCK		(1 << 3)	/* Composite clock from table */
-+#define ALWAYS_ENABLED		(1 << 4)	/* Clock cannot be disabled */
-+#define ENABLE_REG_32BIT	(1 << 5)	/* Use 32-bit access */
-+#define VIRTUAL_IO_ADDRESS	(1 << 6)	/* Clock in virtual address */
-+#define CLOCK_IDLE_CONTROL	(1 << 7)
-+#define CLOCK_NO_IDLE_PARENT	(1 << 8)
-+#define DELAYED_APP		(1 << 9)	/* Delay application of clock */
-+#define CONFIG_PARTICIPANT	(1 << 10)	/* Fundamental clock */
-+
-+
-+#define CLK_HCLK2_MAX_FREQ	104000000
-+#define CLK_FC_CLK_MAX_FREQ	104000000
-+#define CLK_CAM_CLK_MAX_FREQ	 78000000
-+
-+/**
-+ * clk_register_notifier - register a driver with clock mngt
-+ *	@nb: notifier function to register
-+ *  @clk: clock element rate change to be notified
++/*
++ * This may get called early from board specific init
++ * for boards that have interrupts routed via FPGA.
 + */
-+extern int clk_register_notifier(struct notifier_block *nb, struct clk *clk);
++int u6_gpio_init(void)
++{
++	if (!initialized)
++		return platform_driver_register(&u6_gpio_driver);
++	else
++		return 0;
++}
 +
-+/**
-+ * clk_unregister_notifier - unregister a driver with clock mngt
-+ *	@nb: notifier function to register
-+ *  @clk: clock element rate change to be notified
-+ */
-+extern int clk_unregister_notifier(struct notifier_block *nb, struct clk *clk);
++static int __init u6_gpio_sysinit(void)
++{
++	int ret = 0;
 +
-+/**
-+ * clk_notify_transition - call notifier chain
++	if (!initialized)
++		ret = u6_gpio_init();
++
++	if (ret == 0) {
++		ret = sysdev_class_register(&u6_gpio_sysclass);
++		if (ret == 0)
++			ret = sysdev_register(&u6_gpio_device);
++	}
++
++	return ret;
++}
++
++arch_initcall(u6_gpio_sysinit);
+diff --git a/arch/arm/plat-u6xxx/include/mach/gpio.h b/arch/arm/plat-u6xxx/include/mach/gpio.h
+new file mode 100644
+index 0000000..a205f1c
+--- /dev/null
++++ b/arch/arm/plat-u6xxx/include/mach/gpio.h
+@@ -0,0 +1,396 @@
++/*
++ * linux/arch/arm/plat-u6xxx/include/mach/gpio.h
 + *
-+ * This function calls the transition notifiers and the and set rate
-+ * It is called twice on all frequency changes that have
-+ * external effects.
++ * Copyright (C) ST-Ericsson SA 2010
++ * Author: Loic Pallardy <loic.pallardy@stericsson.com> for ST-Ericsson.
++ * License terms:  GNU General Public License (GPL), version 2
++ * GPIO handling defines and functions
 + */
-+extern int clk_notify_transition(struct clk *clk,
-+		unsigned int state, void *data);
 +
-+#define CLK_RATE_PRECHANGE 0
-+#define CLK_RATE_POSTCHANGE 1
-+#define CLK_SRCE_PRECHANGE 2
-+#define CLK_SRCE_POSTCHANGE 3
++#ifndef __ASM_PLAT_U6_GPIO_H
++#define __ASM_PLAT_U6_GPIO_H
 +
-+/* Hardware Register Definitions CGU (Clock Gating Unit) */
++#include <linux/io.h>
++#include <mach/hardware.h>
++#include <mach/irqs.h>
++#include <mach/gpio.h>
 +
-+/* CGU DSP1CON Register (32 bits) */
-+#define CGU_DSP1CON_OFFSET             0x0
-+#define CGU_DSP1CON_REG                IO_ADDRESS(CGU_BASE + CGU_DSP1CON_OFFSET)
++#include <linux/errno.h>
++#include <asm-generic/gpio.h>
 +
-+/* CGU SCCON Register (32 bits) */
-+#define CGU_SCCON_OFFSET               0x4
-+#define CGU_SCCON_REG                  IO_ADDRESS(CGU_BASE + CGU_SCCON_OFFSET)
++/* GPIO bank description */
++struct gpio_bank {
++	u32 gpio_base;
++	u32 mux_base;
++	u16 irq;
++	u16 virtual_irq_start;
++	int method;
++	u32 reserved_map;
++	u32 suspend_wakeup;
++	u32 saved_wakeup;
++	spinlock_t lock;
++	struct gpio_chip chip;
++};
 +
-+/* CGU GATESC1 Register (32 bits) */
-+#define CGU_GATESC1_OFFSET             0x8
-+#define CGU_GATESC1_REG                IO_ADDRESS(CGU_BASE + CGU_GATESC1_OFFSET)
 +
-+/* CGU SLEEPSC Register (32 bits) */
-+#define CGU_SLEEPSC_OFFSET             0xC
-+#define CGU_SLEEPSC_REG                IO_ADDRESS(CGU_BASE + CGU_SLEEPSC_OFFSET)
++struct gpio_data {
++	u32 nb_banks;
++	struct gpio_bank *gpio_bank_desc;
++};
 +
-+/* CGU FDIV Register (32 bits) */
-+#define CGU_FDIV_OFFSET                0x10
-+#define CGU_FDIV_REG                   IO_ADDRESS(CGU_BASE + CGU_FDIV_OFFSET)
 +
-+/* CGU GATEIVS Register (32 bits) */
-+#define CGU_GATEIVS_OFFSET             0x14
-+#define CGU_GATEIVS_REG                IO_ADDRESS(CGU_BASE + CGU_GATEIVS_OFFSET)
++/* GPIO Init configuration */
 +
-+/* CGU DSP2CON Register (32 bits) */
-+#define CGU_DSP2CON_OFFSET             0x18
-+#define CGU_DSP2CON_REG                IO_ADDRESS(CGU_BASE + CGU_DSP2CON_OFFSET)
++struct u6_gpio_config {
++	u32 gpio;
++	u32 dir;
++	u32 value;
++};
 +
-+/* CGU CAMCON Register (32 bits) */
-+#define CGU_CAMCON_OFFSET              0x1C
-+#define CGU_CAMCON_REG                 IO_ADDRESS(CGU_BASE + CGU_CAMCON_OFFSET)
 +
-+/* CGU GATESC2 Register (32 bits) */
-+#define CGU_GATESC2_OFFSET             0x20
-+#define CGU_GATESC2_REG                IO_ADDRESS(CGU_BASE + CGU_GATESC2_OFFSET)
++/* list of GPIO */
++enum U6_GPIO_LIST {
++	GPIO_A0 = 0,
++	GPIO_A1,
++	GPIO_A2,
++	GPIO_A3,
++	GPIO_A4,
++	GPIO_A5,
++	GPIO_A6,
++	GPIO_A7,
++	GPIO_A8,
++	GPIO_A9,
++	GPIO_A10,
++	GPIO_A11,
++	GPIO_A12,
++	GPIO_A13,
++	GPIO_A14,
++	GPIO_A15,
++	GPIO_A16,
++	GPIO_A17,
++	GPIO_A18,
++	GPIO_A19,
++	GPIO_A20,
++	GPIO_A21,
++	GPIO_A22,
++	GPIO_A23,
++	GPIO_A24,
++	GPIO_A25,
++	GPIO_A26,
++	GPIO_A27,
++	GPIO_A28,
++	GPIO_A29,
++	GPIO_A30,
++	GPIO_A31,
++	GPIO_B0,
++	GPIO_B1,
++	GPIO_B2,
++	GPIO_B3,
++	GPIO_B4,
++	GPIO_B5,
++	GPIO_B6,
++	GPIO_B7,
++	GPIO_B8,
++	GPIO_B9,
++	GPIO_B10,
++	GPIO_B11,
++	GPIO_B12,
++	GPIO_B13,
++	GPIO_B14,
++	GPIO_B15,
++	GPIO_B16,
++	GPIO_B17,
++	GPIO_B18,
++	GPIO_B19,
++	GPIO_B20,
++	GPIO_B21,
++	GPIO_B22,
++	GPIO_B23,
++	GPIO_B24,
++	GPIO_B25,
++	GPIO_B26,
++	GPIO_B27,
++	GPIO_B28,
++	GPIO_B29,
++	GPIO_B30,
++	GPIO_B31,
++	GPIO_C0,
++	GPIO_C1,
++	GPIO_C2,
++	GPIO_C3,
++	GPIO_C4,
++	GPIO_C5,
++	GPIO_C6,
++	GPIO_C7,
++	GPIO_C8,
++	GPIO_C9,
++	GPIO_C10,
++	GPIO_C11,
++	GPIO_C12,
++	GPIO_C13,
++	GPIO_C14,
++	GPIO_C15,
++	GPIO_C16,
++	GPIO_C17,
++	GPIO_C18,
++	GPIO_C19,
++	GPIO_C20,
++	GPIO_C21,
++	GPIO_C22,
++	GPIO_C23,
++	GPIO_C24,
++	GPIO_C25,
++	GPIO_C26,
++	GPIO_C27,
++	GPIO_C28,
++	GPIO_C29,
++	GPIO_C30,
++	GPIO_C31,
++	GPIO_D0,
++	GPIO_D1,
++	GPIO_D2,
++	GPIO_D3,
++	GPIO_D4,
++	GPIO_D5,
++	GPIO_D6,
++	GPIO_D7,
++	GPIO_D8,
++	GPIO_D9,
++	GPIO_D10,
++	GPIO_D11,
++	GPIO_D12,
++	GPIO_D13,
++	GPIO_D14,
++	GPIO_D15,
++	GPIO_D16,
++	GPIO_D17,
++	GPIO_D18,
++	GPIO_D19,
++	GPIO_D20,
++	GPIO_D21,
++	GPIO_D22,
++	GPIO_D23,
++	GPIO_D24,
++	GPIO_D25,
++	GPIO_D26,
++	GPIO_D27,
++	GPIO_D28,
++	GPIO_D29,
++	GPIO_D30,
++	GPIO_D31,
++	GPIO_E0,
++	GPIO_E1,
++	GPIO_E2,
++	GPIO_E3,
++	GPIO_E4,
++	GPIO_E5,
++	GPIO_E6,
++	GPIO_E7,
++	GPIO_E8,
++	GPIO_E9,
++	GPIO_E10,
++	GPIO_E11,
++	GPIO_E12,
++	GPIO_E13,
++	GPIO_E14,
++	GPIO_E15,
++	GPIO_E16,
++	GPIO_E17,
++	GPIO_E18,
++	GPIO_E19,
++	GPIO_E20,
++	GPIO_E21,
++	GPIO_E22,
++	GPIO_E23,
++	GPIO_E24,
++	GPIO_E25,
++	GPIO_E26,
++	GPIO_E27,
++	GPIO_E28,
++	GPIO_E29,
++	GPIO_E30,
++	GPIO_E31,
++	GPIO_F0,
++	GPIO_F1,
++	GPIO_F2,
++	GPIO_F3,
++	GPIO_F4,
++	GPIO_F5,
++	GPIO_F6,
++	GPIO_F7,
++	GPIO_F8,
++	GPIO_F9,
++	GPIO_F10,
++	GPIO_F11,
++	GPIO_F12,
++	GPIO_F13,
++	GPIO_F14,
++	GPIO_F15,
++	GPIO_F16,
++	GPIO_F17,
++	GPIO_F18,
++	GPIO_F19,
++	GPIO_F20,
++	GPIO_F21,
++	GPIO_F22,
++	GPIO_F23,
++	GPIO_F24,
++	GPIO_F25,
++	GPIO_F26,
++	GPIO_F27,
++	GPIO_F28,
++	GPIO_F29,
++	GPIO_F30,
++	GPIO_F31,
++	GPIO_COUNT,
++};
 +
-+/* CGU SDMCON Register (32 bits) */
-+#define CGU_SDMCON_OFFSET              0x24
-+#define CGU_SDMCON_REG                 IO_ADDRESS(CGU_BASE + CGU_SDMCON_OFFSET)
++enum PMU_GPIO_LIST {
++	PMU_GPIO1 = GPIO_COUNT,
++	PMU_GPIO2,
++	PMU_GPIO3,
++	PMU_GPIO4,
++};
 +
-+/* CGU TVCON Register (32 bits) */
-+#define CGU_TVCON_OFFSET               0x28
-+#define CGU_TVCON_REG                  IO_ADDRESS(CGU_BASE + CGU_TVCON_OFFSET)
++enum U6_GPIO_MODE {
++	GPIO_MODE_MUX0 = 0,
++	GPIO_MODE_MUX1,
++	GPIO_MODE_MUX2,
++	GPIO_MODE_MUX3
++};
 +
-+/* CGU IDLESC Register (32 bits) */
-+#define CGU_IDLESC_OFFSET              0x2C
-+#define CGU_IDLESC_REG                 IO_ADDRESS(CGU_BASE + CGU_IDLESC_OFFSET)
 +
-+/* CGU FIXCON Register (32 bits) */
-+#define CGU_FIXCON_OFFSET              0x30
-+#define CGU_FIXCON_REG                 IO_ADDRESS(CGU_BASE + CGU_FIXCON_OFFSET)
++#define GPIO_DIR_INPUT  1
++#define GPIO_DIR_OUTPUT 0
 +
-+/* CGU CNTCON Register (32 bits) */
-+#define CGU_CNTCON_OFFSET              0x38
-+#define CGU_CNTCON_REG                 IO_ADDRESS(CGU_BASE + CGU_CNTCON_OFFSET)
 +
-+/* Register description for GATESC1 */
++extern int  u6_gpio_init(void);	/* Call from board init only */
++extern int  u6_gpio_request(int gpio);
++extern void u6_gpio_free(int gpio);
++extern int  u6_gpio_set_mode(int gpio, int mode);
++extern int  u6_gpio_set_mode_gpio(int gpio);
++extern int  u6_gpio_set_direction(int gpio, int is_input);
++extern int  u6_gpio_write_pin(int gpio, int gpio_value);
++extern int  u6_gpio_read_pin(int gpio);
++extern int  u6_gpio_set_irq_debounce(int irq, int cycles);
++extern int  u6_gpio_set_irq_selection(int irq, int selection);
++extern int  u6_gpio_clear_irq(unsigned int irq);
 +
-+/* Bits definition for register CGU_GATESC1 */
-+#define CGU_EBIEN_SHIFT            31
-+#define CGU_EBIEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_EBIEN_SHIFT))
-+#define CGU_EBIEN_0                (0x0UL<<CGU_EBIEN_SHIFT)
-+#define CGU_EBIEN_1                (0x1UL<<CGU_EBIEN_SHIFT)
-+#define CGU_EBIEN                  (0x1UL<<CGU_EBIEN_SHIFT)
-+#define CGU_NFIEN_SHIFT            29
-+#define CGU_NFIEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_NFIEN_SHIFT))
-+#define CGU_NFIEN_0                (0x0UL<<CGU_NFIEN_SHIFT)
-+#define CGU_NFIEN_1                (0x1UL<<CGU_NFIEN_SHIFT)
-+#define CGU_NFIEN                  (0x1UL<<CGU_NFIEN_SHIFT)
-+#define CGU_SDIEN_SHIFT            28
-+#define CGU_SDIEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_SDIEN_SHIFT))
-+#define CGU_SDIEN_0                (0x0UL<<CGU_SDIEN_SHIFT)
-+#define CGU_SDIEN_1                (0x1UL<<CGU_SDIEN_SHIFT)
-+#define CGU_SDIEN                  (0x1UL<<CGU_SDIEN_SHIFT)
-+#define CGU_MSIEN_SHIFT            26
-+#define CGU_MSIEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_MSIEN_SHIFT))
-+#define CGU_MSIEN_0                (0x0UL<<CGU_MSIEN_SHIFT)
-+#define CGU_MSIEN_1                (0x1UL<<CGU_MSIEN_SHIFT)
-+#define CGU_MSIEN                  (0x1UL<<CGU_MSIEN_SHIFT)
-+#define CGU_UCCEN_SHIFT            25
-+#define CGU_UCCEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_UCCEN_SHIFT))
-+#define CGU_UCCEN_0                (0x0UL<<CGU_UCCEN_SHIFT)
-+#define CGU_UCCEN_1                (0x1UL<<CGU_UCCEN_SHIFT)
-+#define CGU_UCCEN                  (0x1UL<<CGU_UCCEN_SHIFT)
-+#define CGU_JDIEN_SHIFT            24
-+#define CGU_JDIEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_JDIEN_SHIFT))
-+#define CGU_JDIEN_0                (0x0UL<<CGU_JDIEN_SHIFT)
-+#define CGU_JDIEN_1                (0x1UL<<CGU_JDIEN_SHIFT)
-+#define CGU_JDIEN                  (0x1UL<<CGU_JDIEN_SHIFT)
-+#define CGU_DMAUEN_SHIFT           20
-+#define CGU_DMAUEN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_DMAUEN_SHIFT))
-+#define CGU_DMAUEN_0               (0x0UL<<CGU_DMAUEN_SHIFT)
-+#define CGU_DMAUEN_1               (0x1UL<<CGU_DMAUEN_SHIFT)
-+#define CGU_DMAUEN                 (0x1UL<<CGU_DMAUEN_SHIFT)
-+#define CGU_RFSM1EN_SHIFT          19
-+#define CGU_RFSM1EN_FIELD          (0xFFFFFFFF - (0x1UL<<CGU_RFSM1EN_SHIFT))
-+#define CGU_RFSM1EN_0              (0x0UL<<CGU_RFSM1EN_SHIFT)
-+#define CGU_RFSM1EN_1              (0x1UL<<CGU_RFSM1EN_SHIFT)
-+#define CGU_RFSM1EN                (0x1UL<<CGU_RFSM1EN_SHIFT)
-+#define CGU_SIISEN_SHIFT           18
-+#define CGU_SIISEN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_SIISEN_SHIFT))
-+#define CGU_SIISEN_0               (0x0UL<<CGU_SIISEN_SHIFT)
-+#define CGU_SIISEN_1               (0x1UL<<CGU_SIISEN_SHIFT)
-+#define CGU_SIISEN                 (0x1UL<<CGU_SIISEN_SHIFT)
-+#define CGU_USBEN_SHIFT            17
-+#define CGU_USBEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_USBEN_SHIFT))
-+#define CGU_USBEN_0                (0x0UL<<CGU_USBEN_SHIFT)
-+#define CGU_USBEN_1                (0x1UL<<CGU_USBEN_SHIFT)
-+#define CGU_USBEN                  (0x1UL<<CGU_USBEN_SHIFT)
-+#define CGU_FCIEN_SHIFT            16
-+#define CGU_FCIEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_FCIEN_SHIFT))
-+#define CGU_FCIEN_0                (0x0UL<<CGU_FCIEN_SHIFT)
-+#define CGU_FCIEN_1                (0x1UL<<CGU_FCIEN_SHIFT)
-+#define CGU_FCIEN                  (0x1UL<<CGU_FCIEN_SHIFT)
-+#define CGU_USIMEN_SHIFT           15
-+#define CGU_USIMEN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_USIMEN_SHIFT))
-+#define CGU_USIMEN_0               (0x0UL<<CGU_USIMEN_SHIFT)
-+#define CGU_USIMEN_1               (0x1UL<<CGU_USIMEN_SHIFT)
-+#define CGU_USIMEN                 (0x1UL<<CGU_USIMEN_SHIFT)
-+#define CGU_GEACEN_SHIFT           14
-+#define CGU_GEACEN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_GEACEN_SHIFT))
-+#define CGU_GEACEN_0               (0x0UL<<CGU_GEACEN_SHIFT)
-+#define CGU_GEACEN_1               (0x1UL<<CGU_GEACEN_SHIFT)
-+#define CGU_GEACEN                 (0x1UL<<CGU_GEACEN_SHIFT)
-+#define CGU_PWM3EN_SHIFT           13
-+#define CGU_PWM3EN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_PWM3EN_SHIFT))
-+#define CGU_PWM3EN_0               (0x0UL<<CGU_PWM3EN_SHIFT)
-+#define CGU_PWM3EN_1               (0x1UL<<CGU_PWM3EN_SHIFT)
-+#define CGU_PWM3EN                 (0x1UL<<CGU_PWM3EN_SHIFT)
-+#define CGU_PWM2EN_SHIFT           12
-+#define CGU_PWM2EN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_PWM2EN_SHIFT))
-+#define CGU_PWM2EN_0               (0x0UL<<CGU_PWM2EN_SHIFT)
-+#define CGU_PWM2EN_1               (0x1UL<<CGU_PWM2EN_SHIFT)
-+#define CGU_PWM2EN                 (0x1UL<<CGU_PWM2EN_SHIFT)
-+#define CGU_PWM1EN_SHIFT           11
-+#define CGU_PWM1EN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_PWM1EN_SHIFT))
-+#define CGU_PWM1EN_0               (0x0UL<<CGU_PWM1EN_SHIFT)
-+#define CGU_PWM1EN_1               (0x1UL<<CGU_PWM1EN_SHIFT)
-+#define CGU_PWM1EN                 (0x1UL<<CGU_PWM1EN_SHIFT)
-+#define CGU_KBSEN_SHIFT            10
-+#define CGU_KBSEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_KBSEN_SHIFT))
-+#define CGU_KBSEN_0                (0x0UL<<CGU_KBSEN_SHIFT)
-+#define CGU_KBSEN_1                (0x1UL<<CGU_KBSEN_SHIFT)
-+#define CGU_KBSEN                  (0x1UL<<CGU_KBSEN_SHIFT)
-+#define CGU_GPIOEN_SHIFT           9
-+#define CGU_GPIOEN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_GPIOEN_SHIFT))
-+#define CGU_GPIOEN_0               (0x0UL<<CGU_GPIOEN_SHIFT)
-+#define CGU_GPIOEN_1               (0x1UL<<CGU_GPIOEN_SHIFT)
-+#define CGU_GPIOEN                 (0x1UL<<CGU_GPIOEN_SHIFT)
-+#define CGU_UART2EN_SHIFT          8
-+#define CGU_UART2EN_FIELD          (0xFFFFFFFF - (0x1UL<<CGU_UART2EN_SHIFT))
-+#define CGU_UART2EN_0              (0x0UL<<CGU_UART2EN_SHIFT)
-+#define CGU_UART2EN_1              (0x1UL<<CGU_UART2EN_SHIFT)
-+#define CGU_UART2EN                (0x1UL<<CGU_UART2EN_SHIFT)
-+#define CGU_UART1EN_SHIFT          7
-+#define CGU_UART1EN_FIELD          (0xFFFFFFFF - (0x1UL<<CGU_UART1EN_SHIFT))
-+#define CGU_UART1EN_0              (0x0UL<<CGU_UART1EN_SHIFT)
-+#define CGU_UART1EN_1              (0x1UL<<CGU_UART1EN_SHIFT)
-+#define CGU_UART1EN                (0x1UL<<CGU_UART1EN_SHIFT)
-+#define CGU_IIC2EN_SHIFT           6
-+#define CGU_IIC2EN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_IIC2EN_SHIFT))
-+#define CGU_IIC2EN_0               (0x0UL<<CGU_IIC2EN_SHIFT)
-+#define CGU_IIC2EN_1               (0x1UL<<CGU_IIC2EN_SHIFT)
-+#define CGU_IIC2EN                 (0x1UL<<CGU_IIC2EN_SHIFT)
-+#define CGU_IIC1EN_SHIFT           5
-+#define CGU_IIC1EN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_IIC1EN_SHIFT))
-+#define CGU_IIC1EN_0               (0x0UL<<CGU_IIC1EN_SHIFT)
-+#define CGU_IIC1EN_1               (0x1UL<<CGU_IIC1EN_SHIFT)
-+#define CGU_IIC1EN                 (0x1UL<<CGU_IIC1EN_SHIFT)
-+#define CGU_SPI2EN_SHIFT           4
-+#define CGU_SPI2EN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_SPI2EN_SHIFT))
-+#define CGU_SPI2EN_0               (0x0UL<<CGU_SPI2EN_SHIFT)
-+#define CGU_SPI2EN_1               (0x1UL<<CGU_SPI2EN_SHIFT)
-+#define CGU_SPI2EN                 (0x1UL<<CGU_SPI2EN_SHIFT)
-+#define CGU_SPI1EN_SHIFT           3
-+#define CGU_SPI1EN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_SPI1EN_SHIFT))
-+#define CGU_SPI1EN_0               (0x0UL<<CGU_SPI1EN_SHIFT)
-+#define CGU_SPI1EN_1               (0x1UL<<CGU_SPI1EN_SHIFT)
-+#define CGU_SPI1EN                 (0x1UL<<CGU_SPI1EN_SHIFT)
-+#define CGU_SCTUEN_SHIFT           2
-+#define CGU_SCTUEN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_SCTUEN_SHIFT))
-+#define CGU_SCTUEN_0               (0x0UL<<CGU_SCTUEN_SHIFT)
-+#define CGU_SCTUEN_1               (0x1UL<<CGU_SCTUEN_SHIFT)
-+#define CGU_SCTUEN                 (0x1UL<<CGU_SCTUEN_SHIFT)
-+#define CGU_EXTINTEN_SHIFT         1
-+#define CGU_EXTINTEN_FIELD         (0xFFFFFFFF - (0x1UL<<CGU_EXTINTEN_SHIFT))
-+#define CGU_EXTINTEN_0             (0x0UL<<CGU_EXTINTEN_SHIFT)
-+#define CGU_EXTINTEN_1             (0x1UL<<CGU_EXTINTEN_SHIFT)
-+#define CGU_EXTINTEN               (0x1UL<<CGU_EXTINTEN_SHIFT)
-+#define CGU_INTCEN_SHIFT           0
-+#define CGU_INTCEN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_INTCEN_SHIFT))
-+#define CGU_INTCEN_0               (0x0UL<<CGU_INTCEN_SHIFT)
-+#define CGU_INTCEN_1               (0x1UL<<CGU_INTCEN_SHIFT)
-+#define CGU_INTCEN                 (0x1UL<<CGU_INTCEN_SHIFT)
 +
-+/* Register description for GATESC2 */
++/*
++ * Wrappers for "new style" GPIO calls, using the new infrastructure
++ * which lets us plug in FPGA, I2C, and other implementations.
++ */
 +
-+/* Bits definition for register CGU_GATESC2 */
-+#define CGU_TRAUPCLKEN_SHIFT       15
-+#define CGU_TRAUPCLKEN_FIELD       (0xFFFFFFFF - (0x1UL<<CGU_TRAUPCLKEN_SHIFT))
-+#define CGU_TRAUPCLKEN_0           (0x0UL<<CGU_TRAUPCLKEN_SHIFT)
-+#define CGU_TRAUPCLKEN_1           (0x1UL<<CGU_TRAUPCLKEN_SHIFT)
-+#define CGU_TRAUPCLKEN             (0x1UL<<CGU_TRAUPCLKEN_SHIFT)
-+#define CGU_AUTRXPCLKEN_SHIFT      12
-+#define CGU_AUTRXPCLKEN_FIELD      (0xFFFFFFFF - (0x1UL<<CGU_AUTRXPCLKEN_SHIFT))
-+#define CGU_AUTRXPCLKEN_0          (0x0UL<<CGU_AUTRXPCLKEN_SHIFT)
-+#define CGU_AUTRXPCLKEN_1          (0x1UL<<CGU_AUTRXPCLKEN_SHIFT)
-+#define CGU_AUTRXPCLKEN            (0x1UL<<CGU_AUTRXPCLKEN_SHIFT)
-+#define CGU_AUTRXMCLK2EN_SHIFT     11
-+#define CGU_AUTRXMCLK2EN_FIELD    (0xFFFFFFFF - (0x1UL<<CGU_AUTRXMCLK2EN_SHIFT))
-+#define CGU_AUTRXMCLK2EN_0         (0x0UL<<CGU_AUTRXMCLK2EN_SHIFT)
-+#define CGU_AUTRXMCLK2EN_1         (0x1UL<<CGU_AUTRXMCLK2EN_SHIFT)
-+#define CGU_AUTRXMCLK2EN           (0x1UL<<CGU_AUTRXMCLK2EN_SHIFT)
-+#define CGU_AUTRXMCLK1EN_SHIFT     10
-+#define CGU_AUTRXMCLK1EN_FIELD    (0xFFFFFFFF - (0x1UL<<CGU_AUTRXMCLK1EN_SHIFT))
-+#define CGU_AUTRXMCLK1EN_0         (0x0UL<<CGU_AUTRXMCLK1EN_SHIFT)
-+#define CGU_AUTRXMCLK1EN_1         (0x1UL<<CGU_AUTRXMCLK1EN_SHIFT)
-+#define CGU_AUTRXMCLK1EN           (0x1UL<<CGU_AUTRXMCLK1EN_SHIFT)
-+#define CGU_BBIPCLKEN_SHIFT        9
-+#define CGU_BBIPCLKEN_FIELD        (0xFFFFFFFF - (0x1UL<<CGU_BBIPCLKEN_SHIFT))
-+#define CGU_BBIPCLKEN_0            (0x0UL<<CGU_BBIPCLKEN_SHIFT)
-+#define CGU_BBIPCLKEN_1            (0x1UL<<CGU_BBIPCLKEN_SHIFT)
-+#define CGU_BBIPCLKEN              (0x1UL<<CGU_BBIPCLKEN_SHIFT)
-+#define CGU_HSDPAHCLKEN_SHIFT      8
-+#define CGU_HSDPAHCLKEN_FIELD      (0xFFFFFFFF - (0x1UL<<CGU_HSDPAHCLKEN_SHIFT))
-+#define CGU_HSDPAHCLKEN_0          (0x0UL<<CGU_HSDPAHCLKEN_SHIFT)
-+#define CGU_HSDPAHCLKEN_1          (0x1UL<<CGU_HSDPAHCLKEN_SHIFT)
-+#define CGU_HSDPAHCLKEN            (0x1UL<<CGU_HSDPAHCLKEN_SHIFT)
-+#define CGU_3GMHCLKEN_SHIFT        7
-+#define CGU_3GMHCLKEN_FIELD        (0xFFFFFFFF - (0x1UL<<CGU_3GMHCLKEN_SHIFT))
-+#define CGU_3GMHCLKEN_0            (0x0UL<<CGU_3GMHCLKEN_SHIFT)
-+#define CGU_3GMHCLKEN_1            (0x1UL<<CGU_3GMHCLKEN_SHIFT)
-+#define CGU_3GMHCLKEN              (0x1UL<<CGU_3GMHCLKEN_SHIFT)
-+#define CGU_3GMMCLKEN_SHIFT        6
-+#define CGU_3GMMCLKEN_FIELD        (0xFFFFFFFF - (0x1UL<<CGU_3GMMCLKEN_SHIFT))
-+#define CGU_3GMMCLKEN_0            (0x0UL<<CGU_3GMMCLKEN_SHIFT)
-+#define CGU_3GMMCLKEN_1            (0x1UL<<CGU_3GMMCLKEN_SHIFT)
-+#define CGU_3GMMCLKEN              (0x1UL<<CGU_3GMMCLKEN_SHIFT)
-+#define CGU_ETBEN_SHIFT            4
-+#define CGU_ETBEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_ETBEN_SHIFT))
-+#define CGU_ETBEN_0                (0x0UL<<CGU_ETBEN_SHIFT)
-+#define CGU_ETBEN_1                (0x1UL<<CGU_ETBEN_SHIFT)
-+#define CGU_ETBEN                  (0x1UL<<CGU_ETBEN_SHIFT)
-+#define CGU_MMTUEN_SHIFT           2
-+#define CGU_MMTUEN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_MMTUEN_SHIFT))
-+#define CGU_MMTUEN_0               (0x0UL<<CGU_MMTUEN_SHIFT)
-+#define CGU_MMTUEN_1               (0x1UL<<CGU_MMTUEN_SHIFT)
-+#define CGU_MMTUEN                 (0x1UL<<CGU_MMTUEN_SHIFT)
-+#define CGU_CAEEN_SHIFT            0
-+#define CGU_CAEEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_CAEEN_SHIFT))
-+#define CGU_CAEEN_0                (0x0UL<<CGU_CAEEN_SHIFT)
-+#define CGU_CAEEN_1                (0x1UL<<CGU_CAEEN_SHIFT)
-+#define CGU_CAEEN                  (0x1UL<<CGU_CAEEN_SHIFT)
++static inline int gpio_get_value(unsigned gpio)
++{
++	return __gpio_get_value(gpio);
++}
++
++static inline void gpio_set_value(unsigned gpio, int value)
++{
++	__gpio_set_value(gpio, value);
++}
++
++static inline int gpio_cansleep(unsigned gpio)
++{
++	return __gpio_cansleep(gpio);
++}
++
++static inline int gpio_to_irq(unsigned gpio)
++{
++	return __gpio_to_irq(gpio);
++}
++
++static inline int irq_to_gpio(unsigned irq)
++{
++	return EXTINT_TO_GPIO(irq);
++}
++
++/*
++* Hardware Register Definitions for EXTINT
++ */
++
++/* EXTINT ENABLE1 Register (32 bits) */
++#define EXTINT_ENABLE1_OFFSET  0x60
++#define EXTINT_ENABLE1_REG     IO_ADDRESS(EXTINT_BASE + EXTINT_ENABLE1_OFFSET)
++
++/* EXTINT ENABLE2 Register (32 bits) */
++#define EXTINT_ENABLE2_OFFSET  0x64
++#define EXTINT_ENABLE2_REG     IO_ADDRESS(EXTINT_BASE + EXTINT_ENABLE2_OFFSET)
++
++/* EXTINT ENABLE3 Register (32 bits) */
++#define EXTINT_ENABLE3_OFFSET  0x68
++#define EXTINT_ENABLE3_REG     IO_ADDRESS(EXTINT_BASE + EXTINT_ENABLE3_OFFSET)
++
++/* EXTINT STATUS Register (32 bits) */
++#define EXTINT_STATUS_OFFSET   0x6C
++#define EXTINT_STATUS_REG      IO_ADDRESS(EXTINT_BASE + EXTINT_STATUS_OFFSET)
++
++/* EXTINT SIGNAL Register (32 bits) */
++#define EXTINT_SIGNAL_OFFSET   0x70
++#define EXTINT_SIGNAL_REG      IO_ADDRESS(EXTINT_BASE + EXTINT_SIGNAL_OFFSET)
++
++/* Bits definition for register EXTINT_CFG[23:0] */
++#define EXTINT_MODE_SHIFT      6
++#define EXTINT_MODE_FIELD      (0xFFFFFFFF - (0x3UL<<EXTINT_MODE_SHIFT))
++#define EXTINT_MODE_BYPASS     (0x0UL<<EXTINT_MODE_SHIFT)
++#define EXTINT_MODE_STRETCHING (0x1UL<<EXTINT_MODE_SHIFT)
++#define EXTINT_MODE_DEBOUNCE   (0x2UL<<EXTINT_MODE_SHIFT)
++#define EXTINT_MODE_DUAL_EDGE  (0x3UL<<EXTINT_MODE_SHIFT)
++#define EXTINT_DEBOUNCE_SHIFT  3
++#define EXTINT_DEBOUNCE_FIELD  (0xFFFFFFFF - (0x7UL<<EXTINT_DEBOUNCE_SHIFT))
++#define EXTINT_DEBOUNCE_0      (0x0UL<<EXTINT_DEBOUNCE_SHIFT)
++#define EXTINT_DEBOUNCE_1      (0x1UL<<EXTINT_DEBOUNCE_SHIFT)
++#define EXTINT_DEBOUNCE_2      (0x2UL<<EXTINT_DEBOUNCE_SHIFT)
++#define EXTINT_DEBOUNCE_3      (0x3UL<<EXTINT_DEBOUNCE_SHIFT)
++#define EXTINT_DEBOUNCE_7      (0x7UL<<EXTINT_DEBOUNCE_SHIFT)
++#define EXTINT_POL_SHIFT       2
++#define EXTINT_POL_FIELD       (0xFFFFFFFF - (0x1UL<<EXTINT_POL_SHIFT))
++#define EXTINT_POL_NEGATIVE    (0x0UL<<EXTINT_POL_SHIFT)
++#define EXTINT_POL_POSITIVE    (0x1UL<<EXTINT_POL_SHIFT)
++#define EXTINT_POL             (0x1UL<<EXTINT_POL_SHIFT)
++#define EXTINT_SEL_SHIFT       1
++#define EXTINT_SEL_FIELD       (0xFFFFFFFF - (0x1UL<<EXTINT_SEL_SHIFT))
++#define EXTINT_SEL_EXTINT      (0x0UL<<EXTINT_SEL_SHIFT)
++#define EXTINT_SEL_ALTERNATE   (0x1UL<<EXTINT_SEL_SHIFT)
++#define EXTINT_SEL             (0x1UL<<EXTINT_SEL_SHIFT)
++
++/*****************************************************************************/
++/* Register description for ENABLE[3:1] */
++
++/* Bits definition for register EXTINT_ENABLE[3:1] */
++#define EXTINT_ENABLE_SHIFT    0
++#define EXTINT_ENABLE_FIELD    (0xFFFFFFFF - (0xFFFFFFUL<<EXTINT_ENABLE_SHIFT))
++#define EXTINT_ENABLE_0        (0x0UL<<EXTINT_ENABLE_SHIFT)
++#define EXTINT_ENABLE_1        (0x1UL<<EXTINT_ENABLE_SHIFT)
++
++/*****************************************************************************/
++/* Register description for STATUS */
++
++/* Bits definition for register EXTINT_STATUS */
++#define EXTINT_STATUS_SHIFT    0
++#define EXTINT_STATUS_FIELD    (0xFFFFFFFF - (0xFFFFFFUL<<EXTINT_STATUS_SHIFT))
++#define EXTINT_STATUS_0        (0x0UL<<EXTINT_STATUS_SHIFT)
++#define EXTINT_STATUS_1        (0x1UL<<EXTINT_STATUS_SHIFT)
++
++/*****************************************************************************
++* Hardware Register Definitions for GPIOx
++*****************************************************************************/
++/* Offsets */
++#define GPIO_PINS_OFFSET       0x0
++#define GPIO_OR_OFFSET         0x4
++#define GPIO_DR_OFFSET         0x8
++
++/* GPIOx PINS Registers (32 bits) */
++#define GPIOA_PINS_REG         IO_ADDRESS(GPIOA_BASE + GPIO_PINS_OFFSET)
++#define GPIOB_PINS_REG         IO_ADDRESS(GPIOB_BASE + GPIO_PINS_OFFSET)
++#define GPIOC_PINS_REG         IO_ADDRESS(GPIOC_BASE + GPIO_PINS_OFFSET)
++#define GPIOD_PINS_REG         IO_ADDRESS(GPIOD_BASE + GPIO_PINS_OFFSET)
++#define GPIOE_PINS_REG         IO_ADDRESS(GPIOE_BASE + GPIO_PINS_OFFSET)
++#define GPIOF_PINS_REG         IO_ADDRESS(GPIOF_BASE + GPIO_PINS_OFFSET)
++
++/* GPIOx OR Registers (32 bits) */
++#define GPIOA_OR_REG           IO_ADDRESS(GPIOC_BASE + GPIO_OR_OFFSET)
 +
 +#endif
-diff --git a/arch/arm/plat-u6xxx/timer.c b/arch/arm/plat-u6xxx/timer.c
-index 62f13f5..357e87c 100644
---- a/arch/arm/plat-u6xxx/timer.c
-+++ b/arch/arm/plat-u6xxx/timer.c
-@@ -19,6 +19,7 @@
- #include <asm/mach/irq.h>
- #include <linux/interrupt.h>
- #include <mach/irqs.h>
-+#include <mach/clock.h>
- 
- #include <linux/clk.h>
- 
 -- 
 1.7.1
