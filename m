@@ -1,76 +1,192 @@
 From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
-Date: Thu, 27 May 2010 10:58:54 +0200
-Subject: [PATCH v2 1/4] imx-ssi.c: add new choices to platform configuration
-Message-ID: <1274950737-26498-1-git-send-email-eric@eukrea.com>
+Date: Thu, 27 May 2010 10:58:55 +0200
+Subject: [PATCH v2 2/4] soc/imx: add eukrea-tlv320
+In-Reply-To: <1274950737-26498-1-git-send-email-eric@eukrea.com>
+References: <1274950737-26498-1-git-send-email-eric@eukrea.com>
+Message-ID: <1274950737-26498-2-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* introduce 3 new flags to allow a more detailed configuration
-of the SSI link :
-	IMX_SSI_NET : enable Network Mode
-	IMX_SSI_SYN : enable Synchronous Mode
-	IMX_SSI_USE_I2S_SLAVE : enable I2S Slave Mode
-* new platform can use these settings without breaking actual
-platforms.
+Add the necessary files to support the TLV320AIC23B wired in I2S
+on our i.MX platforms.
 
 Signed-off-by: Eric B?nard <eric@eukrea.com>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
 Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
 Cc: Liam Girdwood <lrg@slimlogic.co.uk>
 ---
- arch/arm/plat-mxc/include/mach/ssi.h |    3 +++
- sound/soc/imx/imx-ssi.c              |   11 +++++++++--
- 2 files changed, 12 insertions(+), 2 deletions(-)
+ sound/soc/imx/Kconfig         |    8 +++
+ sound/soc/imx/Makefile        |    2 +
+ sound/soc/imx/eukrea-tlv320.c |  135 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 145 insertions(+), 0 deletions(-)
+ create mode 100644 sound/soc/imx/eukrea-tlv320.c
 
-diff --git a/arch/arm/plat-mxc/include/mach/ssi.h b/arch/arm/plat-mxc/include/mach/ssi.h
-index c34ded5..63f3c28 100644
---- a/arch/arm/plat-mxc/include/mach/ssi.h
-+++ b/arch/arm/plat-mxc/include/mach/ssi.h
-@@ -10,6 +10,9 @@ struct imx_ssi_platform_data {
- 	unsigned int flags;
- #define IMX_SSI_DMA            (1 << 0)
- #define IMX_SSI_USE_AC97       (1 << 1)
-+#define IMX_SSI_NET            (1 << 2)
-+#define IMX_SSI_SYN            (1 << 3)
-+#define IMX_SSI_USE_I2S_SLAVE  (1 << 4)
- 	void (*ac97_reset) (struct snd_ac97 *ac97);
- 	void (*ac97_warm_reset)(struct snd_ac97 *ac97);
- };
-diff --git a/sound/soc/imx/imx-ssi.c b/sound/soc/imx/imx-ssi.c
-index 80b4fee..50f5162 100644
---- a/sound/soc/imx/imx-ssi.c
-+++ b/sound/soc/imx/imx-ssi.c
-@@ -83,8 +83,6 @@ static int imx_ssi_set_dai_tdm_slot(struct snd_soc_dai *cpu_dai,
- /*
-  * SSI DAI format configuration.
-  * Should only be called when port is inactive (i.e. SSIEN = 0).
-- * Note: We don't use the I2S modes but instead manually configure the
-- * SSI for I2S because the I2S mode is only a register preset.
-  */
- static int imx_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
- {
-@@ -99,6 +97,10 @@ static int imx_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
- 		/* data on rising edge of bclk, frame low 1clk before data */
- 		strcr |= SSI_STCR_TFSI | SSI_STCR_TEFS | SSI_STCR_TXBIT0;
- 		scr |= SSI_SCR_NET;
-+		if (ssi->flags & IMX_SSI_USE_I2S_SLAVE) {
-+			scr &= ~SSI_I2S_MODE_MASK;
-+			scr |= SSI_SCR_I2S_MODE_SLAVE;
-+		}
- 		break;
- 	case SND_SOC_DAIFMT_LEFT_J:
- 		/* data on rising edge of bclk, frame high with data */
-@@ -143,6 +145,11 @@ static int imx_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
+diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
+index 7174b4c..3e27b16 100644
+--- a/sound/soc/imx/Kconfig
++++ b/sound/soc/imx/Kconfig
+@@ -11,3 +11,11 @@ config SND_IMX_SOC
+ config SND_MXC_SOC_SSI
+ 	tristate
  
- 	strcr |= SSI_STCR_TFEN0;
- 
-+	if (ssi->flags & IMX_SSI_NET)
-+		scr |= SSI_SCR_NET;
-+	if (ssi->flags & IMX_SSI_SYN)
-+		scr |= SSI_SCR_SYN;
++config SND_SOC_EUKREA_TLV320
++	bool "Eukrea TLV320"
++	depends on MACH_EUKREA_MBIMX27_BASEBOARD
++	select SND_IMX_SOC
++	select SND_SOC_TLV320AIC23
++	help
++	  Enable I2S based access to the TLV320AIC23B codec attached
++	  to the SSI4 interface
+diff --git a/sound/soc/imx/Makefile b/sound/soc/imx/Makefile
+index 9f8bb92..28d4b1e 100644
+--- a/sound/soc/imx/Makefile
++++ b/sound/soc/imx/Makefile
+@@ -10,3 +10,5 @@ obj-$(CONFIG_SND_IMX_SOC) += snd-soc-imx.o
+ # i.MX Machine Support
+ snd-soc-phycore-ac97-objs := phycore-ac97.o
+ obj-$(CONFIG_SND_SOC_PHYCORE_AC97) += snd-soc-phycore-ac97.o
++snd-soc-eukrea-tlv320-objs := eukrea-tlv320.o
++obj-$(CONFIG_SND_SOC_EUKREA_TLV320) += snd-soc-eukrea-tlv320.o
+diff --git a/sound/soc/imx/eukrea-tlv320.c b/sound/soc/imx/eukrea-tlv320.c
+new file mode 100644
+index 0000000..968380a
+--- /dev/null
++++ b/sound/soc/imx/eukrea-tlv320.c
+@@ -0,0 +1,135 @@
++/*
++ * eukrea-tlv320.c  --  SoC audio for eukrea_cpuimxXX in I2S mode
++ *
++ * Copyright 2010 Eric B?nard, Eukr?a Electromatique <eric@eukrea.com>
++ *
++ * based on sound/soc/s3c24xx/s3c24xx_simtec_tlv320aic23.c
++ * which is Copyright 2009 Simtec Electronics
++ * and on sound/soc/imx/phycore-ac97.c which is
++ * Copyright 2009 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
++ * 
++ *  This program is free software; you can redistribute  it and/or modify it
++ *  under  the terms of  the GNU General  Public License as published by the
++ *  Free Software Foundation;  either version 2 of the  License, or (at your
++ *  option) any later version.
++ *
++ */
 +
- 	writel(strcr, ssi->base + SSI_STCR);
- 	writel(strcr, ssi->base + SSI_SRCR);
- 	writel(scr, ssi->base + SSI_SCR);
++#include <linux/module.h>
++#include <linux/moduleparam.h>
++#include <linux/device.h>
++#include <linux/i2c.h>
++#include <sound/core.h>
++#include <sound/pcm.h>
++#include <sound/soc.h>
++#include <sound/soc-dapm.h>
++#include <asm/mach-types.h>
++
++#include "../codecs/tlv320aic23.h"
++#include "imx-ssi.h"
++
++#define CODEC_CLOCK 12000000
++
++static int eukrea_tlv320_hw_params(struct snd_pcm_substream *substream,
++			    struct snd_pcm_hw_params *params)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct snd_soc_dai *codec_dai = rtd->dai->codec_dai;
++	struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
++	int ret;
++
++	ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_I2S |
++				  SND_SOC_DAIFMT_NB_NF |
++				  SND_SOC_DAIFMT_CBM_CFM);
++	if (ret) {
++		pr_err("%s: failed set cpu dai format\n", __func__);
++		return ret;
++	}
++
++	ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_I2S |
++				  SND_SOC_DAIFMT_NB_NF |
++				  SND_SOC_DAIFMT_CBM_CFM);
++	if (ret) {
++		pr_err("%s: failed set codec dai format\n", __func__);
++		return ret;
++	}
++
++	ret = snd_soc_dai_set_sysclk(codec_dai, 0,
++				     CODEC_CLOCK, SND_SOC_CLOCK_OUT);
++	if (ret) {
++		pr_err("%s: failed setting codec sysclk\n", __func__);
++		return ret;
++	}
++
++	ret = snd_soc_dai_set_sysclk(cpu_dai, IMX_SSP_SYS_CLK, 0,
++				SND_SOC_CLOCK_IN);
++	if (ret) {
++		pr_err("can't set CPU system clock IMX_SSP_SYS_CLK\n");
++		return ret;
++	}
++
++	return 0;
++}
++
++static struct snd_soc_ops eukrea_tlv320_snd_ops = {
++	.hw_params	= eukrea_tlv320_hw_params,
++};
++
++static struct snd_soc_dai_link eukrea_tlv320_dai = {
++	.name		= "tlv320aic23",
++	.stream_name	= "TLV320AIC23",
++	.codec_dai	= &tlv320aic23_dai,
++	.ops		= &eukrea_tlv320_snd_ops,
++};
++
++static struct snd_soc_card eukrea_tlv320 = {
++	.name		= "cpuimx-audio",
++	.platform	= &imx_soc_platform,
++	.dai_link	= &eukrea_tlv320_dai,
++	.num_links	= 1,
++};
++
++static struct snd_soc_device eukrea_tlv320_snd_devdata = {
++	.card		= &eukrea_tlv320,
++	.codec_dev	= &soc_codec_dev_tlv320aic23,
++};
++
++static struct platform_device *eukrea_tlv320_snd_device;
++
++static int __init eukrea_tlv320_init(void)
++{
++	int ret;
++
++	if (!machine_is_eukrea_cpuimx27())
++		/* return happy. We might run on a totally different machine */
++		return 0;
++
++	eukrea_tlv320_snd_device = platform_device_alloc("soc-audio", -1);
++	if (!eukrea_tlv320_snd_device)
++		return -ENOMEM;
++
++	eukrea_tlv320_dai.cpu_dai = &imx_ssi_pcm_dai[0];
++
++	platform_set_drvdata(eukrea_tlv320_snd_device, &eukrea_tlv320_snd_devdata);
++	eukrea_tlv320_snd_devdata.dev = &eukrea_tlv320_snd_device->dev;
++	ret = platform_device_add(eukrea_tlv320_snd_device);
++
++	if (ret) {
++		printk(KERN_ERR "ASoC: Platform device allocation failed\n");
++		platform_device_put(eukrea_tlv320_snd_device);
++	}
++
++	return ret;
++}
++
++static void __exit eukrea_tlv320_exit(void)
++{
++	platform_device_unregister(eukrea_tlv320_snd_device);
++}
++
++module_init(eukrea_tlv320_init);
++module_exit(eukrea_tlv320_exit);
++
++MODULE_AUTHOR("Eric B?nard <eric@eukrea.com>");
++MODULE_DESCRIPTION("CPUIMX ALSA SoC driver");
++MODULE_LICENSE("GPL");
 -- 
 1.6.3.3
