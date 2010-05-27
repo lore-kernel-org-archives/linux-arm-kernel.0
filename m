@@ -1,42 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 May 2010 22:46:42 +0100
-Subject: [PATCH v3] i.MX27: add suspend to RAM support
-In-Reply-To: <4BFEDC10.4090204@eukrea.com>
-References: <1274942000-3580-1-git-send-email-eric@eukrea.com>
-	<1274969635-2212-1-git-send-email-eric@eukrea.com>
-	<20100527194305.GB25921@n2100.arm.linux.org.uk>
-	<4BFED0AC.6000604@eukrea.com>
-	<20100527201600.GF25921@n2100.arm.linux.org.uk>
-	<4BFEDC10.4090204@eukrea.com>
-Message-ID: <20100527214642.GG25921@n2100.arm.linux.org.uk>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 27 May 2010 23:52:11 +0200
+Subject: [PATCH 4/4] pata_samsung: Add Samsung PATA controller driver
+In-Reply-To: <1274948524-2970-5-git-send-email-kgene.kim@samsung.com>
+References: <1274948524-2970-1-git-send-email-kgene.kim@samsung.com>
+	<1274948524-2970-5-git-send-email-kgene.kim@samsung.com>
+Message-ID: <4BFEE98B.3090303@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 27, 2010 at 10:54:40PM +0200, Eric B?nard wrote:
-> Le 27/05/2010 22:16, Russell King - ARM Linux a ?crit :
->> On Thu, May 27, 2010 at 10:06:04PM +0200, Eric B?nard wrote:
->>> Do you think I should also fix this warning ?
->>>
->>> ./linux-2.6/scripts/checkpatch.pl
->>> 0001-i.MX27-add-suspend-to-RAM-support.patch
->>> WARNING: struct platform_suspend_ops should normally be const
->>> #72: FILE: arch/arm/mach-mx2/pm-imx27.c:35:
->>> +static struct platform_suspend_ops mx27_suspend_ops = {
->>
->> It's trivial enough to fix, and doesn't cause any issues by doing so,
->> so I'd suggest adding the const.
->>
-> well now this triggers the following warning so forget the patch v4,  
-> checkpatch seems wrong on this case :
->   CC      arch/arm/mach-mx2/pm-imx27.o
-> arch/arm/mach-mx2/pm-imx27.c: In function 'mx27_pm_init':
-> arch/arm/mach-mx2/pm-imx27.c:42: warning: passing argument 1 of  
-> 'suspend_set_ops' discards qualifiers from pointer target type
+Hello,
 
-Hmm, seems that checkpatch is incorrect on this point then.
-include/linux/suspend.h has:
+On 05/27/2010 10:22 AM, Kukjin Kim wrote:
+> From: Abhilash Kesavan <a.kesavan@samsung.com>
+> 
+> Adds support for the Samsung PATA controller. This driver is based on the
+> Libata subsystem and references the earlier patches sent for IDE subsystem.
 
-extern void suspend_set_ops(struct platform_suspend_ops *ops);
-static inline void suspend_set_ops(struct platform_suspend_ops *ops) {}
+Just one small thing.
 
-and I can't find any suggestion that these ever took a const pointer.
+> +static struct ata_port_operations pata_s3c_port_ops = {
+> +	.inherits		= &ata_sff_port_ops,
+> +	.sff_check_status	= pata_s3c_check_status,
+> +	.sff_tf_load		= pata_s3c_tf_load,
+> +	.sff_tf_read		= pata_s3c_tf_read,
+> +	.sff_data_xfer		= pata_s3c_data_xfer,
+> +	.sff_exec_command	= pata_s3c_exec_command,
+> +	.qc_prep		= ata_noop_qc_prep,
+> +	.set_piomode		= pata_s3c_set_piomode,
+> +};
+> +
+> +static struct ata_port_operations pata_s5p_port_ops = {
+> +	.inherits		= &ata_sff_port_ops,
+> +	.qc_prep		= ata_noop_qc_prep,
+> +	.set_piomode		= pata_s3c_set_piomode,
+> +};
+
+You don't need to override .qc_prep to ata_noop_qc_prep() and can you
+please base the patch against the current libata-dev#upstream?
+
+Thanks.
+
+-- 
+tejun
