@@ -1,32 +1,55 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Thu, 27 May 2010 12:47:06 +0300
-Subject: [RFC] Initial attempt to make ARM use LMB
-In-Reply-To: <20100527092501.GA28112@n2100.arm.linux.org.uk>
-References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
-	<20100522215848.GB29889@n2100.arm.linux.org.uk>
-	<20100526004418.GM9645@atomide.com>
-	<20100526075059.GA25435@n2100.arm.linux.org.uk>
-	<20100526135128.GN9645@atomide.com>
-	<20100526214037.GB16418@n2100.arm.linux.org.uk>
-	<1274950338.2265.134.camel@tubuntu.research.nokia.com>
-	<20100527092501.GA28112@n2100.arm.linux.org.uk>
-Message-ID: <1274953626.2265.196.camel@tubuntu.research.nokia.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 27 May 2010 11:57:17 +0200
+Subject: [PATCH] atmel_serial: Atmel RS485 support v2
+In-Reply-To: <4BFE2F38.8050200@evidence.eu.com>
+References: <4BB053C4.7050700@evidence.eu.com>	<4BB10304.6090006@bluewatersys.com>	<4BB1BF49.2000609@evidence.eu.com>	<4BB252E3.3030703@bluewatersys.com>	<4BBD8C9D.3070401@evidence.eu.com>	<20100408111310.524f7354@lxorguk.ukuu.org.uk>	<4BBDD71D.1010700@evidence.eu.com>
+	<4BFD1FB6.8050405@atmel.com> <4BFE2F38.8050200@evidence.eu.com>
+Message-ID: <4BFE41FD.2080804@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-05-27 at 11:25 +0200, ext Russell King - ARM Linux wrote:
-> On Thu, May 27, 2010 at 11:52:18AM +0300, Tomi Valkeinen wrote:
-
-> > I tested your lmb branch on OMAP 3430SDP board, and after removing the
-> > topmost patch (ARM: use LMB to allocate system memory MMIO resource
-> > structures) everything related to DSS2 (drivers/video/omap2/) seemed to
-> > work ok.
+Le 27/05/2010 10:37, Claudio Scordino :
+> Nicolas Ferre ha scritto:
+>> Le 08/04/2010 15:16, Claudio Scordino :
+>>
+>> [..]
+>>
+>>   
+>>> atmel_serial: Atmel RS485 support
+>>>
+>>> Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
+>>> Signed-off-by: Michael Trimarchi <michael@evidence.eu.com>
+>>> Signed-off-by: Rick Bronson <rick@efn.org>
+>>> Signed-off-by: Sebastian Heutling <Sebastian.Heutling@who-ing.de>
+>>> Tested-by: Sebastian Heutling <Sebastian.Heutling@who-ing.de>
+>>> Reviewed-by: Ryan Mallon <ryan@bluewatersys.com>
+>>>     
+>>
+>> Even though I personally did not test this patch I think it is time to
+>> go forward with this very good work.
+>>
+>> Considering the number of people involved in this testing and review I
+>> think that we can submit this patch for mainline. Who will handle it?
+>> - do we submit to ARM or serial subsystem ?
+>>   
 > 
-> Great, can I add your tested-by for the OMAP and LMB stuff up to but not
-> including the last commit?
+> Hi Nicolas,
+> 
+>     the latest version of the patch has been already merged in the
+> latest Linus' git tree through Russell King's patchsystem 
 
-Sure.
+My fault: I use to check Russell patchsystem with "AT91" searching
+string and not "atmel" ;-)
 
-I'll also try to find time to review the DSS side changes properly.
+> (the maintainer of the driver never answered to emails...).
 
- Tomi
+I was supposed to take over its maintainance one year ago but did not
+find time to do it. My fault here also...
+
+Anyway, it was the occasion to tell all of you that this RS485 support
+is a nice job and that even if I do not answer, I try to track all
+interesting activity in the background.
+
+Best regards,
+-- 
+Nicolas Ferre
