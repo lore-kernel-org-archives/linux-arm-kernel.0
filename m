@@ -1,49 +1,117 @@
-From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
-Date: Thu, 27 May 2010 08:33:20 +0200
-Subject: [PATCH v2 8/8] imxfb: fix PM
-In-Reply-To: <1274942000-3580-7-git-send-email-eric@eukrea.com>
-References: <1274942000-3580-1-git-send-email-eric@eukrea.com>
-	<1274942000-3580-2-git-send-email-eric@eukrea.com>
-	<1274942000-3580-3-git-send-email-eric@eukrea.com>
-	<1274942000-3580-4-git-send-email-eric@eukrea.com>
-	<1274942000-3580-5-git-send-email-eric@eukrea.com>
-	<1274942000-3580-6-git-send-email-eric@eukrea.com>
-	<1274942000-3580-7-git-send-email-eric@eukrea.com>
-Message-ID: <1274942000-3580-8-git-send-email-eric@eukrea.com>
+From: wills.wang.cn@gmail.com (wills wang)
+Date: Thu, 27 May 2010 14:41:33 +0800
+Subject: [Linux-arm-nuc900] NUC900 nand driver Patch
+In-Reply-To: <AANLkTilp8zYk-o3FhBrS4UNvz8lwQReooXx-PCv7Xs34@mail.gmail.com>
+References: <4BD99D4A.2020908@gmail.com>
+	<AANLkTilp8zYk-o3FhBrS4UNvz8lwQReooXx-PCv7Xs34@mail.gmail.com>
+Message-ID: <AANLkTilCkqebNVJnvL-0Zw2mCc373rsS0pceuVLqPxLP@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* if the screen is blanked, the clock is already disabled, so handle
-this case
-* before this patch, the following log was triggered :
-WARNING: at arch/arm/plat-mxc/clock.c:59 __clk_disable+0x68/0x74()
-Modules linked in:
-[<c002d200>] (unwind_backtrace+0x0/0xf8) from [<c0046008>] (warn_slowpath_common+0x48/0x78)
-[<c0046008>] (warn_slowpath_common+0x48/0x78) from [<c0031e28>] (__clk_disable+0x68/0x74)
-[<c0031e28>] (__clk_disable+0x68/0x74) from [<c0031ddc>] (__clk_disable+0x1c/0x74)
-[<c0031ddc>] (__clk_disable+0x1c/0x74) from [<c0031e58>] (clk_disable+0x24/0x34)
-[<c0031e58>] (clk_disable+0x24/0x34) from [<c019808c>] (imxfb_disable_controller+0x38/0x48)
-[<c019808c>] (imxfb_disable_controller+0x38/0x48) from [<c01980b0>] (imxfb_suspend+0x14/0x1c)
+2010/5/18 Wan ZongShun <mcuos.com@gmail.com>
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
----
- drivers/video/imxfb.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-index b4b6dec..6cbfbff 100644
---- a/drivers/video/imxfb.c
-+++ b/drivers/video/imxfb.c
-@@ -597,8 +597,8 @@ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
- 	struct imxfb_info *fbi = info->par;
- 
- 	pr_debug("%s\n", __func__);
--
--	imxfb_disable_controller(fbi);
-+	if (readl(fbi->regs + LCDC_RMCR))
-+		imxfb_disable_controller(fbi);
- 	return 0;
- }
- 
--- 
-1.6.3.3
+> Hi Wills,
+>
+> Please send your patch to me as a attached file.
+>
+> thanks!
+>
+> ? 2010?4?29? ??10:52?Wills Wang <wills.wang.cn@gmail.com> ???
+> > There is a patch for NUC900 nand driver, it fix up the bug access for
+> > incorrect register address and NULL pointer.
+> >
+> > --- linux-2.6.34-rc5/drivers/mtd/nand/nuc900_nand.c 2010-04-29
+> > 14:35:04.000000000 +0000
+> > +++ linux-2.6.34-rc5/drivers/mtd/nand/nuc900_nand.c 2010-04-29
+> > 14:42:22.000000000 +0000
+> > @@ -132,7 +153,7 @@
+> > {
+> > unsigned int val;
+> > spin_lock(&nand->lock);
+> > - val = __raw_readl(REG_SMISR);
+> > + val = __raw_readl(nand->reg + REG_SMISR);
+> > val &= READYBUSY;
+> > spin_unlock(&nand->lock);
+> >
+> > @@ -150,6 +171,19 @@
+> > return ready;
+> > }
+> >
+> > +static void nuc900_nand_select_chip(struct mtd_info *mtd, int chipnr)
+> > +{
+> > + switch (chipnr) {
+> > + case -1:
+> > + break;
+> > + case 0:
+> > + break;
+> > +
+> > + default:
+> > + BUG();
+> > + }
+> > +}
+> > +
+> > static void nuc900_nand_command_lp(struct mtd_info *mtd, unsigned int
+> > command,
+> > int column, int page_addr)
+> > {
+> > @@ -240,7 +274,6 @@
+> > ;
+> > }
+> >
+> > -
+> > static void nuc900_nand_enable(struct nuc900_nand *nand)
+> > {
+> > unsigned int val;
+> > @@ -250,7 +283,7 @@
+> > val = __raw_readl(nand->reg + REG_FMICSR);
+> >
+> > if (!(val & NAND_EN))
+> > - __raw_writel(val | NAND_EN, REG_FMICSR);
+> > + __raw_writel(val | NAND_EN, nand->reg + REG_FMICSR);
+> >
+> > val = __raw_readl(nand->reg + REG_SMCSR);
+> >
+> > @@ -286,7 +319,7 @@
+> > goto fail1;
+> > }
+> > clk_enable(nuc900_nand->clk);
+> > -
+> > + chip->select_chip = nuc900_nand_select_chip;
+> > chip->cmdfunc = nuc900_nand_command_lp;
+> > chip->dev_ready = nuc900_nand_devready;
+> > chip->read_byte = nuc900_nand_read_byte;
+> >
+> > --
+> > ????"NUC900 Linux BSP????".
+> > NUC900 Linux????????????
+> > NUC900 at googlegroups.com
+> > ?????????
+> > NUC900+unsubscribe at googlegroups.com<NUC900%2Bunsubscribe@googlegroups.com>
+> > ??????????
+> > https://groups.google.com/group/NUC900?hl=zh-CN
+> >
+>
+>
+>
+> --
+> *linux-arm-kernel mailing list
+> mail addr:linux-arm-kernel at lists.infradead.org<addr%3Alinux-arm-kernel@lists.infradead.org>
+> you can subscribe by:
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> * linux-arm-NUC900 mailing list
+> mail addr:NUC900 at googlegroups.com <addr%3ANUC900@googlegroups.com>
+> main web: https://groups.google.com/group/NUC900
+> you can subscribe it by sending me mail:
+> mcuos.com at gmail.com
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100527/5ca8e613/attachment-0001.htm>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: linux-2.6.34-nuc900.patch
+Type: application/octet-stream
+Size: 33970 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100527/5ca8e613/attachment-0001.obj>
