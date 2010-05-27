@@ -1,48 +1,29 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Thu, 27 May 2010 10:07:40 +0530
-Subject: [PATCH] ARM:VFPv3:enable {d16-d31} access
-In-Reply-To: <20100526201017.GE6232@n2100.arm.linux.org.uk>
-References: <tarun.kanti@ti.com>
-	<1274818736-26597-1-git-send-email-tarun.kanti@ti.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0322FA884E@dbde02.ent.ti.com>
-	<20100525185741.GB16204@n2100.arm.linux.org.uk>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0322FA8E37@dbde02.ent.ti.com>
-	<20100526201017.GE6232@n2100.arm.linux.org.uk>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB03230B1B3E@dbde02.ent.ti.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 27 May 2010 09:16:37 +0300
+Subject: [PATCH] s3c2410_ts: restore s3c24xx ids
+Message-ID: <1274940997-23706-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Without s3c24xx ids driver doesn't attach on s3c2410 and s3c244x
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Thursday, May 27, 2010 1:40 AM
-> To: DebBarma, Tarun Kanti
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] ARM:VFPv3:enable {d16-d31} access
-> 
-> On Wed, May 26, 2010 at 05:13:24PM +0530, DebBarma, Tarun Kanti wrote:
-> > 1) With the existing implementation I am not able to correctly
-> > write/read {d0-d15} but not the {d16-d31} set
-> >
-> > 2) With my changes I am able to write/read correctly.
-> 
-> The reason this happens is simple.  In vfp_get_double(), we have:
-> 
-> 1:      fmrrd   r0, r1, d\dr
-> 1:      mrrc    p11, 3, r0, r1, c\dr    @ fmrrd r0, r1, d\dr
-> 
-> but in vfp_put_double(), we have:
-> 
-> 1:      fmdrr   d\dr, r0, r1
-> 1:      mcrr    p11, 3, r1, r2, c\dr    @ fmdrr r1, r2, d\dr
-> 
-> Note the different registers.  Change "r1, r2" to "r0, r1" and it
-> should work.
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+ drivers/input/touchscreen/s3c2410_ts.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-Yes, that's right. I figured that out yesterday and confirmed the test results. Thanks!
-
-Can I go ahead with next version of the patch?
-
-BR
-Tarun
+diff --git a/drivers/input/touchscreen/s3c2410_ts.c b/drivers/input/touchscreen/s3c2410_ts.c
+index e0b7c83..ac5d0f9 100644
+--- a/drivers/input/touchscreen/s3c2410_ts.c
++++ b/drivers/input/touchscreen/s3c2410_ts.c
+@@ -413,6 +413,8 @@ static struct dev_pm_ops s3c_ts_pmops = {
+ #endif
+ 
+ static struct platform_device_id s3cts_driver_ids[] = {
++	{ "s3c2410-ts", 0 },
++	{ "s3c2440-ts", 0 },
+ 	{ "s3c64xx-ts", FEAT_PEN_IRQ },
+ 	{ }
+ };
+-- 
+1.7.1
