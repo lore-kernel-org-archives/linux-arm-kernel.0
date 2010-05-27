@@ -1,30 +1,86 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 27 May 2010 17:34:14 +0200
-Subject: [PATCH 05/25] msm: generalize clock support.
-In-Reply-To: <20100526185833.GA5548@huya.qualcomm.com>
-References: <> <1273700754-10256-6-git-send-email-dwalker@codeaurora.org>
-	<20100524185540.GA1292@ucw.cz>
-	<20100525005115.GA7791@huya.qualcomm.com>
-	<20100526173753.GD9069@elf.ucw.cz>
-	<20100526185833.GA5548@huya.qualcomm.com>
-Message-ID: <20100527153413.GC1957@elf.ucw.cz>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Thu, 27 May 2010 10:45:05 -0500
+Subject: [PATCHv3 2.6.34 2/2] mx5: Register i2c on Freescale MX51 Babbage HW
+In-Reply-To: <1274975105-8884-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1274975105-8884-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1274975105-8884-2-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2010-05-26 18:58:33, David Brown wrote:
-> On Wed, May 26, 2010 at 07:37:54PM +0200, Pavel Machek wrote:
-> 
-> > > Um, this is a standard 3-clause BSD license.  There are nearly
-> > > 900 existing files in the kernel that have this license on them.
-> > 
-> > Are you sure? I believe that Dual GPL/BSD is ok, just BSD is not.
-> 
-> It is, according to the FSF
-> <http://www.gnu.org/licenses/license-list.html>
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-Not acording to kernel sources. Please make it dual GPL/BSD.
+Add device registration and setup IOMUX pins in the mx51_babbage
+board feil.
 
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx51_babbage.c |   26 ++++++++++++++++++++++++++
+ 1 files changed, 26 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index ed885f9..19cde68 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -12,6 +12,7 @@
+ 
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
++#include <linux/i2c.h>
+ #include <linux/gpio.h>
+ #include <linux/delay.h>
+ #include <linux/io.h>
+@@ -21,6 +22,7 @@
+ #include <mach/hardware.h>
+ #include <mach/imx-uart.h>
+ #include <mach/iomux-mx51.h>
++#include <mach/i2c.h>
+ #include <mach/mxc_ehci.h>
+ 
+ #include <asm/irq.h>
+@@ -64,6 +66,18 @@ static struct pad_desc mx51babbage_pads[] = {
+ 	MX51_PAD_EIM_D27__UART3_RTS,
+ 	MX51_PAD_EIM_D24__UART3_CTS,
+ 
++	/* I2C1 */
++	MX51_PAD_EIM_D16__I2C1_SDA,
++	MX51_PAD_EIM_D19__I2C1_SCL,
++
++	/* I2C2 */
++	MX51_PAD_KEY_COL4__I2C2_SCL,
++	MX51_PAD_KEY_COL5__I2C2_SDA,
++
++	/* HSI2C */
++	MX51_PAD_I2C1_CLK__HSI2C_CLK,
++	MX51_PAD_I2C1_DAT__HSI2C_DAT,
++
+ 	/* USB HOST1 */
+ 	MX51_PAD_USBH1_CLK__USBH1_CLK,
+ 	MX51_PAD_USBH1_DIR__USBH1_DIR,
+@@ -99,6 +113,14 @@ static inline void mxc_init_imx_uart(void)
+ }
+ #endif /* SERIAL_IMX */
+ 
++static struct imxi2c_platform_data babbage_i2c_data = {
++	.bitrate = 100000,
++};
++
++static struct imxi2c_platform_data babbage_hsi2c_data = {
++	.bitrate = 400000,
++};
++
+ static int gpio_usbh1_active(void)
+ {
+ 	struct pad_desc usbh1stp_gpio = MX51_PAD_USBH1_STP__GPIO_1_27;
+@@ -230,6 +252,10 @@ static void __init mxc_board_init(void)
+ 	mxc_init_imx_uart();
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ 
++	mxc_register_device(&mxc_i2c_device0, &babbage_i2c_data);
++	mxc_register_device(&mxc_i2c_device1, &babbage_i2c_data);
++	mxc_register_device(&mxc_hsi2c_device, &babbage_hsi2c_data);
++
+ 	if (otg_mode_host)
+ 		mxc_register_device(&mxc_usbdr_host_device, &dr_utmi_config);
+ 	else {
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.6.0.4
