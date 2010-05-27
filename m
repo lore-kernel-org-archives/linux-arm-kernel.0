@@ -1,74 +1,41 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Thu, 27 May 2010 18:57:26 +0300
-Subject: [PATCH v2] rtc-s3c: Fix rtc-s3c driver initialization
-Message-ID: <1274975846-14006-1-git-send-email-anarsoul@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 27 May 2010 17:53:33 +0100
+Subject: [PATCH] ARM: change definition of cpu_relax() for ARM11MPCore
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C57A6E03@dbde02.ent.ti.com>
+References: <1274973118-11874-1-git-send-email-will.deacon@arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C57A6E03@dbde02.ent.ti.com>
+Message-ID: <000601cafdbd$24b7c4f0$6e274ed0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-setfreq should be called only after rtc device registration,
-as it uses rtc device; s3c_rtc_cpu_type should be checked
-only once it was set.
+Hi Santosh,
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- drivers/rtc/rtc-s3c.c |   29 +++++++++++++----------------
- 1 files changed, 13 insertions(+), 16 deletions(-)
+> > This patch changes the definition of cpu_relax() to smp_mb() for ARMv6 cores,
+> > forcing a flushing of the write buffer on SMP systems before the next load
+> > takes place. If the Kernel is not compiled for SMP support, this will expand
+> > to a barrier() as before.
+> >
+> I have missed this thread. Is this not applicable for ARMv7 MP Cores as well??
 
-diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-index e5972b2..dc2081f 100644
---- a/drivers/rtc/rtc-s3c.c
-+++ b/drivers/rtc/rtc-s3c.c
-@@ -488,19 +488,7 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
- 		goto err_nomap;
- 	}
- 
--	/* check to see if everything is setup correctly */
--
--	s3c_rtc_enable(pdev, 1);
--
-- 	pr_debug("s3c2410_rtc: RTCCON=%02x\n",
--		 readb(s3c_rtc_base + S3C2410_RTCCON));
--
--	s3c_rtc_setfreq(&pdev->dev, 1);
--
--	device_init_wakeup(&pdev->dev, 1);
--
--	/* register RTC and exit */
--
-+	/* Register rtc and check to see if everything is setup correctly */
- 	rtc = rtc_device_register("s3c", &pdev->dev, &s3c_rtcops,
- 				  THIS_MODULE);
- 
-@@ -510,18 +498,27 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
- 		goto err_nortc;
- 	}
- 
-+	platform_set_drvdata(pdev, rtc);
-+
-+	s3c_rtc_cpu_type = platform_get_device_id(pdev)->driver_data;
-+
- 	if (s3c_rtc_cpu_type == TYPE_S3C64XX)
- 		rtc->max_user_freq = 32768;
- 	else
- 		rtc->max_user_freq = 128;
- 
--	s3c_rtc_cpu_type = platform_get_device_id(pdev)->driver_data;
-+	s3c_rtc_enable(pdev, 1);
-+
-+	pr_debug("s3c2410_rtc: RTCCON=%02x\n",
-+		 readb(s3c_rtc_base + S3C2410_RTCCON));
-+
-+	s3c_rtc_setfreq(&pdev->dev, 1);
-+
-+	device_init_wakeup(&pdev->dev, 1);
- 
--	platform_set_drvdata(pdev, rtc);
- 	return 0;
- 
-  err_nortc:
--	s3c_rtc_enable(pdev, 0);
- 	iounmap(s3c_rtc_base);
- 
-  err_nomap:
--- 
-1.7.1
+You can pick up on some of the old thread here:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-April/012874.html
+
+Actually, the ChangeLog I wrote for that patch is better, so I'll update
+my current one.
+
+To answer your question; this problem only occurs on ARM11MPCore. For ARMv7MP,
+stores are guaranteed to become visible eventually [i.e. they can't be held up
+indefinitely by a sequence of aggresive loads].
+
+An addition to the ARM ARM [Section A3.8.2] says:
+
+* For an implementation that does not include the Multiprocessing Extensions,
+it is IMPLEMENTATION DEFINED whether all writes become globally observed in
+their shareability domain in a finite period of time, or whether in some cases,
+software must execute a DSB to ensure the visibility of some writes.
+
+* For an implementation that includes the Multiprocessing Extensions, all writes
+become globally observed in their shareability domain in a finite period of time. 
+
+Will
