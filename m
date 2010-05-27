@@ -1,69 +1,75 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Thu, 27 May 2010 17:48:29 +0300
-Subject: [PATCH] rtc-s3c: Fix rtc-s3c driver initialization
-Message-ID: <1274971709-7874-1-git-send-email-anarsoul@gmail.com>
+From: fachkar.datawind@gmail.com (f. achkar)
+Date: Thu, 27 May 2010 10:53:41 -0400
+Subject: defining ARM machine type properly
+In-Reply-To: <AANLkTilhxt5hVjffJMRPzN477Czw2_Xtqo2joYvo1vM3@mail.gmail.com>
+References: <4BFD8E7A.6050103@gmail.com>
+	<AANLkTilhxt5hVjffJMRPzN477Czw2_Xtqo2joYvo1vM3@mail.gmail.com>
+Message-ID: <4BFE8775.4000200@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-setfreq should be called only after rtc device registration,
-as it uses rtc device; s3c_rtc_cpu_type should be checked
-only once it was set.
-
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- drivers/rtc/rtc-s3c.c |   28 +++++++++++++---------------
- 1 files changed, 13 insertions(+), 15 deletions(-)
-
-diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-index e5972b2..6b47f53 100644
---- a/drivers/rtc/rtc-s3c.c
-+++ b/drivers/rtc/rtc-s3c.c
-@@ -488,7 +488,19 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
- 		goto err_nomap;
- 	}
- 
--	/* check to see if everything is setup correctly */
-+	/* Register rtc and check to see if everything is setup correctly */
-+	rtc = rtc_device_register("s3c", &pdev->dev, &s3c_rtcops,
-+				  THIS_MODULE);
-+
-+	if (IS_ERR(rtc)) {
-+		dev_err(&pdev->dev, "cannot attach rtc\n");
-+		ret = PTR_ERR(rtc);
-+		goto err_nortc;
-+	}
-+
-+	s3c_rtc_cpu_type = platform_get_device_id(pdev)->driver_data;
-+
-+	platform_set_drvdata(pdev, rtc);
- 
- 	s3c_rtc_enable(pdev, 1);
- 
-@@ -499,25 +511,11 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
- 
- 	device_init_wakeup(&pdev->dev, 1);
- 
--	/* register RTC and exit */
--
--	rtc = rtc_device_register("s3c", &pdev->dev, &s3c_rtcops,
--				  THIS_MODULE);
--
--	if (IS_ERR(rtc)) {
--		dev_err(&pdev->dev, "cannot attach rtc\n");
--		ret = PTR_ERR(rtc);
--		goto err_nortc;
--	}
--
- 	if (s3c_rtc_cpu_type == TYPE_S3C64XX)
- 		rtc->max_user_freq = 32768;
- 	else
- 		rtc->max_user_freq = 128;
- 
--	s3c_rtc_cpu_type = platform_get_device_id(pdev)->driver_data;
--
--	platform_set_drvdata(pdev, rtc);
- 	return 0;
- 
-  err_nortc:
--- 
-1.7.1
+On 05/26/2010 11:14 PM, Wan ZongShun wrote:
+> 2010/5/27 f. achkar <fachkar.datawind@gmail.com>:
+>   
+>> hi,
+>> I'm trying to port smdk2450 arch to the a new kernel 2.6.32-9, I did the
+>> initial work as per various googled documents, but somehow the current
+>> initial Image is failing at arch/arm/kernel/head-common.S :
+>> '__lookup_processor_type', and eventually goes to '__error_a' of the
+>>     
+> The '__lookup_processor_type' goes to '__error_a'  is not related to
+> your machine_type,
+> you should check whether there is a true definition of  select
+> CPU_ARMxx in the arch/arm/kconfig.
+>   
+ Symbol: MACH_SMDK2450
+[=y]                                                                                                    
+? 
+  ? Prompt:
+SMDK2450                                                                                                              
+? 
+  ?   Defined at
+arch/arm/mach-s3c2450/Kconfig:30                                                                                 
+? 
+  ?   Depends on:
+ARCH_S3C2410                                                                                                    
+? 
+  ?  
+Location:                                                                                                                   
+? 
+  ?     -> System
+Type                                                                                                            
+? 
+  ?       -> S3C2450
+Machines                                                                                                     
+? 
+  ?   Selects: CPU_S3C2450 && MACH_SMDK
+> The issue maybe result from you get a wrong ARM processor type
+> number,which is not equal to
+> the R9 resigster value.
+>   
+most likely the case, what should be my check-list to verify correct doing?
+thanks,
+>   
+>> same file! this seems to be related to the definition of machine_type as
+>> defined in :
+>> include/asm-arm/mach-types.h  and arch/arm/tools/mach-types*
+>> I checked where the definition goes in  include/asm-arm/mach-types.h by
+>> inserting
+>> #error 2223XX
+>> into various parts of that header and seems fine at the point.
+>> nevertheless I'm not 100 sure
+>> I wonder if the is a definitive reference to guide in this matter,
+>> better yet a check-list like procedure??
+>> thanks,
+>> ferar
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>>     
+>
+>
+>   
