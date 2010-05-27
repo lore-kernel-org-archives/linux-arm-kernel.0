@@ -1,96 +1,87 @@
 From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
-Date: Thu, 27 May 2010 19:54:44 +0200
-Subject: [PATCH] mxcmmc: add card detect through DAT3 possibility
-In-Reply-To: <1274287568-30253-9-git-send-email-eric@eukrea.com>
-References: <1274287568-30253-9-git-send-email-eric@eukrea.com>
-Message-ID: <1274982884-13205-1-git-send-email-eric@eukrea.com>
+Date: Thu, 27 May 2010 19:55:19 +0200
+Subject: [PATCH] mxc_nand: fix PM
+In-Reply-To: <1274942000-3580-2-git-send-email-eric@eukrea.com>
+References: <1274942000-3580-2-git-send-email-eric@eukrea.com>
+Message-ID: <1274982919-13251-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
-To: s.hauer at pengutronix.de
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-mmc at vger.kernel.org
----
- arch/arm/plat-mxc/include/mach/mmc.h |    3 +++
- drivers/mmc/host/mxcmmc.c            |   16 +++++++++++++---
- 2 files changed, 16 insertions(+), 3 deletions(-)
+* when resuming, we get the following log :
+nand_resume called for a chip which is not in suspended state
+* this happens because mtd->suspend and mtd->resume are already
+called from the mtd layer, thus they were called a second time
+in mxc_nand so mtd complains when trying to resume for the
+second time
+* the fix is to remove these call and thus remove the supend and
+resume functions of mxc_nand
 
-diff --git a/arch/arm/plat-mxc/include/mach/mmc.h b/arch/arm/plat-mxc/include/mach/mmc.h
-index de2128d..29115f4 100644
---- a/arch/arm/plat-mxc/include/mach/mmc.h
-+++ b/arch/arm/plat-mxc/include/mach/mmc.h
-@@ -31,6 +31,9 @@ struct imxmmc_platform_data {
- 
- 	/* adjust slot voltage */
- 	void (*setpower)(struct device *, unsigned int vdd);
-+
-+	/* enable card detect using DAT3 */
-+	int dat3_card_detect;
- };
- 
- #endif
-diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-index ec18e3b..74c87e0 100644
---- a/drivers/mmc/host/mxcmmc.c
-+++ b/drivers/mmc/host/mxcmmc.c
-@@ -119,6 +119,7 @@ struct mxcmci_host {
- 	int			detect_irq;
- 	int			dma;
- 	int			do_dma;
-+	int			default_irq_mask;
- 	int			use_sdio;
- 	unsigned int		power_mode;
- 	struct imxmmc_platform_data *pdata;
-@@ -228,7 +229,7 @@ static int mxcmci_setup_data(struct mxcmci_host *host, struct mmc_data *data)
- static int mxcmci_start_cmd(struct mxcmci_host *host, struct mmc_command *cmd,
- 		unsigned int cmdat)
- {
--	u32 int_cntr;
-+	u32 int_cntr = host->default_irq_mask;
- 	unsigned long flags;
- 
- 	WARN_ON(host->cmd != NULL);
-@@ -275,7 +276,7 @@ static int mxcmci_start_cmd(struct mxcmci_host *host, struct mmc_command *cmd,
- static void mxcmci_finish_request(struct mxcmci_host *host,
- 		struct mmc_request *req)
- {
--	u32 int_cntr = 0;
-+	u32 int_cntr = host->default_irq_mask;
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&host->lock, flags);
-@@ -585,6 +586,9 @@ static irqreturn_t mxcmci_irq(int irq, void *devid)
- 		  (stat & (STATUS_DATA_TRANS_DONE | STATUS_WRITE_OP_DONE)))
- 		mxcmci_data_done(host, stat);
- #endif
-+	if (host->default_irq_mask &&
-+		  (stat & (STATUS_CARD_INSERTION | STATUS_CARD_REMOVAL)))
-+		mmc_detect_change(host->mmc, msecs_to_jiffies(200));
- 	return IRQ_HANDLED;
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+Cc: s.hauer at pengutronix.de
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-mtd at lists.infradead.org
+---
+ drivers/mtd/nand/mxc_nand.c |   44 +------------------------------------------
+ 1 files changed, 1 insertions(+), 43 deletions(-)
+
+diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+index 314e2bf..217b247 100644
+--- a/drivers/mtd/nand/mxc_nand.c
++++ b/drivers/mtd/nand/mxc_nand.c
+@@ -892,53 +892,11 @@ static int __devexit mxcnd_remove(struct platform_device *pdev)
+ 	return 0;
  }
  
-@@ -809,6 +813,12 @@ static int mxcmci_probe(struct platform_device *pdev)
- 	else
- 		mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
+-#ifdef CONFIG_PM
+-static int mxcnd_suspend(struct platform_device *pdev, pm_message_t state)
+-{
+-	struct mtd_info *mtd = platform_get_drvdata(pdev);
+-	struct nand_chip *nand_chip = mtd->priv;
+-	struct mxc_nand_host *host = nand_chip->priv;
+-	int ret = 0;
+-
+-	DEBUG(MTD_DEBUG_LEVEL0, "MXC_ND : NAND suspend\n");
+-
+-	ret = mtd->suspend(mtd);
+-
+-	/*
+-	 * nand_suspend locks the device for exclusive access, so
+-	 * the clock must already be off.
+-	 */
+-	BUG_ON(!ret && host->clk_act);
+-
+-	return ret;
+-}
+-
+-static int mxcnd_resume(struct platform_device *pdev)
+-{
+-	struct mtd_info *mtd = platform_get_drvdata(pdev);
+-	struct nand_chip *nand_chip = mtd->priv;
+-	struct mxc_nand_host *host = nand_chip->priv;
+-	int ret = 0;
+-
+-	DEBUG(MTD_DEBUG_LEVEL0, "MXC_ND : NAND resume\n");
+-
+-	mtd->resume(mtd);
+-
+-	return ret;
+-}
+-
+-#else
+-# define mxcnd_suspend   NULL
+-# define mxcnd_resume    NULL
+-#endif				/* CONFIG_PM */
+-
+ static struct platform_driver mxcnd_driver = {
+ 	.driver = {
+ 		   .name = DRIVER_NAME,
+-		   },
++	},
+ 	.remove = __devexit_p(mxcnd_remove),
+-	.suspend = mxcnd_suspend,
+-	.resume = mxcnd_resume,
+ };
  
-+	if (host->pdata && host->pdata->dat3_card_detect)
-+		host->default_irq_mask =
-+			INT_CARD_INSERTION_EN | INT_CARD_REMOVAL_EN;
-+	else
-+		host->default_irq_mask = 0;
-+
- 	host->res = r;
- 	host->irq = irq;
- 
-@@ -835,7 +845,7 @@ static int mxcmci_probe(struct platform_device *pdev)
- 	/* recommended in data sheet */
- 	writew(0x2db4, host->base + MMC_REG_READ_TO);
- 
--	writel(0, host->base + MMC_REG_INT_CNTR);
-+	writel(host->default_irq_mask, host->base + MMC_REG_INT_CNTR);
- 
- #ifdef HAS_DMA
- 	host->dma = imx_dma_request_by_prio(DRIVER_NAME, DMA_PRIO_LOW);
+ static int __init mxc_nd_init(void)
 -- 
 1.6.3.3
