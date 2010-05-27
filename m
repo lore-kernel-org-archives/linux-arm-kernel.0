@@ -1,46 +1,31 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 28 May 2010 09:09:01 +1200
-Subject: Controlling Driver Load Order
-In-Reply-To: <AANLkTilKUfcYsPqr5kXlONJQAFCaE8D8U9ltQybIzCPu@mail.gmail.com>
-References: <AANLkTikzDvWakd7JW3DzTHinjS3dAlqzPx6K8V2qMDG7@mail.gmail.com>	<AANLkTinkY8JYh44UOEPflBUDyQ2wat_AKShRjA3HPxrf@mail.gmail.com>	<20100526235246.GA31068@pengutronix.de>	<AANLkTikj8yGSK5Ovud_k8f6jWloojqDJmQ_H6pD_IFgM@mail.gmail.com>	<20100527041358.GA14070@pengutronix.de>
-	<AANLkTilKUfcYsPqr5kXlONJQAFCaE8D8U9ltQybIzCPu@mail.gmail.com>
-Message-ID: <4BFEDF6D.3090100@bluewatersys.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 27 May 2010 23:13:56 +0200
+Subject: [PATCH v3] i.MX27: add suspend to RAM support
+In-Reply-To: <20100527201600.GF25921@n2100.arm.linux.org.uk>
+References: <1274942000-3580-1-git-send-email-eric@eukrea.com>
+	<1274969635-2212-1-git-send-email-eric@eukrea.com>
+	<20100527194305.GB25921@n2100.arm.linux.org.uk>
+	<4BFED0AC.6000604@eukrea.com>
+	<20100527201600.GF25921@n2100.arm.linux.org.uk>
+Message-ID: <20100527211356.GB5636@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Emanuele wrote:
-> Hi Wolfram,
-> 
-> I am using the i2c-gpio.c driver, not the i2c-at91 driver.  The Atmel
-> folks have expressed concerns over their i2c silicon and wrote a gpio
-> version.
-> 
-> Anyway, I better understand the subsys_initcall now and applied that
-> to the i2c-gpio and my i2c chip driver.  That worked perfectly for my
-> issue.  I'd be happy to return a patch of this.  Would be this the
-> sort of thing that would benefit from a config option?  Something
-> like:
-> 
-> #if defined(CONFIG_EARLY_i2C_GPIO)
-> subsys_initcall(i2c_gpio_init);
-> #else
-> module_init(i2c_gpio_init);
-> #endif
+> Eg, we have asm/memory.h, and there is a linux/memory.h, but the two
+> are completely unrelated - so the checkpatch warnings about "use
+> linux/memory.h rather than asm/memory.h" are rather misleading.
 
-Looks like this has already been done:
-http://www.mail-archive.com/linux-i2c at vger.kernel.org/msg03056.html
-
-There was a discussion a while back to make all of the embedded i2c
-busses be subsys_initcall since i2c is often a system bus on embedded
-devices. Looks the i2c_gpio driver got missed the first time round.
-
-~Ryan
+checkpatch can blacklist .h-files for this warning (as it does for irq.h at the
+moment). Do you think adding memory.h there is worthwhile? I'd prepare a patch,
+then.
 
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100527/86c6e21d/attachment.sig>
