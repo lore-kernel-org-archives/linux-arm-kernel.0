@@ -1,34 +1,24 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 May 2010 10:25:01 +0100
-Subject: [RFC] Initial attempt to make ARM use LMB
-In-Reply-To: <1274950338.2265.134.camel@tubuntu.research.nokia.com>
-References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
-	<20100522215848.GB29889@n2100.arm.linux.org.uk>
-	<20100526004418.GM9645@atomide.com>
-	<20100526075059.GA25435@n2100.arm.linux.org.uk>
-	<20100526135128.GN9645@atomide.com>
-	<20100526214037.GB16418@n2100.arm.linux.org.uk>
-	<1274950338.2265.134.camel@tubuntu.research.nokia.com>
-Message-ID: <20100527092501.GA28112@n2100.arm.linux.org.uk>
+Date: Thu, 27 May 2010 10:29:33 +0100
+Subject: [PATCH] ARM:VFPv3:enable {d16-d31} access
+In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB03230B1B3E@dbde02.ent.ti.com>
+References: <tarun.kanti@ti.com>
+	<1274818736-26597-1-git-send-email-tarun.kanti@ti.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0322FA884E@dbde02.ent.ti.com>
+	<20100525185741.GB16204@n2100.arm.linux.org.uk>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0322FA8E37@dbde02.ent.ti.com>
+	<20100526201017.GE6232@n2100.arm.linux.org.uk>
+	<5A47E75E594F054BAF48C5E4FC4B92AB03230B1B3E@dbde02.ent.ti.com>
+Message-ID: <20100527092933.GB28112@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 27, 2010 at 11:52:18AM +0300, Tomi Valkeinen wrote:
-> On Wed, 2010-05-26 at 23:40 +0200, ext Russell King - ARM Linux wrote:
-> > On Wed, May 26, 2010 at 06:51:29AM -0700, Tony Lindgren wrote:
+On Thu, May 27, 2010 at 10:07:40AM +0530, DebBarma, Tarun Kanti wrote:
+> > Note the different registers.  Change "r1, r2" to "r0, r1" and it
+> > should work.
 > 
-> > > Yeah I'll do that once the dss2 code has been verified to work.
-> > 
-> > It'd help with this patch - it seems rx51 needs some additional stuff.
-> > Any other OMAP platforms with this kind of thing?
-> 
-> I think rx51 is currently the only board that configures the VRAM size
-> dynamically at boot time.
-> 
-> I tested your lmb branch on OMAP 3430SDP board, and after removing the
-> topmost patch (ARM: use LMB to allocate system memory MMIO resource
-> structures) everything related to DSS2 (drivers/video/omap2/) seemed to
-> work ok.
+> Yes, that's right. I figured that out yesterday and confirmed the test
+> results. Thanks!
 
-Great, can I add your tested-by for the OMAP and LMB stuff up to but not
-including the last commit?
+I've now committed a fix to change those registers.  Are you ok with
+being credited with a Reported-by tag?
