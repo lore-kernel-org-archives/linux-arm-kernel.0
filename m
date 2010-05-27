@@ -1,95 +1,44 @@
-From: rob@emanuele.us (Robert Emanuele)
-Date: Thu, 27 May 2010 10:07:08 -0700
-Subject: Controlling Driver Load Order
-In-Reply-To: <20100527041358.GA14070@pengutronix.de>
-References: <AANLkTikzDvWakd7JW3DzTHinjS3dAlqzPx6K8V2qMDG7@mail.gmail.com>
-	<AANLkTinkY8JYh44UOEPflBUDyQ2wat_AKShRjA3HPxrf@mail.gmail.com>
-	<20100526235246.GA31068@pengutronix.de>
-	<AANLkTikj8yGSK5Ovud_k8f6jWloojqDJmQ_H6pD_IFgM@mail.gmail.com>
-	<20100527041358.GA14070@pengutronix.de>
-Message-ID: <AANLkTilKUfcYsPqr5kXlONJQAFCaE8D8U9ltQybIzCPu@mail.gmail.com>
+From: fabioestevam@yahoo.com (Fabio Estevam)
+Date: Thu, 27 May 2010 10:09:23 -0700 (PDT)
+Subject: [PATCH v3] net/fec: fix pm to survive to suspend/resume
+In-Reply-To: <1274969989-4280-1-git-send-email-eric@eukrea.com>
+Message-ID: <536177.31761.qm@web51001.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+Eric,
 
-I am using the i2c-gpio.c driver, not the i2c-at91 driver.  The Atmel
-folks have expressed concerns over their i2c silicon and wrote a gpio
-version.
+--- On Thu, 5/27/10, Eric B?nard <eric@eukrea.com> wrote:
 
-Anyway, I better understand the subsys_initcall now and applied that
-to the i2c-gpio and my i2c chip driver.  That worked perfectly for my
-issue.  I'd be happy to return a patch of this.  Would be this the
-sort of thing that would benefit from a config option?  Something
-like:
-
-#if defined(CONFIG_EARLY_i2C_GPIO)
-subsys_initcall(i2c_gpio_init);
-#else
-module_init(i2c_gpio_init);
-#endif
-
-I appreciate your help and direction.
-
-Thank you,
-
-Rob
-
-On Wed, May 26, 2010 at 9:13 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
-> On Wed, May 26, 2010 at 06:39:13PM -0700, Robert Emanuele wrote:
->
->> Still the framebuffer device would initialize first and it would lack
->> having the i2c chips it needs ready. ?That is the order I'm trying to
->> straighten out.
->
-> Understood. Our pointers were probably not precise enough, sorry. Please try
-> this patch and give a Tested-by-tag if it solves your problems.
->
-> From: Wolfram Sang <w.sang@pengutronix.de>
-> Date: Thu, 27 May 2010 06:03:48 +0200
-> Subject: [PATCH] i2c-at91: use subsys_initcall() for early initialization
->
-> I2C needs to be available early, so other subsystems can access it.
->
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Robert Emanuele <rob@emanuele.us>
-> Cc: Ben Dooks <ben-linux@fluff.org>
+> From: Eric B?nard <eric@eukrea.com>
+> Subject: [PATCH v3] net/fec: fix pm to survive to suspend/resume
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: s.hauer at pengutronix.de, sshtylyov at mvista.com
+> Date: Thursday, May 27, 2010, 11:19 AM
+> * with this patch, if the connection
+> if active before suspend, it
+> will be active after resume.
+> * before this patch, it was necessary to close the
+> interface and
+> reopen it to recover the connection.
+> 
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
 > ---
->
-> ?drivers/i2c/busses/i2c-at91.c | ? ?3 +--
-> ?1 files changed, 1 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index 305c075..bea5794 100644
-> --- a/drivers/i2c/busses/i2c-at91.c
-> +++ b/drivers/i2c/busses/i2c-at91.c
-> @@ -313,13 +313,12 @@ static int __init at91_i2c_init(void)
-> ?{
-> ? ? ? ?return platform_driver_register(&at91_i2c_driver);
-> ?}
-> +subsys_initcall(at91_i2c_init);
->
-> ?static void __exit at91_i2c_exit(void)
-> ?{
-> ? ? ? ?platform_driver_unregister(&at91_i2c_driver);
-> ?}
-> -
-> -module_init(at91_i2c_init);
-> ?module_exit(at91_i2c_exit);
->
-> ?MODULE_AUTHOR("Rick Bronson");
->
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Wolfram Sang ? ? ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->
-> -----BEGIN PGP SIGNATURE-----
-> Version: GnuPG v1.4.9 (GNU/Linux)
->
-> iEYEARECAAYFAkv98YYACgkQD27XaX1/VRsvlwCffUOH2qAsWbaG2EmIf1Cl2H+I
-> 8P4AoInnCS69XCfq6wIFku1hUgeT8hlG
-> =vGcD
-> -----END PGP SIGNATURE-----
->
->
+> v3 : fix following Sergei Shtylyov's comments
+> 
+>  drivers/net/fec.c |???10 +++++++---
+>  1 files changed, 7 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/net/fec.c b/drivers/net/fec.c
+> index 9b4e8f7..1521972 100644
+> --- a/drivers/net/fec.c
+> +++ b/drivers/net/fec.c
+
+I think you should have CC'ed the linux-netdev list also.
+
+Regards,
+
+Fabio Estevam
+
+
+      
