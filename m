@@ -1,75 +1,86 @@
-From: fachkar.datawind@gmail.com (f. achkar)
-Date: Thu, 27 May 2010 10:53:41 -0400
-Subject: defining ARM machine type properly
-In-Reply-To: <AANLkTilhxt5hVjffJMRPzN477Czw2_Xtqo2joYvo1vM3@mail.gmail.com>
-References: <4BFD8E7A.6050103@gmail.com>
-	<AANLkTilhxt5hVjffJMRPzN477Czw2_Xtqo2joYvo1vM3@mail.gmail.com>
-Message-ID: <4BFE8775.4000200@gmail.com>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Thu, 27 May 2010 09:57:49 -0500
+Subject: [PATCHv2 2.6.34 2/2] mx5: Register i2c on Freescale MX51 Babbage HW
+In-Reply-To: <1274972269-6946-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1274972269-6946-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1274972269-6946-2-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2010 11:14 PM, Wan ZongShun wrote:
-> 2010/5/27 f. achkar <fachkar.datawind@gmail.com>:
->   
->> hi,
->> I'm trying to port smdk2450 arch to the a new kernel 2.6.32-9, I did the
->> initial work as per various googled documents, but somehow the current
->> initial Image is failing at arch/arm/kernel/head-common.S :
->> '__lookup_processor_type', and eventually goes to '__error_a' of the
->>     
-> The '__lookup_processor_type' goes to '__error_a'  is not related to
-> your machine_type,
-> you should check whether there is a true definition of  select
-> CPU_ARMxx in the arch/arm/kconfig.
->   
- Symbol: MACH_SMDK2450
-[=y]                                                                                                    
-? 
-  ? Prompt:
-SMDK2450                                                                                                              
-? 
-  ?   Defined at
-arch/arm/mach-s3c2450/Kconfig:30                                                                                 
-? 
-  ?   Depends on:
-ARCH_S3C2410                                                                                                    
-? 
-  ?  
-Location:                                                                                                                   
-? 
-  ?     -> System
-Type                                                                                                            
-? 
-  ?       -> S3C2450
-Machines                                                                                                     
-? 
-  ?   Selects: CPU_S3C2450 && MACH_SMDK
-> The issue maybe result from you get a wrong ARM processor type
-> number,which is not equal to
-> the R9 resigster value.
->   
-most likely the case, what should be my check-list to verify correct doing?
-thanks,
->   
->> same file! this seems to be related to the definition of machine_type as
->> defined in :
->> include/asm-arm/mach-types.h  and arch/arm/tools/mach-types*
->> I checked where the definition goes in  include/asm-arm/mach-types.h by
->> inserting
->> #error 2223XX
->> into various parts of that header and seems fine at the point.
->> nevertheless I'm not 100 sure
->> I wonder if the is a definitive reference to guide in this matter,
->> better yet a check-list like procedure??
->> thanks,
->> ferar
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->>     
->
->
->   
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+
+Add device registration and setup IOMUX pins in the mx51_babbage
+board feil.
+
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx51_babbage.c |   26 ++++++++++++++++++++++++++
+ 1 files changed, 26 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index ed885f9..19cde68 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -12,6 +12,7 @@
+ 
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
++#include <linux/i2c.h>
+ #include <linux/gpio.h>
+ #include <linux/delay.h>
+ #include <linux/io.h>
+@@ -21,6 +22,7 @@
+ #include <mach/hardware.h>
+ #include <mach/imx-uart.h>
+ #include <mach/iomux-mx51.h>
++#include <mach/i2c.h>
+ #include <mach/mxc_ehci.h>
+ 
+ #include <asm/irq.h>
+@@ -64,6 +66,18 @@ static struct pad_desc mx51babbage_pads[] = {
+ 	MX51_PAD_EIM_D27__UART3_RTS,
+ 	MX51_PAD_EIM_D24__UART3_CTS,
+ 
++	/* I2C1 */
++	MX51_PAD_EIM_D16__I2C1_SDA,
++	MX51_PAD_EIM_D19__I2C1_SCL,
++
++	/* I2C2 */
++	MX51_PAD_KEY_COL4__I2C2_SCL,
++	MX51_PAD_KEY_COL5__I2C2_SDA,
++
++	/* HSI2C */
++	MX51_PAD_I2C1_CLK__HSI2C_CLK,
++	MX51_PAD_I2C1_DAT__HSI2C_DAT,
++
+ 	/* USB HOST1 */
+ 	MX51_PAD_USBH1_CLK__USBH1_CLK,
+ 	MX51_PAD_USBH1_DIR__USBH1_DIR,
+@@ -99,6 +113,14 @@ static inline void mxc_init_imx_uart(void)
+ }
+ #endif /* SERIAL_IMX */
+ 
++static struct imxi2c_platform_data babbage_i2c_data = {
++	.bitrate = 100000,
++};
++
++static struct imxi2c_platform_data babbage_hsi2c_data = {
++	.bitrate = 400000,
++};
++
+ static int gpio_usbh1_active(void)
+ {
+ 	struct pad_desc usbh1stp_gpio = MX51_PAD_USBH1_STP__GPIO_1_27;
+@@ -230,6 +252,10 @@ static void __init mxc_board_init(void)
+ 	mxc_init_imx_uart();
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ 
++	mxc_register_device(&mxc_i2c_device0, &babbage_i2c_data);
++	mxc_register_device(&mxc_i2c_device1, &babbage_i2c_data);
++	mxc_register_device(&mxc_hsi2c_device, &babbage_hsi2c_data);
++
+ 	if (otg_mode_host)
+ 		mxc_register_device(&mxc_usbdr_host_device, &dr_utmi_config);
+ 	else {
+-- 
+1.6.0.4
