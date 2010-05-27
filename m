@@ -1,51 +1,47 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 27 May 2010 17:02:38 +0200
-Subject: [PATCHv2 2.6.34 1/2] mx5: Add i2c to Freescale MX51 Babbage HW
-In-Reply-To: <1274972269-6946-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1274972269-6946-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20100527150238.GH2695@buzzloop.caiaq.de>
+From: fachkar.datawind@gmail.com (f. achkar)
+Date: Thu, 27 May 2010 11:08:35 -0400
+Subject: defining ARM machine type properly
+In-Reply-To: <20100527010742.GH7248@trinity.fluff.org>
+References: <4BFD8E7A.6050103@gmail.com>
+	<20100527010742.GH7248@trinity.fluff.org>
+Message-ID: <4BFE8AF3.4060304@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 27, 2010 at 09:57:48AM -0500, Dinh.Nguyen at freescale.com wrote:
-> This patch adds I2C functionality to the Freescale MX51 Babbage HW.
-> The patch adds device structures, i2c board slave device defines,
-> IOMUX pin defines, and clocks.
-> 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> ---
->  arch/arm/mach-mx5/clock-mx51.c              |   11 +++++
->  arch/arm/mach-mx5/devices.c                 |   58 +++++++++++++++++++++++++++
->  arch/arm/mach-mx5/devices.h                 |    3 +
->  arch/arm/plat-mxc/include/mach/iomux-mx51.h |   18 ++++++---
->  4 files changed, 84 insertions(+), 6 deletions(-)
-> 
-
-[...]
-
->  static struct resource usbotg_resources[] = {
-> diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
-> index 0494d6b..d0451bf 100644
-> --- a/arch/arm/mach-mx5/devices.h
-> +++ b/arch/arm/mach-mx5/devices.h
-> @@ -5,3 +5,6 @@ extern struct platform_device mxc_fec_device;
->  extern struct platform_device mxc_usbdr_host_device;
->  extern struct platform_device mxc_usbh1_device;
->  extern struct platform_device mxc_usbdr_udc_device;
-> +extern struct platform_device mxc_i2c_device0;
-> +extern struct platform_device mxc_i2c_device1;
-> +extern struct platform_device mxc_hsi2c_device;
-> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> index ab0f95d..6ea6861 100644
-> --- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> @@ -38,6 +38,8 @@ typedef enum iomux_config {
->  				PAD_CTL_SRE_FAST)
->  #define MX51_UART3_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_DSE_HIGH | \
->  				PAD_CTL_SRE_FAST)
-> +#define MX51_I2C_PAD_CTRL		(PAD_CTL_SRE_FAST | PAD_CTL_ODE | \
-> ++				PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP | PAD_CTL_HYS)
-   ^
-I believe something went wrong here.
-
-Daniel
+On 05/26/2010 09:07 PM, Ben Dooks wrote:
+> On Wed, May 26, 2010 at 05:11:22PM -0400, f. achkar wrote:
+>   
+>> hi,
+>> I'm trying to port smdk2450 arch to the a new kernel 2.6.32-9, I did the
+>>     
+> I suspect what you are doing is trying to port it to a machine that
+> was loosley based on the SMDK2450 and that whoever did the uboot port
+> failed to understand that when the hardware changes then the machine
+> number needs to change too.
+>
+>   
+>> initial work as per various googled documents, but somehow the current
+>> initial Image is failing at arch/arm/kernel/head-common.S :
+>> '__lookup_processor_type', and eventually goes to '__error_a' of the
+>> same file! this seems to be related to the definition of machine_type as
+>> defined in :
+>> include/asm-arm/mach-types.h  and arch/arm/tools/mach-types*
+>> I checked where the definition goes in  include/asm-arm/mach-types.h by
+>> inserting
+>>     
+> you probably wanted to enable the debugging in the head code.
+>
+>   
+>> #error 2223XX
+>> into various parts of that header and seems fine at the point.
+>> nevertheless I'm not 100 sure
+>> I wonder if the is a definitive reference to guide in this matter,
+>> better yet a check-list like procedure??
+>> thanks,
+>> ferar
+>>     
+> How about downloading the latest kernel, with nice fresh S3C2450 support
+> in it?
+>   
+which version is that? 2.6.34 does not contain such support!
+thanks
