@@ -1,57 +1,49 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Thu, 27 May 2010 11:14:07 +0800
-Subject: defining ARM machine type properly
-In-Reply-To: <4BFD8E7A.6050103@gmail.com>
-References: <4BFD8E7A.6050103@gmail.com>
-Message-ID: <AANLkTilhxt5hVjffJMRPzN477Czw2_Xtqo2joYvo1vM3@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 26 May 2010 23:49:55 -0400 (EDT)
+Subject: [PATCH] sa1111: Prevent deadlock in resume path
+In-Reply-To: <201005270035.54509.marek.vasut@gmail.com>
+References: <1274901104-22133-1-git-send-email-marek.vasut@gmail.com>
+	<201005262352.34052.marek.vasut@gmail.com>
+	<20100526222530.GD16418@n2100.arm.linux.org.uk>
+	<201005270035.54509.marek.vasut@gmail.com>
+Message-ID: <alpine.LFD.2.00.1005262306080.24526@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/5/27 f. achkar <fachkar.datawind@gmail.com>:
-> hi,
-> I'm trying to port smdk2450 arch to the a new kernel 2.6.32-9, I did the
-> initial work as per various googled documents, but somehow the current
-> initial Image is failing at arch/arm/kernel/head-common.S :
-> '__lookup_processor_type', and eventually goes to '__error_a' of the
+On Thu, 27 May 2010, Marek Vasut wrote:
 
-The '__lookup_processor_type' goes to '__error_a'  is not related to
-your machine_type,
-you should check whether there is a true definition of  select
-CPU_ARMxx in the arch/arm/kconfig.
+> Dne ?t 27. kv?tna 2010 00:25:30 Russell King - ARM Linux napsal(a):
+> > Mine is that I'm dreadful at dealing with patches in email.  Unless I
+> > deal with a message at the point I've read it, it basically doesn't
+> > exist. 
+> 
+> Why don't you set up a mailbox for that ? You read the emails anyway and you can 
+> drop the patches you Ack into that mailbox ... then run git am on that once in a 
+> while.
 
-The issue maybe result from you get a wrong ARM processor type
-number,which is not equal to
-the R9 resigster value.
+Marek, let me give you some bit of wisdom.
 
-> same file! this seems to be related to the definition of machine_type as
-> defined in :
-> include/asm-arm/mach-types.h ?and arch/arm/tools/mach-types*
-> I checked where the definition goes in ?include/asm-arm/mach-types.h by
-> inserting
-> #error 2223XX
-> into various parts of that header and seems fine at the point.
-> nevertheless I'm not 100 sure
-> I wonder if the is a definitive reference to guide in this matter,
-> better yet a check-list like procedure??
-> thanks,
-> ferar
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Russell's patch system existed way before git was created.  It works 
+quite well for random patches.  He even created custom scripts to 
+extract patches from his system and stuff them into git.  So if he went 
+through such trouble instead of relying on the standard 'git am' tool 
+with a patch mailbox then there must be a reason, even if that reason 
+makes sense only to him.
+
+The impact on you (and I) is rather minimal.  The process is indeed 
+documented at length on his website but the actual operation is not much 
+different from posting the patch to this mailing list.  And I'm glad to 
+make my own life a tiny bit more complicated due to having to email the 
+same patch twice (once here and once to the patch system) if that makes 
+a big difference to Russell's life.
+
+If you do have a real problem with that system, then just create your 
+own git tree and ask RMK to pull it.  That has worked quite well too, 
+especially for large patch series.
+
+So please just accept that the ARM process is odd and deal with it.  
+The day you end up maintaining a body of code with people routing their 
+patches through you then it will be your turn to set the rules for them.
 
 
-
--- 
-*linux-arm-kernel mailing list
-mail addr:linux-arm-kernel at lists.infradead.org
-you can subscribe by:
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-* linux-arm-NUC900 mailing list
-mail addr:NUC900 at googlegroups.com
-main web: https://groups.google.com/group/NUC900
-you can subscribe it by sending me mail:
-mcuos.com at gmail.com
+Nicolas
