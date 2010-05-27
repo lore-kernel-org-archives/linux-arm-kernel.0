@@ -1,25 +1,23 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Thu, 27 May 2010 14:51:15 +0100
-Subject: [PATCH v2 3/4] eukrea_mbimx27: add audio codec
-In-Reply-To: <1274950737-26498-3-git-send-email-eric@eukrea.com>
-References: <1274950737-26498-1-git-send-email-eric@eukrea.com>
+From: eric@eukrea.com (=?UTF-8?B?RXJpYyBCw6luYXJk?=)
+Date: Thu, 27 May 2010 16:04:47 +0200
+Subject: [PATCH v2 2/4] soc/imx: add eukrea-tlv320
+In-Reply-To: <1274968205.3542.283.camel@odin>
+References: <1274950737-26498-1-git-send-email-eric@eukrea.com>	
 	<1274950737-26498-2-git-send-email-eric@eukrea.com>
-	<1274950737-26498-3-git-send-email-eric@eukrea.com>
-Message-ID: <1274968275.3542.284.camel@odin>
+	<1274968205.3542.283.camel@odin>
+Message-ID: <4BFE7BFF.7010400@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-05-27 at 10:58 +0200, Eric B?nard wrote:
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Liam Girdwood <lrg@slimlogic.co.uk>
-> ---
->  arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c |   44 +++++++++++++++++++++++++-
->  1 files changed, 43 insertions(+), 1 deletions(-)
+Hi Liam,
 
-Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
--- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+Le 27/05/2010 15:50, Liam Girdwood a ?crit :
+>> +
+>> +	eukrea_tlv320_dai.cpu_dai =&imx_ssi_pcm_dai[0];
+>
+> Any reason why this is not defined above ?
+>
+I plan to reuse this driver for iMX25, 35 & 51 based boards so this 
+parameter may change depending on machine_is_xxx macro.
+
+Eric
