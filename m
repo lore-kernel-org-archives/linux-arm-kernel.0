@@ -1,67 +1,30 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 27 May 2010 20:50:47 +0530
-Subject: [PATCH] ARM: change definition of cpu_relax() for ARM11MPCore
-In-Reply-To: <1274973118-11874-1-git-send-email-will.deacon@arm.com>
-References: <1274973118-11874-1-git-send-email-will.deacon@arm.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C57A6E03@dbde02.ent.ti.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 27 May 2010 17:34:14 +0200
+Subject: [PATCH 05/25] msm: generalize clock support.
+In-Reply-To: <20100526185833.GA5548@huya.qualcomm.com>
+References: <> <1273700754-10256-6-git-send-email-dwalker@codeaurora.org>
+	<20100524185540.GA1292@ucw.cz>
+	<20100525005115.GA7791@huya.qualcomm.com>
+	<20100526173753.GD9069@elf.ucw.cz>
+	<20100526185833.GA5548@huya.qualcomm.com>
+Message-ID: <20100527153413.GC1957@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+On Wed 2010-05-26 18:58:33, David Brown wrote:
+> On Wed, May 26, 2010 at 07:37:54PM +0200, Pavel Machek wrote:
+> 
+> > > Um, this is a standard 3-clause BSD license.  There are nearly
+> > > 900 existing files in the kernel that have this license on them.
+> > 
+> > Are you sure? I believe that Dual GPL/BSD is ok, just BSD is not.
+> 
+> It is, according to the FSF
+> <http://www.gnu.org/licenses/license-list.html>
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Will Deacon
-> Sent: Thursday, May 27, 2010 8:42 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Russell King - ARM Linux; Will Deacon
-> Subject: [PATCH] ARM: change definition of cpu_relax() for ARM11MPCore
-> 
-> The cpu_relax() macro is often used in the body of busy-wait loops to ensure
-> that the variable being spun on is re-loaded for each iteration. On the
-> ARM11MPCore processor [where loads are prioritised over stores], spinning in
-> such a loop will prevent the write buffer from draining. If a write contained
-> in the write buffer indirectly affects the variable being spun on, there is a
-> potential for deadlock. This deadlock is experienced when executing the KGDB
-> testsuite on an SMP ARM11MPCore configuration.
-> 
-> This patch changes the definition of cpu_relax() to smp_mb() for ARMv6 cores,
-> forcing a flushing of the write buffer on SMP systems before the next load
-> takes place. If the Kernel is not compiled for SMP support, this will expand
-> to a barrier() as before.
->
-I have missed this thread. Is this not applicable for ARMv7 MP Cores as well??
- 
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
-> 
-> Russell - the discussion on this last month seemed to draw to a close.
-> Can I submit this to the patch system please, or are there any outstanding
-> issues?
-> 
->  arch/arm/include/asm/processor.h |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
-> index 6a89567..7bed3da 100644
-> --- a/arch/arm/include/asm/processor.h
-> +++ b/arch/arm/include/asm/processor.h
-> @@ -91,7 +91,11 @@ extern void release_thread(struct task_struct *);
-> 
->  unsigned long get_wchan(struct task_struct *p);
-> 
-> +#if __LINUX_ARM_ARCH__ == 6
-> +#define cpu_relax()			smp_mb()
-> +#else
->  #define cpu_relax()			barrier()
-> +#endif
-> 
->  /*
->   * Create a new kernel thread
-> --
-> 1.6.3.3
+Not acording to kernel sources. Please make it dual GPL/BSD.
 
-Regards,
-Santosh
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
