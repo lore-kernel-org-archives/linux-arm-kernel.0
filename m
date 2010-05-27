@@ -1,49 +1,77 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 28 May 2010 00:09:51 +0200
-Subject: Controlling Driver Load Order
-In-Reply-To: <4BFEEA08.70401@bluewatersys.com>
-References: <AANLkTikzDvWakd7JW3DzTHinjS3dAlqzPx6K8V2qMDG7@mail.gmail.com>
-	<AANLkTinkY8JYh44UOEPflBUDyQ2wat_AKShRjA3HPxrf@mail.gmail.com>
-	<20100526235246.GA31068@pengutronix.de>
-	<AANLkTikj8yGSK5Ovud_k8f6jWloojqDJmQ_H6pD_IFgM@mail.gmail.com>
-	<20100527041358.GA14070@pengutronix.de>
-	<AANLkTilKUfcYsPqr5kXlONJQAFCaE8D8U9ltQybIzCPu@mail.gmail.com>
-	<4BFEDF6D.3090100@bluewatersys.com>
-	<20100527214209.GC5636@pengutronix.de>
-	<4BFEEA08.70401@bluewatersys.com>
-Message-ID: <20100527220951.GD5636@pengutronix.de>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Thu, 27 May 2010 16:01:20 -0700
+Subject: [GIT PULL] final dmaengine update for 2.6.35-rc1
+Message-ID: <1275001280.21315.14.camel@dwillia2-linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Always ask which kernel is used, sigh...
-> 
-> Sorry? I didn't see a kernel version mentioned. I went looking because I
-> had though that i2c-gpio was already subsys_initcall.
+Hi Linus, please pull from:
 
-Sorry, I missed emphasizing that my comment was meant as a "note-to-myself".
-You were perfectly right, of course, I should have done the same.
+  git://git.kernel.org/pub/scm/linux/kernel/git/djbw/async_tx.git next
 
-> >> There was a discussion a while back to make all of the embedded i2c
-> >> busses be subsys_initcall since i2c is often a system bus on embedded
-> > 
-> > Oh, where was that? Can't recall (but couldn't recall that I acked the i2c-gpio
-> > patch above as well ;))
-> > 
-> 
-> Moving the embedded i2c busses to subsys_initcall was discussed here:
-> http://lists.lm-sensors.org/pipermail/i2c/2008-June/004142.html. The
-> i2c_gpio bus got mentioned, which is why I thought it had already been
-> changed.
+1/ A new dma driver from Jassi that was dependent on patches that went
+in via the ARM tree.
 
-Thanks for the pointer!
+2/ A platform enabling patch for the dma40 driver that went in with my
+first pull request.  This was pending an acked-by from Russell.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100528/5f9d5fe7/attachment.sig>
+Both have been shaken out in -next, the dma40 patch had some recent
+janitorial fixups spotted by Russell.
+
+Thanks,
+Dan
+
+Jassi Brar (1):
+      DMA: PL330: Add dma api driver
+
+Linus Walleij (1):
+      DMAENGINE: DMA40 U8500 platform configuration
+
+ arch/arm/mach-ux500/clock.c                    |    2 +-
+ arch/arm/mach-ux500/cpu-db8500.c               |    4 +
+ arch/arm/mach-ux500/devices-db8500.c           |  109 +++
+ arch/arm/mach-ux500/include/mach/db8500-regs.h |   12 +
+ arch/arm/mach-ux500/include/mach/devices.h     |    3 +
+ arch/arm/mach-ux500/ste-dma40-db8500.h         |  154 +++++
+ drivers/dma/Kconfig                            |    9 +
+ drivers/dma/Makefile                           |    1 +
+ drivers/dma/pl330.c                            |  866 ++++++++++++++++++++++++
+ include/linux/amba/pl330.h                     |   45 ++
+ 10 files changed, 1204 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/ste-dma40-db8500.h
+ create mode 100644 drivers/dma/pl330.c
+ create mode 100644 include/linux/amba/pl330.h
+
+commit 7b8ddb06e54ad98edeb7951f317aee4d1feda9d6
+Author: Linus Walleij <linus.walleij@stericsson.com>
+Date:   Thu May 27 15:21:26 2010 -0700
+
+    DMAENGINE: DMA40 U8500 platform configuration
+    
+    This completes the DMA40 support with the platform-specific
+    configuration for U8500/DB8500.
+    
+    Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+    Acked-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+    Reviewed-by: Alessandro Rubini <rubini@unipv.it>
+    Cc: STEricsson_nomadik_linux at list.st.com
+    Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+    [fixed up dma40_{tx|rx}_map declaration/initialization]
+    Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+
+commit b3040e40675ec2c43542331cd30d4ee3dae797e8
+Author: Jassi Brar <jassi.brar@samsung.com>
+Date:   Sun May 23 20:28:19 2010 -0700
+
+    DMA: PL330: Add dma api driver
+    
+    Add DMA Engine API driver for the PL330 DMAC.
+    This driver is supposed to be reusable by various
+    platforms that have one or more PL330 DMACs.
+    Atm, DMA_SLAVE and DMA_MEMCPY capabilities have been
+    implemented.
+    
+    Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+    Reviewed-by: Linus Walleij <linus.walleij@stericsson.com>
+    [dan.j.williams at intel.com: missing slab.h and ->device_control() fixups]
+    Signed-off-by: Dan Williams <dan.j.williams@intel.com>
