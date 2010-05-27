@@ -1,45 +1,47 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 27 May 2010 02:07:42 +0100
-Subject: defining ARM machine type properly
-In-Reply-To: <4BFD8E7A.6050103@gmail.com>
-References: <4BFD8E7A.6050103@gmail.com>
-Message-ID: <20100527010742.GH7248@trinity.fluff.org>
+From: rob@emanuele.us (Robert Emanuele)
+Date: Wed, 26 May 2010 18:33:47 -0700
+Subject: Controlling Driver Load Order
+In-Reply-To: <20100526235246.GA31068@pengutronix.de>
+References: <AANLkTikzDvWakd7JW3DzTHinjS3dAlqzPx6K8V2qMDG7@mail.gmail.com>
+	<AANLkTinkY8JYh44UOEPflBUDyQ2wat_AKShRjA3HPxrf@mail.gmail.com>
+	<20100526235246.GA31068@pengutronix.de>
+Message-ID: <AANLkTinhbSuKl3ajWEonsgsa_BVbUDffK7tNAXINUGZN@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 26, 2010 at 05:11:22PM -0400, f. achkar wrote:
-> hi,
-> I'm trying to port smdk2450 arch to the a new kernel 2.6.32-9, I did the
+Maybe I'm not describing this correctly...
+In my platform init_machine I had something like this:
+{
+at91_add_device_i2c(1, my_i2c_devices, ARRAY_SIZE(my_i2c_devices));
 
-I suspect what you are doing is trying to port it to a machine that
-was loosley based on the SMDK2450 and that whoever did the uboot port
-failed to understand that when the hardware changes then the machine
-number needs to change too.
+add_my_display
 
-> initial work as per various googled documents, but somehow the current
-> initial Image is failing at arch/arm/kernel/head-common.S :
-> '__lookup_processor_type', and eventually goes to '__error_a' of the
-> same file! this seems to be related to the definition of machine_type as
-> defined in :
-> include/asm-arm/mach-types.h  and arch/arm/tools/mach-types*
-> I checked where the definition goes in  include/asm-arm/mach-types.h by
-> inserting
 
-you probably wanted to enable the debugging in the head code.
-
-> #error 2223XX
-> into various parts of that header and seems fine at the point.
-> nevertheless I'm not 100 sure
-> I wonder if the is a definitive reference to guide in this matter,
-> better yet a check-list like procedure??
-> thanks,
-> ferar
-
-How about downloading the latest kernel, with nice fresh S3C2450 support
-in it?
-
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+On Wed, May 26, 2010 at 4:52 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> On Wed, May 26, 2010 at 11:04:01PM +0200, Linus Walleij wrote:
+>> 2010/5/26 Robert Emanuele <rob@emanuele.us>:
+>>
+>> > On my at91sam9g45 platform I need my i2c drivers to load before the
+>> > framebuffer driver. ?The i2c drivers control a power management IC
+>> > which is needed to enable the graphics controller.
+>> >
+>> > Is there a way to set up that order?
+>>
+>> The usual trick (which you can find in a lot of other I2C busses) is to use
+>> a core_initcall() instead of module_init().
+>
+> Correct, but it's subsys_initcall().
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Wolfram Sang ? ? ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
+> -----BEGIN PGP SIGNATURE-----
+> Version: GnuPG v1.4.9 (GNU/Linux)
+>
+> iEYEARECAAYFAkv9tE4ACgkQD27XaX1/VRsuwgCgtuBO/G43yUxbTED+MdBf6tUv
+> 9hYAn0WL0L475IYsXqiOlUMzGmdrAcr7
+> =KcVU
+> -----END PGP SIGNATURE-----
+>
+>
