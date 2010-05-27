@@ -1,82 +1,57 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 26 May 2010 22:13:10 -0400
-Subject: [RFC PATCH v2 1/3] ep93xx i2s audio driver
-In-Reply-To: <1274850588-30460-2-git-send-email-ryan@bluewatersys.com>
-References: <1274850588-30460-1-git-send-email-ryan@bluewatersys.com>
-	<1274850588-30460-2-git-send-email-ryan@bluewatersys.com>
-Message-ID: <20100527021306.GA21697@opensource.wolfsonmicro.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Thu, 27 May 2010 11:14:07 +0800
+Subject: defining ARM machine type properly
+In-Reply-To: <4BFD8E7A.6050103@gmail.com>
+References: <4BFD8E7A.6050103@gmail.com>
+Message-ID: <AANLkTilhxt5hVjffJMRPzN477Czw2_Xtqo2joYvo1vM3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 26, 2010 at 05:09:46PM +1200, Ryan Mallon wrote:
+2010/5/27 f. achkar <fachkar.datawind@gmail.com>:
+> hi,
+> I'm trying to port smdk2450 arch to the a new kernel 2.6.32-9, I did the
+> initial work as per various googled documents, but somehow the current
+> initial Image is failing at arch/arm/kernel/head-common.S :
+> '__lookup_processor_type', and eventually goes to '__error_a' of the
 
-> +	/* 
-> +	 * Calculate the sdiv (bit clock) and lrdiv (left/right clock) values. 
-> +	 * If the lrclk is pulse length is larger than the word size, then the
-> +	 * bit clock will be gated for the unused bits.
-> +	 */
-> +	div = (clk_get_rate(info->mclk) / params_rate(params)) * 
-> +		params_channels(params);
-> +	for (sdiv = 2; !found && sdiv <= 4; sdiv += 2)
-> +		for (lrdiv = 32; !found && lrdiv <= 128; lrdiv <<= 1)
-> +			if (sdiv * lrdiv == div)
-> +				found = 1;
-> +	if (!found)
-> +		return -EINVAL;
+The '__lookup_processor_type' goes to '__error_a'  is not related to
+your machine_type,
+you should check whether there is a true definition of  select
+CPU_ARMxx in the arch/arm/kconfig.
 
-This suggests that the device has a single LRCLK for both TX and RX and
-therefore the DAI should have symmetric_rates set so that applications
-are told about this restriction and the upper layers prevent them from
-setting asymmetric rates (which would result in the first direction
-ending up running at the wrong rate when the second direction starts).
+The issue maybe result from you get a wrong ARM processor type
+number,which is not equal to
+the R9 resigster value.
 
-> +	err = snd_soc_register_dai(&ep93xx_i2s_dai);
-> +	if (err)
-> +		goto fail_free_info;
+> same file! this seems to be related to the definition of machine_type as
+> defined in :
+> include/asm-arm/mach-types.h ?and arch/arm/tools/mach-types*
+> I checked where the definition goes in ?include/asm-arm/mach-types.h by
+> inserting
+> #error 2223XX
+> into various parts of that header and seems fine at the point.
+> nevertheless I'm not 100 sure
+> I wonder if the is a definitive reference to guide in this matter,
+> better yet a check-list like procedure??
+> thanks,
+> ferar
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		err = -ENODEV;
-> +		goto fail_unregister_dai;
-> +	}
-> +		
 
-The DAI registration is happening at the wrong place - you're telling
-ASoC the DAI is ready before you've finished acquiring the resources it
-needs to run, meaning that there's a race condition where something may
-try to start audio up while the probe is still running.  Generally DAI
-registration should be the last thing your driver does.
 
-> +static int __devexit ep93xx_i2s_remove(struct platform_device *pdev)
-> +{
-> +	struct ep93xx_i2s_info *info = ep93xx_i2s_dai.private_data;
-> +	
-> +	clk_put(info->lrclk);
-> +	clk_put(info->sclk);
-> +	clk_put(info->mclk);
-> +	iounmap(info->regs);
-> +	release_mem_region(info->mem->start, resource_size(info->mem));
-> +	snd_soc_unregister_dai(&ep93xx_i2s_dai);
-> +	kfree(info);
-> +	return 0;
-> +}
+-- 
+*linux-arm-kernel mailing list
+mail addr:linux-arm-kernel at lists.infradead.org
+you can subscribe by:
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Here you should free the DAI before anything else for the same reason as
-above.
-
-> +/*
-> + * These are the offsets for the LRDIV and SDIV fields in the syscon i2sclkdiv
-> + * register.
-> + */
-> +#define EP93XX_I2S_LRDIV	17
-> +#define EP93XX_I2S_SDIV		16
-
-Most of the other defines are in the driver - should these be there (or
-removed)?
-
-> +static int ep93xx_pcm_prepare(struct snd_pcm_substream *substream)
-> +{
-> +	return 0;
-> +}
-
-Remove this if no code is needed.
+* linux-arm-NUC900 mailing list
+mail addr:NUC900 at googlegroups.com
+main web: https://groups.google.com/group/NUC900
+you can subscribe it by sending me mail:
+mcuos.com at gmail.com
