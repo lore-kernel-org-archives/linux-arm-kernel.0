@@ -1,114 +1,82 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 27 May 2010 17:13:28 +0200
-Subject: SPARSEMEM support for Atmel AT91SAM9G45 and M10
-In-Reply-To: <4BFE2A3F.2010606@visionsystems.de>
-References: <AANLkTin3-rqG2o0t4rbggpCE2cFAV6GWeH0v7UjC1tnQ@mail.gmail.com>
-	<201005261610.32937.marek.vasut@gmail.com>
-	<4BFE2A3F.2010606@visionsystems.de>
-Message-ID: <201005271713.28491.marek.vasut@gmail.com>
+From: fachkar.datawind@gmail.com (f. achkar)
+Date: Thu, 27 May 2010 11:18:41 -0400
+Subject: [not solved yet] debugging linux kernel on arm926ejs target
+Message-ID: <4BFE8D51.2020708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 27. kv?tna 2010 10:15:59 Yegor Yefremov napsal(a):
-> Marek Vasut schrieb:
-> > Dne St 26. kv?tna 2010 15:46:21 Yegor Yefremov napsal(a):
-> >>>     I'm resurrecting an old thread
-> >>> 
-> >>> (http://lists.arm.linux.org.uk/lurker/message/20090914.072902.97115112.
-> >>> en .html) about using the two memory banks available
-> >>> on Atmel AT91SAM9G45/M10. I managed to make it work on 2.6.30 by
-> >>> following Russell King advice on how to configure SPARSEMEM.
-> >>> 
-> >>>     I submitted a working patch for 2.6.34 here:
-> >>> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6143/1
-> >>> 
-> >>> The problem is that I'm unsure how to get rid of the #define that
-> >>> forces high_memory value in mm/init.c, should I add a fixup function
-> >>> to board-sam9m10g45ek.c to provide meminfo information ?
-> >> 
-> >> I've already tested the patch on 2.6.33 and it is working properly.
-> >> Concerning high_memory value problem I think the cause is how
-> >> find_node_limits() in arch/arm/m/init.c is implemented. We have two
-> >> memory banks one starting at 0x70000000 and another at 0x200000000. The
-> >> virtual mapping looks like this:
-> >> 
-> >> 0x70000000 -> 0xc0000000
-> >> 0x20000000 -> 0xc8000000
-> >> 
-> >> However find_node_limits() routine is working with physical addresses so
-> >> the upper limit is 0x70000000 and not 0x20000000 as it should be. As a
-> >> result max_low is pointing to 0x70000000 and that's why only first bank
-> >> will be mapped correctly.
-> >> 
-> >> How can find_node_limits() be changed to work with virtual addresses?
-> >> 
-> >> Regards,
-> >> Yegor
-> > 
-> > Hey, try searching for "[PATCH 1/5] pxa/vpac270: Enable SparseMEM for 256
-> > MB of RAM" ... The device has also one memory bank mapped under the
-> > primary one. Maybe that can help. Cheers
-> 
-> Marek, I've looked at patch and apart from defining HIGH_MEMORY_VIRT it
-> does the same. Nevertheless if I don't define HIGH_MEMORY_VIRT I get the
-> following crash (I've added debug string showing calculated high_memory.
-> It should be 0xd0000000 and not 0xc8000000):
-> 
-> Linux version 2.6.33.2 (OpenRISC at VScom) (gcc version 4.3.2
-> (crosstool-NG-1.3.2) ) #30 Thu May 27 10:06:42 CEST 2010
-> CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
-> CPU: VIVT data cache, VIVT instruction cache
-> Machine: Atmel AT91SAM9G45-EKES
-> Memory policy: ECC disabled, Data cache writeback
-> DBG: high_memory 0xc8000000
-> Clocks: CPU 400 MHz, master 133 MHz, main 12.000 MHz
-> Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 62720
-> Kernel command line: console=ttyS0,115200 root=/dev/mtdblock2 rootwait
-> PID hash table entries: 1024 (order: 0, 4096 bytes)
-> Dentry cache hash table entries: 32768 (order: 5, 131072 bytes)
-> Inode-cache hash table entries: 16384 (order: 4, 65536 bytes)
-> Memory: 128MB 128MB = 256MB total
-> Memory: 255036KB available (3944K code, 303K data, 140K init, 0K highmem)
-> Hierarchical RCU implementation.
-> NR_IRQS:192
-> AT91: 160 gpio irqs in 5 banks
-> Console: colour dummy device 80x30
-> console [ttyS0] enabled
-> Calibrating delay loop... 199.47 BogoMIPS (lpj=997376)
-> Mount-cache hash table entries: 512
-> CPU: Testing write buffer coherency:
-> ------------[ cut here ]------------
-> WARNING: at mm/vmalloc.c:107 vmap_page_range_noflush+0x128/0x1d8()
-> Modules linked in:
-> [<c0031894>] (unwind_backtrace+0x0/0xdc) from [<c0043c34>]
-> (warn_slowpath_common+0x4c/0x80) [<c0043c34>]
-> (warn_slowpath_common+0x4c/0x80) from [<c008df9c>]
-> (vmap_page_range_noflush+0x128/0x1d8) [<c008df9c>]
-> (vmap_page_range_noflush+0x128/0x1d8) from [<c008e074>]
-> (map_vm_area+0x28/0x50) [<c008e074>] (map_vm_area+0x28/0x50) from
-> [<c008e4f8>] (vmap+0x48/0x6c) [<c008e4f8>] (vmap+0x48/0x6c) from
-> [<c000cf60>] (check_writebuffer_bugs+0x5c/0x134) [<c000cf60>]
-> (check_writebuffer_bugs+0x5c/0x134) from [<c0008b9c>]
-> (start_kernel+0x31c/0x388) [<c0008b9c>] (start_kernel+0x31c/0x388) from
-> [<70008034>] (0x70008034) ---[ end trace 1b75b31a2719ed1c ]---
-> ------------[ cut here ]------------
-> WARNING: at mm/vmalloc.c:107 vmap_page_range_noflush+0x128/0x1d8()
-> Modules linked in:
-> [<c0031894>] (unwind_backtrace+0x0/0xdc) from [<c0043c34>]
-> (warn_slowpath_common+0x4c/0x80) [<c0043c34>]
-> (warn_slowpath_common+0x4c/0x80) from [<c008df9c>]
-> (vmap_page_range_noflush+0x128/0x1d8) [<c008df9c>]
-> (vmap_page_range_noflush+0x128/0x1d8) from [<c008e074>]
-> (map_vm_area+0x28/0x50) [<c008e074>] (map_vm_area+0x28/0x50) from
-> [<c008e4f8>] (vmap+0x48/0x6c) [<c008e4f8>] (vmap+0x48/0x6c) from
-> [<c000cf78>] (check_writebuffer_bugs+0x74/0x134) [<c000cf78>]
-> (check_writebuffer_bugs+0x74/0x134) from [<c0008b9c>]
-> (start_kernel+0x31c/0x388) [<c0008b9c>] (start_kernel+0x31c/0x388) from
-> [<70008034>] (0x70008034) ---[ end trace 1b75b31a2719ed1d ]---
-> failed, unable to map memory
-> 
-> Any ideas?
-> 
-> Yegor
+anyone successfully debugged linux kernel via openocd + gdb pls read on:
 
-Do you have CONFIG_HIGHMEM enabled ? If so, why ?
+greetings,
+
+I'm newbie and have a s3c2450 based board (arm926ejs), I have a working compressed kernel image
+zImage, this image boots properly via u-boot-1.1.6, however I simply 
+failed to debug remotely the vmlinux (root directory of linux source tree) via openocd-0.4.0 with a j-link segger.
+is there a good reference on how to properly debug the linux kernel via openocd/gdb for an arm target on a linux hot machine?
+
+details:
+1. let u-boot start the board;
+2. I get the u-boot command prompt:
+
+# bdinfo
+      arch_number = 0x00000648
+      env_t       = 0x00000000
+      boot_params = 0x30000100
+      DRAM bank   = 0x00000000
+      -> start    = 0x30000000
+      -> size     = 0x04000000
+      DRAM bank   = 0x00000001
+      -> start    = 0x38000000
+      -> size     = 0x04000000
+      ethaddr     = 00:40:5C:26:0A:5B
+      ip_addr     = 192.168.3.5
+      baudrate    = 115200 bps
+
+3. halt the target via openocd/telnet;
+4. cd to root directory of linux source code and issue:
+gdb vmlinux
+GNU gdb (GDB) 6.8.50.20090417
+Copyright (C) 2009 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later
+<http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
+and "show warranty" for details.
+This GDB was configured as "--host=i686-pc-linux-gnu
+--target=arm-none-linux-gnueabi".
+For bug reporting instructions, please see:
+<http://www.gnu.org/software/gdb/bugs/>...
+(gdb)
+
+5.
+(gdb) target remote localhost:3333
+Remote debugging using localhost:3333
+0xc3e01874 in ?? ()
+0xc3e01874:    ldr    r3, [r0, #16]
+(gdb)
+
+6.
+(gdb) set remote hardware-breakpoint-limit 2
+(gdb) set remote hardware-watchpoint-limit 2
+
+7.
+(gdb) load
+Loading section .init, size 0x7b000 lma 0xc0008000
+Loading section .text, size 0x2bb618 lma 0xc0083000
+Loading section __ksymtab, size 0x4a58 lma 0xc033f000
+Loading section __ksymtab_gpl, size 0x1360 lma 0xc0343a58
+Loading section __ksymtab_gpl_future, size 0x18 lma 0xc0344db8
+Loading section __ksymtab_strings, size 0xcab7 lma 0xc0344dd0
+Loading section __param, size 0x654 lma 0xc0351888
+Loading section .data, size 0x21538 lma 0xc0352000
+Start address 0xc0008000, load size 3582507
+Transfer rate: 35 KB/sec, 15922 bytes/write.
+(gdb)
+
+8. if I do continue (gdb) c, then I don't see any output on the serial
+console (as normally do during zImage booting process!)
+
+where I'm messing up? or how should I get on with debugging the linux kernel at jtag level?
+
+thanks,
+ferar
