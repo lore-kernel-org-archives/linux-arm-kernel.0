@@ -1,43 +1,41 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 27 May 2010 14:00:34 +0200
-Subject: Initrd and 2.6.33 curious behaviour
-In-Reply-To: <87hblz2alm.fsf@free.fr> (Robert Jarzmik's message of "Sun\,
-	23 May 2010 12\:09\:25 +0200")
-References: <874oi157c6.fsf@free.fr>
-	<20100521204343.GA18032@n2100.arm.linux.org.uk>
-	<87fx1k46qg.fsf@free.fr> <20100522094637.GA954@n2100.arm.linux.org.uk>
-	<87pr0n31q2.fsf@free.fr> <20100523090139.GA950@n2100.arm.linux.org.uk>
-	<87hblz2alm.fsf@free.fr>
-Message-ID: <87pr0hy2ot.fsf@free.fr>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Thu, 27 May 2010 14:49:08 +0200
+Subject: [PULL REQ] IXP4xx (ARM): pull request
+Message-ID: <m37hmp33y3.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Linus,
 
-I have made some progress.
+The following changes since Linus 2.6.34 are available in the git
+repository at:
 
-I have traced that :
- - after the bootloader has disabled the MMU, disabled the caches, quiesced
- the DMAs and masked the interrupts, and just before the final jump to the
- kernel first instruction :
-   => the first u32 at physical address 0xa0508000 is 1f:8b:08:08
-   => this is the correct begining of my initrd.gz
+  git://git.kernel.org/pub/scm/linux/kernel/git/chris/linux-2.6.git ixp4xx
 
-In function setup_arch(), just after paging_init(mdesc), I read the value again
-with a "rjk = *((unsigned int *)(phys_to_virt(0xa0508000)));", and it has
-changed to 10:00:00:a0.
+Krzysztof Ha?asa (5):
+      IXP4xx: Prevent HSS transmitter lockup by disabling FRaMe signals.
+      IXP4xx: Fix ixp4xx_crypto little-endian operation.
+      IXP4xx: Make mdio_bus struct static in the Ethernet driver.
+      IXP4xx: Fix sparse warnings in I/O primitives.
+      IXP4xx: Fix LL debugging on little-endian CPU.
 
-Now, I would need some help to trace this memory location before
-paging_init(). My current understanding is that before paging_init(), the MMU is
-set by __create_page_tables(). The mapping doesn't cover the initrd area.
-If I was to be able to watch this area, I would need to :
- - amend __create_page_tables(), and add a mapping for the 0xa0508000 area (1MB
- is enough)
- - read the value of the u32 at physical address 0xa0508000 from this mapping
- - printk the stored value at the end of setup_arch()
+Marc Zyngier (2) (support for a new platform):
+      ixp4xx: base support for Arcom Vulcan
+      ixp4xx/vulcan: add PCI support
 
-The questions I have are :
- - is this the right approach ?
- - which virtual address space can I use for my mapping
+ arch/arm/mach-ixp4xx/Kconfig                    |    8 +
+ arch/arm/mach-ixp4xx/Makefile                   |    2 +
+ arch/arm/mach-ixp4xx/include/mach/debug-macro.S |    2 +
+ arch/arm/mach-ixp4xx/include/mach/io.h          |    6 +-
+ arch/arm/mach-ixp4xx/vulcan-pci.c               |   73 +++++++
+ arch/arm/mach-ixp4xx/vulcan-setup.c             |  246 +++++++++++++++++++++++
+ drivers/crypto/ixp4xx_crypto.c                  |   21 ++
+ drivers/net/arm/ixp4xx_eth.c                    |    2 +-
+ drivers/net/wan/ixp4xx_hss.c                    |    2 +-
+ 9 files changed, 357 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/mach-ixp4xx/vulcan-pci.c
+ create mode 100644 arch/arm/mach-ixp4xx/vulcan-setup.c
 
---
-Robert
+TIA.
+-- 
+Krzysztof Halasa
