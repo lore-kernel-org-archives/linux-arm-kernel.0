@@ -1,54 +1,102 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Thu, 27 May 2010 14:59:31 +0800
-Subject: [PATCH] NUC900/rtc: change the waiting for device ready implement
-Message-ID: <4BFE1853.5070105@gmail.com>
+From: yegor_sub1@visionsystems.de (Yegor Yefremov)
+Date: Thu, 27 May 2010 10:15:59 +0200
+Subject: SPARSEMEM support for Atmel AT91SAM9G45 and M10
+In-Reply-To: <201005261610.32937.marek.vasut@gmail.com>
+References: <AANLkTin3-rqG2o0t4rbggpCE2cFAV6GWeH0v7UjC1tnQ@mail.gmail.com>
+	<4BFD262D.1010308@visionsystems.de>
+	<201005261610.32937.marek.vasut@gmail.com>
+Message-ID: <4BFE2A3F.2010606@visionsystems.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew,
+Marek Vasut schrieb:
+> Dne St 26. kv?tna 2010 15:46:21 Yegor Yefremov napsal(a):
+>>>     I'm resurrecting an old thread
+>>>
+>>> (http://lists.arm.linux.org.uk/lurker/message/20090914.072902.97115112.en
+>>> .html) about using the two memory banks available
+>>> on Atmel AT91SAM9G45/M10. I managed to make it work on 2.6.30 by
+>>> following Russell King advice on how to configure SPARSEMEM.
+>>>
+>>>     I submitted a working patch for 2.6.34 here:
+>>> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6143/1
+>>>
+>>> The problem is that I'm unsure how to get rid of the #define that
+>>> forces high_memory value in mm/init.c, should I add a fixup function
+>>> to board-sam9m10g45ek.c to provide meminfo information ?
+>> I've already tested the patch on 2.6.33 and it is working properly.
+>> Concerning high_memory value problem I think the cause is how
+>> find_node_limits() in arch/arm/m/init.c is implemented. We have two memory
+>> banks one starting at 0x70000000 and another at 0x200000000. The virtual
+>> mapping looks like this:
+>>
+>> 0x70000000 -> 0xc0000000
+>> 0x20000000 -> 0xc8000000
+>>
+>> However find_node_limits() routine is working with physical addresses so
+>> the upper limit is 0x70000000 and not 0x20000000 as it should be. As a
+>> result max_low is pointing to 0x70000000 and that's why only first bank
+>> will be mapped correctly.
+>>
+>> How can find_node_limits() be changed to work with virtual addresses?
+>>
+>> Regards,
+>> Yegor
+>>
+> Hey, try searching for "[PATCH 1/5] pxa/vpac270: Enable SparseMEM for 256 MB of 
+> RAM" ... The device has also one memory bank mapped under the primary one. Maybe 
+> that can help. Cheers
 
-This patch is only to change the waiting for device ready implement
-for winbond nuc900 platform.
 
-Signed-off-by:Wan ZongShun<mcuos.com@gmail.com>
+Marek, I've looked at patch and apart from defining HIGH_MEMORY_VIRT it does the same. Nevertheless if I don't define HIGH_MEMORY_VIRT I get the following crash (I've added debug string showing calculated high_memory. It should be 0xd0000000 and not 0xc8000000):
 
----
- drivers/rtc/rtc-nuc900.c |   15 +++++++--------
- 1 files changed, 7 insertions(+), 8 deletions(-)
+Linux version 2.6.33.2 (OpenRISC at VScom) (gcc version 4.3.2 (crosstool-NG-1.3.2)
+) #30 Thu May 27 10:06:42 CEST 2010
+CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
+CPU: VIVT data cache, VIVT instruction cache
+Machine: Atmel AT91SAM9G45-EKES
+Memory policy: ECC disabled, Data cache writeback
+DBG: high_memory 0xc8000000
+Clocks: CPU 400 MHz, master 133 MHz, main 12.000 MHz
+Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 62720
+Kernel command line: console=ttyS0,115200 root=/dev/mtdblock2 rootwait
+PID hash table entries: 1024 (order: 0, 4096 bytes)
+Dentry cache hash table entries: 32768 (order: 5, 131072 bytes)
+Inode-cache hash table entries: 16384 (order: 4, 65536 bytes)
+Memory: 128MB 128MB = 256MB total
+Memory: 255036KB available (3944K code, 303K data, 140K init, 0K highmem)
+Hierarchical RCU implementation.
+NR_IRQS:192
+AT91: 160 gpio irqs in 5 banks
+Console: colour dummy device 80x30
+console [ttyS0] enabled
+Calibrating delay loop... 199.47 BogoMIPS (lpj=997376)
+Mount-cache hash table entries: 512
+CPU: Testing write buffer coherency:
+------------[ cut here ]------------
+WARNING: at mm/vmalloc.c:107 vmap_page_range_noflush+0x128/0x1d8()
+Modules linked in:
+[<c0031894>] (unwind_backtrace+0x0/0xdc) from [<c0043c34>] (warn_slowpath_common+0x4c/0x80)
+[<c0043c34>] (warn_slowpath_common+0x4c/0x80) from [<c008df9c>] (vmap_page_range_noflush+0x128/0x1d8)
+[<c008df9c>] (vmap_page_range_noflush+0x128/0x1d8) from [<c008e074>] (map_vm_area+0x28/0x50)
+[<c008e074>] (map_vm_area+0x28/0x50) from [<c008e4f8>] (vmap+0x48/0x6c)
+[<c008e4f8>] (vmap+0x48/0x6c) from [<c000cf60>] (check_writebuffer_bugs+0x5c/0x134)
+[<c000cf60>] (check_writebuffer_bugs+0x5c/0x134) from [<c0008b9c>] (start_kernel+0x31c/0x388)
+[<c0008b9c>] (start_kernel+0x31c/0x388) from [<70008034>] (0x70008034)
+---[ end trace 1b75b31a2719ed1c ]---
+------------[ cut here ]------------
+WARNING: at mm/vmalloc.c:107 vmap_page_range_noflush+0x128/0x1d8()
+Modules linked in:
+[<c0031894>] (unwind_backtrace+0x0/0xdc) from [<c0043c34>] (warn_slowpath_common+0x4c/0x80)
+[<c0043c34>] (warn_slowpath_common+0x4c/0x80) from [<c008df9c>] (vmap_page_range_noflush+0x128/0x1d8)
+[<c008df9c>] (vmap_page_range_noflush+0x128/0x1d8) from [<c008e074>] (map_vm_area+0x28/0x50)
+[<c008e074>] (map_vm_area+0x28/0x50) from [<c008e4f8>] (vmap+0x48/0x6c)
+[<c008e4f8>] (vmap+0x48/0x6c) from [<c000cf78>] (check_writebuffer_bugs+0x74/0x134)
+[<c000cf78>] (check_writebuffer_bugs+0x74/0x134) from [<c0008b9c>] (start_kernel+0x31c/0x388)
+[<c0008b9c>] (start_kernel+0x31c/0x388) from [<70008034>] (0x70008034)
+---[ end trace 1b75b31a2719ed1d ]---
+failed, unable to map memory
 
-diff --git a/drivers/rtc/rtc-nuc900.c b/drivers/rtc/rtc-nuc900.c
-index a351bd5..21d1330 100644
---- a/drivers/rtc/rtc-nuc900.c
-+++ b/drivers/rtc/rtc-nuc900.c
-@@ -85,22 +85,21 @@ static irqreturn_t nuc900_rtc_interrupt(int irq, void *_rtc)
+Any ideas?
 
- static int *check_rtc_access_enable(struct nuc900_rtc *nuc900_rtc)
- {
--	unsigned int i;
-+	unsigned int i, timeout = 0x1000;
- 	__raw_writel(INIRRESET, nuc900_rtc->rtc_reg + REG_RTC_INIR);
-
- 	mdelay(10);
-
- 	__raw_writel(AERPOWERON, nuc900_rtc->rtc_reg + REG_RTC_AER);
-
--	for (i = 0; i < 1000; i++) {
--		if (__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
--			return 0;
--	}
-+	while (!(__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
-+								&& timeout--)
-+		mdelay(1);
-
--	if ((__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB) == 0x0)
--		return ERR_PTR(-ENODEV);
-+	if (!timeout)
-+		return ERR_PTR(-EPERM);
-
--	return ERR_PTR(-EPERM);
-+	return 0;
- }
-
- static void nuc900_rtc_bcd2bin(unsigned int timereg,
--- 
-1.6.3.3
+Yegor
