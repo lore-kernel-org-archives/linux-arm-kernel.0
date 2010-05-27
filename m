@@ -1,45 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 27 May 2010 16:00:48 +0100
-Subject: [PATCH] OMAP3: pmu: make CPU_HAS_PMU dependent on OMAP3_EMU
-Message-ID: <1274972448-10721-1-git-send-email-will.deacon@arm.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Thu, 27 May 2010 17:02:38 +0200
+Subject: [PATCHv2 2.6.34 1/2] mx5: Add i2c to Freescale MX51 Babbage HW
+In-Reply-To: <1274972269-6946-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1274972269-6946-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <20100527150238.GH2695@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU performance event counters on v7 cores will only operate
-if either the NIDEN or DBGEN signals are driven high.
+On Thu, May 27, 2010 at 09:57:48AM -0500, Dinh.Nguyen at freescale.com wrote:
+> This patch adds I2C functionality to the Freescale MX51 Babbage HW.
+> The patch adds device structures, i2c board slave device defines,
+> IOMUX pin defines, and clocks.
+> 
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> ---
+>  arch/arm/mach-mx5/clock-mx51.c              |   11 +++++
+>  arch/arm/mach-mx5/devices.c                 |   58 +++++++++++++++++++++++++++
+>  arch/arm/mach-mx5/devices.h                 |    3 +
+>  arch/arm/plat-mxc/include/mach/iomux-mx51.h |   18 ++++++---
+>  4 files changed, 84 insertions(+), 6 deletions(-)
+> 
 
-For the OMAP3 platform, these signals are driven low by default [i.e.
-when a JTAG debugger is not connected] but DBGEN can be asserted in
-software by selecting the OMAP3_EMU Kconfig option, which enables the
-virtual clock for hardware debugging peripherals.
+[...]
 
-This patch makes CPU_HAS_PMU depend on OMAP3_EMU for OMAP3 platforms.
+>  static struct resource usbotg_resources[] = {
+> diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
+> index 0494d6b..d0451bf 100644
+> --- a/arch/arm/mach-mx5/devices.h
+> +++ b/arch/arm/mach-mx5/devices.h
+> @@ -5,3 +5,6 @@ extern struct platform_device mxc_fec_device;
+>  extern struct platform_device mxc_usbdr_host_device;
+>  extern struct platform_device mxc_usbh1_device;
+>  extern struct platform_device mxc_usbdr_udc_device;
+> +extern struct platform_device mxc_i2c_device0;
+> +extern struct platform_device mxc_i2c_device1;
+> +extern struct platform_device mxc_hsi2c_device;
+> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> index ab0f95d..6ea6861 100644
+> --- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> @@ -38,6 +38,8 @@ typedef enum iomux_config {
+>  				PAD_CTL_SRE_FAST)
+>  #define MX51_UART3_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_DSE_HIGH | \
+>  				PAD_CTL_SRE_FAST)
+> +#define MX51_I2C_PAD_CTRL		(PAD_CTL_SRE_FAST | PAD_CTL_ODE | \
+> ++				PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP | PAD_CTL_HYS)
+   ^
+I believe something went wrong here.
 
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Jean Pihet <jpihet@mvista.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
-
-Since I don't have an OMAP3 board to test this on I would appreciate
-it if somebody with some hardware could (a) confirm that this problem
-exists and (b) validate that this patch solves the issue. Thanks!
-
- arch/arm/Kconfig |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 1f254bd..98922f7 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -955,7 +955,8 @@ config XSCALE_PMU
- 	default y
- 
- config CPU_HAS_PMU
--	depends on CPU_V6 || CPU_V7 || XSCALE_PMU
-+	depends on (CPU_V6 || CPU_V7 || XSCALE_PMU) && \
-+		   (!ARCH_OMAP3 || OMAP3_EMU)
- 	default y
- 	bool
- 
--- 
-1.6.3.3
+Daniel
