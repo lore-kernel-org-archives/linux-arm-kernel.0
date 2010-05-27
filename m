@@ -1,35 +1,32 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Thu, 27 May 2010 15:01:01 +0530
-Subject: [PATCH] ARM:VFPv3:enable {d16-d31} access
-In-Reply-To: <20100527092933.GB28112@n2100.arm.linux.org.uk>
-References: <tarun.kanti@ti.com>
-	<1274818736-26597-1-git-send-email-tarun.kanti@ti.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0322FA884E@dbde02.ent.ti.com>
-	<20100525185741.GB16204@n2100.arm.linux.org.uk>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0322FA8E37@dbde02.ent.ti.com>
-	<20100526201017.GE6232@n2100.arm.linux.org.uk>
-	<5A47E75E594F054BAF48C5E4FC4B92AB03230B1B3E@dbde02.ent.ti.com>
-	<20100527092933.GB28112@n2100.arm.linux.org.uk>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB03230B1D5B@dbde02.ent.ti.com>
+From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
+Date: Thu, 27 May 2010 12:47:06 +0300
+Subject: [RFC] Initial attempt to make ARM use LMB
+In-Reply-To: <20100527092501.GA28112@n2100.arm.linux.org.uk>
+References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
+	<20100522215848.GB29889@n2100.arm.linux.org.uk>
+	<20100526004418.GM9645@atomide.com>
+	<20100526075059.GA25435@n2100.arm.linux.org.uk>
+	<20100526135128.GN9645@atomide.com>
+	<20100526214037.GB16418@n2100.arm.linux.org.uk>
+	<1274950338.2265.134.camel@tubuntu.research.nokia.com>
+	<20100527092501.GA28112@n2100.arm.linux.org.uk>
+Message-ID: <1274953626.2265.196.camel@tubuntu.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 2010-05-27 at 11:25 +0200, ext Russell King - ARM Linux wrote:
+> On Thu, May 27, 2010 at 11:52:18AM +0300, Tomi Valkeinen wrote:
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Thursday, May 27, 2010 3:00 PM
-> To: DebBarma, Tarun Kanti
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] ARM:VFPv3:enable {d16-d31} access
+> > I tested your lmb branch on OMAP 3430SDP board, and after removing the
+> > topmost patch (ARM: use LMB to allocate system memory MMIO resource
+> > structures) everything related to DSS2 (drivers/video/omap2/) seemed to
+> > work ok.
 > 
-> On Thu, May 27, 2010 at 10:07:40AM +0530, DebBarma, Tarun Kanti wrote:
-> > > Note the different registers.  Change "r1, r2" to "r0, r1" and it
-> > > should work.
-> >
-> > Yes, that's right. I figured that out yesterday and confirmed the test
-> > results. Thanks!
-> 
-> I've now committed a fix to change those registers.  Are you ok with
-> being credited with a Reported-by tag?
+> Great, can I add your tested-by for the OMAP and LMB stuff up to but not
+> including the last commit?
 
-That's fine!
+Sure.
+
+I'll also try to find time to review the DSS side changes properly.
+
+ Tomi
