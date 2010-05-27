@@ -1,45 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 May 2010 21:16:00 +0100
-Subject: [PATCH v3] i.MX27: add suspend to RAM support
-In-Reply-To: <4BFED0AC.6000604@eukrea.com>
-References: <1274942000-3580-1-git-send-email-eric@eukrea.com>
-	<1274969635-2212-1-git-send-email-eric@eukrea.com>
-	<20100527194305.GB25921@n2100.arm.linux.org.uk>
-	<4BFED0AC.6000604@eukrea.com>
-Message-ID: <20100527201600.GF25921@n2100.arm.linux.org.uk>
+From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
+Date: Thu, 27 May 2010 22:48:20 +0200
+Subject: [PATCH v4] i.MX27: add suspend to RAM support
+In-Reply-To: <20100527201600.GF25921@n2100.arm.linux.org.uk>
+References: <20100527201600.GF25921@n2100.arm.linux.org.uk>
+Message-ID: <1274993300-4887-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 27, 2010 at 10:06:04PM +0200, Eric B?nard wrote:
-> Le 27/05/2010 21:43, Russell King - ARM Linux a ?crit :
->> On Thu, May 27, 2010 at 04:13:55PM +0200, Eric B?nard wrote:
-> OK sorry for this one, you already told me this at the first review and
-> I forget to fix it.
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+---
+v4:
+	fixed include + const struct
+v3:
+	return -EINVAL instead of -1
 
-np.
+ arch/arm/mach-mx2/Makefile   |    2 +-
+ arch/arm/mach-mx2/pm-imx27.c |   46 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 47 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-mx2/pm-imx27.c
 
->> (checkpatch.pl will tell you this, although the general rule that "if
->> there's a linux/foo.h and an asm/foo.h, linux/foo.h should be used"
->> doesn't always apply - there are some exceptions.)
->>
-> In fact checkpatch only returned the following warning (which I didn't
-> fixed as I didn't found any platform_suspend_ops which is const).
-
-It seems to be classified as a "--subjective" check - I suspect because
-there's some variance between arch maintainers on their policy on this
-issue, and also because there are some exceptions as I've said above.
-
-Eg, we have asm/memory.h, and there is a linux/memory.h, but the two
-are completely unrelated - so the checkpatch warnings about "use
-linux/memory.h rather than asm/memory.h" are rather misleading.
-
-> Do you think I should also fix this warning ?
->
-> ./linux-2.6/scripts/checkpatch.pl  
-> 0001-i.MX27-add-suspend-to-RAM-support.patch
-> WARNING: struct platform_suspend_ops should normally be const
-> #72: FILE: arch/arm/mach-mx2/pm-imx27.c:35:
-> +static struct platform_suspend_ops mx27_suspend_ops = {
-
-It's trivial enough to fix, and doesn't cause any issues by doing so,
-so I'd suggest adding the const.
+diff --git a/arch/arm/mach-mx2/Makefile b/arch/arm/mach-mx2/Makefile
+index e3254fa..27d496c 100644
+--- a/arch/arm/mach-mx2/Makefile
++++ b/arch/arm/mach-mx2/Makefile
+@@ -8,7 +8,7 @@ obj-y	:=  devices.o serial.o
+ 
+ obj-$(CONFIG_MACH_MX21) += clock_imx21.o mm-imx21.o
+ 
+-obj-$(CONFIG_MACH_MX27) += cpu_imx27.o
++obj-$(CONFIG_MACH_MX27) += cpu_imx27.o pm-imx27.o
+ obj-$(CONFIG_MACH_MX27) += clock_imx27.o mm-imx27.o
+ 
+ obj-$(CONFIG_MACH_MX21ADS) += mach-mx21ads.o
+diff --git a/arch/arm/mach-mx2/pm-imx27.c b/arch/arm/mach-mx2/pm-imx27.c
+new file mode 100644
+index 0000000..2153ca7
+--- /dev/null
++++ b/arch/arm/mach-mx2/pm-imx27.c
+@@ -0,0 +1,46 @@
++/*
++ * i.MX27 Power Management Routines
++ *
++ * Based on Freescale's BSP
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License.
++ */
++
++#include <linux/kernel.h>
++#include <linux/suspend.h>
++#include <linux/io.h>
++#include <mach/system.h>
++#include <mach/mx27.h>
++
++static int mx27_suspend_enter(suspend_state_t state)
++{
++	u32 cscr;
++	switch (state) {
++	case PM_SUSPEND_MEM:
++		/* Clear MPEN and SPEN to disable MPLL/SPLL */
++		cscr = __raw_readl(MX27_IO_ADDRESS(MX27_CCM_BASE_ADDR));
++		cscr &= 0xFFFFFFFC;
++		__raw_writel(cscr, MX27_IO_ADDRESS(MX27_CCM_BASE_ADDR));
++		/* Executes WFI */
++		arch_idle();
++		break;
++
++	default:
++		return -EINVAL;
++	}
++	return 0;
++}
++
++static const struct platform_suspend_ops mx27_suspend_ops = {
++	.enter = mx27_suspend_enter,
++	.valid = suspend_valid_only_mem,
++};
++
++static int __init mx27_pm_init(void)
++{
++	suspend_set_ops(&mx27_suspend_ops);
++	return 0;
++}
++
++device_initcall(mx27_pm_init);
+-- 
+1.6.3.3
