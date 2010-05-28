@@ -1,37 +1,34 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 28 May 2010 07:19:19 +0100
-Subject: [PATCH 9/9] ARM: S3C64XX: Use s3c_set_platdata() helper
+Date: Fri, 28 May 2010 07:19:11 +0100
+Subject: [PATCH 1/9] ARM: SAMSUNG: Default s3c_device_i2c1
 In-Reply-To: <1275027559-29278-1-git-send-email-ben-linux@fluff.org>
 References: <1275027559-29278-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1275027559-29278-10-git-send-email-ben-linux@fluff.org>
+Message-ID: <1275027559-29278-2-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit f8b5ea089d5a447a8933a6540ceeccbcb78f9e53 added a helper
-to copy and set platform data, so let's replace the various sites
-in the Samsung support where this is happening.
+There are no current SoCs where i2c1 is anything other than an s3c2440-i2c
+implementation, so change the device's name to be s3c2440-i2c so we can
+go and eliminate the calls in the cpu-init which set the name.
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-s3c64xx/dev-onenand1.c |    8 ++------
- 1 files changed, 2 insertions(+), 6 deletions(-)
+ arch/arm/plat-samsung/dev-i2c1.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/dev-onenand1.c b/arch/arm/mach-s3c64xx/dev-onenand1.c
-index 92ffd5b..c902a1d 100644
---- a/arch/arm/mach-s3c64xx/dev-onenand1.c
-+++ b/arch/arm/mach-s3c64xx/dev-onenand1.c
-@@ -46,10 +46,6 @@ struct platform_device s3c64xx_device_onenand1 = {
+diff --git a/arch/arm/plat-samsung/dev-i2c1.c b/arch/arm/plat-samsung/dev-i2c1.c
+index 858ee2a..f97905f 100644
+--- a/arch/arm/plat-samsung/dev-i2c1.c
++++ b/arch/arm/plat-samsung/dev-i2c1.c
+@@ -38,7 +38,8 @@ static struct resource s3c_i2c_resource[] = {
+ };
  
- void s3c64xx_onenand1_set_platdata(struct onenand_platform_data *pdata)
- {
--	struct onenand_platform_data *pd;
--
--	pd = kmemdup(pdata, sizeof(struct onenand_platform_data), GFP_KERNEL);
--	if (!pd)
--		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
--	s3c64xx_device_onenand1.dev.platform_data = pd;
-+	s3c_set_platdata(pd, sizeof(struct onenand_platform_data),
-+			 &s3c64xx_device_onenand1);
- }
+ struct platform_device s3c_device_i2c1 = {
+-	.name		  = "s3c2410-i2c",
++	/* default to s3c2440-i2c as no SoC with >1 I2C is s3c2410 style */
++	.name		  = "s3c2440-i2c",
+ 	.id		  = 1,
+ 	.num_resources	  = ARRAY_SIZE(s3c_i2c_resource),
+ 	.resource	  = s3c_i2c_resource,
 -- 
 1.6.3.3
