@@ -1,17 +1,35 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 28 May 2010 11:41:13 +0900
-Subject: [PATCH] Updates for S3C HSOTG driver
-Message-ID: <1275014477-23133-1-git-send-email-kgene.kim@samsung.com>
+Date: Fri, 28 May 2010 11:41:15 +0900
+Subject: [PATCH 2/4] ARM: S5PV210: Assign clock rate for clk_xusbxti clock.
+In-Reply-To: <1275014477-23133-1-git-send-email-kgene.kim@samsung.com>
+References: <1275014477-23133-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1275014477-23133-3-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds the following updates for S3C HSTOG driver.
-1. Adds HCLK clock for S3C HSOTG module.
-2. Adds clk_xusbxti clock to the list of clocks to be registred in S5P.
-3. Sets the clk_xusbsti clock rate on S5PV210 to 24Mhz.
-4. Updates the s3c hsotg driver to use the HCLK OTG clock.
+From: Thomas Abraham <thomas.ab@samsung.com>
 
-[PATCH 1/4] ARM: S3C64XX: Add USB OTG HCLK to the list of clocks
-[PATCH 2/4] ARM: S5PV210: Assign clock rate for clk_xusbxti clock.
-[PATCH 3/4] ARM: S5P: Add clk_xusbxti clock to the list of clocks to be registered.
-[PATCH 4/4] usb: s3c-hsotg: Enable HCLK for the OTG module.
+The input clock frequency for USB Phy is 24 Mhz on the S5PV210
+platform. This patch initializes the clk_xusbxti clock rate to 24Mhz.
+
+Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-s5pv210/clock.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+index 154bca4..4ef09d4 100644
+--- a/arch/arm/mach-s5pv210/clock.c
++++ b/arch/arm/mach-s5pv210/clock.c
+@@ -954,6 +954,8 @@ void __init_or_cpufreq s5pv210_setup_clocks(void)
+ 
+ 	printk(KERN_DEBUG "%s: registering clocks\n", __func__);
+ 
++	clk_xusbxti.rate = 24 * MHZ;
++
+ 	clkdiv0 = __raw_readl(S5P_CLK_DIV0);
+ 	clkdiv1 = __raw_readl(S5P_CLK_DIV1);
+ 
+-- 
+1.6.3.3
