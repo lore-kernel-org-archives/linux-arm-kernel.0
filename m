@@ -1,65 +1,97 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 28 May 2010 04:53:52 +0100
-Subject: [PATCH] s5pv210: Change the base ram address to 0x3000'0000
-In-Reply-To: <20100528023559.GA8174@july>
-References: <20100528023559.GA8174@july>
-Message-ID: <20100528035352.GO4720@trinity.fluff.org>
+Date: Fri, 28 May 2010 04:58:55 +0100
+Subject: [PATCH 4/4] usb: s3c-hsotg: Enable HCLK for the OTG module.
+In-Reply-To: <1275014477-23133-5-git-send-email-kgene.kim@samsung.com>
+References: <1275014477-23133-1-git-send-email-kgene.kim@samsung.com>
+	<1275014477-23133-5-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20100528035855.GQ4720@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 28, 2010 at 11:35:59AM +0900, Kyungmin Park wrote:
-> s5pc110 (aka s5pv210) has 2 DRAM port and used it both usually.
-> Assume DMC0 starts with 0x2000'0000 with 128MiB.
-> DMC1 starts with 0x4000'0000 with 128MiB.
-> Note that DMC1 has to start address 0x4000'0000 at least.
+On Fri, May 28, 2010 at 11:41:17AM +0900, Kukjin Kim wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
 > 
-> Then there's too much memory hole 0x1800'0000 (128MiB + 256MiB)
+> This patch modifies the following in S3C hsotg driver.
 > 
-> To reduce memory waste, the DMC0 start with 0x3000'0000.
+> 1. Gets a reference to the USB OTG hclk clock and enables it. This is
+>    required for plaforms on which the USB OTG hclk is disabled during
+>    the boot time clock intialization.
+> 
+> 2. Add necessary clock clean up in case of error during initialization
+>    failure or during module unload.
+> 
+> 3. Add a new field 'clk_otg' in 'struct s3c_hsotg' to maintain a
+>    reference to the USB OTG hclk clock.
 
-We should be using SPARSEMEM now, is it not reducing any wastage
-in virtual memory space?
-
-How will the user change their board to deal with this change to hte
-kernel?
+ok, please note that the recent update sent from Marus to set the
+PHY clock rate already gets the clock. we should make sure that the
+code that does that uses this new clock from the hsotg info.
  
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 > ---
-> diff --git a/arch/arm/mach-s5pv210/Makefile.boot b/arch/arm/mach-s5pv210/Makefile.boot
-> index ff90aa1..b0909e3 100644
-> --- a/arch/arm/mach-s5pv210/Makefile.boot
-> +++ b/arch/arm/mach-s5pv210/Makefile.boot
-> @@ -1,2 +1,2 @@
-> -   zreladdr-y	:= 0x20008000
-> -params_phys-y	:= 0x20000100
-> +   zreladdr-y	:= 0x30008000
-> +params_phys-y	:= 0x30000100
-> diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
-> index 34eb168..9f4c368 100644
-> --- a/arch/arm/mach-s5pv210/include/mach/map.h
-> +++ b/arch/arm/mach-s5pv210/include/mach/map.h
-> @@ -74,7 +74,7 @@
->  #define S5PV210_PA_VIC3		(0xF2300000)
->  #define S5P_PA_VIC3		S5PV210_PA_VIC3
+>  drivers/usb/gadget/s3c-hsotg.c |   17 +++++++++++++++++
+>  1 files changed, 17 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
+> index 81c47d2..526d081 100644
+> --- a/drivers/usb/gadget/s3c-hsotg.c
+> +++ b/drivers/usb/gadget/s3c-hsotg.c
+> @@ -130,6 +130,7 @@ struct s3c_hsotg_ep {
+>   * @dev: The parent device supplied to the probe function
+>   * @driver: USB gadget driver
+>   * @plat: The platform specific configuration data.
+> + * @clk_otg: The hclk for otg module.
+>   * @regs: The memory area mapped for accessing registers.
+>   * @regs_res: The resource that was allocated when claiming register space.
+>   * @irq: The IRQ number we are using
+> @@ -147,6 +148,7 @@ struct s3c_hsotg {
+>  	struct device		 *dev;
+>  	struct usb_gadget_driver *driver;
+>  	struct s3c_hsotg_plat	 *plat;
+> +	struct clk		 *clk_otg;
 >  
-> -#define S5PV210_PA_SDRAM	(0x20000000)
-> +#define S5PV210_PA_SDRAM	(0x30000000)
->  #define S5P_PA_SDRAM		S5PV210_PA_SDRAM
+>  	void __iomem		*regs;
+>  	struct resource		*regs_res;
+> @@ -3269,6 +3271,14 @@ static int __devinit s3c_hsotg_probe(struct platform_device *pdev)
+>  		goto err_regs_res;
+>  	}
 >  
->  /* I2S */
-> diff --git a/arch/arm/mach-s5pv210/include/mach/memory.h b/arch/arm/mach-s5pv210/include/mach/memory.h
-> index 379117e..07a15d8 100644
-> --- a/arch/arm/mach-s5pv210/include/mach/memory.h
-> +++ b/arch/arm/mach-s5pv210/include/mach/memory.h
-> @@ -13,7 +13,7 @@
->  #ifndef __ASM_ARCH_MEMORY_H
->  #define __ASM_ARCH_MEMORY_H
+> +	hsotg->clk_otg = clk_get(&pdev->dev, "otg");
+> +	if (IS_ERR(hsotg->clk_otg)) {
+> +		dev_err(dev, "failed to find usb otg clock source\n");
+> +		ret = -ENODEV;
+> +		goto err_noclk;
+> +	}
+> +	clk_enable(hsotg->clk_otg);
+> +
+>  	ret = platform_get_irq(pdev, 0);
+>  	if (ret < 0) {
+>  		dev_err(dev, "cannot find IRQ\n");
+> @@ -3330,6 +3340,10 @@ static int __devinit s3c_hsotg_probe(struct platform_device *pdev)
+>  	return 0;
 >  
-> -#define PHYS_OFFSET		UL(0x20000000)
-> +#define PHYS_OFFSET		UL(0x30000000)
->  #define CONSISTENT_DMA_SIZE	(SZ_8M + SZ_4M + SZ_2M)
+>  err_regs:
+> +	clk_disable(hsotg->clk_otg);
+> +	clk_put(hsotg->clk_otg);
+> +
+> +err_noclk:
+>  	iounmap(hsotg->regs);
 >  
->  /* Maximum of 256MiB in one bank */
+>  err_regs_res:
+> @@ -3352,6 +3366,9 @@ static int __devexit s3c_hsotg_remove(struct platform_device *pdev)
+>  	free_irq(hsotg->irq, hsotg);
+>  	iounmap(hsotg->regs);
+>  
+> +	clk_disable(hsotg->clk_otg);
+> +	clk_put(hsotg->clk_otg);
+> +
+>  	release_resource(hsotg->regs_res);
+>  	kfree(hsotg->regs_res);
+>  
+> -- 
+> 1.6.3.3
+> 
 
 -- 
 -- 
