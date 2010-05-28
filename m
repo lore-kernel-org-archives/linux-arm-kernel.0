@@ -1,145 +1,75 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 28 May 2010 06:56:39 +0100
-Subject: [PATCH 02/15] ARM: S3C64XX: Change dev-audio.c to use S3C_GPIO_SFN()
-	for special functions
+Date: Fri, 28 May 2010 06:56:52 +0100
+Subject: [PATCH 15/15] ARM: S5PV210: Change to using s3c_gpio_cfgrange_nopull()
 In-Reply-To: <1275026212-27510-1-git-send-email-ben-linux@fluff.org>
 References: <1275026212-27510-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1275026212-27510-3-git-send-email-ben-linux@fluff.org>
+Message-ID: <1275026212-27510-16-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To aide in changing the gpio code, remove the use of pin-specific configs
-and move to using the S3C_GPIO_SFN() versions.
+Chane code setting special-function and no pull-up to use
+the s3c_gpio_cfgrange_nopull() wrapper.
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-s3c64xx/dev-audio.c |   79 +++++++++++++++++-------------------
- 1 files changed, 37 insertions(+), 42 deletions(-)
+ arch/arm/mach-s5pv210/setup-sdhci-gpio.c |   21 +++++++--------------
+ 1 files changed, 7 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/dev-audio.c b/arch/arm/mach-s3c64xx/dev-audio.c
-index c3e9e73..6699cdc 100644
---- a/arch/arm/mach-s3c64xx/dev-audio.c
-+++ b/arch/arm/mach-s3c64xx/dev-audio.c
-@@ -22,27 +22,22 @@
- #include <plat/audio.h>
- #include <plat/gpio-cfg.h>
- 
--#include <mach/gpio-bank-c.h>
--#include <mach/gpio-bank-d.h>
--#include <mach/gpio-bank-e.h>
--#include <mach/gpio-bank-h.h>
--
- static int s3c64xx_i2sv3_cfg_gpio(struct platform_device *pdev)
- {
- 	switch (pdev->id) {
- 	case 0:
--		s3c_gpio_cfgpin(S3C64XX_GPD(0), S3C64XX_GPD0_I2S0_CLK);
--		s3c_gpio_cfgpin(S3C64XX_GPD(1), S3C64XX_GPD1_I2S0_CDCLK);
--		s3c_gpio_cfgpin(S3C64XX_GPD(2), S3C64XX_GPD2_I2S0_LRCLK);
--		s3c_gpio_cfgpin(S3C64XX_GPD(3), S3C64XX_GPD3_I2S0_DI);
--		s3c_gpio_cfgpin(S3C64XX_GPD(4), S3C64XX_GPD4_I2S0_D0);
-+		s3c_gpio_cfgpin(S3C64XX_GPD(0), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S3C64XX_GPD(1), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S3C64XX_GPD(2), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S3C64XX_GPD(3), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S3C64XX_GPD(4), S3C_GPIO_SFN(3));
- 		break;
- 	case 1:
--		s3c_gpio_cfgpin(S3C64XX_GPE(0), S3C64XX_GPE0_I2S1_CLK);
--		s3c_gpio_cfgpin(S3C64XX_GPE(1), S3C64XX_GPE1_I2S1_CDCLK);
--		s3c_gpio_cfgpin(S3C64XX_GPE(2), S3C64XX_GPE2_I2S1_LRCLK);
--		s3c_gpio_cfgpin(S3C64XX_GPE(3), S3C64XX_GPE3_I2S1_DI);
--		s3c_gpio_cfgpin(S3C64XX_GPE(4), S3C64XX_GPE4_I2S1_D0);
-+		s3c_gpio_cfgpin(S3C64XX_GPE(0), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S3C64XX_GPE(1), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S3C64XX_GPE(2), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S3C64XX_GPE(3), S3C_GPIO_SFN(3));
-+		s3c_gpio_cfgpin(S3C64XX_GPE(4), S3C_GPIO_SFN(3));
+diff --git a/arch/arm/mach-s5pv210/setup-sdhci-gpio.c b/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
+index 38189d1..2307d52 100644
+--- a/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
++++ b/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
+@@ -31,12 +31,10 @@ void s5pv210_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
+ 	switch (width) {
+ 	case 8:
+ 		/* GPG1[3:6] special-funtion 3 */
+-		s3c_gpio_cfgall_range(S5PV210_GPG1(3), 4,
+-				      S3C_GPIO_SFN(3), S3C_GPIO_PULL_NONE);
++		s3c_gpio_cfgrange_nopull(S5PV210_GPG1(3), 4, S3C_GPIO_SFN(3));
+ 	case 4:
+ 		/* GPG0[3:6] special-funtion 2 */
+-		s3c_gpio_cfgall_range(S5PV210_GPG0(3), 4,
+-				      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
++		s3c_gpio_cfgrange_nopull(S5PV210_GPG0(3), 4, S3C_GPIO_SFN(2));
  	default:
- 		printk(KERN_DEBUG "Invalid I2S Controller number!");
- 		return -EINVAL;
-@@ -53,13 +48,13 @@ static int s3c64xx_i2sv3_cfg_gpio(struct platform_device *pdev)
- 
- static int s3c64xx_i2sv4_cfg_gpio(struct platform_device *pdev)
- {
--	s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C64XX_GPC4_I2S_V40_DO0);
--	s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C64XX_GPC5_I2S_V40_DO1);
--	s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C64XX_GPC7_I2S_V40_DO2);
--	s3c_gpio_cfgpin(S3C64XX_GPH(6), S3C64XX_GPH6_I2S_V40_BCLK);
--	s3c_gpio_cfgpin(S3C64XX_GPH(7), S3C64XX_GPH7_I2S_V40_CDCLK);
--	s3c_gpio_cfgpin(S3C64XX_GPH(8), S3C64XX_GPH8_I2S_V40_LRCLK);
--	s3c_gpio_cfgpin(S3C64XX_GPH(9), S3C64XX_GPH9_I2S_V40_DI);
-+	s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C_GPIO_SFN(5));
-+	s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C_GPIO_SFN(5));
-+	s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C_GPIO_SFN(5));
-+	s3c_gpio_cfgpin(S3C64XX_GPH(6), S3C_GPIO_SFN(4));
-+	s3c_gpio_cfgpin(S3C64XX_GPH(7), S3C_GPIO_SFN(4));
-+	s3c_gpio_cfgpin(S3C64XX_GPH(8), S3C_GPIO_SFN(4));
-+	s3c_gpio_cfgpin(S3C64XX_GPH(9), S3C_GPIO_SFN(4)); 
- 
- 	return 0;
- }
-@@ -170,18 +165,18 @@ static int s3c64xx_pcm_cfg_gpio(struct platform_device *pdev)
- {
- 	switch (pdev->id) {
- 	case 0:
--		s3c_gpio_cfgpin(S3C64XX_GPD(0), S3C64XX_GPD0_PCM0_SCLK);
--		s3c_gpio_cfgpin(S3C64XX_GPD(1), S3C64XX_GPD1_PCM0_EXTCLK);
--		s3c_gpio_cfgpin(S3C64XX_GPD(2), S3C64XX_GPD2_PCM0_FSYNC);
--		s3c_gpio_cfgpin(S3C64XX_GPD(3), S3C64XX_GPD3_PCM0_SIN);
--		s3c_gpio_cfgpin(S3C64XX_GPD(4), S3C64XX_GPD4_PCM0_SOUT);
-+		s3c_gpio_cfgpin(S3C64XX_GPD(0), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S3C64XX_GPD(1), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S3C64XX_GPD(2), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S3C64XX_GPD(3), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S3C64XX_GPD(4), S3C_GPIO_SFN(2));
  		break;
- 	case 1:
--		s3c_gpio_cfgpin(S3C64XX_GPE(0), S3C64XX_GPE0_PCM1_SCLK);
--		s3c_gpio_cfgpin(S3C64XX_GPE(1), S3C64XX_GPE1_PCM1_EXTCLK);
--		s3c_gpio_cfgpin(S3C64XX_GPE(2), S3C64XX_GPE2_PCM1_FSYNC);
--		s3c_gpio_cfgpin(S3C64XX_GPE(3), S3C64XX_GPE3_PCM1_SIN);
--		s3c_gpio_cfgpin(S3C64XX_GPE(4), S3C64XX_GPE4_PCM1_SOUT);
-+		s3c_gpio_cfgpin(S3C64XX_GPE(0), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S3C64XX_GPE(1), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S3C64XX_GPE(2), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S3C64XX_GPE(3), S3C_GPIO_SFN(2));
-+		s3c_gpio_cfgpin(S3C64XX_GPE(4), S3C_GPIO_SFN(2));
- 		break;
+ 	}
+@@ -48,12 +46,10 @@ void s5pv210_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
+ void s5pv210_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
+ {
+ 	/* Set all the necessary GPG1[0:1] pins to special-function 2 */
+-	s3c_gpio_cfgall_range(S5PV210_GPG1(0), 2,
+-			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
++	s3c_gpio_cfgrange_nopull(S5PV210_GPG1(0), 2, S3C_GPIO_SFN(2));
+ 
+ 	/* Data pin GPG1[3:6] to special-function 2 */
+-	s3c_gpio_cfgall_range(S5PV210_GPG1(3), 4,
+-			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
++	s3c_gpio_cfgrange_nopull(S5PV210_GPG1(3), 4, S3C_GPIO_SFN(2));
+ 
+ 	s3c_gpio_setpull(S5PV210_GPG1(2), S3C_GPIO_PULL_UP);
+ 	s3c_gpio_cfgpin(S5PV210_GPG1(2), S3C_GPIO_SFN(2));
+@@ -62,18 +58,15 @@ void s5pv210_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
+ void s5pv210_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
+ {
+ 	/* Set all the necessary GPG2[0:1] pins to special-function 2 */
+-	s3c_gpio_cfgall_range(S5PV210_GPG2(0), 2,
+-			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
++	s3c_gpio_cfgrange_nopull(S5PV210_GPG2(0), 2, S3C_GPIO_SFN(2));
+ 
+ 	switch (width) {
+ 	case 8:
+ 		/* Data pin GPG3[3:6] to special-function 3 */
+-		s3c_gpio_cfgall_range(S5PV210_GPG3(3), 4,
+-				      S3C_GPIO_SFN(3), S3C_GPIO_PULL_NONE);
++		s3c_gpio_cfgrange_nopull(S5PV210_GPG3(3), 4, S3C_GPIO_SFN(3));
+ 	case 4:
+ 		/* Data pin GPG2[3:6] to special-function 2 */
+-		s3c_gpio_cfgall_range(S5PV210_GPG2(3), 4,
+-				      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
++		s3c_gpio_cfgrange_nopull(S5PV210_GPG2(3), 4, S3C_GPIO_SFN(2));
  	default:
- 		printk(KERN_DEBUG "Invalid PCM Controller number!");
-@@ -261,22 +256,22 @@ EXPORT_SYMBOL(s3c64xx_device_pcm1);
- 
- static int s3c64xx_ac97_cfg_gpd(struct platform_device *pdev)
- {
--	s3c_gpio_cfgpin(S3C64XX_GPD(0), S3C64XX_GPD0_AC97_BITCLK);
--	s3c_gpio_cfgpin(S3C64XX_GPD(1), S3C64XX_GPD1_AC97_nRESET);
--	s3c_gpio_cfgpin(S3C64XX_GPD(2), S3C64XX_GPD2_AC97_SYNC);
--	s3c_gpio_cfgpin(S3C64XX_GPD(3), S3C64XX_GPD3_AC97_SDI);
--	s3c_gpio_cfgpin(S3C64XX_GPD(4), S3C64XX_GPD4_AC97_SDO);
-+	s3c_gpio_cfgpin(S3C64XX_GPD(0), S3C_GPIO_SFN(4));
-+	s3c_gpio_cfgpin(S3C64XX_GPD(1), S3C_GPIO_SFN(4));
-+	s3c_gpio_cfgpin(S3C64XX_GPD(2), S3C_GPIO_SFN(4));
-+	s3c_gpio_cfgpin(S3C64XX_GPD(3), S3C_GPIO_SFN(4));
-+	s3c_gpio_cfgpin(S3C64XX_GPD(4), S3C_GPIO_SFN(4));
- 
- 	return 0;
- }
- 
- static int s3c64xx_ac97_cfg_gpe(struct platform_device *pdev)
- {
--	s3c_gpio_cfgpin(S3C64XX_GPE(0), S3C64XX_GPE0_AC97_BITCLK);
--	s3c_gpio_cfgpin(S3C64XX_GPE(1), S3C64XX_GPE1_AC97_nRESET);
--	s3c_gpio_cfgpin(S3C64XX_GPE(2), S3C64XX_GPE2_AC97_SYNC);
--	s3c_gpio_cfgpin(S3C64XX_GPE(3), S3C64XX_GPE3_AC97_SDI);
--	s3c_gpio_cfgpin(S3C64XX_GPE(4), S3C64XX_GPE4_AC97_SDO);
-+	s3c_gpio_cfgpin(S3C64XX_GPE(0), S3C_GPIO_SFN(4));
-+	s3c_gpio_cfgpin(S3C64XX_GPE(1), S3C_GPIO_SFN(4));
-+	s3c_gpio_cfgpin(S3C64XX_GPE(2), S3C_GPIO_SFN(4));
-+	s3c_gpio_cfgpin(S3C64XX_GPE(3), S3C_GPIO_SFN(4));
-+	s3c_gpio_cfgpin(S3C64XX_GPE(4), S3C_GPIO_SFN(4));
- 
- 	return 0;
- }
+ 		break;
+ 	}
 -- 
 1.6.3.3
