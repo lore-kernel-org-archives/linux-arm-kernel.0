@@ -1,102 +1,71 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 28 May 2010 07:19:16 +0100
-Subject: [PATCH 6/9] ARM: SAMSUNG: Add helper to clone and set platform data
+Date: Fri, 28 May 2010 07:19:12 +0100
+Subject: [PATCH 2/9] ARM: SAMSUNG: Remove s3c_i2c1_setname() calls for
+	s3c2440-i2c
 In-Reply-To: <1275027559-29278-1-git-send-email-ben-linux@fluff.org>
 References: <1275027559-29278-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1275027559-29278-7-git-send-email-ben-linux@fluff.org>
+Message-ID: <1275027559-29278-3-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a helper to clone the platform data via kmemdup() and set it into
-the specified device and report any problems via printk().
-
-This is intended to replace a number of sites in the Samsung kernel
-where the same thing is being repeated in specific platform setting
-code. See next patches for replacements.
+Now we've defaulted the s3c_device_i2c1's name to s3c2440-i2c, remove
+all the s3c_i2c1_setname("s3c2440-i2c") as they are no longer needed.
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/plat-samsung/Makefile            |    2 +
- arch/arm/plat-samsung/include/plat/devs.h |   12 +++++++++
- arch/arm/plat-samsung/platformdata.c      |   37 +++++++++++++++++++++++++++++
- 3 files changed, 51 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-samsung/platformdata.c
+ arch/arm/mach-s3c2416/s3c2416.c |    1 -
+ arch/arm/mach-s3c64xx/s3c6410.c |    1 -
+ arch/arm/mach-s5pc100/cpu.c     |    1 -
+ arch/arm/mach-s5pv210/cpu.c     |    1 -
+ 4 files changed, 0 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index b1d82cc..228c2ad 100644
---- a/arch/arm/plat-samsung/Makefile
-+++ b/arch/arm/plat-samsung/Makefile
-@@ -30,6 +30,8 @@ obj-$(CONFIG_S3C_ADC)	+= adc.o
+diff --git a/arch/arm/mach-s3c2416/s3c2416.c b/arch/arm/mach-s3c2416/s3c2416.c
+index 35dabcc..4213f79 100644
+--- a/arch/arm/mach-s3c2416/s3c2416.c
++++ b/arch/arm/mach-s3c2416/s3c2416.c
+@@ -88,7 +88,6 @@ int __init s3c2416_init(void)
  
- # devices
+ 	/* the i2c devices are directly compatible with s3c2440 */
+ 	s3c_i2c0_setname("s3c2440-i2c");
+-	s3c_i2c1_setname("s3c2440-i2c");
  
-+obj-y				+= platformdata.o
-+
- obj-$(CONFIG_S3C_DEV_HSMMC)	+= dev-hsmmc.o
- obj-$(CONFIG_S3C_DEV_HSMMC1)	+= dev-hsmmc1.o
- obj-$(CONFIG_S3C_DEV_HSMMC2)	+= dev-hsmmc2.o
-diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
-index e6144e4..6760999 100644
---- a/arch/arm/plat-samsung/include/plat/devs.h
-+++ b/arch/arm/plat-samsung/include/plat/devs.h
-@@ -108,3 +108,15 @@ extern struct platform_device s3c_device_camif;
- extern struct platform_device s3c_device_ac97;
+ 	s3c_device_fb.name = "s3c2443-fb";
  
- #endif
-+
-+/**
-+ * s3c_set_platdata() - helper for setting platform data
-+ * @pd: The default platform data for this device.
-+ * @pdsize: The size of the platform data.
-+ * @pdev: Pointer to the device to fill in.
-+ *
-+ * This helper replaces a number of calls that copy and then set the
-+ * platform data of the device.
-+ */
-+extern void *s3c_set_platdata(void *pd, size_t pdsize,
-+			      struct platform_device *pdev);
-diff --git a/arch/arm/plat-samsung/platformdata.c b/arch/arm/plat-samsung/platformdata.c
-new file mode 100644
-index 0000000..4a05efb
---- /dev/null
-+++ b/arch/arm/plat-samsung/platformdata.c
-@@ -0,0 +1,37 @@
-+/* linux/arch/arm/plat-samsung/platformdata.c
-+ *
-+ * Copyright 2010 Ben Dooks <ben-linux@fluff.org>
-+ *
-+ * Helper for platform data setting
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/kernel.h>
-+#include <linux/string.h>
-+#include <linux/platform_device.h>
-+
-+#include <plat/devs.h>
-+
-+void __init *s3c_set_platdata(void *pd, size_t pdsize,
-+			      struct platform_device *pdev)
-+{
-+	void *npd;
-+
-+	if (!pd) {
-+		/* too early to use dev_name(), may not be registered */
-+		printk(KERN_ERR "%s: no platform data supplied\n", pdev->name);
-+		return NULL;
-+	}
-+
-+	npd = kmemdup(pd, pdsize, GFP_KERNEL);
-+	if (!npd) {
-+		printk(KERN_ERR "%s: cannot clone platform data\n", pdev->name);
-+		return NULL;
-+	}
-+
-+	pdev->dev.platform_data = npd;
-+	return npd;
-+}
+diff --git a/arch/arm/mach-s3c64xx/s3c6410.c b/arch/arm/mach-s3c64xx/s3c6410.c
+index 014401c..b5fc100 100644
+--- a/arch/arm/mach-s3c64xx/s3c6410.c
++++ b/arch/arm/mach-s3c64xx/s3c6410.c
+@@ -52,7 +52,6 @@ void __init s3c6410_map_io(void)
+ 
+ 	/* the i2c devices are directly compatible with s3c2440 */
+ 	s3c_i2c0_setname("s3c2440-i2c");
+-	s3c_i2c1_setname("s3c2440-i2c");
+ 
+ 	s3c_device_adc.name	= "s3c64xx-adc";
+ 	s3c_device_nand.name = "s3c6400-nand";
+diff --git a/arch/arm/mach-s5pc100/cpu.c b/arch/arm/mach-s5pc100/cpu.c
+index 7b5bdbc..f020aeb 100644
+--- a/arch/arm/mach-s5pc100/cpu.c
++++ b/arch/arm/mach-s5pc100/cpu.c
+@@ -89,7 +89,6 @@ void __init s5pc100_map_io(void)
+ 
+ 	/* the i2c devices are directly compatible with s3c2440 */
+ 	s3c_i2c0_setname("s3c2440-i2c");
+-	s3c_i2c1_setname("s3c2440-i2c");
+ 
+ 	s3c_onenand_setname("s5pc100-onenand");
+ }
+diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
+index 411a4a9..987fe1d 100644
+--- a/arch/arm/mach-s5pv210/cpu.c
++++ b/arch/arm/mach-s5pv210/cpu.c
+@@ -89,7 +89,6 @@ void __init s5pv210_map_io(void)
+ 
+ 	/* the i2c devices are directly compatible with s3c2440 */
+ 	s3c_i2c0_setname("s3c2440-i2c");
+-	s3c_i2c1_setname("s3c2440-i2c");
+ 	s3c_i2c2_setname("s3c2440-i2c");
+ }
+ 
 -- 
 1.6.3.3
