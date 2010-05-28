@@ -1,71 +1,111 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 28 May 2010 15:26:21 -0400 (EDT)
-Subject: [PATCH] ARM: fix highmem with VIPT cache and DMA
-In-Reply-To: <20100528185604.GB5189@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1003251638030.694@xanadu.home>
-	<1269610458.807.49.camel@e102109-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1003261144020.694@xanadu.home>
-	<alpine.LFD.2.00.1004111033010.7232@xanadu.home>
-	<20100528185604.GB5189@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1005281503260.24526@xanadu.home>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 28 May 2010 21:28:00 +0200
+Subject: [PATCH 1/2] pxa/spitz: Correctly register WM8750
+In-Reply-To: <AANLkTin07va1RbvK_D68ZMZzoOcQR014Vaq8CcvyYMW7@mail.gmail.com>
+References: <1275014733-21588-1-git-send-email-marek.vasut@gmail.com>
+	<20100528133323.GA2323@ucw.cz>
+	<AANLkTin07va1RbvK_D68ZMZzoOcQR014Vaq8CcvyYMW7@mail.gmail.com>
+Message-ID: <201005282128.00805.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 May 2010, Russell King - ARM Linux wrote:
+Dne P? 28. kv?tna 2010 16:17:31 Eric Miao napsal(a):
+> On Fri, May 28, 2010 at 9:33 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> > On Fri 2010-05-28 04:45:32, Marek Vasut wrote:
+> >> This patch registers the WM8750 codec on a proper place on the SPITZ
+> >> machine after the WM8750 driver was converted to new API.
+> >> 
+> >> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> >> ---
+> >>  arch/arm/mach-pxa/spitz.c |    3 +++
+> >>  sound/soc/pxa/spitz.c     |   36 ------------------------------------
+> >>  2 files changed, 3 insertions(+), 36 deletions(-)
+> > 
+> > I got rejects on second file when trying to apply it on 2.6.34...?
 
-> FYI, I'm considering reverting this patch; this patch is one of two
-> responsible for causing a stability regression of Versatile Express
-> platform - a highmem+Cortex A9 MPCore system with VIPT non-aliasing
-> caches.
+Apply it by hand, the patch is obvious. This is based on Eric's -devel, latest 
+edition (updated before sending this), maybe you have local changes?
 
-Two questions:
-
-1) Do you actually have CONFIG_HIGHMEM enabled?
-
-2) If no, does the reversal of this patch really make a difference?
-   If yes, are you sure highmem actually works reliably without it?
-
-In theory, this patch should have no effect if CONFIG_HIGHMEM is 
-configured out, and should result in the same kernel binary with or 
-without this patch.
-
-But if you do have CONFIG_HIGHMEM turned on without this patch then you 
-should get memory corruption pretty fast simply by booting on a block 
-device with a driver that uses DMA.  That was confirmed on both a TI 
-OMAP board and on a Marvell Dove board.
-
-> The two commits responsible for making Versatile Express userspace
-> completely unstable are:
+Marek
 > 
-> b8349b569aae661dea9d59d7d2ee587ccea3336c
-> ARM: 6112/1: Use the Inner Shareable I-cache and BTB ops on ARMv7 SMP
+> Pavel,
 > 
-> 7e5a69e83ba7a0d5917ad830f417cba8b8d6aa72
-> ARM: 6007/1: fix highmem with VIPT cache and DMA
+> Could you give it a quick test? It does solve a building issue of
+> spitz.
 > 
-> Most of the instability is from the second (this) patch, but reverting
-> just one patch doesn't fully restore userspace stability.
-
-And that includes reverting only b8349b56, right?
-
-> The instability seen consists of completely random SIGSEGVs and SIGILLs,
-> sometimes early enough to kill init, sometimes init is the only thing
-> able to run - so it's very severe.
-
-That is exactly the observed behavior on OMAP and Dove when this patch 
-is _not_ applied.
-
-> Rootfs is on ext2fs on a read only MMC filesystem, using the MMCI driver.
-> No swap.
-
-The OMAP board was also using an MMC card, while the Dove board was 
-booting on a SATA hard disk.
-
-Also beware the CONFIG_MMC_BLOCK_BOUNCE option.  If that is enabled and 
-the core code decides to actually use it, then the cache coherency issue 
-caused by DMA usage will be hidden and things might appear to just work 
-fine as the DMA won't happen directly into highmem user pages (same 
-thing if you boot with NFS root).
-
-
-Nicolas
+> >                                                                      
+> >  Pavel
+> > 
+> >> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+> >> index 4d2413e..c1048a3 100644
+> >> --- a/arch/arm/mach-pxa/spitz.c
+> >> +++ b/arch/arm/mach-pxa/spitz.c
+> >> @@ -818,6 +818,9 @@ static struct i2c_board_info akita_i2c_board_info[]
+> >> = { .type           = "max7310",
+> >>               .addr           = 0x18,
+> >>               .platform_data  = &akita_ioexp,
+> >> +     }, {
+> >> +             .type           = "wm8750",
+> >> +             .addr           = 0x1b,
+> >>       },
+> >>  };
+> >> 
+> >> diff --git a/sound/soc/pxa/spitz.c b/sound/soc/pxa/spitz.c
+> >> index 1941a35..d256f5f 100644
+> >> --- a/sound/soc/pxa/spitz.c
+> >> +++ b/sound/soc/pxa/spitz.c
+> >> @@ -328,38 +328,6 @@ static struct snd_soc_device spitz_snd_devdata = {
+> >>       .codec_dev = &soc_codec_dev_wm8750,
+> >>  };
+> >> 
+> >> -/*
+> >> - * FIXME: This is a temporary bodge to avoid cross-tree merge issues.
+> >> - * New drivers should register the wm8750 I2C device in the machine
+> >> - * setup code (under arch/arm for ARM systems).
+> >> - */
+> >> -static int wm8750_i2c_register(void)
+> >> -{
+> >> -     struct i2c_board_info info;
+> >> -     struct i2c_adapter *adapter;
+> >> -     struct i2c_client *client;
+> >> -
+> >> -     memset(&info, 0, sizeof(struct i2c_board_info));
+> >> -     info.addr = 0x1b;
+> >> -     strlcpy(info.type, "wm8750", I2C_NAME_SIZE);
+> >> -
+> >> -     adapter = i2c_get_adapter(0);
+> >> -     if (!adapter) {
+> >> -             printk(KERN_ERR "can't get i2c adapter 0\n");
+> >> -             return -ENODEV;
+> >> -     }
+> >> -
+> >> -     client = i2c_new_device(adapter, &info);
+> >> -     i2c_put_adapter(adapter);
+> >> -     if (!client) {
+> >> -             printk(KERN_ERR "can't add i2c device at 0x%x\n",
+> >> -             (unsigned int)info.addr);
+> >> -             return -ENODEV;
+> >> -     }
+> >> -
+> >> -     return 0;
+> >> -}
+> >> -
+> >>  static struct platform_device *spitz_snd_device;
+> >> 
+> >>  static int __init spitz_init(void)
+> >> @@ -369,10 +337,6 @@ static int __init spitz_init(void)
+> >>       if (!(machine_is_spitz() || machine_is_borzoi() ||
+> >> machine_is_akita())) return -ENODEV;
+> >> 
+> >> -     ret = wm8750_i2c_setup();
+> >> -     if (ret != 0)
+> >> -             return ret;
+> >> -
+> >>       spitz_snd_device = platform_device_alloc("soc-audio", -1);
+> >>       if (!spitz_snd_device)
+> >>               return -ENOMEM;
+> > 
+> > --
+> > (english) http://www.livejournal.com/~pavelmachek
+> > (cesky, pictures)
+> > http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
