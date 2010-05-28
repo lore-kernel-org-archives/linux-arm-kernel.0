@@ -1,81 +1,50 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 28 May 2010 10:02:17 +0200
-Subject: [PATCH] mxc_nand: Fix OOB accesses on i.MX27
-Message-ID: <20100528080217.GH23664@pengutronix.de>
+From: amit.kucheria@verdurent.com (Amit Kucheria)
+Date: Fri, 28 May 2010 11:29:09 +0300
+Subject: [PATCH 1/1] arm: mxc: utilise usecount field in clock operations
+In-Reply-To: <4BD0D4F0.9090605@canonical.com>
+References: <d501dcf8dbe98ed7f5aa9e7b34e68f0e1076ac84.1271968118.git.amit.kucheria@verdurent.com>
+	<4BD0D4F0.9090605@canonical.com>
+Message-ID: <20100528082909.GA3122@matterhorn.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10 Apr 22, Tim Gardner wrote:
+> On 04/22/2010 02:30 PM, Amit Kucheria wrote:
+> >From: Amit Kucheria<amit.kucheria@canonical.com>
+> >
+> >This patch fixes the clock refcounting when reparenting is used.
+> >
+> >Sascha just pointed out a good explanation of refcounting here:
+> >http://www.spinics.net/lists/arm-kernel/msg85879.html
+> >
+> >Signed-off-by: Amit Kucheria<amit.kucheria@canonical.com>
+> >---
+> >  arch/arm/plat-mxc/clock.c |   34 ++++++++++++++++++++++------------
+> >  1 files changed, 22 insertions(+), 12 deletions(-)
+> >
+> >diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
+> >index 323ff8c..14781cc 100644
+> >--- a/arch/arm/plat-mxc/clock.c
+> >+++ b/arch/arm/plat-mxc/clock.c
+> >@@ -50,15 +50,16 @@ static DEFINE_MUTEX(clocks_mutex);
+> >
+> >  static void __clk_disable(struct clk *clk)
+> >  {
+> >-	if (clk == NULL || IS_ERR(clk))
+> >+	WARN_ON(!clk->usecount);
+> >+	if (clk == NULL || IS_ERR(clk) || !clk->usecount)
+> >  		return;
+> >
+> 
+> The clk==NULL check seem superfluous if WARN_ON(!clk->usecount) has
+> already dereferenced clk (and possibly crashed). You might need two
+> statements if its likely that clk could be NULL.
+> 
 
-Hi all,
+Tim, You're right. 
 
-The OOB handling in the mxc_nand driver is broken for v1 type
-controllers (i.MX27/31) with 512 byte page size. This perhaps
-did not show up because ubi does not use OOB.
-Update the driver to always read/write a whole page even if
-only OOB is requested. With this patch the driver passes the
-mtd_oobtest on i.MX27 with 512 byte page size. Also tested
-with 2048 byte page size and on i.MX35 (v2 type controller)
+Sascha, updated patch to fix that issue and correspond more closely to
+Russell's explanation follows.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/mtd/nand/mxc_nand.c |   31 +++++--------------------------
- 1 files changed, 5 insertions(+), 26 deletions(-)
-
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 82e9438..6e8aa34 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -623,8 +623,7 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
- 		else
- 			host->buf_start = column + mtd->writesize;
- 
--		if (mtd->writesize > 512)
--			command = NAND_CMD_READ0; /* only READ0 is valid */
-+		command = NAND_CMD_READ0; /* only READ0 is valid */
- 
- 		send_cmd(host, command, false);
- 		mxc_do_addr_cycle(mtd, column, page_addr);
-@@ -639,31 +638,11 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
- 		break;
- 
- 	case NAND_CMD_SEQIN:
--		if (column >= mtd->writesize) {
--			/*
--			 * FIXME: before send SEQIN command for write OOB,
--			 * We must read one page out.
--			 * For K9F1GXX has no READ1 command to set current HW
--			 * pointer to spare area, we must write the whole page
--			 * including OOB together.
--			 */
--			if (mtd->writesize > 512)
--				/* call ourself to read a page */
--				mxc_nand_command(mtd, NAND_CMD_READ0, 0,
--						page_addr);
--
--			host->buf_start = column;
--
--			/* Set program pointer to spare region */
--			if (mtd->writesize == 512)
--				send_cmd(host, NAND_CMD_READOOB, false);
--		} else {
--			host->buf_start = column;
-+		if (column >= mtd->writesize)
-+			/* call ourself to read a page */
-+			mxc_nand_command(mtd, NAND_CMD_READ0, 0, page_addr);
- 
--			/* Set program pointer to page start */
--			if (mtd->writesize == 512)
--				send_cmd(host, NAND_CMD_READ0, false);
--		}
-+		host->buf_start = column;
- 
- 		send_cmd(host, command, false);
- 		mxc_do_addr_cycle(mtd, column, page_addr);
--- 
-1.7.1
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Cheers,
+Amit
