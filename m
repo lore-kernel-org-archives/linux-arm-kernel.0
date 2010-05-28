@@ -1,91 +1,111 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 28 May 2010 19:10:43 +0400
-Subject: [PATCH 2/2] at91sam9g20ek: add fixed-value regulator for wm8731
-In-Reply-To: <1275059443-10100-1-git-send-email-dbaryshkov@gmail.com>
-References: <1275059443-10100-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1275059443-10100-2-git-send-email-dbaryshkov@gmail.com>
+From: phorton@bitbox.co.uk (Peter Horton)
+Date: Fri, 28 May 2010 16:37:26 +0100
+Subject: [PATCH] Fix AT91SAM9G20 reset
+Message-ID: <20100528153725.GA5102@axolotl.localnet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_REGULATOR is enabled, wm8731 fails on AT91SAM9G20EK board,
-since codec driver requires several voltage supplies and none are
-provided currently. As requires voltages are hardwired to 3V3, use fixed
-voltage regulator for this chip.
+Fix AT91SAM9G20 as per the errata in the datasheet.
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c |   45 ++++++++++++++++++++++++
- 1 files changed, 45 insertions(+), 0 deletions(-)
+If the SDRAM is not cleanly shutdown before reset it can be left driving
+the bus, which then stops the bootloader booting from NAND.
 
-diff --git a/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c b/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c
-index a4102d7..c49f5c0 100644
---- a/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c
-+++ b/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c
-@@ -26,6 +26,9 @@
- #include <linux/spi/spi.h>
- #include <linux/spi/at73c213.h>
- #include <linux/clk.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/fixed.h>
-+#include <linux/regulator/consumer.h>
+Signed-off-by: Peter Horton <phorton@bitbox.co.uk>
+--
+
+Index: linux-2.6.32/arch/arm/mach-at91/Makefile
+===================================================================
+--- linux-2.6.32.orig/arch/arm/mach-at91/Makefile	2009-12-09 13:33:28.000000000 +0000
++++ linux-2.6.32/arch/arm/mach-at91/Makefile	2009-12-09 13:33:28.000000000 +0000
+@@ -16,7 +16,7 @@
+ obj-$(CONFIG_ARCH_AT91SAM9G10)	+= at91sam9261.o at91sam926x_time.o at91sam9261_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91SAM9263)	+= at91sam9263.o at91sam926x_time.o at91sam9263_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91SAM9RL)	+= at91sam9rl.o at91sam926x_time.o at91sam9rl_devices.o sam9_smc.o
+-obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o sam9_smc.o
++obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o sam9_smc.o at91sam9g20_reset.o
+ obj-$(CONFIG_ARCH_AT91SAM9G45)	+= at91sam9g45.o at91sam926x_time.o at91sam9g45_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91CAP9)	+= at91cap9.o at91sam926x_time.o at91cap9_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT572D940HF)  += at572d940hf.o at91sam926x_time.o at572d940hf_devices.o sam9_smc.o
+Index: linux-2.6.32/arch/arm/mach-at91/at91sam9260.c
+===================================================================
+--- linux-2.6.32.orig/arch/arm/mach-at91/at91sam9260.c	2009-12-03 03:51:21.000000000 +0000
++++ linux-2.6.32/arch/arm/mach-at91/at91sam9260.c	2009-12-09 13:45:50.000000000 +0000
+@@ -25,6 +25,8 @@
+ #include "generic.h"
+ #include "clock.h"
  
- #include <mach/hardware.h>
- #include <asm/setup.h>
-@@ -235,6 +238,46 @@ static struct gpio_led ek_leds[] = {
- 	}
- };
- 
-+#if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
-+static struct regulator_consumer_supply ek_audio_consumer_supplies[] = {
-+	REGULATOR_SUPPLY("AVDD", "0-001b"),
-+	REGULATOR_SUPPLY("HPVDD", "0-001b"),
-+	REGULATOR_SUPPLY("DBVDD", "0-001b"),
-+	REGULATOR_SUPPLY("DCVDD", "0-001b"),
-+};
++extern void at91sam9g20_reset(void);
 +
-+static struct regulator_init_data ek_avdd_reg_init_data = {
-+	.constraints	= {
-+		.name	= "3V3",
-+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-+	},
-+	.consumer_supplies = ek_audio_consumer_supplies,
-+	.num_consumer_supplies = ARRAY_SIZE(ek_audio_consumer_supplies),
-+};
-+
-+static struct fixed_voltage_config ek_vdd_pdata = {
-+	.supply_name	= "board-3V3",
-+	.microvolts	= 3300000,
-+	.gpio		= -EINVAL,
-+	.enabled_at_boot = 0,
-+	.init_data	= &ek_avdd_reg_init_data,
-+};
-+static struct platform_device ek_voltage_regulator = {
-+	.name		= "reg-fixed-voltage",
-+	.id		= -1,
-+	.num_resources	= 0,
-+	.dev		= {
-+		.platform_data	= &ek_vdd_pdata,
-+	},
-+};
-+static void __init ek_add_regulators(void)
-+{
-+	platform_device_register(&ek_voltage_regulator);
-+}
-+#else
-+static void __init ek_add_regulators(void) {}
-+#endif
-+
- static struct i2c_board_info __initdata ek_i2c_devices[] = {
+ static struct map_desc at91sam9260_io_desc[] __initdata = {
  	{
- 		I2C_BOARD_INFO("24c512", 0x50),
-@@ -256,6 +299,8 @@ static void __init ek_board_init(void)
- 	ek_add_device_nand();
- 	/* Ethernet */
- 	at91_add_device_eth(&ek_macb_data);
-+	/* Regulators */
-+	ek_add_regulators();
- 	/* MMC */
- #if defined(CONFIG_MMC_ATMELMCI) || defined(CONFIG_MMC_ATMELMCI_MODULE)
- 	at91_add_device_mci(0, &ek_mmc_data);
--- 
-1.7.1
+ 		.virtual	= AT91_VA_BASE_SYS,
+@@ -327,7 +329,11 @@
+ 	else
+ 		iotable_init(at91sam9260_sram_desc, ARRAY_SIZE(at91sam9260_sram_desc));
+ 
+-	at91_arch_reset = at91sam9260_reset;
++	if (cpu_is_at91sam9g20())
++		at91_arch_reset = at91sam9g20_reset;
++	else
++		at91_arch_reset = at91sam9260_reset;
++
+ 	pm_power_off = at91sam9260_poweroff;
+ 	at91_extern_irq = (1 << AT91SAM9260_ID_IRQ0) | (1 << AT91SAM9260_ID_IRQ1)
+ 			| (1 << AT91SAM9260_ID_IRQ2);
+Index: linux-2.6.32/arch/arm/mach-at91/at91sam9g20_reset.S
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.32/arch/arm/mach-at91/at91sam9g20_reset.S	2009-12-09 13:33:28.000000000 +0000
+@@ -0,0 +1,52 @@
++/*
++ * (C) BitBox Ltd 2010
++ *
++ * reset AT91SAM9G20 as per errata
++ *
++ * unless the SDRAM is cleanly shutdown before we hit the
++ * reset register it can be left driving the data bus and
++ * killing the chance of a subsequent boot from NAND
++ */
++
++#define CP15_CR_I			(1 << 12)
++
++#define SYS_VIRT_OFS			(-0x01000000)
++
++#define SDRAMC_BASE			(SYS_VIRT_OFS + 0xffffea00)
++#define  SDRAMC_TR			0x0004
++#define  SDRAMC_LPR			0x0010
++#define   SDRAMC_LPCB_POWER_DOWN	2
++
++#define RSTC_BASE			(SYS_VIRT_OFS + 0xfffffd00)
++#define  RSTC_CR			0x0000
++#define   RSTC_PROCRST			(1 << 0)
++#define   RSTC_PERRST			(1 << 2)
++#define   RSTC_KEY			(0xa5 << 24)
++
++			.arm
++
++			.globl	at91sam9g20_reset
++
++at91sam9g20_reset:	mov	r0, #0
++			mcr	p15, 0, r0, c7, c5, 0	@ flush I-cache
++
++			mrc	p15, 0, r0, c1, c0, 0
++			orr	r0, r0, #CP15_CR_I
++			mcr	p15, 0, r0, c1, c0, 0	@ enable I-cache
++
++			ldr	r0, =SDRAMC_BASE	@ preload constants
++			ldr	r1, =RSTC_BASE
++
++			mov	r2, #1
++			mov	r3, #SDRAMC_LPCB_POWER_DOWN
++			ldr	r4, =RSTC_KEY | RSTC_PERRST | RSTC_PROCRST
++
++			.balign	32			@ align to cache line
++
++			str	r2, [r0, #SDRAMC_TR]	@ disable SDRAM access
++			str	r3, [r0, #SDRAMC_LPR]	@ power down SDRAM
++			str	r4, [r1, #RSTC_CR]	@ reset processor
++
++			b	.
++
++/* vi:set ft=ignore ai: */
