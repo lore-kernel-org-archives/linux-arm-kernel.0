@@ -1,138 +1,115 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 28 May 2010 06:56:47 +0100
-Subject: [PATCH 10/15] ARM: S5PC100: Change to using s3c_gpio_cfgall_range()
-In-Reply-To: <1275026212-27510-1-git-send-email-ben-linux@fluff.org>
-References: <1275026212-27510-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1275026212-27510-11-git-send-email-ben-linux@fluff.org>
+Date: Fri, 28 May 2010 07:02:23 +0100
+Subject: [PATCH] s5pv210: Change the base ram address to 0x3000'0000
+In-Reply-To: <AANLkTimBlk4zAA_dwvENfmhr-bUb3VXRjJ5wsxI76Oih@mail.gmail.com>
+References: <20100528023559.GA8174@july>
+	<20100528035352.GO4720@trinity.fluff.org>
+	<AANLkTikfCdHgzgRjVikeGYg5wK_meh3NyDRCOzs6j6uc@mail.gmail.com>
+	<20100528042029.GS4720@trinity.fluff.org>
+	<AANLkTimBlk4zAA_dwvENfmhr-bUb3VXRjJ5wsxI76Oih@mail.gmail.com>
+Message-ID: <20100528060223.GU4720@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the code setting a range of GPIO pins' configuration and
-pull state to use the recently introduced s3c_gpio_cfgall_range().
+On Fri, May 28, 2010 at 02:25:41PM +0900, Kyungmin Park wrote:
+> On Fri, May 28, 2010 at 1:20 PM, Ben Dooks <ben-linux@fluff.org> wrote:
+> > On Fri, May 28, 2010 at 01:02:24PM +0900, Kyungmin Park wrote:
+> >> On Fri, May 28, 2010 at 12:53 PM, Ben Dooks <ben-linux@fluff.org> wrote:
+> >> > On Fri, May 28, 2010 at 11:35:59AM +0900, Kyungmin Park wrote:
+> >> >> s5pc110 (aka s5pv210) has 2 DRAM port and used it both usually.
+> >> >> Assume DMC0 starts with 0x2000'0000 with 128MiB.
+> >> >> DMC1 starts with 0x4000'0000 with 128MiB.
+> >> >> Note that DMC1 has to start address 0x4000'0000 at least.
+> >> >>
+> >> >> Then there's too much memory hole 0x1800'0000 (128MiB + 256MiB)
+> >> >>
+> >> >> To reduce memory waste, the DMC0 start with 0x3000'0000.
+> >
+> > but you just said DMC0 starts at 0x2... ? Is this reconfigurable via
+> > software, if so can it be moved once initialisation si done? how fixed
+> > is this?
+> 
+> DMC0 can set the its start address at bootloader, it can range from
+> 0x2000'0000 to 0x3fff'ffff.
+> 
+> My goal is that reduce the 256MiB memory area and can use the full
+> memory without HIGHMEM and 2G/2G split configuration.
 
-Mop up a few missed s3c_gpio_cfgpin_range() changes.
+If I remember correctly, te device has 4x256MiB banks, of which the
+population is external on S5PV210 or packaging with the S5PC1xx series.
 
-Signed-off-by: Ben Dooks <ben-linux@fluff.org>
----
- arch/arm/mach-s5pc100/setup-fb-24bpp.c   |   30 +++++++----------------
- arch/arm/mach-s5pc100/setup-sdhci-gpio.c |   38 ++++++-----------------------
- 2 files changed, 17 insertions(+), 51 deletions(-)
+On the split situation, is it really that bad to have a 2G/2G split,
+are you currently running into a situation where a single process
+really needs that much address space (especially given the fact that
+there can only ever be 1GiB of real memory in the system)?
 
-diff --git a/arch/arm/mach-s5pc100/setup-fb-24bpp.c b/arch/arm/mach-s5pc100/setup-fb-24bpp.c
-index 6eba6cb..5a882d4 100644
---- a/arch/arm/mach-s5pc100/setup-fb-24bpp.c
-+++ b/arch/arm/mach-s5pc100/setup-fb-24bpp.c
-@@ -22,27 +22,15 @@
+On the higmem issue, I don't think we've ever had to bother with HIGMEM
+even on a SMDKV210 with 1GiB of memory fitted when we first did the support.
+
+> >
+> >> Hi,
+> >>
+> >> >
+> >> > We should be using SPARSEMEM now, is it not reducing any wastage
+> >> > in virtual memory space?
+> >>
+> >> Please consider the older kernel also. and most systems are designed
+> >> for 0x3000'0000.
+> >
+> > Ok, will a kernel with the base-address set to 0x3... work when loaded
+> > on a system with RAM starting at 0x2... ? I'm not sure the answer to this
+> > question.
+> 
+> Then can't detect last 2Gib memory, only detect first 2Gib memory at
+> kernel 2.6.29.
+
+Not sure how to deal with this one.
  
- #define DISR_OFFSET	0x7008
+> >
+> > I'd rather try and get one kernel working on all systems with the S5PV210
+> > if possible instead of havign to pick which ones have certain base addresses
+> >
+> >
+> >> >
+> >> > How will the user change their board to deal with this change to hte
+> >> > kernel?
+> >>
+> >> Now we got the these memory
+> >> DMC0 has 128MiB and DMC1 has 512MiB.
+> >> Then it uses the memory from 0x2000'0000 to 0x5fff'ffff. it used 1GiB
+> >> memory address space.
+> >> Of course we can enable thie HIGHMEM but older kernel doesn't support it fully.
+> >> Also I hope to use the 3G/1G memory scheme.
+> >
+> > Given you can only get 1G of real memory into a S5PV210, is it really
+> > necessary to go to 3G/1G? What problems are there with 2/2 split?
+> 
+> Right it's best but can't. It's hardware problem. DMC0 has different
+> memory with 166MHz and DMC1 has 200MHz
+> It can't change it.
+
+Yes, but that's an allocation issue not a layout issue. Whatever is
+allocating pages needs to know to prefer the DMC1 memory.
  
--void s5pc100_fb_gpio_setup_24bpp(void)
-+static void s5pc100_fb_setgpios(unsigned int base, unsigned int nr)
- {
--	unsigned int gpio = 0;
--
--	for (gpio = S5PC100_GPF0(0); gpio <= S5PC100_GPF0(7); gpio++) {
--		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
--		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
--	}
--
--	for (gpio = S5PC100_GPF1(0); gpio <= S5PC100_GPF1(7); gpio++) {
--		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
--		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
--	}
--
--	for (gpio = S5PC100_GPF2(0); gpio <= S5PC100_GPF2(7); gpio++) {
--		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
--		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
--	}
-+	s3c_gpio_cfgall_range(base, nr, S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
-+}
- 
--	for (gpio = S5PC100_GPF3(0); gpio <= S5PC100_GPF3(3); gpio++) {
--		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
--		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
--	}
-+void s5pc100_fb_gpio_setup_24bpp(void)
-+{
-+	s5pc100_fb_setgpios(S5PC100_GPF0(0), 8);
-+	s5pc100_fb_setgpios(S5PC100_GPF1(0), 8);
-+	s5pc100_fb_setgpios(S5PC100_GPF2(0), 8);
-+	s5pc100_fb_setgpios(S5PC100_GPF3(0), 4);
- }
-diff --git a/arch/arm/mach-s5pc100/setup-sdhci-gpio.c b/arch/arm/mach-s5pc100/setup-sdhci-gpio.c
-index 320dc64..15cf1ac 100644
---- a/arch/arm/mach-s5pc100/setup-sdhci-gpio.c
-+++ b/arch/arm/mach-s5pc100/setup-sdhci-gpio.c
-@@ -23,8 +23,6 @@
- 
- void s5pc100_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
- {
--	unsigned int gpio;
--	unsigned int end;
- 	unsigned int num;
- 
- 	num = width;
-@@ -32,19 +30,13 @@ void s5pc100_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
- 	if (width == 8)
- 		num = width - 2;
- 
--	end = S5PC100_GPG0(2 + num);
--
- 	/* Set all the necessary GPG0/GPG1 pins to special-function 0 */
--	s3c_gpio_cfgpin_range(S5PC100_GPG0(0), 2 + num, S3C_GPIO_SFN(2));
--	for (gpio = S5PC100_GPG0(0); gpio < end; gpio++) {
--		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
--	}
-+	s3c_gpio_cfgall_range(S5PC100_GPG0(0), 2 + num,
-+			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
- 
- 	if (width == 8) {
--		for (gpio = S5PC100_GPG1(0); gpio <= S5PC100_GPG1(1); gpio++) {
--			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
--			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
--		}
-+		s3c_gpio_cfgall_range(S5PC100_GPG1(0), 2,
-+				      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
- 	}
- 
- 	s3c_gpio_setpull(S5PC100_GPG1(2), S3C_GPIO_PULL_UP);
-@@ -53,16 +45,9 @@ void s5pc100_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
- 
- void s5pc100_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
- {
--	unsigned int gpio;
--	unsigned int end;
--
--	end = S5PC100_GPG2(2 + width);
--	s3c_gpio_cfgpin_range(S5PC100_GPG2(0), 2 + width, S3C_GPIO_SFN(2));
--
- 	/* Set all the necessary GPG2 pins to special-function 2 */
--	for (gpio = S5PC100_GPG2(0); gpio < end; gpio++) {
--		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
--	}
-+	s3c_gpio_cfgall_range(S5PC100_GPG2(0), 2 + width,
-+			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
- 
- 	s3c_gpio_setpull(S5PC100_GPG2(6), S3C_GPIO_PULL_UP);
- 	s3c_gpio_cfgpin(S5PC100_GPG2(6), S3C_GPIO_SFN(2));
-@@ -70,16 +55,9 @@ void s5pc100_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
- 
- void s5pc100_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
- {
--	unsigned int gpio;
--	unsigned int end;
--
--	end = S5PC100_GPG3(2 + width);
--	s3c_gpio_cfgpin_range(S5PC100_GPG3(0), 2 + width, S3C_GPIO_SFN(2));
--
- 	/* Set all the necessary GPG3 pins to special-function 2 */
--	for (gpio = S5PC100_GPG3(0); gpio < end; gpio++) {
--		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
--	}
-+	s3c_gpio_cfgall_range(S5PC100_GPG3(0), 2 + width,
-+			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
- 
- 	s3c_gpio_setpull(S5PC100_GPG3(6), S3C_GPIO_PULL_UP);
- 	s3c_gpio_cfgpin(S5PC100_GPG3(6), S3C_GPIO_SFN(2));
+> >
+> >> How to you think?
+> >
+> > I thought that when the s5pv210 was submitted we enabled the SPARSMEM
+> > support so that whatever DRAM configuration we could handle it within
+> > a single kernel.
+> 
+> I also hope to use single kernel for s5p series. and that's reason I
+> hope to change it.
+> With some reason. mobile division has different memory types and DMC0
+> should be used fixed memory.
+> and only DMC1 can modify form 2Gib to 4Gib.
+> 
+> Thank you,
+> Kyungmin Park
+
 -- 
-1.6.3.3
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
