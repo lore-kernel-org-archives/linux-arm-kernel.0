@@ -1,57 +1,25 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 28 May 2010 14:48:25 +0400
-Subject: [PATCH 4/4] usb: s3c-hsotg: Enable HCLK for the OTG module.
-In-Reply-To: <20100528102232.GZ4720@trinity.fluff.org>
-References: <1275014477-23133-1-git-send-email-kgene.kim@samsung.com>
-	<1275014477-23133-5-git-send-email-kgene.kim@samsung.com>
-	<20100528102232.GZ4720@trinity.fluff.org>
-Message-ID: <4BFF9F79.106@ru.mvista.com>
+From: lukasz.goralczyk@gmail.com (=?UTF-8?Q?=C5=81ukasz_G=C3=B3ralczyk?=)
+Date: Fri, 28 May 2010 12:59:27 +0200
+Subject: Problem with at91_mci and AT91RM9200
+In-Reply-To: <52497.72.68.115.39.1274971187.squirrel@webmail.hostgator.com>
+References: <1274966669.2465.105.camel@arcturus>
+	<52497.72.68.115.39.1274971187.squirrel@webmail.hostgator.com>
+Message-ID: <1275044367.2401.3.camel@arcturus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Dnia 2010-05-27, czw o godzinie 09:39 -0500, zql at glomationinc.com pisze:
+[cut]
+> > I compiled newest kernel (2.6.33.4 and 2.6.32 with at91 patches
+> > http://www.at91.com/linux4sam/bin/view/Linux4SAM/LinuxKernel#AT91_Linux_kernel_sources_summar
+> > )
+> > which boots but fails to detect SD Card (Sandisk microSD 2 GB through SD
+> > adapter). A the end there's a debugging output (stripped, full:
+[cut]
+> The MMC/SD card driver is broken for Atmel 9G20 as well since 2.6.30.  It
+> no longer detect cards that used to work on 2.6.27.
 
-Ben Dooks wrote:
+In my case 2.6.27 doesn't work either - symptoms are similar as for
+2.6.33.
 
->> From: Thomas Abraham <thomas.ab@samsung.com>
-
->> This patch modifies the following in S3C hsotg driver.
-
->> 1. Gets a reference to the USB OTG hclk clock and enables it. This is
->>    required for plaforms on which the USB OTG hclk is disabled during
->>    the boot time clock intialization.
-
->> 2. Add necessary clock clean up in case of error during initialization
->>    failure or during module unload.
-
->> 3. Add a new field 'clk_otg' in 'struct s3c_hsotg' to maintain a
->>    reference to the USB OTG hclk clock.
-
->> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
->> ---
->>  drivers/usb/gadget/s3c-hsotg.c |   17 +++++++++++++++++
->>  1 files changed, 17 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
->> index 81c47d2..526d081 100644
->> --- a/drivers/usb/gadget/s3c-hsotg.c
->> +++ b/drivers/usb/gadget/s3c-hsotg.c
-
-[...]
-
->> @@ -3269,6 +3271,14 @@ static int __devinit s3c_hsotg_probe(struct platform_device *pdev)
->>  		goto err_regs_res;
->>  	}
->>  
->> +	hsotg->clk_otg = clk_get(&pdev->dev, "otg");
->> +	if (IS_ERR(hsotg->clk_otg)) {
->> +		dev_err(dev, "failed to find usb otg clock source\n");
->> +		ret = -ENODEV;
-
-> hmm, -ENODEV isn't really the right error to return here, it'll
-> get silently ignored by the device core.
-
-    Right, PTR_ERR(hsotg->clk_otg) should be returned in this case.
-
-WBR, Sergei
+Lukasz.
