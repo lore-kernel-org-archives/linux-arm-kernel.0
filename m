@@ -1,71 +1,60 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 28 May 2010 06:56:38 +0100
-Subject: [PATCH 01/15] ARM: SAMSUNG: Add GPIO configuration for a range of pins
+Date: Fri, 28 May 2010 06:56:51 +0100
+Subject: [PATCH 14/15] ARM: S5PC100: Change to using s3c_gpio_cfgrange_nopull()
 In-Reply-To: <1275026212-27510-1-git-send-email-ben-linux@fluff.org>
 References: <1275026212-27510-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1275026212-27510-2-git-send-email-ben-linux@fluff.org>
+Message-ID: <1275026212-27510-15-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add s3c_gpio_cfgpin_range() to configure a range of pins to the given
-value. This is useful for a number of blocks where the pins are in order
-and saves multiple calls to s3c_gpio_cfgpin().
+Chane code setting special-function and no pull-up to use
+the s3c_gpio_cfgrange_nopull() wrapper.
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/plat-samsung/gpio-config.c           |   15 +++++++++++++++
- arch/arm/plat-samsung/include/plat/gpio-cfg.h |   13 +++++++++++++
- 2 files changed, 28 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pc100/setup-sdhci-gpio.c |   15 +++++----------
+ 1 files changed, 5 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/gpio-config.c b/arch/arm/plat-samsung/gpio-config.c
-index 57b68a5..a927dd2 100644
---- a/arch/arm/plat-samsung/gpio-config.c
-+++ b/arch/arm/plat-samsung/gpio-config.c
-@@ -41,6 +41,21 @@ int s3c_gpio_cfgpin(unsigned int pin, unsigned int config)
- }
- EXPORT_SYMBOL(s3c_gpio_cfgpin);
+diff --git a/arch/arm/mach-s5pc100/setup-sdhci-gpio.c b/arch/arm/mach-s5pc100/setup-sdhci-gpio.c
+index 15cf1ac..b353441 100644
+--- a/arch/arm/mach-s5pc100/setup-sdhci-gpio.c
++++ b/arch/arm/mach-s5pc100/setup-sdhci-gpio.c
+@@ -31,13 +31,10 @@ void s5pc100_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
+ 		num = width - 2;
  
-+int s3c_gpio_cfgpin_range(unsigned int start, unsigned int nr,
-+			  unsigned int cfg)
-+{
-+	int ret;
-+
-+	for (; nr > 0; nr--, start++) {
-+		ret = s3c_gpio_cfgpin(start, cfg);
-+		if (ret != 0)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(s3c_gpio_cfgpin_range);
-+
- unsigned s3c_gpio_getcfg(unsigned int pin)
+ 	/* Set all the necessary GPG0/GPG1 pins to special-function 0 */
+-	s3c_gpio_cfgall_range(S5PC100_GPG0(0), 2 + num,
+-			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
++	s3c_gpio_cfgrange_nopull(S5PC100_GPG0(0), 2 + num, S3C_GPIO_SFN(2));
+ 
+-	if (width == 8) {
+-		s3c_gpio_cfgall_range(S5PC100_GPG1(0), 2,
+-				      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
+-	}
++	if (width == 8)
++		s3c_gpio_cfgrange_nopull(S5PC100_GPG1(0), 2, S3C_GPIO_SFN(2));
+ 
+ 	s3c_gpio_setpull(S5PC100_GPG1(2), S3C_GPIO_PULL_UP);
+ 	s3c_gpio_cfgpin(S5PC100_GPG1(2), S3C_GPIO_SFN(2));
+@@ -46,8 +43,7 @@ void s5pc100_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
+ void s5pc100_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
  {
- 	struct s3c_gpio_chip *chip = s3c_gpiolib_getchip(pin);
-diff --git a/arch/arm/plat-samsung/include/plat/gpio-cfg.h b/arch/arm/plat-samsung/include/plat/gpio-cfg.h
-index 34efdd2..8ec9936 100644
---- a/arch/arm/plat-samsung/include/plat/gpio-cfg.h
-+++ b/arch/arm/plat-samsung/include/plat/gpio-cfg.h
-@@ -89,6 +89,19 @@ extern int s3c_gpio_cfgpin(unsigned int pin, unsigned int to);
-  */
- extern unsigned s3c_gpio_getcfg(unsigned int pin);
+ 	/* Set all the necessary GPG2 pins to special-function 2 */
+-	s3c_gpio_cfgall_range(S5PC100_GPG2(0), 2 + width,
+-			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
++	s3c_gpio_cfgrange_nopull(S5PC100_GPG2(0), 2 + width, S3C_GPIO_SFN(2));
  
-+/**
-+ * s3c_gpio_cfgpin_range() - Change the GPIO function for configuring pin range
-+ * @start: The pin number to start at
-+ * @number: The number of pins to configure from @start.
-+ * @cfg: The configuration for the pin's function
-+ *
-+ * Call s3c_gpio_cfgpin() for the @number pins starting at @start.
-+ *
-+ * @sa s3c_gpio_cfgpin.
-+ */
-+extern int s3c_gpio_cfgpin_range(unsigned int start, unsigned int nr,
-+				 unsigned int cfg);
-+
- /* Define values for the pull-{up,down} available for each gpio pin.
-  *
-  * These values control the state of the weak pull-{up,down} resistors
+ 	s3c_gpio_setpull(S5PC100_GPG2(6), S3C_GPIO_PULL_UP);
+ 	s3c_gpio_cfgpin(S5PC100_GPG2(6), S3C_GPIO_SFN(2));
+@@ -56,8 +52,7 @@ void s5pc100_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
+ void s5pc100_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
+ {
+ 	/* Set all the necessary GPG3 pins to special-function 2 */
+-	s3c_gpio_cfgall_range(S5PC100_GPG3(0), 2 + width,
+-			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
++	s3c_gpio_cfgrange_nopull(S5PC100_GPG3(0), 2 + width, S3C_GPIO_SFN(2));
+ 
+ 	s3c_gpio_setpull(S5PC100_GPG3(6), S3C_GPIO_PULL_UP);
+ 	s3c_gpio_cfgpin(S5PC100_GPG3(6), S3C_GPIO_SFN(2));
 -- 
 1.6.3.3
