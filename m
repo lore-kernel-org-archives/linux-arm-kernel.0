@@ -1,93 +1,69 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 28 May 2010 05:00:36 +0200
-Subject: [PATCH] Add battery support into Zipit Z2
-In-Reply-To: <1275015564-21803-1-git-send-email-marek.vasut@gmail.com>
-References: <1275015564-21803-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <201005280500.36443.marek.vasut@gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Fri, 28 May 2010 04:53:52 +0100
+Subject: [PATCH] s5pv210: Change the base ram address to 0x3000'0000
+In-Reply-To: <20100528023559.GA8174@july>
+References: <20100528023559.GA8174@july>
+Message-ID: <20100528035352.GO4720@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 28. kv?tna 2010 04:59:24 Marek Vasut napsal(a):
-> This patch adds support for the AER915 battery chip into Zipit Z2
-> platform file.
+On Fri, May 28, 2010 at 11:35:59AM +0900, Kyungmin Park wrote:
+> s5pc110 (aka s5pv210) has 2 DRAM port and used it both usually.
+> Assume DMC0 starts with 0x2000'0000 with 128MiB.
+> DMC1 starts with 0x4000'0000 with 128MiB.
+> Note that DMC1 has to start address 0x4000'0000 at least.
 > 
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> ---
->  arch/arm/mach-pxa/z2.c |   42 +++++++++++++++++++++++++++++++++++++++---
->  1 files changed, 39 insertions(+), 3 deletions(-)
+> Then there's too much memory hole 0x1800'0000 (128MiB + 256MiB)
 > 
-> diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
-> index f5d1ae3..194865e 100644
-> --- a/arch/arm/mach-pxa/z2.c
-> +++ b/arch/arm/mach-pxa/z2.c
-> @@ -16,6 +16,7 @@
->  #include <linux/mtd/mtd.h>
->  #include <linux/mtd/partitions.h>
->  #include <linux/pwm_backlight.h>
-> +#include <linux/z2_battery.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/spi/spi.h>
->  #include <linux/spi/libertas_spi.h>
-> @@ -458,6 +459,39 @@ static inline void z2_keys_init(void) {}
->  #endif
-> 
->  /*************************************************************************
-> ***** + * Battery
-> +
-> **************************************************************************
-> ****/ +#if defined(CONFIG_I2C_PXA) || defined(CONFIG_I2C_PXA_MODULE)
-> +static struct z2_battery_info batt_chip_info = {
-> +	.batt_I2C_bus	= 0,
-> +	.batt_I2C_addr	= 0x55,
-> +	.batt_I2C_reg	= 2,
-> +	.charge_gpio	= GPIO0_ZIPITZ2_AC_DETECT,
-> +	.min_voltage	= 2400000,
-> +	.max_voltage	= 3700000,
-> +	.batt_div	= 69,
-> +	.batt_mult	= 1000000,
-> +	.batt_tech	= POWER_SUPPLY_TECHNOLOGY_LION,
-> +	.batt_name	= "Z2",
-> +};
-> +
-> +static struct i2c_board_info __initdata z2_i2c_board_info[] = {
-> +	{
-> +		I2C_BOARD_INFO("aer915", 0x55),
-> +		.platform_data	= &batt_chip_info,
-> +	}
-> +};
-> +
-> +static void __init z2_i2c_init(void)
-> +{
-> +	pxa_set_i2c_info(NULL);
-> +	i2c_register_board_info(0, ARRAY_AND_SIZE(z2_i2c_board_info));
-> +}
-> +#else
-> +static inline void z2_i2c_init(void) {}
-> +#endif
-> +
-> +/*************************************************************************
-> ***** * SSP Devices - WiFi and LCD control
->  
-> **************************************************************************
-> ****/ #if defined(CONFIG_SPI_PXA2XX) || defined(CONFIG_SPI_PXA2XX_MODULE)
-> @@ -585,12 +619,14 @@ static void __init z2_init(void)
->  {
->  	pxa2xx_mfp_config(ARRAY_AND_SIZE(z2_pin_config));
-> 
-> +	pxa_set_ffuart_info(NULL);
-> +	pxa_set_btuart_info(NULL);
-> +	pxa_set_stuart_info(NULL);
-> +
->  	z2_lcd_init();
->  	z2_mmc_init();
->  	z2_mkp_init();
-> -
-> -	pxa_set_i2c_info(NULL);
-> -
-> +	z2_i2c_init();
->  	z2_spi_init();
->  	z2_nor_init();
->  	z2_pwm_init();
+> To reduce memory waste, the DMC0 start with 0x3000'0000.
 
-btw. this should be applied before "[PATCH 2/2] pxa/z2: Register WM8750". Sorry, 
-I'm off to bed before I do any more stupid mistakes.
+We should be using SPARSEMEM now, is it not reducing any wastage
+in virtual memory space?
+
+How will the user change their board to deal with this change to hte
+kernel?
+ 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> diff --git a/arch/arm/mach-s5pv210/Makefile.boot b/arch/arm/mach-s5pv210/Makefile.boot
+> index ff90aa1..b0909e3 100644
+> --- a/arch/arm/mach-s5pv210/Makefile.boot
+> +++ b/arch/arm/mach-s5pv210/Makefile.boot
+> @@ -1,2 +1,2 @@
+> -   zreladdr-y	:= 0x20008000
+> -params_phys-y	:= 0x20000100
+> +   zreladdr-y	:= 0x30008000
+> +params_phys-y	:= 0x30000100
+> diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
+> index 34eb168..9f4c368 100644
+> --- a/arch/arm/mach-s5pv210/include/mach/map.h
+> +++ b/arch/arm/mach-s5pv210/include/mach/map.h
+> @@ -74,7 +74,7 @@
+>  #define S5PV210_PA_VIC3		(0xF2300000)
+>  #define S5P_PA_VIC3		S5PV210_PA_VIC3
+>  
+> -#define S5PV210_PA_SDRAM	(0x20000000)
+> +#define S5PV210_PA_SDRAM	(0x30000000)
+>  #define S5P_PA_SDRAM		S5PV210_PA_SDRAM
+>  
+>  /* I2S */
+> diff --git a/arch/arm/mach-s5pv210/include/mach/memory.h b/arch/arm/mach-s5pv210/include/mach/memory.h
+> index 379117e..07a15d8 100644
+> --- a/arch/arm/mach-s5pv210/include/mach/memory.h
+> +++ b/arch/arm/mach-s5pv210/include/mach/memory.h
+> @@ -13,7 +13,7 @@
+>  #ifndef __ASM_ARCH_MEMORY_H
+>  #define __ASM_ARCH_MEMORY_H
+>  
+> -#define PHYS_OFFSET		UL(0x20000000)
+> +#define PHYS_OFFSET		UL(0x30000000)
+>  #define CONSISTENT_DMA_SIZE	(SZ_8M + SZ_4M + SZ_2M)
+>  
+>  /* Maximum of 256MiB in one bank */
+
+-- 
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
