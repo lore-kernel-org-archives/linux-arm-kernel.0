@@ -1,97 +1,68 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 28 May 2010 11:22:32 +0100
-Subject: [PATCH 4/4] usb: s3c-hsotg: Enable HCLK for the OTG module.
-In-Reply-To: <1275014477-23133-5-git-send-email-kgene.kim@samsung.com>
-References: <1275014477-23133-1-git-send-email-kgene.kim@samsung.com>
-	<1275014477-23133-5-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20100528102232.GZ4720@trinity.fluff.org>
+Date: Fri, 28 May 2010 11:27:31 +0100
+Subject: [PATCH] ARM: S5PV210: serial: Fix section mismatch warning
+In-Reply-To: <4BFF9917.5000503@samsung.com>
+References: <4BFF9917.5000503@samsung.com>
+Message-ID: <20100528102731.GA4720@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 28, 2010 at 11:41:17AM +0900, Kukjin Kim wrote:
-> From: Thomas Abraham <thomas.ab@samsung.com>
+On Fri, May 28, 2010 at 07:21:11PM +0900, Joonyoung Shim wrote:
+> Rename the structure to avoid the following warning:
+
+ok, will apply to next fixes tree.
+ 
+> WARNING: drivers/serial/built-in.o(.data+0x534): Section mismatch in reference from the variable s5p_serial_drv to the function .devexit.text:s3c24xx_serial_remove()
+> The variable s5p_serial_drv references
+> the function __devexit s3c24xx_serial_remove()
+> If the reference is valid then annotate the
+> variable with __exit* (see linux/init.h) or name the variable:
+> *driver, *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
 > 
-> This patch modifies the following in S3C hsotg driver.
-> 
-> 1. Gets a reference to the USB OTG hclk clock and enables it. This is
->    required for plaforms on which the USB OTG hclk is disabled during
->    the boot time clock intialization.
-> 
-> 2. Add necessary clock clean up in case of error during initialization
->    failure or during module unload.
-> 
-> 3. Add a new field 'clk_otg' in 'struct s3c_hsotg' to maintain a
->    reference to the USB OTG hclk clock.
-> 
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
 > ---
->  drivers/usb/gadget/s3c-hsotg.c |   17 +++++++++++++++++
->  1 files changed, 17 insertions(+), 0 deletions(-)
+>  drivers/serial/s5pv210.c |    8 ++++----
+>  1 files changed, 4 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-> index 81c47d2..526d081 100644
-> --- a/drivers/usb/gadget/s3c-hsotg.c
-> +++ b/drivers/usb/gadget/s3c-hsotg.c
-> @@ -130,6 +130,7 @@ struct s3c_hsotg_ep {
->   * @dev: The parent device supplied to the probe function
->   * @driver: USB gadget driver
->   * @plat: The platform specific configuration data.
-> + * @clk_otg: The hclk for otg module.
->   * @regs: The memory area mapped for accessing registers.
->   * @regs_res: The resource that was allocated when claiming register space.
->   * @irq: The IRQ number we are using
-> @@ -147,6 +148,7 @@ struct s3c_hsotg {
->  	struct device		 *dev;
->  	struct usb_gadget_driver *driver;
->  	struct s3c_hsotg_plat	 *plat;
-> +	struct clk		 *clk_otg;
+> diff --git a/drivers/serial/s5pv210.c b/drivers/serial/s5pv210.c
+> index 8dc0383..4a789e5 100644
+> --- a/drivers/serial/s5pv210.c
+> +++ b/drivers/serial/s5pv210.c
+> @@ -119,7 +119,7 @@ static int s5p_serial_probe(struct platform_device *pdev)
+>  	return s3c24xx_serial_probe(pdev, s5p_uart_inf[pdev->id]);
+>  }
 >  
->  	void __iomem		*regs;
->  	struct resource		*regs_res;
-> @@ -3269,6 +3271,14 @@ static int __devinit s3c_hsotg_probe(struct platform_device *pdev)
->  		goto err_regs_res;
->  	}
+> -static struct platform_driver s5p_serial_drv = {
+> +static struct platform_driver s5p_serial_driver = {
+>  	.probe		= s5p_serial_probe,
+>  	.remove		= __devexit_p(s3c24xx_serial_remove),
+>  	.driver		= {
+> @@ -130,19 +130,19 @@ static struct platform_driver s5p_serial_drv = {
 >  
-> +	hsotg->clk_otg = clk_get(&pdev->dev, "otg");
-> +	if (IS_ERR(hsotg->clk_otg)) {
-> +		dev_err(dev, "failed to find usb otg clock source\n");
-> +		ret = -ENODEV;
-
-hmm, -ENODEV isn't really the right error to return here, it'll
-get silently ignored by the device core.
-
-> +		goto err_noclk;
-> +	}
-> +	clk_enable(hsotg->clk_otg);
-> +
->  	ret = platform_get_irq(pdev, 0);
->  	if (ret < 0) {
->  		dev_err(dev, "cannot find IRQ\n");
-> @@ -3330,6 +3340,10 @@ static int __devinit s3c_hsotg_probe(struct platform_device *pdev)
->  	return 0;
+>  static int __init s5pv210_serial_console_init(void)
+>  {
+> -	return s3c24xx_serial_initconsole(&s5p_serial_drv, s5p_uart_inf);
+> +	return s3c24xx_serial_initconsole(&s5p_serial_driver, s5p_uart_inf);
+>  }
 >  
->  err_regs:
-> +	clk_disable(hsotg->clk_otg);
-> +	clk_put(hsotg->clk_otg);
-> +
-> +err_noclk:
->  	iounmap(hsotg->regs);
+>  console_initcall(s5pv210_serial_console_init);
 >  
->  err_regs_res:
-> @@ -3352,6 +3366,9 @@ static int __devexit s3c_hsotg_remove(struct platform_device *pdev)
->  	free_irq(hsotg->irq, hsotg);
->  	iounmap(hsotg->regs);
+>  static int __init s5p_serial_init(void)
+>  {
+> -	return s3c24xx_serial_init(&s5p_serial_drv, *s5p_uart_inf);
+> +	return s3c24xx_serial_init(&s5p_serial_driver, *s5p_uart_inf);
+>  }
 >  
-> +	clk_disable(hsotg->clk_otg);
-> +	clk_put(hsotg->clk_otg);
-> +
->  	release_resource(hsotg->regs_res);
->  	kfree(hsotg->regs_res);
+>  static void __exit s5p_serial_exit(void)
+>  {
+> -	platform_driver_unregister(&s5p_serial_drv);
+> +	platform_driver_unregister(&s5p_serial_driver);
+>  }
 >  
+>  module_init(s5p_serial_init);
 > -- 
-> 1.6.3.3
-> 
+> 1.7.0.4
 
 -- 
 -- 
