@@ -1,7 +1,9 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 28 May 2010 19:10:42 +0400
-Subject: [PATCH 1/2] at91sam9g20ek: add fixed-value regulator for wm8731
-Message-ID: <1275059443-10100-1-git-send-email-dbaryshkov@gmail.com>
+Date: Fri, 28 May 2010 19:10:43 +0400
+Subject: [PATCH 2/2] at91sam9g20ek: add fixed-value regulator for wm8731
+In-Reply-To: <1275059443-10100-1-git-send-email-dbaryshkov@gmail.com>
+References: <1275059443-10100-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1275059443-10100-2-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,16 +14,16 @@ voltage regulator for this chip.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/mach-at91/board-sam9g20ek.c |   45 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c |   45 ++++++++++++++++++++++++
  1 files changed, 45 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
-index a2f00f4..9398ebc 100644
---- a/arch/arm/mach-at91/board-sam9g20ek.c
-+++ b/arch/arm/mach-at91/board-sam9g20ek.c
-@@ -28,6 +28,9 @@
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
+diff --git a/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c b/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c
+index a4102d7..c49f5c0 100644
+--- a/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c
++++ b/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c
+@@ -26,6 +26,9 @@
+ #include <linux/spi/spi.h>
+ #include <linux/spi/at73c213.h>
  #include <linux/clk.h>
 +#include <linux/regulator/machine.h>
 +#include <linux/regulator/fixed.h>
@@ -29,9 +31,9 @@ index a2f00f4..9398ebc 100644
  
  #include <mach/hardware.h>
  #include <asm/setup.h>
-@@ -283,6 +286,46 @@ static void __init ek_add_device_buttons(void)
- static void __init ek_add_device_buttons(void) {}
- #endif
+@@ -235,6 +238,46 @@ static struct gpio_led ek_leds[] = {
+ 	}
+ };
  
 +#if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
 +static struct regulator_consumer_supply ek_audio_consumer_supplies[] = {
@@ -73,17 +75,17 @@ index a2f00f4..9398ebc 100644
 +static void __init ek_add_regulators(void) {}
 +#endif
 +
- 
  static struct i2c_board_info __initdata ek_i2c_devices[] = {
-         {
-@@ -308,6 +351,8 @@ static void __init ek_board_init(void)
+ 	{
+ 		I2C_BOARD_INFO("24c512", 0x50),
+@@ -256,6 +299,8 @@ static void __init ek_board_init(void)
  	ek_add_device_nand();
  	/* Ethernet */
  	at91_add_device_eth(&ek_macb_data);
 +	/* Regulators */
 +	ek_add_regulators();
  	/* MMC */
- 	at91_add_device_mmc(0, &ek_mmc_data);
- 	/* I2C */
+ #if defined(CONFIG_MMC_ATMELMCI) || defined(CONFIG_MMC_ATMELMCI_MODULE)
+ 	at91_add_device_mci(0, &ek_mmc_data);
 -- 
 1.7.1
