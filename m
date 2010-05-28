@@ -1,47 +1,43 @@
-From: hjk@linutronix.de (Hans J. Koch)
-Date: Fri, 28 May 2010 15:34:25 +0200
-Subject: [PATCH 4/4] mx35: add flexcan devices
-In-Reply-To: <1275046938-8465-5-git-send-email-mkl@pengutronix.de>
-References: <1275046938-8465-1-git-send-email-mkl@pengutronix.de>
-	<1275046938-8465-5-git-send-email-mkl@pengutronix.de>
-Message-ID: <20100528133424.GA2001@bluebox.local>
+From: fachkar.datawind@gmail.com (f. achkar)
+Date: Fri, 28 May 2010 09:35:20 -0400
+Subject: [Solved] Re: [Openocd-development] debugging linux kernel on arm926ejs
+	targetvia openocd-0.4.0
+In-Reply-To: <70E876B0EA86DD4BAF101844BC814DFE08E055C848@Cloud.RL.local>
+References: <70E876B0EA86DD4BAF101844BC814DFE08E055C848@Cloud.RL.local>
+Message-ID: <4BFFC698.8080207@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 28, 2010 at 01:42:18PM +0200, Marc Kleine-Budde wrote:
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> ---
->  arch/arm/mach-mx3/devices.c |   40 ++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-mx3/devices.h |    2 ++
->  2 files changed, 42 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx3/devices.c b/arch/arm/mach-mx3/devices.c
-> index db7acd6..0e1e20b 100644
-> --- a/arch/arm/mach-mx3/devices.c
-> +++ b/arch/arm/mach-mx3/devices.c
-> @@ -127,6 +127,46 @@ struct platform_device mxc_uart_device4 = {
->  };
->  #endif /* CONFIG_ARCH_MX31 */
->  
-> +#ifdef CONFIG_ARCH_MX35
-> +static struct resource mxc_can_1_resources[] = {
-> +	{
-> +		.start	= 0x53fe4000,
-> +		.end	= 0x53fe7fff,
-> +		.flags	= IORESOURCE_MEM,
-> +	}, {
-> +		.start	= 43,
-> +		.end	= 43,
-> +		.flags	= IORESOURCE_IRQ,
-> +	}
-> +};
-> +
-> +struct platform_device mxc_can_device0 = {
-> +	.name = "flexcan",
-
-Did you also post the flexcan driver itself somewhere? I've got such a device
-on my desk right now, and would be willing to test that. I've made some tests
-with Sascha's old version, but it's not really satisfying...
-
-Thanks,
-Hans
+many thanks to everyone ...
+-----------------------------------------------------------
+On 05/27/2010 11:56 PM, Jon Povey wrote:
+> f. achkar wrote:
+>   
+>> is there a good reference on how to properly debug the linux kernel
+>> via openocd/gdb for an arm target on a linux hot machine?
+>>     
+> I have been debugging with this kind of setup over the past few days.
+> I don't think you can just load your image like you are doing: it is loading at 0xc... which is a virtual address and the MMU hasn't been setup yet.
+>
+> Instead try doing your steps 1-6 but instead of "load" do:
+>  hbreak start_kernel
+>  cont
+>
+> then in u-boot boot the kernel from uImage over TFTP or from flash. Your debugger will break near the start of kernel execution and you can debug from there using software breakpoints (MMU will be on).
+>
+> If you need to debug the early stuff before MMU is on try
+>  hbreak 0x80008000
+> instead of start_kernel and have a look at
+>  arm-none-linux-gnueabi objdump -S arch/arm/boot/compressed/head.o
+>
+> --
+> Jon Povey
+> jon.povey at racelogic.co.uk
+>
+> Racelogic is a limited company registered in England. Registered number 2743719 .
+> Registered Office Unit 10, Swan Business Centre, Osier Way, Buckingham, Bucks, MK18 1TB .
+>
+> The information contained in this electronic mail transmission is intended by Racelogic Ltd for the use of the named individual or entity to which it is directed and may contain information that is confidential or privileged. If you have received this electronic mail transmission in error, please delete it from your system without copying or forwarding it, and notify the sender of the error by reply email so that the sender's address records can be corrected. The views expressed by the sender of this communication do not necessarily represent those of Racelogic Ltd. Please note that Racelogic reserves the right to monitor e-mail communications passing through its network
+>
+>
+>   
