@@ -1,50 +1,70 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 28 May 2010 07:19:13 +0100
-Subject: [PATCH 3/9] ARM: SAMSUNG: Default s3c_device_i2c2 to s3c2440-i2c
+Date: Fri, 28 May 2010 07:19:18 +0100
+Subject: [PATCH 8/9] ARM: S3C24XX: Use s3c_set_platdata() helper
 In-Reply-To: <1275027559-29278-1-git-send-email-ben-linux@fluff.org>
 References: <1275027559-29278-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1275027559-29278-4-git-send-email-ben-linux@fluff.org>
+Message-ID: <1275027559-29278-9-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are no current SoCs where i2c2 is anything other than a s3c2440-i2c
-implementation (see also e4c5cb3796155eb4f15f7f0b1b7ea705f87743a7) so
-change the device's name to s3c2440-i2c by default so we can eliminate
-the calls that set the name.
-
-Also remove the singler user of this, the s5pv210.
+Commit f8b5ea089d5a447a8933a6540ceeccbcb78f9e53 added a helper
+to copy and set platform data, so let's replace the various sites
+in the Samsung support where this is happening.
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-s5pv210/cpu.c      |    1 -
- arch/arm/plat-samsung/dev-i2c2.c |    3 ++-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/plat-s3c24xx/devs.c |   23 ++++-------------------
+ 1 files changed, 4 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
-index 987fe1d..8a64ef3 100644
---- a/arch/arm/mach-s5pv210/cpu.c
-+++ b/arch/arm/mach-s5pv210/cpu.c
-@@ -89,7 +89,6 @@ void __init s5pv210_map_io(void)
+diff --git a/arch/arm/plat-s3c24xx/devs.c b/arch/arm/plat-s3c24xx/devs.c
+index 452e184..028c8bd 100644
+--- a/arch/arm/plat-s3c24xx/devs.c
++++ b/arch/arm/plat-s3c24xx/devs.c
+@@ -149,9 +149,8 @@ void __init s3c24xx_fb_set_platdata(struct s3c2410fb_mach_info *pd)
+ {
+ 	struct s3c2410fb_mach_info *npd;
  
- 	/* the i2c devices are directly compatible with s3c2440 */
- 	s3c_i2c0_setname("s3c2440-i2c");
--	s3c_i2c2_setname("s3c2440-i2c");
+-	npd = kmemdup(pd, sizeof(*npd), GFP_KERNEL);
++	npd = s3c_set_platdata(pd, sizeof(*npd), &s3c_device_lcd);
+ 	if (npd) {
+-		s3c_device_lcd.dev.platform_data = npd;
+ 		npd->displays = kmemdup(pd->displays,
+ 			sizeof(struct s3c2410fb_display) * npd->num_displays,
+ 			GFP_KERNEL);
+@@ -223,15 +222,7 @@ EXPORT_SYMBOL(s3c_device_usbgadget);
+ 
+ void __init s3c24xx_udc_set_platdata(struct s3c2410_udc_mach_info *pd)
+ {
+-	struct s3c2410_udc_mach_info *npd;
+-
+-	npd = kmalloc(sizeof(*npd), GFP_KERNEL);
+-	if (npd) {
+-		memcpy(npd, pd, sizeof(*npd));
+-		s3c_device_usbgadget.dev.platform_data = npd;
+-	} else {
+-		printk(KERN_ERR "no memory for udc platform data\n");
+-	}
++	s3c_set_platdata(pd, sizeof(*pd), &s3c_device_usbgadget);
  }
  
- void __init s5pv210_init_clocks(int xtal)
-diff --git a/arch/arm/plat-samsung/dev-i2c2.c b/arch/arm/plat-samsung/dev-i2c2.c
-index 07036de..ab2b3d5 100644
---- a/arch/arm/plat-samsung/dev-i2c2.c
-+++ b/arch/arm/plat-samsung/dev-i2c2.c
-@@ -39,7 +39,8 @@ static struct resource s3c_i2c_resource[] = {
- };
+ /* IIS */
+@@ -341,15 +332,9 @@ struct platform_device s3c_device_sdi = {
  
- struct platform_device s3c_device_i2c2 = {
--	.name		  = "s3c2410-i2c",
-+	/* default to s3c2440-i2c as no SoC with >1 I2C is s3c2410 style */
-+	.name		  = "s3c2440-i2c",
- 	.id		  = 2,
- 	.num_resources	  = ARRAY_SIZE(s3c_i2c_resource),
- 	.resource	  = s3c_i2c_resource,
+ EXPORT_SYMBOL(s3c_device_sdi);
+ 
+-void __init s3c24xx_mci_set_platdata(struct s3c24xx_mci_pdata *pdata)
++void __init s3c24xx_mci_set_platdata(struct s3c24xx_mci_pdata *pd)
+ {
+-	struct s3c24xx_mci_pdata *npd;
+-
+-	npd = kmemdup(pdata, sizeof(struct s3c24xx_mci_pdata), GFP_KERNEL);
+-	if (!npd)
+-		printk(KERN_ERR "%s: no memory to copy pdata", __func__);
+-
+-	s3c_device_sdi.dev.platform_data = npd;
++	s3c_set_platdata(pd, sizeof(struct s3c24xx_mci_pdata), &s3c_device_sdi);
+ }
+ 
+ 
 -- 
 1.6.3.3
