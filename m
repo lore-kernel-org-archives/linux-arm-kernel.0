@@ -1,111 +1,34 @@
-From: phorton@bitbox.co.uk (Peter Horton)
-Date: Fri, 28 May 2010 16:37:26 +0100
-Subject: [PATCH] Fix AT91SAM9G20 reset
-Message-ID: <20100528153725.GA5102@axolotl.localnet>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 28 May 2010 10:56:13 -0700
+Subject: [PATCH 05/25] msm: generalize clock support.
+In-Reply-To: <20100527153413.GC1957@elf.ucw.cz>
+References: <> <1273700754-10256-6-git-send-email-dwalker@codeaurora.org>
+	<20100524185540.GA1292@ucw.cz>
+	<20100525005115.GA7791@huya.qualcomm.com>
+	<20100526173753.GD9069@elf.ucw.cz>
+	<20100526185833.GA5548@huya.qualcomm.com>
+	<20100527153413.GC1957@elf.ucw.cz>
+Message-ID: <20100528175613.GA5455@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix AT91SAM9G20 as per the errata in the datasheet.
+On Thu, May 27, 2010 at 05:34:14PM +0200, Pavel Machek wrote:
 
-If the SDRAM is not cleanly shutdown before reset it can be left driving
-the bus, which then stops the bootloader booting from NAND.
+> > > Are you sure? I believe that Dual GPL/BSD is ok, just BSD is not.
+> > 
+> > It is, according to the FSF
+> > <http://www.gnu.org/licenses/license-list.html>
+> 
+> Not acording to kernel sources. Please make it dual GPL/BSD.
 
-Signed-off-by: Peter Horton <phorton@bitbox.co.uk>
---
+If this is actually necessary, we can go back and wrangle another
+license change, but it is a fairly painful and unpleasant
+process.
 
-Index: linux-2.6.32/arch/arm/mach-at91/Makefile
-===================================================================
---- linux-2.6.32.orig/arch/arm/mach-at91/Makefile	2009-12-09 13:33:28.000000000 +0000
-+++ linux-2.6.32/arch/arm/mach-at91/Makefile	2009-12-09 13:33:28.000000000 +0000
-@@ -16,7 +16,7 @@
- obj-$(CONFIG_ARCH_AT91SAM9G10)	+= at91sam9261.o at91sam926x_time.o at91sam9261_devices.o sam9_smc.o
- obj-$(CONFIG_ARCH_AT91SAM9263)	+= at91sam9263.o at91sam926x_time.o at91sam9263_devices.o sam9_smc.o
- obj-$(CONFIG_ARCH_AT91SAM9RL)	+= at91sam9rl.o at91sam926x_time.o at91sam9rl_devices.o sam9_smc.o
--obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o sam9_smc.o
-+obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o sam9_smc.o at91sam9g20_reset.o
- obj-$(CONFIG_ARCH_AT91SAM9G45)	+= at91sam9g45.o at91sam926x_time.o at91sam9g45_devices.o sam9_smc.o
- obj-$(CONFIG_ARCH_AT91CAP9)	+= at91cap9.o at91sam926x_time.o at91cap9_devices.o sam9_smc.o
- obj-$(CONFIG_ARCH_AT572D940HF)  += at572d940hf.o at91sam926x_time.o at572d940hf_devices.o sam9_smc.o
-Index: linux-2.6.32/arch/arm/mach-at91/at91sam9260.c
-===================================================================
---- linux-2.6.32.orig/arch/arm/mach-at91/at91sam9260.c	2009-12-03 03:51:21.000000000 +0000
-+++ linux-2.6.32/arch/arm/mach-at91/at91sam9260.c	2009-12-09 13:45:50.000000000 +0000
-@@ -25,6 +25,8 @@
- #include "generic.h"
- #include "clock.h"
- 
-+extern void at91sam9g20_reset(void);
-+
- static struct map_desc at91sam9260_io_desc[] __initdata = {
- 	{
- 		.virtual	= AT91_VA_BASE_SYS,
-@@ -327,7 +329,11 @@
- 	else
- 		iotable_init(at91sam9260_sram_desc, ARRAY_SIZE(at91sam9260_sram_desc));
- 
--	at91_arch_reset = at91sam9260_reset;
-+	if (cpu_is_at91sam9g20())
-+		at91_arch_reset = at91sam9g20_reset;
-+	else
-+		at91_arch_reset = at91sam9260_reset;
-+
- 	pm_power_off = at91sam9260_poweroff;
- 	at91_extern_irq = (1 << AT91SAM9260_ID_IRQ0) | (1 << AT91SAM9260_ID_IRQ1)
- 			| (1 << AT91SAM9260_ID_IRQ2);
-Index: linux-2.6.32/arch/arm/mach-at91/at91sam9g20_reset.S
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.32/arch/arm/mach-at91/at91sam9g20_reset.S	2009-12-09 13:33:28.000000000 +0000
-@@ -0,0 +1,52 @@
-+/*
-+ * (C) BitBox Ltd 2010
-+ *
-+ * reset AT91SAM9G20 as per errata
-+ *
-+ * unless the SDRAM is cleanly shutdown before we hit the
-+ * reset register it can be left driving the data bus and
-+ * killing the chance of a subsequent boot from NAND
-+ */
-+
-+#define CP15_CR_I			(1 << 12)
-+
-+#define SYS_VIRT_OFS			(-0x01000000)
-+
-+#define SDRAMC_BASE			(SYS_VIRT_OFS + 0xffffea00)
-+#define  SDRAMC_TR			0x0004
-+#define  SDRAMC_LPR			0x0010
-+#define   SDRAMC_LPCB_POWER_DOWN	2
-+
-+#define RSTC_BASE			(SYS_VIRT_OFS + 0xfffffd00)
-+#define  RSTC_CR			0x0000
-+#define   RSTC_PROCRST			(1 << 0)
-+#define   RSTC_PERRST			(1 << 2)
-+#define   RSTC_KEY			(0xa5 << 24)
-+
-+			.arm
-+
-+			.globl	at91sam9g20_reset
-+
-+at91sam9g20_reset:	mov	r0, #0
-+			mcr	p15, 0, r0, c7, c5, 0	@ flush I-cache
-+
-+			mrc	p15, 0, r0, c1, c0, 0
-+			orr	r0, r0, #CP15_CR_I
-+			mcr	p15, 0, r0, c1, c0, 0	@ enable I-cache
-+
-+			ldr	r0, =SDRAMC_BASE	@ preload constants
-+			ldr	r1, =RSTC_BASE
-+
-+			mov	r2, #1
-+			mov	r3, #SDRAMC_LPCB_POWER_DOWN
-+			ldr	r4, =RSTC_KEY | RSTC_PERRST | RSTC_PROCRST
-+
-+			.balign	32			@ align to cache line
-+
-+			str	r2, [r0, #SDRAMC_TR]	@ disable SDRAM access
-+			str	r3, [r0, #SDRAMC_LPR]	@ power down SDRAM
-+			str	r4, [r1, #RSTC_CR]	@ reset processor
-+
-+			b	.
-+
-+/* vi:set ft=ignore ai: */
+We changed to this license initially because of an objection to
+a dual license (admittedly a poorly worded one).
+
+The BSD license is compatible with the GPL, and it should not be
+necessary to add any kind of dual license to it.
+
+David
