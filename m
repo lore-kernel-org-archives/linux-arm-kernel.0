@@ -1,163 +1,104 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 28 May 2010 23:17:19 +0900
-Subject: [PATCH] s5pv210: Change the base ram address to 0x3000'0000
-In-Reply-To: <20100528070937.GW4720@trinity.fluff.org>
-References: <20100528023559.GA8174@july>
-	<20100528035352.GO4720@trinity.fluff.org>
-	<AANLkTikfCdHgzgRjVikeGYg5wK_meh3NyDRCOzs6j6uc@mail.gmail.com>
-	<20100528042029.GS4720@trinity.fluff.org>
-	<AANLkTimBlk4zAA_dwvENfmhr-bUb3VXRjJ5wsxI76Oih@mail.gmail.com>
-	<20100528060223.GU4720@trinity.fluff.org>
-	<AANLkTil1lYz4qXtxQF1zjBTUzLHiFvMpKXCKh94kN5-5@mail.gmail.com>
-	<20100528070937.GW4720@trinity.fluff.org>
-Message-ID: <AANLkTils1sTRga53I_Jxl_IsVbfIRQiFR43kGZrTNMQA@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 28 May 2010 22:17:31 +0800
+Subject: [PATCH 1/2] pxa/spitz: Correctly register WM8750
+In-Reply-To: <20100528133323.GA2323@ucw.cz>
+References: <1275014733-21588-1-git-send-email-marek.vasut@gmail.com>
+	<20100528133323.GA2323@ucw.cz>
+Message-ID: <AANLkTin07va1RbvK_D68ZMZzoOcQR014Vaq8CcvyYMW7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 28, 2010 at 4:09 PM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Fri, May 28, 2010 at 03:19:43PM +0900, Kyungmin Park wrote:
->> On Fri, May 28, 2010 at 3:02 PM, Ben Dooks <ben-linux@fluff.org> wrote:
->> > On Fri, May 28, 2010 at 02:25:41PM +0900, Kyungmin Park wrote:
->> >> On Fri, May 28, 2010 at 1:20 PM, Ben Dooks <ben-linux@fluff.org> wrote:
->> >> > On Fri, May 28, 2010 at 01:02:24PM +0900, Kyungmin Park wrote:
->> >> >> On Fri, May 28, 2010 at 12:53 PM, Ben Dooks <ben-linux@fluff.org> wrote:
->> >> >> > On Fri, May 28, 2010 at 11:35:59AM +0900, Kyungmin Park wrote:
->> >> >> >> s5pc110 (aka s5pv210) has 2 DRAM port and used it both usually.
->> >> >> >> Assume DMC0 starts with 0x2000'0000 with 128MiB.
->> >> >> >> DMC1 starts with 0x4000'0000 with 128MiB.
->> >> >> >> Note that DMC1 has to start address 0x4000'0000 at least.
->> >> >> >>
->> >> >> >> Then there's too much memory hole 0x1800'0000 (128MiB + 256MiB)
->> >> >> >>
->> >> >> >> To reduce memory waste, the DMC0 start with 0x3000'0000.
->> >> >
->> >> > but you just said DMC0 starts at 0x2... ? Is this reconfigurable via
->> >> > software, if so can it be moved once initialisation si done? how fixed
->> >> > is this?
->> >>
->> >> DMC0 can set the its start address at bootloader, it can range from
->> >> 0x2000'0000 to 0x3fff'ffff.
->> >>
->> >> My goal is that reduce the 256MiB memory area and can use the full
->> >> memory without HIGHMEM and 2G/2G split configuration.
->> >
->> > If I remember correctly, te device has 4x256MiB banks, of which the
->> > population is external on S5PV210 or packaging with the S5PC1xx series.
->> >
->> > On the split situation, is it really that bad to have a 2G/2G split,
->> > are you currently running into a situation where a single process
->> > really needs that much address space (especially given the fact that
->> > there can only ever be 1GiB of real memory in the system)?
+On Fri, May 28, 2010 at 9:33 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> On Fri 2010-05-28 04:45:32, Marek Vasut wrote:
+>> This patch registers the WM8750 codec on a proper place on the SPITZ machine
+>> after the WM8750 driver was converted to new API.
 >>
->> By reduce the 256MiB memory from 0x2000'0000 to 0x3000'0000,
->> we can use 128MiB + (128MiB hole) + 512MiB without any memory changes
->> and configurations.
->>
->> we got several boards which has 2Gib, 3Gib, and 4Gib. So to use these board
->> with one kernel. it's best way to use 0x3000'0000 and we used it from
->> first time.
->> but the problem is that mainline codes are committed as 0x2000'0000.
+>> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+>> ---
+>> ?arch/arm/mach-pxa/spitz.c | ? ?3 +++
+>> ?sound/soc/pxa/spitz.c ? ? | ? 36 ------------------------------------
+>> ?2 files changed, 3 insertions(+), 36 deletions(-)
 >
-> ok, but if we change the base to 0x3... then will we end up breaking the
-> kernel for someone else? ie, booting on an smdkv210?
->
-> I may have been confused with getting the sparsemem support in, as it
-> definetly deal with the case of memory holes, I also thought it would
-> allow the kernel to run with a non-hole'd virtual memory space.
->
-> The current kernel defconfig has 2:2, so not sure why the importance
-> of 1:3 split.
->
->> >
->> > On the higmem issue, I don't think we've ever had to bother with HIGMEM
->> > even on a SMDKV210 with 1GiB of memory fitted when we first did the support.
->> >
->> >> >
->> >> >> Hi,
->> >> >>
->> >> >> >
->> >> >> > We should be using SPARSEMEM now, is it not reducing any wastage
->> >> >> > in virtual memory space?
->> >> >>
->> >> >> Please consider the older kernel also. and most systems are designed
->> >> >> for 0x3000'0000.
->> >> >
->> >> > Ok, will a kernel with the base-address set to 0x3... work when loaded
->> >> > on a system with RAM starting at 0x2... ? I'm not sure the answer to this
->> >> > question.
->> >>
->> >> Then can't detect last 2Gib memory, only detect first 2Gib memory at
->> >> kernel 2.6.29.
->> >
->> > Not sure how to deal with this one.
->> >
->> >> >
->> >> > I'd rather try and get one kernel working on all systems with the S5PV210
->> >> > if possible instead of havign to pick which ones have certain base addresses
->> >> >
->> >> >
->> >> >> >
->> >> >> > How will the user change their board to deal with this change to hte
->> >> >> > kernel?
->> >> >>
->> >> >> Now we got the these memory
->> >> >> DMC0 has 128MiB and DMC1 has 512MiB.
->> >> >> Then it uses the memory from 0x2000'0000 to 0x5fff'ffff. it used 1GiB
->> >> >> memory address space.
->> >> >> Of course we can enable thie HIGHMEM but older kernel doesn't support it fully.
->> >> >> Also I hope to use the 3G/1G memory scheme.
->> >> >
->> >> > Given you can only get 1G of real memory into a S5PV210, is it really
->> >> > necessary to go to 3G/1G? What problems are there with 2/2 split?
->> >>
->> >> Right it's best but can't. It's hardware problem. DMC0 has different
->> >> memory with 166MHz and DMC1 has 200MHz
->> >> It can't change it.
->> >
->> > Yes, but that's an allocation issue not a layout issue. Whatever is
->> > allocating pages needs to know to prefer the DMC1 memory.
->>
->> No it's hardware issue. when connect the 166MHz memory we need to
->> async bridge to work on 200MHz.
->> In this case, we can't use DMC0 CS1 for 200MHz memory device. that's
->> reason we put the 4Gib memory to DMC1.
->
-> Ok, but you're still giving all the memory to the kernel? If i've
-> calculated correctly then the kernel is still in the DMC0 area
-> with the 166MHz memory?
+> I got rejects on second file when trying to apply it on 2.6.34...?
 
-Right, kernel located at 0x30xx'xxxx, Is it possible to locate the
-kernel at 0x40xx'xxxx and use the 0x30xx'xxxx for free memory. I mean
-does the kernel locate in the middle of memory?
-If possible, it's best.
+Pavel,
 
-One note it's impossible to swap the DMC0 memory to DMC1. it's hardware wired.
+Could you give it a quick test? It does solve a building issue of
+spitz.
 
-Thank you,
-Kyungmin Park
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?Pavel
 >
->> Thank you,
->> Kyungmin Park
 >>
->> >
->> >> >
->> >> >> How to you think?
->> >> >
->> >> > I thought that when the s5pv210 was submitted we enabled the SPARSMEM
->> >> > support so that whatever DRAM configuration we could handle it within
->> >> > a single kernel.
->> >>
->> >> I also hope to use single kernel for s5p series. and that's reason I
->> >> hope to change it.
->> >> With some reason. mobile division has different memory types and DMC0
->> >> should be used fixed memory.
->> >> and only DMC1 can modify form 2Gib to 4Gib.
+>> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+>> index 4d2413e..c1048a3 100644
+>> --- a/arch/arm/mach-pxa/spitz.c
+>> +++ b/arch/arm/mach-pxa/spitz.c
+>> @@ -818,6 +818,9 @@ static struct i2c_board_info akita_i2c_board_info[] = {
+>> ? ? ? ? ? ? ? .type ? ? ? ? ? = "max7310",
+>> ? ? ? ? ? ? ? .addr ? ? ? ? ? = 0x18,
+>> ? ? ? ? ? ? ? .platform_data ?= &akita_ioexp,
+>> + ? ? }, {
+>> + ? ? ? ? ? ? .type ? ? ? ? ? = "wm8750",
+>> + ? ? ? ? ? ? .addr ? ? ? ? ? = 0x1b,
+>> ? ? ? },
+>> ?};
+>>
+>> diff --git a/sound/soc/pxa/spitz.c b/sound/soc/pxa/spitz.c
+>> index 1941a35..d256f5f 100644
+>> --- a/sound/soc/pxa/spitz.c
+>> +++ b/sound/soc/pxa/spitz.c
+>> @@ -328,38 +328,6 @@ static struct snd_soc_device spitz_snd_devdata = {
+>> ? ? ? .codec_dev = &soc_codec_dev_wm8750,
+>> ?};
+>>
+>> -/*
+>> - * FIXME: This is a temporary bodge to avoid cross-tree merge issues.
+>> - * New drivers should register the wm8750 I2C device in the machine
+>> - * setup code (under arch/arm for ARM systems).
+>> - */
+>> -static int wm8750_i2c_register(void)
+>> -{
+>> - ? ? struct i2c_board_info info;
+>> - ? ? struct i2c_adapter *adapter;
+>> - ? ? struct i2c_client *client;
+>> -
+>> - ? ? memset(&info, 0, sizeof(struct i2c_board_info));
+>> - ? ? info.addr = 0x1b;
+>> - ? ? strlcpy(info.type, "wm8750", I2C_NAME_SIZE);
+>> -
+>> - ? ? adapter = i2c_get_adapter(0);
+>> - ? ? if (!adapter) {
+>> - ? ? ? ? ? ? printk(KERN_ERR "can't get i2c adapter 0\n");
+>> - ? ? ? ? ? ? return -ENODEV;
+>> - ? ? }
+>> -
+>> - ? ? client = i2c_new_device(adapter, &info);
+>> - ? ? i2c_put_adapter(adapter);
+>> - ? ? if (!client) {
+>> - ? ? ? ? ? ? printk(KERN_ERR "can't add i2c device at 0x%x\n",
+>> - ? ? ? ? ? ? (unsigned int)info.addr);
+>> - ? ? ? ? ? ? return -ENODEV;
+>> - ? ? }
+>> -
+>> - ? ? return 0;
+>> -}
+>> -
+>> ?static struct platform_device *spitz_snd_device;
+>>
+>> ?static int __init spitz_init(void)
+>> @@ -369,10 +337,6 @@ static int __init spitz_init(void)
+>> ? ? ? if (!(machine_is_spitz() || machine_is_borzoi() || machine_is_akita()))
+>> ? ? ? ? ? ? ? return -ENODEV;
+>>
+>> - ? ? ret = wm8750_i2c_setup();
+>> - ? ? if (ret != 0)
+>> - ? ? ? ? ? ? return ret;
+>> -
+>> ? ? ? spitz_snd_device = platform_device_alloc("soc-audio", -1);
+>> ? ? ? if (!spitz_snd_device)
+>> ? ? ? ? ? ? ? return -ENOMEM;
 >
 > --
-> --
-> Ben
->
-> Q: ? ? ?What's a light-year?
-> A: ? ? ?One-third less calories than a regular year.
->
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
 >
