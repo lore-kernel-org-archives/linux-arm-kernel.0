@@ -1,60 +1,53 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 28 May 2010 02:08:51 +0100
-Subject: defining ARM machine type properly
-In-Reply-To: <4BFE8AF3.4060304@gmail.com>
-References: <4BFD8E7A.6050103@gmail.com>
-	<20100527010742.GH7248@trinity.fluff.org>
-	<4BFE8AF3.4060304@gmail.com>
-Message-ID: <20100528010851.GN4720@trinity.fluff.org>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 28 May 2010 11:35:59 +0900
+Subject: [PATCH] s5pv210: Change the base ram address to 0x3000'0000
+Message-ID: <20100528023559.GA8174@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 27, 2010 at 11:08:35AM -0400, f. achkar wrote:
-> On 05/26/2010 09:07 PM, Ben Dooks wrote:
-> > On Wed, May 26, 2010 at 05:11:22PM -0400, f. achkar wrote:
-> >   
-> >> hi,
-> >> I'm trying to port smdk2450 arch to the a new kernel 2.6.32-9, I did the
-> >>     
-> > I suspect what you are doing is trying to port it to a machine that
-> > was loosley based on the SMDK2450 and that whoever did the uboot port
-> > failed to understand that when the hardware changes then the machine
-> > number needs to change too.
-> >
-> >   
-> >> initial work as per various googled documents, but somehow the current
-> >> initial Image is failing at arch/arm/kernel/head-common.S :
-> >> '__lookup_processor_type', and eventually goes to '__error_a' of the
-> >> same file! this seems to be related to the definition of machine_type as
-> >> defined in :
-> >> include/asm-arm/mach-types.h  and arch/arm/tools/mach-types*
-> >> I checked where the definition goes in  include/asm-arm/mach-types.h by
-> >> inserting
-> >>     
-> > you probably wanted to enable the debugging in the head code.
-> >
-> >   
-> >> #error 2223XX
-> >> into various parts of that header and seems fine at the point.
-> >> nevertheless I'm not 100 sure
-> >> I wonder if the is a definitive reference to guide in this matter,
-> >> better yet a check-list like procedure??
-> >> thanks,
-> >> ferar
-> >>     
-> > How about downloading the latest kernel, with nice fresh S3C2450 support
-> > in it?
-> >   
-> which version is that? 2.6.34 does not contain such support!
-> thanks
+s5pc110 (aka s5pv210) has 2 DRAM port and used it both usually.
+Assume DMC0 starts with 0x2000'0000 with 128MiB.
+DMC1 starts with 0x4000'0000 with 128MiB.
+Note that DMC1 has to start address 0x4000'0000 at least.
 
-2.6.34-git
+Then there's too much memory hole 0x1800'0000 (128MiB + 256MiB)
 
-core support is in, hopefully core peripheral support can be sorted out
-and released as soon as possible.
+To reduce memory waste, the DMC0 start with 0x3000'0000.
 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+diff --git a/arch/arm/mach-s5pv210/Makefile.boot b/arch/arm/mach-s5pv210/Makefile.boot
+index ff90aa1..b0909e3 100644
+--- a/arch/arm/mach-s5pv210/Makefile.boot
++++ b/arch/arm/mach-s5pv210/Makefile.boot
+@@ -1,2 +1,2 @@
+-   zreladdr-y	:= 0x20008000
+-params_phys-y	:= 0x20000100
++   zreladdr-y	:= 0x30008000
++params_phys-y	:= 0x30000100
+diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
+index 34eb168..9f4c368 100644
+--- a/arch/arm/mach-s5pv210/include/mach/map.h
++++ b/arch/arm/mach-s5pv210/include/mach/map.h
+@@ -74,7 +74,7 @@
+ #define S5PV210_PA_VIC3		(0xF2300000)
+ #define S5P_PA_VIC3		S5PV210_PA_VIC3
+ 
+-#define S5PV210_PA_SDRAM	(0x20000000)
++#define S5PV210_PA_SDRAM	(0x30000000)
+ #define S5P_PA_SDRAM		S5PV210_PA_SDRAM
+ 
+ /* I2S */
+diff --git a/arch/arm/mach-s5pv210/include/mach/memory.h b/arch/arm/mach-s5pv210/include/mach/memory.h
+index 379117e..07a15d8 100644
+--- a/arch/arm/mach-s5pv210/include/mach/memory.h
++++ b/arch/arm/mach-s5pv210/include/mach/memory.h
+@@ -13,7 +13,7 @@
+ #ifndef __ASM_ARCH_MEMORY_H
+ #define __ASM_ARCH_MEMORY_H
+ 
+-#define PHYS_OFFSET		UL(0x20000000)
++#define PHYS_OFFSET		UL(0x30000000)
+ #define CONSISTENT_DMA_SIZE	(SZ_8M + SZ_4M + SZ_2M)
+ 
+ /* Maximum of 256MiB in one bank */
