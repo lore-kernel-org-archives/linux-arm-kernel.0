@@ -1,69 +1,53 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 28 May 2010 11:29:06 +0100
-Subject: [PATCH] ARM: S5PV210: serial: Fix section mismatch warning
-In-Reply-To: <4BFF9917.5000503@samsung.com>
-References: <4BFF9917.5000503@samsung.com>
-Message-ID: <20100528102906.GB4720@trinity.fluff.org>
+Date: Fri, 28 May 2010 11:30:59 +0100
+Subject: [PATCH 1/2] ARM: S5PV210: Add OneNAND device to the GONI board
+In-Reply-To: <4BFF6594.5050502@samsung.com>
+References: <4BFF6594.5050502@samsung.com>
+Message-ID: <20100528103059.GC4720@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 28, 2010 at 07:21:11PM +0900, Joonyoung Shim wrote:
-> Rename the structure to avoid the following warning:
+On Fri, May 28, 2010 at 03:41:24PM +0900, Joonyoung Shim wrote:
+> This patch is to support OneNAND device to the GONI board.
 > 
-> WARNING: drivers/serial/built-in.o(.data+0x534): Section mismatch in reference from the variable s5p_serial_drv to the function .devexit.text:s3c24xx_serial_remove()
-> The variable s5p_serial_drv references
-> the function __devexit s3c24xx_serial_remove()
-> If the reference is valid then annotate the
-> variable with __exit* (see linux/init.h) or name the variable:
-> *driver, *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-if it's from you, then why is there a signoff from marek.
-
-if Marek is the original authour then there should be a "From:" line
-attributing the patch to him.
-
 > Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+
+i'd say the second signoff here is at best un-necessary as Joonyoung
+is the sender of the patch and at worst incorrect.
+
+there's acked-by or other tags for people who've reviewed or tested the
+patch.
+
 > ---
->  drivers/serial/s5pv210.c |    8 ++++----
->  1 files changed, 4 insertions(+), 4 deletions(-)
+>  arch/arm/mach-s5pv210/Kconfig     |    1 +
+>  arch/arm/mach-s5pv210/mach-goni.c |    1 +
+>  2 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> diff --git a/drivers/serial/s5pv210.c b/drivers/serial/s5pv210.c
-> index 8dc0383..4a789e5 100644
-> --- a/drivers/serial/s5pv210.c
-> +++ b/drivers/serial/s5pv210.c
-> @@ -119,7 +119,7 @@ static int s5p_serial_probe(struct platform_device *pdev)
->  	return s3c24xx_serial_probe(pdev, s5p_uart_inf[pdev->id]);
->  }
+> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+> index 0761eac..d0432c6 100644
+> --- a/arch/arm/mach-s5pv210/Kconfig
+> +++ b/arch/arm/mach-s5pv210/Kconfig
+> @@ -58,6 +58,7 @@ config MACH_GONI
+>  	bool "GONI"
+>  	select CPU_S5PV210
+>  	select ARCH_SPARSEMEM_ENABLE
+> +	select S5PC110_DEV_ONENAND
+>  	help
+>  	  Machine support for Samsung GONI board
+>  	  S5PC110(MCP) is one of package option of S5PV210
+> diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+> index 4863b13..bea812f 100644
+> --- a/arch/arm/mach-s5pv210/mach-goni.c
+> +++ b/arch/arm/mach-s5pv210/mach-goni.c
+> @@ -72,6 +72,7 @@ static struct s3c2410_uartcfg goni_uartcfgs[] __initdata = {
+>  };
 >  
-> -static struct platform_driver s5p_serial_drv = {
-> +static struct platform_driver s5p_serial_driver = {
->  	.probe		= s5p_serial_probe,
->  	.remove		= __devexit_p(s3c24xx_serial_remove),
->  	.driver		= {
-> @@ -130,19 +130,19 @@ static struct platform_driver s5p_serial_drv = {
+>  static struct platform_device *goni_devices[] __initdata = {
+> +	&s5pc110_device_onenand,
+>  };
 >  
->  static int __init s5pv210_serial_console_init(void)
->  {
-> -	return s3c24xx_serial_initconsole(&s5p_serial_drv, s5p_uart_inf);
-> +	return s3c24xx_serial_initconsole(&s5p_serial_driver, s5p_uart_inf);
->  }
->  
->  console_initcall(s5pv210_serial_console_init);
->  
->  static int __init s5p_serial_init(void)
->  {
-> -	return s3c24xx_serial_init(&s5p_serial_drv, *s5p_uart_inf);
-> +	return s3c24xx_serial_init(&s5p_serial_driver, *s5p_uart_inf);
->  }
->  
->  static void __exit s5p_serial_exit(void)
->  {
-> -	platform_driver_unregister(&s5p_serial_drv);
-> +	platform_driver_unregister(&s5p_serial_driver);
->  }
->  
->  module_init(s5p_serial_init);
+>  static void __init goni_map_io(void)
 > -- 
 > 1.7.0.4
 
