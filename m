@@ -1,116 +1,32 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 28 May 2010 19:34:08 +0200
-Subject: [PATCH 2/2] ARM: move IOP to use common mult/shift calculation code
-Message-ID: <1275068048-17778-1-git-send-email-linus.walleij@stericsson.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 28 May 2010 19:50:43 +0100
+Subject: [PATCH 7/8] ARM: Use the Inner Shareable I-cache and BTB ops
+	on ARMv7 SMP
+In-Reply-To: <20100504164454.26355.7003.stgit@e102109-lin.cambridge.arm.com>
+References: <20100504163823.26355.58568.stgit@e102109-lin.cambridge.arm.com>
+	<20100504164454.26355.7003.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100528185043.GA5189@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the infrastructure for determining shift/mult values from a
-clock rate and a minimum programmable rate is now in the kernel,
-lets remove this custom code.
+On Tue, May 04, 2010 at 05:44:54PM +0100, Catalin Marinas wrote:
+> The standard I-cache Invalidate All (ICIALLU) and Branch Predication
+> Invalidate All (BPIALL) operations are not automatically broadcast to
+> the other CPUs in an ARMv7 MP system. The patch adds the Inner Shareable
+> variants, ICIALLUIS and BPIALLIS, if ARMv7 and SMP.
 
-Cc: Mikael Pettersson <mikpe@it.uu.se>
-Cc: Deepak Saxena <dsaxena@plexity.net>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
-Mikael: I cannot test this change, but I have compiled it against
-iop33x_defconfig. You'd have to test it and Acked-by: it before
-I do anything else with it. Try to think about what a minimum range
-would be for the generic IOP platform...
----
- arch/arm/plat-iop/time.c |   53 +++++++--------------------------------------
- 1 files changed, 9 insertions(+), 44 deletions(-)
+FYI, I'm considering reverting this patch; this patch is one of two
+responsible for causing a stability regression of Versatile Express
+platform.
 
-diff --git a/arch/arm/plat-iop/time.c b/arch/arm/plat-iop/time.c
-index 6c8a02a..85d3e55 100644
---- a/arch/arm/plat-iop/time.c
-+++ b/arch/arm/plat-iop/time.c
-@@ -29,6 +29,11 @@
- #include <mach/time.h>
- 
- /*
-+ * Minimum clocksource/clockevent timer range in seconds
-+ */
-+#define IOP_MIN_RANGE 4
-+
-+/*
-  * IOP clocksource (free-running timer 1).
-  */
- static cycle_t iop_clocksource_read(struct clocksource *unused)
-@@ -44,27 +49,6 @@ static struct clocksource iop_clocksource = {
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
- };
- 
--static void __init iop_clocksource_set_hz(struct clocksource *cs, unsigned int hz)
--{
--	u64 temp;
--	u32 shift;
--
--	/* Find shift and mult values for hz. */
--	shift = 32;
--	do {
--		temp = (u64) NSEC_PER_SEC << shift;
--		do_div(temp, hz);
--		if ((temp >> 32) == 0)
--			break;
--	} while (--shift != 0);
--
--	cs->shift = shift;
--	cs->mult = (u32) temp;
--
--	printk(KERN_INFO "clocksource: %s uses shift %u mult %#x\n",
--	       cs->name, cs->shift, cs->mult);
--}
--
- /*
-  * IOP sched_clock() implementation via its clocksource.
-  */
-@@ -130,27 +114,6 @@ static struct clock_event_device iop_clockevent = {
- 	.set_mode	= iop_set_mode,
- };
- 
--static void __init iop_clockevent_set_hz(struct clock_event_device *ce, unsigned int hz)
--{
--	u64 temp;
--	u32 shift;
--
--	/* Find shift and mult values for hz. */
--	shift = 32;
--	do {
--		temp = (u64) hz << shift;
--		do_div(temp, NSEC_PER_SEC);
--		if ((temp >> 32) == 0)
--			break;
--	} while (--shift != 0);
--
--	ce->shift = shift;
--	ce->mult = (u32) temp;
--
--	printk(KERN_INFO "clockevent: %s uses shift %u mult %#lx\n",
--	       ce->name, ce->shift, ce->mult);
--}
--
- static irqreturn_t
- iop_timer_interrupt(int irq, void *dev_id)
- {
-@@ -190,7 +153,8 @@ void __init iop_init_time(unsigned long tick_rate)
- 	 */
- 	write_tmr0(timer_ctl & ~IOP_TMR_EN);
- 	setup_irq(IRQ_IOP_TIMER0, &iop_timer_irq);
--	iop_clockevent_set_hz(&iop_clockevent, tick_rate);
-+	clockevents_calc_mult_shift(&iop_clockevent,
-+				    tick_rate, IOP_MIN_RANGE);
- 	iop_clockevent.max_delta_ns =
- 		clockevent_delta2ns(0xfffffffe, &iop_clockevent);
- 	iop_clockevent.min_delta_ns =
-@@ -207,6 +171,7 @@ void __init iop_init_time(unsigned long tick_rate)
- 	write_trr1(0xffffffff);
- 	write_tcr1(0xffffffff);
- 	write_tmr1(timer_ctl);
--	iop_clocksource_set_hz(&iop_clocksource, tick_rate);
-+	clocksource_calc_mult_shift(&iop_clocksource, tick_rate,
-+				    IOP_MIN_RANGE);
- 	clocksource_register(&iop_clocksource);
- }
--- 
-1.6.3.3
+The two commits responsible for making Versatile Express userspace
+completely unstable are:
+
+b8349b569aae661dea9d59d7d2ee587ccea3336c
+ARM: 6112/1: Use the Inner Shareable I-cache and BTB ops on ARMv7 SMP
+
+7e5a69e83ba7a0d5917ad830f417cba8b8d6aa72
+ARM: 6007/1: fix highmem with VIPT cache and DMA
+
+Most of the instability is from the second patch, but reverting just
+the second patch doesn't fully restore userspace stability.
