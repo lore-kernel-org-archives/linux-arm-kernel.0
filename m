@@ -1,141 +1,42 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 28 May 2010 07:35:46 +0100
-Subject: [PATCH 05/15] ARM: S5P6442: Change to using
-	s3c_gpio_cfgpin_range()
-In-Reply-To: <AANLkTilPCk0NqJ7od6ZBorqPrlG0xCjdPaim1Q3WwZMH@mail.gmail.com>
-References: <1275026212-27510-1-git-send-email-ben-linux@fluff.org>
-	<1275026212-27510-6-git-send-email-ben-linux@fluff.org>
-	<AANLkTilPCk0NqJ7od6ZBorqPrlG0xCjdPaim1Q3WwZMH@mail.gmail.com>
-Message-ID: <20100528063546.GV4720@trinity.fluff.org>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Fri, 28 May 2010 15:41:24 +0900
+Subject: [PATCH 1/2] ARM: S5PV210: Add OneNAND device to the GONI board
+Message-ID: <4BFF6594.5050502@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 28, 2010 at 03:24:02PM +0900, Kyungmin Park wrote:
-> Hi,
-> 
-> Looks good but I'm afraid it's more difficult to find pin
-> configuration from typo.
+This patch is to support OneNAND device to the GONI board.
 
-I'm not sure if that's really so much of a problem.
+Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv210/Kconfig     |    1 +
+ arch/arm/mach-s5pv210/mach-goni.c |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+index 0761eac..d0432c6 100644
+--- a/arch/arm/mach-s5pv210/Kconfig
++++ b/arch/arm/mach-s5pv210/Kconfig
+@@ -58,6 +58,7 @@ config MACH_GONI
+ 	bool "GONI"
+ 	select CPU_S5PV210
+ 	select ARCH_SPARSEMEM_ENABLE
++	select S5PC110_DEV_ONENAND
+ 	help
+ 	  Machine support for Samsung GONI board
+ 	  S5PC110(MCP) is one of package option of S5PV210
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index 4863b13..bea812f 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -72,6 +72,7 @@ static struct s3c2410_uartcfg goni_uartcfgs[] __initdata = {
+ };
  
-> On Fri, May 28, 2010 at 2:56 PM, Ben Dooks <ben-linux@fluff.org> wrote:
-> > Change the code setting ranges of GPIO pins using s3c_gpio_cfgpin() to
-> > use the recently introduced s3c_gpio_cfgpin_range().
-> >
-> > Signed-off-by: Ben Dooks <ben-linux@fluff.org>
-> > ---
-> > ?arch/arm/mach-s5p6442/dev-audio.c | ? 30 ++++++++++--------------------
-> > ?arch/arm/mach-s5p6442/dev-spi.c ? | ? ?4 +---
-> > ?2 files changed, 11 insertions(+), 23 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-s5p6442/dev-audio.c b/arch/arm/mach-s5p6442/dev-audio.c
-> > index cb801e1..0e57caf 100644
-> > --- a/arch/arm/mach-s5p6442/dev-audio.c
-> > +++ b/arch/arm/mach-s5p6442/dev-audio.c
-> > @@ -21,22 +21,16 @@
-> >
-> > ?static int s5p6442_cfg_i2s(struct platform_device *pdev)
-> > ?{
-> > + ? ? ? unsigned int base;
-> > +
-> > ? ? ? ?/* configure GPIO for i2s port */
-> > ? ? ? ?switch (pdev->id) {
-> > ? ? ? ?case 1:
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC1(0), S3C_GPIO_SFN(2));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC1(1), S3C_GPIO_SFN(2));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC1(2), S3C_GPIO_SFN(2));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC1(3), S3C_GPIO_SFN(2));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC1(4), S3C_GPIO_SFN(2));
-> > + ? ? ? ? ? ? ? base = S5P6442_GPC1(0);
-> > ? ? ? ? ? ? ? ?break;
-> >
-> > ? ? ? ?case -1:
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC0(0), S3C_GPIO_SFN(2));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC0(1), S3C_GPIO_SFN(2));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC0(2), S3C_GPIO_SFN(2));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC0(3), S3C_GPIO_SFN(2));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC0(4), S3C_GPIO_SFN(2));
-> > + ? ? ? ? ? ? ? base = S5P6442_GPC0(0);
-> > ? ? ? ? ? ? ? ?break;
-> >
-> > ? ? ? ?default:
-> > @@ -44,6 +38,7 @@ static int s5p6442_cfg_i2s(struct platform_device *pdev)
-> > ? ? ? ? ? ? ? ?return -EINVAL;
-> > ? ? ? ?}
-> >
-> > + ? ? ? s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(2));
-> > ? ? ? ?return 0;
-> > ?}
-> >
-> > @@ -111,21 +106,15 @@ struct platform_device s5p6442_device_iis1 = {
-> >
-> > ?static int s5p6442_pcm_cfg_gpio(struct platform_device *pdev)
-> > ?{
-> > + ? ? ? unsigned int base;
-> > +
-> > ? ? ? ?switch (pdev->id) {
-> > ? ? ? ?case 0:
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC0(0), S3C_GPIO_SFN(3));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC0(1), S3C_GPIO_SFN(3));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC0(2), S3C_GPIO_SFN(3));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC0(3), S3C_GPIO_SFN(3));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC0(4), S3C_GPIO_SFN(3));
-> > + ? ? ? ? ? ? ? base = S5P6442_GPC0(0);
-> > ? ? ? ? ? ? ? ?break;
-> >
-> > ? ? ? ?case 1:
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC1(0), S3C_GPIO_SFN(3));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC1(1), S3C_GPIO_SFN(3));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC1(2), S3C_GPIO_SFN(3));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC1(3), S3C_GPIO_SFN(3));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPC1(4), S3C_GPIO_SFN(3));
-> > + ? ? ? ? ? ? ? base = S5P6442_GPC1(0);
-> > ? ? ? ? ? ? ? ?break;
-> >
-> > ? ? ? ?default:
-> > @@ -133,6 +122,7 @@ static int s5p6442_pcm_cfg_gpio(struct platform_device *pdev)
-> > ? ? ? ? ? ? ? ?return -EINVAL;
-> > ? ? ? ?}
-> >
-> > + ? ? ? s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
-> > ? ? ? ?return 0;
-> > ?}
-> >
-> > diff --git a/arch/arm/mach-s5p6442/dev-spi.c b/arch/arm/mach-s5p6442/dev-spi.c
-> > index 3019952..1c5c170 100644
-> > --- a/arch/arm/mach-s5p6442/dev-spi.c
-> > +++ b/arch/arm/mach-s5p6442/dev-spi.c
-> > @@ -37,9 +37,7 @@ static int s5p6442_spi_cfg_gpio(struct platform_device *pdev)
-> > ?{
-> > ? ? ? ?switch (pdev->id) {
-> > ? ? ? ?case 0:
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPB(0), S3C_GPIO_SFN(2));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPB(2), S3C_GPIO_SFN(2));
-> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6442_GPB(3), S3C_GPIO_SFN(2));
-> > + ? ? ? ? ? ? ? s3c_gpio_cfgpin_range(S5P6442_GPB(0), 4, S3C_GPIO_SFN(2));
-> 
-> Where's the GPB(1)???
-
-you're right, this is an invalid change. will back it out.
+ static struct platform_device *goni_devices[] __initdata = {
++	&s5pc110_device_onenand,
+ };
  
-> Thank you,
-> Kyungmin Park
-> 
-> > ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6442_GPB(0), S3C_GPIO_PULL_UP);
-> > ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6442_GPB(2), S3C_GPIO_PULL_UP);
-> > ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6442_GPB(3), S3C_GPIO_PULL_UP);
-> > --
-> > 1.6.3.3
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> >
-
+ static void __init goni_map_io(void)
 -- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+1.7.0.4
