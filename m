@@ -1,32 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 28 May 2010 13:44:26 +0100
-Subject: [PATCH 2/5] ARM: S5PV210: Add keypad device helpers
-In-Reply-To: <4BFFAE4E.2040508@samsung.com>
-References: <4BFFAE4E.2040508@samsung.com>
-Message-ID: <20100528124426.GA8230@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 28 May 2010 15:54:48 +0200
+Subject: [PATCH] MAINTAINERS: some Atmel drivers change maintainer
+In-Reply-To: <20100528114245.3d030692@hskinnemoen-d830>
+References: <20100528114245.3d030692@hskinnemoen-d830>
+Message-ID: <1275054888-13828-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 28, 2010 at 08:51:42PM +0900, Joonyoung Shim wrote:
-> diff --git a/arch/arm/mach-s5pv210/setup-keypad.c b/arch/arm/mach-s5pv210/setup-keypad.c
-> new file mode 100644
-> index 0000000..03a9de1
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv210/setup-keypad.c
-> @@ -0,0 +1,34 @@
-> +/*
-> + * linux/arch/arm/mach-s5pv210/setup-keypad.c
-> + *
-> + * Copyright (C) 2010 Samsung Electronics Co.Ltd
-> + * Author: Joonyoung Shim <jy0922.shim@samsung.com>
-> + *
-> + *  This program is free software; you can redistribute  it and/or modify it
-> + *  under  the terms of  the GNU General  Public License as published by the
-> + *  Free Software Foundation;  either version 2 of the  License, or (at your
-> + *  option) any later version.
-> + *
-> + */
-> +
-> +#include <mach/gpio.h>
+I take over the maintenance of SPI, USART, Ethernet and USB gadget drivers.
+Those drivers are found in Atmel microcontrollers, both AT32/AVR32 and
+AT91/ARM.
 
-linux/gpio.h
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Haavard,
+I finally change the MAINTAINERS entries for all drivers that you were
+taking care of. I must admit that I was a bit frighten at the first place but
+anyway, since one year, I am getting used to it ;-)
+
+
+ MAINTAINERS |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 33047a6..d9ce9c6 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1148,7 +1148,7 @@ F:	drivers/mmc/host/atmel-mci.c
+ F:	drivers/mmc/host/atmel-mci-regs.h
+ 
+ ATMEL AT91 / AT32 SERIAL DRIVER
+-M:	Haavard Skinnemoen <hskinnemoen@atmel.com>
++M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+ S:	Supported
+ F:	drivers/serial/atmel_serial.c
+ 
+@@ -1160,18 +1160,18 @@ F:	drivers/video/atmel_lcdfb.c
+ F:	include/video/atmel_lcdc.h
+ 
+ ATMEL MACB ETHERNET DRIVER
+-M:	Haavard Skinnemoen <hskinnemoen@atmel.com>
++M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+ S:	Supported
+ F:	drivers/net/macb.*
+ 
+ ATMEL SPI DRIVER
+-M:	Haavard Skinnemoen <hskinnemoen@atmel.com>
++M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+ S:	Supported
+ F:	drivers/spi/atmel_spi.*
+ 
+ ATMEL USBA UDC DRIVER
+-M:	Haavard Skinnemoen <hskinnemoen@atmel.com>
+-L:	kernel at avr32linux.org
++M:	Nicolas Ferre <nicolas.ferre@atmel.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ W:	http://avr32linux.org/twiki/bin/view/Main/AtmelUsbDeviceDriver
+ S:	Supported
+ F:	drivers/usb/gadget/atmel_usba_udc.*
+-- 
+1.5.6.5
