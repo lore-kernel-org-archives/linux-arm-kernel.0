@@ -1,32 +1,74 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 30 May 2010 01:52:24 -0700
-Subject: [PATCH v2 1/5] ARM: SAMSUNG: Add keypad device support
-In-Reply-To: <201005300542.37715.marek.vasut@gmail.com>
-References: <1275188784-23395-1-git-send-email-jy0922.shim@samsung.com>
-	<201005300542.37715.marek.vasut@gmail.com>
-Message-ID: <20100530085224.GA28188@core.coreip.homeip.net>
+From: martin.ereth@arcor.de (Martin Ereth)
+Date: Sun, 30 May 2010 17:16:42 +0200
+Subject: strange characters on serial port when booting kernel on at91sam9263
+	board
+Message-ID: <4C02815A.8090402@arcor.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 30, 2010 at 05:42:37AM +0200, Marek Vasut wrote:
-> Dne Ne 30. kv?tna 2010 05:06:20 Joonyoung Shim napsal(a):
-> > + */
-> > +struct samsung_kp_platdata {
-> > +	const struct matrix_keymap_data	*keymap_data;
-> > +	unsigned int		rows;
-> > +	unsigned int		cols;
-> > +	unsigned int		rep;
-> 
-> I don't know, maybe using uint32_t here? On ARM, it doesn't matter so far as int 
-> will be always 32bit, but maybe we should just type the variables well ?
-> 
-> Guys, what do you think ?
-> 
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-I think unsigned int is fine, we do not care about particular size, just
-need "big enough". I'd change 'rep' to be a boolean though.
+Hi,
 
-Thanks.
+I have a board which is based on the AT91SAM9263-EK but with a little
+but annoying difference: SDRAM is smaller.
 
--- 
-Dmitry
+Thus I cannot use prebuilt images. I've compiled AT91Bootstrap-1.15
+which directly loads the linux kernel (2.6.34).
+I've tried a linux kernel built with buildroot and one compiled on my
+own using the toolchain of buildroot. Both are in uncompressed uImage
+format.
+
+When watching the serial port I get the output shown here [1]. After the
+last line, part [2] shows up. That looks like a wrong speed of the
+serial port. But I've tried all known speeds (using cu) but no good
+characters are showing up. :(
+
+The serial port is configured for 115200 baud. I am starting linux with
+console=ttyS0,115200.
+
+I think this is a problem with the kernel, maybe a wrong frequency or
+baud rate?
+
+What can I try to get the kernel running on this board?
+Is it better to compile the kernel on my own? What patches are recommended?
+Do I need to change the SDRAM size somewhere in the kernel sources or is
+this detected automatically?
+
+Thanks a lot in advance,
+Martin
+
+
+[1] (please do not feel disturbed by some debugging output)
+RomBOOT
+>Start AT91Bootstrap...
+init SDRAM
+init sdramc_hw
+sdramc_hw ok
+SDRAM ok
+======= load image header from nandflash =======
+init nandflash_hw
+nandflash_hw init ok
+nandflash_cfg_8bits_dbw_init ok
+======= load image from nandflash =======
+init nandflash_hw
+nandflash_hw init ok
+nandflash_cfg_8bits_dbw_init ok
+======= jump to entry point =======
+Uncompressing Linux... done, booting the kernel.
+
+[2]
+?*S???N???A?
+            ?1?Y?HWK???x*??A?
+                              ???V?,1?q?*P/?????Y$?a?#
+                                                      ???e?1
+(and so on)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2.0.14 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+
+iEYEARECAAYFAkwCgVkACgkQE5UqXaCvB8LyPgCgkjIUi3cMCOTzxqFey+OqKtE5
+qq4AoLFu5OHbima0ipQNuj6PZ7qOH8Fq
+=vfNO
+-----END PGP SIGNATURE-----
