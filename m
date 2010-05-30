@@ -1,45 +1,35 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Sun, 30 May 2010 06:21:14 +0100
-Subject: [PATCH v2 1/5] ARM: SAMSUNG: Add keypad device support
-In-Reply-To: <AANLkTimJyc8E_D_-95eeVFwOVXwJKM5xKCCW-7gkNWrU@mail.gmail.com>
-References: <1275188784-23395-1-git-send-email-jy0922.shim@samsung.com>
-	<201005300542.37715.marek.vasut@gmail.com>
-	<AANLkTilt_-UAZGZepwtIYM7HRuPsX7gsW_ppLZD1_bZq@mail.gmail.com>
-	<20100530045151.GE4720@trinity.fluff.org>
-	<AANLkTimJyc8E_D_-95eeVFwOVXwJKM5xKCCW-7gkNWrU@mail.gmail.com>
-Message-ID: <20100530052114.GF4720@trinity.fluff.org>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Sun, 30 May 2010 09:36:52 +0200
+Subject: 2.6.34 hangs during boot on PB11MPCore
+In-Reply-To: <AANLkTin9n6HDdiTnQoQ9mrmuzSR8JhZVq7uPgU86yqgU@mail.gmail.com>
+References: <AANLkTin9n6HDdiTnQoQ9mrmuzSR8JhZVq7uPgU86yqgU@mail.gmail.com>
+Message-ID: <20100530073652.GX2695@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 30, 2010 at 02:04:39PM +0900, Jassi Brar wrote:
-> On Sun, May 30, 2010 at 1:51 PM, Ben Dooks <ben-linux@fluff.org> wrote:
-> > On Sun, May 30, 2010 at 01:46:03PM +0900, Jassi Brar wrote:
-> >> On Sun, May 30, 2010 at 12:42 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> >> > Dne Ne 30. kv??tna 2010 05:06:20 Joonyoung Shim napsal(a):
-> >> >> +struct samsung_kp_platdata {
-> >> >> + ? ? const struct matrix_keymap_data *keymap_data;
-> >> >> + ? ? unsigned int ? ? ? ? ? ?rows;
-> >> >> + ? ? unsigned int ? ? ? ? ? ?cols;
-> >> >> + ? ? unsigned int ? ? ? ? ? ?rep;
-> >> >
-> >> > I don't know, maybe using uint32_t here? On ARM, it doesn't matter so far as int
-> >> > will be always 32bit, but maybe we should just type the variables well ?
-> >>
-> >> I thought int was 32bits on all archs
-> >
-> > No, the C standard doesn't make any guarantees about the size of types,
-> > it is up to the implementation of the compiler. If I rember correctly
-> > the only guarantee in the lanugage definition is that char->short->int->long
-> > be that the next up the line be at-least as a ?big as the one before.
-> I believe on most implementations, if not all, sizeof char, short and
-> int are resp
-> 1, 2 and 4 bytes. whereas long denotes the native capacity of the arch.
+On Sat, May 29, 2010 at 06:02:28PM -0400, Bjoern Brandenburg wrote:
+> We've tried three kernel versions:
+> - 2.6.33-arm1 [1]
+>   - boot log: http://pastebin.com/UqhfJNgz
+> - 2.6.34-vanilla
+>   - boot log with maxcpus=1: http://pastebin.com/NHHeYpbb
+>   - boot log with failure: http://pastebin.com/uy6y8msZ
+>   - config: http://pastebin.com/v9dttg0L
+> - 2.6.34-arm  [2]
+>   - boot log with maxcpus=1: http://pastebin.com/rCy2x9AP
+>   - boot log with failure: http://pastebin.com/spam.php?i=mpedVqp3
+> 
+> Of these, only 2.6.33-arm1 boots with more than one CPU enabled. The 2.6.34
+> versions only boot to login if we restrict the number of CPUs. The configuration
+> used in all cases is based on the one provided by ARM [3]. For 2.6.34, we used
+> 'make oldconfig' and accepted all defaults.
 
-Mostly, but that is up to the compiler/arch combination, not defined by
-the main C standard. It may be defned by the arch C standard.
- 
--- 
-Ben
+This sounds like a perfect case for giving 'git bisect' a try. It will
+point you to the commit between 2.6.33 and 2.6.34 which broke it for
+you.
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+See for example http://www.landley.net/writing/git-quick.html#bisect for
+a detailed explanation of how to use it.
+
+
+Daniel
