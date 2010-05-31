@@ -1,33 +1,14 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 31 May 2010 10:49:54 +0200
-Subject: [PATCH 2/2] i.MX ssi: Add missing Kconfig entry for Phytec boards
-In-Reply-To: <1275295794-3168-1-git-send-email-s.hauer@pengutronix.de>
-References: <1275295794-3168-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1275295794-3168-3-git-send-email-s.hauer@pengutronix.de>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Mon, 31 May 2010 10:59:41 +0200
+Subject: Assorted mini-fixes for MX31
+In-Reply-To: <1274798817-21805-1-git-send-email-daniel@caiaq.de>
+References: <1274798817-21805-1-git-send-email-daniel@caiaq.de>
+Message-ID: <20100531085940.GD2695@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- sound/soc/imx/Kconfig |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+On Tue, May 25, 2010 at 04:46:52PM +0200, Daniel Mack wrote:
+> Here are some very trivial, non-urgent fixes for MX31, to be applied on
+> top of the current mxc-master tree.
 
-diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
-index 11b4bcc..b1b33e6 100644
---- a/sound/soc/imx/Kconfig
-+++ b/sound/soc/imx/Kconfig
-@@ -19,3 +19,12 @@ config SND_MXC_SOC_WM1133_EV1
- 	help
- 	  Enable support for audio on the i.MX31ADS with the WM1133-EV1
- 	  PMIC board with WM8835x fitted.
-+
-+config SND_SOC_PHYCORE_AC97
-+	tristate "SoC Audio support for Phytec phyCORE (and phyCARD) boards"
-+	depends on MACH_PCM043 || MACH_PCA100
-+	select SND_MXC_SOC_SSI
-+	select SND_SOC_WM9712
-+	help
-+	  Say Y if you want to add support for SoC audio on Phytec phyCORE
-+	  and phyCARD boards in AC97 mode
--- 
-1.7.1
+Ping :)
