@@ -1,51 +1,44 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 31 May 2010 17:34:19 +0200
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Mon, 31 May 2010 18:23:37 +0200
 Subject: [PATCH] ixp4xx: Support the all multicast flag on the NPE devices.
-In-Reply-To: <m3pr0c17ue.fsf@intrepid.localdomain>
+In-Reply-To: <19459.57149.428000.694558@pilspetsen.it.uu.se> (Mikael
+	Pettersson's message of "Mon, 31 May 2010 18:09:33 +0200")
 References: <20100531131102.GA15870@riccoc20.at.omicron.at>
 	<m3pr0c17ue.fsf@intrepid.localdomain>
-Message-ID: <20100531153419.GA17317@riccoc20.at.omicron.at>
+	<20100531153419.GA17317@riccoc20.at.omicron.at>
+	<19459.57149.428000.694558@pilspetsen.it.uu.se>
+Message-ID: <m3y6f0yr92.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 31, 2010 at 04:09:13PM +0200, Krzysztof Halasa wrote:
-> Looks good, though I'd prefer a bit of "const" and "static" in the
-> allmulti[] declaration. Would you please repost? TIA.
+Mikael Pettersson <mikpe@it.uu.se> writes:
 
-Okay, here it is.
+>  > +	static const u8 allmulti[] = { 0x01, 0x00, 0x00, 0x00, 0x00, 0x00 };
+>  > +
+>  > +	if (dev->flags & IFF_ALLMULTI) {
+>  > +		for (i = 0; i < ETH_ALEN; i++) {
+>  > +			__raw_writel(allmulti[i], &port->regs->mcast_addr[i]);
+>  > +			__raw_writel(allmulti[i], &port->regs->mcast_mask[i]);
+>
+> Seems a bit excessive to define a lookup table for a computation
+> that amounts to nothing more than "i ? 0 : 1".
+>
+> Something like the following would IMO be cleaner:
+>
+> 	if (...) {
+> 		for (...) {
+> 			u8 multi = i ? 0x00 : 0x01;
+> 			__raw_writel(multi, ...);
+> 			...
+> 		}
+> 	}
 
-Thanks,
-Richard
+Well... cleaner = easier to understand?
+I don't think so, the array is clearly a MAC address (mask) and the
+"i ? 0x00 : 0x01" (which one could simply write as "!i") requires some
+additional attention.
 
-This patch adds support for the IFF_ALLMULTI flag. Previously only the
-IFF_PROMISC flag was supported.
-
-Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
----
- drivers/net/arm/ixp4xx_eth.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/net/arm/ixp4xx_eth.c b/drivers/net/arm/ixp4xx_eth.c
-index 6be8b09..42b4361 100644
---- a/drivers/net/arm/ixp4xx_eth.c
-+++ b/drivers/net/arm/ixp4xx_eth.c
-@@ -739,6 +739,17 @@ static void eth_set_mcast_list(struct net_device *dev)
- 	struct dev_mc_list *mclist;
- 	u8 diffs[ETH_ALEN], *addr;
- 	int i;
-+	static const u8 allmulti[] = { 0x01, 0x00, 0x00, 0x00, 0x00, 0x00 };
-+
-+	if (dev->flags & IFF_ALLMULTI) {
-+		for (i = 0; i < ETH_ALEN; i++) {
-+			__raw_writel(allmulti[i], &port->regs->mcast_addr[i]);
-+			__raw_writel(allmulti[i], &port->regs->mcast_mask[i]);
-+		}
-+		__raw_writel(DEFAULT_RX_CNTRL0 | RX_CNTRL0_ADDR_FLTR_EN,
-+			&port->regs->rx_control[0]);
-+		return;
-+	}
- 
- 	if ((dev->flags & IFF_PROMISC) || netdev_mc_empty(dev)) {
- 		__raw_writel(DEFAULT_RX_CNTRL0 & ~RX_CNTRL0_ADDR_FLTR_EN,
+It's a slow "admin" path so an unmeasurable speedup doesn't mean
+anything.
 -- 
-1.6.3.3
+Krzysztof Halasa
