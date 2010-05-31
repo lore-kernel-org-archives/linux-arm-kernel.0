@@ -1,56 +1,21 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Mon, 31 May 2010 18:09:33 +0200
-Subject: [PATCH] ixp4xx: Support the all multicast flag on the NPE devices.
-In-Reply-To: <20100531153419.GA17317@riccoc20.at.omicron.at>
-References: <20100531131102.GA15870@riccoc20.at.omicron.at>
-	<m3pr0c17ue.fsf@intrepid.localdomain>
-	<20100531153419.GA17317@riccoc20.at.omicron.at>
-Message-ID: <19459.57149.428000.694558@pilspetsen.it.uu.se>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 31 May 2010 18:17:46 +0100
+Subject: [PATCH 2/2] i.MX ssi: Add missing Kconfig entry for Phytec boards
+In-Reply-To: <20100531121950.GG26820@pengutronix.de>
+References: <20100531101200.GA3489@rakim.wolfsonmicro.main>
+	<1275301701-17599-1-git-send-email-s.hauer@pengutronix.de>
+	<20100531103045.GB3489@rakim.wolfsonmicro.main>
+	<20100531121950.GG26820@pengutronix.de>
+Message-ID: <20100531171746.GA27088@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Cochran writes:
- > On Mon, May 31, 2010 at 04:09:13PM +0200, Krzysztof Halasa wrote:
- > > Looks good, though I'd prefer a bit of "const" and "static" in the
- > > allmulti[] declaration. Would you please repost? TIA.
- > 
- > Okay, here it is.
- > 
- > Thanks,
- > Richard
- > 
- > This patch adds support for the IFF_ALLMULTI flag. Previously only the
- > IFF_PROMISC flag was supported.
- > 
- > Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
- > ---
- >  drivers/net/arm/ixp4xx_eth.c |   11 +++++++++++
- >  1 files changed, 11 insertions(+), 0 deletions(-)
- > 
- > diff --git a/drivers/net/arm/ixp4xx_eth.c b/drivers/net/arm/ixp4xx_eth.c
- > index 6be8b09..42b4361 100644
- > --- a/drivers/net/arm/ixp4xx_eth.c
- > +++ b/drivers/net/arm/ixp4xx_eth.c
- > @@ -739,6 +739,17 @@ static void eth_set_mcast_list(struct net_device *dev)
- >  	struct dev_mc_list *mclist;
- >  	u8 diffs[ETH_ALEN], *addr;
- >  	int i;
- > +	static const u8 allmulti[] = { 0x01, 0x00, 0x00, 0x00, 0x00, 0x00 };
- > +
- > +	if (dev->flags & IFF_ALLMULTI) {
- > +		for (i = 0; i < ETH_ALEN; i++) {
- > +			__raw_writel(allmulti[i], &port->regs->mcast_addr[i]);
- > +			__raw_writel(allmulti[i], &port->regs->mcast_mask[i]);
+On Mon, May 31, 2010 at 02:19:50PM +0200, Sascha Hauer wrote:
 
-Seems a bit excessive to define a lookup table for a computation
-that amounts to nothing more than "i ? 0 : 1".
+> Sorry, wrong patch. I wanted to update the other patch according to your
+> comment. Here's the right one.
 
-Something like the following would IMO be cleaner:
-
-	if (...) {
-		for (...) {
-			u8 multi = i ? 0x00 : 0x01;
-			__raw_writel(multi, ...);
-			...
-		}
-	}
+Applied both, but please do remember to submit patches in a form which
+can be directly applied.  For both patches I had to edit the subject
+line and for this patch you'd just appeneded it to the body of a mail
+message.
