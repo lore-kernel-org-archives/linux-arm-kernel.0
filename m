@@ -1,73 +1,44 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Mon, 31 May 2010 16:02:32 +0200
-Subject: [PATCH] ARM: pxa/raumfeld: check charge state after resume
-In-Reply-To: <AANLkTikMrOtrwI82Y9sXEGU80TZJ7brruXuoE8wiUGLj@mail.gmail.com>
-References: <AANLkTikMrOtrwI82Y9sXEGU80TZJ7brruXuoE8wiUGLj@mail.gmail.com>
-Message-ID: <1275314552-5214-1-git-send-email-daniel@caiaq.de>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Mon, 31 May 2010 16:09:13 +0200
+Subject: [PATCH] ixp4xx: Support the all multicast flag on the NPE devices.
+In-Reply-To: <20100531131102.GA15870@riccoc20.at.omicron.at> (Richard
+	Cochran's message of "Mon, 31 May 2010 15:11:02 +0200")
+References: <20100531131102.GA15870@riccoc20.at.omicron.at>
+Message-ID: <m3pr0c17ue.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the resume callback of the pda_power supply framework to check for a
-'charge finished' event that might have occured during the sleep phase.
+Richard Cochran <richardcochran@gmail.com> writes:
 
-Signed-off-by: Daniel Mack <daniel@caiaq.de>
-Cc: Eric Miao <eric.y.miao@gmail.com>
----
- arch/arm/mach-pxa/raumfeld.c |   29 +++++++++++++++++++++--------
- 1 files changed, 21 insertions(+), 8 deletions(-)
+> This patch adds support for the IFF_ALLMULTI flag. Previously only the
+> IFF_PROMISC flag was supported.
+>
+> Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
+> ---
+>  drivers/net/arm/ixp4xx_eth.c |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/net/arm/ixp4xx_eth.c b/drivers/net/arm/ixp4xx_eth.c
+> index 6be8b09..5d35064 100644
+> --- a/drivers/net/arm/ixp4xx_eth.c
+> +++ b/drivers/net/arm/ixp4xx_eth.c
+> @@ -739,6 +739,17 @@ static void eth_set_mcast_list(struct net_device *dev)
+>  	struct dev_mc_list *mclist;
+>  	u8 diffs[ETH_ALEN], *addr;
+>  	int i;
+> +	u8 allmulti[] = { 0x01, 0x00, 0x00, 0x00, 0x00, 0x00 };
+> +
+> +	if (dev->flags & IFF_ALLMULTI) {
+> +		for (i = 0; i < ETH_ALEN; i++) {
+> +			__raw_writel(allmulti[i], &port->regs->mcast_addr[i]);
+> +			__raw_writel(allmulti[i], &port->regs->mcast_mask[i]);
+> +		}
+> +		__raw_writel(DEFAULT_RX_CNTRL0 | RX_CNTRL0_ADDR_FLTR_EN,
+> +			&port->regs->rx_control[0]);
+> +		return;
+> +	}
 
-diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-index 1c8cd39..7582a12 100644
---- a/arch/arm/mach-pxa/raumfeld.c
-+++ b/arch/arm/mach-pxa/raumfeld.c
-@@ -750,13 +750,32 @@ static int raumfeld_is_usb_online(void)
- 
- static char *raumfeld_power_supplicants[] = { "ds2760-battery.0" };
- 
-+static void raumfeld_power_signal_charged(void)
-+{
-+	struct power_supply *psy =
-+		power_supply_get_by_name(raumfeld_power_supplicants[0]);
-+
-+	if (psy)
-+		power_supply_set_battery_charged(psy);
-+}
-+
-+static int raumfeld_power_resume(void)
-+{
-+	/* check if GPIO_CHARGE_DONE went low while we were sleeping */
-+	if (!gpio_get_value(GPIO_CHARGE_DONE))
-+		raumfeld_power_signal_charged();
-+
-+	return 0;
-+}
-+
- static struct pda_power_pdata power_supply_info = {
- 	.init			= power_supply_init,
- 	.is_ac_online		= raumfeld_is_ac_online,
- 	.is_usb_online		= raumfeld_is_usb_online,
- 	.exit			= power_supply_exit,
- 	.supplied_to		= raumfeld_power_supplicants,
--	.num_supplicants	= ARRAY_SIZE(raumfeld_power_supplicants)
-+	.num_supplicants	= ARRAY_SIZE(raumfeld_power_supplicants),
-+	.resume			= raumfeld_power_resume,
- };
- 
- static struct resource power_supply_resources[] = {
-@@ -771,13 +790,7 @@ static struct resource power_supply_resources[] = {
- 
- static irqreturn_t charge_done_irq(int irq, void *dev_id)
- {
--	struct power_supply *psy;
--
--	psy = power_supply_get_by_name("ds2760-battery.0");
--
--	if (psy)
--		power_supply_set_battery_charged(psy);
--
-+	raumfeld_power_signal_charged();
- 	return IRQ_HANDLED;
- }
- 
+Looks good, though I'd prefer a bit of "const" and "static" in the
+allmulti[] declaration. Would you please repost? TIA.
 -- 
-1.7.1
+Krzysztof Halasa
