@@ -1,21 +1,32 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 31 May 2010 11:12:01 +0100
-Subject: [PATCH 1/2] i.MX ssi: MX31ads sound support should depend on
-	MACH_MX31ADS
-In-Reply-To: <1275295794-3168-2-git-send-email-s.hauer@pengutronix.de>
-References: <1275295794-3168-1-git-send-email-s.hauer@pengutronix.de>
-	<1275295794-3168-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20100531101200.GA3489@rakim.wolfsonmicro.main>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Mon, 31 May 2010 11:15:39 +0100
+Subject: [alsa-devel] [patch 0/6] kirkwood openrd client audio support - v4
+In-Reply-To: <20100527125737.524554667@mandriva.com>
+References: <20100527125737.524554667@mandriva.com>
+Message-ID: <1275300939.3174.6.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 31, 2010 at 10:49:53AM +0200, Sascha Hauer wrote:
+On Thu, 2010-05-27 at 14:57 +0200, apatard at mandriva.com wrote:
+> Hi,
+> 
+> This patchset is an other try to get merged openrd audio support mainline.
+> The main change is going back to using kirkwood instead of orion, as the 
+> only orion having i2s is not merged mainline (if I got it right).
+> I've also fixed the lastests comments on the cs42l51 codec patch.
+> 
+> Arnaud
+> 
+> Changes :
+> - changed back from orion to kirkwood
+> - removed cs42l51 adc input register initialisation
+> - moved the DAPM event macro to soc-dapm
+> - fixed cs42l51_set_dai_fmt() master/slave check
+> - removed cs42l51 startup message
+> - use snd_soc_update_bits() in cs42l51_pdn_event()
 
->  config SND_MXC_SOC_WM1133_EV1
->  	tristate "Audio on the the i.MX31ADS with WM1133-EV1 fitted"
-> -	depends on SND_IMX_SOC && EXPERIMENTAL
-> +	depends on SND_IMX_SOC && MACH_MX31ADS && EXPERIMENTAL
-
-This should depend on the 1133-EV1, not the core machine.  The module
-has a dependency on the core machine already and is required to use the
-drivers.
+Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
+-- 
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
