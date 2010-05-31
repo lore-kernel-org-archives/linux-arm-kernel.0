@@ -1,13 +1,14 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 May 2010 13:47:50 +0100
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 31 May 2010 08:57:31 -0400 (EDT)
 Subject: pxa-devel back-merge / cherry pick request
 In-Reply-To: <20100531114815.GF2695@buzzloop.caiaq.de>
 References: <20100531114815.GF2695@buzzloop.caiaq.de>
-Message-ID: <20100531124750.GA21679@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1005310855250.24526@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 31, 2010 at 01:48:16PM +0200, Daniel Mack wrote:
+On Mon, 31 May 2010, Daniel Mack wrote:
+
 > Hi Eric,
 > 
 > Is there any plans to merge Linus' tree into your pxa-devel any time
@@ -17,5 +18,8 @@ On Mon, May 31, 2010 at 01:48:16PM +0200, Daniel Mack wrote:
 > 
 > upstream. Alternatively, could you cherry-pick this one commit?
 
-Please don't cherry-pick commits back into branches which will eventually
-find their way back into mainline.
+Even better is for you to fork a branch starting at that particular 
+commit, apply your patch on top, then ask Eric to pull it.
+
+
+Nicolas
