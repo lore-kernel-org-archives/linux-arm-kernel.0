@@ -1,32 +1,33 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Mon, 31 May 2010 11:15:39 +0100
-Subject: [alsa-devel] [patch 0/6] kirkwood openrd client audio support - v4
-In-Reply-To: <20100527125737.524554667@mandriva.com>
-References: <20100527125737.524554667@mandriva.com>
-Message-ID: <1275300939.3174.6.camel@odin>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 31 May 2010 12:28:21 +0200
+Subject: [PATCH 2/2] i.MX ssi: Add missing Kconfig entry for Phytec boards
+In-Reply-To: <20100531101200.GA3489@rakim.wolfsonmicro.main>
+References: <20100531101200.GA3489@rakim.wolfsonmicro.main>
+Message-ID: <1275301701-17599-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-05-27 at 14:57 +0200, apatard at mandriva.com wrote:
-> Hi,
-> 
-> This patchset is an other try to get merged openrd audio support mainline.
-> The main change is going back to using kirkwood instead of orion, as the 
-> only orion having i2s is not merged mainline (if I got it right).
-> I've also fixed the lastests comments on the cs42l51 codec patch.
-> 
-> Arnaud
-> 
-> Changes :
-> - changed back from orion to kirkwood
-> - removed cs42l51 adc input register initialisation
-> - moved the DAPM event macro to soc-dapm
-> - fixed cs42l51_set_dai_fmt() master/slave check
-> - removed cs42l51 startup message
-> - use snd_soc_update_bits() in cs42l51_pdn_event()
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ sound/soc/imx/Kconfig |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
+diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
+index 10acbe9..252defe 100644
+--- a/sound/soc/imx/Kconfig
++++ b/sound/soc/imx/Kconfig
+@@ -19,3 +19,12 @@ config SND_MXC_SOC_WM1133_EV1
+ 	help
+ 	  Enable support for audio on the i.MX31ADS with the WM1133-EV1
+ 	  PMIC board with WM8835x fitted.
++
++config SND_SOC_PHYCORE_AC97
++	tristate "SoC Audio support for Phytec phyCORE (and phyCARD) boards"
++	depends on MACH_PCM043 || MACH_PCA100
++	select SND_MXC_SOC_SSI
++	select SND_SOC_WM9712
++	help
++	  Say Y if you want to add support for SoC audio on Phytec phyCORE
++	  and phyCARD boards in AC97 mode
 -- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+1.7.1
