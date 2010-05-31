@@ -1,37 +1,24 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Mon, 31 May 2010 10:40:00 +0100
-Subject: i.MX SSI Kconfig fixes
-In-Reply-To: <1275295794-3168-1-git-send-email-s.hauer@pengutronix.de>
-References: <1275295794-3168-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1275298800.3174.1.camel@odin>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 31 May 2010 10:44:09 +0100
+Subject: [PATCH v2 1/5] ARM: SAMSUNG: Add keypad device support
+In-Reply-To: <AANLkTimJyc8E_D_-95eeVFwOVXwJKM5xKCCW-7gkNWrU@mail.gmail.com>
+References: <1275188784-23395-1-git-send-email-jy0922.shim@samsung.com>
+	<201005300542.37715.marek.vasut@gmail.com>
+	<AANLkTilt_-UAZGZepwtIYM7HRuPsX7gsW_ppLZD1_bZq@mail.gmail.com>
+	<20100530045151.GE4720@trinity.fluff.org>
+	<AANLkTimJyc8E_D_-95eeVFwOVXwJKM5xKCCW-7gkNWrU@mail.gmail.com>
+Message-ID: <20100531094408.GB7799@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-05-31 at 10:49 +0200, Sascha Hauer wrote:
-> Hi,
-> 
-> Two small fixes for i.MX SSI.
-> 
-> Sascha
-> 
-> The following changes since commit 67a3e12b05e055c0415c556a315a3d3eb637e29e:
-> 
->   Linux 2.6.35-rc1 (2010-05-30 13:21:02 -0700)
-> 
-> are available in the git repository at:
->   git://git.pengutronix.de/git/imx/linux-2.6.git imx-ssi-fixes
-> 
-> Sascha Hauer (2):
->       i.MX ssi: MX31ads sound support should depend on MACH_MX31ADS
->       i.MX ssi: Add missing Kconfig entry for Phytec boards
-> 
->  sound/soc/imx/Kconfig |   11 ++++++++++-
->  1 files changed, 10 insertions(+), 1 deletions(-)
+On Sun, May 30, 2010 at 02:04:39PM +0900, Jassi Brar wrote:
 
-Both
+> I believe on most implementations, if not all, sizeof char, short and
+> int are resp
+> 1, 2 and 4 bytes. whereas long denotes the native capacity of the arch.
 
-Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
--- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+This is very common for interoperability with code making the assumption
+that you just made but you shouldn't rely on it, the C standard just
+specifies minimum sizes and requires that char <= short <= int <= long.
+The common issues to run into are int being made the native word size
+and not having any sub word types@all.
