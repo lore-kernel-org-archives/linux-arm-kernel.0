@@ -1,162 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 31 May 2010 08:59:38 +0200
-Subject: [RFC PATCH] ARM: Add SSI Clock Adjustment for i.MX27 TO2
-In-Reply-To: <1275267300-30687-1-git-send-email-redhatter@gentoo.org>
-References: <1275267300-30687-1-git-send-email-redhatter@gentoo.org>
-Message-ID: <20100531065938.GA26820@pengutronix.de>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Mon, 31 May 2010 15:15:19 +0800
+Subject: [GIT PULL] pxa: fixes for v2.6.34-rc1
+In-Reply-To: <AANLkTillgu4x49AMo9f6NMmmZvoMQRFaenfwi9d62W__@mail.gmail.com>
+References: <AANLkTillgu4x49AMo9f6NMmmZvoMQRFaenfwi9d62W__@mail.gmail.com>
+Message-ID: <4C036207.5070701@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stuart,
+Just a minor thing, the subject of this email should be "[GIT PULL] pxa: fixes
+for v2.6.35-rc1"
 
-On Mon, May 31, 2010 at 10:55:00AM +1000, Stuart Longland wrote:
-> This adds support for adjusting the SSI clocks using the generic clock
-> infrastructure.
+-Bryan
+
+On 05/31/2010 12:25 PM, Eric Miao wrote:
+> The following changes since commit 67a3e12b05e055c0415c556a315a3d3eb637e29e:
+>   Linus Torvalds (1):
+>         Linux 2.6.35-rc1
 > 
-> Known bug:
-> 	The generated clock is approximately 1/4 of what is requested.
-> 	I'm not sure if this is due to a bug in reading MCLK, or
-> 	something else dividing the clock down.  Hence the printk's in
-> 	get_rate_ssix, and the patch's "RFC" status.
-
-The SSI clock can be switched between mpll and spll in CSCR/SSIx_SEL,
-currently this is not handled. Could this be the problem?
-Do you measure the resulting clock on the SSI clock pin? If yes, you
-could try using the CLKO pin to measure the input clock of the SSI unit.
-
+> are available in the git repository at:
 > 
-> This should open the door to using the SSI ports on the i.MX27 in I?S
-> Master mode amongst other things.
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
 > 
-> Signed-off-by: Stuart Longland <redhatter@gentoo.org>
-> ---
->  arch/arm/mach-mx2/clock_imx27.c |   75 +++++++++++++++++++++++++++++++++++++--
->  1 files changed, 72 insertions(+), 3 deletions(-)
+> Marek Vasut (1):
+>       [ARM] pxa/spitz: Correctly register WM8750
 > 
-> diff --git a/arch/arm/mach-mx2/clock_imx27.c b/arch/arm/mach-mx2/clock_imx27.c
-> index 0f0823c..48a4f62 100644
-> --- a/arch/arm/mach-mx2/clock_imx27.c
-> +++ b/arch/arm/mach-mx2/clock_imx27.c
-> @@ -244,12 +244,59 @@ static unsigned long get_rate_ssix(struct clk *clk, unsigned long pdf)
->  
->  	parent_rate = clk_get_rate(clk->parent);
->  
-> +	printk("%s: parent = %ld Hz; raw pdf = %ld\n",
-> +		__FUNCTION__, parent_rate, pdf );
-> +
-
-Please use __func__. Probably doesn't matter because the printks will go
-away anyway.
-
-Sascha
-
-
->  	if (mx27_revision() >= CHIP_REV_2_0)
->  		pdf += 4;  /* MX27 TO2+ */
->  	else
->  		pdf = (pdf < 2) ? 124UL : pdf;  /* MX21 & MX27 TO1 */
->  
-> -	return 2UL * parent_rate / pdf;
-> +	printk("%s: parent = %ld Hz;     pdf = %ld\n",
-> +		__FUNCTION__, parent_rate, pdf );
-> +
-> +	return (2UL * parent_rate) / pdf;
-> +}
-> +
-> +static unsigned long set_rate_ssix(struct clk *clk, unsigned long rate)
-> +{
-> +	unsigned long parent_rate;
-> +	unsigned long pdf;
-> +
-> +	parent_rate = clk_get_rate(clk->parent);
-> +	pdf = (2UL * parent_rate) / rate;
-> +
-> +	if (mx27_revision() >= CHIP_REV_2_0)
-> +		pdf -= 4;  /* MX27 TO2+ */
-> +
-> +	/* TODO: Not sure how to handle other CPU types */
-> +#if 0
-> +	else
-> +		pdf = (pdf < 2) ? 124UL : pdf;  /* MX21 & MX27 TO1 */
-> +#endif
-> +	printk("%s: %ld Hz => %ld; pdf = %ld\n",
-> +			__FUNCTION__, parent_rate, rate, pdf );
-> +
-> +	return pdf & 0x3f;
-> +}
-> +
-> +static unsigned long round_rate_ssix(struct clk *clk, unsigned long rate)
-> +{
-> +	unsigned long div;
-> +	unsigned long parent_rate = clk_get_rate(clk->parent);
-> +
-> +	div = (2UL * parent_rate) / rate;
-> +	printk("%s: 2* %ld Hz / %ld Hz = %ld\n",
-> +			__FUNCTION__, parent_rate, rate, div );
-> +
-> +	if ( ( div < 4 ) || ( div > 67 ) )
-> +		/* Corresponds to divider value < 2 or > 33.5 */
-> +		return -EINVAL;
-> +
-> +	printk("%s: 2* %ld Hz / %ld = %ld\n",
-> +			__FUNCTION__, parent_rate, div, (2UL*parent_rate) / div);
-> +
-> +	return (2UL * parent_rate) / div;
->  }
->  
->  static unsigned long get_rate_ssi1(struct clk *clk)
-> @@ -257,11 +304,33 @@ static unsigned long get_rate_ssi1(struct clk *clk)
->  	return get_rate_ssix(clk, (__raw_readl(CCM_PCDR0) >> 16) & 0x3f);
->  }
->  
-> +static int set_rate_ssi1(struct clk *clk, unsigned long rate)
-> +{
-> +	__raw_writel( set_rate_ssix(clk, rate) << 16, CCM_PCDR0 );
-> +	return 0;
-> +}
-> +
-> +static unsigned long round_rate_ssi1(struct clk *clk, unsigned long rate)
-> +{
-> +	return round_rate_ssix(clk, rate);
-> +}
-> +
->  static unsigned long get_rate_ssi2(struct clk *clk)
->  {
->  	return get_rate_ssix(clk, (__raw_readl(CCM_PCDR0) >> 26) & 0x3f);
->  }
->  
-> +static int set_rate_ssi2(struct clk *clk, unsigned long rate)
-> +{
-> +	__raw_writel( set_rate_ssix(clk, rate) << 26, CCM_PCDR0 );
-> +	return 0;
-> +}
-> +
-> +static unsigned long round_rate_ssi2(struct clk *clk, unsigned long rate)
-> +{
-> +	return round_rate_ssix(clk, rate);
-> +}
-> +
->  static unsigned long get_rate_nfc(struct clk *clk)
->  {
->  	unsigned long nfc_pdf;
-> @@ -564,8 +633,8 @@ DEFINE_CLOCK(cspi1_clk1,   0, PCCR0, 31, NULL, NULL, &ipg_clk);
->  
->  DEFINE_CLOCK(mstick_clk,   0, PCCR1,  2, NULL, &mstick_clk1, &ipg_clk);
->  DEFINE_CLOCK(nfc_clk,      0, PCCR1,  3, get_rate_nfc, NULL, &cpu_clk);
-> -DEFINE_CLOCK(ssi2_clk,     1, PCCR1,  4, get_rate_ssi2, &ssi2_clk1, &mpll_main2_clk);
-> -DEFINE_CLOCK(ssi1_clk,     0, PCCR1,  5, get_rate_ssi1, &ssi1_clk1, &mpll_main2_clk);
-> +DEFINE_CLOCK1(ssi2_clk,     1, PCCR1,  4, ssi2, &ssi2_clk1, &mpll_main2_clk);
-> +DEFINE_CLOCK1(ssi1_clk,     0, PCCR1,  5, ssi1, &ssi1_clk1, &mpll_main2_clk);
->  DEFINE_CLOCK(vpu_clk,      0, PCCR1,  6, get_rate_vpu, &vpu_clk1, &mpll_main2_clk);
->  DEFINE_CLOCK1(per4_clk,    3, PCCR1,  7, per, NULL, &mpll_main2_clk);
->  DEFINE_CLOCK1(per3_clk,    2, PCCR1,  8, per, NULL, &mpll_main2_clk);
-> -- 
-> 1.6.4.4
+> Tobias Klauser (1):
+>       [ARM] pxa/palmtc: storage class should be before const qualifier
 > 
+>  arch/arm/mach-pxa/palmtc.c |    4 ++--
+>  arch/arm/mach-pxa/spitz.c  |    3 +++
+>  sound/soc/pxa/spitz.c      |   36 ------------------------------------
+>  3 files changed, 5 insertions(+), 38 deletions(-)
 > 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
