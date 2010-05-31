@@ -1,74 +1,162 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 31 May 2010 11:56:30 +0530
-Subject: 2.6.34 hangs during boot on PB11MPCore
-In-Reply-To: <AANLkTim3YdK3QDXC-20otTBPqYF_XX9rGHRX50cycqk6@mail.gmail.com>
-References: <AANLkTin9n6HDdiTnQoQ9mrmuzSR8JhZVq7uPgU86yqgU@mail.gmail.com>
-	<20100530073652.GX2695@buzzloop.caiaq.de>
-	<AANLkTimUF5iiGnc6RnN5C3sy-R6DAqHZNf6ZEu2o3W9P@mail.gmail.com>
-	<AANLkTikdvjg52v-3AKUBukGO2FCp3fENGoYgpZZ2xVtT@mail.gmail.com>
-	<AANLkTilMtEpt5hRfF_hszpU_AxZm7H93bkhqUacGWZc9@mail.gmail.com>
-	<1275259589.22752.14.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTim4e5Sdj9tronOiI-sIMVGaUQdfRIhKHzZ4XfKp@mail.gmail.com>
-	<AANLkTim3YdK3QDXC-20otTBPqYF_XX9rGHRX50cycqk6@mail.gmail.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C5844FB1@dbde02.ent.ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 31 May 2010 08:59:38 +0200
+Subject: [RFC PATCH] ARM: Add SSI Clock Adjustment for i.MX27 TO2
+In-Reply-To: <1275267300-30687-1-git-send-email-redhatter@gentoo.org>
+References: <1275267300-30687-1-git-send-email-redhatter@gentoo.org>
+Message-ID: <20100531065938.GA26820@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Bjoern Brandenburg
-> Sent: Monday, May 31, 2010 6:46 AM
-> To: Catalin Marinas
-> Cc: bastoni at cs.unc.edu; Daniel Mack; linux-arm-kernel at lists.infradead.org; linus.ml.walleij at gmail.com
-> Subject: Re: 2.6.34 hangs during boot on PB11MPCore
-> 
-> On Sun, May 30, 2010 at 9:04 PM, Bjoern Brandenburg <bbb.lst@gmail.com> wrote:
-> > On Sun, May 30, 2010 at 6:46 PM, Catalin Marinas
-> > <catalin.marinas@arm.com> wrote:
-> >> On Sun, 2010-05-30 at 22:38 +0100, Bjoern Brandenburg wrote:
-> >>> On Sun, May 30, 2010 at 5:05 PM, Bjoern Brandenburg <bbb.lst@gmail.com> wrote:
-> >>> > On Sun, May 30, 2010 at 3:27 PM, Bjoern Brandenburg <bbb.lst@gmail.com> wrote:
-> >>> >>
-> >>> >> I'll try to see if I can pinpoint what was dropped between 2.6.33-arm1
-> >>> >> and 2.6.34-arm.
-> >>> >
-> >>> > Progress: I can get 2.6.34-arm to boot with all 4 CPUs after
-> >>> > cherry-picking the following commits (which seemed relevant but
-> >>> > absent):
-> >>> >
-> >>> > 60060ca ARM: Handle instruction cache maintenance fault ?properly
-> >>> > 3f64e83 ARM errata: Eviction Buffer not empty after Cache Sync on L220
-> >>> > 3b009b5 ARM: change definition of cpu_relax() for ARM11MPCore
-> >>> >
-> >>> > Let's see which is the critical one...
-> >>>
-> >>> It's 3f64e83 "ARM errata: Eviction Buffer not empty after Cache Sync
-> >>> on L220" [1]. With this commit cherry-picked (on top of the 'rebased'
-> >>> branch in ARM's repository, i.e., 2.6.34-arm), the system boots to X11
-> >>> and runs some simple FS tests; the other ones don't make a difference.
-> >>>
-> >>> Are there plans for getting this and the other patches in the
-> >>> 'rebased' branch into mainline (for .35 or .36)?
-> >>
-> >> Thanks for the investigation. I recall I got something similar in the
-> >> past though I could no longer reproduce it with 2.6.34 (-arm) on the
-> >> PB11MPCore I have. Could you try reverting commit e7c5650f606 (ARM:
-> >> Change the mandatory barriers implementation) on a vanilla 2.6.34
-> >> kernel?
-> >
-> > That doesn't seem to help. v2.6.34 with e7c5650f606 reverted still hangs.
-> 
-> Given that 2.6.34-arm contains patches for missing synchronization
-> primitives in the network driver, it is maybe not too surprising that
-> the vanilla kernel won't boot with an NFS root file system.
-> 
-> I just tried 2.6.34-arm (i.e., the 'rebased' branch in the ARM repo)
-> with e7c5650f606 reverted (and without cherry-picking 3f64e83)   and
-> that kernel boots ok!
-> 
-We have similar observation on SPI based network driver. By playing with
-buffer alignment, the issue seems to be going away. Do you have link
-to " synchronization primitives in the network driver"  patches ??
+Hi Stuart,
 
-Regards,
-Santosh
+On Mon, May 31, 2010 at 10:55:00AM +1000, Stuart Longland wrote:
+> This adds support for adjusting the SSI clocks using the generic clock
+> infrastructure.
+> 
+> Known bug:
+> 	The generated clock is approximately 1/4 of what is requested.
+> 	I'm not sure if this is due to a bug in reading MCLK, or
+> 	something else dividing the clock down.  Hence the printk's in
+> 	get_rate_ssix, and the patch's "RFC" status.
+
+The SSI clock can be switched between mpll and spll in CSCR/SSIx_SEL,
+currently this is not handled. Could this be the problem?
+Do you measure the resulting clock on the SSI clock pin? If yes, you
+could try using the CLKO pin to measure the input clock of the SSI unit.
+
+> 
+> This should open the door to using the SSI ports on the i.MX27 in I?S
+> Master mode amongst other things.
+> 
+> Signed-off-by: Stuart Longland <redhatter@gentoo.org>
+> ---
+>  arch/arm/mach-mx2/clock_imx27.c |   75 +++++++++++++++++++++++++++++++++++++--
+>  1 files changed, 72 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx2/clock_imx27.c b/arch/arm/mach-mx2/clock_imx27.c
+> index 0f0823c..48a4f62 100644
+> --- a/arch/arm/mach-mx2/clock_imx27.c
+> +++ b/arch/arm/mach-mx2/clock_imx27.c
+> @@ -244,12 +244,59 @@ static unsigned long get_rate_ssix(struct clk *clk, unsigned long pdf)
+>  
+>  	parent_rate = clk_get_rate(clk->parent);
+>  
+> +	printk("%s: parent = %ld Hz; raw pdf = %ld\n",
+> +		__FUNCTION__, parent_rate, pdf );
+> +
+
+Please use __func__. Probably doesn't matter because the printks will go
+away anyway.
+
+Sascha
+
+
+>  	if (mx27_revision() >= CHIP_REV_2_0)
+>  		pdf += 4;  /* MX27 TO2+ */
+>  	else
+>  		pdf = (pdf < 2) ? 124UL : pdf;  /* MX21 & MX27 TO1 */
+>  
+> -	return 2UL * parent_rate / pdf;
+> +	printk("%s: parent = %ld Hz;     pdf = %ld\n",
+> +		__FUNCTION__, parent_rate, pdf );
+> +
+> +	return (2UL * parent_rate) / pdf;
+> +}
+> +
+> +static unsigned long set_rate_ssix(struct clk *clk, unsigned long rate)
+> +{
+> +	unsigned long parent_rate;
+> +	unsigned long pdf;
+> +
+> +	parent_rate = clk_get_rate(clk->parent);
+> +	pdf = (2UL * parent_rate) / rate;
+> +
+> +	if (mx27_revision() >= CHIP_REV_2_0)
+> +		pdf -= 4;  /* MX27 TO2+ */
+> +
+> +	/* TODO: Not sure how to handle other CPU types */
+> +#if 0
+> +	else
+> +		pdf = (pdf < 2) ? 124UL : pdf;  /* MX21 & MX27 TO1 */
+> +#endif
+> +	printk("%s: %ld Hz => %ld; pdf = %ld\n",
+> +			__FUNCTION__, parent_rate, rate, pdf );
+> +
+> +	return pdf & 0x3f;
+> +}
+> +
+> +static unsigned long round_rate_ssix(struct clk *clk, unsigned long rate)
+> +{
+> +	unsigned long div;
+> +	unsigned long parent_rate = clk_get_rate(clk->parent);
+> +
+> +	div = (2UL * parent_rate) / rate;
+> +	printk("%s: 2* %ld Hz / %ld Hz = %ld\n",
+> +			__FUNCTION__, parent_rate, rate, div );
+> +
+> +	if ( ( div < 4 ) || ( div > 67 ) )
+> +		/* Corresponds to divider value < 2 or > 33.5 */
+> +		return -EINVAL;
+> +
+> +	printk("%s: 2* %ld Hz / %ld = %ld\n",
+> +			__FUNCTION__, parent_rate, div, (2UL*parent_rate) / div);
+> +
+> +	return (2UL * parent_rate) / div;
+>  }
+>  
+>  static unsigned long get_rate_ssi1(struct clk *clk)
+> @@ -257,11 +304,33 @@ static unsigned long get_rate_ssi1(struct clk *clk)
+>  	return get_rate_ssix(clk, (__raw_readl(CCM_PCDR0) >> 16) & 0x3f);
+>  }
+>  
+> +static int set_rate_ssi1(struct clk *clk, unsigned long rate)
+> +{
+> +	__raw_writel( set_rate_ssix(clk, rate) << 16, CCM_PCDR0 );
+> +	return 0;
+> +}
+> +
+> +static unsigned long round_rate_ssi1(struct clk *clk, unsigned long rate)
+> +{
+> +	return round_rate_ssix(clk, rate);
+> +}
+> +
+>  static unsigned long get_rate_ssi2(struct clk *clk)
+>  {
+>  	return get_rate_ssix(clk, (__raw_readl(CCM_PCDR0) >> 26) & 0x3f);
+>  }
+>  
+> +static int set_rate_ssi2(struct clk *clk, unsigned long rate)
+> +{
+> +	__raw_writel( set_rate_ssix(clk, rate) << 26, CCM_PCDR0 );
+> +	return 0;
+> +}
+> +
+> +static unsigned long round_rate_ssi2(struct clk *clk, unsigned long rate)
+> +{
+> +	return round_rate_ssix(clk, rate);
+> +}
+> +
+>  static unsigned long get_rate_nfc(struct clk *clk)
+>  {
+>  	unsigned long nfc_pdf;
+> @@ -564,8 +633,8 @@ DEFINE_CLOCK(cspi1_clk1,   0, PCCR0, 31, NULL, NULL, &ipg_clk);
+>  
+>  DEFINE_CLOCK(mstick_clk,   0, PCCR1,  2, NULL, &mstick_clk1, &ipg_clk);
+>  DEFINE_CLOCK(nfc_clk,      0, PCCR1,  3, get_rate_nfc, NULL, &cpu_clk);
+> -DEFINE_CLOCK(ssi2_clk,     1, PCCR1,  4, get_rate_ssi2, &ssi2_clk1, &mpll_main2_clk);
+> -DEFINE_CLOCK(ssi1_clk,     0, PCCR1,  5, get_rate_ssi1, &ssi1_clk1, &mpll_main2_clk);
+> +DEFINE_CLOCK1(ssi2_clk,     1, PCCR1,  4, ssi2, &ssi2_clk1, &mpll_main2_clk);
+> +DEFINE_CLOCK1(ssi1_clk,     0, PCCR1,  5, ssi1, &ssi1_clk1, &mpll_main2_clk);
+>  DEFINE_CLOCK(vpu_clk,      0, PCCR1,  6, get_rate_vpu, &vpu_clk1, &mpll_main2_clk);
+>  DEFINE_CLOCK1(per4_clk,    3, PCCR1,  7, per, NULL, &mpll_main2_clk);
+>  DEFINE_CLOCK1(per3_clk,    2, PCCR1,  8, per, NULL, &mpll_main2_clk);
+> -- 
+> 1.6.4.4
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
