@@ -1,60 +1,34 @@
-From: bbb.lst@gmail.com (Bjoern Brandenburg)
-Date: Sun, 30 May 2010 21:16:13 -0400
-Subject: 2.6.34 hangs during boot on PB11MPCore
-In-Reply-To: <AANLkTim4e5Sdj9tronOiI-sIMVGaUQdfRIhKHzZ4XfKp@mail.gmail.com>
-References: <AANLkTin9n6HDdiTnQoQ9mrmuzSR8JhZVq7uPgU86yqgU@mail.gmail.com>
-	<20100530073652.GX2695@buzzloop.caiaq.de>
-	<AANLkTimUF5iiGnc6RnN5C3sy-R6DAqHZNf6ZEu2o3W9P@mail.gmail.com>
-	<AANLkTikdvjg52v-3AKUBukGO2FCp3fENGoYgpZZ2xVtT@mail.gmail.com>
-	<AANLkTilMtEpt5hRfF_hszpU_AxZm7H93bkhqUacGWZc9@mail.gmail.com>
-	<1275259589.22752.14.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTim4e5Sdj9tronOiI-sIMVGaUQdfRIhKHzZ4XfKp@mail.gmail.com>
-Message-ID: <AANLkTim3YdK3QDXC-20otTBPqYF_XX9rGHRX50cycqk6@mail.gmail.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Mon, 31 May 2010 10:18:03 +0900
+Subject: [PATCH 05/15] ARM: S5P6442: Change to using
+	s3c_gpio_cfgpin_range()
+In-Reply-To: <20100531010907.GO7248@trinity.fluff.org>
+References: <1275026212-27510-1-git-send-email-ben-linux@fluff.org>
+	<1275026212-27510-6-git-send-email-ben-linux@fluff.org>
+	<AANLkTilPCk0NqJ7od6ZBorqPrlG0xCjdPaim1Q3WwZMH@mail.gmail.com>
+	<20100531010907.GO7248@trinity.fluff.org>
+Message-ID: <AANLkTikp-Zaj1LsBlLK1BhvhxfCXbtMyB5KxsUd-I8HN@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 30, 2010 at 9:04 PM, Bjoern Brandenburg <bbb.lst@gmail.com> wrote:
-> On Sun, May 30, 2010 at 6:46 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
->> On Sun, 2010-05-30 at 22:38 +0100, Bjoern Brandenburg wrote:
->>> On Sun, May 30, 2010 at 5:05 PM, Bjoern Brandenburg <bbb.lst@gmail.com> wrote:
->>> > On Sun, May 30, 2010 at 3:27 PM, Bjoern Brandenburg <bbb.lst@gmail.com> wrote:
->>> >>
->>> >> I'll try to see if I can pinpoint what was dropped between 2.6.33-arm1
->>> >> and 2.6.34-arm.
->>> >
->>> > Progress: I can get 2.6.34-arm to boot with all 4 CPUs after
->>> > cherry-picking the following commits (which seemed relevant but
->>> > absent):
->>> >
->>> > 60060ca ARM: Handle instruction cache maintenance fault ?properly
->>> > 3f64e83 ARM errata: Eviction Buffer not empty after Cache Sync on L220
->>> > 3b009b5 ARM: change definition of cpu_relax() for ARM11MPCore
->>> >
->>> > Let's see which is the critical one...
->>>
->>> It's 3f64e83 "ARM errata: Eviction Buffer not empty after Cache Sync
->>> on L220" [1]. With this commit cherry-picked (on top of the 'rebased'
->>> branch in ARM's repository, i.e., 2.6.34-arm), the system boots to X11
->>> and runs some simple FS tests; the other ones don't make a difference.
->>>
->>> Are there plans for getting this and the other patches in the
->>> 'rebased' branch into mainline (for .35 or .36)?
+On Mon, May 31, 2010 at 10:09 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+> On Fri, May 28, 2010 at 03:24:02PM +0900, Kyungmin Park wrote:
+>> Hi,
 >>
->> Thanks for the investigation. I recall I got something similar in the
->> past though I could no longer reproduce it with 2.6.34 (-arm) on the
->> PB11MPCore I have. Could you try reverting commit e7c5650f606 (ARM:
->> Change the mandatory barriers implementation) on a vanilla 2.6.34
->> kernel?
+>> Looks good but I'm afraid it's more difficult to find pin
+>> configuration from typo.
 >
-> That doesn't seem to help. v2.6.34 with e7c5650f606 reverted still hangs.
+> Do you meant that there's now no explicit mention of all pins invovled?
 
-Given that 2.6.34-arm contains patches for missing synchronization
-primitives in the network driver, it is maybe not too surprising that
-the vanilla kernel won't boot with an NFS root file system.
+When develop new device drivers, developers can be give wrong pin
+number easily so can't find a what's the problem.
 
-I just tried 2.6.34-arm (i.e., the 'rebased' branch in the ARM repo)
-with e7c5650f606 reverted (and without cherry-picking 3f64e83)   and
-that kernel boots ok!
+So how about to add sysfs which pins have function number to check it easily?
 
-- Bj?rn
+>
+> Note, may decided to drop or re-do this series.
+
+I vote for working continuously .
+
+Thank you,
+Kyungmin Park
