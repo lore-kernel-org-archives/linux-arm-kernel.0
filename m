@@ -1,120 +1,51 @@
-From: claudio@evidence.eu.com (Claudio Scordino)
-Date: Mon, 31 May 2010 17:21:21 +0200
-Subject: [PATCH] General fixes in the serial_rs485 structure
-In-Reply-To: <20100531142122.GA2571@frolo.macqel>
-References: <4BFE66CA.5050500@evidence.eu.com>
-	<20100529000839.158dedd3@lxorguk.ukuu.org.uk>
-	<4C0375C1.5030305@evidence.eu.com>
-	<20100531113429.5efd6de9@lxorguk.ukuu.org.uk>
-	<4C03BC19.5060402@evidence.eu.com>
-	<20100531142122.GA2571@frolo.macqel>
-Message-ID: <4C03D3F1.9040104@evidence.eu.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Mon, 31 May 2010 17:34:19 +0200
+Subject: [PATCH] ixp4xx: Support the all multicast flag on the NPE devices.
+In-Reply-To: <m3pr0c17ue.fsf@intrepid.localdomain>
+References: <20100531131102.GA15870@riccoc20.at.omicron.at>
+	<m3pr0c17ue.fsf@intrepid.localdomain>
+Message-ID: <20100531153419.GA17317@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Philippe De Muyter ha scritto:
-> On Mon, May 31, 2010 at 03:39:37PM +0200, Claudio Scordino wrote:
-> 
->> diff --git a/drivers/serial/atmel_serial.c b/drivers/serial/atmel_serial.c
->> index eed3c2d..1adb1bf 100644
->> --- a/drivers/serial/atmel_serial.c
->> +++ b/drivers/serial/atmel_serial.c
->> @@ -216,7 +216,7 @@ void atmel_config_rs485(struct uart_port *port, struct serial_rs485 *rs485conf)
->>  	if (rs485conf->flags & SER_RS485_ENABLED) {
->>  		dev_dbg(port->dev, "Setting UART to RS485\n");
->>  		atmel_port->tx_done_mask = ATMEL_US_TXEMPTY;
->> -		UART_PUT_TTGR(port, rs485conf->delay_rts_before_send);
->> +		UART_PUT_TTGR(port, rs485conf->delay_rts_after_send);
->>  		mode |= ATMEL_US_USMODE_RS485;
->>  	} else {
->>  		dev_dbg(port->dev, "Setting UART to RS232\n");
-> 
-> Should the usage of delay_rts_after_send not depend on
-> (flags & SER_RS485_RTS_AFTER_SEND) also ?
+On Mon, May 31, 2010 at 04:09:13PM +0200, Krzysztof Halasa wrote:
+> Looks good, though I'd prefer a bit of "const" and "static" in the
+> allmulti[] declaration. Would you please repost? TIA.
 
+Okay, here it is.
 
-You're right. Sorry for the oversight.
+Thanks,
+Richard
 
-This is the patch fixed.
+This patch adds support for the IFF_ALLMULTI flag. Previously only the
+IFF_PROMISC flag was supported.
 
-Many thanks,
-
-              Claudio
-
-==========================
-
-New fields in structure serial_rs485.
-
-This patch fixes several issues related to the RS485 interface:
-
- - It adds the flag SER_RS485_RTS_BEFORE_SEND that was missing from the 
-   serial_rs485 structure (even if "delay_rts_before_send" was existing)
-
- - It adds a further "delay_rts_after_send" field for those drivers that 
-   can have a delay after send (e.g., atmel_serial)
-
- - It fixes the usage of the structure in the atmel_serial driver (where
-   "delay_rts_before_send" should be used instead of "delay_rts_after_send").
-
-
-Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
-Signed-off-by: Bernhard Roth <br@pwrnet.de>
+Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
 ---
- drivers/serial/atmel_serial.c |   11 ++++++++---
- include/linux/serial.h        |    4 +++-
- 2 files changed, 11 insertions(+), 4 deletions(-)
+ drivers/net/arm/ixp4xx_eth.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/serial/atmel_serial.c b/drivers/serial/atmel_serial.c
-index eed3c2d..6a33546 100644
---- a/drivers/serial/atmel_serial.c
-+++ b/drivers/serial/atmel_serial.c
-@@ -216,7 +216,8 @@ void atmel_config_rs485(struct uart_port *port, struct serial_rs485 *rs485conf)
- 	if (rs485conf->flags & SER_RS485_ENABLED) {
- 		dev_dbg(port->dev, "Setting UART to RS485\n");
- 		atmel_port->tx_done_mask = ATMEL_US_TXEMPTY;
--		UART_PUT_TTGR(port, rs485conf->delay_rts_before_send);
-+		if (rs485conf->flags & SER_RS485_RTS_AFTER_SEND)
-+			UART_PUT_TTGR(port, rs485conf->delay_rts_after_send);
- 		mode |= ATMEL_US_USMODE_RS485;
- 	} else {
- 		dev_dbg(port->dev, "Setting UART to RS232\n");
-@@ -291,7 +292,9 @@ static void atmel_set_mctrl(struct uart_port *port, u_int mctrl)
+diff --git a/drivers/net/arm/ixp4xx_eth.c b/drivers/net/arm/ixp4xx_eth.c
+index 6be8b09..42b4361 100644
+--- a/drivers/net/arm/ixp4xx_eth.c
++++ b/drivers/net/arm/ixp4xx_eth.c
+@@ -739,6 +739,17 @@ static void eth_set_mcast_list(struct net_device *dev)
+ 	struct dev_mc_list *mclist;
+ 	u8 diffs[ETH_ALEN], *addr;
+ 	int i;
++	static const u8 allmulti[] = { 0x01, 0x00, 0x00, 0x00, 0x00, 0x00 };
++
++	if (dev->flags & IFF_ALLMULTI) {
++		for (i = 0; i < ETH_ALEN; i++) {
++			__raw_writel(allmulti[i], &port->regs->mcast_addr[i]);
++			__raw_writel(allmulti[i], &port->regs->mcast_mask[i]);
++		}
++		__raw_writel(DEFAULT_RX_CNTRL0 | RX_CNTRL0_ADDR_FLTR_EN,
++			&port->regs->rx_control[0]);
++		return;
++	}
  
- 	if (atmel_port->rs485.flags & SER_RS485_ENABLED) {
- 		dev_dbg(port->dev, "Setting UART to RS485\n");
--		UART_PUT_TTGR(port, atmel_port->rs485.delay_rts_before_send);
-+		if (atmel_port->rs485.flags & SER_RS485_RTS_AFTER_SEND)
-+			UART_PUT_TTGR(port,
-+					atmel_port->rs485.delay_rts_after_send);
- 		mode |= ATMEL_US_USMODE_RS485;
- 	} else {
- 		dev_dbg(port->dev, "Setting UART to RS232\n");
-@@ -1210,7 +1213,9 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
- 
- 	if (atmel_port->rs485.flags & SER_RS485_ENABLED) {
- 		dev_dbg(port->dev, "Setting UART to RS485\n");
--		UART_PUT_TTGR(port, atmel_port->rs485.delay_rts_before_send);
-+		if (atmel_port->rs485.flags & SER_RS485_RTS_AFTER_SEND)
-+			UART_PUT_TTGR(port,
-+					atmel_port->rs485.delay_rts_after_send);
- 		mode |= ATMEL_US_USMODE_RS485;
- 	} else {
- 		dev_dbg(port->dev, "Setting UART to RS232\n");
-diff --git a/include/linux/serial.h b/include/linux/serial.h
-index c8613c3..f9a0b67 100644
---- a/include/linux/serial.h
-+++ b/include/linux/serial.h
-@@ -210,8 +210,10 @@ struct serial_rs485 {
- #define SER_RS485_ENABLED		(1 << 0)
- #define SER_RS485_RTS_ON_SEND		(1 << 1)
- #define SER_RS485_RTS_AFTER_SEND	(1 << 2)
-+#define SER_RS485_RTS_BEFORE_SEND	(1 << 3)
- 	__u32	delay_rts_before_send;	/* Milliseconds */
--	__u32	padding[6];		/* Memory is cheap, new structs
-+	__u32	delay_rts_after_send;	/* Milliseconds */
-+	__u32	padding[5];		/* Memory is cheap, new structs
- 					   are a royal PITA .. */
- };
- 
+ 	if ((dev->flags & IFF_PROMISC) || netdev_mc_empty(dev)) {
+ 		__raw_writel(DEFAULT_RX_CNTRL0 & ~RX_CNTRL0_ADDR_FLTR_EN,
 -- 
-1.6.0.4
+1.6.3.3
