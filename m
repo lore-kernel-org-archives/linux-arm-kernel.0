@@ -1,34 +1,95 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 31 May 2010 10:18:03 +0900
-Subject: [PATCH 05/15] ARM: S5P6442: Change to using
-	s3c_gpio_cfgpin_range()
-In-Reply-To: <20100531010907.GO7248@trinity.fluff.org>
-References: <1275026212-27510-1-git-send-email-ben-linux@fluff.org>
-	<1275026212-27510-6-git-send-email-ben-linux@fluff.org>
-	<AANLkTilPCk0NqJ7od6ZBorqPrlG0xCjdPaim1Q3WwZMH@mail.gmail.com>
-	<20100531010907.GO7248@trinity.fluff.org>
-Message-ID: <AANLkTikp-Zaj1LsBlLK1BhvhxfCXbtMyB5KxsUd-I8HN@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 31 May 2010 12:24:18 +0800
+Subject: [PATCH 1/2] pxa/spitz: Correctly register WM8750
+In-Reply-To: <1275014580-21514-2-git-send-email-marek.vasut@gmail.com>
+References: <1275014580-21514-1-git-send-email-marek.vasut@gmail.com>
+	<1275014580-21514-2-git-send-email-marek.vasut@gmail.com>
+Message-ID: <AANLkTil4ax1ZQjS_CeJH8MtlbZUS8fNLTbxisCz_AxOK@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 31, 2010 at 10:09 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Fri, May 28, 2010 at 03:24:02PM +0900, Kyungmin Park wrote:
->> Hi,
->>
->> Looks good but I'm afraid it's more difficult to find pin
->> configuration from typo.
+On Fri, May 28, 2010 at 10:42 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> This patch registers the WM8750 codec on a proper place on the SPITZ machine
+> after the WM8750 driver was converted to new API.
 >
-> Do you meant that there's now no explicit mention of all pins invovled?
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 
-When develop new device drivers, developers can be give wrong pin
-number easily so can't find a what's the problem.
+Applied to 'fix'.
 
-So how about to add sysfs which pins have function number to check it easily?
-
+> ---
+> ?arch/arm/mach-pxa/spitz.c | ? ?3 +++
+> ?sound/soc/pxa/spitz.c ? ? | ? 36 ------------------------------------
+> ?2 files changed, 3 insertions(+), 36 deletions(-)
 >
-> Note, may decided to drop or re-do this series.
-
-I vote for working continuously .
-
-Thank you,
-Kyungmin Park
+> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+> index 4d2413e..c1048a3 100644
+> --- a/arch/arm/mach-pxa/spitz.c
+> +++ b/arch/arm/mach-pxa/spitz.c
+> @@ -818,6 +818,9 @@ static struct i2c_board_info akita_i2c_board_info[] = {
+> ? ? ? ? ? ? ? ?.type ? ? ? ? ? = "max7310",
+> ? ? ? ? ? ? ? ?.addr ? ? ? ? ? = 0x18,
+> ? ? ? ? ? ? ? ?.platform_data ?= &akita_ioexp,
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .type ? ? ? ? ? = "wm8750",
+> + ? ? ? ? ? ? ? .addr ? ? ? ? ? = 0x1b,
+> ? ? ? ?},
+> ?};
+>
+> diff --git a/sound/soc/pxa/spitz.c b/sound/soc/pxa/spitz.c
+> index 1941a35..d256f5f 100644
+> --- a/sound/soc/pxa/spitz.c
+> +++ b/sound/soc/pxa/spitz.c
+> @@ -328,38 +328,6 @@ static struct snd_soc_device spitz_snd_devdata = {
+> ? ? ? ?.codec_dev = &soc_codec_dev_wm8750,
+> ?};
+>
+> -/*
+> - * FIXME: This is a temporary bodge to avoid cross-tree merge issues.
+> - * New drivers should register the wm8750 I2C device in the machine
+> - * setup code (under arch/arm for ARM systems).
+> - */
+> -static int wm8750_i2c_register(void)
+> -{
+> - ? ? ? struct i2c_board_info info;
+> - ? ? ? struct i2c_adapter *adapter;
+> - ? ? ? struct i2c_client *client;
+> -
+> - ? ? ? memset(&info, 0, sizeof(struct i2c_board_info));
+> - ? ? ? info.addr = 0x1b;
+> - ? ? ? strlcpy(info.type, "wm8750", I2C_NAME_SIZE);
+> -
+> - ? ? ? adapter = i2c_get_adapter(0);
+> - ? ? ? if (!adapter) {
+> - ? ? ? ? ? ? ? printk(KERN_ERR "can't get i2c adapter 0\n");
+> - ? ? ? ? ? ? ? return -ENODEV;
+> - ? ? ? }
+> -
+> - ? ? ? client = i2c_new_device(adapter, &info);
+> - ? ? ? i2c_put_adapter(adapter);
+> - ? ? ? if (!client) {
+> - ? ? ? ? ? ? ? printk(KERN_ERR "can't add i2c device at 0x%x\n",
+> - ? ? ? ? ? ? ? (unsigned int)info.addr);
+> - ? ? ? ? ? ? ? return -ENODEV;
+> - ? ? ? }
+> -
+> - ? ? ? return 0;
+> -}
+> -
+> ?static struct platform_device *spitz_snd_device;
+>
+> ?static int __init spitz_init(void)
+> @@ -369,10 +337,6 @@ static int __init spitz_init(void)
+> ? ? ? ?if (!(machine_is_spitz() || machine_is_borzoi() || machine_is_akita()))
+> ? ? ? ? ? ? ? ?return -ENODEV;
+>
+> - ? ? ? ret = wm8750_i2c_setup();
+> - ? ? ? if (ret != 0)
+> - ? ? ? ? ? ? ? return ret;
+> -
+> ? ? ? ?spitz_snd_device = platform_device_alloc("soc-audio", -1);
+> ? ? ? ?if (!spitz_snd_device)
+> ? ? ? ? ? ? ? ?return -ENOMEM;
+> --
+> 1.7.0
+>
+>
