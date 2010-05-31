@@ -1,29 +1,22 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Mon, 31 May 2010 15:25:05 +0200
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 31 May 2010 21:25:07 +0800
 Subject: pxa-devel back-merge / cherry pick request
-In-Reply-To: <20100531132233.GC14195@sirena.org.uk>
+In-Reply-To: <20100531114815.GF2695@buzzloop.caiaq.de>
 References: <20100531114815.GF2695@buzzloop.caiaq.de>
-	<20100531124750.GA21679@n2100.arm.linux.org.uk>
-	<20100531131317.GF2698@buzzloop.caiaq.de>
-	<20100531132233.GC14195@sirena.org.uk>
-Message-ID: <20100531132505.GI2695@buzzloop.caiaq.de>
+Message-ID: <AANLkTikMrOtrwI82Y9sXEGU80TZJ7brruXuoE8wiUGLj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 31, 2010 at 02:22:34PM +0100, Mark Brown wrote:
-> On Mon, May 31, 2010 at 03:13:17PM +0200, Daniel Mack wrote:
-> 
-> > Just out of interest - why would cherry-picking be frowned upon?
-> > Shouldn't git just ignore the commits it already knows when things are
-> > pulled?
-> 
-> No, git is content based.  The merge should be a noop merge if the two
-> sides end up being the same but you still end up with two different
-> copies of the change in history.
+On Mon, May 31, 2010 at 7:48 PM, Daniel Mack <daniel@caiaq.de> wrote:
+> Hi Eric,
+>
+> Is there any plans to merge Linus' tree into your pxa-devel any time
+> soon? I'm asking because I have one patch pending which depends on
+>
+> ?a3bcbbee ("pda_power: Add function callbacks for suspend and resume")
+>
+> upstream. Alternatively, could you cherry-pick this one commit?
+>
 
-Ah, the commit won't have the same ID anymore after it is cherry-picked,
-of course.
-
-That makes sense. Thanks for explaining.
-
-Daniel
+'devel' branch rebased and pushed. Normally I rebase before sending
+git pull request to Russell.
