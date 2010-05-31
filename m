@@ -1,14 +1,21 @@
-From: apatard@mandriva.com (apatard at mandriva.com)
-Date: Mon, 31 May 2010 13:49:14 +0200
-Subject: [patch 3/4] kirkwood: Add i2s support
-References: <20100527125737.524554667@mandriva.com>
-	<20100527130337.925751129@mandriva.com>
-	<20100531111422.GF3489@rakim.wolfsonmicro.main>
-	<20100531114911.487732770@mandriva.com>
-Message-ID: <20100531115003.832989377@mandriva.com>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Mon, 31 May 2010 13:58:21 +0200
+Subject: [PATCH 0/3] ARM: S3C64XX: DMA core patches
+Message-ID: <4C03A45D.1050802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An embedded and charset-unspecified text was scrubbed...
-Name: kirkwood_i2s.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100531/306733e6/attachment.el>
+The first two patches add support for SDMA to the DMA core, which the crypto
+engine needs to support DMA.
+
+The third one implements behaviour that seems to be forgotten, namely stopping
+and flushing pending requests on freeing a DMA channel.
+
+Maurus Cuelenaere (3):
+  ARM: S3C64XX: Add SDMA clocks
+  ARM: S3C64XX: Add SDMA support to DMA core
+  ARM: S3C64XX: Stop and flush requests on freeing
+
+ arch/arm/mach-s3c64xx/clock.c |   12 +++++++++
+ arch/arm/mach-s3c64xx/dma.c   |   55 ++++++++++++++++++++++++++++++++---------
+ 2 files changed, 55 insertions(+), 12 deletions(-)
