@@ -1,29 +1,32 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 May 2010 15:26:40 +0100
+Date: Mon, 31 May 2010 15:29:46 +0100
 Subject: pxa-devel back-merge / cherry pick request
-In-Reply-To: <20100531132233.GC14195@sirena.org.uk>
+In-Reply-To: <AANLkTikMrOtrwI82Y9sXEGU80TZJ7brruXuoE8wiUGLj@mail.gmail.com>
 References: <20100531114815.GF2695@buzzloop.caiaq.de>
-	<20100531124750.GA21679@n2100.arm.linux.org.uk>
-	<20100531131317.GF2698@buzzloop.caiaq.de>
-	<20100531132233.GC14195@sirena.org.uk>
-Message-ID: <20100531142639.GA30051@n2100.arm.linux.org.uk>
+	<AANLkTikMrOtrwI82Y9sXEGU80TZJ7brruXuoE8wiUGLj@mail.gmail.com>
+Message-ID: <20100531142946.GB30051@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 31, 2010 at 02:22:34PM +0100, Mark Brown wrote:
-> On Mon, May 31, 2010 at 03:13:17PM +0200, Daniel Mack wrote:
+On Mon, May 31, 2010 at 09:25:07PM +0800, Eric Miao wrote:
+> On Mon, May 31, 2010 at 7:48 PM, Daniel Mack <daniel@caiaq.de> wrote:
+> > Hi Eric,
+> >
+> > Is there any plans to merge Linus' tree into your pxa-devel any time
+> > soon? I'm asking because I have one patch pending which depends on
+> >
+> > ?a3bcbbee ("pda_power: Add function callbacks for suspend and resume")
+> >
+> > upstream. Alternatively, could you cherry-pick this one commit?
+> >
 > 
-> > Just out of interest - why would cherry-picking be frowned upon?
-> > Shouldn't git just ignore the commits it already knows when things are
-> > pulled?
-> 
-> No, git is content based.  The merge should be a noop merge if the two
-> sides end up being the same but you still end up with two different
-> copies of the change in history.
+> 'devel' branch rebased and pushed. Normally I rebase before sending
+> git pull request to Russell.
 
-Sometimes it actually causes merge conflicts if there are changes in
-the same part of the file as the picked patch touches which aren't
-also cherry-picked.
+It's best to avoid rebasing altogether unless there is a good reason
+to do so.
 
-It's best to avoid cherry-picking commits into two different git
-threads and then try to merge them.
+If you want to make a decision about whether to rebase, one way to do
+it is to create a test branch/tree, and try merging your selected
+rebase point in - if it conflicts then you know when the original
+branch is merged it'll have problems.
