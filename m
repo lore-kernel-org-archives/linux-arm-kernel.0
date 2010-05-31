@@ -1,18 +1,20 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 31 May 2010 12:02:55 +0100
-Subject: [PATCH 1/2] pxa/spitz: Correctly register WM8750
-In-Reply-To: <1275014733-21588-1-git-send-email-marek.vasut@gmail.com>
-References: <1275014733-21588-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <20100531110255.GD3489@rakim.wolfsonmicro.main>
+Date: Mon, 31 May 2010 12:14:22 +0100
+Subject: [patch 1/6] orion/kirkwood: add audio functions.
+In-Reply-To: <20100527130337.925751129@mandriva.com>
+References: <20100527125737.524554667@mandriva.com>
+	<20100527130337.925751129@mandriva.com>
+Message-ID: <20100531111422.GF3489@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 28, 2010 at 04:45:32AM +0200, Marek Vasut wrote:
-> This patch registers the WM8750 codec on a proper place on the SPITZ machine
-> after the WM8750 driver was converted to new API.
+On Thu, May 27, 2010 at 02:57:38PM +0200, apatard at mandriva.com wrote:
+> This patch add audio related definitions and functions
 > 
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> 
+> Signed-off-by: Arnaud Patard <apatard@mandriva.com>
 
-Both
-
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+I'm not sure which tree this patch was generated against but it won't
+apply to either 2.6.35-rc1 or my old for-2.6.35 branch.  Please
+regenerate against my for-2.6.36 branch.  The patches look fine but I'm
+not able to apply them.
