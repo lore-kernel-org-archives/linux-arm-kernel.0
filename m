@@ -1,34 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 31 May 2010 11:04:30 +0300
-Subject: [RFC] Initial attempt to make ARM use LMB
-In-Reply-To: <20100528143207.GB25568@n2100.arm.linux.org.uk>
-References: <20100325233248.GM24984@n2100.arm.linux.org.uk>
-	<20100522215848.GB29889@n2100.arm.linux.org.uk>
-	<20100526004418.GM9645@atomide.com>
-	<20100528143207.GB25568@n2100.arm.linux.org.uk>
-Message-ID: <20100531080429.GA30216@atomide.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 31 May 2010 10:49:53 +0200
+Subject: [PATCH 1/2] i.MX ssi: MX31ads sound support should depend on
+	MACH_MX31ADS
+In-Reply-To: <1275295794-3168-1-git-send-email-s.hauer@pengutronix.de>
+References: <1275295794-3168-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1275295794-3168-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [100528 17:26]:
-> On Tue, May 25, 2010 at 05:44:18PM -0700, Tony Lindgren wrote:
-> > Also, the last patch in lmb branch "ARM: use LMB to allocate system
-> > memory MMIO resource structures" causes both osk5912 and n900
-> > to hang very early. Maybe I'm missing some patch again..
-> 
-> I'll drop this patch for the time being - we don't have stuff in the
-> right order yet for lmb_alloc() to work immediately after arm_lmb_init()
-> with highmem present - lmb_alloc tries to allocate from unmapped or high
-> memory, which we then use __va() on and referencing the resulting pointer
-> causes an abort.
-> 
-> However, using lmb_alloc() for the OMAP framebuffers shouldn't be an
-> issue because the problem only happens if you want to immediately
-> dereference the memory.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ sound/soc/imx/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-OK. Looks like your lmb branch still has it and is from the 23rd,
-maybe you forgot to push out the update lmb branch?
-
-Regards,
-
-Tony
+diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
+index eba9b9d..11b4bcc 100644
+--- a/sound/soc/imx/Kconfig
++++ b/sound/soc/imx/Kconfig
+@@ -13,7 +13,7 @@ config SND_MXC_SOC_SSI
+ 
+ config SND_MXC_SOC_WM1133_EV1
+ 	tristate "Audio on the the i.MX31ADS with WM1133-EV1 fitted"
+-	depends on SND_IMX_SOC && EXPERIMENTAL
++	depends on SND_IMX_SOC && MACH_MX31ADS && EXPERIMENTAL
+ 	select SND_SOC_WM8350
+ 	select SND_MXC_SOC_SSI
+ 	help
+-- 
+1.7.1
