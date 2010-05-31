@@ -1,39 +1,33 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 31 May 2010 15:11:02 +0200
-Subject: [PATCH] ixp4xx: Support the all multicast flag on the NPE devices.
-Message-ID: <20100531131102.GA15870@riccoc20.at.omicron.at>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Mon, 31 May 2010 15:13:17 +0200
+Subject: pxa-devel back-merge / cherry pick request
+In-Reply-To: <20100531124750.GA21679@n2100.arm.linux.org.uk>
+References: <20100531114815.GF2695@buzzloop.caiaq.de>
+	<20100531124750.GA21679@n2100.arm.linux.org.uk>
+Message-ID: <20100531131317.GF2698@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the IFF_ALLMULTI flag. Previously only the
-IFF_PROMISC flag was supported.
+On Mon, May 31, 2010 at 01:47:50PM +0100, Russell King - ARM Linux wrote:
+> On Mon, May 31, 2010 at 01:48:16PM +0200, Daniel Mack wrote:
+> > Hi Eric,
+> > 
+> > Is there any plans to merge Linus' tree into your pxa-devel any time
+> > soon? I'm asking because I have one patch pending which depends on
+> > 
+> >   a3bcbbee ("pda_power: Add function callbacks for suspend and resume")
+> > 
+> > upstream. Alternatively, could you cherry-pick this one commit?
+> 
+> Please don't cherry-pick commits back into branches which will eventually
+> find their way back into mainline.
 
-Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
----
- drivers/net/arm/ixp4xx_eth.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+Hmm, ok just wait for the back-merge then. It's just that one single
+commit and not an urgent fix.
 
-diff --git a/drivers/net/arm/ixp4xx_eth.c b/drivers/net/arm/ixp4xx_eth.c
-index 6be8b09..5d35064 100644
---- a/drivers/net/arm/ixp4xx_eth.c
-+++ b/drivers/net/arm/ixp4xx_eth.c
-@@ -739,6 +739,17 @@ static void eth_set_mcast_list(struct net_device *dev)
- 	struct dev_mc_list *mclist;
- 	u8 diffs[ETH_ALEN], *addr;
- 	int i;
-+	u8 allmulti[] = { 0x01, 0x00, 0x00, 0x00, 0x00, 0x00 };
-+
-+	if (dev->flags & IFF_ALLMULTI) {
-+		for (i = 0; i < ETH_ALEN; i++) {
-+			__raw_writel(allmulti[i], &port->regs->mcast_addr[i]);
-+			__raw_writel(allmulti[i], &port->regs->mcast_mask[i]);
-+		}
-+		__raw_writel(DEFAULT_RX_CNTRL0 | RX_CNTRL0_ADDR_FLTR_EN,
-+			&port->regs->rx_control[0]);
-+		return;
-+	}
- 
- 	if ((dev->flags & IFF_PROMISC) || netdev_mc_empty(dev)) {
- 		__raw_writel(DEFAULT_RX_CNTRL0 & ~RX_CNTRL0_ADDR_FLTR_EN,
--- 
-1.6.3.3
+Just out of interest - why would cherry-picking be frowned upon?
+Shouldn't git just ignore the commits it already knows when things are
+pulled?
+
+Thanks,
+Daniel
