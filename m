@@ -1,136 +1,98 @@
-From: redhatter@gentoo.org (Stuart Longland)
-Date: Mon, 31 May 2010 10:55:00 +1000
-Subject: [RFC PATCH] ARM: Add SSI Clock Adjustment for i.MX27 TO2
-Message-ID: <1275267300-30687-1-git-send-email-redhatter@gentoo.org>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Mon, 31 May 2010 09:56:31 +0900
+Subject: [PATCH] s5pv210: Change the base ram address to 0x3000'0000
+In-Reply-To: <AANLkTilMSARvhdta47LieosduQPJLhwqEts8MDrbbBSI@mail.gmail.com>
+References: <20100528023559.GA8174@july>
+	<20100531003911.GM7248@trinity.fluff.org>
+	<AANLkTilMSARvhdta47LieosduQPJLhwqEts8MDrbbBSI@mail.gmail.com>
+Message-ID: <AANLkTilwyDab6MC_hC5L2AeI6yrDCKZ3GsNlztbsAwo3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for adjusting the SSI clocks using the generic clock
-infrastructure.
+On Mon, May 31, 2010 at 9:47 AM, Kyungmin Park <kmpark@infradead.org> wrote:
+> On Mon, May 31, 2010 at 9:39 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+>> On Fri, May 28, 2010 at 11:35:59AM +0900, Kyungmin Park wrote:
+>>> s5pc110 (aka s5pv210) has 2 DRAM port and used it both usually.
+>>> Assume DMC0 starts with 0x2000'0000 with 128MiB.
+>>> DMC1 starts with 0x4000'0000 with 128MiB.
+>>> Note that DMC1 has to start address 0x4000'0000 at least.
+>>>
+>>> Then there's too much memory hole 0x1800'0000 (128MiB + 256MiB)
+>>>
+>>> To reduce memory waste, the DMC0 start with 0x3000'0000.
+>>>
+>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>> ---
+>>> diff --git a/arch/arm/mach-s5pv210/Makefile.boot b/arch/arm/mach-s5pv210/Makefile.boot
+>>> index ff90aa1..b0909e3 100644
+>>> --- a/arch/arm/mach-s5pv210/Makefile.boot
+>>> +++ b/arch/arm/mach-s5pv210/Makefile.boot
+>>> @@ -1,2 +1,2 @@
+>>> - ? zreladdr-y ? ? ? ?:= 0x20008000
+>>> -params_phys-y ? ? ? ?:= 0x20000100
+>>> + ? zreladdr-y ? ? ? ?:= 0x30008000
+>>> +params_phys-y ? ? ? ?:= 0x30000100
+>>
+>> Apart from the technical comments that have been in this thread, I would
+>> like to share notes about making changes like these that affect the entire
+>> SoC kernel build.
+>>
+>> Firstly, changing this effects the rest of the users, not everyone is
+>> using the same device with same layout. This configuration boots on
+>> both S5PC110 and S5PV210 devices. Some of these _have_ to support 1GiB
+>> of memory. Some of them have their bootloaders programemd to start at
+>> 0x20... So please think of how this will affect everyone else.
+>>
+>> Secondly, if you have thought about point 1, then please let us know in
+>> the commit messages. ?The commit message isn't just a log of what the
+>> patch does, it can also be used to show any necessary working about what
+>> is happening and side-effects of it.
+>>
+>> Thirdly, the kernel's default configuration for a SoC/arch isn't meant to
+>> be the best-fit for your board(s) or development practicies. It is meant
+>> to cover as many devices as possible, to allow build testing and to have
+>> something that people can test with. If it is not the most efficient on
+>> the board, then make your own defconfig that is a best fit for your
+>> purposes.
+>>
+>> So, sometimes when this sort of change is required there may be a case of
+>> making it configurable so that your own defconfig/boardconfig can select
+>> it for your own projects.
+>>
+>>
+>> Please keep in mind that other people have/are using the kernel and that
+>> some changes have an affect on other projects as well as your own. This
+>> is why user-space facing changes are the most debated and difficult to
+>> do, kernel internals shift quite easily, whilst the data exported to
+>> userspace is kept as stable as possible.
+>
+> Definitely I agree with your opinions. and that's why I change it to
+> 0x3000'0000.
+> when we start the project. chip vendor guides us to use the
+> 0x3000'0000. at that time there's some reason to use this address. As
+> I know. but some time later they change it to 0x2000'0000.
+> But we already setup and develop the all environment as 0x3000'0000.
+> it's also difficult to change it to 0x2000'0000.
 
-Known bug:
-	The generated clock is approximately 1/4 of what is requested.
-	I'm not sure if this is due to a bug in reading MCLK, or
-	something else dividing the clock down.  Hence the printk's in
-	get_rate_ssix, and the patch's "RFC" status.
+Please see the committed date.
+http://git.denx.de/?p=u-boot.git;a=commitdiff;h=8bc4ee9e8213abe4031ea1720aa02fa98d4402ad
 
-This should open the door to using the SSI ports on the i.MX27 in I?S
-Master mode amongst other things.
++#
++# Copyright (C) 2008 # Samsung Elecgtronics
++# Kyungmin Park <kyungmin.park@samsung.com>
++#
++
++# On S5PC100 we use the 128 MiB OneDRAM bank at
++#
++# 0x30000000 to 0x35000000 (80MiB)
++# 0x38000000 to 0x40000000 (128MiB)
++#
++# On S5PC110 we use the 128 MiB OneDRAM bank at
++#
++# 0x30000000 to 0x35000000 (80MiB)
++# 0x40000000 to 0x48000000 (128MiB)
++#
++TEXT_BASE = 0x34800000
 
-Signed-off-by: Stuart Longland <redhatter@gentoo.org>
----
- arch/arm/mach-mx2/clock_imx27.c |   75 +++++++++++++++++++++++++++++++++++++--
- 1 files changed, 72 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-mx2/clock_imx27.c b/arch/arm/mach-mx2/clock_imx27.c
-index 0f0823c..48a4f62 100644
---- a/arch/arm/mach-mx2/clock_imx27.c
-+++ b/arch/arm/mach-mx2/clock_imx27.c
-@@ -244,12 +244,59 @@ static unsigned long get_rate_ssix(struct clk *clk, unsigned long pdf)
- 
- 	parent_rate = clk_get_rate(clk->parent);
- 
-+	printk("%s: parent = %ld Hz; raw pdf = %ld\n",
-+		__FUNCTION__, parent_rate, pdf );
-+
- 	if (mx27_revision() >= CHIP_REV_2_0)
- 		pdf += 4;  /* MX27 TO2+ */
- 	else
- 		pdf = (pdf < 2) ? 124UL : pdf;  /* MX21 & MX27 TO1 */
- 
--	return 2UL * parent_rate / pdf;
-+	printk("%s: parent = %ld Hz;     pdf = %ld\n",
-+		__FUNCTION__, parent_rate, pdf );
-+
-+	return (2UL * parent_rate) / pdf;
-+}
-+
-+static unsigned long set_rate_ssix(struct clk *clk, unsigned long rate)
-+{
-+	unsigned long parent_rate;
-+	unsigned long pdf;
-+
-+	parent_rate = clk_get_rate(clk->parent);
-+	pdf = (2UL * parent_rate) / rate;
-+
-+	if (mx27_revision() >= CHIP_REV_2_0)
-+		pdf -= 4;  /* MX27 TO2+ */
-+
-+	/* TODO: Not sure how to handle other CPU types */
-+#if 0
-+	else
-+		pdf = (pdf < 2) ? 124UL : pdf;  /* MX21 & MX27 TO1 */
-+#endif
-+	printk("%s: %ld Hz => %ld; pdf = %ld\n",
-+			__FUNCTION__, parent_rate, rate, pdf );
-+
-+	return pdf & 0x3f;
-+}
-+
-+static unsigned long round_rate_ssix(struct clk *clk, unsigned long rate)
-+{
-+	unsigned long div;
-+	unsigned long parent_rate = clk_get_rate(clk->parent);
-+
-+	div = (2UL * parent_rate) / rate;
-+	printk("%s: 2* %ld Hz / %ld Hz = %ld\n",
-+			__FUNCTION__, parent_rate, rate, div );
-+
-+	if ( ( div < 4 ) || ( div > 67 ) )
-+		/* Corresponds to divider value < 2 or > 33.5 */
-+		return -EINVAL;
-+
-+	printk("%s: 2* %ld Hz / %ld = %ld\n",
-+			__FUNCTION__, parent_rate, div, (2UL*parent_rate) / div);
-+
-+	return (2UL * parent_rate) / div;
- }
- 
- static unsigned long get_rate_ssi1(struct clk *clk)
-@@ -257,11 +304,33 @@ static unsigned long get_rate_ssi1(struct clk *clk)
- 	return get_rate_ssix(clk, (__raw_readl(CCM_PCDR0) >> 16) & 0x3f);
- }
- 
-+static int set_rate_ssi1(struct clk *clk, unsigned long rate)
-+{
-+	__raw_writel( set_rate_ssix(clk, rate) << 16, CCM_PCDR0 );
-+	return 0;
-+}
-+
-+static unsigned long round_rate_ssi1(struct clk *clk, unsigned long rate)
-+{
-+	return round_rate_ssix(clk, rate);
-+}
-+
- static unsigned long get_rate_ssi2(struct clk *clk)
- {
- 	return get_rate_ssix(clk, (__raw_readl(CCM_PCDR0) >> 26) & 0x3f);
- }
- 
-+static int set_rate_ssi2(struct clk *clk, unsigned long rate)
-+{
-+	__raw_writel( set_rate_ssix(clk, rate) << 26, CCM_PCDR0 );
-+	return 0;
-+}
-+
-+static unsigned long round_rate_ssi2(struct clk *clk, unsigned long rate)
-+{
-+	return round_rate_ssix(clk, rate);
-+}
-+
- static unsigned long get_rate_nfc(struct clk *clk)
- {
- 	unsigned long nfc_pdf;
-@@ -564,8 +633,8 @@ DEFINE_CLOCK(cspi1_clk1,   0, PCCR0, 31, NULL, NULL, &ipg_clk);
- 
- DEFINE_CLOCK(mstick_clk,   0, PCCR1,  2, NULL, &mstick_clk1, &ipg_clk);
- DEFINE_CLOCK(nfc_clk,      0, PCCR1,  3, get_rate_nfc, NULL, &cpu_clk);
--DEFINE_CLOCK(ssi2_clk,     1, PCCR1,  4, get_rate_ssi2, &ssi2_clk1, &mpll_main2_clk);
--DEFINE_CLOCK(ssi1_clk,     0, PCCR1,  5, get_rate_ssi1, &ssi1_clk1, &mpll_main2_clk);
-+DEFINE_CLOCK1(ssi2_clk,     1, PCCR1,  4, ssi2, &ssi2_clk1, &mpll_main2_clk);
-+DEFINE_CLOCK1(ssi1_clk,     0, PCCR1,  5, ssi1, &ssi1_clk1, &mpll_main2_clk);
- DEFINE_CLOCK(vpu_clk,      0, PCCR1,  6, get_rate_vpu, &vpu_clk1, &mpll_main2_clk);
- DEFINE_CLOCK1(per4_clk,    3, PCCR1,  7, per, NULL, &mpll_main2_clk);
- DEFINE_CLOCK1(per3_clk,    2, PCCR1,  8, per, NULL, &mpll_main2_clk);
--- 
-1.6.4.4
+Thank you,
+Kyungmin Park
