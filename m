@@ -1,20 +1,21 @@
-From: pan@nt.tu-darmstadt.de (Vladimir Pantelic)
-Date: Mon, 31 May 2010 11:45:36 +0200
-Subject: 18bpp display on OMAP3
-In-Reply-To: <667948.10985.qm@web29003.mail.ird.yahoo.com>
-References: <667948.10985.qm@web29003.mail.ird.yahoo.com>
-Message-ID: <4C038540.1020401@nt.tu-darmstadt.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 31 May 2010 11:12:01 +0100
+Subject: [PATCH 1/2] i.MX ssi: MX31ads sound support should depend on
+	MACH_MX31ADS
+In-Reply-To: <1275295794-3168-2-git-send-email-s.hauer@pengutronix.de>
+References: <1275295794-3168-1-git-send-email-s.hauer@pengutronix.de>
+	<1275295794-3168-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20100531101200.GA3489@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patrick wrote:
-> Hello all,
->
-> I am currently designing a new board based on OMAP3530 (Gumstix) with a 18bpp touchscreen. According to the Ti
-> Technical Ref. Manual (page 2164) the Display controller support two packing mode: the "Loosely Packed" that use
-> 24bits buts only the 6 MSB bits of each color and the "Packed" mode that compact all the 18bpp.
->
-> I would like to know which mode is recommended to use depending on the fb driver and eventually on the POWERVR SGX
-> driver.
+On Mon, May 31, 2010 at 10:49:53AM +0200, Sascha Hauer wrote:
 
-only one of the modes (packed iirc) supports HW dithering in the DSS subsystem ...
+>  config SND_MXC_SOC_WM1133_EV1
+>  	tristate "Audio on the the i.MX31ADS with WM1133-EV1 fitted"
+> -	depends on SND_IMX_SOC && EXPERIMENTAL
+> +	depends on SND_IMX_SOC && MACH_MX31ADS && EXPERIMENTAL
+
+This should depend on the 1133-EV1, not the core machine.  The module
+has a dependency on the core machine already and is required to use the
+drivers.
