@@ -1,25 +1,50 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 31 May 2010 12:25:01 +0800
-Subject: [GIT PULL] pxa: fixes for v2.6.34-rc1
-Message-ID: <AANLkTillgu4x49AMo9f6NMmmZvoMQRFaenfwi9d62W__@mail.gmail.com>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Mon, 31 May 2010 13:40:59 +0900
+Subject: [PATCH v3 0/5] Add samsung keypad
+Message-ID: <4C033DDB.1030906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 67a3e12b05e055c0415c556a315a3d3eb637e29e:
-  Linus Torvalds (1):
-        Linux 2.6.35-rc1
+This is patch v3 series to add Samsung keypad.
 
-are available in the git repository at:
+Changes since v1:
+- Include linux/gpio.h instead of mach/gpio.h
+- Switch to dev_pm_ops in the samsung keypad driver
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+Changes since v2:
+- Add keypad device types to remove platform specific #ifdef
+- Remove unnecessary include and checking codes.
+- Rename from 'kp' to 'keypad'
+- Rename keypad registers definition
+- Modify 'rep' variable declaration
 
-Marek Vasut (1):
-      [ARM] pxa/spitz: Correctly register WM8750
+---
+Joonyoung Shim (5):
+      ARM: SAMSUNG: Add keypad device support
+      ARM: S5PV210: Add keypad device helpers
+      ARM: S5PV210: Add keypad device to the GONI board
+      ARM: S5PV210: Add keypad device to the Aquila board
+      input: samsung-keypad - Add samsung keypad driver
 
-Tobias Klauser (1):
-      [ARM] pxa/palmtc: storage class should be before const qualifier
-
- arch/arm/mach-pxa/palmtc.c |    4 ++--
- arch/arm/mach-pxa/spitz.c  |    3 +++
- sound/soc/pxa/spitz.c      |   36 ------------------------------------
- 3 files changed, 5 insertions(+), 38 deletions(-)
+ arch/arm/mach-s5pv210/Kconfig                    |    9 +
+ arch/arm/mach-s5pv210/Makefile                   |    1 +
+ arch/arm/mach-s5pv210/cpu.c                      |    4 +
+ arch/arm/mach-s5pv210/include/mach/map.h         |    3 +
+ arch/arm/mach-s5pv210/mach-aquila.c              |   25 ++
+ arch/arm/mach-s5pv210/mach-goni.c                |   26 ++
+ arch/arm/mach-s5pv210/setup-keypad.c             |   34 ++
+ arch/arm/plat-samsung/Kconfig                    |    5 +
+ arch/arm/plat-samsung/Makefile                   |    1 +
+ arch/arm/plat-samsung/dev-keypad.c               |   50 +++
+ arch/arm/plat-samsung/include/plat/devs.h        |    2 +
+ arch/arm/plat-samsung/include/plat/keypad.h      |   57 +++
+ arch/arm/plat-samsung/include/plat/regs-keypad.h |   49 +++
+ drivers/input/keyboard/Kconfig                   |    9 +
+ drivers/input/keyboard/Makefile                  |    1 +
+ drivers/input/keyboard/samsung-keypad.c          |  397 ++++++++++++++++++++++
+ 16 files changed, 673 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s5pv210/setup-keypad.c
+ create mode 100644 arch/arm/plat-samsung/dev-keypad.c
+ create mode 100644 arch/arm/plat-samsung/include/plat/keypad.h
+ create mode 100644 arch/arm/plat-samsung/include/plat/regs-keypad.h
+ create mode 100644 drivers/input/keyboard/samsung-keypad.c
