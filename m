@@ -1,32 +1,46 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 1 Jun 2010 13:53:21 +0100
-Subject: [PATCH v2] ARM: S5PV210: Add Power Management Support
-In-Reply-To: <20100601041633.GB30276@trinity.fluff.org>
-References: <1275356164-7896-1-git-send-email-kgene.kim@samsung.com>
-	<20100601020329.GT4720@trinity.fluff.org>
-	<AANLkTinNCTUtXDeRTOBi05Yv7FoatY2ruWmnNtTSmg36@mail.gmail.com>
-	<20100601041633.GB30276@trinity.fluff.org>
-Message-ID: <20100601125320.GA10031@sirena.org.uk>
+From: yegor_sub1@visionsystems.de (Yegor Yefremov)
+Date: Tue, 01 Jun 2010 15:39:35 +0200
+Subject: AC97 audio broken on SAM9263EK?
+In-Reply-To: <4B97C086.2080404@atmel.com>
+References: <4B85789D.6000704@billgatliff.com>
+	<4B864C66.6060209@atmel.com>	<4B867108.2050806@billgatliff.com>
+	<4B86AA29.8010806@atmel.com>	<4B89E1BB.6090504@billgatliff.com>
+	<4B8B9849.5040203@atmel.com> <4B96571A.3040403@visionsystems.de>
+	<4B96668E.6090805@atmel.com> <4B975C9A.3020106@visionsystems.de>
+	<4B97602C.6070608@atmel.com> <4B97BD8C.3030502@visionsystems.de>
+	<4B97C086.2080404@atmel.com>
+Message-ID: <4C050D97.4000404@visionsystems.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 01, 2010 at 05:16:33AM +0100, Ben Dooks wrote:
-> On Tue, Jun 01, 2010 at 12:23:39PM +0900, Kyungmin Park wrote:
+Hi,
 
-> > It's common function. Please add it to platform init instead of each board init.
+>> When do you think the driver could hit the mainline kernel? Till
+>> 2.6.35 open window?
+> 
+> It has been acked, but I don't know when it will be in the mainline kernel.
 
-> I know Mark Brown would rather this be the case too, but the original intent
-> was that each board would declare itself to be capable of PM by calling this
-> function to ensure that any boards which had not been validated or where
-> simply incapable of suspend/resume did not end up with this enabled.
+have just tested 2.6.35-rc1 with mainline ac97 driver and found this issue. During playback I see following output on the console:
 
-This does result in rather confusing behaviour, in that the attempts to
-suspend end up getting silently ignored which isn't what you expect.
-Other ARM platforms deal with this by erroring out of the suspend if
-they can tell that it's not going to work and otherwise just trusting
-the system integrator to know what they're doing when they turn on
-suspend in Kconfig.
+...
+atmel_ac97c atmel_ac97c.0: channel A event
+atmel_ac97c atmel_ac97c.0: channel A event
+atmel_ac97c atmel_ac97c.0: channel A event
+...
 
-It would be more friendly to at least put in a default implementation
-which prints an error telling the user what they need to do to actually
-get suspend working.
+If I see it right these, lines come from sound/atmel/ac97c.c->atmel_ac97c_interrupt():
+
+dev_info(&chip->pdev->dev, "channel A event%s%s%s%s%s%s\n",
+                                casr & AC97C_CSR_OVRUN   ? " OVRUN"   : "",
+                                casr & AC97C_CSR_RXRDY   ? " RXRDY"   : "",
+                                casr & AC97C_CSR_UNRUN   ? " UNRUN"   : "",
+                                casr & AC97C_CSR_TXEMPTY ? " TXEMPTY" : "",
+                                casr & AC97C_CSR_TXRDY   ? " TXRDY"   : "",
+                                !casr                    ? " NONE"    : "");
+
+ 
+
+It is necessary to output this message in normal mode or is it a debug message?
+
+Regards,
+Yegor
