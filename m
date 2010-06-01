@@ -1,22 +1,28 @@
 From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Tue, 1 Jun 2010 08:35:06 -0700 (PDT)
-Subject: [PATCH 1/3] mxc: Add support for the imx51 3-stack board
-In-Reply-To: <1275405043-18230-2-git-send-email-jason77.wang@gmail.com>
-Message-ID: <82469.38984.qm@web51002.mail.re2.yahoo.com>
+Date: Tue, 1 Jun 2010 08:56:22 -0700 (PDT)
+Subject: [PATCH 3/3] mx51/clock: add keypad clock definition and
+	registration
+In-Reply-To: <1275405043-18230-4-git-send-email-jason77.wang@gmail.com>
+Message-ID: <495250.54370.qm@web51001.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Jason,
 
 --- On Tue, 6/1/10, Jason Wang <jason77.wang@gmail.com> wrote:
-...
-> +static void __init mx51_3ds_timer_init(void)
-> +{
-> +??? mx51_clocks_init(32768, 24000000, 22579200, 24576000)
 
-This should be:
+> From: Jason Wang <jason77.wang@gmail.com>
+> Subject: [PATCH 3/3] mx51/clock: add keypad clock definition and registration
+> To: s.hauer at pengutronix.de, amit.kucheria at canonical.com
+> Cc: linux-arm-kernel at lists.infradead.org
+> Date: Tuesday, June 1, 2010, 12:10 PM
+> On i.MX51 platforms, the keypad
+> controller has no gate clock, to
+> meet the imx keypad driver requirement, we add a empty
+> definition and
+> register it. Now the keypad driver can work.
 
-mx51_clocks_init(32768, 24000000, 22579200, 0)
+I did not see an entry for the keypad at arch/arm/mach-mx5/devices.c.
 
 Regards,
 
