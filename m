@@ -1,31 +1,32 @@
-From: stefan@datenfreihafen.org (Stefan Schmidt)
-Date: Sat, 5 Jun 2010 10:05:56 +0200
-Subject: defconfig information
-In-Reply-To: <20100604222820.GA4438@kyllikki.org>
-References: <20100604222820.GA4438@kyllikki.org>
-Message-ID: <20100605080556.GA6441@excalibur.local>
+From: balakrishnan@e-consystems.com (balakrishnan)
+Date: Tue, 01 Jun 2010 11:14:18 +0530
+Subject: pxa300 - DDRAM base value
+Message-ID: <1275371058.7001.35.camel@balakrishnan-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+I am working on pxa300 based development board and using Linux 2.6.34.
+This Linux kernel already has support for following boards
+1. zylonite_pxa300
+2. cm-x300 
+3. colibri-pxa300
+4. littleton
 
-On Fri, 2010-06-04 at 23:28, Vincent Sanders wrote:
-> With all the recent issues over default configurations I have decided
-> to release the Kernel autobuilder fifth anniversary statistics a bit
-> early.
+My doubt is that pxa300 based boards are using "0xa0000000"  as DDRAM
+base and PHYS_OFFSET is also defined in
+"arch/arm/mach-pxa/include/mach/memory.h" as 0xa0000000.
+But in our board  DDR is mapped in 0x80000000. Does it make any
+problem?. Because after mmu is turned ON, my board is hanging. 
 
-Thanks to the people involved keeping this working.
+"zreladdr-y   := 0x80008000" is defined in
+"arch/arm/mach-pxa/Makefile.boot" file .
+my machine_desc is as follows 
+.phys_io        = 0x40000000, 
+.io_pg_offst    = (io_p2v(0x40000000) >> 18) & 0xfffc,  
+.boot_params    = 0x80000100,  
 
-> The community usage of this service has dropped to an all time low
-> (only six people actually used it in the last month) and I am
-> seriously considering if it serves a useful purpose any longer.
-
-What do you mean by "used it"? Is there anything else then subscribing to the ml
-and get the build mails?
-
-I found those mails very useful to have a fast overview if something broke most
-of the arm builds. Getting a mail about the MIPS build showed useless to me tho
-as none of the builds ever succeded.
-
-regards
-Stefan Schmidt
+With Thanks
+J.Balakrishnan 
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100601/dd4a8178/attachment-0001.htm>
