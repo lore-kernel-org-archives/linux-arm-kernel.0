@@ -1,41 +1,72 @@
 From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Tue,  1 Jun 2010 08:30:43 +0300
-Subject: [PATCH 4/8] omap iommu: Fix Memory leak
+Date: Tue,  1 Jun 2010 08:30:41 +0300
+Subject: [PATCH 2/8] omap iommu: Introduce iopgd_is_table MACRO
 In-Reply-To: <20100531.123637.28796762.Hiroshi.DOYU@nokia.com>
 References: <20100531.123637.28796762.Hiroshi.DOYU@nokia.com>
-Message-ID: <1275370247-15888-4-git-send-email-Hiroshi.DOYU@nokia.com>
+Message-ID: <1275370247-15888-2-git-send-email-Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Satish <x0124230@ti.com>
+A bit more strict comparison.
 
-The memory allocated for sgt structure is not freed on error
-when sg_alloc_table is called in sgtable_alloc().
-
-Signed-off-by: Satish Kumar <x0124230@ti.com>
-Signed-off-by: Manjunatha GK <manjugk@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: vimal singh <vimal.newwork@gmail.com>
 Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 ---
- arch/arm/plat-omap/iovmm.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+ arch/arm/plat-omap/iommu.c     |    8 ++++----
+ arch/arm/plat-omap/iopgtable.h |    2 ++
+ 2 files changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/plat-omap/iovmm.c b/arch/arm/plat-omap/iovmm.c
-index e43983b..8ce0de2 100644
---- a/arch/arm/plat-omap/iovmm.c
-+++ b/arch/arm/plat-omap/iovmm.c
-@@ -140,8 +140,10 @@ static struct sg_table *sgtable_alloc(const size_t bytes, u32 flags)
- 		return ERR_PTR(-ENOMEM);
+diff --git a/arch/arm/plat-omap/iommu.c b/arch/arm/plat-omap/iommu.c
+index bc094db..341c481 100644
+--- a/arch/arm/plat-omap/iommu.c
++++ b/arch/arm/plat-omap/iommu.c
+@@ -653,7 +653,7 @@ void iopgtable_lookup_entry(struct iommu *obj, u32 da, u32 **ppgd, u32 **ppte)
+ 	if (!*iopgd)
+ 		goto out;
  
- 	err = sg_alloc_table(sgt, nr_entries, GFP_KERNEL);
--	if (err)
-+	if (err) {
-+		kfree(sgt);
- 		return ERR_PTR(err);
-+	}
+-	if (*iopgd & IOPGD_TABLE)
++	if (iopgd_is_table(*iopgd))
+ 		iopte = iopte_offset(iopgd, da);
+ out:
+ 	*ppgd = iopgd;
+@@ -670,7 +670,7 @@ static size_t iopgtable_clear_entry_core(struct iommu *obj, u32 da)
+ 	if (!*iopgd)
+ 		return 0;
  
- 	pr_debug("%s: sgt:%p(%d entries)\n", __func__, sgt, nr_entries);
+-	if (*iopgd & IOPGD_TABLE) {
++	if (iopgd_is_table(*iopgd)) {
+ 		int i;
+ 		u32 *iopte = iopte_offset(iopgd, da);
+ 
+@@ -745,7 +745,7 @@ static void iopgtable_clear_entry_all(struct iommu *obj)
+ 		if (!*iopgd)
+ 			continue;
+ 
+-		if (*iopgd & IOPGD_TABLE)
++		if (iopgd_is_table(*iopgd))
+ 			iopte_free(iopte_offset(iopgd, 0));
+ 
+ 		*iopgd = 0;
+@@ -785,7 +785,7 @@ static irqreturn_t iommu_fault_handler(int irq, void *data)
+ 
+ 	iopgd = iopgd_offset(obj, da);
+ 
+-	if (!(*iopgd & IOPGD_TABLE)) {
++	if (!iopgd_is_table(*iopgd)) {
+ 		dev_err(obj->dev, "%s: da:%08x pgd:%p *pgd:%08x\n", __func__,
+ 			da, iopgd, *iopgd);
+ 		return IRQ_NONE;
+diff --git a/arch/arm/plat-omap/iopgtable.h b/arch/arm/plat-omap/iopgtable.h
+index ab23b6a..f2e6b64 100644
+--- a/arch/arm/plat-omap/iopgtable.h
++++ b/arch/arm/plat-omap/iopgtable.h
+@@ -63,6 +63,8 @@
+ #define IOPGD_SECTION		(2 << 0)
+ #define IOPGD_SUPER		(1 << 18 | 2 << 0)
+ 
++#define iopgd_is_table(x)	(((x) & 3) == IOPGD_TABLE)
++
+ #define IOPTE_SMALL		(2 << 0)
+ #define IOPTE_LARGE		(1 << 0)
  
 -- 
 1.7.1.rc1
