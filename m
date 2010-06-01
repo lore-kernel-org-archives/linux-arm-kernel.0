@@ -1,32 +1,26 @@
-From: balakrishnan@e-consystems.com (balakrishnan)
-Date: Tue, 01 Jun 2010 11:14:18 +0530
-Subject: pxa300 - DDRAM base value
-Message-ID: <1275371058.7001.35.camel@balakrishnan-desktop>
+From: vinayakpane@csu.fullerton.edu (Vinayak Pane)
+Date: Tue, 1 Jun 2010 13:27:42 -0400
+Subject: Preload engine in ARMv7 (cortex A8)
+Message-ID: <AANLkTilGu3OC_tth-Wurgu1jcm5zKKntINGc-A8CwkxI@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am working on pxa300 based development board and using Linux 2.6.34.
-This Linux kernel already has support for following boards
-1. zylonite_pxa300
-2. cm-x300 
-3. colibri-pxa300
-4. littleton
+Hi Reader,
 
-My doubt is that pxa300 based boards are using "0xa0000000"  as DDRAM
-base and PHYS_OFFSET is also defined in
-"arch/arm/mach-pxa/include/mach/memory.h" as 0xa0000000.
-But in our board  DDR is mapped in 0x80000000. Does it make any
-problem?. Because after mmu is turned ON, my board is hanging. 
+I am planning to utilize the PreLoad Engine for L2 cache. In past, I have
+played with cache locking with line by line in ARM9. There I could recall
+that tags and indexes are generated on basis of physical address of the
+data. Now in case of PLE we have the start address and number of lines to
+fill with. Does the PLE operation will leave some indexes empty ? Or does
+the PLE populate all the lines in that way with the source data address ? Do
+I need to start PLE for the block of size equal to that of way-size ? To
+ensure no lines remain empty  and to ensure no line gets overwriten by other
+line.
 
-"zreladdr-y   := 0x80008000" is defined in
-"arch/arm/mach-pxa/Makefile.boot" file .
-my machine_desc is as follows 
-.phys_io        = 0x40000000, 
-.io_pg_offst    = (io_p2v(0x40000000) >> 18) & 0xfffc,  
-.boot_params    = 0x80000100,  
+Appreciate your comments.
 
-With Thanks
-J.Balakrishnan 
+Thanks
+vinayak
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100601/dd4a8178/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100601/42348758/attachment-0001.htm>
