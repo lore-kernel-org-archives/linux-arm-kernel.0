@@ -1,32 +1,31 @@
-From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Tue, 1 Jun 2010 08:56:22 -0700 (PDT)
-Subject: [PATCH 3/3] mx51/clock: add keypad clock definition and
-	registration
-In-Reply-To: <1275405043-18230-4-git-send-email-jason77.wang@gmail.com>
-Message-ID: <495250.54370.qm@web51001.mail.re2.yahoo.com>
+From: fachkar.datawind@gmail.com (f. achkar)
+Date: Tue, 01 Jun 2010 12:48:36 -0400
+Subject: incorrect panic("failed to get clock for system timer"); ??
+Message-ID: <4C0539E4.9090501@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+Hi,
+Newbie debugging Linux-2.6.32-9 on S3C2450, the kernel seems to panic at :
+s3c2410_timer_init () at arch/arm/plat-s3c/time.c:256
 
---- On Tue, 6/1/10, Jason Wang <jason77.wang@gmail.com> wrote:
+if (IS_ERR(timerclk))
+        panic("failed to get clock for system timer");
 
-> From: Jason Wang <jason77.wang@gmail.com>
-> Subject: [PATCH 3/3] mx51/clock: add keypad clock definition and registration
-> To: s.hauer at pengutronix.de, amit.kucheria at canonical.com
-> Cc: linux-arm-kernel at lists.infradead.org
-> Date: Tuesday, June 1, 2010, 12:10 PM
-> On i.MX51 platforms, the keypad
-> controller has no gate clock, to
-> meet the imx keypad driver requirement, we add a empty
-> definition and
-> register it. Now the keypad driver can work.
+more precisely  'if (IS_ERR(timerclk))' is non-null !?! although the
+'timerclk' seem to be fine:
+(gdb) print *timerclk
+$27 = {list = {next = 0xc04a933c, prev = 0xc04a93ac}, owner = 0x0,
+parent = 0xc04abfd4, name = 0xc042c5a1 "timers", id = -1,
+  usage = 0, rate = 0, ctrlbit = 1024, enable = 0xc009631c
+<s3c2443_clkcon_enable_p>, set_rate = 0, get_rate = 0,
+  round_rate = 0, set_parent = 0}
+(gdb) s
+257            panic("failed to get clock for system timer");
+(gdb) print (unsigned long)(timerclk)
+$28 = 3226112884
+(gdb)
 
-I did not see an entry for the keypad at arch/arm/mach-mx5/devices.c.
-
-Regards,
-
-Fabio Estevam
-
-
-      
+I'm not sure why 'IS_ERR(timerclk)' is holding true? or is it a bug ?
+thanks,
+ferar
