@@ -1,23 +1,19 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 1 Jun 2010 19:05:28 +0100
-Subject: [alsa-devel] [PATCH v2 1/4] imx-ssi.c: add new choices to
-	platform configuration
-In-Reply-To: <1274950737-26498-1-git-send-email-eric@eukrea.com>
-References: <1274950737-26498-1-git-send-email-eric@eukrea.com>
-Message-ID: <20100601180527.GC10031@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Jun 2010 19:09:44 +0100
+Subject: [PATCH 2/2] ARM: PL011 baudrate extension for ST-Ericssons
+	derivative
+In-Reply-To: <1275385698-1599-1-git-send-email-linus.walleij@stericsson.com>
+References: <1275385698-1599-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20100601180944.GC6644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 27, 2010 at 10:58:54AM +0200, Eric B??nard wrote:
-> * introduce 3 new flags to allow a more detailed configuration
-> of the SSI link :
-> 	IMX_SSI_NET : enable Network Mode
-> 	IMX_SSI_SYN : enable Synchronous Mode
-> 	IMX_SSI_USE_I2S_SLAVE : enable I2S Slave Mode
-> * new platform can use these settings without breaking actual
-> platforms.
-> 
-> Signed-off-by: Eric B??nard <eric@eukrea.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+On Tue, Jun 01, 2010 at 11:48:18AM +0200, Linus Walleij wrote:
+> @@ -90,6 +92,7 @@ static struct vendor_data vendor_arm = {
+>  	.fifosize		= 16,
+>  	.lcrh_tx                = UART011_LCRH,
+>  	.lcrh_rx                = UART011_LCRH,
+> +        .oversampling	        = false,
 
-Sascha, any comments on the first couple of patches here?
+I assume these spaces rather than tabs are due to an editor error
+rather than an email client problem?
