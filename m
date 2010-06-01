@@ -1,63 +1,69 @@
-From: bbb.lst@gmail.com (Bjoern Brandenburg)
-Date: Tue, 1 Jun 2010 18:57:24 -0400
-Subject: 2.6.34 hangs during boot on PB11MPCore
-In-Reply-To: <F01D8B85CFF58440B2A13965FBA90CA42DA38528B5@GEORGE.Emea.Arm.com>
-References: <AANLkTin9n6HDdiTnQoQ9mrmuzSR8JhZVq7uPgU86yqgU@mail.gmail.com>
-	<20100530073652.GX2695@buzzloop.caiaq.de>
-	<AANLkTimUF5iiGnc6RnN5C3sy-R6DAqHZNf6ZEu2o3W9P@mail.gmail.com>
-	<AANLkTikdvjg52v-3AKUBukGO2FCp3fENGoYgpZZ2xVtT@mail.gmail.com>
-	<AANLkTilMtEpt5hRfF_hszpU_AxZm7H93bkhqUacGWZc9@mail.gmail.com>
-	<1275259589.22752.14.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTim4e5Sdj9tronOiI-sIMVGaUQdfRIhKHzZ4XfKp@mail.gmail.com>
-	<AANLkTim3YdK3QDXC-20otTBPqYF_XX9rGHRX50cycqk6@mail.gmail.com>
-	<1275290414.2843.11.camel@e102109-lin.cambridge.arm.com>
-	<F01D8B85CFF58440B2A13965FBA90CA42DA38528B5@GEORGE.Emea.Arm.com>
-Message-ID: <AANLkTinvXEs9UKl1hEW8zf2t7JqylO4zhocRfEpak1ho@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 2 Jun 2010 01:14:32 +0200 (CEST)
+Subject: [RFC PATCH] irq: handle private interrupt registration
+In-Reply-To: <20100601152652.9296c5d0.akpm@linux-foundation.org>
+References: <1274905794-7848-1-git-send-email-adharmap@codeaurora.org>
+	<20100601152652.9296c5d0.akpm@linux-foundation.org>
+Message-ID: <alpine.LFD.2.00.1006020110090.2933@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 1, 2010 at 3:46 AM, Colin Tuckley <Colin.Tuckley@arm.com> wrote:
->> -----Original Message-----
->> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
->> kernel-bounces at lists.infradead.org] On Behalf Of Catalin Marinas
->
->> Regarding the SMSC 911x driver synchronisation - I've been asking SMSC
->> for more than a year to look into this.
->
-> I'm still waiting for them to take up our offer of a PB11MPCore system for testing.
->
-> One thing Bjoern hasn't mentioned... is the board firmware up to date? I.e. has the fpga image been updated to the latest release (from the latest CD).
->
+On Tue, 1 Jun 2010, Andrew Morton wrote:
 
-Mhhh... Despite much looking through the arm.com site, I couldn't
-figure out what the "latest CD" is. We got our box last September and
-haven't installed any firmware updates since. Thus it's quite possible
-that the firmware is out of date.
-Is this the revision ID that you're looking for?
+> On Wed, 26 May 2010 13:29:54 -0700
+> adharmap at codeaurora.org wrote:
+> 
+> > From: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> > 
+> > The current code fails to register a handler for the same irq
+> > without taking in to account that it could be a per cpu interrupt.
+> > If the IRQF_PERCPU flag is set, enable the interrupt on that cpu
+> > and return success.
+> > 
+> > Change-Id: I748b3aa08d794342ad74cbd0bb900cc599f883a6
+> > Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> > ---
+> > 
+> > On systems with an interrupt controller that supports
+> > private interrupts per core, it is not possible to call 
+> > request_irq/setup_irq from multiple cores for the same irq. This is because
+> > the second+ invocation of __setup_irq checks if the previous
+> > hndler had a IRQ_SHARED flag set and errors out if not. 
+> > 
+> > The current irq handling code doesnt take in to account what cpu it 
+> > is executing on.  Usually the local interrupt controller registers are banked 
+> > per cpu a.k.a. a cpu can enable its local interrupt by writing to its banked 
+> > registers.
+> > 
+> > One way to get around this problem is to call the setup_irq on a single cpu 
+> > while other cpus simply enable their private interrupts by writing to their 
+> > banked registers
+> > 
+> > For eg. code in arch/arm/time/smp_twd.c
+> > 	/* Make sure our local interrupt controller has this enabled */
+> > 	local_irq_save(flags);
+> > 	get_irq_chip(clk->irq)->unmask(clk->irq);
+> > 	local_irq_restore(flags);
+> > 
+> > This looks like a hacky way to get local interrupts working on 
+> > multiple cores.
 
-# cat /proc/cpuinfo
-Processor	: ARMv6-compatible processor rev 0 (v6l)
-processor	: 0
-BogoMIPS	: 83.55
+Yes, it is. But it's saner than your aproach to trick the setup_irq()
+to handle that case.
 
-processor	: 1
-BogoMIPS	: 83.55
+There are two sane solutions: 
+      
+1) Use PER_CPU offsets for the irq numbers. The generic irq code does
+   not care whether the interrupt number is matching any physical
+   numbering scheme in the hardware, as long as the arch specific chip
+   implementation knows how to deal with it, which is not rocket
+   science to do.
 
-processor	: 2
-BogoMIPS	: 83.55
+2) Let the boot CPU setup the interrupt and provide a generic
+   enable_per_cpu_irq() / disable_per_cpu_irq() interface, which has
+   sanity checking in place. That has a couple of interesting
+   implications as well, but they can be dealt with.
 
-processor	: 3
-BogoMIPS	: 83.55
+Thanks,
 
-Features	: swp half thumb fastmult vfp edsp java
-CPU implementer	: 0x41
-CPU architecture: 7
-CPU variant	: 0x0
-CPU part	: 0xb02
-CPU revision	: 0
-
-Hardware	: ARM-RealView PB11MPCore
-Revision	: 2159f503
-Serial		: 0000000000000000
-
-- Bj?rn
+	tglx
