@@ -1,133 +1,116 @@
-From: gdavis@mvista.com (gdavis at mvista.com)
-Date: Tue,  1 Jun 2010 17:59:24 -0400
-Subject: [RFC PATCH] gcov: Add ARM eABI support
-Message-ID: <1275429564-9922-1-git-send-email-gdavis@mvista.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 1 Jun 2010 15:26:52 -0700
+Subject: [RFC PATCH] irq: handle private interrupt registration
+In-Reply-To: <1274905794-7848-1-git-send-email-adharmap@codeaurora.org>
+References: <1274905794-7848-1-git-send-email-adharmap@codeaurora.org>
+Message-ID: <20100601152652.9296c5d0.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: George G. Davis <gdavis@mvista.com>
+On Wed, 26 May 2010 13:29:54 -0700
+adharmap at codeaurora.org wrote:
 
-Initially based on linux-2.6.30-gcov-arm-eabi.patch [1] and
-linux-2.6.30-gcov-arm-hack.patch [2] with fixups to resolve
-forward port conflicts.  Improved on [1] by making the
-constructors section name a kernel config variable so the
-correct section name is automatically selected based on the
-build target.
+> From: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> 
+> The current code fails to register a handler for the same irq
+> without taking in to account that it could be a per cpu interrupt.
+> If the IRQF_PERCPU flag is set, enable the interrupt on that cpu
+> and return success.
+> 
+> Change-Id: I748b3aa08d794342ad74cbd0bb900cc599f883a6
+> Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> ---
+> 
+> On systems with an interrupt controller that supports
+> private interrupts per core, it is not possible to call 
+> request_irq/setup_irq from multiple cores for the same irq. This is because
+> the second+ invocation of __setup_irq checks if the previous
+> hndler had a IRQ_SHARED flag set and errors out if not. 
+> 
+> The current irq handling code doesnt take in to account what cpu it 
+> is executing on.  Usually the local interrupt controller registers are banked 
+> per cpu a.k.a. a cpu can enable its local interrupt by writing to its banked 
+> registers.
+> 
+> One way to get around this problem is to call the setup_irq on a single cpu 
+> while other cpus simply enable their private interrupts by writing to their 
+> banked registers
+> 
+> For eg. code in arch/arm/time/smp_twd.c
+> 	/* Make sure our local interrupt controller has this enabled */
+> 	local_irq_save(flags);
+> 	get_irq_chip(clk->irq)->unmask(clk->irq);
+> 	local_irq_restore(flags);
+> 
+> This looks like a hacky way to get local interrupts working on 
+> multiple cores.
+> 
+> The patch adds a check for PERCPU flag in __setup_irq - if an handler is 
+> present it simply enables that interrupt for that core and returns 0.
+> 
+> ...
+>  
+> --- a/kernel/irq/manage.c
+> +++ b/kernel/irq/manage.c
+> @@ -683,6 +683,37 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
+>  	old_ptr = &desc->action;
+>  	old = *old_ptr;
+>  	if (old) {
+> +#if defined(CONFIG_IRQ_PER_CPU)
+> +		/* All handlers must agree on per-cpuness */
+> +		if ((old->flags & IRQF_PERCPU) !=
+> +			(new->flags & IRQF_PERCPU))
+> +			goto mismatch;
+> +
+> +		if (old->flags & IRQF_PERCPU) {
+> +			/* the chip must have been set for this interrupt*/
+> +			if (!(desc->status & IRQ_NOAUTOEN)) {
+> +				desc->depth = 0;
+> +				desc->status &= ~IRQ_DISABLED;
+> +				desc->chip->startup(irq);
+> +			} else
+> +				/* Undo nested disables: */
+> +				desc->depth = 1;
+> +
+> +			spin_unlock_irqrestore(&desc->lock, flags);
 
-[1] http://ltp.cvs.sourceforge.net/viewvc/*checkout*/ltp/utils/analysis/gcov-kernel/linux-2.6.30-gcov-arm-eabi.patch?revision=1.1
-[2] http://ltp.cvs.sourceforge.net/viewvc/*checkout*/ltp/utils/analysis/gcov-kernel/linux-2.6.30-gcov-arm-hack.patch?revision=1.1
+The rest of the code uses raw_spin_unlock_irqrestore().
 
-Signed-off-by: David Singleton <dsingleton@mvista.com>
-Signed-off-by: George G. Davis <gdavis@mvista.com>
----
- arch/arm/boot/bootp/Makefile      |    2 ++
- arch/arm/boot/compressed/Makefile |    2 ++
- arch/arm/include/asm/elf.h        |    1 +
- arch/arm/kernel/module.c          |    1 +
- include/asm-generic/vmlinux.lds.h |    2 +-
- kernel/gcov/Kconfig               |    8 +++++++-
- kernel/module.c                   |    2 +-
- 7 files changed, 15 insertions(+), 3 deletions(-)
+I don't know _why_ is uses this.  There are no code comments, and the
+239007b8440abff689632f50cdf0f2b9e895b534 changelog is:
 
-diff --git a/arch/arm/boot/bootp/Makefile b/arch/arm/boot/bootp/Makefile
-index c394e30..5761f00 100644
---- a/arch/arm/boot/bootp/Makefile
-+++ b/arch/arm/boot/bootp/Makefile
-@@ -5,6 +5,8 @@
- # architecture-specific flags and dependencies.
- #
- 
-+GCOV_PROFILE	:= n
-+
- LDFLAGS_bootp	:=-p --no-undefined -X \
- 		 --defsym initrd_phys=$(INITRD_PHYS) \
- 		 --defsym params_phys=$(PARAMS_PHYS) -T
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 53faa90..e1aee30 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -8,6 +8,8 @@ HEAD	= head.o
- OBJS	= misc.o decompress.o
- FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
- 
-+GCOV_PROFILE		:= n
-+
- #
- # Architecture dependencies
- #
-diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-index 51662fe..6b19f46 100644
---- a/arch/arm/include/asm/elf.h
-+++ b/arch/arm/include/asm/elf.h
-@@ -52,6 +52,7 @@ typedef struct user_fp elf_fpregset_t;
- #define R_ARM_ABS32		2
- #define R_ARM_CALL		28
- #define R_ARM_JUMP24		29
-+#define R_ARM_TARGET1		38
- #define R_ARM_V4BX		40
- #define R_ARM_PREL31		42
- #define R_ARM_MOVW_ABS_NC	43
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index c628bdf..2e04a98 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -129,6 +129,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 			break;
- 
- 		case R_ARM_ABS32:
-+		case R_ARM_TARGET1:
- 			*(u32 *)loc += sym->st_value;
- 			break;
- 
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index 48c5299..4dfce1a 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -442,7 +442,7 @@
- #ifdef CONFIG_CONSTRUCTORS
- #define KERNEL_CTORS()	. = ALIGN(8);			   \
- 			VMLINUX_SYMBOL(__ctors_start) = .; \
--			*(.ctors)			   \
-+			*(CONFIG_GCOV_CTORS)			   \
- 			VMLINUX_SYMBOL(__ctors_end) = .;
- #else
- #define KERNEL_CTORS()
-diff --git a/kernel/gcov/Kconfig b/kernel/gcov/Kconfig
-index 70a298d..8564dc8 100644
---- a/kernel/gcov/Kconfig
-+++ b/kernel/gcov/Kconfig
-@@ -34,7 +34,7 @@ config GCOV_KERNEL
- config GCOV_PROFILE_ALL
- 	bool "Profile entire Kernel"
- 	depends on GCOV_KERNEL
--	depends on S390 || X86 || (PPC && EXPERIMENTAL) || MICROBLAZE
-+	depends on S390 || X86 || (PPC && EXPERIMENTAL) || MICROBLAZE || ARM
- 	default n
- 	---help---
- 	This options activates profiling for the entire kernel.
-@@ -45,4 +45,10 @@ config GCOV_PROFILE_ALL
- 	larger and run slower. Also be sure to exclude files from profiling
- 	which are not linked to the kernel image to prevent linker errors.
- 
-+config GCOV_CTORS
-+	string
-+	depends on GCOV_KERNEL
-+	default ".init_array" if ARM && AEABI
-+	default ".ctors"
-+
- endmenu
-diff --git a/kernel/module.c b/kernel/module.c
-index 0129769..b4eaed9 100644
---- a/kernel/module.c
-+++ b/kernel/module.c
-@@ -2296,7 +2296,7 @@ static noinline struct module *load_module(void __user *umod,
- 					    "__kcrctab_unused_gpl");
- #endif
- #ifdef CONFIG_CONSTRUCTORS
--	mod->ctors = section_objs(hdr, sechdrs, secstrings, ".ctors",
-+	mod->ctors = section_objs(hdr, sechdrs, secstrings, CONFIG_GCOV_CTORS,
- 				  sizeof(*mod->ctors), &mod->num_ctors);
- #endif
- 
--- 
-1.6.3.3.328.ga9ee94
+: genirq: Convert irq_desc.lock to raw_spinlock
+:    
+: Convert locks which cannot be sleeping locks in preempt-rt to
+: raw_spinlocks.
+
+which is pathetically useless.
+
+But I suppose we should ignorantly copy it and hope we're not screwing
+something up.
+
+> +			if (new->thread)
+> +				wake_up_process(new->thread);
+> +			return 0;
+> +		}
+> +#endif
+> +
+> +		/* they are the same types and same handler
+> +		 * perhaps it is a private cpu interrupt
+> +		 */
+> +		if (old->flags == new->flags
+> +			&& old->handler == new->handler)
+> +			setup_affinity(irq, desc);
+> +			return 0;
+
+And this appears to have forgotten to undo the lock altogether, which
+makes one wonder about the testing coverage.
+
+It also embeds a `return' statement deep inside a huge and complex
+function, which is invariably bad.
+
+And in so doing it bypasses the register_irq_proc() and
+register_handler_proc() calls.  I have no way of knowing whether that
+was deliberate or whether it was a bug.  If it was deliberate then some
+code and'/or changelog commentary is needed, so that others don't think
+that it is a bug too.
