@@ -1,116 +1,80 @@
-From: raj.khem@gmail.com (Khem Raj)
-Date: Tue,  1 Jun 2010 01:06:40 -0700
-Subject: [PATCH] Add kto and kfrom to input operands list.
-Message-ID: <1275379600-23498-1-git-send-email-raj.khem@gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 01 Jun 2010 10:51:16 +0200
+Subject: [PATCH V2] i2c-imx: do not allow interruptions when waiting for
+	I2C to complete
+In-Reply-To: <1274962561-17007-1-git-send-email-mkl@pengutronix.de>
+References: <1274962561-17007-1-git-send-email-mkl@pengutronix.de>
+Message-ID: <4C04CA04.6000207@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When functions incoming parameters are not in input operands list gcc 4.5 does not
-load the parameters into registers before calling this function but the
-inline assembly assumes valid addresses inside this function. This
-breaks the code because r0 and r1 are invalid when execution enters
-v4wb_copy_user_page ()
+Marc Kleine-Budde wrote:
+> The i2c_imx_trx_complete() function is using
+> wait_event_interruptible_timeout() to wait for the I2C controller to
+> signal that it has completed an I2C bus operation. If the process that
+> causes the I2C operation receives a signal, the wait will be
+> interrupted, returning an error. It is better to let the I2C operation
+> finished before handling the signal (i.e. returning into userspace).
+> 
+> It is safe to use wait_event_timeout() instead, because the timeout
+> will allow the process to exit if the I2C bus hangs. It's also better
+> to allow the I2C operation to finish, because unacknowledged I2C
+> operations can cause the I2C bus to hang.
 
-Also the constant needs to be used as third input operand so account for that
-as well.
+Ping, can someone please comment the patch and/or push upstream.
 
-Tested on qemu arm.
+Marc
+> 
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
+> ---
+> 
+> V2: Remove check for "result < 0" as commented by Wolfram Sang.
+> 
+>  drivers/i2c/busses/i2c-imx.c |    9 +++------
+>  1 files changed, 3 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+> index d1ff940..58df809 100644
+> --- a/drivers/i2c/busses/i2c-imx.c
+> +++ b/drivers/i2c/busses/i2c-imx.c
+> @@ -161,13 +161,10 @@ static int i2c_imx_trx_complete(struct imx_i2c_struct *i2c_imx)
+>  {
+>  	int result;
+>  
+> -	result = wait_event_interruptible_timeout(i2c_imx->queue,
+> +	result = wait_event_timeout(i2c_imx->queue,
+>  		i2c_imx->i2csr & I2SR_IIF, HZ / 10);
+>  
+> -	if (unlikely(result < 0)) {
+> -		dev_dbg(&i2c_imx->adapter.dev, "<%s> result < 0\n", __func__);
+> -		return result;
+> -	} else if (unlikely(!(i2c_imx->i2csr & I2SR_IIF))) {
+> +	if (unlikely(!(i2c_imx->i2csr & I2SR_IIF))) {
+>  		dev_dbg(&i2c_imx->adapter.dev, "<%s> Timeout\n", __func__);
+>  		return -ETIMEDOUT;
+>  	}
+> @@ -295,7 +292,7 @@ static irqreturn_t i2c_imx_isr(int irq, void *dev_id)
+>  		i2c_imx->i2csr = temp;
+>  		temp &= ~I2SR_IIF;
+>  		writeb(temp, i2c_imx->base + IMX_I2C_I2SR);
+> -		wake_up_interruptible(&i2c_imx->queue);
+> +		wake_up(&i2c_imx->queue);
+>  		return IRQ_HANDLED;
+>  	}
+>  
 
-Signed-off-by: Khem Raj <raj.khem@gmail.com>
----
- arch/arm/mm/copypage-feroceon.c |    4 ++--
- arch/arm/mm/copypage-v4wb.c     |    4 ++--
- arch/arm/mm/copypage-v4wt.c     |    4 ++--
- arch/arm/mm/copypage-xsc3.c     |    4 ++--
- 4 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mm/copypage-feroceon.c b/arch/arm/mm/copypage-feroceon.c
-index 5eb4fd9..ac163de 100644
---- a/arch/arm/mm/copypage-feroceon.c
-+++ b/arch/arm/mm/copypage-feroceon.c
-@@ -18,7 +18,7 @@ feroceon_copy_user_page(void *kto, const void *kfrom)
- {
- 	asm("\
- 	stmfd	sp!, {r4-r9, lr}		\n\
--	mov	ip, %0				\n\
-+	mov	ip, %2				\n\
- 1:	mov	lr, r1				\n\
- 	ldmia	r1!, {r2 - r9}			\n\
- 	pld	[lr, #32]			\n\
-@@ -64,7 +64,7 @@ feroceon_copy_user_page(void *kto, const void *kfrom)
- 	mcr	p15, 0, ip, c7, c10, 4		@ drain WB\n\
- 	ldmfd	sp!, {r4-r9, pc}"
- 	:
--	: "I" (PAGE_SIZE));
-+	: "r" (kto), "r" (kfrom), "I" (PAGE_SIZE));
- }
- 
- void feroceon_copy_user_highpage(struct page *to, struct page *from,
-diff --git a/arch/arm/mm/copypage-v4wb.c b/arch/arm/mm/copypage-v4wb.c
-index 7c2eb55..cb589cb 100644
---- a/arch/arm/mm/copypage-v4wb.c
-+++ b/arch/arm/mm/copypage-v4wb.c
-@@ -27,7 +27,7 @@ v4wb_copy_user_page(void *kto, const void *kfrom)
- {
- 	asm("\
- 	stmfd	sp!, {r4, lr}			@ 2\n\
--	mov	r2, %0				@ 1\n\
-+	mov	r2, %2				@ 1\n\
- 	ldmia	r1!, {r3, r4, ip, lr}		@ 4\n\
- 1:	mcr	p15, 0, r0, c7, c6, 1		@ 1   invalidate D line\n\
- 	stmia	r0!, {r3, r4, ip, lr}		@ 4\n\
-@@ -44,7 +44,7 @@ v4wb_copy_user_page(void *kto, const void *kfrom)
- 	mcr	p15, 0, r1, c7, c10, 4		@ 1   drain WB\n\
- 	ldmfd	 sp!, {r4, pc}			@ 3"
- 	:
--	: "I" (PAGE_SIZE / 64));
-+	: "r" (kto), "r" (kfrom), "I" (PAGE_SIZE / 64));
- }
- 
- void v4wb_copy_user_highpage(struct page *to, struct page *from,
-diff --git a/arch/arm/mm/copypage-v4wt.c b/arch/arm/mm/copypage-v4wt.c
-index 172e6a5..30c7d04 100644
---- a/arch/arm/mm/copypage-v4wt.c
-+++ b/arch/arm/mm/copypage-v4wt.c
-@@ -25,7 +25,7 @@ v4wt_copy_user_page(void *kto, const void *kfrom)
- {
- 	asm("\
- 	stmfd	sp!, {r4, lr}			@ 2\n\
--	mov	r2, %0				@ 1\n\
-+	mov	r2, %2				@ 1\n\
- 	ldmia	r1!, {r3, r4, ip, lr}		@ 4\n\
- 1:	stmia	r0!, {r3, r4, ip, lr}		@ 4\n\
- 	ldmia	r1!, {r3, r4, ip, lr}		@ 4+1\n\
-@@ -40,7 +40,7 @@ v4wt_copy_user_page(void *kto, const void *kfrom)
- 	mcr	p15, 0, r2, c7, c7, 0		@ flush ID cache\n\
- 	ldmfd	sp!, {r4, pc}			@ 3"
- 	:
--	: "I" (PAGE_SIZE / 64));
-+	: "r" (kto), "r" (kfrom), "I" (PAGE_SIZE / 64));
- }
- 
- void v4wt_copy_user_highpage(struct page *to, struct page *from,
-diff --git a/arch/arm/mm/copypage-xsc3.c b/arch/arm/mm/copypage-xsc3.c
-index 747ad41..f9cde07 100644
---- a/arch/arm/mm/copypage-xsc3.c
-+++ b/arch/arm/mm/copypage-xsc3.c
-@@ -34,7 +34,7 @@ xsc3_mc_copy_user_page(void *kto, const void *kfrom)
- {
- 	asm("\
- 	stmfd	sp!, {r4, r5, lr}		\n\
--	mov	lr, %0				\n\
-+	mov	lr, %2				\n\
- 						\n\
- 	pld	[r1, #0]			\n\
- 	pld	[r1, #32]			\n\
-@@ -67,7 +67,7 @@ xsc3_mc_copy_user_page(void *kto, const void *kfrom)
- 						\n\
- 	ldmfd	sp!, {r4, r5, pc}"
- 	:
--	: "I" (PAGE_SIZE / 64 - 1));
-+	: "r" (kto), "r" (kfrom), "I" (PAGE_SIZE / 64 - 1));
- }
- 
- void xsc3_mc_copy_user_highpage(struct page *to, struct page *from,
 -- 
-1.7.0.4
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 260 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100601/5cbd7706/attachment.sig>
