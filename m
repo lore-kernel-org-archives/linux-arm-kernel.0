@@ -1,52 +1,85 @@
 From: saeed@marvell.com (Saeed Bishara)
-Date: Tue,  1 Jun 2010 18:09:26 +0300
-Subject: [PATCH 1/3] [ARM] Kirkwood: add support for rev A1 of the 88f6192 and
-	88f6180 chips.
-Message-ID: <1275404968-12258-1-git-send-email-saeed@marvell.com>
+Date: Tue,  1 Jun 2010 18:09:27 +0300
+Subject: [PATCH 2/3] [ARM] Kirkwood: Add support for 88f6282
+In-Reply-To: <1275404968-12258-1-git-send-email-saeed@marvell.com>
+References: <1275404968-12258-1-git-send-email-saeed@marvell.com>
+Message-ID: <1275404968-12258-2-git-send-email-saeed@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The 6282 SoC is compatible to 6280 and features faster CPU, DDR3, additional
+PCIe interface, and LCD controller. More infromation can be found here:
+http://www.marvell.com/products/processors/embedded/armada_300/armada_310.pdf
 
 Signed-off-by: Saeed Bishara <saeed@marvell.com>
 ---
- arch/arm/mach-kirkwood/common.c                |    4 ++++
+ arch/arm/mach-kirkwood/common.c                |   13 ++++++++++---
  arch/arm/mach-kirkwood/include/mach/kirkwood.h |    2 ++
- 2 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/mach-kirkwood/mpp.c                   |    3 ++-
+ 3 files changed, 14 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index 6072eaa..c780c4a 100644
+index c780c4a..4ccfdf9 100644
 --- a/arch/arm/mach-kirkwood/common.c
 +++ b/arch/arm/mach-kirkwood/common.c
-@@ -891,11 +891,15 @@ static char * __init kirkwood_id(void)
- 			return "MV88F6192-Z0";
- 		else if (rev == MV88F6192_REV_A0)
- 			return "MV88F6192-A0";
-+		else if (rev == MV88F6192_REV_A1)
-+			return "MV88F6192-A1";
- 		else
- 			return "MV88F6192-Rev-Unsupported";
- 	} else if (dev == MV88F6180_DEV_ID) {
- 		if (rev == MV88F6180_REV_A0)
- 			return "MV88F6180-Rev-A0";
-+		else if (rev == MV88F6180_REV_A1)
-+			return "MV88F6180-Rev-A1";
+@@ -402,7 +402,7 @@ void __init kirkwood_sdio_init(struct mvsdio_platform_data *mvsdio_data)
+ 	u32 dev, rev;
+ 
+ 	kirkwood_pcie_id(&dev, &rev);
+-	if (rev == 0)  /* catch all Kirkwood Z0's */
++	if (rev == 0 && dev != MV88F6282_DEV_ID) /* catch all Kirkwood Z0's */
+ 		mvsdio_data->clock = 100000000;
+ 	else
+ 		mvsdio_data->clock = 200000000;
+@@ -847,8 +847,10 @@ int __init kirkwood_find_tclk(void)
+ 	u32 dev, rev;
+ 
+ 	kirkwood_pcie_id(&dev, &rev);
+-	if (dev == MV88F6281_DEV_ID && (rev == MV88F6281_REV_A0 ||
+-					rev == MV88F6281_REV_A1))
++
++	if ((dev == MV88F6281_DEV_ID && (rev == MV88F6281_REV_A0 ||
++					rev == MV88F6281_REV_A1)) ||
++	    (dev == MV88F6282_DEV_ID))
+ 		return 200000000;
+ 
+ 	return 166666667;
+@@ -902,6 +904,11 @@ static char * __init kirkwood_id(void)
+ 			return "MV88F6180-Rev-A1";
  		else
  			return "MV88F6180-Rev-Unsupported";
++	} else if (dev == MV88F6282_DEV_ID) {
++		if (rev == MV88F6282_REV_A0)
++			return "MV88F6282-Rev-A0";
++		else
++			return "MV88F6282-Rev-Unsupported";
  	} else {
+ 		return "Device-Unknown";
+ 	}
 diff --git a/arch/arm/mach-kirkwood/include/mach/kirkwood.h b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
-index a15cf0e..d61b9aa 100644
+index d61b9aa..dd7eddb 100644
 --- a/arch/arm/mach-kirkwood/include/mach/kirkwood.h
 +++ b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
-@@ -107,8 +107,10 @@
- #define MV88F6192_DEV_ID	0x6192
- #define MV88F6192_REV_Z0	0
- #define MV88F6192_REV_A0	2
-+#define MV88F6192_REV_A1	3
- 
- #define MV88F6180_DEV_ID	0x6180
+@@ -113,4 +113,6 @@
  #define MV88F6180_REV_A0	2
-+#define MV88F6180_REV_A1	3
+ #define MV88F6180_REV_A1	3
  
++#define MV88F6282_DEV_ID	0x6282
++#define MV88F6282_REV_A0	0
  #endif
+diff --git a/arch/arm/mach-kirkwood/mpp.c b/arch/arm/mach-kirkwood/mpp.c
+index a5900f6..065187d 100644
+--- a/arch/arm/mach-kirkwood/mpp.c
++++ b/arch/arm/mach-kirkwood/mpp.c
+@@ -23,7 +23,8 @@ static unsigned int __init kirkwood_variant(void)
+ 
+ 	kirkwood_pcie_id(&dev, &rev);
+ 
+-	if (dev == MV88F6281_DEV_ID && rev >= MV88F6281_REV_A0)
++	if ((dev == MV88F6281_DEV_ID && rev >= MV88F6281_REV_A0) ||
++	    (dev == MV88F6282_DEV_ID))
+ 		return MPP_F6281_MASK;
+ 	if (dev == MV88F6192_DEV_ID && rev >= MV88F6192_REV_A0)
+ 		return MPP_F6192_MASK;
 -- 
 1.6.0.4
