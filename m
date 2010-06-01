@@ -1,48 +1,45 @@
 From: jason77.wang@gmail.com (Jason Wang)
-Date: Tue,  1 Jun 2010 23:10:42 +0800
-Subject: [PATCH 2/3] mxc/iomux: add GPIO bank offset for iomux v3 platforms
-In-Reply-To: <1275405043-18230-2-git-send-email-jason77.wang@gmail.com>
+Date: Tue,  1 Jun 2010 23:10:43 +0800
+Subject: [PATCH 3/3] mx51/clock: add keypad clock definition and registration
+In-Reply-To: <1275405043-18230-3-git-send-email-jason77.wang@gmail.com>
 References: <1275405043-18230-1-git-send-email-jason77.wang@gmail.com>
 	<1275405043-18230-2-git-send-email-jason77.wang@gmail.com>
-Message-ID: <1275405043-18230-3-git-send-email-jason77.wang@gmail.com>
+	<1275405043-18230-3-git-send-email-jason77.wang@gmail.com>
+Message-ID: <1275405043-18230-4-git-send-email-jason77.wang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These GPIO bank offsets are useful when define a gpio number.
-E.G. when GPIO PORTC pin 6 is used for irq request pin of external
-expanding device, we can define it like:
-  #define EXP_PARENT_IRQ_PIN (GPIO_PORTC + 6)
+On i.MX51 platforms, the keypad controller has no gate clock, to
+meet the imx keypad driver requirement, we add a empty definition and
+register it. Now the keypad driver can work.
 
 Signed-off-by: Jason Wang <jason77.wang@gmail.com>
 ---
- arch/arm/plat-mxc/include/mach/iomux-v3.h |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/clock-mx51.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-v3.h b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-index f2f73d3..0880a4a 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-v3.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-@@ -89,6 +89,21 @@ struct pad_desc {
- #define PAD_CTL_SRE_FAST		(1 << 0)
- #define PAD_CTL_SRE_SLOW		(0 << 0)
+diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
+index d9f612d..e89b93a 100644
+--- a/arch/arm/mach-mx5/clock-mx51.c
++++ b/arch/arm/mach-mx5/clock-mx51.c
+@@ -758,6 +758,10 @@ static struct clk gpt_32k_clk = {
+ 	.parent = &ckil_clk,
+ };
  
++static struct clk kpp_clk = {
++	.id = 0,
++};
 +
-+#define MX51_NUM_GPIO_PORT	4
-+
-+#define GPIO_PIN_MASK 0x1f
-+
-+#define GPIO_PORT_SHIFT 5
-+#define GPIO_PORT_MASK (0x7 << GPIO_PORT_SHIFT)
-+
-+#define GPIO_PORTA	(0 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTB	(1 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTC	(2 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTD	(3 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTE	(4 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTF	(5 << GPIO_PORT_SHIFT)
-+
- /*
-  * setups a single pad in the iomuxer
-  */
+ #define DEFINE_CLOCK(name, i, er, es, gr, sr, p, s)	\
+ 	static struct clk name = {			\
+ 		.id		= i,			\
+@@ -821,6 +825,7 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
+ 	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
+ 	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
++	_REGISTER_CLOCK(NULL, "kpp", kpp_clk)
+ };
+ 
+ static void clk_tree_init(void)
 -- 
 1.5.6.5
