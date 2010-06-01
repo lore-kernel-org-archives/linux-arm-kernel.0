@@ -1,62 +1,95 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 1 Jun 2010 15:43:24 -0700
-Subject: [PATCH] NUC900/rtc: change the waiting for device ready implement
-In-Reply-To: <4BFE1853.5070105@gmail.com>
-References: <4BFE1853.5070105@gmail.com>
-Message-ID: <20100601154324.f1273812.akpm@linux-foundation.org>
+From: bbb.lst@gmail.com (Bjoern Brandenburg)
+Date: Tue, 1 Jun 2010 18:53:54 -0400
+Subject: 2.6.34 hangs during boot on PB11MPCore
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C5844FB1@dbde02.ent.ti.com>
+References: <AANLkTin9n6HDdiTnQoQ9mrmuzSR8JhZVq7uPgU86yqgU@mail.gmail.com>
+	<20100530073652.GX2695@buzzloop.caiaq.de>
+	<AANLkTimUF5iiGnc6RnN5C3sy-R6DAqHZNf6ZEu2o3W9P@mail.gmail.com>
+	<AANLkTikdvjg52v-3AKUBukGO2FCp3fENGoYgpZZ2xVtT@mail.gmail.com>
+	<AANLkTilMtEpt5hRfF_hszpU_AxZm7H93bkhqUacGWZc9@mail.gmail.com>
+	<1275259589.22752.14.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTim4e5Sdj9tronOiI-sIMVGaUQdfRIhKHzZ4XfKp@mail.gmail.com>
+	<AANLkTim3YdK3QDXC-20otTBPqYF_XX9rGHRX50cycqk6@mail.gmail.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C5844FB1@dbde02.ent.ti.com>
+Message-ID: <AANLkTinEMbV1onbIZtNOvchP-CVsnVZsh_tKKkQUXmpJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 May 2010 14:59:31 +0800
-Wan ZongShun <mcuos.com@gmail.com> wrote:
+On Mon, May 31, 2010 at 2:26 AM, Shilimkar, Santosh
+<santosh.shilimkar@ti.com> wrote:
+>> -----Original Message-----
+>> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+>> bounces at lists.infradead.org] On Behalf Of Bjoern Brandenburg
+>> Sent: Monday, May 31, 2010 6:46 AM
+>> To: Catalin Marinas
+>> Cc: bastoni at cs.unc.edu; Daniel Mack; linux-arm-kernel at lists.infradead.org; linus.ml.walleij at gmail.com
+>> Subject: Re: 2.6.34 hangs during boot on PB11MPCore
+>>
+>> On Sun, May 30, 2010 at 9:04 PM, Bjoern Brandenburg <bbb.lst@gmail.com> wrote:
+>> > On Sun, May 30, 2010 at 6:46 PM, Catalin Marinas
+>> > <catalin.marinas@arm.com> wrote:
+>> >> On Sun, 2010-05-30 at 22:38 +0100, Bjoern Brandenburg wrote:
+>> >>> On Sun, May 30, 2010 at 5:05 PM, Bjoern Brandenburg <bbb.lst@gmail.com> wrote:
+>> >>> > On Sun, May 30, 2010 at 3:27 PM, Bjoern Brandenburg <bbb.lst@gmail.com> wrote:
+>> >>> >>
+>> >>> >> I'll try to see if I can pinpoint what was dropped between 2.6.33-arm1
+>> >>> >> and 2.6.34-arm.
+>> >>> >
+>> >>> > Progress: I can get 2.6.34-arm to boot with all 4 CPUs after
+>> >>> > cherry-picking the following commits (which seemed relevant but
+>> >>> > absent):
+>> >>> >
+>> >>> > 60060ca ARM: Handle instruction cache maintenance fault ?properly
+>> >>> > 3f64e83 ARM errata: Eviction Buffer not empty after Cache Sync on L220
+>> >>> > 3b009b5 ARM: change definition of cpu_relax() for ARM11MPCore
+>> >>> >
+>> >>> > Let's see which is the critical one...
+>> >>>
+>> >>> It's 3f64e83 "ARM errata: Eviction Buffer not empty after Cache Sync
+>> >>> on L220" [1]. With this commit cherry-picked (on top of the 'rebased'
+>> >>> branch in ARM's repository, i.e., 2.6.34-arm), the system boots to X11
+>> >>> and runs some simple FS tests; the other ones don't make a difference.
+>> >>>
+>> >>> Are there plans for getting this and the other patches in the
+>> >>> 'rebased' branch into mainline (for .35 or .36)?
+>> >>
+>> >> Thanks for the investigation. I recall I got something similar in the
+>> >> past though I could no longer reproduce it with 2.6.34 (-arm) on the
+>> >> PB11MPCore I have. Could you try reverting commit e7c5650f606 (ARM:
+>> >> Change the mandatory barriers implementation) on a vanilla 2.6.34
+>> >> kernel?
+>> >
+>> > That doesn't seem to help. v2.6.34 with e7c5650f606 reverted still hangs.
+>>
+>> Given that 2.6.34-arm contains patches for missing synchronization
+>> primitives in the network driver, it is maybe not too surprising that
+>> the vanilla kernel won't boot with an NFS root file system.
+>>
+>> I just tried 2.6.34-arm (i.e., the 'rebased' branch in the ARM repo)
+>> with e7c5650f606 reverted (and without cherry-picking 3f64e83) ? and
+>> that kernel boots ok!
+>>
+> We have similar observation on SPI based network driver. By playing with
+> buffer alignment, the issue seems to be going away. Do you have link
+> to " synchronization primitives in the network driver" ?patches ??
 
-> Dear Andrew,
-> 
-> This patch is only to change the waiting for device ready implement
-> for winbond nuc900 platform.
-> 
+Hi  Santosh,
 
-It's not very helpful to only say "I changed it".  _why_ did you change
-it?  What change did you make?  What was wrong with the old code and
-what's better about the new code?
+I was referring to the below patch. Without it, none of the tested
+kernels could boot on our box.
 
-> --- a/drivers/rtc/rtc-nuc900.c
-> +++ b/drivers/rtc/rtc-nuc900.c
-> @@ -85,22 +85,21 @@ static irqreturn_t nuc900_rtc_interrupt(int irq, void *_rtc)
-> 
->  static int *check_rtc_access_enable(struct nuc900_rtc *nuc900_rtc)
->  {
-> -	unsigned int i;
-> +	unsigned int i, timeout = 0x1000;
->  	__raw_writel(INIRRESET, nuc900_rtc->rtc_reg + REG_RTC_INIR);
-> 
->  	mdelay(10);
-> 
->  	__raw_writel(AERPOWERON, nuc900_rtc->rtc_reg + REG_RTC_AER);
-> 
-> -	for (i = 0; i < 1000; i++) {
-> -		if (__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
-> -			return 0;
-> -	}
-> +	while (!(__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
-> +								&& timeout--)
-> +		mdelay(1);
-> 
-> -	if ((__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB) == 0x0)
-> -		return ERR_PTR(-ENODEV);
-> +	if (!timeout)
-> +		return ERR_PTR(-EPERM);
-> 
-> -	return ERR_PTR(-EPERM);
-> +	return 0;
-> }
+- Bjoern
 
-I can see that the patch makes two changes: it adds an mdelay(1) to the
-polling loop and it changes the return value from ENODEV to EPERM if
-the loop timed out.
+http://linux-arm.org/git?p=linux-2.6.git;a=commit;h=840cb637f8781516b9a4abc8f39508b30a63f1b0
+commit 840cb637f8781516b9a4abc8f39508b30a63f1b0
+Author: Catalin Marinas <catalin.marinas@arm.com>
+Date:   Tue Jun 1 10:05:05 2010 +0100
 
-But I don't have the faintest idea _why_ the changes were made!
+    smsc911x: Add spinlocks around registers access
 
+    On SMP systems, the SMSC911x registers may be accessed by multiple CPUs
+    and this seems to put the chip in an inconsistent state. The patch adds
+    spinlocks to the smsc911x_reg_read, smsc911x_reg_write,
+    smsc911x_rx_readfifo and smsc911x_tx_writefifo functions.
 
-So.  I merged the patch without a changelog.  Please send a changelog
-for this patch which permits others to understand the change.
+    Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
