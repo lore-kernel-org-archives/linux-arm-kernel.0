@@ -1,70 +1,116 @@
-From: raj.khem@gmail.com (Mikael Pettersson)
-Date: Tue,  1 Jun 2010 01:05:52 -0700
-Subject: [PATCH] Augment __naked__ function attribute with __noinline__ and
-	__noclone__
-Message-ID: <1275379552-23449-1-git-send-email-mikpe@it.uu.se>
+From: raj.khem@gmail.com (Khem Raj)
+Date: Tue,  1 Jun 2010 01:06:40 -0700
+Subject: [PATCH] Add kto and kfrom to input operands list.
+Message-ID: <1275379600-23498-1-git-send-email-raj.khem@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The asm() bodies of naked functions often depend on standard calling
-conventions, therefore they must be noinline and noclone.  GCC 4.[56]
-currently fail to enforce this, see GCC PR44290.  The effect is that
-most arch/arm/mm/copypage-*.c modules get miscompiled, resulting in
-kernel crashes during bootup.
+When functions incoming parameters are not in input operands list gcc 4.5 does not
+load the parameters into registers before calling this function but the
+inline assembly assumes valid addresses inside this function. This
+breaks the code because r0 and r1 are invalid when execution enters
+v4wb_copy_user_page ()
 
-Part of the fix is to augment the __naked attribute to imply noinline
-and noclone.  This patch implements that, and has been verified to fix
-the failure to boot a gcc-4.5 compiled 2.6.34 kernel on a Thecus n2100
-(XScale-based mach-iop32x).
+Also the constant needs to be used as third input operand so account for that
+as well.
 
-Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
+Tested on qemu arm.
+
 Signed-off-by: Khem Raj <raj.khem@gmail.com>
 ---
- include/linux/compiler-gcc.h  |   11 ++++++++++-
- include/linux/compiler-gcc4.h |    4 ++++
- 2 files changed, 14 insertions(+), 1 deletions(-)
+ arch/arm/mm/copypage-feroceon.c |    4 ++--
+ arch/arm/mm/copypage-v4wb.c     |    4 ++--
+ arch/arm/mm/copypage-v4wt.c     |    4 ++--
+ arch/arm/mm/copypage-xsc3.c     |    4 ++--
+ 4 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/include/linux/compiler-gcc.h b/include/linux/compiler-gcc.h
-index 73dcf80..83bd87c 100644
---- a/include/linux/compiler-gcc.h
-+++ b/include/linux/compiler-gcc.h
-@@ -58,8 +58,12 @@
-  * naked functions because then mcount is called without stack and frame pointer
-  * being set up and there is no chance to restore the lr register to the value
-  * before mcount was called.
-+ *
-+ * The asm() bodies of naked functions often depend on standard calling conventions,
-+ * therefore they must be noinline and noclone.  GCC 4.[56] currently fail to enforce
-+ * this, so we must do so ourselves.  See GCC PR44290.
-  */
--#define __naked				__attribute__((naked)) notrace
-+#define __naked				__attribute__((naked)) noinline __noclone notrace
+diff --git a/arch/arm/mm/copypage-feroceon.c b/arch/arm/mm/copypage-feroceon.c
+index 5eb4fd9..ac163de 100644
+--- a/arch/arm/mm/copypage-feroceon.c
++++ b/arch/arm/mm/copypage-feroceon.c
+@@ -18,7 +18,7 @@ feroceon_copy_user_page(void *kto, const void *kfrom)
+ {
+ 	asm("\
+ 	stmfd	sp!, {r4-r9, lr}		\n\
+-	mov	ip, %0				\n\
++	mov	ip, %2				\n\
+ 1:	mov	lr, r1				\n\
+ 	ldmia	r1!, {r2 - r9}			\n\
+ 	pld	[lr, #32]			\n\
+@@ -64,7 +64,7 @@ feroceon_copy_user_page(void *kto, const void *kfrom)
+ 	mcr	p15, 0, ip, c7, c10, 4		@ drain WB\n\
+ 	ldmfd	sp!, {r4-r9, pc}"
+ 	:
+-	: "I" (PAGE_SIZE));
++	: "r" (kto), "r" (kfrom), "I" (PAGE_SIZE));
+ }
  
- #define __noreturn			__attribute__((noreturn))
+ void feroceon_copy_user_highpage(struct page *to, struct page *from,
+diff --git a/arch/arm/mm/copypage-v4wb.c b/arch/arm/mm/copypage-v4wb.c
+index 7c2eb55..cb589cb 100644
+--- a/arch/arm/mm/copypage-v4wb.c
++++ b/arch/arm/mm/copypage-v4wb.c
+@@ -27,7 +27,7 @@ v4wb_copy_user_page(void *kto, const void *kfrom)
+ {
+ 	asm("\
+ 	stmfd	sp!, {r4, lr}			@ 2\n\
+-	mov	r2, %0				@ 1\n\
++	mov	r2, %2				@ 1\n\
+ 	ldmia	r1!, {r3, r4, ip, lr}		@ 4\n\
+ 1:	mcr	p15, 0, r0, c7, c6, 1		@ 1   invalidate D line\n\
+ 	stmia	r0!, {r3, r4, ip, lr}		@ 4\n\
+@@ -44,7 +44,7 @@ v4wb_copy_user_page(void *kto, const void *kfrom)
+ 	mcr	p15, 0, r1, c7, c10, 4		@ 1   drain WB\n\
+ 	ldmfd	 sp!, {r4, pc}			@ 3"
+ 	:
+-	: "I" (PAGE_SIZE / 64));
++	: "r" (kto), "r" (kfrom), "I" (PAGE_SIZE / 64));
+ }
  
-@@ -85,3 +89,8 @@
- #define _gcc_header(x) __gcc_header(linux/compiler-gcc##x.h)
- #define gcc_header(x) _gcc_header(x)
- #include gcc_header(__GNUC__)
-+
-+#if !defined(__noclone)
-+#define __noclone	/* not needed */
-+#endif
-+
-diff --git a/include/linux/compiler-gcc4.h b/include/linux/compiler-gcc4.h
-index 94dea3f..fcfa5b9 100644
---- a/include/linux/compiler-gcc4.h
-+++ b/include/linux/compiler-gcc4.h
-@@ -48,6 +48,10 @@
-  * unreleased.  Really, we need to have autoconf for the kernel.
-  */
- #define unreachable() __builtin_unreachable()
-+
-+/* Mark a function definition as prohibited from being cloned. */
-+#define __noclone	__attribute__((__noclone__))
-+
- #endif
+ void v4wb_copy_user_highpage(struct page *to, struct page *from,
+diff --git a/arch/arm/mm/copypage-v4wt.c b/arch/arm/mm/copypage-v4wt.c
+index 172e6a5..30c7d04 100644
+--- a/arch/arm/mm/copypage-v4wt.c
++++ b/arch/arm/mm/copypage-v4wt.c
+@@ -25,7 +25,7 @@ v4wt_copy_user_page(void *kto, const void *kfrom)
+ {
+ 	asm("\
+ 	stmfd	sp!, {r4, lr}			@ 2\n\
+-	mov	r2, %0				@ 1\n\
++	mov	r2, %2				@ 1\n\
+ 	ldmia	r1!, {r3, r4, ip, lr}		@ 4\n\
+ 1:	stmia	r0!, {r3, r4, ip, lr}		@ 4\n\
+ 	ldmia	r1!, {r3, r4, ip, lr}		@ 4+1\n\
+@@ -40,7 +40,7 @@ v4wt_copy_user_page(void *kto, const void *kfrom)
+ 	mcr	p15, 0, r2, c7, c7, 0		@ flush ID cache\n\
+ 	ldmfd	sp!, {r4, pc}			@ 3"
+ 	:
+-	: "I" (PAGE_SIZE / 64));
++	: "r" (kto), "r" (kfrom), "I" (PAGE_SIZE / 64));
+ }
  
- #endif
+ void v4wt_copy_user_highpage(struct page *to, struct page *from,
+diff --git a/arch/arm/mm/copypage-xsc3.c b/arch/arm/mm/copypage-xsc3.c
+index 747ad41..f9cde07 100644
+--- a/arch/arm/mm/copypage-xsc3.c
++++ b/arch/arm/mm/copypage-xsc3.c
+@@ -34,7 +34,7 @@ xsc3_mc_copy_user_page(void *kto, const void *kfrom)
+ {
+ 	asm("\
+ 	stmfd	sp!, {r4, r5, lr}		\n\
+-	mov	lr, %0				\n\
++	mov	lr, %2				\n\
+ 						\n\
+ 	pld	[r1, #0]			\n\
+ 	pld	[r1, #32]			\n\
+@@ -67,7 +67,7 @@ xsc3_mc_copy_user_page(void *kto, const void *kfrom)
+ 						\n\
+ 	ldmfd	sp!, {r4, r5, pc}"
+ 	:
+-	: "I" (PAGE_SIZE / 64 - 1));
++	: "r" (kto), "r" (kfrom), "I" (PAGE_SIZE / 64 - 1));
+ }
+ 
+ void xsc3_mc_copy_user_highpage(struct page *to, struct page *from,
 -- 
 1.7.0.4
