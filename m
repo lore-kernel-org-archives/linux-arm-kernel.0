@@ -1,46 +1,52 @@
-From: yegor_sub1@visionsystems.de (Yegor Yefremov)
-Date: Tue, 01 Jun 2010 15:39:35 +0200
-Subject: AC97 audio broken on SAM9263EK?
-In-Reply-To: <4B97C086.2080404@atmel.com>
-References: <4B85789D.6000704@billgatliff.com>
-	<4B864C66.6060209@atmel.com>	<4B867108.2050806@billgatliff.com>
-	<4B86AA29.8010806@atmel.com>	<4B89E1BB.6090504@billgatliff.com>
-	<4B8B9849.5040203@atmel.com> <4B96571A.3040403@visionsystems.de>
-	<4B96668E.6090805@atmel.com> <4B975C9A.3020106@visionsystems.de>
-	<4B97602C.6070608@atmel.com> <4B97BD8C.3030502@visionsystems.de>
-	<4B97C086.2080404@atmel.com>
-Message-ID: <4C050D97.4000404@visionsystems.de>
+From: saeed@marvell.com (Saeed Bishara)
+Date: Tue,  1 Jun 2010 18:09:26 +0300
+Subject: [PATCH 1/3] [ARM] Kirkwood: add support for rev A1 of the 88f6192 and
+	88f6180 chips.
+Message-ID: <1275404968-12258-1-git-send-email-saeed@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
->> When do you think the driver could hit the mainline kernel? Till
->> 2.6.35 open window?
-> 
-> It has been acked, but I don't know when it will be in the mainline kernel.
+Signed-off-by: Saeed Bishara <saeed@marvell.com>
+---
+ arch/arm/mach-kirkwood/common.c                |    4 ++++
+ arch/arm/mach-kirkwood/include/mach/kirkwood.h |    2 ++
+ 2 files changed, 6 insertions(+), 0 deletions(-)
 
-have just tested 2.6.35-rc1 with mainline ac97 driver and found this issue. During playback I see following output on the console:
-
-...
-atmel_ac97c atmel_ac97c.0: channel A event
-atmel_ac97c atmel_ac97c.0: channel A event
-atmel_ac97c atmel_ac97c.0: channel A event
-...
-
-If I see it right these, lines come from sound/atmel/ac97c.c->atmel_ac97c_interrupt():
-
-dev_info(&chip->pdev->dev, "channel A event%s%s%s%s%s%s\n",
-                                casr & AC97C_CSR_OVRUN   ? " OVRUN"   : "",
-                                casr & AC97C_CSR_RXRDY   ? " RXRDY"   : "",
-                                casr & AC97C_CSR_UNRUN   ? " UNRUN"   : "",
-                                casr & AC97C_CSR_TXEMPTY ? " TXEMPTY" : "",
-                                casr & AC97C_CSR_TXRDY   ? " TXRDY"   : "",
-                                !casr                    ? " NONE"    : "");
-
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index 6072eaa..c780c4a 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -891,11 +891,15 @@ static char * __init kirkwood_id(void)
+ 			return "MV88F6192-Z0";
+ 		else if (rev == MV88F6192_REV_A0)
+ 			return "MV88F6192-A0";
++		else if (rev == MV88F6192_REV_A1)
++			return "MV88F6192-A1";
+ 		else
+ 			return "MV88F6192-Rev-Unsupported";
+ 	} else if (dev == MV88F6180_DEV_ID) {
+ 		if (rev == MV88F6180_REV_A0)
+ 			return "MV88F6180-Rev-A0";
++		else if (rev == MV88F6180_REV_A1)
++			return "MV88F6180-Rev-A1";
+ 		else
+ 			return "MV88F6180-Rev-Unsupported";
+ 	} else {
+diff --git a/arch/arm/mach-kirkwood/include/mach/kirkwood.h b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
+index a15cf0e..d61b9aa 100644
+--- a/arch/arm/mach-kirkwood/include/mach/kirkwood.h
++++ b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
+@@ -107,8 +107,10 @@
+ #define MV88F6192_DEV_ID	0x6192
+ #define MV88F6192_REV_Z0	0
+ #define MV88F6192_REV_A0	2
++#define MV88F6192_REV_A1	3
  
-
-It is necessary to output this message in normal mode or is it a debug message?
-
-Regards,
-Yegor
+ #define MV88F6180_DEV_ID	0x6180
+ #define MV88F6180_REV_A0	2
++#define MV88F6180_REV_A1	3
+ 
+ #endif
+-- 
+1.6.0.4
