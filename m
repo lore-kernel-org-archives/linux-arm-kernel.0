@@ -1,35 +1,39 @@
 From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Tue,  1 Jun 2010 08:30:40 +0300
-Subject: [PATCH 1/8] omap iommu: update ducati mmu irq define name
+Date: Tue,  1 Jun 2010 08:30:42 +0300
+Subject: [PATCH 3/8] omap iommu: Rename iopte_[p, v]addr -> iopte_page_[p,
+	v]addr
 In-Reply-To: <20100531.123637.28796762.Hiroshi.DOYU@nokia.com>
 References: <20100531.123637.28796762.Hiroshi.DOYU@nokia.com>
-Message-ID: <1275370247-15888-1-git-send-email-Hiroshi.DOYU@nokia.com>
+Message-ID: <1275370247-15888-3-git-send-email-Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kanigeri, Hari <h-kanigeri2@ti.com>
+Follow Linux pagetable accessor name convention.
 
-2.6.34-rc6 kernel has the Ducati mmu irq define name changed, which is
-resulting in compilation error.
-
-Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
 Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 ---
- arch/arm/mach-omap2/omap-iommu.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/plat-omap/iopgtable.h |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap-iommu.c b/arch/arm/mach-omap2/omap-iommu.c
-index eb9bee7..f5a1aad 100644
---- a/arch/arm/mach-omap2/omap-iommu.c
-+++ b/arch/arm/mach-omap2/omap-iommu.c
-@@ -59,7 +59,7 @@ static struct platform_device *omap3_iommu_pdev[NR_OMAP3_IOMMU_DEVICES];
- static struct iommu_device omap4_devices[] = {
- 	{
- 		.base = OMAP4_MMU1_BASE,
--		.irq = INT_44XX_DUCATI_MMU_IRQ,
-+		.irq = OMAP44XX_IRQ_DUCATI_MMU,
- 		.pdata = {
- 			.name = "ducati",
- 			.nr_tlb_entries = 32,
+diff --git a/arch/arm/plat-omap/iopgtable.h b/arch/arm/plat-omap/iopgtable.h
+index f2e6b64..c3e93bb 100644
+--- a/arch/arm/plat-omap/iopgtable.h
++++ b/arch/arm/plat-omap/iopgtable.h
+@@ -72,12 +72,12 @@
+ #define iopgd_index(da)		(((da) >> IOPGD_SHIFT) & (PTRS_PER_IOPGD - 1))
+ #define iopgd_offset(obj, da)	((obj)->iopgd + iopgd_index(da))
+ 
+-#define iopte_paddr(iopgd)	(*iopgd & ~((1 << 10) - 1))
+-#define iopte_vaddr(iopgd)	((u32 *)phys_to_virt(iopte_paddr(iopgd)))
++#define iopgd_page_paddr(iopgd)	(*iopgd & ~((1 << 10) - 1))
++#define iopgd_page_vaddr(iopgd)	((u32 *)phys_to_virt(iopgd_page_paddr(iopgd)))
+ 
+ /* to find an entry in the second-level page table. */
+ #define iopte_index(da)		(((da) >> IOPTE_SHIFT) & (PTRS_PER_IOPTE - 1))
+-#define iopte_offset(iopgd, da)	(iopte_vaddr(iopgd) + iopte_index(da))
++#define iopte_offset(iopgd, da)	(iopgd_page_vaddr(iopgd) + iopte_index(da))
+ 
+ static inline u32 iotlb_init_entry(struct iotlb_entry *e, u32 da, u32 pa,
+ 				   u32 flags)
 -- 
 1.7.1.rc1
