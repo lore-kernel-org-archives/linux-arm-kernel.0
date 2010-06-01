@@ -1,116 +1,62 @@
 From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 1 Jun 2010 15:26:52 -0700
-Subject: [RFC PATCH] irq: handle private interrupt registration
-In-Reply-To: <1274905794-7848-1-git-send-email-adharmap@codeaurora.org>
-References: <1274905794-7848-1-git-send-email-adharmap@codeaurora.org>
-Message-ID: <20100601152652.9296c5d0.akpm@linux-foundation.org>
+Date: Tue, 1 Jun 2010 15:43:24 -0700
+Subject: [PATCH] NUC900/rtc: change the waiting for device ready implement
+In-Reply-To: <4BFE1853.5070105@gmail.com>
+References: <4BFE1853.5070105@gmail.com>
+Message-ID: <20100601154324.f1273812.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 May 2010 13:29:54 -0700
-adharmap at codeaurora.org wrote:
+On Thu, 27 May 2010 14:59:31 +0800
+Wan ZongShun <mcuos.com@gmail.com> wrote:
 
-> From: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> Dear Andrew,
 > 
-> The current code fails to register a handler for the same irq
-> without taking in to account that it could be a per cpu interrupt.
-> If the IRQF_PERCPU flag is set, enable the interrupt on that cpu
-> and return success.
+> This patch is only to change the waiting for device ready implement
+> for winbond nuc900 platform.
 > 
-> Change-Id: I748b3aa08d794342ad74cbd0bb900cc599f883a6
-> Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
-> ---
+
+It's not very helpful to only say "I changed it".  _why_ did you change
+it?  What change did you make?  What was wrong with the old code and
+what's better about the new code?
+
+> --- a/drivers/rtc/rtc-nuc900.c
+> +++ b/drivers/rtc/rtc-nuc900.c
+> @@ -85,22 +85,21 @@ static irqreturn_t nuc900_rtc_interrupt(int irq, void *_rtc)
 > 
-> On systems with an interrupt controller that supports
-> private interrupts per core, it is not possible to call 
-> request_irq/setup_irq from multiple cores for the same irq. This is because
-> the second+ invocation of __setup_irq checks if the previous
-> hndler had a IRQ_SHARED flag set and errors out if not. 
+>  static int *check_rtc_access_enable(struct nuc900_rtc *nuc900_rtc)
+>  {
+> -	unsigned int i;
+> +	unsigned int i, timeout = 0x1000;
+>  	__raw_writel(INIRRESET, nuc900_rtc->rtc_reg + REG_RTC_INIR);
 > 
-> The current irq handling code doesnt take in to account what cpu it 
-> is executing on.  Usually the local interrupt controller registers are banked 
-> per cpu a.k.a. a cpu can enable its local interrupt by writing to its banked 
-> registers.
+>  	mdelay(10);
 > 
-> One way to get around this problem is to call the setup_irq on a single cpu 
-> while other cpus simply enable their private interrupts by writing to their 
-> banked registers
+>  	__raw_writel(AERPOWERON, nuc900_rtc->rtc_reg + REG_RTC_AER);
 > 
-> For eg. code in arch/arm/time/smp_twd.c
-> 	/* Make sure our local interrupt controller has this enabled */
-> 	local_irq_save(flags);
-> 	get_irq_chip(clk->irq)->unmask(clk->irq);
-> 	local_irq_restore(flags);
+> -	for (i = 0; i < 1000; i++) {
+> -		if (__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
+> -			return 0;
+> -	}
+> +	while (!(__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
+> +								&& timeout--)
+> +		mdelay(1);
 > 
-> This looks like a hacky way to get local interrupts working on 
-> multiple cores.
+> -	if ((__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB) == 0x0)
+> -		return ERR_PTR(-ENODEV);
+> +	if (!timeout)
+> +		return ERR_PTR(-EPERM);
 > 
-> The patch adds a check for PERCPU flag in __setup_irq - if an handler is 
-> present it simply enables that interrupt for that core and returns 0.
-> 
-> ...
->  
-> --- a/kernel/irq/manage.c
-> +++ b/kernel/irq/manage.c
-> @@ -683,6 +683,37 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
->  	old_ptr = &desc->action;
->  	old = *old_ptr;
->  	if (old) {
-> +#if defined(CONFIG_IRQ_PER_CPU)
-> +		/* All handlers must agree on per-cpuness */
-> +		if ((old->flags & IRQF_PERCPU) !=
-> +			(new->flags & IRQF_PERCPU))
-> +			goto mismatch;
-> +
-> +		if (old->flags & IRQF_PERCPU) {
-> +			/* the chip must have been set for this interrupt*/
-> +			if (!(desc->status & IRQ_NOAUTOEN)) {
-> +				desc->depth = 0;
-> +				desc->status &= ~IRQ_DISABLED;
-> +				desc->chip->startup(irq);
-> +			} else
-> +				/* Undo nested disables: */
-> +				desc->depth = 1;
-> +
-> +			spin_unlock_irqrestore(&desc->lock, flags);
+> -	return ERR_PTR(-EPERM);
+> +	return 0;
+> }
 
-The rest of the code uses raw_spin_unlock_irqrestore().
+I can see that the patch makes two changes: it adds an mdelay(1) to the
+polling loop and it changes the return value from ENODEV to EPERM if
+the loop timed out.
 
-I don't know _why_ is uses this.  There are no code comments, and the
-239007b8440abff689632f50cdf0f2b9e895b534 changelog is:
+But I don't have the faintest idea _why_ the changes were made!
 
-: genirq: Convert irq_desc.lock to raw_spinlock
-:    
-: Convert locks which cannot be sleeping locks in preempt-rt to
-: raw_spinlocks.
 
-which is pathetically useless.
-
-But I suppose we should ignorantly copy it and hope we're not screwing
-something up.
-
-> +			if (new->thread)
-> +				wake_up_process(new->thread);
-> +			return 0;
-> +		}
-> +#endif
-> +
-> +		/* they are the same types and same handler
-> +		 * perhaps it is a private cpu interrupt
-> +		 */
-> +		if (old->flags == new->flags
-> +			&& old->handler == new->handler)
-> +			setup_affinity(irq, desc);
-> +			return 0;
-
-And this appears to have forgotten to undo the lock altogether, which
-makes one wonder about the testing coverage.
-
-It also embeds a `return' statement deep inside a huge and complex
-function, which is invariably bad.
-
-And in so doing it bypasses the register_irq_proc() and
-register_handler_proc() calls.  I have no way of knowing whether that
-was deliberate or whether it was a bug.  If it was deliberate then some
-code and'/or changelog commentary is needed, so that others don't think
-that it is a bug too.
+So.  I merged the patch without a changelog.  Please send a changelog
+for this patch which permits others to understand the change.
