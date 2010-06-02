@@ -1,26 +1,54 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Wed, 02 Jun 2010 13:27:39 +0530
-Subject: [PATCH] Watchdog: Adding support for ARM Primecell SP805	Watchdog
-In-Reply-To: <20100602074800.GD6644@n2100.arm.linux.org.uk>
-References: <1274344428-28329-1-git-send-email-viresh.kumar@st.com>
-	<20100602074800.GD6644@n2100.arm.linux.org.uk>
-Message-ID: <4C060EF3.1050000@st.com>
+From: amit.kucheria@canonical.com (Amit Kucheria)
+Date: Wed, 2 Jun 2010 11:00:54 +0300
+Subject: [PATCH 3/3] mx51/clock: add keypad clock definition and
+	registration
+In-Reply-To: <1275405043-18230-4-git-send-email-jason77.wang@gmail.com>
+References: <1275405043-18230-1-git-send-email-jason77.wang@gmail.com>
+	<1275405043-18230-2-git-send-email-jason77.wang@gmail.com>
+	<1275405043-18230-3-git-send-email-jason77.wang@gmail.com>
+	<1275405043-18230-4-git-send-email-jason77.wang@gmail.com>
+Message-ID: <20100602080054.GL2346@matterhorn.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/2/2010 1:18 PM, Russell King - ARM Linux wrote:
-> On Thu, May 20, 2010 at 02:03:48PM +0530, Viresh KUMAR wrote:
->> Technical Reference Manual can be found at:
->> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0270b/DDI0270.pdf
+On 10 Jun 01, Jason Wang wrote:
+> On i.MX51 platforms, the keypad controller has no gate clock, to
+> meet the imx keypad driver requirement, we add a empty definition and
+> register it. Now the keypad driver can work.
 > 
-> Please include Wim Van Sebroeck for watchdog stuff - his address is in
-> MAINTAINERS.  Please also ensure that in future you're sending your
-> patches to relevant people - there isn't the capacity to review
-> every bit of code on this list.
+> Signed-off-by: Jason Wang <jason77.wang@gmail.com>
+> ---
+>  arch/arm/mach-mx5/clock-mx51.c |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
 > 
+> diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
+> index d9f612d..e89b93a 100644
+> --- a/arch/arm/mach-mx5/clock-mx51.c
+> +++ b/arch/arm/mach-mx5/clock-mx51.c
+> @@ -758,6 +758,10 @@ static struct clk gpt_32k_clk = {
+>  	.parent = &ckil_clk,
+>  };
+>  
+> +static struct clk kpp_clk = {
+> +	.id = 0,
+> +};
+> +
+>  #define DEFINE_CLOCK(name, i, er, es, gr, sr, p, s)	\
+>  	static struct clk name = {			\
+>  		.id		= i,			\
+> @@ -821,6 +825,7 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
+>  	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
+>  	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
+> +	_REGISTER_CLOCK(NULL, "kpp", kpp_clk)
 
-Thanks Russell.
+Should be
 
-I will send patch to Wim Van.
+_REGISTER_CLOCK("imx-keypad", NULL, kpp_clk)
 
-viresh
+since that is the device id that will be used in your platform device.
+
+-- 
+----------------------------------------------------------------------
+Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
+----------------------------------------------------------------------
