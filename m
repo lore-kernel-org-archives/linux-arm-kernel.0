@@ -1,56 +1,41 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 2 Jun 2010 09:43:58 +0200
-Subject: [PATCH 3/3] mx51/clock: add keypad clock definition and
-	registration
-In-Reply-To: <1275405043-18230-4-git-send-email-jason77.wang@gmail.com>
-References: <1275405043-18230-1-git-send-email-jason77.wang@gmail.com>
-	<1275405043-18230-2-git-send-email-jason77.wang@gmail.com>
-	<1275405043-18230-3-git-send-email-jason77.wang@gmail.com>
-	<1275405043-18230-4-git-send-email-jason77.wang@gmail.com>
-Message-ID: <20100602074358.GL26820@pengutronix.de>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Wed,  2 Jun 2010 10:40:45 +0300
+Subject: [PATCH 0/5] Enable pxa310 usb otg port host mode.
+Message-ID: <1275464450-23003-1-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 01, 2010 at 11:10:43PM +0800, Jason Wang wrote:
-> On i.MX51 platforms, the keypad controller has no gate clock, to
-> meet the imx keypad driver requirement, we add a empty definition and
-> register it. Now the keypad driver can work.
-> 
-> Signed-off-by: Jason Wang <jason77.wang@gmail.com>
-> ---
->  arch/arm/mach-mx5/clock-mx51.c |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
-> index d9f612d..e89b93a 100644
-> --- a/arch/arm/mach-mx5/clock-mx51.c
-> +++ b/arch/arm/mach-mx5/clock-mx51.c
-> @@ -758,6 +758,10 @@ static struct clk gpt_32k_clk = {
->  	.parent = &ckil_clk,
->  };
->  
-> +static struct clk kpp_clk = {
-> +	.id = 0,
-> +};
-> +
->  #define DEFINE_CLOCK(name, i, er, es, gr, sr, p, s)	\
->  	static struct clk name = {			\
->  		.id		= i,			\
-> @@ -821,6 +825,7 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
->  	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
->  	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
-> +	_REGISTER_CLOCK(NULL, "kpp", kpp_clk)
+This patch series extends the existing usb ulpi generic driver
+with support for Function and Interface control of the ULPI PHYs,
+adds support for SMSC USB3319 ulpi phy,
+implement the pxa310 specific ulpi functionality and make pxa specific ohci
+implementation aware of pxa310 usb otg port host mode.
 
-_REGISTER_CLOCK("imx-keypad", NULL, kpp_clk)
+Igor Grinberg (5):
+  usb/otg/ulpi: extend the generic ulpi driver.
+  usb/otg/ulpi: add support for SMSC USB3319 ulpi phy.
+  [ARM] pxa: add PXA310 specific ULPI implementation
+  [ARM] usb/host/ohci-pxa27x: make PXA310 USB OTG port work in host
+    mode.
+  [ARM] pxa/cm-x300: enable USB host port 2 on CM-X300 with PXA310 cpu.
 
-(or imx-keypad.0 depending on what id the kpp platform_device has)
-
-SAscha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+ arch/arm/mach-mx2/mach-pca100.c              |   10 +-
+ arch/arm/mach-mx3/mach-armadillo5x0.c        |   10 +-
+ arch/arm/mach-mx3/mach-mx31lite.c            |    5 +-
+ arch/arm/mach-mx3/mach-mx31moboard.c         |    5 +-
+ arch/arm/mach-mx3/mach-pcm037.c              |   10 +-
+ arch/arm/mach-mx3/mach-pcm043.c              |    5 +-
+ arch/arm/mach-pxa/Kconfig                    |    4 +
+ arch/arm/mach-pxa/Makefile                   |    1 +
+ arch/arm/mach-pxa/cm-x300.c                  |  102 ++++++++++++++
+ arch/arm/mach-pxa/include/mach/ohci.h        |    3 +
+ arch/arm/mach-pxa/include/mach/pxa310-ulpi.h |   19 +++
+ arch/arm/mach-pxa/include/mach/regs-u2d.h    |    2 +
+ arch/arm/mach-pxa/pxa310-ulpi.c              |  110 +++++++++++++++
+ drivers/usb/host/ohci-pxa27x.c               |  183 ++++++++++++++++++++++++++
+ drivers/usb/otg/Kconfig                      |    2 -
+ drivers/usb/otg/ulpi.c                       |   65 ++++++++-
+ include/linux/usb/ulpi.h                     |   25 ++++-
+ 17 files changed, 542 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm/mach-pxa/include/mach/pxa310-ulpi.h
+ create mode 100644 arch/arm/mach-pxa/pxa310-ulpi.c
