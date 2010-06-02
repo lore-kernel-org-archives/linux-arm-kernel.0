@@ -1,290 +1,53 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 2 Jun 2010 13:03:56 +0100
-Subject: [RFC,PATCH 1/2] Add a common struct clk
-In-Reply-To: <1275479804.138101.137592675542.1.gpush@pororo>
-References: <1275479804.137633.565764505843.0.gpush@pororo>
-	<1275479804.138101.137592675542.1.gpush@pororo>
-Message-ID: <20100602120356.GQ7248@trinity.fluff.org>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Wed, 2 Jun 2010 14:08:44 +0200
+Subject: [PATCH] Add kto and kfrom to input operands list.
+In-Reply-To: <1275379600-23498-1-git-send-email-raj.khem@gmail.com>
+References: <1275379600-23498-1-git-send-email-raj.khem@gmail.com>
+Message-ID: <19462.18892.533099.360440@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 02, 2010 at 07:56:44PM +0800, Jeremy Kerr wrote:
-> We currently have 21 definitions of struct clk in the ARM architecture,
-> each defined on a per-platform basis. This makes it difficult to define
-> platform- (or architecture-) independent clock sources without making
-> assumptions about struct clk, and impossible to compile two
-> platforms with different struct clks into a single image.
-> 
-> This change is an effort to unify struct clk where possible, by defining
-> a common struct clk, containing a set of clock operations. Different
-> clock implementations can set their own operations, and have a standard
-> interface for generic code. The callback interface is exposed to the
-> kernel proper, while the clock implementations only need to be seen by
-> the platform internals.
-> 
-> This allows us to share clock code among platforms, and makes it
-> possible to dynamically create clock devices in platform-independent
-> code.
-> 
-> Platforms can enable the generic struct clock through
-> CONFIG_USE_COMMON_STRUCT_CLK. In this case, the clock infrastructure
-> consists of a common struct clk:
-> 
-> struct clk {
-> 	struct clk_operations *ops;
-> 	atomic_t enable_count;
-> };
-> 
-> And a set of clock operations (defined per type of clock):
-> 
-> struct clk_operations {
->        int             (*enable)(struct clk *);
+Khem Raj writes:
+ > When functions incoming parameters are not in input operands list gcc 4.5 does not
+ > load the parameters into registers before calling this function but the
+ > inline assembly assumes valid addresses inside this function. This
+ > breaks the code because r0 and r1 are invalid when execution enters
+ > v4wb_copy_user_page ()
+ > 
+ > Also the constant needs to be used as third input operand so account for that
+ > as well.
+ > 
+ > Tested on qemu arm.
+ > 
+ > Signed-off-by: Khem Raj <raj.khem@gmail.com>
+ > ---
+ >  arch/arm/mm/copypage-feroceon.c |    4 ++--
 
-I'd rather the enable/disable calls where simply a set
-and a bool on/off, very rarelyt is the enable and disable
-operartions different.
+I've tested and verified that this bit enables a gcc-4.5 compiled kernel
+to boot on TS-119 (Kirkwood) when combined with my fix for __naked.
+With neither or only one of the patches applied, the kernel oopses hard
+in copy_user_page() as it tries to start /sbin/init.
 
-an aside, you might want to just clal these clk_ops to get into the
-spirit of the original naming.
+So for the copypage-feroceon.c change:
+Tested-by: Mikael Pettersson <mikpe@it.uu.se>
 
->        void            (*disable)(struct clk *);
->        unsigned long   (*get_rate)(struct clk *);
->        [...]
-> };
-> 
-> To define a hardware-specific clock, machine code can "subclass" the
-> struct clock into a new struct (adding any device-specific data), and
-> provide a set of operations:
-> 
-> struct clk_foo {
-> 	struct clk	clk;
-> 	void __iomem	*some_register;
-> };
-> 
-> struct clk_operations clk_foo_ops = {
-> 	.get_rate = clk_foo_get_rate,
-> };
-> 
-> The common clock definitions are based on a development patch from Ben
-> Herrenschmidt <benh@kernel.crashing.org>.
-> 
-> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-> 
-> ---
->  arch/Kconfig        |    3 
->  include/linux/clk.h |  148 +++++++++++++++++++++++++++++++++++---------
->  2 files changed, 124 insertions(+), 27 deletions(-)
-> 
-> diff --git a/arch/Kconfig b/arch/Kconfig
-> index acda512..2458b5e 100644
-> --- a/arch/Kconfig
-> +++ b/arch/Kconfig
-> @@ -151,4 +151,7 @@ config HAVE_MIXED_BREAKPOINTS_REGS
->  config HAVE_USER_RETURN_NOTIFIER
->  	bool
->  
-> +config USE_COMMON_STRUCT_CLK
-> +	bool
-> +
->  source "kernel/gcov/Kconfig"
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> index 1d37f42..f70137a 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
-> @@ -3,6 +3,7 @@
->   *
->   *  Copyright (C) 2004 ARM Limited.
->   *  Written by Deep Blue Solutions Limited.
-> + *  Copyright (c) 2010 Jeremy Kerr <jeremy.kerr@canonical.com>
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 as
-> @@ -11,36 +12,114 @@
->  #ifndef __LINUX_CLK_H
->  #define __LINUX_CLK_H
->  
-> -struct device;
-> +#include <linux/err.h>
-> +#include <asm/atomic.h>
->  
-> -/*
-> - * The base API.
-> +#ifdef CONFIG_USE_COMMON_STRUCT_CLK
-> +
-> +/* If we're using the common struct clk, we define the base clk object here,
-> + * which will be 'subclassed' by device-specific implementations. For example:
-> + *
-> + *  struct clk_foo {
-> + *      struct clk;
-> + *      [device specific fields]
-> + *  };
-> + *
-> + * We define the common clock API through a set of static inlines that call the
-> + * corresponding clk_operations. The API is exactly the same as that documented
-> + * in the !CONFIG_USE_COMMON_STRUCT_CLK case.
->   */
->  
-> +struct clk {
-> +	const struct clk_operations *ops;
-> +	atomic_t enable_count;
-> +};
-> +
-> +#define DEFINE_CLK(o) \
-> +	{ .ops = &o, .enable_count = ATOMIC_INIT(0) }
-> +
-> +struct clk_operations {
-> +       int             (*enable)(struct clk *);
-> +       void            (*disable)(struct clk *);
-> +       unsigned long   (*get_rate)(struct clk *);
-> +       void            (*put)(struct clk *);
-> +       long            (*round_rate)(struct clk *, unsigned long);
-> +       int             (*set_rate)(struct clk *, unsigned long);
-> +       int             (*set_parent)(struct clk *, struct clk *);
-> +       struct clk*     (*get_parent)(struct clk *);
-> +};
-> +
-> +static inline int clk_enable(struct clk *clk)
-> +{
-> +	if (!clk->ops->enable)
-> +		return 0;
-> +
-> +	if (atomic_inc_return(&clk->enable_count) != 1)
-> +		return 0;
-> +
-> +	return clk->ops->enable(clk);
-> +}
-> +
-> +static inline void clk_disable(struct clk *clk)
-> +{
-> +	if (!clk->ops->disable)
-> +		return;
-> +
-> +	if (atomic_dec_return(&clk->enable_count) != 0)
-> +		return;
-> +
-> +	clk->ops->disable(clk);
-> +}
-> +
-> +static inline unsigned long clk_get_rate(struct clk *clk)
-> +{
-> +	if (clk->ops->get_rate)
-> +		return clk->ops->get_rate(clk);
-> +	return 0;
-> +}
-> +
-> +static inline void clk_put(struct clk *clk)
-> +{
-> +	if (clk->ops->put)
-> +		clk->ops->put(clk);
-> +}
-> +
-> +static inline long clk_round_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	if (clk->ops->round_rate)
-> +		return clk->ops->round_rate(clk, rate);
-> +	return -ENOSYS;
-> +}
-> +
-> +static inline int clk_set_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	if (clk->ops->set_rate)
-> +		return clk->ops->set_rate(clk, rate);
-> +	return -ENOSYS;
-> +}
-> +
-> +static inline int clk_set_parent(struct clk *clk, struct clk *parent)
-> +{
-> +	if (clk->ops->set_parent)
-> +		return clk->ops->set_parent(clk, parent);
-> +	return -ENOSYS;
-> +}
-> +
-> +static inline struct clk *clk_get_parent(struct clk *clk)
-> +{
-> +	if (clk->ops->get_parent)
-> +		return clk->ops->get_parent(clk);
-> +	return ERR_PTR(-ENOSYS);
-> +}
-> +
-> +#else /* !CONFIG_USE_COMMON_STRUCT_CLK */
->  
->  /*
-> - * struct clk - an machine class defined object / cookie.
-> + * Global clock object, actual structure is declared per-machine
->   */
->  struct clk;
->  
->  /**
-> - * clk_get - lookup and obtain a reference to a clock producer.
-> - * @dev: device for clock "consumer"
-> - * @id: clock comsumer ID
-> - *
-> - * Returns a struct clk corresponding to the clock producer, or
-> - * valid IS_ERR() condition containing errno.  The implementation
-> - * uses @dev and @id to determine the clock consumer, and thereby
-> - * the clock producer.  (IOW, @id may be identical strings, but
-> - * clk_get may return different clock producers depending on @dev.)
-> - *
-> - * Drivers must assume that the clock source is not enabled.
-> - *
-> - * clk_get should not be called from within interrupt context.
-> - */
-> -struct clk *clk_get(struct device *dev, const char *id);
-> -
-> -/**
->   * clk_enable - inform the system when the clock source should be running.
->   * @clk: clock source
->   *
-> @@ -83,12 +162,6 @@ unsigned long clk_get_rate(struct clk *clk);
->   */
->  void clk_put(struct clk *clk);
->  
-> -
-> -/*
-> - * The remaining APIs are optional for machine class support.
-> - */
-> -
-> -
->  /**
->   * clk_round_rate - adjust a rate to the exact rate a clock can provide
->   * @clk: clock source
-> @@ -125,6 +198,27 @@ int clk_set_parent(struct clk *clk, struct clk *parent);
->   */
->  struct clk *clk_get_parent(struct clk *clk);
->  
-> +#endif /* !CONFIG_USE_COMMON_STRUCT_CLK */
-> +
-> +struct device;
-> +
-> +/**
-> + * clk_get - lookup and obtain a reference to a clock producer.
-> + * @dev: device for clock "consumer"
-> + * @id: clock comsumer ID
-> + *
-> + * Returns a struct clk corresponding to the clock producer, or
-> + * valid IS_ERR() condition containing errno.  The implementation
-> + * uses @dev and @id to determine the clock consumer, and thereby
-> + * the clock producer.  (IOW, @id may be identical strings, but
-> + * clk_get may return different clock producers depending on @dev.)
-> + *
-> + * Drivers must assume that the clock source is not enabled.
-> + *
-> + * clk_get should not be called from within interrupt context.
-> + */
-> +struct clk *clk_get(struct device *dev, const char *id);
-> +
->  /**
->   * clk_get_sys - get a clock based upon the device name
->   * @dev_id: device name
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+To elaborate, the copy_user_page() functions in these copypage-*.c files
+break in two ways with gcc-4.5:
+- they are static __naked functions, and gcc-4.5 erroneously clones
+  them and changes their calling conventions in ways that don't match
+  the expectations of their asm() bodies, causing runtime crashes;
+  my patch to make __naked imply noinline and noclone fixes that
+- the asm() bodies of these __naked functions have inadequate input
+  parameter constraints, in particular they fail to declare any
+  dependencies on the functions' formal parameters; gcc-4.5 sees this
+  and skips the parameter setup before calling these functions, causing
+  runtime crashes; Khem's patch (this one) fixes that
+  (copypage-xscale.c already had correct asm() constraints so it works
+  with only the __naked fix, these other copypage-*.c files need both
+  patches to work)
 
--- 
--- 
-Ben
+These patches are no-ops for earlier compilers since they merely
+formalise the parameter passing behaviour that the kernel has been
+expecting all along.
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+/Mikael
