@@ -1,36 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Jun 2010 17:00:11 +0100
-Subject: [PATCH] Add kto and kfrom to input operands list.
-In-Reply-To: <19462.18892.533099.360440@pilspetsen.it.uu.se>
-References: <1275379600-23498-1-git-send-email-raj.khem@gmail.com>
-	<19462.18892.533099.360440@pilspetsen.it.uu.se>
-Message-ID: <20100602160010.GB872@n2100.arm.linux.org.uk>
+From: nobin.mathew@gmail.com (Nobin Mathew)
+Date: Wed, 2 Jun 2010 21:40:23 +0530
+Subject: make ARM=arm menuconfig problem in mainline
+In-Reply-To: <20100602085748.6771e025.randy.dunlap@oracle.com>
+References: <AANLkTikC61Y9g-WbqwgGDghDSy2XtgraFSRoZYkHRGTG@mail.gmail.com>
+	<AANLkTilEYHVHJrj_KgF48OYCSEUcsKLi57Q_Y73d9va-@mail.gmail.com>
+	<20100602085748.6771e025.randy.dunlap@oracle.com>
+Message-ID: <AANLkTikYYVh0S2l884s_u3efl-b413YhoNttjOJGKsrt@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 02, 2010 at 02:08:44PM +0200, Mikael Pettersson wrote:
-> Khem Raj writes:
->  > When functions incoming parameters are not in input operands list gcc 4.5 does not
->  > load the parameters into registers before calling this function but the
->  > inline assembly assumes valid addresses inside this function. This
->  > breaks the code because r0 and r1 are invalid when execution enters
->  > v4wb_copy_user_page ()
->  > 
->  > Also the constant needs to be used as third input operand so account for that
->  > as well.
->  > 
->  > Tested on qemu arm.
->  > 
->  > Signed-off-by: Khem Raj <raj.khem@gmail.com>
->  > ---
->  >  arch/arm/mm/copypage-feroceon.c |    4 ++--
-> 
-> I've tested and verified that this bit enables a gcc-4.5 compiled kernel
-> to boot on TS-119 (Kirkwood) when combined with my fix for __naked.
-> With neither or only one of the patches applied, the kernel oopses hard
-> in copy_user_page() as it tries to start /sbin/init.
-> 
-> So for the copypage-feroceon.c change:
-> Tested-by: Mikael Pettersson <mikpe@it.uu.se>
+when I go to select ARM system
+type(OMAP, Davinci etc), I am not seeing any entries there in the pop
+up window. When I remove  bool "Samsung S3C2410, S3C2412, S3C2413,
+S3C2416, S3C2440,
+>> S3C2442, S3C2443, S3C2450"  it is working fine. I feel it is something to do with length of that string.
 
-Ok.
+Is it possible to attach screenshots in this list?
+
+Thanks
+Nobin
+
+On Wed, Jun 2, 2010 at 9:27 PM, Randy Dunlap <randy.dunlap@oracle.com> wrote:
+> On Wed, 2 Jun 2010 20:04:28 +0530 Nobin Mathew wrote:
+>
+>> adding linux-arm-kernel at lists.infradead.org
+>>
+>> Hi,
+>>
+>> The following entry creates problem in ARM System type menu. I am
+>> using a Fedora 12 system.
+>
+> What kind of problem does it create?
+> It seems to work for me (on f11, not f12).
+> Does it have something to do with F12 specifically?
+>
+>
+>> Length of bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440,
+>> S3C2442, S3C2443, S3C2450" is the problem. How can I fix it.
+>
+> Describe the problem, please.
+>
+>> config ARCH_S3C2410
+>> ? ? ? ?bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440,
+>> S3C2442, S3C2443, S3C2450"
+>> ? ? ? ?select GENERIC_GPIO
+>> ? ? ? ?select ARCH_HAS_CPUFREQ
+>> ? ? ? ?select HAVE_CLK
+>> ? ? ? ?select ARCH_USES_GETTIMEOFFSET
+>> ? ? ? ?help
+>> ? ? ? ? ?Samsung S3C2410X CPU based systems, such as the Simtec Electronics
+>> ? ? ? ? ?BAST (<http://www.simtec.co.uk/products/EB110ITX/>), the IPAQ 1940 or
+>> ? ? ? ? ?the Samsung SMDK2410 development board (and derivatives).
+>>
+>> ? ? ? ? ?Note, the S3C2416 and the S3C2450 are so close that they even share
+>> ? ? ? ? ?the same SoC ID code. This means that there is no seperate machine
+>> ? ? ? ? ?directory (no arch/arm/mach-s3c2450) as the S3C2416 was first.
+>
+>
+> ---
+> ~Randy
+> *** Remember to use Documentation/SubmitChecklist when testing your code ***
+>
