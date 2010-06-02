@@ -1,32 +1,45 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 02 Jun 2010 18:02:51 +0100
-Subject: [PATCH v2 7/8] ARM: Remove dummy loads from the original relocation
-	address
+Date: Wed, 02 Jun 2010 18:02:56 +0100
+Subject: [PATCH v2 8/8] ARM: Do not compile the Thumb-2 module relocations
+	on an ARM kernel
 In-Reply-To: <20100602170039.18569.41823.stgit@e102109-lin.cambridge.arm.com>
 References: <20100602170039.18569.41823.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100602170251.18569.3944.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100602170256.18569.89549.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reading back the upper and lower values in the R_ARM_THM_CALL and
-R_ARM_THM_JUMP24 case was introduced by a previous commit but they are
-not needed.
-
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/kernel/module.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+ arch/arm/kernel/module.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index ae3c804..aab7fca 100644
+index aab7fca..6b46058 100644
 --- a/arch/arm/kernel/module.c
 +++ b/arch/arm/kernel/module.c
-@@ -233,8 +233,6 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 			*(u16 *)(loc + 2) = (u16)((lower & 0xd000) |
- 						  (j1 << 13) | (j2 << 11) |
- 						  ((offset >> 1) & 0x07ff));
--			upper = *(u16 *)loc;
--			lower = *(u16 *)(loc + 2);
+@@ -102,7 +102,9 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 		unsigned long loc;
+ 		Elf32_Sym *sym;
+ 		s32 offset;
++#ifdef CONFIG_THUMB2_KERNEL
+ 		u32 upper, lower, sign, j1, j2;
++#endif
+ 
+ 		offset = ELF32_R_SYM(rel->r_info);
+ 		if (offset < 0 || offset > (symsec->sh_size / sizeof(Elf32_Sym))) {
+@@ -185,6 +187,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 					(offset & 0x0fff);
  			break;
  
- 		case R_ARM_THM_MOVW_ABS_NC:
++#ifdef CONFIG_THUMB2_KERNEL
+ 		case R_ARM_THM_CALL:
+ 		case R_ARM_THM_JUMP24:
+ 			upper = *(u16 *)loc;
+@@ -266,6 +269,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 						  ((offset & 0x0700) << 4) |
+ 						  (offset & 0x00ff));
+ 			break;
++#endif
+ 
+ 		default:
+ 			printk(KERN_ERR "%s: unknown relocation: %u\n",
