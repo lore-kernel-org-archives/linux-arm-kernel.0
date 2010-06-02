@@ -1,318 +1,309 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed,  2 Jun 2010 10:40:46 +0300
-Subject: [PATCH 1/5] usb/otg/ulpi: extend the generic ulpi driver.
-In-Reply-To: <1275464450-23003-1-git-send-email-grinberg@compulab.co.il>
+Date: Wed,  2 Jun 2010 10:40:49 +0300
+Subject: [PATCH 4/5] [ARM] usb/host/ohci-pxa27x: make PXA310 USB OTG port work
+	in host mode.
+In-Reply-To: <1275464450-23003-4-git-send-email-grinberg@compulab.co.il>
 References: <1275464450-23003-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1275464450-23003-2-git-send-email-grinberg@compulab.co.il>
+	<1275464450-23003-2-git-send-email-grinberg@compulab.co.il>
+	<1275464450-23003-3-git-send-email-grinberg@compulab.co.il>
+	<1275464450-23003-4-git-send-email-grinberg@compulab.co.il>
+Message-ID: <1275464450-23003-5-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extends the generic ulpi driver with support for
-Function and Interface control of upli phy.
 
 Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
 Signed-off-by: Mike Rapoport <mike@compulab.co.il>
 ---
- arch/arm/mach-mx2/mach-pca100.c       |   10 ++++-
- arch/arm/mach-mx3/mach-armadillo5x0.c |   10 ++++-
- arch/arm/mach-mx3/mach-mx31lite.c     |    5 ++-
- arch/arm/mach-mx3/mach-mx31moboard.c  |    5 ++-
- arch/arm/mach-mx3/mach-pcm037.c       |   10 ++++-
- arch/arm/mach-mx3/mach-pcm043.c       |    5 ++-
- drivers/usb/otg/Kconfig               |    2 -
- drivers/usb/otg/ulpi.c                |   64 +++++++++++++++++++++++++++++----
- include/linux/usb/ulpi.h              |   25 ++++++++++++-
- 9 files changed, 117 insertions(+), 19 deletions(-)
+ arch/arm/mach-pxa/include/mach/ohci.h     |    3 +
+ arch/arm/mach-pxa/include/mach/regs-u2d.h |    2 +
+ drivers/usb/host/ohci-pxa27x.c            |  183 +++++++++++++++++++++++++++++
+ 3 files changed, 188 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mx2/mach-pca100.c b/arch/arm/mach-mx2/mach-pca100.c
-index 778fff2..0f2ece0 100644
---- a/arch/arm/mach-mx2/mach-pca100.c
-+++ b/arch/arm/mach-mx2/mach-pca100.c
-@@ -356,13 +356,19 @@ static void __init pca100_init(void)
- #if defined(CONFIG_USB_ULPI)
- 	if (otg_mode_host) {
- 		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+						USB_OTG_DRV_VBUS |
-+						USB_OTG_DRV_VBUS_EXT,
-+						ULPI_IC_DEFAULT,
-+						ULPI_FC_DEFAULT);
+diff --git a/arch/arm/mach-pxa/include/mach/ohci.h b/arch/arm/mach-pxa/include/mach/ohci.h
+index 95b6e2a..a543d0f 100644
+--- a/arch/arm/mach-pxa/include/mach/ohci.h
++++ b/arch/arm/mach-pxa/include/mach/ohci.h
+@@ -29,6 +29,9 @@ struct pxaohci_platform_data {
+ #define PMM_PERPORT_MODE       3
  
- 		mxc_register_device(&mxc_otg_host, &otg_pdata);
- 	}
- 
- 	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+					  USB_OTG_DRV_VBUS |
-+					  USB_OTG_DRV_VBUS_EXT,
-+					  ULPI_IC_DEFAULT,
-+					  ULPI_FC_DEFAULT);
- 
- 	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
- #endif
-diff --git a/arch/arm/mach-mx3/mach-armadillo5x0.c b/arch/arm/mach-mx3/mach-armadillo5x0.c
-index 5f72ec9..81904d4 100644
---- a/arch/arm/mach-mx3/mach-armadillo5x0.c
-+++ b/arch/arm/mach-mx3/mach-armadillo5x0.c
-@@ -552,9 +552,15 @@ static void __init armadillo5x0_init(void)
- 	/* USB */
- #if defined(CONFIG_USB_ULPI)
- 	usbotg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--			USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+					   USB_OTG_DRV_VBUS |
-+					   USB_OTG_DRV_VBUS_EXT,
-+					   ULPI_IC_DEFAULT,
-+					   ULPI_FC_DEFAULT);
- 	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--			USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+					  USB_OTG_DRV_VBUS |
-+					  USB_OTG_DRV_VBUS_EXT,
-+					  ULPI_IC_DEFAULT,
-+					  ULPI_FC_DEFAULT);
- 
- 	mxc_register_device(&mxc_otg_host, &usbotg_pdata);
- 	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
-diff --git a/arch/arm/mach-mx3/mach-mx31lite.c b/arch/arm/mach-mx3/mach-mx31lite.c
-index 2b6d114..9413be4 100644
---- a/arch/arm/mach-mx3/mach-mx31lite.c
-+++ b/arch/arm/mach-mx3/mach-mx31lite.c
-@@ -261,7 +261,10 @@ static void __init mxc_board_init(void)
- #if defined(CONFIG_USB_ULPI)
- 	/* USB */
- 	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+					  USB_OTG_DRV_VBUS |
-+					  USB_OTG_DRV_VBUS_EXT,
-+					  ULPI_IC_DEFAULT,
-+					  ULPI_FC_DEFAULT);
- 
- 	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
- #endif
-diff --git a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
-index fccb920..620f21a 100644
---- a/arch/arm/mach-mx3/mach-mx31moboard.c
-+++ b/arch/arm/mach-mx3/mach-mx31moboard.c
-@@ -391,7 +391,10 @@ static struct mxc_usbh_platform_data usbh2_pdata = {
- static int __init moboard_usbh2_init(void)
- {
- 	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--			USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+					  USB_OTG_DRV_VBUS |
-+					  USB_OTG_DRV_VBUS_EXT,
-+					  ULPI_IC_DEFAULT,
-+					  ULPI_FC_DEFAULT);
- 
- 	return mxc_register_device(&mxc_usbh2, &usbh2_pdata);
- }
-diff --git a/arch/arm/mach-mx3/mach-pcm037.c b/arch/arm/mach-mx3/mach-pcm037.c
-index 2df1ec5..33471c4 100644
---- a/arch/arm/mach-mx3/mach-pcm037.c
-+++ b/arch/arm/mach-mx3/mach-pcm037.c
-@@ -657,13 +657,19 @@ static void __init mxc_board_init(void)
- #if defined(CONFIG_USB_ULPI)
- 	if (otg_mode_host) {
- 		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+						USB_OTG_DRV_VBUS |
-+						USB_OTG_DRV_VBUS_EXT,
-+						ULPI_IC_DEFAULT,
-+						ULPI_FC_DEFAULT);
- 
- 		mxc_register_device(&mxc_otg_host, &otg_pdata);
- 	}
- 
- 	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+					  USB_OTG_DRV_VBUS |
-+					  USB_OTG_DRV_VBUS_EXT,
-+					  ULPI_IC_DEFAULT,
-+					  ULPI_FC_DEFAULT);
- 
- 	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
- #endif
-diff --git a/arch/arm/mach-mx3/mach-pcm043.c b/arch/arm/mach-mx3/mach-pcm043.c
-index 1bf1ec2..63d8719 100644
---- a/arch/arm/mach-mx3/mach-pcm043.c
-+++ b/arch/arm/mach-mx3/mach-pcm043.c
-@@ -379,7 +379,10 @@ static void __init mxc_board_init(void)
- #if defined(CONFIG_USB_ULPI)
- 	if (otg_mode_host) {
- 		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+						USB_OTG_DRV_VBUS |
-+						USB_OTG_DRV_VBUS_EXT,
-+						ULPI_IC_DEFAULT,
-+						ULPI_FC_DEFAULT);
- 
- 		mxc_register_device(&mxc_otg_host, &otg_pdata);
- 	}
-diff --git a/drivers/usb/otg/Kconfig b/drivers/usb/otg/Kconfig
-index 3d2d3e5..3b12895 100644
---- a/drivers/usb/otg/Kconfig
-+++ b/drivers/usb/otg/Kconfig
-@@ -49,8 +49,6 @@ config USB_ULPI
- 	  Enable this to support ULPI connected USB OTG transceivers which
- 	  are likely found on embedded boards.
- 
--	  The only chip currently supported is NXP's ISP1504
--
- config TWL4030_USB
- 	tristate "TWL4030 USB Transceiver Driver"
- 	depends on TWL4030_CORE && REGULATOR_TWL4030
-diff --git a/drivers/usb/otg/ulpi.c b/drivers/usb/otg/ulpi.c
-index 9010225..0e7a826 100644
---- a/drivers/usb/otg/ulpi.c
-+++ b/drivers/usb/otg/ulpi.c
-@@ -34,6 +34,7 @@
- #define ULPI_VID_HIGH        0x01    /* Vendor ID high */
- #define ULPI_PID_LOW         0x02    /* Product ID low */
- #define ULPI_PID_HIGH        0x03    /* Product ID high */
-+#define ULPI_FUNCTL          0x04    /* Function Control */
- #define ULPI_ITFCTL          0x07    /* Interface Control */
- #define ULPI_OTGCTL          0x0A    /* OTG Control */
- 
-@@ -60,25 +61,51 @@ static unsigned int ulpi_ids[] = {
- 	ULPI_ID(0x04cc, 0x1504),	/* NXP ISP1504 */
+ 	int power_budget;
++
++	struct otg_transceiver *otg;
++	unsigned long ulpi_mode;
  };
  
--static int ulpi_set_flags(struct otg_transceiver *otg)
-+static int ulpi_set_otg_flags(struct otg_transceiver *otg)
- {
-+	unsigned int otg_flags = otg->flags & 0xff;
- 	unsigned int flags = 0;
+ extern void pxa_set_ohci_info(struct pxaohci_platform_data *info);
+diff --git a/arch/arm/mach-pxa/include/mach/regs-u2d.h b/arch/arm/mach-pxa/include/mach/regs-u2d.h
+index c15c0c5..82597e7 100644
+--- a/arch/arm/mach-pxa/include/mach/regs-u2d.h
++++ b/arch/arm/mach-pxa/include/mach/regs-u2d.h
+@@ -3,6 +3,8 @@
  
--	if (otg->flags & USB_OTG_PULLUP_ID)
-+	if (otg_flags & USB_OTG_PULLUP_ID)
- 		flags |= ID_PULL_UP;
+ #include <mach/bitfield.h>
  
--	if (otg->flags & USB_OTG_PULLDOWN_DM)
-+	if (otg_flags & USB_OTG_PULLDOWN_DM)
- 		flags |= DM_PULL_DOWN;
++#define U2D_PHYS_BASE   0x54100000
++
+ /*
+  * USB2 device controller registers and bits definitions
+  */
+diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
+index a18debd..c4aa239 100644
+--- a/drivers/usb/host/ohci-pxa27x.c
++++ b/drivers/usb/host/ohci-pxa27x.c
+@@ -24,6 +24,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/clk.h>
+ #include <mach/ohci.h>
++#include <mach/regs-u2d.h>
++#include <mach/pxa310-ulpi.h>
  
--	if (otg->flags & USB_OTG_PULLDOWN_DP)
-+	if (otg_flags & USB_OTG_PULLDOWN_DP)
- 		flags |= DP_PULL_DOWN;
+ /*
+  * UHC: USB Host Controller (OHCI-like) register definitions
+@@ -104,10 +106,126 @@ struct pxa27x_ohci {
+ 	struct device	*dev;
+ 	struct clk	*clk;
+ 	void __iomem	*mmio_base;
++
++	struct clk	*u2d_clk;
++	void __iomem	*u2d_mmio_base;
+ };
  
--	if (otg->flags & USB_OTG_EXT_VBUS_INDICATOR)
-+	if (otg_flags & USB_OTG_EXT_VBUS_INDICATOR)
- 		flags |= USE_EXT_VBUS_IND;
+ #define to_pxa27x_ohci(hcd)	(struct pxa27x_ohci *)hcd_to_ohci(hcd)
  
- 	return otg_io_write(otg, flags, ULPI_OTGCTL + ULPI_REG_SET);
- }
- 
-+static int ulpi_set_fc_flags(struct otg_transceiver *otg)
++#if defined(CONFIG_PXA310_ULPI)
++static void pxa310_setup_otg_hc(struct pxa27x_ohci *ohci)
 +{
-+	unsigned int fc_flags = (otg->flags >> 16) & 0xff;
++	void __iomem *u2d_mmio_base = ohci->u2d_mmio_base;
++	u32 u2dotgcr;
 +
-+	/*
-+	 * Bit 6 in Function Control Register is SuspendM
-+	 * 1 - Powered.
-+	 * 0 - Suspend.
-+	 */
-+	fc_flags |= (1 << 6);
-+
-+	return otg_io_write(otg, fc_flags, ULPI_FUNCTL + ULPI_REG_SET);
++	u2dotgcr = __raw_readl(u2d_mmio_base + U2DOTGCR);
++	u2dotgcr |= U2DOTGCR_ULAF | U2DOTGCR_UTMID;
++	u2dotgcr &= ~(U2DOTGCR_SMAF | U2DOTGCR_CKAF);
++	__raw_writel(u2dotgcr, u2d_mmio_base + U2DOTGCR);
++	msleep(5);
++	__raw_writel(u2dotgcr | U2DOTGCR_ULE, u2d_mmio_base + U2DOTGCR);
++	msleep(5);
++	__raw_writel(__raw_readl(u2d_mmio_base + U2DOTGICR) & ~0x37F7F,
++		     u2d_mmio_base + U2DOTGICR);
 +}
 +
-+static inline int ulpi_set_flags(struct otg_transceiver *otg)
++static void pxa310_otg_transceiver_rtsm(struct pxa27x_ohci *ohci)
 +{
-+	int ret;
++	void __iomem *u2d_mmio_base = ohci->u2d_mmio_base;
++	u32 u2dotgcr;
 +
-+	ret = ulpi_set_otg_flags(otg);
-+	if (ret)
-+		return ret;
-+
-+	return ulpi_set_fc_flags(otg);
++	/* put PHY to sync mode */
++	u2dotgcr = __raw_readl(u2d_mmio_base + U2DOTGCR);
++	u2dotgcr |=  U2DOTGCR_RTSM | U2DOTGCR_UTMID;
++	__raw_writel(u2dotgcr, u2d_mmio_base + U2DOTGCR);
++	msleep(10);
++	/* setup OTG sync mode */
++	u2dotgcr = __raw_readl(u2d_mmio_base + U2DOTGCR);
++	u2dotgcr |= U2DOTGCR_ULAF;
++	u2dotgcr &= ~(U2DOTGCR_SMAF | U2DOTGCR_CKAF);
++	__raw_writel(u2dotgcr, u2d_mmio_base + U2DOTGCR);
 +}
 +
- static int ulpi_init(struct otg_transceiver *otg)
- {
- 	int i, vid, pid;
-@@ -98,6 +125,28 @@ static int ulpi_init(struct otg_transceiver *otg)
- 	return -ENODEV;
- }
- 
-+static int ulpi_set_host(struct otg_transceiver *otg, struct usb_bus *host)
++static int start_otg_transceiver(struct pxa27x_ohci *ohci,
++				 struct otg_transceiver *otg)
 +{
-+	unsigned int ic_flags = (otg->flags >> 8) & 0xff;
-+	unsigned int ic = ic_flags & ~0x7;
++	int err;
 +
-+	if (!host) {
-+		otg->host = NULL;
-+		return 0;
++	err = otg_init(otg);
++	if (err) {
++		pr_err("OTG transceiver init failed");
++		return err;
 +	}
 +
-+	otg->host = host;
++	err = otg_set_vbus(otg, 1);
++	if (err) {
++		pr_err("OTG transceiver VBUS set failed");
++		return err;
++	}
 +
-+	if (ic_flags & ULPI_IC_3PIN)
-+		ic |= ULPI_IC_3PIN;
-+	else if (ic_flags & ULPI_IC_CARKIT)
-+		ic |= ULPI_IC_CARKIT;
-+	else
-+		ic |= ULPI_IC_6PIN;
++	err = otg_set_host(otg, &ohci_to_hcd(&ohci->ohci)->self);
++	if (err)
++		pr_err("OTG transceiver Host mode set failed");
 +
-+	return otg_io_write(otg, ic, ULPI_ITFCTL + ULPI_REG_SET);
++	return err;
 +}
 +
- static int ulpi_set_vbus(struct otg_transceiver *otg, bool on)
- {
- 	unsigned int flags = otg_io_read(otg, ULPI_OTGCTL);
-@@ -117,7 +166,7 @@ static int ulpi_set_vbus(struct otg_transceiver *otg, bool on)
- 
- struct otg_transceiver *
- otg_ulpi_create(struct otg_io_access_ops *ops,
--		unsigned int flags)
-+		u8 otg_flags, u8 ic_flags, u8 fc_flags)
- {
- 	struct otg_transceiver *otg;
- 
-@@ -126,9 +175,10 @@ otg_ulpi_create(struct otg_io_access_ops *ops,
- 		return NULL;
- 
- 	otg->label	= "ULPI";
--	otg->flags	= flags;
-+	otg->flags	= otg_flags | (ic_flags << 8) | (fc_flags << 16);
- 	otg->io_ops	= ops;
- 	otg->init	= ulpi_init;
-+	otg->set_host	= ulpi_set_host;
- 	otg->set_vbus	= ulpi_set_vbus;
- 
- 	return otg;
-diff --git a/include/linux/usb/ulpi.h b/include/linux/usb/ulpi.h
-index 20675c6..8318067 100644
---- a/include/linux/usb/ulpi.h
-+++ b/include/linux/usb/ulpi.h
-@@ -1,7 +1,30 @@
- #ifndef __LINUX_USB_ULPI_H
- #define __LINUX_USB_ULPI_H
- 
-+/* ULPI Function Control Register bits */
-+#define ULPI_FC_HS	0		/* Enable HS tcvr */
-+#define ULPI_FC_FS	(0x1 << 0)	/* Enable FS tcvr */
-+#define ULPI_FC_LS	(0x2 << 0)	/* Enable LS tcvr */
-+#define ULPI_FC_FS_LS	(0x3 << 0)	/* Enable FS tcvr for LS packets */
-+#define ULPI_FC_TRM_SEL	(0x1 << 2)	/* Internal pullup and HS termination */
-+#define ULPI_FC_NODRV	(0x1 << 3)	/* Non-Driving Operation */
-+#define ULPI_FC_NONRZI	(0x1 << 4)	/* Disable bit-stuff and NRZI encode */
-+#define ULPI_FC_RESET	(0x1 << 5)	/* Reset the UTMI core */
-+#define ULPI_FC_DEFAULT	0x41		/* Function Control Register Default */
++static int pxa310_start_otg_hc(struct pxa27x_ohci *ohci,
++			       struct pxaohci_platform_data *inf)
++{
++	void __iomem *u2d_mmio_base = ohci->u2d_mmio_base;
++	u32 u2dotgcr;
++	int err;
 +
++	pxa310_otg_transceiver_rtsm(ohci);
 +
-+/* ULPI Interface Register bits */
-+#define ULPI_IC_6PIN	(1 << 0)	/* XCVR 6 serial pin mode */
-+#define ULPI_IC_3PIN	(1 << 1)	/* XCVR 3 serial pin mode */
-+#define ULPI_IC_CARKIT	(1 << 2)	/* Carkit mode */
-+#define ULPI_IC_CLKSPND	(1 << 3)	/* Active low clock suspend */
-+#define ULPI_IC_AUTORES	(1 << 4)	/* PHY auto transmit resume signal */
-+#define ULPI_IC_VBUSINV	(1 << 5)	/* Invert the external VBUS indicator */
-+#define ULPI_IC_INDPT	(1 << 6)	/* Indicator Pass Through */
-+#define ULPI_IC_DISPRT	(1 << 7)	/* Interface Protect Disable */
-+#define ULPI_IC_DEFAULT	0x0		/* Interface Control Register Default */
++	/* disable USB device controller */
++	__raw_writel(__raw_readl(u2d_mmio_base + U2DCR) & ~U2DCR_UDE,
++		     u2d_mmio_base + U2DCR);
++	__raw_writel(__raw_readl(u2d_mmio_base + U2DOTGCR) |
++		     U2DOTGCR_UTMID, u2d_mmio_base + U2DOTGCR);
++	__raw_writel(__raw_readl(u2d_mmio_base + U2DOTGICR) & ~0x37F7F,
++		     u2d_mmio_base + U2DOTGICR);
 +
- struct otg_transceiver *otg_ulpi_create(struct otg_io_access_ops *ops,
--					unsigned int flags);
-+					u8 fc_flags, u8 ic_flags, u8 otg_flags);
++	err = start_otg_transceiver(ohci, inf->otg);
++	if (err)
++		return err;
++
++	/* set xceiver mode */
++	if (inf->ulpi_mode == ULPI_IC_6PIN)
++		__raw_writel(__raw_readl(u2d_mmio_base + U2DP3CR) &
++			     ~U2DP3CR_P2SS, u2d_mmio_base + U2DP3CR);
++	else if (inf->ulpi_mode == ULPI_IC_3PIN)
++		__raw_writel(__raw_readl(u2d_mmio_base + U2DP3CR) |
++			     U2DP3CR_P2SS, u2d_mmio_base + U2DP3CR);
++
++	/* start OTG host controller */
++	u2dotgcr =__raw_readl(u2d_mmio_base + U2DOTGCR) | U2DOTGCR_SMAF;
++	__raw_writel(u2dotgcr & ~(U2DOTGCR_ULAF | U2DOTGCR_CKAF),
++		     u2d_mmio_base + U2DOTGCR);
++
++	return 0;
++}
++
++static inline bool pxa310_u2d_is_setup(struct pxa27x_ohci *ohci)
++{
++	return cpu_is_pxa310() && !IS_ERR(ohci->u2d_clk) && ohci->u2d_mmio_base;
++}
++#else
++static inline void pxa310_setup_otg_hc(struct pxa27x_ohci *ohci) {}
++static inline void pxa310_otg_transceiver_rtsm(struct pxa27x_ohci *ohci) {}
++static inline int pxa310_start_otg_hc(struct pxa27x_ohci *ohci,
++				      struct pxaohci_platform_data *inf)
++{
++	return 0;
++}
++static inline bool pxa310_u2d_is_setup(struct pxa27x_ohci *ohci)
++{
++	return false;
++}
++#endif /* CONFIG_PXA310_ULPI */
++
+ /*
+   PMM_NPS_MODE -- PMM Non-power switching mode
+       Ports are powered continuously.
+@@ -229,12 +347,24 @@ static int pxa27x_start_hc(struct pxa27x_ohci *ohci, struct device *dev)
  
- #endif /* __LINUX_USB_ULPI_H */
+ 	pxa27x_setup_hc(ohci, inf);
+ 
++	if (pxa310_u2d_is_setup(ohci)) {
++		clk_enable(ohci->u2d_clk);
++		pxa310_setup_otg_hc(ohci);
++	}
++
+ 	if (inf->init)
+ 		retval = inf->init(dev);
+ 
+ 	if (retval < 0)
+ 		return retval;
+ 
++	/*
++	 * Platform can have a special init for the ulpi phy,
++	 * therefore the rest of the init must be done after the platform code.
++	 */
++	if (pxa310_u2d_is_setup(ohci))
++		pxa310_start_otg_hc(ohci, inf);
++
+ 	uhchr = __raw_readl(ohci->mmio_base + UHCHR) & ~UHCHR_SSE;
+ 	__raw_writel(uhchr, ohci->mmio_base + UHCHR);
+ 	__raw_writel(UHCHIE_UPRIE | UHCHIE_RWIE, ohci->mmio_base + UHCHIE);
+@@ -251,6 +381,11 @@ static void pxa27x_stop_hc(struct pxa27x_ohci *ohci, struct device *dev)
+ 
+ 	inf = dev->platform_data;
+ 
++	if (pxa310_u2d_is_setup(ohci)) {
++		pxa310_otg_transceiver_rtsm(ohci);
++		clk_disable(ohci->u2d_clk);
++	}
++
+ 	if (inf->exit)
+ 		inf->exit(dev);
+ 
+@@ -264,6 +399,38 @@ static void pxa27x_stop_hc(struct pxa27x_ohci *ohci, struct device *dev)
+ 	clk_disable(ohci->clk);
+ }
+ 
++static int pxa310_init_otg_resources(struct pxa27x_ohci *ohci,
++				     struct pxaohci_platform_data *inf)
++{
++	int retval;
++
++	ohci->u2d_clk = clk_get(NULL, "U2DCLK");
++	if (IS_ERR(ohci->u2d_clk))
++		return PTR_ERR(ohci->u2d_clk);
++
++	inf->otg->io_priv = ioremap(U2D_PHYS_BASE, 0x1300);
++	if (!inf->otg->io_priv) {
++		retval = -ENOMEM;
++		goto err_ioremap;
++	}
++
++	ohci->u2d_mmio_base = inf->otg->io_priv;
++
++	return 0;
++
++err_ioremap:
++	clk_put(ohci->u2d_clk);
++	return retval;
++}
++
++static void pxa310_free_otg_resources(struct pxa27x_ohci *ohci)
++{
++	if (ohci->u2d_mmio_base)
++		iounmap(ohci->u2d_mmio_base);
++
++	if (ohci->u2d_clk)
++		clk_put(ohci->u2d_clk);
++}
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+@@ -337,6 +504,12 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
+ 	ohci->clk = usb_clk;
+ 	ohci->mmio_base = (void __iomem *)hcd->regs;
+ 
++	if (cpu_is_pxa310() && inf->otg) {
++		retval = pxa310_init_otg_resources(ohci, inf);
++		if (retval)
++			goto err3;
++	}
++
+ 	if ((retval = pxa27x_start_hc(ohci, &pdev->dev)) < 0) {
+ 		pr_debug("pxa27x_start_hc failed");
+ 		goto err3;
+@@ -357,11 +530,15 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
+ 	pxa27x_stop_hc(ohci, &pdev->dev);
+  err3:
+ 	iounmap(hcd->regs);
++
++	if (cpu_is_pxa310() && inf->otg)
++		pxa310_free_otg_resources(ohci);
+  err2:
+ 	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+  err1:
+ 	usb_put_hcd(hcd);
+ 	clk_put(usb_clk);
++
+ 	return retval;
+ }
+ 
+@@ -385,6 +562,12 @@ void usb_hcd_pxa27x_remove (struct usb_hcd *hcd, struct platform_device *pdev)
+ 
+ 	usb_remove_hcd(hcd);
+ 	pxa27x_stop_hc(ohci, &pdev->dev);
++
++	if (pxa310_u2d_is_setup(ohci)) {
++		iounmap(ohci->u2d_mmio_base);
++		clk_put(ohci->u2d_clk);
++	}
++
+ 	iounmap(hcd->regs);
+ 	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+ 	usb_put_hcd(hcd);
 -- 
 1.6.4.4
