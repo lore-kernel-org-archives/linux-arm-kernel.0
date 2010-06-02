@@ -1,45 +1,84 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 02 Jun 2010 18:02:56 +0100
-Subject: [PATCH v2 8/8] ARM: Do not compile the Thumb-2 module relocations
-	on an ARM kernel
-In-Reply-To: <20100602170039.18569.41823.stgit@e102109-lin.cambridge.arm.com>
-References: <20100602170039.18569.41823.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100602170256.18569.89549.stgit@e102109-lin.cambridge.arm.com>
+From: nobin.mathew@gmail.com (Nobin Mathew)
+Date: Wed, 2 Jun 2010 22:41:32 +0530
+Subject: [TEMP PATCH] Re: make ARM=arm menuconfig problem in mainline
+In-Reply-To: <4C068BAA.4030004@oracle.com>
+References: <AANLkTikC61Y9g-WbqwgGDghDSy2XtgraFSRoZYkHRGTG@mail.gmail.com>
+	<AANLkTilEYHVHJrj_KgF48OYCSEUcsKLi57Q_Y73d9va-@mail.gmail.com>
+	<20100602085748.6771e025.randy.dunlap@oracle.com>
+	<AANLkTilpzeYVExQfLgpVmS3bPvb_h3kmWaatidekI-0r@mail.gmail.com>
+	<4C068BAA.4030004@oracle.com>
+Message-ID: <AANLkTimGeOsW5Zt5wR7t4uIUoju3wDXSqSFcIiemdsNU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/kernel/module.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index aab7fca..6b46058 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -102,7 +102,9 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 		unsigned long loc;
- 		Elf32_Sym *sym;
- 		s32 offset;
-+#ifdef CONFIG_THUMB2_KERNEL
- 		u32 upper, lower, sign, j1, j2;
-+#endif
- 
- 		offset = ELF32_R_SYM(rel->r_info);
- 		if (offset < 0 || offset > (symsec->sh_size / sizeof(Elf32_Sym))) {
-@@ -185,6 +187,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 					(offset & 0x0fff);
- 			break;
- 
-+#ifdef CONFIG_THUMB2_KERNEL
- 		case R_ARM_THM_CALL:
- 		case R_ARM_THM_JUMP24:
- 			upper = *(u16 *)loc;
-@@ -266,6 +269,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 						  ((offset & 0x0700) << 4) |
- 						  (offset & 0x00ff));
- 			break;
-+#endif
- 
- 		default:
- 			printk(KERN_ERR "%s: unknown relocation: %u\n",
+On Wed, Jun 2, 2010 at 10:19 PM, Randy Dunlap <randy.dunlap@oracle.com> wrote:
+> On 06/02/10 09:08, Nobin Mathew wrote:
+>>
+>> On Wed, Jun 2, 2010 at 9:27 PM, Randy Dunlap <randy.dunlap@oracle.com> wrote:
+>>> On Wed, 2 Jun 2010 20:04:28 +0530 Nobin Mathew wrote:
+>>>
+>>>> adding linux-arm-kernel at lists.infradead.org
+>>>>
+>>>> Hi,
+>>>>
+>>>> The following entry creates problem in ARM System type menu. I am
+>>>> using a Fedora 12 system.
+>>>
+>>> What kind of problem does it create?
+>>> It seems to work for me (on f11, not f12).
+>>> Does it have something to do with F12 specifically?
+>>>
+>>>
+>>>> Length of bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440,
+>>>> S3C2442, S3C2443, S3C2450" is the problem. How can I fix it.
+>>>
+>>> Describe the problem, please.
+>
+> [please don't top-post]
+Sorry I forgot. I rarely send mails to this list.
+>
+>> Sorry if attachments are not allowed, when I go to select ARM system
+>> type(OMAP, Davinci etc), I am not seeing any entries there in the pop
+>> up window. When I remove ?bool "Samsung S3C2410, S3C2412, S3C2413,
+>> S3C2416, S3C2440,
+>>>> S3C2442, S3C2443, S3C2450" ?it is working fine. I feel it is something to do with length of that string.
+>>
+>> Thanks
+>> Nobin
+>
+>
+> OK, I see that now. ?Well, it is some kind of problem.
+> Adding cc to linux-kbuild mailing list.
+>
+>
+> The patch below fixes the problem temporarily, but the bool string length does
+> seem to be a problem.
+>
+> Thanks for your report.
+>
+> --
+> From: Randy Dunlap <randy.dunlap@oracle.com>
+>
+> The bool "long string" causes the choices not to be displayed,
+> so temporarily change it to a shorter string until a real fix
+> is found.
+>
+> Signed-off-by: Randy Dunlap <randy.dunlap@oracle.com>
+> Reported-by: Nobin Mathew <nobin.mathew@gmail.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> ---
+> ?arch/arm/Kconfig | ? ?2 +-
+> ?1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> --- linux-next-20100602.orig/arch/arm/Kconfig
+> +++ linux-next-20100602/arch/arm/Kconfig
+> @@ -629,7 +629,7 @@ config ARCH_SA1100
+> ? ? ? ? ?Support for StrongARM 11x0 based boards.
+>
+> ?config ARCH_S3C2410
+> - ? ? ? bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442, S3C2443, S3C2450"
+> + ? ? ? bool "Samsung S3C24xx"
+> ? ? ? ?select GENERIC_GPIO
+> ? ? ? ?select ARCH_HAS_CPUFREQ
+> ? ? ? ?select HAVE_CLK
+>
