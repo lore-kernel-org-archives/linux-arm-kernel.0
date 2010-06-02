@@ -1,62 +1,39 @@
-From: dkirjanov@hera.kernel.org (Denis Kirjanov)
-Date: Wed, 2 Jun 2010 19:27:04 +0000
-Subject: [PATCH] fec: convert legacy PM hooks to dem_pm_ops
-Message-ID: <20100602192704.GA22726@hera.kernel.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 02 Jun 2010 15:29:58 -0400 (EDT)
+Subject: [PATCH 3/3] [ARM] Kirkwood: add support for PCIe1
+In-Reply-To: <AANLkTiltiNe5W0bRyEYIFJK0nB-Y4DDxHvBMHZntChdB@mail.gmail.com>
+References: <1275404968-12258-1-git-send-email-saeed@marvell.com>
+	<1275404968-12258-2-git-send-email-saeed@marvell.com>
+	<1275404968-12258-3-git-send-email-saeed@marvell.com>
+	<alpine.LFD.2.00.1006011447410.24526@xanadu.home>
+	<AANLkTiltiNe5W0bRyEYIFJK0nB-Y4DDxHvBMHZntChdB@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1006021529040.24526@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch compile tested only.
+On Wed, 2 Jun 2010, saeed bishara wrote:
 
-Convert legacy PM hooks to dev_pm_ops
-Signed-off-by: Denis Kirjanov <dkirjanov@kernel.org>
----
-drivers/net/fec.c |   24 +++++++++++++++++++++---
- 1 files changed, 21 insertions(+), 3 deletions(-)
+> > I think this looks like a bit too much code for what this does. ?To
+> > simplify things, you could:
+> >
+> > 1) Duplicate kirkwood_pcie_setup() into kirkwood_pcie0_setup() and
+> > ? kirkwood_pcie1_setup() instead. ?This will remove a couple
+> > ? "if (pp->index == 0)" and the snprintf() which could remain
+> > ? purely static initializations.
+> >
+> > 2) Remove bus_to_port() entirely, and store the address of the appropriate
+> > ? struct pcie_port instance into the sysdata pointer of the pci_bus
+> > ? structure. ?This struct pcie_port could even be kmalloc'd as needed.
+> The sysdata already used by arm to store the pci_sys_data,
 
-diff --git a/drivers/net/fec.c b/drivers/net/fec.c
-index 42d9ac9..6990791 100644
---- a/drivers/net/fec.c
-+++ b/drivers/net/fec.c
-@@ -1339,6 +1339,8 @@ fec_drv_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM
-+
- static int
- fec_suspend(struct platform_device *dev, pm_message_t state)
- {
-@@ -1369,15 +1371,31 @@ fec_resume(struct platform_device *dev)
- 	return 0;
- }
- 
-+static const struct dev_pm_ops fec_pm_ops = {
-+	.suspend	= fec_suspend,
-+	.resume		= fec_resume,
-+	.freeze		= fec_suspend,
-+	.thaw		= fec_resume,
-+	.poweroff	= fec_suspend,
-+	.restore	= fec_resume,
-+};
-+
-+#define FEC_PM_OPS (&fec_pm_ops)
-+
-+#else /* !CONFIG_PM */
-+
-+#define FEC_PM_OPS NULL
-+
-+#endif /* !CONFIG_PM */
-+
- static struct platform_driver fec_driver = {
- 	.driver	= {
- 		.name    = "fec",
- 		.owner	 = THIS_MODULE,
-+		.pm		 = FEC_PM_OPS,
- 	},
- 	.probe   = fec_probe,
- 	.remove  = __devexit_p(fec_drv_remove),
--	.suspend = fec_suspend,
--	.resume  = fec_resume,
- };
- 
- static int __init
+Ah, you're right.
+
+> I think we will have to add a private pointer to the pci_sys_data 
+> structure, that pointer will hold mach specific data per pci 
+> controller. this pointer is needed for any platform that has multiple 
+> pci controller. agree?
+
+Yes.
+
+
+Nicolas
