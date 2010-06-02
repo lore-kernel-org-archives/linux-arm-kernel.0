@@ -1,31 +1,19 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 2 Jun 2010 11:46:19 +0400
-Subject: [PATCH 1/2] at91sam9g20ek: add fixed-value regulator for wm8731
-In-Reply-To: <1275059443-10100-1-git-send-email-dbaryshkov@gmail.com>
-References: <1275059443-10100-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <AANLkTimgLRs_MX036cEsoIOYWoGfG9--W86-O6BRWACE@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Jun 2010 08:48:00 +0100
+Subject: [PATCH] Watchdog: Adding support for ARM Primecell SP805 Watchdog
+In-Reply-To: <1274344428-28329-1-git-send-email-viresh.kumar@st.com>
+References: <1274344428-28329-1-git-send-email-viresh.kumar@st.com>
+Message-ID: <20100602074800.GD6644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any comments on these two patches? Can I submit them to patchsystem?
+On Thu, May 20, 2010 at 02:03:48PM +0530, Viresh KUMAR wrote:
+> Technical Reference Manual can be found at:
+> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0270b/DDI0270.pdf
 
-Without these patches the kernel with CONFIG_REGULATOR enabled is broken
-on sam9g20ek boards (sound won't work).
+Please include Wim Van Sebroeck for watchdog stuff - his address is in
+MAINTAINERS.  Please also ensure that in future you're sending your
+patches to relevant people - there isn't the capacity to review
+every bit of code on this list.
 
-
-
-On Fri, May 28, 2010 at 7:10 PM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
-> If CONFIG_REGULATOR is enabled, wm8731 fails on AT91SAM9G20EK board,
-> since codec driver requires several voltage supplies and none are
-> provided currently. As requires voltages are hardwired to 3V3, use fixed
-> voltage regulator for this chip.
->
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> ---
-> ?arch/arm/mach-at91/board-sam9g20ek.c | ? 45 ++++++++++++++++++++++++++++++++++
-> ?1 files changed, 45 insertions(+), 0 deletions(-)
-
--- 
-With best wishes
-Dmitry
+There is a script - scripts/get_maintainer.pl - to help with this.
