@@ -1,54 +1,33 @@
 From: weber@corscience.de (Thomas Weber)
-Date: Wed,  2 Jun 2010 13:37:49 +0200
-Subject: [PATCHv2 09/11] OMAP2: Devkit8000: Using gpio_is_valid macro
+Date: Wed,  2 Jun 2010 13:37:51 +0200
+Subject: [PATCHv2 11/11] OMAP2: Devkit8000: Fix regulator for power supply
 In-Reply-To: <1275478671-24563-1-git-send-email-weber@corscience.de>
 References: <1275478671-24563-1-git-send-email-weber@corscience.de>
-Message-ID: <1275478671-24563-10-git-send-email-weber@corscience.de>
+Message-ID: <1275478671-24563-12-git-send-email-weber@corscience.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using the macro gpio_is_valid for check of valid gpio pins.
+Devkit8000 uses the TPS65930 and not the TWL4030.
+The TPS65930 uses only a subset of the power supplies
+of the TWL4030.
 
 Signed-off-by: Thomas Weber <weber@corscience.de>
 ---
- arch/arm/mach-omap2/board-devkit8000.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/board-devkit8000.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-index 3da88c8..dbd16de 100644
+index a485d39..648b565 100644
 --- a/arch/arm/mach-omap2/board-devkit8000.c
 +++ b/arch/arm/mach-omap2/board-devkit8000.c
-@@ -134,27 +134,27 @@ static int devkit8000_panel_enable_lcd(struct omap_dss_device *dssdev)
- 	twl_i2c_write_u8(TWL4030_MODULE_GPIO, 0x80, REG_GPIODATADIR1);
- 	twl_i2c_write_u8(TWL4030_MODULE_LED, 0x0, 0x0);
+@@ -380,7 +380,7 @@ static struct twl4030_platform_data devkit8000_twldata = {
  
--	if (dssdev->reset_gpio != -EINVAL)
-+	if (gpio_is_valid(dssdev->reset_gpio))
- 		gpio_set_value(dssdev->reset_gpio, 1);
- 	return 0;
- }
- 
- static void devkit8000_panel_disable_lcd(struct omap_dss_device *dssdev)
- {
--	if (dssdev->reset_gpio != -EINVAL)
-+	if (gpio_is_valid(dssdev->reset_gpio))
- 		gpio_set_value(dssdev->reset_gpio, 0);
- }
- 
- static int devkit8000_panel_enable_dvi(struct omap_dss_device *dssdev)
- {
--	if (dssdev->reset_gpio != -EINVAL)
-+	if (gpio_is_valid(dssdev->reset_gpio))
- 		gpio_set_value(dssdev->reset_gpio, 1);
- 	return 0;
- }
- 
- static void devkit8000_panel_disable_dvi(struct omap_dss_device *dssdev)
- {
--	if (dssdev->reset_gpio != -EINVAL)
-+	if (gpio_is_valid(dssdev->reset_gpio))
- 		gpio_set_value(dssdev->reset_gpio, 0);
- }
- 
+ static struct i2c_board_info __initdata devkit8000_i2c_boardinfo[] = {
+ 	{
+-		I2C_BOARD_INFO("twl4030", 0x48),
++		I2C_BOARD_INFO("tps65930", 0x48),
+ 		.flags = I2C_CLIENT_WAKE,
+ 		.irq = INT_34XX_SYS_NIRQ,
+ 		.platform_data = &devkit8000_twldata,
 -- 
 1.7.1
