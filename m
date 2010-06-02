@@ -1,27 +1,40 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 02 Jun 2010 17:53:52 +0100
-Subject: [PATCH v2 0/4] Patches for -next
-In-Reply-To: <20100602164459.17783.9741.stgit@e102109-lin.cambridge.arm.com>
-References: <20100602164459.17783.9741.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <1275497632.23442.27.camel@e102109-lin.cambridge.arm.com>
+Date: Wed, 02 Jun 2010 18:02:11 +0100
+Subject: [PATCH v2 0/8] Patches for 2.6.35
+Message-ID: <20100602170039.18569.41823.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-06-02 at 17:48 +0100, Catalin Marinas wrote:
-> Catalin Marinas (4):
->       ARM: Remove the domain switching on ARMv6k/v7 CPUs
->       ARM: Use lazy cache flushing on ARMv7 SMP systems
->       ARM: Assume new page cache pages have dirty D-cache
->       ARM: Synchronise the I and D caches via set_pte_at() on SMP systems
+These are a set of patches I'd like to get merged in 2.6.35 (during the
+-rc) period.
 
-Forgot to mention - for easier testing, these patches are also available
-in my "proposed" branch at:
+The first one was posted some time ago but deferred because of other
+conflicting patch (the 16-way PL310).
 
-http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-2.6-cm.git;a=summary
+Some of the other patches are necessary fixes plus a few trivial ones.
 
-BTW, does anyone know how to get linux-arm-kernel subscribed to
-patchwork.kernel.org? I know we have a patch system but that's only for
-final merging rather than RFC patches.
+Thanks.
+
+
+Catalin Marinas (8):
+      ARM: Improve the L2 cache performance when PL310 is used
+      ARM: Align machine_desc.phys_io to a 1MB section
+      ARM: Avoid the CONSISTENT_DMA_SIZE warning on noMMU builds
+      ARM: The v6_dma_inv_range() function must preserve data on SMP
+      ARM: Add a config option for the ARM11MPCore DMA cache maintenance workaround
+      ARM: Add support for the MOVW/MOVT relocations in Thumb-2
+      ARM: Remove dummy loads from the original relocation address
+      ARM: Do not compile the Thumb-2 module relocations on an ARM kernel
+
+
+ arch/arm/include/asm/elf.h |    2 +
+ arch/arm/kernel/head.S     |    2 +
+ arch/arm/kernel/module.c   |   34 +++++++++++++++++++++++
+ arch/arm/mm/Kconfig        |   26 ++++++++++++++++++
+ arch/arm/mm/cache-l2x0.c   |   65 ++++++++++++++++++++++++++++++--------------
+ arch/arm/mm/cache-v6.S     |   18 +++++++++---
+ arch/arm/mm/dma-mapping.c  |    2 +
+ 7 files changed, 124 insertions(+), 25 deletions(-)
 
 -- 
 Catalin
