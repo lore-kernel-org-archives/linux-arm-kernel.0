@@ -1,97 +1,83 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Wed, 2 Jun 2010 15:06:58 +0800
-Subject: [PATCH] NUC900/rtc: change the waiting for device ready implement
-In-Reply-To: <20100601154324.f1273812.akpm@linux-foundation.org>
-References: <4BFE1853.5070105@gmail.com>
-	<20100601154324.f1273812.akpm@linux-foundation.org>
-Message-ID: <AANLkTikkNZ9DkUUxm6eWTv-UY-Cfl7yT0XZHurMr5vb7@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed,  2 Jun 2010 16:06:08 +0900
+Subject: [PATCH v2] ARM: S5PC100: Add Watchdog support for S5PC100
+Message-ID: <1275462368-21621-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew ,
+From: Banajit Goswami <banajit.g@samsung.com>
 
-The patch makes two changes:
-(1) it adds an mdelay(1) to the polling loop
+This patch adds support for Watchdog timer for Samsung S5PC100.
 
-Here I change the 'for' loop to 'while' loop and and add an mdelay(1),
-which can make less access to the hardware register.
+Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+Changes since v1:
+- Move the dependency of watchdog timer driver from MACH_XXX(board)
+  to ARCH_XXX(SoC) as per comments from Ben Dooks
 
-(2) it changes the return value from ENODEV to EPERM if the loop timed out.
+ arch/arm/Kconfig                         |    1 +
+ arch/arm/mach-s5pc100/Kconfig            |    1 +
+ arch/arm/mach-s5pc100/include/mach/map.h |    3 +++
+ arch/arm/mach-s5pc100/mach-smdkc100.c    |    1 +
+ 4 files changed, 6 insertions(+), 0 deletions(-)
 
-I think the 'Operation not permitted' description is more suitable for
-the meaning
-of 'check_rtc_access_enable()' function, it just be used to judge rtc
-access operation is permitted or not.
-
-
-
-2010/6/2 Andrew Morton <akpm@linux-foundation.org>:
-> On Thu, 27 May 2010 14:59:31 +0800
-> Wan ZongShun <mcuos.com@gmail.com> wrote:
->
->> Dear Andrew,
->>
->> This patch is only to change the waiting for device ready implement
->> for winbond nuc900 platform.
->>
->
-> It's not very helpful to only say "I changed it". ?_why_ did you change
-> it? ?What change did you make? ?What was wrong with the old code and
-> what's better about the new code?
->
->> --- a/drivers/rtc/rtc-nuc900.c
->> +++ b/drivers/rtc/rtc-nuc900.c
->> @@ -85,22 +85,21 @@ static irqreturn_t nuc900_rtc_interrupt(int irq, void *_rtc)
->>
->> ?static int *check_rtc_access_enable(struct nuc900_rtc *nuc900_rtc)
->> ?{
->> - ? ? unsigned int i;
->> + ? ? unsigned int i, timeout = 0x1000;
->> ? ? ? __raw_writel(INIRRESET, nuc900_rtc->rtc_reg + REG_RTC_INIR);
->>
->> ? ? ? mdelay(10);
->>
->> ? ? ? __raw_writel(AERPOWERON, nuc900_rtc->rtc_reg + REG_RTC_AER);
->>
->> - ? ? for (i = 0; i < 1000; i++) {
->> - ? ? ? ? ? ? if (__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
->> - ? ? ? ? ? ? ? ? ? ? return 0;
->> - ? ? }
->> + ? ? while (!(__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? && timeout--)
->> + ? ? ? ? ? ? mdelay(1);
->>
->> - ? ? if ((__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB) == 0x0)
->> - ? ? ? ? ? ? return ERR_PTR(-ENODEV);
->> + ? ? if (!timeout)
->> + ? ? ? ? ? ? return ERR_PTR(-EPERM);
->>
->> - ? ? return ERR_PTR(-EPERM);
->> + ? ? return 0;
->> }
->
-> I can see that the patch makes two changes: it adds an mdelay(1) to the
-> polling loop and it changes the return value from ENODEV to EPERM if
-> the loop timed out.
->
-> But I don't have the faintest idea _why_ the changes were made!
->
->
-> So. ?I merged the patch without a changelog. ?Please send a changelog
-> for this patch which permits others to understand the change.
->
->
-
-
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 40c90bd..47fb03e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -693,6 +693,7 @@ config ARCH_S5PC100
+ 	select CPU_V7
+ 	select ARM_L1_CACHE_SHIFT_6
+ 	select ARCH_USES_GETTIMEOFFSET
++	select HAVE_S3C2410_WATCHDOG
+ 	help
+ 	  Samsung S5PC100 series based systems
+ 
+diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+index b2a11df..56ebd3c 100644
+--- a/arch/arm/mach-s5pc100/Kconfig
++++ b/arch/arm/mach-s5pc100/Kconfig
+@@ -12,6 +12,7 @@ config CPU_S5PC100
+ 	select PLAT_S5P
+ 	select S5P_EXT_INT
+ 	select S3C_PL330_DMA
++	select S3C_DEV_WDT
+ 	help
+ 	  Enable S5PC100 CPU support
+ 
+diff --git a/arch/arm/mach-s5pc100/include/mach/map.h b/arch/arm/mach-s5pc100/include/mach/map.h
+index cadae43..4b3a7b7 100644
+--- a/arch/arm/mach-s5pc100/include/mach/map.h
++++ b/arch/arm/mach-s5pc100/include/mach/map.h
+@@ -72,6 +72,8 @@
+ 
+ #define S5PC100_PA_SYSTIMER	(0xEA100000)
+ 
++#define S5PC100_PA_WATCHDOG	(0xEA200000)
++
+ #define S5PC100_PA_UART		(0xEC000000)
+ 
+ #define S5P_PA_UART0		(S5PC100_PA_UART + 0x0)
+@@ -131,6 +133,7 @@
+ #define S3C_PA_HSMMC2		S5PC100_PA_HSMMC(2)
+ #define S3C_PA_KEYPAD		S5PC100_PA_KEYPAD
+ #define S3C_PA_TSADC		S5PC100_PA_TSADC
++#define S3C_PA_WDT		S5PC100_PA_WATCHDOG
+ #define S3C_PA_ONENAND		S5PC100_PA_ONENAND
+ #define S3C_PA_ONENAND_BUF	S5PC100_PA_ONENAND_BUF
+ #define S3C_SZ_ONENAND_BUF	S5PC100_SZ_ONENAND_BUF
+diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-s5pc100/mach-smdkc100.c
+index af22f82..49c0270 100644
+--- a/arch/arm/mach-s5pc100/mach-smdkc100.c
++++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
+@@ -159,6 +159,7 @@ static struct platform_device *smdkc100_devices[] __initdata = {
+ 	&smdkc100_lcd_powerdev,
+ 	&s5pc100_device_iis0,
+ 	&s5pc100_device_ac97,
++	&s3c_device_wdt,
+ };
+ 
+ static void __init smdkc100_map_io(void)
 -- 
-*linux-arm-kernel mailing list
-mail addr:linux-arm-kernel at lists.infradead.org
-you can subscribe by:
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-* linux-arm-NUC900 mailing list
-mail addr:NUC900 at googlegroups.com
-main web: https://groups.google.com/group/NUC900
-you can subscribe it by sending me mail:
-mcuos.com at gmail.com
+1.6.2.5
