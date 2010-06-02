@@ -1,33 +1,32 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed,  2 Jun 2010 16:05:37 +0900
-Subject: [PATCH] ARM: SAMSUNG: Reduce virtual memory size for WDT device
-Message-ID: <1275462337-21587-1-git-send-email-kgene.kim@samsung.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Wed, 2 Jun 2010 09:16:18 +0200
+Subject: [PATCH 2/2] ARM: PL011 baudrate extension for ST-Ericssons
+	derivative
+In-Reply-To: <20100601180944.GC6644@n2100.arm.linux.org.uk>
+References: <1275385698-1599-1-git-send-email-linus.walleij@stericsson.com>
+	<20100601180944.GC6644@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikXGuRm_oUYof6DxWadBGQ8LZCD9rZ5TCW_VZxU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Banajit Goswami <banajit.g@samsung.com>
+2010/6/1 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-This patch reduces the virtual memory allocated for WDT device from 1M
-to 1K.
+> On Tue, Jun 01, 2010 at 11:48:18AM +0200, Linus Walleij wrote:
+>> @@ -90,6 +92,7 @@ static struct vendor_data vendor_arm = {
+>> ? ? ? .fifosize ? ? ? ? ? ? ? = 16,
+>> ? ? ? .lcrh_tx ? ? ? ? ? ? ? ?= UART011_LCRH,
+>> ? ? ? .lcrh_rx ? ? ? ? ? ? ? ?= UART011_LCRH,
+>> + ? ? ? ?.oversampling ? ? ? ? ? ? ? ?= false,
+>
+> I assume these spaces rather than tabs are due to an editor error
+> rather than an email client problem?
 
-Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/plat-samsung/dev-wdt.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Yeah it was :-/
 
-diff --git a/arch/arm/plat-samsung/dev-wdt.c b/arch/arm/plat-samsung/dev-wdt.c
-index 5efca87..019b5b8 100644
---- a/arch/arm/plat-samsung/dev-wdt.c
-+++ b/arch/arm/plat-samsung/dev-wdt.c
-@@ -21,7 +21,7 @@
- static struct resource s3c_wdt_resource[] = {
- 	[0] = {
- 		.start	= S3C_PA_WDT,
--		.end	= S3C_PA_WDT + SZ_1M - 1,
-+		.end	= S3C_PA_WDT + SZ_1K,
- 		.flags	= IORESOURCE_MEM,
- 	},
- 	[1] = {
--- 
-1.6.2.5
+I've fixed it up and put the fixed versions in the patch tracker.
+
+(Marcin I have some nice extensions to EMACS that check this as
+you code, mail me if you want it.)
+
+Yours,
+Linus Walleij
