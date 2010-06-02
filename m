@@ -1,84 +1,88 @@
-From: nobin.mathew@gmail.com (Nobin Mathew)
-Date: Wed, 2 Jun 2010 22:41:32 +0530
-Subject: [TEMP PATCH] Re: make ARM=arm menuconfig problem in mainline
-In-Reply-To: <4C068BAA.4030004@oracle.com>
-References: <AANLkTikC61Y9g-WbqwgGDghDSy2XtgraFSRoZYkHRGTG@mail.gmail.com>
-	<AANLkTilEYHVHJrj_KgF48OYCSEUcsKLi57Q_Y73d9va-@mail.gmail.com>
-	<20100602085748.6771e025.randy.dunlap@oracle.com>
-	<AANLkTilpzeYVExQfLgpVmS3bPvb_h3kmWaatidekI-0r@mail.gmail.com>
-	<4C068BAA.4030004@oracle.com>
-Message-ID: <AANLkTimGeOsW5Zt5wR7t4uIUoju3wDXSqSFcIiemdsNU@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 2 Jun 2010 19:23:34 +0200
+Subject: [PATCH 1/3] mxc: Add support for the imx51 3-stack board
+In-Reply-To: <002e01cb025f$b3daf110$9b00a8c0@wuef10f27ebed8>
+References: <1275405043-18230-1-git-send-email-jason77.wang@gmail.com>
+	<1275405043-18230-2-git-send-email-jason77.wang@gmail.com>
+	<20100602073650.GK26820@pengutronix.de>
+	<002e01cb025f$b3daf110$9b00a8c0@wuef10f27ebed8>
+Message-ID: <20100602172334.GS26820@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 2, 2010 at 10:19 PM, Randy Dunlap <randy.dunlap@oracle.com> wrote:
-> On 06/02/10 09:08, Nobin Mathew wrote:
->>
->> On Wed, Jun 2, 2010 at 9:27 PM, Randy Dunlap <randy.dunlap@oracle.com> wrote:
->>> On Wed, 2 Jun 2010 20:04:28 +0530 Nobin Mathew wrote:
->>>
->>>> adding linux-arm-kernel at lists.infradead.org
->>>>
->>>> Hi,
->>>>
->>>> The following entry creates problem in ARM System type menu. I am
->>>> using a Fedora 12 system.
->>>
->>> What kind of problem does it create?
->>> It seems to work for me (on f11, not f12).
->>> Does it have something to do with F12 specifically?
->>>
->>>
->>>> Length of bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440,
->>>> S3C2442, S3C2443, S3C2450" is the problem. How can I fix it.
->>>
->>> Describe the problem, please.
->
-> [please don't top-post]
-Sorry I forgot. I rarely send mails to this list.
->
->> Sorry if attachments are not allowed, when I go to select ARM system
->> type(OMAP, Davinci etc), I am not seeing any entries there in the pop
->> up window. When I remove ?bool "Samsung S3C2410, S3C2412, S3C2413,
->> S3C2416, S3C2440,
->>>> S3C2442, S3C2443, S3C2450" ?it is working fine. I feel it is something to do with length of that string.
->>
->> Thanks
->> Nobin
->
->
-> OK, I see that now. ?Well, it is some kind of problem.
-> Adding cc to linux-kbuild mailing list.
->
->
-> The patch below fixes the problem temporarily, but the bool string length does
-> seem to be a problem.
->
-> Thanks for your report.
->
-> --
-> From: Randy Dunlap <randy.dunlap@oracle.com>
->
-> The bool "long string" causes the choices not to be displayed,
-> so temporarily change it to a shorter string until a real fix
-> is found.
->
-> Signed-off-by: Randy Dunlap <randy.dunlap@oracle.com>
-> Reported-by: Nobin Mathew <nobin.mathew@gmail.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> ---
-> ?arch/arm/Kconfig | ? ?2 +-
-> ?1 file changed, 1 insertion(+), 1 deletion(-)
->
-> --- linux-next-20100602.orig/arch/arm/Kconfig
-> +++ linux-next-20100602/arch/arm/Kconfig
-> @@ -629,7 +629,7 @@ config ARCH_SA1100
-> ? ? ? ? ?Support for StrongARM 11x0 based boards.
->
-> ?config ARCH_S3C2410
-> - ? ? ? bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442, S3C2443, S3C2450"
-> + ? ? ? bool "Samsung S3C24xx"
-> ? ? ? ?select GENERIC_GPIO
-> ? ? ? ?select ARCH_HAS_CPUFREQ
-> ? ? ? ?select HAVE_CLK
->
+On Wed, Jun 02, 2010 at 10:27:03PM +0800, jason wang wrote:
+> 
+> 
+> > Hi Jason,
+> > 
+> > On Tue, Jun 01, 2010 at 11:10:41PM +0800, Jason Wang wrote:
+> >> 3-stack is a reference board from Freescale for their i.MX51 SoC.
+> >> 
+> >> Add board definition, Kconfig and Makefile to enable Freescale 3-stack
+> >> board.
+> > 
+> > The debug board code looks the same like in mach-mx31_3ds.c. Does
+> > anybody know how similar the different debug boards for the 3ds boards
+> > are? ATM we only have the mx31_3ds with debug board support in the
+> > kernel. This could be the moment to go for a arch/arm/plat-mxc/3ds-debugboard.c
+> > 
+> Besides mx31_3ds and mx51_3ds, the mx31_ads and mx27_ads also have the similar CPLD expanding device.
+> They have similar functions but different CPLD image version. That is to say, except base_addr and parent_irq_pin,
+> the CPLD implemented device controller(like uart and interrupt controller) will be a little bit different.
+> I think the software for this part could be moved to a common file like plat-mxc/mxc-debugboard.c
+> 
+> Because this is a big action, it will affect some exsiting platforms. How about leave this work to next
+> action?
+> 
+> Thanks,
+> Jason.
+> > Several other comments inline.
+> > 
+> Except following 1 comment, all others will be addressed in V2.
+> 
+> <snip>
+> >> 
+> >> Boot tested on a i.MX51 3-stack Rev2.0 board
+> >> + __raw_writew(0xFFFF, brd_io + INTR_RESET_REG);
+> >> + __raw_writew(0, brd_io + INTR_RESET_REG);
+> >> + __raw_writew(0x1F, brd_io + INTR_MASK_REG);
+> >> + for (i = MXC_BOARD_IRQ_START;
+> >> +      i < (MXC_BOARD_IRQ_START + MXC_BOARD_IRQS); i++) {
+> > 
+> > MXC_BOARD_IRQS is the maximum number of interrupts available for the
+> > board. What you need here instead is the number of interrupts the expio
+> > actually has.
+> > 
+> It seems MXC_BOARD_IRQS is the number of CPLD expanding irq(or debugboard expanding irq).
+
+Not exactly. See mach/irqs.h:
+
+/*
+ * The next 16 interrupts are for board specific purposes.  Since
+ * the kernel can only run on one machine at a time, we can re-use
+ * these.  If you need more, increase MXC_BOARD_IRQS, but keep it
+ * within sensible limits.
+ */
+#define MXC_BOARD_IRQ_START     (MXC_INTERNAL_IRQS + MXC_GPIO_IRQS)
+
+#ifdef CONFIG_MACH_MX31ADS_WM1133_EV1
+#define MXC_BOARD_IRQS  80
+#else
+#define MXC_BOARD_IRQS  16
+#endif
+
+
+Remember that we can compile the kernel for more than one board at a
+time. So if MACH_MX31ADS_WM1133_EV1 is compiled in we will have 60 board
+irqs. Ok, you will hardly compile a kernel for mx31ads and mx51, but
+there could well come a mx51 board with more irqs in which case your
+expio handler goes nuts.
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
