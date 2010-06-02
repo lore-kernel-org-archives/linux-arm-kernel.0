@@ -1,49 +1,28 @@
-From: randy.dunlap@oracle.com (Randy Dunlap)
-Date: Wed, 2 Jun 2010 08:57:48 -0700
-Subject: make ARM=arm menuconfig problem in mainline
-In-Reply-To: <AANLkTilEYHVHJrj_KgF48OYCSEUcsKLi57Q_Y73d9va-@mail.gmail.com>
-References: <AANLkTikC61Y9g-WbqwgGDghDSy2XtgraFSRoZYkHRGTG@mail.gmail.com>
-	<AANLkTilEYHVHJrj_KgF48OYCSEUcsKLi57Q_Y73d9va-@mail.gmail.com>
-Message-ID: <20100602085748.6771e025.randy.dunlap@oracle.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Jun 2010 16:59:47 +0100
+Subject: [PATCH] Augment __naked__ function attribute with __noinline__
+	and __noclone__
+In-Reply-To: <19462.19024.560502.149871@pilspetsen.it.uu.se>
+References: <1275379552-23449-1-git-send-email-mikpe@it.uu.se>
+	<19462.19024.560502.149871@pilspetsen.it.uu.se>
+Message-ID: <20100602155947.GA872@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Jun 2010 20:04:28 +0530 Nobin Mathew wrote:
-
-> adding linux-arm-kernel at lists.infradead.org
+On Wed, Jun 02, 2010 at 02:10:56PM +0200, Mikael Pettersson wrote:
+> Mikael Pettersson writes:
+>  > The asm() bodies of naked functions often depend on standard calling
+>  > conventions, therefore they must be noinline and noclone.  GCC 4.[56]
+>  > currently fail to enforce this, see GCC PR44290.  The effect is that
+>  > most arch/arm/mm/copypage-*.c modules get miscompiled, resulting in
+>  > kernel crashes during bootup.
+>  > 
+>  > Part of the fix is to augment the __naked attribute to imply noinline
+>  > and noclone.  This patch implements that, and has been verified to fix
+>  > the failure to boot a gcc-4.5 compiled 2.6.34 kernel on a Thecus n2100
+>  > (XScale-based mach-iop32x).
 > 
-> Hi,
-> 
-> The following entry creates problem in ARM System type menu. I am
-> using a Fedora 12 system.
+> Now also tested with a gcc-4.5 compiled 2.6.35-rc1 kernel on a ds101
+> (XScale-based mach-ixp4xx).
 
-What kind of problem does it create?
-It seems to work for me (on f11, not f12).
-Does it have something to do with F12 specifically?
-
-
-> Length of bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440,
-> S3C2442, S3C2443, S3C2450" is the problem. How can I fix it.
-
-Describe the problem, please.
-
-> config ARCH_S3C2410
-> ? ? ? ?bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440,
-> S3C2442, S3C2443, S3C2450"
-> ? ? ? ?select GENERIC_GPIO
-> ? ? ? ?select ARCH_HAS_CPUFREQ
-> ? ? ? ?select HAVE_CLK
-> ? ? ? ?select ARCH_USES_GETTIMEOFFSET
-> ? ? ? ?help
-> ? ? ? ? ?Samsung S3C2410X CPU based systems, such as the Simtec Electronics
-> ? ? ? ? ?BAST (<http://www.simtec.co.uk/products/EB110ITX/>), the IPAQ 1940 or
-> ? ? ? ? ?the Samsung SMDK2410 development board (and derivatives).
-> 
-> ? ? ? ? ?Note, the S3C2416 and the S3C2450 are so close that they even share
-> ? ? ? ? ?the same SoC ID code. This means that there is no seperate machine
-> ? ? ? ? ?directory (no arch/arm/mach-s3c2450) as the S3C2416 was first.
-
-
----
-~Randy
-*** Remember to use Documentation/SubmitChecklist when testing your code ***
+I think this needs to go somewhere near linux-kernel.
