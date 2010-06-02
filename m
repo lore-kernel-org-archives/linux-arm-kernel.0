@@ -1,53 +1,78 @@
 From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Wed, 2 Jun 2010 14:08:44 +0200
-Subject: [PATCH] Add kto and kfrom to input operands list.
-In-Reply-To: <1275379600-23498-1-git-send-email-raj.khem@gmail.com>
-References: <1275379600-23498-1-git-send-email-raj.khem@gmail.com>
-Message-ID: <19462.18892.533099.360440@pilspetsen.it.uu.se>
+Date: Wed, 2 Jun 2010 14:10:56 +0200
+Subject: [PATCH] Augment __naked__ function attribute with __noinline__
+	and __noclone__
+In-Reply-To: <1275379552-23449-1-git-send-email-mikpe@it.uu.se>
+References: <1275379552-23449-1-git-send-email-mikpe@it.uu.se>
+Message-ID: <19462.19024.560502.149871@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Khem Raj writes:
- > When functions incoming parameters are not in input operands list gcc 4.5 does not
- > load the parameters into registers before calling this function but the
- > inline assembly assumes valid addresses inside this function. This
- > breaks the code because r0 and r1 are invalid when execution enters
- > v4wb_copy_user_page ()
+Mikael Pettersson writes:
+ > The asm() bodies of naked functions often depend on standard calling
+ > conventions, therefore they must be noinline and noclone.  GCC 4.[56]
+ > currently fail to enforce this, see GCC PR44290.  The effect is that
+ > most arch/arm/mm/copypage-*.c modules get miscompiled, resulting in
+ > kernel crashes during bootup.
  > 
- > Also the constant needs to be used as third input operand so account for that
- > as well.
- > 
- > Tested on qemu arm.
- > 
+ > Part of the fix is to augment the __naked attribute to imply noinline
+ > and noclone.  This patch implements that, and has been verified to fix
+ > the failure to boot a gcc-4.5 compiled 2.6.34 kernel on a Thecus n2100
+ > (XScale-based mach-iop32x).
+
+Now also tested with a gcc-4.5 compiled 2.6.35-rc1 kernel on a ds101
+(XScale-based mach-ixp4xx).
+
+ >
+ > Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
  > Signed-off-by: Khem Raj <raj.khem@gmail.com>
  > ---
- >  arch/arm/mm/copypage-feroceon.c |    4 ++--
-
-I've tested and verified that this bit enables a gcc-4.5 compiled kernel
-to boot on TS-119 (Kirkwood) when combined with my fix for __naked.
-With neither or only one of the patches applied, the kernel oopses hard
-in copy_user_page() as it tries to start /sbin/init.
-
-So for the copypage-feroceon.c change:
-Tested-by: Mikael Pettersson <mikpe@it.uu.se>
-
-To elaborate, the copy_user_page() functions in these copypage-*.c files
-break in two ways with gcc-4.5:
-- they are static __naked functions, and gcc-4.5 erroneously clones
-  them and changes their calling conventions in ways that don't match
-  the expectations of their asm() bodies, causing runtime crashes;
-  my patch to make __naked imply noinline and noclone fixes that
-- the asm() bodies of these __naked functions have inadequate input
-  parameter constraints, in particular they fail to declare any
-  dependencies on the functions' formal parameters; gcc-4.5 sees this
-  and skips the parameter setup before calling these functions, causing
-  runtime crashes; Khem's patch (this one) fixes that
-  (copypage-xscale.c already had correct asm() constraints so it works
-  with only the __naked fix, these other copypage-*.c files need both
-  patches to work)
-
-These patches are no-ops for earlier compilers since they merely
-formalise the parameter passing behaviour that the kernel has been
-expecting all along.
-
-/Mikael
+ >  include/linux/compiler-gcc.h  |   11 ++++++++++-
+ >  include/linux/compiler-gcc4.h |    4 ++++
+ >  2 files changed, 14 insertions(+), 1 deletions(-)
+ > 
+ > diff --git a/include/linux/compiler-gcc.h b/include/linux/compiler-gcc.h
+ > index 73dcf80..83bd87c 100644
+ > --- a/include/linux/compiler-gcc.h
+ > +++ b/include/linux/compiler-gcc.h
+ > @@ -58,8 +58,12 @@
+ >   * naked functions because then mcount is called without stack and frame pointer
+ >   * being set up and there is no chance to restore the lr register to the value
+ >   * before mcount was called.
+ > + *
+ > + * The asm() bodies of naked functions often depend on standard calling conventions,
+ > + * therefore they must be noinline and noclone.  GCC 4.[56] currently fail to enforce
+ > + * this, so we must do so ourselves.  See GCC PR44290.
+ >   */
+ > -#define __naked				__attribute__((naked)) notrace
+ > +#define __naked				__attribute__((naked)) noinline __noclone notrace
+ >  
+ >  #define __noreturn			__attribute__((noreturn))
+ >  
+ > @@ -85,3 +89,8 @@
+ >  #define _gcc_header(x) __gcc_header(linux/compiler-gcc##x.h)
+ >  #define gcc_header(x) _gcc_header(x)
+ >  #include gcc_header(__GNUC__)
+ > +
+ > +#if !defined(__noclone)
+ > +#define __noclone	/* not needed */
+ > +#endif
+ > +
+ > diff --git a/include/linux/compiler-gcc4.h b/include/linux/compiler-gcc4.h
+ > index 94dea3f..fcfa5b9 100644
+ > --- a/include/linux/compiler-gcc4.h
+ > +++ b/include/linux/compiler-gcc4.h
+ > @@ -48,6 +48,10 @@
+ >   * unreleased.  Really, we need to have autoconf for the kernel.
+ >   */
+ >  #define unreachable() __builtin_unreachable()
+ > +
+ > +/* Mark a function definition as prohibited from being cloned. */
+ > +#define __noclone	__attribute__((__noclone__))
+ > +
+ >  #endif
+ >  
+ >  #endif
+ > -- 
+ > 1.7.0.4
+ > 
