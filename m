@@ -1,105 +1,97 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 2 Jun 2010 08:19:20 +0200
-Subject: Fwd: [RFC, PATCH 1/3] ARM: PL08X: Add PL08x AMBA DMA Controller
-	driver.
-In-Reply-To: <AANLkTilXKWWvn6HLjfbcC0XFEn-Z7jSf4f6CKHBuW8Qb@mail.gmail.com>
-References: <1227275251-12005-1-git-send-email-protected@arm.com>
-	<1227275251-12005-2-git-send-email-protected@arm.com>
-	<AANLkTilXKWWvn6HLjfbcC0XFEn-Z7jSf4f6CKHBuW8Qb@mail.gmail.com>
-Message-ID: <AANLkTimoZRr5P_k4QH75upXAWRwkBKJjAfrStm5Znn5S@mail.gmail.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Wed, 2 Jun 2010 15:06:58 +0800
+Subject: [PATCH] NUC900/rtc: change the waiting for device ready implement
+In-Reply-To: <20100601154324.f1273812.akpm@linux-foundation.org>
+References: <4BFE1853.5070105@gmail.com>
+	<20100601154324.f1273812.akpm@linux-foundation.org>
+Message-ID: <AANLkTikkNZ9DkUUxm6eWTv-UY-Cfl7yT0XZHurMr5vb7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oops this was onto the old list address, Peter is busy so does anybody
-else know about
-address boundaries in the RealViews?
+Hi Andrew ,
 
-Linus Walleij
+The patch makes two changes:
+(1) it adds an mdelay(1) to the polling loop
 
+Here I change the 'for' loop to 'while' loop and and add an mdelay(1),
+which can make less access to the hardware register.
 
----------- Forwarded message ----------
-From: Linus Walleij <linus.ml.walleij@gmail.com>
-Date: 2010/5/30
-Subject: Re: [RFC, PATCH 1/3] ARM: PL08X: Add PL08x AMBA DMA Controller driver.
-To: Peter Pearse <peter.pearse@arm.com>
-Kopia: linux-arm-kernel <linux-arm-kernel@lists.arm.linux.org.uk>
+(2) it changes the return value from ENODEV to EPERM if the loop timed out.
 
-
-Hi,
-
-as you know I'm hacking around with this PL08x driver since the Versatile
-support is in the way for getting my DMA work merged.
-
-Now this piece I don't quite get:
-
-2008/11/21 Peter Pearse <protected@arm.com>:
+I think the 'Operation not permitted' description is more suitable for
+the meaning
+of 'check_rtc_access_enable()' function, it just be used to judge rtc
+access operation is permitted or not.
 
 
-> +/*
-> + * Return number of bytes to fill to boundary, or len
-> + */
-> +static int pl08x_pre_boundary(int addr, int len)
-> +{
-> + ? ? ? int boundary;
-> +
-> + ? ? ? if (len <= 0)
-> + ? ? ? ? ? ? ? printk(KERN_ERR "PL08X::pre_boundary() - zero length\n");
-> +
-> + ? ? ? boundary = ((addr >> PL08X_BOUNDARY_SHIFT) + 1) << PL08X_BOUNDARY_SHIFT;
-> +
-> + ? ? ? if (boundary < addr + len)
-> + ? ? ? ? ? ? ? return boundary - addr;
-> + ? ? ? else
-> + ? ? ? ? ? ? ? return len;
-> +}
 
-This PL08X_BOUNDARY_SHIFT is defined to
-#define PL08X_BOUNDARY_SHIFT ? ? ? ? ? (10) ? ?/* 1KB 0x400 */
-#define PL08X_BOUNDARY_SIZE ? ? ? ? ? ?(1 << PL08X_BOUNDARY_SHIFT)
+2010/6/2 Andrew Morton <akpm@linux-foundation.org>:
+> On Thu, 27 May 2010 14:59:31 +0800
+> Wan ZongShun <mcuos.com@gmail.com> wrote:
+>
+>> Dear Andrew,
+>>
+>> This patch is only to change the waiting for device ready implement
+>> for winbond nuc900 platform.
+>>
+>
+> It's not very helpful to only say "I changed it". ?_why_ did you change
+> it? ?What change did you make? ?What was wrong with the old code and
+> what's better about the new code?
+>
+>> --- a/drivers/rtc/rtc-nuc900.c
+>> +++ b/drivers/rtc/rtc-nuc900.c
+>> @@ -85,22 +85,21 @@ static irqreturn_t nuc900_rtc_interrupt(int irq, void *_rtc)
+>>
+>> ?static int *check_rtc_access_enable(struct nuc900_rtc *nuc900_rtc)
+>> ?{
+>> - ? ? unsigned int i;
+>> + ? ? unsigned int i, timeout = 0x1000;
+>> ? ? ? __raw_writel(INIRRESET, nuc900_rtc->rtc_reg + REG_RTC_INIR);
+>>
+>> ? ? ? mdelay(10);
+>>
+>> ? ? ? __raw_writel(AERPOWERON, nuc900_rtc->rtc_reg + REG_RTC_AER);
+>>
+>> - ? ? for (i = 0; i < 1000; i++) {
+>> - ? ? ? ? ? ? if (__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
+>> - ? ? ? ? ? ? ? ? ? ? return 0;
+>> - ? ? }
+>> + ? ? while (!(__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? && timeout--)
+>> + ? ? ? ? ? ? mdelay(1);
+>>
+>> - ? ? if ((__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB) == 0x0)
+>> - ? ? ? ? ? ? return ERR_PTR(-ENODEV);
+>> + ? ? if (!timeout)
+>> + ? ? ? ? ? ? return ERR_PTR(-EPERM);
+>>
+>> - ? ? return ERR_PTR(-EPERM);
+>> + ? ? return 0;
+>> }
+>
+> I can see that the patch makes two changes: it adds an mdelay(1) to the
+> polling loop and it changes the return value from ENODEV to EPERM if
+> the loop timed out.
+>
+> But I don't have the faintest idea _why_ the changes were made!
+>
+>
+> So. ?I merged the patch without a changelog. ?Please send a changelog
+> for this patch which permits others to understand the change.
+>
+>
 
-And then later:
 
-> +/*
-> + * Note that we assume we never have to change the burst sizes
-> + */
-> +int fill_LLIS_for_desc(struct pl08x_txd *local_txd, int pl08x_chan_num)
-> +{
-> (...)
-> + ? ? ? ? ? ? ? /*
-> + ? ? ? ? ? ? ? ?* Make largest possible LLIs until less than one bus width left
-> + ? ? ? ? ? ? ? ?*/
-> + ? ? ? ? ? ? ? while (remainder > (mbus->buswidth - 1)) {
-> + ? ? ? ? ? ? ? ? ? ? ? int lli_len, target_len;
-> + ? ? ? ? ? ? ? ? ? ? ? int tsize;
-> + ? ? ? ? ? ? ? ? ? ? ? int odd_bytes;
-> + ? ? ? ? ? ? ? ? ? ? ? /*
-> + ? ? ? ? ? ? ? ? ? ? ? ?* If enough left try to send max possible,
-> + ? ? ? ? ? ? ? ? ? ? ? ?* otherwise try to send the remainder
-> + ? ? ? ? ? ? ? ? ? ? ? ?*/
-> + ? ? ? ? ? ? ? ? ? ? ? target_len = remainder;
-> + ? ? ? ? ? ? ? ? ? ? ? if (remainder > max_bytes_per_lli)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? target_len = max_bytes_per_lli;
-> + ? ? ? ? ? ? ? ? ? ? ? /*
-> + ? ? ? ? ? ? ? ? ? ? ? ?* ?Set bus lengths for incrementing busses
-> + ? ? ? ? ? ? ? ? ? ? ? ?* ?to number of bytes which fill
-> + ? ? ? ? ? ? ? ? ? ? ? ?* ?to next memory boundary
-> + ? ? ? ? ? ? ? ? ? ? ? ?*/
-> + ? ? ? ? ? ? ? ? ? ? ? if (cctl_parm.bits.si)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? local_txd->srcbus.fill_bytes
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? = pl08x_pre_boundary(local_txd->srcbus.addr
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? , remainder);
-> + ? ? ? ? ? ? ? ? ? ? ? else
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? local_txd->srcbus.fill_bytes
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? = max_bytes_per_lli;
 
-Here the transfer lengths for lli:s crawls up tp a boundary.
-Now, the DMAC PL08x cannot move past a 0x400 boundary on the RealViews,
-so much is clear. But: is this a thing that will affect:
+-- 
+*linux-arm-kernel mailing list
+mail addr:linux-arm-kernel at lists.infradead.org
+you can subscribe by:
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-- All RealView / Versatile equipment
-- All implementations of PL08x on all silicon
-- All ARM architectures and nothing to do with the PL08x at all, rather
-?with some AMBA stuff or so?
-
-Yours,
-Linus Walleij
+* linux-arm-NUC900 mailing list
+mail addr:NUC900 at googlegroups.com
+main web: https://groups.google.com/group/NUC900
+you can subscribe it by sending me mail:
+mcuos.com at gmail.com
