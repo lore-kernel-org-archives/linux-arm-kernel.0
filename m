@@ -1,53 +1,38 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 02 Jun 2010 11:46:27 +0900
-Subject: [PATCH 4/4] pata_samsung: Add Samsung PATA controller driver
-In-Reply-To: <4BFEE98B.3090303@kernel.org>
-References: <1274948524-2970-1-git-send-email-kgene.kim@samsung.com>
-	<1274948524-2970-5-git-send-email-kgene.kim@samsung.com>
-	<4BFEE98B.3090303@kernel.org>
-Message-ID: <002b01cb01fd$cf1589c0$6d409d40$%kim@samsung.com>
+From: felipe.balbi@nokia.com (Felipe Balbi)
+Date: Wed, 2 Jun 2010 08:41:04 +0300
+Subject: [RFC PATCH] irq: handle private interrupt registration
+In-Reply-To: <alpine.LFD.2.00.1006020110090.2933@localhost.localdomain>
+References: <1274905794-7848-1-git-send-email-adharmap@codeaurora.org>
+	<20100601152652.9296c5d0.akpm@linux-foundation.org>
+	<alpine.LFD.2.00.1006020110090.2933@localhost.localdomain>
+Message-ID: <20100602054104.GE6465@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tejun Heo wrote:
-> 
-> Hello,
-> 
-> On 05/27/2010 10:22 AM, Kukjin Kim wrote:
-> > From: Abhilash Kesavan <a.kesavan@samsung.com>
-> >
-> > Adds support for the Samsung PATA controller. This driver is based on the
-> > Libata subsystem and references the earlier patches sent for IDE
-subsystem.
-> 
-> Just one small thing.
-> 
-> > +static struct ata_port_operations pata_s3c_port_ops = {
-> > +	.inherits		= &ata_sff_port_ops,
-> > +	.sff_check_status	= pata_s3c_check_status,
-> > +	.sff_tf_load		= pata_s3c_tf_load,
-> > +	.sff_tf_read		= pata_s3c_tf_read,
-> > +	.sff_data_xfer		= pata_s3c_data_xfer,
-> > +	.sff_exec_command	= pata_s3c_exec_command,
-> > +	.qc_prep		= ata_noop_qc_prep,
-> > +	.set_piomode		= pata_s3c_set_piomode,
-> > +};
-> > +
-> > +static struct ata_port_operations pata_s5p_port_ops = {
-> > +	.inherits		= &ata_sff_port_ops,
-> > +	.qc_prep		= ata_noop_qc_prep,
-> > +	.set_piomode		= pata_s3c_set_piomode,
-> > +};
-> 
-> You don't need to override .qc_prep to ata_noop_qc_prep() and can you
-> please base the patch against the current libata-dev#upstream?
-> 
-Will remove the override and rebase the new patches against upstream branch.
+Hi,
 
-Thanks.
+On Wed, Jun 02, 2010 at 01:14:32AM +0200, ext Thomas Gleixner wrote:
+>1) Use PER_CPU offsets for the irq numbers. The generic irq code does
+>   not care whether the interrupt number is matching any physical
+>   numbering scheme in the hardware, as long as the arch specific chip
+>   implementation knows how to deal with it, which is not rocket
+>   science to do.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+FWIW, I think (1) is a better approach as the problem will vanish 
+altogether and to me it sounds like the simpler approach as well. Archs 
+which have more than one IRQ chip (like OMAP with the twl4030 family) 
+will already use sequencial numbering anyway, so using the same approach 
+for N cpus, to me, sounds like a good deal.
+
+While at that, a question from my side: do we have a generic way of 
+fetching the last IRQ number so we can easily use that to calculate the 
+physical number of the IRQ line on the chip ?
+
+On OMAP, we have been passing that number down to twl4030 via 
+platform_data, but it would be better to ask genirq to tell us which was 
+the last irq number "claimed".
+
+-- 
+balbi
+
+DefectiveByDesign.org
