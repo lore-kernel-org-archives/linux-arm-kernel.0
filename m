@@ -1,78 +1,36 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Wed, 2 Jun 2010 14:10:56 +0200
-Subject: [PATCH] Augment __naked__ function attribute with __noinline__
-	and __noclone__
-In-Reply-To: <1275379552-23449-1-git-send-email-mikpe@it.uu.se>
-References: <1275379552-23449-1-git-send-email-mikpe@it.uu.se>
-Message-ID: <19462.19024.560502.149871@pilspetsen.it.uu.se>
+From: avorontsov@mvista.com (Anton Vorontsov)
+Date: Wed, 2 Jun 2010 16:29:44 +0400
+Subject: [PATCH 3/4] ARM: cns3xxx: Add support for AHCI controllers
+In-Reply-To: <4C0623D8.6030701@ru.mvista.com>
+References: <20100601165409.GA29614@oksana.dev.rtsoft.ru>
+	<20100601165540.GC7123@oksana.dev.rtsoft.ru>
+	<4C0623D8.6030701@ru.mvista.com>
+Message-ID: <20100602122944.GA11087@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mikael Pettersson writes:
- > The asm() bodies of naked functions often depend on standard calling
- > conventions, therefore they must be noinline and noclone.  GCC 4.[56]
- > currently fail to enforce this, see GCC PR44290.  The effect is that
- > most arch/arm/mm/copypage-*.c modules get miscompiled, resulting in
- > kernel crashes during bootup.
- > 
- > Part of the fix is to augment the __naked attribute to imply noinline
- > and noclone.  This patch implements that, and has been verified to fix
- > the failure to boot a gcc-4.5 compiled 2.6.34 kernel on a Thecus n2100
- > (XScale-based mach-iop32x).
+On Wed, Jun 02, 2010 at 01:26:48PM +0400, Sergei Shtylyov wrote:
+[...]
+> >+	tmp = MISC_SATA_POWER_MODE;
+> >+	tmp |= 0x1 << 16; /* Disable SATA PHY 0 from SLUMBER Mode */
+> >+	tmp |= 0x1 << 17; /* Disable SATA PHY 1 from SLUMBER Mode */
+> >+	MISC_SATA_POWER_MODE = tmp;
+> 
+>    Why aren't you using I/O accessors?
 
-Now also tested with a gcc-4.5 compiled 2.6.35-rc1 kernel on a ds101
-(XScale-based mach-ixp4xx).
+For CNS3xxx __raw_{read,write} are equivalent to direct accesses,
+and originally Cavium used registers directly just because it was
+easier (less keystrokes, quite understandable).
 
- >
- > Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
- > Signed-off-by: Khem Raj <raj.khem@gmail.com>
- > ---
- >  include/linux/compiler-gcc.h  |   11 ++++++++++-
- >  include/linux/compiler-gcc4.h |    4 ++++
- >  2 files changed, 14 insertions(+), 1 deletions(-)
- > 
- > diff --git a/include/linux/compiler-gcc.h b/include/linux/compiler-gcc.h
- > index 73dcf80..83bd87c 100644
- > --- a/include/linux/compiler-gcc.h
- > +++ b/include/linux/compiler-gcc.h
- > @@ -58,8 +58,12 @@
- >   * naked functions because then mcount is called without stack and frame pointer
- >   * being set up and there is no chance to restore the lr register to the value
- >   * before mcount was called.
- > + *
- > + * The asm() bodies of naked functions often depend on standard calling conventions,
- > + * therefore they must be noinline and noclone.  GCC 4.[56] currently fail to enforce
- > + * this, so we must do so ourselves.  See GCC PR44290.
- >   */
- > -#define __naked				__attribute__((naked)) notrace
- > +#define __naked				__attribute__((naked)) noinline __noclone notrace
- >  
- >  #define __noreturn			__attribute__((noreturn))
- >  
- > @@ -85,3 +89,8 @@
- >  #define _gcc_header(x) __gcc_header(linux/compiler-gcc##x.h)
- >  #define gcc_header(x) _gcc_header(x)
- >  #include gcc_header(__GNUC__)
- > +
- > +#if !defined(__noclone)
- > +#define __noclone	/* not needed */
- > +#endif
- > +
- > diff --git a/include/linux/compiler-gcc4.h b/include/linux/compiler-gcc4.h
- > index 94dea3f..fcfa5b9 100644
- > --- a/include/linux/compiler-gcc4.h
- > +++ b/include/linux/compiler-gcc4.h
- > @@ -48,6 +48,10 @@
- >   * unreleased.  Really, we need to have autoconf for the kernel.
- >   */
- >  #define unreachable() __builtin_unreachable()
- > +
- > +/* Mark a function definition as prohibited from being cloned. */
- > +#define __noclone	__attribute__((__noclone__))
- > +
- >  #endif
- >  
- >  #endif
- > -- 
- > 1.7.0.4
- > 
+Ben Dooks also pointed out this concern, and I agree that using
+IO accessors would be a good cleanup.
+
+As I'm going to send other improvements, I think I'll fix this for
+all CNS3xxx code base on top of this pull request, if nobody minds.
+
+Thanks!
+
+-- 
+Anton Vorontsov
+email: cbouatmailru at gmail.com
+irc://irc.freenode.net/bd2
