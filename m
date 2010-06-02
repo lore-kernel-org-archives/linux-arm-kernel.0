@@ -1,41 +1,31 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed,  2 Jun 2010 10:40:45 +0300
-Subject: [PATCH 0/5] Enable pxa310 usb otg port host mode.
-Message-ID: <1275464450-23003-1-git-send-email-grinberg@compulab.co.il>
+Date: Wed,  2 Jun 2010 10:40:47 +0300
+Subject: [PATCH 2/5] usb/otg/ulpi: add support for SMSC USB3319 ulpi phy.
+In-Reply-To: <1275464450-23003-2-git-send-email-grinberg@compulab.co.il>
+References: <1275464450-23003-1-git-send-email-grinberg@compulab.co.il>
+	<1275464450-23003-2-git-send-email-grinberg@compulab.co.il>
+Message-ID: <1275464450-23003-3-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series extends the existing usb ulpi generic driver
-with support for Function and Interface control of the ULPI PHYs,
-adds support for SMSC USB3319 ulpi phy,
-implement the pxa310 specific ulpi functionality and make pxa specific ohci
-implementation aware of pxa310 usb otg port host mode.
 
-Igor Grinberg (5):
-  usb/otg/ulpi: extend the generic ulpi driver.
-  usb/otg/ulpi: add support for SMSC USB3319 ulpi phy.
-  [ARM] pxa: add PXA310 specific ULPI implementation
-  [ARM] usb/host/ohci-pxa27x: make PXA310 USB OTG port work in host
-    mode.
-  [ARM] pxa/cm-x300: enable USB host port 2 on CM-X300 with PXA310 cpu.
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+---
+ drivers/usb/otg/ulpi.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
- arch/arm/mach-mx2/mach-pca100.c              |   10 +-
- arch/arm/mach-mx3/mach-armadillo5x0.c        |   10 +-
- arch/arm/mach-mx3/mach-mx31lite.c            |    5 +-
- arch/arm/mach-mx3/mach-mx31moboard.c         |    5 +-
- arch/arm/mach-mx3/mach-pcm037.c              |   10 +-
- arch/arm/mach-mx3/mach-pcm043.c              |    5 +-
- arch/arm/mach-pxa/Kconfig                    |    4 +
- arch/arm/mach-pxa/Makefile                   |    1 +
- arch/arm/mach-pxa/cm-x300.c                  |  102 ++++++++++++++
- arch/arm/mach-pxa/include/mach/ohci.h        |    3 +
- arch/arm/mach-pxa/include/mach/pxa310-ulpi.h |   19 +++
- arch/arm/mach-pxa/include/mach/regs-u2d.h    |    2 +
- arch/arm/mach-pxa/pxa310-ulpi.c              |  110 +++++++++++++++
- drivers/usb/host/ohci-pxa27x.c               |  183 ++++++++++++++++++++++++++
- drivers/usb/otg/Kconfig                      |    2 -
- drivers/usb/otg/ulpi.c                       |   65 ++++++++-
- include/linux/usb/ulpi.h                     |   25 ++++-
- 17 files changed, 542 insertions(+), 19 deletions(-)
- create mode 100644 arch/arm/mach-pxa/include/mach/pxa310-ulpi.h
- create mode 100644 arch/arm/mach-pxa/pxa310-ulpi.c
+diff --git a/drivers/usb/otg/ulpi.c b/drivers/usb/otg/ulpi.c
+index 0e7a826..99756ab 100644
+--- a/drivers/usb/otg/ulpi.c
++++ b/drivers/usb/otg/ulpi.c
+@@ -59,6 +59,7 @@
+ /* ULPI hardcoded IDs, used for probing */
+ static unsigned int ulpi_ids[] = {
+ 	ULPI_ID(0x04cc, 0x1504),	/* NXP ISP1504 */
++	ULPI_ID(0x0424, 0x0006),        /* SMSC USB3319 */
+ };
+ 
+ static int ulpi_set_otg_flags(struct otg_transceiver *otg)
+-- 
+1.6.4.4
