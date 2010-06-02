@@ -1,32 +1,24 @@
-From: ra7055@freescale.com (Rob Herring)
-Date: Wed, 02 Jun 2010 08:08:35 -0500
-Subject: [PATCH 1/3] mxc: Add support for the imx51 3-stack board
-In-Reply-To: <20100602073650.GK26820@pengutronix.de>
-References: <1275405043-18230-1-git-send-email-jason77.wang@gmail.com>
-	<1275405043-18230-2-git-send-email-jason77.wang@gmail.com>
-	<20100602073650.GK26820@pengutronix.de>
-Message-ID: <1275484115.6821.10.camel@ra7055-laptop>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 02 Jun 2010 06:13:44 -0700 (PDT)
+Subject: [PATCH v2] net/fec: fix pm to survive to suspend/resume
+In-Reply-To: <1275163490-13027-1-git-send-email-eric@eukrea.com>
+References: <20100529.001534.57459102.davem@davemloft.net>
+	<1275163490-13027-1-git-send-email-eric@eukrea.com>
+Message-ID: <20100602.061344.129778393.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-06-02 at 09:36 +0200, Sascha Hauer wrote:
-> Hi Jason,
-> 
-> On Tue, Jun 01, 2010 at 11:10:41PM +0800, Jason Wang wrote:
-> > 3-stack is a reference board from Freescale for their i.MX51 SoC.
-> > 
-> > Add board definition, Kconfig and Makefile to enable Freescale 3-stack
-> > board.
-> 
-> The debug board code looks the same like in mach-mx31_3ds.c. Does
-> anybody know how similar the different debug boards for the 3ds boards
-> are? ATM we only have the mx31_3ds with debug board support in the
-> kernel. This could be the moment to go for a arch/arm/plat-mxc/3ds-debugboard.c
+From: Eric B?nard <eric@eukrea.com>
+Date: Sat, 29 May 2010 22:04:50 +0200
 
-All debug boards are the same h/w design. The CPLD program has changed
-for muxed addr and data bus support on MX51, but it retains
-compatibility with other boards. The interface mode is set automatically
-by signals tied off on the personality board, so there are no s/w
-differences. 
+> * in the actual driver, calling fec_stop and fec_enet_init doesn't
+> allow to have a working network interface at resume (where a
+> ifconfig down and up is required to recover the interface)
+> * by using fec_enet_close and fec_enet_open, this patch solves this
+> problem and handle the case where the link changed between suspend
+> and resume
+> * this patch also disable clock at suspend and reenable it at resume
+> 
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
 
-Rob
+Applied, thanks.
