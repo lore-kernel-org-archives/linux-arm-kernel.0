@@ -1,139 +1,78 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 02 Jun 2010 17:48:58 +0100
-Subject: [PATCH v2 4/4] ARM: Synchronise the I and D caches via set_pte_at()
-	on SMP systems
-In-Reply-To: <20100602164459.17783.9741.stgit@e102109-lin.cambridge.arm.com>
-References: <20100602164459.17783.9741.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100602164858.17783.30961.stgit@e102109-lin.cambridge.arm.com>
+From: randy.dunlap@oracle.com (Randy Dunlap)
+Date: Wed, 02 Jun 2010 09:49:46 -0700
+Subject: [TEMP PATCH] Re: make ARM=arm menuconfig problem in mainline
+In-Reply-To: <AANLkTilpzeYVExQfLgpVmS3bPvb_h3kmWaatidekI-0r@mail.gmail.com>
+References: <AANLkTikC61Y9g-WbqwgGDghDSy2XtgraFSRoZYkHRGTG@mail.gmail.com>	<AANLkTilEYHVHJrj_KgF48OYCSEUcsKLi57Q_Y73d9va-@mail.gmail.com>	<20100602085748.6771e025.randy.dunlap@oracle.com>
+	<AANLkTilpzeYVExQfLgpVmS3bPvb_h3kmWaatidekI-0r@mail.gmail.com>
+Message-ID: <4C068BAA.4030004@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On SMP systems, there is a small chance of a PTE becoming visible to a
-different CPU before the cache maintenance operations in
-update_mmu_cache(). This patch follows the IA-64 and PowerPC approach of
-synchronising the I and D caches via the set_pte_at() function. In this
-case, there is no need for update_mmu_cache() to be implemented since
-lazy cache flushing is already handled by the time this function is
-called.
+On 06/02/10 09:08, Nobin Mathew wrote:
+> 
+> On Wed, Jun 2, 2010 at 9:27 PM, Randy Dunlap <randy.dunlap@oracle.com> wrote:
+>> On Wed, 2 Jun 2010 20:04:28 +0530 Nobin Mathew wrote:
+>>
+>>> adding linux-arm-kernel at lists.infradead.org
+>>>
+>>> Hi,
+>>>
+>>> The following entry creates problem in ARM System type menu. I am
+>>> using a Fedora 12 system.
+>>
+>> What kind of problem does it create?
+>> It seems to work for me (on f11, not f12).
+>> Does it have something to do with F12 specifically?
+>>
+>>
+>>> Length of bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440,
+>>> S3C2442, S3C2443, S3C2450" is the problem. How can I fix it.
+>>
+>> Describe the problem, please.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+[please don't top-post]
+
+> Sorry if attachments are not allowed, when I go to select ARM system
+> type(OMAP, Davinci etc), I am not seeing any entries there in the pop
+> up window. When I remove  bool "Samsung S3C2410, S3C2412, S3C2413,
+> S3C2416, S3C2440,
+>>> S3C2442, S3C2443, S3C2450"  it is working fine. I feel it is something to do with length of that string.
+> 
+> Thanks
+> Nobin
+
+
+OK, I see that now.  Well, it is some kind of problem.
+Adding cc to linux-kbuild mailing list.
+
+
+The patch below fixes the problem temporarily, but the bool string length does
+seem to be a problem.
+
+Thanks for your report.
+
+-- 
+From: Randy Dunlap <randy.dunlap@oracle.com>
+
+The bool "long string" causes the choices not to be displayed,
+so temporarily change it to a shorter string until a real fix
+is found.
+
+Signed-off-by: Randy Dunlap <randy.dunlap@oracle.com>
+Reported-by: Nobin Mathew <nobin.mathew@gmail.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/include/asm/pgtable.h  |   25 ++++++++++++++++++++++---
- arch/arm/include/asm/tlbflush.h |   10 +++++++++-
- arch/arm/mm/fault-armv.c        |    2 ++
- arch/arm/mm/flush.c             |   15 +++++++++++++++
- 4 files changed, 48 insertions(+), 4 deletions(-)
+ arch/arm/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index ab68cf1..a3752f5 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -278,9 +278,24 @@ extern struct page *empty_zero_page;
+--- linux-next-20100602.orig/arch/arm/Kconfig
++++ linux-next-20100602/arch/arm/Kconfig
+@@ -629,7 +629,7 @@ config ARCH_SA1100
+ 	  Support for StrongARM 11x0 based boards.
  
- #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
- 
--#define set_pte_at(mm,addr,ptep,pteval) do { \
--	set_pte_ext(ptep, pteval, (addr) >= TASK_SIZE ? 0 : PTE_EXT_NG); \
-- } while (0)
-+#ifndef CONFIG_SMP
-+static inline void __sync_icache_dcache(pte_t pteval)
-+{
-+}
-+#else
-+extern void __sync_icache_dcache(pte_t pteval);
-+#endif
-+
-+static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
-+			      pte_t *ptep, pte_t pteval)
-+{
-+	if (addr >= TASK_SIZE)
-+		set_pte_ext(ptep, pteval, 0);
-+	else {
-+		__sync_icache_dcache(pteval);
-+		set_pte_ext(ptep, pteval, PTE_EXT_NG);
-+	}
-+}
- 
- /*
-  * The following only work if pte_present() is true.
-@@ -292,6 +307,10 @@ extern struct page *empty_zero_page;
- #define pte_young(pte)		(pte_val(pte) & L_PTE_YOUNG)
- #define pte_special(pte)	(0)
- 
-+#define pte_present_exec_user(pte) \
-+	((pte_val(pte) & (L_PTE_PRESENT | L_PTE_EXEC | L_PTE_USER)) == \
-+	 (L_PTE_PRESENT | L_PTE_EXEC | L_PTE_USER))
-+
- #define PTE_BIT_FUNC(fn,op) \
- static inline pte_t pte_##fn(pte_t pte) { pte_val(pte) op; return pte; }
- 
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index 40a7092..6aabedd 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -554,10 +554,18 @@ extern void flush_tlb_kernel_range(unsigned long start, unsigned long end);
- /*
-  * If PG_dcache_clean is not set for the page, we need to ensure that any
-  * cache entries for the kernels virtual memory range are written
-- * back to the page.
-+ * back to the page. On SMP systems, the cache coherency is handled in the
-+ * set_pte_at() function.
-  */
-+#ifndef CONFIG_SMP
- extern void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
- 	pte_t *ptep);
-+#else
-+static inline void update_mmu_cache(struct vm_area_struct *vma,
-+				    unsigned long addr, pte_t *ptep)
-+{
-+}
-+#endif
- 
- #endif
- 
-diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
-index 91a691f..030f1da 100644
---- a/arch/arm/mm/fault-armv.c
-+++ b/arch/arm/mm/fault-armv.c
-@@ -28,6 +28,7 @@
- 
- static unsigned long shared_pte_mask = L_PTE_MT_BUFFERABLE;
- 
-+#ifndef CONFIG_SMP
- /*
-  * We take the easy way out of this problem - we make the
-  * PTE uncacheable.  However, we leave the write buffer on.
-@@ -177,6 +178,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
- 			__flush_icache_all();
- 	}
- }
-+#endif	/* !CONFIG_SMP */
- 
- /*
-  * Check whether the write buffer has physical address aliasing
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 6f55e36..2d08a5e 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -212,6 +212,21 @@ static void __flush_dcache_aliases(struct address_space *mapping, struct page *p
- 	flush_dcache_mmap_unlock(mapping);
- }
- 
-+#ifdef CONFIG_SMP
-+void __sync_icache_dcache(pte_t pteval)
-+{
-+	unsigned long pfn = pte_pfn(pteval);
-+
-+	if (pfn_valid(pfn) && pte_present_exec_user(pteval)) {
-+		struct page *page = pfn_to_page(pfn);
-+
-+		if (!test_and_set_bit(PG_dcache_clean, &page->flags))
-+			__flush_dcache_page(NULL, page);
-+		__flush_icache_all();
-+	}
-+}
-+#endif
-+
- /*
-  * Ensure cache coherency between kernel mapping and userspace mapping
-  * of this page.
+ config ARCH_S3C2410
+-	bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442, S3C2443, S3C2450"
++	bool "Samsung S3C24xx"
+ 	select GENERIC_GPIO
+ 	select ARCH_HAS_CPUFREQ
+ 	select HAVE_CLK
