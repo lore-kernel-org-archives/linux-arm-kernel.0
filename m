@@ -1,88 +1,28 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 02 Jun 2010 13:51:51 +0400
-Subject: [PATCH 4/4] pata_samsung: Add Samsung PATA controller driver
-In-Reply-To: <002a01cb01fd$4cf10a50$e6d31ef0$%kim@samsung.com>
-References: <1274948524-2970-1-git-send-email-kgene.kim@samsung.com>
-	<1274948524-2970-5-git-send-email-kgene.kim@samsung.com>
-	<4BFE46C4.5030007@mvista.com>
-	<002a01cb01fd$4cf10a50$e6d31ef0$%kim@samsung.com>
-Message-ID: <4C0629B7.4060300@ru.mvista.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 2 Jun 2010 11:55:58 +0200
+Subject: [PATCH 0/3] Support for three IXP425 based boards
+Message-ID: <cover.1275415521.git.richard.cochran@omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+This patch series adds support for three IXP425 based boards from
+OMICRON electronics GmbH. The code has been adapted from the IXDP425
+and the NSLU boards.
 
-Kukjin Kim wrote:
+Richard Cochran (3):
+  ixp4xx: support the OMICRON DEVIXP board
+  ixp4xx: support the OMICRON MICCPT board
+  ixp4xx: support the OMICRON MIC256 board
 
->>> From: Abhilash Kesavan <a.kesavan@samsung.com>
->>> Adds support for the Samsung PATA controller. This driver is based on the
->>> Libata subsystem and references the earlier patches sent for IDE subsystem.
-
-    Where I those I wonder? :-)
-    It's a pity they didn't get accepted.
-
->>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
->>> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-
-[...]
-
->>> +		for (i = 0; i < words; i++, temp_addr++) {
->>> +			wait_for_host_ready(info);
->>> +			writel(*temp_addr, data_addr);
->>> +		}
->>> +	}
-
->>     Well, if this is pere CF case, 'buflen' can't be odd, but otherwise
-
-    I meant to type "pure". :-)
-
->> you should handle that case...
-
->>> +	uint pio_teoc[5] = { 240, 43, 10, 70, 25 };
-
->>     What timing is this? :-O
-
-> Should have been t2i rec.
-
-    If it's t2i timing, it is incorrect for the first 3 PIO modes.
-
->>> +	if (cpu_type == TYPE_S3C6400) {
->>> +		ap->ops = &pata_s3c_port_ops;
->>> +		info->sfr_addr = info->ide_addr + 0x1800;
->>> +		info->ide_addr = info->ide_addr + 0x1900;
->>> +		info->fifo_status_reg = 0x94;
->>> +	} else if (cpu_type == TYPE_S5PC100) {
->>> +		ap->ops = &pata_s5p_port_ops;
->>> +		info->sfr_addr = info->ide_addr + 0x1800;
->>> +		info->ide_addr = info->ide_addr + 0x1900;
-
->>     Does make sense to assign those before *if*.
-
-> Offsets not required for S5PV210/S5PC110.
-
-    pata_s3c_tune_chipset() certainly requires them.
-
->>> +		info->fifo_status_reg = 0x84;
->>> +	} else {
->>> +		ap->ops = &pata_s5p_port_ops;
-
->>     You don't assign 'info->ide_addr' here but you'll need it in
->> pata_s3c_tune_chipset() which will be called thru pata_s5p_port_ops!
-
-> The address received at ioremap() is enough for S5PV210/S5PC110..no offset
-> needed.
-
-    I only have to restate that pata_s3c_tune_chipset() does use 
-'info->ide_addr'. Maybe you shouldn't install this method for S5PV210/S5PC110? 
-Or do you mean thgat offset of 0 will work?
-
->>> +release_mem:
->>> +	release_mem_region(res->start, res->end - res->start + 1);
-
->>     But you didn't call request_mem_region()!
-
-> I didn't..will remove.
-
-    But you should call request_mem_region() in one or another form...
-
-MBR, Sergei
+ arch/arm/mach-ixp4xx/Kconfig                   |   22 +++
+ arch/arm/mach-ixp4xx/Makefile                  |    4 +
+ arch/arm/mach-ixp4xx/devixp-setup.c            |  225 ++++++++++++++++++++++++
+ arch/arm/mach-ixp4xx/include/mach/uncompress.h |    3 +-
+ arch/arm/mach-ixp4xx/mic256-setup.c            |  220 +++++++++++++++++++++++
+ arch/arm/mach-ixp4xx/miccpt-pci.c              |   78 ++++++++
+ arch/arm/mach-ixp4xx/miccpt-setup.c            |  221 +++++++++++++++++++++++
+ 7 files changed, 772 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-ixp4xx/devixp-setup.c
+ create mode 100644 arch/arm/mach-ixp4xx/mic256-setup.c
+ create mode 100644 arch/arm/mach-ixp4xx/miccpt-pci.c
+ create mode 100644 arch/arm/mach-ixp4xx/miccpt-setup.c
