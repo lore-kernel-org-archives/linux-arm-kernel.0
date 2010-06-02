@@ -1,32 +1,37 @@
-From: jason77.wang@gmail.com (jason wang)
-Date: Wed, 2 Jun 2010 22:29:48 +0800
-Subject: [PATCH 3/3] mx51/clock: add keypad clock definition and
-	registration
-References: <1275405043-18230-1-git-send-email-jason77.wang@gmail.com>
-	<1275405043-18230-2-git-send-email-jason77.wang@gmail.com>
-	<1275405043-18230-3-git-send-email-jason77.wang@gmail.com>
-	<1275405043-18230-4-git-send-email-jason77.wang@gmail.com>
-	<20100602080054.GL2346@matterhorn.lan>
-Message-ID: <003c01cb0260$162f36a0$9b00a8c0@wuef10f27ebed8>
+From: nobin.mathew@gmail.com (Nobin Mathew)
+Date: Wed, 2 Jun 2010 20:04:28 +0530
+Subject: make ARM=arm menuconfig problem in mainline
+In-Reply-To: <AANLkTikC61Y9g-WbqwgGDghDSy2XtgraFSRoZYkHRGTG@mail.gmail.com>
+References: <AANLkTikC61Y9g-WbqwgGDghDSy2XtgraFSRoZYkHRGTG@mail.gmail.com>
+Message-ID: <AANLkTilEYHVHJrj_KgF48OYCSEUcsKLi57Q_Y73d9va-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<snip>
+adding linux-arm-kernel at lists.infradead.org
 
->>  _REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
->> + _REGISTER_CLOCK(NULL, "kpp", kpp_clk)
-> 
-> Should be
-> 
-> _REGISTER_CLOCK("imx-keypad", NULL, kpp_clk)
-> 
-> since that is the device id that will be used in your platform device.
->
-Accept, will be fixed in V2.
+Hi,
 
-Thanks,
-Jason. 
-> -- 
-> ----------------------------------------------------------------------
-> Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-> ----------------------------------------------------------------------
+The following entry creates problem in ARM System type menu. I am
+using a Fedora 12 system.
+
+Length of bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440,
+S3C2442, S3C2443, S3C2450" is the problem. How can I fix it.
+
+config ARCH_S3C2410
+? ? ? ?bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440,
+S3C2442, S3C2443, S3C2450"
+? ? ? ?select GENERIC_GPIO
+? ? ? ?select ARCH_HAS_CPUFREQ
+? ? ? ?select HAVE_CLK
+? ? ? ?select ARCH_USES_GETTIMEOFFSET
+? ? ? ?help
+? ? ? ? ?Samsung S3C2410X CPU based systems, such as the Simtec Electronics
+? ? ? ? ?BAST (<http://www.simtec.co.uk/products/EB110ITX/>), the IPAQ 1940 or
+? ? ? ? ?the Samsung SMDK2410 development board (and derivatives).
+
+? ? ? ? ?Note, the S3C2416 and the S3C2450 are so close that they even share
+? ? ? ? ?the same SoC ID code. This means that there is no seperate machine
+? ? ? ? ?directory (no arch/arm/mach-s3c2450) as the S3C2416 was first.
+
+Thanks
+Nobin
