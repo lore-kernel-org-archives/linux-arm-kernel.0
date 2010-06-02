@@ -1,79 +1,62 @@
-From: weber@corscience.de (Thomas Weber)
-Date: Wed,  2 Jun 2010 13:37:46 +0200
-Subject: [PATCHv2 06/11] OMAP2: Devkit8000: Remove non existing vsim supply
-In-Reply-To: <1275478671-24563-1-git-send-email-weber@corscience.de>
-References: <1275478671-24563-1-git-send-email-weber@corscience.de>
-Message-ID: <1275478671-24563-7-git-send-email-weber@corscience.de>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Wed, 02 Jun 2010 19:56:44 +0800
+Subject: [RFC,PATCH 0/2] Common struct clk implementation, v3
+Message-ID: <1275479804.137633.565764505843.0.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Devkit8000 uses the cost reduced variant tps65930 of the twl4030.
-The TPS65930 only has vdd1, vdd2, vpll1, vio, vmmc1, vdac and vaux2.
+Hi all,
 
-vaux2 is not used on Devkit8000.
+These patches are an attempt to allow platforms to share clock code. At
+present, the definitions of 'struct clk' are local to platform code,
+which makes allocating and initialising cross-platform clock sources
+difficult, and makes it impossible to compile a single image containing
+support for two ARM platforms with different struct clks.
 
-Signed-off-by: Thomas Weber <weber@corscience.de>
+The two patches are for the architecture-independent kernel code,
+introducing the common clk infrastructure. The changelog for the first
+patch includes details about the new clock definitions.
+
+As requested by rmk, I've put together a small series of patches
+illustrating the usage of the common struct clock on the ARM imx51
+platform. These are available in my git tree:
+
+ git://kernel.ubuntu.com/jk/dt/linux-2.6
+
+in the clk-common-mx51 branch (clk-common..clk-common-mx51).
+
+The approach I've taken with the imx51 port is to temporarly duplicate
+the platform-common clock code (ie, for all mxc-based boards) to enable
+usage of the common struct clk on one machine (imx51), while leaving the
+others as-is. For a proper platform-wide usage of the common struct clk,
+we'd be better off doing the whole platform at once. However, mx51 is
+the only mxc-based HW I have, hence the duplicated example port.
+
+In the example port, the first change simply converts the mxc's struct
+clk to a struct clk_mxc, using the new API.  The subsequent patches move
+certain clocks to more specific data structures (eg clk_fixed and
+clk_pll) where possible.
+
+Ben Herrenschmidt is looking at using common struct clk code for powerpc
+too, hence the kernel-wide approach.
+
+Comments most welcome.
+
+Cheers,
+
+
+Jeremy
+
+--
+v3:
+ * do clock usage refcounting in common code
+ * provide sample port
+
+v2:
+ * no longer ARM-specific
+ * use clk_operations
+
 ---
- arch/arm/mach-omap2/board-devkit8000.c |   22 ----------------------
- 1 files changed, 0 insertions(+), 22 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-index 8cc8c3b..59877b1 100644
---- a/arch/arm/mach-omap2/board-devkit8000.c
-+++ b/arch/arm/mach-omap2/board-devkit8000.c
-@@ -168,15 +168,10 @@ static void devkit8000_panel_disable_tv(struct omap_dss_device *dssdev)
- {
- }
- 
--
- static struct regulator_consumer_supply devkit8000_vmmc1_supply = {
- 	.supply			= "vmmc",
- };
- 
--static struct regulator_consumer_supply devkit8000_vsim_supply = {
--	.supply			= "vmmc_aux",
--};
--
- /* ads7846 on SPI */
- static struct regulator_consumer_supply devkit8000_vio_supplies[] = {
- 	REGULATOR_SUPPLY("vcc", "spi2.0")
-@@ -281,7 +276,6 @@ static int devkit8000_twl_gpio_setup(struct device *dev,
- 
- 	/* link regulators to MMC adapters */
- 	devkit8000_vmmc1_supply.dev = mmc[0].dev;
--	devkit8000_vsim_supply.dev = mmc[0].dev;
- 
- 	/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
- 	gpio_leds[2].gpio = gpio + TWL4030_GPIO_MAX + 1;
-@@ -334,21 +328,6 @@ static struct regulator_init_data devkit8000_vmmc1 = {
- 	.consumer_supplies	= &devkit8000_vmmc1_supply,
- };
- 
--/* VSIM for MMC1 pins DAT4..DAT7 (2 mA, plus card == max 50 mA) */
--static struct regulator_init_data devkit8000_vsim = {
--	.constraints = {
--		.min_uV			= 1800000,
--		.max_uV			= 3000000,
--		.valid_modes_mask	= REGULATOR_MODE_NORMAL
--					| REGULATOR_MODE_STANDBY,
--		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
--					| REGULATOR_CHANGE_MODE
--					| REGULATOR_CHANGE_STATUS,
--	},
--	.num_consumer_supplies	= 1,
--	.consumer_supplies	= &devkit8000_vsim_supply,
--};
--
- /* VDAC for DSS driving S-Video (8 mA unloaded, max 65 mA) */
- static struct regulator_init_data devkit8000_vdac = {
- 	.constraints = {
-@@ -414,7 +393,6 @@ static struct twl4030_platform_data devkit8000_twldata = {
- 	.gpio		= &devkit8000_gpio_data,
- 	.codec		= &devkit8000_codec_data,
- 	.vmmc1		= &devkit8000_vmmc1,
--	.vsim		= &devkit8000_vsim,
- 	.vdac		= &devkit8000_vdac,
- 	.vpll1		= &devkit8000_vpll1,
- 	.vio		= &devkit8000_vio,
--- 
-1.7.1
+Jeremy Kerr (2):
+      Add a common struct clk
+      clk: Generic support for fixed-rate clocks
