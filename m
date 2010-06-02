@@ -1,24 +1,29 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 02 Jun 2010 06:13:44 -0700 (PDT)
-Subject: [PATCH v2] net/fec: fix pm to survive to suspend/resume
-In-Reply-To: <1275163490-13027-1-git-send-email-eric@eukrea.com>
-References: <20100529.001534.57459102.davem@davemloft.net>
-	<1275163490-13027-1-git-send-email-eric@eukrea.com>
-Message-ID: <20100602.061344.129778393.davem@davemloft.net>
+From: jason77.wang@gmail.com (jason wang)
+Date: Wed, 2 Jun 2010 21:53:26 +0800
+Subject: [PATCH 1/3] mxc: Add support for the imx51 3-stack board
+References: <82469.38984.qm@web51002.mail.re2.yahoo.com>
+Message-ID: <002101cb025b$0775a0e0$9b00a8c0@wuef10f27ebed8>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric B?nard <eric@eukrea.com>
-Date: Sat, 29 May 2010 22:04:50 +0200
+>Hi Jason,
 
-> * in the actual driver, calling fec_stop and fec_enet_init doesn't
-> allow to have a working network interface at resume (where a
-> ifconfig down and up is required to recover the interface)
-> * by using fec_enet_close and fec_enet_open, this patch solves this
-> problem and handle the case where the link changed between suspend
-> and resume
-> * this patch also disable clock at suspend and reenable it at resume
-> 
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
+>--- On Tue, 6/1/10, Jason Wang <jason77.wang@gmail.com> wrote:
+>...
+>> +static void __init mx51_3ds_timer_init(void)
+>> +{
+>> + mx51_clocks_init(32768, 24000000, 22579200, 24576000)
 
-Applied, thanks.
+>This should be:
+
+>mx51_clocks_init(32768, 24000000, 22579200, 0)
+Hi Fabio,
+Thanks for your comments, you are right, i checked schematic, the CKIH2 pin is floating.
+I will fix it in V2.
+
+Thanks,
+Jason.
+
+>Regards,
+
+>Fabio Estevam
