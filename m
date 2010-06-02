@@ -1,49 +1,50 @@
 From: weber@corscience.de (Thomas Weber)
-Date: Wed,  2 Jun 2010 13:37:47 +0200
-Subject: [PATCHv2 07/11] OMAP2: Devkit8000: Remove en-/disable for tv panel
+Date: Wed,  2 Jun 2010 13:37:50 +0200
+Subject: [PATCHv2 10/11] OMAP2: Devkit8000: Remove unused omap_board_config
 In-Reply-To: <1275478671-24563-1-git-send-email-weber@corscience.de>
 References: <1275478671-24563-1-git-send-email-weber@corscience.de>
-Message-ID: <1275478671-24563-8-git-send-email-weber@corscience.de>
+Message-ID: <1275478671-24563-11-git-send-email-weber@corscience.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devkit8000_panel_enable_tv and devkit8000_panel_disable_tv are already
-done in DSS2 code. So they are no longer needed in board code.
+omap_board_config is no longer used and thats why empty.
+This patch removes the empty omap_board_config.
 
 Signed-off-by: Thomas Weber <weber@corscience.de>
 ---
- arch/arm/mach-omap2/board-devkit8000.c |   12 ------------
- 1 files changed, 0 insertions(+), 12 deletions(-)
+ arch/arm/mach-omap2/board-devkit8000.c |    6 ------
+ 1 files changed, 0 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-index 59877b1..095dc7a 100644
+index dbd16de..a485d39 100644
 --- a/arch/arm/mach-omap2/board-devkit8000.c
 +++ b/arch/arm/mach-omap2/board-devkit8000.c
-@@ -158,16 +158,6 @@ static void devkit8000_panel_disable_dvi(struct omap_dss_device *dssdev)
- 		gpio_set_value(dssdev->reset_gpio, 0);
- }
- 
--static int devkit8000_panel_enable_tv(struct omap_dss_device *dssdev)
--{
--
--	return 0;
--}
--
--static void devkit8000_panel_disable_tv(struct omap_dss_device *dssdev)
--{
--}
--
- static struct regulator_consumer_supply devkit8000_vmmc1_supply = {
- 	.supply			= "vmmc",
+@@ -126,8 +126,6 @@ static struct omap2_hsmmc_info mmc[] = {
+ 	},
+ 	{}	/* Terminator */
  };
-@@ -201,8 +191,6 @@ static struct omap_dss_device devkit8000_tv_device = {
- 	.driver_name            = "venc",
- 	.type                   = OMAP_DISPLAY_TYPE_VENC,
- 	.phy.venc.type          = OMAP_DSS_VENC_TYPE_SVIDEO,
--	.platform_enable        = devkit8000_panel_enable_tv,
--	.platform_disable       = devkit8000_panel_disable_tv,
- };
+-static struct omap_board_config_kernel devkit8000_config[] __initdata = {
+-};
  
+ static int devkit8000_panel_enable_lcd(struct omap_dss_device *dssdev)
+ {
+@@ -464,8 +462,6 @@ static struct platform_device keys_gpio = {
  
+ static void __init devkit8000_init_irq(void)
+ {
+-	omap_board_config = devkit8000_config;
+-	omap_board_config_size = ARRAY_SIZE(devkit8000_config);
+ 	omap2_init_common_hw(mt46h32m32lf6_sdrc_params,
+ 			     mt46h32m32lf6_sdrc_params);
+ 	omap_init_irq();
+@@ -797,8 +793,6 @@ static void __init devkit8000_init(void)
+ 	devkit8000_i2c_init();
+ 	platform_add_devices(devkit8000_devices,
+ 			ARRAY_SIZE(devkit8000_devices));
+-	omap_board_config = devkit8000_config;
+-	omap_board_config_size = ARRAY_SIZE(devkit8000_config);
+ 
+ 	spi_register_board_info(devkit8000_spi_board_info,
+ 	ARRAY_SIZE(devkit8000_spi_board_info));
 -- 
 1.7.1
