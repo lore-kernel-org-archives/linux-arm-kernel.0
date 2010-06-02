@@ -1,11 +1,14 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed,  2 Jun 2010 10:40:48 +0300
-Subject: [PATCH 3/5] [ARM] pxa: add PXA310 specific ULPI implementation
-In-Reply-To: <1275464450-23003-3-git-send-email-grinberg@compulab.co.il>
+Date: Wed,  2 Jun 2010 10:40:50 +0300
+Subject: [PATCH 5/5] [ARM] pxa/cm-x300: enable USB host port 2 on CM-X300 with
+	PXA310 cpu.
+In-Reply-To: <1275464450-23003-5-git-send-email-grinberg@compulab.co.il>
 References: <1275464450-23003-1-git-send-email-grinberg@compulab.co.il>
 	<1275464450-23003-2-git-send-email-grinberg@compulab.co.il>
 	<1275464450-23003-3-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1275464450-23003-4-git-send-email-grinberg@compulab.co.il>
+	<1275464450-23003-4-git-send-email-grinberg@compulab.co.il>
+	<1275464450-23003-5-git-send-email-grinberg@compulab.co.il>
+Message-ID: <1275464450-23003-6-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,186 +16,166 @@ List-Id: linux-arm-kernel.lists.infradead.org
 Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
 Signed-off-by: Mike Rapoport <mike@compulab.co.il>
 ---
- arch/arm/mach-pxa/Kconfig                    |    4 +
- arch/arm/mach-pxa/Makefile                   |    1 +
- arch/arm/mach-pxa/include/mach/pxa310-ulpi.h |   19 +++++
- arch/arm/mach-pxa/pxa310-ulpi.c              |  110 ++++++++++++++++++++++++++
- 4 files changed, 134 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-pxa/include/mach/pxa310-ulpi.h
- create mode 100644 arch/arm/mach-pxa/pxa310-ulpi.c
+ arch/arm/mach-pxa/cm-x300.c |  102 +++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 102 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index 5b6ee46..3c54cf0 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -616,6 +616,7 @@ config CPU_PXA300
- config CPU_PXA310
- 	bool
- 	select CPU_PXA300
-+	select PXA310_ULPI if USB_ULPI
- 	help
- 	  PXA310 (codename Monahans-LV)
+diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
+index d37cfa1..87ffb38 100644
+--- a/arch/arm/mach-pxa/cm-x300.c
++++ b/arch/arm/mach-pxa/cm-x300.c
+@@ -19,6 +19,7 @@
+ #include <linux/init.h>
+ #include <linux/delay.h>
+ #include <linux/platform_device.h>
++#include <linux/clk.h>
  
-@@ -681,4 +682,7 @@ config PXA_HAVE_BOARD_IRQS
- config PXA_HAVE_ISA_IRQS
- 	bool
+ #include <linux/gpio.h>
+ #include <linux/dm9000.h>
+@@ -35,6 +36,9 @@
+ #include <linux/spi/spi_gpio.h>
+ #include <linux/spi/tdo24m.h>
  
-+config PXA310_ULPI
-+	bool
-+
- endif
-diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
-index 86bc87b..4ab51dd 100644
---- a/arch/arm/mach-pxa/Makefile
-+++ b/arch/arm/mach-pxa/Makefile
-@@ -21,6 +21,7 @@ obj-$(CONFIG_PXA25x)		+= mfp-pxa2xx.o pxa2xx.o pxa25x.o
- obj-$(CONFIG_PXA27x)		+= mfp-pxa2xx.o pxa2xx.o pxa27x.o
- obj-$(CONFIG_PXA3xx)		+= mfp-pxa3xx.o pxa3xx.o smemc.o
- obj-$(CONFIG_CPU_PXA300)	+= pxa300.o
-+obj-$(CONFIG_PXA310_ULPI)	+= pxa310-ulpi.o
- obj-$(CONFIG_CPU_PXA320)	+= pxa320.o
- obj-$(CONFIG_CPU_PXA930)	+= pxa930.o
- 
-diff --git a/arch/arm/mach-pxa/include/mach/pxa310-ulpi.h b/arch/arm/mach-pxa/include/mach/pxa310-ulpi.h
-new file mode 100644
-index 0000000..b0f2062
---- /dev/null
-+++ b/arch/arm/mach-pxa/include/mach/pxa310-ulpi.h
-@@ -0,0 +1,19 @@
-+/*
-+ * PXA310 ULPI USB host header file.
-+ *
-+ * Copyright (C) 2010 CompuLab Ltd.
-+ *
-+ * Igor Grinberg <grinberg@compulab.co.il>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#ifndef __PXA310_ULPI__
-+#define __PXA310_ULPI__
-+
++#include <linux/usb/otg.h>
 +#include <linux/usb/ulpi.h>
 +
-+extern struct otg_io_access_ops pxa310_ulpi_access_ops;
-+
-+#endif /* __PXA310_ULPI__ */
-diff --git a/arch/arm/mach-pxa/pxa310-ulpi.c b/arch/arm/mach-pxa/pxa310-ulpi.c
-new file mode 100644
-index 0000000..14b6a2e
---- /dev/null
-+++ b/arch/arm/mach-pxa/pxa310-ulpi.c
-@@ -0,0 +1,110 @@
-+/*
-+ * linux/arch/arm/mach-pxa/pxa310-ulpi.c
-+ *
-+ * PXA310 ULPI implementation.
-+ *
-+ * Copyright (C) 2010 CompuLab Ltd.
-+ *
-+ * Igor Grinberg <grinberg@compulab.co.il>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/delay.h>
-+#include <linux/clk.h>
-+#include <linux/usb/otg.h>
-+
-+#include <mach/regs-u2d.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/setup.h>
+@@ -47,6 +51,7 @@
+ #include <plat/i2c.h>
+ #include <plat/pxa3xx_nand.h>
+ #include <mach/audio.h>
 +#include <mach/pxa310-ulpi.h>
+ 
+ #include <asm/mach/map.h>
+ 
+@@ -65,6 +70,8 @@
+ #define GPIO97_RTC_RD		(97)
+ #define GPIO98_RTC_IO		(98)
+ 
++#define GPIO127_ULPI_PHY_RST	(127)
 +
-+#define U2DOTGUCR_ADDR_S	(16)
-+#define U2DOTGUCR_WDATA_S	(8)
+ static mfp_cfg_t cm_x3xx_mfp_cfg[] __initdata = {
+ 	/* LCD */
+ 	GPIO54_LCD_LDD_0,
+@@ -470,23 +477,118 @@ static inline void cm_x300_init_mmc(void) {}
+ #endif
+ 
+ #if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
++#if defined(CONFIG_PXA310_ULPI)
++static struct clk *pout_clk;
 +
-+enum u2d_phy_mode {
-+	SYNCH		= 0,
-+	CARKIT		= (1 << 0),
-+	SER_3PIN	= (1 << 1),
-+	SER_6PIN	= (1 << 2),
-+	LOWPOWER	= (1 << 3),
-+};
-+
-+static inline u32 u2d_readl(struct otg_transceiver *otg, u32 off)
-+{
-+	void __iomem *u2d_mmio_base = otg->io_priv;
-+
-+	return __raw_readl(u2d_mmio_base + off);
-+}
-+
-+static inline void u2d_writel(struct otg_transceiver *otg, u32 off, u32 val)
-+{
-+	void __iomem *u2d_mmio_base = otg->io_priv;
-+
-+	__raw_writel(val, u2d_mmio_base + off);
-+}
-+
-+static inline enum u2d_phy_mode ulpi_get_phymode(struct otg_transceiver *otg)
-+{
-+	return (u2d_readl(otg, U2DOTGUSR) & 0xF0000000) >> 28;
-+}
-+
-+static int ulpi_poll(struct otg_transceiver *otg)
-+{
-+	int timeout = 50000;
-+
-+	while (timeout--) {
-+		if (!(u2d_readl(otg, U2DOTGUCR) & U2DOTGUCR_RUN))
-+			return 0;
-+
-+		cpu_relax();
-+	}
-+
-+	pr_warning("%s: ULPI access timed out!\n", __func__);
-+
-+	return -ETIMEDOUT;
-+}
-+
-+static int ulpi_read(struct otg_transceiver *otg, u32 reg)
++static int cm_x300_ulpi_clk_enable(void)
 +{
 +	int err;
 +
-+	if (ulpi_get_phymode(otg)) {
-+		pr_warning("%s: PHY is not in SYNCH mode!\n", __func__);
-+		return -EBUSY;
++	/* CLK_POUT is connected to the ULPI PHY */
++	pout_clk = clk_get(NULL, "CLK_POUT");
++	if (IS_ERR(pout_clk)) {
++		err = PTR_ERR(pout_clk);
++		pr_err("%s: failed to get CLK_POUT: %d\n", __func__, err);
++		return err;
++	}
++	clk_enable(pout_clk);
++
++	return 0;
++}
++
++static inline void cm_x300_ulpi_clk_disable(void)
++{
++	if (!IS_ERR(pout_clk)) {
++		clk_disable(pout_clk);
++		clk_put(pout_clk);
++	}
++}
++
++static int cm_x300_ulpi_phy_reset(void)
++{
++	int err;
++
++	/* reset the PHY */
++	err = gpio_request(GPIO127_ULPI_PHY_RST, "ulpi reset");
++	if (err) {
++		pr_err("%s: failed to request ULPI reset GPIO: %d\n",
++		       __func__, err);
++		return err;
 +	}
 +
-+	u2d_writel(otg, U2DOTGUCR,
-+		   U2DOTGUCR_RUN | U2DOTGUCR_RNW | (reg << U2DOTGUCR_ADDR_S));
-+	msleep(5);
++	gpio_direction_output(GPIO127_ULPI_PHY_RST, 0);
++	msleep(10);
++	gpio_set_value(GPIO127_ULPI_PHY_RST, 1);
++	msleep(10);
 +
-+	err = ulpi_poll(otg);
++	gpio_free(GPIO127_ULPI_PHY_RST);
++
++	return 0;
++}
++
++static inline int cm_x300_ulpi_init(void)
++{
++	int err;
++
++	err = cm_x300_ulpi_clk_enable();
 +	if (err)
 +		return err;
 +
-+	return u2d_readl(otg, U2DOTGUCR) & U2DOTGUCR_RDATA;
++	err = cm_x300_ulpi_phy_reset();
++	if (err)
++		pr_err("%s: ULPI PHY init failed!\n", __func__);
++
++	return err;
++}
++#else
++static inline int cm_x300_ulpi_init(void) { return 0; }
++static inline void cm_x300_ulpi_clk_disable(void) {}
++#endif /* CONFIG_PXA310_ULPI */
++
+ static int cm_x300_ohci_init(struct device *dev)
+ {
+ 	if (cpu_is_pxa300())
+ 		UP2OCR = UP2OCR_HXS
+ 			| UP2OCR_HXOE | UP2OCR_DMPDE | UP2OCR_DPPDE;
+ 
++	if (cpu_is_pxa310())
++		cm_x300_ulpi_init();
++
+ 	return 0;
+ }
+ 
++static void cm_x300_ohci_exit(struct device *dev)
++{
++	if (cpu_is_pxa310())
++		cm_x300_ulpi_clk_disable();
 +}
 +
-+static int ulpi_write(struct otg_transceiver *otg, u32 val, u32 reg)
-+{
-+	if (ulpi_get_phymode(otg)) {
-+		pr_warning("%s: PHY is not in SYNCH mode!\n", __func__);
-+		return -EBUSY;
+ static struct pxaohci_platform_data cm_x300_ohci_platform_data = {
+ 	.port_mode	= PMM_PERPORT_MODE,
+ 	.flags		= ENABLE_PORT_ALL | POWER_CONTROL_LOW,
+ 	.init		= cm_x300_ohci_init,
++	.exit		= cm_x300_ohci_exit,
++
++#if defined(CONFIG_PXA310_ULPI)
++	.ulpi_mode	= ULPI_IC_6PIN,
++#endif
+ };
+ 
+ static void __init cm_x300_init_ohci(void)
+ {
++	if (cpu_is_pxa310()) {
++#if defined(CONFIG_PXA310_ULPI)
++		cm_x300_ohci_platform_data.otg =
++			otg_ulpi_create(&pxa310_ulpi_access_ops,
++					USB_OTG_PULLDOWN_DM |
++					USB_OTG_PULLDOWN_DP |
++					USB_OTG_DRV_VBUS,
++					ULPI_IC_6PIN,
++					ULPI_FC_DEFAULT |
++					ULPI_FC_TRM_SEL);
++#endif
 +	}
 +
-+	u2d_writel(otg, U2DOTGUCR, U2DOTGUCR_RUN | (reg << U2DOTGUCR_ADDR_S) |
-+		   (val << U2DOTGUCR_WDATA_S));
-+	msleep(5);
-+
-+	return ulpi_poll(otg);
-+}
-+
-+struct otg_io_access_ops pxa310_ulpi_access_ops = {
-+	.read	= ulpi_read,
-+	.write	= ulpi_write,
-+};
-+EXPORT_SYMBOL_GPL(pxa310_ulpi_access_ops);
+ 	pxa_set_ohci_info(&cm_x300_ohci_platform_data);
+ }
+ #else
 -- 
 1.6.4.4
