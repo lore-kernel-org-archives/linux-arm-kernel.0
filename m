@@ -1,78 +1,27 @@
-From: randy.dunlap@oracle.com (Randy Dunlap)
-Date: Wed, 02 Jun 2010 09:49:46 -0700
-Subject: [TEMP PATCH] Re: make ARM=arm menuconfig problem in mainline
-In-Reply-To: <AANLkTilpzeYVExQfLgpVmS3bPvb_h3kmWaatidekI-0r@mail.gmail.com>
-References: <AANLkTikC61Y9g-WbqwgGDghDSy2XtgraFSRoZYkHRGTG@mail.gmail.com>	<AANLkTilEYHVHJrj_KgF48OYCSEUcsKLi57Q_Y73d9va-@mail.gmail.com>	<20100602085748.6771e025.randy.dunlap@oracle.com>
-	<AANLkTilpzeYVExQfLgpVmS3bPvb_h3kmWaatidekI-0r@mail.gmail.com>
-Message-ID: <4C068BAA.4030004@oracle.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 02 Jun 2010 17:53:52 +0100
+Subject: [PATCH v2 0/4] Patches for -next
+In-Reply-To: <20100602164459.17783.9741.stgit@e102109-lin.cambridge.arm.com>
+References: <20100602164459.17783.9741.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <1275497632.23442.27.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/10 09:08, Nobin Mathew wrote:
-> 
-> On Wed, Jun 2, 2010 at 9:27 PM, Randy Dunlap <randy.dunlap@oracle.com> wrote:
->> On Wed, 2 Jun 2010 20:04:28 +0530 Nobin Mathew wrote:
->>
->>> adding linux-arm-kernel at lists.infradead.org
->>>
->>> Hi,
->>>
->>> The following entry creates problem in ARM System type menu. I am
->>> using a Fedora 12 system.
->>
->> What kind of problem does it create?
->> It seems to work for me (on f11, not f12).
->> Does it have something to do with F12 specifically?
->>
->>
->>> Length of bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440,
->>> S3C2442, S3C2443, S3C2450" is the problem. How can I fix it.
->>
->> Describe the problem, please.
+On Wed, 2010-06-02 at 17:48 +0100, Catalin Marinas wrote:
+> Catalin Marinas (4):
+>       ARM: Remove the domain switching on ARMv6k/v7 CPUs
+>       ARM: Use lazy cache flushing on ARMv7 SMP systems
+>       ARM: Assume new page cache pages have dirty D-cache
+>       ARM: Synchronise the I and D caches via set_pte_at() on SMP systems
 
-[please don't top-post]
+Forgot to mention - for easier testing, these patches are also available
+in my "proposed" branch at:
 
-> Sorry if attachments are not allowed, when I go to select ARM system
-> type(OMAP, Davinci etc), I am not seeing any entries there in the pop
-> up window. When I remove  bool "Samsung S3C2410, S3C2412, S3C2413,
-> S3C2416, S3C2440,
->>> S3C2442, S3C2443, S3C2450"  it is working fine. I feel it is something to do with length of that string.
-> 
-> Thanks
-> Nobin
+http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-2.6-cm.git;a=summary
 
-
-OK, I see that now.  Well, it is some kind of problem.
-Adding cc to linux-kbuild mailing list.
-
-
-The patch below fixes the problem temporarily, but the bool string length does
-seem to be a problem.
-
-Thanks for your report.
+BTW, does anyone know how to get linux-arm-kernel subscribed to
+patchwork.kernel.org? I know we have a patch system but that's only for
+final merging rather than RFC patches.
 
 -- 
-From: Randy Dunlap <randy.dunlap@oracle.com>
-
-The bool "long string" causes the choices not to be displayed,
-so temporarily change it to a shorter string until a real fix
-is found.
-
-Signed-off-by: Randy Dunlap <randy.dunlap@oracle.com>
-Reported-by: Nobin Mathew <nobin.mathew@gmail.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
----
- arch/arm/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
---- linux-next-20100602.orig/arch/arm/Kconfig
-+++ linux-next-20100602/arch/arm/Kconfig
-@@ -629,7 +629,7 @@ config ARCH_SA1100
- 	  Support for StrongARM 11x0 based boards.
- 
- config ARCH_S3C2410
--	bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442, S3C2443, S3C2450"
-+	bool "Samsung S3C24xx"
- 	select GENERIC_GPIO
- 	select ARCH_HAS_CPUFREQ
- 	select HAVE_CLK
+Catalin
