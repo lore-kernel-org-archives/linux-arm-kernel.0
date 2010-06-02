@@ -1,65 +1,104 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 02 Jun 2010 16:49:13 +0400
-Subject: [PATCH 3/4] ARM: cns3xxx: Add support for AHCI controllers
-In-Reply-To: <20100601165540.GC7123@oksana.dev.rtsoft.ru>
-References: <20100601165409.GA29614@oksana.dev.rtsoft.ru>
-	<20100601165540.GC7123@oksana.dev.rtsoft.ru>
-Message-ID: <4C065349.80005@ru.mvista.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Wed, 2 Jun 2010 16:50:27 +0400
+Subject: [PATCH] ARM: Small cleanup for 'config PCI'
+Message-ID: <20100602125027.GA28977@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Simply introduce ARCH_HAS_PCI to avoid the very long 'if' condition
+for PCI Kconfig symbol.
 
-Anton Vorontsov wrote:
+Suggested-by: Ben Dooks <ben@simtec.co.uk>
+Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
+---
 
-> CNS3xxx chips have AHCI-compatible SATA controller. This patch adds
-> the support using generic ahci_platform driver.
+Note that this is on top of the cns3xxx pull request.
 
-> Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
+ arch/arm/Kconfig                 |   11 ++++++++++-
+ arch/arm/mach-integrator/Kconfig |    1 +
+ arch/arm/mach-pxa/Kconfig        |    1 +
+ arch/arm/mach-versatile/Kconfig  |    1 +
+ 4 files changed, 13 insertions(+), 1 deletions(-)
 
-[...]
-
-> diff --git a/arch/arm/mach-cns3xxx/devices.c b/arch/arm/mach-cns3xxx/devices.c
-> index 549ad0c..bf6044b 100644
-> --- a/arch/arm/mach-cns3xxx/devices.c
-> +++ b/arch/arm/mach-cns3xxx/devices.c
-> @@ -14,14 +14,75 @@
->  #include <linux/init.h>
->  #include <linux/compiler.h>
->  #include <linux/delay.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/device.h>
->  #include <linux/platform_device.h>
-> +#include <linux/ahci_platform.h>
->  #include <linux/mmc/host.h>
->  #include <linux/sdhci-pltfm.h>
->  #include "../../../drivers/mmc/host/sdhci.h"
-> +#include "core.h"
->  #include "devices.h"
->  
->  /*
-> + * AHCI
-> + */
-> +static int cns3xxx_ahci_init(struct device *dev)
-> +{
-> +	u32 tmp;
-> +
-> +	tmp = MISC_SATA_POWER_MODE;
-> +	tmp |= 0x1 << 16; /* Disable SATA PHY 0 from SLUMBER Mode */
-> +	tmp |= 0x1 << 17; /* Disable SATA PHY 1 from SLUMBER Mode */
-> +	MISC_SATA_POWER_MODE = tmp;
-> +
-> +	/* Enable SATA PHY */
-> +	cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY0);
-> +	cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY1);
-> +
-> +	/* Enable SATA Clock */
-> +	cns3xxx_pwr_clk_en(0x1 << PM_CLK_GATE_REG_OFFSET_SATA);
-> +
-> +	/* De-Asscer SATA Reset */
-> +	tmp = PM_SOFT_RST_REG;
-> +	tmp |= 0x1 << PM_SOFT_RST_REG_OFFST_SATA;
-
-    You have *REG_OFFSET* everywhere, and *REG_OFFST* here -- a typo?
-
-WBR, Sergei
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index fab2ddd..63cb0a2 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -301,6 +301,7 @@ config ARCH_CNS3XXX
+ 	select CPU_V6
+ 	select GENERIC_CLOCKEVENTS
+ 	select ARM_GIC
++	select ARCH_HAS_PCI
+ 	select PCI_DOMAINS if PCI
+ 	help
+ 	  Support for Cavium Networks CNS3XXX platform.
+@@ -436,6 +437,7 @@ config ARCH_IXP4XX
+ 	select CPU_XSCALE
+ 	select GENERIC_GPIO
+ 	select GENERIC_CLOCKEVENTS
++	select ARCH_HAS_PCI
+ 	select DMABOUNCE if PCI
+ 	help
+ 	  Support for Intel's IXP4XX (XScale) family of processors.
+@@ -523,6 +525,7 @@ config ARCH_KS8695
+ 	select CPU_ARM922T
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_USES_GETTIMEOFFSET
++	select ARCH_HAS_PCI
+ 	help
+ 	  Support for Micrel/Kendin KS8695 "Centaur" (ARM922T) based
+ 	  System-on-Chip devices.
+@@ -1059,8 +1062,14 @@ config ISA_DMA
+ config ISA_DMA_API
+ 	bool
+ 
++config ARCH_HAS_PCI
++	bool
++	help
++	  Architectures should select this option if they want to give
++	  user a choice to enable PCI support.
++
+ config PCI
+-	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB || ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX
++	bool "PCI support" if ARCH_HAS_PCI
+ 	help
+ 	  Find out whether you have a PCI motherboard. PCI is the name of a
+ 	  bus system, i.e. the way the CPU talks to the other stuff inside
+diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
+index 27db275..6116308 100644
+--- a/arch/arm/mach-integrator/Kconfig
++++ b/arch/arm/mach-integrator/Kconfig
+@@ -4,6 +4,7 @@ menu "Integrator Options"
+ 
+ config ARCH_INTEGRATOR_AP
+ 	bool "Support Integrator/AP and Integrator/PP2 platforms"
++	select ARCH_HAS_PCI
+ 	help
+ 	  Include support for the ARM(R) Integrator/AP and
+ 	  Integrator/PP2 platforms.
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index 3b51741..67907f0 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -96,6 +96,7 @@ config MACH_ARMCORE
+ 	select PXA27x
+ 	select IWMMXT
+ 	select PXA25x
++	select ARCH_HAS_PCI
+ 
+ config MACH_EM_X270
+ 	bool "CompuLab EM-x270 platform"
+diff --git a/arch/arm/mach-versatile/Kconfig b/arch/arm/mach-versatile/Kconfig
+index c781f30..2dd4c12 100644
+--- a/arch/arm/mach-versatile/Kconfig
++++ b/arch/arm/mach-versatile/Kconfig
+@@ -4,6 +4,7 @@ menu "Versatile platform type"
+ config ARCH_VERSATILE_PB
+ 	bool "Support Versatile/PB platform"
+ 	select CPU_ARM926T
++	select ARCH_HAS_PCI
+ 	default y
+ 	help
+ 	  Include support for the ARM(R) Versatile/PB platform.
+-- 
+1.7.0.5
