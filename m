@@ -1,34 +1,31 @@
-From: bill_carson@126.com (rocky)
-Date: Thu, 3 Jun 2010 13:55:42 +0800 (CST)
-Subject: Query about arch/arm/boot/compressed/Makefile.debug
-In-Reply-To: <AANLkTinEA_7sFG9WqzETirCY76XIIeicKe3Cw9eQvYwx@mail.gmail.com>
-References: <AANLkTinEA_7sFG9WqzETirCY76XIIeicKe3Cw9eQvYwx@mail.gmail.com>
-	<198ace.57aa.128fc51e27e.Coremail.bill_carson@126.com>
-Message-ID: <13ff02f.5b3c.128fc611d48.Coremail.bill_carson@126.com>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Thu, 03 Jun 2010 14:57:03 +0900
+Subject: [PATCH] i2c: Enable i2c-s3c2410 for S5P cpus
+Message-ID: <1275544623-5425-1-git-send-email-jy0922.shim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Eric
+This i2c controller driver can be used on the S5P series processors too,
+so enable the driver in Konfig for those platforms.
 
->Conduct?a?strict?memory?checking?and?check?the?cache?enabling?code,?normally
->that's?where?the?problem?is.?The?decompressor?itself,?should?be?less?problematic
->since?it's?working?elsewhere?on?most?other?platforms.
+Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/i2c/busses/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-All ARM1176 based SoC share the same cache enable/disable API which defined in arch/arm/boot/compressed/head.S, ARM1176 falls into ARMv7 .
-
-Actually, our DDR run at 800MHz, I'm trying to tune it a little bit lower at 533MHz to see what happened.
-
-thanks for your kind tips.
-
-rocky
-
-
-
-
-
-
-
-
-
-
-?2010-06-03?13:47:00?"Eric?Miao"?<eric.y.miao@gmail.com>????>On?Thu,?Jun?3,?2010?at?1:39?PM,?rocky?<bill_carson@126.com>?wrote:>>?Hi,?all>>?I'm?porting?Linux?to?a?ARM1176?based?SOC,?sometimes?after?running?make?zImage,>>?I?got?CRC?error?when?uncompressing?the?kernel?all?the?time.>>Conduct?a?strict?memory?checking?and?check?the?cache?enabling?code,?normally>that's?where?the?problem?is.?The?decompressor?itself,?should?be?less?problematic>since?it's?working?elsewhere?on?most?other?platforms.>>>>>?no?idea?why?this?should?happened,?i?want?to?use?misc.c?with?STANDALONE_DEBUG?mode,>>?so?how?should?i?use?this?debug?mode?>>>>>>?thanks>>?BR>>?rocky>>>>>>>>?_______________________________________________>>?linux-arm-kernel?mailing?list>>?linux-arm-kernel at lists.infradead.org>>?http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>>
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index 87ab056..4765d62 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -503,7 +503,7 @@ config I2C_PXA_SLAVE
+ 
+ config I2C_S3C2410
+ 	tristate "S3C2410 I2C Driver"
+-	depends on ARCH_S3C2410 || ARCH_S3C64XX
++	depends on ARCH_S3C2410 || ARCH_S3C64XX || PLAT_S5P
+ 	help
+ 	  Say Y here to include support for I2C controller in the
+ 	  Samsung S3C2410 based System-on-Chip devices.
+-- 
+1.7.0.4
