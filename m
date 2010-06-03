@@ -1,67 +1,93 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 3 Jun 2010 10:31:55 +0200
-Subject: [PATCH 2/2] mx31moboard: Add MC13783 power button support
-In-Reply-To: <1275334140-29339-3-git-send-email-philippe.retornaz@epfl.ch>
-References: <1275334140-29339-1-git-send-email-philippe.retornaz@epfl.ch>
-	<1275334140-29339-2-git-send-email-philippe.retornaz@epfl.ch>
-	<1275334140-29339-3-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <20100603083155.GW26820@pengutronix.de>
+Date: Thu, 3 Jun 2010 10:35:22 +0200
+Subject: Please pull mxc patches for -rc
+Message-ID: <20100603083522.GX26820@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philippe,
+Hi Russell,
 
-Please ping me once the LED/Power button support is merged. I'll take
-care of the platform patches.
+please pull the following for -rc.
 
 Sascha
 
-On Mon, May 31, 2010 at 09:29:00PM +0200, Philippe R?tornaz wrote:
-> Add the power-on button on mx31moboard using MC13783 PMIC.
-> 
-> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
-> ---
->  arch/arm/mach-mx3/mach-mx31moboard.c |   10 +++++++++-
->  1 files changed, 9 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
-> index 62b5e40..7a8f078 100644
-> --- a/arch/arm/mach-mx3/mach-mx31moboard.c
-> +++ b/arch/arm/mach-mx3/mach-mx31moboard.c
-> @@ -31,6 +31,7 @@
->  #include <linux/mfd/mc13783.h>
->  #include <linux/spi/spi.h>
->  #include <linux/types.h>
-> +#include <linux/input.h>
->  
->  #include <linux/usb/otg.h>
->  #include <linux/usb/ulpi.h>
-> @@ -262,12 +263,19 @@ static struct mc13783_leds_platform_data moboard_leds = {
->  	.tc2_period = MC13783_LED_PERIOD_10MS,
->  };
->  
-> +static struct mc13783_buttons_platform_data moboard_buttons = {
-> +	.b1on_flags = MC13783_BUTTON_DBNC_750MS | MC13783_BUTTON_ENABLE |
-> +			MC13783_BUTTON_POL_INVERT | MC13783_BUTTON_EMUL_CAD,
-> +	.b1on_key = KEY_POWER,
-> +};
-> +
->  static struct mc13783_platform_data moboard_pmic = {
->  	.regulators = moboard_regulators,
->  	.num_regulators = ARRAY_SIZE(moboard_regulators),
->  	.leds = &moboard_leds,
-> +	.buttons = &moboard_buttons,
->  	.flags = MC13783_USE_REGULATOR | MC13783_USE_RTC |
-> -		MC13783_USE_ADC | MC13783_USE_LED,
-> +		MC13783_USE_ADC | MC13783_USE_LED | MC13783_USE_BUTTON,
->  };
->  
->  static struct spi_board_info moboard_spi_board_info[] __initdata = {
-> -- 
-> 1.6.3.3
-> 
-> 
+The following changes since commit aef4b9aaae1decc775778903922bd0075cce7a88:
 
+  Merge branch 'next' of git://git.kernel.org/pub/scm/linux/kernel/git/benh/powerpc (2010-06-01 14:13:14 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git for-rmk
+
+Amit Kucheria (1):
+      arm: mxc: utilise usecount field in clock operations
+
+Baruch Siach (3):
+      mxc_nand: add support for platform defined partitions
+      mx25: add platform code for imx-keypad
+      mx25pdk: add keypad support
+
+Daniel Mack (4):
+      ARM: mx3: pcm037: remove unused variable
+      ARM: mx3: mx31lilly: fix build error for !CONFIG_USB_ULPI
+      ARM: mx3: mx31lilly: pass mc13783 SPI IRQ pin
+      ARM: mx3: update mx3_defconfig
+
+Dinh Nguyen (2):
+      mx5: Add i2c to Freescale MX51 Babbage HW
+      mx5: Register i2c on Freescale MX51 Babbage HW
+
+Eric B?nard (13):
+      eukrea_mbimx27-baseboard: fix typo in display name
+      eukrea_mbimx27-baseboard: add generic-bl and platform-lcd controls
+      eukrea_mbimx27-baseboard: add timings for DVI output
+      cpuimx27 and mbimx27: allow fine control of UART4 and SDHC2 usage
+      mach-cpuimx27: fix QuadUART's IRQ typo in pins'setup
+      eukrea_mbimx27: fix ADS7846 support
+      mach-cpuimx27: add USB Host2 and OTG support
+      mach-cpuimx27: register wdt and w1_master resources
+      mxcmmc: add card detect through DAT3 possibility
+      eukrea_mbimx27: use card detect through DAT3 for SDHC1
+      MX2X: Add Keypad device definition for MX2X arch
+      eukrea_mbimx27: add support for the keyboard
+      eukrea_mbimx27: add audio codec
+
+Sascha Hauer (2):
+      mxc_nand: Fix OOB handling
+      arm: Add a mx25_defconfig file
+
+Wolfram Sang (1):
+      pcm037/pcm043/pca100: fix ULPI-related build warnings
+
+ arch/arm/configs/mx25_defconfig              | 1756 ++++++++++++++++++++++++++
+ arch/arm/configs/mx3_defconfig               |  695 ++++++++++-
+ arch/arm/mach-mx2/Kconfig                    |   10 +-
+ arch/arm/mach-mx2/devices.c                  |   18 +
+ arch/arm/mach-mx2/devices.h                  |    1 +
+ arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c |  181 +++-
+ arch/arm/mach-mx2/mach-cpuimx27.c            |   93 ++-
+ arch/arm/mach-mx2/mach-pca100.c              |    2 +
+ arch/arm/mach-mx25/clock.c                   |    2 +-
+ arch/arm/mach-mx25/devices.c                 |   20 +
+ arch/arm/mach-mx25/devices.h                 |    1 +
+ arch/arm/mach-mx25/mach-mx25pdk.c            |   36 +
+ arch/arm/mach-mx3/mach-mx31lilly.c           |   34 +-
+ arch/arm/mach-mx3/mach-pcm037.c              |    3 +-
+ arch/arm/mach-mx3/mach-pcm043.c              |    2 +
+ arch/arm/mach-mx5/board-mx51_babbage.c       |   26 +
+ arch/arm/mach-mx5/clock-mx51.c               |   11 +
+ arch/arm/mach-mx5/devices.c                  |   58 +
+ arch/arm/mach-mx5/devices.h                  |    3 +
+ arch/arm/plat-mxc/clock.c                    |   37 +-
+ arch/arm/plat-mxc/include/mach/iomux-mx25.h  |   19 +-
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h  |   18 +-
+ arch/arm/plat-mxc/include/mach/mmc.h         |    3 +
+ arch/arm/plat-mxc/include/mach/mx25.h        |    2 +
+ arch/arm/plat-mxc/include/mach/mxc_nand.h    |    4 +
+ drivers/mmc/host/mxcmmc.c                    |   16 +-
+ drivers/mtd/nand/mxc_nand.c                  |   33 +-
+ 27 files changed, 2949 insertions(+), 135 deletions(-)
+ create mode 100644 arch/arm/configs/mx25_defconfig
 -- 
 Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
