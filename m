@@ -1,50 +1,15 @@
-From: jason77.wang@gmail.com (Jason Wang)
-Date: Thu,  3 Jun 2010 20:05:45 +0800
-Subject: [V2 2/3] mxc/iomux: add GPIO bank offset for iomux v3 platforms
-In-Reply-To: <1275566746-6510-2-git-send-email-jason77.wang@gmail.com>
-References: <1275566746-6510-1-git-send-email-jason77.wang@gmail.com>
-	<1275566746-6510-2-git-send-email-jason77.wang@gmail.com>
-Message-ID: <1275566746-6510-3-git-send-email-jason77.wang@gmail.com>
+From: timyao@gmail.com (Tim Yao)
+Date: Thu, 3 Jun 2010 16:22:02 -0700
+Subject: Question about flush_dcache_all in kernel start up code
+Message-ID: <AANLkTimWFpNC_tXJB84pzVrg14Ot_Nk7WGVE9Qwvg_pK@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wang Hui <Hui.Wang@windriver.com>
-
-These GPIO bank offsets are useful when define a gpio number.
-E.G. when GPIO PORTC pin 6 is used for irq request pin of external
-expanding device, we can define it like:
-  #define EXP_PARENT_IRQ_PIN (GPIO_PORTC + 6)
-
-Signed-off-by: Jason Wang <jason77.wang@gmail.com>
----
- arch/arm/plat-mxc/include/mach/iomux-v3.h |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-v3.h b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-index f2f73d3..0880a4a 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-v3.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-@@ -89,6 +89,21 @@ struct pad_desc {
- #define PAD_CTL_SRE_FAST		(1 << 0)
- #define PAD_CTL_SRE_SLOW		(0 << 0)
- 
-+
-+#define MX51_NUM_GPIO_PORT	4
-+
-+#define GPIO_PIN_MASK 0x1f
-+
-+#define GPIO_PORT_SHIFT 5
-+#define GPIO_PORT_MASK (0x7 << GPIO_PORT_SHIFT)
-+
-+#define GPIO_PORTA	(0 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTB	(1 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTC	(2 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTD	(3 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTE	(4 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTF	(5 << GPIO_PORT_SHIFT)
-+
- /*
-  * setups a single pad in the iomuxer
-  */
--- 
-1.5.6.5
+Hi,
+I have a question regarding the data cache flush routine called at the
+beginning of kernel start up. At the beginning of the start up code, after
+processor type and machine type look up and simple page table created, a
+__switch_data is called which goes to __v7_setup in my case (since the CPU
+is A9). Then at the beginning of the function it calls v7_flush_dcache_all.
+This cache routine is in cache-v7.S and I see it actually does "clean and
+invalidate" operation as opposed to invalidate only.
