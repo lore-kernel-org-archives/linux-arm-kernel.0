@@ -1,43 +1,63 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu,  3 Jun 2010 03:44:00 +0200
-Subject: [PATCH] pxa/z2: Fix includes in battery driver
-Message-ID: <1275529440-31121-1-git-send-email-marek.vasut@gmail.com>
+Date: Thu,  3 Jun 2010 03:50:10 +0200
+Subject: [PATCH] pxa/z2: Fix flash layout to final version
+Message-ID: <1275529810-589-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove redundant includes and add slab.h to fix problem with building.
+This patch fixes flash layout to it's final version. Also, I fixed the
+authorship information of this file as it's been totally reworked since Ken
+released his last version.
 
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- drivers/power/z2_battery.c |   12 +++---------
- 1 files changed, 3 insertions(+), 9 deletions(-)
+ arch/arm/mach-pxa/z2.c |   26 ++++++++++----------------
+ 1 files changed, 10 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/power/z2_battery.c b/drivers/power/z2_battery.c
-index 9cca465..85064a9 100644
---- a/drivers/power/z2_battery.c
-+++ b/drivers/power/z2_battery.c
-@@ -9,19 +9,13 @@
+diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
+index 4cba5b6..967e8cb 100644
+--- a/arch/arm/mach-pxa/z2.c
++++ b/arch/arm/mach-pxa/z2.c
+@@ -3,8 +3,9 @@
   *
-  */
- 
--#include <linux/init.h>
--#include <linux/kernel.h>
- #include <linux/module.h>
--#include <linux/platform_device.h>
--#include <linux/power_supply.h>
--#include <linux/i2c.h>
--#include <linux/spinlock.h>
--#include <linux/interrupt.h>
- #include <linux/gpio.h>
-+#include <linux/i2c.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
--#include <asm/irq.h>
--#include <asm/mach/irq.h>
-+#include <linux/power_supply.h>
-+#include <linux/slab.h>
- #include <linux/z2_battery.h>
- 
- #define	Z2_DEFAULT_NAME	"Z2"
+  *  Support for the Zipit Z2 Handheld device.
+  *
+- *  Author: 	Ken McGuire
+- *  Created:	Jan 25, 2009
++ *  Copyright (C) 2009-2010 Marek Vasut <marek.vasut@gmail.com>
++ *
++ *  Based on research and code by: Ken McGuire
+  *  Based on mainstone.c as modified for the Zipit Z2.
+  *
+  *  This program is free software; you can redistribute it and/or modify
+@@ -158,21 +159,14 @@ static struct mtd_partition z2_flash_parts[] = {
+ 	{
+ 		.name	= "U-Boot Bootloader",
+ 		.offset	= 0x0,
+-		.size	= 0x20000,
+-	},
+-	{
+-		.name	= "Linux Kernel",
+-		.offset	= 0x20000,
+-		.size	= 0x220000,
+-	},
+-	{
+-		.name	= "Filesystem",
+-		.offset	= 0x240000,
+-		.size	= 0x5b0000,
+-	},
+-	{
++		.size	= 0x40000,
++	}, {
+ 		.name	= "U-Boot Environment",
+-		.offset	= 0x7f0000,
++		.offset	= 0x40000,
++		.size	= 0x60000,
++	}, {
++		.name	= "Flash",
++		.offset	= 0x60000,
+ 		.size	= MTDPART_SIZ_FULL,
+ 	},
+ };
 -- 
 1.7.0
