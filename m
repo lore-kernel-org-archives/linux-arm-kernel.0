@@ -1,71 +1,87 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 04 Jun 2010 09:09:29 +1200
-Subject: [RFC,PATCH 1/2] Add a common struct clk
-In-Reply-To: <20100603081354.GA4720@trinity.fluff.org>
-References: <1275479804.137633.565764505843.0.gpush@pororo>	<1275479804.138101.137592675542.1.gpush@pororo>	<20100602120356.GQ7248@trinity.fluff.org>	<201006031121.21896.jeremy.kerr@canonical.com>
-	<20100603081354.GA4720@trinity.fluff.org>
-Message-ID: <4C081A09.1020706@bluewatersys.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 3 Jun 2010 15:12:17 -0600
+Subject: Boot interface for device trees on ARM
+In-Reply-To: <AANLkTil3vDAN4QIJJImk8MnQklisqFJq_RBc7c9VEZxl@mail.gmail.com>
+References: <201005181054.32325.jeremy.kerr@canonical.com>
+	<alpine.LFD.2.00.1005172341200.12758@xanadu.home>
+	<AANLkTilJl9_NHiT1LITG7UbA9S7OYsnGMcDAsFEEx5Ob@mail.gmail.com>
+	<alpine.LFD.2.00.1005191055180.12758@xanadu.home>
+	<20100519200819.GF1693@shareable.org>
+	<alpine.LFD.2.00.1005191614580.12758@xanadu.home>
+	<AANLkTil3vDAN4QIJJImk8MnQklisqFJq_RBc7c9VEZxl@mail.gmail.com>
+Message-ID: <AANLkTikgdfC7LL8go8SiXDOll40ZoJeSn4uLjK3na1MO@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks wrote:
-> On Thu, Jun 03, 2010 at 11:21:19AM +0800, Jeremy Kerr wrote:
->> Hi Ben,
->>
->>>> And a set of clock operations (defined per type of clock):
->>>>
->>>> struct clk_operations {
->>>>
->>>>        int             (*enable)(struct clk *);
->>> I'd rather the enable/disable calls where simply a set
->>> and a bool on/off, very rarelyt is the enable and disable
->>> operartions different.
->> I thought about merging these, but decided against it. It does work for the 
->> simple case where we're setting a bit in a register:
->>
->> static int clk_foo_set_state(struct clk *_clk, int enable)
->> {
->> 	struct clk_foo *clk = to_clk_foo(_clk)
->> 	u32 reg;
->>
->> 	reg = raw_readl(foo->some_register);
->> 	if (enable)
->> 		reg |= FOO_ENABLE;
->> 	else
->> 		reg &= ~FOO_ENABLE;
->> 	raw_writel(foo->some_register, reg);
->>
->> 	return 0;
->> }
->>
->> However, for anything more complex than this - for example, if there's a 
->> parent clock - then we start getting pretty messy:
->>
->> static int clk_foo_set_state(struct clk *_clk, int enable)
->> {
->> 	struct clk_foo *clk = to_clk_foo(_clk)
->> 	u32 reg;
-> 
-> Yuck. I think this should really be handled by the base clk_enable()
-> and clk_disable() calls. Roughly based on what is currently in the
-> plat-samsung clock implementation:
+On Fri, May 21, 2010 at 10:24 AM, John Rigby <jcrigby@gmail.com> wrote:
+> Wow, no responses for almost two days, does that mean consensus has
+> been reached?
 
-I think its a good idea to do this incrementally. The proposed patches
-don't require much code rewrite because the interface is basically the
-same. I think the best approach is to get the proposed patches applied,
-which basically just makes the common interface from
-include/linux/clock.h generic, and _all_ of the mach implementations
-(and possibly other archs such as powerpc) converted and tested first.
-Then we can go from there to see what other common functionality can be
-moved into the generic clock framework.
+No, it just means the merge window was open; not to mention the UDS hangover.
 
-~Ryan
+g.
+
+>
+> On Wed, May 19, 2010 at 2:22 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+>> On Wed, 19 May 2010, Jamie Lokier wrote:
+>>
+>>> Nicolas Pitre wrote:
+>>> > It is not up to the bootloader to "adjust" to the kernel. ?But rather
+>>> > for the kernel to cope with the bootloader's provided information. ?If
+>>> > the bootloader passes a specific machine ID with the ATAG list then the
+>>> > kernel will use that, and if the bootloader passes a DT machine ID with
+>>> > a DT blob then the kernel will use that. ?You just have to configure
+>>> > your kernel with both "machine types" at the same time.
+>>>
+>>> Scenario:
+>>>
+>>> You upgrade your systems to a new DT-capable kernel and DT-capable
+>>> bootloader. ?It works great. ?You ship new instances of your device with this.
+>>>
+>>> Once they're in the field, someone reports a bug that doesn't happen
+>>> with the older device instances. ?It's not a bug you can reproduce,
+>>> but you suspect the newer of kernel. ?So you remote-update some of the
+>>> newly shipped devices with an old, pre-DT kernel binary that's been
+>>> stable on the older devices, to see if the bug goes away.
+>>>
+>>> Problem: The newer shipped devices have a DT-capable bootloader, and
+>>> it can't boot old kernels, because they don't understand the DT format.
+>>>
+>>> You could remote-downgrade the bootloaders, but that's risky. ?You
+>>> could try building the old kernel with DT support, but that adds
+>>> another variable to your testing.
+>>>
+>>> Anticipating this well in advance, you of course built your DT-capable
+>>> bootloader with the ability to boot old and new style kernels...
+>>
+>> Exact. ?Quoting myself:
+>>
+>> |I think that, for the moment, it is best if the bootloader on already
+>> |existing subarchitectures where DT is introduced still preserve the
+>> |already existing ability to boot using ATAGs. ?This allows for the
+>> |testing and validation of the DT concept against the legacy ATAG method
+>> |more easily.
+>> |
+>> |On new subarchitectures, it might make sense to go with DT from the
+>> |start instead of creating setup code for every single machine. ?In that
+>> |case the bootloader for those machines would only need to care about DT
+>> |and forget about ATAGs.
+>>
+>>
+>> Nicolas
+>> _______________________________________________
+>> devicetree-discuss mailing list
+>> devicetree-discuss at lists.ozlabs.org
+>> https://lists.ozlabs.org/listinfo/devicetree-discuss
+>>
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
+>
+
+
 
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
