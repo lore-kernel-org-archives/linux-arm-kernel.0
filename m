@@ -1,63 +1,41 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu,  3 Jun 2010 03:50:10 +0200
-Subject: [PATCH] pxa/z2: Fix flash layout to final version
-Message-ID: <1275529810-589-1-git-send-email-marek.vasut@gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 3 Jun 2010 10:30:06 +0800
+Subject: [URGENT] Re: bit errors on spitz + voipac
+In-Reply-To: <201006030201.13341.marek.vasut@gmail.com>
+References: <20100305212708.GC21773@elf.ucw.cz>
+	<1268048916.6477.9.camel@utx.utx.cz>
+	<20100308121634.GA14904@atrey.karlin.mff.cuni.cz>
+	<201006030201.13341.marek.vasut@gmail.com>
+Message-ID: <AANLkTikSotOdWIKqPpNi100rsVraIxZp6yZplIvaSo9m@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes flash layout to it's final version. Also, I fixed the
-authorship information of this file as it's been totally reworked since Ken
-released his last version.
+On Thu, Jun 3, 2010 at 8:01 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Dne Po 8. b?ezna 2010 13:16:35 Cyril Hrubis napsal(a):
+>> Hi!
+>>
+>> > - And I see display noise while CF Wi-Fi card is active.
+>>
+>> Forgotten about this one. See for yourself, notice short black vertical
+>> lines flashing randomly.
+>>
+>> http://atrey.karlin.mff.cuni.cz/~metan/outgoing/zaurus_sickness.mpg
+>
+> This is not only case of spitz. I've seen LCD image falling apart on pxafb on
+> Voipac PXA270 board. The image was like "torn in half and part of it was moved
+> to right, the hole between staying white".
+>
+> This happened exactly when I started doing a DMA transfer from a harddrive
+> attached through pata_pxa. It's perfectly replicable. If I disabled DMA and let
+> it run only in PIO, the image was fine.
+>
+> I assume the corruption Pavel was seeing is related. My guess is the problems
+> are caused when DMA between the CPU and a companion chip happens. I dunno if the
+> DMA controller doesn't have enough power to supply LCD and the companion chip
+> with data, but that's one of my guesses.
+>
+> btw. Adjusting the DMA descriptor length in pata_pxa didn't help.
+>
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- arch/arm/mach-pxa/z2.c |   26 ++++++++++----------------
- 1 files changed, 10 insertions(+), 16 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
-index 4cba5b6..967e8cb 100644
---- a/arch/arm/mach-pxa/z2.c
-+++ b/arch/arm/mach-pxa/z2.c
-@@ -3,8 +3,9 @@
-  *
-  *  Support for the Zipit Z2 Handheld device.
-  *
-- *  Author: 	Ken McGuire
-- *  Created:	Jan 25, 2009
-+ *  Copyright (C) 2009-2010 Marek Vasut <marek.vasut@gmail.com>
-+ *
-+ *  Based on research and code by: Ken McGuire
-  *  Based on mainstone.c as modified for the Zipit Z2.
-  *
-  *  This program is free software; you can redistribute it and/or modify
-@@ -158,21 +159,14 @@ static struct mtd_partition z2_flash_parts[] = {
- 	{
- 		.name	= "U-Boot Bootloader",
- 		.offset	= 0x0,
--		.size	= 0x20000,
--	},
--	{
--		.name	= "Linux Kernel",
--		.offset	= 0x20000,
--		.size	= 0x220000,
--	},
--	{
--		.name	= "Filesystem",
--		.offset	= 0x240000,
--		.size	= 0x5b0000,
--	},
--	{
-+		.size	= 0x40000,
-+	}, {
- 		.name	= "U-Boot Environment",
--		.offset	= 0x7f0000,
-+		.offset	= 0x40000,
-+		.size	= 0x60000,
-+	}, {
-+		.name	= "Flash",
-+		.offset	= 0x60000,
- 		.size	= MTDPART_SIZ_FULL,
- 	},
- };
--- 
-1.7.0
+If there is a FIFO attached, may need the FIFO status when the error happens.
+And a dump of the DMA registers would also be helpful.
