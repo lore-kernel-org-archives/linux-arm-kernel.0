@@ -1,22 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Jun 2010 20:52:39 +0100
-Subject: Please pull mxc patches for -rc
-In-Reply-To: <20100603083522.GX26820@pengutronix.de>
-References: <20100603083522.GX26820@pengutronix.de>
-Message-ID: <20100603195239.GB9169@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 3 Jun 2010 21:55:19 +0200
+Subject: Heads up: Linus plans to kill ARM defconfigs
+In-Reply-To: <20100603192459.GA9169@n2100.arm.linux.org.uk>
+References: <20100603192459.GA9169@n2100.arm.linux.org.uk>
+Message-ID: <201006032155.19349.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 03, 2010 at 10:35:22AM +0200, Sascha Hauer wrote:
-> Hi Russell,
+Dne ?t 3. ?ervna 2010 21:24:59 Russell King - ARM Linux napsal(a):
+> The subject says everything you need to know.  Randy provided this
+> link earlier:
 > 
-> please pull the following for -rc.
+>   http://lkml.org/lkml/2010/6/2/472
+> 
+> Linus doesn't appear to be listening to reason, so I see now this as
+> a fait accompli.  It'll apparantly happen at the next merge window.
 
-I won't be pulling this for a while; I've no idea at the moment where
-ARM as a community goes from where we find ourselves as of this morning
-given Linus' complaints about our "pointless churn".
+The defconfigs age ... there's no point keeping them. They'll be useless crap 
+unless someone updates them often anyway.
 
-Certainly the defconfigs seem out of the equation.
+Maybe adding a Kconfig option that's select all the default stuff the platform 
+needs would be a way to go ? (that was already proposed there)
 
-I'm also off for an extended weekend.  So it's nice timing on major
-issues yet again.
+> 
+> So, don't send anything which contains a defconfig file or updates to
+> it.  It's pointless.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
