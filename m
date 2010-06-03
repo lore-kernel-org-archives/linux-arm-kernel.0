@@ -1,43 +1,58 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 03 Jun 2010 12:30:05 -0400 (EDT)
-Subject: [PATCH 3/3] [ARM] Kirkwood: add support for PCIe1
-In-Reply-To: <AANLkTinQ_DdwRrjwtzrTXqtoeQxh87qAjSXDd6O4cPba@mail.gmail.com>
-References: <1275404968-12258-1-git-send-email-saeed@marvell.com>
-	<1275404968-12258-2-git-send-email-saeed@marvell.com>
-	<1275404968-12258-3-git-send-email-saeed@marvell.com>
-	<alpine.LFD.2.00.1006011447410.24526@xanadu.home>
-	<AANLkTinQ_DdwRrjwtzrTXqtoeQxh87qAjSXDd6O4cPba@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1006031224180.24526@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 3 Jun 2010 19:15:53 +0300
+Subject: [PATCH v3 00/14] omap: mailbox: bunch of cleanups
+In-Reply-To: <AANLkTinBMdcxzF_pZuiFHc1Eox_bYtD8PXG1OuKo0XWu@mail.gmail.com>
+References: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
+	<20100603.094022.200375421.Hiroshi.DOYU@nokia.com>
+	<20100603114726.GC7127@n2100.arm.linux.org.uk>
+	<AANLkTinBMdcxzF_pZuiFHc1Eox_bYtD8PXG1OuKo0XWu@mail.gmail.com>
+Message-ID: <20100603161553.GL30622@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Jun 2010, saeed bishara wrote:
-
-> On Tue, Jun 1, 2010 at 10:55 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> > On Tue, 1 Jun 2010, Saeed Bishara wrote:
-> >> +void __init kirkwood_pcie_init(int init_port0, int init_port1)
+* Felipe Contreras <felipe.contreras@gmail.com> [100603 17:53]:
+> On Thu, Jun 3, 2010 at 2:47 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Jun 03, 2010 at 09:40:22AM +0300, Hiroshi DOYU wrote:
+> >> > Felipe Contreras (14):
+> >> > ? omap: mailbox: trivial whitespace cleanups
+> >> > ? omap: mailbox: trivial cleanups
 > >
-> > And instead of having (int init_port0, int init_port1), this should be
-> > (int port) which is much less error prone as demonstrated by your own
-> > kirkwood_pcie_init(0, 1) usage. ?Those machines with both PCIe ports
-> > would simply have to call this twice.
-> nico, this is different from other controller,  we can't have multiple
-> registrations as the pci_commont_init() can't be called multiple
-> times.
+> > I think folk need to read this:
+> >
+> > ? ? ? ?http://lkml.org/lkml/2010/6/2/472
+> >
+> > and consider what it means for the future, and what can be done to reduce
+> > the amount of "churn".
+> 
+> If I have to decipher that rant, my best guess is that he is
+> complaining about the amount of code. If that's the case, this patch
+> series is only doing good:
+> 6 files changed, 168 insertions(+), 230 deletions(-)
+> 
+> Another part of the rant is the fact that Linus cannot follow the huge
+> amount of changes. I think "trivial whitespace cleanups" pretty much
+> says: don't look at me if you want to be productive, while "trivial
+> cleanups" says, look at me if you feel like looking at easy changes.
+> If I were to squash these two, I think the patch series would become
+> harder to follow.
+> 
+> Something that helps in other projects, like git, is that merges are
+> clearly identified.
+> 
+> Merge branch 'linux-arm'
+>  Merge branch 'linux-omap'
+>   Merge branch 'linux-omap-mbox'
+>    Merge branch 'fc-cleanups'
+>    Merge branch 'ob-kfifo'
+> 
+> Then it's a bit clearer what each patch series is doing in the mailbox
+> tree without looking at individual patches.
 
-OK. In that case that would be better to have only one argument and 
-define some flag bits for it:
+Also we need to make sure all the code we merge is really tested
+well before the merge window. Too much of the code needs to be
+fixed after the merge window. For the upcoming merge window, we
+will only merge things that have been sitting in the for-next
+for days before the merge window opens.
 
-#define KW_PCIE0	(1 << 0)
-#define KW_PCIE1	(1 << 1)
-
-void __init kirkwood_pcie_init(int portmask)
-
-And usage would be:
-
-	kirkwood_pcie_init(KW_PCIE0 | KW_PCIE1);
-
-This is much easier to review, and less prone to errors.
-
-
-Nicolas
+Tony
