@@ -1,39 +1,119 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 3 Jun 2010 02:01:13 +0200
-Subject: [URGENT] Re: bit errors on spitz + voipac
-In-Reply-To: <20100308121634.GA14904@atrey.karlin.mff.cuni.cz>
-References: <20100305212708.GC21773@elf.ucw.cz>
-	<1268048916.6477.9.camel@utx.utx.cz>
-	<20100308121634.GA14904@atrey.karlin.mff.cuni.cz>
-Message-ID: <201006030201.13341.marek.vasut@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 03 Jun 2010 09:25:24 +0900
+Subject: [PATCH 4/4] pata_samsung: Add Samsung PATA controller driver
+In-Reply-To: <4C0629B7.4060300@ru.mvista.com>
+References: <1274948524-2970-1-git-send-email-kgene.kim@samsung.com>
+	<1274948524-2970-5-git-send-email-kgene.kim@samsung.com>
+	<4BFE46C4.5030007@mvista.com>
+	<002a01cb01fd$4cf10a50$e6d31ef0$%kim@samsung.com>
+	<4C0629B7.4060300@ru.mvista.com>
+Message-ID: <002101cb02b3$44d40be0$ce7c23a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne Po 8. b?ezna 2010 13:16:35 Cyril Hrubis napsal(a):
-> Hi!
+Sergei Shtylyov wrote:
 > 
-> > - And I see display noise while CF Wi-Fi card is active.
+> Hello.
+
+Hi ;-)
+
+> Kukjin Kim wrote:
 > 
-> Forgotten about this one. See for yourself, notice short black vertical
-> lines flashing randomly.
+> >>> From: Abhilash Kesavan <a.kesavan@samsung.com>
+> >>> Adds support for the Samsung PATA controller. This driver is based on
+the
+> >>> Libata subsystem and references the earlier patches sent for IDE
+subsystem.
 > 
-> http://atrey.karlin.mff.cuni.cz/~metan/outgoing/zaurus_sickness.mpg
+>     Where I those I wonder? :-)
+>     It's a pity they didn't get accepted.
+> 
+Was told that that only new libata based drivers would be accepted.
 
-This is not only case of spitz. I've seen LCD image falling apart on pxafb on 
-Voipac PXA270 board. The image was like "torn in half and part of it was moved 
-to right, the hole between staying white".
+> >>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> >>> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> 
+> [...]
+> 
+> >>> +		for (i = 0; i < words; i++, temp_addr++) {
+> >>> +			wait_for_host_ready(info);
+> >>> +			writel(*temp_addr, data_addr);
+> >>> +		}
+> >>> +	}
+> 
+> >>     Well, if this is pere CF case, 'buflen' can't be odd, but otherwise
+> 
+>     I meant to type "pure". :-)
+> 
+considering CF in true-ide mode..should I still add the check?
 
-This happened exactly when I started doing a DMA transfer from a harddrive 
-attached through pata_pxa. It's perfectly replicable. If I disabled DMA and let 
-it run only in PIO, the image was fine.
+> >> you should handle that case...
+> 
+> >>> +	uint pio_teoc[5] = { 240, 43, 10, 70, 25 };
+> 
+> >>     What timing is this? :-O
+> 
+> > Should have been t2i rec.
+> 
+>     If it's t2i timing, it is incorrect for the first 3 PIO modes.
+> 
+Should have been (240, 93, 40, 70, 25)
 
-I assume the corruption Pavel was seeing is related. My guess is the problems 
-are caused when DMA between the CPU and a companion chip happens. I dunno if the 
-DMA controller doesn't have enough power to supply LCD and the companion chip 
-with data, but that's one of my guesses.
+> >>> +	if (cpu_type == TYPE_S3C6400) {
+> >>> +		ap->ops = &pata_s3c_port_ops;
+> >>> +		info->sfr_addr = info->ide_addr + 0x1800;
+> >>> +		info->ide_addr = info->ide_addr + 0x1900;
+> >>> +		info->fifo_status_reg = 0x94;
+> >>> +	} else if (cpu_type == TYPE_S5PC100) {
+> >>> +		ap->ops = &pata_s5p_port_ops;
+> >>> +		info->sfr_addr = info->ide_addr + 0x1800;
+> >>> +		info->ide_addr = info->ide_addr + 0x1900;
+> 
+> >>     Does make sense to assign those before *if*.
+> 
+> > Offsets not required for S5PV210/S5PC110.
+> 
+>     pata_s3c_tune_chipset() certainly requires them.
+> 
+yes..but for V210/C110 just the ioremapped info->ide_addr with 0 offset is
+enough.
 
-btw. Adjusting the DMA descriptor length in pata_pxa didn't help.
+> >>> +		info->fifo_status_reg = 0x84;
+> >>> +	} else {
+> >>> +		ap->ops = &pata_s5p_port_ops;
+> 
+> >>     You don't assign 'info->ide_addr' here but you'll need it in
+> >> pata_s3c_tune_chipset() which will be called thru pata_s5p_port_ops!
+> 
+> > The address received at ioremap() is enough for S5PV210/S5PC110..no
+offset
+> > needed.
+> 
+>     I only have to restate that pata_s3c_tune_chipset() does use
+> 'info->ide_addr'. Maybe you shouldn't install this method for
+S5PV210/S5PC110?
+> Or do you mean thgat offset of 0 will work?
+> 
+V210/C110 requires 0 offset as compared to 6410 and C100 which require
+0x1800.
 
-Guys, we need to investigate this as it seems to cause problems on many places.
+> >>> +release_mem:
+> >>> +	release_mem_region(res->start, res->end - res->start + 1);
+> 
+> >>     But you didn't call request_mem_region()!
+> 
+> > I didn't..will remove.
+> 
+>     But you should call request_mem_region() in one or another form...
+> 
+OK..will request mem_region() before ioremap()..and then the release_mem's
+should be fine.
 
-Cheers!
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
