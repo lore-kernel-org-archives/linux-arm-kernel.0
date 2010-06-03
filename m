@@ -1,39 +1,97 @@
 From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Thu,  3 Jun 2010 09:34:09 +0300
-Subject: [PATCH 01/10] Mailbox: free mailbox interrupt before freeing blk queue
+Date: Thu,  3 Jun 2010 09:34:14 +0300
+Subject: [PATCH 06/10] omap: mailbox: convert rwlocks to spinlock
 In-Reply-To: <1275546858-29507-1-git-send-email-Hiroshi.DOYU@nokia.com>
 References: <1275546858-29507-1-git-send-email-Hiroshi.DOYU@nokia.com>
-Message-ID: <1275546858-29507-2-git-send-email-Hiroshi.DOYU@nokia.com>
+Message-ID: <1275546858-29507-7-git-send-email-Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fernando Guzman Lugo <x0095840@ti.com>
+From: Ohad Ben-Cohen <ohad@wizery.com>
 
-Free interrupt before freeing blk_queue to avoid
-any attempt of access to blk_queue after it was freed.
+rwlocks are slower and have potential starvation issues
+therefore spinlocks are generally preferred.
 
-Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
+see also: http://lwn.net/Articles/364583/
+
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+Signed-off-by: Kanigeri Hari <h-kanigeri2@ti.com>
 Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 ---
- arch/arm/plat-omap/mailbox.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+ arch/arm/plat-omap/mailbox.c |   20 ++++++++++----------
+ 1 files changed, 10 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-index 08a2df7..252a586 100644
+index c340216..fafe47b 100644
 --- a/arch/arm/plat-omap/mailbox.c
 +++ b/arch/arm/plat-omap/mailbox.c
-@@ -298,11 +298,10 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
+@@ -31,7 +31,7 @@
  
- static void omap_mbox_fini(struct omap_mbox *mbox)
+ static struct workqueue_struct *mboxd;
+ static struct omap_mbox *mboxes;
+-static DEFINE_RWLOCK(mboxes_lock);
++static DEFINE_SPINLOCK(mboxes_lock);
+ static bool rq_full;
+ 
+ static int mbox_configured;
+@@ -341,14 +341,14 @@ struct omap_mbox *omap_mbox_get(const char *name)
+ 	struct omap_mbox *mbox;
+ 	int ret;
+ 
+-	read_lock(&mboxes_lock);
++	spin_lock(&mboxes_lock);
+ 	mbox = *(find_mboxes(name));
+ 	if (mbox == NULL) {
+-		read_unlock(&mboxes_lock);
++		spin_unlock(&mboxes_lock);
+ 		return ERR_PTR(-ENOENT);
+ 	}
+ 
+-	read_unlock(&mboxes_lock);
++	spin_unlock(&mboxes_lock);
+ 
+ 	ret = omap_mbox_startup(mbox);
+ 	if (ret)
+@@ -374,15 +374,15 @@ int omap_mbox_register(struct device *parent, struct omap_mbox *mbox)
+ 	if (mbox->next)
+ 		return -EBUSY;
+ 
+-	write_lock(&mboxes_lock);
++	spin_lock(&mboxes_lock);
+ 	tmp = find_mboxes(mbox->name);
+ 	if (*tmp) {
+ 		ret = -EBUSY;
+-		write_unlock(&mboxes_lock);
++		spin_unlock(&mboxes_lock);
+ 		goto err_find;
+ 	}
+ 	*tmp = mbox;
+-	write_unlock(&mboxes_lock);
++	spin_unlock(&mboxes_lock);
+ 
+ 	return 0;
+ 
+@@ -395,18 +395,18 @@ int omap_mbox_unregister(struct omap_mbox *mbox)
  {
-+	free_irq(mbox->irq, mbox);
- 	mbox_queue_free(mbox->txq);
- 	mbox_queue_free(mbox->rxq);
+ 	struct omap_mbox **tmp;
  
--	free_irq(mbox->irq, mbox);
--
- 	if (unlikely(mbox->ops->shutdown)) {
- 		write_lock(&mboxes_lock);
- 		if (mbox_configured > 0)
+-	write_lock(&mboxes_lock);
++	spin_lock(&mboxes_lock);
+ 	tmp = &mboxes;
+ 	while (*tmp) {
+ 		if (mbox == *tmp) {
+ 			*tmp = mbox->next;
+ 			mbox->next = NULL;
+-			write_unlock(&mboxes_lock);
++			spin_unlock(&mboxes_lock);
+ 			return 0;
+ 		}
+ 		tmp = &(*tmp)->next;
+ 	}
+-	write_unlock(&mboxes_lock);
++	spin_unlock(&mboxes_lock);
+ 
+ 	return -EINVAL;
+ }
 -- 
 1.7.1.rc1
