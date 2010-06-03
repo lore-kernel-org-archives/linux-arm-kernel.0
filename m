@@ -1,52 +1,43 @@
-From: randy.dunlap@oracle.com (Randy Dunlap)
-Date: Wed, 2 Jun 2010 18:22:01 -0700
-Subject: Pull request for nanoengine
-In-Reply-To: <20100602163844.509e9953.akpm@linux-foundation.org>
-References: <AANLkTilh4NtHS5p3tWbMtIU9MBBC-Md13Aw9_RdL3Ogp@mail.gmail.com>
-	<20100602163844.509e9953.akpm@linux-foundation.org>
-Message-ID: <20100602182201.4fcb3417.randy.dunlap@oracle.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu,  3 Jun 2010 03:44:00 +0200
+Subject: [PATCH] pxa/z2: Fix includes in battery driver
+Message-ID: <1275529440-31121-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Jun 2010 16:38:44 -0700 Andrew Morton wrote:
+Remove redundant includes and add slab.h to fix problem with building.
 
-> On Wed, 2 Jun 2010 20:19:01 -0300
-> Marcelo Roberto Jimenez <mroberto@cetuc.puc-rio.br> wrote:
-> 
-> > The following is a compilation of all the patches I have done for the
-> > nanoengine. Some of these are also valid for SA11xx based machines
-> > like, e.g, sharp Zaurus.
-> 
-> Which other kernel developer were you hoping would merge this tree?
-> 
-> >  arch/arm/configs/nanoengine_defconfig          | 1396 ++++++++++++++++++++++++
-> >  arch/arm/mach-sa1100/Kconfig                   |    8 +
-> >  arch/arm/mach-sa1100/Makefile                  |    2 +
-> >  arch/arm/mach-sa1100/cpu-sa1100.c              |   56 +-
-> >  arch/arm/mach-sa1100/cpu-sa1110.c              |   51 +-
-> >  arch/arm/mach-sa1100/include/mach/nanoengine.h |   30 +
-> >  arch/arm/mach-sa1100/nanoengine.c              |  115 ++
-> >  drivers/pcmcia/Makefile                        |    3 +-
-> >  drivers/pcmcia/sa1100_generic.c                |    3 +
-> >  drivers/pcmcia/sa1100_generic.h                |    1 +
-> >  drivers/pcmcia/sa1100_nanoengine.c             |  219 ++++
-> >  drivers/pcmcia/soc_common.c                    |  129 ++-
-> >  drivers/rtc/rtc-sa1100.c                       |  153 ++-
-> 
-> I can only think it must have been Russell.
-> 
-> I've rather lost track of what's happening with ARM subtrees.  I
-> _think_ it's now the case the relevant maintainers are putting their
-> trees into linux-next directly and are asking Linus to pull them
-> directly.  But maybe that's a misconception.
-> 
-> Can someone please explain the current state of play?
-
-
-Check this from about 2 hours before your question:
-  http://lkml.org/lkml/2010/6/2/472  (Linus)
-
-
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
-~Randy
-*** Remember to use Documentation/SubmitChecklist when testing your code ***
+ drivers/power/z2_battery.c |   12 +++---------
+ 1 files changed, 3 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/power/z2_battery.c b/drivers/power/z2_battery.c
+index 9cca465..85064a9 100644
+--- a/drivers/power/z2_battery.c
++++ b/drivers/power/z2_battery.c
+@@ -9,19 +9,13 @@
+  *
+  */
+ 
+-#include <linux/init.h>
+-#include <linux/kernel.h>
+ #include <linux/module.h>
+-#include <linux/platform_device.h>
+-#include <linux/power_supply.h>
+-#include <linux/i2c.h>
+-#include <linux/spinlock.h>
+-#include <linux/interrupt.h>
+ #include <linux/gpio.h>
++#include <linux/i2c.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+-#include <asm/irq.h>
+-#include <asm/mach/irq.h>
++#include <linux/power_supply.h>
++#include <linux/slab.h>
+ #include <linux/z2_battery.h>
+ 
+ #define	Z2_DEFAULT_NAME	"Z2"
+-- 
+1.7.0
