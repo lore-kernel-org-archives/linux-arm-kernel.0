@@ -1,58 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Jun 2010 19:15:53 +0300
-Subject: [PATCH v3 00/14] omap: mailbox: bunch of cleanups
-In-Reply-To: <AANLkTinBMdcxzF_pZuiFHc1Eox_bYtD8PXG1OuKo0XWu@mail.gmail.com>
-References: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
-	<20100603.094022.200375421.Hiroshi.DOYU@nokia.com>
-	<20100603114726.GC7127@n2100.arm.linux.org.uk>
-	<AANLkTinBMdcxzF_pZuiFHc1Eox_bYtD8PXG1OuKo0XWu@mail.gmail.com>
-Message-ID: <20100603161553.GL30622@atomide.com>
+From: randy.dunlap@oracle.com (Randy Dunlap)
+Date: Thu, 03 Jun 2010 09:32:42 -0700
+Subject: [PATCH 1/2] menuconfig: fix to center checklist correctly in
+	a corner case
+In-Reply-To: <4C0758B7.5070907@cn.fujitsu.com>
+References: <4C0758B7.5070907@cn.fujitsu.com>
+Message-ID: <4C07D92A.4000806@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Contreras <felipe.contreras@gmail.com> [100603 17:53]:
-> On Thu, Jun 3, 2010 at 2:47 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Thu, Jun 03, 2010 at 09:40:22AM +0300, Hiroshi DOYU wrote:
-> >> > Felipe Contreras (14):
-> >> > ? omap: mailbox: trivial whitespace cleanups
-> >> > ? omap: mailbox: trivial cleanups
-> >
-> > I think folk need to read this:
-> >
-> > ? ? ? ?http://lkml.org/lkml/2010/6/2/472
-> >
-> > and consider what it means for the future, and what can be done to reduce
-> > the amount of "churn".
+On 06/03/10 00:24, Li Zefan wrote:
+> Run:
+> 	make ARCH=arm menuconfig
 > 
-> If I have to decipher that rant, my best guess is that he is
-> complaining about the amount of code. If that's the case, this patch
-> series is only doing good:
-> 6 files changed, 168 insertions(+), 230 deletions(-)
+> And then select "System Type" -> "ARM system type". The kconfig
+> "choice" menu at this point looks empty.
 > 
-> Another part of the rant is the fact that Linus cannot follow the huge
-> amount of changes. I think "trivial whitespace cleanups" pretty much
-> says: don't look at me if you want to be productive, while "trivial
-> cleanups" says, look at me if you feel like looking at easy changes.
-> If I were to squash these two, I think the patch series would become
-> harder to follow.
+> It's because config ARCH_S3C2410 has a long prompt:
 > 
-> Something that helps in other projects, like git, is that merges are
-> clearly identified.
+> config ARCH_S3C2410
+>         bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442, S3C2443, S3C2450"
+> 	...
 > 
-> Merge branch 'linux-arm'
->  Merge branch 'linux-omap'
->   Merge branch 'linux-omap-mbox'
->    Merge branch 'fc-cleanups'
->    Merge branch 'ob-kfifo'
+> menuconfig centers the checklist according to this prompt without
+> considering the width of the list, and then things get wrong.
 > 
-> Then it's a bit clearer what each patch series is doing in the mailbox
-> tree without looking at individual patches.
+> Reported-by: Nobin Mathew <nobin.mathew@gmail.com>
+> Signed-off-by: Li Zefan <lizf@cn.fujitsu.com>
+> ---
+> 
+> Please queue these 2 patches for 2.6.35.
 
-Also we need to make sure all the code we merge is really tested
-well before the merge window. Too much of the code needs to be
-fixed after the merge window. For the upcoming merge window, we
-will only merge things that have been sitting in the for-next
-for days before the merge window opens.
+Tested-by: Randy Dunlap <randy.dunlap@oracle.com>
 
-Tony
+Thanks.
+
+> ---
+>  scripts/kconfig/lxdialog/checklist.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/scripts/kconfig/lxdialog/checklist.c b/scripts/kconfig/lxdialog/checklist.c
+> index bcc6f19..c92a05a 100644
+> --- a/scripts/kconfig/lxdialog/checklist.c
+> +++ b/scripts/kconfig/lxdialog/checklist.c
+> @@ -175,6 +175,7 @@ do_resize:
+>  	check_x = 0;
+>  	item_foreach()
+>  		check_x = MAX(check_x, strlen(item_str()) + 4);
+> +	check_x = MIN(check_x, list_width);
+>  
+>  	check_x = (list_width - check_x) / 2;
+>  	item_x = check_x + 4;
+
+
+-- 
+~Randy
+*** Remember to use Documentation/SubmitChecklist when testing your code ***
