@@ -1,36 +1,24 @@
-From: yegor_sub1@visionsystems.de (Yegor Yefremov)
-Date: Thu, 03 Jun 2010 11:44:57 +0200
-Subject: at91sam9g45 real RTC support
-Message-ID: <4C077999.4030601@visionsystems.de>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Thu, 03 Jun 2010 19:09:54 +0900
+Subject: [PATCH] S5PV210: Increase the VIC_NR as 4
+Message-ID: <20100603100954.GA17434@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As far as I understand RTC support for at91sam9g45 is realized via RTT and GPBR, where base time offset is stored. But the board has real RTC with common RTC registers as stated in the documentation. Why is it not supported directly? Is hardware broken?
+The S5PV210 SoC have 4 VICs. It requires for suspend and resume.
 
-The other issue is this code part
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
 
-/* --------------------------------------------------------------------
- *  RTC
- * -------------------------------------------------------------------- */
-
-#if defined(CONFIG_RTC_DRV_AT91RM9200) || defined(CONFIG_RTC_DRV_AT91RM9200_MODULE)
-static struct platform_device at91sam9g45_rtc_device = {
-	.name		= "at91_rtc",
-	.id		= -1,
-	.num_resources	= 0,
-};
-
-static void __init at91_add_device_rtc(void)
-{
-	platform_device_register(&at91sam9g45_rtc_device);
-}
-#else
-static void __init at91_add_device_rtc(void) {}
-#endif
-
-I've tweaked the driver/rtc/Kconfig and could then select the AT91RM9200 RTC driver. I could successfully compile the kernel and the RTC has completed the quick test: hwclock --systohc, poweroff, poweron hwclock. The time was correct.
-
-So what is advantage of the RTT based solution? And why AT91RM9200 RTC driver is not made selectable?
-
-Best regards,
-Yegor
+diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+index 0a34c81..0ac3d81 100644
+--- a/arch/arm/common/Kconfig
++++ b/arch/arm/common/Kconfig
+@@ -6,6 +6,7 @@ config ARM_VIC
+ 
+ config ARM_VIC_NR
+ 	int
++	default 4 if ARCH_S5PV210
+ 	default 2
+ 	depends on ARM_VIC
+ 	help
