@@ -1,119 +1,99 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 03 Jun 2010 09:25:24 +0900
-Subject: [PATCH 4/4] pata_samsung: Add Samsung PATA controller driver
-In-Reply-To: <4C0629B7.4060300@ru.mvista.com>
-References: <1274948524-2970-1-git-send-email-kgene.kim@samsung.com>
-	<1274948524-2970-5-git-send-email-kgene.kim@samsung.com>
-	<4BFE46C4.5030007@mvista.com>
-	<002a01cb01fd$4cf10a50$e6d31ef0$%kim@samsung.com>
-	<4C0629B7.4060300@ru.mvista.com>
-Message-ID: <002101cb02b3$44d40be0$ce7c23a0$%kim@samsung.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Thu, 3 Jun 2010 01:25:27 +0100
+Subject: [TEMP PATCH] Re: make ARM=arm menuconfig problem in mainline
+In-Reply-To: <4C068BAA.4030004@oracle.com>
+References: <AANLkTikC61Y9g-WbqwgGDghDSy2XtgraFSRoZYkHRGTG@mail.gmail.com>
+	<AANLkTilEYHVHJrj_KgF48OYCSEUcsKLi57Q_Y73d9va-@mail.gmail.com>
+	<20100602085748.6771e025.randy.dunlap@oracle.com>
+	<AANLkTilpzeYVExQfLgpVmS3bPvb_h3kmWaatidekI-0r@mail.gmail.com>
+	<4C068BAA.4030004@oracle.com>
+Message-ID: <20100603002526.GV4720@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei Shtylyov wrote:
+On Wed, Jun 02, 2010 at 09:49:46AM -0700, Randy Dunlap wrote:
+> On 06/02/10 09:08, Nobin Mathew wrote:
+> > 
+> > On Wed, Jun 2, 2010 at 9:27 PM, Randy Dunlap <randy.dunlap@oracle.com> wrote:
+> >> On Wed, 2 Jun 2010 20:04:28 +0530 Nobin Mathew wrote:
+> >>
+> >>> adding linux-arm-kernel at lists.infradead.org
+> >>>
+> >>> Hi,
+> >>>
+> >>> The following entry creates problem in ARM System type menu. I am
+> >>> using a Fedora 12 system.
+> >>
+> >> What kind of problem does it create?
+> >> It seems to work for me (on f11, not f12).
+> >> Does it have something to do with F12 specifically?
+> >>
+> >>
+> >>> Length of bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440,
+> >>> S3C2442, S3C2443, S3C2450" is the problem. How can I fix it.
+> >>
+> >> Describe the problem, please.
 > 
-> Hello.
-
-Hi ;-)
-
-> Kukjin Kim wrote:
-> 
-> >>> From: Abhilash Kesavan <a.kesavan@samsung.com>
-> >>> Adds support for the Samsung PATA controller. This driver is based on
-the
-> >>> Libata subsystem and references the earlier patches sent for IDE
-subsystem.
-> 
->     Where I those I wonder? :-)
->     It's a pity they didn't get accepted.
-> 
-Was told that that only new libata based drivers would be accepted.
-
-> >>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> >>> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> 
-> [...]
-> 
-> >>> +		for (i = 0; i < words; i++, temp_addr++) {
-> >>> +			wait_for_host_ready(info);
-> >>> +			writel(*temp_addr, data_addr);
-> >>> +		}
-> >>> +	}
-> 
-> >>     Well, if this is pere CF case, 'buflen' can't be odd, but otherwise
-> 
->     I meant to type "pure". :-)
-> 
-considering CF in true-ide mode..should I still add the check?
-
-> >> you should handle that case...
-> 
-> >>> +	uint pio_teoc[5] = { 240, 43, 10, 70, 25 };
-> 
-> >>     What timing is this? :-O
-> 
-> > Should have been t2i rec.
-> 
->     If it's t2i timing, it is incorrect for the first 3 PIO modes.
-> 
-Should have been (240, 93, 40, 70, 25)
-
-> >>> +	if (cpu_type == TYPE_S3C6400) {
-> >>> +		ap->ops = &pata_s3c_port_ops;
-> >>> +		info->sfr_addr = info->ide_addr + 0x1800;
-> >>> +		info->ide_addr = info->ide_addr + 0x1900;
-> >>> +		info->fifo_status_reg = 0x94;
-> >>> +	} else if (cpu_type == TYPE_S5PC100) {
-> >>> +		ap->ops = &pata_s5p_port_ops;
-> >>> +		info->sfr_addr = info->ide_addr + 0x1800;
-> >>> +		info->ide_addr = info->ide_addr + 0x1900;
-> 
-> >>     Does make sense to assign those before *if*.
-> 
-> > Offsets not required for S5PV210/S5PC110.
-> 
->     pata_s3c_tune_chipset() certainly requires them.
-> 
-yes..but for V210/C110 just the ioremapped info->ide_addr with 0 offset is
-enough.
-
-> >>> +		info->fifo_status_reg = 0x84;
-> >>> +	} else {
-> >>> +		ap->ops = &pata_s5p_port_ops;
-> 
-> >>     You don't assign 'info->ide_addr' here but you'll need it in
-> >> pata_s3c_tune_chipset() which will be called thru pata_s5p_port_ops!
-> 
-> > The address received at ioremap() is enough for S5PV210/S5PC110..no
-offset
-> > needed.
-> 
->     I only have to restate that pata_s3c_tune_chipset() does use
-> 'info->ide_addr'. Maybe you shouldn't install this method for
-S5PV210/S5PC110?
-> Or do you mean thgat offset of 0 will work?
-> 
-V210/C110 requires 0 offset as compared to 6410 and C100 which require
-0x1800.
-
-> >>> +release_mem:
-> >>> +	release_mem_region(res->start, res->end - res->start + 1);
-> 
-> >>     But you didn't call request_mem_region()!
-> 
-> > I didn't..will remove.
-> 
->     But you should call request_mem_region() in one or another form...
-> 
-OK..will request mem_region() before ioremap()..and then the release_mem's
-should be fine.
+> [please don't top-post]
 
 
-Thanks.
+I can think of several solutions, the first being to remove the S3C prefix
+friom all these.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+S3C24XX is not acceptable, there's S3C series that are either too old to
+be bothered with, or don't fit under this architecture.
+
+how about Samsung S3C: 2410,2412/3,2416,2440/2442,2443,2450
+
+ 
+> > Sorry if attachments are not allowed, when I go to select ARM system
+> > type(OMAP, Davinci etc), I am not seeing any entries there in the pop
+> > up window. When I remove  bool "Samsung S3C2410, S3C2412, S3C2413,
+> > S3C2416, S3C2440,
+> >>> S3C2442, S3C2443, S3C2450"  it is working fine. I feel it is something to do with length of that string.
+> > 
+> > Thanks
+> > Nobin
+> 
+> 
+> OK, I see that now.  Well, it is some kind of problem.
+> Adding cc to linux-kbuild mailing list.
+> 
+> 
+> The patch below fixes the problem temporarily, but the bool string length does
+> seem to be a problem.
+> 
+> Thanks for your report.
+> 
+> -- 
+> From: Randy Dunlap <randy.dunlap@oracle.com>
+> 
+> The bool "long string" causes the choices not to be displayed,
+> so temporarily change it to a shorter string until a real fix
+> is found.
+> 
+> Signed-off-by: Randy Dunlap <randy.dunlap@oracle.com>
+> Reported-by: Nobin Mathew <nobin.mathew@gmail.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> ---
+>  arch/arm/Kconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> --- linux-next-20100602.orig/arch/arm/Kconfig
+> +++ linux-next-20100602/arch/arm/Kconfig
+> @@ -629,7 +629,7 @@ config ARCH_SA1100
+>  	  Support for StrongARM 11x0 based boards.
+>  
+>  config ARCH_S3C2410
+> -	bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442, S3C2443, S3C2450"
+> +	bool "Samsung S3C24xx"
+>  	select GENERIC_GPIO
+>  	select ARCH_HAS_CPUFREQ
+>  	select HAVE_CLK
+
+-- 
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
