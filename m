@@ -1,32 +1,63 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 04 Jun 2010 09:04:57 +1200
-Subject: Heads up: Linus plans to kill ARM defconfigs
-In-Reply-To: <20100603192459.GA9169@n2100.arm.linux.org.uk>
-References: <20100603192459.GA9169@n2100.arm.linux.org.uk>
-Message-ID: <4C0818F9.9070008@bluewatersys.com>
+Date: Fri, 04 Jun 2010 09:09:29 +1200
+Subject: [RFC,PATCH 1/2] Add a common struct clk
+In-Reply-To: <20100603081354.GA4720@trinity.fluff.org>
+References: <1275479804.137633.565764505843.0.gpush@pororo>	<1275479804.138101.137592675542.1.gpush@pororo>	<20100602120356.GQ7248@trinity.fluff.org>	<201006031121.21896.jeremy.kerr@canonical.com>
+	<20100603081354.GA4720@trinity.fluff.org>
+Message-ID: <4C081A09.1020706@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> The subject says everything you need to know.  Randy provided this
-> link earlier:
+Ben Dooks wrote:
+> On Thu, Jun 03, 2010 at 11:21:19AM +0800, Jeremy Kerr wrote:
+>> Hi Ben,
+>>
+>>>> And a set of clock operations (defined per type of clock):
+>>>>
+>>>> struct clk_operations {
+>>>>
+>>>>        int             (*enable)(struct clk *);
+>>> I'd rather the enable/disable calls where simply a set
+>>> and a bool on/off, very rarelyt is the enable and disable
+>>> operartions different.
+>> I thought about merging these, but decided against it. It does work for the 
+>> simple case where we're setting a bit in a register:
+>>
+>> static int clk_foo_set_state(struct clk *_clk, int enable)
+>> {
+>> 	struct clk_foo *clk = to_clk_foo(_clk)
+>> 	u32 reg;
+>>
+>> 	reg = raw_readl(foo->some_register);
+>> 	if (enable)
+>> 		reg |= FOO_ENABLE;
+>> 	else
+>> 		reg &= ~FOO_ENABLE;
+>> 	raw_writel(foo->some_register, reg);
+>>
+>> 	return 0;
+>> }
+>>
+>> However, for anything more complex than this - for example, if there's a 
+>> parent clock - then we start getting pretty messy:
+>>
+>> static int clk_foo_set_state(struct clk *_clk, int enable)
+>> {
+>> 	struct clk_foo *clk = to_clk_foo(_clk)
+>> 	u32 reg;
 > 
->   http://lkml.org/lkml/2010/6/2/472
-> 
-> Linus doesn't appear to be listening to reason, so I see now this as
-> a fait accompli.  It'll apparantly happen at the next merge window.
-> 
-> So, don't send anything which contains a defconfig file or updates to
-> it.  It's pointless.
+> Yuck. I think this should really be handled by the base clk_enable()
+> and clk_disable() calls. Roughly based on what is currently in the
+> plat-samsung clock implementation:
 
-Is it worth being a bit proactive and getting rid of some of them in
-advance? Things like spear3[012]0_defconfig are basically identically
-except for the board type. Combining all three of those would remove
-1500 lines of code.
-
-Basically reduce down to one or two defconfigs for each mach directory
-which include as many boards and drivers as possible. People wanting
-more tailored configs can do that in their own trees.
+I think its a good idea to do this incrementally. The proposed patches
+don't require much code rewrite because the interface is basically the
+same. I think the best approach is to get the proposed patches applied,
+which basically just makes the common interface from
+include/linux/clock.h generic, and _all_ of the mach implementations
+(and possibly other archs such as powerpc) converted and tested first.
+Then we can go from there to see what other common functionality can be
+moved into the generic clock framework.
 
 ~Ryan
 
