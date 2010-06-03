@@ -1,46 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 03 Jun 2010 17:15:09 +0100
-Subject: PB1176 broken in 2.6.35-rc1, bisected
-In-Reply-To: <AANLkTimJkaadEM1xvG30WVvEjJPZQXHwx216SeqWFKNp@mail.gmail.com>
-References: <AANLkTikoCy2FH_5ICh-iiI_wzGj6D6oszyM-zCXkNC_4@mail.gmail.com>
-	<1275518783.27834.2.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTimJkaadEM1xvG30WVvEjJPZQXHwx216SeqWFKNp@mail.gmail.com>
-Message-ID: <1275581709.8775.14.camel@e102109-lin.cambridge.arm.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 03 Jun 2010 12:30:05 -0400 (EDT)
+Subject: [PATCH 3/3] [ARM] Kirkwood: add support for PCIe1
+In-Reply-To: <AANLkTinQ_DdwRrjwtzrTXqtoeQxh87qAjSXDd6O4cPba@mail.gmail.com>
+References: <1275404968-12258-1-git-send-email-saeed@marvell.com>
+	<1275404968-12258-2-git-send-email-saeed@marvell.com>
+	<1275404968-12258-3-git-send-email-saeed@marvell.com>
+	<alpine.LFD.2.00.1006011447410.24526@xanadu.home>
+	<AANLkTinQ_DdwRrjwtzrTXqtoeQxh87qAjSXDd6O4cPba@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1006031224180.24526@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-06-03 at 09:48 +0100, Linus Walleij wrote:
-> 2010/6/3 Catalin Marinas <catalin.marinas@arm.com>:
-> > On Wed, 2010-06-02 at 23:33 +0100, Linus Walleij wrote:
-> >> my PB1176 doesn't boot properly in 2.6.35-rc1, it goes to this point
-> >> and hangs:
-> >>
-> >> (...)
-> >> Switching to clocksource timer3
-> >> NET: Registered protocol family 2
-> >> IP route cache hash table entries: 1024 (order: 0, 4096 bytes)
-> >> TCP established hash table entries: 4096 (order: 3, 32768 bytes)
-> >> TCP bind hash table entries: 4096 (order: 2, 16384 bytes)
-> >> TCP: Hash tables configured (established 4096 bind 4096)
-> >> TCP reno registered
-> >> UDP hash table entries: 256 (order: 0, 4096 bytes)
-> >> UDP-Lite hash table entries: 256 (order: 0, 4096 bytes)
-> >> NET: Registered protocol family 1
-> >> RPC: Registered udp transport module.
-> >> RPC: Registered tcp transport module.
-> >> RPC: Registered tcp NFSv4.1 backchannel transport module.
+On Thu, 3 Jun 2010, saeed bishara wrote:
+
+> On Tue, Jun 1, 2010 at 10:55 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> > On Tue, 1 Jun 2010, Saeed Bishara wrote:
+> >> +void __init kirkwood_pcie_init(int init_port0, int init_port1)
 > >
-> > Have you tried disabling CONFIG_CACHE_L2X0?
-> 
-> Hey it works! :-)
-> 
-> I suppose your latest patches will hopefully  get the defconfig with
-> l2x0 working again in -rc2 if they're merged?
+> > And instead of having (int init_port0, int init_port1), this should be
+> > (int port) which is much less error prone as demonstrated by your own
+> > kirkwood_pcie_init(0, 1) usage. ?Those machines with both PCIe ports
+> > would simply have to call this twice.
+> nico, this is different from other controller,  we can't have multiple
+> registrations as the pci_commont_init() can't be called multiple
+> times.
 
-I think there is an L2 erratum (and trying to get the right workaround).
-It may be triggered by commit e7c5650f6.
+OK. In that case that would be better to have only one argument and 
+define some flag bits for it:
 
-I'll get back on the list with a patch.
+#define KW_PCIE0	(1 << 0)
+#define KW_PCIE1	(1 << 1)
 
--- 
-Catalin
+void __init kirkwood_pcie_init(int portmask)
+
+And usage would be:
+
+	kirkwood_pcie_init(KW_PCIE0 | KW_PCIE1);
+
+This is much easier to review, and less prone to errors.
+
+
+Nicolas
