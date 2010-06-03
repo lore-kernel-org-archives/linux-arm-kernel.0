@@ -1,87 +1,28 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 3 Jun 2010 15:12:17 -0600
-Subject: Boot interface for device trees on ARM
-In-Reply-To: <AANLkTil3vDAN4QIJJImk8MnQklisqFJq_RBc7c9VEZxl@mail.gmail.com>
-References: <201005181054.32325.jeremy.kerr@canonical.com>
-	<alpine.LFD.2.00.1005172341200.12758@xanadu.home>
-	<AANLkTilJl9_NHiT1LITG7UbA9S7OYsnGMcDAsFEEx5Ob@mail.gmail.com>
-	<alpine.LFD.2.00.1005191055180.12758@xanadu.home>
-	<20100519200819.GF1693@shareable.org>
-	<alpine.LFD.2.00.1005191614580.12758@xanadu.home>
-	<AANLkTil3vDAN4QIJJImk8MnQklisqFJq_RBc7c9VEZxl@mail.gmail.com>
-Message-ID: <AANLkTikgdfC7LL8go8SiXDOll40ZoJeSn4uLjK3na1MO@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 03 Jun 2010 18:31:56 -0400 (EDT)
+Subject: Heads up: Linus plans to kill ARM defconfigs
+In-Reply-To: <4C0818F9.9070008@bluewatersys.com>
+References: <20100603192459.GA9169@n2100.arm.linux.org.uk>
+	<4C0818F9.9070008@bluewatersys.com>
+Message-ID: <alpine.LFD.2.00.1006031829020.24526@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 21, 2010 at 10:24 AM, John Rigby <jcrigby@gmail.com> wrote:
-> Wow, no responses for almost two days, does that mean consensus has
-> been reached?
+On Fri, 4 Jun 2010, Ryan Mallon wrote:
 
-No, it just means the merge window was open; not to mention the UDS hangover.
+> Is it worth being a bit proactive and getting rid of some of them in
+> advance? Things like spear3[012]0_defconfig are basically identically
+> except for the board type. Combining all three of those would remove
+> 1500 lines of code.
 
-g.
+Please go ahead with a patch.
 
->
-> On Wed, May 19, 2010 at 2:22 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
->> On Wed, 19 May 2010, Jamie Lokier wrote:
->>
->>> Nicolas Pitre wrote:
->>> > It is not up to the bootloader to "adjust" to the kernel. ?But rather
->>> > for the kernel to cope with the bootloader's provided information. ?If
->>> > the bootloader passes a specific machine ID with the ATAG list then the
->>> > kernel will use that, and if the bootloader passes a DT machine ID with
->>> > a DT blob then the kernel will use that. ?You just have to configure
->>> > your kernel with both "machine types" at the same time.
->>>
->>> Scenario:
->>>
->>> You upgrade your systems to a new DT-capable kernel and DT-capable
->>> bootloader. ?It works great. ?You ship new instances of your device with this.
->>>
->>> Once they're in the field, someone reports a bug that doesn't happen
->>> with the older device instances. ?It's not a bug you can reproduce,
->>> but you suspect the newer of kernel. ?So you remote-update some of the
->>> newly shipped devices with an old, pre-DT kernel binary that's been
->>> stable on the older devices, to see if the bug goes away.
->>>
->>> Problem: The newer shipped devices have a DT-capable bootloader, and
->>> it can't boot old kernels, because they don't understand the DT format.
->>>
->>> You could remote-downgrade the bootloaders, but that's risky. ?You
->>> could try building the old kernel with DT support, but that adds
->>> another variable to your testing.
->>>
->>> Anticipating this well in advance, you of course built your DT-capable
->>> bootloader with the ability to boot old and new style kernels...
->>
->> Exact. ?Quoting myself:
->>
->> |I think that, for the moment, it is best if the bootloader on already
->> |existing subarchitectures where DT is introduced still preserve the
->> |already existing ability to boot using ATAGs. ?This allows for the
->> |testing and validation of the DT concept against the legacy ATAG method
->> |more easily.
->> |
->> |On new subarchitectures, it might make sense to go with DT from the
->> |start instead of creating setup code for every single machine. ?In that
->> |case the bootloader for those machines would only need to care about DT
->> |and forget about ATAGs.
->>
->>
->> Nicolas
->> _______________________________________________
->> devicetree-discuss mailing list
->> devicetree-discuss at lists.ozlabs.org
->> https://lists.ozlabs.org/listinfo/devicetree-discuss
->>
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
->
+> Basically reduce down to one or two defconfigs for each mach directory
+> which include as many boards and drivers as possible. People wanting
+> more tailored configs can do that in their own trees.
+
+This actually should have been the plan from the start.  See for example 
+orion5x_defconfig which currently already supports 23 machines.
 
 
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Nicolas
