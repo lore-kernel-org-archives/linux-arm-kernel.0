@@ -1,22 +1,67 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 3 Jun 2010 17:52:53 +0100
-Subject: [alsa-devel] [PATCH v2 1/4] imx-ssi.c: add new choices to
-	platform configuration
-In-Reply-To: <20100603081926.GT26820@pengutronix.de>
-References: <1274950737-26498-1-git-send-email-eric@eukrea.com>
-	<20100601180527.GC10031@sirena.org.uk>
-	<20100603081926.GT26820@pengutronix.de>
-Message-ID: <20100603165252.GD2762@rakim.wolfsonmicro.main>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 3 Jun 2010 20:59:09 +0200 (CEST)
+Subject: [PATCH] mioa701: fix camera regression
+In-Reply-To: <1275514190-32006-1-git-send-email-robert.jarzmik@free.fr>
+References: <1275514190-32006-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <Pine.LNX.4.64.1006032058380.19573@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 03, 2010 at 10:19:26AM +0200, Sascha Hauer wrote:
-> On Tue, Jun 01, 2010 at 07:05:28PM +0100, Mark Brown wrote:
+On Wed, 2 Jun 2010, Robert Jarzmik wrote:
 
-> > Sascha, any comments on the first couple of patches here?
+> Since commit a48c24a696f0d93c49f913b7818e9819612b1f4e, the
+> camera is not working anymore.
+> 
+> After the v4l2 migration, the mt9m111 camera board
+> information was not passed to the i2c layer anymore, but
+> stored for future use of v4l2 (through soc_camera).
+> 
+> Because mioa701_i2c_devices[] was tagged as "__initdata",
+> and because after the v4l2 migration, the new structure
+> "iclink" references it, the mt9m111 driver is not probed
+> anymore, as part of "iclink" is not valid (discarded after
+> kernel init).
+> 
+> Although there is not compilation error, nor runtime oops,
+> this patch restores a working camera on the mioa701 board.
+> 
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Applied both, though I had to hand edit the Makefile and Kconfig for the
-machine driver - not sure what it was generated against but it didn't
-seem terribly mainline.
+> 
+> --
+> Eric, could you schedule that into your fix branch please ?
+> ---
+>  arch/arm/mach-pxa/mioa701.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
+> index 7a50ed8..9836921 100644
+> --- a/arch/arm/mach-pxa/mioa701.c
+> +++ b/arch/arm/mach-pxa/mioa701.c
+> @@ -696,7 +696,7 @@ static struct i2c_board_info __initdata mioa701_pi2c_devices[] = {
+>  };
+>  
+>  /* Board I2C devices. */
+> -static struct i2c_board_info __initdata mioa701_i2c_devices[] = {
+> +static struct i2c_board_info mioa701_i2c_devices[] = {
+>  	{
+>  		I2C_BOARD_INFO("mt9m111", 0x5d),
+>  	},
+> -- 
+> 1.7.0.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
