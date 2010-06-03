@@ -1,65 +1,63 @@
 From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Thu,  3 Jun 2010 09:34:16 +0300
-Subject: [PATCH 08/10] omap: mailbox: remove (un)likely macros from cold paths
+Date: Thu,  3 Jun 2010 09:34:13 +0300
+Subject: [PATCH 05/10] Mailbox: disable mailbox interrupt when request queue
 In-Reply-To: <1275546858-29507-1-git-send-email-Hiroshi.DOYU@nokia.com>
 References: <1275546858-29507-1-git-send-email-Hiroshi.DOYU@nokia.com>
-Message-ID: <1275546858-29507-9-git-send-email-Hiroshi.DOYU@nokia.com>
+Message-ID: <1275546858-29507-6-git-send-email-Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ohad Ben-Cohen <ohad@wizery.com>
+From: Fernando Guzman Lugo <x0095840@ti.com>
 
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+when blk_get_request fails to get the request it is returning
+without read the message from the mailbox fifo, then when it
+leaves the isr and interruption is trigger again and again and
+the workqueue which get elements from the request queue is never
+executed and the kernel is stuck and shows a softlockup message.
+Now the mailbox interrupt is disabled when request queue is full
+and enabled when it pop a elememt form the request queue.
+
+Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
 Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 ---
- arch/arm/plat-omap/mailbox.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/plat-omap/mailbox.c |   10 +++++++++-
+ 1 files changed, 9 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-index 66c6e87..81076b5 100644
+index 986002b..c340216 100644
 --- a/arch/arm/plat-omap/mailbox.c
 +++ b/arch/arm/plat-omap/mailbox.c
-@@ -258,12 +258,12 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
- 	int ret = 0;
- 	struct omap_mbox_queue *mq;
+@@ -32,6 +32,7 @@
+ static struct workqueue_struct *mboxd;
+ static struct omap_mbox *mboxes;
+ static DEFINE_RWLOCK(mboxes_lock);
++static bool rq_full;
  
--	if (likely(mbox->ops->startup)) {
-+	if (mbox->ops->startup) {
- 		mutex_lock(&mbox_configured_lock);
- 		if (!mbox_configured)
- 			ret = mbox->ops->startup(mbox);
+ static int mbox_configured;
+ static DEFINE_MUTEX(mbox_configured_lock);
+@@ -141,6 +142,10 @@ static void mbox_rx_work(struct work_struct *work)
+ 	while (1) {
+ 		spin_lock_irqsave(q->queue_lock, flags);
+ 		rq = blk_fetch_request(q);
++		if (rq_full) {
++			omap_mbox_enable_irq(mbox, IRQ_RX);
++			rq_full = false;
++		}
+ 		spin_unlock_irqrestore(q->queue_lock, flags);
+ 		if (!rq)
+ 			break;
+@@ -178,8 +183,11 @@ static void __mbox_rx_interrupt(struct omap_mbox *mbox)
  
--		if (unlikely(ret)) {
-+		if (ret) {
- 			mutex_unlock(&mbox_configured_lock);
- 			return ret;
- 		}
-@@ -273,7 +273,7 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
+ 	while (!mbox_fifo_empty(mbox)) {
+ 		rq = blk_get_request(q, WRITE, GFP_ATOMIC);
+-		if (unlikely(!rq))
++		if (unlikely(!rq)) {
++			omap_mbox_disable_irq(mbox, IRQ_RX);
++			rq_full = true;
+ 			goto nomem;
++		}
  
- 	ret = request_irq(mbox->irq, mbox_interrupt, IRQF_SHARED,
- 				mbox->name, mbox);
--	if (unlikely(ret)) {
-+	if (ret) {
- 		printk(KERN_ERR
- 			"failed to register mailbox interrupt:%d\n", ret);
- 		goto fail_request_irq;
-@@ -300,7 +300,7 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
-  fail_alloc_txq:
- 	free_irq(mbox->irq, mbox);
-  fail_request_irq:
--	if (unlikely(mbox->ops->shutdown))
-+	if (mbox->ops->shutdown)
- 		mbox->ops->shutdown(mbox);
+ 		msg = mbox_fifo_read(mbox);
  
- 	return ret;
-@@ -314,7 +314,7 @@ static void omap_mbox_fini(struct omap_mbox *mbox)
- 	mbox_queue_free(mbox->txq);
- 	mbox_queue_free(mbox->rxq);
- 
--	if (unlikely(mbox->ops->shutdown)) {
-+	if (mbox->ops->shutdown) {
- 		mutex_lock(&mbox_configured_lock);
- 		if (mbox_configured > 0)
- 			mbox_configured--;
 -- 
 1.7.1.rc1
