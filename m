@@ -1,97 +1,65 @@
 From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Thu,  3 Jun 2010 09:34:14 +0300
-Subject: [PATCH 06/10] omap: mailbox: convert rwlocks to spinlock
+Date: Thu,  3 Jun 2010 09:34:16 +0300
+Subject: [PATCH 08/10] omap: mailbox: remove (un)likely macros from cold paths
 In-Reply-To: <1275546858-29507-1-git-send-email-Hiroshi.DOYU@nokia.com>
 References: <1275546858-29507-1-git-send-email-Hiroshi.DOYU@nokia.com>
-Message-ID: <1275546858-29507-7-git-send-email-Hiroshi.DOYU@nokia.com>
+Message-ID: <1275546858-29507-9-git-send-email-Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ohad Ben-Cohen <ohad@wizery.com>
 
-rwlocks are slower and have potential starvation issues
-therefore spinlocks are generally preferred.
-
-see also: http://lwn.net/Articles/364583/
-
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-Signed-off-by: Kanigeri Hari <h-kanigeri2@ti.com>
 Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 ---
- arch/arm/plat-omap/mailbox.c |   20 ++++++++++----------
- 1 files changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/plat-omap/mailbox.c |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-index c340216..fafe47b 100644
+index 66c6e87..81076b5 100644
 --- a/arch/arm/plat-omap/mailbox.c
 +++ b/arch/arm/plat-omap/mailbox.c
-@@ -31,7 +31,7 @@
+@@ -258,12 +258,12 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
+ 	int ret = 0;
+ 	struct omap_mbox_queue *mq;
  
- static struct workqueue_struct *mboxd;
- static struct omap_mbox *mboxes;
--static DEFINE_RWLOCK(mboxes_lock);
-+static DEFINE_SPINLOCK(mboxes_lock);
- static bool rq_full;
+-	if (likely(mbox->ops->startup)) {
++	if (mbox->ops->startup) {
+ 		mutex_lock(&mbox_configured_lock);
+ 		if (!mbox_configured)
+ 			ret = mbox->ops->startup(mbox);
  
- static int mbox_configured;
-@@ -341,14 +341,14 @@ struct omap_mbox *omap_mbox_get(const char *name)
- 	struct omap_mbox *mbox;
- 	int ret;
- 
--	read_lock(&mboxes_lock);
-+	spin_lock(&mboxes_lock);
- 	mbox = *(find_mboxes(name));
- 	if (mbox == NULL) {
--		read_unlock(&mboxes_lock);
-+		spin_unlock(&mboxes_lock);
- 		return ERR_PTR(-ENOENT);
- 	}
- 
--	read_unlock(&mboxes_lock);
-+	spin_unlock(&mboxes_lock);
- 
- 	ret = omap_mbox_startup(mbox);
- 	if (ret)
-@@ -374,15 +374,15 @@ int omap_mbox_register(struct device *parent, struct omap_mbox *mbox)
- 	if (mbox->next)
- 		return -EBUSY;
- 
--	write_lock(&mboxes_lock);
-+	spin_lock(&mboxes_lock);
- 	tmp = find_mboxes(mbox->name);
- 	if (*tmp) {
- 		ret = -EBUSY;
--		write_unlock(&mboxes_lock);
-+		spin_unlock(&mboxes_lock);
- 		goto err_find;
- 	}
- 	*tmp = mbox;
--	write_unlock(&mboxes_lock);
-+	spin_unlock(&mboxes_lock);
- 
- 	return 0;
- 
-@@ -395,18 +395,18 @@ int omap_mbox_unregister(struct omap_mbox *mbox)
- {
- 	struct omap_mbox **tmp;
- 
--	write_lock(&mboxes_lock);
-+	spin_lock(&mboxes_lock);
- 	tmp = &mboxes;
- 	while (*tmp) {
- 		if (mbox == *tmp) {
- 			*tmp = mbox->next;
- 			mbox->next = NULL;
--			write_unlock(&mboxes_lock);
-+			spin_unlock(&mboxes_lock);
- 			return 0;
+-		if (unlikely(ret)) {
++		if (ret) {
+ 			mutex_unlock(&mbox_configured_lock);
+ 			return ret;
  		}
- 		tmp = &(*tmp)->next;
- 	}
--	write_unlock(&mboxes_lock);
-+	spin_unlock(&mboxes_lock);
+@@ -273,7 +273,7 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
  
- 	return -EINVAL;
- }
+ 	ret = request_irq(mbox->irq, mbox_interrupt, IRQF_SHARED,
+ 				mbox->name, mbox);
+-	if (unlikely(ret)) {
++	if (ret) {
+ 		printk(KERN_ERR
+ 			"failed to register mailbox interrupt:%d\n", ret);
+ 		goto fail_request_irq;
+@@ -300,7 +300,7 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
+  fail_alloc_txq:
+ 	free_irq(mbox->irq, mbox);
+  fail_request_irq:
+-	if (unlikely(mbox->ops->shutdown))
++	if (mbox->ops->shutdown)
+ 		mbox->ops->shutdown(mbox);
+ 
+ 	return ret;
+@@ -314,7 +314,7 @@ static void omap_mbox_fini(struct omap_mbox *mbox)
+ 	mbox_queue_free(mbox->txq);
+ 	mbox_queue_free(mbox->rxq);
+ 
+-	if (unlikely(mbox->ops->shutdown)) {
++	if (mbox->ops->shutdown) {
+ 		mutex_lock(&mbox_configured_lock);
+ 		if (mbox_configured > 0)
+ 			mbox_configured--;
 -- 
 1.7.1.rc1
