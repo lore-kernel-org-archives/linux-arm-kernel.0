@@ -1,26 +1,40 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 03 Jun 2010 16:38:38 -0400 (EDT)
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Fri, 04 Jun 2010 09:04:57 +1200
 Subject: Heads up: Linus plans to kill ARM defconfigs
-In-Reply-To: <201006032227.56429.marek.vasut@gmail.com>
+In-Reply-To: <20100603192459.GA9169@n2100.arm.linux.org.uk>
 References: <20100603192459.GA9169@n2100.arm.linux.org.uk>
-	<201006032155.19349.marek.vasut@gmail.com>
-	<20100603200109.GC9169@n2100.arm.linux.org.uk>
-	<201006032227.56429.marek.vasut@gmail.com>
-Message-ID: <alpine.LFD.2.00.1006031637190.24526@xanadu.home>
+Message-ID: <4C0818F9.9070008@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Jun 2010, Marek Vasut wrote:
-
-> > Anyway, let's not start a new lengthy thread on the subject here; it won't
-> > have much effect being only on this list.
+Russell King - ARM Linux wrote:
+> The subject says everything you need to know.  Randy provided this
+> link earlier:
 > 
-> Just as Nicolas pointed out, we need a solution. I guess lenghty thread is 
-> unavoidable, sorry. If possible, could you CC interested parties ?
+>   http://lkml.org/lkml/2010/6/2/472
+> 
+> Linus doesn't appear to be listening to reason, so I see now this as
+> a fait accompli.  It'll apparantly happen at the next merge window.
+> 
+> So, don't send anything which contains a defconfig file or updates to
+> it.  It's pointless.
 
-The discussion is happening on linux-kernel at vger.kernel.org.  Please 
-feel free to contribute to the thread over there.  You don't need to be 
-subscribed to post.
+Is it worth being a bit proactive and getting rid of some of them in
+advance? Things like spear3[012]0_defconfig are basically identically
+except for the board type. Combining all three of those would remove
+1500 lines of code.
 
+Basically reduce down to one or two defconfigs for each mach directory
+which include as many boards and drivers as possible. People wanting
+more tailored configs can do that in their own trees.
 
-Nicolas
+~Ryan
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
