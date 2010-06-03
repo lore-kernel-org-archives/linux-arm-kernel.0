@@ -1,70 +1,157 @@
 From: eric.miao@canonical.com (Eric Miao)
-Date: Thu,  3 Jun 2010 17:43:34 +0800
-Subject: [PATCH 1/2] [ARM] Make __create_page_table to accept phys_offset in a
-	register
+Date: Thu,  3 Jun 2010 17:43:35 +0800
+Subject: [PATCH 2/2] [ARM] Allow PHYS_OFFSET to be runtime determined
 In-Reply-To: <1275558215-12743-1-git-send-email-eric.miao@canonical.com>
 References: <1275558215-12743-1-git-send-email-eric.miao@canonical.com>
-Message-ID: <1275558215-12743-2-git-send-email-eric.miao@canonical.com>
+Message-ID: <1275558215-12743-3-git-send-email-eric.miao@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Miao <eric.y.miao@gmail.com>
+From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
+Original patch from: "Uwe Kleine-K?nig" <u.kleine-koenig@pengutronix.de>
+
+Changes to the original patch:
+
+1. simplify the algorithm of getting phys_offset by masking PC with
+   0xf000_0000, this works for most platforms, but we can possibly
+   loosen this restriction to 0xf800_0000 or 0xfc00_0000 to cover
+   more platforms like ARCH_MX1/ARCH_SHARK and ARCH_S3C2400. It is
+   a bit more difficult to support the U300 platform though.
+
+2. Assigning 0xdeadbeef to phys_offset might be a bit hackish,
+   explicitly specify the section for it.
+
+3. Make RUNTIME_PHYS_OFFSET a toggle-able option in case someone
+   want to manually enable or disable it. And make it valid only
+   when MMU is enabled and XIP_KERNEL is disabled.
+
+Cc: Lennert Buytenhek <buytenh@wantstofly.org>
+Cc: Steve Chen <schen@mvista.com>
+Cc: Mark A. Greer <mgreer@mvista.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 Signed-off-by: Eric Miao <eric.miao@canonical.com>
 ---
- arch/arm/kernel/head.S |   17 ++++++++++-------
- 1 files changed, 10 insertions(+), 7 deletions(-)
+ arch/arm/Kconfig              |    9 +++++++++
+ arch/arm/include/asm/memory.h |    6 ++++++
+ arch/arm/kernel/head.S        |   14 +++++++++++++-
+ arch/arm/kernel/setup.c       |   10 +++++++++-
+ 4 files changed, 37 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 818f731..add2c15 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1498,6 +1498,15 @@ config TEXT_OFFSET
+ 	  memory start. Currently, it is expected the least significant 16
+ 	  bits to be 0x8000, so to leave space for the initial page table.
+ 
++config RUNTIME_PHYS_OFFSET
++	bool "Auto calculate the physical address of the memory start"
++	depends on MMU && !XIP_KERNEL
++	help
++	  PHYS_OFFSET can be automatically caculated at run time by
++	  masking the PC with 0xf0000000 if the memory starts at 256MB
++	  boundary (most platforms do). Do not select this option if
++	  it is not a correct assumption on your platform.
++
+ config AUTO_ZRELADDR
+ 	bool "Auto calculation of the decompressed kernel image address"
+ 	depends on !ZBOOT_ROM && !(ARCH_MX1 || ARCH_SHARK || ARCH_U300)
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 4312ee5..fb18aff 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -147,6 +147,12 @@
+ 
+ #ifndef __ASSEMBLY__
+ 
++#ifdef CONFIG_RUNTIME_PHYS_OFFSET
++extern unsigned long phys_offset;
++#undef  PHYS_OFFSET
++#define PHYS_OFFSET	phys_offset
++#endif
++
+ /*
+  * The DMA mask corresponding to the maximum bus address allocatable
+  * using GFP_DMA.  The default here places no restriction on DMA
 diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index eb62bf9..db789fb 100644
+index db789fb..c77db05 100644
 --- a/arch/arm/kernel/head.S
 +++ b/arch/arm/kernel/head.S
-@@ -44,8 +44,12 @@
- 	.globl	swapper_pg_dir
- 	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - 0x4000
+@@ -22,7 +22,7 @@
+ #include <asm/thread_info.h>
+ #include <asm/system.h>
  
--	.macro	pgtbl, rd
--	ldr	\rd, =(KERNEL_RAM_PADDR - 0x4000)
-+	.macro	pgtbl, rd, phys_offset
-+	add	\rd, \phys_offset, #(TEXT_OFFSET - 0x4000)
-+	.endm
-+
-+	.macro	get_phys_offset, rd
-+	ldr	\rd, =(PHYS_OFFSET & 0xfff00000)
+-#if (PHYS_OFFSET & 0x001fffff)
++#if !defined(CONFIG_RUNTIME_PHYS_OFFSET) && (PHYS_OFFSET & 0x001fffff)
+ #error "PHYS_OFFSET must be at an even 2MiB boundary!"
+ #endif
+ 
+@@ -48,9 +48,15 @@
+ 	add	\rd, \phys_offset, #(TEXT_OFFSET - 0x4000)
  	.endm
  
++#ifndef CONFIG_RUNTIME_PHYS_OFFSET
+ 	.macro	get_phys_offset, rd
+ 	ldr	\rd, =(PHYS_OFFSET & 0xfff00000)
+ 	.endm
++#else
++	.macro	get_phys_offset, rd
++	and	\rd, pc, #0xf0000000
++	.endm
++#endif
+ 
  #ifdef CONFIG_XIP_KERNEL
-@@ -86,6 +90,7 @@ ENTRY(stext)
- 	movs	r8, r5				@ invalid machine (r5=0)?
- 	beq	__error_a			@ yes, error 'a'
- 	bl	__vet_atags
-+	get_phys_offset r5
- 	bl	__create_page_tables
+ #define KERNEL_START	XIP_VIRT_ADDR(CONFIG_XIP_PHYS_ADDR)
+@@ -332,6 +338,12 @@ __create_page_tables:
+ 	str	r3, [r0]
+ #endif
+ #endif
++
++#ifdef CONFIG_RUNTIME_PHYS_OFFSET
++	@ save to __phys_to_virt(phys_offset)
++	ldr	r0, =(phys_offset - PAGE_OFFSET)
++	str	r5, [r0, r5]
++#endif
+ 	mov	pc, lr
+ ENDPROC(__create_page_tables)
+ 	.ltorg
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 122d999..e11fdb7 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -105,6 +105,12 @@ struct cpu_cache_fns cpu_cache;
+ struct outer_cache_fns outer_cache;
+ EXPORT_SYMBOL(outer_cache);
+ #endif
++#ifdef CONFIG_RUNTIME_PHYS_OFFSET
++/* prevent phys_offset from being end up in bss */
++unsigned long phys_offset __attribute__(section(".data"));
++EXPORT_SYMBOL(phys_offset);
++#endif
++
  
- 	/*
-@@ -215,9 +220,10 @@ ENDPROC(__turn_mmu_on)
-  * Returns:
-  *  r0, r3, r6, r7 corrupted
-  *  r4 = physical page table address
-+ *  r5 = physical address of memory start
-  */
- __create_page_tables:
--	pgtbl	r4				@ page table address
-+	pgtbl	r4, r5				@ page table address
+ struct stack {
+ 	u32 irq[3];
+@@ -648,7 +654,7 @@ static struct init_tags {
+ 	{ tag_size(tag_core), ATAG_CORE },
+ 	{ 1, PAGE_SIZE, 0xff },
+ 	{ tag_size(tag_mem32), ATAG_MEM },
+-	{ MEM_SIZE, PHYS_OFFSET },
++	{ MEM_SIZE, },
+ 	{ 0, ATAG_NONE }
+ };
  
- 	/*
- 	 * Clear the 16K level 1 swapper page table
-@@ -282,10 +288,7 @@ __create_page_tables:
- 	 * Then map first 1MB of ram in case it contains our boot params.
- 	 */
- 	add	r0, r4, #PAGE_OFFSET >> 18
--	orr	r6, r7, #(PHYS_OFFSET & 0xff000000)
--	.if	(PHYS_OFFSET & 0x00f00000)
--	orr	r6, r6, #(PHYS_OFFSET & 0x00f00000)
--	.endif
-+	orr	r6, r5, r7
- 	str	r6, [r0]
+@@ -678,6 +684,8 @@ void __init setup_arch(char **cmdline_p)
+ 	if (mdesc->soft_reboot)
+ 		reboot_setup("s");
  
- #ifdef CONFIG_DEBUG_LL
++	init_tags.mem.start = PHYS_OFFSET;
++
+ 	if (__atags_pointer)
+ 		tags = phys_to_virt(__atags_pointer);
+ 	else if (mdesc->boot_params)
 -- 
 1.7.0.4
