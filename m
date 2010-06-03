@@ -1,77 +1,141 @@
-From: l.fu@pengutronix.de (Luotao Fu)
-Date: Thu,  3 Jun 2010 12:34:48 +0200
-Subject: [PATCH] imxfb: add flag to avoid disabling clk multiple times
-Message-ID: <1275561288-20661-1-git-send-email-l.fu@pengutronix.de>
+From: peter.pearse@arm.com (Peter Pearse)
+Date: Thu, 3 Jun 2010 11:42:48 +0100
+Subject: [RFC,
+	PATCH 1/3] ARM: PL08X: Add PL08x AMBA DMA Controller 	driver.
+In-Reply-To: <AANLkTimoZRr5P_k4QH75upXAWRwkBKJjAfrStm5Znn5S@mail.gmail.com>
+References: <1227275251-12005-1-git-send-email-protected@arm.com>	<1227275251-12005-2-git-send-email-protected@arm.com>	<AANLkTilXKWWvn6HLjfbcC0XFEn-Z7jSf4f6CKHBuW8Qb@mail.gmail.com>
+	<AANLkTimoZRr5P_k4QH75upXAWRwkBKJjAfrStm5Znn5S@mail.gmail.com>
+Message-ID: <000301cb0309$827f2230$3744010a@Emea.Arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-while the imxfb driver blanks the screen. The clock supply to the framebuffer
-controller is disabled. The same callback to disable the fb is, however, also
-used the remove and shutdown hooks of the imxfb platform driver. This means that
-the imxfb driver can run into a WARN in clock_disable while unloading or
-rebooting, if the screen is blanked previously, since the same clock will be
-than eventually disabled multiple times.  This patch adds a flag to make sure
-that the clock will only be disabled, if it was not already disabled before.
+ 
 
-The remove or shutdown callbacks in the imxfb platform driver call
-imxfb_disable_controller to disable the hardware,
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org 
+> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On 
+> Behalf Of Linus Walleij
+> Sent: 02 June 2010 07:19
+> To: linux-arm-kernel at lists.infradead.org
+> Subject: Fwd: [RFC, PATCH 1/3] ARM: PL08X: Add PL08x AMBA DMA 
+> Controller driver.
+> 
+> Oops this was onto the old list address, Peter is busy so 
+> does anybody else know about address boundaries in the RealViews?
+> 
+> Linus Walleij
+> 
+> 
+> ---------- Forwarded message ----------
+> From: Linus Walleij <linus.ml.walleij@gmail.com>
+> Date: 2010/5/30
+> Subject: Re: [RFC, PATCH 1/3] ARM: PL08X: Add PL08x AMBA DMA 
+> Controller driver.
+> To: Peter Pearse <peter.pearse@arm.com>
+> Kopia: linux-arm-kernel <linux-arm-kernel@lists.arm.linux.org.uk>
+> 
+> 
+> Hi,
+> 
+> as you know I'm hacking around with this PL08x driver since 
+> the Versatile support is in the way for getting my DMA work merged.
+> 
+> Now this piece I don't quite get:
+> 
+> 2008/11/21 Peter Pearse <protected@arm.com>:
+> 
+> 
+> > +/*
+> > + * Return number of bytes to fill to boundary, or len  */ 
+> static int 
+> > +pl08x_pre_boundary(int addr, int len) {
+> > + ? ? ? int boundary;
+> > +
+> > + ? ? ? if (len <= 0)
+> > + ? ? ? ? ? ? ? printk(KERN_ERR "PL08X::pre_boundary() - zero 
+> > + length\n");
+> > +
+> > + ? ? ? boundary = ((addr >> PL08X_BOUNDARY_SHIFT) + 1) << 
+> > + PL08X_BOUNDARY_SHIFT;
+> > +
+> > + ? ? ? if (boundary < addr + len)
+> > + ? ? ? ? ? ? ? return boundary - addr;
+> > + ? ? ? else
+> > + ? ? ? ? ? ? ? return len;
+> > +}
+> 
+> This PL08X_BOUNDARY_SHIFT is defined to
+> #define PL08X_BOUNDARY_SHIFT ? ? ? ? ? (10) ? ?/* 1KB 0x400 
+> */ #define PL08X_BOUNDARY_SIZE ? ? ? ? ? ?(1 << PL08X_BOUNDARY_SHIFT)
+> 
+> And then later:
+> 
+> > +/*
+> > + * Note that we assume we never have to change the burst sizes  */ 
+> > +int fill_LLIS_for_desc(struct pl08x_txd *local_txd, int 
+> > +pl08x_chan_num) {
+> > (...)
+> > + ? ? ? ? ? ? ? /*
+> > + ? ? ? ? ? ? ? ?* Make largest possible LLIs until less 
+> than one bus 
+> > + width left
+> > + ? ? ? ? ? ? ? ?*/
+> > + ? ? ? ? ? ? ? while (remainder > (mbus->buswidth - 1)) {
+> > + ? ? ? ? ? ? ? ? ? ? ? int lli_len, target_len;
+> > + ? ? ? ? ? ? ? ? ? ? ? int tsize;
+> > + ? ? ? ? ? ? ? ? ? ? ? int odd_bytes;
+> > + ? ? ? ? ? ? ? ? ? ? ? /*
+> > + ? ? ? ? ? ? ? ? ? ? ? ?* If enough left try to send max possible,
+> > + ? ? ? ? ? ? ? ? ? ? ? ?* otherwise try to send the remainder
+> > + ? ? ? ? ? ? ? ? ? ? ? ?*/
+> > + ? ? ? ? ? ? ? ? ? ? ? target_len = remainder;
+> > + ? ? ? ? ? ? ? ? ? ? ? if (remainder > max_bytes_per_lli)
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? target_len = max_bytes_per_lli;
+> > + ? ? ? ? ? ? ? ? ? ? ? /*
+> > + ? ? ? ? ? ? ? ? ? ? ? ?* ?Set bus lengths for incrementing busses
+> > + ? ? ? ? ? ? ? ? ? ? ? ?* ?to number of bytes which fill
+> > + ? ? ? ? ? ? ? ? ? ? ? ?* ?to next memory boundary
+> > + ? ? ? ? ? ? ? ? ? ? ? ?*/
+> > + ? ? ? ? ? ? ? ? ? ? ? if (cctl_parm.bits.si)
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? local_txd->srcbus.fill_bytes
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? = 
+> > + pl08x_pre_boundary(local_txd->srcbus.addr
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? , 
+> > + remainder);
+> > + ? ? ? ? ? ? ? ? ? ? ? else
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? local_txd->srcbus.fill_bytes
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? = max_bytes_per_lli;
+> 
+> Here the transfer lengths for lli:s crawls up tp a boundary.
+> Now, the DMAC PL08x cannot move past a 0x400 boundary on the 
+> RealViews, so much is clear. But: is this a thing that will affect:
+> 
+> - All RealView / Versatile equipment
+> - All implementations of PL08x on all silicon
 
-Signed-off-by: Luotao Fu <l.fu@pengutronix.de>
----
- drivers/video/imxfb.c |   13 +++++++++++--
- 1 files changed, 11 insertions(+), 2 deletions(-)
+Both pl08x manuals have
+3.5 Address generation
+Address generation can be either incrementing or non-incrementing. Address
+wrapping
+is not supported. Bursts do not cross the 1KB address boundary.
 
-diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-index 17c6b5f..6ef9817 100644
---- a/drivers/video/imxfb.c
-+++ b/drivers/video/imxfb.c
-@@ -35,6 +35,7 @@
- 
- #include <mach/imxfb.h>
- #include <mach/hardware.h>
-+#include <mach/clock.h>
- 
- /*
-  * Complain if VAR is out of range.
-@@ -176,6 +177,7 @@ struct imxfb_info {
- 
- 	struct imx_fb_videomode *mode;
- 	int			num_modes;
-+	bool			fbclk_disabled;
- 
- 	void (*lcd_power)(int);
- 	void (*backlight_power)(int);
-@@ -466,6 +468,7 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
- 	writel(RMCR_LCDC_EN, fbi->regs + LCDC_RMCR);
- 
- 	clk_enable(fbi->clk);
-+	fbi->fbclk_disabled = 0;
- 
- 	if (fbi->backlight_power)
- 		fbi->backlight_power(1);
-@@ -482,7 +485,10 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
- 	if (fbi->lcd_power)
- 		fbi->lcd_power(0);
- 
--	clk_disable(fbi->clk);
-+	if (!fbi->fbclk_disabled) {
-+		fbi->fbclk_disabled = 1;
-+		clk_disable(fbi->clk);
-+	}
- 
- 	writel(0, fbi->regs + LCDC_RMCR);
- }
-@@ -863,7 +869,10 @@ static int __devexit imxfb_remove(struct platform_device *pdev)
- 
- 	iounmap(fbi->regs);
- 	release_mem_region(res->start, resource_size(res));
--	clk_disable(fbi->clk);
-+
-+	if (!fbi->fbclk_disabled)
-+		clk_disable(fbi->clk);
-+
- 	clk_put(fbi->clk);
- 
- 	platform_set_drvdata(pdev, NULL);
--- 
-1.7.1
+
+Although our partners may choose to adapt their implementations to cross
+boundaries
+
+the driver should play safe......
+
+
+
+> - All ARM architectures and nothing to do with the PL08x at 
+> all, rather
+> ?with some AMBA stuff or so?
+> 
+> Yours,
+> Linus Walleij
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
