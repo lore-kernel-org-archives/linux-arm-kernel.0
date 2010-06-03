@@ -1,101 +1,104 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Thu, 03 Jun 2010 15:14:53 +0900
-Subject: [PATCH 2/7] ARM: S5P: Add GPIOlib gpio_to_irq for external
-	interrupts
-In-Reply-To: <20100603054323.GZ4720@trinity.fluff.org>
-References: <1275541299-25566-1-git-send-email-jy0922.shim@samsung.com>
-	<1275541299-25566-2-git-send-email-jy0922.shim@samsung.com>
-	<20100603054323.GZ4720@trinity.fluff.org>
-Message-ID: <4C07485D.2020808@samsung.com>
+From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
+Date: Thu,  3 Jun 2010 09:34:18 +0300
+Subject: [PATCH 10/10] omap mailbox: Set a device in logical mbox instance for
+	traceability
+In-Reply-To: <1275546858-29507-1-git-send-email-Hiroshi.DOYU@nokia.com>
+References: <1275546858-29507-1-git-send-email-Hiroshi.DOYU@nokia.com>
+Message-ID: <1275546858-29507-11-git-send-email-Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/3/2010 2:43 PM, Ben Dooks wrote:
-> On Thu, Jun 03, 2010 at 02:01:34PM +0900, Joonyoung Shim wrote:
->> This patch is to support gpio_to_irq() of GPIOlib for external
->> interrupts. The gpio_to_irq() calls s5p_gpiolib_eint_to_irq function.
-> 
-> How about each s3c_gpio_chip have a irq base in it?
->  
+From: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 
-Good, then it can be arch and irq type(gpio, external)independent codes.
+With this patch, you'll get the following sysfs directories. This
+structure implies that a single platform device, "omap2-mailbox" holds
+multiple logical mbox instances. This could be the base to add sysfs
+files for each logical mboxes. Then userland application can access a
+mbox through sysfs entries if necessary(ex: setting kfifo size
+dynamically)
 
->> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  arch/arm/plat-s5p/Makefile                     |    1 +
->>  arch/arm/plat-s5p/gpiolib.c                    |   35 ++++++++++++++++++++++++
->>  arch/arm/plat-samsung/include/plat/gpio-core.h |    2 +
->>  3 files changed, 38 insertions(+), 0 deletions(-)
->>  create mode 100644 arch/arm/plat-s5p/gpiolib.c
->>
->> diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
->> index 39c242b..f6e1a13 100644
->> --- a/arch/arm/plat-s5p/Makefile
->> +++ b/arch/arm/plat-s5p/Makefile
->> @@ -15,6 +15,7 @@ obj-				:=
->>  obj-y				+= dev-uart.o
->>  obj-y				+= cpu.o
->>  obj-y				+= clock.o
->> +obj-y				+= gpiolib.o
->>  obj-y				+= irq.o
->>  obj-$(CONFIG_S5P_EXT_INT)	+= irq-eint.o
->>  
->> diff --git a/arch/arm/plat-s5p/gpiolib.c b/arch/arm/plat-s5p/gpiolib.c
->> new file mode 100644
->> index 0000000..0c27a9d
->> --- /dev/null
->> +++ b/arch/arm/plat-s5p/gpiolib.c
->> @@ -0,0 +1,35 @@
->> +/*
->> + * linux/arch/arm/plat-s5p/gpiolib.c
->> + *
->> + * Copyright (C) 2010 Samsung Electronics Co.Ltd
->> + * Author: Joonyoung Shim <jy0922.shim@samsung.com>
->> + *
->> + * S5P - GPIOlib support
->> + *
->> + *  This program is free software; you can redistribute  it and/or modify it
->> + *  under  the terms of  the GNU General  Public License as published by the
->> + *  Free Software Foundation;  either version 2 of the  License, or (at your
->> + *  option) any later version.
->> + *
->> + */
->> +
->> +#include <linux/gpio.h>
->> +#include <mach/irqs.h>
->> +#include <mach/regs-gpio.h>
->> +
->> +/* be called from gpio_to_irq() for external interrupts */
->> +int s5p_gpiolib_eint_to_irq(struct gpio_chip *chip, unsigned int offset)
->> +{
->> +	switch (chip->base) {
->> +	case EINT_GPIO_0(0):
->> +		return IRQ_EINT(offset);
->> +	case EINT_GPIO_1(0):
->> +		return IRQ_EINT(8 + offset);
->> +	case EINT_GPIO_2(0):
->> +		return IRQ_EINT(16 + offset);
->> +	case EINT_GPIO_3(0):
->> +		return IRQ_EINT(24 + offset);
->> +	default:
->> +		return -EINVAL;
->> +	}
->> +}
->> diff --git a/arch/arm/plat-samsung/include/plat/gpio-core.h b/arch/arm/plat-samsung/include/plat/gpio-core.h
->> index e358c7d..f6c5151 100644
->> --- a/arch/arm/plat-samsung/include/plat/gpio-core.h
->> +++ b/arch/arm/plat-samsung/include/plat/gpio-core.h
->> @@ -121,6 +121,8 @@ extern void samsung_gpiolib_add_4bit2(struct s3c_gpio_chip *chip);
->>  /* exported for core SoC support to change */
->>  extern struct s3c_gpio_cfg s3c24xx_gpiocfg_default;
->>  
->> +extern int s5p_gpiolib_eint_to_irq(struct gpio_chip *chip, unsigned int offset);
->> +
->>  #ifdef CONFIG_S3C_GPIO_TRACK
->>  extern struct s3c_gpio_chip *s3c_gpios[S3C_GPIO_END];
->>  
->> -- 
->> 1.7.0.4
->>
-> 
+  ~# tree -d -L 2 /sys/devices/platform/omap2-mailbox/
+  /sys/devices/platform/omap2-mailbox/
+  |-- driver -> ../../../bus/platform/drivers/omap2-mailbox
+  |-- mbox
+  |   |-- dsp      <- they are each instances of logical mailbox.
+  |   |-- ducati
+  |   |-- iva2
+  |   |-- mbox01
+  |   |-- mbox02
+  |   |-- mbox03
+  |   |-- .....
+  |   `-- tesla
+  |-- power
+  `-- subsystem -> ../../../bus/platform
+
+This was wrongly dropped by:
+     commit c7c158e57bce6220644f2bcd65d82e1468aa40ec
+
+Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+---
+ arch/arm/plat-omap/mailbox.c |   17 ++++++++++++++++-
+ 1 files changed, 16 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+index ec0e159..87e0cde 100644
+--- a/arch/arm/plat-omap/mailbox.c
++++ b/arch/arm/plat-omap/mailbox.c
+@@ -347,6 +347,8 @@ void omap_mbox_put(struct omap_mbox *mbox)
+ }
+ EXPORT_SYMBOL(omap_mbox_put);
+ 
++static struct class omap_mbox_class = { .name = "mbox", };
++
+ int omap_mbox_register(struct device *parent, struct omap_mbox *mbox)
+ {
+ 	int ret = 0;
+@@ -357,6 +359,11 @@ int omap_mbox_register(struct device *parent, struct omap_mbox *mbox)
+ 	if (mbox->next)
+ 		return -EBUSY;
+ 
++	mbox->dev = device_create(&omap_mbox_class,
++				  parent, 0, mbox, "%s", mbox->name);
++	if (IS_ERR(mbox->dev))
++		return PTR_ERR(mbox->dev);
++
+ 	spin_lock(&mboxes_lock);
+ 	tmp = find_mboxes(mbox->name);
+ 	if (*tmp) {
+@@ -385,6 +392,7 @@ int omap_mbox_unregister(struct omap_mbox *mbox)
+ 			*tmp = mbox->next;
+ 			mbox->next = NULL;
+ 			spin_unlock(&mboxes_lock);
++			device_unregister(mbox->dev);
+ 			return 0;
+ 		}
+ 		tmp = &(*tmp)->next;
+@@ -397,6 +405,12 @@ EXPORT_SYMBOL(omap_mbox_unregister);
+ 
+ static int __init omap_mbox_init(void)
+ {
++	int err;
++
++	err = class_register(&omap_mbox_class);
++	if (err)
++		return err;
++
+ 	mboxd = create_workqueue("mboxd");
+ 	if (!mboxd)
+ 		return -ENOMEM;
+@@ -407,11 +421,12 @@ static int __init omap_mbox_init(void)
+ 
+ 	return 0;
+ }
+-module_init(omap_mbox_init);
++subsys_initcall(omap_mbox_init);
+ 
+ static void __exit omap_mbox_exit(void)
+ {
+ 	destroy_workqueue(mboxd);
++	class_unregister(&omap_mbox_class);
+ }
+ module_exit(omap_mbox_exit);
+ 
+-- 
+1.7.1.rc1
