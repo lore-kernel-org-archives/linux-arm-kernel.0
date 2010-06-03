@@ -1,41 +1,93 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 3 Jun 2010 10:30:06 +0800
-Subject: [URGENT] Re: bit errors on spitz + voipac
-In-Reply-To: <201006030201.13341.marek.vasut@gmail.com>
-References: <20100305212708.GC21773@elf.ucw.cz>
-	<1268048916.6477.9.camel@utx.utx.cz>
-	<20100308121634.GA14904@atrey.karlin.mff.cuni.cz>
-	<201006030201.13341.marek.vasut@gmail.com>
-Message-ID: <AANLkTikSotOdWIKqPpNi100rsVraIxZp6yZplIvaSo9m@mail.gmail.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Thu, 3 Jun 2010 11:21:19 +0800
+Subject: [RFC,PATCH 1/2] Add a common struct clk
+In-Reply-To: <20100602120356.GQ7248@trinity.fluff.org>
+References: <1275479804.137633.565764505843.0.gpush@pororo>
+	<1275479804.138101.137592675542.1.gpush@pororo>
+	<20100602120356.GQ7248@trinity.fluff.org>
+Message-ID: <201006031121.21896.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 3, 2010 at 8:01 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Dne Po 8. b?ezna 2010 13:16:35 Cyril Hrubis napsal(a):
->> Hi!
->>
->> > - And I see display noise while CF Wi-Fi card is active.
->>
->> Forgotten about this one. See for yourself, notice short black vertical
->> lines flashing randomly.
->>
->> http://atrey.karlin.mff.cuni.cz/~metan/outgoing/zaurus_sickness.mpg
->
-> This is not only case of spitz. I've seen LCD image falling apart on pxafb on
-> Voipac PXA270 board. The image was like "torn in half and part of it was moved
-> to right, the hole between staying white".
->
-> This happened exactly when I started doing a DMA transfer from a harddrive
-> attached through pata_pxa. It's perfectly replicable. If I disabled DMA and let
-> it run only in PIO, the image was fine.
->
-> I assume the corruption Pavel was seeing is related. My guess is the problems
-> are caused when DMA between the CPU and a companion chip happens. I dunno if the
-> DMA controller doesn't have enough power to supply LCD and the companion chip
-> with data, but that's one of my guesses.
->
-> btw. Adjusting the DMA descriptor length in pata_pxa didn't help.
->
+Hi Ben,
 
-If there is a FIFO attached, may need the FIFO status when the error happens.
-And a dump of the DMA registers would also be helpful.
+> > And a set of clock operations (defined per type of clock):
+> > 
+> > struct clk_operations {
+> > 
+> >        int             (*enable)(struct clk *);
+> 
+> I'd rather the enable/disable calls where simply a set
+> and a bool on/off, very rarelyt is the enable and disable
+> operartions different.
+
+I thought about merging these, but decided against it. It does work for the 
+simple case where we're setting a bit in a register:
+
+static int clk_foo_set_state(struct clk *_clk, int enable)
+{
+	struct clk_foo *clk = to_clk_foo(_clk)
+	u32 reg;
+
+	reg = raw_readl(foo->some_register);
+	if (enable)
+		reg |= FOO_ENABLE;
+	else
+		reg &= ~FOO_ENABLE;
+	raw_writel(foo->some_register, reg);
+
+	return 0;
+}
+
+However, for anything more complex than this - for example, if there's a 
+parent clock - then we start getting pretty messy:
+
+static int clk_foo_set_state(struct clk *_clk, int enable)
+{
+	struct clk_foo *clk = to_clk_foo(_clk)
+	u32 reg;
+
+	if (enable) {
+		int ret = clk_enable(clk->parent);
+		if (ret)
+			return ret;
+	}
+
+	reg = raw_readl(foo->some_register);
+	if (enable)
+		reg |= FOO_ENABLE;
+	else
+		reg &= ~FOO_ENABLE;
+
+	raw_writel(foo->some_register, reg);
+
+	if (!enable)
+		clk_disable(clk->parent);
+
+	return 0;
+}
+
+- where most of the function becomes surrounded by "if (enable)" statements. 
+
+I'm aware that we can turn this into a conditional call of clk_foo_enable or 
+clk_foo_disable, but then we're back to square 1. I also think that the simple 
+case is clearer (if a little more verbose) with separate functions.
+
+Also, enable and disable in the external clock API have different return 
+types.
+
+> an aside, you might want to just clal these clk_ops to get into the
+> spirit of the original naming.
+
+Either is fine with me - looks like 'ops' is more commonly used:
+
+$ git grep -E '^struct \w*operations\s*\{' include/ | wc -l
+30
+
+$ git grep -E '^struct \w*ops\s*{' include/ | wc -l
+138
+
+Cheers,
+
+
+Jeremy
