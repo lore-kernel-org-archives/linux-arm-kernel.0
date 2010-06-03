@@ -1,32 +1,52 @@
 From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Thu,  3 Jun 2010 09:34:08 +0300
-Subject: [PATCH 00/10] omap mailbox: Paches for -next
-Message-ID: <1275546858-29507-1-git-send-email-Hiroshi.DOYU@nokia.com>
+Date: Thu, 03 Jun 2010 09:40:22 +0300 (EEST)
+Subject: [PATCH v3 00/14] omap: mailbox: bunch of cleanups
+In-Reply-To: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
+References: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <20100603.094022.200375421.Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Felipe,
 
-The following patches are for -next for omap mailbox module.
+From: ext Felipe Contreras <felipe.contreras@gmail.com>
+Subject: [PATCH v3 00/14] omap: mailbox: bunch of cleanups
+Date: Sat, 22 May 2010 19:14:11 +0200
 
-Fernando Guzman Lugo (4):
-  Mailbox: free mailbox interrupt before freeing blk queue
-  Mailbox: flush pending deferred works before freeing blk queue
-  Mailbox: Check valid registered callback before calling
-  Mailbox: disable mailbox interrupt when request queue
+> Hi,
+> 
+> These are hopefully non-functional changes. Just shuffling code around, and
+> removing unecessary stuff.
+> 
+> In v2 I tried to split platform_device and also make mailbox_mach built-in. Not
+> any more.
+> 
+> Comments from Felipe Balbi, Tony Lindgren, Hiroshi DOYU, and Russell King.
+> 
 
-Hiroshi DOYU (2):
-  Mailbox: new mutext lock for h/w mailbox configuration
-  omap mailbox: Set a device in logical mbox instance for traceability
+Have you had a chance to update them?
 
-Ohad Ben-Cohen (4):
-  omap: mailbox: convert rwlocks to spinlock
-  omap: mailbox cleanup: split MODULE_AUTHOR line
-  omap: mailbox: remove (un)likely macros from cold paths
-  omap: mailbox: convert block api to kfifo
-
- arch/arm/mach-omap2/mailbox.c             |    3 +-
- arch/arm/plat-omap/Kconfig                |    9 ++
- arch/arm/plat-omap/include/plat/mailbox.h |    4 +-
- arch/arm/plat-omap/mailbox.c              |  182 ++++++++++++++++-------------
- 4 files changed, 111 insertions(+), 87 deletions(-)
+> Felipe Contreras (14):
+>   omap: mailbox: trivial whitespace cleanups
+>   omap: mailbox: trivial cleanups
+>   omap: mailbox: reorganize structures
+>   omap: mailbox: 2420 should be detected at run-time
+>   omap: mailbox: use correct config for omap1
+>   omap: mailbox: update omap1 probing
+>   omap: mailbox: don't export unecessary symbols
+>   omap: mailbox: remove unecessary fields
+>   omap: mailbox: add IRQ names
+>   omap: mailbox: reorganize registering
+>   omap: mailbox: only compile for configured archs
+>   omap: mailbox: standarize on 'omap-mailbox'
+>   omap: mailbox: simplify omap_mbox_register()
+>   omap: mailbox: reorganize headers
+> 
+>  arch/arm/mach-omap1/devices.c             |   11 +-
+>  arch/arm/mach-omap1/mailbox.c             |   52 ++++-----
+>  arch/arm/mach-omap2/devices.c             |    6 +-
+>  arch/arm/mach-omap2/mailbox.c             |  177 +++++++++++++----------------
+>  arch/arm/plat-omap/include/plat/mailbox.h |   16 +--
+>  arch/arm/plat-omap/mailbox.c              |  136 +++++++++-------------
+>  6 files changed, 168 insertions(+), 230 deletions(-)
+> 
