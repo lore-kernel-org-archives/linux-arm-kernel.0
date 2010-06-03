@@ -1,53 +1,46 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Thu, 3 Jun 2010 17:59:10 +0300
-Subject: [PATCH v3 00/14] omap: mailbox: bunch of cleanups
-In-Reply-To: <20100603114726.GC7127@n2100.arm.linux.org.uk>
-References: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
-	<20100603.094022.200375421.Hiroshi.DOYU@nokia.com>
-	<20100603114726.GC7127@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinBMdcxzF_pZuiFHc1Eox_bYtD8PXG1OuKo0XWu@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 03 Jun 2010 17:15:09 +0100
+Subject: PB1176 broken in 2.6.35-rc1, bisected
+In-Reply-To: <AANLkTimJkaadEM1xvG30WVvEjJPZQXHwx216SeqWFKNp@mail.gmail.com>
+References: <AANLkTikoCy2FH_5ICh-iiI_wzGj6D6oszyM-zCXkNC_4@mail.gmail.com>
+	<1275518783.27834.2.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTimJkaadEM1xvG30WVvEjJPZQXHwx216SeqWFKNp@mail.gmail.com>
+Message-ID: <1275581709.8775.14.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 3, 2010 at 2:47 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jun 03, 2010 at 09:40:22AM +0300, Hiroshi DOYU wrote:
->> > Felipe Contreras (14):
->> > ? omap: mailbox: trivial whitespace cleanups
->> > ? omap: mailbox: trivial cleanups
->
-> I think folk need to read this:
->
-> ? ? ? ?http://lkml.org/lkml/2010/6/2/472
->
-> and consider what it means for the future, and what can be done to reduce
-> the amount of "churn".
+On Thu, 2010-06-03 at 09:48 +0100, Linus Walleij wrote:
+> 2010/6/3 Catalin Marinas <catalin.marinas@arm.com>:
+> > On Wed, 2010-06-02 at 23:33 +0100, Linus Walleij wrote:
+> >> my PB1176 doesn't boot properly in 2.6.35-rc1, it goes to this point
+> >> and hangs:
+> >>
+> >> (...)
+> >> Switching to clocksource timer3
+> >> NET: Registered protocol family 2
+> >> IP route cache hash table entries: 1024 (order: 0, 4096 bytes)
+> >> TCP established hash table entries: 4096 (order: 3, 32768 bytes)
+> >> TCP bind hash table entries: 4096 (order: 2, 16384 bytes)
+> >> TCP: Hash tables configured (established 4096 bind 4096)
+> >> TCP reno registered
+> >> UDP hash table entries: 256 (order: 0, 4096 bytes)
+> >> UDP-Lite hash table entries: 256 (order: 0, 4096 bytes)
+> >> NET: Registered protocol family 1
+> >> RPC: Registered udp transport module.
+> >> RPC: Registered tcp transport module.
+> >> RPC: Registered tcp NFSv4.1 backchannel transport module.
+> >
+> > Have you tried disabling CONFIG_CACHE_L2X0?
+> 
+> Hey it works! :-)
+> 
+> I suppose your latest patches will hopefully  get the defconfig with
+> l2x0 working again in -rc2 if they're merged?
 
-If I have to decipher that rant, my best guess is that he is
-complaining about the amount of code. If that's the case, this patch
-series is only doing good:
-6 files changed, 168 insertions(+), 230 deletions(-)
+I think there is an L2 erratum (and trying to get the right workaround).
+It may be triggered by commit e7c5650f6.
 
-Another part of the rant is the fact that Linus cannot follow the huge
-amount of changes. I think "trivial whitespace cleanups" pretty much
-says: don't look at me if you want to be productive, while "trivial
-cleanups" says, look at me if you feel like looking at easy changes.
-If I were to squash these two, I think the patch series would become
-harder to follow.
-
-Something that helps in other projects, like git, is that merges are
-clearly identified.
-
-Merge branch 'linux-arm'
- Merge branch 'linux-omap'
-  Merge branch 'linux-omap-mbox'
-   Merge branch 'fc-cleanups'
-   Merge branch 'ob-kfifo'
-
-Then it's a bit clearer what each patch series is doing in the mailbox
-tree without looking at individual patches.
-
-Cheers.
+I'll get back on the list with a patch.
 
 -- 
-Felipe Contreras
+Catalin
