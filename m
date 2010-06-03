@@ -1,203 +1,108 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 3 Jun 2010 02:00:25 +0100
-Subject: [PATCH v2 5/5] input: samsung-keypad - Add samsung keypad driver
-In-Reply-To: <4C01EB2E.4020600@samsung.com>
-References: <1275188784-23395-1-git-send-email-jy0922.shim@samsung.com>
-	<1275188784-23395-5-git-send-email-jy0922.shim@samsung.com>
-	<20100530034250.GK7248@trinity.fluff.org>
-	<4C01EB2E.4020600@samsung.com>
-Message-ID: <20100603010025.GA14272@trinity.fluff.org>
+From: randy.dunlap@oracle.com (Randy Dunlap)
+Date: Wed, 02 Jun 2010 18:12:26 -0700
+Subject: [TEMP PATCH v2] Re: make ARM=arm menuconfig problem in mainline
+In-Reply-To: <20100603002526.GV4720@trinity.fluff.org>
+References: <AANLkTikC61Y9g-WbqwgGDghDSy2XtgraFSRoZYkHRGTG@mail.gmail.com>
+	<AANLkTilEYHVHJrj_KgF48OYCSEUcsKLi57Q_Y73d9va-@mail.gmail.com>
+	<20100602085748.6771e025.randy.dunlap@oracle.com>
+	<AANLkTilpzeYVExQfLgpVmS3bPvb_h3kmWaatidekI-0r@mail.gmail.com>
+	<4C068BAA.4030004@oracle.com>
+	<20100603002526.GV4720@trinity.fluff.org>
+Message-ID: <4C07017A.50007@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 30, 2010 at 01:35:58PM +0900, Joonyoung Shim wrote:
-
-> >> +static void samsung_kp_timer(unsigned long data)
-> >> +{
-> >> +	struct samsung_kp *keypad = (struct samsung_kp *)data;
-> >> +
-> >> +	schedule_work(&keypad->work);
-
-would schedule_delayed_work() avoid the need for a timer here?
-
-
-> >> +	keypad = kzalloc(sizeof(*keypad), GFP_KERNEL);
-> >> +	keycodes = kzalloc((pdata->rows << row_shift) * sizeof(*keycodes),
-> >> +			GFP_KERNEL);
-> > 
-> > you could allocate this in one go.
-> > 
+On 06/02/10 17:25, Ben Dooks wrote:
+> On Wed, Jun 02, 2010 at 09:49:46AM -0700, Randy Dunlap wrote:
+>> On 06/02/10 09:08, Nobin Mathew wrote:
+>>>
+>>> On Wed, Jun 2, 2010 at 9:27 PM, Randy Dunlap <randy.dunlap@oracle.com> wrote:
+>>>> On Wed, 2 Jun 2010 20:04:28 +0530 Nobin Mathew wrote:
+>>>>
+>>>>> adding linux-arm-kernel at lists.infradead.org
+>>>>>
+>>>>> Hi,
+>>>>>
+>>>>> The following entry creates problem in ARM System type menu. I am
+>>>>> using a Fedora 12 system.
+>>>>
+>>>> What kind of problem does it create?
+>>>> It seems to work for me (on f11, not f12).
+>>>> Does it have something to do with F12 specifically?
+>>>>
+>>>>
+>>>>> Length of bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440,
+>>>>> S3C2442, S3C2443, S3C2450" is the problem. How can I fix it.
+>>>>
+>>>> Describe the problem, please.
+>>
+>> [please don't top-post]
 > 
-> Hmm, how i do it? Do you mean to allocate keypad and keycodes together?
+> 
+> I can think of several solutions, the first being to remove the S3C prefix
+> friom all these.
+> 
+> S3C24XX is not acceptable, there's S3C series that are either too old to
+> be bothered with, or don't fit under this architecture.
 
-There's a couple of ways to do this, they may of course be not the nicest
-ways.
+and not in the current kernel tree?
+I did not find any others in the current tree....
 
-make the last entry of the first (know size) structure a unsized array.
-as so:
+> how about Samsung S3C: 2410,2412/3,2416,2440/2442,2443,2450
 
-   struct a {
-   	  ...
-	  struct b t[];
-   }
+OK, that works.
 
-then do
-     struct a *my_a;
-     my_a = kzalloc(sizeof(struct a ) + sizeof(struct b) * nr_b);
+For kbuild/kconfig people:  run:
+make ARCH=arm O=test menuconfig
 
-or by incrementing the pointer:
-	struct a *my_a;
-	struct b *my_b;
-
-	my_a = kzalloc(sizeof(struct a ) + sizeof(struct b) * nr_b);
-	my_b = (struct b *)(my_a + 1);
-     
-> >> +	keypad->clk = clk_get(&pdev->dev, "keypad");
-
-I'm going to get rid of this practice, it should be clk_get(&pdev->dev, NULL),
-see up-comming clock changes.
+and then select System Type & ARM system type.  The kconfig "choice" menu at this
+point looks empty.  It seems to be just a text windowing/display problem.
+Pressing the down/up arrow keys will display the choices, although not where they
+should be displayed in the rectangle, and they can be selected there.
 
 
-> >> +	ret = request_irq(keypad->irq, samsung_kp_interrupt, 0,
-> >> +			dev_name(&pdev->dev), keypad);
-> >> +
-> >> +	if (ret)
-NO PRINT HERE?
+>>> Sorry if attachments are not allowed, when I go to select ARM system
+>>> type(OMAP, Davinci etc), I am not seeing any entries there in the pop
+>>> up window. When I remove  bool "Samsung S3C2410, S3C2412, S3C2413,
+>>> S3C2416, S3C2440,
+>>>>> S3C2442, S3C2443, S3C2450"  it is working fine. I feel it is something to do with length of that string.
+>>>
+>>> Thanks
+>>> Nobin
+>>
+>>
+>> OK, I see that now.  Well, it is some kind of problem.
+>> Adding cc to linux-kbuild mailing list.
+>>
+>>
+>> The patch below fixes the problem temporarily, but the bool string length does
+>> seem to be a problem.
+>>
+>> Thanks for your report.
 
-> >> +		goto err_disable_clk;
-> >> +
-> >> +	input_dev->name = pdev->name;
-> >> +	input_dev->id.bustype = BUS_HOST;
-> >> +	input_dev->dev.parent = &pdev->dev;
-> >> +
-> >> +	input_dev->evbit[0] = BIT_MASK(EV_KEY);
-> >> +	if (pdata->rep)
-> >> +		input_dev->evbit[0] |= BIT_MASK(EV_REP);
-> >> +
-> >> +	input_dev->keycode = keycodes;
-> >> +	input_dev->keycodesize = sizeof(*keycodes);
-> >> +	input_dev->keycodemax = pdata->rows << row_shift;
-> >> +
-> >> +	matrix_keypad_build_keymap(keymap_data, row_shift,
-> >> +			input_dev->keycode, input_dev->keybit);
-> >> +
-> >> +	ret = input_register_device(keypad->input_dev);
-> >> +	if (ret)
-> >> +		goto err_free_irq;
-> >> +
-> >> +	platform_set_drvdata(pdev, keypad);
-> >> +	clk_disable(keypad->clk);
-> >> +
-> >> +	return 0;
-> >> +
-> >> +err_free_irq:
-> >> +	free_irq(keypad->irq, keypad);
-> >> +err_disable_clk:
-> >> +	clk_disable(keypad->clk);
-> >> +	clk_put(keypad->clk);
-> >> +err_unmap_base:
-> >> +	iounmap(keypad->base);
-> >> +err_free_mem:
-> >> +	input_free_device(input_dev);
-> >> +	kfree(keycodes);
-> >> +	kfree(keypad);
-> >> +
-> >> +	return ret;
-> >> +}
-> >> +
-> >> +static int __devexit samsung_kp_remove(struct platform_device *pdev)
-> >> +{
-> >> +	struct samsung_kp *keypad = platform_get_drvdata(pdev);
-> >> +
-> >> +	free_irq(keypad->irq, keypad);
-> >> +	cancel_work_sync(&keypad->work);
-> >> +	del_timer_sync(&keypad->timer);
-> >> +
-> >> +	platform_set_drvdata(pdev, NULL);
-> >> +	input_unregister_device(keypad->input_dev);
-> >> +
-> >> +	clk_disable(keypad->clk);
-> >> +	clk_put(keypad->clk);
-> >> +
-> >> +	iounmap(keypad->base);
-> >> +	kfree(keypad->keycodes);
-> >> +	kfree(keypad);
-> >> +
-> >> +	return 0;
-> >> +}
-> >> +
-> >> +#ifdef CONFIG_PM
-> >> +static int samsung_kp_suspend(struct device *dev)
-> >> +{
-> >> +	struct platform_device *pdev = to_platform_device(dev);
-> >> +	struct samsung_kp *keypad = platform_get_drvdata(pdev);
-> >> +
-> >> +	disable_irq(keypad->irq);
-> >> +
-> >> +	return 0;
-> >> +}
-> >> +
-> >> +static int samsung_kp_resume(struct device pdev)
-> >> +{
-> >> +	struct platform_device *pdev = to_platform_device(dev);
-> >> +	struct samsung_kp *keypad = platform_get_drvdata(pdev);
-> >> +	unsigned int val;
-> >> +
-> >> +	clk_enable(keypad->clk);
-> >> +
-> >> +	/* enable interrupt and wakeup bit */
-> >> +	val = SAMSUNG_INT_F_EN | SAMSUNG_INT_R_EN | SAMSUNG_WAKEUPEN;
-> >> +	writel(val, keypad->base + SAMSUNG_KEYIFCON);
-> >> +
-> >> +	/* KEYIFCOL reg clear */
-> >> +	writel(0, keypad->base + SAMSUNG_KEYIFCOL);
-> >> +
-> >> +	enable_irq(keypad->irq);
-> >> +	clk_disable(keypad->clk);
-> >> +
-> >> +	return 0;
-> >> +}
-> >> +
-> >> +static const struct dev_pm_ops samsung_kp_pm_ops = {
-> >> +	.suspend	= samsung_kp_suspend,
-> >> +	.resume		= samsung_kp_resume,
-> >> +};
-> >> +#endif
-> >> +
-> >> +static struct platform_driver samsung_kp_driver = {
-> >> +	.probe		= samsung_kp_probe,
-> >> +	.remove		= __devexit_p(samsung_kp_remove),
-> >> +	.driver		= {
-> >> +		.name	= "samsung-keypad",
-> >> +		.owner	= THIS_MODULE,
-> >> +#ifdef CONFIG_PM
-> >> +		.pm	= &samsung_kp_pm_ops,
-> >> +#endif
-> >> +	},
-> >> +};
-> >> +
-> >> +static int __init samsung_kp_init(void)
-> >> +{
-> >> +	return platform_driver_register(&samsung_kp_driver);
-> >> +}
-> >> +
-> >> +static void __exit samsung_kp_exit(void)
-> >> +{
-> >> +	platform_driver_unregister(&samsung_kp_driver);
-> >> +}
-> >> +
-> >> +module_init(samsung_kp_init);
-> >> +module_exit(samsung_kp_exit);
-> >> +
-> >> +MODULE_DESCRIPTION("Samsung keypad driver");
-> >> +MODULE_AUTHOR("Joonyoung Shim <jy0922.shim@samsung.com>");
-> >> +MODULE_AUTHOR("Donghwa Lee <dh09.lee@samsung.com>");
-> >> +MODULE_LICENSE("GPL");
 
-You missed MODULE_ALIAS() for your platform device name
+---
+From: Randy Dunlap <randy.dunlap@oracle.com>
 
--- 
-Ben
+"bool <long string>" causes kconfig choices not to be displayed
+correctly, so temporarily change it to a shorter string until a real
+fix is found.
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Signed-off-by: Randy Dunlap <randy.dunlap@oracle.com>
+Reported-by: Nobin Mathew <nobin.mathew@gmail.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+---
+ arch/arm/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- linux-next-20100602.orig/arch/arm/Kconfig
++++ linux-next-20100602/arch/arm/Kconfig
+@@ -629,7 +629,7 @@ config ARCH_SA1100
+ 	  Support for StrongARM 11x0 based boards.
+ 
+ config ARCH_S3C2410
+-	bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442, S3C2443, S3C2450"
++	bool "Samsung S3C: 2410,2412/3,2416,2440/2442,2443,2450"
+ 	select GENERIC_GPIO
+ 	select ARCH_HAS_CPUFREQ
+ 	select HAVE_CLK
