@@ -1,39 +1,39 @@
-From: yegor_sub1@visionsystems.de (Yegor Yefremov)
-Date: Thu, 03 Jun 2010 16:02:59 +0200
-Subject: AC97 audio broken on SAM9263EK?
-In-Reply-To: <4C07A422.5070505@atmel.com>
-References: <4B85789D.6000704@billgatliff.com>
-	<4B864C66.6060209@atmel.com>	<4B867108.2050806@billgatliff.com>
-	<4B86AA29.8010806@atmel.com>	<4B89E1BB.6090504@billgatliff.com>
-	<4B8B9849.5040203@atmel.com> <4B96571A.3040403@visionsystems.de>
-	<4B96668E.6090805@atmel.com> <4B975C9A.3020106@visionsystems.de>
-	<4B97602C.6070608@atmel.com> <4B97BD8C.3030502@visionsystems.de>
-	<4B97C086.2080404@atmel.com> <4C050D97.4000404@visionsystems.de>
-	<4C07A422.5070505@atmel.com>
-Message-ID: <4C07B613.2040201@visionsystems.de>
+From: amit.kucheria@canonical.com (Amit Kucheria)
+Date: Thu, 3 Jun 2010 17:35:34 +0300
+Subject: [V2 1/3] mxc: Add support for the imx51 3-stack board
+In-Reply-To: <20100603135705.GA25357@pengutronix.de>
+References: <1275566746-6510-1-git-send-email-jason77.wang@gmail.com>
+	<1275566746-6510-2-git-send-email-jason77.wang@gmail.com>
+	<20100603123908.GB3527@matterhorn.lan>
+	<20100603135705.GA25357@pengutronix.de>
+Message-ID: <20100603143534.GC3527@matterhorn.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sedji,
+On 10 Jun 03, Sascha Hauer wrote:
+> On Thu, Jun 03, 2010 at 03:39:08PM +0300, Amit Kucheria wrote:
+> > Two comments inline.
+> > 
+> > > +static struct platform_device smsc_lan9217_device = {
+> > > +	.name = "smsc911x",
+> > > +	.id = 0,
+> > > +	.dev = {
+> > > +		.platform_data = &smsc911x_config,
+> > > +	},
+> > > +	.num_resources = ARRAY_SIZE(smsc911x_resources),
+> > > +	.resource = smsc911x_resources,
+> > > +};
+> > 
+> > You forgot to move this platform_device to devices.c
+> 
+> No, devices.c is the place for the i.MX51 integrated peripherals, not
+> for externally conntected peripherals.
 
-> It is an error indeed, it should be a debug message.
+OK. Didn't know this was an externally connected peripheral. Which, BTW, is
+also why I had suggested that the smsc and the debug board support were added as
+separate patches. But it is a preference thing.
 
-here is a patch:
-
-atmel: set "channel A event" output to debug
-
-Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
-
-Index: b/sound/atmel/ac97c.c
-===================================================================
---- a/sound/atmel/ac97c.c	2010-06-01 15:28:23.000000000 +0200
-+++ b/sound/atmel/ac97c.c	2010-06-03 15:20:43.000000000 +0200
-@@ -657,7 +657,7 @@
- 	if (sr & AC97C_SR_CAEVT) {
- 		struct snd_pcm_runtime *runtime;
- 		int offset, next_period, block_size;
--		dev_info(&chip->pdev->dev, "channel A event%s%s%s%s%s%s\n",
-+		dev_dbg(&chip->pdev->dev, "channel A event%s%s%s%s%s%s\n",
- 				casr & AC97C_CSR_OVRUN   ? " OVRUN"   : "",
- 				casr & AC97C_CSR_RXRDY   ? " RXRDY"   : "",
- 				casr & AC97C_CSR_UNRUN   ? " UNRUN"   : "",
+-- 
+----------------------------------------------------------------------
+Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
+----------------------------------------------------------------------
