@@ -1,37 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Jun 2010 11:31:44 +0100
-Subject: [PATCH] S5PV210: Increase the VIC_NR as 4
-In-Reply-To: <20100603100954.GA17434@july>
-References: <20100603100954.GA17434@july>
-Message-ID: <20100603103144.GA7127@n2100.arm.linux.org.uk>
+From: l.fu@pengutronix.de (Luotao Fu)
+Date: Thu,  3 Jun 2010 12:34:48 +0200
+Subject: [PATCH] imxfb: add flag to avoid disabling clk multiple times
+Message-ID: <1275561288-20661-1-git-send-email-l.fu@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 03, 2010 at 07:09:54PM +0900, Kyungmin Park wrote:
-> The S5PV210 SoC have 4 VICs. It requires for suspend and resume.
+while the imxfb driver blanks the screen. The clock supply to the framebuffer
+controller is disabled. The same callback to disable the fb is, however, also
+used the remove and shutdown hooks of the imxfb platform driver. This means that
+the imxfb driver can run into a WARN in clock_disable while unloading or
+rebooting, if the screen is blanked previously, since the same clock will be
+than eventually disabled multiple times.  This patch adds a flag to make sure
+that the clock will only be disabled, if it was not already disabled before.
 
-Isn't this negated by Ben's "ARM: VIC: Allocate VIC PM device from slab"
-patch?
+The remove or shutdown callbacks in the imxfb platform driver call
+imxfb_disable_controller to disable the hardware,
 
-Incidentally, shouldn't Ben's patch remove this configuration option too?
+Signed-off-by: Luotao Fu <l.fu@pengutronix.de>
+---
+ drivers/video/imxfb.c |   13 +++++++++++--
+ 1 files changed, 11 insertions(+), 2 deletions(-)
 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> 
-> diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
-> index 0a34c81..0ac3d81 100644
-> --- a/arch/arm/common/Kconfig
-> +++ b/arch/arm/common/Kconfig
-> @@ -6,6 +6,7 @@ config ARM_VIC
->  
->  config ARM_VIC_NR
->  	int
-> +	default 4 if ARCH_S5PV210
->  	default 2
->  	depends on ARM_VIC
->  	help
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index 17c6b5f..6ef9817 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -35,6 +35,7 @@
+ 
+ #include <mach/imxfb.h>
+ #include <mach/hardware.h>
++#include <mach/clock.h>
+ 
+ /*
+  * Complain if VAR is out of range.
+@@ -176,6 +177,7 @@ struct imxfb_info {
+ 
+ 	struct imx_fb_videomode *mode;
+ 	int			num_modes;
++	bool			fbclk_disabled;
+ 
+ 	void (*lcd_power)(int);
+ 	void (*backlight_power)(int);
+@@ -466,6 +468,7 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ 	writel(RMCR_LCDC_EN, fbi->regs + LCDC_RMCR);
+ 
+ 	clk_enable(fbi->clk);
++	fbi->fbclk_disabled = 0;
+ 
+ 	if (fbi->backlight_power)
+ 		fbi->backlight_power(1);
+@@ -482,7 +485,10 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ 	if (fbi->lcd_power)
+ 		fbi->lcd_power(0);
+ 
+-	clk_disable(fbi->clk);
++	if (!fbi->fbclk_disabled) {
++		fbi->fbclk_disabled = 1;
++		clk_disable(fbi->clk);
++	}
+ 
+ 	writel(0, fbi->regs + LCDC_RMCR);
+ }
+@@ -863,7 +869,10 @@ static int __devexit imxfb_remove(struct platform_device *pdev)
+ 
+ 	iounmap(fbi->regs);
+ 	release_mem_region(res->start, resource_size(res));
+-	clk_disable(fbi->clk);
++
++	if (!fbi->fbclk_disabled)
++		clk_disable(fbi->clk);
++
+ 	clk_put(fbi->clk);
+ 
+ 	platform_set_drvdata(pdev, NULL);
+-- 
+1.7.1
