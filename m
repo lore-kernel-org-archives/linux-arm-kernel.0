@@ -1,24 +1,19 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 03 Jun 2010 19:09:54 +0900
-Subject: [PATCH] S5PV210: Increase the VIC_NR as 4
-Message-ID: <20100603100954.GA17434@july>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Thu, 3 Jun 2010 13:23:43 +0300
+Subject: [PATCH v3 00/14] omap: mailbox: bunch of cleanups
+In-Reply-To: <20100603.094022.200375421.Hiroshi.DOYU@nokia.com>
+References: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
+	<20100603.094022.200375421.Hiroshi.DOYU@nokia.com>
+Message-ID: <AANLkTinI-TCT6CnfauzXPnmZFSSxU3LRD030zRbTuxbF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The S5PV210 SoC have 4 VICs. It requires for suspend and resume.
+On Thu, Jun 3, 2010 at 9:40 AM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
+> Have you had a chance to update them?
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
+Sorry, no. I've been busy with user-space stuff. Probably this weekend.
 
-diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
-index 0a34c81..0ac3d81 100644
---- a/arch/arm/common/Kconfig
-+++ b/arch/arm/common/Kconfig
-@@ -6,6 +6,7 @@ config ARM_VIC
- 
- config ARM_VIC_NR
- 	int
-+	default 4 if ARCH_S5PV210
- 	default 2
- 	depends on ARM_VIC
- 	help
+There's no merge-window rush or anything, right?
+
+-- 
+Felipe Contreras
