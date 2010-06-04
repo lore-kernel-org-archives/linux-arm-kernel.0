@@ -1,31 +1,29 @@
-From: lizf@cn.fujitsu.com (Li Zefan)
-Date: Fri, 04 Jun 2010 08:57:35 +0800
-Subject: [PATCH 2/2] menuconfig: truncate list items
-In-Reply-To: <4C07D932.4040404@oracle.com>
-References: <4C0758B7.5070907@cn.fujitsu.com>
-	<4C0758C9.7080108@cn.fujitsu.com> <4C07D932.4040404@oracle.com>
-Message-ID: <4C084F7F.9060802@cn.fujitsu.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri,  4 Jun 2010 03:07:32 +0200
+Subject: [PATCH 1/3] pxa/colibri270: Fix typo in colibri_pxa270_flash
+Message-ID: <1275613654-23918-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Randy Dunlap wrote:
-> On 06/03/10 00:24, Li Zefan wrote:
->> Truncate list items to fit in a single line, otherwise those items
->> which have long prompts will cover some other items.
->>
->> This follows the behavior of menubox.
->>
->> Signed-off-by: Li Zefan <lizf@cn.fujitsu.com>
-> 
-> Thanks :)
-> 
-> Tested-by: Randy Dunlap <randy.dunlap@oracle.com>
-> 
-> Ben, the Samsung S3C24* prompt still gets truncated with this patch (when using
-> an 80-column wide xterm).  If you care about seeing all of the models,
-> you might want to shorten the prompt.
-> 
+Append colibri_pxa270_flash(_device). This was missing.
 
-An alterative is to print the truncated string and end it with "...":
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ arch/arm/mach-pxa/colibri-pxa270.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-( ) Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440...
+diff --git a/arch/arm/mach-pxa/colibri-pxa270.c b/arch/arm/mach-pxa/colibri-pxa270.c
+index 96ce4ae..98673ac 100644
+--- a/arch/arm/mach-pxa/colibri-pxa270.c
++++ b/arch/arm/mach-pxa/colibri-pxa270.c
+@@ -99,7 +99,7 @@ static struct platform_device colibri_pxa270_flash_device = {
+ 
+ static void __init colibri_pxa270_nor_init(void)
+ {
+-	platform_device_register(&colibri_pxa270_flash);
++	platform_device_register(&colibri_pxa270_flash_device);
+ }
+ #else
+ static inline void colibri_pxa270_nor_init(void) {}
+-- 
+1.7.1
