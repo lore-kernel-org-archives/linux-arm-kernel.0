@@ -1,48 +1,82 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 03 Jun 2010 16:46:37 -0700
-Subject: Heads up: Linus plans to kill ARM defconfigs
-In-Reply-To: <20100603200109.GC9169@n2100.arm.linux.org.uk>
-References: <20100603192459.GA9169@n2100.arm.linux.org.uk>
-	<201006032155.19349.marek.vasut@gmail.com>
-	<20100603200109.GC9169@n2100.arm.linux.org.uk>
-Message-ID: <1275608797.23384.328.camel@c-dwalke-linux.qualcomm.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Fri, 4 Jun 2010 01:06:05 +0100
+Subject: [RFC,PATCH 1/2] Add a common struct clk
+In-Reply-To: <20100603110533.GB7127@n2100.arm.linux.org.uk>
+References: <1275479804.137633.565764505843.0.gpush@pororo>
+	<201006031121.21896.jeremy.kerr@canonical.com>
+	<20100603081354.GA4720@trinity.fluff.org>
+	<201006031824.53832.jeremy.kerr@canonical.com>
+	<20100603110533.GB7127@n2100.arm.linux.org.uk>
+Message-ID: <20100604000605.GF4720@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-06-03 at 21:01 +0100, Russell King - ARM Linux wrote:
-> On Thu, Jun 03, 2010 at 09:55:19PM +0200, Marek Vasut wrote:
-> > Dne ?t 3. ?ervna 2010 21:24:59 Russell King - ARM Linux napsal(a):
-> > > The subject says everything you need to know.  Randy provided this
-> > > link earlier:
-> > > 
-> > >   http://lkml.org/lkml/2010/6/2/472
-> > > 
-> > > Linus doesn't appear to be listening to reason, so I see now this as
-> > > a fait accompli.  It'll apparantly happen at the next merge window.
+On Thu, Jun 03, 2010 at 12:05:33PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jun 03, 2010 at 06:24:50PM +0800, Jeremy Kerr wrote:
+> > OK, this would mean adding parent to struct clk:
 > > 
-> > The defconfigs age ... there's no point keeping them. They'll be useless crap 
-> > unless someone updates them often anyway.
+> > struct clk {
+> > 	struct clk_operations	*ops;
+> > 	atomic_t				enable_count;
+> 
+> I don't think it makes sense for this to be an atomic type.
+> 
+> > static inline int clk_enable(struct clk *clk)
+> > {
+> > 	int ret;
 > > 
-> > Maybe adding a Kconfig option that's select all the default stuff the platform 
-> > needs would be a way to go ? (that was already proposed there)
+> > 	if (atomic_inc(clk->enable_count) != 1))
+> > 		return 0;
 > 
-> The problem comes (as Daniel pointed out _after_ my suggested solution to
-> this problem) is if you want to turn off something that's 'selected' in
-> this way.
+> Okay, so what if we sleep at this point, and someone else comes along
+> and calls clk_enable(), which'll merely increment the count and return.
 > 
-> Anyway, let's not start a new lengthy thread on the subject here; it won't
-> have much effect being only on this list.
+> Unfortunately, the clock is still disabled at that point - which is a
+> violation of what's supposed to happen.
+> 
+> Or to put it another way, the above method results in clk_enable()
+> sometimes returning with the clock enabled and sometimes with the
+> clock still disabled.
+> 
+> That's not nice behaviour for drivers which may need the clock enabled
+> to read/write the device registers.
 
-I think Linus was suggesting that we create Kconfig files that are
-strictly used to generate .config files for certain platforms.
+You're right, especially if the clock takes time to enable.
 
-So his proposal was to encode everything into Kconfig files, but those
-Kconfig options we use don't show up in "make menuconfig" .. so the
-whole notion of things not getting unselected doesn't really matter, we
-wouldn't end up dealing with it.
+Either we need some form of locking to deal with this. An overall lock
+will cause problems with respect to re-using clk_enable() internally
+and per-clock locks are probably a bad idea with respect of trying to
+lock the parents (deadlock) depending on the implementation.
 
-You would just generate the .config for whatever sub-architecture you
-need, then run "make menuconfig" and select or de-select whatever else
-you want.
+I'm not sure if something like a wake queue is required, where any caller
+who is calling when the clock is disabled gets placed on the queue
+awaiting the original enabler finishing the enable operation.
 
-Daniel
+	 if (atomic_increment(&clk->usage_count) == 1) {
+	    /* start enable */
+	    atomic_set(&clk->is_enabled, 1);
+	    wake_up(&clk->wait_for_enable);   
+	 } else if (atomic_read(&clk->is_enabled) == 0) {
+	   wait_event(&clk->wait_for_enable);
+	 }
+
+Also, what about the behaviour across >1 CPU? There's a pile of
+up-comming SoCs with SMP ARM cores. If CPU1 enables the clock, and CPU2
+comes along and tries to do that also, we have the same race condition
+again.
+
+As an addendum to Russell's comments, we need to specify the behaviour
+with resepect to what happens about clock stabilisation as well, if the
+clock we enabled takes time to stabilise, then should we wait? This will
+be even worse when we realise some of these architectures have clocks
+which are source from PLLs that can be turned on/off, and these PLLs
+have settling time in 100s of usecs.
+
+Even if the clock is enabled, it requires time to stabilise to avoid
+problems when the driver then goes to try and use it.
+
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
