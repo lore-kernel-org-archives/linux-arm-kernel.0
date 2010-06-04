@@ -1,29 +1,39 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri,  4 Jun 2010 03:07:32 +0200
-Subject: [PATCH 1/3] pxa/colibri270: Fix typo in colibri_pxa270_flash
-Message-ID: <1275613654-23918-1-git-send-email-marek.vasut@gmail.com>
+Date: Fri,  4 Jun 2010 03:07:34 +0200
+Subject: [PATCH 3/3] wm97xx_batt: Remove redundant header file
+In-Reply-To: <1275613654-23918-1-git-send-email-marek.vasut@gmail.com>
+References: <1275613654-23918-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1275613654-23918-3-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Append colibri_pxa270_flash(_device). This was missing.
-
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- arch/arm/mach-pxa/colibri-pxa270.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ include/linux/wm97xx_batt.h |   16 ----------------
+ 1 files changed, 0 insertions(+), 16 deletions(-)
+ delete mode 100644 include/linux/wm97xx_batt.h
 
-diff --git a/arch/arm/mach-pxa/colibri-pxa270.c b/arch/arm/mach-pxa/colibri-pxa270.c
-index 96ce4ae..98673ac 100644
---- a/arch/arm/mach-pxa/colibri-pxa270.c
-+++ b/arch/arm/mach-pxa/colibri-pxa270.c
-@@ -99,7 +99,7 @@ static struct platform_device colibri_pxa270_flash_device = {
- 
- static void __init colibri_pxa270_nor_init(void)
- {
--	platform_device_register(&colibri_pxa270_flash);
-+	platform_device_register(&colibri_pxa270_flash_device);
- }
- #else
- static inline void colibri_pxa270_nor_init(void) {}
+diff --git a/include/linux/wm97xx_batt.h b/include/linux/wm97xx_batt.h
+deleted file mode 100644
+index a1d6419..0000000
+--- a/include/linux/wm97xx_batt.h
++++ /dev/null
+@@ -1,16 +0,0 @@
+-#ifndef _LINUX_WM97XX_BAT_H
+-#define _LINUX_WM97XX_BAT_H
+-
+-#include <linux/wm97xx.h>
+-
+-#warning This file will be removed soon, use wm97xx.h instead!
+-
+-#define wm97xx_batt_info wm97xx_batt_pdata
+-
+-#ifdef CONFIG_BATTERY_WM97XX
+-void wm97xx_bat_set_pdata(struct wm97xx_batt_info *data);
+-#else
+-static inline void wm97xx_bat_set_pdata(struct wm97xx_batt_info *data) {}
+-#endif
+-
+-#endif
 -- 
 1.7.1
