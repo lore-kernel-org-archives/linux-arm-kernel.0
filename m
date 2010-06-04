@@ -1,32 +1,27 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri,  4 Jun 2010 07:52:28 +0200
-Subject: [PATCH 2/2] backlight: Fix blanking for L4F00242T03 LCD
-In-Reply-To: <1275630748-10722-1-git-send-email-marek.vasut@gmail.com>
-References: <1275630748-10722-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1275630748-10722-2-git-send-email-marek.vasut@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 Jun 2010 09:03:39 +0300
+Subject: Heads up: Linus plans to kill ARM defconfigs
+In-Reply-To: <201006040353.35816.marek.vasut@gmail.com>
+References: <20100603192459.GA9169@n2100.arm.linux.org.uk>
+	<201006040337.10593.marek.vasut@gmail.com>
+	<201006040350.36944.marek.vasut@gmail.com>
+	<201006040353.35816.marek.vasut@gmail.com>
+Message-ID: <20100604060338.GH6499@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LCD was turned on if the variable power was > 0, but that was incorrect. The
-LCD has to be turned on in every case but POWERDOWN.
+* Marek Vasut <marek.vasut@gmail.com> [100604 04:54]:
+> > 
+> > OMAP: palmte_defconfig, palmtt_defconfig, palmz71_defconfig
+> 
+> Ok, making them into one is compile tested. I'd be for calling it a 
+> "palmomap_defconfig". Or maybe is there a plan to put whole OMAP1 into a single 
+> defconfig ?
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- drivers/video/backlight/l4f00242t03.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Yeah, we should have just one omap1_defconfig. It should already
+mostly work already for 15xx + 16xx. To build in 7xx, the entry-macro.S
+needs to be done the same way as for mach-omap2.
 
-diff --git a/drivers/video/backlight/l4f00242t03.c b/drivers/video/backlight/l4f00242t03.c
-index 9093ef0..ac20b2e 100644
---- a/drivers/video/backlight/l4f00242t03.c
-+++ b/drivers/video/backlight/l4f00242t03.c
-@@ -78,7 +78,7 @@ static int l4f00242t03_lcd_power_set(struct lcd_device *ld, int power)
- 	const u16 slpin = 0x10;
- 	const u16 disoff = 0x28;
- 
--	if (power) {
-+	if (power < FB_BLANK_POWERDOWN) {
- 		if (priv->lcd_on)
- 			return 0;
- 
--- 
-1.7.1
+Regards,
+
+Tony
