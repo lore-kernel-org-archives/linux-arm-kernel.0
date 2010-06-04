@@ -1,196 +1,183 @@
 From: jason77.wang@gmail.com (Jason Wang)
-Date: Fri,  4 Jun 2010 22:09:26 +0800
-Subject: [V3 5/7] mxc/mx51: Add support for the imx51 3-stack board
-In-Reply-To: <1275660568-7738-5-git-send-email-jason77.wang@gmail.com>
+Date: Fri,  4 Jun 2010 22:09:27 +0800
+Subject: [V3 6/7] mx51/keypad: add keypad support for i.MX51 platforms
+In-Reply-To: <1275660568-7738-6-git-send-email-jason77.wang@gmail.com>
 References: <1275660568-7738-1-git-send-email-jason77.wang@gmail.com>
 	<1275660568-7738-2-git-send-email-jason77.wang@gmail.com>
 	<1275660568-7738-3-git-send-email-jason77.wang@gmail.com>
 	<1275660568-7738-4-git-send-email-jason77.wang@gmail.com>
 	<1275660568-7738-5-git-send-email-jason77.wang@gmail.com>
-Message-ID: <1275660568-7738-6-git-send-email-jason77.wang@gmail.com>
+	<1275660568-7738-6-git-send-email-jason77.wang@gmail.com>
+Message-ID: <1275660568-7738-7-git-send-email-jason77.wang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3-stack is a reference board from Freescale for their i.MX51 SoC.
-
-Add board definition, Kconfig and Makefile to enable Freescale 3-stack
-board.
-
-Boot tested on a i.MX51 3-stack Rev2.0 board
+Add keypad controller device definition for all i.MX51 platforms,
+add a dummy kpp clock for imx keypad driver and add keypad device
+registration on i.MX51 3-stack board.
 
 Signed-off-by: Jason Wang <jason77.wang@gmail.com>
 ---
- arch/arm/mach-mx5/Kconfig                       |    6 ++
- arch/arm/mach-mx5/Makefile                      |    2 +-
- arch/arm/mach-mx5/board-mx51_3ds.c              |  100 +++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/board-mx51_3ds.h |   27 ++++++
- 4 files changed, 134 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-mx5/board-mx51_3ds.c
- create mode 100644 arch/arm/plat-mxc/include/mach/board-mx51_3ds.h
+ arch/arm/mach-mx5/board-mx51_3ds.c |   61 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mx5/clock-mx51.c     |    5 +++
+ arch/arm/mach-mx5/devices.c        |   19 +++++++++++
+ arch/arm/mach-mx5/devices.h        |    1 +
+ 4 files changed, 86 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index 1576d51..6ef3428 100644
---- a/arch/arm/mach-mx5/Kconfig
-+++ b/arch/arm/mach-mx5/Kconfig
-@@ -15,4 +15,10 @@ config MACH_MX51_BABBAGE
- 	  u-boot. This includes specific configurations for the board and its
- 	  peripherals.
- 
-+config MACH_MX51_3DS
-+	bool "Support MX51PDK (3DS)"
-+	select MXC_DEBUG_BOARD
-+	help
-+	  Include support for MX51PDK (3DS) platform. This includes specific
-+	  configurations for the board and its peripherals.
- endif
-diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-index bf23f86..c757c59 100644
---- a/arch/arm/mach-mx5/Makefile
-+++ b/arch/arm/mach-mx5/Makefile
-@@ -6,4 +6,4 @@
- obj-y   := cpu.o mm.o clock-mx51.o devices.o
- 
- obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
--
-+obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
 diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
-new file mode 100644
-index 0000000..af0362c
---- /dev/null
+index af0362c..49f576f 100644
+--- a/arch/arm/mach-mx5/board-mx51_3ds.c
 +++ b/arch/arm/mach-mx5/board-mx51_3ds.c
-@@ -0,0 +1,100 @@
-+/*
-+ * Copyright 2008-2009 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright (C) 2010 Jason Wang <jason77.wang@gmail.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
+@@ -12,6 +12,7 @@
+ 
+ #include <linux/irq.h>
+ #include <linux/platform_device.h>
++#include <linux/input/matrix_keypad.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -47,6 +48,18 @@ static struct pad_desc mx51_3ds_pads[] = {
+ 
+ 	/* CPLD PARENT IRQ PIN */
+ 	MX51_PAD_GPIO_1_6__GPIO1_6,
 +
-+#include <linux/irq.h>
-+#include <linux/platform_device.h>
++	/* KPP */
++	MX51_PAD_KEY_ROW0__KEY_ROW0,
++	MX51_PAD_KEY_ROW1__KEY_ROW1,
++	MX51_PAD_KEY_ROW2__KEY_ROW2,
++	MX51_PAD_KEY_ROW3__KEY_ROW3,
++	MX51_PAD_KEY_COL0__KEY_COL0,
++	MX51_PAD_KEY_COL1__KEY_COL1,
++	MX51_PAD_KEY_COL2__KEY_COL2,
++	MX51_PAD_KEY_COL3__KEY_COL3,
++	MX51_PAD_KEY_COL4__KEY_COL4,
++	MX51_PAD_KEY_COL5__KEY_COL5,
+ };
+ 
+ /* Serial ports */
+@@ -67,6 +80,52 @@ static inline void mxc_init_imx_uart(void)
+ }
+ #endif /* SERIAL_IMX */
+ 
++#if defined(CONFIG_KEYBOARD_IMX) || defined(CONFIG_KEYBOARD_IMX_MODULE)
++static int mx51_3ds_board_keymap[] = {
++	KEY(0, 0, KEY_1),
++	KEY(0, 1, KEY_2),
++	KEY(0, 2, KEY_3),
++	KEY(0, 3, KEY_F1),
++	KEY(0, 4, KEY_UP),
++	KEY(0, 5, KEY_F2),
 +
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
++	KEY(1, 0, KEY_4),
++	KEY(1, 1, KEY_5),
++	KEY(1, 2, KEY_6),
++	KEY(1, 3, KEY_LEFT),
++	KEY(1, 4, KEY_SELECT),
++	KEY(1, 5, KEY_RIGHT),
 +
-+#include <mach/hardware.h>
-+#include <mach/common.h>
-+#include <mach/iomux-mx51.h>
-+#include <mach/board-mx51_3ds.h>
-+#include <mach/imx-uart.h>
-+#include <mach/cpld_debugboard.h>
++	KEY(2, 0, KEY_7),
++	KEY(2, 1, KEY_8),
++	KEY(2, 2, KEY_9),
++	KEY(2, 3, KEY_F3),
++	KEY(2, 4, KEY_DOWN),
++	KEY(2, 5, KEY_F4),
 +
-+#include "devices.h"
-+
-+static struct pad_desc mx51_3ds_pads[] = {
-+	/* UART1 */
-+	MX51_PAD_UART1_RXD__UART1_RXD,
-+	MX51_PAD_UART1_TXD__UART1_TXD,
-+	MX51_PAD_UART1_RTS__UART1_RTS,
-+	MX51_PAD_UART1_CTS__UART1_CTS,
-+
-+	/* UART2 */
-+	MX51_PAD_UART2_RXD__UART2_RXD,
-+	MX51_PAD_UART2_TXD__UART2_TXD,
-+	MX51_PAD_EIM_D25__UART2_CTS,
-+	MX51_PAD_EIM_D26__UART2_RTS,
-+
-+	/* UART3 */
-+	MX51_PAD_UART3_RXD__UART3_RXD,
-+	MX51_PAD_UART3_TXD__UART3_TXD,
-+	MX51_PAD_EIM_D24__UART3_CTS,
-+	MX51_PAD_EIM_D27__UART3_RTS,
-+
-+	/* CPLD PARENT IRQ PIN */
-+	MX51_PAD_GPIO_1_6__GPIO1_6,
++	KEY(3, 0, KEY_0),
++	KEY(3, 1, KEY_OK),
++	KEY(3, 2, KEY_ESC),
++	KEY(3, 3, KEY_ENTER),
++	KEY(3, 4, KEY_MENU),
++	KEY(3, 5, KEY_BACK)
 +};
 +
-+/* Serial ports */
-+#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
-+static struct imxuart_platform_data uart_pdata = {
-+	.flags = IMXUART_HAVE_RTSCTS,
++static struct matrix_keymap_data mx51_3ds_map_data = {
++	.keymap		= mx51_3ds_board_keymap,
++	.keymap_size	= ARRAY_SIZE(mx51_3ds_board_keymap),
 +};
 +
-+static inline void mxc_init_imx_uart(void)
++static void mxc_init_keypad(void)
 +{
-+	mxc_register_device(&mxc_uart_device0, &uart_pdata);
-+	mxc_register_device(&mxc_uart_device1, &uart_pdata);
-+	mxc_register_device(&mxc_uart_device2, &uart_pdata);
++	mxc_register_device(&mxc_keypad_device, &mx51_3ds_map_data);
 +}
-+#else /* !SERIAL_IMX */
-+static inline void mxc_init_imx_uart(void)
++#else
++static inline void mxc_init_keypad(void)
 +{
 +}
-+#endif /* SERIAL_IMX */
++#endif
 +
-+/*
-+ * Board specific initialization.
-+ */
-+static void __init mxc_board_init(void)
-+{
-+	mxc_iomux_v3_setup_multiple_pads(mx51_3ds_pads,
-+					ARRAY_SIZE(mx51_3ds_pads));
-+	mxc_init_imx_uart();
+ /*
+  * Board specific initialization.
+  */
+@@ -78,6 +137,8 @@ static void __init mxc_board_init(void)
+ 
+ 	if (!mxc_expio_init(MX51_CS5_BASE_ADDR, EXPIO_PARENT_INT))
+ 		platform_device_register(&smsc_lan9217_device);
 +
-+	if (!mxc_expio_init(MX51_CS5_BASE_ADDR, EXPIO_PARENT_INT))
-+		platform_device_register(&smsc_lan9217_device);
-+}
-+
-+static void __init mx51_3ds_timer_init(void)
-+{
-+	mx51_clocks_init(32768, 24000000, 22579200, 0);
-+}
-+
-+static struct sys_timer mxc_timer = {
-+	.init	= mx51_3ds_timer_init,
++	mxc_init_keypad();
+ }
+ 
+ static void __init mx51_3ds_timer_init(void)
+diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
+index d9f612d..60fced6 100644
+--- a/arch/arm/mach-mx5/clock-mx51.c
++++ b/arch/arm/mach-mx5/clock-mx51.c
+@@ -758,6 +758,10 @@ static struct clk gpt_32k_clk = {
+ 	.parent = &ckil_clk,
+ };
+ 
++static struct clk kpp_clk = {
++	.id = 0,
 +};
 +
-+MACHINE_START(MX51_3DS, "Freescale MX51 3-Stack Board")
-+	.phys_io = MX51_AIPS1_BASE_ADDR,
-+	.io_pg_offst = ((MX51_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.boot_params = PHYS_OFFSET + 0x100,
-+	.map_io = mx51_map_io,
-+	.init_irq = mx51_init_irq,
-+	.init_machine = mxc_board_init,
-+	.timer = &mxc_timer,
-+MACHINE_END
-diff --git a/arch/arm/plat-mxc/include/mach/board-mx51_3ds.h b/arch/arm/plat-mxc/include/mach/board-mx51_3ds.h
-new file mode 100644
-index 0000000..c2aa016
---- /dev/null
-+++ b/arch/arm/plat-mxc/include/mach/board-mx51_3ds.h
-@@ -0,0 +1,27 @@
-+/*
-+ * Copyright 2008-2009 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
+ #define DEFINE_CLOCK(name, i, er, es, gr, sr, p, s)	\
+ 	static struct clk name = {			\
+ 		.id		= i,			\
+@@ -821,6 +825,7 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", ahb_clk)
+ 	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
+ 	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
++	_REGISTER_CLOCK("imx-keypad.0", NULL, kpp_clk)
+ };
+ 
+ static void clk_tree_init(void)
+diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
+index 7130449..2aa4ea0 100644
+--- a/arch/arm/mach-mx5/devices.c
++++ b/arch/arm/mach-mx5/devices.c
+@@ -168,6 +168,25 @@ struct platform_device mxc_wdt = {
+ 	.resource = mxc_wdt_resources,
+ };
+ 
++static struct resource mxc_kpp_resources[] = {
++	{
++		.start = MX51_MXC_INT_KPP,
++		.end = MX51_MXC_INT_KPP,
++		.flags = IORESOURCE_IRQ,
++	} , {
++		.start = MX51_KPP_BASE_ADDR,
++		.end = MX51_KPP_BASE_ADDR + 0x8 - 1,
++		.flags = IORESOURCE_MEM,
++	},
++};
 +
-+#ifndef __ASM_ARCH_MXC_BOARD_MX51_3DS_H__
-+#define __ASM_ARCH_MXC_BOARD_MX51_3DS_H__
++struct platform_device mxc_keypad_device = {
++	.name = "imx-keypad",
++	.id = 0,
++	.num_resources = ARRAY_SIZE(mxc_kpp_resources),
++	.resource = mxc_kpp_resources,
++};
 +
-+/*
-+ * plat-mxc/include/mach/board-mx51_3ds.h
-+ *
-+ * This file contains all the board level configuration options.
-+ *
-+ * It currently hold the options defined for MX51 3Stack Platform.
-+ *
-+ */
-+
-+#define EXPIO_PARENT_INT	(MXC_INTERNAL_IRQS + GPIO_PORTA + 6)
-+
-+#endif	/* __ASM_ARCH_MXC_BOARD_MX51_3DS_H__ */
+ static struct mxc_gpio_port mxc_gpio_ports[] = {
+ 	{
+ 		.chip.label = "gpio-0",
+diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
+index c879ae7..1fef140 100644
+--- a/arch/arm/mach-mx5/devices.h
++++ b/arch/arm/mach-mx5/devices.h
+@@ -6,3 +6,4 @@ extern struct platform_device mxc_usbdr_host_device;
+ extern struct platform_device mxc_usbh1_device;
+ extern struct platform_device mxc_usbdr_udc_device;
+ extern struct platform_device mxc_wdt;
++extern struct platform_device mxc_keypad_device;
 -- 
 1.5.6.5
