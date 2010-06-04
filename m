@@ -1,86 +1,41 @@
-From: martin.ereth@arcor.de (Martin Ereth)
-Date: Fri, 04 Jun 2010 23:58:58 +0200
-Subject: [PATCH 2.6.35-rc1] arm/mach-at91: Different crystal frequencies on
-	AT91SAM9263 evaluation kit
-Message-ID: <4C097722.7060704@arcor.de>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Sat, 05 Jun 2010 00:08:44 +0200
+Subject: Heads up: Linus plans to kill ARM defconfigs
+In-Reply-To: <alpine.LFD.2.00.1006041418390.22319@xanadu.home> (Nicolas
+	Pitre's message of "Fri, 04 Jun 2010 16:51:24 -0400 (EDT)")
+References: <20100603192459.GA9169@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1006031829020.24526@xanadu.home>
+	<4C083BCF.2060500@bluewatersys.com>
+	<201006040310.15019.marek.vasut@gmail.com>
+	<4C0853E1.1080005@bluewatersys.com>
+	<AANLkTinEq99_8UyVNnmzNEreDoyHKEnxpuJmaAo_kpPN@mail.gmail.com>
+	<20100604061034.GI6499@atomide.com>
+	<AANLkTikrK-RkDntgrpptBaG6TvnesNFncOw3DW4Jt-TY@mail.gmail.com>
+	<AANLkTil1IetX6koHVRrgnWs3DqhPtZVqR2euEdg9lZUa@mail.gmail.com>
+	<alpine.LFD.2.00.1006041418390.22319@xanadu.home>
+Message-ID: <m38w6ulac3.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Ereth <martin.ereth@arcor.de>
+Nicolas Pitre <nico@fluxnic.net> writes:
 
-On newer evaluation boards for AT91SAM9263 Atmel changed the crystal where the
-frequency of the processor is derived from. They changed it from 16.36766 MHz
-to 18.432 MHz because it is easier to connect a gps receiver.
+> Linus wants something to be done about the current defconfig mess which 
+> is perfectly legitimate.  He even suggested a possible solution.  I 
+> don't think he'll simply drop those defconfig files if we demonstrate 
+> that we're taking action to fix the actual problem.
 
-Using the wrong crystal frequency during board initialization results in the
-wrong frequency of the processor which leads to strange characters on a serial
-console.
+To be honest, I see no usefulness in current defconfigs. Not only ARM
+- in any and all defconfigs altogether.
 
-With this patch the user is able to choose the crystal installed on his board.
+Having this info somewhere on the web, maybe - just like we have the
+build logs etc. But in the kernel source tree?
 
-Signed-off-by: Martin Ereth <martin.ereth@arcor.de>
----
+I wonder if I'm the only one frequently doing
+grep CONFIG* ... | grep -v defconfig.
 
-Please be patient, this is my first patch. If I do things wrong
-please tell me. What is the next step? Thanks.
-
-diff -rupN linux-2.6.35-rc1-vanilla/arch/arm/mach-at91/board-sam9263ek.c linux-2.6.35-rc1/arch/arm/mach-at91/board-sam9263ek.c
---- linux-2.6.35-rc1-vanilla/arch/arm/mach-at91/board-sam9263ek.c       2010-06-04 15:40:55.000000000 +0200
-+++ linux-2.6.35-rc1/arch/arm/mach-at91/board-sam9263ek.c       2010-06-04 16:43:18.000000000 +0200
-@@ -54,8 +54,8 @@
-
-  static void __init ek_map_io(void)
-  {
--       /* Initialize processor: 16.367 MHz crystal */
--       at91sam9263_initialize(16367660);
-+       /* Initialize processor: 16.36766 MHz or 18.432 MHz crystal */
-+       at91sam9263_initialize(AT91SAM9263_CRYSTAL_HZ);
-
-         /* DBGU on ttyS0. (Rx & Tx only) */
-         at91_register_uart(0, 0, 0);
-diff -rupN linux-2.6.35-rc1-vanilla/arch/arm/mach-at91/include/mach/at91sam9263.h linux-2.6.35-rc1/arch/arm/mach-at91/include/mach/at91sam9263.h
---- linux-2.6.35-rc1-vanilla/arch/arm/mach-at91/include/mach/at91sam9263.h      2010-06-04 15:40:55.000000000 +0200
-+++ linux-2.6.35-rc1/arch/arm/mach-at91/include/mach/at91sam9263.h      2010-06-04 16:51:56.000000000 +0200
-@@ -123,5 +123,13 @@
-  #define AT91SAM9263_DMAC_BASE  0x00800000      /* DMA Controller */
-  #define AT91SAM9263_UHP_BASE   0x00a00000      /* USB Host controller */
-
-+/*
-+ * Crystals.
-+ */
-+#if defined(CONFIG_HAVE_AT91SAM9263_CRYSTAL_16367660)
-+#define AT91SAM9263_CRYSTAL_HZ 16367660
-+#else /* CONFIG_HAVE_AT91SAM9263_CRYSTAL_18432000 */
-+#define AT91SAM9263_CRYSTAL_HZ 18432000
-+#endif
-
-  #endif
-diff -rupN linux-2.6.35-rc1-vanilla/arch/arm/mach-at91/Kconfig linux-2.6.35-rc1/arch/arm/mach-at91/Kconfig
---- linux-2.6.35-rc1-vanilla/arch/arm/mach-at91/Kconfig 2010-06-04 15:40:55.000000000 +0200
-+++ linux-2.6.35-rc1/arch/arm/mach-at91/Kconfig 2010-06-04 16:22:19.000000000 +0200
-@@ -448,6 +448,25 @@ config MTD_NAND_ATMEL_BUSWIDTH_16
-           On AT91SAM926x boards both types of NAND flash can be present
-           (8 and 16 bit data bus width).
-
-+if MACH_AT91SAM9263EK
-+
-+choice
-+       prompt "Choose crystal frequency on your board"
-+
-+config HAVE_AT91SAM9263_CRYSTAL_16367660
-+       bool "16.36766 MHz"
-+       help
-+         Select this if you have a 16.36766 MHz crystal on your board.
-+
-+config HAVE_AT91SAM9263_CRYSTAL_18432000
-+       bool "18.432 MHz"
-+       help
-+         Select this if you have a 18.432 MHz crystal on your board.
-+
-+endchoice
-+
-+endif
-+
-  # ----------------------------------------------------------
-
-  comment "AT91 Feature Selections"
+I think the issue will fix itself when the "select problem" is fixed.
+And we should've fixed the "select problem" long ago (e.g. Kconfig*
+should be able to select things without worrying about intermediate
+steps, and it should be able to ask the user if needed).
+-- 
+Krzysztof Halasa
