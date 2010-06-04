@@ -1,82 +1,52 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 4 Jun 2010 01:06:05 +0100
-Subject: [RFC,PATCH 1/2] Add a common struct clk
-In-Reply-To: <20100603110533.GB7127@n2100.arm.linux.org.uk>
-References: <1275479804.137633.565764505843.0.gpush@pororo>
-	<201006031121.21896.jeremy.kerr@canonical.com>
-	<20100603081354.GA4720@trinity.fluff.org>
-	<201006031824.53832.jeremy.kerr@canonical.com>
-	<20100603110533.GB7127@n2100.arm.linux.org.uk>
-Message-ID: <20100604000605.GF4720@trinity.fluff.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 03 Jun 2010 20:13:32 -0400 (EDT)
+Subject: Heads up: Linus plans to kill ARM defconfigs
+In-Reply-To: <AANLkTinKoGMzJBUhUkG9O--Q2sWbqaSgdHKTJ6QtrbOd@mail.gmail.com>
+References: <20100603192459.GA9169@n2100.arm.linux.org.uk>
+	<4C0818F9.9070008@bluewatersys.com>
+	<alpine.LFD.2.00.1006031829020.24526@xanadu.home>
+	<4C083BCF.2060500@bluewatersys.com>
+	<AANLkTinKoGMzJBUhUkG9O--Q2sWbqaSgdHKTJ6QtrbOd@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1006031955510.24526@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 03, 2010 at 12:05:33PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jun 03, 2010 at 06:24:50PM +0800, Jeremy Kerr wrote:
-> > OK, this would mean adding parent to struct clk:
-> > 
-> > struct clk {
-> > 	struct clk_operations	*ops;
-> > 	atomic_t				enable_count;
+On Fri, 4 Jun 2010, Kyungmin Park wrote:
+
+> If target has several variants with different memory size, different
+> GPIOs. It's really hard to maintain and support.
+> To address this issues. we implement the detect routine and give
+> different system revision at bootloader side and kernel boot with this
+> information. with this approaches I can support 5 different targets
+> based on s5pc110.
+
+Please have a look at arch/arm/mach-kirkwood/netspace_v2-setup.c for 
+example.  This file contains the support for two boards already.  
+They're supported by the same source files because they have lot of code 
+in common.  but the differences are distinguished by the machine ID 
+number passed into r1 by the bootloader used to select which machine 
+record is selected.  The proper machine_init method within each of those 
+machine records is called on boot, where a different table for GPIO 
+initialization (it is called MPP on Kirkwood) is again selected.  All 
+this is accomplished at run time.
+
+If you want more complex GPIO config variants, have a look at mach-pxa/* 
+where they're called MFP instead.
+
+Memory size should normally be detected and passed along to the kernel 
+by the bootloader.
+
+> In previous time, we usually make a kernel for each boards but it's
+> hard works and takes long time. So single kernel is best approaches
+> and it's possible at least similar CPUs. e.g. samsung s5p series.
 > 
-> I don't think it makes sense for this to be an atomic type.
-> 
-> > static inline int clk_enable(struct clk *clk)
-> > {
-> > 	int ret;
-> > 
-> > 	if (atomic_inc(clk->enable_count) != 1))
-> > 		return 0;
-> 
-> Okay, so what if we sleep at this point, and someone else comes along
-> and calls clk_enable(), which'll merely increment the count and return.
-> 
-> Unfortunately, the clock is still disabled at that point - which is a
-> violation of what's supposed to happen.
-> 
-> Or to put it another way, the above method results in clk_enable()
-> sometimes returning with the clock enabled and sometimes with the
-> clock still disabled.
-> 
-> That's not nice behaviour for drivers which may need the clock enabled
-> to read/write the device registers.
+> As I know s5pc110 (aka s5pv210) and s5p644x is similar and can
+> possible to make single kernel.
 
-You're right, especially if the clock takes time to enable.
+Exact.  It is always a good idea to try to compile as many boards as 
+possible in a single kernel, and then have the ability to optimize the 
+kernel configuration in order to have the support for only one board 
+built into the kernel if desired.
 
-Either we need some form of locking to deal with this. An overall lock
-will cause problems with respect to re-using clk_enable() internally
-and per-clock locks are probably a bad idea with respect of trying to
-lock the parents (deadlock) depending on the implementation.
 
-I'm not sure if something like a wake queue is required, where any caller
-who is calling when the clock is disabled gets placed on the queue
-awaiting the original enabler finishing the enable operation.
-
-	 if (atomic_increment(&clk->usage_count) == 1) {
-	    /* start enable */
-	    atomic_set(&clk->is_enabled, 1);
-	    wake_up(&clk->wait_for_enable);   
-	 } else if (atomic_read(&clk->is_enabled) == 0) {
-	   wait_event(&clk->wait_for_enable);
-	 }
-
-Also, what about the behaviour across >1 CPU? There's a pile of
-up-comming SoCs with SMP ARM cores. If CPU1 enables the clock, and CPU2
-comes along and tries to do that also, we have the same race condition
-again.
-
-As an addendum to Russell's comments, we need to specify the behaviour
-with resepect to what happens about clock stabilisation as well, if the
-clock we enabled takes time to stabilise, then should we wait? This will
-be even worse when we realise some of these architectures have clocks
-which are source from PLLs that can be turned on/off, and these PLLs
-have settling time in 100s of usecs.
-
-Even if the clock is enabled, it requires time to stabilise to avoid
-problems when the driver then goes to try and use it.
-
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Nicolas
