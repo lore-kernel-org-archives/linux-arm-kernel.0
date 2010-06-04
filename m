@@ -1,34 +1,56 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Fri, 4 Jun 2010 17:48:08 +0300
-Subject: [V3 0/7]Add i.MX51 3-stack board support
-In-Reply-To: <1275660568-7738-1-git-send-email-jason77.wang@gmail.com>
-References: <1275660568-7738-1-git-send-email-jason77.wang@gmail.com>
-Message-ID: <20100604144808.GC2982@matterhorn.lan>
+From: cjb@laptop.org (Chris Ball)
+Date: Fri, 04 Jun 2010 10:59:14 -0400
+Subject: Libertas/SDIO deep sleep mode
+In-Reply-To: <20100604121245.GW2695@buzzloop.caiaq.de> (Daniel Mack's message
+	of "Fri, 4 Jun 2010 14:12:45 +0200")
+References: <20100604121245.GW2695@buzzloop.caiaq.de>
+Message-ID: <m3631y7sjh.fsf@pullcord.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Jun 04, Jason Wang wrote:
-> I don't know why 2 patches([patch 2/3] and [patch 3/3]) are lost in
-> the V2 review.
-> In V3, i fix all comments both in V1 and V2.
-> 
-> Big diffs:
-> 1) the number of patches increases from 3 to 7, because i add 1 3ds
-> common debug board patch, 2 iomux pad rename and update patches and
-> 1 revert mx31_3ds debug board relating stuffs patch.
-> 
-> 2) Though the smsc911x_platform_config is a little bit different
-> between mx31_3ds and mx51_3ds originally,  when using the common
-> configuration in the mxc debug board, they all works fine. I have
-> validated these two BSPs through mounting NFS rootfs.
-> 
-> 3) the patch [3/7] is a rename and cleanup of iomux pad definition,
-> i don't know if this update has been merged, if so, please drop
-> it.
+Hi,
 
-It didn't fail. Give it some time. :)
+   > Hi, I read about the recently added features in the libertas
+   > driver to send the chip to its deep-sleep mode when the system
+   > suspends, so the wakeup phase is shortened.
 
+I think there might be a bit of terminology confusion here -- as
+I understand it, "deep sleep" refers to putting the 8686 into a
+power-saving mode after a certain amount of idle time, while the
+rest of the system is running.
+
+If you want to preserve power to the 8686 over a system suspend,
+that's a largely different set of code, which isn't complete in
+mainline yet; as you've seen, the MMC and SDHCI side of it is
+upstream, but not libertas or pxamci code yet.
+
+   > * The "Parentless device registered during a PM transaction"
+   > looks like a bug to me. Note that I added kobject_name(&dev->kobj)
+   > to the output to get a clue about what's going on.
+
+Not sure what's going on there.
+
+   > * The firmware survives the suspend/resume transition and works
+   > fine after that. I just wonder why, as the voltage was switched
+   > off?
+
+That's odd.  Perhaps the 8686 is being alternatively powered somehow
+on your hardware?
+
+   > * I believe that if we need to keep the power switched on, there
+   > should be a call to sdio_set_host_pm_flags(MMC_PM_KEEP_POWER)
+   > somewhere in the libertas_sdio layer, right? How should the
+   > pxamci core get to know it shouldn't switch off its regulator?
+
+That's right.  We're using this code at OLPC, to go into system
+suspend with the 8686 powered and then be woken when a new packet
+arrives.  The libertas side of that code hasn't been submitted yet,
+but you're welcome to check it out at our git repo:
+
+http://dev.laptop.org/git/olpc-2.6/commit/?h=olpc-2.6.31&id=db09aa1f537f7d5eae6e52ecf59cdf3571150ee6
+http://dev.laptop.org/git/olpc-2.6/log/drivers/net/wireless/libertas?h=olpc-2.6.31
+
+- Chris.
 -- 
-----------------------------------------------------------------------
-Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-----------------------------------------------------------------------
+Chris Ball   <cjb@laptop.org>
+One Laptop Per Child
