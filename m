@@ -1,24 +1,54 @@
-From: jason77.wang@gmail.com (Jason Wang)
-Date: Fri,  4 Jun 2010 22:09:21 +0800
-Subject: [V3 0/7]Add i.MX51 3-stack board support
-Message-ID: <1275660568-7738-1-git-send-email-jason77.wang@gmail.com>
+From: amit.kucheria@canonical.com (Amit Kucheria)
+Date: Fri, 4 Jun 2010 17:09:59 +0300
+Subject: [PATCH] mxc: Fix pad names for imx51
+In-Reply-To: <20100604105347.GA2982@matterhorn.lan>
+References: <1275566746-6510-1-git-send-email-jason77.wang@gmail.com>
+	<1275566746-6510-2-git-send-email-jason77.wang@gmail.com>
+	<20100604085320.GB25357@pengutronix.de>
+	<20100604105347.GA2982@matterhorn.lan>
+Message-ID: <20100604140959.GB2982@matterhorn.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I don't know why 2 patches([patch 2/3] and [patch 3/3]) are lost in
-the V2 review.
-In V3, i fix all comments both in V1 and V2.
+On 10 Jun 04, Amit Kucheria wrote:
+> On 10 Jun 04, Sascha Hauer wrote:
+> > On Thu, Jun 03, 2010 at 08:05:44PM +0800, Jason Wang wrote:
+> > >  
+> > > -#define MX51_PAD_GPIO_1_22__UART3_RXD	IOMUX_PAD(0x630, 0x240, 3, 0x0, 0, NO_PAD_CTRL)
+> > > -#define MX51_PAD_GPIO_1_23__UART3_TXD	IOMUX_PAD(0x634, 0x244, 3, 0x0, 0, NO_PAD_CTRL)
+> > > +#define MX51_PAD_GPIO_1_22__UART3_RXD	IOMUX_PAD(0x630, 0x240, IOMUX_CONFIG_ALT1, 0x9f4, 4, MX51_UART3_PAD_CTRL)
+> > > +#define MX51_PAD_GPIO_1_23__UART3_TXD	IOMUX_PAD(0x634, 0x244, IOMUX_CONFIG_ALT1, 0x0, 0, MX51_UART3_PAD_CTRL)
+> > 
+> > Urgs, there really is something wrong here.
+> > 
+> > First of all, this define should be named MX51_PAD_UART3_RXD__GPIO_1_22
+> > as it describes the pad UART3_RXD in GPIO_1_22 mode. This seems to be
+> > wrong with many (all?) defines in this file. Amit, you should have read
+> > the comment ontop of this file which you copied from the i.MX35 part:
+> 
+> I'll admit that I was not completely conversant with the naming scheme then.
+> All the GPIO-related names have been reversed. The others seem fine.
+> 
+> > /*
+> >  * The naming convention for the pad modes is MX51_PAD_<padname>__<padmode>
+> >  * If <padname> or <padmode> refers to a GPIO, it is named
+> >  * GPIO_<unit>_<num> see also iomux-v3.h
+> >  */
+> 
+> There was a comment below this:
+> /*
+>  * FIXME: This was converted using scripts from existing Freescale code to
+>  * this form used upstream. Need to verify the name format.
+>  */
+> 
+> I obviously reversed the naming for all the GPIO pads.
+> 
+> > This should be fixed before doing any other change to this file.
+> 
+> I'm preparing a patch now.
+> 
 
-Big diffs:
-1) the number of patches increases from 3 to 7, because i add 1 3ds
-common debug board patch, 2 iomux pad rename and update patches and
-1 revert mx31_3ds debug board relating stuffs patch.
+Please find the patch attached.
 
-2) Though the smsc911x_platform_config is a little bit different
-between mx31_3ds and mx51_3ds originally,  when using the common
-configuration in the mxc debug board, they all works fine. I have
-validated these two BSPs through mounting NFS rootfs.
-
-3) the patch [3/7] is a rename and cleanup of iomux pad definition,
-i don't know if this update has been merged, if so, please drop
-it.
+You can see the output of diff without the whitespace changes here:
+http://paste.ubuntu.com/444628/
