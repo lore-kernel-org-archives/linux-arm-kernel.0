@@ -1,74 +1,67 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Fri, 04 Jun 2010 09:29:43 +0200
-Subject: [PATCH 2/2] backlight: Fix blanking for L4F00242T03 LCD
-In-Reply-To: <1275630748-10722-2-git-send-email-marek.vasut@gmail.com>
-References: <1275630748-10722-1-git-send-email-marek.vasut@gmail.com>
-	<1275630748-10722-2-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1275636583.3210.37.camel@realization>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Fri, 04 Jun 2010 15:30:08 +0800
+Subject: [RFC,PATCH 0/2] Common struct clk implementation, v4
+Message-ID: <1275636608.606606.450179637764.0.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ven, 2010-06-04 at 07:52 +0200, Marek Vasut wrote:
-> The LCD was turned on if the variable power was > 0, but that was incorrect. The
-> LCD has to be turned on in every case but POWERDOWN.
-> 
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+Hi all,
 
-Ack
+These patches are an attempt to allow platforms to share clock code. At
+present, the definitions of 'struct clk' are local to platform code,
+which makes allocating and initialising cross-platform clock sources
+difficult, and makes it impossible to compile a single image containing
+support for two ARM platforms with different struct clks.
 
-> ---
->  drivers/video/backlight/l4f00242t03.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/video/backlight/l4f00242t03.c b/drivers/video/backlight/l4f00242t03.c
-> index 9093ef0..ac20b2e 100644
-> --- a/drivers/video/backlight/l4f00242t03.c
-> +++ b/drivers/video/backlight/l4f00242t03.c
-> @@ -78,7 +78,7 @@ static int l4f00242t03_lcd_power_set(struct lcd_device *ld, int power)
->  	const u16 slpin = 0x10;
->  	const u16 disoff = 0x28;
->  
-> -	if (power) {
-> +	if (power < FB_BLANK_POWERDOWN) {
->  		if (priv->lcd_on)
->  			return 0;
->  
+The two patches are for the architecture-independent kernel code,
+introducing the common clk infrastructure. The changelog for the first
+patch includes details about the new clock definitions.
 
-lcd.h states:
-struct lcd_ops {
-	/* Get the LCD panel power status (0: full on, 1..3: controller
-	   power on, flat panel power off, 4: full off), see FB_BLANK_XXX */
-	int (*get_power)(struct lcd_device *);
-	/* Enable or disable power to the LCD (0: on; 4: off, see FB_BLANK_XXX) */
-	int (*set_power)(struct lcd_device *, int power);
+As requested by rmk, I've put together a small series of patches
+illustrating the usage of the common struct clock on the ARM imx51
+platform. These are available in my git tree:
 
-AFAIK the gray area between FB_BLANK_NORMAL and FB_BLANK_HSYNC_SUSPEND
-can be chosen as needs.
+ git://kernel.ubuntu.com/jk/dt/linux-2.6
 
-Why not:
+in the clk-common-mx51 branch (clk-common..clk-common-mx51).
 
-+ #define POWER_IS_ON(pwr)	((pwr) <= FB_BLANK_NORMAL)
+The approach I've taken with the imx51 port is to temporarly duplicate
+the platform-common clock code (ie, for all mxc-based boards) to enable
+usage of the common struct clk on one machine (imx51), while leaving the
+others as-is. For a proper platform-wide usage of the common struct clk,
+we'd be better off doing the whole platform at once. However, mx51 is
+the only mxc-based HW I have, hence the duplicated example port.
 
-...
+In the example port, the first change simply converts the mxc's struct
+clk to a struct clk_mxc, using the new API.  The subsequent patches move
+certain clocks to more specific data structures (eg clk_fixed and
+clk_pll) where possible.
 
--	if (power) {
-+	if (POWER_IS_ON(power)) {
- 		if (priv->lcd_on)
- 			return 0;
+Ben Herrenschmidt is looking at using common struct clk code for powerpc
+too, hence the kernel-wide approach.
 
-So with FB_BLANK_NORMAL the lcd is active and on -> low latencies
-in re-enabling the video out, but for !POWER_IS_ON(power) we will send  
-the lcd to standby.
+Comments most welcome.
 
-It have to be implemented for power == FB_BLANK_POWERDOWN to turn off the 
-regulators of the lcd.
+Cheers,
 
-What do you think about?
 
-Regards,
+Jeremy
 
--- 
-Alberto!
+--
+v4:
+ * use mutex for enable/disable locking
+ * DEFINE_CLK -> INIT_CLK, and pass the clk name for mutex init
+ * struct clk_operations -> struct clk_ops
 
-        Be Persistent!
-                - Greg Kroah-Hartman (FOSDEM 2010)
+v3:
+ * do clock usage refcounting in common code
+ * provide sample port
+
+v2:
+ * no longer ARM-specific
+ * use clk_operations
+
+---
+Jeremy Kerr (2):
+      Add a common struct clk
+      clk: Generic support for fixed-rate clocks
