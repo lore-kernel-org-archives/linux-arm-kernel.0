@@ -1,65 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 4 Jun 2010 13:42:47 +0300
-Subject: Heads up: Linus plans to kill ARM defconfigs
-In-Reply-To: <AANLkTikrK-RkDntgrpptBaG6TvnesNFncOw3DW4Jt-TY@mail.gmail.com>
-References: <20100603192459.GA9169@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1006031829020.24526@xanadu.home>
-	<4C083BCF.2060500@bluewatersys.com>
-	<201006040310.15019.marek.vasut@gmail.com>
-	<4C0853E1.1080005@bluewatersys.com>
-	<AANLkTinEq99_8UyVNnmzNEreDoyHKEnxpuJmaAo_kpPN@mail.gmail.com>
-	<20100604061034.GI6499@atomide.com>
-	<AANLkTikrK-RkDntgrpptBaG6TvnesNFncOw3DW4Jt-TY@mail.gmail.com>
-Message-ID: <20100604104246.GD11111@atomide.com>
+From: amit.kucheria@canonical.com (Amit Kucheria)
+Date: Fri, 4 Jun 2010 13:53:47 +0300
+Subject: [V2 1/3] mxc: Add support for the imx51 3-stack board
+In-Reply-To: <20100604085320.GB25357@pengutronix.de>
+References: <1275566746-6510-1-git-send-email-jason77.wang@gmail.com>
+	<1275566746-6510-2-git-send-email-jason77.wang@gmail.com>
+	<20100604085320.GB25357@pengutronix.de>
+Message-ID: <20100604105347.GA2982@matterhorn.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Eric Miao <eric.y.miao@gmail.com> [100604 10:07]:
-> On Fri, Jun 4, 2010 at 2:10 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Eric Miao <eric.y.miao@gmail.com> [100604 04:35]:
-> >>
-> >> Also, we are now working on a single kernel for multiple sub-arch (at least
-> >> what Nicolas and I am doing now, and welcome to join us). It's tough (the
-> >> way to handle different phys_offset is only the tip of the iceberg) and seems
-> >> now more and more necessary. so hopefully by the end of the day, we may
-> >> possible end up with only very few defconfig.
-> >
-> > Great, do you have some git branch for that somewhere?
-> >
+On 10 Jun 04, Sascha Hauer wrote:
+> On Thu, Jun 03, 2010 at 08:05:44PM +0800, Jason Wang wrote:
+> >  
+> > -#define MX51_PAD_GPIO_1_22__UART3_RXD	IOMUX_PAD(0x630, 0x240, 3, 0x0, 0, NO_PAD_CTRL)
+> > -#define MX51_PAD_GPIO_1_23__UART3_TXD	IOMUX_PAD(0x634, 0x244, 3, 0x0, 0, NO_PAD_CTRL)
+> > +#define MX51_PAD_GPIO_1_22__UART3_RXD	IOMUX_PAD(0x630, 0x240, IOMUX_CONFIG_ALT1, 0x9f4, 4, MX51_UART3_PAD_CTRL)
+> > +#define MX51_PAD_GPIO_1_23__UART3_TXD	IOMUX_PAD(0x634, 0x244, IOMUX_CONFIG_ALT1, 0x0, 0, MX51_UART3_PAD_CTRL)
 > 
-> All the currently done work I've posted to the mailing list:
+> Urgs, there really is something wrong here.
 > 
-> 1. SPARSEIRQ
-> 2. MULTI_IRQ_HANDLER
-> 3. Makefile.boot move to arch/arm/boot/bootp _only_
-> 4. RUNTIME_PHYS_OFFSET (not really my work, but Uwe's)
-> 
-> Nico and I have setup a blueprint and wiki spec for this, I hope more
-> can join us with the effort.
-> 
-> https://blueprints.launchpad.net/ubuntu/+spec/kernel-maverick-arm-single-zimage
-> https://wiki.ubuntu.com/Specs/ARMSingleKernel
-> 
-> I'll push what I did to
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
-> unified-kernel
-> 
-> But it's a mess now.
+> First of all, this define should be named MX51_PAD_UART3_RXD__GPIO_1_22
+> as it describes the pad UART3_RXD in GPIO_1_22 mode. This seems to be
+> wrong with many (all?) defines in this file. Amit, you should have read
+> the comment ontop of this file which you copied from the i.MX35 part:
 
-OK thanks.
- 
-> > Parallel to dealing with different phys_offset we can also try combining
-> > some two ARM platforms that have the same phy_offset. That already exposes
-> > tons of conflicting defines that need to be sorted out..
-> >
+I'll admit that I was not completely conversant with the naming scheme then.
+All the GPIO-related names have been reversed. The others seem fine.
+
+> /*
+>  * The naming convention for the pad modes is MX51_PAD_<padname>__<padmode>
+>  * If <padname> or <padmode> refers to a GPIO, it is named
+>  * GPIO_<unit>_<num> see also iomux-v3.h
+>  */
+
+There was a comment below this:
+/*
+ * FIXME: This was converted using scripts from existing Freescale code to
+ * this form used upstream. Need to verify the name format.
+ */
+
+I obviously reversed the naming for all the GPIO pads.
+
+> This should be fixed before doing any other change to this file.
+
+I'm preparing a patch now.
+
+> Then Jason, what you are looking for is the following:
 > 
-> A first step to take might be looking at all those machine specific header
-> files that will be included into generic <asm/*.h> and in turn included by
-> other code. The PHYS_OFFSET is only a small tip of the iceberg I'm afraid.
-> A very rough grep and analysis as below:
+> #define MX51_PAD_UART3_RXD__UART3_RXD
+> 
+> because you want the UART3_RXD pad in its native mode.
 
-Nice analysis :) First I need to finish my earlier TLS patch for ARMv6 and 7
-binaries, then I'll try to find some time to help on this stuff too.
+Cheers,
+Amit
 
-Tony
+-- 
+----------------------------------------------------------------------
+Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
+----------------------------------------------------------------------
