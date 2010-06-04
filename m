@@ -1,41 +1,31 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sat, 05 Jun 2010 00:08:44 +0200
-Subject: Heads up: Linus plans to kill ARM defconfigs
-In-Reply-To: <alpine.LFD.2.00.1006041418390.22319@xanadu.home> (Nicolas
-	Pitre's message of "Fri, 04 Jun 2010 16:51:24 -0400 (EDT)")
-References: <20100603192459.GA9169@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1006031829020.24526@xanadu.home>
-	<4C083BCF.2060500@bluewatersys.com>
-	<201006040310.15019.marek.vasut@gmail.com>
-	<4C0853E1.1080005@bluewatersys.com>
-	<AANLkTinEq99_8UyVNnmzNEreDoyHKEnxpuJmaAo_kpPN@mail.gmail.com>
-	<20100604061034.GI6499@atomide.com>
-	<AANLkTikrK-RkDntgrpptBaG6TvnesNFncOw3DW4Jt-TY@mail.gmail.com>
-	<AANLkTil1IetX6koHVRrgnWs3DqhPtZVqR2euEdg9lZUa@mail.gmail.com>
-	<alpine.LFD.2.00.1006041418390.22319@xanadu.home>
-Message-ID: <m38w6ulac3.fsf@intrepid.localdomain>
+From: vince@kyllikki.org (Vincent Sanders)
+Date: Fri, 4 Jun 2010 23:28:20 +0100
+Subject: defconfig information
+Message-ID: <20100604222820.GA4438@kyllikki.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre <nico@fluxnic.net> writes:
+With all the recent issues over default configurations I have decided
+to release the Kernel autobuilder fifth anniversary statistics a bit
+early.
 
-> Linus wants something to be done about the current defconfig mess which 
-> is perfectly legitimate.  He even suggested a possible solution.  I 
-> don't think he'll simply drop those defconfig files if we demonstrate 
-> that we're taking action to fix the actual problem.
+http://armlinux.simtec.co.uk/reports/kautobuild-5year-report.pdf
+http://armlinux.simtec.co.uk/reports/kautobuild-5year-stats.ods
 
-To be honest, I see no usefulness in current defconfigs. Not only ARM
-- in any and all defconfigs altogether.
+The report is still a little raw but clearly illustrates the
+proliferation of default configurations on ARM (although MIPS and PPC
+are not all that far behind!) 
 
-Having this info somewhere on the web, maybe - just like we have the
-build logs etc. But in the kernel source tree?
+In brief, we could loose around 90% of the default configurations
+(i.e. keep only 20 configurations) and "only" loose build coverage of
+40% of the supported machines!
 
-I wonder if I'm the only one frequently doing
-grep CONFIG* ... | grep -v defconfig.
+As always the ARM Kernel autobuilder is available at
+http://armlinux.simtec.co.uk/kautobuild/ 
 
-I think the issue will fix itself when the "select problem" is fixed.
-And we should've fixed the "select problem" long ago (e.g. Kconfig*
-should be able to select things without worrying about intermediate
-steps, and it should be able to ask the user if needed).
+The community usage of this service has dropped to an all time low
+(only six people actually used it in the last month) and I am
+seriously considering if it serves a useful purpose any longer.
+
 -- 
-Krzysztof Halasa
+Regards Vincent
