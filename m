@@ -1,60 +1,48 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Fri, 4 Jun 2010 13:53:47 +0300
-Subject: [V2 1/3] mxc: Add support for the imx51 3-stack board
-In-Reply-To: <20100604085320.GB25357@pengutronix.de>
-References: <1275566746-6510-1-git-send-email-jason77.wang@gmail.com>
-	<1275566746-6510-2-git-send-email-jason77.wang@gmail.com>
-	<20100604085320.GB25357@pengutronix.de>
-Message-ID: <20100604105347.GA2982@matterhorn.lan>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 4 Jun 2010 13:06:59 +0200
+Subject: Heads up: Linus plans to kill ARM defconfigs
+In-Reply-To: <201006032155.19349.marek.vasut@gmail.com>
+References: <20100603192459.GA9169@n2100.arm.linux.org.uk>
+	<201006032155.19349.marek.vasut@gmail.com>
+Message-ID: <20100604110659.GA14543@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Jun 04, Sascha Hauer wrote:
-> On Thu, Jun 03, 2010 at 08:05:44PM +0800, Jason Wang wrote:
-> >  
-> > -#define MX51_PAD_GPIO_1_22__UART3_RXD	IOMUX_PAD(0x630, 0x240, 3, 0x0, 0, NO_PAD_CTRL)
-> > -#define MX51_PAD_GPIO_1_23__UART3_TXD	IOMUX_PAD(0x634, 0x244, 3, 0x0, 0, NO_PAD_CTRL)
-> > +#define MX51_PAD_GPIO_1_22__UART3_RXD	IOMUX_PAD(0x630, 0x240, IOMUX_CONFIG_ALT1, 0x9f4, 4, MX51_UART3_PAD_CTRL)
-> > +#define MX51_PAD_GPIO_1_23__UART3_TXD	IOMUX_PAD(0x634, 0x244, IOMUX_CONFIG_ALT1, 0x0, 0, MX51_UART3_PAD_CTRL)
+On Thu, Jun 03, 2010 at 09:55:19PM +0200, Marek Vasut wrote:
+> Dne ?t 3. ?ervna 2010 21:24:59 Russell King - ARM Linux napsal(a):
+> > The subject says everything you need to know.  Randy provided this
+> > link earlier:
+> > 
+> >   http://lkml.org/lkml/2010/6/2/472
+> > 
+> > Linus doesn't appear to be listening to reason, so I see now this as
+> > a fait accompli.  It'll apparantly happen at the next merge window.
 > 
-> Urgs, there really is something wrong here.
-> 
-> First of all, this define should be named MX51_PAD_UART3_RXD__GPIO_1_22
-> as it describes the pad UART3_RXD in GPIO_1_22 mode. This seems to be
-> wrong with many (all?) defines in this file. Amit, you should have read
-> the comment ontop of this file which you copied from the i.MX35 part:
+> The defconfigs age ... there's no point keeping them. They'll be useless crap 
+> unless someone updates them often anyway.
+Some time ago I wrote a little script that minimized a .config and
+applied it to ns9xxx_defconfig.
 
-I'll admit that I was not completely conversant with the naming scheme then.
-All the GPIO-related names have been reversed. The others seem fine.
+The result is that ns9xxx_defconfig only has 79 lines while the average
+is >1200.  (I have to admit that ns9xxx isn't complete by far as there
+are no device drivers in tree, but anyhow, after $(make
+ns9xxx_defconfig) the resulting .config has 1181 lines.) Would it already
+help to apply it to all defconfigs?  A nice effect is that changes to
+these small files are smaller and so easier to understand.  IIRC I posted
+the script to linux-kbuild back then.  I can try to find and apply it
+before the next merge window.
 
-> /*
->  * The naming convention for the pad modes is MX51_PAD_<padname>__<padmode>
->  * If <padname> or <padmode> refers to a GPIO, it is named
->  * GPIO_<unit>_<num> see also iomux-v3.h
->  */
+And I want to point out that there are efforts to merge all arch-mx* and
+plat-mxc and so reduce the number of defconfigs from seven[1] to one.
+Eric picked up on the runtime-physoffset patches that are currently a
+stopper for (AFAIK) several merges.
 
-There was a comment below this:
-/*
- * FIXME: This was converted using scripts from existing Freescale code to
- * this form used upstream. Need to verify the name format.
- */
+Best regards
+Uwe
 
-I obviously reversed the naming for all the GPIO pads.
-
-> This should be fixed before doing any other change to this file.
-
-I'm preparing a patch now.
-
-> Then Jason, what you are looking for is the following:
-> 
-> #define MX51_PAD_UART3_RXD__UART3_RXD
-> 
-> because you want the UART3_RXD pad in its native mode.
-
-Cheers,
-Amit
+[1] IIRC I recently saw a patch that adds mx25_defconfig, so there are
+even eight imx defconfigs.
 
 -- 
-----------------------------------------------------------------------
-Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-----------------------------------------------------------------------
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
