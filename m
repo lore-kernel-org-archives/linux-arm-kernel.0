@@ -1,15 +1,35 @@
-From: timyao@gmail.com (Tim Yao)
-Date: Thu, 3 Jun 2010 16:22:02 -0700
-Subject: Question about flush_dcache_all in kernel start up code
-Message-ID: <AANLkTimWFpNC_tXJB84pzVrg14Ot_Nk7WGVE9Qwvg_pK@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 4 Jun 2010 16:42:00 +0800
+Subject: Heads up: Linus plans to kill ARM defconfigs
+In-Reply-To: <AANLkTilyIb8WDAanNHlQKHco6rSjzNjNS9Q3TpWQqt8o@mail.gmail.com>
+References: <20100603192459.GA9169@n2100.arm.linux.org.uk>
+	<4C083BCF.2060500@bluewatersys.com>
+	<201006040310.15019.marek.vasut@gmail.com>
+	<201006041036.39059.pieterg@gmx.com>
+	<AANLkTilyIb8WDAanNHlQKHco6rSjzNjNS9Q3TpWQqt8o@mail.gmail.com>
+Message-ID: <AANLkTin1Kt5ydz0Ipq04zYnzEfp69xv0Etu2Iu7FyXAo@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-I have a question regarding the data cache flush routine called at the
-beginning of kernel start up. At the beginning of the start up code, after
-processor type and machine type look up and simple page table created, a
-__switch_data is called which goes to __v7_setup in my case (since the CPU
-is A9). Then at the beginning of the function it calls v7_flush_dcache_all.
-This cache routine is in cache-v7.S and I see it actually does "clean and
-invalidate" operation as opposed to invalidate only.
+That's supposed to be possible with ASoC, what's the exact problem?
+
+- eric from G1
+
+On Jun 4, 2010 4:39 PM, "pieterg" <pieterg@gmx.com> wrote:
+
+On Friday 04 June 2010 03:10:14 Marek Vasut wrote:
+> I just tested, PXA (mach-pxa) probably can be c...
+For my boards (colibri) I see only one exception; I haven't managed to build
+a single kernel with support for different AC97 chips.
+
+I have to build separate WM9715 and UCB1400 kernels.
+
+Rgds, Pieter
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at list...
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100604/1bebde89/attachment-0001.htm>
