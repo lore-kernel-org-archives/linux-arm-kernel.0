@@ -1,56 +1,34 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Fri, 04 Jun 2010 10:59:14 -0400
-Subject: Libertas/SDIO deep sleep mode
-In-Reply-To: <20100604121245.GW2695@buzzloop.caiaq.de> (Daniel Mack's message
-	of "Fri, 4 Jun 2010 14:12:45 +0200")
-References: <20100604121245.GW2695@buzzloop.caiaq.de>
-Message-ID: <m3631y7sjh.fsf@pullcord.laptop.org>
+From: darkstar6262@gmail.com (Cory Maccarrone)
+Date: Fri, 4 Jun 2010 14:59:55 +0000 (UTC)
+Subject: Heads up: Linus plans to kill ARM defconfigs
+References: <20100603192459.GA9169@n2100.arm.linux.org.uk>
+	<201006040337.10593.marek.vasut@gmail.com>
+	<201006040350.36944.marek.vasut@gmail.com>
+	<201006040353.35816.marek.vasut@gmail.com>
+	<20100604060338.GH6499@atomide.com>
+Message-ID: <loom.20100604T165709-423@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Tony Lindgren <tony <at> atomide.com> writes:
 
-   > Hi, I read about the recently added features in the libertas
-   > driver to send the chip to its deep-sleep mode when the system
-   > suspends, so the wakeup phase is shortened.
+> 
+> 
+> Yeah, we should have just one omap1_defconfig. It should already
+> mostly work already for 15xx + 16xx. To build in 7xx, the entry-macro.S
+> needs to be done the same way as for mach-omap2.
+> 
+> Regards,
+> 
+> Tony
+> 
 
-I think there might be a bit of terminology confusion here -- as
-I understand it, "deep sleep" refers to putting the 8686 into a
-power-saving mode after a certain amount of idle time, while the
-rest of the system is running.
+All the new omap7xx boards I plan to submit in the future should be able to work
+fine in a single defconfig.  That's how I build now with my development tree.
+I'd be perfectly happy to see my htcherald_defconfig get wrapped into a more
+generic omap1_defconfig.
 
-If you want to preserve power to the 8686 over a system suspend,
-that's a largely different set of code, which isn't complete in
-mainline yet; as you've seen, the MMC and SDHCI side of it is
-upstream, but not libertas or pxamci code yet.
+They might even be generic enough that I won't need separate board files for
+them -- I'll have to see when I get to that point.
 
-   > * The "Parentless device registered during a PM transaction"
-   > looks like a bug to me. Note that I added kobject_name(&dev->kobj)
-   > to the output to get a clue about what's going on.
-
-Not sure what's going on there.
-
-   > * The firmware survives the suspend/resume transition and works
-   > fine after that. I just wonder why, as the voltage was switched
-   > off?
-
-That's odd.  Perhaps the 8686 is being alternatively powered somehow
-on your hardware?
-
-   > * I believe that if we need to keep the power switched on, there
-   > should be a call to sdio_set_host_pm_flags(MMC_PM_KEEP_POWER)
-   > somewhere in the libertas_sdio layer, right? How should the
-   > pxamci core get to know it shouldn't switch off its regulator?
-
-That's right.  We're using this code at OLPC, to go into system
-suspend with the 8686 powered and then be woken when a new packet
-arrives.  The libertas side of that code hasn't been submitted yet,
-but you're welcome to check it out at our git repo:
-
-http://dev.laptop.org/git/olpc-2.6/commit/?h=olpc-2.6.31&id=db09aa1f537f7d5eae6e52ecf59cdf3571150ee6
-http://dev.laptop.org/git/olpc-2.6/log/drivers/net/wireless/libertas?h=olpc-2.6.31
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>
-One Laptop Per Child
+- Cory
