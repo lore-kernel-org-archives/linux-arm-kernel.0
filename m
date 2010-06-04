@@ -1,29 +1,34 @@
-From: pieterg@gmx.com (pieterg)
-Date: Fri, 4 Jun 2010 11:37:18 +0200
-Subject: Heads up: Linus plans to kill ARM defconfigs
-In-Reply-To: <20100604085629.GU2695@buzzloop.caiaq.de>
-References: <20100603192459.GA9169@n2100.arm.linux.org.uk>
-	<201006041036.39059.pieterg@gmx.com>
-	<20100604085629.GU2695@buzzloop.caiaq.de>
-Message-ID: <201006041137.18270.pieterg@gmx.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Fri, 04 Jun 2010 11:48:54 +0200
+Subject: [V2 1/3] mxc: Add support for the imx51 3-stack board
+In-Reply-To: <20100604085320.GB25357@pengutronix.de>
+References: <1275566746-6510-1-git-send-email-jason77.wang@gmail.com>
+	<1275566746-6510-2-git-send-email-jason77.wang@gmail.com>
+	<20100604085320.GB25357@pengutronix.de>
+Message-ID: <1275644934.3210.46.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 June 2010 10:56:29 Daniel Mack wrote:
-> On Fri, Jun 04, 2010 at 10:36:39AM +0200, pieterg wrote:
-> > On Friday 04 June 2010 03:10:14 Marek Vasut wrote:
-> > > I just tested, PXA (mach-pxa) probably can be compiled into single
-> > > kernel supporting all the boards.
-> >
-> > For my boards (colibri) I see only one exception; I haven't managed to
-> > build a single kernel with support for different AC97 chips.
->
-> Which problems did you have when tring this?
+On ven, 2010-06-04 at 10:53 +0200, Sascha Hauer wrote:
+> I'm not willing to accept another 3ds_debug board support in the
+> kernel
+> given that it's no rocket science to seperate this into another file
+> and
+> we still have plenty of time before the next merge window.
+> Jason, can you please move this to plat-mxc? I think we could find
+> someone else to switch the mx31_3ds support to the generic debug board
+> support then. 
 
-Hm, thanks for making me try this again. I was convinced a UCB1400 
-touchscreen was not recognised when I had CONFIG_TOUCHSCREEN_WM97XX in the 
-config, but trying this again now shows it works fine.
-I must have drawn the wrong conclusion back then.
-Glad I can use a single config for my boards now.
+Sascha, what do you mean with: switch the mx31_3ds support to the generic
+one in plat-mxc?
+We are going to have a single machine file for all imx(2-3-5) based debug boards?
+I think it will look so messy..
 
-Rgds, Pieter
+I read the Linus concerns about ARM stuffs and RMK answer to your ask for pull..
+May we need to start a thread to discuss how we can restructure the imx support?
+
+-- 
+Alberto!
+
+        Be Persistent!
+                - Greg Kroah-Hartman (FOSDEM 2010)
