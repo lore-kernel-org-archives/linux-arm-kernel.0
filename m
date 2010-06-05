@@ -1,19 +1,31 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 5 Jun 2010 16:04:25 +0800
-Subject: [PATCH 3/4] [ARM] pxa: merge all pxa3xx board configs into
-	pxa3xx_defconfig
-In-Reply-To: <1275724538-5075-4-git-send-email-eric.y.miao@gmail.com>
-References: <1275724538-5075-1-git-send-email-eric.y.miao@gmail.com>
-	<1275724538-5075-4-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <AANLkTinO49Mpt2wEft08xJnrAULQcuR1GvLw90Q9ggZ6@mail.gmail.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Sat, 05 Jun 2010 17:07:06 +0800
+Subject: [PATCHv2 1/3] MTD/pxa: use __devinit for pxa2xx_flash_probe
+Message-ID: <4C0A13BA.6050700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch as in attachment.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0003-ARM-pxa-merge-all-pxa3xx-board-configs-into-pxa3xx_d.patch.bz2
-Type: application/x-bzip2
-Size: 23807 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100605/e4763152/attachment-0001.bz2>
+This patch is to use the '__devinit' for pxa2xx_flash_probe.
+
+Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+Acked-by: Eric Miao <eric.y.miao@gmail.com>
+
+---
+ drivers/mtd/maps/pxa2xx-flash.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
+index dd90880..d8ae634 100644
+--- a/drivers/mtd/maps/pxa2xx-flash.c
++++ b/drivers/mtd/maps/pxa2xx-flash.c
+@@ -51,7 +51,7 @@ struct pxa2xx_flash_info {
+ static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
+
+
+-static int __init pxa2xx_flash_probe(struct platform_device *pdev)
++static int __devinit pxa2xx_flash_probe(struct platform_device *pdev)
+ {
+ 	struct flash_platform_data *flash = pdev->dev.platform_data;
+ 	struct pxa2xx_flash_info *info;
+-- 
+1.6.3.3
