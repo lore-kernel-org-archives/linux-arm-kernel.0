@@ -1,39 +1,27 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 5 Jun 2010 19:19:17 +0200
-Subject: pxa300 - DDRAM base value
-In-Reply-To: <1275371058.7001.35.camel@balakrishnan-desktop>
-References: <1275371058.7001.35.camel@balakrishnan-desktop>
-Message-ID: <201006051919.17738.marek.vasut@gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 5 Jun 2010 12:19:40 -0600
+Subject: [PATCH 0/10] Tegra platform support
+In-Reply-To: <1275635441-17378-1-git-send-email-olof@lixom.net>
+References: <3478yvr76gerav> <1275635441-17378-1-git-send-email-olof@lixom.net>
+Message-ID: <AANLkTimbXbSWsNEjlTCsDK0IdYO6Ys4lttr7C8ICq8Ct@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 1. ?ervna 2010 07:44:18 balakrishnan napsal(a):
-> I am working on pxa300 based development board and using Linux 2.6.34.
-> This Linux kernel already has support for following boards
-> 1. zylonite_pxa300
-> 2. cm-x300
-> 3. colibri-pxa300
-> 4. littleton
-> 
-> My doubt is that pxa300 based boards are using "0xa0000000"  as DDRAM
-> base and PHYS_OFFSET is also defined in
-> "arch/arm/mach-pxa/include/mach/memory.h" as 0xa0000000.
-> But in our board  DDR is mapped in 0x80000000. Does it make any
-> problem?. Because after mmu is turned ON, my board is hanging.
-> 
-> "zreladdr-y   := 0x80008000" is defined in
-> "arch/arm/mach-pxa/Makefile.boot" file .
-> my machine_desc is as follows
-> .phys_io        = 0x40000000,
-> .io_pg_offst    = (io_p2v(0x40000000) >> 18) & 0xfffc,
-> .boot_params    = 0x80000100,
-> 
+On Fri, Jun 4, 2010 at 1:10 AM, Olof Johansson <olof@lixom.net> wrote:
+>
+> Hi,
+>
+> This is for the most part a repost of the arch/arm/mach-tegra parts of
+> Erik Gilling's post of the Tegra series from April 13. I've done some
+> minor cleanups and picked up a couple of bugfixes from later patches,
+> but I wanted to keep the original series bite size for easier review.
+>
+> There is more to come once this is in.
+>
+> Russell, do you prefer to take the initial series and feed it to Linus, or
+> should I send a direct pull request with your acked-by (once you give it)?
 
-Try editing both arch/arm/mach-pxa/Makefile.boot and 
-arch/arm/mach/pxa/include/mach/memory.h
+Hey Olof,  What is the url of your git tree?
 
-> With Thanks
-> J.Balakrishnan
-
-The 0x80000000 should be aliased to 0xa0000000, but looking into the PXA docs, 
-it is only on pxa320. Eric, any ideas on this ?
+Thanks,
+g.
