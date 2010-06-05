@@ -1,72 +1,68 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat,  5 Jun 2010 02:46:48 +0200
-Subject: [PATCH] pxa2xx/cpufreq: Fix DRI computation
-Message-ID: <1275698808-31166-1-git-send-email-marek.vasut@gmail.com>
+From: jason77.wang@gmail.com (jason)
+Date: Sat, 05 Jun 2010 08:54:47 +0800
+Subject: [V3 3/7] mx51/iomux: fix some pad names and make some cleanups
+In-Reply-To: <20100604151307.GD2982@matterhorn.lan>
+References: <1275660568-7738-1-git-send-email-jason77.wang@gmail.com>
+	<1275660568-7738-2-git-send-email-jason77.wang@gmail.com>
+	<1275660568-7738-3-git-send-email-jason77.wang@gmail.com>
+	<1275660568-7738-4-git-send-email-jason77.wang@gmail.com>
+	<20100604151307.GD2982@matterhorn.lan>
+Message-ID: <4C09A057.4090201@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DRI field was incorrectly computed, causing various hangs and weird
-behaviour on PXA2xx machines. This patch introduces the DRI computation
-according to the PXA255 (January 2004) and PXA270 (MV-S301039-00 Rev. A)
-datasheets.
+Amit Kucheria wrote:
+> On 10 Jun 04, Jason Wang wrote:
+>   
+>> Fix some pad names according to the naming convention and make some
+>> cleanups for vertical lineup.
+>>
+>> Signed-off-by: Jason Wang <jason77.wang@gmail.com>
+>> ---
+>>  arch/arm/plat-mxc/include/mach/iomux-mx51.h |  507 ++++++++++++--------------
+>>  1 files changed, 234 insertions(+), 273 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+>> index ab0f95d..df9ecdf 100644
+>> --- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+>> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+>> @@ -57,278 +57,239 @@ typedef enum iomux_config {
+>>  
+>>  /*						PAD      MUX   ALT INPSE PATH PADCTRL */
+>>  
+>> -#define MX51_PAD_GPIO_2_0__EIM_D16	IOMUX_PAD(0x3f0, 0x05c, 1, 0x0,   0, NO_PAD_CTRL)
+>> -#define MX51_PAD_GPIO_2_1__EIM_D17	IOMUX_PAD(0x3f4, 0x060, 1, 0x0,   0, NO_PAD_CTRL)
+>>     
+> <snip> 
+>
+> Did you try compiling this? It fails to compile both babbage and 3ds boards.
+>
+> This breaks the babbage board because a pad name was changed here. (An
+> underscore between GPIO and 1)
+>
+> arch/arm/mach-mx5/board-mx51_babbage.c:81: error:
+> 'MX51_PAD_GPIO_1_7__GPIO1_7' undeclared here (not in a function)
+> arch/arm/mach-mx5/board-mx51_babbage.c: In function 'initialize_otg_port':
+>
+> For 3ds, the errors are:
+> arch/arm/mach-mx5/board-mx51_3ds.c:44: error: 'MX51_PAD_UART3_RXD__UART3_RXD'
+> undeclared here (not in a function)
+> arch/arm/mach-mx5/board-mx51_3ds.c:45: error: 'MX51_PAD_UART3_TXD__UART3_TXD'
+> undeclared here (not in a function)
+> arch/arm/mach-mx5/board-mx51_3ds.c:50: error: 'MX51_PAD_GPIO_1_6__GPIO1_6'
+> undeclared here (not in a function)
+>
+> Perhaps you should wait till Sascha pulls in either of our patches to fixup
+> the padnames first.
+>
+>   
+Sorry, this is because just before i send V3, i make some changes for 
+iomux-mx51.h in a hurry
+and didn't make building test after change this part.
+Take your advice.
 
-NOTE: The CPU type is checked only once, so the code is a little bit faster now.
-
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- arch/arm/mach-pxa/cpufreq-pxa2xx.c |   33 +++++++++++++++++++++++++++++----
- 1 files changed, 29 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/cpufreq-pxa2xx.c b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
-index 9e4d981..5373db0 100644
---- a/arch/arm/mach-pxa/cpufreq-pxa2xx.c
-+++ b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
-@@ -251,17 +251,42 @@ static void init_sdram_rows(void)
- 	if (mdcnfg & (MDCNFG_DE0 | MDCNFG_DE1))
- 		drac0 = MDCNFG_DRAC0(mdcnfg);
- 
--	sdram_rows = 1 << (11 + max(drac0, drac2));
-+	sdram_rows = 11 + max(drac0, drac2);
- }
- 
- static u32 mdrefr_dri(unsigned int freq)
- {
- 	u32 dri = 0;
- 
--	if (cpu_is_pxa25x())
--		dri = ((freq * SDRAM_TREF) / (sdram_rows * 32));
-+	/* 
-+	 * PXA255 (6.5.3):
-+	 * 	DRI = (Refresh time / rows * memory clock frequency) / 32
-+	 * PXA270 (Table 91):
-+	 * 	DRI = (Refresh time / rows * memory clock frequency - 31) / 32
-+	 * 
-+	 * Memory clock frequency is in MHz here! (Refresh time is in ms).
-+	 */
-+
-+	/*
-+	 * SDRAM_TREF	Refresh time
-+	 * freq		Memory clock frequency (in kHz)
-+	 * sdram_rows	Rows
-+	 *
-+	 * Here we do the common part for both CPUs:
-+	 * 	(Refresh time / rows * memory clock frequency)
-+	 *
-+	 * NOTE: We must convert freq from kHz to MHz, but we do the
-+	 * multiplication prior to division to retain percision.
-+	 */
-+	dri = (SDRAM_TREF * freq) / (sdram_rows * 1000);
-+
-+	/* On PXA27x, substitute 31 from the value first (Table 91). */
- 	if (cpu_is_pxa27x())
--		dri = ((freq * SDRAM_TREF) / (sdram_rows - 31)) / 32;
-+		dri -= 31;
-+
-+	/* Finaly, divide the result by 32. */
-+	dri /= 32;
-+
- 	return dri;
- }
- 
--- 
-1.7.1
+Thanks,
+Jason.
+> Cheers,
+> Amit
+>   
