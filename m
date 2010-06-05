@@ -1,78 +1,44 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 5 Jun 2010 03:25:46 +0200
-Subject: [PATCH 2/2] backlight: Fix blanking for L4F00242T03 LCD
-In-Reply-To: <1275636583.3210.37.camel@realization>
-References: <1275630748-10722-1-git-send-email-marek.vasut@gmail.com>
-	<1275630748-10722-2-git-send-email-marek.vasut@gmail.com>
-	<1275636583.3210.37.camel@realization>
-Message-ID: <201006050325.47060.marek.vasut@gmail.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Sat, 5 Jun 2010 09:33:04 +0800
+Subject: Boot interface for device trees on ARM
+In-Reply-To: <AANLkTilhqg270l-_m9raalqAPPRhvLJD9omHe8ysgLjg@mail.gmail.com>
+References: <201005181054.32325.jeremy.kerr@canonical.com>
+	<alpine.LFD.2.00.1005191055180.12758@xanadu.home>
+	<AANLkTilhqg270l-_m9raalqAPPRhvLJD9omHe8ysgLjg@mail.gmail.com>
+Message-ID: <201006050933.06714.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 4. ?ervna 2010 09:29:43 Alberto Panizzo napsal(a):
-> On ven, 2010-06-04 at 07:52 +0200, Marek Vasut wrote:
-> > The LCD was turned on if the variable power was > 0, but that was
-> > incorrect. The LCD has to be turned on in every case but POWERDOWN.
-> > 
-> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> 
-> Ack
-> 
-> > ---
-> > 
-> >  drivers/video/backlight/l4f00242t03.c |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/drivers/video/backlight/l4f00242t03.c
-> > b/drivers/video/backlight/l4f00242t03.c index 9093ef0..ac20b2e 100644
-> > --- a/drivers/video/backlight/l4f00242t03.c
-> > +++ b/drivers/video/backlight/l4f00242t03.c
-> > @@ -78,7 +78,7 @@ static int l4f00242t03_lcd_power_set(struct lcd_device
-> > *ld, int power)
-> > 
-> >  	const u16 slpin = 0x10;
-> >  	const u16 disoff = 0x28;
-> > 
-> > -	if (power) {
-> > +	if (power < FB_BLANK_POWERDOWN) {
-> > 
-> >  		if (priv->lcd_on)
-> >  		
-> >  			return 0;
-> 
-> lcd.h states:
-> struct lcd_ops {
-> 	/* Get the LCD panel power status (0: full on, 1..3: controller
-> 	   power on, flat panel power off, 4: full off), see FB_BLANK_XXX */
-> 	int (*get_power)(struct lcd_device *);
-> 	/* Enable or disable power to the LCD (0: on; 4: off, see FB_BLANK_XXX) 
-*/
-> 	int (*set_power)(struct lcd_device *, int power);
-> 
-> AFAIK the gray area between FB_BLANK_NORMAL and FB_BLANK_HSYNC_SUSPEND
-> can be chosen as needs.
-> 
-> Why not:
-> 
-> + #define POWER_IS_ON(pwr)	((pwr) <= FB_BLANK_NORMAL)
-> 
-> ...
-> 
-> -	if (power) {
-> +	if (POWER_IS_ON(power)) {
->  		if (priv->lcd_on)
->  			return 0;
-> 
-> So with FB_BLANK_NORMAL the lcd is active and on -> low latencies
-> in re-enabling the video out, but for !POWER_IS_ON(power) we will send
-> the lcd to standby.
-> 
-> It have to be implemented for power == FB_BLANK_POWERDOWN to turn off the
-> regulators of the lcd.
-> 
-> What do you think about?
+All,
 
-Thanks! I sent a new (better) version. If you want credit in it, tell me how 
-should I add you one ;-)
+> > With this, the kernel can remain largely backward compatible with the
+> > legacy boot method, requiring _no_ change to the existing code, as the
+> > ID is sufficient to distinguish between both boot types.  The machine
+> > record remains largely relevant even for a DT boot as the majority of
+> > its content is SOC specific anyway, and given a per SOC ID for DT usage
+> > means that the early boot facilities are still usable as is even in the
+> > DT context.  And then the init_machine method in the machine record is
+> > naturally used to parse the device tree and do its work on multiple
+> > machines' behalf instead of relying on compiled-in static data for a
+> > specific machine.
 > 
-> Regards,
+> There will still be instances of machine-specific setup code that
+> needs to be chosen at boot (based on the top level 'compatible'
+> property), but init_machine() appears to be early enough to handle
+> this.
+> 
+> hmmm... however, things the device tree blob and the initrd both need
+> to be marked as bootmem at paging_init() time, but init_machine()
+> doesn't run until later.  There will still need to be some hooks for
+> doing early DT processing, but none of that should be either board or
+> SoC specific.
+
+If we're planning to keep the machine IDs around (even if they are now per-
+SoC), I'd like to know what would be left using them. The only thing that I 
+can see that we currently use is io_pg_offset for the DEBUG_LL builds, and 
+that isn't a convincing case to keep them.
+
+Cheers,
+
+
+Jeremy
