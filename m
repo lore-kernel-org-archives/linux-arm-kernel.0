@@ -1,22 +1,19 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 5 Jun 2010 16:04:59 +0800
-Subject: [PATCH 2/4] [ARM] pxa: merge all pxa2xx board configs into
-	pxa2xx_defconfig
-In-Reply-To: <AANLkTin5mvdRG3R2JGOnAmakRaCXCTTJTGnwmA9gmTVP@mail.gmail.com>
+Date: Sat, 5 Jun 2010 16:05:28 +0800
+Subject: [PATCH 4/4] [ARM] pxa: merge {corgi,spitz}_defconfig into
+	zaurus_defconfig
+In-Reply-To: <1275724538-5075-5-git-send-email-eric.y.miao@gmail.com>
 References: <1275724538-5075-1-git-send-email-eric.y.miao@gmail.com>
-	<1275724538-5075-3-git-send-email-eric.y.miao@gmail.com>
-	<AANLkTin5mvdRG3R2JGOnAmakRaCXCTTJTGnwmA9gmTVP@mail.gmail.com>
-Message-ID: <AANLkTint336Ik0HszyMbc748lcv7HU2LKxOvD14XZupm@mail.gmail.com>
+	<1275724538-5075-5-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <AANLkTiliwWE4A7IypQp8zkxu_W_jyUiegBtb-tIAsNq6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 5, 2010 at 4:03 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> The change is apparently too much, I'm attaching the patch as an
-> attachment here and compressed :-(
+Patch in attachment.
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0002-ARM-pxa-merge-all-pxa2xx-board-configs-into-pxa2xx_d.patch.bz2
+Name: 0004-ARM-pxa-merge-corgi-spitz-_defconfig-into-zaurus_def.patch.bz2
 Type: application/x-bzip2
-Size: 50330 bytes
+Size: 19964 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100605/049852b7/attachment-0001.bz2>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100605/d283f604/attachment-0001.bz2>
