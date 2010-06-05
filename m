@@ -1,32 +1,18 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat,  5 Jun 2010 11:50:41 +0200
-Subject: [PATCH 2/2] backlight: Fix blanking for L4F00242T03 LCD
-In-Reply-To: <1275731441-7612-1-git-send-email-marek.vasut@gmail.com>
-References: <1275731441-7612-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1275731441-7612-2-git-send-email-marek.vasut@gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 05 Jun 2010 02:55:01 -0700 (PDT)
+Subject: [PATCH] fec: convert legacy PM hooks to dem_pm_ops
+In-Reply-To: <20100602192704.GA22726@hera.kernel.org>
+References: <20100602192704.GA22726@hera.kernel.org>
+Message-ID: <20100605.025501.68155297.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LCD was turned on if the variable power was > 0, but that was incorrect. The
-LCD has to be turned on in NORMAL and UNBLANK case.
+From: Denis Kirjanov <dkirjanov@hera.kernel.org>
+Date: Wed, 2 Jun 2010 19:27:04 +0000
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- drivers/video/backlight/l4f00242t03.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> This patch compile tested only.
+> 
+> Convert legacy PM hooks to dev_pm_ops
+> Signed-off-by: Denis Kirjanov <dkirjanov@kernel.org>
 
-diff --git a/drivers/video/backlight/l4f00242t03.c b/drivers/video/backlight/l4f00242t03.c
-index 9093ef0..c67801e 100644
---- a/drivers/video/backlight/l4f00242t03.c
-+++ b/drivers/video/backlight/l4f00242t03.c
-@@ -78,7 +78,7 @@ static int l4f00242t03_lcd_power_set(struct lcd_device *ld, int power)
- 	const u16 slpin = 0x10;
- 	const u16 disoff = 0x28;
- 
--	if (power) {
-+	if (power <= FB_BLANK_NORMAL) {
- 		if (priv->lcd_on)
- 			return 0;
- 
--- 
-1.7.1
+Applied, thanks.
