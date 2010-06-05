@@ -1,63 +1,91 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Sat, 05 Jun 2010 17:14:36 +0800
-Subject: [PATCHv2 3/3] MTD/pxa: patch for error return value method of
-	pxa2xx-flash
-Message-ID: <4C0A157C.1050909@gmail.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Sat, 05 Jun 2010 11:22:02 +0200
+Subject: [PATCH 2/2] backlight: Fix blanking for L4F00242T03 LCD
+In-Reply-To: <201006050325.47060.marek.vasut@gmail.com>
+References: <1275630748-10722-1-git-send-email-marek.vasut@gmail.com>
+	<1275630748-10722-2-git-send-email-marek.vasut@gmail.com>
+	<1275636583.3210.37.camel@realization>
+	<201006050325.47060.marek.vasut@gmail.com>
+Message-ID: <1275729722.3446.10.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to re-implement the 'pxa2xx-flash.c' error return value method
-of probe() and remove() function,the old return way can arouse the 'info' memory
-leak risk.
+On sab, 2010-06-05 at 03:25 +0200, Marek Vasut wrote:
+> Dne P? 4. ?ervna 2010 09:29:43 Alberto Panizzo napsal(a):
+> > On ven, 2010-06-04 at 07:52 +0200, Marek Vasut wrote:
+> > > The LCD was turned on if the variable power was > 0, but that was
+> > > incorrect. The LCD has to be turned on in every case but POWERDOWN.
+> > > 
+> > > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> > 
+> > Ack
+> > 
+> > > ---
+> > > 
+> > >  drivers/video/backlight/l4f00242t03.c |    2 +-
+> > >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > > 
+> > > diff --git a/drivers/video/backlight/l4f00242t03.c
+> > > b/drivers/video/backlight/l4f00242t03.c index 9093ef0..ac20b2e 100644
+> > > --- a/drivers/video/backlight/l4f00242t03.c
+> > > +++ b/drivers/video/backlight/l4f00242t03.c
+> > > @@ -78,7 +78,7 @@ static int l4f00242t03_lcd_power_set(struct lcd_device
+> > > *ld, int power)
+> > > 
+> > >  	const u16 slpin = 0x10;
+> > >  	const u16 disoff = 0x28;
+> > > 
+> > > -	if (power) {
+> > > +	if (power < FB_BLANK_POWERDOWN) {
+> > > 
+> > >  		if (priv->lcd_on)
+> > >  		
+> > >  			return 0;
+> > 
+> > lcd.h states:
+> > struct lcd_ops {
+> > 	/* Get the LCD panel power status (0: full on, 1..3: controller
+> > 	   power on, flat panel power off, 4: full off), see FB_BLANK_XXX */
+> > 	int (*get_power)(struct lcd_device *);
+> > 	/* Enable or disable power to the LCD (0: on; 4: off, see FB_BLANK_XXX) 
+> */
+> > 	int (*set_power)(struct lcd_device *, int power);
+> > 
+> > AFAIK the gray area between FB_BLANK_NORMAL and FB_BLANK_HSYNC_SUSPEND
+> > can be chosen as needs.
+> > 
+> > Why not:
+> > 
+> > + #define POWER_IS_ON(pwr)	((pwr) <= FB_BLANK_NORMAL)
+> > 
+> > ...
+> > 
+> > -	if (power) {
+> > +	if (POWER_IS_ON(power)) {
+> >  		if (priv->lcd_on)
+> >  			return 0;
+> > 
+> > So with FB_BLANK_NORMAL the lcd is active and on -> low latencies
+> > in re-enabling the video out, but for !POWER_IS_ON(power) we will send
+> > the lcd to standby.
+> > 
+> > It have to be implemented for power == FB_BLANK_POWERDOWN to turn off the
+> > regulators of the lcd.
+> > 
+> > What do you think about?
+> 
+> Thanks! I sent a new (better) version. If you want credit in it, tell me how 
+> should I add you one ;-)
 
-This patch has been reviewed by Eric, according to his advice, I modify some wrong
-issues of previous patch and resend to maillist.
+Oh no, you have the credit on it. I admit that my L4F00242T03 is not my 
+best driver, but soon I will work on it again ;)
 
-Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+Thank you for your fix!
 
----
- drivers/mtd/maps/pxa2xx-flash.c |   15 ++++++++++-----
- 1 files changed, 10 insertions(+), 5 deletions(-)
+Regards,
 
-diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
-index b5bb1a4..e789358 100644
---- a/drivers/mtd/maps/pxa2xx-flash.c
-+++ b/drivers/mtd/maps/pxa2xx-flash.c
-@@ -78,7 +78,8 @@ static int __devinit pxa2xx_flash_probe(struct platform_device *pdev)
- 	if (!info->map.virt) {
- 		printk(KERN_WARNING "Failed to ioremap %s\n",
- 		       info->map.name);
--		return -ENOMEM;
-+		ret = -ENOMEM;
-+		goto fail1;
- 	}
- 	info->map.cached =
- 		ioremap_cached(info->map.phys, info->map.size);
-@@ -97,10 +98,8 @@ static int __devinit pxa2xx_flash_probe(struct platform_device *pdev)
- 	info->mtd = do_map_probe(flash->map_name, &info->map);
-
- 	if (!info->mtd) {
--		iounmap((void *)info->map.virt);
--		if (info->map.cached)
--			iounmap(info->map.cached);
--		return -EIO;
-+		ret = -EIO;
-+		goto fail2;
- 	}
- 	info->mtd->owner = THIS_MODULE;
-
-@@ -124,6 +123,12 @@ static int __devinit pxa2xx_flash_probe(struct platform_device *pdev)
-
- 	platform_set_drvdata(pdev, info);
- 	return 0;
-+
-+fail2:	iounmap(info->map.virt);
-+	if (info->map.cached)
-+		iounmap(info->map.cached);
-+fail1:	kfree(info);
-+	return ret;
- }
-
- static int __devexit pxa2xx_flash_remove(struct platform_device *dev)
 -- 
-1.6.3.3
+Alberto!
+
+        Be Persistent!
+                - Greg Kroah-Hartman (FOSDEM 2010)
