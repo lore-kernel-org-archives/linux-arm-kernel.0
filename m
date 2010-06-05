@@ -1,19 +1,31 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 5 Jun 2010 16:05:28 +0800
-Subject: [PATCH 4/4] [ARM] pxa: merge {corgi,spitz}_defconfig into
-	zaurus_defconfig
-In-Reply-To: <1275724538-5075-5-git-send-email-eric.y.miao@gmail.com>
-References: <1275724538-5075-1-git-send-email-eric.y.miao@gmail.com>
-	<1275724538-5075-5-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <AANLkTiliwWE4A7IypQp8zkxu_W_jyUiegBtb-tIAsNq6@mail.gmail.com>
+From: stefan@datenfreihafen.org (Stefan Schmidt)
+Date: Sat, 5 Jun 2010 10:05:56 +0200
+Subject: defconfig information
+In-Reply-To: <20100604222820.GA4438@kyllikki.org>
+References: <20100604222820.GA4438@kyllikki.org>
+Message-ID: <20100605080556.GA6441@excalibur.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch in attachment.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0004-ARM-pxa-merge-corgi-spitz-_defconfig-into-zaurus_def.patch.bz2
-Type: application/x-bzip2
-Size: 19964 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100605/d283f604/attachment-0001.bz2>
+Hello.
+
+On Fri, 2010-06-04 at 23:28, Vincent Sanders wrote:
+> With all the recent issues over default configurations I have decided
+> to release the Kernel autobuilder fifth anniversary statistics a bit
+> early.
+
+Thanks to the people involved keeping this working.
+
+> The community usage of this service has dropped to an all time low
+> (only six people actually used it in the last month) and I am
+> seriously considering if it serves a useful purpose any longer.
+
+What do you mean by "used it"? Is there anything else then subscribing to the ml
+and get the build mails?
+
+I found those mails very useful to have a fast overview if something broke most
+of the arm builds. Getting a mail about the MIPS build showed useless to me tho
+as none of the builds ever succeded.
+
+regards
+Stefan Schmidt
