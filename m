@@ -1,51 +1,67 @@
-From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1_=27Sleep=5FWalker=27?=
-	=?utf-8?q?_=C4=8Cech?=)
-Date: Sun, 6 Jun 2010 20:10:57 +0200
-Subject: [PATCH 2/3] pxa: Fix all devices using wm97xx_batt.h
-In-Reply-To: <1275613654-23918-2-git-send-email-marek.vasut@gmail.com>
-References: <1275613654-23918-1-git-send-email-marek.vasut@gmail.com>
-	<1275613654-23918-2-git-send-email-marek.vasut@gmail.com>
-Message-ID: <201006062010.58423.sleep_walker@suse.cz>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Sun, 06 Jun 2010 20:11:27 +0200
+Subject: [V2 3/3] mx51/keypad: add keypad support for i.MX51 platforms
+In-Reply-To: <4C0A5B8E.4020906@gmail.com>
+References: <1275566746-6510-1-git-send-email-jason77.wang@gmail.com>
+	<1275566746-6510-2-git-send-email-jason77.wang@gmail.com>
+	<1275566746-6510-3-git-send-email-jason77.wang@gmail.com>
+	<1275566746-6510-4-git-send-email-jason77.wang@gmail.com>
+	<1275730558.3446.23.camel@realization>  <4C0A5B8E.4020906@gmail.com>
+Message-ID: <1275847887.11528.13.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 4. ?ervna 2010 03:07:33 Marek Vasut napsal(a):
-> This file is scheduled for removal, therefore fix all devices that use this
-> file to use the suggested wm97xx.h and pass platform data properly.
-> 
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> ---
->  arch/arm/mach-pxa/mioa701.c  |   10 +++++++---
->  arch/arm/mach-pxa/palmld.c   |   19 ++++++++++---------
->  arch/arm/mach-pxa/palmt5.c   |   19 ++++++++++---------
->  arch/arm/mach-pxa/palmte2.c  |   20 ++++++++++++--------
->  arch/arm/mach-pxa/palmtreo.c |    1 -
->  arch/arm/mach-pxa/palmtx.c   |   19 ++++++++++---------
->  arch/arm/mach-pxa/palmz72.c  |   20 ++++++++++++--------
->  7 files changed, 61 insertions(+), 47 deletions(-)
-> 
-...
+Hi Jason,
 
-> diff --git a/arch/arm/mach-pxa/palmtreo.c b/arch/arm/mach-pxa/palmtreo.c
-> index d8b4469..4eb0258 100644
-> --- a/arch/arm/mach-pxa/palmtreo.c
-> +++ b/arch/arm/mach-pxa/palmtreo.c
-> @@ -23,7 +23,6 @@
->  #include <linux/pda_power.h>
->  #include <linux/pwm_backlight.h>
->  #include <linux/gpio.h>
-> -#include <linux/wm97xx_batt.h>
->  #include <linux/power_supply.h>
->  #include <linux/sysdev.h>
->  #include <linux/w1-gpio.h>
+On sab, 2010-06-05 at 22:13 +0800, jason wrote:
+> Alberto Panizzo wrote:
+> > On gio, 2010-06-03 at 20:05 +0800, Jason Wang wrote:
+> >   
+> >> Add keypad controller device definition for all i.MX51 platforms,
+> >> add a dummy kpp clock for imx keypad driver and add keypad device
+> >> registration on i.MX51 3-stack board.
+> >>
+> >> Signed-off-by: Jason Wang <jason77.wang@gmail.com>
+> >> ---
+> >>  arch/arm/mach-mx5/board-mx51_3ds.c |   59 ++++++++++++++++++++++++++++++++++++
+> >>  arch/arm/mach-mx5/clock-mx51.c     |    5 +++
+> >>  arch/arm/mach-mx5/devices.c        |   19 +++++++++++
+> >>  arch/arm/mach-mx5/devices.h        |    1 +
+> >>  4 files changed, 84 insertions(+), 0 deletions(-)
+> >>     
+> >
+> > May you wont divide platform vs machine code in two different patches.
+> >   
+> Thanks for your comments, but here i don't really know what you mean,
+> should i divide this patch to 2 patches or ?
+
+Code that stays into devices.[c|h] is general code that shall not be 
+modified together with machine code (board-mx51_3ds.c).
 
 
-Thanks for this one.
+> > and, Eric B?nard is working on imx_keypad suspend/resume features[1] and
+> > about it, he is going to modify the platform interface that make us able
+> > to register the device.. this patch could look old in a few.
+> >
+> > [1]http://thread.gmane.org/gmane.linux.ports.arm.kernel/80968/focus=13131
+> >
+> > Best regards,
+> > Alberto!
+> >
+> >   
+> Yes, reading this thread, my platform interface is old.
+> I just git pull the upstream, it seems that new interface change hasn't 
+> been merged,
+> i will modify this interface if it is merged into the upstream.
 
-For palmtreo.c:
+Well Dmitry (linux input maintainer) asked Eric some clarifications 
+before merging his work.
+In all case, Eric work is going to be part of the next merge window
+through the linux input tree if all goes in the right way.
+So in the imx tree you would see it at least since .35
 
-Acked-by: Tomas Cech <sleep_walker@suse.cz>
+Sascha, what is your policy about this? Shall Jason support the keypad
+with the current interface and update it's support in the next merge
+window? or it is better to wait?
 
-Best regards,
-
-Tomas Cech
+Alberto!
