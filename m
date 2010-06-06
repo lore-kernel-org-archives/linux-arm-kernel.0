@@ -1,67 +1,33 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Sun, 06 Jun 2010 20:11:27 +0200
-Subject: [V2 3/3] mx51/keypad: add keypad support for i.MX51 platforms
-In-Reply-To: <4C0A5B8E.4020906@gmail.com>
-References: <1275566746-6510-1-git-send-email-jason77.wang@gmail.com>
-	<1275566746-6510-2-git-send-email-jason77.wang@gmail.com>
-	<1275566746-6510-3-git-send-email-jason77.wang@gmail.com>
-	<1275566746-6510-4-git-send-email-jason77.wang@gmail.com>
-	<1275730558.3446.23.camel@realization>  <4C0A5B8E.4020906@gmail.com>
-Message-ID: <1275847887.11528.13.camel@realization>
+From: walsimou@walsimou.com (Abdoulaye Walsimou Gaye)
+Date: Sun, 06 Jun 2010 21:13:14 +0200
+Subject: mini2440 (likely more boards) boot failure because of recent changes
+	in s3c gpio
+Message-ID: <4C0BF34A.1060805@walsimou.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Hello list,
+Recent changes in s3c gpio break mini2440 board.
+The problem is that mach-mini2440.c: mini2440_init() (where we call 
+s3c_gpio_setpull())
+is called before s3c2440.c: s3c2440_init() (where we initialize 
+s3c24xx_gpiocfg_default.set_pull function pointer).
+This causes dereferencing of NULL pointer at boot time and a kernel panic.
+The following change (probably not what needs to be done) lets the board 
+boot again:
 
-On sab, 2010-06-05 at 22:13 +0800, jason wrote:
-> Alberto Panizzo wrote:
-> > On gio, 2010-06-03 at 20:05 +0800, Jason Wang wrote:
-> >   
-> >> Add keypad controller device definition for all i.MX51 platforms,
-> >> add a dummy kpp clock for imx keypad driver and add keypad device
-> >> registration on i.MX51 3-stack board.
-> >>
-> >> Signed-off-by: Jason Wang <jason77.wang@gmail.com>
-> >> ---
-> >>  arch/arm/mach-mx5/board-mx51_3ds.c |   59 ++++++++++++++++++++++++++++++++++++
-> >>  arch/arm/mach-mx5/clock-mx51.c     |    5 +++
-> >>  arch/arm/mach-mx5/devices.c        |   19 +++++++++++
-> >>  arch/arm/mach-mx5/devices.h        |    1 +
-> >>  4 files changed, 84 insertions(+), 0 deletions(-)
-> >>     
-> >
-> > May you wont divide platform vs machine code in two different patches.
-> >   
-> Thanks for your comments, but here i don't really know what you mean,
-> should i divide this patch to 2 patches or ?
+diff --git a/arch/arm/plat-s3c24xx/gpiolib.c 
+b/arch/arm/plat-s3c24xx/gpiolib.c
+index 4c0896f..ae9d3c2 100644
+--- a/arch/arm/plat-s3c24xx/gpiolib.c
++++ b/arch/arm/plat-s3c24xx/gpiolib.c
+@@ -87,6 +87,8 @@ static struct s3c_gpio_cfg s3c24xx_gpiocfg_banka = {
+  struct s3c_gpio_cfg s3c24xx_gpiocfg_default = {
+         .set_config     = s3c_gpio_setcfg_s3c24xx,
+         .get_config     = s3c_gpio_getcfg_s3c24xx,
++       .set_pull       = s3c_gpio_setpull_1up,
++       .get_pull       = s3c_gpio_getpull_1up,
+  };
 
-Code that stays into devices.[c|h] is general code that shall not be 
-modified together with machine code (board-mx51_3ds.c).
-
-
-> > and, Eric B?nard is working on imx_keypad suspend/resume features[1] and
-> > about it, he is going to modify the platform interface that make us able
-> > to register the device.. this patch could look old in a few.
-> >
-> > [1]http://thread.gmane.org/gmane.linux.ports.arm.kernel/80968/focus=13131
-> >
-> > Best regards,
-> > Alberto!
-> >
-> >   
-> Yes, reading this thread, my platform interface is old.
-> I just git pull the upstream, it seems that new interface change hasn't 
-> been merged,
-> i will modify this interface if it is merged into the upstream.
-
-Well Dmitry (linux input maintainer) asked Eric some clarifications 
-before merging his work.
-In all case, Eric work is going to be part of the next merge window
-through the linux input tree if all goes in the right way.
-So in the imx tree you would see it at least since .35
-
-Sascha, what is your policy about this? Shall Jason support the keypad
-with the current interface and update it's support in the next merge
-window? or it is better to wait?
-
-Alberto!
+Best regards,
+AWG
