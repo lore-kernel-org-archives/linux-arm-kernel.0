@@ -1,46 +1,28 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 6 Jun 2010 16:17:00 +0800
-Subject: pxa300 - DDRAM base value
-In-Reply-To: <201006051919.17738.marek.vasut@gmail.com>
-References: <1275371058.7001.35.camel@balakrishnan-desktop>
-	<201006051919.17738.marek.vasut@gmail.com>
-Message-ID: <AANLkTil5TWYILcdp872as8S8LMqQWhPYWLt7cxs2lUm5@mail.gmail.com>
+Date: Sun, 6 Jun 2010 17:27:58 +0800
+Subject: [PATCHv2 1/3] MTD/pxa: use __devinit for pxa2xx_flash_probe
+In-Reply-To: <4C0A86D9.2070106@mvista.com>
+References: <4C0A13BA.6050700@gmail.com> <4C0A86D9.2070106@mvista.com>
+Message-ID: <AANLkTinRQ2TwU0fj2k70GdNFKmOVQ4DLc2xELu7HnnZ5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 6, 2010 at 1:19 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Dne ?t 1. ?ervna 2010 07:44:18 balakrishnan napsal(a):
->> I am working on pxa300 based development board and using Linux 2.6.34.
->> This Linux kernel already has support for following boards
->> 1. zylonite_pxa300
->> 2. cm-x300
->> 3. colibri-pxa300
->> 4. littleton
->>
->> My doubt is that pxa300 based boards are using "0xa0000000" ?as DDRAM
->> base and PHYS_OFFSET is also defined in
->> "arch/arm/mach-pxa/include/mach/memory.h" as 0xa0000000.
->> But in our board ?DDR is mapped in 0x80000000. Does it make any
->> problem?. Because after mmu is turned ON, my board is hanging.
->>
->> "zreladdr-y ? := 0x80008000" is defined in
->> "arch/arm/mach-pxa/Makefile.boot" file .
->> my machine_desc is as follows
->> .phys_io ? ? ? ?= 0x40000000,
->> .io_pg_offst ? ?= (io_p2v(0x40000000) >> 18) & 0xfffc,
->> .boot_params ? ?= 0x80000100,
->>
+On Sun, Jun 6, 2010 at 1:18 AM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
+> Wan ZongShun wrote:
 >
-> Try editing both arch/arm/mach-pxa/Makefile.boot and
-> arch/arm/mach/pxa/include/mach/memory.h
+>> This patch is to use the '__devinit' for pxa2xx_flash_probe.
 >
->> With Thanks
->> J.Balakrishnan
->
-> The 0x80000000 should be aliased to 0xa0000000, but looking into the PXA docs,
-> it is only on pxa320. Eric, any ideas on this ?
+> ? Why? Is it hot-pluggable device? I guess not...
 >
 
-Should be working on pxa300/310 as well. If it doesn't, check you bootloader
-to make sure the mapping is OK, and memory doesn't exceed
-(0xa000_0000 - 0x8000_0000).
+Then I guess the __devexit is not applicable to pxa2xx_flash_remove as well.
+Apart from the _probe() being unnecessarily built in when HOTPLUG is
+defined, is there any drawbacks. It does make code a little bit consistent
+from my POV.
+
+>> Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+>> Acked-by: Eric Miao <eric.y.miao@gmail.com>
+>
+> WBR, Sergei
+>
+>
