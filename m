@@ -1,62 +1,76 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Sun, 20 Jun 2010 06:49:56 -0500
-Subject: [PATCH 1/2 v2] mv643xx_eth: use sw csum for big packets
-In-Reply-To: <20100614093237.GG14513@mail.wantstofly.org>
-References: <FCBE654890C0334289D0AD3AF4EF009F9FAC75A69C@IL-MB01.marvell.com>
-	<1276073483-17208-1-git-send-email-saeed@marvell.com>
-	<20100610064330.GK1743@mail.wantstofly.org>
-	<FCBE654890C0334289D0AD3AF4EF009F9FAC75AA96@IL-MB01.marvell.com>
-	<20100612083137.GO1743@mail.wantstofly.org>
-	<FCBE654890C0334289D0AD3AF4EF009F9FAC7B6E2B@IL-MB01.marvell.com>
-	<20100614093237.GG14513@mail.wantstofly.org>
-Message-ID: <AANLkTik1QFcRKy95sLTr6MlPfhEyR84iTCcAzpuSg47D@mail.gmail.com>
+From: saeed@marvell.com (Saeed Bishara)
+Date: Sun, 6 Jun 2010 14:40:49 +0300
+Subject: [PATCH 1/2 v3] mv643xx_eth: use sw csum for big packets
+Message-ID: <mailman.53.1277034601.27306.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 14, 2010 at 4:32 AM, Lennert Buytenhek
-<buytenh@wantstofly.org> wrote:
-> On Sun, Jun 13, 2010 at 10:38:10AM +0300, Saeed Bishara wrote:
->
->> >> >> @@ -2666,6 +2668,9 @@ static int
->> >> >mv643xx_eth_shared_probe(struct platform_device *pdev)
->> >> >> ? ? ? ? ?* Detect hardware parameters.
->> >> >> ? ? ? ? ?*/
->> >> >> ? ? ? ? msp->t_clk = (pd != NULL && pd->t_clk != 0) ? pd->t_clk
->> >> >: 133000000;
->> >> >> + ? ? ? msp->tx_csum_limit = pd->tx_csum_limit ?
->> >> >pd->tx_csum_limit : 9 * 1024;
->> >> >> + ? ? ? /* add header count so we can compare against skb->len */
->> >> >> + ? ? ? msp->tx_csum_limit += ETH_HLEN;
->> >> >> ? ? ? ? infer_hw_params(msp);
->> >> >
->> >> >Is the limit 9 * 1024 + 14 for the whole packet, or 9 *
->> >1024 for the IP
->> >> >part?
->> >>
->> >> the limit is for the IP part, but I thought that adding the
->> >header length, then comparing agains skb->len will be the
->> >same. What do you suggest?
->> >
->> >Right, but for the header length you take 14, while if to include VLAN
->> >tags or DSA tags the header might actually be longer -- how does that
->> >affect the ability of the hardware to compute the checksum?
->> >
->> >I.e. is the restriction "total packet length must be < N + 14 bytes"
->> >or is it "the IP part must be < N bytes and it doesn't matter whether
->> >there are VLAN tags or not"?
->>
->> It's the second option: "the IP part must be < N" regardless to the L2 header.
->
-> Then I suppose you want to do something like:
->
-> ? ? ? ?int hdr_len;
-> ? ? ? ?int tag_bytes;
->
-> ? ? ? ?hdr_len = (void *)ip_hdr(skb) - (void *)skb->data;
-> ? ? ? ?tag_bytes = hdr_len - 4;
-that should be 14 instead of 4, right?
-> ? ? ? ?if (skb->len - hdr_len > the limit || unlikely(tag_bytes & ~12)) {
->
-> (And then keep the limit as maximum number of bytes in the packet
-> starting from the IP header part.)
-ok. here is the updated patch:
+Some controllers (KW, Dove) limits the TX IP/layer4 checksum
+offloading to a max size.
+
+Signed-off-by: Saeed Bishara <saeed@marvell.com>
+---
+ drivers/net/mv643xx_eth.c   |    9 +++++++--
+ include/linux/mv643xx_eth.h |    5 +++++
+ 2 files changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/mv643xx_eth.c b/drivers/net/mv643xx_eth.c
+index e345ec8..73bb8ea 100644
+--- a/drivers/net/mv643xx_eth.c
++++ b/drivers/net/mv643xx_eth.c
+@@ -289,6 +289,7 @@ struct mv643xx_eth_shared_private {
+ 	unsigned int t_clk;
+ 	int extended_rx_coal_limit;
+ 	int tx_bw_control;
++	int tx_csum_limit;
+ };
+
+ #define TX_BW_CONTROL_ABSENT		0
+@@ -776,13 +777,16 @@ static int txq_submit_skb(struct tx_queue *txq,
+struct sk_buff *skb)
+ 	l4i_chk =3D 0;
+
+ 	if (skb->ip_summed =3D=3D CHECKSUM_PARTIAL) {
++		int hdr_len;
+ 		int tag_bytes;
+
+ 		BUG_ON(skb->protocol !=3D htons(ETH_P_IP) &&
+ 		       skb->protocol !=3D htons(ETH_P_8021Q));
+
+-		tag_bytes =3D (void *)ip_hdr(skb) - (void *)skb->data - ETH_HLEN;
+-		if (unlikely(tag_bytes & ~12)) {
++		hdr_len =3D (void *)ip_hdr(skb) - (void *)skb->data;
++		tag_bytes =3D hdr_len - ETH_HLEN;
++		if (skb->len - hdr_len > mp->shared->tx_csum_limit ||
++		    unlikely(tag_bytes & ~12)) {
+ 			if (skb_checksum_help(skb) =3D=3D 0)
+ 				goto no_csum;
+ 			kfree_skb(skb);
+@@ -2666,6 +2670,7 @@ static int mv643xx_eth_shared_probe(struct
+platform_device *pdev)
+ 	 * Detect hardware parameters.
+ 	 */
+ 	msp->t_clk =3D (pd !=3D NULL && pd->t_clk !=3D 0) ? pd->t_clk : 133000000=
+;
++	msp->tx_csum_limit =3D pd->tx_csum_limit ? pd->tx_csum_limit : 9 * 1024;
+ 	infer_hw_params(msp);
+
+ 	platform_set_drvdata(pdev, msp);
+diff --git a/include/linux/mv643xx_eth.h b/include/linux/mv643xx_eth.h
+index cbbbe9b..30b0c4e 100644
+--- a/include/linux/mv643xx_eth.h
++++ b/include/linux/mv643xx_eth.h
+@@ -19,6 +19,11 @@ struct mv643xx_eth_shared_platform_data {
+ 	struct mbus_dram_target_info	*dram;
+ 	struct platform_device	*shared_smi;
+ 	unsigned int		t_clk;
++	/*
++	 * Max packet size for Tx IP/Layer 4 checksum, when set to 0, default
++	 * limit of 9KiB will be used.
++	 */
++	int			tx_csum_limit;
+ };
+
+ #define MV643XX_ETH_PHY_ADDR_DEFAULT	0
+--=20
+1.6.0.4
