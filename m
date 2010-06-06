@@ -1,61 +1,46 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 06 Jun 2010 09:15:10 +0300
-Subject: [PATCH 0/5] Enable pxa310 usb otg port host mode.
-In-Reply-To: <AANLkTil7KUMIqP76bXAOOCiAfISzCiixtMzNDAHo7kNo@mail.gmail.com>
-References: <1275464450-23003-1-git-send-email-grinberg@compulab.co.il>
-	<AANLkTil7KUMIqP76bXAOOCiAfISzCiixtMzNDAHo7kNo@mail.gmail.com>
-Message-ID: <4C0B3CEE.80000@compulab.co.il>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sun, 6 Jun 2010 16:17:00 +0800
+Subject: pxa300 - DDRAM base value
+In-Reply-To: <201006051919.17738.marek.vasut@gmail.com>
+References: <1275371058.7001.35.camel@balakrishnan-desktop>
+	<201006051919.17738.marek.vasut@gmail.com>
+Message-ID: <AANLkTil5TWYILcdp872as8S8LMqQWhPYWLt7cxs2lUm5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping!
-
-On 06/02/10 11:29, Eric Miao wrote:
-> On Wed, Jun 2, 2010 at 3:40 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->   
->> This patch series extends the existing usb ulpi generic driver
->> with support for Function and Interface control of the ULPI PHYs,
->> adds support for SMSC USB3319 ulpi phy,
->> implement the pxa310 specific ulpi functionality and make pxa specific ohci
->> implementation aware of pxa310 usb otg port host mode.
+On Sun, Jun 6, 2010 at 1:19 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Dne ?t 1. ?ervna 2010 07:44:18 balakrishnan napsal(a):
+>> I am working on pxa300 based development board and using Linux 2.6.34.
+>> This Linux kernel already has support for following boards
+>> 1. zylonite_pxa300
+>> 2. cm-x300
+>> 3. colibri-pxa300
+>> 4. littleton
 >>
->>     
-> Looks like a right way to go, include Haojian and Jing for review.
+>> My doubt is that pxa300 based boards are using "0xa0000000" ?as DDRAM
+>> base and PHYS_OFFSET is also defined in
+>> "arch/arm/mach-pxa/include/mach/memory.h" as 0xa0000000.
+>> But in our board ?DDR is mapped in 0x80000000. Does it make any
+>> problem?. Because after mmu is turned ON, my board is hanging.
+>>
+>> "zreladdr-y ? := 0x80008000" is defined in
+>> "arch/arm/mach-pxa/Makefile.boot" file .
+>> my machine_desc is as follows
+>> .phys_io ? ? ? ?= 0x40000000,
+>> .io_pg_offst ? ?= (io_p2v(0x40000000) >> 18) & 0xfffc,
+>> .boot_params ? ?= 0x80000100,
+>>
 >
->   
->> Igor Grinberg (5):
->>  usb/otg/ulpi: extend the generic ulpi driver.
->>  usb/otg/ulpi: add support for SMSC USB3319 ulpi phy.
->>  [ARM] pxa: add PXA310 specific ULPI implementation
->>  [ARM] usb/host/ohci-pxa27x: make PXA310 USB OTG port work in host
->>    mode.
->>  [ARM] pxa/cm-x300: enable USB host port 2 on CM-X300 with PXA310 cpu.
->>
->>  arch/arm/mach-mx2/mach-pca100.c              |   10 +-
->>  arch/arm/mach-mx3/mach-armadillo5x0.c        |   10 +-
->>  arch/arm/mach-mx3/mach-mx31lite.c            |    5 +-
->>  arch/arm/mach-mx3/mach-mx31moboard.c         |    5 +-
->>  arch/arm/mach-mx3/mach-pcm037.c              |   10 +-
->>  arch/arm/mach-mx3/mach-pcm043.c              |    5 +-
->>  arch/arm/mach-pxa/Kconfig                    |    4 +
->>  arch/arm/mach-pxa/Makefile                   |    1 +
->>  arch/arm/mach-pxa/cm-x300.c                  |  102 ++++++++++++++
->>  arch/arm/mach-pxa/include/mach/ohci.h        |    3 +
->>  arch/arm/mach-pxa/include/mach/pxa310-ulpi.h |   19 +++
->>  arch/arm/mach-pxa/include/mach/regs-u2d.h    |    2 +
->>  arch/arm/mach-pxa/pxa310-ulpi.c              |  110 +++++++++++++++
->>  drivers/usb/host/ohci-pxa27x.c               |  183 ++++++++++++++++++++++++++
->>  drivers/usb/otg/Kconfig                      |    2 -
->>  drivers/usb/otg/ulpi.c                       |   65 ++++++++-
->>  include/linux/usb/ulpi.h                     |   25 ++++-
->>  17 files changed, 542 insertions(+), 19 deletions(-)
->>  create mode 100644 arch/arm/mach-pxa/include/mach/pxa310-ulpi.h
->>  create mode 100644 arch/arm/mach-pxa/pxa310-ulpi.c
->>
->>
->>     
->   
+> Try editing both arch/arm/mach-pxa/Makefile.boot and
+> arch/arm/mach/pxa/include/mach/memory.h
+>
+>> With Thanks
+>> J.Balakrishnan
+>
+> The 0x80000000 should be aliased to 0xa0000000, but looking into the PXA docs,
+> it is only on pxa320. Eric, any ideas on this ?
+>
 
--- 
-Regards,
-Igor.
+Should be working on pxa300/310 as well. If it doesn't, check you bootloader
+to make sure the mapping is OK, and memory doesn't exceed
+(0xa000_0000 - 0x8000_0000).
