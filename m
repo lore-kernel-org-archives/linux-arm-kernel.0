@@ -1,61 +1,42 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Mon, 07 Jun 2010 14:15:47 -0700
-Subject: [PATCH] mxc: Fix pad names for imx51
-In-Reply-To: <20100607210448.GA2446@matterhorn.lan>
-References: <1275566746-6510-1-git-send-email-jason77.wang@gmail.com>	<1275566746-6510-2-git-send-email-jason77.wang@gmail.com>	<20100604085320.GB25357@pengutronix.de>	<20100604105347.GA2982@matterhorn.lan>	<20100604140959.GB2982@matterhorn.lan>	<4C0D5996.9050906@boundarydevices.com>
-	<20100607210448.GA2446@matterhorn.lan>
-Message-ID: <4C0D6183.1010501@boundarydevices.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 7 Jun 2010 23:20:35 +0200
+Subject: [PATCH] pxa2xx/cpufreq: Fix DRI computation
+In-Reply-To: <87bpbmocjy.fsf@free.fr>
+References: <1275698808-31166-1-git-send-email-marek.vasut@gmail.com>
+	<87bpbmocjy.fsf@free.fr>
+Message-ID: <201006072320.35473.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amit Kucheria wrote:
-> On 10 Jun 07, Troy Kisky wrote:
+Dne Po 7. ?ervna 2010 21:41:37 Robert Jarzmik napsal(a):
+> Marek Vasut <marek.vasut@gmail.com> writes:
+> > The DRI field was incorrectly computed, causing various hangs and weird
+> > behaviour on PXA2xx machines. This patch introduces the DRI computation
+> > according to the PXA255 (January 2004) and PXA270 (MV-S301039-00 Rev. A)
+> > datasheets.
 > 
->>> On 10 Jun 04, Amit Kucheria wrote:
->>>
+> Hi Marek,
 > 
-> <snip>
+> I'll help a bit in the review here, but I need a few days.
 > 
->>> +#define MX51_PAD_CSPI1_SCLK__GPIO_4_27		IOMUX_PAD(0x614, 0x224,  3, 0x0,   0, NO_PAD_CTRL)
+> Meanwhile, I began the review and I have a question : did you check
+> MDCNFG_DRAC0() and MDCNFG_DRAC2() definitions ? As I check my TRM, it
+> should be, according to my manual :
+> + #define MDCNFG_DRAC2(mdcnfg) (((mdcnfg) >> 19) & 0x3)
+> + #define MDCNFG_DRAC0(mdcnfg) (((mdcnfg) >> 3) & 0x3)
+> - #define MDCNFG_DRAC2(mdcnfg) (((mdcnfg) >> 21) & 0x3)
+> - #define MDCNFG_DRAC0(mdcnfg) (((mdcnfg) >> 5) & 0x3)
 > 
-> <snip>
-> 
->>> +#define MX51_PAD_GPIO_1_2__GPIO_1_2		IOMUX_PAD(0x7D4, 0x3CC, 0, 0x0,   0, NO_PAD_CTRL)
->>> +#define MX51_PAD_GPIO_1_3__GPIO_1_3		IOMUX_PAD(0x7D8, 0x3D0, 0, 0x0,   0, NO_PAD_CTRL)
->>> +#define MX51_PAD_PMIC_INT_REQ__PMIC_INT_REQ	IOMUX_PAD(0x7FC, 0x3D4, 0, 0x0,   0, NO_PAD_CTRL)
->>> +#define MX51_PAD_GPIO_1_4__GPIO_1_4		IOMUX_PAD(0x804, 0x3D8, 0, 0x0,   0, NO_PAD_CTRL)
->>> +#define MX51_PAD_GPIO_1_5__GPIO_1_5		IOMUX_PAD(0x808, 0x3DC, 0, 0x0,   0, NO_PAD_CTRL)
->>> +#define MX51_PAD_GPIO_1_6__GPIO_1_6		IOMUX_PAD(0x80C, 0x3E0, 0, 0x0,   0, NO_PAD_CTRL)
->>> +#define MX51_PAD_GPIO_1_7__GPIO_1_7		IOMUX_PAD(0x810, 0x3E4, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
->>> +#define MX51_PAD_GPIO_1_8__GPIO_1_8		IOMUX_PAD(0x814, 0x3E8, 0, 0x0,   1, MX51_GPIO_PAD_CTRL)
->>> +#define MX51_PAD_GPIO_1_9__GPIO_1_9		IOMUX_PAD(0x818, 0x3EC, 0, 0x0,   0, NO_PAD_CTRL)
->> Why all the stuttering?
->> Isn't MX51_PAD_GPIO_1_9 or MX51_PAD_DISP2_DAT15 descriptive enough?
->>
-> 
-> Just following the convention use in the rest of imx devices. See the
-> following comment at the top of the file:
-> 
-> /*
->  * The naming convention for the pad modes is MX51_PAD_<padname>__<padmode>
->  * If <padname> or <padmode> refers to a GPIO, it is named
->  * GPIO_<unit>_<num> see also iomux-v3.h
->  */
-> 
-> We could use the short names for pads being used in their "native mode".
-> But as soon as we use the pad in a different mode, such as
-> PAD_CSPI1_SCLK__GPIO_4_27 above, we'd need a different naming convention.
-> 
-> Regards,
-> Amit
-> 
+> While I was checking the calculation, that rows calculation doesn't fit.
+> Hence I wonder if init_sdram_rows() will be correct.
+> I'll send a full review soon, don't be too quick with V2 please.
 
-I'm fine with MX51_PAD_CSPI1_SCLK__GPIO_4_27, but I don't care for
-MX51_PAD_GPIO_1_9__GPIO_1_9. How about changing the comment to
+Robert, this is actually a good catch, I'll try with this change, maybe it'll 
+stop hanging finally.
 
- /*
-  * The naming convention for the pad modes is MX51_PAD_<padname>
-  * or MX51_PAD_<padname>__<padmode> if padname != padmode.
-  * If <padname> or <padmode> refers to a GPIO, it is named
-  * GPIO_<unit>_<num> see also iomux-v3.h
-  */
+Thanks!
+> 
+> Cheers.
+> 
+> --
+> Robert
