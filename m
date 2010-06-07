@@ -1,77 +1,102 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 7 Jun 2010 07:32:02 +0200
-Subject: [PATCH 2/2] pxa/spitz: Add isl6271a voltage regulator
-In-Reply-To: <1275888473-22512-2-git-send-email-marek.vasut@gmail.com>
-References: <1275888473-22512-1-git-send-email-marek.vasut@gmail.com>
-	<1275888473-22512-2-git-send-email-marek.vasut@gmail.com>
-Message-ID: <201006070732.02675.marek.vasut@gmail.com>
+Date: Mon, 7 Jun 2010 08:58:36 +0200
+Subject: pxa300 - DDRAM base value
+In-Reply-To: <1275892191.3501.17.camel@balakrishnan-desktop>
+References: <1275371058.7001.35.camel@balakrishnan-desktop>
+	<201006061834.50297.marek.vasut@gmail.com>
+	<1275892191.3501.17.camel@balakrishnan-desktop>
+Message-ID: <201006070858.36341.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne Po 7. ?ervna 2010 07:27:53 Marek Vasut napsal(a):
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> ---
->  arch/arm/mach-pxa/spitz.c |   32 ++++++++++++++++++++++++++++++++
->  1 files changed, 32 insertions(+), 0 deletions(-)
+Dne Po 7. ?ervna 2010 08:29:51 balakrishnan napsal(a):
+> On Sun, 2010-06-06 at 18:34 +0200, Marek Vasut wrote:
+> > Dne Ne 6. ?ervna 2010 10:17:00 Eric Miao napsal(a):
+> > > On Sun, Jun 6, 2010 at 1:19 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> > > > Dne ?t 1. ?ervna 2010 07:44:18 balakrishnan napsal(a):
+> > > >> I am working on pxa300 based development board and using Linux
+> > > >> 2.6.34. This Linux kernel already has support for following boards
+> > > >> 1. zylonite_pxa300
+> > > >> 2. cm-x300
+> > > >> 3. colibri-pxa300
+> > > >> 4. littleton
+> > > >> 
+> > > >> My doubt is that pxa300 based boards are using "0xa0000000"  as
+> > > >> DDRAM base and PHYS_OFFSET is also defined in
+> > > >> "arch/arm/mach-pxa/include/mach/memory.h" as 0xa0000000.
+> > > >> But in our board  DDR is mapped in 0x80000000. Does it make any
+> > > >> problem?. Because after mmu is turned ON, my board is hanging.
+> > > >> 
+> > > >> "zreladdr-y   := 0x80008000" is defined in
+> > > >> "arch/arm/mach-pxa/Makefile.boot" file .
+> > > >> my machine_desc is as follows
+> > > >> .phys_io        = 0x40000000,
+> > > >> .io_pg_offst    = (io_p2v(0x40000000) >> 18) & 0xfffc,
+> > > >> .boot_params    = 0x80000100,
+> > > > 
+> > > > Try editing both arch/arm/mach-pxa/Makefile.boot and
+> > > > arch/arm/mach/pxa/include/mach/memory.h
+> > > > 
+> > > >> With Thanks
+> > > >> J.Balakrishnan
+> > > > 
+> > > > The 0x80000000 should be aliased to 0xa0000000, but looking into the
+> > > > PXA docs, it is only on pxa320. Eric, any ideas on this ?
+> > > 
+> > > Should be working on pxa300/310 as well. If it doesn't, check you
+> > > bootloader to make sure the mapping is OK, and memory doesn't exceed
+> > > (0xa000_0000 - 0x8000_0000).
+> > 
+> > It worked last time I used the pxa310 littleton board, but I can't check
+> > on the pxa300 zylonite board just yet.
+> > 
+> > Could you give us your bootloader details ?
 > 
-> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-> index c1048a3..5767ceb 100644
-> --- a/arch/arm/mach-pxa/spitz.c
-> +++ b/arch/arm/mach-pxa/spitz.c
-> @@ -26,6 +26,7 @@
->  #include <linux/spi/corgi_lcd.h>
->  #include <linux/mtd/sharpsl.h>
->  #include <linux/input/matrix_keypad.h>
-> +#include <linux/regulator/machine.h>
-> 
->  #include <asm/setup.h>
->  #include <asm/mach-types.h>
-> @@ -709,6 +710,34 @@ static struct platform_device sharpsl_rom_device = {
->  	.dev.platform_data = &sharpsl_rom_data,
->  };
-> 
-> +static struct regulator_consumer_supply isl6271a_consumers[] = {
-> +	{
-> +		.supply	= "vcc_core",
-> +	}
-> +};
-> +
-> +static struct regulator_init_data isl6271a_info[] = {
-> +	{
-> +		.constraints = {
-> +			.name		= "vcc_core range",
-> +			.min_uV		= 850000,
-> +			.max_uV		= 1600000,
-> +			.always_on	= 1,
-> +			.valid_ops_mask	= REGULATOR_CHANGE_VOLTAGE,
-> +		},
-> +		.consumer_supplies	= isl6271_consumers,
-> +		.num_consumer_supplies	= ARRAY_SIZE(isl6271_consumers),
-> +	}
-> +};
-> +
-> +static struct i2c_board_info spitz_pi2c_board_info[] = {
-> +	{
-> +		.type		= "isl6271a",
-> +		.addr		= 0x1b,
+> hi,
+>       Now, I can able to boot after editing following files
+> arch/arm/mach-pxa/Makefile.boot and
+> arch/arm/mach/pxa/include/mach/memory.h (0x80000000 changed to
+> 0xa0000000). My doubt is
 
-btw. also change this -- i2c_detect will tell you what address the chip have if 
-you don't know it yet.
+It was always set to 0xa0000000, both of them.
 
-> +		.platform_data	= &isl6271_info,
-> +	},
-> +};
-> +
->  static struct platform_device *devices[] __initdata = {
->  	&spitzscoop_device,
->  	&spitzkbd_device,
-> @@ -765,6 +794,9 @@ static void __init common_init(void)
->  	pxa_set_ficp_info(&spitz_ficp_platform_data);
->  	set_pxa_fb_info(&spitz_pxafb_info);
->  	pxa_set_i2c_info(NULL);
-> +
-> +	pxa27x_set_i2c_power_info(NULL);
-> +	i2c_register_board_info(1, ARRAY_AND_SIZE(spitz_pi2c_board_info));
->  }
+> 1.why 0x80000000 (DDR phy address) is aliased to 0xa0000000 in pxa
+> architecture?
+
+Because that's how the HW guys did it and because it's written in TRM (which is 
+the holy bible(substitute any other holy object) of the CPU) ;-)
+
+> 2.In my development board two DDRAMs mapped at 0x80000000-0x88000000 and
+> 0xc0000000-0xc8000000, how can I inform to kernel about this different
+> bank and size?.
+
+Check LAKML and look for:
+"[PATCH] pxa/vpac270: Enable SparseMEM for 256 MB of RAM"
+
+This might give you an idea ... though it's a hack. All this goo about 
+PHYS_OFFSET etc. will be gone in hopefully near future.
+
+Cheers!
+
 > 
->  #if defined(CONFIG_MACH_AKITA) || defined(CONFIG_MACH_BORZOI)
+> My Boot loader details,
+> ------------------------------
+> =>bdi
+> arch_number = 0x00000B04
+> env_t       = 0x00000000
+> boot_params = 0x80000100
+> DRAM bank   = 0x00000000
+> -> start    = 0x80000000
+> -> size     = 0x08000000
+> DRAM bank   = 0x00000001
+> -> start    = 0xC0000000
+> -> size     = 0x08000000
+> ethaddr     = 08:00:3e:26:0a:5b
+> ip_addr     = 192.168.0.21
+> baudrate    = 115200 bps
+> =>ver
+> U-Boot 2010.03 (Jun 01 2010 - 14:27:43)
+> 
+> 
+> With Thanks
+> J.Balakrishnan
