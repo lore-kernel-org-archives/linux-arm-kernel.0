@@ -1,37 +1,22 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 07 Jun 2010 21:41:37 +0200
-Subject: [PATCH] pxa2xx/cpufreq: Fix DRI computation
-In-Reply-To: <1275698808-31166-1-git-send-email-marek.vasut@gmail.com> (Marek
-	Vasut's message of "Sat\, 5 Jun 2010 02\:46\:48 +0200")
-References: <1275698808-31166-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <87bpbmocjy.fsf@free.fr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Jun 2010 20:44:57 +0100
+Subject: [PATCH] ARM: Add PI/robust mutexes support for SMP kernels
+In-Reply-To: <20100607173630.GA10489@oksana.dev.rtsoft.ru>
+References: <20100607173630.GA10489@oksana.dev.rtsoft.ru>
+Message-ID: <20100607194457.GC7220@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Vasut <marek.vasut@gmail.com> writes:
+On Mon, Jun 07, 2010 at 09:36:30PM +0400, Anton Vorontsov wrote:
+> To support PI or robust mutexes, the kernel needs to perform some
+> operations atomically on userspace addresses, and yet ARM lacked
+> the support for the SMP case.
+> 
+> ARMv6 adds exclusive access variants of ldr and str instructions,
+> which means that support for PI/robust mutexes should now be
+> relatively straightforward.
 
-> The DRI field was incorrectly computed, causing various hangs and weird
-> behaviour on PXA2xx machines. This patch introduces the DRI computation
-> according to the PXA255 (January 2004) and PXA270 (MV-S301039-00 Rev. A)
-> datasheets.
-
-Hi Marek,
-
-I'll help a bit in the review here, but I need a few days.
-
-Meanwhile, I began the review and I have a question : did you check
-MDCNFG_DRAC0() and MDCNFG_DRAC2() definitions ? As I check my TRM, it should be,
-according to my manual :
-+ #define MDCNFG_DRAC2(mdcnfg) (((mdcnfg) >> 19) & 0x3)
-+ #define MDCNFG_DRAC0(mdcnfg) (((mdcnfg) >> 3) & 0x3)
-- #define MDCNFG_DRAC2(mdcnfg) (((mdcnfg) >> 21) & 0x3)
-- #define MDCNFG_DRAC0(mdcnfg) (((mdcnfg) >> 5) & 0x3)
-
-While I was checking the calculation, that rows calculation doesn't fit. Hence I
-wonder if init_sdram_rows() will be correct.
-I'll send a full review soon, don't be too quick with V2 please.
-
-Cheers.
-
---
-Robert
+It isn't this straight forward.  You're now bypassing the MMU protections
+in that 'strex' can bypass the read-only protection of the user page.
+This can result in the zero BSS page being corrupted, or worse corruption
+to page cache pages.
