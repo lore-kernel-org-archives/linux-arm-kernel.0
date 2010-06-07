@@ -1,71 +1,58 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Mon, 7 Jun 2010 21:01:17 +0200
-Subject: [PATCH] mx31lilly: prevent ulpi calls if !USB_CONFIG_ULPI
-In-Reply-To: <1275936573-21108-1-git-send-email-jic23@cam.ac.uk>
-References: <1275936573-21108-1-git-send-email-jic23@cam.ac.uk>
-Message-ID: <20100607190117.GA2695@buzzloop.caiaq.de>
+From: mike.rapoport@gmail.com (Mike Rapoport)
+Date: Mon, 7 Jun 2010 22:37:16 +0300
+Subject: pxa300 - DDRAM base value
+In-Reply-To: <1275892191.3501.17.camel@balakrishnan-desktop>
+References: <1275371058.7001.35.camel@balakrishnan-desktop>
+	<201006051919.17738.marek.vasut@gmail.com>
+	<AANLkTil5TWYILcdp872as8S8LMqQWhPYWLt7cxs2lUm5@mail.gmail.com>
+	<201006061834.50297.marek.vasut@gmail.com>
+	<1275892191.3501.17.camel@balakrishnan-desktop>
+Message-ID: <AANLkTinKc9Uc6QeKYogK3h1kHsOU1p6Qp1kWgn0J8cMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 07, 2010 at 07:49:33PM +0100, Jonathan Cameron wrote:
-> Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
-> ---
->  All of the mx3 boards that use ulpi are suitably protected.
->  This currently makes mx3_defconfig fail as highlighted by
->  Kautobuild.  Sorry for noise if a fix is already on it's way!
+> hi,
+> ????? Now, I can able to boot after editing following files
+> arch/arm/mach-pxa/Makefile.boot and arch/arm/mach/pxa/include/mach/memory.h
+> (0x80000000 changed to 0xa0000000). My doubt is
+> 1.why 0x80000000 (DDR phy address) is aliased to 0xa0000000 in pxa
+> architecture?
+> 2.In my development board two DDRAMs mapped at 0x80000000-0x88000000 and
+> 0xc0000000-0xc8000000, how can I inform to kernel about this different bank
+> and size?.
 
-There is actually. Have a look at Sascha's mxc trees.
+enable CONFIG_HIGHMEM
 
-Thanks, anyway :)
-
-Daniel
-
-
-> 
->  arch/arm/mach-mx3/mach-mx31lilly.c |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx3/mach-mx31lilly.c b/arch/arm/mach-mx3/mach-mx31lilly.c
-> index d3d5877..6827c68 100644
-> --- a/arch/arm/mach-mx3/mach-mx31lilly.c
-> +++ b/arch/arm/mach-mx3/mach-mx31lilly.c
-> @@ -114,6 +114,7 @@ static struct platform_device physmap_flash_device = {
->  };
->  
->  /* USB */
-> +#if defined(CONFIG_USB_ULPI)
->  
->  #define USB_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
->  			PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
-> @@ -243,6 +244,7 @@ static struct mxc_usbh_platform_data usbh2_pdata = {
->  	.portsc	= MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
->  	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
->  };
-> +#endif /* USB_ULPI */
->  
->  static struct platform_device *devices[] __initdata = {
->  	&smsc91x_device,
-> @@ -321,6 +323,7 @@ static void __init mx31lilly_board_init(void)
->  	platform_add_devices(devices, ARRAY_SIZE(devices));
->  
->  	/* USB */
-> +#if defined(CONFIG_USB_ULPI)
->  	usbotg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
->  				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
->  	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
-> @@ -328,6 +331,7 @@ static void __init mx31lilly_board_init(void)
->  
->  	mxc_register_device(&mxc_usbh1, &usbh1_pdata);
->  	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
-> +#endif
->  }
->  
->  static void __init mx31lilly_timer_init(void)
-> -- 
-> 1.6.4.4
-> 
-> 
+> My Boot loader details,
+> ------------------------------
+> =>bdi
+> arch_number = 0x00000B04
+> env_t?????? = 0x00000000
+> boot_params = 0x80000100
+> DRAM bank?? = 0x00000000
+> -> start??? = 0x80000000
+> -> size???? = 0x08000000
+> DRAM bank?? = 0x00000001
+> -> start??? = 0xC0000000
+> -> size???? = 0x08000000
+> ethaddr???? = 08:00:3e:26:0a:5b
+> ip_addr???? = 192.168.0.21
+> baudrate??? = 115200 bps
+> =>ver
+> U-Boot 2010.03 (Jun 01 2010 - 14:27:43)
+>
+>
+> With Thanks
+> J.Balakrishnan
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+
+
+
+-- 
+	Sincerely Yours,
+		Mike.
