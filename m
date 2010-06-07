@@ -1,51 +1,29 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Mon, 7 Jun 2010 16:57:32 +0800
-Subject: [PATCH] RTC/pxa: remove unnecessary private ops->ioctl()
-In-Reply-To: <877hmbcjqu.fsf@free.fr>
-References: <4C0A5F53.6070600@gmail.com>
-	<877hmbcjqu.fsf@free.fr>
-Message-ID: <AANLkTilJntnk11OZJt5oeKv4bk5qv8nlDnuGHc2hTGOt@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 07 Jun 2010 10:04:52 +0100
+Subject: Preload engine in ARMv7 (cortex A8)
+In-Reply-To: <AANLkTilGu3OC_tth-Wurgu1jcm5zKKntINGc-A8CwkxI@mail.gmail.com>
+References: <AANLkTilGu3OC_tth-Wurgu1jcm5zKKntINGc-A8CwkxI@mail.gmail.com>
+Message-ID: <1275901492.7258.6.camel@toshiba-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/6/7 Robert Jarzmik <robert.jarzmik@free.fr>:
-> Wan ZongShun <mcuos.com@gmail.com> writes:
->> Please, do not implement private ops->ioctl() unless absolutely necessary.
->> pxa series RTC driver's ioctl() is unnecessary, since RTC subsystem has implement
->> the ioctl() very well,so we can only use the API of '.alarm_irq_enable' and
->> '.update_irq_enable' to do enable irq action.
->>
->> Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
-> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
->
-> This is not an urgent fix, but a cleanup. Whoever gets it in (Alessandro through
-> rtc tree, Eric through arm/pxa tree, or Andrew) is to be defined.
->
+On Tue, 2010-06-01 at 18:27 +0100, Vinayak Pane wrote:
+> I am planning to utilize the PreLoad Engine for L2 cache. In past, I
+> have played with cache locking with line by line in ARM9. There I
+> could recall that tags and indexes are generated on basis of physical
+> address of the data. Now in case of PLE we have the start address and
+> number of lines to fill with. Does the PLE operation will leave some
+> indexes empty ? Or does the PLE populate all the lines in that way
+> with the source data address ? Do I need to start PLE for the block of
+> size equal to that of way-size ? To ensure no lines remain empty  and
+> to ensure no line gets overwriten by other line.
 
-I will ping Andrew to apply it as soon as I get the owner's ACK.
+I couldn't fully understand your question. It looks more like
+hardware-related (you could try support at arm.com).
 
-> I would go for Alessandro, as he handles the RTC tree.
->
-> Cheers.
->
-> --
-> Robert
->
-> PS: Removed alsa-devel list, as this is not alsa material
+Anyway, in general you should not make any assumptions about which lines
+are present or not in the cache. With speculative loads on newer cores,
+you can get other lines in the cache than what you were expecting and
+they may evict some the you explicitly tried to preload.
 
-Yes, I think I am careless for this. sorry.
->
-
-
-
--- 
-*linux-arm-kernel mailing list
-mail addr:linux-arm-kernel at lists.infradead.org
-you can subscribe by:
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-* linux-arm-NUC900 mailing list
-mail addr:NUC900 at googlegroups.com
-main web: https://groups.google.com/group/NUC900
-you can subscribe it by sending me mail:
-mcuos.com at gmail.com
+Catalin
