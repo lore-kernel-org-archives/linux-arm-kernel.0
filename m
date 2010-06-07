@@ -1,38 +1,30 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Tue, 8 Jun 2010 01:35:17 +0400
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 07 Jun 2010 16:40:01 -0400 (EDT)
 Subject: [PATCH] ARM: Add PI/robust mutexes support for SMP kernels
-In-Reply-To: <alpine.LFD.2.00.1006071634340.30664@xanadu.home>
+In-Reply-To: <20100607202701.GA14529@oksana.dev.rtsoft.ru>
 References: <20100607173630.GA10489@oksana.dev.rtsoft.ru>
 	<20100607194457.GC7220@n2100.arm.linux.org.uk>
 	<20100607202701.GA14529@oksana.dev.rtsoft.ru>
-	<alpine.LFD.2.00.1006071634340.30664@xanadu.home>
-Message-ID: <20100607213517.GA25479@oksana.dev.rtsoft.ru>
+Message-ID: <alpine.LFD.2.00.1006071634340.30664@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 07, 2010 at 04:40:01PM -0400, Nicolas Pitre wrote:
-> On Tue, 8 Jun 2010, Anton Vorontsov wrote:
+On Tue, 8 Jun 2010, Anton Vorontsov wrote:
+
+> So, can we solve this by
 > 
-> > So, can we solve this by
-> > 
-> > ldrex
-> > ...
-> > strt newval
-> >    ^ may cause exception, but doesn't clear the tag, so we're still atomic
-> > strex <- clears the tag
-> 
-> No, you're not atomic anymore, as some other ldrex/strex might have come 
-> through by the time the strt is executed, and while this strex wouldn't 
-> be executed as the tag would be cleared at that point, the strt has no 
-> such concerns with atomic tags and would indeed corrupt whatever new 
-> value has been stored in the mean time.
+> ldrex
+> ...
+> strt newval
+>    ^ may cause exception, but doesn't clear the tag, so we're still atomic
+> strex <- clears the tag
 
-Ugh, surely right you are, thanks!
+No, you're not atomic anymore, as some other ldrex/strex might have come 
+through by the time the strt is executed, and while this strex wouldn't 
+be executed as the tag would be cleared@that point, the strt has no 
+such concerns with atomic tags and would indeed corrupt whatever new 
+value has been stored in the mean time.
 
-It seems Catalin's "Remove the domain switching" patch comes handy
-here.
 
--- 
-Anton Vorontsov
-email: cbouatmailru at gmail.com
-irc://irc.freenode.net/bd2
+
+Nicolas
