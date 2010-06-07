@@ -1,263 +1,36 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 7 Jun 2010 18:56:56 +0200
-Subject: [PATCH Resend] PCMCIA: add Cogent CSB726 PCMCIA support
-In-Reply-To: <20100607162457.GA10712@isilmar-3.linta.de>
-References: <1275571550-24437-1-git-send-email-vzapolskiy@gmail.com>
-	<20100607162457.GA10712@isilmar-3.linta.de>
-Message-ID: <201006071856.56960.marek.vasut@gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 7 Jun 2010 18:30:41 +0100
+Subject: FYI: Qemu support on s5pc110
+In-Reply-To: <AANLkTil8bmtwXNYpMhtPqK21_Z-kEi9wZSOoZtd1n7ML@mail.gmail.com>
+References: <AANLkTil8bmtwXNYpMhtPqK21_Z-kEi9wZSOoZtd1n7ML@mail.gmail.com>
+Message-ID: <20100607173041.GS7248@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne Po 7. ?ervna 2010 18:24:57 Dominik Brodowski napsal(a):
-> Russell,
+
+On Sun, Jun 06, 2010 at 02:03:39PM +0900, Kyungmin Park wrote:
+> Dear all,
 > 
-> have you had a chance to review this patch, and/or decide which way it
-> should take upstream?
+> FYI: My team release the qemu support on s5pc110 at
+> http://en.sourceforge.jp/projects/sfnet_slp-emulator/
+
+Interesting, any plans on merginging it back into qemu?
+ 
+> You can find a s5pc110 files at hw directories.
 > 
-> Best,
-> 	Dominik
+> The current mainline kernel, aquila and goni is will be run with this qemu.
 > 
-> On Thu, Jun 03, 2010 at 05:25:50PM +0400, Vladimir Zapolskiy wrote:
-> > This patch adds support for CompactFlash socket found in CSB726 board.
-> > 
-> > Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
-> > Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> > Cc: Dominik Brodowski <linux@dominikbrodowski.net>
-> > Acked-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> > Acked-by: Dominik Brodowski<linux@dominikbrodowski.net>
-> > ---
-> > 
-> >  drivers/pcmcia/Kconfig         |    3 +-
-> >  drivers/pcmcia/Makefile        |    1 +
-> >  drivers/pcmcia/pxa2xx_csb726.c |  156
-> >  ++++++++++++++++++++++++++++++++++++++++ 3 files changed, 159
-> >  insertions(+), 1 deletions(-)
-> >  create mode 100644 drivers/pcmcia/pxa2xx_csb726.c
-> > 
-> > diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
-> > index 9f3adbd..168219b 100644
-> > --- a/drivers/pcmcia/Kconfig
-> > +++ b/drivers/pcmcia/Kconfig
-> > @@ -208,7 +208,8 @@ config PCMCIA_PXA2XX
-> > 
-> >  	depends on ARM && ARCH_PXA && PCMCIA
-> >  	depends on (ARCH_LUBBOCK || MACH_MAINSTONE || PXA_SHARPSL \
-> >  	
-> >  		    || MACH_ARMCORE || ARCH_PXA_PALM || TRIZEPS_PCMCIA \
-> > 
-> > -		    || ARCOM_PCMCIA || ARCH_PXA_ESERIES || MACH_STARGATE2)
-> > +		    || ARCOM_PCMCIA || ARCH_PXA_ESERIES || MACH_STARGATE2 \
-> > +		    || MACH_CSB726)
-> > 
-> >  	select PCMCIA_SOC_COMMON
-> >  	help
-> >  	
-> >  	  Say Y here to include support for the PXA2xx PCMCIA controller
-> > 
-> > diff --git a/drivers/pcmcia/Makefile b/drivers/pcmcia/Makefile
-> > index 83ff802..efcda3f 100644
-> > --- a/drivers/pcmcia/Makefile
-> > +++ b/drivers/pcmcia/Makefile
-> > @@ -74,5 +74,6 @@ pxa2xx-obj-$(CONFIG_MACH_PALMTC)		+= 
-pxa2xx_palmtc.o
-> > 
-> >  pxa2xx-obj-$(CONFIG_MACH_PALMLD)		+= pxa2xx_palmld.o
-> >  pxa2xx-obj-$(CONFIG_MACH_E740)			+= pxa2xx_e740.o
-> >  pxa2xx-obj-$(CONFIG_MACH_STARGATE2)		+= pxa2xx_stargate2.o
-> > 
-> > +pxa2xx-obj-$(CONFIG_MACH_CSB726)		+= pxa2xx_csb726.o
-> > 
-> >  obj-$(CONFIG_PCMCIA_PXA2XX)			+= pxa2xx_base.o 
-$(pxa2xx-obj-y)
-> > 
-> > diff --git a/drivers/pcmcia/pxa2xx_csb726.c
-> > b/drivers/pcmcia/pxa2xx_csb726.c new file mode 100644
-> > index 0000000..bd86e90
-> > --- /dev/null
-> > +++ b/drivers/pcmcia/pxa2xx_csb726.c
-> > @@ -0,0 +1,156 @@
-> > +/*
-> > + * linux/drivers/pcmcia/pxa2xx_csb726.c
-> > + *
-> > + * Cogent CSB726 Compact Flash specific routines.
-> > + *
-> > + * Copyright 2010 Vladimir Zapolskiy <vzapolskiy@gmail.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + */
-> > +
-> > +#include <linux/module.h>
-> > +#include <linux/init.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/delay.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/gpio.h>
-> > +
-> > +#include <pcmcia/ss.h>
-> > +
-> > +#include <asm/irq.h>
-> > +#include <asm/mach-types.h>
-> > +
-> > +#include "soc_common.h"
-> > +
-> > +#define GPIO_CF_RDY     98
-> > +#define GPIO_CF_CD      99
-> > +#define GPIO_CF_RST     103
-> > +
-> > +static struct pcmcia_irqs irqs[] = {
-> > +	{
-> > +		.sock = 0,
-> > +		.irq  = IRQ_GPIO(GPIO_CF_CD),
-> > +		.str  = "PCMCIA0 CD",
-> > +	},
-> > +};
-> > +
-> > +static int csb726_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
-> > +{
-> > +	int ret;
-> > +
-> > +	ret = gpio_request(GPIO_CF_RST, "CF reset");
-> > +	if (ret)
-> > +		return ret;
-> > +	gpio_direction_output(GPIO_CF_RST, 0);
-
-This can also fail.
-
-> > +
-> > +	skt->socket.pci_irq = IRQ_GPIO(GPIO_CF_RDY);
-
-gpio_to_irq();
-
-> > +	ret = soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
-> > +	if (!ret)
-> > +		gpio_free(GPIO_CF_RST);
-
-Use a failpath here:
-if (ret) { dev_err(); goto err1; }
-return 0;
-err1:
-...
-
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static void csb726_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
-> > +{
-> > +	soc_pcmcia_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
-> > +	gpio_free(GPIO_CF_RST);
-> > +}
-> > +
-> > +static void csb726_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
-> > +				       struct pcmcia_state *state)
-> > +{
-> > +	state->detect = !gpio_get_value(GPIO_CF_CD);
-> > +	state->ready  = !!gpio_get_value(GPIO_CF_RDY);
-
-Is the double negation (!!) needed here?
-
-> > +	state->bvd1   = 0; /* not available - battery detect on card */
-> > +	state->bvd2   = 0; /* not available */
-> > +	state->vs_3v  = 1; /* not available - voltage detect for card */
-> > +	state->vs_Xv  = 0; /* not available */
-> > +	state->wrprot = 0; /* not available - write protect */
-> > +}
-> > +
-> > +static int csb726_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
-> > +					  const socket_state_t *state)
-> > +{
-> > +	switch (skt->nr) {
-> > +	case 0:
-
-You registered just one socket anyway ... how can socket->nr be != 0?
-
-> > +		if (state->flags & SS_RESET) {
-> > +			/* reset */
-> > +			gpio_set_value(GPIO_CF_RST, 1);
-> > +			udelay(10);
-> > +			gpio_set_value(GPIO_CF_RST, 0);
-> > +		}
-> > +		break;
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static void csb726_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
-> > +{
-> > +	soc_pcmcia_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
-> > +}
-> > +
-> > +static void csb726_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
-> > +{
-> > +	soc_pcmcia_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
-> > +}
-> > +
-> > +static struct pcmcia_low_level csb726_pcmcia_ops __initdata = {
-> > +	.owner			= THIS_MODULE,
-> > +	.hw_init		= csb726_pcmcia_hw_init,
-> > +	.hw_shutdown		= csb726_pcmcia_hw_shutdown,
-> > +	.socket_state		= csb726_pcmcia_socket_state,
-> > +	.configure_socket	= csb726_pcmcia_configure_socket,
-> > +	.socket_init		= csb726_pcmcia_socket_init,
-> > +	.socket_suspend		= csb726_pcmcia_socket_suspend,
-> > +	.nr			= 1,
-> > +};
-> > +
-> > +static struct platform_device *csb726_pcmcia_device;
-> > +
-> > +static int __init csb726_pcmcia_init(void)
-> > +{
-> > +	int ret;
-> > +
-> > +	if (!machine_is_csb726())
-> > +		return -ENODEV;
-> > +
-> > +	csb726_pcmcia_device = platform_device_alloc("pxa2xx-pcmcia", -1);
-> > +	if (!csb726_pcmcia_device)
-> > +		return -ENOMEM;
-> > +
-> > +	ret = platform_device_add_data(csb726_pcmcia_device,
-> > +				       &csb726_pcmcia_ops,
-> > +				       sizeof(csb726_pcmcia_ops));
-> > +	if (ret)
-> > +		goto error_put_platform_device;
-> > +
-> > +	ret = platform_device_add(csb726_pcmcia_device);
-> > +	if (ret)
-> > +		goto error_put_platform_device;
-> > +
-> > +	return 0;
-> > +
-> > +error_put_platform_device:
-> > +	platform_device_put(csb726_pcmcia_device);
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static void __exit csb726_pcmcia_exit(void)
-> > +{
-> > +	platform_device_unregister(csb726_pcmcia_device);
-> > +}
-> > +
-> > +fs_initcall(csb726_pcmcia_init);
-
-module_init();
-
-> > +module_exit(csb726_pcmcia_exit);
-> > +
-> > +MODULE_DESCRIPTION("Cogent CSB726 Compact Flash Driver");
-> > +MODULE_AUTHOR("Vladimir Zapolskiy <vzapolskiy@gmail.com>");
-> > +MODULE_LICENSE("GPL v2");
-> > +MODULE_ALIAS("platform:pxa2xx-pcmcia");
+> Thank you,
+> Kyungmin Park
 > 
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Cheers!
+-- 
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
