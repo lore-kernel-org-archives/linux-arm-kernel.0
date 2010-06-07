@@ -1,52 +1,41 @@
 From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Tue, 8 Jun 2010 01:43:00 +0200
-Subject: [PATCH 05/10] [ARM] tegra: Add timer support
-In-Reply-To: <1275635441-17378-6-git-send-email-olof@lixom.net>
+Date: Tue, 8 Jun 2010 01:47:16 +0200
+Subject: [PATCH 08/10] [ARM] tegra: harmony: Add harmony board file
+In-Reply-To: <1275635441-17378-9-git-send-email-olof@lixom.net>
 References: <1275635441-17378-1-git-send-email-olof@lixom.net>
 	<1275635441-17378-2-git-send-email-olof@lixom.net>
 	<1275635441-17378-3-git-send-email-olof@lixom.net>
 	<1275635441-17378-4-git-send-email-olof@lixom.net>
 	<1275635441-17378-5-git-send-email-olof@lixom.net>
 	<1275635441-17378-6-git-send-email-olof@lixom.net>
-Message-ID: <AANLkTilitoPKhSCk1gxwyzOdu8LZD-9xA3EesFKkDsLy@mail.gmail.com>
+	<1275635441-17378-7-git-send-email-olof@lixom.net>
+	<1275635441-17378-8-git-send-email-olof@lixom.net>
+	<1275635441-17378-9-git-send-email-olof@lixom.net>
+Message-ID: <AANLkTim-vAk1f0gLzvk1o0iPhfiRSClRcjZsandp269v@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2010/6/4 Olof Johansson <olof@lixom.net>:
 
-> (....)
-> +static struct clock_event_device tegra_clockevent = {
-> + ? ? ? .name ? ? ? ? ? = "timer0",
-> + ? ? ? .rating ? ? ? ? = 300,
-> + ? ? ? .features ? ? ? = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
-> + ? ? ? .mult ? ? ? ? ? = 16777,
-> + ? ? ? .shift ? ? ? ? ?= 24,
-> + ? ? ? .set_next_event = tegra_timer_set_next_event,
-> + ? ? ? .set_mode ? ? ? = tegra_timer_set_mode,
-> +};
-> +
-> +static struct clocksource tegra_clocksource = {
-> + ? ? ? .name ? = "timer_us",
-> + ? ? ? .rating = 300,
-> + ? ? ? .read ? = tegra_clocksource_read,
-> + ? ? ? .mask ? = 0xFFFFFFFFUL,
-> + ? ? ? .mult ? = 1000,
-> + ? ? ? .shift ?= 0,
-> + ? ? ? .flags ?= CLOCK_SOURCE_IS_CONTINUOUS,
+> (...)
+> +static struct plat_serial8250_port debug_uart_platform_data[] = {
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .membase ? ? ? ?= IO_ADDRESS(TEGRA_UARTD_BASE),
+> + ? ? ? ? ? ? ? .mapbase ? ? ? ?= TEGRA_UARTD_BASE,
+> + ? ? ? ? ? ? ? .irq ? ? ? ? ? ?= INT_UARTD,
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= UPF_BOOT_AUTOCONF,
+> + ? ? ? ? ? ? ? .iotype ? ? ? ? = UPIO_MEM,
+> + ? ? ? ? ? ? ? .regshift ? ? ? = 2,
+> + ? ? ? ? ? ? ? .uartclk ? ? ? ?= 216000000/16 * 16,
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0
+> + ? ? ? }
 > +};
 
-How did you calculate the magic mult/shift numbers 16777/24 and
-1000/0 above? Especially the latter intuitively seem very inappropriate,
-and I guess there will be revisions of this platform with new frequencies
-for the timer as well, making these hard-coded values a bug source.
+Ummmm what is this = 216000000/16 * 16?
 
-I would consider using the
-clocksource_calc_mult_shift() and
-clockevents_calc_mult_shift()
-functions based on the frequency of the timer counter and a minimum wakeup
-range if you don't know exactly why you want these mult+shifts.
-
-I posted some patches to encourage the use of these recently.
+I think the compiler will optimize that to 216000000 so why not set
+it to that.
 
 Yours,
 Linus Walleij
