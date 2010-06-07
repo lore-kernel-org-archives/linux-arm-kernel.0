@@ -1,34 +1,47 @@
-From: dhylands@gmail.com (Dave Hylands)
-Date: Mon, 7 Jun 2010 13:11:17 -0700
-Subject: Question about SMP
-Message-ID: <AANLkTilJOUmarsLJJtNzbVwrZLbLAD29gp2SHL0TZCUQ@mail.gmail.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Tue, 8 Jun 2010 00:27:01 +0400
+Subject: [PATCH] ARM: Add PI/robust mutexes support for SMP kernels
+In-Reply-To: <20100607194457.GC7220@n2100.arm.linux.org.uk>
+References: <20100607173630.GA10489@oksana.dev.rtsoft.ru>
+	<20100607194457.GC7220@n2100.arm.linux.org.uk>
+Message-ID: <20100607202701.GA14529@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jun 07, 2010 at 08:44:57PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jun 07, 2010 at 09:36:30PM +0400, Anton Vorontsov wrote:
+> > To support PI or robust mutexes, the kernel needs to perform some
+> > operations atomically on userspace addresses, and yet ARM lacked
+> > the support for the SMP case.
+> > 
+> > ARMv6 adds exclusive access variants of ldr and str instructions,
+> > which means that support for PI/robust mutexes should now be
+> > relatively straightforward.
+> 
+> It isn't this straight forward.  You're now bypassing the MMU protections
+> in that 'strex' can bypass the read-only protection of the user page.
+> This can result in the zero BSS page being corrupted, or worse corruption
+> to page cache pages.
 
-(filled in subject line this time - Doh).
+Interesting. I don't pretend I understand all MMU details, but arm.com
+says "If a processor does an STR on a memory region that it has already
+marked as exclusive, this does not clear the tag."
 
-I'm trying to understand what I need to be concerned about with SMP
-processors and sharing global data (in particular a dual Cortex-A9)
+So, can we solve this by
 
-I'm familiar with spinlocks, but in this case I'm trying to work with
-some lockless data structures.
+ldrex
+...
+strt newval
+   ^ may cause exception, but doesn't clear the tag, so we're still atomic
+strex <- clears the tag
 
-What I'm not sure is whether the following would work. Suppose I have
-a couple of 8-bit get/put indicies which are in adjacent memory
-locations (within the same 32-bit word).
+.fixup
+	strex oldval <- just clear the tag
+	return -EFAULT;
 
-If I have an ISR and a thread running on an SMP core, and the ISR is
-running on one core and the thread is running on a second core, if the
-ISR were to only write to the put pointer and the thread were only to
-write to the get pointer, does the cache maintain consistency? Or do
-the get and put pointers need to be in separate cache lines?
+Thanks!
 
-Another way of asking this: If both cores are writing to the same
-32-bit word (but different bytes) do the writes collide?
-
---
-Dave Hylands
-Shuswap, BC, Canada
-http://www.DaveHylands.com/
+-- 
+Anton Vorontsov
+email: cbouatmailru@gmail.com
+irc://irc.freenode.net/bd2
