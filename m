@@ -1,32 +1,54 @@
-From: dhylands@gmail.com (Dave Hylands)
-Date: Mon, 7 Jun 2010 10:58:04 -0700
-Subject: No subject
-Message-ID: <AANLkTikxfktI7Heocg8kaBFziT3CXMzRzr-RJcXSQhbG@mail.gmail.com>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Mon,  7 Jun 2010 19:49:33 +0100
+Subject: [PATCH] mx31lilly: prevent ulpi calls if !USB_CONFIG_ULPI
+Message-ID: <1275936573-21108-1-git-send-email-jic23@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
+---
+ All of the mx3 boards that use ulpi are suitably protected.
+ This currently makes mx3_defconfig fail as highlighted by
+ Kautobuild.  Sorry for noise if a fix is already on it's way!
 
-I'm trying to understand what I need to be concerned about with SMP
-processors and sharing global data (in particular a dual Cortex-A9)
+ arch/arm/mach-mx3/mach-mx31lilly.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-I'm familiar with spinlocks, but in this case I'm trying to work with
-some lockless data structures.
-
-What I'm not sure is whether the following would work. Suppose I have
-a couple of 8-bit get/put indicies which are in adjacent memory
-locations (within the same 32-bit word).
-
-If I have an ISR and a thread running on an SMP core, and the ISR is
-running on one core and the thread is running on a second core, if the
-ISR were to only write to the put pointer and the thread were only to
-write to the get pointer, does the cache maintain consistency? Or do
-the get and put pointers need to be in separate cache lines?
-
-Another way of asking this: If both cores are writing to the same
-32-bit word (but different bytes) do the writes collide?
-
---
-Dave Hylands
-Shuswap, BC, Canada
-http://www.DaveHylands.com/
+diff --git a/arch/arm/mach-mx3/mach-mx31lilly.c b/arch/arm/mach-mx3/mach-mx31lilly.c
+index d3d5877..6827c68 100644
+--- a/arch/arm/mach-mx3/mach-mx31lilly.c
++++ b/arch/arm/mach-mx3/mach-mx31lilly.c
+@@ -114,6 +114,7 @@ static struct platform_device physmap_flash_device = {
+ };
+ 
+ /* USB */
++#if defined(CONFIG_USB_ULPI)
+ 
+ #define USB_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
+ 			PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
+@@ -243,6 +244,7 @@ static struct mxc_usbh_platform_data usbh2_pdata = {
+ 	.portsc	= MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
+ 	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
+ };
++#endif /* USB_ULPI */
+ 
+ static struct platform_device *devices[] __initdata = {
+ 	&smsc91x_device,
+@@ -321,6 +323,7 @@ static void __init mx31lilly_board_init(void)
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ 
+ 	/* USB */
++#if defined(CONFIG_USB_ULPI)
+ 	usbotg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
+ 				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
+ 	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
+@@ -328,6 +331,7 @@ static void __init mx31lilly_board_init(void)
+ 
+ 	mxc_register_device(&mxc_usbh1, &usbh1_pdata);
+ 	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
++#endif
+ }
+ 
+ static void __init mx31lilly_timer_init(void)
+-- 
+1.6.4.4
