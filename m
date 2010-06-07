@@ -1,102 +1,40 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 7 Jun 2010 08:58:36 +0200
-Subject: pxa300 - DDRAM base value
-In-Reply-To: <1275892191.3501.17.camel@balakrishnan-desktop>
-References: <1275371058.7001.35.camel@balakrishnan-desktop>
-	<201006061834.50297.marek.vasut@gmail.com>
-	<1275892191.3501.17.camel@balakrishnan-desktop>
-Message-ID: <201006070858.36341.marek.vasut@gmail.com>
+From: stefan@datenfreihafen.org (Stefan Schmidt)
+Date: Mon, 7 Jun 2010 09:07:24 +0200
+Subject: [RFC PATCH] stargate2 and imote2 board file merge
+In-Reply-To: <1275832502-28552-1-git-send-email-jic23@cam.ac.uk>
+References: <1275832502-28552-1-git-send-email-jic23@cam.ac.uk>
+Message-ID: <20100607070724.GB2702@excalibur.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne Po 7. ?ervna 2010 08:29:51 balakrishnan napsal(a):
-> On Sun, 2010-06-06 at 18:34 +0200, Marek Vasut wrote:
-> > Dne Ne 6. ?ervna 2010 10:17:00 Eric Miao napsal(a):
-> > > On Sun, Jun 6, 2010 at 1:19 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> > > > Dne ?t 1. ?ervna 2010 07:44:18 balakrishnan napsal(a):
-> > > >> I am working on pxa300 based development board and using Linux
-> > > >> 2.6.34. This Linux kernel already has support for following boards
-> > > >> 1. zylonite_pxa300
-> > > >> 2. cm-x300
-> > > >> 3. colibri-pxa300
-> > > >> 4. littleton
-> > > >> 
-> > > >> My doubt is that pxa300 based boards are using "0xa0000000"  as
-> > > >> DDRAM base and PHYS_OFFSET is also defined in
-> > > >> "arch/arm/mach-pxa/include/mach/memory.h" as 0xa0000000.
-> > > >> But in our board  DDR is mapped in 0x80000000. Does it make any
-> > > >> problem?. Because after mmu is turned ON, my board is hanging.
-> > > >> 
-> > > >> "zreladdr-y   := 0x80008000" is defined in
-> > > >> "arch/arm/mach-pxa/Makefile.boot" file .
-> > > >> my machine_desc is as follows
-> > > >> .phys_io        = 0x40000000,
-> > > >> .io_pg_offst    = (io_p2v(0x40000000) >> 18) & 0xfffc,
-> > > >> .boot_params    = 0x80000100,
-> > > > 
-> > > > Try editing both arch/arm/mach-pxa/Makefile.boot and
-> > > > arch/arm/mach/pxa/include/mach/memory.h
-> > > > 
-> > > >> With Thanks
-> > > >> J.Balakrishnan
-> > > > 
-> > > > The 0x80000000 should be aliased to 0xa0000000, but looking into the
-> > > > PXA docs, it is only on pxa320. Eric, any ideas on this ?
-> > > 
-> > > Should be working on pxa300/310 as well. If it doesn't, check you
-> > > bootloader to make sure the mapping is OK, and memory doesn't exceed
-> > > (0xa000_0000 - 0x8000_0000).
-> > 
-> > It worked last time I used the pxa310 littleton board, but I can't check
-> > on the pxa300 zylonite board just yet.
-> > 
-> > Could you give us your bootloader details ?
-> 
-> hi,
->       Now, I can able to boot after editing following files
-> arch/arm/mach-pxa/Makefile.boot and
-> arch/arm/mach/pxa/include/mach/memory.h (0x80000000 changed to
-> 0xa0000000). My doubt is
+Hello.
 
-It was always set to 0xa0000000, both of them.
+On Sun, 2010-06-06 at 14:55, Jonathan Cameron wrote:
+> Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
+> ---
+>  These two boards are extremely similar in many ways and hence
+>  the board configs overlap a lot.  This patch merges the two
+>  board files.  Do people think this is worth doing?  Traditionally
+>  we always built a kernel supporting both devices anyway but the
+>  ifdefs allow one to be picked if people really want to.
 
-> 1.why 0x80000000 (DDR phy address) is aliased to 0xa0000000 in pxa
-> architecture?
+I find it an interesting idea. We have done this on EZX with 6 devices. One
+thing that jumps into my face is that we should provide a way to let people know
+that the stargate2.c file does indeed also provide support for imote2. At least
+updated comments in KConfig and the header of the c file would be needed. That
+would allow people to discover it during configuration or greping.
 
-Because that's how the HW guys did it and because it's written in TRM (which is 
-the holy bible(substitute any other holy object) of the CPU) ;-)
+I don't know much about the Crossbow product palette but maybe we should even
+rename it to crossbow.c
 
-> 2.In my development board two DDRAMs mapped at 0x80000000-0x88000000 and
-> 0xc0000000-0xc8000000, how can I inform to kernel about this different
-> bank and size?.
+>  arch/arm/mach-pxa/Makefile    |    2 +-
+>  arch/arm/mach-pxa/imote2.c    |  590 -----------------------------------
+>  arch/arm/mach-pxa/stargate2.c |  679 +++++++++++++++++++++++++++--------------
+>  3 files changed, 454 insertions(+), 817 deletions(-)
 
-Check LAKML and look for:
-"[PATCH] pxa/vpac270: Enable SparseMEM for 256 MB of RAM"
+Given that we can eliminate nearly 400 lines of code and one board file I think
+it is worth it. I looked over the patch and it does look good so far. Will give
+it a runtime test the next days. If that truns out well I'm fine to ack it.
 
-This might give you an idea ... though it's a hack. All this goo about 
-PHYS_OFFSET etc. will be gone in hopefully near future.
-
-Cheers!
-
-> 
-> My Boot loader details,
-> ------------------------------
-> =>bdi
-> arch_number = 0x00000B04
-> env_t       = 0x00000000
-> boot_params = 0x80000100
-> DRAM bank   = 0x00000000
-> -> start    = 0x80000000
-> -> size     = 0x08000000
-> DRAM bank   = 0x00000001
-> -> start    = 0xC0000000
-> -> size     = 0x08000000
-> ethaddr     = 08:00:3e:26:0a:5b
-> ip_addr     = 192.168.0.21
-> baudrate    = 115200 bps
-> =>ver
-> U-Boot 2010.03 (Jun 01 2010 - 14:27:43)
-> 
-> 
-> With Thanks
-> J.Balakrishnan
+regards
+Stefan Schmidt
