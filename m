@@ -1,38 +1,36 @@
 From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Tue, 8 Jun 2010 01:31:45 +0400
+Date: Tue, 8 Jun 2010 01:35:17 +0400
 Subject: [PATCH] ARM: Add PI/robust mutexes support for SMP kernels
-In-Reply-To: <1275944170.11056.7.camel@toshiba-laptop>
+In-Reply-To: <alpine.LFD.2.00.1006071634340.30664@xanadu.home>
 References: <20100607173630.GA10489@oksana.dev.rtsoft.ru>
 	<20100607194457.GC7220@n2100.arm.linux.org.uk>
-	<1275944170.11056.7.camel@toshiba-laptop>
-Message-ID: <20100607213145.GA23421@oksana.dev.rtsoft.ru>
+	<20100607202701.GA14529@oksana.dev.rtsoft.ru>
+	<alpine.LFD.2.00.1006071634340.30664@xanadu.home>
+Message-ID: <20100607213517.GA25479@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 07, 2010 at 09:56:10PM +0100, Catalin Marinas wrote:
-> On Mon, 2010-06-07 at 20:44 +0100, Russell King - ARM Linux wrote:
-> > On Mon, Jun 07, 2010 at 09:36:30PM +0400, Anton Vorontsov wrote:
-> > > To support PI or robust mutexes, the kernel needs to perform some
-> > > operations atomically on userspace addresses, and yet ARM lacked
-> > > the support for the SMP case.
-> > >
-> > > ARMv6 adds exclusive access variants of ldr and str instructions,
-> > > which means that support for PI/robust mutexes should now be
-> > > relatively straightforward.
-> > 
-> > It isn't this straight forward.  You're now bypassing the MMU protections
-> > in that 'strex' can bypass the read-only protection of the user page.
-> > This can result in the zero BSS page being corrupted, or worse corruption
-> > to page cache pages.
+On Mon, Jun 07, 2010 at 04:40:01PM -0400, Nicolas Pitre wrote:
+> On Tue, 8 Jun 2010, Anton Vorontsov wrote:
 > 
-> Do you mean STREX in SVC mode targeting user pages? I keep posting a
-> patch for more than a year :) which removes the domains switching and
-> makes user pages read-only for both kernel and user space.
+> > So, can we solve this by
+> > 
+> > ldrex
+> > ...
+> > strt newval
+> >    ^ may cause exception, but doesn't clear the tag, so we're still atomic
+> > strex <- clears the tag
+> 
+> No, you're not atomic anymore, as some other ldrex/strex might have come 
+> through by the time the strt is executed, and while this strex wouldn't 
+> be executed as the tag would be cleared at that point, the strt has no 
+> such concerns with atomic tags and would indeed corrupt whatever new 
+> value has been stored in the mean time.
 
-Wow. Then I should just make PI/robust mutexes depend on
-!CONFIG_CPU_USE_DOMAINS (which is actually always true for SMP :-).
+Ugh, surely right you are, thanks!
 
-Thanks!
+It seems Catalin's "Remove the domain switching" patch comes handy
+here.
 
 -- 
 Anton Vorontsov
