@@ -1,59 +1,44 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Tue, 8 Jun 2010 00:04:48 +0300
-Subject: [PATCH] mxc: Fix pad names for imx51
-In-Reply-To: <4C0D5996.9050906@boundarydevices.com>
-References: <1275566746-6510-1-git-send-email-jason77.wang@gmail.com>
-	<1275566746-6510-2-git-send-email-jason77.wang@gmail.com>
-	<20100604085320.GB25357@pengutronix.de>
-	<20100604105347.GA2982@matterhorn.lan>
-	<20100604140959.GB2982@matterhorn.lan>
-	<4C0D5996.9050906@boundarydevices.com>
-Message-ID: <20100607210448.GA2446@matterhorn.lan>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 07 Jun 2010 22:05:57 +0100
+Subject: [PATCH] ARM: Add PI/robust mutexes support for SMP kernels
+In-Reply-To: <20100607202701.GA14529@oksana.dev.rtsoft.ru>
+References: <20100607173630.GA10489@oksana.dev.rtsoft.ru>
+	<20100607194457.GC7220@n2100.arm.linux.org.uk>
+	<20100607202701.GA14529@oksana.dev.rtsoft.ru>
+Message-ID: <1275944757.11056.16.camel@toshiba-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Jun 07, Troy Kisky wrote:
-
-> > On 10 Jun 04, Amit Kucheria wrote:
+On Mon, 2010-06-07 at 21:27 +0100, Anton Vorontsov wrote:
+> On Mon, Jun 07, 2010 at 08:44:57PM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Jun 07, 2010 at 09:36:30PM +0400, Anton Vorontsov wrote:
+> > > To support PI or robust mutexes, the kernel needs to perform some
+> > > operations atomically on userspace addresses, and yet ARM lacked
+> > > the support for the SMP case.
+> > >
+> > > ARMv6 adds exclusive access variants of ldr and str instructions,
+> > > which means that support for PI/robust mutexes should now be
+> > > relatively straightforward.
 > >
-
-<snip>
-
-> > +#define MX51_PAD_CSPI1_SCLK__GPIO_4_27		IOMUX_PAD(0x614, 0x224,  3, 0x0,   0, NO_PAD_CTRL)
-
-<snip>
-
-> > +#define MX51_PAD_GPIO_1_2__GPIO_1_2		IOMUX_PAD(0x7D4, 0x3CC, 0, 0x0,   0, NO_PAD_CTRL)
-> > +#define MX51_PAD_GPIO_1_3__GPIO_1_3		IOMUX_PAD(0x7D8, 0x3D0, 0, 0x0,   0, NO_PAD_CTRL)
-> > +#define MX51_PAD_PMIC_INT_REQ__PMIC_INT_REQ	IOMUX_PAD(0x7FC, 0x3D4, 0, 0x0,   0, NO_PAD_CTRL)
-> > +#define MX51_PAD_GPIO_1_4__GPIO_1_4		IOMUX_PAD(0x804, 0x3D8, 0, 0x0,   0, NO_PAD_CTRL)
-> > +#define MX51_PAD_GPIO_1_5__GPIO_1_5		IOMUX_PAD(0x808, 0x3DC, 0, 0x0,   0, NO_PAD_CTRL)
-> > +#define MX51_PAD_GPIO_1_6__GPIO_1_6		IOMUX_PAD(0x80C, 0x3E0, 0, 0x0,   0, NO_PAD_CTRL)
-> > +#define MX51_PAD_GPIO_1_7__GPIO_1_7		IOMUX_PAD(0x810, 0x3E4, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
-> > +#define MX51_PAD_GPIO_1_8__GPIO_1_8		IOMUX_PAD(0x814, 0x3E8, 0, 0x0,   1, MX51_GPIO_PAD_CTRL)
-> > +#define MX51_PAD_GPIO_1_9__GPIO_1_9		IOMUX_PAD(0x818, 0x3EC, 0, 0x0,   0, NO_PAD_CTRL)
+> > It isn't this straight forward.  You're now bypassing the MMU protections
+> > in that 'strex' can bypass the read-only protection of the user page.
+> > This can result in the zero BSS page being corrupted, or worse corruption
+> > to page cache pages.
 > 
-> Why all the stuttering?
-> Isn't MX51_PAD_GPIO_1_9 or MX51_PAD_DISP2_DAT15 descriptive enough?
-> 
+> Interesting. I don't pretend I understand all MMU details, but arm.com
+> says "If a processor does an STR on a memory region that it has already
+> marked as exclusive, this does not clear the tag."
 
-Just following the convention use in the rest of imx devices. See the
-following comment at the top of the file:
+Russell is probably referring to a STR or STREX in kernel mode that
+writes to a read-only user page (currently mapped as kernel read/write).
+Such write would succeed and it breaks the copy-on-write mechanism that
+Linux uses for duplicating various pages. The original futex code uses
+STRT which is executed with user permissions even if in kernel mode, so
+it won't succeed (but raise a data abort which is handled by the
+kernel).
 
-/*
- * The naming convention for the pad modes is MX51_PAD_<padname>__<padmode>
- * If <padname> or <padmode> refers to a GPIO, it is named
- * GPIO_<unit>_<num> see also iomux-v3.h
- */
-
-We could use the short names for pads being used in their "native mode".
-But as soon as we use the pad in a different mode, such as
-PAD_CSPI1_SCLK__GPIO_4_27 above, we'd need a different naming convention.
-
-Regards,
-Amit
+But as I said, we already have patches to change the kernel R/W
+permission for RO user pages.
 
 -- 
-----------------------------------------------------------------------
-Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-----------------------------------------------------------------------
+Catalin
