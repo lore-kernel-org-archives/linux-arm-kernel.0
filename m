@@ -1,41 +1,19 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Tue, 8 Jun 2010 01:47:16 +0200
-Subject: [PATCH 08/10] [ARM] tegra: harmony: Add harmony board file
-In-Reply-To: <1275635441-17378-9-git-send-email-olof@lixom.net>
-References: <1275635441-17378-1-git-send-email-olof@lixom.net>
-	<1275635441-17378-2-git-send-email-olof@lixom.net>
-	<1275635441-17378-3-git-send-email-olof@lixom.net>
-	<1275635441-17378-4-git-send-email-olof@lixom.net>
-	<1275635441-17378-5-git-send-email-olof@lixom.net>
-	<1275635441-17378-6-git-send-email-olof@lixom.net>
-	<1275635441-17378-7-git-send-email-olof@lixom.net>
-	<1275635441-17378-8-git-send-email-olof@lixom.net>
-	<1275635441-17378-9-git-send-email-olof@lixom.net>
-Message-ID: <AANLkTim-vAk1f0gLzvk1o0iPhfiRSClRcjZsandp269v@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 8 Jun 2010 00:52:16 +0100
+Subject: [alsa-devel] [RFC PATCH v3 0/3] ep93xx i2s audio
+In-Reply-To: <4C0D58BB.5030505@bluewatersys.com>
+	(sfid-20100607_213827_729716_0AEBDFD1)
+References: <1275628285-12642-1-git-send-email-ryan@bluewatersys.com>
+	<1275914732.3045.105.camel@odin>
+	<4C0D58BB.5030505@bluewatersys.com>
+	(sfid-20100607_213827_729716_0AEBDFD1)
+Message-ID: <F302D76F-8D7D-4F4B-ACC5-D7F76998AA4A@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/6/4 Olof Johansson <olof@lixom.net>:
+On 7 Jun 2010, at 21:38, Ryan Mallon wrote:
 
-> (...)
-> +static struct plat_serial8250_port debug_uart_platform_data[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .membase ? ? ? ?= IO_ADDRESS(TEGRA_UARTD_BASE),
-> + ? ? ? ? ? ? ? .mapbase ? ? ? ?= TEGRA_UARTD_BASE,
-> + ? ? ? ? ? ? ? .irq ? ? ? ? ? ?= INT_UARTD,
-> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= UPF_BOOT_AUTOCONF,
-> + ? ? ? ? ? ? ? .iotype ? ? ? ? = UPIO_MEM,
-> + ? ? ? ? ? ? ? .regshift ? ? ? = 2,
-> + ? ? ? ? ? ? ? .uartclk ? ? ? ?= 216000000/16 * 16,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0
-> + ? ? ? }
-> +};
+> Russell, Mark has picked up patch 2/3 via the alsa tree. Should I submit
+> 1/3 and 3/3 via the arm patch system with Liam's ack?
 
-Ummmm what is this = 216000000/16 * 16?
-
-I think the compiler will optimize that to 216000000 so why not set
-it to that.
-
-Yours,
-Linus Walleij
+At least 3/3 needs to go via the ASoC tree since it depends on 2/3. It may make sense for all of them to go that way, or perhaps 1/3 could go separately via the ARM tree (in which case I'd ack it too).
