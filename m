@@ -1,39 +1,29 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Mon, 7 Jun 2010 22:12:45 +0800
-Subject: [PATCH]ARM/footbridge: fix wrong parenthesis
-In-Reply-To: <20100607140131.GA7220@n2100.arm.linux.org.uk>
-References: <4C08C749.3050700@gmail.com>
-	<20100607140131.GA7220@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTin8Crq0F76TmXsLGsd9tXcYQKbDhxZgoDjvvazV@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 7 Jun 2010 16:54:51 +0200
+Subject: [PATCH 1/2] ISL6271A voltage regulator support.
+In-Reply-To: <20100607114856.GD5993@sirena.org.uk>
+References: <1275887908-22285-1-git-send-email-marek.vasut@gmail.com>
+	<20100607114856.GD5993@sirena.org.uk>
+Message-ID: <201006071654.51324.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So should I send  a true one again or fix it by your self?
+Dne Po 7. ?ervna 2010 13:48:56 Mark Brown napsal(a):
+> On Mon, Jun 07, 2010 at 07:18:27AM +0200, Marek Vasut wrote:
+> > This device is very simple, it supports only one LDO. This single LDO is
+> > programmed over I2C to 16 possible voltages.
+> 
+> Marek, you really should know to CC patches to maintainers by now.  This
+> is not CCed to myself, Liam or lkml.
 
-2010/6/7, Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Fri, Jun 04, 2010 at 05:28:41PM +0800, Wan ZongShun wrote:
->> There is a wrong redundant right parenthesis in this code.
->
-> This patch is wrong.
->
->>  unsigned long __pfn_to_bus(unsigned long pfn)
->>  {
->> -	return __pfn_to_phys(pfn) + (fb_bus_sdram_offset() - PHYS_OFFSET));
->> +	return __pfn_to_phys(pfn + (fb_bus_sdram_offset() - PHYS_OFFSET));
->
-> It makes no sense to add byte address offsets to a PFN.  The correct
-> solution is to delete the right paren at the end of the line instead.
->
-
-
--- 
-*linux-arm-kernel mailing list
-mail addr:linux-arm-kernel at lists.infradead.org
-you can subscribe by:
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-* linux-arm-NUC900 mailing list
-mail addr:NUC900 at googlegroups.com
-main web: https://groups.google.com/group/NUC900
-you can subscribe it by sending me mail:
-mcuos.com at gmail.com
+I rather should have marked this RFC ... this code probably doesn't even work, I 
+just want someone who has zaurus to test it (they are CCed). Sorry for the 
+confusion.
+> 
+> > +#include <linux/regulator/driver.h>
+> > +#include <linux/regulator/machine.h>
+> 
+> Why are you including machine.h here?  I can't actually see any suspect
+> code in the driver so I suspect it's unused.
+> 
+> Otherwise this looks good.
