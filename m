@@ -1,95 +1,102 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 7 Jun 2010 11:33:05 +0200
-Subject: [PATCH] ARM: PL011 baudrate extension for ST-Ericssons derivative
-In-Reply-To: <1275507433-32644-1-git-send-email-linus.walleij@stericsson.com>
-References: <1275507433-32644-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <AANLkTingPGmsrG_7Kn6X1xSKVozRFfQ6AAoYkZMXIA3R@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon,  7 Jun 2010 10:53:50 +0100
+Subject: [PATCH] Versatile Express: add support for local timers on CA9X4
+	daughterboard
+Message-ID: <1275904430-15995-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting self
+This patch adds support for the Cortex-A9 local timers available when
+using the CA9X4 daughterboard with the Versatile Express.
 
-2010/6/2 Linus Walleij <linus.walleij@stericsson.com>:
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/Kconfig                               |    5 +++--
+ arch/arm/mach-vexpress/ct-ca9x4.c              |   14 ++++++++------
+ arch/arm/mach-vexpress/include/mach/ct-ca9x4.h |    1 +
+ 3 files changed, 12 insertions(+), 8 deletions(-)
 
-> Implementation of the ST-Ericsson baudrate extension in the PL011
-> block. In this modified variant it is possible to change the
-> sampling factor from 16 to 8, and thanks to this we can get higher
-> baudrates while still using the same peripheral clock.
->
-> Also replace the simple division to determine the baud divisor
-> with DIV_ROUND_CLOSEST() rather than a simple integer division.
-> (...)
-> -       baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk/16);
-> -       quot = port->uartclk * 4 / baud;
-> + ? ? ? baud = uart_get_baud_rate(port, termios, old, 0,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? port->uartclk/(uap->oversampling ? 8 : 16));
-> +
-> + ? ? ? if (baud > port->uartclk/16)
-> + ? ? ? ? ? ? ? quot = DIV_ROUND_CLOSEST(port->uartclk * 8, baud);
-> + ? ? ? else
-> + ? ? ? ? ? ? ? quot = DIV_ROUND_CLOSEST(port->uartclk * 4, baud);
-
-I should add that we have measured some hard data on this change,
-and it fixes a real-life bug for us: below you can see what are diversions from
-fixed baudrates for the two algorithms,
-first: original, second: DIV_ROUND_CLOSEST:
-
-baud=   9600, FBRD=0x00 IBRD=0xFA os=0, real baud=   9600 (0.00%)
-baud=   9600, FBRD=0x00 IBRD=0xFA os=0, real baud=   9600 (0.00%)
-----
-baud=  19200, FBRD=0x00 IBRD=0x7D os=0, real baud=  19200 (0.00%)
-baud=  19200, FBRD=0x00 IBRD=0x7D os=0, real baud=  19200 (0.00%)
-----
-baud=  38400, FBRD=0x20 IBRD=0x3E os=0, real baud=  38400 (0.00%)
-baud=  38400, FBRD=0x20 IBRD=0x3E os=0, real baud=  38400 (0.00%)
-----
-baud=  57600, FBRD=0x2A IBRD=0x29 os=0, real baud=  57614 (0.02%)
-baud=  57600, FBRD=0x2B IBRD=0x29 os=0, real baud=  57592 (0.01%)
-----
-baud= 115200, FBRD=0x35 IBRD=0x14 os=0, real baud= 115228 (0.02%)
-baud= 115200, FBRD=0x35 IBRD=0x14 os=0, real baud= 115228 (0.02%)
-----
-baud= 230400, FBRD=0x1A IBRD=0x0A os=0, real baud= 230630 (0.10%)
-baud= 230400, FBRD=0x1B IBRD=0x0A os=0, real baud= 230284 (0.05%)
-----
-baud= 460800, FBRD=0x0D IBRD=0x05 os=0, real baud= 461261 (0.10%)
-baud= 460800, FBRD=0x0D IBRD=0x05 os=0, real baud= 461261 (0.10%)
-----
-baud= 500000, FBRD=0x33 IBRD=0x04 os=0, real baud= 500325 (0.07%)
-baud= 500000, FBRD=0x33 IBRD=0x04 os=0, real baud= 500325 (0.07%)
-----
-baud= 576000, FBRD=0x0A IBRD=0x04 os=0, real baud= 577443 (0.25%)
-baud= 576000, FBRD=0x0B IBRD=0x04 os=0, real baud= 575280 (0.13%)
-----
-baud= 921600, FBRD=0x26 IBRD=0x02 os=0, real baud= 925301 (0.40%)
-baud= 921600, FBRD=0x27 IBRD=0x02 os=0, real baud= 919760 (0.20%)
-----
-baud=1000000, FBRD=0x19 IBRD=0x02 os=0, real baud=1003921 (0.39%)
-baud=1000000, FBRD=0x1A IBRD=0x02 os=0, real baud= 997402 (0.26%)
-----
-baud=1152000, FBRD=0x05 IBRD=0x02 os=0, real baud=1154887 (0.25%)
-baud=1152000, FBRD=0x05 IBRD=0x02 os=0, real baud=1154887 (0.25%)
-----
-baud=1500000, FBRD=0x26 IBRD=0x01 os=0, real baud=1505882 (0.39%)
-baud=1500000, FBRD=0x26 IBRD=0x01 os=0, real baud=1505882 (0.39%)
-----
-baud=2000000, FBRD=0x0C IBRD=0x01 os=0, real baud=2021052 (1.05%)
-baud=2000000, FBRD=0x0D IBRD=0x01 os=0, real baud=1994805 (0.26%)
-----
-baud=2500000, FBRD=0x3A IBRD=0x01 os=1, real baud=2518032 (0.72%)
-baud=2500000, FBRD=0x3B IBRD=0x01 os=1, real baud=2497560 (0.10%)
-----
-baud=3000000, FBRD=0x26 IBRD=0x01 os=1, real baud=3011764 (0.39%)
-baud=3000000, FBRD=0x26 IBRD=0x01 os=1, real baud=3011764 (0.39%)
-----
-baud=3500000, FBRD=0x17 IBRD=0x01 os=1, real baud=3531034 (0.89%)
-baud=3500000, FBRD=0x18 IBRD=0x01 os=1, real baud=3490908 (0.26%)
-----
-baud=4000000, FBRD=0x0C IBRD=0x01 os=1, real baud=4042104 (1.05%)
-baud=4000000, FBRD=0x0D IBRD=0x01 os=1, real baud=3989610 (0.26%)
-
-As you see, the effect kicks in at the higher baudrates in the ST-Ericsson
-derivative, but it's still marginally improving the non-exended case as well.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 98922f7..7b117b1 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1172,9 +1172,10 @@ config HOTPLUG_CPU
+ config LOCAL_TIMERS
+ 	bool "Use local timer interrupts"
+ 	depends on SMP && (REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || \
+-		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || ARCH_U8500)
++		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
++		ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
+ 	default y
+-	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500)
++	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_VEXPRESS || ARCH_OMAP4 || ARCH_U8500)
+ 	help
+ 	  Enable support for local timers on SMP platforms, rather then the
+ 	  legacy IPI broadcast method.  Local timers allows the system
+diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
+index e6f7303..3762fc8 100644
+--- a/arch/arm/mach-vexpress/ct-ca9x4.c
++++ b/arch/arm/mach-vexpress/ct-ca9x4.c
+@@ -14,6 +14,7 @@
+ #include <asm/hardware/gic.h>
+ #include <asm/mach-types.h>
+ #include <asm/pmu.h>
++#include <asm/smp_twd.h>
+ 
+ #include <mach/clkdev.h>
+ #include <mach/ct-ca9x4.h>
+@@ -63,20 +64,25 @@ static void __init ct_ca9x4_init_irq(void)
+ 	gic_cpu_init(0, gic_cpu_base_addr);
+ }
+ 
+-#if 0
+ static void ct_ca9x4_timer_init(void)
+ {
++#if 0
+ 	writel(0, MMIO_P2V(CT_CA9X4_TIMER0) + TIMER_CTRL);
+ 	writel(0, MMIO_P2V(CT_CA9X4_TIMER1) + TIMER_CTRL);
+ 
+ 	sp804_clocksource_init(MMIO_P2V(CT_CA9X4_TIMER1));
+ 	sp804_clockevents_init(MMIO_P2V(CT_CA9X4_TIMER0), IRQ_CT_CA9X4_TIMER0);
++#endif
++
++#ifdef CONFIG_LOCAL_TIMERS
++	twd_base = MMIO_P2V(A9_MPCORE_TWD);
++#endif
++	v2m_timer.init();
+ }
+ 
+ static struct sys_timer ct_ca9x4_timer = {
+ 	.init	= ct_ca9x4_timer_init,
+ };
+-#endif
+ 
+ static struct clcd_panel xvga_panel = {
+ 	.mode		= {
+@@ -240,10 +246,6 @@ MACHINE_START(VEXPRESS, "ARM-Versatile Express CA9x4")
+ 	.boot_params	= PHYS_OFFSET + 0x00000100,
+ 	.map_io		= ct_ca9x4_map_io,
+ 	.init_irq	= ct_ca9x4_init_irq,
+-#if 0
+ 	.timer		= &ct_ca9x4_timer,
+-#else
+-	.timer		= &v2m_timer,
+-#endif
+ 	.init_machine	= ct_ca9x4_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h b/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
+index 8650f04..f9e2f8d 100644
+--- a/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
++++ b/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
+@@ -28,6 +28,7 @@
+ #define A9_MPCORE_SCU		(CT_CA9X4_MPIC + 0x0000)
+ #define A9_MPCORE_GIC_CPU	(CT_CA9X4_MPIC + 0x0100)
+ #define A9_MPCORE_GIT		(CT_CA9X4_MPIC + 0x0200)
++#define A9_MPCORE_TWD		(CT_CA9X4_MPIC + 0x0600)
+ #define A9_MPCORE_GIC_DIST	(CT_CA9X4_MPIC + 0x1000)
+ 
+ /*
+-- 
+1.6.3.3
