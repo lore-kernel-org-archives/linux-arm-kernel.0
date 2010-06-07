@@ -1,24 +1,40 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 7 Jun 2010 12:48:56 +0100
-Subject: [PATCH 1/2] ISL6271A voltage regulator support.
-In-Reply-To: <1275887908-22285-1-git-send-email-marek.vasut@gmail.com>
-References: <1275887908-22285-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <20100607114856.GD5993@sirena.org.uk>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Mon, 07 Jun 2010 13:45:32 +0100
+Subject: [alsa-devel] [RFC PATCH v3 0/3] ep93xx i2s audio
+In-Reply-To: <1275628285-12642-1-git-send-email-ryan@bluewatersys.com>
+References: <1275628285-12642-1-git-send-email-ryan@bluewatersys.com>
+Message-ID: <1275914732.3045.105.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 07, 2010 at 07:18:27AM +0200, Marek Vasut wrote:
+On Fri, 2010-06-04 at 17:11 +1200, Ryan Mallon wrote:
+> The following patch series adds support for i2s audio on the ep93xx,
+> with the Snapper CL15 used as an example implementation.
+> 
+> This version fixes a number of things from the previous round:
+>  - Removed unused #defines
+>  - Set symmetric rates for the cpu dai
+>  - Fixed the sdiv/lrdiv calculation loop
+>  - Moved the cpu dai registration
+>  - Removed empty ep93xx_pcm_prepare callback
+>  - Fixed enable/disable when both capture and playback are running
+>  
+> Capture still does not work. The dma is running, but the captured data
+> is all zeros (tested used arecord and loopback). I have a 2.6.20
+> kernel with ep93xx i2s audio working an capture works there on the
+> same hardware. I have spent sometime looking into this, but can't see
+> the problem. Would appreciate if someone can lend some insight as to
+> what I have done wrong.
+> 
+> Ryan Mallon (3):
+>   ep93xx i2s core support
+>   ep93xx i2s audio driver
+>   Snapper cl15 audio support
 
-> This device is very simple, it supports only one LDO. This single LDO is
-> programmed over I2C to 16 possible voltages.
+All
 
-Marek, you really should know to CC patches to maintainers by now.  This
-is not CCed to myself, Liam or lkml.
-
-> +#include <linux/regulator/driver.h>
-> +#include <linux/regulator/machine.h>
-
-Why are you including machine.h here?  I can't actually see any suspect
-code in the driver so I suspect it's unused.
-
-Otherwise this looks good.
+Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
+-- 
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
