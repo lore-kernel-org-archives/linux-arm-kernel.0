@@ -1,50 +1,39 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 7 Jun 2010 23:54:10 +0100
-Subject: mini2440 (likely more boards) boot failure because of recent
-	changes in s3c gpio
-In-Reply-To: <4C0BF34A.1060805@walsimou.com>
-References: <4C0BF34A.1060805@walsimou.com>
-Message-ID: <20100607225410.GT7248@trinity.fluff.org>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 08 Jun 2010 00:09:43 +0100
+Subject: Preload engine in ARMv7 (cortex A8)
+References: <AANLkTilGu3OC_tth-Wurgu1jcm5zKKntINGc-A8CwkxI@mail.gmail.com>
+	<1275901492.7258.6.camel@toshiba-laptop>
+Message-ID: <yw1xk4qaxww8.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 06, 2010 at 09:13:14PM +0200, Abdoulaye Walsimou Gaye wrote:
-> Hello list,
-> Recent changes in s3c gpio break mini2440 board.
-> The problem is that mach-mini2440.c: mini2440_init() (where we call  
-> s3c_gpio_setpull())
-> is called before s3c2440.c: s3c2440_init() (where we initialize  
-> s3c24xx_gpiocfg_default.set_pull function pointer).
-> This causes dereferencing of NULL pointer at boot time and a kernel panic.
-> The following change (probably not what needs to be done) lets the board  
-> boot again:
+Catalin Marinas <catalin.marinas@arm.com> writes:
 
-ok, thankyou for reporting this. will look into it as soon as possible.
+> On Tue, 2010-06-01 at 18:27 +0100, Vinayak Pane wrote:
+>> I am planning to utilize the PreLoad Engine for L2 cache. In past, I
+>> have played with cache locking with line by line in ARM9. There I
+>> could recall that tags and indexes are generated on basis of physical
+>> address of the data. Now in case of PLE we have the start address and
+>> number of lines to fill with. Does the PLE operation will leave some
+>> indexes empty ? Or does the PLE populate all the lines in that way
+>> with the source data address ? Do I need to start PLE for the block of
+>> size equal to that of way-size ? To ensure no lines remain empty  and
+>> to ensure no line gets overwriten by other line.
+>
+> I couldn't fully understand your question. It looks more like
+> hardware-related (you could try support at arm.com).
+>
+> Anyway, in general you should not make any assumptions about which lines
+> are present or not in the cache. With speculative loads on newer cores,
+> you can get other lines in the cache than what you were expecting and
+> they may evict some the you explicitly tried to preload.
 
-> diff --git a/arch/arm/plat-s3c24xx/gpiolib.c  
-> b/arch/arm/plat-s3c24xx/gpiolib.c
-> index 4c0896f..ae9d3c2 100644
-> --- a/arch/arm/plat-s3c24xx/gpiolib.c
-> +++ b/arch/arm/plat-s3c24xx/gpiolib.c
-> @@ -87,6 +87,8 @@ static struct s3c_gpio_cfg s3c24xx_gpiocfg_banka = {
->  struct s3c_gpio_cfg s3c24xx_gpiocfg_default = {
->         .set_config     = s3c_gpio_setcfg_s3c24xx,
->         .get_config     = s3c_gpio_getcfg_s3c24xx,
-> +       .set_pull       = s3c_gpio_setpull_1up,
-> +       .get_pull       = s3c_gpio_getpull_1up,
->  };
->
-> Best regards,
-> AWG
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Locking a cache way before loading it with the PLE would avoid
+unrelated loads, speculative or otherwise, evicting the preloaded data
+early.  This of course gets complicated quickly, so it's generally
+better to not assume anything.  Cache is not TCM and should not be
+treated as such.
 
 -- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+M?ns Rullg?rd
+mans at mansr.com
