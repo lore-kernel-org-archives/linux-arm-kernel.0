@@ -1,7 +1,7 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon,  7 Jun 2010 05:40:20 +0200
-Subject: [PATCH] pxa/z2: Add regulator support
-Message-ID: <1275882020-30159-1-git-send-email-marek.vasut@gmail.com>
+Date: Mon,  7 Jun 2010 05:59:03 +0200
+Subject: [PATCH v2] pxa/z2: Add regulator support
+Message-ID: <1275883143-3512-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,11 +10,11 @@ but this chip is apparently compatible.
 
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- arch/arm/mach-pxa/z2.c |   45 +++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 45 insertions(+), 0 deletions(-)
+ arch/arm/mach-pxa/z2.c |   71 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 71 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
-index 967e8cb..c9c9857 100644
+index 967e8cb..cceffeb 100644
 --- a/arch/arm/mach-pxa/z2.c
 +++ b/arch/arm/mach-pxa/z2.c
 @@ -27,6 +27,7 @@
@@ -25,7 +25,7 @@ index 967e8cb..c9c9857 100644
  
  #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
-@@ -610,6 +611,49 @@ static inline void z2_spi_init(void) {}
+@@ -610,6 +611,75 @@ static inline void z2_spi_init(void) {}
  #endif
  
  /******************************************************************************
@@ -50,9 +50,35 @@ index 967e8cb..c9c9857 100644
 +		},
 +		.consumer_supplies	= z2_tps65021_consumers,
 +		.num_consumer_supplies	= ARRAY_SIZE(z2_tps65021_consumers),
-+	},
-+	/* The rest of the LDOs is unused */
-+	{},{},{},{},
++	}, {
++		.constraints = {
++			.name		= "DCDC2",
++			.min_uV		= 3300000,
++			.max_uV		= 3300000,
++			.always_on	= 1,
++		},
++	}, {
++		.constraints = {
++			.name		= "DCDC3",
++			.min_uV		= 1800000,
++			.max_uV		= 1800000,
++			.always_on	= 1,
++		},
++	}, {
++		.constraints = {
++			.name		= "LDO1",
++			.min_uV		= 1000000,
++			.max_uV		= 3150000,
++			.always_on	= 1,
++		},
++	}, {
++		.constraints = {
++			.name		= "LDO2",
++			.min_uV		= 1050000,
++			.max_uV		= 3300000,
++			.always_on	= 1,
++		},
++	}
 +};
 +
 +static struct i2c_board_info __initdata z2_pi2c_board_info[] = {
@@ -75,7 +101,7 @@ index 967e8cb..c9c9857 100644
   * Machine init
   ******************************************************************************/
  static void __init z2_init(void)
-@@ -629,6 +673,7 @@ static void __init z2_init(void)
+@@ -629,6 +699,7 @@ static void __init z2_init(void)
  	z2_pwm_init();
  	z2_leds_init();
  	z2_keys_init();
