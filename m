@@ -1,36 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Jun 2010 10:41:48 +0300
-Subject: Heads up: Linus plans to kill ARM defconfigs
-In-Reply-To: <loom.20100604T165709-423@post.gmane.org>
-References: <20100603192459.GA9169@n2100.arm.linux.org.uk>
-	<201006040337.10593.marek.vasut@gmail.com>
-	<201006040350.36944.marek.vasut@gmail.com>
-	<201006040353.35816.marek.vasut@gmail.com>
-	<20100604060338.GH6499@atomide.com>
-	<loom.20100604T165709-423@post.gmane.org>
-Message-ID: <20100607074147.GB15515@atomide.com>
+From: benjamin.zores@alcatel-lucent.com (Benjamin Zores)
+Date: Mon, 07 Jun 2010 10:04:08 +0200
+Subject: [PATCH 3/3 v3] [ARM] Kirkwood: add support for PCIe1
+In-Reply-To: <1275819882-8373-1-git-send-email-saeed@marvell.com>
+References: <alpine.LFD.2.00.1006031224180.24526@xanadu.home>
+	<1275819882-8373-1-git-send-email-saeed@marvell.com>
+Message-ID: <4C0CA7F8.3080506@alcatel-lucent.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Cory Maccarrone <darkstar6262@gmail.com> [100604 18:05]:
-> Tony Lindgren <tony <at> atomide.com> writes:
-> 
-> All the new omap7xx boards I plan to submit in the future should be able to work
-> fine in a single defconfig.  That's how I build now with my development tree.
-> I'd be perfectly happy to see my htcherald_defconfig get wrapped into a more
-> generic omap1_defconfig.
+On 06/06/2010 12:24, Saeed Bishara wrote:
+> This patch extens the kirkwood's PCIe support up to 2 controllers as in the 6282 devices.
+>
+> diff --git a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+> index 39bdf4b..c428348 100644
+> --- a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+> +++ b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+> @@ -74,9 +74,15 @@ static void __init db88f6281_init(void)
+>
+>   static int __init db88f6281_pci_init(void)
+>   {
+> -	if (machine_is_db88f6281_bp())
+> -		kirkwood_pcie_init();
+> +	if (machine_is_db88f6281_bp()) {
+> +		u32 dev, rev;
+>
+> +		kirkwood_pcie_id(&dev,&rev);
+> +		if (dev == MV88F6282_DEV_ID)
+> +			kirkwood_pcie_init(KW_PCIE1 | KW_PCIE0);
+> +		else
+> +			kirkwood_pcie_init(KW_PCIE0);
+> +	}
+>   	return 0;
+>    
 
-OK. Do you want to take a look at fixing the omap1 entry-macro.S in a similar
-way to omap2 entry-macro.S so it works on 7xx too? See the ifdef MULTI_OMAP2
-in entry-macro.S. 15xx is ARM925 based, so that's easy to detect. But for
-detecting between ARM926 based 7xx and 16xx you would have to use some other
-register.
- 
-> They might even be generic enough that I won't need separate board files for
-> them -- I'll have to see when I get to that point.
+This is still not likely to be possible: I don't think a given board can 
+have 2 different SoCs.
 
-OK
+> +#define CGC_PEX1		(1<<  18)
+>   #define CGC_GE1			(1<<  19)
+>   #define CGC_TDM			(1<<  20)
+>   #define CGC_RESERVED		((1<<  18) | (0x6<<  21))
+>    
 
-Regards,
+(1 << 18) is no longer reserved.
 
-Tony
+Except from that you still miss the mapping definition and phy 
+initialization in common.c
+
+See 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/017176.html 
+for details.
+
+Ben
