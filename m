@@ -1,30 +1,17 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 07 Jun 2010 16:40:01 -0400 (EDT)
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Jun 2010 22:52:24 +0100
 Subject: [PATCH] ARM: Add PI/robust mutexes support for SMP kernels
-In-Reply-To: <20100607202701.GA14529@oksana.dev.rtsoft.ru>
+In-Reply-To: <1275944757.11056.16.camel@toshiba-laptop>
 References: <20100607173630.GA10489@oksana.dev.rtsoft.ru>
 	<20100607194457.GC7220@n2100.arm.linux.org.uk>
 	<20100607202701.GA14529@oksana.dev.rtsoft.ru>
-Message-ID: <alpine.LFD.2.00.1006071634340.30664@xanadu.home>
+	<1275944757.11056.16.camel@toshiba-laptop>
+Message-ID: <20100607215224.GD7220@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Jun 2010, Anton Vorontsov wrote:
+On Mon, Jun 07, 2010 at 10:05:57PM +0100, Catalin Marinas wrote:
+> But as I said, we already have patches to change the kernel R/W
+> permission for RO user pages.
 
-> So, can we solve this by
-> 
-> ldrex
-> ...
-> strt newval
->    ^ may cause exception, but doesn't clear the tag, so we're still atomic
-> strex <- clears the tag
-
-No, you're not atomic anymore, as some other ldrex/strex might have come 
-through by the time the strt is executed, and while this strex wouldn't 
-be executed as the tag would be cleared@that point, the strt has no 
-such concerns with atomic tags and would indeed corrupt whatever new 
-value has been stored in the mean time.
-
-
-
-Nicolas
+... but they introduce their own problem.
