@@ -1,10 +1,10 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 7 Jun 2010 23:20:35 +0200
+Date: Mon, 7 Jun 2010 23:26:09 +0200
 Subject: [PATCH] pxa2xx/cpufreq: Fix DRI computation
 In-Reply-To: <87bpbmocjy.fsf@free.fr>
 References: <1275698808-31166-1-git-send-email-marek.vasut@gmail.com>
 	<87bpbmocjy.fsf@free.fr>
-Message-ID: <201006072320.35473.marek.vasut@gmail.com>
+Message-ID: <201006072326.09722.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -30,12 +30,10 @@ Dne Po 7. ?ervna 2010 21:41:37 Robert Jarzmik napsal(a):
 > While I was checking the calculation, that rows calculation doesn't fit.
 > Hence I wonder if init_sdram_rows() will be correct.
 > I'll send a full review soon, don't be too quick with V2 please.
-
-Robert, this is actually a good catch, I'll try with this change, maybe it'll 
-stop hanging finally.
-
-Thanks!
 > 
+
+No actually, the definitions are correct. I just looked and what you are looking 
+at is DCAC, not DRAC. Cheers
 > Cheers.
 > 
 > --
