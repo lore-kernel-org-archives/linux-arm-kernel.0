@@ -1,34 +1,33 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Mon, 7 Jun 2010 11:54:22 +0200
-Subject: defconfig information
-In-Reply-To: <20100604222820.GA4438@kyllikki.org>
-References: <20100604222820.GA4438@kyllikki.org>
-Message-ID: <20100607095422.GF8767@pengutronix.de>
+From: stefan@datenfreihafen.org (Stefan Schmidt)
+Date: Mon, 7 Jun 2010 11:54:36 +0200
+Subject: [RFC PATCH] stargate2 and imote2 board file merge
+In-Reply-To: <20100607092458.GE2702@excalibur.local>
+References: <1275832502-28552-1-git-send-email-jic23@cam.ac.uk>
+	<20100607070724.GB2702@excalibur.local>
+	<4C0CB700.8080300@cam.ac.uk>
+	<20100607092458.GE2702@excalibur.local>
+Message-ID: <20100607095436.GF2702@excalibur.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
+Hello.
 
-On Fri, Jun 04, 2010 at 11:28:20PM +0100, Vincent Sanders wrote:
-> As always the ARM Kernel autobuilder is available at
-> http://armlinux.simtec.co.uk/kautobuild/
->
-> The community usage of this service has dropped to an all time low
-> (only six people actually used it in the last month) and I am
-> seriously considering if it serves a useful purpose any longer.
+On Mon, 2010-06-07 at 11:24, Stefan Schmidt wrote:
+> On Mon, 2010-06-07 at 10:08, Jonathan Cameron wrote:
+> 
+> > :) I'll admit I haven't tested it myself yet.  Didn't have the debug board to hand
+> > to be able to flash it to an imote2 and my sg2's were all in use testing the radio
+> > driver (that is dependent on mac802154 mainlining).  One day we will have these devices
+> > fully supported in mainline.
+> 
+> I should be able to flash it onto the imote2 today or tomorrow. Will let you
+> know my results.
 
-It would be cool to have some kind of filter: I read the autobuilder
-mails on a daily base, but usually, we are only interested in the state
-of machines we are maintaining, which is difficult to find out if you
-always get the whole list. So for my daily checks, I'm relying more on
-the mails of our internal autobuilder, which allows better filtering
-plus runtime tests.
+I can confirm that it boots fine on my imote2.
 
-But anyway: the service is great!
+Acked-by: Stefan Schmidt <stefan@datenfreihafen.org>
 
-rsc
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I guess its Eric's call if he would like to see them merged.
+
+regards
+Stefan Schmidt
