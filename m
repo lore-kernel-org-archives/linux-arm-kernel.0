@@ -1,40 +1,40 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 7 Jun 2010 23:26:09 +0200
-Subject: [PATCH] pxa2xx/cpufreq: Fix DRI computation
-In-Reply-To: <87bpbmocjy.fsf@free.fr>
-References: <1275698808-31166-1-git-send-email-marek.vasut@gmail.com>
-	<87bpbmocjy.fsf@free.fr>
-Message-ID: <201006072326.09722.marek.vasut@gmail.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Tue, 8 Jun 2010 01:31:45 +0400
+Subject: [PATCH] ARM: Add PI/robust mutexes support for SMP kernels
+In-Reply-To: <1275944170.11056.7.camel@toshiba-laptop>
+References: <20100607173630.GA10489@oksana.dev.rtsoft.ru>
+	<20100607194457.GC7220@n2100.arm.linux.org.uk>
+	<1275944170.11056.7.camel@toshiba-laptop>
+Message-ID: <20100607213145.GA23421@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne Po 7. ?ervna 2010 21:41:37 Robert Jarzmik napsal(a):
-> Marek Vasut <marek.vasut@gmail.com> writes:
-> > The DRI field was incorrectly computed, causing various hangs and weird
-> > behaviour on PXA2xx machines. This patch introduces the DRI computation
-> > according to the PXA255 (January 2004) and PXA270 (MV-S301039-00 Rev. A)
-> > datasheets.
+On Mon, Jun 07, 2010 at 09:56:10PM +0100, Catalin Marinas wrote:
+> On Mon, 2010-06-07 at 20:44 +0100, Russell King - ARM Linux wrote:
+> > On Mon, Jun 07, 2010 at 09:36:30PM +0400, Anton Vorontsov wrote:
+> > > To support PI or robust mutexes, the kernel needs to perform some
+> > > operations atomically on userspace addresses, and yet ARM lacked
+> > > the support for the SMP case.
+> > >
+> > > ARMv6 adds exclusive access variants of ldr and str instructions,
+> > > which means that support for PI/robust mutexes should now be
+> > > relatively straightforward.
+> > 
+> > It isn't this straight forward.  You're now bypassing the MMU protections
+> > in that 'strex' can bypass the read-only protection of the user page.
+> > This can result in the zero BSS page being corrupted, or worse corruption
+> > to page cache pages.
 > 
-> Hi Marek,
-> 
-> I'll help a bit in the review here, but I need a few days.
-> 
-> Meanwhile, I began the review and I have a question : did you check
-> MDCNFG_DRAC0() and MDCNFG_DRAC2() definitions ? As I check my TRM, it
-> should be, according to my manual :
-> + #define MDCNFG_DRAC2(mdcnfg) (((mdcnfg) >> 19) & 0x3)
-> + #define MDCNFG_DRAC0(mdcnfg) (((mdcnfg) >> 3) & 0x3)
-> - #define MDCNFG_DRAC2(mdcnfg) (((mdcnfg) >> 21) & 0x3)
-> - #define MDCNFG_DRAC0(mdcnfg) (((mdcnfg) >> 5) & 0x3)
-> 
-> While I was checking the calculation, that rows calculation doesn't fit.
-> Hence I wonder if init_sdram_rows() will be correct.
-> I'll send a full review soon, don't be too quick with V2 please.
-> 
+> Do you mean STREX in SVC mode targeting user pages? I keep posting a
+> patch for more than a year :) which removes the domains switching and
+> makes user pages read-only for both kernel and user space.
 
-No actually, the definitions are correct. I just looked and what you are looking 
-at is DCAC, not DRAC. Cheers
-> Cheers.
-> 
-> --
-> Robert
+Wow. Then I should just make PI/robust mutexes depend on
+!CONFIG_CPU_USE_DOMAINS (which is actually always true for SMP :-).
+
+Thanks!
+
+-- 
+Anton Vorontsov
+email: cbouatmailru at gmail.com
+irc://irc.freenode.net/bd2
