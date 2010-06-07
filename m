@@ -1,33 +1,17 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Jun 2010 14:23:47 +0300
-Subject: defconfig information
-In-Reply-To: <20100607095422.GF8767@pengutronix.de>
-References: <20100604222820.GA4438@kyllikki.org>
-	<20100607095422.GF8767@pengutronix.de>
-Message-ID: <20100607112347.GN15515@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 7 Jun 2010 12:38:03 +0100
+Subject: [PATCH] pxa/z2: Add regulator support
+In-Reply-To: <1275882020-30159-1-git-send-email-marek.vasut@gmail.com>
+References: <1275882020-30159-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <20100607113802.GB5993@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Robert Schwebel <r.schwebel@pengutronix.de> [100607 12:53]:
-> Hi Vincent,
-> 
-> On Fri, Jun 04, 2010 at 11:28:20PM +0100, Vincent Sanders wrote:
-> > As always the ARM Kernel autobuilder is available at
-> > http://armlinux.simtec.co.uk/kautobuild/
-> >
-> > The community usage of this service has dropped to an all time low
-> > (only six people actually used it in the last month) and I am
-> > seriously considering if it serves a useful purpose any longer.
-> 
-> It would be cool to have some kind of filter: I read the autobuilder
-> mails on a daily base, but usually, we are only interested in the state
-> of machines we are maintaining, which is difficult to find out if you
-> always get the whole list. So for my daily checks, I'm relying more on
-> the mails of our internal autobuilder, which allows better filtering
-> plus runtime tests.
-> 
-> But anyway: the service is great!
+On Mon, Jun 07, 2010 at 05:40:20AM +0200, Marek Vasut wrote:
+> Register TPS65023 regulator as found in Z2. The Z2 actually contains a TPS65021,
+> but this chip is apparently compatible.
 
-Yes I too use it for checking after each -rc has been tagged or so.
-
-Tony
+If you're doing this you should register the chip that is actually
+present on the board and then modify the driver to bind to both device
+IDs.  That way the driver will be able to handle any differences that do
+exist.
