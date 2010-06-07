@@ -1,39 +1,84 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Tue, 08 Jun 2010 00:09:43 +0100
-Subject: Preload engine in ARMv7 (cortex A8)
-References: <AANLkTilGu3OC_tth-Wurgu1jcm5zKKntINGc-A8CwkxI@mail.gmail.com>
-	<1275901492.7258.6.camel@toshiba-laptop>
-Message-ID: <yw1xk4qaxww8.fsf@unicorn.mansr.com>
+From: jason77.wang@gmail.com (jason)
+Date: Tue, 08 Jun 2010 07:22:18 +0800
+Subject: [V2 3/3] mx51/keypad: add keypad support for i.MX51 platforms
+In-Reply-To: <1275847887.11528.13.camel@realization>
+References: <1275566746-6510-1-git-send-email-jason77.wang@gmail.com>	
+	<1275566746-6510-2-git-send-email-jason77.wang@gmail.com>	
+	<1275566746-6510-3-git-send-email-jason77.wang@gmail.com>	
+	<1275566746-6510-4-git-send-email-jason77.wang@gmail.com>	
+	<1275730558.3446.23.camel@realization> <4C0A5B8E.4020906@gmail.com>
+	<1275847887.11528.13.camel@realization>
+Message-ID: <4C0D7F2A.5050706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas <catalin.marinas@arm.com> writes:
-
-> On Tue, 2010-06-01 at 18:27 +0100, Vinayak Pane wrote:
->> I am planning to utilize the PreLoad Engine for L2 cache. In past, I
->> have played with cache locking with line by line in ARM9. There I
->> could recall that tags and indexes are generated on basis of physical
->> address of the data. Now in case of PLE we have the start address and
->> number of lines to fill with. Does the PLE operation will leave some
->> indexes empty ? Or does the PLE populate all the lines in that way
->> with the source data address ? Do I need to start PLE for the block of
->> size equal to that of way-size ? To ensure no lines remain empty  and
->> to ensure no line gets overwriten by other line.
+Alberto Panizzo wrote:
+> Hi Jason,
 >
-> I couldn't fully understand your question. It looks more like
-> hardware-related (you could try support at arm.com).
+> On sab, 2010-06-05 at 22:13 +0800, jason wrote:
+>   
+>> Alberto Panizzo wrote:
+>>     
+>>> On gio, 2010-06-03 at 20:05 +0800, Jason Wang wrote:
+>>>   
+>>>       
+>>>> Add keypad controller device definition for all i.MX51 platforms,
+>>>> add a dummy kpp clock for imx keypad driver and add keypad device
+>>>> registration on i.MX51 3-stack board.
+>>>>
+>>>> Signed-off-by: Jason Wang <jason77.wang@gmail.com>
+>>>> ---
+>>>>  arch/arm/mach-mx5/board-mx51_3ds.c |   59 ++++++++++++++++++++++++++++++++++++
+>>>>  arch/arm/mach-mx5/clock-mx51.c     |    5 +++
+>>>>  arch/arm/mach-mx5/devices.c        |   19 +++++++++++
+>>>>  arch/arm/mach-mx5/devices.h        |    1 +
+>>>>  4 files changed, 84 insertions(+), 0 deletions(-)
+>>>>     
+>>>>         
+>>> May you wont divide platform vs machine code in two different patches.
+>>>   
+>>>       
+>> Thanks for your comments, but here i don't really know what you mean,
+>> should i divide this patch to 2 patches or ?
+>>     
 >
-> Anyway, in general you should not make any assumptions about which lines
-> are present or not in the cache. With speculative loads on newer cores,
-> you can get other lines in the cache than what you were expecting and
-> they may evict some the you explicitly tried to preload.
+> Code that stays into devices.[c|h] is general code that shall not be 
+> modified together with machine code (board-mx51_3ds.c).
+>
+>   
+OK, accept.
 
-Locking a cache way before loading it with the PLE would avoid
-unrelated loads, speculative or otherwise, evicting the preloaded data
-early.  This of course gets complicated quickly, so it's generally
-better to not assume anything.  Cache is not TCM and should not be
-treated as such.
-
--- 
-M?ns Rullg?rd
-mans at mansr.com
+Thanks,
+Jason.
+>>> and, Eric B?nard is working on imx_keypad suspend/resume features[1] and
+>>> about it, he is going to modify the platform interface that make us able
+>>> to register the device.. this patch could look old in a few.
+>>>
+>>> [1]http://thread.gmane.org/gmane.linux.ports.arm.kernel/80968/focus=13131
+>>>
+>>> Best regards,
+>>> Alberto!
+>>>
+>>>   
+>>>       
+>> Yes, reading this thread, my platform interface is old.
+>> I just git pull the upstream, it seems that new interface change hasn't 
+>> been merged,
+>> i will modify this interface if it is merged into the upstream.
+>>     
+>
+> Well Dmitry (linux input maintainer) asked Eric some clarifications 
+> before merging his work.
+> In all case, Eric work is going to be part of the next merge window
+> through the linux input tree if all goes in the right way.
+> So in the imx tree you would see it at least since .35
+>
+> Sascha, what is your policy about this? Shall Jason support the keypad
+> with the current interface and update it's support in the next merge
+> window? or it is better to wait?
+>
+> Alberto!
+>
+>
+>
+>   
