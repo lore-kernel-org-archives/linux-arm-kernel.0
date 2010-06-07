@@ -1,47 +1,37 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Tue, 8 Jun 2010 00:27:01 +0400
-Subject: [PATCH] ARM: Add PI/robust mutexes support for SMP kernels
-In-Reply-To: <20100607194457.GC7220@n2100.arm.linux.org.uk>
-References: <20100607173630.GA10489@oksana.dev.rtsoft.ru>
-	<20100607194457.GC7220@n2100.arm.linux.org.uk>
-Message-ID: <20100607202701.GA14529@oksana.dev.rtsoft.ru>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Tue, 08 Jun 2010 08:35:42 +1200
+Subject: [alsa-devel] [RFC PATCH v3 0/3] ep93xx i2s audio
+In-Reply-To: <20100607132634.GE5993@sirena.org.uk>
+References: <1275628285-12642-1-git-send-email-ryan@bluewatersys.com>
+	<20100607132634.GE5993@sirena.org.uk>
+Message-ID: <4C0D581E.3010802@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 07, 2010 at 08:44:57PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jun 07, 2010 at 09:36:30PM +0400, Anton Vorontsov wrote:
-> > To support PI or robust mutexes, the kernel needs to perform some
-> > operations atomically on userspace addresses, and yet ARM lacked
-> > the support for the SMP case.
-> > 
-> > ARMv6 adds exclusive access variants of ldr and str instructions,
-> > which means that support for PI/robust mutexes should now be
-> > relatively straightforward.
+Mark Brown wrote:
+> On Fri, Jun 04, 2010 at 05:11:22PM +1200, Ryan Mallon wrote:
+>> The following patch series adds support for i2s audio on the ep93xx,
+>> with the Snapper CL15 used as an example implementation.
 > 
-> It isn't this straight forward.  You're now bypassing the MMU protections
-> in that 'strex' can bypass the read-only protection of the user page.
-> This can result in the zero BSS page being corrupted, or worse corruption
-> to page cache pages.
+> Please do remember to CC maintainers on patches.  I've had to remind you
+> about this before, it's really not helpful to drop the people you're
+> expecting to review the patches - it'll tend to delay things or lead to
+> the patches getting missed.  From a code point of view this looks fine
+> but we'll need an arch maintainer to sign off on that bit of the code.
+> I've applied 2/3 since that has no arch/arm elements.
 
-Interesting. I don't pretend I understand all MMU details, but arm.com
-says "If a processor does an STR on a memory region that it has already
-marked as exclusive, this does not clear the tag."
+Sorry, again. I copied the CC list from the last series I sent. I must
+have missed you accidentally.
 
-So, can we solve this by
+Thanks for picking this up.
 
-ldrex
-...
-strt newval
-   ^ may cause exception, but doesn't clear the tag, so we're still atomic
-strex <- clears the tag
-
-.fixup
-	strex oldval <- just clear the tag
-	return -EFAULT;
-
-Thanks!
+~Ryan
 
 -- 
-Anton Vorontsov
-email: cbouatmailru@gmail.com
-irc://irc.freenode.net/bd2
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
