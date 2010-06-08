@@ -1,144 +1,115 @@
 From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Tue, 8 Jun 2010 21:01:59 +0400
-Subject: [PATCH 3/4] ARM: cns3xxx: Add support for SDHCI controllers
+Date: Tue, 8 Jun 2010 21:02:17 +0400
+Subject: [PATCH 4/4] ARM: cns3xxx: Add support for AHCI controllers
 In-Reply-To: <20100608170030.GA26992@oksana.dev.rtsoft.ru>
 References: <20100608170030.GA26992@oksana.dev.rtsoft.ru>
-Message-ID: <20100608170159.GC22516@oksana.dev.rtsoft.ru>
+Message-ID: <20100608170217.GD22516@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CNS3xxx chips have SDHCI-compatible SDIO/SD/MMC controller. This patch
-adds the support using sdhci-cns3xxx driver.
+CNS3xxx chips have AHCI-compatible SATA controller. This patch adds
+the support using generic ahci_platform driver.
 
 Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
 ---
- arch/arm/mach-cns3xxx/Makefile    |    2 +-
- arch/arm/mach-cns3xxx/cns3420vb.c |    3 ++
- arch/arm/mach-cns3xxx/devices.c   |   59 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-cns3xxx/devices.h   |   19 ++++++++++++
- 4 files changed, 82 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-cns3xxx/devices.c
- create mode 100644 arch/arm/mach-cns3xxx/devices.h
+ arch/arm/mach-cns3xxx/cns3420vb.c |    1 +
+ arch/arm/mach-cns3xxx/devices.c   |   52 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-cns3xxx/devices.h   |    1 +
+ 3 files changed, 54 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-cns3xxx/Makefile b/arch/arm/mach-cns3xxx/Makefile
-index 683f117..11033f1 100644
---- a/arch/arm/mach-cns3xxx/Makefile
-+++ b/arch/arm/mach-cns3xxx/Makefile
-@@ -1,3 +1,3 @@
--obj-$(CONFIG_ARCH_CNS3XXX)		+= core.o pm.o
-+obj-$(CONFIG_ARCH_CNS3XXX)		+= core.o pm.o devices.o
- obj-$(CONFIG_PCI)			+= pcie.o
- obj-$(CONFIG_MACH_CNS3420VB)		+= cns3420vb.o
 diff --git a/arch/arm/mach-cns3xxx/cns3420vb.c b/arch/arm/mach-cns3xxx/cns3420vb.c
-index 2e30c82..04ae1ce 100644
+index 04ae1ce..9df8391 100644
 --- a/arch/arm/mach-cns3xxx/cns3420vb.c
 +++ b/arch/arm/mach-cns3xxx/cns3420vb.c
-@@ -32,6 +32,7 @@
- #include <mach/cns3xxx.h>
- #include <mach/irqs.h>
- #include "core.h"
-+#include "devices.h"
- 
- /*
-  * NOR Flash
-@@ -117,6 +118,8 @@ static void __init cns3420_init(void)
+@@ -118,6 +118,7 @@ static void __init cns3420_init(void)
  {
  	platform_add_devices(cns3420_pdevs, ARRAY_SIZE(cns3420_pdevs));
  
-+	cns3xxx_sdhci_init();
-+
- 	pm_power_off = cns3xxx_power_off;
- }
++	cns3xxx_ahci_init();
+ 	cns3xxx_sdhci_init();
  
+ 	pm_power_off = cns3xxx_power_off;
 diff --git a/arch/arm/mach-cns3xxx/devices.c b/arch/arm/mach-cns3xxx/devices.c
-new file mode 100644
-index 0000000..b01a301
---- /dev/null
+index b01a301..50b4d31 100644
+--- a/arch/arm/mach-cns3xxx/devices.c
 +++ b/arch/arm/mach-cns3xxx/devices.c
-@@ -0,0 +1,59 @@
-+/*
-+ * CNS3xxx common devices
-+ *
-+ * Copyright 2008 Cavium Networks
-+ *		  Scott Shu
-+ * Copyright 2010 MontaVista Software, LLC.
-+ *		  Anton Vorontsov <avorontsov@mvista.com>
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
+@@ -14,6 +14,7 @@
+ #include <linux/io.h>
+ #include <linux/init.h>
+ #include <linux/compiler.h>
++#include <linux/dma-mapping.h>
+ #include <linux/platform_device.h>
+ #include <mach/cns3xxx.h>
+ #include <mach/irqs.h>
+@@ -21,6 +22,57 @@
+ #include "devices.h"
+ 
+ /*
++ * AHCI
 + */
-+
-+#include <linux/io.h>
-+#include <linux/init.h>
-+#include <linux/compiler.h>
-+#include <linux/platform_device.h>
-+#include <mach/cns3xxx.h>
-+#include <mach/irqs.h>
-+#include "core.h"
-+#include "devices.h"
-+
-+/*
-+ * SDHCI
-+ */
-+static struct resource cns3xxx_sdhci_resources[] = {
++static struct resource cns3xxx_ahci_resource[] = {
 +	[0] = {
-+		.start = CNS3XXX_SDIO_BASE,
-+		.end   = CNS3XXX_SDIO_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
++		.start	= CNS3XXX_SATA2_BASE,
++		.end	= CNS3XXX_SATA2_BASE + CNS3XXX_SATA2_SIZE - 1,
++		.flags	= IORESOURCE_MEM,
 +	},
 +	[1] = {
-+		.start = IRQ_CNS3XXX_SDIO,
-+		.end   = IRQ_CNS3XXX_SDIO,
-+		.flags = IORESOURCE_IRQ,
++		.start	= IRQ_CNS3XXX_SATA,
++		.end	= IRQ_CNS3XXX_SATA,
++		.flags	= IORESOURCE_IRQ,
 +	},
 +};
 +
-+static struct platform_device cns3xxx_sdhci_pdev = {
-+	.name		= "sdhci-cns3xxx",
++static u64 cns3xxx_ahci_dmamask = DMA_BIT_MASK(32);
++
++static struct platform_device cns3xxx_ahci_pdev = {
++	.name		= "ahci",
 +	.id		= 0,
-+	.num_resources	= ARRAY_SIZE(cns3xxx_sdhci_resources),
-+	.resource	= cns3xxx_sdhci_resources,
++	.resource	= cns3xxx_ahci_resource,
++	.num_resources	= ARRAY_SIZE(cns3xxx_ahci_resource),
++	.dev		= {
++		.dma_mask		= &cns3xxx_ahci_dmamask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++	},
 +};
 +
-+void __init cns3xxx_sdhci_init(void)
++void __init cns3xxx_ahci_init(void)
 +{
-+	u32 __iomem *gpioa = __io(CNS3XXX_MISC_BASE_VIRT + 0x0014);
-+	u32 gpioa_pins = __raw_readl(gpioa);
++	u32 tmp;
 +
-+	/* MMC/SD pins share with GPIOA */
-+	gpioa_pins |= 0x1fff0004;
-+	__raw_writel(gpioa_pins, gpioa);
++	tmp = __raw_readl(MISC_SATA_POWER_MODE);
++	tmp |= 0x1 << 16; /* Disable SATA PHY 0 from SLUMBER Mode */
++	tmp |= 0x1 << 17; /* Disable SATA PHY 1 from SLUMBER Mode */
++	__raw_writel(tmp, MISC_SATA_POWER_MODE);
 +
-+	cns3xxx_pwr_clk_en(CNS3XXX_PWR_CLK_EN(SDIO));
-+	cns3xxx_pwr_soft_rst(CNS3XXX_PWR_SOFTWARE_RST(SDIO));
++	/* Enable SATA PHY */
++	cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY0);
++	cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY1);
 +
-+	platform_device_register(&cns3xxx_sdhci_pdev);
++	/* Enable SATA Clock */
++	cns3xxx_pwr_clk_en(0x1 << PM_CLK_GATE_REG_OFFSET_SATA);
++
++	/* De-Asscer SATA Reset */
++	cns3xxx_pwr_soft_rst(CNS3XXX_PWR_SOFTWARE_RST(SATA));
++
++	platform_device_register(&cns3xxx_ahci_pdev);
 +}
-diff --git a/arch/arm/mach-cns3xxx/devices.h b/arch/arm/mach-cns3xxx/devices.h
-new file mode 100644
-index 0000000..0735a45
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/devices.h
-@@ -0,0 +1,19 @@
++
 +/*
-+ * CNS3xxx common devices
-+ *
-+ * Copyright 2008 Cavium Networks
-+ *		  Scott Shu
-+ * Copyright 2010 MontaVista Software, LLC.
-+ *		  Anton Vorontsov <avorontsov@mvista.com>
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __CNS3XXX_DEVICES_H_
-+#define __CNS3XXX_DEVICES_H_
-+
-+void __init cns3xxx_sdhci_init(void);
-+
-+#endif /* __CNS3XXX_DEVICES_H_ */
+  * SDHCI
+  */
+ static struct resource cns3xxx_sdhci_resources[] = {
+diff --git a/arch/arm/mach-cns3xxx/devices.h b/arch/arm/mach-cns3xxx/devices.h
+index 0735a45..27e15a1 100644
+--- a/arch/arm/mach-cns3xxx/devices.h
++++ b/arch/arm/mach-cns3xxx/devices.h
+@@ -14,6 +14,7 @@
+ #ifndef __CNS3XXX_DEVICES_H_
+ #define __CNS3XXX_DEVICES_H_
+ 
++void __init cns3xxx_ahci_init(void);
+ void __init cns3xxx_sdhci_init(void);
+ 
+ #endif /* __CNS3XXX_DEVICES_H_ */
 -- 
 1.7.0.5
