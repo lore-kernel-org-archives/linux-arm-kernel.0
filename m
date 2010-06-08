@@ -1,41 +1,64 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Tue, 8 Jun 2010 22:49:09 +0800
-Subject: [PATCH 2/2] pxa: modify the pxa2xx-ac97 file for pxa168
-In-Reply-To: <AANLkTimNwtScfKYVc4qPZFEP6GYklPoHLgr2AE7yquQL@mail.gmail.com>
-References: <4C0E21A1.4000909@gmail.com>
-	<AANLkTimNwtScfKYVc4qPZFEP6GYklPoHLgr2AE7yquQL@mail.gmail.com>
-Message-ID: <AANLkTimZjKvAAcK9xiXng7wJ0tVBJrmTIvMgyzrS7HqH@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 8 Jun 2010 10:41:10 -0500
+Subject: [PATCH] ep93xx: register backlight driver
+In-Reply-To: <0D753D10438DA54287A00B0270842697636EE74BB1@AUSP01VMBX24.collaborationhost.net>
+References: <0D753D10438DA54287A00B0270842697636EE74BB1@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <0D753D10438DA54287A00B027084269763708AFE70@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/6/8 Eric Miao <eric.y.miao@gmail.com>:
-> 2010/6/8 Wan ZongShun <mcuos.com@gmail.com>:
->> In order to allow the sharing of the pxa2xx-ac97 driver file with pxa168,
->> we have to do a little change to pxa2xx-ac97 file.
->>
->> All private register addresses were located in mach/include/ac97.h.
+On Monday, May 10, 2010 6:58 PM, H Hartley Sweeten wrote:
 >
-> This is not the right way to go, as suggested already. I hope the ac97
-> driver is more self-contained. i.e. having a platform device for:
+> Add the platform registration for the ep93xx backlight driver
+> that is now queued in the backlight tree.
 >
-> ?- where the registers are mapped from
-> ?- drcmr channel numbers can be encoded within dma resource
-> ?- ac97 register definitions are not exposed everywhere
+> Since the pwm BRIGHT signal only functions if the video system
+> is operating, register the backlight when the framebuffer device
+> is registered.
 >
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <ryan@bluewatersys.com>
 
-Got it, so I should put above to platform_device and remove regs-ac97.h,
-any private bit definition should be removed to driver directory as
-driver _only_.
+Ryan,
 
+The EP93xx backlight driver is now merged.
+commit 08b3924b24cdb1942393dc3009335a2153bd2eac
 
--- 
-*linux-arm-kernel mailing list
-mail addr:linux-arm-kernel at lists.infradead.org
-you can subscribe by:
+Do you have any issues with this patch to enable it?
+
+Regards,
+Hartley
+
+---
+
+This is based off next-20100510, if needed I can rebase it off
+another tree.
+
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index 8d3f77e..07d7bb9 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -568,6 +568,11 @@ static struct platform_device ep93xx_fb_device = {
+ 	.resource		= ep93xx_fb_resource,
+ };
+ 
++static struct platform_device ep93xx_bl_device = {
++	.name		= "ep93xx-bl",
++	.id		= -1,
++};
++
+ /**
+  * ep93xx_register_fb - Register the framebuffer platform device.
+  * @data:	platform specific framebuffer configuration (__initdata)
+@@ -576,6 +581,7 @@ void __init ep93xx_register_fb(struct ep93xxfb_mach_info *data)
+ {
+ 	ep93xxfb_data = *data;
+ 	platform_device_register(&ep93xx_fb_device);
++	platform_device_register(&ep93xx_bl_device);
+ }
+ 
+ 
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-* linux-arm-NUC900 mailing list
-mail addr:NUC900 at googlegroups.com
-main web: https://groups.google.com/group/NUC900
-you can subscribe it by sending me mail:
-mcuos.com at gmail.com
