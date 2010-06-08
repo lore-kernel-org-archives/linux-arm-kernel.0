@@ -1,62 +1,37 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Tue, 8 Jun 2010 19:08:46 +0200
-Subject: [PATCH 1/2] mv643xx_eth: disable csum offloading if the hw
-	limited by max size
-In-Reply-To: <1275827336-31111-1-git-send-email-saeed@marvell.com>
+Date: Tue, 8 Jun 2010 19:09:48 +0200
+Subject: [PATCH 2/2] set packet size limit for the mv643xx csum offloading
+In-Reply-To: <1275827336-31111-2-git-send-email-saeed@marvell.com>
 References: <1275827336-31111-1-git-send-email-saeed@marvell.com>
-Message-ID: <20100608170846.GR1743@mail.wantstofly.org>
+	<1275827336-31111-2-git-send-email-saeed@marvell.com>
+Message-ID: <20100608170948.GS1743@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 06, 2010 at 03:28:55PM +0300, Saeed Bishara wrote:
+On Sun, Jun 06, 2010 at 03:28:56PM +0300, Saeed Bishara wrote:
 
-> diff --git a/drivers/net/mv643xx_eth.c b/drivers/net/mv643xx_eth.c
-> index e345ec8..79243dd 100644
-> --- a/drivers/net/mv643xx_eth.c
-> +++ b/drivers/net/mv643xx_eth.c
-> @@ -289,6 +289,7 @@ struct mv643xx_eth_shared_private {
->  	unsigned int t_clk;
->  	int extended_rx_coal_limit;
->  	int tx_bw_control;
-> +	int tx_csum_limit;
->  };
->  
->  #define TX_BW_CONTROL_ABSENT		0
-> @@ -2468,6 +2469,14 @@ static int mv643xx_eth_change_mtu(struct net_device *dev, int new_mtu)
->  	mv643xx_eth_recalc_skb_size(mp);
->  	tx_set_rate(mp, 1000000000, 16777216);
->  
-> +	if (mp->shared->tx_csum_limit && dev->mtu > mp->shared->tx_csum_limit) {
-> +		dev->features &= ~NETIF_F_IP_CSUM;
-> +		dev->vlan_features &= ~NETIF_F_IP_CSUM;
-> +	} else {
-> +		dev->features |= NETIF_F_IP_CSUM;
-> +		dev->vlan_features |= NETIF_F_IP_CSUM;
-> +	}
+> The mv643xx ethernet controller limits the packet size for the TX
+> checksum offloading. this patch sets this limits for the needed
+> devices.
+> 
+> Signed-off-by: Saeed Bishara <saeed@marvell.com>
+> ---
+>  arch/arm/mach-dove/common.c     |    1 +
+>  arch/arm/mach-kirkwood/common.c |    1 +
+>  2 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+> index 5da2cf4..473ce0b 100644
+> --- a/arch/arm/mach-dove/common.c
+> +++ b/arch/arm/mach-dove/common.c
+> @@ -149,6 +149,7 @@ void __init dove_ehci1_init(void)
+>  struct mv643xx_eth_shared_platform_data dove_ge00_shared_data = {
+>  	.t_clk		= 0,
+>  	.dram		= &dove_mbus_dram_info,
+> +	.tx_csum_limit	= 1600,
 
-I wonder if it would be better to still advertise NETIF_F_IP_CSUM in
-this case, but just call skb_checksum_help() if skb->len is > dev->mtu
-in txq_submit_skb(), like we do for the case where the ethernet header
-is of an unsupported length -- that way, we'd still have hardware
-checksum offload for TX packets that _do_ fit inside the hardware TX
-fifo, e.g. when communicating with hosts on another subnet where the
-default MTU is used.
+Assuming that 1600 is exactly the right value (and not 1599 or 1601 etc),
 
+Acked-by: Lennert Buytenhek <buytenh@wantstofly.org>
 
-> diff --git a/include/linux/mv643xx_eth.h b/include/linux/mv643xx_eth.h
-> index cbbbe9b..7402718 100644
-> --- a/include/linux/mv643xx_eth.h
-> +++ b/include/linux/mv643xx_eth.h
-> @@ -19,6 +19,10 @@ struct mv643xx_eth_shared_platform_data {
->  	struct mbus_dram_target_info	*dram;
->  	struct platform_device	*shared_smi;
->  	unsigned int		t_clk;
-> +	/*
-> +	 * Max packet size for Tx IP/Layer 4 checksum (0 -> no limit)
-
-There's always a limit. :-)  You might as well just fill in the right
-values for orion5x/kw/dd/loki while you're at it.
-
-
-thanks,
-Lennert
+Can you fill in for orion5x/dd/loki as well?
