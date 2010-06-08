@@ -1,47 +1,71 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 08 Jun 2010 15:03:40 +0300
-Subject: [PATCH 5/5] OMAP3: PM: fix IO daisy chain enable to use PM_WKEN reg
-In-Reply-To: <20100608120104.24902.36055.stgit@baageli.muru.com>
-References: <20100608120104.24902.36055.stgit@baageli.muru.com>
-Message-ID: <20100608120340.24902.73479.stgit@baageli.muru.com>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Tue, 8 Jun 2010 15:20:56 +0300
+Subject: [PATCH 3/3 v4] [ARM] Kirkwood: add support for PCIe1
+In-Reply-To: <4C0E2CF0.3050307@alcatel-lucent.com>
+References: <AANLkTilEM81aUCdIaTyN1s8es6LMETuMOGXh3a67sWgf@mail.gmail.com>
+	<1275996094-16929-1-git-send-email-saeed@marvell.com>
+	<4C0E2CF0.3050307@alcatel-lucent.com>
+Message-ID: <AANLkTilq6R6_9aEBZ66mSnMe5GsOLYDqP4qbQQHJsb8b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Hilman <khilman@deeprootsystems.com>
-
-Checking to se if the IO daisy chain is enabled should be checking the
-PM_WKEN register, not the PM_WKST register.  Reading PM_WKST tells us
-if an event occurred, not whether or not it is enabled.
-
-Apparently, we've been lucky until now in that a pending event has not
-been there during enable.  However, on 3630/Zoom3, I noticed because
-of the WARN that this timeout was always happening.
-
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/pm34xx.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 2e96771..b88737f 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -99,7 +99,7 @@ static void omap3_enable_io_chain(void)
- 		/* Do a readback to assure write has been done */
- 		prm_read_mod_reg(WKUP_MOD, PM_WKEN);
- 
--		while (!(prm_read_mod_reg(WKUP_MOD, PM_WKST) &
-+		while (!(prm_read_mod_reg(WKUP_MOD, PM_WKEN) &
- 			 OMAP3430_ST_IO_CHAIN_MASK)) {
- 			timeout++;
- 			if (timeout > 1000) {
-@@ -108,7 +108,7 @@ static void omap3_enable_io_chain(void)
- 				return;
- 			}
- 			prm_set_mod_reg_bits(OMAP3430_ST_IO_CHAIN_MASK,
--					     WKUP_MOD, PM_WKST);
-+					     WKUP_MOD, PM_WKEN);
- 		}
- 	}
- }
+On Tue, Jun 8, 2010 at 2:43 PM, Benjamin Zores
+<benjamin.zores@alcatel-lucent.com> wrote:
+> On 08/06/2010 13:21, Saeed Bishara wrote:
+>>
+>> @@ -106,17 +108,21 @@ void __init kirkwood_setup_cpu_mbus(void)
+>> ? ? ? ? ? ? ? ? ? ? ?TARGET_PCIE, ATTR_PCIE_IO,
+>> KIRKWOOD_PCIE_IO_BUS_BASE);
+>> ? ? ? ?setup_cpu_win(1, KIRKWOOD_PCIE_MEM_PHYS_BASE,
+>> KIRKWOOD_PCIE_MEM_SIZE,
+>> ? ? ? ? ? ? ? ? ? ? ?TARGET_PCIE, ATTR_PCIE_MEM,
+>> KIRKWOOD_PCIE_MEM_BUS_BASE);
+>> + ? ? ? setup_cpu_win(2, KIRKWOOD_PCIE1_IO_PHYS_BASE,
+>> KIRKWOOD_PCIE1_IO_SIZE,
+>> + ? ? ? ? ? ? ? ? ? ? TARGET_PCIE, ATTR_PCIE1_IO,
+>> KIRKWOOD_PCIE1_IO_BUS_BASE);
+>> + ? ? ? setup_cpu_win(3, KIRKWOOD_PCIE1_MEM_PHYS_BASE,
+>> KIRKWOOD_PCIE1_MEM_SIZE,
+>> + ? ? ? ? ? ? ? ? ? ? TARGET_PCIE, ATTR_PCIE1_MEM,
+>> KIRKWOOD_PCIE1_MEM_BUS_BASE);
+>>
+>>
+>
+> I'd have used an id, and incremented it at each setup_cpu_win() call.
+> Also only doing the last 2 calls on 6282.
+>
+>> ? ? ? ?/* Make sure those units are accessible */
+>> - ? ? ? writel(curr | CGC_SATA0 | CGC_SATA1 | CGC_PEX0,
+>> CLOCK_GATING_CTRL);
+>> + ? ? ? writel(curr | CGC_SATA0 | CGC_SATA1 | CGC_PEX0 | CGC_PEX1,
+>> CLOCK_GATING_CTRL);
+>>
+>>
+>
+> Why not (pseudo code):
+>
+> int flags = curr | CGC_SATA0 | CGC_SATA1 | CGC_PEX0;
+> if (6282) flags |= CGC_PEX1;
+> writel(flags, ...);
+>
+>> + ? ? ? /* For PCIe 1: first shutdown the phy */
+>> + ? ? ? if (dev == MV88F6282_DEV_ID) {
+>> + ? ? ? ? ? ? ? if (!(kirkwood_clk_ctrl& ?CGC_PEX1)) {
+>> + ? ? ? ? ? ? ? ? ? ? ? writel(readl(PCIE1_LINK_CTRL) | 0x10,
+>> PCIE1_LINK_CTRL);
+>> + ? ? ? ? ? ? ? ? ? ? ? while (1)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (readl(PCIE1_STATUS)& ?0x1)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+>> + ? ? ? ? ? ? ? ? ? ? ? writel(readl(PCIE1_LINK_CTRL)& ?~0x10,
+>> PCIE1_LINK_CTRL);
+>> + ? ? ? ? ? ? ? }
+>> + ? ? ? } else ?/* keep this bit set for devices that don't have PCIe1 */
+>> + ? ? ? ? ? ? ? kirkwood_clk_ctrl |= CGC_PEX1;
+>>
+>>
+>
+> the else part is useless with the proposal above i guess.
+>
+> Except from that, when using your patch I was unable to boot kernel anymore
+> on 6281 boards.
+can you try the patch I send regarding nand mpps?
