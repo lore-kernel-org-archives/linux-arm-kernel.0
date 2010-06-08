@@ -1,71 +1,66 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Tue, 8 Jun 2010 15:20:56 +0300
-Subject: [PATCH 3/3 v4] [ARM] Kirkwood: add support for PCIe1
-In-Reply-To: <4C0E2CF0.3050307@alcatel-lucent.com>
-References: <AANLkTilEM81aUCdIaTyN1s8es6LMETuMOGXh3a67sWgf@mail.gmail.com>
-	<1275996094-16929-1-git-send-email-saeed@marvell.com>
-	<4C0E2CF0.3050307@alcatel-lucent.com>
-Message-ID: <AANLkTilq6R6_9aEBZ66mSnMe5GsOLYDqP4qbQQHJsb8b@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Jun 2010 15:31:03 +0300
+Subject: Heads up: Linus plans to kill ARM defconfigs
+In-Reply-To: <20100608115832.GB25370@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1006031829020.24526@xanadu.home>
+	<4C083BCF.2060500@bluewatersys.com>
+	<201006040310.15019.marek.vasut@gmail.com>
+	<4C0853E1.1080005@bluewatersys.com>
+	<AANLkTinEq99_8UyVNnmzNEreDoyHKEnxpuJmaAo_kpPN@mail.gmail.com>
+	<20100604061034.GI6499@atomide.com>
+	<AANLkTikrK-RkDntgrpptBaG6TvnesNFncOw3DW4Jt-TY@mail.gmail.com>
+	<AANLkTil1IetX6koHVRrgnWs3DqhPtZVqR2euEdg9lZUa@mail.gmail.com>
+	<alpine.LFD.2.00.1006041418390.22319@xanadu.home>
+	<20100608115832.GB25370@n2100.arm.linux.org.uk>
+Message-ID: <20100608123102.GT15515@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 8, 2010 at 2:43 PM, Benjamin Zores
-<benjamin.zores@alcatel-lucent.com> wrote:
-> On 08/06/2010 13:21, Saeed Bishara wrote:
->>
->> @@ -106,17 +108,21 @@ void __init kirkwood_setup_cpu_mbus(void)
->> ? ? ? ? ? ? ? ? ? ? ?TARGET_PCIE, ATTR_PCIE_IO,
->> KIRKWOOD_PCIE_IO_BUS_BASE);
->> ? ? ? ?setup_cpu_win(1, KIRKWOOD_PCIE_MEM_PHYS_BASE,
->> KIRKWOOD_PCIE_MEM_SIZE,
->> ? ? ? ? ? ? ? ? ? ? ?TARGET_PCIE, ATTR_PCIE_MEM,
->> KIRKWOOD_PCIE_MEM_BUS_BASE);
->> + ? ? ? setup_cpu_win(2, KIRKWOOD_PCIE1_IO_PHYS_BASE,
->> KIRKWOOD_PCIE1_IO_SIZE,
->> + ? ? ? ? ? ? ? ? ? ? TARGET_PCIE, ATTR_PCIE1_IO,
->> KIRKWOOD_PCIE1_IO_BUS_BASE);
->> + ? ? ? setup_cpu_win(3, KIRKWOOD_PCIE1_MEM_PHYS_BASE,
->> KIRKWOOD_PCIE1_MEM_SIZE,
->> + ? ? ? ? ? ? ? ? ? ? TARGET_PCIE, ATTR_PCIE1_MEM,
->> KIRKWOOD_PCIE1_MEM_BUS_BASE);
->>
->>
->
-> I'd have used an id, and incremented it at each setup_cpu_win() call.
-> Also only doing the last 2 calls on 6282.
->
->> ? ? ? ?/* Make sure those units are accessible */
->> - ? ? ? writel(curr | CGC_SATA0 | CGC_SATA1 | CGC_PEX0,
->> CLOCK_GATING_CTRL);
->> + ? ? ? writel(curr | CGC_SATA0 | CGC_SATA1 | CGC_PEX0 | CGC_PEX1,
->> CLOCK_GATING_CTRL);
->>
->>
->
-> Why not (pseudo code):
->
-> int flags = curr | CGC_SATA0 | CGC_SATA1 | CGC_PEX0;
-> if (6282) flags |= CGC_PEX1;
-> writel(flags, ...);
->
->> + ? ? ? /* For PCIe 1: first shutdown the phy */
->> + ? ? ? if (dev == MV88F6282_DEV_ID) {
->> + ? ? ? ? ? ? ? if (!(kirkwood_clk_ctrl& ?CGC_PEX1)) {
->> + ? ? ? ? ? ? ? ? ? ? ? writel(readl(PCIE1_LINK_CTRL) | 0x10,
->> PCIE1_LINK_CTRL);
->> + ? ? ? ? ? ? ? ? ? ? ? while (1)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (readl(PCIE1_STATUS)& ?0x1)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
->> + ? ? ? ? ? ? ? ? ? ? ? writel(readl(PCIE1_LINK_CTRL)& ?~0x10,
->> PCIE1_LINK_CTRL);
->> + ? ? ? ? ? ? ? }
->> + ? ? ? } else ?/* keep this bit set for devices that don't have PCIe1 */
->> + ? ? ? ? ? ? ? kirkwood_clk_ctrl |= CGC_PEX1;
->>
->>
->
-> the else part is useless with the proposal above i guess.
->
-> Except from that, when using your patch I was unable to boot kernel anymore
-> on 6281 boards.
-can you try the patch I send regarding nand mpps?
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [100608 14:53]:
+> On Fri, Jun 04, 2010 at 04:51:24PM -0400, Nicolas Pitre wrote:
+> > Linus wants something to be done about the current defconfig mess which 
+> > is perfectly legitimate.  He even suggested a possible solution.  I 
+> > don't think he'll simply drop those defconfig files if we demonstrate 
+> > that we're taking action to fix the actual problem.
+> 
+> However, having a set of patches which combine a load of defconfig
+> files into one is not going to solve the problem.
+> 
+> If you're hypothesis that Linus is only looking at the diffstat, then
+> what are patches to combine the defconfigs going to do?  It's going
+> to create lots of noise in arch/arm/configs/ - which is precisely what
+> Linus is complaining about.  In fact, patch-wise it's going to create
+> an extremely large patch.  And if we do this time and time again while
+> progressively reducing the defconfigs.  No, this isn't the answer -
+> it's only going to make the problem worse.
+> 
+> I believe the only acceptable solution is to get an alterative method
+> in place - no matter what it is - and remove the all but one of the
+> defconfig files from the mainline kernel.  _And_, most importantly,
+> kautobuild needs to be fixed so that we still get build coverage.
+> 
+> The loss of kautobuild is a major concern here, and I believe it trumps
+> everything else for the next merge window.  Kautobuild is an extremely
+> important resource that we simply can not afford to lose.
+
+How about the following strategy for the next merge window:
+
+- Update kautobuild to temporarily host the current defconfigs
+
+- Remove all the arm defconfigs except one
+
+Then over the next few merge cycles:
+
+- Make the ARM platform specific Kconfig or similar option to work
+
+- Drop the old defconfigs from kautobuild once we have the new solution
+
+Then over yet unknown lenght of time:
+
+- Work towards building in more features (TLS/SMP/VFPvX) into the same kernel
+
+- Work towards building in multiple ARM platforms into the same kernel
+
+Regards,
+
+Tony
