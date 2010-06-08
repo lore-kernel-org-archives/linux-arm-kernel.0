@@ -1,67 +1,80 @@
-From: saeed@marvell.com (Saeed Bishara)
-Date: Wed,  9 Jun 2010 11:51:23 +0300
-Subject: [PATCH 1/2 v2] mv643xx_eth: use sw csum for big packets
-In-Reply-To: <FCBE654890C0334289D0AD3AF4EF009F9FAC75A69C@IL-MB01.marvell.com>
-References: <FCBE654890C0334289D0AD3AF4EF009F9FAC75A69C@IL-MB01.marvell.com>
-Message-ID: <1276073483-17208-1-git-send-email-saeed@marvell.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 8 Jun 2010 08:30:36 +0200
+Subject: [PATCH] mxc: Fix pad names for imx51
+In-Reply-To: <4C0D6183.1010501@boundarydevices.com>
+References: <1275566746-6510-1-git-send-email-jason77.wang@gmail.com>
+	<1275566746-6510-2-git-send-email-jason77.wang@gmail.com>
+	<20100604085320.GB25357@pengutronix.de>
+	<20100604105347.GA2982@matterhorn.lan>
+	<20100604140959.GB2982@matterhorn.lan>
+	<4C0D5996.9050906@boundarydevices.com>
+	<20100607210448.GA2446@matterhorn.lan>
+	<4C0D6183.1010501@boundarydevices.com>
+Message-ID: <20100608063036.GB20799@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some controllers (KW, Dove) limits the TX IP/layer4 checksum offloading to a max size.
+On Mon, Jun 07, 2010 at 02:15:47PM -0700, Troy Kisky wrote:
+> Amit Kucheria wrote:
+> > On 10 Jun 07, Troy Kisky wrote:
+> > 
+> >>> On 10 Jun 04, Amit Kucheria wrote:
+> >>>
+> > 
+> > <snip>
+> > 
+> >>> +#define MX51_PAD_CSPI1_SCLK__GPIO_4_27		IOMUX_PAD(0x614, 0x224,  3, 0x0,   0, NO_PAD_CTRL)
+> > 
+> > <snip>
+> > 
+> >>> +#define MX51_PAD_GPIO_1_2__GPIO_1_2		IOMUX_PAD(0x7D4, 0x3CC, 0, 0x0,   0, NO_PAD_CTRL)
+> >>> +#define MX51_PAD_GPIO_1_3__GPIO_1_3		IOMUX_PAD(0x7D8, 0x3D0, 0, 0x0,   0, NO_PAD_CTRL)
+> >>> +#define MX51_PAD_PMIC_INT_REQ__PMIC_INT_REQ	IOMUX_PAD(0x7FC, 0x3D4, 0, 0x0,   0, NO_PAD_CTRL)
+> >>> +#define MX51_PAD_GPIO_1_4__GPIO_1_4		IOMUX_PAD(0x804, 0x3D8, 0, 0x0,   0, NO_PAD_CTRL)
+> >>> +#define MX51_PAD_GPIO_1_5__GPIO_1_5		IOMUX_PAD(0x808, 0x3DC, 0, 0x0,   0, NO_PAD_CTRL)
+> >>> +#define MX51_PAD_GPIO_1_6__GPIO_1_6		IOMUX_PAD(0x80C, 0x3E0, 0, 0x0,   0, NO_PAD_CTRL)
+> >>> +#define MX51_PAD_GPIO_1_7__GPIO_1_7		IOMUX_PAD(0x810, 0x3E4, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >>> +#define MX51_PAD_GPIO_1_8__GPIO_1_8		IOMUX_PAD(0x814, 0x3E8, 0, 0x0,   1, MX51_GPIO_PAD_CTRL)
+> >>> +#define MX51_PAD_GPIO_1_9__GPIO_1_9		IOMUX_PAD(0x818, 0x3EC, 0, 0x0,   0, NO_PAD_CTRL)
+> >> Why all the stuttering?
+> >> Isn't MX51_PAD_GPIO_1_9 or MX51_PAD_DISP2_DAT15 descriptive enough?
+> >>
+> > 
+> > Just following the convention use in the rest of imx devices. See the
+> > following comment at the top of the file:
+> > 
+> > /*
+> >  * The naming convention for the pad modes is MX51_PAD_<padname>__<padmode>
+> >  * If <padname> or <padmode> refers to a GPIO, it is named
+> >  * GPIO_<unit>_<num> see also iomux-v3.h
+> >  */
+> > 
+> > We could use the short names for pads being used in their "native mode".
+> > But as soon as we use the pad in a different mode, such as
+> > PAD_CSPI1_SCLK__GPIO_4_27 above, we'd need a different naming convention.
+> > 
+> > Regards,
+> > Amit
+> > 
+> 
+> I'm fine with MX51_PAD_CSPI1_SCLK__GPIO_4_27, but I don't care for
+> MX51_PAD_GPIO_1_9__GPIO_1_9. How about changing the comment to
+> 
+>  /*
+>   * The naming convention for the pad modes is MX51_PAD_<padname>
+>   * or MX51_PAD_<padname>__<padmode> if padname != padmode.
+>   * If <padname> or <padmode> refers to a GPIO, it is named
+>   * GPIO_<unit>_<num> see also iomux-v3.h
+>   */
 
-Signed-off-by: Saeed Bishara <saeed@marvell.com>
----
- drivers/net/mv643xx_eth.c   |    7 ++++++-
- include/linux/mv643xx_eth.h |    5 +++++
- 2 files changed, 11 insertions(+), 1 deletions(-)
+If anything then MX51_PAD_GPIO_<unit>_<num>. I chose to use the long
+name to get a consistent naming and to express the fact that the pad has
+a name and the mode has a name which can but don't has to be the same.
 
-diff --git a/drivers/net/mv643xx_eth.c b/drivers/net/mv643xx_eth.c
-index e345ec8..2d0e06b 100644
---- a/drivers/net/mv643xx_eth.c
-+++ b/drivers/net/mv643xx_eth.c
-@@ -289,6 +289,7 @@ struct mv643xx_eth_shared_private {
- 	unsigned int t_clk;
- 	int extended_rx_coal_limit;
- 	int tx_bw_control;
-+	int tx_csum_limit;
- };
- 
- #define TX_BW_CONTROL_ABSENT		0
-@@ -782,7 +783,8 @@ static int txq_submit_skb(struct tx_queue *txq, struct sk_buff *skb)
- 		       skb->protocol != htons(ETH_P_8021Q));
- 
- 		tag_bytes = (void *)ip_hdr(skb) - (void *)skb->data - ETH_HLEN;
--		if (unlikely(tag_bytes & ~12)) {
-+		if (unlikely(tag_bytes & ~12) ||
-+			skb->len > mp->shared->tx_csum_limit) {
- 			if (skb_checksum_help(skb) == 0)
- 				goto no_csum;
- 			kfree_skb(skb);
-@@ -2666,6 +2668,9 @@ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
- 	 * Detect hardware parameters.
- 	 */
- 	msp->t_clk = (pd != NULL && pd->t_clk != 0) ? pd->t_clk : 133000000;
-+	msp->tx_csum_limit = pd->tx_csum_limit ? pd->tx_csum_limit : 9 * 1024;
-+	/* add header count so we can compare against skb->len */
-+	msp->tx_csum_limit += ETH_HLEN;
- 	infer_hw_params(msp);
- 
- 	platform_set_drvdata(pdev, msp);
-diff --git a/include/linux/mv643xx_eth.h b/include/linux/mv643xx_eth.h
-index cbbbe9b..30b0c4e 100644
---- a/include/linux/mv643xx_eth.h
-+++ b/include/linux/mv643xx_eth.h
-@@ -19,6 +19,11 @@ struct mv643xx_eth_shared_platform_data {
- 	struct mbus_dram_target_info	*dram;
- 	struct platform_device	*shared_smi;
- 	unsigned int		t_clk;
-+	/*
-+	 * Max packet size for Tx IP/Layer 4 checksum, when set to 0, default
-+	 * limit of 9KiB will be used.
-+	 */
-+	int			tx_csum_limit;
- };
- 
- #define MV643XX_ETH_PHY_ADDR_DEFAULT	0
+Sascha
+
 -- 
-1.6.0.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
