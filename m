@@ -1,44 +1,214 @@
 From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Tue, 8 Jun 2010 21:00:30 +0400
-Subject: [GIT PULL v2] Some Cavium CNS3xxx updates for 2.6.36
-Message-ID: <20100608170030.GA26992@oksana.dev.rtsoft.ru>
+Date: Tue, 8 Jun 2010 21:01:23 +0400
+Subject: [PATCH 1/4] ARM: cns3xxx: Use IO memory accessors everywhere
+In-Reply-To: <20100608170030.GA26992@oksana.dev.rtsoft.ru>
+References: <20100608170030.GA26992@oksana.dev.rtsoft.ru>
+Message-ID: <20100608170123.GA22516@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Before it isn't too late let's switch to IO memory accessors.
+This patch converts all current _REG users and _REG definitions.
+There should be no functional changes.
 
-The main reason for the v2 is, obviously, the defconfigs situation.
-I dropped the defconfig update in this pull request.
+Suggested-by: Ben Dooks <ben-linux@fluff.org>
+Suggested-by: Sergei Shtylyov <sshtylyov@mvista.com>
+Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
+---
+ arch/arm/mach-cns3xxx/include/mach/cns3xxx.h |   91 +++++++++++++-------------
+ arch/arm/mach-cns3xxx/pm.c                   |   31 +++++++--
+ 2 files changed, 68 insertions(+), 54 deletions(-)
 
-There are also few improvements as suggested by by Ben Dooks and
-Sergei Shtylyov, plus there is no longer the ugly
-"../../../drivers/mmc/host/sdhci.h" include anymore.
-
-As usual, I'm posting the updated patches as well.
-
-The following changes since commit 9dda696f0de87a2e5cfabb147e28c76b7d3c6846:
-  Linus Torvalds (1):
-        Merge branch 'release' of git://git.kernel.org/.../aegl/linux-2.6
-
-are available in the git repository at:
-
-  git://git.infradead.org/users/cbou/linux-cns3xxx.git master
-
-Anton Vorontsov (4):
-      ARM: cns3xxx: Use IO memory accessors everywhere
-      ARM: cns3xxx: Add support for PCI Express ports
-      ARM: cns3xxx: Add support for SDHCI controllers
-      ARM: cns3xxx: Add support for AHCI controllers
-
- arch/arm/Kconfig                             |    3 +-
- arch/arm/mach-cns3xxx/Makefile               |    3 +-
- arch/arm/mach-cns3xxx/cns3420vb.c            |    4 +
- arch/arm/mach-cns3xxx/devices.c              |  111 ++++++++
- arch/arm/mach-cns3xxx/devices.h              |   20 ++
- arch/arm/mach-cns3xxx/include/mach/cns3xxx.h |   91 +++---
- arch/arm/mach-cns3xxx/pcie.c                 |  389 ++++++++++++++++++++++++++
- arch/arm/mach-cns3xxx/pm.c                   |   31 ++-
- 8 files changed, 596 insertions(+), 56 deletions(-)
- create mode 100644 arch/arm/mach-cns3xxx/devices.c
- create mode 100644 arch/arm/mach-cns3xxx/devices.h
- create mode 100644 arch/arm/mach-cns3xxx/pcie.c
+diff --git a/arch/arm/mach-cns3xxx/include/mach/cns3xxx.h b/arch/arm/mach-cns3xxx/include/mach/cns3xxx.h
+index 8a2f5a2..6dbce13 100644
+--- a/arch/arm/mach-cns3xxx/include/mach/cns3xxx.h
++++ b/arch/arm/mach-cns3xxx/include/mach/cns3xxx.h
+@@ -247,37 +247,36 @@
+  * Misc block
+  */
+ #define MISC_MEM_MAP(offs) (void __iomem *)(CNS3XXX_MISC_BASE_VIRT + (offs))
+-#define MISC_MEM_MAP_VALUE(offset) (*((volatile unsigned int *)(CNS3XXX_MISC_BASE_VIRT + (offset))))
+-
+-#define MISC_MEMORY_REMAP_REG			MISC_MEM_MAP_VALUE(0x00)
+-#define MISC_CHIP_CONFIG_REG			MISC_MEM_MAP_VALUE(0x04)
+-#define MISC_DEBUG_PROBE_DATA_REG		MISC_MEM_MAP_VALUE(0x08)
+-#define MISC_DEBUG_PROBE_SELECTION_REG		MISC_MEM_MAP_VALUE(0x0C)
+-#define MISC_IO_PIN_FUNC_SELECTION_REG		MISC_MEM_MAP_VALUE(0x10)
+-#define MISC_GPIOA_PIN_ENABLE_REG		MISC_MEM_MAP_VALUE(0x14)
+-#define MISC_GPIOB_PIN_ENABLE_REG		MISC_MEM_MAP_VALUE(0x18)
+-#define MISC_IO_PAD_DRIVE_STRENGTH_CTRL_A	MISC_MEM_MAP_VALUE(0x1C)
+-#define MISC_IO_PAD_DRIVE_STRENGTH_CTRL_B	MISC_MEM_MAP_VALUE(0x20)
+-#define MISC_GPIOA_15_0_PULL_CTRL_REG		MISC_MEM_MAP_VALUE(0x24)
+-#define MISC_GPIOA_16_31_PULL_CTRL_REG		MISC_MEM_MAP_VALUE(0x28)
+-#define MISC_GPIOB_15_0_PULL_CTRL_REG		MISC_MEM_MAP_VALUE(0x2C)
+-#define MISC_GPIOB_16_31_PULL_CTRL_REG		MISC_MEM_MAP_VALUE(0x30)
+-#define MISC_IO_PULL_CTRL_REG			MISC_MEM_MAP_VALUE(0x34)
+-#define MISC_E_FUSE_31_0_REG			MISC_MEM_MAP_VALUE(0x40)
+-#define MISC_E_FUSE_63_32_REG			MISC_MEM_MAP_VALUE(0x44)
+-#define MISC_E_FUSE_95_64_REG			MISC_MEM_MAP_VALUE(0x48)
+-#define MISC_E_FUSE_127_96_REG			MISC_MEM_MAP_VALUE(0x4C)
+-#define MISC_SOFTWARE_TEST_1_REG		MISC_MEM_MAP_VALUE(0x50)
+-#define MISC_SOFTWARE_TEST_2_REG		MISC_MEM_MAP_VALUE(0x54)
+-
+-#define MISC_SATA_POWER_MODE			MISC_MEM_MAP_VALUE(0x310)
+-
+-#define MISC_USB_CFG_REG			MISC_MEM_MAP_VALUE(0x800)
+-#define MISC_USB_STS_REG			MISC_MEM_MAP_VALUE(0x804)
+-#define MISC_USBPHY00_CFG_REG			MISC_MEM_MAP_VALUE(0x808)
+-#define MISC_USBPHY01_CFG_REG			MISC_MEM_MAP_VALUE(0x80c)
+-#define MISC_USBPHY10_CFG_REG			MISC_MEM_MAP_VALUE(0x810)
+-#define MISC_USBPHY11_CFG_REG			MISC_MEM_MAP_VALUE(0x814)
++
++#define MISC_MEMORY_REMAP_REG			MISC_MEM_MAP(0x00)
++#define MISC_CHIP_CONFIG_REG			MISC_MEM_MAP(0x04)
++#define MISC_DEBUG_PROBE_DATA_REG		MISC_MEM_MAP(0x08)
++#define MISC_DEBUG_PROBE_SELECTION_REG		MISC_MEM_MAP(0x0C)
++#define MISC_IO_PIN_FUNC_SELECTION_REG		MISC_MEM_MAP(0x10)
++#define MISC_GPIOA_PIN_ENABLE_REG		MISC_MEM_MAP(0x14)
++#define MISC_GPIOB_PIN_ENABLE_REG		MISC_MEM_MAP(0x18)
++#define MISC_IO_PAD_DRIVE_STRENGTH_CTRL_A	MISC_MEM_MAP(0x1C)
++#define MISC_IO_PAD_DRIVE_STRENGTH_CTRL_B	MISC_MEM_MAP(0x20)
++#define MISC_GPIOA_15_0_PULL_CTRL_REG		MISC_MEM_MAP(0x24)
++#define MISC_GPIOA_16_31_PULL_CTRL_REG		MISC_MEM_MAP(0x28)
++#define MISC_GPIOB_15_0_PULL_CTRL_REG		MISC_MEM_MAP(0x2C)
++#define MISC_GPIOB_16_31_PULL_CTRL_REG		MISC_MEM_MAP(0x30)
++#define MISC_IO_PULL_CTRL_REG			MISC_MEM_MAP(0x34)
++#define MISC_E_FUSE_31_0_REG			MISC_MEM_MAP(0x40)
++#define MISC_E_FUSE_63_32_REG			MISC_MEM_MAP(0x44)
++#define MISC_E_FUSE_95_64_REG			MISC_MEM_MAP(0x48)
++#define MISC_E_FUSE_127_96_REG			MISC_MEM_MAP(0x4C)
++#define MISC_SOFTWARE_TEST_1_REG		MISC_MEM_MAP(0x50)
++#define MISC_SOFTWARE_TEST_2_REG		MISC_MEM_MAP(0x54)
++
++#define MISC_SATA_POWER_MODE			MISC_MEM_MAP(0x310)
++
++#define MISC_USB_CFG_REG			MISC_MEM_MAP(0x800)
++#define MISC_USB_STS_REG			MISC_MEM_MAP(0x804)
++#define MISC_USBPHY00_CFG_REG			MISC_MEM_MAP(0x808)
++#define MISC_USBPHY01_CFG_REG			MISC_MEM_MAP(0x80c)
++#define MISC_USBPHY10_CFG_REG			MISC_MEM_MAP(0x810)
++#define MISC_USBPHY11_CFG_REG			MISC_MEM_MAP(0x814)
+ 
+ #define MISC_PCIEPHY_CMCTL(x)			MISC_MEM_MAP(0x900 + (x) * 0x004)
+ #define MISC_PCIEPHY_CTL(x)			MISC_MEM_MAP(0x940 + (x) * 0x100)
+@@ -300,21 +299,21 @@
+ /*
+  * Power management and clock control
+  */
+-#define PMU_REG_VALUE(offset) (*((volatile unsigned int *)(CNS3XXX_PM_BASE_VIRT + (offset))))
+-
+-#define PM_CLK_GATE_REG					PMU_REG_VALUE(0x000)
+-#define PM_SOFT_RST_REG					PMU_REG_VALUE(0x004)
+-#define PM_HS_CFG_REG					PMU_REG_VALUE(0x008)
+-#define PM_CACTIVE_STA_REG				PMU_REG_VALUE(0x00C)
+-#define PM_PWR_STA_REG					PMU_REG_VALUE(0x010)
+-#define PM_CLK_CTRL_REG					PMU_REG_VALUE(0x014)
+-#define PM_PLL_LCD_I2S_CTRL_REG				PMU_REG_VALUE(0x018)
+-#define PM_PLL_HM_PD_CTRL_REG				PMU_REG_VALUE(0x01C)
+-#define PM_REGULAT_CTRL_REG				PMU_REG_VALUE(0x020)
+-#define PM_WDT_CTRL_REG					PMU_REG_VALUE(0x024)
+-#define PM_WU_CTRL0_REG					PMU_REG_VALUE(0x028)
+-#define PM_WU_CTRL1_REG					PMU_REG_VALUE(0x02C)
+-#define PM_CSR_REG					PMU_REG_VALUE(0x030)
++#define PMU_MEM_MAP(offs) (void __iomem *)(CNS3XXX_PM_BASE_VIRT + (offs))
++
++#define PM_CLK_GATE_REG					PMU_MEM_MAP(0x000)
++#define PM_SOFT_RST_REG					PMU_MEM_MAP(0x004)
++#define PM_HS_CFG_REG					PMU_MEM_MAP(0x008)
++#define PM_CACTIVE_STA_REG				PMU_MEM_MAP(0x00C)
++#define PM_PWR_STA_REG					PMU_MEM_MAP(0x010)
++#define PM_CLK_CTRL_REG					PMU_MEM_MAP(0x014)
++#define PM_PLL_LCD_I2S_CTRL_REG				PMU_MEM_MAP(0x018)
++#define PM_PLL_HM_PD_CTRL_REG				PMU_MEM_MAP(0x01C)
++#define PM_REGULAT_CTRL_REG				PMU_MEM_MAP(0x020)
++#define PM_WDT_CTRL_REG					PMU_MEM_MAP(0x024)
++#define PM_WU_CTRL0_REG					PMU_MEM_MAP(0x028)
++#define PM_WU_CTRL1_REG					PMU_MEM_MAP(0x02C)
++#define PM_CSR_REG					PMU_MEM_MAP(0x030)
+ 
+ /* PM_CLK_GATE_REG */
+ #define PM_CLK_GATE_REG_OFFSET_SDIO			(25)
+diff --git a/arch/arm/mach-cns3xxx/pm.c b/arch/arm/mach-cns3xxx/pm.c
+index 725e1a4..38e4470 100644
+--- a/arch/arm/mach-cns3xxx/pm.c
++++ b/arch/arm/mach-cns3xxx/pm.c
+@@ -6,18 +6,25 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/io.h>
+ #include <linux/delay.h>
+ #include <mach/system.h>
+ #include <mach/cns3xxx.h>
+ 
+ void cns3xxx_pwr_clk_en(unsigned int block)
+ {
+-	PM_CLK_GATE_REG |= (block & PM_CLK_GATE_REG_MASK);
++	u32 reg = __raw_readl(PM_CLK_GATE_REG);
++
++	reg |= (block & PM_CLK_GATE_REG_MASK);
++	__raw_writel(reg, PM_CLK_GATE_REG);
+ }
+ 
+ void cns3xxx_pwr_power_up(unsigned int block)
+ {
+-	PM_PLL_HM_PD_CTRL_REG &= ~(block & CNS3XXX_PWR_PLL_ALL);
++	u32 reg = __raw_readl(PM_PLL_HM_PD_CTRL_REG);
++
++	reg &= ~(block & CNS3XXX_PWR_PLL_ALL);
++	__raw_writel(reg, PM_PLL_HM_PD_CTRL_REG);
+ 
+ 	/* Wait for 300us for the PLL output clock locked. */
+ 	udelay(300);
+@@ -25,22 +32,29 @@ void cns3xxx_pwr_power_up(unsigned int block)
+ 
+ void cns3xxx_pwr_power_down(unsigned int block)
+ {
++	u32 reg = __raw_readl(PM_PLL_HM_PD_CTRL_REG);
++
+ 	/* write '1' to power down */
+-	PM_PLL_HM_PD_CTRL_REG |= (block & CNS3XXX_PWR_PLL_ALL);
++	reg |= (block & CNS3XXX_PWR_PLL_ALL);
++	__raw_writel(reg, PM_PLL_HM_PD_CTRL_REG);
+ };
+ 
+ static void cns3xxx_pwr_soft_rst_force(unsigned int block)
+ {
++	u32 reg = __raw_readl(PM_SOFT_RST_REG);
++
+ 	/*
+ 	 * bit 0, 28, 29 => program low to reset,
+ 	 * the other else program low and then high
+ 	 */
+ 	if (block & 0x30000001) {
+-		PM_SOFT_RST_REG &= ~(block & PM_SOFT_RST_REG_MASK);
++		reg &= ~(block & PM_SOFT_RST_REG_MASK);
+ 	} else {
+-		PM_SOFT_RST_REG &= ~(block & PM_SOFT_RST_REG_MASK);
+-		PM_SOFT_RST_REG |= (block & PM_SOFT_RST_REG_MASK);
++		reg &= ~(block & PM_SOFT_RST_REG_MASK);
++		reg |= (block & PM_SOFT_RST_REG_MASK);
+ 	}
++
++	__raw_writel(reg, PM_SOFT_RST_REG);
+ }
+ 
+ void cns3xxx_pwr_soft_rst(unsigned int block)
+@@ -73,12 +87,13 @@ void arch_reset(char mode, const char *cmd)
+  */
+ int cns3xxx_cpu_clock(void)
+ {
++	u32 reg = __raw_readl(PM_CLK_CTRL_REG);
+ 	int cpu;
+ 	int cpu_sel;
+ 	int div_sel;
+ 
+-	cpu_sel = (PM_CLK_CTRL_REG >> PM_CLK_CTRL_REG_OFFSET_PLL_CPU_SEL) & 0xf;
+-	div_sel = (PM_CLK_CTRL_REG >> PM_CLK_CTRL_REG_OFFSET_CPU_CLK_DIV) & 0x3;
++	cpu_sel = (reg >> PM_CLK_CTRL_REG_OFFSET_PLL_CPU_SEL) & 0xf;
++	div_sel = (reg >> PM_CLK_CTRL_REG_OFFSET_CPU_CLK_DIV) & 0x3;
+ 
+ 	cpu = (300 + ((cpu_sel / 3) * 100) + ((cpu_sel % 3) * 33)) >> div_sel;
+ 
+-- 
+1.7.0.5
