@@ -1,62 +1,24 @@
-From: anfei.zhou@gmail.com (anfei)
-Date: Tue, 8 Jun 2010 22:19:34 +0800
-Subject: kernel virtual memory access (from app) does not generate segfault
-In-Reply-To: <20100608133605.GG25370@n2100.arm.linux.org.uk>
-References: <4BCD7076.9030802@browserseal.com>
-	<20100420093441.GD6684@trinity.fluff.org>
-	<000001cae074$1b564ff0$4044010a@Emea.Arm.com>
-	<20100420142047.GA7398@desktop>
-	<20100420170944.GE2234@trinity.fluff.org>
-	<20100420192813.GA29831@n2100.arm.linux.org.uk>
-	<20100421131149.GB9408@desktop> <20100608132940.GA6874@desktop>
-	<20100608133605.GG25370@n2100.arm.linux.org.uk>
-Message-ID: <20100608141934.GB6874@desktop>
+From: shanevolpe@gmail.com (Shane Volpe)
+Date: Tue, 8 Jun 2010 10:38:36 -0400
+Subject: Kernel 2.6.33: PXA270 Audio does not resume after resume from suspend
+	state
+Message-ID: <AANLkTiloYpM6LBNFHOfHGdvoHZ03cavW8vdmVZjHxSKC@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 08, 2010 at 02:36:05PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jun 08, 2010 at 09:29:40PM +0800, anfei wrote:
-> > Hi Russell,
-> > 
-> > On Wed, Apr 21, 2010 at 09:11:49PM +0800, anfei wrote:
-> > > Patch updated, and with comment log.
-> > > 
-> > > ===
-> > > ARM: Proper prefetch abort handling on pre-ARMv6
-> > > 
-> > > Instruction faults on pre-ARMv6 CPUs are interpreted as
-> > > a 'translation fault', but do_translation_fault doesn't
-> > > handle well if user mode trying to run instruction above
-> > > TASK_SIZE, and result in the infinite retry of that
-> > > instruction.
-> > > 
-> > > Signed-off-by: Anfei Zhou <anfei.zhou@gmail.com>
-> > > ---
-> > >  arch/arm/mm/fault.c |    3 +++
-> > >  1 files changed, 3 insertions(+), 0 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-> > > index 9d40c34..8ad75e9 100644
-> > > --- a/arch/arm/mm/fault.c
-> > > +++ b/arch/arm/mm/fault.c
-> > > @@ -393,6 +393,9 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
-> > >  	if (addr < TASK_SIZE)
-> > >  		return do_page_fault(addr, fsr, regs);
-> > >  
-> > > +	if (user_mode(regs))
-> > > +		goto bad_area;
-> > > +
-> > >  	index = pgd_index(addr);
-> > >  
-> > >  	/*
-> > 
-> > This patch is still not into the mainline, will you plan to apply it?
-> 
-> I had, but as it isn't in the patch system, it got buried and forgotten.
-> Could you submit it to the patch system please?  Just emailing it in
-> a similar manner to that above, but with a subject of
-> "Proper prefetch abort handling on pre-ARMv6" and an additional
-> "KernelVersion: 2.6.whatever" line to the patch system should suffice.
+I have upgraded an embedded system (PXA270) to the 2.6.33 kernel (from
+2.6.23).  Now when I run an audio program (ogg123) and put the system
+into standby then wake the system up the audio does not work (continue
+playing) after resume until I terminate ogg123 and start again.  After
+restarting ogg123 the audio works fine with out reseting the system or
+changing anything else on the system.
 
-Done, thanks!
-Anfei.
+The system is using the UCB1400 AC97 codec and just as added
+information when the audio is locked up, after resume, the touchscreen
+on the system still works which is also controlled by the UCB1400
+audio codec.  I have also tried several other audio players and the
+results are the same.   Has anyone else seen this bug and does anyone
+have suggestions on further tests to perform to narrow down were the
+bug may reside?
+Regards,
+Shane
