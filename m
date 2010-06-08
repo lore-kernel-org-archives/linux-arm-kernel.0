@@ -1,49 +1,37 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 08 Jun 2010 15:03:31 +0300
-Subject: [PATCH 3/5] omap: DMTIMER: Ack pending interrupt always when stopping
-	a timer
+Date: Tue, 08 Jun 2010 15:03:35 +0300
+Subject: [PATCH 4/5] omap: GPIO: fix auto-disable of debounce clock
 In-Reply-To: <20100608120104.24902.36055.stgit@baageli.muru.com>
 References: <20100608120104.24902.36055.stgit@baageli.muru.com>
-Message-ID: <20100608120331.24902.90256.stgit@baageli.muru.com>
+Message-ID: <20100608120335.24902.28296.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tero Kristo <tero.kristo@nokia.com>
+From: Kevin Hilman <khilman@deeprootsystems.com>
 
-The kernel timer queue is being run currently from a GP timer running in a one
-shot mode, which works in a way that when it expires, it will also stop.
-Usually during this situation, the interrupt handler will ack the interrupt,
-load a new value to the timer and start it again. During suspend, the
-situation is slightly different, as we disable interrupts just before
-timekeeping is suspended, which leaves a small window where the timer can
-expire before it is stopped, and will leave the interrupt flag pending.
-This pending interrupt will prevent ARM sleep entry, thus now we ack it always
-when we are attempting to stop a timer.
+The addition of the new debounce code (commit
+168ef3d9a56bd8bffe0ef4189c450888b4aefefe) broke the auto-disable of
+debounce clocks on idle by forgetting to update the debounce clock
+enable mask.
 
-Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
-Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
-[tony at atomide.com: removed the ifdef to make the patch cover omap1 also]
+Add back the updating of bank->dbck_enable_mask so debounce clocks are
+auto-disabled.
+
+Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/plat-omap/dmtimer.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/plat-omap/gpio.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index c64875f..44bafda 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -541,11 +541,11 @@ void omap_dm_timer_stop(struct omap_dm_timer *timer)
- 		  * timer is stopped
- 		  */
- 		udelay(3500000 / clk_get_rate(timer->fclk) + 1);
--		/* Ack possibly pending interrupt */
--		omap_dm_timer_write_reg(timer, OMAP_TIMER_STAT_REG,
--				OMAP_TIMER_INT_OVERFLOW);
- #endif
+diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
+index 393e921..9b7e354 100644
+--- a/arch/arm/plat-omap/gpio.c
++++ b/arch/arm/plat-omap/gpio.c
+@@ -673,6 +673,7 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
+ 		if (cpu_is_omap34xx() || cpu_is_omap44xx())
+ 			clk_disable(bank->dbck);
  	}
-+	/* Ack possibly pending interrupt */
-+	omap_dm_timer_write_reg(timer, OMAP_TIMER_STAT_REG,
-+			OMAP_TIMER_INT_OVERFLOW);
- }
- EXPORT_SYMBOL_GPL(omap_dm_timer_stop);
++	bank->dbck_enable_mask = val;
  
+ 	__raw_writel(val, reg);
+ }
