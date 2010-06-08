@@ -1,25 +1,41 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 08 Jun 2010 22:09:27 +1200
-Subject: [alsa-devel] [PATCH 2/3] EP93xx: Add i2s audio driver
-In-Reply-To: <20100608100514.GA7624@rakim.wolfsonmicro.main>
-References: <1275991272-30122-1-git-send-email-ryan@bluewatersys.com>	<1275991272-30122-3-git-send-email-ryan@bluewatersys.com>
-	<20100608100514.GA7624@rakim.wolfsonmicro.main>
-Message-ID: <4C0E16D7.5070506@bluewatersys.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 08 Jun 2010 11:14:37 +0100
+Subject: [PATCH] ARM: Add PI/robust mutexes support for SMP kernels
+In-Reply-To: <20100607213517.GA25479@oksana.dev.rtsoft.ru>
+References: <20100607173630.GA10489@oksana.dev.rtsoft.ru>
+	<20100607194457.GC7220@n2100.arm.linux.org.uk>
+	<20100607202701.GA14529@oksana.dev.rtsoft.ru>
+	<alpine.LFD.2.00.1006071634340.30664@xanadu.home>
+	<20100607213517.GA25479@oksana.dev.rtsoft.ru>
+Message-ID: <1275992077.2127.13.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> On Tue, Jun 08, 2010 at 10:01:11PM +1200, Ryan Mallon wrote:
->> Add pcm and i2s SoC audio drivers for EP93xx
->>
->> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+On Mon, 2010-06-07 at 22:35 +0100, Anton Vorontsov wrote:
+> On Mon, Jun 07, 2010 at 04:40:01PM -0400, Nicolas Pitre wrote:
+> > On Tue, 8 Jun 2010, Anton Vorontsov wrote:
+> >
+> > > So, can we solve this by
+> > >
+> > > ldrex
+> > > ...
+> > > strt newval
+> > >    ^ may cause exception, but doesn't clear the tag, so we're still atomic
+> > > strex <- clears the tag
+> >
+> > No, you're not atomic anymore, as some other ldrex/strex might have come
+> > through by the time the strt is executed, and while this strex wouldn't
+> > be executed as the tag would be cleared at that point, the strt has no
+> > such concerns with atomic tags and would indeed corrupt whatever new
+> > value has been stored in the mean time.
 > 
-> As I said yesterday I have applied this patch already.  If there are any
-> changes in the new version please send incremental patches updating the
-> driver.
+> Ugh, surely right you are, thanks!
+> 
+> It seems Catalin's "Remove the domain switching" patch comes handy
+> here.
 
-There are no changes to the patch which you have picked up, only the
-other two. I reposted the whole series for completeness. Will post
-incremental patches if there are changes to patch 2/3.
+As I said, not all the domains patch is needed for your specific case,
+just the parts dealing with page permissions.
 
-~Ryan
+-- 
+Catalin
