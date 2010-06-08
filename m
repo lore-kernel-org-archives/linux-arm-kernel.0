@@ -1,42 +1,38 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 08 Jun 2010 19:31:58 +0200
-Subject: [PATCH] mioa701: fix camera regression
-In-Reply-To: <Pine.LNX.4.64.1006032058380.19573@axis700.grange> (Guennadi
-	Liakhovetski's message of "Thu\,
-	3 Jun 2010 20\:59\:09 +0200 \(CEST\)")
-References: <1275514190-32006-1-git-send-email-robert.jarzmik@free.fr>
-	<Pine.LNX.4.64.1006032058380.19573@axis700.grange>
-Message-ID: <87pr01mnw1.fsf@free.fr>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 08 Jun 2010 10:38:51 -0700
+Subject: [PATCH] Marvell OpenRD-Ultimate machine support
+In-Reply-To: <4c0e7d5a.0c3ddf0a.2771.ffffd485@mx.google.com>
+References: <4c0e7d5a.0c3ddf0a.2771.ffffd485@mx.google.com>
+Message-ID: <1276018731.1571.518.camel@Joe-Laptop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wed, 2 Jun 2010, Robert Jarzmik wrote:
->
->> Since commit a48c24a696f0d93c49f913b7818e9819612b1f4e, the
->> camera is not working anymore.
->> 
->> After the v4l2 migration, the mt9m111 camera board
->> information was not passed to the i2c layer anymore, but
->> stored for future use of v4l2 (through soc_camera).
->> 
->> Because mioa701_i2c_devices[] was tagged as "__initdata",
->> and because after the v4l2 migration, the new structure
->> "iclink" references it, the mt9m111 driver is not probed
->> anymore, as part of "iclink" is not valid (discarded after
->> kernel init).
->> 
->> Although there is not compilation error, nor runtime oops,
->> this patch restores a working camera on the mioa701 board.
->> 
->> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
->
-> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
->
->> 
->> --
->> Eric, could you schedule that into your fix branch please ?
+On Tue, 2010-06-08 at 20:24 +0300, Dmytro Milinevskyy wrote:
+> @@ -73,9 +81,14 @@ static void __init openrd_init(void)
+>  
+>  	kirkwood_ehci_init();
+>  
+> -	kirkwood_ge00_init(&openrd_ge00_data);
+> -	if (machine_is_openrd_client())
+> -		kirkwood_ge01_init(&openrd_ge01_data);
+> +	if (machine_is_openrd_ultimate()) {
+> +		kirkwood_ge00_init(&openrd_ultimate_ge00_data);
+> +		kirkwood_ge01_init(&openrd_ultimate_ge01_data);
+> +	} else {
+> +		kirkwood_ge00_init(&openrd_ge00_data);
+> +		if (machine_is_openrd_client())
+> +			kirkwood_ge01_init(&openrd_ge01_data);
+> +	}
 
-Ping.
+Perhaps some utility functions like:
 
---
-Robert
+	if (kirkwood_has_multiple_ethernets())?
+
+> @@ -84,7 +97,7 @@ static void __init openrd_init(void)
+>  
+>  static int __init openrd_pci_init(void)
+>  {
+> -	if (machine_is_openrd_base() || machine_is_openrd_client())
+> +	if (machine_is_openrd_base() || machine_is_openrd_client() || machine_is_openrd_ultimate())
+
+	if (kirkwood_has_pcie()?
