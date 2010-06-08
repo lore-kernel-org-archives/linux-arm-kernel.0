@@ -1,107 +1,42 @@
-From: milinevskyy@gmail.com (Dmytro Milinevskyy)
-Date: Tue, 08 Jun 2010 20:24:40 +0300
-Subject: [PATCH] Marvell OpenRD-Ultimate machine support
-Message-ID: <4c0e7d5a.0c3ddf0a.2771.ffffd485@mx.google.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 08 Jun 2010 19:31:58 +0200
+Subject: [PATCH] mioa701: fix camera regression
+In-Reply-To: <Pine.LNX.4.64.1006032058380.19573@axis700.grange> (Guennadi
+	Liakhovetski's message of "Thu\,
+	3 Jun 2010 20\:59\:09 +0200 \(CEST\)")
+References: <1275514190-32006-1-git-send-email-robert.jarzmik@free.fr>
+	<Pine.LNX.4.64.1006032058380.19573@axis700.grange>
+Message-ID: <87pr01mnw1.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
-This patch adds support for the OpenRD Ultimate machine(could be found at http://www.arm.linux.org.uk/developer/machines/list.php?id=2884)
+> On Wed, 2 Jun 2010, Robert Jarzmik wrote:
+>
+>> Since commit a48c24a696f0d93c49f913b7818e9819612b1f4e, the
+>> camera is not working anymore.
+>> 
+>> After the v4l2 migration, the mt9m111 camera board
+>> information was not passed to the i2c layer anymore, but
+>> stored for future use of v4l2 (through soc_camera).
+>> 
+>> Because mioa701_i2c_devices[] was tagged as "__initdata",
+>> and because after the v4l2 migration, the new structure
+>> "iclink" references it, the mt9m111 driver is not probed
+>> anymore, as part of "iclink" is not valid (discarded after
+>> kernel init).
+>> 
+>> Although there is not compilation error, nor runtime oops,
+>> this patch restores a working camera on the mioa701 board.
+>> 
+>> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>
+> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+>
+>> 
+>> --
+>> Eric, could you schedule that into your fix branch please ?
 
-It slightly differs from Client version.
+Ping.
 
-Also this patch adds correction for PHY address for Ultimate version.
-
-Regards,
-
--- Dmytro Milinevskyy
-
-Signed-off-by: Dmytro Milinevskyy <milinevskyy@gmail.com>
----
- arch/arm/mach-kirkwood/Kconfig        |    7 ++++++
- arch/arm/mach-kirkwood/openrd-setup.c |   34 +++++++++++++++++++++++++++++---
- 2 files changed, 37 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index 29b2163..110a3b8 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -75,6 +75,13 @@ config MACH_OPENRD_CLIENT
- 	  Say 'Y' here if you want your kernel to support the
- 	  Marvell OpenRD Client Board.
- 
-+config MACH_OPENRD_ULTIMATE
-+	bool "Marvell OpenRD Ultimate Board"
-+	select MACH_OPENRD
-+	help
-+	  Say 'Y' here if you want your kernel to support the
-+	  Marvell OpenRD Ultimate Board.
-+
- config MACH_NETSPACE_V2
- 	bool "LaCie Network Space v2 NAS Board"
- 	help
-diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
-index ad3f1ec..5d6797a 100644
---- a/arch/arm/mach-kirkwood/openrd-setup.c
-+++ b/arch/arm/mach-kirkwood/openrd-setup.c
-@@ -47,6 +47,14 @@ static struct mv643xx_eth_platform_data openrd_ge01_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(24),
- };
- 
-+static struct mv643xx_eth_platform_data openrd_ultimate_ge00_data = {
-+	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
-+};
-+
-+static struct mv643xx_eth_platform_data openrd_ultimate_ge01_data = {
-+	.phy_addr	= MV643XX_ETH_PHY_ADDR(1),
-+};
-+
- static struct mv_sata_platform_data openrd_sata_data = {
- 	.n_ports	= 2,
- };
-@@ -73,9 +81,14 @@ static void __init openrd_init(void)
- 
- 	kirkwood_ehci_init();
- 
--	kirkwood_ge00_init(&openrd_ge00_data);
--	if (machine_is_openrd_client())
--		kirkwood_ge01_init(&openrd_ge01_data);
-+	if (machine_is_openrd_ultimate()) {
-+		kirkwood_ge00_init(&openrd_ultimate_ge00_data);
-+		kirkwood_ge01_init(&openrd_ultimate_ge01_data);
-+	} else {
-+		kirkwood_ge00_init(&openrd_ge00_data);
-+		if (machine_is_openrd_client())
-+			kirkwood_ge01_init(&openrd_ge01_data);
-+	}
- 	kirkwood_sata_init(&openrd_sata_data);
- 	kirkwood_sdio_init(&openrd_mvsdio_data);
- 
-@@ -84,7 +97,7 @@ static void __init openrd_init(void)
- 
- static int __init openrd_pci_init(void)
- {
--	if (machine_is_openrd_base() || machine_is_openrd_client())
-+	if (machine_is_openrd_base() || machine_is_openrd_client() || machine_is_openrd_ultimate())
- 		kirkwood_pcie_init();
- 
- 	return 0;
-@@ -116,3 +129,16 @@ MACHINE_START(OPENRD_CLIENT, "Marvell OpenRD Client Board")
- 	.timer		= &kirkwood_timer,
- MACHINE_END
- #endif
-+
-+#ifdef CONFIG_MACH_OPENRD_ULTIMATE
-+MACHINE_START(OPENRD_ULTIMATE, "Marvell OpenRD Ultimate Board")
-+	/* Maintainer: Dhaval Vasa <dhaval.vasa@einfochips.com> */
-+	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
-+	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
-+	.boot_params	= 0x00000100,
-+	.init_machine	= openrd_init,
-+	.map_io		= kirkwood_map_io,
-+	.init_irq	= kirkwood_init_irq,
-+	.timer		= &kirkwood_timer,
-+MACHINE_END
-+#endif
--- 
-1.7.1
+--
+Robert
