@@ -1,25 +1,42 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Tue, 8 Jun 2010 16:58:19 +0800
-Subject: [RFC] pxa: about ac97 for public use
-Message-ID: <AANLkTinVD25v8HyOHDPWjpev7yp_tFqy_8S8Wa5njgYs@mail.gmail.com>
+From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
+Date: Tue,  8 Jun 2010 11:02:55 +0200
+Subject: [PATCH 1/8] MX25: put define for OTG base address in right include
+Message-ID: <1275987782-16094-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+the standard place for this define is include/mach/mx25.h
 
-Now, our pxa168 ac97 driver need the regs-ac97.h file support, but
-this file was located in mach-pxa/include.
-Should we move the public 'regs-ac97.h' to plat-pxa/ or create a new
-one in mach-mmp/include for pxa168 ac97 driver?
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+---
+ arch/arm/mach-mx25/devices.c          |    2 --
+ arch/arm/plat-mxc/include/mach/mx25.h |    1 +
+ 2 files changed, 1 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/mach-mx25/devices.c b/arch/arm/mach-mx25/devices.c
+index 3a405fa..032a347 100644
+--- a/arch/arm/mach-mx25/devices.c
++++ b/arch/arm/mach-mx25/devices.c
+@@ -117,8 +117,6 @@ struct platform_device mxc_uart_device4 = {
+ 	.num_resources = ARRAY_SIZE(uart4),
+ };
+ 
+-#define MX25_OTG_BASE_ADDR 0x53FF4000
+-
+ static u64 otg_dmamask = DMA_BIT_MASK(32);
+ 
+ static struct resource mxc_otg_resources[] = {
+diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
+index 4eb6e33..bc0ba27 100644
+--- a/arch/arm/plat-mxc/include/mach/mx25.h
++++ b/arch/arm/plat-mxc/include/mach/mx25.h
+@@ -34,6 +34,7 @@
+ #define MX25_NFC_BASE_ADDR		0xbb000000
+ #define MX25_DRYICE_BASE_ADDR		0x53ffc000
+ #define MX25_LCDC_BASE_ADDR		0x53fbc000
++#define MX25_OTG_BASE_ADDR		0x53ff4000
+ 
+ #define MX25_INT_DRYICE	25
+ #define MX25_INT_FEC	57
 -- 
-*linux-arm-kernel mailing list
-mail addr:linux-arm-kernel at lists.infradead.org
-you can subscribe by:
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-* linux-arm-NUC900 mailing list
-mail addr:NUC900 at googlegroups.com
-main web: https://groups.google.com/group/NUC900
-you can subscribe it by sending me mail:
-mcuos.com at gmail.com
+1.6.3.3
