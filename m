@@ -1,59 +1,45 @@
-From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
-Date: Tue,  8 Jun 2010 11:03:02 +0200
-Subject: [PATCH 8/8] eukrea-tlv320: add support for our i.MX25 board
-In-Reply-To: <1275987782-16094-7-git-send-email-eric@eukrea.com>
-References: <1275987782-16094-1-git-send-email-eric@eukrea.com>
-	<1275987782-16094-2-git-send-email-eric@eukrea.com>
-	<1275987782-16094-3-git-send-email-eric@eukrea.com>
-	<1275987782-16094-4-git-send-email-eric@eukrea.com>
-	<1275987782-16094-5-git-send-email-eric@eukrea.com>
-	<1275987782-16094-6-git-send-email-eric@eukrea.com>
-	<1275987782-16094-7-git-send-email-eric@eukrea.com>
-Message-ID: <1275987782-16094-8-git-send-email-eric@eukrea.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue,  8 Jun 2010 18:06:55 +0900
+Subject: [PATCH v2 0/5] Add support for Samsung CF controller
+Message-ID: <1275988020-29000-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* tdm slot has to be configured to get sound working on i.MX25
+This is v2 of the patchset adding support for Samsung's CF controller. 
+Note: Depends on Ben Dook's platform_data helper patch
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
----
- sound/soc/imx/Kconfig         |    2 +-
- sound/soc/imx/eukrea-tlv320.c |    3 ++-
- 2 files changed, 3 insertions(+), 2 deletions(-)
+Changes since v1:
 
-diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
-index fd292f1..fd616ae 100644
---- a/sound/soc/imx/Kconfig
-+++ b/sound/soc/imx/Kconfig
-@@ -31,7 +31,7 @@ config SND_SOC_PHYCORE_AC97
- 
- config SND_SOC_EUKREA_TLV320
- 	bool "Eukrea TLV320"
--	depends on MACH_EUKREA_MBIMX27_BASEBOARD
-+	depends on MACH_EUKREA_MBIMX27_BASEBOARD || MACH_EUKREA_MBIMXSD_BASEBOARD
- 	select SND_MXC_SOC_SSI
- 	select SND_SOC_TLV320AIC23
- 	help
-diff --git a/sound/soc/imx/eukrea-tlv320.c b/sound/soc/imx/eukrea-tlv320.c
-index 968380a..45f5e4b 100644
---- a/sound/soc/imx/eukrea-tlv320.c
-+++ b/sound/soc/imx/eukrea-tlv320.c
-@@ -60,6 +60,7 @@ static int eukrea_tlv320_hw_params(struct snd_pcm_substream *substream,
- 		pr_err("%s: failed setting codec sysclk\n", __func__);
- 		return ret;
- 	}
-+	snd_soc_dai_set_tdm_slot(cpu_dai, 0xffffffc, 0xffffffc, 2, 0);
- 
- 	ret = snd_soc_dai_set_sysclk(cpu_dai, IMX_SSP_SYS_CLK, 0,
- 				SND_SOC_CLOCK_IN);
-@@ -100,7 +101,7 @@ static int __init eukrea_tlv320_init(void)
- {
- 	int ret;
- 
--	if (!machine_is_eukrea_cpuimx27())
-+	if (!machine_is_eukrea_cpuimx27() && !machine_is_eukrea_cpuimx25sd())
- 		/* return happy. We might run on a totally different machine */
- 		return 0;
- 
--- 
-1.6.3.3
+	- Made a seperate patch for plat-samsung changes
+	- Moved CF true-ide configuration to driver code from
+	  platform-specific setup code
+	- Reduced memory allocated for CF device  
+	- Renamed driver file to pata_samsung_cf.c
+	- Used resource_size() function in ioremap
+	- Used new dev_pm_ops
+
+	- readl/writel functions consistently used
+	- Used ata_pio_need_iordy, ata_timing_find_mode for setting up
+	  pio mode instead of using own timing parameters
+	- Removed useless checks in tf functions
+	- Added overrides for sff_dev_select, sff_check_altstatus and
+	  sff_set_devctl
+	- Used platform_get_drvdata/platform_set_drvdata
+	- Added request_mem_region which was missing 
+	- Misc coding guideline changes - typos, extra includes,
+	  parenthesis etc.
+
+	- Changed the device naming override to follow onenand/iic style.
+
+	- Removed the qc_prep override
+	- Based the new patch on upstream branch of libata-dev
+
+	- Used 'linux/gpio.h' in place of 'mach/gpio.h'
+
+This patch set includes the following patches:
+
+[PATCH v2 1/5] libata: pata_samsung: Add Samsung PATA controller driver
+[PATCH v2 2/5] ARM: SAMSUNG: Add Compact Flash device support for Samsung SoCs
+[PATCH v2 3/5] ARM: S3C64XX: Add support for Compact Flash driver on SMDK6410
+[PATCH v2 4/5] ARM: S5PC100: Add support for Compact Flash driver on SMDKC100
+[PATCH v2 5/5] ARM: S5PV210: Add support for Compact Flash driver on SMDKV210/C110
