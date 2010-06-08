@@ -1,89 +1,41 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 8 Jun 2010 22:51:38 +0800
-Subject: Heads up: Linus plans to kill ARM defconfigs
-In-Reply-To: <20100608131319.GF25370@n2100.arm.linux.org.uk>
-References: <4C0853E1.1080005@bluewatersys.com>
-	<AANLkTinEq99_8UyVNnmzNEreDoyHKEnxpuJmaAo_kpPN@mail.gmail.com>
-	<20100604061034.GI6499@atomide.com>
-	<AANLkTikrK-RkDntgrpptBaG6TvnesNFncOw3DW4Jt-TY@mail.gmail.com>
-	<AANLkTil1IetX6koHVRrgnWs3DqhPtZVqR2euEdg9lZUa@mail.gmail.com>
-	<alpine.LFD.2.00.1006041418390.22319@xanadu.home>
-	<20100608115832.GB25370@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1006080839240.30664@xanadu.home>
-	<20100608125053.GD25370@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1006080857390.30664@xanadu.home>
-	<20100608131319.GF25370@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinWCRIKyMUseSpkRfEC0Cba4JRGBiUwb_jD_MkZ@mail.gmail.com>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Tue, 08 Jun 2010 16:01:55 +0100
+Subject: [PATCH 2/2] pxa: modify the pxa2xx-ac97 file for pxa168
+In-Reply-To: <AANLkTimZjKvAAcK9xiXng7wJ0tVBJrmTIvMgyzrS7HqH@mail.gmail.com>
+References: <4C0E21A1.4000909@gmail.com>
+	<AANLkTimNwtScfKYVc4qPZFEP6GYklPoHLgr2AE7yquQL@mail.gmail.com>
+	<AANLkTimZjKvAAcK9xiXng7wJ0tVBJrmTIvMgyzrS7HqH@mail.gmail.com>
+Message-ID: <1276009315.3003.346.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 8, 2010 at 9:13 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jun 08, 2010 at 09:01:35AM -0400, Nicolas Pitre wrote:
->> I wouldn't give up on that option just yet though. ?I don't think he
->> fully understood your idea, and without an actual patch it might be hard
->> to understand as well, especially for people who are not used to deal
->> with the target varieties we have on ARM. ?Linus is also known to change
->> his mind when presented with evidences.
->
-> The two ideas are very close to each other - and can be generated
-> together.
->
-> If we create something like Linus' preferred solution, we can then do
-> in the main arch/arm/Kconfig:
->
-> config STD_CONFIG
-> ? ? ? ?bool "blah"
->
-> if STD_CONFIG
->
-> if MACH_WHATEVER
-> include arch/arm/config/Kconfig.whatever
-> endif
->
-> if MACH_BLAH
-> include arch/arm/config/Kconfig.blah
-> endif
->
-> endif
->
-> which should work as per my idea.
->
+On Tue, 2010-06-08 at 22:49 +0800, Wan ZongShun wrote:
+> 2010/6/8 Eric Miao <eric.y.miao@gmail.com>:
+> > 2010/6/8 Wan ZongShun <mcuos.com@gmail.com>:
+> >> In order to allow the sharing of the pxa2xx-ac97 driver file with pxa168,
+> >> we have to do a little change to pxa2xx-ac97 file.
+> >>
+> >> All private register addresses were located in mach/include/ac97.h.
+> >
+> > This is not the right way to go, as suggested already. I hope the ac97
+> > driver is more self-contained. i.e. having a platform device for:
+> >
+> >  - where the registers are mapped from
+> >  - drcmr channel numbers can be encoded within dma resource
+> >  - ac97 register definitions are not exposed everywhere
+> >
+> 
+> Got it, so I should put above to platform_device and remove regs-ac97.h,
+> any private bit definition should be removed to driver directory as
+> driver _only_.
+> 
 
-Anyway, we might need a tool to analyze those common config options across all
-boards, and those not. Attached is a script used when updating debian kernel
-configs, which I found might be useful. The result is still a _big_
-mess to sort out
-though. Below is what I did:
+...and could you also CC Mark on any ASoC related changes too.
 
-1. Generating a complete list of configs (updated)
-ycmiao at macbook-lucid:~/kernel/linux-2.6$ for i in arch/arm/configs/*;
-do j=`echo $i | sed 's/.*configs\/\(.*\)_defconfig/\1/'`; echo $j;
-mkdir ../build/tmp; make ARCH=arm O=../build/tmp `basename $i`; make
-ARCH=arm O=../build/tmp oldconfig; cp ../build/tmp/.config
-../configs/config.$j; rm -fr ../build/tmp; done
+Thanks
 
-2. Use splitconfigs.pl shows the reduction of config options
-
-ycmiao at macbook-lucid:~/kernel/configs$ cat * | wc -l
-258408
-
-ycmiao at macbook-lucid:~/kernel/configs$ splitconfig.pl .
-Reading config's ...
-Merging lists ...
-Creating common config ... done.
-Creating stub configs ...
-
-ycmiao at macbook-lucid:~/kernel/configs$ cat * | wc -l
-142062
-
-3. A config.common includes those options common to all config.* and
-the remaining
-config.* now only includes those could be different across boards.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: splitconfig.pl
-Type: application/octet-stream
-Size: 2404 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100608/e0b6259d/attachment.obj>
+Liam
+-- 
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
