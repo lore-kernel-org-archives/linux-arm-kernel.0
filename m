@@ -1,37 +1,64 @@
-From: saeed@marvell.com (Saeed Bishara)
-Date: Tue,  8 Jun 2010 14:30:37 +0300
-Subject: [PATCH] [ARM] Kirkwood: configure NAND mpp's for db88f6281
-Message-ID: <1275996637-25273-1-git-send-email-saeed@marvell.com>
+From: benjamin.zores@alcatel-lucent.com (Benjamin Zores)
+Date: Tue, 08 Jun 2010 13:43:44 +0200
+Subject: [PATCH 3/3 v4] [ARM] Kirkwood: add support for PCIe1
+In-Reply-To: <1275996094-16929-1-git-send-email-saeed@marvell.com>
+References: <AANLkTilEM81aUCdIaTyN1s8es6LMETuMOGXh3a67sWgf@mail.gmail.com>
+	<1275996094-16929-1-git-send-email-saeed@marvell.com>
+Message-ID: <4C0E2CF0.3050307@alcatel-lucent.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case the board is configured to boot from spi flash, the mpps
-will not be configured to select the NAND I/Os. This patch makes
-sure to select the NAND I/O's regardless to the boot device type.
+On 08/06/2010 13:21, Saeed Bishara wrote:
+> @@ -106,17 +108,21 @@ void __init kirkwood_setup_cpu_mbus(void)
+>   		      TARGET_PCIE, ATTR_PCIE_IO, KIRKWOOD_PCIE_IO_BUS_BASE);
+>   	setup_cpu_win(1, KIRKWOOD_PCIE_MEM_PHYS_BASE, KIRKWOOD_PCIE_MEM_SIZE,
+>   		      TARGET_PCIE, ATTR_PCIE_MEM, KIRKWOOD_PCIE_MEM_BUS_BASE);
+> +	setup_cpu_win(2, KIRKWOOD_PCIE1_IO_PHYS_BASE, KIRKWOOD_PCIE1_IO_SIZE,
+> +		      TARGET_PCIE, ATTR_PCIE1_IO, KIRKWOOD_PCIE1_IO_BUS_BASE);
+> +	setup_cpu_win(3, KIRKWOOD_PCIE1_MEM_PHYS_BASE, KIRKWOOD_PCIE1_MEM_SIZE,
+> +		      TARGET_PCIE, ATTR_PCIE1_MEM, KIRKWOOD_PCIE1_MEM_BUS_BASE);
+>
+>    
 
-Signed-off-by: Saeed Bishara <saeed@marvell.com>
----
- arch/arm/mach-kirkwood/db88f6281-bp-setup.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+I'd have used an id, and incremented it at each setup_cpu_win() call.
+Also only doing the last 2 calls on 6282.
 
-diff --git a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
-index c428348..16f6691 100644
---- a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
-+++ b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
-@@ -51,6 +51,14 @@ static struct mvsdio_platform_data db88f6281_mvsdio_data = {
- };
- 
- static unsigned int db88f6281_mpp_config[] __initdata = {
-+	MPP0_NF_IO2,
-+	MPP1_NF_IO3,
-+	MPP2_NF_IO4,
-+	MPP3_NF_IO5,
-+	MPP4_NF_IO6,
-+	MPP5_NF_IO7,
-+	MPP18_NF_IO0,
-+	MPP19_NF_IO1,
- 	MPP37_GPIO,
- 	MPP38_GPIO,
- 	0
--- 
-1.6.0.4
+>   	/* Make sure those units are accessible */
+> -	writel(curr | CGC_SATA0 | CGC_SATA1 | CGC_PEX0, CLOCK_GATING_CTRL);
+> +	writel(curr | CGC_SATA0 | CGC_SATA1 | CGC_PEX0 | CGC_PEX1, CLOCK_GATING_CTRL);
+>
+>    
+
+Why not (pseudo code):
+
+int flags = curr | CGC_SATA0 | CGC_SATA1 | CGC_PEX0;
+if (6282) flags |= CGC_PEX1;
+writel(flags, ...);
+
+> +	/* For PCIe 1: first shutdown the phy */
+> +	if (dev == MV88F6282_DEV_ID) {
+> +		if (!(kirkwood_clk_ctrl&  CGC_PEX1)) {
+> +			writel(readl(PCIE1_LINK_CTRL) | 0x10, PCIE1_LINK_CTRL);
+> +			while (1)
+> +				if (readl(PCIE1_STATUS)&  0x1)
+> +					break;
+> +			writel(readl(PCIE1_LINK_CTRL)&  ~0x10, PCIE1_LINK_CTRL);
+> +		}
+> +	} else  /* keep this bit set for devices that don't have PCIe1 */
+> +		kirkwood_clk_ctrl |= CGC_PEX1;
+>
+>    
+
+the else part is useless with the proposal above i guess.
+
+Except from that, when using your patch I was unable to boot kernel 
+anymore on 6281 boards.
+I have a quite similar patch that however uses preinit() calls in pcie.c 
+for the board to boot again.
+
+I'd like to send it but I'm in discussion with your company whether or 
+not I'm allowed to do so.
+In the same way I do have patches for MPP and 2nd TWSI interface support 
+if it may help.
+
+Ben
