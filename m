@@ -1,64 +1,30 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 8 Jun 2010 10:41:10 -0500
-Subject: [PATCH] ep93xx: register backlight driver
-In-Reply-To: <0D753D10438DA54287A00B0270842697636EE74BB1@AUSP01VMBX24.collaborationhost.net>
-References: <0D753D10438DA54287A00B0270842697636EE74BB1@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <0D753D10438DA54287A00B027084269763708AFE70@AUSP01VMBX24.collaborationhost.net>
+From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
+Date: Tue,  8 Jun 2010 18:07:05 +0200
+Subject: [PATCH] i.MX35: return IPU clock's value for mx3fb
+Message-ID: <1276013225-11982-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, May 10, 2010 6:58 PM, H Hartley Sweeten wrote:
->
-> Add the platform registration for the ep93xx backlight driver
-> that is now queued in the backlight tree.
->
-> Since the pwm BRIGHT signal only functions if the video system
-> is operating, register the backlight when the framebuffer device
-> is registered.
->
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <ryan@bluewatersys.com>
+without this patch, ipu_clk's value is 0 thus preventing mx3fb from
+calculating the right divisor for pixel clock generator.
 
-Ryan,
-
-The EP93xx backlight driver is now merged.
-commit 08b3924b24cdb1942393dc3009335a2153bd2eac
-
-Do you have any issues with this patch to enable it?
-
-Regards,
-Hartley
-
+Signed-off-by: Eric B?nard <eric@eukrea.com>
 ---
+ arch/arm/mach-mx3/clock-imx35.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-This is based off next-20100510, if needed I can rebase it off
-another tree.
-
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index 8d3f77e..07d7bb9 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -568,6 +568,11 @@ static struct platform_device ep93xx_fb_device = {
- 	.resource		= ep93xx_fb_resource,
- };
- 
-+static struct platform_device ep93xx_bl_device = {
-+	.name		= "ep93xx-bl",
-+	.id		= -1,
-+};
-+
- /**
-  * ep93xx_register_fb - Register the framebuffer platform device.
-  * @data:	platform specific framebuffer configuration (__initdata)
-@@ -576,6 +581,7 @@ void __init ep93xx_register_fb(struct ep93xxfb_mach_info *data)
- {
- 	ep93xxfb_data = *data;
- 	platform_device_register(&ep93xx_fb_device);
-+	platform_device_register(&ep93xx_bl_device);
- }
- 
- 
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
+index 9f3e943..28be011 100644
+--- a/arch/arm/mach-mx3/clock-imx35.c
++++ b/arch/arm/mach-mx3/clock-imx35.c
+@@ -359,7 +359,7 @@ DEFINE_CLOCK(i2c1_clk,   0, CCM_CGR1, 10, get_rate_ipg_per, NULL);
+ DEFINE_CLOCK(i2c2_clk,   1, CCM_CGR1, 12, get_rate_ipg_per, NULL);
+ DEFINE_CLOCK(i2c3_clk,   2, CCM_CGR1, 14, get_rate_ipg_per, NULL);
+ DEFINE_CLOCK(iomuxc_clk, 0, CCM_CGR1, 16, NULL, NULL);
+-DEFINE_CLOCK(ipu_clk,    0, CCM_CGR1, 18, NULL, NULL);
++DEFINE_CLOCK(ipu_clk,    0, CCM_CGR1, 18, get_rate_ahb, NULL);
+ DEFINE_CLOCK(kpp_clk,    0, CCM_CGR1, 20, get_rate_ipg, NULL);
+ DEFINE_CLOCK(mlb_clk,    0, CCM_CGR1, 22, get_rate_ahb, NULL);
+ DEFINE_CLOCK(mshc_clk,   0, CCM_CGR1, 24, get_rate_mshc, NULL);
+-- 
+1.6.3.3
