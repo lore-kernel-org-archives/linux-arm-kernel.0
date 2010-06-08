@@ -1,89 +1,108 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 8 Jun 2010 21:36:30 +0200
-Subject: [PATCH] pxa2xx/cpufreq: Fix DRI computation
-In-Reply-To: <87ljap7opx.fsf@free.fr>
-References: <1275698808-31166-1-git-send-email-marek.vasut@gmail.com>
-	<87ljap7opx.fsf@free.fr>
-Message-ID: <201006082136.30785.marek.vasut@gmail.com>
+From: milinevskyy@gmail.com (Dmytro Milinevskyy)
+Date: Tue, 08 Jun 2010 22:47:47 +0300
+Subject: [PATCH] Marvell OpenRD-Ultimate machine support
+Message-ID: <4c0e9ee6.8704df0a.2e71.ffffdf65@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 8. ?ervna 2010 13:23:06 Robert Jarzmik napsal(a):
-> Marek Vasut <marek.vasut@gmail.com> writes:
-> > The DRI field was incorrectly computed, causing various hangs and weird
-> > behaviour on PXA2xx machines. This patch introduces the DRI computation
-> > according to the PXA255 (January 2004) and PXA270 (MV-S301039-00 Rev. A)
-> > datasheets.
-> > 
-> > NOTE: The CPU type is checked only once, so the code is a little bit
-> > faster now.
-> > 
-> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> > ---
-> > 
-> >  arch/arm/mach-pxa/cpufreq-pxa2xx.c |   33
-> >  +++++++++++++++++++++++++++++---- 1 files changed, 29 insertions(+), 4
-> >  deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-pxa/cpufreq-pxa2xx.c
-> > b/arch/arm/mach-pxa/cpufreq-pxa2xx.c index 9e4d981..5373db0 100644
-> > --- a/arch/arm/mach-pxa/cpufreq-pxa2xx.c
-> > +++ b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
-> > @@ -251,17 +251,42 @@ static void init_sdram_rows(void)
-> > 
-> >  	if (mdcnfg & (MDCNFG_DE0 | MDCNFG_DE1))
-> >  	
-> >  		drac0 = MDCNFG_DRAC0(mdcnfg);
-> > 
-> > -	sdram_rows = 1 << (11 + max(drac0, drac2));
-> > +	sdram_rows = 11 + max(drac0, drac2);
-> 
-> I don't think that's correct.
-> From DRACn, you learn that SDRAM row is selected from 11+DRACn bits. That
-> means that if drac == 2, then the SDRAM row is a number between 0 and
-> (11+drac0) - 1. That in turn means that the number of SDRAM rows is : 2 ^
-> (11 + drac0). Example:
->  - drac0 = 2 : row encoded on 13 bits => 2^13 rows (ie. 1 << (11 + 2)).
+Hi!
+This patch adds support for the OpenRD Ultimate machine(could be found at http://www.arm.linux.org.uk/developer/machines/list.php?id=2884)
 
-That I'm aware of, but are you sure the TRM means it that way ?
-> 
-> >  static u32 mdrefr_dri(unsigned int freq)
-> >  {
-> >  
-> >  	u32 dri = 0;
-> > 
-> > -	if (cpu_is_pxa25x())
-> > -		dri = ((freq * SDRAM_TREF) / (sdram_rows * 32));
-> > +	/*
-> > +	 * PXA255 (6.5.3):
-> > +	 * 	DRI = (Refresh time / rows * memory clock frequency) / 32
-> > +	 * PXA270 (Table 91):
-> > +	 * 	DRI = (Refresh time / rows * memory clock frequency - 31) / 32
-> > +	 *
-> > +	 * Memory clock frequency is in MHz here! (Refresh time is in ms).
-> > +	 */
-> 
-> I don't agree here either. The "freq" variable is in kHz.
+Besides adding machine description this patch adds correction for PHY address for Ultimate version.
 
-That's concerning the TRM, not the freq value. In TRM, it's in MHz.
+Differences from the previous attempt:
+ - Applied suggestion from Lennert Buytenhek to change PHY addresses in instances of mv643xx_eth_platform_data in case of ultimate version.
 
-> It comes from
-> "new_freq_mem = pxa_freq_settings[idx].membus;" in pxa_set_target(). The
-> membus value is in kHz, as in tables pxaXXX_freqs (see 104000 and 208000,
-> second column in pxa27x_freqs for example). As refresh time is in ms,
-> there is no need for a 1000th multiplier.
-> 
-> And my understanding is that the legacy formula is incorrect, as you
-> discovered it. Yet it should be, IMO :
->     if (cpu_is_pxa27x())
-> -       dri = ((freq * SDRAM_TREF) / (sdram_rows - 31)) / 32;
-> +       dri = ((freq * SDRAM_TREF) / sdram_rows - 31) / 32;
-> 
-> This is the only change to apply IMHO.
+Regards,
 
-Ok, but still, even though I fixed it your way, it doesn't fix the real problem, 
-I'll recheck though, I just need a few days too.
+-- Dmytro Milinevskyy
 
-Cheers
-> 
-> Can you confirm my analysis ?
+Signed-off-by: Dmytro Milinevskyy <milinevskyy@gmail.com>
+---
+ arch/arm/mach-kirkwood/Kconfig        |    7 ++++++
+ arch/arm/mach-kirkwood/openrd-setup.c |   34 +++++++++++++++++++++++++++++---
+ 2 files changed, 37 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index 29b2163..110a3b8 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -75,6 +75,13 @@ config MACH_OPENRD_CLIENT
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell OpenRD Client Board.
+ 
++config MACH_OPENRD_ULTIMATE
++	bool "Marvell OpenRD Ultimate Board"
++	select MACH_OPENRD
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  Marvell OpenRD Ultimate Board.
++
+ config MACH_NETSPACE_V2
+ 	bool "LaCie Network Space v2 NAS Board"
+ 	help
+diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
+index ad3f1ec..5d6797a 100644
+--- a/arch/arm/mach-kirkwood/openrd-setup.c
++++ b/arch/arm/mach-kirkwood/openrd-setup.c
+@@ -47,6 +47,14 @@ static struct mv643xx_eth_platform_data openrd_ge01_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(24),
+ };
+ 
++static struct mv643xx_eth_platform_data openrd_ultimate_ge00_data = {
++	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
++};
++
++static struct mv643xx_eth_platform_data openrd_ultimate_ge01_data = {
++	.phy_addr	= MV643XX_ETH_PHY_ADDR(1),
++};
++
+ static struct mv_sata_platform_data openrd_sata_data = {
+ 	.n_ports	= 2,
+ };
+@@ -73,9 +81,14 @@ static void __init openrd_init(void)
+ 
+ 	kirkwood_ehci_init();
+ 
+-	kirkwood_ge00_init(&openrd_ge00_data);
+-	if (machine_is_openrd_client())
+-		kirkwood_ge01_init(&openrd_ge01_data);
++	if (machine_is_openrd_ultimate()) {
++		kirkwood_ge00_init(&openrd_ultimate_ge00_data);
++		kirkwood_ge01_init(&openrd_ultimate_ge01_data);
++	} else {
++		kirkwood_ge00_init(&openrd_ge00_data);
++		if (machine_is_openrd_client())
++			kirkwood_ge01_init(&openrd_ge01_data);
++	}
+ 	kirkwood_sata_init(&openrd_sata_data);
+ 	kirkwood_sdio_init(&openrd_mvsdio_data);
+ 
+@@ -84,7 +97,7 @@ static void __init openrd_init(void)
+ 
+ static int __init openrd_pci_init(void)
+ {
+-	if (machine_is_openrd_base() || machine_is_openrd_client())
++	if (machine_is_openrd_base() || machine_is_openrd_client() || machine_is_openrd_ultimate())
+ 		kirkwood_pcie_init();
+ 
+ 	return 0;
+@@ -116,3 +129,16 @@ MACHINE_START(OPENRD_CLIENT, "Marvell OpenRD Client Board")
+ 	.timer		= &kirkwood_timer,
+ MACHINE_END
+ #endif
++
++#ifdef CONFIG_MACH_OPENRD_ULTIMATE
++MACHINE_START(OPENRD_ULTIMATE, "Marvell OpenRD Ultimate Board")
++	/* Maintainer: Dhaval Vasa <dhaval.vasa@einfochips.com> */
++	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
++	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
++	.boot_params	= 0x00000100,
++	.init_machine	= openrd_init,
++	.map_io		= kirkwood_map_io,
++	.init_irq	= kirkwood_init_irq,
++	.timer		= &kirkwood_timer,
++MACHINE_END
++#endif
+-- 
+1.7.1
