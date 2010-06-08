@@ -1,37 +1,107 @@
-From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Tue, 8 Jun 2010 19:09:48 +0200
-Subject: [PATCH 2/2] set packet size limit for the mv643xx csum offloading
-In-Reply-To: <1275827336-31111-2-git-send-email-saeed@marvell.com>
-References: <1275827336-31111-1-git-send-email-saeed@marvell.com>
-	<1275827336-31111-2-git-send-email-saeed@marvell.com>
-Message-ID: <20100608170948.GS1743@mail.wantstofly.org>
+From: milinevskyy@gmail.com (Dmytro Milinevskyy)
+Date: Tue, 08 Jun 2010 20:24:40 +0300
+Subject: [PATCH] Marvell OpenRD-Ultimate machine support
+Message-ID: <4c0e7d5a.0c3ddf0a.2771.ffffd485@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 06, 2010 at 03:28:56PM +0300, Saeed Bishara wrote:
+Hello!
+This patch adds support for the OpenRD Ultimate machine(could be found at http://www.arm.linux.org.uk/developer/machines/list.php?id=2884)
 
-> The mv643xx ethernet controller limits the packet size for the TX
-> checksum offloading. this patch sets this limits for the needed
-> devices.
-> 
-> Signed-off-by: Saeed Bishara <saeed@marvell.com>
-> ---
->  arch/arm/mach-dove/common.c     |    1 +
->  arch/arm/mach-kirkwood/common.c |    1 +
->  2 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-> index 5da2cf4..473ce0b 100644
-> --- a/arch/arm/mach-dove/common.c
-> +++ b/arch/arm/mach-dove/common.c
-> @@ -149,6 +149,7 @@ void __init dove_ehci1_init(void)
->  struct mv643xx_eth_shared_platform_data dove_ge00_shared_data = {
->  	.t_clk		= 0,
->  	.dram		= &dove_mbus_dram_info,
-> +	.tx_csum_limit	= 1600,
+It slightly differs from Client version.
 
-Assuming that 1600 is exactly the right value (and not 1599 or 1601 etc),
+Also this patch adds correction for PHY address for Ultimate version.
 
-Acked-by: Lennert Buytenhek <buytenh@wantstofly.org>
+Regards,
 
-Can you fill in for orion5x/dd/loki as well?
+-- Dmytro Milinevskyy
+
+Signed-off-by: Dmytro Milinevskyy <milinevskyy@gmail.com>
+---
+ arch/arm/mach-kirkwood/Kconfig        |    7 ++++++
+ arch/arm/mach-kirkwood/openrd-setup.c |   34 +++++++++++++++++++++++++++++---
+ 2 files changed, 37 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index 29b2163..110a3b8 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -75,6 +75,13 @@ config MACH_OPENRD_CLIENT
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell OpenRD Client Board.
+ 
++config MACH_OPENRD_ULTIMATE
++	bool "Marvell OpenRD Ultimate Board"
++	select MACH_OPENRD
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  Marvell OpenRD Ultimate Board.
++
+ config MACH_NETSPACE_V2
+ 	bool "LaCie Network Space v2 NAS Board"
+ 	help
+diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
+index ad3f1ec..5d6797a 100644
+--- a/arch/arm/mach-kirkwood/openrd-setup.c
++++ b/arch/arm/mach-kirkwood/openrd-setup.c
+@@ -47,6 +47,14 @@ static struct mv643xx_eth_platform_data openrd_ge01_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(24),
+ };
+ 
++static struct mv643xx_eth_platform_data openrd_ultimate_ge00_data = {
++	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
++};
++
++static struct mv643xx_eth_platform_data openrd_ultimate_ge01_data = {
++	.phy_addr	= MV643XX_ETH_PHY_ADDR(1),
++};
++
+ static struct mv_sata_platform_data openrd_sata_data = {
+ 	.n_ports	= 2,
+ };
+@@ -73,9 +81,14 @@ static void __init openrd_init(void)
+ 
+ 	kirkwood_ehci_init();
+ 
+-	kirkwood_ge00_init(&openrd_ge00_data);
+-	if (machine_is_openrd_client())
+-		kirkwood_ge01_init(&openrd_ge01_data);
++	if (machine_is_openrd_ultimate()) {
++		kirkwood_ge00_init(&openrd_ultimate_ge00_data);
++		kirkwood_ge01_init(&openrd_ultimate_ge01_data);
++	} else {
++		kirkwood_ge00_init(&openrd_ge00_data);
++		if (machine_is_openrd_client())
++			kirkwood_ge01_init(&openrd_ge01_data);
++	}
+ 	kirkwood_sata_init(&openrd_sata_data);
+ 	kirkwood_sdio_init(&openrd_mvsdio_data);
+ 
+@@ -84,7 +97,7 @@ static void __init openrd_init(void)
+ 
+ static int __init openrd_pci_init(void)
+ {
+-	if (machine_is_openrd_base() || machine_is_openrd_client())
++	if (machine_is_openrd_base() || machine_is_openrd_client() || machine_is_openrd_ultimate())
+ 		kirkwood_pcie_init();
+ 
+ 	return 0;
+@@ -116,3 +129,16 @@ MACHINE_START(OPENRD_CLIENT, "Marvell OpenRD Client Board")
+ 	.timer		= &kirkwood_timer,
+ MACHINE_END
+ #endif
++
++#ifdef CONFIG_MACH_OPENRD_ULTIMATE
++MACHINE_START(OPENRD_ULTIMATE, "Marvell OpenRD Ultimate Board")
++	/* Maintainer: Dhaval Vasa <dhaval.vasa@einfochips.com> */
++	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
++	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
++	.boot_params	= 0x00000100,
++	.init_machine	= openrd_init,
++	.map_io		= kirkwood_map_io,
++	.init_irq	= kirkwood_init_irq,
++	.timer		= &kirkwood_timer,
++MACHINE_END
++#endif
+-- 
+1.7.1
