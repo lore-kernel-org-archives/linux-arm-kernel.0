@@ -1,24 +1,29 @@
-From: shanevolpe@gmail.com (Shane Volpe)
-Date: Tue, 8 Jun 2010 10:38:36 -0400
-Subject: Kernel 2.6.33: PXA270 Audio does not resume after resume from suspend
-	state
-Message-ID: <AANLkTiloYpM6LBNFHOfHGdvoHZ03cavW8vdmVZjHxSKC@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Jun 2010 15:41:06 +0100
+Subject: Heads up: Linus plans to kill ARM defconfigs
+In-Reply-To: <201006032227.56429.marek.vasut@gmail.com>
+References: <20100603192459.GA9169@n2100.arm.linux.org.uk>
+	<201006032155.19349.marek.vasut@gmail.com>
+	<20100603200109.GC9169@n2100.arm.linux.org.uk>
+	<201006032227.56429.marek.vasut@gmail.com>
+Message-ID: <20100608144106.GH25370@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have upgraded an embedded system (PXA270) to the 2.6.33 kernel (from
-2.6.23).  Now when I run an audio program (ogg123) and put the system
-into standby then wake the system up the audio does not work (continue
-playing) after resume until I terminate ogg123 and start again.  After
-restarting ogg123 the audio works fine with out reseting the system or
-changing anything else on the system.
+On Thu, Jun 03, 2010 at 10:27:56PM +0200, Marek Vasut wrote:
+> btw. Maybe updating the machine registry so it allows pasting/attaching a 
+> defconfig with information about kernel version the defconfig corresponds
+> with ?
 
-The system is using the UCB1400 AC97 codec and just as added
-information when the audio is locked up, after resume, the touchscreen
-on the system still works which is also controlled by the UCB1400
-audio codec.  I have also tried several other audio players and the
-results are the same.   Has anyone else seen this bug and does anyone
-have suggestions on further tests to perform to narrow down were the
-bug may reside?
-Regards,
-Shane
+That means persisting with defconfigs, and the problems of keeping
+them updated with the kernel.
+
+Moreover, it encourages "one defconfig per machine", which will
+cause the number of defconfigs to grow even more - and I don't see
+such a system being usable with kautobuild.
+
+Given that it'd mean we still need to solve the problem, I don't see
+much point in expanding the machine database to store defconfigs.  It
+seems to me it only moves the problem elsewhere, and at the same time
+means we end up with two concurrently running systems - the fixed
+in-kernel method and the external defconfig file.
