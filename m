@@ -1,21 +1,37 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 8 Jun 2010 19:23:34 +0800
-Subject: [PATCH 2/2] pxa: modify the pxa2xx-ac97 file for pxa168
-In-Reply-To: <4C0E21A1.4000909@gmail.com>
-References: <4C0E21A1.4000909@gmail.com>
-Message-ID: <AANLkTimNwtScfKYVc4qPZFEP6GYklPoHLgr2AE7yquQL@mail.gmail.com>
+From: saeed@marvell.com (Saeed Bishara)
+Date: Tue,  8 Jun 2010 14:30:37 +0300
+Subject: [PATCH] [ARM] Kirkwood: configure NAND mpp's for db88f6281
+Message-ID: <1275996637-25273-1-git-send-email-saeed@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/6/8 Wan ZongShun <mcuos.com@gmail.com>:
-> In order to allow the sharing of the pxa2xx-ac97 driver file with pxa168,
-> we have to do a little change to pxa2xx-ac97 file.
->
-> All private register addresses were located in mach/include/ac97.h.
+In case the board is configured to boot from spi flash, the mpps
+will not be configured to select the NAND I/Os. This patch makes
+sure to select the NAND I/O's regardless to the boot device type.
 
-This is not the right way to go, as suggested already. I hope the ac97
-driver is more self-contained. i.e. having a platform device for:
+Signed-off-by: Saeed Bishara <saeed@marvell.com>
+---
+ arch/arm/mach-kirkwood/db88f6281-bp-setup.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
- - where the registers are mapped from
- - drcmr channel numbers can be encoded within dma resource
- - ac97 register definitions are not exposed everywhere
+diff --git a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+index c428348..16f6691 100644
+--- a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
++++ b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+@@ -51,6 +51,14 @@ static struct mvsdio_platform_data db88f6281_mvsdio_data = {
+ };
+ 
+ static unsigned int db88f6281_mpp_config[] __initdata = {
++	MPP0_NF_IO2,
++	MPP1_NF_IO3,
++	MPP2_NF_IO4,
++	MPP3_NF_IO5,
++	MPP4_NF_IO6,
++	MPP5_NF_IO7,
++	MPP18_NF_IO0,
++	MPP19_NF_IO1,
+ 	MPP37_GPIO,
+ 	MPP38_GPIO,
+ 	0
+-- 
+1.6.0.4
