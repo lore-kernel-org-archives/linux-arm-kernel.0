@@ -1,25 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Jun 2010 11:26:30 +0100
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 08 Jun 2010 11:42:28 +0100
 Subject: [PATCH] ARM: Add PI/robust mutexes support for SMP kernels
-In-Reply-To: <1275991455.2127.2.camel@e102109-lin.cambridge.arm.com>
-References: <20100607173630.GA10489@oksana.dev.rtsoft.ru>
-	<20100607194457.GC7220@n2100.arm.linux.org.uk>
-	<20100607202701.GA14529@oksana.dev.rtsoft.ru>
-	<1275944757.11056.16.camel@toshiba-laptop>
-	<20100607215224.GD7220@n2100.arm.linux.org.uk>
-	<1275991455.2127.2.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100608102630.GA22993@n2100.arm.linux.org.uk>
+In-Reply-To: <20100608102630.GA22993@n2100.arm.linux.org.uk>
+References: <20100608102630.GA22993@n2100.arm.linux.org.uk>
+Message-ID: <1275993748.2127.21.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 08, 2010 at 11:04:15AM +0100, Catalin Marinas wrote:
-> On Mon, 2010-06-07 at 22:52 +0100, Russell King - ARM Linux wrote:
-> > On Mon, Jun 07, 2010 at 10:05:57PM +0100, Catalin Marinas wrote:
-> > > But as I said, we already have patches to change the kernel R/W
-> > > permission for RO user pages.
-> > 
-> > ... but they introduce their own problem.
+On Tue, 2010-06-08 at 11:26 +0100, Russell King - ARM Linux wrote:
+> On Tue, Jun 08, 2010 at 11:04:15AM +0100, Catalin Marinas wrote:
+> > On Mon, 2010-06-07 at 22:52 +0100, Russell King - ARM Linux wrote:
+> > > On Mon, Jun 07, 2010 at 10:05:57PM +0100, Catalin Marinas wrote:
+> > > > But as I said, we already have patches to change the kernel R/W
+> > > > permission for RO user pages.
+> > >
+> > > ... but they introduce their own problem.
+> >
+> > And these problem are ...
 > 
-> And these problem are ...
+> As pointed out in May.
 
-As pointed out in May.
+Your first point was FIQ handlers and I updated the patch.
+
+Your second point was I/D cache coherency and I also replied saying that
+it doesn't matter on non-aliasing VIPT caches. There was no further
+reply from you.
+
+-- 
+Catalin
