@@ -1,232 +1,76 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue,  8 Jun 2010 18:07:00 +0900
-Subject: [PATCH v2 5/5] ARM: S5PV210: Add support for Compact Flash driver on
-	SMDKV210/C110
+Date: Tue,  8 Jun 2010 18:06:57 +0900
+Subject: [PATCH v2 2/5] ARM: SAMSUNG: Add Compact Flash device support for
+	Samsung SoCs
 In-Reply-To: <1275988020-29000-1-git-send-email-kgene.kim@samsung.com>
 References: <1275988020-29000-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1275988020-29000-6-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1275988020-29000-3-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Abhilash Kesavan <a.kesavan@samsung.com>
 
-Following is added for the CF-ATA driver:
-	- Platform data strucure instantiation
-	- Platform device enabling code
-	- Platform-specific gpio setup code
-	- Fixed IRQ naming to match across 64xx and v210
+Following has been added:
+	- Common CF Platform device definition
+	- Platform data strucure definition
+	- CF controller register definitions
 
 Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5pv210/Kconfig             |    9 +++++
- arch/arm/mach-s5pv210/Makefile            |    1 +
- arch/arm/mach-s5pv210/cpu.c               |    4 ++-
- arch/arm/mach-s5pv210/include/mach/irqs.h |    2 +-
- arch/arm/mach-s5pv210/include/mach/map.h  |    3 ++
- arch/arm/mach-s5pv210/mach-smdkc110.c     |    8 +++++
- arch/arm/mach-s5pv210/mach-smdkv210.c     |    8 +++++
- arch/arm/mach-s5pv210/setup-ide.c         |   50 +++++++++++++++++++++++++++++
- 8 files changed, 83 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/setup-ide.c
+ arch/arm/plat-samsung/Kconfig                 |    5 ++
+ arch/arm/plat-samsung/Makefile                |    1 +
+ arch/arm/plat-samsung/dev-ide.c               |   44 +++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/ata-core.h |   28 ++++++++++++
+ arch/arm/plat-samsung/include/plat/ata.h      |   36 ++++++++++++++++
+ arch/arm/plat-samsung/include/plat/devs.h     |    1 +
+ arch/arm/plat-samsung/include/plat/regs-ata.h |   56 +++++++++++++++++++++++++
+ 7 files changed, 171 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-samsung/dev-ide.c
+ create mode 100644 arch/arm/plat-samsung/include/plat/ata-core.h
+ create mode 100644 arch/arm/plat-samsung/include/plat/ata.h
+ create mode 100644 arch/arm/plat-samsung/include/plat/regs-ata.h
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 0761eac..4068c91 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -27,6 +27,11 @@ config S5PV210_SETUP_I2C2
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 2753fb3..12c647c 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -216,6 +216,11 @@ config SAMSUNG_DEV_ADC
  	help
- 	  Common setup code for i2c bus 2.
+ 	  Compile in platform device definition for ADC controller
  
-+config S5PV210_SETUP_IDE
++config SAMSUNG_DEV_IDE
 +	bool
 +	help
-+	  Common setup code for S5PV210 IDE GPIO configurations
++	  Compile in platform device definitions for IDE
 +
- config S5PV210_SETUP_FB_24BPP
+ config S3C64XX_DEV_SPI
  	bool
  	help
-@@ -72,9 +77,11 @@ config MACH_SMDKV210
- 	select CPU_S5PV210
- 	select ARCH_SPARSEMEM_ENABLE
- 	select SAMSUNG_DEV_ADC
-+	select SAMSUNG_DEV_IDE
- 	select SAMSUNG_DEV_TS
- 	select S3C_DEV_WDT
- 	select HAVE_S3C2410_WATCHDOG
-+	select S5PV210_SETUP_IDE
- 	help
- 	  Machine support for Samsung SMDKV210
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index 228c2ad..e7a9755 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -49,6 +49,7 @@ obj-$(CONFIG_S3C_DEV_ONENAND)	+= dev-onenand.o
+ obj-$(CONFIG_S3C_DEV_RTC)	+= dev-rtc.o
  
-@@ -82,8 +89,10 @@ config MACH_SMDKC110
- 	bool "SMDKC110"
- 	select CPU_S5PV210
- 	select ARCH_SPARSEMEM_ENABLE
-+	select SAMSUNG_DEV_IDE
- 	select S3C_DEV_WDT
- 	select HAVE_S3C2410_WATCHDOG
-+	select S5PV210_SETUP_IDE
- 	help
- 	  Machine support for Samsung SMDKC110
- 	  S5PC110(MCP) is one of package option of S5PV210
-diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-index 30be9a6..af55785 100644
---- a/arch/arm/mach-s5pv210/Makefile
-+++ b/arch/arm/mach-s5pv210/Makefile
-@@ -31,5 +31,6 @@ obj-$(CONFIG_S5PC110_DEV_ONENAND) += dev-onenand.o
- obj-$(CONFIG_S5PV210_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
- obj-$(CONFIG_S5PV210_SETUP_I2C1) 	+= setup-i2c1.o
- obj-$(CONFIG_S5PV210_SETUP_I2C2) 	+= setup-i2c2.o
-+obj-$(CONFIG_S5PV210_SETUP_IDE)		+= setup-ide.o
- obj-$(CONFIG_S5PV210_SETUP_SDHCI)       += setup-sdhci.o
- obj-$(CONFIG_S5PV210_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
-diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
-index 411a4a9..8c4fdcd 100644
---- a/arch/arm/mach-s5pv210/cpu.c
-+++ b/arch/arm/mach-s5pv210/cpu.c
-@@ -32,6 +32,7 @@
- #include <plat/devs.h>
- #include <plat/clock.h>
- #include <plat/s5pv210.h>
-+#include <plat/ata-core.h>
- #include <plat/iic-core.h>
- #include <plat/sdhci.h>
+ obj-$(CONFIG_SAMSUNG_DEV_ADC)	+= dev-adc.o
++obj-$(CONFIG_SAMSUNG_DEV_IDE)	+= dev-ide.o
+ obj-$(CONFIG_SAMSUNG_DEV_TS)	+= dev-ts.o
  
-@@ -79,7 +80,6 @@ void __init s5pv210_map_io(void)
- #ifdef CONFIG_S3C_DEV_ADC
- 	s3c_device_adc.name	= "s3c64xx-adc";
- #endif
--
- 	iotable_init(s5pv210_iodesc, ARRAY_SIZE(s5pv210_iodesc));
- 
- 	/* initialise device information early */
-@@ -87,6 +87,8 @@ void __init s5pv210_map_io(void)
- 	s5pv210_default_sdhci1();
- 	s5pv210_default_sdhci2();
- 
-+	s3c_cfcon_setname("s5pv210-pata");
-+
- 	/* the i2c devices are directly compatible with s3c2440 */
- 	s3c_i2c0_setname("s3c2440-i2c");
- 	s3c_i2c1_setname("s3c2440-i2c");
-diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-s5pv210/include/mach/irqs.h
-index 9689537..e1d3c45 100644
---- a/arch/arm/mach-s5pv210/include/mach/irqs.h
-+++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
-@@ -45,7 +45,7 @@
- #define IRQ_IEMIEC		S5P_IRQ_VIC1(6)
- #define IRQ_ONENAND		S5P_IRQ_VIC1(7)
- #define IRQ_NFC			S5P_IRQ_VIC1(8)
--#define IRQ_CFC			S5P_IRQ_VIC1(9)
-+#define IRQ_CFCON		S5P_IRQ_VIC1(9)
- #define IRQ_UART0		S5P_IRQ_VIC1(10)
- #define IRQ_UART1		S5P_IRQ_VIC1(11)
- #define IRQ_UART2		S5P_IRQ_VIC1(12)
-diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
-index 34eb168..3846a0b 100644
---- a/arch/arm/mach-s5pv210/include/mach/map.h
-+++ b/arch/arm/mach-s5pv210/include/mach/map.h
-@@ -54,6 +54,8 @@
- 
- #define S5PV210_PA_SROMC	(0xE8000000)
- 
-+#define S5PV210_PA_CFCON	(0xE8200000)
-+
- #define S5PV210_PA_MDMA		0xFA200000
- #define S5PV210_PA_PDMA0	0xE0900000
- #define S5PV210_PA_PDMA1	0xE0A00000
-@@ -104,5 +106,6 @@
- #define S3C_PA_WDT		S5PV210_PA_WATCHDOG
- 
- #define SAMSUNG_PA_ADC		S5PV210_PA_ADC
-+#define SAMSUNG_PA_CFCON	S5PV210_PA_CFCON
- 
- #endif /* __ASM_ARCH_MAP_H */
-diff --git a/arch/arm/mach-s5pv210/mach-smdkc110.c b/arch/arm/mach-s5pv210/mach-smdkc110.c
-index 4c8903c..723e607 100644
---- a/arch/arm/mach-s5pv210/mach-smdkc110.c
-+++ b/arch/arm/mach-s5pv210/mach-smdkc110.c
-@@ -25,6 +25,7 @@
- #include <plat/s5pv210.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-+#include <plat/ata.h>
- 
- /* Following are default values for UCON, ULCON and UFCON UART registers */
- #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-@@ -71,9 +72,14 @@ static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
- 	},
- };
- 
-+static struct s3c_ide_platdata smdkv210_ide_pdata __initdata = {
-+	.setup_gpio	= s5pv210_ide_setup_gpio,
-+};
-+
- static struct platform_device *smdkc110_devices[] __initdata = {
- 	&s5pv210_device_iis0,
- 	&s5pv210_device_ac97,
-+	&s3c_device_cfcon,
- 	&s3c_device_wdt,
- };
- 
-@@ -86,6 +92,8 @@ static void __init smdkc110_map_io(void)
- 
- static void __init smdkc110_machine_init(void)
- {
-+	s3c_ide_set_platdata(&smdkv210_ide_pdata);
-+
- 	platform_add_devices(smdkc110_devices, ARRAY_SIZE(smdkc110_devices));
- }
- 
-diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
-index 0d46279..cc902c1 100644
---- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-+++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-@@ -27,6 +27,7 @@
- #include <plat/cpu.h>
- #include <plat/adc.h>
- #include <plat/ts.h>
-+#include <plat/ata.h>
- 
- /* Following are default values for UCON, ULCON and UFCON UART registers */
- #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-@@ -73,10 +74,15 @@ static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
- 	},
- };
- 
-+static struct s3c_ide_platdata smdkv210_ide_pdata __initdata = {
-+	.setup_gpio	= s5pv210_ide_setup_gpio,
-+};
-+
- static struct platform_device *smdkv210_devices[] __initdata = {
- 	&s5pv210_device_iis0,
- 	&s5pv210_device_ac97,
- 	&s3c_device_adc,
-+	&s3c_device_cfcon,
- 	&s3c_device_ts,
- 	&s3c_device_wdt,
- };
-@@ -97,6 +103,8 @@ static void __init smdkv210_map_io(void)
- static void __init smdkv210_machine_init(void)
- {
- 	s3c24xx_ts_set_platdata(&s3c_ts_platform);
-+	s3c_ide_set_platdata(&smdkv210_ide_pdata);
-+
- 	platform_add_devices(smdkv210_devices, ARRAY_SIZE(smdkv210_devices));
- }
- 
-diff --git a/arch/arm/mach-s5pv210/setup-ide.c b/arch/arm/mach-s5pv210/setup-ide.c
+ # DMA support
+diff --git a/arch/arm/plat-samsung/dev-ide.c b/arch/arm/plat-samsung/dev-ide.c
 new file mode 100644
-index 0000000..b558b1c
+index 0000000..b497982
 --- /dev/null
-+++ b/arch/arm/mach-s5pv210/setup-ide.c
-@@ -0,0 +1,50 @@
-+/* linux/arch/arm/mach-s5pv210/setup-ide.c
++++ b/arch/arm/plat-samsung/dev-ide.c
+@@ -0,0 +1,44 @@
++/* linux/arch/arm/plat-samsung/dev-ide.c
 + *
 + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
 + *		http://www.samsung.com
 + *
-+ * S5PV210 setup information for IDE
++ * Samsung CF-ATA device definition.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -234,42 +78,186 @@ index 0000000..b558b1c
 +*/
 +
 +#include <linux/kernel.h>
-+#include <linux/gpio.h>
++#include <linux/interrupt.h>
++#include <linux/platform_device.h>
 +
-+#include <plat/gpio-cfg.h>
++#include <mach/map.h>
++#include <plat/ata.h>
++#include <plat/devs.h>
 +
-+void s5pv210_ide_setup_gpio(void)
++static struct resource s3c_cfcon_resource[] = {
++	[0] = {
++		.start	= SAMSUNG_PA_CFCON,
++		.end	= SAMSUNG_PA_CFCON + SZ_16K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= IRQ_CFCON,
++		.end	= IRQ_CFCON,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device s3c_device_cfcon = {
++	.id		= 0,
++	.num_resources	= ARRAY_SIZE(s3c_cfcon_resource),
++	.resource	= s3c_cfcon_resource,
++};
++
++void s3c_ide_set_platdata(struct s3c_ide_platdata *pdata)
 +{
-+	unsigned int gpio = 0;
-+
-+	for (gpio = S5PV210_GPJ0(0); gpio <= S5PV210_GPJ0(7); gpio++) {
-+		/* CF_Add[0 - 2], CF_IORDY, CF_INTRQ, CF_DMARQ, CF_DMARST,
-+			CF_DMACK */
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(4));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
-+
-+	for (gpio = S5PV210_GPJ2(0); gpio <= S5PV210_GPJ2(7); gpio++) {
-+		/*CF_Data[0 - 7] */
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(4));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
-+
-+	for (gpio = S5PV210_GPJ3(0); gpio <= S5PV210_GPJ3(7); gpio++) {
-+		/* CF_Data[8 - 15] */
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(4));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
-+
-+	for (gpio = S5PV210_GPJ4(0); gpio <= S5PV210_GPJ4(3); gpio++) {
-+		/* CF_CS0, CF_CS1, CF_IORD, CF_IOWR */
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(4));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
++	s3c_set_platdata(pdata, sizeof(struct s3c_ide_platdata),
++			 &s3c_device_cfcon);
 +}
+diff --git a/arch/arm/plat-samsung/include/plat/ata-core.h b/arch/arm/plat-samsung/include/plat/ata-core.h
+new file mode 100644
+index 0000000..f5a4ec7
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/plat/ata-core.h
+@@ -0,0 +1,28 @@
++/* linux/arch/arm/plat-samsung/include/plat/ata-core.h
++ *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Samsung CF-ATA Controller core functions
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_PLAT_ATA_CORE_H
++#define __ASM_PLAT_ATA_CORE_H __FILE__
++
++/* These functions are only for use with the core support code, such as
++ * the cpu specific initialisation code
++*/
++
++/* re-define device name depending on support. */
++static inline void s3c_cfcon_setname(char *name)
++{
++#ifdef CONFIG_SAMSUNG_DEV_IDE
++	s3c_device_cfcon.name = name;
++#endif
++}
++
++#endif /* __ASM_PLAT_ATA_CORE_H */
+diff --git a/arch/arm/plat-samsung/include/plat/ata.h b/arch/arm/plat-samsung/include/plat/ata.h
+new file mode 100644
+index 0000000..2a3855a
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/plat/ata.h
+@@ -0,0 +1,36 @@
++/* linux/arch/arm/plat-samsung/include/plat/ata.h
++ *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Samsung CF-ATA platform_device info
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_PLAT_ATA_H
++#define __ASM_PLAT_ATA_H __FILE__
++
++/**
++ * struct s3c_ide_platdata - S3C IDE driver platform data.
++ * @setup_gpio: Setup the external GPIO pins to the right state for data
++ * transfer in true-ide mode.
++ */
++struct s3c_ide_platdata {
++	void (*setup_gpio)(void);
++};
++
++/*
++ * s3c_ide_set_platdata() - Setup the platform specifc data for IDE driver.
++ * @pdata: Platform data for IDE driver.
++ */
++extern void s3c_ide_set_platdata(struct s3c_ide_platdata *pdata);
++
++/* architecture-specific IDE configuration */
++extern void s3c64xx_ide_setup_gpio(void);
++extern void s5pc100_ide_setup_gpio(void);
++extern void s5pv210_ide_setup_gpio(void);
++
++#endif /*__ASM_PLAT_ATA_H */
+diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
+index 6760999..4a66130 100644
+--- a/arch/arm/plat-samsung/include/plat/devs.h
++++ b/arch/arm/plat-samsung/include/plat/devs.h
+@@ -54,6 +54,7 @@ extern struct platform_device s3c_device_hwmon;
+ extern struct platform_device s3c_device_hsmmc0;
+ extern struct platform_device s3c_device_hsmmc1;
+ extern struct platform_device s3c_device_hsmmc2;
++extern struct platform_device s3c_device_cfcon;
+ 
+ extern struct platform_device s3c_device_spi0;
+ extern struct platform_device s3c_device_spi1;
+diff --git a/arch/arm/plat-samsung/include/plat/regs-ata.h b/arch/arm/plat-samsung/include/plat/regs-ata.h
+new file mode 100644
+index 0000000..f5df92f
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/plat/regs-ata.h
+@@ -0,0 +1,56 @@
++/* linux/arch/arm/plat-samsung/include/plat/regs-ata.h
++ *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Samsung CF-ATA register definitions
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_PLAT_REGS_ATA_H
++#define __ASM_PLAT_REGS_ATA_H __FILE__
++
++#define S3C_CFATA_REG(x)	(x)
++
++#define S3C_CFATA_MUX		S3C_CFATA_REG(0x0)
++
++#define S3C_ATA_CTRL		S3C_CFATA_REG(0x0)
++#define S3C_ATA_STATUS		S3C_CFATA_REG(0x4)
++#define S3C_ATA_CMD		S3C_CFATA_REG(0x8)
++#define S3C_ATA_SWRST		S3C_CFATA_REG(0xc)
++#define S3C_ATA_IRQ		S3C_CFATA_REG(0x10)
++#define S3C_ATA_IRQ_MSK		S3C_CFATA_REG(0x14)
++#define S3C_ATA_CFG		S3C_CFATA_REG(0x18)
++
++#define S3C_ATA_MDMA_TIME	S3C_CFATA_REG(0x28)
++#define S3C_ATA_PIO_TIME	S3C_CFATA_REG(0x2c)
++#define S3C_ATA_UDMA_TIME	S3C_CFATA_REG(0x30)
++#define S3C_ATA_XFR_NUM		S3C_CFATA_REG(0x34)
++#define S3C_ATA_XFR_CNT		S3C_CFATA_REG(0x38)
++#define S3C_ATA_TBUF_START	S3C_CFATA_REG(0x3c)
++#define S3C_ATA_TBUF_SIZE	S3C_CFATA_REG(0x40)
++#define S3C_ATA_SBUF_START	S3C_CFATA_REG(0x44)
++#define S3C_ATA_SBUF_SIZE	S3C_CFATA_REG(0x48)
++#define S3C_ATA_CADR_TBUF	S3C_CFATA_REG(0x4c)
++#define S3C_ATA_CADR_SBUF	S3C_CFATA_REG(0x50)
++#define S3C_ATA_PIO_DTR		S3C_CFATA_REG(0x54)
++#define S3C_ATA_PIO_FED		S3C_CFATA_REG(0x58)
++#define S3C_ATA_PIO_SCR		S3C_CFATA_REG(0x5c)
++#define S3C_ATA_PIO_LLR		S3C_CFATA_REG(0x60)
++#define S3C_ATA_PIO_LMR		S3C_CFATA_REG(0x64)
++#define S3C_ATA_PIO_LHR		S3C_CFATA_REG(0x68)
++#define S3C_ATA_PIO_DVR		S3C_CFATA_REG(0x6c)
++#define S3C_ATA_PIO_CSD		S3C_CFATA_REG(0x70)
++#define S3C_ATA_PIO_DAD		S3C_CFATA_REG(0x74)
++#define S3C_ATA_PIO_READY	S3C_CFATA_REG(0x78)
++#define S3C_ATA_PIO_RDATA	S3C_CFATA_REG(0x7c)
++
++#define S3C_CFATA_MUX_TRUEIDE	0x01
++
++#define S3C_ATA_CFG_SWAP	0x40
++#define S3C_ATA_CFG_IORDYEN	0x02
++
++#endif /* __ASM_PLAT_REGS_ATA_H */
 -- 
 1.6.2.5
