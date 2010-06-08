@@ -1,30 +1,74 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 08 Jun 2010 11:42:28 +0100
-Subject: [PATCH] ARM: Add PI/robust mutexes support for SMP kernels
-In-Reply-To: <20100608102630.GA22993@n2100.arm.linux.org.uk>
-References: <20100608102630.GA22993@n2100.arm.linux.org.uk>
-Message-ID: <1275993748.2127.21.camel@e102109-lin.cambridge.arm.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Tue, 08 Jun 2010 18:44:58 +0800
+Subject: [PATCH 1/2] pxa: Move 'regs-ac97.h' from /mach-pxa/inlude/ to
+	/plat-pxa/include
+Message-ID: <4C0E1F2A.1060306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-06-08 at 11:26 +0100, Russell King - ARM Linux wrote:
-> On Tue, Jun 08, 2010 at 11:04:15AM +0100, Catalin Marinas wrote:
-> > On Mon, 2010-06-07 at 22:52 +0100, Russell King - ARM Linux wrote:
-> > > On Mon, Jun 07, 2010 at 10:05:57PM +0100, Catalin Marinas wrote:
-> > > > But as I said, we already have patches to change the kernel R/W
-> > > > permission for RO user pages.
-> > >
-> > > ... but they introduce their own problem.
-> >
-> > And these problem are ...
-> 
-> As pointed out in May.
+There is two kinds of changes:
+(1) Move 'regs-ac97.h' from /mach-pxa/inlude/ to /plat-pxa/include.
 
-Your first point was FIQ handlers and I updated the patch.
+It will be the public header file If pxa168 ac97 driver was submitted.
 
-Your second point was I/D cache coherency and I also replied saying that
-it doesn't matter on non-aliasing VIPT caches. There was no further
-reply from you.
+(2) Modify the path of including header file.
 
+Apply to (1).
+
+Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+
+---
+ .../mach => plat-pxa/include/plat}/regs-ac97.h     |    0
+ sound/arm/pxa2xx-ac97-lib.c                        |    2 +-
+ sound/arm/pxa2xx-ac97.c                            |    2 +-
+ sound/soc/pxa/pxa2xx-ac97.c                        |    2 +-
+ 4 files changed, 3 insertions(+), 3 deletions(-)
+ rename arch/arm/{mach-pxa/include/mach => plat-pxa/include/plat}/regs-ac97.h (100%)
+
+diff --git a/arch/arm/mach-pxa/include/mach/regs-ac97.h b/arch/arm/plat-pxa/include/plat/regs-ac97.h
+similarity index 100%
+rename from arch/arm/mach-pxa/include/mach/regs-ac97.h
+rename to arch/arm/plat-pxa/include/plat/regs-ac97.h
+diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
+index 88eec38..e40093c 100644
+--- a/sound/arm/pxa2xx-ac97-lib.c
++++ b/sound/arm/pxa2xx-ac97-lib.c
+@@ -21,7 +21,7 @@
+ #include <sound/pxa2xx-lib.h>
+
+ #include <asm/irq.h>
+-#include <mach/regs-ac97.h>
++#include <plat/regs-ac97.h>
+ #include <mach/audio.h>
+
+ static DEFINE_MUTEX(car_mutex);
+diff --git a/sound/arm/pxa2xx-ac97.c b/sound/arm/pxa2xx-ac97.c
+index 5d94118..246d0a1 100644
+--- a/sound/arm/pxa2xx-ac97.c
++++ b/sound/arm/pxa2xx-ac97.c
+@@ -20,7 +20,7 @@
+ #include <sound/initval.h>
+ #include <sound/pxa2xx-lib.h>
+
+-#include <mach/regs-ac97.h>
++#include <plat/regs-ac97.h>
+ #include <mach/audio.h>
+
+ #include "pxa2xx-pcm.h"
+diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
+index d314115..173c476 100644
+--- a/sound/soc/pxa/pxa2xx-ac97.c
++++ b/sound/soc/pxa/pxa2xx-ac97.c
+@@ -20,9 +20,9 @@
+ #include <sound/pxa2xx-lib.h>
+
+ #include <mach/hardware.h>
+-#include <mach/regs-ac97.h>
+ #include <mach/dma.h>
+ #include <mach/audio.h>
++#include <plat/regs-ac97.h>
+
+ #include "pxa2xx-pcm.h"
+ #include "pxa2xx-ac97.h"
 -- 
-Catalin
+1.6.3.3
