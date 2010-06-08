@@ -1,115 +1,62 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Tue, 8 Jun 2010 21:02:17 +0400
-Subject: [PATCH 4/4] ARM: cns3xxx: Add support for AHCI controllers
-In-Reply-To: <20100608170030.GA26992@oksana.dev.rtsoft.ru>
-References: <20100608170030.GA26992@oksana.dev.rtsoft.ru>
-Message-ID: <20100608170217.GD22516@oksana.dev.rtsoft.ru>
+From: buytenh@wantstofly.org (Lennert Buytenhek)
+Date: Tue, 8 Jun 2010 19:08:46 +0200
+Subject: [PATCH 1/2] mv643xx_eth: disable csum offloading if the hw
+	limited by max size
+In-Reply-To: <1275827336-31111-1-git-send-email-saeed@marvell.com>
+References: <1275827336-31111-1-git-send-email-saeed@marvell.com>
+Message-ID: <20100608170846.GR1743@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CNS3xxx chips have AHCI-compatible SATA controller. This patch adds
-the support using generic ahci_platform driver.
+On Sun, Jun 06, 2010 at 03:28:55PM +0300, Saeed Bishara wrote:
 
-Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
----
- arch/arm/mach-cns3xxx/cns3420vb.c |    1 +
- arch/arm/mach-cns3xxx/devices.c   |   52 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-cns3xxx/devices.h   |    1 +
- 3 files changed, 54 insertions(+), 0 deletions(-)
+> diff --git a/drivers/net/mv643xx_eth.c b/drivers/net/mv643xx_eth.c
+> index e345ec8..79243dd 100644
+> --- a/drivers/net/mv643xx_eth.c
+> +++ b/drivers/net/mv643xx_eth.c
+> @@ -289,6 +289,7 @@ struct mv643xx_eth_shared_private {
+>  	unsigned int t_clk;
+>  	int extended_rx_coal_limit;
+>  	int tx_bw_control;
+> +	int tx_csum_limit;
+>  };
+>  
+>  #define TX_BW_CONTROL_ABSENT		0
+> @@ -2468,6 +2469,14 @@ static int mv643xx_eth_change_mtu(struct net_device *dev, int new_mtu)
+>  	mv643xx_eth_recalc_skb_size(mp);
+>  	tx_set_rate(mp, 1000000000, 16777216);
+>  
+> +	if (mp->shared->tx_csum_limit && dev->mtu > mp->shared->tx_csum_limit) {
+> +		dev->features &= ~NETIF_F_IP_CSUM;
+> +		dev->vlan_features &= ~NETIF_F_IP_CSUM;
+> +	} else {
+> +		dev->features |= NETIF_F_IP_CSUM;
+> +		dev->vlan_features |= NETIF_F_IP_CSUM;
+> +	}
 
-diff --git a/arch/arm/mach-cns3xxx/cns3420vb.c b/arch/arm/mach-cns3xxx/cns3420vb.c
-index 04ae1ce..9df8391 100644
---- a/arch/arm/mach-cns3xxx/cns3420vb.c
-+++ b/arch/arm/mach-cns3xxx/cns3420vb.c
-@@ -118,6 +118,7 @@ static void __init cns3420_init(void)
- {
- 	platform_add_devices(cns3420_pdevs, ARRAY_SIZE(cns3420_pdevs));
- 
-+	cns3xxx_ahci_init();
- 	cns3xxx_sdhci_init();
- 
- 	pm_power_off = cns3xxx_power_off;
-diff --git a/arch/arm/mach-cns3xxx/devices.c b/arch/arm/mach-cns3xxx/devices.c
-index b01a301..50b4d31 100644
---- a/arch/arm/mach-cns3xxx/devices.c
-+++ b/arch/arm/mach-cns3xxx/devices.c
-@@ -14,6 +14,7 @@
- #include <linux/io.h>
- #include <linux/init.h>
- #include <linux/compiler.h>
-+#include <linux/dma-mapping.h>
- #include <linux/platform_device.h>
- #include <mach/cns3xxx.h>
- #include <mach/irqs.h>
-@@ -21,6 +22,57 @@
- #include "devices.h"
- 
- /*
-+ * AHCI
-+ */
-+static struct resource cns3xxx_ahci_resource[] = {
-+	[0] = {
-+		.start	= CNS3XXX_SATA2_BASE,
-+		.end	= CNS3XXX_SATA2_BASE + CNS3XXX_SATA2_SIZE - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= IRQ_CNS3XXX_SATA,
-+		.end	= IRQ_CNS3XXX_SATA,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static u64 cns3xxx_ahci_dmamask = DMA_BIT_MASK(32);
-+
-+static struct platform_device cns3xxx_ahci_pdev = {
-+	.name		= "ahci",
-+	.id		= 0,
-+	.resource	= cns3xxx_ahci_resource,
-+	.num_resources	= ARRAY_SIZE(cns3xxx_ahci_resource),
-+	.dev		= {
-+		.dma_mask		= &cns3xxx_ahci_dmamask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+	},
-+};
-+
-+void __init cns3xxx_ahci_init(void)
-+{
-+	u32 tmp;
-+
-+	tmp = __raw_readl(MISC_SATA_POWER_MODE);
-+	tmp |= 0x1 << 16; /* Disable SATA PHY 0 from SLUMBER Mode */
-+	tmp |= 0x1 << 17; /* Disable SATA PHY 1 from SLUMBER Mode */
-+	__raw_writel(tmp, MISC_SATA_POWER_MODE);
-+
-+	/* Enable SATA PHY */
-+	cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY0);
-+	cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY1);
-+
-+	/* Enable SATA Clock */
-+	cns3xxx_pwr_clk_en(0x1 << PM_CLK_GATE_REG_OFFSET_SATA);
-+
-+	/* De-Asscer SATA Reset */
-+	cns3xxx_pwr_soft_rst(CNS3XXX_PWR_SOFTWARE_RST(SATA));
-+
-+	platform_device_register(&cns3xxx_ahci_pdev);
-+}
-+
-+/*
-  * SDHCI
-  */
- static struct resource cns3xxx_sdhci_resources[] = {
-diff --git a/arch/arm/mach-cns3xxx/devices.h b/arch/arm/mach-cns3xxx/devices.h
-index 0735a45..27e15a1 100644
---- a/arch/arm/mach-cns3xxx/devices.h
-+++ b/arch/arm/mach-cns3xxx/devices.h
-@@ -14,6 +14,7 @@
- #ifndef __CNS3XXX_DEVICES_H_
- #define __CNS3XXX_DEVICES_H_
- 
-+void __init cns3xxx_ahci_init(void);
- void __init cns3xxx_sdhci_init(void);
- 
- #endif /* __CNS3XXX_DEVICES_H_ */
--- 
-1.7.0.5
+I wonder if it would be better to still advertise NETIF_F_IP_CSUM in
+this case, but just call skb_checksum_help() if skb->len is > dev->mtu
+in txq_submit_skb(), like we do for the case where the ethernet header
+is of an unsupported length -- that way, we'd still have hardware
+checksum offload for TX packets that _do_ fit inside the hardware TX
+fifo, e.g. when communicating with hosts on another subnet where the
+default MTU is used.
+
+
+> diff --git a/include/linux/mv643xx_eth.h b/include/linux/mv643xx_eth.h
+> index cbbbe9b..7402718 100644
+> --- a/include/linux/mv643xx_eth.h
+> +++ b/include/linux/mv643xx_eth.h
+> @@ -19,6 +19,10 @@ struct mv643xx_eth_shared_platform_data {
+>  	struct mbus_dram_target_info	*dram;
+>  	struct platform_device	*shared_smi;
+>  	unsigned int		t_clk;
+> +	/*
+> +	 * Max packet size for Tx IP/Layer 4 checksum (0 -> no limit)
+
+There's always a limit. :-)  You might as well just fill in the right
+values for orion5x/kw/dd/loki while you're at it.
+
+
+thanks,
+Lennert
