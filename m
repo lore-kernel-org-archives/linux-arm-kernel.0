@@ -1,59 +1,46 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 09 Jun 2010 09:09:54 -0400 (EDT)
-Subject: Boot interface for device trees on ARM
-In-Reply-To: <201006091226.15438.jeremy.kerr@canonical.com>
-References: <201005181054.32325.jeremy.kerr@canonical.com>
-	<201006050933.06714.jeremy.kerr@canonical.com>
-	<alpine.LFD.2.00.1006042212400.30664@xanadu.home>
-	<201006091226.15438.jeremy.kerr@canonical.com>
-Message-ID: <alpine.LFD.2.00.1006090841310.30664@xanadu.home>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Wed, 09 Jun 2010 06:32:58 -0700
+Subject: Heads up: Linus plans to kill ARM defconfigs
+In-Reply-To: <201006090807.20810.post@hendrik-sattler.de>
+References: <4C083BCF.2060500@bluewatersys.com>
+	<alpine.LFD.2.00.1006081655350.30664@xanadu.home>
+	<4C0ED074.7050700@bluewatersys.com>
+	<201006090807.20810.post@hendrik-sattler.de>
+Message-ID: <1276090378.2006.11.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 Jun 2010, Jeremy Kerr wrote:
-
-> Hi Nicolas,
+On Wed, 2010-06-09 at 08:07 +0200, Hendrik Sattler wrote:
+> Am Mittwoch 09 Juni 2010, 01:21:24 schrieb Ryan Mallon:
+> > Yes. I thought the problem was that Kconfig doesn't work correctly for
+> > this though. Does having 'select MTD_PARTITIONS' automatically cause
+> > CONFIG_MTD to be set? If not, then you basically need to have the full
+> > config option list, which is basically what defconfig is.
 > 
-> > > If we're planning to keep the machine IDs around (even if they are now
-> > > per- SoC), I'd like to know what would be left using them. The only
-> > > thing that I can see that we currently use is io_pg_offset for the
-> > > DEBUG_LL builds, and that isn't a convincing case to keep them.
-> > 
-> > Why not?
-> 
-> Because it's something we can justifiably replace with a single compile-time 
-> constant, since it's only for low-level debug. I don't see that as a reason 
-> for keeping these machine numbers around if that's all they're used for.
+> Anybody thought about improving Kconfig to make this possible?
+> Specifying CONFIG_MTD and CONFIG_MTD_PARTITIONS again and again will just 
+> repeat information (that CONFIG_MTD_PARTITIONS depends on CONFIG_MTD).
+> The recursive 'select' could have a different name.
 
-it's not only for that.  As I said below:
+There is work going on to create a SAT solver because the depends lines
+are often expression instead of just specifying a single other config
+option. So updating the select to work correctly isn't entirely trivial.
 
-> > Kernel infrastructure backward compatibility means that you need to keep
-> > struct machine_desc instances around.  Granted, for the DT case, many of
-> > the members could be NULL or initialized with dummy stubs.  But that is
-> > very cheap to keep around, and that allows the same kernel binary to be
-> > able to use both the DT boot and the legacy boot.
-> 
-> ... this is a good point; if it helps with the transition, then this is 
-> probably a decent reason to keep it in the interface.
-> 
-> I'd like to keep my "only use the device tree" value (MACH_TYPE_DT = 
-> 0xffffffff) though, so we don't needlessly allocate machine numbers where they 
-> aren't actually used.
+The other thing the SAT solver _could_ do is trivialize the current
+defconfig into files to only 10 lines or so depending on which arm ..
+For instance a defconfig file for trout under mach-msm (the one I
+maintain) would look like this,
 
-There isn't such thing as "only use the device tree".  To keep the low 
-level code _unmodified_ and _useful_ you'll have to allocate a number 
-per machine class otherwise you won't be able to support more than one 
-machine class in the same kernel binary at the same time.  You can't 
-just say that those machine IDs aren't used.
+CONFIG_MACH_TROUT=y
+CONFIG_MSM_DEBUG_UART3=y
+CONFIG_MMC_MSM7X00A=y
 
-I don't see the point of crippling that existing support just for the 
-sake of using 0xffffffff, if it is only to save you a few machine ID 
-registrations.  Because let's be honest, we won't DT-ify old machine 
-targets anytime soon.  So only the recent and future machine classes 
-will require a number, and that's probably on the order of 2 or 3 new 
-IDs per year (meaning less than 5 minutes on RMK's automatic 
-registration website).  Certainly much much less than the current 2000+ 
-IDs that have been already allocated to date.
+then the solver would just deduce every other option. So three lines vs.
+the current 1800+ lines. The files would become manageable, and readable
+since they're so much smaller. However, we would still have all the
+current files we have now.
 
+That's all speculation still, since this solver thing doesn't exist yet.
+We would have to drive it in this direction.
 
-Nicolas
+Daniel
