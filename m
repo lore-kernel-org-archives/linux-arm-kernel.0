@@ -1,31 +1,39 @@
-From: jason.mcmullan@netronome.com (Jason McMullan)
-Date: Wed, 9 Jun 2010 14:06:53 -0400
-Subject: [PATCH] [kirkwood-otg] Leverage the Freescale OTG driver for
-	Kirkwood OTG
-In-Reply-To: <alpine.LFD.2.00.1006091307321.30664@xanadu.home>
-References: <1276094138-13497-1-git-send-email-jason.mcmullan@netronome.com>
-	<1276094138-13497-2-git-send-email-jason.mcmullan@netronome.com>
-	<alpine.LFD.2.00.1006091307321.30664@xanadu.home>
-Message-ID: <AANLkTikVeVBdSfeS_p0k4dRwFopELw2OIXUrS1NjEdt6@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 09 Jun 2010 15:10:16 -0400 (EDT)
+Subject: [PATCH v2 1/4] ARM: Remove the domain switching on ARMv6k/v7 CPUs
+In-Reply-To: <20100602164841.17783.94825.stgit@e102109-lin.cambridge.arm.com>
+References: <20100602164459.17783.9741.stgit@e102109-lin.cambridge.arm.com>
+	<20100602164841.17783.94825.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.00.1006091447460.30664@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 9, 2010 at 1:17 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Wed, 9 Jun 2010, Jason S. McMullan wrote:
->> NOTE: Your bootloader must ensure that the Kirkwood
->> ? ? ? USB 2.0 Bridge Window registers are set correctly,
->> ? ? ? or the driver will stall on the first DMA.
->
-> Could you add the code to sets that up in the kernel instead?
+Sorry for the delay... I'm just starting to seriously look at this.
 
-Will do.
+On Wed, 2 Jun 2010, Catalin Marinas wrote:
 
->> ?config USB_GADGET_FSL_USB2
->
-> Maybe the help text should be extended to mention Kirkwood?
+> This patch removes the domain switching functionality via the set_fs and
+> __switch_to functions on cores that have a TLS register.
+[...]
+> The user pages access rights are also modified for kernel read-only
+> access rather than read/write so that the copy-on-write mechanism still
+> works. CPU_USE_DOMAINS gets disabled only if HAS_TLS_REG is defined
+> since writing the TLS value to the high vectors page isn't possible.
 
-Again, good idea, will do.
+I don't like this limitation much.
 
--- 
-Jason S. McMullan
-Netronome Systems, Inc.
+Since the vector page has to be accessed somehow for FIQs anyway, and 
+the current solution for that involves accesses through the direct 
+mapping of the vector page, then this patch could be made to work on 
+pre-ARMv6 systems too simply by adding the necessary cache ops around 
+the TLS and FIQ updates.
+
+Or even better: on those VIVT systems, the domain switching could be 
+used _only_ when direct modifications to the vector page is performed.
+
+This way, this patch could get a wider base for test coverage.  And this 
+could even remove the need for the uaccess_with_memcpy.c hack at some 
+point.
+
+
+Nicolas
