@@ -1,95 +1,67 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 09 Jun 2010 10:40:33 +0200
-Subject: [PATCH] arm: s5pv210: add more banks to gpiolib
-Message-ID: <1276072833-4862-1-git-send-email-m.szyprowski@samsung.com>
+From: saeed@marvell.com (Saeed Bishara)
+Date: Wed,  9 Jun 2010 11:51:23 +0300
+Subject: [PATCH 1/2 v2] mv643xx_eth: use sw csum for big packets
+In-Reply-To: <FCBE654890C0334289D0AD3AF4EF009F9FAC75A69C@IL-MB01.marvell.com>
+References: <FCBE654890C0334289D0AD3AF4EF009F9FAC75A69C@IL-MB01.marvell.com>
+Message-ID: <1276073483-17208-1-git-send-email-saeed@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for MP04 and MP05 gpio banks. Pins from these
-banks will be used by Samsung Aquila board.
+Some controllers (KW, Dove) limits the TX IP/layer4 checksum offloading to a max size.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-
+Signed-off-by: Saeed Bishara <saeed@marvell.com>
 ---
- arch/arm/mach-s5pv210/gpiolib.c           |   17 +++++++++++++++++
- arch/arm/mach-s5pv210/include/mach/gpio.h |   10 ++++++++--
- 2 files changed, 25 insertions(+), 2 deletions(-)
+ drivers/net/mv643xx_eth.c   |    7 ++++++-
+ include/linux/mv643xx_eth.h |    5 +++++
+ 2 files changed, 11 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/gpiolib.c b/arch/arm/mach-s5pv210/gpiolib.c
-index f4ac81f..6f74a98 100644
---- a/arch/arm/mach-s5pv210/gpiolib.c
-+++ b/arch/arm/mach-s5pv210/gpiolib.c
-@@ -208,6 +208,22 @@ static struct s3c_gpio_chip s5pv210_gpio_4bit[] = {
- 			.label	= "MP03",
- 		},
- 	}, {
-+		.base	= (S5P_VA_GPIO + 0x340),
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PV210_MP04(0),
-+			.ngpio	= S5PV210_GPIO_MP04_NR,
-+			.label	= "MP04",
-+		},
-+	}, {
-+		.base	= (S5P_VA_GPIO + 0x360),
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PV210_MP05(0),
-+			.ngpio	= S5PV210_GPIO_MP05_NR,
-+			.label	= "MP05",
-+		},
-+	}, {
- 		.base	= (S5P_VA_GPIO + 0xC00),
- 		.config	= &gpio_cfg_noint,
- 		.chip	= {
-@@ -244,6 +260,7 @@ static struct s3c_gpio_chip s5pv210_gpio_4bit[] = {
- 			.to_irq = s5p_gpiolib_eint_to_irq,
- 		},
- 	},
-+
+diff --git a/drivers/net/mv643xx_eth.c b/drivers/net/mv643xx_eth.c
+index e345ec8..2d0e06b 100644
+--- a/drivers/net/mv643xx_eth.c
++++ b/drivers/net/mv643xx_eth.c
+@@ -289,6 +289,7 @@ struct mv643xx_eth_shared_private {
+ 	unsigned int t_clk;
+ 	int extended_rx_coal_limit;
+ 	int tx_bw_control;
++	int tx_csum_limit;
  };
  
- static __init int s5pv210_gpiolib_init(void)
-diff --git a/arch/arm/mach-s5pv210/include/mach/gpio.h b/arch/arm/mach-s5pv210/include/mach/gpio.h
-index d6461ba..33a9867 100644
---- a/arch/arm/mach-s5pv210/include/mach/gpio.h
-+++ b/arch/arm/mach-s5pv210/include/mach/gpio.h
-@@ -52,6 +52,8 @@
- #define S5PV210_GPIO_MP01_NR	(8)
- #define S5PV210_GPIO_MP02_NR	(4)
- #define S5PV210_GPIO_MP03_NR	(8)
-+#define S5PV210_GPIO_MP04_NR	(8)
-+#define S5PV210_GPIO_MP05_NR	(8)
+ #define TX_BW_CONTROL_ABSENT		0
+@@ -782,7 +783,8 @@ static int txq_submit_skb(struct tx_queue *txq, struct sk_buff *skb)
+ 		       skb->protocol != htons(ETH_P_8021Q));
  
- /* GPIO bank numbers */
+ 		tag_bytes = (void *)ip_hdr(skb) - (void *)skb->data - ETH_HLEN;
+-		if (unlikely(tag_bytes & ~12)) {
++		if (unlikely(tag_bytes & ~12) ||
++			skb->len > mp->shared->tx_csum_limit) {
+ 			if (skb_checksum_help(skb) == 0)
+ 				goto no_csum;
+ 			kfree_skb(skb);
+@@ -2666,6 +2668,9 @@ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
+ 	 * Detect hardware parameters.
+ 	 */
+ 	msp->t_clk = (pd != NULL && pd->t_clk != 0) ? pd->t_clk : 133000000;
++	msp->tx_csum_limit = pd->tx_csum_limit ? pd->tx_csum_limit : 9 * 1024;
++	/* add header count so we can compare against skb->len */
++	msp->tx_csum_limit += ETH_HLEN;
+ 	infer_hw_params(msp);
  
-@@ -94,6 +96,8 @@ enum s5p_gpio_number {
- 	S5PV210_GPIO_MP01_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_J4),
- 	S5PV210_GPIO_MP02_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP01),
- 	S5PV210_GPIO_MP03_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP02),
-+	S5PV210_GPIO_MP04_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP03),
-+	S5PV210_GPIO_MP05_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP04),
+ 	platform_set_drvdata(pdev, msp);
+diff --git a/include/linux/mv643xx_eth.h b/include/linux/mv643xx_eth.h
+index cbbbe9b..30b0c4e 100644
+--- a/include/linux/mv643xx_eth.h
++++ b/include/linux/mv643xx_eth.h
+@@ -19,6 +19,11 @@ struct mv643xx_eth_shared_platform_data {
+ 	struct mbus_dram_target_info	*dram;
+ 	struct platform_device	*shared_smi;
+ 	unsigned int		t_clk;
++	/*
++	 * Max packet size for Tx IP/Layer 4 checksum, when set to 0, default
++	 * limit of 9KiB will be used.
++	 */
++	int			tx_csum_limit;
  };
  
- /* S5PV210 GPIO number definitions */
-@@ -127,13 +131,15 @@ enum s5p_gpio_number {
- #define S5PV210_MP01(_nr)	(S5PV210_GPIO_MP01_START + (_nr))
- #define S5PV210_MP02(_nr)	(S5PV210_GPIO_MP02_START + (_nr))
- #define S5PV210_MP03(_nr)	(S5PV210_GPIO_MP03_START + (_nr))
-+#define S5PV210_MP04(_nr)	(S5PV210_GPIO_MP04_START + (_nr))
-+#define S5PV210_MP05(_nr)	(S5PV210_GPIO_MP05_START + (_nr))
- 
- /* the end of the S5PV210 specific gpios */
--#define S5PV210_GPIO_END	(S5PV210_MP03(S5PV210_GPIO_MP03_NR) + 1)
-+#define S5PV210_GPIO_END	(S5PV210_MP05(S5PV210_GPIO_MP05_NR) + 1)
- #define S3C_GPIO_END		S5PV210_GPIO_END
- 
- /* define the number of gpios we need to the one after the MP03() range */
--#define ARCH_NR_GPIOS		(S5PV210_MP03(S5PV210_GPIO_MP03_NR) +	\
-+#define ARCH_NR_GPIOS		(S5PV210_MP05(S5PV210_GPIO_MP05_NR) +	\
- 				 CONFIG_SAMSUNG_GPIO_EXTRA + 1)
- 
- #include <asm-generic/gpio.h>
+ #define MV643XX_ETH_PHY_ADDR_DEFAULT	0
 -- 
-1.7.1.240.g225c
+1.6.0.4
