@@ -1,28 +1,34 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 10 Jun 2010 09:40:02 +1200
-Subject: [PATCH 0/3] EP93xx: Add i2s audio support
-In-Reply-To: <20100609101742.GA5618@opensource.wolfsonmicro.com>
-References: <1275991272-30122-1-git-send-email-ryan@bluewatersys.com>
-	<20100609101742.GA5618@opensource.wolfsonmicro.com>
-Message-ID: <4C100A32.7010403@bluewatersys.com>
+Date: Thu, 10 Jun 2010 09:56:07 +1200
+Subject: Heads up: Linus plans to kill ARM defconfigs
+In-Reply-To: <201006090807.20810.post@hendrik-sattler.de>
+References: <4C083BCF.2060500@bluewatersys.com>	<alpine.LFD.2.00.1006081655350.30664@xanadu.home>	<4C0ED074.7050700@bluewatersys.com>
+	<201006090807.20810.post@hendrik-sattler.de>
+Message-ID: <4C100DF7.3040907@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> On Tue, Jun 08, 2010 at 10:01:09PM +1200, Ryan Mallon wrote:
->> Repost of the i2s audio series for ep93xx. Patch 2/3 is unchanged. The
->> core support has been modified to move setting of the SPOL and ORIDE
->> bits of the i2sclkdiv register, as well as the i2s pin strapping
->> configuration, to a new function called ep93xx_i2s_acquire which is
->> called from the audio board drivers.
+Hendrik Sattler wrote:
+> Am Mittwoch 09 Juni 2010, 01:21:24 schrieb Ryan Mallon:
+>> Yes. I thought the problem was that Kconfig doesn't work correctly for
+>> this though. Does having 'select MTD_PARTITIONS' automatically cause
+>> CONFIG_MTD to be set? If not, then you basically need to have the full
+>> config option list, which is basically what defconfig is.
 > 
-> I've now applied both patches.  There was a trivial fixup required for
-> the clocks due to an add/add overlap with the SPI clock - I think it's
-> OK but please check.
+> Anybody thought about improving Kconfig to make this possible?
+> Specifying CONFIG_MTD and CONFIG_MTD_PARTITIONS again and again will just 
+> repeat information (that CONFIG_MTD_PARTITIONS depends on CONFIG_MTD).
+> The recursive 'select' could have a different name.
 
-Stupid question, but where was it applied? I can't find it in any of the
-branches at:
-http://opensource.wolfsonmicro.com/cgi-bin/gitweb.cgi?p=linux-2.6-asoc.git;a=summary
+This could be done by manually fixing the Kconfig files and using the
+select keyword to specify mandatory dependencies. For example CONFIG_MTD
+should select CONFIG_MTD_PARTITIONS since it cannot work without it. The
+MTD_PARTITIONS option will still be hidden until MTD is selected because
+of the 'if MTD' at the top of drivers/mtd/Kconfig, but it means the
+other Kconfig files doing a select MTD_PARTITIONS would work correctly.
+
+Would be a lot of work to go through all of the Kconfig files and fix
+this though.
 
 ~Ryan
 
