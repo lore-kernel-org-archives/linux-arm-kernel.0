@@ -1,46 +1,36 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 9 Jun 2010 16:39:03 -0500
-Subject: [PATCH v3] ep93xx: move physmap flash registration into core.c
-In-Reply-To: <4C1008CC.2000201@bluewatersys.com>
-References: <AcrcNxXi/1OpCfUUTQ2+Xkz9P4CSMQ==>
-	<0D753D10438DA54287A00B0270842697636D62B066@AUSP01VMBX24.collaborationhost.net>
-	<t2h56d259a01004200333gfc5b6307vb34c20e60db28aa1@mail.gmail.com>
-	<0D753D10438DA54287A00B0270842697636F3238EC@AUSP01VMBX24.collaborationhost.net>
-	<0D753D10438DA54287A00B02708426976370F421F7@AUSP01VMBX24.collaborationhost.net>
-	<4C10009B.2010607@bluewatersys.com>
-	<0D753D10438DA54287A00B02708426976370F422A7@AUSP01VMBX24.collaborationhost.net>
-	<4C1008CC.2000201@bluewatersys.com>
-Message-ID: <0D753D10438DA54287A00B02708426976370F42366@AUSP01VMBX24.collaborationhost.net>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Thu, 10 Jun 2010 09:40:02 +1200
+Subject: [PATCH 0/3] EP93xx: Add i2s audio support
+In-Reply-To: <20100609101742.GA5618@opensource.wolfsonmicro.com>
+References: <1275991272-30122-1-git-send-email-ryan@bluewatersys.com>
+	<20100609101742.GA5618@opensource.wolfsonmicro.com>
+Message-ID: <4C100A32.7010403@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 09, 2010 2:34 PM, Ryan Mallon wrote:
-> H Hartley Sweeten wrote:
->> On Wednesday, June 09, 2010 1:59 PM, Ryan Mallon wrote:
->>> H Hartley Sweeten wrote:
->>>> Create a core.c __init function to handle the physmap flash
->>>> registration for all the ep93xx platforms.  Also, modify all
->>>> the ep93xx platforms to use this new function.
->>>>
->>>> This simplifies all the ep93xx platform init code and removes
->>>> all the static variables that would exist in a unified kernel
->>>> supporting multiple ep93xx platforms.
->>> Looks fine. Not sure I understand the second part about the unified
->>> kernel though. Can't we already build all ep93xx boards (at least those
->>> at the same phys offset) into one kernel?
->> 
->> Yes, we already build a unified kernel for boards with the same phys
->> offset.  But with the current code each platform has a private static
->> Resource and platform device for the flash.  Since this data is not
->> tagged as __initdata it just takes up space after initialization.  If
->> a working runtime PHYS_OFFSET patch is ever worked out this static
->> data will increase for each ep93xx platform added.
->
-> Ah, that makes sense. Just say that it reduces the size of the kernel
-> when including multiple ep93xx boards.
+Mark Brown wrote:
+> On Tue, Jun 08, 2010 at 10:01:09PM +1200, Ryan Mallon wrote:
+>> Repost of the i2s audio series for ep93xx. Patch 2/3 is unchanged. The
+>> core support has been modified to move setting of the SPOL and ORIDE
+>> bits of the i2sclkdiv register, as well as the i2s pin strapping
+>> configuration, to a new function called ep93xx_i2s_acquire which is
+>> called from the audio board drivers.
+> 
+> I've now applied both patches.  There was a trivial fixup required for
+> the clocks due to an add/add overlap with the SPI clock - I think it's
+> OK but please check.
 
-I'll change the commit message when I put the patch into Russell's patch
-system.  I'll wait a couple days incase anyone else has a comment.
+Stupid question, but where was it applied? I can't find it in any of the
+branches at:
+http://opensource.wolfsonmicro.com/cgi-bin/gitweb.cgi?p=linux-2.6-asoc.git;a=summary
 
-Regards,
-Hartley
+~Ryan
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
