@@ -1,39 +1,33 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 09 Jun 2010 15:10:16 -0400 (EDT)
-Subject: [PATCH v2 1/4] ARM: Remove the domain switching on ARMv6k/v7 CPUs
-In-Reply-To: <20100602164841.17783.94825.stgit@e102109-lin.cambridge.arm.com>
-References: <20100602164459.17783.9741.stgit@e102109-lin.cambridge.arm.com>
-	<20100602164841.17783.94825.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.00.1006091447460.30664@xanadu.home>
+From: buytenh@wantstofly.org (Lennert Buytenhek)
+Date: Wed, 9 Jun 2010 21:10:56 +0200
+Subject: [PATCH 1/2] mv643xx_eth: disable csum offloading if the hw
+	limited by max size
+In-Reply-To: <FCBE654890C0334289D0AD3AF4EF009F9FAC75A69C@IL-MB01.marvell.com>
+References: <1275827336-31111-1-git-send-email-saeed@marvell.com>
+	<20100608170846.GR1743@mail.wantstofly.org>
+	<FCBE654890C0334289D0AD3AF4EF009F9FAC75A69C@IL-MB01.marvell.com>
+Message-ID: <20100609191056.GI1743@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for the delay... I'm just starting to seriously look at this.
+On Wed, Jun 09, 2010 at 11:21:47AM +0300, Saeed Bishara wrote:
 
-On Wed, 2 Jun 2010, Catalin Marinas wrote:
+> >> diff --git a/include/linux/mv643xx_eth.h 
+> >b/include/linux/mv643xx_eth.h
+> >> index cbbbe9b..7402718 100644
+> >> --- a/include/linux/mv643xx_eth.h
+> >> +++ b/include/linux/mv643xx_eth.h
+> >> @@ -19,6 +19,10 @@ struct mv643xx_eth_shared_platform_data {
+> >>  	struct mbus_dram_target_info	*dram;
+> >>  	struct platform_device	*shared_smi;
+> >>  	unsigned int		t_clk;
+> >> +	/*
+> >> +	 * Max packet size for Tx IP/Layer 4 checksum (0 -> no limit)
+> >
+> >There's always a limit. :-)  You might as well just fill in the right
+> >values for orion5x/kw/dd/loki while you're at it.
+>
+> Right, kirkwood and dove are limited to 1600, the others to 9*1024. Don't know about loki.
 
-> This patch removes the domain switching functionality via the set_fs and
-> __switch_to functions on cores that have a TLS register.
-[...]
-> The user pages access rights are also modified for kernel read-only
-> access rather than read/write so that the copy-on-write mechanism still
-> works. CPU_USE_DOMAINS gets disabled only if HAS_TLS_REG is defined
-> since writing the TLS value to the high vectors page isn't possible.
-
-I don't like this limitation much.
-
-Since the vector page has to be accessed somehow for FIQs anyway, and 
-the current solution for that involves accesses through the direct 
-mapping of the vector page, then this patch could be made to work on 
-pre-ARMv6 systems too simply by adding the necessary cache ops around 
-the TLS and FIQ updates.
-
-Or even better: on those VIVT systems, the domain switching could be 
-used _only_ when direct modifications to the vector page is performed.
-
-This way, this patch could get a wider base for test coverage.  And this 
-could even remove the need for the uaccess_with_memcpy.c hack at some 
-point.
-
-
-Nicolas
+As I know Loki to be able to tx jumbo frames with hw checksum
+offload, it is likely 9*1024 also.
