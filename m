@@ -1,89 +1,84 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 09 Jun 2010 15:08:39 +0200
-Subject: [PATCH v2] arm: s5pv210: add more banks to gpiolib
-Message-ID: <1276088919-20730-1-git-send-email-m.szyprowski@samsung.com>
+From: amit.kucheria@canonical.com (Amit Kucheria)
+Date: Wed, 9 Jun 2010 15:09:04 +0200
+Subject: [PATCH] mxc: Fix pad names for imx51
+In-Reply-To: <20100608063036.GB20799@pengutronix.de>
+References: <1275566746-6510-1-git-send-email-jason77.wang@gmail.com>
+	<1275566746-6510-2-git-send-email-jason77.wang@gmail.com>
+	<20100604085320.GB25357@pengutronix.de>
+	<20100604105347.GA2982@matterhorn.lan>
+	<20100604140959.GB2982@matterhorn.lan>
+	<4C0D5996.9050906@boundarydevices.com>
+	<20100607210448.GA2446@matterhorn.lan>
+	<4C0D6183.1010501@boundarydevices.com>
+	<20100608063036.GB20799@pengutronix.de>
+Message-ID: <20100609130904.GA2599@eyjafjallajokull>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for MP04 and MP05 gpio banks.
+On 10 Jun 08, Sascha Hauer wrote:
+> On Mon, Jun 07, 2010 at 02:15:47PM -0700, Troy Kisky wrote:
+> > Amit Kucheria wrote:
+> > > On 10 Jun 07, Troy Kisky wrote:
+> > > 
+> > >>> On 10 Jun 04, Amit Kucheria wrote:
+> > >>>
+> > > 
+> > > <snip>
+> > > 
+> > >>> +#define MX51_PAD_CSPI1_SCLK__GPIO_4_27		IOMUX_PAD(0x614, 0x224,  3, 0x0,   0, NO_PAD_CTRL)
+> > > 
+> > > <snip>
+> > > 
+> > >>> +#define MX51_PAD_GPIO_1_2__GPIO_1_2		IOMUX_PAD(0x7D4, 0x3CC, 0, 0x0,   0, NO_PAD_CTRL)
+> > >>> +#define MX51_PAD_GPIO_1_3__GPIO_1_3		IOMUX_PAD(0x7D8, 0x3D0, 0, 0x0,   0, NO_PAD_CTRL)
+> > >>> +#define MX51_PAD_PMIC_INT_REQ__PMIC_INT_REQ	IOMUX_PAD(0x7FC, 0x3D4, 0, 0x0,   0, NO_PAD_CTRL)
+> > >>> +#define MX51_PAD_GPIO_1_4__GPIO_1_4		IOMUX_PAD(0x804, 0x3D8, 0, 0x0,   0, NO_PAD_CTRL)
+> > >>> +#define MX51_PAD_GPIO_1_5__GPIO_1_5		IOMUX_PAD(0x808, 0x3DC, 0, 0x0,   0, NO_PAD_CTRL)
+> > >>> +#define MX51_PAD_GPIO_1_6__GPIO_1_6		IOMUX_PAD(0x80C, 0x3E0, 0, 0x0,   0, NO_PAD_CTRL)
+> > >>> +#define MX51_PAD_GPIO_1_7__GPIO_1_7		IOMUX_PAD(0x810, 0x3E4, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> > >>> +#define MX51_PAD_GPIO_1_8__GPIO_1_8		IOMUX_PAD(0x814, 0x3E8, 0, 0x0,   1, MX51_GPIO_PAD_CTRL)
+> > >>> +#define MX51_PAD_GPIO_1_9__GPIO_1_9		IOMUX_PAD(0x818, 0x3EC, 0, 0x0,   0, NO_PAD_CTRL)
+> > >> Why all the stuttering?
+> > >> Isn't MX51_PAD_GPIO_1_9 or MX51_PAD_DISP2_DAT15 descriptive enough?
+> > >>
+> > > 
+> > > Just following the convention use in the rest of imx devices. See the
+> > > following comment at the top of the file:
+> > > 
+> > > /*
+> > >  * The naming convention for the pad modes is MX51_PAD_<padname>__<padmode>
+> > >  * If <padname> or <padmode> refers to a GPIO, it is named
+> > >  * GPIO_<unit>_<num> see also iomux-v3.h
+> > >  */
+> > > 
+> > > We could use the short names for pads being used in their "native mode".
+> > > But as soon as we use the pad in a different mode, such as
+> > > PAD_CSPI1_SCLK__GPIO_4_27 above, we'd need a different naming convention.
+> > > 
+> > > Regards,
+> > > Amit
+> > > 
+> > 
+> > I'm fine with MX51_PAD_CSPI1_SCLK__GPIO_4_27, but I don't care for
+> > MX51_PAD_GPIO_1_9__GPIO_1_9. How about changing the comment to
+> > 
+> >  /*
+> >   * The naming convention for the pad modes is MX51_PAD_<padname>
+> >   * or MX51_PAD_<padname>__<padmode> if padname != padmode.
+> >   * If <padname> or <padmode> refers to a GPIO, it is named
+> >   * GPIO_<unit>_<num> see also iomux-v3.h
+> >   */
+> 
+> If anything then MX51_PAD_GPIO_<unit>_<num>. I chose to use the long
+> name to get a consistent naming and to express the fact that the pad has
+> a name and the mode has a name which can but don't has to be the same.
+> 
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+So will you take a modified patch to reflect this new naming convention?
 
----
-
-Changes since v1:
-- fixed style issues reported by Kukjin Kim
-
- arch/arm/mach-s5pv210/gpiolib.c           |   14 ++++++++++++++
- arch/arm/mach-s5pv210/include/mach/gpio.h |   12 +++++++++---
- 2 files changed, 23 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-s5pv210/gpiolib.c b/arch/arm/mach-s5pv210/gpiolib.c
-index f4ac81f..0261908 100644
---- a/arch/arm/mach-s5pv210/gpiolib.c
-+++ b/arch/arm/mach-s5pv210/gpiolib.c
-@@ -208,6 +208,20 @@ static struct s3c_gpio_chip s5pv210_gpio_4bit[] = {
- 			.label	= "MP03",
- 		},
- 	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PV210_MP04(0),
-+			.ngpio	= S5PV210_GPIO_MP04_NR,
-+			.label	= "MP04",
-+		},
-+	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PV210_MP05(0),
-+			.ngpio	= S5PV210_GPIO_MP05_NR,
-+			.label	= "MP05",
-+		},
-+	}, {
- 		.base	= (S5P_VA_GPIO + 0xC00),
- 		.config	= &gpio_cfg_noint,
- 		.chip	= {
-diff --git a/arch/arm/mach-s5pv210/include/mach/gpio.h b/arch/arm/mach-s5pv210/include/mach/gpio.h
-index d6461ba..1f4b595 100644
---- a/arch/arm/mach-s5pv210/include/mach/gpio.h
-+++ b/arch/arm/mach-s5pv210/include/mach/gpio.h
-@@ -52,6 +52,8 @@
- #define S5PV210_GPIO_MP01_NR	(8)
- #define S5PV210_GPIO_MP02_NR	(4)
- #define S5PV210_GPIO_MP03_NR	(8)
-+#define S5PV210_GPIO_MP04_NR	(8)
-+#define S5PV210_GPIO_MP05_NR	(8)
- 
- /* GPIO bank numbers */
- 
-@@ -94,6 +96,8 @@ enum s5p_gpio_number {
- 	S5PV210_GPIO_MP01_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_J4),
- 	S5PV210_GPIO_MP02_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP01),
- 	S5PV210_GPIO_MP03_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP02),
-+	S5PV210_GPIO_MP04_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP03),
-+	S5PV210_GPIO_MP05_START	= S5PV210_GPIO_NEXT(S5PV210_GPIO_MP04),
- };
- 
- /* S5PV210 GPIO number definitions */
-@@ -127,13 +131,15 @@ enum s5p_gpio_number {
- #define S5PV210_MP01(_nr)	(S5PV210_GPIO_MP01_START + (_nr))
- #define S5PV210_MP02(_nr)	(S5PV210_GPIO_MP02_START + (_nr))
- #define S5PV210_MP03(_nr)	(S5PV210_GPIO_MP03_START + (_nr))
-+#define S5PV210_MP04(_nr)	(S5PV210_GPIO_MP04_START + (_nr))
-+#define S5PV210_MP05(_nr)	(S5PV210_GPIO_MP05_START + (_nr))
- 
- /* the end of the S5PV210 specific gpios */
--#define S5PV210_GPIO_END	(S5PV210_MP03(S5PV210_GPIO_MP03_NR) + 1)
-+#define S5PV210_GPIO_END	(S5PV210_MP05(S5PV210_GPIO_MP05_NR) + 1)
- #define S3C_GPIO_END		S5PV210_GPIO_END
- 
--/* define the number of gpios we need to the one after the MP03() range */
--#define ARCH_NR_GPIOS		(S5PV210_MP03(S5PV210_GPIO_MP03_NR) +	\
-+/* define the number of gpios we need to the one after the MP05() range */
-+#define ARCH_NR_GPIOS		(S5PV210_MP05(S5PV210_GPIO_MP05_NR) +	\
- 				 CONFIG_SAMSUNG_GPIO_EXTRA + 1)
- 
- #include <asm-generic/gpio.h>
+Regards,
+Amit
 -- 
-1.7.1.240.g225c
+----------------------------------------------------------------------
+Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
+----------------------------------------------------------------------
