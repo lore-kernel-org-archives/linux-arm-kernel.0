@@ -1,19 +1,19 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 9 Jun 2010 11:17:43 +0100
-Subject: [PATCH 0/3] EP93xx: Add i2s audio support
-In-Reply-To: <1275991272-30122-1-git-send-email-ryan@bluewatersys.com>
-References: <1275991272-30122-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <20100609101742.GA5618@opensource.wolfsonmicro.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed,  9 Jun 2010 14:06:59 +0300
+Subject: [PATCH 0/3] MX25 watchdog
+Message-ID: <cover.1276081393.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 08, 2010 at 10:01:09PM +1200, Ryan Mallon wrote:
-> Repost of the i2s audio series for ep93xx. Patch 2/3 is unchanged. The
-> core support has been modified to move setting of the SPOL and ORIDE
-> bits of the i2sclkdiv register, as well as the i2s pin strapping
-> configuration, to a new function called ep93xx_i2s_acquire which is
-> called from the audio board drivers.
+This series adds support for the new watchdog driver on the i.MX25 PDK 
+platform. A little fix to the watchdog driver itself is also added.
 
-I've now applied both patches.  There was a trivial fixup required for
-the clocks due to an add/add overlap with the SPI clock - I think it's
-OK but please check.
+Baruch Siach (3):
+  mx25: add watchdog clock
+  mx25pdk: register watchdog device
+  imx2_wdt: fix section mismatch
+
+ arch/arm/mach-mx25/clock.c        |    2 ++
+ arch/arm/mach-mx25/mach-mx25pdk.c |    1 +
+ drivers/watchdog/imx2_wdt.c       |    1 -
+ 3 files changed, 3 insertions(+), 1 deletions(-)
