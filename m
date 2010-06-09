@@ -1,57 +1,132 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Wed, 09 Jun 2010 14:49:51 +0300
-Subject: [PATCH 0/5] Enable pxa310 usb otg port host mode.
-In-Reply-To: <1275464450-23003-1-git-send-email-grinberg@compulab.co.il>
-References: <1275464450-23003-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <4C0F7FDF.2000702@compulab.co.il>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 09 Jun 2010 21:10:38 +0900
+Subject: [PATCH] arm: s5pv210: add more banks to gpiolib
+In-Reply-To: <1276072833-4862-1-git-send-email-m.szyprowski@samsung.com>
+References: <1276072833-4862-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <010301cb07cc$c8affa50$5a0feef0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric, Greg,
-Any comments on this?
+Marek Szyprowski wrote:
+> 
+> This patch adds support for MP04 and MP05 gpio banks. Pins from these
+> banks will be used by Samsung Aquila board.
+> 
+Hi,
 
-Igor Grinberg wrote:
-> This patch series extends the existing usb ulpi generic driver
-> with support for Function and Interface control of the ULPI PHYs,
-> adds support for SMSC USB3319 ulpi phy,
-> implement the pxa310 specific ulpi functionality and make pxa specific ohci
-> implementation aware of pxa310 usb otg port host mode.
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > 
-> Igor Grinberg (5):
->   usb/otg/ulpi: extend the generic ulpi driver.
->   usb/otg/ulpi: add support for SMSC USB3319 ulpi phy.
->   [ARM] pxa: add PXA310 specific ULPI implementation
->   [ARM] usb/host/ohci-pxa27x: make PXA310 USB OTG port work in host
->     mode.
->   [ARM] pxa/cm-x300: enable USB host port 2 on CM-X300 with PXA310 cpu.
+> ---
+>  arch/arm/mach-s5pv210/gpiolib.c           |   17 +++++++++++++++++
+>  arch/arm/mach-s5pv210/include/mach/gpio.h |   10 ++++++++--
+>  2 files changed, 25 insertions(+), 2 deletions(-)
 > 
->  arch/arm/mach-mx2/mach-pca100.c              |   10 +-
->  arch/arm/mach-mx3/mach-armadillo5x0.c        |   10 +-
->  arch/arm/mach-mx3/mach-mx31lite.c            |    5 +-
->  arch/arm/mach-mx3/mach-mx31moboard.c         |    5 +-
->  arch/arm/mach-mx3/mach-pcm037.c              |   10 +-
->  arch/arm/mach-mx3/mach-pcm043.c              |    5 +-
->  arch/arm/mach-pxa/Kconfig                    |    4 +
->  arch/arm/mach-pxa/Makefile                   |    1 +
->  arch/arm/mach-pxa/cm-x300.c                  |  102 ++++++++++++++
->  arch/arm/mach-pxa/include/mach/ohci.h        |    3 +
->  arch/arm/mach-pxa/include/mach/pxa310-ulpi.h |   19 +++
->  arch/arm/mach-pxa/include/mach/regs-u2d.h    |    2 +
->  arch/arm/mach-pxa/pxa310-ulpi.c              |  110 +++++++++++++++
->  drivers/usb/host/ohci-pxa27x.c               |  183 ++++++++++++++++++++++++++
->  drivers/usb/otg/Kconfig                      |    2 -
->  drivers/usb/otg/ulpi.c                       |   65 ++++++++-
->  include/linux/usb/ulpi.h                     |   25 ++++-
->  17 files changed, 542 insertions(+), 19 deletions(-)
->  create mode 100644 arch/arm/mach-pxa/include/mach/pxa310-ulpi.h
->  create mode 100644 arch/arm/mach-pxa/pxa310-ulpi.c
+> diff --git a/arch/arm/mach-s5pv210/gpiolib.c
+b/arch/arm/mach-s5pv210/gpiolib.c
+> index f4ac81f..6f74a98 100644
+> --- a/arch/arm/mach-s5pv210/gpiolib.c
+> +++ b/arch/arm/mach-s5pv210/gpiolib.c
+> @@ -208,6 +208,22 @@ static struct s3c_gpio_chip s5pv210_gpio_4bit[] = {
+>  			.label	= "MP03",
+>  		},
+>  	}, {
+> +		.base	= (S5P_VA_GPIO + 0x340),
+
+don't need .base
+it can be calculated in s5pv210_gpiolib_init()
+
+> +		.config	= &gpio_cfg_noint,
+> +		.chip	= {
+> +			.base	= S5PV210_MP04(0),
+> +			.ngpio	= S5PV210_GPIO_MP04_NR,
+> +			.label	= "MP04",
+> +		},
+> +	}, {
+> +		.base	= (S5P_VA_GPIO + 0x360),
+
+same
+
+> +		.config	= &gpio_cfg_noint,
+> +		.chip	= {
+> +			.base	= S5PV210_MP05(0),
+> +			.ngpio	= S5PV210_GPIO_MP05_NR,
+> +			.label	= "MP05",
+> +		},
+> +	}, {
+>  		.base	= (S5P_VA_GPIO + 0xC00),
+>  		.config	= &gpio_cfg_noint,
+>  		.chip	= {
+> @@ -244,6 +260,7 @@ static struct s3c_gpio_chip s5pv210_gpio_4bit[] = {
+>  			.to_irq = s5p_gpiolib_eint_to_irq,
+>  		},
+>  	},
+> +
+
+redundant empty line
+
+>  };
 > 
+>  static __init int s5pv210_gpiolib_init(void)
+> diff --git a/arch/arm/mach-s5pv210/include/mach/gpio.h b/arch/arm/mach-
+> s5pv210/include/mach/gpio.h
+> index d6461ba..33a9867 100644
+> --- a/arch/arm/mach-s5pv210/include/mach/gpio.h
+> +++ b/arch/arm/mach-s5pv210/include/mach/gpio.h
+> @@ -52,6 +52,8 @@
+>  #define S5PV210_GPIO_MP01_NR	(8)
+>  #define S5PV210_GPIO_MP02_NR	(4)
+>  #define S5PV210_GPIO_MP03_NR	(8)
+> +#define S5PV210_GPIO_MP04_NR	(8)
+> +#define S5PV210_GPIO_MP05_NR	(8)
+> 
+>  /* GPIO bank numbers */
+> 
+> @@ -94,6 +96,8 @@ enum s5p_gpio_number {
+>  	S5PV210_GPIO_MP01_START	=
+> S5PV210_GPIO_NEXT(S5PV210_GPIO_J4),
+>  	S5PV210_GPIO_MP02_START	=
+> S5PV210_GPIO_NEXT(S5PV210_GPIO_MP01),
+>  	S5PV210_GPIO_MP03_START	=
+> S5PV210_GPIO_NEXT(S5PV210_GPIO_MP02),
+> +	S5PV210_GPIO_MP04_START	=
+> S5PV210_GPIO_NEXT(S5PV210_GPIO_MP03),
+> +	S5PV210_GPIO_MP05_START	=
+> S5PV210_GPIO_NEXT(S5PV210_GPIO_MP04),
+>  };
+> 
+>  /* S5PV210 GPIO number definitions */
+> @@ -127,13 +131,15 @@ enum s5p_gpio_number {
+>  #define S5PV210_MP01(_nr)	(S5PV210_GPIO_MP01_START + (_nr))
+>  #define S5PV210_MP02(_nr)	(S5PV210_GPIO_MP02_START + (_nr))
+>  #define S5PV210_MP03(_nr)	(S5PV210_GPIO_MP03_START + (_nr))
+> +#define S5PV210_MP04(_nr)	(S5PV210_GPIO_MP04_START + (_nr))
+> +#define S5PV210_MP05(_nr)	(S5PV210_GPIO_MP05_START + (_nr))
+> 
+>  /* the end of the S5PV210 specific gpios */
+> -#define S5PV210_GPIO_END	(S5PV210_MP03(S5PV210_GPIO_MP03_NR) +
+> 1)
+> +#define S5PV210_GPIO_END	(S5PV210_MP05(S5PV210_GPIO_MP05_NR) +
+> 1)
+>  #define S3C_GPIO_END		S5PV210_GPIO_END
+> 
+>  /* define the number of gpios we need to the one after the MP03() range */
+
+need to modify to MP05()
+
+> -#define ARCH_NR_GPIOS
+> 	(S5PV210_MP03(S5PV210_GPIO_MP03_NR) +	\
+> +#define ARCH_NR_GPIOS
+> 	(S5PV210_MP05(S5PV210_GPIO_MP05_NR) +	\
+>  				 CONFIG_SAMSUNG_GPIO_EXTRA + 1)
+> 
+>  #include <asm-generic/gpio.h>
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
+Thanks.
 
--- 
-Sincerely yours,
-Mike.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
