@@ -1,44 +1,105 @@
-From: abhijeet@marvell.com (Abhijeet Gole)
-Date: Wed, 9 Jun 2010 12:22:26 -0700
-Subject: [PATCH 1/2] mv643xx_eth: disable csum offloading if the hw
-	limited by max size
-In-Reply-To: <20100609191056.GI1743@mail.wantstofly.org>
-References: <1275827336-31111-1-git-send-email-saeed@marvell.com>
-	<20100608170846.GR1743@mail.wantstofly.org>
-	<FCBE654890C0334289D0AD3AF4EF009F9FAC75A69C@IL-MB01.marvell.com>
-	<20100609191056.GI1743@mail.wantstofly.org>
-Message-ID: <5FF020A1CFFEEC49BD1E09530C4FF595056D62F9DD@SC-VEXCH1.marvell.com>
+From: milinevskyy@gmail.com (Dmytro Milinevskyy)
+Date: Wed, 09 Jun 2010 23:14:39 +0300
+Subject: [PATCH] Marvell OpenRD-Ultimate machine support
+Message-ID: <4c0ff6b2.0c3ddf0a.2185.2e09@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
+This patch adds support for the OpenRD Ultimate machine(could be found at http://www.arm.linux.org.uk/developer/machines/list.php?id=2884)
 
-Yes, Loki is 9*1024.
+Besides adding machine description this patch adds correction for PHY address for Ultimate version.
 
------Original Message-----
-From: Lennert Buytenhek [mailto:buytenh at wantstofly.org] 
-Sent: Wednesday, June 09, 2010 12:11 PM
-To: Saeed Bishara
-Cc: linux-net at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Abhijeet Gole
-Subject: Re: [PATCH 1/2] mv643xx_eth: disable csum offloading if the hw limited by max size
+Differences from the previous attempt:
+ - Applied suggestion from Lennert Buytenhek to change PHY addresses in instances of mv643xx_eth_platform_data in case of ultimate version.
 
-On Wed, Jun 09, 2010 at 11:21:47AM +0300, Saeed Bishara wrote:
+Regards,
 
-> >> diff --git a/include/linux/mv643xx_eth.h 
-> >b/include/linux/mv643xx_eth.h
-> >> index cbbbe9b..7402718 100644
-> >> --- a/include/linux/mv643xx_eth.h
-> >> +++ b/include/linux/mv643xx_eth.h
-> >> @@ -19,6 +19,10 @@ struct mv643xx_eth_shared_platform_data {
-> >>  	struct mbus_dram_target_info	*dram;
-> >>  	struct platform_device	*shared_smi;
-> >>  	unsigned int		t_clk;
-> >> +	/*
-> >> +	 * Max packet size for Tx IP/Layer 4 checksum (0 -> no limit)
-> >
-> >There's always a limit. :-)  You might as well just fill in the right
-> >values for orion5x/kw/dd/loki while you're at it.
->
-> Right, kirkwood and dove are limited to 1600, the others to 9*1024. Don't know about loki.
+-- Dmytro Milinevskyy
 
-As I know Loki to be able to tx jumbo frames with hw checksum
-offload, it is likely 9*1024 also.
+
+Signed-off-by: Dmytro Milinevskyy <milinevskyy@gmail.com>
+---
+ arch/arm/mach-kirkwood/Kconfig        |    7 +++++++
+ arch/arm/mach-kirkwood/openrd-setup.c |   28 +++++++++++++++++++++++++---
+ 2 files changed, 32 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index 29b2163..110a3b8 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -75,6 +75,13 @@ config MACH_OPENRD_CLIENT
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell OpenRD Client Board.
+ 
++config MACH_OPENRD_ULTIMATE
++	bool "Marvell OpenRD Ultimate Board"
++	select MACH_OPENRD
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  Marvell OpenRD Ultimate Board.
++
+ config MACH_NETSPACE_V2
+ 	bool "LaCie Network Space v2 NAS Board"
+ 	help
+diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
+index ad3f1ec..81b330d 100644
+--- a/arch/arm/mach-kirkwood/openrd-setup.c
++++ b/arch/arm/mach-kirkwood/openrd-setup.c
+@@ -1,7 +1,7 @@
+ /*
+  * arch/arm/mach-kirkwood/openrd-setup.c
+  *
+- * Marvell OpenRD (Base|Client) Board Setup
++ * Marvell OpenRD (Base|Client|Ultimate) Board Setup
+  *
+  * This file is licensed under the terms of the GNU General Public
+  * License version 2.  This program is licensed "as is" without any
+@@ -73,9 +73,16 @@ static void __init openrd_init(void)
+ 
+ 	kirkwood_ehci_init();
+ 
++	if (machine_is_openrd_ultimate()) {
++		openrd_ge00_data.phy = 0;
++		openrd_ge01_data.phy = 1;
++	}
++
+ 	kirkwood_ge00_init(&openrd_ge00_data);
+-	if (machine_is_openrd_client())
++	if (machine_is_openrd_client() ||
++		machine_is_openrd_ultimate())
+ 		kirkwood_ge01_init(&openrd_ge01_data);
++
+ 	kirkwood_sata_init(&openrd_sata_data);
+ 	kirkwood_sdio_init(&openrd_mvsdio_data);
+ 
+@@ -84,7 +91,9 @@ static void __init openrd_init(void)
+ 
+ static int __init openrd_pci_init(void)
+ {
+-	if (machine_is_openrd_base() || machine_is_openrd_client())
++	if (machine_is_openrd_base() ||
++		machine_is_openrd_client() ||
++		machine_is_openrd_ultimate())
+ 		kirkwood_pcie_init();
+ 
+ 	return 0;
+@@ -116,3 +125,16 @@ MACHINE_START(OPENRD_CLIENT, "Marvell OpenRD Client Board")
+ 	.timer		= &kirkwood_timer,
+ MACHINE_END
+ #endif
++
++#ifdef CONFIG_MACH_OPENRD_ULTIMATE
++MACHINE_START(OPENRD_ULTIMATE, "Marvell OpenRD Ultimate Board")
++	/* Maintainer: Dhaval Vasa <dhaval.vasa@einfochips.com> */
++	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
++	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
++	.boot_params	= 0x00000100,
++	.init_machine	= openrd_init,
++	.map_io		= kirkwood_map_io,
++	.init_irq	= kirkwood_init_irq,
++	.timer		= &kirkwood_timer,
++MACHINE_END
++#endif
+-- 
+1.7.1
