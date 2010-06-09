@@ -1,28 +1,29 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed,  9 Jun 2010 14:07:01 +0300
-Subject: [PATCH 2/3] mx25pdk: register watchdog device
+Date: Wed,  9 Jun 2010 14:07:02 +0300
+Subject: [PATCH 3/3] imx2_wdt: fix section mismatch
 In-Reply-To: <cover.1276081393.git.baruch@tkos.co.il>
 References: <cover.1276081393.git.baruch@tkos.co.il>
-Message-ID: <a8fd2ca108974bd7fac663c470b3b22e0543d41c.1276081393.git.baruch@tkos.co.il>
+Message-ID: <31360d4c97db0e754d15f27567b4592010bdd831.1276081393.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+Cc: Wim Van Sebroeck <wim@iguana.be>
 ---
- arch/arm/mach-mx25/mach-mx25pdk.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/watchdog/imx2_wdt.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-mx25/mach-mx25pdk.c b/arch/arm/mach-mx25/mach-mx25pdk.c
-index 83d7410..9ef99f8 100644
---- a/arch/arm/mach-mx25/mach-mx25pdk.c
-+++ b/arch/arm/mach-mx25/mach-mx25pdk.c
-@@ -147,6 +147,7 @@ static void __init mx25pdk_init(void)
- 	mxc_register_device(&mxc_nand_device, &mx25pdk_nand_board_info);
- 	mxc_register_device(&mx25_rtc_device, NULL);
- 	mxc_register_device(&mx25_fb_device, &mx25pdk_fb_pdata);
-+	mxc_register_device(&mxc_wdt, NULL);
+diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+index ea25885..2ee7dac 100644
+--- a/drivers/watchdog/imx2_wdt.c
++++ b/drivers/watchdog/imx2_wdt.c
+@@ -330,7 +330,6 @@ static void imx2_wdt_shutdown(struct platform_device *pdev)
+ }
  
- 	mx25pdk_fec_reset();
- 	mxc_register_device(&mx25_fec_device, &mx25_fec_pdata);
+ static struct platform_driver imx2_wdt_driver = {
+-	.probe		= imx2_wdt_probe,
+ 	.remove		= __exit_p(imx2_wdt_remove),
+ 	.shutdown	= imx2_wdt_shutdown,
+ 	.driver		= {
 -- 
 1.7.1
