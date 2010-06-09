@@ -1,50 +1,33 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 09 Jun 2010 11:25:49 +0900
-Subject: Current menuconfig (ARM system type) is broken
-In-Reply-To: <w3pfx0yuv3x.wl%kuninori.morimoto.gx@renesas.com>
-References: <w3pfx0yuv3x.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <00cc01cb077b$16333e60$4299bb20$%kim@samsung.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 8 Jun 2010 21:35:30 -0500
+Subject: [PATCH 09/10] omap: mailbox: convert block api to kfifo
+In-Reply-To: <D2943F03B81C9C458E44DFB213905E02B6325C6A@dlee04.ent.ti.com>
+References: <1275546858-29507-1-git-send-email-Hiroshi.DOYU@nokia.com>
+	<1275546858-29507-10-git-send-email-Hiroshi.DOYU@nokia.com>
+	<D2943F03B81C9C458E44DFB213905E02B6325C6A@dlee04.ent.ti.com>
+Message-ID: <AANLkTik4lW3_xP_e4BStJEYpHlVoNjemEz8zWfIE7gRU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kuninori Morimoto wrote:
-> 
-> Dear all
-> 
-Hi,
+Hi Rene,
 
-> Is current menuconfig broken ?
-> It mean
-> 
-> [Sytem Type] - [ARM system type]
-> 
-> In my environment, string output is broken.
-> 
-> I think
-> ${LINUX}/arch/arm/Kconfig
-> 
-> config ARCH_S3C2410
-> 	bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440,
-> S3C2442, S3C2443, S3C2450"
-> 
-> this line is very long.
-> If I modify it to more short, it works correct.
-> 
-
-It was already reported.
-
-Please refer to below thread.
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/017001.html
-
-Ben Dooks' comments:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/017030.html
+On Tue, Jun 8, 2010 at 7:16 PM, Sapiens, Rene <rene.sapiens@ti.com> wrote:
+> In mbox_rx_work() you are removing the lines that enable back the ?mbox irq for the RX case, but inside ?__mbox_rx_interrupt() this interrupt ?is disabled in the case that the kfifo for Rx mailbox gets full. So I think that we need to enable it back as soon as there is space in this kfifo.
 
 
-Thanks.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Actually these irq on/off lines are not part of my patch; they are
+introduced by patch 05/10 on top of which my patches were rebased.
+
+Nevertheless I agree with you - the kfifo migration patch should not
+affect that irq on/off behavior. It's probably just a rebase gotcha.
+
+But now that you point me to this irq on/off thing, it looks a bit
+broken in terms of multiple concurrent mbox support since it relies on
+a global rq_full state. I guess it'd be better to hold that rq_full
+state in the relevant mbox queue state itself.
+
+Fernando what do you think ?
+
+Thanks,
+Ohad.
