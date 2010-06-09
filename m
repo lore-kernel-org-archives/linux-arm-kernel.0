@@ -1,84 +1,59 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Wed, 9 Jun 2010 15:09:04 +0200
-Subject: [PATCH] mxc: Fix pad names for imx51
-In-Reply-To: <20100608063036.GB20799@pengutronix.de>
-References: <1275566746-6510-1-git-send-email-jason77.wang@gmail.com>
-	<1275566746-6510-2-git-send-email-jason77.wang@gmail.com>
-	<20100604085320.GB25357@pengutronix.de>
-	<20100604105347.GA2982@matterhorn.lan>
-	<20100604140959.GB2982@matterhorn.lan>
-	<4C0D5996.9050906@boundarydevices.com>
-	<20100607210448.GA2446@matterhorn.lan>
-	<4C0D6183.1010501@boundarydevices.com>
-	<20100608063036.GB20799@pengutronix.de>
-Message-ID: <20100609130904.GA2599@eyjafjallajokull>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 09 Jun 2010 09:09:54 -0400 (EDT)
+Subject: Boot interface for device trees on ARM
+In-Reply-To: <201006091226.15438.jeremy.kerr@canonical.com>
+References: <201005181054.32325.jeremy.kerr@canonical.com>
+	<201006050933.06714.jeremy.kerr@canonical.com>
+	<alpine.LFD.2.00.1006042212400.30664@xanadu.home>
+	<201006091226.15438.jeremy.kerr@canonical.com>
+Message-ID: <alpine.LFD.2.00.1006090841310.30664@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Jun 08, Sascha Hauer wrote:
-> On Mon, Jun 07, 2010 at 02:15:47PM -0700, Troy Kisky wrote:
-> > Amit Kucheria wrote:
-> > > On 10 Jun 07, Troy Kisky wrote:
-> > > 
-> > >>> On 10 Jun 04, Amit Kucheria wrote:
-> > >>>
-> > > 
-> > > <snip>
-> > > 
-> > >>> +#define MX51_PAD_CSPI1_SCLK__GPIO_4_27		IOMUX_PAD(0x614, 0x224,  3, 0x0,   0, NO_PAD_CTRL)
-> > > 
-> > > <snip>
-> > > 
-> > >>> +#define MX51_PAD_GPIO_1_2__GPIO_1_2		IOMUX_PAD(0x7D4, 0x3CC, 0, 0x0,   0, NO_PAD_CTRL)
-> > >>> +#define MX51_PAD_GPIO_1_3__GPIO_1_3		IOMUX_PAD(0x7D8, 0x3D0, 0, 0x0,   0, NO_PAD_CTRL)
-> > >>> +#define MX51_PAD_PMIC_INT_REQ__PMIC_INT_REQ	IOMUX_PAD(0x7FC, 0x3D4, 0, 0x0,   0, NO_PAD_CTRL)
-> > >>> +#define MX51_PAD_GPIO_1_4__GPIO_1_4		IOMUX_PAD(0x804, 0x3D8, 0, 0x0,   0, NO_PAD_CTRL)
-> > >>> +#define MX51_PAD_GPIO_1_5__GPIO_1_5		IOMUX_PAD(0x808, 0x3DC, 0, 0x0,   0, NO_PAD_CTRL)
-> > >>> +#define MX51_PAD_GPIO_1_6__GPIO_1_6		IOMUX_PAD(0x80C, 0x3E0, 0, 0x0,   0, NO_PAD_CTRL)
-> > >>> +#define MX51_PAD_GPIO_1_7__GPIO_1_7		IOMUX_PAD(0x810, 0x3E4, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
-> > >>> +#define MX51_PAD_GPIO_1_8__GPIO_1_8		IOMUX_PAD(0x814, 0x3E8, 0, 0x0,   1, MX51_GPIO_PAD_CTRL)
-> > >>> +#define MX51_PAD_GPIO_1_9__GPIO_1_9		IOMUX_PAD(0x818, 0x3EC, 0, 0x0,   0, NO_PAD_CTRL)
-> > >> Why all the stuttering?
-> > >> Isn't MX51_PAD_GPIO_1_9 or MX51_PAD_DISP2_DAT15 descriptive enough?
-> > >>
-> > > 
-> > > Just following the convention use in the rest of imx devices. See the
-> > > following comment at the top of the file:
-> > > 
-> > > /*
-> > >  * The naming convention for the pad modes is MX51_PAD_<padname>__<padmode>
-> > >  * If <padname> or <padmode> refers to a GPIO, it is named
-> > >  * GPIO_<unit>_<num> see also iomux-v3.h
-> > >  */
-> > > 
-> > > We could use the short names for pads being used in their "native mode".
-> > > But as soon as we use the pad in a different mode, such as
-> > > PAD_CSPI1_SCLK__GPIO_4_27 above, we'd need a different naming convention.
-> > > 
-> > > Regards,
-> > > Amit
-> > > 
-> > 
-> > I'm fine with MX51_PAD_CSPI1_SCLK__GPIO_4_27, but I don't care for
-> > MX51_PAD_GPIO_1_9__GPIO_1_9. How about changing the comment to
-> > 
-> >  /*
-> >   * The naming convention for the pad modes is MX51_PAD_<padname>
-> >   * or MX51_PAD_<padname>__<padmode> if padname != padmode.
-> >   * If <padname> or <padmode> refers to a GPIO, it is named
-> >   * GPIO_<unit>_<num> see also iomux-v3.h
-> >   */
-> 
-> If anything then MX51_PAD_GPIO_<unit>_<num>. I chose to use the long
-> name to get a consistent naming and to express the fact that the pad has
-> a name and the mode has a name which can but don't has to be the same.
-> 
+On Wed, 9 Jun 2010, Jeremy Kerr wrote:
 
-So will you take a modified patch to reflect this new naming convention?
+> Hi Nicolas,
+> 
+> > > If we're planning to keep the machine IDs around (even if they are now
+> > > per- SoC), I'd like to know what would be left using them. The only
+> > > thing that I can see that we currently use is io_pg_offset for the
+> > > DEBUG_LL builds, and that isn't a convincing case to keep them.
+> > 
+> > Why not?
+> 
+> Because it's something we can justifiably replace with a single compile-time 
+> constant, since it's only for low-level debug. I don't see that as a reason 
+> for keeping these machine numbers around if that's all they're used for.
 
-Regards,
-Amit
--- 
-----------------------------------------------------------------------
-Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-----------------------------------------------------------------------
+it's not only for that.  As I said below:
+
+> > Kernel infrastructure backward compatibility means that you need to keep
+> > struct machine_desc instances around.  Granted, for the DT case, many of
+> > the members could be NULL or initialized with dummy stubs.  But that is
+> > very cheap to keep around, and that allows the same kernel binary to be
+> > able to use both the DT boot and the legacy boot.
+> 
+> ... this is a good point; if it helps with the transition, then this is 
+> probably a decent reason to keep it in the interface.
+> 
+> I'd like to keep my "only use the device tree" value (MACH_TYPE_DT = 
+> 0xffffffff) though, so we don't needlessly allocate machine numbers where they 
+> aren't actually used.
+
+There isn't such thing as "only use the device tree".  To keep the low 
+level code _unmodified_ and _useful_ you'll have to allocate a number 
+per machine class otherwise you won't be able to support more than one 
+machine class in the same kernel binary at the same time.  You can't 
+just say that those machine IDs aren't used.
+
+I don't see the point of crippling that existing support just for the 
+sake of using 0xffffffff, if it is only to save you a few machine ID 
+registrations.  Because let's be honest, we won't DT-ify old machine 
+targets anytime soon.  So only the recent and future machine classes 
+will require a number, and that's probably on the order of 2 or 3 new 
+IDs per year (meaning less than 5 minutes on RMK's automatic 
+registration website).  Certainly much much less than the current 2000+ 
+IDs that have been already allocated to date.
+
+
+Nicolas
