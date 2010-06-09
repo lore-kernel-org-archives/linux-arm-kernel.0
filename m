@@ -1,69 +1,31 @@
-From: jgarzik@pobox.com (Jeff Garzik)
-Date: Wed, 09 Jun 2010 13:31:23 -0400
-Subject: [PATCH v2 1/5] libata: pata_samsung: Add Samsung PATA controller
-	driver
-In-Reply-To: <1275988020-29000-2-git-send-email-kgene.kim@samsung.com>
-References: <1275988020-29000-1-git-send-email-kgene.kim@samsung.com>
-	<1275988020-29000-2-git-send-email-kgene.kim@samsung.com>
-Message-ID: <4C0FCFEB.6030603@pobox.com>
+From: jason.mcmullan@netronome.com (Jason McMullan)
+Date: Wed, 9 Jun 2010 14:06:53 -0400
+Subject: [PATCH] [kirkwood-otg] Leverage the Freescale OTG driver for
+	Kirkwood OTG
+In-Reply-To: <alpine.LFD.2.00.1006091307321.30664@xanadu.home>
+References: <1276094138-13497-1-git-send-email-jason.mcmullan@netronome.com>
+	<1276094138-13497-2-git-send-email-jason.mcmullan@netronome.com>
+	<alpine.LFD.2.00.1006091307321.30664@xanadu.home>
+Message-ID: <AANLkTikVeVBdSfeS_p0k4dRwFopELw2OIXUrS1NjEdt6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2010 05:06 AM, Kukjin Kim wrote:
-> From: Abhilash Kesavan<a.kesavan@samsung.com>
+On Wed, Jun 9, 2010 at 1:17 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Wed, 9 Jun 2010, Jason S. McMullan wrote:
+>> NOTE: Your bootloader must ensure that the Kirkwood
+>> ? ? ? USB 2.0 Bridge Window registers are set correctly,
+>> ? ? ? or the driver will stall on the first DMA.
 >
-> Adds support for the Samsung PATA controller. This driver is based on the
-> Libata subsystem and references the earlier patches sent for IDE subsystem.
+> Could you add the code to sets that up in the kernel instead?
+
+Will do.
+
+>> ?config USB_GADGET_FSL_USB2
 >
-> Signed-off-by: Abhilash Kesavan<a.kesavan@samsung.com>
-> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
-> ---
->   drivers/ata/Kconfig           |    9 +
->   drivers/ata/Makefile          |    1 +
->   drivers/ata/pata_samsung_cf.c |  608 +++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 618 insertions(+), 0 deletions(-)
->   create mode 100644 drivers/ata/pata_samsung_cf.c
+> Maybe the help text should be extended to mention Kirkwood?
 
-Looks OK to me, minor nits only...
+Again, good idea, will do.
 
-
-
-> +#define DRV_NAME "pata_samsung"
-
-this should be "pata_samsung_cf"
-
-
-> +static void pata_s3c_hwinit(struct s3c_ide_info *info,
-> +				struct s3c_ide_platdata *pdata)
-> +{
-> +	switch (info->cpu_type) {
-> +	case TYPE_S3C64XX:
-> +		/* Configure as big endian */
-> +		pata_s3c_cfg_mode(info->sfr_addr);
-> +		pata_s3c_set_endian(info->ide_addr, 1);
-> +		pata_s3c_enable(info->ide_addr, 1);
-> +		mdelay(100);
-> +
-> +		/* Remove IRQ Status */
-> +		writel(0x1f, info->ide_addr + S3C_ATA_IRQ);
-> +		writel(0x1b, info->ide_addr + S3C_ATA_IRQ_MSK);
-> +	break;
-> +
-> +	case TYPE_S5PC100:
-> +		pata_s3c_cfg_mode(info->sfr_addr);
-> +
-> +	case TYPE_S5PV210:
-> +		/* Configure as little endian */
-> +		pata_s3c_set_endian(info->ide_addr, 0);
-> +		pata_s3c_enable(info->ide_addr, 1);
-> +		mdelay(100);
-> +
-> +		/* Remove IRQ Status */
-> +		writel(0x3f, info->ide_addr + S3C_ATA_IRQ);
-> +		writel(0x3f, info->ide_addr + S3C_ATA_IRQ_MSK);
-> +	break;
-> +
-> +	default:
-> +		BUG();
-
-Use of msleep() is preferred, in cases where you can sleep (such as this)
+-- 
+Jason S. McMullan
+Netronome Systems, Inc.
