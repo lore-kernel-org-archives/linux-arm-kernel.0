@@ -1,46 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 10 Jun 2010 10:16:08 +0100
-Subject: [PATCH 4/5] [ARM] Auto calculate ZRELADDR and provide option
-	for exceptions
-In-Reply-To: <20100610090015.GD3422@pengutronix.de>
-References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
-	<1275550613-9553-5-git-send-email-eric.miao@canonical.com>
-	<20100610090015.GD3422@pengutronix.de>
-Message-ID: <20100610091608.GA28305@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 10 Jun 2010 11:18:44 +0200
+Subject: [PATCH 0/3] MX25 watchdog
+In-Reply-To: <cover.1276081393.git.baruch@tkos.co.il>
+References: <cover.1276081393.git.baruch@tkos.co.il>
+Message-ID: <20100610091844.GF5333@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 10, 2010 at 11:00:15AM +0200, Uwe Kleine-K?nig wrote:
-> What do you think about requiring r4 to be set to physoffset as I did in
-> my series?  This way zImage would already know PHYSOFFSET and so didn't
-> need to guess ZRELADDR.  OK, until most bootloaders are fixed we need
-> to guess, too.  But at least this would provide a way to stop guessing
-> wrong for the affected platforms.
+On Wed, Jun 09, 2010 at 02:06:59PM +0300, Baruch Siach wrote:
+> This series adds support for the new watchdog driver on the i.MX25 PDK 
+> platform. A little fix to the watchdog driver itself is also added.
+> 
+> Baruch Siach (3):
+>   mx25: add watchdog clock
+>   mx25pdk: register watchdog device
+>   imx2_wdt: fix section mismatch
+> 
+>  arch/arm/mach-mx25/clock.c        |    2 ++
+>  arch/arm/mach-mx25/mach-mx25pdk.c |    1 +
+>  drivers/watchdog/imx2_wdt.c       |    1 -
+>  3 files changed, 3 insertions(+), 1 deletions(-)
 
-That means it won't get implemented.  Look at the facts.  It's taken
-_years_ (5+ years) for boot loaders to start passing a value in r1.
-We then switched to the ATAG stuff, and it's again taking years for
-boot loaders to start passing right ATAG stuff - and most of them don't
-get it right.  Eg, lots of uboot are happy to print out the memory
-information on the terminal as they start up, but don't pass memory
-information to the kernel.
+Assuming the fixed register in patch 1, whole series is:
 
-So if we want phys offset in r4, we better realise that it'll take
-something like five years of nagging to get it in place, and even then
-people will continue to use boot loaders which don't have support.
-And if it's only necessary for a handful of platforms, I doubt anyone's
-really going to bother - or even validate that r4 is correct.
+Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
 
-You have a whole set of other problems - how do you cope with existing
-boot loaders which happen to call the kernel with a value in r4 which
-_could_ potentially be valid, but should not be used?  At the moment,
-r4 could contain _any_ value what so ever.
-
-Let's face it - advertising that "the kernel will eventually start using
-r4" doesn't solve the problem either - we did that with the ATAG list
-and we know the results from that.
-
-Maybe the right experiment to try this time - if we want r4 to contain
-a value - is to say that kernel 2.6.37 will require a value in r4, and
-won't boot without it, and will therefore be incompatible with old
-boot loaders.
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100610/f335e6bc/attachment.sig>
