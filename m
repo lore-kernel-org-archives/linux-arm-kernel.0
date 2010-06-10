@@ -1,60 +1,49 @@
-From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Thu, 10 Jun 2010 15:26:01 +0530
-Subject: [PATCH 3/3] nomadik-gpio: fix "ignoring return value" warning
-In-Reply-To: <1276163761-28342-1-git-send-email-rabin.vincent@stericsson.com>
-References: <1276163761-28342-1-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <1276163761-28342-3-git-send-email-rabin.vincent@stericsson.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 10 Jun 2010 12:00:39 +0200
+Subject: [PATCH 3/5] [ARM] Make TEXT_OFFSET a configurable option
+In-Reply-To: <AANLkTilNMqC0q65GzRiyyX091390TaHFD7ffaxkWWyf8@mail.gmail.com>
+References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
+	<1275550613-9553-4-git-send-email-eric.miao@canonical.com>
+	<20100610085053.GC3422@pengutronix.de>
+	<AANLkTilNMqC0q65GzRiyyX091390TaHFD7ffaxkWWyf8@mail.gmail.com>
+Message-ID: <20100610100039.GB31057@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/plat-nomadik/gpio.c: In function 'nmk_gpio_remove':
-arch/arm/plat-nomadik/gpio.c:630: warning: ignoring return value of 'gpiochip_remove', declared with attribute warn_unused_result
+On Thu, Jun 10, 2010 at 05:45:53PM +0800, Eric Miao wrote:
+> 2010/6/10 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> > On Thu, Jun 03, 2010 at 03:36:51PM +0800, Eric Miao wrote:
+> >> From: Eric Miao <eric.y.miao@gmail.com>
+> >>
+> >> Signed-off-by: Eric Miao <eric.miao@canonical.com>
+> >> ---
+> >> ?arch/arm/Kconfig ? ? ? ? | ? 13 +++++++++++++
+> >> ?arch/arm/Makefile ? ? ? ?| ? 13 +------------
+> >> ?arch/arm/kernel/Makefile | ? ?4 ++--
+> >> ?3 files changed, 16 insertions(+), 14 deletions(-)
+> >>
+> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> >> index 1f254bd..e340193 100644
+> >> --- a/arch/arm/Kconfig
+> >> +++ b/arch/arm/Kconfig
+> >> @@ -1484,6 +1484,19 @@ config ATAGS_PROC
+> >> ? ? ? ? Should the atags used to boot the kernel be exported in an "atags"
+> >> ? ? ? ? file in procfs. Useful with kexec.
+> >>
+> >> +config TEXT_OFFSET
+> >> + ? ? hex "Offset of the kernel image from the start of RAM"
+> > IMHO this should not be user configurable.
+> >
+> 
+> That's true. The reason I don't want to keep this in Makefile is the
+> concern about future change to Makefile (that machine-y could be
+> composed of all the mach-*), and make it a kernel config option at
+> least provide a way to fix that by the user interactively.
+You can have both, just remove the string after "hex" above.
 
-Because this function is marked __exit and this code can't be built as a
-module, this function is never used.  So just remove it, fixing the
-warning in the process.
+Best regards
+Uwe
 
-Acked-by: Alessandro Rubini <rubini@unipv.it>
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
----
- arch/arm/plat-nomadik/gpio.c |   18 ------------------
- 1 files changed, 0 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm/plat-nomadik/gpio.c b/arch/arm/plat-nomadik/gpio.c
-index b4aa299..dc736d2 100644
---- a/arch/arm/plat-nomadik/gpio.c
-+++ b/arch/arm/plat-nomadik/gpio.c
-@@ -619,30 +619,12 @@ out:
- 	return ret;
- }
- 
--static int __exit nmk_gpio_remove(struct platform_device *dev)
--{
--	struct nmk_gpio_chip *nmk_chip;
--	struct resource *res;
--
--	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
--
--	nmk_chip = platform_get_drvdata(dev);
--	gpiochip_remove(&nmk_chip->chip);
--	clk_disable(nmk_chip->clk);
--	clk_put(nmk_chip->clk);
--	kfree(nmk_chip);
--	release_mem_region(res->start, resource_size(res));
--	return 0;
--}
--
--
- static struct platform_driver nmk_gpio_driver = {
- 	.driver = {
- 		.owner = THIS_MODULE,
- 		.name = "gpio",
- 		},
- 	.probe = nmk_gpio_probe,
--	.remove = __exit_p(nmk_gpio_remove),
- 	.suspend = NULL, /* to be done */
- 	.resume = NULL,
- };
 -- 
-1.7.0
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
