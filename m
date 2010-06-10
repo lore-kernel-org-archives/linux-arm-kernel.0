@@ -1,770 +1,633 @@
 From: benjamin.zores@alcatel-lucent.com (Benjamin Zores)
-Date: Thu, 10 Jun 2010 15:59:36 +0200
-Subject: [PATCH 1/4] arch/arm/mach-kirkwood: update MPP definition.
-Message-ID: <20100610135936.14097.22635.stgit@localhost.localdomain>
+Date: Thu, 10 Jun 2010 15:59:46 +0200
+Subject: [PATCH 3/4] arch/arm/mach-kirkwood: add support for 2nd PCIe port on
+	88f6282.
+In-Reply-To: <20100610135936.14097.22635.stgit@localhost.localdomain>
+References: <20100610135936.14097.22635.stgit@localhost.localdomain>
+Message-ID: <20100610135946.14097.39894.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MPP definitions for Marvell Kirkwood 88F6282 revision.
-Update some defines to reflect datasheet's MPP names.
-
 Signed-off-by: Benjamin Zores <benjamin.zores@alcatel-lucent.com>
 ---
- arch/arm/mach-kirkwood/mpp.h               |  595 +++++++++++++++-------------
- arch/arm/mach-kirkwood/netspace_v2-setup.c |    4 
- arch/arm/mach-kirkwood/netxbig_v2-setup.c  |   32 +-
- arch/arm/mach-kirkwood/ts219-setup.c       |    4 
- arch/arm/mach-kirkwood/ts41x-setup.c       |   28 +
- 5 files changed, 356 insertions(+), 307 deletions(-)
+ arch/arm/mach-kirkwood/addr-map.c                 |   21 ++
+ arch/arm/mach-kirkwood/common.c                   |   28 +++
+ arch/arm/mach-kirkwood/common.h                   |    5 -
+ arch/arm/mach-kirkwood/db88f6281-bp-setup.c       |    2 
+ arch/arm/mach-kirkwood/include/mach/bridge-regs.h |    3 
+ arch/arm/mach-kirkwood/include/mach/irqs.h        |    1 
+ arch/arm/mach-kirkwood/include/mach/kirkwood.h    |   12 +
+ arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c    |    2 
+ arch/arm/mach-kirkwood/openrd-setup.c             |    2 
+ arch/arm/mach-kirkwood/pcie.c                     |  202 ++++++++++++++++-----
+ arch/arm/mach-kirkwood/rd88f6192-nas-setup.c      |    2 
+ arch/arm/mach-kirkwood/rd88f6281-setup.c          |    2 
+ arch/arm/mach-kirkwood/ts219-setup.c              |    2 
+ arch/arm/mach-kirkwood/ts41x-setup.c              |    2 
+ 14 files changed, 223 insertions(+), 63 deletions(-)
 
-diff --git a/arch/arm/mach-kirkwood/mpp.h b/arch/arm/mach-kirkwood/mpp.h
-index bc74278..51a2974 100644
---- a/arch/arm/mach-kirkwood/mpp.h
-+++ b/arch/arm/mach-kirkwood/mpp.h
-@@ -11,7 +11,7 @@
- #ifndef __KIRKWOOD_MPP_H
- #define __KIRKWOOD_MPP_H
+diff --git a/arch/arm/mach-kirkwood/addr-map.c b/arch/arm/mach-kirkwood/addr-map.c
+index 2e69168..aa6bf38 100644
+--- a/arch/arm/mach-kirkwood/addr-map.c
++++ b/arch/arm/mach-kirkwood/addr-map.c
+@@ -31,6 +31,8 @@
+ #define ATTR_DEV_CS0		0x3e
+ #define ATTR_PCIE_IO		0xe0
+ #define ATTR_PCIE_MEM		0xe8
++#define ATTR_PCIE1_IO		0xd0
++#define ATTR_PCIE1_MEM		0xd8
+ #define ATTR_SRAM		0x01
  
--#define MPP(_num, _sel, _in, _out, _F6180, _F6190, _F6192, _F6281) ( \
-+#define MPP(_num, _sel, _in, _out, _F6180, _F6190, _F6192, _F6281, _F6282) ( \
- 	/* MPP number */		((_num) & 0xff) | \
- 	/* MPP select value */		(((_sel) & 0xf) << 8) | \
- 	/* may be input signal */	((!!(_in)) << 12) | \
-@@ -19,282 +19,331 @@
- 	/* available on F6180 */	((!!(_F6180)) << 14) | \
- 	/* available on F6190 */	((!!(_F6190)) << 15) | \
- 	/* available on F6192 */	((!!(_F6192)) << 16) | \
--	/* available on F6281 */	((!!(_F6281)) << 17))
-+	/* available on F6281 */	((!!(_F6281)) << 17) | \
-+	/* available on F6282 */	((!!(_F6282)) << 18))
+ /*
+@@ -84,6 +86,8 @@ void __init kirkwood_setup_cpu_mbus(void)
+ 	void __iomem *addr;
+ 	int i;
+ 	int cs;
++	int id = 0;
++	u32 dev, rev;
  
- #define MPP_NUM(x)	((x) & 0xff)
- #define MPP_SEL(x)	(((x) >> 8) & 0xf)
+ 	/*
+ 	 * First, disable and clear windows.
+@@ -102,21 +106,30 @@ void __init kirkwood_setup_cpu_mbus(void)
+ 	/*
+ 	 * Setup windows for PCIe IO+MEM space.
+ 	 */
+-	setup_cpu_win(0, KIRKWOOD_PCIE_IO_PHYS_BASE, KIRKWOOD_PCIE_IO_SIZE,
++	setup_cpu_win(id++, KIRKWOOD_PCIE_IO_PHYS_BASE, KIRKWOOD_PCIE_IO_SIZE,
+ 		      TARGET_PCIE, ATTR_PCIE_IO, KIRKWOOD_PCIE_IO_BUS_BASE);
+-	setup_cpu_win(1, KIRKWOOD_PCIE_MEM_PHYS_BASE, KIRKWOOD_PCIE_MEM_SIZE,
++	setup_cpu_win(id++, KIRKWOOD_PCIE_MEM_PHYS_BASE, KIRKWOOD_PCIE_MEM_SIZE,
+ 		      TARGET_PCIE, ATTR_PCIE_MEM, KIRKWOOD_PCIE_MEM_BUS_BASE);
  
--				/*   num sel  i  o  6180 6190 6192 6281 */
--
--#define MPP_INPUT_MASK		MPP(  0, 0x0, 1, 0, 0,   0,   0,   0    )
--#define MPP_OUTPUT_MASK		MPP(  0, 0x0, 0, 1, 0,   0,   0,   0    )
--
--#define MPP_F6180_MASK		MPP(  0, 0x0, 0, 0, 1,   0,   0,   0    )
--#define MPP_F6190_MASK		MPP(  0, 0x0, 0, 0, 0,   1,   0,   0    )
--#define MPP_F6192_MASK		MPP(  0, 0x0, 0, 0, 0,   0,   1,   0    )
--#define MPP_F6281_MASK		MPP(  0, 0x0, 0, 0, 0,   0,   0,   1    )
--
--#define MPP0_GPIO		MPP(  0, 0x0, 1, 1, 1,   1,   1,   1    )
--#define MPP0_NF_IO2		MPP(  0, 0x1, 1, 1, 1,   1,   1,   1    )
--#define MPP0_SPI_SCn		MPP(  0, 0x2, 0, 1, 1,   1,   1,   1    )
--
--#define MPP1_GPO		MPP(  1, 0x0, 0, 1, 1,   1,   1,   1    )
--#define MPP1_NF_IO3		MPP(  1, 0x1, 1, 1, 1,   1,   1,   1    )
--#define MPP1_SPI_MOSI		MPP(  1, 0x2, 0, 1, 1,   1,   1,   1    )
--
--#define MPP2_GPO		MPP(  2, 0x0, 0, 1, 1,   1,   1,   1    )
--#define MPP2_NF_IO4		MPP(  2, 0x1, 1, 1, 1,   1,   1,   1    )
--#define MPP2_SPI_SCK		MPP(  2, 0x2, 0, 1, 1,   1,   1,   1    )
--
--#define MPP3_GPO		MPP(  3, 0x0, 0, 1, 1,   1,   1,   1    )
--#define MPP3_NF_IO5		MPP(  3, 0x1, 1, 1, 1,   1,   1,   1    )
--#define MPP3_SPI_MISO		MPP(  3, 0x2, 1, 0, 1,   1,   1,   1    )
--
--#define MPP4_GPIO		MPP(  4, 0x0, 1, 1, 1,   1,   1,   1    )
--#define MPP4_NF_IO6		MPP(  4, 0x1, 1, 1, 1,   1,   1,   1    )
--#define MPP4_UART0_RXD		MPP(  4, 0x2, 1, 0, 1,   1,   1,   1    )
--#define MPP4_SATA1_ACTn		MPP(  4, 0x5, 0, 1, 0,   0,   1,   1    )
--#define MPP4_PTP_CLK		MPP(  4, 0xd, 1, 0, 1,   1,   1,   1    )
--
--#define MPP5_GPO		MPP(  5, 0x0, 0, 1, 1,   1,   1,   1    )
--#define MPP5_NF_IO7		MPP(  5, 0x1, 1, 1, 1,   1,   1,   1    )
--#define MPP5_UART0_TXD		MPP(  5, 0x2, 0, 1, 1,   1,   1,   1    )
--#define MPP5_PTP_TRIG_GEN	MPP(  5, 0x4, 0, 1, 1,   1,   1,   1    )
--#define MPP5_SATA0_ACTn		MPP(  5, 0x5, 0, 1, 0,   1,   1,   1    )
--
--#define MPP6_SYSRST_OUTn	MPP(  6, 0x1, 0, 1, 1,   1,   1,   1    )
--#define MPP6_SPI_MOSI		MPP(  6, 0x2, 0, 1, 1,   1,   1,   1    )
--#define MPP6_PTP_TRIG_GEN	MPP(  6, 0x3, 0, 1, 1,   1,   1,   1    )
--
--#define MPP7_GPO		MPP(  7, 0x0, 0, 1, 1,   1,   1,   1    )
--#define MPP7_PEX_RST_OUTn	MPP(  7, 0x1, 0, 1, 1,   1,   1,   1    )
--#define MPP7_SPI_SCn		MPP(  7, 0x2, 0, 1, 1,   1,   1,   1    )
--#define MPP7_PTP_TRIG_GEN	MPP(  7, 0x3, 0, 1, 1,   1,   1,   1    )
--
--#define MPP8_GPIO		MPP(  8, 0x0, 1, 1, 1,    1,  1,   1    )
--#define MPP8_TW_SDA		MPP(  8, 0x1, 1, 1, 1,   1,   1,   1    )
--#define MPP8_UART0_RTS		MPP(  8, 0x2, 0, 1, 1,   1,   1,   1    )
--#define MPP8_UART1_RTS		MPP(  8, 0x3, 0, 1, 1,   1,   1,   1    )
--#define MPP8_MII0_RXERR		MPP(  8, 0x4, 1, 0, 0,   1,   1,   1    )
--#define MPP8_SATA1_PRESENTn	MPP(  8, 0x5, 0, 1, 0,   0,   1,   1    )
--#define MPP8_PTP_CLK		MPP(  8, 0xc, 1, 0, 1,   1,   1,   1    )
--#define MPP8_MII0_COL		MPP(  8, 0xd, 1, 0, 1,   1,   1,   1    )
--
--#define MPP9_GPIO		MPP(  9, 0x0, 1, 1, 1,   1,   1,   1    )
--#define MPP9_TW_SCK		MPP(  9, 0x1, 1, 1, 1,   1,   1,   1    )
--#define MPP9_UART0_CTS		MPP(  9, 0x2, 1, 0, 1,   1,   1,   1    )
--#define MPP9_UART1_CTS		MPP(  9, 0x3, 1, 0, 1,   1,   1,   1    )
--#define MPP9_SATA0_PRESENTn	MPP(  9, 0x5, 0, 1, 0,   1,   1,   1    )
--#define MPP9_PTP_EVENT_REQ	MPP(  9, 0xc, 1, 0, 1,   1,   1,   1    )
--#define MPP9_MII0_CRS		MPP(  9, 0xd, 1, 0, 1,   1,   1,   1    )
--
--#define MPP10_GPO		MPP( 10, 0x0, 0, 1, 1,   1,   1,   1    )
--#define MPP10_SPI_SCK		MPP( 10, 0x2, 0, 1, 1,   1,   1,   1    )
--#define MPP10_UART0_TXD		MPP( 10, 0X3, 0, 1, 1,   1,   1,   1    )
--#define MPP10_SATA1_ACTn	MPP( 10, 0x5, 0, 1, 0,   0,   1,   1    )
--#define MPP10_PTP_TRIG_GEN	MPP( 10, 0xc, 0, 1, 1,   1,   1,   1    )
--
--#define MPP11_GPIO		MPP( 11, 0x0, 1, 1, 1,   1,   1,   1    )
--#define MPP11_SPI_MISO		MPP( 11, 0x2, 1, 0, 1,   1,   1,   1    )
--#define MPP11_UART0_RXD		MPP( 11, 0x3, 1, 0, 1,   1,   1,   1    )
--#define MPP11_PTP_EVENT_REQ	MPP( 11, 0x4, 1, 0, 1,   1,   1,   1    )
--#define MPP11_PTP_TRIG_GEN	MPP( 11, 0xc, 0, 1, 1,   1,   1,   1    )
--#define MPP11_PTP_CLK		MPP( 11, 0xd, 1, 0, 1,   1,   1,   1    )
--#define MPP11_SATA0_ACTn	MPP( 11, 0x5, 0, 1, 0,   1,   1,   1    )
--
--#define MPP12_GPO		MPP( 12, 0x0, 0, 1, 1,   1,   1,   1    )
--#define MPP12_SD_CLK		MPP( 12, 0x1, 0, 1, 1,   1,   1,   1    )
--
--#define MPP13_GPIO		MPP( 13, 0x0, 1, 1, 1,   1,   1,   1    )
--#define MPP13_SD_CMD		MPP( 13, 0x1, 1, 1, 1,   1,   1,   1    )
--#define MPP13_UART1_TXD		MPP( 13, 0x3, 0, 1, 1,   1,   1,   1    )
--
--#define MPP14_GPIO		MPP( 14, 0x0, 1, 1, 1,   1,   1,   1    )
--#define MPP14_SD_D0		MPP( 14, 0x1, 1, 1, 1,   1,   1,   1    )
--#define MPP14_UART1_RXD		MPP( 14, 0x3, 1, 0, 1,   1,   1,   1    )
--#define MPP14_SATA1_PRESENTn	MPP( 14, 0x4, 0, 1, 0,   0,   1,   1    )
--#define MPP14_MII0_COL		MPP( 14, 0xd, 1, 0, 1,   1,   1,   1    )
--
--#define MPP15_GPIO		MPP( 15, 0x0, 1, 1, 1,   1,   1,   1    )
--#define MPP15_SD_D1		MPP( 15, 0x1, 1, 1, 1,   1,   1,   1    )
--#define MPP15_UART0_RTS		MPP( 15, 0x2, 0, 1, 1,   1,   1,   1    )
--#define MPP15_UART1_TXD		MPP( 15, 0x3, 0, 1, 1,   1,   1,   1    )
--#define MPP15_SATA0_ACTn	MPP( 15, 0x4, 0, 1, 0,   1,   1,   1    )
--
--#define MPP16_GPIO		MPP( 16, 0x0, 1, 1, 1,   1,   1,   1    )
--#define MPP16_SD_D2		MPP( 16, 0x1, 1, 1, 1,   1,   1,   1    )
--#define MPP16_UART0_CTS		MPP( 16, 0x2, 1, 0, 1,   1,   1,   1    )
--#define MPP16_UART1_RXD		MPP( 16, 0x3, 1, 0, 1,   1,   1,   1    )
--#define MPP16_SATA1_ACTn	MPP( 16, 0x4, 0, 1, 0,   0,   1,   1    )
--#define MPP16_MII0_CRS		MPP( 16, 0xd, 1, 0, 1,   1,   1,   1    )
--
--#define MPP17_GPIO		MPP( 17, 0x0, 1, 1, 1,   1,   1,   1    )
--#define MPP17_SD_D3		MPP( 17, 0x1, 1, 1, 1,   1,   1,   1    )
--#define MPP17_SATA0_PRESENTn	MPP( 17, 0x4, 0, 1, 0,   1,   1,   1    )
--
--#define MPP18_GPO		MPP( 18, 0x0, 0, 1, 1,   1,   1,   1    )
--#define MPP18_NF_IO0		MPP( 18, 0x1, 1, 1, 1,   1,   1,   1    )
--
--#define MPP19_GPO		MPP( 19, 0x0, 0, 1, 1,   1,   1,   1    )
--#define MPP19_NF_IO1		MPP( 19, 0x1, 1, 1, 1,   1,   1,   1    )
--
--#define MPP20_GPIO		MPP( 20, 0x0, 1, 1, 0,   1,   1,   1    )
--#define MPP20_TSMP0		MPP( 20, 0x1, 1, 1, 0,   0,   1,   1    )
--#define MPP20_TDM_CH0_TX_QL	MPP( 20, 0x2, 0, 1, 0,   0,   1,   1    )
--#define MPP20_GE1_0		MPP( 20, 0x3, 0, 0, 0,   1,   1,   1    )
--#define MPP20_AUDIO_SPDIFI	MPP( 20, 0x4, 1, 0, 0,   0,   1,   1    )
--#define MPP20_SATA1_ACTn	MPP( 20, 0x5, 0, 1, 0,   0,   1,   1    )
--
--#define MPP21_GPIO		MPP( 21, 0x0, 1, 1, 0,   1,   1,   1    )
--#define MPP21_TSMP1		MPP( 21, 0x1, 1, 1, 0,   0,   1,   1    )
--#define MPP21_TDM_CH0_RX_QL	MPP( 21, 0x2, 0, 1, 0,   0,   1,   1    )
--#define MPP21_GE1_1		MPP( 21, 0x3, 0, 0, 0,   1,   1,   1    )
--#define MPP21_AUDIO_SPDIFO	MPP( 21, 0x4, 0, 1, 0,   0,   1,   1    )
--#define MPP21_SATA0_ACTn	MPP( 21, 0x5, 0, 1, 0,   1,   1,   1    )
--
--#define MPP22_GPIO		MPP( 22, 0x0, 1, 1, 0,   1,   1,   1    )
--#define MPP22_TSMP2		MPP( 22, 0x1, 1, 1, 0,   0,   1,   1    )
--#define MPP22_TDM_CH2_TX_QL	MPP( 22, 0x2, 0, 1, 0,   0,   1,   1    )
--#define MPP22_GE1_2		MPP( 22, 0x3, 0, 0, 0,   1,   1,   1    )
--#define MPP22_AUDIO_SPDIFRMKCLK	MPP( 22, 0x4, 0, 1, 0,   0,   1,   1    )
--#define MPP22_SATA1_PRESENTn	MPP( 22, 0x5, 0, 1, 0,   0,   1,   1    )
--
--#define MPP23_GPIO		MPP( 23, 0x0, 1, 1, 0,   1,   1,   1    )
--#define MPP23_TSMP3		MPP( 23, 0x1, 1, 1, 0,   0,   1,   1    )
--#define MPP23_TDM_CH2_RX_QL	MPP( 23, 0x2, 1, 0, 0,   0,   1,   1    )
--#define MPP23_GE1_3		MPP( 23, 0x3, 0, 0, 0,   1,   1,   1    )
--#define MPP23_AUDIO_I2SBCLK	MPP( 23, 0x4, 0, 1, 0,   0,   1,   1    )
--#define MPP23_SATA0_PRESENTn	MPP( 23, 0x5, 0, 1, 0,   1,   1,   1    )
--
--#define MPP24_GPIO		MPP( 24, 0x0, 1, 1, 0,   1,   1,   1    )
--#define MPP24_TSMP4		MPP( 24, 0x1, 1, 1, 0,   0,   1,   1    )
--#define MPP24_TDM_SPI_CS0	DEV( 24, 0x2, 0, 1, 0,   0,   1,   1    )
--#define MPP24_GE1_4		MPP( 24, 0x3, 0, 0, 0,   1,   1,   1    )
--#define MPP24_AUDIO_I2SDO	MPP( 24, 0x4, 0, 1, 0,   0,   1,   1    )
--
--#define MPP25_GPIO		MPP( 25, 0x0, 1, 1, 0,   1,   1,   1    )
--#define MPP25_TSMP5		MPP( 25, 0x1, 1, 1, 0,   0,   1,   1    )
--#define MPP25_TDM_SPI_SCK	MPP( 25, 0x2, 0, 1, 0,   0,   1,   1    )
--#define MPP25_GE1_5		MPP( 25, 0x3, 0, 0, 0,   1,   1,   1    )
--#define MPP25_AUDIO_I2SLRCLK	MPP( 25, 0x4, 0, 1, 0,   0,   1,   1    )
--
--#define MPP26_GPIO		MPP( 26, 0x0, 1, 1, 0,   1,   1,   1    )
--#define MPP26_TSMP6		MPP( 26, 0x1, 1, 1, 0,   0,   1,   1    )
--#define MPP26_TDM_SPI_MISO	MPP( 26, 0x2, 1, 0, 0,   0,   1,   1    )
--#define MPP26_GE1_6		MPP( 26, 0x3, 0, 0, 0,   1,   1,   1    )
--#define MPP26_AUDIO_I2SMCLK	MPP( 26, 0x4, 0, 1, 0,   0,   1,   1    )
--
--#define MPP27_GPIO		MPP( 27, 0x0, 1, 1, 0,   1,   1,   1    )
--#define MPP27_TSMP7		MPP( 27, 0x1, 1, 1, 0,   0,   1,   1    )
--#define MPP27_TDM_SPI_MOSI	MPP( 27, 0x2, 0, 1, 0,   0,   1,   1    )
--#define MPP27_GE1_7		MPP( 27, 0x3, 0, 0, 0,   1,   1,   1    )
--#define MPP27_AUDIO_I2SDI	MPP( 27, 0x4, 1, 0, 0,   0,   1,   1    )
--
--#define MPP28_GPIO		MPP( 28, 0x0, 1, 1, 0,   1,   1,   1    )
--#define MPP28_TSMP8		MPP( 28, 0x1, 1, 1, 0,   0,   1,   1    )
--#define MPP28_TDM_CODEC_INTn	MPP( 28, 0x2, 0, 0, 0,   0,   1,   1    )
--#define MPP28_GE1_8		MPP( 28, 0x3, 0, 0, 0,   1,   1,   1    )
--#define MPP28_AUDIO_EXTCLK	MPP( 28, 0x4, 1, 0, 0,   0,   1,   1    )
--
--#define MPP29_GPIO		MPP( 29, 0x0, 1, 1, 0,   1,   1,   1    )
--#define MPP29_TSMP9		MPP( 29, 0x1, 1, 1, 0,   0,   1,   1    )
--#define MPP29_TDM_CODEC_RSTn	MPP( 29, 0x2, 0, 0, 0,   0,   1,   1    )
--#define MPP29_GE1_9		MPP( 29, 0x3, 0, 0, 0,   1,   1,   1    )
--
--#define MPP30_GPIO		MPP( 30, 0x0, 1, 1, 0,   1,   1,   1    )
--#define MPP30_TSMP10		MPP( 30, 0x1, 1, 1, 0,   0,   1,   1    )
--#define MPP30_TDM_PCLK		MPP( 30, 0x2, 1, 1, 0,   0,   1,   1    )
--#define MPP30_GE1_10		MPP( 30, 0x3, 0, 0, 0,   1,   1,   1    )
--
--#define MPP31_GPIO		MPP( 31, 0x0, 1, 1, 0,   1,   1,   1    )
--#define MPP31_TSMP11		MPP( 31, 0x1, 1, 1, 0,   0,   1,   1    )
--#define MPP31_TDM_FS		MPP( 31, 0x2, 1, 1, 0,   0,   1,   1    )
--#define MPP31_GE1_11		MPP( 31, 0x3, 0, 0, 0,   1,   1,   1    )
--
--#define MPP32_GPIO		MPP( 32, 0x0, 1, 1, 0,   1,   1,   1    )
--#define MPP32_TSMP12		MPP( 32, 0x1, 1, 1, 0,   0,   1,   1    )
--#define MPP32_TDM_DRX		MPP( 32, 0x2, 1, 0, 0,   0,   1,   1    )
--#define MPP32_GE1_12		MPP( 32, 0x3, 0, 0, 0,   1,   1,   1    )
--
--#define MPP33_GPIO		MPP( 33, 0x0, 1, 1, 0,   1,   1,   1    )
--#define MPP33_TDM_DTX		MPP( 33, 0x2, 0, 1, 0,   0,   1,   1    )
--#define MPP33_GE1_13		MPP( 33, 0x3, 0, 0, 0,   1,   1,   1    )
--
--#define MPP34_GPIO		MPP( 34, 0x0, 1, 1, 0,   1,   1,   1    )
--#define MPP34_TDM_SPI_CS1	MPP( 34, 0x2, 0, 1, 0,   0,   1,   1    )
--#define MPP34_GE1_14		MPP( 34, 0x3, 0, 0, 0,   1,   1,   1    )
--
--#define MPP35_GPIO		MPP( 35, 0x0, 1, 1, 1,   1,   1,   1    )
--#define MPP35_TDM_CH0_TX_QL	MPP( 35, 0x2, 0, 1, 0,   0,   1,   1    )
--#define MPP35_GE1_15		MPP( 35, 0x3, 0, 0, 0,   1,   1,   1    )
--#define MPP35_SATA0_ACTn	MPP( 35, 0x5, 0, 1, 0,   1,   1,   1    )
--#define MPP35_MII0_RXERR	MPP( 35, 0xc, 1, 0, 1,   1,   1,   1    )
--
--#define MPP36_GPIO		MPP( 36, 0x0, 1, 1, 1,   0,   0,   1    )
--#define MPP36_TSMP0		MPP( 36, 0x1, 1, 1, 0,   0,   0,   1    )
--#define MPP36_TDM_SPI_CS1	MPP( 36, 0x2, 0, 1, 0,   0,   0,   1    )
--#define MPP36_AUDIO_SPDIFI	MPP( 36, 0x4, 1, 0, 1,   0,   0,   1    )
--
--#define MPP37_GPIO		MPP( 37, 0x0, 1, 1, 1,   0,   0,   1    )
--#define MPP37_TSMP1		MPP( 37, 0x1, 1, 1, 0,   0,   0,   1    )
--#define MPP37_TDM_CH2_TX_QL	MPP( 37, 0x2, 0, 1, 0,   0,   0,   1    )
--#define MPP37_AUDIO_SPDIFO	MPP( 37, 0x4, 0, 1, 1,   0,   0,   1    )
--
--#define MPP38_GPIO		MPP( 38, 0x0, 1, 1, 1,   0,   0,   1    )
--#define MPP38_TSMP2		MPP( 38, 0x1, 1, 1, 0,   0,   0,   1    )
--#define MPP38_TDM_CH2_RX_QL	MPP( 38, 0x2, 0, 1, 0,   0,   0,   1    )
--#define MPP38_AUDIO_SPDIFRMLCLK	MPP( 38, 0x4, 0, 1, 1,   0,   0,   1    )
--
--#define MPP39_GPIO		MPP( 39, 0x0, 1, 1, 1,   0,   0,   1    )
--#define MPP39_TSMP3		MPP( 39, 0x1, 1, 1, 0,   0,   0,   1    )
--#define MPP39_TDM_SPI_CS0	MPP( 39, 0x2, 0, 1, 0,   0,   0,   1    )
--#define MPP39_AUDIO_I2SBCLK	MPP( 39, 0x4, 0, 1, 1,   0,   0,   1    )
--
--#define MPP40_GPIO		MPP( 40, 0x0, 1, 1, 1,   0,   0,   1    )
--#define MPP40_TSMP4		MPP( 40, 0x1, 1, 1, 0,   0,   0,   1    )
--#define MPP40_TDM_SPI_SCK	MPP( 40, 0x2, 0, 1, 0,   0,   0,   1    )
--#define MPP40_AUDIO_I2SDO	MPP( 40, 0x4, 0, 1, 1,   0,   0,   1    )
--
--#define MPP41_GPIO		MPP( 41, 0x0, 1, 1, 1,   0,   0,   1    )
--#define MPP41_TSMP5		MPP( 41, 0x1, 1, 1, 0,   0,   0,   1    )
--#define MPP41_TDM_SPI_MISO	MPP( 41, 0x2, 1, 0, 0,   0,   0,   1    )
--#define MPP41_AUDIO_I2SLRC	MPP( 41, 0x4, 0, 1, 1,   0,   0,   1    )
--
--#define MPP42_GPIO		MPP( 42, 0x0, 1, 1, 1,   0,   0,   1    )
--#define MPP42_TSMP6		MPP( 42, 0x1, 1, 1, 0,   0,   0,   1    )
--#define MPP42_TDM_SPI_MOSI	MPP( 42, 0x2, 0, 1, 0,   0,   0,   1    )
--#define MPP42_AUDIO_I2SMCLK	MPP( 42, 0x4, 0, 1, 1,   0,   0,   1    )
--
--#define MPP43_GPIO		MPP( 43, 0x0, 1, 1, 1,   0,   0,   1    )
--#define MPP43_TSMP7		MPP( 43, 0x1, 1, 1, 0,   0,   0,   1    )
--#define MPP43_TDM_CODEC_INTn	MPP( 43, 0x2, 0, 0, 0,   0,   0,   1    )
--#define MPP43_AUDIO_I2SDI	MPP( 43, 0x4, 1, 0, 1,   0,   0,   1    )
--
--#define MPP44_GPIO		MPP( 44, 0x0, 1, 1, 1,   0,   0,   1    )
--#define MPP44_TSMP8		MPP( 44, 0x1, 1, 1, 0,   0,   0,   1    )
--#define MPP44_TDM_CODEC_RSTn	MPP( 44, 0x2, 0, 0, 0,   0,   0,   1    )
--#define MPP44_AUDIO_EXTCLK	MPP( 44, 0x4, 1, 0, 1,   0,   0,   1    )
--
--#define MPP45_GPIO		MPP( 45, 0x0, 1, 1, 0,   0,   0,   1    )
--#define MPP45_TSMP9		MPP( 45, 0x1, 1, 1, 0,   0,   0,   1    )
--#define MPP45_TDM_PCLK		MPP( 45, 0x2, 1, 1, 0,   0,   0,   1    )
--
--#define MPP46_GPIO		MPP( 46, 0x0, 1, 1, 0,   0,   0,   1    )
--#define MPP46_TSMP10		MPP( 46, 0x1, 1, 1, 0,   0,   0,   1    )
--#define MPP46_TDM_FS		MPP( 46, 0x2, 1, 1, 0,   0,   0,   1    )
--
--#define MPP47_GPIO		MPP( 47, 0x0, 1, 1, 0,   0,   0,   1    )
--#define MPP47_TSMP11		MPP( 47, 0x1, 1, 1, 0,   0,   0,   1    )
--#define MPP47_TDM_DRX		MPP( 47, 0x2, 1, 0, 0,   0,   0,   1    )
--
--#define MPP48_GPIO		MPP( 48, 0x0, 1, 1, 0,   0,   0,   1    )
--#define MPP48_TSMP12		MPP( 48, 0x1, 1, 1, 0,   0,   0,   1    )
--#define MPP48_TDM_DTX		MPP( 48, 0x2, 0, 1, 0,   0,   0,   1    )
--
--#define MPP49_GPIO		MPP( 49, 0x0, 1, 1, 0,   0,   0,   1    )
--#define MPP49_TSMP9		MPP( 49, 0x1, 1, 1, 0,   0,   0,   1    )
--#define MPP49_TDM_CH0_RX_QL	MPP( 49, 0x2, 0, 1, 0,   0,   0,   1    )
--#define MPP49_PTP_CLK		MPP( 49, 0x5, 1, 0, 0,   0,   0,   1    )
-+				/*   num sel  i  o  6180 6190 6192 6281 6282 */
++	kirkwood_pcie_id(&dev, &rev);
 +
-+#define MPP_INPUT_MASK		MPP(  0, 0x0, 1, 0, 0,   0,   0,   0,   0 )
-+#define MPP_OUTPUT_MASK		MPP(  0, 0x0, 0, 1, 0,   0,   0,   0,   0 )
++	if (dev == MV88F6282_DEV_ID && (rev == MV88F6282_REV_A0)) {
++	  setup_cpu_win(id++, KIRKWOOD_PCIE1_IO_PHYS_BASE, KIRKWOOD_PCIE1_IO_SIZE,
++			TARGET_PCIE, ATTR_PCIE1_IO, KIRKWOOD_PCIE1_IO_BUS_BASE);
++	  setup_cpu_win(id++, KIRKWOOD_PCIE1_MEM_PHYS_BASE, KIRKWOOD_PCIE1_MEM_SIZE,
++			TARGET_PCIE, ATTR_PCIE1_MEM, KIRKWOOD_PCIE1_MEM_BUS_BASE);
++	}
 +
-+#define MPP_F6180_MASK		MPP(  0, 0x0, 0, 0, 1,   0,   0,   0,   0 )
-+#define MPP_F6190_MASK		MPP(  0, 0x0, 0, 0, 0,   1,   0,   0,   0 )
-+#define MPP_F6192_MASK		MPP(  0, 0x0, 0, 0, 0,   0,   1,   0,   0 )
-+#define MPP_F6281_MASK		MPP(  0, 0x0, 0, 0, 0,   0,   0,   1,   0 )
-+#define MPP_F6282_MASK		MPP(  0, 0x0, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP0_GPIO		MPP(  0, 0x0, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP0_NF_IO2		MPP(  0, 0x1, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP0_SPI_SCn		MPP(  0, 0x2, 0, 1, 1,   1,   1,   1,   1 )
-+
-+#define MPP1_GPO		MPP(  1, 0x0, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP1_NF_IO3		MPP(  1, 0x1, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP1_SPI_MOSI		MPP(  1, 0x2, 0, 1, 1,   1,   1,   1,   1 )
-+
-+#define MPP2_GPO		MPP(  2, 0x0, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP2_NF_IO4		MPP(  2, 0x1, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP2_SPI_SCK		MPP(  2, 0x2, 0, 1, 1,   1,   1,   1,   1 )
-+
-+#define MPP3_GPO		MPP(  3, 0x0, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP3_NF_IO5		MPP(  3, 0x1, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP3_SPI_MISO		MPP(  3, 0x2, 1, 0, 1,   1,   1,   1,   1 )
-+
-+#define MPP4_GPIO		MPP(  4, 0x0, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP4_NF_IO6		MPP(  4, 0x1, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP4_UART0_RXD		MPP(  4, 0x2, 1, 0, 1,   1,   1,   1,   1 )
-+#define MPP4_SATA1_ACTn		MPP(  4, 0x5, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP4_LCD_VGA_HSYNC	MPP(  4, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+#define MPP4_PTP_CLK		MPP(  4, 0xd, 1, 0, 1,   1,   1,   1,   0 )
-+
-+#define MPP5_GPO		MPP(  5, 0x0, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP5_NF_IO7		MPP(  5, 0x1, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP5_UART0_TXD		MPP(  5, 0x2, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP5_PTP_TRIG_GEN	MPP(  5, 0x4, 0, 1, 1,   1,   1,   1,   0 )
-+#define MPP5_SATA0_ACTn		MPP(  5, 0x5, 0, 1, 0,   1,   1,   1,   1 )
-+#define MPP5_LCD_VGA_VSYNC	MPP(  5, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP6_SYSRST_OUTn	MPP(  6, 0x1, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP6_SPI_MOSI		MPP(  6, 0x2, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP6_PTP_TRIG_GEN	MPP(  6, 0x3, 0, 1, 1,   1,   1,   1,   0 )
-+
-+#define MPP7_GPO		MPP(  7, 0x0, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP7_PEX_RST_OUTn	MPP(  7, 0x1, 0, 1, 1,   1,   1,   1,   0 )
-+#define MPP7_SPI_SCn		MPP(  7, 0x2, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP7_PTP_TRIG_GEN	MPP(  7, 0x3, 0, 1, 1,   1,   1,   1,   0 )
-+#define MPP7_LCD_PWM		MPP(  7, 0xb, 0, 1, 0,   0,   0,   0,   1 )
-+
-+#define MPP8_GPIO		MPP(  8, 0x0, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP8_TW0_SDA		MPP(  8, 0x1, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP8_UART0_RTS		MPP(  8, 0x2, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP8_UART1_RTS		MPP(  8, 0x3, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP8_MII0_RXERR		MPP(  8, 0x4, 1, 0, 0,   1,   1,   1,   1 )
-+#define MPP8_SATA1_PRESENTn	MPP(  8, 0x5, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP8_PTP_CLK		MPP(  8, 0xc, 1, 0, 1,   1,   1,   1,   0 )
-+#define MPP8_MII0_COL		MPP(  8, 0xd, 1, 0, 1,   1,   1,   1,   1 )
-+
-+#define MPP9_GPIO		MPP(  9, 0x0, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP9_TW0_SCK		MPP(  9, 0x1, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP9_UART0_CTS		MPP(  9, 0x2, 1, 0, 1,   1,   1,   1,   1 )
-+#define MPP9_UART1_CTS		MPP(  9, 0x3, 1, 0, 1,   1,   1,   1,   1 )
-+#define MPP9_SATA0_PRESENTn	MPP(  9, 0x5, 0, 1, 0,   1,   1,   1,   1 )
-+#define MPP9_PTP_EVENT_REQ	MPP(  9, 0xc, 1, 0, 1,   1,   1,   1,   0 )
-+#define MPP9_MII0_CRS		MPP(  9, 0xd, 1, 0, 1,   1,   1,   1,   1 )
-+
-+#define MPP10_GPO		MPP( 10, 0x0, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP10_SPI_SCK		MPP( 10, 0x2, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP10_UART0_TXD		MPP( 10, 0X3, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP10_SATA1_ACTn	MPP( 10, 0x5, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP10_PTP_TRIG_GEN	MPP( 10, 0xc, 0, 1, 1,   1,   1,   1,   0 )
-+
-+#define MPP11_GPIO		MPP( 11, 0x0, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP11_SPI_MISO		MPP( 11, 0x2, 1, 0, 1,   1,   1,   1,   1 )
-+#define MPP11_UART0_RXD		MPP( 11, 0x3, 1, 0, 1,   1,   1,   1,   1 )
-+#define MPP11_PTP_EVENT_REQ	MPP( 11, 0x4, 1, 0, 1,   1,   1,   1,   0 )
-+#define MPP11_PTP_TRIG_GEN	MPP( 11, 0xc, 0, 1, 1,   1,   1,   1,   0 )
-+#define MPP11_PTP_CLK		MPP( 11, 0xd, 1, 0, 1,   1,   1,   1,   0 )
-+#define MPP11_SATA0_ACTn	MPP( 11, 0x5, 0, 1, 0,   1,   1,   1,   1 )
-+
-+#define MPP12_GPO		MPP( 12, 0x0, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP12_SD_CLK		MPP( 12, 0x1, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP12_AU_SPDIF0		MPP( 12, 0xa, 0, 1, 0,   0,   0,   0,   1 )
-+#define MPP12_SPI_MOSI		MPP( 12, 0xb, 0, 1, 0,   0,   0,   0,   1 )
-+#define MPP12_TW1_SDA		MPP( 12, 0xd, 1, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP13_GPIO		MPP( 13, 0x0, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP13_SD_CMD		MPP( 13, 0x1, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP13_UART1_TXD		MPP( 13, 0x3, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP13_AU_SPDIFRMCLK	MPP( 13, 0xa, 0, 1, 0,   0,   0,   0,   1 )
-+#define MPP13_LCDPWM		MPP( 13, 0xb, 0, 1, 0,   0,   0,   0,   1 )
-+
-+#define MPP14_GPIO		MPP( 14, 0x0, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP14_SD_D0		MPP( 14, 0x1, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP14_UART1_RXD		MPP( 14, 0x3, 1, 0, 1,   1,   1,   1,   1 )
-+#define MPP14_SATA1_PRESENTn	MPP( 14, 0x4, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP14_AU_SPDIFI		MPP( 14, 0xa, 1, 0, 0,   0,   0,   0,   1 )
-+#define MPP14_AU_I2SDI		MPP( 14, 0xb, 1, 0, 0,   0,   0,   0,   1 )
-+#define MPP14_MII0_COL		MPP( 14, 0xd, 1, 0, 1,   1,   1,   1,   1 )
-+
-+#define MPP15_GPIO		MPP( 15, 0x0, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP15_SD_D1		MPP( 15, 0x1, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP15_UART0_RTS		MPP( 15, 0x2, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP15_UART1_TXD		MPP( 15, 0x3, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP15_SATA0_ACTn	MPP( 15, 0x4, 0, 1, 0,   1,   1,   1,   1 )
-+#define MPP15_SPI_CSn		MPP( 15, 0xb, 0, 1, 0,   0,   0,   0,   1 )
-+
-+#define MPP16_GPIO		MPP( 16, 0x0, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP16_SD_D2		MPP( 16, 0x1, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP16_UART0_CTS		MPP( 16, 0x2, 1, 0, 1,   1,   1,   1,   1 )
-+#define MPP16_UART1_RXD		MPP( 16, 0x3, 1, 0, 1,   1,   1,   1,   1 )
-+#define MPP16_SATA1_ACTn	MPP( 16, 0x4, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP16_LCD_EXT_REF_CLK	MPP( 16, 0xb, 1, 0, 0,   0,   0,   0,   1 )
-+#define MPP16_MII0_CRS		MPP( 16, 0xd, 1, 0, 1,   1,   1,   1,   1 )
-+
-+#define MPP17_GPIO		MPP( 17, 0x0, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP17_SD_D3		MPP( 17, 0x1, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP17_SATA0_PRESENTn	MPP( 17, 0x4, 0, 1, 0,   1,   1,   1,   1 )
-+#define MPP17_SATA1_ACTn	MPP( 17, 0xa, 0, 1, 0,   0,   0,   0,   1 )
-+#define MPP17_TW1_SCK		MPP( 17, 0xd, 1, 1, 0,   0,   0,   0,   1 )
-+
-+#define MPP18_GPO		MPP( 18, 0x0, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP18_NF_IO0		MPP( 18, 0x1, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP18_PEX0_CLKREQ	MPP( 18, 0x2, 0, 1, 0,   0,   0,   0,   1 )
-+
-+#define MPP19_GPO		MPP( 19, 0x0, 0, 1, 1,   1,   1,   1,   1 )
-+#define MPP19_NF_IO1		MPP( 19, 0x1, 1, 1, 1,   1,   1,   1,   1 )
-+
-+#define MPP20_GPIO		MPP( 20, 0x0, 1, 1, 0,   1,   1,   1,   1 )
-+#define MPP20_TSMP0		MPP( 20, 0x1, 1, 1, 0,   0,   1,   1,   1 )
-+#define MPP20_TDM_CH0_TX_QL	MPP( 20, 0x2, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP20_GE1_TXD0		MPP( 20, 0x3, 0, 0, 0,   1,   1,   1,   1 )
-+#define MPP20_AU_SPDIFI		MPP( 20, 0x4, 1, 0, 0,   0,   1,   1,   1 )
-+#define MPP20_SATA1_ACTn	MPP( 20, 0x5, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP20_LCD_D0		MPP( 20, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP21_GPIO		MPP( 21, 0x0, 1, 1, 0,   1,   1,   1,   1 )
-+#define MPP21_TSMP1		MPP( 21, 0x1, 1, 1, 0,   0,   1,   1,   1 )
-+#define MPP21_TDM_CH0_RX_QL	MPP( 21, 0x2, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP21_GE1_TXD1		MPP( 21, 0x3, 0, 0, 0,   1,   1,   1,   1 )
-+#define MPP21_AU_SPDIFO		MPP( 21, 0x4, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP21_SATA0_ACTn	MPP( 21, 0x5, 0, 1, 0,   1,   1,   1,   1 )
-+#define MPP21_LCD_D1		MPP( 21, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP22_GPIO		MPP( 22, 0x0, 1, 1, 0,   1,   1,   1,   1 )
-+#define MPP22_TSMP2		MPP( 22, 0x1, 1, 1, 0,   0,   1,   1,   1 )
-+#define MPP22_TDM_CH2_TX_QL	MPP( 22, 0x2, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP22_GE1_TXD2		MPP( 22, 0x3, 0, 0, 0,   1,   1,   1,   1 )
-+#define MPP22_AU_SPDIFRMKCLK	MPP( 22, 0x4, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP22_SATA1_PRESENTn	MPP( 22, 0x5, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP22_LCD_D2		MPP( 22, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP23_GPIO		MPP( 23, 0x0, 1, 1, 0,   1,   1,   1,   1 )
-+#define MPP23_TSMP3		MPP( 23, 0x1, 1, 1, 0,   0,   1,   1,   1 )
-+#define MPP23_TDM_CH2_RX_QL	MPP( 23, 0x2, 1, 0, 0,   0,   1,   1,   1 )
-+#define MPP23_GE1_TXD3		MPP( 23, 0x3, 0, 0, 0,   1,   1,   1,   1 )
-+#define MPP23_AU_I2SBCLK	MPP( 23, 0x4, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP23_SATA0_PRESENTn	MPP( 23, 0x5, 0, 1, 0,   1,   1,   1,   1 )
-+#define MPP23_LCD_D3		MPP( 23, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP24_GPIO		MPP( 24, 0x0, 1, 1, 0,   1,   1,   1,   1 )
-+#define MPP24_TSMP4		MPP( 24, 0x1, 1, 1, 0,   0,   1,   1,   1 )
-+#define MPP24_TDM_SPI_CS0	MPP( 24, 0x2, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP24_GE1_RXD0		MPP( 24, 0x3, 0, 0, 0,   1,   1,   1,   1 )
-+#define MPP24_AU_I2SDO		MPP( 24, 0x4, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP24_LCD_D4		MPP( 24, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP25_GPIO		MPP( 25, 0x0, 1, 1, 0,   1,   1,   1,   1 )
-+#define MPP25_TSMP5		MPP( 25, 0x1, 1, 1, 0,   0,   1,   1,   1 )
-+#define MPP25_TDM_SPI_SCK	MPP( 25, 0x2, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP25_GE1_RXD1		MPP( 25, 0x3, 0, 0, 0,   1,   1,   1,   1 )
-+#define MPP25_AU_I2SLRCLK	MPP( 25, 0x4, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP25_LCD_D5		MPP( 25, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP26_GPIO		MPP( 26, 0x0, 1, 1, 0,   1,   1,   1,   1 )
-+#define MPP26_TSMP6		MPP( 26, 0x1, 1, 1, 0,   0,   1,   1,   1 )
-+#define MPP26_TDM_SPI_MISO	MPP( 26, 0x2, 1, 0, 0,   0,   1,   1,   1 )
-+#define MPP26_GE1_RXD2		MPP( 26, 0x3, 0, 0, 0,   1,   1,   1,   1 )
-+#define MPP26_AU_I2SMCLK	MPP( 26, 0x4, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP26_LCD_D6		MPP( 26, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP27_GPIO		MPP( 27, 0x0, 1, 1, 0,   1,   1,   1,   1 )
-+#define MPP27_TSMP7		MPP( 27, 0x1, 1, 1, 0,   0,   1,   1,   1 )
-+#define MPP27_TDM_SPI_MOSI	MPP( 27, 0x2, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP27_GE1_RXD3		MPP( 27, 0x3, 0, 0, 0,   1,   1,   1,   1 )
-+#define MPP27_AU_I2SDI		MPP( 27, 0x4, 1, 0, 0,   0,   1,   1,   1 )
-+#define MPP27_LCD_D7		MPP( 27, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP28_GPIO		MPP( 28, 0x0, 1, 1, 0,   1,   1,   1,   1 )
-+#define MPP28_TSMP8		MPP( 28, 0x1, 1, 1, 0,   0,   1,   1,   1 )
-+#define MPP28_TDM_CODEC_INTn	MPP( 28, 0x2, 0, 0, 0,   0,   1,   1,   1 )
-+#define MPP28_GE1_COL		MPP( 28, 0x3, 0, 0, 0,   1,   1,   1,   1 )
-+#define MPP28_AU_EXTCLK		MPP( 28, 0x4, 1, 0, 0,   0,   1,   1,   1 )
-+#define MPP28_LCD_D8		MPP( 28, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP29_GPIO		MPP( 29, 0x0, 1, 1, 0,   1,   1,   1,   1 )
-+#define MPP29_TSMP9		MPP( 29, 0x1, 1, 1, 0,   0,   1,   1,   1 )
-+#define MPP29_TDM_CODEC_RSTn	MPP( 29, 0x2, 0, 0, 0,   0,   1,   1,   1 )
-+#define MPP29_GE1_TCLK		MPP( 29, 0x3, 0, 0, 0,   1,   1,   1,   1 )
-+#define MPP29_LCD_D9		MPP( 29, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP30_GPIO		MPP( 30, 0x0, 1, 1, 0,   1,   1,   1,   1 )
-+#define MPP30_TSMP10		MPP( 30, 0x1, 1, 1, 0,   0,   1,   1,   1 )
-+#define MPP30_TDM_PCLK		MPP( 30, 0x2, 1, 1, 0,   0,   1,   1,   1 )
-+#define MPP30_GE1_RXCTL		MPP( 30, 0x3, 0, 0, 0,   1,   1,   1,   1 )
-+#define MPP30_LCD_D10		MPP( 30, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP31_GPIO		MPP( 31, 0x0, 1, 1, 0,   1,   1,   1,   1 )
-+#define MPP31_TSMP11		MPP( 31, 0x1, 1, 1, 0,   0,   1,   1,   1 )
-+#define MPP31_TDM_FS		MPP( 31, 0x2, 1, 1, 0,   0,   1,   1,   1 )
-+#define MPP31_GE1_RXCLK		MPP( 31, 0x3, 0, 0, 0,   1,   1,   1,   1 )
-+#define MPP31_LCD_D11		MPP( 31, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP32_GPIO		MPP( 32, 0x0, 1, 1, 0,   1,   1,   1,   1 )
-+#define MPP32_TSMP12		MPP( 32, 0x1, 1, 1, 0,   0,   1,   1,   1 )
-+#define MPP32_TDM_DRX		MPP( 32, 0x2, 1, 0, 0,   0,   1,   1,   1 )
-+#define MPP32_GE1_TCLKOUT	MPP( 32, 0x3, 0, 0, 0,   1,   1,   1,   1 )
-+#define MPP32_LCD_D12		MPP( 32, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP33_GPO		MPP( 33, 0x0, 0, 1, 0,   1,   1,   1,   1 )
-+#define MPP33_TDM_DTX		MPP( 33, 0x2, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP33_GE1_TXCTL		MPP( 33, 0x3, 0, 0, 0,   1,   1,   1,   1 )
-+#define MPP33_LCD_D13		MPP( 33, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP34_GPIO		MPP( 34, 0x0, 1, 1, 0,   1,   1,   1,   1 )
-+#define MPP34_TDM_SPI_CS1	MPP( 34, 0x2, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP34_GE1_TXEN		MPP( 34, 0x3, 0, 0, 0,   1,   1,   1,   1 )
-+#define MPP34_SATA1_ACTn	MPP( 34, 0x5, 0, 1, 0,   0,   0,   1,   1 )
-+#define MPP34_LCD_D14		MPP( 34, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP35_GPIO		MPP( 35, 0x0, 1, 1, 1,   1,   1,   1,   1 )
-+#define MPP35_TDM_CH0_TX_QL	MPP( 35, 0x2, 0, 1, 0,   0,   1,   1,   1 )
-+#define MPP35_GE1_RXERR		MPP( 35, 0x3, 0, 0, 0,   1,   1,   1,   1 )
-+#define MPP35_SATA0_ACTn	MPP( 35, 0x5, 0, 1, 0,   1,   1,   1,   1 )
-+#define MPP35_LCD_D15		MPP( 22, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+#define MPP35_MII0_RXERR	MPP( 35, 0xc, 1, 0, 1,   1,   1,   1,   1 )
-+
-+#define MPP36_GPIO		MPP( 36, 0x0, 1, 1, 1,   0,   0,   1,   1 )
-+#define MPP36_TSMP0		MPP( 36, 0x1, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP36_TDM_SPI_CS1	MPP( 36, 0x2, 0, 1, 0,   0,   0,   1,   1 )
-+#define MPP36_AU_SPDIFI		MPP( 36, 0x4, 1, 0, 1,   0,   0,   1,   1 )
-+#define MPP36_TW1_SDA		MPP( 36, 0xb, 1, 1, 0,   0,   0,   0,   1 )
-+
-+#define MPP37_GPIO		MPP( 37, 0x0, 1, 1, 1,   0,   0,   1,   1 )
-+#define MPP37_TSMP1		MPP( 37, 0x1, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP37_TDM_CH2_TX_QL	MPP( 37, 0x2, 0, 1, 0,   0,   0,   1,   1 )
-+#define MPP37_AU_SPDIFO		MPP( 37, 0x4, 0, 1, 1,   0,   0,   1,   1 )
-+#define MPP37_TW1_SCK		MPP( 37, 0xb, 1, 1, 0,   0,   0,   0,   1 )
-+
-+#define MPP38_GPIO		MPP( 38, 0x0, 1, 1, 1,   0,   0,   1,   1 )
-+#define MPP38_TSMP2		MPP( 38, 0x1, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP38_TDM_CH2_RX_QL	MPP( 38, 0x2, 0, 1, 0,   0,   0,   1,   1 )
-+#define MPP38_AU_SPDIFRMLCLK	MPP( 38, 0x4, 0, 1, 1,   0,   0,   1,   1 )
-+#define MPP38_LCD_D18		MPP( 38, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP39_GPIO		MPP( 39, 0x0, 1, 1, 1,   0,   0,   1,   1 )
-+#define MPP39_TSMP3		MPP( 39, 0x1, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP39_TDM_SPI_CS0	MPP( 39, 0x2, 0, 1, 0,   0,   0,   1,   1 )
-+#define MPP39_AU_I2SBCLK	MPP( 39, 0x4, 0, 1, 1,   0,   0,   1,   1 )
-+#define MPP39_LCD_D19		MPP( 39, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP40_GPIO		MPP( 40, 0x0, 1, 1, 1,   0,   0,   1,   1 )
-+#define MPP40_TSMP4		MPP( 40, 0x1, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP40_TDM_SPI_SCK	MPP( 40, 0x2, 0, 1, 0,   0,   0,   1,   1 )
-+#define MPP40_AU_I2SDO		MPP( 40, 0x4, 0, 1, 1,   0,   0,   1,   1 )
-+#define MPP40_LCD_D20		MPP( 40, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP41_GPIO		MPP( 41, 0x0, 1, 1, 1,   0,   0,   1,   1 )
-+#define MPP41_TSMP5		MPP( 41, 0x1, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP41_TDM_SPI_MISO	MPP( 41, 0x2, 1, 0, 0,   0,   0,   1,   1 )
-+#define MPP41_AU_I2SLRCLK	MPP( 41, 0x4, 0, 1, 1,   0,   0,   1,   1 )
-+#define MPP41_LCD_D21		MPP( 41, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP42_GPIO		MPP( 42, 0x0, 1, 1, 1,   0,   0,   1,   1 )
-+#define MPP42_TSMP6		MPP( 42, 0x1, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP42_TDM_SPI_MOSI	MPP( 42, 0x2, 0, 1, 0,   0,   0,   1,   1 )
-+#define MPP42_AU_I2SMCLK	MPP( 42, 0x4, 0, 1, 1,   0,   0,   1,   1 )
-+#define MPP42_LCD_D22		MPP( 42, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP43_GPIO		MPP( 43, 0x0, 1, 1, 1,   0,   0,   1,   1 )
-+#define MPP43_TSMP7		MPP( 43, 0x1, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP43_TDM_CODEC_INTn	MPP( 43, 0x2, 0, 0, 0,   0,   0,   1,   1 )
-+#define MPP43_AU_I2SDI		MPP( 43, 0x4, 1, 0, 1,   0,   0,   1,   1 )
-+#define MPP43_LCD_D23		MPP( 22, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP44_GPIO		MPP( 44, 0x0, 1, 1, 1,   0,   0,   1,   1 )
-+#define MPP44_TSMP8		MPP( 44, 0x1, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP44_TDM_CODEC_RSTn	MPP( 44, 0x2, 0, 0, 0,   0,   0,   1,   1 )
-+#define MPP44_AU_EXTCLK		MPP( 44, 0x4, 1, 0, 1,   0,   0,   1,   1 )
-+#define MPP44_LCD_CLK		MPP( 44, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP45_GPIO		MPP( 45, 0x0, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP45_TSMP9		MPP( 45, 0x1, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP45_TDM_PCLK		MPP( 45, 0x2, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP245_LCD_E		MPP( 45, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP46_GPIO		MPP( 46, 0x0, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP46_TSMP10		MPP( 46, 0x1, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP46_TDM_FS		MPP( 46, 0x2, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP46_LCD_HSYNC		MPP( 46, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP47_GPIO		MPP( 47, 0x0, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP47_TSMP11		MPP( 47, 0x1, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP47_TDM_DRX		MPP( 47, 0x2, 1, 0, 0,   0,   0,   1,   1 )
-+#define MPP47_LCD_VSYNC		MPP( 47, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP48_GPIO		MPP( 48, 0x0, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP48_TSMP12		MPP( 48, 0x1, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP48_TDM_DTX		MPP( 48, 0x2, 0, 1, 0,   0,   0,   1,   1 )
-+#define MPP48_LCD_D16		MPP( 22, 0xb, 0, 0, 0,   0,   0,   0,   1 )
-+
-+#define MPP49_GPIO		MPP( 49, 0x0, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP49_TSMP9		MPP( 49, 0x1, 1, 1, 0,   0,   0,   1,   1 )
-+#define MPP49_TDM_CH0_RX_QL	MPP( 49, 0x2, 0, 1, 0,   0,   0,   1,   1 )
-+#define MPP49_PTP_CLK		MPP( 49, 0x5, 1, 0, 0,   0,   0,   1,   0 )
-+#define MPP49_PEX0_CLKREQ	MPP( 49, 0xa, 0, 1, 0,   0,   0,   0,   1 )
-+#define MPP49_LCD_D17		MPP( 49, 0xb, 0, 0, 0,   0,   0,   0,   1 )
+ 	/*
+ 	 * Setup window for NAND controller.
+ 	 */
+-	setup_cpu_win(2, KIRKWOOD_NAND_MEM_PHYS_BASE, KIRKWOOD_NAND_MEM_SIZE,
++	setup_cpu_win(id++, KIRKWOOD_NAND_MEM_PHYS_BASE, KIRKWOOD_NAND_MEM_SIZE,
+ 		      TARGET_DEV_BUS, ATTR_DEV_NAND, -1);
  
- #define MPP_MAX			49
+ 	/*
+ 	 * Setup window for SRAM.
+ 	 */
+-	setup_cpu_win(3, KIRKWOOD_SRAM_PHYS_BASE, KIRKWOOD_SRAM_SIZE,
++	setup_cpu_win(id++, KIRKWOOD_SRAM_PHYS_BASE, KIRKWOOD_SRAM_SIZE,
+ 		      TARGET_SRAM, ATTR_SRAM, -1);
  
-diff --git a/arch/arm/mach-kirkwood/netspace_v2-setup.c b/arch/arm/mach-kirkwood/netspace_v2-setup.c
-index 3ae158d..b96e43b 100644
---- a/arch/arm/mach-kirkwood/netspace_v2-setup.c
-+++ b/arch/arm/mach-kirkwood/netspace_v2-setup.c
-@@ -249,8 +249,8 @@ static unsigned int netspace_v2_mpp_config[] __initdata = {
- 	MPP4_NF_IO6,
- 	MPP5_NF_IO7,
- 	MPP6_SYSRST_OUTn,
--	MPP8_TW_SDA,
--	MPP9_TW_SCK,
-+	MPP8_TW0_SDA,
-+	MPP9_TW0_SCK,
- 	MPP10_UART0_TXD,
- 	MPP11_UART0_RXD,
- 	MPP12_GPO,		/* Red led */
-diff --git a/arch/arm/mach-kirkwood/netxbig_v2-setup.c b/arch/arm/mach-kirkwood/netxbig_v2-setup.c
-index 8a2bb02..2bd14c5 100644
---- a/arch/arm/mach-kirkwood/netxbig_v2-setup.c
-+++ b/arch/arm/mach-kirkwood/netxbig_v2-setup.c
-@@ -270,8 +270,8 @@ static unsigned int net2big_v2_mpp_config[] __initdata = {
- 	MPP3_SPI_MISO,
- 	MPP6_SYSRST_OUTn,
- 	MPP7_GPO,		/* Request power-off */
--	MPP8_TW_SDA,
--	MPP9_TW_SCK,
-+	MPP8_TW0_SDA,
-+	MPP9_TW0_SCK,
- 	MPP10_UART0_TXD,
- 	MPP11_UART0_RXD,
- 	MPP13_GPIO,		/* Rear power switch (on|auto) */
-@@ -306,8 +306,8 @@ static unsigned int net5big_v2_mpp_config[] __initdata = {
- 	MPP3_SPI_MISO,
- 	MPP6_SYSRST_OUTn,
- 	MPP7_GPO,		/* Request power-off */
--	MPP8_TW_SDA,
--	MPP9_TW_SCK,
-+	MPP8_TW0_SDA,
-+	MPP9_TW0_SCK,
- 	MPP10_UART0_TXD,
- 	MPP11_UART0_RXD,
- 	MPP13_GPIO,		/* Rear power switch (on|auto) */
-@@ -315,20 +315,20 @@ static unsigned int net5big_v2_mpp_config[] __initdata = {
- 	MPP15_GPIO,		/* Rear power switch (auto|off) */
- 	MPP16_GPIO,		/* SATA HDD1 power */
- 	MPP17_GPIO,		/* SATA HDD2 power */
--	MPP20_GE1_0,
--	MPP21_GE1_1,
--	MPP22_GE1_2,
--	MPP23_GE1_3,
--	MPP24_GE1_4,
--	MPP25_GE1_5,
--	MPP26_GE1_6,
--	MPP27_GE1_7,
-+	MPP20_GE1_TXD0,
-+	MPP21_GE1_TXD1,
-+	MPP22_GE1_TXD2,
-+	MPP23_GE1_TXD3,
-+	MPP24_GE1_RXD0,
-+	MPP25_GE1_RXD1,
-+	MPP26_GE1_RXD2,
-+	MPP27_GE1_RXD3,
- 	MPP28_GPIO,		/* USB enable host vbus */
- 	MPP29_GPIO,		/* CPLD extension ALE */
--	MPP30_GE1_10,
--	MPP31_GE1_11,
--	MPP32_GE1_12,
--	MPP33_GE1_13,
-+	MPP30_GE1_RXCTL,
-+	MPP31_GE1_RXCLK,
-+	MPP32_GE1_TCLKOUT,
-+	MPP33_GE1_TXCTL,
- 	MPP34_GPIO,		/* Rear Push button */
- 	MPP35_GPIO,		/* Inhibit switch power-off */
- 	MPP36_GPIO,		/* SATA HDD1 presence */
+ 	/*
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index 94f629d..473a1d0 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -44,6 +44,11 @@ static struct map_desc kirkwood_io_desc[] __initdata = {
+ 		.length		= KIRKWOOD_PCIE_IO_SIZE,
+ 		.type		= MT_DEVICE,
+ 	}, {
++		.virtual	= KIRKWOOD_PCIE1_IO_VIRT_BASE,
++		.pfn		= __phys_to_pfn(KIRKWOOD_PCIE1_IO_PHYS_BASE),
++		.length		= KIRKWOOD_PCIE1_IO_SIZE,
++		.type		= MT_DEVICE,
++	}, {
+ 		.virtual	= KIRKWOOD_REGS_VIRT_BASE,
+ 		.pfn		= __phys_to_pfn(KIRKWOOD_REGS_PHYS_BASE),
+ 		.length		= KIRKWOOD_REGS_SIZE,
+@@ -957,12 +962,20 @@ void __init kirkwood_init(void)
+ static int __init kirkwood_clock_gate(void)
+ {
+ 	unsigned int curr = readl(CLOCK_GATING_CTRL);
++	u32 dev, rev;
++	int flags;
+ 
+ 	printk(KERN_DEBUG "Gating clock of unused units\n");
+ 	printk(KERN_DEBUG "before: 0x%08x\n", curr);
+ 
++	kirkwood_pcie_id(&dev, &rev);
++
+ 	/* Make sure those units are accessible */
+-	writel(curr | CGC_SATA0 | CGC_SATA1 | CGC_PEX0, CLOCK_GATING_CTRL);
++	flags = curr | CGC_SATA0 | CGC_SATA1 | CGC_PEX0;
++
++	if (dev == MV88F6282_DEV_ID && (rev == MV88F6282_REV_A0))
++		flags |= CGC_PEX1;	
++	writel(flags, CLOCK_GATING_CTRL);
+ 
+ 	/* For SATA: first shutdown the phy */
+ 	if (!(kirkwood_clk_ctrl & CGC_SATA0)) {
+@@ -978,7 +991,7 @@ static int __init kirkwood_clock_gate(void)
+ 		writel(readl(SATA1_IF_CTRL) | 0x200, SATA1_IF_CTRL);
+ 	}
+ 	
+-	/* For PCIe: first shutdown the phy */
++	/* For PCIe #0: first shutdown the phy */
+ 	if (!(kirkwood_clk_ctrl & CGC_PEX0)) {
+ 		writel(readl(PCIE_LINK_CTRL) | 0x10, PCIE_LINK_CTRL);
+ 		while (1)
+@@ -987,6 +1000,17 @@ static int __init kirkwood_clock_gate(void)
+ 		writel(readl(PCIE_LINK_CTRL) & ~0x10, PCIE_LINK_CTRL);
+ 	}
+ 
++	/* For PCIe #1: first shutdown the phy */
++	if (dev == MV88F6282_DEV_ID && (rev == MV88F6282_REV_A0)) {
++		if (!(kirkwood_clk_ctrl & CGC_PEX1)) {
++			writel(readl(PCIE1_LINK_CTRL) | 0x10, PCIE1_LINK_CTRL);
++			while (1)
++				if (readl(PCIE1_STATUS) & 0x1)
++					break;
++			writel(readl(PCIE1_LINK_CTRL) & ~0x10, PCIE1_LINK_CTRL);
++		}
++	}
++
+ 	/* Now gate clock the required units */
+ 	writel(kirkwood_clk_ctrl, CLOCK_GATING_CTRL);
+ 	printk(KERN_DEBUG " after: 0x%08x\n", readl(CLOCK_GATING_CTRL));
+diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
+index 05e8a8a..5b2c1c1 100644
+--- a/arch/arm/mach-kirkwood/common.h
++++ b/arch/arm/mach-kirkwood/common.h
+@@ -18,6 +18,9 @@ struct mvsdio_platform_data;
+ struct mtd_partition;
+ struct mtd_info;
+ 
++#define KW_PCIE0	(1 << 0)
++#define KW_PCIE1	(1 << 1)
++
+ /*
+  * Basic Kirkwood init functions used early by machine-setup.
+  */
+@@ -34,7 +37,7 @@ void kirkwood_ehci_init(void);
+ void kirkwood_ge00_init(struct mv643xx_eth_platform_data *eth_data);
+ void kirkwood_ge01_init(struct mv643xx_eth_platform_data *eth_data);
+ void kirkwood_ge00_switch_init(struct dsa_platform_data *d, int irq);
+-void kirkwood_pcie_init(void);
++void kirkwood_pcie_init(unsigned int portmask);
+ void kirkwood_sata_init(struct mv_sata_platform_data *sata_data);
+ void kirkwood_sdio_init(struct mvsdio_platform_data *mvsdio_data);
+ void kirkwood_spi_init(void);
+diff --git a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+index 39bdf4b..7550c4e 100644
+--- a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
++++ b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+@@ -75,7 +75,7 @@ static void __init db88f6281_init(void)
+ static int __init db88f6281_pci_init(void)
+ {
+ 	if (machine_is_db88f6281_bp())
+-		kirkwood_pcie_init();
++		kirkwood_pcie_init(KW_PCIE0);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
+index 418f501..aff0e13 100644
+--- a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
++++ b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
+@@ -59,8 +59,9 @@
+ #define CGC_SATA1		(1 << 15)
+ #define CGC_XOR1		(1 << 16)
+ #define CGC_CRYPTO		(1 << 17)
++#define CGC_PEX1		(1 << 18)
+ #define CGC_GE1			(1 << 19)
+ #define CGC_TDM			(1 << 20)
+-#define CGC_RESERVED		((1 << 18) | (0x6 << 21))
++#define CGC_RESERVED		(0x6 << 21)
+ 
+ #endif
+diff --git a/arch/arm/mach-kirkwood/include/mach/irqs.h b/arch/arm/mach-kirkwood/include/mach/irqs.h
+index f00a0a4..9da2eb5 100644
+--- a/arch/arm/mach-kirkwood/include/mach/irqs.h
++++ b/arch/arm/mach-kirkwood/include/mach/irqs.h
+@@ -23,6 +23,7 @@
+ #define IRQ_KIRKWOOD_XOR_10	7
+ #define IRQ_KIRKWOOD_XOR_11	8
+ #define IRQ_KIRKWOOD_PCIE	9
++#define IRQ_KIRKWOOD_PCIE1	10
+ #define IRQ_KIRKWOOD_GE00_SUM	11
+ #define IRQ_KIRKWOOD_GE01_SUM	15
+ #define IRQ_KIRKWOOD_USB	19
+diff --git a/arch/arm/mach-kirkwood/include/mach/kirkwood.h b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
+index a571860..7f0b50a 100644
+--- a/arch/arm/mach-kirkwood/include/mach/kirkwood.h
++++ b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
+@@ -38,6 +38,11 @@
+ #define KIRKWOOD_PCIE_IO_BUS_BASE	0x00000000
+ #define KIRKWOOD_PCIE_IO_SIZE		SZ_1M
+ 
++#define KIRKWOOD_PCIE1_IO_PHYS_BASE	0xf5000000
++#define KIRKWOOD_PCIE1_IO_VIRT_BASE	0xfed00000
++#define KIRKWOOD_PCIE1_IO_BUS_BASE	0x00000000
++#define KIRKWOOD_PCIE1_IO_SIZE		SZ_1M
++
+ #define KIRKWOOD_REGS_PHYS_BASE		0xf1000000
+ #define KIRKWOOD_REGS_VIRT_BASE		0xfee00000
+ #define KIRKWOOD_REGS_SIZE		SZ_1M
+@@ -46,6 +51,10 @@
+ #define KIRKWOOD_PCIE_MEM_BUS_BASE	0xe0000000
+ #define KIRKWOOD_PCIE_MEM_SIZE		SZ_128M
+ 
++#define KIRKWOOD_PCIE1_MEM_PHYS_BASE	0xd8000000
++#define KIRKWOOD_PCIE1_MEM_BUS_BASE	0xd8000000
++#define KIRKWOOD_PCIE1_MEM_SIZE		SZ_128M
++
+ /*
+  * Register Map
+  */
+@@ -72,6 +81,9 @@
+ #define PCIE_VIRT_BASE		(KIRKWOOD_REGS_VIRT_BASE | 0x40000)
+ #define PCIE_LINK_CTRL		(PCIE_VIRT_BASE | 0x70)
+ #define PCIE_STATUS		(PCIE_VIRT_BASE | 0x1a04)
++#define PCIE1_VIRT_BASE		(KIRKWOOD_REGS_VIRT_BASE | 0x44000)
++#define PCIE1_LINK_CTRL		(PCIE1_VIRT_BASE | 0x70)
++#define PCIE1_STATUS		(PCIE1_VIRT_BASE | 0x1a04)
+ 
+ #define USB_PHYS_BASE		(KIRKWOOD_REGS_PHYS_BASE | 0x50000)
+ 
+diff --git a/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c b/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
+index 5e6f711..c6b92b4 100644
+--- a/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
++++ b/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
+@@ -155,7 +155,7 @@ static void __init mv88f6281gtw_ge_init(void)
+ static int __init mv88f6281gtw_ge_pci_init(void)
+ {
+ 	if (machine_is_mv88f6281gtw_ge())
+-		kirkwood_pcie_init();
++		kirkwood_pcie_init(KW_PCIE0);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
+index ad3f1ec..2400207 100644
+--- a/arch/arm/mach-kirkwood/openrd-setup.c
++++ b/arch/arm/mach-kirkwood/openrd-setup.c
+@@ -85,7 +85,7 @@ static void __init openrd_init(void)
+ static int __init openrd_pci_init(void)
+ {
+ 	if (machine_is_openrd_base() || machine_is_openrd_client())
+-		kirkwood_pcie_init();
++		kirkwood_pcie_init(KW_PCIE0);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
+index dee1eff..dd1dc29 100644
+--- a/arch/arm/mach-kirkwood/pcie.c
++++ b/arch/arm/mach-kirkwood/pcie.c
+@@ -18,29 +18,51 @@
+ #include <mach/bridge-regs.h>
+ #include "common.h"
+ 
++void __init kirkwood_pcie_id(u32 *dev, u32 *rev)
++{
++	*dev = orion_pcie_dev_id((void __iomem *)PCIE_VIRT_BASE);
++	*rev = orion_pcie_rev((void __iomem *)PCIE_VIRT_BASE);
++}
+ 
+-#define PCIE_BASE	((void __iomem *)PCIE_VIRT_BASE)
++struct pcie_port {
++	int			index;
++	u8			root_bus_nr;
++	void __iomem		*base;
++	spinlock_t		conf_lock;
++	int			irq;
++	struct resource		res[2];
++};
+ 
+-void __init kirkwood_pcie_id(u32 *dev, u32 *rev)
++static struct pcie_port pcie_port[2];
++static int num_pcie_ports;
++
++static inline struct pcie_port *bus_to_port(int bus)
+ {
+-	*dev = orion_pcie_dev_id(PCIE_BASE);
+-	*rev = orion_pcie_rev(PCIE_BASE);
++	int i;
++
++	for (i = num_pcie_ports - 1; i >= 0; i--) {
++        	int rbus = pcie_port[i].root_bus_nr;
++		if (rbus != -1 && rbus <= bus)
++			break;
++	}
++
++	return i >= 0 ? pcie_port + i : NULL;
+ }
+ 
+-static int pcie_valid_config(int bus, int dev)
++static int pcie_valid_config(struct pcie_port *pp, int bus, int dev)
+ {
+ 	/*
+ 	 * Don't go out when trying to access --
+ 	 * 1. nonexisting device on local bus
+ 	 * 2. where there's no device connected (no link)
+ 	 */
+-	if (bus == 0 && dev == 0)
++	if (bus == pp->root_bus_nr && dev == 0)
+ 		return 1;
+ 
+-	if (!orion_pcie_link_up(PCIE_BASE))
++	if (!orion_pcie_link_up(pp->base))
+ 		return 0;
+ 
+-	if (bus == 0 && dev != 1)
++	if (bus == pp->root_bus_nr && dev != 1)
+ 		return 0;
+ 
+ 	return 1;
+@@ -52,22 +74,22 @@ static int pcie_valid_config(int bus, int dev)
+  * and then reading the PCIE_CONF_DATA register. Need to make sure these
+  * transactions are atomic.
+  */
+-static DEFINE_SPINLOCK(kirkwood_pcie_lock);
+ 
+ static int pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+ 			int size, u32 *val)
+ {
++	struct pcie_port *pp = bus_to_port(bus->number);
+ 	unsigned long flags;
+ 	int ret;
+ 
+-	if (pcie_valid_config(bus->number, PCI_SLOT(devfn)) == 0) {
++	if (pcie_valid_config(pp, bus->number, PCI_SLOT(devfn)) == 0) {
+ 		*val = 0xffffffff;
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 	}
+ 
+-	spin_lock_irqsave(&kirkwood_pcie_lock, flags);
+-	ret = orion_pcie_rd_conf(PCIE_BASE, bus, devfn, where, size, val);
+-	spin_unlock_irqrestore(&kirkwood_pcie_lock, flags);
++	spin_lock_irqsave(&pp->conf_lock, flags);
++	ret = orion_pcie_rd_conf(pp->base, bus, devfn, where, size, val);
++	spin_unlock_irqrestore(&pp->conf_lock, flags);
+ 
+ 	return ret;
+ }
+@@ -75,15 +97,16 @@ static int pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+ static int pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+ 			int where, int size, u32 val)
+ {
++	struct pcie_port *pp = bus_to_port(bus->number);
+ 	unsigned long flags;
+ 	int ret;
+ 
+-	if (pcie_valid_config(bus->number, PCI_SLOT(devfn)) == 0)
++	if (pcie_valid_config(pp, bus->number, PCI_SLOT(devfn)) == 0)
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 
+-	spin_lock_irqsave(&kirkwood_pcie_lock, flags);
+-	ret = orion_pcie_wr_conf(PCIE_BASE, bus, devfn, where, size, val);
+-	spin_unlock_irqrestore(&kirkwood_pcie_lock, flags);
++	spin_lock_irqsave(&pp->conf_lock, flags);
++	ret = orion_pcie_wr_conf(pp->base, bus, devfn, where, size, val);
++	spin_unlock_irqrestore(&pp->conf_lock, flags);
+ 
+ 	return ret;
+ }
+@@ -93,50 +116,106 @@ static struct pci_ops pcie_ops = {
+ 	.write = pcie_wr_conf,
+ };
+ 
+-
+-static int __init kirkwood_pcie_setup(int nr, struct pci_sys_data *sys)
++static int __init pcie0_ioresouces_setup(struct pcie_port *pp)
+ {
+-	struct resource *res;
+-	extern unsigned int kirkwood_clk_ctrl;
+-
+ 	/*
+-	 * Generic PCIe unit setup.
++	 * IORESOURCE_IO
+ 	 */
+-	orion_pcie_setup(PCIE_BASE, &kirkwood_mbus_dram_info);
++	pp->res[0].name  = "PCIe 0 I/O Space";
++	pp->res[0].start = KIRKWOOD_PCIE_IO_PHYS_BASE;
++	pp->res[0].end   = pp->res[0].start + KIRKWOOD_PCIE_IO_SIZE - 1;
++	pp->res[0].flags = IORESOURCE_IO;
++	if (request_resource(&ioport_resource, &pp->res[0]))
++		panic("Request PCIe 0 IO resource failed\n");
+ 
+ 	/*
+-	 * Request resources.
++	 * IORESOURCE_MEM
+ 	 */
+-	res = kzalloc(sizeof(struct resource) * 2, GFP_KERNEL);
+-	if (!res)
+-		panic("pcie_setup unable to alloc resources");
++	pp->res[1].name  = "PCIe 0 MEM";
++	pp->res[1].start = KIRKWOOD_PCIE_MEM_PHYS_BASE;
++	pp->res[1].end   = pp->res[1].start + KIRKWOOD_PCIE_MEM_SIZE - 1;
++	pp->res[1].flags = IORESOURCE_MEM;
++	if (request_resource(&iomem_resource, &pp->res[1]))
++		panic("Request PCIe 0 Memory resource failed\n");
++
++	return 1;
++}
+ 
++static int __init pcie1_ioresouces_setup(struct pcie_port *pp)
++{
+ 	/*
+ 	 * IORESOURCE_IO
+ 	 */
+-	res[0].name = "PCIe I/O Space";
+-	res[0].flags = IORESOURCE_IO;
+-	res[0].start = KIRKWOOD_PCIE_IO_BUS_BASE;
+-	res[0].end = res[0].start + KIRKWOOD_PCIE_IO_SIZE - 1;
+-	if (request_resource(&ioport_resource, &res[0]))
+-		panic("Request PCIe IO resource failed\n");
+-	sys->resource[0] = &res[0];
++	pp->res[0].name  = "PCIe 1 I/O Space";
++	pp->res[0].start = KIRKWOOD_PCIE1_IO_PHYS_BASE;
++	pp->res[0].end   = pp->res[0].start + KIRKWOOD_PCIE1_IO_SIZE - 1;
++	pp->res[0].flags = IORESOURCE_IO;
++	if (request_resource(&ioport_resource, &pp->res[0]))
++		panic("Request PCIe 1 IO resource failed\n");
+ 
+ 	/*
+ 	 * IORESOURCE_MEM
+ 	 */
+-	res[1].name = "PCIe Memory Space";
+-	res[1].flags = IORESOURCE_MEM;
+-	res[1].start = KIRKWOOD_PCIE_MEM_BUS_BASE;
+-	res[1].end = res[1].start + KIRKWOOD_PCIE_MEM_SIZE - 1;
+-	if (request_resource(&iomem_resource, &res[1]))
+-		panic("Request PCIe Memory resource failed\n");
+-	sys->resource[1] = &res[1];
++	pp->res[1].name  = "PCIe 1 MEM";
++	pp->res[1].start = KIRKWOOD_PCIE1_MEM_PHYS_BASE;
++	pp->res[1].end   = pp->res[1].start + KIRKWOOD_PCIE1_MEM_SIZE - 1;
++	pp->res[1].flags = IORESOURCE_MEM;
++	if (request_resource(&iomem_resource, &pp->res[1]))
++		panic("Request PCIe 1 Memory resource failed\n");
+ 
+-	sys->resource[2] = NULL;
+-	sys->io_offset = 0;
++	return 1;
++}
++
++static void __init kirkwood_pcie_preinit(void)
++{
++	int i;
++
++	for (i = 0; i < num_pcie_ports; i++) {
++		struct pcie_port *pp = pcie_port + i;
++		extern unsigned int kirkwood_clk_ctrl;
+ 
++		switch (pp->index) {
++		case 0:
++			pp->base = (void __iomem *)PCIE_VIRT_BASE;
++			pp->irq	= IRQ_KIRKWOOD_PCIE;
+ 	kirkwood_clk_ctrl |= CGC_PEX0;
++			pcie0_ioresouces_setup(pp);
++			break;
++		case 1:
++			pp->base = (void __iomem *)PCIE1_VIRT_BASE;
++			pp->irq	= IRQ_KIRKWOOD_PCIE1;
++			kirkwood_clk_ctrl |= CGC_PEX1;
++			pcie1_ioresouces_setup(pp);
++			break;
++		default:
++			panic("PCIe setup: invalid controller");
++		}
++	}
++}
++
++static int __init kirkwood_pcie_setup(int nr, struct pci_sys_data *sys)
++{
++	struct pcie_port *pp;
++
++	if (nr >= num_pcie_ports)
++		return 0;
++
++	pp = &pcie_port[nr];
++	pp->root_bus_nr = sys->busnr;
++
++	printk(KERN_INFO "PCI: bus%d uses PCIe port %d\n",
++	       sys->busnr, pp->index);
++
++	/*
++	 * Generic PCIe unit setup.
++	 */
++	orion_pcie_set_local_bus_nr(pp->base, sys->busnr);
++	orion_pcie_setup(pp->base, &kirkwood_mbus_dram_info);
++
++	sys->resource[0] = &pp->res[0];
++	sys->resource[1] = &pp->res[1];
++	sys->resource[2] = NULL;
++	sys->io_offset   = 0;
+ 
+ 	return 1;
+ }
+@@ -163,7 +242,7 @@ kirkwood_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+ {
+ 	struct pci_bus *bus;
+ 
+-	if (nr == 0) {
++	if (nr < num_pcie_ports) {
+ 		bus = pci_scan_bus(sys->busnr, &pcie_ops, sys);
+ 	} else {
+ 		bus = NULL;
+@@ -175,18 +254,45 @@ kirkwood_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+ 
+ static int __init kirkwood_pcie_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
+ {
+-	return IRQ_KIRKWOOD_PCIE;
++	struct pcie_port *pp = bus_to_port(dev->bus->number);
++
++	return pp->irq;
+ }
+ 
+ static struct hw_pci kirkwood_pci __initdata = {
+-	.nr_controllers	= 1,
++	.preinit	= kirkwood_pcie_preinit,
+ 	.swizzle	= pci_std_swizzle,
+ 	.setup		= kirkwood_pcie_setup,
+ 	.scan		= kirkwood_pcie_scan_bus,
+ 	.map_irq	= kirkwood_pcie_map_irq,
+ };
+ 
+-void __init kirkwood_pcie_init(void)
++static void __init add_pcie_port(int index, unsigned long base)
++{
++	printk(KERN_INFO "Kirkwood PCIe port %d: ", index);
++
++	if (orion_pcie_link_up((void __iomem *)base)) {
++		struct pcie_port *pp = &pcie_port[num_pcie_ports++];
++
++		printk(KERN_INFO "link up\n");
++
++		pp->index = index;
++		pp->root_bus_nr = -1;
++		pp->base = (void __iomem *)base;
++		spin_lock_init(&pp->conf_lock);
++		memset(pp->res, 0, sizeof(pp->res));
++	} else
++		printk(KERN_INFO "link down, ignoring\n");
++}
++
++void __init kirkwood_pcie_init(unsigned int portmask)
+ {
++	if (portmask & KW_PCIE0)
++		add_pcie_port(0, PCIE_VIRT_BASE);
++
++	if (portmask & KW_PCIE1)
++		add_pcie_port(1, PCIE1_VIRT_BASE);
++
++	kirkwood_pci.nr_controllers = num_pcie_ports;
+ 	pci_common_init(&kirkwood_pci);
+ }
+diff --git a/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c b/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
+index 3bf6304..c34718c 100644
+--- a/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
++++ b/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
+@@ -71,7 +71,7 @@ static void __init rd88f6192_init(void)
+ static int __init rd88f6192_pci_init(void)
+ {
+ 	if (machine_is_rd88f6192_nas())
+-		kirkwood_pcie_init();
++		kirkwood_pcie_init(KW_PCIE0);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-kirkwood/rd88f6281-setup.c b/arch/arm/mach-kirkwood/rd88f6281-setup.c
+index 31708dd..3d14771 100644
+--- a/arch/arm/mach-kirkwood/rd88f6281-setup.c
++++ b/arch/arm/mach-kirkwood/rd88f6281-setup.c
+@@ -107,7 +107,7 @@ static void __init rd88f6281_init(void)
+ static int __init rd88f6281_pci_init(void)
+ {
+ 	if (machine_is_rd88f6281())
+-		kirkwood_pcie_init();
++		kirkwood_pcie_init(KW_PCIE0);
+ 
+ 	return 0;
+ }
 diff --git a/arch/arm/mach-kirkwood/ts219-setup.c b/arch/arm/mach-kirkwood/ts219-setup.c
-index 2830f0f..d23aff9 100644
+index d23aff9..5c7dd85 100644
 --- a/arch/arm/mach-kirkwood/ts219-setup.c
 +++ b/arch/arm/mach-kirkwood/ts219-setup.c
-@@ -74,8 +74,8 @@ static unsigned int qnap_ts219_mpp_config[] __initdata = {
- 	MPP3_SPI_MISO,
- 	MPP4_SATA1_ACTn,
- 	MPP5_SATA0_ACTn,
--	MPP8_TW_SDA,
--	MPP9_TW_SCK,
-+	MPP8_TW0_SDA,
-+	MPP9_TW0_SCK,
- 	MPP10_UART0_TXD,
- 	MPP11_UART0_RXD,
- 	MPP13_UART1_TXD,	/* PIC controller */
+@@ -111,7 +111,7 @@ static void __init qnap_ts219_init(void)
+ static int __init ts219_pci_init(void)
+ {
+    if (machine_is_ts219())
+-           kirkwood_pcie_init();
++	kirkwood_pcie_init(KW_PCIE0);
+ 
+    return 0;
+ }
 diff --git a/arch/arm/mach-kirkwood/ts41x-setup.c b/arch/arm/mach-kirkwood/ts41x-setup.c
-index de49c2d..ecd0d5f 100644
+index ecd0d5f..a2c5f70 100644
 --- a/arch/arm/mach-kirkwood/ts41x-setup.c
 +++ b/arch/arm/mach-kirkwood/ts41x-setup.c
-@@ -78,26 +78,26 @@ static unsigned int qnap_ts41x_mpp_config[] __initdata = {
- 	MPP3_SPI_MISO,
- 	MPP6_SYSRST_OUTn,
- 	MPP7_PEX_RST_OUTn,
--	MPP8_TW_SDA,
--	MPP9_TW_SCK,
-+	MPP8_TW0_SDA,
-+	MPP9_TW0_SCK,
- 	MPP10_UART0_TXD,
- 	MPP11_UART0_RXD,
- 	MPP13_UART1_TXD,	/* PIC controller */
- 	MPP14_UART1_RXD,	/* PIC controller */
- 	MPP15_SATA0_ACTn,
- 	MPP16_SATA1_ACTn,
--	MPP20_GE1_0,
--	MPP21_GE1_1,
--	MPP22_GE1_2,
--	MPP23_GE1_3,
--	MPP24_GE1_4,
--	MPP25_GE1_5,
--	MPP26_GE1_6,
--	MPP27_GE1_7,
--	MPP30_GE1_10,
--	MPP31_GE1_11,
--	MPP32_GE1_12,
--	MPP33_GE1_13,
-+	MPP20_GE1_TXD0,
-+	MPP21_GE1_TXD1,
-+	MPP22_GE1_TXD2,
-+	MPP23_GE1_TXD3,
-+	MPP24_GE1_RXD0,
-+	MPP25_GE1_RXD1,
-+	MPP26_GE1_RXD2,
-+	MPP27_GE1_RXD3,
-+	MPP30_GE1_RXCTL,
-+	MPP31_GE1_RXCLK,
-+	MPP32_GE1_TCLKOUT,
-+	MPP33_GE1_TXCTL,
- 	MPP36_GPIO,		/* RAM: 0: 256 MB, 1: 512 MB */
- 	MPP37_GPIO,		/* Reset button */
- 	MPP43_GPIO,		/* USB Copy button */
+@@ -136,7 +136,7 @@ static void __init qnap_ts41x_init(void)
+ static int __init ts41x_pci_init(void)
+ {
+ 	if (machine_is_ts41x())
+-		kirkwood_pcie_init();
++		kirkwood_pcie_init(KW_PCIE0);
+ 
+    return 0;
+ }
