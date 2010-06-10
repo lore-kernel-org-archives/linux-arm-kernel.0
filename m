@@ -1,38 +1,38 @@
 From: eric.miao@canonical.com (Eric Miao)
-Date: Thu, 10 Jun 2010 18:28:44 +0800
-Subject: [PATCH 0/10] cleanup in early boot code
-In-Reply-To: <20100610102427.GC31057@pengutronix.de>
-References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
-	<20100610102427.GC31057@pengutronix.de>
-Message-ID: <AANLkTimB-i5Pbf7DCWc8ojGIqpfoh5HE0SYYqTKqrbPc@mail.gmail.com>
+Date: Thu, 10 Jun 2010 18:31:52 +0800
+Subject: [PATCH 01/10] arm/zImage: don't hard code the stack size twice
+In-Reply-To: <1276165636-20150-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20100610102427.GC31057@pengutronix.de>
+	<1276165636-20150-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <AANLkTinvvP7GFMHDoaw3SgIetd42Yyho1r9oMuiSIlnV@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2010/6/10 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello,
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> ?arch/arm/boot/compressed/head.S | ? ?3 ++-
+> ?1 files changed, 2 insertions(+), 1 deletions(-)
 >
-> a while ago I sent a few patches that clean up in this area, too, some
-> of them are orthogonal to Eric's. ?I resend them in reply to this mail.
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index c5191b1..390aa92 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -315,7 +315,7 @@ LC0: ? ? ? ? ? ? ? ?.word ? LC0 ? ? ? ? ? ? ? ? ? ? @ r1
+> ? ? ? ? ? ? ? ?.word ? _image_size ? ? ? ? ? ? @ r6
+> ? ? ? ? ? ? ? ?.word ? _got_start ? ? ? ? ? ? ?@ r11
+> ? ? ? ? ? ? ? ?.word ? _got_end ? ? ? ? ? ? ? ?@ ip
+> - ? ? ? ? ? ? ? .word ? user_stack+4096 ? ? ? ? @ sp
+> + ? ? ? ? ? ? ? .word ? user_stack_end ? ? ? ? ?@ sp
+> ?LC1: ? ? ? ? ? .word ? reloc_end - reloc_start
+> ? ? ? ? ? ? ? ?.size ? LC0, . - LC0
 >
-> Eric, maybe we can start merging your and my work, at least the bits
-> that doesn't need further discussion between us? ?(i.e. the patches I
-> acked and hopefully the first few of mine)
->
-> Do you irc? ?I'm (e.g.) in #armlinux on freenode.
+> @@ -1070,3 +1070,4 @@ reloc_end:
+> ? ? ? ? ? ? ? ?.align
+> ? ? ? ? ? ? ? ?.section ".stack", "w"
+> ?user_stack: ? ?.space ?4096
+> +user_stack_end:
 
-I'm normally ericm or ericm|ubuntu in #ubuntu-arm, sometime, I'll add
-#armlinux into my channels to join automatically
+This one looks OK to me.
 
->
-> Best regards
-> Uwe
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Acked-by: Eric Miao <eric.miao@canonical.com>
