@@ -1,65 +1,91 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 10 Jun 2010 20:39:51 +0900
-Subject: [PATCH] sdhci-s3c: Add SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK quirk for
-	Samsung SoC
-Message-ID: <1276169991-16396-1-git-send-email-kgene.kim@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 10 Jun 2010 13:49:45 +0200
+Subject: [PATCH] mxc: Fix pad names for imx51
+In-Reply-To: <20100609130904.GA2599@eyjafjallajokull>
+References: <1275566746-6510-1-git-send-email-jason77.wang@gmail.com>
+	<1275566746-6510-2-git-send-email-jason77.wang@gmail.com>
+	<20100604085320.GB25357@pengutronix.de>
+	<20100604105347.GA2982@matterhorn.lan>
+	<20100604140959.GB2982@matterhorn.lan>
+	<4C0D5996.9050906@boundarydevices.com>
+	<20100607210448.GA2446@matterhorn.lan>
+	<4C0D6183.1010501@boundarydevices.com>
+	<20100608063036.GB20799@pengutronix.de>
+	<20100609130904.GA2599@eyjafjallajokull>
+Message-ID: <20100610114945.GM20799@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lee Hyuk <hyuk1.lee@samsung.com>
+On Wed, Jun 09, 2010 at 03:09:04PM +0200, Amit Kucheria wrote:
+> On 10 Jun 08, Sascha Hauer wrote:
+> > On Mon, Jun 07, 2010 at 02:15:47PM -0700, Troy Kisky wrote:
+> > > Amit Kucheria wrote:
+> > > > On 10 Jun 07, Troy Kisky wrote:
+> > > > 
+> > > >>> On 10 Jun 04, Amit Kucheria wrote:
+> > > >>>
+> > > > 
+> > > > <snip>
+> > > > 
+> > > >>> +#define MX51_PAD_CSPI1_SCLK__GPIO_4_27		IOMUX_PAD(0x614, 0x224,  3, 0x0,   0, NO_PAD_CTRL)
+> > > > 
+> > > > <snip>
+> > > > 
+> > > >>> +#define MX51_PAD_GPIO_1_2__GPIO_1_2		IOMUX_PAD(0x7D4, 0x3CC, 0, 0x0,   0, NO_PAD_CTRL)
+> > > >>> +#define MX51_PAD_GPIO_1_3__GPIO_1_3		IOMUX_PAD(0x7D8, 0x3D0, 0, 0x0,   0, NO_PAD_CTRL)
+> > > >>> +#define MX51_PAD_PMIC_INT_REQ__PMIC_INT_REQ	IOMUX_PAD(0x7FC, 0x3D4, 0, 0x0,   0, NO_PAD_CTRL)
+> > > >>> +#define MX51_PAD_GPIO_1_4__GPIO_1_4		IOMUX_PAD(0x804, 0x3D8, 0, 0x0,   0, NO_PAD_CTRL)
+> > > >>> +#define MX51_PAD_GPIO_1_5__GPIO_1_5		IOMUX_PAD(0x808, 0x3DC, 0, 0x0,   0, NO_PAD_CTRL)
+> > > >>> +#define MX51_PAD_GPIO_1_6__GPIO_1_6		IOMUX_PAD(0x80C, 0x3E0, 0, 0x0,   0, NO_PAD_CTRL)
+> > > >>> +#define MX51_PAD_GPIO_1_7__GPIO_1_7		IOMUX_PAD(0x810, 0x3E4, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> > > >>> +#define MX51_PAD_GPIO_1_8__GPIO_1_8		IOMUX_PAD(0x814, 0x3E8, 0, 0x0,   1, MX51_GPIO_PAD_CTRL)
+> > > >>> +#define MX51_PAD_GPIO_1_9__GPIO_1_9		IOMUX_PAD(0x818, 0x3EC, 0, 0x0,   0, NO_PAD_CTRL)
+> > > >> Why all the stuttering?
+> > > >> Isn't MX51_PAD_GPIO_1_9 or MX51_PAD_DISP2_DAT15 descriptive enough?
+> > > >>
+> > > > 
+> > > > Just following the convention use in the rest of imx devices. See the
+> > > > following comment at the top of the file:
+> > > > 
+> > > > /*
+> > > >  * The naming convention for the pad modes is MX51_PAD_<padname>__<padmode>
+> > > >  * If <padname> or <padmode> refers to a GPIO, it is named
+> > > >  * GPIO_<unit>_<num> see also iomux-v3.h
+> > > >  */
+> > > > 
+> > > > We could use the short names for pads being used in their "native mode".
+> > > > But as soon as we use the pad in a different mode, such as
+> > > > PAD_CSPI1_SCLK__GPIO_4_27 above, we'd need a different naming convention.
+> > > > 
+> > > > Regards,
+> > > > Amit
+> > > > 
+> > > 
+> > > I'm fine with MX51_PAD_CSPI1_SCLK__GPIO_4_27, but I don't care for
+> > > MX51_PAD_GPIO_1_9__GPIO_1_9. How about changing the comment to
+> > > 
+> > >  /*
+> > >   * The naming convention for the pad modes is MX51_PAD_<padname>
+> > >   * or MX51_PAD_<padname>__<padmode> if padname != padmode.
+> > >   * If <padname> or <padmode> refers to a GPIO, it is named
+> > >   * GPIO_<unit>_<num> see also iomux-v3.h
+> > >   */
+> > 
+> > If anything then MX51_PAD_GPIO_<unit>_<num>. I chose to use the long
+> > name to get a consistent naming and to express the fact that the pad has
+> > a name and the mode has a name which can but don't has to be the same.
+> > 
+> 
+> So will you take a modified patch to reflect this new naming convention?
 
-On Samsung's SDMMC hosts the timeout clock is derivied from the SD
-Clock, which is set dynamically.
-So, checked 'SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK' quirk and removed
-'sdhci_s3c_get_timeout_clk' callback which doesn't need any more.
+Unless there are strong opinions for short names I'd like to keep the
+old naming scheme as it is also used for other i.MX SoCs.
 
-Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- drivers/mmc/host/sdhci-s3c.c |   10 +++-------
- 1 files changed, 3 insertions(+), 7 deletions(-)
+Sascha
 
-diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-index af21792..ca09382 100644
---- a/drivers/mmc/host/sdhci-s3c.c
-+++ b/drivers/mmc/host/sdhci-s3c.c
-@@ -110,11 +110,6 @@ static unsigned int sdhci_s3c_get_max_clk(struct sdhci_host *host)
- 	return max;
- }
- 
--static unsigned int sdhci_s3c_get_timeout_clk(struct sdhci_host *host)
--{
--	return sdhci_s3c_get_max_clk(host) / 1000000;
--}
--
- /**
-  * sdhci_s3c_consider_clock - consider one the bus clocks for current setting
-  * @ourhost: Our SDHCI instance.
-@@ -188,7 +183,6 @@ static void sdhci_s3c_set_clock(struct sdhci_host *host, unsigned int clock)
- 
- 		ourhost->cur_clk = best_src;
- 		host->max_clk = clk_get_rate(clk);
--		host->timeout_clk = sdhci_s3c_get_timeout_clk(host);
- 
- 		ctrl = readl(host->ioaddr + S3C_SDHCI_CONTROL2);
- 		ctrl &= ~S3C_SDHCI_CTRL2_SELBASECLK_MASK;
-@@ -211,7 +205,6 @@ static void sdhci_s3c_set_clock(struct sdhci_host *host, unsigned int clock)
- 
- static struct sdhci_ops sdhci_s3c_ops = {
- 	.get_max_clock		= sdhci_s3c_get_max_clk,
--	.get_timeout_clock	= sdhci_s3c_get_timeout_clk,
- 	.set_clock		= sdhci_s3c_set_clock,
- };
- 
-@@ -335,6 +328,9 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
- 	host->quirks |= (SDHCI_QUIRK_32BIT_DMA_ADDR |
- 			 SDHCI_QUIRK_32BIT_DMA_SIZE);
- 
-+	/* HSMMC on Samsung SoCs uses SDCLK as timeout clock. */
-+	host->quirks |= SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK;
-+
- 	ret = sdhci_add_host(host);
- 	if (ret) {
- 		dev_err(dev, "sdhci_add_host() failed\n");
+
 -- 
-1.6.2.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
