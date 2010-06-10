@@ -1,49 +1,112 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 10 Jun 2010 12:00:39 +0200
-Subject: [PATCH 3/5] [ARM] Make TEXT_OFFSET a configurable option
-In-Reply-To: <AANLkTilNMqC0q65GzRiyyX091390TaHFD7ffaxkWWyf8@mail.gmail.com>
-References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
-	<1275550613-9553-4-git-send-email-eric.miao@canonical.com>
-	<20100610085053.GC3422@pengutronix.de>
-	<AANLkTilNMqC0q65GzRiyyX091390TaHFD7ffaxkWWyf8@mail.gmail.com>
-Message-ID: <20100610100039.GB31057@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 10 Jun 2010 19:01:25 +0900
+Subject: [PATCH v2] arm: s5pv210: add more banks to gpiolib
+In-Reply-To: <1276088919-20730-1-git-send-email-m.szyprowski@samsung.com>
+References: <1276088919-20730-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <019101cb0883$e5a07fb0$b0e17f10$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 10, 2010 at 05:45:53PM +0800, Eric Miao wrote:
-> 2010/6/10 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > On Thu, Jun 03, 2010 at 03:36:51PM +0800, Eric Miao wrote:
-> >> From: Eric Miao <eric.y.miao@gmail.com>
-> >>
-> >> Signed-off-by: Eric Miao <eric.miao@canonical.com>
-> >> ---
-> >> ?arch/arm/Kconfig ? ? ? ? | ? 13 +++++++++++++
-> >> ?arch/arm/Makefile ? ? ? ?| ? 13 +------------
-> >> ?arch/arm/kernel/Makefile | ? ?4 ++--
-> >> ?3 files changed, 16 insertions(+), 14 deletions(-)
-> >>
-> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> >> index 1f254bd..e340193 100644
-> >> --- a/arch/arm/Kconfig
-> >> +++ b/arch/arm/Kconfig
-> >> @@ -1484,6 +1484,19 @@ config ATAGS_PROC
-> >> ? ? ? ? Should the atags used to boot the kernel be exported in an "atags"
-> >> ? ? ? ? file in procfs. Useful with kexec.
-> >>
-> >> +config TEXT_OFFSET
-> >> + ? ? hex "Offset of the kernel image from the start of RAM"
-> > IMHO this should not be user configurable.
-> >
+Marek Szyprowski wrote:
 > 
-> That's true. The reason I don't want to keep this in Makefile is the
-> concern about future change to Makefile (that machine-y could be
-> composed of all the mach-*), and make it a kernel config option at
-> least provide a way to fix that by the user interactively.
-You can have both, just remove the string after "hex" above.
+> This patch adds support for MP04 and MP05 gpio banks.
+> 
+LGTM. Will apply.
 
-Best regards
-Uwe
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> ---
+> 
+> Changes since v1:
+> - fixed style issues reported by Kukjin Kim
+> 
+>  arch/arm/mach-s5pv210/gpiolib.c           |   14 ++++++++++++++
+>  arch/arm/mach-s5pv210/include/mach/gpio.h |   12 +++++++++---
+>  2 files changed, 23 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv210/gpiolib.c b/arch/arm/mach-s5pv210/gpiolib.c
+> index f4ac81f..0261908 100644
+> --- a/arch/arm/mach-s5pv210/gpiolib.c
+> +++ b/arch/arm/mach-s5pv210/gpiolib.c
+> @@ -208,6 +208,20 @@ static struct s3c_gpio_chip s5pv210_gpio_4bit[] = {
+>  			.label	= "MP03",
+>  		},
+>  	}, {
+> +		.config	= &gpio_cfg_noint,
+> +		.chip	= {
+> +			.base	= S5PV210_MP04(0),
+> +			.ngpio	= S5PV210_GPIO_MP04_NR,
+> +			.label	= "MP04",
+> +		},
+> +	}, {
+> +		.config	= &gpio_cfg_noint,
+> +		.chip	= {
+> +			.base	= S5PV210_MP05(0),
+> +			.ngpio	= S5PV210_GPIO_MP05_NR,
+> +			.label	= "MP05",
+> +		},
+> +	}, {
+>  		.base	= (S5P_VA_GPIO + 0xC00),
+>  		.config	= &gpio_cfg_noint,
+>  		.chip	= {
+> diff --git a/arch/arm/mach-s5pv210/include/mach/gpio.h b/arch/arm/mach-
+> s5pv210/include/mach/gpio.h
+> index d6461ba..1f4b595 100644
+> --- a/arch/arm/mach-s5pv210/include/mach/gpio.h
+> +++ b/arch/arm/mach-s5pv210/include/mach/gpio.h
+> @@ -52,6 +52,8 @@
+>  #define S5PV210_GPIO_MP01_NR	(8)
+>  #define S5PV210_GPIO_MP02_NR	(4)
+>  #define S5PV210_GPIO_MP03_NR	(8)
+> +#define S5PV210_GPIO_MP04_NR	(8)
+> +#define S5PV210_GPIO_MP05_NR	(8)
+> 
+>  /* GPIO bank numbers */
+> 
+> @@ -94,6 +96,8 @@ enum s5p_gpio_number {
+>  	S5PV210_GPIO_MP01_START	=
+> S5PV210_GPIO_NEXT(S5PV210_GPIO_J4),
+>  	S5PV210_GPIO_MP02_START	=
+> S5PV210_GPIO_NEXT(S5PV210_GPIO_MP01),
+>  	S5PV210_GPIO_MP03_START	=
+> S5PV210_GPIO_NEXT(S5PV210_GPIO_MP02),
+> +	S5PV210_GPIO_MP04_START	=
+> S5PV210_GPIO_NEXT(S5PV210_GPIO_MP03),
+> +	S5PV210_GPIO_MP05_START	=
+> S5PV210_GPIO_NEXT(S5PV210_GPIO_MP04),
+>  };
+> 
+>  /* S5PV210 GPIO number definitions */
+> @@ -127,13 +131,15 @@ enum s5p_gpio_number {
+>  #define S5PV210_MP01(_nr)	(S5PV210_GPIO_MP01_START + (_nr))
+>  #define S5PV210_MP02(_nr)	(S5PV210_GPIO_MP02_START + (_nr))
+>  #define S5PV210_MP03(_nr)	(S5PV210_GPIO_MP03_START + (_nr))
+> +#define S5PV210_MP04(_nr)	(S5PV210_GPIO_MP04_START + (_nr))
+> +#define S5PV210_MP05(_nr)	(S5PV210_GPIO_MP05_START + (_nr))
+> 
+>  /* the end of the S5PV210 specific gpios */
+> -#define S5PV210_GPIO_END	(S5PV210_MP03(S5PV210_GPIO_MP03_NR) +
+> 1)
+> +#define S5PV210_GPIO_END	(S5PV210_MP05(S5PV210_GPIO_MP05_NR) +
+> 1)
+>  #define S3C_GPIO_END		S5PV210_GPIO_END
+> 
+> -/* define the number of gpios we need to the one after the MP03() range */
+> -#define ARCH_NR_GPIOS
+> 	(S5PV210_MP03(S5PV210_GPIO_MP03_NR) +	\
+> +/* define the number of gpios we need to the one after the MP05() range */
+> +#define ARCH_NR_GPIOS
+> 	(S5PV210_MP05(S5PV210_GPIO_MP05_NR) +	\
+>  				 CONFIG_SAMSUNG_GPIO_EXTRA + 1)
+> 
+>  #include <asm-generic/gpio.h>
+> --
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
