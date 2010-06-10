@@ -1,50 +1,46 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 10 Jun 2010 12:14:32 +0300
-Subject: [PATCH] mx25: add a comment documenting undocumented IPG clocks
-Message-ID: <19a61a0788a899caf2be6126769b20bbf662f90a.1276161160.git.baruch@tkos.co.il>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 Jun 2010 10:16:08 +0100
+Subject: [PATCH 4/5] [ARM] Auto calculate ZRELADDR and provide option
+	for exceptions
+In-Reply-To: <20100610090015.GD3422@pengutronix.de>
+References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
+	<1275550613-9553-5-git-send-email-eric.miao@canonical.com>
+	<20100610090015.GD3422@pengutronix.de>
+Message-ID: <20100610091608.GA28305@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The information in the i.MX25 Reference Manual is lacking. Add information from
-the Freescale BSP.
+On Thu, Jun 10, 2010 at 11:00:15AM +0200, Uwe Kleine-K?nig wrote:
+> What do you think about requiring r4 to be set to physoffset as I did in
+> my series?  This way zImage would already know PHYSOFFSET and so didn't
+> need to guess ZRELADDR.  OK, until most bootloaders are fixed we need
+> to guess, too.  But at least this would provide a way to stop guessing
+> wrong for the affected platforms.
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/mach-mx25/clock.c |   22 ++++++++++++++++++++++
- 1 files changed, 22 insertions(+), 0 deletions(-)
+That means it won't get implemented.  Look at the facts.  It's taken
+_years_ (5+ years) for boot loaders to start passing a value in r1.
+We then switched to the ATAG stuff, and it's again taking years for
+boot loaders to start passing right ATAG stuff - and most of them don't
+get it right.  Eg, lots of uboot are happy to print out the memory
+information on the terminal as they start up, but don't pass memory
+information to the kernel.
 
-diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
-index f9662d9..43d6045 100644
---- a/arch/arm/mach-mx25/clock.c
-+++ b/arch/arm/mach-mx25/clock.c
-@@ -166,6 +166,28 @@ static void clk_cgcr_disable(struct clk *clk)
- 		.secondary	= s,			\
- 	}
- 
-+/*
-+ * Note: the following IPG clock gating bits are wrongly marked "Reserved" in
-+ * the i.MX25 Reference Manual Rev 1, table 15-13. The information below is
-+ * taken from the Freescale released BSP.
-+ *
-+ * bit	reg	offset	clock
-+ *
-+ * 0	CGCR1	0	AUDMUX
-+ * 12	CGCR1	12	ESAI
-+ * 16	CGCR1	16	GPIO1
-+ * 17	CGCR1	17	GPIO2
-+ * 18	CGCR1	18	GPIO3
-+ * 23	CGCR1	23	I2C1
-+ * 24	CGCR1	24	I2C2
-+ * 25	CGCR1	25	I2C3
-+ * 27	CGCR1	27	IOMUXC
-+ * 28	CGCR1	28	KPP
-+ * 30	CGCR1	30	OWIRE
-+ * 36	CGCR2	4	RTIC
-+ * 51	CGCR2	19	WDOG
-+ */
-+
- DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_gpt, NULL, NULL);
- DEFINE_CLOCK(uart_per_clk, 0, CCM_CGCR0, 15, get_rate_uart, NULL, NULL);
- DEFINE_CLOCK(cspi1_clk,  0, CCM_CGCR1,  5, get_rate_ipg, NULL, NULL);
--- 
-1.7.1
+So if we want phys offset in r4, we better realise that it'll take
+something like five years of nagging to get it in place, and even then
+people will continue to use boot loaders which don't have support.
+And if it's only necessary for a handful of platforms, I doubt anyone's
+really going to bother - or even validate that r4 is correct.
+
+You have a whole set of other problems - how do you cope with existing
+boot loaders which happen to call the kernel with a value in r4 which
+_could_ potentially be valid, but should not be used?  At the moment,
+r4 could contain _any_ value what so ever.
+
+Let's face it - advertising that "the kernel will eventually start using
+r4" doesn't solve the problem either - we did that with the ATAG list
+and we know the results from that.
+
+Maybe the right experiment to try this time - if we want r4 to contain
+a value - is to say that kernel 2.6.37 will require a value in r4, and
+won't boot without it, and will therefore be incompatible with old
+boot loaders.
