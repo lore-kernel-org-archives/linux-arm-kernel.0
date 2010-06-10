@@ -1,35 +1,46 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 10 Jun 2010 14:44:53 -0400 (EDT)
-Subject: [PATCH 0/5] Makefile.boot cleanup
-In-Reply-To: <20100603075704.GB336@pengutronix.de>
-References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
-	<20100603075704.GB336@pengutronix.de>
-Message-ID: <alpine.LFD.2.00.1006101442130.30664@xanadu.home>
+Date: Thu, 10 Jun 2010 14:47:40 -0400 (EDT)
+Subject: [PATCH 01/10] arm/zImage: don't hard code the stack size twice
+In-Reply-To: <AANLkTinvvP7GFMHDoaw3SgIetd42Yyho1r9oMuiSIlnV@mail.gmail.com>
+References: <20100610102427.GC31057@pengutronix.de>
+	<1276165636-20150-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<AANLkTinvvP7GFMHDoaw3SgIetd42Yyho1r9oMuiSIlnV@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1006101446450.30664@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Jun 2010, Uwe Kleine-K?nig wrote:
+On Thu, 10 Jun 2010, Eric Miao wrote:
 
-> Hello Eric,
+> 2010/6/10 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> > ?arch/arm/boot/compressed/head.S | ? ?3 ++-
+> > ?1 files changed, 2 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> > index c5191b1..390aa92 100644
+> > --- a/arch/arm/boot/compressed/head.S
+> > +++ b/arch/arm/boot/compressed/head.S
+> > @@ -315,7 +315,7 @@ LC0: ? ? ? ? ? ? ? ?.word ? LC0 ? ? ? ? ? ? ? ? ? ? @ r1
+> > ? ? ? ? ? ? ? ?.word ? _image_size ? ? ? ? ? ? @ r6
+> > ? ? ? ? ? ? ? ?.word ? _got_start ? ? ? ? ? ? ?@ r11
+> > ? ? ? ? ? ? ? ?.word ? _got_end ? ? ? ? ? ? ? ?@ ip
+> > - ? ? ? ? ? ? ? .word ? user_stack+4096 ? ? ? ? @ sp
+> > + ? ? ? ? ? ? ? .word ? user_stack_end ? ? ? ? ?@ sp
+> > ?LC1: ? ? ? ? ? .word ? reloc_end - reloc_start
+> > ? ? ? ? ? ? ? ?.size ? LC0, . - LC0
+> >
+> > @@ -1070,3 +1070,4 @@ reloc_end:
+> > ? ? ? ? ? ? ? ?.align
+> > ? ? ? ? ? ? ? ?.section ".stack", "w"
+> > ?user_stack: ? ?.space ?4096
+> > +user_stack_end:
 > 
-> On Thu, Jun 03, 2010 at 03:36:48PM +0800, Eric Miao wrote:
-> > Several facts:
-> > 
-> > 1. ZRELADDR in most cases can be auto detected by maksing PC with
-> >    0xf000_0000 if the zImage is placed within the first 256MiB from
-> >    the memory start, which is a sane assumption except for:
-> > 
-> >    - when ARCH_MX1 or ARCH_SHARK is defined
-> >    - when ARCH_U300 is defined (U300 really is strange when defining
-> >      PHYS_OFFSET and ZRELADDR)
-> >    - or when ZBOOT_ROM is defined
-> If you guess ZRELADDR based on sp instead of pc it even should work if
-> ZBOOT_ROM is defined?!
+> This one looks OK to me.
+> 
+> Acked-by: Eric Miao <eric.miao@canonical.com>
 
-If you're using ZBOOT_ROM that means you want to execute zImage directly 
-from ROM.  This is therefore a highly customized configuration.  In that 
-context, having a variable phys-offset doesn't make much sense to start 
-with.
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
 
 Nicolas
