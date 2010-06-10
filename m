@@ -1,87 +1,45 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 10 Jun 2010 17:00:51 -0400 (EDT)
-Subject: [PATCH v2 1/4] ARM: Remove the domain switching on ARMv6k/v7 CPUs
-In-Reply-To: <alpine.LFD.2.00.1006101411160.30664@xanadu.home>
-References: <20100602164459.17783.9741.stgit@e102109-lin.cambridge.arm.com>
-	<20100602164841.17783.94825.stgit@e102109-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1006091447460.30664@xanadu.home>
-	<1276122405.17056.47.camel@toshiba-laptop>
-	<alpine.LFD.2.00.1006092039000.30664@xanadu.home>
-	<1276169316.24535.32.camel@e102109-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1006101411160.30664@xanadu.home>
-Message-ID: <alpine.LFD.2.00.1006101648390.30664@xanadu.home>
+From: r-woodruff2@ti.com (Woodruff, Richard)
+Date: Thu, 10 Jun 2010 16:12:43 -0500
+Subject: facing undefined inconsistent cache issues on cortex-a9
+In-Reply-To: <4C0905BC.1090301@st.com>
+References: <4BF9F5FB.6020306@st.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C57001F3@dbde02.ent.ti.com>
+	<4BFBBD83.5080302@st.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C57A5FC6@dbde02.ent.ti.com>
+	<13B9B4C6EF24D648824FF11BE896716203BB37005A@dlee02.ent.ti.com>
+	<4C0905BC.1090301@st.com>
+Message-ID: <13B9B4C6EF24D648824FF11BE896716203BB762EB0@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Jun 2010, Nicolas Pitre wrote:
 
-> On Thu, 10 Jun 2010, Catalin Marinas wrote:
-> 
-> > On Thu, 2010-06-10 at 01:56 +0100, Nicolas Pitre wrote:
-> > > On Wed, 9 Jun 2010, Catalin Marinas wrote:
-> > > 
-> > > > On Wed, 2010-06-09 at 20:10 +0100, Nicolas Pitre wrote:
-> > > > > Sorry for the delay... I'm just starting to seriously look at this.
-> > > > >
-> > > > > On Wed, 2 Jun 2010, Catalin Marinas wrote:
-> > > > >
-> > > > > > This patch removes the domain switching functionality via the set_fs and
-> > > > > > __switch_to functions on cores that have a TLS register.
-> > > > > [...]
-> > > > > > The user pages access rights are also modified for kernel read-only
-> > > > > > access rather than read/write so that the copy-on-write mechanism still
-> > > > > > works. CPU_USE_DOMAINS gets disabled only if HAS_TLS_REG is defined
-> > > > > > since writing the TLS value to the high vectors page isn't possible.
-> > > > >
-> > > > > I don't like this limitation much.
-> > > > >
-> > > > > Since the vector page has to be accessed somehow for FIQs anyway, and
-> > > > > the current solution for that involves accesses through the direct
-> > > > > mapping of the vector page, then this patch could be made to work on
-> > > > > pre-ARMv6 systems too simply by adding the necessary cache ops around
-> > > > > the TLS and FIQ updates.
-> > > >
-> > > > Getting rid of domains in Linux requires that several functions no
-> > > > longer use LDRT/STRT but LDR/STR. This implies that RO user pages should
-> > > > also have RO permissions for the kernel. I don't have the old ARM ARM at
-> > > > hand now but I recall there were some issues with user RO kernel RO
-> > > > permission on pre-ARMv6 processors (there is an R bit in the CP15
-> > > > control register which may help, I need to check the documentation).
-> > > 
-> > > I just checked.  It says:
-> > > 
-> > >    The access permission bits in section and page descriptors control
-> > >    access to the corresponding section or page. The access permissions
-> > >    are modified by the System (S) and ROM (R) control bits in CP15
-> > >    register 1.
-> > > 
-> > > But those bits are of no use as they are effective only when the MMU
-> > > access permission bits are all 0, otherwise they're ignored.
-> > 
-> > OK. So for read-only user pages we could set AP to 00 and R to 1 so that
-> > pages are read-only for kernel as well. For the other cases we just use
-> > a non-zero AP.
-> 
-> But what about non existing pages?  They can't go through with a read 
-> access from the first memory page.
+> From: Shiraz HASHIM [mailto:shiraz.hashim at st.com]
+> Sent: Friday, June 04, 2010 8:55 AM
+> To: Woodruff, Richard
 
-Well... that looks like this is simply unworkable.  The R bit is global, 
-so as soon as you have it on then kernel access to any memory will 
-always succeed.  There is no way to have kernel RO user RO and still 
-have no access on missing pages.
+> thanks for your inputs. We have some updates in this regard.
+> In our architecture we have 2 ports coming out of the A9SM (multi core cortex)
+> block to the interconnect matrix and the transfers are distributed between
+> them.
+>
+> When we used the address filtering option of SCU to divide and mutually
+> exclude
+> the traffic between port0 and port1 of A9SM(multi core cortex) block. Like,
+> assigning 1 half of the address space to port 1 and rest goes through port0.
+> This solved the problem with the same set of cache and other system
+> configurations.
+> We are not using L2 cache and it is kept disabled. The SCU also is only used
+> for
+> address filtering and its synchronisation function is disabled (as we are not
+> bringing up the second core)
+> Now, we are not able to understand what it means. Do we need to divide the
+> traffic between ports as described and it is normal. Or there is some problem
+> in
+> the way the transfers are handled in the system.
 
-   Table 3-3 MMU access permissions
+Off hand I'm not sure of the right answer.  The design I'm working on does not require the filtering feature so I've not looked much at it outside of some errata.  I am aware of another design which accesses a bit larger address space which does use filtering.
 
-            Privileged    User
-   AP   S R permissions   permissions
+I'd guess you need to understand your cortex-memmap + AXI-to-memory bus adapter characteristics.
 
-   0b00 0 0 No access     No access
-   0b00 1 0 Read only     No access
-   0b00 0 1 Read only     Read only
-   0b00 1 1 UNPREDICTABLE UNPREDICTABLE
-   0b01 x x Read/write    No access
-   0b10 x x Read/write    Read only
-   0b11 x x Read/write    Read/write
-
-
-Nicolas
+Regards,
+Richard W.
