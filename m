@@ -1,43 +1,52 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 10 Jun 2010 12:27:13 +0200
-Subject: [PATCH 07/10] arm/zImage: don't define unused symbol initrd_phys
+Date: Thu, 10 Jun 2010 12:27:11 +0200
+Subject: [PATCH 05/10] arm/zImage: annotate debug functions about corrupted
+	registers
 In-Reply-To: <20100610102427.GC31057@pengutronix.de>
 References: <20100610102427.GC31057@pengutronix.de>
-Message-ID: <1276165636-20150-7-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1276165636-20150-5-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only user of initrd_phys is arch/arm/boot/bootp/init.S which still
-gets the value passed to.
-
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/boot/compressed/Makefile |    9 +++------
- 1 files changed, 3 insertions(+), 6 deletions(-)
+ arch/arm/boot/compressed/head.S |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 53faa90..5419448 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -79,16 +79,13 @@ endif
- EXTRA_CFLAGS  := -fpic -fno-builtin
- EXTRA_AFLAGS  := -Wa,-march=all
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index f8a210b..dbeeb56 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -1005,6 +1005,7 @@ __armv3_mpu_cache_flush:
+ phexbuf:	.space	12
+ 		.size	phexbuf, . - phexbuf
  
--# Supply ZRELADDR, INITRD_PHYS and PARAMS_PHYS to the decompressor via
--# linker symbols.  We only define initrd_phys and params_phys if the
--# machine class defined the corresponding makefile variable.
-+# Supply ZRELADDR and PARAMS_PHYS to the decompressor via linker symbols.  We
-+# only define params_phys if the machine class defined the corresponding
-+# makefile variable.
- LDFLAGS_vmlinux := --defsym zreladdr=$(ZRELADDR)
- ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
- LDFLAGS_vmlinux += --be8
- endif
--ifneq ($(INITRD_PHYS),)
--LDFLAGS_vmlinux += --defsym initrd_phys=$(INITRD_PHYS)
--endif
- ifneq ($(PARAMS_PHYS),)
- LDFLAGS_vmlinux += --defsym params_phys=$(PARAMS_PHYS)
- endif
++@ phex corrupts {r0, r1, r2, r3}
+ phex:		adr	r3, phexbuf
+ 		mov	r2, #0
+ 		strb	r2, [r3, r1]
+@@ -1019,6 +1020,7 @@ phex:		adr	r3, phexbuf
+ 		strb	r2, [r3, r1]
+ 		b	1b
+ 
++@ puts corrupts {r0, r1, r2, r3}
+ puts:		loadsp	r3, r1
+ 1:		ldrb	r2, [r0], #1
+ 		teq	r2, #0
+@@ -1033,12 +1035,14 @@ puts:		loadsp	r3, r1
+ 		teq	r0, #0
+ 		bne	1b
+ 		mov	pc, lr
++@ putc corrupts {r0, r1, r2, r3}
+ putc:
+ 		mov	r2, r0
+ 		mov	r0, #0
+ 		loadsp	r3, r1
+ 		b	2b
+ 
++@ memdump corrupts {r0, r1, r2, r3, r10, r11, r12, lr}
+ memdump:	mov	r12, r0
+ 		mov	r10, lr
+ 		mov	r11, #0
 -- 
 1.7.1
