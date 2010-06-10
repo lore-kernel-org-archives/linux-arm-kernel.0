@@ -1,34 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Jun 2010 00:05:52 +0100
-Subject: [PATCH] sa1111: Prevent deadlock in resume path
-In-Reply-To: <201006102349.12849.marek.vasut@gmail.com>
-References: <1274901104-22133-1-git-send-email-marek.vasut@gmail.com>
-	<20100526201824.GA16418@n2100.arm.linux.org.uk>
-	<20100610135609.GC4514@ucw.cz>
-	<201006102349.12849.marek.vasut@gmail.com>
-Message-ID: <20100610230552.GE32362@n2100.arm.linux.org.uk>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 11 Jun 2010 08:06:45 +0900
+Subject: [PATCH] s5pc110: SDHCI-s3c can override host capabilities
+In-Reply-To: <20100610134304.c109811a.akpm@linux-foundation.org>
+References: <20100605024053.GA23419@july>
+	<20100610134304.c109811a.akpm@linux-foundation.org>
+Message-ID: <AANLkTinwSxo4OqWlwQE-RxpG8WubLku2-77k2q7DPphr@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 10, 2010 at 11:49:12PM +0200, Marek Vasut wrote:
-> Even though my problem was fixed (yeah, sorry Russell, I didn't know
-> the patch tracker was updated to support git-send-email), I have a
-> question though.
-> 
-> I believe that Kernel-version is unnecessary. Isn't this information already 
-> encoded in the git-send-emailed patch?
+hi,
 
-It's there so that gnu patches can be accepted, and the additional
-information does help when applying hard to apply patches, particularly
-if either the patch has aged or was generated against an old kernel
-version.
+On Fri, Jun 11, 2010 at 5:43 AM, Andrew Morton
+<akpm@linux-foundation.org> wrote:
+> On Sat, 05 Jun 2010 11:40:53 +0900
+> Kyungmin Park <kmpark@infradead.org> wrote:
+>
+>> From: Kyungmin Park <kmpark@infradead.org>
+>> To: linux-arm-kernel at lists.infradead.org, linux-mmc at vger.kernel.org, akpm at linux-foundation.org, ben-linux at fluff.org
+>> Subject: [PATCH] s5pc110: SDHCI-s3c can override host capabilities
+>> Date: Sat, 05 Jun 2010 11:40:53 +0900
+>> User-Agent: Mutt/1.5.14 (2007-02-12)
+>>
+>> Each board can override the default sdhci host capabilities.
+>> Some board has broken features by hardwares and support 8-bit bandwidth.
+>>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>
+> The way this patch was presented, it will go into git with an Author:
+> address of "kmpark at infradead.org", but a Signed-off-by: address of
+> "kyungmin.park at samsung.com". ?Which is a little odd.
+>
+> The way to prevent that is to put an explicit "From:" line at the top
+> of the changelog. ?If that line is absent, people's tools will fall
+> back to the From: line in the mail headers, which is what happened
+> here.
+>
+> Please let me know if you want me to make any changes to these three
+> patches.
+>
+No problem, please fix it freely.
 
-Not only that, but it was once critical when we had 2.4 and 2.5/2.6
-kernel patches going via the patch system.
+Next time, I'll add the From line.
+One more, mails from Marek has duplicated patches, so please ignore it.
 
-Last point to make - and it's in similar vain to the KernelVersion
-tag - is that it would be useful if people would tag pure fixes which
-should be applied to previous kernels with a "Cc: <stable@kernel.org>"
-tag along-side the existing sign-offs.  That allows the stable
-maintainers to automatically pick up on these patches when they're
-merged into mainline.
+Thank you,
+Kyungmin Park
