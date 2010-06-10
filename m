@@ -1,51 +1,34 @@
-From: martinwguy@gmail.com (Martin Guy)
-Date: Thu, 10 Jun 2010 21:36:39 +0100
-Subject: Context Switching is Broken
-In-Reply-To: <20100610142015.GC32362@n2100.arm.linux.org.uk>
-References: <503171.97993.qm@web51806.mail.re2.yahoo.com>
-	<20100610140136.GA32362@n2100.arm.linux.org.uk>
-	<20100610142015.GC32362@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimeZ6xawjcYfVDohBFcMbbLlC3h2gDs91CyGcBX@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 10 Jun 2010 13:43:04 -0700
+Subject: [PATCH] s5pc110: SDHCI-s3c can override host capabilities
+In-Reply-To: <20100605024053.GA23419@july>
+References: <20100605024053.GA23419@july>
+Message-ID: <20100610134304.c109811a.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/10/10, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Thu, Jun 10, 2010 at 03:16:49PM +0100, Will Deacon wrote:
->  > > On Thu, Jun 10, 2010 at 04:11:35AM -0700, Herman Swartz wrote:
->  > > > Context switching is broken. The man page for context is example code
->  > > > that doesn't work, but should. Does a bug report need to be submitted?
->  > >
->  > > $ man context
->  > > No manual entry for context
->  > >
->
-> > Quite. man makecontext has a fairly scary example, maybe that's it.
->
-> In which case it's a question for libc people - the kernel has nothing
->  to do with makecontext, getcontext, setcontext and swapcontext.
->
->  I believe for glibc, these are simply unimplemented on ARM, and linking
->  a program which uses makecontext with glibc would result in the linker
->  issuing:
->
->  warning: makecontext is not implemented and will always fail
+On Sat, 05 Jun 2010 11:40:53 +0900
+Kyungmin Park <kmpark@infradead.org> wrote:
 
-Indeed on ARM:
+> From: Kyungmin Park <kmpark@infradead.org>
+> To: linux-arm-kernel at lists.infradead.org, linux-mmc at vger.kernel.org, akpm at linux-foundation.org, ben-linux at fluff.org
+> Subject: [PATCH] s5pc110: SDHCI-s3c can override host capabilities
+> Date: Sat, 05 Jun 2010 11:40:53 +0900
+> User-Agent: Mutt/1.5.14 (2007-02-12)
+> 
+> Each board can override the default sdhci host capabilities.
+> Some board has broken features by hardwares and support 8-bit bandwidth.
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-martin:~$ make makecontext
-cc     makecontext.c   -o makecontext
-/tmp/ccnapqW4.o: In function `main':
-makecontext.c:(.text+0x110): warning: warning: getcontext is not
-implemented and will always fail
-makecontext.c:(.text+0x164): warning: warning: makecontext is not
-implemented and will always fail
-/tmp/ccnapqW4.o: In function `func1':
-makecontext.c:(.text+0x24): warning: warning: swapcontext is not
-implemented and will always fail
-$ ./makecontext
-Function not inplemented.
-$
+The way this patch was presented, it will go into git with an Author:
+address of "kmpark at infradead.org", but a Signed-off-by: address of
+"kyungmin.park at samsung.com".  Which is a little odd.
 
-so?
+The way to prevent that is to put an explicit "From:" line at the top
+of the changelog.  If that line is absent, people's tools will fall
+back to the From: line in the mail headers, which is what happened
+here.
 
-    M
+Please let me know if you want me to make any changes to these three
+patches.
