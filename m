@@ -1,32 +1,51 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 10 Jun 2010 09:00:23 +0200
-Subject: usb gadget on zaurus and kexec
-In-Reply-To: <AANLkTilCvgvf9Ch55f878nTNTue8tHYmcrLEywsjnylY@mail.gmail.com>
-References: <20100519154618.GA26381@atrey.karlin.mff.cuni.cz>
-	<AANLkTim49akRJK0BN_Qk1wL6e5mrdjZioDjGNWlrjUVQ@mail.gmail.com>
-	<AANLkTilCvgvf9Ch55f878nTNTue8tHYmcrLEywsjnylY@mail.gmail.com>
-Message-ID: <201006100900.23981.marek.vasut@gmail.com>
+From: saeed@marvell.com (Saeed Bishara)
+Date: Thu, 10 Jun 2010 10:26:17 +0300
+Subject: [PATCH] [kirkwood-otg] Leverage the Freescale OTG driver for
+	Kirkwood OTG
+In-Reply-To: <AANLkTikVeVBdSfeS_p0k4dRwFopELw2OIXUrS1NjEdt6@mail.gmail.com>
+References: <1276094138-13497-1-git-send-email-jason.mcmullan@netronome.com>
+	<1276094138-13497-2-git-send-email-jason.mcmullan@netronome.com>
+	<alpine.LFD.2.00.1006091307321.30664@xanadu.home>
+	<AANLkTikVeVBdSfeS_p0k4dRwFopELw2OIXUrS1NjEdt6@mail.gmail.com>
+Message-ID: <FCBE654890C0334289D0AD3AF4EF009F9FAC75AA7B@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 10. ?ervna 2010 08:10:22 Eric Miao napsal(a):
-> On Thu, May 20, 2010 at 1:05 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> > On Wed, May 19, 2010 at 11:46 PM, Cyril Hrubis <metan@ucw.cz> wrote:
-> >> Hi!
-> >> After some testing I found out that no usb gadget (g_ether,
-> >> g_mass_storage, ...) is working after zaurus boots with kexec. So it
-> >> seems like some missing initalization (it's working after doing reboot
-> >> again) anybody has any clue, patch or ideas how to debug this?
-> > 
-> > Dumping out the registers of the two situations and doing a comparison
-> > then might be a quick way.
-> 
-> Any debugging update on this?
+ 
 
-Yeah, there's a workaround. Cyril's working on a proper fix, but that might take 
-some time. Simply -- UP2OCR is misconfigured.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>-----Original Message-----
+>From: Jason McMullan [mailto:jason.mcmullan at netronome.com] 
+>Sent: Wednesday, June 09, 2010 9:07 PM
+>To: Nicolas Pitre
+>Cc: linux-arm-kernel at lists.infradead.org; Haavard Skinnemoen; 
+>Ronen Shitrit; Saeed Bishara; Rabeeh Khoury; Guennadi 
+>Liakhovetski; Li Yang; Lennert Buytenhek
+>Subject: Re: [PATCH] [kirkwood-otg] Leverage the Freescale OTG 
+>driver for Kirkwood OTG
+>
+>On Wed, Jun 9, 2010 at 1:17 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+>> On Wed, 9 Jun 2010, Jason S. McMullan wrote:
+>>> NOTE: Your bootloader must ensure that the Kirkwood
+>>> ? ? ? USB 2.0 Bridge Window registers are set correctly,
+>>> ? ? ? or the driver will stall on the first DMA.
+>>
+>> Could you add the code to sets that up in the kernel instead?
+The ehci-orion.c has the code for setting the DMA. Also, the Marvell
+controllers have different usb phy, and the ehci-orion also has the code that
+initializes the phy. So we shuold look for the methode for sharing this code
+between the host mode and device mode drivers.
+
+>
+>Will do.
+>
+>>> ?config USB_GADGET_FSL_USB2
+>>
+>> Maybe the help text should be extended to mention Kirkwood?
+>
+>Again, good idea, will do.
+All the orion devices actually have the same usb core.
+>
+>-- 
+>Jason S. McMullan
+>Netronome Systems, Inc.
+>
