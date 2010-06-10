@@ -1,47 +1,64 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 10 Jun 2010 15:59:53 +0100
-Subject: [RFC PATCH 0/4] ARM: add support for hw-breakpoints [v3]
-Message-ID: <1276181997-20677-1-git-send-email-will.deacon@arm.com>
+Date: Thu, 10 Jun 2010 15:59:54 +0100
+Subject: [PATCH 1/4] ARM: hw-breakpoint: add mechanism for hooking into
+	prefetch aborts
+In-Reply-To: <1276181997-20677-1-git-send-email-will.deacon@arm.com>
+References: <1276181997-20677-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1276181997-20677-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is version 3 of the RFC patches originally posted at:
+On ARM processors with hardware breakpoint and watchpoint support,
+triggering these events results in a debug exception. These manifest
+as prefetch and data aborts respectively.
 
-v1.) http://lists.infradead.org/pipermail/linux-arm-kernel/2010-February/009084.html
-v2.) http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011170.html
-
-Changes from v2 include:
-	- Based on 2.6.35-rc2
-	- Updated to use new hw-breakpoint API features
-	- Addressed some comments from Frederic on LKML
-	- Complete redesign of the ptrace interface so that it
-	  follows the ARM ARM (v7) register structure more closely.
-
-Unfortunately, I've only managed to compile-test this and check that the
-resulting image boots. The main reasons for posting are (a) to support
-current GDB development and (b) to attract comments on the code.
-
-All comments welcome.
+arch/arm/mm/fault.c already provides hook_fault_code for hooking
+into data aborts dependent on the DFSR. This patch adds a new function,
+hook_ifault_code for hooking into prefetch aborts in the same manner.
 
 Cc: Frederic Weisbecker <fweisbec@gmail.com>
 Cc: S. Karthikeyan <informkarthik@gmail.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/system.h |    3 +++
+ arch/arm/mm/fault.c           |   11 +++++++++++
+ 2 files changed, 14 insertions(+), 0 deletions(-)
 
-Will Deacon (4):
-  ARM: hw-breakpoint: add mechanism for hooking into prefetch aborts
-  ARM: hw-breakpoint: add ARM backend for the hw-breakpoint framework
-  ARM: hw-breakpoint: add new ptrace requests for hw-breakpoint
-    interaction
-  ARM: hw-breakpoint: add HAVE_HW_BREAKPOINT to Kconfig
-
- arch/arm/Kconfig                     |    1 +
- arch/arm/include/asm/hw_breakpoint.h |  117 ++++++
- arch/arm/include/asm/processor.h     |    4 +
- arch/arm/include/asm/ptrace.h        |    2 +
- arch/arm/include/asm/system.h        |    3 +
- arch/arm/kernel/Makefile             |    1 +
- arch/arm/kernel/hw_breakpoint.c      |  734 ++++++++++++++++++++++++++++++++++
- arch/arm/kernel/ptrace.c             |  196 +++++++++
- arch/arm/mm/fault.c                  |   11 +
- 9 files changed, 1069 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/hw_breakpoint.h
- create mode 100644 arch/arm/kernel/hw_breakpoint.c
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+index 5f4f480..42da2f8 100644
+--- a/arch/arm/include/asm/system.h
++++ b/arch/arm/include/asm/system.h
+@@ -84,6 +84,9 @@ void arm_notify_die(const char *str, struct pt_regs *regs, struct siginfo *info,
+ void hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+ 				       struct pt_regs *),
+ 		     int sig, const char *name);
++void hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int,
++				       struct pt_regs *),
++		     int sig, const char *name);
+ 
+ #define xchg(ptr,x) \
+ 	((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index 92f5801..a71b410 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -572,6 +572,17 @@ static struct fsr_info ifsr_info[] = {
+ 	{ do_bad,		SIGBUS,  0,		"unknown 31"			   },
+ };
+ 
++void __init
++hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *),
++			int sig, const char *name)
++{
++	if (nr >= 0 && nr < ARRAY_SIZE(ifsr_info)) {
++		ifsr_info[nr].fn   = fn;
++		ifsr_info[nr].sig  = sig;
++		ifsr_info[nr].name = name;
++	}
++}
++
+ asmlinkage void __exception
+ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
+ {
+-- 
+1.6.3.3
