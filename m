@@ -1,68 +1,46 @@
 From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Fri, 11 Jun 2010 00:17:44 +0200
+Date: Fri, 11 Jun 2010 00:23:31 +0200
 Subject: [PATCH 4/5] [ARM] Auto calculate ZRELADDR and provide option for
 	exceptions
-In-Reply-To: <1275550613-9553-5-git-send-email-eric.miao@canonical.com>
+In-Reply-To: <AANLkTin9qGAJGSgu9Y2YjI_W8UwBITd-QYyGERcLLUgP@mail.gmail.com>
 References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
 	<1275550613-9553-5-git-send-email-eric.miao@canonical.com>
-Message-ID: <AANLkTiltifSEFdpXB0avw4ZyDzP_IrDpipafBAJbN17U@mail.gmail.com>
+	<20100610090015.GD3422@pengutronix.de>
+	<AANLkTin9qGAJGSgu9Y2YjI_W8UwBITd-QYyGERcLLUgP@mail.gmail.com>
+Message-ID: <AANLkTilrG9sDFzAKaYi6k6dBGDC-Fgy6MIHyPHADTWs4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/6/3 Eric Miao <eric.miao@canonical.com>:
+2010/6/10 Eric Miao <eric.miao@canonical.com>:
 
-> +config ZRELADDR
-> + ? ? ? hex "Physical address of the decompressed kernel image"
-> + ? ? ? depends on !AUTO_ZRELADDR
-> + ? ? ? default 0x00008000 if ARCH_BCMRING || ARCH_CNS3XXX || ARCH_DOVE ||\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_EBSA110 || ARCH_FOOTBRIDGE || ARCH_INTEGRATOR ||\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_IOP13XX || ARCH_IOP33X || ARCH_IXP2000 ||\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_IXP23XX || ARCH_IXP4XX || ARCH_KIRKWOOD ||\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_KS8695 ?|| ARCH_LOKI || ARCH_MMP || ARCH_MV78XX0 ||\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_NOMADIK || ARCH_NUC93X || ARCH_NS9XXX ||\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_ORION5X || ARCH_SPEAR3XX || ARCH_SPEAR6XX ||\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_UX5XX || ARCH_VERSATILE || ARCH_W90X900
-> + ? ? ? default 0x08008000 if ARCH_MX1 || ARCH_SHARK
-> + ? ? ? default 0x10008000 if ARCH_MSM || ARCH_OMAP1 || ARCH_RPC
-> + ? ? ? default 0x20008000 if ARCH_S5P6440 || ARCH_S5P6442 ||\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_S5PC100 || ARCH_S5PV210
-> + ? ? ? default 0x30008000 if ARCH_S3C2410 || ARCH_S3C2400 || ARCH_S3C2412 ||\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_S3C2416 || ARCH_S3C2440 || ARCH_S3C2443
-> + ? ? ? default 0x40008000 if ARCH_STMP378X || ARCH_STMP37XX || ARCH_SH7372 ||\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_SH7377
-> + ? ? ? default 0x50008000 if ARCH_S3C64XX || ARCH_SH7367
-> + ? ? ? default 0x60008000 if ARCH_VEXPRESS
-> + ? ? ? default 0x80008000 if ARCH_MX25 || ARCH_MX3 || ARCH_NETX ||\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_OMAP2 || ARCH_PNX4008
-> + ? ? ? default 0x90008000 if ARCH_MX5 || ARCH_MX91231
-> + ? ? ? default 0xa0008000 if ARCH_IOP32X || ARCH_PXA || MACH_MX27
-> + ? ? ? default 0xc0008000 if ARCH_LH7A40X || MACH_MX21
-> + ? ? ? default 0xf0008000 if ARCH_AAEC2000 || ARCH_L7200
-> + ? ? ? default 0xc0028000 if ARCH_CLPS711X
-> + ? ? ? default 0x70008000 if ARCH_AT91 && (ARCH_AT91CAP9 || ARCH_AT91SAM9G45)
-> + ? ? ? default 0x20008000 if ARCH_AT91 && !(ARCH_AT91CAP9 || ARCH_AT91SAM9G45)
-> + ? ? ? default 0xc0008000 if ARCH_DAVINCI && ARCH_DAVINCI_DA8XX
-> + ? ? ? default 0x80008000 if ARCH_DAVINCI && !ARCH_DAVINCI_DA8XX
-> + ? ? ? default 0x00008000 if ARCH_EP93XX && EP93XX_SDCE3_SYNC_PHYS_OFFSET
-> + ? ? ? default 0xc0008000 if ARCH_EP93XX && EP93XX_SDCE0_PHYS_OFFSET
-> + ? ? ? default 0xd0008000 if ARCH_EP93XX && EP93XX_SDCE1_PHYS_OFFSET
-> + ? ? ? default 0xe0008000 if ARCH_EP93XX && EP93XX_SDCE2_PHYS_OFFSET
-> + ? ? ? default 0xf0008000 if ARCH_EP93XX && EP93XX_SDCE3_ASYNC_PHYS_OFFSET
-> + ? ? ? default 0x00008000 if ARCH_GEMINI && GEMINI_MEM_SWAP
-> + ? ? ? default 0x10008000 if ARCH_GEMINI && !GEMINI_MEM_SWAP
-> + ? ? ? default 0x70008000 if ARCH_REALVIEW && REALVIEW_HIGH_PHYS_OFFSET
-> + ? ? ? default 0x00008000 if ARCH_REALVIEW && !REALVIEW_HIGH_PHYS_OFFSET
-> + ? ? ? default 0xc0208000 if ARCH_SA1100 && SA1111
-> + ? ? ? default 0xc0008000 if ARCH_SA1100 && !SA1111
-> + ? ? ? default 0x30108000 if ARCH_S3C2410 && PM_H1940
-> + ? ? ? default 0x28E08000 if ARCH_U300 && MACH_U300_SINGLE_RAM
-> + ? ? ? default 0x48008000 if ARCH_U300 && !MACH_U300_SINGLE_RAM
+>>> arch/arm/mach-mx1/Makefile.boot: ? ? ? ? zreladdr-y ? := 0x08008000
+>>> arch/arm/mach-shark/Makefile.boot: ? ? ? zreladdr-y ? := 0x08008000
+>>> arch/arm/mach-u300/Makefile.boot: ? ? ? ?zreladdr-y ? := 0x28E08000
+>>> arch/arm/mach-u300/Makefile.boot: ? ? ? ?zreladdr-y ? := 0x48008000
+>> I care about mx1, so I would prefer using 0xf8000000.
+>
+> Fair enough actually. And my guess of the u300 architecture is the phys
+> offset actually starts from 0x2800_0000 or 0x4800_0000 which is also
+> covered by 0xf800_0000.
 
-This looks correct so
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+This is correct and incorrect. :-)
 
-I assume it should be submitted simultaneously with a patch nuking off
-all Makefile.boot files and that infrastructure then?
+In the latter case yes, it is always at 0x48000000
+
+In the other case the physical memory is indeed at 0x28000000 but
+the range reserved for the other (ACC) CPU is locked by the boot
+loader, and read/write results in a bus error. So this is compile-time
+configurable.
+
+It won't be more than a few MiB though, typically 13.
+
+> And I think u300 can actually get rid of those
+> inconsistent addresses by other means though we all know it might be
+> suffering from the communication processor side of the memory allocation.
+
+Any ideas, I'd be happy to implement them.
+
+Any details you need, just ask.
 
 Yours,
 Linus Walleij
