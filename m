@@ -1,34 +1,37 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 10 Jun 2010 13:43:04 -0700
-Subject: [PATCH] s5pc110: SDHCI-s3c can override host capabilities
-In-Reply-To: <20100605024053.GA23419@july>
-References: <20100605024053.GA23419@july>
-Message-ID: <20100610134304.c109811a.akpm@linux-foundation.org>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Fri, 11 Jun 2010 08:46:29 +1200
+Subject: [PATCH 0/3] EP93xx: Add i2s audio support
+In-Reply-To: <C54C83DB-A9D3-4A7A-837B-17644B257251@opensource.wolfsonmicro.com>
+References: <1275991272-30122-1-git-send-email-ryan@bluewatersys.com>
+	<20100609101742.GA5618@opensource.wolfsonmicro.com>
+	<4C100A32.7010403@bluewatersys.com>
+	(sfid-20100609_224011_305149_EE792DDC)
+	<C54C83DB-A9D3-4A7A-837B-17644B257251@opensource.wolfsonmicro.com>
+Message-ID: <4C114F25.5060809@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 05 Jun 2010 11:40:53 +0900
-Kyungmin Park <kmpark@infradead.org> wrote:
-
-> From: Kyungmin Park <kmpark@infradead.org>
-> To: linux-arm-kernel at lists.infradead.org, linux-mmc at vger.kernel.org, akpm at linux-foundation.org, ben-linux at fluff.org
-> Subject: [PATCH] s5pc110: SDHCI-s3c can override host capabilities
-> Date: Sat, 05 Jun 2010 11:40:53 +0900
-> User-Agent: Mutt/1.5.14 (2007-02-12)
+Mark Brown wrote:
+> On 9 Jun 2010, at 22:40, Ryan Mallon wrote:
 > 
-> Each board can override the default sdhci host capabilities.
-> Some board has broken features by hardwares and support 8-bit bandwidth.
+>> Stupid question, but where was it applied? I can't find it in any of the
+>> branches at:
+>> http://opensource.wolfsonmicro.com/cgi-bin/gitweb.cgi?p=linux-2.6-asoc.git;a=summary
 > 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Look in my kernel.org repository referenced in MAINTAINERS
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound-2.6.git
 
-The way this patch was presented, it will go into git with an Author:
-address of "kmpark at infradead.org", but a Signed-off-by: address of
-"kyungmin.park at samsung.com".  Which is a little odd.
+Builds and runs fine.
 
-The way to prevent that is to put an explicit "From:" line at the top
-of the changelog.  If that line is absent, people's tools will fall
-back to the From: line in the mail headers, which is what happened
-here.
+Thanks,
+~Ryan
 
-Please let me know if you want me to make any changes to these three
-patches.
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
