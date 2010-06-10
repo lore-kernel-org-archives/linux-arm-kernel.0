@@ -1,58 +1,42 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 10 Jun 2010 19:46:13 +0900
-Subject: [PATCH 3/5] sdhci-s3c: increase the timeout value
-In-Reply-To: <1276076383-24825-4-git-send-email-m.szyprowski@samsung.com>
-References: <1276076383-24825-1-git-send-email-m.szyprowski@samsung.com>
-	<1276076383-24825-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <019301cb088a$29134970$7b39dc50$%kim@samsung.com>
+From: saeed@marvell.com (Saeed Bishara)
+Date: Thu, 10 Jun 2010 13:57:16 +0300
+Subject: [PATCH] [kirkwood-otg] Leverage the Freescale OTG driver for
+	Kirkwood OTG
+In-Reply-To: <AANLkTikVeVBdSfeS_p0k4dRwFopELw2OIXUrS1NjEdt6@mail.gmail.com>
+References: <1276094138-13497-1-git-send-email-jason.mcmullan@netronome.com>
+	<1276094138-13497-2-git-send-email-jason.mcmullan@netronome.com>
+	<alpine.LFD.2.00.1006091307321.30664@xanadu.home>
+	<AANLkTikVeVBdSfeS_p0k4dRwFopELw2OIXUrS1NjEdt6@mail.gmail.com>
+Message-ID: <FCBE654890C0334289D0AD3AF4EF009F9FAC75ABB8@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> 
-> This patch increases the timeout value on sdhci-s3c controller by using
-> SDHCI_QUIRK_BROKEN_TIMEOUT_VAL quirk. Without it most transfers from
-> external mmc cards fails on Samsung s5pv210 SoCs based systems. Tested
-> on Samsung Aquila board.
-> 
+ 
 
-Hi,
-
-Seems to use max timeout value, 0xE.
-However, should be use SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK.
-Because basically, Samsung MMC used sdclock as timeout clock.
-
-Please refer to below URL:
-http://article.gmane.org/gmane.linux.kernel.mmc/304
-
-And new patch with SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK will be submitted.
-
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/mmc/host/sdhci-s3c.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> index ad30f07..2b6cb44 100644
-> --- a/drivers/mmc/host/sdhci-s3c.c
-> +++ b/drivers/mmc/host/sdhci-s3c.c
-> @@ -331,6 +331,7 @@ static int __devinit sdhci_s3c_probe(struct
-platform_device
-> *pdev)
->  	 * transfers, not sure if this is a problem with this specific
->  	 * SDHCI block, or a missing configuration that needs to be set. */
->  	host->quirks |= SDHCI_QUIRK_NO_BUSY_IRQ;
-> +	host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
-> 
->  	host->quirks |= (SDHCI_QUIRK_32BIT_DMA_ADDR |
->  			 SDHCI_QUIRK_32BIT_DMA_SIZE);
-> --
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+>-----Original Message-----
+>From: Jason McMullan [mailto:jason.mcmullan at netronome.com] 
+>Sent: Wednesday, June 09, 2010 9:07 PM
+>To: Nicolas Pitre
+>Cc: linux-arm-kernel at lists.infradead.org; Haavard Skinnemoen; 
+>Ronen Shitrit; Saeed Bishara; Rabeeh Khoury; Guennadi 
+>Liakhovetski; Li Yang; Lennert Buytenhek
+>Subject: Re: [PATCH] [kirkwood-otg] Leverage the Freescale OTG 
+>driver for Kirkwood OTG
+>
+>On Wed, Jun 9, 2010 at 1:17 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+>> On Wed, 9 Jun 2010, Jason S. McMullan wrote:
+>>> NOTE: Your bootloader must ensure that the Kirkwood
+>>> ? ? ? USB 2.0 Bridge Window registers are set correctly,
+>>> ? ? ? or the driver will stall on the first DMA.
+>>
+>> Could you add the code to sets that up in the kernel instead?
+>
+>Will do.
+>
+>>> ?config USB_GADGET_FSL_USB2
+>>
+>> Maybe the help text should be extended to mention Kirkwood?
+>
+>Again, good idea, will do.
+Jason, the USB on kirkwood (and all orions) doesn't support OTG feature, it only support device mode when the system configured for that mode, so please repace the "otg" with udc.
+Saeed
