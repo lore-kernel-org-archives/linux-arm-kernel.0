@@ -1,128 +1,106 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 10 Jun 2010 12:27:14 +0200
-Subject: [PATCH 08/10] arm: deprecate support for old way to pass kernel
-	parameters
+Date: Thu, 10 Jun 2010 12:27:12 +0200
+Subject: [PATCH 06/10] arm: remove bit-rotten STANDALONE_DEBUG for decompressor
 In-Reply-To: <20100610102427.GC31057@pengutronix.de>
 References: <20100610102427.GC31057@pengutronix.de>
-Message-ID: <1276165636-20150-8-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1276165636-20150-6-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This was deprecated in 2001 and announced to live on for 5 years.
+I tried to get this running to debug the regression introduced by
+e7db7b4 without success.  But this has several problems that make it
+hard to fix:
 
-For now provide a kernel parameter for those who still need it.
+  - lib/decompress_inflate.c includes in-kernel headers that make
+    it difficult to compile for user space.
+  - the binary formats changed both in kernel and user space and
+    at least for the kernel side there isn't only a single
+    variant.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/Kconfig         |    6 ++++++
- arch/arm/kernel/Makefile |    4 +++-
- arch/arm/kernel/compat.c |    7 -------
- arch/arm/kernel/compat.h |    2 --
- arch/arm/kernel/setup.c  |   11 +++++++++++
- 5 files changed, 20 insertions(+), 10 deletions(-)
+ arch/arm/boot/compressed/Makefile.debug |   23 -----------------------
+ arch/arm/boot/compressed/misc.c         |   20 --------------------
+ 2 files changed, 0 insertions(+), 43 deletions(-)
+ delete mode 100644 arch/arm/boot/compressed/Makefile.debug
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 1f254bd..a53ac65 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1374,6 +1374,12 @@ config UACCESS_WITH_MEMCPY
- 	  However, if the CPU data cache is using a write-allocate mode,
- 	  this option is unlikely to provide any performance gain.
- 
-+config DEPRECATED_PARAM_STRUCT
-+	bool "Provide old way to pass kernel parameters"
-+	help
-+	  This was deprecated in 2001 and announced to live on for 5 years.
-+	  Some old boot loaders still use this way.
-+
- endmenu
- 
- menu "Boot options"
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 26d302c..021f72d 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -13,10 +13,12 @@ CFLAGS_REMOVE_return_address.o = -pg
- 
- # Object file lists.
- 
--obj-y		:= compat.o elf.o entry-armv.o entry-common.o irq.o \
-+obj-y		:= elf.o entry-armv.o entry-common.o irq.o \
- 		   process.o ptrace.o return_address.o setup.o signal.o \
- 		   sys_arm.o stacktrace.o time.o traps.o
- 
-+obj-$(CONFIG_DEPRECATED_PARAM_STRUCT) += compat.o
-+
- obj-$(CONFIG_LEDS)		+= leds.o
- obj-$(CONFIG_OC_ETM)		+= etm.o
- 
-diff --git a/arch/arm/kernel/compat.c b/arch/arm/kernel/compat.c
-index 0a13854..9256523 100644
---- a/arch/arm/kernel/compat.c
-+++ b/arch/arm/kernel/compat.c
-@@ -217,10 +217,3 @@ void __init convert_to_tag_list(struct tag *tags)
- 	struct param_struct *params = (struct param_struct *)tags;
- 	build_tag_list(params, &params->u2);
- }
+diff --git a/arch/arm/boot/compressed/Makefile.debug b/arch/arm/boot/compressed/Makefile.debug
+deleted file mode 100644
+index 491a037..0000000
+--- a/arch/arm/boot/compressed/Makefile.debug
++++ /dev/null
+@@ -1,23 +0,0 @@
+-#
+-# linux/arch/arm/boot/compressed/Makefile
+-#
+-# create a compressed vmlinux image from the original vmlinux
+-#
 -
--void __init squash_mem_tags(struct tag *tag)
--{
--	for (; tag->hdr.size; tag = tag_next(tag))
--		if (tag->hdr.tag == ATAG_MEM)
--			tag->hdr.tag = ATAG_NONE;
--}
-diff --git a/arch/arm/kernel/compat.h b/arch/arm/kernel/compat.h
-index 27e61a6..39264ab 100644
---- a/arch/arm/kernel/compat.h
-+++ b/arch/arm/kernel/compat.h
-@@ -9,5 +9,3 @@
- */
- 
- extern void convert_to_tag_list(struct tag *tags);
+-COMPRESSED_EXTRA=../../lib/ll_char_wr.o
+-OBJECTS=misc-debug.o ll_char_wr.aout.o
 -
--extern void squash_mem_tags(struct tag *tag);
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 122d999..cbc6ddb 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -44,7 +44,9 @@
- #include <asm/traps.h>
- #include <asm/unwind.h>
+-CFLAGS=-D__KERNEL__ -O2 -DSTDC_HEADERS -DSTANDALONE_DEBUG -Wall -I../../../../include -c
+-
+-test-gzip: piggy.aout.o $(OBJECTS)
+-	$(CC) -o $@ $(OBJECTS) piggy.aout.o
+-
+-misc-debug.o: misc.c
+-	$(CC) $(CFLAGS) -o $@ misc.c
+-
+-piggy.aout.o: piggy.o
+-	arm-linuxelf-objcopy --change-leading-char -I elf32-arm -O arm-aout32-linux piggy.o piggy.aout.o
+-
+-ll_char_wr.aout.o: $(COMPRESSED_EXTRA)
+-	arm-linuxelf-objcopy --change-leading-char -I elf32-arm -O arm-aout32-linux $(COMPRESSED_EXTRA) ll_char_wr.aout.o
+-
+diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+index d2b2ef4..e653a6d 100644
+--- a/arch/arm/boot/compressed/misc.c
++++ b/arch/arm/boot/compressed/misc.c
+@@ -28,9 +28,6 @@ unsigned int __machine_arch_type;
  
-+#if defined(CONFIG_DEPRECATED_PARAM_STRUCT)
- #include "compat.h"
-+#endif
- #include "atags.h"
- #include "tcm.h"
+ #include <asm/unaligned.h>
  
-@@ -663,6 +665,13 @@ static int __init customize_machine(void)
+-#ifdef STANDALONE_DEBUG
+-#define putstr printf
+-#else
+ 
+ static void putstr(const char *ptr);
+ extern void error(char *x);
+@@ -116,7 +113,6 @@ static void putstr(const char *ptr)
+ 	flush();
  }
- arch_initcall(customize_machine);
  
-+static void __init squash_mem_tags(struct tag *tag)
-+{
-+	for (; tag->hdr.size; tag = tag_next(tag))
-+		if (tag->hdr.tag == ATAG_MEM)
-+			tag->hdr.tag = ATAG_NONE;
-+}
-+
- void __init setup_arch(char **cmdline_p)
+-#endif
+ 
+ void *memcpy(void *__dest, __const void *__src, size_t __n)
  {
- 	struct tag *tags = (struct tag *)&init_tags;
-@@ -683,12 +692,14 @@ void __init setup_arch(char **cmdline_p)
- 	else if (mdesc->boot_params)
- 		tags = phys_to_virt(mdesc->boot_params);
+@@ -186,7 +182,6 @@ asmlinkage void __div0(void)
  
-+#if defined(CONFIG_DEPRECATED_PARAM_STRUCT)
- 	/*
- 	 * If we have the old style parameters, convert them to
- 	 * a tag list.
- 	 */
- 	if (tags->hdr.tag != ATAG_CORE)
- 		convert_to_tag_list(tags);
-+#endif
- 	if (tags->hdr.tag != ATAG_CORE)
- 		tags = (struct tag *)&init_tags;
+ extern void do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x));
  
+-#ifndef STANDALONE_DEBUG
+ 
+ unsigned long
+ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
+@@ -211,18 +206,3 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
+ 	putstr(" done, booting the kernel.\n");
+ 	return output_ptr;
+ }
+-#else
+-
+-char output_buffer[1500*1024];
+-
+-int main()
+-{
+-	output_data = output_buffer;
+-
+-	putstr("Uncompressing Linux...");
+-	decompress(input_data, input_data_end - input_data,
+-			NULL, NULL, output_data, NULL, error);
+-	putstr("done.\n");
+-	return 0;
+-}
+-#endif
 -- 
 1.7.1
