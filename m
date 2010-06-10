@@ -1,46 +1,31 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Fri, 11 Jun 2010 00:23:31 +0200
-Subject: [PATCH 4/5] [ARM] Auto calculate ZRELADDR and provide option for
-	exceptions
-In-Reply-To: <AANLkTin9qGAJGSgu9Y2YjI_W8UwBITd-QYyGERcLLUgP@mail.gmail.com>
-References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
-	<1275550613-9553-5-git-send-email-eric.miao@canonical.com>
-	<20100610090015.GD3422@pengutronix.de>
-	<AANLkTin9qGAJGSgu9Y2YjI_W8UwBITd-QYyGERcLLUgP@mail.gmail.com>
-Message-ID: <AANLkTilrG9sDFzAKaYi6k6dBGDC-Fgy6MIHyPHADTWs4@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 Jun 2010 23:59:30 +0100
+Subject: Context Switching is Broken
+In-Reply-To: <AANLkTilfwCVpr7JrLlWLIXV1DtAGZyRpvDd_8W-qfq5t@mail.gmail.com>
+References: <503171.97993.qm@web51806.mail.re2.yahoo.com>
+	<20100610140136.GA32362@n2100.arm.linux.org.uk>
+	<20100610142015.GC32362@n2100.arm.linux.org.uk>
+	<AANLkTimeZ6xawjcYfVDohBFcMbbLlC3h2gDs91CyGcBX@mail.gmail.com>
+	<148780.29764.qm@web51806.mail.re2.yahoo.com>
+	<AANLkTilfwCVpr7JrLlWLIXV1DtAGZyRpvDd_8W-qfq5t@mail.gmail.com>
+Message-ID: <20100610225930.GD32362@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/6/10 Eric Miao <eric.miao@canonical.com>:
+On Thu, Jun 10, 2010 at 10:29:12PM +0100, Martin Guy wrote:
+> While context switching works fine - any Unix system would have a hard
+> time working without it - these four esoteric system calls are not
+> implemented in the ARM port of Linux. If you'd like to modify the
+> linux source code to implement them, I'm sure the community would be
+> happy to review the patches for inclusion in the next version of the
+> kernel.
 
->>> arch/arm/mach-mx1/Makefile.boot: ? ? ? ? zreladdr-y ? := 0x08008000
->>> arch/arm/mach-shark/Makefile.boot: ? ? ? zreladdr-y ? := 0x08008000
->>> arch/arm/mach-u300/Makefile.boot: ? ? ? ?zreladdr-y ? := 0x28E08000
->>> arch/arm/mach-u300/Makefile.boot: ? ? ? ?zreladdr-y ? := 0x48008000
->> I care about mx1, so I would prefer using 0xf8000000.
->
-> Fair enough actually. And my guess of the u300 architecture is the phys
-> offset actually starts from 0x2800_0000 or 0x4800_0000 which is also
-> covered by 0xf800_0000.
+If you read what I said:
 
-This is correct and incorrect. :-)
+"I believe for glibc, these are simply unimplemented on ARM, and linking
+a program which uses makecontext with glibc would result in the linker
+issuing:"
 
-In the latter case yes, it is always at 0x48000000
-
-In the other case the physical memory is indeed at 0x28000000 but
-the range reserved for the other (ACC) CPU is locked by the boot
-loader, and read/write results in a bus error. So this is compile-time
-configurable.
-
-It won't be more than a few MiB though, typically 13.
-
-> And I think u300 can actually get rid of those
-> inconsistent addresses by other means though we all know it might be
-> suffering from the communication processor side of the memory allocation.
-
-Any ideas, I'd be happy to implement them.
-
-Any details you need, just ask.
-
-Yours,
-Linus Walleij
+These calls are nothing to do with the kernel.  They're a subject purely
+for glibc.  So there's no modification to the Linux kernel source code
+which could effect their implementation.
