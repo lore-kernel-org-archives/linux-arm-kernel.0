@@ -1,50 +1,59 @@
-From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Thu, 10 Jun 2010 08:43:30 +0200
-Subject: [PATCH 1/2 v2] mv643xx_eth: use sw csum for big packets
-In-Reply-To: <1276073483-17208-1-git-send-email-saeed@marvell.com>
-References: <FCBE654890C0334289D0AD3AF4EF009F9FAC75A69C@IL-MB01.marvell.com>
-	<1276073483-17208-1-git-send-email-saeed@marvell.com>
-Message-ID: <20100610064330.GK1743@mail.wantstofly.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 10 Jun 2010 08:36:28 +0200
+Subject: [PATCH 1/8] MX25: put define for OTG base address in right include
+In-Reply-To: <1275987782-16094-1-git-send-email-eric@eukrea.com>
+References: <1275987782-16094-1-git-send-email-eric@eukrea.com>
+Message-ID: <20100610063627.GF20799@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 09, 2010 at 11:51:23AM +0300, Saeed Bishara wrote:
+Hi Eric,
 
-> diff --git a/drivers/net/mv643xx_eth.c b/drivers/net/mv643xx_eth.c
-> index e345ec8..2d0e06b 100644
-> --- a/drivers/net/mv643xx_eth.c
-> +++ b/drivers/net/mv643xx_eth.c
-> @@ -289,6 +289,7 @@ struct mv643xx_eth_shared_private {
->  	unsigned int t_clk;
->  	int extended_rx_coal_limit;
->  	int tx_bw_control;
-> +	int tx_csum_limit;
+applied all but the last one which needs another patch.
+
+Sascha
+
+On Tue, Jun 08, 2010 at 11:02:55AM +0200, Eric B?nard wrote:
+> the standard place for this define is include/mach/mx25.h
+> 
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
+> ---
+>  arch/arm/mach-mx25/devices.c          |    2 --
+>  arch/arm/plat-mxc/include/mach/mx25.h |    1 +
+>  2 files changed, 1 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx25/devices.c b/arch/arm/mach-mx25/devices.c
+> index 3a405fa..032a347 100644
+> --- a/arch/arm/mach-mx25/devices.c
+> +++ b/arch/arm/mach-mx25/devices.c
+> @@ -117,8 +117,6 @@ struct platform_device mxc_uart_device4 = {
+>  	.num_resources = ARRAY_SIZE(uart4),
 >  };
 >  
->  #define TX_BW_CONTROL_ABSENT		0
-> @@ -782,7 +783,8 @@ static int txq_submit_skb(struct tx_queue *txq, struct sk_buff *skb)
->  		       skb->protocol != htons(ETH_P_8021Q));
+> -#define MX25_OTG_BASE_ADDR 0x53FF4000
+> -
+>  static u64 otg_dmamask = DMA_BIT_MASK(32);
 >  
->  		tag_bytes = (void *)ip_hdr(skb) - (void *)skb->data - ETH_HLEN;
-> -		if (unlikely(tag_bytes & ~12)) {
-> +		if (unlikely(tag_bytes & ~12) ||
-> +			skb->len > mp->shared->tx_csum_limit) {
+>  static struct resource mxc_otg_resources[] = {
+> diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
+> index 4eb6e33..bc0ba27 100644
+> --- a/arch/arm/plat-mxc/include/mach/mx25.h
+> +++ b/arch/arm/plat-mxc/include/mach/mx25.h
+> @@ -34,6 +34,7 @@
+>  #define MX25_NFC_BASE_ADDR		0xbb000000
+>  #define MX25_DRYICE_BASE_ADDR		0x53ffc000
+>  #define MX25_LCDC_BASE_ADDR		0x53fbc000
+> +#define MX25_OTG_BASE_ADDR		0x53ff4000
+>  
+>  #define MX25_INT_DRYICE	25
+>  #define MX25_INT_FEC	57
+> -- 
+> 1.6.3.3
+> 
+> 
 
-Please line up skb->len with unlikely() on the line above it.
-
-
-> @@ -2666,6 +2668,9 @@ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
->  	 * Detect hardware parameters.
->  	 */
->  	msp->t_clk = (pd != NULL && pd->t_clk != 0) ? pd->t_clk : 133000000;
-> +	msp->tx_csum_limit = pd->tx_csum_limit ? pd->tx_csum_limit : 9 * 1024;
-> +	/* add header count so we can compare against skb->len */
-> +	msp->tx_csum_limit += ETH_HLEN;
->  	infer_hw_params(msp);
-
-Is the limit 9 * 1024 + 14 for the whole packet, or 9 * 1024 for the IP
-part?
-
-I.e. what happens if skb->len is 9 * 1024 + 15, but there is one VLAN
-tag present -- will the hardware be able to do the checksum offload or
-not?
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
