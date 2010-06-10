@@ -1,105 +1,49 @@
-From: milinevskyy@gmail.com (Dmytro Milinevskyy)
-Date: Thu, 10 Jun 2010 22:12:55 +0300
-Subject: [PATCH] Marvell OpenRD-Ultimate machine support
-Message-ID: <4c1139ba.0d01df0a.42a6.1368@mx.google.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 10 Jun 2010 15:18:14 -0400 (EDT)
+Subject: Heads up: Linus plans to kill ARM defconfigs
+In-Reply-To: <20100610063234.GA22533@pengutronix.de>
+References: <4C083BCF.2060500@bluewatersys.com>
+	<alpine.LFD.2.00.1006081655350.30664@xanadu.home>
+	<4C0ED074.7050700@bluewatersys.com>
+	<201006090807.20810.post@hendrik-sattler.de>
+	<1276090378.2006.11.camel@m0nster>
+	<20100610063234.GA22533@pengutronix.de>
+Message-ID: <alpine.LFD.2.00.1006101513080.30664@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-This patch adds support for the OpenRD Ultimate machine(could be found at http://www.arm.linux.org.uk/developer/machines/list.php?id=2884)
+On Thu, 10 Jun 2010, Uwe Kleine-K?nig wrote:
 
-Besides adding machine description this patch adds correction for PHY address for Ultimate version.
+> I removed all lines from all defconfigs that don't affect the resulting
+> .config basing on .35-rc1.  The diffstat is below.  As far as I checked
+> there are no added lines and the 'pluses' are only context noise.  So
+> the defconfigs are down to 124.4 (from 1214.4) lines on average.
+> You can see the result at
+> 
+> 	http://git.pengutronix.de/?p=ukl/linux-2.6.git;a=commitdiff;h=arm/defconfig/reduced-v2.6.35-rc1
+> 
+> I'm currently reducing the defconfigs in .34 to be able to compare the
+> diffstats between (.34 -> .35-rc1) and between (.34-reduced ->
+> .35-reduced).  I would expect the diff is more or less the same as with
+> the Kconfig idea.
+> 
+> Compared to the Kconfig idea I see a few advantages:
+>  - Assuming that kautobuild would only use a base config + per arch
+>    selections we would loose compile coverage of e.g. CONFIG_AEABI.
 
-Differences from the previous attempt:
- - Correctly filled instances of mv643xx_eth_platform_data in case of ultimate version.
- - Do PCIE initialization for Ultimate version along with Base and Client
- - Init ge01 if (!openrd-base) to make the code cleaner
+That is not acceptable of course.
 
-Regards,
+Same thing for HIGHMEM, PREEMPT, SMP, etc.
 
--- Dmytro Milinevskyy
+>  - I have a script that reduces a config, so there is a bit less manual
+>    work.
+>  - No need to change kautobuild
+> 
+[...]
+> 
+>  177 files changed, 652 insertions(+), 194157 deletions(-)
 
-Signed-off-by: Dmytro Milinevskyy <milinevskyy@gmail.com>
----
- arch/arm/mach-kirkwood/Kconfig        |    7 +++++++
- arch/arm/mach-kirkwood/openrd-setup.c |   27 ++++++++++++++++++++++++---
- 2 files changed, 31 insertions(+), 3 deletions(-)
+That's really nice.
 
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index 29b2163..110a3b8 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -75,6 +75,13 @@ config MACH_OPENRD_CLIENT
- 	  Say 'Y' here if you want your kernel to support the
- 	  Marvell OpenRD Client Board.
- 
-+config MACH_OPENRD_ULTIMATE
-+	bool "Marvell OpenRD Ultimate Board"
-+	select MACH_OPENRD
-+	help
-+	  Say 'Y' here if you want your kernel to support the
-+	  Marvell OpenRD Ultimate Board.
-+
- config MACH_NETSPACE_V2
- 	bool "LaCie Network Space v2 NAS Board"
- 	help
-diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
-index ad3f1ec..284b00f 100644
---- a/arch/arm/mach-kirkwood/openrd-setup.c
-+++ b/arch/arm/mach-kirkwood/openrd-setup.c
-@@ -1,7 +1,7 @@
- /*
-  * arch/arm/mach-kirkwood/openrd-setup.c
-  *
-- * Marvell OpenRD (Base|Client) Board Setup
-+ * Marvell OpenRD (Base|Client|Ultimate) Board Setup
-  *
-  * This file is licensed under the terms of the GNU General Public
-  * License version 2.  This program is licensed "as is" without any
-@@ -73,9 +73,15 @@ static void __init openrd_init(void)
- 
- 	kirkwood_ehci_init();
- 
-+	if (machine_is_openrd_ultimate()) {
-+		openrd_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
-+		openrd_ge01_data.phy_addr = MV643XX_ETH_PHY_ADDR(1);
-+	}
-+
- 	kirkwood_ge00_init(&openrd_ge00_data);
--	if (machine_is_openrd_client())
-+	if (!machine_is_openrd_base())
- 		kirkwood_ge01_init(&openrd_ge01_data);
-+
- 	kirkwood_sata_init(&openrd_sata_data);
- 	kirkwood_sdio_init(&openrd_mvsdio_data);
- 
-@@ -84,7 +90,9 @@ static void __init openrd_init(void)
- 
- static int __init openrd_pci_init(void)
- {
--	if (machine_is_openrd_base() || machine_is_openrd_client())
-+	if (machine_is_openrd_base() ||
-+		machine_is_openrd_client() ||
-+		machine_is_openrd_ultimate())
- 		kirkwood_pcie_init();
- 
- 	return 0;
-@@ -116,3 +124,16 @@ MACHINE_START(OPENRD_CLIENT, "Marvell OpenRD Client Board")
- 	.timer		= &kirkwood_timer,
- MACHINE_END
- #endif
-+
-+#ifdef CONFIG_MACH_OPENRD_ULTIMATE
-+MACHINE_START(OPENRD_ULTIMATE, "Marvell OpenRD Ultimate Board")
-+	/* Maintainer: Dhaval Vasa <dhaval.vasa@einfochips.com> */
-+	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
-+	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
-+	.boot_params	= 0x00000100,
-+	.init_machine	= openrd_init,
-+	.map_io		= kirkwood_map_io,
-+	.init_irq	= kirkwood_init_irq,
-+	.timer		= &kirkwood_timer,
-+MACHINE_END
-+#endif
--- 
-1.7.1
+
+Nicolas
