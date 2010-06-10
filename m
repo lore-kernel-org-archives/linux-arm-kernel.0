@@ -1,112 +1,60 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 10 Jun 2010 19:01:25 +0900
-Subject: [PATCH v2] arm: s5pv210: add more banks to gpiolib
-In-Reply-To: <1276088919-20730-1-git-send-email-m.szyprowski@samsung.com>
-References: <1276088919-20730-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <019101cb0883$e5a07fb0$b0e17f10$%kim@samsung.com>
+From: eric.miao@canonical.com (Eric Miao)
+Date: Thu, 10 Jun 2010 18:20:45 +0800
+Subject: [PATCH 4/5] [ARM] Auto calculate ZRELADDR and provide option for
+	exceptions
+In-Reply-To: <20100610095808.GA31057@pengutronix.de>
+References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
+	<1275550613-9553-5-git-send-email-eric.miao@canonical.com>
+	<20100610090015.GD3422@pengutronix.de>
+	<AANLkTin9qGAJGSgu9Y2YjI_W8UwBITd-QYyGERcLLUgP@mail.gmail.com>
+	<20100610095808.GA31057@pengutronix.de>
+Message-ID: <AANLkTikulOGKEoAYptacYPgM8PAJ49JlGUO6rJWY5gqF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> 
-> This patch adds support for MP04 and MP05 gpio banks.
-> 
-LGTM. Will apply.
+2010/6/10 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello Eric,
+>
+>> > What do you think about requiring r4 to be set to physoffset as I did in
+>> > my series?
+>>
+>> My only concern is to impose less restrictions on the boot loaders.
+> While it remains optional without runtime physoffset it's OK if you ask
+> me.
+>
+>> And zImage is only one of the possible headers we may have:
+>>
+>> ?* vmlinux can actually directly booted into as long as it's placed at the
+>> ? ?right place
+>> ?* uImage, with zImage or vmlinux (raw or compressed) encapsulated
+>> ?* zImage
+>> ?* xipImage
+>> ?* bootpImage
+> bootpimage is still used? ?In a different thread I suggested to remove
+> it.
+> The others are just a wrapped vmlinux that needs to be aware anyhow.
+> And the wrappers only need to pass r4 additionally to r2 and r3 through.
+>
+>> I'd really like to separate the guess work into two parts so they don't
+>> have dependencies.
+> But zreladdr is always physoffset + textoffset, isn't it?
 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> ---
-> 
-> Changes since v1:
-> - fixed style issues reported by Kukjin Kim
-> 
->  arch/arm/mach-s5pv210/gpiolib.c           |   14 ++++++++++++++
->  arch/arm/mach-s5pv210/include/mach/gpio.h |   12 +++++++++---
->  2 files changed, 23 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv210/gpiolib.c b/arch/arm/mach-s5pv210/gpiolib.c
-> index f4ac81f..0261908 100644
-> --- a/arch/arm/mach-s5pv210/gpiolib.c
-> +++ b/arch/arm/mach-s5pv210/gpiolib.c
-> @@ -208,6 +208,20 @@ static struct s3c_gpio_chip s5pv210_gpio_4bit[] = {
->  			.label	= "MP03",
->  		},
->  	}, {
-> +		.config	= &gpio_cfg_noint,
-> +		.chip	= {
-> +			.base	= S5PV210_MP04(0),
-> +			.ngpio	= S5PV210_GPIO_MP04_NR,
-> +			.label	= "MP04",
-> +		},
-> +	}, {
-> +		.config	= &gpio_cfg_noint,
-> +		.chip	= {
-> +			.base	= S5PV210_MP05(0),
-> +			.ngpio	= S5PV210_GPIO_MP05_NR,
-> +			.label	= "MP05",
-> +		},
-> +	}, {
->  		.base	= (S5P_VA_GPIO + 0xC00),
->  		.config	= &gpio_cfg_noint,
->  		.chip	= {
-> diff --git a/arch/arm/mach-s5pv210/include/mach/gpio.h b/arch/arm/mach-
-> s5pv210/include/mach/gpio.h
-> index d6461ba..1f4b595 100644
-> --- a/arch/arm/mach-s5pv210/include/mach/gpio.h
-> +++ b/arch/arm/mach-s5pv210/include/mach/gpio.h
-> @@ -52,6 +52,8 @@
->  #define S5PV210_GPIO_MP01_NR	(8)
->  #define S5PV210_GPIO_MP02_NR	(4)
->  #define S5PV210_GPIO_MP03_NR	(8)
-> +#define S5PV210_GPIO_MP04_NR	(8)
-> +#define S5PV210_GPIO_MP05_NR	(8)
-> 
->  /* GPIO bank numbers */
-> 
-> @@ -94,6 +96,8 @@ enum s5p_gpio_number {
->  	S5PV210_GPIO_MP01_START	=
-> S5PV210_GPIO_NEXT(S5PV210_GPIO_J4),
->  	S5PV210_GPIO_MP02_START	=
-> S5PV210_GPIO_NEXT(S5PV210_GPIO_MP01),
->  	S5PV210_GPIO_MP03_START	=
-> S5PV210_GPIO_NEXT(S5PV210_GPIO_MP02),
-> +	S5PV210_GPIO_MP04_START	=
-> S5PV210_GPIO_NEXT(S5PV210_GPIO_MP03),
-> +	S5PV210_GPIO_MP05_START	=
-> S5PV210_GPIO_NEXT(S5PV210_GPIO_MP04),
->  };
-> 
->  /* S5PV210 GPIO number definitions */
-> @@ -127,13 +131,15 @@ enum s5p_gpio_number {
->  #define S5PV210_MP01(_nr)	(S5PV210_GPIO_MP01_START + (_nr))
->  #define S5PV210_MP02(_nr)	(S5PV210_GPIO_MP02_START + (_nr))
->  #define S5PV210_MP03(_nr)	(S5PV210_GPIO_MP03_START + (_nr))
-> +#define S5PV210_MP04(_nr)	(S5PV210_GPIO_MP04_START + (_nr))
-> +#define S5PV210_MP05(_nr)	(S5PV210_GPIO_MP05_START + (_nr))
-> 
->  /* the end of the S5PV210 specific gpios */
-> -#define S5PV210_GPIO_END	(S5PV210_MP03(S5PV210_GPIO_MP03_NR) +
-> 1)
-> +#define S5PV210_GPIO_END	(S5PV210_MP05(S5PV210_GPIO_MP05_NR) +
-> 1)
->  #define S3C_GPIO_END		S5PV210_GPIO_END
-> 
-> -/* define the number of gpios we need to the one after the MP03() range */
-> -#define ARCH_NR_GPIOS
-> 	(S5PV210_MP03(S5PV210_GPIO_MP03_NR) +	\
-> +/* define the number of gpios we need to the one after the MP05() range */
-> +#define ARCH_NR_GPIOS
-> 	(S5PV210_MP05(S5PV210_GPIO_MP05_NR) +	\
->  				 CONFIG_SAMSUNG_GPIO_EXTRA + 1)
-> 
->  #include <asm-generic/gpio.h>
+I'm not completely sure about the u300 case.
+
+> So you should
+> use the same guess for both physoffset and zreladdr, no?
+
+My understanding is that separating guess of phys_offset and zreladdr might
+be a smoother migration path at this moment and yes it's a trade off.
+
+
+> And if you do it properly, it should even be possible to reuse the same
+> code for all locations.
+>
+> Best regards
+> Uwe
+>
 > --
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
