@@ -1,46 +1,105 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 10 Jun 2010 14:47:40 -0400 (EDT)
-Subject: [PATCH 01/10] arm/zImage: don't hard code the stack size twice
-In-Reply-To: <AANLkTinvvP7GFMHDoaw3SgIetd42Yyho1r9oMuiSIlnV@mail.gmail.com>
-References: <20100610102427.GC31057@pengutronix.de>
-	<1276165636-20150-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<AANLkTinvvP7GFMHDoaw3SgIetd42Yyho1r9oMuiSIlnV@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1006101446450.30664@xanadu.home>
+From: milinevskyy@gmail.com (Dmytro Milinevskyy)
+Date: Thu, 10 Jun 2010 22:12:55 +0300
+Subject: [PATCH] Marvell OpenRD-Ultimate machine support
+Message-ID: <4c1139ba.0d01df0a.42a6.1368@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Jun 2010, Eric Miao wrote:
+Hi!
+This patch adds support for the OpenRD Ultimate machine(could be found at http://www.arm.linux.org.uk/developer/machines/list.php?id=2884)
 
-> 2010/6/10 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> > ?arch/arm/boot/compressed/head.S | ? ?3 ++-
-> > ?1 files changed, 2 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> > index c5191b1..390aa92 100644
-> > --- a/arch/arm/boot/compressed/head.S
-> > +++ b/arch/arm/boot/compressed/head.S
-> > @@ -315,7 +315,7 @@ LC0: ? ? ? ? ? ? ? ?.word ? LC0 ? ? ? ? ? ? ? ? ? ? @ r1
-> > ? ? ? ? ? ? ? ?.word ? _image_size ? ? ? ? ? ? @ r6
-> > ? ? ? ? ? ? ? ?.word ? _got_start ? ? ? ? ? ? ?@ r11
-> > ? ? ? ? ? ? ? ?.word ? _got_end ? ? ? ? ? ? ? ?@ ip
-> > - ? ? ? ? ? ? ? .word ? user_stack+4096 ? ? ? ? @ sp
-> > + ? ? ? ? ? ? ? .word ? user_stack_end ? ? ? ? ?@ sp
-> > ?LC1: ? ? ? ? ? .word ? reloc_end - reloc_start
-> > ? ? ? ? ? ? ? ?.size ? LC0, . - LC0
-> >
-> > @@ -1070,3 +1070,4 @@ reloc_end:
-> > ? ? ? ? ? ? ? ?.align
-> > ? ? ? ? ? ? ? ?.section ".stack", "w"
-> > ?user_stack: ? ?.space ?4096
-> > +user_stack_end:
-> 
-> This one looks OK to me.
-> 
-> Acked-by: Eric Miao <eric.miao@canonical.com>
+Besides adding machine description this patch adds correction for PHY address for Ultimate version.
 
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Differences from the previous attempt:
+ - Correctly filled instances of mv643xx_eth_platform_data in case of ultimate version.
+ - Do PCIE initialization for Ultimate version along with Base and Client
+ - Init ge01 if (!openrd-base) to make the code cleaner
 
+Regards,
 
-Nicolas
+-- Dmytro Milinevskyy
+
+Signed-off-by: Dmytro Milinevskyy <milinevskyy@gmail.com>
+---
+ arch/arm/mach-kirkwood/Kconfig        |    7 +++++++
+ arch/arm/mach-kirkwood/openrd-setup.c |   27 ++++++++++++++++++++++++---
+ 2 files changed, 31 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index 29b2163..110a3b8 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -75,6 +75,13 @@ config MACH_OPENRD_CLIENT
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell OpenRD Client Board.
+ 
++config MACH_OPENRD_ULTIMATE
++	bool "Marvell OpenRD Ultimate Board"
++	select MACH_OPENRD
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  Marvell OpenRD Ultimate Board.
++
+ config MACH_NETSPACE_V2
+ 	bool "LaCie Network Space v2 NAS Board"
+ 	help
+diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
+index ad3f1ec..284b00f 100644
+--- a/arch/arm/mach-kirkwood/openrd-setup.c
++++ b/arch/arm/mach-kirkwood/openrd-setup.c
+@@ -1,7 +1,7 @@
+ /*
+  * arch/arm/mach-kirkwood/openrd-setup.c
+  *
+- * Marvell OpenRD (Base|Client) Board Setup
++ * Marvell OpenRD (Base|Client|Ultimate) Board Setup
+  *
+  * This file is licensed under the terms of the GNU General Public
+  * License version 2.  This program is licensed "as is" without any
+@@ -73,9 +73,15 @@ static void __init openrd_init(void)
+ 
+ 	kirkwood_ehci_init();
+ 
++	if (machine_is_openrd_ultimate()) {
++		openrd_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
++		openrd_ge01_data.phy_addr = MV643XX_ETH_PHY_ADDR(1);
++	}
++
+ 	kirkwood_ge00_init(&openrd_ge00_data);
+-	if (machine_is_openrd_client())
++	if (!machine_is_openrd_base())
+ 		kirkwood_ge01_init(&openrd_ge01_data);
++
+ 	kirkwood_sata_init(&openrd_sata_data);
+ 	kirkwood_sdio_init(&openrd_mvsdio_data);
+ 
+@@ -84,7 +90,9 @@ static void __init openrd_init(void)
+ 
+ static int __init openrd_pci_init(void)
+ {
+-	if (machine_is_openrd_base() || machine_is_openrd_client())
++	if (machine_is_openrd_base() ||
++		machine_is_openrd_client() ||
++		machine_is_openrd_ultimate())
+ 		kirkwood_pcie_init();
+ 
+ 	return 0;
+@@ -116,3 +124,16 @@ MACHINE_START(OPENRD_CLIENT, "Marvell OpenRD Client Board")
+ 	.timer		= &kirkwood_timer,
+ MACHINE_END
+ #endif
++
++#ifdef CONFIG_MACH_OPENRD_ULTIMATE
++MACHINE_START(OPENRD_ULTIMATE, "Marvell OpenRD Ultimate Board")
++	/* Maintainer: Dhaval Vasa <dhaval.vasa@einfochips.com> */
++	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
++	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
++	.boot_params	= 0x00000100,
++	.init_machine	= openrd_init,
++	.map_io		= kirkwood_map_io,
++	.init_irq	= kirkwood_init_irq,
++	.timer		= &kirkwood_timer,
++MACHINE_END
++#endif
+-- 
+1.7.1
