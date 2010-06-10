@@ -1,44 +1,54 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 10 Jun 2010 15:14:52 +0200
-Subject: usb gadget on zaurus and kexec
-In-Reply-To: <201006100900.23981.marek.vasut@gmail.com> (Marek Vasut's message
-	of "Thu, 10 Jun 2010 09:00:23 +0200")
-References: <20100519154618.GA26381@atrey.karlin.mff.cuni.cz>
-	<AANLkTim49akRJK0BN_Qk1wL6e5mrdjZioDjGNWlrjUVQ@mail.gmail.com>
-	<AANLkTilCvgvf9Ch55f878nTNTue8tHYmcrLEywsjnylY@mail.gmail.com>
-	<201006100900.23981.marek.vasut@gmail.com>
-Message-ID: <87wru7xc4z.fsf@free.fr>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 10 Jun 2010 15:56:10 +0200
+Subject: [PATCH] sa1111: Prevent deadlock in resume path
+In-Reply-To: <20100526201824.GA16418@n2100.arm.linux.org.uk>
+References: <1274901104-22133-1-git-send-email-marek.vasut@gmail.com>
+	<20100526191425.GD6232@n2100.arm.linux.org.uk>
+	<201005262115.57282.marek.vasut@gmail.com>
+	<20100526201824.GA16418@n2100.arm.linux.org.uk>
+Message-ID: <20100610135609.GC4514@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Vasut <marek.vasut@gmail.com> writes:
+On Wed 2010-05-26 21:18:24, Russell King - ARM Linux wrote:
+> On Wed, May 26, 2010 at 09:15:57PM +0200, Marek Vasut wrote:
+> > Dne St 26. kv?tna 2010 21:14:25 Russell King - ARM Linux napsal(a):
+> > > On Wed, May 26, 2010 at 09:11:44PM +0200, Marek Vasut wrote:
+> > > > This patch reorganises the sa1111_resume() function in a manner the
+> > > > spinlock happens after calling the sa1111_wake(). This fixes two bugs:
+> > > > 
+> > > > 1) This function called sa1111_wake() which tried to claim the same
+> > > > spinlock
+> > > > 
+> > > >    the sa1111_resume() already claimed. This would result in certain
+> > > >    deadlock.
+> > > >    
+> > > >    Original idea for this part: Russell King <linux@arm.linux.org.uk>
+> > > > 
+> > > > 2) The function didn't unlock the spinlock in case the chip didn't report
+> > > > 
+> > > >    correct ID.
+> > > >    
+> > > >    Original idea for this part: Julia Lawall <julia@diku.dk>
+> > > > 
+> > > > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> > > 
+> > > Yea, good enough.
+> > 
+> > You want me to fight your patch tracking system or will you just merge it into 
+> > your tree ?
+> 
+> What do you mean "fight" ?  Just send a standard git formatted patch
+> to the email address with an additional KernelVersion: tag.  It's
+> not at all hard.
 
->> > Dumping out the registers of the two situations and doing a comparison
->> > then might be a quick way.
->> 
->> Any debugging update on this?
->
-> Yeah, there's a workaround. Cyril's working on a proper fix, but that might take 
-> some time. Simply -- UP2OCR is misconfigured.
+You are linux kernel maintainer. Start acting as one. It is not at all
+hard.
 
-That's quite interesting. In the pxa27x_udc gadget driver, I seem to have a
-regression on the resume from suspend to RAM path. My USB UDC is not enumerated
-anymore.
+Alternatively, just remove KernelVersion: checking in  your
+scripts.
 
-The might be a correlation, as UP2OCR is lost in the suspend process. I'm very
-interested by your analysis of the issue you have on kexec, as that might ease
-my work :)
-
-Besides, it's been some time I've been thinking that the pxa deserves a proper
-encapsulation of the USB internal routing paths (ie. a proper way to switch from
-usb host handled by ohci-pxa27x to an usb client handled by pxa2x_udc), to
-reflect the setup of the Pad Unit (see TRM chapter 12.4 : tables 12.2, 12.15,
-12.17, 12.18 and 12.19).
-
-Whatever you find on the USB Port2 configuration register would help me design
-the Pad block.
-
-Cheers.
-
---
-Robert
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
