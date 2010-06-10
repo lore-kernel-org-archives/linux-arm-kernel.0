@@ -1,31 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 10 Jun 2010 23:59:30 +0100
-Subject: Context Switching is Broken
-In-Reply-To: <AANLkTilfwCVpr7JrLlWLIXV1DtAGZyRpvDd_8W-qfq5t@mail.gmail.com>
-References: <503171.97993.qm@web51806.mail.re2.yahoo.com>
-	<20100610140136.GA32362@n2100.arm.linux.org.uk>
-	<20100610142015.GC32362@n2100.arm.linux.org.uk>
-	<AANLkTimeZ6xawjcYfVDohBFcMbbLlC3h2gDs91CyGcBX@mail.gmail.com>
-	<148780.29764.qm@web51806.mail.re2.yahoo.com>
-	<AANLkTilfwCVpr7JrLlWLIXV1DtAGZyRpvDd_8W-qfq5t@mail.gmail.com>
-Message-ID: <20100610225930.GD32362@n2100.arm.linux.org.uk>
+Date: Fri, 11 Jun 2010 00:05:52 +0100
+Subject: [PATCH] sa1111: Prevent deadlock in resume path
+In-Reply-To: <201006102349.12849.marek.vasut@gmail.com>
+References: <1274901104-22133-1-git-send-email-marek.vasut@gmail.com>
+	<20100526201824.GA16418@n2100.arm.linux.org.uk>
+	<20100610135609.GC4514@ucw.cz>
+	<201006102349.12849.marek.vasut@gmail.com>
+Message-ID: <20100610230552.GE32362@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 10, 2010 at 10:29:12PM +0100, Martin Guy wrote:
-> While context switching works fine - any Unix system would have a hard
-> time working without it - these four esoteric system calls are not
-> implemented in the ARM port of Linux. If you'd like to modify the
-> linux source code to implement them, I'm sure the community would be
-> happy to review the patches for inclusion in the next version of the
-> kernel.
+On Thu, Jun 10, 2010 at 11:49:12PM +0200, Marek Vasut wrote:
+> Even though my problem was fixed (yeah, sorry Russell, I didn't know
+> the patch tracker was updated to support git-send-email), I have a
+> question though.
+> 
+> I believe that Kernel-version is unnecessary. Isn't this information already 
+> encoded in the git-send-emailed patch?
 
-If you read what I said:
+It's there so that gnu patches can be accepted, and the additional
+information does help when applying hard to apply patches, particularly
+if either the patch has aged or was generated against an old kernel
+version.
 
-"I believe for glibc, these are simply unimplemented on ARM, and linking
-a program which uses makecontext with glibc would result in the linker
-issuing:"
+Not only that, but it was once critical when we had 2.4 and 2.5/2.6
+kernel patches going via the patch system.
 
-These calls are nothing to do with the kernel.  They're a subject purely
-for glibc.  So there's no modification to the Linux kernel source code
-which could effect their implementation.
+Last point to make - and it's in similar vain to the KernelVersion
+tag - is that it would be useful if people would tag pure fixes which
+should be applied to previous kernels with a "Cc: <stable@kernel.org>"
+tag along-side the existing sign-offs.  That allows the stable
+maintainers to automatically pick up on these patches when they're
+merged into mainline.
