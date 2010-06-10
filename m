@@ -1,26 +1,40 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 10 Jun 2010 12:24:27 +0200
-Subject: [PATCH 0/10] cleanup in early boot code
-In-Reply-To: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
-References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
-Message-ID: <20100610102427.GC31057@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 10 Jun 2010 12:27:08 +0200
+Subject: [PATCH 02/10] arm/zImage: some comments for __armv3_mpu_cache_on
+In-Reply-To: <20100610102427.GC31057@pengutronix.de>
+References: <20100610102427.GC31057@pengutronix.de>
+Message-ID: <1276165636-20150-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+__armv3_mpu_cache_on seems broken.  As there is noone around who knows
+about these machines just keep the code as is but point out the strange
+things.
 
-a while ago I sent a few patches that clean up in this area, too, some
-of them are orthogonal to Eric's.  I resend them in reply to this mail.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/boot/compressed/head.S |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-Eric, maybe we can start merging your and my work, at least the bits
-that doesn't need further discussion between us?  (i.e. the patches I
-acked and hopefully the first few of mine)
-
-Do you irc?  I'm (e.g.) in #armlinux on freenode.
-
-Best regards
-Uwe
-
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 390aa92..384150b 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -396,12 +396,15 @@ __armv3_mpu_cache_on:
+ 
+ 		mov	r0, #0
+ 		mcr	p15, 0, r0, c7, c0, 0	@ invalidate whole cache v3
++		/* ?? ARMv3 MMU doesn not allow reading the control register, does this really work on ARMv3 MPU? */
+ 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
+ 						@ .... .... .... WC.M
+ 		orr	r0, r0, #0x000d		@ .... .... .... 11.1
++		/* ?? this overwrites the value constructed above? */
+ 		mov	r0, #0
+ 		mcr	p15, 0, r0, c1, c0, 0	@ write control reg
+ 
++		/* ?? invalidate for the second time? */
+ 		mcr	p15, 0, r0, c7, c0, 0	@ invalidate whole cache v3
+ 		mov	pc, lr
+ 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.1
