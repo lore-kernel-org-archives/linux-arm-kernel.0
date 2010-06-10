@@ -1,97 +1,68 @@
 From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Fri, 11 Jun 2010 00:06:00 +0200
+Date: Fri, 11 Jun 2010 00:17:44 +0200
 Subject: [PATCH 4/5] [ARM] Auto calculate ZRELADDR and provide option for
 	exceptions
-In-Reply-To: <AANLkTikulOGKEoAYptacYPgM8PAJ49JlGUO6rJWY5gqF@mail.gmail.com>
+In-Reply-To: <1275550613-9553-5-git-send-email-eric.miao@canonical.com>
 References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
 	<1275550613-9553-5-git-send-email-eric.miao@canonical.com>
-	<20100610090015.GD3422@pengutronix.de>
-	<AANLkTin9qGAJGSgu9Y2YjI_W8UwBITd-QYyGERcLLUgP@mail.gmail.com>
-	<20100610095808.GA31057@pengutronix.de>
-	<AANLkTikulOGKEoAYptacYPgM8PAJ49JlGUO6rJWY5gqF@mail.gmail.com>
-Message-ID: <AANLkTimr0lj3Gsxw0LNf-tOX474HrSZ2-lntjrEYpu3a@mail.gmail.com>
+Message-ID: <AANLkTiltifSEFdpXB0avw4ZyDzP_IrDpipafBAJbN17U@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/6/10 Eric Miao <eric.miao@canonical.com>:
-> 2010/6/10 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+2010/6/3 Eric Miao <eric.miao@canonical.com>:
 
->> But zreladdr is always physoffset + textoffset, isn't it?
->
-> I'm not completely sure about the u300 case.
+> +config ZRELADDR
+> + ? ? ? hex "Physical address of the decompressed kernel image"
+> + ? ? ? depends on !AUTO_ZRELADDR
+> + ? ? ? default 0x00008000 if ARCH_BCMRING || ARCH_CNS3XXX || ARCH_DOVE ||\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_EBSA110 || ARCH_FOOTBRIDGE || ARCH_INTEGRATOR ||\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_IOP13XX || ARCH_IOP33X || ARCH_IXP2000 ||\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_IXP23XX || ARCH_IXP4XX || ARCH_KIRKWOOD ||\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_KS8695 ?|| ARCH_LOKI || ARCH_MMP || ARCH_MV78XX0 ||\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_NOMADIK || ARCH_NUC93X || ARCH_NS9XXX ||\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_ORION5X || ARCH_SPEAR3XX || ARCH_SPEAR6XX ||\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_UX5XX || ARCH_VERSATILE || ARCH_W90X900
+> + ? ? ? default 0x08008000 if ARCH_MX1 || ARCH_SHARK
+> + ? ? ? default 0x10008000 if ARCH_MSM || ARCH_OMAP1 || ARCH_RPC
+> + ? ? ? default 0x20008000 if ARCH_S5P6440 || ARCH_S5P6442 ||\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_S5PC100 || ARCH_S5PV210
+> + ? ? ? default 0x30008000 if ARCH_S3C2410 || ARCH_S3C2400 || ARCH_S3C2412 ||\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_S3C2416 || ARCH_S3C2440 || ARCH_S3C2443
+> + ? ? ? default 0x40008000 if ARCH_STMP378X || ARCH_STMP37XX || ARCH_SH7372 ||\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_SH7377
+> + ? ? ? default 0x50008000 if ARCH_S3C64XX || ARCH_SH7367
+> + ? ? ? default 0x60008000 if ARCH_VEXPRESS
+> + ? ? ? default 0x80008000 if ARCH_MX25 || ARCH_MX3 || ARCH_NETX ||\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARCH_OMAP2 || ARCH_PNX4008
+> + ? ? ? default 0x90008000 if ARCH_MX5 || ARCH_MX91231
+> + ? ? ? default 0xa0008000 if ARCH_IOP32X || ARCH_PXA || MACH_MX27
+> + ? ? ? default 0xc0008000 if ARCH_LH7A40X || MACH_MX21
+> + ? ? ? default 0xf0008000 if ARCH_AAEC2000 || ARCH_L7200
+> + ? ? ? default 0xc0028000 if ARCH_CLPS711X
+> + ? ? ? default 0x70008000 if ARCH_AT91 && (ARCH_AT91CAP9 || ARCH_AT91SAM9G45)
+> + ? ? ? default 0x20008000 if ARCH_AT91 && !(ARCH_AT91CAP9 || ARCH_AT91SAM9G45)
+> + ? ? ? default 0xc0008000 if ARCH_DAVINCI && ARCH_DAVINCI_DA8XX
+> + ? ? ? default 0x80008000 if ARCH_DAVINCI && !ARCH_DAVINCI_DA8XX
+> + ? ? ? default 0x00008000 if ARCH_EP93XX && EP93XX_SDCE3_SYNC_PHYS_OFFSET
+> + ? ? ? default 0xc0008000 if ARCH_EP93XX && EP93XX_SDCE0_PHYS_OFFSET
+> + ? ? ? default 0xd0008000 if ARCH_EP93XX && EP93XX_SDCE1_PHYS_OFFSET
+> + ? ? ? default 0xe0008000 if ARCH_EP93XX && EP93XX_SDCE2_PHYS_OFFSET
+> + ? ? ? default 0xf0008000 if ARCH_EP93XX && EP93XX_SDCE3_ASYNC_PHYS_OFFSET
+> + ? ? ? default 0x00008000 if ARCH_GEMINI && GEMINI_MEM_SWAP
+> + ? ? ? default 0x10008000 if ARCH_GEMINI && !GEMINI_MEM_SWAP
+> + ? ? ? default 0x70008000 if ARCH_REALVIEW && REALVIEW_HIGH_PHYS_OFFSET
+> + ? ? ? default 0x00008000 if ARCH_REALVIEW && !REALVIEW_HIGH_PHYS_OFFSET
+> + ? ? ? default 0xc0208000 if ARCH_SA1100 && SA1111
+> + ? ? ? default 0xc0008000 if ARCH_SA1100 && !SA1111
+> + ? ? ? default 0x30108000 if ARCH_S3C2410 && PM_H1940
+> + ? ? ? default 0x28E08000 if ARCH_U300 && MACH_U300_SINGLE_RAM
+> + ? ? ? default 0x48008000 if ARCH_U300 && !MACH_U300_SINGLE_RAM
 
-OK as you see in mach-u300/Makefile.boot we have ZRELADDR
-at two different locations:
+This looks correct so
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 
-0x28E08000 or 0x48008000
-
-(textoffset is 0x8000 IIRC)
-
-The stuff in mach-u300/include/memory.h play with the Kconfig
-options in mach-u300/Kconfig and is supposed to provide
-dynamic resize of the memory for the 0x28e08000 variant,
-because that variant can actually be reconfigured by the boot loader
-(memory will be assigned to another CPU).
-
-Then PHYS_OFFSET is set to the closest 2MiB boundary toward
-lower addresses since this is required by ARM Linux.
-
-As you can see in the Kconfig we currently have 13 MiB meaning
-PHYS_OFFSET will be
-0x28000000 + (13 - 13&1) *1024*1024 = 0x28C00000
-
-This way we comply with the 2MiB alignment requirement,
-even though in this case the actual physical memory begins
-at 0x28D00000. So the first MiB does not really exist. This is
-then compensated for in arch/arm/mm/mmu.c:
-
-        /*
-         * U300 - This platform family can share physical memory
-         * between two ARM cpus, one running Linux and the other
-         * running another OS.
-         */
-        if (machine_is_u300()) {
-#ifdef CONFIG_MACH_U300_SINGLE_RAM
-#if ((CONFIG_MACH_U300_ACCESS_MEM_SIZE & 1) == 1) &&    \
-        CONFIG_MACH_U300_2MB_ALIGNMENT_FIX
-                res_size = 0x00100000;
-#endif
-#endif
-        }
-
-So we reserve the first MiB which is not actually memory, so
-that this will not be used, and Linux will actually make use of
-the memory from 0x28D00000.
-
-If we had reserved 14MiB instead it would be:
-0x28000000 + (14 - 14&1) *1024*1024 = 0x28E00000
-
-And then it would have matched.
-
-The ZRELADDR in Makefile.boot is actually just some
-convention for the bootloader, it will work as long as we
-shrink the memory used by the other CPU, if we expand it
-past 14MiB everything breaks, like for 16 MiB for the other
-CPU physical memory begins at 0x29000000 and trying
-to have ZRELADDR at 28e08000 will just result in a
-bus error.
-
-So the relation between ZRELADDR and PHYS_OFFSET
-on the U300 is:
-
-if CONFIG_MACH_U300_SINGLE_RAM
-PHYS_OFFSET = 0x28000000 +
-  reserved_for_other_cpu_rounded_to_closest_2MiB_lower_addresses
-ZRELADDR = 0x28e00000 + textoffset
-else
-PHYS_OFFSET = 0x48000000
-ZRELADDR = 0x48000000 + textoffset
-endif
-
-So the assumption holds if
-!CONFIG_MACH_U300_SINGLE_RAM
-
-Else it is complicated.
+I assume it should be submitted simultaneously with a patch nuking off
+all Makefile.boot files and that infrastructure then?
 
 Yours,
 Linus Walleij
