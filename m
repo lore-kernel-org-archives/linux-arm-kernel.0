@@ -1,52 +1,128 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 10 Jun 2010 12:27:11 +0200
-Subject: [PATCH 05/10] arm/zImage: annotate debug functions about corrupted
-	registers
+Date: Thu, 10 Jun 2010 12:27:14 +0200
+Subject: [PATCH 08/10] arm: deprecate support for old way to pass kernel
+	parameters
 In-Reply-To: <20100610102427.GC31057@pengutronix.de>
 References: <20100610102427.GC31057@pengutronix.de>
-Message-ID: <1276165636-20150-5-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1276165636-20150-8-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This was deprecated in 2001 and announced to live on for 5 years.
+
+For now provide a kernel parameter for those who still need it.
+
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/boot/compressed/head.S |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/Kconfig         |    6 ++++++
+ arch/arm/kernel/Makefile |    4 +++-
+ arch/arm/kernel/compat.c |    7 -------
+ arch/arm/kernel/compat.h |    2 --
+ arch/arm/kernel/setup.c  |   11 +++++++++++
+ 5 files changed, 20 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index f8a210b..dbeeb56 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -1005,6 +1005,7 @@ __armv3_mpu_cache_flush:
- phexbuf:	.space	12
- 		.size	phexbuf, . - phexbuf
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1f254bd..a53ac65 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1374,6 +1374,12 @@ config UACCESS_WITH_MEMCPY
+ 	  However, if the CPU data cache is using a write-allocate mode,
+ 	  this option is unlikely to provide any performance gain.
  
-+@ phex corrupts {r0, r1, r2, r3}
- phex:		adr	r3, phexbuf
- 		mov	r2, #0
- 		strb	r2, [r3, r1]
-@@ -1019,6 +1020,7 @@ phex:		adr	r3, phexbuf
- 		strb	r2, [r3, r1]
- 		b	1b
++config DEPRECATED_PARAM_STRUCT
++	bool "Provide old way to pass kernel parameters"
++	help
++	  This was deprecated in 2001 and announced to live on for 5 years.
++	  Some old boot loaders still use this way.
++
+ endmenu
  
-+@ puts corrupts {r0, r1, r2, r3}
- puts:		loadsp	r3, r1
- 1:		ldrb	r2, [r0], #1
- 		teq	r2, #0
-@@ -1033,12 +1035,14 @@ puts:		loadsp	r3, r1
- 		teq	r0, #0
- 		bne	1b
- 		mov	pc, lr
-+@ putc corrupts {r0, r1, r2, r3}
- putc:
- 		mov	r2, r0
- 		mov	r0, #0
- 		loadsp	r3, r1
- 		b	2b
+ menu "Boot options"
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 26d302c..021f72d 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -13,10 +13,12 @@ CFLAGS_REMOVE_return_address.o = -pg
  
-+@ memdump corrupts {r0, r1, r2, r3, r10, r11, r12, lr}
- memdump:	mov	r12, r0
- 		mov	r10, lr
- 		mov	r11, #0
+ # Object file lists.
+ 
+-obj-y		:= compat.o elf.o entry-armv.o entry-common.o irq.o \
++obj-y		:= elf.o entry-armv.o entry-common.o irq.o \
+ 		   process.o ptrace.o return_address.o setup.o signal.o \
+ 		   sys_arm.o stacktrace.o time.o traps.o
+ 
++obj-$(CONFIG_DEPRECATED_PARAM_STRUCT) += compat.o
++
+ obj-$(CONFIG_LEDS)		+= leds.o
+ obj-$(CONFIG_OC_ETM)		+= etm.o
+ 
+diff --git a/arch/arm/kernel/compat.c b/arch/arm/kernel/compat.c
+index 0a13854..9256523 100644
+--- a/arch/arm/kernel/compat.c
++++ b/arch/arm/kernel/compat.c
+@@ -217,10 +217,3 @@ void __init convert_to_tag_list(struct tag *tags)
+ 	struct param_struct *params = (struct param_struct *)tags;
+ 	build_tag_list(params, &params->u2);
+ }
+-
+-void __init squash_mem_tags(struct tag *tag)
+-{
+-	for (; tag->hdr.size; tag = tag_next(tag))
+-		if (tag->hdr.tag == ATAG_MEM)
+-			tag->hdr.tag = ATAG_NONE;
+-}
+diff --git a/arch/arm/kernel/compat.h b/arch/arm/kernel/compat.h
+index 27e61a6..39264ab 100644
+--- a/arch/arm/kernel/compat.h
++++ b/arch/arm/kernel/compat.h
+@@ -9,5 +9,3 @@
+ */
+ 
+ extern void convert_to_tag_list(struct tag *tags);
+-
+-extern void squash_mem_tags(struct tag *tag);
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 122d999..cbc6ddb 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -44,7 +44,9 @@
+ #include <asm/traps.h>
+ #include <asm/unwind.h>
+ 
++#if defined(CONFIG_DEPRECATED_PARAM_STRUCT)
+ #include "compat.h"
++#endif
+ #include "atags.h"
+ #include "tcm.h"
+ 
+@@ -663,6 +665,13 @@ static int __init customize_machine(void)
+ }
+ arch_initcall(customize_machine);
+ 
++static void __init squash_mem_tags(struct tag *tag)
++{
++	for (; tag->hdr.size; tag = tag_next(tag))
++		if (tag->hdr.tag == ATAG_MEM)
++			tag->hdr.tag = ATAG_NONE;
++}
++
+ void __init setup_arch(char **cmdline_p)
+ {
+ 	struct tag *tags = (struct tag *)&init_tags;
+@@ -683,12 +692,14 @@ void __init setup_arch(char **cmdline_p)
+ 	else if (mdesc->boot_params)
+ 		tags = phys_to_virt(mdesc->boot_params);
+ 
++#if defined(CONFIG_DEPRECATED_PARAM_STRUCT)
+ 	/*
+ 	 * If we have the old style parameters, convert them to
+ 	 * a tag list.
+ 	 */
+ 	if (tags->hdr.tag != ATAG_CORE)
+ 		convert_to_tag_list(tags);
++#endif
+ 	if (tags->hdr.tag != ATAG_CORE)
+ 		tags = (struct tag *)&init_tags;
+ 
 -- 
 1.7.1
