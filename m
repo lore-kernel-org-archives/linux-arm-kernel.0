@@ -1,37 +1,87 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 11 Jun 2010 08:46:29 +1200
-Subject: [PATCH 0/3] EP93xx: Add i2s audio support
-In-Reply-To: <C54C83DB-A9D3-4A7A-837B-17644B257251@opensource.wolfsonmicro.com>
-References: <1275991272-30122-1-git-send-email-ryan@bluewatersys.com>
-	<20100609101742.GA5618@opensource.wolfsonmicro.com>
-	<4C100A32.7010403@bluewatersys.com>
-	(sfid-20100609_224011_305149_EE792DDC)
-	<C54C83DB-A9D3-4A7A-837B-17644B257251@opensource.wolfsonmicro.com>
-Message-ID: <4C114F25.5060809@bluewatersys.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 10 Jun 2010 17:00:51 -0400 (EDT)
+Subject: [PATCH v2 1/4] ARM: Remove the domain switching on ARMv6k/v7 CPUs
+In-Reply-To: <alpine.LFD.2.00.1006101411160.30664@xanadu.home>
+References: <20100602164459.17783.9741.stgit@e102109-lin.cambridge.arm.com>
+	<20100602164841.17783.94825.stgit@e102109-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1006091447460.30664@xanadu.home>
+	<1276122405.17056.47.camel@toshiba-laptop>
+	<alpine.LFD.2.00.1006092039000.30664@xanadu.home>
+	<1276169316.24535.32.camel@e102109-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1006101411160.30664@xanadu.home>
+Message-ID: <alpine.LFD.2.00.1006101648390.30664@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> On 9 Jun 2010, at 22:40, Ryan Mallon wrote:
+On Thu, 10 Jun 2010, Nicolas Pitre wrote:
+
+> On Thu, 10 Jun 2010, Catalin Marinas wrote:
 > 
->> Stupid question, but where was it applied? I can't find it in any of the
->> branches at:
->> http://opensource.wolfsonmicro.com/cgi-bin/gitweb.cgi?p=linux-2.6-asoc.git;a=summary
+> > On Thu, 2010-06-10 at 01:56 +0100, Nicolas Pitre wrote:
+> > > On Wed, 9 Jun 2010, Catalin Marinas wrote:
+> > > 
+> > > > On Wed, 2010-06-09 at 20:10 +0100, Nicolas Pitre wrote:
+> > > > > Sorry for the delay... I'm just starting to seriously look at this.
+> > > > >
+> > > > > On Wed, 2 Jun 2010, Catalin Marinas wrote:
+> > > > >
+> > > > > > This patch removes the domain switching functionality via the set_fs and
+> > > > > > __switch_to functions on cores that have a TLS register.
+> > > > > [...]
+> > > > > > The user pages access rights are also modified for kernel read-only
+> > > > > > access rather than read/write so that the copy-on-write mechanism still
+> > > > > > works. CPU_USE_DOMAINS gets disabled only if HAS_TLS_REG is defined
+> > > > > > since writing the TLS value to the high vectors page isn't possible.
+> > > > >
+> > > > > I don't like this limitation much.
+> > > > >
+> > > > > Since the vector page has to be accessed somehow for FIQs anyway, and
+> > > > > the current solution for that involves accesses through the direct
+> > > > > mapping of the vector page, then this patch could be made to work on
+> > > > > pre-ARMv6 systems too simply by adding the necessary cache ops around
+> > > > > the TLS and FIQ updates.
+> > > >
+> > > > Getting rid of domains in Linux requires that several functions no
+> > > > longer use LDRT/STRT but LDR/STR. This implies that RO user pages should
+> > > > also have RO permissions for the kernel. I don't have the old ARM ARM at
+> > > > hand now but I recall there were some issues with user RO kernel RO
+> > > > permission on pre-ARMv6 processors (there is an R bit in the CP15
+> > > > control register which may help, I need to check the documentation).
+> > > 
+> > > I just checked.  It says:
+> > > 
+> > >    The access permission bits in section and page descriptors control
+> > >    access to the corresponding section or page. The access permissions
+> > >    are modified by the System (S) and ROM (R) control bits in CP15
+> > >    register 1.
+> > > 
+> > > But those bits are of no use as they are effective only when the MMU
+> > > access permission bits are all 0, otherwise they're ignored.
+> > 
+> > OK. So for read-only user pages we could set AP to 00 and R to 1 so that
+> > pages are read-only for kernel as well. For the other cases we just use
+> > a non-zero AP.
 > 
-> Look in my kernel.org repository referenced in MAINTAINERS
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound-2.6.git
+> But what about non existing pages?  They can't go through with a read 
+> access from the first memory page.
 
-Builds and runs fine.
+Well... that looks like this is simply unworkable.  The R bit is global, 
+so as soon as you have it on then kernel access to any memory will 
+always succeed.  There is no way to have kernel RO user RO and still 
+have no access on missing pages.
 
-Thanks,
-~Ryan
+   Table 3-3 MMU access permissions
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
+            Privileged    User
+   AP   S R permissions   permissions
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+   0b00 0 0 No access     No access
+   0b00 1 0 Read only     No access
+   0b00 0 1 Read only     Read only
+   0b00 1 1 UNPREDICTABLE UNPREDICTABLE
+   0b01 x x Read/write    No access
+   0b10 x x Read/write    Read only
+   0b11 x x Read/write    Read/write
+
+
+Nicolas
