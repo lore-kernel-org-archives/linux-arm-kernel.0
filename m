@@ -1,30 +1,64 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Fri, 11 Jun 2010 10:58:07 -0700
-Subject: [PATCH] ARM: Add ARCH_HAS_L2X0 and make CACHE_L2X0 config
-	depend on that
-In-Reply-To: <1276272211-13065-1-git-send-email-olof@lixom.net>
-References: <6fqujhaev78923q90va>
-	<1276272211-13065-1-git-send-email-olof@lixom.net>
-Message-ID: <1276279087.31800.6.camel@c-dwalke-linux.qualcomm.com>
+From: ccross@android.com (Colin Cross)
+Date: Fri, 11 Jun 2010 11:54:29 -0700
+Subject: [PATCH 05/10] [ARM] tegra: Add timer support
+In-Reply-To: <AANLkTilitoPKhSCk1gxwyzOdu8LZD-9xA3EesFKkDsLy@mail.gmail.com>
+References: <1275635441-17378-1-git-send-email-olof@lixom.net>
+	<1275635441-17378-2-git-send-email-olof@lixom.net>
+	<1275635441-17378-3-git-send-email-olof@lixom.net>
+	<1275635441-17378-4-git-send-email-olof@lixom.net>
+	<1275635441-17378-5-git-send-email-olof@lixom.net>
+	<1275635441-17378-6-git-send-email-olof@lixom.net>
+	<AANLkTilitoPKhSCk1gxwyzOdu8LZD-9xA3EesFKkDsLy@mail.gmail.com>
+Message-ID: <AANLkTiketaVq4PBc9FTr6RgVO038twXXF7BMU0W8GsH5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-06-11 at 11:03 -0500, Olof Johansson wrote:
+On Mon, Jun 7, 2010 at 4:43 PM, Linus Walleij
+<linus.ml.walleij@gmail.com> wrote:
+> 2010/6/4 Olof Johansson <olof@lixom.net>:
+>
+>> (....)
+>> +static struct clock_event_device tegra_clockevent = {
+>> + ? ? ? .name ? ? ? ? ? = "timer0",
+>> + ? ? ? .rating ? ? ? ? = 300,
+>> + ? ? ? .features ? ? ? = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
+>> + ? ? ? .mult ? ? ? ? ? = 16777,
+>> + ? ? ? .shift ? ? ? ? ?= 24,
+>> + ? ? ? .set_next_event = tegra_timer_set_next_event,
+>> + ? ? ? .set_mode ? ? ? = tegra_timer_set_mode,
+>> +};
+>> +
+>> +static struct clocksource tegra_clocksource = {
+>> + ? ? ? .name ? = "timer_us",
+>> + ? ? ? .rating = 300,
+>> + ? ? ? .read ? = tegra_clocksource_read,
+>> + ? ? ? .mask ? = 0xFFFFFFFFUL,
+>> + ? ? ? .mult ? = 1000,
+>> + ? ? ? .shift ?= 0,
+>> + ? ? ? .flags ?= CLOCK_SOURCE_IS_CONTINUOUS,
+>> +};
+>
+> How did you calculate the magic mult/shift numbers 16777/24 and
+> 1000/0 above? Especially the latter intuitively seem very inappropriate,
+> and I guess there will be revisions of this platform with new frequencies
+> for the timer as well, making these hard-coded values a bug source.
 
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 346ae14..419b957 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -759,11 +759,13 @@ config CACHE_FEROCEON_L2_WRITETHROUGH
->  	  Say Y here to use the Feroceon L2 cache in writethrough mode.
->  	  Unless you specifically require this, say N for writeback mode.
->  
-> +config ARCH_HAS_L2X0
-> +	bool
-> +	default n
-> +
+Thanks, fixed.  The numbers are correct, as Tegra timers all run at
+1MHz regardless of input clock frequency, but removing the magic
+numbers is clearer.
 
-I made a similar change not too long ago, but Russell wanted the define
-to be HAVE_CACHE_L2X0 ..
+For the clocksource, I replaced it with clocksource_register_hz, which
+hides the minsec number as well. Clockevents I replaced iwth
+clockevents_calc_mult_shift.
 
-Daniel
+> I would consider using the
+> clocksource_calc_mult_shift() and
+> clockevents_calc_mult_shift()
+> functions based on the frequency of the timer counter and a minimum wakeup
+> range if you don't know exactly why you want these mult+shifts.
+>
+> I posted some patches to encourage the use of these recently.
+>
+> Yours,
+> Linus Walleij
+>
