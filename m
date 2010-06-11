@@ -1,56 +1,38 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 11 Jun 2010 14:52:56 +0900
-Subject: [PATCH 2/2] MAINTAINERS: add maintainer for SAMSUNG ARM
-	ARCHITECTURES
-In-Reply-To: <AANLkTinpth-JO7pIOWXbnuUWXM3xQ1OnFKkfESwi0cP3@mail.gmail.com>
-References: <1275647794-30634-1-git-send-email-kgene.kim@samsung.com>
-	<1275647794-30634-2-git-send-email-kgene.kim@samsung.com>
-	<AANLkTinpth-JO7pIOWXbnuUWXM3xQ1OnFKkfESwi0cP3@mail.gmail.com>
-Message-ID: <AANLkTikygrbXPkszVvBpH217mOaY8UzJE8zcOGVTGRZo@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 11 Jun 2010 07:59:01 +0200
+Subject: [PATCH v2] s3c64xx: Fix build without SDHCI controllers
+In-Reply-To: <000801cb0900$f64bbdc0$e2e33940$%kim@samsung.com>
+References: <000801cb0900$f64bbdc0$e2e33940$%kim@samsung.com>
+Message-ID: <1276235941-12114-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping.
+This patch fixes the following compilation problem if only NCP machine
+is selected:
 
-On Sat, Jun 5, 2010 at 11:24 AM, Kyungmin Park <kmpark@infradead.org> wrote:
-> Hi Ben,
->
-> I'm waiting your comments.
->
-> Thank you,
-> Kyungmin Park
->
-> On Fri, Jun 4, 2010 at 7:36 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
->> ---
->> ?MAINTAINERS | ? ?2 ++
->> ?1 files changed, 2 insertions(+), 0 deletions(-)
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index 1d41149..f4e4c61 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -896,11 +896,13 @@ S: ? ? ? ?Maintained
->>
->> ?ARM/SAMSUNG ARM ARCHITECTURES
->> ?M: ? ? Ben Dooks <ben-linux@fluff.org>
->> +M: ? ? Kukjin Kim <kgene.kim@samsung.com>
->> ?L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->> ?W: ? ? http://www.fluff.org/ben/linux/
->> ?S: ? ? Maintained
->> ?F: ? ? arch/arm/plat-samsung/
->> ?F: ? ? arch/arm/plat-s3c24xx/
->> +F: ? ? arch/arm/plat-s5p/
->>
->> ?ARM/S3C2410 ARM ARCHITECTURE
->> ?M: ? ? Ben Dooks <ben-linux@fluff.org>
->> --
->> 1.6.2.5
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
+arch/arm/mach-s3c64xx/s3c6410.c: In function ?s3c6410_map_io?:
+arch/arm/mach-s3c64xx/s3c6410.c:51: error: implicit declaration of function ?s3c6410_default_sdhci2?
+
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/plat-samsung/include/plat/sdhci.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h b/arch/arm/plat-samsung/include/plat/sdhci.h
+index 13f9fb2..2e263a8 100644
+--- a/arch/arm/plat-samsung/include/plat/sdhci.h
++++ b/arch/arm/plat-samsung/include/plat/sdhci.h
+@@ -166,8 +166,10 @@ static inline void s3c6410_default_sdhci2(void) { }
+ #else
+ static inline void s3c6410_default_sdhci0(void) { }
+ static inline void s3c6410_default_sdhci1(void) { }
++static inline void s3c6410_default_sdhci2(void) { }
+ static inline void s3c6400_default_sdhci0(void) { }
+ static inline void s3c6400_default_sdhci1(void) { }
++static inline void s3c6400_default_sdhci2(void) { }
+ 
+ #endif /* CONFIG_S3C64XX_SETUP_SDHCI */
+ 
+-- 
+1.7.1.240.g225c
