@@ -1,64 +1,64 @@
-From: ccross@android.com (Colin Cross)
-Date: Fri, 11 Jun 2010 11:54:29 -0700
-Subject: [PATCH 05/10] [ARM] tegra: Add timer support
-In-Reply-To: <AANLkTilitoPKhSCk1gxwyzOdu8LZD-9xA3EesFKkDsLy@mail.gmail.com>
-References: <1275635441-17378-1-git-send-email-olof@lixom.net>
-	<1275635441-17378-2-git-send-email-olof@lixom.net>
-	<1275635441-17378-3-git-send-email-olof@lixom.net>
-	<1275635441-17378-4-git-send-email-olof@lixom.net>
-	<1275635441-17378-5-git-send-email-olof@lixom.net>
-	<1275635441-17378-6-git-send-email-olof@lixom.net>
-	<AANLkTilitoPKhSCk1gxwyzOdu8LZD-9xA3EesFKkDsLy@mail.gmail.com>
-Message-ID: <AANLkTiketaVq4PBc9FTr6RgVO038twXXF7BMU0W8GsH5@mail.gmail.com>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Fri, 11 Jun 2010 21:48:37 +0200
+Subject: [RFC/PATCH 0/9] Samsung crypto engine
+Message-ID: <4C129315.4030404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 7, 2010 at 4:43 PM, Linus Walleij
-<linus.ml.walleij@gmail.com> wrote:
-> 2010/6/4 Olof Johansson <olof@lixom.net>:
->
->> (....)
->> +static struct clock_event_device tegra_clockevent = {
->> + ? ? ? .name ? ? ? ? ? = "timer0",
->> + ? ? ? .rating ? ? ? ? = 300,
->> + ? ? ? .features ? ? ? = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
->> + ? ? ? .mult ? ? ? ? ? = 16777,
->> + ? ? ? .shift ? ? ? ? ?= 24,
->> + ? ? ? .set_next_event = tegra_timer_set_next_event,
->> + ? ? ? .set_mode ? ? ? = tegra_timer_set_mode,
->> +};
->> +
->> +static struct clocksource tegra_clocksource = {
->> + ? ? ? .name ? = "timer_us",
->> + ? ? ? .rating = 300,
->> + ? ? ? .read ? = tegra_clocksource_read,
->> + ? ? ? .mask ? = 0xFFFFFFFFUL,
->> + ? ? ? .mult ? = 1000,
->> + ? ? ? .shift ?= 0,
->> + ? ? ? .flags ?= CLOCK_SOURCE_IS_CONTINUOUS,
->> +};
->
-> How did you calculate the magic mult/shift numbers 16777/24 and
-> 1000/0 above? Especially the latter intuitively seem very inappropriate,
-> and I guess there will be revisions of this platform with new frequencies
-> for the timer as well, making these hard-coded values a bug source.
+Hi all,
 
-Thanks, fixed.  The numbers are correct, as Tegra timers all run at
-1MHz regardless of input clock frequency, but removing the magic
-numbers is clearer.
+this patchset introduces crypto acceleration support for the crypto engine
+available in S3C64XX and S5PC100 SoC's. I only have access to a S3C6410 board so
+it would be nice if people could test these patches on S5PC100.
 
-For the clocksource, I replaced it with clocksource_register_hz, which
-hides the minsec number as well. Clockevents I replaced iwth
-clockevents_calc_mult_shift.
+The driver currently only supports AES and (T)DES in PIO mode, but even then it
+doesn't always succeed the DES self-tests so the driver part of this patch is
+more an RFC than an actual patch.
 
-> I would consider using the
-> clocksource_calc_mult_shift() and
-> clockevents_calc_mult_shift()
-> functions based on the frequency of the timer counter and a minimum wakeup
-> range if you don't know exactly why you want these mult+shifts.
->
-> I posted some patches to encourage the use of these recently.
->
-> Yours,
-> Linus Walleij
->
+AES seems to work better than (T)DES, but it hangs on 64-bytes transfers (DES
+hangs on a 24-byte transfer).
+
+There is support for DMA in the driver, but that has its own set of problems (it
+can't even finish a single transfer).
+
+I've tagged the patches I think are worthy for upstreaming with [PATCH], the
+others are tagged with [RFC] (reviews are welcome!).
+
+I'm not completely sure about my approach of handling the subsystems' register
+offsets currently as this limits the driver to S3C64XX- or S5PC100-only.
+
+Mapping these to virtual space could solve this and would have the benefit of
+reducing the ~11MB IO space on S3C64XX SoC's.
+
+Maurus Cuelenaere (9):
+  ARM: S3C64XX: Add SDMA clocks
+  ARM: S3C64XX: Add SDMA support to DMA core
+  ARM: S3C64XX: Stop and flush requests on freeing
+  ARM: S3C64XX: Add support for secur clock
+  ARM: S3C64XX: Add crypto engine register definitions
+  ARM: S5PC100: Add crypto engine register definitions
+  ARM: SAMSUNG: Add crypto engine platform definition
+  ARM: SAMSUNG: Add crypto engine register definitions
+  crypto: Add Samsung crypto engine driver
+
+ arch/arm/Kconfig                              |    2 +
+ arch/arm/mach-s3c64xx/clock.c                 |   21 +
+ arch/arm/mach-s3c64xx/dma.c                   |   54 +-
+ arch/arm/mach-s3c64xx/include/mach/map.h      |    3 +
+ arch/arm/mach-s3c64xx/include/mach/regs-sss.h |   27 +
+ arch/arm/mach-s5pc100/include/mach/map.h      |    4 +
+ arch/arm/mach-s5pc100/include/mach/regs-sss.h |   29 +
+ arch/arm/plat-samsung/Kconfig                 |    5 +
+ arch/arm/plat-samsung/Makefile                |    1 +
+ arch/arm/plat-samsung/dev-sss.c               |   46 +
+ arch/arm/plat-samsung/include/plat/devs.h     |    2 +
+ arch/arm/plat-samsung/include/plat/regs-sss.h |  153 +++
+ drivers/crypto/Kconfig                        |   11 +
+ drivers/crypto/Makefile                       |    1 +
+ drivers/crypto/s3c-sss.c                      | 1320 +++++++++++++++++++++++++
+ 15 files changed, 1668 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm/mach-s3c64xx/include/mach/regs-sss.h
+ create mode 100644 arch/arm/mach-s5pc100/include/mach/regs-sss.h
+ create mode 100644 arch/arm/plat-samsung/dev-sss.c
+ create mode 100644 arch/arm/plat-samsung/include/plat/regs-sss.h
+ create mode 100644 drivers/crypto/s3c-sss.c
