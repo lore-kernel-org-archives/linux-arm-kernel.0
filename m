@@ -1,28 +1,33 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Fri, 11 Jun 2010 09:39:53 +0530
-Subject: [PATCH resend] Watchdog: Adding support for ARM Primecell SP805
-	Watchdog
-In-Reply-To: <1275465783-14052-1-git-send-email-viresh.kumar@st.com>
-References: <1275465783-14052-1-git-send-email-viresh.kumar@st.com>
-Message-ID: <4C11B711.70907@st.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 11 Jun 2010 13:25:18 +0900
+Subject: Pending patches for s5pc110
+In-Reply-To: <AANLkTil0wWSFHpwi58enMhhG7475uUmFoZG6QhRim6Xk@mail.gmail.com>
+References: <AANLkTil0wWSFHpwi58enMhhG7475uUmFoZG6QhRim6Xk@mail.gmail.com>
+Message-ID: <AANLkTimjwSHLiMYFywn3vHZYCbqQCCCh9qE-n3xuYOaq@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/2/2010 1:33 PM, Viresh KUMAR wrote:
-> Technical Reference Manual can be found at:
-> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0270b/DDI0270.pdf
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  drivers/watchdog/Kconfig     |    7 +
->  drivers/watchdog/Makefile    |    1 +
->  drivers/watchdog/sp805_wdt.c |  386 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 394 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/watchdog/sp805_wdt.c
-> 
+Hi,
 
-Wim,
+No comments mean it's okay then we will prepare the patches to git pull.
 
-Is this patch fine or do i need to send V2?
+Thank you,
+Kyungmin Park
 
-viresh.
+On Fri, Jun 4, 2010 at 8:53 AM, Kyungmin Park <kmpark@infradead.org> wrote:
+> Hi ben,
+>
+> There's some pending patches for s5pc110.
+> 1. aquila & goni support files.
+> 2. keypad
+> 3. s3c-fb - we have to implement FIMD and MIPI interface so please
+> decide how to handle it.
+> 4. etc.
+>
+> Do you want to re-post or any activities?
+>
+> Please give your plans or opinions.
+>
+> Thank you,
+> Kyungmin Park
+>
