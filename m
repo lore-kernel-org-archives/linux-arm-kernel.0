@@ -1,33 +1,31 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 11 Jun 2010 13:25:18 +0900
-Subject: Pending patches for s5pc110
-In-Reply-To: <AANLkTil0wWSFHpwi58enMhhG7475uUmFoZG6QhRim6Xk@mail.gmail.com>
-References: <AANLkTil0wWSFHpwi58enMhhG7475uUmFoZG6QhRim6Xk@mail.gmail.com>
-Message-ID: <AANLkTimjwSHLiMYFywn3vHZYCbqQCCCh9qE-n3xuYOaq@mail.gmail.com>
+From: srinidhi.kasagar@stericsson.com (srinidhi)
+Date: Fri, 11 Jun 2010 09:57:57 +0530
+Subject: [PATCH 4/5] [ARM] Auto calculate ZRELADDR and provide option
+	for exceptions
+In-Reply-To: <1275550613-9553-5-git-send-email-eric.miao@canonical.com>
+References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
+	<1275550613-9553-5-git-send-email-eric.miao@canonical.com>
+Message-ID: <1276230477.7920.481.camel@bnru03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 2010-06-03 at 09:36 +0200, Eric Miao wrote:
 
-No comments mean it's okay then we will prepare the patches to git pull.
+(...)
 
-Thank you,
-Kyungmin Park
+> +
+> +config ZRELADDR
+> +       hex "Physical address of the decompressed kernel image"
+> +       depends on !AUTO_ZRELADDR
+> +       default 0x00008000 if ARCH_BCMRING || ARCH_CNS3XXX || ARCH_DOVE ||\
+> +                             ARCH_EBSA110 || ARCH_FOOTBRIDGE || ARCH_INTEGRATOR ||\
+> +                             ARCH_IOP13XX || ARCH_IOP33X || ARCH_IXP2000 ||\
+> +                             ARCH_IXP23XX || ARCH_IXP4XX || ARCH_KIRKWOOD ||\
+> +                             ARCH_KS8695  || ARCH_LOKI || ARCH_MMP || ARCH_MV78XX0 ||\
+> +                             ARCH_NOMADIK || ARCH_NUC93X || ARCH_NS9XXX ||\
+> +                             ARCH_ORION5X || ARCH_SPEAR3XX || ARCH_SPEAR6XX ||\
+> +                             ARCH_UX5XX || ARCH_VERSATILE || ARCH_W90X900
 
-On Fri, Jun 4, 2010 at 8:53 AM, Kyungmin Park <kmpark@infradead.org> wrote:
-> Hi ben,
->
-> There's some pending patches for s5pc110.
-> 1. aquila & goni support files.
-> 2. keypad
-> 3. s3c-fb - we have to implement FIMD and MIPI interface so please
-> decide how to handle it.
-> 4. etc.
->
-> Do you want to re-post or any activities?
->
-> Please give your plans or opinions.
->
-> Thank you,
-> Kyungmin Park
->
+s/ARCH_UX5XX/ARCH_U8500
+
+Srinidhi
