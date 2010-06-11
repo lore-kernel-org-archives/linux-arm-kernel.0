@@ -1,28 +1,18 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Fri, 11 Jun 2010 18:50:30 +0800
-Subject: [RFC,PATCH 1/2] Add a common struct clk
-In-Reply-To: <19474.2817.333749.485028@ipc1.ka-ro>
-References: <1275636608.606606.450179637764.0.gpush@pororo>
-	<20100611095839.GC10894@pengutronix.de>
-	<19474.2817.333749.485028@ipc1.ka-ro>
-Message-ID: <201006111850.32528.jeremy.kerr@canonical.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri, 11 Jun 2010 13:15:45 +0100
+Subject: kmalloc/__get_free_pages and SHMLBA
+Message-ID: <20100611120841.GF4403@wear.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lothar,
+I'm writing a driver at the moment that mmap()'s a buffer into userspace and
+then performs DMA from the kernel buffer into the device. If I allocate with
+kmalloc()/__get_free_pages() is there anything that can be done to guarantee
+that the allocation is aligned to SHMLBA or do I need to try overallocating
+and do this myself?
 
-> You may want to disable a clock in the IRQ handler. The VPU driver in
-> the Freescale BSP for i.MX51 does exactly this.
+The alternative is to use vmalloc_user() and use vmalloc_to_page() to get the
+direct mapping addresses to perform the DMA mapping but I'd like to be able to
+DMA the whole buffer without the need for scatterlists.
 
-Is this something we can defer to a sleepable context?
-
-> Anyway I don't see any reason for using a mutex here instead of
-> spin_lock_irq_save() as all other implementations do.
-
-Just that enable/disable may take an arbitrarily long time to complete. Sounds 
-like that hasn't been a problem in the past though.
-
-Cheers,
-
-
-Jeremy
+Jamie
