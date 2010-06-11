@@ -1,38 +1,188 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 11 Jun 2010 07:59:01 +0200
-Subject: [PATCH v2] s3c64xx: Fix build without SDHCI controllers
-In-Reply-To: <000801cb0900$f64bbdc0$e2e33940$%kim@samsung.com>
-References: <000801cb0900$f64bbdc0$e2e33940$%kim@samsung.com>
-Message-ID: <1276235941-12114-1-git-send-email-m.szyprowski@samsung.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 11 Jun 2010 15:05:32 +0900
+Subject: [PATCH 3/3] s5pv210: Aquila: add definitions for sdhci devices
+In-Reply-To: <20100611051825.GW7248@trinity.fluff.org>
+References: <1276076345-24370-1-git-send-email-m.szyprowski@samsung.com>
+	<1276076345-24370-4-git-send-email-m.szyprowski@samsung.com>
+	<20100611051825.GW7248@trinity.fluff.org>
+Message-ID: <AANLkTil5a4B4Yk31MnEtCc80-645x09ZvCOCHcyIY-vS@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following compilation problem if only NCP machine
-is selected:
+On Fri, Jun 11, 2010 at 2:18 PM, Ben Dooks <ben-linux@fluff.org> wrote:
+> On Wed, Jun 09, 2010 at 11:39:05AM +0200, Marek Szyprowski wrote:
+>> This patch add support for SDHCI blocks on Samsung Aquila board. The
+>> following host controllers are defined:
+>> 1. Internal MoviNAND device (permanently wired to the controller)
+>> 2. Internal WiFI SDIO device (card is activated by power regualor)
+>> 3. External MMC/SD socket (card detection is provided by external
+>> gpio interrupt)
+>>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>> ?arch/arm/mach-s5pv210/Kconfig ? ? ? | ? ?4 ++
+>> ?arch/arm/mach-s5pv210/mach-aquila.c | ? 66 +++++++++++++++++++++++++++++++++++
+>> ?2 files changed, 70 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+>> index b7a2f38..dcc9d74 100644
+>> --- a/arch/arm/mach-s5pv210/Kconfig
+>> +++ b/arch/arm/mach-s5pv210/Kconfig
+>> @@ -57,7 +57,11 @@ config MACH_AQUILA
+>> ? ? ? select CPU_S5PV210
+>> ? ? ? select ARCH_SPARSEMEM_ENABLE
+>> ? ? ? select S5PV210_SETUP_FB_24BPP
+>> + ? ? select S5PV210_SETUP_SDHCI
+>> ? ? ? select S3C_DEV_FB
+>> + ? ? select S3C_DEV_HSMMC
+>> + ? ? select S3C_DEV_HSMMC1
+>> + ? ? select S3C_DEV_HSMMC2
+>> ? ? ? select S5PC110_DEV_ONENAND
+>> ? ? ? help
+>> ? ? ? ? Machine support for the Samsung Aquila target based on S5PC110 SoC
+>> diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
+>> index fb9dbb2..1b7fe79 100644
+>> --- a/arch/arm/mach-s5pv210/mach-aquila.c
+>> +++ b/arch/arm/mach-s5pv210/mach-aquila.c
+>> @@ -13,6 +13,7 @@
+>> ?#include <linux/init.h>
+>> ?#include <linux/serial_core.h>
+>> ?#include <linux/fb.h>
+>> +#include <linux/gpio.h>
+>>
+>> ?#include <asm/mach/arch.h>
+>> ?#include <asm/mach/map.h>
+>> @@ -22,12 +23,15 @@
+>> ?#include <mach/map.h>
+>> ?#include <mach/regs-clock.h>
+>> ?#include <mach/regs-fb.h>
+>> +#include <mach/regs-gpio.h>
+>>
+>> ?#include <plat/regs-serial.h>
+>> ?#include <plat/s5pv210.h>
+>> ?#include <plat/devs.h>
+>> ?#include <plat/cpu.h>
+>> ?#include <plat/fb.h>
+>> +#include <plat/gpio-cfg.h>
+>> +#include <plat/sdhci.h>
+>>
+>> ?/* Following are default values for UCON, ULCON and UFCON UART registers */
+>> ?#define S5PV210_UCON_DEFAULT (S3C2410_UCON_TXILEVEL | ? ? ? ?\
+>> @@ -116,9 +120,66 @@ static struct s3c_fb_platdata aquila_lcd_pdata __initdata = {
+>> ? ? ? .setup_gpio ? ? = s5pv210_fb_gpio_setup_24bpp,
+>> ?};
+>>
+>> +/* MoviNAND */
+>> +static struct s3c_sdhci_platdata aquila_hsmmc0_data __initdata = {
+>> + ? ? .max_width ? ? ? ? ? ? ?= 4,
+>> + ? ? .cd_type ? ? ? ? ? ? ? ?= S3C_SDHCI_CD_PERMANENT,
+>> +};
+>> +
+>> +/* Wireless LAN */
+>> +static struct s3c_sdhci_platdata aquila_hsmmc1_data __initdata = {
+>> + ? ? .max_width ? ? ? ? ? ? ?= 4,
+>> + ? ? .cd_type ? ? ? ? ? ? ? ?= S3C_SDHCI_CD_EXTERNAL,
+>> + ? ? /* ext_cd_{init,cleanup} callbacks will be added later */
+>> +};
+>> +
+>> +/* External Flash */
+>> +#define AQUILA_EXT_FLASH_IRQ IRQ_EINT(28) ? ?/* S5PV210_GPH3(4) */
+>> +#define AQUILA_EXT_FLASH_EN ?S5PV210_MP05(4)
+>> +#define AQUILA_EXT_FLASH_CD ?S5PV210_GPH3(4)
+>> +
+>> +static irqreturn_t aquila_ext_flash_card_detect_isr(int irq, void *dev_id)
+>> +{
+>> + ? ? void (*notify_func)(struct platform_device *, int state) = dev_id;
+>> + ? ? notify_func(&s3c_device_hsmmc2, !gpio_get_value(AQUILA_EXT_FLASH_CD));
+>> + ? ? return IRQ_HANDLED;
+>> +}
+>
+> hmm, not very nice this.
+>
+> I'd much prefer to see a gpio-based handler in either the sdhci core or
+> at-least in the driver's directory since I'm sure that his is (a) something
+> Thomas Abrahama has already published patches for (which do need work) and
 
-arch/arm/mach-s3c64xx/s3c6410.c: In function ?s3c6410_map_io?:
-arch/arm/mach-s3c64xx/s3c6410.c:51: error: implicit declaration of function ?s3c6410_default_sdhci2?
+Maybe you see the samsung internal codes. but I think the baseline is
+mailing list, others are implement the same functionality with
+different place. can you tell me which mail has these one?
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/plat-samsung/include/plat/sdhci.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Thank you,
+Kyungmin Park
 
-diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h b/arch/arm/plat-samsung/include/plat/sdhci.h
-index 13f9fb2..2e263a8 100644
---- a/arch/arm/plat-samsung/include/plat/sdhci.h
-+++ b/arch/arm/plat-samsung/include/plat/sdhci.h
-@@ -166,8 +166,10 @@ static inline void s3c6410_default_sdhci2(void) { }
- #else
- static inline void s3c6410_default_sdhci0(void) { }
- static inline void s3c6410_default_sdhci1(void) { }
-+static inline void s3c6410_default_sdhci2(void) { }
- static inline void s3c6400_default_sdhci0(void) { }
- static inline void s3c6400_default_sdhci1(void) { }
-+static inline void s3c6400_default_sdhci2(void) { }
- 
- #endif /* CONFIG_S3C64XX_SETUP_SDHCI */
- 
--- 
-1.7.1.240.g225c
+> (b) probably going to be needed by other boards and/or other architectures.
+
+
+>
+>> +static int aquila_ext_flash_card_detect_init(
+>> + ? ? ? ? ? ? void (*notify_func)(struct platform_device *, int state))
+>> +{
+>> + ? ? gpio_request(AQUILA_EXT_FLASH_EN, "FLASH_EN");
+>> + ? ? gpio_direction_output(AQUILA_EXT_FLASH_EN, 1);
+>> +
+>> + ? ? if (request_irq(AQUILA_EXT_FLASH_IRQ, aquila_ext_flash_card_detect_isr,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? "SDHCI card detect", notify_func))
+>> + ? ? ? ? ? ? printk(KERN_ERR "Error: cannot request irq for External Flash\n");
+>> + ? ? return 0;
+>> +}
+>> +
+>> +static int aquila_ext_flash_card_detect_cleanup(
+>> + ? ? ? ? ? ? void (*notify_func)(struct platform_device *, int state))
+>> +{
+>> + ? ? free_irq(AQUILA_EXT_FLASH_IRQ, notify_func);
+>> + ? ? gpio_direction_output(AQUILA_EXT_FLASH_EN, 0);
+>> + ? ? gpio_free(AQUILA_EXT_FLASH_EN);
+>> + ? ? return 0;
+>> +}
+>> +
+>> +static struct s3c_sdhci_platdata aquila_hsmmc2_data __initdata = {
+>> + ? ? .max_width ? ? ? ? ? ? ?= 4,
+>> + ? ? .cd_type ? ? ? ? ? ? ? ?= S3C_SDHCI_CD_EXTERNAL,
+>> + ? ? .ext_cd_init ? ? ? ? ? ?= aquila_ext_flash_card_detect_init,
+>> + ? ? .ext_cd_cleanup ? ? ? ? = aquila_ext_flash_card_detect_cleanup,
+>> +};
+>> +
+>> ?static struct platform_device *aquila_devices[] __initdata = {
+>> ? ? ? &s3c_device_fb,
+>> ? ? ? &s5pc110_device_onenand,
+>> + ? ? &s3c_device_hsmmc0,
+>> + ? ? &s3c_device_hsmmc1,
+>> + ? ? &s3c_device_hsmmc2,
+>> ?};
+>>
+>> ?static void __init aquila_map_io(void)
+>> @@ -130,6 +191,11 @@ static void __init aquila_map_io(void)
+>>
+>> ?static void __init aquila_machine_init(void)
+>> ?{
+>> + ? ? /* SDHCI */
+>> + ? ? s3c_sdhci0_set_platdata(&aquila_hsmmc0_data);
+>> + ? ? s3c_sdhci1_set_platdata(&aquila_hsmmc1_data);
+>> + ? ? s3c_sdhci2_set_platdata(&aquila_hsmmc2_data);
+>> +
+>> ? ? ? /* FB */
+>> ? ? ? s3c_fb_set_platdata(&aquila_lcd_pdata);
+>>
+>> --
+>> 1.7.1.240.g225c
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> --
+> --
+> Ben
+>
+> Q: ? ? ?What's a light-year?
+> A: ? ? ?One-third less calories than a regular year.
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
