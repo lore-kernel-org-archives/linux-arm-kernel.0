@@ -1,67 +1,218 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 11 Jun 2010 08:54:57 +0100
-Subject: Pending patches for s5pc110
-In-Reply-To: <AANLkTimnuN9h-qka3pRlmaEsR8o6IzFgl3A2YQ5Y28HJ@mail.gmail.com>
-References: <AANLkTil0wWSFHpwi58enMhhG7475uUmFoZG6QhRim6Xk@mail.gmail.com>
-	<AANLkTimjwSHLiMYFywn3vHZYCbqQCCCh9qE-n3xuYOaq@mail.gmail.com>
-	<20100611051521.GV7248@trinity.fluff.org>
-	<AANLkTikJQnDEjVunmiCLGaVAnj5bR7JdsUZYJ9xAEdE5@mail.gmail.com>
-	<20100611062300.GY7248@trinity.fluff.org>
-	<AANLkTimnuN9h-qka3pRlmaEsR8o6IzFgl3A2YQ5Y28HJ@mail.gmail.com>
-Message-ID: <20100611075457.GZ7248@trinity.fluff.org>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Fri, 11 Jun 2010 15:57:10 +0800
+Subject: [RFC,PATCH 1/2] Add a common struct clk
+In-Reply-To: <20100611042046.GA31045@fluff.org.uk>
+References: <1275636608.606606.450179637764.0.gpush@pororo>
+	<1275636608.607067.417709988883.1.gpush@pororo>
+	<20100611042046.GA31045@fluff.org.uk>
+Message-ID: <201006111557.12249.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 11, 2010 at 04:07:58PM +0900, Kyungmin Park wrote:
-> On Fri, Jun 11, 2010 at 3:23 PM, Ben Dooks <ben-linux@fluff.org> wrote:
-> > On Fri, Jun 11, 2010 at 02:38:56PM +0900, Kyungmin Park wrote:
-> >> On Fri, Jun 11, 2010 at 2:15 PM, Ben Dooks <ben-linux@fluff.org> wrote:
-> >> > On Fri, Jun 11, 2010 at 01:25:18PM +0900, Kyungmin Park wrote:
-> >> >> Hi,
-> >> >>
-> >> >> No comments mean it's okay then we will prepare the patches to git pull.
-> >> >
-> >> > No. no comments means that people either haven't had time to sort
-> >> > them out or in fact ON HOLIDAY.
-> >>
-> >> but you usually missed our patches frequently. with this reason our
-> >> patches can't merge within proper merge window.
-> >
-> > I belive the last set where either being posted just-before or during
-> > the last merge window. We already had far too much queueud up then and
-> > we where trying to ensure that the already-queued entries where processed.
+Hi Ben,
+
+> > Platforms can enable the generic struct clock through
+> > CONFIG_USE_COMMON_STRUCT_CLK. In this case, the clock infrastructure
+> > consists of a common struct clk:
+>
+> What do people think of just changing everyone who is currently using
+> clk support to using this new implementation?
+
+I think it'd be too-big a task to take on for a single change; we'd be better 
+off allowing the two implementations concurrently. Also, I'd say that there 
+are many platforms that will never need the new code, so no need to change 
+them over.
+
+> > struct clk {
+> > 
+> > 	const struct clk_ops	*ops;
+> > 	unsigned int		enable_count;
+> > 	struct mutex		mutex;
 > 
-> Not tell this case, please see the s5pc110 patches last year. last
-> year we sent the s5pc110 related patches several times. but you don't
-> give any opinions and can't accept without any reason.
+> I'm a little worried about the size of struct clk if all of them
+> have a mutex in them. If i'm right, this is 40 bytes of data each
+> clock has to take on board.
 
-I gave you comments, or at least Marke should have got them for the
-series sent in November, then there's nothing in my mailbox since
-then.
- 
-> Well it's past story,  forget it.
+Yeah, I see your concern about adding a mutex per clock, but I do think it's 
+the best solution. Of course, if there's a better way to do it, I'm happy to 
+try it out.
+
+I believe we need to ensure that clocks are enabled when clk_enable returns, 
+so we'll need some mechanism for waiting on the thread doing the 
+enable/disable. Since (as you say) some clocks may take 100s of microseconds 
+to enable, we'll need a lock that we can hold while sleeping.
+
+We could use a global mutex for all clocks, but that would complicate the 
+interface by requiring non-locking versions of enable/disable, to allow 
+recursive enable/disable of parent clocks. Also, we'd lose any parallelism 
+possible in clock initialisation (we want boot to be fast, right?)
+
+Without all the debug stuff, it looks like a mutex is 12 bytes on UP, 20 on 
+SMP. That brings the maximum possible overhead to 26kB/43kB. More tolerable, 
+but not great.
+
+You know what would be awesome? if we could put platform-specific code in 
+their own sections and the discard the ones we know we won't need after boot. 
+But that's a discussion for another day...
+
+> >        int             (*enable)(struct clk *);
 > 
-> Last question.
+> still think that not passing an bool as a second argument is silly.
+
+Still don't :D
+
+> > +struct clk {
+> > +	const struct clk_ops	*ops;
+> > +	unsigned int		enable_count;
+> > +	struct mutex		mutex;
+> > +};
 > 
-> I think you share the s3c maintainer-ship with Kukjin. Can you explain
-> the criteria?
+> how about defining a nice kerneldoc for this.
 
-Ok, here's the list:
+Shall do. I've also decided to un-inline the base API, which means that I can 
+use all of the existing prototypes in clk.h, which means the kerneldoc is 
+shared too.
 
-1) SystemLSI are the best placed to see all the chips in development,
-   since they're the ones making them. You are only dealing with a
-   subset of their output (generally the S5PC100 and S5PC110) whereas
-   there are many more devices in the line.
+> > +#define INIT_CLK(name, o) \
+> > +	{ .ops = &o, .enable_count = 0, \
+> > +		.mutex = __MUTEX_INITIALIZER(name.mutex) }
+> 
+> how about doing the mutex initinitialisation at registration
+> time, will save a pile of non-zero code in the image to mess up
+> the compression.
 
-2) SystemLSI have spent time talking to me about what they need to do
-   when maintaining a system and trying to acquire the necessary skills
-   for managing a port.
+I've just yesterday added the following to my tree, to allow dynamic 
+initialisation:
 
-This does not mean that you cannot be included at a later date.
+static inline void clk_init(struct clk *clk, const struct clk_ops *ops)
+{
+	clk->ops = ops;
+	clk->enable_count = 0;
+	mutex_init(&clk->mutex);
+}
 
-As a note, that I have left myself in the maintainers entries for the
-samsung series and will re-visit this once we see how well the transfer
-goes in the next kernel release or two.
- 
--- 
-Ben
+So we can do this either way.
+
+> ~> +struct clk_ops {
+> 
+> > +       int             (*enable)(struct clk *);
+> > +       void            (*disable)(struct clk *);
+> > +       unsigned long   (*get_rate)(struct clk *);
+> > +       void            (*put)(struct clk *);
+> > +       long            (*round_rate)(struct clk *, unsigned long);
+> > +       int             (*set_rate)(struct clk *, unsigned long);
+> > +       int             (*set_parent)(struct clk *, struct clk *);
+> > +       struct clk*     (*get_parent)(struct clk *);
+> 
+> should each clock carry a parent field and the this is returned by
+> the get parent call.~~
+
+I've been debating dropping the get_parent and set_parent ops entirely, 
+actually; setting a parent seems to be quite specific to hardware (you have to 
+know that a particular clock can be a parent of another clock), so it seems 
+like something that we shouldn't expose to drivers through this API. For the 
+code that knows the hardware, it can probably access the underlying clock 
+types directly.
+
+However, I see that something in the samsung code uses clk_get_parent for what 
+seems like a sane purpose, so have left them in for now. Or could this be done 
+differently?
+
+> > +static inline int clk_enable(struct clk *clk)
+> > +{
+> > +	int ret = 0;
+> > +
+> > +	if (!clk->ops->enable)
+> > +		return 0;
+> > +
+> > +	mutex_lock(&clk->mutex);
+> > +	if (!clk->enable_count)
+> > +		ret = clk->ops->enable(clk);
+> > +
+> > +	if (!ret)
+> > +		clk->enable_count++;
+> > +	mutex_unlock(&clk->mutex);
+> > +
+> > +	return ret;
+> > +}
+> 
+> So we're leaving the enable parent code now to each implementation?
+> 
+> I think this is a really bad decision, it leaves so much open to bad
+> code repetition, as well as something the core should really be doing
+> if it had a parent clock field.
+
+I'm tempted to go in either direction - either no [sg]et_parent in the clk 
+API, or add a parent to struct clk, but first I'd need to get up to speed on 
+the external uses of the clk's parent. Want to catch me on IRC to discuss?
+
+> ~> +static inline void clk_disable(struct clk *clk)
+> 
+> > +{
+> > +	if (!clk->ops->enable)
+> > +		return;
+> 
+> so if we've no enable call we ignore disable too?
+
+Typo; this should be "if (!clk->ops->disable)". Will fix for the next 
+revision.
+
+> also, we don't keep an enable count if this fields are in use,
+> could people rely on this being correct even if the clock has
+> no enable/disable fields.
+> 
+> Would much rather see the enable_count being kept up-to-date
+> no matter what, given it may be watched by other parts of the
+> implementation, useful for debug info, and possibly useful if
+> later in the start sequence the clk_ops get changed to have this
+> field.~
+
+Checking for the ops first allows us to skip the mutex acquire, but I'm happy 
+either way.
+
+> > +~	mutex_lock(&clk->mutex);
+> > +
+> > +	if (!--clk->enable_count)
+> > +		clk->ops->disable(clk);
+> > +
+> > +	mutex_unlock(&clk->mutex);
+> > +}
+> > +
+> > +static inline unsigned long clk_get_rate(struct clk *clk)
+> > +{
+> > +	if (clk->ops->get_rate)
+> > +		return clk->ops->get_rate(clk);
+> > +	return 0;
+> > +}
+> > +
+> > +static inline void clk_put(struct clk *clk)
+> > +{
+> > +	if (clk->ops->put)
+> > +		clk->ops->put(clk);
+> > +}
+> 
+> I'm beginging to wonder if we don't just have a set of default ops
+> that get set into the clk+ops at registration time if these do
+> not have an implementation.
+
+Using default ops would mean a couple of things:
+
+1) we can no longer mark the real ops as const; and
+2) we can no longer avoid the hard-to-predict indirect branch
+
+> this means that either any driver that is using a multi-parent clock
+> has to deal with the proper enable/disable of the parents (this is
+> is going to lead to code repetition, and I bet people will get it
+> badly wrong).
+> 
+> I belive the core of the clock code should deal with this, since
+> otherwise we end up with the situation of the same code being
+> repeated throughout the kernel.
+
+I see the concern here, but I'll defer this one until we've decided on whether 
+or not the parents should be exposed through the API.
+
+Cheers,
+
+
+Jeremy
