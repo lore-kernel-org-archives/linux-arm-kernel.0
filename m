@@ -1,55 +1,37 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 11 Jun 2010 09:20:50 +0100
-Subject: [PATCH 04/11] USB: s3c-hsotg: Avoid overwriting contents of perodic
-	in 'fifo'
-In-Reply-To: <1276244457-4072-1-git-send-email-ben-linux@fluff.org>
-References: <1276244457-4072-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1276244457-4072-5-git-send-email-ben-linux@fluff.org>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Fri, 11 Jun 2010 17:33:14 +0900
+Subject: [PATCH v2 0/4] ARM: S5P: Support gpio interrupts
+Message-ID: <4C11F4CA.10802@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In shared fifo mode (used on older SoCs) the periodic in fifo beahves
-much more like a packet buffer, discarding old data when writing new
-data. Avoid this by ensuring that we do not load new transactions in
-when there is data sitting already in the FIFO.
+This patch v2 set is to support gpio interrupts of samsung s5p cpus, and
+the GPIOlib gpio_to_irq goes to plat-samsung gpiolib, so patch v2 set 
+has four commit smaller than v1.
 
-Note, this may not be an observed bug, we are fixing the case that this
-may happen.
+Changes since v1:
+- Add irq_base to s3c_gpio_chip struct 
+- GPIOlib gpio_to_irq() is implemented to samsung_gpiolib_to_irq() of
+  plat-samsung gpiolib
 
-Signed-off-by: Ben Dooks <ben-linux@fluff.org>
----
- drivers/usb/gadget/s3c-hsotg.c |   12 +++++++++++-
- 1 files changed, 11 insertions(+), 1 deletions(-)
+Joonyoung Shim (4):
+      ARM: S5PV210: Add gpio interrupt support
+      ARM: S5PC100: Use S5P gpio interrupts interface
+      ARM: S5PC100: Move external interrupt defines
+      ARM: SAMSUNG: Add GPIOlib gpio_to_irq
 
-diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-index a018b6a..df3e8d1 100644
---- a/drivers/usb/gadget/s3c-hsotg.c
-+++ b/drivers/usb/gadget/s3c-hsotg.c
-@@ -92,7 +92,9 @@ struct s3c_hsotg_req;
-  * For periodic IN endpoints, we have fifo_size and fifo_load to try
-  * and keep track of the amount of data in the periodic FIFO for each
-  * of these as we don't have a status register that tells us how much
-- * is in each of them.
-+ * is in each of them. (note, this may actually be useless information
-+ * as in shared-fifo mode periodic in acts like a single-frame packet
-+ * buffer than a fifo)
-  */
- struct s3c_hsotg_ep {
- 	struct usb_ep		ep;
-@@ -475,6 +477,14 @@ static int s3c_hsotg_write_fifo(struct s3c_hsotg *hsotg,
- 
- 		size_left = S3C_DxEPTSIZ_XferSize_GET(epsize);
- 
-+		/* if shared fifo, we cannot write anything until the
-+		 * previous data has been completely sent.
-+		 */
-+		if (hs_ep->fifo_load != 0) {
-+			s3c_hsotg_en_gsint(hsotg, S3C_GINTSTS_PTxFEmp);
-+			return -ENOSPC;
-+		}
-+
- 		dev_dbg(hsotg->dev, "%s: left=%d, load=%d, fifo=%d, size %d\n",
- 			__func__, size_left,
- 			hs_ep->size_loaded, hs_ep->fifo_load, hs_ep->fifo_size);
--- 
-1.7.0.4
+ arch/arm/mach-s5pc100/Makefile                 |    2 +-
+ arch/arm/mach-s5pc100/gpiolib.c                |   70 ++-----
+ arch/arm/mach-s5pc100/include/mach/gpio.h      |    7 -
+ arch/arm/mach-s5pc100/include/mach/irqs.h      |   18 ++-
+ arch/arm/mach-s5pc100/include/mach/regs-gpio.h |    7 +
+ arch/arm/mach-s5pc100/irq-gpio.c               |  266 ------------------------
+ arch/arm/mach-s5pv210/gpiolib.c                |   18 ++-
+ arch/arm/mach-s5pv210/include/mach/irqs.h      |   16 ++-
+ arch/arm/plat-s5p/Makefile                     |    2 +-
+ arch/arm/plat-s5p/irq-gpioint.c                |  208 ++++++++++++++++++
+ arch/arm/plat-samsung/gpiolib.c                |    9 +
+ arch/arm/plat-samsung/include/plat/gpio-core.h |    6 +
+ 12 files changed, 295 insertions(+), 334 deletions(-)
+ delete mode 100644 arch/arm/mach-s5pc100/irq-gpio.c
+ create mode 100644 arch/arm/plat-s5p/irq-gpioint.c
