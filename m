@@ -1,96 +1,56 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Fri, 11 Jun 2010 14:42:07 +0900
-Subject: [PATCH 1/5] sdhci-s3c: depend on plat-samsung
-In-Reply-To: <20100611052407.GX7248@trinity.fluff.org>
-References: <1276076383-24825-1-git-send-email-m.szyprowski@samsung.com>
-	<1276076383-24825-2-git-send-email-m.szyprowski@samsung.com>
-	<000701cb08fd$2f8e15a0$8eaa40e0$%kim@samsung.com>
-	<20100611052407.GX7248@trinity.fluff.org>
-Message-ID: <AANLkTildPiWp2BZvTm8sOvaMy1gRSTH8RHqvZQRdYP6-@mail.gmail.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 11 Jun 2010 14:52:56 +0900
+Subject: [PATCH 2/2] MAINTAINERS: add maintainer for SAMSUNG ARM
+	ARCHITECTURES
+In-Reply-To: <AANLkTinpth-JO7pIOWXbnuUWXM3xQ1OnFKkfESwi0cP3@mail.gmail.com>
+References: <1275647794-30634-1-git-send-email-kgene.kim@samsung.com>
+	<1275647794-30634-2-git-send-email-kgene.kim@samsung.com>
+	<AANLkTinpth-JO7pIOWXbnuUWXM3xQ1OnFKkfESwi0cP3@mail.gmail.com>
+Message-ID: <AANLkTikygrbXPkszVvBpH217mOaY8UzJE8zcOGVTGRZo@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 11, 2010 at 2:24 PM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Fri, Jun 11, 2010 at 09:29:38AM +0900, Kukjin Kim wrote:
->> Marek Szyprowski wrote:
->> >
->> > Most Samsung SoC have support for SDHCI block, so make the driver
->> > dependent on the Samsung platform instead on listing all SoCs in the
->> > Kconfig (and updating it again when support for the new SoC variant is
->> > added).
->> >
->> Hi, Marek
->>
->> Kyungmin Park already submitted same patch.
->
-> Hmm, Mr Park and Co really need to learn how to handle the treatment of
-> patches. I'm really disapointed that these patches get submitted without
-> the proper authour accreditation. If this isn't sorted out then I for
-> one will start thinking about giving this stuff an automatic reject.
+Ping.
 
-It's just Marek missed the previous my patch, and I reply there's
-duplicated patch already.
-
-Thank you,
-Kyungmin Park
-
+On Sat, Jun 5, 2010 at 11:24 AM, Kyungmin Park <kmpark@infradead.org> wrote:
+> Hi Ben,
 >
-> Please ensure that the original authour of a patch is accredited for
-> the work, and the right sign-off and any other ack data is kept with
-> the patch. There's documentation about most of this in the kernel
-> already at Documentation/SubmittingPatches.
+> I'm waiting your comments.
 >
->> And Andrew Morton added to the -mm tree.
->> http://www.spinics.net/lists/mm-commits/msg79159.html
+> Thank you,
+> Kyungmin Park
+>
+> On Fri, Jun 4, 2010 at 7:36 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+>> ---
+>> ?MAINTAINERS | ? ?2 ++
+>> ?1 files changed, 2 insertions(+), 0 deletions(-)
 >>
->> But, I think your comment is better...
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index 1d41149..f4e4c61 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -896,11 +896,13 @@ S: ? ? ? ?Maintained
 >>
->> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> > ---
->> > ?drivers/mmc/host/Kconfig | ? ?2 +-
->> > ?1 files changed, 1 insertions(+), 1 deletions(-)
->> >
->> > diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
->> > index e171e77..acf5bf6 100644
->> > --- a/drivers/mmc/host/Kconfig
->> > +++ b/drivers/mmc/host/Kconfig
->> > @@ -123,7 +123,7 @@ config MMC_SDHCI_PLTFM
->> >
->> > ?config MMC_SDHCI_S3C
->> > ? ? tristate "SDHCI support on Samsung S3C SoC"
->> > - ? depends on MMC_SDHCI && (PLAT_S3C24XX || PLAT_S3C64XX)
->> > + ? depends on MMC_SDHCI && PLAT_SAMSUNG
->> > ? ? help
->> > ? ? ? This selects the Secure Digital Host Controller Interface (SDHCI)
->> > ? ? ? often referrered to as the HSMMC block in some of the Samsung S3C
->> > --
+>> ?ARM/SAMSUNG ARM ARCHITECTURES
+>> ?M: ? ? Ben Dooks <ben-linux@fluff.org>
+>> +M: ? ? Kukjin Kim <kgene.kim@samsung.com>
+>> ?L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>> ?W: ? ? http://www.fluff.org/ben/linux/
+>> ?S: ? ? Maintained
+>> ?F: ? ? arch/arm/plat-samsung/
+>> ?F: ? ? arch/arm/plat-s3c24xx/
+>> +F: ? ? arch/arm/plat-s5p/
 >>
->>
->> Thanks.
->>
->> Best regards,
->> Kgene.
+>> ?ARM/S3C2410 ARM ARCHITECTURE
+>> ?M: ? ? Ben Dooks <ben-linux@fluff.org>
 >> --
->> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
->> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>> 1.6.2.5
 >>
 >>
 >> _______________________________________________
 >> linux-arm-kernel mailing list
 >> linux-arm-kernel at lists.infradead.org
 >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> --
-> --
-> Ben
->
-> Q: ? ? ?What's a light-year?
-> A: ? ? ?One-third less calories than a regular year.
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
 >
