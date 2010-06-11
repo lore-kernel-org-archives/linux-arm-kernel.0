@@ -1,18 +1,35 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 11 Jun 2010 13:15:45 +0100
-Subject: kmalloc/__get_free_pages and SHMLBA
-Message-ID: <20100611120841.GF4403@wear.picochip.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 11 Jun 2010 13:22:16 +0100
+Subject: [PATCH] sa1111: Prevent deadlock in resume path
+In-Reply-To: <20100610135609.GC4514@ucw.cz>
+References: <1274901104-22133-1-git-send-email-marek.vasut@gmail.com>
+	<20100526191425.GD6232@n2100.arm.linux.org.uk>
+	<201005262115.57282.marek.vasut@gmail.com>
+	<20100526201824.GA16418@n2100.arm.linux.org.uk>
+	<20100610135609.GC4514@ucw.cz>
+Message-ID: <1276258936.16663.39.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm writing a driver at the moment that mmap()'s a buffer into userspace and
-then performs DMA from the kernel buffer into the device. If I allocate with
-kmalloc()/__get_free_pages() is there anything that can be done to guarantee
-that the allocation is aligned to SHMLBA or do I need to try overallocating
-and do this myself?
+On Thu, 2010-06-10 at 14:56 +0100, Pavel Machek wrote:
+> On Wed 2010-05-26 21:18:24, Russell King - ARM Linux wrote:
+> > On Wed, May 26, 2010 at 09:15:57PM +0200, Marek Vasut wrote:
+> > > You want me to fight your patch tracking system or will you just merge it into
+> > > your tree ?
+> >
+> > What do you mean "fight" ?  Just send a standard git formatted patch
+> > to the email address with an additional KernelVersion: tag.  It's
+> > not at all hard.
+> 
+> You are linux kernel maintainer. Start acting as one. It is not at all
+> hard.
+> 
+> Alternatively, just remove KernelVersion: checking in  your
+> scripts.
 
-The alternative is to use vmalloc_user() and use vmalloc_to_page() to get the
-direct mapping addresses to perform the DMA mapping but I'd like to be able to
-DMA the whole buffer without the need for scatterlists.
+BTW (and I'm not complaining about Russell's patch system here), how can
+we get the linux-arm-kernel list subscribed to patchwork.kernel.org?
+That would be useful for grabbing RFC/CFT patches.
 
-Jamie
+-- 
+Catalin
