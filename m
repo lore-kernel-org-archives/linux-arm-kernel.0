@@ -1,50 +1,48 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 11 Jun 2010 09:29:38 +0900
-Subject: [PATCH 1/5] sdhci-s3c: depend on plat-samsung
-In-Reply-To: <1276076383-24825-2-git-send-email-m.szyprowski@samsung.com>
-References: <1276076383-24825-1-git-send-email-m.szyprowski@samsung.com>
-	<1276076383-24825-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <000701cb08fd$2f8e15a0$8eaa40e0$%kim@samsung.com>
+Date: Fri, 11 Jun 2010 09:56:38 +0900
+Subject: [PATCH 1/3] s3c64xx: Fix build without SDHCI controllers
+In-Reply-To: <1276076345-24370-2-git-send-email-m.szyprowski@samsung.com>
+References: <1276076345-24370-1-git-send-email-m.szyprowski@samsung.com>
+	<1276076345-24370-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <000801cb0900$f64bbdc0$e2e33940$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Marek Szyprowski wrote:
 > 
-> Most Samsung SoC have support for SDHCI block, so make the driver
-> dependent on the Samsung platform instead on listing all SoCs in the
-> Kconfig (and updating it again when support for the new SoC variant is
-> added).
+> This patch fixes the following compilation problem if only NCP machine
+> is selected:
 > 
-Hi, Marek
-
-Kyungmin Park already submitted same patch.
-
-And Andrew Morton added to the -mm tree.
-http://www.spinics.net/lists/mm-commits/msg79159.html
-
-But, I think your comment is better...
-
+> arch/arm/mach-s3c64xx/s3c6410.c: In function ?s3c6410_map_io?:
+> arch/arm/mach-s3c64xx/s3c6410.c:51: error: implicit declaration of function
+> ?s3c6410_default_sdhci2?
+> 
 > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  drivers/mmc/host/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  arch/arm/plat-samsung/include/plat/sdhci.h |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index e171e77..acf5bf6 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -123,7 +123,7 @@ config MMC_SDHCI_PLTFM
+> diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h b/arch/arm/plat-
+> samsung/include/plat/sdhci.h
+> index 13f9fb2..c2044e5 100644
+> --- a/arch/arm/plat-samsung/include/plat/sdhci.h
+> +++ b/arch/arm/plat-samsung/include/plat/sdhci.h
+> @@ -166,6 +166,7 @@ static inline void s3c6410_default_sdhci2(void) { }
+>  #else
+>  static inline void s3c6410_default_sdhci0(void) { }
+>  static inline void s3c6410_default_sdhci1(void) { }
+> +static inline void s3c6410_default_sdhci2(void) { }
+>  static inline void s3c6400_default_sdhci0(void) { }
+>  static inline void s3c6400_default_sdhci1(void) { }
 > 
->  config MMC_SDHCI_S3C
->  	tristate "SDHCI support on Samsung S3C SoC"
-> -	depends on MMC_SDHCI && (PLAT_S3C24XX || PLAT_S3C64XX)
-> +	depends on MMC_SDHCI && PLAT_SAMSUNG
->  	help
->  	  This selects the Secure Digital Host Controller Interface (SDHCI)
->  	  often referrered to as the HSMMC block in some of the Samsung S3C
 > --
 
+Maybe missed in Maurus' patch 'S3C64XX: add HSMMC2 support'
+commit 92b118f6968ae0788ac659af47b464acd9a754a1
+
+Also need 'static inline s3c6400_default_sdhci2(void) { }'
+Could you re-submit updated patch including s3c6400_default_sdhci2()?
 
 Thanks.
 
