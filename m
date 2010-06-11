@@ -1,74 +1,141 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Fri, 11 Jun 2010 11:46:59 +0200
-Subject: [PATCH 01/11] USB: s3c_hsotg: Add support for external USB clock
-In-Reply-To: <006a01cb0949$6c7e7300$457b5900$%szyprowski@samsung.com>
-References: <1276244457-4072-1-git-send-email-ben-linux@fluff.org>
-	<1276244457-4072-2-git-send-email-ben-linux@fluff.org>
-	<006a01cb0949$6c7e7300$457b5900$%szyprowski@samsung.com>
-Message-ID: <4C120613.6000507@gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 11 Jun 2010 13:48:53 +0400
+Subject: [PATCH v3] libata: pata_samsung_cf: Add Samsung PATA controller
+	driver
+In-Reply-To: <003301cb0937$e04412c0$a0cc3840$%kim@samsung.com>
+References: <1276156241-28804-1-git-send-email-kgene.kim@samsung.com>
+	<4C10C1D6.8080708@ru.mvista.com>
+	<003301cb0937$e04412c0$a0cc3840$%kim@samsung.com>
+Message-ID: <4C120685.8030306@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PLL that drives the USB clock supports 3 input clocks: 12, 24 and 48Mhz.
-This patch adds support to the USB driver for setting the correct register bit
-according to the given clock.
+Hello.
 
-This depends on the following patch:
-[PATCH] ARM: S3C64XX: Add USB external clock definition
+Kukjin Kim wrote:
 
-Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
----
+>>> From: Abhilash Kesavan <a.kesavan@samsung.com>
+>>> Adds support for the Samsung PATA controller. This driver is based on the
+>>> Libata subsystem and references the earlier patches sent for IDE subsystem.
 
-v2: - fixes space issues
-    - use MHZ define
+> Hi,
 
----
- drivers/usb/gadget/s3c-hsotg.c |   19 +++++++++++++++++++
- 1 files changed, 19 insertions(+), 0 deletions(-)
+> Thanks for your comments.
 
-diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-index 1f73b48..40ee63a 100644
---- a/drivers/usb/gadget/s3c-hsotg.c
-+++ b/drivers/usb/gadget/s3c-hsotg.c
-@@ -23,6 +23,7 @@
- #include <linux/delay.h>
- #include <linux/io.h>
- #include <linux/slab.h>
-+#include <linux/clk.h>
- 
- #include <linux/usb/ch9.h>
- #include <linux/usb/gadget.h>
-@@ -2699,6 +2700,7 @@ static void __devinit s3c_hsotg_initep(struct s3c_hsotg *hsotg,
-  */
- static void s3c_hsotg_otgreset(struct s3c_hsotg *hsotg)
- {
-+	struct clk *xusbxti;
- 	u32 osc;
- 
- 	writel(0, S3C_PHYPWR);
-@@ -2706,6 +2708,23 @@ static void s3c_hsotg_otgreset(struct s3c_hsotg *hsotg)
- 
- 	osc = hsotg->plat->is_osc ? S3C_PHYCLK_EXT_OSC : 0;
- 
-+	xusbxti = clk_get(hsotg->dev, "xusbxti");
-+	if (xusbxti && !IS_ERR(xusbxti)) {
-+		switch (clk_get_rate(xusbxti)) {
-+		case 12*MHZ:
-+			osc |= S3C_PHYCLK_CLKSEL_12M;
-+			break;
-+		case 24*MHZ:
-+			osc |= S3C_PHYCLK_CLKSEL_24M;
-+			break;
-+		default:
-+		case 48*MHZ:
-+			/* default reference clock */
-+			break;
-+		}
-+		clk_put(xusbxti);
-+	}
-+
- 	writel(osc | 0x10, S3C_PHYCLK);
- 
- 	/* issue a full set of resets to the otg and core */
--- 
-1.7.1
+>>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>>> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+>> [...]
+
+>>> diff --git a/drivers/ata/pata_samsung_cf.c b/drivers/ata/pata_samsung_cf.c
+>>> new file mode 100644
+>>> index 0000000..fef5515
+>>> --- /dev/null
+>>> +++ b/drivers/ata/pata_samsung_cf.c
+>>> @@ -0,0 +1,608 @@
+>>> +/* linux/drivers/ata/pata_samsung_cf.c
+
+>>     File names in the heading comment are discouraged.
+
+> Hmm. I used like that in other device drivers.
+
+    Nevertheless, it's quite an old rule already.
+
+> Ok..will remove the file name in the heading comment.
+
+>> [...]
+
+>>> +
+>>> +	piotime = (t2i << 12) | (t2 << 4) | t1;
+>>> +
+>>> +	return piotime;
+>>> +}
+>>> +
+>>> +static void pata_s3c_set_piomode(struct ata_port *ap, struct ata_device *adev)
+>>> +{
+>>> +	int mode = adev->pio_mode - XFER_PIO_0;
+>>> +	struct s3c_ide_info *info = ap->host->private_data;
+>>> +	ulong ata_cfg = readl(info->ide_addr + S3C_ATA_CFG);
+>>> +	ulong piotime;
+>>> +
+>>> +	/* Calculates timing parameters for PIO mode */
+>>> +	piotime = pata_s3c_setup_timing(info, adev);
+
+>>     In fact, for 8-bit (command) timing you should program the slowest mode  of
+>> the two drives. However, with CF, you probably only have only one drive per
+>> channel...
+
+> Below code looks OK ?
+
+    No, it doesn't.
+
+> 	if (ata_timing_compute(adev, adev->pio_mode, &timing, cycle_time, 0))
+> {
+> 		dev_err(ap->dev, "Failed to compute ATA timing\n");
+> 		piotime = pata_s3c_setup_timing(info, &initial_timing);
+> 	} else {
+> 		piotime = pata_s3c_setup_timing(info, &timing);
+> 	}
+> where initial_timing is for PIO0. I have added the below struct
+
+> static const struct ata_timing initial_timing =
+> 	{XFER_PIO_0, 70, 290, 240, 600, 165, 150, 0, 600, 0};
+
+    I'd call ata_timing_find_mode(XFER_PIO_0) rather than duplicating the 
+ata_timing entry. But really, you shouldn't set any timing for an invalid mode 
+and, as I said, you won't be passed one, so there's nor much sense in calling 
+ata_timing_compute() and checking its result; anyway, you'd want to call 
+ata_timing_find_mode() here instead of ata_timing_compute() because the latter 
+returns already quantized timings, but initial_timing is not quantized, you'll 
+have to call ata_timing_compute() in pata_s3c_setup_timing() anyway.
+
+>>> +
+>>> +	/* Enables IORDY if mode requires it */
+>>> +	if (ata_pio_need_iordy(adev))
+>>> +		ata_cfg |= S3C_ATA_CFG_IORDYEN;
+>>> +	else
+>>> +		ata_cfg &= ~S3C_ATA_CFG_IORDYEN;
+>>> +
+>>> +	/* Host controller supports upto PIO4 only */
+>>> +	if (mode >= 0 && mode <= 4) {
+
+>>     No need to check -- you won't be passed a mode not specified by your
+>> pio_mask.
+
+> Will remove the check.
+
+>>> +static int __devinit pata_s3c_probe(struct platform_device *pdev)
+[...]
+>>> +	if (!request_mem_region(res->start, resource_size(res), DRV_NAME)) {
+
+>>     Probably should call devm_request_mem_region() if you're using
+>> devm_ioremap()...
+
+> Will change to devm_request_mem_region.
+
+    This function does exist, if I don't mistake...
+
+>>> +release_mem:
+>>> +	release_mem_region(res->start, resource_size(res));
+>>> +release_device_mem:
+>>> +	kfree(info);
+
+>>     Doesn't using devm_kzalloc() guarantee that the memory will be freed up
+>> automatically?
+
+> Will remove kfree and release_mem_region because of devm_kzalloc and
+> devm_request_mem_region usage
+
+    I don't know devres librarry capabilities well. Tejun, am I right?
+
+>>> +static struct platform_driver pata_s3c_driver = {
+>>> +	.probe		= pata_s3c_probe,
+>>>
+>>>
+
+>>     2 empty lines -- broken patch?
+
+> Seems OK at my end.
+
+    The sent patch had them, nevertheless.
+
+MBR, Sergei
