@@ -1,23 +1,28 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 11 Jun 2010 12:50:32 +0200
-Subject: [PATCH] AT91: add new at91 chips in at91sam9g45 family
-In-Reply-To: <1273509900-30278-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1273509900-30278-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <4C1214F8.80005@atmel.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Fri, 11 Jun 2010 18:50:30 +0800
+Subject: [RFC,PATCH 1/2] Add a common struct clk
+In-Reply-To: <19474.2817.333749.485028@ipc1.ka-ro>
+References: <1275636608.606606.450179637764.0.gpush@pororo>
+	<20100611095839.GC10894@pengutronix.de>
+	<19474.2817.333749.485028@ipc1.ka-ro>
+Message-ID: <201006111850.32528.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 10/05/2010 18:45, Nicolas Ferre :
-> This is the basic support for at91sam9g46, at91sam9m10 and at91sam9m11. Those
-> are just very basic cpu macros and clock definition.
-> 
-> Signed-off-by: Patrice Vilchez <patrice.vilchez@atmel.com>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Hi Lothar,
 
-Acked-by Andrew Victor added.
-Submitted as patch 6169/1
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6169/1
+> You may want to disable a clock in the IRQ handler. The VPU driver in
+> the Freescale BSP for i.MX51 does exactly this.
 
-Best regards,
--- 
-Nicolas Ferre
+Is this something we can defer to a sleepable context?
+
+> Anyway I don't see any reason for using a mutex here instead of
+> spin_lock_irq_save() as all other implementations do.
+
+Just that enable/disable may take an arbitrarily long time to complete. Sounds 
+like that hasn't been a problem in the past though.
+
+Cheers,
+
+
+Jeremy
