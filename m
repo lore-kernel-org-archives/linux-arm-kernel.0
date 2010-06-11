@@ -1,87 +1,51 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Fri, 11 Jun 2010 18:51:49 +0300
-Subject: [PATCH v4 14/14] omap: mailbox: reorganize headers
-In-Reply-To: <1276271509-11983-1-git-send-email-felipe.contreras@gmail.com>
-References: <1276271509-11983-1-git-send-email-felipe.contreras@gmail.com>
-Message-ID: <1276271509-11983-15-git-send-email-felipe.contreras@gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 11 Jun 2010 17:52:08 +0200
+Subject: [PATCH 2/2] pxa/spitz: Rework spitz
+In-Reply-To: <20100611143600.GA1307@ucw.cz>
+References: <1276238740-10640-1-git-send-email-marek.vasut@gmail.com>
+	<201006110852.45838.marek.vasut@gmail.com>
+	<20100611143600.GA1307@ucw.cz>
+Message-ID: <201006111752.08130.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove kernel.h and module.h since they are not used correctly anyway.
+Dne P? 11. ?ervna 2010 16:36:00 Pavel Machek napsal(a):
+> On Fri 2010-06-11 08:52:45, Marek Vasut wrote:
+> > Dne P? 11. ?ervna 2010 08:45:40 Marek Vasut napsal(a):
+> > > This huge patch mostly shuffles code. The spitz.c file contained
+> > > terrible mess and needed a cleanup, here it is:
+> > > 
+> > > 1) Made every part modular, components are not built in if not
+> > > selected. 2) Removed loads of preprocessor goo, mostly "#ifdef
+> > > MACH_AKITA .... #endif" and similar code. The kernel size will grow by
+> > > a few kb now, but the file is much more readable.
+> > > 3) Reworked SD/CF power setting function and made it reentrant.
+> > > 
+> > > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> > > ---
+> > > 
+> > >  arch/arm/mach-pxa/include/mach/spitz.h |    2 -
+> > >  arch/arm/mach-pxa/spitz.c              |  748
+> > > 
+> > > ++++++++++++++++++-------------- 2 files changed, 420 insertions(+),
+> > > 330 deletions(-)
+> > 
+> > Pavel, Eric, I tested this on metan's Z, could you give it a go ?
+> 
+> quick test on 2.6.35-rc2 (of the 2nd version), and all seems
+> well. What should I look for?
+> 								Pavel
 
-Also, remove device.h since it comes along with platform_device.h
-(always will I guess).
+Nothing, the functionality should be the same ... I just felt like it needs 
+rework, it was frustrating digging in it in the state it is in now. The way it 
+is now it's much easier to hack on it. There are still open issues:
 
-Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
----
- arch/arm/mach-omap1/mailbox.c             |    3 ---
- arch/arm/mach-omap2/mailbox.c             |    1 -
- arch/arm/plat-omap/include/plat/mailbox.h |    3 ++-
- arch/arm/plat-omap/mailbox.c              |    5 ++---
- 4 files changed, 4 insertions(+), 8 deletions(-)
+1) CPUfreq on Zaurus is still broken. (doesn't work on other devices - causes 
+freezes)
+2) PCMCIA driver looses interrupts. (pcmcia-sharpsl needs rework)
+3) We need driver for the CPU PMIC. (I already wrote it)
+4) Weird mess on the LCD when using DMA (also happens on other devices)
 
-diff --git a/arch/arm/mach-omap1/mailbox.c b/arch/arm/mach-omap1/mailbox.c
-index afc3963..1a85a42 100644
---- a/arch/arm/mach-omap1/mailbox.c
-+++ b/arch/arm/mach-omap1/mailbox.c
-@@ -9,13 +9,10 @@
-  * for more details.
-  */
- 
--#include <linux/kernel.h>
--#include <linux/resource.h>
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <plat/mailbox.h>
--#include <mach/irqs.h>
- 
- #define MAILBOX_ARM2DSP1		0x00
- #define MAILBOX_ARM2DSP1b		0x04
-diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index 62d5ffe..42dbfa4 100644
---- a/arch/arm/mach-omap2/mailbox.c
-+++ b/arch/arm/mach-omap2/mailbox.c
-@@ -10,7 +10,6 @@
-  * for more details.
-  */
- 
--#include <linux/kernel.h>
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/platform_device.h>
-diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
-index c44fde3..9976565 100644
---- a/arch/arm/plat-omap/include/plat/mailbox.h
-+++ b/arch/arm/plat-omap/include/plat/mailbox.h
-@@ -3,9 +3,10 @@
- #ifndef MAILBOX_H
- #define MAILBOX_H
- 
--#include <linux/wait.h>
-+#include <linux/spinlock.h>
- #include <linux/workqueue.h>
- #include <linux/interrupt.h>
-+#include <linux/device.h>
- #include <linux/kfifo.h>
- 
- typedef u32 mbox_msg_t;
-diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-index a8e22e1..8d4c7be 100644
---- a/arch/arm/plat-omap/mailbox.c
-+++ b/arch/arm/plat-omap/mailbox.c
-@@ -21,10 +21,9 @@
-  *
-  */
- 
--#include <linux/kernel.h>
--#include <linux/module.h>
- #include <linux/interrupt.h>
--#include <linux/device.h>
-+#include <linux/spinlock.h>
-+#include <linux/mutex.h>
- #include <linux/delay.h>
- #include <linux/slab.h>
- #include <linux/kfifo.h>
--- 
-1.7.1
+So we'll have at least another four following patches sometimes later.
+
+Pavel, can we get this in? Can I get your Ack and get this one applied? Thanks
