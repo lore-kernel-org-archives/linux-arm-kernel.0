@@ -1,218 +1,250 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Fri, 11 Jun 2010 15:57:10 +0800
-Subject: [RFC,PATCH 1/2] Add a common struct clk
-In-Reply-To: <20100611042046.GA31045@fluff.org.uk>
-References: <1275636608.606606.450179637764.0.gpush@pororo>
-	<1275636608.607067.417709988883.1.gpush@pororo>
-	<20100611042046.GA31045@fluff.org.uk>
-Message-ID: <201006111557.12249.jeremy.kerr@canonical.com>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Fri, 11 Jun 2010 17:08:46 +0900
+Subject: [PATCH v4 1/3] ARM: SAMSUNG: Add keypad device support
+Message-ID: <1276243728-17704-1-git-send-email-jy0922.shim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+This patch adds samsung keypad device definition for samsung cpus.
 
-> > Platforms can enable the generic struct clock through
-> > CONFIG_USE_COMMON_STRUCT_CLK. In this case, the clock infrastructure
-> > consists of a common struct clk:
->
-> What do people think of just changing everyone who is currently using
-> clk support to using this new implementation?
+Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/plat-samsung/Kconfig                    |    5 ++
+ arch/arm/plat-samsung/Makefile                   |    1 +
+ arch/arm/plat-samsung/dev-keypad.c               |   58 +++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/devs.h        |    2 +
+ arch/arm/plat-samsung/include/plat/keypad.h      |   59 ++++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/regs-keypad.h |   49 ++++++++++++++++++
+ 6 files changed, 174 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-samsung/dev-keypad.c
+ create mode 100644 arch/arm/plat-samsung/include/plat/keypad.h
+ create mode 100644 arch/arm/plat-samsung/include/plat/regs-keypad.h
 
-I think it'd be too-big a task to take on for a single change; we'd be better 
-off allowing the two implementations concurrently. Also, I'd say that there 
-are many platforms that will never need the new code, so no need to change 
-them over.
-
-> > struct clk {
-> > 
-> > 	const struct clk_ops	*ops;
-> > 	unsigned int		enable_count;
-> > 	struct mutex		mutex;
-> 
-> I'm a little worried about the size of struct clk if all of them
-> have a mutex in them. If i'm right, this is 40 bytes of data each
-> clock has to take on board.
-
-Yeah, I see your concern about adding a mutex per clock, but I do think it's 
-the best solution. Of course, if there's a better way to do it, I'm happy to 
-try it out.
-
-I believe we need to ensure that clocks are enabled when clk_enable returns, 
-so we'll need some mechanism for waiting on the thread doing the 
-enable/disable. Since (as you say) some clocks may take 100s of microseconds 
-to enable, we'll need a lock that we can hold while sleeping.
-
-We could use a global mutex for all clocks, but that would complicate the 
-interface by requiring non-locking versions of enable/disable, to allow 
-recursive enable/disable of parent clocks. Also, we'd lose any parallelism 
-possible in clock initialisation (we want boot to be fast, right?)
-
-Without all the debug stuff, it looks like a mutex is 12 bytes on UP, 20 on 
-SMP. That brings the maximum possible overhead to 26kB/43kB. More tolerable, 
-but not great.
-
-You know what would be awesome? if we could put platform-specific code in 
-their own sections and the discard the ones we know we won't need after boot. 
-But that's a discussion for another day...
-
-> >        int             (*enable)(struct clk *);
-> 
-> still think that not passing an bool as a second argument is silly.
-
-Still don't :D
-
-> > +struct clk {
-> > +	const struct clk_ops	*ops;
-> > +	unsigned int		enable_count;
-> > +	struct mutex		mutex;
-> > +};
-> 
-> how about defining a nice kerneldoc for this.
-
-Shall do. I've also decided to un-inline the base API, which means that I can 
-use all of the existing prototypes in clk.h, which means the kerneldoc is 
-shared too.
-
-> > +#define INIT_CLK(name, o) \
-> > +	{ .ops = &o, .enable_count = 0, \
-> > +		.mutex = __MUTEX_INITIALIZER(name.mutex) }
-> 
-> how about doing the mutex initinitialisation at registration
-> time, will save a pile of non-zero code in the image to mess up
-> the compression.
-
-I've just yesterday added the following to my tree, to allow dynamic 
-initialisation:
-
-static inline void clk_init(struct clk *clk, const struct clk_ops *ops)
-{
-	clk->ops = ops;
-	clk->enable_count = 0;
-	mutex_init(&clk->mutex);
-}
-
-So we can do this either way.
-
-> ~> +struct clk_ops {
-> 
-> > +       int             (*enable)(struct clk *);
-> > +       void            (*disable)(struct clk *);
-> > +       unsigned long   (*get_rate)(struct clk *);
-> > +       void            (*put)(struct clk *);
-> > +       long            (*round_rate)(struct clk *, unsigned long);
-> > +       int             (*set_rate)(struct clk *, unsigned long);
-> > +       int             (*set_parent)(struct clk *, struct clk *);
-> > +       struct clk*     (*get_parent)(struct clk *);
-> 
-> should each clock carry a parent field and the this is returned by
-> the get parent call.~~
-
-I've been debating dropping the get_parent and set_parent ops entirely, 
-actually; setting a parent seems to be quite specific to hardware (you have to 
-know that a particular clock can be a parent of another clock), so it seems 
-like something that we shouldn't expose to drivers through this API. For the 
-code that knows the hardware, it can probably access the underlying clock 
-types directly.
-
-However, I see that something in the samsung code uses clk_get_parent for what 
-seems like a sane purpose, so have left them in for now. Or could this be done 
-differently?
-
-> > +static inline int clk_enable(struct clk *clk)
-> > +{
-> > +	int ret = 0;
-> > +
-> > +	if (!clk->ops->enable)
-> > +		return 0;
-> > +
-> > +	mutex_lock(&clk->mutex);
-> > +	if (!clk->enable_count)
-> > +		ret = clk->ops->enable(clk);
-> > +
-> > +	if (!ret)
-> > +		clk->enable_count++;
-> > +	mutex_unlock(&clk->mutex);
-> > +
-> > +	return ret;
-> > +}
-> 
-> So we're leaving the enable parent code now to each implementation?
-> 
-> I think this is a really bad decision, it leaves so much open to bad
-> code repetition, as well as something the core should really be doing
-> if it had a parent clock field.
-
-I'm tempted to go in either direction - either no [sg]et_parent in the clk 
-API, or add a parent to struct clk, but first I'd need to get up to speed on 
-the external uses of the clk's parent. Want to catch me on IRC to discuss?
-
-> ~> +static inline void clk_disable(struct clk *clk)
-> 
-> > +{
-> > +	if (!clk->ops->enable)
-> > +		return;
-> 
-> so if we've no enable call we ignore disable too?
-
-Typo; this should be "if (!clk->ops->disable)". Will fix for the next 
-revision.
-
-> also, we don't keep an enable count if this fields are in use,
-> could people rely on this being correct even if the clock has
-> no enable/disable fields.
-> 
-> Would much rather see the enable_count being kept up-to-date
-> no matter what, given it may be watched by other parts of the
-> implementation, useful for debug info, and possibly useful if
-> later in the start sequence the clk_ops get changed to have this
-> field.~
-
-Checking for the ops first allows us to skip the mutex acquire, but I'm happy 
-either way.
-
-> > +~	mutex_lock(&clk->mutex);
-> > +
-> > +	if (!--clk->enable_count)
-> > +		clk->ops->disable(clk);
-> > +
-> > +	mutex_unlock(&clk->mutex);
-> > +}
-> > +
-> > +static inline unsigned long clk_get_rate(struct clk *clk)
-> > +{
-> > +	if (clk->ops->get_rate)
-> > +		return clk->ops->get_rate(clk);
-> > +	return 0;
-> > +}
-> > +
-> > +static inline void clk_put(struct clk *clk)
-> > +{
-> > +	if (clk->ops->put)
-> > +		clk->ops->put(clk);
-> > +}
-> 
-> I'm beginging to wonder if we don't just have a set of default ops
-> that get set into the clk+ops at registration time if these do
-> not have an implementation.
-
-Using default ops would mean a couple of things:
-
-1) we can no longer mark the real ops as const; and
-2) we can no longer avoid the hard-to-predict indirect branch
-
-> this means that either any driver that is using a multi-parent clock
-> has to deal with the proper enable/disable of the parents (this is
-> is going to lead to code repetition, and I bet people will get it
-> badly wrong).
-> 
-> I belive the core of the clock code should deal with this, since
-> otherwise we end up with the situation of the same code being
-> repeated throughout the kernel.
-
-I see the concern here, but I'll defer this one until we've decided on whether 
-or not the parents should be exposed through the API.
-
-Cheers,
-
-
-Jeremy
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 2753fb3..bd007e3 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -227,6 +227,11 @@ config SAMSUNG_DEV_TS
+ 	help
+ 	    Common in platform device definitions for touchscreen device
+ 
++config SAMSUNG_DEV_KEYPAD
++	bool
++	help
++	  Compile in platform device definitions for keypad
++
+ # DMA
+ 
+ config S3C_DMA
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index b1d82cc..8269d80 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -48,6 +48,7 @@ obj-$(CONFIG_S3C_DEV_RTC)	+= dev-rtc.o
+ 
+ obj-$(CONFIG_SAMSUNG_DEV_ADC)	+= dev-adc.o
+ obj-$(CONFIG_SAMSUNG_DEV_TS)	+= dev-ts.o
++obj-$(CONFIG_SAMSUNG_DEV_KEYPAD)	+= dev-keypad.o
+ 
+ # DMA support
+ 
+diff --git a/arch/arm/plat-samsung/dev-keypad.c b/arch/arm/plat-samsung/dev-keypad.c
+new file mode 100644
+index 0000000..679b444
+--- /dev/null
++++ b/arch/arm/plat-samsung/dev-keypad.c
+@@ -0,0 +1,58 @@
++/*
++ * linux/arch/arm/plat-samsung/dev-keypad.c
++ *
++ * Copyright (C) 2010 Samsung Electronics Co.Ltd
++ * Author: Joonyoung Shim <jy0922.shim@samsung.com>
++ *
++ *  This program is free software; you can redistribute  it and/or modify it
++ *  under  the terms of  the GNU General  Public License as published by the
++ *  Free Software Foundation;  either version 2 of the  License, or (at your
++ *  option) any later version.
++ *
++ */
++
++#include <linux/platform_device.h>
++#include <mach/irqs.h>
++#include <mach/map.h>
++#include <plat/cpu.h>
++#include <plat/devs.h>
++#include <plat/keypad.h>
++
++static struct resource samsung_keypad_resources[] = {
++	[0] = {
++		.start	= SAMSUNG_PA_KEYPAD,
++		.end	= SAMSUNG_PA_KEYPAD + 0x20 - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= IRQ_KEYPAD,
++		.end	= IRQ_KEYPAD,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device samsung_device_keypad = {
++	.name		= "samsung-keypad",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(samsung_keypad_resources),
++	.resource	= samsung_keypad_resources,
++};
++
++void __init samsung_keypad_set_platdata(struct samsung_keypad_platdata *pd)
++{
++	struct samsung_keypad_platdata *npd;
++
++	if (!pd) {
++		printk(KERN_ERR "%s: no platform data\n", __func__);
++		return;
++	}
++
++	npd = kmemdup(pd, sizeof(struct samsung_keypad_platdata), GFP_KERNEL);
++	if (!npd)
++		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
++
++	if (!npd->cfg_gpio)
++		npd->cfg_gpio = samsung_keypad_cfg_gpio;
++
++	samsung_device_keypad.dev.platform_data = npd;
++}
+diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
+index e6144e4..6d9f01b 100644
+--- a/arch/arm/plat-samsung/include/plat/devs.h
++++ b/arch/arm/plat-samsung/include/plat/devs.h
+@@ -100,6 +100,8 @@ extern struct platform_device s5pc100_device_iis0;
+ extern struct platform_device s5pc100_device_iis1;
+ extern struct platform_device s5pc100_device_iis2;
+ 
++extern struct platform_device samsung_device_keypad;
++
+ /* s3c2440 specific devices */
+ 
+ #ifdef CONFIG_CPU_S3C2440
+diff --git a/arch/arm/plat-samsung/include/plat/keypad.h b/arch/arm/plat-samsung/include/plat/keypad.h
+new file mode 100644
+index 0000000..6d139d6
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/plat/keypad.h
+@@ -0,0 +1,59 @@
++/*
++ * linux/arch/arm/plat-samsung/include/plat/keypad.h
++ *
++ * Copyright (C) 2010 Samsung Electronics Co.Ltd
++ * Author: Joonyoung Shim <jy0922.shim@samsung.com>
++ *
++ * Samsung Platform - Keypad platform data definitions
++ *
++ *  This program is free software; you can redistribute  it and/or modify it
++ *  under  the terms of  the GNU General  Public License as published by the
++ *  Free Software Foundation;  either version 2 of the  License, or (at your
++ *  option) any later version.
++ *
++ */
++
++#ifndef __PLAT_SAMSUNG_KEYPAD_H
++#define __PLAT_SAMSUNG_KEYPAD_H
++
++#include <linux/input/matrix_keypad.h>
++
++#define SAMSUNG_MAX_ROWS	8
++#define SAMSUNG_MAX_COLS	8
++
++/**
++ * struct samsung_keypad_platdata - Platform device data for Samsung Keypad.
++ * @keymap_data: pointer to &matrix_keymap_data.
++ * @rows: number of keypad row supported.
++ * @cols: number of keypad col supported.
++ * @no_autorepeat: disable key autorepeat.
++ * @wakeup: controls whether the device should be set up as wakeup source.
++ * @cfg_gpio: configure the GPIO.
++ *
++ * Initialisation data specific to either the machine or the platform
++ * for the device driver to use or call-back when configuring gpio.
++ */
++struct samsung_keypad_platdata {
++	const struct matrix_keymap_data	*keymap_data;
++	unsigned int		rows;
++	unsigned int		cols;
++	bool			no_autorepeat;
++	bool			wakeup;
++
++	void	(*cfg_gpio)(unsigned int rows, unsigned int cols);
++};
++
++/**
++ * samsung_keypad_set_platdata - Set platform data for Samsung Keypad device.
++ * @pd: Platform data to register to device.
++ *
++ * Register the given platform data for use with Samsung Keypad device.
++ * The call will copy the platform data, so the board definitions can
++ * make the structure itself __initdata.
++ */
++extern void samsung_keypad_set_platdata(struct samsung_keypad_platdata *pd);
++
++/* defined by architecture to configure gpio. */
++extern void samsung_keypad_cfg_gpio(unsigned int rows, unsigned int cols);
++
++#endif /* __PLAT_SAMSUNG_KEYPAD_H */
+diff --git a/arch/arm/plat-samsung/include/plat/regs-keypad.h b/arch/arm/plat-samsung/include/plat/regs-keypad.h
+new file mode 100644
+index 0000000..e4688f0
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/plat/regs-keypad.h
+@@ -0,0 +1,49 @@
++/*
++ * linux/arch/arm/plat-samsung/include/plat/regs-keypad.h
++ *
++ * Copyright (C) 2010 Samsung Electronics Co.Ltd
++ * Author: Joonyoung Shim <jy0922.shim@samsung.com>
++ *
++ *  This program is free software; you can redistribute  it and/or modify it
++ *  under  the terms of  the GNU General  Public License as published by the
++ *  Free Software Foundation;  either version 2 of the  License, or (at your
++ *  option) any later version.
++ *
++ */
++
++#ifndef __SAMSUNG_KEYPAD_H__
++#define __SAMSUNG_KEYPAD_H__
++
++#define SAMSUNG_KEYIFCON			0x00
++#define SAMSUNG_KEYIFSTSCLR			0x04
++#define SAMSUNG_KEYIFCOL			0x08
++#define SAMSUNG_KEYIFROW			0x0c
++#define SAMSUNG_KEYIFFC				0x10
++
++/* SAMSUNG_KEYIFCON */
++#define SAMSUNG_KEYIFCON_INT_F_EN		(1 << 0)
++#define SAMSUNG_KEYIFCON_INT_R_EN		(1 << 1)
++#define SAMSUNG_KEYIFCON_DF_EN			(1 << 2)
++#define SAMSUNG_KEYIFCON_FC_EN			(1 << 3)
++#define SAMSUNG_KEYIFCON_WAKEUPEN		(1 << 4)
++
++/* SAMSUNG_KEYIFSTSCLR */
++#define SAMSUNG_KEYIFSTSCLR_P_INT_MASK		(0xff << 0)
++#define SAMSUNG_KEYIFSTSCLR_R_INT_MASK		(0xff << 8)
++#define SAMSUNG_KEYIFSTSCLR_R_INT_OFFSET	8
++#define S5PV210_KEYIFSTSCLR_P_INT_MASK		(0x3fff << 0)
++#define S5PV210_KEYIFSTSCLR_R_INT_MASK		(0x3fff << 16)
++#define S5PV210_KEYIFSTSCLR_R_INT_OFFSET	16
++
++/* SAMSUNG_KEYIFCOL */
++#define SAMSUNG_KEYIFCOL_MASK			(0xff << 0)
++#define S5PV210_KEYIFCOLEN_MASK			(0xff << 8)
++
++/* SAMSUNG_KEYIFROW */
++#define SAMSUNG_KEYIFROW_MASK			(0xff << 0)
++#define S5PV210_KEYIFROW_MASK			(0x3fff << 0)
++
++/* SAMSUNG_KEYIFFC */
++#define SAMSUNG_KEYIFFC_MASK			(0x3ff << 0)
++
++#endif /* __SAMSUNG_KEYPAD_H__ */
+-- 
+1.7.0.4
