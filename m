@@ -1,45 +1,44 @@
 From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Fri, 11 Jun 2010 21:49:05 +0200
-Subject: [PATCH 6/9] ARM: S5PC100: Add crypto engine register definitions
+Date: Fri, 11 Jun 2010 21:49:00 +0200
+Subject: [PATCH 5/9] ARM: S3C64XX: Add crypto engine register definitions
 In-Reply-To: <cover.1276284559.git.mcuelenaere@gmail.com>
 References: <cover.1276284559.git.mcuelenaere@gmail.com>
-Message-ID: <4C129331.7000001@gmail.com>
+Message-ID: <4C12932C.8060803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch adds the physical address and size which corresponds to the crypto
-engine on the S5PC100. It also adds the offsets for the crypto subsystems.
+engine on the S3C64XX. It also adds the offsets for the crypto subsystems.
 
 Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
 ---
- arch/arm/mach-s5pc100/include/mach/map.h      |    4 +++
- arch/arm/mach-s5pc100/include/mach/regs-sss.h |   29 +++++++++++++++++++++++++
- 2 files changed, 33 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pc100/include/mach/regs-sss.h
+ arch/arm/mach-s3c64xx/include/mach/map.h      |    3 ++
+ arch/arm/mach-s3c64xx/include/mach/regs-sss.h |   27 +++++++++++++++++++++++++
+ 2 files changed, 30 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s3c64xx/include/mach/regs-sss.h
 
-diff --git a/arch/arm/mach-s5pc100/include/mach/map.h b/arch/arm/mach-s5pc100/include/mach/map.h
-index 4681ebe..1d842b5 100644
---- a/arch/arm/mach-s5pc100/include/mach/map.h
-+++ b/arch/arm/mach-s5pc100/include/mach/map.h
-@@ -116,6 +116,10 @@
- #define S5PC100_PA_SDRAM	(0x20000000)
- #define S5PC1XX_PA_SDRAM	S5PC100_PA_SDRAM
+diff --git a/arch/arm/mach-s3c64xx/include/mach/map.h b/arch/arm/mach-s3c64xx/include/mach/map.h
+index 9fdd50c..fa80afc 100644
+--- a/arch/arm/mach-s3c64xx/include/mach/map.h
++++ b/arch/arm/mach-s3c64xx/include/mach/map.h
+@@ -87,6 +87,9 @@
+ #define S3C64XX_PA_USB_HSPHY	(0x7C100000)
+ #define S3C64XX_VA_USB_HSPHY	S3C_ADDR_CPU(0x00200000)
  
-+/* Crypto Engine */
-+#define SAMSUNG_PA_SSS		(0xF4000000)
-+#define SAMSUNG_SZ_SSS		(SZ_1M * 3 + SZ_64K)
++#define SAMSUNG_PA_SSS		(0x7D000000)
++#define SAMSUNG_SZ_SSS		(SZ_1M * 10 + SZ_256)
 +
- /* compatibility defines. */
- #define S3C_PA_RTC		S5PC100_PA_RTC
- #define S3C_PA_UART		S5PC100_PA_UART
-diff --git a/arch/arm/mach-s5pc100/include/mach/regs-sss.h b/arch/arm/mach-s5pc100/include/mach/regs-sss.h
+ /* place VICs close together */
+ #define VA_VIC0			(S3C_VA_IRQ + 0x00)
+ #define VA_VIC1			(S3C_VA_IRQ + 0x10000)
+diff --git a/arch/arm/mach-s3c64xx/include/mach/regs-sss.h b/arch/arm/mach-s3c64xx/include/mach/regs-sss.h
 new file mode 100644
-index 0000000..41b3e6b
+index 0000000..3a0769f
 --- /dev/null
-+++ b/arch/arm/mach-s5pc100/include/mach/regs-sss.h
-@@ -0,0 +1,29 @@
++++ b/arch/arm/mach-s3c64xx/include/mach/regs-sss.h
+@@ -0,0 +1,27 @@
 +/*
-+ * linux/arch/arm/mach-s5pc100/include/mach/regs-sss.h
++ * linux/arch/arm/mach-s3c64xx/include/mach/regs-sss.h
 + *
 + * Copyright (C) 2010 Maurus Cuelenaere
 + *
@@ -49,23 +48,21 @@ index 0000000..41b3e6b
 + *
 + */
 +
-+#ifndef __MACH_S5PC100_REGS_SSS_H
-+#define __MACH_S5PC100_REGS_SSS_H __FILE__
++#ifndef __MACH_S3C64XX_REGS_SSS_H
++#define __MACH_S3C64XX_REGS_SSS_H __FILE__
 +
 +#define SSS_OFF_CFG				(0x000000)
-+#define SSS_OFF_FIFO_RX				(0x010000)
-+#define SSS_OFF_AES_RX				(0x040000)
-+#define SSS_OFF_TDES_RX				(0x050000)
-+#define SSS_OFF_HASH_RX				(0x060000)
++#define SSS_OFF_AES_RX				(0x100000)
++#define SSS_OFF_TDES_RX				(0x200000)
++#define SSS_OFF_HASH_RX				(0x300000)
++#define SSS_OFF_FIFO_RX				(0x400000)
++#define SSS_OFF_AES_TX				(0x500000)
++#define SSS_OFF_TDES_TX				(0x600000)
++#define SSS_OFF_HASH_TX				(0x700000)
++#define SSS_OFF_FIFO_TX				(0x800000)
++#define SSS_OFF_SDMA_RX				(0x900000)
++#define SSS_OFF_SDMA_TX				(0xA00000)
 +
-+#define SSS_OFF_FIFO_TX				(0x110000)
-+#define SSS_OFF_AES_TX				(0x140000)
-+#define SSS_OFF_TDES_TX				(0x150000)
-+#define SSS_OFF_HASH_TX				(0x160000)
-+
-+#define SSS_OFF_SDMA_RX				(0x200000)
-+#define SSS_OFF_SDMA_TX				(0x300000)
-+
-+#endif /* __MACH_S5PC100_REGS_SSS_H */
++#endif /* __MACH_S3C64XX_REGS_SSS_H */
 -- 
 1.7.1
