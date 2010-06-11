@@ -1,172 +1,70 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 11 Jun 2010 09:20:52 +0100
-Subject: [PATCH 06/11] USB: s3c-hsotg: Add initial detection and setup for
-	dedicated FIFO mode
+Date: Fri, 11 Jun 2010 09:20:47 +0100
+Subject: [PATCH 01/11] USB: s3c_hsotg: Add support for external USB clock
 In-Reply-To: <1276244457-4072-1-git-send-email-ben-linux@fluff.org>
 References: <1276244457-4072-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1276244457-4072-7-git-send-email-ben-linux@fluff.org>
+Message-ID: <1276244457-4072-2-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the dedicated FIFO mode on newer SoCs such as the S5PV210
-partly to improve support and to fix the bug where any non-EP0 IN endpoint
-requires its own FIFO allocation.
+From: Maurus Cuelenaere <mcuelenaere@gmail.com>
 
-To fix this, we ensure that any non-zero IN endpoint is given a TXFIFO
-using the same allocation method as the periodic case (all our current
-hardware has enough FIFOs and FIFO memory for a 1:1 mapping) and ensure
-that the necessary transmission done interrupt is enabled.
+The PLL that drives the USB clock supports 3 input clocks: 12, 24 and 48Mhz.
+This patch adds support to the USB driver for setting the correct register bit
+according to the given clock.
 
-The default settings from reset for the core point all EPs at FIFO0,
-used for the control endpoint. However, the controller documentation
-states that all IN endpoints _must_ have a unique FIFO to avoid any
-contention during transmission.
+This depends on the following patch:
+[PATCH] ARM: S3C64XX: Add USB external clock definition
 
-Note, this leaves us with a large IN FIFO for EP0 (which re-uses the
-old NPTXFIFO) for an endpoint which cannot shift more than a pair of
-packets at a time... this is a waste, but it looks like we cannot
-re-allocate space to the individual IN FIFOs as they are already
-maxed out (to be confirmed).
-
-Signed-off-by: Ben Dooks <ben-linux@fluff.org?
+Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
+Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- .../arm/plat-samsung/include/plat/regs-usb-hsotg.h |    2 +
- drivers/usb/gadget/s3c-hsotg.c                     |   40 +++++++++++++++++++-
- 2 files changed, 40 insertions(+), 2 deletions(-)
+ drivers/usb/gadget/s3c-hsotg.c |   19 +++++++++++++++++++
+ 1 files changed, 19 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/regs-usb-hsotg.h b/arch/arm/plat-samsung/include/plat/regs-usb-hsotg.h
-index 8d18d9d..dc90f5e 100644
---- a/arch/arm/plat-samsung/include/plat/regs-usb-hsotg.h
-+++ b/arch/arm/plat-samsung/include/plat/regs-usb-hsotg.h
-@@ -226,6 +226,7 @@
- 
- #define S3C_DIEPMSK				S3C_HSOTG_REG(0x810)
- 
-+#define S3C_DIEPMSK_TxFIFOEmpty			(1 << 7)
- #define S3C_DIEPMSK_INEPNakEffMsk		(1 << 6)
- #define S3C_DIEPMSK_INTknEPMisMsk		(1 << 5)
- #define S3C_DIEPMSK_INTknTXFEmpMsk		(1 << 4)
-@@ -371,6 +372,7 @@
- 
- #define S3C_DIEPDMA(_a)				S3C_HSOTG_REG(0x914 + ((_a) * 0x20))
- #define S3C_DOEPDMA(_a)				S3C_HSOTG_REG(0xB14 + ((_a) * 0x20))
-+#define S3C_DTXFSTS(_a)				S3C_HSOTG_REG(0x918 + ((_a) * 0x20))
- 
- #define S3C_EPFIFO(_a)				S3C_HSOTG_REG(0x1000 + ((_a) * 0x1000))
- 
 diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-index 5b61bcf..819e75a 100644
+index 26193ec..6a303ce 100644
 --- a/drivers/usb/gadget/s3c-hsotg.c
 +++ b/drivers/usb/gadget/s3c-hsotg.c
-@@ -12,6 +12,8 @@
-  * published by the Free Software Foundation.
- */
+@@ -23,6 +23,7 @@
+ #include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
++#include <linux/clk.h>
  
-+#define DEBUG
-+
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/spinlock.h>
-@@ -131,6 +133,7 @@ struct s3c_hsotg_ep {
-  * @regs: The memory area mapped for accessing registers.
-  * @regs_res: The resource that was allocated when claiming register space.
-  * @irq: The IRQ number we are using
-+ * @dedicated_fifos: Set if the hardware has dedicated IN-EP fifos.
-  * @debug_root: root directrory for debugfs.
-  * @debug_file: main status file for debugfs.
-  * @debug_fifo: FIFO status file for debugfs.
-@@ -149,6 +152,8 @@ struct s3c_hsotg {
- 	struct resource		*regs_res;
- 	int			irq;
- 
-+	unsigned int		dedicated_fifos:1;
-+
- 	struct dentry		*debug_root;
- 	struct dentry		*debug_file;
- 	struct dentry		*debug_fifo;
-@@ -467,7 +472,7 @@ static int s3c_hsotg_write_fifo(struct s3c_hsotg *hsotg,
- 	if (to_write == 0)
- 		return 0;
- 
--	if (periodic) {
-+	if (periodic && !hsotg->dedicated_fifos) {
- 		u32 epsize = readl(hsotg->regs + S3C_DIEPTSIZ(hs_ep->index));
- 		int size_left;
- 		int size_done;
-@@ -505,6 +510,11 @@ static int s3c_hsotg_write_fifo(struct s3c_hsotg *hsotg,
- 			s3c_hsotg_en_gsint(hsotg, S3C_GINTSTS_PTxFEmp);
- 			return -ENOSPC;
- 		}
-+	} else if (hsotg->dedicated_fifos && hs_ep->index != 0) {
-+		can_write = readl(hsotg->regs + S3C_DTXFSTS(hs_ep->index));
-+
-+		can_write &= 0xffff;
-+		can_write *= 4;
- 	} else {
- 		if (S3C_GNPTXSTS_NPTxQSpcAvail_GET(gnptxsts) == 0) {
- 			dev_dbg(hsotg->dev,
-@@ -1830,6 +1840,15 @@ static void s3c_hsotg_epint(struct s3c_hsotg *hsotg, unsigned int idx,
- 				 __func__, idx);
- 			clear |= S3C_DIEPMSK_INTknEPMisMsk;
- 		}
-+
-+		/* FIFO has space or is empty (see GAHBCFG) */
-+		if (hsotg->dedicated_fifos &&
-+		    ints & S3C_DIEPMSK_TxFIFOEmpty) {
-+			dev_dbg(hsotg->dev, "%s: ep%d: TxFIFOEmpty\n",
-+				__func__, idx);
-+			s3c_hsotg_trytx(hsotg, hs_ep);
-+			clear |= S3C_DIEPMSK_TxFIFOEmpty;
-+		}
- 	}
- 
- 	writel(clear, hsotg->regs + epint_reg);
-@@ -2281,6 +2300,12 @@ static int s3c_hsotg_ep_enable(struct usb_ep *ep,
- 		break;
- 	}
- 
-+	/* if the hardware has dedicated fifos, we must give each IN EP
-+	 * a unique tx-fifo even if it is non-periodic.
-+	 */
-+	if (dir_in && hsotg->dedicated_fifos)
-+		epctrl |= S3C_DxEPCTL_TxFNum(index);
-+
- 	/* for non control endpoints, set PID to D0 */
- 	if (index)
- 		epctrl |= S3C_DxEPCTL_SetD0PID;
-@@ -2570,7 +2595,8 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
- 
- 	writel(S3C_DIEPMSK_TimeOUTMsk | S3C_DIEPMSK_AHBErrMsk |
- 	       S3C_DIEPMSK_INTknEPMisMsk |
--	       S3C_DIEPMSK_EPDisbldMsk | S3C_DIEPMSK_XferComplMsk,
-+	       S3C_DIEPMSK_EPDisbldMsk | S3C_DIEPMSK_XferComplMsk |
-+	       ((hsotg->dedicated_fifos) ? S3C_DIEPMSK_TxFIFOEmpty : 0),
- 	       hsotg->regs + S3C_DIEPMSK);
- 
- 	/* don't need XferCompl, we get that from RXFIFO in slave mode. In
-@@ -2797,6 +2823,8 @@ static void s3c_hsotg_otgreset(struct s3c_hsotg *hsotg)
- 
- static void s3c_hsotg_init(struct s3c_hsotg *hsotg)
+ #include <linux/usb/ch9.h>
+ #include <linux/usb/gadget.h>
+@@ -2753,6 +2754,7 @@ static void __devinit s3c_hsotg_initep(struct s3c_hsotg *hsotg,
+  */
+ static void s3c_hsotg_otgreset(struct s3c_hsotg *hsotg)
  {
-+	u32 cfg4;
-+
- 	/* unmask subset of endpoint interrupts */
++	struct clk *xusbxti;
+ 	u32 osc;
  
- 	writel(S3C_DIEPMSK_TimeOUTMsk | S3C_DIEPMSK_AHBErrMsk |
-@@ -2832,6 +2860,14 @@ static void s3c_hsotg_init(struct s3c_hsotg *hsotg)
+ 	writel(0, S3C_PHYPWR);
+@@ -2760,6 +2762,23 @@ static void s3c_hsotg_otgreset(struct s3c_hsotg *hsotg)
  
- 	writel(using_dma(hsotg) ? S3C_GAHBCFG_DMAEn : 0x0,
- 	       hsotg->regs + S3C_GAHBCFG);
-+
-+	/* check hardware configuration */
-+
-+	cfg4 = readl(hsotg->regs + 0x50);
-+	hsotg->dedicated_fifos = (cfg4 >> 25) & 1;
-+
-+	dev_info(hsotg->dev, "%s fifos\n",
-+		 hsotg->dedicated_fifos ? "dedicated" : "shared");
- }
+ 	osc = hsotg->plat->is_osc ? S3C_PHYCLK_EXT_OSC : 0;
  
- static void s3c_hsotg_dump(struct s3c_hsotg *hsotg)
++	xusbxti = clk_get(hsotg->dev, "xusbxti");
++	if (xusbxti && !IS_ERR(xusbxti)) {
++		switch (clk_get_rate(xusbxti)) {
++		case 12000000:
++		    osc |= S3C_PHYCLK_CLKSEL_12M;
++		    break;
++		case 24000000:
++		    osc |= S3C_PHYCLK_CLKSEL_24M;
++		    break;
++		default:
++		case 48000000:
++		    /* default reference clock */
++		    break;
++		}
++		clk_put(xusbxti);
++	}
++
+ 	writel(osc | 0x10, S3C_PHYCLK);
+ 
+ 	/* issue a full set of resets to the otg and core */
 -- 
 1.7.0.4
