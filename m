@@ -1,37 +1,55 @@
-From: wim@iguana.be (Wim Van Sebroeck)
-Date: Fri, 11 Jun 2010 07:30:49 +0200
-Subject: [PATCH resend] Watchdog: Adding support for ARM Primecell
-	SP805 Watchdog
-In-Reply-To: <4C11B711.70907@st.com>
-References: <1275465783-14052-1-git-send-email-viresh.kumar@st.com>
-	<4C11B711.70907@st.com>
-Message-ID: <20100611053049.GM3788@infomag.iguana.be>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Fri, 11 Jun 2010 06:32:34 +0100
+Subject: [PATCH 0/6] Various s3c-fb updates
+In-Reply-To: <1275296935-2693-1-git-send-email-p.osciak@samsung.com>
+References: <1275296935-2693-1-git-send-email-p.osciak@samsung.com>
+Message-ID: <20100611053234.GE14272@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
-
-Still need to look at it. First finishing up another project.
-Probably for this weekend.
-
-Kind regards,
-Wim.
-
-> On 6/2/2010 1:33 PM, Viresh KUMAR wrote:
-> > Technical Reference Manual can be found at:
-> > http://infocenter.arm.com/help/topic/com.arm.doc.ddi0270b/DDI0270.pdf
-> > 
-> > Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> > ---
-> >  drivers/watchdog/Kconfig     |    7 +
-> >  drivers/watchdog/Makefile    |    1 +
-> >  drivers/watchdog/sp805_wdt.c |  386 ++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 394 insertions(+), 0 deletions(-)
-> >  create mode 100644 drivers/watchdog/sp805_wdt.c
-> > 
+On Mon, May 31, 2010 at 11:08:49AM +0200, Pawel Osciak wrote:
+> Hello,
 > 
-> Wim,
+> This series is rebased onto Ben Dook's framebuffer branch available at:
+> git://git.fluff.org/bjdooks/linux.git dev/s3c-fb
+
+I'll look at updating this series once I am back in the uk, it mostly
+looks good but I have yet to do any testing or give it a thorough
+review.
+ 
+> The main changes are the addition of an ability to wait for VSYNC and
+> display panning.
 > 
-> Is this patch fine or do i need to send V2?
+> The first patch attempts to fix some NULL pointer dereferences in case
+> of a failed framebuffer memory allocation attempt. This is a quick
+> fix, so please treat it more as an indication of what may be wrong
+> with the code in the probe function and not as something to merge.
 > 
-> viresh.
+> Patches 3-4 add "new style" device name initialization for various
+> S3C/S5P devices. The 4th patch also separates S5PC100 and S5PV210 as
+> their framebuffer registers sets differ.
+> 
+> 
+> [PATCH 1/6] s3c-fb: Fix various null references on framebuffer memory alloc failure
+> [PATCH 2/6] s3c-fb: Correct FRAMESEL1 bitfield defines for VIDINTCON0 register
+> [PATCH 3/6] s3c-fb: Add device name initialization.
+> [PATCH 4/6] s3c-fb: Separate S5PC100 and S5PV210 framebuffer driver data structures
+> [PATCH 5/6] s3c-fb: Add support for display panning
+> [PATCH 6/6] s3c-fb: Add wait for VSYNC ioctl
+> 
+> Best regards
+> --
+> Pawel Osciak
+> Linux Platform Group
+> Samsung Poland R&D Center
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
