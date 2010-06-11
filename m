@@ -1,35 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 11 Jun 2010 13:22:16 +0100
-Subject: [PATCH] sa1111: Prevent deadlock in resume path
-In-Reply-To: <20100610135609.GC4514@ucw.cz>
-References: <1274901104-22133-1-git-send-email-marek.vasut@gmail.com>
-	<20100526191425.GD6232@n2100.arm.linux.org.uk>
-	<201005262115.57282.marek.vasut@gmail.com>
-	<20100526201824.GA16418@n2100.arm.linux.org.uk>
-	<20100610135609.GC4514@ucw.cz>
-Message-ID: <1276258936.16663.39.camel@e102109-lin.cambridge.arm.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 11 Jun 2010 15:17:05 +0200
+Subject: [PATCH 1/2] ARM/scoop: Add CPR register bit definitions
+Message-ID: <1276262226-15015-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-06-10 at 14:56 +0100, Pavel Machek wrote:
-> On Wed 2010-05-26 21:18:24, Russell King - ARM Linux wrote:
-> > On Wed, May 26, 2010 at 09:15:57PM +0200, Marek Vasut wrote:
-> > > You want me to fight your patch tracking system or will you just merge it into
-> > > your tree ?
-> >
-> > What do you mean "fight" ?  Just send a standard git formatted patch
-> > to the email address with an additional KernelVersion: tag.  It's
-> > not at all hard.
-> 
-> You are linux kernel maintainer. Start acting as one. It is not at all
-> hard.
-> 
-> Alternatively, just remove KernelVersion: checking in  your
-> scripts.
+Add bit definitions of the CPR register of the SCOOP chip into scoop.h
 
-BTW (and I'm not complaining about Russell's patch system here), how can
-we get the linux-arm-kernel list subscribed to patchwork.kernel.org?
-That would be useful for grabbing RFC/CFT patches.
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ arch/arm/include/asm/hardware/scoop.h |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/include/asm/hardware/scoop.h b/arch/arm/include/asm/hardware/scoop.h
+index 46492a6..5821f21 100644
+--- a/arch/arm/include/asm/hardware/scoop.h
++++ b/arch/arm/include/asm/hardware/scoop.h
+@@ -22,6 +22,11 @@
+ #define SCOOP_GPWR 0x24
+ #define SCOOP_GPRR 0x28
+ 
++#define SCOOP_CPR_OUT	( 1 << 7 )
++#define SCOOP_CPR_SD_3V	( 1 << 2 )
++#define SCOOP_CPR_CF_XV	( 1 << 1 )
++#define SCOOP_CPR_CF_3V	( 1 << 0 )
++
+ #define SCOOP_GPCR_PA22	( 1 << 12 )
+ #define SCOOP_GPCR_PA21	( 1 << 11 )
+ #define SCOOP_GPCR_PA20	( 1 << 10 )
 -- 
-Catalin
+1.7.1
