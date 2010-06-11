@@ -1,141 +1,36 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 11 Jun 2010 13:48:53 +0400
-Subject: [PATCH v3] libata: pata_samsung_cf: Add Samsung PATA controller
-	driver
-In-Reply-To: <003301cb0937$e04412c0$a0cc3840$%kim@samsung.com>
-References: <1276156241-28804-1-git-send-email-kgene.kim@samsung.com>
-	<4C10C1D6.8080708@ru.mvista.com>
-	<003301cb0937$e04412c0$a0cc3840$%kim@samsung.com>
-Message-ID: <4C120685.8030306@mvista.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 11 Jun 2010 11:58:39 +0200
+Subject: [RFC,PATCH 1/2] Add a common struct clk
+In-Reply-To: <19474.172.742782.972629@ipc1.ka-ro>
+References: <1275636608.606606.450179637764.0.gpush@pororo>
+	<201006111557.12249.jeremy.kerr@canonical.com>
+	<19473.61547.684572.647641@ipc1.ka-ro>
+	<201006111718.47426.jeremy.kerr@canonical.com>
+	<19474.172.742782.972629@ipc1.ka-ro>
+Message-ID: <20100611095839.GC10894@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-Kukjin Kim wrote:
-
->>> From: Abhilash Kesavan <a.kesavan@samsung.com>
->>> Adds support for the Samsung PATA controller. This driver is based on the
->>> Libata subsystem and references the earlier patches sent for IDE subsystem.
-
+On Fri, Jun 11, 2010 at 11:23:56AM +0200, Lothar Wa?mann wrote:
 > Hi,
+> 
+> > > Using a mutex in clk_enable()/clk_disable() is a bad idea, since that
+> > > makes it impossible to call those functions in interrupt context.
+IMHO if a device generates an irq its clock should already be on.  This
+way you don't need to enable or disable a clock in irq context.
+ 
+> > Do we do this at the moment? I know at least one implementation of clk_enable 
+> > uses a mutex for locking.
+> > 
+> You are probably talking about the Freescale i.MX51 kernel, that won't
+> even boot, if you enable CONFIG_DEBUG_KERNEL, CONFIG_DEBUG_SPINLOCK,
+> CONFIG_DEBUG_LOCKDEP and CONFIG_DEBUG_SPINLOCK_SLEEP.
+> The mutex in the clock implementation is one of the reasons.
+I will have a look into this later today.
 
-> Thanks for your comments.
+Best regards
+Uwe
 
->>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
->>> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
->> [...]
-
->>> diff --git a/drivers/ata/pata_samsung_cf.c b/drivers/ata/pata_samsung_cf.c
->>> new file mode 100644
->>> index 0000000..fef5515
->>> --- /dev/null
->>> +++ b/drivers/ata/pata_samsung_cf.c
->>> @@ -0,0 +1,608 @@
->>> +/* linux/drivers/ata/pata_samsung_cf.c
-
->>     File names in the heading comment are discouraged.
-
-> Hmm. I used like that in other device drivers.
-
-    Nevertheless, it's quite an old rule already.
-
-> Ok..will remove the file name in the heading comment.
-
->> [...]
-
->>> +
->>> +	piotime = (t2i << 12) | (t2 << 4) | t1;
->>> +
->>> +	return piotime;
->>> +}
->>> +
->>> +static void pata_s3c_set_piomode(struct ata_port *ap, struct ata_device *adev)
->>> +{
->>> +	int mode = adev->pio_mode - XFER_PIO_0;
->>> +	struct s3c_ide_info *info = ap->host->private_data;
->>> +	ulong ata_cfg = readl(info->ide_addr + S3C_ATA_CFG);
->>> +	ulong piotime;
->>> +
->>> +	/* Calculates timing parameters for PIO mode */
->>> +	piotime = pata_s3c_setup_timing(info, adev);
-
->>     In fact, for 8-bit (command) timing you should program the slowest mode  of
->> the two drives. However, with CF, you probably only have only one drive per
->> channel...
-
-> Below code looks OK ?
-
-    No, it doesn't.
-
-> 	if (ata_timing_compute(adev, adev->pio_mode, &timing, cycle_time, 0))
-> {
-> 		dev_err(ap->dev, "Failed to compute ATA timing\n");
-> 		piotime = pata_s3c_setup_timing(info, &initial_timing);
-> 	} else {
-> 		piotime = pata_s3c_setup_timing(info, &timing);
-> 	}
-> where initial_timing is for PIO0. I have added the below struct
-
-> static const struct ata_timing initial_timing =
-> 	{XFER_PIO_0, 70, 290, 240, 600, 165, 150, 0, 600, 0};
-
-    I'd call ata_timing_find_mode(XFER_PIO_0) rather than duplicating the 
-ata_timing entry. But really, you shouldn't set any timing for an invalid mode 
-and, as I said, you won't be passed one, so there's nor much sense in calling 
-ata_timing_compute() and checking its result; anyway, you'd want to call 
-ata_timing_find_mode() here instead of ata_timing_compute() because the latter 
-returns already quantized timings, but initial_timing is not quantized, you'll 
-have to call ata_timing_compute() in pata_s3c_setup_timing() anyway.
-
->>> +
->>> +	/* Enables IORDY if mode requires it */
->>> +	if (ata_pio_need_iordy(adev))
->>> +		ata_cfg |= S3C_ATA_CFG_IORDYEN;
->>> +	else
->>> +		ata_cfg &= ~S3C_ATA_CFG_IORDYEN;
->>> +
->>> +	/* Host controller supports upto PIO4 only */
->>> +	if (mode >= 0 && mode <= 4) {
-
->>     No need to check -- you won't be passed a mode not specified by your
->> pio_mask.
-
-> Will remove the check.
-
->>> +static int __devinit pata_s3c_probe(struct platform_device *pdev)
-[...]
->>> +	if (!request_mem_region(res->start, resource_size(res), DRV_NAME)) {
-
->>     Probably should call devm_request_mem_region() if you're using
->> devm_ioremap()...
-
-> Will change to devm_request_mem_region.
-
-    This function does exist, if I don't mistake...
-
->>> +release_mem:
->>> +	release_mem_region(res->start, resource_size(res));
->>> +release_device_mem:
->>> +	kfree(info);
-
->>     Doesn't using devm_kzalloc() guarantee that the memory will be freed up
->> automatically?
-
-> Will remove kfree and release_mem_region because of devm_kzalloc and
-> devm_request_mem_region usage
-
-    I don't know devres librarry capabilities well. Tejun, am I right?
-
->>> +static struct platform_driver pata_s3c_driver = {
->>> +	.probe		= pata_s3c_probe,
->>>
->>>
-
->>     2 empty lines -- broken patch?
-
-> Seems OK at my end.
-
-    The sent patch had them, nevertheless.
-
-MBR, Sergei
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
