@@ -1,27 +1,23 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 11 Jun 2010 11:07:23 +0200
-Subject: [PATCH 10/11] USB: s3c-hsotg: Fix the OUT EP0 limit
-In-Reply-To: <1276244457-4072-11-git-send-email-ben-linux@fluff.org>
-References: <1276244457-4072-1-git-send-email-ben-linux@fluff.org>
-	<1276244457-4072-11-git-send-email-ben-linux@fluff.org>
-Message-ID: <006901cb0945$842a9e10$8c7fda30$%szyprowski@samsung.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Fri, 11 Jun 2010 17:18:44 +0800
+Subject: [RFC,PATCH 1/2] Add a common struct clk
+In-Reply-To: <19473.61547.684572.647641@ipc1.ka-ro>
+References: <1275636608.606606.450179637764.0.gpush@pororo>
+	<201006111557.12249.jeremy.kerr@canonical.com>
+	<19473.61547.684572.647641@ipc1.ka-ro>
+Message-ID: <201006111718.47426.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Lothar,
 
-On Friday, June 11, 2010 10:21 AM Ben Dooks wrote:
+> Using a mutex in clk_enable()/clk_disable() is a bad idea, since that
+> makes it impossible to call those functions in interrupt context.
 
-> The EP0 out limit is the same as the IN limit, so make them the same.
-> 
-> Signed-off-by: Ben Dooks <ben-linux@fluff.org>
-> 
-> tmp-fix
+Do we do this at the moment? I know at least one implementation of clk_enable 
+uses a mutex for locking.
 
-^ looks like this temporary fix managed to get into the final patch series
-without proper cleanup.
+Cheers,
 
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+
+Jeremy
