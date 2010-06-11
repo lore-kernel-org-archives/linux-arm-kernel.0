@@ -1,92 +1,172 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 11 Jun 2010 09:20:57 +0100
-Subject: [PATCH 11/11] USB: s3c-hsotg: Fix OUT packet request retry
+Date: Fri, 11 Jun 2010 09:20:52 +0100
+Subject: [PATCH 06/11] USB: s3c-hsotg: Add initial detection and setup for
+	dedicated FIFO mode
 In-Reply-To: <1276244457-4072-1-git-send-email-ben-linux@fluff.org>
 References: <1276244457-4072-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1276244457-4072-12-git-send-email-ben-linux@fluff.org>
+Message-ID: <1276244457-4072-7-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If there is more data in the request than we could fit into a single
-hardware request, then check when the OutDone event is received if
-we have more data, and if so, schedule the new data instead of trying
-to complete the request (and in the case of EP0, sending a 0 packet
-in the middle of a transfer).
+Add support for the dedicated FIFO mode on newer SoCs such as the S5PV210
+partly to improve support and to fix the bug where any non-EP0 IN endpoint
+requires its own FIFO allocation.
 
-Also, move the debug message about the current transfer state before
-the warning about a bad transfer.
+To fix this, we ensure that any non-zero IN endpoint is given a TXFIFO
+using the same allocation method as the periodic case (all our current
+hardware has enough FIFOs and FIFO memory for a 1:1 mapping) and ensure
+that the necessary transmission done interrupt is enabled.
 
-Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+The default settings from reset for the core point all EPs at FIFO0,
+used for the control endpoint. However, the controller documentation
+states that all IN endpoints _must_ have a unique FIFO to avoid any
+contention during transmission.
+
+Note, this leaves us with a large IN FIFO for EP0 (which re-uses the
+old NPTXFIFO) for an endpoint which cannot shift more than a pair of
+packets at a time... this is a waste, but it looks like we cannot
+re-allocate space to the individual IN FIFOs as they are already
+maxed out (to be confirmed).
+
+Signed-off-by: Ben Dooks <ben-linux@fluff.org?
 ---
- drivers/usb/gadget/s3c-hsotg.c |   18 +++++++++++-------
- 1 files changed, 11 insertions(+), 7 deletions(-)
+ .../arm/plat-samsung/include/plat/regs-usb-hsotg.h |    2 +
+ drivers/usb/gadget/s3c-hsotg.c                     |   40 +++++++++++++++++++-
+ 2 files changed, 40 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/plat-samsung/include/plat/regs-usb-hsotg.h b/arch/arm/plat-samsung/include/plat/regs-usb-hsotg.h
+index 8d18d9d..dc90f5e 100644
+--- a/arch/arm/plat-samsung/include/plat/regs-usb-hsotg.h
++++ b/arch/arm/plat-samsung/include/plat/regs-usb-hsotg.h
+@@ -226,6 +226,7 @@
+ 
+ #define S3C_DIEPMSK				S3C_HSOTG_REG(0x810)
+ 
++#define S3C_DIEPMSK_TxFIFOEmpty			(1 << 7)
+ #define S3C_DIEPMSK_INEPNakEffMsk		(1 << 6)
+ #define S3C_DIEPMSK_INTknEPMisMsk		(1 << 5)
+ #define S3C_DIEPMSK_INTknTXFEmpMsk		(1 << 4)
+@@ -371,6 +372,7 @@
+ 
+ #define S3C_DIEPDMA(_a)				S3C_HSOTG_REG(0x914 + ((_a) * 0x20))
+ #define S3C_DOEPDMA(_a)				S3C_HSOTG_REG(0xB14 + ((_a) * 0x20))
++#define S3C_DTXFSTS(_a)				S3C_HSOTG_REG(0x918 + ((_a) * 0x20))
+ 
+ #define S3C_EPFIFO(_a)				S3C_HSOTG_REG(0x1000 + ((_a) * 0x1000))
+ 
 diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-index b34a05d..3da45f5 100644
+index 5b61bcf..819e75a 100644
 --- a/drivers/usb/gadget/s3c-hsotg.c
 +++ b/drivers/usb/gadget/s3c-hsotg.c
-@@ -1384,6 +1384,9 @@ static void s3c_hsotg_rx_data(struct s3c_hsotg *hsotg, int ep_idx, int size)
- 	read_ptr = hs_req->req.actual;
- 	max_req = hs_req->req.length - read_ptr;
+@@ -12,6 +12,8 @@
+  * published by the Free Software Foundation.
+ */
  
-+	dev_dbg(hsotg->dev, "%s: read %d/%d, done %d/%d\n",
-+		__func__, to_read, max_req, read_ptr, hs_req->req.length);
++#define DEBUG
 +
- 	if (to_read > max_req) {
- 		/* more data appeared than we where willing
- 		 * to deal with in this request.
-@@ -1393,9 +1396,6 @@ static void s3c_hsotg_rx_data(struct s3c_hsotg *hsotg, int ep_idx, int size)
- 		WARN_ON_ONCE(1);
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/spinlock.h>
+@@ -131,6 +133,7 @@ struct s3c_hsotg_ep {
+  * @regs: The memory area mapped for accessing registers.
+  * @regs_res: The resource that was allocated when claiming register space.
+  * @irq: The IRQ number we are using
++ * @dedicated_fifos: Set if the hardware has dedicated IN-EP fifos.
+  * @debug_root: root directrory for debugfs.
+  * @debug_file: main status file for debugfs.
+  * @debug_fifo: FIFO status file for debugfs.
+@@ -149,6 +152,8 @@ struct s3c_hsotg {
+ 	struct resource		*regs_res;
+ 	int			irq;
+ 
++	unsigned int		dedicated_fifos:1;
++
+ 	struct dentry		*debug_root;
+ 	struct dentry		*debug_file;
+ 	struct dentry		*debug_fifo;
+@@ -467,7 +472,7 @@ static int s3c_hsotg_write_fifo(struct s3c_hsotg *hsotg,
+ 	if (to_write == 0)
+ 		return 0;
+ 
+-	if (periodic) {
++	if (periodic && !hsotg->dedicated_fifos) {
+ 		u32 epsize = readl(hsotg->regs + S3C_DIEPTSIZ(hs_ep->index));
+ 		int size_left;
+ 		int size_done;
+@@ -505,6 +510,11 @@ static int s3c_hsotg_write_fifo(struct s3c_hsotg *hsotg,
+ 			s3c_hsotg_en_gsint(hsotg, S3C_GINTSTS_PTxFEmp);
+ 			return -ENOSPC;
+ 		}
++	} else if (hsotg->dedicated_fifos && hs_ep->index != 0) {
++		can_write = readl(hsotg->regs + S3C_DTXFSTS(hs_ep->index));
++
++		can_write &= 0xffff;
++		can_write *= 4;
+ 	} else {
+ 		if (S3C_GNPTXSTS_NPTxQSpcAvail_GET(gnptxsts) == 0) {
+ 			dev_dbg(hsotg->dev,
+@@ -1830,6 +1840,15 @@ static void s3c_hsotg_epint(struct s3c_hsotg *hsotg, unsigned int idx,
+ 				 __func__, idx);
+ 			clear |= S3C_DIEPMSK_INTknEPMisMsk;
+ 		}
++
++		/* FIFO has space or is empty (see GAHBCFG) */
++		if (hsotg->dedicated_fifos &&
++		    ints & S3C_DIEPMSK_TxFIFOEmpty) {
++			dev_dbg(hsotg->dev, "%s: ep%d: TxFIFOEmpty\n",
++				__func__, idx);
++			s3c_hsotg_trytx(hsotg, hs_ep);
++			clear |= S3C_DIEPMSK_TxFIFOEmpty;
++		}
  	}
  
--	dev_dbg(hsotg->dev, "%s: read %d/%d, done %d/%d\n",
--		__func__, to_read, max_req, read_ptr, hs_req->req.length);
--
- 	hs_ep->total_data += to_read;
- 	hs_req->req.actual += to_read;
- 	to_read = DIV_ROUND_UP(to_read, 4);
-@@ -1464,9 +1464,11 @@ static void s3c_hsotg_send_zlp(struct s3c_hsotg *hsotg,
- static void s3c_hsotg_handle_outdone(struct s3c_hsotg *hsotg,
- 				     int epnum, bool was_setup)
+ 	writel(clear, hsotg->regs + epint_reg);
+@@ -2281,6 +2300,12 @@ static int s3c_hsotg_ep_enable(struct usb_ep *ep,
+ 		break;
+ 	}
+ 
++	/* if the hardware has dedicated fifos, we must give each IN EP
++	 * a unique tx-fifo even if it is non-periodic.
++	 */
++	if (dir_in && hsotg->dedicated_fifos)
++		epctrl |= S3C_DxEPCTL_TxFNum(index);
++
+ 	/* for non control endpoints, set PID to D0 */
+ 	if (index)
+ 		epctrl |= S3C_DxEPCTL_SetD0PID;
+@@ -2570,7 +2595,8 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
+ 
+ 	writel(S3C_DIEPMSK_TimeOUTMsk | S3C_DIEPMSK_AHBErrMsk |
+ 	       S3C_DIEPMSK_INTknEPMisMsk |
+-	       S3C_DIEPMSK_EPDisbldMsk | S3C_DIEPMSK_XferComplMsk,
++	       S3C_DIEPMSK_EPDisbldMsk | S3C_DIEPMSK_XferComplMsk |
++	       ((hsotg->dedicated_fifos) ? S3C_DIEPMSK_TxFIFOEmpty : 0),
+ 	       hsotg->regs + S3C_DIEPMSK);
+ 
+ 	/* don't need XferCompl, we get that from RXFIFO in slave mode. In
+@@ -2797,6 +2823,8 @@ static void s3c_hsotg_otgreset(struct s3c_hsotg *hsotg)
+ 
+ static void s3c_hsotg_init(struct s3c_hsotg *hsotg)
  {
-+	u32 epsize = readl(hsotg->regs + S3C_DOEPTSIZ(epnum));
- 	struct s3c_hsotg_ep *hs_ep = &hsotg->eps[epnum];
- 	struct s3c_hsotg_req *hs_req = hs_ep->req;
- 	struct usb_request *req = &hs_req->req;
-+	unsigned size_left = S3C_DxEPTSIZ_XferSize_GET(epsize);
- 	int result = 0;
- 
- 	if (!hs_req) {
-@@ -1475,9 +1477,7 @@ static void s3c_hsotg_handle_outdone(struct s3c_hsotg *hsotg,
- 	}
- 
- 	if (using_dma(hsotg)) {
--		u32 epsize = readl(hsotg->regs + S3C_DOEPTSIZ(epnum));
- 		unsigned size_done;
--		unsigned size_left;
- 
- 		/* Calculate the size of the transfer by checking how much
- 		 * is left in the endpoint size register and then working it
-@@ -1487,14 +1487,18 @@ static void s3c_hsotg_handle_outdone(struct s3c_hsotg *hsotg,
- 		 * so may overshoot/undershoot the transfer.
- 		 */
- 
--		size_left = S3C_DxEPTSIZ_XferSize_GET(epsize);
--
- 		size_done = hs_ep->size_loaded - size_left;
- 		size_done += hs_ep->last_load;
- 
- 		req->actual = size_done;
- 	}
- 
-+	/* if there is more request to do, schedule new transfer */
-+	if (req->actual < req->length && size_left == 0) {
-+		s3c_hsotg_start_req(hsotg, hs_ep, hs_req, true);
-+		return;
-+	}
++	u32 cfg4;
 +
- 	if (req->actual < req->length && req->short_not_ok) {
- 		dev_dbg(hsotg->dev, "%s: got %d/%d (short not ok) => error\n",
- 			__func__, req->actual, req->length);
+ 	/* unmask subset of endpoint interrupts */
+ 
+ 	writel(S3C_DIEPMSK_TimeOUTMsk | S3C_DIEPMSK_AHBErrMsk |
+@@ -2832,6 +2860,14 @@ static void s3c_hsotg_init(struct s3c_hsotg *hsotg)
+ 
+ 	writel(using_dma(hsotg) ? S3C_GAHBCFG_DMAEn : 0x0,
+ 	       hsotg->regs + S3C_GAHBCFG);
++
++	/* check hardware configuration */
++
++	cfg4 = readl(hsotg->regs + 0x50);
++	hsotg->dedicated_fifos = (cfg4 >> 25) & 1;
++
++	dev_info(hsotg->dev, "%s fifos\n",
++		 hsotg->dedicated_fifos ? "dedicated" : "shared");
+ }
+ 
+ static void s3c_hsotg_dump(struct s3c_hsotg *hsotg)
 -- 
 1.7.0.4
