@@ -1,108 +1,25 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 11 Jun 2010 15:26:32 +0900
-Subject: [PATCH 1/3] s3c64xx: Fix build without SDHCI controllers
-In-Reply-To: <00a401cb091f$6f212370$4d636a50$%park@samsung.com>
-References: <1276076345-24370-1-git-send-email-m.szyprowski@samsung.com>
-	<1276076345-24370-2-git-send-email-m.szyprowski@samsung.com>
-	<000801cb0900$f64bbdc0$e2e33940$%kim@samsung.com>
-	<AANLkTimPp36K_SmFm053cu9f9Znb8SFHVcKAn8bjD1PI@mail.gmail.com>
-	<000c01cb091a$675b2fa0$36118ee0$%kim@samsung.com>
-	<00a401cb091f$6f212370$4d636a50$%park@samsung.com>
-Message-ID: <003001cb092f$0b4b53b0$21e1fb10$%kim@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 11 Jun 2010 08:37:33 +0200
+Subject: [PATCH 4/5] [ARM] Auto calculate ZRELADDR and provide option
+	for exceptions
+In-Reply-To: <AANLkTiltifSEFdpXB0avw4ZyDzP_IrDpipafBAJbN17U@mail.gmail.com>
+References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
+	<1275550613-9553-5-git-send-email-eric.miao@canonical.com>
+	<AANLkTiltifSEFdpXB0avw4ZyDzP_IrDpipafBAJbN17U@mail.gmail.com>
+Message-ID: <20100611063733.GB10894@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Linus,
 
-> -----Original Message-----
-> From: Kyungmin Park [mailto:kyungmin.park at samsung.com]
-> Sent: Friday, June 11, 2010 1:35 PM
-> To: 'Kukjin Kim'
-> Cc: 'Marek Szyprowski'; linux-arm-kernel at lists.infradead.org; linux-samsung-
-> soc at vger.kernel.org; linux-mmc at vger.kernel.org; ben-linux at fluff.org
-> Subject: RE: [PATCH 1/3] s3c64xx: Fix build without SDHCI controllers
-> 
-> 
-> 
-> > -----Original Message-----
-> > From: Kukjin Kim [mailto:kgene.kim at samsung.com]
-> > Sent: Friday, June 11, 2010 12:59 PM
-> > To: 'Kyungmin Park'
-> > Cc: 'Marek Szyprowski'; linux-arm-kernel at lists.infradead.org; linux-
-> > samsung-soc at vger.kernel.org; linux-mmc at vger.kernel.org; ben-
-> > linux at fluff.org
-> > Subject: RE: [PATCH 1/3] s3c64xx: Fix build without SDHCI controllers
-> >
-> > Kyungmin Park wrote:
-> > >
-> > > On Fri, Jun 11, 2010 at 9:56 AM, Kukjin Kim <kgene.kim@samsung.com>
-> > wrote:
-> > > > Marek Szyprowski wrote:
-> > > >>
-> > > >> This patch fixes the following compilation problem if only NCP
-> > machine
-> > > >> is selected:
-> > > >>
-> > > >> arch/arm/mach-s3c64xx/s3c6410.c: In function ?s3c6410_map_io?:
-> > > >> arch/arm/mach-s3c64xx/s3c6410.c:51: error: implicit declaration of
-> > function
-> > > >> ?s3c6410_default_sdhci2?
-> > > >>
-> > > >> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > > >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > > >> ---
-> > > >>  arch/arm/plat-samsung/include/plat/sdhci.h |    1 +
-> > > >>  1 files changed, 1 insertions(+), 0 deletions(-)
-> > > >>
-> > > >> diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h
-> > b/arch/arm/plat-
-> > > >> samsung/include/plat/sdhci.h
-> > > >> index 13f9fb2..c2044e5 100644
-> > > >> --- a/arch/arm/plat-samsung/include/plat/sdhci.h
-> > > >> +++ b/arch/arm/plat-samsung/include/plat/sdhci.h
-> > > >> @@ -166,6 +166,7 @@ static inline void s3c6410_default_sdhci2(void)
-> > { }
-> > > >>  #else
-> > > >>  static inline void s3c6410_default_sdhci0(void) { }
-> > > >>  static inline void s3c6410_default_sdhci1(void) { }
-> > > >> +static inline void s3c6410_default_sdhci2(void) { }
-> > > >>  static inline void s3c6400_default_sdhci0(void) { }
-> > > >>  static inline void s3c6400_default_sdhci1(void) { }
-> > > >>
-> > > >> --
-> > > >
-> > > > Maybe missed in Maurus' patch 'S3C64XX: add HSMMC2 support'
-> > > > commit 92b118f6968ae0788ac659af47b464acd9a754a1
-> > >
-> > > Which kernel tree do you use?
-> > > it's against the latest kernel.
-> > >
-> > Of course, Linus' 35-rc2.
-> 
-> We used 63a07cb64ccc3ceae619d3298545d602ab5ecd38
-> And there's no s3c6410_default_sdhci2(void) .
-> 
-Hmm. Maybe some misunderstanding.
+On Fri, Jun 11, 2010 at 12:17:44AM +0200, Linus Walleij wrote:
+> I assume it should be submitted simultaneously with a patch nuking off
+> all Makefile.boot files and that infrastructure then?
+Only when bootp is deleted or fixed not to use these variables.
 
-I meant maybe Maurus missed when he submitted HSMMC2 support patch.
-(it means Marek's patch is correct)
-And need 's3c6400_default_sdhci2()' as well as 's36410_default_sdhci2()' in Marek's patch.
-So requested to re-submit updated patch.
+Best regards
+Uwe
 
-> 
-> > Any problem?
-> >
-> > > >
-> > > > Also need 'static inline s3c6400_default_sdhci2(void) { }'
-> > > > Could you re-submit updated patch including s3c6400_default_sdhci2()?
-> > > >
-> >
-> >
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
