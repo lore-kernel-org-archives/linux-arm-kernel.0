@@ -1,1165 +1,393 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 11 Jun 2010 08:45:40 +0200
-Subject: [PATCH 2/2] pxa/spitz: Rework spitz
-In-Reply-To: <1276238740-10640-1-git-send-email-marek.vasut@gmail.com>
-References: <1276238740-10640-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1276238740-10640-2-git-send-email-marek.vasut@gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 11 Jun 2010 16:50:18 +1000
+Subject: [RFC,PATCH 1/2] Add a common struct clk
+In-Reply-To: <20100611042046.GA31045@fluff.org.uk>
+References: <1275636608.606606.450179637764.0.gpush@pororo>
+	<1275636608.607067.417709988883.1.gpush@pororo>
+	<20100611042046.GA31045@fluff.org.uk>
+Message-ID: <1276239018.1962.118.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This huge patch mostly shuffles code. The spitz.c file contained terrible mess
-and needed a cleanup, here it is:
+On Fri, 2010-06-11 at 05:20 +0100, Ben Dooks wrote:
+> On Fri, Jun 04, 2010 at 03:30:08PM +0800, Jeremy Kerr wrote:
+> > We currently have 21 definitions of struct clk in the ARM architecture,
+> > each defined on a per-platform basis. This makes it difficult to define
+> > platform- (or architecture-) independent clock sources without making
+> > assumptions about struct clk, and impossible to compile two
+> > platforms with different struct clks into a single image.
+> 
+> Whilst I agree that this is a useful thing to do, I'd like to ensure
+> we get a good base for our work before we get another reason for Linus
+> to complain about churn.
 
-1) Made every part modular, components are not built in if not selected.
-2) Removed loads of preprocessor goo, mostly "#ifdef MACH_AKITA .... #endif" and
-   similar code. The kernel size will grow by a few kb now, but the file is much
-   more readable.
-3) Reworked SD/CF power setting function and made it reentrant.
+Well, in this case the goal is to unify things, both within ARM and
+between architectures, so I fail to see Linus complaining about that :-)
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- arch/arm/mach-pxa/include/mach/spitz.h |    2 -
- arch/arm/mach-pxa/spitz.c              |  748 ++++++++++++++++++--------------
- 2 files changed, 420 insertions(+), 330 deletions(-)
+> What do people think of just changing everyone who is currently using
+> clk support to using this new implementation?
 
-diff --git a/arch/arm/mach-pxa/include/mach/spitz.h b/arch/arm/mach-pxa/include/mach/spitz.h
-index fa1998c..685749a 100644
---- a/arch/arm/mach-pxa/include/mach/spitz.h
-+++ b/arch/arm/mach-pxa/include/mach/spitz.h
-@@ -185,7 +185,5 @@
- /*
-  * Shared data structures
-  */
--extern struct platform_device spitzscoop_device;
--extern struct platform_device spitzscoop2_device;
- extern struct platform_device spitzssp_device;
- extern struct sharpsl_charger_machinfo spitz_pm_machinfo;
-diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-index 4d2413e..bf6a7d4 100644
---- a/arch/arm/mach-pxa/spitz.c
-+++ b/arch/arm/mach-pxa/spitz.c
-@@ -18,12 +18,12 @@
- #include <linux/gpio_keys.h>
- #include <linux/gpio.h>
- #include <linux/leds.h>
--#include <linux/mtd/physmap.h>
- #include <linux/i2c.h>
- #include <linux/i2c/pca953x.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/ads7846.h>
- #include <linux/spi/corgi_lcd.h>
-+#include <linux/mtd/physmap.h>
- #include <linux/mtd/sharpsl.h>
- #include <linux/input/matrix_keypad.h>
- 
-@@ -33,11 +33,9 @@
- #include <asm/mach/sharpsl_param.h>
- #include <asm/hardware/scoop.h>
- 
--
- #include <mach/pxa27x.h>
- #include <mach/pxa27x-udc.h>
- #include <mach/reset.h>
--#include <plat/i2c.h>
- #include <mach/irda.h>
- #include <mach/mmc.h>
- #include <mach/ohci.h>
-@@ -45,11 +43,16 @@
- #include <mach/pxa2xx_spi.h>
- #include <mach/spitz.h>
- 
-+#include <plat/i2c.h>
-+
- #include "generic.h"
- #include "devices.h"
- #include "sharpsl.h"
- 
--static unsigned long spitz_pin_config[] __initdata = {
-+/******************************************************************************
-+ * Pin configuration
-+ ******************************************************************************/
-+static unsigned long sharpslc_pin_config[] __initdata = {
- 	/* Chip Selects */
- 	GPIO78_nCS_2,	/* SCOOP #2 */
- 	GPIO79_nCS_3,	/* NAND */
-@@ -124,10 +127,13 @@ static unsigned long spitz_pin_config[] __initdata = {
- 	GPIO1_GPIO | WAKEUP_ON_EDGE_FALL,	/* SPITZ_GPIO_RESET */
- };
- 
--/*
-- * Spitz SCOOP Device #1
-- */
--static struct resource spitz_scoop_resources[] = {
-+
-+/******************************************************************************
-+ * Scoop GPIO expander
-+ ******************************************************************************/
-+#if defined(CONFIG_SHARP_SCOOP) || defined(CONFIG_SHARP_SCOOP_MODULE)
-+/* SCOOP Device #1 */
-+static struct resource sharpslc_scoop_1_resources[] = {
- 	[0] = {
- 		.start		= 0x10800000,
- 		.end		= 0x10800fff,
-@@ -135,7 +141,7 @@ static struct resource spitz_scoop_resources[] = {
- 	},
- };
- 
--static struct scoop_config spitz_scoop_setup = {
-+static struct scoop_config sharpslc_scoop_1_setup = {
- 	.io_dir		= SPITZ_SCP_IO_DIR,
- 	.io_out		= SPITZ_SCP_IO_OUT,
- 	.suspend_clr	= SPITZ_SCP_SUS_CLR,
-@@ -143,20 +149,18 @@ static struct scoop_config spitz_scoop_setup = {
- 	.gpio_base	= SPITZ_SCP_GPIO_BASE,
- };
- 
--struct platform_device spitzscoop_device = {
-+struct platform_device sharpslc_scoop_1_device = {
- 	.name		= "sharp-scoop",
- 	.id		= 0,
- 	.dev		= {
-- 		.platform_data	= &spitz_scoop_setup,
-+ 		.platform_data	= &sharpslc_scoop_1_setup,
- 	},
--	.num_resources	= ARRAY_SIZE(spitz_scoop_resources),
--	.resource	= spitz_scoop_resources,
-+	.num_resources	= ARRAY_SIZE(sharpslc_scoop_1_resources),
-+	.resource	= sharpslc_scoop_1_resources,
- };
- 
--/*
-- * Spitz SCOOP Device #2
-- */
--static struct resource spitz_scoop2_resources[] = {
-+/* SCOOP Device #2 */
-+static struct resource sharpslc_scoop_2_resources[] = {
- 	[0] = {
- 		.start		= 0x08800040,
- 		.end		= 0x08800fff,
-@@ -164,7 +168,7 @@ static struct resource spitz_scoop2_resources[] = {
- 	},
- };
- 
--static struct scoop_config spitz_scoop2_setup = {
-+static struct scoop_config sharpslc_scoop_2_setup = {
- 	.io_dir		= SPITZ_SCP2_IO_DIR,
- 	.io_out		= SPITZ_SCP2_IO_OUT,
- 	.suspend_clr	= SPITZ_SCP2_SUS_CLR,
-@@ -172,82 +176,110 @@ static struct scoop_config spitz_scoop2_setup = {
- 	.gpio_base	= SPITZ_SCP2_GPIO_BASE,
- };
- 
--struct platform_device spitzscoop2_device = {
-+struct platform_device sharpslc_scoop_2_device = {
- 	.name		= "sharp-scoop",
- 	.id		= 1,
- 	.dev		= {
-- 		.platform_data	= &spitz_scoop2_setup,
-+ 		.platform_data	= &sharpslc_scoop_2_setup,
- 	},
--	.num_resources	= ARRAY_SIZE(spitz_scoop2_resources),
--	.resource	= spitz_scoop2_resources,
-+	.num_resources	= ARRAY_SIZE(sharpslc_scoop_2_resources),
-+	.resource	= sharpslc_scoop_2_resources,
- };
- 
--#define SPITZ_PWR_SD 0x01
--#define SPITZ_PWR_CF 0x02
-+static void __init sharpslc_scoop_init(void)
-+{
-+	platform_device_register(&sharpslc_scoop_1_device);
-+
-+	/* Akita doesn't have the second SCOOP chip */
-+	if (!machine_is_akita())
-+		platform_device_register(&sharpslc_scoop_2_device);
-+}
- 
- /* Power control is shared with between one of the CF slots and SD */
--static void spitz_card_pwr_ctrl(int device, unsigned short new_cpr)
-+static void sharpslc_card_pwr_ctrl(int enable, unsigned short new_cpr)
- {
--	unsigned short cpr = read_scoop_reg(&spitzscoop_device.dev, SCOOP_CPR);
-+	unsigned short cpr;
-+	unsigned long flags;
- 
--	if (new_cpr & 0x0007) {
-+	if (new_cpr & 0x7) {
- 		gpio_set_value(SPITZ_GPIO_CF_POWER, 1);
--		if (!(cpr & 0x0002) && !(cpr & 0x0004))
--		        mdelay(5);
--		if (device == SPITZ_PWR_CF)
--		        cpr |= 0x0002;
--		if (device == SPITZ_PWR_SD)
--		        cpr |= 0x0004;
--	        write_scoop_reg(&spitzscoop_device.dev, SCOOP_CPR, cpr | new_cpr);
--	} else {
--		if (device == SPITZ_PWR_CF)
--		        cpr &= ~0x0002;
--		if (device == SPITZ_PWR_SD)
--		        cpr &= ~0x0004;
--		if (!(cpr & 0x0002) && !(cpr & 0x0004)) {
--			write_scoop_reg(&spitzscoop_device.dev, SCOOP_CPR, 0x0000);
--		        mdelay(1);
--			gpio_set_value(SPITZ_GPIO_CF_POWER, 0);
--		} else {
--		        write_scoop_reg(&spitzscoop_device.dev, SCOOP_CPR, cpr | new_cpr);
--		}
-+		mdelay(5);
-+	}
-+		
-+	local_irq_save(flags);
-+
-+	cpr = read_scoop_reg(&sharpslc_scoop_1_device.dev, SCOOP_CPR);
-+
-+	if (enable & new_cpr)
-+		cpr |= new_cpr;
-+	else
-+		cpr &= ~enable;
-+
-+        write_scoop_reg(&sharpslc_scoop_1_device.dev, SCOOP_CPR, cpr);
-+
-+	local_irq_restore(flags);
-+
-+	if (!(cpr & 0x7)) {
-+	        mdelay(1);
-+		gpio_set_value(SPITZ_GPIO_CF_POWER, 0);
- 	}
- }
- 
--static void spitz_pcmcia_pwr(struct device *scoop, unsigned short cpr, int nr)
-+#else
-+static inline void sharpslc_scoop_init(void) {}
-+static inline void sharpslc_card_pwr_ctrl(int device, unsigned short new_cpr) {}
-+#endif
-+
-+/******************************************************************************
-+ * PCMCIA
-+ ******************************************************************************/
-+#if defined(CONFIG_PCMCIA_PXA2XX) || defined(CONFIG_PCMCIA_PXA2XX_MODULE)
-+static void sharpslc_pcmcia_pwr(struct device *scoop, unsigned short cpr, int nr)
- {
- 	/* Only need to override behaviour for slot 0 */
- 	if (nr == 0)
--		spitz_card_pwr_ctrl(SPITZ_PWR_CF, cpr);
-+		sharpslc_card_pwr_ctrl(
-+			cpr & (SCOOP_CPR_CF_3V | SCOOP_CPR_CF_XV), cpr);
- 	else
- 		write_scoop_reg(scoop, SCOOP_CPR, cpr);
- }
- 
--static struct scoop_pcmcia_dev spitz_pcmcia_scoop[] = {
--{
--	.dev        = &spitzscoop_device.dev,
--	.irq        = SPITZ_IRQ_GPIO_CF_IRQ,
--	.cd_irq     = SPITZ_IRQ_GPIO_CF_CD,
--	.cd_irq_str = "PCMCIA0 CD",
--},{
--	.dev        = &spitzscoop2_device.dev,
--	.irq        = SPITZ_IRQ_GPIO_CF2_IRQ,
--	.cd_irq     = -1,
--},
-+static struct scoop_pcmcia_dev sharpslc_pcmcia_scoop[] = {
-+	{
-+		.dev        = &sharpslc_scoop_1_device.dev,
-+		.irq        = SPITZ_IRQ_GPIO_CF_IRQ,
-+		.cd_irq     = SPITZ_IRQ_GPIO_CF_CD,
-+		.cd_irq_str = "PCMCIA0 CD",
-+	},{
-+		.dev        = &sharpslc_scoop_2_device.dev,
-+		.irq        = SPITZ_IRQ_GPIO_CF2_IRQ,
-+		.cd_irq     = -1,
-+	},
- };
- 
--static struct scoop_pcmcia_config spitz_pcmcia_config = {
--	.devs         = &spitz_pcmcia_scoop[0],
--	.num_devs     = 2,
--	.power_ctrl   = spitz_pcmcia_pwr,
-+static struct scoop_pcmcia_config sharpslc_pcmcia_config = {
-+	.devs		= &sharpslc_pcmcia_scoop[0],
-+	.num_devs	= 2,
-+	.power_ctrl	= sharpslc_pcmcia_pwr,
- };
- 
--EXPORT_SYMBOL(spitzscoop_device);
--EXPORT_SYMBOL(spitzscoop2_device);
-+static void __init sharpslc_pcmcia_init(void)
-+{
-+	/* Akita has only one PCMCIA slot used */
-+	if (machine_is_akita())
-+		sharpslc_pcmcia_config.num_devs = 1;
-+
-+	platform_scoop_config = &sharpslc_pcmcia_config;
-+}
-+#else
-+static inline void sharpslc_pcmcia_init(void) {}
-+#endif
-+
-+/******************************************************************************
-+ * GPIO keyboard
-+ ******************************************************************************/
-+#if defined(CONFIG_KEYBOARD_MATRIX) || defined(CONFIG_KEYBOARD_MATRIX_MODULE)
- 
--/*
-- * Spitz Keyboard Device
-- */
- #define SPITZ_KEY_CALENDAR	KEY_F1
- #define SPITZ_KEY_ADDRESS	KEY_F2
- #define SPITZ_KEY_FN		KEY_F3
-@@ -263,7 +295,7 @@ EXPORT_SYMBOL(spitzscoop2_device);
- #define SPITZ_KEY_OK		KEY_F11
- #define SPITZ_KEY_MENU		KEY_F12
- 
--static const uint32_t spitzkbd_keymap[] = {
-+static const uint32_t sharpslc_keymap[] = {
- 	KEY(0, 0, KEY_LEFTCTRL),
- 	KEY(0, 1, KEY_1),
- 	KEY(0, 2, KEY_3),
-@@ -330,37 +362,48 @@ static const uint32_t spitzkbd_keymap[] = {
- 	KEY(6, 8, KEY_RIGHT),
- };
- 
--static const struct matrix_keymap_data spitzkbd_keymap_data = {
--	.keymap		= spitzkbd_keymap,
--	.keymap_size	= ARRAY_SIZE(spitzkbd_keymap),
-+static const struct matrix_keymap_data sharpslc_keymap_data = {
-+	.keymap		= sharpslc_keymap,
-+	.keymap_size	= ARRAY_SIZE(sharpslc_keymap),
- };
- 
--static const uint32_t spitzkbd_row_gpios[] =
-+static const uint32_t sharpslc_row_gpios[] =
- 		{ 12, 17, 91, 34, 36, 38, 39 };
--static const uint32_t spitzkbd_col_gpios[] =
-+static const uint32_t sharpslc_col_gpios[] =
- 		{ 88, 23, 24, 25, 26, 27, 52, 103, 107, 108, 114 };
- 
--static struct matrix_keypad_platform_data spitzkbd_pdata = {
--	.keymap_data		= &spitzkbd_keymap_data,
--	.row_gpios		= spitzkbd_row_gpios,
--	.col_gpios		= spitzkbd_col_gpios,
--	.num_row_gpios		= ARRAY_SIZE(spitzkbd_row_gpios),
--	.num_col_gpios		= ARRAY_SIZE(spitzkbd_col_gpios),
-+static struct matrix_keypad_platform_data sharpslc_mkp_pdata = {
-+	.keymap_data		= &sharpslc_keymap_data,
-+	.row_gpios		= sharpslc_row_gpios,
-+	.col_gpios		= sharpslc_col_gpios,
-+	.num_row_gpios		= ARRAY_SIZE(sharpslc_row_gpios),
-+	.num_col_gpios		= ARRAY_SIZE(sharpslc_col_gpios),
- 	.col_scan_delay_us	= 10,
- 	.debounce_ms		= 10,
- 	.wakeup			= 1,
- };
- 
--static struct platform_device spitzkbd_device = {
-+static struct platform_device sharpslc_mkp_device = {
- 	.name		= "matrix-keypad",
- 	.id		= -1,
- 	.dev		= {
--		.platform_data = &spitzkbd_pdata,
-+		.platform_data	= &sharpslc_mkp_pdata,
- 	},
- };
- 
-+static void __init sharpslc_mkp_init(void)
-+{
-+	platform_device_register(&sharpslc_mkp_device);
-+}
-+#else
-+static inline void sharpslc_mkp_init(void) {}
-+#endif
- 
--static struct gpio_keys_button spitz_gpio_keys[] = {
-+/******************************************************************************
-+ * GPIO keys
-+ ******************************************************************************/
-+#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
-+static struct gpio_keys_button sharpslc_gpio_keys[] = {
- 	{
- 		.type	= EV_PWR,
- 		.code	= KEY_SUSPEND,
-@@ -383,27 +426,35 @@ static struct gpio_keys_button spitz_gpio_keys[] = {
- 	},
- };
- 
--static struct gpio_keys_platform_data spitz_gpio_keys_platform_data = {
--	.buttons	= spitz_gpio_keys,
--	.nbuttons	= ARRAY_SIZE(spitz_gpio_keys),
-+static struct gpio_keys_platform_data sharpslc_gpio_keys_platform_data = {
-+	.buttons	= sharpslc_gpio_keys,
-+	.nbuttons	= ARRAY_SIZE(sharpslc_gpio_keys),
- };
- 
--static struct platform_device spitz_gpio_keys_device = {
-+static struct platform_device sharpslc_gpio_keys_device = {
- 	.name	= "gpio-keys",
- 	.id	= -1,
- 	.dev	= {
--		.platform_data	= &spitz_gpio_keys_platform_data,
-+		.platform_data	= &sharpslc_gpio_keys_platform_data,
- 	},
- };
- 
-+static void __init sharpslc_keys_init(void)
-+{
-+	platform_device_register(&sharpslc_gpio_keys_device);
-+}
-+#else
-+static inline void sharpslc_keys_init(void) {}
-+#endif
- 
--/*
-- * Spitz LEDs
-- */
--static struct gpio_led spitz_gpio_leds[] = {
-+/******************************************************************************
-+ * LEDs
-+ ******************************************************************************/
-+#if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
-+static struct gpio_led sharpslc_gpio_leds[] = {
- 	{
- 		.name			= "spitz:amber:charge",
--		.default_trigger	= "sharpsl-charge",
-+		.default_trigger	= "sharpslc-charge",
- 		.gpio			= SPITZ_GPIO_LED_ORANGE,
- 	},
- 	{
-@@ -413,25 +464,32 @@ static struct gpio_led spitz_gpio_leds[] = {
- 	},
- };
- 
--static struct gpio_led_platform_data spitz_gpio_leds_info = {
--	.leds		= spitz_gpio_leds,
--	.num_leds	= ARRAY_SIZE(spitz_gpio_leds),
-+static struct gpio_led_platform_data sharpslc_gpio_leds_info = {
-+	.leds		= sharpslc_gpio_leds,
-+	.num_leds	= ARRAY_SIZE(sharpslc_gpio_leds),
- };
- 
--static struct platform_device spitzled_device = {
-+static struct platform_device sharpslc_led_device = {
- 	.name		= "leds-gpio",
- 	.id		= -1,
- 	.dev		= {
--		.platform_data = &spitz_gpio_leds_info,
-+		.platform_data	= &sharpslc_gpio_leds_info,
- 	},
- };
- 
--#if defined(CONFIG_SPI_PXA2XX) || defined(CONFIG_SPI_PXA2XX_MODULE)
--static struct pxa2xx_spi_master spitz_spi_info = {
--	.num_chipselect	= 3,
--};
-+static void __init sharpslc_leds_init(void)
-+{
-+	platform_device_register(&sharpslc_led_device);
-+}
-+#else
-+static inline void sharpslc_leds_init(void) {}
-+#endif
- 
--static void spitz_wait_for_hsync(void)
-+/******************************************************************************
-+ * SSP Devices
-+ ******************************************************************************/
-+#if defined(CONFIG_SPI_PXA2XX) || defined(CONFIG_SPI_PXA2XX_MODULE)
-+static void sharpslc_ads7846_wait_for_hsync(void)
- {
- 	while (gpio_get_value(SPITZ_GPIO_HSYNC))
- 		cpu_relax();
-@@ -440,21 +498,21 @@ static void spitz_wait_for_hsync(void)
- 		cpu_relax();
- }
- 
--static struct ads7846_platform_data spitz_ads7846_info = {
-+static struct ads7846_platform_data sharpslc_ads7846_info = {
- 	.model			= 7846,
- 	.vref_delay_usecs	= 100,
- 	.x_plate_ohms		= 419,
- 	.y_plate_ohms		= 486,
- 	.pressure_max		= 1024,
- 	.gpio_pendown		= SPITZ_GPIO_TP_INT,
--	.wait_for_sync		= spitz_wait_for_hsync,
-+	.wait_for_sync		= sharpslc_ads7846_wait_for_hsync,
- };
- 
--static struct pxa2xx_spi_chip spitz_ads7846_chip = {
-+static struct pxa2xx_spi_chip sharpslc_ads7846_chip = {
- 	.gpio_cs		= SPITZ_GPIO_ADS7846_CS,
- };
- 
--static void spitz_bl_kick_battery(void)
-+static void sharpslc_bl_kick_battery(void)
- {
- 	void (*kick_batt)(void);
- 
-@@ -465,93 +523,107 @@ static void spitz_bl_kick_battery(void)
- 	}
- }
- 
--static struct corgi_lcd_platform_data spitz_lcdcon_info = {
-+static struct corgi_lcd_platform_data sharpslc_lcdcon_info = {
- 	.init_mode		= CORGI_LCD_MODE_VGA,
- 	.max_intensity		= 0x2f,
- 	.default_intensity	= 0x1f,
- 	.limit_mask		= 0x0b,
- 	.gpio_backlight_cont	= SPITZ_GPIO_BACKLIGHT_CONT,
- 	.gpio_backlight_on	= SPITZ_GPIO_BACKLIGHT_ON,
--	.kick_battery		= spitz_bl_kick_battery,
-+	.kick_battery		= sharpslc_bl_kick_battery,
- };
- 
--static struct pxa2xx_spi_chip spitz_lcdcon_chip = {
-+static struct pxa2xx_spi_chip sharpslc_lcdcon_chip = {
- 	.gpio_cs	= SPITZ_GPIO_LCDCON_CS,
- };
- 
--static struct pxa2xx_spi_chip spitz_max1111_chip = {
-+static struct pxa2xx_spi_chip sharpslc_max1111_chip = {
- 	.gpio_cs	= SPITZ_GPIO_MAX1111_CS,
- };
- 
--static struct spi_board_info spitz_spi_devices[] = {
-+static struct spi_board_info sharpslc_spi_devices[] = {
- 	{
- 		.modalias	= "ads7846",
- 		.max_speed_hz	= 1200000,
- 		.bus_num	= 2,
- 		.chip_select	= 0,
--		.platform_data	= &spitz_ads7846_info,
--		.controller_data= &spitz_ads7846_chip,
-+		.platform_data	= &sharpslc_ads7846_info,
-+		.controller_data= &sharpslc_ads7846_chip,
- 		.irq		= gpio_to_irq(SPITZ_GPIO_TP_INT),
- 	}, {
- 		.modalias	= "corgi-lcd",
- 		.max_speed_hz	= 50000,
- 		.bus_num	= 2,
- 		.chip_select	= 1,
--		.platform_data	= &spitz_lcdcon_info,
--		.controller_data= &spitz_lcdcon_chip,
-+		.platform_data	= &sharpslc_lcdcon_info,
-+		.controller_data= &sharpslc_lcdcon_chip,
- 	}, {
- 		.modalias	= "max1111",
- 		.max_speed_hz	= 450000,
- 		.bus_num	= 2,
- 		.chip_select	= 2,
--		.controller_data= &spitz_max1111_chip,
-+		.controller_data= &sharpslc_max1111_chip,
- 	},
- };
- 
--static void __init spitz_init_spi(void)
-+static struct pxa2xx_spi_master sharpslc_spi_info = {
-+	.num_chipselect	= 3,
-+};
-+
-+static void __init sharpslc_spi_init(void)
- {
- 	if (machine_is_akita()) {
--		spitz_lcdcon_info.gpio_backlight_cont = AKITA_GPIO_BACKLIGHT_CONT;
--		spitz_lcdcon_info.gpio_backlight_on = AKITA_GPIO_BACKLIGHT_ON;
-+		sharpslc_lcdcon_info.gpio_backlight_cont = AKITA_GPIO_BACKLIGHT_CONT;
-+		sharpslc_lcdcon_info.gpio_backlight_on = AKITA_GPIO_BACKLIGHT_ON;
- 	}
- 
--	pxa2xx_set_spi_info(2, &spitz_spi_info);
--	spi_register_board_info(ARRAY_AND_SIZE(spitz_spi_devices));
-+	pxa2xx_set_spi_info(2, &sharpslc_spi_info);
-+	spi_register_board_info(ARRAY_AND_SIZE(sharpslc_spi_devices));
- }
- #else
--static inline void spitz_init_spi(void) {}
-+static inline void sharpslc_spi_init(void) {}
- #endif
- 
-+/******************************************************************************
-+ * SD/MMC card controller
-+ ******************************************************************************/
-+#if defined(CONFIG_MMC_PXA) || defined(CONFIG_MMC_PXA_MODULE)
- /*
-- * MMC/SD Device
-- *
-- * The card detect interrupt isn't debounced so we delay it by 250ms
-- * to give the card a chance to fully insert/eject.
-+ * NOTE: The card detect interrupt isn't debounced so we delay it by 250ms to
-+ * give the card a chance to fully insert/eject.
-  */
--static void spitz_mci_setpower(struct device *dev, unsigned int vdd)
-+static void sharpslc_mci_setpower(struct device *dev, unsigned int vdd)
- {
- 	struct pxamci_platform_data* p_d = dev->platform_data;
- 
--	if (( 1 << vdd) & p_d->ocr_mask)
--		spitz_card_pwr_ctrl(SPITZ_PWR_SD, 0x0004);
-+	if ((1 << vdd) & p_d->ocr_mask)
-+		sharpslc_card_pwr_ctrl(SCOOP_CPR_SD_3V, SCOOP_CPR_SD_3V);
- 	else
--		spitz_card_pwr_ctrl(SPITZ_PWR_SD, 0x0000);
-+		sharpslc_card_pwr_ctrl(SCOOP_CPR_SD_3V, 0x0);
- }
- 
--static struct pxamci_platform_data spitz_mci_platform_data = {
-+static struct pxamci_platform_data sharpslc_mci_platform_data = {
- 	.detect_delay_ms	= 250,
- 	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
--	.setpower 		= spitz_mci_setpower,
-+	.setpower 		= sharpslc_mci_setpower,
- 	.gpio_card_detect	= SPITZ_GPIO_nSD_DETECT,
- 	.gpio_card_ro		= SPITZ_GPIO_nSD_WP,
- 	.gpio_power		= -1,
- };
- 
-+static void __init sharpslc_mmc_init(void)
-+{
-+	pxa_set_mci_info(&sharpslc_mci_platform_data);
-+}
-+#else
-+static inline void sharpslc_mmc_init(void) {}
-+#endif
- 
--/*
-- * USB Host (OHCI)
-- */
--static int spitz_ohci_init(struct device *dev)
-+/******************************************************************************
-+ * USB Host
-+ ******************************************************************************/
-+#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
-+static int sharpslc_ohci_init(struct device *dev)
- {
- 	int err;
- 
-@@ -559,88 +631,114 @@ static int spitz_ohci_init(struct device *dev)
- 	if (err)
- 		return err;
- 
--	/* Only Port 2 is connected
--	 * Setup USB Port 2 Output Control Register
--	 */
-+	/* Only Port 2 is connected, setup USB Port 2 Output Control Register */
- 	UP2OCR = UP2OCR_HXS | UP2OCR_HXOE | UP2OCR_DPPDE | UP2OCR_DMPDE;
- 
- 	return gpio_direction_output(SPITZ_GPIO_USB_HOST, 1);
- }
- 
--static void spitz_ohci_exit(struct device *dev)
-+static void sharpslc_ohci_exit(struct device *dev)
- {
- 	gpio_free(SPITZ_GPIO_USB_HOST);
- }
- 
--static struct pxaohci_platform_data spitz_ohci_platform_data = {
-+static struct pxaohci_platform_data sharpslc_ohci_platform_data = {
- 	.port_mode	= PMM_NPS_MODE,
--	.init		= spitz_ohci_init,
--	.exit		= spitz_ohci_exit,
-+	.init		= sharpslc_ohci_init,
-+	.exit		= sharpslc_ohci_exit,
- 	.flags		= ENABLE_PORT_ALL | NO_OC_PROTECTION,
- 	.power_budget	= 150,
- };
- 
-+static void __init sharpslc_uhc_init(void)
-+{
-+	pxa_set_ohci_info(&sharpslc_ohci_platform_data);
-+}
-+#else
-+static inline void sharpslc_uhc_init(void) {}
-+#endif
- 
--/*
-- * Irda
-- */
--
--static struct pxaficp_platform_data spitz_ficp_platform_data = {
--/* .gpio_pwdown is set in spitz_init() and akita_init() accordingly */
-+/******************************************************************************
-+ * IrDA
-+ ******************************************************************************/
-+#if defined(CONFIG_PXA_FICP) || defined(CONFIG_PXA_FICP_MODULE)
-+static struct pxaficp_platform_data sharpslc_ficp_platform_data = {
- 	.transceiver_cap	= IR_SIRMODE | IR_OFF,
- };
- 
-+static void __init sharpslc_irda_init(void)
-+{
-+	if (machine_is_akita())
-+		sharpslc_ficp_platform_data.gpio_pwdown = AKITA_GPIO_IR_ON;
-+	else
-+		sharpslc_ficp_platform_data.gpio_pwdown = SPITZ_GPIO_IR_ON;
- 
--/*
-- * Spitz PXA Framebuffer
-- */
-+	pxa_set_ficp_info(&sharpslc_ficp_platform_data);
-+}
-+#else
-+static inline void sharpslc_irda_init(void) {}
-+#endif
- 
--static struct pxafb_mode_info spitz_pxafb_modes[] = {
--{
--	.pixclock       = 19231,
--	.xres           = 480,
--	.yres           = 640,
--	.bpp            = 16,
--	.hsync_len      = 40,
--	.left_margin    = 46,
--	.right_margin   = 125,
--	.vsync_len      = 3,
--	.upper_margin   = 1,
--	.lower_margin   = 0,
--	.sync           = 0,
--},{
--	.pixclock       = 134617,
--	.xres           = 240,
--	.yres           = 320,
--	.bpp            = 16,
--	.hsync_len      = 20,
--	.left_margin    = 20,
--	.right_margin   = 46,
--	.vsync_len      = 2,
--	.upper_margin   = 1,
--	.lower_margin   = 0,
--	.sync           = 0,
--},
--};
--
--static struct pxafb_mach_info spitz_pxafb_info = {
--	.modes          = &spitz_pxafb_modes[0],
--	.num_modes      = 2,
-+/******************************************************************************
-+ * Framebuffer
-+ ******************************************************************************/
-+#if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
-+static struct pxafb_mode_info sharpslc_pxafb_modes[] = {
-+	{
-+		.pixclock       = 19231,
-+		.xres           = 480,
-+		.yres           = 640,
-+		.bpp            = 16,
-+		.hsync_len      = 40,
-+		.left_margin    = 46,
-+		.right_margin   = 125,
-+		.vsync_len      = 3,
-+		.upper_margin   = 1,
-+		.lower_margin   = 0,
-+		.sync           = 0,
-+	},{
-+		.pixclock       = 134617,
-+		.xres           = 240,
-+		.yres           = 320,
-+		.bpp            = 16,
-+		.hsync_len      = 20,
-+		.left_margin    = 20,
-+		.right_margin   = 46,
-+		.vsync_len      = 2,
-+		.upper_margin   = 1,
-+		.lower_margin   = 0,
-+		.sync           = 0,
-+	},
-+};
-+
-+static struct pxafb_mach_info sharpslc_pxafb_info = {
-+	.modes          = sharpslc_pxafb_modes,
-+	.num_modes      = ARRAY_SIZE(sharpslc_pxafb_modes),
- 	.fixed_modes    = 1,
- 	.lcd_conn	= LCD_COLOR_TFT_16BPP | LCD_ALTERNATE_MAPPING,
- };
- 
--static struct mtd_partition sharpsl_nand_partitions[] = {
-+static void __init sharpslc_lcd_init(void)
-+{
-+	set_pxa_fb_info(&sharpslc_pxafb_info);
-+}
-+#else
-+static inline void sharpslc_lcd_init(void) {}
-+#endif
-+
-+/******************************************************************************
-+ * Framebuffer
-+ ******************************************************************************/
-+#if defined(CONFIG_MTD_NAND_SHARPSL) || defined(CONFIG_MTD_NAND_SHARPSL_MODULE)
-+static struct mtd_partition sharpslc_nand_partitions[] = {
- 	{
- 		.name = "System Area",
- 		.offset = 0,
- 		.size = 7 * 1024 * 1024,
--	},
--	{
-+	}, {
- 		.name = "Root Filesystem",
- 		.offset = 7 * 1024 * 1024,
--	},
--	{
-+	}, {
- 		.name = "Home Filesystem",
- 		.offset = MTDPART_OFS_APPEND,
- 		.size = MTDPART_SIZ_FULL,
-@@ -649,37 +747,72 @@ static struct mtd_partition sharpsl_nand_partitions[] = {
- 
- static uint8_t scan_ff_pattern[] = { 0xff, 0xff };
- 
--static struct nand_bbt_descr sharpsl_bbt = {
--	.options = 0,
--	.offs = 4,
--	.len = 2,
--	.pattern = scan_ff_pattern
-+static struct nand_bbt_descr sharpslc_nand_bbt = {
-+	.options	= 0,
-+	.offs		= 4,
-+	.len		= 2,
-+	.pattern	= scan_ff_pattern
- };
- 
--static struct sharpsl_nand_platform_data sharpsl_nand_platform_data = {
--	.badblock_pattern	= &sharpsl_bbt,
--	.partitions		= sharpsl_nand_partitions,
--	.nr_partitions		= ARRAY_SIZE(sharpsl_nand_partitions),
-+static struct nand_ecclayout sharpslc_akita_oobinfo = {
-+	.oobfree	= {{0x08, 0x09}},
-+	.eccbytes	= 24,
-+	.eccpos		= {
-+			0x05, 0x01, 0x02, 0x03, 0x06, 0x07, 0x15, 0x11,
-+			0x12, 0x13, 0x16, 0x17, 0x25, 0x21, 0x22, 0x23,
-+			0x26, 0x27, 0x35, 0x31, 0x32, 0x33, 0x36, 0x37,
-+	},
-+};
-+
-+static struct sharpsl_nand_platform_data sharpslc_nand_platform_data = {
-+	.badblock_pattern	= &sharpslc_nand_bbt,
-+	.partitions		= sharpslc_nand_partitions,
-+	.nr_partitions		= ARRAY_SIZE(sharpslc_nand_partitions),
- };
- 
--static struct resource sharpsl_nand_resources[] = {
-+static struct resource sharpslc_nand_resources[] = {
- 	{
--		.start	= 0x0C000000,
--		.end	= 0x0C000FFF,
-+		.start	= PXA_CS3_PHYS,
-+		.end	= PXA_CS3_PHYS + SZ_4K - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
- };
- 
--static struct platform_device sharpsl_nand_device = {
-+static struct platform_device sharpslc_nand_device = {
- 	.name		= "sharpsl-nand",
- 	.id		= -1,
--	.resource	= sharpsl_nand_resources,
--	.num_resources	= ARRAY_SIZE(sharpsl_nand_resources),
--	.dev.platform_data	= &sharpsl_nand_platform_data,
-+	.resource	= sharpslc_nand_resources,
-+	.num_resources	= ARRAY_SIZE(sharpslc_nand_resources),
-+	.dev		= {
-+		.platform_data	= &sharpslc_nand_platform_data,
-+	}
- };
- 
-+static void __init sharpslc_nand_init(void)
-+{
-+	if (machine_is_spitz()) {
-+		sharpslc_nand_partitions[1].size = 5 * 1024 * 1024;
-+	} else if (machine_is_akita()) {
-+		sharpslc_nand_partitions[1].size = 58 * 1024 * 1024;
-+		sharpslc_nand_bbt.len = 1;
-+		sharpslc_nand_platform_data.ecc_layout = &sharpslc_akita_oobinfo;
-+	} else if (machine_is_borzoi()) {
-+		sharpslc_nand_partitions[1].size = 32 * 1024 * 1024;
-+		sharpslc_nand_bbt.len = 1;
-+		sharpslc_nand_platform_data.ecc_layout = &sharpslc_akita_oobinfo;
-+	}
- 
--static struct mtd_partition sharpsl_rom_parts[] = {
-+	platform_device_register(&sharpslc_nand_device);
-+}
-+#else
-+static inline void sharpslc_nand_init(void) {}
-+#endif
-+
-+/******************************************************************************
-+ * NOR Flash
-+ ******************************************************************************/
-+#if defined(CONFIG_MTD_PHYSMAP) || defined(CONFIG_MTD_PHYSMAP_MODULE)
-+static struct mtd_partition sharpslc_rom_parts[] = {
- 	{
- 		.name	="Boot PROM Filesystem",
- 		.offset	= 0x00140000,
-@@ -687,158 +820,117 @@ static struct mtd_partition sharpsl_rom_parts[] = {
- 	},
- };
- 
--static struct physmap_flash_data sharpsl_rom_data = {
-+static struct physmap_flash_data sharpslc_rom_data = {
- 	.width		= 2,
--	.nr_parts	= ARRAY_SIZE(sharpsl_rom_parts),
--	.parts		= sharpsl_rom_parts,
-+	.nr_parts	= ARRAY_SIZE(sharpslc_rom_parts),
-+	.parts		= sharpslc_rom_parts,
- };
- 
--static struct resource sharpsl_rom_resources[] = {
-+static struct resource sharpslc_rom_resources[] = {
- 	{
--		.start	= 0x00000000,
--		.end	= 0x007fffff,
-+		.start	= PXA_CS0_PHYS,
-+		.end	= PXA_CS0_PHYS + SZ_8M - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
- };
- 
--static struct platform_device sharpsl_rom_device = {
--	.name	= "physmap-flash",
--	.id	= -1,
--	.resource = sharpsl_rom_resources,
--	.num_resources = ARRAY_SIZE(sharpsl_rom_resources),
--	.dev.platform_data = &sharpsl_rom_data,
-+static struct platform_device sharpslc_rom_device = {
-+	.name		= "physmap-flash",
-+	.id		= -1,
-+	.resource	= sharpslc_rom_resources,
-+	.num_resources	= ARRAY_SIZE(sharpslc_rom_resources),
-+	.dev		= {
-+		.platform_data	= &sharpslc_rom_data,
-+	},
- };
- 
--static struct platform_device *devices[] __initdata = {
--	&spitzscoop_device,
--	&spitzkbd_device,
--	&spitz_gpio_keys_device,
--	&spitzled_device,
--	&sharpsl_nand_device,
--	&sharpsl_rom_device,
-+static void __init sharpslc_nor_init(void)
-+{
-+	platform_device_register(&sharpslc_rom_device);
-+}
-+#else
-+static inline void sharpslc_nor_init(void) {}
-+#endif
-+
-+/******************************************************************************
-+ * GPIO expander
-+ ******************************************************************************/
-+#if defined(CONFIG_GPIO_PCA953X) || defined(CONFIG_GPIO_PCA953X_MODULE)
-+static struct pca953x_platform_data akita_pca953x_pdata = {
-+	.gpio_base		= AKITA_IOEXP_GPIO_BASE,
-+};
-+
-+static struct i2c_board_info akita_i2c_devs[] = {
-+	{
-+		.type		= "max7310",
-+		.addr		= 0x18,
-+		.platform_data	= &akita_pxa953x_pdata,
-+	},
- };
- 
--static void spitz_poweroff(void)
-+static void __init sharpslc_i2c_init(void)
-+{
-+	if (machine_is_akita()) {
-+		pxa_set_i2c_info(NULL);
-+		i2c_register_board_info(0, ARRAY_AND_SIZE(akita_i2c_devs));
-+	}
-+}
-+#else
-+static inline void sharpslc_i2c_init(void) {}
-+#endif
-+
-+
-+/******************************************************************************
-+ * Machine init
-+ ******************************************************************************/
-+static void sharpslc_poweroff(void)
- {
- 	arm_machine_restart('g', NULL);
- }
- 
--static void spitz_restart(char mode, const char *cmd)
-+static void sharpslc_restart(char mode, const char *cmd)
- {
- 	/* Bootloader magic for a reboot */
--	if((MSC0 & 0xffff0000) == 0x7ff00000)
-+	if ((MSC0 & 0xffff0000) == 0x7ff00000)
- 		MSC0 = (MSC0 & 0xffff) | 0x7ee00000;
- 
--	spitz_poweroff();
-+	sharpslc_poweroff();
- }
- 
--static void __init common_init(void)
-+static void __init sharpslc_init(void)
- {
- 	init_gpio_reset(SPITZ_GPIO_ON_RESET, 1, 0);
--	pm_power_off = spitz_poweroff;
--	arm_pm_restart = spitz_restart;
--
--	if (machine_is_spitz()) {
--		sharpsl_nand_partitions[1].size = 5 * 1024 * 1024;
--	} else if (machine_is_akita()) {
--		sharpsl_nand_partitions[1].size = 58 * 1024 * 1024;
--	} else if (machine_is_borzoi()) {
--		sharpsl_nand_partitions[1].size = 32 * 1024 * 1024;
--	}
-+	pm_power_off = sharpslc_poweroff;
-+	arm_pm_restart = sharpslc_restart;
- 
- 	PMCR = 0x00;
- 
- 	/* Stop 3.6MHz and drive HIGH to PCMCIA and CS */
- 	PCFR |= PCFR_OPDE;
- 
--	pxa2xx_mfp_config(ARRAY_AND_SIZE(spitz_pin_config));
-+	pxa2xx_mfp_config(ARRAY_AND_SIZE(sharpslc_pin_config));
- 
- 	pxa_set_ffuart_info(NULL);
- 	pxa_set_btuart_info(NULL);
- 	pxa_set_stuart_info(NULL);
--
--	spitz_init_spi();
--
--	platform_add_devices(devices, ARRAY_SIZE(devices));
--	pxa_set_mci_info(&spitz_mci_platform_data);
--	pxa_set_ohci_info(&spitz_ohci_platform_data);
--	pxa_set_ficp_info(&spitz_ficp_platform_data);
--	set_pxa_fb_info(&spitz_pxafb_info);
--	pxa_set_i2c_info(NULL);
--}
--
--#if defined(CONFIG_MACH_AKITA) || defined(CONFIG_MACH_BORZOI)
--static struct nand_bbt_descr sharpsl_akita_bbt = {
--	.options = 0,
--	.offs = 4,
--	.len = 1,
--	.pattern = scan_ff_pattern
--};
--
--static struct nand_ecclayout akita_oobinfo = {
--	.eccbytes = 24,
--	.eccpos = {
--		   0x5, 0x1, 0x2, 0x3, 0x6, 0x7, 0x15, 0x11,
--		   0x12, 0x13, 0x16, 0x17, 0x25, 0x21, 0x22, 0x23,
--		   0x26, 0x27, 0x35, 0x31, 0x32, 0x33, 0x36, 0x37},
--	.oobfree = {{0x08, 0x09}}
--};
--#endif
--
--#if defined(CONFIG_MACH_SPITZ) || defined(CONFIG_MACH_BORZOI)
--static void __init spitz_init(void)
--{
--	spitz_ficp_platform_data.gpio_pwdown = SPITZ_GPIO_IR_ON;
--
--#ifdef CONFIG_MACH_BORZOI
--	if (machine_is_borzoi()) {
--		sharpsl_nand_platform_data.badblock_pattern = &sharpsl_akita_bbt;
--		sharpsl_nand_platform_data.ecc_layout = &akita_oobinfo;
--	}
--#endif
--
--	platform_scoop_config = &spitz_pcmcia_config;
--
--	common_init();
--
--	platform_device_register(&spitzscoop2_device);
-+	pxa27x_set_i2c_power_info(NULL);
-+
-+	sharpslc_spi_init();
-+	sharpslc_scoop_init();
-+	sharpslc_mkp_init();
-+	sharpslc_keys_init();
-+	sharpslc_leds_init();
-+	sharpslc_mmc_init();
-+	sharpslc_pcmcia_init();
-+	sharpslc_irda_init();
-+	sharpslc_uhc_init();
-+	sharpslc_lcd_init();
-+	sharpslc_nor_init();
-+	sharpslc_nand_init();
-+	sharpslc_i2c_init();
- }
--#endif
--
--#ifdef CONFIG_MACH_AKITA
--/*
-- * Akita IO Expander
-- */
--static struct pca953x_platform_data akita_ioexp = {
--	.gpio_base		= AKITA_IOEXP_GPIO_BASE,
--};
--
--static struct i2c_board_info akita_i2c_board_info[] = {
--	{
--		.type		= "max7310",
--		.addr		= 0x18,
--		.platform_data	= &akita_ioexp,
--	},
--};
--
--static void __init akita_init(void)
--{
--	spitz_ficp_platform_data.gpio_pwdown = AKITA_GPIO_IR_ON;
--
--	sharpsl_nand_platform_data.badblock_pattern = &sharpsl_akita_bbt;
--	sharpsl_nand_platform_data.ecc_layout = &akita_oobinfo;
--
--	/* We just pretend the second element of the array doesn't exist */
--	spitz_pcmcia_config.num_devs = 1;
--	platform_scoop_config = &spitz_pcmcia_config;
--
--	i2c_register_board_info(0, ARRAY_AND_SIZE(akita_i2c_board_info));
--
--	common_init();
--}
--#endif
- 
--static void __init fixup_spitz(struct machine_desc *desc,
-+static void __init sharpslc_fixup(struct machine_desc *desc,
- 		struct tag *tags, char **cmdline, struct meminfo *mi)
- {
- 	sharpsl_save_param();
-@@ -852,10 +944,10 @@ static void __init fixup_spitz(struct machine_desc *desc,
- MACHINE_START(SPITZ, "SHARP Spitz")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.fixup		= fixup_spitz,
-+	.fixup		= sharpslc_fixup,
- 	.map_io		= pxa_map_io,
- 	.init_irq	= pxa27x_init_irq,
--	.init_machine	= spitz_init,
-+	.init_machine	= sharpslc_init,
- 	.timer		= &pxa_timer,
- MACHINE_END
- #endif
-@@ -864,10 +956,10 @@ MACHINE_END
- MACHINE_START(BORZOI, "SHARP Borzoi")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.fixup		= fixup_spitz,
-+	.fixup		= sharpslc_fixup,
- 	.map_io		= pxa_map_io,
- 	.init_irq	= pxa27x_init_irq,
--	.init_machine	= spitz_init,
-+	.init_machine	= sharpslc_init,
- 	.timer		= &pxa_timer,
- MACHINE_END
- #endif
-@@ -876,10 +968,10 @@ MACHINE_END
- MACHINE_START(AKITA, "SHARP Akita")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.fixup		= fixup_spitz,
-+	.fixup		= sharpslc_fixup,
- 	.map_io		= pxa_map_io,
- 	.init_irq	= pxa27x_init_irq,
--	.init_machine	= akita_init,
-+	.init_machine	= sharpslc_init,
- 	.timer		= &pxa_timer,
- MACHINE_END
- #endif
--- 
-1.7.1
+It's risky I suppose... there isn't many users of struct clk in powerpc
+land today (I think one SoC platform only uses it upstream at the
+moment) so I won't mind getting moved over at once but on ARM, you have
+to deal with a lot more cruft that might warrant a more progressive
+migration approach... but I'll let you guys judge.
+ 
+> > struct clk {
+> > 	const struct clk_ops	*ops;
+> > 	unsigned int		enable_count;
+> > 	struct mutex		mutex;
+> 
+> I'm a little worried about the size of struct clk if all of them
+> have a mutex in them. If i'm right, this is 40 bytes of data each
+> clock has to take on board.
+> 
+> Doing the following:
+> 
+> find arch/arm -type f -name "*.c" | xargs grep -c -E "struct.*clk.*=.*{" | grep -v ":0" | awk 'BEGIN { count=0; FS=":" }
+> count += $2; END { print count }'
+> 
+> indicates that there's approximately 2241 clocks under arch/arm at the
+> moment. That's about 87KiB of mutexes if all are being compiled at
+> once.
+
+I'm not convince this is relevant. You assume that all 2241 of those
+clocks are statically allocated -and- compiled at the same time in the
+same kernel binary.
+
+I think both assumptions are terribly unlikely, especially in ARM
+land :-) And in the event where you would actually manage to achieve
+such a thing, I believe 87K is going to be the very last of your
+worries :-)
+
+In case it is of interest (and I know not everybody will want to do like
+that) the way I intend to use this on powerpc is to have static clk_ops,
+but instanciate the struct clk (or rather subclasses of struct clk)
+on demand at clk_get time.
+
+Basically, the device-tree (or platform code as a fallback) will bind
+a device clock input to a clock provider / output pair. The clock
+provider is something that produces struct clk * on demand for its
+outputs.
+
+Cheers,
+Ben.
+
+> ~> };
+> > 
+> > And a set of clock operations (defined per type of clock):
+> > 
+> > struct clk_operations {
+> >        int             (*enable)(struct clk *);
+> still think that not passing an bool as a second argument is silly.
+> 
+> >        void            (*disable)(struct clk *);
+> ~>        unsigned long   (*get_rate)(struct clk *);
+> >        [...]
+> > };
+> > 
+> > To define a hardware-specific clock, machine code can "subclass" the
+> > struct clock into a new struct (adding any device-specific data), and
+> > provide a set of operations:
+> > 
+> > struct clk_foo {
+> > 	struct clk	clk;
+> > 	void __iomem	*some_register;
+> > };
+> > 
+> > struct clk_operations clk_foo_ops = {
+> > 	.get_rate = clk_foo_get_rate,
+> > };
+> > 
+> > The common clock definitions are based on a development patch from Ben
+> > Herrenschmidt <benh@kernel.crashing.org>.
+> > 
+> > Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> > 
+> > ---
+> >  arch/Kconfig        |    3 
+> >  include/linux/clk.h |  159 ++++++++++++++++++++++++++++++++++++--------
+> >  2 files changed, 135 insertions(+), 27 deletions(-)
+> ~~~~> 
+> > diff --git a/arch/Kconfig b/arch/Kconfig
+> > index acda512..2458b5e 100644
+> > --- a/arch/Kconfig
+> > +++ b/arch/Kconfig
+> > @@ -151,4 +151,7 @@ config HAVE_MIXED_BREAKPOINTS_REGS
+> >  config HAVE_USER_RETURN_NOTIFIER
+> >  	bool
+> >  
+> > +config USE_COMMON_STRUCT_CLK
+> > +	bool
+> > +
+> >  source "kernel/gcov/Kconfig"
+> > diff --git a/include/linux/clk.h b/include/linux/clk.h
+> > index 1d37f42..bb6957a 100644
+> > --- a/include/linux/clk.h
+> > +++ b/include/linux/clk.h
+> > @@ -3,6 +3,7 @@
+> >   *
+> >   *  Copyright (C) 2004 ARM Limited.
+> >   *  Written by Deep Blue Solutions Limited.
+> > + *  Copyright (c) 2010 Jeremy Kerr <jeremy.kerr@canonical.com>
+> >   *
+> >   * This program is free software; you can redistribute it and/or modify
+> >   * it under the terms of the GNU General Public License version 2 as
+> > @@ -11,36 +12,125 @@
+> >  #ifndef __LINUX_CLK_H
+> >  #define __LINUX_CLK_H
+> >  
+> > -struct device;
+> > +#include <linux/err.h>
+> > +#include <linux/mutex.h>
+> >  
+> > -/*
+> > - * The base API.
+> > +#ifdef CONFIG_USE_COMMON_STRUCT_CLK
+> > +
+> > +/* If we're using the common struct clk, we define the base clk object here,
+> > + * which will be 'subclassed' by device-specific implementations. For example:
+> > + *
+> > + *  struct clk_foo {
+> > + *      struct clk;
+> > + *      [device specific fields]
+> > + *  };
+> > + *
+> > + * We define the common clock API through a set of static inlines that call the
+> > + * corresponding clk_operations. The API is exactly the same as that documented
+> > + * in the !CONFIG_USE_COMMON_STRUCT_CLK case.
+> >   */
+> >  
+> > +struct clk {
+> > +	const struct clk_ops	*ops;
+> > +	unsigned int		enable_count;
+> > +	struct mutex		mutex;
+> > +};
+> 
+> how about defining a nice kerneldoc for this.
+> 
+> > +#define INIT_CLK(name, o) \
+> > +	{ .ops = &o, .enable_count = 0, \
+> > +		.mutex = __MUTEX_INITIALIZER(name.mutex) }
+> 
+> how about doing the mutex initinitialisation at registration
+> time, will save a pile of non-zero code in the image to mess up
+> the compression.
+> 
+> ~> +struct clk_ops {
+> > +       int             (*enable)(struct clk *);
+> > +       void            (*disable)(struct clk *);
+> > +       unsigned long   (*get_rate)(struct clk *);
+> > +       void            (*put)(struct clk *);
+> > +       long            (*round_rate)(struct clk *, unsigned long);
+> > +       int             (*set_rate)(struct clk *, unsigned long);
+> > +       int             (*set_parent)(struct clk *, struct clk *);
+> > +       struct clk*     (*get_parent)(struct clk *);
+> 
+> should each clock carry a parent field and the this is returned by
+> the get parent call.~~
+> 
+> > +};
+> > +
+> > +static inline int clk_enable(struct clk *clk)
+> > +{
+> > +	int ret = 0;
+> > +
+> > +	if (!clk->ops->enable)
+> > +		return 0;
+> > +
+> > +	mutex_lock(&clk->mutex);
+> > +	if (!clk->enable_count)
+> > +		ret = clk->ops->enable(clk);
+> > +
+> > +	if (!ret)
+> > +		clk->enable_count++;
+> > +	mutex_unlock(&clk->mutex);
+> > +
+> > +	return ret;
+> > +}
+> 
+> So we're leaving the enable parent code now to each implementation?
+> 
+> I think this is a really bad decision, it leaves so much open to bad
+> code repetition, as well as something the core should really be doing
+> if it had a parent clock field.
+> 
+> ~> +static inline void clk_disable(struct clk *clk)
+> > +{
+> > +	if (!clk->ops->enable)
+> > +		return;
+> 
+> so if we've no enable call we ignore disable too?
+> 
+> also, we don't keep an enable count if this fields are in use,
+> could people rely on this being correct even if the clock has
+> no enable/disable fields.
+> 
+> Would much rather see the enable_count being kept up-to-date
+> no matter what, given it may be watched by other parts of the
+> implementation, useful for debug info, and possibly useful if
+> later in the start sequence the clk_ops get changed to have this
+> field.~
+> 
+> > +~	mutex_lock(&clk->mutex);
+> > +
+> > +	if (!--clk->enable_count)
+> > +		clk->ops->disable(clk);
+> > +
+> > +	mutex_unlock(&clk->mutex);
+> > +}
+> > +
+> > +static inline unsigned long clk_get_rate(struct clk *clk)
+> > +{
+> > +	if (clk->ops->get_rate)
+> > +		return clk->ops->get_rate(clk);
+> > +	return 0;
+> > +}
+> > +
+> > +static inline void clk_put(struct clk *clk)
+> > +{
+> > +	if (clk->ops->put)
+> > +		clk->ops->put(clk);
+> > +}
+> 
+> I'm beginging to wonder if we don't just have a set of default ops
+> that get set into the clk+ops at registration time if these do
+> not have an implementation.
+> ~
+> > +static inline long clk_round_rate(struct clk *clk, unsigned long rate)
+> > +{
+> > +	if (clk->ops->round_rate)
+> > +		return clk->ops->round_rate(clk, rate);
+> > +	return -ENOSYS;
+> > +}
+> > +
+> > +static inline int clk_set_rate(struct clk *clk, unsigned long rate)
+> >~ +{
+> > +	if (clk->ops->set_rate)
+> > +		return clk->ops->set_rate(clk, rate);
+> > +	return -ENOSYS;
+> > +}
+> > +
+> > +static inline int clk_set_parent(struct clk *clk, struct clk *parent)
+> > +{
+> > +	if (clk->ops->set_parent)
+> > +		return clk->ops->set_parent(clk, parent);
+> > +	return -ENOSYS;
+> > +}
+> 
+> We have an interesting problem here which I belive should be dealt
+> with, what happens when the clock's parent is changed with respect
+> to the enable count of the parent.
+> 
+> With the following instance:
+> 
+> 	we have clocks a, b, c;
+> 	a and b are possible parents for c;
+> 	c starts off with a as parent
+> 
+> then the driver comes along:
+> 
+> 	1) gets clocks a, b, c;
+> 	2) clk_enable(c);
+> 	3) clk_set_parent(c, b);
+> 	
+> now we have the following:
+> 
+> 	A) clk a now has an enable count of non-zero
+> 	B) clk b may not be enabled
+> 	C) even though clk a may now be unused, it is still running
+> 	D) even though clk c was enabled, it isn't running since step3
+> 
+> this means that either any driver that is using a multi-parent clock
+> has to deal with the proper enable/disable of the parents (this is
+> is going to lead to code repetition, and I bet people will get it
+> badly wrong).
+> 
+> I belive the core of the clock code should deal with this, since
+> otherwise we end up with the situation of the same code being
+> repeated throughout the kernel.
+> 
+> > +static inline struct clk *clk_get_parent(struct clk *clk)
+> > +{
+> > +	if (clk->ops->get_parent)
+> > +		return clk->ops->get_parent(clk);
+> > +	return ERR_PTR(-ENOSYS);
+> > +}
+> >
+> > +#else /* !CONFIG_USE_COMMON_STRUCT_CLK */
+> >  
+> >  /*
+> > - * struct clk - an machine class defined object / cookie.
+> > + * Global clock object, actual structure is declared per-machine
+> >   */
+> >  struct clk;
+> >  
+> >  /**
+> > - * clk_get - lookup and obtain a reference to a clock producer.
+> > - * @dev: device for clock "consumer"
+> > - * @id: clock comsumer ID
+> > - *
+> > - * Returns a struct clk corresponding to the clock producer, or
+> > - * valid IS_ERR() condition containing errno.  The implementation
+> > - * uses @dev and @id to determine the clock consumer, and thereby
+> ~> - * the clock producer.  (IOW, @id may be identical strings, but
+> > - * clk_get may return different clock producers depending on @dev.)
+> > - *
+> > - * Drivers must assume that the clock source is not enabled.
+> > - *
+> > - * clk_get should not be called from within interrupt context.
+> > - */
+> > -struct clk *clk_get(struct device *dev, const char *id);
+> > -
+> > -/**
+> >   * clk_enable - inform the system when the clock source should be running.
+> >   * @clk: clock source
+> >   *
+> > @@ -83,12 +173,6 @@ unsigned long clk_get_rate(struct clk *clk);
+> >   */
+> >  void clk_put(struct clk *clk);
+> >  
+> > -
+> > -/*
+> > - * The remaining APIs are optional for machine class support.
+> > - */
+> > -
+> > -
+> >  /**
+> >   * clk_round_rate - adjust a rate to the exact rate a clock can provide
+> >   * @clk: clock source
+> > @@ -125,6 +209,27 @@ int clk_set_parent(struct clk *clk, struct clk *parent);
+> >   */
+> >  struct clk *clk_get_parent(struct clk *clk);
+> >  
+> > +#endif /* !CONFIG_USE_COMMON_STRUCT_CLK */
+> > +
+> > +struct device;
+> > +
+> > +/**
+> > + * clk_get - lookup and obtain a reference to a clock producer.
+> > + * @dev: device for clock "consumer"
+> > + * @id: clock comsumer ID
+> > + *
+> > + * Returns a struct clk corresponding to the clock producer, or
+> > + * valid IS_ERR() condition containing errno.  The implementation
+> > + * uses @dev and @id to determine the clock consumer, and thereby
+> > + * the clock producer.  (IOW, @id may be identical strings, but
+> > + * clk_get may return different clock producers depending on @dev.)
+> > + *
+> > + * Drivers must assume that the clock source is not enabled.
+> > + *
+> > + * clk_get should not be called from within interrupt context.
+> ~~> + */
+> > +struct clk *clk_get(struct device *dev, const char *id);
+> > +
+> >  /**
+> >   * clk_get_sys - get a clock based upon the device name
+> >   * @dev_id: device name
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
+> 
