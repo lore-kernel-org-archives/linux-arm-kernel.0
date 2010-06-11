@@ -1,38 +1,24 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 11 Jun 2010 09:20:54 +0100
-Subject: [PATCH 08/11] USB: s3c-hsotg: Check for new request before enqueing
-	new setup
-In-Reply-To: <1276244457-4072-1-git-send-email-ben-linux@fluff.org>
-References: <1276244457-4072-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1276244457-4072-9-git-send-email-ben-linux@fluff.org>
+Date: Fri, 11 Jun 2010 09:20:46 +0100
+Subject: s3c-hsotg fixes
+Message-ID: <1276244457-4072-1-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before trying a new setup transaction after getting an EP0 in complete
-interrupt, check that the driver did not try and send more EP0 IN data
-before enqueing a new setup transaction.
 
-This fixes a bug where we cannot send all of the IN data in one go
-so split the transfer, but then fail to send all the data as we start
-waiting for a new OUT transaction
+Some further fixes for the s3c-hsotg block, as well as a repost of
+the missed USB phy clock setting patch which either got missed or
+passed over from last time.
 
-Signed-off-by: Ben Dooks <ben-linux@fluff.org>
----
- drivers/usb/gadget/s3c-hsotg.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+As a note, this series has a patch adding support for dedicated FIFO
+mode, this is in my view a fix, as when the hsotg block is compiled
+with dedicated fifos then each USB IN non-periodic pipe needs to be
+alloacted a unique TX FIFO. We have no actual data on how well the
+block performs when all IN TX NP FIFOs are all set to the same one,
+but it really should be fixed.
 
-diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-index 7c35bfe..2555f27 100644
---- a/drivers/usb/gadget/s3c-hsotg.c
-+++ b/drivers/usb/gadget/s3c-hsotg.c
-@@ -1791,7 +1791,7 @@ static void s3c_hsotg_epint(struct s3c_hsotg *hsotg, unsigned int idx,
- 		if (dir_in) {
- 			s3c_hsotg_complete_in(hsotg, hs_ep);
- 
--			if (idx == 0)
-+			if (idx == 0 && !hs_ep->req)
- 				s3c_hsotg_enqueue_setup(hsotg);
- 		} else if (using_dma(hsotg)) {
- 			/* We're using DMA, we need to fire an OutDone here
+I am not sure if I have been subscribed to linux-usb, please CC: me
+just in case.
+
 -- 
-1.7.0.4
+Ben
