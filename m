@@ -1,37 +1,18 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Fri, 11 Jun 2010 11:23:56 +0200
-Subject: [RFC,PATCH 1/2] Add a common struct clk
-In-Reply-To: <201006111718.47426.jeremy.kerr@canonical.com>
-References: <1275636608.606606.450179637764.0.gpush@pororo>
-	<201006111557.12249.jeremy.kerr@canonical.com>
-	<19473.61547.684572.647641@ipc1.ka-ro>
-	<201006111718.47426.jeremy.kerr@canonical.com>
-Message-ID: <19474.172.742782.972629@ipc1.ka-ro>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 11 Jun 2010 10:35:15 +0100
+Subject: [alsa-devel] [PATCH 0/3] EP93xx: Add i2s audio support
+In-Reply-To: <4C114F25.5060809@bluewatersys.com>
+References: <1275991272-30122-1-git-send-email-ryan@bluewatersys.com>
+	<20100609101742.GA5618@opensource.wolfsonmicro.com>
+	<4C100A32.7010403@bluewatersys.com>
+	<C54C83DB-A9D3-4A7A-837B-17644B257251@opensource.wolfsonmicro.com>
+	<4C114F25.5060809@bluewatersys.com>
+Message-ID: <20100611093514.GA12436@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jun 11, 2010 at 08:46:29AM +1200, Ryan Mallon wrote:
 
-> > Using a mutex in clk_enable()/clk_disable() is a bad idea, since that
-> > makes it impossible to call those functions in interrupt context.
-> 
-> Do we do this at the moment? I know at least one implementation of clk_enable 
-> uses a mutex for locking.
-> 
-You are probably talking about the Freescale i.MX51 kernel, that won't
-even boot, if you enable CONFIG_DEBUG_KERNEL, CONFIG_DEBUG_SPINLOCK,
-CONFIG_DEBUG_LOCKDEP and CONFIG_DEBUG_SPINLOCK_SLEEP.
-The mutex in the clock implementation is one of the reasons.
+> Builds and runs fine.
 
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Excellent, thanks!
