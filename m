@@ -1,74 +1,80 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 11 Jun 2010 14:38:56 +0900
-Subject: Pending patches for s5pc110
-In-Reply-To: <20100611051521.GV7248@trinity.fluff.org>
-References: <AANLkTil0wWSFHpwi58enMhhG7475uUmFoZG6QhRim6Xk@mail.gmail.com>
-	<AANLkTimjwSHLiMYFywn3vHZYCbqQCCCh9qE-n3xuYOaq@mail.gmail.com>
-	<20100611051521.GV7248@trinity.fluff.org>
-Message-ID: <AANLkTikJQnDEjVunmiCLGaVAnj5bR7JdsUZYJ9xAEdE5@mail.gmail.com>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Fri, 11 Jun 2010 14:42:07 +0900
+Subject: [PATCH 1/5] sdhci-s3c: depend on plat-samsung
+In-Reply-To: <20100611052407.GX7248@trinity.fluff.org>
+References: <1276076383-24825-1-git-send-email-m.szyprowski@samsung.com>
+	<1276076383-24825-2-git-send-email-m.szyprowski@samsung.com>
+	<000701cb08fd$2f8e15a0$8eaa40e0$%kim@samsung.com>
+	<20100611052407.GX7248@trinity.fluff.org>
+Message-ID: <AANLkTildPiWp2BZvTm8sOvaMy1gRSTH8RHqvZQRdYP6-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 11, 2010 at 2:15 PM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Fri, Jun 11, 2010 at 01:25:18PM +0900, Kyungmin Park wrote:
->> Hi,
->>
->> No comments mean it's okay then we will prepare the patches to git pull.
->
-> No. no comments means that people either haven't had time to sort
-> them out or in fact ON HOLIDAY.
-
-but you usually missed our patches frequently. with this reason our
-patches can't merge within proper merge window.
-
->
->> Thank you,
->> Kyungmin Park
->>
->> On Fri, Jun 4, 2010 at 8:53 AM, Kyungmin Park <kmpark@infradead.org> wrote:
->> > Hi ben,
+On Fri, Jun 11, 2010 at 2:24 PM, Ben Dooks <ben-linux@fluff.org> wrote:
+> On Fri, Jun 11, 2010 at 09:29:38AM +0900, Kukjin Kim wrote:
+>> Marek Szyprowski wrote:
 >> >
->> > There's some pending patches for s5pc110.
->> > 1. aquila & goni support files.
+>> > Most Samsung SoC have support for SDHCI block, so make the driver
+>> > dependent on the Samsung platform instead on listing all SoCs in the
+>> > Kconfig (and updating it again when support for the new SoC variant is
+>> > added).
+>> >
+>> Hi, Marek
+>>
+>> Kyungmin Park already submitted same patch.
 >
-> these two should have gone in already
+> Hmm, Mr Park and Co really need to learn how to handle the treatment of
+> patches. I'm really disapointed that these patches get submitted without
+> the proper authour accreditation. If this isn't sorted out then I for
+> one will start thinking about giving this stuff an automatic reject.
 
-I mean more aquila & goni patches. not basic support. e.g. OneNAND
-support, FB support and so on.
->
->> > 2. keypad
->
-> I think kukjin has been looking at this, best check with him.
-
-It's already discussed. do you think it needs more comments?
-
->
->> > 3. s3c-fb - we have to implement FIMD and MIPI interface so please
->> > decide how to handle it.
->
-> since we've not had any chance to discuss what is going on here
-> I can't see how we are ready to submit anything.
-
-It's basic functionality for s3c-fb. it's required for our target and
-want to use it. even though someone don't use it.
-
-I wonder some features are not used for other board. in this case it
-should be merged if it doesn't break any previous board. Of course
-with proper feedback. I think we answer your question doesn't it?
+It's just Marek missed the previous my patch, and I reply there's
+duplicated patch already.
 
 Thank you,
 Kyungmin Park
 
 >
->> > 4. etc.
+> Please ensure that the original authour of a patch is accredited for
+> the work, and the right sign-off and any other ack data is kept with
+> the patch. There's documentation about most of this in the kernel
+> already at Documentation/SubmittingPatches.
+>
+>> And Andrew Morton added to the -mm tree.
+>> http://www.spinics.net/lists/mm-commits/msg79159.html
+>>
+>> But, I think your comment is better...
+>>
+>> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> > ---
+>> > ?drivers/mmc/host/Kconfig | ? ?2 +-
+>> > ?1 files changed, 1 insertions(+), 1 deletions(-)
 >> >
->> > Do you want to re-post or any activities?
+>> > diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+>> > index e171e77..acf5bf6 100644
+>> > --- a/drivers/mmc/host/Kconfig
+>> > +++ b/drivers/mmc/host/Kconfig
+>> > @@ -123,7 +123,7 @@ config MMC_SDHCI_PLTFM
 >> >
->> > Please give your plans or opinions.
->> >
->> > Thank you,
->> > Kyungmin Park
->> >
+>> > ?config MMC_SDHCI_S3C
+>> > ? ? tristate "SDHCI support on Samsung S3C SoC"
+>> > - ? depends on MMC_SDHCI && (PLAT_S3C24XX || PLAT_S3C64XX)
+>> > + ? depends on MMC_SDHCI && PLAT_SAMSUNG
+>> > ? ? help
+>> > ? ? ? This selects the Secure Digital Host Controller Interface (SDHCI)
+>> > ? ? ? often referrered to as the HSMMC block in some of the Samsung S3C
+>> > --
+>>
+>>
+>> Thanks.
+>>
+>> Best regards,
+>> Kgene.
+>> --
+>> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+>> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>>
 >>
 >> _______________________________________________
 >> linux-arm-kernel mailing list
@@ -82,4 +88,9 @@ Kyungmin Park
 > Q: ? ? ?What's a light-year?
 > A: ? ? ?One-third less calories than a regular year.
 >
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
