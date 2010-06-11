@@ -1,33 +1,28 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Fri, 11 Jun 2010 18:19:15 +0300
-Subject: [PATCH v3 13/14] omap: mailbox: simplify omap_mbox_register()
-In-Reply-To: <AANLkTinAKOZwGSDsQv5VKXBrr1BSQw-9w5Dcq2Z_96M0@mail.gmail.com>
-References: <1274548465-20208-1-git-send-email-felipe.contreras@gmail.com>
-	<1274548465-20208-14-git-send-email-felipe.contreras@gmail.com>
-	<20100524.174233.26958915.Hiroshi.DOYU@nokia.com>
-	<AANLkTinAKOZwGSDsQv5VKXBrr1BSQw-9w5Dcq2Z_96M0@mail.gmail.com>
-Message-ID: <AANLkTiniZF39voWYAsgb5FNF8Yi59V3NCZFLOBCGFUo-@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 11 Jun 2010 17:26:15 +0200
+Subject: [PATCH 00/13] PrimeCell DMA API and drivers v6
+Message-ID: <1276269975-1191-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 11, 2010 at 6:17 PM, Felipe Contreras
-<felipe.contreras@gmail.com> wrote:
-> On Mon, May 24, 2010 at 5:42 PM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
->> From: ext Felipe Contreras <felipe.contreras@gmail.com>
->> Subject: [PATCH v3 13/14] omap: mailbox: simplify omap_mbox_register()
->> Date: Sat, 22 May 2010 19:14:24 +0200
->>
->>> No need to dynamically register mailboxes one by one.
->>
->> Can you squash this into [PATCH 10/14]?
->>
->> I think that the "struct omap_mbox **list" would make more sense
->> without those reworking of modifications in this patch.
->
-> I don't know, I'm looking at the patch and I think it's much more
-> difficult to figure out what's happening.
+This is the sixth iteration of this patch set for PrimeCell
+DMA support, reposting the entire series.
 
-I forgot to mention: what I will do is put one patch after the other.
+Since Russell want this to run on the Versatile boards, I
+have hacked around with Peter Pearse's DMA driver for PL08x
+and now it is starting to look usable. Still it doesn't work
+with the PB1176 (because the DMA hardware is broken) and not
+with the PB11MPCore for anything but memcpy (for unknown
+reason slave DMA fails, possibly my stupidity).
 
--- 
-Felipe Contreras
+I need help to test and try to iron out the final problems
+with the RealView+Versatile DMA. The PL08x driver is long
+due, it's used in Nomadik and SPEAr as well, with more
+platforms waiting in the perimeter.
+
+This entire series should probably be considered RFC even
+though everything is well tested on U300 and U8500, since
+the Versatile implementation gatekeeps the others.
+
+Yours,
+Linus Walleij
