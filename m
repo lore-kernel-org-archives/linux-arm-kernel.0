@@ -1,51 +1,36 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 11 Jun 2010 17:52:08 +0200
-Subject: [PATCH 2/2] pxa/spitz: Rework spitz
-In-Reply-To: <20100611143600.GA1307@ucw.cz>
-References: <1276238740-10640-1-git-send-email-marek.vasut@gmail.com>
-	<201006110852.45838.marek.vasut@gmail.com>
-	<20100611143600.GA1307@ucw.cz>
-Message-ID: <201006111752.08130.marek.vasut@gmail.com>
+Date: Fri, 11 Jun 2010 17:55:27 +0200
+Subject: [PATCH 3/3] PalmZ72: Add support for OV9640 camera sensor
+In-Reply-To: <AANLkTimS2Il7oMsfizddQosf6_qDa0imJ3N-FPhVz8aJ@mail.gmail.com>
+References: <200908220852.06689.marek.vasut@gmail.com>
+	<201004211411.37371.marek.vasut@gmail.com>
+	<AANLkTimS2Il7oMsfizddQosf6_qDa0imJ3N-FPhVz8aJ@mail.gmail.com>
+Message-ID: <201006111755.27382.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 11. ?ervna 2010 16:36:00 Pavel Machek napsal(a):
-> On Fri 2010-06-11 08:52:45, Marek Vasut wrote:
-> > Dne P? 11. ?ervna 2010 08:45:40 Marek Vasut napsal(a):
-> > > This huge patch mostly shuffles code. The spitz.c file contained
-> > > terrible mess and needed a cleanup, here it is:
-> > > 
-> > > 1) Made every part modular, components are not built in if not
-> > > selected. 2) Removed loads of preprocessor goo, mostly "#ifdef
-> > > MACH_AKITA .... #endif" and similar code. The kernel size will grow by
-> > > a few kb now, but the file is much more readable.
-> > > 3) Reworked SD/CF power setting function and made it reentrant.
-> > > 
-> > > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> > > ---
-> > > 
-> > >  arch/arm/mach-pxa/include/mach/spitz.h |    2 -
-> > >  arch/arm/mach-pxa/spitz.c              |  748
-> > > 
-> > > ++++++++++++++++++-------------- 2 files changed, 420 insertions(+),
-> > > 330 deletions(-)
+Dne P? 11. ?ervna 2010 16:38:52 Eric Miao napsal(a):
+> On Wed, Apr 21, 2010 at 8:11 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> > Dne St 21. dubna 2010 13:44:34 Eric Miao napsal(a):
+> >> On Wed, Apr 21, 2010 at 5:41 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> >> > Dne So 22. srpna 2009 08:52:06 Marek Vasut napsal(a):
+> >> >> From 777212ce6d3bacea76281aa3d74839a3c38b32a4 Mon Sep 17 00:00:00
+> >> >> 2001 From: Marek Vasut <marek.vasut@gmail.com>
+> >> >> Date: Sat, 22 Aug 2009 05:15:10 +0200
+> >> >> Subject: [PATCH 3/3] PalmZ72: Add support for OV9640 camera sensor
+> >> > 
+> >> > Hi, was this ever merged ?
+> >> 
+> >> Is the required change to ov9640 merged?
 > > 
-> > Pavel, Eric, I tested this on metan's Z, could you give it a go ?
+> > Looking at this more properly, this might need a revision. The ov9640
+> > driver is in though.
 > 
-> quick test on 2.6.35-rc2 (of the 2nd version), and all seems
-> well. What should I look for?
-> 								Pavel
+> Marek,
+> 
+> How's the status of the revision?
 
-Nothing, the functionality should be the same ... I just felt like it needs 
-rework, it was frustrating digging in it in the state it is in now. The way it 
-is now it's much easier to hack on it. There are still open issues:
+Ewwww ... I totally forgot about this one ... could you send me the original 
+patch please?
 
-1) CPUfreq on Zaurus is still broken. (doesn't work on other devices - causes 
-freezes)
-2) PCMCIA driver looses interrupts. (pcmcia-sharpsl needs rework)
-3) We need driver for the CPU PMIC. (I already wrote it)
-4) Weird mess on the LCD when using DMA (also happens on other devices)
-
-So we'll have at least another four following patches sometimes later.
-
-Pavel, can we get this in? Can I get your Ack and get this one applied? Thanks
+Thanks!
