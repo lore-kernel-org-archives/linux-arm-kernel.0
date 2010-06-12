@@ -1,39 +1,42 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 12 Jun 2010 13:23:34 +0800
-Subject: [PATCH 3/3] PalmZ72: Add support for OV9640 camera sensor
-In-Reply-To: <201006111755.27382.marek.vasut@gmail.com>
-References: <200908220852.06689.marek.vasut@gmail.com>
-	<201004211411.37371.marek.vasut@gmail.com>
-	<AANLkTimS2Il7oMsfizddQosf6_qDa0imJ3N-FPhVz8aJ@mail.gmail.com>
-	<201006111755.27382.marek.vasut@gmail.com>
-Message-ID: <AANLkTimjT8xgYIKp9QBttzD9fRnxvGJPecv4zj8Sgeev@mail.gmail.com>
+Date: Sat, 12 Jun 2010 13:36:32 +0800
+Subject: [PATCH] sa1111: Prevent deadlock in resume path
+In-Reply-To: <1276258936.16663.39.camel@e102109-lin.cambridge.arm.com>
+References: <1274901104-22133-1-git-send-email-marek.vasut@gmail.com>
+	<20100526191425.GD6232@n2100.arm.linux.org.uk>
+	<201005262115.57282.marek.vasut@gmail.com>
+	<20100526201824.GA16418@n2100.arm.linux.org.uk>
+	<20100610135609.GC4514@ucw.cz>
+	<1276258936.16663.39.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <AANLkTin5QDIZGJ_SvNxrK5C3ewT3DcMJNqrryYgMlEmy@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 11, 2010 at 11:55 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Dne P? 11. ?ervna 2010 16:38:52 Eric Miao napsal(a):
->> On Wed, Apr 21, 2010 at 8:11 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
->> > Dne St 21. dubna 2010 13:44:34 Eric Miao napsal(a):
->> >> On Wed, Apr 21, 2010 at 5:41 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
->> >> > Dne So 22. srpna 2009 08:52:06 Marek Vasut napsal(a):
->> >> >> From 777212ce6d3bacea76281aa3d74839a3c38b32a4 Mon Sep 17 00:00:00
->> >> >> 2001 From: Marek Vasut <marek.vasut@gmail.com>
->> >> >> Date: Sat, 22 Aug 2009 05:15:10 +0200
->> >> >> Subject: [PATCH 3/3] PalmZ72: Add support for OV9640 camera sensor
->> >> >
->> >> > Hi, was this ever merged ?
->> >>
->> >> Is the required change to ov9640 merged?
+On Fri, Jun 11, 2010 at 8:22 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Thu, 2010-06-10 at 14:56 +0100, Pavel Machek wrote:
+>> On Wed 2010-05-26 21:18:24, Russell King - ARM Linux wrote:
+>> > On Wed, May 26, 2010 at 09:15:57PM +0200, Marek Vasut wrote:
+>> > > You want me to fight your patch tracking system or will you just merge it into
+>> > > your tree ?
 >> >
->> > Looking at this more properly, this might need a revision. The ov9640
->> > driver is in though.
+>> > What do you mean "fight" ? ?Just send a standard git formatted patch
+>> > to the email address with an additional KernelVersion: tag. ?It's
+>> > not at all hard.
 >>
->> Marek,
+>> You are linux kernel maintainer. Start acting as one. It is not at all
+>> hard.
 >>
->> How's the status of the revision?
+>> Alternatively, just remove KernelVersion: checking in ?your
+>> scripts.
 >
-> Ewwww ... I totally forgot about this one ... could you send me the original
-> patch please?
+> BTW (and I'm not complaining about Russell's patch system here), how can
+> we get the linux-arm-kernel list subscribed to patchwork.kernel.org?
+> That would be useful for grabbing RFC/CFT patches.
 >
 
-Forwarded.
+CC'ed Jeremy Kerr.
+
+Jeremy,
+
+Is it OK to add linux-arm-kernel?
