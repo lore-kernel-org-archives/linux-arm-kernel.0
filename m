@@ -1,46 +1,38 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 12 Jun 2010 17:16:58 +0800
-Subject: [PATCH 3/3] wm97xx_batt: Remove redundant header file
-In-Reply-To: <1275613654-23918-3-git-send-email-marek.vasut@gmail.com>
-References: <1275613654-23918-1-git-send-email-marek.vasut@gmail.com>
-	<1275613654-23918-3-git-send-email-marek.vasut@gmail.com>
-Message-ID: <AANLkTimb6TqQLLHDLI_qInwScZUQpYIDxNymE8SUh_9J@mail.gmail.com>
+Date: Sat, 12 Jun 2010 17:24:52 +0800
+Subject: [RFC PATCH] stargate2 and imote2 board file merge
+In-Reply-To: <20100607095436.GF2702@excalibur.local>
+References: <1275832502-28552-1-git-send-email-jic23@cam.ac.uk>
+	<20100607070724.GB2702@excalibur.local> <4C0CB700.8080300@cam.ac.uk>
+	<20100607092458.GE2702@excalibur.local>
+	<20100607095436.GF2702@excalibur.local>
+Message-ID: <AANLkTimGhZ0Q8roMB6Sh95J_abENichdO7Nk2uHDEkth@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 4, 2010 at 9:07 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> ---
-> ?include/linux/wm97xx_batt.h | ? 16 ----------------
-> ?1 files changed, 0 insertions(+), 16 deletions(-)
-> ?delete mode 100644 include/linux/wm97xx_batt.h
+On Mon, Jun 7, 2010 at 5:54 PM, Stefan Schmidt
+<stefan@datenfreihafen.org> wrote:
+> Hello.
 >
-> diff --git a/include/linux/wm97xx_batt.h b/include/linux/wm97xx_batt.h
-> deleted file mode 100644
-> index a1d6419..0000000
-> --- a/include/linux/wm97xx_batt.h
-> +++ /dev/null
-> @@ -1,16 +0,0 @@
-> -#ifndef _LINUX_WM97XX_BAT_H
-> -#define _LINUX_WM97XX_BAT_H
-> -
-> -#include <linux/wm97xx.h>
-> -
-> -#warning This file will be removed soon, use wm97xx.h instead!
-> -
-> -#define wm97xx_batt_info wm97xx_batt_pdata
-> -
-> -#ifdef CONFIG_BATTERY_WM97XX
-> -void wm97xx_bat_set_pdata(struct wm97xx_batt_info *data);
-> -#else
-> -static inline void wm97xx_bat_set_pdata(struct wm97xx_batt_info *data) {}
-> -#endif
-> -
-> -#endif
+> On Mon, 2010-06-07 at 11:24, Stefan Schmidt wrote:
+>> On Mon, 2010-06-07 at 10:08, Jonathan Cameron wrote:
+>>
+>> > :) I'll admit I haven't tested it myself yet. ?Didn't have the debug board to hand
+>> > to be able to flash it to an imote2 and my sg2's were all in use testing the radio
+>> > driver (that is dependent on mac802154 mainlining). ?One day we will have these devices
+>> > fully supported in mainline.
+>>
+>> I should be able to flash it onto the imote2 today or tomorrow. Will let you
+>> know my results.
+>
+> I can confirm that it boots fine on my imote2.
+>
+> Acked-by: Stefan Schmidt <stefan@datenfreihafen.org>
+>
+> I guess its Eric's call if he would like to see them merged.
+>
 
-A git grep of wm97xx_batt.h shows:
+Patches reducing duplication are always welcome, and this looks good to me.
+Thanks for the testing.
 
-drivers/power/wm97xx_battery.c:/* The interface is deprecated, as well
-as linux/wm97xx_batt.h */
-
-So you may want to remove that part as well. Otherwise looks good to me.
+Applied to 'devel'.
