@@ -1,35 +1,39 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sat, 12 Jun 2010 15:14:03 +1000
-Subject: [RFC,PATCH 1/2] Add a common struct clk
-In-Reply-To: <19474.2817.333749.485028@ipc1.ka-ro>
-References: <1275636608.606606.450179637764.0.gpush@pororo>
-	<201006111557.12249.jeremy.kerr@canonical.com>
-	<19473.61547.684572.647641@ipc1.ka-ro>
-	<201006111718.47426.jeremy.kerr@canonical.com>
-	<19474.172.742782.972629@ipc1.ka-ro>
-	<20100611095839.GC10894@pengutronix.de>
-	<19474.2817.333749.485028@ipc1.ka-ro>
-Message-ID: <1276319643.1962.181.camel@pasglop>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sat, 12 Jun 2010 13:23:34 +0800
+Subject: [PATCH 3/3] PalmZ72: Add support for OV9640 camera sensor
+In-Reply-To: <201006111755.27382.marek.vasut@gmail.com>
+References: <200908220852.06689.marek.vasut@gmail.com>
+	<201004211411.37371.marek.vasut@gmail.com>
+	<AANLkTimS2Il7oMsfizddQosf6_qDa0imJ3N-FPhVz8aJ@mail.gmail.com>
+	<201006111755.27382.marek.vasut@gmail.com>
+Message-ID: <AANLkTimjT8xgYIKp9QBttzD9fRnxvGJPecv4zj8Sgeev@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-06-11 at 12:08 +0200, Lothar Wa?mann wrote:
-> Hi,
-> 
-> > > > > Using a mutex in clk_enable()/clk_disable() is a bad idea, since that
-> > > > > makes it impossible to call those functions in interrupt context.
-> > IMHO if a device generates an irq its clock should already be on.  This
-> > way you don't need to enable or disable a clock in irq context.
-> >  
-> You may want to disable a clock in the IRQ handler. The VPU driver in
-> the Freescale BSP for i.MX51 does exactly this.
-> Anyway I don't see any reason for using a mutex here instead of
-> spin_lock_irq_save() as all other implementations do.
+On Fri, Jun 11, 2010 at 11:55 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Dne P? 11. ?ervna 2010 16:38:52 Eric Miao napsal(a):
+>> On Wed, Apr 21, 2010 at 8:11 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+>> > Dne St 21. dubna 2010 13:44:34 Eric Miao napsal(a):
+>> >> On Wed, Apr 21, 2010 at 5:41 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+>> >> > Dne So 22. srpna 2009 08:52:06 Marek Vasut napsal(a):
+>> >> >> From 777212ce6d3bacea76281aa3d74839a3c38b32a4 Mon Sep 17 00:00:00
+>> >> >> 2001 From: Marek Vasut <marek.vasut@gmail.com>
+>> >> >> Date: Sat, 22 Aug 2009 05:15:10 +0200
+>> >> >> Subject: [PATCH 3/3] PalmZ72: Add support for OV9640 camera sensor
+>> >> >
+>> >> > Hi, was this ever merged ?
+>> >>
+>> >> Is the required change to ov9640 merged?
+>> >
+>> > Looking at this more properly, this might need a revision. The ov9640
+>> > driver is in though.
+>>
+>> Marek,
+>>
+>> How's the status of the revision?
+>
+> Ewwww ... I totally forgot about this one ... could you send me the original
+> patch please?
+>
 
-Because you suddenly make it impossible to sleep inside enable/disable
-unless I'm mistaken about the implementation details. Some PLLs can need
-milliseconds to stabilize (especially if they need to be powered up
-first). Doing that with a lock held is a BAD IDEA.
-
-Cheers,
-Ben.
+Forwarded.
