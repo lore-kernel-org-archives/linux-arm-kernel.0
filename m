@@ -1,50 +1,27 @@
-From: jason77.wang@gmail.com (Jason Wang)
-Date: Sat, 12 Jun 2010 22:22:39 +0800
-Subject: [PATCH 4/4] mxc/iomux: add GPIO bank offset for iomux v3 platforms
-In-Reply-To: <1276352559-8105-4-git-send-email-jason77.wang@gmail.com>
-References: <1276352559-8105-1-git-send-email-jason77.wang@gmail.com>
-	<1276352559-8105-2-git-send-email-jason77.wang@gmail.com>
-	<1276352559-8105-3-git-send-email-jason77.wang@gmail.com>
-	<1276352559-8105-4-git-send-email-jason77.wang@gmail.com>
-Message-ID: <1276352559-8105-5-git-send-email-jason77.wang@gmail.com>
+From: david-b@pacbell.net (David Brownell)
+Date: Sat, 12 Jun 2010 07:24:30 -0700 (PDT)
+Subject: [PATCH 4/5] [ARM] usb/host/ohci-pxa27x: make PXA310 USB OTG port
+	work in host mode.
+In-Reply-To: <AANLkTilUt8D7B3UF_j1wOvsnXTVQyioofwMEikScdLOn@mail.gmail.com>
+Message-ID: <614940.91741.qm@web180314.mail.gq1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These GPIO bank offsets are useful when define a gpio number.
-E.G. when GPIO PORTC pin 6 is used for irq request pin of external
-expanding device, we can define it like:
-  #define EXP_PARENT_IRQ_PIN (GPIO_PORTC + 6)
 
-Signed-off-by: Jason Wang <jason77.wang@gmail.com>
----
- arch/arm/plat-mxc/include/mach/iomux-v3.h |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-v3.h b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-index f2f73d3..0880a4a 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-v3.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-@@ -89,6 +89,21 @@ struct pad_desc {
- #define PAD_CTL_SRE_FAST		(1 << 0)
- #define PAD_CTL_SRE_SLOW		(0 << 0)
- 
-+
-+#define MX51_NUM_GPIO_PORT	4
-+
-+#define GPIO_PIN_MASK 0x1f
-+
-+#define GPIO_PORT_SHIFT 5
-+#define GPIO_PORT_MASK (0x7 << GPIO_PORT_SHIFT)
-+
-+#define GPIO_PORTA	(0 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTB	(1 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTC	(2 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTD	(3 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTE	(4 << GPIO_PORT_SHIFT)
-+#define GPIO_PORTF	(5 << GPIO_PORT_SHIFT)
-+
- /*
-  * setups a single pad in the iomuxer
-  */
--- 
-1.5.6.5
+--- On Sat, 6/12/10, Eric Miao <eric.y.miao@gmail.com> wrote:
+
+> > ?arch/arm/mach-pxa/include/mach/ohci.h ? ? | ? ?3
+> +
+> > ?arch/arm/mach-pxa/include/mach/regs-u2d.h | ? ?2
+> +
+> > ?drivers/usb/host/ohci-pxa27x.c ? ? ? ? ? ?|
+> ?183 +++++++++++++++++++++++++++++
+
+Doesn't touch generic OHCI code, so it looks
+OK to me... ack.
+> 
+> My feeling is on pxa310, the OTG/ULPI is actually closer to
+> the UDC, so
+> generally, I'd really like to see minimum change to ohci.
+> 
