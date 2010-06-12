@@ -1,42 +1,20 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 12 Jun 2010 13:36:32 +0800
-Subject: [PATCH] sa1111: Prevent deadlock in resume path
-In-Reply-To: <1276258936.16663.39.camel@e102109-lin.cambridge.arm.com>
-References: <1274901104-22133-1-git-send-email-marek.vasut@gmail.com>
-	<20100526191425.GD6232@n2100.arm.linux.org.uk>
-	<201005262115.57282.marek.vasut@gmail.com>
-	<20100526201824.GA16418@n2100.arm.linux.org.uk>
-	<20100610135609.GC4514@ucw.cz>
-	<1276258936.16663.39.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <AANLkTin5QDIZGJ_SvNxrK5C3ewT3DcMJNqrryYgMlEmy@mail.gmail.com>
+From: buytenh@wantstofly.org (Lennert Buytenhek)
+Date: Sat, 12 Jun 2010 10:29:19 +0200
+Subject: [PATCH] Marvell OpenRD-Ultimate machine support
+In-Reply-To: <4c1139ba.0d01df0a.42a6.1368@mx.google.com>
+References: <4c1139ba.0d01df0a.42a6.1368@mx.google.com>
+Message-ID: <20100612082919.GN1743@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 11, 2010 at 8:22 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, 2010-06-10 at 14:56 +0100, Pavel Machek wrote:
->> On Wed 2010-05-26 21:18:24, Russell King - ARM Linux wrote:
->> > On Wed, May 26, 2010 at 09:15:57PM +0200, Marek Vasut wrote:
->> > > You want me to fight your patch tracking system or will you just merge it into
->> > > your tree ?
->> >
->> > What do you mean "fight" ? ?Just send a standard git formatted patch
->> > to the email address with an additional KernelVersion: tag. ?It's
->> > not at all hard.
->>
->> You are linux kernel maintainer. Start acting as one. It is not at all
->> hard.
->>
->> Alternatively, just remove KernelVersion: checking in ?your
->> scripts.
->
-> BTW (and I'm not complaining about Russell's patch system here), how can
-> we get the linux-arm-kernel list subscribed to patchwork.kernel.org?
-> That would be useful for grabbing RFC/CFT patches.
->
+On Thu, Jun 10, 2010 at 10:12:55PM +0300, Dmytro Milinevskyy wrote:
 
-CC'ed Jeremy Kerr.
+> This patch adds support for the OpenRD Ultimate machine(could be found at http://www.arm.linux.org.uk/developer/machines/list.php?id=2884)
 
-Jeremy,
+Acked-by: Lennert Buytenhek <buytenh@wantstofly.org>
 
-Is it OK to add linux-arm-kernel?
+
+> +MACHINE_START(OPENRD_ULTIMATE, "Marvell OpenRD Ultimate Board")
+> +	/* Maintainer: Dhaval Vasa <dhaval.vasa@einfochips.com> */
+
+I wonder whether this is correct, though.
