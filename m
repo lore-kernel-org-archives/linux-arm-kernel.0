@@ -1,50 +1,55 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 12 Jun 2010 14:47:33 +0200
-Subject: [PATCH 3/3] wm97xx_batt: Remove redundant header file
-In-Reply-To: <AANLkTimb6TqQLLHDLI_qInwScZUQpYIDxNymE8SUh_9J@mail.gmail.com>
-References: <1275613654-23918-1-git-send-email-marek.vasut@gmail.com>
-	<1275613654-23918-3-git-send-email-marek.vasut@gmail.com>
-	<AANLkTimb6TqQLLHDLI_qInwScZUQpYIDxNymE8SUh_9J@mail.gmail.com>
-Message-ID: <201006121447.33221.marek.vasut@gmail.com>
+Date: Sat, 12 Jun 2010 14:51:13 +0200
+Subject: [PATCH] wm97xx_batt: Remove deprecated method to set pdata
+Message-ID: <1276347073-3055-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne So 12. ?ervna 2010 11:16:58 Eric Miao napsal(a):
-> On Fri, Jun 4, 2010 at 9:07 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> > ---
-> >  include/linux/wm97xx_batt.h |   16 ----------------
-> >  1 files changed, 0 insertions(+), 16 deletions(-)
-> >  delete mode 100644 include/linux/wm97xx_batt.h
-> > 
-> > diff --git a/include/linux/wm97xx_batt.h b/include/linux/wm97xx_batt.h
-> > deleted file mode 100644
-> > index a1d6419..0000000
-> > --- a/include/linux/wm97xx_batt.h
-> > +++ /dev/null
-> > @@ -1,16 +0,0 @@
-> > -#ifndef _LINUX_WM97XX_BAT_H
-> > -#define _LINUX_WM97XX_BAT_H
-> > -
-> > -#include <linux/wm97xx.h>
-> > -
-> > -#warning This file will be removed soon, use wm97xx.h instead!
-> > -
-> > -#define wm97xx_batt_info wm97xx_batt_pdata
-> > -
-> > -#ifdef CONFIG_BATTERY_WM97XX
-> > -void wm97xx_bat_set_pdata(struct wm97xx_batt_info *data);
-> > -#else
-> > -static inline void wm97xx_bat_set_pdata(struct wm97xx_batt_info *data)
-> > {} -#endif
-> > -
-> > -#endif
-> 
-> A git grep of wm97xx_batt.h shows:
-> 
-> drivers/power/wm97xx_battery.c:/* The interface is deprecated, as well
-> as linux/wm97xx_batt.h */
-> 
-> So you may want to remove that part as well. Otherwise looks good to me.
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ drivers/power/wm97xx_battery.c |   16 ----------------
+ 1 files changed, 0 insertions(+), 16 deletions(-)
 
-Thanks, good catch. But let's push this through a separate patch, shall we?
+diff --git a/drivers/power/wm97xx_battery.c b/drivers/power/wm97xx_battery.c
+index 4e8afce..5071d85 100644
+--- a/drivers/power/wm97xx_battery.c
++++ b/drivers/power/wm97xx_battery.c
+@@ -29,7 +29,6 @@ static DEFINE_MUTEX(bat_lock);
+ static struct work_struct bat_work;
+ static struct mutex work_lock;
+ static int bat_status = POWER_SUPPLY_STATUS_UNKNOWN;
+-static struct wm97xx_batt_info *gpdata;
+ static enum power_supply_property *prop;
+ 
+ static unsigned long wm97xx_read_bat(struct power_supply *bat_ps)
+@@ -172,12 +171,6 @@ static int __devinit wm97xx_bat_probe(struct platform_device *dev)
+ 	struct wm97xx_pdata *wmdata = dev->dev.platform_data;
+ 	struct wm97xx_batt_pdata *pdata;
+ 
+-	if (gpdata) {
+-		dev_err(&dev->dev, "Do not pass platform_data through "
+-			"wm97xx_bat_set_pdata!\n");
+-		return -EINVAL;
+-	}
+-
+ 	if (!wmdata) {
+ 		dev_err(&dev->dev, "No platform data supplied\n");
+ 		return -EINVAL;
+@@ -308,15 +301,6 @@ static void __exit wm97xx_bat_exit(void)
+ 	platform_driver_unregister(&wm97xx_bat_driver);
+ }
+ 
+-/* The interface is deprecated, as well as linux/wm97xx_batt.h */
+-void wm97xx_bat_set_pdata(struct wm97xx_batt_info *data);
+-
+-void wm97xx_bat_set_pdata(struct wm97xx_batt_info *data)
+-{
+-	gpdata = data;
+-}
+-EXPORT_SYMBOL_GPL(wm97xx_bat_set_pdata);
+-
+ module_init(wm97xx_bat_init);
+ module_exit(wm97xx_bat_exit);
+ 
+-- 
+1.7.1
