@@ -1,169 +1,32 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sun, 13 Jun 2010 11:10:23 +1000
-Subject: [PATCH 1/4] net/phy/marvell: Expose IDs and flags in a .h and add
-	dns323 LEDs setup flag
-Message-ID: <1276391423.1962.263.camel@pasglop>
+Date: Sun, 13 Jun 2010 11:10:39 +1000
+Subject: [PATCH 3/4] arm/orion5x: Fix soft-reset for some platforms
+Message-ID: <1276391439.1962.265.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves the various known Marvell PHY IDs to include/linux/marvell_phy.h
-along with dev_flags definitions for use by the driver.
+Some platforms, such as the DNS-323 rev C requires the soft reset line
+to be toggled on and back off for the reset to work.
 
-I then added a flag that changes the PHY init code to setup the LEDs
-config to the values needed to operate a dns323 rev C1 NAS.
-
-I moved the existing "resistance" flag to the .h as well, though I've
-been unable to find whoever sets this to convert it to use that constant.
+Note: The choice of 200ms delay comes from the 2.6.12 based vendor kernel.
+It seems to be a -lot- though and I had my device working fine with much
+smaller delays but better safe...
 
 Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
 ---
- drivers/net/phy/marvell.c   |   38 ++++++++++++++++++++------------------
- include/linux/marvell_phy.h |   20 ++++++++++++++++++++
- 2 files changed, 40 insertions(+), 18 deletions(-)
- create mode 100644 include/linux/marvell_phy.h
+ arch/arm/mach-orion5x/include/mach/system.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/net/phy/marvell.c b/drivers/net/phy/marvell.c
-index 78b74e8..5a1bd5d 100644
---- a/drivers/net/phy/marvell.c
-+++ b/drivers/net/phy/marvell.c
-@@ -29,6 +29,7 @@
- #include <linux/mii.h>
- #include <linux/ethtool.h>
- #include <linux/phy.h>
-+#include <linux/marvell_phy.h>
+diff --git a/arch/arm/mach-orion5x/include/mach/system.h b/arch/arm/mach-orion5x/include/mach/system.h
+index 60e734c..a1d6e46 100644
+--- a/arch/arm/mach-orion5x/include/mach/system.h
++++ b/arch/arm/mach-orion5x/include/mach/system.h
+@@ -25,6 +25,8 @@ static inline void arch_reset(char mode, const char *cmd)
+ 	 */
+ 	orion5x_setbits(RSTOUTn_MASK, (1 << 2));
+ 	orion5x_setbits(CPU_SOFT_RESET, 1);
++	mdelay(200);
++	orion5x_clrbits(CPU_SOFT_RESET, 1);
+ }
  
- #include <asm/io.h>
- #include <asm/irq.h>
-@@ -48,8 +49,6 @@
- #define MII_M1145_RGMII_RX_DELAY	0x0080
- #define MII_M1145_RGMII_TX_DELAY	0x0002
  
--#define M1145_DEV_FLAGS_RESISTANCE	0x00000001
--
- #define MII_M1111_PHY_LED_CONTROL	0x18
- #define MII_M1111_PHY_LED_DIRECT	0x4100
- #define MII_M1111_PHY_LED_COMBINE	0x411c
-@@ -350,7 +349,10 @@ static int m88e1118_config_init(struct phy_device *phydev)
- 		return err;
- 
- 	/* Adjust LED Control */
--	err = phy_write(phydev, 0x10, 0x021e);
-+	if (phydev->dev_flags & MARVELL_PHY_M1118_DNS323_LEDS)
-+		err = phy_write(phydev, 0x10, 0x1100);
-+	else
-+		err = phy_write(phydev, 0x10, 0x021e);
- 	if (err < 0)
- 		return err;
- 
-@@ -398,7 +400,7 @@ static int m88e1145_config_init(struct phy_device *phydev)
- 		if (err < 0)
- 			return err;
- 
--		if (phydev->dev_flags & M1145_DEV_FLAGS_RESISTANCE) {
-+		if (phydev->dev_flags & MARVELL_PHY_M1145_FLAGS_RESISTANCE) {
- 			err = phy_write(phydev, 0x1d, 0x0012);
- 			if (err < 0)
- 				return err;
-@@ -529,8 +531,8 @@ static int m88e1121_did_interrupt(struct phy_device *phydev)
- 
- static struct phy_driver marvell_drivers[] = {
- 	{
--		.phy_id = 0x01410c60,
--		.phy_id_mask = 0xfffffff0,
-+		.phy_id = MARVELL_PHY_ID_88E1101,
-+		.phy_id_mask = MARVELL_PHY_ID_MASK,
- 		.name = "Marvell 88E1101",
- 		.features = PHY_GBIT_FEATURES,
- 		.flags = PHY_HAS_INTERRUPT,
-@@ -541,8 +543,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
--		.phy_id = 0x01410c90,
--		.phy_id_mask = 0xfffffff0,
-+		.phy_id = MARVELL_PHY_ID_88E1112,
-+		.phy_id_mask = MARVELL_PHY_ID_MASK,
- 		.name = "Marvell 88E1112",
- 		.features = PHY_GBIT_FEATURES,
- 		.flags = PHY_HAS_INTERRUPT,
-@@ -554,8 +556,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
--		.phy_id = 0x01410cc0,
--		.phy_id_mask = 0xfffffff0,
-+		.phy_id = MARVELL_PHY_ID_88E1111,
-+		.phy_id_mask = MARVELL_PHY_ID_MASK,
- 		.name = "Marvell 88E1111",
- 		.features = PHY_GBIT_FEATURES,
- 		.flags = PHY_HAS_INTERRUPT,
-@@ -567,8 +569,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
--		.phy_id = 0x01410e10,
--		.phy_id_mask = 0xfffffff0,
-+		.phy_id = MARVELL_PHY_ID_88E1118,
-+		.phy_id_mask = MARVELL_PHY_ID_MASK,
- 		.name = "Marvell 88E1118",
- 		.features = PHY_GBIT_FEATURES,
- 		.flags = PHY_HAS_INTERRUPT,
-@@ -580,8 +582,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.driver = {.owner = THIS_MODULE,},
- 	},
- 	{
--		.phy_id = 0x01410cb0,
--		.phy_id_mask = 0xfffffff0,
-+		.phy_id = MARVELL_PHY_ID_88E1121R,
-+		.phy_id_mask = MARVELL_PHY_ID_MASK,
- 		.name = "Marvell 88E1121R",
- 		.features = PHY_GBIT_FEATURES,
- 		.flags = PHY_HAS_INTERRUPT,
-@@ -593,8 +595,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
--		.phy_id = 0x01410cd0,
--		.phy_id_mask = 0xfffffff0,
-+		.phy_id = MARVELL_PHY_ID_88E1145,
-+		.phy_id_mask = MARVELL_PHY_ID_MASK,
- 		.name = "Marvell 88E1145",
- 		.features = PHY_GBIT_FEATURES,
- 		.flags = PHY_HAS_INTERRUPT,
-@@ -606,8 +608,8 @@ static struct phy_driver marvell_drivers[] = {
- 		.driver = { .owner = THIS_MODULE },
- 	},
- 	{
--		.phy_id = 0x01410e30,
--		.phy_id_mask = 0xfffffff0,
-+		.phy_id = MARVELL_PHY_ID_88E1240,
-+		.phy_id_mask = MARVELL_PHY_ID_MASK,
- 		.name = "Marvell 88E1240",
- 		.features = PHY_GBIT_FEATURES,
- 		.flags = PHY_HAS_INTERRUPT,
-diff --git a/include/linux/marvell_phy.h b/include/linux/marvell_phy.h
-new file mode 100644
-index 0000000..2ed4fb8
---- /dev/null
-+++ b/include/linux/marvell_phy.h
-@@ -0,0 +1,20 @@
-+#ifndef _MARVELL_PHY_H
-+#define _MARVELL_PHY_H
-+
-+/* Mask used for ID comparisons */
-+#define MARVELL_PHY_ID_MASK		0xfffffff0
-+
-+/* Known PHY IDs */
-+#define MARVELL_PHY_ID_88E1101		0x01410c60
-+#define MARVELL_PHY_ID_88E1112		0x01410c90
-+#define MARVELL_PHY_ID_88E1111		0x01410cc0
-+#define MARVELL_PHY_ID_88E1118		0x01410e10
-+#define MARVELL_PHY_ID_88E1121R		0x01410cb0
-+#define MARVELL_PHY_ID_88E1145		0x01410cd0
-+#define MARVELL_PHY_ID_88E1240		0x01410e30
-+
-+/* struct phy_device dev_flags definitions */
-+#define MARVELL_PHY_M1145_FLAGS_RESISTANCE	0x00000001
-+#define MARVELL_PHY_M1118_DNS323_LEDS		0x00000002
-+
-+#endif /* _MARVELL_PHY_H */
