@@ -1,36 +1,35 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sun, 13 Jun 2010 07:28:31 +0200
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Sun, 13 Jun 2010 16:02:35 +1000
 Subject: [PATCH 1/4] net/phy/marvell: Expose IDs and flags in a .h and
 	add dns323 LEDs setup flag
-In-Reply-To: <1276391423.1962.263.camel@pasglop>
+In-Reply-To: <20100613052831.GA17012@pengutronix.de>
 References: <1276391423.1962.263.camel@pasglop>
-Message-ID: <20100613052831.GA17012@pengutronix.de>
+	<20100613052831.GA17012@pengutronix.de>
+Message-ID: <1276408955.1962.578.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 13, 2010 at 11:10:23AM +1000, Benjamin Herrenschmidt wrote:
-> This moves the various known Marvell PHY IDs to include/linux/marvell_phy.h
-> along with dev_flags definitions for use by the driver.
+On Sun, 2010-06-13 at 07:28 +0200, Wolfram Sang wrote:
+> On Sun, Jun 13, 2010 at 11:10:23AM +1000, Benjamin Herrenschmidt wrote:
+> > This moves the various known Marvell PHY IDs to include/linux/marvell_phy.h
+> > along with dev_flags definitions for use by the driver.
+> > 
+> > I then added a flag that changes the PHY init code to setup the LEDs
+> > config to the values needed to operate a dns323 rev C1 NAS.
+> > 
+> > I moved the existing "resistance" flag to the .h as well, though I've
+> > been unable to find whoever sets this to convert it to use that constant.
+> > 
+> > Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
 > 
-> I then added a flag that changes the PHY init code to setup the LEDs
-> config to the values needed to operate a dns323 rev C1 NAS.
+> That should do for now.
 > 
-> I moved the existing "resistance" flag to the .h as well, though I've
-> been unable to find whoever sets this to convert it to use that constant.
-> 
-> Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
 
-That should do for now.
+Thanks.
 
-Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
+Dave, any objection to having that go via the arm tree along with the
+rest of my patches to support the dns323 since they depend on this one ?
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100613/8be21569/attachment.sig>
+Cheers,
+Ben.
