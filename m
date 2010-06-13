@@ -1,98 +1,774 @@
 From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Mon, 14 Jun 2010 00:51:32 +0800
-Subject: [PATCH] pxa168 and pxa930 build fix - plat-pxa/pmu.c dependent on
-	ARCH_PXA for IRQ_PMU
-In-Reply-To: <AANLkTik2JD4y1-4Dt5999adu4mtNAAS9DLu9sG77l56u@mail.gmail.com>
-References: <1275932959-474-1-git-send-email-jic23@cam.ac.uk>
-	<AANLkTilXErDZHWf71e7pwUbt1i66MVrfP_lPisgoBZ0G@mail.gmail.com>
-	<AANLkTinm5ZU1tLR8CYwU4K8FPbCdLTdAyrfXq54nYkl_@mail.gmail.com>
-	<3623778261485640027@unknownmsgid>
-	<AANLkTik2JD4y1-4Dt5999adu4mtNAAS9DLu9sG77l56u@mail.gmail.com>
-Message-ID: <AANLkTinHL6q_Nbed237cuoCNy1DUCGTGXQG6np-tZtS-@mail.gmail.com>
+Date: Mon, 14 Jun 2010 01:24:12 +0800
+Subject: [PATCH 1/2] NUC900:  Add i2c0 driver support for NUC900
+Message-ID: <4C15143C.1020603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/6/14 Eric Miao <eric.y.miao@gmail.com>:
-> On Tue, Jun 8, 2010 at 4:52 PM, Will Deacon <will.deacon@arm.com> wrote:
->> Hi Eric,
->>
->>> We have different ways to handle this:
->>>
->>> 1. register different platform devices with different IRQs for pxa[23]xx, pxa168
->>> 2. modify the IRQ at run-time to a correct one
->>> 3. move the platform device registration back into arch/arm/mach-pxa/<soc>.c
->>> (or arch/arm/mach-pxa/common.c) and arch/arm/mach-mmp/<soc>.c
->>
->> For the RealView boards, we take approach number (1). This is largely for two
->> reasons:
->>
->> 1.) The PMU IRQ doesn't have a consistent naming scheme
->> 2.) SMP RealView platforms need to have an extra resource in the
->> ? ?platform_device for each CPU.
->>
->> However, looking at the PXA168 description and the perf-events code,
->> I don't think we support the PMU anyway [see init_hw_perf_events in
->> arch/arm/kernel/perf_event.c]. If the PMU present is accessible in the
->> same way as one of the other supported PMUs, then it would be easy to
->> add it to the perf-events code. Otherwise, a new PMU driver will need
->> to be written if people want to use it.
->>
->> Without access to a TRM, I can't tell whether or not supporting the PMU
->> is trivial, so I guess we go with option (3) for the time being.
->>
->>> We need to figure out if there are some other differences between these
->>> PMUs (or in the future), which will make solution 3) stand out.
->>
->> In the future I reckon PMU devices will be memory-mapped and live inside
->> components other than the CPU. PMU registration will then be highly SoC-specific.
->> Perf events doesn't yet support any of this, so it depends how future-proof you
->> want to be!
->>
->
-> For a quick solution of the build error, I decided to pick Jonathan's
-> patch first. At least PMU is not tested and ever used on pxa168/910/mmp2
-> series at this moment. I'll work on a proper fix later, possibly a patch
-> merged through -devel branch instead of -fix.
->
+This patch is to add i2c0 driver support for NUC900.
 
-Good idea. thanks!
+Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
 
->>
->>> >> ?arch/arm/plat-pxa/Makefile | ? ?3 ++-
->>> >> ?1 files changed, 2 insertions(+), 1 deletions(-)
->>> >>
->>> >> diff --git a/arch/arm/plat-pxa/Makefile b/arch/arm/plat-pxa/Makefile
->>> >> index 6187edf..a17cc0c 100644
->>> >> --- a/arch/arm/plat-pxa/Makefile
->>> >> +++ b/arch/arm/plat-pxa/Makefile
->>> >> @@ -2,8 +2,9 @@
->>> >> ?# Makefile for code common across different PXA processor families
->>> >> ?#
->>> >>
->>> >> -obj-y ?:= dma.o pmu.o
->>> >> +obj-y ?:= dma.o
->>> >>
->>> >> +obj-$(CONFIG_ARCH_PXA) ? ? ? ? += pmu.o
->>> >> ?obj-$(CONFIG_GENERIC_GPIO) ? ? += gpio.o
->>> >> ?obj-$(CONFIG_PXA3xx) ? ? ? ? ? += mfp.o
->>> >> ?obj-$(CONFIG_ARCH_MMP) ? ? ? ? += mfp.o
->>> >> --
->>> >> 1.6.4.4
->>
->>
->>
->
+---
+ arch/arm/mach-w90x900/include/mach/i2c.h |   11 +
+ drivers/i2c/busses/Kconfig               |    7 +
+ drivers/i2c/busses/Makefile              |    1 +
+ drivers/i2c/busses/i2c-nuc900.c          |  699 ++++++++++++++++++++++++++++++
+ 4 files changed, 718 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-w90x900/include/mach/i2c.h
+ create mode 100644 drivers/i2c/busses/i2c-nuc900.c
 
+diff --git a/arch/arm/mach-w90x900/include/mach/i2c.h b/arch/arm/mach-w90x900/include/mach/i2c.h
+new file mode 100644
+index 0000000..292f3f9
+--- /dev/null
++++ b/arch/arm/mach-w90x900/include/mach/i2c.h
+@@ -0,0 +1,11 @@
++#ifndef __ASM_ARCH_NUC900_I2C_H
++#define __ASM_ARCH_NUC900_I2C_H
++
++struct nuc900_platform_i2c {
++	int		bus_num;
++	unsigned long   bus_freq;
++	void	(*get_clock)(unsigned int *cpuclk_khz,
++			unsigned int *ahbclk_khz, unsigned int *apbclk_khz);
++};
++
++#endif /* __ASM_ARCH_NUC900_I2C_H */
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index bceafbf..ee284d2 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -448,6 +448,13 @@ config I2C_NOMADIK
+ 	  If you say yes to this option, support will be included for the
+ 	  I2C interface from ST-Ericsson's Nomadik and Ux500 architectures.
 
-
++config I2C_NUC900
++	tristate "NUC900 I2C Driver"
++	depends on ARCH_W90X900
++	help
++	  Say Y here to include support for I2C controller in the
++	  Winbond/Nuvoton NUC900 based System-on-Chip devices.
++
+ config I2C_OCORES
+ 	tristate "OpenCores I2C Controller"
+ 	depends on EXPERIMENTAL
+diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
+index 936880b..c3ef492 100644
+--- a/drivers/i2c/busses/Makefile
++++ b/drivers/i2c/busses/Makefile
+@@ -43,6 +43,7 @@ obj-$(CONFIG_I2C_IXP2000)	+= i2c-ixp2000.o
+ obj-$(CONFIG_I2C_MPC)		+= i2c-mpc.o
+ obj-$(CONFIG_I2C_MV64XXX)	+= i2c-mv64xxx.o
+ obj-$(CONFIG_I2C_NOMADIK)	+= i2c-nomadik.o
++obj-$(CONFIG_I2C_NUC900)	+= i2c-nuc900.o
+ obj-$(CONFIG_I2C_OCORES)	+= i2c-ocores.o
+ obj-$(CONFIG_I2C_OMAP)		+= i2c-omap.o
+ obj-$(CONFIG_I2C_PASEMI)	+= i2c-pasemi.o
+diff --git a/drivers/i2c/busses/i2c-nuc900.c b/drivers/i2c/busses/i2c-nuc900.c
+new file mode 100644
+index 0000000..c8e043a
+--- /dev/null
++++ b/drivers/i2c/busses/i2c-nuc900.c
+@@ -0,0 +1,699 @@
++/*
++ * linux/drivers/i2c/busses/i2c-nuc900.c
++ *
++ * Copyright (c) 2010 Nuvoton technology corporation.
++ *
++ * This driver based on S3C2410 I2C Controller of Ben Dooks <ben@simtec.co.uk>.
++ * Written by Wan ZongShun <mcuos.com@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation;version 2 of the License.
++ *
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++
++#include <linux/i2c.h>
++#include <linux/i2c-id.h>
++#include <linux/init.h>
++#include <linux/time.h>
++#include <linux/interrupt.h>
++#include <linux/delay.h>
++#include <linux/errno.h>
++#include <linux/err.h>
++#include <linux/platform_device.h>
++#include <linux/clk.h>
++#include <linux/cpufreq.h>
++#include <linux/slab.h>
++#include <linux/io.h>
++
++#include <mach/mfp.h>
++#include <mach/i2c.h>
++
++#define CSR		0x00
++#define DIVIDER		0x04
++#define CMDR		0x08
++#define SWR		0x0C
++#define RXR		0x10
++#define TXR		0x14
++
++#define IRQEN		0x003
++#define I2CBUSY		0x400
++#define I2CSTART	0x018
++
++#define I2C_CMD_START	0x10
++#define I2C_CMD_STOP	0x08
++#define I2C_CMD_READ	0x04
++#define I2C_CMD_WRITE	0x02
++#define I2C_CMD_NACK	0x01
++
++#define IRQFLAG		0x004
++#define ARBIT_LOST	0x200
++#define SLAVE_ACK	0x800
++
++/* i2c controller state */
++
++enum nuc900_i2c_state {
++	STATE_IDLE,
++	STATE_START,
++	STATE_READ,
++	STATE_WRITE,
++	STATE_STOP
++};
++
++struct nuc900_i2c {
++	spinlock_t		lock;
++	wait_queue_head_t	wait;
++
++	struct i2c_msg		*msg;
++	unsigned int		msg_num;
++	unsigned int		msg_idx;
++	unsigned int		msg_ptr;
++	unsigned int		irq;
++
++	enum nuc900_i2c_state	state;
++
++	void __iomem		*regs;
++	struct clk		*clk;
++	struct device		*dev;
++	struct resource		*ioarea;
++	struct i2c_adapter	adap;
++};
++
++/* nuc900_i2c_master_complete
++ *
++ * complete the message and wake up the caller, using the given return code,
++ * or zero to mean ok.
++*/
++
++static inline void nuc900_i2c_master_complete(struct nuc900_i2c *i2c, int ret)
++{
++	dev_dbg(i2c->dev, "master_complete %d\n", ret);
++
++	i2c->msg_ptr = 0;
++	i2c->msg = NULL;
++	i2c->msg_idx++;
++	i2c->msg_num = 0;
++	if (ret)
++		i2c->msg_idx = ret;
++
++	wake_up(&i2c->wait);
++}
++
++/* irq enable/disable functions */
++
++static inline void nuc900_i2c_disable_irq(struct nuc900_i2c *i2c)
++{
++	unsigned long tmp;
++
++	tmp = readl(i2c->regs + CSR);
++	writel(tmp & ~IRQEN, i2c->regs + CSR);
++}
++
++static inline void nuc900_i2c_enable_irq(struct nuc900_i2c *i2c)
++{
++	unsigned long tmp;
++
++	tmp = readl(i2c->regs + CSR);
++	writel(tmp | IRQEN, i2c->regs + CSR);
++}
++
++
++/* nuc900_i2c_message_start
++ *
++ * put the start of a message onto the bus
++*/
++
++static void nuc900_i2c_message_start(struct nuc900_i2c *i2c,
++				      struct i2c_msg *msg)
++{
++	unsigned int addr = (msg->addr & 0x7f) << 1;
++
++	if (msg->flags & I2C_M_RD)
++		addr |= 0x1;
++	writel(addr & 0xff, i2c->regs + TXR);
++	writel(I2C_CMD_START | I2C_CMD_WRITE, i2c->regs + CMDR);
++}
++
++static inline void nuc900_i2c_stop(struct nuc900_i2c *i2c, int ret)
++{
++
++	dev_dbg(i2c->dev, "STOP\n");
++
++	/* stop the transfer */
++	i2c->state = STATE_STOP;
++	writel(I2C_CMD_STOP, i2c->regs + CMDR);
++
++	nuc900_i2c_master_complete(i2c, ret);
++	nuc900_i2c_disable_irq(i2c);
++}
++
++/* helper functions to determine the current state in the set of
++ * messages we are sending */
++
++/* is_lastmsg()
++ *
++ * returns TRUE if the current message is the last in the set
++*/
++
++static inline int is_lastmsg(struct nuc900_i2c *i2c)
++{
++	return i2c->msg_idx >= (i2c->msg_num - 1);
++}
++
++/* is_msglast
++ *
++ * returns TRUE if we this is the last byte in the current message
++*/
++
++static inline int is_msglast(struct nuc900_i2c *i2c)
++{
++	return i2c->msg_ptr == i2c->msg->len-1;
++}
++
++/* is_msgend
++ *
++ * returns TRUE if we reached the end of the current message
++*/
++
++static inline int is_msgend(struct nuc900_i2c *i2c)
++{
++	return i2c->msg_ptr >= i2c->msg->len;
++}
++
++/* i2s_s3c_irq_nextbyte
++ *
++ * process an interrupt and work out what to do
++ */
++
++static int i2s_nuc900_irq_nextbyte(struct nuc900_i2c *i2c,
++							unsigned long iicstat)
++{
++	unsigned char byte;
++	int ret = 0;
++
++	switch (i2c->state) {
++
++	case STATE_IDLE:
++		dev_err(i2c->dev, "%s: called in STATE_IDLE\n", __func__);
++		break;
++
++	case STATE_STOP:
++		dev_err(i2c->dev, "%s: called in STATE_STOP\n", __func__);
++		nuc900_i2c_disable_irq(i2c);
++		break;
++
++	case STATE_START:
++		/* last thing we did was send a start condition on the
++		 * bus, or started a new i2c message
++		 */
++
++		if (iicstat & SLAVE_ACK &&
++		    !(i2c->msg->flags & I2C_M_IGNORE_NAK)) {
++			/* ack was not received... */
++
++			dev_dbg(i2c->dev, "ack was not received\n");
++			nuc900_i2c_stop(i2c, -ENXIO);
++			goto out;
++		}
++
++		if (i2c->msg->flags & I2C_M_RD)
++			i2c->state = STATE_READ;
++		else
++			i2c->state = STATE_WRITE;
++
++		/* terminate the transfer if there is nothing to do
++		 * as this is used by the i2c probe to find devices. */
++
++		if (is_lastmsg(i2c) && i2c->msg->len == 0) {
++			nuc900_i2c_stop(i2c, 0);
++			goto out;
++		}
++
++		if (i2c->state == STATE_READ)
++			goto prepare_read;
++
++		/* fall through to the write state, as we will need to
++		 * send a byte as well */
++
++	case STATE_WRITE:
++		/* we are writing data to the device... check for the
++		 * end of the message, and if so, work out what to do
++		 */
++
++		if (!(i2c->msg->flags & I2C_M_IGNORE_NAK)) {
++			if (iicstat & SLAVE_ACK) {
++				dev_dbg(i2c->dev, "WRITE: No Ack\n");
++
++				nuc900_i2c_stop(i2c, -ECONNREFUSED);
++				goto out;
++			}
++		}
++
++retry_write:
++
++		if (!is_msgend(i2c)) {
++			byte = i2c->msg->buf[i2c->msg_ptr++];
++			writeb(byte, i2c->regs + TXR);
++			writel(I2C_CMD_WRITE, i2c->regs + CMDR);
++
++		} else if (!is_lastmsg(i2c)) {
++			/* we need to go to the next i2c message */
++
++			dev_dbg(i2c->dev, "WRITE: Next Message\n");
++
++			i2c->msg_ptr = 0;
++			i2c->msg_idx++;
++			i2c->msg++;
++
++			/* check to see if we need to do another message */
++			if (i2c->msg->flags & I2C_M_NOSTART) {
++
++				if (i2c->msg->flags & I2C_M_RD) {
++					/* cannot do this, the controller
++					 * forces us to send a new START
++					 * when we change direction */
++
++					nuc900_i2c_stop(i2c, -EINVAL);
++				}
++
++				goto retry_write;
++			} else {
++				/* send the new start */
++				nuc900_i2c_message_start(i2c, i2c->msg);
++				i2c->state = STATE_START;
++			}
++
++		} else {
++			/* send stop */
++
++			nuc900_i2c_stop(i2c, 0);
++		}
++		break;
++
++	case STATE_READ:
++		/* we have a byte of data in the data register, do
++		 * something with it, and then work out wether we are
++		 * going to do any more read/write
++		 */
++
++		byte = readb(i2c->regs + RXR);
++		i2c->msg->buf[i2c->msg_ptr++] = byte;
++
++prepare_read:
++		if (is_msglast(i2c)) {
++			/* last byte of buffer */
++
++			if (is_lastmsg(i2c))
++				writel(I2C_CMD_READ | I2C_CMD_NACK,
++							i2c->regs + CMDR);
++
++		} else if (is_msgend(i2c)) {
++			/* ok, we've read the entire buffer, see if there
++			 * is anything else we need to do */
++
++			if (is_lastmsg(i2c)) {
++				/* last message, send stop and complete */
++				dev_dbg(i2c->dev, "READ: Send Stop\n");
++
++				nuc900_i2c_stop(i2c, 0);
++			} else {
++				/* go to the next transfer */
++				dev_dbg(i2c->dev, "READ: Next Transfer\n");
++
++				i2c->msg_ptr = 0;
++				i2c->msg_idx++;
++				i2c->msg++;
++
++				writel(I2C_CMD_READ, i2c->regs + CMDR);
++			}
++
++		} else {
++			writel(I2C_CMD_READ, i2c->regs + CMDR);
++		}
++
++		break;
++	}
++
++ out:
++	return ret;
++}
++
++/* nuc900_i2c_irq
++ *
++ * top level IRQ servicing routine
++*/
++
++static irqreturn_t nuc900_i2c_irq(int irqno, void *dev_id)
++{
++	struct nuc900_i2c *i2c = dev_id;
++	unsigned long status;
++
++	status = readl(i2c->regs + CSR);
++	writel(status | IRQFLAG, i2c->regs + CSR);
++
++	if (status & ARBIT_LOST) {
++		/* deal with arbitration loss */
++		dev_err(i2c->dev, "deal with arbitration loss\n");
++		goto out;
++	}
++
++	if (i2c->state == STATE_IDLE) {
++		dev_dbg(i2c->dev, "IRQ: error i2c->state == IDLE\n");
++		goto out;
++	}
++
++	/* pretty much this leaves us with the fact that we've
++	 * transmitted or received whatever byte we last sent */
++
++	i2s_nuc900_irq_nextbyte(i2c, status);
++
++ out:
++	return IRQ_HANDLED;
++}
++
++
++/* nuc900_i2c_set_master
++ *
++ * get the i2c bus for a master transaction
++*/
++
++static int nuc900_i2c_set_master(struct nuc900_i2c *i2c)
++{
++	int timeout = 400;
++
++	while (timeout-- > 0) {
++		if (((readl(i2c->regs + SWR) & I2CSTART) == I2CSTART) &&
++				((readl(i2c->regs + CSR) & I2CBUSY) == 0)) {
++			return 0;
++		}
++
++		msleep(1);
++	}
++
++	return -ETIMEDOUT;
++}
++
++/* nuc900_i2c_doxfer
++ *
++ * this starts an i2c transfer
++*/
++
++static int nuc900_i2c_doxfer(struct nuc900_i2c *i2c,
++			      struct i2c_msg *msgs, int num)
++{
++	unsigned long iicstat, timeout;
++	int spins = 20;
++	int ret;
++
++	ret = nuc900_i2c_set_master(i2c);
++	if (ret != 0) {
++		dev_err(i2c->dev, "cannot get bus (error %d)\n", ret);
++		ret = -EAGAIN;
++		goto out;
++	}
++
++	spin_lock_irq(&i2c->lock);
++
++	i2c->msg     = msgs;
++	i2c->msg_num = num;
++	i2c->msg_ptr = 0;
++	i2c->msg_idx = 0;
++	i2c->state   = STATE_START;
++
++	nuc900_i2c_enable_irq(i2c);
++	nuc900_i2c_message_start(i2c, msgs);
++	spin_unlock_irq(&i2c->lock);
++
++	timeout = wait_event_timeout(i2c->wait, i2c->msg_num == 0, HZ * 5);
++
++	ret = i2c->msg_idx;
++
++	/* having these next two as dev_err() makes life very
++	 * noisy when doing an i2cdetect */
++
++	if (timeout == 0)
++		dev_dbg(i2c->dev, "timeout\n");
++	else if (ret != num)
++		dev_dbg(i2c->dev, "incomplete xfer (%d)\n", ret);
++
++	/* ensure the stop has been through the bus */
++
++	dev_dbg(i2c->dev, "waiting for bus idle\n");
++
++	/* first, try busy waiting briefly */
++	do {
++		iicstat = readl(i2c->regs + CSR);
++	} while ((iicstat & I2CBUSY) && --spins);
++
++	/* if that timed out sleep */
++	if (!spins) {
++		msleep(1);
++		iicstat = readl(i2c->regs + CSR);
++	}
++
++	if (iicstat & I2CBUSY)
++		dev_warn(i2c->dev, "timeout waiting for bus idle\n");
++
++ out:
++	return ret;
++}
++
++/* nuc900_i2c_xfer
++ *
++ * first port of call from the i2c bus code when an message needs
++ * transferring across the i2c bus.
++*/
++
++static int nuc900_i2c_xfer(struct i2c_adapter *adap,
++			struct i2c_msg *msgs, int num)
++{
++	struct nuc900_i2c *i2c = (struct nuc900_i2c *)adap->algo_data;
++	int retry;
++	int ret;
++
++	for (retry = 0; retry < adap->retries; retry++) {
++
++		ret = nuc900_i2c_doxfer(i2c, msgs, num);
++
++		if (ret != -EAGAIN)
++			return ret;
++
++		dev_dbg(i2c->dev, "Retrying transmission (%d)\n", retry);
++
++		udelay(100);
++	}
++
++	return -EREMOTEIO;
++}
++
++/* declare our i2c functionality */
++static u32 nuc900_i2c_func(struct i2c_adapter *adap)
++{
++	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL | I2C_FUNC_PROTOCOL_MANGLING;
++}
++
++/* i2c bus registration info */
++
++static const struct i2c_algorithm nuc900_i2c_algorithm = {
++	.master_xfer		= nuc900_i2c_xfer,
++	.functionality		= nuc900_i2c_func,
++};
++
++/* nuc900_i2c_probe
++ *
++ * called by the bus driver when a suitable device is found
++*/
++
++static int __devinit nuc900_i2c_probe(struct platform_device *pdev)
++{
++	struct nuc900_i2c *i2c;
++	struct nuc900_platform_i2c *pdata;
++	struct resource *res;
++	unsigned int apbclk_khz;
++	int ret;
++
++	pdata = pdev->dev.platform_data;
++	if (!pdata) {
++		dev_err(&pdev->dev, "no platform data\n");
++		return -EINVAL;
++	}
++
++	i2c = kzalloc(sizeof(struct nuc900_i2c), GFP_KERNEL);
++	if (!i2c) {
++		dev_err(&pdev->dev, "no memory for state\n");
++		return -ENOMEM;
++	}
++
++	strlcpy(i2c->adap.name, "nuc900-i2c0", sizeof(i2c->adap.name));
++	i2c->adap.owner   = THIS_MODULE;
++	i2c->adap.algo    = &nuc900_i2c_algorithm;
++	i2c->adap.retries = 2;
++	i2c->adap.class   = I2C_CLASS_HWMON | I2C_CLASS_SPD;
++
++	spin_lock_init(&i2c->lock);
++	init_waitqueue_head(&i2c->wait);
++
++	/* find the clock and enable it */
++
++	i2c->dev = &pdev->dev;
++	i2c->clk = clk_get(&pdev->dev, "nuc900-i2c0");
++	if (IS_ERR(i2c->clk)) {
++		dev_err(&pdev->dev, "cannot get clock\n");
++		ret = -ENOENT;
++		goto err_noclk;
++	}
++
++	dev_dbg(&pdev->dev, "clock source %p\n", i2c->clk);
++
++	clk_enable(i2c->clk);
++
++	/* map the registers */
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (res == NULL) {
++		dev_err(&pdev->dev, "cannot find IO resource\n");
++		ret = -ENOENT;
++		goto err_clk;
++	}
++
++	i2c->ioarea = request_mem_region(res->start, resource_size(res),
++					 pdev->name);
++
++	if (i2c->ioarea == NULL) {
++		dev_err(&pdev->dev, "cannot request IO\n");
++		ret = -ENXIO;
++		goto err_clk;
++	}
++
++	i2c->regs = ioremap(res->start, resource_size(res));
++
++	if (i2c->regs == NULL) {
++		dev_err(&pdev->dev, "cannot map IO\n");
++		ret = -ENXIO;
++		goto err_ioarea;
++	}
++
++	dev_dbg(&pdev->dev, "registers %p (%p, %p)\n",
++		i2c->regs, i2c->ioarea, res);
++
++	/* setup info block for the i2c core */
++
++	i2c->adap.algo_data = i2c;
++	i2c->adap.dev.parent = &pdev->dev;
++
++	mfp_set_groupg(&pdev->dev);
++
++	pdata->get_clock(NULL, NULL, &apbclk_khz);
++
++	ret = apbclk_khz/(pdata->bus_freq * 5) - 1;
++	writel(ret & 0xffff, i2c->regs + DIVIDER);
++
++	/* find the IRQ for this unit (note, this relies on the init call to
++	 * ensure no current IRQs pending
++	 */
++
++	i2c->irq = ret = platform_get_irq(pdev, 0);
++	if (ret <= 0) {
++		dev_err(&pdev->dev, "cannot find IRQ\n");
++		goto err_iomap;
++	}
++
++	ret = request_irq(i2c->irq, nuc900_i2c_irq, IRQF_DISABLED,
++			  dev_name(&pdev->dev), i2c);
++
++	if (ret != 0) {
++		dev_err(&pdev->dev, "cannot claim IRQ %d\n", i2c->irq);
++		goto err_iomap;
++	}
++
++	/* Note, previous versions of the driver used i2c_add_adapter()
++	 * to add the bus at any number. We now pass the bus number via
++	 * the platform data, so if unset it will now default to always
++	 * being bus 0.
++	 */
++
++	i2c->adap.nr = pdata->bus_num;
++
++	ret = i2c_add_numbered_adapter(&i2c->adap);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "failed to add bus to i2c core\n");
++		goto err_irq;
++	}
++
++	platform_set_drvdata(pdev, i2c);
++
++	dev_info(&pdev->dev, "%s: NUC900 I2C adapter\n",
++						dev_name(&i2c->adap.dev));
++	return 0;
++
++ err_irq:
++	free_irq(i2c->irq, i2c);
++
++ err_iomap:
++	iounmap(i2c->regs);
++
++ err_ioarea:
++	release_resource(i2c->ioarea);
++	kfree(i2c->ioarea);
++
++ err_clk:
++	clk_disable(i2c->clk);
++	clk_put(i2c->clk);
++
++ err_noclk:
++	kfree(i2c);
++	return ret;
++}
++
++/* nuc900_i2c_remove
++ *
++ * called when device is removed from the bus
++*/
++
++static int __devexit nuc900_i2c_remove(struct platform_device *pdev)
++{
++	struct nuc900_i2c *i2c = platform_get_drvdata(pdev);
++
++	i2c_del_adapter(&i2c->adap);
++	free_irq(i2c->irq, i2c);
++
++	clk_disable(i2c->clk);
++	clk_put(i2c->clk);
++
++	iounmap(i2c->regs);
++
++	release_resource(i2c->ioarea);
++	kfree(i2c->ioarea);
++	kfree(i2c);
++
++	return 0;
++}
++
++static struct platform_driver nuc900_i2c_driver = {
++	.probe		= nuc900_i2c_probe,
++	.remove		= __devexit_p(nuc900_i2c_remove),
++	.driver		= {
++		.owner	= THIS_MODULE,
++		.name	= "nuc900-i2c0",
++	},
++};
++
++static int __init i2c_adap_nuc900_init(void)
++{
++	return platform_driver_register(&nuc900_i2c_driver);
++}
++
++static void __exit i2c_adap_nuc900_exit(void)
++{
++	platform_driver_unregister(&nuc900_i2c_driver);
++}
++subsys_initcall(i2c_adap_nuc900_init);
++module_exit(i2c_adap_nuc900_exit);
++
++MODULE_DESCRIPTION("NUC900 I2C Bus driver");
++MODULE_AUTHOR("Wan ZongShun, <mcuos.com@gmail.com>");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:nuc900-i2c0");
 -- 
-*linux-arm-kernel mailing list
-mail addr:linux-arm-kernel at lists.infradead.org
-you can subscribe by:
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-* linux-arm-NUC900 mailing list
-mail addr:NUC900 at googlegroups.com
-main web: https://groups.google.com/group/NUC900
-you can subscribe it by sending me mail:
-mcuos.com at gmail.com
+1.6.3.3
