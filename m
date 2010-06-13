@@ -1,78 +1,98 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 14 Jun 2010 00:42:45 +0800
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Mon, 14 Jun 2010 00:51:32 +0800
 Subject: [PATCH] pxa168 and pxa930 build fix - plat-pxa/pmu.c dependent on
 	ARCH_PXA for IRQ_PMU
-In-Reply-To: <3623778261485640027@unknownmsgid>
+In-Reply-To: <AANLkTik2JD4y1-4Dt5999adu4mtNAAS9DLu9sG77l56u@mail.gmail.com>
 References: <1275932959-474-1-git-send-email-jic23@cam.ac.uk>
 	<AANLkTilXErDZHWf71e7pwUbt1i66MVrfP_lPisgoBZ0G@mail.gmail.com>
 	<AANLkTinm5ZU1tLR8CYwU4K8FPbCdLTdAyrfXq54nYkl_@mail.gmail.com>
 	<3623778261485640027@unknownmsgid>
-Message-ID: <AANLkTik2JD4y1-4Dt5999adu4mtNAAS9DLu9sG77l56u@mail.gmail.com>
+	<AANLkTik2JD4y1-4Dt5999adu4mtNAAS9DLu9sG77l56u@mail.gmail.com>
+Message-ID: <AANLkTinHL6q_Nbed237cuoCNy1DUCGTGXQG6np-tZtS-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 8, 2010 at 4:52 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Eric,
->
->> We have different ways to handle this:
+2010/6/14 Eric Miao <eric.y.miao@gmail.com>:
+> On Tue, Jun 8, 2010 at 4:52 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> Hi Eric,
 >>
->> 1. register different platform devices with different IRQs for pxa[23]xx, pxa168
->> 2. modify the IRQ at run-time to a correct one
->> 3. move the platform device registration back into arch/arm/mach-pxa/<soc>.c
->> (or arch/arm/mach-pxa/common.c) and arch/arm/mach-mmp/<soc>.c
+>>> We have different ways to handle this:
+>>>
+>>> 1. register different platform devices with different IRQs for pxa[23]xx, pxa168
+>>> 2. modify the IRQ at run-time to a correct one
+>>> 3. move the platform device registration back into arch/arm/mach-pxa/<soc>.c
+>>> (or arch/arm/mach-pxa/common.c) and arch/arm/mach-mmp/<soc>.c
+>>
+>> For the RealView boards, we take approach number (1). This is largely for two
+>> reasons:
+>>
+>> 1.) The PMU IRQ doesn't have a consistent naming scheme
+>> 2.) SMP RealView platforms need to have an extra resource in the
+>> ? ?platform_device for each CPU.
+>>
+>> However, looking at the PXA168 description and the perf-events code,
+>> I don't think we support the PMU anyway [see init_hw_perf_events in
+>> arch/arm/kernel/perf_event.c]. If the PMU present is accessible in the
+>> same way as one of the other supported PMUs, then it would be easy to
+>> add it to the perf-events code. Otherwise, a new PMU driver will need
+>> to be written if people want to use it.
+>>
+>> Without access to a TRM, I can't tell whether or not supporting the PMU
+>> is trivial, so I guess we go with option (3) for the time being.
+>>
+>>> We need to figure out if there are some other differences between these
+>>> PMUs (or in the future), which will make solution 3) stand out.
+>>
+>> In the future I reckon PMU devices will be memory-mapped and live inside
+>> components other than the CPU. PMU registration will then be highly SoC-specific.
+>> Perf events doesn't yet support any of this, so it depends how future-proof you
+>> want to be!
+>>
 >
-> For the RealView boards, we take approach number (1). This is largely for two
-> reasons:
->
-> 1.) The PMU IRQ doesn't have a consistent naming scheme
-> 2.) SMP RealView platforms need to have an extra resource in the
-> ? ?platform_device for each CPU.
->
-> However, looking at the PXA168 description and the perf-events code,
-> I don't think we support the PMU anyway [see init_hw_perf_events in
-> arch/arm/kernel/perf_event.c]. If the PMU present is accessible in the
-> same way as one of the other supported PMUs, then it would be easy to
-> add it to the perf-events code. Otherwise, a new PMU driver will need
-> to be written if people want to use it.
->
-> Without access to a TRM, I can't tell whether or not supporting the PMU
-> is trivial, so I guess we go with option (3) for the time being.
->
->> We need to figure out if there are some other differences between these
->> PMUs (or in the future), which will make solution 3) stand out.
->
-> In the future I reckon PMU devices will be memory-mapped and live inside
-> components other than the CPU. PMU registration will then be highly SoC-specific.
-> Perf events doesn't yet support any of this, so it depends how future-proof you
-> want to be!
+> For a quick solution of the build error, I decided to pick Jonathan's
+> patch first. At least PMU is not tested and ever used on pxa168/910/mmp2
+> series at this moment. I'll work on a proper fix later, possibly a patch
+> merged through -devel branch instead of -fix.
 >
 
-For a quick solution of the build error, I decided to pick Jonathan's
-patch first. At least PMU is not tested and ever used on pxa168/910/mmp2
-series at this moment. I'll work on a proper fix later, possibly a patch
-merged through -devel branch instead of -fix.
+Good idea. thanks!
 
+>>
+>>> >> ?arch/arm/plat-pxa/Makefile | ? ?3 ++-
+>>> >> ?1 files changed, 2 insertions(+), 1 deletions(-)
+>>> >>
+>>> >> diff --git a/arch/arm/plat-pxa/Makefile b/arch/arm/plat-pxa/Makefile
+>>> >> index 6187edf..a17cc0c 100644
+>>> >> --- a/arch/arm/plat-pxa/Makefile
+>>> >> +++ b/arch/arm/plat-pxa/Makefile
+>>> >> @@ -2,8 +2,9 @@
+>>> >> ?# Makefile for code common across different PXA processor families
+>>> >> ?#
+>>> >>
+>>> >> -obj-y ?:= dma.o pmu.o
+>>> >> +obj-y ?:= dma.o
+>>> >>
+>>> >> +obj-$(CONFIG_ARCH_PXA) ? ? ? ? += pmu.o
+>>> >> ?obj-$(CONFIG_GENERIC_GPIO) ? ? += gpio.o
+>>> >> ?obj-$(CONFIG_PXA3xx) ? ? ? ? ? += mfp.o
+>>> >> ?obj-$(CONFIG_ARCH_MMP) ? ? ? ? += mfp.o
+>>> >> --
+>>> >> 1.6.4.4
+>>
+>>
+>>
 >
->> >> ?arch/arm/plat-pxa/Makefile | ? ?3 ++-
->> >> ?1 files changed, 2 insertions(+), 1 deletions(-)
->> >>
->> >> diff --git a/arch/arm/plat-pxa/Makefile b/arch/arm/plat-pxa/Makefile
->> >> index 6187edf..a17cc0c 100644
->> >> --- a/arch/arm/plat-pxa/Makefile
->> >> +++ b/arch/arm/plat-pxa/Makefile
->> >> @@ -2,8 +2,9 @@
->> >> ?# Makefile for code common across different PXA processor families
->> >> ?#
->> >>
->> >> -obj-y ?:= dma.o pmu.o
->> >> +obj-y ?:= dma.o
->> >>
->> >> +obj-$(CONFIG_ARCH_PXA) ? ? ? ? += pmu.o
->> >> ?obj-$(CONFIG_GENERIC_GPIO) ? ? += gpio.o
->> >> ?obj-$(CONFIG_PXA3xx) ? ? ? ? ? += mfp.o
->> >> ?obj-$(CONFIG_ARCH_MMP) ? ? ? ? += mfp.o
->> >> --
->> >> 1.6.4.4
->
->
->
+
+
+
+-- 
+*linux-arm-kernel mailing list
+mail addr:linux-arm-kernel at lists.infradead.org
+you can subscribe by:
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+* linux-arm-NUC900 mailing list
+mail addr:NUC900 at googlegroups.com
+main web: https://groups.google.com/group/NUC900
+you can subscribe it by sending me mail:
+mcuos.com at gmail.com
