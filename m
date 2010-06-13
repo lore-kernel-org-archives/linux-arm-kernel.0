@@ -1,39 +1,78 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 14 Jun 2010 00:02:22 +0800
-Subject: [PATCH 2/2] [ARM] pxa/cm-x300: enable the IRQ_WAKEUP0 as wakeup
-	source.
-In-Reply-To: <1276417909-22980-3-git-send-email-grinberg@compulab.co.il>
-References: <1276417909-22980-1-git-send-email-grinberg@compulab.co.il>
-	<1276417909-22980-2-git-send-email-grinberg@compulab.co.il>
-	<1276417909-22980-3-git-send-email-grinberg@compulab.co.il>
-Message-ID: <AANLkTilhqoMa3qsPEYyVWKJrPHl5NnKWUhzexhPjEZaZ@mail.gmail.com>
+Date: Mon, 14 Jun 2010 00:42:45 +0800
+Subject: [PATCH] pxa168 and pxa930 build fix - plat-pxa/pmu.c dependent on
+	ARCH_PXA for IRQ_PMU
+In-Reply-To: <3623778261485640027@unknownmsgid>
+References: <1275932959-474-1-git-send-email-jic23@cam.ac.uk>
+	<AANLkTilXErDZHWf71e7pwUbt1i66MVrfP_lPisgoBZ0G@mail.gmail.com>
+	<AANLkTinm5ZU1tLR8CYwU4K8FPbCdLTdAyrfXq54nYkl_@mail.gmail.com>
+	<3623778261485640027@unknownmsgid>
+Message-ID: <AANLkTik2JD4y1-4Dt5999adu4mtNAAS9DLu9sG77l56u@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 13, 2010 at 4:31 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+On Tue, Jun 8, 2010 at 4:52 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Eric,
 >
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+>> We have different ways to handle this:
+>>
+>> 1. register different platform devices with different IRQs for pxa[23]xx, pxa168
+>> 2. modify the IRQ at run-time to a correct one
+>> 3. move the platform device registration back into arch/arm/mach-pxa/<soc>.c
+>> (or arch/arm/mach-pxa/common.c) and arch/arm/mach-mmp/<soc>.c
+>
+> For the RealView boards, we take approach number (1). This is largely for two
+> reasons:
+>
+> 1.) The PMU IRQ doesn't have a consistent naming scheme
+> 2.) SMP RealView platforms need to have an extra resource in the
+> ? ?platform_device for each CPU.
+>
+> However, looking at the PXA168 description and the perf-events code,
+> I don't think we support the PMU anyway [see init_hw_perf_events in
+> arch/arm/kernel/perf_event.c]. If the PMU present is accessible in the
+> same way as one of the other supported PMUs, then it would be easy to
+> add it to the perf-events code. Otherwise, a new PMU driver will need
+> to be written if people want to use it.
+>
+> Without access to a TRM, I can't tell whether or not supporting the PMU
+> is trivial, so I guess we go with option (3) for the time being.
+>
+>> We need to figure out if there are some other differences between these
+>> PMUs (or in the future), which will make solution 3) stand out.
+>
+> In the future I reckon PMU devices will be memory-mapped and live inside
+> components other than the CPU. PMU registration will then be highly SoC-specific.
+> Perf events doesn't yet support any of this, so it depends how future-proof you
+> want to be!
+>
 
-OK, applied.
+For a quick solution of the build error, I decided to pick Jonathan's
+patch first. At least PMU is not tested and ever used on pxa168/910/mmp2
+series at this moment. I'll work on a proper fix later, possibly a patch
+merged through -devel branch instead of -fix.
 
-> ---
-> ?arch/arm/mach-pxa/cm-x300.c | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
 >
-> diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
-> index fdda6be..8d227b4 100644
-> --- a/arch/arm/mach-pxa/cm-x300.c
-> +++ b/arch/arm/mach-pxa/cm-x300.c
-> @@ -689,6 +689,7 @@ static void __init cm_x300_init_da9030(void)
-> ?{
-> ? ? ? ?pxa3xx_set_i2c_power_info(&cm_x300_pwr_i2c_info);
-> ? ? ? ?i2c_register_board_info(1, &cm_x300_pmic_info, 1);
-> + ? ? ? set_irq_wake(IRQ_WAKEUP0, 1);
-> ?}
+>> >> ?arch/arm/plat-pxa/Makefile | ? ?3 ++-
+>> >> ?1 files changed, 2 insertions(+), 1 deletions(-)
+>> >>
+>> >> diff --git a/arch/arm/plat-pxa/Makefile b/arch/arm/plat-pxa/Makefile
+>> >> index 6187edf..a17cc0c 100644
+>> >> --- a/arch/arm/plat-pxa/Makefile
+>> >> +++ b/arch/arm/plat-pxa/Makefile
+>> >> @@ -2,8 +2,9 @@
+>> >> ?# Makefile for code common across different PXA processor families
+>> >> ?#
+>> >>
+>> >> -obj-y ?:= dma.o pmu.o
+>> >> +obj-y ?:= dma.o
+>> >>
+>> >> +obj-$(CONFIG_ARCH_PXA) ? ? ? ? += pmu.o
+>> >> ?obj-$(CONFIG_GENERIC_GPIO) ? ? += gpio.o
+>> >> ?obj-$(CONFIG_PXA3xx) ? ? ? ? ? += mfp.o
+>> >> ?obj-$(CONFIG_ARCH_MMP) ? ? ? ? += mfp.o
+>> >> --
+>> >> 1.6.4.4
 >
-> ?static void __init cm_x300_init_wi2wi(void)
-> --
-> 1.6.4.4
 >
 >
