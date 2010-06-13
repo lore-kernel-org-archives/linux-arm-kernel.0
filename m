@@ -1,39 +1,45 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Sun, 13 Jun 2010 23:27:15 +0100
-Subject: [RFC,PATCH 1/2] Add a common struct clk
-In-Reply-To: <19474.2817.333749.485028@ipc1.ka-ro>
-References: <1275636608.606606.450179637764.0.gpush@pororo>
-	<201006111557.12249.jeremy.kerr@canonical.com>
-	<19473.61547.684572.647641@ipc1.ka-ro>
-	<201006111718.47426.jeremy.kerr@canonical.com>
-	<19474.172.742782.972629@ipc1.ka-ro>
-	<20100611095839.GC10894@pengutronix.de>
-	<19474.2817.333749.485028@ipc1.ka-ro>
-Message-ID: <20100613222715.GF31045@fluff.org.uk>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Mon, 14 Jun 2010 10:46:21 +1200
+Subject: [PATCH] ep93xx: clear devcfg bits before setting them
+In-Reply-To: <0D753D10438DA54287A00B027084269763711321BA@AUSP01VMBX24.collaborationhost.net>
+References: <0D753D10438DA54287A00B027084269763711321BA@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <4C155FBD.4020106@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 11, 2010 at 12:08:01PM +0200, Lothar Wa?mann wrote:
-> Hi,
+H Hartley Sweeten wrote:
+> The ep93xx core helper function ep93xx_devcfg_set_clear should mask the
+> clear_bits before setting the new set_bits in case the clear_bits are a
+> mask value that also includes the set_bits.
 > 
-> > > > > Using a mutex in clk_enable()/clk_disable() is a bad idea, since that
-> > > > > makes it impossible to call those functions in interrupt context.
-> > IMHO if a device generates an irq its clock should already be on.  This
-> > way you don't need to enable or disable a clock in irq context.
-> >  
-> You may want to disable a clock in the IRQ handler. The VPU driver in
-> the Freescale BSP for i.MX51 does exactly this.
-> Anyway I don't see any reason for using a mutex here instead of
-> spin_lock_irq_save() as all other implementations do.
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <ryan@bluewatersys.com>
 
-Hmm, then again the VPU driver may just be a bit wrong here.
+Acked-by: Ryan Mallon <ryan@bluewatersys.com>
 
-We could protect each clock with a spinlock, but that would end up
-with a problem of spinning where we have clocks that takes 100s of
-usec or so to init. See all PLLs on S3C devices, where it can take
-100-300uS to get a stable clock out of the device.
+> ---
+> 
+> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+> index 9092677..92f2ebb 100644
+> --- a/arch/arm/mach-ep93xx/core.c
+> +++ b/arch/arm/mach-ep93xx/core.c
+> @@ -215,8 +215,8 @@ void ep93xx_devcfg_set_clear(unsigned int set_bits, unsigned int clear_bits)
+>  	spin_lock_irqsave(&syscon_swlock, flags);
+>  
+>  	val = __raw_readl(EP93XX_SYSCON_DEVCFG);
+> -	val |= set_bits;
+>  	val &= ~clear_bits;
+> +	val |= set_bits;
+>  	__raw_writel(0xaa, EP93XX_SYSCON_SWLOCK);
+>  	__raw_writel(val, EP93XX_SYSCON_DEVCFG);
+>  
+
 
 -- 
-Ben (ben at fluff.org, http://www.fluff.org/)
+Bluewater Systems Ltd - ARM Technology Solution Centre
 
-  'a smiley only costs 4 bytes'
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
