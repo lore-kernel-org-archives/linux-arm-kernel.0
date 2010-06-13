@@ -1,35 +1,25 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sun, 13 Jun 2010 16:02:35 +1000
-Subject: [PATCH 1/4] net/phy/marvell: Expose IDs and flags in a .h and
-	add dns323 LEDs setup flag
-In-Reply-To: <20100613052831.GA17012@pengutronix.de>
-References: <1276391423.1962.263.camel@pasglop>
-	<20100613052831.GA17012@pengutronix.de>
-Message-ID: <1276408955.1962.578.camel@pasglop>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sun, 13 Jun 2010 08:50:31 +0200
+Subject: [PATCH] wm97xx_batt: Remove deprecated method to set pdata
+In-Reply-To: <AANLkTikhclymsEo5jyS3Zi3bzRimgoYU1GWNNErtFVEi@mail.gmail.com>
+References: <1276347073-3055-1-git-send-email-marek.vasut@gmail.com>
+	<20100612172140.GB20610@opensource.wolfsonmicro.com>
+	<AANLkTikhclymsEo5jyS3Zi3bzRimgoYU1GWNNErtFVEi@mail.gmail.com>
+Message-ID: <201006130850.31627.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2010-06-13 at 07:28 +0200, Wolfram Sang wrote:
-> On Sun, Jun 13, 2010 at 11:10:23AM +1000, Benjamin Herrenschmidt wrote:
-> > This moves the various known Marvell PHY IDs to include/linux/marvell_phy.h
-> > along with dev_flags definitions for use by the driver.
-> > 
-> > I then added a flag that changes the PHY init code to setup the LEDs
-> > config to the values needed to operate a dns323 rev C1 NAS.
-> > 
-> > I moved the existing "resistance" flag to the .h as well, though I've
-> > been unable to find whoever sets this to convert it to use that constant.
-> > 
-> > Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Dne Ne 13. ?ervna 2010 04:33:11 Eric Miao napsal(a):
+> On Sun, Jun 13, 2010 at 1:21 AM, Mark Brown
 > 
-> That should do for now.
+> <broonie@opensource.wolfsonmicro.com> wrote:
+> > On Sat, Jun 12, 2010 at 02:51:13PM +0200, Marek Vasut wrote:
+> >> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> > 
+> > Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > 
-> Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
+> Thanks. Applied.
 
-Thanks.
+Please also apply the other one (the one removing linux/wm97xx_batt.h)
 
-Dave, any objection to having that go via the arm tree along with the
-rest of my patches to support the dns323 since they depend on this one ?
-
-Cheers,
-Ben.
+Thanks!
