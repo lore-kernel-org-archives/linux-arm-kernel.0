@@ -1,32 +1,20 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 13 Jun 2010 11:31:49 +0300
-Subject: [PATCH 2/2] [ARM] pxa/cm-x300: enable the IRQ_WAKEUP0 as wakeup
+Date: Sun, 13 Jun 2010 11:31:47 +0300
+Subject: [PATCH 0/2] [ARM] pxa3xx: enable the IRQ_WAKEUPx to be a wakeup
 	source.
-In-Reply-To: <1276417909-22980-2-git-send-email-grinberg@compulab.co.il>
-References: <1276417909-22980-1-git-send-email-grinberg@compulab.co.il>
-	<1276417909-22980-2-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1276417909-22980-3-git-send-email-grinberg@compulab.co.il>
+Message-ID: <1276417909-22980-1-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hardware specific setup should be done to enable
+the IRQ_WAKEUPx as a wakeup source on pxa3xx cpu.
+This patch series enables the IRQ_WAKEUPx to be
+a wakeup source and makes use of it on cm-x300.
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-Signed-off-by: Mike Rapoport <mike@compulab.co.il>
----
+Igor Grinberg (2):
+  [ARM] pxa3xx: add set_type to the ext_wakeup irq chip.
+  [ARM] pxa/cm-x300: enable the IRQ_WAKEUP0 as wakeup source.
+
  arch/arm/mach-pxa/cm-x300.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
-index fdda6be..8d227b4 100644
---- a/arch/arm/mach-pxa/cm-x300.c
-+++ b/arch/arm/mach-pxa/cm-x300.c
-@@ -689,6 +689,7 @@ static void __init cm_x300_init_da9030(void)
- {
- 	pxa3xx_set_i2c_power_info(&cm_x300_pwr_i2c_info);
- 	i2c_register_board_info(1, &cm_x300_pmic_info, 1);
-+	set_irq_wake(IRQ_WAKEUP0, 1);
- }
- 
- static void __init cm_x300_init_wi2wi(void)
--- 
-1.6.4.4
+ arch/arm/mach-pxa/pxa3xx.c  |   12 ++++++++++++
+ 2 files changed, 13 insertions(+), 0 deletions(-)
