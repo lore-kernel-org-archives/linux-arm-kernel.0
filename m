@@ -1,52 +1,87 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Sun, 13 Jun 2010 10:06:50 +0300
-Subject: [PATCH 4/5] [ARM] usb/host/ohci-pxa27x: make PXA310 USB OTG port
-	work in host mode.
-In-Reply-To: <AANLkTin2RmVoFhF7-2iWIx_7hRr473KZnyq9FOqZhcWi@mail.gmail.com>
-References: <1275464450-23003-1-git-send-email-grinberg@compulab.co.il>
-	<1275464450-23003-2-git-send-email-grinberg@compulab.co.il>
-	<1275464450-23003-3-git-send-email-grinberg@compulab.co.il>
-	<1275464450-23003-4-git-send-email-grinberg@compulab.co.il>
-	<1275464450-23003-5-git-send-email-grinberg@compulab.co.il>
-	<AANLkTilUt8D7B3UF_j1wOvsnXTVQyioofwMEikScdLOn@mail.gmail.com>
-	<4C148162.2020507@compulab.co.il>
-	<AANLkTin2RmVoFhF7-2iWIx_7hRr473KZnyq9FOqZhcWi@mail.gmail.com>
-Message-ID: <4C14838A.7060509@compulab.co.il>
+From: saeed@marvell.com (Saeed Bishara)
+Date: Sun, 13 Jun 2010 10:38:10 +0300
+Subject: [PATCH 1/2 v2] mv643xx_eth: use sw csum for big packets
+In-Reply-To: <20100612083137.GO1743@mail.wantstofly.org>
+References: <FCBE654890C0334289D0AD3AF4EF009F9FAC75A69C@IL-MB01.marvell.com>
+	<1276073483-17208-1-git-send-email-saeed@marvell.com>
+	<20100610064330.GK1743@mail.wantstofly.org>
+	<FCBE654890C0334289D0AD3AF4EF009F9FAC75AA96@IL-MB01.marvell.com>
+	<20100612083137.GO1743@mail.wantstofly.org>
+Message-ID: <FCBE654890C0334289D0AD3AF4EF009F9FAC7B6E2B@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric Miao wrote:
-> On Sun, Jun 13, 2010 at 2:57 PM, Mike Rapoport <mike@compulab.co.il> wrote:
->> Eric Miao wrote:
->>> On Wed, Jun 2, 2010 at 3:40 PM, Igor Grinberg <grinberg@compulab.co.il>
->>> wrote:
->>>> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
->>>> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
->>>> ---
->>>>  arch/arm/mach-pxa/include/mach/ohci.h     |    3 +
->>>>  arch/arm/mach-pxa/include/mach/regs-u2d.h |    2 +
->>>>  drivers/usb/host/ohci-pxa27x.c            |  183
->>>> +++++++++++++++++++++++++++++
->>> My feeling is on pxa310, the OTG/ULPI is actually closer to the UDC, so
->>> generally, I'd really like to see minimum change to ohci.
->> There are certain registers set up that should be done in order to enable
->> the pxa310 otg port in the host mode. I agree that most of them should be
->> done in the UDC driver, but since there's no UDC driver at all for pxa310,
-> 
-> Wow, that's a big problem.
- >
->> the most logical place for those register set ups would be pxa ohci glue
->> driver.
+ 
+
+>-----Original Message-----
+>From: Lennert Buytenhek [mailto:buytenh at wantstofly.org] 
+>Sent: Saturday, June 12, 2010 11:32 AM
+>To: Saeed Bishara
+>Cc: linux-net at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+>Subject: Re: [PATCH 1/2 v2] mv643xx_eth: use sw csum for big packets
+>
+>On Thu, Jun 10, 2010 at 10:38:05AM +0300, Saeed Bishara wrote:
+>
+>> >> diff --git a/drivers/net/mv643xx_eth.c b/drivers/net/mv643xx_eth.c
+>> >> index e345ec8..2d0e06b 100644
+>> >> --- a/drivers/net/mv643xx_eth.c
+>> >> +++ b/drivers/net/mv643xx_eth.c
+>> >> @@ -289,6 +289,7 @@ struct mv643xx_eth_shared_private {
+>> >>  	unsigned int t_clk;
+>> >>  	int extended_rx_coal_limit;
+>> >>  	int tx_bw_control;
+>> >> +	int tx_csum_limit;
+>> >>  };
+>> >>  
+>> >>  #define TX_BW_CONTROL_ABSENT		0
+>> >> @@ -782,7 +783,8 @@ static int txq_submit_skb(struct 
+>> >tx_queue *txq, struct sk_buff *skb)
+>> >>  		       skb->protocol != htons(ETH_P_8021Q));
+>> >>  
+>> >>  		tag_bytes = (void *)ip_hdr(skb) - (void 
+>> >*)skb->data - ETH_HLEN;
+>> >> -		if (unlikely(tag_bytes & ~12)) {
+>> >> +		if (unlikely(tag_bytes & ~12) ||
+>> >> +			skb->len > mp->shared->tx_csum_limit) {
+>> >
+>> >Please line up skb->len with unlikely() on the line above it.
+>> >
+>> >
+>> >> @@ -2666,6 +2668,9 @@ static int 
+>> >mv643xx_eth_shared_probe(struct platform_device *pdev)
+>> >>  	 * Detect hardware parameters.
+>> >>  	 */
+>> >>  	msp->t_clk = (pd != NULL && pd->t_clk != 0) ? pd->t_clk 
+>> >: 133000000;
+>> >> +	msp->tx_csum_limit = pd->tx_csum_limit ? 
+>> >pd->tx_csum_limit : 9 * 1024;
+>> >> +	/* add header count so we can compare against skb->len */
+>> >> +	msp->tx_csum_limit += ETH_HLEN;
+>> >>  	infer_hw_params(msp);
+>> >
+>> >Is the limit 9 * 1024 + 14 for the whole packet, or 9 * 
+>1024 for the IP
+>> >part?
 >>
-> 
-> So, is there a simple way to setup the ULPI for the host within mach-pxa/*?
-> We need really really simple code for that, so it has minimum impact when
-> we move that part into pxa310-udc.c? I still want ohci-pxa27x to remain
-> minimum impacted.
-
-we can put most of the code in, say, arch/arm/mach-pxa/pxa3xx-u2d.c and 
-add hooks in ohci-pxa27x.
-
--- 
-Sincerely yours,
-Mike.
+>> the limit is for the IP part, but I thought that adding the 
+>header length, then comparing agains skb->len will be the 
+>same. What do you suggest?
+>
+>Right, but for the header length you take 14, while if to include VLAN
+>tags or DSA tags the header might actually be longer -- how does that
+>affect the ability of the hardware to compute the checksum?
+>
+>I.e. is the restriction "total packet length must be < N + 14 bytes"
+>or is it "the IP part must be < N bytes and it doesn't matter whether
+>there are VLAN tags or not"?
+It's the second option: "the IP part must be < N" regardless to the L2 header.
+saeed
+>
+>I.e.:
+>
+>> >I.e. what happens if skb->len is 9 * 1024 + 15, but there 
+>is one VLAN
+>> >tag present -- will the hardware be able to do the checksum 
+>offload or
+>> >not?
+>
