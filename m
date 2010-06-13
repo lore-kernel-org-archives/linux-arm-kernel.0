@@ -1,48 +1,53 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 13 Jun 2010 11:31:48 +0300
-Subject: [PATCH 1/2] [ARM] pxa3xx: add set_type to the ext_wakeup irq chip.
-In-Reply-To: <1276417909-22980-1-git-send-email-grinberg@compulab.co.il>
-References: <1276417909-22980-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1276417909-22980-2-git-send-email-grinberg@compulab.co.il>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Sun, 13 Jun 2010 12:16:06 +0300
+Subject: [PATCH] ixp4xx: add support for static flash partitions
+In-Reply-To: <20100531162434.GA4599@riccoc20.at.omicron.at>
+References: <20100531162434.GA4599@riccoc20.at.omicron.at>
+Message-ID: <1276420566.19028.184.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pxa3xx cpu needs the irq type setup to be able to
-wakeup from low power mode on IRQ_WAKEUPx events.
+On Mon, 2010-05-31 at 18:24 +0200, Richard Cochran wrote:
+> This patch adds support for static flash partitioning from a platform
+> device. Also, we clean up some weirdness where statements were separated
+> by commas instead of semicolons. While we are at it, fix some minor bad
+> white space, too.
+> 
+> Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
+> ---
+>  drivers/mtd/maps/ixp4xx.c |   37 ++++++++++++++++++++++++++++---------
+>  1 files changed, 28 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/mtd/maps/ixp4xx.c b/drivers/mtd/maps/ixp4xx.c
+> index 7b05152..5345d11 100644
+> --- a/drivers/mtd/maps/ixp4xx.c
+> +++ b/drivers/mtd/maps/ixp4xx.c
+> @@ -108,7 +108,7 @@ static void ixp4xx_copy_from(struct map_info *map, void *to,
+>  
+>  	if (from & 1) {
+>  		*dest++ = BYTE1(flash_read16(src));
+> -                src++;
+> +		src++;
+>  		--len;
+>  	}
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-Signed-off-by: Mike Rapoport <mike@compulab.co.il>
----
- arch/arm/mach-pxa/pxa3xx.c |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+Your patch mostly applies, except of this chunk, which was modified
+before by
 
-diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-index f2f4127..2d54812 100644
---- a/arch/arm/mach-pxa/pxa3xx.c
-+++ b/arch/arm/mach-pxa/pxa3xx.c
-@@ -566,11 +566,23 @@ static void pxa_unmask_ext_wakeup(unsigned int irq)
- 	PECR |= PECR_IE(irq - IRQ_WAKEUP0);
- }
- 
-+static int pxa_set_ext_wakeup_type(unsigned int irq, unsigned int flow_type)
-+{
-+	if (flow_type & IRQ_TYPE_EDGE_RISING)
-+		PWER |= 1 << (irq - IRQ_WAKEUP0);
-+
-+	if (flow_type & IRQ_TYPE_EDGE_FALLING)
-+		PWER |= 1 << (irq - IRQ_WAKEUP0 + 2);
-+
-+	return 0;
-+}
-+
- static struct irq_chip pxa_ext_wakeup_chip = {
- 	.name		= "WAKEUP",
- 	.ack		= pxa_ack_ext_wakeup,
- 	.mask		= pxa_mask_ext_wakeup,
- 	.unmask		= pxa_unmask_ext_wakeup,
-+	.set_type	= pxa_set_ext_wakeup_type,
- };
- 
- static void __init pxa_init_ext_wakeup_irq(set_wake_t fn)
+commit 53f2b1c86a1fa1414be93571062ac4c263fa9fbc
+Author: Jon Ringle <jon@ringle.org>
+Date:   Wed Jan 13 09:36:10 2010 -0500
+
+    mtd: ixp4xx: fix reading from half-word boundary
+    
+    Fix handling of reads that don't start on a half-word boundary.
+    
+    Signed-off-by: Jon Ringle <jon@ringle.org>
+    Signed-off-by: Artem Bityutskiy <Artem.Bityutskiy@nokia.com>
+    Signed-off-by: David Woodhouse <David.Woodhouse@intel.com>
+
+I could fix your patch up myself, but I do not know the code, so please,
+re-send a patch against the latest mtd-2.6 tree.
 -- 
-1.6.4.4
+Best Regards,
+Artem Bityutskiy (????? ????????)
