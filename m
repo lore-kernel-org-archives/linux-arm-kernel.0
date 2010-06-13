@@ -1,39 +1,30 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Mon, 14 Jun 2010 10:46:21 +1200
-Subject: [PATCH] ep93xx: clear devcfg bits before setting them
-In-Reply-To: <0D753D10438DA54287A00B027084269763711321BA@AUSP01VMBX24.collaborationhost.net>
-References: <0D753D10438DA54287A00B027084269763711321BA@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <4C155FBD.4020106@bluewatersys.com>
+Date: Mon, 14 Jun 2010 10:51:06 +1200
+Subject: [PATCH 0/5] SPEAr3xx: Unify build of SPEAr3xx platforms
+In-Reply-To: <1275717955-14545-1-git-send-email-ryan@bluewatersys.com>
+References: <1275717955-14545-1-git-send-email-ryan@bluewatersys.com>
+Message-ID: <4C1560DA.5040803@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H Hartley Sweeten wrote:
-> The ep93xx core helper function ep93xx_devcfg_set_clear should mask the
-> clear_bits before setting the new set_bits in case the clear_bits are a
-> mask value that also includes the set_bits.
+Ryan Mallon wrote:
+> Rework the SPEAr3xx code to allow all three SPEAr3xx platforms to be
+> built into a single kernel.
 > 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <ryan@bluewatersys.com>
+> I do not have access to any SPEAr3xx hardware, so the patch series is
+> build tested only.
 
-Acked-by: Ryan Mallon <ryan@bluewatersys.com>
+Any interest in this patch series, or anybody with hardware that is able
+to test it?
 
-> ---
-> 
-> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-> index 9092677..92f2ebb 100644
-> --- a/arch/arm/mach-ep93xx/core.c
-> +++ b/arch/arm/mach-ep93xx/core.c
-> @@ -215,8 +215,8 @@ void ep93xx_devcfg_set_clear(unsigned int set_bits, unsigned int clear_bits)
->  	spin_lock_irqsave(&syscon_swlock, flags);
->  
->  	val = __raw_readl(EP93XX_SYSCON_DEVCFG);
-> -	val |= set_bits;
->  	val &= ~clear_bits;
-> +	val |= set_bits;
->  	__raw_writel(0xaa, EP93XX_SYSCON_SWLOCK);
->  	__raw_writel(val, EP93XX_SYSCON_DEVCFG);
->  
+Patch 1/5 is a simple cleanup patch which makes a bunch of local
+structures static, so it doesn't change functionality. Patch 5/5 can be
+dropped until the path forward for cleaning up the defconfigs has been
+decided. The other patches should not change the functionality if only
+one of the platforms is compiled in, but should also allow all three
+SPEAr3xx platforms to be built and run in a single kernel.
 
+~Ryan
 
 -- 
 Bluewater Systems Ltd - ARM Technology Solution Centre
