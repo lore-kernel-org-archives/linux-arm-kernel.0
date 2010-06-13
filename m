@@ -1,242 +1,260 @@
-From: tbm@cyrius.com (Martin Michlmayr)
-Date: Sun, 13 Jun 2010 20:00:16 +0100
-Subject: [PATCH] Kirkwood: Add support for HP t5325 Thin Client
-Message-ID: <20100613190016.GA7604@jirafa.cyrius.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Sun, 13 Jun 2010 23:23:49 +0100
+Subject: [RFC,PATCH 1/2] Add a common struct clk
+In-Reply-To: <201006111557.12249.jeremy.kerr@canonical.com>
+References: <1275636608.606606.450179637764.0.gpush@pororo>
+	<1275636608.607067.417709988883.1.gpush@pororo>
+	<20100611042046.GA31045@fluff.org.uk>
+	<201006111557.12249.jeremy.kerr@canonical.com>
+Message-ID: <20100613222349.GD31045@fluff.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the HP t5325 Thin Client.  This thin client is based
-on a Marvell Kirkwood chip at 1.2 GHz and features 512 MB RAM, 512 MB
-SATA-attached flash and an XGI Volari Z11 GPU.
-
-Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
-
----
-This patch doesn't take Saeed's PCI changes into account; also, it
-requires a mach-types update to build.
-
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -99,6 +99,12 @@ config MACH_NET5BIG_V2
- 	  Say 'Y' here if you want your kernel to support the
- 	  LaCie 5Big Network v2 NAS.
+On Fri, Jun 11, 2010 at 03:57:10PM +0800, Jeremy Kerr wrote:
+> Hi Ben,
+> 
+> > > Platforms can enable the generic struct clock through
+> > > CONFIG_USE_COMMON_STRUCT_CLK. In this case, the clock infrastructure
+> > > consists of a common struct clk:
+> >
+> > What do people think of just changing everyone who is currently using
+> > clk support to using this new implementation?
+> 
+> I think it'd be too-big a task to take on for a single change; we'd be better 
+> off allowing the two implementations concurrently. Also, I'd say that there 
+> are many platforms that will never need the new code, so no need to change 
+> them over.
+~
+Ok, agreed on that.
  
-+config MACH_T5325
-+	bool "HP t5325 Thin Client"
-+	help
-+	  Say 'Y' here if you want your kernel to support the
-+	  HP t5325 Thin Client.
-+
- endmenu
+> > > struct clk {
+> > > 
+> > > 	const struct clk_ops	*ops;
+> > > 	unsigned int		enable_count;
+> > > 	struct mutex		mutex;
+> > 
+> > I'm a little worried about the size of struct clk if all of them
+> > have a mutex in them. If i'm right, this is 40 bytes of data each
+> > clock has to take on board.
+> 
+> Yeah, I see your concern about adding a mutex per clock, but I do think it's 
+> the best solution. Of course, if there's a better way to do it, I'm happy to 
+> try it out.
+
+You also need a warning that even if it protects the clock, it may not
+protect any access to the hardware implementing it.
  
- endif
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -14,5 +14,6 @@ obj-$(CONFIG_MACH_NETSPACE_V2)		+= netspace_v2-setup.o
- obj-$(CONFIG_MACH_INETSPACE_V2)		+= netspace_v2-setup.o
- obj-$(CONFIG_MACH_NET2BIG_V2)		+= netxbig_v2-setup.o
- obj-$(CONFIG_MACH_NET5BIG_V2)		+= netxbig_v2-setup.o
-+obj-$(CONFIG_MACH_T5325)		+= t5325-setup.o
+> I believe we need to ensure that clocks are enabled when clk_enable returns, 
+> so we'll need some mechanism for waiting on the thread doing the 
+> enable/disable. Since (as you say) some clocks may take 100s of microseconds 
+> to enable, we'll need a lock that we can hold while sleeping.
+
+Well, mutexes give us that, whilst enabling we hold the mutex.
  
- obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
---- /dev/null	2010-05-25 13:42:08.579681378 +0000
-+++ b/arch/arm/mach-kirkwood/t5325-setup.c	2010-05-24 14:48:44.000000000 +0000
-@@ -0,0 +1,194 @@
-+/*
-+ *
-+ * HP t5325 Thin Client setup
-+ *
-+ * Copyright (C) 2010  Martin Michlmayr <tbm@cyrius.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the License, or (at your option) any later version.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/mtd/physmap.h>
-+#include <linux/spi/flash.h>
-+#include <linux/spi/spi.h>
-+#include <linux/spi/orion_spi.h>
-+#include <linux/i2c.h>
-+#include <linux/mv643xx_eth.h>
-+#include <linux/ata_platform.h>
-+#include <linux/gpio.h>
-+#include <linux/gpio_keys.h>
-+#include <linux/input.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <mach/kirkwood.h>
-+#include "common.h"
-+#include "mpp.h"
-+
-+struct mtd_partition hp_t5325_partitions[] = {
-+	{
-+		.name		= "u-boot env",
-+		.size		= SZ_64K,
-+		.offset		= SZ_512K + SZ_256K,
-+	},
-+	{
-+		.name		= "permanent u-boot env",
-+		.size		= SZ_64K,
-+		.offset		= MTDPART_OFS_APPEND,
-+		.mask_flags	= MTD_WRITEABLE,
-+	},
-+	{
-+		.name		= "HP env",
-+		.size		= SZ_64K,
-+		.offset		= MTDPART_OFS_APPEND,
-+	},
-+	{
-+		.name		= "u-boot",
-+		.size		= SZ_512K,
-+		.offset		= 0,
-+		.mask_flags	= MTD_WRITEABLE,
-+	},
-+	{
-+		.name		= "SSD firmware",
-+		.size		= SZ_256K,
-+		.offset		= SZ_512K,
-+	},
-+};
-+
-+const struct flash_platform_data hp_t5325_flash = {
-+	.type		= "mx25l8005",
-+	.name		= "spi_flash",
-+	.parts		= hp_t5325_partitions,
-+	.nr_parts	= ARRAY_SIZE(hp_t5325_partitions),
-+};
-+
-+struct spi_board_info __initdata hp_t5325_spi_slave_info[] = {
-+	{
-+		.modalias	= "m25p80",
-+		.platform_data	= &hp_t5325_flash,
-+		.irq		= -1,
-+	},
-+};
-+
-+static struct mv643xx_eth_platform_data hp_t5325_ge00_data = {
-+	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
-+};
-+
-+static struct mv_sata_platform_data hp_t5325_sata_data = {
-+	.n_ports	= 2,
-+};
-+
-+static struct gpio_keys_button hp_t5325_buttons[] = {
-+	{
-+		.code		= KEY_POWER,
-+		.gpio		= 45,
-+		.desc		= "Power",
-+		.active_low	= 1,
-+	},
-+};
-+
-+static struct gpio_keys_platform_data hp_t5325_button_data = {
-+	.buttons	= hp_t5325_buttons,
-+	.nbuttons	= ARRAY_SIZE(hp_t5325_buttons),
-+};
-+
-+static struct platform_device hp_t5325_button_device = {
-+	.name		= "gpio-keys",
-+	.id		= -1,
-+	.num_resources	= 0,
-+	.dev		= {
-+		.platform_data	= &hp_t5325_button_data,
-+	}
-+};
-+
-+static unsigned int hp_t5325_mpp_config[] __initdata = {
-+	MPP0_NF_IO2,
-+	MPP1_SPI_MOSI,
-+	MPP2_SPI_SCK,
-+	MPP3_SPI_MISO,
-+	MPP4_NF_IO6,
-+	MPP5_NF_IO7,
-+	MPP6_SYSRST_OUTn,
-+	MPP7_SPI_SCn,
-+	MPP8_TW_SDA,
-+	MPP9_TW_SCK,
-+	MPP10_UART0_TXD,
-+	MPP11_UART0_RXD,
-+	MPP12_SD_CLK,
-+	MPP13_GPIO,
-+	MPP14_GPIO,
-+	MPP15_GPIO,
-+	MPP16_GPIO,
-+	MPP17_GPIO,
-+	MPP18_NF_IO0,
-+	MPP19_NF_IO1,
-+	MPP20_GPIO,
-+	MPP21_GPIO,
-+	MPP22_GPIO,
-+	MPP23_GPIO,
-+	MPP32_GPIO,
-+	MPP33_GE1_13,
-+	MPP39_AUDIO_I2SBCLK,
-+	MPP40_AUDIO_I2SDO,
-+	MPP41_AUDIO_I2SLRC,
-+	MPP42_AUDIO_I2SMCLK,
-+	MPP45_GPIO,		/* Power button */
-+	MPP48_GPIO,		/* Board power off */
-+	0
-+};
-+
-+#define HP_T5325_GPIO_POWER_OFF		48
-+
-+static void hp_t5325_power_off(void)
-+{
-+	gpio_set_value(HP_T5325_GPIO_POWER_OFF, 1);
-+}
-+
-+static void __init hp_t5325_init(void)
-+{
-+	/*
-+	 * Basic setup. Needs to be called early.
-+	 */
-+	kirkwood_init();
-+	kirkwood_mpp_conf(hp_t5325_mpp_config);
-+
-+	kirkwood_uart0_init();
-+	spi_register_board_info(hp_t5325_spi_slave_info,
-+				ARRAY_SIZE(hp_t5325_spi_slave_info));
-+	kirkwood_spi_init();
-+	kirkwood_i2c_init();
-+	kirkwood_ge00_init(&hp_t5325_ge00_data);
-+	kirkwood_sata_init(&hp_t5325_sata_data);
-+	kirkwood_ehci_init();
-+	platform_device_register(&hp_t5325_button_device);
-+
-+	if (gpio_request(HP_T5325_GPIO_POWER_OFF, "power-off") == 0 &&
-+	    gpio_direction_output(HP_T5325_GPIO_POWER_OFF, 0) == 0)
-+		pm_power_off = hp_t5325_power_off;
-+	else
-+		pr_err("t5325: failed to configure power-off GPIO\n");
-+}
-+
-+static int __init hp_t5325_pci_init(void)
-+{
-+	if (machine_is_t5325())
-+		kirkwood_pcie_init();
-+
-+	return 0;
-+}
-+subsys_initcall(hp_t5325_pci_init);
-+
-+MACHINE_START(T5325, "HP t5325 Thin Client")
-+	/* Maintainer: Martin Michlmayr <tbm@cyrius.com> */
-+	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
-+	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
-+	.boot_params	= 0x00000100,
-+	.init_machine	= hp_t5325_init,
-+	.map_io		= kirkwood_map_io,
-+	.init_irq	= kirkwood_init_irq,
-+	.timer		= &kirkwood_timer,
-+MACHINE_END
+> We could use a global mutex for all clocks, but that would complicate the 
+> interface by requiring non-locking versions of enable/disable, to allow 
+> recursive enable/disable of parent clocks. Also, we'd lose any parallelism 
+> possible in clock initialisation (we want boot to be fast, right?)
+
+More to the point, we need it to _work_ fast. It isn't just boot time.
+ 
+> Without all the debug stuff, it looks like a mutex is 12 bytes on UP, 20 on 
+> SMP. That brings the maximum possible overhead to 26kB/43kB. More tolerable, 
+> but not great.
+>
+> You know what would be awesome? if we could put platform-specific code in 
+> their own sections and the discard the ones we know we won't need after boot. 
+> But that's a discussion for another day...
+> 
+> > >        int             (*enable)(struct clk *);
+> > 
+> > still think that not passing an bool as a second argument is silly.
+> 
+> Still don't :D
+
+Pfft.
+
+> > > +struct clk {
+> > > +	const struct clk_ops	*ops;
+> > > +	unsigned int		enable_count;
+> > > +	struct mutex		mutex;
+> > > +};
+> > 
+> > how about defining a nice kerneldoc for this.
+> 
+> Shall do. I've also decided to un-inline the base API, which means that I can 
+> use all of the existing prototypes in clk.h, which means the kerneldoc is 
+> shared too.
+
+Ok, I was going to suggest that anyway.
+
+> 
+> > > +#define INIT_CLK(name, o) \
+> > > +	{ .ops = &o, .enable_count = 0, \
+> > > +		.mutex = __MUTEX_INITIALIZER(name.mutex) }
+> > 
+> > how about doing the mutex initinitialisation at registration
+> > time, will save a pile of non-zero code in the image to mess up
+> > the compression.
+> 
+> I've just yesterday added the following to my tree, to allow dynamic 
+> initialisation:
+> 
+> static inline void clk_init(struct clk *clk, const struct clk_ops *ops)
+> {
+> 	clk->ops = ops;
+> 	clk->enable_count = 0;
+> 	mutex_init(&clk->mutex);
+> }
+> 
+> So we can do this either way.
+
+the above is in my view better.
+ 
+> > ~> +struct clk_ops {
+> > 
+> > > +       int             (*enable)(struct clk *);
+> > > +       void            (*disable)(struct clk *);
+> > > +       unsigned long   (*get_rate)(struct clk *);
+> > > +       void            (*put)(struct clk *);
+> > > +       long            (*round_rate)(struct clk *, unsigned long);
+> > > +       int             (*set_rate)(struct clk *, unsigned long);
+> > > +       int             (*set_parent)(struct clk *, struct clk *);
+> > > +       struct clk*     (*get_parent)(struct clk *);
+> > 
+> > should each clock carry a parent field and the this is returned by
+> > the get parent call.~~
+> 
+> I've been debating dropping the get_parent and set_parent ops entirely, 
+> actually; setting a parent seems to be quite specific to hardware (you have to 
+> know that a particular clock can be a parent of another clock), so it seems 
+> like something that we shouldn't expose to drivers through this API. For the 
+> code that knows the hardware, it can probably access the underlying clock 
+> types directly.
+>
+
+Not really, and it is in use with extant drivers, so not easily
+removable either.
+
+> However, I see that something in the samsung code uses clk_get_parent for what 
+> seems like a sane purpose, so have left them in for now. Or could this be done 
+> differently?
+
+nope, and I really like this method.
+ 
+> > > +static inline int clk_enable(struct clk *clk)
+> > > +{
+> > > +	int ret = 0;
+> > > +
+> > > +	if (!clk->ops->enable)
+> > > +		return 0;
+> > > +
+> > > +	mutex_lock(&clk->mutex);
+> > > +	if (!clk->enable_count)
+> > > +		ret = clk->ops->enable(clk);
+> > > +
+> > > +	if (!ret)
+> > > +		clk->enable_count++;
+> > > +	mutex_unlock(&clk->mutex);
+> > > +
+> > > +	return ret;
+> > > +}
+> > 
+> > So we're leaving the enable parent code now to each implementation?
+> > 
+> > I think this is a really bad decision, it leaves so much open to bad
+> > code repetition, as well as something the core should really be doing
+> > if it had a parent clock field.
+> 
+> I'm tempted to go in either direction - either no [sg]et_parent in the clk 
+> API, or add a parent to struct clk, but first I'd need to get up to speed on 
+> the external uses of the clk's parent. Want to catch me on IRC to discuss?
+
+Possibly, still screwed on timezone.
+ 
+> > ~> +static inline void clk_disable(struct clk *clk)
+> > 
+> > > +{
+> > > +	if (!clk->ops->enable)
+> > > +		return;
+> > 
+> > so if we've no enable call we ignore disable too?
+> 
+> Typo; this should be "if (!clk->ops->disable)". Will fix for the next 
+> revision.
+
+yes, pointing that out.
+ 
+> > also, we don't keep an enable count if this fields are in use,
+> > could people rely on this being correct even if the clock has
+> > no enable/disable fields.
+> > 
+> > Would much rather see the enable_count being kept up-to-date
+> > no matter what, given it may be watched by other parts of the
+> > implementation, useful for debug info, and possibly useful if
+> > later in the start sequence the clk_ops get changed to have this
+> > field.~
+> 
+> Checking for the ops first allows us to skip the mutex acquire, but I'm happy 
+> either way.
+
+erm, sorry, yes, you can check for them before mutex. any chages
+should be done with mutex held.
+ 
+> > > +~	mutex_lock(&clk->mutex);
+> > > +
+> > > +	if (!--clk->enable_count)
+> > > +		clk->ops->disable(clk);
+> > > +
+> > > +	mutex_unlock(&clk->mutex);
+> > > +}
+> > > +
+> > > +static inline unsigned long clk_get_rate(struct clk *clk)
+> > > +{
+> > > +	if (clk->ops->get_rate)
+> > > +		return clk->ops->get_rate(clk);
+> > > +	return 0;
+> > > +}
+> > > +
+> > > +static inline void clk_put(struct clk *clk)
+> > > +{
+> > > +	if (clk->ops->put)
+> > > +		clk->ops->put(clk);
+> > > +}
+> > 
+> > I'm beginging to wonder if we don't just have a set of default ops
+> > that get set into the clk+ops at registration time if these do
+> > not have an implementation.
+> 
+> Using default ops would mean a couple of things:
+> 
+> 1) we can no longer mark the real ops as const; and
+> 2) we can no longer avoid the hard-to-predict indirect branch
+
+ok, how about people have to mark these as a default non op in their
+clock structure, and then error if they try and register a clock with
+null ops. anyone changing these to NULL later deserves all the pain and agony
+they get.
+ 
+> > this means that either any driver that is using a multi-parent clock
+> > has to deal with the proper enable/disable of the parents (this is
+> > is going to lead to code repetition, and I bet people will get it
+> > badly wrong).
+> > 
+> > I belive the core of the clock code should deal with this, since
+> > otherwise we end up with the situation of the same code being
+> > repeated throughout the kernel.
+> 
+> I see the concern here, but I'll defer this one until we've decided on whether 
+> or not the parents should be exposed through the API.
+
+Ok, let's find out what other people think too. I'm not the only user.
+
+BTW, we do need to do some cleanups to the samsung code, we've a few
+places where we explicitly name clocks. Discussion for seperate
+thread.
 
 -- 
-Martin Michlmayr
-http://www.cyrius.com/
+Ben (ben at fluff.org, http://www.fluff.org/)
+
+  'a smiley only costs 4 bytes'
