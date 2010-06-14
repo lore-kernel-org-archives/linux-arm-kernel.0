@@ -1,253 +1,518 @@
 From: konkers@android.com (Erik Gilling)
-Date: Mon, 14 Jun 2010 14:10:18 -0700
-Subject: [PATCH v3 02/11] [ARM] tegra: Add IRQ support
-In-Reply-To: <1276549827-2688-2-git-send-email-konkers@android.com>
+Date: Mon, 14 Jun 2010 14:10:20 -0700
+Subject: [PATCH v3 04/11] [ARM] tegra: SMP support
+In-Reply-To: <1276549827-2688-4-git-send-email-konkers@android.com>
 References: <1271198563-10424-1-git-send-email-konkers@android.com>
 	<1276549827-2688-1-git-send-email-konkers@android.com>
 	<1276549827-2688-2-git-send-email-konkers@android.com>
-Message-ID: <1276549827-2688-3-git-send-email-konkers@android.com>
+	<1276549827-2688-3-git-send-email-konkers@android.com>
+	<1276549827-2688-4-git-send-email-konkers@android.com>
+Message-ID: <1276549827-2688-5-git-send-email-konkers@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2: fixes from Russell King
-	- include linux/io.h instead of asm/io.h and mach/io.h
+From: Colin Cross <ccross@android.com>
 
 Signed-off-by: Colin Cross <ccross@android.com>
 Signed-off-by: Erik Gilling <konkers@android.com>
 ---
- arch/arm/mach-tegra/Makefile            |    1 +
- arch/arm/mach-tegra/include/mach/irqs.h |  173 +++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/irq.c               |   34 ++++++
- 3 files changed, 208 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-tegra/include/mach/irqs.h
- create mode 100644 arch/arm/mach-tegra/irq.c
+ arch/arm/Kconfig                       |   11 ++-
+ arch/arm/mach-tegra/Makefile           |    2 +
+ arch/arm/mach-tegra/headsmp.S          |   61 +++++++++++++
+ arch/arm/mach-tegra/hotplug.c          |  140 ++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/include/mach/smp.h |   30 ++++++
+ arch/arm/mach-tegra/localtimer.c       |   25 +++++
+ arch/arm/mach-tegra/platsmp.c          |  156 ++++++++++++++++++++++++++++++++
+ 7 files changed, 421 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/headsmp.S
+ create mode 100644 arch/arm/mach-tegra/hotplug.c
+ create mode 100644 arch/arm/mach-tegra/include/mach/smp.h
+ create mode 100644 arch/arm/mach-tegra/localtimer.c
+ create mode 100644 arch/arm/mach-tegra/platsmp.c
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 98e41e1..c8f28f8 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1113,10 +1113,11 @@ config SMP
+ 	bool "Symmetric Multi-Processing (EXPERIMENTAL)"
+ 	depends on EXPERIMENTAL && (REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP ||\
+ 		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 ||\
+-		 ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
++		 ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_TEGRA)
+ 	depends on GENERIC_CLOCKEVENTS
+ 	select USE_GENERIC_SMP_HELPERS
+-	select HAVE_ARM_SCU if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
++	select HAVE_ARM_SCU if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500 || \
++		 ARCH_VEXPRESS_CA9X4 || ARCH_TEGRA)
+ 	help
+ 	  This enables support for systems with more than one CPU. If you have
+ 	  a system with only one CPU, like most personal computers, say N. If
+@@ -1185,9 +1186,11 @@ config HOTPLUG_CPU
+ config LOCAL_TIMERS
+ 	bool "Use local timer interrupts"
+ 	depends on SMP && (REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || \
+-		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || ARCH_U8500)
++		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
++		ARCH_U8500 || ARCH_TEGRA)
+ 	default y
+-	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500)
++	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500 || \
++		ARCH_TEGRA)
+ 	help
+ 	  Enable support for local timers on SMP platforms, rather then the
+ 	  legacy IPI broadcast method.  Local timers allows the system
 diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 81f003d..a0d2c5b 100644
+index e20546a..f339559 100644
 --- a/arch/arm/mach-tegra/Makefile
 +++ b/arch/arm/mach-tegra/Makefile
-@@ -1,2 +1,3 @@
- obj-y                                   += common.o
- obj-y                                   += io.o
-+obj-y                                   += irq.o
-diff --git a/arch/arm/mach-tegra/include/mach/irqs.h b/arch/arm/mach-tegra/include/mach/irqs.h
+@@ -3,3 +3,5 @@ obj-y                                   += io.o
+ obj-y                                   += irq.o
+ obj-y                                   += clock.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
++obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
++obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
+diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
 new file mode 100644
-index 0000000..20f640e
+index 0000000..b5349b2
 --- /dev/null
-+++ b/arch/arm/mach-tegra/include/mach/irqs.h
-@@ -0,0 +1,173 @@
-+/*
-+ * arch/arm/mach-tegra/include/mach/irqs.h
-+ *
-+ * Copyright (C) 2010 Google, Inc.
-+ *
-+ * Author:
-+ *	Colin Cross <ccross@google.com>
-+ *	Erik Gilling <konkers@google.com>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#ifndef __MACH_TEGRA_IRQS_H
-+#define __MACH_TEGRA_IRQS_H
-+
-+#define INT_GIC_BASE			0
-+
-+#define IRQ_LOCALTIMER                  29
-+
-+/* Primary Interrupt Controller */
-+#define INT_PRI_BASE			(INT_GIC_BASE + 32)
-+#define INT_TMR1			(INT_PRI_BASE + 0)
-+#define INT_TMR2			(INT_PRI_BASE + 1)
-+#define INT_RTC				(INT_PRI_BASE + 2)
-+#define INT_I2S2			(INT_PRI_BASE + 3)
-+#define INT_SHR_SEM_INBOX_IBF		(INT_PRI_BASE + 4)
-+#define INT_SHR_SEM_INBOX_IBE		(INT_PRI_BASE + 5)
-+#define INT_SHR_SEM_OUTBOX_IBF		(INT_PRI_BASE + 6)
-+#define INT_SHR_SEM_OUTBOX_IBE		(INT_PRI_BASE + 7)
-+#define INT_VDE_UCQ_ERROR		(INT_PRI_BASE + 8)
-+#define INT_VDE_SYNC_TOKEN		(INT_PRI_BASE + 9)
-+#define INT_VDE_BSE_V			(INT_PRI_BASE + 10)
-+#define INT_VDE_BSE_A			(INT_PRI_BASE + 11)
-+#define INT_VDE_SXE			(INT_PRI_BASE + 12)
-+#define INT_I2S1			(INT_PRI_BASE + 13)
-+#define INT_SDMMC1			(INT_PRI_BASE + 14)
-+#define INT_SDMMC2			(INT_PRI_BASE + 15)
-+#define INT_XIO				(INT_PRI_BASE + 16)
-+#define INT_VDE				(INT_PRI_BASE + 17)
-+#define INT_AVP_UCQ			(INT_PRI_BASE + 18)
-+#define INT_SDMMC3			(INT_PRI_BASE + 19)
-+#define INT_USB				(INT_PRI_BASE + 20)
-+#define INT_USB2			(INT_PRI_BASE + 21)
-+#define INT_PRI_RES_22			(INT_PRI_BASE + 22)
-+#define INT_EIDE			(INT_PRI_BASE + 23)
-+#define INT_NANDFLASH			(INT_PRI_BASE + 24)
-+#define INT_VCP				(INT_PRI_BASE + 25)
-+#define INT_APB_DMA			(INT_PRI_BASE + 26)
-+#define INT_AHB_DMA			(INT_PRI_BASE + 27)
-+#define INT_GNT_0			(INT_PRI_BASE + 28)
-+#define INT_GNT_1			(INT_PRI_BASE + 29)
-+#define INT_OWR				(INT_PRI_BASE + 30)
-+#define INT_SDMMC4			(INT_PRI_BASE + 31)
-+
-+/* Secondary Interrupt Controller */
-+#define INT_SEC_BASE			(INT_PRI_BASE + 32)
-+#define INT_GPIO1			(INT_SEC_BASE + 0)
-+#define INT_GPIO2			(INT_SEC_BASE + 1)
-+#define INT_GPIO3			(INT_SEC_BASE + 2)
-+#define INT_GPIO4			(INT_SEC_BASE + 3)
-+#define INT_UARTA			(INT_SEC_BASE + 4)
-+#define INT_UARTB			(INT_SEC_BASE + 5)
-+#define INT_I2C				(INT_SEC_BASE + 6)
-+#define INT_SPI				(INT_SEC_BASE + 7)
-+#define INT_TWC				(INT_SEC_BASE + 8)
-+#define INT_TMR3			(INT_SEC_BASE + 9)
-+#define INT_TMR4			(INT_SEC_BASE + 10)
-+#define INT_FLOW_RSM0			(INT_SEC_BASE + 11)
-+#define INT_FLOW_RSM1			(INT_SEC_BASE + 12)
-+#define INT_SPDIF			(INT_SEC_BASE + 13)
-+#define INT_UARTC			(INT_SEC_BASE + 14)
-+#define INT_MIPI			(INT_SEC_BASE + 15)
-+#define INT_EVENTA			(INT_SEC_BASE + 16)
-+#define INT_EVENTB			(INT_SEC_BASE + 17)
-+#define INT_EVENTC			(INT_SEC_BASE + 18)
-+#define INT_EVENTD			(INT_SEC_BASE + 19)
-+#define INT_VFIR			(INT_SEC_BASE + 20)
-+#define INT_DVC				(INT_SEC_BASE + 21)
-+#define INT_SYS_STATS_MON		(INT_SEC_BASE + 22)
-+#define INT_GPIO5			(INT_SEC_BASE + 23)
-+#define INT_CPU0_PMU_INTR		(INT_SEC_BASE + 24)
-+#define INT_CPU2_PMU_INTR		(INT_SEC_BASE + 25)
-+#define INT_SEC_RES_26			(INT_SEC_BASE + 26)
-+#define INT_S_LINK1			(INT_SEC_BASE + 27)
-+#define INT_APB_DMA_COP			(INT_SEC_BASE + 28)
-+#define INT_AHB_DMA_COP			(INT_SEC_BASE + 29)
-+#define INT_DMA_TX			(INT_SEC_BASE + 30)
-+#define INT_DMA_RX			(INT_SEC_BASE + 31)
-+
-+/* Tertiary Interrupt Controller */
-+#define INT_TRI_BASE			(INT_SEC_BASE + 32)
-+#define INT_HOST1X_COP_SYNCPT		(INT_TRI_BASE + 0)
-+#define INT_HOST1X_MPCORE_SYNCPT	(INT_TRI_BASE + 1)
-+#define INT_HOST1X_COP_GENERAL		(INT_TRI_BASE + 2)
-+#define INT_HOST1X_MPCORE_GENERAL	(INT_TRI_BASE + 3)
-+#define INT_MPE_GENERAL			(INT_TRI_BASE + 4)
-+#define INT_VI_GENERAL			(INT_TRI_BASE + 5)
-+#define INT_EPP_GENERAL			(INT_TRI_BASE + 6)
-+#define INT_ISP_GENERAL			(INT_TRI_BASE + 7)
-+#define INT_2D_GENERAL			(INT_TRI_BASE + 8)
-+#define INT_DISPLAY_GENERAL		(INT_TRI_BASE + 9)
-+#define INT_DISPLAY_B_GENERAL		(INT_TRI_BASE + 10)
-+#define INT_HDMI			(INT_TRI_BASE + 11)
-+#define INT_TVO_GENERAL			(INT_TRI_BASE + 12)
-+#define INT_MC_GENERAL			(INT_TRI_BASE + 13)
-+#define INT_EMC_GENERAL			(INT_TRI_BASE + 14)
-+#define INT_TRI_RES_15			(INT_TRI_BASE + 15)
-+#define INT_TRI_RES_16			(INT_TRI_BASE + 16)
-+#define INT_AC97			(INT_TRI_BASE + 17)
-+#define INT_SPI_2			(INT_TRI_BASE + 18)
-+#define INT_SPI_3			(INT_TRI_BASE + 19)
-+#define INT_I2C2			(INT_TRI_BASE + 20)
-+#define INT_KBC				(INT_TRI_BASE + 21)
-+#define INT_EXTERNAL_PMU		(INT_TRI_BASE + 22)
-+#define INT_GPIO6			(INT_TRI_BASE + 23)
-+#define INT_TVDAC			(INT_TRI_BASE + 24)
-+#define INT_GPIO7			(INT_TRI_BASE + 25)
-+#define INT_UARTD			(INT_TRI_BASE + 26)
-+#define INT_UARTE			(INT_TRI_BASE + 27)
-+#define INT_I2C3			(INT_TRI_BASE + 28)
-+#define INT_SPI_4			(INT_TRI_BASE + 29)
-+#define INT_TRI_RES_30			(INT_TRI_BASE + 30)
-+#define INT_SW_RESERVED			(INT_TRI_BASE + 31)
-+
-+/* Quaternary Interrupt Controller */
-+#define INT_QUAD_BASE			(INT_TRI_BASE + 32)
-+#define INT_SNOR			(INT_QUAD_BASE + 0)
-+#define INT_USB3			(INT_QUAD_BASE + 1)
-+#define INT_PCIE_INTR			(INT_QUAD_BASE + 2)
-+#define INT_PCIE_MSI			(INT_QUAD_BASE + 3)
-+#define INT_QUAD_RES_4			(INT_QUAD_BASE + 4)
-+#define INT_QUAD_RES_5			(INT_QUAD_BASE + 5)
-+#define INT_QUAD_RES_6			(INT_QUAD_BASE + 6)
-+#define INT_QUAD_RES_7			(INT_QUAD_BASE + 7)
-+#define INT_APB_DMA_CH0			(INT_QUAD_BASE + 8)
-+#define INT_APB_DMA_CH1			(INT_QUAD_BASE + 9)
-+#define INT_APB_DMA_CH2			(INT_QUAD_BASE + 10)
-+#define INT_APB_DMA_CH3			(INT_QUAD_BASE + 11)
-+#define INT_APB_DMA_CH4			(INT_QUAD_BASE + 12)
-+#define INT_APB_DMA_CH5			(INT_QUAD_BASE + 13)
-+#define INT_APB_DMA_CH6			(INT_QUAD_BASE + 14)
-+#define INT_APB_DMA_CH7			(INT_QUAD_BASE + 15)
-+#define INT_APB_DMA_CH8			(INT_QUAD_BASE + 16)
-+#define INT_APB_DMA_CH9			(INT_QUAD_BASE + 17)
-+#define INT_APB_DMA_CH10		(INT_QUAD_BASE + 18)
-+#define INT_APB_DMA_CH11		(INT_QUAD_BASE + 19)
-+#define INT_APB_DMA_CH12		(INT_QUAD_BASE + 20)
-+#define INT_APB_DMA_CH13		(INT_QUAD_BASE + 21)
-+#define INT_APB_DMA_CH14		(INT_QUAD_BASE + 22)
-+#define INT_APB_DMA_CH15		(INT_QUAD_BASE + 23)
-+#define INT_QUAD_RES_24			(INT_QUAD_BASE + 24)
-+#define INT_QUAD_RES_25			(INT_QUAD_BASE + 25)
-+#define INT_QUAD_RES_26			(INT_QUAD_BASE + 26)
-+#define INT_QUAD_RES_27			(INT_QUAD_BASE + 27)
-+#define INT_QUAD_RES_28			(INT_QUAD_BASE + 28)
-+#define INT_QUAD_RES_29			(INT_QUAD_BASE + 29)
-+#define INT_QUAD_RES_30			(INT_QUAD_BASE + 30)
-+#define INT_QUAD_RES_31			(INT_QUAD_BASE + 31)
-+
-+#define INT_GPIO_BASE			(INT_QUAD_BASE + 32)
-+#define INT_GPIO_NR			(28 * 8)
-+
-+#define NR_IRQS				(INT_GPIO_BASE + INT_GPIO_NR)
-+
-+#endif
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-new file mode 100644
-index 0000000..1fdbe70
---- /dev/null
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -0,0 +1,34 @@
-+/*
-+ * Copyright (C) 2010 Google, Inc.
-+ *
-+ * Author:
-+ *	Colin Cross <ccross@google.com>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#include <linux/kernel.h>
++++ b/arch/arm/mach-tegra/headsmp.S
+@@ -0,0 +1,61 @@
++#include <linux/linkage.h>
 +#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/io.h>
++
++        .section ".text.head", "ax"
++	__CPUINIT
++
++/*
++ * Tegra specific entry point for secondary CPUs.
++ *   The secondary kernel init calls v7_flush_dcache_all before it enables
++ *   the L1; however, the L1 comes out of reset in an undefined state, so
++ *   the clean + invalidate performed by v7_flush_dcache_all causes a bunch
++ *   of cache lines with uninitialized data and uninitialized tags to get
++ *   written out to memory, which does really unpleasant things to the main
++ *   processor.  We fix this by performing an invalidate, rather than a
++ *   clean + invalidate, before jumping into the kernel.
++ */
++ENTRY(v7_invalidate_l1)
++        mov     r0, #0
++        mcr     p15, 2, r0, c0, c0, 0
++        mrc     p15, 1, r0, c0, c0, 0
++
++        ldr     r1, =0x7fff
++        and     r2, r1, r0, lsr #13
++
++        ldr     r1, =0x3ff
++
++        and     r3, r1, r0, lsr #3  @ NumWays - 1
++        add     r2, r2, #1          @ NumSets
++
++        and     r0, r0, #0x7
++        add     r0, r0, #4          @ SetShift
++
++        clz     r1, r3              @ WayShift
++        add     r4, r3, #1          @ NumWays
++1:      sub     r2, r2, #1          @ NumSets--
++        mov     r3, r4              @ Temp = NumWays
++2:      subs    r3, r3, #1          @ Temp--
++        mov     r5, r3, lsl r1
++        mov     r6, r2, lsl r0
++        orr     r5, r5, r6          @ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
++        mcr     p15, 0, r5, c7, c6, 2
++        bgt     2b
++        cmp     r2, #0
++        bgt     1b
++        dsb
++        isb
++        mov     pc, lr
++ENDPROC(v7_invalidate_l1)
++
++ENTRY(tegra_secondary_startup)
++	msr	cpsr_fsxc, #0xd3
++        bl      v7_invalidate_l1
++	mrc	p15, 0, r0, c0, c0, 5
++        and	r0, r0, #15
++        ldr     r1, =0x6000f100
++        str     r0, [r1]
++1:      ldr     r2, [r1]
++        cmp     r0, r2
++        beq     1b
++        b       secondary_startup
++ENDPROC(tegra_secondary_startup)
+diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+new file mode 100644
+index 0000000..8e7f115
+--- /dev/null
++++ b/arch/arm/mach-tegra/hotplug.c
+@@ -0,0 +1,140 @@
++/*
++ *  linux/arch/arm/mach-realview/hotplug.c
++ *
++ *  Copyright (C) 2002 ARM Ltd.
++ *  All Rights Reserved
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/kernel.h>
++#include <linux/errno.h>
++#include <linux/smp.h>
++#include <linux/completion.h>
++
++#include <asm/cacheflush.h>
++
++static DECLARE_COMPLETION(cpu_killed);
++
++static inline void cpu_enter_lowpower(void)
++{
++	unsigned int v;
++
++	flush_cache_all();
++	asm volatile(
++	"	mcr	p15, 0, %1, c7, c5, 0\n"
++	"	mcr	p15, 0, %1, c7, c10, 4\n"
++	/*
++	 * Turn off coherency
++	 */
++	"	mrc	p15, 0, %0, c1, c0, 1\n"
++	"	bic	%0, %0, #0x20\n"
++	"	mcr	p15, 0, %0, c1, c0, 1\n"
++	"	mrc	p15, 0, %0, c1, c0, 0\n"
++	"	bic	%0, %0, #0x04\n"
++	"	mcr	p15, 0, %0, c1, c0, 0\n"
++	  : "=&r" (v)
++	  : "r" (0)
++	  : "cc");
++}
++
++static inline void cpu_leave_lowpower(void)
++{
++	unsigned int v;
++
++	asm volatile(
++	"mrc	p15, 0, %0, c1, c0, 0\n"
++	"	orr	%0, %0, #0x04\n"
++	"	mcr	p15, 0, %0, c1, c0, 0\n"
++	"	mrc	p15, 0, %0, c1, c0, 1\n"
++	"	orr	%0, %0, #0x20\n"
++	"	mcr	p15, 0, %0, c1, c0, 1\n"
++	  : "=&r" (v)
++	  :
++	  : "cc");
++}
++
++static inline void platform_do_lowpower(unsigned int cpu)
++{
++	/*
++	 * there is no power-control hardware on this platform, so all
++	 * we can do is put the core into WFI; this is safe as the calling
++	 * code will have already disabled interrupts
++	 */
++	for (;;) {
++		/*
++		 * here's the WFI
++		 */
++		asm(".word	0xe320f003\n"
++		    :
++		    :
++		    : "memory", "cc");
++
++		/*if (pen_release == cpu) {*/
++			/*
++			 * OK, proper wakeup, we're done
++			 */
++			break;
++		/*}*/
++
++		/*
++		 * getting here, means that we have come out of WFI without
++		 * having been woken up - this shouldn't happen
++		 *
++		 * The trouble is, letting people know about this is not really
++		 * possible, since we are currently running incoherently, and
++		 * therefore cannot safely call printk() or anything else
++		 */
++#ifdef DEBUG
++		printk(KERN_WARN "CPU%u: spurious wakeup call\n", cpu);
++#endif
++	}
++}
++
++int platform_cpu_kill(unsigned int cpu)
++{
++	return wait_for_completion_timeout(&cpu_killed, 5000);
++}
++
++/*
++ * platform-specific code to shutdown a CPU
++ *
++ * Called with IRQs disabled
++ */
++void platform_cpu_die(unsigned int cpu)
++{
++#ifdef DEBUG
++	unsigned int this_cpu = hard_smp_processor_id();
++
++	if (cpu != this_cpu) {
++		printk(KERN_CRIT "Eek! platform_cpu_die running on %u, should be %u\n",
++			   this_cpu, cpu);
++		BUG();
++	}
++#endif
++
++	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
++	complete(&cpu_killed);
++
++	/*
++	 * we're ready for shutdown now, so do it
++	 */
++	cpu_enter_lowpower();
++	platform_do_lowpower(cpu);
++
++	/*
++	 * bring this CPU back into the world of cache
++	 * coherency, and then restore interrupts
++	 */
++	cpu_leave_lowpower();
++}
++
++int platform_cpu_disable(unsigned int cpu)
++{
++	/*
++	 * we don't allow CPU 0 to be shutdown (it is still too special
++	 * e.g. clock tick interrupts)
++	 */
++	return cpu == 0 ? -EPERM : 0;
++}
+diff --git a/arch/arm/mach-tegra/include/mach/smp.h b/arch/arm/mach-tegra/include/mach/smp.h
+new file mode 100644
+index 0000000..8b42dab
+--- /dev/null
++++ b/arch/arm/mach-tegra/include/mach/smp.h
+@@ -0,0 +1,30 @@
++#ifndef ASMARM_ARCH_SMP_H
++#define ASMARM_ARCH_SMP_H
++
 +
 +#include <asm/hardware/gic.h>
 +
++#define hard_smp_processor_id()			\
++	({						\
++		unsigned int cpunum;			\
++		__asm__("mrc p15, 0, %0, c0, c0, 5"	\
++			: "=r" (cpunum));		\
++		cpunum &= 0x0F;				\
++	})
++
++/*
++ * We use IRQ1 as the IPI
++ */
++static inline void smp_cross_call(const struct cpumask *mask)
++{
++	gic_raise_softirq(mask, 1);
++}
++
++/*
++ * Do nothing on MPcore.
++ */
++static inline void smp_cross_call_done(cpumask_t callmap)
++{
++}
++
++#endif
+diff --git a/arch/arm/mach-tegra/localtimer.c b/arch/arm/mach-tegra/localtimer.c
+new file mode 100644
+index 0000000..f81ca7c
+--- /dev/null
++++ b/arch/arm/mach-tegra/localtimer.c
+@@ -0,0 +1,25 @@
++/*
++ *  arch/arm/mach-tegra/localtimer.c
++ *
++ *  Copyright (C) 2002 ARM Ltd.
++ *  All Rights Reserved
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/init.h>
++#include <linux/smp.h>
++#include <linux/clockchips.h>
++#include <asm/irq.h>
++#include <asm/smp_twd.h>
++#include <asm/localtimer.h>
++
++/*
++ * Setup the local clock events for a CPU.
++ */
++void __cpuinit local_timer_setup(struct clock_event_device *evt)
++{
++	evt->irq = IRQ_LOCALTIMER;
++	twd_timer_setup(evt);
++}
+diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+new file mode 100644
+index 0000000..1c0fd92
+--- /dev/null
++++ b/arch/arm/mach-tegra/platsmp.c
+@@ -0,0 +1,156 @@
++/*
++ *  linux/arch/arm/mach-tegra/platsmp.c
++ *
++ *  Copyright (C) 2002 ARM Ltd.
++ *  All Rights Reserved
++ *
++ *  Copyright (C) 2009 Palm
++ *  All Rights Reserved
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/init.h>
++#include <linux/errno.h>
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/jiffies.h>
++#include <linux/smp.h>
++#include <linux/io.h>
++
++#include <asm/cacheflush.h>
++#include <mach/hardware.h>
++#include <asm/mach-types.h>
++#include <asm/localtimer.h>
++#include <asm/smp_scu.h>
++
 +#include <mach/iomap.h>
 +
-+#include "board.h"
++extern void tegra_secondary_startup(void);
 +
-+void __init tegra_init_irq(void)
++static DEFINE_SPINLOCK(boot_lock);
++static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
++
++#define EVP_CPU_RESET_VECTOR \
++	(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100)
++#define CLK_RST_CONTROLLER_CLK_CPU_CMPLX \
++	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x4c)
++#define CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR \
++	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x344)
++
++void __cpuinit platform_secondary_init(unsigned int cpu)
 +{
-+	gic_dist_init(0, IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE), 29);
-+	gic_cpu_init(0, IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
++	trace_hardirqs_off();
++
++	/*
++	 * if any interrupts are already enabled for the primary
++	 * core (e.g. timer irq), then they will not have been enabled
++	 * for us: do so
++	 */
++	gic_cpu_init(0, IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x100);
++
++	/*
++	 * Synchronise with the boot thread.
++	 */
++	spin_lock(&boot_lock);
++	spin_unlock(&boot_lock);
++}
++
++int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	unsigned long old_boot_vector;
++	unsigned long boot_vector;
++	unsigned long timeout;
++	u32 reg;
++
++	/*
++	 * set synchronisation state between this boot processor
++	 * and the secondary one
++	 */
++	spin_lock(&boot_lock);
++
++
++	/* set the reset vector to point to the secondary_startup routine */
++
++	boot_vector = virt_to_phys(tegra_secondary_startup);
++	old_boot_vector = readl(EVP_CPU_RESET_VECTOR);
++	writel(boot_vector, EVP_CPU_RESET_VECTOR);
++
++	/* enable cpu clock on cpu1 */
++	reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
++	writel(reg & ~(1<<9), CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
++
++	reg = (1<<13) | (1<<9) | (1<<5) | (1<<1);
++	writel(reg, CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR);
++
++	smp_wmb();
++	flush_cache_all();
++
++	/* unhalt the cpu */
++	writel(0, IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + 0x14);
++
++	timeout = jiffies + (1 * HZ);
++	while (time_before(jiffies, timeout)) {
++		if (readl(EVP_CPU_RESET_VECTOR) != boot_vector)
++			break;
++		udelay(10);
++	}
++
++	/* put the old boot vector back */
++	writel(old_boot_vector, EVP_CPU_RESET_VECTOR);
++
++	/*
++	 * now the secondary core is starting up let it run its
++	 * calibrations, then wait for it to finish
++	 */
++	spin_unlock(&boot_lock);
++
++	return 0;
++}
++
++/*
++ * Initialise the CPU possible map early - this describes the CPUs
++ * which may be present or become present in the system.
++ */
++void __init smp_init_cpus(void)
++{
++	unsigned int i, ncores = scu_get_core_count(scu_base);
++
++	for (i = 0; i < ncores; i++)
++		cpu_set(i, cpu_possible_map);
++}
++
++void __init smp_prepare_cpus(unsigned int max_cpus)
++{
++	unsigned int ncores = scu_get_core_count(scu_base);
++	unsigned int cpu = smp_processor_id();
++	int i;
++
++	smp_store_cpu_info(cpu);
++
++	/*
++	 * are we trying to boot more cores than exist?
++	 */
++	if (max_cpus > ncores)
++		max_cpus = ncores;
++
++	/*
++	 * Initialise the present map, which describes the set of CPUs
++	 * actually populated at the present time.
++	 */
++	for (i = 0; i < max_cpus; i++)
++		set_cpu_present(i, true);
++
++	/*
++	 * Initialise the SCU if there are more than one CPU and let
++	 * them know where to start. Note that, on modern versions of
++	 * MILO, the "poke" doesn't actually do anything until each
++	 * individual core is sent a soft interrupt to get it out of
++	 * WFI
++	 */
++	if (max_cpus > 1) {
++		percpu_timer_setup();
++		scu_enable(scu_base);
++	}
 +}
 -- 
 1.6.5.6
