@@ -1,27 +1,66 @@
 From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Mon, 14 Jun 2010 12:44:43 +0200
-Subject: [PATCH v2] rtc-s3c: Fix rtc-s3c driver initialization
-In-Reply-To: <201006141338.47947.anarsoul@gmail.com>
-References: <1274975846-14006-1-git-send-email-anarsoul@gmail.com>
-	<201006140904.17950.anarsoul@gmail.com>
-	<4C1601F0.1060209@gmail.com>
-	<201006141338.47947.anarsoul@gmail.com>
-Message-ID: <4C16081B.3030907@gmail.com>
+Date: Mon, 14 Jun 2010 13:31:16 +0200
+Subject: S3C FB pixclock calculation
+Message-ID: <4C161304.70903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Op 14-06-10 12:38, Vasily Khoruzhick schreef:
-> ? ????????? ?? 14 ???? 2010 13:18:24 ????? Maurus Cuelenaere ???????:
->   
->> A similar patch is already in Linus' tree, see
->> e893de59a4982791368b3ce412bc67dd601a88a0.
->>     
-> Thanks for pointing that.
-> Sad that this change is not in Ben's next-samsung yet :(
->   
+Hi,
 
-It's just a matter of rebasing. And AFAICS current Ben's next-samsung ==
-Linus' 2.6.35-rc1 tag.
+one thing that has bothered me for some time is the fb pixclock value: this
+seems rather arbitrary and undocumented (couldn't find it in the datasheets).
 
--- 
+Though I did find an "algorithm", which I've used in the SmartQ machs for the
+calculation of this value (I can't remember where I found it, I think it was in
+the original SmartQ kernels).
+
+So I made this small patch which does the calculation in the s3c fb driver
+itself when the pixclock pdata hasn't been set (see below).
+
+I've checked this against the SMDK6410 value (and ANW6410 and HMT, which are
+identical) and it seems to match so I *think* this is correct, but as it's
+undocumented I'm not sure.
+
+Is anyone able to tell me whether I'm correct? (if so, I'll clean up this patch
+and send it for inclusion)
+
+--
 Maurus Cuelenaere
+
+diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
+index 9682ecc..17d882f 100644
+--- a/drivers/video/s3c-fb.c
++++ b/drivers/video/s3c-fb.c
+@@ -235,6 +235,22 @@ static int s3c_fb_calc_pixclk(struct s3c_fb *sfb, unsigned int pixclk)
+ 	return result;
+ }
+
++static void s3c_fb_missing_pixclock(struct fb_videomode *mode)
++{
++	u64 pixclk = 1000000000000ULL;
++	u32 div;
++
++	div  = mode->left_margin + mode->hsync_len + mode->right_margin +
++	       mode->xres;
++	div *= mode->upper_margin + mode->vsync_len + mode->lower_margin +
++	       mode->yres;
++	div *= mode->refresh ? : 80;
++
++	do_div(pixclk, div);
++
++	mode->pixclock = pixclk;
++}
++
+ /**
+  * s3c_fb_align_word() - align pixel count to word boundary
+  * @bpp: The number of bits per pixel
+@@ -925,6 +941,9 @@ static int __devinit s3c_fb_probe(struct platform_device *pdev)
+ 		if (!pd->win[win])
+ 			continue;
+
++		if (!pd->win[win]->win_mode.pixclock)
++			s3c_fb_missing_pixclock(&pd->win[win]->win_mode);
++
+ 		ret = s3c_fb_probe_win(sfb, win, &sfb->windows[win]);
+ 		if (ret < 0) {
+ 			dev_err(dev, "failed to create window %d\n", win);
