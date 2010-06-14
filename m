@@ -1,40 +1,27 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Mon, 14 Jun 2010 22:17:59 +1200
-Subject: [PATCH 2/5] SPEAR3xx: Rename register/irq defines to remove naming
-	conflicts
-In-Reply-To: <4C15C22A.7070408@st.com>
-References: <1275717955-14545-1-git-send-email-ryan@bluewatersys.com>
-	<1275717955-14545-3-git-send-email-ryan@bluewatersys.com>
-	<4C15BB99.4060108@st.com> <4C15BFDC.70809@bluewatersys.com>
-	<4C15C22A.7070408@st.com>
-Message-ID: <4C1601D7.1080404@bluewatersys.com>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Mon, 14 Jun 2010 12:18:24 +0200
+Subject: [PATCH v2] rtc-s3c: Fix rtc-s3c driver initialization
+In-Reply-To: <201006140904.17950.anarsoul@gmail.com>
+References: <1274975846-14006-1-git-send-email-anarsoul@gmail.com>
+	<201006140904.17950.anarsoul@gmail.com>
+Message-ID: <4C1601F0.1060209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Viresh KUMAR wrote:
-> On 6/14/2010 11:06 AM, Ryan Mallon wrote:
->> The goal of the patch series is to allow all a single kernel to have
->> support for all of the spear platforms, ie CONFIG_MACH_SPEAR300,
->> CONFIG_MACH_SPEAR310 and CONFIG_MACH_SPEAR320 can all be set.
+Op 14-06-10 08:04, Vasily Khoruzhick schreef:
+> ? ????????? ?? 27 ??? 2010 18:57:26 ????? Vasily Khoruzhick ???????:
+>> setfreq should be called only after rtc device registration,
+>> as it uses rtc device; s3c_rtc_cpu_type should be checked
+>> only once it was set.
 >>
->> The current code has duplicate defines in
->> arch/arm/mach-spear3xx/include/mach/spear3[012]0.h which means that
->> these three files cannot be included at once (they are included from
->> arch/arm/mach-spear3xx/include/mach/spear.h).
+>> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 > 
-> I understood what you did, but i am not sure how will it actually work.
-> I tried to look into kernel source but couldn't find much.
+> Hi, Ben.
 > 
-> Suppose all three machines/boards are selected and we got one kernel.
-> Then how should we tell the kernel which machines init routine to be called.
-> I suppose through uboot only, but not sure how it internally works.
+> What about this patch? I've seen similar series on linux-samsung-soc maillist, 
+> but neither their series nor my patch is applied to your tree. Why? :)
 > 
-> Can you please help me understand that?
+> Regards
+> Vasily
 
-The machine id is passed in register r1 by the boot loader, which
-matches the id in the MACHINE_START descriptors in the board files. Many
-of the other arm sub-architectures already allow multiple
-boards/implementations to be compiled into a single kernel and selected
-at runtime.
-
-~Ryan
+A similar patch is already in Linus' tree, see e893de59a4982791368b3ce412bc67dd601a88a0.
