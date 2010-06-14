@@ -1,26 +1,93 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 14 Jun 2010 11:09:49 +0800
-Subject: [GIT PULL] pxa: fixes for v2.6.35-rc3
-Message-ID: <AANLkTikVogt4MaYbOxOIr1DXjX29pYWYw5pbmCkC36Lv@mail.gmail.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Mon, 14 Jun 2010 11:10:25 +0800
+Subject: [RFC,PATCH 1/2] Add a common struct clk
+In-Reply-To: <20100613222349.GD31045@fluff.org.uk>
+References: <1275636608.606606.450179637764.0.gpush@pororo>
+	<201006111557.12249.jeremy.kerr@canonical.com>
+	<20100613222349.GD31045@fluff.org.uk>
+Message-ID: <201006141110.26440.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7e27d6e778cd87b6f2415515d7127eba53fe5d02:
+Hi Ben,
 
-  Linux 2.6.35-rc3 (2010-06-11 19:14:04 -0700)
+> You also need a warning that even if it protects the clock, it may not
+> protect any access to the hardware implementing it.
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+Yep, agreed. HW clock implementations are free to acquire the mutex in their 
+ops.
 
-Jonathan Cameron (1):
-      [ARM] mmp: fix build failure due to IRQ_PMU depends on ARCH_PXA
+> > I believe we need to ensure that clocks are enabled when clk_enable
+> > returns, so we'll need some mechanism for waiting on the thread doing
+> > the enable/disable. Since (as you say) some clocks may take 100s of
+> > microseconds to enable, we'll need a lock that we can hold while
+> > sleeping.
+> 
+> Well, mutexes give us that, whilst enabling we hold the mutex.
 
-Marek Vasut (2):
-      [ARM] pxa/z2: fix missing include in battery driver
-      [ARM] pxa/z2: fix flash layout to final version
+Exactly, that's why I think the mutex option is the best way to go.
 
-Robert Jarzmik (1):
-      [ARM] pxa/mioa701: fix camera regression
+> > I've just yesterday added the following to my tree, to allow dynamic
+> > initialisation:
+> > 
+> > static inline void clk_init(struct clk *clk, const struct clk_ops *ops)
+> > {
+> > 
+> > 	clk->ops = ops;
+> > 	clk->enable_count = 0;
+> > 	mutex_init(&clk->mutex);
+> > 
+> > }
+> > 
+> > So we can do this either way.
+> 
+> the above is in my view better.
 
-Steve Bennett (1):
-      [ARM] pxa: fix incorrect gpio type in udc_pxa2xx.h
+By 'the above' do you mean doing the mutex init at registration time, or the 
+clk_init code above?
+
+Either way should be fine; delaying the mutex_init until registration will has 
+the nice property of not requiring the clock name to be passed to INIT_CLK.
+
+> > I've been debating dropping the get_parent and set_parent ops entirely,
+> > actually; setting a parent seems to be quite specific to hardware (you
+> > have to know that a particular clock can be a parent of another clock),
+> > so it seems like something that we shouldn't expose to drivers through
+> > this API. For the code that knows the hardware, it can probably access
+> > the underlying clock types directly.
+> 
+> Not really, and it is in use with extant drivers, so not easily
+> removable either.
+
+OK, is set_parent used much? I can see the use of get_parent, but calls 
+set_parent need to know specifics of the clock hardware.
+
+> > Checking for the ops first allows us to skip the mutex acquire, but I'm
+> > happy either way.
+> 
+> erm, sorry, yes, you can check for them before mutex. any chages
+> should be done with mutex held.
+
+Yep.
+
+> > Using default ops would mean a couple of things:
+> > 
+> > 1) we can no longer mark the real ops as const; and
+> > 2) we can no longer avoid the hard-to-predict indirect branch
+> 
+> ok, how about people have to mark these as a default non op in their
+> clock structure, and then error if they try and register a clock with
+> null ops. anyone changing these to NULL later deserves all the pain and
+> agony they get.
+
+That addresses the first point, but still means we have an unnecessary 
+indirect branch to a function that does nothing. Since I've unlined the code 
+where this happens, the checks for null ops are pretty unobtrusive. If we 
+require all ops to be not-null, then we'll need much larger chunks of code 
+where the ops are defined. I like that you can just set the ops callbacks that 
+you need, and the rest "just works".
+
+Cheers,
+
+
+Jeremy
