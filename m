@@ -1,33 +1,24 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Mon, 14 Jun 2010 19:22:58 +1000
-Subject: [RFC,PATCH 1/2] Add a common struct clk
-In-Reply-To: <19477.52889.982995.407051@ipc1.ka-ro>
-References: <1275636608.606606.450179637764.0.gpush@pororo>
-	<201006111557.12249.jeremy.kerr@canonical.com>
-	<19473.61547.684572.647641@ipc1.ka-ro>
-	<201006111718.47426.jeremy.kerr@canonical.com>
-	<19474.172.742782.972629@ipc1.ka-ro>
-	<20100611095839.GC10894@pengutronix.de>
-	<19474.2817.333749.485028@ipc1.ka-ro>
-	<1276319643.1962.181.camel@pasglop>
-	<19477.52889.982995.407051@ipc1.ka-ro>
-Message-ID: <1276507378.2552.39.camel@pasglop>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Jun 2010 10:25:59 +0100
+Subject: Request review of device tree documentation
+In-Reply-To: <4C15DE2E.1050905@firmworks.com>
+References: <1276339529.1962.184.camel@pasglop>
+	<1276339684.1962.186.camel@pasglop>
+	<4C13B618.1030006@firmworks.com>
+	<1276383132.1962.195.camel@pasglop>
+	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>
+	<4C146F18.9030008@firmworks.com>
+	<1276408773.1962.574.camel@pasglop>
+	<AANLkTinwL0XtMNG13inr_1UliOlqZkyr4dlvG-ZGL9JT@mail.gmail.com>
+	<20100614073828.GA6095@n2100.arm.linux.org.uk>
+	<4C15DE2E.1050905@firmworks.com>
+Message-ID: <20100614092559.GA7881@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-06-14 at 08:39 +0200, Lothar Wa?mann wrote:
-> All implementations so far use spin_lock_irq_save()!
+On Sun, Jun 13, 2010 at 09:45:50PM -1000, Mitch Bradley wrote:
+> None of this is a deal-breaker for the kind of debugging tasks that are  
+> the primary use case for the callback.
 
-Nothing prevents your implementation to be a tad smarter.
-
-> How would you be able to sleep with a mutex held?
-> If you hold a lock you must not sleep, no matter what sort of lock it
-> is. 
-
-You can perfectly sleep with a mutex held. You -do- have to be careful
-of course to ensure you aren't going to do silly thing like re-enter and
-try to take it twice, or A->B B->A deadlocks, but in the typical case of
-wanting to use a msleep rather than udelay, it works very well :-)
-
-Cheers,
-Ben.
+Would you mind explaining what kind of tasks these callbacks will
+be used for?
