@@ -1,65 +1,40 @@
-From: x0095840@ti.com (Fernando Guzman Lugo)
-Date: Mon, 14 Jun 2010 11:51:09 -0500
-Subject: [PATCH] mailbox: change full flag per mailbox queue instead of global
-Message-ID: <1276534269-19179-1-git-send-email-x0095840@ti.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 14 Jun 2010 11:57:54 -0500
+Subject: [PATCH] mtd: physmap.c: use resource_size()
+Message-ID: <0D753D10438DA54287A00B02708426976371223143@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As pointed by Ben Ohand, the variable rq_full flag is a global
-variable, so if there are multiple mailbox users there will be
-conflics. Now there is a full flag per mailbox queue.
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: David Woodhouse <David.Woodhouse@intel.com>
 
-Reported-by: Ohad Ben-Cohen <ohad@wizery.com>
-Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
 ---
- arch/arm/plat-omap/include/plat/mailbox.h |    1 +
- arch/arm/plat-omap/mailbox.c              |    7 +++----
- 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
-index 729166b..a6144b8 100644
---- a/arch/arm/plat-omap/include/plat/mailbox.h
-+++ b/arch/arm/plat-omap/include/plat/mailbox.h
-@@ -47,6 +47,7 @@ struct omap_mbox_queue {
- 	struct tasklet_struct	tasklet;
- 	int	(*callback)(void *);
- 	struct omap_mbox	*mbox;
-+	bool	full;
- };
+diff --git a/drivers/mtd/maps/physmap.c b/drivers/mtd/maps/physmap.c
+index 426461a..829aa4b 100644
+--- a/drivers/mtd/maps/physmap.c
++++ b/drivers/mtd/maps/physmap.c
+@@ -106,12 +106,12 @@ static int physmap_flash_probe(struct platform_device *dev)
  
- struct omap_mbox {
-diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-index 8d86b0b..a1e274e 100644
---- a/arch/arm/plat-omap/mailbox.c
-+++ b/arch/arm/plat-omap/mailbox.c
-@@ -30,7 +30,6 @@
+ 	for (i = 0; i < dev->num_resources; i++) {
+ 		printk(KERN_NOTICE "physmap platform flash device: %.8llx at %.8llx\n",
+-		       (unsigned long long)(dev->resource[i].end - dev->resource[i].start + 1),
++		       (unsigned long long)resource_size(&dev->resource[i]),
+ 		       (unsigned long long)dev->resource[i].start);
  
- static struct omap_mbox *mboxes;
- static DEFINE_RWLOCK(mboxes_lock);
--static bool rq_full;
+ 		if (!devm_request_mem_region(&dev->dev,
+ 			dev->resource[i].start,
+-			dev->resource[i].end - dev->resource[i].start + 1,
++			resource_size(&dev->resource[i]),
+ 			dev_name(&dev->dev))) {
+ 			dev_err(&dev->dev, "Could not reserve memory region\n");
+ 			err = -ENOMEM;
+@@ -120,7 +120,7 @@ static int physmap_flash_probe(struct platform_device *dev)
  
- static int mbox_configured;
- static DEFINE_MUTEX(mbox_configured_lock);
-@@ -140,9 +139,9 @@ static void mbox_rx_work(struct work_struct *work)
- 	while (1) {
- 		spin_lock_irqsave(q->queue_lock, flags);
- 		rq = blk_fetch_request(q);
--		if (rq_full) {
-+		if (mbox->rxq->full) {
- 			omap_mbox_enable_irq(mbox, IRQ_RX);
--			rq_full = false;
-+			mbox->rxq->full = false;
- 		}
- 		spin_unlock_irqrestore(q->queue_lock, flags);
- 		if (!rq)
-@@ -183,7 +182,7 @@ static void __mbox_rx_interrupt(struct omap_mbox *mbox)
- 		rq = blk_get_request(q, WRITE, GFP_ATOMIC);
- 		if (unlikely(!rq)) {
- 			omap_mbox_disable_irq(mbox, IRQ_RX);
--			rq_full = true;
-+			mbox->rxq->full = true;
- 			goto nomem;
- 		}
- 
--- 
-1.6.3.3
+ 		info->map[i].name = dev_name(&dev->dev);
+ 		info->map[i].phys = dev->resource[i].start;
+-		info->map[i].size = dev->resource[i].end - dev->resource[i].start + 1;
++		info->map[i].size = resource_size(&dev->resource[i]);
+ 		info->map[i].bankwidth = physmap_data->width;
+ 		info->map[i].set_vpp = physmap_data->set_vpp;
+ 		info->map[i].pfow_base = physmap_data->pfow_base;
