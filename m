@@ -1,75 +1,170 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Mon, 14 Jun 2010 08:52:25 +0200
-Subject: [RFC,PATCH 1/2] Add a common struct clk
-In-Reply-To: <20100614064028.GA12159@pengutronix.de>
-References: <1275636608.606606.450179637764.0.gpush@pororo>
-	<201006111557.12249.jeremy.kerr@canonical.com>
-	<19473.61547.684572.647641@ipc1.ka-ro>
-	<201006111718.47426.jeremy.kerr@canonical.com>
-	<19474.172.742782.972629@ipc1.ka-ro>
-	<20100611095839.GC10894@pengutronix.de>
-	<19474.2817.333749.485028@ipc1.ka-ro>
-	<1276319643.1962.181.camel@pasglop>
-	<19477.52889.982995.407051@ipc1.ka-ro>
-	<20100614064028.GA12159@pengutronix.de>
-Message-ID: <19477.53673.644128.558827@ipc1.ka-ro>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 14 Jun 2010 15:57:48 +0900
+Subject: [PATCH v3] libata: pata_samsung_cf: Add Samsung PATA controller
+	driver
+In-Reply-To: <4C120685.8030306@mvista.com>
+References: <1276156241-28804-1-git-send-email-kgene.kim@samsung.com>
+	<4C10C1D6.8080708@ru.mvista.com>
+	<003301cb0937$e04412c0$a0cc3840$%kim@samsung.com>
+	<4C120685.8030306@mvista.com>
+Message-ID: <008801cb0b8e$e89a50c0$b9cef240$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Uwe Kleine-K?nig writes:
-> Hello Lothar,
+Sergei Shtylyov wrote:
 > 
-> On Mon, Jun 14, 2010 at 08:39:21AM +0200, Lothar Wa?mann wrote:
+> Hello.
+> 
+> Kukjin Kim wrote:
+> 
+> >>> From: Abhilash Kesavan <a.kesavan@samsung.com>
+> >>> Adds support for the Samsung PATA controller. This driver is based on
+the
+> >>> Libata subsystem and references the earlier patches sent for IDE
+subsystem.
+> 
 > > Hi,
-> > 
-> > Benjamin Herrenschmidt writes:
-> > > On Fri, 2010-06-11 at 12:08 +0200, Lothar Wa?mann wrote:
-> > > > Hi,
-> > > > 
-> > > > > > > > Using a mutex in clk_enable()/clk_disable() is a bad idea, since that
-> > > > > > > > makes it impossible to call those functions in interrupt context.
-> > > > > IMHO if a device generates an irq its clock should already be on.  This
-> > > > > way you don't need to enable or disable a clock in irq context.
-> > > > >  
-> > > > You may want to disable a clock in the IRQ handler. The VPU driver in
-> > > > the Freescale BSP for i.MX51 does exactly this.
-> > > > Anyway I don't see any reason for using a mutex here instead of
-> > > > spin_lock_irq_save() as all other implementations do.
-> > > 
-> > > Because you suddenly make it impossible to sleep inside enable/disable
-> >               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> > ???
-> > All implementations so far use spin_lock_irq_save()!
-> > 
-> > How would you be able to sleep with a mutex held?
-> > If you hold a lock you must not sleep, no matter what sort of lock it
-> > is.
-> That's wrong.  With a mutex hold you may sleep.
 > 
-OK, you're right. But still all other implementations (omap, mxc,
-davinci,...) use spin_lock_irqsave() to protect the enable/disable
-functions and don't seem to have any problem with this.
-Is there any reason to change this, or make it inconsistent
-for one arch?
+> > Thanks for your comments.
+> 
+> >>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> >>> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> >> [...]
+> 
+> >>> diff --git a/drivers/ata/pata_samsung_cf.c
+b/drivers/ata/pata_samsung_cf.c
+> >>> new file mode 100644
+> >>> index 0000000..fef5515
+> >>> --- /dev/null
+> >>> +++ b/drivers/ata/pata_samsung_cf.c
+> >>> @@ -0,0 +1,608 @@
+> >>> +/* linux/drivers/ata/pata_samsung_cf.c
+> 
+> >>     File names in the heading comment are discouraged.
+> 
+> > Hmm. I used like that in other device drivers.
+> 
+>     Nevertheless, it's quite an old rule already.
+> 
+> > Ok..will remove the file name in the heading comment.
+> 
+> >> [...]
+> 
+> >>> +
+> >>> +	piotime = (t2i << 12) | (t2 << 4) | t1;
+> >>> +
+> >>> +	return piotime;
+> >>> +}
+> >>> +
+> >>> +static void pata_s3c_set_piomode(struct ata_port *ap, struct
+ata_device
+> *adev)
+> >>> +{
+> >>> +	int mode = adev->pio_mode - XFER_PIO_0;
+> >>> +	struct s3c_ide_info *info = ap->host->private_data;
+> >>> +	ulong ata_cfg = readl(info->ide_addr + S3C_ATA_CFG);
+> >>> +	ulong piotime;
+> >>> +
+> >>> +	/* Calculates timing parameters for PIO mode */
+> >>> +	piotime = pata_s3c_setup_timing(info, adev);
+> 
+> >>     In fact, for 8-bit (command) timing you should program the slowest
+mode
+> of
+> >> the two drives. However, with CF, you probably only have only one drive
+per
+> >> channel...
+> 
+> > Below code looks OK ?
+> 
+>     No, it doesn't.
+> 
+> > 	if (ata_timing_compute(adev, adev->pio_mode, &timing, cycle_time, 0))
+> > {
+> > 		dev_err(ap->dev, "Failed to compute ATA timing\n");
+> > 		piotime = pata_s3c_setup_timing(info, &initial_timing);
+> > 	} else {
+> > 		piotime = pata_s3c_setup_timing(info, &timing);
+> > 	}
+> > where initial_timing is for PIO0. I have added the below struct
+> 
+> > static const struct ata_timing initial_timing =
+> > 	{XFER_PIO_0, 70, 290, 240, 600, 165, 150, 0, 600, 0};
+> 
+>     I'd call ata_timing_find_mode(XFER_PIO_0) rather than duplicating the
+> ata_timing entry. But really, you shouldn't set any timing for an invalid
+mode
+> and, as I said, you won't be passed one, so there's nor much sense in
+calling
+> ata_timing_compute() and checking its result; anyway, you'd want to call
+> ata_timing_find_mode() here instead of ata_timing_compute() because the
+latter
+> returns already quantized timings, but initial_timing is not quantized,
+you'll
+> have to call ata_timing_compute() in pata_s3c_setup_timing() anyway.
+> 
+OK, no check for invalid mode then. Now using 'ata_timing_compute' to get the
+quantized timings t1, t2 and t2i and then writing them to PIO_TIME registers.
+PIO_TIME [0:3]  t1      [4:11] t2      [12:19] t2i.
 
-And arch/arm/plat-s3c/clock.c has the following comment:
-|/* We originally used an mutex here, but some contexts (see resume)
-| * are calling functions such as clk_set_parent() with IRQs disabled
-| * causing an BUG to be triggered.
-| */
-|DEFINE_SPINLOCK(clocks_lock);
+> >>> +
+> >>> +	/* Enables IORDY if mode requires it */
+> >>> +	if (ata_pio_need_iordy(adev))
+> >>> +		ata_cfg |= S3C_ATA_CFG_IORDYEN;
+> >>> +	else
+> >>> +		ata_cfg &= ~S3C_ATA_CFG_IORDYEN;
+> >>> +
+> >>> +	/* Host controller supports upto PIO4 only */
+> >>> +	if (mode >= 0 && mode <= 4) {
+> 
+> >>     No need to check -- you won't be passed a mode not specified by your
+> >> pio_mask.
+> 
+> > Will remove the check.
+> 
+> >>> +static int __devinit pata_s3c_probe(struct platform_device *pdev)
+> [...]
+> >>> +	if (!request_mem_region(res->start, resource_size(res), DRV_NAME)) {
+> 
+> >>     Probably should call devm_request_mem_region() if you're using
+> >> devm_ioremap()...
+> 
+> > Will change to devm_request_mem_region.
+> 
+>     This function does exist, if I don't mistake...
+> 
+> >>> +release_mem:
+> >>> +	release_mem_region(res->start, resource_size(res));
+> >>> +release_device_mem:
+> >>> +	kfree(info);
+> 
+> >>     Doesn't using devm_kzalloc() guarantee that the memory will be freed
+up
+> >> automatically?
+> 
+> > Will remove kfree and release_mem_region because of devm_kzalloc and
+> > devm_request_mem_region usage
+> 
+>     I don't know devres librarry capabilities well. Tejun, am I right?
+> 
+> >>> +static struct platform_driver pata_s3c_driver = {
+> >>> +	.probe		= pata_s3c_probe,
+> >>>
+> >>>
+> 
+> >>     2 empty lines -- broken patch?
+> 
+> > Seems OK at my end.
+> 
+>     The sent patch had them, nevertheless.
+> 
+> MBR, Sergei
 
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Thanks.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
