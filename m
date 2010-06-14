@@ -1,68 +1,102 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 14 Jun 2010 11:58:54 -0400 (EDT)
+From: jamie@shareable.org (Jamie Lokier)
+Date: Mon, 14 Jun 2010 17:02:01 +0100
 Subject: Request review of device tree documentation
-In-Reply-To: <AANLkTim1mYpaxe-_OGbOF3AaZ6m5_SVUXLbeyKnAyvjs@mail.gmail.com>
-References: <AANLkTilK4YkRMJqlcRDOAlGBzpdlZuSo9NF5NrRNocHT@mail.gmail.com>
-	<33BD8E86-9397-432A-97BF-F154812C157B@digitaldans.com>
-	<AANLkTilv6TtPZs0DAwd8JlSV_J3VvMsvtVVOOeQauOIn@mail.gmail.com>
-	<4C13430B.5000907@firmworks.com> <1276339529.1962.184.camel@pasglop>
-	<1276339684.1962.186.camel@pasglop> <4C13B618.1030006@firmworks.com>
+In-Reply-To: <alpine.LFD.2.00.1006141044510.13427@xanadu.home>
+References: <4C13430B.5000907@firmworks.com>
+	<1276339529.1962.184.camel@pasglop>
+	<1276339684.1962.186.camel@pasglop>
+	<4C13B618.1030006@firmworks.com>
 	<1276383132.1962.195.camel@pasglop>
 	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>
-	<4C146F18.9030008@firmworks.com> <1276408773.1962.574.camel@pasglop>
-	<AANLkTinwL0XtMNG13inr_1UliOlqZkyr4dlvG-ZGL9JT@mail.gmail.com>
-	<alpine.LFD.2.00.1006140943350.13427@xanadu.home>
-	<AANLkTim1mYpaxe-_OGbOF3AaZ6m5_SVUXLbeyKnAyvjs@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1006141143480.13427@xanadu.home>
+	<4C146F18.9030008@firmworks.com>
+	<AANLkTikls3hjXOmKFqG2D_9GaJSjOXNuuRXPlanAjo5E@mail.gmail.com>
+	<20100614124438.GF9323@yookeroo>
+	<alpine.LFD.2.00.1006141044510.13427@xanadu.home>
+Message-ID: <20100614160201.GD9550@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Jun 2010, Grant Likely wrote:
-
-> The discussion *started* with a request to review this document:
+Nicolas Pitre wrote:
+> On Mon, 14 Jun 2010, David Gibson wrote:
 > 
-> http://devicetree.org/Device_Tree_Usage
+> > On Sun, Jun 13, 2010 at 11:02:15PM -0600, Grant Likely wrote:
+> > [sni]
+> > > > That's sort of a self-fulfilling prophecy. ?If the OS doesn't trust the
+> > > > firmware, there is no pressure for the firmware to "get it right".
+> > > 
+> > > Firmware will not get it right.  Period.  There will always be
+> > > something wrong.  It is never right on PCs.  It will never be right on
+> > > the other architectures.
+> > 
+> > Yes, yes, yes.  And there is a great deal of empirical evidence to
+> > back that assertion.
+> > 
+> > >  That goes for OSes too, but upgrading an OS
+> > > isn't as risky as upgrading firmware.  That isn't to say that it can't
+> > > be close, but every firmware feature that the OS depends on is a
+> > > feature that could force a risky firmware upgrade when the bug in it
+> > > is discovered.
+> > 
+> > Indeed.  In fact, the general rule of thumb is really "put as much as
+> > possible into the most easily replaced layer of the stack".  This is,
+> > incidentally, why I've always been dubious about simple firmwares
+> > supplying a flattened device tree rather than including the device
+> > tree template in the kernel, cuboot style.
 > 
-> Which is in early draft form (which is why the arm list wasn't
-> initially cc'd. I was soliciting feedback from the current device tree
-> users.  A second request for review will go out after rework is done
-> to the document).
+> The biggest advantage, IMHO, for adding DT to ARM, is actually to 
+> decouple the hardware config information and the kernel.  If in the end 
+> the DT has to be shipped in the kernel then we're losing all this 
+> advantage over the current state of things on ARM which still works 
+> pretty well otherwise.
+> 
+> In the best case, the simple firmware simply has to retrieve the 
+> flattened device tree from flash, and pass it to the kernel just like 
+> some anonymous blob.  And the simple firmware only needs to provide a 
+> way for that DT blob to be updatable, like through an upload of a 
+> replacement blob that was prepared offline.  Just like a ramdisk image 
+> or the like.
+> 
+> That doesn't need to be fancier than that, and the goal of having the DT 
+> data tied to the hardware instead of the kernel is achieved.
 
-I'm therefore assuming I can safely ignore it for now then.
+Imho that puts the DT in a similar category as initrd/initramfs, from
+the bootloader's point of view.  It's another blob whose address is
+passed to the kernel, just like initrd.
 
-> In one of the reply threads Mitch stated that he is working on an ARM
-> project that will use Open Firmware as the bootloader, and that he'd
-> like the ability to keep OFW available after the kernel is booted
-> which is something currently done on both Sparc and OLPC x86.  Mitch
-> will correct me if I'm made any misrepresentations here.
+Some bootloaders can't update blobs independently for technical
+reasons, or to be minimal.
 
-OK... but what does "keep OFW available" mean? And what for?
+A device I'm using does kernel updates by updating the whole romfs
+boot image, which contains the kernel and other auxiliary blobs used
+for booting (splash screen, early irq handlers etc.) as well as the
+root filesystem.
 
-> Conceptually I'm not opposed to allowing OFW to stay resident
-> providing that it does not impose new requirements on the boot
-> interface (the kernel would still need to be handed the flattened
-> representation of the device tree) and that the code to do so is well
-> contained in the kernel.  The devil is of course in the details on how
-> feasible it is to accomplish.
+It is done that way to pack everything together in the small flash,
+and because the NOR flash eraseblocks are too large relative to the
+whole flash size to use separate partitions for kernel, boot
+filesystem and other blobs for booting.
 
-Well, you'd need to tell the kernel about what memory area not to touch 
-(given that memory is not in some area the kernel will touch anyway when 
-it is in its early boot stage and still not smart enough to avoid it).
+Dedicating a 64kiB eraseblock out of 2MB just for a small DT would be
+quite wasteful.  Dedicating two to make it powerfail-safe would be
+even worse.
 
-Then you'll need special code to perform those steps RMK already 
-mentioned.  This is a bit like the low-level code for suspend/resume 
-support is doing.  This is of course if I'm still guessing right about 
-the whole purpose of this.
+So requiring that a bootloader can update the DT _independently_ of
+everything else is a bit much for some devices.
 
-> ARM machines with Open Firmware are
-> going to be the minority, so I'm not interested in doing anything
-> special or out of the ordinary specifically to support it.
+But requiring that it's generally treated like other separate blob,
+i.e. in a similar way to initrd, and the kernel image itself, seems
+not unreasonable.
 
-This certainly doesn't have to involve the core kernel.  A special 
-module may even be sufficient to keep the complexity localized.  Just 
-like low-level suspend/resume code is per SOC already anyway.
+Like initrd, some people will find they need to compile it in to the
+kernel image to fit some bootloader they can't change, or daren't risk
+changing in already rolled out devices that they want to update to a
+DT-using kernel.
 
-But again, what for?
+I won't be surprised if I see some vendor SDK containing a kernel
+patch to early-parse the bootloader-supplied ROMFS image to extract
+"devicetree.bin.gz" at some point :-)
 
+We can discourage that sort of thing (but not prevent it) by ensuring
+the open source bootloaders support a DT blob as easily as possible.
 
-Nicolas
+-- Jamie
