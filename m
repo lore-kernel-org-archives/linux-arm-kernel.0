@@ -1,32 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Jun 2010 10:47:40 +0100
-Subject: Request review of device tree documentation
-In-Reply-To: <1276508170.2552.43.camel@pasglop>
-References: <4C13B618.1030006@firmworks.com>
-	<1276383132.1962.195.camel@pasglop>
-	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>
-	<4C146F18.9030008@firmworks.com>
-	<1276408773.1962.574.camel@pasglop>
-	<AANLkTinwL0XtMNG13inr_1UliOlqZkyr4dlvG-ZGL9JT@mail.gmail.com>
-	<20100614073828.GA6095@n2100.arm.linux.org.uk>
-	<4C15DE2E.1050905@firmworks.com>
-	<20100614092559.GA7881@n2100.arm.linux.org.uk>
-	<1276508170.2552.43.camel@pasglop>
-Message-ID: <20100614094740.GB7881@n2100.arm.linux.org.uk>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Mon, 14 Jun 2010 22:17:59 +1200
+Subject: [PATCH 2/5] SPEAR3xx: Rename register/irq defines to remove naming
+	conflicts
+In-Reply-To: <4C15C22A.7070408@st.com>
+References: <1275717955-14545-1-git-send-email-ryan@bluewatersys.com>
+	<1275717955-14545-3-git-send-email-ryan@bluewatersys.com>
+	<4C15BB99.4060108@st.com> <4C15BFDC.70809@bluewatersys.com>
+	<4C15C22A.7070408@st.com>
+Message-ID: <4C1601D7.1080404@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 14, 2010 at 07:36:10PM +1000, Benjamin Herrenschmidt wrote:
-> However, there's a lot of room for abuse here and I'm worried that if it
-> becomes widespread, we'll start seeing vendors use that as a way to do
-> some kind of HAL and hide various platform methods in there (clock
-> control, nvram, etc...).
+Viresh KUMAR wrote:
+> On 6/14/2010 11:06 AM, Ryan Mallon wrote:
+>> The goal of the patch series is to allow all a single kernel to have
+>> support for all of the spear platforms, ie CONFIG_MACH_SPEAR300,
+>> CONFIG_MACH_SPEAR310 and CONFIG_MACH_SPEAR320 can all be set.
+>>
+>> The current code has duplicate defines in
+>> arch/arm/mach-spear3xx/include/mach/spear3[012]0.h which means that
+>> these three files cannot be included at once (they are included from
+>> arch/arm/mach-spear3xx/include/mach/spear.h).
+> 
+> I understood what you did, but i am not sure how will it actually work.
+> I tried to look into kernel source but couldn't find much.
+> 
+> Suppose all three machines/boards are selected and we got one kernel.
+> Then how should we tell the kernel which machines init routine to be called.
+> I suppose through uboot only, but not sure how it internally works.
+> 
+> Can you please help me understand that?
 
-This is what I'm worried about too.
+The machine id is passed in register r1 by the boot loader, which
+matches the id in the MACHINE_START descriptors in the board files. Many
+of the other arm sub-architectures already allow multiple
+boards/implementations to be compiled into a single kernel and selected
+at runtime.
 
-As I said in my first reply in this thread, calling out from the kernel
-will kill performance due to the time taken to shut down the caches and
-MMU, which can only be done safely with all exceptions turned off.
-
-The only time that it can be seriously considered is if you're calling
-out to reboot, shutdown or kexec.
+~Ryan
