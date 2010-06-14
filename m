@@ -1,28 +1,27 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 14 Jun 2010 18:19:30 +0800
-Subject: [PATCH] [ARM] pxa/corgi: fix MMC/SD card detection failure
-Message-ID: <1276510770-27748-1-git-send-email-eric.y.miao@gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 14 Jun 2010 13:38:40 +0300
+Subject: [PATCH v2] rtc-s3c: Fix rtc-s3c driver initialization
+In-Reply-To: <4C1601F0.1060209@gmail.com>
+References: <1274975846-14006-1-git-send-email-anarsoul@gmail.com>
+	<201006140904.17950.anarsoul@gmail.com>
+	<4C1601F0.1060209@gmail.com>
+Message-ID: <201006141338.47947.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reported-by: Andrea Adami <andrea.adami@gmail.com>
-Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
----
- arch/arm/mach-pxa/corgi.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+? ????????? ?? 14 ???? 2010 13:18:24 ????? Maurus Cuelenaere ???????:
+> A similar patch is already in Linus' tree, see
+> e893de59a4982791368b3ce412bc67dd601a88a0.
 
-diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
-index 3d1dcb9..51ffa6a 100644
---- a/arch/arm/mach-pxa/corgi.c
-+++ b/arch/arm/mach-pxa/corgi.c
-@@ -446,7 +446,7 @@ static struct platform_device corgiled_device = {
- static struct pxamci_platform_data corgi_mci_platform_data = {
- 	.detect_delay_ms	= 250,
- 	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
--	.gpio_card_detect	= -1,
-+	.gpio_card_detect	= CORGI_GPIO_nSD_DETECT,
- 	.gpio_card_ro		= CORGI_GPIO_nSD_WP,
- 	.gpio_power		= CORGI_GPIO_SD_PWR,
- };
--- 
-1.7.1.251.g92a7
+Thanks for pointing that.
+Sad that this change is not in Ben's next-samsung yet :(
+
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100614/899b7950/attachment.sig>
