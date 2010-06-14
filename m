@@ -1,125 +1,155 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 14 Jun 2010 10:48:17 +0530
-Subject: [PATCH 2/5] SPEAR3xx: Rename register/irq defines to remove naming
-	conflicts
-In-Reply-To: <1275717955-14545-3-git-send-email-ryan@bluewatersys.com>
-References: <1275717955-14545-1-git-send-email-ryan@bluewatersys.com>
-	<1275717955-14545-3-git-send-email-ryan@bluewatersys.com>
-Message-ID: <4C15BB99.4060108@st.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 14 Jun 2010 14:18:53 +0900
+Subject: [PATCH v4 2/3] ARM: S5PV210: Add keypad device helpers
+In-Reply-To: <1276243728-17704-2-git-send-email-jy0922.shim@samsung.com>
+References: <1276243728-17704-1-git-send-email-jy0922.shim@samsung.com>
+	<1276243728-17704-2-git-send-email-jy0922.shim@samsung.com>
+Message-ID: <007801cb0b81$16cc0ff0$44642fd0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/5/2010 11:35 AM, Ryan Mallon wrote:
-> Prefix register and irq defintions to remove naming conflicts between
-> the three SPEAr3xx platforms.
+Joonyoung Shim wrote:
 > 
-> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+> This patch adds the keypad device platform helpers for S5PV210 cpu.
+> 
+> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/mach-spear3xx/include/mach/generic.h  |    4 +-
->  arch/arm/mach-spear3xx/include/mach/irqs.h     |  195 ++++++++++++------------
->  arch/arm/mach-spear3xx/include/mach/spear300.h |   26 ++--
->  arch/arm/mach-spear3xx/include/mach/spear310.h |   44 +++---
->  arch/arm/mach-spear3xx/include/mach/spear320.h |   50 +++---
->  arch/arm/mach-spear3xx/spear300.c              |   65 ++++----
->  arch/arm/mach-spear3xx/spear310.c              |   92 ++++++------
->  arch/arm/mach-spear3xx/spear320.c              |  134 ++++++++--------
->  arch/arm/mach-spear3xx/spear3xx.c              |    4 +-
->  9 files changed, 308 insertions(+), 306 deletions(-)
+>  arch/arm/mach-s5pv210/Kconfig            |    5 ++++
+>  arch/arm/mach-s5pv210/Makefile           |    1 +
+>  arch/arm/mach-s5pv210/cpu.c              |    4 +++
+>  arch/arm/mach-s5pv210/include/mach/map.h |    3 ++
+>  arch/arm/mach-s5pv210/setup-keypad.c     |   34
+> ++++++++++++++++++++++++++++++
+>  5 files changed, 47 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-s5pv210/setup-keypad.c
 > 
-> diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-> index af7e02c..48dfb9c 100644
-> --- a/arch/arm/mach-spear3xx/include/mach/generic.h
-> +++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-> @@ -27,8 +27,8 @@
->   * Following GPT channels will be used as clock source and clockevent
->   */
->  #define SPEAR_GPT0_BASE		SPEAR3XX_ML1_TMR_BASE
-> -#define SPEAR_GPT0_CHAN0_IRQ	IRQ_CPU_GPT1_1
-> -#define SPEAR_GPT0_CHAN1_IRQ	IRQ_CPU_GPT1_2
-> +#define SPEAR_GPT0_CHAN0_IRQ	SPEAR3XX_IRQ_CPU_GPT1_1
-> +#define SPEAR_GPT0_CHAN1_IRQ	SPEAR3XX_IRQ_CPU_GPT1_2
->  
->  /* Add spear3xx family device structure declarations here */
->  extern struct amba_device gpio_device;
-> diff --git a/arch/arm/mach-spear3xx/include/mach/irqs.h b/arch/arm/mach-spear3xx/include/mach/irqs.h
-> index 7f940b8..668bf72 100644
-> --- a/arch/arm/mach-spear3xx/include/mach/irqs.h
-> +++ b/arch/arm/mach-spear3xx/include/mach/irqs.h
-> @@ -15,138 +15,141 @@
->  #define __MACH_IRQS_H
->  
->  /* SPEAr3xx IRQ definitions */
-> -#define IRQ_HW_ACCEL_MOD_0			0
-> -#define IRQ_INTRCOMM_RAS_ARM			1
-> -#define IRQ_CPU_GPT1_1				2
-> -#define IRQ_CPU_GPT1_2				3
-> -#define IRQ_BASIC_GPT1_1			4
-> -#define IRQ_BASIC_GPT1_2			5
-> -#define IRQ_BASIC_GPT2_1			6
-> -#define IRQ_BASIC_GPT2_2			7
-> -#define IRQ_BASIC_DMA				8
-> -#define IRQ_BASIC_SMI				9
-> -#define IRQ_BASIC_RTC				10
-> -#define IRQ_BASIC_GPIO				11
-> -#define IRQ_BASIC_WDT				12
-> -#define IRQ_DDR_CONTROLLER			13
-> -#define IRQ_SYS_ERROR				14
-> -#define IRQ_WAKEUP_RCV				15
-> -#define IRQ_JPEG				16
-> -#define IRQ_IRDA				17
-> -#define IRQ_ADC					18
-> -#define IRQ_UART				19
-> -#define IRQ_SSP					20
-> -#define IRQ_I2C					21
-> -#define IRQ_MAC_1				22
-> -#define IRQ_MAC_2				23
-> -#define IRQ_USB_DEV				24
-> -#define IRQ_USB_H_OHCI_0			25
-> -#define IRQ_USB_H_EHCI_0			26
-> -#define IRQ_USB_H_EHCI_1			IRQ_USB_H_EHCI_0
-> -#define IRQ_USB_H_OHCI_1			27
-> -#define IRQ_GEN_RAS_1				28
-> -#define IRQ_GEN_RAS_2				29
-> -#define IRQ_GEN_RAS_3				30
-> -#define IRQ_HW_ACCEL_MOD_1			31
-> -#define IRQ_VIC_END				32
-> -
-> -#define VIRQ_START				IRQ_VIC_END
-> +#define SPEAR3XX_IRQ_HW_ACCEL_MOD_0		0
-> +#define SPEAR3XX_IRQ_INTRCOMM_RAS_ARM		1
-> +#define SPEAR3XX_IRQ_CPU_GPT1_1			2
-> +#define SPEAR3XX_IRQ_CPU_GPT1_2			3
-> +#define SPEAR3XX_IRQ_BASIC_GPT1_1		4
-> +#define SPEAR3XX_IRQ_BASIC_GPT1_2		5
-> +#define SPEAR3XX_IRQ_BASIC_GPT2_1		6
-> +#define SPEAR3XX_IRQ_BASIC_GPT2_2		7
-> +#define SPEAR3XX_IRQ_BASIC_DMA			8
-> +#define SPEAR3XX_IRQ_BASIC_SMI			9
-> +#define SPEAR3XX_IRQ_BASIC_RTC			10
-> +#define SPEAR3XX_IRQ_BASIC_GPIO			11
-> +#define SPEAR3XX_IRQ_BASIC_WDT			12
-> +#define SPEAR3XX_IRQ_DDR_CONTROLLER		13
-> +#define SPEAR3XX_IRQ_SYS_ERROR			14
-> +#define SPEAR3XX_IRQ_WAKEUP_RCV			15
-> +#define SPEAR3XX_IRQ_JPEG			16
-> +#define SPEAR3XX_IRQ_IRDA			17
-> +#define SPEAR3XX_IRQ_ADC			18
-> +#define SPEAR3XX_IRQ_UART			19
-> +#define SPEAR3XX_IRQ_SSP			20
-> +#define SPEAR3XX_IRQ_I2C			21
-> +#define SPEAR3XX_IRQ_MAC_1			22
-> +#define SPEAR3XX_IRQ_MAC_2			23
-> +#define SPEAR3XX_IRQ_USB_DEV			24
-> +#define SPEAR3XX_IRQ_USB_H_OHCI_0		25
-> +#define SPEAR3XX_IRQ_USB_H_EHCI_0		26
-> +#define SPEAR3XX_IRQ_USB_H_EHCI_1		SPEAR3XX_IRQ_USB_H_EHCI_0
-> +#define SPEAR3XX_IRQ_USB_H_OHCI_1		27
-> +#define SPEAR3XX_IRQ_GEN_RAS_1			28
-> +#define SPEAR3XX_IRQ_GEN_RAS_2			29
-> +#define SPEAR3XX_IRQ_GEN_RAS_3			30
-> +#define SPEAR3XX_IRQ_HW_ACCEL_MOD_1		31
-> +#define SPEAR3XX_IRQ_VIC_END			32
+> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+> index 0761eac..692d01c 100644
+> --- a/arch/arm/mach-s5pv210/Kconfig
+> +++ b/arch/arm/mach-s5pv210/Kconfig
+> @@ -32,6 +32,11 @@ config S5PV210_SETUP_FB_24BPP
+>  	help
+>            Common setup code for S5PV210 with an 24bpp RGB display helper.
+> 
+> +config S5PV210_SETUP_KEYPAD
+> +	bool
+> +	help
+> +	  Common setup code for keypad.
+> +
+>  config S5PV210_SETUP_SDHCI
+>          bool
+>          select S5PV210_SETUP_SDHCI_GPIO
+> diff --git a/arch/arm/mach-s5pv210/Makefile
+b/arch/arm/mach-s5pv210/Makefile
+> index 30be9a6..aae592a 100644
+> --- a/arch/arm/mach-s5pv210/Makefile
+> +++ b/arch/arm/mach-s5pv210/Makefile
+> @@ -31,5 +31,6 @@ obj-$(CONFIG_S5PC110_DEV_ONENAND) += dev-onenand.o
+>  obj-$(CONFIG_S5PV210_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
+>  obj-$(CONFIG_S5PV210_SETUP_I2C1) 	+= setup-i2c1.o
+>  obj-$(CONFIG_S5PV210_SETUP_I2C2) 	+= setup-i2c2.o
+> +obj-$(CONFIG_S5PV210_SETUP_KEYPAD)	+= setup-keypad.o
+>  obj-$(CONFIG_S5PV210_SETUP_SDHCI)       += setup-sdhci.o
+>  obj-$(CONFIG_S5PV210_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
+> diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
+> index 411a4a9..a3034ac 100644
+> --- a/arch/arm/mach-s5pv210/cpu.c
+> +++ b/arch/arm/mach-s5pv210/cpu.c
+> @@ -80,6 +80,10 @@ void __init s5pv210_map_io(void)
+>  	s3c_device_adc.name	= "s3c64xx-adc";
+>  #endif
+> 
+> +#ifdef CONFIG_SAMSUNG_DEV_KEYPAD
+> +	samsung_device_keypad.name = "s5pv210-keypad";
+> +#endif
 > +
 
-We have kept it, the way it was intentionally. I don't understand why any
-conflicts will occur.
+Please use one method. See Kyungmin Park's prev. comments on the subject.
+
+>  	iotable_init(s5pv210_iodesc, ARRAY_SIZE(s5pv210_iodesc));
+> 
+>  	/* initialise device information early */
+> diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-
+> s5pv210/include/mach/map.h
+> index 34eb168..e2f6e2a 100644
+> --- a/arch/arm/mach-s5pv210/include/mach/map.h
+> +++ b/arch/arm/mach-s5pv210/include/mach/map.h
+> @@ -32,6 +32,8 @@
+>  #define S5PV210_PA_SPI0		0xE1300000
+>  #define S5PV210_PA_SPI1		0xE1400000
+> 
+> +#define S5PV210_PA_KEYPAD	(0xE1600000)
+> +
+>  #define S5PV210_PA_IIC0		(0xE1800000)
+>  #define S5PV210_PA_IIC1		(0xFAB00000)
+>  #define S5PV210_PA_IIC2		(0xE1A00000)
+> @@ -104,5 +106,6 @@
+>  #define S3C_PA_WDT		S5PV210_PA_WATCHDOG
+> 
+>  #define SAMSUNG_PA_ADC		S5PV210_PA_ADC
+> +#define SAMSUNG_PA_KEYPAD	S5PV210_PA_KEYPAD
+> 
+>  #endif /* __ASM_ARCH_MAP_H */
+> diff --git a/arch/arm/mach-s5pv210/setup-keypad.c
+b/arch/arm/mach-s5pv210/setup-
+> keypad.c
+> new file mode 100644
+> index 0000000..f51bf8d
+> --- /dev/null
+> +++ b/arch/arm/mach-s5pv210/setup-keypad.c
+> @@ -0,0 +1,34 @@
+> +/*
+> + * linux/arch/arm/mach-s5pv210/setup-keypad.c
+> + *
+> + * Copyright (C) 2010 Samsung Electronics Co.Ltd
+> + * Author: Joonyoung Shim <jy0922.shim@samsung.com>
+> + *
+> + *  This program is free software; you can redistribute  it and/or modify
+it
+> + *  under  the terms of  the GNU General  Public License as published by
+the
+> + *  Free Software Foundation;  either version 2 of the  License, or (at
+your
+> + *  option) any later version.
+> + *
+> + */
+> +
+> +#include <linux/gpio.h>
+> +#include <plat/gpio-cfg.h>
+> +
+> +void samsung_keypad_cfg_gpio(unsigned int rows, unsigned int cols)
+> +{
+> +	unsigned int gpio, end;
+> +
+> +	/* Set all the necessary GPH3 pins to special-function 3 */
+
+What's the special-function 3?
+How about 'special function KP_ROWs'?
+
+> +	end = S5PV210_GPH3(rows);
+> +	for (gpio = S5PV210_GPH3(0); gpio < end; gpio++) {
+> +		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
+> +		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+> +	}
+> +
+> +	/* Set all the necessary GPH2 pins to special-function 3 */
+
+How about 'special function KP_COLs'?
+
+> +	end = S5PV210_GPH2(cols);
+> +	for (gpio = S5PV210_GPH2(0); gpio < end; gpio++) {
+> +		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
+> +		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+> +	}
+> +}
+> --
+
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
