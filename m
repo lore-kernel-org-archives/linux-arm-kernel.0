@@ -1,170 +1,93 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 14 Jun 2010 15:57:48 +0900
-Subject: [PATCH v3] libata: pata_samsung_cf: Add Samsung PATA controller
-	driver
-In-Reply-To: <4C120685.8030306@mvista.com>
-References: <1276156241-28804-1-git-send-email-kgene.kim@samsung.com>
-	<4C10C1D6.8080708@ru.mvista.com>
-	<003301cb0937$e04412c0$a0cc3840$%kim@samsung.com>
-	<4C120685.8030306@mvista.com>
-Message-ID: <008801cb0b8e$e89a50c0$b9cef240$%kim@samsung.com>
+From: eric@eukrea.com (=?UTF-8?B?RXJpYyBCw6luYXJk?=)
+Date: Mon, 14 Jun 2010 09:07:46 +0200
+Subject: [PATCH] mxc_nand: fix PM
+In-Reply-To: <1274982919-13251-1-git-send-email-eric@eukrea.com>
+References: <1274942000-3580-2-git-send-email-eric@eukrea.com>
+	<1274982919-13251-1-git-send-email-eric@eukrea.com>
+Message-ID: <4C15D542.2060102@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei Shtylyov wrote:
-> 
-> Hello.
-> 
-> Kukjin Kim wrote:
-> 
-> >>> From: Abhilash Kesavan <a.kesavan@samsung.com>
-> >>> Adds support for the Samsung PATA controller. This driver is based on
-the
-> >>> Libata subsystem and references the earlier patches sent for IDE
-subsystem.
-> 
-> > Hi,
-> 
-> > Thanks for your comments.
-> 
-> >>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> >>> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> >> [...]
-> 
-> >>> diff --git a/drivers/ata/pata_samsung_cf.c
-b/drivers/ata/pata_samsung_cf.c
-> >>> new file mode 100644
-> >>> index 0000000..fef5515
-> >>> --- /dev/null
-> >>> +++ b/drivers/ata/pata_samsung_cf.c
-> >>> @@ -0,0 +1,608 @@
-> >>> +/* linux/drivers/ata/pata_samsung_cf.c
-> 
-> >>     File names in the heading comment are discouraged.
-> 
-> > Hmm. I used like that in other device drivers.
-> 
->     Nevertheless, it's quite an old rule already.
-> 
-> > Ok..will remove the file name in the heading comment.
-> 
-> >> [...]
-> 
-> >>> +
-> >>> +	piotime = (t2i << 12) | (t2 << 4) | t1;
-> >>> +
-> >>> +	return piotime;
-> >>> +}
-> >>> +
-> >>> +static void pata_s3c_set_piomode(struct ata_port *ap, struct
-ata_device
-> *adev)
-> >>> +{
-> >>> +	int mode = adev->pio_mode - XFER_PIO_0;
-> >>> +	struct s3c_ide_info *info = ap->host->private_data;
-> >>> +	ulong ata_cfg = readl(info->ide_addr + S3C_ATA_CFG);
-> >>> +	ulong piotime;
-> >>> +
-> >>> +	/* Calculates timing parameters for PIO mode */
-> >>> +	piotime = pata_s3c_setup_timing(info, adev);
-> 
-> >>     In fact, for 8-bit (command) timing you should program the slowest
-mode
-> of
-> >> the two drives. However, with CF, you probably only have only one drive
-per
-> >> channel...
-> 
-> > Below code looks OK ?
-> 
->     No, it doesn't.
-> 
-> > 	if (ata_timing_compute(adev, adev->pio_mode, &timing, cycle_time, 0))
-> > {
-> > 		dev_err(ap->dev, "Failed to compute ATA timing\n");
-> > 		piotime = pata_s3c_setup_timing(info, &initial_timing);
-> > 	} else {
-> > 		piotime = pata_s3c_setup_timing(info, &timing);
-> > 	}
-> > where initial_timing is for PIO0. I have added the below struct
-> 
-> > static const struct ata_timing initial_timing =
-> > 	{XFER_PIO_0, 70, 290, 240, 600, 165, 150, 0, 600, 0};
-> 
->     I'd call ata_timing_find_mode(XFER_PIO_0) rather than duplicating the
-> ata_timing entry. But really, you shouldn't set any timing for an invalid
-mode
-> and, as I said, you won't be passed one, so there's nor much sense in
-calling
-> ata_timing_compute() and checking its result; anyway, you'd want to call
-> ata_timing_find_mode() here instead of ata_timing_compute() because the
-latter
-> returns already quantized timings, but initial_timing is not quantized,
-you'll
-> have to call ata_timing_compute() in pata_s3c_setup_timing() anyway.
-> 
-OK, no check for invalid mode then. Now using 'ata_timing_compute' to get the
-quantized timings t1, t2 and t2i and then writing them to PIO_TIME registers.
-PIO_TIME [0:3]  t1      [4:11] t2      [12:19] t2i.
+Hi Sascha,
 
-> >>> +
-> >>> +	/* Enables IORDY if mode requires it */
-> >>> +	if (ata_pio_need_iordy(adev))
-> >>> +		ata_cfg |= S3C_ATA_CFG_IORDYEN;
-> >>> +	else
-> >>> +		ata_cfg &= ~S3C_ATA_CFG_IORDYEN;
-> >>> +
-> >>> +	/* Host controller supports upto PIO4 only */
-> >>> +	if (mode >= 0 && mode <= 4) {
-> 
-> >>     No need to check -- you won't be passed a mode not specified by your
-> >> pio_mask.
-> 
-> > Will remove the check.
-> 
-> >>> +static int __devinit pata_s3c_probe(struct platform_device *pdev)
-> [...]
-> >>> +	if (!request_mem_region(res->start, resource_size(res), DRV_NAME)) {
-> 
-> >>     Probably should call devm_request_mem_region() if you're using
-> >> devm_ioremap()...
-> 
-> > Will change to devm_request_mem_region.
-> 
->     This function does exist, if I don't mistake...
-> 
-> >>> +release_mem:
-> >>> +	release_mem_region(res->start, resource_size(res));
-> >>> +release_device_mem:
-> >>> +	kfree(info);
-> 
-> >>     Doesn't using devm_kzalloc() guarantee that the memory will be freed
-up
-> >> automatically?
-> 
-> > Will remove kfree and release_mem_region because of devm_kzalloc and
-> > devm_request_mem_region usage
-> 
->     I don't know devres librarry capabilities well. Tejun, am I right?
-> 
-> >>> +static struct platform_driver pata_s3c_driver = {
-> >>> +	.probe		= pata_s3c_probe,
-> >>>
-> >>>
-> 
-> >>     2 empty lines -- broken patch?
-> 
-> > Seems OK at my end.
-> 
->     The sent patch had them, nevertheless.
-> 
-> MBR, Sergei
+Le 27/05/2010 19:55, Eric B?nard a ?crit :
+> * when resuming, we get the following log :
+> nand_resume called for a chip which is not in suspended state
+> * this happens because mtd->suspend and mtd->resume are already
+> called from the mtd layer, thus they were called a second time
+> in mxc_nand so mtd complains when trying to resume for the
+> second time
+> * the fix is to remove these call and thus remove the supend and
+> resume functions of mxc_nand
+>
+any news concerning this patch ?
 
+Eric
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> Signed-off-by: Eric B?nard<eric@eukrea.com>
+> Cc: s.hauer at pengutronix.de
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-mtd at lists.infradead.org
+> ---
+>   drivers/mtd/nand/mxc_nand.c |   44 +------------------------------------------
+>   1 files changed, 1 insertions(+), 43 deletions(-)
+>
+> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> index 314e2bf..217b247 100644
+> --- a/drivers/mtd/nand/mxc_nand.c
+> +++ b/drivers/mtd/nand/mxc_nand.c
+> @@ -892,53 +892,11 @@ static int __devexit mxcnd_remove(struct platform_device *pdev)
+>   	return 0;
+>   }
+>
+> -#ifdef CONFIG_PM
+> -static int mxcnd_suspend(struct platform_device *pdev, pm_message_t state)
+> -{
+> -	struct mtd_info *mtd = platform_get_drvdata(pdev);
+> -	struct nand_chip *nand_chip = mtd->priv;
+> -	struct mxc_nand_host *host = nand_chip->priv;
+> -	int ret = 0;
+> -
+> -	DEBUG(MTD_DEBUG_LEVEL0, "MXC_ND : NAND suspend\n");
+> -
+> -	ret = mtd->suspend(mtd);
+> -
+> -	/*
+> -	 * nand_suspend locks the device for exclusive access, so
+> -	 * the clock must already be off.
+> -	 */
+> -	BUG_ON(!ret&&  host->clk_act);
+> -
+> -	return ret;
+> -}
+> -
+> -static int mxcnd_resume(struct platform_device *pdev)
+> -{
+> -	struct mtd_info *mtd = platform_get_drvdata(pdev);
+> -	struct nand_chip *nand_chip = mtd->priv;
+> -	struct mxc_nand_host *host = nand_chip->priv;
+> -	int ret = 0;
+> -
+> -	DEBUG(MTD_DEBUG_LEVEL0, "MXC_ND : NAND resume\n");
+> -
+> -	mtd->resume(mtd);
+> -
+> -	return ret;
+> -}
+> -
+> -#else
+> -# define mxcnd_suspend   NULL
+> -# define mxcnd_resume    NULL
+> -#endif				/* CONFIG_PM */
+> -
+>   static struct platform_driver mxcnd_driver = {
+>   	.driver = {
+>   		   .name = DRIVER_NAME,
+> -		   },
+> +	},
+>   	.remove = __devexit_p(mxcnd_remove),
+> -	.suspend = mxcnd_suspend,
+> -	.resume = mxcnd_resume,
+>   };
+>
+>   static int __init mxc_nd_init(void)
