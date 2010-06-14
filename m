@@ -1,128 +1,105 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 14 Jun 2010 10:51:13 +0530
-Subject: [PATCH 3/5] SPEAr3xx: Rework pmx_dev code to remove conflicts
-In-Reply-To: <1275717955-14545-4-git-send-email-ryan@bluewatersys.com>
-References: <1275717955-14545-1-git-send-email-ryan@bluewatersys.com>
-	<1275717955-14545-4-git-send-email-ryan@bluewatersys.com>
-Message-ID: <4C15BC49.5040105@st.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sun, 13 Jun 2010 23:23:45 -0600
+Subject: Request review of device tree documentation
+In-Reply-To: <1276408773.1962.574.camel@pasglop>
+References: <AANLkTilK4YkRMJqlcRDOAlGBzpdlZuSo9NF5NrRNocHT@mail.gmail.com>
+	<33BD8E86-9397-432A-97BF-F154812C157B@digitaldans.com>
+	<AANLkTilv6TtPZs0DAwd8JlSV_J3VvMsvtVVOOeQauOIn@mail.gmail.com>
+	<4C13430B.5000907@firmworks.com> <1276339529.1962.184.camel@pasglop>
+	<1276339684.1962.186.camel@pasglop> <4C13B618.1030006@firmworks.com>
+	<1276383132.1962.195.camel@pasglop>
+	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>
+	<4C146F18.9030008@firmworks.com> <1276408773.1962.574.camel@pasglop>
+Message-ID: <AANLkTinwL0XtMNG13inr_1UliOlqZkyr4dlvG-ZGL9JT@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/5/2010 11:35 AM, Ryan Mallon wrote:
-> Prefix the pmx_devs to remove naming conflicts between the three
-> SPEAr3xx platforms. Also make pmx_driver static to each platform and
-> rework the init code to pass the devices rather than export the
-> pmx_driver structure.
-> 
-> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
-> ---
->  arch/arm/mach-spear3xx/include/mach/generic.h |  135 ++++++++++++-------------
->  arch/arm/mach-spear3xx/spear300.c             |   39 ++++----
->  arch/arm/mach-spear3xx/spear300_evb.c         |   26 ++---
->  arch/arm/mach-spear3xx/spear310.c             |   29 +++---
->  arch/arm/mach-spear3xx/spear310_evb.c         |   42 ++++-----
->  arch/arm/mach-spear3xx/spear320.c             |   57 ++++++-----
->  arch/arm/mach-spear3xx/spear320_evb.c         |   36 +++----
->  arch/arm/mach-spear3xx/spear3xx.c             |   60 ++++++------
->  8 files changed, 202 insertions(+), 222 deletions(-)
-> 
-> diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-> index 48dfb9c..408d39f 100644
-> --- a/arch/arm/mach-spear3xx/include/mach/generic.h
-> +++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-> @@ -60,21 +60,21 @@ void spear_pmx_init(struct pmx_driver *pmx_driver, uint base, uint size);
->  #define PMX_TIMER_1_2_MASK	(1 << 0)
->  
->  /* pad mux devices */
-> -extern struct pmx_dev pmx_firda;
-> -extern struct pmx_dev pmx_i2c;
-> -extern struct pmx_dev pmx_ssp_cs;
-> -extern struct pmx_dev pmx_ssp;
-> -extern struct pmx_dev pmx_mii;
-> -extern struct pmx_dev pmx_gpio_pin0;
-> -extern struct pmx_dev pmx_gpio_pin1;
-> -extern struct pmx_dev pmx_gpio_pin2;
-> -extern struct pmx_dev pmx_gpio_pin3;
-> -extern struct pmx_dev pmx_gpio_pin4;
-> -extern struct pmx_dev pmx_gpio_pin5;
-> -extern struct pmx_dev pmx_uart0_modem;
-> -extern struct pmx_dev pmx_uart0;
-> -extern struct pmx_dev pmx_timer_3_4;
-> -extern struct pmx_dev pmx_timer_1_2;
-> +extern struct pmx_dev spear3xx_pmx_firda;
-> +extern struct pmx_dev spear3xx_pmx_i2c;
-> +extern struct pmx_dev spear3xx_pmx_ssp_cs;
-> +extern struct pmx_dev spear3xx_pmx_ssp;
-> +extern struct pmx_dev spear3xx_pmx_mii;
-> +extern struct pmx_dev spear3xx_pmx_gpio_pin0;
-> +extern struct pmx_dev spear3xx_pmx_gpio_pin1;
-> +extern struct pmx_dev spear3xx_pmx_gpio_pin2;
-> +extern struct pmx_dev spear3xx_pmx_gpio_pin3;
-> +extern struct pmx_dev spear3xx_pmx_gpio_pin4;
-> +extern struct pmx_dev spear3xx_pmx_gpio_pin5;
-> +extern struct pmx_dev spear3xx_pmx_uart0_modem;
-> +extern struct pmx_dev spear3xx_pmx_uart0;
-> +extern struct pmx_dev spear3xx_pmx_timer_3_4;
-> +extern struct pmx_dev spear3xx_pmx_timer_1_2;
->  
+[cc'ing linux-arm-kernel]
 
-same here. I don't understand why any conflicts will be there.
+On Sat, Jun 12, 2010 at 11:59 PM, Benjamin Herrenschmidt
+<benh@kernel.crashing.org> wrote:
+> On Sat, 2010-06-12 at 19:39 -1000, Mitch Bradley wrote:
+>
+>> Minimally, OFW needs to own some memory that the kernel won't steal.
+>> OFW on ARM is position-independent, so it can be tucked up at the top of memory
+>> fairly easily.
+>
+> Amen :-)
+>
+>> To call back into OFW, the virtual mapping for that memory needs to be
+>> reestablished.
+>
+> That's a nasty part unless ARM provides a usable "real mode" which
+> allows MMIO accesses, which I -think- it does. I don't remember the
+> details that much.
+>
+> Maybe we could define a binding tho where we could somewhat standardize
+> the portion of the virtual address space used by OF. IE. from the top of
+> the address space down to the max size it requires. It might require
+> some games to play with the fixmap on ARM side tho...
+>
+> Another option would be something more RTAS-like where a specific call
+> can be done by the OS itself to 'relocate' (not physically but virtually
+> in this case) OF into the OS preferred location. Be prepared to have
+> multiple of these called though as kernels kexec into one another.
 
-[snip...]
+This sounds reasonable to me.
 
->  
->  /* pmx driver structure */
-> -struct pmx_driver pmx_driver = {
-> +static struct pmx_driver pmx_driver = {
->  	.mode_reg = {.offset = MODE_CONFIG_REG, .mask = 0x00000007},
->  	.mux_reg = {.offset = PAD_MUX_CONFIG_REG, .mask = 0x00007fff},
->  };
-> @@ -511,7 +511,8 @@ static struct spear_shirq shirq_intrcomm_ras = {
->  };
->  
->  /* spear320 routines */
-> -void __init spear320_init(void)
-> +void __init spear320_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
-> +			  u8 pmx_dev_count)
->  {
->  	void __iomem *base;
->  	int ret = 0;
-> @@ -540,10 +541,10 @@ void __init spear320_init(void)
->  		if (ret)
->  			printk(KERN_ERR "Error registering Shared IRQ 4\n");
->  	}
-> -}
->  
-> -void spear320_pmx_init(void)
-> -{
-> +	pmx_driver.mode = pmx_mode;
-> +	pmx_driver.devs = pmx_devs;
-> +	pmx_driver.devs_count = pmx_dev_count;
->  	spear_pmx_init(&pmx_driver, SPEAR320_SOC_CONFIG_BASE,
-> -			SPEAR320_SOC_CONFIG_SIZE);
-> +		       SPEAR320_SOC_CONFIG_SIZE);
->  }
+>> Or perhaps the MMU and caches can be turned off for the duration of the
+>> callback.
+>> I don't have the details of ARM MMUs and caches reloaded into my head
+>> yet. ?Maybe next week...
+>
+> Forgot most of it too. Looks like it's about time I read the ARM
+> architecture again, this sounds like fun :-)
+>
+> BTW. I notice no ARM list is CCed on this discussion ... maybe we should
+> fix that ?
 
-This part looks fine.
+cc'ing linux-arm-kernel in all my replies
 
-> diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
-> index 62ac685..4969fa9 100644
-> --- a/arch/arm/mach-spear3xx/spear320_evb.c
-> +++ b/arch/arm/mach-spear3xx/spear320_evb.c
-> @@ -19,22 +19,22 @@
->  
->  static struct amba_device *amba_devs[] __initdata = {
-> @@ -56,13 +56,7 @@ static void __init spear320_evb_init(void)
->  	unsigned int i;
->  
->  	/* call spear320 machine init function */
-> -	spear320_init();
-> -
-> -	/* padmux initialization */
-> -	pmx_driver.mode = &auto_net_mii_mode;
-> -	pmx_driver.devs = pmx_devs;
-> -	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
-> -	spear320_pmx_init();
-> +	spear320_init(&auto_net_mii_mode, pmx_devs, ARRAY_SIZE(pmx_devs));
+>> Also, for debugging, OFW typically needs access to a UART. ?If the OS is
+>> using the UART, it's often possible for OFW to use it just by turning off interrupts and
+>> polling the UART.
+>
+> That might not be a big deal unless the OS plays with the clocks which
+> it -does- tend to do. It might be worth defining some kind of property
+> OF puts in the UART node to inform the OS not to play games and keep
+> that one enabled, though that could affect power management, so might
+> need to be conditional on some nvram option (debug-enabled?)
+>
+>> The use case for a dynamic device tree is not compelling.
+>
+> Right, generally not, except in virtualized environments (see my other
+> response).
+>
+> Now, the -one- thing that WILL happen if we have something like OF that
+> remains alive is of course vendors will try to use it as a HAL. You know
+> as well as I do that it -will- happen :-)
+>
+> There's two reasons that typically happen. The misguided "good" one
+> which is to think it helps keeping a single/more maintainable kernel
+> image by stuffing the horrible details of nvram, rtc, etc.. access,
+> poweron/off GPIOs, clock control, etc... in there. The "bad" one which
+> is to stash code you don't want to show the source code for (codec
+> control, etc...).
+>
+> This is bad for so many reasons that I don't think I need to even start
+> listing them :-) So that's something that will have to be strongly kept
+> in check and fought I suspect.
 
-this is also fine.
+With a stout 2x4 if needed.  I'm going to try very hard to dissuade
+this.  Yet another reason why I only what one method for passing the
+device tree into the kernel.
+
+> To some extent, in fact, doing that sort of stuff in OF or even in RTAS
+> like we do on power is even worse than ACPI-like tables. At least with
+> those tables, the interpreter is in the operating system, thus can run
+> with interrupts on, scheduling on, etc... With RTAS, or client interface
+> calls, you'll end up with potentially huge slumps of CPU time "lost"
+> into the bowels of the firmware.
+
+Unfortunately, on the newer ARM SoCs, binary blobs are all over the
+place anyway.  :-(
+
+g.
