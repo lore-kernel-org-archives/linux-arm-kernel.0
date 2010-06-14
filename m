@@ -1,45 +1,33 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 14 Jun 2010 10:43:51 +0200
-Subject: [PATCH] mxc_nand: fix PM
-In-Reply-To: <1274982919-13251-1-git-send-email-eric@eukrea.com>
-References: <1274942000-3580-2-git-send-email-eric@eukrea.com>
-	<1274982919-13251-1-git-send-email-eric@eukrea.com>
-Message-ID: <20100614084351.GC12159@pengutronix.de>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Mon, 14 Jun 2010 19:22:58 +1000
+Subject: [RFC,PATCH 1/2] Add a common struct clk
+In-Reply-To: <19477.52889.982995.407051@ipc1.ka-ro>
+References: <1275636608.606606.450179637764.0.gpush@pororo>
+	<201006111557.12249.jeremy.kerr@canonical.com>
+	<19473.61547.684572.647641@ipc1.ka-ro>
+	<201006111718.47426.jeremy.kerr@canonical.com>
+	<19474.172.742782.972629@ipc1.ka-ro>
+	<20100611095839.GC10894@pengutronix.de>
+	<19474.2817.333749.485028@ipc1.ka-ro>
+	<1276319643.1962.181.camel@pasglop>
+	<19477.52889.982995.407051@ipc1.ka-ro>
+Message-ID: <1276507378.2552.39.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Eric,
+On Mon, 2010-06-14 at 08:39 +0200, Lothar Wa?mann wrote:
+> All implementations so far use spin_lock_irq_save()!
 
-On Thu, May 27, 2010 at 07:55:19PM +0200, Eric B?nard wrote:
-> * when resuming, we get the following log :
-> nand_resume called for a chip which is not in suspended state
-> * this happens because mtd->suspend and mtd->resume are already
-> called from the mtd layer, thus they were called a second time
-> in mxc_nand so mtd complains when trying to resume for the
-> second time
-> * the fix is to remove these call and thus remove the supend and
-> resume functions of mxc_nand
-the commit log looks IMHO ugly.  Better make it (including Subject):
+Nothing prevents your implementation to be a tad smarter.
 
-mtd/mxc_nand: don't call mtd->{suspend,resume} explicitly
+> How would you be able to sleep with a mutex held?
+> If you hold a lock you must not sleep, no matter what sort of lock it
+> is. 
 
-The mtd layer is responsible to call mtd->{suspend,resume}.  Doing it
-again in the driver is wrong and results in a warning:
+You can perfectly sleep with a mutex held. You -do- have to be careful
+of course to ensure you aren't going to do silly thing like re-enter and
+try to take it twice, or A->B B->A deadlocks, but in the typical case of
+wanting to use a msleep rather than udelay, it works very well :-)
 
-	nand_resume called for a chip which is not in suspended state
-
-at resume time.  Removing the calls from the resume and suspend
-functions makes them empty allowing them to be deleted completely.
-
-Signed-off-by: Eric B?nard <eric@eukrea.com>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-mtd at lists.infradead.org
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Cheers,
+Ben.
