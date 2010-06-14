@@ -1,36 +1,26 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Mon, 14 Jun 2010 10:51:06 +1200
-Subject: [PATCH 0/5] SPEAr3xx: Unify build of SPEAr3xx platforms
-In-Reply-To: <1275717955-14545-1-git-send-email-ryan@bluewatersys.com>
-References: <1275717955-14545-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <4C1560DA.5040803@bluewatersys.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 14 Jun 2010 11:09:49 +0800
+Subject: [GIT PULL] pxa: fixes for v2.6.35-rc3
+Message-ID: <AANLkTikVogt4MaYbOxOIr1DXjX29pYWYw5pbmCkC36Lv@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ryan Mallon wrote:
-> Rework the SPEAr3xx code to allow all three SPEAr3xx platforms to be
-> built into a single kernel.
-> 
-> I do not have access to any SPEAr3xx hardware, so the patch series is
-> build tested only.
+The following changes since commit 7e27d6e778cd87b6f2415515d7127eba53fe5d02:
 
-Any interest in this patch series, or anybody with hardware that is able
-to test it?
+  Linux 2.6.35-rc3 (2010-06-11 19:14:04 -0700)
 
-Patch 1/5 is a simple cleanup patch which makes a bunch of local
-structures static, so it doesn't change functionality. Patch 5/5 can be
-dropped until the path forward for cleaning up the defconfigs has been
-decided. The other patches should not change the functionality if only
-one of the platforms is compiled in, but should also allow all three
-SPEAr3xx platforms to be built and run in a single kernel.
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
 
-~Ryan
+Jonathan Cameron (1):
+      [ARM] mmp: fix build failure due to IRQ_PMU depends on ARCH_PXA
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
+Marek Vasut (2):
+      [ARM] pxa/z2: fix missing include in battery driver
+      [ARM] pxa/z2: fix flash layout to final version
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Robert Jarzmik (1):
+      [ARM] pxa/mioa701: fix camera regression
+
+Steve Bennett (1):
+      [ARM] pxa: fix incorrect gpio type in udc_pxa2xx.h
