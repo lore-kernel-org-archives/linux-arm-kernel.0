@@ -1,135 +1,35 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 14 Jun 2010 10:32:14 +0200
-Subject: ARM defconfig files
-In-Reply-To: <alpine.LFD.2.00.1006031119440.8175@i5.linux-foundation.org>
-References: <20100603074548.GA12104@flint.arm.linux.org.uk>
-	<alpine.LFD.2.00.1006030725420.8175@i5.linux-foundation.org>
-	<20100603181010.GA25779@flint.arm.linux.org.uk>
-	<1275589230.23384.19.camel@c-dwalke-linux.qualcomm.com>
-	<alpine.LFD.2.00.1006031119440.8175@i5.linux-foundation.org>
-Message-ID: <20100614083214.GA2104@pengutronix.de>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Mon, 14 Jun 2010 17:39:09 +0900
+Subject: [PATCH 0/6] S5PV210 PM Support (suspend-to-mem)
+Message-ID: <1276504755-24741-1-git-send-email-MyungJoo.Ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch set supports S5PV210/S5PC110 PM (suspend-to-mem).
 
-[Added linux-arm-kernel ML to Cc, note that it's moderated for
-non-subscribers.]
+MyungJoo Ham (8):
+  S5PV210 Add IRQ/EINT register information for the CPU.
+  S5PV210 add clock registers for the CPU.
+  S5PV210 added register mappings
+  S5PV210 GPIO relataed registers are added.
+  S5PV210 added EINT-GPIO register mappings
+  S5PV210 PM Support (suspend-to-mem)
 
-On Thu, Jun 03, 2010 at 11:21:59AM -0700, Linus Torvalds wrote:
-> 
-> 
-> On Thu, 3 Jun 2010, Daniel Walker wrote:
-> > 
-> > I don't see how we can do without defconfigs altogether tho. I mean , if
-> > you want to run a Beagle board or a Nexus one we can't just give the
-> > users a slim ARM config and let them troll through 1000's of drivers
-> > trying to find just those ones that work on their given board.
-> 
-> Well, you also don't need the full defconfig's with the kernel.
-> 
-> Right now they are just noise. They actually _hide_ things, because 
-> diffstat (and dirstat) information becomes pointless, and the diffs become 
-> totally unreadable by any human (trust me - when the choice is between 
-> "search for next relevant diff" or "blast it, I can't be bothered with 
-> walking through this crap", quite often the choice is the latter).
-I wrote a script that throws out all unneeded lines in all arm
-defconfigs that don't influence the resulting .config for .34 and
-.35-rc1 and compared .34<->.35-rc with .34-reduced<->.35-rc1-reduced.
-
-Here are the results:
-
-	$ git diff --dirstat v2.6.34 v2.6.35-rc1 arch/arm
-	  11.8% arch/arm/configs/
-	  10.0% arch/arm/mach-msm/
-	  10.8% arch/arm/mach-omap2/
-	   4.8% arch/arm/mach-pxa/
-	   4.5% arch/arm/mach-s5pc100/
-	   3.3% arch/arm/mach-s5pv210/
-	   4.4% arch/arm/mach-spear3xx/
-	   3.1% arch/arm/mach-ux500/
-	   5.1% arch/arm/plat-s5pc1xx/
-	   3.1% arch/arm/plat-samsung/
-	  38.2% arch/arm/
-
-	$ git diff --dirstat arm/defconfig/reduced-v2.6.34 arm/defconfig/reduced-v2.6.35-rc1 arch/arm
-	   3.1% arch/arm/mach-davinci/
-	  11.3% arch/arm/mach-msm/
-	  12.2% arch/arm/mach-omap2/
-	   5.4% arch/arm/mach-pxa/
-	   5.1% arch/arm/mach-s5pc100/
-	   3.7% arch/arm/mach-s5pv210/
-	   5.0% arch/arm/mach-spear3xx/
-	   3.5% arch/arm/mach-ux500/
-	   5.8% arch/arm/plat-s5pc1xx/
-	   3.5% arch/arm/plat-samsung/
-	  40.9% arch/arm/
-
-	$ git diff --dirstat=0 arm/defconfig/reduced-v2.6.34 arm/defconfig/reduced-v2.6.35-rc1 arch/arm | grep config
-	   1.1% arch/arm/configs/
-
-	$ git diff --shortstat v2.6.35-rc1 arm/defconfig/reduced-v2.6.35-rc1
-	 177 files changed, 652 insertions(+), 194157 deletions(-)
-
-(The insertions above are only moved lines I think, I didn't check them
-all.)
-
-The branches arm/defconfig/reduced-v2.6.34 and
-arm/defconfig/reduced-v2.6.35-rc1 are available at my repo at
-git://git.pengutronix.de/git/ukl/linux-2.6.git .  (There is a gitweb at
-http://git.pengutronix.de/?p=ukl/linux-2.6.git)
-
-So maintaining these minimal defconfigs would have reduced the defconfig
-noise from 11.8% down to 1.1%.  And probably it could be considerably
-reduced further with constructs like:
-
-	config HAVE_MTD_NAND_MXC
-		bool
-
-	config MTD_NAND_MXC
-		tristate "MXC NAND support"
-		...
-		default m if HAVE_MTD_NAND_MXC
-		help
-		  ...
-
-	...
-	config MACH_MX27ADS
-		...
-		select HAVE_MTD_NAND_MXC
-
-.  Compared with selecting everything in Kconfig files this approach
-allows further tweaking of a config.  (E.g. "I have a mx27ads machine,
-but I don't need nand support.")  Compared with the SAT-Solver it's an
-idea that works today.
-
-One downside of this approach (when done with my script only) is that
-too much is removed.  E.g. in mx3_defconfig CONFIG_ARCH_MX3 is removed.
-This is OK from a logical POV but then changing the default of the
-corresponding choice (and I intend to do that in the near future) would
-break this defconfig.
-
-I can share my script and I'm willing to support maintaining the
-minimality of the defconfig files if they are an acceptable (maybe
-intermediate) step for Linus.
-
-Together with the efforts to reduce the number of defconfigs as thought
-about in other mails of this thread the situation should become quite
-better for Linus.  (I'm currently working on merging support for all
-Freescale SoCs into a single mach- directory and so merge mx1_defconfig,
-mx21_defconfig, mx27_defconfig, mx31pdk_defconfig, mx3_defconfig and
-mx51_defconfig.)
-
-Linus: I would really appreciate if you wouldn't remove all (or nearly
-all) defconfig files.  I think you would force a quicker solution to
-this problem, but during that time the ARM community would loose compile
-coverage.
-
-Thoughts on this?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+ arch/arm/mach-s5pv210/Makefile                  |    4 +
+ arch/arm/mach-s5pv210/include/mach/irqs.h       |    9 +
+ arch/arm/mach-s5pv210/include/mach/map.h        |   45 +++
+ arch/arm/mach-s5pv210/include/mach/regs-clock.h |  467 ++++++++++++++++++++++-
+ arch/arm/mach-s5pv210/include/mach/regs-gpio.h  |  121 ++++++
+ arch/arm/mach-s5pv210/include/mach/regs-irq.h   |    6 +
+ arch/arm/plat-s5p/Makefile                      |    3 +
+ arch/arm/plat-s5p/include/plat/gpio-ext.h       |   44 +++
+ arch/arm/plat-s5p/include/plat/map-s5p.h        |    1 +
+ arch/arm/plat-s5p/sleep.S                       |  248 ++++++++++++
+ arch/arm/plat-samsung/include/plat/pm-core.h    |   53 +++
+ arch/arm/plat-samsung/include/plat/pm.h         |   13 +
+ arch/arm/plat-samsung/pm-gpio.c                 |    4 +-
+ arch/arm/plat-samsung/pm.c                      |   75 ++++-
+ 14 files changed, 1082 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm/plat-s5p/include/plat/gpio-ext.h
+ create mode 100644 arch/arm/plat-s5p/sleep.S
+ create mode 100644 arch/arm/plat-samsung/include/plat/pm-core.h
