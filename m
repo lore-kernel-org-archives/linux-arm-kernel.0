@@ -1,60 +1,95 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Mon, 14 Jun 2010 17:36:28 +1200
-Subject: [PATCH 2/5] SPEAR3xx: Rename register/irq defines to remove naming
-	conflicts
-In-Reply-To: <4C15BB99.4060108@st.com>
-References: <1275717955-14545-1-git-send-email-ryan@bluewatersys.com>
-	<1275717955-14545-3-git-send-email-ryan@bluewatersys.com>
-	<4C15BB99.4060108@st.com>
-Message-ID: <4C15BFDC.70809@bluewatersys.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sun, 13 Jun 2010 23:36:57 -0600
+Subject: Request review of device tree documentation
+In-Reply-To: <1276417792.1962.731.camel@pasglop>
+References: <AANLkTilK4YkRMJqlcRDOAlGBzpdlZuSo9NF5NrRNocHT@mail.gmail.com>
+	<33BD8E86-9397-432A-97BF-F154812C157B@digitaldans.com>
+	<AANLkTilv6TtPZs0DAwd8JlSV_J3VvMsvtVVOOeQauOIn@mail.gmail.com>
+	<4C13430B.5000907@firmworks.com> <1276339529.1962.184.camel@pasglop>
+	<1276339684.1962.186.camel@pasglop> <4C13B618.1030006@firmworks.com>
+	<1276383132.1962.195.camel@pasglop>
+	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>
+	<4C146F18.9030008@firmworks.com> <1276408773.1962.574.camel@pasglop>
+	<4C147EA5.3060500@firmworks.com> <1276417792.1962.731.camel@pasglop>
+Message-ID: <AANLkTimc12G-YYTd4yQiviY-ijvJ9TzVEmxxaoF43xVR@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Viresh KUMAR wrote:
-> On 6/5/2010 11:35 AM, Ryan Mallon wrote:
->> Prefix register and irq defintions to remove naming conflicts between
->> the three SPEAr3xx platforms.
+On Sun, Jun 13, 2010 at 2:29 AM, Benjamin Herrenschmidt
+<benh@kernel.crashing.org> wrote:
+> On Sat, 2010-06-12 at 20:45 -1000, Mitch Bradley wrote:
+>
+>> Either fought or embraced. ?To the extent that it is possible to focus
+>> solely on Linux and ARM, one could image doing a good HAL.
+>
+> That will come with a huge amount of comunity resistance sadly, but I
+> can imagine distros liking it.
+>
+> In general, I much prefer having all the necessary native drivers in the
+> kernel, and the device-tree to provide the right representation, and
+> avoid trying to abstract "methods" via a HAL. It's the Linux philosophy
+> as much as possible (even when defeated by ACPI).
+>
+> But if we're going to be forced by vendors into HALs, we can also make
+> sure that whatever they come up with is half reasonable :-)
+
+I think there is more to be concerned about regarding binary blobs
+than HALs.  Many of the new SoCs require closed binaries to use all
+the hardware right now (graphics cores in particular).
+
+Board vendors seem to be taking the plunge and modifying the kernel
+rather than trying to create a HAL for driving board specific
+features.
+
+>> (The reason I say ARM-only is ?because the
+>> only other non-x86 architecture that has any "legs" left is PowerPC, and
+>> PPC already has a coherent story.)
+>
+> Well, ppc story isn't that coherent as far as this goes :-) We don't
+> keep OF alive, we have RTAS which is a pile of poo... etc...
+>
+> But yeah, we are fine without a HAL, so if we stick to OF as a
+> bootloader and provider of the device-tree, we are fine.
+>
+>> > To some extent, in fact, doing that sort of stuff in OF or even in RTAS
+>> > like we do on power is even worse than ACPI-like tables. At least with
+>> > those tables, the interpreter is in the operating system, thus can run
+>> > with interrupts on, scheduling on, etc...
 >>
->> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
->> ---
->>  arch/arm/mach-spear3xx/include/mach/generic.h  |    4 +-
->>  arch/arm/mach-spear3xx/include/mach/irqs.h     |  195 ++++++++++++------------
->>  arch/arm/mach-spear3xx/include/mach/spear300.h |   26 ++--
->>  arch/arm/mach-spear3xx/include/mach/spear310.h |   44 +++---
->>  arch/arm/mach-spear3xx/include/mach/spear320.h |   50 +++---
->>  arch/arm/mach-spear3xx/spear300.c              |   65 ++++----
->>  arch/arm/mach-spear3xx/spear310.c              |   92 ++++++------
->>  arch/arm/mach-spear3xx/spear320.c              |  134 ++++++++--------
->>  arch/arm/mach-spear3xx/spear3xx.c              |    4 +-
->>  9 files changed, 308 insertions(+), 306 deletions(-)
->>
->> diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
->> index af7e02c..48dfb9c 100644
->> --- a/arch/arm/mach-spear3xx/include/mach/generic.h
->> +++ b/arch/arm/mach-spear3xx/include/mach/generic.h
->> @@ -27,8 +27,8 @@
->>   * Following GPT channels will be used as clock source and clockevent
->>   */
->>  #define SPEAR_GPT0_BASE		SPEAR3XX_ML1_TMR_BASE
->> -#define SPEAR_GPT0_CHAN0_IRQ	IRQ_CPU_GPT1_1
->> -#define SPEAR_GPT0_CHAN1_IRQ	IRQ_CPU_GPT1_2
->> +#define SPEAR_GPT0_CHAN0_IRQ	SPEAR3XX_IRQ_CPU_GPT1_1
->> +#define SPEAR_GPT0_CHAN1_IRQ	SPEAR3XX_IRQ_CPU_GPT1_2
->>  
+>> I have an FCode interpreter that can live inside the OS. ?It's
+>> considerably simpler than the ACPI interpreter.
+>
+> That's the one thing I purposefully avoided mentioning :-)
+>
+> It's an interesting idea, I've though about it. If course, there's all
+> sort of things to be careful about, such as who provides the f-code with
+> virtual->physical mappings to devices, how they are represented, how
+> much of the OF "forth" environment is accessible to such f-code, locking
+> between f-code and kernel use of shared resources (especially true when
+> dealing with things like i2c devices, plls, etc...).
+>
+> IE. THe base idea is simple. The implementation can be a huge can of
+> worms.
+>
+> Cheers,
+> Ben.
+>
+>> > ?With RTAS, or client interface
+>> > calls, you'll end up with potentially huge slumps of CPU time "lost"
+>> > into the bowels of the firmware.
+>> >
+>> >
+>> > Cheers,
+>> > Ben.
+>> >
+>> >
+>> >
+>
+>
+>
 
-<snip>
 
-> 
-> We have kept it, the way it was intentionally. I don't understand why any
-> conflicts will occur.
 
-The goal of the patch series is to allow all a single kernel to have
-support for all of the spear platforms, ie CONFIG_MACH_SPEAR300,
-CONFIG_MACH_SPEAR310 and CONFIG_MACH_SPEAR320 can all be set.
-
-The current code has duplicate defines in
-arch/arm/mach-spear3xx/include/mach/spear3[012]0.h which means that
-these three files cannot be included at once (they are included from
-arch/arm/mach-spear3xx/include/mach/spear.h).
-
-~Ryan
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
