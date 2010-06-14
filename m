@@ -1,518 +1,367 @@
 From: konkers@android.com (Erik Gilling)
-Date: Mon, 14 Jun 2010 14:10:20 -0700
-Subject: [PATCH v3 04/11] [ARM] tegra: SMP support
-In-Reply-To: <1276549827-2688-4-git-send-email-konkers@android.com>
+Date: Mon, 14 Jun 2010 14:10:24 -0700
+Subject: [PATCH v3 08/11] [ARM] tegra: harmony: Add harmony board file
+In-Reply-To: <1276549827-2688-8-git-send-email-konkers@android.com>
 References: <1271198563-10424-1-git-send-email-konkers@android.com>
 	<1276549827-2688-1-git-send-email-konkers@android.com>
 	<1276549827-2688-2-git-send-email-konkers@android.com>
 	<1276549827-2688-3-git-send-email-konkers@android.com>
 	<1276549827-2688-4-git-send-email-konkers@android.com>
-Message-ID: <1276549827-2688-5-git-send-email-konkers@android.com>
+	<1276549827-2688-5-git-send-email-konkers@android.com>
+	<1276549827-2688-6-git-send-email-konkers@android.com>
+	<1276549827-2688-7-git-send-email-konkers@android.com>
+	<1276549827-2688-8-git-send-email-konkers@android.com>
+Message-ID: <1276549827-2688-9-git-send-email-konkers@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Colin Cross <ccross@android.com>
 
+v2: fixes from Russell King
+	- include linux/io.h instead of mach/io.h
+
+v3: fixes from Linus Walleij
+	- remove /16 * 16 from UART clock
+
+v3:
+	- Fix checkpatch issues
+	- make board init calls explicit
+	- use clock init table to set clocks
+	- remove panel
+
 Signed-off-by: Colin Cross <ccross@android.com>
 Signed-off-by: Erik Gilling <konkers@android.com>
 ---
- arch/arm/Kconfig                       |   11 ++-
- arch/arm/mach-tegra/Makefile           |    2 +
- arch/arm/mach-tegra/headsmp.S          |   61 +++++++++++++
- arch/arm/mach-tegra/hotplug.c          |  140 ++++++++++++++++++++++++++++
- arch/arm/mach-tegra/include/mach/smp.h |   30 ++++++
- arch/arm/mach-tegra/localtimer.c       |   25 +++++
- arch/arm/mach-tegra/platsmp.c          |  156 ++++++++++++++++++++++++++++++++
- 7 files changed, 421 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/mach-tegra/headsmp.S
- create mode 100644 arch/arm/mach-tegra/hotplug.c
- create mode 100644 arch/arm/mach-tegra/include/mach/smp.h
- create mode 100644 arch/arm/mach-tegra/localtimer.c
- create mode 100644 arch/arm/mach-tegra/platsmp.c
+ arch/arm/mach-tegra/Makefile               |    3 +
+ arch/arm/mach-tegra/board-harmony-pinmux.c |  144 ++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/board-harmony.c        |  127 ++++++++++++++++++++++++
+ arch/arm/mach-tegra/board-harmony.h        |   22 ++++
+ 4 files changed, 296 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/board-harmony-pinmux.c
+ create mode 100644 arch/arm/mach-tegra/board-harmony.c
+ create mode 100644 arch/arm/mach-tegra/board-harmony.h
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 98e41e1..c8f28f8 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1113,10 +1113,11 @@ config SMP
- 	bool "Symmetric Multi-Processing (EXPERIMENTAL)"
- 	depends on EXPERIMENTAL && (REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP ||\
- 		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 ||\
--		 ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
-+		 ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_TEGRA)
- 	depends on GENERIC_CLOCKEVENTS
- 	select USE_GENERIC_SMP_HELPERS
--	select HAVE_ARM_SCU if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
-+	select HAVE_ARM_SCU if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500 || \
-+		 ARCH_VEXPRESS_CA9X4 || ARCH_TEGRA)
- 	help
- 	  This enables support for systems with more than one CPU. If you have
- 	  a system with only one CPU, like most personal computers, say N. If
-@@ -1185,9 +1186,11 @@ config HOTPLUG_CPU
- config LOCAL_TIMERS
- 	bool "Use local timer interrupts"
- 	depends on SMP && (REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || \
--		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || ARCH_U8500)
-+		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
-+		ARCH_U8500 || ARCH_TEGRA)
- 	default y
--	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500)
-+	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500 || \
-+		ARCH_TEGRA)
- 	help
- 	  Enable support for local timers on SMP platforms, rather then the
- 	  legacy IPI broadcast method.  Local timers allows the system
 diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index e20546a..f339559 100644
+index 5e47a71..51e9370 100644
 --- a/arch/arm/mach-tegra/Makefile
 +++ b/arch/arm/mach-tegra/Makefile
-@@ -3,3 +3,5 @@ obj-y                                   += io.o
- obj-y                                   += irq.o
- obj-y                                   += clock.o
+@@ -9,3 +9,6 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clock.o
  obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
-+obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
-+obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
-diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
+ obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
++
++obj-${CONFIG_MACH_HARMONY}              += board-harmony.o
++obj-${CONFIG_MACH_HARMONY}              += board-harmony-pinmux.o
+diff --git a/arch/arm/mach-tegra/board-harmony-pinmux.c b/arch/arm/mach-tegra/board-harmony-pinmux.c
 new file mode 100644
-index 0000000..b5349b2
+index 0000000..50b15d5
 --- /dev/null
-+++ b/arch/arm/mach-tegra/headsmp.S
-@@ -0,0 +1,61 @@
-+#include <linux/linkage.h>
-+#include <linux/init.h>
-+
-+        .section ".text.head", "ax"
-+	__CPUINIT
-+
++++ b/arch/arm/mach-tegra/board-harmony-pinmux.c
+@@ -0,0 +1,144 @@
 +/*
-+ * Tegra specific entry point for secondary CPUs.
-+ *   The secondary kernel init calls v7_flush_dcache_all before it enables
-+ *   the L1; however, the L1 comes out of reset in an undefined state, so
-+ *   the clean + invalidate performed by v7_flush_dcache_all causes a bunch
-+ *   of cache lines with uninitialized data and uninitialized tags to get
-+ *   written out to memory, which does really unpleasant things to the main
-+ *   processor.  We fix this by performing an invalidate, rather than a
-+ *   clean + invalidate, before jumping into the kernel.
-+ */
-+ENTRY(v7_invalidate_l1)
-+        mov     r0, #0
-+        mcr     p15, 2, r0, c0, c0, 0
-+        mrc     p15, 1, r0, c0, c0, 0
-+
-+        ldr     r1, =0x7fff
-+        and     r2, r1, r0, lsr #13
-+
-+        ldr     r1, =0x3ff
-+
-+        and     r3, r1, r0, lsr #3  @ NumWays - 1
-+        add     r2, r2, #1          @ NumSets
-+
-+        and     r0, r0, #0x7
-+        add     r0, r0, #4          @ SetShift
-+
-+        clz     r1, r3              @ WayShift
-+        add     r4, r3, #1          @ NumWays
-+1:      sub     r2, r2, #1          @ NumSets--
-+        mov     r3, r4              @ Temp = NumWays
-+2:      subs    r3, r3, #1          @ Temp--
-+        mov     r5, r3, lsl r1
-+        mov     r6, r2, lsl r0
-+        orr     r5, r5, r6          @ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
-+        mcr     p15, 0, r5, c7, c6, 2
-+        bgt     2b
-+        cmp     r2, #0
-+        bgt     1b
-+        dsb
-+        isb
-+        mov     pc, lr
-+ENDPROC(v7_invalidate_l1)
-+
-+ENTRY(tegra_secondary_startup)
-+	msr	cpsr_fsxc, #0xd3
-+        bl      v7_invalidate_l1
-+	mrc	p15, 0, r0, c0, c0, 5
-+        and	r0, r0, #15
-+        ldr     r1, =0x6000f100
-+        str     r0, [r1]
-+1:      ldr     r2, [r1]
-+        cmp     r0, r2
-+        beq     1b
-+        b       secondary_startup
-+ENDPROC(tegra_secondary_startup)
-diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
-new file mode 100644
-index 0000000..8e7f115
---- /dev/null
-+++ b/arch/arm/mach-tegra/hotplug.c
-@@ -0,0 +1,140 @@
-+/*
-+ *  linux/arch/arm/mach-realview/hotplug.c
++ * arch/arm/mach-tegra/board-harmony-pinmux.c
 + *
-+ *  Copyright (C) 2002 ARM Ltd.
-+ *  All Rights Reserved
++ * Copyright (C) 2010 Google, Inc.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
 + */
++
 +#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/smp.h>
-+#include <linux/completion.h>
++#include <mach/pinmux.h>
 +
-+#include <asm/cacheflush.h>
++#include "board-harmony.h"
 +
-+static DECLARE_COMPLETION(cpu_killed);
++static struct tegra_pingroup_config harmony_pinmux[] = {
++	{TEGRA_PINGROUP_ATA,   TEGRA_MUX_IDE,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_ATB,   TEGRA_MUX_SDIO4,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_ATC,   TEGRA_MUX_NAND,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_ATD,   TEGRA_MUX_GMI,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_ATE,   TEGRA_MUX_GMI,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_CDEV1, TEGRA_MUX_OSC,           TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_CDEV2, TEGRA_MUX_PLLP_OUT4,     TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_CRTP,  TEGRA_MUX_CRT,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_CSUS,  TEGRA_MUX_VI_SENSOR_CLK, TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_DAP1,  TEGRA_MUX_DAP1,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_DAP2,  TEGRA_MUX_DAP2,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_DAP3,  TEGRA_MUX_DAP3,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_DAP4,  TEGRA_MUX_DAP4,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_DDC,   TEGRA_MUX_I2C2,          TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_DTA,   TEGRA_MUX_SDIO2,         TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_DTB,   TEGRA_MUX_RSVD1,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_DTC,   TEGRA_MUX_RSVD1,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_DTD,   TEGRA_MUX_SDIO2,         TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_DTE,   TEGRA_MUX_RSVD1,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_DTF,   TEGRA_MUX_I2C3,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_GMA,   TEGRA_MUX_SDIO4,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_GMB,   TEGRA_MUX_GMI,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_GMC,   TEGRA_MUX_UARTD,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_GMD,   TEGRA_MUX_GMI,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_GME,   TEGRA_MUX_SDIO4,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_GPU,   TEGRA_MUX_GMI,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_GPU7,  TEGRA_MUX_RTCK,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_GPV,   TEGRA_MUX_PCIE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_HDINT, TEGRA_MUX_HDMI,          TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_I2CP,  TEGRA_MUX_I2C,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_IRRX,  TEGRA_MUX_UARTA,         TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_IRTX,  TEGRA_MUX_UARTA,         TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_KBCA,  TEGRA_MUX_KBC,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_KBCB,  TEGRA_MUX_KBC,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_KBCC,  TEGRA_MUX_KBC,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_KBCD,  TEGRA_MUX_KBC,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_KBCE,  TEGRA_MUX_KBC,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_KBCF,  TEGRA_MUX_KBC,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LCSN,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_LD0,   TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LD1,   TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LD10,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LD11,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LD12,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LD13,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LD14,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LD15,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LD16,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LD17,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LD2,   TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LD3,   TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LD4,   TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LD5,   TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LD6,   TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LD7,   TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LD8,   TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LD9,   TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LDC,   TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_LDI,   TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LHP0,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LHP1,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LHP2,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LHS,   TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LM0,   TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LM1,   TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_LPP,   TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LPW0,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LPW1,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_LPW2,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LSC0,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LSC1,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_LSCK,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_LSDA,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_LSDI,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_LSPI,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LVP0,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_LVP1,  TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_LVS,   TEGRA_MUX_DISPLAYA,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_OWC,   TEGRA_MUX_RSVD2,         TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_PMC,   TEGRA_MUX_PWR_ON,        TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_PTA,   TEGRA_MUX_HDMI,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_RM,    TEGRA_MUX_I2C,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_SDB,   TEGRA_MUX_PWM,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SDC,   TEGRA_MUX_PWM,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_SDD,   TEGRA_MUX_PWM,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SDIO1, TEGRA_MUX_SDIO1,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SLXA,  TEGRA_MUX_PCIE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SLXC,  TEGRA_MUX_SPDIF,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SLXD,  TEGRA_MUX_SPDIF,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SLXK,  TEGRA_MUX_PCIE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SPDI,  TEGRA_MUX_RSVD2,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SPDO,  TEGRA_MUX_RSVD2,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SPIA,  TEGRA_MUX_GMI,           TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SPIB,  TEGRA_MUX_GMI,           TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SPIC,  TEGRA_MUX_GMI,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_SPID,  TEGRA_MUX_SPI1,          TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SPIE,  TEGRA_MUX_SPI1,          TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SPIF,  TEGRA_MUX_SPI1,          TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SPIG,  TEGRA_MUX_SPI2_ALT,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SPIH,  TEGRA_MUX_SPI2_ALT,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_UAA,   TEGRA_MUX_ULPI,          TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_UAB,   TEGRA_MUX_ULPI,          TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_UAC,   TEGRA_MUX_RSVD2,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_UAD,   TEGRA_MUX_IRDA,          TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_UCA,   TEGRA_MUX_UARTC,         TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_UCB,   TEGRA_MUX_UARTC,         TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_UDA,   TEGRA_MUX_ULPI,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_CK32,  TEGRA_MUX_NONE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_DDRC,  TEGRA_MUX_NONE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_PMCA,  TEGRA_MUX_NONE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_PMCB,  TEGRA_MUX_NONE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_PMCC,  TEGRA_MUX_NONE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_PMCD,  TEGRA_MUX_NONE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_PMCE,  TEGRA_MUX_NONE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_XM2C,  TEGRA_MUX_NONE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_XM2D,  TEGRA_MUX_NONE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
++};
 +
-+static inline void cpu_enter_lowpower(void)
++void harmony_pinmux_init(void)
 +{
-+	unsigned int v;
-+
-+	flush_cache_all();
-+	asm volatile(
-+	"	mcr	p15, 0, %1, c7, c5, 0\n"
-+	"	mcr	p15, 0, %1, c7, c10, 4\n"
-+	/*
-+	 * Turn off coherency
-+	 */
-+	"	mrc	p15, 0, %0, c1, c0, 1\n"
-+	"	bic	%0, %0, #0x20\n"
-+	"	mcr	p15, 0, %0, c1, c0, 1\n"
-+	"	mrc	p15, 0, %0, c1, c0, 0\n"
-+	"	bic	%0, %0, #0x04\n"
-+	"	mcr	p15, 0, %0, c1, c0, 0\n"
-+	  : "=&r" (v)
-+	  : "r" (0)
-+	  : "cc");
++	tegra_pinmux_config_table(harmony_pinmux, ARRAY_SIZE(harmony_pinmux));
 +}
-+
-+static inline void cpu_leave_lowpower(void)
-+{
-+	unsigned int v;
-+
-+	asm volatile(
-+	"mrc	p15, 0, %0, c1, c0, 0\n"
-+	"	orr	%0, %0, #0x04\n"
-+	"	mcr	p15, 0, %0, c1, c0, 0\n"
-+	"	mrc	p15, 0, %0, c1, c0, 1\n"
-+	"	orr	%0, %0, #0x20\n"
-+	"	mcr	p15, 0, %0, c1, c0, 1\n"
-+	  : "=&r" (v)
-+	  :
-+	  : "cc");
-+}
-+
-+static inline void platform_do_lowpower(unsigned int cpu)
-+{
-+	/*
-+	 * there is no power-control hardware on this platform, so all
-+	 * we can do is put the core into WFI; this is safe as the calling
-+	 * code will have already disabled interrupts
-+	 */
-+	for (;;) {
-+		/*
-+		 * here's the WFI
-+		 */
-+		asm(".word	0xe320f003\n"
-+		    :
-+		    :
-+		    : "memory", "cc");
-+
-+		/*if (pen_release == cpu) {*/
-+			/*
-+			 * OK, proper wakeup, we're done
-+			 */
-+			break;
-+		/*}*/
-+
-+		/*
-+		 * getting here, means that we have come out of WFI without
-+		 * having been woken up - this shouldn't happen
-+		 *
-+		 * The trouble is, letting people know about this is not really
-+		 * possible, since we are currently running incoherently, and
-+		 * therefore cannot safely call printk() or anything else
-+		 */
-+#ifdef DEBUG
-+		printk(KERN_WARN "CPU%u: spurious wakeup call\n", cpu);
-+#endif
-+	}
-+}
-+
-+int platform_cpu_kill(unsigned int cpu)
-+{
-+	return wait_for_completion_timeout(&cpu_killed, 5000);
-+}
-+
-+/*
-+ * platform-specific code to shutdown a CPU
-+ *
-+ * Called with IRQs disabled
-+ */
-+void platform_cpu_die(unsigned int cpu)
-+{
-+#ifdef DEBUG
-+	unsigned int this_cpu = hard_smp_processor_id();
-+
-+	if (cpu != this_cpu) {
-+		printk(KERN_CRIT "Eek! platform_cpu_die running on %u, should be %u\n",
-+			   this_cpu, cpu);
-+		BUG();
-+	}
-+#endif
-+
-+	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
-+	complete(&cpu_killed);
-+
-+	/*
-+	 * we're ready for shutdown now, so do it
-+	 */
-+	cpu_enter_lowpower();
-+	platform_do_lowpower(cpu);
-+
-+	/*
-+	 * bring this CPU back into the world of cache
-+	 * coherency, and then restore interrupts
-+	 */
-+	cpu_leave_lowpower();
-+}
-+
-+int platform_cpu_disable(unsigned int cpu)
-+{
-+	/*
-+	 * we don't allow CPU 0 to be shutdown (it is still too special
-+	 * e.g. clock tick interrupts)
-+	 */
-+	return cpu == 0 ? -EPERM : 0;
-+}
-diff --git a/arch/arm/mach-tegra/include/mach/smp.h b/arch/arm/mach-tegra/include/mach/smp.h
+diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
 new file mode 100644
-index 0000000..8b42dab
+index 0000000..05e78dd
 --- /dev/null
-+++ b/arch/arm/mach-tegra/include/mach/smp.h
-@@ -0,0 +1,30 @@
-+#ifndef ASMARM_ARCH_SMP_H
-+#define ASMARM_ARCH_SMP_H
-+
-+
-+#include <asm/hardware/gic.h>
-+
-+#define hard_smp_processor_id()			\
-+	({						\
-+		unsigned int cpunum;			\
-+		__asm__("mrc p15, 0, %0, c0, c0, 5"	\
-+			: "=r" (cpunum));		\
-+		cpunum &= 0x0F;				\
-+	})
-+
++++ b/arch/arm/mach-tegra/board-harmony.c
+@@ -0,0 +1,127 @@
 +/*
-+ * We use IRQ1 as the IPI
-+ */
-+static inline void smp_cross_call(const struct cpumask *mask)
-+{
-+	gic_raise_softirq(mask, 1);
-+}
-+
-+/*
-+ * Do nothing on MPcore.
-+ */
-+static inline void smp_cross_call_done(cpumask_t callmap)
-+{
-+}
-+
-+#endif
-diff --git a/arch/arm/mach-tegra/localtimer.c b/arch/arm/mach-tegra/localtimer.c
-new file mode 100644
-index 0000000..f81ca7c
---- /dev/null
-+++ b/arch/arm/mach-tegra/localtimer.c
-@@ -0,0 +1,25 @@
-+/*
-+ *  arch/arm/mach-tegra/localtimer.c
++ * arch/arm/mach-tegra/board-harmony.c
 + *
-+ *  Copyright (C) 2002 ARM Ltd.
-+ *  All Rights Reserved
++ * Copyright (C) 2010 Google, Inc.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
 + */
++
++#include <linux/kernel.h>
 +#include <linux/init.h>
-+#include <linux/smp.h>
-+#include <linux/clockchips.h>
-+#include <asm/irq.h>
-+#include <asm/smp_twd.h>
-+#include <asm/localtimer.h>
-+
-+/*
-+ * Setup the local clock events for a CPU.
-+ */
-+void __cpuinit local_timer_setup(struct clock_event_device *evt)
-+{
-+	evt->irq = IRQ_LOCALTIMER;
-+	twd_timer_setup(evt);
-+}
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-new file mode 100644
-index 0000000..1c0fd92
---- /dev/null
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -0,0 +1,156 @@
-+/*
-+ *  linux/arch/arm/mach-tegra/platsmp.c
-+ *
-+ *  Copyright (C) 2002 ARM Ltd.
-+ *  All Rights Reserved
-+ *
-+ *  Copyright (C) 2009 Palm
-+ *  All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/init.h>
-+#include <linux/errno.h>
-+#include <linux/delay.h>
-+#include <linux/device.h>
-+#include <linux/jiffies.h>
-+#include <linux/smp.h>
++#include <linux/platform_device.h>
++#include <linux/serial_8250.h>
++#include <linux/clk.h>
++#include <linux/dma-mapping.h>
++#include <linux/pda_power.h>
 +#include <linux/io.h>
 +
-+#include <asm/cacheflush.h>
-+#include <mach/hardware.h>
 +#include <asm/mach-types.h>
-+#include <asm/localtimer.h>
-+#include <asm/smp_scu.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++#include <asm/setup.h>
 +
 +#include <mach/iomap.h>
++#include <mach/irqs.h>
 +
-+extern void tegra_secondary_startup(void);
++#include "board.h"
++#include "board-harmony.h"
++#include "clock.h"
 +
-+static DEFINE_SPINLOCK(boot_lock);
-+static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
++/* NVidia bootloader tags */
++#define ATAG_NVIDIA		0x41000801
 +
-+#define EVP_CPU_RESET_VECTOR \
-+	(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100)
-+#define CLK_RST_CONTROLLER_CLK_CPU_CMPLX \
-+	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x4c)
-+#define CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR \
-+	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x344)
++#define ATAG_NVIDIA_RM			0x1
++#define ATAG_NVIDIA_DISPLAY		0x2
++#define ATAG_NVIDIA_FRAMEBUFFER		0x3
++#define ATAG_NVIDIA_CHIPSHMOO		0x4
++#define ATAG_NVIDIA_CHIPSHMOOPHYS	0x5
++#define ATAG_NVIDIA_PRESERVED_MEM_0	0x10000
++#define ATAG_NVIDIA_PRESERVED_MEM_N	2
++#define ATAG_NVIDIA_FORCE_32		0x7fffffff
 +
-+void __cpuinit platform_secondary_init(unsigned int cpu)
++struct tag_tegra {
++	__u32 bootarg_key;
++	__u32 bootarg_len;
++	char bootarg[1];
++};
++
++static int __init parse_tag_nvidia(const struct tag *tag)
 +{
-+	trace_hardirqs_off();
-+
-+	/*
-+	 * if any interrupts are already enabled for the primary
-+	 * core (e.g. timer irq), then they will not have been enabled
-+	 * for us: do so
-+	 */
-+	gic_cpu_init(0, IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x100);
-+
-+	/*
-+	 * Synchronise with the boot thread.
-+	 */
-+	spin_lock(&boot_lock);
-+	spin_unlock(&boot_lock);
-+}
-+
-+int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	unsigned long old_boot_vector;
-+	unsigned long boot_vector;
-+	unsigned long timeout;
-+	u32 reg;
-+
-+	/*
-+	 * set synchronisation state between this boot processor
-+	 * and the secondary one
-+	 */
-+	spin_lock(&boot_lock);
-+
-+
-+	/* set the reset vector to point to the secondary_startup routine */
-+
-+	boot_vector = virt_to_phys(tegra_secondary_startup);
-+	old_boot_vector = readl(EVP_CPU_RESET_VECTOR);
-+	writel(boot_vector, EVP_CPU_RESET_VECTOR);
-+
-+	/* enable cpu clock on cpu1 */
-+	reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
-+	writel(reg & ~(1<<9), CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
-+
-+	reg = (1<<13) | (1<<9) | (1<<5) | (1<<1);
-+	writel(reg, CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR);
-+
-+	smp_wmb();
-+	flush_cache_all();
-+
-+	/* unhalt the cpu */
-+	writel(0, IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + 0x14);
-+
-+	timeout = jiffies + (1 * HZ);
-+	while (time_before(jiffies, timeout)) {
-+		if (readl(EVP_CPU_RESET_VECTOR) != boot_vector)
-+			break;
-+		udelay(10);
-+	}
-+
-+	/* put the old boot vector back */
-+	writel(old_boot_vector, EVP_CPU_RESET_VECTOR);
-+
-+	/*
-+	 * now the secondary core is starting up let it run its
-+	 * calibrations, then wait for it to finish
-+	 */
-+	spin_unlock(&boot_lock);
 +
 +	return 0;
 +}
++__tagtable(ATAG_NVIDIA, parse_tag_nvidia);
 +
-+/*
-+ * Initialise the CPU possible map early - this describes the CPUs
-+ * which may be present or become present in the system.
-+ */
-+void __init smp_init_cpus(void)
-+{
-+	unsigned int i, ncores = scu_get_core_count(scu_base);
-+
-+	for (i = 0; i < ncores; i++)
-+		cpu_set(i, cpu_possible_map);
-+}
-+
-+void __init smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	unsigned int ncores = scu_get_core_count(scu_base);
-+	unsigned int cpu = smp_processor_id();
-+	int i;
-+
-+	smp_store_cpu_info(cpu);
-+
-+	/*
-+	 * are we trying to boot more cores than exist?
-+	 */
-+	if (max_cpus > ncores)
-+		max_cpus = ncores;
-+
-+	/*
-+	 * Initialise the present map, which describes the set of CPUs
-+	 * actually populated at the present time.
-+	 */
-+	for (i = 0; i < max_cpus; i++)
-+		set_cpu_present(i, true);
-+
-+	/*
-+	 * Initialise the SCU if there are more than one CPU and let
-+	 * them know where to start. Note that, on modern versions of
-+	 * MILO, the "poke" doesn't actually do anything until each
-+	 * individual core is sent a soft interrupt to get it out of
-+	 * WFI
-+	 */
-+	if (max_cpus > 1) {
-+		percpu_timer_setup();
-+		scu_enable(scu_base);
++static struct plat_serial8250_port debug_uart_platform_data[] = {
++	{
++		.membase	= IO_ADDRESS(TEGRA_UARTD_BASE),
++		.mapbase	= TEGRA_UARTD_BASE,
++		.irq		= INT_UARTD,
++		.flags		= UPF_BOOT_AUTOCONF,
++		.iotype		= UPIO_MEM,
++		.regshift	= 2,
++		.uartclk	= 216000000,
++	}, {
++		.flags		= 0
 +	}
++};
++
++static struct platform_device debug_uart = {
++	.name = "serial8250",
++	.id = PLAT8250_DEV_PLATFORM,
++	.dev = {
++		.platform_data = debug_uart_platform_data,
++	},
++};
++
++static struct platform_device *harmony_devices[] __initdata = {
++	&debug_uart,
++};
++
++static void __init tegra_harmony_fixup(struct machine_desc *desc,
++	struct tag *tags, char **cmdline, struct meminfo *mi)
++{
++	mi->nr_banks = 2;
++	mi->bank[0].start = PHYS_OFFSET;
++	mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
++	mi->bank[0].size = 448 * SZ_1M;
++	mi->bank[1].start = SZ_512M;
++	mi->bank[1].node = PHYS_TO_NID(SZ_512M);
++	mi->bank[1].size = SZ_512M;
 +}
++
++static __initdata struct tegra_clk_init_table harmony_clk_init_table[] = {
++	/* name		parent		rate		enabled */
++	{ "uartd",	"pll_p",	216000000,	true },
++	{ NULL,		NULL,		0,		0},
++};
++
++static void __init tegra_harmony_init(void)
++{
++	tegra_common_init();
++
++	tegra_clk_init_from_table(harmony_clk_init_table);
++
++	harmony_pinmux_init();
++
++	platform_add_devices(harmony_devices, ARRAY_SIZE(harmony_devices));
++}
++
++MACHINE_START(HARMONY, "harmony")
++	.boot_params  = 0x00000100,
++	.phys_io        = IO_APB_PHYS,
++	.io_pg_offst    = ((IO_APB_VIRT) >> 18) & 0xfffc,
++	.fixup		= tegra_harmony_fixup,
++	.init_irq       = tegra_init_irq,
++	.init_machine   = tegra_harmony_init,
++	.map_io         = tegra_map_common_io,
++	.timer          = &tegra_timer,
++MACHINE_END
+diff --git a/arch/arm/mach-tegra/board-harmony.h b/arch/arm/mach-tegra/board-harmony.h
+new file mode 100644
+index 0000000..09ca775
+--- /dev/null
++++ b/arch/arm/mach-tegra/board-harmony.h
+@@ -0,0 +1,22 @@
++/*
++ * arch/arm/mach-tegra/board-harmony.h
++ *
++ * Copyright (C) 2010 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _MACH_TEGRA_BOARD_HARMONY_H
++#define _MACH_TEGRA_BOARD_HARMONY_H
++
++void harmony_pinmux_init(void);
++
++#endif
 -- 
 1.6.5.6
