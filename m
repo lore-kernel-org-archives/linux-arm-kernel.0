@@ -1,30 +1,54 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 14 Jun 2010 09:04:11 +0300
-Subject: [PATCH v2] rtc-s3c: Fix rtc-s3c driver initialization
-In-Reply-To: <1274975846-14006-1-git-send-email-anarsoul@gmail.com>
-References: <1274975846-14006-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <201006140904.17950.anarsoul@gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Mon, 14 Jun 2010 16:09:32 +1000
+Subject: Request review of device tree documentation
+In-Reply-To: <AANLkTikBjwuVvij8I91XaQgLfn8r_lZDrAsIBfJrHDBF@mail.gmail.com>
+References: <AANLkTilK4YkRMJqlcRDOAlGBzpdlZuSo9NF5NrRNocHT@mail.gmail.com>
+	<33BD8E86-9397-432A-97BF-F154812C157B@digitaldans.com>
+	<AANLkTilv6TtPZs0DAwd8JlSV_J3VvMsvtVVOOeQauOIn@mail.gmail.com>
+	<4C13430B.5000907@firmworks.com> <1276339529.1962.184.camel@pasglop>
+	<1276339684.1962.186.camel@pasglop> <4C13B618.1030006@firmworks.com>
+	<1276383132.1962.195.camel@pasglop>
+	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>
+	<1276408087.1962.552.camel@pasglop>
+	<AANLkTikBjwuVvij8I91XaQgLfn8r_lZDrAsIBfJrHDBF@mail.gmail.com>
+Message-ID: <1276495772.2552.22.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 27 ??? 2010 18:57:26 ????? Vasily Khoruzhick ???????:
-> setfreq should be called only after rtc device registration,
-> as it uses rtc device; s3c_rtc_cpu_type should be checked
-> only once it was set.
+On Sun, 2010-06-13 at 23:13 -0600, Grant Likely wrote:
+> > We use that to suck the device-tree, which we flatten, and then
+> re-enter
+> > the kernel with the "common" entry interface.
 > 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> I don't think I want to do the same on ARM.  I'd rather have the
+> prom_init stuff in a boot wrapper, or have OFW itself generate the
+> flat representation before booting the kernel.
 
-Hi, Ben.
+But then it's no longer OF. IE. A compliant OF implementation provides a
+client interface API :-)
 
-What about this patch? I've seen similar series on linux-samsung-soc maillist, 
-but neither their series nor my patch is applied to your tree. Why? :)
+This is going to be especially important if Mitch wants to keep OF
+alive.
 
-Regards
-Vasily
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100614/3c8e6704/attachment.sig>
+I suppose it could be done via a wrapper like prom_init, which flattens
+the tree, and sticks somewhere in a property the address of the OF
+client interface callback though it's a tad awkward. If well defined, I
+suppose Mitch might even be able to make his OF natively boot kernels
+that way but that's of course up to him.
+
+> I'm trying to constrain the number of things that could go wrong by
+> defining only one way for getting the device tree data into the
+> kernel.
+
+I understand, and the flattened method is the most versatile, I'm just
+pointing out the situation here :-)
+
+> Right.  We don't need to use OFW/RTAS to handle this use case.
+
+Definitely not. It will depend on whatever hypervisor interface is
+implemented in a given environment. Though I do like the idea of passing
+precompiled bits of .dtb around for hotplug :-) We could make that a
+standard way of KVM to do things in embedded space.
+
+Cheers,
+Ben.
