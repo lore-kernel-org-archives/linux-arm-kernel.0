@@ -1,155 +1,128 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 14 Jun 2010 14:18:53 +0900
-Subject: [PATCH v4 2/3] ARM: S5PV210: Add keypad device helpers
-In-Reply-To: <1276243728-17704-2-git-send-email-jy0922.shim@samsung.com>
-References: <1276243728-17704-1-git-send-email-jy0922.shim@samsung.com>
-	<1276243728-17704-2-git-send-email-jy0922.shim@samsung.com>
-Message-ID: <007801cb0b81$16cc0ff0$44642fd0$%kim@samsung.com>
+From: viresh.kumar@st.com (Viresh KUMAR)
+Date: Mon, 14 Jun 2010 10:51:13 +0530
+Subject: [PATCH 3/5] SPEAr3xx: Rework pmx_dev code to remove conflicts
+In-Reply-To: <1275717955-14545-4-git-send-email-ryan@bluewatersys.com>
+References: <1275717955-14545-1-git-send-email-ryan@bluewatersys.com>
+	<1275717955-14545-4-git-send-email-ryan@bluewatersys.com>
+Message-ID: <4C15BC49.5040105@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joonyoung Shim wrote:
+On 6/5/2010 11:35 AM, Ryan Mallon wrote:
+> Prefix the pmx_devs to remove naming conflicts between the three
+> SPEAr3xx platforms. Also make pmx_driver static to each platform and
+> rework the init code to pass the devices rather than export the
+> pmx_driver structure.
 > 
-> This patch adds the keypad device platform helpers for S5PV210 cpu.
-> 
-> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 > ---
->  arch/arm/mach-s5pv210/Kconfig            |    5 ++++
->  arch/arm/mach-s5pv210/Makefile           |    1 +
->  arch/arm/mach-s5pv210/cpu.c              |    4 +++
->  arch/arm/mach-s5pv210/include/mach/map.h |    3 ++
->  arch/arm/mach-s5pv210/setup-keypad.c     |   34
-> ++++++++++++++++++++++++++++++
->  5 files changed, 47 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-s5pv210/setup-keypad.c
+>  arch/arm/mach-spear3xx/include/mach/generic.h |  135 ++++++++++++-------------
+>  arch/arm/mach-spear3xx/spear300.c             |   39 ++++----
+>  arch/arm/mach-spear3xx/spear300_evb.c         |   26 ++---
+>  arch/arm/mach-spear3xx/spear310.c             |   29 +++---
+>  arch/arm/mach-spear3xx/spear310_evb.c         |   42 ++++-----
+>  arch/arm/mach-spear3xx/spear320.c             |   57 ++++++-----
+>  arch/arm/mach-spear3xx/spear320_evb.c         |   36 +++----
+>  arch/arm/mach-spear3xx/spear3xx.c             |   60 ++++++------
+>  8 files changed, 202 insertions(+), 222 deletions(-)
 > 
-> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-> index 0761eac..692d01c 100644
-> --- a/arch/arm/mach-s5pv210/Kconfig
-> +++ b/arch/arm/mach-s5pv210/Kconfig
-> @@ -32,6 +32,11 @@ config S5PV210_SETUP_FB_24BPP
->  	help
->            Common setup code for S5PV210 with an 24bpp RGB display helper.
-> 
-> +config S5PV210_SETUP_KEYPAD
-> +	bool
-> +	help
-> +	  Common setup code for keypad.
-> +
->  config S5PV210_SETUP_SDHCI
->          bool
->          select S5PV210_SETUP_SDHCI_GPIO
-> diff --git a/arch/arm/mach-s5pv210/Makefile
-b/arch/arm/mach-s5pv210/Makefile
-> index 30be9a6..aae592a 100644
-> --- a/arch/arm/mach-s5pv210/Makefile
-> +++ b/arch/arm/mach-s5pv210/Makefile
-> @@ -31,5 +31,6 @@ obj-$(CONFIG_S5PC110_DEV_ONENAND) += dev-onenand.o
->  obj-$(CONFIG_S5PV210_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
->  obj-$(CONFIG_S5PV210_SETUP_I2C1) 	+= setup-i2c1.o
->  obj-$(CONFIG_S5PV210_SETUP_I2C2) 	+= setup-i2c2.o
-> +obj-$(CONFIG_S5PV210_SETUP_KEYPAD)	+= setup-keypad.o
->  obj-$(CONFIG_S5PV210_SETUP_SDHCI)       += setup-sdhci.o
->  obj-$(CONFIG_S5PV210_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
-> diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
-> index 411a4a9..a3034ac 100644
-> --- a/arch/arm/mach-s5pv210/cpu.c
-> +++ b/arch/arm/mach-s5pv210/cpu.c
-> @@ -80,6 +80,10 @@ void __init s5pv210_map_io(void)
->  	s3c_device_adc.name	= "s3c64xx-adc";
->  #endif
-> 
-> +#ifdef CONFIG_SAMSUNG_DEV_KEYPAD
-> +	samsung_device_keypad.name = "s5pv210-keypad";
-> +#endif
-> +
+> diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+> index 48dfb9c..408d39f 100644
+> --- a/arch/arm/mach-spear3xx/include/mach/generic.h
+> +++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+> @@ -60,21 +60,21 @@ void spear_pmx_init(struct pmx_driver *pmx_driver, uint base, uint size);
+>  #define PMX_TIMER_1_2_MASK	(1 << 0)
+>  
+>  /* pad mux devices */
+> -extern struct pmx_dev pmx_firda;
+> -extern struct pmx_dev pmx_i2c;
+> -extern struct pmx_dev pmx_ssp_cs;
+> -extern struct pmx_dev pmx_ssp;
+> -extern struct pmx_dev pmx_mii;
+> -extern struct pmx_dev pmx_gpio_pin0;
+> -extern struct pmx_dev pmx_gpio_pin1;
+> -extern struct pmx_dev pmx_gpio_pin2;
+> -extern struct pmx_dev pmx_gpio_pin3;
+> -extern struct pmx_dev pmx_gpio_pin4;
+> -extern struct pmx_dev pmx_gpio_pin5;
+> -extern struct pmx_dev pmx_uart0_modem;
+> -extern struct pmx_dev pmx_uart0;
+> -extern struct pmx_dev pmx_timer_3_4;
+> -extern struct pmx_dev pmx_timer_1_2;
+> +extern struct pmx_dev spear3xx_pmx_firda;
+> +extern struct pmx_dev spear3xx_pmx_i2c;
+> +extern struct pmx_dev spear3xx_pmx_ssp_cs;
+> +extern struct pmx_dev spear3xx_pmx_ssp;
+> +extern struct pmx_dev spear3xx_pmx_mii;
+> +extern struct pmx_dev spear3xx_pmx_gpio_pin0;
+> +extern struct pmx_dev spear3xx_pmx_gpio_pin1;
+> +extern struct pmx_dev spear3xx_pmx_gpio_pin2;
+> +extern struct pmx_dev spear3xx_pmx_gpio_pin3;
+> +extern struct pmx_dev spear3xx_pmx_gpio_pin4;
+> +extern struct pmx_dev spear3xx_pmx_gpio_pin5;
+> +extern struct pmx_dev spear3xx_pmx_uart0_modem;
+> +extern struct pmx_dev spear3xx_pmx_uart0;
+> +extern struct pmx_dev spear3xx_pmx_timer_3_4;
+> +extern struct pmx_dev spear3xx_pmx_timer_1_2;
+>  
 
-Please use one method. See Kyungmin Park's prev. comments on the subject.
+same here. I don't understand why any conflicts will be there.
 
->  	iotable_init(s5pv210_iodesc, ARRAY_SIZE(s5pv210_iodesc));
-> 
->  	/* initialise device information early */
-> diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-
-> s5pv210/include/mach/map.h
-> index 34eb168..e2f6e2a 100644
-> --- a/arch/arm/mach-s5pv210/include/mach/map.h
-> +++ b/arch/arm/mach-s5pv210/include/mach/map.h
-> @@ -32,6 +32,8 @@
->  #define S5PV210_PA_SPI0		0xE1300000
->  #define S5PV210_PA_SPI1		0xE1400000
-> 
-> +#define S5PV210_PA_KEYPAD	(0xE1600000)
-> +
->  #define S5PV210_PA_IIC0		(0xE1800000)
->  #define S5PV210_PA_IIC1		(0xFAB00000)
->  #define S5PV210_PA_IIC2		(0xE1A00000)
-> @@ -104,5 +106,6 @@
->  #define S3C_PA_WDT		S5PV210_PA_WATCHDOG
-> 
->  #define SAMSUNG_PA_ADC		S5PV210_PA_ADC
-> +#define SAMSUNG_PA_KEYPAD	S5PV210_PA_KEYPAD
-> 
->  #endif /* __ASM_ARCH_MAP_H */
-> diff --git a/arch/arm/mach-s5pv210/setup-keypad.c
-b/arch/arm/mach-s5pv210/setup-
-> keypad.c
-> new file mode 100644
-> index 0000000..f51bf8d
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv210/setup-keypad.c
-> @@ -0,0 +1,34 @@
-> +/*
-> + * linux/arch/arm/mach-s5pv210/setup-keypad.c
-> + *
-> + * Copyright (C) 2010 Samsung Electronics Co.Ltd
-> + * Author: Joonyoung Shim <jy0922.shim@samsung.com>
-> + *
-> + *  This program is free software; you can redistribute  it and/or modify
-it
-> + *  under  the terms of  the GNU General  Public License as published by
-the
-> + *  Free Software Foundation;  either version 2 of the  License, or (at
-your
-> + *  option) any later version.
-> + *
-> + */
-> +
-> +#include <linux/gpio.h>
-> +#include <plat/gpio-cfg.h>
-> +
-> +void samsung_keypad_cfg_gpio(unsigned int rows, unsigned int cols)
-> +{
-> +	unsigned int gpio, end;
-> +
-> +	/* Set all the necessary GPH3 pins to special-function 3 */
+[snip...]
 
-What's the special-function 3?
-How about 'special function KP_ROWs'?
+>  
+>  /* pmx driver structure */
+> -struct pmx_driver pmx_driver = {
+> +static struct pmx_driver pmx_driver = {
+>  	.mode_reg = {.offset = MODE_CONFIG_REG, .mask = 0x00000007},
+>  	.mux_reg = {.offset = PAD_MUX_CONFIG_REG, .mask = 0x00007fff},
+>  };
+> @@ -511,7 +511,8 @@ static struct spear_shirq shirq_intrcomm_ras = {
+>  };
+>  
+>  /* spear320 routines */
+> -void __init spear320_init(void)
+> +void __init spear320_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
+> +			  u8 pmx_dev_count)
+>  {
+>  	void __iomem *base;
+>  	int ret = 0;
+> @@ -540,10 +541,10 @@ void __init spear320_init(void)
+>  		if (ret)
+>  			printk(KERN_ERR "Error registering Shared IRQ 4\n");
+>  	}
+> -}
+>  
+> -void spear320_pmx_init(void)
+> -{
+> +	pmx_driver.mode = pmx_mode;
+> +	pmx_driver.devs = pmx_devs;
+> +	pmx_driver.devs_count = pmx_dev_count;
+>  	spear_pmx_init(&pmx_driver, SPEAR320_SOC_CONFIG_BASE,
+> -			SPEAR320_SOC_CONFIG_SIZE);
+> +		       SPEAR320_SOC_CONFIG_SIZE);
+>  }
 
-> +	end = S5PV210_GPH3(rows);
-> +	for (gpio = S5PV210_GPH3(0); gpio < end; gpio++) {
-> +		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
-> +		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-> +	}
-> +
-> +	/* Set all the necessary GPH2 pins to special-function 3 */
+This part looks fine.
 
-How about 'special function KP_COLs'?
+> diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
+> index 62ac685..4969fa9 100644
+> --- a/arch/arm/mach-spear3xx/spear320_evb.c
+> +++ b/arch/arm/mach-spear3xx/spear320_evb.c
+> @@ -19,22 +19,22 @@
+>  
+>  static struct amba_device *amba_devs[] __initdata = {
+> @@ -56,13 +56,7 @@ static void __init spear320_evb_init(void)
+>  	unsigned int i;
+>  
+>  	/* call spear320 machine init function */
+> -	spear320_init();
+> -
+> -	/* padmux initialization */
+> -	pmx_driver.mode = &auto_net_mii_mode;
+> -	pmx_driver.devs = pmx_devs;
+> -	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
+> -	spear320_pmx_init();
+> +	spear320_init(&auto_net_mii_mode, pmx_devs, ARRAY_SIZE(pmx_devs));
 
-> +	end = S5PV210_GPH2(cols);
-> +	for (gpio = S5PV210_GPH2(0); gpio < end; gpio++) {
-> +		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
-> +		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-> +	}
-> +}
-> --
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+this is also fine.
