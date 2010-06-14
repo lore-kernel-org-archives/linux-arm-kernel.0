@@ -1,105 +1,42 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 13 Jun 2010 23:23:45 -0600
-Subject: Request review of device tree documentation
-In-Reply-To: <1276408773.1962.574.camel@pasglop>
-References: <AANLkTilK4YkRMJqlcRDOAlGBzpdlZuSo9NF5NrRNocHT@mail.gmail.com>
-	<33BD8E86-9397-432A-97BF-F154812C157B@digitaldans.com>
-	<AANLkTilv6TtPZs0DAwd8JlSV_J3VvMsvtVVOOeQauOIn@mail.gmail.com>
-	<4C13430B.5000907@firmworks.com> <1276339529.1962.184.camel@pasglop>
-	<1276339684.1962.186.camel@pasglop> <4C13B618.1030006@firmworks.com>
-	<1276383132.1962.195.camel@pasglop>
-	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>
-	<4C146F18.9030008@firmworks.com> <1276408773.1962.574.camel@pasglop>
-Message-ID: <AANLkTinwL0XtMNG13inr_1UliOlqZkyr4dlvG-ZGL9JT@mail.gmail.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Mon, 14 Jun 2010 17:31:30 +1200
+Subject: [PATCH 1/5] SPEAr3xx: Make local structres static
+In-Reply-To: <4C15BB22.9010309@st.com>
+References: <1275717955-14545-1-git-send-email-ryan@bluewatersys.com>
+	<1275717955-14545-2-git-send-email-ryan@bluewatersys.com>
+	<4C15BB22.9010309@st.com>
+Message-ID: <4C15BEB2.1030004@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[cc'ing linux-arm-kernel]
+Viresh KUMAR wrote:
+> On 6/5/2010 11:35 AM, Ryan Mallon wrote:
+>> Several structures in arch/arm/mach-spear3xx are not marked static
+>> like they should be. Fix this.
+>>
+>> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+>> ---
+>>  arch/arm/mach-spear3xx/spear300.c |   33 ++++++++++----------
+>>  arch/arm/mach-spear3xx/spear310.c |   16 +++++-----
+>>  arch/arm/mach-spear3xx/spear320.c |   56 +++++++++++++++++-----------------
+>>  arch/arm/mach-spear3xx/spear3xx.c |   60 ++++++++++++++++++------------------
+>>  4 files changed, 83 insertions(+), 82 deletions(-)
+>>
 
-On Sat, Jun 12, 2010 at 11:59 PM, Benjamin Herrenschmidt
-<benh@kernel.crashing.org> wrote:
-> On Sat, 2010-06-12 at 19:39 -1000, Mitch Bradley wrote:
->
->> Minimally, OFW needs to own some memory that the kernel won't steal.
->> OFW on ARM is position-independent, so it can be tucked up at the top of memory
->> fairly easily.
->
-> Amen :-)
->
->> To call back into OFW, the virtual mapping for that memory needs to be
->> reestablished.
->
-> That's a nasty part unless ARM provides a usable "real mode" which
-> allows MMIO accesses, which I -think- it does. I don't remember the
-> details that much.
->
-> Maybe we could define a binding tho where we could somewhat standardize
-> the portion of the virtual address space used by OF. IE. from the top of
-> the address space down to the max size it requires. It might require
-> some games to play with the fixmap on ARM side tho...
->
-> Another option would be something more RTAS-like where a specific call
-> can be done by the OS itself to 'relocate' (not physically but virtually
-> in this case) OF into the OS preferred location. Be prepared to have
-> multiple of these called though as kernels kexec into one another.
+<snip>
 
-This sounds reasonable to me.
+>> -struct pmx_dev_mode pmx_plgpio_45_46_49_50_modes[] = {
+>> +static struct pmx_dev_mode pmx_plgpio_45_46_49_50_modes[] = {
+>>  	{
+>>  		.ids = 0x00,
+>>  		.mask = PMX_TIMER_3_4_MASK,
+> 
+> These structures are not local, they are used in spear3**_evb.c files,
+> and hence can't be static.
 
->> Or perhaps the MMU and caches can be turned off for the duration of the
->> callback.
->> I don't have the details of ARM MMUs and caches reloaded into my head
->> yet. ?Maybe next week...
->
-> Forgot most of it too. Looks like it's about time I read the ARM
-> architecture again, this sounds like fun :-)
->
-> BTW. I notice no ARM list is CCed on this discussion ... maybe we should
-> fix that ?
+The pmx_dev structures are used by the spear3**_evb.c files, but the
+pmx_dev_mode structures are local. This patch is only making the latter
+static. I have done a build test which includes all three spear3**_evb
+board files and got no compilation warnings/errors.
 
-cc'ing linux-arm-kernel in all my replies
-
->> Also, for debugging, OFW typically needs access to a UART. ?If the OS is
->> using the UART, it's often possible for OFW to use it just by turning off interrupts and
->> polling the UART.
->
-> That might not be a big deal unless the OS plays with the clocks which
-> it -does- tend to do. It might be worth defining some kind of property
-> OF puts in the UART node to inform the OS not to play games and keep
-> that one enabled, though that could affect power management, so might
-> need to be conditional on some nvram option (debug-enabled?)
->
->> The use case for a dynamic device tree is not compelling.
->
-> Right, generally not, except in virtualized environments (see my other
-> response).
->
-> Now, the -one- thing that WILL happen if we have something like OF that
-> remains alive is of course vendors will try to use it as a HAL. You know
-> as well as I do that it -will- happen :-)
->
-> There's two reasons that typically happen. The misguided "good" one
-> which is to think it helps keeping a single/more maintainable kernel
-> image by stuffing the horrible details of nvram, rtc, etc.. access,
-> poweron/off GPIOs, clock control, etc... in there. The "bad" one which
-> is to stash code you don't want to show the source code for (codec
-> control, etc...).
->
-> This is bad for so many reasons that I don't think I need to even start
-> listing them :-) So that's something that will have to be strongly kept
-> in check and fought I suspect.
-
-With a stout 2x4 if needed.  I'm going to try very hard to dissuade
-this.  Yet another reason why I only what one method for passing the
-device tree into the kernel.
-
-> To some extent, in fact, doing that sort of stuff in OF or even in RTAS
-> like we do on power is even worse than ACPI-like tables. At least with
-> those tables, the interpreter is in the operating system, thus can run
-> with interrupts on, scheduling on, etc... With RTAS, or client interface
-> calls, you'll end up with potentially huge slumps of CPU time "lost"
-> into the bowels of the firmware.
-
-Unfortunately, on the newer ARM SoCs, binary blobs are all over the
-place anyway.  :-(
-
-g.
+~Ryan
