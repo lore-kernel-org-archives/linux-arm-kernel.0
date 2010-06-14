@@ -1,44 +1,32 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 14 Jun 2010 11:43:10 +0200
-Subject: [RFC,PATCH 1/2] Add a common struct clk
-In-Reply-To: <19477.63136.664249.167207@ipc1.ka-ro>
-References: <201006111557.12249.jeremy.kerr@canonical.com>
-	<19473.61547.684572.647641@ipc1.ka-ro>
-	<201006111718.47426.jeremy.kerr@canonical.com>
-	<19474.172.742782.972629@ipc1.ka-ro>
-	<20100611095839.GC10894@pengutronix.de>
-	<19474.2817.333749.485028@ipc1.ka-ro>
-	<1276319643.1962.181.camel@pasglop>
-	<19477.52889.982995.407051@ipc1.ka-ro>
-	<1276507378.2552.39.camel@pasglop>
-	<19477.63136.664249.167207@ipc1.ka-ro>
-Message-ID: <20100614094310.GE12159@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Jun 2010 10:47:40 +0100
+Subject: Request review of device tree documentation
+In-Reply-To: <1276508170.2552.43.camel@pasglop>
+References: <4C13B618.1030006@firmworks.com>
+	<1276383132.1962.195.camel@pasglop>
+	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>
+	<4C146F18.9030008@firmworks.com>
+	<1276408773.1962.574.camel@pasglop>
+	<AANLkTinwL0XtMNG13inr_1UliOlqZkyr4dlvG-ZGL9JT@mail.gmail.com>
+	<20100614073828.GA6095@n2100.arm.linux.org.uk>
+	<4C15DE2E.1050905@firmworks.com>
+	<20100614092559.GA7881@n2100.arm.linux.org.uk>
+	<1276508170.2552.43.camel@pasglop>
+Message-ID: <20100614094740.GB7881@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 14, 2010 at 11:30:08AM +0200, Lothar Wa?mann wrote:
-> Benjamin Herrenschmidt writes:
-> > On Mon, 2010-06-14 at 08:39 +0200, Lothar Wa?mann wrote:
-> > > All implementations so far use spin_lock_irq_save()!
-> > 
-> > Nothing prevents your implementation to be a tad smarter.
-> > 
-> I vote for consistency, so that device drivers can be kept arch
-> independent instead of having to care about implentation details of
-> each arch.
-Back when I implemented clock support for ns9xxx (unfortunately not in
-mainline) I tried with a spinlock first and later switched to a mutex.
-IIRC the reason was that on ns9215 enabling the rtc clock took long
-(don't remember a number) and successfull enabling was signaled by an
-irq.  So I would have had to implement irq polling in the clock code.
+On Mon, Jun 14, 2010 at 07:36:10PM +1000, Benjamin Herrenschmidt wrote:
+> However, there's a lot of room for abuse here and I'm worried that if it
+> becomes widespread, we'll start seeing vendors use that as a way to do
+> some kind of HAL and hide various platform methods in there (clock
+> control, nvram, etc...).
 
-I think you can find different examples that make both possiblities bad.
-All in all I think that a sleeping clock implementation is preferable as
-it improves (general) latencies.
+This is what I'm worried about too.
 
-Best regards
-Uwe
+As I said in my first reply in this thread, calling out from the kernel
+will kill performance due to the time taken to shut down the caches and
+MMU, which can only be done safely with all exceptions turned off.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+The only time that it can be seriously considered is if you're calling
+out to reboot, shutdown or kexec.
