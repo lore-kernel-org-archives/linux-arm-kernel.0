@@ -1,90 +1,61 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 14 Jun 2010 09:35:21 +0200
-Subject: [GIT PULL] mxc patches
-Message-ID: <20100614073521.GY20799@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Jun 2010 08:38:28 +0100
+Subject: Request review of device tree documentation
+In-Reply-To: <AANLkTinwL0XtMNG13inr_1UliOlqZkyr4dlvG-ZGL9JT@mail.gmail.com>
+References: <AANLkTilv6TtPZs0DAwd8JlSV_J3VvMsvtVVOOeQauOIn@mail.gmail.com>
+	<4C13430B.5000907@firmworks.com>
+	<1276339529.1962.184.camel@pasglop>
+	<1276339684.1962.186.camel@pasglop>
+	<4C13B618.1030006@firmworks.com>
+	<1276383132.1962.195.camel@pasglop>
+	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>
+	<4C146F18.9030008@firmworks.com>
+	<1276408773.1962.574.camel@pasglop>
+	<AANLkTinwL0XtMNG13inr_1UliOlqZkyr4dlvG-ZGL9JT@mail.gmail.com>
+Message-ID: <20100614073828.GA6095@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is basically the same pull request as the last time minus the
-defconfig changes.
+On Sun, Jun 13, 2010 at 11:23:45PM -0600, Grant Likely wrote:
+> >> Or perhaps the MMU and caches can be turned off for the duration of the
+> >> callback.
+> >> I don't have the details of ARM MMUs and caches reloaded into my head
+> >> yet. ?Maybe next week...
 
-Sascha
+We've had these kinds of questions in the past.  Doing what you're asking
+above is not really an option - it requires:
 
-The following changes since commit 7e27d6e778cd87b6f2415515d7127eba53fe5d02:
+1. disable all IRQs
+2. setup 1:1 MMU mappings for code to turn off MMU
+   (requires new page table)
+3. disable imprecise exceptions
+4. flush caches and TLBS
+5. jump to 1:1 mapping area for code to disable MMU
+6. disable caches and mmu
+7. call function
+8. flush caches and TLBs
+9. re-enable caches and mmu
+10. re-enable imprecise exceptions
+11. switch back to original MMU mappings
+12. re-enable all IRQs
 
-  Linux 2.6.35-rc3 (2010-06-11 19:14:04 -0700)
+This is fine if you don't care at all about interrupt latency.
+Unfortunately, most people do care about interrupt latency because
+that directly affects interactivity and system performance.  The
+called function could not enable interrupts or exceptions - as the
+CPU vectors are in virtual space, disabling the MMU effectively
+makes them disappear.
 
-are available in the git repository at:
-  git://git.pengutronix.de/git/imx/linux-2.6 for-rmk
+Moreover, with the MMU and caches disabled, the CPU performance is
+extremely poor, so the called function will run slowly.
 
-Amit Kucheria (1):
-      arm: mxc: utilise usecount field in clock operations
+So, disabling the MMU isn't really viable.
 
-Baruch Siach (3):
-      mxc_nand: add support for platform defined partitions
-      mx25: add platform code for imx-keypad
-      mx25pdk: add keypad support
+Now, if the external code was fully PIC, we could then run it with
+the MMU enabled.  However, this wouldn't really help - the external
+code could not access any devices without knowledge of how the kernel
+setup the V:P translations.
 
-Daniel Mack (3):
-      ARM: mx3: pcm037: remove unused variable
-      ARM: mx3: mx31lilly: fix build error for !CONFIG_USB_ULPI
-      ARM: mx3: mx31lilly: pass mc13783 SPI IRQ pin
-
-Dinh Nguyen (2):
-      mx5: Add i2c to Freescale MX51 Babbage HW
-      mx5: Register i2c on Freescale MX51 Babbage HW
-
-Eric B?nard (14):
-      eukrea_mbimx27-baseboard: fix typo in display name
-      eukrea_mbimx27-baseboard: add generic-bl and platform-lcd controls
-      eukrea_mbimx27-baseboard: add timings for DVI output
-      cpuimx27 and mbimx27: allow fine control of UART4 and SDHC2 usage
-      mach-cpuimx27: fix QuadUART's IRQ typo in pins'setup
-      eukrea_mbimx27: fix ADS7846 support
-      mach-cpuimx27: add USB Host2 and OTG support
-      mach-cpuimx27: register wdt and w1_master resources
-      mxcmmc: add card detect through DAT3 possibility
-      eukrea_mbimx27: use card detect through DAT3 for SDHC1
-      MX2X: Add Keypad device definition for MX2X arch
-      eukrea_mbimx27: add support for the keyboard
-      eukrea_mbimx27: add audio codec
-      i.MX35: return IPU clock's value for mx3fb
-
-Sascha Hauer (1):
-      mxc_nand: Fix OOB handling
-
-Wolfram Sang (1):
-      pcm037/pcm043/pca100: fix ULPI-related build warnings
-
- arch/arm/mach-mx2/Kconfig                    |   10 ++-
- arch/arm/mach-mx2/devices.c                  |   18 +++
- arch/arm/mach-mx2/devices.h                  |    1 +
- arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c |  181 +++++++++++++++++++++++---
- arch/arm/mach-mx2/mach-cpuimx27.c            |   93 +++++++++++++-
- arch/arm/mach-mx2/mach-pca100.c              |    2 +
- arch/arm/mach-mx25/clock.c                   |    2 +-
- arch/arm/mach-mx25/devices.c                 |   20 +++
- arch/arm/mach-mx25/devices.h                 |    1 +
- arch/arm/mach-mx25/mach-mx25pdk.c            |   36 +++++
- arch/arm/mach-mx3/clock-imx35.c              |    2 +-
- arch/arm/mach-mx3/mach-mx31lilly.c           |   34 ++++--
- arch/arm/mach-mx3/mach-pcm037.c              |    3 +-
- arch/arm/mach-mx3/mach-pcm043.c              |    2 +
- arch/arm/mach-mx5/board-mx51_babbage.c       |   26 ++++
- arch/arm/mach-mx5/clock-mx51.c               |   11 ++
- arch/arm/mach-mx5/devices.c                  |   58 ++++++++
- arch/arm/mach-mx5/devices.h                  |    3 +
- arch/arm/plat-mxc/clock.c                    |   37 ++++--
- arch/arm/plat-mxc/include/mach/iomux-mx25.h  |   19 ++-
- arch/arm/plat-mxc/include/mach/iomux-mx51.h  |   18 ++-
- arch/arm/plat-mxc/include/mach/mmc.h         |    3 +
- arch/arm/plat-mxc/include/mach/mx25.h        |    2 +
- arch/arm/plat-mxc/include/mach/mxc_nand.h    |    4 +
- drivers/mmc/host/mxcmmc.c                    |   16 ++-
- drivers/mtd/nand/mxc_nand.c                  |   33 +----
- 26 files changed, 545 insertions(+), 90 deletions(-)
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+So you'd need to pass some kind of data structure giving locations of
+devices to the called code - but then what if the kernel doesn't have
+the device mapped?
