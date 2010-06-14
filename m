@@ -1,25 +1,28 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Mon, 14 Jun 2010 18:18:24 +0800
-Subject: [RFC,PATCH 1/2] Add a common struct clk
-In-Reply-To: <20100611042046.GA31045@fluff.org.uk>
-References: <1275636608.606606.450179637764.0.gpush@pororo>
-	<1275636608.607067.417709988883.1.gpush@pororo>
-	<20100611042046.GA31045@fluff.org.uk>
-Message-ID: <201006141818.26954.jeremy.kerr@canonical.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 14 Jun 2010 18:19:30 +0800
+Subject: [PATCH] [ARM] pxa/corgi: fix MMC/SD card detection failure
+Message-ID: <1276510770-27748-1-git-send-email-eric.y.miao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+Reported-by: Andrea Adami <andrea.adami@gmail.com>
+Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+---
+ arch/arm/mach-pxa/corgi.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-I've just pushed to my clk-common branch, mostly involving the changes we've 
-discussed so far.
-
-http://kernel.ubuntu.com/git?p=jk/dt/linux-2.6.git;a=commitdiff;h=f2c5141c88aa4c5ba82aee1b5b8abe5e9ff09146
-
-The clk-common-mx51 and clk-common-versatile branches both contain basic ports 
-of the mx51 and versatile platforms to the new clock infrastructure.
-
-Cheers,
-
-
-Jeremy
+diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
+index 3d1dcb9..51ffa6a 100644
+--- a/arch/arm/mach-pxa/corgi.c
++++ b/arch/arm/mach-pxa/corgi.c
+@@ -446,7 +446,7 @@ static struct platform_device corgiled_device = {
+ static struct pxamci_platform_data corgi_mci_platform_data = {
+ 	.detect_delay_ms	= 250,
+ 	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
+-	.gpio_card_detect	= -1,
++	.gpio_card_detect	= CORGI_GPIO_nSD_DETECT,
+ 	.gpio_card_ro		= CORGI_GPIO_nSD_WP,
+ 	.gpio_power		= CORGI_GPIO_SD_PWR,
+ };
+-- 
+1.7.1.251.g92a7
