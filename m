@@ -1,56 +1,541 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Mon, 14 Jun 2010 17:39:10 +0900
-Subject: [PATCH 1/6] S5PV210 Add IRQ/EINT register information for the CPU.
-In-Reply-To: <1276504755-24741-1-git-send-email-MyungJoo.Ham@samsung.com>
+Date: Mon, 14 Jun 2010 17:39:11 +0900
+Subject: [PATCH 2/6] S5PV210 add clock registers for the CPU.
+In-Reply-To: <1276504755-24741-2-git-send-email-MyungJoo.Ham@samsung.com>
 References: <1276504755-24741-1-git-send-email-MyungJoo.Ham@samsung.com>
-Message-ID: <1276504755-24741-2-git-send-email-MyungJoo.Ham@samsung.com>
+	<1276504755-24741-2-git-send-email-MyungJoo.Ham@samsung.com>
+Message-ID: <1276504755-24741-3-git-send-email-MyungJoo.Ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+	Besides, renamed a register name "BUS0" into "IP5" as EVT1 uses
+"IP5" instead of BUS0 (of EVT0)
 
 Signed-off-by: MyungJoo Ham <MyungJoo.Ham@samsung.com>
 ---
- arch/arm/mach-s5pv210/include/mach/irqs.h     |    9 +++++++++
- arch/arm/mach-s5pv210/include/mach/regs-irq.h |    6 ++++++
- 2 files changed, 15 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pv210/include/mach/regs-clock.h |  467 ++++++++++++++++++++++-
+ 1 files changed, 465 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-s5pv210/include/mach/irqs.h
-index 9689537..6c5f491 100644
---- a/arch/arm/mach-s5pv210/include/mach/irqs.h
-+++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
-@@ -118,9 +118,18 @@
- #define IRQ_MDNIE3		S5P_IRQ_VIC3(8)
- #define IRQ_VIC_END		S5P_IRQ_VIC3(31)
+diff --git a/arch/arm/mach-s5pv210/include/mach/regs-clock.h b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+index 2a25ab4..9652338 100644
+--- a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
++++ b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+@@ -25,6 +25,8 @@
+ #define S5P_APLL_CON		S5P_CLKREG(0x100)
+ #define S5P_MPLL_CON		S5P_CLKREG(0x108)
+ #define S5P_EPLL_CON		S5P_CLKREG(0x110)
++#define S5P_EPLL_CON1		S5P_CLKREG(0x114)
++#define S5P_EPLL_CON1_MASK	(0xFFFF << 0)
+ #define S5P_VPLL_CON		S5P_CLKREG(0x120)
  
-+/* External interrupt */
-+
- #define S5P_EINT_BASE1		(S5P_IRQ_VIC0(0))
- #define S5P_EINT_BASE2		(IRQ_VIC_END + 1)
+ #define S5P_CLK_SRC0		S5P_CLKREG(0x200)
+@@ -63,14 +65,139 @@
+ #define S5P_CLKGATE_IP4		S5P_CLKREG(0x470)
  
-+#define S5P_EINT(x)             (S5P_EINT_BASE2 + ((x) - 16))
-+#define IRQ_EINT_BIT(x) ((x) < IRQ_EINT16_31 ? (x) - S5P_VIC0_BASE : (x) - S5P_EINT(0))
+ #define S5P_CLKGATE_BLOCK	S5P_CLKREG(0x480)
+-#define S5P_CLKGATE_BUS0	S5P_CLKREG(0x484)
++#define S5P_CLKGATE_IP5		S5P_CLKREG(0x484)
+ #define S5P_CLKGATE_BUS1	S5P_CLKREG(0x488)
+ #define S5P_CLK_OUT		S5P_CLKREG(0x500)
++#define S5P_CLK_DIV_STAT0   S5P_CLKREG(0x1000)
++#define S5P_CLK_DIV_STAT1   S5P_CLKREG(0x1004)
++#define S5P_CLK_MUX_STAT0   S5P_CLKREG(0x1100)
++#define S5P_CLK_MUX_STAT1   S5P_CLKREG(0x1104)
++#define S5P_MIXER_OUT_SEL	S5P_CLKREG(0x7004)
++#define S5P_MDNIE_SEL		S5P_CLKREG(0x7008)
++#define S5P_MIPI_PHY_CON0	S5P_CLKREG(0x7200)
++#define S5P_MIPI_PHY_CON1	S5P_CLKREG(0x7204)
 +
-+/* GPIO interrupt */
-+#define S5P_IRQ_GPIO_BASE       (IRQ_EINT(31) + 1)
-+#define S5P_IRQ_GPIO(x)         (S5P_IRQ_GPIO_BASE + (x))
++#define S5P_DCGIDX_MAP0		S5P_CLKREG(0x3000)
++#define S5P_DCGIDX_MAP1		S5P_CLKREG(0x3004)
++#define S5P_DCGIDX_MAP2		S5P_CLKREG(0x3008)
++#define S5P_DCGPERF_MAP0	S5P_CLKREG(0x3020)
++#define S5P_DCGPERF_MAP1	S5P_CLKREG(0x3024)
++#define S5P_DVCIDX_MAP		S5P_CLKREG(0x3040)
++#define S5P_FREQ_CPU		S5P_CLKREG(0x3060)
++#define S5P_FREQ_DPM		S5P_CLKREG(0x3064)
++#define S5P_DVSEMCLK_EN		S5P_CLKREG(0x3080)
++#define S5P_MAXPERF		S5P_CLKREG(0x3084)
 +
- /* Set the default NR_IRQS */
- #define NR_IRQS			(IRQ_EINT(31) + 1)
++#define S5P_EPLL_EN     (1<<31)
++#define S5P_EPLL_MASK   0xffffffff
++#define S5P_EPLLVAL(_v,_m,_p,_s)   ((_v) << 27 | (_m) << 16 | ((_p) << 8) | ((_s)))
  
-diff --git a/arch/arm/mach-s5pv210/include/mach/regs-irq.h b/arch/arm/mach-s5pv210/include/mach/regs-irq.h
-index 5c3b104..139604f 100644
---- a/arch/arm/mach-s5pv210/include/mach/regs-irq.h
-+++ b/arch/arm/mach-s5pv210/include/mach/regs-irq.h
-@@ -16,4 +16,10 @@
- #include <asm/hardware/vic.h>
- #include <mach/map.h>
- 
-+/* interrupt controller */
-+#define S5PV210_VIC0REG(x)                      ((x) + VA_VIC0)
-+#define S5PV210_VIC1REG(x)                      ((x) + VA_VIC1)
-+#define S5PV210_VIC2REG(x)                      ((x) + VA_VIC2)
-+#define S5PV210_VIC3REG(x)                      ((x) + VA_VIC3)
+ /* CLKSRC0 */
++#define S5P_CLKSRC0_APLL_MASK		(0x1<<0)
++#define S5P_CLKSRC0_APLL_SHIFT		(0)
++#define S5P_CLKSRC0_MPLL_MASK		(0x1<<4)
++#define S5P_CLKSRC0_MPLL_SHIFT		(4)
++#define S5P_CLKSRC0_EPLL_MASK		(0x1<<8)
++#define S5P_CLKSRC0_EPLL_SHIFT		(8)
++#define S5P_CLKSRC0_VPLL_MASK		(0x1<<12)
++#define S5P_CLKSRC0_VPLL_SHIFT		(12)
+ #define S5P_CLKSRC0_MUX200_MASK		(0x1<<16)
++#define S5P_CLKSRC0_MUX200_SHIFT	(16)
+ #define S5P_CLKSRC0_MUX166_MASK		(0x1<<20)
++#define S5P_CLKSRC0_MUX166_SHIFT	(20)
+ #define S5P_CLKSRC0_MUX133_MASK		(0x1<<24)
++#define S5P_CLKSRC0_MUX133_SHIFT	(24)
++#define S5P_CLKSRC0_ONENAND_MASK	(0x1<<28)
++#define S5P_CLKSRC0_ONENAND_SHIFT	(28)
 +
- #endif /* __ASM_ARCH_REGS_IRQ_H */
++/* CLKSRC1 */
++#define S5P_CLKSRC1_HDMI_MASK		(0x1<<0)
++#define S5P_CLKSRC1_HDMI_SHIFT		(0)
++#define S5P_CLKSRC1_MIXER_MASK		(0x1<<4)
++#define S5P_CLKSRC1_MIXER_SHIFT		(4)
++#define S5P_CLKSRC1_DAC_MASK		(0x1<<8)
++#define S5P_CLKSRC1_DAC_SHIFT		(8)
++#define S5P_CLKSRC1_CAM0_MASK		(0xF<<12)
++#define S5P_CLKSRC1_CAM0_SHIFT		(12)
++#define S5P_CLKSRC1_CAM1_MASK		(0xF<<16)
++#define S5P_CLKSRC1_CAM1_SHIFT		(16)
++#define S5P_CLKSRC1_FIMD_MASK		(0xF<<20)
++#define S5P_CLKSRC1_FIMD_SHIFT		(20)
++#define S5P_CLKSRC1_CSIS_MASK		(0xF<<24)
++#define S5P_CLKSRC1_CSIS_SHIFT		(24)
++#define S5P_CLKSRC1_VPLLSRC_MASK	(0x1<<28)
++#define S5P_CLKSRC1_VPLLSRC_SHIFT	(28)
++
++/* CLKSRC2 */
++#define S5P_CLKSRC2_G3D_MASK		(0x3<<0)
++#define S5P_CLKSRC2_G3D_SHIFT		(0)
++#define S5P_CLKSRC2_MFC_MASK		(0x3<<4)
++#define S5P_CLKSRC2_MFC_SHIFT		(4)
++#define S5P_CLKSRC2_G2D_MASK		(0x3<<8)
++#define S5P_CLKSRC2_G2D_SHIFT		(8)
++
++/* CLKSRC3 */
++#define S5P_CLKSRC3_MDNIE_MASK		(0xF<<0)
++#define S5P_CLKSRC3_MDNIE_SHIFT		(0)
++#define S5P_CLKSRC3_MDNIE_PWMCLK_MASK	(0xF<<4)
++#define S5P_CLKSRC3_MDNIE_PWMCLK_SHIFT	(4)
++#define S5P_CLKSRC3_FIMC0_LCLK_MASK	(0xF<<12)
++#define S5P_CLKSRC3_FIMC0_LCLK_SHIFT	(12)
++#define S5P_CLKSRC3_FIMC1_LCLK_MASK	(0xF<<16)
++#define S5P_CLKSRC3_FIMC1_LCLK_SHIFT	(16)
++#define S5P_CLKSRC3_FIMC2_LCLK_MASK	(0xF<<20)
++#define S5P_CLKSRC3_FIMC2_LCLK_SHIFT	(20)
++
++/* CLKSRC4 */
++#define S5P_CLKSRC4_MMC0_MASK		(0xF<<0)
++#define S5P_CLKSRC4_MMC0_SHIFT		(0)
++#define S5P_CLKSRC4_MMC1_MASK		(0xF<<4)
++#define S5P_CLKSRC4_MMC1_SHIFT		(4)
++#define S5P_CLKSRC4_MMC2_MASK		(0xF<<8)
++#define S5P_CLKSRC4_MMC2_SHIFT		(8)
++#define S5P_CLKSRC4_MMC3_MASK		(0xF<<12)
++#define S5P_CLKSRC4_MMC3_SHIFT		(12)
++#define S5P_CLKSRC4_UART0_MASK		(0xF<<16)
++#define S5P_CLKSRC4_UART0_SHIFT		(16)
++#define S5P_CLKSRC4_UART1_MASK		(0xF<<20)
++#define S5P_CLKSRC4_UART1_SHIFT		(20)
++#define S5P_CLKSRC4_UART2_MASK		(0xF<<24)
++#define S5P_CLKSRC4_UART2_SHIFT		(24)
++#define S5P_CLKSRC4_UART3_MASK		(0xF<<28)
++#define S5P_CLKSRC4_UART3_SHIFT		(28)
++
++/* CLKSRC5 */
++#define S5P_CLKSRC5_SPI0_MASK		(0xF<<0)
++#define S5P_CLKSRC5_SPI0_SHIFT		(0)
++#define S5P_CLKSRC5_SPI1_MASK		(0xF<<4)
++#define S5P_CLKSRC5_SPI1_SHIFT		(4)
++#define S5P_CLKSRC5_SPI2_MASK		(0xF<<8)
++#define S5P_CLKSRC5_SPI2_SHIFT		(8)
++#define S5P_CLKSRC5_PWM_MASK		(0xF<<12)
++#define S5P_CLKSRC5_PWM_SHIFT		(12)
++
++/* CLKSRC6 */
++#define S5P_CLKSRC6_AUDIO0_MASK		(0xF<<0)
++#define S5P_CLKSRC6_AUDIO0_SHIFT	(0)
++#define S5P_CLKSRC6_AUDIO1_MASK		(0xF<<4)
++#define S5P_CLKSRC6_AUDIO1_SHIFT	(4)
++#define S5P_CLKSRC6_AUDIO2_MASK		(0xF<<8)
++#define S5P_CLKSRC6_AUDIO2_SHIFT	(8)
++#define S5P_CLKSRC6_SPDIF_MASK		(0x3<<12)
++#define S5P_CLKSRC6_SPDIF_SHIFT		(12)
++#define S5P_CLKSRC6_HPM_MASK		(0x1<<16)
++#define S5P_CLKSRC6_HPM_SHIFT		(16)
++#define S5P_CLKSRC6_PWI_MASK		(0xF<<20)
++#define S5P_CLKSRC6_PWI_SHIFT		(20)
++#define S5P_CLKSRC6_ONEDRAM_MASK	(0x3<<24)
++#define S5P_CLKSRC6_ONEDRAM_SHIFT	(24)
++
++/* CLKSRC_MASK0 - To be defined */
++#define S5P_CLKSRC_MASK0_HDMI		(1<<0)
++#define S5P_CLKSRC_MASK0_MIXER		(1<<1)
++
++/* CLKSRC_MASK1 - To be defined */
++
+ 
+ /* CLKDIV0 */
+ #define S5P_CLKDIV0_APLL_SHIFT		(0)
+@@ -90,7 +217,325 @@
+ #define S5P_CLKDIV0_PCLK66_SHIFT	(28)
+ #define S5P_CLKDIV0_PCLK66_MASK		(0x7 << S5P_CLKDIV0_PCLK66_SHIFT)
+ 
++/* CLKDIV1 */
++#define S5P_CLKDIV1_TBLK_MASK		(0xF<<0)
++#define S5P_CLKDIV1_TBLK_SHIFT		(0)
++#define S5P_CLKDIV1_FIMC_MASK		(0xF<<8)
++#define S5P_CLKDIV1_FIMC_SHIFT		(8)
++#define S5P_CLKDIV1_CAM0_MASK		(0xF<<12)
++#define S5P_CLKDIV1_CAM0_SHIFT		(12)
++#define S5P_CLKDIV1_CAM1_MASK		(0xF<<16)
++#define S5P_CLKDIV1_CAM1_SHIFT		(16)
++#define S5P_CLKDIV1_FIMD_MASK		(0xF<<20)
++#define S5P_CLKDIV1_FIMD_SHIFT		(20)
++#define S5P_CLKDIV1_CSIS_MASK		(0xF<<28)
++#define S5P_CLKDIV1_CSIS_SHIFT		(28)
++
++/* CLKDIV2 */
++#define S5P_CLKDIV2_G3D_MASK		(0xF<<0)
++#define S5P_CLKDIV2_G3D_SHIFT		(0)
++#define S5P_CLKDIV2_MFC_MASK		(0xF<<4)
++#define S5P_CLKDIV2_MFC_SHIFT		(4)
++#define S5P_CLKDIV2_G2D_MASK		(0xF<<8)
++#define S5P_CLKDIV2_G2D_SHIFT		(8)
++
++/* CLKDIV3 */
++#define S5P_CLKDIV3_MDNIE_MASK		(0xf<<0)
++#define S5P_CLKDIV3_MDNIE_SHIFT		(0)
++#define S5P_CLKDIV3_MDNIE_PWM_MASK	(0x3f<<4)
++#define S5P_CLKDIV3_MDNIE_PWM_SHIFT	(4)
++#define S5P_CLKDIV3_FIMC0_LCLK_MASK	(0xf<<12)
++#define S5P_CLKDIV3_FIMC0_LCLK_SHIFT	(12)
++#define S5P_CLKDIV3_FIMC1_LCLK_MASK	(0xf<<16)
++#define S5P_CLKDIV3_FIMC1_LCLK_SHIFT	(16)
++#define S5P_CLKDIV3_FIMC2_LCLK_MASK	(0xf<<20)
++#define S5P_CLKDIV3_FIMC2_LCLK_SHIFT	(20)
++
++/* CLKDIV4 */
++#define S5P_CLKDIV4_MMC0_MASK		(0xF<<0)
++#define S5P_CLKDIV4_MMC0_SHIFT		(0)
++#define S5P_CLKDIV4_MMC1_MASK		(0xF<<4)
++#define S5P_CLKDIV4_MMC1_SHIFT		(4)
++#define S5P_CLKDIV4_MMC2_MASK		(0xF<<8)
++#define S5P_CLKDIV4_MMC2_SHIFT		(8)
++#define S5P_CLKDIV4_MMC3_MASK		(0xF<<12)
++#define S5P_CLKDIV4_MMC3_SHIFT		(12)
++#define S5P_CLKDIV4_UART0_MASK		(0xF<<16)
++#define S5P_CLKDIV4_UART0_SHIFT		(16)
++#define S5P_CLKDIV4_UART1_MASK		(0xf<<20)
++#define S5P_CLKDIV4_UART1_SHIFT		(20)
++#define S5P_CLKDIV4_UART2_MASK		(0xf<<24)
++#define S5P_CLKDIV4_UART2_SHIFT		(24)
++#define S5P_CLKDIV4_UART3_MASK		(0xf<<28)
++#define S5P_CLKDIV4_UART3_SHIFT		(28)
++
++/* CLKDIV5 */
++#define S5P_CLKDIV5_SPI0_MASK		(0xF<<0)
++#define S5P_CLKDIV5_SPI0_SHIFT		(0)
++#define S5P_CLKDIV5_SPI1_MASK		(0xF<<4)
++#define S5P_CLKDIV5_SPI1_SHIFT		(4)
++#define S5P_CLKDIV5_SPI2_MASK		(0xF<<8)
++#define S5P_CLKDIV5_SPI2_SHIFT		(8)
++#define S5P_CLKDIV5_PWM_MASK		(0xF<<12)
++#define S5P_CLKDIV5_PWM_SHIFT		(12)
++
++/* CLKDIV6 */
++#define S5P_CLKDIV6_AUDIO0_MASK		(0xF<<0)
++#define S5P_CLKDIV6_AUDIO0_SHIFT	(0)
++#define S5P_CLKDIV6_AUDIO1_MASK		(0xF<<4)
++#define S5P_CLKDIV6_AUDIO1_SHIFT	(4)
++#define S5P_CLKDIV6_AUDIO2_MASK		(0xF<<8)
++#define S5P_CLKDIV6_AUDIO2_SHIFT	(8)
++#define S5P_CLKDIV6_ONENAND_MASK	(0x7<<12)
++#define S5P_CLKDIV6_ONENAND_SHIFT	(12)
++#define S5P_CLKDIV6_COPY_MASK		(0x7<<16)
++#define S5P_CLKDIV6_COPY_SHIFT		(16)
++#define S5P_CLKDIV6_HPM_MASK		(0x7<<20)
++#define S5P_CLKDIV6_HPM_SHIFT		(20)
++#define S5P_CLKDIV6_PWI_MASK		(0xf<<24)
++#define S5P_CLKDIV6_PWI_SHIFT		(24)
++#define S5P_CLKDIV6_ONEDRAM_MASK	(0xf<<28)
++#define S5P_CLKDIV6_ONEDRAM_SHIFT	(28)
++
++/* IP Clock Gate 0 Registers */
++#define S5P_CLKGATE_IP0_CSIS		(1<<31)
++#define S5P_CLKGATE_IP0_IPC		(1<<30)
++#define S5P_CLKGATE_IP0_ROTATOR		(1<<29)
++#define S5P_CLKGATE_IP0_JPEG		(1<<28)
++#define S5P_CLKGATE_IP0_FIMC2		(1<<26)
++#define S5P_CLKGATE_IP0_FIMC1		(1<<25)
++#define S5P_CLKGATE_IP0_FIMC0		(1<<24)
++#define S5P_CLKGATE_IP0_MFC		(1<<16)
++#define S5P_CLKGATE_IP0_G2D		(1<<12)
++#define S5P_CLKGATE_IP0_G3D		(1<<8)
++#define S5P_CLKGATE_IP0_IMEM		(1<<5)
++#define S5P_CLKGATE_IP0_PDMA1		(1<<4)
++#define S5P_CLKGATE_IP0_PDMA0		(1<<3)
++#define S5P_CLKGATE_IP0_MDMA		(1<<2)
++#define S5P_CLKGATE_IP0_DMC1		(1<<1)
++#define S5P_CLKGATE_IP0_DMC0		(1<<0)
++#define S5P_CLKGATE_IP0_RESERVED	(0x08feeec0)
++#define S5P_CLKGATE_IP0_ALWAYS_ON	( S5P_CLKGATE_IP0_DMC1 |\
++					S5P_CLKGATE_IP0_DMC0 |\
++					S5P_CLKGATE_IP0_IMEM )
++#ifdef CONFIG_S5PV210_AGGRESSIVE_GATING
++#define S5P_CLKGATE_IP0_BOOT_ON		( S5P_CLKGATE_IP0_PDMA0 |\
++					S5P_CLKGATE_IP0_PDMA1)
++#else
++#define S5P_CLKGATE_IP0_BOOT_ON		( S5P_CLKGATE_IP0_PDMA0 |\
++					S5P_CLKGATE_IP0_PDMA1 |\
++					S5P_CLKGATE_IP0_G2D)
++#endif
++
++/* IP Clock Gate 1 Registers */
++#define S5P_CLKGATE_IP1_NFCON		(1<<28)
++#define S5P_CLKGATE_IP1_SROMC		(1<<26)
++#define S5P_CLKGATE_IP1_CFCON		(1<<25)
++#define S5P_CLKGATE_IP1_NANDXL		(1<<24)
++#define S5P_CLKGATE_IP1_USBHOST		(1<<17)
++#define S5P_CLKGATE_IP1_USBOTG		(1<<16)
++#define S5P_CLKGATE_IP1_HDMI		(1<<11)
++#define S5P_CLKGATE_IP1_TVENC		(1<<10)
++#define S5P_CLKGATE_IP1_MIXER		(1<<9)
++#define S5P_CLKGATE_IP1_VP		(1<<8)
++#define S5P_CLKGATE_IP1_DSIM		(1<<2)
++#define S5P_CLKGATE_IP1_MIE		(1<<1)
++#define S5P_CLKGATE_IP1_FIMD		(1<<0)
++#define S5P_CLKGATE_IP1_RESERVED	(0xe8fcf0f8)
++#define S5P_CLKGATE_IP1_ALWAYS_ON	( 0 )
++#ifdef CONFIG_S5PV210_AGGRESSIVE_GATING
++#define S5P_CLKGATE_IP1_BOOT_ON		( S5P_CLKGATE_IP1_FIMD |\
++					S5P_CLKGATE_IP1_NANDXL)
++#else
++#define S5P_CLKGATE_IP1_BOOT_ON		( S5P_CLKGATE_IP1_FIMD |\
++					S5P_CLKGATE_IP1_NANDXL |\
++					S5P_CLKGATE_IP1_USBOTG)
++#endif
++
++
++/* IP Clock Gate 2 Registers */
++#define S5P_CLKGATE_IP2_TZIC3		(1<<31)
++#define S5P_CLKGATE_IP2_TZIC2		(1<<30)
++#define S5P_CLKGATE_IP2_TZIC1		(1<<29)
++#define S5P_CLKGATE_IP2_TZIC0		(1<<28)
++#define S5P_CLKGATE_IP2_VIC3		(1<<27)
++#define S5P_CLKGATE_IP2_VIC2		(1<<26)
++#define S5P_CLKGATE_IP2_VIC1		(1<<25)
++#define S5P_CLKGATE_IP2_VIC0		(1<<24)
++#define S5P_CLKGATE_IP2_TSI		(1<<20)
++#define S5P_CLKGATE_IP2_HSMMC3		(1<<19)
++#define S5P_CLKGATE_IP2_HSMMC2		(1<<18)
++#define S5P_CLKGATE_IP2_HSMMC1		(1<<17)
++#define S5P_CLKGATE_IP2_HSMMC0		(1<<16)
++#define S5P_CLKGATE_IP2_SECJTAG		(1<<11)
++#define S5P_CLKGATE_IP2_HOSTIF		(1<<10)
++#define S5P_CLKGATE_IP2_MODEM		(1<<9)
++#define S5P_CLKGATE_IP2_CORESIGHT	(1<<8)
++#define S5P_CLKGATE_IP2_SDM		(1<<1)
++#define S5P_CLKGATE_IP2_SECSS		(1<<0)
++#define S5P_CLKGATE_IP2_RESERVED	(0xe0f0fc)
++#define S5P_CLKGATE_IP2_ALWAYS_ON	( S5P_CLKGATE_IP2_TZIC3 | S5P_CLKGATE_IP2_TZIC2 |\
++					S5P_CLKGATE_IP2_TZIC1 | S5P_CLKGATE_IP2_TZIC0 |\
++					S5P_CLKGATE_IP2_VIC3 | S5P_CLKGATE_IP2_VIC2 |\
++					S5P_CLKGATE_IP2_VIC1 | S5P_CLKGATE_IP2_VIC0 |\
++					S5P_CLKGATE_IP2_SECJTAG | S5P_CLKGATE_IP2_CORESIGHT |\
++					S5P_CLKGATE_IP2_SDM | S5P_CLKGATE_IP2_SECSS )
++#ifdef CONFIG_S5PV210_AGGRESSIVE_GATING
++#define S5P_CLKGATE_IP2_BOOT_ON		( 0 )
++#else
++#define S5P_CLKGATE_IP2_BOOT_ON		( S5P_CLKGATE_IP2_TSI |\
++					S5P_CLKGATE_IP2_HSMMC2 |\
++					S5P_CLKGATE_IP2_HSMMC0 |\
++					S5P_CLKGATE_IP2_HOSTIF |\
++					S5P_CLKGATE_IP2_MODEM)
++#endif
++
++
++/* IP Clock Gate 3 Registers */
++#define S5P_CLKGATE_IP3_PCM2		(1<<30)
++#define S5P_CLKGATE_IP3_PCM1		(1<<29)
++#define S5P_CLKGATE_IP3_PCM0		(1<<28)
++#define S5P_CLKGATE_IP3_SYSCON		(1<<27)
++#define S5P_CLKGATE_IP3_GPIO		(1<<26)
++#define S5P_CLKGATE_IP3_TSADC		(1<<24)
++#define S5P_CLKGATE_IP3_PWM		(1<<23)
++#define S5P_CLKGATE_IP3_WDT		(1<<22)
++#define S5P_CLKGATE_IP3_KEYIF		(1<<21)
++#define S5P_CLKGATE_IP3_UART3		(1<<20)
++#define S5P_CLKGATE_IP3_UART2		(1<<19)
++#define S5P_CLKGATE_IP3_UART1		(1<<18)
++#define S5P_CLKGATE_IP3_UART0		(1<<17)
++#define S5P_CLKGATE_IP3_SYSTIMER	(1<<16)
++#define S5P_CLKGATE_IP3_RTC		(1<<15)
++#define S5P_CLKGATE_IP3_SPI2		(1<<14)
++#define S5P_CLKGATE_IP3_SPI1		(1<<13)
++#define S5P_CLKGATE_IP3_SPI0		(1<<12)
++#define S5P_CLKGATE_IP3_I2C_HDMI_PHY	(1<<11)
++#define S5P_CLKGATE_IP3_I2C_HDMI_DDC	(1<<10)
++#define S5P_CLKGATE_IP3_I2C2		(1<<9)
++#define S5P_CLKGATE_IP3_I2C1		(1<<8)
++#define S5P_CLKGATE_IP3_I2C0		(1<<7)
++#define S5P_CLKGATE_IP3_I2S2		(1<<6)
++#define S5P_CLKGATE_IP3_I2S1		(1<<5)
++#define S5P_CLKGATE_IP3_I2S0		(1<<4)
++#define S5P_CLKGATE_IP3_AC97		(1<<1)
++#define S5P_CLKGATE_IP3_SPDIF		(1<<0)
++#define S5P_CLKGATE_IP3_RESERVED	(0x8200000c)
++#define S5P_CLKGATE_IP3_ALWAYS_ON	( S5P_CLKGATE_IP3_SYSCON |\
++					S5P_CLKGATE_IP3_GPIO |\
++					S5P_CLKGATE_IP3_PWM |\
++					S5P_CLKGATE_IP3_UART0 |\
++					S5P_CLKGATE_IP3_UART1 |\
++					S5P_CLKGATE_IP3_UART2 |\
++					S5P_CLKGATE_IP3_UART3 |\
++					S5P_CLKGATE_IP3_SYSTIMER |\
++					S5P_CLKGATE_IP3_I2C0 |\
++					S5P_CLKGATE_IP3_I2C1 |\
++					S5P_CLKGATE_IP3_I2C2 |\
++					S5P_CLKGATE_IP3_RTC )
++#ifdef CONFIG_S5PV210_AGGRESSIVE_GATING
++#define S5P_CLKGATE_IP3_BOOT_ON		( 0 )
++#else
++#define S5P_CLKGATE_IP3_BOOT_ON		( S5P_CLKGATE_IP3_WDT |\
++					S5P_CLKGATE_IP3_KEYIF |\
++					S5P_CLKGATE_IP3_I2C_HDMI_PHY )
++#endif
++
++
++/* IP Clock Gate 4 Registers */
++#define S5P_CLKGATE_IP4_TZPC3		(1<<8)
++#define S5P_CLKGATE_IP4_TZPC2		(1<<7)
++#define S5P_CLKGATE_IP4_TZPC1		(1<<6)
++#define S5P_CLKGATE_IP4_TZPC0		(1<<5)
++#define S5P_CLKGATE_IP4_SECKEY		(1<<3)
++#define S5P_CLKGATE_IP4_IEM_APC		(1<<2)
++#define S5P_CLKGATE_IP4_IEM_IEC		(1<<1)
++#define S5P_CLKGATE_IP4_CHIP_ID		(1<<0)
++#define S5P_CLKGATE_IP4_RESERVED	(0xfffffe10)
++#define S5P_CLKGATE_IP4_ALWAYS_ON	( S5P_CLKGATE_IP4_TZPC3 |\
++					S5P_CLKGATE_IP4_TZPC2 |\
++					S5P_CLKGATE_IP4_TZPC1 |\
++					S5P_CLKGATE_IP4_TZPC0 )
++#ifdef CONFIG_S5PV210_AGGRESSIVE_GATING
++#define S5P_CLKGATE_IP4_BOOT_ON		( 0 )
++#else
++#define S5P_CLKGATE_IP4_BOOT_ON		( S5P_CLKGATE_IP4_CHIP_ID )
++#endif
++
++
++/* Block Clock Gate Registers */
++#define S5P_CLKGATE_BLOCK_INTC		(1<<10)
++#define S5P_CLKGATE_BLOCK_HSMMC		(1<<9)
++#define S5P_CLKGATE_BLOCK_DEBUG		(1<<8)
++#define S5P_CLKGATE_BLOCK_SECURITY	(1<<7)
++#define S5P_CLKGATE_BLOCK_MEMORY	(1<<6)
++#define S5P_CLKGATE_BLOCK_USB		(1<<5)
++#define S5P_CLKGATE_BLOCK_TV		(1<<4)
++#define S5P_CLKGATE_BLOCK_LCD		(1<<3)
++#define S5P_CLKGATE_BLOCK_IMG		(1<<2)
++#define S5P_CLKGATE_BLOCK_MFC		(1<<1)
++#define S5P_CLKGATE_BLOCK_G3D		(1<<0)
++
++/* IP Clock Gate 5 Registers */
++#define S5P_CLKGATE_IP5_JPEG		(1<<29)
++#define S5P_CLKGATE_IP5_RESERVED	(0xdfffffff)
++#define S5P_CLKGATE_IP5_ALWAYS_ON	(0)
++#ifdef CONFIG_S5PV210_AGGRESSIVE_GATING
++#define S5P_CLKGATE_IP5_BOOT_ON		(0)
++#else
++#define S5P_CLKGATE_IP5_BOOT_ON		( S5P_CLKGATE_IP5_JPEG )
++#endif
++
++/* Bus Clock Gate Registers (hidden) */
++
++
++/* CLK_OUT Registers */
++#define S5P_CLKOUT_DIV_SHIFT		(20)
++#define S5P_CLKOUT_DIV_MASK		(0xf << S5P_CLKOUT_DIV_SHIFT)
++#define S5P_CLKOUT_CLKSEL_SHIFT		(12)
++#define S5P_CLKOUT_CLKSEL_MASK		(0x1f << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_APLL		(0 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_MPLL		(1 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_EPLL		(2 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_VPLL		(3 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_SCLK_USBPHY0	(4 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_SCLK_USBPHY1	(5 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_SCLK_HDMIPHY	(6 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_RTC		(7 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_TICK		(8 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_HCLK200	(9 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_PCLK100	(10 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_HCLK166	(11 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_PCLK83	(12 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_HCLK133	(13 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_PCLK66	(14 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_ARMCLK	(15 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_SCLK_HPM	(16 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_XXTI		(17 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_XUSBXTI	(18 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_CLKSEL_DOUT		(19 << S5P_CLKOUT_CLKSEL_SHIFT)
++#define S5P_CLKOUT_DCLKCMP_SHIFT	(8)
++#define S5P_CLKOUT_DCLKCMP_MASK		(0xf << S5P_CLKOUT_DCLKCMP_SHIFT)
++#define S5P_CLKOUT_DCLKDIV_SHIFT	(4)
++#define S5P_CLKOUT_DCLKDIV_MASK		(0xf << S5P_CLKOUT_DCLKDIV_SHIFT)
++#define S5P_CLKOUT_DCLKSEL_SHIFT	(1)
++#define S5P_CLKOUT_DCLKSEL_MASK		(0x7 << S5P_CLKOUT_DCLKSEL_SHIFT)
++#define S5P_CLKOUT_DCLKSEL_XXTI		(0 << S5P_CLKOUT_DCLKSEL_SHIFT)
++#define S5P_CLKOUT_DCLKSEL_XUSBXTI	(1 << S5P_CLKOUT_DCLKSEL_SHIFT)
++#define S5P_CLKOUT_DCLKSEL_HDMI27M	(2 << S5P_CLKOUT_DCLKSEL_SHIFT)
++#define S5P_CLKOUT_DCLKSEL_USBPHY0	(3 << S5P_CLKOUT_DCLKSEL_SHIFT)
++#define S5P_CLKOUT_DCLKSEL_USBPHY1	(4 << S5P_CLKOUT_DCLKSEL_SHIFT)
++#define S5P_CLKOUT_DCLKSEL_HDMIPHY	(5 << S5P_CLKOUT_DCLKSEL_SHIFT)
++#define S5P_CLKOUT_DCLKSEL_FOUTEPLL	(6 << S5P_CLKOUT_DCLKSEL_SHIFT)
++#define S5P_CLKOUT_DCLKSEL_SCLKEPLL	(7 << S5P_CLKOUT_DCLKSEL_SHIFT)
++#define S5P_CLKOUT_DCLKEN_SHIFT		(0)
++#define S5P_CLKOUT_DCLKEN_MASK		(0x1 << S5P_CLKOUT_DCLKEN_SHIFT)
++#define S5P_CLKOUT_DCLKEN_ENABLE	(1 << S5P_CLKOUT_DCLKEN_SHIFT)
++#define S5P_CLKOUT_DCLKEN_DISABLE	(0 << S5P_CLKOUT_DCLKEN_SHIFT)
++
+ /* Registers related to power management */
++#define S5P_SWRESET		S5P_CLKREG(0x2000)
++
+ #define S5P_PWR_CFG		S5P_CLKREG(0xC000)
+ #define S5P_EINT_WAKEUP_MASK	S5P_CLKREG(0xC004)
+ #define S5P_WAKEUP_MASK 	S5P_CLKREG(0xC008)
+@@ -112,8 +557,13 @@
+ 
+ #define S5P_OTHERS		S5P_CLKREG(0xE000)
+ #define S5P_OM_STAT		S5P_CLKREG(0xE100)
++#define S5P_MIE_CONTROL		S5P_CLKREG(0xE800)
++#define S5P_HDMI_PHY_CONTROL	S5P_CLKREG(0xE804)
+ #define S5P_USB_PHY_CONTROL	S5P_CLKREG(0xE80C)
+ #define S5P_DAC_CONTROL		S5P_CLKREG(0xE810)
++#define S5P_MIPI_DPHY_CONTROL		S5P_CLKREG(0xE814)
++#define S5P_ADC_CONTROL		S5P_CLKREG(0xE818)
++#define S5P_PS_HOLD_CONTROL	S5P_CLKREG(0xE81C)
+ 
+ #define S5P_INFORM0		S5P_CLKREG(0xF000)
+ #define S5P_INFORM1		S5P_CLKREG(0xF004)
+@@ -159,12 +609,25 @@
+ /* OTHERS Resgister */
+ #define S5P_OTHERS_USB_SIG_MASK		(1 << 16)
+ #define S5P_OTHERS_MIPI_DPHY_EN		(1 << 28)
++#define S5P_OTHERS_CLKOUT_SHIFT		(8)
++#define S5P_OTHERS_CLKOUT_MASK		(0x3 << S5P_OTHERS_CLKOUT_SHIFT)
++#define S5P_OTHERS_CLKOUT_SYSCON	(0 << S5P_OTHERS_CLKOUT_SHIFT)
++#define S5P_OTHERS_CLKOUT_RESERVED	(1 << S5P_OTHERS_CLKOUT_SHIFT)
++#define S5P_OTHERS_CLKOUT_XXTI		(2 << S5P_OTHERS_CLKOUT_SHIFT)
++#define S5P_OTHERS_CLKOUT_XUSBXTI	(3 << S5P_OTHERS_CLKOUT_SHIFT)
+ 
+ /* MIPI */
+-#define S5P_MIPI_DPHY_EN		(3)
++#define S5P_MIPI_DPHY_EN		(3 << 0)
++
++/* S5P_MIPI_PHY_CON0 */
++#define S5P_MIPI_M_RESETN		(1 << 1)
+ 
+ /* S5P_DAC_CONTROL */
+ #define S5P_DAC_ENABLE			(1)
+ #define S5P_DAC_DISABLE			(0)
+ 
++#define S5PC110_USB_PHY_CON	S5P_CLKREG(0xE80c)
++#define S5PC110_USB_PHY0_EN	(1 << 0)
++#define S5PC110_USB_PHY1_EN	(1 << 1)
++
+ #endif /* __ASM_ARCH_REGS_CLOCK_H */
 -- 
 1.6.3.3
