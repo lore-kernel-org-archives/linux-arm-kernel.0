@@ -1,114 +1,115 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 14 Jun 2010 12:23:38 -0400 (EDT)
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 14 Jun 2010 10:28:09 -0600
 Subject: Request review of device tree documentation
 In-Reply-To: <20100614160201.GD9550@shareable.org>
 References: <4C13430B.5000907@firmworks.com>
-	<1276339529.1962.184.camel@pasglop> <1276339684.1962.186.camel@pasglop>
-	<4C13B618.1030006@firmworks.com> <1276383132.1962.195.camel@pasglop>
+	<1276339529.1962.184.camel@pasglop>
+	<1276339684.1962.186.camel@pasglop> <4C13B618.1030006@firmworks.com>
+	<1276383132.1962.195.camel@pasglop>
 	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>
 	<4C146F18.9030008@firmworks.com>
 	<AANLkTikls3hjXOmKFqG2D_9GaJSjOXNuuRXPlanAjo5E@mail.gmail.com>
 	<20100614124438.GF9323@yookeroo>
 	<alpine.LFD.2.00.1006141044510.13427@xanadu.home>
 	<20100614160201.GD9550@shareable.org>
-Message-ID: <alpine.LFD.2.00.1006141206110.13427@xanadu.home>
+Message-ID: <AANLkTilZuMKzFN1hD1k4Q067jSkryPuWA2bhW0Y3GJTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Jun 2010, Jamie Lokier wrote:
-
+On Mon, Jun 14, 2010 at 10:02 AM, Jamie Lokier <jamie@shareable.org> wrote:
 > Nicolas Pitre wrote:
-> > On Mon, 14 Jun 2010, David Gibson wrote:
-> > 
-> > > On Sun, Jun 13, 2010 at 11:02:15PM -0600, Grant Likely wrote:
-> > > [sni]
-> > > > > That's sort of a self-fulfilling prophecy. ?If the OS doesn't trust the
-> > > > > firmware, there is no pressure for the firmware to "get it right".
-> > > > 
-> > > > Firmware will not get it right.  Period.  There will always be
-> > > > something wrong.  It is never right on PCs.  It will never be right on
-> > > > the other architectures.
-> > > 
-> > > Yes, yes, yes.  And there is a great deal of empirical evidence to
-> > > back that assertion.
-> > > 
-> > > >  That goes for OSes too, but upgrading an OS
-> > > > isn't as risky as upgrading firmware.  That isn't to say that it can't
-> > > > be close, but every firmware feature that the OS depends on is a
-> > > > feature that could force a risky firmware upgrade when the bug in it
-> > > > is discovered.
-> > > 
-> > > Indeed.  In fact, the general rule of thumb is really "put as much as
-> > > possible into the most easily replaced layer of the stack".  This is,
-> > > incidentally, why I've always been dubious about simple firmwares
-> > > supplying a flattened device tree rather than including the device
-> > > tree template in the kernel, cuboot style.
-> > 
-> > The biggest advantage, IMHO, for adding DT to ARM, is actually to 
-> > decouple the hardware config information and the kernel.  If in the end 
-> > the DT has to be shipped in the kernel then we're losing all this 
-> > advantage over the current state of things on ARM which still works 
-> > pretty well otherwise.
-> > 
-> > In the best case, the simple firmware simply has to retrieve the 
-> > flattened device tree from flash, and pass it to the kernel just like 
-> > some anonymous blob.  And the simple firmware only needs to provide a 
-> > way for that DT blob to be updatable, like through an upload of a 
-> > replacement blob that was prepared offline.  Just like a ramdisk image 
-> > or the like.
-> > 
-> > That doesn't need to be fancier than that, and the goal of having the DT 
-> > data tied to the hardware instead of the kernel is achieved.
-> 
+>> On Mon, 14 Jun 2010, David Gibson wrote:
+>>
+>> > On Sun, Jun 13, 2010 at 11:02:15PM -0600, Grant Likely wrote:
+>> > [sni]
+>> > > > That's sort of a self-fulfilling prophecy. ?If the OS doesn't trust the
+>> > > > firmware, there is no pressure for the firmware to "get it right".
+>> > >
+>> > > Firmware will not get it right. ?Period. ?There will always be
+>> > > something wrong. ?It is never right on PCs. ?It will never be right on
+>> > > the other architectures.
+>> >
+>> > Yes, yes, yes. ?And there is a great deal of empirical evidence to
+>> > back that assertion.
+>> >
+>> > > ?That goes for OSes too, but upgrading an OS
+>> > > isn't as risky as upgrading firmware. ?That isn't to say that it can't
+>> > > be close, but every firmware feature that the OS depends on is a
+>> > > feature that could force a risky firmware upgrade when the bug in it
+>> > > is discovered.
+>> >
+>> > Indeed. ?In fact, the general rule of thumb is really "put as much as
+>> > possible into the most easily replaced layer of the stack". ?This is,
+>> > incidentally, why I've always been dubious about simple firmwares
+>> > supplying a flattened device tree rather than including the device
+>> > tree template in the kernel, cuboot style.
+>>
+>> The biggest advantage, IMHO, for adding DT to ARM, is actually to
+>> decouple the hardware config information and the kernel. ?If in the end
+>> the DT has to be shipped in the kernel then we're losing all this
+>> advantage over the current state of things on ARM which still works
+>> pretty well otherwise.
+>>
+>> In the best case, the simple firmware simply has to retrieve the
+>> flattened device tree from flash, and pass it to the kernel just like
+>> some anonymous blob. ?And the simple firmware only needs to provide a
+>> way for that DT blob to be updatable, like through an upload of a
+>> replacement blob that was prepared offline. ?Just like a ramdisk image
+>> or the like.
+>>
+>> That doesn't need to be fancier than that, and the goal of having the DT
+>> data tied to the hardware instead of the kernel is achieved.
+>
 > Imho that puts the DT in a similar category as initrd/initramfs, from
-> the bootloader's point of view.  It's another blob whose address is
+> the bootloader's point of view. ?It's another blob whose address is
 > passed to the kernel, just like initrd.
-
-Exact.
-
+>
 > Some bootloaders can't update blobs independently for technical
 > reasons, or to be minimal.
-> 
+>
 > A device I'm using does kernel updates by updating the whole romfs
 > boot image, which contains the kernel and other auxiliary blobs used
 > for booting (splash screen, early irq handlers etc.) as well as the
 > root filesystem.
-> 
+>
 > It is done that way to pack everything together in the small flash,
 > and because the NOR flash eraseblocks are too large relative to the
 > whole flash size to use separate partitions for kernel, boot
 > filesystem and other blobs for booting.
 
-If you already have to update everything at once already anyway, then 
-the DT blob just has to be in that update.  No need to do otherwise if 
-you can't do better than that for the kernel alone.
+This is totally fine.  I've got no problem with a specific firmware
+requiring everything (kernel,dt,rootfs) packed into a single image
+file.  Packing the image can be done at OS install time (instead of
+prebuilding it) if the system builder want to retain the independent
+hardware configuration aspects of using the device tree.
 
 > Dedicating a 64kiB eraseblock out of 2MB just for a small DT would be
-> quite wasteful.  Dedicating two to make it powerfail-safe would be
+> quite wasteful. ?Dedicating two to make it powerfail-safe would be
 > even worse.
-
-I hardly see how you can be power fail safe with your 
-update-everything-at-once condition above anyway.
-
-Furthermore, if the DT is updated by the bootloader, then that means 
-you're not running a live system at that point.  If power fails during 
-the DT update, then you simply have to re-update it when power is back 
-to allow a successful boot of the kernel afterwards.
-
+>
 > So requiring that a bootloader can update the DT _independently_ of
 > everything else is a bit much for some devices.
 
-In my opinion, this use case you're illustrating above simply could 
-continue to _not_ use DT at all.  If your NOR flash is so small that you 
-cannot spare some extra erase blocks, then this is a deeply embedded 
-profile the current DT-on-ARM push is not really meant for.  You would 
-be much better with a minimally configured kernel with all the hardware 
-info statically compiled into the kernel and get away without all the DT 
-parsing code altogether, like you're already doing today.
+Independent update of the DT is a useful feature, but it is certainly
+not a hard requirement.  It's a far more likely use-case if the kernel
+and DT is stored on a filesystem instead of bare NOR flash.
 
-While I think DT for ARM has advantages, I don't see us dropping the 
-legacy ARM methods anytime soon, especially for existing or extremely 
-constrained targets.
+> But requiring that it's generally treated like other separate blob,
+> i.e. in a similar way to initrd, and the kernel image itself, seems
+> not unreasonable.
+>
+> Like initrd, some people will find they need to compile it in to the
+> kernel image to fit some bootloader they can't change, or daren't risk
+> changing in already rolled out devices that they want to update to a
+> DT-using kernel.
 
+Yes, I fully expect that.  Fortunately the situation is better than it
+was with powerpc.  Since the machine id is being retained, a
+DT-enabled kernel can continue to support non-DT systems.  There will
+not be a flag day to cut everything over to a new boot interface.
 
-Nicolas
+g.
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
