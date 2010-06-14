@@ -1,170 +1,135 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 14 Jun 2010 16:58:51 +0900
-Subject: [PATCH 2/2 RE-SEND] ARM: S5PV210: Add support HSMMC on Samsung
-	SMDKV210
-In-Reply-To: <AANLkTin-IvzeY3QDMskm-G6QWFqddppdYrrkEBldGGsN@mail.gmail.com>
-References: <1276499983-19463-1-git-send-email-kgene.kim@samsung.com>
-	<AANLkTin-IvzeY3QDMskm-G6QWFqddppdYrrkEBldGGsN@mail.gmail.com>
-Message-ID: <009c01cb0b97$7265ea00$5731be00$%kim@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 14 Jun 2010 10:32:14 +0200
+Subject: ARM defconfig files
+In-Reply-To: <alpine.LFD.2.00.1006031119440.8175@i5.linux-foundation.org>
+References: <20100603074548.GA12104@flint.arm.linux.org.uk>
+	<alpine.LFD.2.00.1006030725420.8175@i5.linux-foundation.org>
+	<20100603181010.GA25779@flint.arm.linux.org.uk>
+	<1275589230.23384.19.camel@c-dwalke-linux.qualcomm.com>
+	<alpine.LFD.2.00.1006031119440.8175@i5.linux-foundation.org>
+Message-ID: <20100614083214.GA2104@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> Hi
-> 
-Hi, :-)
+Hello,
 
-> On Mon, Jun 14, 2010 at 4:19 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > From: Lee Hyuk <hyuk1.lee@samsung.com>
-> >
-> > This patch adds support HSMMC on Samsung SMDKV210, and gpio
-> configuration for
-> > S5PV210 hsmmc3.
-> >
-> > Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> >
-> > Changes since previous patch:
-> >
-> > - Adding missed call s5pv210_default_sdhci3() in s5pv210_map_io()
-> >
-> >  arch/arm/mach-s5pv210/Kconfig            |    5 +++++
-> >  arch/arm/mach-s5pv210/cpu.c              |    1 +
-> >  arch/arm/mach-s5pv210/include/mach/map.h |    1 +
-> >  arch/arm/mach-s5pv210/mach-smdkv210.c    |    4 ++++
-> >  arch/arm/mach-s5pv210/setup-sdhci-gpio.c |   20 ++++++++++++++++++++
-> >  5 files changed, 31 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-s5pv210/Kconfig
-b/arch/arm/mach-s5pv210/Kconfig
-> > index 0761eac..6aee967 100644
-> > --- a/arch/arm/mach-s5pv210/Kconfig
-> > +++ b/arch/arm/mach-s5pv210/Kconfig
-> > @@ -72,9 +72,14 @@ config MACH_SMDKV210
-> >        select CPU_S5PV210
-> >        select ARCH_SPARSEMEM_ENABLE
-> >        select SAMSUNG_DEV_ADC
-> > +       select S3C_DEV_HSMMC
-> > +       select S3C_DEV_HSMMC1
-> > +       select S3C_DEV_HSMMC2
-> > +       select S3C_DEV_HSMMC3
-> >        select SAMSUNG_DEV_TS
-> >        select S3C_DEV_WDT
-> >        select HAVE_S3C2410_WATCHDOG
-> > +       select S5PV210_SETUP_SDHCI
-> >        help
-> >          Machine support for Samsung SMDKV210
-> >
-> > diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
-> > index 411a4a9..765034e 100644
-> > --- a/arch/arm/mach-s5pv210/cpu.c
-> > +++ b/arch/arm/mach-s5pv210/cpu.c
-> > @@ -86,6 +86,7 @@ void __init s5pv210_map_io(void)
-> >        s5pv210_default_sdhci0();
-> >        s5pv210_default_sdhci1();
-> >        s5pv210_default_sdhci2();
-> > +       s5pv210_default_sdhci3();
-> >
-> >        /* the i2c devices are directly compatible with s3c2440 */
-> >        s3c_i2c0_setname("s3c2440-i2c");
-> > diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-
-> s5pv210/include/mach/map.h
-> > index 34eb168..fa9d7c2 100644
-> > --- a/arch/arm/mach-s5pv210/include/mach/map.h
-> > +++ b/arch/arm/mach-s5pv210/include/mach/map.h
-> > @@ -97,6 +97,7 @@
-> >  #define S3C_PA_HSMMC0          S5PV210_PA_HSMMC(0)
-> >  #define S3C_PA_HSMMC1          S5PV210_PA_HSMMC(1)
-> >  #define S3C_PA_HSMMC2          S5PV210_PA_HSMMC(2)
-> > +#define S3C_PA_HSMMC3          S5PV210_PA_HSMMC(3)
-> >  #define S3C_PA_IIC             S5PV210_PA_IIC0
-> >  #define S3C_PA_IIC1            S5PV210_PA_IIC1
-> >  #define S3C_PA_IIC2            S5PV210_PA_IIC2
-> > diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-
-> s5pv210/mach-smdkv210.c
-> > index 0d46279..b08f376 100644
-> > --- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-> > +++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-> > @@ -77,6 +77,10 @@ static struct platform_device *smdkv210_devices[]
-> __initdata = {
-> >        &s5pv210_device_iis0,
-> >        &s5pv210_device_ac97,
-> >        &s3c_device_adc,
-> > +       &s3c_device_hsmmc0,
-> > +       &s3c_device_hsmmc1,
-> > +       &s3c_device_hsmmc2,
-> > +       &s3c_device_hsmmc3,
-> >        &s3c_device_ts,
-> >        &s3c_device_wdt,
-> >  };
-> > diff --git a/arch/arm/mach-s5pv210/setup-sdhci-gpio.c b/arch/arm/mach-
-> s5pv210/setup-sdhci-gpio.c
-> > index fe7d86d..415f62c 100644
-> > --- a/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
-> > +++ b/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
-> > @@ -102,3 +102,23 @@ void s5pv210_setup_sdhci2_cfg_gpio(struct
-> platform_device *dev, int width)
-> >        s3c_gpio_setpull(S5PV210_GPG2(2), S3C_GPIO_PULL_UP);
-> >        s3c_gpio_cfgpin(S5PV210_GPG2(2), S3C_GPIO_SFN(2));
-> >  }
-> > +
-> > +void s5pv210_setup_sdhci3_cfg_gpio(struct platform_device *dev, int
-width)
-> > +{
-> > +       unsigned int gpio;
-> > +
-> > +       /* Set all the necessary GPG1[0:2] pins to special-function 2 */
+[Added linux-arm-kernel ML to Cc, note that it's moderated for
+non-subscribers.]
+
+On Thu, Jun 03, 2010 at 11:21:59AM -0700, Linus Torvalds wrote:
 > 
-> Wrong pin name, GPG3?
 > 
-OK.
-
-> > +       for (gpio = S5PV210_GPG3(0); gpio < S5PV210_GPG3(2); gpio++) {
-> > +               s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> > +               s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-> > +       }
-> > +
-> > +       /* Data pin GPG1[3:6] to special-function 2 */
-> ditto
-
-OK.
-
-> > +       for (gpio = S5PV210_GPG3(3); gpio <= S5PV210_GPG3(6); gpio++) {
-> > +               s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> > +               s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-> > +       }
-> > +
-> > +       s3c_gpio_setpull(S5PV210_GPG3(2), S3C_GPIO_PULL_UP);
-> > +       s3c_gpio_cfgpin(S5PV210_GPG3(2), S3C_GPIO_SFN(2));
+> On Thu, 3 Jun 2010, Daniel Walker wrote:
+> > 
+> > I don't see how we can do without defconfigs altogether tho. I mean , if
+> > you want to run a Beagle board or a Nexus one we can't just give the
+> > users a slim ARM config and let them troll through 1000's of drivers
+> > trying to find just those ones that work on their given board.
 > 
-> In case of this, how about to use one loop like this.
+> Well, you also don't need the full defconfig's with the kernel.
 > 
-> for (gpio = GPG3(0); gpio <= GPG3(7); gpio++)
->     s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> 
-> since all pins use special function 2.
-> 
-> or others methods are welcome.
-> 
+> Right now they are just noise. They actually _hide_ things, because 
+> diffstat (and dirstat) information becomes pointless, and the diffs become 
+> totally unreadable by any human (trust me - when the choice is between 
+> "search for next relevant diff" or "blast it, I can't be bothered with 
+> walking through this crap", quite often the choice is the latter).
+I wrote a script that throws out all unneeded lines in all arm
+defconfigs that don't influence the resulting .config for .34 and
+.35-rc1 and compared .34<->.35-rc with .34-reduced<->.35-rc1-reduced.
 
-Yeah, you're right.
-But used same method of s5pv210_sdhci0_cfg_gpio(), sdhci1_xxx(), and
-sdhci2_xxx() from Marek.
+Here are the results:
 
-If necessary, will modify later with others.
+	$ git diff --dirstat v2.6.34 v2.6.35-rc1 arch/arm
+	  11.8% arch/arm/configs/
+	  10.0% arch/arm/mach-msm/
+	  10.8% arch/arm/mach-omap2/
+	   4.8% arch/arm/mach-pxa/
+	   4.5% arch/arm/mach-s5pc100/
+	   3.3% arch/arm/mach-s5pv210/
+	   4.4% arch/arm/mach-spear3xx/
+	   3.1% arch/arm/mach-ux500/
+	   5.1% arch/arm/plat-s5pc1xx/
+	   3.1% arch/arm/plat-samsung/
+	  38.2% arch/arm/
 
-> To Ben,
-> When do you apply previous gpio helper functions?
-> 
-What's the previous gpio helper functions for?
+	$ git diff --dirstat arm/defconfig/reduced-v2.6.34 arm/defconfig/reduced-v2.6.35-rc1 arch/arm
+	   3.1% arch/arm/mach-davinci/
+	  11.3% arch/arm/mach-msm/
+	  12.2% arch/arm/mach-omap2/
+	   5.4% arch/arm/mach-pxa/
+	   5.1% arch/arm/mach-s5pc100/
+	   3.7% arch/arm/mach-s5pv210/
+	   5.0% arch/arm/mach-spear3xx/
+	   3.5% arch/arm/mach-ux500/
+	   5.8% arch/arm/plat-s5pc1xx/
+	   3.5% arch/arm/plat-samsung/
+	  40.9% arch/arm/
 
+	$ git diff --dirstat=0 arm/defconfig/reduced-v2.6.34 arm/defconfig/reduced-v2.6.35-rc1 arch/arm | grep config
+	   1.1% arch/arm/configs/
 
-Thanks.
+	$ git diff --shortstat v2.6.35-rc1 arm/defconfig/reduced-v2.6.35-rc1
+	 177 files changed, 652 insertions(+), 194157 deletions(-)
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+(The insertions above are only moved lines I think, I didn't check them
+all.)
+
+The branches arm/defconfig/reduced-v2.6.34 and
+arm/defconfig/reduced-v2.6.35-rc1 are available at my repo at
+git://git.pengutronix.de/git/ukl/linux-2.6.git .  (There is a gitweb at
+http://git.pengutronix.de/?p=ukl/linux-2.6.git)
+
+So maintaining these minimal defconfigs would have reduced the defconfig
+noise from 11.8% down to 1.1%.  And probably it could be considerably
+reduced further with constructs like:
+
+	config HAVE_MTD_NAND_MXC
+		bool
+
+	config MTD_NAND_MXC
+		tristate "MXC NAND support"
+		...
+		default m if HAVE_MTD_NAND_MXC
+		help
+		  ...
+
+	...
+	config MACH_MX27ADS
+		...
+		select HAVE_MTD_NAND_MXC
+
+.  Compared with selecting everything in Kconfig files this approach
+allows further tweaking of a config.  (E.g. "I have a mx27ads machine,
+but I don't need nand support.")  Compared with the SAT-Solver it's an
+idea that works today.
+
+One downside of this approach (when done with my script only) is that
+too much is removed.  E.g. in mx3_defconfig CONFIG_ARCH_MX3 is removed.
+This is OK from a logical POV but then changing the default of the
+corresponding choice (and I intend to do that in the near future) would
+break this defconfig.
+
+I can share my script and I'm willing to support maintaining the
+minimality of the defconfig files if they are an acceptable (maybe
+intermediate) step for Linus.
+
+Together with the efforts to reduce the number of defconfigs as thought
+about in other mails of this thread the situation should become quite
+better for Linus.  (I'm currently working on merging support for all
+Freescale SoCs into a single mach- directory and so merge mx1_defconfig,
+mx21_defconfig, mx27_defconfig, mx31pdk_defconfig, mx3_defconfig and
+mx51_defconfig.)
+
+Linus: I would really appreciate if you wouldn't remove all (or nearly
+all) defconfig files.  I think you would force a quicker solution to
+this problem, but during that time the ARM community would loose compile
+coverage.
+
+Thoughts on this?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
