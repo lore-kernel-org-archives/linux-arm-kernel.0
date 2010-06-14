@@ -1,32 +1,65 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Mon, 14 Jun 2010 17:33:24 +0100
-Subject: Request review of device tree documentation
-In-Reply-To: <AANLkTilZuMKzFN1hD1k4Q067jSkryPuWA2bhW0Y3GJTg@mail.gmail.com>
-References: <1276339684.1962.186.camel@pasglop>
-	<4C13B618.1030006@firmworks.com>
-	<1276383132.1962.195.camel@pasglop>
-	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>
-	<4C146F18.9030008@firmworks.com>
-	<AANLkTikls3hjXOmKFqG2D_9GaJSjOXNuuRXPlanAjo5E@mail.gmail.com>
-	<20100614124438.GF9323@yookeroo>
-	<alpine.LFD.2.00.1006141044510.13427@xanadu.home>
-	<20100614160201.GD9550@shareable.org>
-	<AANLkTilZuMKzFN1hD1k4Q067jSkryPuWA2bhW0Y3GJTg@mail.gmail.com>
-Message-ID: <20100614163324.GG9550@shareable.org>
+From: x0095840@ti.com (Fernando Guzman Lugo)
+Date: Mon, 14 Jun 2010 11:51:09 -0500
+Subject: [PATCH] mailbox: change full flag per mailbox queue instead of global
+Message-ID: <1276534269-19179-1-git-send-email-x0095840@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely wrote:
-> > Like initrd, some people will find they need to compile it in to the
-> > kernel image to fit some bootloader they can't change, or daren't risk
-> > changing in already rolled out devices that they want to update to a
-> > DT-using kernel.
-> 
-> Yes, I fully expect that.  Fortunately the situation is better than it
-> was with powerpc.  Since the machine id is being retained, a
-> DT-enabled kernel can continue to support non-DT systems.  There will
-> not be a flag day to cut everything over to a new boot interface.
+As pointed by Ben Ohand, the variable rq_full flag is a global
+variable, so if there are multiple mailbox users there will be
+conflics. Now there is a full flag per mailbox queue.
 
-That's excellent, thank you.  I was a bit unsure about how that was going.
+Reported-by: Ohad Ben-Cohen <ohad@wizery.com>
+Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
+---
+ arch/arm/plat-omap/include/plat/mailbox.h |    1 +
+ arch/arm/plat-omap/mailbox.c              |    7 +++----
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
--- Jamie
+diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
+index 729166b..a6144b8 100644
+--- a/arch/arm/plat-omap/include/plat/mailbox.h
++++ b/arch/arm/plat-omap/include/plat/mailbox.h
+@@ -47,6 +47,7 @@ struct omap_mbox_queue {
+ 	struct tasklet_struct	tasklet;
+ 	int	(*callback)(void *);
+ 	struct omap_mbox	*mbox;
++	bool	full;
+ };
+ 
+ struct omap_mbox {
+diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+index 8d86b0b..a1e274e 100644
+--- a/arch/arm/plat-omap/mailbox.c
++++ b/arch/arm/plat-omap/mailbox.c
+@@ -30,7 +30,6 @@
+ 
+ static struct omap_mbox *mboxes;
+ static DEFINE_RWLOCK(mboxes_lock);
+-static bool rq_full;
+ 
+ static int mbox_configured;
+ static DEFINE_MUTEX(mbox_configured_lock);
+@@ -140,9 +139,9 @@ static void mbox_rx_work(struct work_struct *work)
+ 	while (1) {
+ 		spin_lock_irqsave(q->queue_lock, flags);
+ 		rq = blk_fetch_request(q);
+-		if (rq_full) {
++		if (mbox->rxq->full) {
+ 			omap_mbox_enable_irq(mbox, IRQ_RX);
+-			rq_full = false;
++			mbox->rxq->full = false;
+ 		}
+ 		spin_unlock_irqrestore(q->queue_lock, flags);
+ 		if (!rq)
+@@ -183,7 +182,7 @@ static void __mbox_rx_interrupt(struct omap_mbox *mbox)
+ 		rq = blk_get_request(q, WRITE, GFP_ATOMIC);
+ 		if (unlikely(!rq)) {
+ 			omap_mbox_disable_irq(mbox, IRQ_RX);
+-			rq_full = true;
++			mbox->rxq->full = true;
+ 			goto nomem;
+ 		}
+ 
+-- 
+1.6.3.3
