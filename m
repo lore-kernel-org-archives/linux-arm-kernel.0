@@ -1,116 +1,90 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 14 Jun 2010 16:19:43 +0900
-Subject: [PATCH 2/2 RE-SEND] ARM: S5PV210: Add support HSMMC on Samsung
-	SMDKV210
-Message-ID: <1276499983-19463-1-git-send-email-kgene.kim@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 14 Jun 2010 09:35:21 +0200
+Subject: [GIT PULL] mxc patches
+Message-ID: <20100614073521.GY20799@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lee Hyuk <hyuk1.lee@samsung.com>
+This is basically the same pull request as the last time minus the
+defconfig changes.
 
-This patch adds support HSMMC on Samsung SMDKV210, and gpio configuration for
-S5PV210 hsmmc3.
+Sascha
 
-Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
+The following changes since commit 7e27d6e778cd87b6f2415515d7127eba53fe5d02:
 
-Changes since previous patch:
+  Linux 2.6.35-rc3 (2010-06-11 19:14:04 -0700)
 
-- Adding missed call s5pv210_default_sdhci3() in s5pv210_map_io()
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6 for-rmk
 
- arch/arm/mach-s5pv210/Kconfig            |    5 +++++
- arch/arm/mach-s5pv210/cpu.c              |    1 +
- arch/arm/mach-s5pv210/include/mach/map.h |    1 +
- arch/arm/mach-s5pv210/mach-smdkv210.c    |    4 ++++
- arch/arm/mach-s5pv210/setup-sdhci-gpio.c |   20 ++++++++++++++++++++
- 5 files changed, 31 insertions(+), 0 deletions(-)
+Amit Kucheria (1):
+      arm: mxc: utilise usecount field in clock operations
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 0761eac..6aee967 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -72,9 +72,14 @@ config MACH_SMDKV210
- 	select CPU_S5PV210
- 	select ARCH_SPARSEMEM_ENABLE
- 	select SAMSUNG_DEV_ADC
-+	select S3C_DEV_HSMMC
-+	select S3C_DEV_HSMMC1
-+	select S3C_DEV_HSMMC2
-+	select S3C_DEV_HSMMC3
- 	select SAMSUNG_DEV_TS
- 	select S3C_DEV_WDT
- 	select HAVE_S3C2410_WATCHDOG
-+	select S5PV210_SETUP_SDHCI
- 	help
- 	  Machine support for Samsung SMDKV210
- 
-diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
-index 411a4a9..765034e 100644
---- a/arch/arm/mach-s5pv210/cpu.c
-+++ b/arch/arm/mach-s5pv210/cpu.c
-@@ -86,6 +86,7 @@ void __init s5pv210_map_io(void)
- 	s5pv210_default_sdhci0();
- 	s5pv210_default_sdhci1();
- 	s5pv210_default_sdhci2();
-+	s5pv210_default_sdhci3();
- 
- 	/* the i2c devices are directly compatible with s3c2440 */
- 	s3c_i2c0_setname("s3c2440-i2c");
-diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
-index 34eb168..fa9d7c2 100644
---- a/arch/arm/mach-s5pv210/include/mach/map.h
-+++ b/arch/arm/mach-s5pv210/include/mach/map.h
-@@ -97,6 +97,7 @@
- #define S3C_PA_HSMMC0		S5PV210_PA_HSMMC(0)
- #define S3C_PA_HSMMC1		S5PV210_PA_HSMMC(1)
- #define S3C_PA_HSMMC2		S5PV210_PA_HSMMC(2)
-+#define S3C_PA_HSMMC3		S5PV210_PA_HSMMC(3)
- #define S3C_PA_IIC		S5PV210_PA_IIC0
- #define S3C_PA_IIC1		S5PV210_PA_IIC1
- #define S3C_PA_IIC2		S5PV210_PA_IIC2
-diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
-index 0d46279..b08f376 100644
---- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-+++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-@@ -77,6 +77,10 @@ static struct platform_device *smdkv210_devices[] __initdata = {
- 	&s5pv210_device_iis0,
- 	&s5pv210_device_ac97,
- 	&s3c_device_adc,
-+	&s3c_device_hsmmc0,
-+	&s3c_device_hsmmc1,
-+	&s3c_device_hsmmc2,
-+	&s3c_device_hsmmc3,
- 	&s3c_device_ts,
- 	&s3c_device_wdt,
- };
-diff --git a/arch/arm/mach-s5pv210/setup-sdhci-gpio.c b/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
-index fe7d86d..415f62c 100644
---- a/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
-+++ b/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
-@@ -102,3 +102,23 @@ void s5pv210_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
- 	s3c_gpio_setpull(S5PV210_GPG2(2), S3C_GPIO_PULL_UP);
- 	s3c_gpio_cfgpin(S5PV210_GPG2(2), S3C_GPIO_SFN(2));
- }
-+
-+void s5pv210_setup_sdhci3_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	unsigned int gpio;
-+
-+	/* Set all the necessary GPG1[0:2] pins to special-function 2 */
-+	for (gpio = S5PV210_GPG3(0); gpio < S5PV210_GPG3(2); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+	}
-+
-+	/* Data pin GPG1[3:6] to special-function 2 */
-+	for (gpio = S5PV210_GPG3(3); gpio <= S5PV210_GPG3(6); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+	}
-+
-+	s3c_gpio_setpull(S5PV210_GPG3(2), S3C_GPIO_PULL_UP);
-+	s3c_gpio_cfgpin(S5PV210_GPG3(2), S3C_GPIO_SFN(2));
-+}
+Baruch Siach (3):
+      mxc_nand: add support for platform defined partitions
+      mx25: add platform code for imx-keypad
+      mx25pdk: add keypad support
+
+Daniel Mack (3):
+      ARM: mx3: pcm037: remove unused variable
+      ARM: mx3: mx31lilly: fix build error for !CONFIG_USB_ULPI
+      ARM: mx3: mx31lilly: pass mc13783 SPI IRQ pin
+
+Dinh Nguyen (2):
+      mx5: Add i2c to Freescale MX51 Babbage HW
+      mx5: Register i2c on Freescale MX51 Babbage HW
+
+Eric B?nard (14):
+      eukrea_mbimx27-baseboard: fix typo in display name
+      eukrea_mbimx27-baseboard: add generic-bl and platform-lcd controls
+      eukrea_mbimx27-baseboard: add timings for DVI output
+      cpuimx27 and mbimx27: allow fine control of UART4 and SDHC2 usage
+      mach-cpuimx27: fix QuadUART's IRQ typo in pins'setup
+      eukrea_mbimx27: fix ADS7846 support
+      mach-cpuimx27: add USB Host2 and OTG support
+      mach-cpuimx27: register wdt and w1_master resources
+      mxcmmc: add card detect through DAT3 possibility
+      eukrea_mbimx27: use card detect through DAT3 for SDHC1
+      MX2X: Add Keypad device definition for MX2X arch
+      eukrea_mbimx27: add support for the keyboard
+      eukrea_mbimx27: add audio codec
+      i.MX35: return IPU clock's value for mx3fb
+
+Sascha Hauer (1):
+      mxc_nand: Fix OOB handling
+
+Wolfram Sang (1):
+      pcm037/pcm043/pca100: fix ULPI-related build warnings
+
+ arch/arm/mach-mx2/Kconfig                    |   10 ++-
+ arch/arm/mach-mx2/devices.c                  |   18 +++
+ arch/arm/mach-mx2/devices.h                  |    1 +
+ arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c |  181 +++++++++++++++++++++++---
+ arch/arm/mach-mx2/mach-cpuimx27.c            |   93 +++++++++++++-
+ arch/arm/mach-mx2/mach-pca100.c              |    2 +
+ arch/arm/mach-mx25/clock.c                   |    2 +-
+ arch/arm/mach-mx25/devices.c                 |   20 +++
+ arch/arm/mach-mx25/devices.h                 |    1 +
+ arch/arm/mach-mx25/mach-mx25pdk.c            |   36 +++++
+ arch/arm/mach-mx3/clock-imx35.c              |    2 +-
+ arch/arm/mach-mx3/mach-mx31lilly.c           |   34 ++++--
+ arch/arm/mach-mx3/mach-pcm037.c              |    3 +-
+ arch/arm/mach-mx3/mach-pcm043.c              |    2 +
+ arch/arm/mach-mx5/board-mx51_babbage.c       |   26 ++++
+ arch/arm/mach-mx5/clock-mx51.c               |   11 ++
+ arch/arm/mach-mx5/devices.c                  |   58 ++++++++
+ arch/arm/mach-mx5/devices.h                  |    3 +
+ arch/arm/plat-mxc/clock.c                    |   37 ++++--
+ arch/arm/plat-mxc/include/mach/iomux-mx25.h  |   19 ++-
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h  |   18 ++-
+ arch/arm/plat-mxc/include/mach/mmc.h         |    3 +
+ arch/arm/plat-mxc/include/mach/mx25.h        |    2 +
+ arch/arm/plat-mxc/include/mach/mxc_nand.h    |    4 +
+ drivers/mmc/host/mxcmmc.c                    |   16 ++-
+ drivers/mtd/nand/mxc_nand.c                  |   33 +----
+ 26 files changed, 545 insertions(+), 90 deletions(-)
 -- 
-1.6.2.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
