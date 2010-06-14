@@ -1,7 +1,7 @@
 From: konkers@android.com (Erik Gilling)
-Date: Mon, 14 Jun 2010 14:10:22 -0700
-Subject: [PATCH v3 06/11] [ARM] tegra: add GPIO support
-In-Reply-To: <1276549827-2688-6-git-send-email-konkers@android.com>
+Date: Mon, 14 Jun 2010 14:10:26 -0700
+Subject: [PATCH v3 10/11] [ARM] tegra: Add framebuffer driver
+In-Reply-To: <1276549827-2688-10-git-send-email-konkers@android.com>
 References: <1271198563-10424-1-git-send-email-konkers@android.com>
 	<1276549827-2688-1-git-send-email-konkers@android.com>
 	<1276549827-2688-2-git-send-email-konkers@android.com>
@@ -9,324 +9,123 @@ References: <1271198563-10424-1-git-send-email-konkers@android.com>
 	<1276549827-2688-4-git-send-email-konkers@android.com>
 	<1276549827-2688-5-git-send-email-konkers@android.com>
 	<1276549827-2688-6-git-send-email-konkers@android.com>
-Message-ID: <1276549827-2688-7-git-send-email-konkers@android.com>
+	<1276549827-2688-7-git-send-email-konkers@android.com>
+	<1276549827-2688-8-git-send-email-konkers@android.com>
+	<1276549827-2688-9-git-send-email-konkers@android.com>
+	<1276549827-2688-10-git-send-email-konkers@android.com>
+Message-ID: <1276549827-2688-11-git-send-email-konkers@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2: fixes from Mike Rapoport:
-	- move gpio-names.h to arch/arm/mach-tegra
-    fixes from Russell King
-	- include linux/io.h and linux/gpio.h instead of asm/io.h
-	  and asm/gpio.h
-    additional changes:
-    	- add macros to convert between irq and gpio numbers for platform data
-	- change for_each_bit to for_each_set_bit in gpio.c
-v3:
-	- minor bugfixes
+From: Colin Cross <ccross@android.com>
+
+v2: Fixes from review by Russell King
+    - Use proper return values
+
+v2: Fixes from review by Jaya Kumar
+    - Comments on lcd resolution
+    - Remove stub functions
+    - Change DUMP_REG to pr_debug
+    - Add unregister_framebuffer to tegra_plat_remove
+
+v2: from Colin Cross
+    - adjust debugging
+
+v3: Fixes from review by Jaya Kumar
+        - Free irq in probe error case and remove function
+	- Fix checkpatch issues
 
 Signed-off-by: Colin Cross <ccross@android.com>
 Signed-off-by: Erik Gilling <konkers@android.com>
+CC: Jaya Kumar <jayakumar.lkml@gmail.com>
+CC: linux-fbdev <linux-fbdev@vger.kernel.org>
 ---
- arch/arm/mach-tegra/Kconfig             |    1 +
- arch/arm/mach-tegra/Makefile            |    1 +
- arch/arm/mach-tegra/gpio-names.h        |  247 ++++++++++++++++++++++
- arch/arm/mach-tegra/gpio.c              |  348 +++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/include/mach/gpio.h |   53 +++++
- 5 files changed, 650 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-tegra/gpio-names.h
- create mode 100644 arch/arm/mach-tegra/gpio.c
- create mode 100644 arch/arm/mach-tegra/include/mach/gpio.h
+ arch/arm/mach-tegra/include/mach/tegra_fb.h |   27 ++
+ drivers/video/Kconfig                       |   10 +
+ drivers/video/Makefile                      |    1 +
+ drivers/video/tegrafb.c                     |  624 +++++++++++++++++++++++++++
+ 4 files changed, 662 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/include/mach/tegra_fb.h
+ create mode 100644 drivers/video/tegrafb.c
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index bcbda96..a57713c 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -9,6 +9,7 @@ config ARCH_TEGRA_2x_SOC
- 	bool "Tegra 2 family"
- 	select CPU_V7
- 	select ARM_GIC
-+	select ARCH_REQUIRE_GPIOLIB
+diff --git a/arch/arm/mach-tegra/include/mach/tegra_fb.h b/arch/arm/mach-tegra/include/mach/tegra_fb.h
+new file mode 100644
+index 0000000..84ae886
+--- /dev/null
++++ b/arch/arm/mach-tegra/include/mach/tegra_fb.h
+@@ -0,0 +1,27 @@
++/*
++ * arch/arm/mach-tegra/include/mach/tegra_fb.h
++ *
++ * Copyright (C) 2010 Google, Inc.
++ * Author: Colin Cross <ccross@android.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++/* Platform data structure to be passed to the driver */
++struct tegra_fb_lcd_data {
++	int	fb_xres;
++	int	fb_yres;
++	/* Resolution of the output to the LCD.  If different from the
++	   framebuffer resolution, the Tegra display block will scale it */
++	int	lcd_xres;
++	int	lcd_yres;
++	int	bits_per_pixel;
++};
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 3d94a14..e047002 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -1089,6 +1089,16 @@ config FB_RIVA_BACKLIGHT
  	help
- 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
- 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 01f47fd..122f7dc 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -3,6 +3,7 @@ obj-y                                   += io.o
- obj-y                                   += irq.o
- obj-y                                   += clock.o
- obj-y                                   += timer.o
-+obj-y                                   += gpio.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
- obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
-diff --git a/arch/arm/mach-tegra/gpio-names.h b/arch/arm/mach-tegra/gpio-names.h
+ 	  Say Y here if you want to control the backlight of your display.
+ 
++config FB_TEGRA
++	tristate "NVIDIA Tegra SoC display support"
++	depends on ARCH_TEGRA && FB = y
++	select FB_CFB_FILLRECT
++	select FB_CFB_COPYAREA
++	select FB_CFB_IMAGEBLIT
++	default FB
++	help
++	  This driver supports the NVIDIA Tegra systems-on-a-chip.
++
+ config FB_I810
+ 	tristate "Intel 810/815 support (EXPERIMENTAL)"
+ 	depends on EXPERIMENTAL && FB && PCI && X86_32 && AGP_INTEL
+diff --git a/drivers/video/Makefile b/drivers/video/Makefile
+index ddc2af2..d9098d6 100644
+--- a/drivers/video/Makefile
++++ b/drivers/video/Makefile
+@@ -131,6 +131,7 @@ obj-$(CONFIG_FB_CARMINE)          += carminefb.o
+ obj-$(CONFIG_FB_MB862XX)	  += mb862xx/
+ obj-$(CONFIG_FB_MSM)              += msm/
+ obj-$(CONFIG_FB_NUC900)           += nuc900fb.o
++obj-$(CONFIG_FB_TEGRA)            += tegrafb.o
+ 
+ # Platform or fallback drivers go here
+ obj-$(CONFIG_FB_UVESA)            += uvesafb.o
+diff --git a/drivers/video/tegrafb.c b/drivers/video/tegrafb.c
 new file mode 100644
-index 0000000..f28220a
+index 0000000..47b2d42
 --- /dev/null
-+++ b/arch/arm/mach-tegra/gpio-names.h
-@@ -0,0 +1,247 @@
++++ b/drivers/video/tegrafb.c
+@@ -0,0 +1,624 @@
 +/*
-+ * arch/arm/mach-tegra/include/mach/gpio-names.h
++ * drivers/video/tegrafb.c
 + *
-+ * Copyright (c) 2010 Google, Inc
-+ *
-+ * Author:
-+ *	Erik Gilling <konkers@google.com>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __MACH_TEGRA_GPIO_NAMES_H
-+#define __MACH_TEGRA_GPIO_NAMES_H
-+
-+#define TEGRA_GPIO_PA0		0
-+#define TEGRA_GPIO_PA1		1
-+#define TEGRA_GPIO_PA2		2
-+#define TEGRA_GPIO_PA3		3
-+#define TEGRA_GPIO_PA4		4
-+#define TEGRA_GPIO_PA5		5
-+#define TEGRA_GPIO_PA6		6
-+#define TEGRA_GPIO_PA7		7
-+#define TEGRA_GPIO_PB0		8
-+#define TEGRA_GPIO_PB1		9
-+#define TEGRA_GPIO_PB2		10
-+#define TEGRA_GPIO_PB3		11
-+#define TEGRA_GPIO_PB4		12
-+#define TEGRA_GPIO_PB5		13
-+#define TEGRA_GPIO_PB6		14
-+#define TEGRA_GPIO_PB7		15
-+#define TEGRA_GPIO_PC0		16
-+#define TEGRA_GPIO_PC1		17
-+#define TEGRA_GPIO_PC2		18
-+#define TEGRA_GPIO_PC3		19
-+#define TEGRA_GPIO_PC4		20
-+#define TEGRA_GPIO_PC5		21
-+#define TEGRA_GPIO_PC6		22
-+#define TEGRA_GPIO_PC7		23
-+#define TEGRA_GPIO_PD0		24
-+#define TEGRA_GPIO_PD1		25
-+#define TEGRA_GPIO_PD2		26
-+#define TEGRA_GPIO_PD3		27
-+#define TEGRA_GPIO_PD4		28
-+#define TEGRA_GPIO_PD5		29
-+#define TEGRA_GPIO_PD6		30
-+#define TEGRA_GPIO_PD7		31
-+#define TEGRA_GPIO_PE0		32
-+#define TEGRA_GPIO_PE1		33
-+#define TEGRA_GPIO_PE2		34
-+#define TEGRA_GPIO_PE3		35
-+#define TEGRA_GPIO_PE4		36
-+#define TEGRA_GPIO_PE5		37
-+#define TEGRA_GPIO_PE6		38
-+#define TEGRA_GPIO_PE7		39
-+#define TEGRA_GPIO_PF0		40
-+#define TEGRA_GPIO_PF1		41
-+#define TEGRA_GPIO_PF2		42
-+#define TEGRA_GPIO_PF3		43
-+#define TEGRA_GPIO_PF4		44
-+#define TEGRA_GPIO_PF5		45
-+#define TEGRA_GPIO_PF6		46
-+#define TEGRA_GPIO_PF7		47
-+#define TEGRA_GPIO_PG0		48
-+#define TEGRA_GPIO_PG1		49
-+#define TEGRA_GPIO_PG2		50
-+#define TEGRA_GPIO_PG3		51
-+#define TEGRA_GPIO_PG4		52
-+#define TEGRA_GPIO_PG5		53
-+#define TEGRA_GPIO_PG6		54
-+#define TEGRA_GPIO_PG7		55
-+#define TEGRA_GPIO_PH0		56
-+#define TEGRA_GPIO_PH1		57
-+#define TEGRA_GPIO_PH2		58
-+#define TEGRA_GPIO_PH3		59
-+#define TEGRA_GPIO_PH4		60
-+#define TEGRA_GPIO_PH5		61
-+#define TEGRA_GPIO_PH6		62
-+#define TEGRA_GPIO_PH7		63
-+#define TEGRA_GPIO_PI0		64
-+#define TEGRA_GPIO_PI1		65
-+#define TEGRA_GPIO_PI2		66
-+#define TEGRA_GPIO_PI3		67
-+#define TEGRA_GPIO_PI4		68
-+#define TEGRA_GPIO_PI5		69
-+#define TEGRA_GPIO_PI6		70
-+#define TEGRA_GPIO_PI7		71
-+#define TEGRA_GPIO_PJ0		72
-+#define TEGRA_GPIO_PJ1		73
-+#define TEGRA_GPIO_PJ2		74
-+#define TEGRA_GPIO_PJ3		75
-+#define TEGRA_GPIO_PJ4		76
-+#define TEGRA_GPIO_PJ5		77
-+#define TEGRA_GPIO_PJ6		78
-+#define TEGRA_GPIO_PJ7		79
-+#define TEGRA_GPIO_PK0		80
-+#define TEGRA_GPIO_PK1		81
-+#define TEGRA_GPIO_PK2		82
-+#define TEGRA_GPIO_PK3		83
-+#define TEGRA_GPIO_PK4		84
-+#define TEGRA_GPIO_PK5		85
-+#define TEGRA_GPIO_PK6		86
-+#define TEGRA_GPIO_PK7		87
-+#define TEGRA_GPIO_PL0		88
-+#define TEGRA_GPIO_PL1		89
-+#define TEGRA_GPIO_PL2		90
-+#define TEGRA_GPIO_PL3		91
-+#define TEGRA_GPIO_PL4		92
-+#define TEGRA_GPIO_PL5		93
-+#define TEGRA_GPIO_PL6		94
-+#define TEGRA_GPIO_PL7		95
-+#define TEGRA_GPIO_PM0		96
-+#define TEGRA_GPIO_PM1		97
-+#define TEGRA_GPIO_PM2		98
-+#define TEGRA_GPIO_PM3		99
-+#define TEGRA_GPIO_PM4		100
-+#define TEGRA_GPIO_PM5		101
-+#define TEGRA_GPIO_PM6		102
-+#define TEGRA_GPIO_PM7		103
-+#define TEGRA_GPIO_PN0		104
-+#define TEGRA_GPIO_PN1		105
-+#define TEGRA_GPIO_PN2		106
-+#define TEGRA_GPIO_PN3		107
-+#define TEGRA_GPIO_PN4		108
-+#define TEGRA_GPIO_PN5		109
-+#define TEGRA_GPIO_PN6		110
-+#define TEGRA_GPIO_PN7		111
-+#define TEGRA_GPIO_PO0		112
-+#define TEGRA_GPIO_PO1		113
-+#define TEGRA_GPIO_PO2		114
-+#define TEGRA_GPIO_PO3		115
-+#define TEGRA_GPIO_PO4		116
-+#define TEGRA_GPIO_PO5		117
-+#define TEGRA_GPIO_PO6		118
-+#define TEGRA_GPIO_PO7		119
-+#define TEGRA_GPIO_PP0		120
-+#define TEGRA_GPIO_PP1		121
-+#define TEGRA_GPIO_PP2		122
-+#define TEGRA_GPIO_PP3		123
-+#define TEGRA_GPIO_PP4		124
-+#define TEGRA_GPIO_PP5		125
-+#define TEGRA_GPIO_PP6		126
-+#define TEGRA_GPIO_PP7		127
-+#define TEGRA_GPIO_PQ0		128
-+#define TEGRA_GPIO_PQ1		129
-+#define TEGRA_GPIO_PQ2		130
-+#define TEGRA_GPIO_PQ3		131
-+#define TEGRA_GPIO_PQ4		132
-+#define TEGRA_GPIO_PQ5		133
-+#define TEGRA_GPIO_PQ6		134
-+#define TEGRA_GPIO_PQ7		135
-+#define TEGRA_GPIO_PR0		136
-+#define TEGRA_GPIO_PR1		137
-+#define TEGRA_GPIO_PR2		138
-+#define TEGRA_GPIO_PR3		139
-+#define TEGRA_GPIO_PR4		140
-+#define TEGRA_GPIO_PR5		141
-+#define TEGRA_GPIO_PR6		142
-+#define TEGRA_GPIO_PR7		143
-+#define TEGRA_GPIO_PS0		144
-+#define TEGRA_GPIO_PS1		145
-+#define TEGRA_GPIO_PS2		146
-+#define TEGRA_GPIO_PS3		147
-+#define TEGRA_GPIO_PS4		148
-+#define TEGRA_GPIO_PS5		149
-+#define TEGRA_GPIO_PS6		150
-+#define TEGRA_GPIO_PS7		151
-+#define TEGRA_GPIO_PT0		152
-+#define TEGRA_GPIO_PT1		153
-+#define TEGRA_GPIO_PT2		154
-+#define TEGRA_GPIO_PT3		155
-+#define TEGRA_GPIO_PT4		156
-+#define TEGRA_GPIO_PT5		157
-+#define TEGRA_GPIO_PT6		158
-+#define TEGRA_GPIO_PT7		159
-+#define TEGRA_GPIO_PU0		160
-+#define TEGRA_GPIO_PU1		161
-+#define TEGRA_GPIO_PU2		162
-+#define TEGRA_GPIO_PU3		163
-+#define TEGRA_GPIO_PU4		164
-+#define TEGRA_GPIO_PU5		165
-+#define TEGRA_GPIO_PU6		166
-+#define TEGRA_GPIO_PU7		167
-+#define TEGRA_GPIO_PV0		168
-+#define TEGRA_GPIO_PV1		169
-+#define TEGRA_GPIO_PV2		170
-+#define TEGRA_GPIO_PV3		171
-+#define TEGRA_GPIO_PV4		172
-+#define TEGRA_GPIO_PV5		173
-+#define TEGRA_GPIO_PV6		174
-+#define TEGRA_GPIO_PV7		175
-+#define TEGRA_GPIO_PW0		176
-+#define TEGRA_GPIO_PW1		177
-+#define TEGRA_GPIO_PW2		178
-+#define TEGRA_GPIO_PW3		179
-+#define TEGRA_GPIO_PW4		180
-+#define TEGRA_GPIO_PW5		181
-+#define TEGRA_GPIO_PW6		182
-+#define TEGRA_GPIO_PW7		183
-+#define TEGRA_GPIO_PX0		184
-+#define TEGRA_GPIO_PX1		185
-+#define TEGRA_GPIO_PX2		186
-+#define TEGRA_GPIO_PX3		187
-+#define TEGRA_GPIO_PX4		188
-+#define TEGRA_GPIO_PX5		189
-+#define TEGRA_GPIO_PX6		190
-+#define TEGRA_GPIO_PX7		191
-+#define TEGRA_GPIO_PY0		192
-+#define TEGRA_GPIO_PY1		193
-+#define TEGRA_GPIO_PY2		194
-+#define TEGRA_GPIO_PY3		195
-+#define TEGRA_GPIO_PY4		196
-+#define TEGRA_GPIO_PY5		197
-+#define TEGRA_GPIO_PY6		198
-+#define TEGRA_GPIO_PY7		199
-+#define TEGRA_GPIO_PZ0		200
-+#define TEGRA_GPIO_PZ1		201
-+#define TEGRA_GPIO_PZ2		202
-+#define TEGRA_GPIO_PZ3		203
-+#define TEGRA_GPIO_PZ4		204
-+#define TEGRA_GPIO_PZ5		205
-+#define TEGRA_GPIO_PZ6		206
-+#define TEGRA_GPIO_PZ7		207
-+#define TEGRA_GPIO_PAA0		208
-+#define TEGRA_GPIO_PAA1		209
-+#define TEGRA_GPIO_PAA2		210
-+#define TEGRA_GPIO_PAA3		211
-+#define TEGRA_GPIO_PAA4		212
-+#define TEGRA_GPIO_PAA5		213
-+#define TEGRA_GPIO_PAA6		214
-+#define TEGRA_GPIO_PAA7		215
-+#define TEGRA_GPIO_PBB0		216
-+#define TEGRA_GPIO_PBB1		217
-+#define TEGRA_GPIO_PBB2		218
-+#define TEGRA_GPIO_PBB3		219
-+#define TEGRA_GPIO_PBB4		220
-+#define TEGRA_GPIO_PBB5		221
-+#define TEGRA_GPIO_PBB6		222
-+#define TEGRA_GPIO_PBB7		223
-+
-+#endif
-diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
-new file mode 100644
-index 0000000..fe78fba
---- /dev/null
-+++ b/arch/arm/mach-tegra/gpio.c
-@@ -0,0 +1,348 @@
-+/*
-+ * arch/arm/mach-tegra/gpio.c
-+ *
-+ * Copyright (c) 2010 Google, Inc
-+ *
-+ * Author:
-+ *	Erik Gilling <konkers@google.com>
++ * Copyright (C) 2010 Google, Inc.
++ * Author: Colin Cross <ccross@android.com>
++ *         Travis Geiselbrecht <travis@palm.com>
 + *
 + * This software is licensed under the terms of the GNU General Public
 + * License version 2, as published by the Free Software Foundation, and
@@ -339,393 +138,611 @@ index 0000000..fe78fba
 + *
 + */
 +
-+#include <linux/init.h>
-+#include <linux/irq.h>
++#include <linux/fb.h>
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/errno.h>
++#include <linux/string.h>
++#include <linux/mm.h>
++#include <linux/slab.h>
++#include <linux/delay.h>
++#include <linux/platform_device.h>
++#include <linux/interrupt.h>
++#include <linux/clk.h>
++#include <linux/wait.h>
++#include <asm/cacheflush.h>
++#include <mach/tegra_fb.h>
 +
-+#include <linux/io.h>
-+#include <linux/gpio.h>
++#define DC_CMD_GENERAL_INCR_SYNCPT		0x000
++#define DC_CMD_GENERAL_INCR_SYNCPT_CNTRL	0x001
++#define DC_CMD_GENERAL_INCR_SYNCPT_ERROR	0x002
++#define DC_CMD_WIN_A_INCR_SYNCPT		0x008
++#define DC_CMD_WIN_A_INCR_SYNCPT_CNTRL		0x009
++#define DC_CMD_WIN_A_INCR_SYNCPT_ERROR		0x00a
++#define DC_CMD_WIN_B_INCR_SYNCPT		0x010
++#define DC_CMD_WIN_B_INCR_SYNCPT_CNTRL		0x011
++#define DC_CMD_WIN_B_INCR_SYNCPT_ERROR		0x012
++#define DC_CMD_WIN_C_INCR_SYNCPT		0x018
++#define DC_CMD_WIN_C_INCR_SYNCPT_CNTRL		0x019
++#define DC_CMD_WIN_C_INCR_SYNCPT_ERROR		0x01a
++#define DC_CMD_CONT_SYNCPT_VSYNC		0x028
++#define DC_CMD_DISPLAY_COMMAND_OPTION0		0x031
++#define DC_CMD_DISPLAY_COMMAND			0x032
++#define DC_CMD_SIGNAL_RAISE			0x033
++#define DC_CMD_INT_STATUS			0x037
++#define DC_CMD_INT_MASK				0x038
++#define DC_CMD_INT_ENABLE			0x039
++#define DC_CMD_INT_TYPE				0x03a
++#define DC_CMD_INT_POLARITY			0x03b
++#define DC_CMD_SIGNAL_RAISE1			0x03c
++#define DC_CMD_SIGNAL_RAISE2			0x03d
++#define DC_CMD_SIGNAL_RAISE3			0x03e
++#define DC_CMD_STATE_ACCESS			0x040
++#define DC_CMD_STATE_CONTROL			0x041
++#define DC_CMD_DISPLAY_WINDOW_HEADER		0x042
++#define DC_CMD_REG_ACT_CONTROL			0x043
++#define DC_WINC_A_COLOR_PALETTE			0x500
++#define DC_WINC_A_PALETTE_COLOR_EXT		0x600
++#define DC_WIN_A_WIN_OPTIONS			0x700
++#define DC_WIN_A_BYTE_SWAP			0x701
++#define DC_WIN_A_BUFFER_CONTROL			0x702
++#define DC_WIN_A_COLOR_DEPTH			0x703
++#define DC_WIN_A_POSITION			0x704
++#define DC_WIN_A_SIZE				0x705
++#define DC_WIN_A_PRESCALED_SIZE			0x706
++#define DC_WIN_A_H_INITIAL_DDA			0x707
++#define DC_WIN_A_V_INITIAL_DDA			0x708
++#define DC_WIN_A_DDA_INCREMENT			0x709
++#define DC_WIN_A_LINE_STRIDE			0x70a
++#define DC_WIN_A_BUF_STRIDE			0x70b
++#define DC_WINBUF_A_START_ADDR			0x800
++#define DC_WINBUF_A_ADDR_H_OFFSET		0x806
++#define DC_WINBUF_A_ADDR_V_OFFSET		0x808
 +
-+#include <mach/iomap.h>
 +
-+#define GPIO_BANK(x)		((x) >> 5)
-+#define GPIO_PORT(x)		(((x) >> 3) & 0x3)
-+#define GPIO_BIT(x)		((x) & 0x7)
++#define DC_INT_CTXSW				(1<<0)
++#define DC_INT_FRAME_END			(1<<1)
++#define DC_INT_V_BLANK				(1<<2)
++#define DC_INT_H_BLANK				(1<<3)
++#define DC_INT_V_PULSE3				(1<<4)
 +
-+#define GPIO_REG(x)		(IO_TO_VIRT(TEGRA_GPIO_BASE) +	\
-+				 GPIO_BANK(x) * 0x80 +		\
-+				 GPIO_PORT(x) * 4)
++#define DC_COLOR_DEPTH_P1			0
++#define DC_COLOR_DEPTH_P2			1
++#define DC_COLOR_DEPTH_P4			2
++#define DC_COLOR_DEPTH_P8			3
++#define DC_COLOR_DEPTH_B4G4R4A4			4
++#define DC_COLOR_DEPTH_B5G5R5A			5
++#define DC_COLOR_DEPTH_B5G6R5			6
++#define DC_COLOR_DEPTH_AB5G5R5			7
++#define DC_COLOR_DEPTH_B8G8R8A8			12
++#define DC_COLOR_DEPTH_R8G8B8A8			13
++#define DC_COLOR_DEPTH_B6x2G6x2R6x2A8		14
++#define DC_COLOR_DEPTH_R6x2G6x2B6x2A8		15
++#define DC_COLOR_DEPTH_YCbCr422			16
++#define DC_COLOR_DEPTH_YUV422			17
++#define DC_COLOR_DEPTH_YCbCr420P		18
++#define DC_COLOR_DEPTH_YUV420P			19
++#define DC_COLOR_DEPTH_YCbCr422P		20
++#define DC_COLOR_DEPTH_YUV422P			21
++#define DC_COLOR_DEPTH_YCbCr422R		22
++#define DC_COLOR_DEPTH_YUV422R			23
++#define DC_COLOR_DEPTH_YCbCr422RA		24
++#define DC_COLOR_DEPTH_YUV422RA			25
 +
-+#define GPIO_CNF(x)		(GPIO_REG(x) + 0x00)
-+#define GPIO_OE(x)		(GPIO_REG(x) + 0x10)
-+#define GPIO_OUT(x)		(GPIO_REG(x) + 0X20)
-+#define GPIO_IN(x)		(GPIO_REG(x) + 0x30)
-+#define GPIO_INT_STA(x)		(GPIO_REG(x) + 0x40)
-+#define GPIO_INT_ENB(x)		(GPIO_REG(x) + 0x50)
-+#define GPIO_INT_LVL(x)		(GPIO_REG(x) + 0x60)
-+#define GPIO_INT_CLR(x)		(GPIO_REG(x) + 0x70)
-+
-+#define GPIO_MSK_CNF(x)		(GPIO_REG(x) + 0x800)
-+#define GPIO_MSK_OE(x)		(GPIO_REG(x) + 0x810)
-+#define GPIO_MSK_OUT(x)		(GPIO_REG(x) + 0X820)
-+#define GPIO_MSK_INT_STA(x)	(GPIO_REG(x) + 0x840)
-+#define GPIO_MSK_INT_ENB(x)	(GPIO_REG(x) + 0x850)
-+#define GPIO_MSK_INT_LVL(x)	(GPIO_REG(x) + 0x860)
-+
-+#define GPIO_INT_LVL_MASK		0x010101
-+#define GPIO_INT_LVL_EDGE_RISING	0x000101
-+#define GPIO_INT_LVL_EDGE_FALLING	0x000100
-+#define GPIO_INT_LVL_EDGE_BOTH		0x010100
-+#define GPIO_INT_LVL_LEVEL_HIGH		0x000001
-+#define GPIO_INT_LVL_LEVEL_LOW		0x000000
-+
-+struct tegra_gpio_bank {
-+	int bank;
++struct tegra_fb_info {
++	struct clk *clk;
++	struct resource *reg_mem;
++	struct resource *fb_mem;
++	void __iomem *reg_base;
++	wait_queue_head_t event_wq;
++	unsigned int wait_condition;
++	/* Resolution of the output to the LCD.  If different from the
++	   framebuffer resolution, the Tegra display block will scale it */
++	int lcd_xres;
++	int lcd_yres;
 +	int irq;
-+	spinlock_t lvl_lock[4];
 +};
 +
-+
-+static struct tegra_gpio_bank tegra_gpio_banks[] = {
-+	{.bank = 0, .irq = INT_GPIO1},
-+	{.bank = 1, .irq = INT_GPIO2},
-+	{.bank = 2, .irq = INT_GPIO3},
-+	{.bank = 3, .irq = INT_GPIO4},
-+	{.bank = 4, .irq = INT_GPIO5},
-+	{.bank = 5, .irq = INT_GPIO6},
-+	{.bank = 6, .irq = INT_GPIO7},
-+};
-+
-+static int tegra_gpio_compose(int bank, int port, int bit)
++static void tegra_fb_writel(struct tegra_fb_info *tegra_fb, u32 val,
++	unsigned long reg)
 +{
-+	return (bank << 5) | ((port & 0x3) << 3) | (bit & 0x7);
++	writel(val, tegra_fb->reg_base + reg*sizeof(u32));
 +}
 +
-+static void tegra_gpio_mask_write(u32 reg, int gpio, int value)
++static u32 tegra_fb_readl(struct tegra_fb_info *tegra_fb, unsigned long reg)
 +{
-+	u32 val;
-+
-+	val = 0x100 << GPIO_BIT(gpio);
-+	if (value)
-+		val |= 1 << GPIO_BIT(gpio);
-+	__raw_writel(val, reg);
++	return readl(tegra_fb->reg_base + reg*sizeof(u32));
 +}
 +
-+void tegra_gpio_enable(int gpio)
++/* palette attary used by the fbcon */
++u32 pseudo_palette[16];
++
++irqreturn_t tegra_fb_irq(int irq, void *ptr)
 +{
-+	tegra_gpio_mask_write(GPIO_MSK_CNF(gpio), gpio, 1);
++	struct fb_info *info = ptr;
++	struct tegra_fb_info *tegra_fb = info->par;
++
++	u32 reg = tegra_fb_readl(tegra_fb, DC_CMD_INT_STATUS);
++	tegra_fb_writel(tegra_fb, reg, DC_CMD_INT_STATUS);
++
++	tegra_fb->wait_condition = 1;
++	wake_up(&tegra_fb->event_wq);
++	return IRQ_HANDLED;
 +}
 +
-+void tegra_gpio_disable(int gpio)
++static int tegra_fb_wait_for_event(struct tegra_fb_info *tegra_fb,
++	unsigned long timeout, u32 irq_mask)
 +{
-+	tegra_gpio_mask_write(GPIO_MSK_CNF(gpio), gpio, 0);
-+}
++	u32 reg;
 +
-+static void tegra_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
-+{
-+	tegra_gpio_mask_write(GPIO_MSK_OUT(offset), offset, value);
-+}
++	tegra_fb->wait_condition = 0;
 +
-+static int tegra_gpio_get(struct gpio_chip *chip, unsigned offset)
-+{
-+	return (__raw_readl(GPIO_IN(offset)) >> GPIO_BIT(offset)) & 0x1;
-+}
++	reg = tegra_fb_readl(tegra_fb, DC_CMD_INT_MASK);
++	reg |= irq_mask;
++	tegra_fb_writel(tegra_fb, reg, DC_CMD_INT_MASK);
 +
-+static int tegra_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
-+{
-+	tegra_gpio_mask_write(GPIO_MSK_OE(offset), offset, 0);
++	/* Clear any pending interrupt */
++	tegra_fb_writel(tegra_fb, irq_mask, DC_CMD_INT_STATUS);
++
++	tegra_fb_writel(tegra_fb, irq_mask, DC_CMD_INT_ENABLE);
++
++	/* Wait for the irq to fire */
++	wait_event_interruptible_timeout(tegra_fb->event_wq,
++		tegra_fb->wait_condition, timeout);
++
++	tegra_fb_writel(tegra_fb, 0, DC_CMD_INT_ENABLE);
++
++	if (!tegra_fb->wait_condition) {
++		pr_warning("%s: wait for vsync timed out\n", __func__);
++		return -ETIMEDOUT;
++	}
 +	return 0;
 +}
 +
-+static int tegra_gpio_direction_output(struct gpio_chip *chip, unsigned offset,
-+					int value)
++/* Writes to many registers in the display block are buffered.
++ * tegra_fb_activate requests an update of the main registers from their
++ * double-buffered registers, which takes effect at the end of the next frame,
++ * and then waits for the frame_end IRQ.
++ */
++static void tegra_fb_activate(struct tegra_fb_info *tegra_fb)
 +{
-+	tegra_gpio_set(chip, offset, value);
-+	tegra_gpio_mask_write(GPIO_MSK_OE(offset), offset, 1);
++	int vsync_count = 0;
++
++	if (unlikely(tegra_fb_readl(tegra_fb, DC_CMD_STATE_CONTROL) & 3)) {
++		pr_warning("%s: update already activated!\n", __func__);
++		return;
++	}
++
++	tegra_fb_writel(tegra_fb, (1 << 8) | (1 << 9), DC_CMD_STATE_CONTROL);
++	tegra_fb_writel(tegra_fb, (1 << 0) | (1 << 1), DC_CMD_STATE_CONTROL);
++	while (tegra_fb_readl(tegra_fb, DC_CMD_STATE_CONTROL) & 3) {
++		vsync_count++;
++		if (tegra_fb_wait_for_event(tegra_fb, HZ/10, DC_INT_FRAME_END))
++			break;
++	}
++	if (unlikely(vsync_count > 1))
++		pr_warning("%s: waited for %d vsyncs\n", __func__, vsync_count);
++}
++
++
++static int tegra_fb_open(struct fb_info *info, int user)
++{
 +	return 0;
 +}
 +
-+
-+
-+static struct gpio_chip tegra_gpio_chip = {
-+	.label			= "tegra-gpio",
-+	.direction_input	= tegra_gpio_direction_input,
-+	.get			= tegra_gpio_get,
-+	.direction_output	= tegra_gpio_direction_output,
-+	.set			= tegra_gpio_set,
-+	.base			= 0,
-+	.ngpio			= ARCH_NR_GPIOS,
-+};
-+
-+static void tegra_gpio_irq_ack(unsigned int irq)
++static int tegra_fb_release(struct fb_info *info, int user)
 +{
-+	int gpio = irq - INT_GPIO_BASE;
-+
-+	__raw_writel(1 << GPIO_BIT(gpio), GPIO_INT_CLR(gpio));
++	return 0;
 +}
 +
-+static void tegra_gpio_irq_mask(unsigned int irq)
++static int tegra_fb_check_var(struct fb_var_screeninfo *var,
++	struct fb_info *info)
 +{
-+	int gpio = irq - INT_GPIO_BASE;
-+
-+	tegra_gpio_mask_write(GPIO_MSK_INT_ENB(gpio), gpio, 0);
++	if ((var->xres != info->var.xres) ||
++	    (var->yres != info->var.yres) ||
++	    (var->xres_virtual != info->var.xres_virtual) ||
++	    (var->yres_virtual != info->var.yres_virtual) ||
++	    (var->grayscale != info->var.grayscale))
++		return -EINVAL;
++	return 0;
 +}
 +
-+static void tegra_gpio_irq_unmask(unsigned int irq)
++static int tegra_fb_set_par(struct fb_info *info)
 +{
-+	int gpio = irq - INT_GPIO_BASE;
++	struct tegra_fb_info *tegra_fb = info->par;
++	struct fb_var_screeninfo *var = &info->var;
++	struct fb_fix_screeninfo *fix = &info->fix;
++	u32 color_depth;
++	unsigned int h_dda;
++	unsigned int v_dda;
 +
-+	tegra_gpio_mask_write(GPIO_MSK_INT_ENB(gpio), gpio, 1);
-+}
-+
-+static int tegra_gpio_irq_set_type(unsigned int irq, unsigned int type)
-+{
-+	int gpio = irq - INT_GPIO_BASE;
-+	struct tegra_gpio_bank *bank = get_irq_chip_data(irq);
-+	int port = GPIO_PORT(gpio);
-+	int lvl_type;
-+	int val;
-+	unsigned long flags;
-+
-+	switch (type & IRQ_TYPE_SENSE_MASK) {
-+	case IRQ_TYPE_EDGE_RISING:
-+		lvl_type = GPIO_INT_LVL_EDGE_RISING;
++	/* we only support RGB ordering for now */
++	switch (var->bits_per_pixel) {
++	case 32:
++	case 24:
++		var->red.offset = 0;
++		var->red.length = 8;
++		var->green.offset = 8;
++		var->green.length = 8;
++		var->blue.offset = 16;
++		var->blue.length = 8;
++		color_depth = DC_COLOR_DEPTH_B8G8R8A8;
 +		break;
-+
-+	case IRQ_TYPE_EDGE_FALLING:
-+		lvl_type = GPIO_INT_LVL_EDGE_FALLING;
++	case 16:
++		var->red.offset = 11;
++		var->red.length = 5;
++		var->green.offset = 5;
++		var->green.length = 6;
++		var->blue.offset = 0;
++		var->blue.length = 5;
++		color_depth = DC_COLOR_DEPTH_B5G6R5;
 +		break;
-+
-+	case IRQ_TYPE_EDGE_BOTH:
-+		lvl_type = GPIO_INT_LVL_EDGE_BOTH;
-+		break;
-+
-+	case IRQ_TYPE_LEVEL_HIGH:
-+		lvl_type = GPIO_INT_LVL_LEVEL_HIGH;
-+		break;
-+
-+	case IRQ_TYPE_LEVEL_LOW:
-+		lvl_type = GPIO_INT_LVL_LEVEL_LOW;
-+		break;
-+
 +	default:
 +		return -EINVAL;
 +	}
++	fix->line_length = var->xres * var->bits_per_pixel / 8;
 +
-+	spin_lock_irqsave(&bank->lvl_lock[port], flags);
++	h_dda = (var->xres * 0x1000) / (tegra_fb->lcd_xres - 1);
++	v_dda = (var->yres * 0x1000) / (tegra_fb->lcd_yres - 1);
 +
-+	val = __raw_readl(GPIO_INT_LVL(gpio));
-+	val &= ~(GPIO_INT_LVL_MASK << GPIO_BIT(gpio));
-+	val |= lvl_type << GPIO_BIT(gpio);
-+	__raw_writel(val, GPIO_INT_LVL(gpio));
++	tegra_fb_writel(tegra_fb, tegra_fb->lcd_yres<<16 | tegra_fb->lcd_xres,
++		DC_WIN_A_SIZE);
++	tegra_fb_writel(tegra_fb, var->yres<<16 | fix->line_length,
++		DC_WIN_A_PRESCALED_SIZE);
++	tegra_fb_writel(tegra_fb, 0, DC_WIN_A_H_INITIAL_DDA);
++	tegra_fb_writel(tegra_fb, 0, DC_WIN_A_V_INITIAL_DDA);
++	tegra_fb_writel(tegra_fb, v_dda << 16 | h_dda, DC_WIN_A_DDA_INCREMENT);
++	tegra_fb_writel(tegra_fb, color_depth, DC_WIN_A_COLOR_DEPTH);
++	tegra_fb_writel(tegra_fb, fix->line_length, DC_WIN_A_LINE_STRIDE);
++	return 0;
++}
 +
-+	spin_unlock_irqrestore(&bank->lvl_lock[port], flags);
++static int tegra_fb_setcolreg(unsigned regno, unsigned red, unsigned green,
++	unsigned blue, unsigned transp, struct fb_info *info)
++{
++	struct fb_var_screeninfo *var = &info->var;
 +
-+	if (type & (IRQ_TYPE_LEVEL_LOW | IRQ_TYPE_LEVEL_HIGH))
-+		__set_irq_handler_unlocked(irq, handle_level_irq);
-+	else if (type & (IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING))
-+		__set_irq_handler_unlocked(irq, handle_edge_irq);
++	if (info->fix.visual == FB_VISUAL_TRUECOLOR ||
++	    info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
++		u32 v;
++
++		if (regno >= 16)
++			return -EINVAL;
++
++		v = (red << var->red.offset) |
++			(green << var->green.offset) |
++			(blue << var->blue.offset);
++
++		((u32 *)info->pseudo_palette)[regno] = v;
++	}
 +
 +	return 0;
 +}
 +
-+static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
++static int tegra_fb_pan_display(struct fb_var_screeninfo *var,
++	struct fb_info *info)
 +{
-+	struct tegra_gpio_bank *bank;
-+	int port;
-+	int pin;
-+	int unmasked = 0;
++	struct tegra_fb_info *tegra_fb = info->par;
++	char __iomem *flush_start;
++	char __iomem *flush_end;
++	u32 addr;
 +
-+	desc->chip->ack(irq);
++	flush_start = info->screen_base + (var->yoffset * info->fix.line_length);
++	flush_end = flush_start + (var->yres * info->fix.line_length);
 +
-+	bank = get_irq_data(irq);
++	info->var.xoffset = var->xoffset;
++	info->var.yoffset = var->yoffset;
 +
-+	for (port = 0; port < 4; port++) {
-+		int gpio = tegra_gpio_compose(bank->bank, port, 0);
-+		unsigned long sta = __raw_readl(GPIO_INT_STA(gpio)) &
-+			__raw_readl(GPIO_INT_ENB(gpio));
-+		u32 lvl = __raw_readl(GPIO_INT_LVL(gpio));
++	addr = info->fix.smem_start + (var->yoffset * info->fix.line_length) +
++		(var->xoffset * (var->bits_per_pixel/8));
 +
-+		for_each_set_bit(pin, &sta, 8) {
-+			__raw_writel(1 << pin, GPIO_INT_CLR(gpio));
-+
-+			/* if gpio is edge triggered, clear condition
-+			 * before executing the hander so that we don't
-+			 * miss edges
-+			 */
-+			if (lvl & (0x100 << pin)) {
-+				unmasked = 1;
-+				desc->chip->unmask(irq);
-+			}
-+
-+			generic_handle_irq(gpio_to_irq(gpio + pin));
-+		}
-+	}
-+
-+	if (!unmasked)
-+		desc->chip->unmask(irq);
-+
++	tegra_fb_writel(tegra_fb, addr, DC_WINBUF_A_START_ADDR);
++	tegra_fb_activate(tegra_fb);
++	return 0;
 +}
 +
++static void tegra_fb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
++{
++	cfb_fillrect(info, rect);
++}
 +
-+static struct irq_chip tegra_gpio_irq_chip = {
-+	.name		= "GPIO",
-+	.ack		= tegra_gpio_irq_ack,
-+	.mask		= tegra_gpio_irq_mask,
-+	.unmask		= tegra_gpio_irq_unmask,
-+	.set_type	= tegra_gpio_irq_set_type,
++static void tegra_fb_copyarea(struct fb_info *info, const struct fb_copyarea *region)
++{
++	cfb_copyarea(info, region);
++}
++
++static void tegra_fb_imageblit(struct fb_info *info, const struct fb_image *image)
++{
++	cfb_imageblit(info, image);
++}
++
++#ifdef DEBUG
++#define DUMP_REG(a) dev_dbg(info->dev, "%-32s\t%03x\t%08x\n", #a, a, tegra_fb_readl(tegra_fb, a));
++static void dump_regs(struct fb_info *info)
++{
++	struct tegra_fb_info *tegra_fb = info->par;
++
++	DUMP_REG(DC_CMD_GENERAL_INCR_SYNCPT);
++	DUMP_REG(DC_CMD_GENERAL_INCR_SYNCPT_CNTRL);
++	DUMP_REG(DC_CMD_GENERAL_INCR_SYNCPT_ERROR);
++	DUMP_REG(DC_CMD_WIN_A_INCR_SYNCPT);
++	DUMP_REG(DC_CMD_WIN_A_INCR_SYNCPT_CNTRL);
++	DUMP_REG(DC_CMD_WIN_A_INCR_SYNCPT_ERROR);
++	DUMP_REG(DC_CMD_WIN_B_INCR_SYNCPT);
++	DUMP_REG(DC_CMD_WIN_B_INCR_SYNCPT_CNTRL);
++	DUMP_REG(DC_CMD_WIN_B_INCR_SYNCPT_ERROR);
++	DUMP_REG(DC_CMD_WIN_C_INCR_SYNCPT);
++	DUMP_REG(DC_CMD_WIN_C_INCR_SYNCPT_CNTRL);
++	DUMP_REG(DC_CMD_WIN_C_INCR_SYNCPT_ERROR);
++	DUMP_REG(DC_CMD_CONT_SYNCPT_VSYNC);
++	DUMP_REG(DC_CMD_DISPLAY_COMMAND_OPTION0);
++	DUMP_REG(DC_CMD_DISPLAY_COMMAND);
++	DUMP_REG(DC_CMD_SIGNAL_RAISE);
++	DUMP_REG(DC_CMD_INT_STATUS);
++	DUMP_REG(DC_CMD_INT_MASK);
++	DUMP_REG(DC_CMD_INT_ENABLE);
++	DUMP_REG(DC_CMD_INT_TYPE);
++	DUMP_REG(DC_CMD_INT_POLARITY);
++	DUMP_REG(DC_CMD_SIGNAL_RAISE1);
++	DUMP_REG(DC_CMD_SIGNAL_RAISE2);
++	DUMP_REG(DC_CMD_SIGNAL_RAISE3);
++	DUMP_REG(DC_CMD_STATE_ACCESS);
++	DUMP_REG(DC_CMD_STATE_CONTROL);
++	DUMP_REG(DC_CMD_DISPLAY_WINDOW_HEADER);
++	DUMP_REG(DC_CMD_REG_ACT_CONTROL);
++	tegra_fb_writel(tegra_fb, 1<<4, DC_CMD_DISPLAY_WINDOW_HEADER);
++	DUMP_REG(DC_CMD_DISPLAY_WINDOW_HEADER);
++	DUMP_REG(DC_WINC_A_COLOR_PALETTE);
++	DUMP_REG(DC_WINC_A_PALETTE_COLOR_EXT);
++	DUMP_REG(DC_WIN_A_WIN_OPTIONS);
++	DUMP_REG(DC_WIN_A_BYTE_SWAP);
++	DUMP_REG(DC_WIN_A_BUFFER_CONTROL);
++	DUMP_REG(DC_WIN_A_COLOR_DEPTH);
++	DUMP_REG(DC_WIN_A_POSITION);
++	DUMP_REG(DC_WIN_A_SIZE);
++	DUMP_REG(DC_WIN_A_PRESCALED_SIZE);
++	DUMP_REG(DC_WIN_A_H_INITIAL_DDA);
++	DUMP_REG(DC_WIN_A_V_INITIAL_DDA);
++	DUMP_REG(DC_WIN_A_DDA_INCREMENT);
++	DUMP_REG(DC_WIN_A_LINE_STRIDE);
++	DUMP_REG(DC_WIN_A_BUF_STRIDE);
++	DUMP_REG(DC_WINBUF_A_START_ADDR);
++	DUMP_REG(DC_WINBUF_A_ADDR_H_OFFSET);
++	DUMP_REG(DC_WINBUF_A_ADDR_V_OFFSET);
++}
++#endif
++
++static struct fb_ops tegra_fb_ops = {
++	.owner = THIS_MODULE,
++	.fb_open = tegra_fb_open,
++	.fb_release = tegra_fb_release,
++	.fb_check_var = tegra_fb_check_var,
++	.fb_set_par = tegra_fb_set_par,
++	.fb_setcolreg = tegra_fb_setcolreg,
++	.fb_pan_display = tegra_fb_pan_display,
++	.fb_fillrect = tegra_fb_fillrect,
++	.fb_copyarea = tegra_fb_copyarea,
++	.fb_imageblit = tegra_fb_imageblit,
 +};
 +
-+
-+/* This lock class tells lockdep that GPIO irqs are in a different
-+ * category than their parents, so it won't report false recursion.
-+ */
-+static struct lock_class_key gpio_lock_class;
-+
-+static int __init tegra_gpio_init(void)
++static int tegra_plat_probe(struct platform_device *pdev)
 +{
-+	struct tegra_gpio_bank *bank;
-+	int i;
-+	int j;
++	struct fb_info *info;
++	struct tegra_fb_info *tegra_fb;
++	struct clk *clk;
++	struct resource	*res;
++	struct resource *reg_mem;
++	struct resource *fb_mem;
++	int ret = 0;
++	void __iomem *reg_base;
++	void __iomem *fb_base;
++	unsigned long fb_size;
++	unsigned long fb_phys;
++	int irq;
++	const struct tegra_fb_lcd_data *lcd_data = pdev->dev.platform_data;
 +
-+	for (i = 0; i < 7; i++) {
-+		for (j = 0; j < 4; j++) {
-+			int gpio = tegra_gpio_compose(i, j, 0);
-+			__raw_writel(0x00, GPIO_INT_ENB(gpio));
-+		}
++	info = framebuffer_alloc(sizeof(struct tegra_fb_info), &pdev->dev);
++	if (!info) {
++		ret = -ENOMEM;
++		goto err;
 +	}
 +
-+	gpiochip_add(&tegra_gpio_chip);
-+
-+	for (i = INT_GPIO_BASE; i < (INT_GPIO_BASE + ARCH_NR_GPIOS); i++) {
-+		bank = &tegra_gpio_banks[GPIO_BANK(irq_to_gpio(i))];
-+
-+		lockdep_set_class(&irq_desc[i].lock, &gpio_lock_class);
-+		set_irq_chip_data(i, bank);
-+		set_irq_chip(i, &tegra_gpio_irq_chip);
-+		set_irq_handler(i, handle_simple_irq);
-+		set_irq_flags(i, IRQF_VALID);
++	irq = platform_get_irq(pdev, 0);
++	if (irq <= 0) {
++		dev_err(&pdev->dev, "%s: no irq\n", pdev->name);
++		ret = -ENOENT;
++		goto err_free;
 +	}
 +
-+	for (i = 0; i < ARRAY_SIZE(tegra_gpio_banks); i++) {
-+		bank = &tegra_gpio_banks[i];
-+
-+		set_irq_chained_handler(bank->irq, tegra_gpio_irq_handler);
-+		set_irq_data(bank->irq, bank);
-+
-+		for (j = 0; j < 4; j++)
-+			spin_lock_init(&bank->lvl_lock[j]);
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "%s: no mem resource\n", pdev->name);
++		ret = -ENOENT;
++		goto err_free;
 +	}
 +
++	reg_mem = request_mem_region(res->start, resource_size(res), pdev->name);
++	if (!reg_mem) {
++		dev_err(&pdev->dev, "%s: request_mem_region failed\n", pdev->name);
++		ret = -EBUSY;
++		goto err_free;
++	}
++
++	reg_base = ioremap(res->start, resource_size(res));
++	if (!reg_base) {
++		dev_err(&pdev->dev, "%s: registers can't be mapped\n", pdev->name);
++		ret = -EBUSY;
++		goto err_release_resource_reg;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!res) {
++		dev_err(&pdev->dev, "%s: no mem resource\n", pdev->name);
++		ret = -ENOENT;
++		goto err_iounmap_reg;
++	}
++
++	fb_mem = request_mem_region(res->start, resource_size(res), pdev->name);
++	if (!fb_mem) {
++		dev_err(&pdev->dev, "%s: request_mem_region failed\n", pdev->name);
++		ret = -EBUSY;
++		goto err_iounmap_reg;
++	}
++
++	fb_size = resource_size(res);
++	fb_phys = res->start;
++	fb_base = ioremap_nocache(fb_phys, fb_size);
++	if (!fb_base) {
++		dev_err(&pdev->dev, "%s: fb can't be mapped\n", pdev->name);
++		ret = -EBUSY;
++		goto err_release_resource_fb;
++	}
++
++	clk = clk_get(&pdev->dev, NULL);
++	if (!clk) {
++		dev_err(&pdev->dev, "%s: can't get clock\n", pdev->name);
++		ret = -ENOENT;
++		goto err_iounmap_fb;
++	}
++	clk_enable(clk);
++
++	tegra_fb = info->par;
++	tegra_fb->clk = clk;
++	tegra_fb->fb_mem = fb_mem;
++	tegra_fb->reg_mem = reg_mem;
++	tegra_fb->reg_base = reg_base;
++	tegra_fb->irq = irq;
++	tegra_fb->lcd_xres = lcd_data->lcd_xres;
++	tegra_fb->lcd_yres = lcd_data->lcd_yres;
++
++	info->fbops = &tegra_fb_ops;
++	info->pseudo_palette = pseudo_palette;
++	info->screen_base = fb_base;
++	info->screen_size = fb_size;
++
++	strlcpy(info->fix.id, "tegra_fb", sizeof(info->fix.id));
++	info->fix.type = FB_TYPE_PACKED_PIXELS;
++	info->fix.visual = FB_VISUAL_TRUECOLOR;
++	info->fix.xpanstep   = 1;
++	info->fix.ypanstep   = 1;
++	info->fix.accel	  = FB_ACCEL_NONE;
++	info->fix.smem_start = fb_phys;
++	info->fix.smem_len = fb_size;
++
++	info->var.xres			= lcd_data->fb_xres;
++	info->var.yres			= lcd_data->fb_yres;
++	info->var.xres_virtual		= lcd_data->fb_xres;
++	info->var.yres_virtual		= lcd_data->fb_yres*2;
++	info->var.bits_per_pixel	= lcd_data->bits_per_pixel;
++	info->var.activate		= FB_ACTIVATE_NOW;
++	info->var.height		= -1;
++	info->var.width			= -1;
++	info->var.pixclock		= 24500;
++	info->var.left_margin		= 0;
++	info->var.right_margin		= 0;
++	info->var.upper_margin		= 0;
++	info->var.lower_margin		= 0;
++	info->var.hsync_len		= 0;
++	info->var.vsync_len		= 0;
++	info->var.vmode			= FB_VMODE_NONINTERLACED;
++
++	if (request_irq(irq, tegra_fb_irq, IRQF_DISABLED,
++			dev_name(&pdev->dev), info)) {
++		pr_debug("%s: request_irq %d failed\n",
++			pdev->name, irq);
++		ret = -EBUSY;
++		goto err_clk_disable;
++	}
++
++	init_waitqueue_head(&tegra_fb->event_wq);
++
++	/* Enable writes to Window A */
++	tegra_fb_writel(tegra_fb, 1<<4, DC_CMD_DISPLAY_WINDOW_HEADER);
++
++#ifdef DEBUG
++	info->dev = &pdev->dev;
++	dev_dbg(info->dev, "Framebuffer registers before init:\n");
++	dump_regs(info);
++#endif
++
++	tegra_fb_set_par(info);
++
++#ifdef DEBUG
++	dev_dbg(info->dev, "Framebuffer registers after init:\n");
++	dump_regs(info);
++#endif
++
++	dev_info(&pdev->dev, "base address: %08x (%08x)\n",
++			(unsigned int)info->fix.smem_start,
++			(unsigned int)info->screen_base);
++
++	if (register_framebuffer(info)) {
++		dev_err(&pdev->dev, "failed to register framebuffer\n");
++		ret = -ENODEV;
++		goto err_free_irq;
++	}
++	platform_set_drvdata(pdev, info);
++	return 0;
++
++err_free_irq:
++	free_irq(irq, info);
++err_clk_disable:
++	clk_disable(clk);
++err_iounmap_fb:
++	iounmap(fb_base);
++err_release_resource_fb:
++	release_resource(fb_mem);
++err_iounmap_reg:
++	iounmap(reg_base);
++err_release_resource_reg:
++	release_resource(reg_mem);
++err_free:
++	framebuffer_release(info);
++err:
++	return ret;
++}
++
++static int tegra_plat_remove(struct platform_device *pdev)
++{
++	struct fb_info *info = platform_get_drvdata(pdev);
++	struct tegra_fb_info *tegra_fb = info->par;
++	unregister_framebuffer(info);
++	free_irq(tegra_fb->irq, info);
++	clk_disable(tegra_fb->clk);
++	iounmap(info->screen_base);
++	release_resource(tegra_fb->fb_mem);
++	iounmap(tegra_fb->reg_base);
++	release_resource(tegra_fb->reg_mem);
++	framebuffer_release(info);
 +	return 0;
 +}
 +
-+postcore_initcall(tegra_gpio_init);
-+
-+#ifdef	CONFIG_DEBUG_FS
-+
-+#include <linux/debugfs.h>
-+#include <linux/seq_file.h>
-+
-+static int dbg_gpio_show(struct seq_file *s, void *unused)
-+{
-+	int i;
-+	int j;
-+
-+	for (i = 0; i < 7; i++) {
-+		for (j = 0; j < 4; j++) {
-+			int gpio = tegra_gpio_compose(i, j, 0);
-+			seq_printf(s, "%d:%d %02x %02x %02x %02x %02x %02x %06x\n",
-+			       i, j,
-+			       __raw_readl(GPIO_CNF(gpio)),
-+			       __raw_readl(GPIO_OE(gpio)),
-+			       __raw_readl(GPIO_OUT(gpio)),
-+			       __raw_readl(GPIO_IN(gpio)),
-+			       __raw_readl(GPIO_INT_STA(gpio)),
-+			       __raw_readl(GPIO_INT_ENB(gpio)),
-+			       __raw_readl(GPIO_INT_LVL(gpio)));
-+		}
-+	}
-+	return 0;
-+}
-+
-+static int dbg_gpio_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, dbg_gpio_show, &inode->i_private);
-+}
-+
-+static const struct file_operations debug_fops = {
-+	.open		= dbg_gpio_open,
-+	.read		= seq_read,
-+	.llseek		= seq_lseek,
-+	.release	= single_release,
++struct platform_driver tegra_platform_driver = {
++	.probe = tegra_plat_probe,
++	.remove = tegra_plat_remove,
++	.driver = {
++		.name = "tegrafb",
++		.owner = THIS_MODULE,
++	},
 +};
 +
-+static int __init tegra_gpio_debuginit(void)
++static int __init tegra_fb_init(void)
 +{
-+	(void) debugfs_create_file("tegra_gpio", S_IRUGO,
-+					NULL, NULL, &debug_fops);
-+	return 0;
-+}
-+late_initcall(tegra_gpio_debuginit);
-+#endif
-diff --git a/arch/arm/mach-tegra/include/mach/gpio.h b/arch/arm/mach-tegra/include/mach/gpio.h
-new file mode 100644
-index 0000000..540e822
---- /dev/null
-+++ b/arch/arm/mach-tegra/include/mach/gpio.h
-@@ -0,0 +1,53 @@
-+/*
-+ * arch/arm/mach-tegra/include/mach/gpio.h
-+ *
-+ * Copyright (C) 2010 Google, Inc.
-+ *
-+ * Author:
-+ *	Erik Gilling <konkers@google.com>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#ifndef __MACH_TEGRA_GPIO_H
-+#define __MACH_TEGRA_GPIO_H
-+
-+#include <mach/irqs.h>
-+
-+#define ARCH_NR_GPIOS		INT_GPIO_NR
-+
-+#include <asm-generic/gpio.h>
-+
-+#define gpio_get_value		__gpio_get_value
-+#define gpio_set_value		__gpio_set_value
-+#define gpio_cansleep		__gpio_cansleep
-+
-+#define TEGRA_GPIO_TO_IRQ(gpio) (INT_GPIO_BASE + (gpio))
-+#define TEGRA_IRQ_TO_GPIO(irq) ((gpio) - INT_GPIO_BASE)
-+
-+static inline int gpio_to_irq(unsigned int gpio)
-+{
-+	if (gpio < ARCH_NR_GPIOS)
-+		return INT_GPIO_BASE + gpio;
-+	return -EINVAL;
++	int e;
++	e = platform_driver_register(&tegra_platform_driver);
++	if (e) {
++		pr_info("tegrafb: platform_driver_register failed\n");
++		return e;
++	}
++	return e;
 +}
 +
-+static inline int irq_to_gpio(unsigned int irq)
++static void __exit tegra_exit(void)
 +{
-+	if ((irq >= INT_GPIO_BASE) && (irq < INT_GPIO_BASE + INT_GPIO_NR))
-+		return irq - INT_GPIO_BASE;
-+	return -EINVAL;
++	platform_driver_unregister(&tegra_platform_driver);
 +}
 +
-+void tegra_gpio_enable(int gpio);
-+void tegra_gpio_disable(int gpio);
-+
-+#endif
++module_exit(tegra_exit);
++module_init(tegra_fb_init);
 -- 
 1.6.5.6
