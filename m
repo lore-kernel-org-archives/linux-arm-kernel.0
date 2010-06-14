@@ -1,131 +1,87 @@
 From: konkers@android.com (Erik Gilling)
-Date: Mon, 14 Jun 2010 14:10:26 -0700
-Subject: [PATCH v3 10/11] [ARM] tegra: Add framebuffer driver
-In-Reply-To: <1276549827-2688-10-git-send-email-konkers@android.com>
+Date: Mon, 14 Jun 2010 14:10:19 -0700
+Subject: [PATCH v3 03/11] [ARM] tegra: Add clock support
+In-Reply-To: <1276549827-2688-3-git-send-email-konkers@android.com>
 References: <1271198563-10424-1-git-send-email-konkers@android.com>
 	<1276549827-2688-1-git-send-email-konkers@android.com>
 	<1276549827-2688-2-git-send-email-konkers@android.com>
 	<1276549827-2688-3-git-send-email-konkers@android.com>
-	<1276549827-2688-4-git-send-email-konkers@android.com>
-	<1276549827-2688-5-git-send-email-konkers@android.com>
-	<1276549827-2688-6-git-send-email-konkers@android.com>
-	<1276549827-2688-7-git-send-email-konkers@android.com>
-	<1276549827-2688-8-git-send-email-konkers@android.com>
-	<1276549827-2688-9-git-send-email-konkers@android.com>
-	<1276549827-2688-10-git-send-email-konkers@android.com>
-Message-ID: <1276549827-2688-11-git-send-email-konkers@android.com>
+Message-ID: <1276549827-2688-4-git-send-email-konkers@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Colin Cross <ccross@android.com>
 
-v2: Fixes from review by Russell King
-    - Use proper return values
-
-v2: Fixes from review by Jaya Kumar
-    - Comments on lcd resolution
-    - Remove stub functions
-    - Change DUMP_REG to pr_debug
-    - Add unregister_framebuffer to tegra_plat_remove
-
-v2: from Colin Cross
-    - adjust debugging
-
-v3: Fixes from review by Jaya Kumar
-        - Free irq in probe error case and remove function
+v2: fixes from Russell King:
+	- include linux/io.h instead of asm/io.h
+	- fix whitespace in Kconfig
+	- Use spin_lock_init to initialize lock
+	- Return -ENOSYS instead of BUG for unimplemented clock ops
+	- Use proper return values in tegra2 clock ops
+    additional changes:
+	- Rename some clocks to match dev_ids
+	- add rate propagation
+	- add debugfs entries
+	- add support for clock listed in clk_lookup under multiple dev_ids
+v3:
+	- Replace per-clock locking with global clock lock
+	- Autodetect clock state on init
+	- Let clock dividers pick next lower possible frequency
+	- Add support for clock init tables
+	- Minor bug fixes
 	- Fix checkpatch issues
 
 Signed-off-by: Colin Cross <ccross@android.com>
-Signed-off-by: Erik Gilling <konkers@android.com>
-CC: Jaya Kumar <jayakumar.lkml@gmail.com>
-CC: linux-fbdev <linux-fbdev@vger.kernel.org>
 ---
- arch/arm/mach-tegra/include/mach/tegra_fb.h |   27 ++
- drivers/video/Kconfig                       |   10 +
- drivers/video/Makefile                      |    1 +
- drivers/video/tegrafb.c                     |  624 +++++++++++++++++++++++++++
- 4 files changed, 662 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-tegra/include/mach/tegra_fb.h
- create mode 100644 drivers/video/tegrafb.c
+ arch/arm/Kconfig                          |    1 +
+ arch/arm/mach-tegra/Makefile              |    2 +
+ arch/arm/mach-tegra/clock.c               |  488 +++++++++++
+ arch/arm/mach-tegra/clock.h               |  147 ++++
+ arch/arm/mach-tegra/common.c              |   17 +
+ arch/arm/mach-tegra/include/mach/clk.h    |   26 +
+ arch/arm/mach-tegra/include/mach/clkdev.h |   32 +
+ arch/arm/mach-tegra/tegra2_clocks.c       | 1359 +++++++++++++++++++++++++++++
+ 8 files changed, 2072 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/clock.c
+ create mode 100644 arch/arm/mach-tegra/clock.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/clk.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/clkdev.h
+ create mode 100644 arch/arm/mach-tegra/tegra2_clocks.c
 
-diff --git a/arch/arm/mach-tegra/include/mach/tegra_fb.h b/arch/arm/mach-tegra/include/mach/tegra_fb.h
-new file mode 100644
-index 0000000..84ae886
---- /dev/null
-+++ b/arch/arm/mach-tegra/include/mach/tegra_fb.h
-@@ -0,0 +1,27 @@
-+/*
-+ * arch/arm/mach-tegra/include/mach/tegra_fb.h
-+ *
-+ * Copyright (C) 2010 Google, Inc.
-+ * Author: Colin Cross <ccross@android.com>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+/* Platform data structure to be passed to the driver */
-+struct tegra_fb_lcd_data {
-+	int	fb_xres;
-+	int	fb_yres;
-+	/* Resolution of the output to the LCD.  If different from the
-+	   framebuffer resolution, the Tegra display block will scale it */
-+	int	lcd_xres;
-+	int	lcd_yres;
-+	int	bits_per_pixel;
-+};
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index 3d94a14..e047002 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -1089,6 +1089,16 @@ config FB_RIVA_BACKLIGHT
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 626a3cb..98e41e1 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -567,6 +567,7 @@ config ARCH_TEGRA
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
++	select COMMON_CLKDEV
+ 	select ARCH_HAS_BARRIERS if CACHE_L2X0
  	help
- 	  Say Y here if you want to control the backlight of your display.
- 
-+config FB_TEGRA
-+	tristate "NVIDIA Tegra SoC display support"
-+	depends on ARCH_TEGRA && FB = y
-+	select FB_CFB_FILLRECT
-+	select FB_CFB_COPYAREA
-+	select FB_CFB_IMAGEBLIT
-+	default FB
-+	help
-+	  This driver supports the NVIDIA Tegra systems-on-a-chip.
-+
- config FB_I810
- 	tristate "Intel 810/815 support (EXPERIMENTAL)"
- 	depends on EXPERIMENTAL && FB && PCI && X86_32 && AGP_INTEL
-diff --git a/drivers/video/Makefile b/drivers/video/Makefile
-index ddc2af2..d9098d6 100644
---- a/drivers/video/Makefile
-+++ b/drivers/video/Makefile
-@@ -131,6 +131,7 @@ obj-$(CONFIG_FB_CARMINE)          += carminefb.o
- obj-$(CONFIG_FB_MB862XX)	  += mb862xx/
- obj-$(CONFIG_FB_MSM)              += msm/
- obj-$(CONFIG_FB_NUC900)           += nuc900fb.o
-+obj-$(CONFIG_FB_TEGRA)            += tegrafb.o
- 
- # Platform or fallback drivers go here
- obj-$(CONFIG_FB_UVESA)            += uvesafb.o
-diff --git a/drivers/video/tegrafb.c b/drivers/video/tegrafb.c
+ 	  This enables support for NVIDIA Tegra based systems (Tegra APX,
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index a0d2c5b..e20546a 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -1,3 +1,5 @@
+ obj-y                                   += common.o
+ obj-y                                   += io.o
+ obj-y                                   += irq.o
++obj-y                                   += clock.o
++obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
+diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
 new file mode 100644
-index 0000000..47b2d42
+index 0000000..03ad578
 --- /dev/null
-+++ b/drivers/video/tegrafb.c
-@@ -0,0 +1,624 @@
++++ b/arch/arm/mach-tegra/clock.c
+@@ -0,0 +1,488 @@
 +/*
-+ * drivers/video/tegrafb.c
 + *
 + * Copyright (C) 2010 Google, Inc.
-+ * Author: Colin Cross <ccross@android.com>
-+ *         Travis Geiselbrecht <travis@palm.com>
++ *
++ * Author:
++ *	Colin Cross <ccross@google.com>
 + *
 + * This software is licensed under the terms of the GNU General Public
 + * License version 2, as published by the Free Software Foundation, and
@@ -138,611 +94,2097 @@ index 0000000..47b2d42
 + *
 + */
 +
-+#include <linux/fb.h>
-+#include <linux/module.h>
 +#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/string.h>
-+#include <linux/mm.h>
-+#include <linux/slab.h>
-+#include <linux/delay.h>
-+#include <linux/platform_device.h>
-+#include <linux/interrupt.h>
 +#include <linux/clk.h>
-+#include <linux/wait.h>
-+#include <asm/cacheflush.h>
-+#include <mach/tegra_fb.h>
++#include <linux/list.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/debugfs.h>
++#include <linux/slab.h>
++#include <linux/seq_file.h>
++#include <asm/clkdev.h>
 +
-+#define DC_CMD_GENERAL_INCR_SYNCPT		0x000
-+#define DC_CMD_GENERAL_INCR_SYNCPT_CNTRL	0x001
-+#define DC_CMD_GENERAL_INCR_SYNCPT_ERROR	0x002
-+#define DC_CMD_WIN_A_INCR_SYNCPT		0x008
-+#define DC_CMD_WIN_A_INCR_SYNCPT_CNTRL		0x009
-+#define DC_CMD_WIN_A_INCR_SYNCPT_ERROR		0x00a
-+#define DC_CMD_WIN_B_INCR_SYNCPT		0x010
-+#define DC_CMD_WIN_B_INCR_SYNCPT_CNTRL		0x011
-+#define DC_CMD_WIN_B_INCR_SYNCPT_ERROR		0x012
-+#define DC_CMD_WIN_C_INCR_SYNCPT		0x018
-+#define DC_CMD_WIN_C_INCR_SYNCPT_CNTRL		0x019
-+#define DC_CMD_WIN_C_INCR_SYNCPT_ERROR		0x01a
-+#define DC_CMD_CONT_SYNCPT_VSYNC		0x028
-+#define DC_CMD_DISPLAY_COMMAND_OPTION0		0x031
-+#define DC_CMD_DISPLAY_COMMAND			0x032
-+#define DC_CMD_SIGNAL_RAISE			0x033
-+#define DC_CMD_INT_STATUS			0x037
-+#define DC_CMD_INT_MASK				0x038
-+#define DC_CMD_INT_ENABLE			0x039
-+#define DC_CMD_INT_TYPE				0x03a
-+#define DC_CMD_INT_POLARITY			0x03b
-+#define DC_CMD_SIGNAL_RAISE1			0x03c
-+#define DC_CMD_SIGNAL_RAISE2			0x03d
-+#define DC_CMD_SIGNAL_RAISE3			0x03e
-+#define DC_CMD_STATE_ACCESS			0x040
-+#define DC_CMD_STATE_CONTROL			0x041
-+#define DC_CMD_DISPLAY_WINDOW_HEADER		0x042
-+#define DC_CMD_REG_ACT_CONTROL			0x043
-+#define DC_WINC_A_COLOR_PALETTE			0x500
-+#define DC_WINC_A_PALETTE_COLOR_EXT		0x600
-+#define DC_WIN_A_WIN_OPTIONS			0x700
-+#define DC_WIN_A_BYTE_SWAP			0x701
-+#define DC_WIN_A_BUFFER_CONTROL			0x702
-+#define DC_WIN_A_COLOR_DEPTH			0x703
-+#define DC_WIN_A_POSITION			0x704
-+#define DC_WIN_A_SIZE				0x705
-+#define DC_WIN_A_PRESCALED_SIZE			0x706
-+#define DC_WIN_A_H_INITIAL_DDA			0x707
-+#define DC_WIN_A_V_INITIAL_DDA			0x708
-+#define DC_WIN_A_DDA_INCREMENT			0x709
-+#define DC_WIN_A_LINE_STRIDE			0x70a
-+#define DC_WIN_A_BUF_STRIDE			0x70b
-+#define DC_WINBUF_A_START_ADDR			0x800
-+#define DC_WINBUF_A_ADDR_H_OFFSET		0x806
-+#define DC_WINBUF_A_ADDR_V_OFFSET		0x808
++#include "clock.h"
 +
++static LIST_HEAD(clocks);
 +
-+#define DC_INT_CTXSW				(1<<0)
-+#define DC_INT_FRAME_END			(1<<1)
-+#define DC_INT_V_BLANK				(1<<2)
-+#define DC_INT_H_BLANK				(1<<3)
-+#define DC_INT_V_PULSE3				(1<<4)
++static DEFINE_SPINLOCK(clock_lock);
 +
-+#define DC_COLOR_DEPTH_P1			0
-+#define DC_COLOR_DEPTH_P2			1
-+#define DC_COLOR_DEPTH_P4			2
-+#define DC_COLOR_DEPTH_P8			3
-+#define DC_COLOR_DEPTH_B4G4R4A4			4
-+#define DC_COLOR_DEPTH_B5G5R5A			5
-+#define DC_COLOR_DEPTH_B5G6R5			6
-+#define DC_COLOR_DEPTH_AB5G5R5			7
-+#define DC_COLOR_DEPTH_B8G8R8A8			12
-+#define DC_COLOR_DEPTH_R8G8B8A8			13
-+#define DC_COLOR_DEPTH_B6x2G6x2R6x2A8		14
-+#define DC_COLOR_DEPTH_R6x2G6x2B6x2A8		15
-+#define DC_COLOR_DEPTH_YCbCr422			16
-+#define DC_COLOR_DEPTH_YUV422			17
-+#define DC_COLOR_DEPTH_YCbCr420P		18
-+#define DC_COLOR_DEPTH_YUV420P			19
-+#define DC_COLOR_DEPTH_YCbCr422P		20
-+#define DC_COLOR_DEPTH_YUV422P			21
-+#define DC_COLOR_DEPTH_YCbCr422R		22
-+#define DC_COLOR_DEPTH_YUV422R			23
-+#define DC_COLOR_DEPTH_YCbCr422RA		24
-+#define DC_COLOR_DEPTH_YUV422RA			25
-+
-+struct tegra_fb_info {
-+	struct clk *clk;
-+	struct resource *reg_mem;
-+	struct resource *fb_mem;
-+	void __iomem *reg_base;
-+	wait_queue_head_t event_wq;
-+	unsigned int wait_condition;
-+	/* Resolution of the output to the LCD.  If different from the
-+	   framebuffer resolution, the Tegra display block will scale it */
-+	int lcd_xres;
-+	int lcd_yres;
-+	int irq;
-+};
-+
-+static void tegra_fb_writel(struct tegra_fb_info *tegra_fb, u32 val,
-+	unsigned long reg)
++struct clk *tegra_get_clock_by_name(const char *name)
 +{
-+	writel(val, tegra_fb->reg_base + reg*sizeof(u32));
-+}
-+
-+static u32 tegra_fb_readl(struct tegra_fb_info *tegra_fb, unsigned long reg)
-+{
-+	return readl(tegra_fb->reg_base + reg*sizeof(u32));
-+}
-+
-+/* palette attary used by the fbcon */
-+u32 pseudo_palette[16];
-+
-+irqreturn_t tegra_fb_irq(int irq, void *ptr)
-+{
-+	struct fb_info *info = ptr;
-+	struct tegra_fb_info *tegra_fb = info->par;
-+
-+	u32 reg = tegra_fb_readl(tegra_fb, DC_CMD_INT_STATUS);
-+	tegra_fb_writel(tegra_fb, reg, DC_CMD_INT_STATUS);
-+
-+	tegra_fb->wait_condition = 1;
-+	wake_up(&tegra_fb->event_wq);
-+	return IRQ_HANDLED;
-+}
-+
-+static int tegra_fb_wait_for_event(struct tegra_fb_info *tegra_fb,
-+	unsigned long timeout, u32 irq_mask)
-+{
-+	u32 reg;
-+
-+	tegra_fb->wait_condition = 0;
-+
-+	reg = tegra_fb_readl(tegra_fb, DC_CMD_INT_MASK);
-+	reg |= irq_mask;
-+	tegra_fb_writel(tegra_fb, reg, DC_CMD_INT_MASK);
-+
-+	/* Clear any pending interrupt */
-+	tegra_fb_writel(tegra_fb, irq_mask, DC_CMD_INT_STATUS);
-+
-+	tegra_fb_writel(tegra_fb, irq_mask, DC_CMD_INT_ENABLE);
-+
-+	/* Wait for the irq to fire */
-+	wait_event_interruptible_timeout(tegra_fb->event_wq,
-+		tegra_fb->wait_condition, timeout);
-+
-+	tegra_fb_writel(tegra_fb, 0, DC_CMD_INT_ENABLE);
-+
-+	if (!tegra_fb->wait_condition) {
-+		pr_warning("%s: wait for vsync timed out\n", __func__);
-+		return -ETIMEDOUT;
-+	}
-+	return 0;
-+}
-+
-+/* Writes to many registers in the display block are buffered.
-+ * tegra_fb_activate requests an update of the main registers from their
-+ * double-buffered registers, which takes effect at the end of the next frame,
-+ * and then waits for the frame_end IRQ.
-+ */
-+static void tegra_fb_activate(struct tegra_fb_info *tegra_fb)
-+{
-+	int vsync_count = 0;
-+
-+	if (unlikely(tegra_fb_readl(tegra_fb, DC_CMD_STATE_CONTROL) & 3)) {
-+		pr_warning("%s: update already activated!\n", __func__);
-+		return;
-+	}
-+
-+	tegra_fb_writel(tegra_fb, (1 << 8) | (1 << 9), DC_CMD_STATE_CONTROL);
-+	tegra_fb_writel(tegra_fb, (1 << 0) | (1 << 1), DC_CMD_STATE_CONTROL);
-+	while (tegra_fb_readl(tegra_fb, DC_CMD_STATE_CONTROL) & 3) {
-+		vsync_count++;
-+		if (tegra_fb_wait_for_event(tegra_fb, HZ/10, DC_INT_FRAME_END))
++	struct clk *c;
++	struct clk *ret = NULL;
++	unsigned long flags;
++	spin_lock_irqsave(&clock_lock, flags);
++	list_for_each_entry(c, &clocks, node) {
++		if (strcmp(c->name, name) == 0) {
++			ret = c;
 +			break;
++		}
 +	}
-+	if (unlikely(vsync_count > 1))
-+		pr_warning("%s: waited for %d vsyncs\n", __func__, vsync_count);
-+}
-+
-+
-+static int tegra_fb_open(struct fb_info *info, int user)
-+{
-+	return 0;
-+}
-+
-+static int tegra_fb_release(struct fb_info *info, int user)
-+{
-+	return 0;
-+}
-+
-+static int tegra_fb_check_var(struct fb_var_screeninfo *var,
-+	struct fb_info *info)
-+{
-+	if ((var->xres != info->var.xres) ||
-+	    (var->yres != info->var.yres) ||
-+	    (var->xres_virtual != info->var.xres_virtual) ||
-+	    (var->yres_virtual != info->var.yres_virtual) ||
-+	    (var->grayscale != info->var.grayscale))
-+		return -EINVAL;
-+	return 0;
-+}
-+
-+static int tegra_fb_set_par(struct fb_info *info)
-+{
-+	struct tegra_fb_info *tegra_fb = info->par;
-+	struct fb_var_screeninfo *var = &info->var;
-+	struct fb_fix_screeninfo *fix = &info->fix;
-+	u32 color_depth;
-+	unsigned int h_dda;
-+	unsigned int v_dda;
-+
-+	/* we only support RGB ordering for now */
-+	switch (var->bits_per_pixel) {
-+	case 32:
-+	case 24:
-+		var->red.offset = 0;
-+		var->red.length = 8;
-+		var->green.offset = 8;
-+		var->green.length = 8;
-+		var->blue.offset = 16;
-+		var->blue.length = 8;
-+		color_depth = DC_COLOR_DEPTH_B8G8R8A8;
-+		break;
-+	case 16:
-+		var->red.offset = 11;
-+		var->red.length = 5;
-+		var->green.offset = 5;
-+		var->green.length = 6;
-+		var->blue.offset = 0;
-+		var->blue.length = 5;
-+		color_depth = DC_COLOR_DEPTH_B5G6R5;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+	fix->line_length = var->xres * var->bits_per_pixel / 8;
-+
-+	h_dda = (var->xres * 0x1000) / (tegra_fb->lcd_xres - 1);
-+	v_dda = (var->yres * 0x1000) / (tegra_fb->lcd_yres - 1);
-+
-+	tegra_fb_writel(tegra_fb, tegra_fb->lcd_yres<<16 | tegra_fb->lcd_xres,
-+		DC_WIN_A_SIZE);
-+	tegra_fb_writel(tegra_fb, var->yres<<16 | fix->line_length,
-+		DC_WIN_A_PRESCALED_SIZE);
-+	tegra_fb_writel(tegra_fb, 0, DC_WIN_A_H_INITIAL_DDA);
-+	tegra_fb_writel(tegra_fb, 0, DC_WIN_A_V_INITIAL_DDA);
-+	tegra_fb_writel(tegra_fb, v_dda << 16 | h_dda, DC_WIN_A_DDA_INCREMENT);
-+	tegra_fb_writel(tegra_fb, color_depth, DC_WIN_A_COLOR_DEPTH);
-+	tegra_fb_writel(tegra_fb, fix->line_length, DC_WIN_A_LINE_STRIDE);
-+	return 0;
-+}
-+
-+static int tegra_fb_setcolreg(unsigned regno, unsigned red, unsigned green,
-+	unsigned blue, unsigned transp, struct fb_info *info)
-+{
-+	struct fb_var_screeninfo *var = &info->var;
-+
-+	if (info->fix.visual == FB_VISUAL_TRUECOLOR ||
-+	    info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
-+		u32 v;
-+
-+		if (regno >= 16)
-+			return -EINVAL;
-+
-+		v = (red << var->red.offset) |
-+			(green << var->green.offset) |
-+			(blue << var->blue.offset);
-+
-+		((u32 *)info->pseudo_palette)[regno] = v;
-+	}
-+
-+	return 0;
-+}
-+
-+static int tegra_fb_pan_display(struct fb_var_screeninfo *var,
-+	struct fb_info *info)
-+{
-+	struct tegra_fb_info *tegra_fb = info->par;
-+	char __iomem *flush_start;
-+	char __iomem *flush_end;
-+	u32 addr;
-+
-+	flush_start = info->screen_base + (var->yoffset * info->fix.line_length);
-+	flush_end = flush_start + (var->yres * info->fix.line_length);
-+
-+	info->var.xoffset = var->xoffset;
-+	info->var.yoffset = var->yoffset;
-+
-+	addr = info->fix.smem_start + (var->yoffset * info->fix.line_length) +
-+		(var->xoffset * (var->bits_per_pixel/8));
-+
-+	tegra_fb_writel(tegra_fb, addr, DC_WINBUF_A_START_ADDR);
-+	tegra_fb_activate(tegra_fb);
-+	return 0;
-+}
-+
-+static void tegra_fb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
-+{
-+	cfb_fillrect(info, rect);
-+}
-+
-+static void tegra_fb_copyarea(struct fb_info *info, const struct fb_copyarea *region)
-+{
-+	cfb_copyarea(info, region);
-+}
-+
-+static void tegra_fb_imageblit(struct fb_info *info, const struct fb_image *image)
-+{
-+	cfb_imageblit(info, image);
-+}
-+
-+#ifdef DEBUG
-+#define DUMP_REG(a) dev_dbg(info->dev, "%-32s\t%03x\t%08x\n", #a, a, tegra_fb_readl(tegra_fb, a));
-+static void dump_regs(struct fb_info *info)
-+{
-+	struct tegra_fb_info *tegra_fb = info->par;
-+
-+	DUMP_REG(DC_CMD_GENERAL_INCR_SYNCPT);
-+	DUMP_REG(DC_CMD_GENERAL_INCR_SYNCPT_CNTRL);
-+	DUMP_REG(DC_CMD_GENERAL_INCR_SYNCPT_ERROR);
-+	DUMP_REG(DC_CMD_WIN_A_INCR_SYNCPT);
-+	DUMP_REG(DC_CMD_WIN_A_INCR_SYNCPT_CNTRL);
-+	DUMP_REG(DC_CMD_WIN_A_INCR_SYNCPT_ERROR);
-+	DUMP_REG(DC_CMD_WIN_B_INCR_SYNCPT);
-+	DUMP_REG(DC_CMD_WIN_B_INCR_SYNCPT_CNTRL);
-+	DUMP_REG(DC_CMD_WIN_B_INCR_SYNCPT_ERROR);
-+	DUMP_REG(DC_CMD_WIN_C_INCR_SYNCPT);
-+	DUMP_REG(DC_CMD_WIN_C_INCR_SYNCPT_CNTRL);
-+	DUMP_REG(DC_CMD_WIN_C_INCR_SYNCPT_ERROR);
-+	DUMP_REG(DC_CMD_CONT_SYNCPT_VSYNC);
-+	DUMP_REG(DC_CMD_DISPLAY_COMMAND_OPTION0);
-+	DUMP_REG(DC_CMD_DISPLAY_COMMAND);
-+	DUMP_REG(DC_CMD_SIGNAL_RAISE);
-+	DUMP_REG(DC_CMD_INT_STATUS);
-+	DUMP_REG(DC_CMD_INT_MASK);
-+	DUMP_REG(DC_CMD_INT_ENABLE);
-+	DUMP_REG(DC_CMD_INT_TYPE);
-+	DUMP_REG(DC_CMD_INT_POLARITY);
-+	DUMP_REG(DC_CMD_SIGNAL_RAISE1);
-+	DUMP_REG(DC_CMD_SIGNAL_RAISE2);
-+	DUMP_REG(DC_CMD_SIGNAL_RAISE3);
-+	DUMP_REG(DC_CMD_STATE_ACCESS);
-+	DUMP_REG(DC_CMD_STATE_CONTROL);
-+	DUMP_REG(DC_CMD_DISPLAY_WINDOW_HEADER);
-+	DUMP_REG(DC_CMD_REG_ACT_CONTROL);
-+	tegra_fb_writel(tegra_fb, 1<<4, DC_CMD_DISPLAY_WINDOW_HEADER);
-+	DUMP_REG(DC_CMD_DISPLAY_WINDOW_HEADER);
-+	DUMP_REG(DC_WINC_A_COLOR_PALETTE);
-+	DUMP_REG(DC_WINC_A_PALETTE_COLOR_EXT);
-+	DUMP_REG(DC_WIN_A_WIN_OPTIONS);
-+	DUMP_REG(DC_WIN_A_BYTE_SWAP);
-+	DUMP_REG(DC_WIN_A_BUFFER_CONTROL);
-+	DUMP_REG(DC_WIN_A_COLOR_DEPTH);
-+	DUMP_REG(DC_WIN_A_POSITION);
-+	DUMP_REG(DC_WIN_A_SIZE);
-+	DUMP_REG(DC_WIN_A_PRESCALED_SIZE);
-+	DUMP_REG(DC_WIN_A_H_INITIAL_DDA);
-+	DUMP_REG(DC_WIN_A_V_INITIAL_DDA);
-+	DUMP_REG(DC_WIN_A_DDA_INCREMENT);
-+	DUMP_REG(DC_WIN_A_LINE_STRIDE);
-+	DUMP_REG(DC_WIN_A_BUF_STRIDE);
-+	DUMP_REG(DC_WINBUF_A_START_ADDR);
-+	DUMP_REG(DC_WINBUF_A_ADDR_H_OFFSET);
-+	DUMP_REG(DC_WINBUF_A_ADDR_V_OFFSET);
-+}
-+#endif
-+
-+static struct fb_ops tegra_fb_ops = {
-+	.owner = THIS_MODULE,
-+	.fb_open = tegra_fb_open,
-+	.fb_release = tegra_fb_release,
-+	.fb_check_var = tegra_fb_check_var,
-+	.fb_set_par = tegra_fb_set_par,
-+	.fb_setcolreg = tegra_fb_setcolreg,
-+	.fb_pan_display = tegra_fb_pan_display,
-+	.fb_fillrect = tegra_fb_fillrect,
-+	.fb_copyarea = tegra_fb_copyarea,
-+	.fb_imageblit = tegra_fb_imageblit,
-+};
-+
-+static int tegra_plat_probe(struct platform_device *pdev)
-+{
-+	struct fb_info *info;
-+	struct tegra_fb_info *tegra_fb;
-+	struct clk *clk;
-+	struct resource	*res;
-+	struct resource *reg_mem;
-+	struct resource *fb_mem;
-+	int ret = 0;
-+	void __iomem *reg_base;
-+	void __iomem *fb_base;
-+	unsigned long fb_size;
-+	unsigned long fb_phys;
-+	int irq;
-+	const struct tegra_fb_lcd_data *lcd_data = pdev->dev.platform_data;
-+
-+	info = framebuffer_alloc(sizeof(struct tegra_fb_info), &pdev->dev);
-+	if (!info) {
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq <= 0) {
-+		dev_err(&pdev->dev, "%s: no irq\n", pdev->name);
-+		ret = -ENOENT;
-+		goto err_free;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "%s: no mem resource\n", pdev->name);
-+		ret = -ENOENT;
-+		goto err_free;
-+	}
-+
-+	reg_mem = request_mem_region(res->start, resource_size(res), pdev->name);
-+	if (!reg_mem) {
-+		dev_err(&pdev->dev, "%s: request_mem_region failed\n", pdev->name);
-+		ret = -EBUSY;
-+		goto err_free;
-+	}
-+
-+	reg_base = ioremap(res->start, resource_size(res));
-+	if (!reg_base) {
-+		dev_err(&pdev->dev, "%s: registers can't be mapped\n", pdev->name);
-+		ret = -EBUSY;
-+		goto err_release_resource_reg;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (!res) {
-+		dev_err(&pdev->dev, "%s: no mem resource\n", pdev->name);
-+		ret = -ENOENT;
-+		goto err_iounmap_reg;
-+	}
-+
-+	fb_mem = request_mem_region(res->start, resource_size(res), pdev->name);
-+	if (!fb_mem) {
-+		dev_err(&pdev->dev, "%s: request_mem_region failed\n", pdev->name);
-+		ret = -EBUSY;
-+		goto err_iounmap_reg;
-+	}
-+
-+	fb_size = resource_size(res);
-+	fb_phys = res->start;
-+	fb_base = ioremap_nocache(fb_phys, fb_size);
-+	if (!fb_base) {
-+		dev_err(&pdev->dev, "%s: fb can't be mapped\n", pdev->name);
-+		ret = -EBUSY;
-+		goto err_release_resource_fb;
-+	}
-+
-+	clk = clk_get(&pdev->dev, NULL);
-+	if (!clk) {
-+		dev_err(&pdev->dev, "%s: can't get clock\n", pdev->name);
-+		ret = -ENOENT;
-+		goto err_iounmap_fb;
-+	}
-+	clk_enable(clk);
-+
-+	tegra_fb = info->par;
-+	tegra_fb->clk = clk;
-+	tegra_fb->fb_mem = fb_mem;
-+	tegra_fb->reg_mem = reg_mem;
-+	tegra_fb->reg_base = reg_base;
-+	tegra_fb->irq = irq;
-+	tegra_fb->lcd_xres = lcd_data->lcd_xres;
-+	tegra_fb->lcd_yres = lcd_data->lcd_yres;
-+
-+	info->fbops = &tegra_fb_ops;
-+	info->pseudo_palette = pseudo_palette;
-+	info->screen_base = fb_base;
-+	info->screen_size = fb_size;
-+
-+	strlcpy(info->fix.id, "tegra_fb", sizeof(info->fix.id));
-+	info->fix.type = FB_TYPE_PACKED_PIXELS;
-+	info->fix.visual = FB_VISUAL_TRUECOLOR;
-+	info->fix.xpanstep   = 1;
-+	info->fix.ypanstep   = 1;
-+	info->fix.accel	  = FB_ACCEL_NONE;
-+	info->fix.smem_start = fb_phys;
-+	info->fix.smem_len = fb_size;
-+
-+	info->var.xres			= lcd_data->fb_xres;
-+	info->var.yres			= lcd_data->fb_yres;
-+	info->var.xres_virtual		= lcd_data->fb_xres;
-+	info->var.yres_virtual		= lcd_data->fb_yres*2;
-+	info->var.bits_per_pixel	= lcd_data->bits_per_pixel;
-+	info->var.activate		= FB_ACTIVATE_NOW;
-+	info->var.height		= -1;
-+	info->var.width			= -1;
-+	info->var.pixclock		= 24500;
-+	info->var.left_margin		= 0;
-+	info->var.right_margin		= 0;
-+	info->var.upper_margin		= 0;
-+	info->var.lower_margin		= 0;
-+	info->var.hsync_len		= 0;
-+	info->var.vsync_len		= 0;
-+	info->var.vmode			= FB_VMODE_NONINTERLACED;
-+
-+	if (request_irq(irq, tegra_fb_irq, IRQF_DISABLED,
-+			dev_name(&pdev->dev), info)) {
-+		pr_debug("%s: request_irq %d failed\n",
-+			pdev->name, irq);
-+		ret = -EBUSY;
-+		goto err_clk_disable;
-+	}
-+
-+	init_waitqueue_head(&tegra_fb->event_wq);
-+
-+	/* Enable writes to Window A */
-+	tegra_fb_writel(tegra_fb, 1<<4, DC_CMD_DISPLAY_WINDOW_HEADER);
-+
-+#ifdef DEBUG
-+	info->dev = &pdev->dev;
-+	dev_dbg(info->dev, "Framebuffer registers before init:\n");
-+	dump_regs(info);
-+#endif
-+
-+	tegra_fb_set_par(info);
-+
-+#ifdef DEBUG
-+	dev_dbg(info->dev, "Framebuffer registers after init:\n");
-+	dump_regs(info);
-+#endif
-+
-+	dev_info(&pdev->dev, "base address: %08x (%08x)\n",
-+			(unsigned int)info->fix.smem_start,
-+			(unsigned int)info->screen_base);
-+
-+	if (register_framebuffer(info)) {
-+		dev_err(&pdev->dev, "failed to register framebuffer\n");
-+		ret = -ENODEV;
-+		goto err_free_irq;
-+	}
-+	platform_set_drvdata(pdev, info);
-+	return 0;
-+
-+err_free_irq:
-+	free_irq(irq, info);
-+err_clk_disable:
-+	clk_disable(clk);
-+err_iounmap_fb:
-+	iounmap(fb_base);
-+err_release_resource_fb:
-+	release_resource(fb_mem);
-+err_iounmap_reg:
-+	iounmap(reg_base);
-+err_release_resource_reg:
-+	release_resource(reg_mem);
-+err_free:
-+	framebuffer_release(info);
-+err:
++	spin_unlock_irqrestore(&clock_lock, flags);
 +	return ret;
 +}
 +
-+static int tegra_plat_remove(struct platform_device *pdev)
++int clk_reparent(struct clk *c, struct clk *parent)
 +{
-+	struct fb_info *info = platform_get_drvdata(pdev);
-+	struct tegra_fb_info *tegra_fb = info->par;
-+	unregister_framebuffer(info);
-+	free_irq(tegra_fb->irq, info);
-+	clk_disable(tegra_fb->clk);
-+	iounmap(info->screen_base);
-+	release_resource(tegra_fb->fb_mem);
-+	iounmap(tegra_fb->reg_base);
-+	release_resource(tegra_fb->reg_mem);
-+	framebuffer_release(info);
++	pr_debug("%s: %s\n", __func__, c->name);
++	if (c->refcnt && c->parent)
++		clk_disable_locked(c->parent);
++	c->parent = parent;
++	if (c->refcnt && c->parent)
++		clk_enable_locked(c->parent);
++	list_del(&c->sibling);
++	list_add_tail(&c->sibling, &parent->children);
 +	return 0;
 +}
 +
-+struct platform_driver tegra_platform_driver = {
-+	.probe = tegra_plat_probe,
-+	.remove = tegra_plat_remove,
-+	.driver = {
-+		.name = "tegrafb",
-+		.owner = THIS_MODULE,
-+	},
++static void propagate_rate(struct clk *c)
++{
++	struct clk *clkp;
++	pr_debug("%s: %s\n", __func__, c->name);
++	list_for_each_entry(clkp, &c->children, sibling) {
++		pr_debug("   %s\n", clkp->name);
++		if (clkp->ops->recalculate_rate)
++			clkp->ops->recalculate_rate(clkp);
++		propagate_rate(clkp);
++	}
++}
++
++void clk_init(struct clk *c)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&clock_lock, flags);
++
++	INIT_LIST_HEAD(&c->children);
++	INIT_LIST_HEAD(&c->sibling);
++
++	if (c->ops && c->ops->init)
++		c->ops->init(c);
++
++	list_add(&c->node, &clocks);
++
++	if (c->parent)
++		list_add_tail(&c->sibling, &c->parent->children);
++
++	spin_unlock_irqrestore(&clock_lock, flags);
++}
++
++int clk_enable_locked(struct clk *c)
++{
++	int ret;
++	pr_debug("%s: %s\n", __func__, c->name);
++	if (c->refcnt == 0) {
++		if (c->parent) {
++			ret = clk_enable_locked(c->parent);
++			if (ret)
++				return ret;
++		}
++
++		if (c->ops && c->ops->enable) {
++			ret = c->ops->enable(c);
++			if (ret) {
++				if (c->parent)
++					clk_disable_locked(c->parent);
++				return ret;
++			}
++			c->state = ON;
++#ifdef CONFIG_DEBUG_FS
++			c->set = 1;
++#endif
++		}
++	}
++	c->refcnt++;
++
++	return 0;
++}
++
++int clk_enable(struct clk *c)
++{
++	int ret;
++	unsigned long flags;
++	spin_lock_irqsave(&clock_lock, flags);
++	ret = clk_enable_locked(c);
++	spin_unlock_irqrestore(&clock_lock, flags);
++	return ret;
++}
++EXPORT_SYMBOL(clk_enable);
++
++void clk_disable_locked(struct clk *c)
++{
++	pr_debug("%s: %s\n", __func__, c->name);
++	if (c->refcnt == 0) {
++		WARN(1, "Attempting to disable clock %s with refcnt 0", c->name);
++		return;
++	}
++	if (c->refcnt == 1) {
++		if (c->ops && c->ops->disable)
++			c->ops->disable(c);
++
++		if (c->parent)
++			clk_disable_locked(c->parent);
++
++		c->state = OFF;
++	}
++	c->refcnt--;
++}
++
++void clk_disable(struct clk *c)
++{
++	unsigned long flags;
++	spin_lock_irqsave(&clock_lock, flags);
++	clk_disable_locked(c);
++	spin_unlock_irqrestore(&clock_lock, flags);
++}
++EXPORT_SYMBOL(clk_disable);
++
++int clk_set_parent_locked(struct clk *c, struct clk *parent)
++{
++	int ret;
++
++	pr_debug("%s: %s\n", __func__, c->name);
++
++	if (!c->ops || !c->ops->set_parent)
++		return -ENOSYS;
++
++	ret = c->ops->set_parent(c, parent);
++
++	if (ret)
++		return ret;
++
++	propagate_rate(c);
++
++	return 0;
++}
++
++int clk_set_parent(struct clk *c, struct clk *parent)
++{
++	int ret;
++	unsigned long flags;
++	spin_lock_irqsave(&clock_lock, flags);
++	ret = clk_set_parent_locked(c, parent);
++	spin_unlock_irqrestore(&clock_lock, flags);
++	return ret;
++}
++EXPORT_SYMBOL(clk_set_parent);
++
++struct clk *clk_get_parent(struct clk *c)
++{
++	return c->parent;
++}
++EXPORT_SYMBOL(clk_get_parent);
++
++int clk_set_rate(struct clk *c, unsigned long rate)
++{
++	int ret = 0;
++	unsigned long flags;
++
++	spin_lock_irqsave(&clock_lock, flags);
++
++	pr_debug("%s: %s\n", __func__, c->name);
++
++	if (c->ops && c->ops->set_rate)
++		ret = c->ops->set_rate(c, rate);
++	else
++		ret = -ENOSYS;
++
++	propagate_rate(c);
++
++	spin_unlock_irqrestore(&clock_lock, flags);
++
++	return ret;
++}
++EXPORT_SYMBOL(clk_set_rate);
++
++unsigned long clk_get_rate(struct clk *c)
++{
++	unsigned long flags;
++	unsigned long ret;
++
++	spin_lock_irqsave(&clock_lock, flags);
++
++	pr_debug("%s: %s\n", __func__, c->name);
++
++	ret = c->rate;
++
++	spin_unlock_irqrestore(&clock_lock, flags);
++	return ret;
++}
++EXPORT_SYMBOL(clk_get_rate);
++
++static int tegra_clk_init_one_from_table(struct tegra_clk_init_table *table)
++{
++	struct clk *c;
++	struct clk *p;
++
++	int ret = 0;
++
++	c = tegra_get_clock_by_name(table->name);
++
++	if (!c) {
++		pr_warning("Unable to initialize clock %s\n",
++			table->name);
++		return -ENODEV;
++	}
++
++	if (table->parent) {
++		p = tegra_get_clock_by_name(table->parent);
++		if (!p) {
++			pr_warning("Unable to find parent %s of clock %s\n",
++				table->parent, table->name);
++			return -ENODEV;
++		}
++
++		if (c->parent != p) {
++			ret = clk_set_parent(c, p);
++			if (ret) {
++				pr_warning("Unable to set parent %s of clock %s: %d\n",
++					table->parent, table->name, ret);
++				return -EINVAL;
++			}
++		}
++	}
++
++	if (table->rate && table->rate != clk_get_rate(c)) {
++		ret = clk_set_rate(c, table->rate);
++		if (ret) {
++			pr_warning("Unable to set clock %s to rate %lu: %d\n",
++				table->name, table->rate, ret);
++			return -EINVAL;
++		}
++	}
++
++	if (table->enabled) {
++		ret = clk_enable(c);
++		if (ret) {
++			pr_warning("Unable to enable clock %s: %d\n",
++				table->name, ret);
++			return -EINVAL;
++		}
++	}
++
++	return 0;
++}
++
++void tegra_clk_init_from_table(struct tegra_clk_init_table *table)
++{
++	for (; table->name; table++)
++		tegra_clk_init_one_from_table(table);
++}
++EXPORT_SYMBOL(tegra_clk_init_from_table);
++
++void tegra_periph_reset_deassert(struct clk *c)
++{
++	tegra2_periph_reset_deassert(c);
++}
++EXPORT_SYMBOL(tegra_periph_reset_deassert);
++
++void tegra_periph_reset_assert(struct clk *c)
++{
++	tegra2_periph_reset_assert(c);
++}
++EXPORT_SYMBOL(tegra_periph_reset_assert);
++
++int __init tegra_init_clock(void)
++{
++	tegra2_init_clocks();
++
++	return 0;
++}
++
++#ifdef CONFIG_DEBUG_FS
++static struct dentry *clk_debugfs_root;
++
++
++static void clock_tree_show_one(struct seq_file *s, struct clk *c, int level)
++{
++	struct clk *child;
++	struct clk *safe;
++	const char *state = "uninit";
++	char div[5] = {0};
++
++	if (c->state == ON)
++		state = "on";
++	else if (c->state == OFF)
++		state = "off";
++
++	if (c->mul != 0 && c->div != 0) {
++		BUG_ON(c->mul > 2);
++		if (c->mul > c->div)
++			snprintf(div, sizeof(div), "x%d", c->mul / c->div);
++		else
++			snprintf(div, sizeof(div), "%d%s", c->div / c->mul,
++				(c->div % c->mul) ? ".5" : "");
++	}
++
++	seq_printf(s, "%*s%-*s %-6s %-3d %-5s %-10lu\n",
++		level * 3 + 1, c->set ? "" : "*",
++		30 - level * 3, c->name,
++		state, c->refcnt, div, c->rate);
++	list_for_each_entry_safe(child, safe, &c->children, sibling) {
++		clock_tree_show_one(s, child, level + 1);
++	}
++}
++
++static int clock_tree_show(struct seq_file *s, void *data)
++{
++	struct clk *c;
++	unsigned long flags;
++	seq_printf(s, " clock                          state  ref div   rate      \n");
++	seq_printf(s, "-----------------------------------------------------------\n");
++	spin_lock_irqsave(&clock_lock, flags);
++	list_for_each_entry(c, &clocks, node)
++		if (c->parent == NULL)
++			clock_tree_show_one(s, c, 0);
++	spin_unlock_irqrestore(&clock_lock, flags);
++	return 0;
++}
++
++static int clock_tree_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, clock_tree_show, inode->i_private);
++}
++
++static const struct file_operations clock_tree_fops = {
++	.open		= clock_tree_open,
++	.read		= seq_read,
++	.llseek		= seq_lseek,
++	.release	= single_release,
 +};
 +
-+static int __init tegra_fb_init(void)
++static int possible_parents_show(struct seq_file *s, void *data)
 +{
-+	int e;
-+	e = platform_driver_register(&tegra_platform_driver);
-+	if (e) {
-+		pr_info("tegrafb: platform_driver_register failed\n");
-+		return e;
++	struct clk *c = s->private;
++	int i;
++
++	for (i = 0; c->inputs[i].input; i++) {
++		char *first = (i == 0) ? "" : " ";
++		seq_printf(s, "%s%s", first, c->inputs[i].input->name);
 +	}
-+	return e;
++	seq_printf(s, "\n");
++	return 0;
 +}
 +
-+static void __exit tegra_exit(void)
++static int possible_parents_open(struct inode *inode, struct file *file)
 +{
-+	platform_driver_unregister(&tegra_platform_driver);
++	return single_open(file, possible_parents_show, inode->i_private);
 +}
 +
-+module_exit(tegra_exit);
-+module_init(tegra_fb_init);
++static const struct file_operations possible_parents_fops = {
++	.open		= possible_parents_open,
++	.read		= seq_read,
++	.llseek		= seq_lseek,
++	.release	= single_release,
++};
++
++static int clk_debugfs_register_one(struct clk *c)
++{
++	struct dentry *d, *child, *child_tmp;
++
++	d = debugfs_create_dir(c->name, clk_debugfs_root);
++	if (!d)
++		return -ENOMEM;
++	c->dent = d;
++
++	d = debugfs_create_u8("refcnt", S_IRUGO, c->dent, (u8 *)&c->refcnt);
++	if (!d)
++		goto err_out;
++
++	d = debugfs_create_u32("rate", S_IRUGO, c->dent, (u32 *)&c->rate);
++	if (!d)
++		goto err_out;
++
++	d = debugfs_create_x32("flags", S_IRUGO, c->dent, (u32 *)&c->flags);
++	if (!d)
++		goto err_out;
++
++	if (c->inputs) {
++		d = debugfs_create_file("possible_parents", S_IRUGO, c->dent,
++			c, &possible_parents_fops);
++		if (!d)
++			goto err_out;
++	}
++
++	return 0;
++
++err_out:
++	d = c->dent;
++	list_for_each_entry_safe(child, child_tmp, &d->d_subdirs, d_u.d_child)
++		debugfs_remove(child);
++	debugfs_remove(c->dent);
++	return -ENOMEM;
++}
++
++static int clk_debugfs_register(struct clk *c)
++{
++	int err;
++	struct clk *pa = c->parent;
++
++	if (pa && !pa->dent) {
++		err = clk_debugfs_register(pa);
++		if (err)
++			return err;
++	}
++
++	if (!c->dent) {
++		err = clk_debugfs_register_one(c);
++		if (err)
++			return err;
++	}
++	return 0;
++}
++
++static int __init clk_debugfs_init(void)
++{
++	struct clk *c;
++	struct dentry *d;
++	int err = -ENOMEM;
++
++	d = debugfs_create_dir("clock", NULL);
++	if (!d)
++		return -ENOMEM;
++	clk_debugfs_root = d;
++
++	d = debugfs_create_file("clock_tree", S_IRUGO, clk_debugfs_root, NULL,
++		&clock_tree_fops);
++	if (!d)
++		goto err_out;
++
++	list_for_each_entry(c, &clocks, node) {
++		err = clk_debugfs_register(c);
++		if (err)
++			goto err_out;
++	}
++	return 0;
++err_out:
++	debugfs_remove_recursive(clk_debugfs_root);
++	return err;
++}
++
++late_initcall(clk_debugfs_init);
++#endif
+diff --git a/arch/arm/mach-tegra/clock.h b/arch/arm/mach-tegra/clock.h
+new file mode 100644
+index 0000000..af7c70e
+--- /dev/null
++++ b/arch/arm/mach-tegra/clock.h
+@@ -0,0 +1,147 @@
++/*
++ * arch/arm/mach-tegra/include/mach/clock.h
++ *
++ * Copyright (C) 2010 Google, Inc.
++ *
++ * Author:
++ *	Colin Cross <ccross@google.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef __MACH_TEGRA_CLOCK_H
++#define __MACH_TEGRA_CLOCK_H
++
++#include <linux/list.h>
++#include <asm/clkdev.h>
++
++#define DIV_BUS			(1 << 0)
++#define DIV_U71			(1 << 1)
++#define DIV_U71_FIXED		(1 << 2)
++#define DIV_2			(1 << 3)
++#define PLL_FIXED		(1 << 4)
++#define PLL_HAS_CPCON		(1 << 5)
++#define MUX			(1 << 6)
++#define PLLD			(1 << 7)
++#define PERIPH_NO_RESET		(1 << 8)
++#define PERIPH_NO_ENB		(1 << 9)
++#define PERIPH_EMC_ENB		(1 << 10)
++#define PERIPH_MANUAL_RESET	(1 << 11)
++#define PLL_ALT_MISC_REG	(1 << 12)
++#define ENABLE_ON_INIT		(1 << 28)
++
++struct clk;
++
++struct clk_mux_sel {
++	struct clk	*input;
++	u32		value;
++};
++
++struct clk_pll_table {
++	unsigned long	input_rate;
++	unsigned long	output_rate;
++	u16		n;
++	u16		m;
++	u8		p;
++	u8		cpcon;
++};
++
++struct clk_ops {
++	void		(*init)(struct clk *);
++	int		(*enable)(struct clk *);
++	void		(*disable)(struct clk *);
++	void		(*recalc)(struct clk *);
++	int		(*set_parent)(struct clk *, struct clk *);
++	int		(*set_rate)(struct clk *, unsigned long);
++	unsigned long	(*get_rate)(struct clk *);
++	long		(*round_rate)(struct clk *, unsigned long);
++	unsigned long	(*recalculate_rate)(struct clk *);
++};
++
++enum clk_state {
++	UNINITIALIZED = 0,
++	ON,
++	OFF,
++};
++
++struct clk {
++	/* node for master clocks list */
++	struct list_head		node;
++	struct list_head		children;	/* list of children */
++	struct list_head		sibling;	/* node for children */
++#ifdef CONFIG_DEBUG_FS
++	struct dentry			*dent;
++	struct dentry			*parent_dent;
++#endif
++	struct clk_ops			*ops;
++	struct clk			*parent;
++	struct clk_lookup		lookup;
++	unsigned long			rate;
++	u32				flags;
++	u32				refcnt;
++	const char			*name;
++	u32				reg;
++	u32				reg_shift;
++	unsigned int			clk_num;
++	enum clk_state			state;
++#ifdef CONFIG_DEBUG_FS
++	bool				set;
++#endif
++
++	/* PLL */
++	unsigned long			input_min;
++	unsigned long			input_max;
++	unsigned long			cf_min;
++	unsigned long			cf_max;
++	unsigned long			vco_min;
++	unsigned long			vco_max;
++	u32				m;
++	u32				n;
++	u32				p;
++	u32				cpcon;
++	const struct clk_pll_table	*pll_table;
++
++	/* DIV */
++	u32				div;
++	u32				mul;
++
++	/* MUX */
++	const struct clk_mux_sel	*inputs;
++	u32				sel;
++	u32				reg_mask;
++};
++
++
++struct clk_duplicate {
++	const char *name;
++	struct clk_lookup lookup;
++};
++
++struct tegra_clk_init_table {
++	const char *name;
++	const char *parent;
++	unsigned long rate;
++	bool enabled;
++};
++
++void tegra2_init_clocks(void);
++void tegra2_periph_reset_deassert(struct clk *c);
++void tegra2_periph_reset_assert(struct clk *c);
++void clk_init(struct clk *clk);
++struct clk *tegra_get_clock_by_name(const char *name);
++unsigned long clk_measure_input_freq(void);
++void clk_disable_locked(struct clk *c);
++int clk_enable_locked(struct clk *c);
++int clk_set_parent_locked(struct clk *c, struct clk *parent);
++int clk_reparent(struct clk *c, struct clk *parent);
++void tegra_clk_init_from_table(struct tegra_clk_init_table *table);
++
++#endif
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 20875ee..039a514 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -25,6 +25,21 @@
+ #include <mach/iomap.h>
+ 
+ #include "board.h"
++#include "clock.h"
++
++static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
++	/* name		parent		rate		enabled */
++	{ "clk_m",	NULL,		0,		true },
++	{ "pll_p",	"clk_m",	216000000,	true },
++	{ "pll_p_out1",	"pll_p",	28800000,	true },
++	{ "pll_p_out2",	"pll_p",	48000000,	true },
++	{ "pll_p_out3",	"pll_p",	72000000,	true },
++	{ "pll_p_out4",	"pll_p",	108000000,	true },
++	{ "sys",	"pll_p_out4",	108000000,	true },
++	{ "hclk",	"sys",		108000000,	true },
++	{ "pclk",	"hclk",		54000000,	true },
++	{ NULL,		NULL,		0,		0},
++};
+ 
+ void __init tegra_init_cache(void)
+ {
+@@ -40,5 +55,7 @@ void __init tegra_init_cache(void)
+ 
+ void __init tegra_common_init(void)
+ {
++	tegra_init_clock();
++	tegra_clk_init_from_table(common_clk_init_table);
+ 	tegra_init_cache();
+ }
+diff --git a/arch/arm/mach-tegra/include/mach/clk.h b/arch/arm/mach-tegra/include/mach/clk.h
+new file mode 100644
+index 0000000..2896f25
+--- /dev/null
++++ b/arch/arm/mach-tegra/include/mach/clk.h
+@@ -0,0 +1,26 @@
++/*
++ * arch/arm/mach-tegra/include/mach/clk.h
++ *
++ * Copyright (C) 2010 Google, Inc.
++ *
++ * Author:
++ *	Erik Gilling <konkers@google.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef __MACH_CLK_H
++#define __MACH_CLK_H
++
++void tegra_periph_reset_deassert(struct clk *c);
++void tegra_periph_reset_assert(struct clk *c);
++
++#endif
+diff --git a/arch/arm/mach-tegra/include/mach/clkdev.h b/arch/arm/mach-tegra/include/mach/clkdev.h
+new file mode 100644
+index 0000000..412f5c6
+--- /dev/null
++++ b/arch/arm/mach-tegra/include/mach/clkdev.h
+@@ -0,0 +1,32 @@
++/*
++ * arch/arm/mach-tegra/include/mach/clkdev.h
++ *
++ * Copyright (C) 2010 Google, Inc.
++ *
++ * Author:
++ *	Colin Cross <ccross@google.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef __MACH_CLKDEV_H
++#define __MACH_CLKDEV_H
++
++static inline int __clk_get(struct clk *clk)
++{
++	return 1;
++}
++
++static inline void __clk_put(struct clk *clk)
++{
++}
++
++#endif
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+new file mode 100644
+index 0000000..4261632
+--- /dev/null
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -0,0 +1,1359 @@
++/*
++ * arch/arm/mach-tegra/tegra2_clocks.c
++ *
++ * Copyright (C) 2010 Google, Inc.
++ *
++ * Author:
++ *	Colin Cross <ccross@google.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/list.h>
++#include <linux/spinlock.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/hrtimer.h>
++
++#include <asm/clkdev.h>
++
++#include <mach/iomap.h>
++
++#include "clock.h"
++
++#define RST_DEVICES			0x004
++#define RST_DEVICES_SET			0x300
++#define RST_DEVICES_CLR			0x304
++
++#define CLK_OUT_ENB			0x010
++#define CLK_OUT_ENB_SET			0x320
++#define CLK_OUT_ENB_CLR			0x324
++
++#define OSC_CTRL			0x50
++#define OSC_CTRL_OSC_FREQ_MASK		(3<<30)
++#define OSC_CTRL_OSC_FREQ_13MHZ		(0<<30)
++#define OSC_CTRL_OSC_FREQ_19_2MHZ	(1<<30)
++#define OSC_CTRL_OSC_FREQ_12MHZ		(2<<30)
++#define OSC_CTRL_OSC_FREQ_26MHZ		(3<<30)
++
++#define OSC_FREQ_DET			0x58
++#define OSC_FREQ_DET_TRIG		(1<<31)
++
++#define OSC_FREQ_DET_STATUS		0x5C
++#define OSC_FREQ_DET_BUSY		(1<<31)
++#define OSC_FREQ_DET_CNT_MASK		0xFFFF
++
++#define PERIPH_CLK_SOURCE_MASK		(3<<30)
++#define PERIPH_CLK_SOURCE_SHIFT		30
++#define PERIPH_CLK_SOURCE_ENABLE	(1<<28)
++#define PERIPH_CLK_SOURCE_DIV_MASK	0xFF
++#define PERIPH_CLK_SOURCE_DIV_SHIFT	0
++
++#define PLL_BASE			0x0
++#define PLL_BASE_BYPASS			(1<<31)
++#define PLL_BASE_ENABLE			(1<<30)
++#define PLL_BASE_REF_ENABLE		(1<<29)
++#define PLL_BASE_OVERRIDE		(1<<28)
++#define PLL_BASE_LOCK			(1<<27)
++#define PLL_BASE_DIVP_MASK		(0x7<<20)
++#define PLL_BASE_DIVP_SHIFT		20
++#define PLL_BASE_DIVN_MASK		(0x3FF<<8)
++#define PLL_BASE_DIVN_SHIFT		8
++#define PLL_BASE_DIVM_MASK		(0x1F)
++#define PLL_BASE_DIVM_SHIFT		0
++
++#define PLL_OUT_RATIO_MASK		(0xFF<<8)
++#define PLL_OUT_RATIO_SHIFT		8
++#define PLL_OUT_OVERRIDE		(1<<2)
++#define PLL_OUT_CLKEN			(1<<1)
++#define PLL_OUT_RESET_DISABLE		(1<<0)
++
++#define PLL_MISC(c)			(((c)->flags & PLL_ALT_MISC_REG) ? 0x4 : 0xc)
++#define PLL_MISC_DCCON_SHIFT		20
++#define PLL_MISC_LOCK_ENABLE		(1<<18)
++#define PLL_MISC_CPCON_SHIFT		8
++#define PLL_MISC_CPCON_MASK		(0xF<<PLL_MISC_CPCON_SHIFT)
++#define PLL_MISC_LFCON_SHIFT		4
++#define PLL_MISC_LFCON_MASK		(0xF<<PLL_MISC_LFCON_SHIFT)
++#define PLL_MISC_VCOCON_SHIFT		0
++#define PLL_MISC_VCOCON_MASK		(0xF<<PLL_MISC_VCOCON_SHIFT)
++
++#define PLLD_MISC_CLKENABLE		(1<<30)
++#define PLLD_MISC_DIV_RST		(1<<23)
++#define PLLD_MISC_DCCON_SHIFT		12
++
++#define PERIPH_CLK_TO_ENB_REG(c)	((c->clk_num / 32) * 4)
++#define PERIPH_CLK_TO_ENB_SET_REG(c)	((c->clk_num / 32) * 8)
++#define PERIPH_CLK_TO_ENB_BIT(c)	(1 << (c->clk_num % 32))
++
++#define SUPER_CLK_MUX			0x00
++#define SUPER_STATE_SHIFT		28
++#define SUPER_STATE_MASK		(0xF << SUPER_STATE_SHIFT)
++#define SUPER_STATE_STANDBY		(0x0 << SUPER_STATE_SHIFT)
++#define SUPER_STATE_IDLE		(0x1 << SUPER_STATE_SHIFT)
++#define SUPER_STATE_RUN			(0x2 << SUPER_STATE_SHIFT)
++#define SUPER_STATE_IRQ			(0x3 << SUPER_STATE_SHIFT)
++#define SUPER_STATE_FIQ			(0x4 << SUPER_STATE_SHIFT)
++#define SUPER_SOURCE_MASK		0xF
++#define	SUPER_FIQ_SOURCE_SHIFT		12
++#define	SUPER_IRQ_SOURCE_SHIFT		8
++#define	SUPER_RUN_SOURCE_SHIFT		4
++#define	SUPER_IDLE_SOURCE_SHIFT		0
++
++#define SUPER_CLK_DIVIDER		0x04
++
++#define BUS_CLK_DISABLE			(1<<3)
++#define BUS_CLK_DIV_MASK		0x3
++
++static void __iomem *reg_clk_base = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
++
++#define clk_writel(value, reg) \
++	__raw_writel(value, (u32)reg_clk_base + (reg))
++#define clk_readl(reg) \
++	__raw_readl((u32)reg_clk_base + (reg))
++
++unsigned long clk_measure_input_freq(void)
++{
++	u32 clock_autodetect;
++	clk_writel(OSC_FREQ_DET_TRIG | 1, OSC_FREQ_DET);
++	do {} while (clk_readl(OSC_FREQ_DET_STATUS) & OSC_FREQ_DET_BUSY);
++	clock_autodetect = clk_readl(OSC_FREQ_DET_STATUS);
++	if (clock_autodetect >= 732 - 3 && clock_autodetect <= 732 + 3) {
++		return 12000000;
++	} else if (clock_autodetect >= 794 - 3 && clock_autodetect <= 794 + 3) {
++		return 13000000;
++	} else if (clock_autodetect >= 1172 - 3 && clock_autodetect <= 1172 + 3) {
++		return 19200000;
++	} else if (clock_autodetect >= 1587 - 3 && clock_autodetect <= 1587 + 3) {
++		return 26000000;
++	} else {
++		pr_err("%s: Unexpected clock autodetect value %d", __func__, clock_autodetect);
++		BUG();
++		return 0;
++	}
++}
++
++static int clk_div71_get_divider(struct clk *c, unsigned long rate)
++{
++	unsigned long divider_u71;
++
++	divider_u71 = DIV_ROUND_UP(c->rate * 2, rate);
++
++	if (divider_u71 - 2 > 255 || divider_u71 - 2 < 0)
++		return -EINVAL;
++
++	return divider_u71 - 2;
++}
++
++static unsigned long tegra2_clk_recalculate_rate(struct clk *c)
++{
++	unsigned long rate;
++	rate = c->parent->rate;
++
++	if (c->mul != 0 && c->div != 0)
++		c->rate = rate * c->mul / c->div;
++	else
++		c->rate = rate;
++	return c->rate;
++}
++
++
++/* clk_m functions */
++static unsigned long tegra2_clk_m_autodetect_rate(struct clk *c)
++{
++	u32 auto_clock_control = clk_readl(OSC_CTRL) & ~OSC_CTRL_OSC_FREQ_MASK;
++
++	c->rate = clk_measure_input_freq();
++	switch (c->rate) {
++	case 12000000:
++		auto_clock_control |= OSC_CTRL_OSC_FREQ_12MHZ;
++		break;
++	case 13000000:
++		auto_clock_control |= OSC_CTRL_OSC_FREQ_13MHZ;
++		break;
++	case 19200000:
++		auto_clock_control |= OSC_CTRL_OSC_FREQ_19_2MHZ;
++		break;
++	case 26000000:
++		auto_clock_control |= OSC_CTRL_OSC_FREQ_26MHZ;
++		break;
++	default:
++		pr_err("%s: Unexpected clock rate %ld", __func__, c->rate);
++		BUG();
++	}
++	clk_writel(auto_clock_control, OSC_CTRL);
++	return c->rate;
++}
++
++static void tegra2_clk_m_init(struct clk *c)
++{
++	pr_debug("%s on clock %s\n", __func__, c->name);
++	tegra2_clk_m_autodetect_rate(c);
++}
++
++static int tegra2_clk_m_enable(struct clk *c)
++{
++	pr_debug("%s on clock %s\n", __func__, c->name);
++	return 0;
++}
++
++static void tegra2_clk_m_disable(struct clk *c)
++{
++	pr_debug("%s on clock %s\n", __func__, c->name);
++	BUG();
++}
++
++static struct clk_ops tegra_clk_m_ops = {
++	.init		= tegra2_clk_m_init,
++	.enable		= tegra2_clk_m_enable,
++	.disable	= tegra2_clk_m_disable,
++};
++
++/* super clock functions */
++/* "super clocks" on tegra have two-stage muxes and a clock skipping
++ * super divider.  We will ignore the clock skipping divider, since we
++ * can't lower the voltage when using the clock skip, but we can if we
++ * lower the PLL frequency.
++ */
++static void tegra2_super_clk_init(struct clk *c)
++{
++	u32 val;
++	int source;
++	int shift;
++	const struct clk_mux_sel *sel;
++	val = clk_readl(c->reg + SUPER_CLK_MUX);
++	c->state = ON;
++	BUG_ON(((val & SUPER_STATE_MASK) != SUPER_STATE_RUN) &&
++		((val & SUPER_STATE_MASK) != SUPER_STATE_IDLE));
++	shift = ((val & SUPER_STATE_MASK) == SUPER_STATE_IDLE) ?
++		SUPER_IDLE_SOURCE_SHIFT : SUPER_RUN_SOURCE_SHIFT;
++	source = (val >> shift) & SUPER_SOURCE_MASK;
++	for (sel = c->inputs; sel->input != NULL; sel++) {
++		if (sel->value == source)
++			break;
++	}
++	BUG_ON(sel->input == NULL);
++	c->parent = sel->input;
++	tegra2_clk_recalculate_rate(c);
++}
++
++static int tegra2_super_clk_enable(struct clk *c)
++{
++	clk_writel(0, c->reg + SUPER_CLK_DIVIDER);
++	return 0;
++}
++
++static void tegra2_super_clk_disable(struct clk *c)
++{
++	pr_debug("%s on clock %s\n", __func__, c->name);
++
++	/* oops - don't disable the CPU clock! */
++	BUG();
++}
++
++static int tegra2_super_clk_set_parent(struct clk *c, struct clk *p)
++{
++	u32 val;
++	const struct clk_mux_sel *sel;
++	int shift;
++	val = clk_readl(c->reg + SUPER_CLK_MUX);;
++	BUG_ON(((val & SUPER_STATE_MASK) != SUPER_STATE_RUN) &&
++		((val & SUPER_STATE_MASK) != SUPER_STATE_IDLE));
++	shift = ((val & SUPER_STATE_MASK) == SUPER_STATE_IDLE) ?
++		SUPER_IDLE_SOURCE_SHIFT : SUPER_RUN_SOURCE_SHIFT;
++	for (sel = c->inputs; sel->input != NULL; sel++) {
++		if (sel->input == p) {
++			clk_reparent(c, p);
++			val &= ~(SUPER_SOURCE_MASK << shift);
++			val |= sel->value << shift;
++			clk_writel(val, c->reg);
++			c->rate = c->parent->rate;
++			return 0;
++		}
++	}
++	return -EINVAL;
++}
++
++static struct clk_ops tegra_super_ops = {
++	.init			= tegra2_super_clk_init,
++	.enable			= tegra2_super_clk_enable,
++	.disable		= tegra2_super_clk_disable,
++	.set_parent		= tegra2_super_clk_set_parent,
++	.recalculate_rate	= tegra2_clk_recalculate_rate,
++};
++
++/* bus clock functions */
++static void tegra2_bus_clk_init(struct clk *c)
++{
++	u32 val = clk_readl(c->reg);
++	c->state = ((val >> c->reg_shift) & BUS_CLK_DISABLE) ? OFF : ON;
++	c->div = ((val >> c->reg_shift) & BUS_CLK_DIV_MASK) + 1;
++	c->mul = 1;
++	tegra2_clk_recalculate_rate(c);
++}
++
++static int tegra2_bus_clk_enable(struct clk *c)
++{
++	u32 val = clk_readl(c->reg);
++	val &= ~(BUS_CLK_DISABLE << c->reg_shift);
++	clk_writel(val, c->reg);
++	return 0;
++}
++
++static void tegra2_bus_clk_disable(struct clk *c)
++{
++	u32 val = clk_readl(c->reg);
++	val |= BUS_CLK_DISABLE << c->reg_shift;
++	clk_writel(val, c->reg);
++}
++
++static int tegra2_bus_clk_set_rate(struct clk *c, unsigned long rate)
++{
++	u32 val = clk_readl(c->reg);
++	unsigned long parent_rate = c->parent->rate;
++	int i;
++	for (i = 1; i <= 4; i++) {
++		if (rate == parent_rate / i) {
++			val &= ~(BUS_CLK_DIV_MASK << c->reg_shift);
++			val |= (i - 1) << c->reg_shift;
++			clk_writel(val, c->reg);
++			c->div = i;
++			c->mul = 1;
++			return 0;
++		}
++	}
++	return -EINVAL;
++}
++
++static struct clk_ops tegra_bus_ops = {
++	.init			= tegra2_bus_clk_init,
++	.enable			= tegra2_bus_clk_enable,
++	.disable		= tegra2_bus_clk_disable,
++	.set_rate		= tegra2_bus_clk_set_rate,
++	.recalculate_rate	= tegra2_clk_recalculate_rate,
++};
++
++/* PLL Functions */
++static unsigned long tegra2_pll_clk_recalculate_rate(struct clk *c)
++{
++	u64 rate;
++	rate = c->parent->rate;
++	rate *= c->n;
++	do_div(rate, c->m);
++	if (c->p == 2)
++		rate >>= 1;
++	c->rate = rate;
++	return c->rate;
++}
++
++static int tegra2_pll_clk_wait_for_lock(struct clk *c)
++{
++	ktime_t before;
++
++	before = ktime_get();
++	while (!(clk_readl(c->reg + PLL_BASE) & PLL_BASE_LOCK)) {
++		if (ktime_us_delta(ktime_get(), before) > 5000) {
++			pr_err("Timed out waiting for lock bit on pll %s",
++				c->name);
++			return -1;
++		}
++	}
++
++	return 0;
++}
++
++static void tegra2_pll_clk_init(struct clk *c)
++{
++	u32 val = clk_readl(c->reg + PLL_BASE);
++
++	c->state = (val & PLL_BASE_ENABLE) ? ON : OFF;
++
++	if (c->flags & PLL_FIXED && !(val & PLL_BASE_OVERRIDE)) {
++		pr_warning("Clock %s has unknown fixed frequency\n", c->name);
++		c->n = 1;
++		c->m = 0;
++		c->p = 1;
++	} else if (val & PLL_BASE_BYPASS) {
++		c->n = 1;
++		c->m = 1;
++		c->p = 1;
++	} else {
++		c->n = (val & PLL_BASE_DIVN_MASK) >> PLL_BASE_DIVN_SHIFT;
++		c->m = (val & PLL_BASE_DIVM_MASK) >> PLL_BASE_DIVM_SHIFT;
++		c->p = (val & PLL_BASE_DIVP_MASK) ? 2 : 1;
++	}
++
++	val = clk_readl(c->reg + PLL_MISC(c));
++	if (c->flags & PLL_HAS_CPCON)
++		c->cpcon = (val & PLL_MISC_CPCON_MASK) >> PLL_MISC_CPCON_SHIFT;
++
++	tegra2_pll_clk_recalculate_rate(c);
++}
++
++static int tegra2_pll_clk_enable(struct clk *c)
++{
++	u32 val;
++	pr_debug("%s on clock %s\n", __func__, c->name);
++
++	val = clk_readl(c->reg + PLL_BASE);
++	val &= ~PLL_BASE_BYPASS;
++	val |= PLL_BASE_ENABLE;
++	clk_writel(val, c->reg + PLL_BASE);
++
++	val = clk_readl(c->reg + PLL_MISC(c));
++	val |= PLL_MISC_LOCK_ENABLE;
++	clk_writel(val, c->reg + PLL_MISC(c));
++
++	tegra2_pll_clk_wait_for_lock(c);
++
++	return 0;
++}
++
++static void tegra2_pll_clk_disable(struct clk *c)
++{
++	u32 val;
++	pr_debug("%s on clock %s\n", __func__, c->name);
++
++	val = clk_readl(c->reg);
++	val &= ~(PLL_BASE_BYPASS | PLL_BASE_ENABLE);
++	clk_writel(val, c->reg);
++}
++
++static int tegra2_pll_clk_set_rate(struct clk *c, unsigned long rate)
++{
++	u32 val;
++	unsigned long input_rate;
++	const struct clk_pll_table *sel;
++
++	pr_debug("%s: %s %lu\n", __func__, c->name, rate);
++	BUG_ON(c->refcnt != 0);
++
++	input_rate = c->parent->rate;
++	for (sel = c->pll_table; sel->input_rate != 0; sel++) {
++		if (sel->input_rate == input_rate && sel->output_rate == rate) {
++			c->n = sel->n;
++			c->m = sel->m;
++			c->p = sel->p;
++			c->cpcon = sel->cpcon;
++
++			val = clk_readl(c->reg + PLL_BASE);
++			if (c->flags & PLL_FIXED)
++				val |= PLL_BASE_OVERRIDE;
++			val &= ~(PLL_BASE_DIVP_MASK | PLL_BASE_DIVN_MASK |
++				 PLL_BASE_DIVM_MASK);
++			val |= (c->m << PLL_BASE_DIVM_SHIFT) |
++				(c->n << PLL_BASE_DIVN_SHIFT);
++			BUG_ON(c->p > 2);
++			if (c->p == 2)
++				val |= 1 << PLL_BASE_DIVP_SHIFT;
++			clk_writel(val, c->reg + PLL_BASE);
++
++			if (c->flags & PLL_HAS_CPCON) {
++				val = c->cpcon << PLL_MISC_CPCON_SHIFT;
++				val |= PLL_MISC_LOCK_ENABLE;
++				clk_writel(val, c->reg + PLL_MISC(c));
++			}
++
++			if (c->state == ON)
++				tegra2_pll_clk_enable(c);
++
++			c->rate = rate;
++			return 0;
++		}
++	}
++	return -EINVAL;
++}
++
++static struct clk_ops tegra_pll_ops = {
++	.init			= tegra2_pll_clk_init,
++	.enable			= tegra2_pll_clk_enable,
++	.disable		= tegra2_pll_clk_disable,
++	.set_rate		= tegra2_pll_clk_set_rate,
++	.recalculate_rate	= tegra2_pll_clk_recalculate_rate,
++};
++
++/* Clock divider ops */
++static void tegra2_pll_div_clk_init(struct clk *c)
++{
++	u32 val = clk_readl(c->reg);
++	u32 divu71;
++	val >>= c->reg_shift;
++	c->state = (val & PLL_OUT_CLKEN) ? ON : OFF;
++	if (!(val & PLL_OUT_RESET_DISABLE))
++		c->state = OFF;
++
++	if (c->flags & DIV_U71) {
++		divu71 = (val & PLL_OUT_RATIO_MASK) >> PLL_OUT_RATIO_SHIFT;
++		c->div = (divu71 + 2);
++		c->mul = 2;
++	} else if (c->flags & DIV_2) {
++		c->div = 2;
++		c->mul = 1;
++	} else {
++		c->div = 1;
++		c->mul = 1;
++	}
++
++	tegra2_clk_recalculate_rate(c);
++}
++
++static int tegra2_pll_div_clk_enable(struct clk *c)
++{
++	u32 val;
++	u32 new_val;
++
++	pr_debug("%s: %s\n", __func__, c->name);
++	if (c->flags & DIV_U71) {
++		val = clk_readl(c->reg);
++		new_val = val >> c->reg_shift;
++		new_val &= 0xFFFF;
++
++		new_val |= PLL_OUT_CLKEN | PLL_OUT_RESET_DISABLE;
++
++		val &= ~(0xFFFF << c->reg_shift);
++		val |= new_val << c->reg_shift;
++		clk_writel(val, c->reg);
++		return 0;
++	} else if (c->flags & DIV_2) {
++		BUG_ON(!(c->flags & PLLD));
++		val = clk_readl(c->reg);
++		val &= ~PLLD_MISC_DIV_RST;
++		clk_writel(val, c->reg);
++		return 0;
++	}
++	return -EINVAL;
++}
++
++static void tegra2_pll_div_clk_disable(struct clk *c)
++{
++	u32 val;
++	u32 new_val;
++
++	pr_debug("%s: %s\n", __func__, c->name);
++	if (c->flags & DIV_U71) {
++		val = clk_readl(c->reg);
++		new_val = val >> c->reg_shift;
++		new_val &= 0xFFFF;
++
++		new_val &= ~(PLL_OUT_CLKEN | PLL_OUT_RESET_DISABLE);
++
++		val &= ~(0xFFFF << c->reg_shift);
++		val |= new_val << c->reg_shift;
++		clk_writel(val, c->reg);
++	} else if (c->flags & DIV_2) {
++		BUG_ON(!(c->flags & PLLD));
++		val = clk_readl(c->reg);
++		val |= PLLD_MISC_DIV_RST;
++		clk_writel(val, c->reg);
++	}
++}
++
++static int tegra2_pll_div_clk_set_rate(struct clk *c, unsigned long rate)
++{
++	u32 val;
++	u32 new_val;
++	int divider_u71;
++	pr_debug("%s: %s %lu\n", __func__, c->name, rate);
++	if (c->flags & DIV_U71) {
++		divider_u71 = clk_div71_get_divider(c->parent, rate);
++		if (divider_u71 >= 0) {
++			val = clk_readl(c->reg);
++			new_val = val >> c->reg_shift;
++			new_val &= 0xFFFF;
++			if (c->flags & DIV_U71_FIXED)
++				new_val |= PLL_OUT_OVERRIDE;
++			new_val &= ~PLL_OUT_RATIO_MASK;
++			new_val |= divider_u71 << PLL_OUT_RATIO_SHIFT;
++
++			val &= ~(0xFFFF << c->reg_shift);
++			val |= new_val << c->reg_shift;
++			clk_writel(val, c->reg);
++			c->div = divider_u71 + 2;
++			c->mul = 2;
++			tegra2_clk_recalculate_rate(c);
++			return 0;
++		}
++	} else if (c->flags & DIV_2) {
++		if (c->parent->rate == rate * 2) {
++			c->rate = rate;
++			return 0;
++		}
++	}
++	return -EINVAL;
++}
++
++
++static struct clk_ops tegra_pll_div_ops = {
++	.init			= tegra2_pll_div_clk_init,
++	.enable			= tegra2_pll_div_clk_enable,
++	.disable		= tegra2_pll_div_clk_disable,
++	.set_rate		= tegra2_pll_div_clk_set_rate,
++	.recalculate_rate	= tegra2_clk_recalculate_rate,
++};
++
++/* Periph clk ops */
++
++static void tegra2_periph_clk_init(struct clk *c)
++{
++	u32 val = clk_readl(c->reg);
++	const struct clk_mux_sel *mux = 0;
++	const struct clk_mux_sel *sel;
++	if (c->flags & MUX) {
++		for (sel = c->inputs; sel->input != NULL; sel++) {
++			if (val >> PERIPH_CLK_SOURCE_SHIFT == sel->value)
++				mux = sel;
++		}
++		BUG_ON(!mux);
++
++		c->parent = mux->input;
++	} else {
++		c->parent = c->inputs[0].input;
++	}
++
++	if (c->flags & DIV_U71) {
++		u32 divu71 = val & PERIPH_CLK_SOURCE_DIV_MASK;
++		c->div = divu71 + 2;
++		c->mul = 2;
++	} else {
++		c->div = 1;
++		c->mul = 1;
++	}
++
++	c->state = ON;
++	if (!(clk_readl(CLK_OUT_ENB + PERIPH_CLK_TO_ENB_REG(c)) &
++			PERIPH_CLK_TO_ENB_BIT(c)))
++		c->state = OFF;
++	if (!(c->flags & PERIPH_NO_RESET))
++		if (clk_readl(RST_DEVICES + PERIPH_CLK_TO_ENB_REG(c)) &
++				PERIPH_CLK_TO_ENB_BIT(c))
++			c->state = OFF;
++	tegra2_clk_recalculate_rate(c);
++}
++
++static int tegra2_periph_clk_enable(struct clk *c)
++{
++	u32 val;
++	pr_debug("%s on clock %s\n", __func__, c->name);
++
++	clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
++		CLK_OUT_ENB_SET + PERIPH_CLK_TO_ENB_SET_REG(c));
++	if (!(c->flags & PERIPH_NO_RESET) && !(c->flags & PERIPH_MANUAL_RESET))
++		clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
++			RST_DEVICES_CLR + PERIPH_CLK_TO_ENB_SET_REG(c));
++	if (c->flags & PERIPH_EMC_ENB) {
++		/* The EMC peripheral clock has 2 extra enable bits */
++		/* FIXME: Do they need to be disabled? */
++		val = clk_readl(c->reg);
++		val |= 0x3 << 24;
++		clk_writel(val, c->reg);
++	}
++	return 0;
++}
++
++static void tegra2_periph_clk_disable(struct clk *c)
++{
++	pr_debug("%s on clock %s\n", __func__, c->name);
++
++	clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
++		CLK_OUT_ENB_CLR + PERIPH_CLK_TO_ENB_SET_REG(c));
++}
++
++void tegra2_periph_reset_deassert(struct clk *c)
++{
++	pr_debug("%s on clock %s\n", __func__, c->name);
++	if (!(c->flags & PERIPH_NO_RESET))
++		clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
++			RST_DEVICES_CLR + PERIPH_CLK_TO_ENB_SET_REG(c));
++}
++
++void tegra2_periph_reset_assert(struct clk *c)
++{
++	pr_debug("%s on clock %s\n", __func__, c->name);
++	if (!(c->flags & PERIPH_NO_RESET))
++		clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
++			RST_DEVICES_SET + PERIPH_CLK_TO_ENB_SET_REG(c));
++}
++
++
++static int tegra2_periph_clk_set_parent(struct clk *c, struct clk *p)
++{
++	u32 val;
++	const struct clk_mux_sel *sel;
++	pr_debug("%s: %s %s\n", __func__, c->name, p->name);
++	for (sel = c->inputs; sel->input != NULL; sel++) {
++		if (sel->input == p) {
++			clk_reparent(c, p);
++			val = clk_readl(c->reg);
++			val &= ~PERIPH_CLK_SOURCE_MASK;
++			val |= (sel->value) << PERIPH_CLK_SOURCE_SHIFT;
++			clk_writel(val, c->reg);
++			c->rate = c->parent->rate;
++			return 0;
++		}
++	}
++
++	return -EINVAL;
++}
++
++static int tegra2_periph_clk_set_rate(struct clk *c, unsigned long rate)
++{
++	u32 val;
++	int divider_u71;
++	pr_debug("%s: %lu\n", __func__, rate);
++	if (c->flags & DIV_U71) {
++		divider_u71 = clk_div71_get_divider(c->parent, rate);
++		if (divider_u71 >= 0) {
++			val = clk_readl(c->reg);
++			val &= ~PERIPH_CLK_SOURCE_DIV_MASK;
++			val |= divider_u71;
++			clk_writel(val, c->reg);
++			c->div = divider_u71 + 2;
++			c->mul = 2;
++			tegra2_clk_recalculate_rate(c);
++			return 0;
++		}
++	}
++	return -EINVAL;
++}
++
++static struct clk_ops tegra_periph_clk_ops = {
++	.init			= &tegra2_periph_clk_init,
++	.enable			= &tegra2_periph_clk_enable,
++	.disable		= &tegra2_periph_clk_disable,
++	.set_parent		= &tegra2_periph_clk_set_parent,
++	.set_rate		= &tegra2_periph_clk_set_rate,
++	.recalculate_rate	= &tegra2_clk_recalculate_rate,
++};
++
++/* Clock doubler ops */
++static void tegra2_clk_double_init(struct clk *c)
++{
++	c->mul = 2;
++	c->div = 1;
++	c->state = ON;
++	if (!(clk_readl(CLK_OUT_ENB + PERIPH_CLK_TO_ENB_REG(c)) &
++			PERIPH_CLK_TO_ENB_BIT(c)))
++		c->state = OFF;
++	tegra2_clk_recalculate_rate(c);
++};
++
++static struct clk_ops tegra_clk_double_ops = {
++	.init			= &tegra2_clk_double_init,
++	.enable			= &tegra2_periph_clk_enable,
++	.disable		= &tegra2_periph_clk_disable,
++	.recalculate_rate	= &tegra2_clk_recalculate_rate,
++};
++
++/* Clock definitions */
++static struct clk tegra_clk_32k = {
++	.name = "clk_32k",
++	.rate = 32678,
++	.ops  = NULL,
++};
++
++static struct clk_pll_table tegra_pll_s_table[] = {
++	{32768, 12000000, 366, 1, 1, 0},
++	{32768, 13000000, 397, 1, 1, 0},
++	{32768, 19200000, 586, 1, 1, 0},
++	{32768, 26000000, 793, 1, 1, 0},
++	{0, 0, 0, 0, 0, 0},
++};
++
++static struct clk tegra_pll_s = {
++	.name      = "pll_s",
++	.flags     = PLL_ALT_MISC_REG,
++	.ops       = &tegra_pll_ops,
++	.reg       = 0xf0,
++	.input_min = 32768,
++	.input_max = 32768,
++	.parent    = &tegra_clk_32k,
++	.cf_min    = 0, /* FIXME */
++	.cf_max    = 0, /* FIXME */
++	.vco_min   = 12000000,
++	.vco_max   = 26000000,
++	.pll_table = tegra_pll_s_table,
++};
++
++static struct clk_mux_sel tegra_clk_m_sel[] = {
++	{ .input = &tegra_clk_32k, .value = 0},
++	{ .input = &tegra_pll_s,  .value = 1},
++	{ 0, 0},
++};
++static struct clk tegra_clk_m = {
++	.name      = "clk_m",
++	.flags     = ENABLE_ON_INIT,
++	.ops       = &tegra_clk_m_ops,
++	.inputs    = tegra_clk_m_sel,
++	.reg       = 0x1fc,
++	.reg_mask  = (1<<28),
++	.reg_shift = 28,
++};
++
++static struct clk_pll_table tegra_pll_c_table[] = {
++	{ 0, 0, 0, 0, 0, 0 },
++};
++
++static struct clk tegra_pll_c = {
++	.name      = "pll_c",
++	.flags	   = PLL_HAS_CPCON,
++	.ops       = &tegra_pll_ops,
++	.reg       = 0x80,
++	.input_min = 2000000,
++	.input_max = 31000000,
++	.parent    = &tegra_clk_m,
++	.cf_min    = 1000000,
++	.cf_max    = 6000000,
++	.vco_min   = 20000000,
++	.vco_max   = 1400000000,
++	.pll_table = tegra_pll_c_table,
++};
++
++static struct clk tegra_pll_c_out1 = {
++	.name      = "pll_c_out1",
++	.ops       = &tegra_pll_div_ops,
++	.flags     = DIV_U71,
++	.parent    = &tegra_pll_c,
++	.reg       = 0x84,
++	.reg_shift = 0,
++};
++
++static struct clk_pll_table tegra_pll_m_table[] = {
++	{ 0, 0, 0, 0, 0, 0 },
++};
++
++static struct clk tegra_pll_m = {
++	.name      = "pll_m",
++	.flags     = PLL_HAS_CPCON,
++	.ops       = &tegra_pll_ops,
++	.reg       = 0x90,
++	.input_min = 2000000,
++	.input_max = 31000000,
++	.parent    = &tegra_clk_m,
++	.cf_min    = 1000000,
++	.cf_max    = 6000000,
++	.vco_min   = 20000000,
++	.vco_max   = 1200000000,
++	.pll_table = tegra_pll_m_table,
++};
++
++static struct clk tegra_pll_m_out1 = {
++	.name      = "pll_m_out1",
++	.ops       = &tegra_pll_div_ops,
++	.flags     = DIV_U71,
++	.parent    = &tegra_pll_m,
++	.reg       = 0x94,
++	.reg_shift = 0,
++};
++
++static struct clk_pll_table tegra_pll_p_table[] = {
++	{ 12000000, 216000000, 432, 12, 2, 8},
++	{ 13000000, 216000000, 432, 13, 2, 8},
++	{ 19200000, 216000000, 90,   4, 2, 1},
++	{ 26000000, 216000000, 432, 26, 2, 8},
++	{ 12000000, 432000000, 432, 12, 1, 8},
++	{ 13000000, 432000000, 432, 13, 1, 8},
++	{ 19200000, 432000000, 90,   4, 1, 1},
++	{ 26000000, 432000000, 432, 26, 1, 8},
++	{ 0, 0, 0, 0, 0, 0 },
++};
++
++static struct clk tegra_pll_p = {
++	.name      = "pll_p",
++	.flags     = ENABLE_ON_INIT | PLL_FIXED | PLL_HAS_CPCON,
++	.ops       = &tegra_pll_ops,
++	.reg       = 0xa0,
++	.input_min = 2000000,
++	.input_max = 31000000,
++	.parent    = &tegra_clk_m,
++	.cf_min    = 1000000,
++	.cf_max    = 6000000,
++	.vco_min   = 20000000,
++	.vco_max   = 1400000000,
++	.pll_table = tegra_pll_p_table,
++};
++
++static struct clk tegra_pll_p_out1 = {
++	.name      = "pll_p_out1",
++	.ops       = &tegra_pll_div_ops,
++	.flags     = ENABLE_ON_INIT | DIV_U71 | DIV_U71_FIXED,
++	.parent    = &tegra_pll_p,
++	.reg       = 0xa4,
++	.reg_shift = 0,
++};
++
++static struct clk tegra_pll_p_out2 = {
++	.name      = "pll_p_out2",
++	.ops       = &tegra_pll_div_ops,
++	.flags     = ENABLE_ON_INIT | DIV_U71 | DIV_U71_FIXED,
++	.parent    = &tegra_pll_p,
++	.reg       = 0xa4,
++	.reg_shift = 16,
++};
++
++static struct clk tegra_pll_p_out3 = {
++	.name      = "pll_p_out3",
++	.ops       = &tegra_pll_div_ops,
++	.flags     = ENABLE_ON_INIT | DIV_U71 | DIV_U71_FIXED,
++	.parent    = &tegra_pll_p,
++	.reg       = 0xa8,
++	.reg_shift = 0,
++};
++
++static struct clk tegra_pll_p_out4 = {
++	.name      = "pll_p_out4",
++	.ops       = &tegra_pll_div_ops,
++	.flags     = ENABLE_ON_INIT | DIV_U71 | DIV_U71_FIXED,
++	.parent    = &tegra_pll_p,
++	.reg       = 0xa8,
++	.reg_shift = 16,
++};
++
++static struct clk_pll_table tegra_pll_a_table[] = {
++	{ 28800000, 56448000, 49, 25, 1, 1},
++	{ 28800000, 73728000, 64, 25, 1, 1},
++	{ 28800000, 11289600, 49, 25, 1, 1},
++	{ 28800000, 12288000, 64, 25, 1, 1},
++	{ 0, 0, 0, 0, 0, 0 },
++};
++
++static struct clk tegra_pll_a = {
++	.name      = "pll_a",
++	.flags     = PLL_HAS_CPCON,
++	.ops       = &tegra_pll_ops,
++	.reg       = 0xb0,
++	.input_min = 2000000,
++	.input_max = 31000000,
++	.parent    = &tegra_pll_p_out1,
++	.cf_min    = 1000000,
++	.cf_max    = 6000000,
++	.vco_min   = 20000000,
++	.vco_max   = 1400000000,
++	.pll_table = tegra_pll_a_table,
++};
++
++static struct clk tegra_pll_a_out0 = {
++	.name      = "pll_a_out0",
++	.ops       = &tegra_pll_div_ops,
++	.flags     = DIV_U71,
++	.parent    = &tegra_pll_a,
++	.reg       = 0xb4,
++	.reg_shift = 0,
++};
++
++static struct clk_pll_table tegra_pll_d_table[] = {
++	{ 12000000, 1000000000, 1000, 12, 1, 12},
++	{ 13000000, 1000000000, 1000, 13, 1, 12},
++	{ 19200000, 1000000000, 625,  12, 1, 8},
++	{ 26000000, 1000000000, 1000, 26, 1, 12},
++	{ 0, 0, 0, 0, 0, 0 },
++};
++
++static struct clk tegra_pll_d = {
++	.name      = "pll_d",
++	.flags     = PLL_HAS_CPCON | PLLD,
++	.ops       = &tegra_pll_ops,
++	.reg       = 0xd0,
++	.input_min = 2000000,
++	.input_max = 40000000,
++	.parent    = &tegra_clk_m,
++	.cf_min    = 1000000,
++	.cf_max    = 6000000,
++	.vco_min   = 40000000,
++	.vco_max   = 1000000000,
++	.pll_table = tegra_pll_d_table,
++};
++
++static struct clk tegra_pll_d_out0 = {
++	.name      = "pll_d_out0",
++	.ops       = &tegra_pll_div_ops,
++	.flags     = DIV_2 | PLLD,
++	.parent    = &tegra_pll_d,
++};
++
++static struct clk_pll_table tegra_pll_u_table[] = {
++	{ 12000000, 480000000, 960, 12, 1, 0},
++	{ 13000000, 480000000, 960, 13, 1, 0},
++	{ 19200000, 480000000, 200, 4,  1, 0},
++	{ 26000000, 480000000, 960, 26, 1, 0},
++	{ 0, 0, 0, 0, 0, 0 },
++};
++
++static struct clk tegra_pll_u = {
++	.name      = "pll_u",
++	.flags     = 0,
++	.ops       = &tegra_pll_ops,
++	.reg       = 0xc0,
++	.input_min = 2000000,
++	.input_max = 40000000,
++	.parent    = &tegra_clk_m,
++	.cf_min    = 1000000,
++	.cf_max    = 6000000,
++	.vco_min   = 480000000,
++	.vco_max   = 960000000,
++	.pll_table = tegra_pll_u_table,
++};
++
++static struct clk_pll_table tegra_pll_x_table[] = {
++	{ 12000000, 1000000000, 1000, 12, 1, 12},
++	{ 13000000, 1000000000, 1000, 13, 1, 12},
++	{ 19200000, 1000000000, 625,  12, 1, 8},
++	{ 26000000, 1000000000, 1000, 26, 1, 12},
++	{ 12000000, 750000000,  750,  12, 1, 12},
++	{ 13000000, 750000000,  750,  13, 1, 12},
++	{ 19200000, 750000000,  625,  16, 1, 8},
++	{ 26000000, 750000000,  750,  26, 1, 12},
++	{ 0, 0, 0, 0, 0, 0 },
++};
++
++static struct clk tegra_pll_x = {
++	.name      = "pll_x",
++	.flags     = PLL_HAS_CPCON | PLL_ALT_MISC_REG,
++	.ops       = &tegra_pll_ops,
++	.reg       = 0xe0,
++	.input_min = 2000000,
++	.input_max = 31000000,
++	.parent    = &tegra_clk_m,
++	.cf_min    = 1000000,
++	.cf_max    = 6000000,
++	.vco_min   = 20000000,
++	.vco_max   = 1200000000,
++	.pll_table = tegra_pll_x_table,
++};
++
++static struct clk tegra_clk_d = {
++	.name      = "clk_d",
++	.flags     = PERIPH_NO_RESET,
++	.ops       = &tegra_clk_double_ops,
++	.clk_num   = 90,
++	.reg       = 0x34,
++	.reg_shift = 12,
++	.parent    = &tegra_clk_m,
++};
++
++/* FIXME: need tegra_audio
++static struct clk tegra_clk_audio_2x = {
++	.name      = "clk_d",
++	.flags     = PERIPH_NO_RESET,
++	.ops       = &tegra_clk_double_ops,
++	.clk_num   = 89,
++	.reg       = 0x34,
++	.reg_shift = 8,
++	.parent    = &tegra_audio,
++}
++*/
++
++static struct clk_mux_sel mux_cclk[] = {
++	{ .input = &tegra_clk_m,	.value = 0},
++	{ .input = &tegra_pll_c,	.value = 1},
++	{ .input = &tegra_clk_32k,	.value = 2},
++	{ .input = &tegra_pll_m,	.value = 3},
++	{ .input = &tegra_pll_p,	.value = 4},
++	{ .input = &tegra_pll_p_out4,	.value = 5},
++	{ .input = &tegra_pll_p_out3,	.value = 6},
++	{ .input = &tegra_clk_d,	.value = 7},
++	{ .input = &tegra_pll_x,	.value = 8},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_sclk[] = {
++	{ .input = &tegra_clk_m,	.value = 0},
++	{ .input = &tegra_pll_c_out1,	.value = 1},
++	{ .input = &tegra_pll_p_out4,	.value = 2},
++	{ .input = &tegra_pll_p_out3,	.value = 3},
++	{ .input = &tegra_pll_p_out2,	.value = 4},
++	{ .input = &tegra_clk_d,	.value = 5},
++	{ .input = &tegra_clk_32k,	.value = 6},
++	{ .input = &tegra_pll_m_out1,	.value = 7},
++	{ 0, 0},
++};
++
++static struct clk tegra_clk_cpu = {
++	.name	= "cpu",
++	.inputs	= mux_cclk,
++	.reg	= 0x20,
++	.ops	= &tegra_super_ops,
++};
++
++static struct clk tegra_clk_sys = {
++	.name	= "sys",
++	.inputs	= mux_sclk,
++	.reg	= 0x28,
++	.ops	= &tegra_super_ops,
++};
++
++static struct clk tegra_clk_hclk = {
++	.name		= "hclk",
++	.flags		= DIV_BUS,
++	.parent		= &tegra_clk_sys,
++	.reg		= 0x30,
++	.reg_shift	= 4,
++	.ops		= &tegra_bus_ops,
++};
++
++static struct clk tegra_clk_pclk = {
++	.name		= "pclk",
++	.flags		= DIV_BUS,
++	.parent		= &tegra_clk_hclk,
++	.reg		= 0x30,
++	.reg_shift	= 0,
++	.ops		= &tegra_bus_ops,
++};
++
++static struct clk_mux_sel mux_pllm_pllc_pllp_plla[] = {
++	{ .input = &tegra_pll_m, .value = 0},
++	{ .input = &tegra_pll_c, .value = 1},
++	{ .input = &tegra_pll_p, .value = 2},
++	{ .input = &tegra_pll_a_out0, .value = 3},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_pllm_pllc_pllp_clkm[] = {
++	{ .input = &tegra_pll_m, .value = 0},
++	{ .input = &tegra_pll_c, .value = 1},
++	{ .input = &tegra_pll_p, .value = 2},
++	{ .input = &tegra_clk_m, .value = 3},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_pllp_pllc_pllm_clkm[] = {
++	{ .input = &tegra_pll_p, .value = 0},
++	{ .input = &tegra_pll_c, .value = 1},
++	{ .input = &tegra_pll_m, .value = 2},
++	{ .input = &tegra_clk_m, .value = 3},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_plla_audio_pllp_clkm[] = {
++	{.input = &tegra_pll_a, .value = 0},
++	/* FIXME: no mux defined for tegra_audio
++	{.input = &tegra_audio, .value = 1},*/
++	{.input = &tegra_pll_p, .value = 2},
++	{.input = &tegra_clk_m, .value = 3},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_pllp_plld_pllc_clkm[] = {
++	{.input = &tegra_pll_p, .value = 0},
++	{.input = &tegra_pll_d_out0, .value = 1},
++	{.input = &tegra_pll_c, .value = 2},
++	{.input = &tegra_clk_m, .value = 3},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_pllp_pllc_audio_clkm_clk32[] = {
++	{.input = &tegra_pll_p,     .value = 0},
++	{.input = &tegra_pll_c,     .value = 1},
++	/* FIXME: no mux defined for tegra_audio
++	{.input = &tegra_audio,     .value = 2},*/
++	{.input = &tegra_clk_m,     .value = 3},
++	{.input = &tegra_clk_32k,   .value = 4},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_pllp_pllc_pllm[] = {
++	{.input = &tegra_pll_p,     .value = 0},
++	{.input = &tegra_pll_c,     .value = 1},
++	{.input = &tegra_pll_m,     .value = 2},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_clk_m[] = {
++	{ .input = &tegra_clk_m, .value = 0},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_pllp_out3[] = {
++	{ .input = &tegra_pll_p_out3, .value = 0},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_plld[] = {
++	{ .input = &tegra_pll_d, .value = 0},
++	{ 0, 0},
++};
++
++static struct clk_mux_sel mux_clk_32k[] = {
++	{ .input = &tegra_clk_32k, .value = 0},
++	{ 0, 0},
++};
++
++#define PERIPH_CLK(_name, _dev, _con, _clk_num, _reg, _inputs, _flags) \
++	{						\
++		.name      = _name,			\
++		.lookup    = {				\
++			.dev_id    = _dev,		\
++			.con_id	   = _con,		\
++		},					\
++		.ops       = &tegra_periph_clk_ops,	\
++		.clk_num   = _clk_num,			\
++		.reg       = _reg,			\
++		.inputs    = _inputs,			\
++		.flags     = _flags,			\
++	}
++
++struct clk tegra_periph_clks[] = {
++	PERIPH_CLK("rtc",	"rtc-tegra",		NULL,	4,	0,	mux_clk_32k,			PERIPH_NO_RESET),
++	PERIPH_CLK("timer",	"timer",		NULL,	5,	0,	mux_clk_m,			0),
++	PERIPH_CLK("i2s1",	"i2s.0",		NULL,	11,	0x100,	mux_plla_audio_pllp_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("i2s2",	"i2s.1",		NULL,	18,	0x104,	mux_plla_audio_pllp_clkm,	MUX | DIV_U71),
++	/* FIXME: spdif has 2 clocks but 1 enable */
++	PERIPH_CLK("spdif_out",	"spdif_out",		NULL,	10,	0x108,	mux_plla_audio_pllp_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("spdif_in",	"spdif_in",		NULL,	10,	0x10c,	mux_pllp_pllc_pllm,		MUX | DIV_U71),
++	PERIPH_CLK("pwm",	"pwm",			NULL,	17,	0x110,	mux_pllp_pllc_audio_clkm_clk32,	MUX | DIV_U71),
++	PERIPH_CLK("spi",	"spi",			NULL,	43,	0x114,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("xio",	"xio",			NULL,	45,	0x120,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("twc",	"twc",			NULL,	16,	0x12c,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("sbc1",	"spi_tegra.0",		NULL,	41,	0x134,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("sbc2",	"spi_tegra.1",		NULL,	44,	0x118,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("sbc3",	"spi_tegra.2",		NULL,	46,	0x11c,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("sbc4",	"spi_tegra.3",		NULL,	68,	0x1b4,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("ide",	"ide",			NULL,	25,	0x144,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("ndflash",	"tegra_nand",		NULL,	13,	0x160,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	/* FIXME: vfir shares an enable with uartb */
++	PERIPH_CLK("vfir",	"vfir",			NULL,	7,	0x168,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("sdmmc1",	"sdhci-tegra.0",	NULL,	14,	0x150,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("sdmmc2",	"sdhci-tegra.1",	NULL,	9,	0x154,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("sdmmc3",	"sdhci-tegra.2",	NULL,	69,	0x1bc,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("sdmmc4",	"sdhci-tegra.3",	NULL,	15,	0x160,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("vde",	"vde",			NULL,	61,	0x1c8,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("csite",	"csite",		NULL,	73,	0x1d4,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	/* FIXME: what is la? */
++	PERIPH_CLK("la",	"la",			NULL,	76,	0x1f8,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("owr",	"owr",			NULL,	71,	0x1cc,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("nor",	"nor",			NULL,	42,	0x1d0,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("mipi",	"mipi",			NULL,	50,	0x174,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("i2c1",	"tegra-i2c.0",		NULL,	12,	0x124,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("i2c2",	"tegra-i2c.1",		NULL,	54,	0x198,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("i2c3",	"tegra-i2c.2",		NULL,	67,	0x1b8,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("dvc",	"tegra-i2c.3",		NULL,	47,	0x128,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("i2c1_i2c",	"tegra-i2c.0",		"i2c",	0,	0,	mux_pllp_out3,			0),
++	PERIPH_CLK("i2c2_i2c",	"tegra-i2c.1",		"i2c",	0,	0,	mux_pllp_out3,			0),
++	PERIPH_CLK("i2c3_i2c",	"tegra-i2c.2",		"i2c",	0,	0,	mux_pllp_out3,			0),
++	PERIPH_CLK("dvc_i2c",	"tegra-i2c.3",		"i2c",	0,	0,	mux_pllp_out3,			0),
++	PERIPH_CLK("uarta",	"uart.0",		NULL,	6,	0x178,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("uartb",	"uart.1",		NULL,	7,	0x17c,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("uartc",	"uart.2",		NULL,	55,	0x1a0,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("uartd",	"uart.3",		NULL,	65,	0x1c0,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("uarte",	"uart.4",		NULL,	66,	0x1c4,	mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("3d",	"3d",			NULL,	24,	0x158,	mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_MANUAL_RESET),
++	PERIPH_CLK("2d",	"2d",			NULL,	21,	0x15c,	mux_pllm_pllc_pllp_plla,	MUX | DIV_U71),
++	/* FIXME: vi and vi_sensor share an enable */
++	PERIPH_CLK("vi",	"vi",			NULL,	20,	0x148,	mux_pllm_pllc_pllp_plla,	MUX | DIV_U71),
++	PERIPH_CLK("vi_sensor",	"vi_sensor",		NULL,	20,	0x1a8,	mux_pllm_pllc_pllp_plla,	MUX | DIV_U71),
++	PERIPH_CLK("epp",	"epp",			NULL,	19,	0x16c,	mux_pllm_pllc_pllp_plla,	MUX | DIV_U71),
++	PERIPH_CLK("mpe",	"mpe",			NULL,	60,	0x170,	mux_pllm_pllc_pllp_plla,	MUX | DIV_U71),
++	PERIPH_CLK("host1x",	"host1x",		NULL,	28,	0x180,	mux_pllm_pllc_pllp_plla,	MUX | DIV_U71),
++	/* FIXME: cve and tvo share an enable	*/
++	PERIPH_CLK("cve",	"cve",			NULL,	49,	0x140,	mux_pllp_plld_pllc_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("tvo",	"tvo",			NULL,	49,	0x188,	mux_pllp_plld_pllc_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("hdmi",	"hdmi",			NULL,	51,	0x18c,	mux_pllp_plld_pllc_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("tvdac",	"tvdac",		NULL,	53,	0x194,	mux_pllp_plld_pllc_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("disp1",	"tegrafb.0",		NULL,	27,	0x138,	mux_pllp_plld_pllc_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("disp2",	"tegrafb.1",		NULL,	26,	0x13c,	mux_pllp_plld_pllc_clkm,	MUX | DIV_U71),
++	PERIPH_CLK("usbd",	"fsl-tegra-udc",	NULL,	22,	0,	mux_clk_m,			0),
++	PERIPH_CLK("usb2",	"usb.1",		NULL,	58,	0,	mux_clk_m,			0),
++	PERIPH_CLK("usb3",	"usb.2",		NULL,	59,	0,	mux_clk_m,			0),
++	PERIPH_CLK("emc",	"emc",			NULL,	57,	0x19c,	mux_pllm_pllc_pllp_clkm,	MUX | DIV_U71 | PERIPH_EMC_ENB),
++	PERIPH_CLK("dsi",	"dsi",			NULL,	48,	0,	mux_plld,			0),
++};
++
++#define CLK_DUPLICATE(_name, _dev, _con)		\
++	{						\
++		.name	= _name,			\
++		.lookup	= {				\
++			.dev_id	= _dev,			\
++			.con_id		= _con,		\
++		},					\
++	}
++
++/* Some clocks may be used by different drivers depending on the board
++ * configuration.  List those here to register them twice in the clock lookup
++ * table under two names.
++ */
++struct clk_duplicate tegra_clk_duplicates[] = {
++	CLK_DUPLICATE("uarta",	"tegra_uart.0",	NULL),
++	CLK_DUPLICATE("uartb",	"tegra_uart.1",	NULL),
++	CLK_DUPLICATE("uartc",	"tegra_uart.2",	NULL),
++	CLK_DUPLICATE("uartd",	"tegra_uart.3",	NULL),
++	CLK_DUPLICATE("uarte",	"tegra_uart.4",	NULL),
++};
++
++#define CLK(dev, con, ck)	\
++	{			\
++		.dev_id = dev,	\
++		.con_id = con,	\
++		.clk = ck,	\
++	}
++
++struct clk_lookup tegra_clk_lookups[] = {
++	/* external root sources */
++	CLK(NULL,	"32k_clk",	&tegra_clk_32k),
++	CLK(NULL,	"pll_s",	&tegra_pll_s),
++	CLK(NULL,	"clk_m",	&tegra_clk_m),
++	CLK(NULL,	"pll_m",	&tegra_pll_m),
++	CLK(NULL,	"pll_m_out1",	&tegra_pll_m_out1),
++	CLK(NULL,	"pll_c",	&tegra_pll_c),
++	CLK(NULL,	"pll_c_out1",	&tegra_pll_c_out1),
++	CLK(NULL,	"pll_p",	&tegra_pll_p),
++	CLK(NULL,	"pll_p_out1",	&tegra_pll_p_out1),
++	CLK(NULL,	"pll_p_out2",	&tegra_pll_p_out2),
++	CLK(NULL,	"pll_p_out3",	&tegra_pll_p_out3),
++	CLK(NULL,	"pll_p_out4",	&tegra_pll_p_out4),
++	CLK(NULL,	"pll_a",	&tegra_pll_a),
++	CLK(NULL,	"pll_a_out0",	&tegra_pll_a_out0),
++	CLK(NULL,	"pll_d",	&tegra_pll_d),
++	CLK(NULL,	"pll_d_out0",	&tegra_pll_d_out0),
++	CLK(NULL,	"pll_u",	&tegra_pll_u),
++	CLK(NULL,	"pll_x",	&tegra_pll_x),
++	CLK(NULL,	"cpu",		&tegra_clk_cpu),
++	CLK(NULL,	"sys",		&tegra_clk_sys),
++	CLK(NULL,	"hclk",		&tegra_clk_hclk),
++	CLK(NULL,	"pclk",		&tegra_clk_pclk),
++	CLK(NULL,	"clk_d",	&tegra_clk_d),
++};
++
++void __init tegra2_init_clocks(void)
++{
++	int i;
++	struct clk_lookup *cl;
++	struct clk *c;
++	struct clk_duplicate *cd;
++
++	for (i = 0; i < ARRAY_SIZE(tegra_clk_lookups); i++) {
++		cl = &tegra_clk_lookups[i];
++		clk_init(cl->clk);
++		clkdev_add(cl);
++	}
++
++	for (i = 0; i < ARRAY_SIZE(tegra_periph_clks); i++) {
++		c = &tegra_periph_clks[i];
++		cl = &c->lookup;
++		cl->clk = c;
++
++		clk_init(cl->clk);
++		clkdev_add(cl);
++	}
++
++	for (i = 0; i < ARRAY_SIZE(tegra_clk_duplicates); i++) {
++		cd = &tegra_clk_duplicates[i];
++		c = tegra_get_clock_by_name(cd->name);
++		if (c) {
++			cl = &cd->lookup;
++			cl->clk = c;
++			clkdev_add(cl);
++		} else {
++			pr_err("%s: Unknown duplicate clock %s\n", __func__,
++				cd->name);
++		}
++	}
++}
 -- 
 1.6.5.6
