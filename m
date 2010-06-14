@@ -1,148 +1,71 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 14 Jun 2010 16:41:12 +0900
-Subject: [PATCH 2/2 RE-SEND] ARM: S5PV210: Add support HSMMC on Samsung
-	SMDKV210
-In-Reply-To: <1276499983-19463-1-git-send-email-kgene.kim@samsung.com>
-References: <1276499983-19463-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <AANLkTin-IvzeY3QDMskm-G6QWFqddppdYrrkEBldGGsN@mail.gmail.com>
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Sun, 13 Jun 2010 21:45:50 -1000
+Subject: Request review of device tree documentation
+In-Reply-To: <20100614073828.GA6095@n2100.arm.linux.org.uk>
+References: <AANLkTilv6TtPZs0DAwd8JlSV_J3VvMsvtVVOOeQauOIn@mail.gmail.com>
+	<4C13430B.5000907@firmworks.com>
+	<1276339529.1962.184.camel@pasglop>
+	<1276339684.1962.186.camel@pasglop>
+	<4C13B618.1030006@firmworks.com>
+	<1276383132.1962.195.camel@pasglop>
+	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>
+	<4C146F18.9030008@firmworks.com>
+	<1276408773.1962.574.camel@pasglop>
+	<AANLkTinwL0XtMNG13inr_1UliOlqZkyr4dlvG-ZGL9JT@mail.gmail.com>
+	<20100614073828.GA6095@n2100.arm.linux.org.uk>
+Message-ID: <4C15DE2E.1050905@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Mon, Jun 14, 2010 at 4:19 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> From: Lee Hyuk <hyuk1.lee@samsung.com>
+Russell King - ARM Linux wrote:
+> On Sun, Jun 13, 2010 at 11:23:45PM -0600, Grant Likely wrote:
+>   
+>>>> Or perhaps the MMU and caches can be turned off for the duration of the
+>>>> callback.
+>>>> I don't have the details of ARM MMUs and caches reloaded into my head
+>>>> yet.  Maybe next week...
+>>>>         
 >
-> This patch adds support HSMMC on Samsung SMDKV210, and gpio configuration for
-> S5PV210 hsmmc3.
+> We've had these kinds of questions in the past.  Doing what you're asking
+> above is not really an option - it requires:
 >
-> Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
+> 1. disable all IRQs
+> 2. setup 1:1 MMU mappings for code to turn off MMU
+>    (requires new page table)
+> 3. disable imprecise exceptions
+> 4. flush caches and TLBS
+> 5. jump to 1:1 mapping area for code to disable MMU
+> 6. disable caches and mmu
+> 7. call function
+> 8. flush caches and TLBs
+> 9. re-enable caches and mmu
+> 10. re-enable imprecise exceptions
+> 11. switch back to original MMU mappings
+> 12. re-enable all IRQs
 >
-> Changes since previous patch:
+> This is fine if you don't care at all about interrupt latency.
+> Unfortunately, most people do care about interrupt latency because
+> that directly affects interactivity and system performance.  The
+> called function could not enable interrupts or exceptions - as the
+> CPU vectors are in virtual space, disabling the MMU effectively
+> makes them disappear.
 >
-> - Adding missed call s5pv210_default_sdhci3() in s5pv210_map_io()
+> Moreover, with the MMU and caches disabled, the CPU performance is
+> extremely poor, so the called function will run slowly.
 >
->  arch/arm/mach-s5pv210/Kconfig            |    5 +++++
->  arch/arm/mach-s5pv210/cpu.c              |    1 +
->  arch/arm/mach-s5pv210/include/mach/map.h |    1 +
->  arch/arm/mach-s5pv210/mach-smdkv210.c    |    4 ++++
->  arch/arm/mach-s5pv210/setup-sdhci-gpio.c |   20 ++++++++++++++++++++
->  5 files changed, 31 insertions(+), 0 deletions(-)
+> So, disabling the MMU isn't really viable.
+>   
+
+None of this is a deal-breaker for the kind of debugging tasks that are 
+the primary use case for the callback.
+
+> Now, if the external code was fully PIC, we could then run it with
+> the MMU enabled.  However, this wouldn't really help - the external
+> code could not access any devices without knowledge of how the kernel
+> setup the V:P translations.
 >
-> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-> index 0761eac..6aee967 100644
-> --- a/arch/arm/mach-s5pv210/Kconfig
-> +++ b/arch/arm/mach-s5pv210/Kconfig
-> @@ -72,9 +72,14 @@ config MACH_SMDKV210
->        select CPU_S5PV210
->        select ARCH_SPARSEMEM_ENABLE
->        select SAMSUNG_DEV_ADC
-> +       select S3C_DEV_HSMMC
-> +       select S3C_DEV_HSMMC1
-> +       select S3C_DEV_HSMMC2
-> +       select S3C_DEV_HSMMC3
->        select SAMSUNG_DEV_TS
->        select S3C_DEV_WDT
->        select HAVE_S3C2410_WATCHDOG
-> +       select S5PV210_SETUP_SDHCI
->        help
->          Machine support for Samsung SMDKV210
+> So you'd need to pass some kind of data structure giving locations of
+> devices to the called code - but then what if the kernel doesn't have
+> the device mapped?
 >
-> diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
-> index 411a4a9..765034e 100644
-> --- a/arch/arm/mach-s5pv210/cpu.c
-> +++ b/arch/arm/mach-s5pv210/cpu.c
-> @@ -86,6 +86,7 @@ void __init s5pv210_map_io(void)
->        s5pv210_default_sdhci0();
->        s5pv210_default_sdhci1();
->        s5pv210_default_sdhci2();
-> +       s5pv210_default_sdhci3();
->
->        /* the i2c devices are directly compatible with s3c2440 */
->        s3c_i2c0_setname("s3c2440-i2c");
-> diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
-> index 34eb168..fa9d7c2 100644
-> --- a/arch/arm/mach-s5pv210/include/mach/map.h
-> +++ b/arch/arm/mach-s5pv210/include/mach/map.h
-> @@ -97,6 +97,7 @@
->  #define S3C_PA_HSMMC0          S5PV210_PA_HSMMC(0)
->  #define S3C_PA_HSMMC1          S5PV210_PA_HSMMC(1)
->  #define S3C_PA_HSMMC2          S5PV210_PA_HSMMC(2)
-> +#define S3C_PA_HSMMC3          S5PV210_PA_HSMMC(3)
->  #define S3C_PA_IIC             S5PV210_PA_IIC0
->  #define S3C_PA_IIC1            S5PV210_PA_IIC1
->  #define S3C_PA_IIC2            S5PV210_PA_IIC2
-> diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
-> index 0d46279..b08f376 100644
-> --- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-> +++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-> @@ -77,6 +77,10 @@ static struct platform_device *smdkv210_devices[] __initdata = {
->        &s5pv210_device_iis0,
->        &s5pv210_device_ac97,
->        &s3c_device_adc,
-> +       &s3c_device_hsmmc0,
-> +       &s3c_device_hsmmc1,
-> +       &s3c_device_hsmmc2,
-> +       &s3c_device_hsmmc3,
->        &s3c_device_ts,
->        &s3c_device_wdt,
->  };
-> diff --git a/arch/arm/mach-s5pv210/setup-sdhci-gpio.c b/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
-> index fe7d86d..415f62c 100644
-> --- a/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
-> +++ b/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
-> @@ -102,3 +102,23 @@ void s5pv210_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
->        s3c_gpio_setpull(S5PV210_GPG2(2), S3C_GPIO_PULL_UP);
->        s3c_gpio_cfgpin(S5PV210_GPG2(2), S3C_GPIO_SFN(2));
->  }
-> +
-> +void s5pv210_setup_sdhci3_cfg_gpio(struct platform_device *dev, int width)
-> +{
-> +       unsigned int gpio;
-> +
-> +       /* Set all the necessary GPG1[0:2] pins to special-function 2 */
-
-Wrong pin name, GPG3?
-
-> +       for (gpio = S5PV210_GPG3(0); gpio < S5PV210_GPG3(2); gpio++) {
-> +               s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> +               s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-> +       }
-> +
-> +       /* Data pin GPG1[3:6] to special-function 2 */
-ditto
-> +       for (gpio = S5PV210_GPG3(3); gpio <= S5PV210_GPG3(6); gpio++) {
-> +               s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> +               s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-> +       }
-> +
-> +       s3c_gpio_setpull(S5PV210_GPG3(2), S3C_GPIO_PULL_UP);
-> +       s3c_gpio_cfgpin(S5PV210_GPG3(2), S3C_GPIO_SFN(2));
-
-In case of this, how about to use one loop like this.
-
-for (gpio = GPG3(0); gpio <= GPG3(7); gpio++)
-    s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-
-since all pins use special function 2.
-
-or others methods are welcome.
-
-To Ben,
-When do you apply previous gpio helper functions?
-
-Thank you,
-Kyungmin Park
-
-
-> +}
-> --
-> 1.6.2.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+>   
