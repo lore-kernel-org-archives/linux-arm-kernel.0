@@ -1,78 +1,53 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Sun, 13 Jun 2010 20:17:13 -1000
-Subject: Request review of device tree documentation
-In-Reply-To: <1276495772.2552.22.camel@pasglop>
-References: <AANLkTilK4YkRMJqlcRDOAlGBzpdlZuSo9NF5NrRNocHT@mail.gmail.com>	
-	<33BD8E86-9397-432A-97BF-F154812C157B@digitaldans.com>	
-	<AANLkTilv6TtPZs0DAwd8JlSV_J3VvMsvtVVOOeQauOIn@mail.gmail.com>	
-	<4C13430B.5000907@firmworks.com>
-	<1276339529.1962.184.camel@pasglop>	
-	<1276339684.1962.186.camel@pasglop>
-	<4C13B618.1030006@firmworks.com>	
-	<1276383132.1962.195.camel@pasglop>	
-	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>	
-	<1276408087.1962.552.camel@pasglop>	
-	<AANLkTikBjwuVvij8I91XaQgLfn8r_lZDrAsIBfJrHDBF@mail.gmail.com>
-	<1276495772.2552.22.camel@pasglop>
-Message-ID: <4C15C969.7020108@firmworks.com>
+From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
+Date: Mon, 14 Jun 2010 08:39:21 +0200
+Subject: [RFC,PATCH 1/2] Add a common struct clk
+In-Reply-To: <1276319643.1962.181.camel@pasglop>
+References: <1275636608.606606.450179637764.0.gpush@pororo>
+	<201006111557.12249.jeremy.kerr@canonical.com>
+	<19473.61547.684572.647641@ipc1.ka-ro>
+	<201006111718.47426.jeremy.kerr@canonical.com>
+	<19474.172.742782.972629@ipc1.ka-ro>
+	<20100611095839.GC10894@pengutronix.de>
+	<19474.2817.333749.485028@ipc1.ka-ro>
+	<1276319643.1962.181.camel@pasglop>
+Message-ID: <19477.52889.982995.407051@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benjamin Herrenschmidt wrote:
-> On Sun, 2010-06-13 at 23:13 -0600, Grant Likely wrote:
->   
->>> We use that to suck the device-tree, which we flatten, and then
->>>       
->> re-enter
->>     
->>> the kernel with the "common" entry interface.
->>>       
->> I don't think I want to do the same on ARM.  I'd rather have the
->> prom_init stuff in a boot wrapper, or have OFW itself generate the
->> flat representation before booting the kernel.
->>     
->
-> But then it's no longer OF. IE. A compliant OF implementation provides a
-> client interface API :-)
->
-> This is going to be especially important if Mitch wants to keep OF
-> alive.
->
-> I suppose it could be done via a wrapper like prom_init, which flattens
-> the tree, and sticks somewhere in a property the address of the OF
-> client interface callback though it's a tad awkward. If well defined, I
-> suppose Mitch might even be able to make his OF natively boot kernels
-> that way but that's of course up to him.
->   
+Hi,
 
-I'm willing to create a flattened tree.  I can provide both a client 
-interface and a flattened tree.  The kernel probably won't use the 
-client interface to any significant extent.
+Benjamin Herrenschmidt writes:
+> On Fri, 2010-06-11 at 12:08 +0200, Lothar Wa?mann wrote:
+> > Hi,
+> > 
+> > > > > > Using a mutex in clk_enable()/clk_disable() is a bad idea, since that
+> > > > > > makes it impossible to call those functions in interrupt context.
+> > > IMHO if a device generates an irq its clock should already be on.  This
+> > > way you don't need to enable or disable a clock in irq context.
+> > >  
+> > You may want to disable a clock in the IRQ handler. The VPU driver in
+> > the Freescale BSP for i.MX51 does exactly this.
+> > Anyway I don't see any reason for using a mutex here instead of
+> > spin_lock_irq_save() as all other implementations do.
+> 
+> Because you suddenly make it impossible to sleep inside enable/disable
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+???
+All implementations so far use spin_lock_irq_save()!
 
-Way back in the misty annals of history, I dreamed of having a common 
-interface between firmware and OSs.  That didn't happen.  Every OS 
-insisted on defining its own interface and creating a custom bootloader, 
-or in some cases a half dozen of them.
->   
->> I'm trying to constrain the number of things that could go wrong by
->> defining only one way for getting the device tree data into the
->> kernel.
->>     
->
-> I understand, and the flattened method is the most versatile, I'm just
-> pointing out the situation here :-)
->
->   
->> Right.  We don't need to use OFW/RTAS to handle this use case.
->>     
->
-> Definitely not. It will depend on whatever hypervisor interface is
-> implemented in a given environment. Though I do like the idea of passing
-> precompiled bits of .dtb around for hotplug :-) We could make that a
-> standard way of KVM to do things in embedded space.
->
-> Cheers,
-> Ben.
->
->
->   
+How would you be able to sleep with a mutex held?
+If you hold a lock you must not sleep, no matter what sort of lock it
+is.
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
