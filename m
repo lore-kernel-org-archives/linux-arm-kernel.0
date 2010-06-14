@@ -1,52 +1,44 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Mon, 14 Jun 2010 19:36:10 +1000
-Subject: Request review of device tree documentation
-In-Reply-To: <20100614092559.GA7881@n2100.arm.linux.org.uk>
-References: <1276339529.1962.184.camel@pasglop>
-	<1276339684.1962.186.camel@pasglop> <4C13B618.1030006@firmworks.com>
-	<1276383132.1962.195.camel@pasglop>
-	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>
-	<4C146F18.9030008@firmworks.com> <1276408773.1962.574.camel@pasglop>
-	<AANLkTinwL0XtMNG13inr_1UliOlqZkyr4dlvG-ZGL9JT@mail.gmail.com>
-	<20100614073828.GA6095@n2100.arm.linux.org.uk>
-	<4C15DE2E.1050905@firmworks.com>
-	<20100614092559.GA7881@n2100.arm.linux.org.uk>
-Message-ID: <1276508170.2552.43.camel@pasglop>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 14 Jun 2010 11:43:10 +0200
+Subject: [RFC,PATCH 1/2] Add a common struct clk
+In-Reply-To: <19477.63136.664249.167207@ipc1.ka-ro>
+References: <201006111557.12249.jeremy.kerr@canonical.com>
+	<19473.61547.684572.647641@ipc1.ka-ro>
+	<201006111718.47426.jeremy.kerr@canonical.com>
+	<19474.172.742782.972629@ipc1.ka-ro>
+	<20100611095839.GC10894@pengutronix.de>
+	<19474.2817.333749.485028@ipc1.ka-ro>
+	<1276319643.1962.181.camel@pasglop>
+	<19477.52889.982995.407051@ipc1.ka-ro>
+	<1276507378.2552.39.camel@pasglop>
+	<19477.63136.664249.167207@ipc1.ka-ro>
+Message-ID: <20100614094310.GE12159@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-06-14 at 10:25 +0100, Russell King - ARM Linux wrote:
-> On Sun, Jun 13, 2010 at 09:45:50PM -1000, Mitch Bradley wrote:
-> > None of this is a deal-breaker for the kind of debugging tasks that are  
-> > the primary use case for the callback.
-> 
-> Would you mind explaining what kind of tasks these callbacks will
-> be used for?
+On Mon, Jun 14, 2010 at 11:30:08AM +0200, Lothar Wa?mann wrote:
+> Benjamin Herrenschmidt writes:
+> > On Mon, 2010-06-14 at 08:39 +0200, Lothar Wa?mann wrote:
+> > > All implementations so far use spin_lock_irq_save()!
+> > 
+> > Nothing prevents your implementation to be a tad smarter.
+> > 
+> I vote for consistency, so that device drivers can be kept arch
+> independent instead of having to care about implentation details of
+> each arch.
+Back when I implemented clock support for ns9xxx (unfortunately not in
+mainline) I tried with a spinlock first and later switched to a mutex.
+IIRC the reason was that on ns9215 enabling the rtc clock took long
+(don't remember a number) and successfull enabling was signaled by an
+irq.  So I would have had to implement irq polling in the clock code.
 
-That's one of the thing I'm "touching" on in my previous reply...
+I think you can find different examples that make both possiblities bad.
+All in all I think that a sleeping clock implementation is preferable as
+it improves (general) latencies.
 
-(For those who didn't quite follow, the discussion here is about
-allowing a real Open Firmware implementation on ARM with the feature of
-leaving OF alive while the OS is up, which is something sparc does but
-we never supported on ppc).
+Best regards
+Uwe
 
-Ideally, if you keep open firmware alive, you can drop into it when the
-kernel crashes for example, or in some other circumstances.
-
-However, there's a lot of room for abuse here and I'm worried that if it
-becomes widespread, we'll start seeing vendors use that as a way to do
-some kind of HAL and hide various platform methods in there (clock
-control, nvram, etc...).
-
-Another option Mitch mentioned is to have the f-code interpreter (f-code
-is OF tokenized forth format) in the kernel, but that doesn't completely
-solve the problem of providing it with appropriate virtual mappings,
-arbitrating access to HW resources, etc etc etc
-
-OF as a FW/bootloader is great. OF alive along with the OS can be a nice
-debugging tool under some circumstances but I am a bit more dubious as
-to whether that's going to work out in practice. But I'd like to -not-
-see it abused as some kind of HAL.
-
-Cheers,
-Ben.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
