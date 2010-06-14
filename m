@@ -1,66 +1,69 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Mon, 14 Jun 2010 13:31:16 +0200
-Subject: S3C FB pixclock calculation
-Message-ID: <4C161304.70903@gmail.com>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Mon, 14 Jun 2010 22:44:38 +1000
+Subject: Request review of device tree documentation
+In-Reply-To: <AANLkTikls3hjXOmKFqG2D_9GaJSjOXNuuRXPlanAjo5E@mail.gmail.com>
+References: <33BD8E86-9397-432A-97BF-F154812C157B@digitaldans.com>
+	<AANLkTilv6TtPZs0DAwd8JlSV_J3VvMsvtVVOOeQauOIn@mail.gmail.com>
+	<4C13430B.5000907@firmworks.com>
+	<1276339529.1962.184.camel@pasglop>
+	<1276339684.1962.186.camel@pasglop>
+	<4C13B618.1030006@firmworks.com>
+	<1276383132.1962.195.camel@pasglop>
+	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>
+	<4C146F18.9030008@firmworks.com>
+	<AANLkTikls3hjXOmKFqG2D_9GaJSjOXNuuRXPlanAjo5E@mail.gmail.com>
+Message-ID: <20100614124438.GF9323@yookeroo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Jun 13, 2010 at 11:02:15PM -0600, Grant Likely wrote:
+[sni]
+> > That's sort of a self-fulfilling prophecy. ?If the OS doesn't trust the
+> > firmware, there is no pressure for the firmware to "get it right".
+> 
+> Firmware will not get it right.  Period.  There will always be
+> something wrong.  It is never right on PCs.  It will never be right on
+> the other architectures.
 
-one thing that has bothered me for some time is the fb pixclock value: this
-seems rather arbitrary and undocumented (couldn't find it in the datasheets).
+Yes, yes, yes.  And there is a great deal of empirical evidence to
+back that assertion.
 
-Though I did find an "algorithm", which I've used in the SmartQ machs for the
-calculation of this value (I can't remember where I found it, I think it was in
-the original SmartQ kernels).
+>  That goes for OSes too, but upgrading an OS
+> isn't as risky as upgrading firmware.  That isn't to say that it can't
+> be close, but every firmware feature that the OS depends on is a
+> feature that could force a risky firmware upgrade when the bug in it
+> is discovered.
 
-So I made this small patch which does the calculation in the s3c fb driver
-itself when the pixclock pdata hasn't been set (see below).
+Indeed.  In fact, the general rule of thumb is really "put as much as
+possible into the most easily replaced layer of the stack".  This is,
+incidentally, why I've always been dubious about simple firmwares
+supplying a flattened device tree rather than including the device
+tree template in the kernel, cuboot style.
 
-I've checked this against the SMDK6410 value (and ANW6410 and HMT, which are
-identical) and it seems to match so I *think* this is correct, but as it's
-undocumented I'm not sure.
+> I'm also convinced that the economics are all wrong for "getting it
+> right" when talking about firmware.  Manufactures don't care about
+> firmware; they care about selling boxes.  Customers don't care about
+> firmware, they care about the operating system (well, that's not true
+> either, they care about applications).  For manufactures, once it can
+> boot the real operating system, there is little to no incentive to
+> spend any more money on firmware when the money can be better spent on
+> either the next product or the adding features to the operating system
+> of the existing product.  In fact, spending money on firmware is
+> actually *more risky* one a product ships, because if a firmware
+> upgrade goes bad, then that means product returned for repair at the
+> factory.
 
-Is anyone able to tell me whether I'm correct? (if so, I'll clean up this patch
-and send it for inclusion)
+A good analysis.  The other side of this, is that for an OS, if you
+rely on the firmware to do X, it will work when the firmware gets it
+right.  If you do X yourself, it will work whether or not the firmware
+gets it right.  This means that if there's even one firmware you have
+to deal with out there that gets X wrong, you have to do it yourself
+and then there is little to no incentive to rely on firmware even in
+the cases where it does get it right.  In fact there's a disincentive,
+because then you have two different code paths to test and maintain.
 
---
-Maurus Cuelenaere
-
-diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
-index 9682ecc..17d882f 100644
---- a/drivers/video/s3c-fb.c
-+++ b/drivers/video/s3c-fb.c
-@@ -235,6 +235,22 @@ static int s3c_fb_calc_pixclk(struct s3c_fb *sfb, unsigned int pixclk)
- 	return result;
- }
-
-+static void s3c_fb_missing_pixclock(struct fb_videomode *mode)
-+{
-+	u64 pixclk = 1000000000000ULL;
-+	u32 div;
-+
-+	div  = mode->left_margin + mode->hsync_len + mode->right_margin +
-+	       mode->xres;
-+	div *= mode->upper_margin + mode->vsync_len + mode->lower_margin +
-+	       mode->yres;
-+	div *= mode->refresh ? : 80;
-+
-+	do_div(pixclk, div);
-+
-+	mode->pixclock = pixclk;
-+}
-+
- /**
-  * s3c_fb_align_word() - align pixel count to word boundary
-  * @bpp: The number of bits per pixel
-@@ -925,6 +941,9 @@ static int __devinit s3c_fb_probe(struct platform_device *pdev)
- 		if (!pd->win[win])
- 			continue;
-
-+		if (!pd->win[win]->win_mode.pixclock)
-+			s3c_fb_missing_pixclock(&pd->win[win]->win_mode);
-+
- 		ret = s3c_fb_probe_win(sfb, win, &sfb->windows[win]);
- 		if (ret < 0) {
- 			dev_err(dev, "failed to create window %d\n", win);
+-- 
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
