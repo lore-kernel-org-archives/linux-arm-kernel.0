@@ -1,62 +1,221 @@
 From: konkers@android.com (Erik Gilling)
-Date: Mon, 14 Jun 2010 14:10:21 -0700
-Subject: [PATCH v3 05/11] [ARM] tegra: Add timer support
-In-Reply-To: <1276549827-2688-5-git-send-email-konkers@android.com>
+Date: Mon, 14 Jun 2010 14:10:18 -0700
+Subject: [PATCH v3 02/11] [ARM] tegra: Add IRQ support
+In-Reply-To: <1276549827-2688-2-git-send-email-konkers@android.com>
 References: <1271198563-10424-1-git-send-email-konkers@android.com>
 	<1276549827-2688-1-git-send-email-konkers@android.com>
 	<1276549827-2688-2-git-send-email-konkers@android.com>
-	<1276549827-2688-3-git-send-email-konkers@android.com>
-	<1276549827-2688-4-git-send-email-konkers@android.com>
-	<1276549827-2688-5-git-send-email-konkers@android.com>
-Message-ID: <1276549827-2688-6-git-send-email-konkers@android.com>
+Message-ID: <1276549827-2688-3-git-send-email-konkers@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Cross <ccross@android.com>
-
-v2: fixes from Russell King:
-	- include linux/io.h instead of asm/io.h
-    fixes from Gary King:
-	- remove extra (and incorrect) irq definitions
-	- use timer 3 instead of timer 1 for compatibility with other drivers
-	- fix typo that disabled oneshot mode
-v3:
-	- Implement sched_clock
-	- Fix checkpatch issues
-    fixes from Gary King:
-    	- Fix incorrect cycles calculation
-	- Fix min_delta_ns assignment
-    fixes from Linus Walleij:
-	- use calc_mult_shift() instead of hard coding values
+v2: fixes from Russell King
+	- include linux/io.h instead of asm/io.h and mach/io.h
 
 Signed-off-by: Colin Cross <ccross@android.com>
+Signed-off-by: Erik Gilling <konkers@android.com>
 ---
- arch/arm/mach-tegra/Makefile |    1 +
- arch/arm/mach-tegra/timer.c  |  187 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 188 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-tegra/timer.c
+ arch/arm/mach-tegra/Makefile            |    1 +
+ arch/arm/mach-tegra/include/mach/irqs.h |  173 +++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/irq.c               |   34 ++++++
+ 3 files changed, 208 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/include/mach/irqs.h
+ create mode 100644 arch/arm/mach-tegra/irq.c
 
 diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index f339559..01f47fd 100644
+index 81f003d..a0d2c5b 100644
 --- a/arch/arm/mach-tegra/Makefile
 +++ b/arch/arm/mach-tegra/Makefile
-@@ -2,6 +2,7 @@ obj-y                                   += common.o
+@@ -1,2 +1,3 @@
+ obj-y                                   += common.o
  obj-y                                   += io.o
- obj-y                                   += irq.o
- obj-y                                   += clock.o
-+obj-y                                   += timer.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
- obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
-diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
++obj-y                                   += irq.o
+diff --git a/arch/arm/mach-tegra/include/mach/irqs.h b/arch/arm/mach-tegra/include/mach/irqs.h
 new file mode 100644
-index 0000000..2f42021
+index 0000000..20f640e
 --- /dev/null
-+++ b/arch/arm/mach-tegra/timer.c
-@@ -0,0 +1,187 @@
++++ b/arch/arm/mach-tegra/include/mach/irqs.h
+@@ -0,0 +1,173 @@
 +/*
-+ * arch/arch/mach-tegra/timer.c
++ * arch/arm/mach-tegra/include/mach/irqs.h
 + *
++ * Copyright (C) 2010 Google, Inc.
++ *
++ * Author:
++ *	Colin Cross <ccross@google.com>
++ *	Erik Gilling <konkers@google.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef __MACH_TEGRA_IRQS_H
++#define __MACH_TEGRA_IRQS_H
++
++#define INT_GIC_BASE			0
++
++#define IRQ_LOCALTIMER                  29
++
++/* Primary Interrupt Controller */
++#define INT_PRI_BASE			(INT_GIC_BASE + 32)
++#define INT_TMR1			(INT_PRI_BASE + 0)
++#define INT_TMR2			(INT_PRI_BASE + 1)
++#define INT_RTC				(INT_PRI_BASE + 2)
++#define INT_I2S2			(INT_PRI_BASE + 3)
++#define INT_SHR_SEM_INBOX_IBF		(INT_PRI_BASE + 4)
++#define INT_SHR_SEM_INBOX_IBE		(INT_PRI_BASE + 5)
++#define INT_SHR_SEM_OUTBOX_IBF		(INT_PRI_BASE + 6)
++#define INT_SHR_SEM_OUTBOX_IBE		(INT_PRI_BASE + 7)
++#define INT_VDE_UCQ_ERROR		(INT_PRI_BASE + 8)
++#define INT_VDE_SYNC_TOKEN		(INT_PRI_BASE + 9)
++#define INT_VDE_BSE_V			(INT_PRI_BASE + 10)
++#define INT_VDE_BSE_A			(INT_PRI_BASE + 11)
++#define INT_VDE_SXE			(INT_PRI_BASE + 12)
++#define INT_I2S1			(INT_PRI_BASE + 13)
++#define INT_SDMMC1			(INT_PRI_BASE + 14)
++#define INT_SDMMC2			(INT_PRI_BASE + 15)
++#define INT_XIO				(INT_PRI_BASE + 16)
++#define INT_VDE				(INT_PRI_BASE + 17)
++#define INT_AVP_UCQ			(INT_PRI_BASE + 18)
++#define INT_SDMMC3			(INT_PRI_BASE + 19)
++#define INT_USB				(INT_PRI_BASE + 20)
++#define INT_USB2			(INT_PRI_BASE + 21)
++#define INT_PRI_RES_22			(INT_PRI_BASE + 22)
++#define INT_EIDE			(INT_PRI_BASE + 23)
++#define INT_NANDFLASH			(INT_PRI_BASE + 24)
++#define INT_VCP				(INT_PRI_BASE + 25)
++#define INT_APB_DMA			(INT_PRI_BASE + 26)
++#define INT_AHB_DMA			(INT_PRI_BASE + 27)
++#define INT_GNT_0			(INT_PRI_BASE + 28)
++#define INT_GNT_1			(INT_PRI_BASE + 29)
++#define INT_OWR				(INT_PRI_BASE + 30)
++#define INT_SDMMC4			(INT_PRI_BASE + 31)
++
++/* Secondary Interrupt Controller */
++#define INT_SEC_BASE			(INT_PRI_BASE + 32)
++#define INT_GPIO1			(INT_SEC_BASE + 0)
++#define INT_GPIO2			(INT_SEC_BASE + 1)
++#define INT_GPIO3			(INT_SEC_BASE + 2)
++#define INT_GPIO4			(INT_SEC_BASE + 3)
++#define INT_UARTA			(INT_SEC_BASE + 4)
++#define INT_UARTB			(INT_SEC_BASE + 5)
++#define INT_I2C				(INT_SEC_BASE + 6)
++#define INT_SPI				(INT_SEC_BASE + 7)
++#define INT_TWC				(INT_SEC_BASE + 8)
++#define INT_TMR3			(INT_SEC_BASE + 9)
++#define INT_TMR4			(INT_SEC_BASE + 10)
++#define INT_FLOW_RSM0			(INT_SEC_BASE + 11)
++#define INT_FLOW_RSM1			(INT_SEC_BASE + 12)
++#define INT_SPDIF			(INT_SEC_BASE + 13)
++#define INT_UARTC			(INT_SEC_BASE + 14)
++#define INT_MIPI			(INT_SEC_BASE + 15)
++#define INT_EVENTA			(INT_SEC_BASE + 16)
++#define INT_EVENTB			(INT_SEC_BASE + 17)
++#define INT_EVENTC			(INT_SEC_BASE + 18)
++#define INT_EVENTD			(INT_SEC_BASE + 19)
++#define INT_VFIR			(INT_SEC_BASE + 20)
++#define INT_DVC				(INT_SEC_BASE + 21)
++#define INT_SYS_STATS_MON		(INT_SEC_BASE + 22)
++#define INT_GPIO5			(INT_SEC_BASE + 23)
++#define INT_CPU0_PMU_INTR		(INT_SEC_BASE + 24)
++#define INT_CPU2_PMU_INTR		(INT_SEC_BASE + 25)
++#define INT_SEC_RES_26			(INT_SEC_BASE + 26)
++#define INT_S_LINK1			(INT_SEC_BASE + 27)
++#define INT_APB_DMA_COP			(INT_SEC_BASE + 28)
++#define INT_AHB_DMA_COP			(INT_SEC_BASE + 29)
++#define INT_DMA_TX			(INT_SEC_BASE + 30)
++#define INT_DMA_RX			(INT_SEC_BASE + 31)
++
++/* Tertiary Interrupt Controller */
++#define INT_TRI_BASE			(INT_SEC_BASE + 32)
++#define INT_HOST1X_COP_SYNCPT		(INT_TRI_BASE + 0)
++#define INT_HOST1X_MPCORE_SYNCPT	(INT_TRI_BASE + 1)
++#define INT_HOST1X_COP_GENERAL		(INT_TRI_BASE + 2)
++#define INT_HOST1X_MPCORE_GENERAL	(INT_TRI_BASE + 3)
++#define INT_MPE_GENERAL			(INT_TRI_BASE + 4)
++#define INT_VI_GENERAL			(INT_TRI_BASE + 5)
++#define INT_EPP_GENERAL			(INT_TRI_BASE + 6)
++#define INT_ISP_GENERAL			(INT_TRI_BASE + 7)
++#define INT_2D_GENERAL			(INT_TRI_BASE + 8)
++#define INT_DISPLAY_GENERAL		(INT_TRI_BASE + 9)
++#define INT_DISPLAY_B_GENERAL		(INT_TRI_BASE + 10)
++#define INT_HDMI			(INT_TRI_BASE + 11)
++#define INT_TVO_GENERAL			(INT_TRI_BASE + 12)
++#define INT_MC_GENERAL			(INT_TRI_BASE + 13)
++#define INT_EMC_GENERAL			(INT_TRI_BASE + 14)
++#define INT_TRI_RES_15			(INT_TRI_BASE + 15)
++#define INT_TRI_RES_16			(INT_TRI_BASE + 16)
++#define INT_AC97			(INT_TRI_BASE + 17)
++#define INT_SPI_2			(INT_TRI_BASE + 18)
++#define INT_SPI_3			(INT_TRI_BASE + 19)
++#define INT_I2C2			(INT_TRI_BASE + 20)
++#define INT_KBC				(INT_TRI_BASE + 21)
++#define INT_EXTERNAL_PMU		(INT_TRI_BASE + 22)
++#define INT_GPIO6			(INT_TRI_BASE + 23)
++#define INT_TVDAC			(INT_TRI_BASE + 24)
++#define INT_GPIO7			(INT_TRI_BASE + 25)
++#define INT_UARTD			(INT_TRI_BASE + 26)
++#define INT_UARTE			(INT_TRI_BASE + 27)
++#define INT_I2C3			(INT_TRI_BASE + 28)
++#define INT_SPI_4			(INT_TRI_BASE + 29)
++#define INT_TRI_RES_30			(INT_TRI_BASE + 30)
++#define INT_SW_RESERVED			(INT_TRI_BASE + 31)
++
++/* Quaternary Interrupt Controller */
++#define INT_QUAD_BASE			(INT_TRI_BASE + 32)
++#define INT_SNOR			(INT_QUAD_BASE + 0)
++#define INT_USB3			(INT_QUAD_BASE + 1)
++#define INT_PCIE_INTR			(INT_QUAD_BASE + 2)
++#define INT_PCIE_MSI			(INT_QUAD_BASE + 3)
++#define INT_QUAD_RES_4			(INT_QUAD_BASE + 4)
++#define INT_QUAD_RES_5			(INT_QUAD_BASE + 5)
++#define INT_QUAD_RES_6			(INT_QUAD_BASE + 6)
++#define INT_QUAD_RES_7			(INT_QUAD_BASE + 7)
++#define INT_APB_DMA_CH0			(INT_QUAD_BASE + 8)
++#define INT_APB_DMA_CH1			(INT_QUAD_BASE + 9)
++#define INT_APB_DMA_CH2			(INT_QUAD_BASE + 10)
++#define INT_APB_DMA_CH3			(INT_QUAD_BASE + 11)
++#define INT_APB_DMA_CH4			(INT_QUAD_BASE + 12)
++#define INT_APB_DMA_CH5			(INT_QUAD_BASE + 13)
++#define INT_APB_DMA_CH6			(INT_QUAD_BASE + 14)
++#define INT_APB_DMA_CH7			(INT_QUAD_BASE + 15)
++#define INT_APB_DMA_CH8			(INT_QUAD_BASE + 16)
++#define INT_APB_DMA_CH9			(INT_QUAD_BASE + 17)
++#define INT_APB_DMA_CH10		(INT_QUAD_BASE + 18)
++#define INT_APB_DMA_CH11		(INT_QUAD_BASE + 19)
++#define INT_APB_DMA_CH12		(INT_QUAD_BASE + 20)
++#define INT_APB_DMA_CH13		(INT_QUAD_BASE + 21)
++#define INT_APB_DMA_CH14		(INT_QUAD_BASE + 22)
++#define INT_APB_DMA_CH15		(INT_QUAD_BASE + 23)
++#define INT_QUAD_RES_24			(INT_QUAD_BASE + 24)
++#define INT_QUAD_RES_25			(INT_QUAD_BASE + 25)
++#define INT_QUAD_RES_26			(INT_QUAD_BASE + 26)
++#define INT_QUAD_RES_27			(INT_QUAD_BASE + 27)
++#define INT_QUAD_RES_28			(INT_QUAD_BASE + 28)
++#define INT_QUAD_RES_29			(INT_QUAD_BASE + 29)
++#define INT_QUAD_RES_30			(INT_QUAD_BASE + 30)
++#define INT_QUAD_RES_31			(INT_QUAD_BASE + 31)
++
++#define INT_GPIO_BASE			(INT_QUAD_BASE + 32)
++#define INT_GPIO_NR			(28 * 8)
++
++#define NR_IRQS				(INT_GPIO_BASE + INT_GPIO_NR)
++
++#endif
+diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+new file mode 100644
+index 0000000..1fdbe70
+--- /dev/null
++++ b/arch/arm/mach-tegra/irq.c
+@@ -0,0 +1,34 @@
++/*
 + * Copyright (C) 2010 Google, Inc.
 + *
 + * Author:
@@ -73,173 +232,22 @@ index 0000000..2f42021
 + *
 + */
 +
++#include <linux/kernel.h>
 +#include <linux/init.h>
-+#include <linux/time.h>
 +#include <linux/interrupt.h>
 +#include <linux/irq.h>
-+#include <linux/clockchips.h>
-+#include <linux/clocksource.h>
-+#include <linux/clk.h>
 +#include <linux/io.h>
-+#include <linux/cnt32_to_63.h>
 +
-+#include <asm/mach/time.h>
-+#include <asm/mach/time.h>
-+#include <asm/localtimer.h>
++#include <asm/hardware/gic.h>
 +
 +#include <mach/iomap.h>
-+#include <mach/irqs.h>
 +
 +#include "board.h"
-+#include "clock.h"
 +
-+#define TIMERUS_CNTR_1US 0x10
-+#define TIMERUS_USEC_CFG 0x14
-+#define TIMERUS_CNTR_FREEZE 0x4c
-+
-+#define TIMER1_BASE 0x0
-+#define TIMER2_BASE 0x8
-+#define TIMER3_BASE 0x50
-+#define TIMER4_BASE 0x58
-+
-+#define TIMER_PTV 0x0
-+#define TIMER_PCR 0x4
-+
-+struct tegra_timer;
-+
-+static void __iomem *timer_reg_base = IO_ADDRESS(TEGRA_TMR1_BASE);
-+
-+#define timer_writel(value, reg) \
-+	__raw_writel(value, (u32)timer_reg_base + (reg))
-+#define timer_readl(reg) \
-+	__raw_readl((u32)timer_reg_base + (reg))
-+
-+static int tegra_timer_set_next_event(unsigned long cycles,
-+					 struct clock_event_device *evt)
++void __init tegra_init_irq(void)
 +{
-+	u32 reg;
-+
-+	reg = 0x80000000 | ((cycles > 1) ? (cycles-1) : 0);
-+	timer_writel(reg, TIMER3_BASE + TIMER_PTV);
-+
-+	return 0;
++	gic_dist_init(0, IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE), 29);
++	gic_cpu_init(0, IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
 +}
-+
-+static void tegra_timer_set_mode(enum clock_event_mode mode,
-+				    struct clock_event_device *evt)
-+{
-+	u32 reg;
-+
-+	timer_writel(0, TIMER3_BASE + TIMER_PTV);
-+
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		reg = 0xC0000000 | ((1000000/HZ)-1);
-+		timer_writel(reg, TIMER3_BASE + TIMER_PTV);
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		break;
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	case CLOCK_EVT_MODE_RESUME:
-+		break;
-+	}
-+}
-+
-+static cycle_t tegra_clocksource_read(struct clocksource *cs)
-+{
-+	return cnt32_to_63(timer_readl(TIMERUS_CNTR_1US));
-+}
-+
-+static struct clock_event_device tegra_clockevent = {
-+	.name		= "timer0",
-+	.rating		= 300,
-+	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
-+	.set_next_event	= tegra_timer_set_next_event,
-+	.set_mode	= tegra_timer_set_mode,
-+};
-+
-+static struct clocksource tegra_clocksource = {
-+	.name	= "timer_us",
-+	.rating	= 300,
-+	.read	= tegra_clocksource_read,
-+	.mask	= 0x7FFFFFFFFFFFFFFFULL,
-+	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
-+};
-+
-+unsigned long long sched_clock(void)
-+{
-+	return clocksource_cyc2ns(tegra_clocksource.read(&tegra_clocksource),
-+		tegra_clocksource.mult, tegra_clocksource.shift);
-+}
-+
-+static irqreturn_t tegra_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
-+	timer_writel(1<<30, TIMER3_BASE + TIMER_PCR);
-+	evt->event_handler(evt);
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction tegra_timer_irq = {
-+	.name		= "timer0",
-+	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_TRIGGER_HIGH,
-+	.handler	= tegra_timer_interrupt,
-+	.dev_id		= &tegra_clockevent,
-+	.irq		= INT_TMR3,
-+};
-+
-+static void __init tegra_init_timer(void)
-+{
-+	unsigned long rate = clk_measure_input_freq();
-+	int ret;
-+
-+#ifdef CONFIG_HAVE_ARM_TWD
-+	twd_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x600);
-+#endif
-+
-+	switch (rate) {
-+	case 12000000:
-+		timer_writel(0x000b, TIMERUS_USEC_CFG);
-+		break;
-+	case 13000000:
-+		timer_writel(0x000c, TIMERUS_USEC_CFG);
-+		break;
-+	case 19200000:
-+		timer_writel(0x045f, TIMERUS_USEC_CFG);
-+		break;
-+	case 26000000:
-+		timer_writel(0x0019, TIMERUS_USEC_CFG);
-+		break;
-+	default:
-+		WARN(1, "Unknown clock rate");
-+	}
-+
-+	if (clocksource_register_hz(&tegra_clocksource, 1000000)) {
-+		printk(KERN_ERR "Failed to register clocksource\n");
-+		BUG();
-+	}
-+
-+	ret = setup_irq(tegra_timer_irq.irq, &tegra_timer_irq);
-+	if (ret) {
-+		printk(KERN_ERR "Failed to register timer IRQ: %d\n", ret);
-+		BUG();
-+	}
-+
-+	clockevents_calc_mult_shift(&tegra_clockevent, 1000000, 5);
-+	tegra_clockevent.max_delta_ns =
-+		clockevent_delta2ns(0x1fffffff, &tegra_clockevent);
-+	tegra_clockevent.min_delta_ns =
-+		clockevent_delta2ns(0x1, &tegra_clockevent);
-+	tegra_clockevent.cpumask = cpu_all_mask;
-+	tegra_clockevent.irq = tegra_timer_irq.irq;
-+	clockevents_register_device(&tegra_clockevent);
-+
-+	return;
-+}
-+
-+struct sys_timer tegra_timer = {
-+	.init = tegra_init_timer,
-+};
 -- 
 1.6.5.6
