@@ -1,110 +1,57 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 15 Jun 2010 13:04:06 +0100
-Subject: [PATCH 3/3] sdhci-s3c: Add SDHCI_QUIRK_NO_WP_BIT for Samsung SoC
-In-Reply-To: <1276601268-7226-4-git-send-email-kgene.kim@samsung.com>
-References: <1276601268-7226-1-git-send-email-kgene.kim@samsung.com>
-	<1276601268-7226-4-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20100615120406.GE7248@trinity.fluff.org>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Tue, 15 Jun 2010 14:04:54 +0200
+Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
+In-Reply-To: <AANLkTil7b5Pg5q18eGvGY_cFH75rdpSuZhigH4vcjrnu@mail.gmail.com>
+References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>	<002001cb0c75$0a54fd00$1efef700$%kim@samsung.com>	<AANLkTil7gb7SjrYPrHPfSomwxLlHpowXOZd_Qr125jvr@mail.gmail.com>	<4C176148.4020507@gmail.com>
+	<AANLkTil7b5Pg5q18eGvGY_cFH75rdpSuZhigH4vcjrnu@mail.gmail.com>
+Message-ID: <4C176C66.20008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 15, 2010 at 08:27:48PM +0900, Kukjin Kim wrote:
-> From: Lee Hyuk <hyuk1.lee@samsung.com>
-> 
-> S5PV210 HSMMC host controller doesn't have the WP pin which should be
-> connnected with SDMMC card WP pin. So if there are the cfg_wp and get_ro
-> in pdata, configure the WP pin and replace get_ro function in sdhci with
-> get_ro function in pdata.
-> 
-> Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  drivers/mmc/host/sdhci-s3c.c |   12 ++++++++++++
->  drivers/mmc/host/sdhci.c     |    3 +++
->  drivers/mmc/host/sdhci.h     |    3 +++
->  3 files changed, 18 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> index af21792..857cbed 100644
-> --- a/drivers/mmc/host/sdhci-s3c.c
-> +++ b/drivers/mmc/host/sdhci-s3c.c
-> @@ -311,6 +311,9 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
->  	if (pdata->cfg_gpio)
->  		pdata->cfg_gpio(pdev, pdata->max_width);
->  
-> +	if (pdata->get_ro)
-> +		sdhci_s3c_ops.get_ro = pdata->get_ro;
-> +
->  	host->hw_name = "samsung-hsmmc";
->  	host->ops = &sdhci_s3c_ops;
->  	host->quirks = 0;
-> @@ -335,6 +338,15 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
->  	host->quirks |= (SDHCI_QUIRK_32BIT_DMA_ADDR |
->  			 SDHCI_QUIRK_32BIT_DMA_SIZE);
->  
-> +	/* Controller's WP pin donsn't connected with SD card. So we allocate
-> +	 * a GPIO for getting WP data form SD card  and use that data as
-> +	 * the return value of the get_ro function */
-> +	host->quirks |= SDHCI_QUIRK_NO_WP_BIT;
+Op 15-06-10 13:39, Jassi Brar schreef:
+> On Tue, Jun 15, 2010 at 8:17 PM, Maurus Cuelenaere
+> <mcuelenaere@gmail.com> wrote:
+>   
+>> Op 15-06-10 12:45, Jassi Brar schreef:
+>>     
+>>> On Tue, Jun 15, 2010 at 7:25 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>>>       
+>>>> Linus Walleij wrote:
+>>>>         
+>>>>> This creates a DMAengine driver for the ARM PL080/PL081 PrimeCells
+>>>>> based on the implementation earlier submitted by Peter Pearse.
+>>>>> This is working like a charm for memcpy on the PB11MPCore, but
+>>>>> slave DMA to devices is still not working.
+>>>>>
+>>>>> This DMA controller is used in mostly unmodified form in the ARM
+>>>>> RealView and Versatile platforms, in the ST-Ericsson Nomadik, and
+>>>>> in the ST SPEAr platform.
+>>>>>
+>>>>> It has been converted to use the header from the Samsung PL080
+>>>>> derivate instead of its own defintions, and can potentially support
+>>>>> several controllers in the same system.
+>>>>>
+>>>>> Cc: Peter Pearse <peter.pearse@arm.com>
+>>>>> Cc: Ben Dooks <ben-linux@fluff.org>
+>>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>>>>>           
+>>>> Looks good, but please give me some time to test on the board(SMDK6410).
+>>>> If any problem, let you know. Of course no problem, will ack.
+>>>>         
+>>> Samsung doesn't use the DMA API, so this driver is unlikely to work.
+>>>       
+>> It doesn't indeed, but it could be adapted to be a wrapper around the DMA engine API.
+>> Or even better, the drivers could be adapted to use that API.
+>>     
+> I don't particularly like the idea of making Samsung's drivers use the DMA API.
+> IMHO the S3C dma api is better atm.
+>   
 
-I really think this should be a custom-wp quirk, not a we-don-have-wp
-quirk.
-
-> +
-> +	/* to configure gpio pin as a card write protection signal */
-> +	if (pdata->cfg_wp)
-> +		pdata->cfg_wp(pdev->id);
-> +
->  	ret = sdhci_add_host(host);
->  	if (ret) {
->  		dev_err(dev, "sdhci_add_host() failed\n");
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index c6d1bd8..2f8dfbc 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -1192,6 +1192,9 @@ static int sdhci_get_ro(struct mmc_host *mmc)
->  
->  	host = mmc_priv(mmc);
->  
-> +	if ((host->quirks & SDHCI_QUIRK_NO_WP_BIT) && host->ops->get_ro)
-> +		return host->ops->get_ro(mmc);
-> +
->  	spin_lock_irqsave(&host->lock, flags);
->  
->  	if (host->flags & SDHCI_DEVICE_DEAD)
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index c846813..f479e22 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -240,6 +240,8 @@ struct sdhci_host {
->  #define SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN		(1<<25)
->  /* Controller cannot support End Attribute in NOP ADMA descriptor */
->  #define SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC		(1<<26)
-> +/* Controller has no write-protect pin connected with SD card */
-> +#define SDHCI_QUIRK_NO_WP_BIT                          (1<<27)
->  
->  	int			irq;		/* Device IRQ */
->  	void __iomem *		ioaddr;		/* Mapped address */
-> @@ -312,6 +314,7 @@ struct sdhci_ops {
->  	unsigned int	(*get_max_clock)(struct sdhci_host *host);
->  	unsigned int	(*get_min_clock)(struct sdhci_host *host);
->  	unsigned int	(*get_timeout_clock)(struct sdhci_host *host);
-> +	int		(*get_ro)(struct mmc_host *mmc);
->  };
->  
->  #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
-> -- 
-> 1.6.2.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+At the moment it is better, true. But I do think it'd be better to use a
+generic API than an arch-specific one.
+I'm not familiar enough with both of them to know what functionality is
+currently missing but I do think that once the DMA engine API is up to
+speed, it should replace the s3c one.
 
 -- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Maurus Cuelenaere
