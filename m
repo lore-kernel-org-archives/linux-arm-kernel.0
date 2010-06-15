@@ -1,140 +1,44 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 15 Jun 2010 20:27:47 +0900
-Subject: [PATCH 2/3] ARM: S5PV210: Add support SDMMC WP through EXT_INT on
-	SMDKV210
-In-Reply-To: <1276601268-7226-1-git-send-email-kgene.kim@samsung.com>
-References: <1276601268-7226-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1276601268-7226-3-git-send-email-kgene.kim@samsung.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 15 Jun 2010 20:39:43 +0900
+Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081
+	PrimeCells
+In-Reply-To: <4C176148.4020507@gmail.com>
+References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
+	<002001cb0c75$0a54fd00$1efef700$%kim@samsung.com>
+	<AANLkTil7gb7SjrYPrHPfSomwxLlHpowXOZd_Qr125jvr@mail.gmail.com>
+	<4C176148.4020507@gmail.com>
+Message-ID: <AANLkTil7b5Pg5q18eGvGY_cFH75rdpSuZhigH4vcjrnu@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lee Hyuk <hyuk1.lee@samsung.com>
-
-S5PV210 HSMMC host controller doesn't have the Write Protection pin which
-should be connnected with SDMMC card WP pin. So allocated a GPIO in order to
-get the data from SDMMC card WP pin with EXT_INT and implement get_ro and
-cfg_wp function.
-
-Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-s5pv210/mach-smdkv210.c |    2 +
- arch/arm/mach-s5pv210/setup-sdhci.c   |   72 +++++++++++++++++++++++++++++++++
- 2 files changed, 74 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
-index b08f376..18cdb8c 100644
---- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-+++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-@@ -27,6 +27,7 @@
- #include <plat/cpu.h>
- #include <plat/adc.h>
- #include <plat/ts.h>
-+#include <plat/sdhci.h>
- 
- /* Following are default values for UCON, ULCON and UFCON UART registers */
- #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-@@ -101,6 +102,7 @@ static void __init smdkv210_map_io(void)
- static void __init smdkv210_machine_init(void)
- {
- 	s3c24xx_ts_set_platdata(&s3c_ts_platform);
-+	s3c_sdhci_set_platdata();
- 	platform_add_devices(smdkv210_devices, ARRAY_SIZE(smdkv210_devices));
- }
- 
-diff --git a/arch/arm/mach-s5pv210/setup-sdhci.c b/arch/arm/mach-s5pv210/setup-sdhci.c
-index 51815ec..b553b36 100644
---- a/arch/arm/mach-s5pv210/setup-sdhci.c
-+++ b/arch/arm/mach-s5pv210/setup-sdhci.c
-@@ -15,13 +15,17 @@
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
-+#include <linux/gpio.h>
- 
- #include <linux/mmc/card.h>
- #include <linux/mmc/host.h>
- 
-+#include <plat/gpio-cfg.h>
- #include <plat/regs-sdhci.h>
- #include <plat/sdhci.h>
- 
-+#include <mach/map.h>
-+
- /* clock sources for the mmc bus clock, order as for the ctrl2[5..4] */
- 
- char *s5pv210_hsmmc_clksrcs[4] = {
-@@ -61,3 +65,71 @@ void s5pv210_setup_sdhci_cfg_card(struct platform_device *dev,
- 	writel(ctrl2, r + S3C_SDHCI_CONTROL2);
- 	writel(ctrl3, r + S3C_SDHCI_CONTROL3);
- }
-+
-+static int s5pv210_sdhci_get_ro(struct mmc_host *mmc)
-+{
-+	int gpio_dat;
-+
-+	if ((mmc->index == 0 && s3c_hsmmc0_def_platdata.cfg_wp != NULL) ||
-+		(mmc->index == 1 && s3c_hsmmc1_def_platdata.cfg_wp != NULL)) {
-+		gpio_dat = __raw_readl((S5P_VA_GPIO + 0xC00) + 0x04);
-+		return !!(gpio_dat & 0x80);
-+	} else if (mmc->index == 2 && s3c_hsmmc2_def_platdata.cfg_wp != NULL) {
-+		gpio_dat = __raw_readl((S5P_VA_GPIO + 0xC00) + 0x64);
-+		return !!(gpio_dat & 0x2);
-+	} else if (mmc->index == 3 && s3c_hsmmc3_def_platdata.cfg_wp != NULL) {
-+		gpio_dat = __raw_readl((S5P_VA_GPIO + 0xC00) + 0x24);
-+		return !!(gpio_dat & 0x1);
-+	} else
-+		return 0;
-+}
-+
-+static void s5pv210_setup_sdhci_gpio_wp(int dev_id)
-+{
-+	switch (dev_id) {
-+	case 0:
-+	case 1:
-+		s3c_gpio_cfgpin(S5PV210_GPH0(7), S3C_GPIO_INPUT);
-+		s3c_gpio_setpull(S5PV210_GPH0(7), S3C_GPIO_PULL_UP);
-+		break;
-+	case 2:
-+		s3c_gpio_cfgpin(S5PV210_GPH3(1), S3C_GPIO_INPUT);
-+		s3c_gpio_setpull(S5PV210_GPH3(1), S3C_GPIO_PULL_UP);
-+		break;
-+	case 3:
-+		s3c_gpio_cfgpin(S5PV210_GPH1(0), S3C_GPIO_INPUT);
-+		s3c_gpio_setpull(S5PV210_GPH1(0), S3C_GPIO_PULL_UP);
-+		break;
-+	default:
-+		break;
-+	}
-+}
-+
-+static struct s3c_sdhci_platdata hsmmc0_platdata = {
-+	.cfg_wp         = s5pv210_setup_sdhci_gpio_wp,
-+	.get_ro         = s5pv210_sdhci_get_ro,
-+};
-+
-+static struct s3c_sdhci_platdata hsmmc1_platdata = {
-+	.cfg_wp         = s5pv210_setup_sdhci_gpio_wp,
-+	.get_ro         = s5pv210_sdhci_get_ro,
-+};
-+
-+static struct s3c_sdhci_platdata hsmmc2_platdata = {
-+	.cfg_wp         = s5pv210_setup_sdhci_gpio_wp,
-+	.get_ro         = s5pv210_sdhci_get_ro,
-+};
-+
-+static struct s3c_sdhci_platdata hsmmc3_platdata = {
-+	.cfg_wp         = s5pv210_setup_sdhci_gpio_wp,
-+	.get_ro         = s5pv210_sdhci_get_ro,
-+};
-+
-+void s3c_sdhci_set_platdata(void)
-+{
-+	s3c_sdhci0_set_platdata(&hsmmc0_platdata);
-+	s3c_sdhci1_set_platdata(&hsmmc1_platdata);
-+	s3c_sdhci2_set_platdata(&hsmmc2_platdata);
-+	s3c_sdhci3_set_platdata(&hsmmc3_platdata);
-+}
-+EXPORT_SYMBOL(s3c_sdhci_set_platdata);
--- 
-1.6.2.5
+On Tue, Jun 15, 2010 at 8:17 PM, Maurus Cuelenaere
+<mcuelenaere@gmail.com> wrote:
+> Op 15-06-10 12:45, Jassi Brar schreef:
+>> On Tue, Jun 15, 2010 at 7:25 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>>> Linus Walleij wrote:
+>>>>
+>>>> This creates a DMAengine driver for the ARM PL080/PL081 PrimeCells
+>>>> based on the implementation earlier submitted by Peter Pearse.
+>>>> This is working like a charm for memcpy on the PB11MPCore, but
+>>>> slave DMA to devices is still not working.
+>>>>
+>>>> This DMA controller is used in mostly unmodified form in the ARM
+>>>> RealView and Versatile platforms, in the ST-Ericsson Nomadik, and
+>>>> in the ST SPEAr platform.
+>>>>
+>>>> It has been converted to use the header from the Samsung PL080
+>>>> derivate instead of its own defintions, and can potentially support
+>>>> several controllers in the same system.
+>>>>
+>>>> Cc: Peter Pearse <peter.pearse@arm.com>
+>>>> Cc: Ben Dooks <ben-linux@fluff.org>
+>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>>>
+>>> Looks good, but please give me some time to test on the board(SMDK6410).
+>>> If any problem, let you know. Of course no problem, will ack.
+>> Samsung doesn't use the DMA API, so this driver is unlikely to work.
+>
+> It doesn't indeed, but it could be adapted to be a wrapper around the DMA engine API.
+> Or even better, the drivers could be adapted to use that API.
+I don't particularly like the idea of making Samsung's drivers use the DMA API.
+IMHO the S3C dma api is better atm.
