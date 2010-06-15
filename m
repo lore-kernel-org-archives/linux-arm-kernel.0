@@ -1,64 +1,58 @@
-From: mhowe@cwlinux.com (Morgan Howe)
-Date: Tue, 15 Jun 2010 11:29:36 +0800
-Subject: mxcmmc driver hangs on sync
-Message-ID: <20100615112936.5d03ce92@morgan>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 15 Jun 2010 12:45:36 +0900
+Subject: [PATCH 0/6] S5PV210 PM Support (suspend-to-mem)
+In-Reply-To: <1276504755-24741-1-git-send-email-MyungJoo.Ham@samsung.com>
+References: <1276504755-24741-1-git-send-email-MyungJoo.Ham@samsung.com>
+Message-ID: <007601cb0c3d$3aa91910$affb4b30$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greetings,
+Myungjoo Ham wrote:
+> 
+> This patch set supports S5PV210/S5PC110 PM (suspend-to-mem).
+> 
 
-I'm using a freescale i.mx27 board with 2 class 2 sdhc cards.
-Originally we were working with the 2.6.22 kernel from freescale, but
-found that after an extended period of writing to the SD card (around
-2k-3k writes of a 1mb file), the driver would hang when we called the
-sync command. It appeared to be an issue related to dma interrupts.
+Please include Ben Dooks for Samsung SoC patch - his address is in
+MAINTAINERS.
 
-Since we have been wanting to move to the newer kernel anyway, I
-decided to try a similar test using the current mainline kernel from
-Linus' tree.  Basically, my test is a simple bash script which does
-this:
+And If this patch set is for S5PV210/S5PC110 PM, please make sure that
+includes for PM code.
+Seems to be added unnecessary codes.
 
-while(true) {
-cp 1mb_test_file SD1
-cp SD1/1mb_test_file SD2
-sync
-}
+> MyungJoo Ham (8):
+>   S5PV210 Add IRQ/EINT register information for the CPU.
+>   S5PV210 add clock registers for the CPU.
+>   S5PV210 added register mappings
+>   S5PV210 GPIO relataed registers are added.
+>   S5PV210 added EINT-GPIO register mappings
+>   S5PV210 PM Support (suspend-to-mem)
+> 
+>  arch/arm/mach-s5pv210/Makefile                  |    4 +
+>  arch/arm/mach-s5pv210/include/mach/irqs.h       |    9 +
+>  arch/arm/mach-s5pv210/include/mach/map.h        |   45 +++
+>  arch/arm/mach-s5pv210/include/mach/regs-clock.h |  467
+> ++++++++++++++++++++++-
+>  arch/arm/mach-s5pv210/include/mach/regs-gpio.h  |  121 ++++++
+>  arch/arm/mach-s5pv210/include/mach/regs-irq.h   |    6 +
+>  arch/arm/plat-s5p/Makefile                      |    3 +
+>  arch/arm/plat-s5p/include/plat/gpio-ext.h       |   44 +++
+>  arch/arm/plat-s5p/include/plat/map-s5p.h        |    1 +
+>  arch/arm/plat-s5p/sleep.S                       |  248 ++++++++++++
+>  arch/arm/plat-samsung/include/plat/pm-core.h    |   53 +++
+>  arch/arm/plat-samsung/include/plat/pm.h         |   13 +
+>  arch/arm/plat-samsung/pm-gpio.c                 |    4 +-
+>  arch/arm/plat-samsung/pm.c                      |   75 ++++-
+>  14 files changed, 1082 insertions(+), 11 deletions(-)
+>  create mode 100644 arch/arm/plat-s5p/include/plat/gpio-ext.h
+>  create mode 100644 arch/arm/plat-s5p/sleep.S
+>  create mode 100644 arch/arm/plat-samsung/include/plat/pm-core.h
+> 
+> 
 
-With the older kernel this would hang on sync after a few thousand
-loops, and much sooner if you ran 2 or 3 of these processes at a time.
-I tried last night with the newer kernel and kicking off 3 processes
-and after ~100-150 loops per process I get this:
+Thanks.
 
-mxc-mmc mxc-mmc.0: mxcmci_finish_data: No CRC -ETIMEDOUT
-mmcblk0: error -110 transferring data, sector 24765007, nr 512, card
-status 0x0 mmcblk0: error -110 sending stop command, response 0x0, card
-status 0x0 end_request: I/O error, dev mmcblk0, sector 24765021
-end_request: I/O error, dev mmcblk0, sector 24765023
-end_request: I/O error, dev mmcblk0, sector 24765031
-end_request: I/O error, dev mmcblk0, sector 24765039
-...
-<snip>
-
-It then continues for ~20 more loops per process, and then again I get
-that same error. Continues for a while longer and then finally this:
-
-mxc-mmc mxc-mmc.1: mxcmci_finish_data: No CRC -ETIMEDOUT
-mmcblk1: error -110 transferring data, sector 8859727, nr 144, card
-status 0xc00 FEC: MDIO read timeout
-
-And I can see in the output from ps:
-
-  535 0         2808 S    /bin/sh ./test.sh 
-  673 0         2808 S    /bin/sh ./test.sh 
-  747 0         2808 S    /bin/sh ./test.sh 
- 2097 0         2672 D    sync 
- 2098 0         2672 D    sync 
- 2099 0         2672 D    sync 
- 2261 0            0 SW   [flush-179:8]
- 2262 0         3052 R    ps
-
-Has anyone seen this or have any suggestions how I may be able to go
-about fixing it?
-
-Regards,
-Morgan
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
