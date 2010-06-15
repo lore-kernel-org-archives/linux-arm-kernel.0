@@ -1,88 +1,76 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 15 Jun 2010 03:25:16 +0200
-Subject: [PATCH] pxa/colibri320: Add UDC support
-Message-ID: <1276565116-17646-1-git-send-email-marek.vasut@gmail.com>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Tue, 15 Jun 2010 12:02:24 +1000
+Subject: Request review of device tree documentation
+In-Reply-To: <alpine.LFD.2.00.1006141044510.13427@xanadu.home>
+References: <4C13430B.5000907@firmworks.com>
+	<1276339529.1962.184.camel@pasglop>
+	<1276339684.1962.186.camel@pasglop>
+	<4C13B618.1030006@firmworks.com>
+	<1276383132.1962.195.camel@pasglop>
+	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>
+	<4C146F18.9030008@firmworks.com>
+	<AANLkTikls3hjXOmKFqG2D_9GaJSjOXNuuRXPlanAjo5E@mail.gmail.com>
+	<20100614124438.GF9323@yookeroo>
+	<alpine.LFD.2.00.1006141044510.13427@xanadu.home>
+Message-ID: <20100615020224.GK9323@yookeroo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for PXA UDC.
+On Mon, Jun 14, 2010 at 10:59:20AM -0400, Nicolas Pitre wrote:
+> On Mon, 14 Jun 2010, David Gibson wrote:
+> 
+> > On Sun, Jun 13, 2010 at 11:02:15PM -0600, Grant Likely wrote:
+> > [sni]
+> > > > That's sort of a self-fulfilling prophecy. ?If the OS doesn't trust the
+> > > > firmware, there is no pressure for the firmware to "get it right".
+> > > 
+> > > Firmware will not get it right.  Period.  There will always be
+> > > something wrong.  It is never right on PCs.  It will never be right on
+> > > the other architectures.
+> > 
+> > Yes, yes, yes.  And there is a great deal of empirical evidence to
+> > back that assertion.
+> > 
+> > >  That goes for OSes too, but upgrading an OS
+> > > isn't as risky as upgrading firmware.  That isn't to say that it can't
+> > > be close, but every firmware feature that the OS depends on is a
+> > > feature that could force a risky firmware upgrade when the bug in it
+> > > is discovered.
+> > 
+> > Indeed.  In fact, the general rule of thumb is really "put as much as
+> > possible into the most easily replaced layer of the stack".  This is,
+> > incidentally, why I've always been dubious about simple firmwares
+> > supplying a flattened device tree rather than including the device
+> > tree template in the kernel, cuboot style.
+> 
+> The biggest advantage, IMHO, for adding DT to ARM, is actually to 
+> decouple the hardware config information and the kernel.  If in the end 
+> the DT has to be shipped in the kernel then we're losing all this 
+> advantage over the current state of things on ARM which still works 
+> pretty well otherwise.
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- arch/arm/mach-pxa/colibri-pxa320.c |   40 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 40 insertions(+), 0 deletions(-)
+Right, which is why I'm just dubious, not dead against it.  If
+firmware supplies a device tree that's so awful you have to replace
+most of it, then you haven't won much over having a kernel wrapper
+which uses ad-hoc logic to detect the board type from whatever random
+clues the firmware leaves and selects a device tree from it's library
+of them based on that.  On ARM this sort of approach is probably more
+effective than powerpc, even, since you could use the machine number
+to select from a bag of canned device trees and still have a
+multi-board kernel.
 
-diff --git a/arch/arm/mach-pxa/colibri-pxa320.c b/arch/arm/mach-pxa/colibri-pxa320.c
-index ae835fa..99e850d 100644
---- a/arch/arm/mach-pxa/colibri-pxa320.c
-+++ b/arch/arm/mach-pxa/colibri-pxa320.c
-@@ -16,6 +16,7 @@
- #include <linux/platform_device.h>
- #include <linux/gpio.h>
- #include <linux/interrupt.h>
-+#include <linux/usb/gpio_vbus.h>
- 
- #include <asm/mach-types.h>
- #include <asm/sizes.h>
-@@ -28,6 +29,8 @@
- #include <mach/pxafb.h>
- #include <mach/ohci.h>
- #include <mach/audio.h>
-+#include <mach/pxa27x-udc.h>
-+#include <mach/udc.h>
- 
- #include "generic.h"
- #include "devices.h"
-@@ -101,6 +104,42 @@ void __init colibri_pxa320_init_ohci(void)
- static inline void colibri_pxa320_init_ohci(void) {}
- #endif /* CONFIG_USB_OHCI_HCD || CONFIG_USB_OHCI_HCD_MODULE */
- 
-+#if defined(CONFIG_USB_GADGET_PXA27X)||defined(CONFIG_USB_GADGET_PXA27X_MODULE)
-+static struct gpio_vbus_mach_info colibri_pxa320_gpio_vbus_info = {
-+	.gpio_vbus		= mfp_to_gpio(MFP_PIN_GPIO96),
-+	.gpio_pullup		= -1,
-+};
-+
-+static struct platform_device colibri_pxa320_gpio_vbus = {
-+	.name	= "gpio-vbus",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &colibri_pxa320_gpio_vbus_info,
-+	},
-+};
-+
-+static void colibri_pxa320_udc_command(int cmd)
-+{
-+	if (cmd == PXA2XX_UDC_CMD_CONNECT)
-+		UP2OCR = UP2OCR_HXOE | UP2OCR_DPPUE;
-+	else if (cmd == PXA2XX_UDC_CMD_DISCONNECT)
-+		UP2OCR = UP2OCR_HXOE;
-+}
-+
-+static struct pxa2xx_udc_mach_info colibri_pxa320_udc_info __initdata = {
-+	.udc_command		= colibri_pxa320_udc_command,
-+	.gpio_pullup		= -1,
-+};
-+
-+static void __init colibri_pxa320_init_udc(void)
-+{
-+	pxa_set_udc_info(&colibri_pxa320_udc_info);
-+	platform_device_register(&colibri_pxa320_gpio_vbus);
-+}
-+#else
-+static inline void colibri_pxa320_init_udc(void) {}
-+#endif
-+
- static mfp_cfg_t colibri_pxa320_mmc_pin_config[] __initdata = {
- 	GPIO22_MMC1_CLK,
- 	GPIO23_MMC1_CMD,
-@@ -212,6 +251,7 @@ void __init colibri_pxa320_init(void)
- 	colibri_pxa3xx_init_mmc(ARRAY_AND_SIZE(colibri_pxa320_mmc_pin_config),
- 				mfp_to_gpio(MFP_PIN_GPIO28));
- 	colibri_pxa320_init_uart();
-+	colibri_pxa320_init_udc();
- }
- 
- MACHINE_START(COLIBRI320, "Toradex Colibri PXA320")
+> In the best case, the simple firmware simply has to retrieve the 
+> flattened device tree from flash, and pass it to the kernel just like 
+> some anonymous blob.  And the simple firmware only needs to provide a 
+> way for that DT blob to be updatable, like through an upload of a 
+> replacement blob that was prepared offline.  Just like a ramdisk image 
+> or the like.
+
+Yes, having the firmware DT independently updateable makes most of my
+concerns about it go away.
+
 -- 
-1.7.1
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
