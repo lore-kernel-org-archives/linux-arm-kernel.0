@@ -1,61 +1,161 @@
-From: philippe.retornaz@epfl.ch (Philippe =?iso-8859-1?q?R=E9tornaz?=)
-Date: Tue, 15 Jun 2010 13:47:50 +0200
-Subject: [PATCH 2/2] ehci-mxc: bail out on transceiver problems
-In-Reply-To: <20100615104342.GE17833@buzzloop.caiaq.de>
-References: <1276598063-3956-1-git-send-email-w.sang@pengutronix.de>
-	<1276598063-3956-2-git-send-email-w.sang@pengutronix.de>
-	<20100615104342.GE17833@buzzloop.caiaq.de>
-Message-ID: <201006151347.51085.philippe.retornaz@epfl.ch>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 15 Jun 2010 20:52:45 +0900
+Subject: [PATCH 2/3] ARM: S5PV210: Add support SDMMC WP through EXT_INT on
+	SMDKV210
+In-Reply-To: <1276601268-7226-3-git-send-email-kgene.kim@samsung.com>
+References: <1276601268-7226-1-git-send-email-kgene.kim@samsung.com>
+	<1276601268-7226-3-git-send-email-kgene.kim@samsung.com>
+Message-ID: <AANLkTimQwmFGwRgXASba1ECwYDJaay_D1q4_L6tvIo9y@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mardi, 15 juin 2010 12.43:42, Daniel Mack a ?crit :
-> On Tue, Jun 15, 2010 at 12:34:23PM +0200, Wolfram Sang wrote:
-> > The old code registered the hcd even if there were no transceivers
-> > detected, leading to oopses like this if we try to probe a non-existant
-> > ULPI:
-> 
-> Hmm. I'm aware that there was a missing bail in this function, but
-> actually, I had hardware which didn't properly detect the ULPI chip but
-> still worked fine. There has been quite some discussion here about that,
-> and eventually I decided to not make this a hard error as it didn't
-> really harm.
-> 
-> > [    2.730000] mxc-ehci mxc-ehci.0: unable to init transceiver
-> > [    2.740000] timeout polling for ULPI device
-> > [    2.740000] timeout polling for ULPI device
-> > [    2.750000] mxc-ehci mxc-ehci.0: unable to enable vbus on transceiver
-> > [    2.750000] mxc-ehci mxc-ehci.0: Freescale On-Chip EHCI Host
-> > Controller [    2.760000] mxc-ehci mxc-ehci.0: new USB bus registered,
-> > assigned bus number 2 [    2.770000] Unhandled fault: external abort on
-> > non-linefetch (0x808) at 0xc4876184 [    2.770000] Internal error: : 808
-> > [#1] PREEMPT
-> > [    2.770000] last sysfs file:
-> > [    2.770000] Modules linked in:
-> > [    2.770000] CPU: 0    Not tainted  (2.6.33.5 #5)
-> > [    2.770000] PC is at ehci_hub_control+0x4d4/0x8f8
-> > [    2.770000] LR is at ehci_mxc_setup+0xbc/0xdc
-> > [    2.770000] pc : [<c0196dfc>]    lr : [<c019bc8c>]    psr: 00000093
-> > [    2.770000] sp : c3815e40  ip : 00000001  fp : 60000013
-> > [    2.770000] r10: c4876184  r9 : 00000000  r8 : c3814000
-> > [    2.770000] r7 : c391d2cc  r6 : 00000001  r5 : 00000001  r4 : 00000000
-> > [    2.770000] r3 : 80000000  r2 : 00000007  r1 : 80000000  r0 : c4876184
-> > [    2.770000] Flags: nzcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM
-> > Segment kernel [    2.770000] Control: 0005317f  Table: a0004000  DAC:
-> > 00000017 [    2.770000] Process swapper (pid: 1, stack limit =
-> > 0xc3814270)
-> 
-> But that, of course, changes everthing. If you happen to see such
-> Ooopses, your patch should go in, and I will check the boards again and
-> see if they still fail to probe the ULPI. Eventually, we might need some
-> kind of quirks field in the platform data :(
-> 
+On Tue, Jun 15, 2010 at 8:27 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> From: Lee Hyuk <hyuk1.lee@samsung.com>
+>
+> S5PV210 HSMMC host controller doesn't have the Write Protection pin which
+> should be connnected with SDMMC card WP pin. So allocated a GPIO in order to
+> get the data from SDMMC card WP pin with EXT_INT and implement get_ro and
+> cfg_wp function.
+>
+> Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+> ?arch/arm/mach-s5pv210/mach-smdkv210.c | ? ?2 +
+> ?arch/arm/mach-s5pv210/setup-sdhci.c ? | ? 72 +++++++++++++++++++++++++++++++++
+> ?2 files changed, 74 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
+> index b08f376..18cdb8c 100644
+> --- a/arch/arm/mach-s5pv210/mach-smdkv210.c
+> +++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
+> @@ -27,6 +27,7 @@
+> ?#include <plat/cpu.h>
+> ?#include <plat/adc.h>
+> ?#include <plat/ts.h>
+> +#include <plat/sdhci.h>
+>
+> ?/* Following are default values for UCON, ULCON and UFCON UART registers */
+> ?#define S5PV210_UCON_DEFAULT ? (S3C2410_UCON_TXILEVEL | ? ? ? ?\
+> @@ -101,6 +102,7 @@ static void __init smdkv210_map_io(void)
+> ?static void __init smdkv210_machine_init(void)
+> ?{
+> ? ? ? ?s3c24xx_ts_set_platdata(&s3c_ts_platform);
+> + ? ? ? s3c_sdhci_set_platdata();
+> ? ? ? ?platform_add_devices(smdkv210_devices, ARRAY_SIZE(smdkv210_devices));
+> ?}
+>
+> diff --git a/arch/arm/mach-s5pv210/setup-sdhci.c b/arch/arm/mach-s5pv210/setup-sdhci.c
+> index 51815ec..b553b36 100644
+> --- a/arch/arm/mach-s5pv210/setup-sdhci.c
+> +++ b/arch/arm/mach-s5pv210/setup-sdhci.c
+> @@ -15,13 +15,17 @@
+> ?#include <linux/interrupt.h>
+> ?#include <linux/platform_device.h>
+> ?#include <linux/io.h>
+> +#include <linux/gpio.h>
+>
+> ?#include <linux/mmc/card.h>
+> ?#include <linux/mmc/host.h>
+>
+> +#include <plat/gpio-cfg.h>
+> ?#include <plat/regs-sdhci.h>
+> ?#include <plat/sdhci.h>
+>
+> +#include <mach/map.h>
+> +
+> ?/* clock sources for the mmc bus clock, order as for the ctrl2[5..4] */
+>
+> ?char *s5pv210_hsmmc_clksrcs[4] = {
+> @@ -61,3 +65,71 @@ void s5pv210_setup_sdhci_cfg_card(struct platform_device *dev,
+> ? ? ? ?writel(ctrl2, r + S3C_SDHCI_CONTROL2);
+> ? ? ? ?writel(ctrl3, r + S3C_SDHCI_CONTROL3);
+> ?}
+> +
+> +static int s5pv210_sdhci_get_ro(struct mmc_host *mmc)
+> +{
+> + ? ? ? int gpio_dat;
+> +
+> + ? ? ? if ((mmc->index == 0 && s3c_hsmmc0_def_platdata.cfg_wp != NULL) ||
+> + ? ? ? ? ? ? ? (mmc->index == 1 && s3c_hsmmc1_def_platdata.cfg_wp != NULL)) {
+> + ? ? ? ? ? ? ? gpio_dat = __raw_readl((S5P_VA_GPIO + 0xC00) + 0x04);
+> + ? ? ? ? ? ? ? return !!(gpio_dat & 0x80);
 
-Have you tried my imx31 EHCI controller init patch applied ? 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-May/014729.html
+It's GPIO values, and it's smdk specific values. So it should go smdk
+board files instead of platform common one.
 
-Btw, it has still not be applied, anybody knows why ? 
+> + ? ? ? } else if (mmc->index == 2 && s3c_hsmmc2_def_platdata.cfg_wp != NULL) {
+> + ? ? ? ? ? ? ? gpio_dat = __raw_readl((S5P_VA_GPIO + 0xC00) + 0x64);
+> + ? ? ? ? ? ? ? return !!(gpio_dat & 0x2);
+> + ? ? ? } else if (mmc->index == 3 && s3c_hsmmc3_def_platdata.cfg_wp != NULL) {
+> + ? ? ? ? ? ? ? gpio_dat = __raw_readl((S5P_VA_GPIO + 0xC00) + 0x24);
+> + ? ? ? ? ? ? ? return !!(gpio_dat & 0x1);
+> + ? ? ? } else
+> + ? ? ? ? ? ? ? return 0;
+> +}
+> +
+> +static void s5pv210_setup_sdhci_gpio_wp(int dev_id)
+> +{
+> + ? ? ? switch (dev_id) {
+> + ? ? ? case 0:
+> + ? ? ? case 1:
+> + ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5PV210_GPH0(7), S3C_GPIO_INPUT);
+> + ? ? ? ? ? ? ? s3c_gpio_setpull(S5PV210_GPH0(7), S3C_GPIO_PULL_UP);
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? case 2:
+> + ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5PV210_GPH3(1), S3C_GPIO_INPUT);
+> + ? ? ? ? ? ? ? s3c_gpio_setpull(S5PV210_GPH3(1), S3C_GPIO_PULL_UP);
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? case 3:
+> + ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5PV210_GPH1(0), S3C_GPIO_INPUT);
+> + ? ? ? ? ? ? ? s3c_gpio_setpull(S5PV210_GPH1(0), S3C_GPIO_PULL_UP);
 
-Regards,
+Ditto. board specific configurations. should go smdk board file.
 
-Philippe
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? default:
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? }
+> +}
+> +
+> +static struct s3c_sdhci_platdata hsmmc0_platdata = {
+> + ? ? ? .cfg_wp ? ? ? ? = s5pv210_setup_sdhci_gpio_wp,
+> + ? ? ? .get_ro ? ? ? ? = s5pv210_sdhci_get_ro,
+> +};
+> +
+> +static struct s3c_sdhci_platdata hsmmc1_platdata = {
+> + ? ? ? .cfg_wp ? ? ? ? = s5pv210_setup_sdhci_gpio_wp,
+> + ? ? ? .get_ro ? ? ? ? = s5pv210_sdhci_get_ro,
+> +};
+> +
+> +static struct s3c_sdhci_platdata hsmmc2_platdata = {
+> + ? ? ? .cfg_wp ? ? ? ? = s5pv210_setup_sdhci_gpio_wp,
+> + ? ? ? .get_ro ? ? ? ? = s5pv210_sdhci_get_ro,
+> +};
+> +
+> +static struct s3c_sdhci_platdata hsmmc3_platdata = {
+> + ? ? ? .cfg_wp ? ? ? ? = s5pv210_setup_sdhci_gpio_wp,
+> + ? ? ? .get_ro ? ? ? ? = s5pv210_sdhci_get_ro,
+> +};
+> +
+> +void s3c_sdhci_set_platdata(void)
+> +{
+> + ? ? ? s3c_sdhci0_set_platdata(&hsmmc0_platdata);
+> + ? ? ? s3c_sdhci1_set_platdata(&hsmmc1_platdata);
+> + ? ? ? s3c_sdhci2_set_platdata(&hsmmc2_platdata);
+> + ? ? ? s3c_sdhci3_set_platdata(&hsmmc3_platdata);
+> +}
+> +EXPORT_SYMBOL(s3c_sdhci_set_platdata);
+
+I think all added lines should go smdk totally.
+
+Thank you,
+Kyungmin Park
+
+> --
+> 1.6.2.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
