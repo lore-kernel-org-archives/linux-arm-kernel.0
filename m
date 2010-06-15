@@ -1,42 +1,34 @@
-From: jdzheng@broadcom.com (JD (Jiandong) Zheng)
-Date: Tue, 15 Jun 2010 13:42:26 -0700
-Subject: [PATCH] MAINTAINERS: Change BCMRING maintainer
-Message-ID: <8628FE4E7912BF47A96AE7DD7BAC0AADDDC694E3F7@SJEXCHCCR02.corp.ad.broadcom.com>
+From: linus.walleij@stericsson.com (Linus WALLEIJ)
+Date: Tue, 15 Jun 2010 22:55:07 +0200
+Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
+In-Reply-To: <AANLkTil7gb7SjrYPrHPfSomwxLlHpowXOZd_Qr125jvr@mail.gmail.com>
+References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
+	<002001cb0c75$0a54fd00$1efef700$%kim@samsung.com>
+	<AANLkTil7gb7SjrYPrHPfSomwxLlHpowXOZd_Qr125jvr@mail.gmail.com>
+Message-ID: <CEE6BB42CAD6E947908279175AF8470A025E5AE204@EXDCVYMBSTM006.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+[Jassi]
+> [Kukjin]
+> >> It has been converted to use the header from the Samsung PL080
+> >> derivate instead of its own defintions, and can potentially support
+> >> several controllers in the same system.
+> > Looks good, but please give me some time to test on the
+> board(SMDK6410).
+> > If any problem, let you know. Of course no problem, will ack.
+> Samsung doesn't use the DMA API, so this driver is unlikely to work.
 
-I am Jiandong Zheng working on BCMRING in Broadcom Canada Ltd. I am replacing Leo Chen (leochen at broadcom.com) as " ARM/BCMRING ARM ARCHITECTURE" and "ARM/BCMRING MTD NAND DRIVER" maintainer.
+Yeah that was never the intention, the Samsung derivate has one extra
+Register and other funny stuff.
 
-Here is the patch to MAINTAINERS file in linux 2.6.34 about this change.
+I was more hoping on breaking out a subset in the same elegant way
+with a generic part and a separate DMAengine as was done with the
+PL330... But I need to get it fully working first.
 
-Signed-off-by: Jiandong Zheng <jdzheng@broadcom.com>
+Atleast I used the same include file.
 
-diff -urN linux-2.6.34/MAINTAINERS.orig linux-2.6.34/MAINTAINERS
---- linux-2.6.34/MAINTAINERS.orig	2010-06-15 11:59:53.202128994 -0700
-+++ linux-2.6.34/MAINTAINERS	2010-06-15 12:01:59.862277620 -0700
-@@ -570,14 +570,14 @@
- S:	Maintained
- 
- ARM/BCMRING ARM ARCHITECTURE
--M:	Leo Chen <leochen@broadcom.com>
-+M:	Jiandong Zheng <jdzheng@broadcom.com>
- M:	Scott Branden <sbranden@broadcom.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-bcmring
- 
- ARM/BCMRING MTD NAND DRIVER
--M:	Leo Chen <leochen@broadcom.com>
-+M:	Jiandong Zheng <jdzheng@broadcom.com>
- M:	Scott Branden <sbranden@broadcom.com>
- L:	linux-mtd at lists.infradead.org
- S:	Maintained
+But I have functional UART DMA on the RealView PB11MPCore now!
 
-
-Thanks,
-
-Jiandong Zheng
-Senior Staff Software Engineer
-Broadcom Canada Ltd.
+Yours,
+Linus Walleij
