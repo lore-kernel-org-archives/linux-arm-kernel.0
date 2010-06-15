@@ -1,29 +1,29 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Tue, 15 Jun 2010 13:53:52 +0200
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Tue, 15 Jun 2010 12:59:47 +0100
 Subject: [PATCH 2/3] ARM: S5PV210: Add support SDMMC WP through EXT_INT
 	on SMDKV210
 In-Reply-To: <1276601268-7226-3-git-send-email-kgene.kim@samsung.com>
 References: <1276601268-7226-1-git-send-email-kgene.kim@samsung.com>
 	<1276601268-7226-3-git-send-email-kgene.kim@samsung.com>
-Message-ID: <4C1769D0.7040904@gmail.com>
+Message-ID: <20100615115947.GC7248@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Op 15-06-10 13:27, Kukjin Kim schreef:
+On Tue, Jun 15, 2010 at 08:27:47PM +0900, Kukjin Kim wrote:
 > From: Lee Hyuk <hyuk1.lee@samsung.com>
->
+> 
 > S5PV210 HSMMC host controller doesn't have the Write Protection pin which
 > should be connnected with SDMMC card WP pin. So allocated a GPIO in order to
 > get the data from SDMMC card WP pin with EXT_INT and implement get_ro and
 > cfg_wp function.
->
+> 
 > Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
 > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 > ---
 >  arch/arm/mach-s5pv210/mach-smdkv210.c |    2 +
 >  arch/arm/mach-s5pv210/setup-sdhci.c   |   72 +++++++++++++++++++++++++++++++++
 >  2 files changed, 74 insertions(+), 0 deletions(-)
->
+> 
 > diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
 > index b08f376..18cdb8c 100644
 > --- a/arch/arm/mach-s5pv210/mach-smdkv210.c
@@ -41,10 +41,8 @@ Op 15-06-10 13:27, Kukjin Kim schreef:
 >  {
 >  	s3c24xx_ts_set_platdata(&s3c_ts_platform);
 > +	s3c_sdhci_set_platdata();
->   
 
-Wouldn't it be better to name this s5pv210_sdhci_set_platdata() ?
-Also, see below.
+hmm, did you really want to call it this? also, no argument specified.
 
 >  	platform_add_devices(smdkv210_devices, ARRAY_SIZE(smdkv210_devices));
 >  }
@@ -92,6 +90,10 @@ Also, see below.
 > +		return !!(gpio_dat & 0x1);
 > +	} else
 > +		return 0;
+
+Why not use the gpio layer? really, this sort of thing is what it is
+there for.
+
 > +}
 > +
 > +static void s5pv210_setup_sdhci_gpio_wp(int dev_id)
@@ -112,6 +114,10 @@ Also, see below.
 > +		break;
 > +	default:
 > +		break;
+
+again, if you'd use the gpio layer, at-lesat the cfgpin() wouldn't
+have been necessary.
+
 > +	}
 > +}
 > +
@@ -143,10 +149,12 @@ Also, see below.
 > +	s3c_sdhci3_set_platdata(&hsmmc3_platdata);
 > +}
 > +EXPORT_SYMBOL(s3c_sdhci_set_platdata);
->   
 
-Why do you export this function? I don't see this being used anywhere
-except in mach-s5pv210.
+There is _NO NEED_ to export these, they really should not be used outside
+of the machine initialisation.
 
 -- 
-Maurus Cuelenaere
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
