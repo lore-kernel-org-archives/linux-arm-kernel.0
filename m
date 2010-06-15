@@ -1,44 +1,37 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Tue, 15 Jun 2010 13:12:55 +0200
-Subject: [PATCH 2/2] ehci-mxc: bail out on transceiver problems
-In-Reply-To: <20100615110333.GC2478@pengutronix.de>
-References: <1276598063-3956-1-git-send-email-w.sang@pengutronix.de>
-	<1276598063-3956-2-git-send-email-w.sang@pengutronix.de>
-	<20100615104342.GE17833@buzzloop.caiaq.de>
-	<20100615110333.GC2478@pengutronix.de>
-Message-ID: <20100615111255.GG17833@buzzloop.caiaq.de>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Tue, 15 Jun 2010 13:17:28 +0200
+Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
+In-Reply-To: <AANLkTil7gb7SjrYPrHPfSomwxLlHpowXOZd_Qr125jvr@mail.gmail.com>
+References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>	<002001cb0c75$0a54fd00$1efef700$%kim@samsung.com>
+	<AANLkTil7gb7SjrYPrHPfSomwxLlHpowXOZd_Qr125jvr@mail.gmail.com>
+Message-ID: <4C176148.4020507@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 15, 2010 at 01:03:33PM +0200, Wolfram Sang wrote:
-> On Tue, Jun 15, 2010 at 12:43:42PM +0200, Daniel Mack wrote:
-> > On Tue, Jun 15, 2010 at 12:34:23PM +0200, Wolfram Sang wrote:
-> > > The old code registered the hcd even if there were no transceivers
-> > > detected, leading to oopses like this if we try to probe a non-existant
-> > > ULPI:
-> > 
-> > Hmm. I'm aware that there was a missing bail in this function, but
-> > actually, I had hardware which didn't properly detect the ULPI chip but
-> > still worked fine. There has been quite some discussion here about that,
-> > and eventually I decided to not make this a hard error as it didn't
-> > really harm.
-> 
-> My use case is that we have two very similar boards, one uses just the second
-> host controller, the other one uses also OTG. Of course, we'd like to have just
-> one kernel, so we wanted to check if probing for OTG fails gracefully enough,
-> if the ULPI is not present. It did not, so this is what my patch intends to
-> fix. I think, checking why your boards fail to do the init, is the cleaner way
-> to go in the long run.
+Op 15-06-10 12:45, Jassi Brar schreef:
+> On Tue, Jun 15, 2010 at 7:25 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> Linus Walleij wrote:
+>>>
+>>> This creates a DMAengine driver for the ARM PL080/PL081 PrimeCells
+>>> based on the implementation earlier submitted by Peter Pearse.
+>>> This is working like a charm for memcpy on the PB11MPCore, but
+>>> slave DMA to devices is still not working.
+>>>
+>>> This DMA controller is used in mostly unmodified form in the ARM
+>>> RealView and Versatile platforms, in the ST-Ericsson Nomadik, and
+>>> in the ST SPEAr platform.
+>>>
+>>> It has been converted to use the header from the Samsung PL080
+>>> derivate instead of its own defintions, and can potentially support
+>>> several controllers in the same system.
+>>>
+>>> Cc: Peter Pearse <peter.pearse@arm.com>
+>>> Cc: Ben Dooks <ben-linux@fluff.org>
+>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>>
+>> Looks good, but please give me some time to test on the board(SMDK6410).
+>> If any problem, let you know. Of course no problem, will ack.
+> Samsung doesn't use the DMA API, so this driver is unlikely to work.
 
-There's a design flaw in Freescale's MX31 reference designs which lets
-the nCS pin float. And many board designers blindly copied that flaw
-over to their own designs.
-
-See
-
-  http://marc.info/?l=linux-usb&m=125985151110906&w=4
-
-So we might need quirks handling here.
-
-
-Daniel
+It doesn't indeed, but it could be adapted to be a wrapper around the DMA engine API.
+Or even better, the drivers could be adapted to use that API.
