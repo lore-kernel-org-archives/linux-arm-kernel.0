@@ -1,61 +1,117 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Tue, 15 Jun 2010 11:02:23 +0530
-Subject: [PATCH 0/5] SPEAr3xx: Unify build of SPEAr3xx platforms
-In-Reply-To: <1275717955-14545-1-git-send-email-ryan@bluewatersys.com>
-References: <1275717955-14545-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <4C171067.1060102@st.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 15 Jun 2010 14:59:51 +0900
+Subject: [PATCH 3/6] S5PV210 added register mappings
+In-Reply-To: <1276504755-24741-4-git-send-email-MyungJoo.Ham@samsung.com>
+References: <1276504755-24741-1-git-send-email-MyungJoo.Ham@samsung.com>
+	<1276504755-24741-2-git-send-email-MyungJoo.Ham@samsung.com>
+	<1276504755-24741-3-git-send-email-MyungJoo.Ham@samsung.com>
+	<1276504755-24741-4-git-send-email-MyungJoo.Ham@samsung.com>
+Message-ID: <009501cb0c50$079fc7e0$16df57a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/5/2010 11:35 AM, Ryan Mallon wrote:
-> Rework the SPEAr3xx code to allow all three SPEAr3xx platforms to be
-> built into a single kernel.
-> 
-> I do not have access to any SPEAr3xx hardware, so the patch series is
-> build tested only.
-> 
-> Ryan Mallon (5):
->   SPEAr3xx: Make local structres static
->   SPEAR3xx: Rename register/irq defines to remove naming conflicts
->   SPEAr3xx: Rework pmx_dev code to remove conflicts
->   SPEAr3xx: Rework KConfig to allow all boards to be compiled in
->   SPEAr3xx: Replace defconfigs with single unfied defconfig
-> 
->  arch/arm/configs/spear300_defconfig            |  773 -----------------------
->  arch/arm/configs/spear310_defconfig            |  775 ------------------------
->  arch/arm/configs/spear320_defconfig            |  775 ------------------------
->  arch/arm/configs/spear3xx_defconfig            |  775 ++++++++++++++++++++++++
->  arch/arm/mach-spear3xx/Kconfig                 |   30 +-
->  arch/arm/mach-spear3xx/Kconfig300              |   17 -
->  arch/arm/mach-spear3xx/Kconfig310              |   17 -
->  arch/arm/mach-spear3xx/Kconfig320              |   17 -
->  arch/arm/mach-spear3xx/include/mach/generic.h  |  139 ++---
->  arch/arm/mach-spear3xx/include/mach/irqs.h     |  195 +++---
->  arch/arm/mach-spear3xx/include/mach/spear300.h |   26 +-
->  arch/arm/mach-spear3xx/include/mach/spear310.h |   44 +-
->  arch/arm/mach-spear3xx/include/mach/spear320.h |   50 +-
->  arch/arm/mach-spear3xx/spear300.c              |  135 ++--
->  arch/arm/mach-spear3xx/spear300_evb.c          |   26 +-
->  arch/arm/mach-spear3xx/spear310.c              |  137 +++--
->  arch/arm/mach-spear3xx/spear310_evb.c          |   42 +-
->  arch/arm/mach-spear3xx/spear320.c              |  247 ++++----
->  arch/arm/mach-spear3xx/spear320_evb.c          |   36 +-
->  arch/arm/mach-spear3xx/spear3xx.c              |  124 ++--
->  20 files changed, 1387 insertions(+), 2993 deletions(-)
->  delete mode 100644 arch/arm/configs/spear300_defconfig
->  delete mode 100644 arch/arm/configs/spear310_defconfig
->  delete mode 100644 arch/arm/configs/spear320_defconfig
->  create mode 100644 arch/arm/configs/spear3xx_defconfig
->  delete mode 100644 arch/arm/mach-spear3xx/Kconfig300
->  delete mode 100644 arch/arm/mach-spear3xx/Kconfig310
->  delete mode 100644 arch/arm/mach-spear3xx/Kconfig320
-> 
+MyungJoo Ham wrote:
 > 
 
-Ryan,
+Where is commit message?
+Needs comment why this patch needs.
 
-Patches looks fine to me, but i need to test them before i Ack them.
-Please give me some time to do that, currently i am very busy in some other
-activities.
+> Signed-off-by: MyungJoo Ham <MyungJoo.Ham@samsung.com>
+> ---
+>  arch/arm/mach-s5pv210/include/mach/map.h |   45
+> ++++++++++++++++++++++++++++++
+>  1 files changed, 45 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-
+> s5pv210/include/mach/map.h
+> index 34eb168..e1a6ff8 100644
+> --- a/arch/arm/mach-s5pv210/include/mach/map.h
+> +++ b/arch/arm/mach-s5pv210/include/mach/map.h
+> @@ -54,6 +54,9 @@
+> 
+>  #define S5PV210_PA_SROMC	(0xE8000000)
+> 
+> +/* DMA */
 
-viresh.
+No need above comment.
+We know _PA_DMA means physical address of DMA.
+
+> +#define S5PV210_PA_DMA          (0xFA200000)
+> +#define S5PV210_PA_PDMA         (0xE0900000)
+>  #define S5PV210_PA_MDMA		0xFA200000
+>  #define S5PV210_PA_PDMA0	0xE0900000
+>  #define S5PV210_PA_PDMA1	0xE0A00000
+> @@ -77,6 +80,25 @@
+>  #define S5PV210_PA_SDRAM	(0x20000000)
+>  #define S5P_PA_SDRAM		S5PV210_PA_SDRAM
+> 
+> +#define S5PV210_PA_RTC          (0xE2800000)
+> +
+> +#define S5PV210_PA_PWR          (0xE010C000)
+> +#define S5P_PA_PWR              S5PV210_PA_PWR
+> +#define S5P_PA_INFORM0          (S5P_PA_PWR + 0x3000)
+> +
+> +/* USB HS OTG */
+> +#define S5PV210_PA_USB_HSOTG    (0xEC000000)
+> +#define S5PV210_PA_USB_HSPHY    (0xEC100000)
+> +
+> +/* FIMC */
+> +#define S5PV210_PA_FIMC0        (0xFB200000)
+> +#define S5PV210_PA_FIMC1        (0xFB300000)
+> +#define S5PV210_PA_FIMC2        (0xFB400000)
+> +
+> +/* MFC */
+> +#define S5PV210_PA_MFC          (0xF1700000)
+> +#define S5PV210_SZ_MFC          (0x0000FFFF)
+> +
+>  /* I2S */
+>  #define S5PV210_PA_IIS0		0xEEE30000
+>  #define S5PV210_PA_IIS1		0xE2100000
+> @@ -87,6 +109,17 @@
+>  #define S5PV210_PA_PCM1		0xE1200000
+>  #define S5PV210_PA_PCM2		0xE2B00000
+> 
+> +/* Audio SubSystem */
+> +#define S5PV210_PA_AUDSS        (0xEEE10000)
+> +
+> +/* TZPC */
+> +#define S5PV210_PA_TZPC0        (0xF1500000)
+> +#define S5PV210_PA_TZPC1        (0xFAD00000)
+> +#define S5PV210_PA_TZPC2        (0xE0600000)
+> +#define S5PV210_PA_TZPC3        (0xE1C00000)
+> +
+> +#define S5PV210_VA_TZPC(x)      (S3C_ADDR(0x01700000) + ((x) * 0x10000))
+> +
+>  /* AC97 */
+>  #define S5PV210_PA_AC97		0xE2200000
+> 
+> @@ -101,6 +134,18 @@
+>  #define S3C_PA_IIC1		S5PV210_PA_IIC1
+>  #define S3C_PA_IIC2		S5PV210_PA_IIC2
+>  #define S3C_PA_FB		S5PV210_PA_FB
+> +#define S3C_PA_USB_HSOTG        S5PV210_PA_USB_HSOTG
+> +#define S3C_PA_USB_HSPHY        S5PV210_PA_USB_HSPHY
+> +#define S3C_PA_RTC              S5PV210_PA_RTC
+> +#define S5P_PA_FIMC0            S5PV210_PA_FIMC0
+> +#define S5P_PA_FIMC1            S5PV210_PA_FIMC1
+> +#define S5P_PA_FIMC2            S5PV210_PA_FIMC2
+> +#define S3C_PA_DMA              S5PV210_PA_DMA
+> +#define S3C_PA_PDMA             S5PV210_PA_PDMA
+> +#define S3C_PA_IIS_V50          S5PV210_PA_IIS0
+> +#define S3C_PA_ADC              S5PV210_PA_ADC(0)
+> +#define S3C_PA_ADC0             S5PV210_PA_ADC(0)
+> +#define S3C_PA_ADC1             S5PV210_PA_ADC(1)
+>  #define S3C_PA_WDT		S5PV210_PA_WATCHDOG
+> 
+>  #define SAMSUNG_PA_ADC		S5PV210_PA_ADC
+> --
+
+I don't know why above mappings need now.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
