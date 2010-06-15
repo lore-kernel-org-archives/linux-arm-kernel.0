@@ -1,293 +1,183 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 15 Jun 2010 12:49:13 -0600
-Subject: [PATCH 12/12] ptp: Added a clock driver for the National
-	Semiconductor PHYTER.
-In-Reply-To: <37f5015b186bdd51f8451ade042f90c8b39a5cc8.1276615626.git.richard.cochran@omicron.at>
-References: <cover.1276615626.git.richard.cochran@omicron.at>
-	<37f5015b186bdd51f8451ade042f90c8b39a5cc8.1276615626.git.richard.cochran@omicron.at>
-Message-ID: <AANLkTilqd-wxqMWDxssC-XMDJqZ8iIiSrvp2t8xARAQV@mail.gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 15 Jun 2010 12:02:54 -0700
+Subject: Userspace helpers at static addresses on ARM [was: Re: [PATCH]
+	fix the "unknown" case]
+In-Reply-To: <20100615182919.GB11394@Krystal>
+References: <20100614220600.GA15130@linux.vnet.ibm.com>
+	<OF014FB97C.3968191D-ONC1257743.0043E356-C1257743.004525C9@de.ibm.com>
+	<20100615150727.GC2304@linux.vnet.ibm.com>
+	<OFCD1BC564.0035E292-ONC1257743.0057CB53-C1257743.0058903F@de.ibm.com>
+	<20100615170001.GG2304@linux.vnet.ibm.com>
+	<20100615170315.GA7835@Krystal>
+	<OFC507BE7B.F11411B7-ONC1257743.005F924F-C1257743.00605E5E@de.ibm.com>
+	<20100615182919.GB11394@Krystal>
+Message-ID: <20100615190254.GH2304@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 15, 2010 at 10:10 AM, Richard Cochran
-<richardcochran@gmail.com> wrote:
-> This patch adds support for the PTP clock found on the DP83640. Only the
-> basic clock operations have been implemented.
->
-> Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
-> ---
-> ?drivers/net/phy/Kconfig ? | ? 11 +++
-> ?drivers/net/phy/dp83640.c | ?158 ++++++++++++++++++++++++++++++++++++++++++++-
-> ?2 files changed, 168 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
-> index 430cab1..507c68a 100644
-> --- a/drivers/net/phy/Kconfig
-> +++ b/drivers/net/phy/Kconfig
-> @@ -79,9 +79,20 @@ config NATIONAL_PHY
->
-> ?config DP83640_PHY
-> ? ? ? ?tristate "Driver for the National Semiconductor DP83640 PHYTER"
-> + ? ? ? depends on PTP_1588_CLOCK
-> + ? ? ? depends on NETWORK_PHY_TIMESTAMPING
+On Tue, Jun 15, 2010 at 02:29:19PM -0400, Mathieu Desnoyers wrote:
+> * Ulrich Weigand (Ulrich.Weigand at de.ibm.com) wrote:
+> > Mathieu Desnoyers <mathieu.desnoyers@efficios.com> wrote on 06/15/2010
+> > 07:03:15 PM:
+> > 
+> > > I wonder starting with which Linux kernel version __kernel_dmb appeared.
+> > > Tying ourself directly to a Linux kernel ABI might complicate things.
+> > >
+> > > Is this ABI presented in a vDSO or userland have to go through a system
+> > call ?
+> > > Is there any way to probe for its availability ?
+> > 
+> > This looks sort-of like a vDSO, except without the DSO part :-)
+> > 
+> > The kernel simply makes the code available at a fixed address that is
+> > directly callable by user space.  See the comments in
+> > linux/arch/arm/kernel/entry-armv.S:
+> > 
+> 
+> Hrm, statically addressed shared objects. The security guys should be freaking
+> out here. This can sadly make stack overflow exploitation much, much, easier
+> because of lack of randomization of addresses where the code is located. :-/
+> 
+> About the original topic of our discussion:
+> Thanks for the explanation below. I think making urcu test for the kernel
+> feature at library load seems like the best portable solution so far. We can
+> directly use the specific memory barriers when armv7+ is specified, and check
+> at runtime if the kernel feature is there for "generic" arm build. For generic
+> ARM build where we discover that the kernel lacks the proper features, we could
+> rely on Paul's double-fake-mutex scheme (assuming we audit glibc pthreads to
+> ensure the proper memory barriers are there). If we find out that even pthreads
+> mutexes got the barriers wrong there, then we should refuse to load the library
+> altogether.
 
-Won't this break things for existing DP83640 users?
+OK.  The gcc patches were for __sync_sychronize(), which I have replaced
+with a "dmb" asm, and for __sync_lock_release(), which I do not use.
+If I understand Paolo and Uli correctly (a dubious assumption, to be
+sure), then the memory barriers and atomicity should be supplied by
+the libraries and/or kernel for the other __sync_ primitives.
 
-> ? ? ? ?---help---
-> ? ? ? ? ?Supports the DP83640 PHYTER with IEEE 1588 features.
->
-> + ? ? ? ? This driver adds support for using the DP83640 as a PTP
-> + ? ? ? ? clock. This clock is only useful if your PTP programs are
-> + ? ? ? ? getting hardware time stamps on the PTP Ethernet packets
-> + ? ? ? ? using the SO_TIMESTAMPING API.
-> +
-> + ? ? ? ? In order for this to work, your MAC driver must also
-> + ? ? ? ? implement the the skb_tx_timetamp() and skb_rx_timetamp()
-> + ? ? ? ? functions.
-> +
-> ?config STE10XP
-> ? ? ? ?depends on PHYLIB
-> ? ? ? ?tristate "Driver for STMicroelectronics STe10Xp PHYs"
-> diff --git a/drivers/net/phy/dp83640.c b/drivers/net/phy/dp83640.c
-> index a3217ea..21eadc3 100644
-> --- a/drivers/net/phy/dp83640.c
-> +++ b/drivers/net/phy/dp83640.c
-> @@ -26,6 +26,7 @@
-> ?#include <linux/netdevice.h>
-> ?#include <linux/phy.h>
-> ?#include <linux/ptp_classify.h>
-> +#include <linux/ptp_clock_kernel.h>
->
-> ?#include "dp83640_reg.h"
->
-> @@ -45,10 +46,13 @@ struct rxts {
-> ?};
->
-> ?struct dp83640_private {
-> + ? ? ? struct phy_device *phydev;
-> ? ? ? ?int hwts_tx_en;
-> ? ? ? ?int hwts_rx_en;
-> ? ? ? ?int layer;
-> ? ? ? ?int version;
-> + ? ? ? /* protects PTP_TDR register from concurrent access */
-> + ? ? ? spinlock_t ptp_tdr_lock;
-> ? ? ? ?/* protects extended registers from concurrent access */
-> ? ? ? ?spinlock_t extreg_lock;
-> ? ? ? ?int page;
-> @@ -60,6 +64,9 @@ struct dp83640_private {
->
-> ?/* globals */
->
-> +static struct ptp_clock *dp83640_clock;
-> +DEFINE_SPINLOCK(clock_lock); /* protects the one and only dp83640_clock */
+So for ARMv7, my prior patch should suffice.  (Or am I still missing
+something?)
 
-Why only one?  Is it not possible to have 2 of these PHYs in a system?
+Additional patches are no doubt required for other ARM flavors, and
+perhaps also for older compilers and kernels.
 
-> +
-> ?static struct sock_filter ptp_filter[] = {
-> ? ? ? ?PTP_FILTER
-> ?};
-> @@ -99,6 +106,129 @@ static void ext_write(struct phy_device *phydev, int page, u32 regnum, u16 val)
-> ? ? ? ?spin_unlock(&dp83640->extreg_lock);
-> ?}
->
-> +static int tdr_write(struct dp83640_private *dp83640,
-> + ? ? ? ? ? ? ? ? ? ?struct timespec *ts, u16 cmd)
-> +{
-> + ? ? ? struct phy_device *phydev = dp83640->phydev;
-> +
-> + ? ? ? spin_lock(&dp83640->ptp_tdr_lock);
-> +
-> + ? ? ? ext_write(phydev, PAGE4, PTP_TDR, ts->tv_nsec & 0xffff);/* ns[15:0] */
-> + ? ? ? ext_write(phydev, PAGE4, PTP_TDR, ts->tv_nsec >> 16); ? /* ns[31:16] */
-> + ? ? ? ext_write(phydev, PAGE4, PTP_TDR, ts->tv_sec & 0xffff); /* sec[15:0] */
-> + ? ? ? ext_write(phydev, PAGE4, PTP_TDR, ts->tv_sec >> 16); ? ?/* sec[31:16] */
-> +
-> + ? ? ? ext_write(phydev, PAGE4, PTP_CTL, cmd);
-> +
-> + ? ? ? spin_unlock(&dp83640->ptp_tdr_lock);
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +/* ptp clock methods */
-> +
-> +static int ptp_dp83640_adjfreq(void *priv, s32 ppb)
-> +{
-> + ? ? ? struct dp83640_private *dp83640 = priv;
-> + ? ? ? struct phy_device *phydev = dp83640->phydev;
-> + ? ? ? u64 rate;
-> + ? ? ? int neg_adj = 0;
-> + ? ? ? u16 hi, lo;
-> +
-> + ? ? ? if (!ppb)
-> + ? ? ? ? ? ? ? return 0;
-> +
-> + ? ? ? if (ppb < 0) {
-> + ? ? ? ? ? ? ? neg_adj = 1;
-> + ? ? ? ? ? ? ? ppb = -ppb;
-> + ? ? ? }
-> + ? ? ? rate = ppb;
-> + ? ? ? rate <<= 26;
-> + ? ? ? rate = div_u64(rate, 1953125);
-> +
-> + ? ? ? hi = (rate >> 16) & PTP_RATE_HI_MASK;
-> + ? ? ? if (neg_adj)
-> + ? ? ? ? ? ? ? hi |= PTP_RATE_DIR;
-> +
-> + ? ? ? lo = rate & 0xffff;
-> +
-> + ? ? ? ext_write(phydev, PAGE4, PTP_RATEH, hi);
-> + ? ? ? ext_write(phydev, PAGE4, PTP_RATEL, lo);
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +static int ptp_dp83640_adjtime(void *priv, struct timespec *ts)
-> +{
-> + ? ? ? return tdr_write(priv, ts, PTP_STEP_CLK);
-> +}
-> +
-> +static int ptp_dp83640_gettime(void *priv, struct timespec *ts)
-> +{
-> + ? ? ? struct dp83640_private *dp83640 = priv;
-> + ? ? ? struct phy_device *phydev = dp83640->phydev;
-> + ? ? ? unsigned int val[4];
-> +
-> + ? ? ? spin_lock(&dp83640->ptp_tdr_lock);
-> +
-> + ? ? ? ext_write(phydev, PAGE4, PTP_CTL, PTP_RD_CLK);
-> +
-> + ? ? ? val[0] = ext_read(phydev, PAGE4, PTP_TDR); /* ns[15:0] */
-> + ? ? ? val[1] = ext_read(phydev, PAGE4, PTP_TDR); /* ns[31:16] */
-> + ? ? ? val[2] = ext_read(phydev, PAGE4, PTP_TDR); /* sec[15:0] */
-> + ? ? ? val[3] = ext_read(phydev, PAGE4, PTP_TDR); /* sec[31:16] */
-> +
-> + ? ? ? spin_unlock(&dp83640->ptp_tdr_lock);
-> +
-> + ? ? ? ts->tv_nsec = val[0] | (val[1] << 16);
-> + ? ? ? ts->tv_sec ?= val[2] | (val[3] << 16);
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +static int ptp_dp83640_settime(void *priv, struct timespec *ts)
-> +{
-> + ? ? ? return tdr_write(priv, ts, PTP_LOAD_CLK);
-> +}
-> +
-> +static int ptp_dp83640_gettimer(void *priv, int index, struct itimerspec *ts)
-> +{
-> + ? ? ? /* We do not (yet) offer any ancillary features. */
-> + ? ? ? return -EOPNOTSUPP;
-> +}
-> +
-> +static int ptp_dp83640_settimer(void *p, int i, int abs, struct itimerspec *ts)
-> +{
-> + ? ? ? /* We do not (yet) offer any ancillary features. */
-> + ? ? ? return -EOPNOTSUPP;
-> +}
-> +
-> +static int ptp_dp83640_enable(void *priv, struct ptp_clock_request *rq, int on)
-> +{
-> + ? ? ? /* We do not (yet) offer any ancillary features. */
-> + ? ? ? return -EOPNOTSUPP;
-> +}
-> +
-> +static struct ptp_clock_info ptp_dp83640_caps = {
-> + ? ? ? .owner ? ? ? ? ?= THIS_MODULE,
-> + ? ? ? .name ? ? ? ? ? = "dp83640 timer",
-> + ? ? ? .max_adj ? ? ? ?= 1953124,
-> + ? ? ? .n_alarm ? ? ? ?= 0,
-> + ? ? ? .n_ext_ts ? ? ? = 0,
-> + ? ? ? .n_per_out ? ? ?= 0,
-> + ? ? ? .pps ? ? ? ? ? ?= 0,
-> + ? ? ? .priv ? ? ? ? ? = NULL,
+							Thanx, Paul
 
-ditto here, can leave the 0s and nulls out.
-
-> + ? ? ? .adjfreq ? ? ? ?= ptp_dp83640_adjfreq,
-> + ? ? ? .adjtime ? ? ? ?= ptp_dp83640_adjtime,
-> + ? ? ? .gettime ? ? ? ?= ptp_dp83640_gettime,
-> + ? ? ? .settime ? ? ? ?= ptp_dp83640_settime,
-> + ? ? ? .gettimer ? ? ? = ptp_dp83640_gettimer,
-> + ? ? ? .settimer ? ? ? = ptp_dp83640_settimer,
-> + ? ? ? .enable ? ? ? ? = ptp_dp83640_enable,
-> +};
-> +
-> +/* time stamping methods */
-> +
-> ?static int expired(struct rxts *rxts)
-> ?{
-> ? ? ? ?return time_after(jiffies, rxts->tmo);
-> @@ -144,6 +274,7 @@ static int match(struct sk_buff *skb, unsigned int type, struct rxts *rxts)
-> ?static int dp83640_probe(struct phy_device *phydev)
-> ?{
-> ? ? ? ?struct dp83640_private *dp83640;
-> + ? ? ? unsigned long flags;
-> ? ? ? ?int i;
->
-> ? ? ? ?if (sk_chk_filter(ptp_filter, ARRAY_SIZE(ptp_filter))) {
-> @@ -155,8 +286,9 @@ static int dp83640_probe(struct phy_device *phydev)
-> ? ? ? ?if (!dp83640)
-> ? ? ? ? ? ? ? ?return -ENOMEM;
->
-> + ? ? ? dp83640->phydev = phydev;
-> + ? ? ? spin_lock_init(&dp83640->ptp_tdr_lock);
-> ? ? ? ?spin_lock_init(&dp83640->extreg_lock);
-> -
-> ? ? ? ?INIT_LIST_HEAD(&dp83640->rxts);
-> ? ? ? ?INIT_LIST_HEAD(&dp83640->pool);
->
-> @@ -165,12 +297,36 @@ static int dp83640_probe(struct phy_device *phydev)
->
-> ? ? ? ?phydev->priv = dp83640;
->
-> + ? ? ? spin_lock_irqsave(&clock_lock, flags);
-> +
-> + ? ? ? if (!dp83640_clock) {
-> + ? ? ? ? ? ? ? ptp_dp83640_caps.priv = dp83640;
-> + ? ? ? ? ? ? ? dp83640_clock = ptp_clock_register(&ptp_dp83640_caps);
-> + ? ? ? ? ? ? ? if (IS_ERR(dp83640_clock)) {
-> + ? ? ? ? ? ? ? ? ? ? ? spin_unlock_irqrestore(&clock_lock, flags);
-> + ? ? ? ? ? ? ? ? ? ? ? kfree(dp83640);
-> + ? ? ? ? ? ? ? ? ? ? ? return PTR_ERR(dp83640_clock);
-> + ? ? ? ? ? ? ? }
-> + ? ? ? }
-> + ? ? ? spin_unlock_irqrestore(&clock_lock, flags);
-> +
-> ? ? ? ?return 0;
-> ?}
->
-> ?static void dp83640_remove(struct phy_device *phydev)
-> ?{
-> ? ? ? ?struct dp83640_private *dp83640 = phydev->priv;
-> + ? ? ? unsigned long flags;
-> +
-> + ? ? ? spin_lock_irqsave(&clock_lock, flags);
-> +
-> + ? ? ? if (ptp_dp83640_caps.priv == dp83640) {
-> + ? ? ? ? ? ? ? ptp_clock_unregister(dp83640_clock);
-> + ? ? ? ? ? ? ? dp83640_clock = NULL;
-> + ? ? ? ? ? ? ? ptp_dp83640_caps.priv = NULL;
-> + ? ? ? }
-> + ? ? ? spin_unlock_irqrestore(&clock_lock, flags);
-> +
-> ? ? ? ?kfree(dp83640);
-> ?}
->
-> --
-> 1.6.3.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+> Thanks,
+> 
+> Mathieu
+> 
+> > /*
+> >  * User helpers.
+> >  *
+> >  * These are segment of kernel provided user code reachable from user space
+> >  * at a fixed address in kernel memory.  This is used to provide user space
+> >  * with some operations which require kernel help because of unimplemented
+> >  * native feature and/or instructions in many ARM CPUs. The idea is for
+> >  * this code to be executed directly in user mode for best efficiency but
+> >  * which is too intimate with the kernel counter part to be left to user
+> >  * libraries.  In fact this code might even differ from one CPU to another
+> >  * depending on the available  instruction set and restrictions like on
+> >  * SMP systems.  In other words, the kernel reserves the right to change
+> >  * this code as needed without warning. Only the entry points and their
+> >  * results are guaranteed to be stable.
+> >  *
+> >  * Each segment is 32-byte aligned and will be moved to the top of the high
+> >  * vector page.  New segments (if ever needed) must be added in front of
+> >  * existing ones.  This mechanism should be used only for things that are
+> >  * really small and justified, and not be abused freely.
+> >  *
+> >  * User space is expected to implement those things inline when optimizing
+> >  * for a processor that has the necessary native support, but only if such
+> >  * resulting binaries are already to be incompatible with earlier ARM
+> >  * processors due to the use of unsupported instructions other than what
+> >  * is provided here.  In other words don't make binaries unable to run on
+> >  * earlier processors just for the sake of not using these kernel helpers
+> >  * if your compiled code is not going to use the new instructions for other
+> >  * purpose.
+> >  */
+> > 
+> > 
+> > /*
+> >  * Reference prototype:
+> >  *
+> >  *           void __kernel_memory_barrier(void)
+> >  *
+> >  * Input:
+> >  *
+> >  *           lr = return address
+> >  *
+> >  * Output:
+> >  *
+> >  *           none
+> >  *
+> >  * Clobbered:
+> >  *
+> >  *           none
+> >  *
+> >  * Definition and user space usage example:
+> >  *
+> >  *           typedef void (__kernel_dmb_t)(void);
+> >  *           #define __kernel_dmb (*(__kernel_dmb_t *)0xffff0fa0)
+> >  *
+> >  * Apply any needed memory barrier to preserve consistency with data
+> > modified
+> >  * manually and __kuser_cmpxchg usage.
+> >  *
+> >  * This could be used as follows:
+> >  *
+> >  * #define __kernel_dmb() \
+> >  *         asm volatile ( "mov r0, #0xffff0fff; mov lr, pc; sub pc, r0,
+> > #95" \
+> >  *		         : : : "r0", "lr","cc" )
+> >  */
+> > 
+> > 
+> > As far as I can see, the only provision to check whether a feature is
+> > available
+> > is this one:
+> > 
+> > /*
+> >  * Reference declaration:
+> >  *
+> >  *           extern unsigned int __kernel_helper_version;
+> >  *
+> >  * Definition and user space usage example:
+> >  *
+> >  *           #define __kernel_helper_version (*(unsigned int *)0xffff0ffc)
+> >  *
+> >  * User space may read this to determine the curent number of helpers
+> >  * available.
+> >  */
+> > 
+> > However, note that libgcc code does not perform this check, it simply
+> > assumes
+> > the above routine to be present.
+> > 
+> > The __kernel_dmb (which is the most recently added helper available in
+> > current
+> > mainline) seems to have been available since kernel 2.6.15, so presumably
+> > code
+> > using any of the GCC sync primitives would simply fail on any older kernel,
+> > unless I'm missing something here ...
+> > 
+> > 
+> > Mit freundlichen Gruessen / Best Regards
+> > 
+> > Ulrich Weigand
+> > 
+> > --
+> >   Dr. Ulrich Weigand | Phone: +49-7031/16-3727
+> >   STSM, GNU compiler and toolchain for Linux on System z and Cell/B.E.
+> >   IBM Deutschland Research & Development GmbH
+> >   Vorsitzender des Aufsichtsrats: Martin Jetter | Gesch?ftsf?hrung: Dirk
+> > Wittkopp
+> >   Sitz der Gesellschaft: B?blingen | Registergericht: Amtsgericht
+> > Stuttgart, HRB 243294
+> > 
+> 
+> -- 
+> Mathieu Desnoyers
+> Operating System Efficiency R&D Consultant
+> EfficiOS Inc.
+> http://www.efficios.com
