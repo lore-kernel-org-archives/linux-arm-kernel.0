@@ -1,889 +1,239 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 15 Jun 2010 11:20:41 -0600
-Subject: [PATCH 10/12] ptp: Added a clock that uses the eTSEC found on the
-	MPC85xx.
-In-Reply-To: <041faf3cb6ecbedf8f3ff2104914f91d2a24fc4d.1276615626.git.richard.cochran@omicron.at>
-References: <cover.1276615626.git.richard.cochran@omicron.at>
-	<041faf3cb6ecbedf8f3ff2104914f91d2a24fc4d.1276615626.git.richard.cochran@omicron.at>
-Message-ID: <AANLkTikFc15j-Qhw9M2CnKLKq58Wi1xD7E2dtVNsVgeA@mail.gmail.com>
+From: clagix@gmail.com (Guido Classen)
+Date: Tue, 15 Jun 2010 20:26:24 +0200
+Subject: [PATCH] at91rm9200 static memory controller initialization
+Message-ID: <AANLkTinIPD1tceqoONbpfDmvnJI7Q1F765kQQvMaqgPO@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 15, 2010 at 10:10 AM, Richard Cochran
-<richardcochran@gmail.com> wrote:
-> The eTSEC includes a PTP clock with quite a few features. This patch adds
-> support for the basic clock adjustment functions, plus two external time
-> stamps and one alarm.
->
-> Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
+Hello mailing list,
 
-Hi Richard,
+This patch adds AT91RM9200 static memory controller initialization based
+on a structure 'at91rm9200_smc_config'. It is simlar to a patch provided
+by Andrew Victor for the AT91SAM9 family (sam9_smc.[ch]).
 
-comments below...
+The code can be used like this:
 
-> ---
-> ?Documentation/powerpc/dts-bindings/fsl/tsec.txt | ? 54 +++
-> ?arch/powerpc/boot/dts/mpc8313erdb.dts ? ? ? ? ? | ? 13 +
-> ?arch/powerpc/boot/dts/p2020ds.dts ? ? ? ? ? ? ? | ? 13 +
-> ?arch/powerpc/boot/dts/p2020rdb.dts ? ? ? ? ? ? ?| ? 13 +
-> ?drivers/net/Makefile ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?1 +
-> ?drivers/net/gianfar_ptp.c ? ? ? ? ? ? ? ? ? ? ? | ?518 +++++++++++++++++++++++
-> ?drivers/net/gianfar_ptp_reg.h ? ? ? ? ? ? ? ? ? | ?113 +++++
+        /*
+         * Setup static memory controller chip select for external quad UART
+         *
+         */
+        static const struct __initdata at91rm9200_smc_config
+                quad_uart_cs_config = {
+                .wait_states          = 16,
+                .data_float_time      = 0,
+                .byte_access_type     = AT91RM9200_BAT_8_BIT,
+                .data_bus_width       = AT91RM9200_DATA_BUS_WIDTH_8,
+                .data_read_protocol   = AT91RM9200_DRP_STANDARD,
+                .address_to_cs_setup  = AT91RM9200_ACSS_STANDARD,
+                .rw_setup             = 2,
+                .rw_hold              = 2
+        };
 
-Is this header file used by anything other than gianfar_ptp.c?  If
-not, then roll the two files together.
-
-> ?drivers/ptp/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 13 +
-> ?8 files changed, 738 insertions(+), 0 deletions(-)
-> ?create mode 100644 drivers/net/gianfar_ptp.c
-> ?create mode 100644 drivers/net/gianfar_ptp_reg.h
->
-> diff --git a/Documentation/powerpc/dts-bindings/fsl/tsec.txt b/Documentation/powerpc/dts-bindings/fsl/tsec.txt
-> index edb7ae1..14577e9 100644
-> --- a/Documentation/powerpc/dts-bindings/fsl/tsec.txt
-> +++ b/Documentation/powerpc/dts-bindings/fsl/tsec.txt
-> @@ -74,3 +74,57 @@ Example:
-> ? ? ? ? ? ? ? ?interrupt-parent = <&mpic>;
-> ? ? ? ? ? ? ? ?phy-handle = <&phy0>
-> ? ? ? ?};
-> +
-> +* Gianfar PTP clock nodes
-> +
-> +General Properties:
-> +
-> + ?- compatible ? Should be "fsl,etsec-ptp"
-> + ?- reg ? ? ? ? ?Offset and length of the register set for the device
-> + ?- interrupts ? There should be at least two interrupts. Some devices
-> + ? ? ? ? ? ? ? ? have as many as four PTP related interrupts.
-> +
-> +Clock Properties:
-> +
-> + ?- tclk_period ?Timer reference clock period in nanoseconds.
-> + ?- tmr_prsc ? ? Prescaler, divides the output clock.
-> + ?- tmr_add ? ? ?Frequency compensation value.
-
-Use dash ('-') not underscore ('_') in property names.
-
-> + ?- cksel ? ? ? ?0= external clock, 1= eTSEC system clock, 3= RTC clock input.
-> + ? ? ? ? ? ? ? ? Currently the driver only supports choice "1".
-
-If you encode this value as a string, then it will be friendly for humans too.
-
-> + ?- tmr_fiper1 ? Fixed interval period pulse generator.
-> + ?- tmr_fiper2 ? Fixed interval period pulse generator.
-
-I could use more explication here.  Is this a divider value?
-Computers are good at making calculations, and the driver can obtain
-the clock frequency supplied to the device.  It may be more useful to
-specify here the desired frequency rather than the divider.  Certainly
-more human-friendly too.
-
-> +
-> + ?These properties set the operational parameters for the PTP
-> + ?clock. You must choose these carefully for the clock to work right.
-> + ?Here is how to figure good values:
-> +
-> + ?TimerOsc ? ? = system clock ? ? ? ? ? ? ? MHz
-> + ?tclk_period ?= desired clock period ? ? ? nanoseconds
-> + ?NominalFreq ?= 1000 / tclk_period ? ? ? ? MHz
-> + ?FreqDivRatio = TimerOsc / NominalFreq ? ? (must be greater that 1.0)
-> + ?tmr_add ? ? ?= ceil(2^32 / FreqDivRatio)
-> + ?OutputClock ?= NominalFreq / tmr_prsc ? ? MHz
-> + ?PulseWidth ? = 1 / OutputClock ? ? ? ? ? ?microseconds
-> + ?FiperFreq1 ? = desired frequency in Hz
-> + ?FiperDiv1 ? ?= 1000000 * OutputClock / FiperFreq1
-> + ?tmr_fiper1 ? = tmr_prsc * tclk_period * FiperDiv1 - tclk_period
-> +
-> + ?The calculation for tmr_fiper2 is the same as for tmr_fiper1. The
-> + ?driver expects that tmr_fiper1 will be correctly set to produce a 1
-> + ?Pulse Per Second (PPS) signal, since this will be offered to the PPS
-> + ?subsystem to synchronize the Linux clock.
-> +
-> +Example:
-> +
-> + ? ? ? ptp_clock at 24E00 {
-> + ? ? ? ? ? ? ? compatible = "fsl,etsec-ptp";
-> + ? ? ? ? ? ? ? reg = <0x24E00 0xB0>;
-> + ? ? ? ? ? ? ? interrupts = <12 0x8 13 0x8>;
-> + ? ? ? ? ? ? ? interrupt-parent = < &ipic >;
-> + ? ? ? ? ? ? ? tclk_period = <10>;
-> + ? ? ? ? ? ? ? tmr_prsc ? ?= <100>;
-> + ? ? ? ? ? ? ? tmr_add ? ? = <0x999999A4>;
-> + ? ? ? ? ? ? ? cksel ? ? ? = <0x1>;
-> + ? ? ? ? ? ? ? tmr_fiper1 ?= <0x3B9AC9F6>;
-> + ? ? ? ? ? ? ? tmr_fiper2 ?= <0x00018696>;
-> + ? ? ? };
-> diff --git a/arch/powerpc/boot/dts/mpc8313erdb.dts b/arch/powerpc/boot/dts/mpc8313erdb.dts
-> index 183f2aa..0526384 100644
-> --- a/arch/powerpc/boot/dts/mpc8313erdb.dts
-> +++ b/arch/powerpc/boot/dts/mpc8313erdb.dts
-> @@ -208,6 +208,19 @@
-> ? ? ? ? ? ? ? ? ? ? ? ?sleep = <&pmc 0x00300000>;
-> ? ? ? ? ? ? ? ?};
->
-> + ? ? ? ? ? ? ? ptp_clock at 24E00 {
-> + ? ? ? ? ? ? ? ? ? ? ? compatible = "fsl,etsec-ptp";
-> + ? ? ? ? ? ? ? ? ? ? ? reg = <0x24E00 0xB0>;
-> + ? ? ? ? ? ? ? ? ? ? ? interrupts = <12 0x8 13 0x8>;
-> + ? ? ? ? ? ? ? ? ? ? ? interrupt-parent = < &ipic >;
-> + ? ? ? ? ? ? ? ? ? ? ? tclk_period = <10>;
-> + ? ? ? ? ? ? ? ? ? ? ? tmr_prsc ? ?= <100>;
-> + ? ? ? ? ? ? ? ? ? ? ? tmr_add ? ? = <0x999999A4>;
-> + ? ? ? ? ? ? ? ? ? ? ? cksel ? ? ? = <0x1>;
-> + ? ? ? ? ? ? ? ? ? ? ? tmr_fiper1 ?= <0x3B9AC9F6>;
-> + ? ? ? ? ? ? ? ? ? ? ? tmr_fiper2 ?= <0x00018696>;
-> + ? ? ? ? ? ? ? };
-> +
-> ? ? ? ? ? ? ? ?enet0: ethernet at 24000 {
-> ? ? ? ? ? ? ? ? ? ? ? ?#address-cells = <1>;
-> ? ? ? ? ? ? ? ? ? ? ? ?#size-cells = <1>;
-> diff --git a/arch/powerpc/boot/dts/p2020ds.dts b/arch/powerpc/boot/dts/p2020ds.dts
-> index 1101914..ae5dc4d 100644
-> --- a/arch/powerpc/boot/dts/p2020ds.dts
-> +++ b/arch/powerpc/boot/dts/p2020ds.dts
-> @@ -336,6 +336,19 @@
-> ? ? ? ? ? ? ? ? ? ? ? ?phy_type = "ulpi";
-> ? ? ? ? ? ? ? ?};
->
-> + ? ? ? ? ? ? ? ptp_clock at 24E00 {
-> + ? ? ? ? ? ? ? ? ? ? ? compatible = "fsl,etsec-ptp";
-> + ? ? ? ? ? ? ? ? ? ? ? reg = <0x24E00 0xB0>;
-> + ? ? ? ? ? ? ? ? ? ? ? interrupts = <68 2 69 2 70 2>;
-> + ? ? ? ? ? ? ? ? ? ? ? interrupt-parent = < &mpic >;
-> + ? ? ? ? ? ? ? ? ? ? ? tclk_period = <5>;
-> + ? ? ? ? ? ? ? ? ? ? ? tmr_prsc = <200>;
-> + ? ? ? ? ? ? ? ? ? ? ? tmr_add = <0xCCCCCCCD>;
-> + ? ? ? ? ? ? ? ? ? ? ? cksel = <1>;
-> + ? ? ? ? ? ? ? ? ? ? ? tmr_fiper1 = <0x3B9AC9FB>;
-> + ? ? ? ? ? ? ? ? ? ? ? tmr_fiper2 = <0x0001869B>;
-> + ? ? ? ? ? ? ? };
-> +
-> ? ? ? ? ? ? ? ?enet0: ethernet at 24000 {
-> ? ? ? ? ? ? ? ? ? ? ? ?#address-cells = <1>;
-> ? ? ? ? ? ? ? ? ? ? ? ?#size-cells = <1>;
-> diff --git a/arch/powerpc/boot/dts/p2020rdb.dts b/arch/powerpc/boot/dts/p2020rdb.dts
-> index da4cb0d..133945c 100644
-> --- a/arch/powerpc/boot/dts/p2020rdb.dts
-> +++ b/arch/powerpc/boot/dts/p2020rdb.dts
-> @@ -396,6 +396,19 @@
-> ? ? ? ? ? ? ? ? ? ? ? ?phy_type = "ulpi";
-> ? ? ? ? ? ? ? ?};
->
-> + ? ? ? ? ? ? ? ptp_clock at 24E00 {
-> + ? ? ? ? ? ? ? ? ? ? ? compatible = "fsl,etsec-ptp";
-> + ? ? ? ? ? ? ? ? ? ? ? reg = <0x24E00 0xB0>;
-> + ? ? ? ? ? ? ? ? ? ? ? interrupts = <68 2 69 2 70 2>;
-> + ? ? ? ? ? ? ? ? ? ? ? interrupt-parent = < &mpic >;
-> + ? ? ? ? ? ? ? ? ? ? ? tclk_period = <5>;
-> + ? ? ? ? ? ? ? ? ? ? ? tmr_prsc = <200>;
-> + ? ? ? ? ? ? ? ? ? ? ? tmr_add = <0xCCCCCCCD>;
-> + ? ? ? ? ? ? ? ? ? ? ? cksel = <1>;
-> + ? ? ? ? ? ? ? ? ? ? ? tmr_fiper1 = <0x3B9AC9FB>;
-> + ? ? ? ? ? ? ? ? ? ? ? tmr_fiper2 = <0x0001869B>;
-> + ? ? ? ? ? ? ? };
-> +
-> ? ? ? ? ? ? ? ?enet0: ethernet at 24000 {
-> ? ? ? ? ? ? ? ? ? ? ? ?#address-cells = <1>;
-> ? ? ? ? ? ? ? ? ? ? ? ?#size-cells = <1>;
-> diff --git a/drivers/net/Makefile b/drivers/net/Makefile
-> index 0a0512a..389c0d9 100644
-> --- a/drivers/net/Makefile
-> +++ b/drivers/net/Makefile
-> @@ -28,6 +28,7 @@ obj-$(CONFIG_ATL2) += atlx/
-> ?obj-$(CONFIG_ATL1E) += atl1e/
-> ?obj-$(CONFIG_ATL1C) += atl1c/
-> ?obj-$(CONFIG_GIANFAR) += gianfar_driver.o
-> +obj-$(CONFIG_PTP_1588_CLOCK_GIANFAR) += gianfar_ptp.o
-> ?obj-$(CONFIG_TEHUTI) += tehuti.o
-> ?obj-$(CONFIG_ENIC) += enic/
-> ?obj-$(CONFIG_JME) += jme.o
-> diff --git a/drivers/net/gianfar_ptp.c b/drivers/net/gianfar_ptp.c
-> new file mode 100644
-> index 0000000..0991652
-> --- /dev/null
-> +++ b/drivers/net/gianfar_ptp.c
-> @@ -0,0 +1,518 @@
-> +/*
-> + * PTP 1588 clock using the eTSEC
-> + *
-> + * Copyright (C) 2010 OMICRON electronics GmbH
-> + *
-> + * ?This program is free software; you can redistribute it and/or modify
-> + * ?it under the terms of the GNU General Public License as published by
-> + * ?the Free Software Foundation; either version 2 of the License, or
-> + * ?(at your option) any later version.
-> + *
-> + * ?This program is distributed in the hope that it will be useful,
-> + * ?but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * ?MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
-> + * ?GNU General Public License for more details.
-> + *
-> + * ?You should have received a copy of the GNU General Public License
-> + * ?along with this program; if not, write to the Free Software
-> + * ?Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-> + */
-> +#include <linux/device.h>
-> +#include <linux/hrtimer.h>
-> +#include <linux/init.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/timex.h>
-> +#include <linux/io.h>
-> +
-> +#include <linux/ptp_clock_kernel.h>
-> +
-> +#include "gianfar_ptp_reg.h"
-> +#include "gianfar.h"
-> +
-> +#define DRIVER ? ? ? ? "gianfar_ptp"
-> +#define N_ALARM ? ? ? ? ? ? ? ?1 /* first alarm is used internally to reset fipers */
-> +#define N_EXT_TS ? ? ? 2
-> +#define REG_SIZE ? ? ? sizeof(struct gianfar_ptp_registers)
-> +
-> +struct etsects {
-> + ? ? ? struct gianfar_ptp_registers *regs;
-> + ? ? ? struct ptp_clock *clock;
-> + ? ? ? int irq;
-> + ? ? ? u64 alarm_interval; /* for periodic alarm */
-> + ? ? ? u64 alarm_value;
-> + ? ? ? u32 tclk_period; ?/* nanoseconds */
-> + ? ? ? u32 tmr_prsc;
-> + ? ? ? u32 tmr_add;
-> + ? ? ? u32 cksel;
-> + ? ? ? u32 tmr_fiper1;
-> + ? ? ? u32 tmr_fiper2;
-> +};
-> +
-> +/* Private globals */
-> +static struct etsects the_clock;
-
-Will there ever be multiple instances of this device?
-
-> +DEFINE_SPINLOCK(register_lock);
-> +
-> +/*
-> + * Register access functions
-> + */
-> +
-> +static u64 tmr_cnt_read(struct etsects *etsects)
-> +{
-> + ? ? ? u64 ns;
-> + ? ? ? u32 lo, hi;
-> +
-> + ? ? ? lo = gfar_read(&etsects->regs->tmr_cnt_l);
-> + ? ? ? hi = gfar_read(&etsects->regs->tmr_cnt_h);
-> + ? ? ? ns = ((u64) hi) << 32;
-> + ? ? ? ns |= lo;
-> + ? ? ? return ns;
-> +}
-> +
-> +static void tmr_cnt_write(struct etsects *etsects, u64 ns)
-> +{
-> + ? ? ? u32 hi = ns >> 32;
-> + ? ? ? u32 lo = ns & 0xffffffff;
-> +
-> + ? ? ? gfar_write(&etsects->regs->tmr_cnt_l, lo);
-> + ? ? ? gfar_write(&etsects->regs->tmr_cnt_h, hi);
-> +}
-> +
-> +static void set_alarm(struct etsects *etsects)
-> +{
-> + ? ? ? u64 ns;
-> + ? ? ? u32 lo, hi;
-> +
-> + ? ? ? ns = tmr_cnt_read(etsects) + 1500000000ULL;
-> + ? ? ? ns = div_u64(ns, 1000000000UL) * 1000000000ULL;
-> + ? ? ? ns -= etsects->tclk_period;
-> + ? ? ? hi = ns >> 32;
-> + ? ? ? lo = ns & 0xffffffff;
-> + ? ? ? gfar_write(&etsects->regs->tmr_alarm1_l, lo);
-> + ? ? ? gfar_write(&etsects->regs->tmr_alarm1_h, hi);
-> +}
-> +
-> +static void set_fipers(struct etsects *etsects)
-> +{
-> + ? ? ? u32 tmr_ctrl = gfar_read(&etsects->regs->tmr_ctrl);
-> +
-> + ? ? ? gfar_write(&etsects->regs->tmr_ctrl, ? tmr_ctrl & (~TE));
-> + ? ? ? gfar_write(&etsects->regs->tmr_prsc, ? etsects->tmr_prsc);
-> + ? ? ? gfar_write(&etsects->regs->tmr_fiper1, etsects->tmr_fiper1);
-> + ? ? ? gfar_write(&etsects->regs->tmr_fiper2, etsects->tmr_fiper2);
-> + ? ? ? set_alarm(etsects);
-> + ? ? ? gfar_write(&etsects->regs->tmr_ctrl, ? tmr_ctrl|TE);
-> +}
-> +
-> +/*
-> + * Interrupt service routine
-> + */
-> +
-> +static irqreturn_t isr(int irq, void *priv)
-> +{
-> + ? ? ? struct etsects *etsects = priv;
-> + ? ? ? struct ptp_clock_event event;
-> + ? ? ? u64 ns;
-> + ? ? ? u32 ack = 0, lo, hi, mask, val;
-> +
-> + ? ? ? val = gfar_read(&etsects->regs->tmr_tevent);
-> +
-> + ? ? ? if (val & ETS1) {
-> + ? ? ? ? ? ? ? ack |= ETS1;
-> + ? ? ? ? ? ? ? hi = gfar_read(&etsects->regs->tmr_etts1_h);
-> + ? ? ? ? ? ? ? lo = gfar_read(&etsects->regs->tmr_etts1_l);
-> + ? ? ? ? ? ? ? event.type = PTP_CLOCK_EXTTS;
-> + ? ? ? ? ? ? ? event.index = 0;
-> + ? ? ? ? ? ? ? event.timestamp = ((u64) hi) << 32;
-> + ? ? ? ? ? ? ? event.timestamp |= lo;
-> + ? ? ? ? ? ? ? ptp_clock_event(etsects->clock, &event);
-> + ? ? ? }
-> +
-> + ? ? ? if (val & ETS2) {
-> + ? ? ? ? ? ? ? ack |= ETS2;
-> + ? ? ? ? ? ? ? hi = gfar_read(&etsects->regs->tmr_etts2_h);
-> + ? ? ? ? ? ? ? lo = gfar_read(&etsects->regs->tmr_etts2_l);
-> + ? ? ? ? ? ? ? event.type = PTP_CLOCK_EXTTS;
-> + ? ? ? ? ? ? ? event.index = 1;
-> + ? ? ? ? ? ? ? event.timestamp = ((u64) hi) << 32;
-> + ? ? ? ? ? ? ? event.timestamp |= lo;
-> + ? ? ? ? ? ? ? ptp_clock_event(etsects->clock, &event);
-> + ? ? ? }
-> +
-> + ? ? ? if (val & ALM2) {
-> + ? ? ? ? ? ? ? ack |= ALM2;
-> + ? ? ? ? ? ? ? if (etsects->alarm_value) {
-> + ? ? ? ? ? ? ? ? ? ? ? event.type = PTP_CLOCK_ALARM;
-> + ? ? ? ? ? ? ? ? ? ? ? event.index = 0;
-> + ? ? ? ? ? ? ? ? ? ? ? event.timestamp = etsects->alarm_value;
-> + ? ? ? ? ? ? ? ? ? ? ? ptp_clock_event(etsects->clock, &event);
-> + ? ? ? ? ? ? ? }
-> + ? ? ? ? ? ? ? if (etsects->alarm_interval) {
-> + ? ? ? ? ? ? ? ? ? ? ? ns = etsects->alarm_value + etsects->alarm_interval;
-> + ? ? ? ? ? ? ? ? ? ? ? hi = ns >> 32;
-> + ? ? ? ? ? ? ? ? ? ? ? lo = ns & 0xffffffff;
-> + ? ? ? ? ? ? ? ? ? ? ? spin_lock(&register_lock);
-> + ? ? ? ? ? ? ? ? ? ? ? gfar_write(&etsects->regs->tmr_alarm2_l, lo);
-> + ? ? ? ? ? ? ? ? ? ? ? gfar_write(&etsects->regs->tmr_alarm2_h, hi);
-> + ? ? ? ? ? ? ? ? ? ? ? spin_unlock(&register_lock);
-> + ? ? ? ? ? ? ? ? ? ? ? etsects->alarm_value = ns;
-> + ? ? ? ? ? ? ? } else {
-> + ? ? ? ? ? ? ? ? ? ? ? gfar_write(&etsects->regs->tmr_tevent, ALM2);
-> + ? ? ? ? ? ? ? ? ? ? ? spin_lock(&register_lock);
-> + ? ? ? ? ? ? ? ? ? ? ? mask = gfar_read(&etsects->regs->tmr_temask);
-> + ? ? ? ? ? ? ? ? ? ? ? mask &= ~ALM2EN;
-> + ? ? ? ? ? ? ? ? ? ? ? gfar_write(&etsects->regs->tmr_temask, mask);
-> + ? ? ? ? ? ? ? ? ? ? ? spin_unlock(&register_lock);
-> + ? ? ? ? ? ? ? ? ? ? ? etsects->alarm_value = 0;
-> + ? ? ? ? ? ? ? ? ? ? ? etsects->alarm_interval = 0;
-> + ? ? ? ? ? ? ? }
-> + ? ? ? }
-> +
-> + ? ? ? if (ack) {
-> + ? ? ? ? ? ? ? gfar_write(&etsects->regs->tmr_tevent, ack);
-> + ? ? ? ? ? ? ? return IRQ_HANDLED;
-> + ? ? ? } else
-> + ? ? ? ? ? ? ? return IRQ_NONE;
-> +}
-> +
-> +/*
-> + * PTP clock operations
-> + */
-> +
-> +static int ptp_gianfar_adjfreq(void *priv, s32 ppb)
-> +{
-> + ? ? ? u64 adj;
-> + ? ? ? u32 diff, tmr_add;
-> + ? ? ? int neg_adj = 0;
-> + ? ? ? struct etsects *etsects = priv;
-> +
-> + ? ? ? if (!ppb)
-> + ? ? ? ? ? ? ? return 0;
-> +
-> + ? ? ? if (ppb < 0) {
-> + ? ? ? ? ? ? ? neg_adj = 1;
-> + ? ? ? ? ? ? ? ppb = -ppb;
-> + ? ? ? }
-> + ? ? ? tmr_add = etsects->tmr_add;
-> + ? ? ? adj = tmr_add;
-> + ? ? ? adj *= ppb;
-> + ? ? ? diff = div_u64(adj, 1000000000ULL);
-> +
-> + ? ? ? tmr_add = neg_adj ? tmr_add - diff : tmr_add + diff;
-> +
-> + ? ? ? gfar_write(&etsects->regs->tmr_add, tmr_add);
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +static int ptp_gianfar_adjtime(void *priv, struct timespec *ts)
-> +{
-> + ? ? ? s64 delta, now;
-> + ? ? ? unsigned long flags;
-> + ? ? ? struct etsects *etsects = priv;
-> +
-> + ? ? ? delta = 1000000000LL * ts->tv_sec;
-> + ? ? ? delta += ts->tv_nsec;
-> +
-> + ? ? ? spin_lock_irqsave(&register_lock, flags);
-> +
-> + ? ? ? now = tmr_cnt_read(etsects);
-> + ? ? ? now += delta;
-> + ? ? ? tmr_cnt_write(etsects, now);
-> +
-> + ? ? ? spin_unlock_irqrestore(&register_lock, flags);
-> +
-> + ? ? ? set_fipers(etsects);
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +static int ptp_gianfar_gettime(void *priv, struct timespec *ts)
-> +{
-> + ? ? ? u64 ns;
-> + ? ? ? u32 remainder;
-> + ? ? ? unsigned long flags;
-> + ? ? ? struct etsects *etsects = priv;
-> +
-> + ? ? ? spin_lock_irqsave(&register_lock, flags);
-> +
-> + ? ? ? ns = tmr_cnt_read(etsects);
-> +
-> + ? ? ? spin_unlock_irqrestore(&register_lock, flags);
-> +
-> + ? ? ? ts->tv_sec = div_u64_rem(ns, 1000000000, &remainder);
-> + ? ? ? ts->tv_nsec = remainder;
-> + ? ? ? return 0;
-> +}
-> +
-> +static int ptp_gianfar_settime(void *priv, struct timespec *ts)
-> +{
-> + ? ? ? u64 ns;
-> + ? ? ? unsigned long flags;
-> + ? ? ? struct etsects *etsects = priv;
-> +
-> + ? ? ? ns = ts->tv_sec * 1000000000ULL;
-> + ? ? ? ns += ts->tv_nsec;
-> +
-> + ? ? ? spin_lock_irqsave(&register_lock, flags);
-> +
-> + ? ? ? tmr_cnt_write(etsects, ns);
-> + ? ? ? set_fipers(etsects);
-> +
-> + ? ? ? spin_unlock_irqrestore(&register_lock, flags);
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +static int ptp_gianfar_gettimer(void *priv, int index, struct itimerspec *ts)
-> +{
-> + ? ? ? u64 now, ns;
-> + ? ? ? u32 remainder;
-> + ? ? ? unsigned long flags;
-> + ? ? ? struct etsects *etsects = priv;
-> +
-> + ? ? ? ns = etsects->alarm_interval;
-> +
-> + ? ? ? ts->it_interval.tv_sec = div_u64_rem(ns, 1000000000, &remainder);
-> + ? ? ? ts->it_interval.tv_nsec = remainder;
-> +
-> + ? ? ? spin_lock_irqsave(&register_lock, flags);
-> + ? ? ? now = tmr_cnt_read(etsects);
-> + ? ? ? spin_unlock_irqrestore(&register_lock, flags);
-> +
-> + ? ? ? ns = etsects->alarm_value - now;
-> +
-> + ? ? ? ts->it_value.tv_sec = div_u64_rem(ns, 1000000000, &remainder);
-> + ? ? ? ts->it_value.tv_nsec = remainder;
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +static int ptp_gianfar_settimer(void *p, int i, int abs, struct itimerspec *ts)
-> +{
-> + ? ? ? u64 ns;
-> + ? ? ? u32 lo, hi, mask;
-> + ? ? ? unsigned long flags;
-> + ? ? ? struct etsects *etsects = p;
-> +
-> + ? ? ? ns = ts->it_interval.tv_sec * 1000000000ULL;
-> + ? ? ? ns += ts->it_interval.tv_nsec;
-> +
-> + ? ? ? etsects->alarm_interval = ns;
-> +
-> + ? ? ? ns = ts->it_value.tv_sec * 1000000000ULL;
-> + ? ? ? ns += ts->it_value.tv_nsec;
-> +
-> + ? ? ? if (!ns) {
-> + ? ? ? ? ? ? ? /* Cancel the timer. */
-> + ? ? ? ? ? ? ? etsects->alarm_value = 0;
-> + ? ? ? ? ? ? ? etsects->alarm_interval = 0;
-> + ? ? ? ? ? ? ? return 0;
-> + ? ? ? }
-> +
-> + ? ? ? if (!abs) {
-> + ? ? ? ? ? ? ? spin_lock_irqsave(&register_lock, flags);
-> + ? ? ? ? ? ? ? ns += tmr_cnt_read(etsects);
-> + ? ? ? ? ? ? ? spin_unlock_irqrestore(&register_lock, flags);
-> + ? ? ? }
-> +
-> + ? ? ? etsects->alarm_value = ns;
-> +
-> + ? ? ? hi = ns >> 32;
-> + ? ? ? lo = ns & 0xffffffff;
-> +
-> + ? ? ? spin_lock_irqsave(&register_lock, flags);
-> +
-> + ? ? ? gfar_write(&etsects->regs->tmr_alarm2_l, lo);
-> + ? ? ? gfar_write(&etsects->regs->tmr_alarm2_h, hi);
-> +
-> + ? ? ? mask = gfar_read(&etsects->regs->tmr_temask);
-> + ? ? ? mask |= ALM2EN;
-> + ? ? ? gfar_write(&etsects->regs->tmr_temask, mask);
-> +
-> + ? ? ? spin_unlock_irqrestore(&register_lock, flags);
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +static int ptp_gianfar_enable(void *priv, struct ptp_clock_request *rq, int on)
-> +{
-> + ? ? ? struct etsects *etsects = priv;
-> + ? ? ? unsigned long flags;
-> + ? ? ? u32 bit, mask;
-> +
-> + ? ? ? switch (rq->type) {
-> + ? ? ? case PTP_REQUEST_EXTTS:
-> + ? ? ? ? ? ? ? switch (rq->index) {
-> + ? ? ? ? ? ? ? case 0:
-> + ? ? ? ? ? ? ? ? ? ? ? bit = ETS1EN;
-> + ? ? ? ? ? ? ? ? ? ? ? break;
-> + ? ? ? ? ? ? ? case 1:
-> + ? ? ? ? ? ? ? ? ? ? ? bit = ETS2EN;
-> + ? ? ? ? ? ? ? ? ? ? ? break;
-> + ? ? ? ? ? ? ? default:
-> + ? ? ? ? ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? ? ? ? ? }
-> + ? ? ? ? ? ? ? spin_lock_irqsave(&register_lock, flags);
-> + ? ? ? ? ? ? ? if (on) {
-> + ? ? ? ? ? ? ? ? ? ? ? mask = gfar_read(&etsects->regs->tmr_temask);
-> + ? ? ? ? ? ? ? ? ? ? ? mask |= bit;
-> + ? ? ? ? ? ? ? ? ? ? ? gfar_write(&etsects->regs->tmr_temask, mask);
-> + ? ? ? ? ? ? ? } else {
-> + ? ? ? ? ? ? ? ? ? ? ? mask = gfar_read(&etsects->regs->tmr_temask);
-> + ? ? ? ? ? ? ? ? ? ? ? mask &= ~bit;
-> + ? ? ? ? ? ? ? ? ? ? ? gfar_write(&etsects->regs->tmr_temask, mask);
-> + ? ? ? ? ? ? ? }
-> + ? ? ? ? ? ? ? spin_unlock_irqrestore(&register_lock, flags);
-> + ? ? ? ? ? ? ? return 0;
-> + ? ? ? }
-> +
-> + ? ? ? return -EOPNOTSUPP;
-> +}
-> +
-> +static struct ptp_clock_info ptp_gianfar_caps = {
-> + ? ? ? .owner ? ? ? ? ?= THIS_MODULE,
-> + ? ? ? .name ? ? ? ? ? = "gianfar clock",
-> + ? ? ? .max_adj ? ? ? ?= 512000,
-> + ? ? ? .n_alarm ? ? ? ?= N_ALARM,
-> + ? ? ? .n_ext_ts ? ? ? = N_EXT_TS,
-> + ? ? ? .n_per_out ? ? ?= 0,
-> + ? ? ? .pps ? ? ? ? ? ?= 0,
-> + ? ? ? .priv ? ? ? ? ? = &the_clock,
-> + ? ? ? .adjfreq ? ? ? ?= ptp_gianfar_adjfreq,
-> + ? ? ? .adjtime ? ? ? ?= ptp_gianfar_adjtime,
-> + ? ? ? .gettime ? ? ? ?= ptp_gianfar_gettime,
-> + ? ? ? .settime ? ? ? ?= ptp_gianfar_settime,
-> + ? ? ? .gettimer ? ? ? = ptp_gianfar_gettimer,
-> + ? ? ? .settimer ? ? ? = ptp_gianfar_settimer,
-> + ? ? ? .enable ? ? ? ? = ptp_gianfar_enable,
-> +};
-> +
-> +/* OF device tree */
-> +
-> +static int get_of_u32(struct device_node *node, char *str, u32 *val)
-> +{
-> + ? ? ? int plen;
-> + ? ? ? const u32 *prop = of_get_property(node, str, &plen);
-> +
-> + ? ? ? if (!prop || plen != sizeof(*prop))
-> + ? ? ? ? ? ? ? return -1;
-> + ? ? ? *val = *prop;
-> + ? ? ? return 0;
-> +}
-> +
-> +static int gianfar_ptp_probe(struct of_device *dev,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?const struct of_device_id *match)
-> +{
-> + ? ? ? u64 addr, size;
-> + ? ? ? struct device_node *node = dev->dev.of_node;
-> + ? ? ? struct etsects *etsects = &the_clock;
-> + ? ? ? struct timespec now;
-> + ? ? ? phys_addr_t reg_addr;
-> + ? ? ? unsigned long reg_size;
-> + ? ? ? u32 tmr_ctrl;
-> +
-> + ? ? ? if (get_of_u32(node, "tclk_period", &etsects->tclk_period) ||
-> + ? ? ? ? ? get_of_u32(node, "tmr_prsc", &etsects->tmr_prsc) ||
-> + ? ? ? ? ? get_of_u32(node, "tmr_add", &etsects->tmr_add) ||
-> + ? ? ? ? ? get_of_u32(node, "cksel", &etsects->cksel) ||
-> + ? ? ? ? ? get_of_u32(node, "tmr_fiper1", &etsects->tmr_fiper1) ||
-> + ? ? ? ? ? get_of_u32(node, "tmr_fiper2", &etsects->tmr_fiper2)) {
-> + ? ? ? ? ? ? ? pr_err("device tree node missing required elements\n");
-> + ? ? ? ? ? ? ? return -ENODEV;
-> + ? ? ? }
-> +
-> + ? ? ? etsects->irq = irq_of_parse_and_map(node, 0);
-> +
-> + ? ? ? if (etsects->irq == NO_IRQ) {
-> + ? ? ? ? ? ? ? pr_err("irq not in device tree\n");
-> + ? ? ? ? ? ? ? return -ENODEV;
-> + ? ? ? }
-> + ? ? ? if (request_irq(etsects->irq, isr, 0, DRIVER, etsects)) {
-> + ? ? ? ? ? ? ? pr_err("request_irq failed\n");
-> + ? ? ? ? ? ? ? return -ENODEV;
-> + ? ? ? }
-> +
-> + ? ? ? addr = of_translate_address(node, of_get_address(node, 0, &size, NULL));
-> + ? ? ? reg_addr = addr;
-> + ? ? ? reg_size = size;
-> + ? ? ? if (reg_size < REG_SIZE) {
-> + ? ? ? ? ? ? ? pr_warning("device tree reg range %lu too small\n", reg_size);
-> + ? ? ? ? ? ? ? reg_size = REG_SIZE;
-> + ? ? ? }
-> + ? ? ? etsects->regs = ioremap(reg_addr, reg_size);
-> + ? ? ? if (!etsects->regs) {
-> + ? ? ? ? ? ? ? pr_err("ioremap ptp registers failed\n");
-> + ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? }
-
-Consider of_iomap(), it will simplify the code a bit.
-
-> +
-> + ? ? ? tmr_ctrl =
-> + ? ? ? ? (etsects->tclk_period & TCLK_PERIOD_MASK) << TCLK_PERIOD_SHIFT |
-> + ? ? ? ? (etsects->cksel & CKSEL_MASK) << CKSEL_SHIFT;
-> +
-> + ? ? ? getnstimeofday(&now);
-> + ? ? ? ptp_gianfar_settime(etsects, &now);
-> +
-> + ? ? ? gfar_write(&etsects->regs->tmr_ctrl, ? tmr_ctrl);
-> + ? ? ? gfar_write(&etsects->regs->tmr_add, ? ?etsects->tmr_add);
-> + ? ? ? gfar_write(&etsects->regs->tmr_prsc, ? etsects->tmr_prsc);
-> + ? ? ? gfar_write(&etsects->regs->tmr_fiper1, etsects->tmr_fiper1);
-> + ? ? ? gfar_write(&etsects->regs->tmr_fiper2, etsects->tmr_fiper2);
-> + ? ? ? set_alarm(etsects);
-> + ? ? ? gfar_write(&etsects->regs->tmr_ctrl, ? tmr_ctrl|FS|RTPE|TE);
-> +
-> + ? ? ? etsects->clock = ptp_clock_register(&ptp_gianfar_caps);
-> +
-> + ? ? ? return IS_ERR(etsects->clock) ? PTR_ERR(etsects->clock) : 0;
-> +}
-> +
-> +static int gianfar_ptp_remove(struct of_device *dev)
-> +{
-> + ? ? ? gfar_write(&the_clock.regs->tmr_temask, 0);
-> + ? ? ? gfar_write(&the_clock.regs->tmr_ctrl, ? 0);
-> +
-> + ? ? ? ptp_clock_unregister(the_clock.clock);
-> +
-> + ? ? ? free_irq(the_clock.irq, &the_clock);
-> +
-> + ? ? ? iounmap(the_clock.regs);
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +static struct of_device_id match_table[] = {
-> + ? ? ? { .compatible = "fsl,etsec-ptp" },
-> + ? ? ? {},
-> +};
-> +
-> +static struct of_platform_driver gianfar_ptp_driver = {
-> + ? ? ? .driver = {
-> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "gianfar_ptp",
-> + ? ? ? ? ? ? ? .of_match_table = match_table,
-> + ? ? ? ? ? ? ? .owner ? ? ? ? ?= THIS_MODULE,
-> + ? ? ? },
-> + ? ? ? .probe ? ? ? = gianfar_ptp_probe,
-> + ? ? ? .remove ? ? ?= gianfar_ptp_remove,
-> +};
-> +
-> +/* module operations */
-> +
-> +static void __exit ptp_gianfar_exit(void)
-> +{
-> + ? ? ? of_unregister_platform_driver(&gianfar_ptp_driver);
-> +}
-> +
-> +static int __init ptp_gianfar_init(void)
-> +{
-> + ? ? ? return of_register_platform_driver(&gianfar_ptp_driver);
-> +}
-> +
-> +module_init(ptp_gianfar_init);
-
-Move ptp_gianfar_exit() definition here so it is immediately before
-the module_exit() line.
-
-> +module_exit(ptp_gianfar_exit);
-> +
-> +MODULE_AUTHOR("Richard Cochran <richard.cochran@omicron.at>");
-> +MODULE_DESCRIPTION("PTP clock using the eTSEC");
-> +MODULE_LICENSE("GPL");
-> diff --git a/drivers/net/gianfar_ptp_reg.h b/drivers/net/gianfar_ptp_reg.h
-> new file mode 100644
-> index 0000000..95e171f
-> --- /dev/null
-> +++ b/drivers/net/gianfar_ptp_reg.h
-> @@ -0,0 +1,113 @@
-> +/* gianfar_ptp_reg.h
-> + * Generated by regen.tcl on Thu May 13 01:38:57 PM CEST 2010
-> + *
-> + * PTP 1588 clock using the gianfar eTSEC
-> + *
-> + * Copyright (C) 2010 OMICRON electronics GmbH
-> + *
-> + * ?This program is free software; you can redistribute it and/or modify
-> + * ?it under the terms of the GNU General Public License as published by
-> + * ?the Free Software Foundation; either version 2 of the License, or
-> + * ?(at your option) any later version.
-> + *
-> + * ?This program is distributed in the hope that it will be useful,
-> + * ?but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * ?MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
-> + * ?GNU General Public License for more details.
-> + *
-> + * ?You should have received a copy of the GNU General Public License
-> + * ?along with this program; if not, write to the Free Software
-> + * ?Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-> + */
-> +#ifndef _GIANFAR_PTP_REG_H_
-> +#define _GIANFAR_PTP_REG_H_
-> +
-> +struct gianfar_ptp_registers {
-> + ? ? ? u32 tmr_ctrl; ? ? /* Timer control register */
-> + ? ? ? u32 tmr_tevent; ? /* Timestamp event register */
-> + ? ? ? u32 tmr_temask; ? /* Timer event mask register */
-> + ? ? ? u32 tmr_pevent; ? /* Timestamp event register */
-> + ? ? ? u32 tmr_pemask; ? /* Timer event mask register */
-> + ? ? ? u32 tmr_stat; ? ? /* Timestamp status register */
-> + ? ? ? u32 tmr_cnt_h; ? ?/* Timer counter high register */
-> + ? ? ? u32 tmr_cnt_l; ? ?/* Timer counter low register */
-> + ? ? ? u32 tmr_add; ? ? ?/* Timer drift compensation addend register */
-> + ? ? ? u32 tmr_acc; ? ? ?/* Timer accumulator register */
-> + ? ? ? u32 tmr_prsc; ? ? /* Timer prescale */
-> + ? ? ? u8 ?res1[4];
-> + ? ? ? u32 tmroff_h; ? ? /* Timer offset high */
-> + ? ? ? u32 tmroff_l; ? ? /* Timer offset low */
-> + ? ? ? u8 ?res2[8];
-> + ? ? ? u32 tmr_alarm1_h; /* Timer alarm 1 high register */
-> + ? ? ? u32 tmr_alarm1_l; /* Timer alarm 1 high register */
-> + ? ? ? u32 tmr_alarm2_h; /* Timer alarm 2 high register */
-> + ? ? ? u32 tmr_alarm2_l; /* Timer alarm 2 high register */
-> + ? ? ? u8 ?res3[48];
-> + ? ? ? u32 tmr_fiper1; ? /* Timer fixed period interval */
-> + ? ? ? u32 tmr_fiper2; ? /* Timer fixed period interval */
-> + ? ? ? u32 tmr_fiper3; ? /* Timer fixed period interval */
-> + ? ? ? u8 ?res4[20];
-> + ? ? ? u32 tmr_etts1_h; ?/* Timestamp of general purpose external trigger */
-> + ? ? ? u32 tmr_etts1_l; ?/* Timestamp of general purpose external trigger */
-> + ? ? ? u32 tmr_etts2_h; ?/* Timestamp of general purpose external trigger */
-> + ? ? ? u32 tmr_etts2_l; ?/* Timestamp of general purpose external trigger */
-> +};
-> +
-> +/* Bit definitions for the TMR_CTRL register */
-> +#define ALM1P ? ? ? ? ? ? ? ? (1<<31) /* Alarm1 output polarity */
-> +#define ALM2P ? ? ? ? ? ? ? ? (1<<30) /* Alarm2 output polarity */
-> +#define FS ? ? ? ? ? ? ? ? ? ?(1<<28) /* FIPER start indication */
-> +#define PP1L ? ? ? ? ? ? ? ? ?(1<<27) /* Fiper1 pulse loopback mode enabled. */
-> +#define PP2L ? ? ? ? ? ? ? ? ?(1<<26) /* Fiper2 pulse loopback mode enabled. */
-> +#define TCLK_PERIOD_SHIFT ? ? (16) /* 1588 timer reference clock period. */
-> +#define TCLK_PERIOD_MASK ? ? ?(0x3ff)
-> +#define RTPE ? ? ? ? ? ? ? ? ?(1<<15) /* Record Tx Timestamp to PAL Enable. */
-> +#define FRD ? ? ? ? ? ? ? ? ? (1<<14) /* FIPER Realignment Disable */
-> +#define ESFDP ? ? ? ? ? ? ? ? (1<<11) /* External Tx/Rx SFD Polarity. */
-> +#define ESFDE ? ? ? ? ? ? ? ? (1<<10) /* External Tx/Rx SFD Enable. */
-> +#define ETEP2 ? ? ? ? ? ? ? ? (1<<9) /* External trigger 2 edge polarity */
-> +#define ETEP1 ? ? ? ? ? ? ? ? (1<<8) /* External trigger 1 edge polarity */
-> +#define COPH ? ? ? ? ? ? ? ? ?(1<<7) /* Generated clock (TSEC_1588_GCLK) output phase. */
-> +#define CIPH ? ? ? ? ? ? ? ? ?(1<<6) /* External oscillator input clock phase. */
-> +#define TMSR ? ? ? ? ? ? ? ? ?(1<<5) /* Timer soft reset. When enabled, it resets all the timer registers and state machines. */
-> +#define BYP ? ? ? ? ? ? ? ? ? (1<<3) /* Bypass drift compensated clock */
-> +#define TE ? ? ? ? ? ? ? ? ? ?(1<<2) /* 1588 timer enable. If not enabled, all the timer registers and state machines are disabled. */
-> +#define CKSEL_SHIFT ? ? ? ? ? (0) /* 1588 Timer reference clock source select. */
-> +#define CKSEL_MASK ? ? ? ? ? ?(0x3)
-> +
-> +/* Bit definitions for the TMR_TEVENT register */
-> +#define ETS2 ? ? ? ? ? ? ? ? ?(1<<25) /* External trigger 2 timestamp sampled */
-> +#define ETS1 ? ? ? ? ? ? ? ? ?(1<<24) /* External trigger 1 timestamp sampled */
-> +#define ALM2 ? ? ? ? ? ? ? ? ?(1<<17) /* Current time equaled alarm time register 2 */
-> +#define ALM1 ? ? ? ? ? ? ? ? ?(1<<16) /* Current time equaled alarm time register 1 */
-> +#define PP1 ? ? ? ? ? ? ? ? ? (1<<7) /* Indicates that a periodic pulse has been generated based on FIPER1 register */
-> +#define PP2 ? ? ? ? ? ? ? ? ? (1<<6) /* Indicates that a periodic pulse has been generated based on FIPER2 register */
-> +#define PP3 ? ? ? ? ? ? ? ? ? (1<<5) /* Indicates that a periodic pulse has been generated based on FIPER3 register */
-> +
-> +/* Bit definitions for the TMR_TEMASK register */
-> +#define ETS2EN ? ? ? ? ? ? ? ?(1<<25) /* External trigger 2 timestamp sample event enable */
-> +#define ETS1EN ? ? ? ? ? ? ? ?(1<<24) /* External trigger 1 timestamp sample event enable */
-> +#define ALM2EN ? ? ? ? ? ? ? ?(1<<17) /* Timer ALM2 event enable */
-> +#define ALM1EN ? ? ? ? ? ? ? ?(1<<16) /* Timer ALM1 event enable */
-> +#define PP1EN ? ? ? ? ? ? ? ? (1<<7) /* Periodic pulse event 1 enable */
-> +#define PP2EN ? ? ? ? ? ? ? ? (1<<6) /* Periodic pulse event 2 enable */
-> +
-> +/* Bit definitions for the TMR_PEVENT register */
-> +#define TXP2 ? ? ? ? ? ? ? ? ?(1<<9) /* Indicates that a PTP frame has been transmitted and its timestamp is stored in TXTS2 register */
-> +#define TXP1 ? ? ? ? ? ? ? ? ?(1<<8) /* Indicates that a PTP frame has been transmitted and its timestamp is stored in TXTS1 register */
-> +#define RXP ? ? ? ? ? ? ? ? ? (1<<0) /* Indicates that a PTP frame has been received */
-> +
-> +/* Bit definitions for the TMR_PEMASK register */
-> +#define TXP2EN ? ? ? ? ? ? ? ?(1<<9) /* Transmit PTP packet event 2 enable */
-> +#define TXP1EN ? ? ? ? ? ? ? ?(1<<8) /* Transmit PTP packet event 1 enable */
-> +#define RXPEN ? ? ? ? ? ? ? ? (1<<0) /* Receive PTP packet event enable */
-> +
-> +/* Bit definitions for the TMR_STAT register */
-> +#define STAT_VEC_SHIFT ? ? ? ?(0) /* Timer general purpose status vector */
-> +#define STAT_VEC_MASK ? ? ? ? (0x3f)
-> +
-> +/* Bit definitions for the TMR_PRSC register */
-> +#define PRSC_OCK_SHIFT ? ? ? ?(0) /* Output clock division/prescale factor. */
-> +#define PRSC_OCK_MASK ? ? ? ? (0xffff)
-> +
-> +#endif
-> diff --git a/drivers/ptp/Kconfig b/drivers/ptp/Kconfig
-> index 9390d44..3b7bd73 100644
-> --- a/drivers/ptp/Kconfig
-> +++ b/drivers/ptp/Kconfig
-> @@ -35,4 +35,17 @@ config PTP_1588_CLOCK_LINUX
-> ? ? ? ? ?To compile this driver as a module, choose M here: the module
-> ? ? ? ? ?will be called ptp_linux.
->
-> +config PTP_1588_CLOCK_GIANFAR
-> + ? ? ? tristate "Freescale eTSEC as PTP clock"
-> + ? ? ? depends on PTP_1588_CLOCK
-> + ? ? ? depends on GIANFAR
-> + ? ? ? help
-> + ? ? ? ? This driver adds support for using the eTSEC as a PTP
-> + ? ? ? ? clock. This clock is only useful if your PTP programs are
-> + ? ? ? ? getting hardware time stamps on the PTP Ethernet packets
-> + ? ? ? ? using the SO_TIMESTAMPING API.
-> +
-> + ? ? ? ? To compile this driver as a module, choose M here: the module
-> + ? ? ? ? will be called gianfar_ptp.
-> +
-> ?endmenu
-> --
-> 1.6.3.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+        if (at91rm9200_smc_configure(CCM2200_QUAD_UART_CS,
+                                     &quad_uart_cs_config ) != 0 ) {
+                printk( KERN_ERR
+                        "Unable to configure static memory controller\n" );
+                return -EIO;
+	}
 
 
+I am new at ARM linux and not familiar with the naming conventions.
+Please review the patch and give comments.
 
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Best regards
+
+  Guido Classen
+
+Signed-off-by: Guido Classen <clagix@gmail.com>
+
+diff -Nrub '--exclude=*~'
+linux-2.6.35-ccm2200/arch/arm/mach-at91/at91rm9200_smc.c
+linux-2.6.35-rm9200_smc//arch/arm/mach-at91/at91rm9200_smc.c
+--- linux-2.6.35-ccm2200/arch/arm/mach-at91/at91rm9200_smc.c	1970-01-01
+01:00:00.000000000 +0100
++++ linux-2.6.35-rm9200_smc//arch/arm/mach-at91/at91rm9200_smc.c	2010-06-14
+19:58:48.000000000 +0200
+@@ -0,0 +1,88 @@
++/*
++ * linux/arch/arm/mach-at91/at91rm9200_smc.c
++ *
++ * Copyright (C) 2010 Guido Classen
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307	 USA
++ *
++ */
++
++#include <linux/module.h>
++#include <linux/io.h>
++
++#include <mach/at91rm9200_mc.h>
++#include <mach/at91_pio.h>
++
++#include "at91rm9200_smc.h"
++
++int __init at91rm9200_smc_configure(int chip_select,
++				    struct at91rm9200_smc_config *config)
++{
++	unsigned int mask;
++
++	/* check parameters */
++	if (chip_select < 0 || chip_select > 7
++	    || config->wait_states > 128
++	    || config->data_float_time > 15
++	    || (config->byte_access_type != AT91RM9200_BAT_TWO_8_BIT
++		&& config->byte_access_type != AT91RM9200_BAT_16_BIT)
++	    || (config->data_read_protocol != AT91RM9200_DRP_STANDARD
++		&& config->data_read_protocol != AT91RM9200_DRP_EARLY)
++	    || config->address_to_cs_setup < AT91RM9200_ACSS_STANDARD
++	    || config->address_to_cs_setup > AT91RM9200_ACSS_3_CYCLES
++	    || config->rw_setup > 7
++	    || config->rw_hold > 7)
++		return -EINVAL;
++
++
++	// configure gpios, if necessary
++	if (chip_select > 3)
++	{
++#define AT91C_PC10_NCS4_CFCS  (1<<10)
++#define AT91C_PC11_NCS5_CFCE1 (1<<11)
++#define AT91C_PC12_NCS6_CFCE2 (1<<12)
++#define AT91C_PC13_NCS7	      (1<<13)
++		switch (chip_select)
++		{
++		case 4:	mask = AT91C_PC10_NCS4_CFCS;	break;
++		case 5:	mask = AT91C_PC11_NCS5_CFCE1;	break;
++		case 6:	mask = AT91C_PC12_NCS6_CFCE2;	break;
++		case 7:	mask = AT91C_PC13_NCS7;		break;
++		default: mask = 0;
++		}
++		/* select peripheral a function */
++		at91_sys_write(AT91_PIOC + PIO_ASR, mask);
++
++		/* disable pio controller and enable peripheral */
++		at91_sys_write(AT91_PIOC + PIO_PDR, mask);
++	}
++
++	/* write the new configuration to SMC chip select register */
++	at91_sys_write(AT91_SMC_CSR(chip_select),
++		       (config->wait_states > 0
++			? (AT91_SMC_NWS & (config->wait_states-1))
++			| AT91_SMC_WSEN
++			: 0)
++		       | AT91_SMC_TDF_(config->data_float_time)
++		       | (config->byte_access_type == AT91RM9200_BAT_16_BIT
++			  ? AT91_SMC_BAT : 0)
++		       | ((int)config->data_bus_width << 13)
++		       | (config->data_read_protocol == AT91RM9200_DRP_EARLY
++			  ? AT91_SMC_DPR : 0)
++		       | ((int)config->address_to_cs_setup << 16)
++		       | AT91_SMC_RWSETUP_(config->rw_setup)
++		       | AT91_SMC_RWHOLD_(config->rw_hold) );
++	return 0;
++}
+diff -Nrub '--exclude=*~'
+linux-2.6.35-ccm2200/arch/arm/mach-at91/at91rm9200_smc.h
+linux-2.6.35-rm9200_smc//arch/arm/mach-at91/at91rm9200_smc.h
+--- linux-2.6.35-ccm2200/arch/arm/mach-at91/at91rm9200_smc.h	1970-01-01
+01:00:00.000000000 +0100
++++ linux-2.6.35-rm9200_smc//arch/arm/mach-at91/at91rm9200_smc.h	2010-06-14
+19:51:15.000000000 +0200
+@@ -0,0 +1,66 @@
++/*
++ * linux/arch/arm/mach-at91/at91rm9200_smc.h
++ *
++ * Copyright (C) 2010 Guido Classen
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307	 USA
++ *
++ */
++
++struct at91rm9200_smc_config {
++	/* wait states 0...128 (0 = no wait states) */
++	u8 wait_states;
++	/* 0...15 wait states after memory read cycle */
++	u8 data_float_time;
++
++	/* only valid for data_bus_width=AT91RM9200_DATA_BUS_WIDTH_16 */
++	enum byte_access_type {
++		/* dummy value for 8 bit device (ignored) */
++		AT91RM9200_BAT_8_BIT = 0,
++		/* chip select is connected to two/four 8-bit
++		 * devices */
++		AT91RM9200_BAT_TWO_8_BIT = 0,
++		/* chip select is connected too a 16 bit device */
++		AT91RM9200_BAT_16_BIT = 1
++	} byte_access_type;
++
++	enum data_bus_width {
++		AT91RM9200_DATA_BUS_WIDTH_8 = 2,  /* 8 bit data bus */
++		AT91RM9200_DATA_BUS_WIDTH_16 = 1, /* 16 bit data bus */
++	} data_bus_width;
++	enum data_read_protocol {
++		AT91RM9200_DRP_STANDARD = 0, /* standard data read protocol */
++		AT91RM9200_DRP_EARLY	= 1  /* early data read protocol */
++	} data_read_protocol;
++
++	enum address_to_cs_setup {
++		/* standard: address asserted at the beginning of the
++		 * access and deasserted at the end */
++		AT91RM9200_ACSS_STANDARD   = 0,
++		/* one cycle less at the beginning and end */
++		AT91RM9200_ACSS_1_CYCLE	   = 1,
++		/* two cycles less at the beginning and end */
++		AT91RM9200_ACSS_2_CYCLES   = 2,
++		/* three cycles less at the beginning and end */
++		AT91RM9200_ACSS_3_CYCLES   = 3
++	} address_to_cs_setup;
++	/* 0...7 number of read/write setup cycles */
++	u8 rw_setup;
++	/* 0...7 number of read/write hold cycles */
++	u8 rw_hold;
++};
++
++extern int __init at91rm9200_smc_configure(int chip_select,
++					   struct at91rm9200_smc_config *config);
+diff -Nrub '--exclude=*~'
+linux-2.6.35-ccm2200/arch/arm/mach-at91/Makefile
+linux-2.6.35-rm9200_smc//arch/arm/mach-at91/Makefile
+--- linux-2.6.35-ccm2200/arch/arm/mach-at91/Makefile	2010-06-14
+16:31:35.000000000 +0200
++++ linux-2.6.35-rm9200_smc//arch/arm/mach-at91/Makefile	2010-06-14
+19:45:24.000000000 +0200
+@@ -10,7 +10,7 @@
+ obj-$(CONFIG_AT91_PMC_UNIT)	+= clock.o
+
+ # CPU-specific support
+-obj-$(CONFIG_ARCH_AT91RM9200)	+= at91rm9200.o at91rm9200_time.o
+at91rm9200_devices.o
++obj-$(CONFIG_ARCH_AT91RM9200)	+= at91rm9200.o at91rm9200_time.o
+at91rm9200_devices.o at91rm9200_smc.o
+ obj-$(CONFIG_ARCH_AT91SAM9260)	+= at91sam9260.o at91sam926x_time.o
+at91sam9260_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91SAM9261)	+= at91sam9261.o at91sam926x_time.o
+at91sam9261_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91SAM9G10)	+= at91sam9261.o at91sam926x_time.o
+at91sam9261_devices.o sam9_smc.o
