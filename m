@@ -1,64 +1,48 @@
-From: mhowe@cwlinux.com (Morgan Howe)
-Date: Tue, 15 Jun 2010 18:32:00 +0800
-Subject: mxcmmc driver hangs on sync
-In-Reply-To: <20100615072237.GW17833@buzzloop.caiaq.de>
-References: <20100615112936.5d03ce92@morgan>
-	<20100615063142.GU17833@buzzloop.caiaq.de>
-	<20100615152051.26e4589c@morgan>
-	<20100615072237.GW17833@buzzloop.caiaq.de>
-Message-ID: <20100615183200.45164c20@morgan>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 15 Jun 2010 12:34:22 +0200
+Subject: [PATCH 1/2] otg/ulpi: bail out on read errors
+Message-ID: <1276598063-3956-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Daniel,
+otg_read may return errnos, so bail out correctly to prevent bogus
+ID-numbers.
 
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Daniel Mack <daniel@caiaq.de>
+Cc: Greg KH <gregkh@suse.de>
+---
+ drivers/usb/otg/ulpi.c |   15 ++++++++++-----
+ 1 files changed, 10 insertions(+), 5 deletions(-)
 
-On Tue, 15 Jun 2010 09:22:37 +0200
-Daniel Mack <daniel@caiaq.de> wrote:
-> Could you try two things:
-> 
-> a) build a kernel without MX2 DMA support
-
-I did this and ran the test again several times and the behavior seemed
-basically the same.
-
-Around 100 times, write the file to each SD and sync.
-Then finally:
-
-mxc-mmc mxc-mmc.0: mxcmci_finish_data: No CRC -ETIMEDOUT
-mmcblk0: error -110 transferring data, sector 29692583, nr 512, card
-status 0xc00 end_request: I/O error, dev mmcblk0, sector 29692863
-... <snip ~20 similar I/O errors for other sectors>
-
-After this it continues to write without problems and eventually:
-
-Loop: 159
-Loop: 162
-Loop: 164
-Loop: 187
-mxc-mmc mxc-mmc.0: mxcmci_finish_data: No CRC -ETIMEDOUT
-mmcblk0: error -110 transferring data, sector 29517031, nr 96, card
-status 0xc00 end_request: I/O error, dev mmcblk0, sector 29517125
-
-Loop # represents the number of times each of the four processes has
-copied to SD1, copied from SD1 to SD2, and then called sync.  It
-continues after this error again and then:
-
-Loop: 228
-Loop: 233
-Loop: 231
-Loop: 257
-mxc-mmc mxc-mmc.1: mxcmci_finish_data: No CRC -ETIMEDOUT
-mmcblk1: error -110 transferring data, sector 22419455, nr 56, card
-status 0xc00
-
-At this point I can see that all four of the test scripts are stuck
-at calling sync.
-
-> b) try 2.6.34, as there were some updates to the mxcmmc driver after
->    2.6.34 which could be related
-
-I will try this, but may need a bit more time.
-
-Regards,
-Morgan
+diff --git a/drivers/usb/otg/ulpi.c b/drivers/usb/otg/ulpi.c
+index b1b3469..d331b22 100644
+--- a/drivers/usb/otg/ulpi.c
++++ b/drivers/usb/otg/ulpi.c
+@@ -59,12 +59,17 @@ static int ulpi_set_flags(struct otg_transceiver *otg)
+ 
+ static int ulpi_init(struct otg_transceiver *otg)
+ {
+-	int i, vid, pid;
+-
+-	vid = (otg_io_read(otg, ULPI_VENDOR_ID_HIGH) << 8) |
+-	       otg_io_read(otg, ULPI_VENDOR_ID_LOW);
+-	pid = (otg_io_read(otg, ULPI_PRODUCT_ID_HIGH) << 8) |
+-	       otg_io_read(otg, ULPI_PRODUCT_ID_LOW);
++	int i, vid, pid, ret;
++	u32 ulpi_id = 0;
++
++	for (i = 0; i < 4; i++) {
++		ret = otg_io_read(otg, ULPI_PRODUCT_ID_HIGH - i);
++		if (ret < 0)
++			return ret;
++		ulpi_id = (ulpi_id << 8) | ret;
++	}
++	vid = ulpi_id & 0xffff;
++	pid = ulpi_id >> 16;
+ 
+ 	pr_info("ULPI transceiver vendor/product ID 0x%04x/0x%04x\n", vid, pid);
+ 
+-- 
+1.7.1
