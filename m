@@ -1,87 +1,183 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 15 Jun 2010 17:47:41 +0300
-Subject: [PATCH 1/5] usb/otg/ulpi: extend the generic ulpi driver.
-In-Reply-To: <AANLkTimHDBI0grgNrcvZ-BWS9kd0z4lFqEgVoyM4ysVJ@mail.gmail.com>
-References: <1275464450-23003-1-git-send-email-grinberg@compulab.co.il>
-	<1275464450-23003-2-git-send-email-grinberg@compulab.co.il>
-	<AANLkTimHDBI0grgNrcvZ-BWS9kd0z4lFqEgVoyM4ysVJ@mail.gmail.com>
-Message-ID: <4C17928D.6020402@compulab.co.il>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Tue, 15 Jun 2010 18:06:48 +0200
+Subject: [PATCH v4 00/12] ptp: IEEE 1588 clock support
+Message-ID: <cover.1276615626.git.richard.cochran@omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Now and again there has been talk on the netdev list of adding PTP
+support into Linux. One part of the picture is already in place, the
+SO_TIMESTAMPING API for hardware time stamping. This patch set offers
+the missing second part needed for complete IEEE 1588 support.
+
+The only feature still to be implemented is the hook into the PPS
+subsystem, to synchronize the Linux clock to the PTP clock.
+
+The first seven patches concern phylib. A new generation of PHYs with
+timestamping capabilities is appearing on the market. In order to
+support hardware timestamping on these devices in Linux, a number of
+adjustments will have to be made in the PHY subsystem. The reasons for
+the changes are explained inline at the top of the patches.
+
+The last five patches provide the PTP subsystem itself.
+
+* Why all the CCs?
+
+  1. The patches probably should go through netdev.
+  2. One driver is for PowerPC, and adds device tree stuff.
+  3. One driver is for the ARM Xscale IXP465
+
+* Open Issues:
+
+** DP83640
+   In order to make this work, three lines must be added into the MAC
+   driver. Since this PHY can be connected to almost any MAC, I did
+   not do anything about that. If you have the DP83640 and want to try
+   the driver, you need to add three lines to your MAC driver.
+
+   1. Before mdio_register, add
+		bus->locktype = MDIOBUS_ATOMIC_RW;
+   2. In the .ndo_start_xmit function, add
+		skb_tx_timestamp()
+   3. In the NAPI poll function, add
+		skb_rx_timestamp()
+
+** IXP465
+   I do not know how to correctly choose the timestamp "channel" based
+   on the port identifier:
+
+	#define PORT2CHANNEL(p)		1
+	/*
+	 * PHYSICAL_ID(p->id) ?
+	 * TODO - Figure out correct mapping.
+	 */
+
+* Patch ChangeLog
+
+** v4
+*** general
+   - Added a clock driver for the National Semiconductor PHYTER.
+   - Added a clock driver for the Intel IXP465.
+   - Made more stylish according to checkstyle.pl.
+*** gianfar
+   - Replace device_type and model with compatible string ("fsl,etsec-ptp")
+   - Register only one interrupt, since others are superfluous.
+   - Combine ptp clock instance with private variable structure.
+   - ISR now returns NONE or HANDLED properly.
+   - Print error message if something is missing from the device nodes.
+
+** v3
+*** general
+   - Added documentation on writing clock drivers.
+   - Added the ioctls for the ancillary clock features.
+   - Changed wrong subsys_initcall() to module_init() in clock drivers.
+   - Removed the (too coarse) character device mutex.
+   - Setting the clock now requires CAP_SYS_TIME.
+*** gianfar
+   - Added alarm feature.
+   - Added device tree node binding description.
+   - Added fine grain locking of the clock registers.
+   - Added the external time stamp feature.
+   - Added white space for better style.
+   - Coverted base+offset to structure pointers for register access.
+   - When removing the driver, we now disable all PTP functions.
+
+** v2
+   - Changed clock list from a static array into a dynamic list. Also,
+     use a bitmap to manage the clock's minor numbers.
+   - Replaced character device semaphore with a mutex.
+   - Drop .ko from module names in Kbuild help.
+   - Replace deprecated unifdef-y with header-y for user space header file.
+   - Added links to both of the ptpd patches on sourceforge.
+   - Gianfar driver now gets parameters from device tree.
+   - Added API documentation to Documentation/ptp/ptp.txt
+
+Looking forward to your feedback,
+Richard
 
 
-On 06/12/10 12:35, Eric Miao wrote:
->> +/* ULPI Function Control Register bits */
->> +#define ULPI_FC_HS     0               /* Enable HS tcvr */
->> +#define ULPI_FC_FS     (0x1 << 0)      /* Enable FS tcvr */
->> +#define ULPI_FC_LS     (0x2 << 0)      /* Enable LS tcvr */
->> +#define ULPI_FC_FS_LS  (0x3 << 0)      /* Enable FS tcvr for LS packets */
->> +#define ULPI_FC_TRM_SEL        (0x1 << 2)      /* Internal pullup and HS termination */
->> +#define ULPI_FC_NODRV  (0x1 << 3)      /* Non-Driving Operation */
->> +#define ULPI_FC_NONRZI (0x1 << 4)      /* Disable bit-stuff and NRZI encode */
->> +#define ULPI_FC_RESET  (0x1 << 5)      /* Reset the UTMI core */
->> +#define ULPI_FC_DEFAULT        0x41            /* Function Control Register Default */
->> +
->> +
->> +/* ULPI Interface Register bits */
->> +#define ULPI_IC_6PIN   (1 << 0)        /* XCVR 6 serial pin mode */
->> +#define ULPI_IC_3PIN   (1 << 1)        /* XCVR 3 serial pin mode */
->> +#define ULPI_IC_CARKIT (1 << 2)        /* Carkit mode */
->> +#define ULPI_IC_CLKSPND        (1 << 3)        /* Active low clock suspend */
->> +#define ULPI_IC_AUTORES        (1 << 4)        /* PHY auto transmit resume signal */
->> +#define ULPI_IC_VBUSINV        (1 << 5)        /* Invert the external VBUS indicator */
->> +#define ULPI_IC_INDPT  (1 << 6)        /* Indicator Pass Through */
->> +#define ULPI_IC_DISPRT (1 << 7)        /* Interface Protect Disable */
->> +#define ULPI_IC_DEFAULT        0x0             /* Interface Control Register Default */
->> +
->>  struct otg_transceiver *otg_ulpi_create(struct otg_io_access_ops *ops,
->> -                                       unsigned int flags);
->> +                                       u8 fc_flags, u8 ic_flags, u8 otg_flags);
->>
->>     
-> Just one comment about the API, I might not know all the detail of these two
-> FC/IC registers, but maybe it can be even better:
->
-> 1. separate flags definition from the FC/IC register bits, i.e. sometimes not
-> all the register bits will be used, and some times a meaningful flag name is
-> better (though the flag definition can be encoded properly to simplify the
-> algorithm to map into the actual register bits)
->
->   
+Richard Cochran (12):
+  phylib: preserve ifreq parameter when calling generic phy_mii_ioctl()
+  phylib: do not filter phy_mii_ioctl()
+  phylib: add a driver method for the SIOCSHWTSTAMP ioctl.
+  phylib: add a way to make PHY time stamps possible.
+  phylib: Allow reading and writing a mii bus from atomic context.
+  ptp: add a BPF to help drivers detect PTP packets.
+  phylib: support the National Semiconductor DP83640 PHY.
+  ptp: Added a brand new class driver for ptp clocks.
+  ptp: Added a clock that uses the Linux system time.
+  ptp: Added a clock that uses the eTSEC found on the MPC85xx.
+  ptp: Added a clock driver for the IXP46x.
+  ptp: Added a clock driver for the National Semiconductor PHYTER.
 
-I understand what you mean and I think it is indeed better to keep the
-bits and registers private
-to the ulpi driver and export only some usable flags.
-Meanwhile, there is new ulpi.h, merged between 2.6.34 and 2.6.35-rc1 and
-it violates already
-the concept of keeping the bits/regs private.
-For now there are too many combinations of those bits and it is
-impossible to summarize them
-in some way usable flags.
-pxa310 uses only a reletively small subset of the ulpi register bits, so
-we could define
-flags specific to pxa310 in the new pxa310-u2d.c or pxa310-u2d.h, so
-board will only pass those flags
-to the pxa310-u2d.c driver which in turn will translate them to the ulpi
-register settings.
-
-> 2. extend the original 'flags' variable and bits for the above definitions, so
-> we can keep the API unchanged.
->   
-
-Well, I think that the current API is still fresh and it does only
-support current implementation
-in which the flags are stored in otg_transceiver and there is no any
-private data to the ulpi driver.
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
->   
-
--- 
-Regards,
-Igor.
+ Documentation/powerpc/dts-bindings/fsl/tsec.txt |   54 ++
+ Documentation/ptp/ptp.txt                       |   95 ++++
+ Documentation/ptp/testptp.c                     |  269 ++++++++++
+ Documentation/ptp/testptp.mk                    |   33 ++
+ arch/arm/mach-ixp4xx/include/mach/ixp46x_ts.h   |   67 +++
+ arch/powerpc/boot/dts/mpc8313erdb.dts           |   13 +
+ arch/powerpc/boot/dts/p2020ds.dts               |   13 +
+ arch/powerpc/boot/dts/p2020rdb.dts              |   13 +
+ drivers/Kconfig                                 |    2 +
+ drivers/Makefile                                |    1 +
+ drivers/net/Makefile                            |    1 +
+ drivers/net/arm/ixp4xx_eth.c                    |  197 ++++++++-
+ drivers/net/au1000_eth.c                        |    2 +-
+ drivers/net/bcm63xx_enet.c                      |    2 +-
+ drivers/net/cpmac.c                             |    5 +-
+ drivers/net/dnet.c                              |    2 +-
+ drivers/net/ethoc.c                             |    2 +-
+ drivers/net/fec.c                               |    2 +-
+ drivers/net/fec_mpc52xx.c                       |    2 +-
+ drivers/net/fs_enet/fs_enet-main.c              |    3 +-
+ drivers/net/gianfar.c                           |    2 +-
+ drivers/net/gianfar_ptp.c                       |  518 ++++++++++++++++++++
+ drivers/net/gianfar_ptp_reg.h                   |  113 +++++
+ drivers/net/macb.c                              |    2 +-
+ drivers/net/mv643xx_eth.c                       |    2 +-
+ drivers/net/octeon/octeon_mgmt.c                |    2 +-
+ drivers/net/phy/Kconfig                         |   16 +
+ drivers/net/phy/Makefile                        |    1 +
+ drivers/net/phy/dp83640.c                       |  595 +++++++++++++++++++++++
+ drivers/net/phy/dp83640_reg.h                   |  237 +++++++++
+ drivers/net/phy/mdio_bus.c                      |   35 ++-
+ drivers/net/phy/phy.c                           |    8 +-
+ drivers/net/sb1250-mac.c                        |    2 +-
+ drivers/net/sh_eth.c                            |    2 +-
+ drivers/net/smsc911x.c                          |    2 +-
+ drivers/net/smsc9420.c                          |    2 +-
+ drivers/net/stmmac/stmmac_main.c                |   22 +-
+ drivers/net/tc35815.c                           |    2 +-
+ drivers/net/tg3.c                               |    2 +-
+ drivers/ptp/Kconfig                             |   64 +++
+ drivers/ptp/Makefile                            |    7 +
+ drivers/ptp/ptp_clock.c                         |  514 ++++++++++++++++++++
+ drivers/ptp/ptp_ixp46x.c                        |  231 +++++++++
+ drivers/ptp/ptp_linux.c                         |  136 ++++++
+ drivers/staging/octeon/ethernet-mdio.c          |    2 +-
+ include/linux/Kbuild                            |    1 +
+ include/linux/phy.h                             |   22 +-
+ include/linux/ptp_classify.h                    |  118 +++++
+ include/linux/ptp_clock.h                       |   79 +++
+ include/linux/ptp_clock_kernel.h                |  137 ++++++
+ include/linux/skbuff.h                          |   32 ++
+ kernel/time/ntp.c                               |    2 +
+ net/Kconfig                                     |   11 +
+ net/dsa/slave.c                                 |    3 +-
+ 54 files changed, 3651 insertions(+), 51 deletions(-)
+ create mode 100644 Documentation/ptp/ptp.txt
+ create mode 100644 Documentation/ptp/testptp.c
+ create mode 100644 Documentation/ptp/testptp.mk
+ create mode 100644 arch/arm/mach-ixp4xx/include/mach/ixp46x_ts.h
+ create mode 100644 drivers/net/gianfar_ptp.c
+ create mode 100644 drivers/net/gianfar_ptp_reg.h
+ create mode 100644 drivers/net/phy/dp83640.c
+ create mode 100644 drivers/net/phy/dp83640_reg.h
+ create mode 100644 drivers/ptp/Kconfig
+ create mode 100644 drivers/ptp/Makefile
+ create mode 100644 drivers/ptp/ptp_clock.c
+ create mode 100644 drivers/ptp/ptp_ixp46x.c
+ create mode 100644 drivers/ptp/ptp_linux.c
+ create mode 100644 include/linux/ptp_classify.h
+ create mode 100644 include/linux/ptp_clock.h
+ create mode 100644 include/linux/ptp_clock_kernel.h
