@@ -1,60 +1,88 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 14 Jun 2010 17:43:34 -0700
-Subject: [PATCH v3 10/11] [ARM] tegra: Add framebuffer driver
-In-Reply-To: <AANLkTilppHVz2XpLfin9wxrt9kHE1PIbct5XYvd_4iiX@mail.gmail.com>
-References: <1271198563-10424-1-git-send-email-konkers@android.com>
-	<1276549827-2688-1-git-send-email-konkers@android.com>
-	<1276549827-2688-2-git-send-email-konkers@android.com>
-	<1276549827-2688-3-git-send-email-konkers@android.com>
-	<1276549827-2688-4-git-send-email-konkers@android.com>
-	<1276549827-2688-5-git-send-email-konkers@android.com>
-	<1276549827-2688-6-git-send-email-konkers@android.com>
-	<1276549827-2688-7-git-send-email-konkers@android.com>
-	<1276549827-2688-8-git-send-email-konkers@android.com>
-	<1276549827-2688-9-git-send-email-konkers@android.com>
-	<1276549827-2688-10-git-send-email-konkers@android.com>
-	<1276549827-2688-11-git-send-email-konkers@android.com>
-	<AANLkTikqOrciEnESCC1yGm0UvcxdK942ddrZF4K49TVb@mail.gmail.com>
-	<AANLkTilppHVz2XpLfin9wxrt9kHE1PIbct5XYvd_4iiX@mail.gmail.com>
-Message-ID: <AANLkTikOYNoOGH5-6hYJ5dVZ-qlHE88xGb3G64e_eUH8@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 15 Jun 2010 03:25:16 +0200
+Subject: [PATCH] pxa/colibri320: Add UDC support
+Message-ID: <1276565116-17646-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 14, 2010 at 5:16 PM, Jaya Kumar <jayakumar.lkml@gmail.com> wrote:
-> On Tue, Jun 15, 2010 at 7:59 AM, Jaya Kumar <jayakumar.lkml@gmail.com> wrote:
->> On Tue, Jun 15, 2010 at 5:10 AM, Erik Gilling <konkers@android.com> wrote:
->>
->>> + ? ? ? ? ? ? ? if (tegra_fb_wait_for_event(tegra_fb, HZ/10, DC_INT_FRAME_END))
->>
->> I still didn't follow how tegra_fb_activate is using the -ETIMEDOUT
->> return value from the wait, it seems like it is just ignored. You are
->> also doing stuff like HZ/10 and you might prefer to use
->> msecs_to_jiffies.
->>
->
-> I was unclear above. I mean the following code:
->
-> + ? ? ? while (tegra_fb_readl(tegra_fb, DC_CMD_STATE_CONTROL) & 3) {
-> + ? ? ? ? ? ? ? vsync_count++;
-> + ? ? ? ? ? ? ? if (tegra_fb_wait_for_event(tegra_fb, HZ/10, DC_INT_FRAME_END))
-> + ? ? ? ? ? ? ? ? ? ? ? break;
-> + ? ? ? }
-> + ? ? ? if (unlikely(vsync_count > 1))
-> + ? ? ? ? ? ? ? pr_warning("%s: waited for %d vsyncs\n", __func__, vsync_count);
->
-> It seems to me like the timeout from wait_for_event isn't propagated
-> back upwards. Maybe it isn't needed but the way the code handles this
-> seems confusing to me.
+Add support for PXA UDC.
 
-ETIMEDOUT in tegra_fb_wait_for_event is detecting waiting on an
-interrupt that is not firing, and the loop in tegra_fb_activate is
-checking for the double-buffering bits to clear in a reasonable amount
-of time.  The if check in the loop makes sure that if the frame
-interrupt is not occuring, the driver doesn't loop forever on the
-double-buffering bits.
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ arch/arm/mach-pxa/colibri-pxa320.c |   40 ++++++++++++++++++++++++++++++++++++
+ 1 files changed, 40 insertions(+), 0 deletions(-)
 
-I'll modify tegra_fb_activate to propagate the error code and use
-msecs_to_jiffies.
-
-Thanks,
-Colin
+diff --git a/arch/arm/mach-pxa/colibri-pxa320.c b/arch/arm/mach-pxa/colibri-pxa320.c
+index ae835fa..99e850d 100644
+--- a/arch/arm/mach-pxa/colibri-pxa320.c
++++ b/arch/arm/mach-pxa/colibri-pxa320.c
+@@ -16,6 +16,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/gpio.h>
+ #include <linux/interrupt.h>
++#include <linux/usb/gpio_vbus.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/sizes.h>
+@@ -28,6 +29,8 @@
+ #include <mach/pxafb.h>
+ #include <mach/ohci.h>
+ #include <mach/audio.h>
++#include <mach/pxa27x-udc.h>
++#include <mach/udc.h>
+ 
+ #include "generic.h"
+ #include "devices.h"
+@@ -101,6 +104,42 @@ void __init colibri_pxa320_init_ohci(void)
+ static inline void colibri_pxa320_init_ohci(void) {}
+ #endif /* CONFIG_USB_OHCI_HCD || CONFIG_USB_OHCI_HCD_MODULE */
+ 
++#if defined(CONFIG_USB_GADGET_PXA27X)||defined(CONFIG_USB_GADGET_PXA27X_MODULE)
++static struct gpio_vbus_mach_info colibri_pxa320_gpio_vbus_info = {
++	.gpio_vbus		= mfp_to_gpio(MFP_PIN_GPIO96),
++	.gpio_pullup		= -1,
++};
++
++static struct platform_device colibri_pxa320_gpio_vbus = {
++	.name	= "gpio-vbus",
++	.id	= -1,
++	.dev	= {
++		.platform_data	= &colibri_pxa320_gpio_vbus_info,
++	},
++};
++
++static void colibri_pxa320_udc_command(int cmd)
++{
++	if (cmd == PXA2XX_UDC_CMD_CONNECT)
++		UP2OCR = UP2OCR_HXOE | UP2OCR_DPPUE;
++	else if (cmd == PXA2XX_UDC_CMD_DISCONNECT)
++		UP2OCR = UP2OCR_HXOE;
++}
++
++static struct pxa2xx_udc_mach_info colibri_pxa320_udc_info __initdata = {
++	.udc_command		= colibri_pxa320_udc_command,
++	.gpio_pullup		= -1,
++};
++
++static void __init colibri_pxa320_init_udc(void)
++{
++	pxa_set_udc_info(&colibri_pxa320_udc_info);
++	platform_device_register(&colibri_pxa320_gpio_vbus);
++}
++#else
++static inline void colibri_pxa320_init_udc(void) {}
++#endif
++
+ static mfp_cfg_t colibri_pxa320_mmc_pin_config[] __initdata = {
+ 	GPIO22_MMC1_CLK,
+ 	GPIO23_MMC1_CMD,
+@@ -212,6 +251,7 @@ void __init colibri_pxa320_init(void)
+ 	colibri_pxa3xx_init_mmc(ARRAY_AND_SIZE(colibri_pxa320_mmc_pin_config),
+ 				mfp_to_gpio(MFP_PIN_GPIO28));
+ 	colibri_pxa320_init_uart();
++	colibri_pxa320_init_udc();
+ }
+ 
+ MACHINE_START(COLIBRI320, "Toradex Colibri PXA320")
+-- 
+1.7.1
