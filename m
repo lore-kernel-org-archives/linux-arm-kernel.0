@@ -1,32 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Jun 2010 10:19:31 +0100
-Subject: [PATCH 02/10] arm/zImage: some comments for __armv3_mpu_cache_on
-In-Reply-To: <AANLkTiluJns87Cc7Xk4VA-_9nXMNuhfcR2Kwu0A0IevK@mail.gmail.com>
-References: <20100610102427.GC31057@pengutronix.de>
-	<1276165636-20150-2-git-send-email-u.kleine-koenig@pengutronix.de>
-	<AANLkTiluJns87Cc7Xk4VA-_9nXMNuhfcR2Kwu0A0IevK@mail.gmail.com>
-Message-ID: <20100616091931.GA16149@n2100.arm.linux.org.uk>
+From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
+Date: Wed, 16 Jun 2010 12:21:41 +0300 (EEST)
+Subject: [PATCH v4 00/14] omap: mailbox: bunch of cleanups
+In-Reply-To: <1276271509-11983-1-git-send-email-felipe.contreras@gmail.com>
+References: <1276271509-11983-1-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <20100616.122141.245405863.Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 16, 2010 at 11:16:43AM +0800, Eric Miao wrote:
-> > ? ? ? ? ? ? ? ?mrc ? ? p15, 0, r0, c1, c0, 0 ? @ read control reg
-> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ .... .... .... WC.M
-> > ? ? ? ? ? ? ? ?orr ? ? r0, r0, #0x000d ? ? ? ? @ .... .... .... 11.1
-> > + ? ? ? ? ? ? ? /* ?? this overwrites the value constructed above? */
-> > ? ? ? ? ? ? ? ?mov ? ? r0, #0
+From: ext Felipe Contreras <felipe.contreras@gmail.com>
+Subject: [PATCH v4 00/14] omap: mailbox: bunch of cleanups
+Date: Fri, 11 Jun 2010 17:51:35 +0200
+
+> From: Felipe Contreras <--global>
 > 
-> This does seem to be an error.
+> Hi,
+> 
+> These are hopefully non-functional changes. Just shuffling code around, and
+> removing unecessary stuff.
+> 
+> This v4 includes minor changes suggested by Felipe Balbi, Hiroshi, and Russell.
+> 
+> Comments from Felipe Balbi, Tony Lindgren, Hiroshi DOYU, and Russell King.
 
-If we can't test the removal of that line, we have to assume that the
-existing code was tested, and did work.  (It certainly will work, but
-slower because the caches would not be on.)  We don't know if removing
-this line would cause problems.
+Applied against:
+  git://gitorious.org/~doyu/lk/mainline.git v2.6.35-rc3-mailbox
 
-I think it's better just to add a comment about it, and leave the code
-as-is.
-
-However, if someone has an ARM740T system and can test the removal of
-this, then we can remove it.  I suspect that ARM740T systems are rarely
-worked on now though - esp. as the whole nommu stuff doesn't seem to
-get much attention.
+Only [PATCH 1/14] isn't used since the original patch is correct but
+messed up at applying just in my branch.
