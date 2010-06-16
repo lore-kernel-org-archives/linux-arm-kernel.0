@@ -1,154 +1,68 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 16 Jun 2010 12:11:56 +0200
-Subject: [PATCH/RFC] Samsung multimedia (FIMC and FB) drivers proposal
-Message-ID: <1276683123-30224-1-git-send-email-s.nawrocki@samsung.com>
+Date: Wed, 16 Jun 2010 12:11:58 +0200
+Subject: [PATCH 2/7] ARM: Samsung: Add platform definitions for local FIMC/FIMD
+	fifo path
+In-Reply-To: <1276683123-30224-1-git-send-email-s.nawrocki@samsung.com>
+References: <1276683123-30224-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1276683123-30224-3-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Marek Szyprowski <m.szyprowski@samsung.com>
 
-Hello, 
+Add a common s3c_fifo_link structure that describes a local path link
+between 2 multimedia devices (like FIMC and FrameBuffer).
 
-This RFC concerns Samsung's S3C/S5P SoC series and the proposal 
-of a general solution for managing direct data pipelines between 
-numerous graphics IPs present in these chips.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ arch/arm/plat-samsung/include/plat/fifo.h |   37 +++++++++++++++++++++++++++++
+ 1 files changed, 37 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-samsung/include/plat/fifo.h
 
-Background
------------------
-
-Selected multimedia devices in Samsung S3C/S5P SoCs are capable of 
-transferring data directly between each other over so called fifo 
-channels, bypassing the main memory system bus. The fifo links, for 
-instance exist between tv scaler and framebuffer (S3C64xx), camera 
-interface and framebuffer (S3C64xx, S5PC1xx and others) or framebuffer 
-and video postprocessor (S3C64xx). Usually a framebuffer (display 
-controller) is the data receiver in a different configurations. 
-The framebuffer is divided into logic windows which represent 
-data transfer destination objects in each fifo configurations. 
-
-Implementation
------------------
-
-To enable the fifo link both ends need to be switched in a synchronized 
-way to so called "local fifo mode". Depending on the SoC it mostly needs 
-to be done shortly after an interrupt invocation and excess latencies 
-are not acceptable. 
-
-The proposed solution supports the following kinds of fifo links between
-source and target devices:
- - "one to one", e.g. fimc-0 -> framebuffer window-0 (s5pv210 like)
- - "one to many" e.g. fimc-1 or TV scaler -> framebufer window-1
-   (s3c64xx like)
- - "many to one", e.g. camera interface -> framebuffer window-0 or
-   window-1 (s3c64xx like)
-
-Implementing support for the local fifo mode requires partial control of 
-one (slave) device from within other (master) device. The v4l2_subdev 
-API seem to seem to be a concise solution for this problem. 
-
-The following patches are a preliminary implementation of the V4L2 
-driver of the camera interface/video postprocessor, which is found in 
-S3C/S5P SoCs and required logic in s3c-fb driver. 
-
-We decided to create a v4l2 subdevice instance at framebuffer per its each 
-possible data source, depending on SoC architecture, as shown below:
-
-                  -------------------          ---------------
-                 |                   |        |               |
-                 |   fb window-0     |  ....  |  fb window-N  |<---
-                  -------------------         |               |    |
-       ----------|  v4l2_subdev-0.1  |        |               |    |
-      |           -------------------          ---------------     |
-      |          |  v4l2_subdev-0.2  |        | v4l2_subdev-N |    |
-      |           -------------------          ---------------     |
-      |                 |                        |   ^             |
-      |                 |    -------------------     |          slave_dev
-      |                 |   |                     sub_dev          |
- --------------     ----------------                 |             |
-|  v4l2_device |   |  v4l2_device   |       [ s3c_fifo_link ]------
- --------------     ----------------           | 
-|              |   |                |      master_dev
-|  tv scaler   |   | video postproc.|          |
-|              |   |   (fimc-0)     |<---------
- --------------     ---------------- 
-
-
-The s3c_fifo_link data structure allows to define possible device driver's 
-connections, depending on the physical hardware architecture.
-
-struct s3c_fifo_link {
-	struct device	*master_dev;
-	struct device	*slave_dev;
-	struct v4l2_subdev *sub_dev;
-};
-
-
-Driver initialization sequence
--------------------------------
-
-At slave (fb window) side:
-
-- during probe() call fb driver initializes each window's subdevice 
-  and s3c_fifo_link data structure 
-  
-
-At master (fimc-X) side:
-
-- in video device open() fimc iterates through its list of pointers 
-  to target subdevices earlier setup by the platform code 
-  and initialized by fb probe() and calls v4l2_device_register_subdev() 
-
-
-Driver module release sequence
--------------------------------
-
-When the video postprocessor acquires one of the framebuffer subdevices 
-the framebuffer module is marked as "in use" so it cannot be removed 
-until the postprocessor has completed its perations on fb v4l2-subdev.
-
-On slave module removal (unless any subdevice is in use):
-
-- slave device driver deletes its all subdevices and sets to null
-  corresponding sub_dev field in s3c_fifo_link instance
-
-On master removal/close:
-
--  master device driver calls v4l2_device_register_subdev() on sub_dev; 
-   after that subdevice/fifo interface may be used by any 
-   other master device
-
-
-I would like to ask for any comments on such a v4l2-subdev API usage
-and on any possible drawbacks it might have.
-
-Kernel tree
------------------
-
-This patch series has been prepared in assumption that the following
-patches for s3c-fb driver has been applied:
-1. S3C Frame Buffer patches prepared by Ben Dooks:
-   git://git.fluff.org/bjdooks/linux for-2635/s3c-fb
-2. S3C Frame Buffer patches prepared by Pawel Osciak:
-   http://www.mail-archive.com/linux-samsung-soc@vger.kernel.org/msg01527.html
-   
-For easier code review all the patches will be also available in
-few hours on:
-http://git.infradead.org/users/kmpark/linux-2.6-samsung/ 
-branch s5pv210-fimc-fb
-
-Patches
------------------
-
-The following patch series contains:
-
-[PATCH 1/7] ARM: Samsung: Add FIMC driver register definition and platform helpers
-[PATCH 2/7] ARM: Samsung: Add platform definitions for local FIMC/FIMD fifo path
-[PATCH 3/7] s3c-fb: Add v4l2 subdevice to support framebuffer local fifo input path
-[PATCH 4/7] v4l: Add Samsung FIMC (video postprocessor) driver
-[PATCH 5/7] ARM: S5PV210: Add fifo link definitions for fimc and framebuffer
-[PATCH 6/7] ARM: S5PV210: enable FIMC on Aquila
-[PATCH 7/7] ARM: S5PC100: enable FIMC on SMDKC100
-
-Best regards,
---
-Sylwester Nawrocki
-Samsung Poland R&D Center
+diff --git a/arch/arm/plat-samsung/include/plat/fifo.h b/arch/arm/plat-samsung/include/plat/fifo.h
+new file mode 100644
+index 0000000..84d242b
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/plat/fifo.h
+@@ -0,0 +1,37 @@
++/*
++ * Copyright (c) 2010 Samsung Electronics
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef FIFO_H_
++#define FIFO_H_
++
++#include <linux/device.h>
++#include <media/v4l2-subdev.h>
++
++/*
++ * The multimedia devices contained in Samsung S3C/S5P SoC series
++ * like framebuffer, camera interface or tv scaler can transfer data
++ * directly between each other through hardware fifo channels.
++ * s3c_fifo_link data structure is an abstraction for such links,
++ * it allows to define V4L2 device drivers hierarchy according to
++ * the hardware structure. Fifo links are mostly unidirectional, exclusive
++ * data buses. To control data transfer in fifo mode synchronization is
++ * is required between drivers at both ends of the fifo channel
++ * (master_dev, slave_dev). s3c_fifo_link:sub_dev is intended  to export
++ * in a consistent way all the functionality of the slave device required
++ * at master device driver to enable transfer through fifo channel.
++ * master_dev and slave_dev is to be setup by the platform code whilst
++ * sub_dev entry will mostly be initlized during slave_dev probe().
++ */
++struct s3c_fifo_link {
++	struct device		*master_dev;
++	struct device		*slave_dev;
++	struct v4l2_subdev	*sub_dev;
++};
++
++#endif /* FIFO_H_ */
++
+-- 
+1.7.0.4
