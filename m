@@ -1,29 +1,93 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 16 Jun 2010 08:47:23 +0200
-Subject: [PATCH 0/4]Refine iomux files for i.MX51
-In-Reply-To: <1276352559-8105-1-git-send-email-jason77.wang@gmail.com>
-References: <1276352559-8105-1-git-send-email-jason77.wang@gmail.com>
-Message-ID: <20100616064723.GH20799@pengutronix.de>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Wed, 16 Jun 2010 09:47:40 +0300
+Subject: Request review of device tree documentation
+In-Reply-To: <4C187013.5000400@firmworks.com>
+References: <4C13430B.5000907@firmworks.com>	<1276339529.1962.184.camel@pasglop>	<1276339684.1962.186.camel@pasglop>	<4C13B618.1030006@firmworks.com>	<1276383132.1962.195.camel@pasglop>	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>	<4C146F18.9030008@firmworks.com>	<AANLkTikls3hjXOmKFqG2D_9GaJSjOXNuuRXPlanAjo5E@mail.gmail.com>	<20100614124438.GF9323@yookeroo>	<alpine.LFD.2.00.1006141044510.13427@xanadu.home>	<20100614160201.GD9550@shareable.org>
+	<4C165FD1.6080505@firmworks.com> <4C186AA8.4040709@compulab.co.il>
+	<4C186B7B.1060308@firmworks.com> <4C186C72.2020506@compulab.co.il>
+	<4C187013.5000400@firmworks.com>
+Message-ID: <4C18738C.4090809@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 12, 2010 at 10:22:35PM +0800, Jason Wang wrote:
-> Through the discussion, I divide my patches to 3 parts.
-> part1: mx51 iomux related part, the first patch in this part is from
->        Amit, other patches are based off this patch and they are some
->        fix or adding definitions for imx51_3ds board.
+Mitch Bradley wrote:
+> Mike Rapoport wrote:
+>> Mitch Bradley wrote:
+>>> Mike Rapoport wrote:
+>>>> Mitch Bradley wrote:
+>>>>
+>>>>> The second topic is the hypothetical use of OFW as a HAL. That will 
+>>>>> not happen for several reasons.  The opposition to the idea is 
+>>>>> widespread and deeply held, and there are good arguments to support 
+>>>>> that opposition.   Furthermore, the economic conditions necessary 
+>>>>> for the creation of such a HAL do not exist in the ARM world, nor 
+>>>>> indeed in the Linux world in general.  (The necessary condition is 
+>>>>> the ability for one company to impose a substantial change by fiat 
+>>>>> - essentially a monopoly position.)
+>>>>>
+>>>>> Shall we agree, then, that any further discussion of the HAL issue 
+>>>>> is "just for fun", and that nobody needs to feel threatened that it 
+>>>>> would actually happen?
+>>>>
+>>>> I've recently worked with vendor versions of U-Boot for advanced ARM 
+>>>> SoCs. There is already *huge* chunk of HAL code in those versions. 
+>>>> And if there would be possibility to have callbacks into the 
+>>>> firmware these chunks would only grow, IMHO.
+>>>
+>>> How can there be HAL code in U-Boot unless there is already the 
+>>> possibility to have callbacks into the firmware?
+>>
+>> Currently it aims to abstract hardware from U-Boot and reuse the same 
+>> HW access code across operating systems and bootloaders. If this code 
+>> would have callbacks I afraid the things would became worse.
+> 
+> The only way I can understand what you said is if I assume that by 
+> "callback", you mean the following sequence:
+> 
+> a) U-boot loads and executes the OS, providing to the OS the address of 
+> some HW access routines that it can use
+> b) The OS calls one of those HW access routines
+> c) During the execution of that HW access routine, that routine calls 
+> "back" into the OS, before returning.  So a call into the OS is nested 
+> inside a call into U-boot resident code.
+> 
+> If that is what you are worried about, it is not what we were 
+> discussing.  We were discussing - and many people were against - step (b).
+> 
+> Are you saying that step (b) - the OS calling into routines provided by 
+> U-Boot - is already the status quo?
 
-This is ok now. Can you please rebase onto
-git://git.pengutronix.de/git/imx/linux-2.6.git imx-for-2.6.36
+I'm also objecting the step (b) and, fortunately, it's not yet the 
+status quo.
+Current U-Boot/kernel implementations I've encountered still do not have 
+OS calls to resident HW access routines. But if such calls would be 
+allowed, my impression is that SoC vendors would make extensive use of them.
 
-The first patch conflicts with another of your patches:
-
-e5ceef78 mx5: Add i2c to Freescale MX51 Babbage HW
-
+>>
+>>> It is not HAL if it can't be called.
+>>>
+>>>>
+>>>>
+>>>>> The potential for "vendors breaking out of the debugging use case 
+>>>>> and turning it into a HAL" is miniscule, because
+>>>>>
+>>>>> a) The callback is disabled by default
+>>>>> b) The technical challenges of the callback interface limit its 
+>>>>> applicability to specific "wizard user" scenarios
+>>>>> c) OFW is unlikely to achieve sufficient market penetration for the 
+>>>>> HAL thing to be worth doing
+>>>>>
+>>>>>
+>>>>> _______________________________________________
+>>>>> linux-arm-kernel mailing list
+>>>>> linux-arm-kernel at lists.infradead.org
+>>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>>
+>>>>
+>>
+>>
 
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Sincerely yours,
+Mike.
