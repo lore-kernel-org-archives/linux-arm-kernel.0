@@ -1,39 +1,50 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Wed, 16 Jun 2010 07:40:47 +0200
-Subject: [PATCH 04/12] phylib: add a way to make PHY time stamps possible.
-In-Reply-To: <AANLkTimhAvu0_WuMCwnCrw9Rbcy6dKxvTlzepJm7ZDdR@mail.gmail.com>
-References: <cover.1276615626.git.richard.cochran@omicron.at>
-	<27c0ad283f025c2bb71e7ceb71be07f969939429.1276615626.git.richard.cochran@omicron.at>
-	<AANLkTimhAvu0_WuMCwnCrw9Rbcy6dKxvTlzepJm7ZDdR@mail.gmail.com>
-Message-ID: <20100616054047.GA2887@riccoc20.at.omicron.at>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Wed, 16 Jun 2010 09:09:44 +0300
+Subject: Request review of device tree documentation
+In-Reply-To: <4C165FD1.6080505@firmworks.com>
+References: <4C13430B.5000907@firmworks.com>	<1276339529.1962.184.camel@pasglop>	<1276339684.1962.186.camel@pasglop>	<4C13B618.1030006@firmworks.com>	<1276383132.1962.195.camel@pasglop>	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>	<4C146F18.9030008@firmworks.com>	<AANLkTikls3hjXOmKFqG2D_9GaJSjOXNuuRXPlanAjo5E@mail.gmail.com>	<20100614124438.GF9323@yookeroo>	<alpine.LFD.2.00.1006141044510.13427@xanadu.home>	<20100614160201.GD9550@shareable.org>
+	<4C165FD1.6080505@firmworks.com>
+Message-ID: <4C186AA8.4040709@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 15, 2010 at 10:33:51AM -0600, Grant Likely wrote:
-> > +config NETWORK_PHY_TIMESTAMPING
-> Some overhead?  At a brief glance of the series it looks like it could
-> add a lot of overhead, but I'm not fully clear on what the full
-> process is.  Can you describe how the hardware timestamping works?  I
-> could use an overview of what the kernel has to do.
+Mitch Bradley wrote:
 
-First of all, I want to emphasize that this network stack option is
-purely voluntary. Only those people who know that they have a PTP
-capable PHY and really want the timestamps will (or should) enable
-this option. When it is not enabled, it has no effect at all.
+> The second topic is the hypothetical use of OFW as a HAL. That will not 
+> happen for several reasons.  The opposition to the idea is widespread 
+> and deeply held, and there are good arguments to support that 
+> opposition.   Furthermore, the economic conditions necessary for the 
+> creation of such a HAL do not exist in the ARM world, nor indeed in the 
+> Linux world in general.  (The necessary condition is the ability for one 
+> company to impose a substantial change by fiat - essentially a monopoly 
+> position.)
+> 
+> Shall we agree, then, that any further discussion of the HAL issue is 
+> "just for fun", and that nobody needs to feel threatened that it would 
+> actually happen?
 
-Hardware timestamping is described in
+I've recently worked with vendor versions of U-Boot for advanced ARM 
+SoCs. There is already *huge* chunk of HAL code in those versions. And 
+if there would be possibility to have callbacks into the firmware these 
+chunks would only grow, IMHO.
 
-   Documentation/networking/timestamping.txt
-   Documentation/networking/timestamping/timestamping.c
 
-The PTP subsystem is described in
+> The potential for "vendors breaking out of the debugging use case and 
+> turning it into a HAL" is miniscule, because
+> 
+> a) The callback is disabled by default
+> b) The technical challenges of the callback interface limit its 
+> applicability to specific "wizard user" scenarios
+> c) OFW is unlikely to achieve sufficient market penetration for the HAL 
+> thing to be worth doing
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-   Documentation/ptp/ptp.txt
 
-There really is more to say about the issue than appears in those
-documents, but they are a good starting place for discussion.
-
-BTW I am submitting a conference paper on the design on the PTP
-subsystem. If you would like to have it, just ask me off-list.
-
-Richard
+-- 
+Sincerely yours,
+Mike.
