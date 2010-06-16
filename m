@@ -1,26 +1,33 @@
-From: pan@nt.tu-darmstadt.de (Vladimir Pantelic)
-Date: Wed, 16 Jun 2010 11:45:00 +0200
-Subject: Request review of device tree documentation
-In-Reply-To: <4C187FF0.5020806@firmworks.com>
-References: <4C13430B.5000907@firmworks.com>	<1276339529.1962.184.camel@pasglop>	<1276339684.1962.186.camel@pasglop>	<4C13B618.1030006@firmworks.com>	<1276383132.1962.195.camel@pasglop>	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>	<4C146F18.9030008@firmworks.com>	<AANLkTikls3hjXOmKFqG2D_9GaJSjOXNuuRXPlanAjo5E@mail.gmail.com>	<20100614124438.GF9323@yookeroo>	<alpine.LFD.2.00.1006141044510.13427@xanadu.home>	<20100614160201.GD9550@shareable.org>	<4C165FD1.6080505@firmworks.com>
-	<4C186AA8.4040709@compulab.co.il>	<4C186B7B.1060308@firmworks.com>
-	<4C186C72.2020506@compulab.co.il>	<4C187013.5000400@firmworks.com>
-	<4C18738C.4090809@compulab.co.il> <4C187FF0.5020806@firmworks.com>
-Message-ID: <4C189D1C.6050304@nt.tu-darmstadt.de>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 16 Jun 2010 12:05:39 +0200
+Subject: [PATCH 12/12] ptp: Added a clock driver for the National
+	Semiconductor PHYTER.
+In-Reply-To: <AANLkTilqd-wxqMWDxssC-XMDJqZ8iIiSrvp2t8xARAQV@mail.gmail.com>
+References: <cover.1276615626.git.richard.cochran@omicron.at>
+	<37f5015b186bdd51f8451ade042f90c8b39a5cc8.1276615626.git.richard.cochran@omicron.at>
+	<AANLkTilqd-wxqMWDxssC-XMDJqZ8iIiSrvp2t8xARAQV@mail.gmail.com>
+Message-ID: <20100616100539.GA3569@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mitch Bradley wrote:
+On Tue, Jun 15, 2010 at 12:49:13PM -0600, Grant Likely wrote:
+> Won't this break things for existing DP83640 users?
 
->>  I'm also objecting the step (b) and, fortunately, it's not yet the
->>  status quo.
->>  Current U-Boot/kernel implementations I've encountered still do not
->>  have OS calls to resident HW access routines. But if such calls would
->>  be allowed, my impression is that SoC vendors would make extensive use
->>  of them.
->
-> One could argue that a feature that vendors would use extensively is one
-> that is sorely needed from their point of view.
+Nope, the driver was only added five patches ago, and it only offers
+the timestamping stuff. The standard PHY functions just call the
+generic functions, so the PHY works fine even without this driver.
 
-yes, it would free them from writing these pesky linux drivers and getting
-them into mainline :)
+> > +static struct ptp_clock *dp83640_clock;
+> > +DEFINE_SPINLOCK(clock_lock); /* protects the one and only dp83640_clock */
+> 
+> Why only one?  Is it not possible to have 2 of these PHYs in a system?
+
+Yes, you can have multiple PHYs, but only one PTP clock.
+
+If you do use multiple PHYs, then you must wire their clocks together
+and adjust the PTP clock on only one of the PHYs.
+
+
+Thanks for your other comments,
+
+Richard
