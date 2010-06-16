@@ -1,18 +1,20 @@
 From: hjk@linutronix.de (Hans J. Koch)
-Date: Wed, 16 Jun 2010 21:05:38 +0200
+Date: Wed, 16 Jun 2010 22:18:05 +0200
 Subject: [PATCH 2/7 v6] Add the clock framework for Telechips TCC8xxx
 	processors.
-In-Reply-To: <20100526174846.GE2006@bluebox.local>
+In-Reply-To: <20100616190536.GB2010@bluebox.local>
 References: <20100526174240.GC2006@bluebox.local>
 	<20100526174846.GE2006@bluebox.local>
-Message-ID: <20100616190536.GB2010@bluebox.local>
+	<20100616190536.GB2010@bluebox.local>
+Message-ID: <20100616201804.GA2550@local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The previous implementation contains a rather confusing handling of
-(struct clk)->root_id, adding and subtracting 1 all the time. This
-is a clearer version of the patch for adding the clock framework for
-Telechips TCC8xxx processors.
+(The last patch had one unneeded forward declaration left over and produced a
+compiler warning, here's the correct version.)
+
+This adds definitions and low-level functions to handle clocks in
+TCC8xxx processors.
 
 Signed-off-by: "Hans J. Koch" <hjk@linutronix.de>
 ---
