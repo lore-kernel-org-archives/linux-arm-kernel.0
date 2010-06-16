@@ -1,48 +1,107 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 16 Jun 2010 09:13:06 -0500
-Subject: [PATCH] ARM: Add ARCH_HAS_L2X0 and make CACHE_L2X0 config
-	depend on that
-In-Reply-To: <AANLkTimH979ASCut4dEE0FGJ-3PA3jzfHg_SzVM6eor_@mail.gmail.com>
-References: <1276272211-13065-1-git-send-email-olof@lixom.net>
-	<1276279087.31800.6.camel@c-dwalke-linux.qualcomm.com>
-	<20100613051625.GA7248@trinity.fluff.org>
-	<20100614145956.GA29355@lixom.net>
-	<AANLkTimH979ASCut4dEE0FGJ-3PA3jzfHg_SzVM6eor_@mail.gmail.com>
-Message-ID: <20100616141306.GA21030@lixom.net>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 16 Jun 2010 16:22:24 +0200
+Subject: [PATCH 08/12] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <AANLkTin4lYghEWhjzEyARvYDgHaXdniwLbfyZ4jY0rwm@mail.gmail.com>
+References: <cover.1276615626.git.richard.cochran@omicron.at>
+	<4a030d2bace90f089f2f3f61496b918c6f1dfb52.1276615626.git.richard.cochran@omicron.at>
+	<AANLkTin4lYghEWhjzEyARvYDgHaXdniwLbfyZ4jY0rwm@mail.gmail.com>
+Message-ID: <20100616142224.GA4146@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 16, 2010 at 11:43:29AM +0800, Eric Miao wrote:
-> On Mon, Jun 14, 2010 at 10:59 PM, Olof Johansson <olof@lixom.net> wrote:
-> > On Sun, Jun 13, 2010 at 06:16:26AM +0100, Ben Dooks wrote:
-> >> On Fri, Jun 11, 2010 at 10:58:07AM -0700, Daniel Walker wrote:
-> >> >
-> >> > I made a similar change not too long ago, but Russell wanted the define
-> >> > to be HAVE_CACHE_L2X0 ..
-> >>
-> >> possibly, I was thinking ARM_L2X0 would also be an option, since if I
-> >> remeber correctly it is selecting the driver not the availability of
-> >> it.
-> >
-> > Yeah, there are lots of different possible names. :)
-> >
-> > Let's just go with the one Russell preferred and not worry too much
-> > about it. There's some presendence to using HAVE_.* already.
-> >
+On Tue, Jun 15, 2010 at 11:00:10AM -0600, Grant Likely wrote:
 > 
-> Sometimes I am thinking that maybe ARCH_HAS_* has some benefits:
-> 
-> HAVE_* for those kernel-wide and general capabilities
-> ARCH_HAS_* for those ARM machine-class specific capabilities?
-> 
-> So to make things a bit more clear? If ARCH_HAS_* is widely adopted
-> on architectures other than ARM, maybe we can then switch that name
-> to HAVE_*?
+> Question from an ignorant reviewer:  Why a new interface instead of
+> working with the existing high resolution timers infrastructure?
 
-We're nowhere near depleting the HAVE_.* namespace, it's quite sparsely
-used at the moment. I don't see a need to overengineer things here.
+Short answer: Timers are only one part of the PTP API. If you offer
+the PTP clock as a Linux clock source, then you could just use the
+existing POSIX timers. However, we decided not to offer the PTP clock
+in that way. The following excerpts from an upcoming paper explain
+why:
 
-A bike shed of any color will do, etc.
+\subsection{Basic Clock Operations}
 
+   Based on our experience with a number of commercially available
+   hardware clocks, we identified a set of four basic clock
+   operations. Besides simply setting or getting the clock's time
+   value, two additional operations are needed for clock control.
+   Once a PTP slave has an initial estimate of the offset to its
+   master, it typically would need to shift the clock by the offset
+   atomically.  Also, the servo loop of a slave periodically needs to
+   adjust the clock frequency.
 
--Olof
+\subsection{Ancillary Clock Features}
+
+   Perhaps the most challenging design issue was deciding how to offer
+   a PTP clock's capabilities to the GNU/Linux operating system.  As
+   John Eidson pointed out~\cite{eidson2006measurement}, modern
+   operating systems provide surprisingly little support for
+   programming based on absolute time.  As the IEEE 1588 standard is
+   being applied to a wide variety of test, measurement, and control
+   applications, we can imagine many possible ways to use an embedded
+   computer equipped with a PTP hardware clock.  We do not expect that
+   any API will be able to cover every conceivable application of this
+   technology.  However, the design presented here does cover common
+   use cases based on the capabilities of currently available hardware
+   clocks.
+
+   The design allows user space programs to control all of a clock's
+   ancillary features.  Programs may create one-shot or periodic
+   alarms, with signal delivery on expiration.  \Timestamps on
+   external events are provided via a First In, First Out (FIFO)
+   interface.  If the clock has output signals, then their periods are
+   configurable from user space.  Synchronization of the Linux system
+   time via the PPS subsystem may be enabled or disabled as desired.
+
+\subsection{Synchronizing the Linux System Clock}
+
+   One important question that needed to be addressed was, now that we
+   have a precise time source, how do we synchronize the Linux kernel
+   to it?  The Linux kernel offers a modular clock infrastructure
+   comprising ``clock sources'' and ``clock event devices.'' Clock
+   sources provide a monotonically increasing time base, and clock
+   event devices are used to schedule the next interrupt for various
+   timer events.
+
+   We considered but ultimately rejected the idea of offering the PTP
+   clock to the Linux kernel as a combined clock source and clock
+   event device.  The one great advantage of this approach would have
+   been that it obviates the need for synchronization when the PTP
+   clock is selected as the system timer.
+
+   However, this approach is problematic when using certain kinds of
+   clock hardware. For example, physical layer (PHY) chip based clocks
+   can only be accessed by the relatively slow 16 bit wide MDIO
+   bus. Such a clock would not be suitable for providing high
+   resolution timers, which are now a standard Linux kernel feature.
+   Furthermore, we cannot even be sure that a given hardware clock
+   will offer any interrupt to the system at all.
+
+   Instead, we elected to use the Pulse Per Second (PPS) subsystem as
+   a method to optionally synchronize the Linux system time to the PTP
+   clock.  This method is feasible even for clocks that do not offer
+   fast register access, such as the PHY clocks.  Of course, the main
+   disadvantage of this approach is that the Linux system time will
+   not be exactly synchronized to the PTP clock time.  Since PTP
+   clocks can be synchronized an order of magnitude better than the
+   typical operating system scheduling latency, we expect that this
+   method will still yield acceptable results for many applications.
+   Applications with more demanding time requirements may use the new
+   PTP interfaces directly when needed.
+
+\subsection{System Calls or Character Device}
+
+   When adding new functionality to an operating system, a basic design
+   decision is how user space programs will call into the kernel.  For
+   the Linux kernel, two different ways come into question, namely
+   system calls or as a ``character device.''  In an attempt to make
+   the PTP clock API easy to understand, we patterned it after the
+   existing Network Time Protocol (NTP) and the POSIX timer APIs, as
+   described in Section~\ref{UserAPI}.  Both of these services are
+   exported to the user space as system calls.  However, we decided to
+   offer the PTP clock as a character device because extending the NTP
+   and POSIX interfaces seemed impractical.  In addition, the
+   character device's \fn{read()} method provides a
+   convenient way to deliver time stamped events to user space
+   programs.
