@@ -1,112 +1,85 @@
-From: leiwen@marvell.com (Lei Wen)
-Date: Tue, 22 Jun 2010 23:17:36 +0800
-Subject: [PATCH 28/29] pxa3xx_nand: fix power management support
-Message-ID: <mailman.149.1280297145.27306.linux-arm-kernel@lists.infradead.org>
+From: rabin.vincent@stericsson.com (Rabin Vincent)
+Date: Wed, 16 Jun 2010 15:58:59 +0530
+Subject: [PATCH] mmci: allow the card detect GPIO value not to be inverted
+Message-ID: <mailman.165.1281350283.27306.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lei Wen <leiwen@marvell.com>
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+On some platforms, the GPIO value from the gpio_cd pin doesn't need to
+be inverted to get it active high.  Add a cd_invert platform data
+parameter and change existing platforms using GPIO for CD (only
+Realview) to enable it.
+
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c |   48 +++++++++++++++++++++++++++++++--------
- 1 files changed, 38 insertions(+), 10 deletions(-)
+ arch/arm/mach-realview/core.c |    2 ++
+ drivers/mmc/host/mmci.c       |    5 +++--
+ include/linux/amba/mmci.h     |    2 ++
+ 3 files changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 65cf54c..bc2f56d 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -1659,26 +1659,54 @@ static int __devinit pxa3xx_nand_probe(struct
-platform_device *pdev)
- #ifdef CONFIG_PM
- static int pxa3xx_nand_suspend(struct platform_device *pdev,
-pm_message_t state)
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index 2fa38df..07c0815 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -259,6 +259,7 @@ struct mmci_platform_data realview_mmc0_plat_data = {
+ 	.status		= realview_mmc_status,
+ 	.gpio_wp	= 17,
+ 	.gpio_cd	= 16,
++	.cd_invert	= true,
+ };
+ 
+ struct mmci_platform_data realview_mmc1_plat_data = {
+@@ -266,6 +267,7 @@ struct mmci_platform_data realview_mmc1_plat_data = {
+ 	.status		= realview_mmc_status,
+ 	.gpio_wp	= 19,
+ 	.gpio_cd	= 18,
++	.cd_invert	= true,
+ };
+ 
+ /*
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 840b301..9a9aeac 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -570,12 +570,13 @@ static int mmci_get_ro(struct mmc_host *mmc)
+ static int mmci_get_cd(struct mmc_host *mmc)
  {
--	struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
--	struct mtd_info *mtd = info->mtd;
-+	struct pxa3xx_nand *nand= platform_get_drvdata(pdev);
-+	struct pxa3xx_nand_info *info;
-+	struct mtd_info *mtd;
-+	int ret = 0;
-+	uint8_t cs;
-
--	if (info->state & STATE_CMD_PREPARED) {
--		dev_err(&pdev->dev, "driver busy, state = %d\n", info->state);
-+	if (nand->state & STATE_CMD_PREPARED) {
-+		dev_err(&pdev->dev, "driver busy, state = %d\n", nand->state);
- 		return -EAGAIN;
- 	}
-
--	return 0;
-+	for (cs = 0; cs < NUM_CHIP_SELECT; cs ++) {
-+		info = nand->info[cs];
-+		if (!info)
-+			continue;
-+		mtd = get_mtd_by_info(info);
-+		ret = mtd->suspend(mtd);
-+	}
-+
-+	return ret;
- }
-
- static int pxa3xx_nand_resume(struct platform_device *pdev)
- {
--	struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
--	struct mtd_info *mtd = info->mtd;
-+	struct pxa3xx_nand *nand= platform_get_drvdata(pdev);
-+	struct pxa3xx_nand_info *info;
-+	struct mtd_info *mtd;
-+	uint8_t cs;
-
--	nand_writel(info, NDTR0CS0, info->ndtr0cs0);
--	nand_writel(info, NDTR1CS0, info->ndtr1cs0);
--	clk_enable(info->clk);
-+	for (cs = 0; cs < NUM_CHIP_SELECT; cs ++) {
-+		info = nand->info[cs];
-+		if (!info)
-+			continue;
-+		nand_writel(nand, NDTR0CS0, info->ndtr0cs0);
-+		nand_writel(nand, NDTR1CS0, info->ndtr1cs0);
-+		nand->chip_select = cs;
-+		/* Sometimes nand chip would raise a ready interrupt
-+		 * when resume, reset the by start and stop to prevent
-+		 * it damage driver's state machine */
-+		pxa3xx_nand_start(nand);
-+		pxa3xx_nand_stop(nand);
-+		mtd = get_mtd_by_info(info);
-+		mtd->resume(mtd);
-+	}
-
-+	/* set the controller cs to a invalid num to let driver
-+	 * reconfigure the timing when it call the cmdfunc */
-+	nand->chip_select = 0xff;
- 	return 0;
- }
- #else
+ 	struct mmci_host *host = mmc_priv(mmc);
++	struct mmci_platform_data *plat = host->plat;
+ 	unsigned int status;
+ 
+ 	if (host->gpio_cd == -ENOSYS)
+-		status = host->plat->status(mmc_dev(host->mmc));
++		status = plat->status(mmc_dev(host->mmc));
+ 	else
+-		status = !gpio_get_value(host->gpio_cd);
++		status = !!gpio_get_value(host->gpio_cd) ^ plat->cd_invert;
+ 
+ 	/*
+ 	 * Use positive logic throughout - status is zero for no card,
+diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
+index ca84ce7..f4ee9ac 100644
+--- a/include/linux/amba/mmci.h
++++ b/include/linux/amba/mmci.h
+@@ -24,6 +24,7 @@
+  * whether a card is present in the MMC slot or not
+  * @gpio_wp: read this GPIO pin to see if the card is write protected
+  * @gpio_cd: read this GPIO pin to detect card insertion
++ * @cd_invert: true if the gpio_cd pin value is active low
+  * @capabilities: the capabilities of the block as implemented in
+  * this platform, signify anything MMC_CAP_* from mmc/host.h
+  */
+@@ -35,6 +36,7 @@ struct mmci_platform_data {
+ 	unsigned int (*status)(struct device *);
+ 	int	gpio_wp;
+ 	int	gpio_cd;
++	bool	cd_invert;
+ 	unsigned long capabilities;
+ };
+ 
 -- 
-1.7.0.4
-
-
->From bogus@does.not.exist.com  Sun Jun  6 12:36:48 2010
-From: bogus@does.not.exist.com ()
-Date: Sun, 06 Jun 2010 16:36:48 -0000
-Subject: No subject
-Message-ID: <mailman.151.1280365110.27306.linux-arm-kernel@lists.infradead.org>
-
-AMD/Intel to allow the kvm code to work with a common IOMMU interface. To
-that end, it isn't really a generic IOMMU interface. We have chosen to use
-our own interface because it provides us with a lightweight way of
-managing mappings for more esoteric MSM-specific use cases.
-
-These map functions also take into account the way in which we map buffers
-that we get from our own physical pool, because the current API was not
-intended to deal with prioritized allocation of things like on/off-chip
-memory. We are currently evaluating how to use the DMA API with our own
-specialized allocator, which has been undergoing some discussion on the
-other lists. We would like to use this allocator to maximize TLB
-performance, as well as to prioritize the allocation from several
-different memory pools.
-
-Steve
+1.7.2.dirty
 
 
 
@@ -114,36 +87,45 @@ Steve
 From: bogus@does.not.exist.com ()
 Date: Sun, 06 Jun 2010 16:36:48 -0000
 Subject: No subject
-Message-ID: <mailman.153.1280740994.27306.linux-arm-kernel@lists.infradead.org>
+Message-ID: <mailman.166.1281687448.27306.linux-arm-kernel@lists.infradead.org>
 
-additional IRQs to that.  That's quite small compared to some platforms
-which have in the order of 512 or even 1024 IRQs.
+bootloader issue, isn't it.
 
-> And current kernel don't support the sparse irq feature. then it's
-> reasonable to merge it first and revise it later.
+I don't know exactly what "internal boot mode" means, but assuming the
+ROM code doesn't make any output to UART1 at least this clock smells
+like a bootloader problem.  If you're conviced this is a chip problem,
+did you consider to contact FSL about it?
 
-sparse irq support has been queued for almost a month for the merge
-window which has just this morning opened.  This doesn't help you if
-you instantiate all your 360 interrupts though - just because you
-don't _use_ an interrupt which has been declared as existing doesn't
-reduce the size of the arrays.
+Best regards
+Uwe
 
-> Another why FIMC support is missing? we modified it as his requested
-> and send it properly.
-> [PATCH v3 3/8] ARM: Samsung: Add platform definitions and helpers for
-> http://marc.info/?l=linux-arm-kernel&m=127990218813931&w=2
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
-This looks like it's been missed.  People get busy and miss things on
-the mailing list, there's nothing special about that.
 
-> [PATCH v3 1/8] ARM: Samsung: Add register definitions for Samsung S5P
-> http://marc.info/?l=linux-arm-kernel&m=127990218613922&w=2
+>From bogus@does.not.exist.com  Sun Jun  6 12:36:48 2010
+From: bogus@does.not.exist.com ()
+Date: Sun, 06 Jun 2010 16:36:48 -0000
+Subject: No subject
+Message-ID: <mailman.178.1281999291.27306.linux-arm-kernel@lists.infradead.org>
 
-Kukjin Kim replied to this one with a point requiring an answer, but
-nothing came back.
+#define CHECK(e,l,h) (var->e < l || var->e > h)
+	if (CHECK(right_margin, (5+1), 256) ||	/* back porch */
+	    CHECK(left_margin, (5+1), 256) ||	/* front porch */
+	    CHECK(hsync_len, (5+1), 256) ||
+	    var->xres > 4096 ||
 
-   "Looks ok...however, I'm still thinking whether really need all these
-    definitions."
+These 4 checks don't match the actual values that can be
+generated by the CLCD controller. The minimum values for left
+and right horizontal porch and HSYNC width can go down to
+1 clock.
 
-Seems to be a perfectly reasonable point to raise, and if there's no
-reply to justify them...
+The maximum x resolution for the pl11x devices is 1024 pixels.
+
+I know this function can be overridden for platforms using the
+clcd driver, but does anyone have any problem making this
+function match the hardware?
+
+thanks,
+Kevin
