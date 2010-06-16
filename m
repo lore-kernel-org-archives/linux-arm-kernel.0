@@ -1,31 +1,55 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Wed, 16 Jun 2010 12:41:51 +0100
-Subject: Request review of device tree documentation
-In-Reply-To: <4C18A9C7.5070800@compulab.co.il>
-References: <alpine.LFD.2.00.1006141044510.13427@xanadu.home>
-	<20100614160201.GD9550@shareable.org>
-	<4C165FD1.6080505@firmworks.com> <4C186AA8.4040709@compulab.co.il>
-	<4C186B7B.1060308@firmworks.com> <4C186C72.2020506@compulab.co.il>
-	<4C187013.5000400@firmworks.com> <4C18738C.4090809@compulab.co.il>
-	<4C187FF0.5020806@firmworks.com> <4C18A9C7.5070800@compulab.co.il>
-Message-ID: <20100616114151.GB15054@shareable.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 16 Jun 2010 15:21:27 +0200
+Subject: [PATCH] MAINTAINERS: some Atmel drivers change maintainer
+Message-ID: <1276694487-20065-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike Rapoport wrote:
-> >Which of course raises the question:  How does the Linux community view 
-> >such SoC vendors?  Are they embraced and eagerly supported, or (either 
-> >openly or secretly) viewed as a nuisance?  How does the widespread 
-> >objection to something that such vendors "would make extensive use of" 
-> >mesh with that view?
-> 
-> I cannot tell for the entire Linux community, but from what I know, such 
-> vendors are not much welcomed in the community.
+I take over the maintenance of SPI, USART, Ethernet and USB gadget drivers.
+Those drivers are found in Atmel microcontrollers, both AT32/AVR32 and
+AT91/ARM.
 
-As far as I can tell, many such vendors don't have much interest in
-contributing to the Linux community either.  They use Linux code, glue
-in their black-box binary modules and/or HALs, and engage poorly with
-the community.  It is not just end-product makers, but upstream
-component, board and SDK manufacturers too.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Haavard Skinnemoen <haavard.skinnemoen@atmel.com>
+---
+ MAINTAINERS |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
--- Jamie
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 6d119c9..5f71809 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1148,7 +1148,7 @@ F:	drivers/mmc/host/atmel-mci.c
+ F:	drivers/mmc/host/atmel-mci-regs.h
+ 
+ ATMEL AT91 / AT32 SERIAL DRIVER
+-M:	Haavard Skinnemoen <hskinnemoen@atmel.com>
++M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+ S:	Supported
+ F:	drivers/serial/atmel_serial.c
+ 
+@@ -1160,18 +1160,18 @@ F:	drivers/video/atmel_lcdfb.c
+ F:	include/video/atmel_lcdc.h
+ 
+ ATMEL MACB ETHERNET DRIVER
+-M:	Haavard Skinnemoen <hskinnemoen@atmel.com>
++M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+ S:	Supported
+ F:	drivers/net/macb.*
+ 
+ ATMEL SPI DRIVER
+-M:	Haavard Skinnemoen <hskinnemoen@atmel.com>
++M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+ S:	Supported
+ F:	drivers/spi/atmel_spi.*
+ 
+ ATMEL USBA UDC DRIVER
+-M:	Haavard Skinnemoen <hskinnemoen@atmel.com>
+-L:	kernel at avr32linux.org
++M:	Nicolas Ferre <nicolas.ferre@atmel.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ W:	http://avr32linux.org/twiki/bin/view/Main/AtmelUsbDeviceDriver
+ S:	Supported
+ F:	drivers/usb/gadget/atmel_usba_udc.*
+-- 
+1.5.6.5
