@@ -1,35 +1,58 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 16 Jun 2010 03:44:58 +0200
-Subject: [PATCH 2/2] ehci-mxc: bail out on transceiver problems
-In-Reply-To: <20100615104342.GE17833@buzzloop.caiaq.de>
-References: <1276598063-3956-1-git-send-email-w.sang@pengutronix.de>
-	<1276598063-3956-2-git-send-email-w.sang@pengutronix.de>
-	<20100615104342.GE17833@buzzloop.caiaq.de>
-Message-ID: <20100616014458.GA30484@pengutronix.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 16 Jun 2010 10:17:07 +0800
+Subject: [PATCH] MAINTAINERS: Change BCMRING maintainer
+In-Reply-To: <8628FE4E7912BF47A96AE7DD7BAC0AADDDC694E3F7@SJEXCHCCR02.corp.ad.broadcom.com>
+References: <8628FE4E7912BF47A96AE7DD7BAC0AADDDC694E3F7@SJEXCHCCR02.corp.ad.broadcom.com>
+Message-ID: <AANLkTil6o6tHQdDM0YQRgxme3VLVuk8HUOzqscxsBQBi@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 15, 2010 at 12:43:42PM +0200, Daniel Mack wrote:
-> On Tue, Jun 15, 2010 at 12:34:23PM +0200, Wolfram Sang wrote:
-> > The old code registered the hcd even if there were no transceivers
-> > detected, leading to oopses like this if we try to probe a non-existant
-> > ULPI:
-> 
-> Hmm. I'm aware that there was a missing bail in this function, but
-> actually, I had hardware which didn't properly detect the ULPI chip but
-> still worked fine. There has been quite some discussion here about that,
-> and eventually I decided to not make this a hard error as it didn't
-> really harm.
+On Wed, Jun 16, 2010 at 4:42 AM, JD (Jiandong) Zheng
+<jdzheng@broadcom.com> wrote:
+> Hello,
+>
+> I am Jiandong Zheng working on BCMRING in Broadcom Canada Ltd. I am replacing Leo Chen (leochen at broadcom.com) as " ARM/BCMRING ARM ARCHITECTURE" and "ARM/BCMRING MTD NAND DRIVER" maintainer.
+>
+> Here is the patch to MAINTAINERS file in linux 2.6.34 about this change.
+>
+> Signed-off-by: Jiandong Zheng <jdzheng@broadcom.com>
 
-Hmm, so, do you think this patch is stable-material after all?
+Search your email address in linux-2.6 tree, no result found. This is
+community, not a company. Maintainer is not assigned. Show us some
+credits please?
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100616/bd0e517d/attachment.sig>
+>
+> diff -urN linux-2.6.34/MAINTAINERS.orig linux-2.6.34/MAINTAINERS
+> --- linux-2.6.34/MAINTAINERS.orig ? ? ? 2010-06-15 11:59:53.202128994 -0700
+> +++ linux-2.6.34/MAINTAINERS ? ?2010-06-15 12:01:59.862277620 -0700
+> @@ -570,14 +570,14 @@
+> ?S: ? ? Maintained
+>
+> ?ARM/BCMRING ARM ARCHITECTURE
+> -M: ? ? Leo Chen <leochen@broadcom.com>
+> +M: ? ? Jiandong Zheng <jdzheng@broadcom.com>
+> ?M: ? ? Scott Branden <sbranden@broadcom.com>
+> ?L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> ?S: ? ? Maintained
+> ?F: ? ? arch/arm/mach-bcmring
+>
+> ?ARM/BCMRING MTD NAND DRIVER
+> -M: ? ? Leo Chen <leochen@broadcom.com>
+> +M: ? ? Jiandong Zheng <jdzheng@broadcom.com>
+> ?M: ? ? Scott Branden <sbranden@broadcom.com>
+> ?L: ? ? linux-mtd at lists.infradead.org
+> ?S: ? ? Maintained
+>
+>
+> Thanks,
+>
+> Jiandong Zheng
+> Senior Staff Software Engineer
+> Broadcom Canada Ltd.
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
