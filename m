@@ -1,57 +1,61 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 16 Jun 2010 08:38:38 +0200
-Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081
-	PrimeCells
-In-Reply-To: <4C184C1C.4000204@st.com>
-References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
-	<4C15C60E.6080404@st.com>
-	<AANLkTim9n-p-Pw6FWvzQMBiAuB3h9ILq1Ya6XWk_0l-c@mail.gmail.com>
-	<4C170EE2.4010706@st.com>
-	<CEE6BB42CAD6E947908279175AF8470A025E5AE1ED@EXDCVYMBSTM006.EQ1STM.local>
-	<4C184C1C.4000204@st.com>
-Message-ID: <AANLkTinZgUzXy9wH760foYDqbr5gvHO07LkiCco_q8Wj@mail.gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 16 Jun 2010 08:45:41 +0200
+Subject: [PATCH 10/12] ptp: Added a clock that uses the eTSEC found on
+	the MPC85xx.
+In-Reply-To: <AANLkTikFc15j-Qhw9M2CnKLKq58Wi1xD7E2dtVNsVgeA@mail.gmail.com>
+References: <cover.1276615626.git.richard.cochran@omicron.at>
+	<041faf3cb6ecbedf8f3ff2104914f91d2a24fc4d.1276615626.git.richard.cochran@omicron.at>
+	<AANLkTikFc15j-Qhw9M2CnKLKq58Wi1xD7E2dtVNsVgeA@mail.gmail.com>
+Message-ID: <20100616064541.GD2887@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Viresh]
+On Tue, Jun 15, 2010 at 11:20:41AM -0600, Grant Likely wrote:
+> 
+> Is this header file used by anything other than gianfar_ptp.c?  If
+> not, then roll the two files together.
 
-> In the same way, how other peripheral related data is passed to DMA driver,
-> (like request lines), we can also pass configuration and control information.
+I anticipate that it might be necessary to share the header's contents
+with gianfar.c one day.
 
-Yep.
+> Use dash ('-') not underscore ('_') in property names.
 
-> In SPEAr6xx, Memory is accessible from Master1
-> only but in SPEAr3xx only from Master 2, similar is the pattern with few
-> peripherals also and so i need control over DMA channel configuration.
+Okay, can do.
 
-Oh I had no clue that you could set up your masters like that!
-Anyway, I'll attempt to hack in some platform config for how
-the AHB masters are assigned, but you'll likely have to patch it
-to work with SPEAr in the end.
+> If you encode this value as a string, then it will be friendly for humans too.
 
->> Currently only done dynamically with DMA as the master for
->> Mem2mem, mem2per and per2mem. Mastering from the peripherals
->> is not supported. Do you have advanced features like that?
->
-> We have JPEG controller, which acts as a flow controller for JPEG to
-> mem transfer. (Synopsys JPEG Controller).
+Okay.
 
-OK that's special..
+> I could use more explication here.  Is this a divider value?
+> Computers are good at making calculations, and the driver can obtain
+> the clock frequency supplied to the device.  It may be more useful to
+> specify here the desired frequency rather than the divider.  Certainly
+> more human-friendly too.
 
->> Anyway it can be passed in from platform data easily.
->
-> But platform data will be passed one time only and we will not be able to
-> do it while transferring data at run time.
+It is not that simple. The basic algorithm is described in the text,
+and anyone wanting to use the eTSEC for PTP will have to consider the
+issue themselves, since it is a design issue with a few tradeoffs
+related to the board layout. It is really too thorny to do in the
+driver automatically.
 
-Usually there is a very fixed use for each virtual DMA channel (which
-have a platform config each), i.e. usually there is only one or two
-flow controls per virtual channel. So in this case I guess that
-Synopsys JPEG has a virtual channel that always is JPEG->mem with
-JPEG as master, so it can actually be in fix platform data?
+I can post a tcltk calculator script for finding appropriate values,
+in anyone would like to see it.
 
-Anyway, we can probably extended either the way we did for PrimeCells
-or in some generic way by adding config commands to the DMAengine,
-so I see no road blocker.
+> > +static struct etsects the_clock;
+> 
+> Will there ever be multiple instances of this device?
 
-Yours,
-Linus Walleij
+No, never. If you consider how PTP works, there can only be one clock
+per system.
+
+> Consider of_iomap(), it will simplify the code a bit.
+
+> Move ptp_gianfar_exit() definition here so it is immediately before
+> the module_exit() line.
+
+Okay.
+
+
+Thanks for the review,
+
+Richard
