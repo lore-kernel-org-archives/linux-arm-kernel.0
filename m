@@ -1,40 +1,48 @@
-From: jb@canonical.com (Jamie Bennett)
-Date: Wed, 16 Jun 2010 14:48:07 +0100
-Subject: Request review of device tree documentation
-In-Reply-To: <20100616114151.GB15054@shareable.org>
-References: <alpine.LFD.2.00.1006141044510.13427@xanadu.home>
-	<20100614160201.GD9550@shareable.org>
-	<4C165FD1.6080505@firmworks.com> <4C186AA8.4040709@compulab.co.il>
-	<4C186B7B.1060308@firmworks.com> <4C186C72.2020506@compulab.co.il>
-	<4C187013.5000400@firmworks.com> <4C18738C.4090809@compulab.co.il>
-	<4C187FF0.5020806@firmworks.com> <4C18A9C7.5070800@compulab.co.il>
-	<20100616114151.GB15054@shareable.org>
-Message-ID: <63BD2B99-2B94-4DA0-8489-29C1EE56E21D@canonical.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 16 Jun 2010 09:13:06 -0500
+Subject: [PATCH] ARM: Add ARCH_HAS_L2X0 and make CACHE_L2X0 config
+	depend on that
+In-Reply-To: <AANLkTimH979ASCut4dEE0FGJ-3PA3jzfHg_SzVM6eor_@mail.gmail.com>
+References: <1276272211-13065-1-git-send-email-olof@lixom.net>
+	<1276279087.31800.6.camel@c-dwalke-linux.qualcomm.com>
+	<20100613051625.GA7248@trinity.fluff.org>
+	<20100614145956.GA29355@lixom.net>
+	<AANLkTimH979ASCut4dEE0FGJ-3PA3jzfHg_SzVM6eor_@mail.gmail.com>
+Message-ID: <20100616141306.GA21030@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 Jun 2010, at 12:41, Jamie Lokier wrote:
-> Mike Rapoport wrote:
->>> Which of course raises the question:  How does the Linux community view 
->>> such SoC vendors?  Are they embraced and eagerly supported, or (either 
->>> openly or secretly) viewed as a nuisance?  How does the widespread 
->>> objection to something that such vendors "would make extensive use of" 
->>> mesh with that view?
->> 
->> I cannot tell for the entire Linux community, but from what I know, such 
->> vendors are not much welcomed in the community.
+On Wed, Jun 16, 2010 at 11:43:29AM +0800, Eric Miao wrote:
+> On Mon, Jun 14, 2010 at 10:59 PM, Olof Johansson <olof@lixom.net> wrote:
+> > On Sun, Jun 13, 2010 at 06:16:26AM +0100, Ben Dooks wrote:
+> >> On Fri, Jun 11, 2010 at 10:58:07AM -0700, Daniel Walker wrote:
+> >> >
+> >> > I made a similar change not too long ago, but Russell wanted the define
+> >> > to be HAVE_CACHE_L2X0 ..
+> >>
+> >> possibly, I was thinking ARM_L2X0 would also be an option, since if I
+> >> remeber correctly it is selecting the driver not the availability of
+> >> it.
+> >
+> > Yeah, there are lots of different possible names. :)
+> >
+> > Let's just go with the one Russell preferred and not worry too much
+> > about it. There's some presendence to using HAVE_.* already.
+> >
 > 
-> As far as I can tell, many such vendors don't have much interest in
-> contributing to the Linux community either.  They use Linux code, glue
-> in their black-box binary modules and/or HALs, and engage poorly with
-> the community.  It is not just end-product makers, but upstream
-> component, board and SDK manufacturers too.
+> Sometimes I am thinking that maybe ARCH_HAS_* has some benefits:
+> 
+> HAVE_* for those kernel-wide and general capabilities
+> ARCH_HAS_* for those ARM machine-class specific capabilities?
+> 
+> So to make things a bit more clear? If ARCH_HAS_* is widely adopted
+> on architectures other than ARM, maybe we can then switch that name
+> to HAVE_*?
 
-That is what we are trying to change [1].
+We're nowhere near depleting the HAVE_.* namespace, it's quite sparsely
+used at the moment. I don't see a need to overengineer things here.
 
-> -- Jamie
+A bike shed of any color will do, etc.
 
-Regards,
-Jamie.
 
-[1] http://www.linaro.org
+-Olof
