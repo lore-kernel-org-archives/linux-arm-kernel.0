@@ -1,169 +1,167 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 16 Jun 2010 11:34:48 +0200
-Subject: [PATCH 5/9] s3c-fb: Add support for display panning
+Date: Wed, 16 Jun 2010 11:34:52 +0200
+Subject: [PATCH 9/9] s3c-fb: Correct window osd size and alpha register
+	handling
 In-Reply-To: <1275296935-2693-1-git-send-email-p.osciak@samsung.com>
 References: <1275296935-2693-1-git-send-email-p.osciak@samsung.com>
-Message-ID: <1276680892-14760-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1276680892-14760-10-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Pawel Osciak <p.osciak@samsung.com>
 
-Supports all bpp modes.
-
-The PRTCON register is used to disable in-hardware updates of registers
-that store start and end addresses of framebuffer memory. This prevents
-display corruption in case we do not make it before VSYNC with updating
-them atomically. With this feature there is no need to wait for a VSYNC
-interrupt before each such update.
+S3C64xx and S5P OSD registers for OSD size and alpha are as follows:
+VIDOSDC: win 0 - size, win 1-4: alpha
+VIDOSDD: win 1-2 - size; not present for windows 0, 3 and 4
 
 Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/plat-samsung/include/plat/regs-fb.h |    5 ++
- drivers/video/s3c-fb.c                       |   71 ++++++++++++++++++++++++++
- 2 files changed, 76 insertions(+), 0 deletions(-)
+ drivers/video/s3c-fb.c |   58 ++++++++++++++++++++++++++++++++++++++++++-----
+ 1 files changed, 51 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/regs-fb.h b/arch/arm/plat-samsung/include/plat/regs-fb.h
-index ac10013..f454e32 100644
---- a/arch/arm/plat-samsung/include/plat/regs-fb.h
-+++ b/arch/arm/plat-samsung/include/plat/regs-fb.h
-@@ -112,6 +112,11 @@
- #define VIDCON2_ORGYCbCr			(1 << 8)
- #define VIDCON2_YUVORDCrCb			(1 << 7)
- 
-+/* PRTCON (S3C6410, S5PC100) */
-+
-+#define PRTCON					(0x0c)
-+#define PRTCON_PROTECT				(1 << 11)
-+
- /* VIDTCON0 */
- 
- #define VIDTCON0_VBPDE_MASK			(0xff << 24)
 diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
-index 59ac76a..4f3680d 100644
+index 5e14f0a..f098bd1 100644
 --- a/drivers/video/s3c-fb.c
 +++ b/drivers/video/s3c-fb.c
-@@ -71,6 +71,7 @@ struct s3c_fb;
-  * @buf_end: Offset of buffer end registers.
-  * @osd: The base for the OSD registers.
-  * @palette: Address of palette memory, or 0 if none.
-+ * @has_prtcon: Set if has PRTCON register.
-  */
- struct s3c_fb_variant {
- 	unsigned int	is_2443:1;
-@@ -85,6 +86,8 @@ struct s3c_fb_variant {
- 	unsigned short	osd;
- 	unsigned short	osd_stride;
- 	unsigned short	palette[S3C_FB_MAX_WIN];
-+
-+	unsigned int	has_prtcon:1;
- };
+@@ -64,6 +64,9 @@ struct s3c_fb;
+ #define VIDOSD_B(win, variant) (OSD_BASE(win, variant) + 0x04)
+ #define VIDOSD_C(win, variant) (OSD_BASE(win, variant) + 0x08)
+ #define VIDOSD_D(win, variant) (OSD_BASE(win, variant) + 0x0C)
++#define VIDOSD_SIZE(win, variant, win_variant) \
++	(OSD_BASE(win, variant) + (win_variant).osd_size_off)
++#define VIDOSD_ALPHA(win, variant, win_variant) VIDOSD_C(win, variant)
  
  /**
-@@ -379,6 +382,9 @@ static int s3c_fb_set_par(struct fb_info *info)
- 
- 	info->fix.line_length = (var->xres_virtual * var->bits_per_pixel) / 8;
- 
-+	info->fix.xpanstep = info->var.xres_virtual > info->var.xres ? 1 : 0;
-+	info->fix.ypanstep = info->var.yres_virtual > info->var.yres ? 1 : 0;
-+
- 	/* disable the window whilst we update it */
- 	writel(0, regs + WINCON(win_no));
- 
-@@ -735,6 +741,66 @@ static int s3c_fb_blank(int blank_mode, struct fb_info *info)
- 	return 0;
+  * struct s3c_fb_variant - fb variant information
+@@ -112,7 +115,10 @@ struct s3c_fb_variant {
+ struct s3c_fb_win_variant {
+ 	unsigned int	has_osd_c:1;
+ 	unsigned int	has_osd_d:1;
++	unsigned int	has_osd_size:1;
++	unsigned int	has_osd_alpha:1;
+ 	unsigned int	palette_16bpp:1;
++	unsigned short	osd_size_off;
+ 	unsigned short	palette_sz;
+ 	u32		valid_bpp;
+ };
+@@ -365,6 +371,36 @@ static int s3c_fb_align_word(unsigned int bpp, unsigned int pix)
  }
  
-+/**
-+ * s3c_fb_pan_display() - Pan the display.
+ /**
++ * vidosd_set_size() - set OSD size for a window
 + *
-+ * Note that the offsets can be written to the device at any time, as their
-+ * values are latched at each vsync automatically. This also means that only
-+ * the last call to this function will have any effect on next vsync, but
-+ * there is no need to sleep waiting for it to prevent tearing.
-+ *
-+ * @var: The screen information to verify.
-+ * @info: The framebuffer device.
++ * @win: the window to set OSD size for
++ * @size: OSD size register value
 + */
-+static int s3c_fb_pan_display(struct fb_var_screeninfo *var,
-+			      struct fb_info *info)
++static void vidosd_set_size(struct s3c_fb_win *win, u32 size)
 +{
-+	struct s3c_fb_win *win	= info->par;
-+	struct s3c_fb *sfb	= win->parent;
-+	void __iomem *buf	= sfb->regs + win->index * 8;
-+	unsigned int start_byte_offset, end_byte_offset;
++	struct s3c_fb *sfb = win->parent;
 +
-+	/* Offset in bytes to the start of the displayed area */
-+	start_byte_offset = var->yoffset * info->fix.line_length;
-+	/* X offset depends on the current bpp */
-+	if (info->var.bits_per_pixel >= 8) {
-+		start_byte_offset +=
-+			var->xoffset * (info->var.bits_per_pixel >> 3);
-+	} else {
-+		switch (info->var.bits_per_pixel) {
-+		case 4:
-+			start_byte_offset += var->xoffset >> 1;
-+			break;
-+		case 2:
-+			start_byte_offset += var->xoffset >> 2;
-+			break;
-+		case 1:
-+			start_byte_offset += var->xoffset >> 3;
-+			break;
-+		default:
-+			dev_err(sfb->dev, "invalid bpp\n");
-+			return -EINVAL;
-+		}
-+	}
-+	/* Offset in bytes to the end of the displayed area */
-+	end_byte_offset = start_byte_offset + var->yres * info->fix.line_length;
-+
-+	/* Temporarily turn off per-vsync update from shadow registers until
-+	 * both start and end addresses are updated to prevent corruption */
-+	if (sfb->variant.has_prtcon)
-+		writel(PRTCON_PROTECT, sfb->regs + PRTCON);
-+
-+	writel(info->fix.smem_start + start_byte_offset,
-+		buf + sfb->variant.buf_start);
-+	writel(info->fix.smem_start + end_byte_offset,
-+		buf + sfb->variant.buf_end);
-+
-+	if (sfb->variant.has_prtcon)
-+		writel(0, sfb->regs + PRTCON);
-+
-+	return 0;
++	if (win->variant.has_osd_size)
++		writel(size, sfb->regs + VIDOSD_SIZE(win->index, sfb->variant,
++							win->variant));
 +}
 +
- static struct fb_ops s3c_fb_ops = {
- 	.owner		= THIS_MODULE,
- 	.fb_check_var	= s3c_fb_check_var,
-@@ -744,6 +810,7 @@ static struct fb_ops s3c_fb_ops = {
- 	.fb_fillrect	= cfb_fillrect,
- 	.fb_copyarea	= cfb_copyarea,
- 	.fb_imageblit	= cfb_imageblit,
-+	.fb_pan_display	= s3c_fb_pan_display,
- };
++/**
++ * vidosd_set_alpha() - set alpha transparency for a window
++ *
++ * @win: the window to set OSD size for
++ * @alpha: alpha register value
++ */
++static void vidosd_set_alpha(struct s3c_fb_win *win, u32 alpha)
++{
++	struct s3c_fb *sfb = win->parent;
++
++	if (win->variant.has_osd_alpha)
++		writel(alpha, sfb->regs + VIDOSD_ALPHA(win->index,
++						sfb->variant, win->variant));
++}
++
++/**
+  * s3c_fb_set_par() - framebuffer request to set new framebuffer state.
+  * @info: The framebuffer to change.
+  *
+@@ -378,7 +414,7 @@ static int s3c_fb_set_par(struct fb_info *info)
+ 	void __iomem *regs = sfb->regs;
+ 	void __iomem *buf = regs;
+ 	int win_no = win->index;
+-	u32 osdc_data = 0;
++	u32 alpha = 0;
+ 	u32 data;
+ 	u32 pagewidth;
+ 	int clkdiv;
+@@ -481,15 +517,12 @@ static int s3c_fb_set_par(struct fb_info *info)
  
- /**
-@@ -1243,6 +1310,8 @@ static struct s3c_fb_driverdata s3c_fb_data_64xx __devinitdata = {
- 			[3] = 0x320,
- 			[4] = 0x340,
- 		},
-+
-+		.has_prtcon	= 1,
+ 	data = var->xres * var->yres;
+ 
+-	osdc_data = VIDISD14C_ALPHA1_R(0xf) |
++	alpha = VIDISD14C_ALPHA1_R(0xf) |
+ 		VIDISD14C_ALPHA1_G(0xf) |
+ 		VIDISD14C_ALPHA1_B(0xf);
+ 
+-	if (win->variant.has_osd_d) {
+-		writel(data, regs + VIDOSD_D(win_no, sfb->variant));
+-		writel(osdc_data, regs + VIDOSD_C(win_no, sfb->variant));
+-	} else
+-		writel(data, regs + VIDOSD_C(win_no, sfb->variant));
++	vidosd_set_alpha(win, alpha);
++	vidosd_set_size(win, data);
+ 
+ 	data = WINCONx_ENWIN;
+ 
+@@ -1452,12 +1485,17 @@ static int s3c_fb_resume(struct platform_device *pdev)
+ static struct s3c_fb_win_variant s3c_fb_data_64xx_wins[] __devinitdata = {
+ 	[0] = {
+ 		.has_osd_c	= 1,
++		.has_osd_size	= 1,
++		.osd_size_off	= 0x8,
+ 		.palette_sz	= 256,
+ 		.valid_bpp	= VALID_BPP1248 | VALID_BPP(16) | VALID_BPP(24),
  	},
- 	.win[0]	= &s3c_fb_data_64xx_wins[0],
- 	.win[1]	= &s3c_fb_data_64xx_wins[1],
-@@ -1271,6 +1340,8 @@ static struct s3c_fb_driverdata s3c_fb_data_s5pc100 __devinitdata = {
- 			[3] = 0x3000,
- 			[4] = 0x3400,
- 		},
-+
-+		.has_prtcon	= 1,
+ 	[1] = {
+ 		.has_osd_c	= 1,
+ 		.has_osd_d	= 1,
++		.has_osd_size	= 1,
++		.osd_size_off	= 0x12,
++		.has_osd_alpha	= 1,
+ 		.palette_sz	= 256,
+ 		.valid_bpp	= (VALID_BPP1248 | VALID_BPP(16) |
+ 				   VALID_BPP(18) | VALID_BPP(19) |
+@@ -1466,6 +1504,9 @@ static struct s3c_fb_win_variant s3c_fb_data_64xx_wins[] __devinitdata = {
+ 	[2] = {
+ 		.has_osd_c	= 1,
+ 		.has_osd_d	= 1,
++		.has_osd_size	= 1,
++		.osd_size_off	= 0x12,
++		.has_osd_alpha	= 1,
+ 		.palette_sz	= 16,
+ 		.palette_16bpp	= 1,
+ 		.valid_bpp	= (VALID_BPP1248 | VALID_BPP(16) |
+@@ -1474,6 +1515,7 @@ static struct s3c_fb_win_variant s3c_fb_data_64xx_wins[] __devinitdata = {
  	},
- 	.win[0]	= &s3c_fb_data_64xx_wins[0],
- 	.win[1]	= &s3c_fb_data_64xx_wins[1],
+ 	[3] = {
+ 		.has_osd_c	= 1,
++		.has_osd_alpha	= 1,
+ 		.palette_sz	= 16,
+ 		.palette_16bpp	= 1,
+ 		.valid_bpp	= (VALID_BPP124  | VALID_BPP(16) |
+@@ -1482,6 +1524,7 @@ static struct s3c_fb_win_variant s3c_fb_data_64xx_wins[] __devinitdata = {
+ 	},
+ 	[4] = {
+ 		.has_osd_c	= 1,
++		.has_osd_alpha	= 1,
+ 		.palette_sz	= 4,
+ 		.palette_16bpp	= 1,
+ 		.valid_bpp	= (VALID_BPP(1) | VALID_BPP(2) |
+@@ -1607,6 +1650,7 @@ static struct s3c_fb_driverdata s3c_fb_data_s3c2443 __devinitdata = {
+ 	},
+ 	.win[1] = &(struct s3c_fb_win_variant) {
+ 		.has_osd_c	= 1,
++		.has_osd_alpha	= 1,
+ 		.palette_sz	= 256,
+ 		.valid_bpp	= (VALID_BPP1248 | VALID_BPP(16) |
+ 				   VALID_BPP(18) | VALID_BPP(19) |
 -- 
 1.7.1.240.g225c
