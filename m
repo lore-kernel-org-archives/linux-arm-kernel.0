@@ -1,31 +1,39 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 16 Jun 2010 07:35:19 +0200
-Subject: [PATCH 2/2] ehci-mxc: bail out on transceiver problems
-In-Reply-To: <20100616014458.GA30484@pengutronix.de>
-References: <1276598063-3956-1-git-send-email-w.sang@pengutronix.de>
-	<1276598063-3956-2-git-send-email-w.sang@pengutronix.de>
-	<20100615104342.GE17833@buzzloop.caiaq.de>
-	<20100616014458.GA30484@pengutronix.de>
-Message-ID: <20100616053519.GT17833@buzzloop.caiaq.de>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 16 Jun 2010 07:40:47 +0200
+Subject: [PATCH 04/12] phylib: add a way to make PHY time stamps possible.
+In-Reply-To: <AANLkTimhAvu0_WuMCwnCrw9Rbcy6dKxvTlzepJm7ZDdR@mail.gmail.com>
+References: <cover.1276615626.git.richard.cochran@omicron.at>
+	<27c0ad283f025c2bb71e7ceb71be07f969939429.1276615626.git.richard.cochran@omicron.at>
+	<AANLkTimhAvu0_WuMCwnCrw9Rbcy6dKxvTlzepJm7ZDdR@mail.gmail.com>
+Message-ID: <20100616054047.GA2887@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 16, 2010 at 03:44:58AM +0200, Wolfram Sang wrote:
-> On Tue, Jun 15, 2010 at 12:43:42PM +0200, Daniel Mack wrote:
-> > On Tue, Jun 15, 2010 at 12:34:23PM +0200, Wolfram Sang wrote:
-> > > The old code registered the hcd even if there were no transceivers
-> > > detected, leading to oopses like this if we try to probe a non-existant
-> > > ULPI:
-> > 
-> > Hmm. I'm aware that there was a missing bail in this function, but
-> > actually, I had hardware which didn't properly detect the ULPI chip but
-> > still worked fine. There has been quite some discussion here about that,
-> > and eventually I decided to not make this a hard error as it didn't
-> > really harm.
-> 
-> Hmm, so, do you think this patch is stable-material after all?
+On Tue, Jun 15, 2010 at 10:33:51AM -0600, Grant Likely wrote:
+> > +config NETWORK_PHY_TIMESTAMPING
+> Some overhead?  At a brief glance of the series it looks like it could
+> add a lot of overhead, but I'm not fully clear on what the full
+> process is.  Can you describe how the hardware timestamping works?  I
+> could use an overview of what the kernel has to do.
 
-Hard to say. It might break existing board support, which would be a
-regression. OTOH, it fixes an Oops. Don't know really ...
+First of all, I want to emphasize that this network stack option is
+purely voluntary. Only those people who know that they have a PTP
+capable PHY and really want the timestamps will (or should) enable
+this option. When it is not enabled, it has no effect at all.
 
-Daniel
+Hardware timestamping is described in
+
+   Documentation/networking/timestamping.txt
+   Documentation/networking/timestamping/timestamping.c
+
+The PTP subsystem is described in
+
+   Documentation/ptp/ptp.txt
+
+There really is more to say about the issue than appears in those
+documents, but they are a good starting place for discussion.
+
+BTW I am submitting a conference paper on the design on the PTP
+subsystem. If you would like to have it, just ask me off-list.
+
+Richard
