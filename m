@@ -1,43 +1,55 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 17 Jun 2010 09:33:51 +1000
-Subject: [RFC,PATCH 1/2] Add a common struct clk
-In-Reply-To: <20100616211645.GC30005@fluff.org.uk>
-References: <19473.61547.684572.647641@ipc1.ka-ro>
-	<201006111718.47426.jeremy.kerr@canonical.com>
-	<19474.172.742782.972629@ipc1.ka-ro>
-	<20100611095839.GC10894@pengutronix.de>
-	<19474.2817.333749.485028@ipc1.ka-ro>
-	<1276319643.1962.181.camel@pasglop>
-	<19477.52889.982995.407051@ipc1.ka-ro>
-	<1276507378.2552.39.camel@pasglop>
-	<19477.63136.664249.167207@ipc1.ka-ro>
-	<20100614094310.GE12159@pengutronix.de>
-	<20100616211645.GC30005@fluff.org.uk>
-Message-ID: <1276731231.2552.645.camel@pasglop>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Thu, 17 Jun 2010 08:42:22 +0900
+Subject: [PATCH 2/5] [ARM] add address randomization to mmap()
+In-Reply-To: <1276720403-27918-3-git-send-email-nico@fluxnic.net>
+References: <1276720403-27918-1-git-send-email-nico@fluxnic.net>
+	<1276720403-27918-3-git-send-email-nico@fluxnic.net>
+Message-ID: <AANLkTimXn525QZosUxSsd1SM2JUDxWTfBqHoM1kxz86_@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-06-16 at 22:16 +0100, Ben Dooks wrote:
-> > I think you can find different examples that make both possiblities
-> bad.
-> > All in all I think that a sleeping clock implementation is
-> preferable as
-> > it improves (general) latencies.
-> 
-> It may be that we need to do a bit of work on some of the drivers to
-> ensure that they don't fully re-set their clocks until they are able
-> to sleep. 
+Hi,
 
-With the move of the interrupt disable we did upstream not long ago,
-most drivers now can sleep at any stage of resume. sysdev's can't so
-those are the main issue, but then, I don't like sysdevs :-)
+On Thu, Jun 17, 2010 at 5:33 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> ---
+> ?arch/arm/mm/mmap.c | ? ?4 ++++
+> ?1 files changed, 4 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
+> index f5abc51..4f5b396 100644
+> --- a/arch/arm/mm/mmap.c
+> +++ b/arch/arm/mm/mmap.c
+> @@ -7,6 +7,7 @@
+> ?#include <linux/shm.h>
+> ?#include <linux/sched.h>
+> ?#include <linux/io.h>
+> +#include <linux/random.h>
+> ?#include <asm/cputype.h>
+> ?#include <asm/system.h>
+>
+> @@ -80,6 +81,9 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
+> ? ? ? ? ? ? ? ?start_addr = addr = TASK_UNMAPPED_BASE;
+> ? ? ? ? ? ? ? ?mm->cached_hole_size = 0;
+> ? ? ? ?}
+> + ? ? ? /* 8 bits of randomness in 20 address space bits */
+> + ? ? ? if (current->flags & PF_RANDOMIZE)
+> + ? ? ? ? ? ? ? addr += (get_random_int() % (1 << 8)) << PAGE_SHIFT;
 
-I must say that on powermac I avoid some of these problems by, in
-addition to the normal suspend/resume process, having some platform code
-that (almost) blindly saves & restores a bunch of ASIC regs on late
-suspend/early resume. It ends up being faster and simpler than going
-through convolutions of suspend/resume callbacks left and right that
-need to happen in the right order.
+Doesn't better to use mask operation?
+                   addr += (get_random_int() & ((1 << 8) - 1)) << PAGE_SHIFT;
 
-Cheers,
-Ben.
+Thank you,
+Kyungmin Park
+>
+> ?full_search:
+> ? ? ? ?if (do_align)
+> --
+> 1.7.1.337.gbd0bc
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
