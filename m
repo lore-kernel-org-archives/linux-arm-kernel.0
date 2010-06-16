@@ -1,49 +1,44 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 16 Jun 2010 11:34:43 +0200
-Subject: [PATCH v2] Various s3c-fb updates
+Date: Wed, 16 Jun 2010 11:34:45 +0200
+Subject: [PATCH 2/9] s3c-fb: Correct FRAMESEL1 bitfield defines for VIDINTCON0
+	register
 In-Reply-To: <1275296935-2693-1-git-send-email-p.osciak@samsung.com>
 References: <1275296935-2693-1-git-send-email-p.osciak@samsung.com>
-Message-ID: <1276680892-14760-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1276680892-14760-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Pawel Osciak <p.osciak@samsung.com>
 
-Im sending a new version of the s3c-fb patch series on behalf of Pawel
-Osciak.
+FRAMESEL1 bitfield starts on 13th bit, not on 14th.
 
-This series is rebased onto Ben Dook's framebuffer branch available at:
-git://git.fluff.org/bjdooks/linux.git dev/s3c-fb
+Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/plat-samsung/include/plat/regs-fb.h |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
-The main changes are the addition of an ability to wait for VSYNC and
-display panning and better support for S5PV210 SoCs. A lot of various
-bugs has been also fixed.
-
-The first patch attempts to fix some NULL pointer dereferences in case
-of a failed framebuffer memory allocation attempt. This is a quick fix,
-so please treat it more as an indication of what may be wrong with the
-code in the probe function and not as something to merge.
-
-Patches 3-4 add "new style" device name initialization for various
-S3C/S5P devices. The 4th patch also separates S5PC100 and S5PV210 as
-their framebuffer registers sets differ.
-
-Patch 7 nd 9 are pure bugfixes.
-
-Patch 8 adds support for the new feature available on S5PV210.
-
-The complete list of patches:
-[PATCH 1/9] s3c-fb: Fix various null references on framebuffer memory alloc failure
-[PATCH 2/9] s3c-fb: Correct FRAMESEL1 bitfield defines for VIDINTCON0 register
-[PATCH 3/9] s3c-fb: Add device name initialization.
-[PATCH 4/9] s3c-fb: Separate S5PC100 and S5PV210 framebuffer driver data structures
-[PATCH 5/9] s3c-fb: Add support for display panning
-[PATCH 6/9] s3c-fb: Add wait for VSYNC ioctl
-[PATCH 7/9] s3c-fb: window 3 of 64xx+ does not have an osd_d register
-[PATCH 8/9] s3c-fb: Add SHADOWCON shadow register locking support for S5PV210
-[PATCH 9/9] s3c-fb: Correct window osd size and alpha register handling
-
-Best regards
+diff --git a/arch/arm/plat-samsung/include/plat/regs-fb.h b/arch/arm/plat-samsung/include/plat/regs-fb.h
+index f4259e5..ac10013 100644
+--- a/arch/arm/plat-samsung/include/plat/regs-fb.h
++++ b/arch/arm/plat-samsung/include/plat/regs-fb.h
+@@ -292,11 +292,11 @@
+ #define VIDINTCON0_FRAMESEL0_ACTIVE		(0x2 << 15)
+ #define VIDINTCON0_FRAMESEL0_FRONTPORCH		(0x3 << 15)
+ 
+-#define VIDINTCON0_FRAMESEL1			(1 << 14)
+-#define VIDINTCON0_FRAMESEL1_NONE		(0x0 << 14)
+-#define VIDINTCON0_FRAMESEL1_BACKPORCH		(0x1 << 14)
+-#define VIDINTCON0_FRAMESEL1_VSYNC		(0x2 << 14)
+-#define VIDINTCON0_FRAMESEL1_FRONTPORCH		(0x3 << 14)
++#define VIDINTCON0_FRAMESEL1			(1 << 13)
++#define VIDINTCON0_FRAMESEL1_NONE		(0x0 << 13)
++#define VIDINTCON0_FRAMESEL1_BACKPORCH		(0x1 << 13)
++#define VIDINTCON0_FRAMESEL1_VSYNC		(0x2 << 13)
++#define VIDINTCON0_FRAMESEL1_FRONTPORCH		(0x3 << 13)
+ 
+ #define VIDINTCON0_INT_FRAME			(1 << 12)
+ #define VIDINTCON0_FIFIOSEL_MASK		(0x7f << 5)
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.7.1.240.g225c
