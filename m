@@ -1,61 +1,29 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Wed, 16 Jun 2010 08:45:41 +0200
-Subject: [PATCH 10/12] ptp: Added a clock that uses the eTSEC found on
-	the MPC85xx.
-In-Reply-To: <AANLkTikFc15j-Qhw9M2CnKLKq58Wi1xD7E2dtVNsVgeA@mail.gmail.com>
-References: <cover.1276615626.git.richard.cochran@omicron.at>
-	<041faf3cb6ecbedf8f3ff2104914f91d2a24fc4d.1276615626.git.richard.cochran@omicron.at>
-	<AANLkTikFc15j-Qhw9M2CnKLKq58Wi1xD7E2dtVNsVgeA@mail.gmail.com>
-Message-ID: <20100616064541.GD2887@riccoc20.at.omicron.at>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 16 Jun 2010 08:47:23 +0200
+Subject: [PATCH 0/4]Refine iomux files for i.MX51
+In-Reply-To: <1276352559-8105-1-git-send-email-jason77.wang@gmail.com>
+References: <1276352559-8105-1-git-send-email-jason77.wang@gmail.com>
+Message-ID: <20100616064723.GH20799@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 15, 2010 at 11:20:41AM -0600, Grant Likely wrote:
-> 
-> Is this header file used by anything other than gianfar_ptp.c?  If
-> not, then roll the two files together.
+On Sat, Jun 12, 2010 at 10:22:35PM +0800, Jason Wang wrote:
+> Through the discussion, I divide my patches to 3 parts.
+> part1: mx51 iomux related part, the first patch in this part is from
+>        Amit, other patches are based off this patch and they are some
+>        fix or adding definitions for imx51_3ds board.
 
-I anticipate that it might be necessary to share the header's contents
-with gianfar.c one day.
+This is ok now. Can you please rebase onto
+git://git.pengutronix.de/git/imx/linux-2.6.git imx-for-2.6.36
 
-> Use dash ('-') not underscore ('_') in property names.
+The first patch conflicts with another of your patches:
 
-Okay, can do.
-
-> If you encode this value as a string, then it will be friendly for humans too.
-
-Okay.
-
-> I could use more explication here.  Is this a divider value?
-> Computers are good at making calculations, and the driver can obtain
-> the clock frequency supplied to the device.  It may be more useful to
-> specify here the desired frequency rather than the divider.  Certainly
-> more human-friendly too.
-
-It is not that simple. The basic algorithm is described in the text,
-and anyone wanting to use the eTSEC for PTP will have to consider the
-issue themselves, since it is a design issue with a few tradeoffs
-related to the board layout. It is really too thorny to do in the
-driver automatically.
-
-I can post a tcltk calculator script for finding appropriate values,
-in anyone would like to see it.
-
-> > +static struct etsects the_clock;
-> 
-> Will there ever be multiple instances of this device?
-
-No, never. If you consider how PTP works, there can only be one clock
-per system.
-
-> Consider of_iomap(), it will simplify the code a bit.
-
-> Move ptp_gianfar_exit() definition here so it is immediately before
-> the module_exit() line.
-
-Okay.
+e5ceef78 mx5: Add i2c to Freescale MX51 Babbage HW
 
 
-Thanks for the review,
 
-Richard
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
