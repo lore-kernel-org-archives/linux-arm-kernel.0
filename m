@@ -1,30 +1,27 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 17 Jun 2010 09:20:22 +1200
-Subject: [PATCH 1/3] AT91: Define NR_BUILTIN_GPIO
-In-Reply-To: <1276723224-23252-1-git-send-email-ryan@bluewatersys.com>
-References: <1276723224-23252-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <1276723224-23252-2-git-send-email-ryan@bluewatersys.com>
+Date: Thu, 17 Jun 2010 09:20:21 +1200
+Subject: [PATCH 0/3] at91: Add support for Snapper 9260/9G20 modules
+Message-ID: <1276723224-23252-1-git-send-email-ryan@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add definition for NR_BUILTIN_GPIO for AT91 family
+Add support for Bluewater Systems Snapper 9260/9G20 modules. 
 
-Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
----
- arch/arm/mach-at91/include/mach/gpio.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+In order to fully support the modules, NR_BUILTIN_GPIO must be defined
+for at91 and vbus polarity and polling have been added to the at91 udc
+driver.
 
-diff --git a/arch/arm/mach-at91/include/mach/gpio.h b/arch/arm/mach-at91/include/mach/gpio.h
-index 04c91e3..bfdd8ab 100644
---- a/arch/arm/mach-at91/include/mach/gpio.h
-+++ b/arch/arm/mach-at91/include/mach/gpio.h
-@@ -19,6 +19,7 @@
- #define PIN_BASE		NR_AIC_IRQS
- 
- #define MAX_GPIO_BANKS		5
-+#define NR_BUILTIN_GPIO		(PIN_BASE + (MAX_GPIO_BANKS * 32))
- 
- /* these pin numbers double as IRQ numbers, like AT91xxx_ID_* values */
- 
--- 
-1.5.5.1
+Ryan Mallon (3):
+  AT91: Define NR_BUILTIN_GPIO
+  at91_udc: Add vbus polarity and polling mode
+  at91: Add support for Bluewater Systems Snapper 9260/9G20 modules
+
+ arch/arm/mach-at91/Kconfig              |   11 ++
+ arch/arm/mach-at91/Makefile             |    3 +
+ arch/arm/mach-at91/board-snapper9260.c  |  189 +++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/include/mach/board.h |    2 +
+ arch/arm/mach-at91/include/mach/gpio.h  |    1 +
+ drivers/usb/gadget/at91_udc.c           |   45 ++++++--
+ drivers/usb/gadget/at91_udc.h           |    1 +
+ 7 files changed, 242 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/mach-at91/board-snapper9260.c
