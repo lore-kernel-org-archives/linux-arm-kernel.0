@@ -1,33 +1,155 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Wed, 16 Jun 2010 12:05:39 +0200
-Subject: [PATCH 12/12] ptp: Added a clock driver for the National
-	Semiconductor PHYTER.
-In-Reply-To: <AANLkTilqd-wxqMWDxssC-XMDJqZ8iIiSrvp2t8xARAQV@mail.gmail.com>
-References: <cover.1276615626.git.richard.cochran@omicron.at>
-	<37f5015b186bdd51f8451ade042f90c8b39a5cc8.1276615626.git.richard.cochran@omicron.at>
-	<AANLkTilqd-wxqMWDxssC-XMDJqZ8iIiSrvp2t8xARAQV@mail.gmail.com>
-Message-ID: <20100616100539.GA3569@riccoc20.at.omicron.at>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 16 Jun 2010 12:12:01 +0200
+Subject: [PATCH 5/7] ARM: S5PV210: Add fifo link definitions for fimc and
+	framebuffer
+In-Reply-To: <1276683123-30224-1-git-send-email-s.nawrocki@samsung.com>
+References: <1276683123-30224-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1276683123-30224-6-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 15, 2010 at 12:49:13PM -0600, Grant Likely wrote:
-> Won't this break things for existing DP83640 users?
+From: Marek Szyprowski <m.szyprowski@samsung.com>
 
-Nope, the driver was only added five patches ago, and it only offers
-the timestamping stuff. The standard PHY functions just call the
-generic functions, so the PHY works fine even without this driver.
+Add definition of local paths that are available on Sasmung S5PV210
+SoCs.
 
-> > +static struct ptp_clock *dp83640_clock;
-> > +DEFINE_SPINLOCK(clock_lock); /* protects the one and only dp83640_clock */
-> 
-> Why only one?  Is it not possible to have 2 of these PHYs in a system?
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ arch/arm/mach-s5pv210/setup-fimc0.c       |   23 +++++++++++++++++++++++
+ arch/arm/mach-s5pv210/setup-fimc1.c       |   23 +++++++++++++++++++++++
+ arch/arm/mach-s5pv210/setup-fimc2.c       |   23 +++++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/fimc.h |    4 ++++
+ 4 files changed, 73 insertions(+), 0 deletions(-)
 
-Yes, you can have multiple PHYs, but only one PTP clock.
-
-If you do use multiple PHYs, then you must wire their clocks together
-and adjust the PTP clock on only one of the PHYs.
-
-
-Thanks for your other comments,
-
-Richard
+diff --git a/arch/arm/mach-s5pv210/setup-fimc0.c b/arch/arm/mach-s5pv210/setup-fimc0.c
+index 94205f5..fab6e52 100644
+--- a/arch/arm/mach-s5pv210/setup-fimc0.c
++++ b/arch/arm/mach-s5pv210/setup-fimc0.c
+@@ -10,6 +10,10 @@
+  */
+ 
+ #include <plat/fimc.h>
++#include <plat/fifo.h>
++#include <linux/fb.h>
++#include <plat/fb.h>
++#include <plat/devs.h>
+ 
+ struct samsung_plat_fimc s5p_fimc0_default_data __initdata = {
+ 	.capability	= S5P_FIMC_IN_ROT | S5P_FIMC_OUT_ROT,
+@@ -23,3 +27,22 @@ struct samsung_plat_fimc s5p_fimc0_default_data __initdata = {
+ 	.out_rot_en_w	= 1920,
+ 	.out_rot_dis_w	= 4224
+ };
++
++static struct s3c_fifo_link s5pv210_fimc0_win0_link = {
++	.master_dev	= &s5p_device_fimc0.dev,
++	.slave_dev	= &s3c_device_fb.dev,
++};
++
++void __init s5pv210_setup_fimc0_fb_link(void)
++{
++	struct s3c_fb_platdata *fb_pd;
++	struct samsung_plat_fimc *fimc_pd;
++
++	fimc_pd = s5p_device_fimc0.dev.platform_data;
++	fb_pd = s3c_device_fb.dev.platform_data;
++
++	if (fimc_pd && fb_pd && fb_pd->win[0]) {
++		fb_pd->win[0]->fifo_sources[0] = &s5pv210_fimc0_win0_link;
++		fimc_pd->fifo_targets[0] = &s5pv210_fimc0_win0_link;
++	}
++}
+diff --git a/arch/arm/mach-s5pv210/setup-fimc1.c b/arch/arm/mach-s5pv210/setup-fimc1.c
+index bfaffe9..2a6e930 100644
+--- a/arch/arm/mach-s5pv210/setup-fimc1.c
++++ b/arch/arm/mach-s5pv210/setup-fimc1.c
+@@ -10,6 +10,10 @@
+  */
+ 
+ #include <plat/fimc.h>
++#include <plat/fifo.h>
++#include <linux/fb.h>
++#include <plat/fb.h>
++#include <plat/devs.h>
+ 
+ struct samsung_plat_fimc s5p_fimc1_default_data __initdata = {
+ 	.capability	= S5P_FIMC_IN_ROT | S5P_FIMC_OUT_ROT,
+@@ -23,3 +27,22 @@ struct samsung_plat_fimc s5p_fimc1_default_data __initdata = {
+ 	.out_rot_en_w	= 1920,
+ 	.out_rot_dis_w	= 4224
+ };
++
++static struct s3c_fifo_link s5pv210_fimc1_win1_link = {
++	.master_dev	= &s5p_device_fimc1.dev,
++	.slave_dev	= &s3c_device_fb.dev,
++};
++
++void __init s5pv210_setup_fimc1_fb_link(void)
++{
++	struct s3c_fb_platdata *fb_pd;
++	struct samsung_plat_fimc *fimc_pd;
++
++	fimc_pd = s5p_device_fimc1.dev.platform_data;
++	fb_pd = s3c_device_fb.dev.platform_data;
++
++	if (fimc_pd && fb_pd && fb_pd->win[1]) {
++		fb_pd->win[1]->fifo_sources[0] = &s5pv210_fimc1_win1_link;
++		fimc_pd->fifo_targets[0] = &s5pv210_fimc1_win1_link;
++	}
++}
+diff --git a/arch/arm/mach-s5pv210/setup-fimc2.c b/arch/arm/mach-s5pv210/setup-fimc2.c
+index a53a382..79b61b0 100644
+--- a/arch/arm/mach-s5pv210/setup-fimc2.c
++++ b/arch/arm/mach-s5pv210/setup-fimc2.c
+@@ -10,6 +10,10 @@
+  */
+ 
+ #include <plat/fimc.h>
++#include <plat/fifo.h>
++#include <linux/fb.h>
++#include <plat/fb.h>
++#include <plat/devs.h>
+ 
+ struct samsung_plat_fimc s5p_fimc2_default_data __initdata = {
+ 	.capability	= S5P_FIMC_IN_ROT | S5P_FIMC_OUT_ROT,
+@@ -23,3 +27,22 @@ struct samsung_plat_fimc s5p_fimc2_default_data __initdata = {
+ 	.out_rot_en_w	= 1280,
+ 	.out_rot_dis_w	= 1920
+ };
++
++static struct s3c_fifo_link s5pv210_fimc2_win2_link = {
++	.master_dev	= &s5p_device_fimc2.dev,
++	.slave_dev	= &s3c_device_fb.dev,
++};
++
++void __init s5pv210_setup_fimc2_fb_link(void)
++{
++	struct s3c_fb_platdata *fb_pd;
++	struct samsung_plat_fimc *fimc_pd;
++
++	fimc_pd = s5p_device_fimc2.dev.platform_data;
++	fb_pd = s3c_device_fb.dev.platform_data;
++
++	if (fimc_pd && fb_pd && fb_pd->win[2]) {
++		fb_pd->win[2]->fifo_sources[0] = &s5pv210_fimc2_win2_link;
++		fimc_pd->fifo_targets[0] = &s5pv210_fimc2_win2_link;
++	}
++}
+diff --git a/arch/arm/plat-samsung/include/plat/fimc.h b/arch/arm/plat-samsung/include/plat/fimc.h
+index bc6799e..8f95fc0 100644
+--- a/arch/arm/plat-samsung/include/plat/fimc.h
++++ b/arch/arm/plat-samsung/include/plat/fimc.h
+@@ -54,5 +54,9 @@ extern void s5p_fimc0_set_platdata(struct samsung_plat_fimc *fimc);
+ extern void s5p_fimc1_set_platdata(struct samsung_plat_fimc *fimc);
+ extern void s5p_fimc2_set_platdata(struct samsung_plat_fimc *fimc);
+ 
++extern void __init s5pv210_setup_fimc0_fb_link(void);
++extern void __init s5pv210_setup_fimc1_fb_link(void);
++extern void __init s5pv210_setup_fimc2_fb_link(void);
++
+ #endif /* FIMC_H_ */
+ 
+-- 
+1.7.0.4
