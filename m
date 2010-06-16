@@ -1,50 +1,79 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 16 Jun 2010 22:16:45 +0100
-Subject: [RFC,PATCH 1/2] Add a common struct clk
-In-Reply-To: <20100614094310.GE12159@pengutronix.de>
-References: <19473.61547.684572.647641@ipc1.ka-ro>
-	<201006111718.47426.jeremy.kerr@canonical.com>
-	<19474.172.742782.972629@ipc1.ka-ro>
-	<20100611095839.GC10894@pengutronix.de>
-	<19474.2817.333749.485028@ipc1.ka-ro>
-	<1276319643.1962.181.camel@pasglop>
-	<19477.52889.982995.407051@ipc1.ka-ro>
-	<1276507378.2552.39.camel@pasglop>
-	<19477.63136.664249.167207@ipc1.ka-ro>
-	<20100614094310.GE12159@pengutronix.de>
-Message-ID: <20100616211645.GC30005@fluff.org.uk>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 16 Jun 2010 16:17:58 -0500
+Subject: [PATCH] mailbox: change full flag per mailbox queue instead of
+	global
+In-Reply-To: <1276534269-19179-1-git-send-email-x0095840@ti.com>
+References: <1276534269-19179-1-git-send-email-x0095840@ti.com>
+Message-ID: <AANLkTimQrOIbsvQw7yv2x_KJmsv2p5KfNdcsNk2_DWGm@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 14, 2010 at 11:43:10AM +0200, Uwe Kleine-K?nig wrote:
-> On Mon, Jun 14, 2010 at 11:30:08AM +0200, Lothar Wa?mann wrote:
-> > Benjamin Herrenschmidt writes:
-> > > On Mon, 2010-06-14 at 08:39 +0200, Lothar Wa?mann wrote:
-> > > > All implementations so far use spin_lock_irq_save()!
-> > > 
-> > > Nothing prevents your implementation to be a tad smarter.
-> > > 
-> > I vote for consistency, so that device drivers can be kept arch
-> > independent instead of having to care about implentation details of
-> > each arch.
-> Back when I implemented clock support for ns9xxx (unfortunately not in
-> mainline) I tried with a spinlock first and later switched to a mutex.
-> IIRC the reason was that on ns9215 enabling the rtc clock took long
-> (don't remember a number) and successfull enabling was signaled by an
-> irq.  So I would have had to implement irq polling in the clock code.
+On Mon, Jun 14, 2010 at 11:51 AM, Fernando Guzman Lugo <x0095840@ti.com> wrote:
+> As pointed by Ben Ohand, the variable rq_full flag is a global
+> variable, so if there are multiple mailbox users there will be
+> conflics. Now there is a full flag per mailbox queue.
+>
+> Reported-by: Ohad Ben-Cohen <ohad@wizery.com>
+> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
+> ---
+> ?arch/arm/plat-omap/include/plat/mailbox.h | ? ?1 +
+> ?arch/arm/plat-omap/mailbox.c ? ? ? ? ? ? ?| ? ?7 +++----
+> ?2 files changed, 4 insertions(+), 4 deletions(-)
 
-Ok, you could have implemented a lock ot update the state, then had
-some form of wake-queue to wake up the task once it did.
 
-> I think you can find different examples that make both possiblities bad.
-> All in all I think that a sleeping clock implementation is preferable as
-> it improves (general) latencies.
+Thanks, Fernando, it looks good !
 
-It may be that we need to do a bit of work on some of the drivers to
-ensure that they don't fully re-set their clocks until they are able
-to sleep.
+Since the original patch wasn't merged yet, it might make more sense
+to squash it with this fix into a single patch, instead of introducing
+this fix as a new patch. what do you think ?
 
--- 
-Ben (ben at fluff.org, http://www.fluff.org/)
-
-  'a smiley only costs 4 bytes'
+>
+> diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
+> index 729166b..a6144b8 100644
+> --- a/arch/arm/plat-omap/include/plat/mailbox.h
+> +++ b/arch/arm/plat-omap/include/plat/mailbox.h
+> @@ -47,6 +47,7 @@ struct omap_mbox_queue {
+> ? ? ? ?struct tasklet_struct ? tasklet;
+> ? ? ? ?int ? ? (*callback)(void *);
+> ? ? ? ?struct omap_mbox ? ? ? ?*mbox;
+> + ? ? ? bool ? ?full;
+> ?};
+>
+> ?struct omap_mbox {
+> diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+> index 8d86b0b..a1e274e 100644
+> --- a/arch/arm/plat-omap/mailbox.c
+> +++ b/arch/arm/plat-omap/mailbox.c
+> @@ -30,7 +30,6 @@
+>
+> ?static struct omap_mbox *mboxes;
+> ?static DEFINE_RWLOCK(mboxes_lock);
+> -static bool rq_full;
+>
+> ?static int mbox_configured;
+> ?static DEFINE_MUTEX(mbox_configured_lock);
+> @@ -140,9 +139,9 @@ static void mbox_rx_work(struct work_struct *work)
+> ? ? ? ?while (1) {
+> ? ? ? ? ? ? ? ?spin_lock_irqsave(q->queue_lock, flags);
+> ? ? ? ? ? ? ? ?rq = blk_fetch_request(q);
+> - ? ? ? ? ? ? ? if (rq_full) {
+> + ? ? ? ? ? ? ? if (mbox->rxq->full) {
+> ? ? ? ? ? ? ? ? ? ? ? ?omap_mbox_enable_irq(mbox, IRQ_RX);
+> - ? ? ? ? ? ? ? ? ? ? ? rq_full = false;
+> + ? ? ? ? ? ? ? ? ? ? ? mbox->rxq->full = false;
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ? ? ? ? ?spin_unlock_irqrestore(q->queue_lock, flags);
+> ? ? ? ? ? ? ? ?if (!rq)
+> @@ -183,7 +182,7 @@ static void __mbox_rx_interrupt(struct omap_mbox *mbox)
+> ? ? ? ? ? ? ? ?rq = blk_get_request(q, WRITE, GFP_ATOMIC);
+> ? ? ? ? ? ? ? ?if (unlikely(!rq)) {
+> ? ? ? ? ? ? ? ? ? ? ? ?omap_mbox_disable_irq(mbox, IRQ_RX);
+> - ? ? ? ? ? ? ? ? ? ? ? rq_full = true;
+> + ? ? ? ? ? ? ? ? ? ? ? mbox->rxq->full = true;
+> ? ? ? ? ? ? ? ? ? ? ? ?goto nomem;
+> ? ? ? ? ? ? ? ?}
+>
+> --
+> 1.6.3.3
+>
+>
