@@ -1,128 +1,132 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 16 Jun 2010 12:12:02 +0200
-Subject: [PATCH 6/7] ARM: S5PV210: enable FIMC on Aquila
-In-Reply-To: <1276683123-30224-1-git-send-email-s.nawrocki@samsung.com>
-References: <1276683123-30224-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1276683123-30224-7-git-send-email-s.nawrocki@samsung.com>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Wed, 16 Jun 2010 13:39:03 +0300
+Subject: Request review of device tree documentation
+In-Reply-To: <4C187FF0.5020806@firmworks.com>
+References: <4C13430B.5000907@firmworks.com>	<1276339529.1962.184.camel@pasglop>	<1276339684.1962.186.camel@pasglop>	<4C13B618.1030006@firmworks.com>	<1276383132.1962.195.camel@pasglop>	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>	<4C146F18.9030008@firmworks.com>	<AANLkTikls3hjXOmKFqG2D_9GaJSjOXNuuRXPlanAjo5E@mail.gmail.com>	<20100614124438.GF9323@yookeroo>	<alpine.LFD.2.00.1006141044510.13427@xanadu.home>	<20100614160201.GD9550@shareable.org>
+	<4C165FD1.6080505@firmworks.com> <4C186AA8.4040709@compulab.co.il>
+	<4C186B7B.1060308@firmworks.com> <4C186C72.2020506@compulab.co.il>
+	<4C187013.5000400@firmworks.com> <4C18738C.4090809@compulab.co.il>
+	<4C187FF0.5020806@firmworks.com>
+Message-ID: <4C18A9C7.5070800@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for FIMC on Samsung Aquila board. Enable support for local
-path mode between fimc and frame buffer.
+Mitch Bradley wrote:
+> Mike Rapoport wrote:
+>> Mitch Bradley wrote:
+>>> Mike Rapoport wrote:
+>>>> Mitch Bradley wrote:
+>>>>> Mike Rapoport wrote:
+>>>>>> Mitch Bradley wrote:
+>>>>>>
+>>>>>>> The second topic is the hypothetical use of OFW as a HAL. That 
+>>>>>>> will not happen for several reasons.  The opposition to the idea 
+>>>>>>> is widespread and deeply held, and there are good arguments to 
+>>>>>>> support that opposition.   Furthermore, the economic conditions 
+>>>>>>> necessary for the creation of such a HAL do not exist in the ARM 
+>>>>>>> world, nor indeed in the Linux world in general.  (The necessary 
+>>>>>>> condition is the ability for one company to impose a substantial 
+>>>>>>> change by fiat - essentially a monopoly position.)
+>>>>>>>
+>>>>>>> Shall we agree, then, that any further discussion of the HAL 
+>>>>>>> issue is "just for fun", and that nobody needs to feel threatened 
+>>>>>>> that it would actually happen?
+>>>>>>
+>>>>>> I've recently worked with vendor versions of U-Boot for advanced 
+>>>>>> ARM SoCs. There is already *huge* chunk of HAL code in those 
+>>>>>> versions. And if there would be possibility to have callbacks into 
+>>>>>> the firmware these chunks would only grow, IMHO.
+>>>>>
+>>>>> How can there be HAL code in U-Boot unless there is already the 
+>>>>> possibility to have callbacks into the firmware?
+>>>>
+>>>> Currently it aims to abstract hardware from U-Boot and reuse the 
+>>>> same HW access code across operating systems and bootloaders. If 
+>>>> this code would have callbacks I afraid the things would became worse.
+>>>
+>>> The only way I can understand what you said is if I assume that by 
+>>> "callback", you mean the following sequence:
+>>>
+>>> a) U-boot loads and executes the OS, providing to the OS the address 
+>>> of some HW access routines that it can use
+>>> b) The OS calls one of those HW access routines
+>>> c) During the execution of that HW access routine, that routine calls 
+>>> "back" into the OS, before returning.  So a call into the OS is 
+>>> nested inside a call into U-boot resident code.
+>>>
+>>> If that is what you are worried about, it is not what we were 
+>>> discussing.  We were discussing - and many people were against - step 
+>>> (b).
+>>>
+>>> Are you saying that step (b) - the OS calling into routines provided 
+>>> by U-Boot - is already the status quo?
+>>
+>> I'm also objecting the step (b) and, fortunately, it's not yet the 
+>> status quo.
+>> Current U-Boot/kernel implementations I've encountered still do not 
+>> have OS calls to resident HW access routines. But if such calls would 
+>> be allowed, my impression is that SoC vendors would make extensive use 
+>> of them.
+> 
+> One could argue that a feature that vendors would use extensively is one 
+> that is sorely needed from their point of view.
+> 
+> One counterargument, of course, is that "there is a better way".  But it 
+> is only "better" under a cost function that values things differently 
+> than the vendors value them.  Were that not so, the vendors would gladly 
+> use the "better" way and not be tempted to use the objectionable 
+> feature. (Unless, of course, the vendors are just ignorant or unskilled 
+> - but I generally find that different cost functions cause more 
+> disconnects than lack of ability.)
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/mach-s5pv210/Kconfig       |    6 ++++
- arch/arm/mach-s5pv210/mach-aquila.c |   51 +++++++++++++++++++++++++++++++++++
- 2 files changed, 57 insertions(+), 0 deletions(-)
+It's hardly arguable that Linux community and decision makers at chip 
+vendor companies use different cost functions. But it's not that obvious 
+that vendors cost functions based on well established _technical_ analysis.
+Many vendors try to use the same code base for several operating 
+systems. From the high level perspective it sounds logical: use the same 
+core functionality and thin adaptation layers to fit the core 
+functionality into several OSes. But in reality, developing the OS 
+abstraction layer and "thin" adaptation layers may become more expensive 
+than developing each OS support from scratch. Besides, such code becomes 
+a real mess after a while, and it's maintainability is very questionable.
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 7cbba86..65635ef 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -66,6 +66,12 @@ config MACH_AQUILA
- 	select ARCH_SPARSEMEM_ENABLE
- 	select S5PV210_SETUP_FB_24BPP
- 	select S3C_DEV_FB
-+	select S5P_DEV_FIMC0
-+	select S5PV210_SETUP_FIMC0
-+	select S5P_DEV_FIMC1
-+	select S5PV210_SETUP_FIMC1
-+	select S5P_DEV_FIMC2
-+	select S5PV210_SETUP_FIMC2
- 	help
- 	  Machine support for the Samsung Aquila target based on S5PC110 SoC
- 
-diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
-index 10bc76e..8af0db8 100644
---- a/arch/arm/mach-s5pv210/mach-aquila.c
-+++ b/arch/arm/mach-s5pv210/mach-aquila.c
-@@ -13,6 +13,7 @@
- #include <linux/init.h>
- #include <linux/serial_core.h>
- #include <linux/fb.h>
-+#include <linux/clk.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -28,6 +29,8 @@
- #include <plat/devs.h>
- #include <plat/cpu.h>
- #include <plat/fb.h>
-+#include <plat/fimc.h>
-+#include <plat/fifo.h>
- 
- /* Following are default values for UCON, ULCON and UFCON UART registers */
- #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-@@ -116,8 +119,44 @@ static struct s3c_fb_platdata aquila_lcd_pdata __initdata = {
- 	.setup_gpio	= s5pv210_fb_gpio_setup_24bpp,
- };
- 
-+static void __init aquila_fimc_clk_init(void)
-+{
-+	int i;
-+	struct clk *clk_fimc, *parent;
-+	struct s5p_platform_fimc *pldata;
-+
-+	struct device *fimc_devs[] = {
-+		&s5p_device_fimc0.dev,
-+		&s5p_device_fimc1.dev,
-+		&s5p_device_fimc2.dev
-+	};
-+
-+	parent = clk_get(NULL, "mout_epll");
-+	if (IS_ERR(parent))
-+		return;
-+
-+	for (i = 0; i < ARRAY_SIZE(fimc_devs); i++) {
-+		if (fimc_devs[i]) {
-+			clk_fimc = clk_get(fimc_devs[i], "sclk_fimc");
-+
-+			if (IS_ERR(clk_fimc))
-+				continue;
-+
-+			clk_set_parent(clk_fimc, parent);
-+			pldata = fimc_devs[i]->platform_data;
-+			if (pldata)
-+				clk_set_rate(clk_fimc, 133000000);
-+			clk_enable(clk_fimc);
-+		}
-+	}
-+	clk_put(parent);
-+}
-+
- static struct platform_device *aquila_devices[] __initdata = {
- 	&s3c_device_fb,
-+	&s5p_device_fimc0,
-+	&s5p_device_fimc1,
-+	&s5p_device_fimc2,
- };
- 
- static void __init aquila_map_io(void)
-@@ -129,10 +168,22 @@ static void __init aquila_map_io(void)
- 
- static void __init aquila_machine_init(void)
- {
-+	/* FIMC */
-+	s5p_fimc0_set_platdata(NULL);
-+	s5p_fimc1_set_platdata(NULL);
-+	s5p_fimc2_set_platdata(NULL);
-+
- 	/* FB */
- 	s3c_fb_set_platdata(&aquila_lcd_pdata);
- 
-+	/* FIMC->FB fifo links */
-+	s5pv210_setup_fimc0_fb_link();
-+	s5pv210_setup_fimc1_fb_link();
-+	s5pv210_setup_fimc2_fb_link();
-+
- 	platform_add_devices(aquila_devices, ARRAY_SIZE(aquila_devices));
-+
-+	aquila_fimc_clk_init();
- }
- 
- MACHINE_START(AQUILA, "Aquila")
+> Which of course raises the question:  How does the Linux community view 
+> such SoC vendors?  Are they embraced and eagerly supported, or (either 
+> openly or secretly) viewed as a nuisance?  How does the widespread 
+> objection to something that such vendors "would make extensive use of" 
+> mesh with that view?
+
+I cannot tell for the entire Linux community, but from what I know, such 
+vendors are not much welcomed in the community.
+
+>>
+>>>>
+>>>>> It is not HAL if it can't be called.
+>>>>>
+>>>>>>
+>>>>>>
+>>>>>>> The potential for "vendors breaking out of the debugging use case 
+>>>>>>> and turning it into a HAL" is miniscule, because
+>>>>>>>
+>>>>>>> a) The callback is disabled by default
+>>>>>>> b) The technical challenges of the callback interface limit its 
+>>>>>>> applicability to specific "wizard user" scenarios
+>>>>>>> c) OFW is unlikely to achieve sufficient market penetration for 
+>>>>>>> the HAL thing to be worth doing
+>>>>>>>
+>>>>>>>
+>>>>>>> _______________________________________________
+>>>>>>> linux-arm-kernel mailing list
+>>>>>>> linux-arm-kernel at lists.infradead.org
+>>>>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>>>>
+>>>>>>
+>>>>
+>>>>
+>>
+>>
+
+
 -- 
-1.7.0.4
+Sincerely yours,
+Mike.
