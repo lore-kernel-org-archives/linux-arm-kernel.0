@@ -1,55 +1,42 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 16 Jun 2010 22:22:07 +0800
-Subject: [PATCH] ARM: Add ARCH_HAS_L2X0 and make CACHE_L2X0 config depend
-	on that
-In-Reply-To: <20100616141306.GA21030@lixom.net>
-References: <1276272211-13065-1-git-send-email-olof@lixom.net>
-	<1276279087.31800.6.camel@c-dwalke-linux.qualcomm.com>
-	<20100613051625.GA7248@trinity.fluff.org>
-	<20100614145956.GA29355@lixom.net>
-	<AANLkTimH979ASCut4dEE0FGJ-3PA3jzfHg_SzVM6eor_@mail.gmail.com>
-	<20100616141306.GA21030@lixom.net>
-Message-ID: <AANLkTinL44V08toDrfuOJ73Idxe77UeLHWEbZxQ4Wa_C@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 16 Jun 2010 09:10:42 -0600
+Subject: [PATCH 12/12] ptp: Added a clock driver for the National
+	Semiconductor PHYTER.
+In-Reply-To: <20100616100539.GA3569@riccoc20.at.omicron.at>
+References: <cover.1276615626.git.richard.cochran@omicron.at>
+	<37f5015b186bdd51f8451ade042f90c8b39a5cc8.1276615626.git.richard.cochran@omicron.at>
+	<AANLkTilqd-wxqMWDxssC-XMDJqZ8iIiSrvp2t8xARAQV@mail.gmail.com>
+	<20100616100539.GA3569@riccoc20.at.omicron.at>
+Message-ID: <AANLkTilYBL6gpeg5Yp0wOmqwIo3K5YKW4mtVlE2p6jkp@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 16, 2010 at 10:13 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Wed, Jun 16, 2010 at 11:43:29AM +0800, Eric Miao wrote:
->> On Mon, Jun 14, 2010 at 10:59 PM, Olof Johansson <olof@lixom.net> wrote:
->> > On Sun, Jun 13, 2010 at 06:16:26AM +0100, Ben Dooks wrote:
->> >> On Fri, Jun 11, 2010 at 10:58:07AM -0700, Daniel Walker wrote:
->> >> >
->> >> > I made a similar change not too long ago, but Russell wanted the define
->> >> > to be HAVE_CACHE_L2X0 ..
->> >>
->> >> possibly, I was thinking ARM_L2X0 would also be an option, since if I
->> >> remeber correctly it is selecting the driver not the availability of
->> >> it.
->> >
->> > Yeah, there are lots of different possible names. :)
->> >
->> > Let's just go with the one Russell preferred and not worry too much
->> > about it. There's some presendence to using HAVE_.* already.
->> >
->>
->> Sometimes I am thinking that maybe ARCH_HAS_* has some benefits:
->>
->> HAVE_* for those kernel-wide and general capabilities
->> ARCH_HAS_* for those ARM machine-class specific capabilities?
->>
->> So to make things a bit more clear? If ARCH_HAS_* is widely adopted
->> on architectures other than ARM, maybe we can then switch that name
->> to HAVE_*?
+On Wed, Jun 16, 2010 at 4:05 AM, Richard Cochran
+<richardcochran@gmail.com> wrote:
+> On Tue, Jun 15, 2010 at 12:49:13PM -0600, Grant Likely wrote:
+>> Won't this break things for existing DP83640 users?
 >
-> We're nowhere near depleting the HAVE_.* namespace, it's quite sparsely
-> used at the moment.
-
-No I'm not talking about depleting the HAVE_* , just wondering if there is a way
-to make things a bit clearer.
-
-> I don't see a need to overengineer things here.
+> Nope, the driver was only added five patches ago, and it only offers
+> the timestamping stuff. The standard PHY functions just call the
+> generic functions, so the PHY works fine even without this driver.
 >
-> A bike shed of any color will do, etc.
+>> > +static struct ptp_clock *dp83640_clock;
+>> > +DEFINE_SPINLOCK(clock_lock); /* protects the one and only dp83640_clock */
+>>
+>> Why only one? ?Is it not possible to have 2 of these PHYs in a system?
 >
+> Yes, you can have multiple PHYs, but only one PTP clock.
+>
+> If you do use multiple PHYs, then you must wire their clocks together
+> and adjust the PTP clock on only one of the PHYs.
+>
+>
+> Thanks for your other comments,
 
-Agreed.
+You're welcome.  Make sure to cc: linux-kernel on your next posting.
+I commented on what I could, but there is a lot of code outside my
+areas of expertise.  In particular the time keeping code needs to be
+looked at by the maintainers in that area.
+
+Cheers,
+g.
