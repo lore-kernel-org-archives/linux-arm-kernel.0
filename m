@@ -1,80 +1,57 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Tue, 15 Jun 2010 20:32:51 -1000
-Subject: Request review of device tree documentation
-In-Reply-To: <4C186C72.2020506@compulab.co.il>
-References: <4C13430B.5000907@firmworks.com>	<1276339529.1962.184.camel@pasglop>	<1276339684.1962.186.camel@pasglop>	<4C13B618.1030006@firmworks.com>	<1276383132.1962.195.camel@pasglop>	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>	<4C146F18.9030008@firmworks.com>	<AANLkTikls3hjXOmKFqG2D_9GaJSjOXNuuRXPlanAjo5E@mail.gmail.com>	<20100614124438.GF9323@yookeroo>	<alpine.LFD.2.00.1006141044510.13427@xanadu.home>	<20100614160201.GD9550@shareable.org>
-	<4C165FD1.6080505@firmworks.com> <4C186AA8.4040709@compulab.co.il>
-	<4C186B7B.1060308@firmworks.com> <4C186C72.2020506@compulab.co.il>
-Message-ID: <4C187013.5000400@firmworks.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Wed, 16 Jun 2010 08:38:38 +0200
+Subject: [PATCH 06/13] DMAENGINE: driver for the ARM PL080/PL081
+	PrimeCells
+In-Reply-To: <4C184C1C.4000204@st.com>
+References: <1276270031-1607-1-git-send-email-linus.walleij@stericsson.com>
+	<4C15C60E.6080404@st.com>
+	<AANLkTim9n-p-Pw6FWvzQMBiAuB3h9ILq1Ya6XWk_0l-c@mail.gmail.com>
+	<4C170EE2.4010706@st.com>
+	<CEE6BB42CAD6E947908279175AF8470A025E5AE1ED@EXDCVYMBSTM006.EQ1STM.local>
+	<4C184C1C.4000204@st.com>
+Message-ID: <AANLkTinZgUzXy9wH760foYDqbr5gvHO07LkiCco_q8Wj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike Rapoport wrote:
-> Mitch Bradley wrote:
->> Mike Rapoport wrote:
->>> Mitch Bradley wrote:
->>>
->>>> The second topic is the hypothetical use of OFW as a HAL. That will 
->>>> not happen for several reasons.  The opposition to the idea is 
->>>> widespread and deeply held, and there are good arguments to support 
->>>> that opposition.   Furthermore, the economic conditions necessary 
->>>> for the creation of such a HAL do not exist in the ARM world, nor 
->>>> indeed in the Linux world in general.  (The necessary condition is 
->>>> the ability for one company to impose a substantial change by fiat 
->>>> - essentially a monopoly position.)
->>>>
->>>> Shall we agree, then, that any further discussion of the HAL issue 
->>>> is "just for fun", and that nobody needs to feel threatened that it 
->>>> would actually happen?
->>>
->>> I've recently worked with vendor versions of U-Boot for advanced ARM 
->>> SoCs. There is already *huge* chunk of HAL code in those versions. 
->>> And if there would be possibility to have callbacks into the 
->>> firmware these chunks would only grow, IMHO.
->>
->> How can there be HAL code in U-Boot unless there is already the 
->> possibility to have callbacks into the firmware?
+[Viresh]
+
+> In the same way, how other peripheral related data is passed to DMA driver,
+> (like request lines), we can also pass configuration and control information.
+
+Yep.
+
+> In SPEAr6xx, Memory is accessible from Master1
+> only but in SPEAr3xx only from Master 2, similar is the pattern with few
+> peripherals also and so i need control over DMA channel configuration.
+
+Oh I had no clue that you could set up your masters like that!
+Anyway, I'll attempt to hack in some platform config for how
+the AHB masters are assigned, but you'll likely have to patch it
+to work with SPEAr in the end.
+
+>> Currently only done dynamically with DMA as the master for
+>> Mem2mem, mem2per and per2mem. Mastering from the peripherals
+>> is not supported. Do you have advanced features like that?
 >
-> Currently it aims to abstract hardware from U-Boot and reuse the same 
-> HW access code across operating systems and bootloaders. If this code 
-> would have callbacks I afraid the things would became worse.
+> We have JPEG controller, which acts as a flow controller for JPEG to
+> mem transfer. (Synopsys JPEG Controller).
 
-The only way I can understand what you said is if I assume that by 
-"callback", you mean the following sequence:
+OK that's special..
 
-a) U-boot loads and executes the OS, providing to the OS the address of 
-some HW access routines that it can use
-b) The OS calls one of those HW access routines
-c) During the execution of that HW access routine, that routine calls 
-"back" into the OS, before returning.  So a call into the OS is nested 
-inside a call into U-boot resident code.
-
-If that is what you are worried about, it is not what we were 
-discussing.  We were discussing - and many people were against - step (b).
-
-Are you saying that step (b) - the OS calling into routines provided by 
-U-Boot - is already the status quo?
-
+>> Anyway it can be passed in from platform data easily.
 >
->> It is not HAL if it can't be called.
->>
->>>
->>>
->>>> The potential for "vendors breaking out of the debugging use case 
->>>> and turning it into a HAL" is miniscule, because
->>>>
->>>> a) The callback is disabled by default
->>>> b) The technical challenges of the callback interface limit its 
->>>> applicability to specific "wizard user" scenarios
->>>> c) OFW is unlikely to achieve sufficient market penetration for the 
->>>> HAL thing to be worth doing
->>>>
->>>>
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>>
->
->
+> But platform data will be passed one time only and we will not be able to
+> do it while transferring data at run time.
+
+Usually there is a very fixed use for each virtual DMA channel (which
+have a platform config each), i.e. usually there is only one or two
+flow controls per virtual channel. So in this case I guess that
+Synopsys JPEG has a virtual channel that always is JPEG->mem with
+JPEG as master, so it can actually be in fix platform data?
+
+Anyway, we can probably extended either the way we did for PrimeCells
+or in some generic way by adding config commands to the DMAengine,
+so I see no road blocker.
+
+Yours,
+Linus Walleij
