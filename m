@@ -1,55 +1,43 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 16 Jun 2010 15:21:27 +0200
-Subject: [PATCH] MAINTAINERS: some Atmel drivers change maintainer
-Message-ID: <1276694487-20065-1-git-send-email-nicolas.ferre@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 16 Jun 2010 13:33:22 +0100
+Subject: [PATCH] OMAP3: pmu: make CPU_HAS_PMU dependent on OMAP3_EMU
+In-Reply-To: <AANLkTikIiLybBr-wV_SRWFNLkZn892gwsWHCxsIYenFJ@mail.gmail.com>
+References: <1274972448-10721-1-git-send-email-will.deacon@arm.com>
+	<AANLkTikIiLybBr-wV_SRWFNLkZn892gwsWHCxsIYenFJ@mail.gmail.com>
+Message-ID: <000c01cb0d50$1bdc7a90$53956fb0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I take over the maintenance of SPI, USART, Ethernet and USB gadget drivers.
-Those drivers are found in Atmel microcontrollers, both AT32/AVR32 and
-AT91/ARM.
+Jean,
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Haavard Skinnemoen <haavard.skinnemoen@atmel.com>
----
- MAINTAINERS |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 1f254bd..98922f7 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -955,7 +955,8 @@ config XSCALE_PMU
+> >        default y
+> >
+> >  config CPU_HAS_PMU
+> > -       depends on CPU_V6 || CPU_V7 || XSCALE_PMU
+> > +       depends on (CPU_V6 || CPU_V7 || XSCALE_PMU) && \
+> > +                  (!ARCH_OMAP3 || OMAP3_EMU)
+> >        default y
+> >        bool
+> >
+> > --
+> > 1.6.3.3
+> >
+> >
+> 
+> The patch nicely fixes the issue. Tested with Oprofile on OMAP3530
+> EVM. RETention and OFF power modes succesfully tested.
+> 
+> Acked-by: Jean Pihet <jpihet@mvista.com>
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 6d119c9..5f71809 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1148,7 +1148,7 @@ F:	drivers/mmc/host/atmel-mci.c
- F:	drivers/mmc/host/atmel-mci-regs.h
- 
- ATMEL AT91 / AT32 SERIAL DRIVER
--M:	Haavard Skinnemoen <hskinnemoen@atmel.com>
-+M:	Nicolas Ferre <nicolas.ferre@atmel.com>
- S:	Supported
- F:	drivers/serial/atmel_serial.c
- 
-@@ -1160,18 +1160,18 @@ F:	drivers/video/atmel_lcdfb.c
- F:	include/video/atmel_lcdc.h
- 
- ATMEL MACB ETHERNET DRIVER
--M:	Haavard Skinnemoen <hskinnemoen@atmel.com>
-+M:	Nicolas Ferre <nicolas.ferre@atmel.com>
- S:	Supported
- F:	drivers/net/macb.*
- 
- ATMEL SPI DRIVER
--M:	Haavard Skinnemoen <hskinnemoen@atmel.com>
-+M:	Nicolas Ferre <nicolas.ferre@atmel.com>
- S:	Supported
- F:	drivers/spi/atmel_spi.*
- 
- ATMEL USBA UDC DRIVER
--M:	Haavard Skinnemoen <hskinnemoen@atmel.com>
--L:	kernel at avr32linux.org
-+M:	Nicolas Ferre <nicolas.ferre@atmel.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- W:	http://avr32linux.org/twiki/bin/view/Main/AtmelUsbDeviceDriver
- S:	Supported
- F:	drivers/usb/gadget/atmel_usba_udc.*
--- 
-1.5.6.5
+Brilliant - thanks for testing this.
+Tony: would you mind picking this patch up please or would
+you prefer that I posted it to Russell's patch system?
+
+Thanks,
+
+Will
