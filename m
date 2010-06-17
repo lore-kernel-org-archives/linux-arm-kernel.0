@@ -1,57 +1,69 @@
-From: jekhor@gmail.com (Yauhen Kharuzhy)
-Date: Thu, 17 Jun 2010 22:19:01 +0300
-Subject: [PATCH 11/15] ARM: S3C2416: Add support for second HSMMC channel
-In-Reply-To: <4C1A71F6.5030203@gmail.com>
-References: <1273631766-15693-1-git-send-email-ben-linux@fluff.org>
-	<1273631766-15693-11-git-send-email-ben-linux@fluff.org>
-	<4C1A71F6.5030203@gmail.com>
-Message-ID: <20100617191901.GA5864@jeknote.loshitsa1.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 17 Jun 2010 15:22:05 -0400 (EDT)
+Subject: [PATCH 0/5] Makefile.boot cleanup
+In-Reply-To: <20100603075704.GB336@pengutronix.de>
+References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
+	<20100603075704.GB336@pengutronix.de>
+Message-ID: <alpine.LFD.2.00.1006171203030.13427@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 17, 2010 at 10:05:26PM +0300, Darius Augulis wrote:
-> On 05/12/2010 05:36 AM, Ben Dooks wrote:
-> >Add support for the second HSMMC channel on the S3C2416.
-> 
-> There is issue with mach-s3c2416 and sdhci-s3c driver.
-> Driver probe crashes with following backtrace:
-> 
-> sdhci: Secure Digital Host Controller Interface driver
-> sdhci: Copyright(c) Pierre Ossman
-> Unable to handle kernel NULL pointer dereference at virtual address 00000000
-> pgd = c0004000
-> [00000000] *pgd=00000000
-> Internal error: Oops: 5 [#1]
-> last sysfs file:
-> CPU: 0    Not tainted  (2.6.35-rc3-00001-g7dfb002 #31)
-> PC is at sdhci_s3c_probe+0x188/0x42c
-> LR is at clk_enable+0x50/0x60
-> 
-> The reason is not completely initialised s3c_sdhci_platdata
-> structure. When getting clocks in sdhci_s3c_probe():
-> 
-> for (clks = 0, ptr = 0; ptr < MAX_BUS_CLK; ptr++) {
->                 struct clk *clk;
->                 char *name = pdata->clocks[ptr];
-> 
-> Pointer clocks is not initialised at all, because mach-s3c2416
-> doesn't have such helpers like mach-s3c64xx does:
-> 
-> s3c6400_default_sdhci0()
-> s3c6400_default_sdhci1()
-> s3c6400_default_sdhci2()
-> 
-> Also other necessary s3c_sdhci_platdata members cfg_gpio and
-> cfg_card are missing on s3c2416.
-> 
-> Is there any patch adding this missing info to mach-s3c2416?
+On Thu, 3 Jun 2010, Uwe Kleine-K?nig wrote:
 
-I am already wrote such patch today and will post it after testing
-tomorrow, I hope.
+> Hello Eric,
+> 
+> On Thu, Jun 03, 2010 at 03:36:48PM +0800, Eric Miao wrote:
+> > Several facts:
+> > 
+> > 1. ZRELADDR in most cases can be auto detected by maksing PC with
+> >    0xf000_0000 if the zImage is placed within the first 256MiB from
+> >    the memory start, which is a sane assumption except for:
+> > 
+> >    - when ARCH_MX1 or ARCH_SHARK is defined
+> >    - when ARCH_U300 is defined (U300 really is strange when defining
+> >      PHYS_OFFSET and ZRELADDR)
+> >    - or when ZBOOT_ROM is defined
+> If you guess ZRELADDR based on sp instead of pc it even should work if
+> ZBOOT_ROM is defined?!
 
--- 
-Yauhen Kharuzhy		jekhor _at_ gmail.com
-			JID: jek at jabber.ru
+What is the relation between sp and ZRELADDR?
 
-A: No
-Q: Should I quote below my post?
+While we're pushing forward the notion of a relation between phys offset 
+and the location where zImage is loaded in memory, I think that making 
+the association with sp is a bit too obscur.  Knowing where you upload 
+your kernel is clear, knowing where the stack is allocated in relation 
+to that is not that clear.  It is in the .bss section of course, but 
+when ZBOOT_ROM is not defined then the .bss happens to be right after 
+the zImage binary, while it must be explicitly specified otherwise.
+
+On Sun, 6 Jun 2010, Uwe Kleine-K?nig wrote:
+
+> On Thu, Jun 10, 2010 at 02:44:53PM -0400, Nicolas Pitre wrote:
+> > If you're using ZBOOT_ROM that means you want to execute zImage directly
+> > from ROM.  This is therefore a highly customized configuration.  In that
+> > context, having a variable phys-offset doesn't make much sense to start
+> > with.
+> Right, but then the kernel needs to know this fixed value for
+> phys-offset.  In the patches presented by Eric the person configuring
+> the kernel needs to know that value.  When guessing based on sp she
+> doesn't need to read addional docs when enabling ZBOOT_ROM.
+
+That's presuming phys offset would still be runtime determined.  Again, 
+if you care about ZBOOT_ROM, you probably want a fixed phys offset at 
+compile time too.  So that value has to be determined at kernel config 
+time, not at run time from pc or sp.  And when dealing with such 
+customized expert config options, she better know what she's doing and 
+be familiar with the memory layout so not to have to read the datasheet 
+only for the physical RAM offset while she already must know what flash 
+offset to use.
+
+If anything, you _could_ try doing something similar to:
+
+config PHYS_OFFSET
+	[prompt]
+	default (CONFIG_ZBOOT_ROM_BSS & 0xf0000000) if ZBOOT_ROM
+
+but I doubt Kconfig might accept such a syntax.
+
+
+Nicolas
