@@ -1,35 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Jun 2010 19:40:22 +0100
-Subject: [PATCH] MAINTAINERS: Change BCMRING maintainer
-In-Reply-To: <8628FE4E7912BF47A96AE7DD7BAC0AADDDC69DDF19@SJEXCHCCR02.corp.ad.broadcom.com>
-References: <8628FE4E7912BF47A96AE7DD7BAC0AADDDC694E3F7@SJEXCHCCR02.corp.ad.broadcom.com>
-	<AANLkTil6o6tHQdDM0YQRgxme3VLVuk8HUOzqscxsBQBi@mail.gmail.com>
-	<1276655981.1586.172.camel@Joe-Laptop.home>
-	<AANLkTilI2toj42vZcHzPC4ru82CDMf2UWsTasPyOD3Nh@mail.gmail.com>
-	<8628FE4E7912BF47A96AE7DD7BAC0AADDDC694E57D@SJEXCHCCR02.corp.ad.broadcom.com>
-	<AANLkTink0mz5pS-QE0v7-_xXl_SXhY_Bx9ZH0PGUlUiz@mail.gmail.com>
-	<8628FE4E7912BF47A96AE7DD7BAC0AADDDC69DDF19@SJEXCHCCR02.corp.ad.broadcom.com>
-Message-ID: <20100617184022.GA7973@n2100.arm.linux.org.uk>
+From: erik.oomen@zepcam.com (Erik Oomen)
+Date: Thu, 17 Jun 2010 20:51:37 +0200
+Subject: mxcmmc driver hangs on sync
+In-Reply-To: <20100617163340.69409a3f@morgan>
+References: <20100615112936.5d03ce92@morgan>
+	<20100615063142.GU17833@buzzloop.caiaq.de>
+	<20100615152051.26e4589c@morgan>
+	<20100615072237.GW17833@buzzloop.caiaq.de>
+	<20100617163340.69409a3f@morgan>
+Message-ID: <45DEC573-1158-477E-A971-03CB4633F442@zepcam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 17, 2010 at 10:14:57AM -0700, JD (Jiandong) Zheng wrote:
-> I know it is better to use git to create patch in the future and seems 
-> I just need to clone linus' release tree 
-> (git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git) 
-> instead of arm linux tree (linux-arm.org/linux-2.6-stable.git) to 
-> make change and create patches, is this correct understanding?
+Morgan,
 
-Note that the linux-arm tree is ARM Ltd's tree, and isn't a tree which
-feeds directly into Linus' tree.  You can find that via
-http://www.arm.linux.org.uk/developer/ but I suggest that you use
-Linus' tree as a base line unless I have something which conflicts
-in my tree.
+> Daniel,
+> 
+> On Tue, 15 Jun 2010 09:22:37 +0200
+> Daniel Mack <daniel@caiaq.de> wrote:
+>> On Tue, Jun 15, 2010 at 03:20:51PM +0800, Morgan Howe wrote:
+>>> On Tue, 15 Jun 2010 08:31:43 +0200
+>>> Daniel Mack <daniel@caiaq.de> wrote:
+>>>> On Tue, Jun 15, 2010 at 11:29:36AM +0800, Morgan Howe wrote:
+>>>>> With the older kernel this would hang on sync after a few
+>>>>> thousand loops, and much sooner if you ran 2 or 3 of these
+>>>>> processes at a time. I tried last night with the newer kernel
+>>>>> and kicking off 3 processes and after ~100-150 loops per
+>>>>> process I get this:
+>>>> 
+>>>> Which 'newer kernel' did you try?
+>>> 
+>>> Hey Daniel,
+>>> 
+>>> Sorry, I said current mainline, but actually it's 2.6.35-rc1.
+>> 
+>> Could you try two things:
+>> 
+>> a) build a kernel without MX2 DMA support
+>> b) try 2.6.34, as there were some updates to the mxcmmc driver after
+>>   2.6.34 which could be related
 
-I maintain three primary branches:
-- master, for stuff scheduled for -rc
-- devel, for stuff scheduled for the next merge window, and is unstable
-  (iow, commits don't have a stable ID, so it is inadvisable to base
-   work off this.)
-- devel-stable, for stuff scheduled for the next merge window, where the
-  commits are immutable.
+We've had the same problems for various kernels and mxcmmc modifications. The following fixed it.  We applied it to the 2.6.28 kernel and have been writing and reading *many* Gigabytes without a problem. 
+
+diff --git a/arch/arm/plat-mxc/dma-mx1-mx2.c b/arch/arm/plat-mxc/dma-mx1-mx2.c
+index e16014b..f295d68 100644
+--- a/arch/arm/plat-mxc/dma-mx1-mx2.c
++++ b/arch/arm/plat-mxc/dma-mx1-mx2.c
+@@ -653,7 +653,9 @@ static void dma_irq_handle_channel(int chno)
+ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
+ {
+        int i, disr;
++       unsigned long flags;
+ 
++       local_irq_save(flags); 
+ #ifdef CONFIG_ARCH_MX2
+        if (cpu_is_mx21() || cpu_is_mx27())
+                dma_err_handler(irq, dev_id);
+@@ -669,7 +671,7 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
+                if (disr & (1 << i))
+                        dma_irq_handle_channel(i);
+        }
+-
++       local_irq_restore(flags);
+        return IRQ_HANDLED;
+ }
+ 
+Regards,
+  Erik
