@@ -1,68 +1,40 @@
-From: l.fu@pengutronix.de (Luotao Fu)
-Date: Thu, 17 Jun 2010 21:22:57 +0200
-Subject: [PATCH] video/imxfb: fix suspend when screen is blanked
-In-Reply-To: <1276801147-4103-5-git-send-email-eric@eukrea.com>
-References: <1276801147-4103-1-git-send-email-eric@eukrea.com>
-	<1276801147-4103-2-git-send-email-eric@eukrea.com>
-	<1276801147-4103-3-git-send-email-eric@eukrea.com>
-	<1276801147-4103-4-git-send-email-eric@eukrea.com>
-	<1276801147-4103-5-git-send-email-eric@eukrea.com>
-Message-ID: <20100617192257.GA18802@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Jun 2010 20:33:24 +0100
+Subject: [PATCH 4/5] [ARM] Auto calculate ZRELADDR and provide option
+	for exceptions
+In-Reply-To: <20100611063733.GB10894@pengutronix.de>
+References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
+	<1275550613-9553-5-git-send-email-eric.miao@canonical.com>
+	<AANLkTiltifSEFdpXB0avw4ZyDzP_IrDpipafBAJbN17U@mail.gmail.com>
+	<20100611063733.GB10894@pengutronix.de>
+Message-ID: <20100617193324.GA8805@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jun 17, 2010 at 08:59:05PM +0200, Eric B?nard wrote:
-> if the screen is blanked when suspending, the clock is already disabled,
-> leading to the following log :
-> WARNING: at arch/arm/plat-mxc/clock.c:59 __clk_disable+0x68/0x74()
-> Modules linked in:
-> [<c002d200>] (unwind_backtrace+0x0/0xf8) from [<c0046008>] (warn_slowpath_common+0x48/0x78)
-> [<c0046008>] (warn_slowpath_common+0x48/0x78) from [<c0031e28>] (__clk_disable+0x68/0x74)
-> [<c0031e28>] (__clk_disable+0x68/0x74) from [<c0031ddc>] (__clk_disable+0x1c/0x74)
-> [<c0031ddc>] (__clk_disable+0x1c/0x74) from [<c0031e58>] (clk_disable+0x24/0x34)
-> [<c0031e58>] (clk_disable+0x24/0x34) from [<c019808c>] (imxfb_disable_controller+0x38/0x48)
-> [<c019808c>] (imxfb_disable_controller+0x38/0x48) from [<c01980b0>] (imxfb_suspend+0x14/0x1c)
+On Fri, Jun 11, 2010 at 08:37:33AM +0200, Uwe Kleine-K?nig wrote:
+> Hello Linus,
 > 
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> Cc: kernel at pengutronix.de
-> Cc: u.kleine-koenig at pengutronix.de
-> Cc: linux-fbdev at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  drivers/video/imxfb.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-> index b4b6dec..6cbfbff 100644
-> --- a/drivers/video/imxfb.c
-> +++ b/drivers/video/imxfb.c
-> @@ -597,8 +597,8 @@ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
->  	struct imxfb_info *fbi = info->par;
->  
->  	pr_debug("%s\n", __func__);
-> -
-> -	imxfb_disable_controller(fbi);
-> +	if (readl(fbi->regs + LCDC_RMCR))
-> +		imxfb_disable_controller(fbi);
->  	return 0;
->  }
+> On Fri, Jun 11, 2010 at 12:17:44AM +0200, Linus Walleij wrote:
+> > I assume it should be submitted simultaneously with a patch nuking off
+> > all Makefile.boot files and that infrastructure then?
+> Only when bootp is deleted or fixed not to use these variables.
 
-I've already submitted a patch to fix this issue:
-http://lkml.org/lkml/2010/6/3/187
+You can't really "fix" it not to use these variables.  The placement
+of things like the ramdisk image is something that can only be
+specified with a certain amount of information, such as where the
+kernel will be located, how large the decompressed kernel will be,
+where the RAM is located, whether there's any platform specific
+restrictions on what RAM can be used.
 
-cheers
-Luotao Fu
--- 
-Pengutronix e.K.                           | Dipl.-Ing. Luotao Fu        |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100617/0d8a4f3e/attachment.sig>
+ARM is its own enemy here - not having started out with the memory
+architected to be in a certain location like it is on x86 makes all
+this very much more complicated, and I doubt that any wrapper around
+the kernel which performs in a way like the bootp wrapper could be
+made to work reliably without being told explicitly where to place
+stuff.
+
+And I'm not in favour of it being deleted; there are boot loaders
+out there which can only fetch and boot one image.  Such boot loaders
+make it difficult to wrap a ramdisk image with the kernel.  The bootp
+wrapper solves that.  It's also not something you want to use ZBOOT=y
+with.
