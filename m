@@ -1,38 +1,27 @@
-From: mattjreimer@gmail.com (Matt Reimer)
-Date: Thu, 17 Jun 2010 09:54:19 -0700
-Subject: Hung kernel on SD writeback while suspending to RAM
-In-Reply-To: <4C1A4C74.1040008@eukrea.com>
-References: <AANLkTikHHcnJygPWKAlDk4NWGBE_fxexeLt3WO0xea0M@mail.gmail.com>
-	<4C1A4C74.1040008@eukrea.com>
-Message-ID: <AANLkTiml6DjWuP-_YEu3J6qRNYbogM52wa8mSHIuqY-z@mail.gmail.com>
+From: jdzheng@broadcom.com (JD (Jiandong) Zheng)
+Date: Thu, 17 Jun 2010 10:14:57 -0700
+Subject: [PATCH] MAINTAINERS: Change BCMRING maintainer
+In-Reply-To: <AANLkTink0mz5pS-QE0v7-_xXl_SXhY_Bx9ZH0PGUlUiz@mail.gmail.com>
+References: <8628FE4E7912BF47A96AE7DD7BAC0AADDDC694E3F7@SJEXCHCCR02.corp.ad.broadcom.com>
+	<AANLkTil6o6tHQdDM0YQRgxme3VLVuk8HUOzqscxsBQBi@mail.gmail.com>
+	<1276655981.1586.172.camel@Joe-Laptop.home>
+	<AANLkTilI2toj42vZcHzPC4ru82CDMf2UWsTasPyOD3Nh@mail.gmail.com>
+	<8628FE4E7912BF47A96AE7DD7BAC0AADDDC694E57D@SJEXCHCCR02.corp.ad.broadcom.com>
+	<AANLkTink0mz5pS-QE0v7-_xXl_SXhY_Bx9ZH0PGUlUiz@mail.gmail.com>
+Message-ID: <8628FE4E7912BF47A96AE7DD7BAC0AADDDC69DDF19@SJEXCHCCR02.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 17, 2010 at 9:25 AM, Eric B?nard <eric@eukrea.com> wrote:
-> Hi,
->
-> Le 15/06/2010 09:58, Alex Gonzalez a ?crit :
->>
->> I am looking into suspend to RAM on a Freescale MX51 running a 2.6.31
->> kernel. The
->> system suspends and resumes OK except when an SD card is mounted.
->>
->> What happens then is that it finds a page which is being written to disk
->> (writeback flag is set), so it waits forever in uninterruptible state
->> for the write to finish, which never happens.
->>
->> I was expecting the filesystem sync previous to the tasks freezing to
->> have written all page caches to disk.
->>
->> Any suggestion as to how to debug this forward?
->>
-> I think you need to enable
-> [ ] Assume MMC/SD cards are non-removable (DANGEROUS)
-> in order to be able to suspend / resume a mounted SDCard.
+> Guess the first rule is wrap your line to less than 80 characters since
+> that really improves readability, and there are a lot geeks out there
+> using console based email clients :-)
+Thanks for this!
 
-Also see the thread "[PATCH] Fix the outstanding issue with hangs on
-insert/removal of mmc cards" on linux-mmc:
+I know it is better to use git to create patch in the future and seems 
+I just need to clone linus' release tree 
+(git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git) 
+instead of arm linux tree (linux-arm.org/linux-2.6-stable.git) to 
+make change and create patches, is this correct understanding?
 
-http://article.gmane.org/gmane.linux.kernel.mmc/2233
-
-Matt
+Thanks,
+JD
