@@ -1,51 +1,168 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 17 Jun 2010 22:59:59 +0100
-Subject: [PATCH] SMDK2416: Select MACH_SMDK, S3C_DEV_NAND, S3C_DEV_USB_HOST
-In-Reply-To: <1276786221-29640-1-git-send-email-jekhor@gmail.com>
-References: <1276786221-29640-1-git-send-email-jekhor@gmail.com>
-Message-ID: <20100617215959.GF7248@trinity.fluff.org>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Fri, 18 Jun 2010 10:03:27 +1200
+Subject: [PATCH 2/3] at91_udc: Add vbus polarity and polling mode
+In-Reply-To: <1276723224-23252-3-git-send-email-ryan@bluewatersys.com>
+References: <1276723224-23252-1-git-send-email-ryan@bluewatersys.com>
+	<1276723224-23252-3-git-send-email-ryan@bluewatersys.com>
+Message-ID: <4C1A9BAF.6050907@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 17, 2010 at 05:50:21PM +0300, Yauhen Kharuzhy wrote:
-> Enable compilation of platform devices and initialization code used in
-> SMDK2416 board file.
-> 
-> Signed-off-by: Yauhen Kharuzhy <jekhor@gmail.com>
-Acked-by: Ben Dooks <ben-linux@fluff.org>
-> ---
->  arch/arm/mach-s3c2416/Kconfig |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c2416/Kconfig b/arch/arm/mach-s3c2416/Kconfig
-> index 657e4fe..eafb0ed 100644
-> --- a/arch/arm/mach-s3c2416/Kconfig
-> +++ b/arch/arm/mach-s3c2416/Kconfig
-> @@ -30,9 +30,12 @@ menu "S3C2416 Machines"
->  config MACH_SMDK2416
->  	bool "SMDK2416"
->  	select CPU_S3C2416
-> +	select MACH_SMDK
->  	select S3C_DEV_FB
->  	select S3C_DEV_HSMMC
->  	select S3C_DEV_HSMMC1
-> +	select S3C_DEV_NAND
-> +	select S3C_DEV_USB_HOST
->  	help
->  	  Say Y here if you are using an SMDK2416
->  
-> -- 
-> 1.6.6.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I realised this patch was not quite correct. If vbus is on an io
+expander then the gpio can potentially sleep, so use the gpiolib
+cansleep variants when in polling mode. Also, do not try and
+enable/disable wakeups on vbus if it is polled.
 
--- 
--- 
-Ben
+---
+at91_udc: Add vbus polarity and polling mode
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Allow the vbus signal to optionally use polling. This is required if the
+vbus signal is connected to an non-interrupting io expander for example.
+If vbus is in polling mode, then it is assumed that the vbus gpio may
+sleep. Also add an option to have vbus be an active low signal. Both
+options are set in the platform data for the device.
+
+Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+---
+
+diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
+index df2ed84..58528aa 100644
+--- a/arch/arm/mach-at91/include/mach/board.h
++++ b/arch/arm/mach-at91/include/mach/board.h
+@@ -44,6 +44,8 @@
+  /* USB Device */
+ struct at91_udc_data {
+ 	u8	vbus_pin;		/* high == host powering us */
++	u8	vbus_active_low;	/* vbus polarity */
++	u8	vbus_polled;		/* Use polling, not interrupt */
+ 	u8	pullup_pin;		/* active == D+ pulled up */
+ 	u8	pullup_active_low;	/* true == pullup_pin is active low */
+ };
+diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+index eaa79c8..469a64c 100644
+--- a/drivers/usb/gadget/at91_udc.c
++++ b/drivers/usb/gadget/at91_udc.c
+@@ -76,6 +76,7 @@
+ static const char driver_name [] = "at91_udc";
+ static const char ep0name[] = "ep0";
+ 
++#define VBUS_POLL_TIMEOUT	msecs_to_jiffies(1000)
+ 
+ #define at91_udp_read(dev, reg) \
+ 	__raw_readl((dev)->udp_baseaddr + (reg))
+@@ -1556,20 +1557,49 @@ static struct at91_udc controller = {
+ 	/* ep6 and ep7 are also reserved (custom silicon might use them) */
+ };
+ 
++static void at91_vbus_update(struct at91_udc *udc, unsigned value)
++{
++	if (udc->board.vbus_active_low)
++		value ^= 1;
++	if (value != udc->vbus)
++		at91_vbus_session(&udc->gadget, value);
++}
++
+ static irqreturn_t at91_vbus_irq(int irq, void *_udc)
+ {
+ 	struct at91_udc	*udc = _udc;
+-	unsigned	value;
+ 
+ 	/* vbus needs at least brief debouncing */
+ 	udelay(10);
+-	value = gpio_get_value(udc->board.vbus_pin);
+-	if (value != udc->vbus)
+-		at91_vbus_session(&udc->gadget, value);
++	at91_vbus_update(udc, gpio_get_value(udc->board.vbus_pin));
+ 
+ 	return IRQ_HANDLED;
+ }
+ 
++static void at91_vbus_timer_work(struct work_struct *work)
++{
++	struct at91_udc *udc = container_of(work, struct at91_udc, 
++					    vbus_timer_work);
++
++	at91_vbus_update(udc, gpio_get_value_cansleep(udc->board.vbus_pin));
++
++	if (!timer_pending(&udc->vbus_timer))
++		mod_timer(&udc->vbus_timer, jiffies + VBUS_POLL_TIMEOUT);
++}
++
++static void at91_vbus_timer(unsigned long data)
++{
++	struct at91_udc *udc = (struct at91_udc *)data;
++
++	/*
++	 * If we are polling vbus it is likely that the gpio is on an
++	 * bus such as i2c or spi which may sleep, so schedule some work
++	 * to read the vbus gpio
++	 */
++	if (!work_pending(&udc->vbus_timer_work))
++		schedule_work(&udc->vbus_timer_work);
++}
++
+ int usb_gadget_register_driver (struct usb_gadget_driver *driver)
+ {
+ 	struct at91_udc	*udc = &controller;
+@@ -1763,13 +1793,22 @@ static int __init at91udc_probe(struct platform_device *pdev)
+ 		 * Get the initial state of VBUS - we cannot expect
+ 		 * a pending interrupt.
+ 		 */
+-		udc->vbus = gpio_get_value(udc->board.vbus_pin);
+-		if (request_irq(udc->board.vbus_pin, at91_vbus_irq,
+-				IRQF_DISABLED, driver_name, udc)) {
+-			DBG("request vbus irq %d failed\n",
+-					udc->board.vbus_pin);
+-			retval = -EBUSY;
+-			goto fail3;
++		if (udc->board.vbus_polled) {
++			udc->vbus = gpio_get_value_cansleep(udc->board.vbus_pin);
++			INIT_WORK(&udc->vbus_timer_work, at91_vbus_timer_work);
++			setup_timer(&udc->vbus_timer, at91_vbus_timer,
++				    (unsigned long)udc);		
++			mod_timer(&udc->vbus_timer,
++				  jiffies + VBUS_POLL_TIMEOUT);
++		} else {
++			udc->vbus = gpio_get_value(udc->board.vbus_pin);
++			if (request_irq(udc->board.vbus_pin, at91_vbus_irq,
++					IRQF_DISABLED, driver_name, udc)) {
++				DBG("request vbus irq %d failed\n",
++				    udc->board.vbus_pin);
++				retval = -EBUSY;
++				goto fail3;
++			}
+ 		}
+ 	} else {
+ 		DBG("no VBUS detection, assuming always-on\n");
+@@ -1855,7 +1894,7 @@ static int at91udc_suspend(struct platform_device *pdev, pm_message_t mesg)
+ 		enable_irq_wake(udc->udp_irq);
+ 
+ 	udc->active_suspend = wake;
+-	if (udc->board.vbus_pin > 0 && wake)
++	if (udc->board.vbus_pin > 0 && !udc->board.vbus_polled && wake)
+ 		enable_irq_wake(udc->board.vbus_pin);
+ 	return 0;
+ }
+@@ -1864,7 +1903,8 @@ static int at91udc_resume(struct platform_device *pdev)
+ {
+ 	struct at91_udc *udc = platform_get_drvdata(pdev);
+ 
+-	if (udc->board.vbus_pin > 0 && udc->active_suspend)
++	if (udc->board.vbus_pin > 0 && !udc->board.vbus_polled && 
++	    udc->active_suspend)
+ 		disable_irq_wake(udc->board.vbus_pin);
+ 
+ 	/* maybe reconnect to host; if so, clocks on */
+diff --git a/drivers/usb/gadget/at91_udc.h b/drivers/usb/gadget/at91_udc.h
+index c65d622..a1f4f54 100644
+--- a/drivers/usb/gadget/at91_udc.h
++++ b/drivers/usb/gadget/at91_udc.h
+@@ -144,6 +144,8 @@ struct at91_udc {
+ 	struct proc_dir_entry		*pde;
+ 	void __iomem			*udp_baseaddr;
+ 	int				udp_irq;
++	struct timer_list		vbus_timer;
++	struct work_struct		vbus_timer_work;
+ };
+ 
+ static inline struct at91_udc *to_udc(struct usb_gadget *g)
