@@ -1,55 +1,51 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 18 Jun 2010 09:47:59 +1200
-Subject: gpiolib and sleeping gpios
-Message-ID: <4C1A980F.8080908@bluewatersys.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Thu, 17 Jun 2010 22:59:59 +0100
+Subject: [PATCH] SMDK2416: Select MACH_SMDK, S3C_DEV_NAND, S3C_DEV_USB_HOST
+In-Reply-To: <1276786221-29640-1-git-send-email-jekhor@gmail.com>
+References: <1276786221-29640-1-git-send-email-jekhor@gmail.com>
+Message-ID: <20100617215959.GF7248@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Currently implementors of gpiolib must provide implementations for
-gpio_get_value, gpio_set_value and gpio_cansleep. Most of the
-implementations just #define these to the double underscore prefixed
-versions in drivers/gpio/gpiolib.c. A few implementations have a simple
-wrapper function which provides a fast path for the SoC gpios, and calls
-gpiolib for the any additional gpios, such as those added by an io expander.
-
-Although gpio_chips know whether or not they may sleep, gpios which can
-sleep need to call gpio_[set/get]_value_cansleep. The only difference
-between __gpio_(set/get)_value and gpio_(set/get)_value_cansleep is that
-the cansleep versions calls might_sleep_if. Most drivers call
-gpio_(get/set)_value, rather than the cansleep variants. I haven't done
-a full audit of all of the drivers (which is a reasonably involved
-task), but I would hazard a guess that some of these could be replaced
-by the cansleep versions.
-
-Would it not be simpler to combine the calls and have something like this:
-
-void __gpio_get_value(unsigned gpio, int value)
-{
-	struct gpio_chip *chip;
-
-	chip = gpio_to_chip(gpio);
-	might_sleep_if(extra_checks && chip->can_sleep);
-	chip->set(chip, gpio - chip->base, value);
-}
-
-Then all drivers can just call gpio_(set/get)_value and any attempts to
-use sleeping gpios from an non-sleeping context will be caught by the
-might_sleep_if check. Is there something I am missing about this?
-
-I can prepare a patch which combines the non-sleeping and sleeping
-variants, but I wanted to check that I'm not missing something
-fundamental first.
-
-Thanks,
-~Ryan
+On Thu, Jun 17, 2010 at 05:50:21PM +0300, Yauhen Kharuzhy wrote:
+> Enable compilation of platform devices and initialization code used in
+> SMDK2416 board file.
+> 
+> Signed-off-by: Yauhen Kharuzhy <jekhor@gmail.com>
+Acked-by: Ben Dooks <ben-linux@fluff.org>
+> ---
+>  arch/arm/mach-s3c2416/Kconfig |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c2416/Kconfig b/arch/arm/mach-s3c2416/Kconfig
+> index 657e4fe..eafb0ed 100644
+> --- a/arch/arm/mach-s3c2416/Kconfig
+> +++ b/arch/arm/mach-s3c2416/Kconfig
+> @@ -30,9 +30,12 @@ menu "S3C2416 Machines"
+>  config MACH_SMDK2416
+>  	bool "SMDK2416"
+>  	select CPU_S3C2416
+> +	select MACH_SMDK
+>  	select S3C_DEV_FB
+>  	select S3C_DEV_HSMMC
+>  	select S3C_DEV_HSMMC1
+> +	select S3C_DEV_NAND
+> +	select S3C_DEV_USB_HOST
+>  	help
+>  	  Say Y here if you are using an SMDK2416
+>  
+> -- 
+> 1.6.6.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
+-- 
+Ben
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
