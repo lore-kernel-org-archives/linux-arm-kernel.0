@@ -1,100 +1,38 @@
-From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
-Date: Thu, 17 Jun 2010 11:42:41 -0500
-Subject: [PATCH] mailbox: change full flag per mailbox queue instead of
-	global
-In-Reply-To: <AANLkTimQrOIbsvQw7yv2x_KJmsv2p5KfNdcsNk2_DWGm@mail.gmail.com>
-References: <1276534269-19179-1-git-send-email-x0095840@ti.com>
-	<AANLkTimQrOIbsvQw7yv2x_KJmsv2p5KfNdcsNk2_DWGm@mail.gmail.com>
-Message-ID: <496565EC904933469F292DDA3F1663E602CBC9385B@dlee06.ent.ti.com>
+From: mattjreimer@gmail.com (Matt Reimer)
+Date: Thu, 17 Jun 2010 09:54:19 -0700
+Subject: Hung kernel on SD writeback while suspending to RAM
+In-Reply-To: <4C1A4C74.1040008@eukrea.com>
+References: <AANLkTikHHcnJygPWKAlDk4NWGBE_fxexeLt3WO0xea0M@mail.gmail.com>
+	<4C1A4C74.1040008@eukrea.com>
+Message-ID: <AANLkTiml6DjWuP-_YEu3J6qRNYbogM52wa8mSHIuqY-z@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+On Thu, Jun 17, 2010 at 9:25 AM, Eric B?nard <eric@eukrea.com> wrote:
+> Hi,
+>
+> Le 15/06/2010 09:58, Alex Gonzalez a ?crit :
+>>
+>> I am looking into suspend to RAM on a Freescale MX51 running a 2.6.31
+>> kernel. The
+>> system suspends and resumes OK except when an SD card is mounted.
+>>
+>> What happens then is that it finds a page which is being written to disk
+>> (writeback flag is set), so it waits forever in uninterruptible state
+>> for the write to finish, which never happens.
+>>
+>> I was expecting the filesystem sync previous to the tasks freezing to
+>> have written all page caches to disk.
+>>
+>> Any suggestion as to how to debug this forward?
+>>
+> I think you need to enable
+> [ ] Assume MMC/SD cards are non-removable (DANGEROUS)
+> in order to be able to suspend / resume a mounted SDCard.
 
-> -----Original Message-----
-> From: Ohad Ben-Cohen [mailto:ohad at wizery.com]
-> Sent: Wednesday, June 16, 2010 4:18 PM
-> To: Guzman Lugo, Fernando
-> Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org;
-> hiroshi.doyu at nokia.com
-> Subject: Re: [PATCH] mailbox: change full flag per mailbox queue instead
-> of global
-> 
-> On Mon, Jun 14, 2010 at 11:51 AM, Fernando Guzman Lugo <x0095840@ti.com>
-> wrote:
-> > As pointed by Ben Ohand, the variable rq_full flag is a global
-> > variable, so if there are multiple mailbox users there will be
-> > conflics. Now there is a full flag per mailbox queue.
-> >
-> > Reported-by: Ohad Ben-Cohen <ohad@wizery.com>
-> > Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
-> > ---
-> > ?arch/arm/plat-omap/include/plat/mailbox.h | ? ?1 +
-> > ?arch/arm/plat-omap/mailbox.c ? ? ? ? ? ? ?| ? ?7 +++----
-> > ?2 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> 
-> Thanks, Fernando, it looks good !
-> 
-> Since the original patch wasn't merged yet, it might make more sense
-> to squash it with this fix into a single patch, instead of introducing
-> this fix as a new patch. what do you think ?
+Also see the thread "[PATCH] Fix the outstanding issue with hangs on
+insert/removal of mmc cards" on linux-mmc:
 
-Sound good. I will send that patch again then. Please discard this pathc.
+http://article.gmane.org/gmane.linux.kernel.mmc/2233
 
-Regards,
-Fernando.
-
-> 
-> >
-> > diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-
-> omap/include/plat/mailbox.h
-> > index 729166b..a6144b8 100644
-> > --- a/arch/arm/plat-omap/include/plat/mailbox.h
-> > +++ b/arch/arm/plat-omap/include/plat/mailbox.h
-> > @@ -47,6 +47,7 @@ struct omap_mbox_queue {
-> > ? ? ? ?struct tasklet_struct ? tasklet;
-> > ? ? ? ?int ? ? (*callback)(void *);
-> > ? ? ? ?struct omap_mbox ? ? ? ?*mbox;
-> > + ? ? ? bool ? ?full;
-> > ?};
-> >
-> > ?struct omap_mbox {
-> > diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-> > index 8d86b0b..a1e274e 100644
-> > --- a/arch/arm/plat-omap/mailbox.c
-> > +++ b/arch/arm/plat-omap/mailbox.c
-> > @@ -30,7 +30,6 @@
-> >
-> > ?static struct omap_mbox *mboxes;
-> > ?static DEFINE_RWLOCK(mboxes_lock);
-> > -static bool rq_full;
-> >
-> > ?static int mbox_configured;
-> > ?static DEFINE_MUTEX(mbox_configured_lock);
-> > @@ -140,9 +139,9 @@ static void mbox_rx_work(struct work_struct *work)
-> > ? ? ? ?while (1) {
-> > ? ? ? ? ? ? ? ?spin_lock_irqsave(q->queue_lock, flags);
-> > ? ? ? ? ? ? ? ?rq = blk_fetch_request(q);
-> > - ? ? ? ? ? ? ? if (rq_full) {
-> > + ? ? ? ? ? ? ? if (mbox->rxq->full) {
-> > ? ? ? ? ? ? ? ? ? ? ? ?omap_mbox_enable_irq(mbox, IRQ_RX);
-> > - ? ? ? ? ? ? ? ? ? ? ? rq_full = false;
-> > + ? ? ? ? ? ? ? ? ? ? ? mbox->rxq->full = false;
-> > ? ? ? ? ? ? ? ?}
-> > ? ? ? ? ? ? ? ?spin_unlock_irqrestore(q->queue_lock, flags);
-> > ? ? ? ? ? ? ? ?if (!rq)
-> > @@ -183,7 +182,7 @@ static void __mbox_rx_interrupt(struct omap_mbox
-> *mbox)
-> > ? ? ? ? ? ? ? ?rq = blk_get_request(q, WRITE, GFP_ATOMIC);
-> > ? ? ? ? ? ? ? ?if (unlikely(!rq)) {
-> > ? ? ? ? ? ? ? ? ? ? ? ?omap_mbox_disable_irq(mbox, IRQ_RX);
-> > - ? ? ? ? ? ? ? ? ? ? ? rq_full = true;
-> > + ? ? ? ? ? ? ? ? ? ? ? mbox->rxq->full = true;
-> > ? ? ? ? ? ? ? ? ? ? ? ?goto nomem;
-> > ? ? ? ? ? ? ? ?}
-> >
-> > --
-> > 1.6.3.3
-> >
-> >
+Matt
