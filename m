@@ -1,44 +1,105 @@
-From: mhowe@cwlinux.com (Morgan Howe)
-Date: Thu, 17 Jun 2010 16:33:40 +0800
-Subject: mxcmmc driver hangs on sync
-In-Reply-To: <20100615072237.GW17833@buzzloop.caiaq.de>
-References: <20100615112936.5d03ce92@morgan>
-	<20100615063142.GU17833@buzzloop.caiaq.de>
-	<20100615152051.26e4589c@morgan>
-	<20100615072237.GW17833@buzzloop.caiaq.de>
-Message-ID: <20100617163340.69409a3f@morgan>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Thu, 17 Jun 2010 17:33:16 +0900
+Subject: [PATCH] S5PV210 Correct clock register properties
+Message-ID: <1276763596-6175-1-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
+From: MyungJoo Ham <myungJoo.ham@samsung.com>
 
-On Tue, 15 Jun 2010 09:22:37 +0200
-Daniel Mack <daniel@caiaq.de> wrote:
-> On Tue, Jun 15, 2010 at 03:20:51PM +0800, Morgan Howe wrote:
-> > On Tue, 15 Jun 2010 08:31:43 +0200
-> > Daniel Mack <daniel@caiaq.de> wrote:
-> > > On Tue, Jun 15, 2010 at 11:29:36AM +0800, Morgan Howe wrote:
-> > > > With the older kernel this would hang on sync after a few
-> > > > thousand loops, and much sooner if you ran 2 or 3 of these
-> > > > processes at a time. I tried last night with the newer kernel
-> > > > and kicking off 3 processes and after ~100-150 loops per
-> > > > process I get this:
-> > > 
-> > > Which 'newer kernel' did you try?
-> > 
-> > Hey Daniel,
-> > 
-> > Sorry, I said current mainline, but actually it's 2.6.35-rc1.
-> 
-> Could you try two things:
-> 
-> a) build a kernel without MX2 DMA support
-> b) try 2.6.34, as there were some updates to the mxcmmc driver after
->    2.6.34 which could be related
+Corrected shift values of I2S and UART clocks (CLK_GATE_IP3).
 
-I have just been able to confirm using the final release of the 2.6.34
-kernel that the problem also exists, with the same behavior as
-described for 2.6.35.
+I2S (CLK_GATE_IP3) and UART (CLK_GATE_IP3) had wrong register shift
+values, which in turn, made them turn on and off wrong clocks.
 
-Regards,
-Morgan
+Please note that each clock definition should access different control
+register; otherwise, the system may suffer lockups. For example, if we
+have two clock definitions "a" and "b" which access the same register
+(and the shift value). Then, when we do:
+
+	module B
+	1 clk = clk_get("b");
+	2 clk->clk_enable(clk);
+	3 do something with clk.
+	4 clk->clk_disable(clk);
+
+	module A
+	1 clk = clk_get("a");
+	2 clk->clk_enable(clk);
+	3 do something with clk
+	4 clk->clk_disable(clk);
+
+	And if the execution order is
+
+	B1->B2->A1->A2->A3->A4->B3 ...
+
+	Then, the system may hang at the point B3.
+
+
+Therefore, there should be no clock definitions with the same contol
+register/shift. If we need to create "aliases", then, creating child
+clocks sharing the clock should be fine.
+
+However, we did not mitigate this doppelganger clock problem for "struct
+clksrc_clk" vs "struct clk"; look at "hsmmc" vs "mmc_bus". In the next
+patch, we plan to let "struct clksrc_clk" access "CLK_SRC_MASK0" and
+"CLK_SRC_MASK1"; i.e., clock source enable/disable should mask the clock
+source itself, not the clock that is supplied by the clock source.
+
+Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+---
+ arch/arm/mach-s5pv210/clock.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+index 154bca4..ec5ad8c 100644
+--- a/arch/arm/mach-s5pv210/clock.c
++++ b/arch/arm/mach-s5pv210/clock.c
+@@ -406,13 +406,13 @@ static struct clk init_clocks_disable[] = {
+ 		.id		= 0,
+ 		.parent		= &clk_p,
+ 		.enable		= s5pv210_clk_ip3_ctrl,
+-		.ctrlbit	= (1<<4),
++		.ctrlbit	= (1<<5),
+ 	}, {
+ 		.name		= "i2s_v32",
+ 		.id		= 1,
+ 		.parent		= &clk_p,
+ 		.enable		= s5pv210_clk_ip3_ctrl,
+-		.ctrlbit	= (1<<4),
++		.ctrlbit	= (1<<6),
+ 	}
+ };
+ 
+@@ -429,25 +429,25 @@ static struct clk init_clocks[] = {
+ 		.id		= 0,
+ 		.parent		= &clk_pclk_psys.clk,
+ 		.enable		= s5pv210_clk_ip3_ctrl,
+-		.ctrlbit	= (1<<7),
++		.ctrlbit	= (1<<17),
+ 	}, {
+ 		.name		= "uart",
+ 		.id		= 1,
+ 		.parent		= &clk_pclk_psys.clk,
+ 		.enable		= s5pv210_clk_ip3_ctrl,
+-		.ctrlbit	= (1<<8),
++		.ctrlbit	= (1<<18),
+ 	}, {
+ 		.name		= "uart",
+ 		.id		= 2,
+ 		.parent		= &clk_pclk_psys.clk,
+ 		.enable		= s5pv210_clk_ip3_ctrl,
+-		.ctrlbit	= (1<<9),
++		.ctrlbit	= (1<<19),
+ 	}, {
+ 		.name		= "uart",
+ 		.id		= 3,
+ 		.parent		= &clk_pclk_psys.clk,
+ 		.enable		= s5pv210_clk_ip3_ctrl,
+-		.ctrlbit	= (1<<10),
++		.ctrlbit	= (1<<20),
+ 	},
+ };
+ 
+-- 
+1.6.3.3
