@@ -1,69 +1,68 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 17 Jun 2010 15:22:05 -0400 (EDT)
-Subject: [PATCH 0/5] Makefile.boot cleanup
-In-Reply-To: <20100603075704.GB336@pengutronix.de>
-References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
-	<20100603075704.GB336@pengutronix.de>
-Message-ID: <alpine.LFD.2.00.1006171203030.13427@xanadu.home>
+From: l.fu@pengutronix.de (Luotao Fu)
+Date: Thu, 17 Jun 2010 21:22:57 +0200
+Subject: [PATCH] video/imxfb: fix suspend when screen is blanked
+In-Reply-To: <1276801147-4103-5-git-send-email-eric@eukrea.com>
+References: <1276801147-4103-1-git-send-email-eric@eukrea.com>
+	<1276801147-4103-2-git-send-email-eric@eukrea.com>
+	<1276801147-4103-3-git-send-email-eric@eukrea.com>
+	<1276801147-4103-4-git-send-email-eric@eukrea.com>
+	<1276801147-4103-5-git-send-email-eric@eukrea.com>
+Message-ID: <20100617192257.GA18802@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Jun 2010, Uwe Kleine-K?nig wrote:
+Hi,
 
-> Hello Eric,
+On Thu, Jun 17, 2010 at 08:59:05PM +0200, Eric B?nard wrote:
+> if the screen is blanked when suspending, the clock is already disabled,
+> leading to the following log :
+> WARNING: at arch/arm/plat-mxc/clock.c:59 __clk_disable+0x68/0x74()
+> Modules linked in:
+> [<c002d200>] (unwind_backtrace+0x0/0xf8) from [<c0046008>] (warn_slowpath_common+0x48/0x78)
+> [<c0046008>] (warn_slowpath_common+0x48/0x78) from [<c0031e28>] (__clk_disable+0x68/0x74)
+> [<c0031e28>] (__clk_disable+0x68/0x74) from [<c0031ddc>] (__clk_disable+0x1c/0x74)
+> [<c0031ddc>] (__clk_disable+0x1c/0x74) from [<c0031e58>] (clk_disable+0x24/0x34)
+> [<c0031e58>] (clk_disable+0x24/0x34) from [<c019808c>] (imxfb_disable_controller+0x38/0x48)
+> [<c019808c>] (imxfb_disable_controller+0x38/0x48) from [<c01980b0>] (imxfb_suspend+0x14/0x1c)
 > 
-> On Thu, Jun 03, 2010 at 03:36:48PM +0800, Eric Miao wrote:
-> > Several facts:
-> > 
-> > 1. ZRELADDR in most cases can be auto detected by maksing PC with
-> >    0xf000_0000 if the zImage is placed within the first 256MiB from
-> >    the memory start, which is a sane assumption except for:
-> > 
-> >    - when ARCH_MX1 or ARCH_SHARK is defined
-> >    - when ARCH_U300 is defined (U300 really is strange when defining
-> >      PHYS_OFFSET and ZRELADDR)
-> >    - or when ZBOOT_ROM is defined
-> If you guess ZRELADDR based on sp instead of pc it even should work if
-> ZBOOT_ROM is defined?!
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
+> Cc: kernel at pengutronix.de
+> Cc: u.kleine-koenig at pengutronix.de
+> Cc: linux-fbdev at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  drivers/video/imxfb.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+> index b4b6dec..6cbfbff 100644
+> --- a/drivers/video/imxfb.c
+> +++ b/drivers/video/imxfb.c
+> @@ -597,8 +597,8 @@ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
+>  	struct imxfb_info *fbi = info->par;
+>  
+>  	pr_debug("%s\n", __func__);
+> -
+> -	imxfb_disable_controller(fbi);
+> +	if (readl(fbi->regs + LCDC_RMCR))
+> +		imxfb_disable_controller(fbi);
+>  	return 0;
+>  }
 
-What is the relation between sp and ZRELADDR?
+I've already submitted a patch to fix this issue:
+http://lkml.org/lkml/2010/6/3/187
 
-While we're pushing forward the notion of a relation between phys offset 
-and the location where zImage is loaded in memory, I think that making 
-the association with sp is a bit too obscur.  Knowing where you upload 
-your kernel is clear, knowing where the stack is allocated in relation 
-to that is not that clear.  It is in the .bss section of course, but 
-when ZBOOT_ROM is not defined then the .bss happens to be right after 
-the zImage binary, while it must be explicitly specified otherwise.
-
-On Sun, 6 Jun 2010, Uwe Kleine-K?nig wrote:
-
-> On Thu, Jun 10, 2010 at 02:44:53PM -0400, Nicolas Pitre wrote:
-> > If you're using ZBOOT_ROM that means you want to execute zImage directly
-> > from ROM.  This is therefore a highly customized configuration.  In that
-> > context, having a variable phys-offset doesn't make much sense to start
-> > with.
-> Right, but then the kernel needs to know this fixed value for
-> phys-offset.  In the patches presented by Eric the person configuring
-> the kernel needs to know that value.  When guessing based on sp she
-> doesn't need to read addional docs when enabling ZBOOT_ROM.
-
-That's presuming phys offset would still be runtime determined.  Again, 
-if you care about ZBOOT_ROM, you probably want a fixed phys offset at 
-compile time too.  So that value has to be determined at kernel config 
-time, not at run time from pc or sp.  And when dealing with such 
-customized expert config options, she better know what she's doing and 
-be familiar with the memory layout so not to have to read the datasheet 
-only for the physical RAM offset while she already must know what flash 
-offset to use.
-
-If anything, you _could_ try doing something similar to:
-
-config PHYS_OFFSET
-	[prompt]
-	default (CONFIG_ZBOOT_ROM_BSS & 0xf0000000) if ZBOOT_ROM
-
-but I doubt Kconfig might accept such a syntax.
-
-
-Nicolas
+cheers
+Luotao Fu
+-- 
+Pengutronix e.K.                           | Dipl.-Ing. Luotao Fu        |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100617/0d8a4f3e/attachment.sig>
