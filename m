@@ -1,41 +1,28 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 16 Jun 2010 18:03:41 -0700 (PDT)
-Subject: [PATCH 04/12] phylib: add a way to make PHY time stamps possible.
-In-Reply-To: <27c0ad283f025c2bb71e7ceb71be07f969939429.1276615626.git.richard.cochran@omicron.at>
-References: <cover.1276615626.git.richard.cochran@omicron.at>
-	<27c0ad283f025c2bb71e7ceb71be07f969939429.1276615626.git.richard.cochran@omicron.at>
-Message-ID: <20100616.180341.242128217.davem@davemloft.net>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 17 Jun 2010 11:18:40 +0800
+Subject: [PATCH] MAINTAINERS: Change BCMRING maintainer
+In-Reply-To: <8628FE4E7912BF47A96AE7DD7BAC0AADDDC694E57D@SJEXCHCCR02.corp.ad.broadcom.com>
+References: <8628FE4E7912BF47A96AE7DD7BAC0AADDDC694E3F7@SJEXCHCCR02.corp.ad.broadcom.com>
+	<AANLkTil6o6tHQdDM0YQRgxme3VLVuk8HUOzqscxsBQBi@mail.gmail.com>
+	<1276655981.1586.172.camel@Joe-Laptop.home>
+	<AANLkTilI2toj42vZcHzPC4ru82CDMf2UWsTasPyOD3Nh@mail.gmail.com>
+	<8628FE4E7912BF47A96AE7DD7BAC0AADDDC694E57D@SJEXCHCCR02.corp.ad.broadcom.com>
+Message-ID: <AANLkTink0mz5pS-QE0v7-_xXl_SXhY_Bx9ZH0PGUlUiz@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Cochran <richardcochran@gmail.com>
-Date: Tue, 15 Jun 2010 18:08:20 +0200
+On Thu, Jun 17, 2010 at 12:49 AM, JD (Jiandong) Zheng
+<jdzheng@broadcom.com> wrote:
+> Hi Eric and Joe,
+>
+> It is true that I didn't contribute to kernel directly using my company's email address. My company wants to have an engineer to be the contact point and submit patch for BCMRING code and as Leo is not longer with our company I took over this responsibility from him so that any BCMRING maintenance issue or question will be directed to me firstly in Broadcom.
+>
 
-> +static inline void skb_tx_timetamp(struct phy_device *phy, struct sk_buff *skb)
-> +{
-> +	union skb_shared_tx *shtx = skb_tx(skb);
-> +
-> +	if (shtx->hardware && phy && phy->drv->txtstamp)
-> +		phy->drv->txtstamp(phy, skb);
-> +
-> +	if (shtx->software && !shtx->in_progress)
-> +		skb_tstamp_tx(skb, NULL);
-> +}
-> +
-> +static inline void skb_rx_timetamp(struct phy_device *phy, struct sk_buff *skb)
-> +{
-> +	if (phy && phy->drv->rxtstamp)
-> +		phy->drv->rxtstamp(phy, skb);
-> +}
+Now we know the story :-) Welcome.
 
-Since, as you say, this can provide a way to deal with the sw TX
-timestamping sequencing problem we have right now, I'd rather
-you implement this from the inside out instead of from the
-outside in.
+> I'd say I am new as a *direct* kernel contributor and I have a lot to learn. I understand I need to show some credits by submitting patches, etc. and I will.
+>
 
-By this I mean you should provide these inline helpers by default
-then we can begin to put them into the drivers.
-
-You could also split the SW tstamp handling into a seperate inline
-function, which drivers call immediately once they know they will
-actually give the packet to the hardware for sending.
+Guess the first rule is wrap your line to less than 80 characters since
+that really improves readability, and there are a lot geeks out there
+using console based email clients :-)
