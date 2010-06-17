@@ -1,28 +1,81 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 17 Jun 2010 11:18:40 +0800
-Subject: [PATCH] MAINTAINERS: Change BCMRING maintainer
-In-Reply-To: <8628FE4E7912BF47A96AE7DD7BAC0AADDDC694E57D@SJEXCHCCR02.corp.ad.broadcom.com>
-References: <8628FE4E7912BF47A96AE7DD7BAC0AADDDC694E3F7@SJEXCHCCR02.corp.ad.broadcom.com>
-	<AANLkTil6o6tHQdDM0YQRgxme3VLVuk8HUOzqscxsBQBi@mail.gmail.com>
-	<1276655981.1586.172.camel@Joe-Laptop.home>
-	<AANLkTilI2toj42vZcHzPC4ru82CDMf2UWsTasPyOD3Nh@mail.gmail.com>
-	<8628FE4E7912BF47A96AE7DD7BAC0AADDDC694E57D@SJEXCHCCR02.corp.ad.broadcom.com>
-Message-ID: <AANLkTink0mz5pS-QE0v7-_xXl_SXhY_Bx9ZH0PGUlUiz@mail.gmail.com>
+From: benjamin.zores@alcatel-lucent.com (Benjamin Zores)
+Date: Thu, 17 Jun 2010 08:45:29 +0200
+Subject: Request review of device tree documentation
+In-Reply-To: <4C190D50.2010501@am.sony.com>
+References: <4C13430B.5000907@firmworks.com>	<1276339529.1962.184.camel@pasglop>	<1276339684.1962.186.camel@pasglop>	<4C13B618.1030006@firmworks.com>	<1276383132.1962.195.camel@pasglop>	<AANLkTimRV8u3gDNCAIlROJoPcKs7jFwj2na3ZDFOg3O0@mail.gmail.com>	<4C146F18.9030008@firmworks.com>	<AANLkTikls3hjXOmKFqG2D_9GaJSjOXNuuRXPlanAjo5E@mail.gmail.com>	<20100614124438.GF9323@yookeroo>	<alpine.LFD.2.00.1006141044510.13427@xanadu.home>	<20100614160201.GD9550@shareable.org>	<4C165FD1.6080505@firmworks.com>	<4C186AA8.4040709@compulab.co.il>	<4C186B7B.1060308@firmworks.com>	<4C186C72.2020506@compulab.co.il>	<4C187013.5000400@firmworks.com>	<4C18738C.4090809@compulab.co.il>	<4C187FF0.5020806@firmworks.com>	<4C18A9C7.5070800@compulab.co.il>	<alpine.LFD.2.00.1006160917390.13427@xanadu.home>
+	<4C190D50.2010501@am.sony.com>
+Message-ID: <4C19C489.1010008@alcatel-lucent.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 17, 2010 at 12:49 AM, JD (Jiandong) Zheng
-<jdzheng@broadcom.com> wrote:
-> Hi Eric and Joe,
->
-> It is true that I didn't contribute to kernel directly using my company's email address. My company wants to have an engineer to be the contact point and submit patch for BCMRING code and as Leo is not longer with our company I took over this responsibility from him so that any BCMRING maintenance issue or question will be directed to me firstly in Broadcom.
->
+On 16/06/2010 19:43, Tim Bird wrote:
+> On 06/16/2010 07:39 AM, Nicolas Pitre wrote:
+>    
+>> The cost function _is_ different for the Linux community and decision
+>> makers at chip vendor companies. I know that for having worked long
+>> enough at a prominent chip vendor already.
+>>
+>> Those vendors want to ship a product and be first on the market before
+>> the competitors do.  They grab a kernel tree, fit in their existing HAL
+>> as quickly as they can, so that they are able to demo the new chip to
+>> potential customers even before moving to full production.  And if the
+>> HAL fitting work has been done into last year's kernel already, then
+>> they will simply reuse that kernel to minimize the effort further as in
+>> theory only the HAL part needs to be swapped with the new one (doesn't
+>> matter if last year's kernel was itself already based on a kernel from
+>> the year before).  Once the software appears to work, they send it to
+>> customers and forget about it as they move to the next chip design.  So
+>> here, the cost is directly related to bring-up time, and quick (or big)
+>> ugly software hacks are more than a convenience but rather a necessity
+>> if you want to win the race.
+>>
+>> People from the Linux community care about totally different things. The
+>> most important factor here is _long term_ maintainability.  It is
+>> important that the code be clean, use a uniform coding style, and follow
+>> common interfaces.  This is so because the cost function here is
+>> directly related to the difficulty for the Linux community to evolve the
+>> kernel with generic improvements and new features.  If each driver has a
+>> different style, or rely on a different HAL, then it quickly becomes
+>> extremely expensive to update those drivers along with the generic
+>> improvements.  And if the HAL is in binary form only, or stuck behind
+>> some unalterable BIOS-like calls or firmware API, then it may even be
+>> impossible to update those drivers as the execution context assumed by
+>> the HAL firmware may not be guaranteed anymore (think about UP vs SMP,
+>> different preemption modes, different realtime kernel modes, etc.)  And
+>> of course it is impossible to anticipate what execution context and
+>> requirements the kernel might need in the future, hence this can't be
+>> provisioned for (and much less validated) into the HAL design in advance
+>> (and see above why it is next to hopeless to expect vendors to update
+>> their HAL for old products in a timely fashion).
+>>
+>> So there *is* indeed a big difference between both points of view.  And
+>> sometimes the imperatives from each group are in total conflict.
+>>      
+> This is absolutely correct.  At the CE Linux Forum, we've been working
+> for years to try to get vendors more involved in the community, with
+> a variety of techniques, including white papers for management,
+> magazine articles, outreach at industry events, and hosting our
+> own events to introduce "industry" and "community" developers.
+>    
 
-Now we know the story :-) Welcome.
+Which they somehow do more and more.
 
-> I'd say I am new as a *direct* kernel contributor and I have a lot to learn. I understand I need to show some credits by submitting patches, etc. and I will.
->
+I second Nicolas' theory (for having worked with his previous employer 
+he's talking about but also others)
+and it's true that chip vendors usually want to have their chip 
+supported in a BSP ASAP
+whatever the code looks like or how easy/hard it may be to use it for a 
+customized board.
 
-Guess the first rule is wrap your line to less than 80 characters since
-that really improves readability, and there are a lot geeks out there
-using console based email clients :-)
+Though, more and more are now duplicating efforts, having 2 kernel 
+development teams: one doing BSP
+and one trying to push code in upstream Linux, conforming to the 
+expected level of quality and maintainability.
+
+While it's true that having this second team doing so is fully welcomed, 
+one has to say that most of the times
+there are no communication between these teams in the same company, 
+people redoing the same mistakes
+(or having to fix the same bugs) twice.
+
+Ben
