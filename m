@@ -1,38 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Jun 2010 00:00:08 +0100
-Subject: [PATCH 08/10] arm: deprecate support for old way to pass
-	kernel parameters
-In-Reply-To: <AANLkTikNtX5TiPlWOAf_C-HqK7kchZgwi-MQzQqgtush@mail.gmail.com>
-References: <20100610102427.GC31057@pengutronix.de>
-	<1276165636-20150-8-git-send-email-u.kleine-koenig@pengutronix.de>
-	<AANLkTikNtX5TiPlWOAf_C-HqK7kchZgwi-MQzQqgtush@mail.gmail.com>
-Message-ID: <20100617230008.GA10780@n2100.arm.linux.org.uk>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 18 Jun 2010 09:08:57 +1000
+Subject: [GIT PULL linux-next] tegra
+In-Reply-To: <AANLkTikXH_UtE95ZGHp5AAm5IRD6dN8cnrNK9A3-MRwY@mail.gmail.com>
+References: <AANLkTikXH_UtE95ZGHp5AAm5IRD6dN8cnrNK9A3-MRwY@mail.gmail.com>
+Message-ID: <20100618090857.057e0a7a.sfr@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 17, 2010 at 05:58:42PM +0800, Eric Miao wrote:
-> 2010/6/10 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > This was deprecated in 2001 and announced to live on for 5 years.
-> >
-> > For now provide a kernel parameter for those who still need it.
-> >
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Hi Eric,
+
+On Thu, 17 Jun 2010 15:38:19 -0700 Erik Gilling <konkers@android.com> wrote:
+>
+> Can you please pull the following into linux-next?
 > 
-> Looks OK to me, Acked.
+> git://android.git.kernel.org/kernel/tegra.git for-next
 > 
-> BTW, is there any existing usage of this and can we remove this
-> completely from now on?
+> This tree adds support for the Nvidia Tegra ARM SOCs.  It's received
+> review on linux-arm-kernel.
 
-Boot messages from my firewall:
+Added from today.  Should the contact be just you or should I add others
+as well.
 
-Linux version 2.6.32.8 (rmk at rmk-PC) (gcc version 3.4.3) #11 Sat Mar 27 20:51:49 GMT 2010
-CPU: StrongARM-110 [4401a102] revision 2 (ARMv4), cr=0000517d
-CPU: VIVT data cache, VIVT instruction cache
-Machine: EBSA110
-Converting old-style param struct to taglist
-ATAG_INITRD is deprecated; please update your bootloader.
-Memory policy: ECC disabled, Data cache writeback
+Thanks for adding your subsystem tree as a participant of linux-next.  As
+you may know, this is not a judgment of your code.  The purpose of
+linux-next is for integration testing and to lower the impact of
+conflicts between subsystems in the next merge window. 
 
-Obviously, being a critical machine here, and that I have no way to jtag
-it if I brick it, I'm not going to replace the boot loader (which
-incidentally can only bootp/tftp one file - the one in the bootp packet.)
+You will need to ensure that the patches/commits in your tree/series have
+been:
+     * submitted under GPL v2 (or later) and include the Contributor's
+	Signed-off-by,
+     * posted to the relevant mailing list,
+     * reviewed by you (or another maintainer of your subsystem tree),
+     * successfully unit tested, and 
+     * destined for the current or next Linux merge window.
+
+Basically, this should be just what you would send to Linus (or ask him
+to fetch).  It is allowed to be rebased if you deem it necessary.
+
+-- 
+Cheers,
+Stephen Rothwell 
+sfr at canb.auug.org.au
+
+Legal Stuff:
+By participating in linux-next, your subsystem tree contributions are
+public and will be included in the linux-next trees.  You may be sent
+e-mail messages indicating errors or other issues when the
+patches/commits from your subsystem tree are merged and tested in
+linux-next.  These messages may also be cross-posted to the linux-next
+mailing list, the linux-kernel mailing list, etc.  The linux-next tree
+project and IBM (my employer) make no warranties regarding the linux-next
+project, the testing procedures, the results, the e-mails, etc.  If you
+don't agree to these ground rules, let me know and I'll remove your tree
+from participation in linux-next.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100618/5840dba5/attachment.sig>
