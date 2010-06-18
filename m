@@ -1,92 +1,66 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 18 Jun 2010 17:15:23 +0800
-Subject: Several questions regarding ARCH_S3C2410
-In-Reply-To: <20100618090010.GX3498@trinity.fluff.org>
-References: <AANLkTimPk6mtyB57jXuAq1ugQseS655OCPEuP9-qZYoT@mail.gmail.com>
-	<20100618090010.GX3498@trinity.fluff.org>
-Message-ID: <AANLkTin8g1jSGvju_-7rctjw0PTuunSKDivS1_yxp_lS@mail.gmail.com>
+Date: Fri, 18 Jun 2010 17:19:59 +0800
+Subject: [PATCH 02/25] pxa3xx_nand: introduce common timing to reduce read
+	id times
+In-Reply-To: <AANLkTil6D3Cijy1JZ3aQLBGBfi99zOGDy5Xl8OmY_T_8@mail.gmail.com>
+References: <AANLkTim1qcVoqSS7T8bE0Vsu6phC2iY_Ok671WYHcD0z@mail.gmail.com>
+	<AANLkTil6QDRdh3s63J9Mm-B1qjMcnYjEEm-W5lC1NXVb@mail.gmail.com>
+	<AANLkTikbzXgwMvnNVRkcOO-9El9hmAXhKZK_dFgStbwY@mail.gmail.com>
+	<AANLkTikDDFYY65l5YYGW3a0O2bWDyKRO6VRb15aaFtF7@mail.gmail.com>
+	<AANLkTil6D3Cijy1JZ3aQLBGBfi99zOGDy5Xl8OmY_T_8@mail.gmail.com>
+Message-ID: <AANLkTimeJYwret1ZlEHaX_-T14qB3WteQwpn9y7_1Zo9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 18, 2010 at 5:00 PM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Fri, Jun 18, 2010 at 11:43:37AM +0800, Eric Miao wrote:
->> Hi Ben,
+On Fri, Jun 18, 2010 at 5:15 PM, Lei Wen <adrian.wenl@gmail.com> wrote:
+> On Fri, Jun 18, 2010 at 4:12 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>>>>> - ? ? ? if (f->page_size != 2048 && f->page_size != 512)
+>>>>> - ? ? ? ? ? ? ? return -EINVAL;
+>>>>> -
+>>>>> - ? ? ? if (f->flash_width != 16 && f->flash_width != 8)
+>>>>> - ? ? ? ? ? ? ? return -EINVAL;
+>>>>> -
+>>>>
+>>>> I do think these are sanity check, that's useful to prevent incorrectly defined
+>>>> data (esp. coming from board code). Can we define the loose flash type as:
+>>>>
+>>>>> ?static struct pxa3xx_nand_flash __devinitdata builtin_flash_types[] = {
+>>>>> + ? ? ? { ?0x0000, ? 0, ? ?512, ?8, ?8, ? ?0, &timing[0], },
+>>>>> + ? ? ? { 0x46ec, ?32, ?512, 16, 16, 4096, &timing[1], },
+>>>>> + ? ? ? { 0xdaec, ?64, 2048, ?8, ?8, 2048, &timing[1], },
+>>>>
+>>>> with a comment of /* default flash type to detect ID */?
+>>>>
+>>>> My understanding is the minimum requirement to detect the NAND ID is a
+>>>> loose timing and 512 small page, 8-bit wide bus, so with a chip_id being
+>>>> 0x0000, that should be enough to tell it's a special flash type to detect ID.
+>>>
+>>> There is no need to add the flash page size and bus width for the
+>>> common timing, or loose timing...
+>>> For the chip identification only need reset and read id command, and
+>>> reset and read id command only care
+>>> for the first command in NDCB0 and the timing setting in NDTR0CS0 and
+>>> NDTR1CS0, the page size is not useful
+>>> here and could make confussion if give such definition...
 >>
->> While working towards a unified kernel, I found that ARCH_S3C2410 actually
->> includes multiple mach-* already.
->>
->> linux-2.6$ git grep "ARCH_S3C2410" arch/arm/Makefile
->> arch/arm/Makefile:machine-$(CONFIG_ARCH_S3C2410) ? ? ?:= s3c2410 s3c2400
->> s3c2412 s3c2416 s3c2440 s3c2443
->>
->> There are several questions though:
->>
->> 1. It looks like only s3c2410 is significant, so all the common definitions
->> ? ?like PHYS_OFFSET are actually same across all mach-s3c24* (except for
->> ? ?s3c24a0) ? Yet I've found arch/arm/mach-s3c2400/include/mach/memory.h,
->> ? ?where a different PHYS_OFFSET is defined, just feel a bit confused.
+>> I know, but I'd like to keep the checking of page_size, and flash_width,
+>> if you take a look into the rest of the code how much it is assumed that
+>> page_size being either 2048 or 512, flash_width being 8 or 16, you'll
+>> know why such an error checking here is mandatory actually.
 >
-> You can safely ignore the s3c24a0 for the moment, there's no-one interested
-> in actually getting it submitted.
-
-Grrr... indeed.Looking into mach-s3c24a0, it's almost empty except for some
-header files.
-
->
->> 2. So except for s3c24a0, theretically, it's possible to combine all these
->> ? ?mach into something mach-s3c24xx?
->
-> Theoretically yes, practically leave it alone.
->
->> 3. When trying building of s3c2410_defconfig, there are a lot complaints
->> ? ?about re-definitions of {in,out}[s]{b,w,l}. ?Taking a look into io.h,
->> ? ?I'm wondering if it's possible to use those definitions in asm/io.h?
->> ? ?(possibly with a customized __io())
->>
->> In file included from linux-2.6/include/linux/scatterlist.h:8,
->> ? ? ? ? ? ? ? ? ?from linux-2.6/include/linux/dma-mapping.h:7,
->> ? ? ? ? ? ? ? ? ?from linux-2.6/include/linux/dmaengine.h:26,
->> ? ? ? ? ? ? ? ? ?from linux-2.6/include/linux/skbuff.h:30,
->> ? ? ? ? ? ? ? ? ?from linux-2.6/lib/kobject_uevent.c:24:
->> linux-2.6/arch/arm/include/asm/io.h:137: warning: "outb" redefined
->> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:196: note: this is
->> the location of the previous definition
->> linux-2.6/arch/arm/include/asm/io.h:138: warning: "outw" redefined
->> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:197: note: this is
->> the location of the previous definition
->> linux-2.6/arch/arm/include/asm/io.h:140: warning: "outl" redefined
->> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:198: note: this is
->> the location of the previous definition
->> linux-2.6/arch/arm/include/asm/io.h:143: warning: "inb" redefined
->> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:193: note: this is
->> the location of the previous definition
->> linux-2.6/arch/arm/include/asm/io.h:144: warning: "inw" redefined
->> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:194: note: this is
->> the location of the previous definition
->> linux-2.6/arch/arm/include/asm/io.h:146: warning: "inl" redefined
->> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:195: note: this is
->> the location of the previous definition
->> linux-2.6/arch/arm/include/asm/io.h:149: warning: "outsb" redefined
->> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:207: note: this is
->> the location of the previous definition
->> linux-2.6/arch/arm/include/asm/io.h:150: warning: "outsw" redefined
->> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:208: note: this is
->> the location of the previous definition
->> linux-2.6/arch/arm/include/asm/io.h:151: warning: "outsl" redefined
->> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:209: note: this is
->> the location of the previous definition
->> linux-2.6/arch/arm/include/asm/io.h:153: warning: "insb" redefined
->> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:203: note: this is
->> the location of the previous definition
->> linux-2.6/arch/arm/include/asm/io.h:154: warning: "insw" redefined
->> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:204: note: this is
->> the location of the previous definition
->> linux-2.6/arch/arm/include/asm/io.h:155: warning: "insl" redefined
->> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:205: note: this is
->> the location of the previous definition
->
-> that's something for you to sort out.
+> I know that the configure_flash function need to check page_size &
+> flash_width to set the
+> ndcr. But what the setting would not affect the reset/read id result anyway...
+> For there is some chip has the same bytes in the first two bytes, I
+> choose to always read out
+> 4 bytes data when send read id command in latter patch of this patch set...
 >
 
-Come on, you must be kidding me. I have no idea how that crap was
-being formed :-)
+My understanding is that NAND READID will at least work with the assumption
+of 512bytes/page and 8-bit wide bus, no matter how the NAND chips are
+connected. (unless some one comes up with a insane design of using multiple
+interlaced NAND chips of different types).
+
+Again, assume the NAND controller is not initialized (register values being
+garbage or all zero-ed), do you still think you can read out the ID without
+letting it know the page size, bus width and etc?
