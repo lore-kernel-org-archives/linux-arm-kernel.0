@@ -1,29 +1,36 @@
-From: john.ogness@linutronix.de (John Ogness)
-Date: Fri, 18 Jun 2010 19:02:03 +0200
-Subject: [PATCH 5/5] mtd: mxc_nand fixups
-Message-ID: <80zkys9svo.fsf@merkur.tec.linutronix.de>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Fri, 18 Jun 2010 19:40:04 +0200
+Subject: [PATCH v2] input/imx_keypad: add PM support
+In-Reply-To: <4C1B84A3.8080300@eukrea.com>
+References: <1276801147-4103-1-git-send-email-eric@eukrea.com>
+	<1276856186.3146.5.camel@realization>  <4C1B84A3.8080300@eukrea.com>
+Message-ID: <1276882804.3146.14.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes some unused variable declarations.
+On ven, 2010-06-18 at 16:37 +0200, Eric B?nard wrote:
+> Hi Alberto,
+> 
+> Le 18/06/2010 12:16, Alberto Panizzo a ?crit :
+> > Ok, so with this patch the keypad cannot wake the system?
+> > It is scheduled another patch?
+> >
+> well, actually, the keypad wakes the system, at least on my board here.
+> 
+> I was quite surprised to get this working this way as I would have 
+> expected disable_irq + clk_disable would prevent the keypad from being a 
+> wake source.
+> Can you try on your board as this cleanup may be wrong on i.MX3 ?
+> 
+> Thanks,
+> Eric
+Well.. it is a surprise to me too. I have to look down the documentation
+ad soon I will try on the mx31pdk.
+I don't wont to tell you wrong things.
 
-The patch is against linux-next 20100618.
 
-Signed-off-by: John Ogness <john.ogness@linutronix.de>
----
- drivers/mtd/nand/mxc_nand.c |    2 --
- 1 file changed, 2 deletions(-)
+-- 
+Alberto!
 
-Index: linux-next-20100618/drivers/mtd/nand/mxc_nand.c
-===================================================================
---- linux-next-20100618.orig/drivers/mtd/nand/mxc_nand.c
-+++ linux-next-20100618/drivers/mtd/nand/mxc_nand.c
-@@ -967,8 +967,6 @@ static int mxcnd_suspend(struct platform
- static int mxcnd_resume(struct platform_device *pdev)
- {
- 	struct mtd_info *mtd = platform_get_drvdata(pdev);
--	struct nand_chip *nand_chip = mtd->priv;
--	struct mxc_nand_host *host = nand_chip->priv;
- 	int ret = 0;
- 
- 	DEBUG(MTD_DEBUG_LEVEL0, "MXC_ND : NAND resume\n");
+        Be Persistent!
+                - Greg Kroah-Hartman (FOSDEM 2010)
