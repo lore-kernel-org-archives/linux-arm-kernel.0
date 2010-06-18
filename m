@@ -1,72 +1,88 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 18 Jun 2010 11:43:37 +0800
-Subject: Several questions regarding ARCH_S3C2410
-Message-ID: <AANLkTimPk6mtyB57jXuAq1ugQseS655OCPEuP9-qZYoT@mail.gmail.com>
+Date: Fri, 18 Jun 2010 12:03:46 +0800
+Subject: [PATCH 1/4] [ARM] Remove now unnecessary dma_needs_bounce()
+In-Reply-To: <1275724538-5075-2-git-send-email-eric.y.miao@gmail.com>
+References: <1275724538-5075-1-git-send-email-eric.y.miao@gmail.com>
+	<1275724538-5075-2-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <AANLkTilJ3UpyHEplDqS_nV8SVDcl_pRRn4glDn7JS1GW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+On Sat, Jun 5, 2010 at 3:55 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> With a correct dev->dma_mask before calling dmabounce_register_dev(),
+> dma_needs_bounce() is not necessary.
+>
+> The above is true for it8152.c and ixp4xx/common-pci.c.
+>
+> The sa1111, though, is a bit complicated. Until it's fully understood
+> and fixed, dma_needs_bounce() for sa1111 is kept if CONFIG_SA1111 is
+> enabled with no side effect (with the condition of machine_is_*)
+>
 
-While working towards a unified kernel, I found that ARCH_S3C2410 actually
-includes multiple mach-* already.
+Sorry I forgot to CC you two. Any feedback is welcome, thanks.
 
-linux-2.6$ git grep "ARCH_S3C2410" arch/arm/Makefile
-arch/arm/Makefile:machine-$(CONFIG_ARCH_S3C2410)	:= s3c2410 s3c2400
-s3c2412 s3c2416 s3c2440 s3c2443
-
-There are several questions though:
-
-1. It looks like only s3c2410 is significant, so all the common definitions
-   like PHYS_OFFSET are actually same across all mach-s3c24* (except for
-   s3c24a0) ? Yet I've found arch/arm/mach-s3c2400/include/mach/memory.h,
-   where a different PHYS_OFFSET is defined, just feel a bit confused.
-
-2. So except for s3c24a0, theretically, it's possible to combine all these
-   mach into something mach-s3c24xx?
-
-3. When trying building of s3c2410_defconfig, there are a lot complaints
-   about re-definitions of {in,out}[s]{b,w,l}.  Taking a look into io.h,
-   I'm wondering if it's possible to use those definitions in asm/io.h?
-   (possibly with a customized __io())
-
-In file included from linux-2.6/include/linux/scatterlist.h:8,
-                 from linux-2.6/include/linux/dma-mapping.h:7,
-                 from linux-2.6/include/linux/dmaengine.h:26,
-                 from linux-2.6/include/linux/skbuff.h:30,
-                 from linux-2.6/lib/kobject_uevent.c:24:
-linux-2.6/arch/arm/include/asm/io.h:137: warning: "outb" redefined
-linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:196: note: this is
-the location of the previous definition
-linux-2.6/arch/arm/include/asm/io.h:138: warning: "outw" redefined
-linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:197: note: this is
-the location of the previous definition
-linux-2.6/arch/arm/include/asm/io.h:140: warning: "outl" redefined
-linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:198: note: this is
-the location of the previous definition
-linux-2.6/arch/arm/include/asm/io.h:143: warning: "inb" redefined
-linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:193: note: this is
-the location of the previous definition
-linux-2.6/arch/arm/include/asm/io.h:144: warning: "inw" redefined
-linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:194: note: this is
-the location of the previous definition
-linux-2.6/arch/arm/include/asm/io.h:146: warning: "inl" redefined
-linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:195: note: this is
-the location of the previous definition
-linux-2.6/arch/arm/include/asm/io.h:149: warning: "outsb" redefined
-linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:207: note: this is
-the location of the previous definition
-linux-2.6/arch/arm/include/asm/io.h:150: warning: "outsw" redefined
-linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:208: note: this is
-the location of the previous definition
-linux-2.6/arch/arm/include/asm/io.h:151: warning: "outsl" redefined
-linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:209: note: this is
-the location of the previous definition
-linux-2.6/arch/arm/include/asm/io.h:153: warning: "insb" redefined
-linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:203: note: this is
-the location of the previous definition
-linux-2.6/arch/arm/include/asm/io.h:154: warning: "insw" redefined
-linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:204: note: this is
-the location of the previous definition
-linux-2.6/arch/arm/include/asm/io.h:155: warning: "insl" redefined
-linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:205: note: this is
-the location of the previous definition
+> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+> ---
+> ?arch/arm/common/it8152.c ? ? ? ? ? | ? ?8 --------
+> ?arch/arm/include/asm/dma-mapping.h | ? ?7 +++++++
+> ?arch/arm/mach-ixp4xx/common-pci.c ?| ? ?5 -----
+> ?3 files changed, 7 insertions(+), 13 deletions(-)
+>
+> diff --git a/arch/arm/common/it8152.c b/arch/arm/common/it8152.c
+> index 7974baa..6c09135 100644
+> --- a/arch/arm/common/it8152.c
+> +++ b/arch/arm/common/it8152.c
+> @@ -263,14 +263,6 @@ static int it8152_pci_platform_notify_remove(struct device *dev)
+> ? ? ? ?return 0;
+> ?}
+>
+> -int dma_needs_bounce(struct device *dev, dma_addr_t dma_addr, size_t size)
+> -{
+> - ? ? ? dev_dbg(dev, "%s: dma_addr %08x, size %08x\n",
+> - ? ? ? ? ? ? ? __func__, dma_addr, size);
+> - ? ? ? return (dev->bus == &pci_bus_type) &&
+> - ? ? ? ? ? ? ? ((dma_addr + size - PHYS_OFFSET) >= SZ_64M);
+> -}
+> -
+> ?int __init it8152_pci_setup(int nr, struct pci_sys_data *sys)
+> ?{
+> ? ? ? ?it8152_io.start = IT8152_IO_BASE + 0x12000;
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index 69ce072..c80d4d2 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -298,7 +298,14 @@ extern void dmabounce_unregister_dev(struct device *);
+> ?* DMA access and 1 if the buffer needs to be bounced.
+> ?*
+> ?*/
+> +#ifdef CONFIG_SA1111
+> ?extern int dma_needs_bounce(struct device*, dma_addr_t, size_t);
+> +#else
+> +static inline int dma_needs_bounce(struct device*, dma_addr_t, size_t)
+> +{
+> + ? ? ? return 0;
+> +}
+> +#endif
+>
+> ?/*
+> ?* The DMA API, implemented by dmabounce.c. ?See below for descriptions.
+> diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
+> index e318153..c7aa0ac 100644
+> --- a/arch/arm/mach-ixp4xx/common-pci.c
+> +++ b/arch/arm/mach-ixp4xx/common-pci.c
+> @@ -337,11 +337,6 @@ static int ixp4xx_pci_platform_notify_remove(struct device *dev)
+> ? ? ? ?return 0;
+> ?}
+>
+> -int dma_needs_bounce(struct device *dev, dma_addr_t dma_addr, size_t size)
+> -{
+> - ? ? ? return (dev->bus == &pci_bus_type ) && ((dma_addr + size) >= SZ_64M);
+> -}
+> -
+> ?/*
+> ?* Only first 64MB of memory can be accessed via PCI.
+> ?* We use GFP_DMA to allocate safe buffers to do map/unmap.
+> --
+> 1.7.0.4
+>
+>
