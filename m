@@ -1,56 +1,29 @@
 From: john.ogness@linutronix.de (John Ogness)
-Date: Fri, 18 Jun 2010 19:01:34 +0200
-Subject: [PATCH 4/5] mtd: mxc_nand fixups
-Message-ID: <804oh0b7gx.fsf@merkur.tec.linutronix.de>
+Date: Fri, 18 Jun 2010 19:02:03 +0200
+Subject: [PATCH 5/5] mtd: mxc_nand fixups
+Message-ID: <80zkys9svo.fsf@merkur.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch reverts the driver to enabling/disabling the NFC interrupt
-mask rather than enabling/disabling the system interrupt. This cleans
-up the driver so that it doesn't rely on interrupts being disabled
-within the interrupt handler.
+This patch removes some unused variable declarations.
 
 The patch is against linux-next 20100618.
 
 Signed-off-by: John Ogness <john.ogness@linutronix.de>
 ---
- drivers/mtd/nand/mxc_nand.c |   11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ drivers/mtd/nand/mxc_nand.c |    2 --
+ 1 file changed, 2 deletions(-)
 
 Index: linux-next-20100618/drivers/mtd/nand/mxc_nand.c
 ===================================================================
 --- linux-next-20100618.orig/drivers/mtd/nand/mxc_nand.c
 +++ linux-next-20100618/drivers/mtd/nand/mxc_nand.c
-@@ -173,8 +173,11 @@ static const char *part_probes[] = { "Re
- static irqreturn_t mxc_nfc_irq(int irq, void *dev_id)
+@@ -967,8 +967,6 @@ static int mxcnd_suspend(struct platform
+ static int mxcnd_resume(struct platform_device *pdev)
  {
- 	struct mxc_nand_host *host = dev_id;
-+	uint16_t tmp;
+ 	struct mtd_info *mtd = platform_get_drvdata(pdev);
+-	struct nand_chip *nand_chip = mtd->priv;
+-	struct mxc_nand_host *host = nand_chip->priv;
+ 	int ret = 0;
  
--	disable_irq_nosync(irq);
-+	tmp = readw(host->regs + NFC_CONFIG1);
-+	tmp |= NFC_INT_MSK; /* disable NFC interrupts */
-+	writew(tmp, host->regs + NFC_CONFIG1);
- 
- 	wake_up(&host->irq_waitq);
- 
-@@ -192,7 +195,9 @@ static void wait_op_done(struct mxc_nand
- 	if (useirq) {
- 		if ((readw(host->regs + NFC_CONFIG2) & NFC_INT) == 0) {
- 
--			enable_irq(host->irq);
-+			tmp = readw(host->regs + NFC_CONFIG1);
-+			tmp  &= ~NFC_INT_MSK;   /* enable NFC interrupts */
-+			writew(tmp, host->regs + NFC_CONFIG1);
- 
- 			wait_event(host->irq_waitq,
- 				readw(host->regs + NFC_CONFIG2) & NFC_INT);
-@@ -846,7 +851,7 @@ static int __init mxcnd_probe(struct pla
- 
- 	host->irq = platform_get_irq(pdev, 0);
- 
--	err = request_irq(host->irq, mxc_nfc_irq, IRQF_DISABLED, DRIVER_NAME, host);
-+	err = request_irq(host->irq, mxc_nfc_irq, 0, DRIVER_NAME, host);
- 	if (err)
- 		goto eirq;
- 
+ 	DEBUG(MTD_DEBUG_LEVEL0, "MXC_ND : NAND resume\n");
