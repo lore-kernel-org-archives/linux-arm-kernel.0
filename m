@@ -1,168 +1,232 @@
-From: david-b@pacbell.net (David Brownell)
-Date: Thu, 17 Jun 2010 23:16:10 -0700 (PDT)
-Subject: gpiolib and sleeping gpios
-In-Reply-To: <4C1A980F.8080908@bluewatersys.com>
-Message-ID: <514259.95052.qm@web180315.mail.gq1.yahoo.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 18 Jun 2010 14:23:02 +0800
+Subject: [PATCH 01/25] pxa3xx_nand: condense the flash definition
+In-Reply-To: <AANLkTil1FnPkGS7l6W0HWeXyOxXzWbZkvFWY4jJF_I_A@mail.gmail.com>
+References: <AANLkTil1FnPkGS7l6W0HWeXyOxXzWbZkvFWY4jJF_I_A@mail.gmail.com>
+Message-ID: <AANLkTinOsQ8AcH-As91CRqrEQVnXdsm_CmFQgyj7gI1_@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jun 18, 2010 at 1:32 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> From 76684334fbf214ab164ed07791b02535a3f04779 Mon Sep 17 00:00:00 2001
+> From: Lei Wen <leiwen@marvell.com>
+> Date: Sat, 20 Mar 2010 19:01:23 +0800
+> Subject: [PATCH 01/25] pxa3xx_nand: condense the flash definition
+>
+> Adding a new flash definition would need less code.
+> Keep the platform passing flash defition method.
+                                  ^^^^^^^^ definition?
+> If one flash is both defined in platform data and builtin table,
+> driver would select the one from platform data first.
 
+This makes sense. I thin the CONFIG_MTD_NAND_PXA3xx_BUILTIN is introduced
+as an optimization so to reduce the code size if platform flash definition
+is provided, instead of an option to remove built-in definitions.
 
---- On Thu, 6/17/10, Ryan Mallon <ryan@bluewatersys.com> wrote:
-> Currently implementors of gpiolib must provide
-> implementations for
-> gpio_get_value, gpio_set_value and gpio_cansleep. 
+>
+> By this way, platform could select the timing most suit for itself,
+                                                     ^^^^ suitable
+> not need to follow the common settings.
+>
+> Signed-off-by: Lei Wen <leiwen@marvell.com>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-Not true.  There is ONE implementation of gpiolib.
+// there are some line wrapped though, maybe it's my gmail fault.
 
-I think you mean "implementors of the GPIO calls".
-many of those implementors will use gpiolib, to
-make their lives easier.  They are not, however,
-re-implementing gpiolib itself...
+> ---
+> ?arch/arm/plat-pxa/include/plat/pxa3xx_nand.h | ? 37 ----
+> ?drivers/mtd/nand/Kconfig ? ? ? ? ? ? ? ? ? ? | ? ?7 -
+> ?drivers/mtd/nand/pxa3xx_nand.c ? ? ? ? ? ? ? | ?241 +++++++-------------------
+> ?3 files changed, 66 insertions(+), 219 deletions(-)
+>
+> diff --git a/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
+> b/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
+> index 3478eae..7e5a28f 100644
+> --- a/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
+> +++ b/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
+> @@ -4,43 +4,6 @@
+> ?#include <linux/mtd/mtd.h>
+> ?#include <linux/mtd/partitions.h>
+>
+> -struct pxa3xx_nand_timing {
+> - ? ? ? unsigned int ? ?tCH; ?/* Enable signal hold time */
+> - ? ? ? unsigned int ? ?tCS; ?/* Enable signal setup time */
+> - ? ? ? unsigned int ? ?tWH; ?/* ND_nWE high duration */
+> - ? ? ? unsigned int ? ?tWP; ?/* ND_nWE pulse time */
+> - ? ? ? unsigned int ? ?tRH; ?/* ND_nRE high duration */
+> - ? ? ? unsigned int ? ?tRP; ?/* ND_nRE pulse width */
+> - ? ? ? unsigned int ? ?tR; ? /* ND_nWE high to ND_nRE low for read */
+> - ? ? ? unsigned int ? ?tWHR; /* ND_nWE high to ND_nRE low for status read */
+> - ? ? ? unsigned int ? ?tAR; ?/* ND_ALE low to ND_nRE low delay */
+> -};
+> -
+> -struct pxa3xx_nand_cmdset {
+> - ? ? ? uint16_t ? ? ? ?read1;
+> - ? ? ? uint16_t ? ? ? ?read2;
+> - ? ? ? uint16_t ? ? ? ?program;
+> - ? ? ? uint16_t ? ? ? ?read_status;
+> - ? ? ? uint16_t ? ? ? ?read_id;
+> - ? ? ? uint16_t ? ? ? ?erase;
+> - ? ? ? uint16_t ? ? ? ?reset;
+> - ? ? ? uint16_t ? ? ? ?lock;
+> - ? ? ? uint16_t ? ? ? ?unlock;
+> - ? ? ? uint16_t ? ? ? ?lock_status;
+> -};
+> -
+> -struct pxa3xx_nand_flash {
+> - ? ? ? const struct pxa3xx_nand_timing *timing; /* NAND Flash timing */
+> - ? ? ? const struct pxa3xx_nand_cmdset *cmdset;
+> -
+> - ? ? ? uint32_t page_per_block;/* Pages per block (PG_PER_BLK) */
+> - ? ? ? uint32_t page_size; ? ? /* Page size in bytes (PAGE_SZ) */
+> - ? ? ? uint32_t flash_width; ? /* Width of Flash memory (DWIDTH_M) */
+> - ? ? ? uint32_t dfc_width; ? ? /* Width of flash controller(DWIDTH_C) */
+> - ? ? ? uint32_t num_blocks; ? ?/* Number of physical blocks in Flash */
+> - ? ? ? uint32_t chip_id;
+> -};
+> -
 
-Most of
-> the
-> implementations just #define these to the double underscore
-> prefixed
-> versions in drivers/gpio/gpiolib.c. A few implementations
-> have a simple
-> wrapper function which provides a fast path for the SoC
-> gpios, and calls
-> gpiolib for the any additional gpios, such as those added
-> by an io expander.
+So does this prevent board code from defining their own timing and etc?
 
-Right...
+> ?struct pxa3xx_nand_platform_data {
+>
+> ? ? ? ?/* the data flash bus is shared between the Static Memory
+> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+> index 98a04b3..9a35d92 100644
+> --- a/drivers/mtd/nand/Kconfig
+> +++ b/drivers/mtd/nand/Kconfig
+> @@ -399,13 +399,6 @@ config MTD_NAND_PXA3xx
+> ? ? ? ? ?This enables the driver for the NAND flash device found on
+> ? ? ? ? ?PXA3xx processors
+>
+> -config MTD_NAND_PXA3xx_BUILTIN
+> - ? ? ? bool "Use builtin definitions for some NAND chips (deprecated)"
+> - ? ? ? depends on MTD_NAND_PXA3xx
+> - ? ? ? help
+> - ? ? ? ? This enables builtin definitions for some NAND chips. This
+> - ? ? ? ? is deprecated in favor of platform specific data.
+> -
+> ?config MTD_NAND_CM_X270
+> ? ? ? ?tristate "Support for NAND Flash on CM-X270 modules"
+> ? ? ? ?depends on MTD_NAND && MACH_ARMCORE
+> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> index e02fa4f..013e075 100644
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
 
+... snipped ...
 
-> Although gpio_chips know whether or not they may sleep,
-> gpios which can
-> sleep need to call gpio_[set/get]_value_cansleep. 
+> ?static struct pxa3xx_nand_timing default_timing;
+> ?static struct pxa3xx_nand_flash default_flash;
+>
+> -static struct pxa3xx_nand_cmdset smallpage_cmdset = {
+> - ? ? ? .read1 ? ? ? ? ?= 0x0000,
+> - ? ? ? .read2 ? ? ? ? ?= 0x0050,
+> - ? ? ? .program ? ? ? ?= 0x1080,
+> - ? ? ? .read_status ? ?= 0x0070,
+> - ? ? ? .read_id ? ? ? ?= 0x0090,
+> - ? ? ? .erase ? ? ? ? ?= 0xD060,
+> - ? ? ? .reset ? ? ? ? ?= 0x00FF,
+> - ? ? ? .lock ? ? ? ? ? = 0x002A,
+> - ? ? ? .unlock ? ? ? ? = 0x2423,
+> - ? ? ? .lock_status ? ?= 0x007A,
+> -};
+> -
+> -static struct pxa3xx_nand_cmdset largepage_cmdset = {
+> +const static struct pxa3xx_nand_cmdset cmdset = {
 
-GPIOsare hardware, or maybe software abstractions;
-either way,  can't call those.
-  Driver level code does
-when it accesses a GPIO.
-for example,peripheral setup logic might.
+So how to handle the difference of command set between smallpage and
+largepage?
 
+> ? ? ? ?.read1 ? ? ? ? ?= 0x3000,
+> ? ? ? ?.read2 ? ? ? ? ?= 0x0050,
+> ? ? ? ?.program ? ? ? ?= 0x1080,
+> @@ -203,143 +225,26 @@ static struct pxa3xx_nand_cmdset largepage_cmdset = {
+> ? ? ? ?.lock_status ? ?= 0x007A,
+> ?};
+>
+> -#ifdef CONFIG_MTD_NAND_PXA3xx_BUILTIN
+> -static struct pxa3xx_nand_timing samsung512MbX16_timing = {
+> - ? ? ? .tCH ? ?= 10,
+> - ? ? ? .tCS ? ?= 0,
+> - ? ? ? .tWH ? ?= 20,
+> - ? ? ? .tWP ? ?= 40,
 
-The only
-> difference
-> between __gpio_(set/get)_value and
-> gpio_(set/get)_value_cansleep is that
+...
 
+> +static struct pxa3xx_nand_timing __devinitdata timing[] = {
 
-only the cansleep() versions may be used for
-GPIOs whose operation requires use of sleeping
-calls.  Most SoC GPIOs are safe to access with
-IRQs disabled, spinlocks, held and so on.
+Better with some comment columns like below:
 
-That's why only the non-cansleep() versions
-are documented as being spinlock-safe.
+  /*	    tCH tCS tWH tWP ... */
+> + ? ? ? /* Samsung NAND series */
+> + ? ? ? { 10, ?0, 20, 40, 30, 40, 11123, 110, 10, },
+> + ? ? ? /* Micron NAND series */
+> + ? ? ? { 10, 25, 15, 25, 15, 30, 25000, ?60, 10, },
+> + ? ? ? /* ST NAND series */
+> + ? ? ? { 10, 35, 15, 25, 15, 25, 25000, ?60, 10, },
 
+Now define something like
 
-> the cansleep versions calls might_sleep_if. Most drivers
+#define NAND_TIMING_SAMSUNG	(&timing[0])
+#define NAND_TIMING_MICRON	(&timing[1])
+#define NAND_TIMING_ST		(&timing[2])
 
+> ?};
+>
+> -static struct pxa3xx_nand_flash samsung32GbX8 = {
+> - ? ? ? .timing ? ? ? ? = &samsung512MbX16_timing,
+> - ? ? ? .cmdset ? ? ? ? = &smallpage_cmdset,
+> - ? ? ? .page_per_block = 128,
+> - ? ? ? .page_size ? ? ?= 4096,
+> - ? ? ? .flash_width ? ?= 8,
+> - ? ? ? .dfc_width ? ? ?= 8,
+> - ? ? ? .num_blocks ? ? = 8192,
+> - ? ? ? .chip_id ? ? ? ?= 0xd7ec,
+> +static struct pxa3xx_nand_flash __devinitdata builtin_flash_types[] = {
 
-That's an implemenation detail, internal to the
-gpiolib code.
+/*	  Chip ID, page per block, page size, flash width, .... */
 
-Note that "can" sleep means exactly that...  It
-doesn't mean "must sleep".  A valid way to
-implement a cansleep() variant is to 
+> + ? ? ? { 0x46ec, ?32, ?512, 16, 16, 4096, &timing[0], },
+> + ? ? ? { 0xdaec, ?64, 2048, ?8, ?8, 2048, &timing[0], },
+> + ? ? ? { 0xd7ec, 128, 4096, ?8, ?8, 8192, &timing[0], },
+> + ? ? ? { 0xa12c, ?64, 2048, ?8, ?8, 1024, &timing[1], },
+> + ? ? ? { 0xb12c, ?64, 2048, 16, 16, 1024, &timing[1], },
+> + ? ? ? { 0xdc2c, ?64, 2048, ?8, ?8, 4096, &timing[1], },
+> + ? ? ? { 0xcc2c, ?64, 2048, 16, 16, 4096, &timing[1], },
+> + ? ? ? { 0xba20, ?64, 2048, 16, 16, 2048, &timing[2], },
+> ?};
 
-just call the spinlock-safe routine, so that
-it never sleeps.
+BTW, I like the array above very much.
 
-THe converse is not true; the spinlock-safe
-routine must never call a cansleep() version.
+>
+> -static struct pxa3xx_nand_timing micron_timing = {
+> - ? ? ? .tCH ? ?= 10,
+> - ? ? ? .tCS ? ?= 25,
+> - ? ? ? .tWH ? ?= 15,
+> - ? ? ? .tWP ? ?= 25,
+> - ? ? ? .tRH ? ?= 15,
+> - ? ? ? .tRP ? ?= 30,
+> - ? ? ? .tR ? ? = 25000,
 
+... snipped ...
 
->  Most drivers call > gpio_(get/set)_value, rather than the cansleep variants. I
-> haven't done
-> a full audit of all of the drivers (which is a reasonably
-> involved
-> task), but I would hazard a guess that some of these could
-> be replaced
-> by the cansleep versions.
+> -};
+> -#endif /* CONFIG_MTD_NAND_PXA3xx_BUILTIN */
+> -
+> ?#define NDTR0_tCH(c) ? (min((c), 7) << 19)
+> ?#define NDTR0_tCS(c) ? (min((c), 7) << 16)
+> ?#define NDTR0_tWH(c) ? (min((c), 7) << 11)
+> @@ -412,7 +317,6 @@ static int prepare_read_prog_cmd(struct
+> pxa3xx_nand_info *info,
+> ? ? ? ? ? ? ? ? ? ? ? ?uint16_t cmd, int column, int page_addr)
+> ?{
+> ? ? ? ?const struct pxa3xx_nand_flash *f = info->flash_info;
+> - ? ? ? const struct pxa3xx_nand_cmdset *cmdset = f->cmdset;
 
+I think it's better to keep a local pointer. Reference within a function
+to a global structure is always a bad idea, one day you will find you've
+to modify all these references again when you add a new cmdset.
 
-One hopes that the runtime warnings have gotten
-folk to fix bugs where the cansleep() version
-should have been used, but wasn't...
-
-
-Better IMO not to make that change except as
-part
-of a bugfix:  e.g. remove a runtime warning
-that boils down to not using the cansleep()
-version when it should have been used.
-> 
-> Would it not be simpler to combine the calls and have
-> something like this:
-> 
-> void __gpio_get_value(unsigned gpio, int value)
-> {
-> ??? struct gpio_chip *chip;
-> 
-> ??? chip = gpio_to_chip(gpio);
-> ??? might_sleep_if(extra_checks &&
-> chip->can_sleep);
-> ??? chip->set(chip, gpio - chip->base,
-
-> value);
-
-calling chip->set() when  chip->can_sleep
-and the call context can't be preempted,
-would be a bug.  So that code is wrong ...
-it should at least warn about the error
-made by the caller.  If we had error returns from gpio get/set calls 9sigh), it'd be right to
-fail that call.
-
-> }
-> 
-> Then all drivers can just call gpio_(set/get)_value
-
-
-Bad idea.  Those calls are only for
-use in non-sleeping contexts; don't
-train developers to misuse calls.
-
- and any
-> attempts to
-> use sleeping gpios from an non-sleeping context will be
-> caught by the
-> might_sleep_if check. Is there something I am missing about
-> this?
-
-The fact that such attempts are errors
-in the calling code, and should not be
-swept under therug...
-
-
-> 
-> I can prepare a patch which combines the non-sleeping and
-> sleeping
-> variants, but I wanted to check that I'm not missing
-> something
-> fundamental first.
-> 
-> Thanks,
-> ~Ryan
-> 
-> -- 
-> Bluewater Systems Ltd - ARM Technology Solution Centre
-> 
-> Ryan Mallon? ? ?
-> ?????? ??? 5
-> Amuri Park, 404 Barbadoes St
-> ryan at bluewatersys.com?
-> ? ? ?????? PO Box 13
-> 889, Christchurch 8013
-> http://www.bluewatersys.com??? New
-> Zealand
-> Phone: +64 3 3779127??? ???
-> Freecall: Australia 1800 148 751
-> Fax:???+64 3 3779135???
-> ??? ??? ? USA 1800 261
-> 2934
-> 
+And most of the modifications below can thus be removed and patch simplified.
