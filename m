@@ -1,61 +1,88 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Fri, 18 Jun 2010 16:56:24 +0800
-Subject: [PATCH 08/25] mmp: add nand support to pxa168
-In-Reply-To: <AANLkTilOIds0GEPmTWgi_y7UzJT4g9qx6iAtDJDgVxWu@mail.gmail.com>
-References: <AANLkTinxMQjZIG4G1d9WVOiUX8-zHjTuTc1eRuInDRGW@mail.gmail.com>
-	<AANLkTilOIds0GEPmTWgi_y7UzJT4g9qx6iAtDJDgVxWu@mail.gmail.com>
-Message-ID: <AANLkTimzn6YyOX8CuCJ2UbchRtHjrrhWxkAL_s4gZovG@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Fri, 18 Jun 2010 10:00:10 +0100
+Subject: Several questions regarding ARCH_S3C2410
+In-Reply-To: <AANLkTimPk6mtyB57jXuAq1ugQseS655OCPEuP9-qZYoT@mail.gmail.com>
+References: <AANLkTimPk6mtyB57jXuAq1ugQseS655OCPEuP9-qZYoT@mail.gmail.com>
+Message-ID: <20100618090010.GX3498@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 18, 2010 at 2:59 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Fri, Jun 18, 2010 at 1:34 PM, Haojian Zhuang
-> <haojian.zhuang@gmail.com> wrote:
->> From 55adf11cb4ba8ba0b88148c9bce0cc08f94b97bd Mon Sep 17 00:00:00 2001
->> From: Lei Wen <leiwen@marvell.com>
->> Date: Mon, 31 May 2010 14:57:49 +0800
->> Subject: [PATCH 08/25] mmp: add nand support to pxa168
->>
->> Signed-off-by: Lei Wen <leiwen@marvell.com>
->> ---
->> ?arch/arm/configs/pxa168_defconfig | ? ?9 ++++++++-
->> ?drivers/mtd/nand/Kconfig ? ? ? ? ?| ? ?2 +-
->> ?2 files changed, 9 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/configs/pxa168_defconfig
->> b/arch/arm/configs/pxa168_defconfig
->> index 113511f..a01ea99 100644
->> --- a/arch/arm/configs/pxa168_defconfig
->> +++ b/arch/arm/configs/pxa168_defconfig
->> @@ -438,7 +438,14 @@ CONFIG_EXTRA_FIRMWARE=""
->> ?# CONFIG_DEBUG_DEVRES is not set
->> ?# CONFIG_SYS_HYPERVISOR is not set
->> ?# CONFIG_CONNECTOR is not set
->> -# CONFIG_MTD is not set
->> +CONFIG_MTD=y
->> +CONFIG_MTD_PARTITIONS=y
->> +CONFIG_MTD_CMDLINE_PARTS=y
->> +CONFIG_MTD_CHAR=y
->> +CONFIG_MTD_BLKDEVS=y
->> +CONFIG_MTD_BLOCK=y
->> +CONFIG_MTD_NAND=y
->> +CONFIG_MTD_NAND_PXA3xx=y
->> ?# CONFIG_PARPORT is not set
->> ?# CONFIG_BLK_DEV is not set
->> ?# CONFIG_MISC_DEVICES is not set
->> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
->> index 9a35d92..0d29b5d 100644
->> --- a/drivers/mtd/nand/Kconfig
->> +++ b/drivers/mtd/nand/Kconfig
->> @@ -394,7 +394,7 @@ endchoice
->>
->> ?config MTD_NAND_PXA3xx
->> ? ? ? ?tristate "Support for NAND flash devices on PXA3xx"
->> - ? ? ? depends on MTD_NAND && (PXA3xx || ARCH_MMP)
->> + ? ? ? depends on MTD_NAND && PLAT_PXA
->
-> I'd prefer this not being changed, as pxa3xx_nand isn't applicable to
-> pxa25x/pxa27x.
->
+On Fri, Jun 18, 2010 at 11:43:37AM +0800, Eric Miao wrote:
+> Hi Ben,
+> 
+> While working towards a unified kernel, I found that ARCH_S3C2410 actually
+> includes multiple mach-* already.
+> 
+> linux-2.6$ git grep "ARCH_S3C2410" arch/arm/Makefile
+> arch/arm/Makefile:machine-$(CONFIG_ARCH_S3C2410)	:= s3c2410 s3c2400
+> s3c2412 s3c2416 s3c2440 s3c2443
+> 
+> There are several questions though:
+> 
+> 1. It looks like only s3c2410 is significant, so all the common definitions
+>    like PHYS_OFFSET are actually same across all mach-s3c24* (except for
+>    s3c24a0) ? Yet I've found arch/arm/mach-s3c2400/include/mach/memory.h,
+>    where a different PHYS_OFFSET is defined, just feel a bit confused.
 
-I see... I would remove that change
+You can safely ignore the s3c24a0 for the moment, there's no-one interested
+in actually getting it submitted.
+ 
+> 2. So except for s3c24a0, theretically, it's possible to combine all these
+>    mach into something mach-s3c24xx?
+
+Theoretically yes, practically leave it alone.
+
+> 3. When trying building of s3c2410_defconfig, there are a lot complaints
+>    about re-definitions of {in,out}[s]{b,w,l}.  Taking a look into io.h,
+>    I'm wondering if it's possible to use those definitions in asm/io.h?
+>    (possibly with a customized __io())
+> 
+> In file included from linux-2.6/include/linux/scatterlist.h:8,
+>                  from linux-2.6/include/linux/dma-mapping.h:7,
+>                  from linux-2.6/include/linux/dmaengine.h:26,
+>                  from linux-2.6/include/linux/skbuff.h:30,
+>                  from linux-2.6/lib/kobject_uevent.c:24:
+> linux-2.6/arch/arm/include/asm/io.h:137: warning: "outb" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:196: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:138: warning: "outw" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:197: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:140: warning: "outl" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:198: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:143: warning: "inb" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:193: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:144: warning: "inw" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:194: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:146: warning: "inl" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:195: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:149: warning: "outsb" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:207: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:150: warning: "outsw" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:208: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:151: warning: "outsl" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:209: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:153: warning: "insb" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:203: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:154: warning: "insw" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:204: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:155: warning: "insl" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:205: note: this is
+> the location of the previous definition
+
+that's something for you to sort out.
+
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
