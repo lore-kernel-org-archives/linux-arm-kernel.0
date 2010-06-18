@@ -1,130 +1,76 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Sat, 19 Jun 2010 10:01:45 +1200
-Subject: gpiolib and sleeping gpios
-In-Reply-To: <514259.95052.qm@web180315.mail.gq1.yahoo.com>
-References: <514259.95052.qm@web180315.mail.gq1.yahoo.com>
-Message-ID: <4C1BECC9.7000805@bluewatersys.com>
+From: frank.rowand@am.sony.com (Frank Rowand)
+Date: Fri, 18 Jun 2010 15:12:03 -0700
+Subject: Request review of device tree documentation
+In-Reply-To: <20100616.005237.338122493954307067.imp@bsdimp.com>
+References: <4C186B7B.1060308@firmworks.com>
+	<4C186C72.2020506@compulab.co.il>	<4C187013.5000400@firmworks.com>
+	<20100616.005237.338122493954307067.imp@bsdimp.com>
+Message-ID: <4C1BEF33.7090400@am.sony.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Brownell wrote:
+On 06/15/10 23:52, M. Warner Losh wrote:
+> In message: <4C187013.5000400@firmworks.com>
+>             Mitch Bradley <wmb@firmworks.com> writes:
+> : Mike Rapoport wrote:
+> : > Mitch Bradley wrote:
+> : >> Mike Rapoport wrote:
+> : >>> Mitch Bradley wrote:
+> : >>>
+> : >>>> The second topic is the hypothetical use of OFW as a HAL. That will
+> : >>>> not happen for several reasons.  The opposition to the idea is
+> : >>>> widespread and deeply held, and there are good arguments to support
+> : >>>> that opposition.  Furthermore, the economic conditions necessary for
+> : >>>> the creation of such a HAL do not exist in the ARM world, nor indeed
+> : >>>> in the Linux world in general.  (The necessary condition is the
+> : >>>> ability for one company to impose a substantial change by fiat -
+> : >>>> essentially a monopoly position.)
+> : >>>>
+> : >>>> Shall we agree, then, that any further discussion of the HAL issue is
+> : >>>> "just for fun", and that nobody needs to feel threatened that it would
+> : >>>> actually happen?
+> : >>>
+> : >>> I've recently worked with vendor versions of U-Boot for advanced ARM
+> : >>> SoCs. There is already *huge* chunk of HAL code in those versions. And
+> : >>> if there would be possibility to have callbacks into the firmware
+> : >>> these chunks would only grow, IMHO.
+> : >>
+> : >> How can there be HAL code in U-Boot unless there is already the
+> : >> possibility to have callbacks into the firmware?
+> : >
+> : > Currently it aims to abstract hardware from U-Boot and reuse the same
+> : > HW access code across operating systems and bootloaders. If this code
+> : > would have callbacks I afraid the things would became worse.
+> : 
+> : The only way I can understand what you said is if I assume that by
+> : "callback", you mean the following sequence:
+> : 
+> : a) U-boot loads and executes the OS, providing to the OS the address
+> : of some HW access routines that it can use
+> : b) The OS calls one of those HW access routines
+> : c) During the execution of that HW access routine, that routine calls
+> : "back" into the OS, before returning.  So a call into the OS is nested
+> : inside a call into U-boot resident code.
+> : 
+> : If that is what you are worried about, it is not what we were
+> : discussing.  We were discussing - and many people were against - step
+> : (b).
+> : 
+> : Are you saying that step (b) - the OS calling into routines provided
+> : by U-Boot - is already the status quo?
 > 
-> --- On Thu, 6/17/10, Ryan Mallon <ryan@bluewatersys.com> wrote:
->> Currently implementors of gpiolib must provide
->> implementations for
->> gpio_get_value, gpio_set_value and gpio_cansleep. 
-> 
-> Not true.  There is ONE implementation of gpiolib.
-> 
-> I think you mean "implementors of the GPIO calls".
-> many of those implementors will use gpiolib, to
-> make their lives easier.  They are not, however,
-> re-implementing gpiolib itself...
+> I don't know about status quo, but it certainly is supported.  There's
+> an option to allow for a secondary boot loader, such as FreeBSD's
+> /boot/loader, to call back into uboot to read things from
+> flash/disk/whatever, do network access, etc.  Not so much a HAL, but
+> more of an echo of the functionality provided by PC BIOS functions.
+> /boot/loader can be viewed as a mini OS that calls back into uboot to
+> have it do things.  Once /boot/loader loads FreeBSD, btw, it and uboot
+> disappear from the scene, so this isn't exactly a HAL situation...
 
-Okay, so I got the semantics wrong. You know what I mean :-).
+Just for reference, there is a patch request on LKML to enable calling
+openfirmware from the kernel on OLPC:
 
-<snip>
+   http://lkml.org/lkml/2010/6/18/336
 
-> 
-> only the cansleep() versions may be used for
-> GPIOs whose operation requires use of sleeping
-> calls.  Most SoC GPIOs are safe to access with
-> IRQs disabled, spinlocks, held and so on.
-> 
-> That's why only the non-cansleep() versions
-> are documented as being spinlock-safe.
-> 
-> 
->> the cansleep versions calls might_sleep_if. Most drivers
-> 
-> 
-> That's an implemenation detail, internal to the
-> gpiolib code.
-> 
-> Note that "can" sleep means exactly that...  It
-> doesn't mean "must sleep".  A valid way to
-> implement a cansleep() variant is to 
-> 
-> just call the spinlock-safe routine, so that
-> it never sleeps.
-> 
-> THe converse is not true; the spinlock-safe
-> routine must never call a cansleep() version.
-
-Right, so it is just an implementation detail. When can easily change
-that to gpio_(set/get)_value is only safe to call from spinlock context
-if the gpio will not sleep. Having the the might_sleep_if check inside
-those calls will give a warning if that condition is not met.
-
-> 
->>  Most drivers call > gpio_(get/set)_value, rather than the cansleep variants. I
->> haven't done
->> a full audit of all of the drivers (which is a reasonably
->> involved
->> task), but I would hazard a guess that some of these could
->> be replaced
->> by the cansleep versions.
-> 
-> 
-> One hopes that the runtime warnings have gotten
-> folk to fix bugs where the cansleep() version
-> should have been used, but wasn't...
-
-The runtime warnings will only show instances where the non-sleeping
-versions where called instead of the sleeping versions. There is no
-warning to say that we are calling the spinlock safe version, where it
-is possible to sleep.
-
-The point I was trying to make is that there are lots of drivers which
-will not work with gpios on sleeping io expanders because they call the
-spinlock safe gpio calls. Some of these drivers may be able to use the
-sleeping variants. There are two possible ways to fix this:
-
-1) Audit each driver which uses non-sleeping gpio calls and determine
-whether they can use the sleeping versions instead.
-2) Modify the gpiolib calls as I suggested. Any attempts to use a
-sleeping gpio with a driver which cannot support it will result in a
-warning.
-
-> 
-> Better IMO not to make that change except as
-> part
-> of a bugfix:  e.g. remove a runtime warning
-> that boils down to not using the cansleep()
-> version when it should have been used.
->> Would it not be simpler to combine the calls and have
->> something like this:
->>
->> void __gpio_get_value(unsigned gpio, int value)
->> {
->>     struct gpio_chip *chip;
->>
->>     chip = gpio_to_chip(gpio);
->>     might_sleep_if(extra_checks &&
->> chip->can_sleep);
->>     chip->set(chip, gpio - chip->base,
-> 
->> value);
-> 
-> calling chip->set() when  chip->can_sleep
-> and the call context can't be preempted,
-> would be a bug.  So that code is wrong ...
-> it should at least warn about the error
-> made by the caller.  If we had error returns from gpio get/set calls 9sigh), it'd be right to
-> fail that call.
-
-Not quite sure what you mean here? Many drivers are generic in that they
-get passed a gpio to use with the gpiolib calls via some platform/driver
-data. Some drivers will be able to use sleeping gpios, but may not be
-correctly using the cansleep variants.
-
-I agree about the errors from the gpio_(set/get)_value calls. set isn't
-too bad, but returning an error and a value from the get calls is a bit
-of a pain.
-
-Possibly a solution is to have an additional argument to gpio_request
-which specifies whether the driver this gpio is able to be a sleeping
-gpio or not. That way the request can fail immediately if a sleeping
-gpio is passed to a driver that calls gpiolibs calls from sleeping context.
-
-~Ryan
+-Frank
