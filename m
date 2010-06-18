@@ -1,35 +1,54 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Fri, 18 Jun 2010 19:26:02 +0530
-Subject: Query dw_dmac driver: All descriptors done, but channel not idle!
-In-Reply-To: <20100618155234.1fc40ce7@hskinnemoen-d830>
-References: <4C1B75B7.1080104@st.com>
-	<20100618155234.1fc40ce7@hskinnemoen-d830>
-Message-ID: <4C1B7AF2.1060500@st.com>
+From: jason77.wang@gmail.com (jason)
+Date: Fri, 18 Jun 2010 22:06:34 +0800
+Subject: [PATCH 1/2] mxc: add common debug board for 3-stack platforms
+In-Reply-To: <20100616065540.GI20799@pengutronix.de>
+References: <1276352707-8199-1-git-send-email-jason77.wang@gmail.com>
+	<1276352707-8199-2-git-send-email-jason77.wang@gmail.com>
+	<20100616065540.GI20799@pengutronix.de>
+Message-ID: <4C1B7D6A.4010301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/18/2010 7:22 PM, Haavard Skinnemoen wrote:
-> Viresh KUMAR <viresh.kumar@st.com> wrote:
->> Can somebody please confirm, if it a known issue or not? Or if there
->> are some solutions for this problem.
-> 
-> I'm not aware of any such issue. The code was added as a purely
-> defensive thing; when writing it, I just thought about what might
-> happen if we go through all our descriptors without finding the current
-> one, and added some code to report the issue and try to recover.
-> 
-> I suppose it might be caused by some issue with the peripheral itself,
-> but I think it's more likely to be caused by some race condition in the
-> driver, i.e. something goes wrong when inserting or removing
-> descriptors in the chain.
-> 
-> What might be very good to know at this point is the value of
-> the llp variable, and perhaps also the value of the CH_EN register to
-> see if the channel is idle or not.
-> 
+Sascha Hauer wrote:
+> On Sat, Jun 12, 2010 at 10:25:06PM +0800, Jason Wang wrote:
+>   
+>> The debug board is little different for all mxc 3-stack(PDK)
+>> platforms, it is possible here to add a common implementation to
+>> support this board.
+>>     
+>
+> Two small things left:
+>
+> Could you change the name cpld_debugboard.c to something like
+> 3ds_debugboard.c? That we are talking about the 3ds is much more
+> interesting than that there's a cpld on the board.
+>
+> Also, I really prefer having no extra header file for the debug board.
+> All information in this header file is only interesting in this single C
+> file.
+>
+> Sascha
+>
+>
+>   
+Hi Sascha,
 
-Thanks Haavard,
+About the header file, most contents can be moved to c file,
+but there are two declarations:
 
-Will debug it further.
+extern struct platform_device smsc_lan9217_device;
+int __init mxc_expio_init(u32 base, u32 p_irq);
 
-viresh.
+which will be used by board_mxNN_3ds.c, should i move them to mach/common.h and
+drop 3ds_debugboard.h or keep them in 3ds_debugboard.h?
+
+Thanks,
+Jason.
+
+>> Signed-off-by: Jason Wang <jason77.wang@gmail.com>
+>> ---
+>>  arch/arm/plat-mxc/Kconfig                        |   11 ++
+>>  arch/arm/plat-mxc/Makefile                       |    1 +
+>>  arch/arm/plat-mxc/cpld_debugboard.c              |  161 ++++++++++++++++++++++
+>>     
+<snip>
