@@ -1,295 +1,171 @@
 From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Sat, 19 Jun 2010 00:36:48 +0400
-Subject: [PATCH v2 2/3] ARM: RealView: Switch to generic SCU routines
+Date: Sat, 19 Jun 2010 00:37:02 +0400
+Subject: [PATCH v2 3/3] ARM: cns3xxx: Add support for SMP
 In-Reply-To: <20100618181707.GA21578@n2100.arm.linux.org.uk>
 References: <20100618181707.GA21578@n2100.arm.linux.org.uk>
-Message-ID: <20100618203648.GB9155@oksana.dev.rtsoft.ru>
+Message-ID: <20100618203702.GC9155@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This shrinks platform-specific code quite a bit.
+Thanks to the previous refactorings, nothing fancy needs to be
+done, just use generic SCU routines.
 
 Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
 ---
- arch/arm/mach-realview/Makefile  |    2 +-
- arch/arm/mach-realview/headsmp.S |   39 ---------
- arch/arm/mach-realview/platsmp.c |  161 +++-----------------------------------
- 3 files changed, 12 insertions(+), 190 deletions(-)
- delete mode 100644 arch/arm/mach-realview/headsmp.S
+ arch/arm/Kconfig                         |    2 +-
+ arch/arm/mach-cns3xxx/Kconfig            |    1 +
+ arch/arm/mach-cns3xxx/Makefile           |    1 +
+ arch/arm/mach-cns3xxx/include/mach/smp.h |   31 +++++++++++++
+ arch/arm/mach-cns3xxx/platsmp.c          |   69 ++++++++++++++++++++++++++++++
+ 5 files changed, 103 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-cns3xxx/include/mach/smp.h
+ create mode 100644 arch/arm/mach-cns3xxx/platsmp.c
 
-diff --git a/arch/arm/mach-realview/Makefile b/arch/arm/mach-realview/Makefile
-index a01b76b..d456163 100644
---- a/arch/arm/mach-realview/Makefile
-+++ b/arch/arm/mach-realview/Makefile
-@@ -8,6 +8,6 @@ obj-$(CONFIG_MACH_REALVIEW_PB11MP)	+= realview_pb11mp.o
- obj-$(CONFIG_MACH_REALVIEW_PB1176)	+= realview_pb1176.o
- obj-$(CONFIG_MACH_REALVIEW_PBA8)	+= realview_pba8.o
- obj-$(CONFIG_MACH_REALVIEW_PBX)		+= realview_pbx.o
--obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index fab2ddd..c6e12d7 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1100,7 +1100,7 @@ config SMP
+ 	bool "Symmetric Multi-Processing (EXPERIMENTAL)"
+ 	depends on EXPERIMENTAL && (REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP ||\
+ 		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 ||\
+-		 ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
++		 ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_CNS3XXX)
+ 	depends on GENERIC_CLOCKEVENTS
+ 	select USE_GENERIC_SMP_HELPERS
+ 	select HAVE_ARM_SCU if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
+diff --git a/arch/arm/mach-cns3xxx/Kconfig b/arch/arm/mach-cns3xxx/Kconfig
+index 9ebfcc4..b510dab 100644
+--- a/arch/arm/mach-cns3xxx/Kconfig
++++ b/arch/arm/mach-cns3xxx/Kconfig
+@@ -3,6 +3,7 @@ menu "CNS3XXX platform type"
+ 
+ config MACH_CNS3420VB
+ 	bool "Support for CNS3420 Validation Board"
++	select HAVE_ARM_SCU
+ 	help
+ 	  Include support for the Cavium Networks CNS3420 MPCore Platform
+ 	  Baseboard.
+diff --git a/arch/arm/mach-cns3xxx/Makefile b/arch/arm/mach-cns3xxx/Makefile
+index 11033f1..ba4ee7b 100644
+--- a/arch/arm/mach-cns3xxx/Makefile
++++ b/arch/arm/mach-cns3xxx/Makefile
+@@ -1,3 +1,4 @@
+ obj-$(CONFIG_ARCH_CNS3XXX)		+= core.o pm.o devices.o
 +obj-$(CONFIG_SMP)			+= platsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
- obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
-diff --git a/arch/arm/mach-realview/headsmp.S b/arch/arm/mach-realview/headsmp.S
-deleted file mode 100644
-index 4075473..0000000
---- a/arch/arm/mach-realview/headsmp.S
-+++ /dev/null
-@@ -1,39 +0,0 @@
--/*
-- *  linux/arch/arm/mach-realview/headsmp.S
-- *
-- *  Copyright (c) 2003 ARM Limited
-- *  All Rights Reserved
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/linkage.h>
--#include <linux/init.h>
--
--	__INIT
--
--/*
-- * Realview specific entry point for secondary CPUs.  This provides
-- * a "holding pen" into which all secondary cores are held until we're
-- * ready for them to initialise.
-- */
--ENTRY(realview_secondary_startup)
--	mrc	p15, 0, r0, c0, c0, 5
--	and	r0, r0, #15
--	adr	r4, 1f
--	ldmia	r4, {r5, r6}
--	sub	r4, r4, r5
--	add	r6, r6, r4
--pen:	ldr	r7, [r6]
--	cmp	r7, r0
--	bne	pen
--
--	/*
--	 * we've been released from the holding pen: secondary_stack
--	 * should now contain the SVC stack for this core
--	 */
--	b	secondary_startup
--
--1:	.long	.
--	.long	pen_release
-diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
-index 0092658..3c1000b 100644
---- a/arch/arm/mach-realview/platsmp.c
-+++ b/arch/arm/mach-realview/platsmp.c
-@@ -9,17 +9,11 @@
-  * published by the Free Software Foundation.
-  */
- #include <linux/init.h>
--#include <linux/errno.h>
--#include <linux/delay.h>
--#include <linux/device.h>
--#include <linux/jiffies.h>
- #include <linux/smp.h>
- #include <linux/io.h>
- 
--#include <asm/cacheflush.h>
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
--#include <asm/localtimer.h>
- #include <asm/unified.h>
- 
- #include <mach/board-eb.h>
-@@ -29,14 +23,6 @@
- 
- #include "core.h"
- 
--extern void realview_secondary_startup(void);
--
--/*
-- * control for which core is the next to come out of the secondary
-- * boot "holding pen"
-- */
--volatile int __cpuinitdata pen_release = -1;
--
- static void __iomem *scu_base_addr(void)
- {
- 	if (machine_is_realview_eb_mp())
-@@ -50,16 +36,6 @@ static void __iomem *scu_base_addr(void)
- 		return (void __iomem *)0;
- }
- 
--static inline unsigned int get_core_count(void)
--{
--	void __iomem *scu_base = scu_base_addr();
--	if (scu_base)
--		return scu_get_core_count(scu_base);
--	return 1;
--}
--
--static DEFINE_SPINLOCK(boot_lock);
--
- void __cpuinit platform_secondary_init(unsigned int cpu)
- {
- 	trace_hardirqs_off();
-@@ -71,151 +47,36 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
- 	 */
- 	gic_cpu_init(0, gic_cpu_base_addr);
- 
--	/*
--	 * let the primary processor know we're out of the
--	 * pen, then head off into the C entry point
--	 */
--	pen_release = -1;
--	smp_wmb();
--
--	/*
--	 * Synchronise with the boot thread.
--	 */
--	spin_lock(&boot_lock);
--	spin_unlock(&boot_lock);
+ obj-$(CONFIG_PCI)			+= pcie.o
+ obj-$(CONFIG_MACH_CNS3420VB)		+= cns3420vb.o
+diff --git a/arch/arm/mach-cns3xxx/include/mach/smp.h b/arch/arm/mach-cns3xxx/include/mach/smp.h
+new file mode 100644
+index 0000000..afb2fef
+--- /dev/null
++++ b/arch/arm/mach-cns3xxx/include/mach/smp.h
+@@ -0,0 +1,31 @@
++/*
++ * Copyright 2002 ARM Ltd.
++ * Copyright 2008 Cavium Networks
++ *
++ * This file is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, Version 2, as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __MACH_SMP_H
++#define __MACH_SMP_H
++
++#include <asm/hardware/gic.h>
++
++#define hard_smp_processor_id()				\
++	({						\
++		unsigned int cpunum;			\
++		__asm__("mrc p15, 0, %0, c0, c0, 5"	\
++			: "=r" (cpunum));		\
++		cpunum &= 0x0F;				\
++	})
++
++/*
++ * We use IRQ1 as the IPI
++ */
++static inline void smp_cross_call(const struct cpumask *mask)
++{
++	gic_raise_softirq(mask, 1);
++}
++
++#endif /* __MACH_SMP_H */
+diff --git a/arch/arm/mach-cns3xxx/platsmp.c b/arch/arm/mach-cns3xxx/platsmp.c
+new file mode 100644
+index 0000000..fc1595c
+--- /dev/null
++++ b/arch/arm/mach-cns3xxx/platsmp.c
+@@ -0,0 +1,69 @@
++/*
++ * Copyright 2002 ARM Ltd
++ * Copyright 2008 Cavium Networks
++ * Copyright 2010 MontaVista Software, LLC.
++ *
++ * This file is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, Version 2, as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/compiler.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/smp.h>
++#include <linux/io.h>
++#include <asm/unified.h>
++#include <asm/smp_scu.h>
++#include <mach/cns3xxx.h>
++#include "core.h"
++
++static void __iomem *scu_base_addr(void)
++{
++	return (void __iomem *)CNS3XXX_TC11MP_SCU_BASE_VIRT;
++}
++
++void __cpuinit platform_secondary_init(unsigned int cpu)
++{
++	trace_hardirqs_off();
++
++	/*
++	 * if any interrupts are already enabled for the primary
++	 * core (e.g. timer irq), then they will not have been enabled
++	 * for us: do so
++	 */
++	gic_cpu_init(0, gic_cpu_base_addr);
++
 +	scu_secondary_init(cpu);
- }
- 
- int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
--	unsigned long timeout;
--
--	/*
--	 * set synchronisation state between this boot processor
--	 * and the secondary one
--	 */
--	spin_lock(&boot_lock);
--
--	/*
--	 * The secondary processor is waiting to be released from
--	 * the holding pen - release it, then wait for it to flag
--	 * that it has been released by resetting pen_release.
--	 *
--	 * Note that "pen_release" is the hardware CPU ID, whereas
--	 * "cpu" is Linux's internal ID.
--	 */
--	pen_release = cpu;
--	flush_cache_all();
--
--	/*
--	 * XXX
--	 *
--	 * This is a later addition to the booting protocol: the
--	 * bootMonitor now puts secondary cores into WFI, so
--	 * poke_milo() no longer gets the cores moving; we need
--	 * to send a soft interrupt to wake the secondary core.
--	 * Use smp_cross_call() for this, since there's little
--	 * point duplicating the code here
--	 */
--	smp_cross_call(cpumask_of(cpu));
--
--	timeout = jiffies + (1 * HZ);
--	while (time_before(jiffies, timeout)) {
--		smp_rmb();
--		if (pen_release == -1)
--			break;
--
--		udelay(10);
--	}
--
--	/*
--	 * now the secondary core is starting up let it run its
--	 * calibrations, then wait for it to finish
--	 */
--	spin_unlock(&boot_lock);
++}
++
++int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
 +	return scu_boot_secondary(cpu, idle);
 +}
- 
--	return pen_release != -1 ? -ENOSYS : 0;
++
 +void __init smp_init_cpus(void)
 +{
 +	scu_init_cpus(scu_base_addr());
- }
- 
- static void __init poke_milo(void)
- {
--	/* nobody is to be released from the pen yet */
--	pen_release = -1;
--
++}
++
++static void __init poke_milo(void)
++{
 +	if (num_present_cpus() <= 1)
 +		return;
- 	/*
- 	 * Write the address of secondary startup into the system-wide flags
- 	 * register. The BootMonitor waits for this register to become
- 	 * non-zero.
- 	 */
--	__raw_writel(BSYM(virt_to_phys(realview_secondary_startup)),
++	/*
++	 * Write the address of secondary startup into the system-wide flags
++	 * register. The BootMonitor waits for this register to become
++	 * non-zero.
++	 */
 +	__raw_writel(BSYM(virt_to_phys(scu_secondary_startup)),
- 		     __io_address(REALVIEW_SYS_FLAGSSET));
- 
- 	mb();
- }
- 
--/*
-- * Initialise the CPU possible map early - this describes the CPUs
-- * which may be present or become present in the system.
-- */
--void __init smp_init_cpus(void)
--{
--	unsigned int i, ncores = get_core_count();
--
--	for (i = 0; i < ncores; i++)
--		set_cpu_possible(i, true);
--}
--
- void __init smp_prepare_cpus(unsigned int max_cpus)
- {
--	unsigned int ncores = get_core_count();
--	unsigned int cpu = smp_processor_id();
--	int i;
--
--	/* sanity check */
--	if (ncores == 0) {
--		printk(KERN_ERR
--		       "Realview: strange CM count of 0? Default to 1\n");
--
--		ncores = 1;
--	}
--
--	if (ncores > NR_CPUS) {
--		printk(KERN_WARNING
--		       "Realview: no. of cores (%d) greater than configured "
--		       "maximum of %d - clipping\n",
--		       ncores, NR_CPUS);
--		ncores = NR_CPUS;
--	}
--
--	smp_store_cpu_info(cpu);
--
--	/*
--	 * are we trying to boot more cores than exist?
--	 */
--	if (max_cpus > ncores)
--		max_cpus = ncores;
--
--	/*
--	 * Initialise the present map, which describes the set of CPUs
--	 * actually populated at the present time.
--	 */
--	for (i = 0; i < max_cpus; i++)
--		set_cpu_present(i, true);
--
--	/*
--	 * Initialise the SCU if there are more than one CPU and let
--	 * them know where to start. Note that, on modern versions of
--	 * MILO, the "poke" doesn't actually do anything until each
--	 * individual core is sent a soft interrupt to get it out of
--	 * WFI
--	 */
--	if (max_cpus > 1) {
--		/*
--		 * Enable the local timer or broadcast device for the
--		 * boot CPU, but only if we have more than one CPU.
--		 */
--		percpu_timer_setup();
--
--		scu_enable(scu_base_addr());
--		poke_milo();
--	}
++		     (void __iomem *)(0xFFF07000 + 0x0600));
++
++	mb();
++}
++
++void __init smp_prepare_cpus(unsigned int max_cpus)
++{
 +	scu_prepare_cpus(scu_base_addr(), max_cpus);
 +	poke_milo();
- }
++}
 -- 
 1.7.0.5
