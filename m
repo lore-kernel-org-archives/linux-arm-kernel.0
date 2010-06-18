@@ -1,31 +1,32 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Fri, 18 Jun 2010 16:16:26 +0800
-Subject: [PATCH 03/25] pxa3xx_nand: remove the flash info in driver
-	structure
-In-Reply-To: <AANLkTilnlE7hl4FKo5qRJ4PeTCuxA3Mfm13eedGPehrk@mail.gmail.com>
-References: <AANLkTimbCSM3Kk-Mq3MhRDyhHAaERR-dXhtuplauB3ki@mail.gmail.com>
-	<AANLkTilnlE7hl4FKo5qRJ4PeTCuxA3Mfm13eedGPehrk@mail.gmail.com>
-Message-ID: <AANLkTikT1hzTe4nEKj5n0cay0Q_277GlygXftYOlHI0q@mail.gmail.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Fri, 18 Jun 2010 11:33:55 +0300
+Subject: invalid address for enqueue_task
+In-Reply-To: <201006171230.38101.alexander.stein@systec-electronic.com>
+References: <201006171230.38101.alexander.stein@systec-electronic.com>
+Message-ID: <20100618083355.GA28107@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 18, 2010 at 2:40 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Fri, Jun 18, 2010 at 1:33 PM, Haojian Zhuang
-> <haojian.zhuang@gmail.com> wrote:
->> From 643765e6ae0f37902321f31e14b565896217dd3a Mon Sep 17 00:00:00 2001
->> From: Lei Wen <leiwen@marvell.com>
->> Date: Wed, 2 Jun 2010 21:54:33 +0800
->> Subject: [PATCH 03/25] pxa3xx_nand: remove the flash info in driver structure
->>
->> After probe, all info already transfer to driver structure.
->> There is no need to keep the original flash info.
->> So that we could safely free the flash info in memory, which may grows
->> larger when more flash is suported.
->>
->
-> Some of the changes should be separated from my POV? Like the
-> change to oob_size, and pxa3xx_nand_resume?
->
+On Thu, Jun 17, 2010 at 12:30:37PM +0200, Alexander Stein wrote:
+> 
+> After doing some research I found out that sched_class inside struct_task has 
+> been modified to some bogus address so sched_class->enqueue_task 
+> (kernel/sched.c:1886) jumps to some invalid address.
 
-This patch is only servered as the prepraration of latter patch
-seris... So hard to seperate them...
+While I cannot help you with this specific problem, I think it is
+worth to mention that this kind of bugs are exactly where kdump
+might prove to be useful. As now you have a snapshot of the system
+during the time of the crash, you might be able to dig out the cause
+using tools like gdb and crash[1]
+
+Currently kdump patches are not in mainline but if you decide to
+take that route, they can be found by searching this ML and I can
+provide assistance for setting them up.
+
+Regards,
+MW
+
+[1] http://people.redhat.com/~anderson/
+
+( crash doesn't have ARM support but I have experimental patches
+  to make it work on ARM as well )
