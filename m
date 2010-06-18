@@ -1,45 +1,68 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 18 Jun 2010 23:21:30 +0900
-Subject: Several questions regarding ARCH_S3C2410
-In-Reply-To: <005d01cb0ed5$6bb83b90$4328b2b0$%kim@samsung.com>
-References: <AANLkTimPk6mtyB57jXuAq1ugQseS655OCPEuP9-qZYoT@mail.gmail.com>
-	<AANLkTilbEYR28lrVBAIXXuJ6sEf5uCp4Tpr7wriBZLj3@mail.gmail.com>
-	<20100618090042.GY3498@trinity.fluff.org>
-	<005d01cb0ed5$6bb83b90$4328b2b0$%kim@samsung.com>
-Message-ID: <AANLkTinzTIxh06xDCcl34P5QhGS1nSHvrlmmQWWeISrW@mail.gmail.com>
+From: Lorenzo.Pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 18 Jun 2010 15:25:43 +0100
+Subject: Platform data with function pointers
+In-Reply-To: <20100618131301.GA21333@n2100.arm.linux.org.uk>
+References: <-71663801230973480@unknownmsgid>
+	<AANLkTikqONUs722_ev6hqfpJiehUq2qAGWGhmxg6WkTs@mail.gmail.com>
+	<000901cb0ee4$68e19e20$3aa4da60$@Pieralisi@arm.com>
+	<20100618131301.GA21333@n2100.arm.linux.org.uk>
+Message-ID: <000a01cb0ef2$23160030$69420090$@Pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Then how about to prepare the these activities.
+Concerning platform_devices ids, sorry I wasn't meant to report an amba primecell binding snippet, I wanted to report here just a
+binding for a simple memory mapped platform device (not a primecell one). I was asking that question about platform_device
+statically defined structs that use the id for enumeration, and going with FDT the id has to be initialized somehow from the tree
+because the struct is allocated dynamically.
 
-Next time we will use the s5pc210 (or whatever) and I hope to use it
-with s5pc110.
-To to this how about to merge the s5p series?
+Wrt map_desc point taken, I was looking into possible ways of getting rid of platform specific statically defined data, that array
+in particular.
 
-I suggest to read the OMAP mailing list how to support OMAP2, 3, and 4
-with single kernel.
+Thanks a lot for your feedback,
 
-Thank you,
-Kyungmin Park
+Lorenzo
 
-On Fri, Jun 18, 2010 at 8:00 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Ben Dooks wrote:
->>
->> On Fri, Jun 18, 2010 at 04:44:59PM +0900, Kyungmin Park wrote:
->> > CCing Mr. Kim
->>
->> not sure it really needs him to be involved at-all
->>
-> I'd like to focus on S5P SoCs and Samsung common(plat-samsung) :-)
->
-> And maybe Ben is more interested in S3C SoCs and Samsung common.
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
+-----Original Message-----
+From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+Sent: Friday, June 18, 2010 2:13 PM
+To: Lorenzo Pieralisi
+Cc: 'Grant Likely'; devicetree-discuss; linux-arm-kernel at lists.infradead.org; Jeremy Kerr; Nicolas Pitre
+Subject: Re: Platform data with function pointers
+
+On Fri, Jun 18, 2010 at 01:47:28PM +0100, Lorenzo Pieralisi wrote:
+> I think chip-select addressing should be used if that is the way HW handles it. If the device is described through a
+memory-mapping,
+> ex. snippet follows:
+> 
+> serial at 101f2000 {
+>         compatible = "arm,pl011";
+>         reg = <0x101f2000 0x1000 >;
+> };
+
+Primecell devices aren't platform devices.  They have no 'id' field as
+such.  Instead, modern implementations have PCI-like IDs.
+
+> struct map_desc {
+> 	unsigned long virtual;
+> 	unsigned long pfn;
+> 	unsigned long length;
+> 	unsigned int type;
+> };
+> 
+> static struct map_desc realview_eb_io_desc[] __initdata = {
+> 	{
+> 		.virtual	= IO_ADDRESS(REALVIEW_SYS_BASE),
+> 		.pfn		= __phys_to_pfn(REALVIEW_SYS_BASE),
+> 		.length		= SZ_4K,
+> 		.type		= MT_DEVICE,
+> 	}, ...
+
+These mappings are entirely arbitary, and change according to the
+implementation of the platform.
+
+Some platforms want to avoid using ioremap() to create 4K page mappings
+for their devices, so instead they statically map them and arrange for
+ioremap() to know about that static mapping.
+
+Given that PAGE_OFFSET can be changed, it would be absolutely silly to
+put this into the device tree.
