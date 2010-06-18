@@ -1,25 +1,43 @@
-From: eric@eukrea.com (=?UTF-8?B?RXJpYyBCw6luYXJk?=)
-Date: Fri, 18 Jun 2010 16:37:23 +0200
-Subject: [PATCH v2] input/imx_keypad: add PM support
-In-Reply-To: <1276856186.3146.5.camel@realization>
-References: <1276801147-4103-1-git-send-email-eric@eukrea.com>
-	<1276856186.3146.5.camel@realization>
-Message-ID: <4C1B84A3.8080300@eukrea.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Sat, 19 Jun 2010 00:01:37 +0900
+Subject: Several questions regarding ARCH_S3C2410
+In-Reply-To: <AANLkTillhXSrUKpyOzg6zXA2DCwQmgQyNVH0bd4-lMcy@mail.gmail.com>
+References: <AANLkTimPk6mtyB57jXuAq1ugQseS655OCPEuP9-qZYoT@mail.gmail.com>
+	<AANLkTilbEYR28lrVBAIXXuJ6sEf5uCp4Tpr7wriBZLj3@mail.gmail.com>
+	<20100618090042.GY3498@trinity.fluff.org>
+	<005d01cb0ed5$6bb83b90$4328b2b0$%kim@samsung.com>
+	<AANLkTinzTIxh06xDCcl34P5QhGS1nSHvrlmmQWWeISrW@mail.gmail.com>
+	<AANLkTillhXSrUKpyOzg6zXA2DCwQmgQyNVH0bd4-lMcy@mail.gmail.com>
+Message-ID: <AANLkTikIDQS-3PABHovz_JM-ar47Gpn6OGoE35BVDRdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alberto,
-
-Le 18/06/2010 12:16, Alberto Panizzo a ?crit :
-> Ok, so with this patch the keypad cannot wake the system?
-> It is scheduled another patch?
+On Fri, Jun 18, 2010 at 11:28 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Fri, Jun 18, 2010 at 10:21 PM, Kyungmin Park <kmpark@infradead.org> wrote:
+>> Then how about to prepare the these activities.
+>>
+>> Next time we will use the s5pc210 (or whatever) and I hope to use it
+>> with s5pc110.
 >
-well, actually, the keypad wakes the system, at least on my board here.
+> Better merge them into one, no more mach-* is recommended unless that's
+> inevitable.
 
-I was quite surprised to get this working this way as I would have 
-expected disable_irq + clk_disable would prevent the keypad from being a 
-wake source.
-Can you try on your board as this cleanup may be wrong on i.MX3 ?
+Agree.
 
-Thanks,
-Eric
+>
+>> To to this how about to merge the s5p series?
+>>
+>> I suggest to read the OMAP mailing list how to support OMAP2, 3, and 4
+>> with single kernel.
+>>
+>
+> Not necessary maybe. Just post your difficulties when merging them
+> into a single kernel and we can discuss.
+>
+
+I hope so, before starting this work, I make a consensus with ben and kukjin.
+I like the OMAP style, runtime detection. IMHO Samsung SoCs goes like
+these approaches.
+
+Thank you,
+Kyungmin Park
