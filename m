@@ -1,76 +1,130 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 18 Jun 2010 22:54:01 +0200
-Subject: [PATCH 4/5] mtd: mxc_nand fixups
-In-Reply-To: <804oh0b7gx.fsf@merkur.tec.linutronix.de>
-References: <804oh0b7gx.fsf@merkur.tec.linutronix.de>
-Message-ID: <20100618205401.GA12115@pengutronix.de>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Sat, 19 Jun 2010 10:01:45 +1200
+Subject: gpiolib and sleeping gpios
+In-Reply-To: <514259.95052.qm@web180315.mail.gq1.yahoo.com>
+References: <514259.95052.qm@web180315.mail.gq1.yahoo.com>
+Message-ID: <4C1BECC9.7000805@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[added Ivo to Cc]
+David Brownell wrote:
+> 
+> --- On Thu, 6/17/10, Ryan Mallon <ryan@bluewatersys.com> wrote:
+>> Currently implementors of gpiolib must provide
+>> implementations for
+>> gpio_get_value, gpio_set_value and gpio_cansleep. 
+> 
+> Not true.  There is ONE implementation of gpiolib.
+> 
+> I think you mean "implementors of the GPIO calls".
+> many of those implementors will use gpiolib, to
+> make their lives easier.  They are not, however,
+> re-implementing gpiolib itself...
 
-On Fri, Jun 18, 2010 at 07:01:34PM +0200, John Ogness wrote:
-> This patch reverts the driver to enabling/disabling the NFC interrupt
-> mask rather than enabling/disabling the system interrupt. This cleans
-> up the driver so that it doesn't rely on interrupts being disabled
-> within the interrupt handler.
+Okay, so I got the semantics wrong. You know what I mean :-).
 
-This behaviour was introduced in
-a47bfd2eb66837653dc3b42541dfe4283dd41251 mxc_nand: support i.MX21
-
-I guess this won't work on i.MX21.
-
-Sascha
+<snip>
 
 > 
-> The patch is against linux-next 20100618.
+> only the cansleep() versions may be used for
+> GPIOs whose operation requires use of sleeping
+> calls.  Most SoC GPIOs are safe to access with
+> IRQs disabled, spinlocks, held and so on.
 > 
-> Signed-off-by: John Ogness <john.ogness@linutronix.de>
-> ---
->  drivers/mtd/nand/mxc_nand.c |   11 ++++++++---
->  1 file changed, 8 insertions(+), 3 deletions(-)
+> That's why only the non-cansleep() versions
+> are documented as being spinlock-safe.
 > 
-> Index: linux-next-20100618/drivers/mtd/nand/mxc_nand.c
-> ===================================================================
-> --- linux-next-20100618.orig/drivers/mtd/nand/mxc_nand.c
-> +++ linux-next-20100618/drivers/mtd/nand/mxc_nand.c
-> @@ -173,8 +173,11 @@ static const char *part_probes[] = { "Re
->  static irqreturn_t mxc_nfc_irq(int irq, void *dev_id)
->  {
->  	struct mxc_nand_host *host = dev_id;
-> +	uint16_t tmp;
->  
-> -	disable_irq_nosync(irq);
-> +	tmp = readw(host->regs + NFC_CONFIG1);
-> +	tmp |= NFC_INT_MSK; /* disable NFC interrupts */
-> +	writew(tmp, host->regs + NFC_CONFIG1);
->  
->  	wake_up(&host->irq_waitq);
->  
-> @@ -192,7 +195,9 @@ static void wait_op_done(struct mxc_nand
->  	if (useirq) {
->  		if ((readw(host->regs + NFC_CONFIG2) & NFC_INT) == 0) {
->  
-> -			enable_irq(host->irq);
-> +			tmp = readw(host->regs + NFC_CONFIG1);
-> +			tmp  &= ~NFC_INT_MSK;   /* enable NFC interrupts */
-> +			writew(tmp, host->regs + NFC_CONFIG1);
->  
->  			wait_event(host->irq_waitq,
->  				readw(host->regs + NFC_CONFIG2) & NFC_INT);
-> @@ -846,7 +851,7 @@ static int __init mxcnd_probe(struct pla
->  
->  	host->irq = platform_get_irq(pdev, 0);
->  
-> -	err = request_irq(host->irq, mxc_nfc_irq, IRQF_DISABLED, DRIVER_NAME, host);
-> +	err = request_irq(host->irq, mxc_nfc_irq, 0, DRIVER_NAME, host);
->  	if (err)
->  		goto eirq;
->  
 > 
+>> the cansleep versions calls might_sleep_if. Most drivers
+> 
+> 
+> That's an implemenation detail, internal to the
+> gpiolib code.
+> 
+> Note that "can" sleep means exactly that...  It
+> doesn't mean "must sleep".  A valid way to
+> implement a cansleep() variant is to 
+> 
+> just call the spinlock-safe routine, so that
+> it never sleeps.
+> 
+> THe converse is not true; the spinlock-safe
+> routine must never call a cansleep() version.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Right, so it is just an implementation detail. When can easily change
+that to gpio_(set/get)_value is only safe to call from spinlock context
+if the gpio will not sleep. Having the the might_sleep_if check inside
+those calls will give a warning if that condition is not met.
+
+> 
+>>  Most drivers call > gpio_(get/set)_value, rather than the cansleep variants. I
+>> haven't done
+>> a full audit of all of the drivers (which is a reasonably
+>> involved
+>> task), but I would hazard a guess that some of these could
+>> be replaced
+>> by the cansleep versions.
+> 
+> 
+> One hopes that the runtime warnings have gotten
+> folk to fix bugs where the cansleep() version
+> should have been used, but wasn't...
+
+The runtime warnings will only show instances where the non-sleeping
+versions where called instead of the sleeping versions. There is no
+warning to say that we are calling the spinlock safe version, where it
+is possible to sleep.
+
+The point I was trying to make is that there are lots of drivers which
+will not work with gpios on sleeping io expanders because they call the
+spinlock safe gpio calls. Some of these drivers may be able to use the
+sleeping variants. There are two possible ways to fix this:
+
+1) Audit each driver which uses non-sleeping gpio calls and determine
+whether they can use the sleeping versions instead.
+2) Modify the gpiolib calls as I suggested. Any attempts to use a
+sleeping gpio with a driver which cannot support it will result in a
+warning.
+
+> 
+> Better IMO not to make that change except as
+> part
+> of a bugfix:  e.g. remove a runtime warning
+> that boils down to not using the cansleep()
+> version when it should have been used.
+>> Would it not be simpler to combine the calls and have
+>> something like this:
+>>
+>> void __gpio_get_value(unsigned gpio, int value)
+>> {
+>>     struct gpio_chip *chip;
+>>
+>>     chip = gpio_to_chip(gpio);
+>>     might_sleep_if(extra_checks &&
+>> chip->can_sleep);
+>>     chip->set(chip, gpio - chip->base,
+> 
+>> value);
+> 
+> calling chip->set() when  chip->can_sleep
+> and the call context can't be preempted,
+> would be a bug.  So that code is wrong ...
+> it should at least warn about the error
+> made by the caller.  If we had error returns from gpio get/set calls 9sigh), it'd be right to
+> fail that call.
+
+Not quite sure what you mean here? Many drivers are generic in that they
+get passed a gpio to use with the gpiolib calls via some platform/driver
+data. Some drivers will be able to use sleeping gpios, but may not be
+correctly using the cansleep variants.
+
+I agree about the errors from the gpio_(set/get)_value calls. set isn't
+too bad, but returning an error and a value from the get calls is a bit
+of a pain.
+
+Possibly a solution is to have an additional argument to gpio_request
+which specifies whether the driver this gpio is able to be a sleeping
+gpio or not. That way the request can fail immediately if a sleeping
+gpio is passed to a driver that calls gpiolibs calls from sleeping context.
+
+~Ryan
