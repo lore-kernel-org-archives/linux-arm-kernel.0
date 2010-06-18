@@ -1,25 +1,184 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 18 Jun 2010 14:40:17 +0800
-Subject: [PATCH 03/25] pxa3xx_nand: remove the flash info in driver
-	structure
-In-Reply-To: <AANLkTimbCSM3Kk-Mq3MhRDyhHAaERR-dXhtuplauB3ki@mail.gmail.com>
-References: <AANLkTimbCSM3Kk-Mq3MhRDyhHAaERR-dXhtuplauB3ki@mail.gmail.com>
-Message-ID: <AANLkTilnlE7hl4FKo5qRJ4PeTCuxA3Mfm13eedGPehrk@mail.gmail.com>
+Date: Fri, 18 Jun 2010 14:43:08 +0800
+Subject: [PATCH 04/25] pxa3xx_nand: make scan procedure more clear
+In-Reply-To: <AANLkTiliVtvBEmJPgkha444k9XGB_dNm0lQ9TCif8AAj@mail.gmail.com>
+References: <AANLkTiliVtvBEmJPgkha444k9XGB_dNm0lQ9TCif8AAj@mail.gmail.com>
+Message-ID: <AANLkTikKNw7purkGZoYMN7rWuHwkLdILSoDAaIzpugYe@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Jun 18, 2010 at 1:33 PM, Haojian Zhuang
 <haojian.zhuang@gmail.com> wrote:
-> From 643765e6ae0f37902321f31e14b565896217dd3a Mon Sep 17 00:00:00 2001
+> From 9023ee9b020ebda0c6ee299807a7fd2eb8fae53d Mon Sep 17 00:00:00 2001
 > From: Lei Wen <leiwen@marvell.com>
-> Date: Wed, 2 Jun 2010 21:54:33 +0800
-> Subject: [PATCH 03/25] pxa3xx_nand: remove the flash info in driver structure
->
-> After probe, all info already transfer to driver structure.
-> There is no need to keep the original flash info.
-> So that we could safely free the flash info in memory, which may grows
-> larger when more flash is suported.
+> Date: Sun, 16 May 2010 17:03:52 +0800
+> Subject: [PATCH 04/25] pxa3xx_nand: make scan procedure more clear
 >
 
-Some of the changes should be separated from my POV? Like the
-change to oob_size, and pxa3xx_nand_resume?
+Looks like a good cleanup to me. The git diff, though, seems to generate poor
+differences here.
+
+> Signed-off-by: Lei Wen <leiwen@marvell.com>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> ---
+> ?drivers/mtd/nand/pxa3xx_nand.c | ? 88 ++++++++++++++++++++++-----------------
+> ?1 files changed, 50 insertions(+), 38 deletions(-)
+>
+> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> index 291610a..1f52701 100644
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> @@ -160,6 +160,7 @@ struct pxa3xx_nand_info {
+> ? ? ? ?unsigned int ? ? ? ? ? ?buf_start;
+> ? ? ? ?unsigned int ? ? ? ? ? ?buf_count;
+>
+> + ? ? ? struct mtd_info ? ? ? ? *mtd;
+> ? ? ? ?/* DMA information */
+> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? drcmr_dat;
+> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? drcmr_cmd;
+> @@ -1105,21 +1106,13 @@ static void pxa3xx_nand_init_mtd(struct mtd_info *mtd,
+> ? ? ? ?this->chip_delay = 25;
+> ?}
+>
+> -static int __devinit pxa3xx_nand_probe(struct platform_device *pdev)
+> +static int alloc_nand_resource(struct platform_device *pdev)
+> ?{
+> - ? ? ? struct pxa3xx_nand_platform_data *pdata;
+> + ? ? ? struct pxa3xx_nand_platform_data *pdata = pdev->dev.platform_data;
+> ? ? ? ?struct pxa3xx_nand_info *info;
+> - ? ? ? struct nand_chip *this;
+> ? ? ? ?struct mtd_info *mtd;
+> ? ? ? ?struct resource *r;
+> - ? ? ? int ret = 0, irq;
+> -
+> - ? ? ? pdata = pdev->dev.platform_data;
+> -
+> - ? ? ? if (!pdata) {
+> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "no platform data defined\n");
+> - ? ? ? ? ? ? ? return -ENODEV;
+> - ? ? ? }
+> + ? ? ? int ret, irq;
+>
+> ? ? ? ?mtd = kzalloc(sizeof(struct mtd_info) + sizeof(struct pxa3xx_nand_info),
+> ? ? ? ? ? ? ? ? ? ? ? ?GFP_KERNEL);
+> @@ -1131,8 +1124,8 @@ static int __devinit pxa3xx_nand_probe(struct
+> platform_device *pdev)
+> ? ? ? ?info = (struct pxa3xx_nand_info *)(&mtd[1]);
+> ? ? ? ?info->pdev = pdev;
+>
+> - ? ? ? this = &info->nand_chip;
+> ? ? ? ?mtd->priv = info;
+> + ? ? ? info->mtd = mtd;
+> ? ? ? ?mtd->owner = THIS_MODULE;
+>
+> ? ? ? ?info->clk = clk_get(&pdev->dev, NULL);
+> @@ -1210,27 +1203,9 @@ static int __devinit pxa3xx_nand_probe(struct
+> platform_device *pdev)
+> ? ? ? ?}
+>
+> ? ? ? ?pxa3xx_nand_init_mtd(mtd, info);
+> + ? ? ? platform_set_drvdata(pdev, info);
+>
+> - ? ? ? platform_set_drvdata(pdev, mtd);
+> -
+> - ? ? ? if (nand_scan(mtd, 1)) {
+> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to scan nand\n");
+> - ? ? ? ? ? ? ? ret = -ENXIO;
+> - ? ? ? ? ? ? ? goto fail_free_irq;
+> - ? ? ? }
+> -
+> - ? ? ? if (mtd_has_cmdlinepart()) {
+> - ? ? ? ? ? ? ? static const char *probes[] = { "cmdlinepart", NULL };
+> - ? ? ? ? ? ? ? struct mtd_partition *parts;
+> - ? ? ? ? ? ? ? int nr_parts;
+> -
+> - ? ? ? ? ? ? ? nr_parts = parse_mtd_partitions(mtd, probes, &parts, 0);
+> -
+> - ? ? ? ? ? ? ? if (nr_parts)
+> - ? ? ? ? ? ? ? ? ? ? ? return add_mtd_partitions(mtd, parts, nr_parts);
+> - ? ? ? }
+> -
+> - ? ? ? return add_mtd_partitions(mtd, pdata->parts, pdata->nr_parts);
+> + ? ? ? return 0;
+>
+> ?fail_free_irq:
+> ? ? ? ?free_irq(irq, info);
+> @@ -1255,8 +1230,8 @@ fail_free_mtd:
+>
+> ?static int pxa3xx_nand_remove(struct platform_device *pdev)
+> ?{
+> - ? ? ? struct mtd_info *mtd = platform_get_drvdata(pdev);
+> - ? ? ? struct pxa3xx_nand_info *info = mtd->priv;
+> + ? ? ? struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
+> + ? ? ? struct mtd_info *mtd = info->mtd;
+> ? ? ? ?struct resource *r;
+> ? ? ? ?int irq;
+>
+> @@ -1285,11 +1260,48 @@ static int pxa3xx_nand_remove(struct
+> platform_device *pdev)
+> ? ? ? ?return 0;
+> ?}
+>
+> +static int __devinit pxa3xx_nand_probe(struct platform_device *pdev)
+> +{
+> + ? ? ? struct pxa3xx_nand_platform_data *pdata;
+> + ? ? ? struct pxa3xx_nand_info *info;
+> + ? ? ? int ret;
+> +
+> + ? ? ? pdata = pdev->dev.platform_data;
+> + ? ? ? if (!pdata) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "no platform data defined\n");
+> + ? ? ? ? ? ? ? return -ENODEV;
+> + ? ? ? }
+> +
+> + ? ? ? ret = alloc_nand_resource(pdev);
+> + ? ? ? if (ret)
+> + ? ? ? ? ? ? ? return ret;
+> +
+> + ? ? ? info = platform_get_drvdata(pdev);
+> + ? ? ? if (nand_scan(info->mtd, 1)) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to scan nand\n");
+> + ? ? ? ? ? ? ? pxa3xx_nand_remove(pdev);
+> + ? ? ? ? ? ? ? return -ENODEV;
+> + ? ? ? }
+> +
+> + ? ? ? if (mtd_has_cmdlinepart()) {
+> + ? ? ? ? ? ? ? static const char *probes[] = { "cmdlinepart", NULL };
+> + ? ? ? ? ? ? ? struct mtd_partition *parts;
+> + ? ? ? ? ? ? ? int nr_parts;
+> +
+> + ? ? ? ? ? ? ? nr_parts = parse_mtd_partitions(mtd, probes, &parts, 0);
+> +
+> + ? ? ? ? ? ? ? if (nr_parts)
+> + ? ? ? ? ? ? ? ? ? ? ? return add_mtd_partitions(mtd, parts, nr_parts);
+> + ? ? ? }
+> +
+> + ? ? ? return add_mtd_partitions(info->mtd, pdata->parts, pdata->nr_parts);
+> +}
+> +
+> ?#ifdef CONFIG_PM
+> ?static int pxa3xx_nand_suspend(struct platform_device *pdev,
+> pm_message_t state)
+> ?{
+> - ? ? ? struct mtd_info *mtd = (struct mtd_info *)platform_get_drvdata(pdev);
+> - ? ? ? struct pxa3xx_nand_info *info = mtd->priv;
+> + ? ? ? struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
+> + ? ? ? struct mtd_info *mtd = info->mtd;
+>
+> ? ? ? ?if (info->state != STATE_READY) {
+> ? ? ? ? ? ? ? ?dev_err(&pdev->dev, "driver busy, state = %d\n", info->state);
+> @@ -1301,8 +1313,8 @@ static int pxa3xx_nand_suspend(struct
+> platform_device *pdev, pm_message_t state)
+>
+> ?static int pxa3xx_nand_resume(struct platform_device *pdev)
+> ?{
+> - ? ? ? struct mtd_info *mtd = (struct mtd_info *)platform_get_drvdata(pdev);
+> - ? ? ? struct pxa3xx_nand_info *info = mtd->priv;
+> + ? ? ? struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
+> + ? ? ? struct mtd_info *mtd = info->mtd;
+>
+> ? ? ? ?nand_writel(info, NDTR0CS0, info->ndtr0cs0);
+> ? ? ? ?nand_writel(info, NDTR1CS0, info->ndtr1cs0);
+> --
+> 1.7.0.4
+>
