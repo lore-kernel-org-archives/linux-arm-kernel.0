@@ -1,38 +1,61 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 18 Jun 2010 14:59:27 +0400
-Subject: [PATCH] MAINTAINERS: some Atmel drivers change maintainer
-In-Reply-To: <1276694487-20065-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1276694487-20065-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <4C1B518F.4090307@ru.mvista.com>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Fri, 18 Jun 2010 12:01:02 +0100
+Subject: [PATCH] ASoC: Add new TI TLV320AIC3204 CODEC driver
+In-Reply-To: <1276833465-31702-1-git-send-email-redhatter@gentoo.org>
+References: <1276833465-31702-1-git-send-email-redhatter@gentoo.org>
+Message-ID: <1276858862.3054.28.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, 2010-06-18 at 13:57 +1000, Stuart Longland wrote:
+> The TLV320AIC3204 is a low-power stereo audio CODEC capable of sample
+> rates of up to 192kHz.  This driver implements basic functionality,
+> using I?C for the control channel.
+> 
+> The audio interface supports many data bus formats, including I?S
+> master/slave, DSP, left/right justified and TDM.
+> 
+> What works:
+> 	- Playback at various bitrates up to 96kHz
+> 	- Recording at various bitrates up to 96kHz
+> 	- Mixer interface
+> 	- PLL generation of CODEC clocks from MCLK
+> 
+> What could work better:
+> 	- DAPM
+> 
+> What isn't tested:
+> 	- Audio interfaces other than I?S
+> 	- PLL with clocks other than ~12MHz
+> 	- Mono recording/playback
+> 	- 192kHz recording/playback
+> 
+> What isn't implemented:
+> 	- SPI interface support
+> 	- PLL without fractional divider (would allow <10MHz clocks)
+> 	- Clock sources other than MCLK
+> 	- Adaptive filtering
+> 	- AGC
+> 	- Headset detection, JACK framework
+> 
+> Signed-off-by: Stuart Longland <redhatter@gentoo.org>
 
-Nicolas Ferre wrote:
+Just had a quick check and the register caching needs addressed.
 
-> I take over the maintenance of SPI, USART, Ethernet and USB gadget drivers.
-> Those drivers are found in Atmel microcontrollers, both AT32/AVR32 and
-> AT91/ARM.
+I agree with your comments, I don't think we really want to cache all
+16K of codec registers here as we will probably only ever use a handful
+of them. I think a smaller lookup table containing only the registers
+that we care about will do.
 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Acked-by: Haavard Skinnemoen <haavard.skinnemoen@atmel.com>
-> ---
->  MAINTAINERS |   10 +++++-----
->  1 files changed, 5 insertions(+), 5 deletions(-)
+Fwiw, a generic ASoC lookup table would be best as this could be used by
+other codecs with large register maps too. The table should be ordered
+(for quick lookup) and also contain a readable/writeable/volatile flag
+for each register.
 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 6d119c9..5f71809 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1148,7 +1148,7 @@ F:	drivers/mmc/host/atmel-mci.c
-[...]
->  ATMEL USBA UDC DRIVER
-> -M:	Haavard Skinnemoen <hskinnemoen@atmel.com>
-> -L:	kernel at avr32linux.org
-> +M:	Nicolas Ferre <nicolas.ferre@atmel.com>
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+Thanks
 
-    Not linux-usb at vger.kernel.org?
-
-WBR, Sergei
+Liam
+-- 
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
