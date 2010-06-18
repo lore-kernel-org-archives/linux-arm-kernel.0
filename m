@@ -1,130 +1,311 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Fri, 18 Jun 2010 19:25:02 +0900
-Subject: [PATCH] S5PV210 Correct clock source control register properties
-In-Reply-To: <005401cb0ecb$c3f16c00$4bd44400$%kim@samsung.com>
-References: <1276766116-6839-1-git-send-email-myungjoo.ham@samsung.com>
-	<005401cb0ecb$c3f16c00$4bd44400$%kim@samsung.com>
-Message-ID: <AANLkTim1psO4ZeZGAgNteJp_ytRhzoPlu4D3VblPgz6w@mail.gmail.com>
+From: rabin.vincent@stericsson.com (Rabin Vincent)
+Date: Fri, 18 Jun 2010 15:58:35 +0530
+Subject: [PATCH 1/2] ux500: add separate irq lists for DB8500 and DB5500
+Message-ID: <1276856916-19124-1-git-send-email-rabin.vincent@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 18, 2010 at 6:50 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> MyungJoo Ham wrote:
->>
->> The clock source controls (struct clksrc_clk) have been often accessing
->> CLK_GATE_IPx, which are for clock gating and are accessed by each clock
->> as well as the clock source. This duplicated clock issue may incur
->> lockup problems when there are two modules accessing the same clock with
->> different names.
->>
-> Could you please explain further about the above the statement " accessed by
-> each clock as well as the clock source"
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+Acked-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+---
+ arch/arm/mach-ux500/board-mop500.c             |    2 +-
+ arch/arm/mach-ux500/devices-db8500.c           |   14 ++--
+ arch/arm/mach-ux500/include/mach/irqs-db5500.h |   85 +++++++++++++++++++++
+ arch/arm/mach-ux500/include/mach/irqs-db8500.h |   96 ++++++++++++++++++++++++
+ arch/arm/mach-ux500/include/mach/irqs.h        |   18 +++--
+ 5 files changed, 201 insertions(+), 14 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/include/mach/irqs-db5500.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/irqs-db8500.h
 
-For example, "CLK_GATE_IP2[16:19]" is accessed by "hsmmc" of struct
-clk (a clock) and "sclk_mmc" of struct clksrc_clk's struct clk (a
-clock source's clk representation).
-
->
->> Besides, the clock source control is supposed to control (setting values
->> of MASK, SRC, DIV), not to turn on/off individual clock.
->>
-> That is not quite true. Only S5PV210/S5PC110 have the gate for the clock mux.
-> S5P6440 and S5PC100, for instance, do not have a gate for the output for
-> _just_ the clock mux. And the reason why the Clock Mux Gate is provide for
-> the mux is explained in Section 3.4 of the user manual.
-
-In cases where clock mux gating is not available and we have each
-clock (supplied by this cluck mux) defined separatedly with .enable
-and .ctrlbit, we'd better omit .enable/.ctrlbit from struct
-clksrc_clk's struct clk.
-
->
->> Another point is that there are registers (CLK_SRC_MASK0/1) specialized
->> for masking clock source control in S5PV210/S5PC110 according to the
->> user manual (rev 20100201).
->>
->> Therefore, accessing CLK_SRC_MASK0/1 (rather than accessing
->> CLK_GATE_IPx) for the clock source control is safer and fits to the
->> semantics of S5PV210/S5PC110 registers. And fortuneatly, each clock
->> source defined in clock.c has corresponding bit at CLK_SRC_MASK0/1
->> except for MFC, G2D, and G3D.
->>
-> Can you please explain how the use CLK_SRC_MASKx makes it safer. The reason
-> why MFC, G2D and G3D do not have a corresponding bit in CLK_SRC_MASKx is
-> mentioned in Section 3.4 of the user manual.
->
-> Let me know your opinion.
->
-
-It's "EXCEPT FOR MFC, G2D, G3D". I'm not saying that using
-CLK_SRC_MASKx is safer for these three. For other cases, I guess the
-lock up example should be fine.
-
-However, in most cases, this lockup issue does not make visible problem because:
-1. normally, drivers use both clksrc_clk's clk and clk at the same
-time. for example
-"mmc_bus".clk_enable;
-"hsmmc".clk_enable;
- blahblah
-"hsmmc".clk_disable;
-"mmc_bus".clk_disable;
-or
-2. drivers sharing the same clock uses only one side of the two.
-or
-3. the execution block between clk_enable and clk_disable is extremely short.
-
-Nevertheless, this potential lockup issue is critical and we'd better
-address it.
-
-
->> In this patch,
->>
->> - DAC, HDMI, AUDIO 0/1/2, UCLK(uart) 0/1/2/3, MIXER, FIMC 0/1/2,
->> FIMC, MMC 0/1/2/3, CSIS, SPI 0/1, PWI, and PWM clock sources are
->> modified to use CLK_SRC_MASK0/1, which were using CLK_GATE_IPx.
->>
->> - CAM 0/1 did not have enable/disable control. They now access
->> ? CLK_SRC_MASK0.
->>
->> - MFC, G3D, G2D were using CLK_GATE_IPx. However, as there are no clocks
->> ? defined to control MFC, G3D, and G2D, we kept them to access
->> CLK_GATE_IPx. These may need to be modified (erase .enable, .ctrlbit
->> from sclk_mfc, sclk_g2d, sclk_g3d and create clocks: g3d, g2d, mfc)
->> later.
->>
->> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
->> ---
->> ?arch/arm/mach-s5pv210/clock.c | ?101
-> ++++++++++++++++++++++-------------------
->> ?1 files changed, 55 insertions(+), 46 deletions(-)
->>
->> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
->> index ec5ad8c..08c1063 100644
->> --- a/arch/arm/mach-s5pv210/clock.c
->> +++ b/arch/arm/mach-s5pv210/clock.c
->
-> (snip)
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
-
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index b83005e..0331e4b 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -78,7 +78,7 @@ static struct spi_board_info u8500_spi_devices[] = {
+ 		.bus_num = 0,
+ 		.chip_select = 0,
+ 		.mode = SPI_MODE_0,
+-		.irq = IRQ_AB4500,
++		.irq = IRQ_DB8500_AB8500,
+ 	},
+ };
+ 
+diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
+index 8229034..56197b2 100644
+--- a/arch/arm/mach-ux500/devices-db8500.c
++++ b/arch/arm/mach-ux500/devices-db8500.c
+@@ -65,7 +65,7 @@ struct amba_device u8500_ssp0_device = {
+ 		.end   = U8500_SSP0_BASE + SZ_4K - 1,
+ 		.flags = IORESOURCE_MEM,
+ 	},
+-	.irq = {IRQ_SSP0, NO_IRQ },
++	.irq = {IRQ_DB8500_SSP0, NO_IRQ },
+ 	/* ST-Ericsson modified id */
+ 	.periphid = SSP_PER_ID,
+ };
+@@ -77,8 +77,8 @@ static struct resource u8500_i2c0_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+-		.start	= IRQ_I2C0,
+-		.end	= IRQ_I2C0,
++		.start	= IRQ_DB8500_I2C0,
++		.end	= IRQ_DB8500_I2C0,
+ 		.flags	= IORESOURCE_IRQ,
+ 	}
+ };
+@@ -97,8 +97,8 @@ static struct resource u8500_i2c4_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+-		.start	= IRQ_I2C4,
+-		.end	= IRQ_I2C4,
++		.start	= IRQ_DB8500_I2C4,
++		.end	= IRQ_DB8500_I2C4,
+ 		.flags	= IORESOURCE_IRQ,
+ 	}
+ };
+@@ -130,8 +130,8 @@ static struct resource dma40_resources[] = {
+ 		.name = "lcla",
+ 	},
+ 	[3] = {
+-		.start = IRQ_DMA,
+-		.end = IRQ_DMA,
++		.start = IRQ_DB8500_DMA,
++		.end = IRQ_DB8500_DMA,
+ 		.flags = IORESOURCE_IRQ}
+ };
+ 
+diff --git a/arch/arm/mach-ux500/include/mach/irqs-db5500.h b/arch/arm/mach-ux500/include/mach/irqs-db5500.h
+new file mode 100644
+index 0000000..6fbfe5e
+--- /dev/null
++++ b/arch/arm/mach-ux500/include/mach/irqs-db5500.h
+@@ -0,0 +1,85 @@
++/*
++ * Copyright (C) ST-Ericsson SA 2010
++ *
++ * Author: Rabin Vincent <rabin.vincent@stericsson.com>
++ * License terms: GNU General Public License (GPL) version 2
++ */
++
++#ifndef __MACH_IRQS_DB5500_H
++#define __MACH_IRQS_DB5500_H
++
++#define IRQ_DB5500_MTU0			(IRQ_SHPI_START + 4)
++#define IRQ_DB5500_SPI2			(IRQ_SHPI_START + 6)
++#define IRQ_DB5500_PMU0			(IRQ_SHPI_START + 7)
++#define IRQ_DB5500_SPI0			(IRQ_SHPI_START + 8)
++#define IRQ_DB5500_RTT			(IRQ_SHPI_START + 9)
++#define IRQ_DB5500_PKA			(IRQ_SHPI_START + 10)
++#define IRQ_DB5500_UART0		(IRQ_SHPI_START + 11)
++#define IRQ_DB5500_I2C3			(IRQ_SHPI_START + 12)
++#define IRQ_DB5500_L2CC			(IRQ_SHPI_START + 13)
++#define IRQ_DB5500_MSP0			(IRQ_SHPI_START + 14)
++#define IRQ_DB5500_CRYP1		(IRQ_SHPI_START + 15)
++#define IRQ_DB5500_PMU1			(IRQ_SHPI_START + 16)
++#define IRQ_DB5500_MTU1			(IRQ_SHPI_START + 17)
++#define IRQ_DB5500_RTC			(IRQ_SHPI_START + 18)
++#define IRQ_DB5500_UART1		(IRQ_SHPI_START + 19)
++#define IRQ_DB5500_USB_WAKEUP		(IRQ_SHPI_START + 20)
++#define IRQ_DB5500_I2C0			(IRQ_SHPI_START + 21)
++#define IRQ_DB5500_I2C1			(IRQ_SHPI_START + 22)
++#define IRQ_DB5500_USBOTG		(IRQ_SHPI_START + 23)
++#define IRQ_DB5500_DMA_SECURE		(IRQ_SHPI_START + 24)
++#define IRQ_DB5500_DMA			(IRQ_SHPI_START + 25)
++#define IRQ_DB5500_UART2		(IRQ_SHPI_START + 26)
++#define IRQ_DB5500_ICN_PMU1		(IRQ_SHPI_START + 27)
++#define IRQ_DB5500_ICN_PMU2		(IRQ_SHPI_START + 28)
++#define IRQ_DB5500_UART3		(IRQ_SHPI_START + 29)
++#define IRQ_DB5500_SPI3			(IRQ_SHPI_START + 30)
++#define IRQ_DB5500_SDMMC4		(IRQ_SHPI_START + 31)
++#define IRQ_DB5500_IRRC			(IRQ_SHPI_START + 33)
++#define IRQ_DB5500_IRDA_FT		(IRQ_SHPI_START + 34)
++#define IRQ_DB5500_IRDA_SD		(IRQ_SHPI_START + 35)
++#define IRQ_DB5500_IRDA_FI		(IRQ_SHPI_START + 36)
++#define IRQ_DB5500_IRDA_FD		(IRQ_SHPI_START + 37)
++#define IRQ_DB5500_FSMC_CODEREADY	(IRQ_SHPI_START + 38)
++#define IRQ_DB5500_FSMC_NANDWAIT	(IRQ_SHPI_START + 39)
++#define IRQ_DB5500_AB5500		(IRQ_SHPI_START + 40)
++#define IRQ_DB5500_SDMMC2		(IRQ_SHPI_START + 41)
++#define IRQ_DB5500_SIA			(IRQ_SHPI_START + 42)
++#define IRQ_DB5500_SIA2			(IRQ_SHPI_START + 43)
++#define IRQ_DB5500_HVA			(IRQ_SHPI_START + 44)
++#define IRQ_DB5500_HVA2			(IRQ_SHPI_START + 45)
++#define IRQ_DB5500_PRCMU0		(IRQ_SHPI_START + 46)
++#define IRQ_DB5500_PRCMU1		(IRQ_SHPI_START + 47)
++#define IRQ_DB5500_DISP			(IRQ_SHPI_START + 48)
++#define IRQ_DB5500_SDMMC1		(IRQ_SHPI_START + 50)
++#define IRQ_DB5500_MSP1			(IRQ_SHPI_START + 52)
++#define IRQ_DB5500_KBD			(IRQ_SHPI_START + 53)
++#define IRQ_DB5500_I2C2			(IRQ_SHPI_START + 55)
++#define IRQ_DB5500_B2R2			(IRQ_SHPI_START + 56)
++#define IRQ_DB5500_CRYP0		(IRQ_SHPI_START + 57)
++#define IRQ_DB5500_SDMMC3		(IRQ_SHPI_START + 59)
++#define IRQ_DB5500_SDMMC0		(IRQ_SHPI_START + 60)
++#define IRQ_DB5500_HSEM			(IRQ_SHPI_START + 61)
++#define IRQ_DB5500_SBAG			(IRQ_SHPI_START + 63)
++#define IRQ_DB5500_SPI1			(IRQ_SHPI_START + 96)
++#define IRQ_DB5500_MSP2			(IRQ_SHPI_START + 98)
++#define IRQ_DB5500_SRPTIMER		(IRQ_SHPI_START + 101)
++#define IRQ_DB5500_CTI0			(IRQ_SHPI_START + 108)
++#define IRQ_DB5500_CTI1			(IRQ_SHPI_START + 109)
++#define IRQ_DB5500_ICN_ERR		(IRQ_SHPI_START + 110)
++#define IRQ_DB5500_MALI_PPMMU		(IRQ_SHPI_START + 112)
++#define IRQ_DB5500_MALI_PP		(IRQ_SHPI_START + 113)
++#define IRQ_DB5500_MALI_GPMMU		(IRQ_SHPI_START + 114)
++#define IRQ_DB5500_MALI_GP		(IRQ_SHPI_START + 115)
++#define IRQ_DB5500_MALI			(IRQ_SHPI_START + 116)
++#define IRQ_DB5500_PRCMU_SEM		(IRQ_SHPI_START + 118)
++#define IRQ_DB5500_GPIO0		(IRQ_SHPI_START + 119)
++#define IRQ_DB5500_GPIO1		(IRQ_SHPI_START + 120)
++#define IRQ_DB5500_GPIO2		(IRQ_SHPI_START + 121)
++#define IRQ_DB5500_GPIO3		(IRQ_SHPI_START + 122)
++#define IRQ_DB5500_GPIO4		(IRQ_SHPI_START + 123)
++#define IRQ_DB5500_GPIO5		(IRQ_SHPI_START + 124)
++#define IRQ_DB5500_GPIO6		(IRQ_SHPI_START + 125)
++#define IRQ_DB5500_GPIO7		(IRQ_SHPI_START + 126)
++
++#endif
+diff --git a/arch/arm/mach-ux500/include/mach/irqs-db8500.h b/arch/arm/mach-ux500/include/mach/irqs-db8500.h
+new file mode 100644
+index 0000000..8b5d9f0
+--- /dev/null
++++ b/arch/arm/mach-ux500/include/mach/irqs-db8500.h
+@@ -0,0 +1,96 @@
++/*
++ * Copyright (C) ST-Ericsson SA 2010
++ *
++ * Author: Rabin Vincent <rabin.vincent@stericsson.com>
++ * License terms: GNU General Public License (GPL) version 2
++ */
++
++#ifndef __MACH_IRQS_DB8500_H
++#define __MACH_IRQS_DB8500_H
++
++#define IRQ_DB8500_MTU0			(IRQ_SHPI_START + 4)
++#define IRQ_DB8500_SPI2			(IRQ_SHPI_START + 6)
++#define IRQ_DB8500_PMU			(IRQ_SHPI_START + 7)
++#define IRQ_DB8500_SPI0			(IRQ_SHPI_START + 8)
++#define IRQ_DB8500_RTT			(IRQ_SHPI_START + 9)
++#define IRQ_DB8500_PKA			(IRQ_SHPI_START + 10)
++#define IRQ_DB8500_UART0		(IRQ_SHPI_START + 11)
++#define IRQ_DB8500_I2C3			(IRQ_SHPI_START + 12)
++#define IRQ_DB8500_L2CC			(IRQ_SHPI_START + 13)
++#define IRQ_DB8500_SSP0			(IRQ_SHPI_START + 14)
++#define IRQ_DB8500_CRYP1		(IRQ_SHPI_START + 15)
++#define IRQ_DB8500_MSP1_RX		(IRQ_SHPI_START + 16)
++#define IRQ_DB8500_MTU1			(IRQ_SHPI_START + 17)
++#define IRQ_DB8500_RTC			(IRQ_SHPI_START + 18)
++#define IRQ_DB8500_UART1		(IRQ_SHPI_START + 19)
++#define IRQ_DB8500_USB_WAKEUP		(IRQ_SHPI_START + 20)
++#define IRQ_DB8500_I2C0			(IRQ_SHPI_START + 21)
++#define IRQ_DB8500_I2C1			(IRQ_SHPI_START + 22)
++#define IRQ_DB8500_USBOTG		(IRQ_SHPI_START + 23)
++#define IRQ_DB8500_DMA_SECURE		(IRQ_SHPI_START + 24)
++#define IRQ_DB8500_DMA			(IRQ_SHPI_START + 25)
++#define IRQ_DB8500_UART2		(IRQ_SHPI_START + 26)
++#define IRQ_DB8500_ICN_PMU1		(IRQ_SHPI_START + 27)
++#define IRQ_DB8500_ICN_PMU2		(IRQ_SHPI_START + 28)
++#define IRQ_DB8500_HSIR_EXCEP		(IRQ_SHPI_START + 29)
++#define IRQ_DB8500_MSP0			(IRQ_SHPI_START + 31)
++#define IRQ_DB8500_HSIR_CH0_OVRRUN	(IRQ_SHPI_START + 32)
++#define IRQ_DB8500_HSIR_CH1_OVRRUN	(IRQ_SHPI_START + 33)
++#define IRQ_DB8500_HSIR_CH2_OVRRUN	(IRQ_SHPI_START + 34)
++#define IRQ_DB8500_HSIR_CH3_OVRRUN	(IRQ_SHPI_START + 35)
++#define IRQ_DB8500_HSIR_CH4_OVRRUN	(IRQ_SHPI_START + 36)
++#define IRQ_DB8500_HSIR_CH5_OVRRUN	(IRQ_SHPI_START + 37)
++#define IRQ_DB8500_HSIR_CH6_OVRRUN	(IRQ_SHPI_START + 38)
++#define IRQ_DB8500_HSIR_CH7_OVRRUN	(IRQ_SHPI_START + 39)
++#define IRQ_DB8500_AB8500		(IRQ_SHPI_START + 40)
++#define IRQ_DB8500_SDMMC2		(IRQ_SHPI_START + 41)
++#define IRQ_DB8500_SIA			(IRQ_SHPI_START + 42)
++#define IRQ_DB8500_SIA2			(IRQ_SHPI_START + 43)
++#define IRQ_DB8500_SVA			(IRQ_SHPI_START + 44)
++#define IRQ_DB8500_SVA2			(IRQ_SHPI_START + 45)
++#define IRQ_DB8500_PRCMU0		(IRQ_SHPI_START + 46)
++#define IRQ_DB8500_PRCMU1		(IRQ_SHPI_START + 47)
++#define IRQ_DB8500_DISP			(IRQ_SHPI_START + 48)
++#define IRQ_DB8500_SPI3			(IRQ_SHPI_START + 49)
++#define IRQ_DB8500_SDMMC1		(IRQ_SHPI_START + 50)
++#define IRQ_DB8500_I2C4			(IRQ_SHPI_START + 51)
++#define IRQ_DB8500_SSP1			(IRQ_SHPI_START + 52)
++#define IRQ_DB8500_SKE			(IRQ_SHPI_START + 53)
++#define IRQ_DB8500_KB			(IRQ_SHPI_START + 54)
++#define IRQ_DB8500_I2C2			(IRQ_SHPI_START + 55)
++#define IRQ_DB8500_B2R2			(IRQ_SHPI_START + 56)
++#define IRQ_DB8500_CRYP0		(IRQ_SHPI_START + 57)
++#define IRQ_DB8500_SDMMC3		(IRQ_SHPI_START + 59)
++#define IRQ_DB8500_SDMMC0		(IRQ_SHPI_START + 60)
++#define IRQ_DB8500_HSEM			(IRQ_SHPI_START + 61)
++#define IRQ_DB8500_MSP1			(IRQ_SHPI_START + 62)
++#define IRQ_DB8500_SBAG			(IRQ_SHPI_START + 63)
++#define IRQ_DB8500_SPI1			(IRQ_SHPI_START + 96)
++#define IRQ_DB8500_SRPTIMER		(IRQ_SHPI_START + 97)
++#define IRQ_DB8500_MSP2			(IRQ_SHPI_START + 98)
++#define IRQ_DB8500_SDMMC4		(IRQ_SHPI_START + 99)
++#define IRQ_DB8500_SDMMC5		(IRQ_SHPI_START + 100)
++#define IRQ_DB8500_HSIRD0		(IRQ_SHPI_START + 104)
++#define IRQ_DB8500_HSIRD1		(IRQ_SHPI_START + 105)
++#define IRQ_DB8500_HSITD0		(IRQ_SHPI_START + 106)
++#define IRQ_DB8500_HSITD1		(IRQ_SHPI_START + 107)
++#define IRQ_DB8500_CTI0			(IRQ_SHPI_START + 108)
++#define IRQ_DB8500_CTI1			(IRQ_SHPI_START + 109)
++#define IRQ_DB8500_ICN_ERR		(IRQ_SHPI_START + 110)
++#define IRQ_DB8500_MALI_PPMMU		(IRQ_SHPI_START + 112)
++#define IRQ_DB8500_MALI_PP		(IRQ_SHPI_START + 113)
++#define IRQ_DB8500_MALI_GPMMU		(IRQ_SHPI_START + 114)
++#define IRQ_DB8500_MALI_GP		(IRQ_SHPI_START + 115)
++#define IRQ_DB8500_MALI			(IRQ_SHPI_START + 116)
++#define IRQ_DB8500_PRCMU_SEM		(IRQ_SHPI_START + 118)
++#define IRQ_DB8500_GPIO0		(IRQ_SHPI_START + 119)
++#define IRQ_DB8500_GPIO1		(IRQ_SHPI_START + 120)
++#define IRQ_DB8500_GPIO2		(IRQ_SHPI_START + 121)
++#define IRQ_DB8500_GPIO3		(IRQ_SHPI_START + 122)
++#define IRQ_DB8500_GPIO4		(IRQ_SHPI_START + 123)
++#define IRQ_DB8500_GPIO5		(IRQ_SHPI_START + 124)
++#define IRQ_DB8500_GPIO6		(IRQ_SHPI_START + 125)
++#define IRQ_DB8500_GPIO7		(IRQ_SHPI_START + 126)
++#define IRQ_DB8500_GPIO8		(IRQ_SHPI_START + 127)
++
++#endif
+diff --git a/arch/arm/mach-ux500/include/mach/irqs.h b/arch/arm/mach-ux500/include/mach/irqs.h
+index 7970684..a6fb1fc 100644
+--- a/arch/arm/mach-ux500/include/mach/irqs.h
++++ b/arch/arm/mach-ux500/include/mach/irqs.h
+@@ -10,7 +10,8 @@
+ #ifndef ASM_ARCH_IRQS_H
+ #define ASM_ARCH_IRQS_H
+ 
+-#include <mach/hardware.h>
++#include <mach/irqs-db5500.h>
++#include <mach/irqs-db8500.h>
+ 
+ #define IRQ_LOCALTIMER                  29
+ #define IRQ_LOCALWDOG                   30
+@@ -67,12 +68,17 @@
+ /* There are 128 shared peripheral interrupts assigned to
+  * INTID[160:32]. The first 32 interrupts are reserved.
+  */
+-#define U8500_SOC_NR_IRQS		161
++#define DBX500_NR_INTERNAL_IRQS		161
+ 
+ /* After chip-specific IRQ numbers we have the GPIO ones */
+ #define NOMADIK_NR_GPIO			288
+-#define NOMADIK_GPIO_TO_IRQ(gpio)	((gpio) + U8500_SOC_NR_IRQS)
+-#define NOMADIK_IRQ_TO_GPIO(irq)	((irq) - U8500_SOC_NR_IRQS)
+-#define NR_IRQS				NOMADIK_GPIO_TO_IRQ(NOMADIK_NR_GPIO)
++#define NOMADIK_GPIO_TO_IRQ(gpio)	((gpio) + DBX500_NR_INTERNAL_IRQS)
++#define NOMADIK_IRQ_TO_GPIO(irq)	((irq) - DBX500_NR_INTERNAL_IRQS)
++#define IRQ_BOARD_START			NOMADIK_GPIO_TO_IRQ(NOMADIK_NR_GPIO)
+ 
+-#endif /*ASM_ARCH_IRQS_H*/
++/* This will be overridden by board-specific irq headers */
++#define IRQ_BOARD_END			IRQ_BOARD_START
++
++#define NR_IRQS				IRQ_BOARD_END
++
++#endif /* ASM_ARCH_IRQS_H */
 -- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+1.7.0
