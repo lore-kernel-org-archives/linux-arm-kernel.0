@@ -1,239 +1,74 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Fri, 18 Jun 2010 19:12:25 +0900
-Subject: [PATCH] S5PV210 Correct clock source control register properties
-In-Reply-To: <005501cb0ecc$d1de38b0$759aaa10$%kim@samsung.com>
-References: <1276766116-6839-1-git-send-email-myungjoo.ham@samsung.com>
-	<003301cb0ea8$474d1640$d5e742c0$%kim@samsung.com>
-	<AANLkTik78ycpNKYIhdu7SKeQ_9htcjCJlXch5bobUxHq@mail.gmail.com>
-	<005501cb0ecc$d1de38b0$759aaa10$%kim@samsung.com>
-Message-ID: <AANLkTin_CgGAzW2Lla2P4PZJyeANAahVZ9_pdqi8Xacf@mail.gmail.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Fri, 18 Jun 2010 12:16:26 +0200
+Subject: [PATCH v2] input/imx_keypad: add PM support
+In-Reply-To: <1276801147-4103-1-git-send-email-eric@eukrea.com>
+References: <1276801147-4103-1-git-send-email-eric@eukrea.com>
+Message-ID: <1276856186.3146.5.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 18, 2010 at 6:58 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> MyungJoo Ham wrote:
->>
->> On Fri, Jun 18, 2010 at 2:36 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> > MyungJoo Ham wrote:
->> >>
->> >> The clock source controls (struct clksrc_clk) have been often accessing
->> >> CLK_GATE_IPx, which are for clock gating and are accessed by each clock
->> >> as well as the clock source. This duplicated clock issue may incur
->> >> lockup problems when there are two modules accessing the same clock with
->> >> different names.
->> >>
->> > Actually, S5V210/S5PC110 CLK_GATE_IPx can disable the clock operation of
->> each
->> > IP if it is not required. And this reduces dynamic power. CLK_SRC_MASKx is
->> > used to control clock mux of each IP's SCLK.
->> >
->> > Basically CLK_SRC_MASKx is for mux control (output masking) of each IP
->> > source, and actually that can _not_ control relevant every source clock of
->> > each IP. So CLK_GATE_IPx exists, can do it.
->> >
->> > I know, in the several case, i.e, camera and fimc, each sclk_xxx need to
->> > control. And can be controlled each sclk_xxx by using your patch, but in this
->> > case, need to additional control relevant clock gating for dynamic clock
->> > gating of each IP in its device driver.
->>
->> We've changed clksrc_clk's not to access CLK_GATE_IPx because of the
->> duplicated clock (or doppelganger) problem. We need to either get rid
->> of ".enable / .ctrlbit" from
->> struct clk of struct clksrc_clk, change them to use "CLK_SRC_MASKx",
->> or get rid of their twins
->> (e.g., "hsmmc" for "mmc_bus") as long as there are clock definitions
->> with different names
->> accessing the same CLK_GATE_IPx. Letting clksrc_clk access
->> CLK_GATE_IPx creates potential
->> kernel lockups.
->>
-> Hmm..duplicated clock problem?
->
+Hi Eric,
 
-> The clk_enable and clk_disable functions maintain a reference count and base the decision about enabling/disabling the clock on the reference count. Could you please explain how kernel lockups will occur in this case (considering the use of reference count in clk_enable and clk_disable)
->
+On gio, 2010-06-17 at 20:59 +0200, Eric B?nard wrote:
+> We use keypad_data to enable wakeup from platform data
+> 
+> suspend/resume is tested on an i.MX27 when keypad is not
+> in use and when it's is in use (in which case we immediatly
+> get the key pressed at wakeup)
+> 
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
+> Cc: maramaopercheseimorto at gmail.com
+> Cc: linux-input at vger.kernel.org
+> Cc: dmitry.torokhov at gmail.com
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+> v2 :
+> 	- simplify suspend & resume functions
+> 	- convert to pm_ops
+> 
+>  drivers/input/keyboard/imx_keypad.c |   40 +++++++++++++++++++++++++++++++++-
+>  1 files changed, 38 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/input/keyboard/imx_keypad.c b/drivers/input/keyboard/imx_keypad.c
+> index d92c15c..9aa0005 100644
+> --- a/drivers/input/keyboard/imx_keypad.c
+> +++ b/drivers/input/keyboard/imx_keypad.c
+> @@ -364,6 +364,38 @@ static void imx_keypad_inhibit(struct imx_keypad *keypad)
+>  	writew(0xff00, keypad->mmio_base + KPCR);
+>  }
+>  
+> +#ifdef CONFIG_PM
+> +static int mxc_kpp_suspend(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct imx_keypad *keypad = platform_get_drvdata(pdev);
+> +
+> +	keypad->enabled = false;
+> +	synchronize_irq(keypad->irq);
+> +	disable_irq(keypad->irq);
+> +	clk_disable(keypad->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int mxc_kpp_resume(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct imx_keypad *keypad = platform_get_drvdata(pdev);
+> +
+> +	keypad->enabled = true;
+> +	clk_enable(keypad->clk);
+> +	enable_irq(keypad->irq);
+> +
+> +	return 0;
+> +}
 
-It's because each struct clk keeps its own count value, not a shared
-count value.
-
-The lockup example (rephrased example of the previous reply)
-
-
-
-(not an exact code / assume that initially the clock is off)
-
-struct clk clkA = {.name="a", .ctrlbit=1, .enable=func};
-struct clk clkB = {.name="b", .ctrlbit=1, .enable=func};
-
-module A
-{
- struct clk *a = clk_get("a");
- clk_enable(a);
- while (1)
-   access registers related with the clock;
- clk_disable(a);
-}
-
-module B
-{
- struct clk *b = clk_get("b");
- clk_enable(b);
-   do a short job related with the clock;
- clk_disable(b);
-}
-
-Imagine when A started first, but while A stays in the loop, B runs
-and exits. Then, in the module A, accessing registers may fail, which,
-in turn, can lead to a lockup.
-
-
-In this example, they do NOT share their count value, but access the
-same register; i.e., a.count is not related with b.count while
-a.enable(a.ctrlbit) will do the exactly same thing with
-b.enable(b.ctrlbit). When there are one module using clkA and another
-using clkB, the system may suffer from lockups.
-
-Unless we change "struct clk" or "plat/clock.c:clk_disable" so that
-they can refer to other "struct clk" (which does not appear to be a
-good idea anyway), we should not define a clock more than once.
-
-
->> Drivers should get clocks defined in "static struct clk init_clocks[],
->> init_clocks_disable[]" in order
->> to access CLK_GATE_IPx though we still have some missing clocks there;
->> e.g., mfc, g2d, and g3d.
->> Again, there should be NO duplicated clock definitions if we are going
->> to use .enable function that
->> accesses the same address & bit.
->>
->> ----------- from the previous patch -----------
->> Please note that each clock definition should access different control
->> register; otherwise, the system may suffer lockups. For example, if we
->> have two clock definitions "a" and "b" which access the same register
->> (and the shift value). Then, when we do:
->>
->> ? ? ? ?module B
->> ? ? ? ?1 clk = clk_get("b");
->> ? ? ? ?2 clk->clk_enable(clk);
->> ? ? ? ?3 do something with clk.
->> ? ? ? ?4 clk->clk_disable(clk);
->>
->> ? ? ? ?module A
->> ? ? ? ?1 clk = clk_get("a");
->> ? ? ? ?2 clk->clk_enable(clk);
->> ? ? ? ?3 do something with clk
->> ? ? ? ?4 clk->clk_disable(clk);
->>
->> ? ? ? ?And if the execution order is
->>
->> ? ? ? ?B1->B2->A1->A2->A3->A4->B3 ...
->>
->> ? ? ? ?Then, the system may hang at the point B3.
->> ------------------------------------------------------------------------------------
->>
->> >
->> >> Besides, the clock source control is supposed to control (setting values
->> >> of MASK, SRC, DIV), not to turn on/off individual clock.
->> >>
->> >> Another point is that there are registers (CLK_SRC_MASK0/1) specialized
->> >> for masking clock source control in S5PV210/S5PC110 according to the
->> >> user manual (rev 20100201).
->> >>
->> >> Therefore, accessing CLK_SRC_MASK0/1 (rather than accessing
->> >> CLK_GATE_IPx) for the clock source control is safer and fits to the
->> >> semantics of S5PV210/S5PC110 registers. And fortuneatly, each clock
->> >> source defined in clock.c has corresponding bit at CLK_SRC_MASK0/1
->> >> except for MFC, G2D, and G3D.
->> >>
->> >> In this patch,
->> >>
->> >> - DAC, HDMI, AUDIO 0/1/2, UCLK(uart) 0/1/2/3, MIXER, FIMC 0/1/2,
->> >> FIMC, MMC 0/1/2/3, CSIS, SPI 0/1, PWI, and PWM clock sources are
->> >> modified to use CLK_SRC_MASK0/1, which were using CLK_GATE_IPx.
->> >>
->> >> - CAM 0/1 did not have enable/disable control. They now access
->> >> ? CLK_SRC_MASK0.
->> >>
->> >> - MFC, G3D, G2D were using CLK_GATE_IPx. However, as there are no clocks
->> >> ? defined to control MFC, G3D, and G2D, we kept them to access
->> >> CLK_GATE_IPx. These may need to be modified (erase .enable, .ctrlbit
->> >> from sclk_mfc, sclk_g2d, sclk_g3d and create clocks: g3d, g2d, mfc)
->> >> later.
->> >>
->> > Hmm..need to check about multimedia usage.
->> >
->> > And in my opinion, it would be helpful to understand that should be short and
->> > clear.
->> >
->> >> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
->> >> ---
->> >> ?arch/arm/mach-s5pv210/clock.c | ?101
->> > ++++++++++++++++++++++-------------------
->> >> ?1 files changed, 55 insertions(+), 46 deletions(-)
->> >>
->> >> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
->> >> index ec5ad8c..08c1063 100644
->> >> --- a/arch/arm/mach-s5pv210/clock.c
->> >> +++ b/arch/arm/mach-s5pv210/clock.c
->
-> (snip)
->
->> >> --
->> >
->> > I'm not sure that need to control of all sclk_xxx like above method, mux
->> > output masking.
->> >
->
-> Please let me know your opinion about above question based on scenario.
->
->> > Thanks.
->> >
->> > Best regards,
->> > Kgene.
->> > --
->> > Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
->> > SW Solution Development Team, Samsung Electronics Co., Ltd.
->> >
->> >
->> > _______________________________________________
->> > linux-arm-kernel mailing list
->> > linux-arm-kernel at lists.infradead.org
->> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->> >
->>
->> ps. I forgot to erase .enable and .ctrlbit of "sclk_fimc"s. The user
->> manual states that
->> the three "sclk_fimc" clocks should be controlled identically at the
->> same time; thus,
->> there should be no individual clock masking control on them. This will
->> be done later.
->> (we may let them control (0x7<<2) so that they are controlled@the
->> same time, however,
->> we create "doppelganger" clocks there by doing so.)
->>
->>
->
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
+Ok, so with this patch the keypad cannot wake the system?
+It is scheduled another patch?
 
 
 -- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+Alberto!
+
+        Be Persistent!
+                - Greg Kroah-Hartman (FOSDEM 2010)
