@@ -1,122 +1,30 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 18 Jun 2010 08:40:10 +0900
-Subject: [PATCH] S5PV210 Correct clock register properties
-In-Reply-To: <1276763596-6175-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1276763596-6175-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <AANLkTikhPeiBzFFOEFQHr4bvV_hiGwkck6weuJi5A72G@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 18 Jun 2010 10:08:30 +1000
+Subject: [GIT PULL linux-next] tegra
+In-Reply-To: <AANLkTin7ZT5YyL7vUjiQ-5s9wjmEWEqfw7tnaHP4k5U_@mail.gmail.com>
+References: <AANLkTikXH_UtE95ZGHp5AAm5IRD6dN8cnrNK9A3-MRwY@mail.gmail.com>
+	<20100618090857.057e0a7a.sfr@canb.auug.org.au>
+	<AANLkTin7ZT5YyL7vUjiQ-5s9wjmEWEqfw7tnaHP4k5U_@mail.gmail.com>
+Message-ID: <20100618100830.d6589e23.sfr@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Hi Eric,
 
-To Ben,
+On Thu, 17 Jun 2010 16:12:23 -0700 Erik Gilling <konkers@android.com> wrote:
+>
+>     Add Colin and Olof as contacts as well.
 
-My concern is happen. that's reason to use the macro instead of
-hard-coded values.
+Done.
 
-It's need to merge 2.6.35-rc4.
-
-Thank you,
-Kyungmin Park
-
-On Thu, Jun 17, 2010 at 5:33 PM, MyungJoo Ham <myungjoo.ham@samsung.com> wrote:
-> From: MyungJoo Ham <myungJoo.ham@samsung.com>
->
-> Corrected shift values of I2S and UART clocks (CLK_GATE_IP3).
->
-> I2S (CLK_GATE_IP3) and UART (CLK_GATE_IP3) had wrong register shift
-> values, which in turn, made them turn on and off wrong clocks.
->
-> Please note that each clock definition should access different control
-> register; otherwise, the system may suffer lockups. For example, if we
-> have two clock definitions "a" and "b" which access the same register
-> (and the shift value). Then, when we do:
->
-> ? ? ? ?module B
-> ? ? ? ?1 clk = clk_get("b");
-> ? ? ? ?2 clk->clk_enable(clk);
-> ? ? ? ?3 do something with clk.
-> ? ? ? ?4 clk->clk_disable(clk);
->
-> ? ? ? ?module A
-> ? ? ? ?1 clk = clk_get("a");
-> ? ? ? ?2 clk->clk_enable(clk);
-> ? ? ? ?3 do something with clk
-> ? ? ? ?4 clk->clk_disable(clk);
->
-> ? ? ? ?And if the execution order is
->
-> ? ? ? ?B1->B2->A1->A2->A3->A4->B3 ...
->
-> ? ? ? ?Then, the system may hang at the point B3.
->
->
-> Therefore, there should be no clock definitions with the same contol
-> register/shift. If we need to create "aliases", then, creating child
-> clocks sharing the clock should be fine.
->
-> However, we did not mitigate this doppelganger clock problem for "struct
-> clksrc_clk" vs "struct clk"; look at "hsmmc" vs "mmc_bus". In the next
-> patch, we plan to let "struct clksrc_clk" access "CLK_SRC_MASK0" and
-> "CLK_SRC_MASK1"; i.e., clock source enable/disable should mask the clock
-> source itself, not the clock that is supplied by the clock source.
->
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> ---
-> ?arch/arm/mach-s5pv210/clock.c | ? 12 ++++++------
-> ?1 files changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-> index 154bca4..ec5ad8c 100644
-> --- a/arch/arm/mach-s5pv210/clock.c
-> +++ b/arch/arm/mach-s5pv210/clock.c
-> @@ -406,13 +406,13 @@ static struct clk init_clocks_disable[] = {
-> ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = 0,
-> ? ? ? ? ? ? ? ?.parent ? ? ? ? = &clk_p,
-> ? ? ? ? ? ? ? ?.enable ? ? ? ? = s5pv210_clk_ip3_ctrl,
-> - ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1<<4),
-> + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1<<5),
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "i2s_v32",
-> ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = 1,
-> ? ? ? ? ? ? ? ?.parent ? ? ? ? = &clk_p,
-> ? ? ? ? ? ? ? ?.enable ? ? ? ? = s5pv210_clk_ip3_ctrl,
-> - ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1<<4),
-> + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1<<6),
-> ? ? ? ?}
-> ?};
->
-> @@ -429,25 +429,25 @@ static struct clk init_clocks[] = {
-> ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = 0,
-> ? ? ? ? ? ? ? ?.parent ? ? ? ? = &clk_pclk_psys.clk,
-> ? ? ? ? ? ? ? ?.enable ? ? ? ? = s5pv210_clk_ip3_ctrl,
-> - ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1<<7),
-> + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1<<17),
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "uart",
-> ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = 1,
-> ? ? ? ? ? ? ? ?.parent ? ? ? ? = &clk_pclk_psys.clk,
-> ? ? ? ? ? ? ? ?.enable ? ? ? ? = s5pv210_clk_ip3_ctrl,
-> - ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1<<8),
-> + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1<<18),
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "uart",
-> ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = 2,
-> ? ? ? ? ? ? ? ?.parent ? ? ? ? = &clk_pclk_psys.clk,
-> ? ? ? ? ? ? ? ?.enable ? ? ? ? = s5pv210_clk_ip3_ctrl,
-> - ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1<<9),
-> + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1<<19),
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "uart",
-> ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = 3,
-> ? ? ? ? ? ? ? ?.parent ? ? ? ? = &clk_pclk_psys.clk,
-> ? ? ? ? ? ? ? ?.enable ? ? ? ? = s5pv210_clk_ip3_ctrl,
-> - ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1<<10),
-> + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1<<20),
-> ? ? ? ?},
-> ?};
->
-> --
-> 1.6.3.3
->
->
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+http://www.canb.auug.org.au/~sfr/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100618/b8b59a24/attachment.sig>
