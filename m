@@ -1,76 +1,133 @@
-From: frank.rowand@am.sony.com (Frank Rowand)
-Date: Fri, 18 Jun 2010 15:12:03 -0700
-Subject: Request review of device tree documentation
-In-Reply-To: <20100616.005237.338122493954307067.imp@bsdimp.com>
-References: <4C186B7B.1060308@firmworks.com>
-	<4C186C72.2020506@compulab.co.il>	<4C187013.5000400@firmworks.com>
-	<20100616.005237.338122493954307067.imp@bsdimp.com>
-Message-ID: <4C1BEF33.7090400@am.sony.com>
+From: redhatter@gentoo.org (Stuart Longland)
+Date: Sat, 19 Jun 2010 08:43:14 +1000
+Subject: [alsa-devel] [PATCH] ASoC: Add new TI TLV320AIC3204 CODEC driver
+In-Reply-To: <20100618155322.GB16941@rakim.wolfsonmicro.main>
+References: <1276833465-31702-1-git-send-email-redhatter@gentoo.org>
+	<1276858862.3054.28.camel@odin>
+	<20100618113335.GB30868@www.longlandclan.yi.org>
+	<20100618155322.GB16941@rakim.wolfsonmicro.main>
+Message-ID: <20100618224313.GC30868@www.longlandclan.yi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/15/10 23:52, M. Warner Losh wrote:
-> In message: <4C187013.5000400@firmworks.com>
->             Mitch Bradley <wmb@firmworks.com> writes:
-> : Mike Rapoport wrote:
-> : > Mitch Bradley wrote:
-> : >> Mike Rapoport wrote:
-> : >>> Mitch Bradley wrote:
-> : >>>
-> : >>>> The second topic is the hypothetical use of OFW as a HAL. That will
-> : >>>> not happen for several reasons.  The opposition to the idea is
-> : >>>> widespread and deeply held, and there are good arguments to support
-> : >>>> that opposition.  Furthermore, the economic conditions necessary for
-> : >>>> the creation of such a HAL do not exist in the ARM world, nor indeed
-> : >>>> in the Linux world in general.  (The necessary condition is the
-> : >>>> ability for one company to impose a substantial change by fiat -
-> : >>>> essentially a monopoly position.)
-> : >>>>
-> : >>>> Shall we agree, then, that any further discussion of the HAL issue is
-> : >>>> "just for fun", and that nobody needs to feel threatened that it would
-> : >>>> actually happen?
-> : >>>
-> : >>> I've recently worked with vendor versions of U-Boot for advanced ARM
-> : >>> SoCs. There is already *huge* chunk of HAL code in those versions. And
-> : >>> if there would be possibility to have callbacks into the firmware
-> : >>> these chunks would only grow, IMHO.
-> : >>
-> : >> How can there be HAL code in U-Boot unless there is already the
-> : >> possibility to have callbacks into the firmware?
-> : >
-> : > Currently it aims to abstract hardware from U-Boot and reuse the same
-> : > HW access code across operating systems and bootloaders. If this code
-> : > would have callbacks I afraid the things would became worse.
-> : 
-> : The only way I can understand what you said is if I assume that by
-> : "callback", you mean the following sequence:
-> : 
-> : a) U-boot loads and executes the OS, providing to the OS the address
-> : of some HW access routines that it can use
-> : b) The OS calls one of those HW access routines
-> : c) During the execution of that HW access routine, that routine calls
-> : "back" into the OS, before returning.  So a call into the OS is nested
-> : inside a call into U-boot resident code.
-> : 
-> : If that is what you are worried about, it is not what we were
-> : discussing.  We were discussing - and many people were against - step
-> : (b).
-> : 
-> : Are you saying that step (b) - the OS calling into routines provided
-> : by U-Boot - is already the status quo?
+On Fri, Jun 18, 2010 at 04:53:23PM +0100, Mark Brown wrote:
+> On Fri, Jun 18, 2010 at 09:33:35PM +1000, Stuart Longland wrote:
+> > On Fri, Jun 18, 2010 at 12:01:02PM +0100, Liam Girdwood wrote:
+> > > On Fri, 2010-06-18 at 13:57 +1000, Stuart Longland wrote:
 > 
-> I don't know about status quo, but it certainly is supported.  There's
-> an option to allow for a secondary boot loader, such as FreeBSD's
-> /boot/loader, to call back into uboot to read things from
-> flash/disk/whatever, do network access, etc.  Not so much a HAL, but
-> more of an echo of the functionality provided by PC BIOS functions.
-> /boot/loader can be viewed as a mini OS that calls back into uboot to
-> have it do things.  Once /boot/loader loads FreeBSD, btw, it and uboot
-> disappear from the scene, so this isn't exactly a HAL situation...
+> > > > The audio interface supports many data bus formats, including I??S
+> > > > master/slave, DSP, left/right justified and TDM.
+> 
+> > > Just had a quick check and the register caching needs addressed.
+> 
+> > > I agree with your comments, I don't think we really want to cache all
+> > > 16K of codec registers here as we will probably only ever use a handful
+> > > of them. I think a smaller lookup table containing only the registers
+> > > that we care about will do.
+> 
+> > Yeah, I wasn't sure how to go about it.  It's inefficient, but it's
+> > simple, and works.  Other options I've considered;
+> 
+> > (1) Mark's suggestion of using per-page arrays
+> > (2) Using address translation. that is:
+> > 	- Page 0 registers 0-127 stored in cache array elements 0-127
+> > 	- Page 1 registers 0-127 stored in cache array elements 128-255
+> > 	- Page 2..7 are skipped
+> > 	- Page 8 registers 0-127 stored in cache array elements 256-383
+> > 	... etc.
+> 
+> Option 2 is what others have used here.  I do think that anything we do
+> here really ought to have some sort of page mapping support whatever the
+> actual implementation it uses - TI in particular have a bunch of chips
+> which do this so there's a general call for something that can handle
+> them.
+> 
+> If you are going to do a lookup table one way of doing this would be to
+> have the lookup table be a table of range mappings (I've not looked at
+> the patch, perhaps that's what you've done already) - just so long as
+> it's got the concept of pages covered somehow.
 
-Just for reference, there is a patch request on LKML to enable calling
-openfirmware from the kernel on OLPC:
+Yeah... for now I've re-sent a new patch... it's on its way... with the
+register cache in its present form.  It's huge and unsightly, but won't
+otherwise cause a problem.
 
-   http://lkml.org/lkml/2010/6/18/336
+I'd sooner get the driver out there in its known working form, then come
+up with a solution to fix the problem in a scalable fashion, then
+quickly try to hack something up here (I'm at home presently) where I
+have no test hardware to check I haven't broken something... and where
+the implementation and design will likely be an appauling mess. ;-)
 
--Frank
+> > Another thought regarding register cache, rather than hard-coding it the
+> > way we presently do, we could also build up the cache on demand... that
+> > is, we maintain a table of previously read registers; if a register
+> > value is read for the first time, an actual read is done from the CODEC
+> > (or the value is copied from a static table).  All subsequent reads then
+> > come from cache.  On suspend; if a register has not been touched, it is
+> > deemed to be left at default settings, and skipped on resume.
+> 
+> The only problem with this is that for a number of reasons a lot of
+> devices have no read functionality at all.  These need us to supply the
+> defaults from outside the device, though other devices could use what
+> you suggest.  I'd not be so bothered about the performance here - this
+> has to be high performance in comparison with doing I/O on a slow bus
+> such as I2C.  If we do run into performance issues we can always work on
+> substituting in a higher performance algorithm later, if everything is
+> well encapsulated this should be doable without much disruption.
+> 
+> It's also useful to have the actual defaults available for allowing
+> writes to be skipped when powering up the device (eg, on resume) - these
+> could be cached on first write so it's not insurmountable but it does
+> need to be considered.
+
+Indeed... I don't check if a register has been modified; I just copy it
+across anyway.  I'm aware some devices do not implement reads, that was
+a comment made about the TLV320AIC3X device driver that I based my
+driver on... in this situation you'd have no choice but to do it the way
+it's presently done now.
+
+I'll think about this over the next few days... but I'm thinking the
+basic structure of such a register cache would possibly take the form of
+something like this:
+
+struct soc_reg_cache_pg {
+	/* Page index; for single-page registers, this would be zero */
+	int index;
+	/* Number of registers cached */
+	int size;
+	/* Register offset cached */
+	int offset;
+	/* Pointer to register flags */
+	const int *flags_data[];
+	/* Pointer to default values */
+	const int *default_data[];
+	/* Pointer to cached values */
+	int *cached_data[];
+	/* Pointer to next block of page registers (for sparse maps) */
+	struct soc_reg_cache_pg *next_block;
+};
+
+... then you'd use several of these in an array... one for each block of
+registers in a page.  If your device uses sparse registers, you can use
+the next_block pointer to point to the next such struct that has the
+next bank of registers, to save you scanning through *every* struct.
+
+The register cache could be an array of pointers, size equal to the
+total number of pages, if a page is not used; it is set to NULL.  If a
+page is sparse, the other blocks would be accessed using the next_block
+pointer.
+
+The flags_data array would be optional; and could be used to indicate
+the read/write status, volatile bits, and other information.  It'd be a
+bitfield.
+
+Thoughts?
+
+Regards,
+-- 
+Stuart Longland (aka Redhatter, VK4MSL)      .'''.
+Gentoo Linux/MIPS Cobalt and Docs Developer  '.'` :
+. . . . . . . . . . . . . . . . . . . . . .   .'.'
+http://dev.gentoo.org/~redhatter             :.'
+
+I haven't lost my mind...
+  ...it's backed up on a tape somewhere.
