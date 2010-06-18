@@ -1,42 +1,45 @@
-From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
-Date: Fri, 18 Jun 2010 16:19:55 +0200
-Subject: [PATCH 2/2] mach-cpuimx27: fix USB_ULPI build warnings
-In-Reply-To: <1276870795-21594-1-git-send-email-eric@eukrea.com>
-References: <1276870795-21594-1-git-send-email-eric@eukrea.com>
-Message-ID: <1276870795-21594-2-git-send-email-eric@eukrea.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 18 Jun 2010 23:21:30 +0900
+Subject: Several questions regarding ARCH_S3C2410
+In-Reply-To: <005d01cb0ed5$6bb83b90$4328b2b0$%kim@samsung.com>
+References: <AANLkTimPk6mtyB57jXuAq1ugQseS655OCPEuP9-qZYoT@mail.gmail.com>
+	<AANLkTilbEYR28lrVBAIXXuJ6sEf5uCp4Tpr7wriBZLj3@mail.gmail.com>
+	<20100618090042.GY3498@trinity.fluff.org>
+	<005d01cb0ed5$6bb83b90$4328b2b0$%kim@samsung.com>
+Message-ID: <AANLkTinzTIxh06xDCcl34P5QhGS1nSHvrlmmQWWeISrW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-when CONFIG_USB_ULPI is not defined we actually get :
-warning: 'otg_pdata' defined but not used
-warning: 'usbh2_pdata' defined but not used
+Then how about to prepare the these activities.
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: s.hauer at pengutronix.de
----
- arch/arm/mach-mx2/mach-cpuimx27.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Next time we will use the s5pc210 (or whatever) and I hope to use it
+with s5pc110.
+To to this how about to merge the s5p series?
 
-diff --git a/arch/arm/mach-mx2/mach-cpuimx27.c b/arch/arm/mach-mx2/mach-cpuimx27.c
-index dc2dca3..5529178 100644
---- a/arch/arm/mach-mx2/mach-cpuimx27.c
-+++ b/arch/arm/mach-mx2/mach-cpuimx27.c
-@@ -219,6 +219,7 @@ static struct platform_device serial_device = {
- };
- #endif
- 
-+#if defined(CONFIG_USB_ULPI)
- static struct mxc_usbh_platform_data otg_pdata = {
- 	.portsc	= MXC_EHCI_MODE_ULPI,
- 	.flags	= MXC_EHCI_INTERFACE_DIFF_UNI,
-@@ -228,6 +229,7 @@ static struct mxc_usbh_platform_data usbh2_pdata = {
- 	.portsc	= MXC_EHCI_MODE_ULPI,
- 	.flags	= MXC_EHCI_INTERFACE_DIFF_UNI,
- };
-+#endif
- 
- static struct fsl_usb2_platform_data otg_device_pdata = {
- 	.operating_mode = FSL_USB2_DR_DEVICE,
--- 
-1.6.3.3
+I suggest to read the OMAP mailing list how to support OMAP2, 3, and 4
+with single kernel.
+
+Thank you,
+Kyungmin Park
+
+On Fri, Jun 18, 2010 at 8:00 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Ben Dooks wrote:
+>>
+>> On Fri, Jun 18, 2010 at 04:44:59PM +0900, Kyungmin Park wrote:
+>> > CCing Mr. Kim
+>>
+>> not sure it really needs him to be involved at-all
+>>
+> I'd like to focus on S5P SoCs and Samsung common(plat-samsung) :-)
+>
+> And maybe Ben is more interested in S3C SoCs and Samsung common.
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
