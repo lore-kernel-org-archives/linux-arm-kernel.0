@@ -1,22 +1,42 @@
-From: eric@eukrea.com (=?UTF-8?B?RXJpYyBCw6luYXJk?=)
-Date: Fri, 18 Jun 2010 19:50:54 +0200
-Subject: [PATCH v2] input/imx_keypad: add PM support
-In-Reply-To: <1276882804.3146.14.camel@realization>
-References: <1276801147-4103-1-git-send-email-eric@eukrea.com>	
-	<1276856186.3146.5.camel@realization> <4C1B84A3.8080300@eukrea.com>
-	<1276882804.3146.14.camel@realization>
-Message-ID: <4C1BB1FE.9090403@eukrea.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Fri, 18 Jun 2010 20:04:20 +0200
+Subject: [PATCH 02/05] mfd: enable onkey on max8925
+In-Reply-To: <AANLkTiko7PRpnVlgsOwVHi5EjvEnpfEtC44zUnDMuQxp@mail.gmail.com>
+References: <AANLkTiko7PRpnVlgsOwVHi5EjvEnpfEtC44zUnDMuQxp@mail.gmail.com>
+Message-ID: <20100618180419.GB3582@sortiz.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 18/06/2010 19:40, Alberto Panizzo a ?crit :
-> Well.. it is a surprise to me too. I have to look down the documentation
-> ad soon I will try on the mx31pdk.
+Hi Haojian,
 
-OK, I'm waiting for your feedback on the mx31pdk.
+On Wed, May 19, 2010 at 02:57:17PM +0800, Haojian Zhuang wrote:
+> @@ -596,6 +614,15 @@ int __devinit max8925_device_init(struct
+> max8925_chip *chip,
+>  		dev_err(chip->dev, "Failed to add rtc subdev\n");
+>  		goto out;
+>  	}
+> +
+> +	ret = mfd_add_devices(chip->dev, 0, &onkey_devs[0],
+> +			      ARRAY_SIZE(onkey_devs),
+> +			      &onkey_resources[0], 0);
+> +	if (ret < 0) {
+> +		dev_err(chip->dev, "Failed to add onkey subdev\n");
+> +		goto out;
+I think you want goto out_dev here.
+I fixed it up for you and applied this patch to my for-next tree.
 
- From my understanding of the documentation, in order to be able to 
-wakeup the CPU, the interrupt of a peripheral and its clock should stay 
-enabled while going to suspend.
+Cheers,
+Samuel.
 
-Eric
+
+> +	}
+> +
+>  	if (pdata && pdata->regulator[0]) {
+>  		ret = mfd_add_devices(chip->dev, 0, &regulator_devs[0],
+>  				      ARRAY_SIZE(regulator_devs),
+> -- 
+> 1.5.6.5
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
