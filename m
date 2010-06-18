@@ -1,170 +1,72 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Fri, 18 Jun 2010 12:30:42 +0900
-Subject: [PATCH] S5PV210 Correct clock register properties
-In-Reply-To: <000f01cb0e8e$64d44950$2e7cdbf0$%kim@samsung.com>
-References: <1276763596-6175-1-git-send-email-myungjoo.ham@samsung.com>
-	<000f01cb0e8e$64d44950$2e7cdbf0$%kim@samsung.com>
-Message-ID: <4C1AE862.8000407@samsung.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 18 Jun 2010 11:43:37 +0800
+Subject: Several questions regarding ARCH_S3C2410
+Message-ID: <AANLkTimPk6mtyB57jXuAq1ugQseS655OCPEuP9-qZYoT@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/18/2010 11:31 AM, Kukjin Kim wrote:
-> MyungJoo Ham wrote:
->> From: MyungJoo Ham <myungJoo.ham@samsung.com>
->>
-> I think you're author of this patch, so no need above 'From'.
-> Maybe from wrong e-mail which should be 'myungjoo.ham...'
-> 
-> Please ensure that your setting of '.gitconfig' is right before submitting.
-> 
->> Corrected shift values of I2S and UART clocks (CLK_GATE_IP3).
->>
->> I2S (CLK_GATE_IP3) and UART (CLK_GATE_IP3) had wrong register shift
->> values, which in turn, made them turn on and off wrong clocks.
-> 
-> Yes..should be fixed.
-> 
->> Please note that each clock definition should access different control
->> register; otherwise, the system may suffer lockups. For example, if we
->> have two clock definitions "a" and "b" which access the same register
->> (and the shift value). Then, when we do:
->>
->> 	module B
->> 	1 clk = clk_get("b");
->> 	2 clk->clk_enable(clk);
->> 	3 do something with clk.
->> 	4 clk->clk_disable(clk);
->>
->> 	module A
->> 	1 clk = clk_get("a");
->> 	2 clk->clk_enable(clk);
->> 	3 do something with clk
->> 	4 clk->clk_disable(clk);
->>
->> 	And if the execution order is
->>
->> 	B1->B2->A1->A2->A3->A4->B3 ...
->>
->> 	Then, the system may hang at the point B3.
->>
->>
->> Therefore, there should be no clock definitions with the same contol
->> register/shift. If we need to create "aliases", then, creating child
->> clocks sharing the clock should be fine.
-> 
-> Yeah, but actually just should be fixed wrong bit.
-> 
->> However, we did not mitigate this doppelganger clock problem for "struct
->> clksrc_clk" vs "struct clk"; look at "hsmmc" vs "mmc_bus". In the next
->> patch, we plan to let "struct clksrc_clk" access "CLK_SRC_MASK0" and
->> "CLK_SRC_MASK1"; i.e., clock source enable/disable should mask the clock
->> source itself, not the clock that is supplied by the clock source.
-> 
-> No need above message in here.
-> 
->> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
->> ---
->>  arch/arm/mach-s5pv210/clock.c |   12 ++++++------
->>  1 files changed, 6 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
->> index 154bca4..ec5ad8c 100644
->> --- a/arch/arm/mach-s5pv210/clock.c
->> +++ b/arch/arm/mach-s5pv210/clock.c
->> @@ -406,13 +406,13 @@ static struct clk init_clocks_disable[] = {
->>  		.id		= 0,
->>  		.parent		= &clk_p,
->>  		.enable		= s5pv210_clk_ip3_ctrl,
->> -		.ctrlbit	= (1<<4),
->> +		.ctrlbit	= (1<<5),
->>  	}, {
->>  		.name		= "i2s_v32",
->>  		.id		= 1,
->>  		.parent		= &clk_p,
->>  		.enable		= s5pv210_clk_ip3_ctrl,
->> -		.ctrlbit	= (1<<4),
->> +		.ctrlbit	= (1<<6),
-> 
-> Your point is right..but your updated code was wrong :-(
-> 
+Hi Ben,
 
-?
+While working towards a unified kernel, I found that ARCH_S3C2410 actually
+includes multiple mach-* already.
 
-> Should be like below.
-> 
+linux-2.6$ git grep "ARCH_S3C2410" arch/arm/Makefile
+arch/arm/Makefile:machine-$(CONFIG_ARCH_S3C2410)	:= s3c2410 s3c2400
+s3c2412 s3c2416 s3c2440 s3c2443
 
-It's same code.
+There are several questions though:
 
-> @@ -400,19 +400,19 @@ static struct clk init_clocks_disable[] = {
->  		.id		= 0,
->  		.parent		= &clk_p,
->  		.enable		= s5pv210_clk_ip3_ctrl,
-> -		.ctrlbit	= (1<<4),
-> +		.ctrlbit	= (1 << 4),
->  	}, {
->  		.name		= "i2s_v32",
->  		.id		= 0,
->  		.parent		= &clk_p,
->  		.enable		= s5pv210_clk_ip3_ctrl,
-> -		.ctrlbit	= (1<<4),
-> +		.ctrlbit	= (1 << 5),
->  	}, {
->  		.name		= "i2s_v32",
->  		.id		= 1,
->  		.parent		= &clk_p,
->  		.enable		= s5pv210_clk_ip3_ctrl,
-> -		.ctrlbit	= (1<<4),
-> +		.ctrlbit	= (1 << 6),
-> 
->>  	}
->>  };
->>
->> @@ -429,25 +429,25 @@ static struct clk init_clocks[] = {
->>  		.id		= 0,
->>  		.parent		= &clk_pclk_psys.clk,
->>  		.enable		= s5pv210_clk_ip3_ctrl,
->> -		.ctrlbit	= (1<<7),
->> +		.ctrlbit	= (1<<17),
->>  	}, {
->>  		.name		= "uart",
->>  		.id		= 1,
->>  		.parent		= &clk_pclk_psys.clk,
->>  		.enable		= s5pv210_clk_ip3_ctrl,
->> -		.ctrlbit	= (1<<8),
->> +		.ctrlbit	= (1<<18),
->>  	}, {
->>  		.name		= "uart",
->>  		.id		= 2,
->>  		.parent		= &clk_pclk_psys.clk,
->>  		.enable		= s5pv210_clk_ip3_ctrl,
->> -		.ctrlbit	= (1<<9),
->> +		.ctrlbit	= (1<<19),
->>  	}, {
->>  		.name		= "uart",
->>  		.id		= 3,
->>  		.parent		= &clk_pclk_psys.clk,
->>  		.enable		= s5pv210_clk_ip3_ctrl,
->> -		.ctrlbit	= (1<<10),
->> +		.ctrlbit	= (1<<20),
-> 
-> How about adding blank on both of '<<' like (1 << x) for easily reading?
-> 
->>  	},
->>  };
->>
->> --
-> 
-> Thanks.
-> 
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+1. It looks like only s3c2410 is significant, so all the common definitions
+   like PHYS_OFFSET are actually same across all mach-s3c24* (except for
+   s3c24a0) ? Yet I've found arch/arm/mach-s3c2400/include/mach/memory.h,
+   where a different PHYS_OFFSET is defined, just feel a bit confused.
+
+2. So except for s3c24a0, theretically, it's possible to combine all these
+   mach into something mach-s3c24xx?
+
+3. When trying building of s3c2410_defconfig, there are a lot complaints
+   about re-definitions of {in,out}[s]{b,w,l}.  Taking a look into io.h,
+   I'm wondering if it's possible to use those definitions in asm/io.h?
+   (possibly with a customized __io())
+
+In file included from linux-2.6/include/linux/scatterlist.h:8,
+                 from linux-2.6/include/linux/dma-mapping.h:7,
+                 from linux-2.6/include/linux/dmaengine.h:26,
+                 from linux-2.6/include/linux/skbuff.h:30,
+                 from linux-2.6/lib/kobject_uevent.c:24:
+linux-2.6/arch/arm/include/asm/io.h:137: warning: "outb" redefined
+linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:196: note: this is
+the location of the previous definition
+linux-2.6/arch/arm/include/asm/io.h:138: warning: "outw" redefined
+linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:197: note: this is
+the location of the previous definition
+linux-2.6/arch/arm/include/asm/io.h:140: warning: "outl" redefined
+linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:198: note: this is
+the location of the previous definition
+linux-2.6/arch/arm/include/asm/io.h:143: warning: "inb" redefined
+linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:193: note: this is
+the location of the previous definition
+linux-2.6/arch/arm/include/asm/io.h:144: warning: "inw" redefined
+linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:194: note: this is
+the location of the previous definition
+linux-2.6/arch/arm/include/asm/io.h:146: warning: "inl" redefined
+linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:195: note: this is
+the location of the previous definition
+linux-2.6/arch/arm/include/asm/io.h:149: warning: "outsb" redefined
+linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:207: note: this is
+the location of the previous definition
+linux-2.6/arch/arm/include/asm/io.h:150: warning: "outsw" redefined
+linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:208: note: this is
+the location of the previous definition
+linux-2.6/arch/arm/include/asm/io.h:151: warning: "outsl" redefined
+linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:209: note: this is
+the location of the previous definition
+linux-2.6/arch/arm/include/asm/io.h:153: warning: "insb" redefined
+linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:203: note: this is
+the location of the previous definition
+linux-2.6/arch/arm/include/asm/io.h:154: warning: "insw" redefined
+linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:204: note: this is
+the location of the previous definition
+linux-2.6/arch/arm/include/asm/io.h:155: warning: "insl" redefined
+linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:205: note: this is
+the location of the previous definition
