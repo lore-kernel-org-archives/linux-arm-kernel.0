@@ -1,95 +1,48 @@
-From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Fri, 18 Jun 2010 15:58:36 +0530
-Subject: [PATCH 2/2] mop500: add AB8500 interrupt support
-In-Reply-To: <1276856916-19124-1-git-send-email-rabin.vincent@stericsson.com>
-References: <1276856916-19124-1-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <1276856916-19124-2-git-send-email-rabin.vincent@stericsson.com>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Fri, 18 Jun 2010 11:29:24 +0100
+Subject: [PATCH] ASoC: Fix overflow bug in SOC_DOUBLE_R_SX_TLV
+In-Reply-To: <1276829770-31557-1-git-send-email-redhatter@gentoo.org>
+References: <20100618023810.GS7759@www.longlandclan.yi.org>
+	<1276829770-31557-1-git-send-email-redhatter@gentoo.org>
+Message-ID: <1276856964.3054.1.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the platform data to enable AB8500 interrupt support.
+On Fri, 2010-06-18 at 12:56 +1000, Stuart Longland wrote:
+> When SX_TLV widgets are read, if the gain is set to a value below 0dB,
+> the mixer control is erroniously read as being at maximum volume.
+> 
+> The value read out of the CODEC register is never sign-extended, and
+> when the minimum value is subtracted (read; added, since the minimum is
+> negative) the result is a number greater than the maximum allowed value
+> for the control, and hence it saturates.
+> 
+> Solution: Mask the result so that it "wraps around", emulating
+> sign-extension.
+> 
+> Signed-off-by: Stuart Longland <redhatter@gentoo.org>
+> ---
+>  sound/soc/soc-core.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
+> index a82a797..0470288 100644
+> --- a/sound/soc/soc-core.c
+> +++ b/sound/soc/soc-core.c
+> @@ -2400,8 +2400,8 @@ int snd_soc_get_volsw_2r_sx(struct snd_kcontrol *kcontrol,
+>  	int val = snd_soc_read(codec, mc->reg) & mask;
+>  	int valr = snd_soc_read(codec, mc->rreg) & mask;
+>  
+> -	ucontrol->value.integer.value[0] = ((val & 0xff)-min);
+> -	ucontrol->value.integer.value[1] = ((valr & 0xff)-min);
+> +	ucontrol->value.integer.value[0] = ((val & 0xff)-min) & mask;
+> +	ucontrol->value.integer.value[1] = ((valr & 0xff)-min) & mask;
+>  	return 0;
+>  }
+>  EXPORT_SYMBOL_GPL(snd_soc_get_volsw_2r_sx);
 
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-Acked-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
----
- arch/arm/mach-ux500/board-mop500.c                 |    6 +++++
- .../mach-ux500/include/mach/irqs-board-mop500.h    |   23 ++++++++++++++++++++
- arch/arm/mach-ux500/include/mach/irqs.h            |    4 +++
- 3 files changed, 33 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-ux500/include/mach/irqs-board-mop500.h
-
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 0331e4b..0e8fd13 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -17,6 +17,7 @@
- #include <linux/amba/bus.h>
- #include <linux/amba/pl022.h>
- #include <linux/spi/spi.h>
-+#include <linux/mfd/ab8500.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -70,10 +71,15 @@ struct pl022_config_chip ab4500_chip_info = {
- 	.cs_control = ab4500_spi_cs_control,
- };
- 
-+static struct ab8500_platform_data ab8500_platdata = {
-+	.irq_base	= MOP500_AB8500_IRQ_BASE,
-+};
-+
- static struct spi_board_info u8500_spi_devices[] = {
- 	{
- 		.modalias = "ab8500",
- 		.controller_data = &ab4500_chip_info,
-+		.platform_data = &ab8500_platdata,
- 		.max_speed_hz = 12000000,
- 		.bus_num = 0,
- 		.chip_select = 0,
-diff --git a/arch/arm/mach-ux500/include/mach/irqs-board-mop500.h b/arch/arm/mach-ux500/include/mach/irqs-board-mop500.h
-new file mode 100644
-index 0000000..cca4f70
---- /dev/null
-+++ b/arch/arm/mach-ux500/include/mach/irqs-board-mop500.h
-@@ -0,0 +1,23 @@
-+/*
-+ * Copyright (C) ST-Ericsson SA 2010
-+ *
-+ * Author: Rabin Vincent <rabin.vincent@stericsson.com>
-+ * License terms: GNU General Public License (GPL) version 2
-+ */
-+
-+#ifndef __MACH_IRQS_BOARD_MOP500_H
-+#define __MACH_IRQS_BOARD_MOP500_H
-+
-+#define AB8500_NR_IRQS			104
-+
-+#define MOP500_AB8500_IRQ_BASE		IRQ_BOARD_START
-+#define MOP500_AB8500_IRQ_END		(MOP500_AB8500_IRQ_BASE \
-+					 + AB8500_NR_IRQS)
-+#define MOP500_IRQ_END			MOP500_AB8500_IRQ_END
-+
-+#if MOP500_IRQ_END > IRQ_BOARD_END
-+#undef IRQ_BOARD_END
-+#define IRQ_BOARD_END	MOP500_IRQ_END
-+#endif
-+
-+#endif
-diff --git a/arch/arm/mach-ux500/include/mach/irqs.h b/arch/arm/mach-ux500/include/mach/irqs.h
-index a6fb1fc..10385bd 100644
---- a/arch/arm/mach-ux500/include/mach/irqs.h
-+++ b/arch/arm/mach-ux500/include/mach/irqs.h
-@@ -79,6 +79,10 @@
- /* This will be overridden by board-specific irq headers */
- #define IRQ_BOARD_END			IRQ_BOARD_START
- 
-+#ifdef CONFIG_MACH_U8500_MOP
-+#include <mach/irqs-board-mop500.h>
-+#endif
-+
- #define NR_IRQS				IRQ_BOARD_END
- 
- #endif /* ASM_ARCH_IRQS_H */
+Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
 -- 
-1.7.0
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
