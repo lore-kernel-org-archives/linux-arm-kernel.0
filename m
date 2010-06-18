@@ -1,60 +1,42 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 18 Jun 2010 11:38:04 +0900
-Subject: [PATCH] S5PV210 Correct clock register properties
-In-Reply-To: <1276763596-6175-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1276763596-6175-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <001001cb0e8f$47e2a8e0$d7a7faa0$%kim@samsung.com>
+From: redhatter@gentoo.org (Stuart Longland)
+Date: Fri, 18 Jun 2010 12:56:10 +1000
+Subject: [PATCH] ASoC: Fix overflow bug in SOC_DOUBLE_R_SX_TLV
+In-Reply-To: <20100618023810.GS7759@www.longlandclan.yi.org>
+References: <20100618023810.GS7759@www.longlandclan.yi.org>
+Message-ID: <1276829770-31557-1-git-send-email-redhatter@gentoo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
-> 
-> From: MyungJoo Ham <myungJoo.ham@samsung.com>
-> 
-> Corrected shift values of I2S and UART clocks (CLK_GATE_IP3).
-> 
-> I2S (CLK_GATE_IP3) and UART (CLK_GATE_IP3) had wrong register shift
-> values, which in turn, made them turn on and off wrong clocks.
+When SX_TLV widgets are read, if the gain is set to a value below 0dB,
+the mixer control is erroniously read as being at maximum volume.
 
-(snip)
+The value read out of the CODEC register is never sign-extended, and
+when the minimum value is subtracted (read; added, since the minimum is
+negative) the result is a number greater than the maximum allowed value
+for the control, and hence it saturates.
 
-Sorry..kindly ignore below comments.
-My mistake..
+Solution: Mask the result so that it "wraps around", emulating
+sign-extension.
 
+Signed-off-by: Stuart Longland <redhatter@gentoo.org>
 ---
-Your point is right..but your updated code was wrong :-(
+ sound/soc/soc-core.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Should be like below.
-
-@@ -400,19 +400,19 @@ static struct clk init_clocks_disable[] = {
- 		.id		= 0,
- 		.parent		= &clk_p,
- 		.enable		= s5pv210_clk_ip3_ctrl,
--		.ctrlbit	= (1<<4),
-+		.ctrlbit	= (1 << 4),
- 	}, {
- 		.name		= "i2s_v32",
- 		.id		= 0,
- 		.parent		= &clk_p,
- 		.enable		= s5pv210_clk_ip3_ctrl,
--		.ctrlbit	= (1<<4),
-+		.ctrlbit	= (1 << 5),
- 	}, {
- 		.name		= "i2s_v32",
- 		.id		= 1,
- 		.parent		= &clk_p,
- 		.enable		= s5pv210_clk_ip3_ctrl,
--		.ctrlbit	= (1<<4),
-+		.ctrlbit	= (1 << 6),
----
-
-(snip)
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
+index a82a797..0470288 100644
+--- a/sound/soc/soc-core.c
++++ b/sound/soc/soc-core.c
+@@ -2400,8 +2400,8 @@ int snd_soc_get_volsw_2r_sx(struct snd_kcontrol *kcontrol,
+ 	int val = snd_soc_read(codec, mc->reg) & mask;
+ 	int valr = snd_soc_read(codec, mc->rreg) & mask;
+ 
+-	ucontrol->value.integer.value[0] = ((val & 0xff)-min);
+-	ucontrol->value.integer.value[1] = ((valr & 0xff)-min);
++	ucontrol->value.integer.value[0] = ((val & 0xff)-min) & mask;
++	ucontrol->value.integer.value[1] = ((valr & 0xff)-min) & mask;
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(snd_soc_get_volsw_2r_sx);
+-- 
+1.6.4.4
