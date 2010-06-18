@@ -1,30 +1,31 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 18 Jun 2010 12:15:45 +0800
-Subject: [Question] SuspendToDisk Feature on ARM ?
-In-Reply-To: <AANLkTinXqVqe9xWQYj-CyzPHl9k7qAqxX6ueOqB3qTve@mail.gmail.com>
-References: <AANLkTinXqVqe9xWQYj-CyzPHl9k7qAqxX6ueOqB3qTve@mail.gmail.com>
-Message-ID: <AANLkTimmvPMG0GFEXfgFlXgC7V4dIWmW8vEC5gegsKSE@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 18 Jun 2010 07:27:09 +0200
+Subject: gpiolib and sleeping gpios
+In-Reply-To: <4C1A980F.8080908@bluewatersys.com>
+References: <4C1A980F.8080908@bluewatersys.com>
+Message-ID: <20100618052709.GA6392@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 17, 2010 at 10:08 PM, sumeet linux <sumeet4linux@gmail.com> wrote:
-> Hi List,
->
-> Does there exists a support for Suspend To Disk (Hibernate) for ARM
-> platforms?
-> I have been googling for it but could not find any information other than
-> some links to the suspend2 support for some ancient kernels.
-> Can anyone provide any clue on how much effort is required to implement this
-> feature to ARM architecture ?
->
+Hi Ryan,
 
-Marvell has done a great job on this for a preliminary enabling on their Dove
-processor, please have a look into:
+On Fri, Jun 18, 2010 at 09:47:59AM +1200, Ryan Mallon wrote:
+> Then all drivers can just call gpio_(set/get)_value and any attempts to
+> use sleeping gpios from an non-sleeping context will be caught by the
+> might_sleep_if check. Is there something I am missing about this?
+The downside is that you change the semantic of gpio_get_value (and
+gpio_set_value I assume?).  But as calling gpio_get_value with a gpio
+that gpio_cansleep() is an error anyhow, so I think that's OK.  The big
+pro is that the API is simplified.
+ 
+> I can prepare a patch which combines the non-sleeping and sleeping
+> variants, but I wanted to check that I'm not missing something
+> fundamental first.
+I will happily look at such a patch and give my comments.
 
-http://kernel.ubuntu.com/git?p=ubuntu/ubuntu-lucid.git;a=shortlog;h=refs/heads/mvl-dove
+Best regards
+Uwe
 
-arch/arm/mach-dove/swsusp.S
-
-The code, mostly, is generic enough to be made common if you are
-interested and have other platforms (with HDD or large NAND) to
-test. x86 is, of course, the reference.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
