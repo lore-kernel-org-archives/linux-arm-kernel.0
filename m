@@ -1,29 +1,38 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 18 Jun 2010 20:00:10 +0900
-Subject: Several questions regarding ARCH_S3C2410
-In-Reply-To: <20100618090042.GY3498@trinity.fluff.org>
-References: <AANLkTimPk6mtyB57jXuAq1ugQseS655OCPEuP9-qZYoT@mail.gmail.com>
-	<AANLkTilbEYR28lrVBAIXXuJ6sEf5uCp4Tpr7wriBZLj3@mail.gmail.com>
-	<20100618090042.GY3498@trinity.fluff.org>
-Message-ID: <005d01cb0ed5$6bb83b90$4328b2b0$%kim@samsung.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 18 Jun 2010 14:59:27 +0400
+Subject: [PATCH] MAINTAINERS: some Atmel drivers change maintainer
+In-Reply-To: <1276694487-20065-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1276694487-20065-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <4C1B518F.4090307@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks wrote:
-> 
-> On Fri, Jun 18, 2010 at 04:44:59PM +0900, Kyungmin Park wrote:
-> > CCing Mr. Kim
-> 
-> not sure it really needs him to be involved at-all
-> 
-I'd like to focus on S5P SoCs and Samsung common(plat-samsung) :-)
+Hello.
 
-And maybe Ben is more interested in S3C SoCs and Samsung common.
+Nicolas Ferre wrote:
 
-Thanks.
+> I take over the maintenance of SPI, USART, Ethernet and USB gadget drivers.
+> Those drivers are found in Atmel microcontrollers, both AT32/AVR32 and
+> AT91/ARM.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Acked-by: Haavard Skinnemoen <haavard.skinnemoen@atmel.com>
+> ---
+>  MAINTAINERS |   10 +++++-----
+>  1 files changed, 5 insertions(+), 5 deletions(-)
+
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 6d119c9..5f71809 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1148,7 +1148,7 @@ F:	drivers/mmc/host/atmel-mci.c
+[...]
+>  ATMEL USBA UDC DRIVER
+> -M:	Haavard Skinnemoen <hskinnemoen@atmel.com>
+> -L:	kernel at avr32linux.org
+> +M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+
+    Not linux-usb at vger.kernel.org?
+
+WBR, Sergei
