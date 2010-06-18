@@ -1,54 +1,87 @@
-From: jason77.wang@gmail.com (jason)
-Date: Fri, 18 Jun 2010 22:06:34 +0800
-Subject: [PATCH 1/2] mxc: add common debug board for 3-stack platforms
-In-Reply-To: <20100616065540.GI20799@pengutronix.de>
-References: <1276352707-8199-1-git-send-email-jason77.wang@gmail.com>
-	<1276352707-8199-2-git-send-email-jason77.wang@gmail.com>
-	<20100616065540.GI20799@pengutronix.de>
-Message-ID: <4C1B7D6A.4010301@gmail.com>
+From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
+Date: Fri, 18 Jun 2010 16:19:54 +0200
+Subject: [PATCH 1/2] net/fec: clean suspend/resume
+Message-ID: <1276870795-21594-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha Hauer wrote:
-> On Sat, Jun 12, 2010 at 10:25:06PM +0800, Jason Wang wrote:
->   
->> The debug board is little different for all mxc 3-stack(PDK)
->> platforms, it is possible here to add a common implementation to
->> support this board.
->>     
->
-> Two small things left:
->
-> Could you change the name cpld_debugboard.c to something like
-> 3ds_debugboard.c? That we are talking about the 3ds is much more
-> interesting than that there's a cpld on the board.
->
-> Also, I really prefer having no extra header file for the debug board.
-> All information in this header file is only interesting in this single C
-> file.
->
-> Sascha
->
->
->   
-Hi Sascha,
+Commit 59d4289b83b11379d867e2f7146904b19cc96404 converted fec to dev_pm_ops but
+didn't update the suspend/resume functions thus leading to the following warning :
+"initialization from incompatible pointer type" when CONFIG_PM is set.
 
-About the header file, most contents can be moved to c file,
-but there are two declarations:
+This patch also fixe a few indentation and style around CONFIG_PM area.
 
-extern struct platform_device smsc_lan9217_device;
-int __init mxc_expio_init(u32 base, u32 p_irq);
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+Cc: netdev at vger.kernel.org
+Cc: davem at davemloft.net
+Cc: amit.kucheria at canonical.com
+Cc: s.hauer at pengutronix.de
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/net/fec.c |   30 ++++++++++++------------------
+ 1 files changed, 12 insertions(+), 18 deletions(-)
 
-which will be used by board_mxNN_3ds.c, should i move them to mach/common.h and
-drop 3ds_debugboard.h or keep them in 3ds_debugboard.h?
-
-Thanks,
-Jason.
-
->> Signed-off-by: Jason Wang <jason77.wang@gmail.com>
->> ---
->>  arch/arm/plat-mxc/Kconfig                        |   11 ++
->>  arch/arm/plat-mxc/Makefile                       |    1 +
->>  arch/arm/plat-mxc/cpld_debugboard.c              |  161 ++++++++++++++++++++++
->>     
-<snip>
+diff --git a/drivers/net/fec.c b/drivers/net/fec.c
+index a3cae4e..b4afd7a 100644
+--- a/drivers/net/fec.c
++++ b/drivers/net/fec.c
+@@ -1360,11 +1360,10 @@ fec_drv_remove(struct platform_device *pdev)
+ }
+ 
+ #ifdef CONFIG_PM
+-
+ static int
+-fec_suspend(struct platform_device *dev, pm_message_t state)
++fec_suspend(struct device *dev)
+ {
+-	struct net_device *ndev = platform_get_drvdata(dev);
++	struct net_device *ndev = dev_get_drvdata(dev);
+ 	struct fec_enet_private *fep;
+ 
+ 	if (ndev) {
+@@ -1377,9 +1376,9 @@ fec_suspend(struct platform_device *dev, pm_message_t state)
+ }
+ 
+ static int
+-fec_resume(struct platform_device *dev)
++fec_resume(struct device *dev)
+ {
+-	struct net_device *ndev = platform_get_drvdata(dev);
++	struct net_device *ndev = dev_get_drvdata(dev);
+ 	struct fec_enet_private *fep;
+ 
+ 	if (ndev) {
+@@ -1399,23 +1398,18 @@ static const struct dev_pm_ops fec_pm_ops = {
+ 	.poweroff	= fec_suspend,
+ 	.restore	= fec_resume,
+ };
+-
+-#define FEC_PM_OPS (&fec_pm_ops)
+-
+-#else /* !CONFIG_PM */
+-
+-#define FEC_PM_OPS NULL
+-
+-#endif /* !CONFIG_PM */
++#endif
+ 
+ static struct platform_driver fec_driver = {
+ 	.driver	= {
+-		.name    = "fec",
+-		.owner	 = THIS_MODULE,
+-		.pm		 = FEC_PM_OPS,
++		.name	= "fec",
++		.owner	= THIS_MODULE,
++#ifdef CONFIG_PM
++		.pm	= &fec_pm_ops,
++#endif
+ 	},
+-	.probe   = fec_probe,
+-	.remove  = __devexit_p(fec_drv_remove),
++	.probe	= fec_probe,
++	.remove	= __devexit_p(fec_drv_remove),
+ };
+ 
+ static int __init
+-- 
+1.6.3.3
