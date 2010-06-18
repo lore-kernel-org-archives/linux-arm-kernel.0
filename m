@@ -1,33 +1,29 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 18 Jun 2010 14:55:38 +0400
-Subject: [PATCH 1/5] [ARM] implement arch_randomize_brk()
-In-Reply-To: <1276720403-27918-2-git-send-email-nico@fluxnic.net>
-References: <1276720403-27918-1-git-send-email-nico@fluxnic.net>
-	<1276720403-27918-2-git-send-email-nico@fluxnic.net>
-Message-ID: <4C1B50AA.9050507@ru.mvista.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 18 Jun 2010 20:00:10 +0900
+Subject: Several questions regarding ARCH_S3C2410
+In-Reply-To: <20100618090042.GY3498@trinity.fluff.org>
+References: <AANLkTimPk6mtyB57jXuAq1ugQseS655OCPEuP9-qZYoT@mail.gmail.com>
+	<AANLkTilbEYR28lrVBAIXXuJ6sEf5uCp4Tpr7wriBZLj3@mail.gmail.com>
+	<20100618090042.GY3498@trinity.fluff.org>
+Message-ID: <005d01cb0ed5$6bb83b90$4328b2b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Ben Dooks wrote:
+> 
+> On Fri, Jun 18, 2010 at 04:44:59PM +0900, Kyungmin Park wrote:
+> > CCing Mr. Kim
+> 
+> not sure it really needs him to be involved at-all
+> 
+I'd like to focus on S5P SoCs and Samsung common(plat-samsung) :-)
 
-Nicolas Pitre wrote:
+And maybe Ben is more interested in S3C SoCs and Samsung common.
 
-> For this feature to take effect, CONFIG_COMPAT_BRK must be turned
-> off.  This can safely be turned off for any EABI user space versions.
+Thanks.
 
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-[...]
-> diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-> index 51662fe..0a96e8c 100644
-> --- a/arch/arm/include/asm/elf.h
-> +++ b/arch/arm/include/asm/elf.h
-> @@ -121,4 +121,7 @@ int dump_task_regs(struct task_struct *t, elf_gregset_t *elfregs);
->  extern void elf_set_personality(const struct elf32_hdr *);
->  #define SET_PERSONALITY(ex)	elf_set_personality(&(ex))
->  
-> +extern unsigned long arch_randomize_brk(struct mm_struct *mm);
-> +#define arch_randomize_brk arch_randomize_brk
-
-    Isn't this an "infinitely recursive" macro?
-
-WBR, Sergei
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
