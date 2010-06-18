@@ -1,120 +1,83 @@
-From: l.fu@pengutronix.de (Luotao Fu)
-Date: Fri, 18 Jun 2010 09:23:18 +0200
-Subject: [PATCH 1/2 V2] pca100: add framebuffer device support and TFT
-In-Reply-To: <1275573348-26564-3-git-send-email-l.fu@pengutronix.de>
-References: <1275573348-26564-3-git-send-email-l.fu@pengutronix.de>
-Message-ID: <1276845799-6122-2-git-send-email-l.fu@pengutronix.de>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 18 Jun 2010 16:44:59 +0900
+Subject: Several questions regarding ARCH_S3C2410
+In-Reply-To: <AANLkTimPk6mtyB57jXuAq1ugQseS655OCPEuP9-qZYoT@mail.gmail.com>
+References: <AANLkTimPk6mtyB57jXuAq1ugQseS655OCPEuP9-qZYoT@mail.gmail.com>
+Message-ID: <AANLkTilbEYR28lrVBAIXXuJ6sEf5uCp4Tpr7wriBZLj3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this one adds the frambuffer device and a TFT panel to the PhyCard-S
-(pca100) board.
+CCing Mr. Kim
 
-Signed-off-by: Luotao Fu <l.fu@pengutronix.de>
-
----
-V2 Changes: removed undefined LVDS_PWR macro.
-
- arch/arm/mach-mx2/mach-pca100.c |   66 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 66 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-mx2/mach-pca100.c b/arch/arm/mach-mx2/mach-pca100.c
-index a87422e..47173d1 100644
---- a/arch/arm/mach-mx2/mach-pca100.c
-+++ b/arch/arm/mach-mx2/mach-pca100.c
-@@ -49,6 +49,7 @@
- #include <mach/mmc.h>
- #include <mach/mxc_ehci.h>
- #include <mach/ulpi.h>
-+#include <mach/imxfb.h>
- 
- #include "devices.h"
- 
-@@ -131,6 +132,30 @@ static int pca100_pins[] = {
- 	PD23_AF_USBH2_DATA2,
- 	PD24_AF_USBH2_DATA1,
- 	PD26_AF_USBH2_DATA5,
-+	/* display */
-+	PA5_PF_LSCLK,
-+	PA6_PF_LD0,
-+	PA7_PF_LD1,
-+	PA8_PF_LD2,
-+	PA9_PF_LD3,
-+	PA10_PF_LD4,
-+	PA11_PF_LD5,
-+	PA12_PF_LD6,
-+	PA13_PF_LD7,
-+	PA14_PF_LD8,
-+	PA15_PF_LD9,
-+	PA16_PF_LD10,
-+	PA17_PF_LD11,
-+	PA18_PF_LD12,
-+	PA19_PF_LD13,
-+	PA20_PF_LD14,
-+	PA21_PF_LD15,
-+	PA22_PF_LD16,
-+	PA23_PF_LD17,
-+	PA26_PF_PS,
-+	PA28_PF_HSYNC,
-+	PA29_PF_VSYNC,
-+	PA31_PF_OE_ACD,
- };
- 
- static struct imxuart_platform_data uart_pdata = {
-@@ -297,6 +322,45 @@ static int __init pca100_otg_mode(char *options)
- }
- __setup("otg_mode=", pca100_otg_mode);
- 
-+/* framebuffer info */
-+static struct imx_fb_videomode pca100_fb_modes[] = {
-+	{
-+		.mode = {
-+			.name		= "EMERGING-ETV570G0DHU",
-+			.refresh	= 60,
-+			.xres		= 640,
-+			.yres		= 480,
-+			.pixclock	= 39722, /* in ps (25.175 MHz) */
-+			.hsync_len	= 30,
-+			.left_margin	= 114,
-+			.right_margin	= 16,
-+			.vsync_len	= 3,
-+			.upper_margin	= 32,
-+			.lower_margin	= 0,
-+		},
-+		/*
-+		 * TFT
-+		 * Pixel pol active high
-+		 * HSYNC active low
-+		 * VSYNC active low
-+		 * use HSYNC for ACD count
-+		 * line clock disable while idle
-+		 * always enable line clock even if no data
-+		 */
-+		.pcr = 0xf0c08080,
-+		.bpp = 16,
-+	},
-+};
-+
-+static struct imx_fb_platform_data pca100_fb_data = {
-+	.mode = pca100_fb_modes,
-+	.num_modes = ARRAY_SIZE(pca100_fb_modes),
-+
-+	.pwmr		= 0x00A903FF,
-+	.lscr1		= 0x00120300,
-+	.dmacr		= 0x00020010,
-+};
-+
- static void __init pca100_init(void)
- {
- 	int ret;
-@@ -372,6 +436,8 @@ static void __init pca100_init(void)
- 		mxc_register_device(&mxc_otg_udc_device, &otg_device_pdata);
- 	}
- 
-+	mxc_register_device(&mxc_fb_device, &pca100_fb_data);
-+
- 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
- }
- 
--- 
-1.7.1
+On Fri, Jun 18, 2010 at 12:43 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> Hi Ben,
+>
+> While working towards a unified kernel, I found that ARCH_S3C2410 actually
+> includes multiple mach-* already.
+>
+> linux-2.6$ git grep "ARCH_S3C2410" arch/arm/Makefile
+> arch/arm/Makefile:machine-$(CONFIG_ARCH_S3C2410) ? ? ? ?:= s3c2410 s3c2400
+> s3c2412 s3c2416 s3c2440 s3c2443
+>
+> There are several questions though:
+>
+> 1. It looks like only s3c2410 is significant, so all the common definitions
+> ? like PHYS_OFFSET are actually same across all mach-s3c24* (except for
+> ? s3c24a0) ? Yet I've found arch/arm/mach-s3c2400/include/mach/memory.h,
+> ? where a different PHYS_OFFSET is defined, just feel a bit confused.
+>
+> 2. So except for s3c24a0, theretically, it's possible to combine all these
+> ? mach into something mach-s3c24xx?
+>
+> 3. When trying building of s3c2410_defconfig, there are a lot complaints
+> ? about re-definitions of {in,out}[s]{b,w,l}. ?Taking a look into io.h,
+> ? I'm wondering if it's possible to use those definitions in asm/io.h?
+> ? (possibly with a customized __io())
+>
+> In file included from linux-2.6/include/linux/scatterlist.h:8,
+> ? ? ? ? ? ? ? ? from linux-2.6/include/linux/dma-mapping.h:7,
+> ? ? ? ? ? ? ? ? from linux-2.6/include/linux/dmaengine.h:26,
+> ? ? ? ? ? ? ? ? from linux-2.6/include/linux/skbuff.h:30,
+> ? ? ? ? ? ? ? ? from linux-2.6/lib/kobject_uevent.c:24:
+> linux-2.6/arch/arm/include/asm/io.h:137: warning: "outb" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:196: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:138: warning: "outw" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:197: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:140: warning: "outl" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:198: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:143: warning: "inb" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:193: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:144: warning: "inw" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:194: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:146: warning: "inl" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:195: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:149: warning: "outsb" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:207: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:150: warning: "outsw" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:208: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:151: warning: "outsl" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:209: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:153: warning: "insb" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:203: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:154: warning: "insw" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:204: note: this is
+> the location of the previous definition
+> linux-2.6/arch/arm/include/asm/io.h:155: warning: "insl" redefined
+> linux-2.6/arch/arm/mach-s3c2410/include/mach/io.h:205: note: this is
+> the location of the previous definition
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
