@@ -1,222 +1,179 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Sat, 19 Jun 2010 13:14:34 +0900
-Subject: [PATCH] S5PV210 Correct clock source control register properties
-In-Reply-To: <000001cb0f63$3682c5b0$a3885110$%kim@samsung.com>
-References: <1276766116-6839-1-git-send-email-myungjoo.ham@samsung.com>
-	<005401cb0ecb$c3f16c00$4bd44400$%kim@samsung.com>
-	<AANLkTim1psO4ZeZGAgNteJp_ytRhzoPlu4D3VblPgz6w@mail.gmail.com>
-	<000001cb0f63$3682c5b0$a3885110$%kim@samsung.com>
-Message-ID: <AANLkTikKREVQrwkdc9OW5zlzK0esY8GV9hEmK_TnRM7y@mail.gmail.com>
+Date: Sat, 19 Jun 2010 13:22:05 +0900
+Subject: [PATCH] Remove unused serial flags
+Message-ID: <20100619042205.GA24864@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 19, 2010 at 12:55 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> MyungJoo Ham wrote:
->>
->> On Fri, Jun 18, 2010 at 6:50 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> > MyungJoo Ham wrote:
->> >>
->> >> The clock source controls (struct clksrc_clk) have been often accessing
->> >> CLK_GATE_IPx, which are for clock gating and are accessed by each clock
->> >> as well as the clock source. This duplicated clock issue may incur
->> >> lockup problems when there are two modules accessing the same clock with
->> >> different names.
->> >>
->> > Could you please explain further about the above the statement " accessed by
->> > each clock as well as the clock source"
->>
->> For example, "CLK_GATE_IP2[16:19]" is accessed by "hsmmc" of struct
->> clk (a clock) and "sclk_mmc" of struct clksrc_clk's struct clk (a
->> clock source's clk representation).
->>
->> >
->> >> Besides, the clock source control is supposed to control (setting values
->> >> of MASK, SRC, DIV), not to turn on/off individual clock.
->> >>
->> > That is not quite true. Only S5PV210/S5PC110 have the gate for the clock mux.
->> > S5P6440 and S5PC100, for instance, do not have a gate for the output for
->> > _just_ the clock mux. And the reason why the Clock Mux Gate is provide for
->> > the mux is explained in Section 3.4 of the user manual.
->>
->> In cases where clock mux gating is not available and we have each
->> clock (supplied by this cluck mux) defined separatedly with .enable
->> and .ctrlbit, we'd better omit .enable/.ctrlbit from struct
->> clksrc_clk's struct clk.
->>
->> >
->> >> Another point is that there are registers (CLK_SRC_MASK0/1) specialized
->> >> for masking clock source control in S5PV210/S5PC110 according to the
->> >> user manual (rev 20100201).
->> >>
->> >> Therefore, accessing CLK_SRC_MASK0/1 (rather than accessing
->> >> CLK_GATE_IPx) for the clock source control is safer and fits to the
->> >> semantics of S5PV210/S5PC110 registers. And fortuneatly, each clock
->> >> source defined in clock.c has corresponding bit at CLK_SRC_MASK0/1
->> >> except for MFC, G2D, and G3D.
->> >>
->> > Can you please explain how the use CLK_SRC_MASKx makes it safer. The reason
->> > why MFC, G2D and G3D do not have a corresponding bit in CLK_SRC_MASKx is
->> > mentioned in Section 3.4 of the user manual.
->> >
->> > Let me know your opinion.
->> >
->>
->> It's "EXCEPT FOR MFC, G2D, G3D". I'm not saying that using
->> CLK_SRC_MASKx is safer for these three. For other cases, I guess the
->> lock up example should be fine.
->>
->> However, in most cases, this lockup issue does not make visible problem because:
->> 1. normally, drivers use both clksrc_clk's clk and clk at the same
->> time. for example
->> "mmc_bus".clk_enable;
->> "hsmmc".clk_enable;
->> ?blahblah
->> "hsmmc".clk_disable;
->> "mmc_bus".clk_disable;
->> or
->> 2. drivers sharing the same clock uses only one side of the two.
->> or
->> 3. the execution block between clk_enable and clk_disable is extremely short.
->>
->> Nevertheless, this potential lockup issue is critical and we'd better
->> address it.
->>
->>
->> >> In this patch,
->> >>
->> >> - DAC, HDMI, AUDIO 0/1/2, UCLK(uart) 0/1/2/3, MIXER, FIMC 0/1/2,
->> >> FIMC, MMC 0/1/2/3, CSIS, SPI 0/1, PWI, and PWM clock sources are
->> >> modified to use CLK_SRC_MASK0/1, which were using CLK_GATE_IPx.
->> >>
->> >> - CAM 0/1 did not have enable/disable control. They now access
->> >> ? CLK_SRC_MASK0.
->> >>
->> >> - MFC, G3D, G2D were using CLK_GATE_IPx. However, as there are no clocks
->> >> ? defined to control MFC, G3D, and G2D, we kept them to access
->> >> CLK_GATE_IPx. These may need to be modified (erase .enable, .ctrlbit
->> >> from sclk_mfc, sclk_g2d, sclk_g3d and create clocks: g3d, g2d, mfc)
->> >> later.
->> >>
->> >> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
->> >> ---
->> >> ?arch/arm/mach-s5pv210/clock.c | ?101
->> > ++++++++++++++++++++++-------------------
->> >> ?1 files changed, 55 insertions(+), 46 deletions(-)
->> >>
->> >> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
->> >> index ec5ad8c..08c1063 100644
->> >> --- a/arch/arm/mach-s5pv210/clock.c
->> >> +++ b/arch/arm/mach-s5pv210/clock.c
->> >
->> > (snip)
->> >
->> > --
->
-> Strictly speaking, 'duplicated clock problem' and 'clock gating issue which is controlled by CLK_GATE_IPx or CLK_SRC_MASKx' are different problem.
-> But mixed above two things in your patch.
->
-> I think just need bug fix.
->
-> See below mmc case.
->
-> Following is for clock gating mmc IP by using CLK_GATE_IPx and can control(clock gating) clocks, 'aclk_hsmmcX' and 'sclk_mmcX' in the mmc IP.
->
-> ? ? ? ?{
-> ? ? ? ? ? ? ? ?.name ? = "hsmmc",
-> ? ? ? ? ? ? ? ?.id ? ? = 0,
-> ? ? ? ? ? ? ? ?.parent = &clk_hclk_psys.clk,
-> ? ? ? ? ? ? ? ?.enable = s5pv210_clk_ip2_ctrl,
-> ? ? ? ? ? ? ? ?.ctrlbit ? ? ? ?= (1<<16),
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.name ? = "hsmmc",
-> ? ? ? ? ? ? ? ?.id ? ? = 1,
-> ? ? ? ? ? ? ? ?.parent = &clk_hclk_psys.clk,
-> ? ? ? ? ? ? ? ?.enable = s5pv210_clk_ip2_ctrl,
-> ? ? ? ? ? ? ? ?.ctrlbit ? ? ? ?= (1<<17),
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.name ? = "hsmmc",
-> ? ? ? ? ? ? ? ?.id ? ? = 2,
-> ? ? ? ? ? ? ? ?.parent = &clk_hclk_psys.clk,
-> ? ? ? ? ? ? ? ?.enable = s5pv210_clk_ip2_ctrl,
-> ? ? ? ? ? ? ? ?.ctrlbit ? ? ? ?= (1<<18),
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.name ? = "hsmmc",
-> ? ? ? ? ? ? ? ?.id ? ? = 3,
-> ? ? ? ? ? ? ? ?.parent = &clk_hclk_psys.clk,
-> ? ? ? ? ? ? ? ?.enable = s5pv210_clk_ip2_ctrl,
-> ? ? ? ? ? ? ? ?.ctrlbit ? ? ? ?= (1<<19),
-> ? ? ? ?}...
->
-> And following is for clock gating just 'sclk_mmcX' by using CLK_SRC_MASKx.
-> But as you know should be 's5pv210_clk_mask0_ctrl' instead of 's5pv210_clk_ip2_ctrl' like below.
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Right, that's the patch of Mr. Ham. Inn case of clksrc_clk use the
-mask_ctrl instead of ip_ctrl.
-The original codes use it by mix-up. his patch addresses it.
+Remove unused serial flags. Only s5p series.
+After remove s3c series then remove s3c240_uartcfg flags field.
 
-Thank you,
-Kyungmin Park
-
->
-> @@ -794,8 +794,8 @@ static struct clksrc_clk clksrcs[] = {
-> ? ? ? ? ? ? ? ?.clk ? ? ? ? ? ?= {
-> ? ? ? ? ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "sclk_mmc",
-> ? ? ? ? ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = 0,
-> - ? ? ? ? ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv210_clk_ip2_ctrl,
-> - ? ? ? ? ? ? ? ? ? ? ? .ctrlbit ? ? ? ? ? ? ? ?= (1 << 16),
-> + ? ? ? ? ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv210_clk_mask0_ctrl,
-> + ? ? ? ? ? ? ? ? ? ? ? .ctrlbit ? ? ? ? ? ? ? ?= (1 << 8),
-> ? ? ? ? ? ? ? ?},
-> ? ? ? ? ? ? ? ?.sources = &clkset_group2,
-> ? ? ? ? ? ? ? ?.reg_src = { .reg = S5P_CLK_SRC4, .shift = 0, .size = 4 },
-> @@ -804,8 +804,8 @@ static struct clksrc_clk clksrcs[] = {
-> ? ? ? ? ? ? ? ?.clk ? ? ? ? ? ?= {
-> ? ? ? ? ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "sclk_mmc",
-> ? ? ? ? ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = 1,
-> - ? ? ? ? ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv210_clk_ip2_ctrl,
-> - ? ? ? ? ? ? ? ? ? ? ? .ctrlbit ? ? ? ? ? ? ? ?= (1 << 17),
-> + ? ? ? ? ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv210_clk_mask0_ctrl,
-> + ? ? ? ? ? ? ? ? ? ? ? .ctrlbit ? ? ? ? ? ? ? ?= (1 << 9),
-> ? ? ? ? ? ? ? ?},
-> ? ? ? ? ? ? ? ?.sources = &clkset_group2,
-> ? ? ? ? ? ? ? ?.reg_src = { .reg = S5P_CLK_SRC4, .shift = 4, .size = 4 },
-> @@ -814,8 +814,8 @@ static struct clksrc_clk clksrcs[] = {
-> ? ? ? ? ? ? ? ?.clk ? ? ? ? ? ?= {
-> ? ? ? ? ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "sclk_mmc",
-> ? ? ? ? ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = 2,
-> - ? ? ? ? ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv210_clk_ip2_ctrl,
-> - ? ? ? ? ? ? ? ? ? ? ? .ctrlbit ? ? ? ? ? ? ? ?= (1 << 18),
-> + ? ? ? ? ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv210_clk_mask0_ctrl,
-> + ? ? ? ? ? ? ? ? ? ? ? .ctrlbit ? ? ? ? ? ? ? ?= (1 << 10),
-> ? ? ? ? ? ? ? ?},
-> ? ? ? ? ? ? ? ?.sources = &clkset_group2,
-> ? ? ? ? ? ? ? ?.reg_src = { .reg = S5P_CLK_SRC4, .shift = 8, .size = 4 },
-> @@ -824,8 +824,8 @@ static struct clksrc_clk clksrcs[] = {
-> ? ? ? ? ? ? ? ?.clk ? ? ? ? ? ?= {
-> ? ? ? ? ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "sclk_mmc",
-> ? ? ? ? ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = 3,
-> - ? ? ? ? ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv210_clk_ip2_ctrl,
-> - ? ? ? ? ? ? ? ? ? ? ? .ctrlbit ? ? ? ? ? ? ? ?= (1 << 19),
-> + ? ? ? ? ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv210_clk_mask0_ctrl,
-> + ? ? ? ? ? ? ? ? ? ? ? .ctrlbit ? ? ? ? ? ? ? ?= (1 << 11),
-> ? ? ? ? ? ? ? ?},
-> ? ? ? ? ? ? ? ?.sources = &clkset_group2,
-> ? ? ? ? ? ? ? ?.reg_src = { .reg = S5P_CLK_SRC4, .shift = 12, .size = 4 }
->
->
-> I think there is no lockup issue(problem) after bug fix about 'sclk_xxx'.
-> Of course, carefully used distinguished clock gating in the relevant device driver.
-> Because as I said, CLK_GATE_IPx can disable all of the clock operation of each IP.
-> If no need CLK_GATE_IPx, just do clock gating each 'sclk_xxx'.
->
-> Could you please re-submit new stuff for bug fix?
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-s5pc100/mach-smdkc100.c
+index af22f82..1698d03 100644
+--- a/arch/arm/mach-s5pc100/mach-smdkc100.c
++++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
+@@ -60,28 +60,24 @@
+ static struct s3c2410_uartcfg smdkc100_uartcfgs[] __initdata = {
+ 	[0] = {
+ 		.hwport	     = 0,
+-		.flags	     = 0,
+ 		.ucon	     = S5PC100_UCON_DEFAULT,
+ 		.ulcon	     = S5PC100_ULCON_DEFAULT,
+ 		.ufcon	     = S5PC100_UFCON_DEFAULT,
+ 	},
+ 	[1] = {
+ 		.hwport	     = 1,
+-		.flags	     = 0,
+ 		.ucon	     = S5PC100_UCON_DEFAULT,
+ 		.ulcon	     = S5PC100_ULCON_DEFAULT,
+ 		.ufcon	     = S5PC100_UFCON_DEFAULT,
+ 	},
+ 	[2] = {
+ 		.hwport	     = 2,
+-		.flags	     = 0,
+ 		.ucon	     = S5PC100_UCON_DEFAULT,
+ 		.ulcon	     = S5PC100_ULCON_DEFAULT,
+ 		.ufcon	     = S5PC100_UFCON_DEFAULT,
+ 	},
+ 	[3] = {
+ 		.hwport	     = 3,
+-		.flags	     = 0,
+ 		.ucon	     = S5PC100_UCON_DEFAULT,
+ 		.ulcon	     = S5PC100_ULCON_DEFAULT,
+ 		.ufcon	     = S5PC100_UFCON_DEFAULT,
+diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
+index 10bc76e..37a62dd 100644
+--- a/arch/arm/mach-s5pv210/mach-aquila.c
++++ b/arch/arm/mach-s5pv210/mach-aquila.c
+@@ -46,28 +46,24 @@
+ static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
+ 	[0] = {
+ 		.hwport		= 0,
+-		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+ 		.ufcon		= S5PV210_UFCON_DEFAULT,
+ 	},
+ 	[1] = {
+ 		.hwport		= 1,
+-		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+ 		.ufcon		= S5PV210_UFCON_DEFAULT,
+ 	},
+ 	[2] = {
+ 		.hwport		= 2,
+-		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+ 		.ufcon		= S5PV210_UFCON_DEFAULT,
+ 	},
+ 	[3] = {
+ 		.hwport		= 3,
+-		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+ 		.ufcon		= S5PV210_UFCON_DEFAULT,
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index 4863b13..b0e54ea 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -43,28 +43,24 @@
+ static struct s3c2410_uartcfg goni_uartcfgs[] __initdata = {
+ 	[0] = {
+ 		.hwport		= 0,
+-		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+ 		.ufcon		= S5PV210_UFCON_DEFAULT,
+ 	},
+ 	[1] = {
+ 		.hwport		= 1,
+-		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+ 		.ufcon		= S5PV210_UFCON_DEFAULT,
+ 	},
+ 	[2] = {
+ 		.hwport		= 2,
+-		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+ 		.ufcon		= S5PV210_UFCON_DEFAULT,
+ 	},
+ 	[3] = {
+ 		.hwport		= 3,
+-		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+ 		.ufcon		= S5PV210_UFCON_DEFAULT,
+diff --git a/arch/arm/mach-s5pv210/mach-smdkc110.c b/arch/arm/mach-s5pv210/mach-smdkc110.c
+index 4c8903c..1410a5f 100644
+--- a/arch/arm/mach-s5pv210/mach-smdkc110.c
++++ b/arch/arm/mach-s5pv210/mach-smdkc110.c
+@@ -43,28 +43,24 @@
+ static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
+ 	[0] = {
+ 		.hwport		= 0,
+-		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+ 		.ufcon		= S5PV210_UFCON_DEFAULT,
+ 	},
+ 	[1] = {
+ 		.hwport		= 1,
+-		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+ 		.ufcon		= S5PV210_UFCON_DEFAULT,
+ 	},
+ 	[2] = {
+ 		.hwport		= 2,
+-		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+ 		.ufcon		= S5PV210_UFCON_DEFAULT,
+ 	},
+ 	[3] = {
+ 		.hwport		= 3,
+-		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+ 		.ufcon		= S5PV210_UFCON_DEFAULT,
+diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
+index 0d46279..e0d72fc 100644
+--- a/arch/arm/mach-s5pv210/mach-smdkv210.c
++++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
+@@ -45,28 +45,24 @@
+ static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
+ 	[0] = {
+ 		.hwport		= 0,
+-		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+ 		.ufcon		= S5PV210_UFCON_DEFAULT,
+ 	},
+ 	[1] = {
+ 		.hwport		= 1,
+-		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+ 		.ufcon		= S5PV210_UFCON_DEFAULT,
+ 	},
+ 	[2] = {
+ 		.hwport		= 2,
+-		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+ 		.ufcon		= S5PV210_UFCON_DEFAULT,
+ 	},
+ 	[3] = {
+ 		.hwport		= 3,
+-		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+ 		.ufcon		= S5PV210_UFCON_DEFAULT,
