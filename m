@@ -1,101 +1,117 @@
-From: tbm@cyrius.com (Martin Michlmayr)
-Date: Sat, 19 Jun 2010 15:06:29 +0100
-Subject: [PATCH] orion/kirkwood: reset PCIe unit on boot
-In-Reply-To: <1276029158-22159-1-git-send-email-razzor@kopf-tisch.de>
-References: <1276029158-22159-1-git-send-email-razzor@kopf-tisch.de>
-Message-ID: <20100619140628.GP1573@jirafa.cyrius.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Sat, 19 Jun 2010 16:13:31 +0200 (CEST)
+Subject: [PATCH v3 1/3] mx2_camera: Add soc_camera support for
+	i.MX25/i.MX27
+In-Reply-To: <190248f3b311ccfcb73f1fc71d185e3927f0bf05.1274865040.git.baruch@tkos.co.il>
+References: <cover.1274865040.git.baruch@tkos.co.il>
+	<190248f3b311ccfcb73f1fc71d185e3927f0bf05.1274865040.git.baruch@tkos.co.il>
+Message-ID: <Pine.LNX.4.64.1006191458420.11313@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olaf Rempel <razzor@kopf-tisch.de> [2010-06-08 22:32]:
-> Patch found in QNAPs vendor source package, with some cleanups
-> (proper defines, shortened max. timeout from 1s to 200ms).
-> 
-> Without this patch the PCIe SATA controller (Marvell 88sx7042/sata_mv)
-> in my QNAP TS-419P (Marvell 88f6281/Kirkwood) stops working after a
-> few minutes.
-> The symptomes are described in this thread:
-> http://marc.info/?l=linux-ide&m=124822863706181&w=2
+Hi Baruch
 
-Nico, Saeed: do you have any comments on this patch?
+On Wed, 26 May 2010, Baruch Siach wrote:
 
-A number of Debian users ran into this issue so I'm glad Olaf found a
-solution.
+> This is the soc_camera support developed by Sascha Hauer for the i.MX27.  Alan
+> Carvalho de Assis modified the original driver to get it working on more recent
+> kernels. I modified it further to add support for i.MX25. This driver has been
+> tested on i.MX25 and i.MX27 based platforms.
 
+I hoped, this would be the final version, but if I'm not mistaken, you've 
+introduced an error, which we better fix before committing. And as we 
+anyway will likely need a v4, I'll also ask you to improve a couple of 
+stylistic issues, which otherwise I'd just fix myself with your 
+permission.
 
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 > ---
->  arch/arm/plat-orion/pcie.c |   34 ++++++++++++++++++++++++++++++++++
->  1 files changed, 34 insertions(+), 0 deletions(-)
+>  arch/arm/plat-mxc/include/mach/memory.h  |    4 +-
+>  arch/arm/plat-mxc/include/mach/mx2_cam.h |   46 +
+>  drivers/media/video/Kconfig              |   13 +
+>  drivers/media/video/Makefile             |    1 +
+>  drivers/media/video/mx2_camera.c         | 1488 ++++++++++++++++++++++++++++++
+>  5 files changed, 1550 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/plat-mxc/include/mach/mx2_cam.h
+>  create mode 100644 drivers/media/video/mx2_camera.c
 > 
-> diff --git a/arch/arm/plat-orion/pcie.c b/arch/arm/plat-orion/pcie.c
-> index 54c84a4..779553a 100644
-> --- a/arch/arm/plat-orion/pcie.c
-> +++ b/arch/arm/plat-orion/pcie.c
-> @@ -13,6 +13,7 @@
->  #include <linux/mbus.h>
->  #include <asm/mach/pci.h>
->  #include <plat/pcie.h>
-> +#include <linux/delay.h>
->  
->  /*
->   * PCIe unit register offsets.
-> @@ -46,6 +47,8 @@
->  #define  PCIE_STAT_BUS_OFFS		8
->  #define  PCIE_STAT_BUS_MASK		0xff
->  #define  PCIE_STAT_LINK_DOWN		1
-> +#define PCIE_DEBUG_CTRL         0x1a60
-> +#define  PCIE_DEBUG_SOFT_RESET		(1<<20)
->  
->  
->  u32 __init orion_pcie_dev_id(void __iomem *base)
-> @@ -85,6 +88,32 @@ void __init orion_pcie_set_local_bus_nr(void __iomem *base, int nr)
->  	writel(stat, base + PCIE_STAT_OFF);
->  }
->  
-> +void __init orion_pcie_reset(void __iomem *base)
-> +{
-> +	u32 reg;
-> +	int i;
-> +
-> +	/*
-> +	 * MV-S104860-U0, Rev. C:
-> +	 * PCI Express Unit Soft Reset
-> +	 * When set, generates an internal reset in the PCI Express unit.
-> +	 * This bit should be cleared after the link is re-established.
-> +	 */
-> +	reg = readl(base + PCIE_DEBUG_CTRL);
-> +	reg |= PCIE_DEBUG_SOFT_RESET;
-> +	writel(reg, base + PCIE_DEBUG_CTRL);
-> +
-> +	for (i = 0; i < 20; i++) {
-> +		mdelay(10);
-> +
-> +		if (orion_pcie_link_up(base))
-> +			break;
-> +	}
-> +
-> +	reg &= ~(PCIE_DEBUG_SOFT_RESET);
-> +	writel(reg, base + PCIE_DEBUG_CTRL);
-> +}
-> +
->  /*
->   * Setup PCIE BARs and Address Decode Wins:
->   * BAR[0,2] -> disabled, BAR[1] -> covers all DRAM banks
-> @@ -153,6 +182,11 @@ void __init orion_pcie_setup(void __iomem *base,
->  	u32 mask;
->  
->  	/*
-> +	 * soft reset PCIe unit
-> +	 */
-> +	orion_pcie_reset(base);
-> +
-> +	/*
->  	 * Point PCIe unit MBUS decode windows to DRAM space.
->  	 */
->  	orion_pcie_setup_wins(base, dram);
-> -- 
-> 1.6.3.3
+> diff --git a/arch/arm/plat-mxc/include/mach/memory.h b/arch/arm/plat-mxc/include/mach/memory.h
+> index c4b40c3..5803836 100644
+> --- a/arch/arm/plat-mxc/include/mach/memory.h
+> +++ b/arch/arm/plat-mxc/include/mach/memory.h
 
--- 
-Martin Michlmayr
-http://www.cyrius.com/
+[snip]
+
+> +static void mx2_videobuf_queue(struct videobuf_queue *vq,
+> +			       struct videobuf_buffer *vb)
+> +{
+> +	struct soc_camera_device *icd = vq->priv_data;
+> +	struct soc_camera_host *ici =
+> +		to_soc_camera_host(icd->dev.parent);
+> +	struct mx2_camera_dev *pcdev = ici->priv;
+> +	struct mx2_buffer *buf = container_of(vb, struct mx2_buffer, vb);
+> +	unsigned long flags;
+> +	int ret;
+> +
+> +	dev_dbg(&icd->dev, "%s (vb=0x%p) 0x%08lx %d\n", __func__,
+> +		vb, vb->baddr, vb->bsize);
+> +
+> +	spin_lock_irqsave(&pcdev->lock, flags);
+> +
+> +	vb->state = VIDEOBUF_QUEUED;
+> +	list_add_tail(&vb->queue, &pcdev->capture);
+> +
+> +	if (mx27_camera_emma(pcdev))
+> +		goto out;
+> +	else if (cpu_is_mx27()) {
+
+One of the minor ones - please, add braces in the "if" case.
+
+[snip]
+
+> +static irqreturn_t mx27_camera_emma_irq(int irq_emma, void *data)
+> +{
+> +	struct mx2_camera_dev *pcdev = data;
+> +	unsigned int status = readl(pcdev->base_emma + PRP_INTRSTATUS);
+> +	struct mx2_buffer *buf;
+> +
+> +	if ((status & (3 << 5)) == (3 << 5)
+> +			&& !list_empty(&pcdev->active_bufs)) {
+> +		/*
+> +		 * Both buffers have triggered, process the one we're expecting
+> +		 * to first
+> +		 */
+> +		buf = list_entry(pcdev->active_bufs.next,
+> +			struct mx2_buffer, vb.queue);
+> +		mx27_camera_frame_done_emma(pcdev, buf->bufnum, VIDEOBUF_DONE);
+> +	}
+> +	if (status & (1 << 6))
+> +		mx27_camera_frame_done_emma(pcdev, 0, VIDEOBUF_DONE);
+> +	if (status & (1 << 5))
+> +		mx27_camera_frame_done_emma(pcdev, 1, VIDEOBUF_DONE);
+
+Now, this is the important one. In my review of v2 I proposed the above 
+fix for the both-bits-set case. But, I think, your implementation is not 
+correct. Don't you have to clear the expected buffer number, so that you 
+don't process it twice? Something like
+
+		status &= ~(1 << 6 - buf->bufnum);
+
+anywhere inside the first of the three ifs?
+
+> +	if (status & (1 << 7)) {
+
+Bit 7 is overflow. A correct handling could be resetting the buffer, 
+returning an error frame and continuing with the next one. However, I 
+understand, that you do not have a chance to implement this properly 
+now. So, please,@least add a "FIXME" comment, explaining, what should 
+be done here. Besides, error states are normally checked before normal 
+data processing. So, either mention this in the comment too, or move this 
+above the buffer completion processing.
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
