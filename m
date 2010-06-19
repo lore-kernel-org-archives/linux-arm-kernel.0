@@ -1,30 +1,103 @@
-From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Sat, 19 Jun 2010 16:23:22 +0200
-Subject: [PATCH] orion/kirkwood: reset PCIe unit on boot
-In-Reply-To: <20100619140628.GP1573@jirafa.cyrius.com>
-References: <1276029158-22159-1-git-send-email-razzor@kopf-tisch.de>
-	<20100619140628.GP1573@jirafa.cyrius.com>
-Message-ID: <20100619142322.GO14513@mail.wantstofly.org>
+From: mfuzzey@gmail.com (Martin Fuzzey)
+Date: Sat, 19 Jun 2010 17:48:08 +0200
+Subject: [PATCH] imxfb: add flag to avoid disabling clk multiple times
+In-Reply-To: <1275561288-20661-1-git-send-email-l.fu@pengutronix.de>
+References: <1275561288-20661-1-git-send-email-l.fu@pengutronix.de>
+Message-ID: <4C1CE6B8.4090504@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 19, 2010 at 03:06:29PM +0100, Martin Michlmayr wrote:
+Hi Luotao,
 
-> > Patch found in QNAPs vendor source package, with some cleanups
-> > (proper defines, shortened max. timeout from 1s to 200ms).
-> > 
-> > Without this patch the PCIe SATA controller (Marvell 88sx7042/sata_mv)
-> > in my QNAP TS-419P (Marvell 88f6281/Kirkwood) stops working after a
-> > few minutes.
-> > The symptomes are described in this thread:
-> > http://marc.info/?l=linux-ide&m=124822863706181&w=2
-> 
-> Nico, Saeed: do you have any comments on this patch?
-> 
-> A number of Debian users ran into this issue so I'm glad Olaf found a
-> solution.
+Luotao Fu wrote:
+> while the imxfb driver blanks the screen. The clock supply to the framebuffer
+> controller is disabled. The same callback to disable the fb is, however, also
+> used the remove and shutdown hooks of the imxfb platform driver. This means that
+> the imxfb driver can run into a WARN in clock_disable while unloading or
+> rebooting, if the screen is blanked previously, since the same clock will be
+> than eventually disabled multiple times.  This patch adds a flag to make sure
+> that the clock will only be disabled, if it was not already disabled before.
+>
+>   
+Actually it's worse than that - you don't need to unload the
+driver or reboot to run into this problem because imxfb_blank()
+calls imxfb_disable_controller() for cases
+    case FB_BLANK_POWERDOWN:
+    case FB_BLANK_VSYNC_SUSPEND:
+    case FB_BLANK_HSYNC_SUSPEND:
+    case FB_BLANK_NORMAL:
 
-I'm not very happy with it, as (as far as I understand) even though
-it might solve the problem, so far it's unclear why exactly it does so.
+Often an X server will call these after successive timeouts
+(eg Normal, Suspend, Powerdown) so you can get into the
+multiple suspend problem you describe just by waiting long
+enough for at least two blank levels to be activated.
 
-And consequently, e.g. whether it's needed on other SoCs as well.
+Furthermore once this happens, not only does a WARN occur
+in clock_disable but the clock usage counter will actually become
+negative so it will require multiple wake up requests to switch
+the display back on.
+
+I was just about to post a patch for this but I see you beat
+me to it :).
+
+Your patch fixes the clock_disable problem but fbi->backlight_power()
+and fbi->lcd_power() can still be called multiple times.
+Not sure if that is really a problem - they should be idempotent.
+
+I did it by making all of imxfb_disable_controller() do nothing if the
+disable was already done like this  (just for illustration not submission,
+lines may be mangled):
+
+
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -175,6 +175,7 @@ struct imxfb_info {
+ 
+        struct imx_fb_videomode *mode;
+        int                     num_modes;
++       int                     enabled;
+ 
+        void (*lcd_power)(int);
+        void (*backlight_power)(int);
+@@ -451,6 +452,9 @@ static int imxfb_set_par(struct fb_info *info)
+ 
+ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ {
++       if (fbi->enabled)
++               return;
++
+        pr_debug("Enabling LCD controller\n");
+ 
+        writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
+@@ -470,10 +474,13 @@ static void imxfb_enable_controller(struct
+imxfb_info *fbi)
+                fbi->backlight_power(1);
+        if (fbi->lcd_power)
+                fbi->lcd_power(1);
++       fbi->enabled = 1;
+ }
+ 
+ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ {
++       if (!fbi->enabled)
++               return;
+        pr_debug("Disabling LCD controller\n");
+ 
+        if (fbi->backlight_power)
+@@ -484,6 +491,7 @@ static void imxfb_disable_controller(struct
+imxfb_info *fbi)
+        clk_disable(fbi->clk);
+ 
+        writel(0, fbi->regs + LCDC_RMCR);
++       fbi->enabled = 0;
+ }
+ 
+ static int imxfb_blank(int blank, struct fb_info *info)
+
+
+Though this does miss the explicit  clk_disable() in imxfb_remove()
+
+
+Cheers,
+
+Martin
