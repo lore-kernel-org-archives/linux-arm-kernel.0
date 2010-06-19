@@ -1,179 +1,52 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Sat, 19 Jun 2010 13:22:05 +0900
-Subject: [PATCH] Remove unused serial flags
-Message-ID: <20100619042205.GA24864@july>
+From: david-b@pacbell.net (David Brownell)
+Date: Fri, 18 Jun 2010 23:21:55 -0700 (PDT)
+Subject: gpiolib and sleeping gpios
+In-Reply-To: <4C1BECC9.7000805@bluewatersys.com>
+Message-ID: <386783.17931.qm@web180310.mail.gq1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Remove unused serial flags. Only s5p series.
-After remove s3c series then remove s3c240_uartcfg flags field.
+> 
+> The runtime warnings will only show instances where the
+> non-sleeping
+> versions where called instead of the sleeping versions.
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
-diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-s5pc100/mach-smdkc100.c
-index af22f82..1698d03 100644
---- a/arch/arm/mach-s5pc100/mach-smdkc100.c
-+++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
-@@ -60,28 +60,24 @@
- static struct s3c2410_uartcfg smdkc100_uartcfgs[] __initdata = {
- 	[0] = {
- 		.hwport	     = 0,
--		.flags	     = 0,
- 		.ucon	     = S5PC100_UCON_DEFAULT,
- 		.ulcon	     = S5PC100_ULCON_DEFAULT,
- 		.ufcon	     = S5PC100_UFCON_DEFAULT,
- 	},
- 	[1] = {
- 		.hwport	     = 1,
--		.flags	     = 0,
- 		.ucon	     = S5PC100_UCON_DEFAULT,
- 		.ulcon	     = S5PC100_ULCON_DEFAULT,
- 		.ufcon	     = S5PC100_UFCON_DEFAULT,
- 	},
- 	[2] = {
- 		.hwport	     = 2,
--		.flags	     = 0,
- 		.ucon	     = S5PC100_UCON_DEFAULT,
- 		.ulcon	     = S5PC100_ULCON_DEFAULT,
- 		.ufcon	     = S5PC100_UFCON_DEFAULT,
- 	},
- 	[3] = {
- 		.hwport	     = 3,
--		.flags	     = 0,
- 		.ucon	     = S5PC100_UCON_DEFAULT,
- 		.ulcon	     = S5PC100_ULCON_DEFAULT,
- 		.ufcon	     = S5PC100_UFCON_DEFAULT,
-diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
-index 10bc76e..37a62dd 100644
---- a/arch/arm/mach-s5pv210/mach-aquila.c
-+++ b/arch/arm/mach-s5pv210/mach-aquila.c
-@@ -46,28 +46,24 @@
- static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
- 	[0] = {
- 		.hwport		= 0,
--		.flags		= 0,
- 		.ucon		= S5PV210_UCON_DEFAULT,
- 		.ulcon		= S5PV210_ULCON_DEFAULT,
- 		.ufcon		= S5PV210_UFCON_DEFAULT,
- 	},
- 	[1] = {
- 		.hwport		= 1,
--		.flags		= 0,
- 		.ucon		= S5PV210_UCON_DEFAULT,
- 		.ulcon		= S5PV210_ULCON_DEFAULT,
- 		.ufcon		= S5PV210_UFCON_DEFAULT,
- 	},
- 	[2] = {
- 		.hwport		= 2,
--		.flags		= 0,
- 		.ucon		= S5PV210_UCON_DEFAULT,
- 		.ulcon		= S5PV210_ULCON_DEFAULT,
- 		.ufcon		= S5PV210_UFCON_DEFAULT,
- 	},
- 	[3] = {
- 		.hwport		= 3,
--		.flags		= 0,
- 		.ucon		= S5PV210_UCON_DEFAULT,
- 		.ulcon		= S5PV210_ULCON_DEFAULT,
- 		.ufcon		= S5PV210_UFCON_DEFAULT,
-diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index 4863b13..b0e54ea 100644
---- a/arch/arm/mach-s5pv210/mach-goni.c
-+++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -43,28 +43,24 @@
- static struct s3c2410_uartcfg goni_uartcfgs[] __initdata = {
- 	[0] = {
- 		.hwport		= 0,
--		.flags		= 0,
- 		.ucon		= S5PV210_UCON_DEFAULT,
- 		.ulcon		= S5PV210_ULCON_DEFAULT,
- 		.ufcon		= S5PV210_UFCON_DEFAULT,
- 	},
- 	[1] = {
- 		.hwport		= 1,
--		.flags		= 0,
- 		.ucon		= S5PV210_UCON_DEFAULT,
- 		.ulcon		= S5PV210_ULCON_DEFAULT,
- 		.ufcon		= S5PV210_UFCON_DEFAULT,
- 	},
- 	[2] = {
- 		.hwport		= 2,
--		.flags		= 0,
- 		.ucon		= S5PV210_UCON_DEFAULT,
- 		.ulcon		= S5PV210_ULCON_DEFAULT,
- 		.ufcon		= S5PV210_UFCON_DEFAULT,
- 	},
- 	[3] = {
- 		.hwport		= 3,
--		.flags		= 0,
- 		.ucon		= S5PV210_UCON_DEFAULT,
- 		.ulcon		= S5PV210_ULCON_DEFAULT,
- 		.ufcon		= S5PV210_UFCON_DEFAULT,
-diff --git a/arch/arm/mach-s5pv210/mach-smdkc110.c b/arch/arm/mach-s5pv210/mach-smdkc110.c
-index 4c8903c..1410a5f 100644
---- a/arch/arm/mach-s5pv210/mach-smdkc110.c
-+++ b/arch/arm/mach-s5pv210/mach-smdkc110.c
-@@ -43,28 +43,24 @@
- static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
- 	[0] = {
- 		.hwport		= 0,
--		.flags		= 0,
- 		.ucon		= S5PV210_UCON_DEFAULT,
- 		.ulcon		= S5PV210_ULCON_DEFAULT,
- 		.ufcon		= S5PV210_UFCON_DEFAULT,
- 	},
- 	[1] = {
- 		.hwport		= 1,
--		.flags		= 0,
- 		.ucon		= S5PV210_UCON_DEFAULT,
- 		.ulcon		= S5PV210_ULCON_DEFAULT,
- 		.ufcon		= S5PV210_UFCON_DEFAULT,
- 	},
- 	[2] = {
- 		.hwport		= 2,
--		.flags		= 0,
- 		.ucon		= S5PV210_UCON_DEFAULT,
- 		.ulcon		= S5PV210_ULCON_DEFAULT,
- 		.ufcon		= S5PV210_UFCON_DEFAULT,
- 	},
- 	[3] = {
- 		.hwport		= 3,
--		.flags		= 0,
- 		.ucon		= S5PV210_UCON_DEFAULT,
- 		.ulcon		= S5PV210_ULCON_DEFAULT,
- 		.ufcon		= S5PV210_UFCON_DEFAULT,
-diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
-index 0d46279..e0d72fc 100644
---- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-+++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-@@ -45,28 +45,24 @@
- static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
- 	[0] = {
- 		.hwport		= 0,
--		.flags		= 0,
- 		.ucon		= S5PV210_UCON_DEFAULT,
- 		.ulcon		= S5PV210_ULCON_DEFAULT,
- 		.ufcon		= S5PV210_UFCON_DEFAULT,
- 	},
- 	[1] = {
- 		.hwport		= 1,
--		.flags		= 0,
- 		.ucon		= S5PV210_UCON_DEFAULT,
- 		.ulcon		= S5PV210_ULCON_DEFAULT,
- 		.ufcon		= S5PV210_UFCON_DEFAULT,
- 	},
- 	[2] = {
- 		.hwport		= 2,
--		.flags		= 0,
- 		.ucon		= S5PV210_UCON_DEFAULT,
- 		.ulcon		= S5PV210_ULCON_DEFAULT,
- 		.ufcon		= S5PV210_UFCON_DEFAULT,
- 	},
- 	[3] = {
- 		.hwport		= 3,
--		.flags		= 0,
- 		.ucon		= S5PV210_UCON_DEFAULT,
- 		.ulcon		= S5PV210_ULCON_DEFAULT,
- 		.ufcon		= S5PV210_UFCON_DEFAULT,
+... *AND* the GPIO requires the cansleep() version...
+
+Right; such calls are errors.  We issue
+warnings since fault returns are inapplicable. 
+
+> There is no
+> warning to say that we are calling the spinlock safe
+> version, where it is possible to sleep.
+
+The call context isn't what controls whether
+gpio_get_value() or gpio_get_value_cansleep()
+is appropriate ... it's the GPIO itself, and
+how its implementation works.
+
+"possible to sleep" is a GPIO attribute,
+exposed by a predicate.  If spinlock-safe
+calls are used on GPIOs with that attribute,
+ a warning *IS* issued.
+
+
+
+
+> 
+> The point I was trying to make is that there are lots of
+> drivers which
+> will not work with gpios on sleeping io expanders because
+> they call the
+> spinlock safe gpio calls.
+
+And they will trigger runtime warnings, and
+thus eventually get fixed.  The way to do that
+is to check if the GPIO needs the cansleep()
+call
+
+
+That's the first category above:  the driver
+should have used the cansleep() variant, and
+sotriggers a runtime warning.
