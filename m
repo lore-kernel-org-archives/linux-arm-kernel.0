@@ -1,93 +1,48 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Mon, 21 Jun 2010 09:31:26 +1200
-Subject: gpiolib and sleeping gpios
-In-Reply-To: <386783.17931.qm@web180310.mail.gq1.yahoo.com>
-References: <386783.17931.qm@web180310.mail.gq1.yahoo.com>
-Message-ID: <4C1E88AE.5070808@bluewatersys.com>
+From: orenl@cs.columbia.edu (Oren Laadan)
+Date: Sun, 20 Jun 2010 17:34:10 -0400
+Subject: [C/R ARM v2][PATCH 0/3] Linux Checkpoint-Restart - ARM port
+In-Reply-To: <1272318223-28438-1-git-send-email-christofferdall@christofferdall.dk>
+References: <1272318223-28438-1-git-send-email-christofferdall@christofferdall.dk>
+Message-ID: <4C1E8952.7010503@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/2010 06:21 PM, David Brownell wrote:
+Applied.
+
+On 04/26/2010 05:43 PM, Christoffer Dall wrote:
+> Following there will be two preparatory patches for an ARM port of the
+> checkpoint-restart code and finally a third patch implementing the
+> architecture-specific parts of c/r.
 > 
->>
->> The runtime warnings will only show instances where the
->> non-sleeping
->> versions where called instead of the sleeping versions.
+> The preparatory patches consist of a partial syscall trace implementation
+> for ARM and an eclone implementation for ARM. The syscall trace
+> implementation provides only the needed functionality for c/r.
 > 
-> ... *AND* the GPIO requires the cansleep() version...
+> There is a separate patch for the user space code, which supports
+> cross-compilation, extracting headers for ARM and an eclone implementation
+> for ARM.
 > 
-> Right; such calls are errors.  We issue
-> warnings since fault returns are inapplicable.
-
-A driver which only uses the non-sleeping versions, but _could_ use the
-cansleep variants (ie all calls to gpio_(set/get)_value are made from
-contexts where it is possible to sleep) is not so easy to spot. Passing
-a sleeping to gpio to such a driver will result in spurious warnings.
-
->> There is no
->> warning to say that we are calling the spinlock safe
->> version, where it is possible to sleep.
+> The kernel patches presented here are based on the ckpt-v21-rc6 patch set.
 > 
-> The call context isn't what controls whether
-> gpio_get_value() or gpio_get_value_cansleep()
-> is appropriate ... it's the GPIO itself, and
-> how its implementation works.
-
-No, a driver should not know anything about a gpio which is passed to
-it. If a driver is able to call the cansleep variants, then it should,
-and it will allow any gpio, sleeping or non-sleeping, to be used with
-that driver.
-
-If a driver uses a gpio in such a way that it cannot sleep, ie the
-gpio_(get/set)_value calls are made from spinlock context, then only
-gpios which do not sleep may be used with that driver.
-
-Thats why I think specifying whether the gpio is able to sleep when it
-is requested is a good idea. A driver which cannot use a sleeping gpio
-
-
-> "possible to sleep" is a GPIO attribute,
-> exposed by a predicate.  If spinlock-safe
-> calls are used on GPIOs with that attribute,
->  a warning *IS* issued.
-
-Possible to sleep is also an attribute of how a driver _uses_ a gpio.
-
->>
->> The point I was trying to make is that there are lots of
->> drivers which
->> will not work with gpios on sleeping io expanders because
->> they call the
->> spinlock safe gpio calls.
+> ---
 > 
-> And they will trigger runtime warnings, and
-> thus eventually get fixed.  The way to do that
-> is to check if the GPIO needs the cansleep()
-> call
-
-Hmm, maybe this then for drivers which cannot accept sleeping gpios:
-
-  if (gpio_cansleep(some_gpio)) {
-  	  dev_err(&dev, "This driver only supports non-sleeping gpios");
-	  return -EINVAL;
-  }
-
-  err = gpio_request(some_gpio, "some_gpio");
-
-I think ideally, gpio_request should specify this via a flags argument, ie:
-
-  #define GPIOF_NO_SLEEP	0x0
-  #define GPIOF_CANSLEEP	0x1
-
-  err = gpio_request(some_gpio, "some_gpio", GPIOF_NO_SLEEP);
-
-~Ryan
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+> CHANGELOG:
+> 
+> [2010-Apr-08] v2:
+> 	- Systrace implementation now inspects process state to get the
+> 	  system call number thereby avoiding extra work on system calls.
+> 	- Removed __user attribute on long type in eclone implementation
+> 	- Better check for architecture versions across C/R
+> 	- Improved checking of user space ABI settings across C/R
+> 	- Code simplifications
+> 
+> [2010-Mar-22] v1:
+> 	- Initial version
+> 	- Systrace implementation modified the system call entry path to
+> 	  store the system call number globally in memory.
+> 	- ARM implementation lightly tested
+> _______________________________________________
+> Containers mailing list
+> Containers at lists.linux-foundation.org
+> https://lists.linux-foundation.org/mailman/listinfo/containers
+> 
