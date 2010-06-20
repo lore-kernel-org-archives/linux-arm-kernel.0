@@ -1,39 +1,93 @@
-From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
-Date: Sun, 20 Jun 2010 21:22:54 +0200
-Subject: [PATCH] eukrea_mbimx27: fix audio support when SOC is compiled as
-	module
-Message-ID: <1277061774-24309-1-git-send-email-eric@eukrea.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Mon, 21 Jun 2010 09:31:26 +1200
+Subject: gpiolib and sleeping gpios
+In-Reply-To: <386783.17931.qm@web180310.mail.gq1.yahoo.com>
+References: <386783.17931.qm@web180310.mail.gq1.yahoo.com>
+Message-ID: <4C1E88AE.5070808@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
----
- arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+On 06/19/2010 06:21 PM, David Brownell wrote:
+> 
+>>
+>> The runtime warnings will only show instances where the
+>> non-sleeping
+>> versions where called instead of the sleeping versions.
+> 
+> ... *AND* the GPIO requires the cansleep() version...
+> 
+> Right; such calls are errors.  We issue
+> warnings since fault returns are inapplicable.
 
-diff --git a/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c b/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
-index 2e57912..75559aa 100644
---- a/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
-+++ b/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
-@@ -96,7 +96,8 @@ static int eukrea_mbimx27_pins[] = {
- 	PD30_PF_CSPI1_MISO,
- 	PD31_PF_CSPI1_MOSI,
- 	/* SSI4 */
--#if defined(CONFIG_SND_SOC_EUKREA_TLV320)
-+#if defined(CONFIG_SND_SOC_EUKREA_TLV320) \
-+	|| defined(CONFIG_SND_SOC_EUKREA_TLV320_MODULE)
- 	PC16_PF_SSI4_FS,
- 	PC17_PF_SSI4_RXD | GPIO_PUEN,
- 	PC18_PF_SSI4_TXD | GPIO_PUEN,
-@@ -338,7 +339,8 @@ void __init eukrea_mbimx27_baseboard_init(void)
- 	mxc_gpio_setup_multiple_pins(eukrea_mbimx27_pins,
- 		ARRAY_SIZE(eukrea_mbimx27_pins), "MBIMX27");
- 
--#if defined(CONFIG_SND_SOC_EUKREA_TLV320)
-+#if defined(CONFIG_SND_SOC_EUKREA_TLV320) \
-+	|| defined(CONFIG_SND_SOC_EUKREA_TLV320_MODULE)
- 	/* SSI unit master I2S codec connected to SSI_PINS_4*/
- 	mxc_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
- 			MXC_AUDMUX_V1_PCR_SYN |
+A driver which only uses the non-sleeping versions, but _could_ use the
+cansleep variants (ie all calls to gpio_(set/get)_value are made from
+contexts where it is possible to sleep) is not so easy to spot. Passing
+a sleeping to gpio to such a driver will result in spurious warnings.
+
+>> There is no
+>> warning to say that we are calling the spinlock safe
+>> version, where it is possible to sleep.
+> 
+> The call context isn't what controls whether
+> gpio_get_value() or gpio_get_value_cansleep()
+> is appropriate ... it's the GPIO itself, and
+> how its implementation works.
+
+No, a driver should not know anything about a gpio which is passed to
+it. If a driver is able to call the cansleep variants, then it should,
+and it will allow any gpio, sleeping or non-sleeping, to be used with
+that driver.
+
+If a driver uses a gpio in such a way that it cannot sleep, ie the
+gpio_(get/set)_value calls are made from spinlock context, then only
+gpios which do not sleep may be used with that driver.
+
+Thats why I think specifying whether the gpio is able to sleep when it
+is requested is a good idea. A driver which cannot use a sleeping gpio
+
+
+> "possible to sleep" is a GPIO attribute,
+> exposed by a predicate.  If spinlock-safe
+> calls are used on GPIOs with that attribute,
+>  a warning *IS* issued.
+
+Possible to sleep is also an attribute of how a driver _uses_ a gpio.
+
+>>
+>> The point I was trying to make is that there are lots of
+>> drivers which
+>> will not work with gpios on sleeping io expanders because
+>> they call the
+>> spinlock safe gpio calls.
+> 
+> And they will trigger runtime warnings, and
+> thus eventually get fixed.  The way to do that
+> is to check if the GPIO needs the cansleep()
+> call
+
+Hmm, maybe this then for drivers which cannot accept sleeping gpios:
+
+  if (gpio_cansleep(some_gpio)) {
+  	  dev_err(&dev, "This driver only supports non-sleeping gpios");
+	  return -EINVAL;
+  }
+
+  err = gpio_request(some_gpio, "some_gpio");
+
+I think ideally, gpio_request should specify this via a flags argument, ie:
+
+  #define GPIOF_NO_SLEEP	0x0
+  #define GPIOF_CANSLEEP	0x1
+
+  err = gpio_request(some_gpio, "some_gpio", GPIOF_NO_SLEEP);
+
+~Ryan
+
 -- 
-1.6.3.3
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
