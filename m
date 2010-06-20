@@ -1,51 +1,62 @@
-From: ivo.clarysse@gmail.com (Ivo Clarysse)
-Date: Sun, 20 Jun 2010 11:09:03 +0200
-Subject: [PATCH 4/5] mtd: mxc_nand fixups
-In-Reply-To: <80sk4ivkga.fsf@merkur.tec.linutronix.de>
-References: <804oh0b7gx.fsf@merkur.tec.linutronix.de>
-	<20100618205401.GA12115@pengutronix.de>
-	<80sk4ivkga.fsf@merkur.tec.linutronix.de>
-Message-ID: <AANLkTimA7Rbm_nHpVYpEPqaPCjrOse9s8YyiInWlhfEK@mail.gmail.com>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Sun, 20 Jun 2010 06:49:56 -0500
+Subject: [PATCH 1/2 v2] mv643xx_eth: use sw csum for big packets
+In-Reply-To: <20100614093237.GG14513@mail.wantstofly.org>
+References: <FCBE654890C0334289D0AD3AF4EF009F9FAC75A69C@IL-MB01.marvell.com>
+	<1276073483-17208-1-git-send-email-saeed@marvell.com>
+	<20100610064330.GK1743@mail.wantstofly.org>
+	<FCBE654890C0334289D0AD3AF4EF009F9FAC75AA96@IL-MB01.marvell.com>
+	<20100612083137.GO1743@mail.wantstofly.org>
+	<FCBE654890C0334289D0AD3AF4EF009F9FAC7B6E2B@IL-MB01.marvell.com>
+	<20100614093237.GG14513@mail.wantstofly.org>
+Message-ID: <AANLkTik1QFcRKy95sLTr6MlPfhEyR84iTCcAzpuSg47D@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 19, 2010 at 10:25 PM, John Ogness <john.ogness@linutronix.de>wrote:
-
-> On 2010-06-18, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> >> This patch reverts the driver to enabling/disabling the NFC interrupt
-> >> mask rather than enabling/disabling the system interrupt. This cleans
-> >> up the driver so that it doesn't rely on interrupts being disabled
-> >> within the interrupt handler.
-> >
-> > This behaviour was introduced in
-> > a47bfd2eb66837653dc3b42541dfe4283dd41251 mxc_nand: support i.MX21
-> >
-> > I guess this won't work on i.MX21.
+On Mon, Jun 14, 2010 at 4:32 AM, Lennert Buytenhek
+<buytenh@wantstofly.org> wrote:
+> On Sun, Jun 13, 2010 at 10:38:10AM +0300, Saeed Bishara wrote:
 >
-> I just downloaded the i.MX21 reference manual and its NFC interrupts can
-> also be masked with INT_MASK (bit 4) of NFC_Flash_Config1 (0xdf003e1a).
+>> >> >> @@ -2666,6 +2668,9 @@ static int
+>> >> >mv643xx_eth_shared_probe(struct platform_device *pdev)
+>> >> >> ? ? ? ? ?* Detect hardware parameters.
+>> >> >> ? ? ? ? ?*/
+>> >> >> ? ? ? ? msp->t_clk = (pd != NULL && pd->t_clk != 0) ? pd->t_clk
+>> >> >: 133000000;
+>> >> >> + ? ? ? msp->tx_csum_limit = pd->tx_csum_limit ?
+>> >> >pd->tx_csum_limit : 9 * 1024;
+>> >> >> + ? ? ? /* add header count so we can compare against skb->len */
+>> >> >> + ? ? ? msp->tx_csum_limit += ETH_HLEN;
+>> >> >> ? ? ? ? infer_hw_params(msp);
+>> >> >
+>> >> >Is the limit 9 * 1024 + 14 for the whole packet, or 9 *
+>> >1024 for the IP
+>> >> >part?
+>> >>
+>> >> the limit is for the IP part, but I thought that adding the
+>> >header length, then comparing agains skb->len will be the
+>> >same. What do you suggest?
+>> >
+>> >Right, but for the header length you take 14, while if to include VLAN
+>> >tags or DSA tags the header might actually be longer -- how does that
+>> >affect the ability of the hardware to compute the checksum?
+>> >
+>> >I.e. is the restriction "total packet length must be < N + 14 bytes"
+>> >or is it "the IP part must be < N bytes and it doesn't matter whether
+>> >there are VLAN tags or not"?
+>>
+>> It's the second option: "the IP part must be < N" regardless to the L2 header.
 >
-> IMHO we should revert the driver to masking the NFC interrupts. The
-> current linux-next version with nosync irq disabling within the
-> interrupt handler is a bit silly. Especially since the interrupt handler
-> does nothing except signal a wait queue.
+> Then I suppose you want to do something like:
 >
-> John Ogness
+> ? ? ? ?int hdr_len;
+> ? ? ? ?int tag_bytes;
 >
-
-Yes, on i.MX21, NFC interrupts can be masked using NFC_CONFIG1:NFC_INT_MSK.
-But I observed that as long as NFC_INT_MSK is set, NFC_CONFIG2:NFC_INT will
-always read out 0 on i.MX21, even if the operation is completed.
-
-So the driver will remain stuck at:
-
-                       wait_event(host->irq_waitq,
-                               readw(host->regs + NFC_CONFIG2) & NFC_INT);
-
-This behavior is not documented by Freescale (Freescale's (linux 2.4) i.MX21
-reference kernel avoid this by always using polling).
-
-Ivo.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100620/e966fefd/attachment.html>
+> ? ? ? ?hdr_len = (void *)ip_hdr(skb) - (void *)skb->data;
+> ? ? ? ?tag_bytes = hdr_len - 4;
+that should be 14 instead of 4, right?
+> ? ? ? ?if (skb->len - hdr_len > the limit || unlikely(tag_bytes & ~12)) {
+>
+> (And then keep the limit as maximum number of bytes in the packet
+> starting from the IP header part.)
+ok. here is the updated patch:
