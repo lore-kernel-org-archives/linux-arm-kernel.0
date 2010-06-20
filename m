@@ -1,66 +1,39 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Sun, 20 Jun 2010 18:08:17 +0200
-Subject: [PATCH 2/2] [ARM] pxa: make use of 'struct machine_class'
-In-Reply-To: <1277042450-30382-2-git-send-email-eric.miao@canonical.com>
-References: <1277042450-30382-1-git-send-email-eric.miao@canonical.com>
-	<1277042450-30382-2-git-send-email-eric.miao@canonical.com>
-Message-ID: <20100620180817.2de11de2.ospite@studenti.unina.it>
+From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
+Date: Sun, 20 Jun 2010 21:22:54 +0200
+Subject: [PATCH] eukrea_mbimx27: fix audio support when SOC is compiled as
+	module
+Message-ID: <1277061774-24309-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 20 Jun 2010 22:00:50 +0800
-Eric Miao <eric.miao@canonical.com> wrote:
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+---
+ arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-> From: Eric Miao <eric.y.miao@gmail.com>
-> 
-> Signed-off-by: Eric Miao <eric.miao@canonical.com>
-> ---
->  arch/arm/mach-pxa/ezx.c      |   60 ++++-------------------------------------
-
-The ezx part looks OK. A comment about magician below.
-
-[...]
-> diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
-> index e81dd0c..6a86f22 100644
-> --- a/arch/arm/mach-pxa/magician.c
-> +++ b/arch/arm/mach-pxa/magician.c
-> @@ -764,11 +764,6 @@ static void __init magician_init(void)
->  
->  
->  MACHINE_START(MAGICIAN, "HTC Magician")
-> -	.phys_io = 0x40000000,
-> -	.io_pg_offst = (io_p2v(0x40000000) >> 18) & 0xfffc,
-> -	.boot_params = 0xa0000100,
-> -	.map_io = pxa_map_io,
-> -	.init_irq = pxa27x_init_irq,
-> -	.init_machine = magician_init,
-> -	.timer = &pxa_timer,
-> +	.class		= &machine_class_pxa27x,
-> +	.init_machine	= magician_init,
->  MACHINE_END
-
-Magician can use PXA27X_MACHINE() as well, can't it?
-
-[...]
-
-Regards,
-   Antonio
-
+diff --git a/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c b/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
+index 2e57912..75559aa 100644
+--- a/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
++++ b/arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c
+@@ -96,7 +96,8 @@ static int eukrea_mbimx27_pins[] = {
+ 	PD30_PF_CSPI1_MISO,
+ 	PD31_PF_CSPI1_MOSI,
+ 	/* SSI4 */
+-#if defined(CONFIG_SND_SOC_EUKREA_TLV320)
++#if defined(CONFIG_SND_SOC_EUKREA_TLV320) \
++	|| defined(CONFIG_SND_SOC_EUKREA_TLV320_MODULE)
+ 	PC16_PF_SSI4_FS,
+ 	PC17_PF_SSI4_RXD | GPIO_PUEN,
+ 	PC18_PF_SSI4_TXD | GPIO_PUEN,
+@@ -338,7 +339,8 @@ void __init eukrea_mbimx27_baseboard_init(void)
+ 	mxc_gpio_setup_multiple_pins(eukrea_mbimx27_pins,
+ 		ARRAY_SIZE(eukrea_mbimx27_pins), "MBIMX27");
+ 
+-#if defined(CONFIG_SND_SOC_EUKREA_TLV320)
++#if defined(CONFIG_SND_SOC_EUKREA_TLV320) \
++	|| defined(CONFIG_SND_SOC_EUKREA_TLV320_MODULE)
+ 	/* SSI unit master I2S codec connected to SSI_PINS_4*/
+ 	mxc_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
+ 			MXC_AUDMUX_V1_PCR_SYN |
 -- 
-Antonio Ospite
-http://ao2.it
-
-PGP public key ID: 0x4553B001
-
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100620/9cfddfda/attachment.sig>
+1.6.3.3
