@@ -1,39 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Jun 2010 11:26:23 +0100
-Subject: [PATCH v3 1/7] ARM: Align machine_desc.phys_io to a 1MB section
-In-Reply-To: <1277114749.20758.24.camel@e102109-lin.cambridge.arm.com>
-References: <20100621093530.GE7702@n2100.arm.linux.org.uk>
-	<1277114749.20758.24.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100621102623.GI7702@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 21 Jun 2010 11:29:29 +0100
+Subject: [PATCH v4 0/8] Patches/fixes for 2.6.35
+Message-ID: <20100621102639.9353.37648.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 21, 2010 at 11:05:49AM +0100, Catalin Marinas wrote:
-> On Mon, 2010-06-21 at 10:35 +0100, Russell King - ARM Linux wrote:
-> > On Mon, Jun 21, 2010 at 10:13:31AM +0100, Catalin Marinas wrote:
-> > > Platforms like RealView don't pass a section-aligned pointer via the
-> > > machine_desc structure. This patch aligns the pointer in the
-> > > __create_page_tables function. Reported by Tony Thompson.
-> > 
-> > I still say this is the wrong way.  As I've said before, please fix it
-> > at the machine_desc initialization point.  
-> 
-> This requirement doesn't seem to be well documented and platforms don't
-> follow it (e.g. RealView and VExpress). Since it's the head.S code
-> responsible for this temporary mapping, the platform code wouldn't need
-> to know whether sections or pages or something else are used to map it.
-> But io_pg_offst already makes the assumption about sections.
+Updates from version 3 of these series:
 
-We're never going to map it using sections - using pages implies a
-way to allocate 2nd level page tables, and we don't have any memory
-allocators which can work this early.
+- noMMU warning patch changed by moving the CONSISTENT_* definitions to
+  the CONFIG_MMU section
+- .phys_io alignment patch replaced by two patches that enforce the
+  alignment in the machine_desc structures for VExpress and RealView
+- commit log added to the T2 module relocations patch
 
-> > If you want, pass it as the
-> > section frame number itself (address >> 20) rather than the address to
-> > allow for more addressing space.
-> 
-> I would rather go for a PFN to allow more addressing space (but doesn't
-> solve the section alignment).
 
-PFNs don't solve the problem you've brought up - might as well stick
-with what we have in that case.
+Catalin Marinas (8):
+      ARM: Avoid the CONSISTENT_DMA_SIZE warning on noMMU builds
+      ARM: The v6_dma_inv_range() function must preserve data on SMP
+      ARM: Add a config option for the ARM11MPCore DMA cache maintenance workaround
+      ARM: Add support for the MOVW/MOVT relocations in Thumb-2
+      ARM: Remove dummy loads from the original relocation address
+      ARM: Do not compile the Thumb-2 module relocations on an ARM kernel
+      ARM: VExpress: Align the machine_desc.phys_io to 1MB section
+      ARM: RealView: Align the machine_desc.phys_io to 1MB section
+
+
+ arch/arm/include/asm/elf.h               |    2 ++
+ arch/arm/kernel/module.c                 |   34 ++++++++++++++++++++++++++++++
+ arch/arm/mach-realview/realview_eb.c     |    3 ++-
+ arch/arm/mach-realview/realview_pb1176.c |    3 ++-
+ arch/arm/mach-realview/realview_pb11mp.c |    3 ++-
+ arch/arm/mach-realview/realview_pba8.c   |    3 ++-
+ arch/arm/mach-realview/realview_pbx.c    |    3 ++-
+ arch/arm/mach-vexpress/ct-ca9x4.c        |    3 ++-
+ arch/arm/mm/Kconfig                      |   19 +++++++++++++++++
+ arch/arm/mm/cache-v6.S                   |   18 ++++++++++++----
+ arch/arm/mm/dma-mapping.c                |   18 ++++++++--------
+ 11 files changed, 90 insertions(+), 19 deletions(-)
+
+-- 
+Catalin
