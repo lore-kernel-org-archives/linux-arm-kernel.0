@@ -1,129 +1,64 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 21 Jun 2010 08:16:00 +0300
-Subject: [PATCHv4 3/3] mx25: add support for the CSI device
-In-Reply-To: <cover.1277096909.git.baruch@tkos.co.il>
-References: <cover.1277096909.git.baruch@tkos.co.il>
-Message-ID: <36c9db771cd895d7bbfe422fbd910dc9bf211219.1277096909.git.baruch@tkos.co.il>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Mon, 21 Jun 2010 13:35:13 +0800
+Subject: [PATCH 2/2] clk: Generic support for fixed-rate clocks
+In-Reply-To: <1277098513.947165.104554431018.0.gpush@pororo>
+Message-ID: <1277098513.947920.264679354891.2.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/mach-mx25/clock.c            |   14 ++++++++++++--
- arch/arm/mach-mx25/devices.c          |   22 ++++++++++++++++++++++
- arch/arm/mach-mx25/devices.h          |    1 +
- arch/arm/plat-mxc/include/mach/mx25.h |    2 ++
- 4 files changed, 37 insertions(+), 2 deletions(-)
+Since most platforms will need a fixed-rate clock, add one. This will
+also serve as a basic example of an implementation of struct clk.
 
-diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
-index 1550149..7a98d18 100644
---- a/arch/arm/mach-mx25/clock.c
-+++ b/arch/arm/mach-mx25/clock.c
-@@ -129,6 +129,11 @@ static unsigned long get_rate_lcdc(struct clk *clk)
- 	return get_rate_per(7);
- }
+Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+
+---
+ include/linux/clk.h |   13 +++++++++++++
+ kernel/clk.c        |   14 ++++++++++++++
+ 2 files changed, 27 insertions(+)
+
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index 5c1098b..1dce473 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -79,6 +79,19 @@ struct clk_ops {
+  */
+ int __clk_get(struct clk *clk);
  
-+static unsigned long get_rate_csi(struct clk *clk)
-+{
-+	return get_rate_per(0);
++/* Simple fixed-rate clock */
++struct clk_fixed {
++	struct clk	clk;
++	unsigned long	rate;
++};
++
++extern struct clk_ops clk_fixed_ops;
++
++#define INIT_CLK_FIXED(r) { \
++	.clk = INIT_CLK(clk_fixed_ops), \
++	.rate = (r) \
 +}
 +
- static unsigned long get_rate_otg(struct clk *clk)
- {
- 	return 48000000; /* FIXME */
-@@ -174,6 +179,8 @@ DEFINE_CLOCK(cspi3_clk,  0, CCM_CGCR1,  7, get_rate_ipg, NULL, NULL);
- DEFINE_CLOCK(fec_ahb_clk, 0, CCM_CGCR0, 23, NULL,	 NULL, NULL);
- DEFINE_CLOCK(lcdc_ahb_clk, 0, CCM_CGCR0, 24, NULL,	 NULL, NULL);
- DEFINE_CLOCK(lcdc_per_clk, 0, CCM_CGCR0,  7, NULL,	 NULL, &lcdc_ahb_clk);
-+DEFINE_CLOCK(csi_ahb_clk, 0, CCM_CGCR0, 18, get_rate_csi, NULL, NULL);
-+DEFINE_CLOCK(csi_per_clk, 0, CCM_CGCR0, 0, get_rate_csi, NULL, &csi_ahb_clk);
- DEFINE_CLOCK(uart1_clk,  0, CCM_CGCR2, 14, get_rate_uart, NULL, &uart_per_clk);
- DEFINE_CLOCK(uart2_clk,  0, CCM_CGCR2, 15, get_rate_uart, NULL, &uart_per_clk);
- DEFINE_CLOCK(uart3_clk,  0, CCM_CGCR2, 16, get_rate_uart, NULL, &uart_per_clk);
-@@ -191,6 +198,7 @@ DEFINE_CLOCK(i2c_clk,	 0, CCM_CGCR0,  6, get_rate_i2c, NULL, NULL);
- DEFINE_CLOCK(fec_clk,	 0, CCM_CGCR1, 15, get_rate_ipg, NULL, &fec_ahb_clk);
- DEFINE_CLOCK(dryice_clk, 0, CCM_CGCR1,  8, get_rate_ipg, NULL, NULL);
- DEFINE_CLOCK(lcdc_clk,	 0, CCM_CGCR1, 29, get_rate_lcdc, NULL, &lcdc_per_clk);
-+DEFINE_CLOCK(csi_clk,    0, CCM_CGCR1,  4, get_rate_csi, NULL,  &csi_per_clk);
+ #else /* !CONFIG_USE_COMMON_STRUCT_CLK */
  
- #define _REGISTER_CLOCK(d, n, c)	\
- 	{				\
-@@ -225,6 +233,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
- 	_REGISTER_CLOCK("imxdi_rtc.0", NULL, dryice_clk)
- 	_REGISTER_CLOCK("imx-fb.0", NULL, lcdc_clk)
-+	_REGISTER_CLOCK("mx2-camera.0", NULL, csi_clk)
- };
- 
- int __init mx25_clocks_init(void)
-@@ -239,8 +248,9 @@ int __init mx25_clocks_init(void)
- 	__raw_writel((0xf << 16) | (3 << 26), CRM_BASE + CCM_CGCR1);
- 	__raw_writel((1 << 5), CRM_BASE + CCM_CGCR2);
- 
--	/* Clock source for lcdc is upll */
--	__raw_writel(__raw_readl(CRM_BASE+0x64) | (1 << 7), CRM_BASE + 0x64);
-+	/* Clock source for lcdc and csi is upll */
-+	__raw_writel(__raw_readl(CRM_BASE+0x64) | (1 << 7) | (1 << 0),
-+			CRM_BASE + 0x64);
- 
- 	mxc_timer_init(&gpt_clk, MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), 54);
- 
-diff --git a/arch/arm/mach-mx25/devices.c b/arch/arm/mach-mx25/devices.c
-index 3a405fa..cbecbe1 100644
---- a/arch/arm/mach-mx25/devices.c
-+++ b/arch/arm/mach-mx25/devices.c
-@@ -515,3 +515,25 @@ struct platform_device mxc_wdt = {
- 	.num_resources = ARRAY_SIZE(mxc_wdt_resources),
- 	.resource = mxc_wdt_resources,
- };
+ /*
+diff --git a/kernel/clk.c b/kernel/clk.c
+index cdea25f..32f25ef 100644
+--- a/kernel/clk.c
++++ b/kernel/clk.c
+@@ -99,3 +99,17 @@ struct clk *clk_get_parent(struct clk *clk)
+ 	return ERR_PTR(-ENOSYS);
+ }
+ EXPORT_SYMBOL_GPL(clk_get_parent);
 +
-+static struct resource mx25_csi_resources[] = {
-+	{
-+		.start	= MX25_CSI_BASE_ADDR,
-+		.end	= MX25_CSI_BASE_ADDR + 0xfff,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= MX25_INT_CSI,
-+		.flags	= IORESOURCE_IRQ
-+	},
-+};
++/* clk_fixed support */
 +
-+struct platform_device mx25_csi_device = {
-+	.name	= "mx2-camera",
-+	.id	= 0,
-+	.num_resources	= ARRAY_SIZE(mx25_csi_resources),
-+	.resource	= mx25_csi_resources,
-+	.dev		= {
-+		.coherent_dma_mask = 0xFFFFFFFF,
-+	},
++#define to_clk_fixed(clk) (container_of(clk, struct clk_fixed, clk))
++
++static unsigned long clk_fixed_get_rate(struct clk *clk)
++{
++	return to_clk_fixed(clk)->rate;
++}
++
++struct clk_ops clk_fixed_ops = {
++	.get_rate = clk_fixed_get_rate,
 +};
-diff --git a/arch/arm/mach-mx25/devices.h b/arch/arm/mach-mx25/devices.h
-index cee12c0..b46f122 100644
---- a/arch/arm/mach-mx25/devices.h
-+++ b/arch/arm/mach-mx25/devices.h
-@@ -22,3 +22,4 @@ extern struct platform_device mxc_nand_device;
- extern struct platform_device mx25_rtc_device;
- extern struct platform_device mx25_fb_device;
- extern struct platform_device mxc_wdt;
-+extern struct platform_device mx25_csi_device;
-diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
-index 4eb6e33..5e6a8b5 100644
---- a/arch/arm/plat-mxc/include/mach/mx25.h
-+++ b/arch/arm/plat-mxc/include/mach/mx25.h
-@@ -34,11 +34,13 @@
- #define MX25_NFC_BASE_ADDR		0xbb000000
- #define MX25_DRYICE_BASE_ADDR		0x53ffc000
- #define MX25_LCDC_BASE_ADDR		0x53fbc000
-+#define MX25_CSI_BASE_ADDR		0x53ff8000
- 
- #define MX25_INT_DRYICE	25
- #define MX25_INT_FEC	57
- #define MX25_INT_NANDFC	33
- #define MX25_INT_LCDC	39
-+#define MX25_INT_CSI	17
- 
- #if defined(IMX_NEEDS_DEPRECATED_SYMBOLS)
- #define UART1_BASE_ADDR			MX25_UART1_BASE_ADDR
--- 
-1.7.1
++EXPORT_SYMBOL_GPL(clk_fixed_ops);
