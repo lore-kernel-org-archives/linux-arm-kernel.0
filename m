@@ -1,33 +1,73 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 21 Jun 2010 10:42:35 +0100
-Subject: [PATCH v3 2/4] ARM: Use lazy cache flushing on ARMv7 SMPsystems
-In-Reply-To: <20100621093856.GF7702@n2100.arm.linux.org.uk>
-References: <20100621091745.23136.67979.stgit@e102109-lin.cambridge.arm.com>
-	<20100621092029.23136.39916.stgit@e102109-lin.cambridge.arm.com>
-	<20100621093856.GF7702@n2100.arm.linux.org.uk>
-Message-ID: <1277113355.20758.11.camel@e102109-lin.cambridge.arm.com>
+Date: Mon, 21 Jun 2010 10:53:05 +0100
+Subject: [PATCH v3 2/7] ARM: Avoid the CONSISTENT_DMA_SIZE warning on
+	noMMU builds
+In-Reply-To: <20100621092307.GC7702@n2100.arm.linux.org.uk>
+References: <20100621090801.22752.21039.stgit@e102109-lin.cambridge.arm.com>
+	<20100621091336.22752.78477.stgit@e102109-lin.cambridge.arm.com>
+	<20100621092307.GC7702@n2100.arm.linux.org.uk>
+Message-ID: <1277113985.20758.14.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-06-21 at 10:38 +0100, Russell King - ARM Linux wrote:
-> On Mon, Jun 21, 2010 at 10:20:29AM +0100, Catalin Marinas wrote:
-> > ARMv7 processors like Cortex-A9 broadcast the cache maintenance
-> > operations in hardware. This patch allows the
-> > flush_dcache_page/update_mmu_cache pair to work in lazy flushing mode
-> > similar to the UP case.
+On Mon, 2010-06-21 at 10:23 +0100, Russell King - ARM Linux wrote:
+> On Mon, Jun 21, 2010 at 10:13:36AM +0100, Catalin Marinas wrote:
+> > This macro is not defined when !CONFIG_MMU.
 > 
-> No.  We know that this trick can't be used on SMP, because update_mmu_cache
-> is called after the PTE has been established and the page has become
-> visible to other CPUs in the system.
-> 
-> So this optimization must remain disabled on SMP for correctness.
+> Just move the definitions into the !CONFIG_MMU section.  No need for
+> any more ifdefs.
 
-Even the current code isn't correct because the I-cache is invalidated
-via update_mmu_cache() but set_pte_at() gets called before.
+Done.
 
-So this is handled by patch 4/4 in the series. I can reorder them but I
-couldn't see any reason since the current non-lazy behaviour isn't
-correct either.
+
+ARM: Avoid the CONSISTENT_DMA_SIZE warning on noMMU builds
+
+From: Catalin Marinas <catalin.marinas@arm.com>
+
+This macro is not defined when !CONFIG_MMU so this patch moves the
+CONSISTENT_* definitions to the CONFIG_MMU section.
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/mm/dma-mapping.c |   18 +++++++++---------
+ 1 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 13fa536..9e7742f 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -24,15 +24,6 @@
+ #include <asm/tlbflush.h>
+ #include <asm/sizes.h>
+ 
+-/* Sanity check size */
+-#if (CONSISTENT_DMA_SIZE % SZ_2M)
+-#error "CONSISTENT_DMA_SIZE must be multiple of 2MiB"
+-#endif
+-
+-#define CONSISTENT_OFFSET(x)	(((unsigned long)(x) - CONSISTENT_BASE) >> PAGE_SHIFT)
+-#define CONSISTENT_PTE_INDEX(x) (((unsigned long)(x) - CONSISTENT_BASE) >> PGDIR_SHIFT)
+-#define NUM_CONSISTENT_PTES (CONSISTENT_DMA_SIZE >> PGDIR_SHIFT)
+-
+ static u64 get_coherent_dma_mask(struct device *dev)
+ {
+ 	u64 mask = ISA_DMA_THRESHOLD;
+@@ -123,6 +114,15 @@ static void __dma_free_buffer(struct page *page, size_t size)
+ }
+ 
+ #ifdef CONFIG_MMU
++/* Sanity check size */
++#if (CONSISTENT_DMA_SIZE % SZ_2M)
++#error "CONSISTENT_DMA_SIZE must be multiple of 2MiB"
++#endif
++
++#define CONSISTENT_OFFSET(x)	(((unsigned long)(x) - CONSISTENT_BASE) >> PAGE_SHIFT)
++#define CONSISTENT_PTE_INDEX(x) (((unsigned long)(x) - CONSISTENT_BASE) >> PGDIR_SHIFT)
++#define NUM_CONSISTENT_PTES (CONSISTENT_DMA_SIZE >> PGDIR_SHIFT)
++
+ /*
+  * These are the page tables (2MB each) covering uncached, DMA consistent allocations
+  */
 
 -- 
 Catalin
