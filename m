@@ -1,102 +1,95 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Jun 2010 16:51:25 +0300
-Subject: [PATCH 2/2] arm: Make VFPv3 usable on ARMv6
-In-Reply-To: <20100621133749.24299.36154.stgit@baageli.muru.com>
-References: <20100621133749.24299.36154.stgit@baageli.muru.com>
-Message-ID: <20100621135125.24299.91290.stgit@baageli.muru.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 21 Jun 2010 22:15:42 +0800
+Subject: [PATCH v5 1/3] ARM: SAMSUNG: Add keypad device support
+In-Reply-To: <20100621111612.GJ7702@n2100.arm.linux.org.uk>
+References: <1277101605-2435-1-git-send-email-jy0922.shim@samsung.com>
+	<AANLkTil1aiJ1gu6jRrO4LeB0fYltOq4A3wXJJB1ZOa8q@mail.gmail.com>
+	<20100621091952.GB7702@n2100.arm.linux.org.uk>
+	<AANLkTilU1X1LR33Eed9BVGE2n-dqRuIuUFfbDd3gzEVc@mail.gmail.com>
+	<20100621111612.GJ7702@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTin2ap24Jn38eXx3uHLiJ32otXA6PgtL-yORU7sr@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MVFR0 and MVFR1 are only available starting with ARM1136 r1p0 release
-according to "B.5 VFP changes" in DDI0211F_arm1136_r1p0_trm.pdf. This is
-also when TLS register got added, so we can use HAS_TLS also to test for
-MVFR0 and MVFR1.
+On Mon, Jun 21, 2010 at 7:16 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jun 21, 2010 at 06:39:10PM +0800, Eric Miao wrote:
+>> On Mon, Jun 21, 2010 at 5:19 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Mon, Jun 21, 2010 at 05:05:34PM +0800, Eric Miao wrote:
+>> >> On Mon, Jun 21, 2010 at 2:26 PM, Joonyoung Shim <jy0922.shim@samsung.com> wrote:
+>> >> > +void __init samsung_keypad_set_platdata(struct samsung_keypad_platdata *pd)
+>> >> > +{
+>> >> > + ? ? ? struct samsung_keypad_platdata *npd;
+>> >> > +
+>> >> > + ? ? ? if (!pd) {
+>> >> > + ? ? ? ? ? ? ? printk(KERN_ERR "%s: no platform data\n", __func__);
+>> >> > + ? ? ? ? ? ? ? return;
+>> >> > + ? ? ? }
+>> >> > +
+>> >> > + ? ? ? npd = kmemdup(pd, sizeof(struct samsung_keypad_platdata), GFP_KERNEL);
+>> >> > + ? ? ? if (!npd)
+>> >> > + ? ? ? ? ? ? ? printk(KERN_ERR "%s: no memory for platform data\n", __func__);
+>> >>
+>> >> This part of the code is actually duplicated again and again and again
+>> >> for each device, PXA and other legacy platforms are bad references for
+>> >> this. In arch/arm/mach-mmp/, it might be a bit cleaner, there are three
+>> >> major points:
+>> >>
+>> >> ?1. A minimum 'struct pxa_device_desc' for a simple description of a
+>> >> ? ? device (more than 90% of the devices can be described that way),
+>> >> ? ? and avoid using a comparatively heavier weight platform_device,
+>> >> ? ? which can be generated at run-time
+>> >>
+>> >> ?2. pxa_register_device() to allocate and register the platform_device
+>> >> ? ? at run-time, along with the platform data
+>> >
+>> > It's a bad idea to make platform data be run-time discardable like this:
+>> >
+>> >> > +struct samsung_keypad_platdata {
+>> >> > + ? ? ? const struct matrix_keymap_data *keymap_data;
+>> >
+>> > What you end up with is some platform data structures which must be kept
+>> > (those which have pointers to them from the platform data), and others
+>> > (the platform data itself) which can be discarded at runtime.
+>> >
+>> > We know that the __initdata attributations cause lots of problems -
+>> > they're frequently wrong. ?Just see the constant hastle with __devinit
+>> > et.al. ?The same issue happens with __initdata as well.
+>> >
+>> > So why make things more complicated by allowing some platform data
+>> > structures to be discardable and others not to be? ?Is their small
+>> > size (maybe 6 words for this one) really worth the hastle of getting
+>> > __initdata attributations wrong (eg, on the keymap data?)
+>> >
+>>
+>> Russell,
+>>
+>> The benefit I see is when multiple boards are compiled in, those
+>> data not used can be automatically discarded.
+>
+> Yes, but only some of the data can be discarded. ?Continuing with the
+> example in hand, while you can discard the six words which represent
+> samsung_keypad_platdata, but the keymap_data can't be because that won't
+> be re-allocated, which is probably a much larger data structure.
+>
+> So, samsung_keypad_platdata can be marked with __initdata, but the keymap
+> data must not be - and this is where the confusion about what can be
+> marked with __initdata starts - and eventually leads to the keymap data
+> also being mistakenly marked __initdata.
 
-Otherwise VFPFMRX and VFPFMXR access fails and we get:
+Indeed. One ideal solution would be to make all the board code into
+a module, yet since some of the code should be executed really
+early and need to stay as built-in, looks like we need a way to
+separate these two parts.
 
-Internal error: Oops - undefined instruction: 0 [#1]
-PC is at no_old_VFP_process+0x8/0x3c
-LR is at __und_svc+0x48/0x80
-...
+>
+> Is saving six words (or so) worth the effort to track down stuff
+> inappropriately marked with __initdata ? ?I'm sure there's bigger savings
+> to be had in other parts of the kernel (such as shrinking the size of
+> tcp hash tables, reducing the kernel message ring buffer, etc) if size is
+> really a concern.
+>
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/include/asm/vfpmacros.h |   18 ++++++++++++++++++
- arch/arm/vfp/vfpmodule.c         |   10 +++++++---
- 2 files changed, 25 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/include/asm/vfpmacros.h b/arch/arm/include/asm/vfpmacros.h
-index 422f3cc..3d5fc41 100644
---- a/arch/arm/include/asm/vfpmacros.h
-+++ b/arch/arm/include/asm/vfpmacros.h
-@@ -3,6 +3,8 @@
-  *
-  * Assembler-only file containing VFP macros and register definitions.
-  */
-+#include <asm/hwcap.h>
-+
- #include "vfp.h"
- 
- @ Macros to allow building with old toolkits (with no VFP support)
-@@ -22,12 +24,20 @@
- 	LDC	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d0-d15}
- #endif
- #ifdef CONFIG_VFPv3
-+#if __LINUX_ARM_ARCH__ <= 6
-+	ldr	\tmp, =elf_hwcap		    @ may not have MVFR regs
-+	ldr	\tmp, [\tmp, #0]
-+	tst	\tmp, #HWCAP_VFPv3D16
-+	ldceq	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
-+	addne	\base, \base, #32*4		    @ step over unused register space
-+#else
- 	VFPFMRX	\tmp, MVFR0			    @ Media and VFP Feature Register 0
- 	and	\tmp, \tmp, #MVFR0_A_SIMD_MASK	    @ A_SIMD field
- 	cmp	\tmp, #2			    @ 32 x 64bit registers?
- 	ldceql	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
- 	addne	\base, \base, #32*4		    @ step over unused register space
- #endif
-+#endif
- 	.endm
- 
- 	@ write all the working registers out of the VFP
-@@ -38,10 +48,18 @@
- 	STC	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d0-d15}
- #endif
- #ifdef CONFIG_VFPv3
-+#if __LINUX_ARM_ARCH__ <= 6
-+	ldr	\tmp, =elf_hwcap		    @ may not have MVFR regs
-+	ldr	\tmp, [\tmp, #0]
-+	tst	\tmp, #HWCAP_VFPv3D16
-+	stceq	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
-+	addne	\base, \base, #32*4		    @ step over unused register space
-+#else
- 	VFPFMRX	\tmp, MVFR0			    @ Media and VFP Feature Register 0
- 	and	\tmp, \tmp, #MVFR0_A_SIMD_MASK	    @ A_SIMD field
- 	cmp	\tmp, #2			    @ 32 x 64bit registers?
- 	stceql	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
- 	addne	\base, \base, #32*4		    @ step over unused register space
- #endif
-+#endif
- 	.endm
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 315a540..19ba626 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -549,10 +549,14 @@ static int __init vfp_init(void)
- 		/*
- 		 * Check for the presence of the Advanced SIMD
- 		 * load/store instructions, integer and single
--		 * precision floating point operations.
-+		 * precision floating point operations. Only check
-+		 * for NEON if the hardware has TLS register as the
-+		 * MVFR registers got added in ARM1136 r1p0 with TLS.
- 		 */
--		if ((fmrx(MVFR1) & 0x000fff00) == 0x00011100)
--			elf_hwcap |= HWCAP_NEON;
-+		if (elf_hwcap & HWCAP_TLS) {
-+			if ((fmrx(MVFR1) & 0x000fff00) == 0x00011100)
-+				elf_hwcap |= HWCAP_NEON;
-+		}
- #endif
- 	}
- 	return 0;
+That's true, however, I think the size will become a bit more significant
+if more and more board code is compiled into a single kernel.
