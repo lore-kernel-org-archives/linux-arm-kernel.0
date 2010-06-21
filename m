@@ -1,116 +1,77 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 21 Jun 2010 11:29:46 +0100
-Subject: [PATCH v4 3/8] ARM: Add a config option for the ARM11MPCore DMA
-	cache maintenance workaround
+Date: Mon, 21 Jun 2010 11:29:51 +0100
+Subject: [PATCH v4 4/8] ARM: Add support for the MOVW/MOVT relocations in
+	Thumb-2
 In-Reply-To: <20100621102639.9353.37648.stgit@e102109-lin.cambridge.arm.com>
 References: <20100621102639.9353.37648.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100621102946.9353.22352.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100621102951.9353.99611.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit f4d6477f introduced a workaround for the lack of hardware
-broadcasting of the cache maintenance operations on ARM11MPCore.
-However, the workaround is only valid on CPUs that do not do speculative
-loads into the D-cache.
-
-This patch adds a Kconfig option with the corresponding help to make the
-above clear. When the DMA_CACHE_RWFO option is disabled, the kernel
-behaviour is that prior to the f4d6477f commit. This also allows ARMv6
-UP processors with speculative loads to work correctly.
-
-For other processors, a different workaround may be needed.
+The patch adds handling case for the R_ARM_THM_MOVW_ABS_NC and
+R_ARM_THM_MOVT_ABS relocations in arch/arm/kernel/module.c. Such
+relocations may appear in Thumb-2 compiled kernel modules.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Ronen Shitrit <rshitrit@marvell.com>
+Reported-by: Kyungmin Park <kmpark@infradead.org>
 ---
- arch/arm/mm/Kconfig    |   19 +++++++++++++++++++
- arch/arm/mm/cache-v6.S |   15 ++++++++++++---
- 2 files changed, 31 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/elf.h |    2 ++
+ arch/arm/kernel/module.c   |   32 ++++++++++++++++++++++++++++++++
+ 2 files changed, 34 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 346ae14..fc1b2fa 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -735,6 +735,25 @@ config NEEDS_SYSCALL_FOR_CMPXCHG
- 	  Forget about fast user space cmpxchg support.
- 	  It is just not possible.
+diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+index 51662fe..4d0e730 100644
+--- a/arch/arm/include/asm/elf.h
++++ b/arch/arm/include/asm/elf.h
+@@ -59,6 +59,8 @@ typedef struct user_fp elf_fpregset_t;
  
-+config DMA_CACHE_RWFO
-+	bool "Enable read/write for ownership DMA cache maintenance"
-+	depends on CPU_V6 && SMP
-+	default y
-+	help
-+	  The Snoop Control Unit on ARM11MPCore does not detect the
-+	  cache maintenance operations and the dma_{map,unmap}_area()
-+	  functions may leave stale cache entries on other CPUs. By
-+	  enabling this option, Read or Write For Ownership in the ARMv6
-+	  DMA cache maintenance functions is performed. These LDR/STR
-+	  instructions change the cache line state to shared or modified
-+	  so that the cache operation has the desired effect.
-+
-+	  Note that the workaround is only valid on processors that do
-+	  not perform speculative loads into the D-cache. For such
-+	  processors, if cache maintenance operations are not broadcast
-+	  in hardware, other workarounds are needed (e.g. cache
-+	  maintenance broadcasting in software via FIQ).
-+
- config OUTER_CACHE
- 	bool
- 
-diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
-index 332b48c..86aa689 100644
---- a/arch/arm/mm/cache-v6.S
-+++ b/arch/arm/mm/cache-v6.S
-@@ -211,7 +211,7 @@ v6_dma_inv_range:
- 	mcrne	p15, 0, r1, c7, c15, 1		@ clean & invalidate unified line
- #endif
- 1:
--#ifdef CONFIG_SMP
-+#ifdef CONFIG_DMA_CACHE_RWFO
- 	ldr	r2, [r0]			@ read for ownership
- 	str	r2, [r0]			@ write for ownership
- #endif
-@@ -235,7 +235,7 @@ v6_dma_inv_range:
- v6_dma_clean_range:
- 	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
- 1:
--#ifdef CONFIG_SMP
-+#ifdef CONFIG_DMA_CACHE_RWFO
- 	ldr	r2, [r0]			@ read for ownership
- #endif
- #ifdef HARVARD_CACHE
-@@ -258,7 +258,7 @@ v6_dma_clean_range:
- ENTRY(v6_dma_flush_range)
- 	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
- 1:
--#ifdef CONFIG_SMP
-+#ifdef CONFIG_DMA_CACHE_RWFO
- 	ldr	r2, [r0]			@ read for ownership
- 	str	r2, [r0]			@ write for ownership
- #endif
-@@ -284,9 +284,13 @@ ENTRY(v6_dma_map_area)
- 	add	r1, r1, r0
- 	teq	r2, #DMA_FROM_DEVICE
- 	beq	v6_dma_inv_range
-+#ifndef CONFIG_DMA_CACHE_RWFO
-+	b	v6_dma_clean_range
-+#else
- 	teq	r2, #DMA_TO_DEVICE
- 	beq	v6_dma_clean_range
- 	b	v6_dma_flush_range
-+#endif
- ENDPROC(v6_dma_map_area)
+ #define R_ARM_THM_CALL		10
+ #define R_ARM_THM_JUMP24	30
++#define R_ARM_THM_MOVW_ABS_NC	47
++#define R_ARM_THM_MOVT_ABS	48
  
  /*
-@@ -296,6 +300,11 @@ ENDPROC(v6_dma_map_area)
-  *	- dir	- DMA direction
-  */
- ENTRY(v6_dma_unmap_area)
-+#ifndef CONFIG_DMA_CACHE_RWFO
-+	add	r1, r1, r0
-+	teq	r2, #DMA_TO_DEVICE
-+	bne	v6_dma_inv_range
-+#endif
- 	mov	pc, lr
- ENDPROC(v6_dma_unmap_area)
+  * These are used to set parameters in the core dumps.
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index c628bdf..ae3c804 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -237,6 +237,38 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 			lower = *(u16 *)(loc + 2);
+ 			break;
  
++		case R_ARM_THM_MOVW_ABS_NC:
++		case R_ARM_THM_MOVT_ABS:
++			upper = *(u16 *)loc;
++			lower = *(u16 *)(loc + 2);
++
++			/*
++			 * MOVT/MOVW instructions encoding in Thumb-2:
++			 *
++			 * i	= upper[10]
++			 * imm4	= upper[3:0]
++			 * imm3	= lower[14:12]
++			 * imm8	= lower[7:0]
++			 *
++			 * imm16 = imm4:i:imm3:imm8
++			 */
++			offset = ((upper & 0x000f) << 12) |
++				((upper & 0x0400) << 1) |
++				((lower & 0x7000) >> 4) | (lower & 0x00ff);
++			offset = (offset ^ 0x8000) - 0x8000;
++			offset += sym->st_value;
++
++			if (ELF32_R_TYPE(rel->r_info) == R_ARM_THM_MOVT_ABS)
++				offset >>= 16;
++
++			*(u16 *)loc = (u16)((upper & 0xfbf0) |
++					    ((offset & 0xf000) >> 12) |
++					    ((offset & 0x0800) >> 1));
++			*(u16 *)(loc + 2) = (u16)((lower & 0x8f00) |
++						  ((offset & 0x0700) << 4) |
++						  (offset & 0x00ff));
++			break;
++
+ 		default:
+ 			printk(KERN_ERR "%s: unknown relocation: %u\n",
+ 			       module->name, ELF32_R_TYPE(rel->r_info));
