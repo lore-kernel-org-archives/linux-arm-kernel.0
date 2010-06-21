@@ -1,27 +1,20 @@
-From: lhrossouw@gmail.com (Lucas)
-Date: Mon, 21 Jun 2010 14:30:56 +0000 (UTC)
-Subject: [PATCH] Fix AT91SAM9G20 reset
-References: <20100528153725.GA5102@axolotl.localnet>
-Message-ID: <loom.20100621T162410-494@post.gmane.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 Jun 2010 15:35:12 +0100
+Subject: [PATCH] OMAP3: pmu: make CPU_HAS_PMU dependent on OMAP3_EMU
+References: <1274972448-10721-1-git-send-email-will.deacon@arm.com>
+	<AANLkTikIiLybBr-wV_SRWFNLkZn892gwsWHCxsIYenFJ@mail.gmail.com>
+Message-ID: <002f01cb114e$f5546060$dffd2120$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Horton <phorton <at> bitbox.co.uk> writes:
+Hello,
 
-> 
-> Fix AT91SAM9G20 as per the errata in the datasheet.
-> 
-> If the SDRAM is not cleanly shutdown before reset it can be left driving
-> the bus, which then stops the bootloader booting from NAND.
-> 
-> Signed-off-by: Peter Horton <phorton <at> bitbox.co.uk>
-> --
-> 
+* I wrote: 
 
+> Tony: would you mind picking this patch up please or would
+> you prefer that I posted it to Russell's patch system?
 
-Hi Peter,
+Since this only modifies arch/arm/KConfig and Jean has acked it,
+I've submitted it to Russell's patch system as #6195/1.
 
-Any Idea how to implement this for the WDT and hardware reset(NRST)?
-A hardware reset sometimes still stops the bootloader booting from NAND.
-
-Lucas 
+Will
