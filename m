@@ -1,55 +1,107 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Jun 2010 10:19:52 +0100
-Subject: [PATCH v5 1/3] ARM: SAMSUNG: Add keypad device support
-In-Reply-To: <AANLkTil1aiJ1gu6jRrO4LeB0fYltOq4A3wXJJB1ZOa8q@mail.gmail.com>
-References: <1277101605-2435-1-git-send-email-jy0922.shim@samsung.com>
-	<AANLkTil1aiJ1gu6jRrO4LeB0fYltOq4A3wXJJB1ZOa8q@mail.gmail.com>
-Message-ID: <20100621091952.GB7702@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 21 Jun 2010 10:20:29 +0100
+Subject: [PATCH v3 2/4] ARM: Use lazy cache flushing on ARMv7 SMP systems
+In-Reply-To: <20100621091745.23136.67979.stgit@e102109-lin.cambridge.arm.com>
+References: <20100621091745.23136.67979.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100621092029.23136.39916.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 21, 2010 at 05:05:34PM +0800, Eric Miao wrote:
-> On Mon, Jun 21, 2010 at 2:26 PM, Joonyoung Shim <jy0922.shim@samsung.com> wrote:
-> > +void __init samsung_keypad_set_platdata(struct samsung_keypad_platdata *pd)
-> > +{
-> > + ? ? ? struct samsung_keypad_platdata *npd;
-> > +
-> > + ? ? ? if (!pd) {
-> > + ? ? ? ? ? ? ? printk(KERN_ERR "%s: no platform data\n", __func__);
-> > + ? ? ? ? ? ? ? return;
-> > + ? ? ? }
-> > +
-> > + ? ? ? npd = kmemdup(pd, sizeof(struct samsung_keypad_platdata), GFP_KERNEL);
-> > + ? ? ? if (!npd)
-> > + ? ? ? ? ? ? ? printk(KERN_ERR "%s: no memory for platform data\n", __func__);
-> 
-> This part of the code is actually duplicated again and again and again
-> for each device, PXA and other legacy platforms are bad references for
-> this. In arch/arm/mach-mmp/, it might be a bit cleaner, there are three
-> major points:
-> 
->  1. A minimum 'struct pxa_device_desc' for a simple description of a
->     device (more than 90% of the devices can be described that way),
->     and avoid using a comparatively heavier weight platform_device,
->     which can be generated at run-time
-> 
->  2. pxa_register_device() to allocate and register the platform_device
->     at run-time, along with the platform data
+ARMv7 processors like Cortex-A9 broadcast the cache maintenance
+operations in hardware. This patch allows the
+flush_dcache_page/update_mmu_cache pair to work in lazy flushing mode
+similar to the UP case.
 
-It's a bad idea to make platform data be run-time discardable like this:
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/include/asm/smp_plat.h |    4 ++++
+ arch/arm/mm/fault-armv.c        |    2 --
+ arch/arm/mm/flush.c             |   13 ++++---------
+ 3 files changed, 8 insertions(+), 11 deletions(-)
 
-> > +struct samsung_keypad_platdata {
-> > + ? ? ? const struct matrix_keymap_data *keymap_data;
-
-What you end up with is some platform data structures which must be kept
-(those which have pointers to them from the platform data), and others
-(the platform data itself) which can be discarded at runtime.
-
-We know that the __initdata attributations cause lots of problems -
-they're frequently wrong.  Just see the constant hastle with __devinit
-et.al.  The same issue happens with __initdata as well.
-
-So why make things more complicated by allowing some platform data
-structures to be discardable and others not to be?  Is their small
-size (maybe 6 words for this one) really worth the hastle of getting
-__initdata attributations wrong (eg, on the keymap data?)
+diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+index e621530..963a338 100644
+--- a/arch/arm/include/asm/smp_plat.h
++++ b/arch/arm/include/asm/smp_plat.h
+@@ -13,9 +13,13 @@ static inline int tlb_ops_need_broadcast(void)
+ 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 2;
+ }
+ 
++#if !defined(CONFIG_SMP) || __LINUX_ARM_ARCH__ >= 7
++#define cache_ops_need_broadcast()	0
++#else
+ static inline int cache_ops_need_broadcast(void)
+ {
+ 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 1;
+ }
++#endif
+ 
+ #endif
+diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
+index 9b906de..9d77d90 100644
+--- a/arch/arm/mm/fault-armv.c
++++ b/arch/arm/mm/fault-armv.c
+@@ -168,10 +168,8 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
+ 		return;
+ 
+ 	mapping = page_mapping(page);
+-#ifndef CONFIG_SMP
+ 	if (test_and_clear_bit(PG_dcache_dirty, &page->flags))
+ 		__flush_dcache_page(mapping, page);
+-#endif
+ 	if (mapping) {
+ 		if (cache_is_vivt())
+ 			make_coherent(mapping, vma, addr, ptep, pfn);
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index c6844cb..5ad8711 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -17,6 +17,7 @@
+ #include <asm/smp_plat.h>
+ #include <asm/system.h>
+ #include <asm/tlbflush.h>
++#include <asm/smp_plat.h>
+ 
+ #include "mm.h"
+ 
+@@ -93,12 +94,10 @@ void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsig
+ #define flush_pfn_alias(pfn,vaddr)	do { } while (0)
+ #endif
+ 
+-#ifdef CONFIG_SMP
+ static void flush_ptrace_access_other(void *args)
+ {
+ 	__flush_icache_all();
+ }
+-#endif
+ 
+ static
+ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+@@ -122,11 +121,9 @@ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+ 	if (vma->vm_flags & VM_EXEC) {
+ 		unsigned long addr = (unsigned long)kaddr;
+ 		__cpuc_coherent_kern_range(addr, addr + len);
+-#ifdef CONFIG_SMP
+ 		if (cache_ops_need_broadcast())
+ 			smp_call_function(flush_ptrace_access_other,
+ 					  NULL, 1);
+-#endif
+ 	}
+ }
+ 
+@@ -246,12 +243,10 @@ void flush_dcache_page(struct page *page)
+ 
+ 	mapping = page_mapping(page);
+ 
+-#ifndef CONFIG_SMP
+-	if (!PageHighMem(page) && mapping && !mapping_mapped(mapping))
++	if (!cache_ops_need_broadcast() &&
++	    !PageHighMem(page) && mapping && !mapping_mapped(mapping))
+ 		set_bit(PG_dcache_dirty, &page->flags);
+-	else
+-#endif
+-	{
++	else {
+ 		__flush_dcache_page(mapping, page);
+ 		if (mapping && cache_is_vivt())
+ 			__flush_dcache_aliases(mapping, page);
