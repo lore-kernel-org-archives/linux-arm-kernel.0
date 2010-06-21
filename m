@@ -1,104 +1,62 @@
 From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Mon, 21 Jun 2010 15:26:44 +0900
-Subject: [PATCH v5 2/3] ARM: S5PV210: Add keypad device helpers
-In-Reply-To: <1277101605-2435-1-git-send-email-jy0922.shim@samsung.com>
-References: <1277101605-2435-1-git-send-email-jy0922.shim@samsung.com>
-Message-ID: <1277101605-2435-2-git-send-email-jy0922.shim@samsung.com>
+Date: Mon, 21 Jun 2010 15:26:43 +0900
+Subject: [PATCH v5 1/3] ARM: SAMSUNG: Add keypad device support
+Message-ID: <1277101605-2435-1-git-send-email-jy0922.shim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the keypad device platform helpers for S5PV210 cpu.
+This patch adds samsung keypad device definition for samsung cpus.
 
 Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s5pv210/Kconfig                    |    5 +++
- arch/arm/mach-s5pv210/Makefile                   |    1 +
- arch/arm/mach-s5pv210/cpu.c                      |    4 ++
- arch/arm/mach-s5pv210/include/mach/map.h         |    3 ++
- arch/arm/mach-s5pv210/setup-keypad.c             |   34 ++++++++++++++++++++++
- arch/arm/plat-samsung/include/plat/keypad-core.h |   31 ++++++++++++++++++++
- 6 files changed, 78 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/setup-keypad.c
- create mode 100644 arch/arm/plat-samsung/include/plat/keypad-core.h
+ arch/arm/plat-samsung/Kconfig                    |    5 ++
+ arch/arm/plat-samsung/Makefile                   |    1 +
+ arch/arm/plat-samsung/dev-keypad.c               |   58 +++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/devs.h        |    2 +
+ arch/arm/plat-samsung/include/plat/keypad.h      |   59 ++++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/regs-keypad.h |   49 ++++++++++++++++++
+ 6 files changed, 174 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-samsung/dev-keypad.c
+ create mode 100644 arch/arm/plat-samsung/include/plat/keypad.h
+ create mode 100644 arch/arm/plat-samsung/include/plat/regs-keypad.h
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 0761eac..692d01c 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -32,6 +32,11 @@ config S5PV210_SETUP_FB_24BPP
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 2753fb3..bd007e3 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -227,6 +227,11 @@ config SAMSUNG_DEV_TS
  	help
-           Common setup code for S5PV210 with an 24bpp RGB display helper.
+ 	    Common in platform device definitions for touchscreen device
  
-+config S5PV210_SETUP_KEYPAD
++config SAMSUNG_DEV_KEYPAD
 +	bool
 +	help
-+	  Common setup code for keypad.
++	  Compile in platform device definitions for keypad
 +
- config S5PV210_SETUP_SDHCI
-         bool
-         select S5PV210_SETUP_SDHCI_GPIO
-diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-index 30be9a6..aae592a 100644
---- a/arch/arm/mach-s5pv210/Makefile
-+++ b/arch/arm/mach-s5pv210/Makefile
-@@ -31,5 +31,6 @@ obj-$(CONFIG_S5PC110_DEV_ONENAND) += dev-onenand.o
- obj-$(CONFIG_S5PV210_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
- obj-$(CONFIG_S5PV210_SETUP_I2C1) 	+= setup-i2c1.o
- obj-$(CONFIG_S5PV210_SETUP_I2C2) 	+= setup-i2c2.o
-+obj-$(CONFIG_S5PV210_SETUP_KEYPAD)	+= setup-keypad.o
- obj-$(CONFIG_S5PV210_SETUP_SDHCI)       += setup-sdhci.o
- obj-$(CONFIG_S5PV210_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
-diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
-index 411a4a9..94c632b 100644
---- a/arch/arm/mach-s5pv210/cpu.c
-+++ b/arch/arm/mach-s5pv210/cpu.c
-@@ -33,6 +33,7 @@
- #include <plat/clock.h>
- #include <plat/s5pv210.h>
- #include <plat/iic-core.h>
-+#include <plat/keypad-core.h>
- #include <plat/sdhci.h>
+ # DMA
  
- /* Initial IO mappings */
-@@ -91,6 +92,9 @@ void __init s5pv210_map_io(void)
- 	s3c_i2c0_setname("s3c2440-i2c");
- 	s3c_i2c1_setname("s3c2440-i2c");
- 	s3c_i2c2_setname("s3c2440-i2c");
-+
-+	/* Use s5pv210-keypad instead of samsung-keypad */
-+	samsung_keypad_setname("s5pv210-keypad");
- }
+ config S3C_DMA
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index b1d82cc..8269d80 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -48,6 +48,7 @@ obj-$(CONFIG_S3C_DEV_RTC)	+= dev-rtc.o
  
- void __init s5pv210_init_clocks(int xtal)
-diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
-index 34eb168..e2f6e2a 100644
---- a/arch/arm/mach-s5pv210/include/mach/map.h
-+++ b/arch/arm/mach-s5pv210/include/mach/map.h
-@@ -32,6 +32,8 @@
- #define S5PV210_PA_SPI0		0xE1300000
- #define S5PV210_PA_SPI1		0xE1400000
+ obj-$(CONFIG_SAMSUNG_DEV_ADC)	+= dev-adc.o
+ obj-$(CONFIG_SAMSUNG_DEV_TS)	+= dev-ts.o
++obj-$(CONFIG_SAMSUNG_DEV_KEYPAD)	+= dev-keypad.o
  
-+#define S5PV210_PA_KEYPAD	(0xE1600000)
-+
- #define S5PV210_PA_IIC0		(0xE1800000)
- #define S5PV210_PA_IIC1		(0xFAB00000)
- #define S5PV210_PA_IIC2		(0xE1A00000)
-@@ -104,5 +106,6 @@
- #define S3C_PA_WDT		S5PV210_PA_WATCHDOG
+ # DMA support
  
- #define SAMSUNG_PA_ADC		S5PV210_PA_ADC
-+#define SAMSUNG_PA_KEYPAD	S5PV210_PA_KEYPAD
- 
- #endif /* __ASM_ARCH_MAP_H */
-diff --git a/arch/arm/mach-s5pv210/setup-keypad.c b/arch/arm/mach-s5pv210/setup-keypad.c
+diff --git a/arch/arm/plat-samsung/dev-keypad.c b/arch/arm/plat-samsung/dev-keypad.c
 new file mode 100644
-index 0000000..37b2790
+index 0000000..679b444
 --- /dev/null
-+++ b/arch/arm/mach-s5pv210/setup-keypad.c
-@@ -0,0 +1,34 @@
++++ b/arch/arm/plat-samsung/dev-keypad.c
+@@ -0,0 +1,58 @@
 +/*
-+ * linux/arch/arm/mach-s5pv210/setup-keypad.c
++ * linux/arch/arm/plat-samsung/dev-keypad.c
 + *
 + * Copyright (C) 2010 Samsung Electronics Co.Ltd
 + * Author: Joonyoung Shim <jy0922.shim@samsung.com>
@@ -110,40 +68,77 @@ index 0000000..37b2790
 + *
 + */
 +
-+#include <linux/gpio.h>
-+#include <plat/gpio-cfg.h>
++#include <linux/platform_device.h>
++#include <mach/irqs.h>
++#include <mach/map.h>
++#include <plat/cpu.h>
++#include <plat/devs.h>
++#include <plat/keypad.h>
 +
-+void samsung_keypad_cfg_gpio(unsigned int rows, unsigned int cols)
++static struct resource samsung_keypad_resources[] = {
++	[0] = {
++		.start	= SAMSUNG_PA_KEYPAD,
++		.end	= SAMSUNG_PA_KEYPAD + 0x20 - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= IRQ_KEYPAD,
++		.end	= IRQ_KEYPAD,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device samsung_device_keypad = {
++	.name		= "samsung-keypad",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(samsung_keypad_resources),
++	.resource	= samsung_keypad_resources,
++};
++
++void __init samsung_keypad_set_platdata(struct samsung_keypad_platdata *pd)
 +{
-+	unsigned int gpio, end;
++	struct samsung_keypad_platdata *npd;
 +
-+	/* Set all the necessary GPH3 pins to special-function 3: KP_ROW[x] */
-+	end = S5PV210_GPH3(rows);
-+	for (gpio = S5PV210_GPH3(0); gpio < end; gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++	if (!pd) {
++		printk(KERN_ERR "%s: no platform data\n", __func__);
++		return;
 +	}
 +
-+	/* Set all the necessary GPH2 pins to special-function 3: KP_COL[x] */
-+	end = S5PV210_GPH2(cols);
-+	for (gpio = S5PV210_GPH2(0); gpio < end; gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+	}
++	npd = kmemdup(pd, sizeof(struct samsung_keypad_platdata), GFP_KERNEL);
++	if (!npd)
++		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
++
++	if (!npd->cfg_gpio)
++		npd->cfg_gpio = samsung_keypad_cfg_gpio;
++
++	samsung_device_keypad.dev.platform_data = npd;
 +}
-diff --git a/arch/arm/plat-samsung/include/plat/keypad-core.h b/arch/arm/plat-samsung/include/plat/keypad-core.h
+diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
+index e6144e4..6d9f01b 100644
+--- a/arch/arm/plat-samsung/include/plat/devs.h
++++ b/arch/arm/plat-samsung/include/plat/devs.h
+@@ -100,6 +100,8 @@ extern struct platform_device s5pc100_device_iis0;
+ extern struct platform_device s5pc100_device_iis1;
+ extern struct platform_device s5pc100_device_iis2;
+ 
++extern struct platform_device samsung_device_keypad;
++
+ /* s3c2440 specific devices */
+ 
+ #ifdef CONFIG_CPU_S3C2440
+diff --git a/arch/arm/plat-samsung/include/plat/keypad.h b/arch/arm/plat-samsung/include/plat/keypad.h
 new file mode 100644
-index 0000000..d513e1b
+index 0000000..6d139d6
 --- /dev/null
-+++ b/arch/arm/plat-samsung/include/plat/keypad-core.h
-@@ -0,0 +1,31 @@
++++ b/arch/arm/plat-samsung/include/plat/keypad.h
+@@ -0,0 +1,59 @@
 +/*
-+ * linux/arch/arm/plat-samsung/include/plat/keypad-core.h
++ * linux/arch/arm/plat-samsung/include/plat/keypad.h
 + *
 + * Copyright (C) 2010 Samsung Electronics Co.Ltd
 + * Author: Joonyoung Shim <jy0922.shim@samsung.com>
 + *
-+ * Samsung keypad controller core function
++ * Samsung Platform - Keypad platform data definitions
 + *
 + *  This program is free software; you can redistribute  it and/or modify it
 + *  under  the terms of  the GNU General  Public License as published by the
@@ -152,21 +147,104 @@ index 0000000..d513e1b
 + *
 + */
 +
-+#ifndef __ASM_ARCH_KEYPAD_CORE_H
-+#define __ASM_ARCH_KEYPAD_CORE_H
++#ifndef __PLAT_SAMSUNG_KEYPAD_H
++#define __PLAT_SAMSUNG_KEYPAD_H
 +
-+/* These function are only for use with the core support code, such as
-+ * the cpu specific initialisation code
++#include <linux/input/matrix_keypad.h>
++
++#define SAMSUNG_MAX_ROWS	8
++#define SAMSUNG_MAX_COLS	8
++
++/**
++ * struct samsung_keypad_platdata - Platform device data for Samsung Keypad.
++ * @keymap_data: pointer to &matrix_keymap_data.
++ * @rows: number of keypad row supported.
++ * @cols: number of keypad col supported.
++ * @no_autorepeat: disable key autorepeat.
++ * @wakeup: controls whether the device should be set up as wakeup source.
++ * @cfg_gpio: configure the GPIO.
++ *
++ * Initialisation data specific to either the machine or the platform
++ * for the device driver to use or call-back when configuring gpio.
++ */
++struct samsung_keypad_platdata {
++	const struct matrix_keymap_data	*keymap_data;
++	unsigned int		rows;
++	unsigned int		cols;
++	bool			no_autorepeat;
++	bool			wakeup;
++
++	void	(*cfg_gpio)(unsigned int rows, unsigned int cols);
++};
++
++/**
++ * samsung_keypad_set_platdata - Set platform data for Samsung Keypad device.
++ * @pd: Platform data to register to device.
++ *
++ * Register the given platform data for use with Samsung Keypad device.
++ * The call will copy the platform data, so the board definitions can
++ * make the structure itself __initdata.
++ */
++extern void samsung_keypad_set_platdata(struct samsung_keypad_platdata *pd);
++
++/* defined by architecture to configure gpio. */
++extern void samsung_keypad_cfg_gpio(unsigned int rows, unsigned int cols);
++
++#endif /* __PLAT_SAMSUNG_KEYPAD_H */
+diff --git a/arch/arm/plat-samsung/include/plat/regs-keypad.h b/arch/arm/plat-samsung/include/plat/regs-keypad.h
+new file mode 100644
+index 0000000..e4688f0
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/plat/regs-keypad.h
+@@ -0,0 +1,49 @@
++/*
++ * linux/arch/arm/plat-samsung/include/plat/regs-keypad.h
++ *
++ * Copyright (C) 2010 Samsung Electronics Co.Ltd
++ * Author: Joonyoung Shim <jy0922.shim@samsung.com>
++ *
++ *  This program is free software; you can redistribute  it and/or modify it
++ *  under  the terms of  the GNU General  Public License as published by the
++ *  Free Software Foundation;  either version 2 of the  License, or (at your
++ *  option) any later version.
++ *
 + */
 +
-+/* re-define device name depending on support. */
-+static inline void samsung_keypad_setname(char *name)
-+{
-+#ifdef CONFIG_SAMSUNG_DEV_KEYPAD
-+	samsung_device_keypad.name = name;
-+#endif
-+}
++#ifndef __SAMSUNG_KEYPAD_H__
++#define __SAMSUNG_KEYPAD_H__
 +
-+#endif /* __ASM_ARCH_KEYPAD_CORE_H */
++#define SAMSUNG_KEYIFCON			0x00
++#define SAMSUNG_KEYIFSTSCLR			0x04
++#define SAMSUNG_KEYIFCOL			0x08
++#define SAMSUNG_KEYIFROW			0x0c
++#define SAMSUNG_KEYIFFC				0x10
++
++/* SAMSUNG_KEYIFCON */
++#define SAMSUNG_KEYIFCON_INT_F_EN		(1 << 0)
++#define SAMSUNG_KEYIFCON_INT_R_EN		(1 << 1)
++#define SAMSUNG_KEYIFCON_DF_EN			(1 << 2)
++#define SAMSUNG_KEYIFCON_FC_EN			(1 << 3)
++#define SAMSUNG_KEYIFCON_WAKEUPEN		(1 << 4)
++
++/* SAMSUNG_KEYIFSTSCLR */
++#define SAMSUNG_KEYIFSTSCLR_P_INT_MASK		(0xff << 0)
++#define SAMSUNG_KEYIFSTSCLR_R_INT_MASK		(0xff << 8)
++#define SAMSUNG_KEYIFSTSCLR_R_INT_OFFSET	8
++#define S5PV210_KEYIFSTSCLR_P_INT_MASK		(0x3fff << 0)
++#define S5PV210_KEYIFSTSCLR_R_INT_MASK		(0x3fff << 16)
++#define S5PV210_KEYIFSTSCLR_R_INT_OFFSET	16
++
++/* SAMSUNG_KEYIFCOL */
++#define SAMSUNG_KEYIFCOL_MASK			(0xff << 0)
++#define S5PV210_KEYIFCOLEN_MASK			(0xff << 8)
++
++/* SAMSUNG_KEYIFROW */
++#define SAMSUNG_KEYIFROW_MASK			(0xff << 0)
++#define S5PV210_KEYIFROW_MASK			(0x3fff << 0)
++
++/* SAMSUNG_KEYIFFC */
++#define SAMSUNG_KEYIFFC_MASK			(0x3ff << 0)
++
++#endif /* __SAMSUNG_KEYPAD_H__ */
 -- 
 1.7.0.4
