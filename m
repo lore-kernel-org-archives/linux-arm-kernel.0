@@ -1,37 +1,27 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 21 Jun 2010 23:22:51 +0800
-Subject: [PATCH 1/4] [ARM] Remove now unnecessary dma_needs_bounce()
-In-Reply-To: <4C1EFABC.4020601@compulab.co.il>
-References: <1275724538-5075-1-git-send-email-eric.y.miao@gmail.com>
-	<1275724538-5075-2-git-send-email-eric.y.miao@gmail.com>
-	<AANLkTilJ3UpyHEplDqS_nV8SVDcl_pRRn4glDn7JS1GW@mail.gmail.com>
-	<4C1EFABC.4020601@compulab.co.il>
-Message-ID: <AANLkTimugHXfVUcEmq_DwaSLwelvnS9QoDJcxJaphahJ@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus WALLEIJ)
+Date: Mon, 21 Jun 2010 17:36:29 +0200
+Subject: [PATCH 07/12] arm: remove duplicated #include
+In-Reply-To: <1274548354-2088-1-git-send-email-weiyi.huang@gmail.com>
+References: <1274548354-2088-1-git-send-email-weiyi.huang@gmail.com>
+Message-ID: <CEE6BB42CAD6E947908279175AF8470A025E8B03A7@EXDCVYMBSTM006.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/6/21 Mike Rapoport <mike@compulab.co.il>:
-> Eric
->
-> Eric Miao wrote:
->>
->> On Sat, Jun 5, 2010 at 3:55 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
->>>
->>> With a correct dev->dma_mask before calling dmabounce_register_dev(),
->>> dma_needs_bounce() is not necessary.
->>>
->>> The above is true for it8152.c and ixp4xx/common-pci.c.
->>>
->>> The sa1111, though, is a bit complicated. Until it's fully understood
->>> and fixed, dma_needs_bounce() for sa1111 is kept if CONFIG_SA1111 is
->>> enabled with no side effect (with the condition of machine_is_*)
->>>
->>
->> Sorry I forgot to CC you two. Any feedback is welcome, thanks.
->
-> Can I pull these changes from your git tree?
+[Huang]
+> From: Huang Weiyi [mailto:weiyi.huang at gmail.com]
+> Sent: den 22 maj 2010 19:13
+> To: Linus WALLEIJ
+> Cc: linux-arm-kernel at lists.infradead.org; Huang Weiyi
+> Subject: [PATCH 07/12] arm: remove duplicated #include
+> 
+> Remove duplicated #include('s) in
+>   arch/arm/plat-nomadik/include/plat/ste_dma40.h
+> 
+> Signed-off-by: Huang Weiyi <weiyi.huang@gmail.com>
 
-Sorry, just pushed them to the branch below:
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
-defconfig_cleanup
+But you have to send the patch to the DMAengine subsystem maintainer
+Dan Williams.
+
+Linus Walleij
