@@ -1,47 +1,44 @@
-From: eric.miao@canonical.com (Eric Miao)
-Date: Mon, 21 Jun 2010 09:06:33 +0800
-Subject: [PATCH 2/2] [ARM] pxa: make use of 'struct machine_class'
-In-Reply-To: <20100620180817.2de11de2.ospite@studenti.unina.it>
-References: <1277042450-30382-1-git-send-email-eric.miao@canonical.com>
-	<1277042450-30382-2-git-send-email-eric.miao@canonical.com>
-	<20100620180817.2de11de2.ospite@studenti.unina.it>
-Message-ID: <AANLkTiklVdwCrys88T-Qy6pvFQ1Y-V7oM6IHjyznyhGX@mail.gmail.com>
+From: david-b@pacbell.net (David Brownell)
+Date: Sun, 20 Jun 2010 19:40:46 -0700 (PDT)
+Subject: gpiolib and sleeping gpios
+In-Reply-To: <4C1E88AE.5070808@bluewatersys.com>
+Message-ID: <887171.45295.qm@web180307.mail.gq1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 21, 2010 at 12:08 AM, Antonio Ospite
-<ospite@studenti.unina.it> wrote:
-> On Sun, 20 Jun 2010 22:00:50 +0800
-> Eric Miao <eric.miao@canonical.com> wrote:
->
->> From: Eric Miao <eric.y.miao@gmail.com>
->>
->> Signed-off-by: Eric Miao <eric.miao@canonical.com>
->> ---
->> ?arch/arm/mach-pxa/ezx.c ? ? ?| ? 60 ++++-------------------------------------
->
-> The ezx part looks OK. A comment about magician below.
->
-> [...]
->> diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
->> index e81dd0c..6a86f22 100644
->> --- a/arch/arm/mach-pxa/magician.c
->> +++ b/arch/arm/mach-pxa/magician.c
->> @@ -764,11 +764,6 @@ static void __init magician_init(void)
->>
->>
->> ?MACHINE_START(MAGICIAN, "HTC Magician")
->> - ? ? .phys_io = 0x40000000,
->> - ? ? .io_pg_offst = (io_p2v(0x40000000) >> 18) & 0xfffc,
->> - ? ? .boot_params = 0xa0000100,
->> - ? ? .map_io = pxa_map_io,
->> - ? ? .init_irq = pxa27x_init_irq,
->> - ? ? .init_machine = magician_init,
->> - ? ? .timer = &pxa_timer,
->> + ? ? .class ? ? ? ? ?= &machine_class_pxa27x,
->> + ? ? .init_machine ? = magician_init,
->> ?MACHINE_END
->
-> Magician can use PXA27X_MACHINE() as well, can't it?
 
-Yes, it can. Missed that :-)
+
+--- On Sun, 6/20/10, Ryan Mallon <ryan@bluewatersys.com> wrote:
+
+
+> >> The point I was trying to make is that
+> >> there are lots of drivers which
+> >> will not work with gpios on sleeping io expandersbecause they call the
+> >> spinlock safe gpio calls.
+
+"Lots"?  You mean there are lots of
+maintainers who aren't even bothering to
+provide trivial fixes for bug which are
+clearly reported to them by warnings?
+These one-liner fixes are not hard...
+
+Such problems are people-problems, not issues
+with any framework. 
+> > 
+> > And they will trigger runtime warnings, and
+> > thus eventually get fixed.
+> \
+> ? }
+> 
+> ? err = gpio_request(some_gpio, "some_gpio",
+>           GPIOF_NO_SLEEP);
+
+
+NAK ... keep it simple.  Such flags are
+clearly not necessary...
+
+I understand that some folk are bothered
+by concepts/frameworks that seem "too simple"
+and thus want to complexify them.  In this
+case I am in a position to help avoid that.
+Complexity is not a virtue.
