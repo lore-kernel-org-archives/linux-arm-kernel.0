@@ -1,31 +1,14 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 21 Jun 2010 20:41:02 +0300
-Subject: [PATCH V2] GPIO PL061: Adding Clk framework support
-In-Reply-To: <1277103463-7311-1-git-send-email-viresh.kumar@st.com>
-References: <1277103463-7311-1-git-send-email-viresh.kumar@st.com>
-Message-ID: <20100621174101.GB11851@tarshish>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Jun 2010 19:22:19 +0100
+Subject: [PATCH 2/3] [ARM] pxa: remove useless NODE_MEM_SIZE_BITS
+In-Reply-To: <1277130154-25912-2-git-send-email-eric.y.miao@gmail.com>
+References: <1277130154-25912-1-git-send-email-eric.y.miao@gmail.com>
+	<1277130154-25912-2-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <20100621182219.GB13624@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+On Mon, Jun 21, 2010 at 10:22:33PM +0800, Eric Miao wrote:
+> As DISCONTIGMEM is not enabled on PXA, remove this useless bit.
 
-On Mon, Jun 21, 2010 at 12:27:43PM +0530, Viresh KUMAR wrote:
-> From: Viresh KUMAR <viresh.kumar@st.com>
-> 
-> GPIO Clk is never enabled on Platforms, like: SPEAr, which are based upon clock
-> framework and use PL061 driver. This patch adds support for Clk enabling and
-> disabling as and when gpios are requested and freed.
-> 
-> Modifications since V1:
->  - Removed usage_count, as already done by clk framework.
->  - Checking error case of clk_enable.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-
-Acked-by: Baruch Siach <baruch@tkos.co.il>
-
-
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+You need to look at my LMB or devel branch.  This is gone already there.
