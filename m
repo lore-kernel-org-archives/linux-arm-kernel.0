@@ -1,14 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Jun 2010 19:22:19 +0100
-Subject: [PATCH 2/3] [ARM] pxa: remove useless NODE_MEM_SIZE_BITS
-In-Reply-To: <1277130154-25912-2-git-send-email-eric.y.miao@gmail.com>
-References: <1277130154-25912-1-git-send-email-eric.y.miao@gmail.com>
-	<1277130154-25912-2-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <20100621182219.GB13624@n2100.arm.linux.org.uk>
+From: fabioestevam@yahoo.com (Fabio Estevam)
+Date: Mon, 21 Jun 2010 13:33:05 -0700 (PDT)
+Subject: [PATCH] mx31_3ds: Handle USB OTG GPIO Errors
+Message-ID: <261388.38765.qm@web51008.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 21, 2010 at 10:22:33PM +0800, Eric Miao wrote:
-> As DISCONTIGMEM is not enabled on PXA, remove this useless bit.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx3/mach-mx31_3ds.c |   23 ++++++++++++++++++++---
+ 1 files changed, 20 insertions(+), 3 deletions(-)
 
-You need to look at my LMB or devel branch.  This is gone already there.
+diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
+index 58e5729..974748b 100644
+--- a/arch/arm/mach-mx3/mach-mx31_3ds.c
++++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
+@@ -182,8 +182,10 @@ static struct mxc_nand_platform_data imx31_3ds_nand_flash_pdata = {
+ 
+ #define USBOTG_RST_B IOMUX_TO_GPIO(MX31_PIN_USB_PWR)
+ 
+-static void mx31_3ds_usbotg_init(void)
++static int mx31_3ds_usbotg_init(void)
+ {
++	int err;
++	
+ 	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA0, USB_PAD_CFG);
+ 	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA1, USB_PAD_CFG);
+ 	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA2, USB_PAD_CFG);
+@@ -197,10 +199,25 @@ static void mx31_3ds_usbotg_init(void)
+ 	mxc_iomux_set_pad(MX31_PIN_USBOTG_NXT, USB_PAD_CFG);
+ 	mxc_iomux_set_pad(MX31_PIN_USBOTG_STP, USB_PAD_CFG);
+ 
+-	gpio_request(USBOTG_RST_B, "otgusb-reset");
+-	gpio_direction_output(USBOTG_RST_B, 0);
++	err = gpio_request(USBOTG_RST_B, "otgusb-reset");
++	if (err) {
++		pr_err("Failed to request the USB OTG reset gpio\n");
++		return err;
++	}
++
++	err = gpio_direction_output(USBOTG_RST_B, 0);
++	if (err) {
++		pr_err("Failed to drive the USB OTG reset gpio\n");
++		goto usbotg_free_reset;
++	}
++
+ 	mdelay(1);
+ 	gpio_set_value(USBOTG_RST_B, 1);
++	return 0;
++
++usbotg_free_reset:
++	gpio_free(USBOTG_RST_B);
++	return err;
+ }
+ 
+ static struct fsl_usb2_platform_data usbotg_pdata = {
+-- 
+1.6.0.4
+
+
+
+
+      
