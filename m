@@ -1,19 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Jun 2010 10:35:30 +0100
-Subject: [PATCH v3 1/7] ARM: Align machine_desc.phys_io to a 1MB section
-In-Reply-To: <20100621091331.22752.73990.stgit@e102109-lin.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 21 Jun 2010 10:37:12 +0100
+Subject: [PATCH v3 7/7] ARM: Do not compile the Thumb-2
+	modulerelocations on an ARM kernel
+In-Reply-To: <20100621092611.GD7702@n2100.arm.linux.org.uk>
 References: <20100621090801.22752.21039.stgit@e102109-lin.cambridge.arm.com>
-	<20100621091331.22752.73990.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100621093530.GE7702@n2100.arm.linux.org.uk>
+	<20100621091404.22752.10456.stgit@e102109-lin.cambridge.arm.com>
+	<20100621092611.GD7702@n2100.arm.linux.org.uk>
+Message-ID: <1277113032.20758.6.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 21, 2010 at 10:13:31AM +0100, Catalin Marinas wrote:
-> Platforms like RealView don't pass a section-aligned pointer via the
-> machine_desc structure. This patch aligns the pointer in the
-> __create_page_tables function. Reported by Tony Thompson.
+On Mon, 2010-06-21 at 10:26 +0100, Russell King - ARM Linux wrote:
+> On Mon, Jun 21, 2010 at 10:14:04AM +0100, Catalin Marinas wrote:
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> Commit message?  What is the reasoning behind this change?
+> 
+> It'd be useful for those who don't know anything about T2 to have
+> some such information about this change.
 
-I still say this is the wrong way.  As I've said before, please fix it
-at the machine_desc initialization point.  If you want, pass it as the
-section frame number itself (address >> 20) rather than the address to
-allow for more addressing space.
+It looks like I forgot to write a description. The reason is just to
+avoid extra code to be compiled in when you don't really need to handle
+such relocations (i.e. ARM-only kernel). Do you think it's not worth?
+
+-- 
+Catalin
