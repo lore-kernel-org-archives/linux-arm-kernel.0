@@ -1,30 +1,47 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 21 Jun 2010 01:17:09 +0200
-Subject: [PATCH] ux500: use neutral PRCMU base
-Message-ID: <1277075829-1051-1-git-send-email-linus.walleij@stericsson.com>
+From: eric.miao@canonical.com (Eric Miao)
+Date: Mon, 21 Jun 2010 09:06:33 +0800
+Subject: [PATCH 2/2] [ARM] pxa: make use of 'struct machine_class'
+In-Reply-To: <20100620180817.2de11de2.ospite@studenti.unina.it>
+References: <1277042450-30382-1-git-send-email-eric.miao@canonical.com>
+	<1277042450-30382-2-git-send-email-eric.miao@canonical.com>
+	<20100620180817.2de11de2.ospite@studenti.unina.it>
+Message-ID: <AANLkTiklVdwCrys88T-Qy6pvFQ1Y-V7oM6IHjyznyhGX@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MTU wallclock timing fix-up patch was hardwired to the DB8500
-causing a regression. This makes it work on the DB5500 as well.
+On Mon, Jun 21, 2010 at 12:08 AM, Antonio Ospite
+<ospite@studenti.unina.it> wrote:
+> On Sun, 20 Jun 2010 22:00:50 +0800
+> Eric Miao <eric.miao@canonical.com> wrote:
+>
+>> From: Eric Miao <eric.y.miao@gmail.com>
+>>
+>> Signed-off-by: Eric Miao <eric.miao@canonical.com>
+>> ---
+>> ?arch/arm/mach-pxa/ezx.c ? ? ?| ? 60 ++++-------------------------------------
+>
+> The ezx part looks OK. A comment about magician below.
+>
+> [...]
+>> diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
+>> index e81dd0c..6a86f22 100644
+>> --- a/arch/arm/mach-pxa/magician.c
+>> +++ b/arch/arm/mach-pxa/magician.c
+>> @@ -764,11 +764,6 @@ static void __init magician_init(void)
+>>
+>>
+>> ?MACHINE_START(MAGICIAN, "HTC Magician")
+>> - ? ? .phys_io = 0x40000000,
+>> - ? ? .io_pg_offst = (io_p2v(0x40000000) >> 18) & 0xfffc,
+>> - ? ? .boot_params = 0xa0000100,
+>> - ? ? .map_io = pxa_map_io,
+>> - ? ? .init_irq = pxa27x_init_irq,
+>> - ? ? .init_machine = magician_init,
+>> - ? ? .timer = &pxa_timer,
+>> + ? ? .class ? ? ? ? ?= &machine_class_pxa27x,
+>> + ? ? .init_machine ? = magician_init,
+>> ?MACHINE_END
+>
+> Magician can use PXA27X_MACHINE() as well, can't it?
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- arch/arm/mach-ux500/clock.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-ux500/clock.c b/arch/arm/mach-ux500/clock.c
-index fe84b90..0a1318f 100644
---- a/arch/arm/mach-ux500/clock.c
-+++ b/arch/arm/mach-ux500/clock.c
-@@ -131,7 +131,7 @@ EXPORT_SYMBOL(clk_disable);
-  */
- static unsigned long clk_mtu_get_rate(struct clk *clk)
- {
--	void __iomem *addr = __io_address(U8500_PRCMU_BASE)
-+	void __iomem *addr = __io_address(UX500_PRCMU_BASE)
- 		+ PRCM_TCR;
- 	u32 tcr = readl(addr);
- 	int mtu = (int) clk->data;
--- 
-1.6.3.3
+Yes, it can. Missed that :-)
