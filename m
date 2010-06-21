@@ -1,26 +1,30 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 21 Jun 2010 15:07:13 -0700
-Subject: [RFC PATCH] smp: parallel smp boot option
-In-Reply-To: <20100621220030.GC13624@n2100.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Jun 2010 23:07:17 +0100
+Subject: [RFC PATCH] msm: initial MSM8X60 early kernel boot support
+In-Reply-To: <1277157793-9712-1-git-send-email-dwalker@codeaurora.org>
 References: <1277156422-9130-1-git-send-email-dwalker@codeaurora.org>
-	<20100621220030.GC13624@n2100.arm.linux.org.uk>
-Message-ID: <1277158033.17092.58.camel@c-dwalke-linux.qualcomm.com>
+	<1277157793-9712-1-git-send-email-dwalker@codeaurora.org>
+Message-ID: <20100621220716.GD13624@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-06-21 at 23:00 +0100, Russell King - ARM Linux wrote:
-> On Mon, Jun 21, 2010 at 02:40:22PM -0700, Daniel Walker wrote:
-> > +#ifdef CONFIG_SMP_PARALLEL_START
-> > +	bl	__smp_secondary_spin
-> > +#endif
-> 
-> This seems to be half a patch - this doesn't exist.
+On Mon, Jun 21, 2010 at 03:03:13PM -0700, Daniel Walker wrote:
+> +int boot_secondary(unsigned int cpu, struct task_struct *idle)
+> +{
+> +	int cnt = 0;
+> +	printk(KERN_DEBUG "Starting secondary CPU %d\n", cpu);
+> +
+> +	/* Tell other CPUs to come out or reset.  Note that secondary CPUs
+> +	 * are probably running with caches off, so we'll need to clean to
+> +	 * memory. Normal cache ops will only clean to L2.
+> +	 */
+> +	pen_release = cpu;
+> +	dmac_clean_range((void *)&pen_release,
+> +			 (void *)(&pen_release + sizeof(pen_release)));
 
-Yeah, I missed part of it. It was spread across two commits.. Also it's
-against 2.6.32 , so it may be partly out of date.
+dmac_clean_range() and dmac_inv_range() no longer exist.
 
-Daniel
+> +	dmac_clean_range((void *)&secondary_data,
+> +			 (void *)(&secondary_data + sizeof(secondary_data)));
 
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+We've already fixed this.
