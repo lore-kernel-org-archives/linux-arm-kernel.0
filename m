@@ -1,99 +1,120 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Mon, 21 Jun 2010 08:38:04 +0300
-Subject: [PATCH 1/4] [ARM] Remove now unnecessary dma_needs_bounce()
-In-Reply-To: <AANLkTilJ3UpyHEplDqS_nV8SVDcl_pRRn4glDn7JS1GW@mail.gmail.com>
-References: <1275724538-5075-1-git-send-email-eric.y.miao@gmail.com>
-	<1275724538-5075-2-git-send-email-eric.y.miao@gmail.com>
-	<AANLkTilJ3UpyHEplDqS_nV8SVDcl_pRRn4glDn7JS1GW@mail.gmail.com>
-Message-ID: <4C1EFABC.4020601@compulab.co.il>
+From: viresh.kumar@st.com (Viresh KUMAR)
+Date: Mon, 21 Jun 2010 11:09:13 +0530
+Subject: [PATCH] GPIO PL061: Adding Clk framework support
+Message-ID: <1277098753-5780-1-git-send-email-viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric
+From: Viresh KUMAR <viresh.kumar@st.com>
 
-Eric Miao wrote:
-> On Sat, Jun 5, 2010 at 3:55 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
->> With a correct dev->dma_mask before calling dmabounce_register_dev(),
->> dma_needs_bounce() is not necessary.
->>
->> The above is true for it8152.c and ixp4xx/common-pci.c.
->>
->> The sa1111, though, is a bit complicated. Until it's fully understood
->> and fixed, dma_needs_bounce() for sa1111 is kept if CONFIG_SA1111 is
->> enabled with no side effect (with the condition of machine_is_*)
->>
-> 
-> Sorry I forgot to CC you two. Any feedback is welcome, thanks.
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ drivers/gpio/pl061.c |   44 +++++++++++++++++++++++++++++++++++++++++---
+ 1 files changed, 41 insertions(+), 3 deletions(-)
 
-Can I pull these changes from your git tree?
-
->> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
->> ---
->>  arch/arm/common/it8152.c           |    8 --------
->>  arch/arm/include/asm/dma-mapping.h |    7 +++++++
->>  arch/arm/mach-ixp4xx/common-pci.c  |    5 -----
->>  3 files changed, 7 insertions(+), 13 deletions(-)
->>
->> diff --git a/arch/arm/common/it8152.c b/arch/arm/common/it8152.c
->> index 7974baa..6c09135 100644
->> --- a/arch/arm/common/it8152.c
->> +++ b/arch/arm/common/it8152.c
->> @@ -263,14 +263,6 @@ static int it8152_pci_platform_notify_remove(struct device *dev)
->>        return 0;
->>  }
->>
->> -int dma_needs_bounce(struct device *dev, dma_addr_t dma_addr, size_t size)
->> -{
->> -       dev_dbg(dev, "%s: dma_addr %08x, size %08x\n",
->> -               __func__, dma_addr, size);
->> -       return (dev->bus == &pci_bus_type) &&
->> -               ((dma_addr + size - PHYS_OFFSET) >= SZ_64M);
->> -}
->> -
->>  int __init it8152_pci_setup(int nr, struct pci_sys_data *sys)
->>  {
->>        it8152_io.start = IT8152_IO_BASE + 0x12000;
->> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
->> index 69ce072..c80d4d2 100644
->> --- a/arch/arm/include/asm/dma-mapping.h
->> +++ b/arch/arm/include/asm/dma-mapping.h
->> @@ -298,7 +298,14 @@ extern void dmabounce_unregister_dev(struct device *);
->>  * DMA access and 1 if the buffer needs to be bounced.
->>  *
->>  */
->> +#ifdef CONFIG_SA1111
->>  extern int dma_needs_bounce(struct device*, dma_addr_t, size_t);
->> +#else
->> +static inline int dma_needs_bounce(struct device*, dma_addr_t, size_t)
->> +{
->> +       return 0;
->> +}
->> +#endif
->>
->>  /*
->>  * The DMA API, implemented by dmabounce.c.  See below for descriptions.
->> diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
->> index e318153..c7aa0ac 100644
->> --- a/arch/arm/mach-ixp4xx/common-pci.c
->> +++ b/arch/arm/mach-ixp4xx/common-pci.c
->> @@ -337,11 +337,6 @@ static int ixp4xx_pci_platform_notify_remove(struct device *dev)
->>        return 0;
->>  }
->>
->> -int dma_needs_bounce(struct device *dev, dma_addr_t dma_addr, size_t size)
->> -{
->> -       return (dev->bus == &pci_bus_type ) && ((dma_addr + size) >= SZ_64M);
->> -}
->> -
->>  /*
->>  * Only first 64MB of memory can be accessed via PCI.
->>  * We use GFP_DMA to allocate safe buffers to do map/unmap.
->> --
->> 1.7.0.4
->>
->>
-
-
+diff --git a/drivers/gpio/pl061.c b/drivers/gpio/pl061.c
+index 105701a..5848237 100644
+--- a/drivers/gpio/pl061.c
++++ b/drivers/gpio/pl061.c
+@@ -11,7 +11,10 @@
+  *
+  * Data sheet: ARM DDI 0190B, September 2000
+  */
++
++#include <linux/clk.h>
+ #include <linux/spinlock.h>
++#include <linux/err.h>
+ #include <linux/errno.h>
+ #include <linux/module.h>
+ #include <linux/list.h>
+@@ -56,8 +59,33 @@ struct pl061_gpio {
+ 	void __iomem		*base;
+ 	unsigned		irq_base;
+ 	struct gpio_chip	gc;
++	unsigned		usage_count;
++	struct clk		*clk;
+ };
+ 
++static int pl061_request(struct gpio_chip *gc, unsigned offset)
++{
++	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
++
++	if (offset >= gc->ngpio)
++		return -EINVAL;
++
++	if (!chip->usage_count)
++		clk_enable(chip->clk);
++
++	chip->usage_count++;
++	return 0;
++}
++
++static void pl061_free(struct gpio_chip *gc, unsigned offset)
++{
++	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
++
++	chip->usage_count--;
++	if (!chip->usage_count)
++		clk_disable(chip->clk);
++}
++
+ static int pl061_direction_input(struct gpio_chip *gc, unsigned offset)
+ {
+ 	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
+@@ -260,10 +288,18 @@ static int __init pl061_probe(struct amba_device *dev, struct amba_id *id)
+ 		goto release_region;
+ 	}
+ 
++	chip->clk = clk_get(&dev->dev, NULL);
++	if (IS_ERR(chip->clk)) {
++		ret = PTR_ERR(chip->clk);
++		goto iounmap;
++	}
++
+ 	spin_lock_init(&chip->lock);
+ 	spin_lock_init(&chip->irq_lock);
+ 	INIT_LIST_HEAD(&chip->list);
+ 
++	chip->gc.request = pl061_request;
++	chip->gc.free = pl061_free;
+ 	chip->gc.direction_input = pl061_direction_input;
+ 	chip->gc.direction_output = pl061_direction_output;
+ 	chip->gc.get = pl061_get_value;
+@@ -279,7 +315,7 @@ static int __init pl061_probe(struct amba_device *dev, struct amba_id *id)
+ 
+ 	ret = gpiochip_add(&chip->gc);
+ 	if (ret)
+-		goto iounmap;
++		goto free_clk;
+ 
+ 	/*
+ 	 * irq_chip support
+@@ -292,7 +328,7 @@ static int __init pl061_probe(struct amba_device *dev, struct amba_id *id)
+ 	irq = dev->irq[0];
+ 	if (irq < 0) {
+ 		ret = -ENODEV;
+-		goto iounmap;
++		goto free_clk;
+ 	}
+ 	set_irq_chained_handler(irq, pl061_irq_handler);
+ 	if (!test_and_set_bit(irq, init_irq)) { /* list initialized? */
+@@ -300,7 +336,7 @@ static int __init pl061_probe(struct amba_device *dev, struct amba_id *id)
+ 		if (chip_list == NULL) {
+ 			clear_bit(irq, init_irq);
+ 			ret = -ENOMEM;
+-			goto iounmap;
++			goto free_clk;
+ 		}
+ 		INIT_LIST_HEAD(chip_list);
+ 		set_irq_data(irq, chip_list);
+@@ -323,6 +359,8 @@ static int __init pl061_probe(struct amba_device *dev, struct amba_id *id)
+ 
+ 	return 0;
+ 
++free_clk:
++	clk_put(chip->clk);
+ iounmap:
+ 	iounmap(chip->base);
+ release_region:
 -- 
-Sincerely yours,
-Mike.
+1.6.0.2
