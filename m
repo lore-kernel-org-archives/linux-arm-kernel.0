@@ -1,34 +1,56 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 21 Jun 2010 12:14:28 +0530
-Subject: [PATCH resend] GPIO PL061: Adding Clk framework support
-In-Reply-To: <20100621063848.GA7582@n2100.arm.linux.org.uk>
-References: <1277101943-6887-1-git-send-email-viresh.kumar@st.com>
-	<20100621063848.GA7582@n2100.arm.linux.org.uk>
-Message-ID: <4C1F0A4C.2070201@st.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 21 Jun 2010 08:51:58 +0200
+Subject: [PATCH 2/2] mach-cpuimx27: fix USB_ULPI build warnings
+In-Reply-To: <1276870795-21594-2-git-send-email-eric@eukrea.com>
+References: <1276870795-21594-1-git-send-email-eric@eukrea.com>
+	<1276870795-21594-2-git-send-email-eric@eukrea.com>
+Message-ID: <20100621065158.GD12115@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/21/2010 12:08 PM, Russell King - ARM Linux wrote:
-> On Mon, Jun 21, 2010 at 12:02:23PM +0530, Viresh KUMAR wrote:
->> @@ -56,8 +59,33 @@ struct pl061_gpio {
->>  	void __iomem		*base;
->>  	unsigned		irq_base;
->>  	struct gpio_chip	gc;
->> +	unsigned		usage_count;
->> +	struct clk		*clk;
->>  };
->>  
->> +static int pl061_request(struct gpio_chip *gc, unsigned offset)
->> +{
->> +	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
->> +
->> +	if (offset >= gc->ngpio)
->> +		return -EINVAL;
->> +
->> +	if (!chip->usage_count)
->> +		clk_enable(chip->clk);
+
+On Fri, Jun 18, 2010 at 04:19:55PM +0200, Eric B?nard wrote:
+> when CONFIG_USB_ULPI is not defined we actually get :
+> warning: 'otg_pdata' defined but not used
+> warning: 'usbh2_pdata' defined but not used
+
+Ok, applied.
+
 > 
-> Clocks are already use-counted.
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: s.hauer at pengutronix.de
+> ---
+>  arch/arm/mach-mx2/mach-cpuimx27.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx2/mach-cpuimx27.c b/arch/arm/mach-mx2/mach-cpuimx27.c
+> index dc2dca3..5529178 100644
+> --- a/arch/arm/mach-mx2/mach-cpuimx27.c
+> +++ b/arch/arm/mach-mx2/mach-cpuimx27.c
+> @@ -219,6 +219,7 @@ static struct platform_device serial_device = {
+>  };
+>  #endif
+>  
+> +#if defined(CONFIG_USB_ULPI)
+>  static struct mxc_usbh_platform_data otg_pdata = {
+>  	.portsc	= MXC_EHCI_MODE_ULPI,
+>  	.flags	= MXC_EHCI_INTERFACE_DIFF_UNI,
+> @@ -228,6 +229,7 @@ static struct mxc_usbh_platform_data usbh2_pdata = {
+>  	.portsc	= MXC_EHCI_MODE_ULPI,
+>  	.flags	= MXC_EHCI_INTERFACE_DIFF_UNI,
+>  };
+> +#endif
+>  
+>  static struct fsl_usb2_platform_data otg_device_pdata = {
+>  	.operating_mode = FSL_USB2_DR_DEVICE,
+> -- 
+> 1.6.3.3
+> 
 > 
 
-Yes. This is not required. Can simple call clk_enable and clk_disable.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
