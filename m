@@ -1,38 +1,37 @@
-From: phorton@bitbox.co.uk (Peter Horton)
-Date: Mon, 21 Jun 2010 16:14:22 +0100
-Subject: [PATCH] Fix AT91SAM9G20 reset
-In-Reply-To: <loom.20100621T162410-494@post.gmane.org>
-References: <20100528153725.GA5102@axolotl.localnet>
-	<loom.20100621T162410-494@post.gmane.org>
-Message-ID: <4C1F81CE.6000905@bitbox.co.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 21 Jun 2010 23:22:51 +0800
+Subject: [PATCH 1/4] [ARM] Remove now unnecessary dma_needs_bounce()
+In-Reply-To: <4C1EFABC.4020601@compulab.co.il>
+References: <1275724538-5075-1-git-send-email-eric.y.miao@gmail.com>
+	<1275724538-5075-2-git-send-email-eric.y.miao@gmail.com>
+	<AANLkTilJ3UpyHEplDqS_nV8SVDcl_pRRn4glDn7JS1GW@mail.gmail.com>
+	<4C1EFABC.4020601@compulab.co.il>
+Message-ID: <AANLkTimugHXfVUcEmq_DwaSLwelvnS9QoDJcxJaphahJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/06/2010 15:30, Lucas wrote:
-> Peter Horton<phorton<at>  bitbox.co.uk>  writes:
+2010/6/21 Mike Rapoport <mike@compulab.co.il>:
+> Eric
 >
+> Eric Miao wrote:
 >>
->> Fix AT91SAM9G20 as per the errata in the datasheet.
+>> On Sat, Jun 5, 2010 at 3:55 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>>>
+>>> With a correct dev->dma_mask before calling dmabounce_register_dev(),
+>>> dma_needs_bounce() is not necessary.
+>>>
+>>> The above is true for it8152.c and ixp4xx/common-pci.c.
+>>>
+>>> The sa1111, though, is a bit complicated. Until it's fully understood
+>>> and fixed, dma_needs_bounce() for sa1111 is kept if CONFIG_SA1111 is
+>>> enabled with no side effect (with the condition of machine_is_*)
+>>>
 >>
->> If the SDRAM is not cleanly shutdown before reset it can be left driving
->> the bus, which then stops the bootloader booting from NAND.
->>
->> Signed-off-by: Peter Horton<phorton<at>  bitbox.co.uk>
->> --
->>
+>> Sorry I forgot to CC you two. Any feedback is welcome, thanks.
 >
->
-> Hi Peter,
->
-> Any Idea how to implement this for the WDT and hardware reset(NRST)?
-> A hardware reset sometimes still stops the bootloader booting from NAND.
->
+> Can I pull these changes from your git tree?
 
-Not possible to fix as far as I understand it. We've had to put down a 
-small DataFlash which then boots from NAND.
+Sorry, just pushed them to the branch below:
 
-Turns out we needed DataFlash anyway as the Atmel boot ROM is not 
-compatible with newer NANDs (newer NANDs no longer guarantee block 0 
-without ECC and the Atmel boot ROM doesn't support ECC).
-
-P.
+  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
+defconfig_cleanup
