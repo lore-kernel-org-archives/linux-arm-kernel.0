@@ -1,29 +1,25 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 21 Jun 2010 15:22:29 -0700
-Subject: [RFC PATCH] smp: parallel smp boot option
-In-Reply-To: <20100621220030.GC13624@n2100.arm.linux.org.uk>
-References: <1277156422-9130-1-git-send-email-dwalker@codeaurora.org>
-	<20100621220030.GC13624@n2100.arm.linux.org.uk>
-Message-ID: <1277158949.17092.61.camel@c-dwalke-linux.qualcomm.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Tue, 22 Jun 2010 00:26:59 +0200
+Subject: [PATCH] h1940: implement mmc_power function
+In-Reply-To: <201006211721.48347.anarsoul@gmail.com> (Vasily Khoruzhick's
+	message of "Mon\, 21 Jun 2010 17\:21\:32 +0300")
+References: <1276346763-29309-1-git-send-email-anarsoul@gmail.com>
+	<201006211721.48347.anarsoul@gmail.com>
+Message-ID: <87iq5crpho.fsf@lechat.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-06-21 at 23:00 +0100, Russell King - ARM Linux wrote:
-> On Mon, Jun 21, 2010 at 02:40:22PM -0700, Daniel Walker wrote:
-> > +#ifdef CONFIG_SMP_PARALLEL_START
-> > +	bl	__smp_secondary_spin
-> > +#endif
-> 
+Vasily Khoruzhick <anarsoul@gmail.com> writes:
 
-Your OK with this hook? I was thinking it might be better to check if
-it's the book cpu or the secondary here instead of in
-arch/arm/mach-msm .
+> ? ????????? ?? 12 ???? 2010 15:46:03 ????? Vasily Khoruzhick ???????:
+>> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+>> ---
+>>  arch/arm/mach-s3c2410/include/mach/h1940-latch.h |    7 +++----
+>>  arch/arm/mach-s3c2410/mach-h1940.c               |   17 ++++++++++++++++-
+>>  2 files changed, 19 insertions(+), 5 deletions(-)
+>
+> Ping :)
 
-Steve, do you have any thoughts on that?
+Fine for me.
 
-Daniel
-
-
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Acked-by: Arnaud Patard <arnaud.patard@rtp-net.org>
