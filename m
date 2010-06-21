@@ -1,63 +1,47 @@
-From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Mon, 21 Jun 2010 13:33:05 -0700 (PDT)
-Subject: [PATCH] mx31_3ds: Handle USB OTG GPIO Errors
-Message-ID: <261388.38765.qm@web51008.mail.re2.yahoo.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Tue, 22 Jun 2010 08:43:06 +1200
+Subject: [PATCH 2/2] clk: Generic support for fixed-rate clocks
+In-Reply-To: <1277098513.947920.264679354891.2.gpush@pororo>
+References: <1277098513.947920.264679354891.2.gpush@pororo>
+Message-ID: <4C1FCEDA.3000303@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-mx3/mach-mx31_3ds.c |   23 ++++++++++++++++++++---
- 1 files changed, 20 insertions(+), 3 deletions(-)
+On 06/21/2010 05:35 PM, Jeremy Kerr wrote:
+> Since most platforms will need a fixed-rate clock, add one. This will
+> also serve as a basic example of an implementation of struct clk.
+> 
+> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> 
+> ---
+>  include/linux/clk.h |   13 +++++++++++++
+>  kernel/clk.c        |   14 ++++++++++++++
+>  2 files changed, 27 insertions(+)
+> 
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index 5c1098b..1dce473 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -79,6 +79,19 @@ struct clk_ops {
+>   */
+>  int __clk_get(struct clk *clk);
+>  
+> +/* Simple fixed-rate clock */
+> +struct clk_fixed {
+> +	struct clk	clk;
+> +	unsigned long	rate;
+> +};
 
-diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
-index 58e5729..974748b 100644
---- a/arch/arm/mach-mx3/mach-mx31_3ds.c
-+++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
-@@ -182,8 +182,10 @@ static struct mxc_nand_platform_data imx31_3ds_nand_flash_pdata = {
- 
- #define USBOTG_RST_B IOMUX_TO_GPIO(MX31_PIN_USB_PWR)
- 
--static void mx31_3ds_usbotg_init(void)
-+static int mx31_3ds_usbotg_init(void)
- {
-+	int err;
-+	
- 	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA0, USB_PAD_CFG);
- 	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA1, USB_PAD_CFG);
- 	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA2, USB_PAD_CFG);
-@@ -197,10 +199,25 @@ static void mx31_3ds_usbotg_init(void)
- 	mxc_iomux_set_pad(MX31_PIN_USBOTG_NXT, USB_PAD_CFG);
- 	mxc_iomux_set_pad(MX31_PIN_USBOTG_STP, USB_PAD_CFG);
- 
--	gpio_request(USBOTG_RST_B, "otgusb-reset");
--	gpio_direction_output(USBOTG_RST_B, 0);
-+	err = gpio_request(USBOTG_RST_B, "otgusb-reset");
-+	if (err) {
-+		pr_err("Failed to request the USB OTG reset gpio\n");
-+		return err;
-+	}
-+
-+	err = gpio_direction_output(USBOTG_RST_B, 0);
-+	if (err) {
-+		pr_err("Failed to drive the USB OTG reset gpio\n");
-+		goto usbotg_free_reset;
-+	}
-+
- 	mdelay(1);
- 	gpio_set_value(USBOTG_RST_B, 1);
-+	return 0;
-+
-+usbotg_free_reset:
-+	gpio_free(USBOTG_RST_B);
-+	return err;
- }
- 
- static struct fsl_usb2_platform_data usbotg_pdata = {
+Not sure if this has been discussed already, but shouldn't rate be const
+for a fixed clock?
+
+~Ryan
+
 -- 
-1.6.0.4
+Bluewater Systems Ltd - ARM Technology Solution Centre
 
-
-
-
-      
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
