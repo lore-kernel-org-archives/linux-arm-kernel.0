@@ -1,73 +1,99 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Mon, 21 Jun 2010 13:35:13 +0800
-Subject: [PATCH 0/2] Common struct clk implementation, v5
-Message-ID: <1277098513.947165.104554431018.0.gpush@pororo>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Mon, 21 Jun 2010 08:38:04 +0300
+Subject: [PATCH 1/4] [ARM] Remove now unnecessary dma_needs_bounce()
+In-Reply-To: <AANLkTilJ3UpyHEplDqS_nV8SVDcl_pRRn4glDn7JS1GW@mail.gmail.com>
+References: <1275724538-5075-1-git-send-email-eric.y.miao@gmail.com>
+	<1275724538-5075-2-git-send-email-eric.y.miao@gmail.com>
+	<AANLkTilJ3UpyHEplDqS_nV8SVDcl_pRRn4glDn7JS1GW@mail.gmail.com>
+Message-ID: <4C1EFABC.4020601@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Eric
 
-These patches are an attempt to allow platforms to share clock code. At
-present, the definitions of 'struct clk' are local to platform code,
-which makes allocating and initialising cross-platform clock sources
-difficult, and makes it impossible to compile a single image containing
-support for two ARM platforms with different struct clks.
+Eric Miao wrote:
+> On Sat, Jun 5, 2010 at 3:55 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>> With a correct dev->dma_mask before calling dmabounce_register_dev(),
+>> dma_needs_bounce() is not necessary.
+>>
+>> The above is true for it8152.c and ixp4xx/common-pci.c.
+>>
+>> The sa1111, though, is a bit complicated. Until it's fully understood
+>> and fixed, dma_needs_bounce() for sa1111 is kept if CONFIG_SA1111 is
+>> enabled with no side effect (with the condition of machine_is_*)
+>>
+> 
+> Sorry I forgot to CC you two. Any feedback is welcome, thanks.
 
-The two patches are for the architecture-independent kernel code,
-introducing the common clk infrastructure. The changelog for the first
-patch includes details about the new clock definitions.
+Can I pull these changes from your git tree?
 
-As requested by rmk, I've put together a small series of patches
-illustrating the usage of the common struct clock on the ARM imx51
-platform. These are available in my git tree:
+>> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+>> ---
+>>  arch/arm/common/it8152.c           |    8 --------
+>>  arch/arm/include/asm/dma-mapping.h |    7 +++++++
+>>  arch/arm/mach-ixp4xx/common-pci.c  |    5 -----
+>>  3 files changed, 7 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/arch/arm/common/it8152.c b/arch/arm/common/it8152.c
+>> index 7974baa..6c09135 100644
+>> --- a/arch/arm/common/it8152.c
+>> +++ b/arch/arm/common/it8152.c
+>> @@ -263,14 +263,6 @@ static int it8152_pci_platform_notify_remove(struct device *dev)
+>>        return 0;
+>>  }
+>>
+>> -int dma_needs_bounce(struct device *dev, dma_addr_t dma_addr, size_t size)
+>> -{
+>> -       dev_dbg(dev, "%s: dma_addr %08x, size %08x\n",
+>> -               __func__, dma_addr, size);
+>> -       return (dev->bus == &pci_bus_type) &&
+>> -               ((dma_addr + size - PHYS_OFFSET) >= SZ_64M);
+>> -}
+>> -
+>>  int __init it8152_pci_setup(int nr, struct pci_sys_data *sys)
+>>  {
+>>        it8152_io.start = IT8152_IO_BASE + 0x12000;
+>> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+>> index 69ce072..c80d4d2 100644
+>> --- a/arch/arm/include/asm/dma-mapping.h
+>> +++ b/arch/arm/include/asm/dma-mapping.h
+>> @@ -298,7 +298,14 @@ extern void dmabounce_unregister_dev(struct device *);
+>>  * DMA access and 1 if the buffer needs to be bounced.
+>>  *
+>>  */
+>> +#ifdef CONFIG_SA1111
+>>  extern int dma_needs_bounce(struct device*, dma_addr_t, size_t);
+>> +#else
+>> +static inline int dma_needs_bounce(struct device*, dma_addr_t, size_t)
+>> +{
+>> +       return 0;
+>> +}
+>> +#endif
+>>
+>>  /*
+>>  * The DMA API, implemented by dmabounce.c.  See below for descriptions.
+>> diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
+>> index e318153..c7aa0ac 100644
+>> --- a/arch/arm/mach-ixp4xx/common-pci.c
+>> +++ b/arch/arm/mach-ixp4xx/common-pci.c
+>> @@ -337,11 +337,6 @@ static int ixp4xx_pci_platform_notify_remove(struct device *dev)
+>>        return 0;
+>>  }
+>>
+>> -int dma_needs_bounce(struct device *dev, dma_addr_t dma_addr, size_t size)
+>> -{
+>> -       return (dev->bus == &pci_bus_type ) && ((dma_addr + size) >= SZ_64M);
+>> -}
+>> -
+>>  /*
+>>  * Only first 64MB of memory can be accessed via PCI.
+>>  * We use GFP_DMA to allocate safe buffers to do map/unmap.
+>> --
+>> 1.7.0.4
+>>
+>>
 
- git://kernel.ubuntu.com/jk/dt/linux-2.6
 
-in the clk-common-mx51 branch (clk-common..clk-common-mx51).
-
-The approach I've taken with the imx51 port is to temporarly duplicate
-the platform-common clock code (ie, for all mxc-based boards) to enable
-usage of the common struct clk on one machine (imx51), while leaving the
-others as-is. For a proper platform-wide usage of the common struct clk,
-we'd be better off doing the whole platform at once. However, mx51 is
-the only mxc-based HW I have, hence the duplicated example port.
-
-In the example port, the first change simply converts the mxc's struct
-clk to a struct clk_mxc, using the new API.  The subsequent patches move
-certain clocks to more specific data structures (eg clk_fixed and
-clk_pll) where possible.
-
-Ben Herrenschmidt is looking at using common struct clk code for powerpc
-too, hence the kernel-wide approach.
-
-Comments most welcome.
-
-Cheers,
-
-
-Jeremy
-
---
-v5:
- * uninline main API, and share definitions with !USE_COMMON_STRUCT_CLK
- * add __clk_get
- * delay mutex init
- * kerneldoc for struct clk
-
-v4:
- * use mutex for enable/disable locking
- * DEFINE_CLK -> INIT_CLK, and pass the clk name for mutex init
- * struct clk_operations -> struct clk_ops
-
-v3:
- * do clock usage refcounting in common code
- * provide sample port
-
-v2:
- * no longer ARM-specific
- * use clk_operations
-
----
-Jeremy Kerr (2):
-      Add a common struct clk
-      clk: Generic support for fixed-rate clocks
+-- 
+Sincerely yours,
+Mike.
