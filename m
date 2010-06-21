@@ -1,22 +1,59 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 21 Jun 2010 11:50:04 +0530
-Subject: [PATCH] GPIO PL061: Adding Clk framework support
-In-Reply-To: <20100621060151.GC18217@jasper.tkos.co.il>
-References: <1277098753-5780-1-git-send-email-viresh.kumar@st.com>
-	<20100621060151.GC18217@jasper.tkos.co.il>
-Message-ID: <4C1F0494.9040309@st.com>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Mon, 21 Jun 2010 15:26:56 +0900
+Subject: [PATCH v5 0/3] Add samsung keypad
+Message-ID: <4C1F0630.7090501@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/21/2010 11:31 AM, Baruch Siach wrote:
-> Hi Viresh,
-> 
-> On Mon, Jun 21, 2010 at 11:09:13AM +0530, Viresh KUMAR wrote:
->> From: Viresh KUMAR <viresh.kumar@st.com>
->>
->> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> 
-> Please add a commit log explaining the need for this change.
-> 
+This is patch v5 series to add Samsung keypad.
 
-OK. Will resend it.
+Changes since v1:
+- Include linux/gpio.h instead of mach/gpio.h
+- Switch to dev_pm_ops in the samsung keypad driver
+
+Changes since v2:
+- Add keypad device types to remove platform specific #ifdef
+- Remove unnecessary include and checking codes.
+- Rename from 'kp' to 'keypad'
+- Rename keypad registers definition
+- Modify 'rep' variable declaration
+
+Changes since v3:
+- Use schedule_delayed_work and remove timer
+- Modify memory alloc codes
+- Add MODULE_ALIAS() and missing error printk
+- Change from rep to no_autorepeat and it's type to bool
+- Add report EV_MSC/MSC_SCAN and wakeup control
+- Remove s3c_set_platdata() call because there is not yet
+
+Changes since v4:
+- Add and use samsung_keypad_setname function
+- Add more specific gpio comments
+
+Joonyoung Shim (3):
+      ARM: SAMSUNG: Add keypad device support
+      ARM: S5PV210: Add keypad device helpers
+      input: samsung-keypad - Add samsung keypad driver
+
+ arch/arm/mach-s5pv210/Kconfig                    |    5 +
+ arch/arm/mach-s5pv210/Makefile                   |    1 +
+ arch/arm/mach-s5pv210/cpu.c                      |    4 +
+ arch/arm/mach-s5pv210/include/mach/map.h         |    3 +
+ arch/arm/mach-s5pv210/setup-keypad.c             |   34 ++
+ arch/arm/plat-samsung/Kconfig                    |    5 +
+ arch/arm/plat-samsung/Makefile                   |    1 +
+ arch/arm/plat-samsung/dev-keypad.c               |   58 ++++
+ arch/arm/plat-samsung/include/plat/devs.h        |    2 +
+ arch/arm/plat-samsung/include/plat/keypad-core.h |   31 ++
+ arch/arm/plat-samsung/include/plat/keypad.h      |   59 ++++
+ arch/arm/plat-samsung/include/plat/regs-keypad.h |   49 +++
+ drivers/input/keyboard/Kconfig                   |    9 +
+ drivers/input/keyboard/Makefile                  |    1 +
+ drivers/input/keyboard/samsung-keypad.c          |  400 ++++++++++++++++++++++
+ 15 files changed, 662 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s5pv210/setup-keypad.c
+ create mode 100644 arch/arm/plat-samsung/dev-keypad.c
+ create mode 100644 arch/arm/plat-samsung/include/plat/keypad-core.h
+ create mode 100644 arch/arm/plat-samsung/include/plat/keypad.h
+ create mode 100644 arch/arm/plat-samsung/include/plat/regs-keypad.h
+ create mode 100644 drivers/input/keyboard/samsung-keypad.c
