@@ -1,46 +1,22 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 21 Jun 2010 09:19:31 +0200
-Subject: [PATCHv4 0/3] Driver for the i.MX2x CMOS Sensor Interface
-In-Reply-To: <cover.1277096909.git.baruch@tkos.co.il>
-References: <cover.1277096909.git.baruch@tkos.co.il>
-Message-ID: <20100621071931.GG12115@pengutronix.de>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Mon, 21 Jun 2010 15:27:49 +0800
+Subject: [PATCH 1/2] [ARM] Introduce 'struct machine_class' for SoC level
+	abstraction
+In-Reply-To: <1277042450-30382-1-git-send-email-eric.miao@canonical.com>
+References: <1277042450-30382-1-git-send-email-eric.miao@canonical.com>
+Message-ID: <201006211527.49786.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+Hi Eric,
+
+> For machine class (mostly equivalent to SoC) level abstraction.
+
+Could you detail your intended usage of machine_class and how this will fit in 
+with the mdesc? Will the mdesc fields override the machine_class fields, or is 
+this intended to be a replacement?
+
+Cheers,
 
 
-> 
-> Baruch Siach (3):
->   mx2_camera: Add soc_camera support for i.MX25/i.MX27
->   mx27: add support for the CSI device
->   mx25: add support for the CSI device
-
-applied 2/3 and 3/3 for 2.6.36.
-
-Sascha
-
-> 
->  arch/arm/mach-mx2/clock_imx27.c          |    2 +-
->  arch/arm/mach-mx2/devices.c              |   31 +
->  arch/arm/mach-mx2/devices.h              |    1 +
->  arch/arm/mach-mx25/clock.c               |   14 +-
->  arch/arm/mach-mx25/devices.c             |   22 +
->  arch/arm/mach-mx25/devices.h             |    1 +
->  arch/arm/plat-mxc/include/mach/memory.h  |    4 +-
->  arch/arm/plat-mxc/include/mach/mx25.h    |    2 +
->  arch/arm/plat-mxc/include/mach/mx2_cam.h |   46 +
->  drivers/media/video/Kconfig              |   13 +
->  drivers/media/video/Makefile             |    1 +
->  drivers/media/video/mx2_camera.c         | 1493 ++++++++++++++++++++++++++++++
->  12 files changed, 1625 insertions(+), 5 deletions(-)
->  create mode 100644 arch/arm/plat-mxc/include/mach/mx2_cam.h
->  create mode 100644 drivers/media/video/mx2_camera.c
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Jeremy
