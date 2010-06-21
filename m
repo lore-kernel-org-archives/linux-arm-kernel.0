@@ -1,77 +1,32 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 21 Jun 2010 11:29:51 +0100
-Subject: [PATCH v4 4/8] ARM: Add support for the MOVW/MOVT relocations in
-	Thumb-2
+Date: Mon, 21 Jun 2010 11:29:57 +0100
+Subject: [PATCH v4 5/8] ARM: Remove dummy loads from the original relocation
+	address
 In-Reply-To: <20100621102639.9353.37648.stgit@e102109-lin.cambridge.arm.com>
 References: <20100621102639.9353.37648.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100621102951.9353.99611.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100621102957.9353.12084.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds handling case for the R_ARM_THM_MOVW_ABS_NC and
-R_ARM_THM_MOVT_ABS relocations in arch/arm/kernel/module.c. Such
-relocations may appear in Thumb-2 compiled kernel modules.
+Reading back the upper and lower values in the R_ARM_THM_CALL and
+R_ARM_THM_JUMP24 case was introduced by a previous commit but they are
+not needed.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Reported-by: Kyungmin Park <kmpark@infradead.org>
 ---
- arch/arm/include/asm/elf.h |    2 ++
- arch/arm/kernel/module.c   |   32 ++++++++++++++++++++++++++++++++
- 2 files changed, 34 insertions(+), 0 deletions(-)
+ arch/arm/kernel/module.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-index 51662fe..4d0e730 100644
---- a/arch/arm/include/asm/elf.h
-+++ b/arch/arm/include/asm/elf.h
-@@ -59,6 +59,8 @@ typedef struct user_fp elf_fpregset_t;
- 
- #define R_ARM_THM_CALL		10
- #define R_ARM_THM_JUMP24	30
-+#define R_ARM_THM_MOVW_ABS_NC	47
-+#define R_ARM_THM_MOVT_ABS	48
- 
- /*
-  * These are used to set parameters in the core dumps.
 diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index c628bdf..ae3c804 100644
+index ae3c804..aab7fca 100644
 --- a/arch/arm/kernel/module.c
 +++ b/arch/arm/kernel/module.c
-@@ -237,6 +237,38 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 			lower = *(u16 *)(loc + 2);
+@@ -233,8 +233,6 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 			*(u16 *)(loc + 2) = (u16)((lower & 0xd000) |
+ 						  (j1 << 13) | (j2 << 11) |
+ 						  ((offset >> 1) & 0x07ff));
+-			upper = *(u16 *)loc;
+-			lower = *(u16 *)(loc + 2);
  			break;
  
-+		case R_ARM_THM_MOVW_ABS_NC:
-+		case R_ARM_THM_MOVT_ABS:
-+			upper = *(u16 *)loc;
-+			lower = *(u16 *)(loc + 2);
-+
-+			/*
-+			 * MOVT/MOVW instructions encoding in Thumb-2:
-+			 *
-+			 * i	= upper[10]
-+			 * imm4	= upper[3:0]
-+			 * imm3	= lower[14:12]
-+			 * imm8	= lower[7:0]
-+			 *
-+			 * imm16 = imm4:i:imm3:imm8
-+			 */
-+			offset = ((upper & 0x000f) << 12) |
-+				((upper & 0x0400) << 1) |
-+				((lower & 0x7000) >> 4) | (lower & 0x00ff);
-+			offset = (offset ^ 0x8000) - 0x8000;
-+			offset += sym->st_value;
-+
-+			if (ELF32_R_TYPE(rel->r_info) == R_ARM_THM_MOVT_ABS)
-+				offset >>= 16;
-+
-+			*(u16 *)loc = (u16)((upper & 0xfbf0) |
-+					    ((offset & 0xf000) >> 12) |
-+					    ((offset & 0x0800) >> 1));
-+			*(u16 *)(loc + 2) = (u16)((lower & 0x8f00) |
-+						  ((offset & 0x0700) << 4) |
-+						  (offset & 0x00ff));
-+			break;
-+
- 		default:
- 			printk(KERN_ERR "%s: unknown relocation: %u\n",
- 			       module->name, ELF32_R_TYPE(rel->r_info));
+ 		case R_ARM_THM_MOVW_ABS_NC:
