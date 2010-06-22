@@ -1,108 +1,103 @@
 From: leiwen@marvell.com (Lei Wen)
-Date: Tue, 22 Jun 2010 20:20:16 +0800
-Subject: [PATCH 03/29] pxa3xx_nand: introduce default timing to reduce
-Message-ID: <mailman.100.1280296615.27306.linux-arm-kernel@lists.infradead.org>
+Date: Tue, 22 Jun 2010 21:01:04 +0800
+Subject: [PATCH 05/29] pxa3xx_nand: set oob length in the runtime
+Message-ID: <mailman.101.1280296629.27306.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-read id times
-
-We certainly don't need to send read id command times by times, since
-we already know what the id is after the first read id...
-
-So create a default timing which could ensure it would successfully read
-id out all supported chip. Then follow the build-in table to reconfigure
-the timing.
+For different command need different oob requirement, set the proper
+oob length by different cmd.
 
 Signed-off-by: Lei Wen <leiwen@marvell.com>
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c |   56 ++++++++++++++++++---------------------
- 1 files changed, 26 insertions(+), 30 deletions(-)
+ drivers/mtd/nand/pxa3xx_nand.c |   25 ++++++++++++++++++-------
+ 1 files changed, 18 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 52cec28..b605147 100644
+index 50e08db..26c0286 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -190,15 +190,18 @@ static struct pxa3xx_nand_cmdset default_cmdset = {
- };
+@@ -274,13 +274,20 @@ static int wait_for_event(struct
+pxa3xx_nand_info *info, uint32_t event)
 
- static struct pxa3xx_nand_timing __devinitdata timing[] = {
--	{ 10,  0, 20, 40, 30, 40, 11123, 110, 10, },
--	{ 10, 25, 15, 25, 15, 30, 25000,  60, 10, },
--	{ 10, 35, 15, 25, 15, 25, 25000,  60, 10, },
-+	{ 40, 80, 60, 100, 80, 100, 90000, 400, 40, },
-+	{ 10,  0, 20,  40, 30,  40, 11123, 110, 10, },
-+	{ 10, 25, 15,  25, 15,  30, 25000,  60, 10, },
-+	{ 10, 35, 15,  25, 15,  25, 25000,  60, 10, },
- };
-
--#define NAND_SETTING_SAMSUNG     &default_cmdset, &timing[0]
--#define NAND_SETTING_MICRON      &default_cmdset, &timing[1]
--#define NAND_SETTING_ST          &default_cmdset, &timing[2]
-+#define NAND_SETTING_DEFAULT     &default_cmdset, &timing[0]
-+#define NAND_SETTING_SAMSUNG     &default_cmdset, &timing[1]
-+#define NAND_SETTING_MICRON      &default_cmdset, &timing[2]
-+#define NAND_SETTING_ST          &default_cmdset, &timing[3]
- static struct pxa3xx_nand_flash __devinitdata builtin_flash_types[] = {
-+	{      0,   0, 2048,  8,  8,    0, NAND_SETTING_DEFAULT, },
- 	{ 0x46ec,  32,  512, 16, 16, 4096, NAND_SETTING_SAMSUNG, },
- 	{ 0xdaec,  64, 2048,  8,  8, 2048, NAND_SETTING_SAMSUNG, },
- 	{ 0xd7ec, 128, 4096,  8,  8, 8192, NAND_SETTING_SAMSUNG, },
-@@ -948,36 +951,29 @@ static int pxa3xx_nand_detect_flash(struct
-pxa3xx_nand_info *info,
- 		if (pxa3xx_nand_detect_config(info) == 0)
- 			return 0;
-
--	for (i = 0; i<pdata->num_flash; ++i) {
--		f = pdata->flash + i;
--
--		if (pxa3xx_nand_config_flash(info, f))
--			continue;
--
--		if (__readid(info, &id))
--			continue;
--
--		if (id == f->chip_id)
--			return 0;
--	}
--
--	for (i = 0; i < ARRAY_SIZE(builtin_flash_types); i++) {
--
--		f = &builtin_flash_types[i];
--
--		if (pxa3xx_nand_config_flash(info, f))
--			continue;
--
--		if (__readid(info, &id))
--			continue;
--
--		if (id == f->chip_id)
-+	/* we use default timing to detect id */
-+	f = &builtin_flash_types[0];
-+	pxa3xx_nand_config_flash(info, f);
-+	if (__readid(info, &id))
-+		goto fail_detect;
+ static void pxa3xx_set_datasize(struct pxa3xx_nand_info *info)
+ {
+-	/* calculate data size */
++	int oob_enable = info->reg_ndcr & NDCR_SPARE_EN;
 +
-+	for (i=0; i<ARRAY_SIZE(builtin_flash_types) + pdata->num_flash - 1; i++) {
-+		/* we first choose the flash definition from platfrom */
-+		if (i < pdata->num_flash)
-+			f = pdata->flash + i;
-+		else
-+			f = &builtin_flash_types[i - pdata->num_flash + 1];
-+		if (f->chip_id == id) {
-+			dev_info(&info->pdev->dev, "detect chip id: 0x%x\n", id);
-+			pxa3xx_nand_config_flash(info, f);
- 			return 0;
-+		}
++	info->data_size = info->page_size;
++	if (!oob_enable) {
++		info->oob_size = 0;
++		return;
++	}
++
+ 	switch (info->page_size) {
+ 	case 2048:
+-		info->data_size = (info->use_ecc) ? 2088 : 2112;
++		info->oob_size = (info->use_ecc) ? 40 : 64;
+ 		break;
+ 	case 512:
+-		info->data_size = (info->use_ecc) ? 520 : 528;
++		info->oob_size = (info->use_ecc) ? 8 : 16;
+ 		break;
  	}
-
- 	dev_warn(&info->pdev->dev,
- 		 "failed to detect configured nand flash; found %04x instead of\n",
- 		 id);
-+fail_detect:
- 	return -ENODEV;
  }
+@@ -334,6 +341,7 @@ static int prepare_other_cmd(struct
+pxa3xx_nand_info *info, uint16_t cmd)
+ 	info->ndcb1 = 0;
+ 	info->ndcb2 = 0;
+
++	info->oob_size = 0;
+ 	if (cmd == cmdset->read_id) {
+ 		info->ndcb0 |= NDCB0_CMD_TYPE(3);
+ 		info->data_size = 8;
+@@ -402,6 +410,9 @@ static int handle_data_pio(struct pxa3xx_nand_info *info)
+ 	case STATE_PIO_WRITING:
+ 		__raw_writesl(info->mmio_base + NDDB, info->data_buff,
+ 				DIV_ROUND_UP(info->data_size, 4));
++		if (info->oob_size > 0)
++			__raw_writesl(info->mmio_base + NDDB, info->oob_buff,
++					DIV_ROUND_UP(info->oob_size, 4));
+
+ 		enable_int(info, NDSR_CS0_BBD | NDSR_CS0_CMDD);
+
+@@ -414,6 +425,9 @@ static int handle_data_pio(struct pxa3xx_nand_info *info)
+ 	case STATE_PIO_READING:
+ 		__raw_readsl(info->mmio_base + NDDB, info->data_buff,
+ 				DIV_ROUND_UP(info->data_size, 4));
++		if (info->oob_size > 0)
++			__raw_readsl(info->mmio_base + NDDB, info->oob_buff,
++					DIV_ROUND_UP(info->oob_size, 4));
+
+ 		break;
+ 	default:
+@@ -429,7 +443,7 @@ static int handle_data_pio(struct pxa3xx_nand_info *info)
+ static void start_data_dma(struct pxa3xx_nand_info *info, int dir_out)
+ {
+ 	struct pxa_dma_desc *desc = info->data_desc;
+-	int dma_len = ALIGN(info->data_size, 32);
++	int dma_len = ALIGN(info->data_size + info->oob_size, 32);
+
+ 	desc->ddadr = DDADR_STOP;
+ 	desc->dcmd = DCMD_ENDIRQEN | DCMD_WIDTH4 | DCMD_BURST32 | dma_len;
+@@ -835,7 +849,6 @@ static int pxa3xx_nand_config_flash(struct
+pxa3xx_nand_info *info,
+ 	info->cmdset = f->cmdset;
+ 	info->page_size = f->page_size;
+ 	info->oob_buff = info->data_buff + f->page_size;
+-	info->oob_size = (f->page_size == 2048) ? 64 : 16;
+ 	info->read_id_bytes = (f->page_size == 2048) ? 4 : 2;
+
+ 	/* calculate addressing information */
+@@ -894,8 +907,6 @@ static int pxa3xx_nand_detect_config(struct
+pxa3xx_nand_info *info)
+ 	i = __ffs(page_per_block * info->page_size);
+ 	num_blocks = type->chipsize << (20 - i);
+
+-	info->oob_size = (info->page_size == 2048) ? 64 : 16;
+-
+ 	/* calculate addressing information */
+ 	info->col_addr_cycles = (info->page_size == 2048) ? 2 : 1;
 
 -- 
 1.7.0.4
