@@ -1,42 +1,72 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 21 Jun 2010 18:14:10 -0700
-Subject: [PATCH V2] [ARM] Add ARCH_PROVIDES_UDELAY config option
-In-Reply-To: <4BFF112A.2060700@codeaurora.org>
-References: <1272654736-28837-1-git-send-email-ccross@android.com>
-	<u2pd73d4eaf1004301237k3ceb859dobe74fe53abec774d@mail.gmail.com>
-	<87d3xgd20n.fsf@deeprootsystems.com>
-	<20100501100148.GE12172@n2100.arm.linux.org.uk>
-	<4BF702CC.5000401@codeaurora.org>
-	<20100521220653.GL11042@n2100.arm.linux.org.uk>
-	<4BFF112A.2060700@codeaurora.org>
-Message-ID: <4C200E62.4090604@codeaurora.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 22 Jun 2010 10:45:23 +0900
+Subject: [PATCH v4] libata: pata_samsung_cf: Add Samsung PATA controller
+	driver
+In-Reply-To: <1276499263-12217-1-git-send-email-kgene.kim@samsung.com>
+References: <1276499263-12217-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <010c01cb11ac$9844e490$c8ceadb0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russel,
-
-Would appreciate your thoughts on this.
-
-Colin,
-
-Are you continuing to use the approach used in your patch in your 
-development tree? I just want to make sure we have a solution that 
-everyone can agree to.
-
-Thanks,
-Saravana
-
-Saravana Kannan wrote:
-> Russell King - ARM Linux wrote:
->> My point is not specific to sched_clock, but to counters which on ARM
->> are 99.9% always memory mapped, and therefore inaccessible during the
->> very early kernel boot.  sched_clock was merely an illustration of the
->> problem.
+Kukjin Kim wrote:
 > 
-> Do you know any code which uses udelay that early? I can't imagine any 
-> non-driver code using udelay. If it's just drivers using udelay, then 
-> they need IO mapping to have been completed for the device register 
-> access to work and hence udelay won't have any problems.
+> From: Abhilash Kesavan <a.kesavan@samsung.com>
 > 
-> -Saravana
+> Adds support for the Samsung PATA controller. This driver is based on the
+> Libata subsystem and references the earlier patches sent for IDE
+subsystem.
 > 
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+
+Hi,
+
+Maybe missed? :-(
+
+If no problems, please apply or kindly let me know how this should be
+handled.
+
+> 
+> Changes since v3:
+> 
+> Addressed comments from
+> 
+> Sergei Shtylyov:
+> 	- Removed filename in header
+> 	- Used ata_timing_compute for obtaining timing parameters
+> 	- Removed valid PIO mode check
+> 	- Added softreset method and associated functions
+> 	- Used devm_request_mem_region function as had used devm_ioremap
+> 	  earlier
+> 	- Removed kree and release_mem_region calls because of managed
+> 	  kzalloc and request_mem_region fns being used
+> 	- Added return in clk_get function
+> 	- Added missing clk_put
+> 	- Corrected indentation issue
+> 
+> Ben Dooks:
+> 	- Added missing 'void __iomem' parameters
+> 	- Added check for trailing bytes in data_xfer function
+> 	- Removed assignment in data_xfer function
+> 	- Coding changes - e.g. in pata_s3c_enable, pata_s3c_dev_select,
+> 	  wait_for_host_ready
+> 	- Removed host checks in suspend/resume functions
+> 
+>  drivers/ata/Kconfig           |    9 +
+>  drivers/ata/Makefile          |    1 +
+>  drivers/ata/pata_samsung_cf.c |  735
+> +++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 745 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/ata/pata_samsung_cf.c
+> 
+(snip)
+
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
