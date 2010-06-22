@@ -1,22 +1,33 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Tue, 22 Jun 2010 09:05:56 +0800
-Subject: [PATCH 2/2] clk: Generic support for fixed-rate clocks
-In-Reply-To: <4C1FCEDA.3000303@bluewatersys.com>
-References: <1277098513.947920.264679354891.2.gpush@pororo>
-	<4C1FCEDA.3000303@bluewatersys.com>
-Message-ID: <201006220905.57533.jeremy.kerr@canonical.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 22 Jun 2010 10:05:59 +0900
+Subject: [PATCH] ARM: S5P6442: Fix PLL setting announce message.
+Message-ID: <1277168759-4599-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ryan,
+From: Thomas Abraham <thomas@localhost.localdomain>
 
-> Not sure if this has been discussed already, but shouldn't rate be const
-> for a fixed clock?
+The S5P6442 PLL setting announce message incorrectly displays S5P6440
+as the SoC. Change it to S5P6442.
 
-No, we may need to set the rate at some point - eg, when setting up the 
-clocks, or parsing from the device tree.
+Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-s5p6442/clock.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Cheers,
-
-
-Jeremy
+diff --git a/arch/arm/mach-s5p6442/clock.c b/arch/arm/mach-s5p6442/clock.c
+index 3aadbf4..087e57f 100644
+--- a/arch/arm/mach-s5p6442/clock.c
++++ b/arch/arm/mach-s5p6442/clock.c
+@@ -294,7 +294,7 @@ void __init_or_cpufreq s5p6442_setup_clocks(void)
+ 	mpll = s5p_get_pll45xx(xtal, __raw_readl(S5P_MPLL_CON), pll_4502);
+ 	epll = s5p_get_pll45xx(xtal, __raw_readl(S5P_EPLL_CON), pll_4500);
+ 
+-	printk(KERN_INFO "S5P6440: PLL settings, A=%ld, M=%ld, E=%ld",
++	printk(KERN_INFO "S5P6442: PLL settings, A=%ld, M=%ld, E=%ld",
+ 			apll, mpll, epll);
+ 
+ 	clk_fout_apll.rate = apll;
+-- 
+1.6.6.rc2
