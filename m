@@ -1,64 +1,45 @@
 From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Tue, 22 Jun 2010 09:59:10 +0300
-Subject: [PATCH 1/3] use ARCH_PFN_OFFSET for pfn_to_paddr/paddr_to_pfn
-	translations
+Date: Tue, 22 Jun 2010 09:59:11 +0300
+Subject: [PATCH 2/3] page_to_pfn(): use ULONGLONG_MAX to for invalid pfn
 In-Reply-To: <cover.1277188127.git.ext-mika.1.westerberg@nokia.com>
 References: <cover.1277188127.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <5867f5fbc8c566b76fa9ccc92ee1587b06cf18c4.1277188128.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <c9fc6b9efa07b4e203d9c4bf13c94e84e9d0bb40.1277188128.git.ext-mika.1.westerberg@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is needed on architectures where PHYS_OFFSET is not always zero.
-By default ARCH_PFN_OFFSET is zero but archs may redefine it if needed.
+Some architectures define PHYS_PFN_OFFSET to be != 0 (ARM for example). This
+means that mem_map[0] is actually first page in kernel direct mapped view (which
+is a valid page).
 
-Also make sure that exclude_zero_pages() uses pfn_to_paddr().
+Change invalid pfn to be ULONGLONG_MAX instead of 0 to handle such cases.
 
 Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
 ---
- makedumpfile.c |    2 +-
- makedumpfile.h |   10 ++++++++--
- 2 files changed, 9 insertions(+), 3 deletions(-)
+ makedumpfile.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/makedumpfile.c b/makedumpfile.c
-index 8a90baa..a33bab6 100644
+index a33bab6..89360bd 100644
 --- a/makedumpfile.c
 +++ b/makedumpfile.c
-@@ -4810,7 +4810,7 @@ exclude_zero_pages(void)
+@@ -4383,7 +4383,8 @@ unsigned long long
+ page_to_pfn(unsigned long page)
+ {
+ 	unsigned int num;
+-	unsigned long long pfn = 0, index = 0;
++	unsigned long long pfn = ULONGLONG_MAX;
++	unsigned long long index = 0;
+ 	struct mem_map_data *mmd;
  
- 	initialize_2nd_bitmap(&bitmap2);
- 
--	for (pfn = paddr = 0; pfn < info->max_mapnr;
-+	for (pfn = 0, paddr = pfn_to_paddr(pfn); pfn < info->max_mapnr;
- 	    pfn++, paddr += info->page_size) {
- 
- 		print_progress(PROGRESS_ZERO_PAGES, pfn, info->max_mapnr);
-diff --git a/makedumpfile.h b/makedumpfile.h
-index 2785001..2717d81 100644
---- a/makedumpfile.h
-+++ b/makedumpfile.h
-@@ -112,8 +112,6 @@ isAnon(unsigned long mapping)
- #define PAGEOFFSET(X)		(((unsigned long)(X)) & (PAGESIZE() - 1))
- #define PAGEBASE(X)		(((unsigned long)(X)) & ~(PAGESIZE() - 1))
- #define _2MB_PAGE_MASK		(~((2*1048576)-1))
--#define paddr_to_pfn(X)		((unsigned long long)(X) >> PAGESHIFT())
--#define pfn_to_paddr(X)		((unsigned long long)(X) << PAGESHIFT())
- 
- /*
-  * for SPARSEMEM
-@@ -696,6 +694,14 @@ unsigned long long vaddr_to_paddr_ia64(unsigned long vaddr);
- #define VADDR_REGION(X)		(((unsigned long)(X)) >> REGION_SHIFT)
- #endif          /* ia64 */
- 
-+#ifndef ARCH_PFN_OFFSET
-+#define ARCH_PFN_OFFSET		0
-+#endif
-+#define paddr_to_pfn(X) \
-+	(((unsigned long long)(X) >> PAGESHIFT()) - ARCH_PFN_OFFSET)
-+#define pfn_to_paddr(X) \
-+	(((unsigned long long)(X) + ARCH_PFN_OFFSET) << PAGESHIFT())
-+
- struct pt_load_segment {
- 	off_t			file_offset;
- 	unsigned long long	phys_start;
+ 	mmd = info->mem_map_data;
+@@ -4398,7 +4399,7 @@ page_to_pfn(unsigned long page)
+ 		pfn = mmd->pfn_start + index;
+ 		break;
+ 	}
+-	if (!pfn) {
++	if (pfn == ULONGLONG_MAX) {
+ 		ERRMSG("Can't convert the address of page descriptor (%lx) to pfn.\n", page);
+ 		return ULONGLONG_MAX;
+ 	}
 -- 
 1.5.6.5
