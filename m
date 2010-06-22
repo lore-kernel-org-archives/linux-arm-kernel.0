@@ -1,33 +1,30 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Tue, 22 Jun 2010 15:59:22 +0530
-Subject: [PATCH v4 0/4] Patches for -next
-In-Reply-To: <20100621144409.26309.87173.stgit@e102109-lin.cambridge.arm.com>
-References: <20100621144409.26309.87173.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <AANLkTimFl8rOzipTjsJ39HyPQDkEjZeliKHssxyL4df6@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 22 Jun 2010 13:19:02 +0200
+Subject: [PATCH] pxa3xx: Fix HSIO bus x24 multiplier
+In-Reply-To: <201006221006.20590.pieterg@gmx.com>
+References: <1277154123-31532-1-git-send-email-marek.vasut@gmail.com>
+	<201006221006.20590.pieterg@gmx.com>
+Message-ID: <201006221319.02992.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 21, 2010 at 8:16 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> Pretty much the same content as v3 but I reordered the last three
-> patches to make sure that switching to lazy cache flushing on ARMv7 SMP
-> doesn't make the set_pte/cache flushing race more visible (issue handled
-> by the set_pte_at patch).
->
->
-> Catalin Marinas (4):
-> ? ? ?ARM: Remove the domain switching on ARMv6k/v7 CPUs
-> ? ? ?ARM: Assume new page cache pages have dirty D-cache
-> ? ? ?ARM: Synchronise the I and D caches via set_pte_at() on SMP systems
-> ? ? ?ARM: Use lazy cache flushing on ARMv7 SMP systems
+Dne ?t 22. ?ervna 2010 10:06:20 pieterg napsal(a):
+> On Monday 21 June 2010 23:02:03 Marek Vasut wrote:
+> > The value should be 24, not 0 in the possibilities array. It was just a
+> > silly mistake.
+> 
+> Good one, reminds me that I've had this one on my list as well for a while.
+> I actually went one step further, made the pxa310 use HSIO 312MHz when
+> running on 624MHz.
+> 
+> (not sure whether the patch will apply cleanly, but cpufreq-pxa3xx.c still
+> looks roughly the same at first glance..)
+> 
+> Rgds, Pieter
 
-I've tried patches 2, 3, and 4 on a Cortex-A9 SMP system and it resolves the
-MMC rootfs init crash without the need for the flush_kernel_dcache_page()
-change.
+Hi,
 
-Tested-by: Rabin Vincent <rabin.vincent@stericsson.com>
+I'd suggest you to submit a proper patch. With your whole name and using git-
+send-email.
 
-Rabin
-
-P.S.: Patch 1 (at least the version on your proposed branch), doesn't seem to
-apply cleanly on linux-next.
+Cheers
