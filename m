@@ -1,52 +1,34 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Tue, 22 Jun 2010 09:30:54 +0530
+Date: Tue, 22 Jun 2010 09:37:26 +0530
 Subject: [PATCH V2] GPIO PL061: Adding Clk framework support
-In-Reply-To: <AANLkTim0x5_4re3CWzWDRr1QMq46sQa1SCSyAiymmiUW@mail.gmail.com>
-References: <1277103463-7311-1-git-send-email-viresh.kumar@st.com>	<20100621154121.GA4290@debian>
-	<AANLkTim0x5_4re3CWzWDRr1QMq46sQa1SCSyAiymmiUW@mail.gmail.com>
-Message-ID: <4C203576.2060200@st.com>
+In-Reply-To: <20100621174101.GB11851@tarshish>
+References: <1277103463-7311-1-git-send-email-viresh.kumar@st.com>
+	<20100621174101.GB11851@tarshish>
+Message-ID: <4C2036FE.40603@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/21/2010 11:04 PM, Linus Walleij wrote:
-> 2010/6/21 Rabin Vincent <rabin@rab.in>:
->> On Mon, Jun 21, 2010 at 12:27:43PM +0530, Viresh KUMAR wrote:
->>> +     chip->clk = clk_get(&dev->dev, NULL);
->>> +     if (IS_ERR(chip->clk)) {
->>> +             ret = PTR_ERR(chip->clk);
->>> +             goto iounmap;
->>> +     }
+On 6/21/2010 11:11 PM, Baruch Siach wrote:
+> Hi Viresh,
+> 
+> On Mon, Jun 21, 2010 at 12:27:43PM +0530, Viresh KUMAR wrote:
+>> From: Viresh KUMAR <viresh.kumar@st.com>
 >>
->> Have you verified that all platforms using this driver already have
->> clocks with the appropriate names?   Otherwise this patch will break
->> those platforms.
+>> GPIO Clk is never enabled on Platforms, like: SPEAr, which are based upon clock
+>> framework and use PL061 driver. This patch adds support for Clk enabling and
+>> disabling as and when gpios are requested and freed.
+>>
+>> Modifications since V1:
+>>  - Removed usage_count, as already done by clk framework.
+>>  - Checking error case of clk_enable.
+>>
+>> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 > 
-> The ARM Versatiles and RealViews are always clocked I think,
-> so clock support should be optional.
-> 
-> When I added a clock lookup to the PL08x block recently I used
-> a construct like this for an optional clock:
-> 
-> chip->clk = clk_get(&dev->dev, NULL);
-> if (IS_ERR(chip->clk)) {
->        ret = PTR_ERR(chip->clk);
->        if (ret == -ENOENT)
->           /* No block clock in this platform */
->           chip->clk = NULL;
->        else
->           goto iounmap;
-> }
-> 
-> This will work whenever clkdevice is used, since that
-> returns -ENOENT for nonexisting entries.
-> 
-> Then:
-> 
-> if (chip->clk)
->   clk_enable(chip->clk);
+> Acked-by: Baruch Siach <baruch@tkos.co.il>
 > 
 
-Will modify it, as suggested.
+Baruch,
 
-thanks
+Sorry, but you need to review another version.
+
 viresh.
