@@ -1,58 +1,41 @@
-From: igawa@mxs.nes.nec.co.jp (Masayuki Igawa)
-Date: Tue, 22 Jun 2010 16:40:19 +0900 (JST)
-Subject: [PATCH 0/3] makedumpfile: add support for ARM crashdumps
-In-Reply-To: <cover.1277188127.git.ext-mika.1.westerberg@nokia.com>
-References: <cover.1277188127.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <20100622.164019.11984249.igawa@mxs.nes.nec.co.jp>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 22 Jun 2010 16:45:11 +0900
+Subject: [PATCH] input: samsung-keypad - Add samsung keypad driver
+In-Reply-To: <4C2019D4.1040105@samsung.com>
+References: <1277163098-10263-1-git-send-email-kgene.kim@samsung.com>
+	<4C2019D4.1040105@samsung.com>
+Message-ID: <013301cb11de$dac50cf0$904f26d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Mika.
+Joonyoung Shim wrote:
+> 
+> On 6/22/2010 8:31 AM, Kukjin Kim wrote:
+> > From: Joonyoung Shim <jy0922.shim@samsung.com>
+> >
+> > This patch adds support for keypad driver running on Samsung SoCs. This
+> > driver is tested on SMDK6410(S3C6410), SMDKC100(S5PC100),
+> Aquila(S5PC110),
+> > GONI(S5PC110) and SMDKV210(S5PV210) boards.
+> >
+> > Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > Tested-by: Naveen Krishna Ch <ch.naveen@samsung.com>
+> > [kgene.kim at samsung.com: added comments]
+> > Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> 
+> I think this is duplicated posting. Why don't you just reply the
+> tested-by or acked-by at previous my mail?
 
-Thank you for your patches.
+I was just thinking, need to modify comments when added 'Tested-by'.
 
-I'll check them.
-
-BTW, I'm preparing for makedumpfile-v1.3.6 release now.
-So I'll skip merging these patches in this v1.3.6 release.
-These patches will be merged in the next release(may be v1.3.7).
+Anyway, if any problems in here, please kindly ignore.
 
 Thanks.
--- 
-Masayuki Igawa
 
-
-From: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
-Subject: [PATCH 0/3] makedumpfile: add support for ARM crashdumps
-Date: Tue, 22 Jun 2010 09:59:09 +0300
-> Hello,
-> 
-> This series adds support for ARM kernel crashdumps to makedumpfile. Although,
-> kernel support is not yet in mainline, I think that it doesn't hurt to have
-> necessary userspace tools available when that happens.
-> 
-> If someone wants to try, kernel patches can be found:
-> 	http://lists.infradead.org/pipermail/linux-arm-kernel/2010-May/014230.html
-> 
-> and kexec-tools already contain ARM crashdump support.
-> 
-> Regards,
-> MW
-> 
-> Mika Westerberg (3):
->   use ARCH_PFN_OFFSET for pfn_to_paddr/paddr_to_pfn translations
->   page_to_pfn(): use ULONGLONG_MAX to for invalid pfn
->   add ARM crashdump support
-> 
->  Makefile       |    4 +-
->  arm.c          |  200 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  makedumpfile.c |    7 +-
->  makedumpfile.h |   43 ++++++++++++-
->  4 files changed, 247 insertions(+), 7 deletions(-)
->  create mode 100644 arm.c
-> 
-> 
-> _______________________________________________
-> kexec mailing list
-> kexec at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/kexec
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
