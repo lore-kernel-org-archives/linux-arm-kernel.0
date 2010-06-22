@@ -1,33 +1,42 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 22 Jun 2010 10:05:59 +0900
-Subject: [PATCH] ARM: S5P6442: Fix PLL setting announce message.
-Message-ID: <1277168759-4599-1-git-send-email-kgene.kim@samsung.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Mon, 21 Jun 2010 18:14:10 -0700
+Subject: [PATCH V2] [ARM] Add ARCH_PROVIDES_UDELAY config option
+In-Reply-To: <4BFF112A.2060700@codeaurora.org>
+References: <1272654736-28837-1-git-send-email-ccross@android.com>
+	<u2pd73d4eaf1004301237k3ceb859dobe74fe53abec774d@mail.gmail.com>
+	<87d3xgd20n.fsf@deeprootsystems.com>
+	<20100501100148.GE12172@n2100.arm.linux.org.uk>
+	<4BF702CC.5000401@codeaurora.org>
+	<20100521220653.GL11042@n2100.arm.linux.org.uk>
+	<4BFF112A.2060700@codeaurora.org>
+Message-ID: <4C200E62.4090604@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Abraham <thomas@localhost.localdomain>
+Russel,
 
-The S5P6442 PLL setting announce message incorrectly displays S5P6440
-as the SoC. Change it to S5P6442.
+Would appreciate your thoughts on this.
 
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-s5p6442/clock.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Colin,
 
-diff --git a/arch/arm/mach-s5p6442/clock.c b/arch/arm/mach-s5p6442/clock.c
-index 3aadbf4..087e57f 100644
---- a/arch/arm/mach-s5p6442/clock.c
-+++ b/arch/arm/mach-s5p6442/clock.c
-@@ -294,7 +294,7 @@ void __init_or_cpufreq s5p6442_setup_clocks(void)
- 	mpll = s5p_get_pll45xx(xtal, __raw_readl(S5P_MPLL_CON), pll_4502);
- 	epll = s5p_get_pll45xx(xtal, __raw_readl(S5P_EPLL_CON), pll_4500);
- 
--	printk(KERN_INFO "S5P6440: PLL settings, A=%ld, M=%ld, E=%ld",
-+	printk(KERN_INFO "S5P6442: PLL settings, A=%ld, M=%ld, E=%ld",
- 			apll, mpll, epll);
- 
- 	clk_fout_apll.rate = apll;
--- 
-1.6.6.rc2
+Are you continuing to use the approach used in your patch in your 
+development tree? I just want to make sure we have a solution that 
+everyone can agree to.
+
+Thanks,
+Saravana
+
+Saravana Kannan wrote:
+> Russell King - ARM Linux wrote:
+>> My point is not specific to sched_clock, but to counters which on ARM
+>> are 99.9% always memory mapped, and therefore inaccessible during the
+>> very early kernel boot.  sched_clock was merely an illustration of the
+>> problem.
+> 
+> Do you know any code which uses udelay that early? I can't imagine any 
+> non-driver code using udelay. If it's just drivers using udelay, then 
+> they need IO mapping to have been completed for the device register 
+> access to work and hence udelay won't have any problems.
+> 
+> -Saravana
+> 
