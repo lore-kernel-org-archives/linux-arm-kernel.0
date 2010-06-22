@@ -1,125 +1,163 @@
 From: leiwen@marvell.com (Lei Wen)
-Date: Tue, 22 Jun 2010 22:57:04 +0800
-Subject: [PATCH 21/29] pxa3xx_nand: add ext id check
-Message-ID: <mailman.137.1280297020.27306.linux-arm-kernel@lists.infradead.org>
+Date: Tue, 22 Jun 2010 23:10:42 +0800
+Subject: [PATCH 24/29] pxa3xx_nand: add polling mode support
+Message-ID: <mailman.138.1280297033.27306.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For K9LBG08U0M and K9LBG08UXD two nand chip, they have the same chip id
-as
-0xd7ec. So we should use the ext id to distinguish them.
+Add polling mode to facilitate debugging.
 
 Signed-off-by: Lei Wen <leiwen@marvell.com>
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- arch/arm/plat-pxa/include/plat/pxa3xx_nand.h |    3 +-
- drivers/mtd/nand/pxa3xx_nand.c               |   32 +++++++++++++-------------
- 2 files changed, 18 insertions(+), 17 deletions(-)
+ arch/arm/plat-pxa/include/plat/pxa3xx_nand.h |    1 +
+ drivers/mtd/nand/pxa3xx_nand.c               |   58 ++++++++++++++++++++------
+ 2 files changed, 46 insertions(+), 13 deletions(-)
 
 diff --git a/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
 b/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
-index ed7d623..c20ac35 100644
+index f7c16d3..9e00267 100644
 --- a/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
 +++ b/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
-@@ -37,7 +37,8 @@ struct pxa3xx_nand_cmdset {
-
- struct pxa3xx_nand_flash {
- 	char		*name;
--	uint32_t	chip_id;
-+	uint16_t	chip_id;	/* chip id */
-+	uint16_t	ext_id;		/* Extend id */
- 	uint16_t	page_per_block; /* Pages per block */
- 	uint16_t 	page_size;	/* Page size in bytes */
- 	uint8_t		flash_width;	/* Width of Flash memory (DWIDTH_M) */
+@@ -64,6 +64,7 @@ struct pxa3xx_nand_flash {
+  * enable such tuning for those platform which support it */
+ #define PXA3XX_ADV_TIME_TUNING	(1 << 4)
+ #define PXA3XX_KEEP_CONFIG	(1 << 5)
++#define PXA3XX_POOLING_MODE	(1 << 6)
+ struct pxa3xx_nand_platform_data {
+ 	unsigned int				controller_attrs;
+ 	const struct mtd_partition		*parts[NUM_CHIP_SELECT];
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 048b576..b0a0ccf 100644
+index 9a37517..fbe455e 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -253,17 +253,17 @@ static struct pxa3xx_nand_timing __devinitdata
-timing[] = {
- #define NAND_SETTING_MICRON      &default_cmdset, &timing[2]
- #define NAND_SETTING_ST          &default_cmdset, &timing[3]
- static struct pxa3xx_nand_flash __devinitdata builtin_flash_types[] = {
--{ "DEFAULT FLASH",      0,   0, 2048,  8,  8, ECC_NONE,      0,
-NAND_SETTING_DEFAULT, },
--{ "64MiB 16-bit",  0x46ec,  32,  512, 16, 16, ECC_HAMMIN, 4096,
-NAND_SETTING_SAMSUNG, },
--{ "256MiB 8-bit",  0xdaec,  64, 2048,  8,  8, ECC_HAMMIN, 2048,
-NAND_SETTING_SAMSUNG, },
--{ "1GiB 8-bit",    0xd3ec, 128, 2048,  8,  8, ECC_BCH,    4096,
-NAND_SETTING_SAMSUNG, },
--{ "4GiB 8-bit",    0xd7ec, 128, 4096,  8,  8, ECC_BCH,    8192,
-NAND_SETTING_SAMSUNG, },
--{ "128MiB 8-bit",  0xa12c,  64, 2048,  8,  8, ECC_HAMMIN, 1024,
-NAND_SETTING_MICRON, },
--{ "128MiB 16-bit", 0xb12c,  64, 2048, 16, 16, ECC_HAMMIN, 1024,
-NAND_SETTING_MICRON, },
--{ "512MiB 8-bit",  0xdc2c,  64, 2048,  8,  8, ECC_HAMMIN, 4096,
-NAND_SETTING_MICRON, },
--{ "512MiB 16-bit", 0xcc2c,  64, 2048, 16, 16, ECC_HAMMIN, 4096,
-NAND_SETTING_MICRON, },
--{ "1GiB 8-bit",    0x382c, 128, 4096,  8,  8, ECC_BCH,    2048,
-NAND_SETTING_MICRON },
--{ "256MiB 16-bit", 0xba20,  64, 2048, 16, 16, ECC_HAMMIN, 2048,
-NAND_SETTING_ST, },
-+{ "DEFAULT FLASH",      0,       0,  0, 2048,  8,  8, ECC_NONE,
-0, NAND_SETTING_DEFAULT, },
-+{ "64MiB 16-bit",  0x46ec, 0xffff,  32,  512, 16, 16, ECC_HAMMIN,
-4096, NAND_SETTING_SAMSUNG, },
-+{ "256MiB 8-bit",  0xdaec, 0xffff,  64, 2048,  8,  8, ECC_HAMMIN,
-2048, NAND_SETTING_SAMSUNG, },
-+{ "1GiB 8-bit",    0xd3ec, 0xffff, 128, 2048,  8,  8, ECC_BCH,
-4096, NAND_SETTING_SAMSUNG, },
-+{ "4GiB 8-bit",    0xd7ec, 0x29d5, 128, 4096,  8,  8, ECC_BCH,
-8192, NAND_SETTING_SAMSUNG, },
-+{ "128MiB 8-bit",  0xa12c, 0xffff,  64, 2048,  8,  8, ECC_HAMMIN,
-1024, NAND_SETTING_MICRON, },
-+{ "128MiB 16-bit", 0xb12c, 0xffff,  64, 2048, 16, 16, ECC_HAMMIN,
-1024, NAND_SETTING_MICRON, },
-+{ "512MiB 8-bit",  0xdc2c, 0xffff,  64, 2048,  8,  8, ECC_HAMMIN,
-4096, NAND_SETTING_MICRON, },
-+{ "512MiB 16-bit", 0xcc2c, 0xffff,  64, 2048, 16, 16, ECC_HAMMIN,
-4096, NAND_SETTING_MICRON, },
-+{ "1GiB 8-bit",    0x382c, 0xffff, 128, 4096,  8,  8, ECC_BCH,
-2048, NAND_SETTING_MICRON },
-+{ "256MiB 16-bit", 0xba20, 0xffff,  64, 2048, 16, 16, ECC_HAMMIN,
-2048, NAND_SETTING_ST, },
- };
+@@ -228,10 +228,9 @@ static int use_dma = 1;
+ module_param(use_dma, bool, 0444);
+ MODULE_PARM_DESC(use_dma, "enable DMA for data transfering to/from NAND HW");
 
- static const char *mtd_names[] = {"pxa3xx_nand-0", "pxa3xx_nand-1", NULL};
-@@ -1209,7 +1209,7 @@ static int __devinit pxa3xx_nand_scan(struct
-mtd_info *mtd)
- 	struct nand_flash_dev pxa3xx_flash_ids[2] = {{NULL,}, {NULL,}};
- 	const struct pxa3xx_nand_flash *f = NULL;
- 	struct nand_chip *chip = mtd->priv;
--	uint32_t id = -1;
-+	uint16_t id[2];
- 	uint64_t chipsize;
- 	int i, ret;
+-/*
+- * Default NAND flash controller configuration setup by the
+- * bootloader. This configuration is used only when pdata->keep_config is set
+- */
++static int use_polling = 0;
++module_param(use_polling, bool, 0444);
++MODULE_PARM_DESC(use_polling, "Use full polling mode");
+ static struct pxa3xx_nand_cmdset default_cmdset = {
+ 	.read1		= 0x3000,
+ 	.read2		= 0x0050,
+@@ -403,6 +402,7 @@ static void pxa3xx_nand_start(struct pxa3xx_nand *nand)
+ 	info = nand->info[nand->chip_select];
+ 	ndcr = info->reg_ndcr;
+ 	ndcr |= nand->use_dma ? NDCR_DMA_EN : 0;
++	ndcr |= use_polling ? NDCR_INT_MASK : 0;
+ 	ndcr |= NDCR_ND_RUN;
 
-@@ -1225,10 +1225,10 @@ static int __devinit pxa3xx_nand_scan(struct
-mtd_info *mtd)
- 		return -EINVAL;
+ 	switch (nand->ecc_strength) {
+@@ -574,9 +574,8 @@ static void pxa3xx_nand_data_dma_irq(int channel,
+void *data)
+ 	nand_writel(nand, NDSR, NDSR_WRDREQ | NDSR_RDDREQ);
+ }
+
+-static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
++static int pxa3xx_nand_transaction(struct pxa3xx_nand *nand)
+ {
+-	struct pxa3xx_nand *nand = devid;
+ 	struct pxa3xx_nand_info *info;
+ 	unsigned int status, is_completed = 0, cs, cmd_seqs, ndcb1, ndcb2;
+ 	unsigned int ready, cmd_done, page_done, badblock_detect;
+@@ -613,13 +612,20 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+ 	if (status & ready) {
+ 		nand->state |= STATE_READY;
+ 		if (nand->wait_ready[cmd_seqs]) {
+-			enable_int(nand, NDCR_WRCMDREQM);
++			if (!use_polling)
++				enable_int(nand, NDCR_WRCMDREQM | NDCR_CS0_CMDDM
++						| NDCR_CS1_CMDDM);
+ 			if (cmd_seqs == nand->total_cmds)
+ 				is_completed = 1;
+ 		}
+ 	}
+ 	if (status & cmd_done) {
+ 		nand->state |= STATE_CMD_DONE;
++		if (nand->wait_ready[cmd_seqs] && !(nand->state & STATE_READY)) {
++			status &= ~cmd_done;
++			if (!use_polling)
++				disable_int(nand, NDCR_CS0_CMDDM | NDCR_CS1_CMDDM);
++		}
+ 		if (cmd_seqs == nand->total_cmds && !nand->wait_ready[cmd_seqs])
+ 			is_completed = 1;
+ 	}
+@@ -627,7 +633,8 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+ 	if (status & NDSR_WRCMDREQ) {
+ 		status &= ~NDSR_WRCMDREQ;
+ 		if (nand->wait_ready[cmd_seqs] && !(nand->state & STATE_READY)) {
+-			disable_int(nand, NDCR_WRCMDREQM);
++			if (!use_polling)
++				disable_int(nand, NDCR_WRCMDREQM);
+ 			goto IRQ_FORCE_EXIT;
+ 		}
+
+@@ -657,12 +664,32 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+ IRQ_FORCE_EXIT:
+ 	/* clear NDSR to let the controller exit the IRQ */
+ 	nand_writel(nand, NDSR, status);
+-	if (is_completed)
+-		complete(&nand->cmd_complete);
+ NORMAL_IRQ_EXIT:
++	return is_completed;
++}
++
++static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
++{
++	struct pxa3xx_nand *nand = devid;
++	if (pxa3xx_nand_transaction(nand))
++		complete(&nand->cmd_complete);
+ 	return IRQ_HANDLED;
+ }
+
++static int pxa3xx_nand_polling(struct pxa3xx_nand *nand, unsigned long timeout)
++{
++	int i, ret = 0;
++
++	for (i = 0; i < timeout; i++) {
++		ret = pxa3xx_nand_transaction(nand);
++		if (ret)
++			break;
++		udelay(10);
++	}
++
++	return ret;
++}
++
+ static inline int is_buf_blank(uint8_t *buf, size_t len)
+ {
+ 	for (; len > 0; len--)
+@@ -930,8 +957,11 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info
+*mtd, unsigned command,
+ 		nand->state |= STATE_CMD_PREPARED;
+ 		pxa3xx_nand_start(nand);
+
+-		ret = wait_for_completion_timeout(&nand->cmd_complete,
+-				CHIP_DELAY_TIMEOUT);
++		if (!use_polling)
++			ret = wait_for_completion_timeout(&nand->cmd_complete,
++					CHIP_DELAY_TIMEOUT);
++		else
++			ret = pxa3xx_nand_polling(nand, CHIP_DELAY_TIMEOUT);
+ 		if (!ret) {
+ 			dev_err(&nand->pdev->dev, "Wait time out!!!\n");
+ 			nand_error_dump(nand);
+@@ -1551,7 +1581,9 @@ static int __devinit pxa3xx_nand_probe(struct
+platform_device *pdev)
+ 		return -ENODEV;
  	}
 
--	nand->data_buff = (unsigned char *)&id;
-+	nand->data_buff = (unsigned char *)id;
- 	chip->cmdfunc(mtd, NAND_CMD_READID, 0, 0);
--	if (id != 0)
--		dev_info(&nand->pdev->dev, "Detect a flash id %x\n", id);
-+	if (id[0] != 0)
-+		dev_info(&nand->pdev->dev, "Detect a flash id %x\n", id[0]);
- 	else {
- 		dev_warn(&nand->pdev->dev, "Read out ID 0, potential timing set wrong!!\n");
- 		free_cs_resource(info, nand->chip_select);
-@@ -1242,7 +1242,7 @@ static int __devinit pxa3xx_nand_scan(struct
-mtd_info *mtd)
- 			f = &builtin_flash_types[i - pdata->num_flash + 1];
-
- 		/* find the chip in default list */
--		if (f->chip_id == id)
-+		if ((f->chip_id == id[0]) && ((f->ext_id & id[1]) == id[1]))
- 			break;
- 	}
-
+-	if (!(pdata->controller_attrs & PXA3XX_DMA_EN))
++	if (pdata->controller_attrs & PXA3XX_POOLING_MODE)
++		use_polling = 1;
++	if (!(pdata->controller_attrs & PXA3XX_DMA_EN) || use_polling)
+ 		use_dma = 0;
+ 	ret = alloc_nand_resource(pdev);
+ 	if (ret)
 -- 
 1.7.0.4
