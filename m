@@ -1,124 +1,73 @@
 From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Tue, 22 Jun 2010 14:47:43 +0530
-Subject: [PATCH 08/12] mmci: add variant data and default MCICLOCK support
+Date: Tue, 22 Jun 2010 14:47:44 +0530
+Subject: [PATCH 09/12] mmci: enable hardware flow control on Ux500 variants
 In-Reply-To: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
 References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <1277198267-10860-8-git-send-email-rabin.vincent@stericsson.com>
+Message-ID: <1277198267-10860-9-git-send-email-rabin.vincent@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a variant_data structure to handle the differences between the
-various variants of this peripheral.  Add a first quirk for a default
-MCICLOCK value, required on the Ux500 variant where the enable bit needs
-to be always set, since it controls access to some registers.
+Although both the U300 and Ux500 use ST variants, the HWFCEN bits are at
+different positions, so use the variant_data to store the information.
 
 Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
 ---
- drivers/mmc/host/mmci.c |   31 ++++++++++++++++++++++++++++++-
- drivers/mmc/host/mmci.h |    2 ++
- 2 files changed, 32 insertions(+), 1 deletions(-)
+ drivers/mmc/host/mmci.c |    8 ++++++--
+ drivers/mmc/host/mmci.h |    2 --
+ 2 files changed, 6 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 63eb7f4..a1d1023 100644
+index a1d1023..3fca46d 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -36,12 +36,30 @@
+@@ -39,19 +39,23 @@ static unsigned int fmax = 515633;
+ /**
+  * struct variant_data - MMCI variant-specific quirks
+  * @clkreg: default value for MCICLOCK register
++ * @clkreg_enable: enable value for MMCICLOCK register
+  */
+ struct variant_data {
+ 	unsigned int		clkreg;
++	unsigned int		clkreg_enable;
+ };
  
- static unsigned int fmax = 515633;
+ static struct variant_data variant_arm = {
+ };
  
-+/**
-+ * struct variant_data - MMCI variant-specific quirks
-+ * @clkreg: default value for MCICLOCK register
-+ */
-+struct variant_data {
-+	unsigned int		clkreg;
-+};
-+
-+static struct variant_data variant_arm = {
-+};
-+
-+static struct variant_data variant_u300 = {
-+};
-+
-+static struct variant_data variant_ux500 = {
-+	.clkreg			= MCI_CLK_ENABLE,
-+};
+ static struct variant_data variant_u300 = {
++	.clkreg_enable		= 1 << 13, /* HWFCEN */
+ };
+ 
+ static struct variant_data variant_ux500 = {
+ 	.clkreg			= MCI_CLK_ENABLE,
++	.clkreg_enable		= 1 << 14, /* HWFCEN */
+ };
  /*
   * This must be called with host->lock held
-  */
- static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
- {
--	u32 clk = 0;
-+	struct variant_data *variant = host->variant;
-+	u32 clk = variant->clkreg;
- 
- 	if (desired) {
- 		if (desired >= host->mclk) {
-@@ -564,6 +582,7 @@ static const struct mmc_host_ops mmci_ops = {
- static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- {
- 	struct mmci_platform_data *plat = dev->dev.platform_data;
-+	struct variant_data *variant = id->data;
- 	struct mmci_host *host;
- 	struct mmc_host *mmc;
- 	int ret;
-@@ -608,6 +627,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- 		goto clk_free;
- 
- 	host->plat = plat;
-+	host->variant = variant;
- 	host->mclk = clk_get_rate(host->clk);
- 	/*
- 	 * According to the spec, mclk is max 100 MHz,
-@@ -860,19 +880,28 @@ static struct amba_id mmci_ids[] = {
- 	{
- 		.id	= 0x00041180,
- 		.mask	= 0x000fffff,
-+		.data	= &variant_arm,
- 	},
- 	{
- 		.id	= 0x00041181,
- 		.mask	= 0x000fffff,
-+		.data	= &variant_arm,
- 	},
- 	/* ST Micro variants */
- 	{
- 		.id     = 0x00180180,
- 		.mask   = 0x00ffffff,
-+		.data	= &variant_u300,
- 	},
- 	{
- 		.id     = 0x00280180,
- 		.mask   = 0x00ffffff,
-+		.data	= &variant_u300,
-+	},
-+	{
-+		.id     = 0x00480180,
-+		.mask   = 0x00ffffff,
-+		.data	= &variant_ux500,
- 	},
- 	{ 0, 0 },
- };
+@@ -71,8 +75,8 @@ static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
+ 				clk = 255;
+ 			host->cclk = host->mclk / (2 * (clk + 1));
+ 		}
+-		if (host->hw_designer == AMBA_VENDOR_ST)
+-			clk |= MCI_ST_FCEN; /* Bug fix in ST IP block */
++
++		clk |= variant->clkreg_enable;
+ 		clk |= MCI_CLK_ENABLE;
+ 		/* This hasn't proven to be worthwhile */
+ 		/* clk |= MCI_CLK_PWRSAVE; */
 diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 516adc6..5e635e1 100644
+index 5e635e1..0a11ddc 100644
 --- a/drivers/mmc/host/mmci.h
 +++ b/drivers/mmc/host/mmci.h
-@@ -145,6 +145,7 @@
- #define NR_SG		16
+@@ -28,8 +28,6 @@
+ #define MCI_4BIT_BUS		(1 << 11)
+ /* 8bit wide buses supported in ST Micro versions */
+ #define MCI_ST_8BIT_BUS		(1 << 12)
+-/* HW flow control on the ST Micro version */
+-#define MCI_ST_FCEN		(1 << 13)
  
- struct clk;
-+struct variant_data;
- 
- struct mmci_host {
- 	void __iomem		*base;
-@@ -165,6 +166,7 @@ struct mmci_host {
- 	unsigned int		cclk;
- 	u32			pwr;
- 	struct mmci_platform_data *plat;
-+	struct variant_data	*variant;
- 
- 	u8			hw_designer;
- 	u8			hw_revision:4;
+ #define MMCIARGUMENT		0x008
+ #define MMCICOMMAND		0x00c
 -- 
 1.7.0
