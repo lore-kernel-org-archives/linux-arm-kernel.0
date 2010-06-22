@@ -1,30 +1,52 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 22 Jun 2010 13:19:02 +0200
-Subject: [PATCH] pxa3xx: Fix HSIO bus x24 multiplier
-In-Reply-To: <201006221006.20590.pieterg@gmx.com>
-References: <1277154123-31532-1-git-send-email-marek.vasut@gmail.com>
-	<201006221006.20590.pieterg@gmx.com>
-Message-ID: <201006221319.02992.marek.vasut@gmail.com>
+From: adrian.wenl@gmail.com (Lei Wen)
+Date: Tue, 22 Jun 2010 19:24:20 +0800
+Subject: [PATCH 05/25] pxa3xx_nand: rework irq logic
+In-Reply-To: <AANLkTinzmIud44FuZhZSs94yo16F0ipP-uPdX9gAhdPf@mail.gmail.com>
+References: <AANLkTimvhEWIDupsj3Ty8vB9ualwU9RsaIxa0CDgWgYQ@mail.gmail.com>
+	<AANLkTikTzNY2hI0JDTOOZpGeOPc_MU79jVJ_1L9XxA_e@mail.gmail.com>
+	<AANLkTikmuCHqJQY2g8G3FsrufO5dKGt9WNZFnmvoSGl2@mail.gmail.com>
+	<AANLkTinzmIud44FuZhZSs94yo16F0ipP-uPdX9gAhdPf@mail.gmail.com>
+Message-ID: <AANLkTinEOvQX0f6jKsGEALSLBMPmeSgx9n6QIsCcHVKG@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 22. ?ervna 2010 10:06:20 pieterg napsal(a):
-> On Monday 21 June 2010 23:02:03 Marek Vasut wrote:
-> > The value should be 24, not 0 in the possibilities array. It was just a
-> > silly mistake.
-> 
-> Good one, reminds me that I've had this one on my list as well for a while.
-> I actually went one step further, made the pxa310 use HSIO 312MHz when
-> running on 624MHz.
-> 
-> (not sure whether the patch will apply cleanly, but cpufreq-pxa3xx.c still
-> looks roughly the same at first glance..)
-> 
-> Rgds, Pieter
+On Tue, Jun 22, 2010 at 6:02 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Tue, Jun 22, 2010 at 5:34 PM, Lei Wen <adrian.wenl@gmail.com> wrote:
+>> On Fri, Jun 18, 2010 at 2:50 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>>> On Fri, Jun 18, 2010 at 1:34 PM, Haojian Zhuang
+>>> <haojian.zhuang@gmail.com> wrote:
+>>>> From 18d589a078871a09dec0862241fedd2d1d07be85 Mon Sep 17 00:00:00 2001
+>>>> From: Lei Wen <leiwen@marvell.com>
+>>>> Date: Mon, 31 May 2010 14:05:46 +0800
+>>>> Subject: [PATCH 05/25] pxa3xx_nand: rework irq logic
+>>>>
+>>>> Enable all irq when we start the nand controller, and
+>>>> put all the transaction logic in the pxa3xx_nand_irq.
+>>>>
+>>>
+>>> Didn't look into the change too much, but the idea sounds to me like
+>>> chaining all the logic with different IRQ events, which was my original
+>>> reason of having different states. And considering the page read/write
+>>> is actually to an internal SRAM within the controller, I guess it's quick
+>>> enough. (though I'd suggest to do some experiments of time profiling
+>>> to see if it's going to increase the interrupt latency)
+>>>
+>>>> By doing this way, we could dramatically increase the
+>>>> performance by avoid unnecessary delay.
+>>>>
+>>>
+>>> The removal of __read_id() doesn't look to be part of this patch, no?
+>>>
+>> For write_cmd function has been discard and __read_id function would
+>> not be used, if
+>> continue to keep the __read_id() definition would lead to make failure...
+>>
+>
+> Well, the logic is: this change doesn't belong to this patch, so is it possible
+> to separate the change apart and still keep it compiling?
+>
 
-Hi,
+Em... Seems reasonable, I'll try to do that. :-)
 
-I'd suggest you to submit a proper patch. With your whole name and using git-
-send-email.
-
-Cheers
+Best regards,
+Lei
