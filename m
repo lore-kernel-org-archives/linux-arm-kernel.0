@@ -1,54 +1,43 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 22 Jun 2010 21:29:09 +0900
-Subject: [PATCH v2] s3c64xx: Fix build without SDHCI controllers
-In-Reply-To: <1276235941-12114-1-git-send-email-m.szyprowski@samsung.com>
-References: <000801cb0900$f64bbdc0$e2e33940$%kim@samsung.com>
-	<1276235941-12114-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <015c01cb1206$86bfeda0$943fc8e0$%kim@samsung.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Tue, 22 Jun 2010 16:47:03 +0400
+Subject: [PATCH v4 1/4] ARM: Remove the domain switching on ARMv6k/v7 CPUs
+In-Reply-To: <20100621144626.26309.59790.stgit@e102109-lin.cambridge.arm.com>
+References: <20100621144409.26309.87173.stgit@e102109-lin.cambridge.arm.com>
+	<20100621144626.26309.59790.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100622124703.GA12613@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
+On Mon, Jun 21, 2010 at 03:46:26PM +0100, Catalin Marinas wrote:
+> This patch removes the domain switching functionality via the set_fs and
+> __switch_to functions on cores that have a TLS register.
 > 
-> This patch fixes the following compilation problem if only NCP machine
-> is selected:
+> Currently, the ioremap and vmalloc areas share the same level 1 page
+> tables and therefore have the same domain (DOMAIN_KERNEL). When the
+> kernel domain is modified from Client to Manager (via the __set_fs or in
+> the __switch_to function), the XN (eXecute Never) bit is overridden and
+> newer CPUs can speculatively prefetch the ioremap'ed memory.
 > 
-> arch/arm/mach-s3c64xx/s3c6410.c: In function ?s3c6410_map_io?:
-> arch/arm/mach-s3c64xx/s3c6410.c:51: error: implicit declaration of function
-> ?s3c6410_default_sdhci2?
+> Linux performs the kernel domain switching to allow user-specific
+> functions (copy_to/from_user, get/put_user etc.) to access kernel
+> memory. In order for these functions to work with the kernel domain set
+> to Client, the patch modifies the LDRT/STRT and related instructions to
+> the LDR/STR ones.
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> The user pages access rights are also modified for kernel read-only
+> access rather than read/write so that the copy-on-write mechanism still
+> works. CPU_USE_DOMAINS gets disabled only if HAS_TLS_REG is defined
+> since writing the TLS value to the high vectors page isn't possible.
+> 
+> The user addresses passed to the kernel are checked by the access_ok()
+> function so that they do not point to the kernel space.
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Applied :-)
+I tested this on ARMv6K (ARM11 MPcore) and ARMv7 (Cortex-A9), and
+didn't notice any issues. This is also needed for robust mutextes
+support... so, if that helps,
 
-> ---
->  arch/arm/plat-samsung/include/plat/sdhci.h |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h b/arch/arm/plat-
-> samsung/include/plat/sdhci.h
-> index 13f9fb2..2e263a8 100644
-> --- a/arch/arm/plat-samsung/include/plat/sdhci.h
-> +++ b/arch/arm/plat-samsung/include/plat/sdhci.h
-> @@ -166,8 +166,10 @@ static inline void s3c6410_default_sdhci2(void) { }
->  #else
->  static inline void s3c6410_default_sdhci0(void) { }
->  static inline void s3c6410_default_sdhci1(void) { }
-> +static inline void s3c6410_default_sdhci2(void) { }
->  static inline void s3c6400_default_sdhci0(void) { }
->  static inline void s3c6400_default_sdhci1(void) { }
-> +static inline void s3c6400_default_sdhci2(void) { }
-> 
->  #endif /* CONFIG_S3C64XX_SETUP_SDHCI */
-> 
-> --
+Tested-by: Anton Vorontsov <cbouatmailru@gmail.com>
 
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Thanks!
