@@ -1,46 +1,189 @@
 From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Tue, 22 Jun 2010 13:53:01 +0530
-Subject: [PATCH] Fix flush_kernel_dcache_page for VIPT non-aliasing caches
-Message-ID: <1277194981-21548-1-git-send-email-rabin.vincent@stericsson.com>
+Date: Tue, 22 Jun 2010 14:47:36 +0530
+Subject: [PATCH 01/12] mmci: use sg_miter API to fix multi-page sg handling
+Message-ID: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-flush_kernel_dcache_page() is currently a no-op on CPUs with VIPT
-non-aliasing data caches.
+The mmci driver's SG list iteration logic assumes that each SG entry
+spans only one page, and only maps and flushes one page of the sg.  This
+is not a valid assumption.  Fix it by converting the driver to the
+sg_miter API, which correctly handles sgs which span multiple pages.
+Cache flushing is handled inside the sg_miter API implementation.
 
-Because the data and instruction caches are not coherent, not flushing
-the D-cache when PIO is done in the kernel could mean that data stays in
-the D-cache and stale data is loaded from memory into the I-cache when
-this page is later executed from.
-
-This can be observed, for example, as random crashes in the init process
-when a file system is mounted from MMC, if the drivers (or the MMC block
-driver bounce buffer) uses flush_kernel_dcache_page() (usually
-indirectly via the sg_miter API).
-
-This problem is visible on systems with write-allocate caches.  To fix
-it, flush the D-cache in flush_kernel_dcache_page() even on VIPT
-non-aliasing caches.
-
-Cc: Catalin Marinas <catalin.marinas@arm.com>
 Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
 ---
- arch/arm/include/asm/cacheflush.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/mmc/host/mmci.c |   55 ++++++++++++++++++++++------------------------
+ drivers/mmc/host/mmci.h |   35 +-----------------------------
+ 2 files changed, 27 insertions(+), 63 deletions(-)
 
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index 4656a24..ddbee95 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -406,7 +406,7 @@ static inline void flush_anon_page(struct vm_area_struct *vma,
- static inline void flush_kernel_dcache_page(struct page *page)
- {
- 	/* highmem pages are always flushed upon kunmap already */
--	if ((cache_is_vivt() || cache_is_vipt_aliasing()) && !PageHighMem(page))
-+	if (!PageHighMem(page))
- 		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 4917af9..683516b 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -26,7 +26,6 @@
+ #include <linux/amba/mmci.h>
+ #include <linux/regulator/consumer.h>
+ 
+-#include <asm/cacheflush.h>
+ #include <asm/div64.h>
+ #include <asm/io.h>
+ #include <asm/sizes.h>
+@@ -98,6 +97,18 @@ static void mmci_stop_data(struct mmci_host *host)
+ 	host->data = NULL;
  }
  
++static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
++{
++	unsigned int flags = SG_MITER_ATOMIC;
++
++	if (data->flags & MMC_DATA_READ)
++		flags |= SG_MITER_TO_SG;
++	else
++		flags |= SG_MITER_FROM_SG;
++
++	sg_miter_start(&host->sg_miter, data->sg, data->sg_len, flags);
++}
++
+ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+ {
+ 	unsigned int datactrl, timeout, irqmask;
+@@ -205,13 +216,6 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 		else if (status & (MCI_TXUNDERRUN|MCI_RXOVERRUN))
+ 			data->error = -EIO;
+ 		status |= MCI_DATAEND;
+-
+-		/*
+-		 * We hit an error condition.  Ensure that any data
+-		 * partially written to a page is properly coherent.
+-		 */
+-		if (host->sg_len && data->flags & MMC_DATA_READ)
+-			flush_dcache_page(sg_page(host->sg_ptr));
+ 	}
+ 	if (status & MCI_DATAEND) {
+ 		mmci_stop_data(host);
+@@ -314,15 +318,18 @@ static int mmci_pio_write(struct mmci_host *host, char *buffer, unsigned int rem
+ static irqreturn_t mmci_pio_irq(int irq, void *dev_id)
+ {
+ 	struct mmci_host *host = dev_id;
++	struct sg_mapping_iter *sg_miter = &host->sg_miter;
+ 	void __iomem *base = host->base;
++	unsigned long flags;
+ 	u32 status;
+ 
+ 	status = readl(base + MMCISTATUS);
+ 
+ 	dev_dbg(mmc_dev(host->mmc), "irq1 (pio) %08x\n", status);
+ 
++	local_irq_save(flags);
++
+ 	do {
+-		unsigned long flags;
+ 		unsigned int remain, len;
+ 		char *buffer;
+ 
+@@ -336,11 +343,11 @@ static irqreturn_t mmci_pio_irq(int irq, void *dev_id)
+ 		if (!(status & (MCI_TXFIFOHALFEMPTY|MCI_RXDATAAVLBL)))
+ 			break;
+ 
+-		/*
+-		 * Map the current scatter buffer.
+-		 */
+-		buffer = mmci_kmap_atomic(host, &flags) + host->sg_off;
+-		remain = host->sg_ptr->length - host->sg_off;
++		if (!sg_miter_next(sg_miter))
++			break;
++
++		buffer = sg_miter->addr;
++		remain = sg_miter->length;
+ 
+ 		len = 0;
+ 		if (status & MCI_RXACTIVE)
+@@ -348,31 +355,21 @@ static irqreturn_t mmci_pio_irq(int irq, void *dev_id)
+ 		if (status & MCI_TXACTIVE)
+ 			len = mmci_pio_write(host, buffer, remain, status);
+ 
+-		/*
+-		 * Unmap the buffer.
+-		 */
+-		mmci_kunmap_atomic(host, buffer, &flags);
++		sg_miter->consumed = len;
+ 
+-		host->sg_off += len;
+ 		host->size -= len;
+ 		remain -= len;
+ 
+ 		if (remain)
+ 			break;
+ 
+-		/*
+-		 * If we were reading, and we have completed this
+-		 * page, ensure that the data cache is coherent.
+-		 */
+-		if (status & MCI_RXACTIVE)
+-			flush_dcache_page(sg_page(host->sg_ptr));
+-
+-		if (!mmci_next_sg(host))
+-			break;
+-
+ 		status = readl(base + MMCISTATUS);
+ 	} while (1);
+ 
++	sg_miter_stop(sg_miter);
++
++	local_irq_restore(flags);
++
+ 	/*
+ 	 * If we're nearing the end of the read, switch to
+ 	 * "any data available" mode.
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index d77062e..7cb24ab 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -171,42 +171,9 @@ struct mmci_host {
+ 	struct timer_list	timer;
+ 	unsigned int		oldstat;
+ 
+-	unsigned int		sg_len;
+-
+ 	/* pio stuff */
+-	struct scatterlist	*sg_ptr;
+-	unsigned int		sg_off;
++	struct sg_mapping_iter	sg_miter;
+ 	unsigned int		size;
+ 	struct regulator	*vcc;
+ };
+ 
+-static inline void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
+-{
+-	/*
+-	 * Ideally, we want the higher levels to pass us a scatter list.
+-	 */
+-	host->sg_len = data->sg_len;
+-	host->sg_ptr = data->sg;
+-	host->sg_off = 0;
+-}
+-
+-static inline int mmci_next_sg(struct mmci_host *host)
+-{
+-	host->sg_ptr++;
+-	host->sg_off = 0;
+-	return --host->sg_len;
+-}
+-
+-static inline char *mmci_kmap_atomic(struct mmci_host *host, unsigned long *flags)
+-{
+-	struct scatterlist *sg = host->sg_ptr;
+-
+-	local_irq_save(*flags);
+-	return kmap_atomic(sg_page(sg), KM_BIO_SRC_IRQ) + sg->offset;
+-}
+-
+-static inline void mmci_kunmap_atomic(struct mmci_host *host, void *buffer, unsigned long *flags)
+-{
+-	kunmap_atomic(buffer, KM_BIO_SRC_IRQ);
+-	local_irq_restore(*flags);
+-}
 -- 
 1.7.0
