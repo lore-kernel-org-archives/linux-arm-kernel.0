@@ -1,110 +1,240 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 22 Jun 2010 15:15:44 +0800
-Subject: [PATCH v5 1/3] ARM: SAMSUNG: Add keypad device support
-In-Reply-To: <4C20356A.1050309@samsung.com>
-References: <1277101605-2435-1-git-send-email-jy0922.shim@samsung.com>
-	<AANLkTil1aiJ1gu6jRrO4LeB0fYltOq4A3wXJJB1ZOa8q@mail.gmail.com>
-	<20100621091952.GB7702@n2100.arm.linux.org.uk>
-	<AANLkTilU1X1LR33Eed9BVGE2n-dqRuIuUFfbDd3gzEVc@mail.gmail.com>
-	<20100621111612.GJ7702@n2100.arm.linux.org.uk>
-	<4C200847.9010200@samsung.com>
-	<AANLkTikbBkDOVF6ti_bTultATuW1KhciAmKc1Geg1OSH@mail.gmail.com>
-	<4C202D8F.7030005@samsung.com>
-	<AANLkTik5ScLMuo5OTSFl_k7qfrBR8xAicVrt98CXqqBa@mail.gmail.com>
-	<4C20356A.1050309@samsung.com>
-Message-ID: <AANLkTil-yVO2cDKLccpWVsJFVn3rpaPF7LJOUo5TlAr3@mail.gmail.com>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Tue, 22 Jun 2010 16:19:19 +0900
+Subject: [PATCH] S5PV210 Correct clock source control register properties
+In-Reply-To: <000001cb0f63$3682c5b0$a3885110$%kim@samsung.com>
+References: <1276766116-6839-1-git-send-email-myungjoo.ham@samsung.com>
+	<005401cb0ecb$c3f16c00$4bd44400$%kim@samsung.com>
+	<AANLkTim1psO4ZeZGAgNteJp_ytRhzoPlu4D3VblPgz6w@mail.gmail.com>
+	<000001cb0f63$3682c5b0$a3885110$%kim@samsung.com>
+Message-ID: <AANLkTimjiBOzK1IfGTEY2xLjZ73uchjJACe8d5LQRB9s@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 22, 2010 at 12:00 PM, Joonyoung Shim
-<jy0922.shim@samsung.com> wrote:
-> On 6/22/2010 12:38 PM, Eric Miao wrote:
->> On Tue, Jun 22, 2010 at 11:27 AM, Joonyoung Shim
->> <jy0922.shim@samsung.com> wrote:
->>> On 6/22/2010 12:02 PM, Eric Miao wrote:
->>>> On Tue, Jun 22, 2010 at 8:48 AM, Joonyoung Shim <jy0922.shim@samsung.com> wrote:
->>>>> On 6/21/2010 8:16 PM, Russell King - ARM Linux wrote:
->>>>>> On Mon, Jun 21, 2010 at 06:39:10PM +0800, Eric Miao wrote:
->>>>>>> On Mon, Jun 21, 2010 at 5:19 PM, Russell King - ARM Linux
->>>>>>> <linux@arm.linux.org.uk> wrote:
->>>>>>>> On Mon, Jun 21, 2010 at 05:05:34PM +0800, Eric Miao wrote:
->>>>>>>>> On Mon, Jun 21, 2010 at 2:26 PM, Joonyoung Shim <jy0922.shim@samsung.com> wrote:
->>>>>>>>>> +void __init samsung_keypad_set_platdata(struct samsung_keypad_platdata *pd)
->>>>>>>>>> +{
->>>>>>>>>> + ? ? ? struct samsung_keypad_platdata *npd;
->>>>>>>>>> +
->>>>>>>>>> + ? ? ? if (!pd) {
->>>>>>>>>> + ? ? ? ? ? ? ? printk(KERN_ERR "%s: no platform data\n", __func__);
->>>>>>>>>> + ? ? ? ? ? ? ? return;
->>>>>>>>>> + ? ? ? }
->>>>>>>>>> +
->>>>>>>>>> + ? ? ? npd = kmemdup(pd, sizeof(struct samsung_keypad_platdata), GFP_KERNEL);
->>>>>>>>>> + ? ? ? if (!npd)
->>>>>>>>>> + ? ? ? ? ? ? ? printk(KERN_ERR "%s: no memory for platform data\n", __func__);
->>>>>>>>> This part of the code is actually duplicated again and again and again
->>>>>>>>> for each device, PXA and other legacy platforms are bad references for
->>>>>>>>> this. In arch/arm/mach-mmp/, it might be a bit cleaner, there are three
->>>>>>>>> major points:
->>>>>>>>>
->>>>>>>>> ?1. A minimum 'struct pxa_device_desc' for a simple description of a
->>>>>>>>> ? ? device (more than 90% of the devices can be described that way),
->>>>>>>>> ? ? and avoid using a comparatively heavier weight platform_device,
->>>>>>>>> ? ? which can be generated at run-time
->>>>>>>>>
->>>>>>>>> ?2. pxa_register_device() to allocate and register the platform_device
->>>>>>>>> ? ? at run-time, along with the platform data
->>>>>>>> It's a bad idea to make platform data be run-time discardable like this:
->>>>>>>>
->>>>>>>>>> +struct samsung_keypad_platdata {
->>>>>>>>>> + ? ? ? const struct matrix_keymap_data *keymap_data;
->>>>>>>> What you end up with is some platform data structures which must be kept
->>>>>>>> (those which have pointers to them from the platform data), and others
->>>>>>>> (the platform data itself) which can be discarded at runtime.
->>>>>>>>
->>>>>>>> We know that the __initdata attributations cause lots of problems -
->>>>>>>> they're frequently wrong. ?Just see the constant hastle with __devinit
->>>>>>>> et.al. ?The same issue happens with __initdata as well.
->>>>>>>>
->>>>>>>> So why make things more complicated by allowing some platform data
->>>>>>>> structures to be discardable and others not to be? ?Is their small
->>>>>>>> size (maybe 6 words for this one) really worth the hastle of getting
->>>>>>>> __initdata attributations wrong (eg, on the keymap data?)
->>>>>>>>
->>>>>>> Russell,
->>>>>>>
->>>>>>> The benefit I see is when multiple boards are compiled in, those
->>>>>>> data not used can be automatically discarded.
->>>>>> Yes, but only some of the data can be discarded. ?Continuing with the
->>>>>> example in hand, while you can discard the six words which represent
->>>>>> samsung_keypad_platdata, but the keymap_data can't be because that won't
->>>>>> be re-allocated, which is probably a much larger data structure.
->>>>>>
->>>>> No. the keymap_data is possible too. The keypad driver allocates other
->>>>> keymap area of input device and it is assigned from datas based on this
->>>>> keymap_data.
->>>>>
->>>> This is a generic issue. Even if in your example, you can avoid this by
->>>> re-allocation and re-assignment (ignore the performance issue for such
->>>> behavior), the real question is the difficult to track all these down. Since
->>> Right, it can occur difficulty of maintain. I wanted just to inform the
->>> current fact.
->>>
->>>> matrix_keypad_data is something out of your control (it was actually
->>>> drafted by me and Dmitry if you are interested), and think about one day
->>>> I changed it's definition, now you have to sync your driver and code every
->>>> time to make sure the discarded data is not referenced.
->>>>
->>> if matrix_keypad_data is changed, i think the patchset should included
->>> change of related other parts using it.
->>>
+On Sat, Jun 19, 2010 at 12:55 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> MyungJoo Ham wrote:
 >>
->> That's reasonable but difficult in practice, every keypad driver using
->> matrix_keypad_data could be doing things differently. That's what I'm
+>> On Fri, Jun 18, 2010 at 6:50 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> > MyungJoo Ham wrote:
+>> >>
+>> >> The clock source controls (struct clksrc_clk) have been often accessing
+>> >> CLK_GATE_IPx, which are for clock gating and are accessed by each clock
+>> >> as well as the clock source. This duplicated clock issue may incur
+>> >> lockup problems when there are two modules accessing the same clock with
+>> >> different names.
+>> >>
+>> > Could you please explain further about the above the statement " accessed by
+>> > each clock as well as the clock source"
+>>
+>> For example, "CLK_GATE_IP2[16:19]" is accessed by "hsmmc" of struct
+>> clk (a clock) and "sclk_mmc" of struct clksrc_clk's struct clk (a
+>> clock source's clk representation).
+>>
+>> >
+>> >> Besides, the clock source control is supposed to control (setting values
+>> >> of MASK, SRC, DIV), not to turn on/off individual clock.
+>> >>
+>> > That is not quite true. Only S5PV210/S5PC110 have the gate for the clock mux.
+>> > S5P6440 and S5PC100, for instance, do not have a gate for the output for
+>> > _just_ the clock mux. And the reason why the Clock Mux Gate is provide for
+>> > the mux is explained in Section 3.4 of the user manual.
+>>
+>> In cases where clock mux gating is not available and we have each
+>> clock (supplied by this cluck mux) defined separatedly with .enable
+>> and .ctrlbit, we'd better omit .enable/.ctrlbit from struct
+>> clksrc_clk's struct clk.
+>>
+>> >
+>> >> Another point is that there are registers (CLK_SRC_MASK0/1) specialized
+>> >> for masking clock source control in S5PV210/S5PC110 according to the
+>> >> user manual (rev 20100201).
+>> >>
+>> >> Therefore, accessing CLK_SRC_MASK0/1 (rather than accessing
+>> >> CLK_GATE_IPx) for the clock source control is safer and fits to the
+>> >> semantics of S5PV210/S5PC110 registers. And fortuneatly, each clock
+>> >> source defined in clock.c has corresponding bit at CLK_SRC_MASK0/1
+>> >> except for MFC, G2D, and G3D.
+>> >>
+>> > Can you please explain how the use CLK_SRC_MASKx makes it safer. The reason
+>> > why MFC, G2D and G3D do not have a corresponding bit in CLK_SRC_MASKx is
+>> > mentioned in Section 3.4 of the user manual.
+>> >
+>> > Let me know your opinion.
+>> >
+>>
+>> It's "EXCEPT FOR MFC, G2D, G3D". I'm not saying that using
+>> CLK_SRC_MASKx is safer for these three. For other cases, I guess the
+>> lock up example should be fine.
+>>
+>> However, in most cases, this lockup issue does not make visible problem because:
+>> 1. normally, drivers use both clksrc_clk's clk and clk at the same
+>> time. for example
+>> "mmc_bus".clk_enable;
+>> "hsmmc".clk_enable;
+>> ?blahblah
+>> "hsmmc".clk_disable;
+>> "mmc_bus".clk_disable;
+>> or
+>> 2. drivers sharing the same clock uses only one side of the two.
+>> or
+>> 3. the execution block between clk_enable and clk_disable is extremely short.
+>>
+>> Nevertheless, this potential lockup issue is critical and we'd better
+>> address it.
+>>
+>>
+>> >> In this patch,
+>> >>
+>> >> - DAC, HDMI, AUDIO 0/1/2, UCLK(uart) 0/1/2/3, MIXER, FIMC 0/1/2,
+>> >> FIMC, MMC 0/1/2/3, CSIS, SPI 0/1, PWI, and PWM clock sources are
+>> >> modified to use CLK_SRC_MASK0/1, which were using CLK_GATE_IPx.
+>> >>
+>> >> - CAM 0/1 did not have enable/disable control. They now access
+>> >> ? CLK_SRC_MASK0.
+>> >>
+>> >> - MFC, G3D, G2D were using CLK_GATE_IPx. However, as there are no clocks
+>> >> ? defined to control MFC, G3D, and G2D, we kept them to access
+>> >> CLK_GATE_IPx. These may need to be modified (erase .enable, .ctrlbit
+>> >> from sclk_mfc, sclk_g2d, sclk_g3d and create clocks: g3d, g2d, mfc)
+>> >> later.
+>> >>
+>> >> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+>> >> ---
+>> >> ?arch/arm/mach-s5pv210/clock.c | ?101
+>> > ++++++++++++++++++++++-------------------
+>> >> ?1 files changed, 55 insertions(+), 46 deletions(-)
+>> >>
+>> >> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+>> >> index ec5ad8c..08c1063 100644
+>> >> --- a/arch/arm/mach-s5pv210/clock.c
+>> >> +++ b/arch/arm/mach-s5pv210/clock.c
+>> >
+>> > (snip)
+>> >
+>> > --
 >
-> Just FYI, correct name is matrix_keymap_data and current all keypad
-> drivers using matrix_keymap_data use it to same way.
+> Strictly speaking, 'duplicated clock problem' and 'clock gating issue which is controlled by CLK_GATE_IPx or CLK_SRC_MASKx' are different problem.
+> But mixed above two things in your patch.
+>
+> I think just need bug fix.
+>
+> See below mmc case.
+>
+> Following is for clock gating mmc IP by using CLK_GATE_IPx and can control(clock gating) clocks, 'aclk_hsmmcX' and 'sclk_mmcX' in the mmc IP.
+>
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?.name ? = "hsmmc",
+> ? ? ? ? ? ? ? ?.id ? ? = 0,
+> ? ? ? ? ? ? ? ?.parent = &clk_hclk_psys.clk,
+> ? ? ? ? ? ? ? ?.enable = s5pv210_clk_ip2_ctrl,
+> ? ? ? ? ? ? ? ?.ctrlbit ? ? ? ?= (1<<16),
+> ? ? ? ?}, {
+> ? ? ? ? ? ? ? ?.name ? = "hsmmc",
+> ? ? ? ? ? ? ? ?.id ? ? = 1,
+> ? ? ? ? ? ? ? ?.parent = &clk_hclk_psys.clk,
+> ? ? ? ? ? ? ? ?.enable = s5pv210_clk_ip2_ctrl,
+> ? ? ? ? ? ? ? ?.ctrlbit ? ? ? ?= (1<<17),
+> ? ? ? ?}, {
+> ? ? ? ? ? ? ? ?.name ? = "hsmmc",
+> ? ? ? ? ? ? ? ?.id ? ? = 2,
+> ? ? ? ? ? ? ? ?.parent = &clk_hclk_psys.clk,
+> ? ? ? ? ? ? ? ?.enable = s5pv210_clk_ip2_ctrl,
+> ? ? ? ? ? ? ? ?.ctrlbit ? ? ? ?= (1<<18),
+> ? ? ? ?}, {
+> ? ? ? ? ? ? ? ?.name ? = "hsmmc",
+> ? ? ? ? ? ? ? ?.id ? ? = 3,
+> ? ? ? ? ? ? ? ?.parent = &clk_hclk_psys.clk,
+> ? ? ? ? ? ? ? ?.enable = s5pv210_clk_ip2_ctrl,
+> ? ? ? ? ? ? ? ?.ctrlbit ? ? ? ?= (1<<19),
+> ? ? ? ?}...
+>
+> And following is for clock gating just 'sclk_mmcX' by using CLK_SRC_MASKx.
+> But as you know should be 's5pv210_clk_mask0_ctrl' instead of 's5pv210_clk_ip2_ctrl' like below.
+>
+> @@ -794,8 +794,8 @@ static struct clksrc_clk clksrcs[] = {
+> ? ? ? ? ? ? ? ?.clk ? ? ? ? ? ?= {
+> ? ? ? ? ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "sclk_mmc",
+> ? ? ? ? ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = 0,
+> - ? ? ? ? ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv210_clk_ip2_ctrl,
+> - ? ? ? ? ? ? ? ? ? ? ? .ctrlbit ? ? ? ? ? ? ? ?= (1 << 16),
+> + ? ? ? ? ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv210_clk_mask0_ctrl,
+> + ? ? ? ? ? ? ? ? ? ? ? .ctrlbit ? ? ? ? ? ? ? ?= (1 << 8),
+> ? ? ? ? ? ? ? ?},
+> ? ? ? ? ? ? ? ?.sources = &clkset_group2,
+> ? ? ? ? ? ? ? ?.reg_src = { .reg = S5P_CLK_SRC4, .shift = 0, .size = 4 },
+> @@ -804,8 +804,8 @@ static struct clksrc_clk clksrcs[] = {
+> ? ? ? ? ? ? ? ?.clk ? ? ? ? ? ?= {
+> ? ? ? ? ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "sclk_mmc",
+> ? ? ? ? ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = 1,
+> - ? ? ? ? ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv210_clk_ip2_ctrl,
+> - ? ? ? ? ? ? ? ? ? ? ? .ctrlbit ? ? ? ? ? ? ? ?= (1 << 17),
+> + ? ? ? ? ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv210_clk_mask0_ctrl,
+> + ? ? ? ? ? ? ? ? ? ? ? .ctrlbit ? ? ? ? ? ? ? ?= (1 << 9),
+> ? ? ? ? ? ? ? ?},
+> ? ? ? ? ? ? ? ?.sources = &clkset_group2,
+> ? ? ? ? ? ? ? ?.reg_src = { .reg = S5P_CLK_SRC4, .shift = 4, .size = 4 },
+> @@ -814,8 +814,8 @@ static struct clksrc_clk clksrcs[] = {
+> ? ? ? ? ? ? ? ?.clk ? ? ? ? ? ?= {
+> ? ? ? ? ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "sclk_mmc",
+> ? ? ? ? ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = 2,
+> - ? ? ? ? ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv210_clk_ip2_ctrl,
+> - ? ? ? ? ? ? ? ? ? ? ? .ctrlbit ? ? ? ? ? ? ? ?= (1 << 18),
+> + ? ? ? ? ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv210_clk_mask0_ctrl,
+> + ? ? ? ? ? ? ? ? ? ? ? .ctrlbit ? ? ? ? ? ? ? ?= (1 << 10),
+> ? ? ? ? ? ? ? ?},
+> ? ? ? ? ? ? ? ?.sources = &clkset_group2,
+> ? ? ? ? ? ? ? ?.reg_src = { .reg = S5P_CLK_SRC4, .shift = 8, .size = 4 },
+> @@ -824,8 +824,8 @@ static struct clksrc_clk clksrcs[] = {
+> ? ? ? ? ? ? ? ?.clk ? ? ? ? ? ?= {
+> ? ? ? ? ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "sclk_mmc",
+> ? ? ? ? ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = 3,
+> - ? ? ? ? ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv210_clk_ip2_ctrl,
+> - ? ? ? ? ? ? ? ? ? ? ? .ctrlbit ? ? ? ? ? ? ? ?= (1 << 19),
+> + ? ? ? ? ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv210_clk_mask0_ctrl,
+> + ? ? ? ? ? ? ? ? ? ? ? .ctrlbit ? ? ? ? ? ? ? ?= (1 << 11),
+> ? ? ? ? ? ? ? ?},
+> ? ? ? ? ? ? ? ?.sources = &clkset_group2,
+> ? ? ? ? ? ? ? ?.reg_src = { .reg = S5P_CLK_SRC4, .shift = 12, .size = 4 }
+>
+>
+> I think there is no lockup issue(problem) after bug fix about 'sclk_xxx'.
+> Of course, carefully used distinguished clock gating in the relevant device driver.
+> Because as I said, CLK_GATE_IPx can disable all of the clock operation of each IP.
+> If no need CLK_GATE_IPx, just do clock gating each 'sclk_xxx'.
+>
+> Could you please re-submit new stuff for bug fix?
+
+
+Ah, I've got it. So, your intention is to keep clocks with
+CLK_SRC/CLK_DIV as a form struct clksrc_clk[] list to control clock
+gating and get rid of them from struct clk[] list, right? As long as
+we are not going to list a clock in both struct clksrc_clk list and
+struct clk list, it should be fine.
+
+However, what about merging hsmmc and sclk_mmc? It there any reason to
+keep them separated? (e.g., remove "hsmmc" and let "sclk_mmc" use
+CLK_GATE_IPx.
+
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
 
-Note I was just thinking there is a potential issue as been pointed out that
-we can improve. And I'm not NACKing your perfect patch. Sorry if I made
-you think so.
+
+
+-- 
+MyungJoo Ham (???), Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
