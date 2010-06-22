@@ -1,54 +1,110 @@
 From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Tue, 22 Jun 2010 14:47:39 +0530
-Subject: [PATCH 04/12] mmci: allow the card detect status not to be inverted
+Date: Tue, 22 Jun 2010 14:47:40 +0530
+Subject: [PATCH 05/12] mmci: support card detection interrupts
 In-Reply-To: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
 References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <1277198267-10860-4-git-send-email-rabin.vincent@stericsson.com>
+Message-ID: <1277198267-10860-5-git-send-email-rabin.vincent@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms, the GPIO value from the gpio_cd pin doesn't need to
-be inverted to get it active high.
+If an IRQ can be requested on the card detected GPIO, use it instead of
+polling.
 
 Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
 ---
- drivers/mmc/host/mmci.c   |    2 +-
- include/linux/amba/mmci.h |    2 ++
- 2 files changed, 3 insertions(+), 1 deletions(-)
+ drivers/mmc/host/mmci.c |   24 +++++++++++++++++++++++-
+ drivers/mmc/host/mmci.h |    1 +
+ 2 files changed, 24 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 65f0e12..7e56726 100644
+index 7e56726..e6477e6 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -538,7 +538,7 @@ static int mmci_get_cd(struct mmc_host *mmc)
- 	else
- 		status = gpio_get_value(host->gpio_cd);
- 
--	return !status;
-+	return !status ^ host->plat->cd_noinvert;
+@@ -541,6 +541,15 @@ static int mmci_get_cd(struct mmc_host *mmc)
+ 	return !status ^ host->plat->cd_noinvert;
  }
  
++static irqreturn_t mmci_cd_irq(int irq, void *dev_id)
++{
++	struct mmci_host *host = dev_id;
++
++	mmc_detect_change(host->mmc, msecs_to_jiffies(500));
++
++	return IRQ_HANDLED;
++}
++
  static const struct mmc_host_ops mmci_ops = {
-diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
-index 7e466fe..f9d1bb5 100644
---- a/include/linux/amba/mmci.h
-+++ b/include/linux/amba/mmci.h
-@@ -23,6 +23,7 @@
-  * whether a card is present in the MMC slot or not
-  * @gpio_wp: read this GPIO pin to see if the card is write protected
-  * @gpio_cd: read this GPIO pin to detect card insertion
-+ * @cd_noinvert: true if the gpio_cd pin value or status are active high
-  * @capabilities: the capabilities of the block as implemented in
-  * this platform, signify anything MMC_CAP_* from mmc/host.h
-  */
-@@ -33,6 +34,7 @@ struct mmci_platform_data {
- 	unsigned int (*status)(struct device *);
- 	int	gpio_wp;
- 	int	gpio_cd;
-+	bool	cd_noinvert;
- 	unsigned long capabilities;
- };
+ 	.request	= mmci_request,
+ 	.set_ios	= mmci_set_ios,
+@@ -576,6 +585,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+ 
+ 	host->gpio_wp = -ENOSYS;
+ 	host->gpio_cd = -ENOSYS;
++	host->gpio_cd_irq = -1;
+ 
+ 	host->hw_designer = amba_manf(dev);
+ 	host->hw_revision = amba_rev(dev);
+@@ -654,7 +664,6 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+ 	if (host->vcc == NULL)
+ 		mmc->ocr_avail = plat->ocr_mask;
+ 	mmc->caps = plat->capabilities;
+-	mmc->caps |= MMC_CAP_NEEDS_POLL;
+ 
+ 	/*
+ 	 * We can do SGIO
+@@ -698,6 +707,12 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+ 			host->gpio_cd = plat->gpio_cd;
+ 		else if (ret != -ENOSYS)
+ 			goto err_gpio_cd;
++
++		ret = request_any_context_irq(gpio_to_irq(plat->gpio_cd),
++					      mmci_cd_irq, 0,
++					      DRIVER_NAME " (cd)", host);
++		if (ret >= 0)
++			host->gpio_cd_irq = gpio_to_irq(plat->gpio_cd);
+ 	}
+ 	if (gpio_is_valid(plat->gpio_wp)) {
+ 		ret = gpio_request(plat->gpio_wp, DRIVER_NAME " (wp)");
+@@ -709,6 +724,9 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+ 			goto err_gpio_wp;
+ 	}
+ 
++	if (host->gpio_cd_irq < 0)
++		mmc->caps |= MMC_CAP_NEEDS_POLL;
++
+ 	ret = request_irq(dev->irq[0], mmci_irq, IRQF_SHARED, DRIVER_NAME " (cmd)", host);
+ 	if (ret)
+ 		goto unmap;
+@@ -735,6 +753,8 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+ 	if (host->gpio_wp != -ENOSYS)
+ 		gpio_free(host->gpio_wp);
+  err_gpio_wp:
++	if (host->gpio_cd_irq >= 0)
++		free_irq(host->gpio_cd_irq, host);
+ 	if (host->gpio_cd != -ENOSYS)
+ 		gpio_free(host->gpio_cd);
+  err_gpio_cd:
+@@ -773,6 +793,8 @@ static int __devexit mmci_remove(struct amba_device *dev)
+ 
+ 		if (host->gpio_wp != -ENOSYS)
+ 			gpio_free(host->gpio_wp);
++		if (host->gpio_cd_irq >= 0)
++			free_irq(host->gpio_cd_irq, host);
+ 		if (host->gpio_cd != -ENOSYS)
+ 			gpio_free(host->gpio_cd);
+ 
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index 7cb24ab..516adc6 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -155,6 +155,7 @@ struct mmci_host {
+ 	struct clk		*clk;
+ 	int			gpio_cd;
+ 	int			gpio_wp;
++	int			gpio_cd_irq;
+ 
+ 	unsigned int		data_xfered;
  
 -- 
 1.7.0
