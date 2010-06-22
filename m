@@ -1,89 +1,51 @@
-From: xiachendong@hotmail.com (Xiachen Dong)
-Date: Tue, 22 Jun 2010 17:05:53 -0400
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Jun 2010 22:40:55 +0100
 Subject: Possible methods for the kernel to terminate a process
-In-Reply-To: <20100622200152.GA7325@n2100.arm.linux.org.uk>
-References: <BAY134-W142753895B5626C329E273BDC40@phx.gbl>,
+In-Reply-To: <BAY134-W52AC318A63E932EC6DDD6BDC40@phx.gbl>
+References: <BAY134-W142753895B5626C329E273BDC40@phx.gbl>
 	<20100622200152.GA7325@n2100.arm.linux.org.uk>
-Message-ID: <BAY134-W52AC318A63E932EC6DDD6BDC40@phx.gbl>
+	<BAY134-W52AC318A63E932EC6DDD6BDC40@phx.gbl>
+Message-ID: <20100622214055.GB7325@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jun 22, 2010 at 05:05:53PM -0400, Xiachen Dong wrote:
+> Sorry that I forgot to mention that the process does not have any
+> signals blocked. And we have tried sending signal from SIG_1 to SIG_64
+> to the process and we were still not able to kill it.
+> 
+> We also wrote a simple kernel char diver (say /dev/testKill) for testing
+> purpose. The close() method of the driver does nothing but trying to
+> down() a semaphore that is intentionally initialized to zero. We also
+> wrote a user space program (say userTestKill) to help the test. What
+> userTestKill does is:
+> 
+> 1) open the device and then;
+> 2) does the busy sleep forever;
+> 
+> Then we try to kill userTestKill by the shell kill command. We found
+> out that we are not able to kill it because userTestKill will end up
+> calling the close() method of /dev/testKill after it receives the
+> signal (via __exit_files() in do_exit()).
 
+Yes - the kernel is trying to free the resources which were in use by
+the program.
 
-Thanks for the reply.
+I think what you're really asking is "I'd like to be able to kill a
+program _and_ leak the resources it's using, possibly rendering them
+inoperative for use by future programs."
 
-Sorry that I forgot to mention that the process does not have any signals blocked. And we have tried sending signal from SIG_1 to SIG_64 to the process and we were still not able to kill it.
+That's possible with a few kernel hacks - all you really need to do is
+to arrange for the kernel to forget that the program ever existed.
 
-We also wrote a simple kernel char diver (say /dev/testKill) for testing purpose. The close() method of the driver does nothing but trying to down() a semaphore that is intentionally initialized to zero. We also wrote a user space program (say userTestKill) to help the test. What userTestKill does is:
+However, I suspect that you don't actually want this - you want to be
+able to terminate a program and free its resources, even if freeing
+those resources ends up blocking with an uninterruptible wait.  I
+don't think that's possible.
 
-1) open the device and then;
-2) does the busy sleep forever;
-
-Then we try to kill userTestKill by the shell kill command. We found out that we are not able to kill it because userTestKill will end up calling the close() method of /dev/testKill after it receives the signal (via __exit_files() in do_exit()). However, since down() method is an uninterruptible block/wait, userTestKill can not be killed by any signal.
-
-What we wish to know is whether there are any other methods for the kernel to terminate userTestKill under such situation. We think over it very hard and could not find any. It looks to us like the only possible method is to reboot the machine.
-
-Here is briefly how the driver for /dev/testKill is written:
-
-static int testKill_release( struct inode* inode, struct file* filp )
-{
-??? ...
-
-??? down( &sem_testKill );??? 
-
-??? ...
-
-??? return 0;
-}
-
-int __init testKill_init( void )
-{
-??? ...
-??? // intentionally set the semaphore to zero
-??? sema_init(&sem_testKill, 0);
-??? ...
-
-??? return 0;
-}
-
-
-Thanks,
-
-
-Xiachen
-
-
-----------------------------------------
-> Date: Tue, 22 Jun 2010 21:01:52 +0100
-> From: linux at arm.linux.org.uk
-> To: xiachendong at hotmail.com
-> Subject: Re: Possible methods for the kernel to terminate a process
-> CC: linux-arm-kernel at lists.infradead.org
->
-> On Tue, Jun 22, 2010 at 03:40:35PM -0400, Xiachen Dong wrote:
->> We have such question because we try to kill a user space process by the
->> shell command kill and we cannot kill it probably because it is in an
->> un-interruptible sleep/wait.
->
-> Some applications block some signals while they wait for events.
-> SIGKILL is one signal which is unblockable. Have you tried using
-> this rather than SIGTERM ?
->
->> However, we still wish to be able to kill the user space process under
->> this circumstance. To our knowledge of the kernel, if the kernel wants
->> to kill a process when special event such as exception happens, it
->> usually sends a signal to the process. We really cannot think of any
->> other methods for a kernel to terminate a process.
->
-> Sometimes the kernel forcefully exits the task - but that can only happen
-> while the task's context is running. If it's in an uninterruptible wait
-> then it won't be running.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
- 		 	   		  
-_________________________________________________________________
-Turn down-time into play-time with Messenger games
-http://go.microsoft.com/?linkid=9734385
+The other issue here is that blocking in close() like this is a very
+bad thing - even with an interruptible wait there, if you could be
+interrupted in __exit_files(), there's no recovery from an interrupted
+wait, and you'll end up leaking resources (and if you did try to call
+exit() from within __exit_files(), you'll find that the kernel will
+throw a fit with "Fixing recursive fault but reboot is needed!".)
