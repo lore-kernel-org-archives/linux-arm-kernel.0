@@ -1,111 +1,52 @@
-From: john.ogness@linutronix.de (John Ogness)
-Date: Tue, 22 Jun 2010 17:54:16 +0200
-Subject: [PATCHv3 4/5] mtd: mxc_nand fixups
-In-Reply-To: <AANLkTikRj_dMkKLyFhW78yld9jIYAIFncfPaPAF8WqUY@mail.gmail.com>
-	(Ivo Clarysse's message of "Mon, 21 Jun 2010 13:47:41 +0200")
-References: <804oh0b7gx.fsf@merkur.tec.linutronix.de>
-	<20100618205401.GA12115@pengutronix.de>
-	<80sk4ivkga.fsf@merkur.tec.linutronix.de>
-	<AANLkTimA7Rbm_nHpVYpEPqaPCjrOse9s8YyiInWlhfEK@mail.gmail.com>
-	<80tyoyhxey.fsf_-_@merkur.tec.linutronix.de>
-	<AANLkTikRj_dMkKLyFhW78yld9jIYAIFncfPaPAF8WqUY@mail.gmail.com>
-Message-ID: <80iq5bqd07.fsf_-_@merkur.tec.linutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 22 Jun 2010 18:13:14 +0200
+Subject: [PATCH 09/16] arm/mx2/mbimx27: compile fixes with
+	CONFIG_TOUCHSCREEN_ADS7846=y
+In-Reply-To: <20100524203428.GB29092@pengutronix.de>
+References: <20100524195430.GA28403@pengutronix.de>
+	<1274730951-29106-9-git-send-email-u.kleine-koenig@pengutronix.de>
+	<4BFADD4F.80309@eukrea.com> <20100524203428.GB29092@pengutronix.de>
+Message-ID: <20100622161314.GA18606@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The v2 version of this patch has 2 problems. I believe that this new
-version addresses the problems and still respects the strange behavior
-of the i.MX21.
+Hi Eric,
 
-Problem 1: The v2 patch passes IRQF_NOAUTOEN to request_irq(), but that
-flag is not evaluated by request_irq(). That flag is only evaluated in
-set_irq_flags(), which is now used by this patch.
+On Mon, May 24, 2010 at 10:34:28PM +0200, Uwe Kleine-K?nig wrote:
+> On Mon, May 24, 2010 at 10:10:55PM +0200, Eric B?nard wrote:
+> > Hi Uwe,
+> >
+> > Le 24/05/2010 21:55, Uwe Kleine-K?nig a ?crit :
+> >> This fixes:
+> >>
+> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:166: error: expected identifier or '(' before '||' token
+> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:204: error: variable 'eukrea_mbimx27_spi_0_data' has initializer but incomplete type
+> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:205: error: unknown field 'chipselect' specified in initializer
+> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:205: warning: excess elements in struct initializer
+> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:205: warning: (near initialization for 'eukrea_mbimx27_spi_0_data')
+> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:206: error: unknown field 'num_chipselect' specified in initializer
+> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:206: warning: excess elements in struct initializer
+> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:206: warning: (near initialization for 'eukrea_mbimx27_spi_0_data')
+> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c: In function 'eukrea_mbimx27_baseboard_init':
+> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:239: error: implicit declaration of function 'ads7846_dev_init'
+> >>
+> >> While at it add TOUCHSCREEN_ADS7846=m to mx27_defconfig.
+> >>
+> > I already fixed this in my patchset for this board :
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-May/015826.html
+> 
+> What do you think about adding TOUCHSCREEN_ADS7846=m to mx27_defconfig?
+> 
+> Other than that I'm OK with your patch, too.  I will remove this patch
+> from my queue.
+If we want to have ADS7846 at least compilable in .35 we should go with
+my patch as your's is (IMHO) too intrusive after -rc1.
 
-Problem 2: We are still having problems with irq's possibly being
-enabled twice when threaded interrupts are used. This happens because
-the main thread that enables the irq can proceed even if the interrupt
-hasn't fired yet (NFC_INT is set, but the irq thread hasn't processed it
-yet). In this case it is possible for the main thread to enable the irq
-again with a later call to wait_op_done().
+Sascha?
 
-This patch addresses the problem by allowing the function that enabled
-the irq to also be responsible for disabling the irq. This obviously
-avoids and double enabling.
+Best regards
+Uwe
 
-In order to prevent interrupt flooding, the interrupt handler will mask
-the interrupt. After the main thread has disabled the irq, it will
-unmask the interrupt. This should allow the i.MX21 to work correctly
-despite its masking behavior.
-
-And finally, this patch correctly clears the interrupt bit each
-time. Previously there was a case where the interrupt bit was not being
-cleared.
-
-The patch is against linux-next 20100618.
-
-The patch is against linux-next 20100618.
-
-Signed-off-by: John Ogness <john.ogness@linutronix.de>
----
- drivers/mtd/nand/mxc_nand.c |   25 ++++++++++++++++++++-----
- 1 file changed, 20 insertions(+), 5 deletions(-)
-
-Index: linux-next-20100618/drivers/mtd/nand/mxc_nand.c
-===================================================================
---- linux-next-20100618.orig/drivers/mtd/nand/mxc_nand.c
-+++ linux-next-20100618/drivers/mtd/nand/mxc_nand.c
-@@ -30,6 +30,7 @@
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/io.h>
-+#include <linux/irq.h>
- 
- #include <asm/mach/flash.h>
- #include <mach/mxc_nand.h>
-@@ -173,8 +174,12 @@ static const char *part_probes[] = { "Re
- static irqreturn_t mxc_nfc_irq(int irq, void *dev_id)
- {
- 	struct mxc_nand_host *host = dev_id;
-+	uint16_t tmp;
- 
--	disable_irq_nosync(irq);
-+	/* mask interrupts */
-+	tmp = readw(host->regs + NFC_CONFIG1);
-+	tmp |= NFC_INT_MSK;
-+	writew(tmp, host->regs + NFC_CONFIG1);
- 
- 	wake_up(&host->irq_waitq);
- 
-@@ -197,10 +202,18 @@ static void wait_op_done(struct mxc_nand
- 			wait_event(host->irq_waitq,
- 				readw(host->regs + NFC_CONFIG2) & NFC_INT);
- 
--			tmp = readw(host->regs + NFC_CONFIG2);
--			tmp  &= ~NFC_INT;
--			writew(tmp, host->regs + NFC_CONFIG2);
-+			disable_irq(host->irq);
-+
-+			/* unmask interrupts */
-+			tmp = readw(host->regs + NFC_CONFIG1);
-+			tmp &= ~NFC_INT_MSK;
-+			writew(tmp, host->regs + NFC_CONFIG1);
- 		}
-+
-+		/* clear interrupt flag */
-+		tmp = readw(host->regs + NFC_CONFIG2);
-+		tmp &= ~NFC_INT;
-+		writew(tmp, host->regs + NFC_CONFIG2);
- 	} else {
- 		while (max_retries-- > 0) {
- 			if (readw(host->regs + NFC_CONFIG2) & NFC_INT) {
-@@ -846,7 +859,9 @@ static int __init mxcnd_probe(struct pla
- 
- 	host->irq = platform_get_irq(pdev, 0);
- 
--	err = request_irq(host->irq, mxc_nfc_irq, IRQF_DISABLED, DRIVER_NAME, host);
-+	/* request irq as disabled */
-+	set_irq_flags(host->irq, IRQF_VALID | IRQF_NOAUTOEN);
-+	err = request_irq(host->irq, mxc_nfc_irq, 0, DRIVER_NAME, host);
- 	if (err)
- 		goto eirq;
- 
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
