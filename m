@@ -1,24 +1,26 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 22 Jun 2010 20:33:50 +0200
-Subject: [PATCH 2/4] pxa2xx/cpufreq: Simplify DRI recomputation routine
-In-Reply-To: <1276840135-5982-2-git-send-email-marek.vasut@gmail.com> (Marek
-	Vasut's message of "Fri\, 18 Jun 2010 07\:48\:53 +0200")
-References: <1276840135-5982-1-git-send-email-marek.vasut@gmail.com>
-	<1276840135-5982-2-git-send-email-marek.vasut@gmail.com>
-Message-ID: <87vd9aapdd.fsf@free.fr>
+From: rabin@rab.in (Rabin Vincent)
+Date: Wed, 23 Jun 2010 01:06:38 +0530
+Subject: [PATCH v4 2/4] ARM: Assume new page cache pages have dirty D-cache
+In-Reply-To: <20100621144632.26309.63314.stgit@e102109-lin.cambridge.arm.com>
+References: <20100621144409.26309.87173.stgit@e102109-lin.cambridge.arm.com>
+	<20100621144632.26309.63314.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100622193638.GA9780@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Vasut <marek.vasut@gmail.com> writes:
+On Mon, Jun 21, 2010 at 03:46:32PM +0100, Catalin Marinas wrote:
+> There are places in Linux where writes to newly allocated page cache
+> pages happen without a subsequent call to flush_dcache_page() (several
+> PIO drivers including USB HCD). This patch changes the meaning of
+> PG_arch_1 to be PG_dcache_clean and always flush the D-cache for a newly
+> mapped page in update_mmu_cache().
 
-> This patch:
-> 1) Simpifies the DRI recomputation routine by pulling out the common code
-> 2) Fixes a bug in PXA27x DRI recomputation caused by incorrect parenthesis
->
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Correct me if I'm misreading the code, but don't this patch and the next
+one make the assumption that CONFIG_SMP == VIPT non-aliasing (or PIPT)
+caches?  This patch does not add flushing on SMP systems, and the next
+one handles the I$-D$ coherency issues there (ignoring the set_pte race
+fix for a moment).   Won't the flushing added in this patch be
+unnecessary on non-SMP PIPT systems, since they too only need the
+exec-related flushing?
 
-Cheers.
-
---
-Robert
+Rabin
