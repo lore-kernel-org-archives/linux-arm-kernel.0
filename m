@@ -1,283 +1,111 @@
-From: jekhor@gmail.com (Yauhen Kharuzhy)
-Date: Tue, 22 Jun 2010 18:22:04 +0300
-Subject: [PATCH v2 4/4] ARM: S3C2416: Add platform helpers for setup SDHCI
-In-Reply-To: <1277220124-16225-1-git-send-email-jekhor@gmail.com>
-References: <1277220124-16225-1-git-send-email-jekhor@gmail.com>
-Message-ID: <1277220124-16225-5-git-send-email-jekhor@gmail.com>
+From: john.ogness@linutronix.de (John Ogness)
+Date: Tue, 22 Jun 2010 17:54:16 +0200
+Subject: [PATCHv3 4/5] mtd: mxc_nand fixups
+In-Reply-To: <AANLkTikRj_dMkKLyFhW78yld9jIYAIFncfPaPAF8WqUY@mail.gmail.com>
+	(Ivo Clarysse's message of "Mon, 21 Jun 2010 13:47:41 +0200")
+References: <804oh0b7gx.fsf@merkur.tec.linutronix.de>
+	<20100618205401.GA12115@pengutronix.de>
+	<80sk4ivkga.fsf@merkur.tec.linutronix.de>
+	<AANLkTimA7Rbm_nHpVYpEPqaPCjrOse9s8YyiInWlhfEK@mail.gmail.com>
+	<80tyoyhxey.fsf_-_@merkur.tec.linutronix.de>
+	<AANLkTikRj_dMkKLyFhW78yld9jIYAIFncfPaPAF8WqUY@mail.gmail.com>
+Message-ID: <80iq5bqd07.fsf_-_@merkur.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Samsung S3C2416 has two SDHCI controllers compatible with other
-Samsung's SoCs (S3C64XX, S5PC100 etc...).
+The v2 version of this patch has 2 problems. I believe that this new
+version addresses the problems and still respects the strange behavior
+of the i.MX21.
 
-Add required platform setup code that the devices can be used with
-sdhci-s3c driver.
+Problem 1: The v2 patch passes IRQF_NOAUTOEN to request_irq(), but that
+flag is not evaluated by request_irq(). That flag is only evaluated in
+set_irq_flags(), which is now used by this patch.
 
-Signed-off-by: Yauhen Kharuzhy <jekhor@gmail.com>
+Problem 2: We are still having problems with irq's possibly being
+enabled twice when threaded interrupts are used. This happens because
+the main thread that enables the irq can proceed even if the interrupt
+hasn't fired yet (NFC_INT is set, but the irq thread hasn't processed it
+yet). In this case it is possible for the main thread to enable the irq
+again with a later call to wait_op_done().
+
+This patch addresses the problem by allowing the function that enabled
+the irq to also be responsible for disabling the irq. This obviously
+avoids and double enabling.
+
+In order to prevent interrupt flooding, the interrupt handler will mask
+the interrupt. After the main thread has disabled the irq, it will
+unmask the interrupt. This should allow the i.MX21 to work correctly
+despite its masking behavior.
+
+And finally, this patch correctly clears the interrupt bit each
+time. Previously there was a case where the interrupt bit was not being
+cleared.
+
+The patch is against linux-next 20100618.
+
+The patch is against linux-next 20100618.
+
+Signed-off-by: John Ogness <john.ogness@linutronix.de>
 ---
- arch/arm/mach-s3c2416/Kconfig              |   12 +++++
- arch/arm/mach-s3c2416/Makefile             |    4 ++
- arch/arm/mach-s3c2416/s3c2416.c            |    5 ++
- arch/arm/mach-s3c2416/setup-sdhci-gpio.c   |   60 +++++++++++++++++++++++++++
- arch/arm/mach-s3c2416/setup-sdhci.c        |   62 ++++++++++++++++++++++++++++
- arch/arm/plat-samsung/include/plat/sdhci.h |   34 +++++++++++++++
- 6 files changed, 177 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s3c2416/setup-sdhci-gpio.c
- create mode 100644 arch/arm/mach-s3c2416/setup-sdhci.c
+ drivers/mtd/nand/mxc_nand.c |   25 ++++++++++++++++++++-----
+ 1 file changed, 20 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2416/Kconfig b/arch/arm/mach-s3c2416/Kconfig
-index eafb0ed..3e2b53d 100644
---- a/arch/arm/mach-s3c2416/Kconfig
-+++ b/arch/arm/mach-s3c2416/Kconfig
-@@ -25,6 +25,17 @@ config S3C2416_DMA
- 	help
- 	  Internal config node for S3C2416 DMA support
+Index: linux-next-20100618/drivers/mtd/nand/mxc_nand.c
+===================================================================
+--- linux-next-20100618.orig/drivers/mtd/nand/mxc_nand.c
++++ linux-next-20100618/drivers/mtd/nand/mxc_nand.c
+@@ -30,6 +30,7 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
++#include <linux/irq.h>
  
-+config S3C2416_SETUP_SDHCI
-+	bool
-+	select S3C2416_SETUP_SDHCI_GPIO
-+	help
-+	  Internal helper functions for S3C2416 based SDHCI systems
-+
-+config S3C2416_SETUP_SDHCI_GPIO
-+	bool
-+	help
-+	  Common setup code for SDHCI gpio.
-+
- menu "S3C2416 Machines"
+ #include <asm/mach/flash.h>
+ #include <mach/mxc_nand.h>
+@@ -173,8 +174,12 @@ static const char *part_probes[] = { "Re
+ static irqreturn_t mxc_nfc_irq(int irq, void *dev_id)
+ {
+ 	struct mxc_nand_host *host = dev_id;
++	uint16_t tmp;
  
- config MACH_SMDK2416
-@@ -36,6 +47,7 @@ config MACH_SMDK2416
- 	select S3C_DEV_HSMMC1
- 	select S3C_DEV_NAND
- 	select S3C_DEV_USB_HOST
-+	select S3C2416_SETUP_SDHCI
- 	help
- 	  Say Y here if you are using an SMDK2416
+-	disable_irq_nosync(irq);
++	/* mask interrupts */
++	tmp = readw(host->regs + NFC_CONFIG1);
++	tmp |= NFC_INT_MSK;
++	writew(tmp, host->regs + NFC_CONFIG1);
  
-diff --git a/arch/arm/mach-s3c2416/Makefile b/arch/arm/mach-s3c2416/Makefile
-index 6c12c7b..4f83f94 100644
---- a/arch/arm/mach-s3c2416/Makefile
-+++ b/arch/arm/mach-s3c2416/Makefile
-@@ -14,6 +14,10 @@ obj-$(CONFIG_CPU_S3C2416)	+= irq.o
+ 	wake_up(&host->irq_waitq);
  
- #obj-$(CONFIG_S3C2416_DMA)	+= dma.o
+@@ -197,10 +202,18 @@ static void wait_op_done(struct mxc_nand
+ 			wait_event(host->irq_waitq,
+ 				readw(host->regs + NFC_CONFIG2) & NFC_INT);
  
-+# Device setup
-+obj-$(CONFIG_S3C2416_SETUP_SDHCI) += setup-sdhci.o
-+obj-$(CONFIG_S3C2416_SETUP_SDHCI_GPIO) += setup-sdhci-gpio.o
+-			tmp = readw(host->regs + NFC_CONFIG2);
+-			tmp  &= ~NFC_INT;
+-			writew(tmp, host->regs + NFC_CONFIG2);
++			disable_irq(host->irq);
 +
- # Machine support
++			/* unmask interrupts */
++			tmp = readw(host->regs + NFC_CONFIG1);
++			tmp &= ~NFC_INT_MSK;
++			writew(tmp, host->regs + NFC_CONFIG1);
+ 		}
++
++		/* clear interrupt flag */
++		tmp = readw(host->regs + NFC_CONFIG2);
++		tmp &= ~NFC_INT;
++		writew(tmp, host->regs + NFC_CONFIG2);
+ 	} else {
+ 		while (max_retries-- > 0) {
+ 			if (readw(host->regs + NFC_CONFIG2) & NFC_INT) {
+@@ -846,7 +859,9 @@ static int __init mxcnd_probe(struct pla
  
- obj-$(CONFIG_MACH_SMDK2416)	+= mach-smdk2416.o
-diff --git a/arch/arm/mach-s3c2416/s3c2416.c b/arch/arm/mach-s3c2416/s3c2416.c
-index 355ab62..06eacf8 100644
---- a/arch/arm/mach-s3c2416/s3c2416.c
-+++ b/arch/arm/mach-s3c2416/s3c2416.c
-@@ -53,6 +53,7 @@
- #include <plat/s3c2416.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-+#include <plat/sdhci.h>
+ 	host->irq = platform_get_irq(pdev, 0);
  
- #include <plat/iic-core.h>
+-	err = request_irq(host->irq, mxc_nfc_irq, IRQF_DISABLED, DRIVER_NAME, host);
++	/* request irq as disabled */
++	set_irq_flags(host->irq, IRQF_VALID | IRQF_NOAUTOEN);
++	err = request_irq(host->irq, mxc_nfc_irq, 0, DRIVER_NAME, host);
+ 	if (err)
+ 		goto eirq;
  
-@@ -115,6 +116,10 @@ void __init s3c2416_map_io(void)
- 	s3c24xx_gpiocfg_default.set_pull = s3c_gpio_setpull_updown;
- 	s3c24xx_gpiocfg_default.get_pull = s3c_gpio_getpull_updown;
- 
-+	/* initialize device information early */
-+	s3c2416_default_sdhci0();
-+	s3c2416_default_sdhci1();
-+
- 	iotable_init(s3c2416_iodesc, ARRAY_SIZE(s3c2416_iodesc));
- }
- 
-diff --git a/arch/arm/mach-s3c2416/setup-sdhci-gpio.c b/arch/arm/mach-s3c2416/setup-sdhci-gpio.c
-new file mode 100644
-index 0000000..ebdab15
---- /dev/null
-+++ b/arch/arm/mach-s3c2416/setup-sdhci-gpio.c
-@@ -0,0 +1,60 @@
-+/* linux/arch/arm/plat-s3c2416/setup-sdhci-gpio.c
-+ *
-+ * Copyright 2010 Promwad Innovation Company
-+ *	Yauhen Kharuzhy <yauhen.kharuzhy@promwad.com>
-+ *
-+ * S3C2416 - Helper functions for setting up SDHCI device(s) GPIO (HSMMC)
-+ *
-+ * Based on mach-s3c64xx/setup-sdhci-gpio.c
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/interrupt.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+
-+#include <mach/gpio.h>
-+#include <mach/regs-gpio.h>
-+#include <plat/gpio-cfg.h>
-+
-+/* Note: hsmmc1 and hsmmc0 are swapped versus datasheet */
-+
-+void s3c2416_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	unsigned int gpio;
-+	unsigned int end;
-+
-+	end = S3C2410_GPE(7 + width);
-+
-+	/* Set all the necessary GPE pins to special-function 0 */
-+	for (gpio = S3C2410_GPE(5); gpio < end; gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+	}
-+}
-+
-+void s3c2416_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	unsigned int gpio;
-+	unsigned int end;
-+
-+	end = S3C2410_GPL(0 + width);
-+
-+	/* Set all the necessary GPG pins to special-function 0 */
-+	for (gpio = S3C2410_GPL(0); gpio < end; gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+	}
-+
-+	s3c_gpio_cfgpin(S3C2410_GPL(8), S3C_GPIO_SFN(2));
-+	s3c_gpio_setpull(S3C2410_GPL(8), S3C_GPIO_PULL_NONE);
-+	s3c_gpio_cfgpin(S3C2410_GPL(9), S3C_GPIO_SFN(2));
-+	s3c_gpio_setpull(S3C2410_GPL(9), S3C_GPIO_PULL_NONE);
-+}
-+
-+
-diff --git a/arch/arm/mach-s3c2416/setup-sdhci.c b/arch/arm/mach-s3c2416/setup-sdhci.c
-new file mode 100644
-index 0000000..345ddd1
---- /dev/null
-+++ b/arch/arm/mach-s3c2416/setup-sdhci.c
-@@ -0,0 +1,62 @@
-+/* linux/arch/arm/mach-s3c2416/setup-sdhci.c
-+ *
-+ * Copyright 2010 Promwad Innovation Company
-+ *	Yauhen Kharuzhy <yauhen.kharuzhy@promwad.com>
-+ *
-+ * S3C2416 - Helper functions for settign up SDHCI device(s) (HSMMC)
-+ *
-+ * Based on mach-s3c64xx/setup-sdhci.c
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/interrupt.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+
-+#include <linux/mmc/card.h>
-+#include <linux/mmc/host.h>
-+
-+#include <plat/regs-sdhci.h>
-+#include <plat/sdhci.h>
-+
-+/* clock sources for the mmc bus clock, order as for the ctrl2[5..4] */
-+
-+char *s3c2416_hsmmc_clksrcs[4] = {
-+	[0] = "hsmmc",
-+	[1] = "hsmmc",
-+	[2] = "hsmmc-if",
-+	/* [3] = "48m", - note not successfully used yet */
-+};
-+
-+void s3c2416_setup_sdhci_cfg_card(struct platform_device *dev,
-+				  void __iomem *r,
-+				  struct mmc_ios *ios,
-+				  struct mmc_card *card)
-+{
-+	u32 ctrl2, ctrl3;
-+
-+	ctrl2 = readl(r + S3C_SDHCI_CONTROL2);
-+	ctrl2 &= S3C_SDHCI_CTRL2_SELBASECLK_MASK;
-+	ctrl2 |= (S3C64XX_SDHCI_CTRL2_ENSTAASYNCCLR |
-+		  S3C64XX_SDHCI_CTRL2_ENCMDCNFMSK |
-+		  S3C_SDHCI_CTRL2_ENFBCLKRX |
-+		  S3C_SDHCI_CTRL2_DFCNT_NONE |
-+		  S3C_SDHCI_CTRL2_ENCLKOUTHOLD);
-+
-+	if (ios->clock < 25 * 1000000)
-+		ctrl3 = (S3C_SDHCI_CTRL3_FCSEL3 |
-+			 S3C_SDHCI_CTRL3_FCSEL2 |
-+			 S3C_SDHCI_CTRL3_FCSEL1 |
-+			 S3C_SDHCI_CTRL3_FCSEL0);
-+	else
-+		ctrl3 = (S3C_SDHCI_CTRL3_FCSEL1 | S3C_SDHCI_CTRL3_FCSEL0);
-+
-+	writel(ctrl2, r + S3C_SDHCI_CONTROL2);
-+	writel(ctrl3, r + S3C_SDHCI_CONTROL3);
-+}
-+
-diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h b/arch/arm/plat-samsung/include/plat/sdhci.h
-index 13f9fb2..d408140 100644
---- a/arch/arm/plat-samsung/include/plat/sdhci.h
-+++ b/arch/arm/plat-samsung/include/plat/sdhci.h
-@@ -78,6 +78,8 @@ extern void s3c64xx_setup_sdhci2_cfg_gpio(struct platform_device *, int w);
- extern void s5pv210_setup_sdhci0_cfg_gpio(struct platform_device *, int w);
- extern void s5pv210_setup_sdhci1_cfg_gpio(struct platform_device *, int w);
- extern void s5pv210_setup_sdhci2_cfg_gpio(struct platform_device *, int w);
-+extern void s3c2416_setup_sdhci0_cfg_gpio(struct platform_device *, int w);
-+extern void s3c2416_setup_sdhci1_cfg_gpio(struct platform_device *, int w);
- 
- /* S3C6400 SDHCI setup */
- 
-@@ -270,6 +272,38 @@ static inline void s5pv210_default_sdhci1(void) { }
- static inline void s5pv210_default_sdhci2(void) { }
- #endif /* CONFIG_S5PC100_SETUP_SDHCI */
- 
-+/* S3C2416 SDHCI setup */
-+#ifdef CONFIG_S3C2416_SETUP_SDHCI
-+extern char *s3c2416_hsmmc_clksrcs[4];
-+
-+extern void s3c2416_setup_sdhci_cfg_card(struct platform_device *dev,
-+					   void __iomem *r,
-+					   struct mmc_ios *ios,
-+					   struct mmc_card *card);
-+
-+#ifdef CONFIG_S3C_DEV_HSMMC
-+static inline void s3c2416_default_sdhci0(void)
-+{
-+	s3c_hsmmc0_def_platdata.clocks = s3c2416_hsmmc_clksrcs;
-+	s3c_hsmmc0_def_platdata.cfg_gpio = s3c2416_setup_sdhci0_cfg_gpio;
-+	s3c_hsmmc0_def_platdata.cfg_card = s3c2416_setup_sdhci_cfg_card;
-+}
-+#else
-+static inline void s3c2416_default_sdhci0(void) { }
-+#endif /* CONFIG_S3C_DEV_HSMMC */
-+
-+#ifdef CONFIG_S3C_DEV_HSMMC1
-+static inline void s3c2416_default_sdhci1(void)
-+{
-+	s3c_hsmmc1_def_platdata.clocks = s3c2416_hsmmc_clksrcs;
-+	s3c_hsmmc1_def_platdata.cfg_gpio = s3c2416_setup_sdhci1_cfg_gpio;
-+	s3c_hsmmc1_def_platdata.cfg_card = s3c2416_setup_sdhci_cfg_card;
-+}
-+#else
-+static inline void s3c2416_default_sdhci1(void) { }
-+#endif /* CONFIG_S3C_DEV_HSMMC1 */
-+
-+#endif /* CONFIG_S3C2416_SETUP_SDHCI */
- 
- 
- 
--- 
-1.7.1
