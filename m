@@ -1,41 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 22 Jun 2010 09:18:35 +0900
-Subject: [PATCH v5 1/3] ARM: SAMSUNG: Add keypad device support
-In-Reply-To: <AANLkTimhik3BOQNzybs1tUuHUXri-yxm5v7wH1JjQ5B1@mail.gmail.com>
-References: <1277101605-2435-1-git-send-email-jy0922.shim@samsung.com>
-	<AANLkTil1aiJ1gu6jRrO4LeB0fYltOq4A3wXJJB1ZOa8q@mail.gmail.com>
-	<4C1F4B30.3020006@samsung.com>
-	<AANLkTimhik3BOQNzybs1tUuHUXri-yxm5v7wH1JjQ5B1@mail.gmail.com>
-Message-ID: <00fb01cb11a0$76cfa3b0$646eeb10$%kim@samsung.com>
+From: smuckle@codeaurora.org (smuckle at codeaurora.org)
+Date: Mon, 21 Jun 2010 17:23:38 -0700 (PDT)
+Subject: [RFC PATCH] smp: parallel smp boot option
+In-Reply-To: <1277158949.17092.61.camel@c-dwalke-linux.qualcomm.com>
+References: <1277156422-9130-1-git-send-email-dwalker@codeaurora.org>
+	<20100621220030.GC13624@n2100.arm.linux.org.uk>
+	<1277158949.17092.61.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <1267e9ffe4a72e14bb7ede32a2d893f3.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric Miao wrote:
-> 
-> >> and now in s5pc200 code, you can also register/re-use the s5pc100_keypad
-> >> device/driver, and everyone knows - OK, the IP on S5PC100 is now re-used
-> >> here.
-> >>
-> >
-> > This is naming issue and i know it was not desided yet.
-> > This keypad driver can support s3c64xx, s5pc100, s5pc110, s5pv210.
-> >
-> 
-> I bet the first silicon this IP is deployed is s3c64xx, so my understanding
-> 's3c64xx-keypad.c' should be an acceptable name.  And it's also reasonable,
-> a s3c64xx-keypad driver, and is later expanded to support subsequent silicons
-> without the file name being changed.
+> On Mon, 2010-06-21 at 23:00 +0100, Russell King - ARM Linux wrote:
+>> On Mon, Jun 21, 2010 at 02:40:22PM -0700, Daniel Walker wrote:
+>> > +#ifdef CONFIG_SMP_PARALLEL_START
+>> > +	bl	__smp_secondary_spin
+>> > +#endif
+>>
+>
+> Your OK with this hook? I was thinking it might be better to check if
+> it's the book cpu or the secondary here instead of in
+> arch/arm/mach-msm .
+>
+> Steve, do you have any thoughts on that?
 
-Hi,
+If we do keep the hook, I think it'd be better to leave it up to the
+platform specific code to do the test, in case for some reason it's not as
+simple as reading the MPIDR register. It also keeps the impact to head.S
+minimal.
 
-Seems to be more suitable 'samsung-keypad', because can support S5PC100, S5PC110, and S5PV210 as well as S3C64XX.
-Already tested on SMDK6410(S3C6410), SMDKC100(S5PC100), Aquila(S5PC110), GONI(S5PC110) and SMDKV210(S5PV210) boards.
+thanks,
+Steve
 
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
