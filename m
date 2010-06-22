@@ -1,51 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Jun 2010 22:40:55 +0100
-Subject: Possible methods for the kernel to terminate a process
-In-Reply-To: <BAY134-W52AC318A63E932EC6DDD6BDC40@phx.gbl>
-References: <BAY134-W142753895B5626C329E273BDC40@phx.gbl>
-	<20100622200152.GA7325@n2100.arm.linux.org.uk>
-	<BAY134-W52AC318A63E932EC6DDD6BDC40@phx.gbl>
-Message-ID: <20100622214055.GB7325@n2100.arm.linux.org.uk>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Wed, 23 Jun 2010 00:03:47 +0200
+Subject: [PATCH 07/12] mmci: pass power_mode to the translate_vdd callback
+In-Reply-To: <1277198267-10860-7-git-send-email-rabin.vincent@stericsson.com>
+References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
+	<1277198267-10860-7-git-send-email-rabin.vincent@stericsson.com>
+Message-ID: <AANLkTil2Cb4alVFkfEjXApMgIdkmNvEEarWkT9AhXIdU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 22, 2010 at 05:05:53PM -0400, Xiachen Dong wrote:
-> Sorry that I forgot to mention that the process does not have any
-> signals blocked. And we have tried sending signal from SIG_1 to SIG_64
-> to the process and we were still not able to kill it.
-> 
-> We also wrote a simple kernel char diver (say /dev/testKill) for testing
-> purpose. The close() method of the driver does nothing but trying to
-> down() a semaphore that is intentionally initialized to zero. We also
-> wrote a user space program (say userTestKill) to help the test. What
-> userTestKill does is:
-> 
-> 1) open the device and then;
-> 2) does the busy sleep forever;
-> 
-> Then we try to kill userTestKill by the shell kill command. We found
-> out that we are not able to kill it because userTestKill will end up
-> calling the close() method of /dev/testKill after it receives the
-> signal (via __exit_files() in do_exit()).
+Thinking a bit about this patch tonight:
 
-Yes - the kernel is trying to free the resources which were in use by
-the program.
+2010/6/22 Rabin Vincent <rabin.vincent@stericsson.com>:
 
-I think what you're really asking is "I'd like to be able to kill a
-program _and_ leak the resources it's using, possibly rendering them
-inoperative for use by future programs."
+> Platforms may have some external power control which need to be
+> controlled from board specific code. ?This is the case for some versions
+> of the MOP500 board (U8500 platform).
+>
+> Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+> ---
+> ?drivers/mmc/host/mmci.c ? | ? ?3 ++-
+> ?include/linux/amba/mmci.h | ? ?6 ++++--
+> ?2 files changed, 6 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index 322958f..63eb7f4 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -483,7 +483,8 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+> ? ? ? ? ? ? ? ? * power control behind this translate function.
+> ? ? ? ? ? ? ? ? */
+> ? ? ? ? ? ? ? ?if (!host->vcc && host->plat->translate_vdd)
+> - ? ? ? ? ? ? ? ? ? ? ? pwr |= host->plat->translate_vdd(mmc_dev(mmc), ios->vdd);
+> + ? ? ? ? ? ? ? ? ? ? ? pwr |= host->plat->translate_vdd(mmc_dev(mmc), ios->vdd,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?ios->power_mode);
+> ? ? ? ? ? ? ? ?/* The ST version does not have this, fall through to POWER_ON */
+> ? ? ? ? ? ? ? ?if (host->hw_designer != AMBA_VENDOR_ST) {
+> ? ? ? ? ? ? ? ? ? ? ? ?pwr |= MCI_PWR_UP;
+> diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
+> index f9d1bb5..61b5810 100644
+> --- a/include/linux/amba/mmci.h
+> +++ b/include/linux/amba/mmci.h
+> @@ -17,7 +17,8 @@
+> ?* mmc/host.h
+> ?* @translate_vdd: a callback function to translate a MMC_VDD_*
+> ?* mask into a value to be binary or:ed and written into the
+> - * MMCIPWR register of the block
+> + * MMCIPWR register of the block. ?May also control external power
+> + * based on the power_mode.
 
-That's possible with a few kernel hacks - all you really need to do is
-to arrange for the kernel to forget that the program ever existed.
+Actually this callback is named like that for a reason: it is to be used
+to translate the MMC_VDD_* into a u8:4 bitmask for the MMCIPWR
+register, 4 bits possibly routed out of the PL180 block on some
+designs (never seen in practice, but could be used in theory).
 
-However, I suspect that you don't actually want this - you want to be
-able to terminate a program and free its resources, even if freeing
-those resources ends up blocking with an uninterruptible wait.  I
-don't think that's possible.
+So it translates a voltage into a 4-bit bitmask, hence the name.
 
-The other issue here is that blocking in close() like this is a very
-bad thing - even with an interruptible wait there, if you could be
-interrupted in __exit_files(), there's no recovery from an interrupted
-wait, and you'll end up leaking resources (and if you did try to call
-exit() from within __exit_files(), you'll find that the kernel will
-throw a fit with "Fixing recursive fault but reboot is needed!".)
+Now the semantics are altered to have other side-effects in
+the platform, so the function should be renamed, something like
+platform_vdd_handler() would be more appropriate.
+
+Yours,
+Linus Walleij
