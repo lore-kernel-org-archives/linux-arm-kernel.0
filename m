@@ -1,52 +1,41 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 22 Jun 2010 18:13:14 +0200
-Subject: [PATCH 09/16] arm/mx2/mbimx27: compile fixes with
-	CONFIG_TOUCHSCREEN_ADS7846=y
-In-Reply-To: <20100524203428.GB29092@pengutronix.de>
-References: <20100524195430.GA28403@pengutronix.de>
-	<1274730951-29106-9-git-send-email-u.kleine-koenig@pengutronix.de>
-	<4BFADD4F.80309@eukrea.com> <20100524203428.GB29092@pengutronix.de>
-Message-ID: <20100622161314.GA18606@pengutronix.de>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Tue, 22 Jun 2010 18:00:20 +0100
+Subject: [PATCH 1/2] arm: Replace CONFIG_HAS_TLS_REG with HWCAP_TLS and
+	check for it on V6
+In-Reply-To: <20100621135120.24299.98499.stgit@baageli.muru.com>
+References: <20100621133749.24299.36154.stgit@baageli.muru.com>
+	<20100621135120.24299.98499.stgit@baageli.muru.com>
+Message-ID: <20100622170020.GF4371@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Tony Lindgren wrote:
+>  __kuser_get_tls:				@ 0xffff0fe0
+> -
+> -#if !defined(CONFIG_HAS_TLS_REG) && !defined(CONFIG_TLS_REG_EMUL)
+> -	ldr	r0, [pc, #(16 - 8)]		@ TLS stored at 0xffff0ff0
+> -#else
+> -	mrc	p15, 0, r0, c13, c0, 3		@ read TLS register
+> -#endif
+> +	ldr     r0, [pc, #(20 - 8)]		@ software TLS set in 0xffff0ff4?
+> +	cmp	r0, #0				@ hardware TLS if flag not set
+> +	mrceq	p15, 0, r0, c13, c0, 3		@ read hardware TLS register
+> +	ldrne	r0, [pc, #(12 - 8)]		@ software TLS val at 0xffff0ff8
+>  	usr_ret	lr
+> -
+> -	.rep	5
+> -	.word	0			@ pad up to __kuser_helper_version
+> -	.endr
+> +	.word	0				@ non-zero for software TLS
+> +	.word	0				@ software TLS value
 
-On Mon, May 24, 2010 at 10:34:28PM +0200, Uwe Kleine-K?nig wrote:
-> On Mon, May 24, 2010 at 10:10:55PM +0200, Eric B?nard wrote:
-> > Hi Uwe,
-> >
-> > Le 24/05/2010 21:55, Uwe Kleine-K?nig a ?crit :
-> >> This fixes:
-> >>
-> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:166: error: expected identifier or '(' before '||' token
-> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:204: error: variable 'eukrea_mbimx27_spi_0_data' has initializer but incomplete type
-> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:205: error: unknown field 'chipselect' specified in initializer
-> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:205: warning: excess elements in struct initializer
-> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:205: warning: (near initialization for 'eukrea_mbimx27_spi_0_data')
-> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:206: error: unknown field 'num_chipselect' specified in initializer
-> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:206: warning: excess elements in struct initializer
-> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:206: warning: (near initialization for 'eukrea_mbimx27_spi_0_data')
-> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c: In function 'eukrea_mbimx27_baseboard_init':
-> >> 	arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c:239: error: implicit declaration of function 'ads7846_dev_init'
-> >>
-> >> While at it add TOUCHSCREEN_ADS7846=m to mx27_defconfig.
-> >>
-> > I already fixed this in my patchset for this board :
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-May/015826.html
-> 
-> What do you think about adding TOUCHSCREEN_ADS7846=m to mx27_defconfig?
-> 
-> Other than that I'm OK with your patch, too.  I will remove this patch
-> from my queue.
-If we want to have ADS7846 at least compilable in .35 we should go with
-my patch as your's is (IMHO) too intrusive after -rc1.
+It'd be nice not to waste instructions checking for HWCAP_TLS on archs
+which definitely don't have it.  I guess it doesn't matter elsewhere;
+I'd expect this to be a warm path for some programs making extensive
+use of TLS (I haven't measured though).
 
-Sascha?
+As it's only a single instruction, and the code is in a writable page
+already (copied at init), how about just patching the instruction
+when ELF_HWCAP is set?
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-- Jamie
