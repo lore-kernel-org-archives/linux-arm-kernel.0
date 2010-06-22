@@ -1,19 +1,20 @@
 From: jekhor@gmail.com (Yauhen Kharuzhy)
-Date: Tue, 22 Jun 2010 17:05:37 +0300
+Date: Tue, 22 Jun 2010 17:19:40 +0300
 Subject: [PATCH 4/4] ARM: S3C2416: Add platform helpers for setup SDHCI
-In-Reply-To: <4C20B860.80308@gmail.com>
+In-Reply-To: <AANLkTimUijwXx5UozqVZiJ8BBDysnxd5nQz8P5d1slRC@mail.gmail.com>
 References: <1277212585-25605-1-git-send-email-jekhor@gmail.com>
 	<1277212585-25605-2-git-send-email-jekhor@gmail.com>
 	<1277212585-25605-3-git-send-email-jekhor@gmail.com>
 	<1277212585-25605-4-git-send-email-jekhor@gmail.com>
 	<1277212585-25605-5-git-send-email-jekhor@gmail.com>
-	<4C20B860.80308@gmail.com>
-Message-ID: <20100622140537.GA3669@jeknote.loshitsa1.net>
+	<AANLkTimUijwXx5UozqVZiJ8BBDysnxd5nQz8P5d1slRC@mail.gmail.com>
+Message-ID: <20100622141940.GB3669@jeknote.loshitsa1.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 22, 2010 at 03:19:28PM +0200, Maurus Cuelenaere wrote:
-> Op 22-06-10 15:16, Yauhen Kharuzhy schreef:
+On Tue, Jun 22, 2010 at 04:45:18PM +0300, Darius Augulis wrote:
+> On Tue, Jun 22, 2010 at 4:16 PM, Yauhen Kharuzhy <jekhor@gmail.com> wrote:
+> 
 > > Samsung S3C2416 has two SDHCI controllers compatible with other
 > > Samsung's SoCs (S3C64XX, S5PC100 etc...).
 > >
@@ -25,8 +26,10 @@ On Tue, Jun 22, 2010 at 03:19:28PM +0200, Maurus Cuelenaere wrote:
 > >  arch/arm/mach-s3c2416/Kconfig              |   23 ++++++++++
 > >  arch/arm/mach-s3c2416/Makefile             |    5 ++
 > >  arch/arm/mach-s3c2416/s3c2416.c            |    5 ++
-> >  arch/arm/mach-s3c2416/setup-sdhci-gpio.c   |   60 +++++++++++++++++++++++++++
-> >  arch/arm/mach-s3c2416/setup-sdhci.c        |   62 ++++++++++++++++++++++++++++
+> >  arch/arm/mach-s3c2416/setup-sdhci-gpio.c   |   60
+> > +++++++++++++++++++++++++++
+> >  arch/arm/mach-s3c2416/setup-sdhci.c        |   62
+> > ++++++++++++++++++++++++++++
 > >  arch/arm/plat-samsung/include/plat/sdhci.h |   34 +++++++++++++++
 > >  6 files changed, 189 insertions(+), 0 deletions(-)
 > >  create mode 100644 arch/arm/mach-s3c2416/setup-sdhci-gpio.c
@@ -37,48 +40,309 @@ On Tue, Jun 22, 2010 at 03:19:28PM +0200, Maurus Cuelenaere wrote:
 > > --- a/arch/arm/mach-s3c2416/Kconfig
 > > +++ b/arch/arm/mach-s3c2416/Kconfig
 > > @@ -25,6 +25,17 @@ config S3C2416_DMA
-> >  	help
-> >  	  Internal config node for S3C2416 DMA support
-> >  
+> >        help
+> >          Internal config node for S3C2416 DMA support
+> >
 > > +config S3C2416_SETUP_SDHCI
-> > +	bool
-> > +	select S3C2416_SETUP_SDHCI_GPIO
-> > +	help
-> > +	  Internal helper functions for S3C2416 based SDHCI systems
+> > +       bool
+> > +       select S3C2416_SETUP_SDHCI_GPIO
+> > +       help
+> > +         Internal helper functions for S3C2416 based SDHCI systems
 > > +
 > > +config S3C2416_SETUP_SDHCI_GPIO
-> > +	bool
-> > +	help
-> > +	  Common setup code for SDHCI gpio.
+> > +       bool
+> > +       help
+> > +         Common setup code for SDHCI gpio.
 > > +
 > >  menu "S3C2416 Machines"
-> >  
+> >
 > >  config MACH_SMDK2416
 > > @@ -36,7 +47,19 @@ config MACH_SMDK2416
-> >  	select S3C_DEV_HSMMC1
-> >  	select S3C_DEV_NAND
-> >  	select S3C_DEV_USB_HOST
-> > +	select S3C2416_SETUP_SDHCI
-> >  	help
-> >  	  Say Y here if you are using an SMDK2416
-> >  
+> >        select S3C_DEV_HSMMC1
+> >        select S3C_DEV_NAND
+> >        select S3C_DEV_USB_HOST
+> > +       select S3C2416_SETUP_SDHCI
+> >        help
+> >          Say Y here if you are using an SMDK2416
+> >
 > > +config MACH_HANLIN_V3C
-> > +	bool "Hanlin eReader V3C"
-> > +	select CPU_S3C2416
-> > +	select S3C_DEV_HSMMC
-> > +	select S3C_DEV_HSMMC1
-> > +	select S3C_DEV_NAND
-> > +	select S3C_DEV_USB_HOST
-> > +	select S3C2416_SETUP_SDHCI
-> > +	help
-> > +	  Say Y here if you are using an Jinke's Hanlin V3C eReader
+> > +       bool "Hanlin eReader V3C"
+> > +       select CPU_S3C2416
+> > +       select S3C_DEV_HSMMC
+> > +       select S3C_DEV_HSMMC1
+> > +       select S3C_DEV_NAND
+> > +       select S3C_DEV_USB_HOST
+> > +       select S3C2416_SETUP_SDHCI
+> > +       help
+> > +         Say Y here if you are using an Jinke's Hanlin V3C eReader
 > > +
-> >   
-> 
-> This seems to be unrelated to the patch?
-I am sorry, will resend.
-> 
 > >  endmenu
+> > diff --git a/arch/arm/mach-s3c2416/Makefile
+> > b/arch/arm/mach-s3c2416/Makefile
+> > index 6c12c7b..678e148 100644
+> > --- a/arch/arm/mach-s3c2416/Makefile
+> > +++ b/arch/arm/mach-s3c2416/Makefile
+> > @@ -14,6 +14,11 @@ obj-$(CONFIG_CPU_S3C2416)    += irq.o
+> >
+> >  #obj-$(CONFIG_S3C2416_DMA)     += dma.o
+> >
+> > +# Device setup
+> > +obj-$(CONFIG_S3C2416_SETUP_SDHCI) += setup-sdhci.o
+> > +obj-$(CONFIG_S3C2416_SETUP_SDHCI_GPIO) += setup-sdhci-gpio.o
+> > +
+> >  # Machine support
+> >
+> >  obj-$(CONFIG_MACH_SMDK2416)    += mach-smdk2416.o
+> > +obj-$(CONFIG_MACH_HANLIN_V3C)  += mach-v3c.o
+> > diff --git a/arch/arm/mach-s3c2416/s3c2416.c
+> > b/arch/arm/mach-s3c2416/s3c2416.c
+> > index 355ab62..06eacf8 100644
+> > --- a/arch/arm/mach-s3c2416/s3c2416.c
+> > +++ b/arch/arm/mach-s3c2416/s3c2416.c
+> > @@ -53,6 +53,7 @@
+> >  #include <plat/s3c2416.h>
+> >  #include <plat/devs.h>
+> >  #include <plat/cpu.h>
+> > +#include <plat/sdhci.h>
+> >
+> >  #include <plat/iic-core.h>
+> >
+> > @@ -115,6 +116,10 @@ void __init s3c2416_map_io(void)
+> >        s3c24xx_gpiocfg_default.set_pull = s3c_gpio_setpull_updown;
+> >        s3c24xx_gpiocfg_default.get_pull = s3c_gpio_getpull_updown;
+> >
+> > +       /* initialize device information early */
+> > +       s3c2416_default_sdhci0();
+> > +       s3c2416_default_sdhci1();
+> > +
+> >        iotable_init(s3c2416_iodesc, ARRAY_SIZE(s3c2416_iodesc));
+> >  }
+> >
+> > diff --git a/arch/arm/mach-s3c2416/setup-sdhci-gpio.c
+> > b/arch/arm/mach-s3c2416/setup-sdhci-gpio.c
+> > new file mode 100644
+> > index 0000000..ebdab15
+> > --- /dev/null
+> > +++ b/arch/arm/mach-s3c2416/setup-sdhci-gpio.c
+> > @@ -0,0 +1,60 @@
+> > +/* linux/arch/arm/plat-s3c2416/setup-sdhci-gpio.c
+> > + *
+> > + * Copyright 2010 Promwad Innovation Company
+> > + *     Yauhen Kharuzhy <yauhen.kharuzhy@promwad.com>
+> > + *
+> > + * S3C2416 - Helper functions for setting up SDHCI device(s) GPIO (HSMMC)
+> > + *
+> > + * Based on mach-s3c64xx/setup-sdhci-gpio.c
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > +*/
+> > +
+> > +#include <linux/kernel.h>
+> > +#include <linux/types.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/io.h>
+> > +
+> > +#include <mach/gpio.h>
+> > +#include <mach/regs-gpio.h>
+> > +#include <plat/gpio-cfg.h>
+> > +
+> > +/* Note: hsmmc1 and hsmmc0 are swapped versus datasheet */
+> >
+> 
+> would be nice to provide more accurate link to information source (document
+> version, page).
+> And there is a bit tricky place: clock ids are swapped and names of helper
+> functions are not.
+> So, it's not clear which helper function corresponds to real physical SDHC
+> interface.
+
+S3C2416 User's Manual, pages 238 (10-4) and 241 (10-7): GPE5-GPE10
+correspond to SD0, GPL0-GPL3, GPL8-GPL9 --- to SD1. So all platform
+devices and GPIO config functions have namas swapped versus datasheet.
+
+We have HSMMC1 and HSMMC0 swapped due to historical reasons --- there are HSMMC
+block in S3C2443 and HSMMC1 block in S3C2416 on same address. I am going
+to revert this swapping later.
+
+> > +void s3c2416_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
+> > +{
+> > +       unsigned int gpio;
+> > +       unsigned int end;
+> > +
+> > +       end = S3C2410_GPE(7 + width);
+> > +
+> > +       /* Set all the necessary GPE pins to special-function 0 */
+> > +       for (gpio = S3C2410_GPE(5); gpio < end; gpio++) {
+> > +               s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
+> > +               s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+> > +       }
+> > +}
+> > +
+> > +void s3c2416_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
+> > +{
+> > +       unsigned int gpio;
+> > +       unsigned int end;
+> > +
+> > +       end = S3C2410_GPL(0 + width);
+> > +
+> > +       /* Set all the necessary GPG pins to special-function 0 */
+> > +       for (gpio = S3C2410_GPL(0); gpio < end; gpio++) {
+> > +               s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
+> > +               s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+> > +       }
+> > +
+> > +       s3c_gpio_cfgpin(S3C2410_GPL(8), S3C_GPIO_SFN(2));
+> > +       s3c_gpio_setpull(S3C2410_GPL(8), S3C_GPIO_PULL_NONE);
+> > +       s3c_gpio_cfgpin(S3C2410_GPL(9), S3C_GPIO_SFN(2));
+> > +       s3c_gpio_setpull(S3C2410_GPL(9), S3C_GPIO_PULL_NONE);
+> > +}
+> > +
+> > +
+> > diff --git a/arch/arm/mach-s3c2416/setup-sdhci.c
+> > b/arch/arm/mach-s3c2416/setup-sdhci.c
+> > new file mode 100644
+> > index 0000000..345ddd1
+> > --- /dev/null
+> > +++ b/arch/arm/mach-s3c2416/setup-sdhci.c
+> > @@ -0,0 +1,62 @@
+> > +/* linux/arch/arm/mach-s3c2416/setup-sdhci.c
+> > + *
+> > + * Copyright 2010 Promwad Innovation Company
+> > + *     Yauhen Kharuzhy <yauhen.kharuzhy@promwad.com>
+> > + *
+> > + * S3C2416 - Helper functions for settign up SDHCI device(s) (HSMMC)
+> > + *
+> > + * Based on mach-s3c64xx/setup-sdhci.c
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > +*/
+> > +
+> > +#include <linux/kernel.h>
+> > +#include <linux/types.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/io.h>
+> > +
+> > +#include <linux/mmc/card.h>
+> > +#include <linux/mmc/host.h>
+> > +
+> > +#include <plat/regs-sdhci.h>
+> > +#include <plat/sdhci.h>
+> > +
+> > +/* clock sources for the mmc bus clock, order as for the ctrl2[5..4] */
+> > +
+> > +char *s3c2416_hsmmc_clksrcs[4] = {
+> > +       [0] = "hsmmc",
+> > +       [1] = "hsmmc",
+> > +       [2] = "hsmmc-if",
+> > +       /* [3] = "48m", - note not successfully used yet */
+> > +};
+> > +
+> > +void s3c2416_setup_sdhci_cfg_card(struct platform_device *dev,
+> > +                                 void __iomem *r,
+> > +                                 struct mmc_ios *ios,
+> > +                                 struct mmc_card *card)
+> > +{
+> > +       u32 ctrl2, ctrl3;
+> > +
+> > +       ctrl2 = readl(r + S3C_SDHCI_CONTROL2);
+> > +       ctrl2 &= S3C_SDHCI_CTRL2_SELBASECLK_MASK;
+> > +       ctrl2 |= (S3C64XX_SDHCI_CTRL2_ENSTAASYNCCLR |
+> > +                 S3C64XX_SDHCI_CTRL2_ENCMDCNFMSK |
+> > +                 S3C_SDHCI_CTRL2_ENFBCLKRX |
+> > +                 S3C_SDHCI_CTRL2_DFCNT_NONE |
+> > +                 S3C_SDHCI_CTRL2_ENCLKOUTHOLD);
+> > +
+> > +       if (ios->clock < 25 * 1000000)
+> > +               ctrl3 = (S3C_SDHCI_CTRL3_FCSEL3 |
+> > +                        S3C_SDHCI_CTRL3_FCSEL2 |
+> > +                        S3C_SDHCI_CTRL3_FCSEL1 |
+> > +                        S3C_SDHCI_CTRL3_FCSEL0);
+> > +       else
+> > +               ctrl3 = (S3C_SDHCI_CTRL3_FCSEL1 | S3C_SDHCI_CTRL3_FCSEL0);
+> > +
+> > +       writel(ctrl2, r + S3C_SDHCI_CONTROL2);
+> > +       writel(ctrl3, r + S3C_SDHCI_CONTROL3);
+> > +}
+> > +
+> > diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h
+> > b/arch/arm/plat-samsung/include/plat/sdhci.h
+> > index 13f9fb2..d408140 100644
+> > --- a/arch/arm/plat-samsung/include/plat/sdhci.h
+> > +++ b/arch/arm/plat-samsung/include/plat/sdhci.h
+> > @@ -78,6 +78,8 @@ extern void s3c64xx_setup_sdhci2_cfg_gpio(struct
+> > platform_device *, int w);
+> >  extern void s5pv210_setup_sdhci0_cfg_gpio(struct platform_device *, int
+> > w);
+> >  extern void s5pv210_setup_sdhci1_cfg_gpio(struct platform_device *, int
+> > w);
+> >  extern void s5pv210_setup_sdhci2_cfg_gpio(struct platform_device *, int
+> > w);
+> > +extern void s3c2416_setup_sdhci0_cfg_gpio(struct platform_device *, int
+> > w);
+> > +extern void s3c2416_setup_sdhci1_cfg_gpio(struct platform_device *, int
+> > w);
+> >
+> >  /* S3C6400 SDHCI setup */
+> >
+> > @@ -270,6 +272,38 @@ static inline void s5pv210_default_sdhci1(void) { }
+> >  static inline void s5pv210_default_sdhci2(void) { }
+> >  #endif /* CONFIG_S5PC100_SETUP_SDHCI */
+> >
+> > +/* S3C2416 SDHCI setup */
+> > +#ifdef CONFIG_S3C2416_SETUP_SDHCI
+> > +extern char *s3c2416_hsmmc_clksrcs[4];
+> > +
+> > +extern void s3c2416_setup_sdhci_cfg_card(struct platform_device *dev,
+> > +                                          void __iomem *r,
+> > +                                          struct mmc_ios *ios,
+> > +                                          struct mmc_card *card);
+> > +
+> > +#ifdef CONFIG_S3C_DEV_HSMMC
+> > +static inline void s3c2416_default_sdhci0(void)
+> > +{
+> > +       s3c_hsmmc0_def_platdata.clocks = s3c2416_hsmmc_clksrcs;
+> > +       s3c_hsmmc0_def_platdata.cfg_gpio = s3c2416_setup_sdhci0_cfg_gpio;
+> > +       s3c_hsmmc0_def_platdata.cfg_card = s3c2416_setup_sdhci_cfg_card;
+> >
+> 
+> helper id 0 gets to interface 0 - not swapped.
+> 
+> 
+> > +}
+> > +#else
+> > +static inline void s3c2416_default_sdhci0(void) { }
+> > +#endif /* CONFIG_S3C_DEV_HSMMC */
+> > +
+> > +#ifdef CONFIG_S3C_DEV_HSMMC1
+> > +static inline void s3c2416_default_sdhci1(void)
+> > +{
+> > +       s3c_hsmmc1_def_platdata.clocks = s3c2416_hsmmc_clksrcs;
+> > +       s3c_hsmmc1_def_platdata.cfg_gpio = s3c2416_setup_sdhci1_cfg_gpio;
+> > +       s3c_hsmmc1_def_platdata.cfg_card = s3c2416_setup_sdhci_cfg_card;
+> >
+> 
+> helper id 1 gets to interface 1 - not swapped.
+> 
+> 
+> > +}
+> > +#else
+> > +static inline void s3c2416_default_sdhci1(void) { }
+> > +#endif /* CONFIG_S3C_DEV_HSMMC1 */
+> > +
+> > +#endif /* CONFIG_S3C2416_SETUP_SDHCI */
+> >
+> >
+> >
+> > --
+> > 1.6.6.1
+> >
+> >
 
 -- 
 Yauhen Kharuzhy		jekhor _at_ gmail.com
