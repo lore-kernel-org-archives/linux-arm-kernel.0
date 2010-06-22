@@ -1,52 +1,41 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Tue, 22 Jun 2010 19:24:20 +0800
-Subject: [PATCH 05/25] pxa3xx_nand: rework irq logic
-In-Reply-To: <AANLkTinzmIud44FuZhZSs94yo16F0ipP-uPdX9gAhdPf@mail.gmail.com>
-References: <AANLkTimvhEWIDupsj3Ty8vB9ualwU9RsaIxa0CDgWgYQ@mail.gmail.com>
-	<AANLkTikTzNY2hI0JDTOOZpGeOPc_MU79jVJ_1L9XxA_e@mail.gmail.com>
-	<AANLkTikmuCHqJQY2g8G3FsrufO5dKGt9WNZFnmvoSGl2@mail.gmail.com>
-	<AANLkTinzmIud44FuZhZSs94yo16F0ipP-uPdX9gAhdPf@mail.gmail.com>
-Message-ID: <AANLkTinEOvQX0f6jKsGEALSLBMPmeSgx9n6QIsCcHVKG@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 22 Jun 2010 12:34:01 +0100
+Subject: [PATCH v4 0/4] Patches for -next
+In-Reply-To: <AANLkTimFl8rOzipTjsJ39HyPQDkEjZeliKHssxyL4df6@mail.gmail.com>
+References: <20100621144409.26309.87173.stgit@e102109-lin.cambridge.arm.com>
+	<AANLkTimFl8rOzipTjsJ39HyPQDkEjZeliKHssxyL4df6@mail.gmail.com>
+Message-ID: <1277206441.22719.41.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 22, 2010 at 6:02 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Tue, Jun 22, 2010 at 5:34 PM, Lei Wen <adrian.wenl@gmail.com> wrote:
->> On Fri, Jun 18, 2010 at 2:50 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
->>> On Fri, Jun 18, 2010 at 1:34 PM, Haojian Zhuang
->>> <haojian.zhuang@gmail.com> wrote:
->>>> From 18d589a078871a09dec0862241fedd2d1d07be85 Mon Sep 17 00:00:00 2001
->>>> From: Lei Wen <leiwen@marvell.com>
->>>> Date: Mon, 31 May 2010 14:05:46 +0800
->>>> Subject: [PATCH 05/25] pxa3xx_nand: rework irq logic
->>>>
->>>> Enable all irq when we start the nand controller, and
->>>> put all the transaction logic in the pxa3xx_nand_irq.
->>>>
->>>
->>> Didn't look into the change too much, but the idea sounds to me like
->>> chaining all the logic with different IRQ events, which was my original
->>> reason of having different states. And considering the page read/write
->>> is actually to an internal SRAM within the controller, I guess it's quick
->>> enough. (though I'd suggest to do some experiments of time profiling
->>> to see if it's going to increase the interrupt latency)
->>>
->>>> By doing this way, we could dramatically increase the
->>>> performance by avoid unnecessary delay.
->>>>
->>>
->>> The removal of __read_id() doesn't look to be part of this patch, no?
->>>
->> For write_cmd function has been discard and __read_id function would
->> not be used, if
->> continue to keep the __read_id() definition would lead to make failure...
->>
->
-> Well, the logic is: this change doesn't belong to this patch, so is it possible
-> to separate the change apart and still keep it compiling?
->
+On Tue, 2010-06-22 at 11:29 +0100, Rabin Vincent wrote:
+> On Mon, Jun 21, 2010 at 8:16 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > Pretty much the same content as v3 but I reordered the last three
+> > patches to make sure that switching to lazy cache flushing on ARMv7 SMP
+> > doesn't make the set_pte/cache flushing race more visible (issue handled
+> > by the set_pte_at patch).
+> >
+> >
+> > Catalin Marinas (4):
+> >      ARM: Remove the domain switching on ARMv6k/v7 CPUs
+> >      ARM: Assume new page cache pages have dirty D-cache
+> >      ARM: Synchronise the I and D caches via set_pte_at() on SMP systems
+> >      ARM: Use lazy cache flushing on ARMv7 SMP systems
+> 
+> I've tried patches 2, 3, and 4 on a Cortex-A9 SMP system and it resolves the
+> MMC rootfs init crash without the need for the flush_kernel_dcache_page()
+> change.
+> 
+> Tested-by: Rabin Vincent <rabin.vincent@stericsson.com>
 
-Em... Seems reasonable, I'll try to do that. :-)
+Thanks.
 
-Best regards,
-Lei
+> P.S.: Patch 1 (at least the version on your proposed branch), doesn't seem to
+> apply cleanly on linux-next.
+
+It's a bit more intrusive and I'd like to push it to linux-next (but
+still waiting for review on this list).
+
+-- 
+Catalin
