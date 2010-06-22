@@ -1,133 +1,58 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Tue, 22 Jun 2010 10:37:27 +0530
-Subject: [PATCH v4] GPIO PL061: Adding Clk framework support
-Message-ID: <1277183247-4557-1-git-send-email-viresh.kumar@st.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 22 Jun 2010 14:20:39 +0900
+Subject: Samsung SoCs naming rules
+In-Reply-To: <011201cb11c8$8236c530$86a44f90$%kim@samsung.com>
+References: <AANLkTiljyiQohHVJxUsn7Q6_IwTZk2AdNlLRxgGmxNpQ@mail.gmail.com>
+	<AANLkTilnjN1dBWPKCuDt_bg8-5GEuSCrOh7vhqGf-VQU@mail.gmail.com>
+	<011201cb11c8$8236c530$86a44f90$%kim@samsung.com>
+Message-ID: <AANLkTikXrvcchcguw4mK4tFKK8AgpH13Q0RcaynSG79d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Viresh KUMAR <viresh.kumar@st.com>
+On Tue, Jun 22, 2010 at 2:05 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Eric Miao wrote:
+>>
+>> On Mon, Jun 21, 2010 at 6:00 PM, Kyungmin Park <kmpark@infradead.org>
+> wrote:
+>> > Dear all,
+>> >
+>> > Now Samsung SoCs doesn't have any special rules include chip name.
+>> >
+>> > Historically s5pc100 is successor form s3c6410 and this chip from
+>> > s3c2410 series.
+>> > on the other hand, s5pc110 (cortex a8) and s5pc64xx (armv6) is
+>> > different from previous chips.
+>>
+>> Don't be shy, Samsung is not the only vendor messes the naming of their
+>> SoCs. Marvell might have done a better job on this :-)
+>>
+>> >
+>> > So it's not good idea grouping with the prefix. e.g., s5p series. and
+>> > the reason to create the samsung.
+>> >
+>>
+>> My guess is your s5p will focus more on Cortex-A8 (or A9 possibly),
+>> even with subsequent processors. And only s5pc100 is an exception,
+>> that's fine, you can still put s5pc100 into mach-s3c6410, and people
+>> will know it's actually closer to s3c6410. And other SoCs will share the
+>> common s5p prefix.
+>
+> Hi Eric,
+>
+> Actually, S5P does not focus on only Cortex-A8 or -A9.
+> The S5P6440 and S5P6442 which have ARM11 core are S5P series in Samsung
+> SoCs, too.
+>
+> Besides, other S5P SoC which has ARM11 core will be produced.
 
-GPIO Clk is never enabled on Platforms, like: SPEAr, which are based upon clock
-framework and use PL061 driver. This patch adds support for Clk enabling and
-disabling as and when gpios are requested and freed.
+Then what's base IPs? I mean which cpu either s3c6410 or s5p6440 are similar?
 
-Modifications in V4:
- - Not registering gpio_request and gpio_free if clk is not found.
+>
+> And S5PC100 is Cortex-A8 SoC, the architecture is different from S3C6410.
 
-Modifications in V3:
- - if clk_get returns -ENOENT, then work without clk enable/disable.
+I can't tell the cpu core. In the view of IPs. it's similar. e.g.,
+which 3D core used at 6410 and c100?
+Does it same as c110?
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- drivers/gpio/pl061.c |   49 +++++++++++++++++++++++++++++++++++++++++++------
- 1 files changed, 43 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/gpio/pl061.c b/drivers/gpio/pl061.c
-index 105701a..b826d2b 100644
---- a/drivers/gpio/pl061.c
-+++ b/drivers/gpio/pl061.c
-@@ -11,7 +11,10 @@
-  *
-  * Data sheet: ARM DDI 0190B, September 2000
-  */
-+
-+#include <linux/clk.h>
- #include <linux/spinlock.h>
-+#include <linux/err.h>
- #include <linux/errno.h>
- #include <linux/module.h>
- #include <linux/list.h>
-@@ -56,8 +59,26 @@ struct pl061_gpio {
- 	void __iomem		*base;
- 	unsigned		irq_base;
- 	struct gpio_chip	gc;
-+	struct clk		*clk;
- };
- 
-+static int pl061_request(struct gpio_chip *gc, unsigned offset)
-+{
-+	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
-+
-+	if (offset >= gc->ngpio)
-+		return -EINVAL;
-+
-+	return clk_enable(chip->clk);
-+}
-+
-+static void pl061_free(struct gpio_chip *gc, unsigned offset)
-+{
-+	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
-+
-+	clk_disable(chip->clk);
-+}
-+
- static int pl061_direction_input(struct gpio_chip *gc, unsigned offset)
- {
- 	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
-@@ -260,9 +281,18 @@ static int __init pl061_probe(struct amba_device *dev, struct amba_id *id)
- 		goto release_region;
- 	}
- 
--	spin_lock_init(&chip->lock);
--	spin_lock_init(&chip->irq_lock);
--	INIT_LIST_HEAD(&chip->list);
-+	chip->clk = clk_get(&dev->dev, NULL);
-+	if (IS_ERR(chip->clk)) {
-+		ret = PTR_ERR(chip->clk);
-+		/* clk Not present */
-+		if (ret == -ENOENT)
-+			chip->clk = NULL;
-+		else
-+			goto iounmap;
-+	} else {
-+		chip->gc.request = pl061_request;
-+		chip->gc.free = pl061_free;
-+	}
- 
- 	chip->gc.direction_input = pl061_direction_input;
- 	chip->gc.direction_output = pl061_direction_output;
-@@ -277,9 +307,13 @@ static int __init pl061_probe(struct amba_device *dev, struct amba_id *id)
- 
- 	chip->irq_base = pdata->irq_base;
- 
-+	spin_lock_init(&chip->lock);
-+	spin_lock_init(&chip->irq_lock);
-+	INIT_LIST_HEAD(&chip->list);
-+
- 	ret = gpiochip_add(&chip->gc);
- 	if (ret)
--		goto iounmap;
-+		goto free_clk;
- 
- 	/*
- 	 * irq_chip support
-@@ -292,7 +326,7 @@ static int __init pl061_probe(struct amba_device *dev, struct amba_id *id)
- 	irq = dev->irq[0];
- 	if (irq < 0) {
- 		ret = -ENODEV;
--		goto iounmap;
-+		goto free_clk;
- 	}
- 	set_irq_chained_handler(irq, pl061_irq_handler);
- 	if (!test_and_set_bit(irq, init_irq)) { /* list initialized? */
-@@ -300,7 +334,7 @@ static int __init pl061_probe(struct amba_device *dev, struct amba_id *id)
- 		if (chip_list == NULL) {
- 			clear_bit(irq, init_irq);
- 			ret = -ENOMEM;
--			goto iounmap;
-+			goto free_clk;
- 		}
- 		INIT_LIST_HEAD(chip_list);
- 		set_irq_data(irq, chip_list);
-@@ -323,6 +357,9 @@ static int __init pl061_probe(struct amba_device *dev, struct amba_id *id)
- 
- 	return 0;
- 
-+free_clk:
-+	if (chip->clk)
-+		clk_put(chip->clk);
- iounmap:
- 	iounmap(chip->base);
- release_region:
--- 
-1.6.0.2
+Thank you,
+Kyungmin Park
