@@ -1,45 +1,35 @@
 From: leiwen@marvell.com (Lei Wen)
-Date: Thu, 3 Jun 2010 15:46:50 +0800
-Subject: [PATCH 17/29] mmp: correct nand clock setting for pxa168 and pxa910
-Message-ID: <mailman.134.1280296963.27306.linux-arm-kernel@lists.infradead.org>
+Date: Tue, 22 Jun 2010 22:32:54 +0800
+Subject: [PATCH 19/29] pxa3xx_nand: update ns2cycle calculation method
+Message-ID: <mailman.135.1280296992.27306.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no clock setting at 208Mhz for nand on pxa168 and pxa910
-platform. Set correct register and lock the clock at
-156MHZ.
+For the original method change from plus 1 to minus 1,
+this way make the default timing like tCS become 0 after calculation,
+although we set the timing as 0xa...
+
+Change the method to no plus and minus, and make the result
+closer to what the timing specified in the NAND chip spec.
 
 Signed-off-by: Lei Wen <leiwen@marvell.com>
 ---
- arch/arm/mach-mmp/pxa168.c |    2 +-
- arch/arm/mach-mmp/pxa910.c |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/mtd/nand/pxa3xx_nand.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-index 652ae66..70d2231 100644
---- a/arch/arm/mach-mmp/pxa168.c
-+++ b/arch/arm/mach-mmp/pxa168.c
-@@ -78,7 +78,7 @@ static APBC_CLK(ssp3, PXA168_SSP3, 4, 0);
- static APBC_CLK(ssp4, PXA168_SSP4, 4, 0);
- static APBC_CLK(ssp5, PXA168_SSP5, 4, 0);
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index 45c9660..50f653b 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -279,7 +279,7 @@ static const char *mtd_names[] = {"pxa3xx_nand-0",
+"pxa3xx_nand-1", NULL};
+ #define NDTR1_tAR(c)	(min((c), 15) << 0)
 
--static APMU_CLK(nand, NAND, 0x01db, 208000000);
-+static APMU_CLK(nand, NAND, 0x19B, 156000000);
+ /* convert nano-seconds to nand flash controller clock cycles */
+-#define ns2cycle(ns, clk)	(int)(((ns) * (clk / 1000000) / 1000) - 1)
++#define ns2cycle(ns, clk)	(int)((ns) * (clk / 1000000) / 1000)
 
- /* device and clock bindings */
- static struct clk_lookup pxa168_clkregs[] = {
-diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
-index 46f2d69..96f2b61 100644
---- a/arch/arm/mach-mmp/pxa910.c
-+++ b/arch/arm/mach-mmp/pxa910.c
-@@ -110,7 +110,7 @@ static APBC_CLK(pwm2, PXA910_PWM2, 1, 13000000);
- static APBC_CLK(pwm3, PXA910_PWM3, 1, 13000000);
- static APBC_CLK(pwm4, PXA910_PWM4, 1, 13000000);
-
--static APMU_CLK(nand, NAND, 0x01db, 208000000);
-+static APMU_CLK(nand, NAND, 0x19B, 156000000);
-
- /* device and clock bindings */
- static struct clk_lookup pxa910_clkregs[] = {
+ static void pxa3xx_nand_set_timing(struct pxa3xx_nand_info *info,
+ 				   const struct pxa3xx_nand_timing *t)
 -- 
 1.7.0.4
