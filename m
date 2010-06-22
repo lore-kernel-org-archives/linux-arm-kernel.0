@@ -1,64 +1,71 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 23 Jun 2010 00:03:47 +0200
-Subject: [PATCH 07/12] mmci: pass power_mode to the translate_vdd callback
-In-Reply-To: <1277198267-10860-7-git-send-email-rabin.vincent@stericsson.com>
-References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
-	<1277198267-10860-7-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <AANLkTil2Cb4alVFkfEjXApMgIdkmNvEEarWkT9AhXIdU@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 22 Jun 2010 23:39:04 +0100
+Subject: [PATCH v4 2/4] ARM: Assume new page cache pages have dirty D-cache
+In-Reply-To: <20100622193638.GA9780@debian>
+References: <20100621144409.26309.87173.stgit@e102109-lin.cambridge.arm.com>
+	<20100621144632.26309.63314.stgit@e102109-lin.cambridge.arm.com>
+	<20100622193638.GA9780@debian>
+Message-ID: <1277246344.20311.30.camel@toshiba-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thinking a bit about this patch tonight:
+On Tue, 2010-06-22 at 20:36 +0100, Rabin Vincent wrote:
+> On Mon, Jun 21, 2010 at 03:46:32PM +0100, Catalin Marinas wrote:
+> > There are places in Linux where writes to newly allocated page cache
+> > pages happen without a subsequent call to flush_dcache_page() (several
+> > PIO drivers including USB HCD). This patch changes the meaning of
+> > PG_arch_1 to be PG_dcache_clean and always flush the D-cache for a newly
+> > mapped page in update_mmu_cache().
+> 
+> Correct me if I'm misreading the code, but don't this patch and the next
+> one make the assumption that CONFIG_SMP == VIPT non-aliasing (or PIPT)
+> caches?  
 
-2010/6/22 Rabin Vincent <rabin.vincent@stericsson.com>:
+Yes.
 
-> Platforms may have some external power control which need to be
-> controlled from board specific code. ?This is the case for some versions
-> of the MOP500 board (U8500 platform).
->
-> Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
-> ---
-> ?drivers/mmc/host/mmci.c ? | ? ?3 ++-
-> ?include/linux/amba/mmci.h | ? ?6 ++++--
-> ?2 files changed, 6 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index 322958f..63eb7f4 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -483,7 +483,8 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
-> ? ? ? ? ? ? ? ? * power control behind this translate function.
-> ? ? ? ? ? ? ? ? */
-> ? ? ? ? ? ? ? ?if (!host->vcc && host->plat->translate_vdd)
-> - ? ? ? ? ? ? ? ? ? ? ? pwr |= host->plat->translate_vdd(mmc_dev(mmc), ios->vdd);
-> + ? ? ? ? ? ? ? ? ? ? ? pwr |= host->plat->translate_vdd(mmc_dev(mmc), ios->vdd,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?ios->power_mode);
-> ? ? ? ? ? ? ? ?/* The ST version does not have this, fall through to POWER_ON */
-> ? ? ? ? ? ? ? ?if (host->hw_designer != AMBA_VENDOR_ST) {
-> ? ? ? ? ? ? ? ? ? ? ? ?pwr |= MCI_PWR_UP;
-> diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
-> index f9d1bb5..61b5810 100644
-> --- a/include/linux/amba/mmci.h
-> +++ b/include/linux/amba/mmci.h
-> @@ -17,7 +17,8 @@
-> ?* mmc/host.h
-> ?* @translate_vdd: a callback function to translate a MMC_VDD_*
-> ?* mask into a value to be binary or:ed and written into the
-> - * MMCIPWR register of the block
-> + * MMCIPWR register of the block. ?May also control external power
-> + * based on the power_mode.
+> This patch does not add flushing on SMP systems, and the next
+> one handles the I$-D$ coherency issues there (ignoring the set_pte race
+> fix for a moment).   
 
-Actually this callback is named like that for a reason: it is to be used
-to translate the MMC_VDD_* into a u8:4 bitmask for the MMCIPWR
-register, 4 bits possibly routed out of the PL180 block on some
-designs (never seen in practice, but could be used in theory).
+The aim of this patch isn't to add any new flushing, just changes the
+default assumptions on the D-cache status for new pages (from clean to
+dirty).
 
-So it translates a voltage into a 4-bit bitmask, hence the name.
+The following patch (sync I-D caches) is aimed at sorting out a race.
+This patch indeed adds a __flush_dcache_page() call if the page is dirty
+but with well-behaved drivers (calling flush_dcache_page), the
+PG_dcache_clean bit should always be set when reaching set_pte_at().
 
-Now the semantics are altered to have other side-effects in
-the platform, so the function should be renamed, something like
-platform_vdd_handler() would be more appropriate.
+On ARM11MPCore, the cache operations are not broadcast in hardware, so
+flush_dcache_page() must be called on the CPU that dirtied the cache. So
+not having a correct driver could lead to errors in user space on this
+processor (if running with more than 1).
 
-Yours,
-Linus Walleij
+Cortex-A9 broadcasts the cache ops in hardware, so even if you don't do
+it via the driver and flush_dcache_page, you catch the dirty page later
+in set_pte_at().
+
+So the sync I-D cache patch fixes both the race and the handling of not
+well written drivers (the latter only on Cortex-A9). With all this in
+place, the final patch in my series allows Cortex-A9 to use lazy cache
+flushing as on UP systems (flush_dcache_page/update_mmu_cache pair).
+
+BTW, I have a patch for ARM11MPCore which allows lazy cache flushing as
+well (by performing a read-for-ownership before flushing the D-cache).
+However, I can't guarantee that it works on anything other than
+ARM11MPcore as it is to specific to the hardware implementation.
+
+> Won't the flushing added in this patch be
+> unnecessary on non-SMP PIPT systems, since they too only need the
+> exec-related flushing?
+
+Yes, this can be optimised. We could extend the __sync_icache_dcache()
+patch to all the ARMv7 (UP) and SMP configurations (just a matter of
+#ifdef's) where we know for sure that the hardware is VIPT non-aliasing.
+
+I'll have a look tomorrow and post an update to this patch.
+
+Thanks.
+
+-- 
+Catalin
