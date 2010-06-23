@@ -1,74 +1,55 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 23 Jun 2010 15:36:46 +0800
-Subject: Samsung SoCs: preparation for single kernel
-In-Reply-To: <20100623072855.GZ12255@atomide.com>
-References: <AANLkTinGwWzIAOe2tj6V2kCrMiPT7PHlYs1kFS-IsiN4@mail.gmail.com>
-	<AANLkTil-AOEqhMOXydaiA1X_v0rjoNQxALrO0UY638AS@mail.gmail.com>
-	<20100623072855.GZ12255@atomide.com>
-Message-ID: <AANLkTinYTm-AZDXOSvtTptGg1HYhKfItYYW8tBuF4SPV@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 Jun 2010 10:39:13 +0300
+Subject: [PATCH 1/2] arm: Replace CONFIG_HAS_TLS_REG with HWCAP_TLS and
+	check for it on V6
+In-Reply-To: <20100622170020.GF4371@shareable.org>
+References: <20100621133749.24299.36154.stgit@baageli.muru.com>
+	<20100621135120.24299.98499.stgit@baageli.muru.com>
+	<20100622170020.GF4371@shareable.org>
+Message-ID: <20100623073912.GA12255@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 23, 2010 at 3:28 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Eric Miao <eric.y.miao@gmail.com> [100623 03:48]:
->> On Wed, Jun 23, 2010 at 7:27 AM, Kyungmin Park <kmpark@infradead.org> wrote:
->> > To Ben,
->> >
->> > I really need single kernel for s5pc110 (cortex A8) and s5pc210
->> > (cortex A9) at least.
->> > Fortunately arm move to these approaches recently. but current Samsung
->> > SoCs not prepare these one.
->> >
->> > So I wonder do you have a plan or how to address these issues?
->> > How to assign the address at resources and use it at runtime?
->> >
->> > Personally I want to use cpu_is_*. but you reject it to use.
->> > Other way is that we can create the base address variables and assign
->> > it at init time.
->> >
->> > Please give your opinions.
->> >
->> > Thank you,
->> > Kyungmin Park
->> >
->> > e.g., cpu_is_* usage at OMAP tree
->> >
->> > static void omap_init_mcspi(void)
->> > {
->> > ? ? ? ?if (cpu_is_omap44xx())
->> > ? ? ? ? ? ? ? ?omap4_mcspi_fixup();
->> >
->> > ? ? ? ?platform_device_register(&omap2_mcspi1);
->> > ? ? ? ?platform_device_register(&omap2_mcspi2);
->> >
->> > ? ? ? ?if (cpu_is_omap2430() || cpu_is_omap343x() || cpu_is_omap44xx())
->> > ? ? ? ? ? ? ? ?omap2_mcspi3_init();
->> >
->> > ? ? ? ?if (cpu_is_omap343x() || cpu_is_omap44xx())
->> > ? ? ? ? ? ? ? ?omap2_mcspi4_init();
->> > }
->>
->> Just my two cents: cpu_is_*() can be used, but only when absolutely necessary.
->> The s3c does a CPU detection at startup, so I guess the usage of cpu_is_*()
->> can be even reduced.
->>
->> I'm not sure if the above case is a good reference or not. The omap_init_mcspi
->> is called from omap2_init_devices(), while the registration can actually be
->> made into the board init code when that device is used (some of the McSPIs are
->> not used, and it's not necessary to register them), and the differences be
->> handled in the driver.
->
-> Few comments regarding the cpu_is_omap macros: The macros should really be
-> soc_is_omapxxxx() instead cpu_is_omapxxxx().
+* Jamie Lokier <jamie@shareable.org> [100622 19:54]:
+> Tony Lindgren wrote:
+> >  __kuser_get_tls:				@ 0xffff0fe0
+> > -
+> > -#if !defined(CONFIG_HAS_TLS_REG) && !defined(CONFIG_TLS_REG_EMUL)
+> > -	ldr	r0, [pc, #(16 - 8)]		@ TLS stored at 0xffff0ff0
+> > -#else
+> > -	mrc	p15, 0, r0, c13, c0, 3		@ read TLS register
+> > -#endif
+> > +	ldr     r0, [pc, #(20 - 8)]		@ software TLS set in 0xffff0ff4?
+> > +	cmp	r0, #0				@ hardware TLS if flag not set
+> > +	mrceq	p15, 0, r0, c13, c0, 3		@ read hardware TLS register
+> > +	ldrne	r0, [pc, #(12 - 8)]		@ software TLS val at 0xffff0ff8
+> >  	usr_ret	lr
+> > -
+> > -	.rep	5
+> > -	.word	0			@ pad up to __kuser_helper_version
+> > -	.endr
+> > +	.word	0				@ non-zero for software TLS
+> > +	.word	0				@ software TLS value
+> 
+> It'd be nice not to waste instructions checking for HWCAP_TLS on archs
+> which definitely don't have it.  I guess it doesn't matter elsewhere;
+> I'd expect this to be a warm path for some programs making extensive
+> use of TLS (I haven't measured though).
 
-Right, that will be more specific. cpu_is_* could be used only
-with the ARM core, like cpu_is_arm946ejs(), ... And apparently
-we all have abusively used it :-)
+OK, but let's try to figure out a way that does not add more ifdef else
+code as that makes it harder to build support for multiple ARM cores.
+ 
+> As it's only a single instruction, and the code is in a writable page
+> already (copied at init), how about just patching the instruction
+> when ELF_HWCAP is set?
 
->
-> Also, sprinkling these too much makes the code messy and hard to patch for
-> new processors. So you should limit the use to very selected places during
-> init, then set some flag like OMAP_HAS_MCSPI2 | OMAP_HAS_MCSPI3 or something
-> similar.
+Yeah that can be done for __kuser_get_tls if it's always writable.
+But __switch_to is trickier because of the CONFIG_MMU ifdefs there.
 
-Exactly.
+What if we have optional __switch_to and __kuser_get_tls implementations
+in the mm/proc-*.S files that get copied over the current locations
+if implemented?
+
+Regards,
+
+Tony
