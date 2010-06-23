@@ -1,20 +1,27 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 23 Jun 2010 08:47:07 +0200
-Subject: [PATCH 0/5] mtd: mxc_nand fixups
-In-Reply-To: <80ljacb7l8.fsf@merkur.tec.linutronix.de>
-References: <80ljacb7l8.fsf@merkur.tec.linutronix.de>
-Message-ID: <20100623064707.GN12115@pengutronix.de>
+Date: Wed, 23 Jun 2010 08:59:14 +0200
+Subject: [PATCH V2 1/2] mxc: add common debug board for 3-stack platforms
+In-Reply-To: <1277216851-15782-2-git-send-email-jason77.wang@gmail.com>
+References: <1277216851-15782-1-git-send-email-jason77.wang@gmail.com>
+	<1277216851-15782-2-git-send-email-jason77.wang@gmail.com>
+Message-ID: <20100623065914.GO12115@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 18, 2010 at 06:58:59PM +0200, John Ogness wrote:
-> Hi,
+On Tue, Jun 22, 2010 at 10:27:30PM +0800, Jason Wang wrote:
+> The debug board is little different for all mxc 3-stack(PDK)
+> platforms, it is possible here to add a common implementation to
+> support this board.
 > 
-> The following 5 patches fix several issues with the MXC NFC
-> driver. These changes were tested using an i.MX35 with a 16-bit flash
-> chip (2K pages, 64 pages per eraseblock).
+> +
+> +void __init mxc_expio_lan_init(void)
+> +{
+> +	platform_device_register(&smsc_lan9217_device);
+> +}
 
-All Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+What do we need this for? Can't we just call this from
+mxc_expio_init()?
+
 
 -- 
 Pengutronix e.K.                           |                             |
