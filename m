@@ -1,44 +1,62 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Wed, 23 Jun 2010 01:44:22 +0100
-Subject: Possible methods for the kernel to terminate a process
-In-Reply-To: <BAY134-W142753895B5626C329E273BDC40@phx.gbl>
-References: <BAY134-W142753895B5626C329E273BDC40@phx.gbl>
-Message-ID: <20100623004422.GB22367@shareable.org>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 23 Jun 2010 08:50:34 +0800
+Subject: Samsung SoCs: preparation for single kernel
+In-Reply-To: <AANLkTinGwWzIAOe2tj6V2kCrMiPT7PHlYs1kFS-IsiN4@mail.gmail.com>
+References: <AANLkTinGwWzIAOe2tj6V2kCrMiPT7PHlYs1kFS-IsiN4@mail.gmail.com>
+Message-ID: <AANLkTil-AOEqhMOXydaiA1X_v0rjoNQxALrO0UY638AS@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Xiachen Dong wrote:
-> 
-> Hi,
-> 
-> We have a quick question. Besides sending signals, are there any other ways for the kernel to terminate a process?
-> 
-> We have such question because we try to kill a user space process by the shell command kill and we cannot kill it probably because it is in an un-interruptible sleep/wait. 
-> 
-> However, we still wish to be able to kill the user space process under this circumstance. To our knowledge of the kernel, if the kernel wants to kill a process when special event such as exception happens, it usually sends a signal to the process. We really cannot think of any other methods for a kernel to terminate a process.
-> 
-> Can anyone provide some hints on this? Is rebooting the machine the only solution to the problem?
+On Wed, Jun 23, 2010 at 7:27 AM, Kyungmin Park <kmpark@infradead.org> wrote:
+> To Ben,
+>
+> I really need single kernel for s5pc110 (cortex A8) and s5pc210
+> (cortex A9) at least.
+> Fortunately arm move to these approaches recently. but current Samsung
+> SoCs not prepare these one.
+>
+> So I wonder do you have a plan or how to address these issues?
+> How to assign the address at resources and use it at runtime?
+>
+> Personally I want to use cpu_is_*. but you reject it to use.
+> Other way is that we can create the base address variables and assign
+> it at init time.
+>
+> Please give your opinions.
+>
+> Thank you,
+> Kyungmin Park
+>
+> e.g., cpu_is_* usage at OMAP tree
+>
+> static void omap_init_mcspi(void)
+> {
+> ? ? ? ?if (cpu_is_omap44xx())
+> ? ? ? ? ? ? ? ?omap4_mcspi_fixup();
+>
+> ? ? ? ?platform_device_register(&omap2_mcspi1);
+> ? ? ? ?platform_device_register(&omap2_mcspi2);
+>
+> ? ? ? ?if (cpu_is_omap2430() || cpu_is_omap343x() || cpu_is_omap44xx())
+> ? ? ? ? ? ? ? ?omap2_mcspi3_init();
+>
+> ? ? ? ?if (cpu_is_omap343x() || cpu_is_omap44xx())
+> ? ? ? ? ? ? ? ?omap2_mcspi4_init();
+> }
 
-You can't kill a task that's in TASK_UNINTERRUPTIBLE state, except by
-the condition the task is waiting on changing.
+Just my two cents: cpu_is_*() can be used, but only when absolutely necessary.
+The s3c does a CPU detection at startup, so I guess the usage of cpu_is_*()
+can be even reduced.
 
-That's been a well known problem with unix for decades, because
-uninterruptible wait is used for some things (like reading a disk
-file) that it seems reasonable to be able to kill.
+I'm not sure if the above case is a good reference or not. The omap_init_mcspi
+is called from omap2_init_devices(), while the registration can actually be
+made into the board init code when that device is used (some of the McSPIs are
+not used, and it's not necessary to register them), and the differences be
+handled in the driver.
 
-So, to fix that, TASK_KILLABLE was added.  It means you can't
-interrupt the process with most signals, but you can at least "kill
--9" the process (SIGKILL).
-
-I think for what you're asking, if the problem is some processes tend
-to block on particular device drivers, or processes blocked while
-accessing files gets stuck, or things like that, the best thing is to
-look at the places they might be in TASK_UNINTERRUPTIBLE and
-*carefully* change the code to use TASK_KILLABLE and handle the killed
-condition.
-
-It's not possible to just search-and-replace TASK_UNINTERRUPTIBLE.
-You have to make sure the killed condition is handled by cleaning up
-locked resources, and only then change to killable.
-
--- Jamie
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
