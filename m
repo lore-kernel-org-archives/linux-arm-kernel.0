@@ -1,87 +1,22 @@
-From: Jiri.Pinkava@vscht.cz (Pinkava J.)
-Date: Wed, 23 Jun 2010 22:31:04 +0200
-Subject: [PATCH] n30: Clean up UARTs configuration
-Message-ID: <4C226F08.7090804@vscht.cz>
+From: jgarzik@pobox.com (Jeff Garzik)
+Date: Wed, 23 Jun 2010 16:36:27 -0400
+Subject: [PATCH v4] libata: pata_samsung_cf: Add Samsung PATA controller
+	driver
+In-Reply-To: <1276499263-12217-1-git-send-email-kgene.kim@samsung.com>
+References: <1276499263-12217-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <4C22704B.50103@pobox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 06/14/2010 03:07 AM, Kukjin Kim wrote:
+> From: Abhilash Kesavan<a.kesavan@samsung.com>
+>
+> Adds support for the Samsung PATA controller. This driver is based on the
+> Libata subsystem and references the earlier patches sent for IDE subsystem.
+>
+> Signed-off-by: Abhilash Kesavan<a.kesavan@samsung.com>
+> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
 
-Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
----
- arch/arm/mach-s3c2410/mach-n30.c                 |   28 +++++++++++++++-------
- arch/arm/plat-samsung/include/plat/regs-serial.h |    3 ++
- 2 files changed, 22 insertions(+), 9 deletions(-)
+Acked-by: Jeff Garzik <jgarzik@redhat.com>
 
-diff --git a/arch/arm/mach-s3c2410/mach-n30.c b/arch/arm/mach-s3c2410/mach-n30.c
-index 29fcb88..401460a 100644
---- a/arch/arm/mach-s3c2410/mach-n30.c
-+++ b/arch/arm/mach-s3c2410/mach-n30.c
-@@ -55,32 +55,42 @@ static struct map_desc n30_iodesc[] __initdata = {
- 	/* nothing here yet */
- };
-
-+#define UCON	(S3C2410_UCON_DEFAULT | \
-+		 S3C2443_UCON_RXERR_IRQEN)
-+
-+#define ULCON	(S3C2410_LCON_CS8 | \
-+		 S3C2410_LCON_PNONE)
-+
-+#define UFCON	(S3C2410_UFCON_FIFOMODE | \
-+		 S3C2410_UFCON_RXTRIG8 | \
-+		 S3C2410_UFCON_TXTRIG4)
-+
- static struct s3c2410_uartcfg n30_uartcfgs[] = {
- 	/* Normal serial port */
- 	[0] = {
- 		.hwport	     = 0,
- 		.flags	     = 0,
--		.ucon	     = 0x2c5,
--		.ulcon	     = 0x03,
--		.ufcon	     = 0x51,
-+		.ucon	     = UCON,
-+		.ulcon	     = ULCON,
-+		.ufcon	     = UFCON,
- 	},
- 	/* IR port */
- 	[1] = {
- 		.hwport	     = 1,
- 		.flags	     = 0,
- 		.uart_flags  = UPF_CONS_FLOW,
--		.ucon	     = 0x2c5,
--		.ulcon	     = 0x43,
--		.ufcon	     = 0x51,
-+		.ucon	     = UCON,
-+		.ulcon	     = ULCON | S3C2410_LCON_IRM,
-+		.ufcon	     = UFCON,
- 	},
- 	/* On the N30 the bluetooth controller is connected here.
- 	 * On the N35 and variants the GPS receiver is connected here. */
- 	[2] = {
- 		.hwport	     = 2,
- 		.flags	     = 0,
--		.ucon	     = 0x2c5,
--		.ulcon	     = 0x03,
--		.ufcon	     = 0x51,
-+		.ucon	     = UCON,
-+		.ulcon	     = ULCON,
-+		.ufcon	     = UFCON,
- 	},
- };
-
-diff --git a/arch/arm/plat-samsung/include/plat/regs-serial.h
-b/arch/arm/plat-samsung/include/plat/regs-serial.h
-index a6eba84..5840198 100644
---- a/arch/arm/plat-samsung/include/plat/regs-serial.h
-+++ b/arch/arm/plat-samsung/include/plat/regs-serial.h
-@@ -114,6 +114,9 @@
-
- #define S3C2410_UFCON_FIFOMODE	  (1<<0)
- #define S3C2410_UFCON_TXTRIG0	  (0<<6)
-+#define S3C2410_UFCON_TXTRIG4	  (1<<6)
-+#define S3C2410_UFCON_TXTRIG8	  (2<<6)
-+#define S3C2410_UFCON_TXTRIG12	  (3<<6)
- #define S3C2410_UFCON_RXTRIG8	  (1<<4)
- #define S3C2410_UFCON_RXTRIG12	  (2<<4)
-
--- 
-1.7.1
+Send it through the appropriate subsystem tree for this platform...
