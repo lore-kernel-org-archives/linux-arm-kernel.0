@@ -1,157 +1,101 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 23 Jun 2010 13:26:31 +0800
-Subject: [RFC PATCH] Rework gpio cansleep (was Re: gpiolib and sleeping
-	gpios)
-In-Reply-To: <4C21955D.1020502@bluewatersys.com>
-References: <191168.5104.qm@web180308.mail.gq1.yahoo.com>
-	<4C21955D.1020502@bluewatersys.com>
-Message-ID: <AANLkTikEvq_qcOWaev79UbHFfWp7hnOil_q9x-QZuSlK@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 23 Jun 2010 08:25:45 +0200
+Subject: Samsung SoCs: preparation for single kernel
+In-Reply-To: <AANLkTikDml6gQAsiRrCjIt4bUD3hnpAATr1erqCGOJMd@mail.gmail.com>
+References: <AANLkTinGwWzIAOe2tj6V2kCrMiPT7PHlYs1kFS-IsiN4@mail.gmail.com>
+	<AANLkTil-AOEqhMOXydaiA1X_v0rjoNQxALrO0UY638AS@mail.gmail.com>
+	<AANLkTil1i_ZGI8bY14HhjrAk9RooVreAJsTteqqrMgqJ@mail.gmail.com>
+	<AANLkTikDml6gQAsiRrCjIt4bUD3hnpAATr1erqCGOJMd@mail.gmail.com>
+Message-ID: <002301cb129c$ec59fe30$c50dfa90$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 23, 2010 at 1:02 PM, Ryan Mallon <ryan@bluewatersys.com> wrote:
-> On 06/23/2010 04:37 PM, David Brownell wrote:
->>
->>
->> --- On Tue, 6/22/10, Ryan Mallon <ryan@bluewatersys.com> wrote:
->>
->>
->>> gpiolib
->>
->>
->> Again, you're talking about "gpiolib" when
->> you seem to mean the GPIO framework itself
->> (for which gpiolib is only an implementation
->> option)...
->
-> Fine, its just semantics. I think everyone knows what I mean when I
-> refer to gpiolib.
->
->>> framework could be simplified for cansleep gpios.
->>>
->>> 'Can sleep' for a gpio has two different meanings depending
->>> on context
->>
->> NO; for the GPIO itself it's only ever had one
->> meaning, regardless of context.
->>
->> You're trying to conflate the GPIO and one
->> of the contexts in which it's used. ?That's
->> the problem you seem to be struggling with.
->>
->> Please stop conflating/confusing
->> those two disparate concepts...
->
-> I'm not. Some gpios, such as those on io expanders, may sleep in their
-> implementations of the gpio_(set/get) functions.
->
-> Drivers, which use a gpio, may call gpio_(set/get) functions for a given
-> gpio from a context where it is not safe to sleep. In this case, a gpio
-> which may sleep (ie one on an i2c io-expander) cannot be used with this
-> driver. The gpio_request will succeed, but any call to
-> gpio_(set/get)_value will produce a warning.
->
->>> example, if a driver calls gpio_get_value(gpio) from an
->>> interupt handler
->>> then the gpio must not be a sleeping gpio.
->>
->> In a threaded IRQ handler it's OK to use
->> the get_value_cansleep() option..
->
-> Ugh, you are really twisting my words. replace 'interrupt handler' with
-> 'non sleep safe context'.
->
->>>
->>> This patch introduces a new flag, FLAG_CANSLEEP, internal
->>> to gpiolib
->>
->> NAK; Superfluous; the gpio_chip already has
->> that information recorded.
->
-> It has a different meaning, but I think you are still correct here. The
-> might_sleep_if in gpio_(set/get)_value is only necessary if
-> chip->cansleep is set.
->
->>
->>> new request function, gpio_request_cansleep, requests a
->>> gpio which may
->>> only be used from sleep possible contexts
->>
->> Also superfluous.
->
-> Not so. In my opinion, it is better to have the gpio_request fail
-> immediately if it is being used incorrectly. For example, say you have
-> two gpios:
->
-> ?soc_gpio: ? ?An SoC gpio which does not sleep on set/get
-> ?sleepy_gpio: An i2c io-expander gpio which may sleep on get/set
->
-> and some driver code which does this:
->
-> ?gpio_request(gpio, "some_gpio");
-> ?...
-> ?// Non-sleep safe context
-> ?gpio_set_value(gpio, 0);
->
-> If you pass sleepy_gpio as the gpio to this driver the gpio_request will
-> succeed, but you will get a warning on the gpio_set_value because its
-> usage is incorrect.
->
-> In my proposed change, the gpio_request would fail because sleepy_gpio
-> might sleep, and therefore cannot be used by drivers which use gpios in
-> non sleep safe context. Basically I am moving the cansleep part of the
-> api from the usage of gpios to the registration time. In my opinion this
-> is better because it means there is only one set of gpio_(set/get)_value
-> calls and incorrect usage of sleeping gpios will be caught when the gpio
-> is registered, not when it is used.
->
->>
->> ?The existing
->>> gpio_request
->>> function requests a gpio, but does not allow it to be used
->>> from a
->>> context where sleep is not possible.
->>
->> Changing semantics of existing calls is a big
->> mess, and should be avoided even if it seems
->> appropriate.
->>
->> Since the request is just reserving a resource
->> that's already been identified (and which has
->> known characteristics, like whether the GPIO
->> value must be accessed only from sleeping
->> contexts), this call would also be superfluous.
->>
->> If you want to ensure the GPIO is a cansleep()
->> one, just check that before reserving it. ?There
->> is no need for new calls to support that model;
->> it works today.
->
-> Except that drivers do not do this.
->
->> (NAK...)
->>
->>
->>
->>> The benefits I see to this approach are:
->>> ?...
->>> ?- The API is simplified by combining gpio_(set/get)_value
->>> and
->>> gpio_(set/get)_value_cansleep
->>
->>
->> You have a strange definition of "simplified"...
->>
->> Recognize that you're also proposing to remove
->> an API characteristic which much simplifies
->> code review: ?you can look at calls and see
->> that because they're the cansleep() version,
->> they are unsafe in IRQ context ...
->
-> Hmm, fair point.
->
+Hello,
 
-My two cents, if it feels confused to use the _cansleep version, why don't
-we just introduce an _atomic() version and use that in atomic situation,
-since most usage of gpio API can actually _sleep_. I didn't read all the
-scroll back, so if it's wrong, ignore me.
+On Wednesday, June 23, 2010 3:55 AM Eric Miao wrote:
+
+> ...
+
+> >>> e.g., cpu_is_* usage at OMAP tree
+> >>>
+> >>> static void omap_init_mcspi(void)
+> >>> {
+> >>>        if (cpu_is_omap44xx())
+> >>>                omap4_mcspi_fixup();
+> >>>
+> >>>        platform_device_register(&omap2_mcspi1);
+> >>>        platform_device_register(&omap2_mcspi2);
+> >>>
+> >>>        if (cpu_is_omap2430() || cpu_is_omap343x() || cpu_is_omap44xx())
+> >>>                omap2_mcspi3_init();
+> >>>
+> >>>        if (cpu_is_omap343x() || cpu_is_omap44xx())
+> >>>                omap2_mcspi4_init();
+> >>> }
+> >>
+> >> Just my two cents: cpu_is_*() can be used, but only when absolutely
+> necessary.
+> >> The s3c does a CPU detection at startup, so I guess the usage of
+> cpu_is_*()
+> >> can be even reduced.
+> >
+> > My concern is that most device resources use the S3C_* or S5P_* prefix
+> > and defined at each arch differently.
+> >
+> > E.G., mmc resource drivers use the S3C_PA_HSMMC0. but each mach has
+> > different base address.
+> > then how to handle this or make it possible?
+> >
+> 
+> Now you have
+> 
+> s5pv210_device_hsmmc0
+> s5pc100_device_hsmmc0
+> s3c64xx_device_hsmmc0
+> ....
+> 
+> each with a different base.
+
+There is no need for such code duplication. Ben is working on a solution for
+a single kernel which supports multiple SoCs. Some of his work in progress can
+be found here: git://git.fluff.org/bjdooks/linux branch wip-samsung-dev and
+wip-samsung-dev2.
+
+> ...
+
+> >> I'm not sure if the above case is a good reference or not. The
+> omap_init_mcspi
+> >> is called from omap2_init_devices(), while the registration can actually
+> be
+> >> made into the board init code when that device is used (some of the
+> McSPIs are
+> >> not used, and it's not necessary to register them), and the differences
+> be
+> >> handled in the driver.
+> >
+> > that's just example how to use cpu_is_* in others. the current schme
+> > in samsung SoCs. we passed the different platform name for each arch.
+> > e.g., s3c2410_i2c or s3c2440_i2c then i2c driver detect it and handle
+> > properly. of course it assume base address is set correctly as above.
+> 
+> For the device driver, when you register two different i2c devices:
+> 
+> struct platform_device s3c2410_device_i2c {
+> 	.name	= "s3c2410-i2c",
+> 	...
+> };
+> 
+> struct platform_device s3c2440_device_i2c {
+> 	.name	= "s3c2440-i2c",
+> 	...
+> };
+> 
+> And register the corresponding one in your board code (your board code
+> knows exactly which one to register, no? )
+
+Yes, this is a recommended way.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
