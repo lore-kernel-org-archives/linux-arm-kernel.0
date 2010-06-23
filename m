@@ -1,13 +1,13 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 23 Jun 2010 18:16:53 +0300
+Date: Wed, 23 Jun 2010 18:20:41 +0300
 Subject: [PATCH] otg/ulpi.c : fix register write
 In-Reply-To: <1277304632-11314-1-git-send-email-eric@eukrea.com>
 References: <1277304632-11314-1-git-send-email-eric@eukrea.com>
-Message-ID: <4C222565.5000407@compulab.co.il>
+Message-ID: <4C222649.8050100@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
+Sorry for that link inside the code, should be:
 
 On 06/23/10 17:50, Eric B?nard wrote:
 > * drivers/usb/otg/ulpi.c :
@@ -26,12 +26,12 @@ and also:
 
 struct otg_io_access_ops {
          int (*read)(struct otg_transceiver *otg, u32 reg);
-<http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=include/linux/usb/otg.h;h=f8302d036a7674e33109bf8fce16d67325d2d17a;hb=HEAD#l60> 
-       int (*write)(struct otg_transceiver *otg, u32 val, u32 reg);
+         int (*write)(struct otg_transceiver *otg, u32 val, u32 reg);
 };
 
 and please, look here:
 http://comments.gmane.org/gmane.linux.usb.general/32092
+
 
 > so keep the same parameters order in drivers/usb/otg/ulpi.c and
 > arch/arm/plat-mxc/ulpi.c.
