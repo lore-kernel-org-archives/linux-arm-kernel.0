@@ -1,64 +1,55 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 23 Jun 2010 16:50:32 +0900
-Subject: [PATCH v2 0/4] ARM: S5P: Support gpio interrupts
-In-Reply-To: <4C11F4CA.10802@samsung.com>
-References: <4C11F4CA.10802@samsung.com>
-Message-ID: <004601cb12a8$c869e560$593db020$%kim@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 Jun 2010 10:57:03 +0300
+Subject: [PATCH 2/2] arm: Make VFPv3 usable on ARMv6
+In-Reply-To: <20100622132037.GV12255@atomide.com>
+References: <20100621135125.24299.91290.stgit@baageli.muru.com>
+	<1277211592.29532.20.camel@e102109-lin.cambridge.arm.com>
+	<20100622132037.GV12255@atomide.com>
+Message-ID: <20100623075703.GB12255@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joonyoung Shim wrote:
+* Tony Lindgren <tony@atomide.com> [100622 16:15]:
+> * Catalin Marinas <catalin.marinas@arm.com> [100622 15:53]:
+> > On Mon, 2010-06-21 at 14:51 +0100, Tony Lindgren wrote:
+> > > diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+> > > index 315a540..19ba626 100644
+> > > --- a/arch/arm/vfp/vfpmodule.c
+> > > +++ b/arch/arm/vfp/vfpmodule.c
+> > > @@ -549,10 +549,14 @@ static int __init vfp_init(void)
+> > >                 /*
+> > >                  * Check for the presence of the Advanced SIMD
+> > >                  * load/store instructions, integer and single
+> > > -                * precision floating point operations.
+> > > +                * precision floating point operations. Only check
+> > > +                * for NEON if the hardware has TLS register as the
+> > > +                * MVFR registers got added in ARM1136 r1p0 with TLS.
+> > >                  */
+> > > -               if ((fmrx(MVFR1) & 0x000fff00) == 0x00011100)
+> > > -                       elf_hwcap |= HWCAP_NEON;
+> > > +               if (elf_hwcap & HWCAP_TLS) {
+> > > +                       if ((fmrx(MVFR1) & 0x000fff00) == 0x00011100)
+> > > +                               elf_hwcap |= HWCAP_NEON;
+> > > +               }
+> > 
+> > MVFR should be available with the new CPU id format:
+> > 
+> > 	((read_cpuid_id() & 0x000f0000) == 0x000f0000)
+> > 
+> > I think that would be a cleaner test than relying on the TLS presence.
 > 
-> This patch v2 set is to support gpio interrupts of samsung s5p cpus, and
-> the GPIOlib gpio_to_irq goes to plat-samsung gpiolib, so patch v2 set
-> has four commit smaller than v1.
-> 
-> Changes since v1:
-> - Add irq_base to s3c_gpio_chip struct
-> - GPIOlib gpio_to_irq() is implemented to samsung_gpiolib_to_irq() of
->   plat-samsung gpiolib
-> 
-> Joonyoung Shim (4):
->       ARM: S5PV210: Add gpio interrupt support
->       ARM: S5PC100: Use S5P gpio interrupts interface
->       ARM: S5PC100: Move external interrupt defines
->       ARM: SAMSUNG: Add GPIOlib gpio_to_irq
-> 
->  arch/arm/mach-s5pc100/Makefile                 |    2 +-
->  arch/arm/mach-s5pc100/gpiolib.c                |   70 ++-----
->  arch/arm/mach-s5pc100/include/mach/gpio.h      |    7 -
->  arch/arm/mach-s5pc100/include/mach/irqs.h      |   18 ++-
->  arch/arm/mach-s5pc100/include/mach/regs-gpio.h |    7 +
->  arch/arm/mach-s5pc100/irq-gpio.c               |  266
-------------------------
->  arch/arm/mach-s5pv210/gpiolib.c                |   18 ++-
->  arch/arm/mach-s5pv210/include/mach/irqs.h      |   16 ++-
->  arch/arm/plat-s5p/Makefile                     |    2 +-
->  arch/arm/plat-s5p/irq-gpioint.c                |  208 ++++++++++++++++++
->  arch/arm/plat-samsung/gpiolib.c                |    9 +
->  arch/arm/plat-samsung/include/plat/gpio-core.h |    6 +
->  12 files changed, 295 insertions(+), 334 deletions(-)
->  delete mode 100644 arch/arm/mach-s5pc100/irq-gpio.c
->  create mode 100644 arch/arm/plat-s5p/irq-gpioint.c
-> 
+> OK, thanks that's better. Will update accordingly and repost.
 
-I am sure this patchset is working code, but Ben had made suggestion about
-'sparse irq'...
-It is because there are too many gpio interrupts and having support of all
-of them is unnecessary as realistically only few of them maybe used.
-In fact in SMDK board there is no use of gpio in interrupt mode.
+Here's this one updated. Using your better MVFR check also removes the
+dependency to the previous patch.
 
-Ben, I remember your suggestion for using 'sparse irq' for handling gpio
-interrupts.
-And in fact, sparse irq implementation can be beneficial to many other
-boards...
-Could you please explain about that?
+Regards,
 
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: vfpv3-armv6-fix.patch
+Type: text/x-diff
+Size: 3323 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100623/75317dfe/attachment.bin>
