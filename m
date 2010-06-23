@@ -1,38 +1,105 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Jun 2010 10:32:42 +0100
-Subject: [PATCH 1/2] arm: Replace CONFIG_HAS_TLS_REG with HWCAP_TLS and
-	check for it on V6
-In-Reply-To: <20100623092843.GC12255@atomide.com>
-References: <20100621133749.24299.36154.stgit@baageli.muru.com>
-	<20100621135120.24299.98499.stgit@baageli.muru.com>
-	<20100622170020.GF4371@shareable.org>
-	<20100623073912.GA12255@atomide.com>
-	<20100623081218.GA16385@n2100.arm.linux.org.uk>
-	<20100623092843.GC12255@atomide.com>
-Message-ID: <20100623093242.GA17948@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Jun 2010 10:36:03 +0100
+Subject: [PATCH 2/2] ARM: perf probe: Add ARM DWARF register number mappings
+In-Reply-To: <1277285763-16213-2-git-send-email-will.deacon@arm.com>
+References: <1277285763-16213-1-git-send-email-will.deacon@arm.com>
+	<1277285763-16213-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1277285763-16213-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 23, 2010 at 12:28:44PM +0300, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [100623 11:06]:
-> > On Wed, Jun 23, 2010 at 10:39:13AM +0300, Tony Lindgren wrote:
-> > > Yeah that can be done for __kuser_get_tls if it's always writable.
-> > > But __switch_to is trickier because of the CONFIG_MMU ifdefs there.
-> > 
-> > And impossible with XIP kernels.
-> > 
-> > > What if we have optional __switch_to and __kuser_get_tls implementations
-> > > in the mm/proc-*.S files that get copied over the current locations
-> > > if implemented?
-> > 
-> > Also problematical with XIP - if we go down the route of implementing
-> > these by copying code fragments into the kernel, we need to strip out
-> > XIP support or implement a second way.  Obviously having a second way
-> > adds maintainence burden, and the second way will probably lose out
-> > on updates.
-> 
-> How about if we implement the default XIP-safe unoptimized functions,
-> with minimal iffdeffery and then allow optional override for non-XIP
-> kernels from mm/proc-*.S files?
+This patch adds mappings from DWARF register numbers to the register
+names used by the ARM `Regs and Stack Access API'.
 
-That's what I was referring to by "second way".
+Cc: Jamie Iles <jamie.iles@picochip.com>
+Cc: Jean Pihet <jpihet@mvista.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ tools/perf/arch/arm/Makefile          |    4 ++
+ tools/perf/arch/arm/util/dwarf-regs.c |   64 +++++++++++++++++++++++++++++++++
+ 2 files changed, 68 insertions(+), 0 deletions(-)
+ create mode 100644 tools/perf/arch/arm/Makefile
+ create mode 100644 tools/perf/arch/arm/util/dwarf-regs.c
+
+diff --git a/tools/perf/arch/arm/Makefile b/tools/perf/arch/arm/Makefile
+new file mode 100644
+index 0000000..15130b5
+--- /dev/null
++++ b/tools/perf/arch/arm/Makefile
+@@ -0,0 +1,4 @@
++ifndef NO_DWARF
++PERF_HAVE_DWARF_REGS := 1
++LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
++endif
+diff --git a/tools/perf/arch/arm/util/dwarf-regs.c b/tools/perf/arch/arm/util/dwarf-regs.c
+new file mode 100644
+index 0000000..fff6450
+--- /dev/null
++++ b/tools/perf/arch/arm/util/dwarf-regs.c
+@@ -0,0 +1,64 @@
++/*
++ * Mapping of DWARF debug register numbers into register names.
++ *
++ * Copyright (C) 2010 Will Deacon, ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <libio.h>
++#include <dwarf-regs.h>
++
++struct pt_regs_dwarfnum {
++	const char *name;
++	unsigned int dwarfnum;
++};
++
++#define STR(s) #s
++#define REG_DWARFNUM_NAME(r, num) {.name = r, .dwarfnum = num}
++#define GPR_DWARFNUM_NAME(num) \
++	{.name = STR(%r##num), .dwarfnum = num}
++#define REG_DWARFNUM_END {.name = NULL, .dwarfnum = 0}
++
++/*
++ * Reference:
++ * http://infocenter.arm.com/help/topic/com.arm.doc.ihi0040a/IHI0040A_aadwarf.pdf
++ */
++static const struct pt_regs_dwarfnum regdwarfnum_table[] = {
++	GPR_DWARFNUM_NAME(0),
++	GPR_DWARFNUM_NAME(1),
++	GPR_DWARFNUM_NAME(2),
++	GPR_DWARFNUM_NAME(3),
++	GPR_DWARFNUM_NAME(4),
++	GPR_DWARFNUM_NAME(5),
++	GPR_DWARFNUM_NAME(6),
++	GPR_DWARFNUM_NAME(7),
++	GPR_DWARFNUM_NAME(8),
++	GPR_DWARFNUM_NAME(9),
++	GPR_DWARFNUM_NAME(10),
++	REG_DWARFNUM_NAME("%fp", 11),
++	REG_DWARFNUM_NAME("%ip", 12),
++	REG_DWARFNUM_NAME("%sp", 13),
++	REG_DWARFNUM_NAME("%lr", 14),
++	REG_DWARFNUM_NAME("%pc", 15),
++	REG_DWARFNUM_END,
++};
++
++/**
++ * get_arch_regstr() - lookup register name from it's DWARF register number
++ * @n:	the DWARF register number
++ *
++ * get_arch_regstr() returns the name of the register in struct
++ * regdwarfnum_table from it's DWARF register number. If the register is not
++ * found in the table, this returns NULL;
++ */
++const char *get_arch_regstr(unsigned int n)
++{
++	const struct pt_regs_dwarfnum *roff;
++	for (roff = regdwarfnum_table; roff->name != NULL; roff++)
++		if (roff->dwarfnum == n)
++			return roff->name;
++	return NULL;
++}
+-- 
+1.6.3.3
