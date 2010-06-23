@@ -1,22 +1,17 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 23 Jun 2010 15:22:20 -0700
-Subject: [PATCH 0/3 v3] msm: Add gpiolib devices to MSM7x30 and QSD8x50.
-In-Reply-To: <1277325516-24111-1-git-send-email-gbean@codeaurora.org>
-References: <1277325516-24111-1-git-send-email-gbean@codeaurora.org>
-Message-ID: <1277331740.8495.0.camel@c-dwalke-linux.qualcomm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 24 Jun 2010 07:31:54 +0900
+Subject: [PATCH] ARM: S5P: Add Support common arch_reset() for S5P SoCs
+Message-ID: <1277332317-30192-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-06-23 at 13:38 -0700, Gregory Bean wrote:
-> Hi folks:
-> 
-> Here is a proposed patch series which adds the configuration and devices
-> needed to enable gpiolib on the MSM7x30 and QSD8x50 chipsets.
+This patch adds system define for arch_reset() for S5P SoCs
+such as S5P6440, S5P6442, S5PC100 and S5PV210/S5PC110.
+Now perform reset using Watchdog reset, SWRESET support with
+s5p_reset_hook() will be added later.
 
-Ok, I applied it to my -next branch.
+NOTE: depends on 'Add Watchdog support for S5PC100'
 
-Daniel
-
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+ARM: S5P6442: Add Watchdog Timer map for S5P6442
+ARM: S5P: Add System define for arch_reset()
+ARM: S5P: Add Support common arch_reset() for S5P SoCs
