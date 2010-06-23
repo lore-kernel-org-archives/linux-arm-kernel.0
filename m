@@ -1,33 +1,312 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Jun 2010 16:02:18 +0100
-Subject: [PATCH 2/2] ARM: atomic64_test: add ARM as supported architecture
-In-Reply-To: <1277305338-26110-2-git-send-email-will.deacon@arm.com>
+Date: Wed, 23 Jun 2010 16:02:17 +0100
+Subject: [PATCH 1/2] ARM: atomic ops: add memory constraints to inline asm
+In-Reply-To: <1277305338-26110-1-git-send-email-will.deacon@arm.com>
 References: <1277305338-26110-1-git-send-email-will.deacon@arm.com>
-	<1277305338-26110-2-git-send-email-will.deacon@arm.com>
-Message-ID: <1277305338-26110-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1277305338-26110-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM has support for the atomic64_dec_if_positive operation
-so ensure that it is tested by the atomic64_test routine.
+Currently, the 32-bit and 64-bit atomic operations on ARM do not
+include memory constraints in the inline assembly blocks. In the
+case of barrier-less operations [for example, atomic_add], this
+means that the compiler may constant fold values which have actually
+been modified by a call to an atomic operation.
+
+This issue can be observed in the atomic64_test routine in
+<kernel root>/lib/atomic64_test.c:
+
+00000000 <test_atomic64>:
+   0:	e1a0c00d 	mov	ip, sp
+   4:	e92dd830 	push	{r4, r5, fp, ip, lr, pc}
+   8:	e24cb004 	sub	fp, ip, #4
+   c:	e24dd008 	sub	sp, sp, #8
+  10:	e24b3014 	sub	r3, fp, #20
+  14:	e30d000d 	movw	r0, #53261	; 0xd00d
+  18:	e3011337 	movw	r1, #4919	; 0x1337
+  1c:	e34c0001 	movt	r0, #49153	; 0xc001
+  20:	e34a1aa3 	movt	r1, #43683	; 0xaaa3
+  24:	e16300f8 	strd	r0, [r3, #-8]!
+  28:	e30c0afe 	movw	r0, #51966	; 0xcafe
+  2c:	e30b1eef 	movw	r1, #48879	; 0xbeef
+  30:	e34d0eaf 	movt	r0, #57007	; 0xdeaf
+  34:	e34d1ead 	movt	r1, #57005	; 0xdead
+  38:	e1b34f9f 	ldrexd	r4, [r3]
+  3c:	e1a34f90 	strexd	r4, r0, [r3]
+  40:	e3340000 	teq	r4, #0
+  44:	1afffffb 	bne	38 <test_atomic64+0x38>
+  48:	e59f0004 	ldr	r0, [pc, #4]	; 54 <test_atomic64+0x54>
+  4c:	e3a0101e 	mov	r1, #30
+  50:	ebfffffe 	bl	0 <__bug>
+  54:	00000000 	.word	0x00000000
+
+The atomic64_set (0x38-0x44) writes to the atomic64_t, but the
+compiler doesn't see this, assumes the test condition is always
+false and generates an unconditional branch to __bug. The rest of the
+test is optimised away.
+
+This patch adds suitable memory constraints to the atomic operations on ARM
+to ensure that the compiler is informed of the correct data hazards.
+Additionally, the implementations of atomic64_cmpxchg and atomic64_add_unless
+are modified so that the portions of their implementation written in C are now
+implemented in assembly to avoid miscompilation by buggy compilers.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- lib/atomic64_test.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/atomic.h |  123 +++++++++++++++++++++--------------------
+ 1 files changed, 62 insertions(+), 61 deletions(-)
 
-diff --git a/lib/atomic64_test.c b/lib/atomic64_test.c
-index 250ed11..44524cc 100644
---- a/lib/atomic64_test.c
-+++ b/lib/atomic64_test.c
-@@ -114,7 +114,7 @@ static __init int test_atomic64(void)
- 	BUG_ON(v.counter != r);
+diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
+index a0162fa..2471d72 100644
+--- a/arch/arm/include/asm/atomic.h
++++ b/arch/arm/include/asm/atomic.h
+@@ -40,12 +40,12 @@ static inline void atomic_add(int i, atomic_t *v)
+ 	int result;
  
- #if defined(CONFIG_X86) || defined(CONFIG_MIPS) || defined(CONFIG_PPC) || \
--    defined(CONFIG_S390) || defined(_ASM_GENERIC_ATOMIC64_H)
-+    defined(CONFIG_S390) || defined(_ASM_GENERIC_ATOMIC64_H) || defined(CONFIG_ARM)
- 	INIT(onestwos);
- 	BUG_ON(atomic64_dec_if_positive(&v) != (onestwos - 1));
- 	r -= one;
+ 	__asm__ __volatile__("@ atomic_add\n"
+-"1:	ldrex	%0, [%2]\n"
+-"	add	%0, %0, %3\n"
+-"	strex	%1, %0, [%2]\n"
++"1:	ldrex	%0, [%3]\n"
++"	add	%0, %0, %4\n"
++"	strex	%1, %0, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+-	: "=&r" (result), "=&r" (tmp)
++	: "=&r" (result), "=&r" (tmp), "+m" (v->counter)
+ 	: "r" (&v->counter), "Ir" (i)
+ 	: "cc");
+ }
+@@ -78,12 +78,12 @@ static inline void atomic_sub(int i, atomic_t *v)
+ 	int result;
+ 
+ 	__asm__ __volatile__("@ atomic_sub\n"
+-"1:	ldrex	%0, [%2]\n"
+-"	sub	%0, %0, %3\n"
+-"	strex	%1, %0, [%2]\n"
++"1:	ldrex	%0, [%3]\n"
++"	sub	%0, %0, %4\n"
++"	strex	%1, %0, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+-	: "=&r" (result), "=&r" (tmp)
++	: "=&r" (result), "=&r" (tmp), "+m" (v->counter)
+ 	: "r" (&v->counter), "Ir" (i)
+ 	: "cc");
+ }
+@@ -137,12 +137,12 @@ static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
+ 	unsigned long tmp, tmp2;
+ 
+ 	__asm__ __volatile__("@ atomic_clear_mask\n"
+-"1:	ldrex	%0, [%2]\n"
+-"	bic	%0, %0, %3\n"
+-"	strex	%1, %0, [%2]\n"
++"1:	ldrex	%0, [%3]\n"
++"	bic	%0, %0, %4\n"
++"	strex	%1, %0, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+-	: "=&r" (tmp), "=&r" (tmp2)
++	: "=&r" (tmp), "=&r" (tmp2), "+m" (*addr)
+ 	: "r" (addr), "Ir" (mask)
+ 	: "cc");
+ }
+@@ -249,7 +249,7 @@ static inline u64 atomic64_read(atomic64_t *v)
+ 	__asm__ __volatile__("@ atomic64_read\n"
+ "	ldrexd	%0, %H0, [%1]"
+ 	: "=&r" (result)
+-	: "r" (&v->counter)
++	: "r" (&v->counter), "m" (v->counter)
+ 	);
+ 
+ 	return result;
+@@ -260,11 +260,11 @@ static inline void atomic64_set(atomic64_t *v, u64 i)
+ 	u64 tmp;
+ 
+ 	__asm__ __volatile__("@ atomic64_set\n"
+-"1:	ldrexd	%0, %H0, [%1]\n"
+-"	strexd	%0, %2, %H2, [%1]\n"
++"1:	ldrexd	%0, %H0, [%2]\n"
++"	strexd	%0, %3, %H3, [%2]\n"
+ "	teq	%0, #0\n"
+ "	bne	1b"
+-	: "=&r" (tmp)
++	: "=&r" (tmp), "=m" (v->counter)
+ 	: "r" (&v->counter), "r" (i)
+ 	: "cc");
+ }
+@@ -275,13 +275,13 @@ static inline void atomic64_add(u64 i, atomic64_t *v)
+ 	unsigned long tmp;
+ 
+ 	__asm__ __volatile__("@ atomic64_add\n"
+-"1:	ldrexd	%0, %H0, [%2]\n"
+-"	adds	%0, %0, %3\n"
+-"	adc	%H0, %H0, %H3\n"
+-"	strexd	%1, %0, %H0, [%2]\n"
++"1:	ldrexd	%0, %H0, [%3]\n"
++"	adds	%0, %0, %4\n"
++"	adc	%H0, %H0, %H4\n"
++"	strexd	%1, %0, %H0, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+-	: "=&r" (result), "=&r" (tmp)
++	: "=&r" (result), "=&r" (tmp), "+m" (v->counter)
+ 	: "r" (&v->counter), "r" (i)
+ 	: "cc");
+ }
+@@ -294,13 +294,13 @@ static inline u64 atomic64_add_return(u64 i, atomic64_t *v)
+ 	smp_mb();
+ 
+ 	__asm__ __volatile__("@ atomic64_add_return\n"
+-"1:	ldrexd	%0, %H0, [%2]\n"
+-"	adds	%0, %0, %3\n"
+-"	adc	%H0, %H0, %H3\n"
+-"	strexd	%1, %0, %H0, [%2]\n"
++"1:	ldrexd	%0, %H0, [%3]\n"
++"	adds	%0, %0, %4\n"
++"	adc	%H0, %H0, %H4\n"
++"	strexd	%1, %0, %H0, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+-	: "=&r" (result), "=&r" (tmp)
++	: "=&r" (result), "=&r" (tmp), "+m" (v->counter)
+ 	: "r" (&v->counter), "r" (i)
+ 	: "cc");
+ 
+@@ -315,13 +315,13 @@ static inline void atomic64_sub(u64 i, atomic64_t *v)
+ 	unsigned long tmp;
+ 
+ 	__asm__ __volatile__("@ atomic64_sub\n"
+-"1:	ldrexd	%0, %H0, [%2]\n"
+-"	subs	%0, %0, %3\n"
+-"	sbc	%H0, %H0, %H3\n"
+-"	strexd	%1, %0, %H0, [%2]\n"
++"1:	ldrexd	%0, %H0, [%3]\n"
++"	subs	%0, %0, %4\n"
++"	sbc	%H0, %H0, %H4\n"
++"	strexd	%1, %0, %H0, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+-	: "=&r" (result), "=&r" (tmp)
++	: "=&r" (result), "=&r" (tmp), "+m" (v->counter)
+ 	: "r" (&v->counter), "r" (i)
+ 	: "cc");
+ }
+@@ -334,13 +334,13 @@ static inline u64 atomic64_sub_return(u64 i, atomic64_t *v)
+ 	smp_mb();
+ 
+ 	__asm__ __volatile__("@ atomic64_sub_return\n"
+-"1:	ldrexd	%0, %H0, [%2]\n"
+-"	subs	%0, %0, %3\n"
+-"	sbc	%H0, %H0, %H3\n"
+-"	strexd	%1, %0, %H0, [%2]\n"
++"1:	ldrexd	%0, %H0, [%3]\n"
++"	subs	%0, %0, %4\n"
++"	sbc	%H0, %H0, %H4\n"
++"	strexd	%1, %0, %H0, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+-	: "=&r" (result), "=&r" (tmp)
++	: "=&r" (result), "=&r" (tmp), "+m" (v->counter)
+ 	: "r" (&v->counter), "r" (i)
+ 	: "cc");
+ 
+@@ -356,17 +356,17 @@ static inline u64 atomic64_cmpxchg(atomic64_t *ptr, u64 old, u64 new)
+ 
+ 	smp_mb();
+ 
+-	do {
+-		__asm__ __volatile__("@ atomic64_cmpxchg\n"
+-		"ldrexd		%1, %H1, [%2]\n"
+-		"mov		%0, #0\n"
+-		"teq		%1, %3\n"
+-		"teqeq		%H1, %H3\n"
+-		"strexdeq	%0, %4, %H4, [%2]"
+-		: "=&r" (res), "=&r" (oldval)
+-		: "r" (&ptr->counter), "r" (old), "r" (new)
+-		: "cc");
+-	} while (res);
++	__asm__ __volatile__("@ atomic64_cmpxchg\n"
++"1:	ldrexd		%1, %H1, [%3]\n"
++"	mov		%0, #0\n"
++"	teq		%1, %4\n"
++"	teqeq		%H1, %H4\n"
++"	strexdeq	%0, %5, %H5, [%3]\n"
++"	teq		%0, #0\n"
++"	bne		1b"
++	: "=&r" (res), "=&r" (oldval), "+m" (ptr->counter)
++	: "r" (&ptr->counter), "r" (old), "r" (new)
++	: "cc");
+ 
+ 	smp_mb();
+ 
+@@ -381,11 +381,11 @@ static inline u64 atomic64_xchg(atomic64_t *ptr, u64 new)
+ 	smp_mb();
+ 
+ 	__asm__ __volatile__("@ atomic64_xchg\n"
+-"1:	ldrexd	%0, %H0, [%2]\n"
+-"	strexd	%1, %3, %H3, [%2]\n"
++"1:	ldrexd	%0, %H0, [%3]\n"
++"	strexd	%1, %4, %H4, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+-	: "=&r" (result), "=&r" (tmp)
++	: "=&r" (result), "=&r" (tmp), "+m" (ptr->counter)
+ 	: "r" (&ptr->counter), "r" (new)
+ 	: "cc");
+ 
+@@ -402,16 +402,16 @@ static inline u64 atomic64_dec_if_positive(atomic64_t *v)
+ 	smp_mb();
+ 
+ 	__asm__ __volatile__("@ atomic64_dec_if_positive\n"
+-"1:	ldrexd	%0, %H0, [%2]\n"
++"1:	ldrexd	%0, %H0, [%3]\n"
+ "	subs	%0, %0, #1\n"
+ "	sbc	%H0, %H0, #0\n"
+ "	teq	%H0, #0\n"
+ "	bmi	2f\n"
+-"	strexd	%1, %0, %H0, [%2]\n"
++"	strexd	%1, %0, %H0, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b\n"
+ "2:"
+-	: "=&r" (result), "=&r" (tmp)
++	: "=&r" (result), "=&r" (tmp), "+m" (v->counter)
+ 	: "r" (&v->counter)
+ 	: "cc");
+ 
+@@ -424,23 +424,24 @@ static inline int atomic64_add_unless(atomic64_t *v, u64 a, u64 u)
+ {
+ 	u64 val;
+ 	unsigned long tmp;
+-	int ret = 1;
++	int ret;
+ 
+ 	smp_mb();
+ 
+ 	__asm__ __volatile__("@ atomic64_add_unless\n"
+-"1:	ldrexd	%0, %H0, [%3]\n"
+-"	teq	%0, %4\n"
+-"	teqeq	%H0, %H4\n"
++"1:	ldrexd	%0, %H0, [%4]\n"
++"	teq	%0, %5\n"
++"	teqeq	%H0, %H5\n"
+ "	moveq	%1, #0\n"
++"	movne	%1, #1\n"
+ "	beq	2f\n"
+-"	adds	%0, %0, %5\n"
+-"	adc	%H0, %H0, %H5\n"
+-"	strexd	%2, %0, %H0, [%3]\n"
++"	adds	%0, %0, %6\n"
++"	adc	%H0, %H0, %H6\n"
++"	strexd	%2, %0, %H0, [%4]\n"
+ "	teq	%2, #0\n"
+ "	bne	1b\n"
+ "2:"
+-	: "=&r" (val), "=&r" (ret), "=&r" (tmp)
++	: "=&r" (val), "=&r" (ret), "=&r" (tmp), "+m" (v->counter)
+ 	: "r" (&v->counter), "r" (u), "r" (a)
+ 	: "cc");
+ 
 -- 
 1.6.3.3
