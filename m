@@ -1,58 +1,35 @@
-From: ext-jani.1.nikula@nokia.com (Jani Nikula)
-Date: Wed, 23 Jun 2010 14:53:52 +0300 (EEST)
-Subject: gpiolib and sleeping gpios
-In-Reply-To: <386783.17931.qm@web180310.mail.gq1.yahoo.com>
-References: <386783.17931.qm@web180310.mail.gq1.yahoo.com>
-Message-ID: <alpine.DEB.2.00.1006231435410.8344@wnav-qrfxgbc>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 23 Jun 2010 19:59:04 +0800
+Subject: [PATCH 5/6] [ARM] shmobile: change __io() definition to use
+	__typesafe_io()
+In-Reply-To: <1277293938-25804-6-git-send-email-eric.y.miao@gmail.com>
+References: <1277293938-25804-1-git-send-email-eric.y.miao@gmail.com>
+	<1277293938-25804-6-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <AANLkTikqB-TPT5qNbkrmNfG0GQpJmc6MNcJd4Up1FFKi@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jun 23, 2010 at 7:52 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> Signed-off-by: Eric Miao <eric.miao@canonical.com>
 
-On Sat, 19 Jun 2010, ext David Brownell wrote:
+Sorry, forgot to CC Magnus.
 
->> The point I was trying to make is that there are lots of drivers which 
->> will not work with gpios on sleeping io expanders because they call the 
->> spinlock safe gpio calls.
+> ---
+> ?arch/arm/mach-shmobile/include/mach/io.h | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
 >
-> And they will trigger runtime warnings, and thus eventually get fixed. 
-> The way to do that is to check if the GPIO needs the cansleep() call
+> diff --git a/arch/arm/mach-shmobile/include/mach/io.h b/arch/arm/mach-shmobile/include/mach/io.h
+> index 3e29649..19d5120 100644
+> --- a/arch/arm/mach-shmobile/include/mach/io.h
+> +++ b/arch/arm/mach-shmobile/include/mach/io.h
+> @@ -1,5 +1,5 @@
+> ?#ifndef __ASM_MACH_IO_H
+> ?#define __ASM_MACH_IO_H
 >
-> That's the first category above:  the driver should have used the 
-> cansleep() variant, and sotriggers a runtime warning.
-
-Hi David -
-
-Part of the reason why such drivers haven't been fixed might be that the 
-runtime warnings are only issued if DEBUG is defined in gpiolib.c:
-
-/* When debugging, extend minimal trust to callers and platform code.
-  * Also emit diagnostic messages that may help initial bringup, when
-  * board setup or driver bugs are most common.
-  *
-  * Otherwise, minimize overhead in what may be bitbanging codepaths.
-  */
-#ifdef	DEBUG
-#define	extra_checks	1
-#else
-#define	extra_checks	0
-#endif
-
-...
-
-int __gpio_get_value(unsigned gpio)
-{
- 	struct gpio_chip	*chip;
-
- 	chip = gpio_to_chip(gpio);
- 	WARN_ON(extra_checks && chip->can_sleep);
- 	return chip->get ? chip->get(chip, gpio - chip->base) : 0;
-}
-
-Do you think it would do more harm than good to unconditionally enable the 
-extra checks? I do see the comment about overhead there, but having them 
-enabled would probably aid driver developers in fixing existing code and 
-choosing the correct calls in the future.
-
-
-BR,
-Jani.
+> -#define __io(a) ? ? ? ? ? ? ? ? ? ? ? ?((void __iomem *)(a))
+> +#define __io(a) ? ? ? ? ? ? ? ? ? ? ? ?__typesafe_io(a)
+> ?#endif /* __ASM_MACH_IO_H */
+> --
+> 1.7.1
+>
+>
