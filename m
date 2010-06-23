@@ -1,21 +1,67 @@
-From: david-b@pacbell.net (David Brownell)
-Date: Wed, 23 Jun 2010 06:39:09 -0700 (PDT)
-Subject: gpiolib and sleeping gpios
-In-Reply-To: <alpine.DEB.2.00.1006231601310.7850@wnav-qrfxgbc>
-Message-ID: <294115.59939.qm@web180308.mail.gq1.yahoo.com>
+From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
+Date: Wed, 23 Jun 2010 16:50:32 +0200
+Subject: [PATCH] otg/ulpi.c : fix register write
+Message-ID: <1277304632-11314-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* drivers/usb/otg/ulpi.c :
+ulpi_set_vbus and ulpi_set_flags are using ULPI_SET(register) to write
+to the PHY's registers, which means we can only set bits in the PHY's
+register and not clear them.
+By directly using the address of the register without any offset, we
+now get the expected behaviour for these functions.
 
+* this patch also keep usage of otg_io_write & ulpi parameters coherent
+as in include/linux/usb/otg.h we have :
+otg_io_write(struct otg_transceiver *otg, u32 reg, u32 val)
+so keep the same parameters order in drivers/usb/otg/ulpi.c and
+arch/arm/plat-mxc/ulpi.c.
 
---- On Wed, 6/23/10, Jani Nikula <ext-jani.1.nikula@nokia.com> wrote:
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+Cc: Daniel Mack <daniel@caiaq.de>
+Cc: linux-usb at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+---
+ arch/arm/plat-mxc/ulpi.c |    2 +-
+ drivers/usb/otg/ulpi.c   |    4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-> -??? WARN_ON(extra_checks &&
-> chip->can_sleep);
-> +??? might_sleep_if(chip->can_sleep);
-
- That looks like the right track.  For
-those cases the "extra_checks" should
-not be optional ... thanks.
-
-- Dave
+diff --git a/arch/arm/plat-mxc/ulpi.c b/arch/arm/plat-mxc/ulpi.c
+index 582c6df..84eb5c7 100644
+--- a/arch/arm/plat-mxc/ulpi.c
++++ b/arch/arm/plat-mxc/ulpi.c
+@@ -83,7 +83,7 @@ static int ulpi_read(struct otg_transceiver *otg, u32 reg)
+ 	return (__raw_readl(view) >> ULPIVW_RDATA_SHIFT) & ULPIVW_RDATA_MASK;
+ }
+ 
+-static int ulpi_write(struct otg_transceiver *otg, u32 val, u32 reg)
++static int ulpi_write(struct otg_transceiver *otg, u32 reg, u32 val)
+ {
+ 	int ret;
+ 	void __iomem *view = otg->io_priv;
+diff --git a/drivers/usb/otg/ulpi.c b/drivers/usb/otg/ulpi.c
+index b1b3469..f6048ca 100644
+--- a/drivers/usb/otg/ulpi.c
++++ b/drivers/usb/otg/ulpi.c
+@@ -54,7 +54,7 @@ static int ulpi_set_flags(struct otg_transceiver *otg)
+ 	if (otg->flags & USB_OTG_EXT_VBUS_INDICATOR)
+ 		flags |= ULPI_OTG_CTRL_EXTVBUSIND;
+ 
+-	return otg_io_write(otg, flags, ULPI_SET(ULPI_OTG_CTRL));
++	return otg_io_write(otg, ULPI_OTG_CTRL, flags);
+ }
+ 
+ static int ulpi_init(struct otg_transceiver *otg)
+@@ -90,7 +90,7 @@ static int ulpi_set_vbus(struct otg_transceiver *otg, bool on)
+ 			flags |= ULPI_OTG_CTRL_DRVVBUS_EXT;
+ 	}
+ 
+-	return otg_io_write(otg, flags, ULPI_SET(ULPI_OTG_CTRL));
++	return otg_io_write(otg, ULPI_OTG_CTRL, flags);
+ }
+ 
+ struct otg_transceiver *
+-- 
+1.6.3.3
