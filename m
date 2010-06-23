@@ -1,70 +1,108 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 24 Jun 2010 07:31:56 +0900
-Subject: [PATCH 2/3] ARM: S5P: Add System define for arch_reset()
+Date: Thu, 24 Jun 2010 07:31:57 +0900
+Subject: [PATCH 3/3] ARM: S5P: Add Support common arch_reset() for S5P SoCs
 In-Reply-To: <1277332317-30192-1-git-send-email-kgene.kim@samsung.com>
 References: <1277332317-30192-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1277332317-30192-3-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1277332317-30192-4-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jongpill Lee <boyko.lee@samsung.com>
 
-This patch adds system define for arch_reset() using Watchdog reset.
-And adds IO mapping for using WDT.
+This patch adds support common arch_reset() for
+S5P6440, S5P6442, S5PC100 and S5PV210/S5PC110.
+Now perform reset using Watchdog reset, SWRESET
+support with s5p_reset_hook() will be added later.
 
 Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/plat-s5p/cpu.c                       |    5 +++++
- arch/arm/plat-s5p/include/plat/system-reset.h |   24 ++++++++++++++++++++++++
- 2 files changed, 29 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-s5p/include/plat/system-reset.h
+ arch/arm/mach-s5p6440/include/mach/system.h |    7 ++-----
+ arch/arm/mach-s5p6442/include/mach/system.h |    7 ++-----
+ arch/arm/mach-s5pc100/include/mach/system.h |    9 +--------
+ arch/arm/mach-s5pv210/include/mach/system.h |    7 ++-----
+ 4 files changed, 7 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/plat-s5p/cpu.c b/arch/arm/plat-s5p/cpu.c
-index 75cb8c3..1ab55e8 100644
---- a/arch/arm/plat-s5p/cpu.c
-+++ b/arch/arm/plat-s5p/cpu.c
-@@ -103,6 +103,11 @@ static struct map_desc s5p_iodesc[] __initdata = {
- 		.pfn		= __phys_to_pfn(S5P_PA_GPIO),
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S3C_VA_WATCHDOG,
-+		.pfn		= __phys_to_pfn(S3C_PA_WDT),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
- 	},
- };
+diff --git a/arch/arm/mach-s5p6440/include/mach/system.h b/arch/arm/mach-s5p6440/include/mach/system.h
+index d2dd817..a359ee3 100644
+--- a/arch/arm/mach-s5p6440/include/mach/system.h
++++ b/arch/arm/mach-s5p6440/include/mach/system.h
+@@ -13,12 +13,9 @@
+ #ifndef __ASM_ARCH_SYSTEM_H
+ #define __ASM_ARCH_SYSTEM_H __FILE__
  
-diff --git a/arch/arm/plat-s5p/include/plat/system-reset.h b/arch/arm/plat-s5p/include/plat/system-reset.h
-new file mode 100644
-index 0000000..7f76a16
---- /dev/null
-+++ b/arch/arm/plat-s5p/include/plat/system-reset.h
-@@ -0,0 +1,24 @@
-+/* linux/arch/arm/plat-s5p/include/plat/system-reset.h
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Based on arch/arm/mach-s3c2410/include/mach/system-reset.h
-+ *
-+ * S5P - System define for arch_reset()
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <plat/watchdog-reset.h>
-+
-+static void arch_reset(char mode, const char *cmd)
-+{
-+	/* Perform reset using Watchdog reset.
-+	 * SWRESET support will be added later.
-+	 */
-+
-+	arch_wdt_reset();
-+}
+-static void arch_idle(void)
+-{
+-	/* nothing here yet */
+-}
++#include <plat/system-reset.h>
+ 
+-static void arch_reset(char mode, const char *cmd)
++static void arch_idle(void)
+ {
+ 	/* nothing here yet */
+ }
+diff --git a/arch/arm/mach-s5p6442/include/mach/system.h b/arch/arm/mach-s5p6442/include/mach/system.h
+index 8bcd8ed..c30c1cc 100644
+--- a/arch/arm/mach-s5p6442/include/mach/system.h
++++ b/arch/arm/mach-s5p6442/include/mach/system.h
+@@ -13,12 +13,9 @@
+ #ifndef __ASM_ARCH_SYSTEM_H
+ #define __ASM_ARCH_SYSTEM_H __FILE__
+ 
+-static void arch_idle(void)
+-{
+-	/* nothing here yet */
+-}
++#include <plat/system-reset.h>
+ 
+-static void arch_reset(char mode, const char *cmd)
++static void arch_idle(void)
+ {
+ 	/* nothing here yet */
+ }
+diff --git a/arch/arm/mach-s5pc100/include/mach/system.h b/arch/arm/mach-s5pc100/include/mach/system.h
+index 681f626..a9ea57c 100644
+--- a/arch/arm/mach-s5pc100/include/mach/system.h
++++ b/arch/arm/mach-s5pc100/include/mach/system.h
+@@ -11,18 +11,11 @@
+ #ifndef __ASM_ARCH_SYSTEM_H
+ #define __ASM_ARCH_SYSTEM_H __FILE__
+ 
+-#include <linux/io.h>
+-#include <mach/map.h>
+-#include <mach/regs-clock.h>
++#include <plat/system-reset.h>
+ 
+ static void arch_idle(void)
+ {
+ 	/* nothing here yet */
+ }
+ 
+-static void arch_reset(char mode, const char *cmd)
+-{
+-	__raw_writel(S5PC100_SWRESET_RESETVAL, S5PC100_SWRESET);
+-	return;
+-}
+ #endif /* __ASM_ARCH_IRQ_H */
+diff --git a/arch/arm/mach-s5pv210/include/mach/system.h b/arch/arm/mach-s5pv210/include/mach/system.h
+index 1ca04d5..af8a200 100644
+--- a/arch/arm/mach-s5pv210/include/mach/system.h
++++ b/arch/arm/mach-s5pv210/include/mach/system.h
+@@ -13,12 +13,9 @@
+ #ifndef __ASM_ARCH_SYSTEM_H
+ #define __ASM_ARCH_SYSTEM_H __FILE__
+ 
+-static void arch_idle(void)
+-{
+-	/* nothing here yet */
+-}
++#include <plat/system-reset.h>
+ 
+-static void arch_reset(char mode, const char *cmd)
++static void arch_idle(void)
+ {
+ 	/* nothing here yet */
+ }
 -- 
 1.6.2.5
