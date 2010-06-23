@@ -1,42 +1,171 @@
-From: john.ogness@linutronix.de (John Ogness)
-Date: Wed, 23 Jun 2010 12:10:08 +0200
-Subject: [PATCHv3 4/5] mtd: mxc_nand fixups
-In-Reply-To: <AANLkTinVaXjCneg-XpxB7YNlmGOwQFTnm5RUcetPdToI@mail.gmail.com>
-	(Ivo Clarysse's message of "Wed, 23 Jun 2010 11:23:55 +0200")
-References: <804oh0b7gx.fsf@merkur.tec.linutronix.de>
-	<20100618205401.GA12115@pengutronix.de>
-	<80sk4ivkga.fsf@merkur.tec.linutronix.de>
-	<AANLkTimA7Rbm_nHpVYpEPqaPCjrOse9s8YyiInWlhfEK@mail.gmail.com>
-	<80tyoyhxey.fsf_-_@merkur.tec.linutronix.de>
-	<AANLkTikRj_dMkKLyFhW78yld9jIYAIFncfPaPAF8WqUY@mail.gmail.com>
-	<80iq5bqd07.fsf_-_@merkur.tec.linutronix.de>
-	<AANLkTimJKNEwOoKldq4a4_ufxNY6IY7r6tAfAM055hlW@mail.gmail.com>
-	<80vd9ab0d2.fsf@merkur.tec.linutronix.de>
-	<AANLkTinVaXjCneg-XpxB7YNlmGOwQFTnm5RUcetPdToI@mail.gmail.com>
-Message-ID: <80lja6awlb.fsf@merkur.tec.linutronix.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 23 Jun 2010 18:24:18 +0800
+Subject: Samsung SoCs: preparation for single kernel
+In-Reply-To: <003e01cb12b5$656c0670$30441350$%szyprowski@samsung.com>
+References: <AANLkTinGwWzIAOe2tj6V2kCrMiPT7PHlYs1kFS-IsiN4@mail.gmail.com>
+	<AANLkTil-AOEqhMOXydaiA1X_v0rjoNQxALrO0UY638AS@mail.gmail.com>
+	<AANLkTil1i_ZGI8bY14HhjrAk9RooVreAJsTteqqrMgqJ@mail.gmail.com>
+	<AANLkTikDml6gQAsiRrCjIt4bUD3hnpAATr1erqCGOJMd@mail.gmail.com>
+	<002301cb129c$ec59fe30$c50dfa90$%szyprowski@samsung.com>
+	<AANLkTikspf9zHuSKe86wDQxI12HpJo_occBlLUXBkjef@mail.gmail.com>
+	<003e01cb12b5$656c0670$30441350$%szyprowski@samsung.com>
+Message-ID: <AANLkTilt7uncmA1Zfo77h4bGbRIlvmp6zOCbdDK3QMez@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2010-06-23, Ivo Clarysse <ivo.clarysse@gmail.com> wrote:
-> But is it OK to use a regular (non-volatile) variable to communicate
-> between interrupt context and the non-interrupt context ?
-
-In this case, yes.
-
-> My original patch for i.MX21 used completions instead:
+On Wednesday, June 23, 2010, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> Hello,
 >
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-April/012694.html
+> On Wednesday, June 23, 2010 10:02 AM Eric Miao wrote:
+>
+>> >> Now you have
+>> >>
+>> >> s5pv210_device_hsmmc0
+>> >> s5pc100_device_hsmmc0
+>> >> s3c64xx_device_hsmmc0
+>> >> ....
+>> >>
+>> >> each with a different base.
+>> >
+>> > There is no need for such code duplication.
+>>
+>> However, I believe this is the right way to go. A certain level of
+>> duplication is the price to pay for a generic and clean solution.
+>>
+>> When a peripheral controller or IP is moved from one SoC to the
+>> next generation, there are several things could have been changed:
+>>
+>> 1. new base address and IRQ number
+>> 2. fixes and enhancements to the original IP
+>>
+>> 1. will result in a different 'struct resource', and 2. will result in a
+>> different 'struct platform_device' with a different name, so the driver
+>> can match the platform_device_id table as you agreed I'm right on
+>> that recommendation.
+>>
+>> They are actually _two_ different devices.
+>
+> Right, they are separate entities, but would be really good if a similar
+> git brcode could be merged together.
+>
+>> > Ben is working on a solution for
+>> > a single kernel which supports multiple SoCs. Some of his work in
+>> progress can
+>> > be found here: git://git.fluff.org/bjdooks/linux branch wip-samsung-dev
+>> and
+>> > wip-samsung-dev2.
+>>
+>> Could you describe it a bit here and bring it on table for discussion?
+>
+> The idea behind his patches is to provide a table for each SoC with short
+> description of all available devices and generate platform_device entries
+> dynamically from that table.
+>
+> Here is a short code example:
+>
+> struct s3c_pdev_table s3c6xxx_dev_table[] __initdata = {
+>  ? ? ? ?{
+>  ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_UART,
+>  ? ? ? ? ? ? ? ?.name ? = "s3c6400-uart",
+>  ? ? ? ? ? ? ? ?.index ?= 0,
+>  ? ? ? ? ? ? ? ?.base ? = S3C_PA_UART0,
+>  ? ? ? ? ? ? ? ?.irq ? ?= IRQ_S3CUART_RX0,
+>  ? ? ? ? ? ? ? ?.template = &template_uart_s3c64xx,
+>  ? ? ? ?}, {
+>  ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_UART,
+>  ? ? ? ? ? ? ? ?.name ? = "s3c6400-uart",
+>  ? ? ? ? ? ? ? ?.index ?= 1,
+>  ? ? ? ? ? ? ? ?.base ? = S3C_PA_UART1,
+>  ? ? ? ? ? ? ? ?.irq ? ?= IRQ_S3CUART_RX1,
+>  ? ? ? ? ? ? ? ?.template = &template_uart_s3c64xx,
+>  ? ? ? ?}, {
+>  ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_UART,
+>  ? ? ? ? ? ? ? ?.name ? = "s3c6400-uart",
+>  ? ? ? ? ? ? ? ?.index ?= 2,
+>  ? ? ? ? ? ? ? ?.base ? = S3C_PA_UART2,
+>  ? ? ? ? ? ? ? ?.irq ? ?= IRQ_S3CUART_RX2,
+>  ? ? ? ? ? ? ? ?.template = &template_uart_s3c64xx,
+>  ? ? ? ?}, {
+>  ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_UART,
+>  ? ? ? ? ? ? ? ?.name ? = "s3c6400-uart",
+>  ? ? ? ? ? ? ? ?.index ?= 3,
+>  ? ? ? ? ? ? ? ?.base ? = S3C_PA_UART3,
+>  ? ? ? ? ? ? ? ?.irq ? ?= IRQ_S3CUART_RX3,
+>  ? ? ? ? ? ? ? ?.template = &template_uart_s3c64xx,
+>  ? ? ? ?}, {
+>  ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_WATCHDOG,
+>  ? ? ? ? ? ? ? ?.name ? = "s3c2410-wdt",
+>  ? ? ? ? ? ? ? ?.index ?= -1,
+>  ? ? ? ? ? ? ? ?.base ? = S3C64XX_PA_WATCHDOG,
+>  ? ? ? ? ? ? ? ?.irq ? ?= IRQ_WDT,
+>  ? ? ? ?}, {
+>  ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_SDHCI,
+>  ? ? ? ? ? ? ? ?.name ? = "s3c-sdhci",
+>  ? ? ? ? ? ? ? ?.index ?= 0,
+>  ? ? ? ? ? ? ? ?.base ? = S3C64XX_PA_HSMMC0 ,
+>  ? ? ? ? ? ? ? ?.irq ? ?= IRQ_HSMMC0,
+>  ? ? ? ? ? ? ? ?.dma ? ?= &samsung_std_dma_mask,
+>  ? ? ? ?}, {
+>  ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_SDHCI,
+>  ? ? ? ? ? ? ? ?.name ? = "s3c-sdhci",
+>  ? ? ? ? ? ? ? ?.index ?= 1,
+>  ? ? ? ? ? ? ? ?.base ? = S3C64XX_PA_HSMMC1,
+>  ? ? ? ? ? ? ? ?.irq ? ?= IRQ_HSMMC1,
+>  ? ? ? ? ? ? ? ?.dma ? ?= &samsung_std_dma_mask,
+>  ? ? ? ?}, {
+>  ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_SDHCI,
+>  ? ? ? ? ? ? ? ?.name ? = "s3c-sdhci",
+>  ? ? ? ? ? ? ? ?.index ?= 2,
+>  ? ? ? ? ? ? ? ?.base ? = S3C64XX_PA_HSMMC2,
+>  ? ? ? ? ? ? ? ?.irq ? ?= IRQ_HSMMC1,
+>  ? ? ? ? ? ? ? ?.dma ? ?= &samsung_std_dma_mask,
+>  ? ? ? ?}, {
+>  ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_OHCI,
+>  ? ? ? ? ? ? ? ?.name ? = "s3c2410-ohci",
+>  ? ? ? ? ? ? ? ?.index ?= -1,
+>  ? ? ? ? ? ? ? ?.base ? = S3C64XX_PA_USBHOST,
+>  ? ? ? ? ? ? ? ?.irq ? ?= IRQ_USBH,
+>  ? ? ? ? ? ? ? ?.dma ? ?= &samsung_std_dma_mask,
+>  ? ? ? ?}, {
+>  ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_NAND,
+>  ? ? ? ? ? ? ? ?.name ? = "s3c6400-nand",
+>  ? ? ? ? ? ? ? ?.index ?= -1,
+>  ? ? ? ? ? ? ? ?.base ? = 0x4E000000,
+>  ? ? ? ? ? ? ? ?.irq ? ?= IRQ_NFC,
+>  ? ? ? ?}, {
+>  ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_I2C,
+>  ? ? ? ? ? ? ? ?.name ? = "s3c2440-i2c",
+>  ? ? ? ? ? ? ? ?.index ?= 0,
+>  ? ? ? ? ? ? ? ?.base ? = S3C64XX_PA_IIC0,
+>  ? ? ? ? ? ? ? ?.irq ? ?= IRQ_IIC,
+>  ? ? ? ?}, {
+> ...
+>
+> This solution is imho really clean an easy to understand. It is also
+> easy to check which SoC has which peripherals defined and how.
+>
 
-Ah. It seems you've been through all this before. I wish I had noticed
-that thread before. I will need to check more carefully in the future.
+Yep, this was already used in arch/arm/mach-mmp, and I wrote that.
 
-Yes, your original patch achieves the exact same thing. Whether we use
-wait_event() with a flag or wait_completion() really is the same
-thing. So I guess Sascha can decide what we should do there.
+It's actually an improved version of multiple platform_device.
 
-What I like about your original patch is that only the i.MX21 has the
-cost of constantly enabling/disabling the irq line. It adds 5
-cpu_is_mx21() blocks to the code, but will lead to less work for the CPU
-on non-i.MX21 boards.
-
-John Ogness
+> I hope Ben will be able to finish it soon and all Samsung platforms can
+> be converted for it. Then creating a single kernel for more than one SoC
+> should be possible with only a few additional changes.
+>
+>> PS: My feeling of commenting several of the samsung patches so far turns
+>> out to be quite frustrated, or I'm just too sensitive. NOTE neither am I
+>> NAKing Samsung patches, nor am I interested to be involved, I'm just givin
+>> my suggestions.
+>
+> I'm sorry if I offended You. I just wanted to show that the solution has
+> been already found.
+>
+> Best regards
+> --
+> Marek Szyprowski
+> Samsung Poland R&D Center
+>
+>
+>
+>
