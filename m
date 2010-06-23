@@ -1,61 +1,34 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 24 Jun 2010 11:06:23 +1200
-Subject: [RFC PATCH] Rework gpio cansleep (was Re: gpiolib and sleeping
-	gpios)
-In-Reply-To: <20100623225345.GD7058@shareable.org>
-References: <191168.5104.qm@web180308.mail.gq1.yahoo.com>
-	<4C21955D.1020502@bluewatersys.com>
-	<20100623225345.GD7058@shareable.org>
-Message-ID: <4C22936F.9050300@bluewatersys.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 24 Jun 2010 00:24:16 +0100
+Subject: [PATCH] ASoC: DaVinci: Added support for stereo I2S
+In-Reply-To: <1277303635-5675-1-git-send-email-lamiaposta71@gmail.com>
+	(sfid-20100623_154205_545825_0E9CDE5F)
+References: <1277303635-5675-1-git-send-email-lamiaposta71@gmail.com>
+	(sfid-20100623_154205_545825_0E9CDE5F)
+Message-ID: <ACF70CBE-6096-431C-A5A1-E3700642EB53@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24/2010 10:53 AM, Jamie Lokier wrote:
-> Ryan Mallon wrote:
->> On 06/23/2010 04:37 PM, David Brownell wrote:
->> I'm not. Some gpios, such as those on io expanders, may sleep in their
->> implementations of the gpio_(set/get) functions.
+On 23 Jun 2010, at 15:33, Raffaele Recalcati wrote:
+
+> From: Raffaele Recalcati <raffaele.recalcati@bticino.it>
 > 
-> I'm having a hard time figuring out where some GPIOs I'm using fit
-> into this picture.
+> 	Added audio playback support with [frame sync master - clock master] mode
+> 	and with [frame sync master - clock slave].
+> 	Clock slave can be important when the external codec need system clock
+> 	and bit clock synchronized.
+> 	In the clock master case there is a FIXME message in the source code, because we
+> 	(Davide and myself) have guessed a frequency of 122000000 that seems the base
+> 	to be divided.
+> 	This patch has been developed against the
+> 		http://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-davinci.git
+> 	git tree and has been tested on bmx board (similar to dm365 evm, but using
+> 	uda1345 as external audio codec).
 > 
-> I have some hardware that is currently using a 2.4.26 kernel, but I
-> look from time to time at forward-porting all the drivers to 2.6.recent.
-> 
-> It has an I2C driven GPIO expander, with a watchdog reset chip hanging
-> off the expander.
-> 
-> The watchdog is kept alive off the back end of a timer BH, which means
-> the I2C GPIO routines are written to be safe in BH context (which
-> isn't sleepable), but they can't be used in IRQ context because the
-> necessary spin_lock_irqsave() would turn off interrupts for too long
-> for other subsystems to function properly.
+> Signed-off-by: Raffaele Recalcati <raffaele.recalcati@bticino.it>
+> Signed-off-by: Davide Bonfanti <davide.bonfanti@bticino.it>
 
-Do the implementations of the get/set calls for the io expander gpios
-sleep at all?
-
-> How should I flag those GPIO routines in your scheme?  They're safe to
-> use in some non-sleeping contexts, but not safe in irq context.
-
-The idea in my proposal is to use gpio_request in a driver if the
-requested gpio can never sleep (ie because of the context it is used
-in), and gpio_request_cansleep if the gpio is never used from non-sleep
-safe context in a driver. I suggested stripping back the patch to just
-add the gpio_request_cansleep function.
-
-In the current code, if a driver ever calls gpio_(set/get)_value on a
-gpio then you cannot pass a sleeping gpio to that driver. The request
-will succeed, but you will get warnings with the get/get calls are made.
-My idea is basically to move the denotation of whether a gpio will be
-used in non-sleep safe context to the gpio request.
-
-~Ryan
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+I'd pretty much echo what Liam said - I'm not 100% sure from your description what the
+patch is supposed to do and the code isn't particularly clear either. It *looks* like you're
+trying to add a new clock source, but from the description this appears to be an
+externally visible clock which makes it very unclear why you have to guess the frequency.
