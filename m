@@ -1,42 +1,31 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 24 Jun 2010 00:15:11 +0530
-Subject: Unhandled fault: imprecise external abort
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C5D15BE2@dbde02.ent.ti.com>
-References: <AANLkTimFhC7PZaT9VVwyVH-jp7Ro74w7sSX2Ma1SX7Mn@mail.gmail.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C5D15BE2@dbde02.ent.ti.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C5D15BE3@dbde02.ent.ti.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 23 Jun 2010 21:00:19 +0200
+Subject: [PATCH 1/4] pxa2xx/cpufreq: Simplify CPU frequency change asm
+In-Reply-To: <1276840135-5982-1-git-send-email-marek.vasut@gmail.com> (Marek
+	Vasut's message of "Fri\, 18 Jun 2010 07\:48\:52 +0200")
+References: <1276840135-5982-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <87eifxa81o.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Marek Vasut <marek.vasut@gmail.com> writes:
 
-> _______________________________________
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Pankaj Pandey
-> Sent: Wednesday, June 23, 2010 9:30 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Subject: Unhandled fault: imprecise external abort
-> 
-> Hi,
-> 
-> I am working on Freescale MXC series based target board runing? with 2.6.31 kernel. I have written a
-> small test application to test the one of? driver. In my test application, I am using mmap to map the
-> kernel memory to user space and? I am trying to read some register values.
-> My user space mmap function is as such :
-> 
-> ?virt_addr = mmap(NULL, 4 * 1024, PROT_READ, MAP_SHARED ,fd, 0);
-> 
-> The mmap returns a specific address in virt_addr.
-> 
-> When I try to read the contents of this address , the kernel throws following error :
-> 
-> ?Unhandled fault: imprecise external abort (0xc06) at 0x00000000
-> 
-> Any pointers on this will great help to resolve this issue.
-> 
-Are you able to access these registers from kernel space ??
-If the kernel space access also reports the external abort then looks like you
-are trying to access the registers of module which is not clocked 
-or is in non-accessible state.
+> This patch does the following changes to cpufreq-pxa2xx:
+> 1) Simplifies the assembler code for frequency change
+OK, but did you think over what the old code was doing ?
+My guess is that all the jumps were there to trigger a load into the I-Cache
+before playing with memory timings. Did you consider that your new assembly fits
+fully into a cache line, and hence is protected from memory shutdown for the
+frequency change period ?
 
-Regards,
-Santosh
+If you thought this over, then I would suggest to put a comment into the code to
+state that the assembly bit fits fully in one cache line. If not, I don't see
+clearly the benefit of removing the jumps ("b 2f" and "b 1b").
+
+And I didn't find the reference for the need of reading the MDREFR register
+after the write. Would you give me a pointer in the pxa27x TRM please ?
+
+Cheers.
+
+--
+Robert
