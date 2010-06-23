@@ -1,30 +1,42 @@
-From: david-b@pacbell.net (David Brownell)
-Date: Wed, 23 Jun 2010 02:51:46 -0700 (PDT)
-Subject: [RFC PATCH] Rework gpio cansleep (was Re: gpiolib and sleeping
-	gpios)
-In-Reply-To: <AANLkTinuO053upBHzsiQ2llNdu4_XZN0rfz01QuIE7LW@mail.gmail.com>
-Message-ID: <711634.79166.qm@web180314.mail.gq1.yahoo.com>
+From: john.ogness@linutronix.de (John Ogness)
+Date: Wed, 23 Jun 2010 12:10:08 +0200
+Subject: [PATCHv3 4/5] mtd: mxc_nand fixups
+In-Reply-To: <AANLkTinVaXjCneg-XpxB7YNlmGOwQFTnm5RUcetPdToI@mail.gmail.com>
+	(Ivo Clarysse's message of "Wed, 23 Jun 2010 11:23:55 +0200")
+References: <804oh0b7gx.fsf@merkur.tec.linutronix.de>
+	<20100618205401.GA12115@pengutronix.de>
+	<80sk4ivkga.fsf@merkur.tec.linutronix.de>
+	<AANLkTimA7Rbm_nHpVYpEPqaPCjrOse9s8YyiInWlhfEK@mail.gmail.com>
+	<80tyoyhxey.fsf_-_@merkur.tec.linutronix.de>
+	<AANLkTikRj_dMkKLyFhW78yld9jIYAIFncfPaPAF8WqUY@mail.gmail.com>
+	<80iq5bqd07.fsf_-_@merkur.tec.linutronix.de>
+	<AANLkTimJKNEwOoKldq4a4_ufxNY6IY7r6tAfAM055hlW@mail.gmail.com>
+	<80vd9ab0d2.fsf@merkur.tec.linutronix.de>
+	<AANLkTinVaXjCneg-XpxB7YNlmGOwQFTnm5RUcetPdToI@mail.gmail.com>
+Message-ID: <80lja6awlb.fsf@merkur.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2010-06-23, Ivo Clarysse <ivo.clarysse@gmail.com> wrote:
+> But is it OK to use a regular (non-volatile) variable to communicate
+> between interrupt context and the non-interrupt context ?
 
-> >
-> > So, NAK on these proposed changes.
-> >
-> 
-> Hi David,
-> 
-> You are really a NAKing machine ;-)
+In this case, yes.
 
-I limit NAKs to bad ideas/code, like this.
+> My original patch for i.MX21 used completions instead:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-April/012694.html
 
+Ah. It seems you've been through all this before. I wish I had noticed
+that thread before. I will need to check more carefully in the future.
 
- People get confused for
-> a reason, and
-> I believe you have a good solution  for this?
+Yes, your original patch achieves the exact same thing. Whether we use
+wait_event() with a flag or wait_completion() really is the same
+thing. So I guess Sascha can decide what we should do there.
 
+What I like about your original patch is that only the i.MX21 has the
+cost of constantly enabling/disabling the irq line. It adds 5
+cpu_is_mx21() blocks to the code, but will lead to less work for the CPU
+on non-i.MX21 boards.
 
-Ryan seems to need a cluebat application.  I've
-tried, but he's resisted, and even denied the most
-blatant sources of his personal confusion.  While
-he esists, I can't do much. for him.
+John Ogness
