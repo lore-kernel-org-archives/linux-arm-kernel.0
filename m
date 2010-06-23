@@ -1,121 +1,38 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 23 Jun 2010 16:37:04 -0700
-Subject: [PATCH 3/3] OMAP1: PM: add simple runtime PM layer to manage clocks
-In-Reply-To: <1277336224-24826-1-git-send-email-khilman@deeprootsystems.com>
-References: <1277336224-24826-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1277336224-24826-4-git-send-email-khilman@deeprootsystems.com>
+Date: Wed, 23 Jun 2010 16:37:01 -0700
+Subject: [PATCH 0/3] OMAP: add runtime PM support at bus-level
+Message-ID: <1277336224-24826-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP1, we do not have omap_device + omap_hwmod to manage the
-device-specific idle, enable and shutdown.  Instead, just
-enable/disable device clocks automatically at the runtime PM level.
+This series introduces runtime PM support at the platform bus level
+for OMAP.
 
-This allows drivers to not have any OMAP1 specific clock management
-and allows them to simply use the runtime PM API to manage clocks.
+In a nutshell, when using the runtime PM API for any device with an
+assocated omap_device (and hwmod), the omap device API will be used to
+handle the hardware-level power management of that device, including
+managing clocks, etc.
 
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
----
+Today, most drivers handle this by manually enabling/disabling their
+clocks when needed.  With this series (and an omap_device/hwmod for
+each device) direct clock managment can be removed from the driver in
+favor of using the runtime PM API.
+
+This series applies on top v2.6.35-rc2 + Tony's omap-fixes branch and
+is also available in the pm-wip/runtime branch of my linux-omap-pm git
+tree:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
+
+Kevin Hilman (3):
+  OMAP: PM: initial runtime PM core support
+  OMAP: PM: use omap_device API for suspend/resume
+  OMAP1: PM: add simple runtime PM layer to manage clocks
+
  arch/arm/mach-omap1/Makefile |    2 +-
- arch/arm/mach-omap1/pm_bus.c |   77 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 78 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap1/pm_bus.c |   77 ++++++++++++++++++++++++
+ arch/arm/mach-omap2/Makefile |    7 ++-
+ arch/arm/mach-omap2/pm_bus.c |  133 ++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 217 insertions(+), 2 deletions(-)
  create mode 100644 arch/arm/mach-omap1/pm_bus.c
-
-diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
-index ea231c7..fd4df71 100644
---- a/arch/arm/mach-omap1/Makefile
-+++ b/arch/arm/mach-omap1/Makefile
-@@ -12,7 +12,7 @@ obj-$(CONFIG_OMAP_MPU_TIMER)	+= time.o
- obj-$(CONFIG_OMAP_32K_TIMER)	+= timer32k.o
- 
- # Power Management
--obj-$(CONFIG_PM) += pm.o sleep.o
-+obj-$(CONFIG_PM) += pm.o sleep.o pm_bus.o
- 
- # DSP
- obj-$(CONFIG_OMAP_MBOX_FWK)	+= mailbox_mach.o
-diff --git a/arch/arm/mach-omap1/pm_bus.c b/arch/arm/mach-omap1/pm_bus.c
-new file mode 100644
-index 0000000..29d651a
---- /dev/null
-+++ b/arch/arm/mach-omap1/pm_bus.c
-@@ -0,0 +1,77 @@
-+/*
-+ * Runtime PM support code for OMAP1
-+ *
-+ * Author: Kevin Hilman, Deep Root Systems, LLC
-+ *
-+ * Copyright (C) 2010 Texas Instruments, Inc.
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/io.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/platform_device.h>
-+#include <linux/mutex.h>
-+
-+#include <plat/omap_device.h>
-+#include <plat/omap-pm.h>
-+
-+#ifdef CONFIG_PM_RUNTIME
-+int platform_pm_runtime_suspend(struct device *dev)
-+{
-+	struct clk *iclk, *fclk;
-+
-+	dev_dbg(dev, "%s\n", __func__);
-+
-+	if (dev->driver->pm && dev->driver->pm->runtime_suspend)
-+		ret = dev->driver->pm->runtime_suspend(dev);
-+
-+	fclk = clk_get(dev, "fck");
-+	if (!IS_ERR(fclk)) {
-+		clk_disable(fclk);
-+		clk_put(fclk);
-+	}
-+
-+	iclk = clk_get(dev, "ick");
-+	if (!IS_ERR(iclk)) {
-+		clk_disable(iclk);
-+		clk_put(iclk);
-+	}
-+
-+	return 0;
-+};
-+
-+int platform_pm_runtime_resume(struct device *dev)
-+{
-+	int r, ret = 0;
-+	struct clk *iclk, *fclk;
-+
-+	iclk = clk_get(dev, "ick");
-+	if (!IS_ERR(iclk)) {
-+		clk_enable(iclk);
-+		clk_put(iclk);
-+	}
-+
-+	fclk = clk_get(dev, "fck");
-+	if (!IS_ERR(fclk)) {
-+		clk_enable(fclk);
-+		clk_put(fclk);
-+	}
-+
-+	if (dev->driver->pm && dev->driver->pm->runtime_resume)
-+		ret = dev->driver->pm->runtime_resume(dev);
-+
-+	return ret;
-+};
-+
-+int platform_pm_runtime_idle(struct device *dev)
-+{
-+	ret = pm_runtime_suspend(dev);
-+	dev_dbg(dev, "%s [%d]\n", __func__, ret);
-+
-+	return 0;
-+};
-+#endif /* CONFIG_PM_RUNTIME */
--- 
-1.7.0.2
+ create mode 100644 arch/arm/mach-omap2/pm_bus.c
