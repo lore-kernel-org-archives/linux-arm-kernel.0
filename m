@@ -1,31 +1,109 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 23 Jun 2010 21:00:19 +0200
-Subject: [PATCH 1/4] pxa2xx/cpufreq: Simplify CPU frequency change asm
-In-Reply-To: <1276840135-5982-1-git-send-email-marek.vasut@gmail.com> (Marek
-	Vasut's message of "Fri\, 18 Jun 2010 07\:48\:52 +0200")
-References: <1276840135-5982-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <87eifxa81o.fsf@free.fr>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Thu, 24 Jun 2010 07:12:50 +1200
+Subject: [RFC PATCH] Rework gpio cansleep (was Re: gpiolib and sleeping
+	gpios)
+In-Reply-To: <728731.73469.qm@web180307.mail.gq1.yahoo.com>
+References: <728731.73469.qm@web180307.mail.gq1.yahoo.com>
+Message-ID: <4C225CB2.6090407@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Vasut <marek.vasut@gmail.com> writes:
+David Brownell wrote:
+> 
+> --- On Tue, 6/22/10, Ryan Mallon <ryan@bluewatersys.com> wrote:
+> 
+>>> --- On Tue, 6/22/10, Ryan Mallon <ryan@bluewatersys.com>
+>> wrote:
 
-> This patch does the following changes to cpufreq-pxa2xx:
-> 1) Simplifies the assembler code for frequency change
-OK, but did you think over what the old code was doing ?
-My guess is that all the jumps were there to trigger a load into the I-Cache
-before playing with memory timings. Did you consider that your new assembly fits
-fully into a cache line, and hence is protected from memory shutdown for the
-frequency change period ?
+>>>> 'Can sleep' for a gpio has two different meanings
+>> depending
+>>>> on context
+>>> NO; for the GPIO itself it's only ever had one
+>>> meaning, regardless of context.
+>>>
+>>> You're trying to conflate the GPIO and one
+>>> of the contexts in which it's used.  That's
+>>> the problem you seem to be struggling with.
+>>>
+>>> Please stop conflating/confusing
+>>> those two disparate concepts...
+>> I'm not. 
+> 
+> BUT Your "counter" example below is solid
+> proof that you are:  it shows exactly the
+> confusion I pointed out:  call context versus
+> the GPIO itself.  There's no way I can read
+> that as anything except "you are"...
+> 
+>  
+> Your intent here seems perhaps more to
+> be a troll than to address any real
+> technical issues.  I don't see much
+> point participating any further.
+> 
+> 
+>  Some gpios, such as those on io expanders, may
+>> sleep in their
+>> implementations of the gpio_(set/get) functions.
+>>
+> 
+> Such GPIOs have a "cansleep" attribute, in short.
+> 
+> 
+>> Drivers, which use a gpio, may call gpio_(set/get)
+>> functions for a given
+>> gpio from a context where it is not safe to sleep.
+> 
+> And that's the call dontext
+> (in this case, from a driver).
 
-If you thought this over, then I would suggest to put a comment into the code to
-state that the assembly bit fits fully in one cache line. If not, I don't see
-clearly the benefit of removing the jumps ("b 2f" and "b 1b").
+Yes.
 
-And I didn't find the reference for the need of reading the MDREFR register
-after the write. Would you give me a pointer in the pxa27x TRM please ?
+>   QED.  You are confusing two disparate concepts.
 
-Cheers.
+We are saying exactly the same thing.
 
---
-Robert
+> 
+>  In this
+>> case, a gpio
+>> which may sleep (ie one on an i2c io-expander) cannot be
+>> used with this
+>> driver. The gpio_request will succeed, but any call to
+>> gpio_(set/get)_value will produce a warning.
+>>
+>>>> example, if a driver calls gpio_get_value(gpio)
+>> from an
+>>>> interupt handler
+> 
+> 
+> (YOU introduce interrupt/IRQ handlers...)
+> 
+>>>> then the gpio must not be a sleeping gpio.
+>>> In a threaded IRQ handler it's OK to use
+>>> the get_value_cansleep() option..
+>> Ugh, you are really twisting my words.
+> 
+> 
+> You said IRQ handler, so did I.  In what csense could I
+> possibly be "twisting" your words"???
+> 
+> 
+> STOP TROLLING.
+
+Okay, I messed up the wording an used 'interrupt handler' as an example
+of a non-sleep safe context. If I had said 'atomic' or 'spinlock'
+context you would probably be telling me off for missing some other
+non-sleep safe contexts.
+
+The point is that we are discussing the issue of calls which may sleep.
+Even if I was not entirely clear by getting the wording wrong, you _do_
+know what I am talking about. You could correct on the bits on I get
+wrong instead of labeling me a troll.
+
+If we strip my patch back to just introducing gpio_request_cansleep,
+which would be used in any driver where all of the calls are
+gpio_(set/get)_cansleep, and make gpio_request only allow non-sleeping
+gpios then incorrect use of gpios would be caught at request time and
+returned to the caller as an error.
+
+~Ryan
