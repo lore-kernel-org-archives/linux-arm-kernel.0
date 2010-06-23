@@ -1,38 +1,65 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 23 Jun 2010 16:37:01 -0700
-Subject: [PATCH 0/3] OMAP: add runtime PM support at bus-level
-Message-ID: <1277336224-24826-1-git-send-email-khilman@deeprootsystems.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 24 Jun 2010 09:52:33 +1000
+Subject: [GIT PULL linux-next] Samsung S5P SoCs
+In-Reply-To: <000d01cb126e$fa193690$ee4ba3b0$%kim@samsung.com>
+References: <000d01cb126e$fa193690$ee4ba3b0$%kim@samsung.com>
+Message-ID: <20100624095233.d2daaa4f.sfr@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series introduces runtime PM support at the platform bus level
-for OMAP.
+Hi,
 
-In a nutshell, when using the runtime PM API for any device with an
-assocated omap_device (and hwmod), the omap device API will be used to
-handle the hardware-level power management of that device, including
-managing clocks, etc.
+On Wed, 23 Jun 2010 09:56:52 +0900 Kukjin Kim <kgene.kim@samsung.com> wrote:
+>
+> Could you please pull the following into linux-next?
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git#for-ne
+> xt
+> 
+> This tree is for next- Samsung S5P SoCs such as S5P6440, S5P6442, S5PC100,
+> and S5PV210/S5PC110.
 
-Today, most drivers handle this by manually enabling/disabling their
-clocks when needed.  With this series (and an omap_device/hwmod for
-each device) direct clock managment can be removed from the driver in
-favor of using the runtime PM API.
+I have added this from today.  I have called the tree s5p.  Currently you
+alone are the contact for problems to do with this tree - should I add
+anyone else (or a mailing list)?
 
-This series applies on top v2.6.35-rc2 + Tony's omap-fixes branch and
-is also available in the pm-wip/runtime branch of my linux-omap-pm git
-tree:
+Thanks for adding your subsystem tree as a participant of linux-next.  As
+you may know, this is not a judgment of your code.  The purpose of
+linux-next is for integration testing and to lower the impact of
+conflicts between subsystems in the next merge window. 
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
+You will need to ensure that the patches/commits in your tree/series have
+been:
+     * submitted under GPL v2 (or later) and include the Contributor's
+	Signed-off-by,
+     * posted to the relevant mailing list,
+     * reviewed by you (or another maintainer of your subsystem tree),
+     * successfully unit tested, and 
+     * destined for the current or next Linux merge window.
 
-Kevin Hilman (3):
-  OMAP: PM: initial runtime PM core support
-  OMAP: PM: use omap_device API for suspend/resume
-  OMAP1: PM: add simple runtime PM layer to manage clocks
+Basically, this should be just what you would send to Linus (or ask him
+to fetch).  It is allowed to be rebased if you deem it necessary.
 
- arch/arm/mach-omap1/Makefile |    2 +-
- arch/arm/mach-omap1/pm_bus.c |   77 ++++++++++++++++++++++++
- arch/arm/mach-omap2/Makefile |    7 ++-
- arch/arm/mach-omap2/pm_bus.c |  133 ++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 217 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-omap1/pm_bus.c
- create mode 100644 arch/arm/mach-omap2/pm_bus.c
+-- 
+Cheers,
+Stephen Rothwell 
+sfr at canb.auug.org.au
+
+Legal Stuff:
+By participating in linux-next, your subsystem tree contributions are
+public and will be included in the linux-next trees.  You may be sent
+e-mail messages indicating errors or other issues when the
+patches/commits from your subsystem tree are merged and tested in
+linux-next.  These messages may also be cross-posted to the linux-next
+mailing list, the linux-kernel mailing list, etc.  The linux-next tree
+project and IBM (my employer) make no warranties regarding the linux-next
+project, the testing procedures, the results, the e-mails, etc.  If you
+don't agree to these ground rules, let me know and I'll remove your tree
+from participation in linux-next.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100624/b2a5607a/attachment-0001.sig>
