@@ -1,46 +1,50 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Wed, 23 Jun 2010 17:24:15 +0200
-Subject: strange segfaults with CompactFlash in "true-ide" mode on PXA270
-In-Reply-To: <201006231706.33182.schindele@nentec.de>
-References: <201006231706.33182.schindele@nentec.de>
-Message-ID: <19490.10015.10027.750374@ipc1.ka-ro>
+From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
+Date: Wed, 23 Jun 2010 18:43:55 +0200
+Subject: [PATCH v2] otg/ulpi.c : fix register write
+Message-ID: <1277311435-12027-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+ulpi_set_vbus and ulpi_set_flags are using ULPI_SET(register) to write
+to the PHY's registers, which means we can only set bits in the PHY's
+register and not clear them.
+By directly using the address of the register without any offset, we
+now get the expected behaviour for these functions.
 
-> we have a strange problem when booting from a Compact Flash card
-> as root-device. In one of 10 cases while booting an application from
-> root-filesystem dies with "Segmentation fault" without a visible error.
-> After booting the same application runs hundred times without error.
-> (we're talking about standard appl. like chat, pppd, hwclock and so on)
-> 
-> For debugging purposes we put printk's in kernels IDE driver 
-> and the problem disappeared. But replacing the printk by a usleep
-> or so (which is not a solution !) brings the problem back.
-> It seems that the application received faulty data from CF.
-> But how and why ?????????????????????????????
-> 
-> We tested with a custom PXA270 board with a CompactFlash in 
-> "true ide" on processor bus driven by "generic ide / pata_platform"
-> driver from linux-2.6.27.x.
-> (by the way linux-2.6.20.x showed the same problem).
-> 
-> Any ideas, hints, experiences, patches are very welcome :-)
-> --------------------------------------------------------------
-I guess that is the old cache problem that apparently was never really
-fixed:
-http://marc.info/?t=108537828400002&r=1&w=2
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+Cc: Daniel Mack <daniel@caiaq.de>
+Cc: linux-usb at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+---
+v2 :
+drop reg/val swap which is handled in a better way by Igor's patch here :
+http://comments.gmane.org/gmane.linux.usb.general/32092 
+ 
+ drivers/usb/otg/ulpi.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-
-Lothar Wa?mann
+diff --git a/drivers/usb/otg/ulpi.c b/drivers/usb/otg/ulpi.c
+index b1b3469..086853b 100644
+--- a/drivers/usb/otg/ulpi.c
++++ b/drivers/usb/otg/ulpi.c
+@@ -54,7 +54,7 @@ static int ulpi_set_flags(struct otg_transceiver *otg)
+ 	if (otg->flags & USB_OTG_EXT_VBUS_INDICATOR)
+ 		flags |= ULPI_OTG_CTRL_EXTVBUSIND;
+ 
+-	return otg_io_write(otg, flags, ULPI_SET(ULPI_OTG_CTRL));
++	return otg_io_write(otg, flags, ULPI_OTG_CTRL);
+ }
+ 
+ static int ulpi_init(struct otg_transceiver *otg)
+@@ -90,7 +90,7 @@ static int ulpi_set_vbus(struct otg_transceiver *otg, bool on)
+ 			flags |= ULPI_OTG_CTRL_DRVVBUS_EXT;
+ 	}
+ 
+-	return otg_io_write(otg, flags, ULPI_SET(ULPI_OTG_CTRL));
++	return otg_io_write(otg, flags, ULPI_OTG_CTRL);
+ }
+ 
+ struct otg_transceiver *
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.6.3.3
