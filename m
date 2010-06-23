@@ -1,55 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Jun 2010 10:39:13 +0300
-Subject: [PATCH 1/2] arm: Replace CONFIG_HAS_TLS_REG with HWCAP_TLS and
-	check for it on V6
-In-Reply-To: <20100622170020.GF4371@shareable.org>
-References: <20100621133749.24299.36154.stgit@baageli.muru.com>
-	<20100621135120.24299.98499.stgit@baageli.muru.com>
-	<20100622170020.GF4371@shareable.org>
-Message-ID: <20100623073912.GA12255@atomide.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 23 Jun 2010 16:50:32 +0900
+Subject: [PATCH v2 0/4] ARM: S5P: Support gpio interrupts
+In-Reply-To: <4C11F4CA.10802@samsung.com>
+References: <4C11F4CA.10802@samsung.com>
+Message-ID: <004601cb12a8$c869e560$593db020$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jamie Lokier <jamie@shareable.org> [100622 19:54]:
-> Tony Lindgren wrote:
-> >  __kuser_get_tls:				@ 0xffff0fe0
-> > -
-> > -#if !defined(CONFIG_HAS_TLS_REG) && !defined(CONFIG_TLS_REG_EMUL)
-> > -	ldr	r0, [pc, #(16 - 8)]		@ TLS stored at 0xffff0ff0
-> > -#else
-> > -	mrc	p15, 0, r0, c13, c0, 3		@ read TLS register
-> > -#endif
-> > +	ldr     r0, [pc, #(20 - 8)]		@ software TLS set in 0xffff0ff4?
-> > +	cmp	r0, #0				@ hardware TLS if flag not set
-> > +	mrceq	p15, 0, r0, c13, c0, 3		@ read hardware TLS register
-> > +	ldrne	r0, [pc, #(12 - 8)]		@ software TLS val at 0xffff0ff8
-> >  	usr_ret	lr
-> > -
-> > -	.rep	5
-> > -	.word	0			@ pad up to __kuser_helper_version
-> > -	.endr
-> > +	.word	0				@ non-zero for software TLS
-> > +	.word	0				@ software TLS value
+Joonyoung Shim wrote:
 > 
-> It'd be nice not to waste instructions checking for HWCAP_TLS on archs
-> which definitely don't have it.  I guess it doesn't matter elsewhere;
-> I'd expect this to be a warm path for some programs making extensive
-> use of TLS (I haven't measured though).
+> This patch v2 set is to support gpio interrupts of samsung s5p cpus, and
+> the GPIOlib gpio_to_irq goes to plat-samsung gpiolib, so patch v2 set
+> has four commit smaller than v1.
+> 
+> Changes since v1:
+> - Add irq_base to s3c_gpio_chip struct
+> - GPIOlib gpio_to_irq() is implemented to samsung_gpiolib_to_irq() of
+>   plat-samsung gpiolib
+> 
+> Joonyoung Shim (4):
+>       ARM: S5PV210: Add gpio interrupt support
+>       ARM: S5PC100: Use S5P gpio interrupts interface
+>       ARM: S5PC100: Move external interrupt defines
+>       ARM: SAMSUNG: Add GPIOlib gpio_to_irq
+> 
+>  arch/arm/mach-s5pc100/Makefile                 |    2 +-
+>  arch/arm/mach-s5pc100/gpiolib.c                |   70 ++-----
+>  arch/arm/mach-s5pc100/include/mach/gpio.h      |    7 -
+>  arch/arm/mach-s5pc100/include/mach/irqs.h      |   18 ++-
+>  arch/arm/mach-s5pc100/include/mach/regs-gpio.h |    7 +
+>  arch/arm/mach-s5pc100/irq-gpio.c               |  266
+------------------------
+>  arch/arm/mach-s5pv210/gpiolib.c                |   18 ++-
+>  arch/arm/mach-s5pv210/include/mach/irqs.h      |   16 ++-
+>  arch/arm/plat-s5p/Makefile                     |    2 +-
+>  arch/arm/plat-s5p/irq-gpioint.c                |  208 ++++++++++++++++++
+>  arch/arm/plat-samsung/gpiolib.c                |    9 +
+>  arch/arm/plat-samsung/include/plat/gpio-core.h |    6 +
+>  12 files changed, 295 insertions(+), 334 deletions(-)
+>  delete mode 100644 arch/arm/mach-s5pc100/irq-gpio.c
+>  create mode 100644 arch/arm/plat-s5p/irq-gpioint.c
+> 
 
-OK, but let's try to figure out a way that does not add more ifdef else
-code as that makes it harder to build support for multiple ARM cores.
- 
-> As it's only a single instruction, and the code is in a writable page
-> already (copied at init), how about just patching the instruction
-> when ELF_HWCAP is set?
+I am sure this patchset is working code, but Ben had made suggestion about
+'sparse irq'...
+It is because there are too many gpio interrupts and having support of all
+of them is unnecessary as realistically only few of them maybe used.
+In fact in SMDK board there is no use of gpio in interrupt mode.
 
-Yeah that can be done for __kuser_get_tls if it's always writable.
-But __switch_to is trickier because of the CONFIG_MMU ifdefs there.
+Ben, I remember your suggestion for using 'sparse irq' for handling gpio
+interrupts.
+And in fact, sparse irq implementation can be beneficial to many other
+boards...
+Could you please explain about that?
 
-What if we have optional __switch_to and __kuser_get_tls implementations
-in the mm/proc-*.S files that get copied over the current locations
-if implemented?
 
-Regards,
+Thanks.
 
-Tony
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
