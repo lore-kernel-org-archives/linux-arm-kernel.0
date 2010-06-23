@@ -1,109 +1,53 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 24 Jun 2010 07:12:50 +1200
-Subject: [RFC PATCH] Rework gpio cansleep (was Re: gpiolib and sleeping
-	gpios)
-In-Reply-To: <728731.73469.qm@web180307.mail.gq1.yahoo.com>
-References: <728731.73469.qm@web180307.mail.gq1.yahoo.com>
-Message-ID: <4C225CB2.6090407@bluewatersys.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Jun 2010 20:48:43 +0100
+Subject: [PATCH 1/6] [ARM] Make common definition for IO_SPACE_LIMIT
+In-Reply-To: <1277293938-25804-2-git-send-email-eric.y.miao@gmail.com>
+References: <1277293938-25804-1-git-send-email-eric.y.miao@gmail.com>
+	<1277293938-25804-2-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <20100623194843.GA25070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Brownell wrote:
-> 
-> --- On Tue, 6/22/10, Ryan Mallon <ryan@bluewatersys.com> wrote:
-> 
->>> --- On Tue, 6/22/10, Ryan Mallon <ryan@bluewatersys.com>
->> wrote:
-
->>>> 'Can sleep' for a gpio has two different meanings
->> depending
->>>> on context
->>> NO; for the GPIO itself it's only ever had one
->>> meaning, regardless of context.
->>>
->>> You're trying to conflate the GPIO and one
->>> of the contexts in which it's used.  That's
->>> the problem you seem to be struggling with.
->>>
->>> Please stop conflating/confusing
->>> those two disparate concepts...
->> I'm not. 
-> 
-> BUT Your "counter" example below is solid
-> proof that you are:  it shows exactly the
-> confusion I pointed out:  call context versus
-> the GPIO itself.  There's no way I can read
-> that as anything except "you are"...
-> 
+On Wed, Jun 23, 2010 at 07:52:13PM +0800, Eric Miao wrote:
+> diff --git a/arch/arm/mach-ebsa110/include/mach/io.h b/arch/arm/mach-ebsa110/include/mach/io.h
+> index f68daa6..44679db 100644
+> --- a/arch/arm/mach-ebsa110/include/mach/io.h
+> +++ b/arch/arm/mach-ebsa110/include/mach/io.h
+> @@ -13,8 +13,6 @@
+>  #ifndef __ASM_ARM_ARCH_IO_H
+>  #define __ASM_ARM_ARCH_IO_H
 >  
-> Your intent here seems perhaps more to
-> be a troll than to address any real
-> technical issues.  I don't see much
-> point participating any further.
-> 
-> 
->  Some gpios, such as those on io expanders, may
->> sleep in their
->> implementations of the gpio_(set/get) functions.
->>
-> 
-> Such GPIOs have a "cansleep" attribute, in short.
-> 
-> 
->> Drivers, which use a gpio, may call gpio_(set/get)
->> functions for a given
->> gpio from a context where it is not safe to sleep.
-> 
-> And that's the call dontext
-> (in this case, from a driver).
+> -#define IO_SPACE_LIMIT 0xffff
+> -
+>  u8 __inb8(unsigned int port);
+>  void __outb8(u8  val, unsigned int port);
+>  
+> diff --git a/arch/arm/mach-footbridge/include/mach/io.h b/arch/arm/mach-footbridge/include/mach/io.h
+> index 101a4fe..c65ed51 100644
+> --- a/arch/arm/mach-footbridge/include/mach/io.h
+> +++ b/arch/arm/mach-footbridge/include/mach/io.h
+> @@ -17,8 +17,6 @@
+>  #define PCIO_SIZE		0x00100000
+>  #define PCIO_BASE		0xff000000
+>  
+> -#define IO_SPACE_LIMIT 0xffff
+> -
+>  /*
+>   * Translation of various region addresses to virtual addresses
+>   */
+> diff --git a/arch/arm/mach-integrator/include/mach/io.h b/arch/arm/mach-integrator/include/mach/io.h
+> index f21bb54..37beed3 100644
+> --- a/arch/arm/mach-integrator/include/mach/io.h
+> +++ b/arch/arm/mach-integrator/include/mach/io.h
+> @@ -20,8 +20,6 @@
+>  #ifndef __ASM_ARM_ARCH_IO_H
+>  #define __ASM_ARM_ARCH_IO_H
+>  
+> -#define IO_SPACE_LIMIT 0xffff
+> -
+>  /*
+>   * WARNING: this has to mirror definitions in platform.h
+>   */
 
-Yes.
-
->   QED.  You are confusing two disparate concepts.
-
-We are saying exactly the same thing.
-
-> 
->  In this
->> case, a gpio
->> which may sleep (ie one on an i2c io-expander) cannot be
->> used with this
->> driver. The gpio_request will succeed, but any call to
->> gpio_(set/get)_value will produce a warning.
->>
->>>> example, if a driver calls gpio_get_value(gpio)
->> from an
->>>> interupt handler
-> 
-> 
-> (YOU introduce interrupt/IRQ handlers...)
-> 
->>>> then the gpio must not be a sleeping gpio.
->>> In a threaded IRQ handler it's OK to use
->>> the get_value_cansleep() option..
->> Ugh, you are really twisting my words.
-> 
-> 
-> You said IRQ handler, so did I.  In what csense could I
-> possibly be "twisting" your words"???
-> 
-> 
-> STOP TROLLING.
-
-Okay, I messed up the wording an used 'interrupt handler' as an example
-of a non-sleep safe context. If I had said 'atomic' or 'spinlock'
-context you would probably be telling me off for missing some other
-non-sleep safe contexts.
-
-The point is that we are discussing the issue of calls which may sleep.
-Even if I was not entirely clear by getting the wording wrong, you _do_
-know what I am talking about. You could correct on the bits on I get
-wrong instead of labeling me a troll.
-
-If we strip my patch back to just introducing gpio_request_cansleep,
-which would be used in any driver where all of the calls are
-gpio_(set/get)_cansleep, and make gpio_request only allow non-sleeping
-gpios then incorrect use of gpios would be caught at request time and
-returned to the caller as an error.
-
-~Ryan
+These three are 0xffff because they are PCI, and the PCI IO window is
+64K.  Allowing reservations above this value could cause problems.
