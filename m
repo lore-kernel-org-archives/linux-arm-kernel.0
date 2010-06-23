@@ -1,108 +1,36 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 24 Jun 2010 07:31:57 +0900
-Subject: [PATCH 3/3] ARM: S5P: Add Support common arch_reset() for S5P SoCs
-In-Reply-To: <1277332317-30192-1-git-send-email-kgene.kim@samsung.com>
-References: <1277332317-30192-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1277332317-30192-4-git-send-email-kgene.kim@samsung.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Wed, 23 Jun 2010 23:53:45 +0100
+Subject: [RFC PATCH] Rework gpio cansleep (was Re: gpiolib and sleeping
+	gpios)
+In-Reply-To: <4C21955D.1020502@bluewatersys.com>
+References: <191168.5104.qm@web180308.mail.gq1.yahoo.com>
+	<4C21955D.1020502@bluewatersys.com>
+Message-ID: <20100623225345.GD7058@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jongpill Lee <boyko.lee@samsung.com>
+Ryan Mallon wrote:
+> On 06/23/2010 04:37 PM, David Brownell wrote:
+> I'm not. Some gpios, such as those on io expanders, may sleep in their
+> implementations of the gpio_(set/get) functions.
 
-This patch adds support common arch_reset() for
-S5P6440, S5P6442, S5PC100 and S5PV210/S5PC110.
-Now perform reset using Watchdog reset, SWRESET
-support with s5p_reset_hook() will be added later.
+I'm having a hard time figuring out where some GPIOs I'm using fit
+into this picture.
 
-Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-s5p6440/include/mach/system.h |    7 ++-----
- arch/arm/mach-s5p6442/include/mach/system.h |    7 ++-----
- arch/arm/mach-s5pc100/include/mach/system.h |    9 +--------
- arch/arm/mach-s5pv210/include/mach/system.h |    7 ++-----
- 4 files changed, 7 insertions(+), 23 deletions(-)
+I have some hardware that is currently using a 2.4.26 kernel, but I
+look from time to time at forward-porting all the drivers to 2.6.recent.
 
-diff --git a/arch/arm/mach-s5p6440/include/mach/system.h b/arch/arm/mach-s5p6440/include/mach/system.h
-index d2dd817..a359ee3 100644
---- a/arch/arm/mach-s5p6440/include/mach/system.h
-+++ b/arch/arm/mach-s5p6440/include/mach/system.h
-@@ -13,12 +13,9 @@
- #ifndef __ASM_ARCH_SYSTEM_H
- #define __ASM_ARCH_SYSTEM_H __FILE__
- 
--static void arch_idle(void)
--{
--	/* nothing here yet */
--}
-+#include <plat/system-reset.h>
- 
--static void arch_reset(char mode, const char *cmd)
-+static void arch_idle(void)
- {
- 	/* nothing here yet */
- }
-diff --git a/arch/arm/mach-s5p6442/include/mach/system.h b/arch/arm/mach-s5p6442/include/mach/system.h
-index 8bcd8ed..c30c1cc 100644
---- a/arch/arm/mach-s5p6442/include/mach/system.h
-+++ b/arch/arm/mach-s5p6442/include/mach/system.h
-@@ -13,12 +13,9 @@
- #ifndef __ASM_ARCH_SYSTEM_H
- #define __ASM_ARCH_SYSTEM_H __FILE__
- 
--static void arch_idle(void)
--{
--	/* nothing here yet */
--}
-+#include <plat/system-reset.h>
- 
--static void arch_reset(char mode, const char *cmd)
-+static void arch_idle(void)
- {
- 	/* nothing here yet */
- }
-diff --git a/arch/arm/mach-s5pc100/include/mach/system.h b/arch/arm/mach-s5pc100/include/mach/system.h
-index 681f626..a9ea57c 100644
---- a/arch/arm/mach-s5pc100/include/mach/system.h
-+++ b/arch/arm/mach-s5pc100/include/mach/system.h
-@@ -11,18 +11,11 @@
- #ifndef __ASM_ARCH_SYSTEM_H
- #define __ASM_ARCH_SYSTEM_H __FILE__
- 
--#include <linux/io.h>
--#include <mach/map.h>
--#include <mach/regs-clock.h>
-+#include <plat/system-reset.h>
- 
- static void arch_idle(void)
- {
- 	/* nothing here yet */
- }
- 
--static void arch_reset(char mode, const char *cmd)
--{
--	__raw_writel(S5PC100_SWRESET_RESETVAL, S5PC100_SWRESET);
--	return;
--}
- #endif /* __ASM_ARCH_IRQ_H */
-diff --git a/arch/arm/mach-s5pv210/include/mach/system.h b/arch/arm/mach-s5pv210/include/mach/system.h
-index 1ca04d5..af8a200 100644
---- a/arch/arm/mach-s5pv210/include/mach/system.h
-+++ b/arch/arm/mach-s5pv210/include/mach/system.h
-@@ -13,12 +13,9 @@
- #ifndef __ASM_ARCH_SYSTEM_H
- #define __ASM_ARCH_SYSTEM_H __FILE__
- 
--static void arch_idle(void)
--{
--	/* nothing here yet */
--}
-+#include <plat/system-reset.h>
- 
--static void arch_reset(char mode, const char *cmd)
-+static void arch_idle(void)
- {
- 	/* nothing here yet */
- }
--- 
-1.6.2.5
+It has an I2C driven GPIO expander, with a watchdog reset chip hanging
+off the expander.
+
+The watchdog is kept alive off the back end of a timer BH, which means
+the I2C GPIO routines are written to be safe in BH context (which
+isn't sleepable), but they can't be used in IRQ context because the
+necessary spin_lock_irqsave() would turn off interrupts for too long
+for other subsystems to function properly.
+
+How should I flag those GPIO routines in your scheme?  They're safe to
+use in some non-sleeping contexts, but not safe in irq context.
+
+Thanks,
+-- Jamie
