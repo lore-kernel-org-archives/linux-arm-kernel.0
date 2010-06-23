@@ -1,250 +1,160 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 23 Jun 2010 14:01:29 +0900
-Subject: [PATCH] S5PV210 Correct clock source control register properties
-In-Reply-To: <AANLkTimjiBOzK1IfGTEY2xLjZ73uchjJACe8d5LQRB9s@mail.gmail.com>
-References: <1276766116-6839-1-git-send-email-myungjoo.ham@samsung.com>
-	<005401cb0ecb$c3f16c00$4bd44400$%kim@samsung.com>
-	<AANLkTim1psO4ZeZGAgNteJp_ytRhzoPlu4D3VblPgz6w@mail.gmail.com>
-	<000001cb0f63$3682c5b0$a3885110$%kim@samsung.com>
-	<AANLkTimjiBOzK1IfGTEY2xLjZ73uchjJACe8d5LQRB9s@mail.gmail.com>
-Message-ID: <002a01cb1291$27ca2c30$775e8490$%kim@samsung.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Wed, 23 Jun 2010 17:02:21 +1200
+Subject: [RFC PATCH] Rework gpio cansleep (was Re: gpiolib and sleeping
+	gpios)
+In-Reply-To: <191168.5104.qm@web180308.mail.gq1.yahoo.com>
+References: <191168.5104.qm@web180308.mail.gq1.yahoo.com>
+Message-ID: <4C21955D.1020502@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
-> 
-> On Sat, Jun 19, 2010 at 12:55 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > MyungJoo Ham wrote:
-> >>
-> >> On Fri, Jun 18, 2010 at 6:50 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> >> > MyungJoo Ham wrote:
-> >> >>
-> >> >> The clock source controls (struct clksrc_clk) have been often accessing
-> >> >> CLK_GATE_IPx, which are for clock gating and are accessed by each clock
-> >> >> as well as the clock source. This duplicated clock issue may incur
-> >> >> lockup problems when there are two modules accessing the same clock with
-> >> >> different names.
-> >> >>
-> >> > Could you please explain further about the above the statement " accessed
-> by
-> >> > each clock as well as the clock source"
-> >>
-> >> For example, "CLK_GATE_IP2[16:19]" is accessed by "hsmmc" of struct
-> >> clk (a clock) and "sclk_mmc" of struct clksrc_clk's struct clk (a
-> >> clock source's clk representation).
-> >>
-> >> >
-> >> >> Besides, the clock source control is supposed to control (setting values
-> >> >> of MASK, SRC, DIV), not to turn on/off individual clock.
-> >> >>
-> >> > That is not quite true. Only S5PV210/S5PC110 have the gate for the clock
-> mux.
-> >> > S5P6440 and S5PC100, for instance, do not have a gate for the output for
-> >> > _just_ the clock mux. And the reason why the Clock Mux Gate is provide for
-> >> > the mux is explained in Section 3.4 of the user manual.
-> >>
-> >> In cases where clock mux gating is not available and we have each
-> >> clock (supplied by this cluck mux) defined separatedly with .enable
-> >> and .ctrlbit, we'd better omit .enable/.ctrlbit from struct
-> >> clksrc_clk's struct clk.
-> >>
-> >> >
-> >> >> Another point is that there are registers (CLK_SRC_MASK0/1) specialized
-> >> >> for masking clock source control in S5PV210/S5PC110 according to the
-> >> >> user manual (rev 20100201).
-> >> >>
-> >> >> Therefore, accessing CLK_SRC_MASK0/1 (rather than accessing
-> >> >> CLK_GATE_IPx) for the clock source control is safer and fits to the
-> >> >> semantics of S5PV210/S5PC110 registers. And fortuneatly, each clock
-> >> >> source defined in clock.c has corresponding bit at CLK_SRC_MASK0/1
-> >> >> except for MFC, G2D, and G3D.
-> >> >>
-> >> > Can you please explain how the use CLK_SRC_MASKx makes it safer. The
-> reason
-> >> > why MFC, G2D and G3D do not have a corresponding bit in
-> CLK_SRC_MASKx is
-> >> > mentioned in Section 3.4 of the user manual.
-> >> >
-> >> > Let me know your opinion.
-> >> >
-> >>
-> >> It's "EXCEPT FOR MFC, G2D, G3D". I'm not saying that using
-> >> CLK_SRC_MASKx is safer for these three. For other cases, I guess the
-> >> lock up example should be fine.
-> >>
-> >> However, in most cases, this lockup issue does not make visible problem
-> because:
-> >> 1. normally, drivers use both clksrc_clk's clk and clk at the same
-> >> time. for example
-> >> "mmc_bus".clk_enable;
-> >> "hsmmc".clk_enable;
-> >>  blahblah
-> >> "hsmmc".clk_disable;
-> >> "mmc_bus".clk_disable;
-> >> or
-> >> 2. drivers sharing the same clock uses only one side of the two.
-> >> or
-> >> 3. the execution block between clk_enable and clk_disable is extremely short.
-> >>
-> >> Nevertheless, this potential lockup issue is critical and we'd better
-> >> address it.
-> >>
-> >>
-> >> >> In this patch,
-> >> >>
-> >> >> - DAC, HDMI, AUDIO 0/1/2, UCLK(uart) 0/1/2/3, MIXER, FIMC 0/1/2,
-> >> >> FIMC, MMC 0/1/2/3, CSIS, SPI 0/1, PWI, and PWM clock sources are
-> >> >> modified to use CLK_SRC_MASK0/1, which were using CLK_GATE_IPx.
-> >> >>
-> >> >> - CAM 0/1 did not have enable/disable control. They now access
-> >> >>   CLK_SRC_MASK0.
-> >> >>
-> >> >> - MFC, G3D, G2D were using CLK_GATE_IPx. However, as there are no
-> clocks
-> >> >>   defined to control MFC, G3D, and G2D, we kept them to access
-> >> >> CLK_GATE_IPx. These may need to be modified (erase .enable, .ctrlbit
-> >> >> from sclk_mfc, sclk_g2d, sclk_g3d and create clocks: g3d, g2d, mfc)
-> >> >> later.
-> >> >>
-> >> >> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> >> >> ---
-> >> >>  arch/arm/mach-s5pv210/clock.c |  101
-> >> > ++++++++++++++++++++++-------------------
-> >> >>  1 files changed, 55 insertions(+), 46 deletions(-)
-> >> >>
-> >> >> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-> >> >> index ec5ad8c..08c1063 100644
-> >> >> --- a/arch/arm/mach-s5pv210/clock.c
-> >> >> +++ b/arch/arm/mach-s5pv210/clock.c
-> >> >
-> >> > (snip)
-> >> >
-> >> > --
-> >
-> > Strictly speaking, 'duplicated clock problem' and 'clock gating issue which is
-> controlled by CLK_GATE_IPx or CLK_SRC_MASKx' are different problem.
-> > But mixed above two things in your patch.
-> >
-> > I think just need bug fix.
-> >
-> > See below mmc case.
-> >
-> > Following is for clock gating mmc IP by using CLK_GATE_IPx and can
-> control(clock gating) clocks, 'aclk_hsmmcX' and 'sclk_mmcX' in the mmc IP.
-> >
-> >        {
-> >                .name   = "hsmmc",
-> >                .id     = 0,
-> >                .parent = &clk_hclk_psys.clk,
-> >                .enable = s5pv210_clk_ip2_ctrl,
-> >                .ctrlbit        = (1<<16),
-> >        }, {
-> >                .name   = "hsmmc",
-> >                .id     = 1,
-> >                .parent = &clk_hclk_psys.clk,
-> >                .enable = s5pv210_clk_ip2_ctrl,
-> >                .ctrlbit        = (1<<17),
-> >        }, {
-> >                .name   = "hsmmc",
-> >                .id     = 2,
-> >                .parent = &clk_hclk_psys.clk,
-> >                .enable = s5pv210_clk_ip2_ctrl,
-> >                .ctrlbit        = (1<<18),
-> >        }, {
-> >                .name   = "hsmmc",
-> >                .id     = 3,
-> >                .parent = &clk_hclk_psys.clk,
-> >                .enable = s5pv210_clk_ip2_ctrl,
-> >                .ctrlbit        = (1<<19),
-> >        }...
-> >
-> > And following is for clock gating just 'sclk_mmcX' by using CLK_SRC_MASKx.
-> > But as you know should be 's5pv210_clk_mask0_ctrl' instead of
-> 's5pv210_clk_ip2_ctrl' like below.
-> >
-> > @@ -794,8 +794,8 @@ static struct clksrc_clk clksrcs[] = {
-> >                .clk            = {
-> >                        .name           = "sclk_mmc",
-> >                        .id             = 0,
-> > -                       .enable         = s5pv210_clk_ip2_ctrl,
-> > -                       .ctrlbit                = (1 << 16),
-> > +                       .enable         = s5pv210_clk_mask0_ctrl,
-> > +                       .ctrlbit                = (1 << 8),
-> >                },
-> >                .sources = &clkset_group2,
-> >                .reg_src = { .reg = S5P_CLK_SRC4, .shift = 0, .size = 4 },
-> > @@ -804,8 +804,8 @@ static struct clksrc_clk clksrcs[] = {
-> >                .clk            = {
-> >                        .name           = "sclk_mmc",
-> >                        .id             = 1,
-> > -                       .enable         = s5pv210_clk_ip2_ctrl,
-> > -                       .ctrlbit                = (1 << 17),
-> > +                       .enable         = s5pv210_clk_mask0_ctrl,
-> > +                       .ctrlbit                = (1 << 9),
-> >                },
-> >                .sources = &clkset_group2,
-> >                .reg_src = { .reg = S5P_CLK_SRC4, .shift = 4, .size = 4 },
-> > @@ -814,8 +814,8 @@ static struct clksrc_clk clksrcs[] = {
-> >                .clk            = {
-> >                        .name           = "sclk_mmc",
-> >                        .id             = 2,
-> > -                       .enable         = s5pv210_clk_ip2_ctrl,
-> > -                       .ctrlbit                = (1 << 18),
-> > +                       .enable         = s5pv210_clk_mask0_ctrl,
-> > +                       .ctrlbit                = (1 << 10),
-> >                },
-> >                .sources = &clkset_group2,
-> >                .reg_src = { .reg = S5P_CLK_SRC4, .shift = 8, .size = 4 },
-> > @@ -824,8 +824,8 @@ static struct clksrc_clk clksrcs[] = {
-> >                .clk            = {
-> >                        .name           = "sclk_mmc",
-> >                        .id             = 3,
-> > -                       .enable         = s5pv210_clk_ip2_ctrl,
-> > -                       .ctrlbit                = (1 << 19),
-> > +                       .enable         = s5pv210_clk_mask0_ctrl,
-> > +                       .ctrlbit                = (1 << 11),
-> >                },
-> >                .sources = &clkset_group2,
-> >                .reg_src = { .reg = S5P_CLK_SRC4, .shift = 12, .size = 4 }
-> >
-> >
-> > I think there is no lockup issue(problem) after bug fix about 'sclk_xxx'.
-> > Of course, carefully used distinguished clock gating in the relevant device driver.
-> > Because as I said, CLK_GATE_IPx can disable all of the clock operation of each
-> IP.
-> > If no need CLK_GATE_IPx, just do clock gating each 'sclk_xxx'.
-> >
-> > Could you please re-submit new stuff for bug fix?
+On 06/23/2010 04:37 PM, David Brownell wrote:
 > 
 > 
-Hi,
+> --- On Tue, 6/22/10, Ryan Mallon <ryan@bluewatersys.com> wrote:
+> 
+> 
+>> gpiolib
+> 
+> 
+> Again, you're talking about "gpiolib" when
+> you seem to mean the GPIO framework itself
+> (for which gpiolib is only an implementation
+> option)...
 
-> Ah, I've got it. So, your intention is to keep clocks with
-> CLK_SRC/CLK_DIV as a form struct clksrc_clk[] list to control clock
-> gating and get rid of them from struct clk[] list, right? As long as
-> we are not going to list a clock in both struct clksrc_clk list and
-> struct clk list, it should be fine.
+Fine, its just semantics. I think everyone knows what I mean when I
+refer to gpiolib.
+
+>> framework could be simplified for cansleep gpios.
+>>
+>> 'Can sleep' for a gpio has two different meanings depending
+>> on context
 > 
-Yes, I think need them, because SRC and DIV of clksrc_clk are a thing about
-MUX and DIVIDER of each IP input sources.
-And as your patch, sclk_xxx should be controlled by CLK_SRC_MASKx.
-
-> However, what about merging hsmmc and sclk_mmc? It there any reason to
-> keep them separated? (e.g., remove "hsmmc" and let "sclk_mmc" use
-> CLK_GATE_IPx.
+> NO; for the GPIO itself it's only ever had one
+> meaning, regardless of context.
 > 
-Actually, the usage or purpose of the CLK_GATE_IPx and CLK_SRC_MASKx is
-differs.
-As you know, all input source of each IP can be controlled(clock gating) by
-CLK_GATE_IPx like hsmmc, and each special(?) clock like sclk_mmc can be
-controlled by CLK_SRC_MASKx.
-And as I commented, carefully used distinguished clock gating in the
-relevant device driver.
+> You're trying to conflate the GPIO and one
+> of the contexts in which it's used.  That's
+> the problem you seem to be struggling with.
+> 
+> Please stop conflating/confusing
+> those two disparate concepts...
 
-Thanks.
+I'm not. Some gpios, such as those on io expanders, may sleep in their
+implementations of the gpio_(set/get) functions.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Drivers, which use a gpio, may call gpio_(set/get) functions for a given
+gpio from a context where it is not safe to sleep. In this case, a gpio
+which may sleep (ie one on an i2c io-expander) cannot be used with this
+driver. The gpio_request will succeed, but any call to
+gpio_(set/get)_value will produce a warning.
+
+>> example, if a driver calls gpio_get_value(gpio) from an
+>> interupt handler
+>> then the gpio must not be a sleeping gpio.
+> 
+> In a threaded IRQ handler it's OK to use
+> the get_value_cansleep() option..
+
+Ugh, you are really twisting my words. replace 'interrupt handler' with
+'non sleep safe context'.
+
+>>
+>> This patch introduces a new flag, FLAG_CANSLEEP, internal
+>> to gpiolib
+> 
+> NAK; Superfluous; the gpio_chip already has
+> that information recorded.
+
+It has a different meaning, but I think you are still correct here. The
+might_sleep_if in gpio_(set/get)_value is only necessary if
+chip->cansleep is set.
+
+> 
+>> new request function, gpio_request_cansleep, requests a
+>> gpio which may
+>> only be used from sleep possible contexts
+> 
+> Also superfluous.
+
+Not so. In my opinion, it is better to have the gpio_request fail
+immediately if it is being used incorrectly. For example, say you have
+two gpios:
+
+  soc_gpio:    An SoC gpio which does not sleep on set/get
+  sleepy_gpio: An i2c io-expander gpio which may sleep on get/set
+
+and some driver code which does this:
+
+  gpio_request(gpio, "some_gpio");
+  ...
+  // Non-sleep safe context
+  gpio_set_value(gpio, 0);
+
+If you pass sleepy_gpio as the gpio to this driver the gpio_request will
+succeed, but you will get a warning on the gpio_set_value because its
+usage is incorrect.
+
+In my proposed change, the gpio_request would fail because sleepy_gpio
+might sleep, and therefore cannot be used by drivers which use gpios in
+non sleep safe context. Basically I am moving the cansleep part of the
+api from the usage of gpios to the registration time. In my opinion this
+is better because it means there is only one set of gpio_(set/get)_value
+calls and incorrect usage of sleeping gpios will be caught when the gpio
+is registered, not when it is used.
+
+> 
+>  The existing
+>> gpio_request
+>> function requests a gpio, but does not allow it to be used
+>> from a
+>> context where sleep is not possible.
+> 
+> Changing semantics of existing calls is a big
+> mess, and should be avoided even if it seems
+> appropriate.
+> 
+> Since the request is just reserving a resource
+> that's already been identified (and which has
+> known characteristics, like whether the GPIO
+> value must be accessed only from sleeping
+> contexts), this call would also be superfluous.
+>
+> If you want to ensure the GPIO is a cansleep()
+> one, just check that before reserving it.  There
+> is no need for new calls to support that model;
+> it works today.
+
+Except that drivers do not do this.
+
+> (NAK...)
+> 
+> 
+> 
+>> The benefits I see to this approach are:
+>>  ...
+>>  - The API is simplified by combining gpio_(set/get)_value
+>> and
+>> gpio_(set/get)_value_cansleep
+> 
+> 
+> You have a strange definition of "simplified"...
+> 
+> Recognize that you're also proposing to remove
+> an API characteristic which much simplifies
+> code review:  you can look at calls and see
+> that because they're the cansleep() version,
+> they are unsafe in IRQ context ...
+
+Hmm, fair point.
+
+~Ryan
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
