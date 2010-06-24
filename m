@@ -1,54 +1,85 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 24 Jun 2010 15:49:22 +0200
-Subject: [PATCH 26/61] ARM: imx: prepare deprecating ARCH_MX1, MACH_MX2,
-	MACH_MX21 and MACH_MX27
+Date: Thu, 24 Jun 2010 15:49:09 +0200
+Subject: [PATCH 13/61] ARM: mxc: grammar fix
 In-Reply-To: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1277387397-3467-27-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1277387397-3467-14-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MACH_... is reserved for machine support, so use SOC as prefix, not MACH.
-
-This introduces new symbols SOC_IMX1, SOC_IMX21 and SOC_IMX27.  They are
-selected by the old symbols for now.  There is no substitute for MACH_MX2
-as most usages of MX2 only means MX21 + MX27 but not MX25.
-
-Later the choice about CPU and CPU family should go away and the individual
-machines should select the right SOC symbol.  This is a precondition to
-support more than one SOC in a single kernel image.
-
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-imx/Kconfig |    3 ---
- 1 files changed, 0 insertions(+), 3 deletions(-)
+ .../plat-mxc/include/mach/board-eukrea_cpuimx27.h  |    2 +-
+ arch/arm/plat-mxc/include/mach/board-mx31lilly.h   |    2 +-
+ arch/arm/plat-mxc/include/mach/board-mx31lite.h    |    2 +-
+ arch/arm/plat-mxc/include/mach/board-mx31moboard.h |    2 +-
+ arch/arm/plat-mxc/include/mach/board-pcm038.h      |    2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 08002df..5edead2 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -2,7 +2,6 @@ if ARCH_MX1
+diff --git a/arch/arm/plat-mxc/include/mach/board-eukrea_cpuimx27.h b/arch/arm/plat-mxc/include/mach/board-eukrea_cpuimx27.h
+index a1fd583..45b2fb8 100644
+--- a/arch/arm/plat-mxc/include/mach/board-eukrea_cpuimx27.h
++++ b/arch/arm/plat-mxc/include/mach/board-eukrea_cpuimx27.h
+@@ -25,7 +25,7 @@
+ #ifndef __ASSEMBLY__
+ /*
+  * This CPU module needs a baseboard to work. After basic initializing
+- * its own devices, it calls baseboard's init function.
++ * its own devices, it calls the baseboard's init function.
+  * TODO: Add your own baseboard init function and call it from
+  * inside eukrea_cpuimx27_init().
+  *
+diff --git a/arch/arm/plat-mxc/include/mach/board-mx31lilly.h b/arch/arm/plat-mxc/include/mach/board-mx31lilly.h
+index eb5a502..0df71bf 100644
+--- a/arch/arm/plat-mxc/include/mach/board-mx31lilly.h
++++ b/arch/arm/plat-mxc/include/mach/board-mx31lilly.h
+@@ -31,7 +31,7 @@ enum mx31lilly_boards {
  
- config SOC_IMX1
- 	select CPU_ARM920T
--	select IMX_HAVE_DMA_V1
- 	select IMX_HAVE_IOMUX_V1
- 	bool
+ /*
+  * This CPU module needs a baseboard to work. After basic initializing
+- * its own devices, it calls baseboard's init function.
++ * its own devices, it calls the baseboard's init function.
+  */
  
-@@ -28,14 +27,12 @@ if ARCH_MX2
- config SOC_IMX21
- 	select CPU_ARM926T
- 	select ARCH_MXC_AUDMUX_V1
--	select IMX_HAVE_DMA_V1
- 	select IMX_HAVE_IOMUX_V1
- 	bool
+ extern void mx31lilly_db_init(void);
+diff --git a/arch/arm/plat-mxc/include/mach/board-mx31lite.h b/arch/arm/plat-mxc/include/mach/board-mx31lite.h
+index 2b2da03..c1ad0ae 100644
+--- a/arch/arm/plat-mxc/include/mach/board-mx31lite.h
++++ b/arch/arm/plat-mxc/include/mach/board-mx31lite.h
+@@ -32,7 +32,7 @@ enum mx31lite_boards {
  
- config SOC_IMX27
- 	select CPU_ARM926T
- 	select ARCH_MXC_AUDMUX_V1
--	select IMX_HAVE_DMA_V1
- 	select IMX_HAVE_IOMUX_V1
- 	bool
+ /*
+  * This CPU module needs a baseboard to work. After basic initializing
+- * its own devices, it calls baseboard's init function.
++ * its own devices, it calls the baseboard's init function.
+  */
  
+ extern void mx31lite_db_init(void);
+diff --git a/arch/arm/plat-mxc/include/mach/board-mx31moboard.h b/arch/arm/plat-mxc/include/mach/board-mx31moboard.h
+index 36ff3ce..de14543 100644
+--- a/arch/arm/plat-mxc/include/mach/board-mx31moboard.h
++++ b/arch/arm/plat-mxc/include/mach/board-mx31moboard.h
+@@ -31,7 +31,7 @@ enum mx31moboard_boards {
+ 
+ /*
+  * This CPU module needs a baseboard to work. After basic initializing
+- * its own devices, it calls baseboard's init function.
++ * its own devices, it calls the baseboard's init function.
+  */
+ 
+ extern void mx31moboard_devboard_init(void);
+diff --git a/arch/arm/plat-mxc/include/mach/board-pcm038.h b/arch/arm/plat-mxc/include/mach/board-pcm038.h
+index 410f978..6f371e3 100644
+--- a/arch/arm/plat-mxc/include/mach/board-pcm038.h
++++ b/arch/arm/plat-mxc/include/mach/board-pcm038.h
+@@ -22,7 +22,7 @@
+ #ifndef __ASSEMBLY__
+ /*
+  * This CPU module needs a baseboard to work. After basic initializing
+- * its own devices, it calls baseboard's init function.
++ * its own devices, it calls the baseboard's init function.
+  * TODO: Add your own baseboard init function and call it from
+  * inside pcm038_init().
+  *
 -- 
 1.7.1
