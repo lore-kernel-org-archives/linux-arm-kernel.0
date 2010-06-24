@@ -1,46 +1,55 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 24 Jun 2010 15:46:51 -0400 (EDT)
-Subject: [PATCH 3/4] pxa2xx/cpufreq: Fix PCMCIA frequency scaling
-In-Reply-To: <20100624191208.GB7974@n2100.arm.linux.org.uk>
-References: <1276840135-5982-1-git-send-email-marek.vasut@gmail.com>
-	<1276840135-5982-3-git-send-email-marek.vasut@gmail.com>
-	<87mxulabaw.fsf@free.fr> <201006242051.27790.marek.vasut@gmail.com>
-	<20100624191208.GB7974@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1006241542380.24097@xanadu.home>
+From: igawa@mxs.nes.nec.co.jp (Masayuki Igawa)
+Date: Fri, 25 Jun 2010 08:31:33 +0900 (JST)
+Subject: [PATCH 3/3] add ARM crashdump support
+In-Reply-To: <20100624081915.GF29920@esdhcp04058.research.nokia.com>
+References: <b567a76e7f4502ccd56f818ebd3d6509ebd4a96d.1277188128.git.ext-mika.1.westerberg@nokia.com>
+	<20100624163356.dbb849bc.igawa@mxs.nes.nec.co.jp>
+	<20100624081915.GF29920@esdhcp04058.research.nokia.com>
+Message-ID: <20100625.083133.77342472.igawa@mxs.nes.nec.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Jun 2010, Russell King - ARM Linux wrote:
+Hi,
 
-> On Thu, Jun 24, 2010 at 08:51:27PM +0200, Marek Vasut wrote:
-> > Dne St 23. ?ervna 2010 19:49:59 Robert Jarzmik napsal(a):
-> > > Marek Vasut <marek.vasut@gmail.com> writes:
-> > > > The MCxx values must be based off memory clock, not CPU core clock.
-> > > > 
-> > > > This also fixes the bug where on some machines the LCD went crazy while
-> > > > using PCMCIA.
-> > > 
-> > > That looks correct to me.
-> > > 
-> > > Reviewed-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> > > 
-> > > Cheers.
-> > > 
-> > > --
-> > > Robert
-> > 
-> > Actually lemme rethink this ... it might still be incorrect.
+From: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
+Date: Thu, 24 Jun 2010 11:19:15 +0300
+> On Thu, Jun 24, 2010 at 09:33:56AM +0200, ext Masayuki Igawa wrote:
+>> Hi, Mika.
 > 
-> As Nicolas was the one who originally wrote that code, while he was
-> working for Montavista and interacting with Intel, I'd be surprised
-> if he didn't try finding out what the right answer is to that fixme.
+> (...)
 
-Well, I might have tried, or I might not have and this simply was never 
-revisited. But I clearly don't remember any of the context anymore.
+>> How about is this?
+>> ====
+>> +unsigned long long
+>> +vaddr_to_paddr_arm(unsigned long vaddr)
+>> +{
+>> +	unsigned long long paddr = vaddr_to_paddr_general(vaddr);
+>> +
+>> +	if (paddr != NOT_PADDR)
+>> +		return paddr;
+>> ====
+> 
+> Yeah, looks OK to me.
+> 
+> Do you want me to send a revisited version of the patches or do you change that
+> yourself?
 
-> I suspect as the fixme remained that there was no clear answer.
+I'll change that myself.
 
-Whatever works in practice is probably the best answer at this point.
+> 
+>> BTW, I'm testing these patches for x86/x86_64 arch now.
+>> I'll merge these patches after my testing.
+> 
+> Cool, thanks.
+> 
+>> But I cannot test for ARM because have no test machines of ARM.
+> 
+> Well I can do the testing for ARM (unless someone else, who is using ARM kdump
+> currently, wants to test this). If the above is the only change it should still
+> work.
 
+OK. I'll merge and push these patches (including this change).
+And I'd like you to do the testing for ARM after that.
 
-Nicolas
+Thanks,
+-- Masayuki Igawa
