@@ -1,140 +1,262 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 24 Jun 2010 09:12:06 -0600
-Subject: [PATCH] spi/omap2_mcspi: disable and enable chan between each SPI
-	transfer
-In-Reply-To: <1277381565-6305-1-git-send-email-jason77.wang@gmail.com>
-References: <1277381565-6305-1-git-send-email-jason77.wang@gmail.com>
-Message-ID: <AANLkTin7mqe_zJIbyDcRPpCLaxPhl_dZQrSGua2z1nYW@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 24 Jun 2010 17:12:17 +0200
+Subject: [PATCH] MMC: remove regulator refcount fiddling in mmc core
+Message-ID: <1277392337-27627-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 24, 2010 at 6:12 AM, Jason Wang <jason77.wang@gmail.com> wrote:
-> In current design, the SPI channel is always enable during the period
-> of handling a SPI message, it is risky when more than one SPI transfer
-> are included in a message. Current working route like that:
-> [
-> ?SPI channel enable
-> ?configure channel
-> ?handle transfer #1
-> ?configure channel
-> ?handle transfer #2
-> ?...
-> ?SPI channel disable
-> ]
-> If we can disable channel before configure it and reenable
-> channel after it is configured, it will be more safe.
->
-> The commit a330ce2 "omap2_mcspi: Flush posted writes" make this risk
-> to a real problem for ads7846 driver on omap3530evm. The
-> ads7846 driver will send a SPI messge which includes,
-> [
-> ?TX_ONLY transfer (1 byte)
-> ?RX_ONLY transfer (2 bytes)
-> ?TX_ONLY transfer (1 byte)
-> ?RX_ONLY transfer (2 bytes)
-> ]
-> If we don't add disable/reenable channel between TX and RX transfers,
-> the RX transfer will get wrong datas sent from slave.
+Currently the mmc_regulator_set_ocr() fiddles with the regulator
+refcount by selectively calling regulator_[enable|disable]
+depending on the state of the regulator. This will confuse the
+reference count if case the regulator is for example shared with
+other MMC slots or user for other stuff than the MMC card.
 
-I don't understand the problem description.  Are you talking about
-manipulation of the SS line, or a problem with the internal state on
-the mcspi controller device?  What is the cause of the wrong data (ie.
-is there a protocol error on the wire, or is the SPI controller not
-performing the read correctly?)
+Push regulator_[enable|disable] out into the MMC host drivers
+and remove this from the MMC core so the reference count can be
+trusted.
 
-Thanks,
-g.
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Liam Girdwood <lrg@slimlogic.co.uk>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Adrian Hunter <adrian.hunter@nokia.com>
+Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+Cc: Sundar Iyer <sundar.iyer@stericsson.com>
+Cc: Bengt Jonsson <bengt.jonsson@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+This has been regression compiled for U300, OMAP3, PXA3XX
+defconfigs, tested on U300.
 
->
-> Signed-off-by: Jason Wang <jason77.wang@gmail.com>
-> ---
-> ?drivers/spi/omap2_mcspi.c | ? 16 ++++++----------
-> ?1 files changed, 6 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/spi/omap2_mcspi.c b/drivers/spi/omap2_mcspi.c
-> index b3a94ca..1e3cb7b 100644
-> --- a/drivers/spi/omap2_mcspi.c
-> +++ b/drivers/spi/omap2_mcspi.c
-> @@ -408,7 +408,6 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?count -= (word_len <= 8) ?? 2 :
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(word_len <= 16) ? 4 :
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* word_len <= 32 */ 8;
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? omap2_mcspi_set_enable(spi, 1);
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?return count;
-> ? ? ? ? ? ? ? ? ? ? ? ?}
-> ? ? ? ? ? ? ? ?}
-> @@ -430,8 +429,10 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (word_len <= 16) ? 2 :
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /* word_len <= 32 */ 4;
-> ? ? ? ? ? ? ? ?}
-> - ? ? ? ? ? ? ? omap2_mcspi_set_enable(spi, 1);
-> ? ? ? ?}
-> +
-> + ? ? ? omap2_mcspi_set_enable(spi, 0);
-> +
-> ? ? ? ?return count;
-> ?}
->
-> @@ -517,8 +518,6 @@ omap2_mcspi_txrx_pio(struct spi_device *spi, struct spi_transfer *xfer)
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?goto out;
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?}
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?c = 0;
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? } else if (c == 0 && tx == NULL) {
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? omap2_mcspi_set_enable(spi, 0);
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?}
->
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?*rx++ = __raw_readl(rx_reg);
-> @@ -570,8 +569,6 @@ omap2_mcspi_txrx_pio(struct spi_device *spi, struct spi_transfer *xfer)
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?goto out;
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?}
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?c = 0;
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? } else if (c == 0 && tx == NULL) {
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? omap2_mcspi_set_enable(spi, 0);
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?}
->
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?*rx++ = __raw_readl(rx_reg);
-> @@ -623,8 +620,6 @@ omap2_mcspi_txrx_pio(struct spi_device *spi, struct spi_transfer *xfer)
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?goto out;
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?}
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?c = 0;
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? } else if (c == 0 && tx == NULL) {
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? omap2_mcspi_set_enable(spi, 0);
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?}
->
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?*rx++ = __raw_readl(rx_reg);
-> @@ -646,7 +641,7 @@ omap2_mcspi_txrx_pio(struct spi_device *spi, struct spi_transfer *xfer)
-> ? ? ? ? ? ? ? ? ? ? ? ?dev_err(&spi->dev, "EOT timed out\n");
-> ? ? ? ?}
-> ?out:
-> - ? ? ? omap2_mcspi_set_enable(spi, 1);
-> + ? ? ? omap2_mcspi_set_enable(spi, 0);
-> ? ? ? ?return count - c;
-> ?}
->
-> @@ -894,7 +889,6 @@ static void omap2_mcspi_work(struct work_struct *work)
-> ? ? ? ? ? ? ? ?cs = spi->controller_state;
-> ? ? ? ? ? ? ? ?cd = spi->controller_data;
->
-> - ? ? ? ? ? ? ? omap2_mcspi_set_enable(spi, 1);
-> ? ? ? ? ? ? ? ?list_for_each_entry(t, &m->transfers, transfer_list) {
-> ? ? ? ? ? ? ? ? ? ? ? ?if (t->tx_buf == NULL && t->rx_buf == NULL && t->len) {
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?status = -EINVAL;
-> @@ -931,6 +925,8 @@ static void omap2_mcspi_work(struct work_struct *work)
->
-> ? ? ? ? ? ? ? ? ? ? ? ?mcspi_write_chconf0(spi, chconf);
->
-> + ? ? ? ? ? ? ? ? ? ? ? omap2_mcspi_set_enable(spi, 1);
-> +
-> ? ? ? ? ? ? ? ? ? ? ? ?if (t->len) {
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned ? ? ? ?count;
->
-> --
-> 1.5.6.5
->
->
+We're facing problems with our regulator reference counters if
+this is not fixed.
+---
+ drivers/mmc/core/core.c       |   66 ++++++++++++++++++-----------------------
+ drivers/mmc/host/mmci.c       |   10 ++++--
+ drivers/mmc/host/omap_hsmmc.c |   40 ++++++++++++++++++------
+ drivers/mmc/host/pxamci.c     |   17 ++++++++--
+ 4 files changed, 78 insertions(+), 55 deletions(-)
 
-
-
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 569e94d..904f245 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -784,47 +784,39 @@ int mmc_regulator_set_ocr(struct regulator *supply, unsigned short vdd_bit)
+ {
+ 	int			result = 0;
+ 	int			min_uV, max_uV;
+-	int			enabled;
++	int			tmp;
++	int			voltage;
+ 
+-	enabled = regulator_is_enabled(supply);
+-	if (enabled < 0)
+-		return enabled;
+-
+-	if (vdd_bit) {
+-		int		tmp;
+-		int		voltage;
+-
+-		/* REVISIT mmc_vddrange_to_ocrmask() may have set some
+-		 * bits this regulator doesn't quite support ... don't
+-		 * be too picky, most cards and regulators are OK with
+-		 * a 0.1V range goof (it's a small error percentage).
+-		 */
+-		tmp = vdd_bit - ilog2(MMC_VDD_165_195);
+-		if (tmp == 0) {
+-			min_uV = 1650 * 1000;
+-			max_uV = 1950 * 1000;
+-		} else {
+-			min_uV = 1900 * 1000 + tmp * 100 * 1000;
+-			max_uV = min_uV + 100 * 1000;
+-		}
+-
+-		/* avoid needless changes to this voltage; the regulator
+-		 * might not allow this operation
+-		 */
+-		voltage = regulator_get_voltage(supply);
+-		if (voltage < 0)
+-			result = voltage;
+-		else if (voltage < min_uV || voltage > max_uV)
+-			result = regulator_set_voltage(supply, min_uV, max_uV);
+-		else
+-			result = 0;
++	if (!vdd_bit)
++		return 0;
+ 
+-		if (result == 0 && !enabled)
+-			result = regulator_enable(supply);
+-	} else if (enabled) {
+-		result = regulator_disable(supply);
++	/*
++	 * REVISIT mmc_vddrange_to_ocrmask() may have set some
++	 * bits this regulator doesn't quite support ... don't
++	 * be too picky, most cards and regulators are OK with
++	 * a 0.1V range goof (it's a small error percentage).
++	 */
++	tmp = vdd_bit - ilog2(MMC_VDD_165_195);
++	if (tmp == 0) {
++		min_uV = 1650 * 1000;
++		max_uV = 1950 * 1000;
++	} else {
++		min_uV = 1900 * 1000 + tmp * 100 * 1000;
++		max_uV = min_uV + 100 * 1000;
+ 	}
+ 
++	/*
++	 * Avoid needless changes to this voltage; the regulator
++	 * might not allow this operation
++	 */
++	voltage = regulator_get_voltage(supply);
++	if (voltage < 0)
++		result = voltage;
++	else if (voltage < min_uV || voltage > max_uV)
++		result = regulator_set_voltage(supply, min_uV, max_uV);
++	else
++		result = 0;
++
+ 	return result;
+ }
+ EXPORT_SYMBOL(mmc_regulator_set_ocr);
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 4917af9..5f530b1 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -467,15 +467,17 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 
+ 	switch (ios->power_mode) {
+ 	case MMC_POWER_OFF:
+-		if(host->vcc &&
+-		   regulator_is_enabled(host->vcc))
++		if (host->vcc)
+ 			regulator_disable(host->vcc);
+ 		break;
+ 	case MMC_POWER_UP:
+ #ifdef CONFIG_REGULATOR
+-		if (host->vcc)
+-			/* This implicitly enables the regulator */
++		if (host->vcc) {
++			if (regulator_enable(host->vcc))
++				dev_err(mmc_dev(mmc),
++					"could not enable regulator\n");
+ 			mmc_regulator_set_ocr(host->vcc, ios->vdd);
++		}
+ #endif
+ 		/*
+ 		 * The translate_vdd function is not used if you have
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index b032828..d8d07e1 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -247,10 +247,17 @@ static int omap_hsmmc_1_set_power(struct device *dev, int slot, int power_on,
+ 	if (mmc_slot(host).before_set_reg)
+ 		mmc_slot(host).before_set_reg(dev, slot, power_on, vdd);
+ 
+-	if (power_on)
+-		ret = mmc_regulator_set_ocr(host->vcc, vdd);
+-	else
+-		ret = mmc_regulator_set_ocr(host->vcc, 0);
++	if (power_on) {
++		ret = regulator_enable(host->vcc);
++		if (ret)
++			dev_err(dev, "could not enable regulator\n");
++		else
++			ret = mmc_regulator_set_ocr(host->vcc, vdd);
++	} else {
++		ret = regulator_disable(host->vcc);
++		if (ret)
++			dev_err(dev, "could not disable regulator\n");
++	}
+ 
+ 	if (mmc_slot(host).after_set_reg)
+ 		mmc_slot(host).after_set_reg(dev, slot, power_on, vdd);
+@@ -289,7 +296,11 @@ static int omap_hsmmc_23_set_power(struct device *dev, int slot, int power_on,
+ 	 * chips/cards need an interface voltage rail too.
+ 	 */
+ 	if (power_on) {
+-		ret = mmc_regulator_set_ocr(host->vcc, vdd);
++		ret = regulator_enable(host->vcc);
++		if (ret < 0)
++			dev_err(dev, "could not enable regulator\n");
++		else
++			ret = mmc_regulator_set_ocr(host->vcc, vdd);
+ 		/* Enable interface voltage rail, if needed */
+ 		if (ret == 0 && host->vcc_aux) {
+ 			ret = regulator_enable(host->vcc_aux);
+@@ -297,10 +308,15 @@ static int omap_hsmmc_23_set_power(struct device *dev, int slot, int power_on,
+ 				ret = mmc_regulator_set_ocr(host->vcc, 0);
+ 		}
+ 	} else {
++		/* Shut down the rail */
+ 		if (host->vcc_aux)
+ 			ret = regulator_disable(host->vcc_aux);
+-		if (ret == 0)
+-			ret = mmc_regulator_set_ocr(host->vcc, 0);
++		if (ret == 0) {
++			/* Then proeeed to shut down the local regulator */
++			ret = regulator_disable(host->vcc);
++			if (ret == 0)
++				ret = mmc_regulator_set_ocr(host->vcc, 0);
++		}
+ 	}
+ 
+ 	if (mmc_slot(host).after_set_reg)
+@@ -340,10 +356,14 @@ static int omap_hsmmc_23_set_sleep(struct device *dev, int slot, int sleep,
+ 
+ 	if (cardsleep) {
+ 		/* VCC can be turned off if card is asleep */
+-		if (sleep)
+-			err = mmc_regulator_set_ocr(host->vcc, 0);
+-		else
++		if (sleep) {
++			err = regulator_disable(host->vcc);
++		} else {
++			err = regulator_enable(host->vcc);
++			if (err)
++				return err;
+ 			err = mmc_regulator_set_ocr(host->vcc, vdd);
++		}
+ 	} else
+ 		err = regulator_set_mode(host->vcc, mode);
+ 	if (err)
+diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
+index 0a4e43f..b7e0216 100644
+--- a/drivers/mmc/host/pxamci.c
++++ b/drivers/mmc/host/pxamci.c
+@@ -99,13 +99,22 @@ static inline void pxamci_init_ocr(struct pxamci_host *host)
+ 	}
+ }
+ 
+-static inline void pxamci_set_power(struct pxamci_host *host, unsigned int vdd)
++static inline void pxamci_set_power(struct pxamci_host *host,
++				    unsigned char power_mode,
++				    unsigned int vdd)
+ {
+ 	int on;
+ 
+ #ifdef CONFIG_REGULATOR
+-	if (host->vcc)
+-		mmc_regulator_set_ocr(host->vcc, vdd);
++	if (host->vcc) {
++		if (power_mode == MMC_POWER_UP) {
++			if (regulator_enable(host->vcc))
++				dev_err(mmc_dev(host->mmc),
++					"could not enable regulator\n");
++			mmc_regulator_set_ocr(host->vcc, vdd);
++		} else if (power_mode == MMC_POWER_OFF)
++			regulator_disable(host->vcc);
++	}
+ #endif
+ 	if (!host->vcc && host->pdata &&
+ 	    gpio_is_valid(host->pdata->gpio_power)) {
+@@ -492,7 +501,7 @@ static void pxamci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	if (host->power_mode != ios->power_mode) {
+ 		host->power_mode = ios->power_mode;
+ 
+-		pxamci_set_power(host, ios->vdd);
++		pxamci_set_power(host, ios->power_mode, ios->vdd);
+ 
+ 		if (ios->power_mode == MMC_POWER_ON)
+ 			host->cmdat |= CMDAT_INIT;
 -- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+1.6.3.3
