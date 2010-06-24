@@ -1,27 +1,25 @@
 From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Thu, 24 Jun 2010 13:35:04 +0900
-Subject: [PATCH 1/2] ARM: S5PV210: Fix Aquila board UART FIFO mode configration
-Message-ID: <1277354105-13097-1-git-send-email-jy0922.shim@samsung.com>
+Date: Thu, 24 Jun 2010 13:35:05 +0900
+Subject: [PATCH 2/2] ARM: S5PV210: Fix GONI board UART FIFO mode configration
+In-Reply-To: <1277354105-13097-1-git-send-email-jy0922.shim@samsung.com>
+References: <1277354105-13097-1-git-send-email-jy0922.shim@samsung.com>
+Message-ID: <1277354105-13097-2-git-send-email-jy0922.shim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Aquila board uses max UART FIFO size to each UART channels. UART0
-supports 256 bytes FIFO, but Aquila board supports 128 bytes FIFO
-because of initial chip bug.
-
-Also, this patch fixes to "s/smdkv210/aquila".
+The GONI board uses max UART FIFO size to each UART channels.
 
 Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s5pv210/mach-aquila.c |   24 +++++++++++++++---------
- 1 files changed, 15 insertions(+), 9 deletions(-)
+ arch/arm/mach-s5pv210/mach-goni.c |   16 +++++++++-------
+ 1 files changed, 9 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
-index 10bc76e..5795a7c 100644
---- a/arch/arm/mach-s5pv210/mach-aquila.c
-+++ b/arch/arm/mach-s5pv210/mach-aquila.c
-@@ -39,38 +39,44 @@
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index 4863b13..0cfb8db 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -36,9 +36,7 @@
  
  #define S5PV210_ULCON_DEFAULT	S3C2410_LCON_CS8
  
@@ -30,20 +28,15 @@ index 10bc76e..5795a7c 100644
 -				 S5PV210_UFCON_RXTRIG4)
 +#define S5PV210_UFCON_DEFAULT	S3C2410_UFCON_FIFOMODE
  
--static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
-+static struct s3c2410_uartcfg aquila_uartcfgs[] __initdata = {
+ static struct s3c2410_uartcfg goni_uartcfgs[] __initdata = {
  	[0] = {
- 		.hwport		= 0,
+@@ -46,28 +44,32 @@ static struct s3c2410_uartcfg goni_uartcfgs[] __initdata = {
  		.flags		= 0,
  		.ucon		= S5PV210_UCON_DEFAULT,
  		.ulcon		= S5PV210_ULCON_DEFAULT,
 -		.ufcon		= S5PV210_UFCON_DEFAULT,
-+		/*
-+		 * Actually UART0 can support 256 bytes fifo, but aquila board
-+		 * supports 128 bytes fifo because of initial chip bug
-+		 */
 +		.ufcon		= S5PV210_UFCON_DEFAULT |
-+			S5PV210_UFCON_TXTRIG128 | S5PV210_UFCON_RXTRIG128,
++			S5PV210_UFCON_TXTRIG256 | S5PV210_UFCON_RXTRIG256,
  	},
  	[1] = {
  		.hwport		= 1,
@@ -74,14 +67,5 @@ index 10bc76e..5795a7c 100644
  	},
  };
  
-@@ -124,7 +130,7 @@ static void __init aquila_map_io(void)
- {
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
- 	s3c24xx_init_clocks(24000000);
--	s3c24xx_init_uarts(smdkv210_uartcfgs, ARRAY_SIZE(smdkv210_uartcfgs));
-+	s3c24xx_init_uarts(aquila_uartcfgs, ARRAY_SIZE(aquila_uartcfgs));
- }
- 
- static void __init aquila_machine_init(void)
 -- 
 1.7.0.4
