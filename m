@@ -1,65 +1,74 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 24 Jun 2010 09:52:33 +1000
-Subject: [GIT PULL linux-next] Samsung S5P SoCs
-In-Reply-To: <000d01cb126e$fa193690$ee4ba3b0$%kim@samsung.com>
-References: <000d01cb126e$fa193690$ee4ba3b0$%kim@samsung.com>
-Message-ID: <20100624095233.d2daaa4f.sfr@canb.auug.org.au>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Thu, 24 Jun 2010 01:04:03 +0100
+Subject: [RFC PATCH] Rework gpio cansleep (was Re: gpiolib and sleeping
+	gpios)
+In-Reply-To: <4C22936F.9050300@bluewatersys.com>
+References: <191168.5104.qm@web180308.mail.gq1.yahoo.com>
+	<4C21955D.1020502@bluewatersys.com>
+	<20100623225345.GD7058@shareable.org>
+	<4C22936F.9050300@bluewatersys.com>
+Message-ID: <20100624000403.GH7058@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, 23 Jun 2010 09:56:52 +0900 Kukjin Kim <kgene.kim@samsung.com> wrote:
->
-> Could you please pull the following into linux-next?
+Ryan Mallon wrote:
+> On 06/24/2010 10:53 AM, Jamie Lokier wrote:
+> > Ryan Mallon wrote:
+> >> On 06/23/2010 04:37 PM, David Brownell wrote:
+> >> I'm not. Some gpios, such as those on io expanders, may sleep in their
+> >> implementations of the gpio_(set/get) functions.
+> > 
+> > I'm having a hard time figuring out where some GPIOs I'm using fit
+> > into this picture.
+> > 
+> > I have some hardware that is currently using a 2.4.26 kernel, but I
+> > look from time to time at forward-porting all the drivers to 2.6.recent.
+> > 
+> > It has an I2C driven GPIO expander, with a watchdog reset chip hanging
+> > off the expander.
+> > 
+> > The watchdog is kept alive off the back end of a timer BH, which means
+> > the I2C GPIO routines are written to be safe in BH context (which
+> > isn't sleepable), but they can't be used in IRQ context because the
+> > necessary spin_lock_irqsave() would turn off interrupts for too long
+> > for other subsystems to function properly.
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git#for-ne
-> xt
+> Do the implementations of the get/set calls for the io expander gpios
+> sleep at all?
+
+No, because sleeping isn't allowed in BH context.  (Note that this is
+2.4.26 code - things have changed a bit for 2.6, but the hardware is
+the same, and still needs the I2C watchdog to be driven from a BH-like
+context).
+
+> > How should I flag those GPIO routines in your scheme?  They're safe to
+> > use in some non-sleeping contexts, but not safe in irq context.
 > 
-> This tree is for next- Samsung S5P SoCs such as S5P6440, S5P6442, S5PC100,
-> and S5PV210/S5PC110.
+> The idea in my proposal is to use gpio_request in a driver if the
+> requested gpio can never sleep (ie because of the context it is used
+> in), and gpio_request_cansleep if the gpio is never used from non-sleep
+> safe context in a driver. I suggested stripping back the patch to just
+> add the gpio_request_cansleep function.
+> 
+> In the current code, if a driver ever calls gpio_(set/get)_value on a
+> gpio then you cannot pass a sleeping gpio to that driver. The request
+> will succeed, but you will get warnings with the get/get calls are made.
+> My idea is basically to move the denotation of whether a gpio will be
+> used in non-sleep safe context to the gpio request.
 
-I have added this from today.  I have called the tree s5p.  Currently you
-alone are the contact for problems to do with this tree - should I add
-anyone else (or a mailing list)?
+The reason I'm asking about my scenario is because the GPIO routines
+can't sleep and are used from a non-sleep safe context - but they are
+not safe to call in irq contexts.
 
-Thanks for adding your subsystem tree as a participant of linux-next.  As
-you may know, this is not a judgment of your code.  The purpose of
-linux-next is for integration testing and to lower the impact of
-conflicts between subsystems in the next merge window. 
+So my watchdog driver would have to call gpio_request (not _cansleep)
+- that's fine.  But if I connected other GPIOs from the same GPIO
+driver (other lines on the same I/O expander chip) to another
+GPIO-using driver which happens to use them from irq context, then
+your changes won't detect the problem - the code will just break at
+runtime.
 
-You will need to ensure that the patches/commits in your tree/series have
-been:
-     * submitted under GPL v2 (or later) and include the Contributor's
-	Signed-off-by,
-     * posted to the relevant mailing list,
-     * reviewed by you (or another maintainer of your subsystem tree),
-     * successfully unit tested, and 
-     * destined for the current or next Linux merge window.
+Of course if I did that, it would be my fault and my problem.  I get
+to keep both pieces etc.  But it's a scenario which your proposal
+would fail to catch at compile time, that's why I bring it up.
 
-Basically, this should be just what you would send to Linus (or ask him
-to fetch).  It is allowed to be rebased if you deem it necessary.
-
--- 
-Cheers,
-Stephen Rothwell 
-sfr at canb.auug.org.au
-
-Legal Stuff:
-By participating in linux-next, your subsystem tree contributions are
-public and will be included in the linux-next trees.  You may be sent
-e-mail messages indicating errors or other issues when the
-patches/commits from your subsystem tree are merged and tested in
-linux-next.  These messages may also be cross-posted to the linux-next
-mailing list, the linux-kernel mailing list, etc.  The linux-next tree
-project and IBM (my employer) make no warranties regarding the linux-next
-project, the testing procedures, the results, the e-mails, etc.  If you
-don't agree to these ground rules, let me know and I'll remove your tree
-from participation in linux-next.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100624/b2a5607a/attachment-0001.sig>
+-- Jamie
