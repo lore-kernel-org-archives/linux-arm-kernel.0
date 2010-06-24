@@ -1,21 +1,20 @@
 From: eric@eukrea.com (=?UTF-8?B?RXJpYyBCw6luYXJk?=)
-Date: Thu, 24 Jun 2010 16:37:14 +0200
-Subject: [PATCH v2] otg/ulpi.c : fix register write
-In-Reply-To: <4C236600.2030605@compulab.co.il>
-References: <1277311435-12027-1-git-send-email-eric@eukrea.com>
-	<4C236600.2030605@compulab.co.il>
-Message-ID: <4C236D9A.4030707@eukrea.com>
+Date: Thu, 24 Jun 2010 16:42:10 +0200
+Subject: 
+In-Reply-To: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <4C236EC2.8090506@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 24/06/2010 16:04, Igor Grinberg a ?crit :
-> ulpi_set_flags is used to set the OTG flags and not to clear them,
-> also it is a static function and is not a part of struct otg_transceiver,
-> so it cannot be called from outside the ulpi.c, thus after the ulpi_create,
-> it is never called.
-> I think, currently, this should stay as it is.
+Hi Uwe,
+
+Le 24/06/2010 15:48, Uwe Kleine-K?nig a ?crit :
+> this is the next step in the project "clean up the imx port" targeting
+> 2.6.36.  The highlights this time are:
 >
-OK, the problem that when one flag is set, you can't clear it without 
-resetting the PHY.
+maybe that would be interesting to rebase your patch serie against
+Sascha's imx-for-2.6.36 in order to include new boards (especially for 
+the patches which change registering nand, i2c, spi and uart) ?
 
 Eric
