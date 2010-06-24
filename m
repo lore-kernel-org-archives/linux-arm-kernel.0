@@ -1,53 +1,58 @@
-From: rabin.vincent@stericsson.com (Rabin VINCENT)
-Date: Thu, 24 Jun 2010 13:57:47 +0530
-Subject: [PATCH 07/12] mmci: pass power_mode to the translate_vdd callback
-In-Reply-To: <AANLkTil2Cb4alVFkfEjXApMgIdkmNvEEarWkT9AhXIdU@mail.gmail.com>
-References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
-	<1277198267-10860-7-git-send-email-rabin.vincent@stericsson.com>
-	<AANLkTil2Cb4alVFkfEjXApMgIdkmNvEEarWkT9AhXIdU@mail.gmail.com>
-Message-ID: <20100624082746.GA12453@bnru01.bnr.st.com>
+From: ext-jani.1.nikula@nokia.com (Jani Nikula)
+Date: Thu, 24 Jun 2010 11:29:42 +0300 (EEST)
+Subject: [RFC PATCH] Rework gpio cansleep (was Re: gpiolib and
+	sleepinggpios)
+In-Reply-To: <70E876B0EA86DD4BAF101844BC814DFE08E0855B97@Cloud.RL.local>
+References: <70E876B0EA86DD4BAF101844BC814DFE08E0855B97@Cloud.RL.local>
+Message-ID: <alpine.DEB.2.00.1006241101240.11148@wnav-qrfxgbc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 23, 2010 at 00:03:47 +0200, Linus Walleij wrote:
-> 2010/6/22 Rabin Vincent <rabin.vincent@stericsson.com>:
-> > @@ -17,7 +17,8 @@
-> > ?* mmc/host.h
-> > ?* @translate_vdd: a callback function to translate a MMC_VDD_*
-> > ?* mask into a value to be binary or:ed and written into the
-> > - * MMCIPWR register of the block
-> > + * MMCIPWR register of the block. ?May also control external power
-> > + * based on the power_mode.
-> 
-> Actually this callback is named like that for a reason: it is to be used
-> to translate the MMC_VDD_* into a u8:4 bitmask for the MMCIPWR
-> register, 4 bits possibly routed out of the PL180 block on some
-> designs (never seen in practice, but could be used in theory).
-> 
-> So it translates a voltage into a 4-bit bitmask, hence the name.
-> 
-> Now the semantics are altered to have other side-effects in
-> the platform, so the function should be renamed, something like
-> platform_vdd_handler() would be more appropriate.
-> 
 
-This is already inside platform data, so how about just ->vdd_handler()?
-Or ->set_power(), like some other drivers?
+On Thu, 24 Jun 2010, ext Jon Povey wrote:
 
-Note that we'd also like to use this to do the board-specific settings
-for the *DIREN and FBCLK bits, which replace the Voltage bits on some ST
-variants, like so:
+> Ryan Mallon wrote:
+>
+>> If we strip my patch back to just introducing gpio_request_cansleep, 
+>> which would be used in any driver where all of the calls are 
+>> gpio_(set/get)_cansleep, and make gpio_request only allow non-sleeping 
+>> gpios then incorrect use of gpios would be caught at request time and 
+>> returned to the caller as an error.
+>
+> It seems like a good idea to catch these at request time. There is 
+> support in the API for this already (gpio_cansleep), but driver writers 
+> are not steered towards checking and thinking in these ways by the 
+> current API or documentation. Perhaps a documentation change with some 
+> cut and paste boilerplate would be enough, but I think some API 
+> enforcement/encouragement would be helpful.
+>
+> I think this agrees with you, Ryan:
+>
+> gpio_request_cansleep would be the same as current gpio_request
+> gpio_request changes to error if this is a sleepy gpio.
+>
+> Imagine a situation where GPIOs are being assigned and passed around 
+> between drivers in some dynamic way, or some way unpredictable to the 
+> driver writer. In development only non-sleeping GPIOs have been seen and 
+> everything is fine. One day someone feeds it a GPIO on an I2C expander 
+> and the driver crashes. If gpio_request had this built-in check the 
+> driver could gracefuly fail to load instead with an appropriate error 
+> message.
 
-+static u32 mop500_sdi0_translate_vdd(struct device *dev, unsigned int vdd,
-+				     unsigned char power_mode)
-+{
-+	if (power_mode == MMC_POWER_UP)
-+		gpio_set_value(gpio_sdmmc_en, 1);
-+	else if (power_mode == MMC_POWER_OFF)
-+		gpio_set_value(gpio_sdmmc_en, 0);
-+
-+	return MCI_FBCLKEN | MCI_CMDDIREN | MCI_DATA0DIREN |
-+	       MCI_DATA2DIREN | MCI_DATA31DIREN;
-+}
+Hi -
 
-Rabin
+There's no need to imagine such situations. It's not at all uncommon to 
+request GPIOs in board files, and pass the already requested GPIO numbers 
+to drivers. Replacing gpio_request() with gpio_request_cansleep() (or 
+gpio_request_atomic() as suggested in another mail) in the board files 
+does *nothing* to help such drivers use the correct gpio get/set calls. 
+The driver will need to know what it's doing, in what contexts. Some 
+drivers might not work with "sleepy" GPIOs, and that's fine - they can 
+check using gpio_cansleep() and fail gracefully.
+
+I'd just improve the documentation of the various calls and have gpiolib.c 
+emit more warnings about incorrect use.
+
+
+BR,
+Jani.
