@@ -1,65 +1,119 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 24 Jun 2010 12:31:13 +0200
-Subject: [RFC PATCH] Rework gpio cansleep (was Re: gpiolib and
-	sleepinggpios)
-In-Reply-To: <alpine.DEB.2.00.1006241101240.11148@wnav-qrfxgbc>
-References: <70E876B0EA86DD4BAF101844BC814DFE08E0855B97@Cloud.RL.local>
-	<alpine.DEB.2.00.1006241101240.11148@wnav-qrfxgbc>
-Message-ID: <4C2333F1.6050102@metafoo.de>
+From: jason77.wang@gmail.com (Jason Wang)
+Date: Thu, 24 Jun 2010 20:12:45 +0800
+Subject: [PATCH] spi/omap2_mcspi: disable and enable chan between each SPI
+	transfer
+Message-ID: <1277381565-6305-1-git-send-email-jason77.wang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jani Nikula wrote:
->
-> On Thu, 24 Jun 2010, ext Jon Povey wrote:
->
->> Ryan Mallon wrote:
->>
->>> If we strip my patch back to just introducing gpio_request_cansleep,
->>> which would be used in any driver where all of the calls are
->>> gpio_(set/get)_cansleep, and make gpio_request only allow
->>> non-sleeping gpios then incorrect use of gpios would be caught at
->>> request time and returned to the caller as an error.
->>
->> It seems like a good idea to catch these at request time. There is
->> support in the API for this already (gpio_cansleep), but driver
->> writers are not steered towards checking and thinking in these ways
->> by the current API or documentation. Perhaps a documentation change
->> with some cut and paste boilerplate would be enough, but I think some
->> API enforcement/encouragement would be helpful.
->>
->> I think this agrees with you, Ryan:
->>
->> gpio_request_cansleep would be the same as current gpio_request
->> gpio_request changes to error if this is a sleepy gpio.
->>
->> Imagine a situation where GPIOs are being assigned and passed around
->> between drivers in some dynamic way, or some way unpredictable to the
->> driver writer. In development only non-sleeping GPIOs have been seen
->> and everything is fine. One day someone feeds it a GPIO on an I2C
->> expander and the driver crashes. If gpio_request had this built-in
->> check the driver could gracefuly fail to load instead with an
->> appropriate error message.
->
-> Hi -
->
-> There's no need to imagine such situations. It's not at all uncommon
-> to request GPIOs in board files, and pass the already requested GPIO
-> numbers to drivers. Replacing gpio_request() with
-> gpio_request_cansleep() (or gpio_request_atomic() as suggested in
-> another mail) in the board files does *nothing* to help such drivers
-> use the correct gpio get/set calls. The driver will need to know what
-> it's doing, in what contexts. Some drivers might not work with
-> "sleepy" GPIOs, and that's fine - they can check using gpio_cansleep()
-> and fail gracefully.
-Is there a reason, why a gpio is requested in the board file and not in
-the driver? I would have considered that the later is far more common.
+In current design, the SPI channel is always enable during the period
+of handling a SPI message, it is risky when more than one SPI transfer
+are included in a message. Current working route like that:
+[
+  SPI channel enable
+  configure channel
+  handle transfer #1
+  configure channel
+  handle transfer #2
+  ...
+  SPI channel disable
+]
+If we can disable channel before configure it and reenable
+channel after it is configured, it will be more safe.
 
-Sure, drivers which do not request the gpios themselves would have to
-call gpio_cansleep, but for those which request the gpios themselves it
-would help to reduce code clutter to have a gpio_request_atomic. The
-only argument speaking against adding such a helper function would be
-that drivers accessing gpios in contexts where they can not sleep are
-far to rare to bother.
+The commit a330ce2 "omap2_mcspi: Flush posted writes" make this risk
+to a real problem for ads7846 driver on omap3530evm. The
+ads7846 driver will send a SPI messge which includes,
+[
+  TX_ONLY transfer (1 byte)
+  RX_ONLY transfer (2 bytes)
+  TX_ONLY transfer (1 byte)
+  RX_ONLY transfer (2 bytes)
+]
+If we don't add disable/reenable channel between TX and RX transfers,
+the RX transfer will get wrong datas sent from slave.
 
-- Lars
+Signed-off-by: Jason Wang <jason77.wang@gmail.com>
+---
+ drivers/spi/omap2_mcspi.c |   16 ++++++----------
+ 1 files changed, 6 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/spi/omap2_mcspi.c b/drivers/spi/omap2_mcspi.c
+index b3a94ca..1e3cb7b 100644
+--- a/drivers/spi/omap2_mcspi.c
++++ b/drivers/spi/omap2_mcspi.c
+@@ -408,7 +408,6 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
+ 				count -= (word_len <= 8)  ? 2 :
+ 					(word_len <= 16) ? 4 :
+ 					/* word_len <= 32 */ 8;
+-				omap2_mcspi_set_enable(spi, 1);
+ 				return count;
+ 			}
+ 		}
+@@ -430,8 +429,10 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
+ 				 (word_len <= 16) ? 2 :
+ 			       /* word_len <= 32 */ 4;
+ 		}
+-		omap2_mcspi_set_enable(spi, 1);
+ 	}
++
++	omap2_mcspi_set_enable(spi, 0);
++
+ 	return count;
+ }
+ 
+@@ -517,8 +518,6 @@ omap2_mcspi_txrx_pio(struct spi_device *spi, struct spi_transfer *xfer)
+ 						goto out;
+ 					}
+ 					c = 0;
+-				} else if (c == 0 && tx == NULL) {
+-					omap2_mcspi_set_enable(spi, 0);
+ 				}
+ 
+ 				*rx++ = __raw_readl(rx_reg);
+@@ -570,8 +569,6 @@ omap2_mcspi_txrx_pio(struct spi_device *spi, struct spi_transfer *xfer)
+ 						goto out;
+ 					}
+ 					c = 0;
+-				} else if (c == 0 && tx == NULL) {
+-					omap2_mcspi_set_enable(spi, 0);
+ 				}
+ 
+ 				*rx++ = __raw_readl(rx_reg);
+@@ -623,8 +620,6 @@ omap2_mcspi_txrx_pio(struct spi_device *spi, struct spi_transfer *xfer)
+ 						goto out;
+ 					}
+ 					c = 0;
+-				} else if (c == 0 && tx == NULL) {
+-					omap2_mcspi_set_enable(spi, 0);
+ 				}
+ 
+ 				*rx++ = __raw_readl(rx_reg);
+@@ -646,7 +641,7 @@ omap2_mcspi_txrx_pio(struct spi_device *spi, struct spi_transfer *xfer)
+ 			dev_err(&spi->dev, "EOT timed out\n");
+ 	}
+ out:
+-	omap2_mcspi_set_enable(spi, 1);
++	omap2_mcspi_set_enable(spi, 0);
+ 	return count - c;
+ }
+ 
+@@ -894,7 +889,6 @@ static void omap2_mcspi_work(struct work_struct *work)
+ 		cs = spi->controller_state;
+ 		cd = spi->controller_data;
+ 
+-		omap2_mcspi_set_enable(spi, 1);
+ 		list_for_each_entry(t, &m->transfers, transfer_list) {
+ 			if (t->tx_buf == NULL && t->rx_buf == NULL && t->len) {
+ 				status = -EINVAL;
+@@ -931,6 +925,8 @@ static void omap2_mcspi_work(struct work_struct *work)
+ 
+ 			mcspi_write_chconf0(spi, chconf);
+ 
++			omap2_mcspi_set_enable(spi, 1);
++
+ 			if (t->len) {
+ 				unsigned	count;
+ 
+-- 
+1.5.6.5
