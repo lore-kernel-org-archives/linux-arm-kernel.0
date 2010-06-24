@@ -1,28 +1,23 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 24 Jun 2010 11:57:03 +0300
-Subject: [PATCH -next 2/2] mx25: add PWM4 to iomux
-In-Reply-To: <cover.1277369614.git.baruch@tkos.co.il>
-References: <cover.1277369614.git.baruch@tkos.co.il>
-Message-ID: <dd3597a30dbdd41f14c207e36123616abab78fde.1277369614.git.baruch@tkos.co.il>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Jun 2010 10:05:02 +0100
+Subject: [PATCH 2/3] ARM: module - simplify unwind table handling
+In-Reply-To: <1275567442-11370-3-git-send-email-ext-phil.2.carmody@nokia.com>
+References: <1275567442-11370-1-git-send-email-ext-phil.2.carmody@nokia.com>
+	<1275567442-11370-2-git-send-email-ext-phil.2.carmody@nokia.com>
+	<1275567442-11370-3-git-send-email-ext-phil.2.carmody@nokia.com>
+Message-ID: <20100624090502.GA1398@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/plat-mxc/include/mach/iomux-mx25.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+On Thu, Jun 03, 2010 at 03:17:21PM +0300, Phil Carmody wrote:
+>  #ifdef CONFIG_ARM_UNWIND
+...
+> +#else
+> +struct mod_arch_specific {
+> +}
+> +#endif
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx25.h b/arch/arm/plat-mxc/include/mach/iomux-mx25.h
-index cbc67c7..593c47c 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx25.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx25.h
-@@ -252,6 +252,7 @@
- #define MX25_PAD_OE_ACD__GPIO_1_25	IOMUX_PAD(0x30c, 0x114, 0x15, 0, 0, NO_PAD_CTRL)
- 
- #define MX25_PAD_CONTRAST__CONTRAST	IOMUX_PAD(0x310, 0x118, 0x10, 0, 0, NO_PAD_CTRL)
-+#define MX25_PAD_CONTRAST__PWM4_PWMO	IOMUX_PAD(0x310, 0x118, 0x14, 0, 0, NO_PAD_CTRL)
- #define MX25_PAD_CONTRAST__FEC_CRS	IOMUX_PAD(0x310, 0x118, 0x15, 0x508, 1, NO_PAD_CTRL)
- 
- #define MX25_PAD_PWM__PWM		IOMUX_PAD(0x314, 0x11c, 0x10, 0, 0, NO_PAD_CTRL)
--- 
-1.7.1
+I assume no one tried building these with UNWIND disabled?  linux-next
+reports most ARM builds are broken by this.
+
+Dropped all three patches out of my git tree until it can be fixed.
