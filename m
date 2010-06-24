@@ -1,262 +1,61 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 24 Jun 2010 17:12:17 +0200
-Subject: [PATCH] MMC: remove regulator refcount fiddling in mmc core
-Message-ID: <1277392337-27627-1-git-send-email-linus.walleij@stericsson.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 24 Jun 2010 09:39:07 -0700
+Subject: [PATCH v2] input/imx_keypad: add PM support
+In-Reply-To: <1276801147-4103-1-git-send-email-eric@eukrea.com>
+References: <1276801147-4103-1-git-send-email-eric@eukrea.com>
+Message-ID: <20100624163907.GB25119@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the mmc_regulator_set_ocr() fiddles with the regulator
-refcount by selectively calling regulator_[enable|disable]
-depending on the state of the regulator. This will confuse the
-reference count if case the regulator is for example shared with
-other MMC slots or user for other stuff than the MMC card.
+On Thu, Jun 17, 2010 at 08:59:01PM +0200, Eric B?nard wrote:
+> We use keypad_data to enable wakeup from platform data
+> 
+> suspend/resume is tested on an i.MX27 when keypad is not
+> in use and when it's is in use (in which case we immediatly
+> get the key pressed at wakeup)
+> 
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
+> Cc: maramaopercheseimorto at gmail.com
+> Cc: linux-input at vger.kernel.org
+> Cc: dmitry.torokhov at gmail.com
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+> v2 :
+> 	- simplify suspend & resume functions
+> 	- convert to pm_ops
+> 
+>  drivers/input/keyboard/imx_keypad.c |   40 +++++++++++++++++++++++++++++++++-
+>  1 files changed, 38 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/input/keyboard/imx_keypad.c b/drivers/input/keyboard/imx_keypad.c
+> index d92c15c..9aa0005 100644
+> --- a/drivers/input/keyboard/imx_keypad.c
+> +++ b/drivers/input/keyboard/imx_keypad.c
+> @@ -364,6 +364,38 @@ static void imx_keypad_inhibit(struct imx_keypad *keypad)
+>  	writew(0xff00, keypad->mmio_base + KPCR);
+>  }
+>  
+> +#ifdef CONFIG_PM
+> +static int mxc_kpp_suspend(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct imx_keypad *keypad = platform_get_drvdata(pdev);
+> +
+> +	keypad->enabled = false;
+> +	synchronize_irq(keypad->irq);
+> +	disable_irq(keypad->irq);
+> +	clk_disable(keypad->clk);
+> +
 
-Push regulator_[enable|disable] out into the MMC host drivers
-and remove this from the MMC core so the reference count can be
-trusted.
+This is not correct. imx_keypad_probe() keypad->enabled = false, waiting for
+imx_keypad_open() to be called. However if nobody opens the device and
+you go through suspend/resume cycle you'll leave keypad->enabled = true.
 
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Liam Girdwood <lrg@slimlogic.co.uk>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Adrian Hunter <adrian.hunter@nokia.com>
-Cc: Robert Jarzmik <robert.jarzmik@free.fr>
-Cc: Sundar Iyer <sundar.iyer@stericsson.com>
-Cc: Bengt Jonsson <bengt.jonsson@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
-This has been regression compiled for U300, OMAP3, PXA3XX
-defconfigs, tested on U300.
 
-We're facing problems with our regulator reference counters if
-this is not fixed.
----
- drivers/mmc/core/core.c       |   66 ++++++++++++++++++-----------------------
- drivers/mmc/host/mmci.c       |   10 ++++--
- drivers/mmc/host/omap_hsmmc.c |   40 ++++++++++++++++++------
- drivers/mmc/host/pxamci.c     |   17 ++++++++--
- 4 files changed, 78 insertions(+), 55 deletions(-)
+BTW, why do you call new functions mxc_kpp_XXX  while the rest of the
+driver uses imx_keypad_XXX naming?
 
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 569e94d..904f245 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -784,47 +784,39 @@ int mmc_regulator_set_ocr(struct regulator *supply, unsigned short vdd_bit)
- {
- 	int			result = 0;
- 	int			min_uV, max_uV;
--	int			enabled;
-+	int			tmp;
-+	int			voltage;
- 
--	enabled = regulator_is_enabled(supply);
--	if (enabled < 0)
--		return enabled;
--
--	if (vdd_bit) {
--		int		tmp;
--		int		voltage;
--
--		/* REVISIT mmc_vddrange_to_ocrmask() may have set some
--		 * bits this regulator doesn't quite support ... don't
--		 * be too picky, most cards and regulators are OK with
--		 * a 0.1V range goof (it's a small error percentage).
--		 */
--		tmp = vdd_bit - ilog2(MMC_VDD_165_195);
--		if (tmp == 0) {
--			min_uV = 1650 * 1000;
--			max_uV = 1950 * 1000;
--		} else {
--			min_uV = 1900 * 1000 + tmp * 100 * 1000;
--			max_uV = min_uV + 100 * 1000;
--		}
--
--		/* avoid needless changes to this voltage; the regulator
--		 * might not allow this operation
--		 */
--		voltage = regulator_get_voltage(supply);
--		if (voltage < 0)
--			result = voltage;
--		else if (voltage < min_uV || voltage > max_uV)
--			result = regulator_set_voltage(supply, min_uV, max_uV);
--		else
--			result = 0;
-+	if (!vdd_bit)
-+		return 0;
- 
--		if (result == 0 && !enabled)
--			result = regulator_enable(supply);
--	} else if (enabled) {
--		result = regulator_disable(supply);
-+	/*
-+	 * REVISIT mmc_vddrange_to_ocrmask() may have set some
-+	 * bits this regulator doesn't quite support ... don't
-+	 * be too picky, most cards and regulators are OK with
-+	 * a 0.1V range goof (it's a small error percentage).
-+	 */
-+	tmp = vdd_bit - ilog2(MMC_VDD_165_195);
-+	if (tmp == 0) {
-+		min_uV = 1650 * 1000;
-+		max_uV = 1950 * 1000;
-+	} else {
-+		min_uV = 1900 * 1000 + tmp * 100 * 1000;
-+		max_uV = min_uV + 100 * 1000;
- 	}
- 
-+	/*
-+	 * Avoid needless changes to this voltage; the regulator
-+	 * might not allow this operation
-+	 */
-+	voltage = regulator_get_voltage(supply);
-+	if (voltage < 0)
-+		result = voltage;
-+	else if (voltage < min_uV || voltage > max_uV)
-+		result = regulator_set_voltage(supply, min_uV, max_uV);
-+	else
-+		result = 0;
-+
- 	return result;
- }
- EXPORT_SYMBOL(mmc_regulator_set_ocr);
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 4917af9..5f530b1 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -467,15 +467,17 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 
- 	switch (ios->power_mode) {
- 	case MMC_POWER_OFF:
--		if(host->vcc &&
--		   regulator_is_enabled(host->vcc))
-+		if (host->vcc)
- 			regulator_disable(host->vcc);
- 		break;
- 	case MMC_POWER_UP:
- #ifdef CONFIG_REGULATOR
--		if (host->vcc)
--			/* This implicitly enables the regulator */
-+		if (host->vcc) {
-+			if (regulator_enable(host->vcc))
-+				dev_err(mmc_dev(mmc),
-+					"could not enable regulator\n");
- 			mmc_regulator_set_ocr(host->vcc, ios->vdd);
-+		}
- #endif
- 		/*
- 		 * The translate_vdd function is not used if you have
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index b032828..d8d07e1 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -247,10 +247,17 @@ static int omap_hsmmc_1_set_power(struct device *dev, int slot, int power_on,
- 	if (mmc_slot(host).before_set_reg)
- 		mmc_slot(host).before_set_reg(dev, slot, power_on, vdd);
- 
--	if (power_on)
--		ret = mmc_regulator_set_ocr(host->vcc, vdd);
--	else
--		ret = mmc_regulator_set_ocr(host->vcc, 0);
-+	if (power_on) {
-+		ret = regulator_enable(host->vcc);
-+		if (ret)
-+			dev_err(dev, "could not enable regulator\n");
-+		else
-+			ret = mmc_regulator_set_ocr(host->vcc, vdd);
-+	} else {
-+		ret = regulator_disable(host->vcc);
-+		if (ret)
-+			dev_err(dev, "could not disable regulator\n");
-+	}
- 
- 	if (mmc_slot(host).after_set_reg)
- 		mmc_slot(host).after_set_reg(dev, slot, power_on, vdd);
-@@ -289,7 +296,11 @@ static int omap_hsmmc_23_set_power(struct device *dev, int slot, int power_on,
- 	 * chips/cards need an interface voltage rail too.
- 	 */
- 	if (power_on) {
--		ret = mmc_regulator_set_ocr(host->vcc, vdd);
-+		ret = regulator_enable(host->vcc);
-+		if (ret < 0)
-+			dev_err(dev, "could not enable regulator\n");
-+		else
-+			ret = mmc_regulator_set_ocr(host->vcc, vdd);
- 		/* Enable interface voltage rail, if needed */
- 		if (ret == 0 && host->vcc_aux) {
- 			ret = regulator_enable(host->vcc_aux);
-@@ -297,10 +308,15 @@ static int omap_hsmmc_23_set_power(struct device *dev, int slot, int power_on,
- 				ret = mmc_regulator_set_ocr(host->vcc, 0);
- 		}
- 	} else {
-+		/* Shut down the rail */
- 		if (host->vcc_aux)
- 			ret = regulator_disable(host->vcc_aux);
--		if (ret == 0)
--			ret = mmc_regulator_set_ocr(host->vcc, 0);
-+		if (ret == 0) {
-+			/* Then proeeed to shut down the local regulator */
-+			ret = regulator_disable(host->vcc);
-+			if (ret == 0)
-+				ret = mmc_regulator_set_ocr(host->vcc, 0);
-+		}
- 	}
- 
- 	if (mmc_slot(host).after_set_reg)
-@@ -340,10 +356,14 @@ static int omap_hsmmc_23_set_sleep(struct device *dev, int slot, int sleep,
- 
- 	if (cardsleep) {
- 		/* VCC can be turned off if card is asleep */
--		if (sleep)
--			err = mmc_regulator_set_ocr(host->vcc, 0);
--		else
-+		if (sleep) {
-+			err = regulator_disable(host->vcc);
-+		} else {
-+			err = regulator_enable(host->vcc);
-+			if (err)
-+				return err;
- 			err = mmc_regulator_set_ocr(host->vcc, vdd);
-+		}
- 	} else
- 		err = regulator_set_mode(host->vcc, mode);
- 	if (err)
-diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-index 0a4e43f..b7e0216 100644
---- a/drivers/mmc/host/pxamci.c
-+++ b/drivers/mmc/host/pxamci.c
-@@ -99,13 +99,22 @@ static inline void pxamci_init_ocr(struct pxamci_host *host)
- 	}
- }
- 
--static inline void pxamci_set_power(struct pxamci_host *host, unsigned int vdd)
-+static inline void pxamci_set_power(struct pxamci_host *host,
-+				    unsigned char power_mode,
-+				    unsigned int vdd)
- {
- 	int on;
- 
- #ifdef CONFIG_REGULATOR
--	if (host->vcc)
--		mmc_regulator_set_ocr(host->vcc, vdd);
-+	if (host->vcc) {
-+		if (power_mode == MMC_POWER_UP) {
-+			if (regulator_enable(host->vcc))
-+				dev_err(mmc_dev(host->mmc),
-+					"could not enable regulator\n");
-+			mmc_regulator_set_ocr(host->vcc, vdd);
-+		} else if (power_mode == MMC_POWER_OFF)
-+			regulator_disable(host->vcc);
-+	}
- #endif
- 	if (!host->vcc && host->pdata &&
- 	    gpio_is_valid(host->pdata->gpio_power)) {
-@@ -492,7 +501,7 @@ static void pxamci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 	if (host->power_mode != ios->power_mode) {
- 		host->power_mode = ios->power_mode;
- 
--		pxamci_set_power(host, ios->vdd);
-+		pxamci_set_power(host, ios->power_mode, ios->vdd);
- 
- 		if (ios->power_mode == MMC_POWER_ON)
- 			host->cmdat |= CMDAT_INIT;
+Thanks.
+
 -- 
-1.6.3.3
+Dmitry
