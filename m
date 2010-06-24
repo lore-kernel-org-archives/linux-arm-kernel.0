@@ -1,46 +1,87 @@
-From: Jon.Povey@racelogic.co.uk (Jon Povey)
-Date: Thu, 24 Jun 2010 05:33:56 +0100
-Subject: [RFC PATCH] Rework gpio cansleep (was Re: gpiolib and
-	sleepinggpios)
-In-Reply-To: <20100624000403.GH7058@shareable.org>
-Message-ID: <70E876B0EA86DD4BAF101844BC814DFE08E0855B96@Cloud.RL.local>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Thu, 24 Jun 2010 13:35:04 +0900
+Subject: [PATCH 1/2] ARM: S5PV210: Fix Aquila board UART FIFO mode configration
+Message-ID: <1277354105-13097-1-git-send-email-jy0922.shim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jamie Lokier wrote:
-> Ryan Mallon wrote:
->> On 06/24/2010 10:53 AM, Jamie Lokier wrote:
+The Aquila board uses max UART FIFO size to each UART channels. UART0
+supports 256 bytes FIFO, but Aquila board supports 128 bytes FIFO
+because of initial chip bug.
 
->>> It has an I2C driven GPIO expander, with a watchdog reset chip
->>> hanging off the expander.
->>>
->>> The watchdog is kept alive off the back end of a timer BH, which
->>> means the I2C GPIO routines are written to be safe in BH context
->>> (which
->>> isn't sleepable), but they can't be used in IRQ context because the
->>> necessary spin_lock_irqsave() would turn off interrupts for too long
->>> for other subsystems to function properly.
->>
->> Do the implementations of the get/set calls for the io expander gpios
->> sleep at all?
->
-> No, because sleeping isn't allowed in BH context.  (Note that this is
-> 2.4.26 code - things have changed a bit for 2.6, but the hardware is
-> the same, and still needs the I2C watchdog to be driven from a BH-like
-> context).
+Also, this patch fixes to "s/smdkv210/aquila".
 
-Could you use a workqueue instead to prod the watchdog?
-Then the GPIOs could sleep, you could rewrite them as such, and other things could use them safely.
+Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv210/mach-aquila.c |   24 +++++++++++++++---------
+ 1 files changed, 15 insertions(+), 9 deletions(-)
 
-Disabling IRQs while you talk to an I2C peripheral sounds like a hack that will impact performance.
-
-Although, if it does that then I think your GPIOs qualify as non-sleeping.. so "safe" to use from a can't-sleep context but probably unacceptably slow as you say.
-
---
-Jon Povey
-jon.povey at racelogic.co.uk
-
-Racelogic is a limited company registered in England. Registered number 2743719 .
-Registered Office Unit 10, Swan Business Centre, Osier Way, Buckingham, Bucks, MK18 1TB .
-
-The information contained in this electronic mail transmission is intended by Racelogic Ltd for the use of the named individual or entity to which it is directed and may contain information that is confidential or privileged. If you have received this electronic mail transmission in error, please delete it from your system without copying or forwarding it, and notify the sender of the error by reply email so that the sender's address records can be corrected. The views expressed by the sender of this communication do not necessarily represent those of Racelogic Ltd. Please note that Racelogic reserves the right to monitor e-mail communications passing through its network
+diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
+index 10bc76e..5795a7c 100644
+--- a/arch/arm/mach-s5pv210/mach-aquila.c
++++ b/arch/arm/mach-s5pv210/mach-aquila.c
+@@ -39,38 +39,44 @@
+ 
+ #define S5PV210_ULCON_DEFAULT	S3C2410_LCON_CS8
+ 
+-#define S5PV210_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
+-				 S5PV210_UFCON_TXTRIG4 |	\
+-				 S5PV210_UFCON_RXTRIG4)
++#define S5PV210_UFCON_DEFAULT	S3C2410_UFCON_FIFOMODE
+ 
+-static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
++static struct s3c2410_uartcfg aquila_uartcfgs[] __initdata = {
+ 	[0] = {
+ 		.hwport		= 0,
+ 		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+-		.ufcon		= S5PV210_UFCON_DEFAULT,
++		/*
++		 * Actually UART0 can support 256 bytes fifo, but aquila board
++		 * supports 128 bytes fifo because of initial chip bug
++		 */
++		.ufcon		= S5PV210_UFCON_DEFAULT |
++			S5PV210_UFCON_TXTRIG128 | S5PV210_UFCON_RXTRIG128,
+ 	},
+ 	[1] = {
+ 		.hwport		= 1,
+ 		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+-		.ufcon		= S5PV210_UFCON_DEFAULT,
++		.ufcon		= S5PV210_UFCON_DEFAULT |
++			S5PV210_UFCON_TXTRIG64 | S5PV210_UFCON_RXTRIG64,
+ 	},
+ 	[2] = {
+ 		.hwport		= 2,
+ 		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+-		.ufcon		= S5PV210_UFCON_DEFAULT,
++		.ufcon		= S5PV210_UFCON_DEFAULT |
++			S5PV210_UFCON_TXTRIG16 | S5PV210_UFCON_RXTRIG16,
+ 	},
+ 	[3] = {
+ 		.hwport		= 3,
+ 		.flags		= 0,
+ 		.ucon		= S5PV210_UCON_DEFAULT,
+ 		.ulcon		= S5PV210_ULCON_DEFAULT,
+-		.ufcon		= S5PV210_UFCON_DEFAULT,
++		.ufcon		= S5PV210_UFCON_DEFAULT |
++			S5PV210_UFCON_TXTRIG16 | S5PV210_UFCON_RXTRIG16,
+ 	},
+ };
+ 
+@@ -124,7 +130,7 @@ static void __init aquila_map_io(void)
+ {
+ 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+ 	s3c24xx_init_clocks(24000000);
+-	s3c24xx_init_uarts(smdkv210_uartcfgs, ARRAY_SIZE(smdkv210_uartcfgs));
++	s3c24xx_init_uarts(aquila_uartcfgs, ARRAY_SIZE(aquila_uartcfgs));
+ }
+ 
+ static void __init aquila_machine_init(void)
+-- 
+1.7.0.4
