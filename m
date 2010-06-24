@@ -1,124 +1,58 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 24 Jun 2010 08:41:27 +0200
-Subject: [RFC PATCH] Rework gpio cansleep (was Re: gpiolib and sleeping
-	gpios)
-In-Reply-To: <4C225CB2.6090407@bluewatersys.com>
-References: <728731.73469.qm@web180307.mail.gq1.yahoo.com>
-	<4C225CB2.6090407@bluewatersys.com>
-Message-ID: <20100624064127.GA23539@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 24 Jun 2010 09:27:32 +0200
+Subject: [PATCHv3 4/5] mtd: mxc_nand fixups
+In-Reply-To: <80lja6awlb.fsf@merkur.tec.linutronix.de>
+References: <20100618205401.GA12115@pengutronix.de>
+	<80sk4ivkga.fsf@merkur.tec.linutronix.de>
+	<AANLkTimA7Rbm_nHpVYpEPqaPCjrOse9s8YyiInWlhfEK@mail.gmail.com>
+	<80tyoyhxey.fsf_-_@merkur.tec.linutronix.de>
+	<AANLkTikRj_dMkKLyFhW78yld9jIYAIFncfPaPAF8WqUY@mail.gmail.com>
+	<80iq5bqd07.fsf_-_@merkur.tec.linutronix.de>
+	<AANLkTimJKNEwOoKldq4a4_ufxNY6IY7r6tAfAM055hlW@mail.gmail.com>
+	<80vd9ab0d2.fsf@merkur.tec.linutronix.de>
+	<AANLkTinVaXjCneg-XpxB7YNlmGOwQFTnm5RUcetPdToI@mail.gmail.com>
+	<80lja6awlb.fsf@merkur.tec.linutronix.de>
+Message-ID: <20100624072732.GQ12115@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Jun 23, 2010 at 12:10:08PM +0200, John Ogness wrote:
+> On 2010-06-23, Ivo Clarysse <ivo.clarysse@gmail.com> wrote:
+> > But is it OK to use a regular (non-volatile) variable to communicate
+> > between interrupt context and the non-interrupt context ?
+> 
+> In this case, yes.
+> 
+> > My original patch for i.MX21 used completions instead:
+> >
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-April/012694.html
+> 
+> Ah. It seems you've been through all this before. I wish I had noticed
+> that thread before. I will need to check more carefully in the future.
+> 
+> Yes, your original patch achieves the exact same thing. Whether we use
+> wait_event() with a flag or wait_completion() really is the same
+> thing. So I guess Sascha can decide what we should do there.
+> 
+> What I like about your original patch is that only the i.MX21 has the
+> cost of constantly enabling/disabling the irq line. It adds 5
+> cpu_is_mx21() blocks to the code, but will lead to less work for the CPU
+> on non-i.MX21 boards.
 
-On Thu, Jun 24, 2010 at 07:12:50AM +1200, Ryan Mallon wrote:
-> David Brownell wrote:
-> > 
-> > --- On Tue, 6/22/10, Ryan Mallon <ryan@bluewatersys.com> wrote:
-> > 
-> >>> --- On Tue, 6/22/10, Ryan Mallon <ryan@bluewatersys.com>
-> >> wrote:
-> 
-> >>>> 'Can sleep' for a gpio has two different meanings
-> >> depending
-> >>>> on context
-> >>> NO; for the GPIO itself it's only ever had one
-> >>> meaning, regardless of context.
-> >>>
-> >>> You're trying to conflate the GPIO and one
-> >>> of the contexts in which it's used.  That's
-> >>> the problem you seem to be struggling with.
-> >>>
-> >>> Please stop conflating/confusing
-> >>> those two disparate concepts...
-> >> I'm not. 
-> > 
-> > BUT Your "counter" example below is solid
-> > proof that you are:  it shows exactly the
-> > confusion I pointed out:  call context versus
-> > the GPIO itself.  There's no way I can read
-> > that as anything except "you are"...
-> > 
-> >  
-> > Your intent here seems perhaps more to
-> > be a troll than to address any real
-> > technical issues.  I don't see much
-> > point participating any further.
-> > 
-> > 
-> >  Some gpios, such as those on io expanders, may
-> >> sleep in their
-> >> implementations of the gpio_(set/get) functions.
-> >>
-> > 
-> > Such GPIOs have a "cansleep" attribute, in short.
-> > 
-> > 
-> >> Drivers, which use a gpio, may call gpio_(set/get)
-> >> functions for a given
-> >> gpio from a context where it is not safe to sleep.
-> > 
-> > And that's the call dontext
-> > (in this case, from a driver).
-> 
-> Yes.
-> 
-> >   QED.  You are confusing two disparate concepts.
-> 
-> We are saying exactly the same thing.
-> 
-> > 
-> >  In this
-> >> case, a gpio
-> >> which may sleep (ie one on an i2c io-expander) cannot be
-> >> used with this
-> >> driver. The gpio_request will succeed, but any call to
-> >> gpio_(set/get)_value will produce a warning.
-> >>
-> >>>> example, if a driver calls gpio_get_value(gpio)
-> >> from an
-> >>>> interupt handler
-> > 
-> > 
-> > (YOU introduce interrupt/IRQ handlers...)
-> > 
-> >>>> then the gpio must not be a sleeping gpio.
-> >>> In a threaded IRQ handler it's OK to use
-> >>> the get_value_cansleep() option..
-> >> Ugh, you are really twisting my words.
-> > 
-> > 
-> > You said IRQ handler, so did I.  In what csense could I
-> > possibly be "twisting" your words"???
-> > 
-> > 
-> > STOP TROLLING.
-> 
-> Okay, I messed up the wording an used 'interrupt handler' as an example
-> of a non-sleep safe context. If I had said 'atomic' or 'spinlock'
-> context you would probably be telling me off for missing some other
-> non-sleep safe contexts.
-> 
-> The point is that we are discussing the issue of calls which may sleep.
-> Even if I was not entirely clear by getting the wording wrong, you _do_
-> know what I am talking about. You could correct on the bits on I get
-> wrong instead of labeling me a troll.
-> 
-> If we strip my patch back to just introducing gpio_request_cansleep,
-> which would be used in any driver where all of the calls are
-> gpio_(set/get)_cansleep, and make gpio_request only allow non-sleeping
-> gpios then incorrect use of gpios would be caught at request time and
-> returned to the caller as an error.
-I'm not sure that changing the API in this way is sensible.  I'd do
-either what Jani Nikula suggested (i.e. substitute some WARN_ON(extra_checks
-&& chip->can_sleep); by might_sleep_if(chip->can_sleep);) or
-alternatively let gpio_get_value et al. return < 0 if they are called in
-atomic context with chip->can_sleep != 0.  Maybe even return < 0
-independant of the current context?
+Ok, if it's the only way out to have 5 cpu_is_* blocks, then lets go for
+it.
 
-Best regards
-Uwe
+BTW I observed that at least on i.MX27 the latencies introduced by
+waiting for an interrupt cause a significant performance drop. The
+driver gets much faster when we just poll all the time. I don't know how
+this affects system performance otherwise, but it may be a possibility
+to drop interrupt support at least for i.MX21. I have no idea how long
+the longest possible time we'd have to poll is though.
+
+Sascha
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
