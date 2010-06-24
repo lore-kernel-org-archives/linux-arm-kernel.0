@@ -1,30 +1,51 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 24 Jun 2010 15:57:11 +0200
-Subject: [PATCH 1/3] pxa3xx: Fix HSIO bus x24 multiplier
-Message-ID: <1277387833-5419-1-git-send-email-marek.vasut@gmail.com>
+Date: Thu, 24 Jun 2010 15:57:13 +0200
+Subject: [PATCH 3/3] pxa2xx/cpufreq: Fix PCMCIA frequency scaling
+In-Reply-To: <1277387833-5419-1-git-send-email-marek.vasut@gmail.com>
+References: <1277387833-5419-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1277387833-5419-3-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The value should be 24, not 0 in the possibilities array. It was just a silly
-mistake.
+The MCxx values must be based off memory clock, not CPU core clock.
+
+This also fixes the bug where on some machines the LCD went crazy while using
+PCMCIA.
 
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- arch/arm/mach-pxa/pxa3xx.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/pcmcia/pxa2xx_base.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-index f544e58..611622a 100644
---- a/arch/arm/mach-pxa/pxa3xx.c
-+++ b/arch/arm/mach-pxa/pxa3xx.c
-@@ -52,7 +52,7 @@
- static unsigned char smcfs_mult[8] = { 6, 0, 8, 0, 0, 16, };
+diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
+index df4532e..f370476 100644
+--- a/drivers/pcmcia/pxa2xx_base.c
++++ b/drivers/pcmcia/pxa2xx_base.c
+@@ -178,7 +178,6 @@ pxa2xx_pcmcia_frequency_change(struct soc_pcmcia_socket *skt,
+ 			       unsigned long val,
+ 			       struct cpufreq_freqs *freqs)
+ {
+-#warning "it's not clear if this is right since the core CPU (N) clock has no effect on the memory (L) clock"
+ 	switch (val) {
+ 	case CPUFREQ_PRECHANGE:
+ 		if (freqs->new > freqs->old) {
+@@ -186,7 +185,7 @@ pxa2xx_pcmcia_frequency_change(struct soc_pcmcia_socket *skt,
+ 			       "pre-updating\n",
+ 			       freqs->new / 1000, (freqs->new / 100) % 10,
+ 			       freqs->old / 1000, (freqs->old / 100) % 10);
+-			pxa2xx_pcmcia_set_mcxx(skt, freqs->new);
++			pxa2xx_pcmcia_set_timing(skt);
+ 		}
+ 		break;
  
- /* crystal frequency to HSIO bus frequency multiplier (HSS) */
--static unsigned char hss_mult[4] = { 8, 12, 16, 0 };
-+static unsigned char hss_mult[4] = { 8, 12, 16, 24 };
- 
- /*
-  * Get the clock frequency as reflected by CCSR and the turbo flag.
+@@ -196,7 +195,7 @@ pxa2xx_pcmcia_frequency_change(struct soc_pcmcia_socket *skt,
+ 			       "post-updating\n",
+ 			       freqs->new / 1000, (freqs->new / 100) % 10,
+ 			       freqs->old / 1000, (freqs->old / 100) % 10);
+-			pxa2xx_pcmcia_set_mcxx(skt, freqs->new);
++			pxa2xx_pcmcia_set_timing(skt);
+ 		}
+ 		break;
+ 	}
 -- 
 1.7.1
