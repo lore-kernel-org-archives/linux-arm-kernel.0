@@ -1,88 +1,121 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 24 Jun 2010 16:43:10 -0700
-Subject: [PATCH v2 2/3] OMAP: bus-level PM: enable use of runtime PM API for
-	suspend/resume
+Date: Thu, 24 Jun 2010 16:43:11 -0700
+Subject: [PATCH v2 3/3] OMAP1: PM: add simple runtime PM layer to manage clocks
 In-Reply-To: <1277422991-25350-1-git-send-email-khilman@deeprootsystems.com>
 References: <1277422991-25350-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1277422991-25350-3-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1277422991-25350-4-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hook into the platform bus methods for suspend and resume and use the
-runtime PM API to allow the OMAP runtime PM core (based on
-omap_device) to automatically idle and enable the device on suspend
-and resume.
+On OMAP1, we do not have omap_device + omap_hwmod to manage the
+device-specific idle, enable and shutdown.  Instead, just
+enable/disable device clocks automatically at the runtime PM level.
 
-This allows device drivers to get rid of direct management of their
-clocks in their suspend/resume paths, and let omap_device do it for
-them .
-
-We currently use the _noirq (late suspend, early resume) versions of
-the suspend/resume methods to ensure that the device is not disabled
-too early for any drivers also using the _noirq methods.
-
-NOTE: only works for devices with omap_hwmod support.
+This allows drivers to not have any OMAP1 specific clock management
+and allows them to simply use the runtime PM API to manage clocks.
 
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/pm_bus.c |   48 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 48 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap1/Makefile |    2 +-
+ arch/arm/mach-omap1/pm_bus.c |   77 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 78 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-omap1/pm_bus.c
 
-diff --git a/arch/arm/mach-omap2/pm_bus.c b/arch/arm/mach-omap2/pm_bus.c
-index 9719a9f..5e453dc 100644
---- a/arch/arm/mach-omap2/pm_bus.c
-+++ b/arch/arm/mach-omap2/pm_bus.c
-@@ -68,3 +68,51 @@ int platform_pm_runtime_idle(struct device *dev)
- };
- #endif /* CONFIG_PM_RUNTIME */
+diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
+index ea231c7..fd4df71 100644
+--- a/arch/arm/mach-omap1/Makefile
++++ b/arch/arm/mach-omap1/Makefile
+@@ -12,7 +12,7 @@ obj-$(CONFIG_OMAP_MPU_TIMER)	+= time.o
+ obj-$(CONFIG_OMAP_32K_TIMER)	+= timer32k.o
  
-+#ifdef CONFIG_SUSPEND
-+int platform_pm_suspend_noirq(struct device *dev)
+ # Power Management
+-obj-$(CONFIG_PM) += pm.o sleep.o
++obj-$(CONFIG_PM) += pm.o sleep.o pm_bus.o
+ 
+ # DSP
+ obj-$(CONFIG_OMAP_MBOX_FWK)	+= mailbox_mach.o
+diff --git a/arch/arm/mach-omap1/pm_bus.c b/arch/arm/mach-omap1/pm_bus.c
+new file mode 100644
+index 0000000..29d651a
+--- /dev/null
++++ b/arch/arm/mach-omap1/pm_bus.c
+@@ -0,0 +1,77 @@
++/*
++ * Runtime PM support code for OMAP1
++ *
++ * Author: Kevin Hilman, Deep Root Systems, LLC
++ *
++ * Copyright (C) 2010 Texas Instruments, Inc.
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/io.h>
++#include <linux/pm_runtime.h>
++#include <linux/platform_device.h>
++#include <linux/mutex.h>
++
++#include <plat/omap_device.h>
++#include <plat/omap-pm.h>
++
++#ifdef CONFIG_PM_RUNTIME
++int platform_pm_runtime_suspend(struct device *dev)
 +{
-+	struct device_driver *drv = dev->driver;
-+	int ret = 0;
++	struct clk *iclk, *fclk;
 +
-+	if (!drv)
-+		return 0;
++	dev_dbg(dev, "%s\n", __func__);
 +
-+	if (drv->pm) {
-+		if (drv->pm->suspend_noirq)
-+			ret = drv->pm->suspend_noirq(dev);
++	if (dev->driver->pm && dev->driver->pm->runtime_suspend)
++		ret = dev->driver->pm->runtime_suspend(dev);
++
++	fclk = clk_get(dev, "fck");
++	if (!IS_ERR(fclk)) {
++		clk_disable(fclk);
++		clk_put(fclk);
 +	}
 +
-+	/*
-+	 * The DPM core has done a 'get' to prevent runtime PM
-+	 * transitions during system PM.  This put is to balance
-+	 * out that get so that this device can now be runtime
-+	 * suspended.
-+	 */
-+	pm_runtime_put_sync(dev);
-+
-+	return ret;
-+}
-+
-+int platform_pm_resume_noirq(struct device *dev)
-+{
-+	struct device_driver *drv = dev->driver;
-+	int ret = 0;
-+
-+	/* 
-+	 * This 'get' is to balance the 'put' in the above suspend_noirq
-+	 * method so that the runtime PM usage counting is in the same
-+	 * state it was when suspend was called.
-+	 */
-+	pm_runtime_get_sync(dev);
-+
-+	if (!drv)
-+		return 0;
-+
-+	if (drv->pm) {
-+		if (drv->pm->resume_noirq)
-+			ret = drv->pm->resume_noirq(dev);
++	iclk = clk_get(dev, "ick");
++	if (!IS_ERR(iclk)) {
++		clk_disable(iclk);
++		clk_put(iclk);
 +	}
 +
++	return 0;
++};
++
++int platform_pm_runtime_resume(struct device *dev)
++{
++	int r, ret = 0;
++	struct clk *iclk, *fclk;
++
++	iclk = clk_get(dev, "ick");
++	if (!IS_ERR(iclk)) {
++		clk_enable(iclk);
++		clk_put(iclk);
++	}
++
++	fclk = clk_get(dev, "fck");
++	if (!IS_ERR(fclk)) {
++		clk_enable(fclk);
++		clk_put(fclk);
++	}
++
++	if (dev->driver->pm && dev->driver->pm->runtime_resume)
++		ret = dev->driver->pm->runtime_resume(dev);
++
 +	return ret;
-+}
-+#endif /* CONFIG_SUSPEND */
++};
++
++int platform_pm_runtime_idle(struct device *dev)
++{
++	ret = pm_runtime_suspend(dev);
++	dev_dbg(dev, "%s [%d]\n", __func__, ret);
++
++	return 0;
++};
++#endif /* CONFIG_PM_RUNTIME */
 -- 
 1.7.0.2
