@@ -1,291 +1,293 @@
 From: jason77.wang@gmail.com (Jason Wang)
-Date: Thu, 24 Jun 2010 21:11:28 +0800
-Subject: [PATCH V3 1/2] mxc: add common debug board for 3-stack platforms
-In-Reply-To: <1277385089-7399-1-git-send-email-jason77.wang@gmail.com>
+Date: Thu, 24 Jun 2010 21:11:29 +0800
+Subject: [PATCH V3 2/2] mx31_3ds: revert 3ds debug board relate code
+In-Reply-To: <1277385089-7399-2-git-send-email-jason77.wang@gmail.com>
 References: <1277385089-7399-1-git-send-email-jason77.wang@gmail.com>
-Message-ID: <1277385089-7399-2-git-send-email-jason77.wang@gmail.com>
+	<1277385089-7399-2-git-send-email-jason77.wang@gmail.com>
+Message-ID: <1277385089-7399-3-git-send-email-jason77.wang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The debug board is little different for all mxc 3-stack(PDK)
-platforms, it is possible here to add a common implementation to
-support this board.
+Because we add a 3ds debug board support in mxc level, we remove
+those redundant codes from board level.
 
 Signed-off-by: Jason Wang <jason77.wang@gmail.com>
 ---
- arch/arm/plat-mxc/3ds_debugboard.c              |  202 +++++++++++++++++++++++
- arch/arm/plat-mxc/Kconfig                       |   11 ++
- arch/arm/plat-mxc/Makefile                      |    1 +
- arch/arm/plat-mxc/include/mach/3ds_debugboard.h |   18 ++
- 4 files changed, 232 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-mxc/3ds_debugboard.c
- create mode 100644 arch/arm/plat-mxc/include/mach/3ds_debugboard.h
+ arch/arm/mach-mx3/Kconfig                       |    1 +
+ arch/arm/mach-mx3/mach-mx31_3ds.c               |  169 +----------------------
+ arch/arm/plat-mxc/include/mach/board-mx31_3ds.h |   42 ------
+ 3 files changed, 5 insertions(+), 207 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/3ds_debugboard.c b/arch/arm/plat-mxc/3ds_debugboard.c
-new file mode 100644
-index 0000000..639c54a
---- /dev/null
-+++ b/arch/arm/plat-mxc/3ds_debugboard.c
-@@ -0,0 +1,202 @@
-+/*
-+ * Copyright 2008-2009 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright (C) 2010 Jason Wang <jason77.wang@gmail.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/io.h>
-+#include <linux/platform_device.h>
-+#include <linux/gpio.h>
-+#include <linux/smsc911x.h>
-+
-+#include <mach/hardware.h>
-+
-+/* LAN9217 ethernet base address */
-+#define LAN9217_BASE_ADDR(n)	(n + 0x0)
-+/* External UART */
-+#define UARTA_BASE_ADDR(n)	(n + 0x8000)
-+#define UARTB_BASE_ADDR(n)	(n + 0x10000)
-+
-+#define BOARD_IO_ADDR(n)	(n + 0x20000)
-+/* LED switchs */
-+#define LED_SWITCH_REG		0x00
-+/* buttons */
-+#define SWITCH_BUTTONS_REG	0x08
-+/* status, interrupt */
-+#define INTR_STATUS_REG	0x10
-+#define INTR_MASK_REG		0x38
-+#define INTR_RESET_REG		0x20
-+/* magic word for debug CPLD */
-+#define MAGIC_NUMBER1_REG	0x40
-+#define MAGIC_NUMBER2_REG	0x48
-+/* CPLD code version */
-+#define CPLD_CODE_VER_REG	0x50
-+/* magic word for debug CPLD */
-+#define MAGIC_NUMBER3_REG	0x58
-+/* module reset register*/
-+#define MODULE_RESET_REG	0x60
-+/* CPU ID and Personality ID */
-+#define MCU_BOARD_ID_REG	0x68
-+
-+#define MXC_IRQ_TO_EXPIO(irq)   ((irq) - MXC_BOARD_IRQ_START)
-+#define MXC_IRQ_TO_GPIO(irq)	((irq) - MXC_INTERNAL_IRQS)
-+
-+#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
-+#define MXC_MAX_EXP_IO_LINES	16
-+
-+/* interrupts like external uart , external ethernet etc*/
-+#define EXPIO_INT_ENET		(MXC_BOARD_IRQ_START + 0)
-+#define EXPIO_INT_XUART_A	(MXC_BOARD_IRQ_START + 1)
-+#define EXPIO_INT_XUART_B	(MXC_BOARD_IRQ_START + 2)
-+#define EXPIO_INT_BUTTON_A	(MXC_BOARD_IRQ_START + 3)
-+#define EXPIO_INT_BUTTON_B	(MXC_BOARD_IRQ_START + 4)
-+
-+static void __iomem *brd_io;
-+static void expio_ack_irq(u32 irq);
-+
-+static struct resource smsc911x_resources[] = {
-+	{
-+		.flags = IORESOURCE_MEM,
-+	} , {
-+		.start = EXPIO_INT_ENET,
-+		.end = EXPIO_INT_ENET,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct smsc911x_platform_config smsc911x_config = {
-+	.irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
-+	.flags = SMSC911X_USE_32BIT | SMSC911X_FORCE_INTERNAL_PHY,
-+};
-+
-+static struct platform_device smsc_lan9217_device = {
-+	.name = "smsc911x",
-+	.id = 0,
-+	.dev = {
-+		.platform_data = &smsc911x_config,
-+	},
-+	.num_resources = ARRAY_SIZE(smsc911x_resources),
-+	.resource = smsc911x_resources,
-+};
-+
-+static void mxc_expio_irq_handler(u32 irq, struct irq_desc *desc)
-+{
-+	u32 imr_val;
-+	u32 int_valid;
-+	u32 expio_irq;
-+
-+	desc->chip->mask(irq);	/* irq = gpio irq number */
-+
-+	imr_val = __raw_readw(brd_io + INTR_MASK_REG);
-+	int_valid = __raw_readw(brd_io + INTR_STATUS_REG) & ~imr_val;
-+
-+	expio_irq = MXC_BOARD_IRQ_START;
-+	for (; int_valid != 0; int_valid >>= 1, expio_irq++) {
-+		struct irq_desc *d;
-+		if ((int_valid & 1) == 0)
-+			continue;
-+		d = irq_desc + expio_irq;
-+		if (unlikely(!(d->handle_irq)))
-+			pr_err("\nEXPIO irq: %d unhandled\n", expio_irq);
-+		else
-+			d->handle_irq(expio_irq, d);
-+	}
-+
-+	desc->chip->ack(irq);
-+	desc->chip->unmask(irq);
-+}
-+
-+/*
-+ * Disable an expio pin's interrupt by setting the bit in the imr.
-+ * Irq is an expio virtual irq number
-+ */
-+static void expio_mask_irq(u32 irq)
-+{
-+	u16 reg;
-+	u32 expio = MXC_IRQ_TO_EXPIO(irq);
-+
-+	reg = __raw_readw(brd_io + INTR_MASK_REG);
-+	reg |= (1 << expio);
-+	__raw_writew(reg, brd_io + INTR_MASK_REG);
-+}
-+
-+static void expio_ack_irq(u32 irq)
-+{
-+	u32 expio = MXC_IRQ_TO_EXPIO(irq);
-+
-+	__raw_writew(1 << expio, brd_io + INTR_RESET_REG);
-+	__raw_writew(0, brd_io + INTR_RESET_REG);
-+	expio_mask_irq(irq);
-+}
-+
-+static void expio_unmask_irq(u32 irq)
-+{
-+	u16 reg;
-+	u32 expio = MXC_IRQ_TO_EXPIO(irq);
-+
-+	reg = __raw_readw(brd_io + INTR_MASK_REG);
-+	reg &= ~(1 << expio);
-+	__raw_writew(reg, brd_io + INTR_MASK_REG);
-+}
-+
-+static struct irq_chip expio_irq_chip = {
-+	.ack = expio_ack_irq,
-+	.mask = expio_mask_irq,
-+	.unmask = expio_unmask_irq,
-+};
-+
-+int __init mxc_expio_init(u32 base, u32 p_irq)
-+{
-+	int i;
-+
-+	brd_io = ioremap(BOARD_IO_ADDR(base), SZ_4K);
-+	if (brd_io == NULL)
-+		return -ENOMEM;
-+
-+	if ((__raw_readw(brd_io + MAGIC_NUMBER1_REG) != 0xAAAA) ||
-+	    (__raw_readw(brd_io + MAGIC_NUMBER2_REG) != 0x5555) ||
-+	    (__raw_readw(brd_io + MAGIC_NUMBER3_REG) != 0xCAFE)) {
-+		pr_info("3-Stack Debug board not detected\n");
-+		iounmap(brd_io);
-+		brd_io = NULL;
-+		return -ENODEV;
-+	}
-+
-+	pr_info("3-Stack Debug board detected, rev = 0x%04X\n",
-+		readw(brd_io + CPLD_CODE_VER_REG));
-+
-+	/*
-+	 * Configure INT line as GPIO input
-+	 */
-+	gpio_request(MXC_IRQ_TO_GPIO(p_irq), "expio_pirq");
-+	gpio_direction_input(MXC_IRQ_TO_GPIO(p_irq));
-+
-+	/* disable the interrupt and clear the status */
-+	__raw_writew(0, brd_io + INTR_MASK_REG);
-+	__raw_writew(0xFFFF, brd_io + INTR_RESET_REG);
-+	__raw_writew(0, brd_io + INTR_RESET_REG);
-+	__raw_writew(0x1F, brd_io + INTR_MASK_REG);
-+	for (i = MXC_EXP_IO_BASE;
-+	     i < (MXC_EXP_IO_BASE + MXC_MAX_EXP_IO_LINES); i++) {
-+		set_irq_chip(i, &expio_irq_chip);
-+		set_irq_handler(i, handle_level_irq);
-+		set_irq_flags(i, IRQF_VALID);
-+	}
-+	set_irq_type(p_irq, IRQF_TRIGGER_LOW);
-+	set_irq_chained_handler(p_irq, mxc_expio_irq_handler);
-+
-+	/* Register Lan device on the debugboard */
-+	smsc911x_resources[0].start = LAN9217_BASE_ADDR(base);
-+	smsc911x_resources[0].end = LAN9217_BASE_ADDR(base) + 0x100 - 1;
-+	platform_device_register(&smsc_lan9217_device);
-+
-+	return 0;
-+}
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index 7f7ad6f..8bf917e 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -81,6 +81,17 @@ config MXC_PWM
+diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
+index 344753f..fd422cf 100644
+--- a/arch/arm/mach-mx3/Kconfig
++++ b/arch/arm/mach-mx3/Kconfig
+@@ -58,6 +58,7 @@ config MACH_MX31LITE
+ config MACH_MX31_3DS
+ 	bool "Support MX31PDK (3DS)"
+ 	select ARCH_MX31
++	select MXC_DEBUG_BOARD
  	help
- 	  Enable support for the i.MX PWM controller(s).
+ 	  Include support for MX31PDK (3DS) platform. This includes specific
+ 	  configurations for the board and its peripherals.
+diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
+index 58e5729..067e418 100644
+--- a/arch/arm/mach-mx3/mach-mx31_3ds.c
++++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
+@@ -22,7 +22,6 @@
+ #include <linux/clk.h>
+ #include <linux/irq.h>
+ #include <linux/gpio.h>
+-#include <linux/smsc911x.h>
+ #include <linux/platform_device.h>
+ #include <linux/mfd/mc13783.h>
+ #include <linux/spi/spi.h>
+@@ -42,6 +41,7 @@
+ #include <mach/iomux-mx3.h>
+ #include <mach/mxc_nand.h>
+ #include <mach/spi.h>
++#include <mach/3ds_debugboard.h>
+ #include "devices.h"
  
-+config MXC_DEBUG_BOARD
-+	bool "Enable MXC debug board(for 3-stack)"
-+	help
-+	  The debug board is an integral part of the MXC 3-stack(PDK)
-+	  platforms, it can be attached or removed from the peripheral
-+	  board. On debug board, several debug devices(ethernet, UART,
-+	  buttons, LEDs and JTAG) are implemented. Between the MCU and
-+	  these devices, a CPLD is added as a bridge which performs
-+	  data/address de-multiplexing and decode, signal level shift,
-+	  interrupt control and various board functions.
-+
- config MXC_ULPI
- 	bool
+ /*!
+@@ -213,173 +213,11 @@ static struct imxuart_platform_data uart_pdata = {
+ };
  
-diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-index 895bc3c..c4a24f2 100644
---- a/arch/arm/plat-mxc/Makefile
-+++ b/arch/arm/plat-mxc/Makefile
-@@ -17,6 +17,7 @@ obj-$(CONFIG_USB_EHCI_MXC) += ehci.o
- obj-$(CONFIG_MXC_ULPI) += ulpi.o
- obj-$(CONFIG_ARCH_MXC_AUDMUX_V1) += audmux-v1.o
- obj-$(CONFIG_ARCH_MXC_AUDMUX_V2) += audmux-v2.o
-+obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
- ifdef CONFIG_SND_IMX_SOC
- obj-y += ssi-fiq.o
- obj-y += ssi-fiq-ksym.o
-diff --git a/arch/arm/plat-mxc/include/mach/3ds_debugboard.h b/arch/arm/plat-mxc/include/mach/3ds_debugboard.h
-new file mode 100644
-index 0000000..a384fdd
---- /dev/null
-+++ b/arch/arm/plat-mxc/include/mach/3ds_debugboard.h
-@@ -0,0 +1,18 @@
-+/*
-+ * Copyright 2008-2009 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later@the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#ifndef __ASM_ARCH_MXC_3DS_DB_H__
-+#define __ASM_ARCH_MXC_3DS_DB_H__
-+
-+extern int __init mxc_expio_init(u32 base, u32 p_irq);
-+
-+#endif /* __ASM_ARCH_MXC_3DS_DB_H__ */
+ /*
+- * Support for the SMSC9217 on the Debug board.
+- */
+-
+-static struct smsc911x_platform_config smsc911x_config = {
+-	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
+-	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
+-	.flags		= SMSC911X_USE_16BIT | SMSC911X_FORCE_INTERNAL_PHY,
+-	.phy_interface	= PHY_INTERFACE_MODE_MII,
+-};
+-
+-static struct resource smsc911x_resources[] = {
+-	{
+-		.start		= LAN9217_BASE_ADDR,
+-		.end		= LAN9217_BASE_ADDR + 0xff,
+-		.flags		= IORESOURCE_MEM,
+-	}, {
+-		.start		= EXPIO_INT_ENET,
+-		.end		= EXPIO_INT_ENET,
+-		.flags		= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device smsc911x_device = {
+-	.name		= "smsc911x",
+-	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(smsc911x_resources),
+-	.resource	= smsc911x_resources,
+-	.dev		= {
+-		.platform_data = &smsc911x_config,
+-	},
+-};
+-
+-/*
+- * Routines for the CPLD on the debug board. It contains a CPLD handling
+- * LEDs, switches, interrupts for Ethernet.
+- */
+-
+-static void mx31_3ds_expio_irq_handler(uint32_t irq, struct irq_desc *desc)
+-{
+-	uint32_t imr_val;
+-	uint32_t int_valid;
+-	uint32_t expio_irq;
+-
+-	imr_val = __raw_readw(CPLD_INT_MASK_REG);
+-	int_valid = __raw_readw(CPLD_INT_STATUS_REG) & ~imr_val;
+-
+-	expio_irq = MXC_EXP_IO_BASE;
+-	for (; int_valid != 0; int_valid >>= 1, expio_irq++) {
+-		if ((int_valid & 1) == 0)
+-			continue;
+-		generic_handle_irq(expio_irq);
+-	}
+-}
+-
+-/*
+- * Disable an expio pin's interrupt by setting the bit in the imr.
+- * @param irq           an expio virtual irq number
+- */
+-static void expio_mask_irq(uint32_t irq)
+-{
+-	uint16_t reg;
+-	uint32_t expio = MXC_IRQ_TO_EXPIO(irq);
+-
+-	/* mask the interrupt */
+-	reg = __raw_readw(CPLD_INT_MASK_REG);
+-	reg |= 1 << expio;
+-	__raw_writew(reg, CPLD_INT_MASK_REG);
+-}
+-
+-/*
+- * Acknowledge an expanded io pin's interrupt by clearing the bit in the isr.
+- * @param irq           an expanded io virtual irq number
+- */
+-static void expio_ack_irq(uint32_t irq)
+-{
+-	uint32_t expio = MXC_IRQ_TO_EXPIO(irq);
+-
+-	/* clear the interrupt status */
+-	__raw_writew(1 << expio, CPLD_INT_RESET_REG);
+-	__raw_writew(0, CPLD_INT_RESET_REG);
+-	/* mask the interrupt */
+-	expio_mask_irq(irq);
+-}
+-
+-/*
+- * Enable a expio pin's interrupt by clearing the bit in the imr.
+- * @param irq           a expio virtual irq number
+- */
+-static void expio_unmask_irq(uint32_t irq)
+-{
+-	uint16_t reg;
+-	uint32_t expio = MXC_IRQ_TO_EXPIO(irq);
+-
+-	/* unmask the interrupt */
+-	reg = __raw_readw(CPLD_INT_MASK_REG);
+-	reg &= ~(1 << expio);
+-	__raw_writew(reg, CPLD_INT_MASK_REG);
+-}
+-
+-static struct irq_chip expio_irq_chip = {
+-	.ack = expio_ack_irq,
+-	.mask = expio_mask_irq,
+-	.unmask = expio_unmask_irq,
+-};
+-
+-static int __init mx31_3ds_init_expio(void)
+-{
+-	int i;
+-	int ret;
+-
+-	/* Check if there's a debug board connected */
+-	if ((__raw_readw(CPLD_MAGIC_NUMBER1_REG) != 0xAAAA) ||
+-	    (__raw_readw(CPLD_MAGIC_NUMBER2_REG) != 0x5555) ||
+-	    (__raw_readw(CPLD_MAGIC_NUMBER3_REG) != 0xCAFE)) {
+-		/* No Debug board found */
+-		return -ENODEV;
+-	}
+-
+-	pr_info("i.MX31 3DS Debug board detected, rev = 0x%04X\n",
+-		__raw_readw(CPLD_CODE_VER_REG));
+-
+-	/*
+-	 * Configure INT line as GPIO input
+-	 */
+-	ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1), "sms9217-irq");
+-	if (ret)
+-		pr_warning("could not get LAN irq gpio\n");
+-	else
+-		gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1));
+-
+-	/* Disable the interrupts and clear the status */
+-	__raw_writew(0, CPLD_INT_MASK_REG);
+-	__raw_writew(0xFFFF, CPLD_INT_RESET_REG);
+-	__raw_writew(0, CPLD_INT_RESET_REG);
+-	__raw_writew(0x1F, CPLD_INT_MASK_REG);
+-	for (i = MXC_EXP_IO_BASE;
+-	     i < (MXC_EXP_IO_BASE + MXC_MAX_EXP_IO_LINES);
+-	     i++) {
+-		set_irq_chip(i, &expio_irq_chip);
+-		set_irq_handler(i, handle_level_irq);
+-		set_irq_flags(i, IRQF_VALID);
+-	}
+-	set_irq_type(EXPIO_PARENT_INT, IRQ_TYPE_LEVEL_LOW);
+-	set_irq_chained_handler(EXPIO_PARENT_INT, mx31_3ds_expio_irq_handler);
+-
+-	return 0;
+-}
+-
+-/*
+- * This structure defines the MX31 memory map.
+- */
+-static struct map_desc mx31_3ds_io_desc[] __initdata = {
+-	{
+-		.virtual = MX31_CS5_BASE_ADDR_VIRT,
+-		.pfn = __phys_to_pfn(MX31_CS5_BASE_ADDR),
+-		.length = MX31_CS5_SIZE,
+-		.type = MT_DEVICE,
+-	},
+-};
+-
+-/*
+  * Set up static virtual mappings.
+  */
+ static void __init mx31_3ds_map_io(void)
+ {
+ 	mx31_map_io();
+-	iotable_init(mx31_3ds_io_desc, ARRAY_SIZE(mx31_3ds_io_desc));
+ }
+ 
+ /*!
+@@ -402,8 +240,9 @@ static void __init mxc_board_init(void)
+ 	mx31_3ds_usbotg_init();
+ 	mxc_register_device(&mxc_otg_udc_device, &usbotg_pdata);
+ 
+-	if (!mx31_3ds_init_expio())
+-		platform_device_register(&smsc911x_device);
++	if (!mxc_expio_init(CS5_BASE_ADDR, EXPIO_PARENT_INT))
++		printk(KERN_WARNING "Init of the debugboard failed, all "
++				    "devices on the board are unusable.\n");
+ }
+ 
+ static void __init mx31_3ds_timer_init(void)
+diff --git a/arch/arm/plat-mxc/include/mach/board-mx31_3ds.h b/arch/arm/plat-mxc/include/mach/board-mx31_3ds.h
+index da92933..c26d88d 100644
+--- a/arch/arm/plat-mxc/include/mach/board-mx31_3ds.h
++++ b/arch/arm/plat-mxc/include/mach/board-mx31_3ds.h
+@@ -12,48 +12,6 @@
+ #define __ASM_ARCH_MXC_BOARD_MX31_3DS_H__
+ 
+ /* Definitions for components on the Debug board */
+-
+-/* Base address of CPLD controller on the Debug board */
+-#define DEBUG_BASE_ADDRESS		CS5_IO_ADDRESS(CS5_BASE_ADDR)
+-
+-/* LAN9217 ethernet base address */
+-#define LAN9217_BASE_ADDR		CS5_BASE_ADDR
+-
+-/* CPLD config and interrupt base address */
+-#define CPLD_ADDR			(DEBUG_BASE_ADDRESS + 0x20000)
+-
+-/* LED switchs */
+-#define CPLD_LED_REG			(CPLD_ADDR + 0x00)
+-/* buttons */
+-#define CPLD_SWITCH_BUTTONS_REG	(EXPIO_ADDR + 0x08)
+-/* status, interrupt */
+-#define CPLD_INT_STATUS_REG		(CPLD_ADDR + 0x10)
+-#define CPLD_INT_MASK_REG		(CPLD_ADDR + 0x38)
+-#define CPLD_INT_RESET_REG		(CPLD_ADDR + 0x20)
+-/* magic word for debug CPLD */
+-#define CPLD_MAGIC_NUMBER1_REG		(CPLD_ADDR + 0x40)
+-#define CPLD_MAGIC_NUMBER2_REG		(CPLD_ADDR + 0x48)
+-/* CPLD code version */
+-#define CPLD_CODE_VER_REG		(CPLD_ADDR + 0x50)
+-/* magic word for debug CPLD */
+-#define CPLD_MAGIC_NUMBER3_REG		(CPLD_ADDR + 0x58)
+-/* module reset register */
+-#define CPLD_MODULE_RESET_REG		(CPLD_ADDR + 0x60)
+-/* CPU ID and Personality ID */
+-#define CPLD_MCU_BOARD_ID_REG		(CPLD_ADDR + 0x68)
+-
+-/* CPLD IRQ line for external uart, external ethernet etc */
+ #define EXPIO_PARENT_INT	IOMUX_TO_IRQ(MX31_PIN_GPIO1_1)
+ 
+-#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
+-#define MXC_IRQ_TO_EXPIO(irq)	((irq) - MXC_EXP_IO_BASE)
+-
+-#define EXPIO_INT_ENET		(MXC_EXP_IO_BASE + 0)
+-#define EXPIO_INT_XUART_A	(MXC_EXP_IO_BASE + 1)
+-#define EXPIO_INT_XUART_B	(MXC_EXP_IO_BASE + 2)
+-#define EXPIO_INT_BUTTON_A	(MXC_EXP_IO_BASE + 3)
+-#define EXPIO_INT_BUTTON_B	(MXC_EXP_IO_BASE + 4)
+-
+-#define MXC_MAX_EXP_IO_LINES	16
+-
+ #endif /* __ASM_ARCH_MXC_BOARD_MX31_3DS_H__ */
 -- 
 1.5.6.5
