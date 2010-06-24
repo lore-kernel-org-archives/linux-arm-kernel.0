@@ -1,33 +1,284 @@
-From: sw1-arm-linux@gmx.de (Stefan)
-Date: Thu, 24 Jun 2010 15:44:31 +0200
-Subject: NXP LPC3250 LCD controller
-Message-ID: <201006241544.32140.sw1-arm-linux@gmx.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 24 Jun 2010 15:48:57 +0200
+Subject: [PATCH 01/61] ARM: mx3: rename mach-mx35pdk.c to mach-mx35_3ds.c
+	matching its arch number
+In-Reply-To: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1277387397-3467-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Additional document all known names of that machine.
 
-there is an errata for NXP LPC3250 LCD controller.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-mx3/Makefile        |    2 +-
+ arch/arm/mach-mx3/mach-mx35_3ds.c |  122 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mx3/mach-mx35pdk.c  |  116 -----------------------------------
+ 3 files changed, 123 insertions(+), 117 deletions(-)
+ create mode 100644 arch/arm/mach-mx3/mach-mx35_3ds.c
+ delete mode 100644 arch/arm/mach-mx3/mach-mx35pdk.c
 
-****
-3.4 LCD.1: Low throughput when LCD controller accesses DDR/SDRAM
-
-Introduction:
-The LCD controller is an AHB Master that uses an internal DMA controller
-to transfer frame data from memory to the LCD panel.
-
-Problem:
-The time required to read data from either SDR or DDR SDRAM using the
-LCD DMA controller takes longer than expected. ...
-****
-
-Does anybody know whether LCD with greater resolution then QVGA will 
-definitely not work? 
-(I'll use 480x272 24Bit) 
-
-Or is there something I could fine tune in memory arbiter?
-
-Has somebody a lager LCD than QVGA running on Linux with this SOC?
-
-Thanks in advance 
-Stefan
+diff --git a/arch/arm/mach-mx3/Makefile b/arch/arm/mach-mx3/Makefile
+index 5d650fd..2a4798d 100644
+--- a/arch/arm/mach-mx3/Makefile
++++ b/arch/arm/mach-mx3/Makefile
+@@ -22,5 +22,5 @@ obj-$(CONFIG_MACH_MX31MOBOARD)	+= mach-mx31moboard.o mx31moboard-devboard.o \
+ obj-$(CONFIG_MACH_QONG)		+= mach-qong.o
+ obj-$(CONFIG_MACH_PCM043)	+= mach-pcm043.o
+ obj-$(CONFIG_MACH_ARMADILLO5X0) += mach-armadillo5x0.o
+-obj-$(CONFIG_MACH_MX35_3DS)	+= mach-mx35pdk.o
++obj-$(CONFIG_MACH_MX35_3DS)	+= mach-mx35_3ds.o
+ obj-$(CONFIG_MACH_KZM_ARM11_01)	+= mach-kzm_arm11_01.o
+diff --git a/arch/arm/mach-mx3/mach-mx35_3ds.c b/arch/arm/mach-mx3/mach-mx35_3ds.c
+new file mode 100644
+index 0000000..66ad2da
+--- /dev/null
++++ b/arch/arm/mach-mx3/mach-mx35_3ds.c
+@@ -0,0 +1,122 @@
++/*
++ * Copyright 2009 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * Author: Fabio Estevam <fabio.estevam@freescale.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++/*
++ * This machine is known as:
++ *  - i.MX35 3-Stack Development System
++ *  - i.MX35 Platform Development Kit (i.MX35 PDK)
++ */
++
++#include <linux/types.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/memory.h>
++#include <linux/gpio.h>
++#include <linux/fsl_devices.h>
++
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++#include <asm/mach/map.h>
++
++#include <mach/hardware.h>
++#include <mach/common.h>
++#include <mach/imx-uart.h>
++#include <mach/iomux-mx35.h>
++
++#include "devices.h"
++
++static struct imxuart_platform_data uart_pdata = {
++	.flags = IMXUART_HAVE_RTSCTS,
++};
++
++static struct platform_device *devices[] __initdata = {
++	&mxc_fec_device,
++};
++
++static struct pad_desc mx35pdk_pads[] = {
++	/* UART1 */
++	MX35_PAD_CTS1__UART1_CTS,
++	MX35_PAD_RTS1__UART1_RTS,
++	MX35_PAD_TXD1__UART1_TXD_MUX,
++	MX35_PAD_RXD1__UART1_RXD_MUX,
++	/* FEC */
++	MX35_PAD_FEC_TX_CLK__FEC_TX_CLK,
++	MX35_PAD_FEC_RX_CLK__FEC_RX_CLK,
++	MX35_PAD_FEC_RX_DV__FEC_RX_DV,
++	MX35_PAD_FEC_COL__FEC_COL,
++	MX35_PAD_FEC_RDATA0__FEC_RDATA_0,
++	MX35_PAD_FEC_TDATA0__FEC_TDATA_0,
++	MX35_PAD_FEC_TX_EN__FEC_TX_EN,
++	MX35_PAD_FEC_MDC__FEC_MDC,
++	MX35_PAD_FEC_MDIO__FEC_MDIO,
++	MX35_PAD_FEC_TX_ERR__FEC_TX_ERR,
++	MX35_PAD_FEC_RX_ERR__FEC_RX_ERR,
++	MX35_PAD_FEC_CRS__FEC_CRS,
++	MX35_PAD_FEC_RDATA1__FEC_RDATA_1,
++	MX35_PAD_FEC_TDATA1__FEC_TDATA_1,
++	MX35_PAD_FEC_RDATA2__FEC_RDATA_2,
++	MX35_PAD_FEC_TDATA2__FEC_TDATA_2,
++	MX35_PAD_FEC_RDATA3__FEC_RDATA_3,
++	MX35_PAD_FEC_TDATA3__FEC_TDATA_3,
++	/* USBOTG */
++	MX35_PAD_USBOTG_PWR__USB_TOP_USBOTG_PWR,
++	MX35_PAD_USBOTG_OC__USB_TOP_USBOTG_OC,
++};
++
++/* OTG config */
++static struct fsl_usb2_platform_data usb_pdata = {
++	.operating_mode	= FSL_USB2_DR_DEVICE,
++	.phy_mode	= FSL_USB2_PHY_UTMI_WIDE,
++};
++
++/*
++ * Board specific initialization.
++ */
++static void __init mxc_board_init(void)
++{
++	mxc_iomux_v3_setup_multiple_pads(mx35pdk_pads, ARRAY_SIZE(mx35pdk_pads));
++
++	platform_add_devices(devices, ARRAY_SIZE(devices));
++
++	mxc_register_device(&mxc_uart_device0, &uart_pdata);
++
++	mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
++}
++
++static void __init mx35pdk_timer_init(void)
++{
++	mx35_clocks_init();
++}
++
++struct sys_timer mx35pdk_timer = {
++	.init	= mx35pdk_timer_init,
++};
++
++MACHINE_START(MX35_3DS, "Freescale MX35PDK")
++	/* Maintainer: Freescale Semiconductor, Inc */
++	.phys_io	= MX35_AIPS1_BASE_ADDR,
++	.io_pg_offst	= ((MX35_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.boot_params    = MX3x_PHYS_OFFSET + 0x100,
++	.map_io         = mx35_map_io,
++	.init_irq       = mx35_init_irq,
++	.init_machine   = mxc_board_init,
++	.timer          = &mx35pdk_timer,
++MACHINE_END
+diff --git a/arch/arm/mach-mx3/mach-mx35pdk.c b/arch/arm/mach-mx3/mach-mx35pdk.c
+deleted file mode 100644
+index bcac84d..0000000
+--- a/arch/arm/mach-mx3/mach-mx35pdk.c
++++ /dev/null
+@@ -1,116 +0,0 @@
+-/*
+- * Copyright 2009 Freescale Semiconductor, Inc. All Rights Reserved.
+- *
+- * Author: Fabio Estevam <fabio.estevam@freescale.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-#include <linux/types.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/memory.h>
+-#include <linux/gpio.h>
+-#include <linux/fsl_devices.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-#include <asm/mach/map.h>
+-
+-#include <mach/hardware.h>
+-#include <mach/common.h>
+-#include <mach/imx-uart.h>
+-#include <mach/iomux-mx35.h>
+-
+-#include "devices.h"
+-
+-static struct imxuart_platform_data uart_pdata = {
+-	.flags = IMXUART_HAVE_RTSCTS,
+-};
+-
+-static struct platform_device *devices[] __initdata = {
+-	&mxc_fec_device,
+-};
+-
+-static struct pad_desc mx35pdk_pads[] = {
+-	/* UART1 */
+-	MX35_PAD_CTS1__UART1_CTS,
+-	MX35_PAD_RTS1__UART1_RTS,
+-	MX35_PAD_TXD1__UART1_TXD_MUX,
+-	MX35_PAD_RXD1__UART1_RXD_MUX,
+-	/* FEC */
+-	MX35_PAD_FEC_TX_CLK__FEC_TX_CLK,
+-	MX35_PAD_FEC_RX_CLK__FEC_RX_CLK,
+-	MX35_PAD_FEC_RX_DV__FEC_RX_DV,
+-	MX35_PAD_FEC_COL__FEC_COL,
+-	MX35_PAD_FEC_RDATA0__FEC_RDATA_0,
+-	MX35_PAD_FEC_TDATA0__FEC_TDATA_0,
+-	MX35_PAD_FEC_TX_EN__FEC_TX_EN,
+-	MX35_PAD_FEC_MDC__FEC_MDC,
+-	MX35_PAD_FEC_MDIO__FEC_MDIO,
+-	MX35_PAD_FEC_TX_ERR__FEC_TX_ERR,
+-	MX35_PAD_FEC_RX_ERR__FEC_RX_ERR,
+-	MX35_PAD_FEC_CRS__FEC_CRS,
+-	MX35_PAD_FEC_RDATA1__FEC_RDATA_1,
+-	MX35_PAD_FEC_TDATA1__FEC_TDATA_1,
+-	MX35_PAD_FEC_RDATA2__FEC_RDATA_2,
+-	MX35_PAD_FEC_TDATA2__FEC_TDATA_2,
+-	MX35_PAD_FEC_RDATA3__FEC_RDATA_3,
+-	MX35_PAD_FEC_TDATA3__FEC_TDATA_3,
+-	/* USBOTG */
+-	MX35_PAD_USBOTG_PWR__USB_TOP_USBOTG_PWR,
+-	MX35_PAD_USBOTG_OC__USB_TOP_USBOTG_OC,
+-};
+-
+-/* OTG config */
+-static struct fsl_usb2_platform_data usb_pdata = {
+-	.operating_mode	= FSL_USB2_DR_DEVICE,
+-	.phy_mode	= FSL_USB2_PHY_UTMI_WIDE,
+-};
+-
+-/*
+- * Board specific initialization.
+- */
+-static void __init mxc_board_init(void)
+-{
+-	mxc_iomux_v3_setup_multiple_pads(mx35pdk_pads, ARRAY_SIZE(mx35pdk_pads));
+-
+-	platform_add_devices(devices, ARRAY_SIZE(devices));
+-
+-	mxc_register_device(&mxc_uart_device0, &uart_pdata);
+-
+-	mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
+-}
+-
+-static void __init mx35pdk_timer_init(void)
+-{
+-	mx35_clocks_init();
+-}
+-
+-struct sys_timer mx35pdk_timer = {
+-	.init	= mx35pdk_timer_init,
+-};
+-
+-MACHINE_START(MX35_3DS, "Freescale MX35PDK")
+-	/* Maintainer: Freescale Semiconductor, Inc */
+-	.phys_io	= MX35_AIPS1_BASE_ADDR,
+-	.io_pg_offst	= ((MX35_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+-	.boot_params    = MX3x_PHYS_OFFSET + 0x100,
+-	.map_io         = mx35_map_io,
+-	.init_irq       = mx35_init_irq,
+-	.init_machine   = mxc_board_init,
+-	.timer          = &mx35pdk_timer,
+-MACHINE_END
+-- 
+1.7.1
