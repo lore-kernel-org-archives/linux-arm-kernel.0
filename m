@@ -1,60 +1,37 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 24 Jun 2010 21:33:07 +0200
-Subject: [PATCH 3/4] pxa2xx/cpufreq: Fix PCMCIA frequency scaling
-In-Reply-To: <20100624191208.GB7974@n2100.arm.linux.org.uk>
-References: <1276840135-5982-1-git-send-email-marek.vasut@gmail.com>
-	<201006242051.27790.marek.vasut@gmail.com>
-	<20100624191208.GB7974@n2100.arm.linux.org.uk>
-Message-ID: <201006242133.07899.marek.vasut@gmail.com>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Thu, 24 Jun 2010 21:48:12 +0200
+Subject: 
+In-Reply-To: <20100624175528.GA14838@pengutronix.de>
+References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>	<4C236EC2.8090506@eukrea.com>
+	<20100624175528.GA14838@pengutronix.de>
+Message-ID: <4C23B67C.7090207@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 24. ?ervna 2010 21:12:08 Russell King - ARM Linux napsal(a):
-> On Thu, Jun 24, 2010 at 08:51:27PM +0200, Marek Vasut wrote:
-> > Dne St 23. ?ervna 2010 19:49:59 Robert Jarzmik napsal(a):
-> > > Marek Vasut <marek.vasut@gmail.com> writes:
-> > > > The MCxx values must be based off memory clock, not CPU core clock.
-> > > > 
-> > > > This also fixes the bug where on some machines the LCD went crazy
-> > > > while using PCMCIA.
-> > > 
-> > > That looks correct to me.
-> > > 
-> > > Reviewed-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> > > 
-> > > Cheers.
-> > > 
-> > > --
-> > > Robert
-> > 
-> > Actually lemme rethink this ... it might still be incorrect.
+Hi Uwe,
 
-Rethought ... well I think there's no problem with this. Anyway, thanks for 
-CCing Nico.
+Le 24/06/2010 19:55, Uwe Kleine-K?nig a ?crit :
+> On Thu, Jun 24, 2010 at 04:42:10PM +0200, Eric B?nard wrote:
+>> Le 24/06/2010 15:48, Uwe Kleine-K?nig a ?crit :
+>>> this is the next step in the project "clean up the imx port" targeting
+>>> 2.6.36.  The highlights this time are:
+>>>
+>> maybe that would be interesting to rebase your patch serie against
+>> Sascha's imx-for-2.6.36 in order to include new boards (especially for
+>> the patches which change registering nand, i2c, spi and uart) ?
+> No, I don't want to rebase it.  I hope Sascha just merges my tree.  Do
+> you know of any problems, I havn't checked if Sascha's branch introduces
+> any new users of devices I removed.  I make a mental note to check thatOK
+> after Sascha merged.
+>
+There are at least my i.MX25 and i.MX35 machines that I would have 
+updated to you patch serie and tested but trying to merge your branch 
+over Sasha's imx-for-2.6.36 + kernel.org tree at 2.6.35-rc3 leads to at 
+least 9 conflitcs.
+How do you manage to merge this simply in order to test it ?
+I added your branch as a remote tree, then fetched it, then merged it : 
+is there any magic git sequence missing here that would help to reduce 
+the number of conflicts ?
 
-This patch fixed an issue on zaurus so I believe it's ok.
-> 
-> As Nicolas was the one who originally wrote that code, while he was
-> working for Montavista and interacting with Intel, I'd be surprised
-> if he didn't try finding out what the right answer is to that fixme.
-> 
-> I suspect as the fixme remained that there was no clear answer.
-
-Well if you look into some schematics, you see the pxa pcmcia is connected to 
-the memory bus ... as other peripherals.
-
-> 
-> Nicolas, can you shed any light on this:
-> 
-> static int
-> pxa2xx_pcmcia_frequency_change(struct soc_pcmcia_socket *skt,
->                                unsigned long val,
->                                struct cpufreq_freqs *freqs)
-> {
-> #warning "it's not clear if this is right since the core CPU (N) clock has
-> no effect on the memory (L) clock"
-
-Cheers
-
-PS. Russell ... feel like doing some politics again? ;-) (take it as a joke 
-please)
+Thanks,
+Eric
