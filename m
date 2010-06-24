@@ -1,112 +1,59 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 24 Jun 2010 16:02:09 +0200
-Subject: [PATCH 1/4] pxa/z2: Add regulator support
-Message-ID: <1277388132-5549-1-git-send-email-marek.vasut@gmail.com>
+Date: Thu, 24 Jun 2010 16:02:11 +0200
+Subject: [PATCH 3/4] ARM/scoop: Add CPR register bit definitions
+In-Reply-To: <1277388132-5549-1-git-send-email-marek.vasut@gmail.com>
+References: <1277388132-5549-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1277388132-5549-3-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register TPS65021 regulator in Zipit Z2.
+Add bit definitions of the CPR register of the SCOOP chip into scoop.h. Also,
+cleanup the GPCR definitions to match coding style.
 
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- arch/arm/mach-pxa/z2.c |   71 ++++++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 71 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/hardware/scoop.h |   29 +++++++++++++++++------------
+ 1 files changed, 17 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
-index 4cba5b6..1bafb23 100644
---- a/arch/arm/mach-pxa/z2.c
-+++ b/arch/arm/mach-pxa/z2.c
-@@ -26,6 +26,7 @@
- #include <linux/gpio.h>
- #include <linux/gpio_keys.h>
- #include <linux/delay.h>
-+#include <linux/regulator/machine.h>
+diff --git a/arch/arm/include/asm/hardware/scoop.h b/arch/arm/include/asm/hardware/scoop.h
+index 46492a6..ebb3cea 100644
+--- a/arch/arm/include/asm/hardware/scoop.h
++++ b/arch/arm/include/asm/hardware/scoop.h
+@@ -22,18 +22,23 @@
+ #define SCOOP_GPWR 0x24
+ #define SCOOP_GPRR 0x28
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -616,6 +617,75 @@ static inline void z2_spi_init(void) {}
- #endif
+-#define SCOOP_GPCR_PA22	( 1 << 12 )
+-#define SCOOP_GPCR_PA21	( 1 << 11 )
+-#define SCOOP_GPCR_PA20	( 1 << 10 )
+-#define SCOOP_GPCR_PA19	( 1 << 9 )
+-#define SCOOP_GPCR_PA18	( 1 << 8 )
+-#define SCOOP_GPCR_PA17	( 1 << 7 )
+-#define SCOOP_GPCR_PA16	( 1 << 6 )
+-#define SCOOP_GPCR_PA15	( 1 << 5 )
+-#define SCOOP_GPCR_PA14	( 1 << 4 )
+-#define SCOOP_GPCR_PA13	( 1 << 3 )
+-#define SCOOP_GPCR_PA12	( 1 << 2 )
+-#define SCOOP_GPCR_PA11	( 1 << 1 )
++#define SCOOP_CPR_OUT	(1 << 7)
++#define SCOOP_CPR_SD_3V	(1 << 2)
++#define SCOOP_CPR_CF_XV	(1 << 1)
++#define SCOOP_CPR_CF_3V	(1 << 0)
++
++#define SCOOP_GPCR_PA22	(1 << 12)
++#define SCOOP_GPCR_PA21	(1 << 11)
++#define SCOOP_GPCR_PA20	(1 << 10)
++#define SCOOP_GPCR_PA19	(1 << 9)
++#define SCOOP_GPCR_PA18	(1 << 8)
++#define SCOOP_GPCR_PA17	(1 << 7)
++#define SCOOP_GPCR_PA16	(1 << 6)
++#define SCOOP_GPCR_PA15	(1 << 5)
++#define SCOOP_GPCR_PA14	(1 << 4)
++#define SCOOP_GPCR_PA13	(1 << 3)
++#define SCOOP_GPCR_PA12	(1 << 2)
++#define SCOOP_GPCR_PA11	(1 << 1)
  
- /******************************************************************************
-+ * Core power regulator
-+ ******************************************************************************/
-+#if defined(CONFIG_REGULATOR_TPS65023) || \
-+	defined(CONFIG_REGULATOR_TPS65023_MODULE)
-+static struct regulator_consumer_supply z2_tps65021_consumers[] = {
-+	{
-+		.supply	= "vcc_core",
-+	}
-+};
-+
-+static struct regulator_init_data z2_tps65021_info[] = {
-+	{
-+		.constraints = {
-+			.name		= "vcc_core range",
-+			.min_uV		= 800000,
-+			.max_uV		= 1600000,
-+			.always_on	= 1,
-+			.valid_ops_mask	= REGULATOR_CHANGE_VOLTAGE,
-+		},
-+		.consumer_supplies	= z2_tps65021_consumers,
-+		.num_consumer_supplies	= ARRAY_SIZE(z2_tps65021_consumers),
-+	}, {
-+		.constraints = {
-+			.name		= "DCDC2",
-+			.min_uV		= 3300000,
-+			.max_uV		= 3300000,
-+			.always_on	= 1,
-+		},
-+	}, {
-+		.constraints = {
-+			.name		= "DCDC3",
-+			.min_uV		= 1800000,
-+			.max_uV		= 1800000,
-+			.always_on	= 1,
-+		},
-+	}, {
-+		.constraints = {
-+			.name		= "LDO1",
-+			.min_uV		= 1000000,
-+			.max_uV		= 3150000,
-+			.always_on	= 1,
-+		},
-+	}, {
-+		.constraints = {
-+			.name		= "LDO2",
-+			.min_uV		= 1050000,
-+			.max_uV		= 3300000,
-+			.always_on	= 1,
-+		},
-+	}
-+};
-+
-+static struct i2c_board_info __initdata z2_pi2c_board_info[] = {
-+	{
-+		I2C_BOARD_INFO("tps65021", 0x48),
-+		.platform_data	= &z2_tps65021_info,
-+	},
-+};
-+
-+static void __init z2_pmic_init(void)
-+{
-+	pxa27x_set_i2c_power_info(NULL);
-+	i2c_register_board_info(1, ARRAY_AND_SIZE(z2_pi2c_board_info));
-+}
-+#else
-+static inline void z2_pmic_init(void) {}
-+#endif
-+
-+/******************************************************************************
-  * Machine init
-  ******************************************************************************/
- static void __init z2_init(void)
-@@ -635,6 +705,7 @@ static void __init z2_init(void)
- 	z2_pwm_init();
- 	z2_leds_init();
- 	z2_keys_init();
-+	z2_pmic_init();
- }
- 
- MACHINE_START(ZIPIT2, "Zipit Z2")
+ struct scoop_config {
+ 	unsigned short io_out;
 -- 
 1.7.1
