@@ -1,88 +1,17 @@
-From: linus.walleij@stericsson.com (Linus WALLEIJ)
-Date: Thu, 24 Jun 2010 10:56:09 +0200
-Subject: [PATCH 07/12] mmci: pass power_mode to the translate_vdd callback
-In-Reply-To: <20100624082746.GA12453@bnru01.bnr.st.com>
-References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
-	<1277198267-10860-7-git-send-email-rabin.vincent@stericsson.com>
-	<AANLkTil2Cb4alVFkfEjXApMgIdkmNvEEarWkT9AhXIdU@mail.gmail.com>
-	<20100624082746.GA12453@bnru01.bnr.st.com>
-Message-ID: <CEE6BB42CAD6E947908279175AF8470A025FD0D483@EXDCVYMBSTM006.EQ1STM.local>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 24 Jun 2010 11:57:01 +0300
+Subject: [PATCH -next 0/2] mx25: add iomux defines
+Message-ID: <cover.1277369614.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Rabin]
+This series adds some iomux defines needed for the UART4 and the PWM4 devices.
 
-> On Wed, Jun 23, 2010 at 00:03:47 +0200, Linus Walleij wrote:
-> > 2010/6/22 Rabin Vincent <rabin.vincent@stericsson.com>:
-> > > @@ -17,7 +17,8 @@
-> > > ?* mmc/host.h
-> > > ?* @translate_vdd: a callback function to translate a MMC_VDD_*
-> > > ?* mask into a value to be binary or:ed and written into the
-> > > - * MMCIPWR register of the block
-> > > + * MMCIPWR register of the block. ?May also control external power
-> > > + * based on the power_mode.
-> >
-> > Actually this callback is named like that for a reason: it is to be
-> used
-> > to translate the MMC_VDD_* into a u8:4 bitmask for the MMCIPWR
-> > register, 4 bits possibly routed out of the PL180 block on some
-> > designs (never seen in practice, but could be used in theory).
-> >
-> > So it translates a voltage into a 4-bit bitmask, hence the name.
-> >
-> > Now the semantics are altered to have other side-effects in
-> > the platform, so the function should be renamed, something like
-> > platform_vdd_handler() would be more appropriate.
-> >
-> 
-> This is already inside platform data, so how about just -
-> >vdd_handler()?
-> Or ->set_power(), like some other drivers?
+This version applies to current imx-for-2.6.36.
 
-Any of these look good to me atleast.
+Baruch Siach (2):
+  mx25: add iomux defines for UART4 on KPP pins
+  mx25: add PWM4 to iomux
 
-But now another thing I came to think of (the fun never
-ends):
-
-Since the ux500 also have a regulator for this and since
-that mechanism is mutually exclusive in the code (since the
-semantics implied that it was only a voltage translation
-function) you should also remove the condition that this
-only gets called in case there is no regulator.
-
-> Note that we'd also like to use this to do the board-specific settings
-> for the *DIREN and FBCLK bits, which replace the Voltage bits on some
-> ST
-> variants, like so:
-> 
-> +static u32 mop500_sdi0_translate_vdd(struct device *dev, unsigned int
-> vdd,
-> +				     unsigned char power_mode)
-> +{
-> +	if (power_mode == MMC_POWER_UP)
-> +		gpio_set_value(gpio_sdmmc_en, 1);
-> +	else if (power_mode == MMC_POWER_OFF)
-> +		gpio_set_value(gpio_sdmmc_en, 0);
-> +
-> +	return MCI_FBCLKEN | MCI_CMDDIREN | MCI_DATA0DIREN |
-> +	       MCI_DATA2DIREN | MCI_DATA31DIREN;
-> +}
-
-OK just update the kerneldoc to reflect the fact that the platform
-can OR on any *custom* bits it like to the PWR register in this
-function.
-
-Side notice: some of bits are for the ST version only, when you
-patch in the latter, can you take this opportunity to also
-rename MCI_FBCLKEN to MCI_ST_FBCLKEN and so on for all stuff
-that is ST-specific? I think I am the sinner here, we had no
-convention for how to do this naming when we first began
-modifying this driver. It should be crystal clear that all
-custom extensions are named MCI_<VENDOR>_FOO.
-
-As a consequence, anything that is OR:ed into from the
-vdd_handler() should typically be MCI_<VENDOR>_FOO, and
-it will be clear why it's there.
-
-Yours,
-Linus Walleij
+ arch/arm/plat-mxc/include/mach/iomux-mx25.h |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
