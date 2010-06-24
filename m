@@ -1,31 +1,26 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 24 Jun 2010 10:08:47 +0100
-Subject: [PATCH 2/3] ARM: module - simplify unwind table handling
-In-Reply-To: <20100624090502.GA1398@n2100.arm.linux.org.uk>
-References: <1275567442-11370-1-git-send-email-ext-phil.2.carmody@nokia.com>
-	<1275567442-11370-2-git-send-email-ext-phil.2.carmody@nokia.com>
-	<1275567442-11370-3-git-send-email-ext-phil.2.carmody@nokia.com>
-	<20100624090502.GA1398@n2100.arm.linux.org.uk>
-Message-ID: <1277370527.31432.0.camel@e102109-lin.cambridge.arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 24 Jun 2010 11:36:14 +0200
+Subject: [PATCH 09/16] arm/mx2/mbimx27: compile fixes with
+	CONFIG_TOUCHSCREEN_ADS7846=y
+In-Reply-To: <20100622161314.GA18606@pengutronix.de>
+References: <20100524195430.GA28403@pengutronix.de>
+	<1274730951-29106-9-git-send-email-u.kleine-koenig@pengutronix.de>
+	<4BFADD4F.80309@eukrea.com> <20100524203428.GB29092@pengutronix.de>
+	<20100622161314.GA18606@pengutronix.de>
+Message-ID: <20100624093614.GB23539@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-06-24 at 10:05 +0100, Russell King - ARM Linux wrote:
-> On Thu, Jun 03, 2010 at 03:17:21PM +0300, Phil Carmody wrote:
-> >  #ifdef CONFIG_ARM_UNWIND
-> ...
-> > +#else
-> > +struct mod_arch_specific {
-> > +}
-> > +#endif
-> 
-> I assume no one tried building these with UNWIND disabled?  linux-next
-> reports most ARM builds are broken by this.
-> 
-> Dropped all three patches out of my git tree until it can be fixed.
+Hello,
 
-It looks like a patch for fixing the build was posted on the 16th of
-June, though not sure whether it went to your patch system or not.
+> If we want to have ADS7846 at least compilable in .35 we should go with
+> my patch as your's is (IMHO) too intrusive after -rc1.
+I have somehow missed that Eric's patch is already in Sascha's
+for-2.6.35 branch.  So there is nothing to do.
+
+Best regards
+Uwe
 
 -- 
-Catalin
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
