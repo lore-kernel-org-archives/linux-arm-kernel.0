@@ -1,134 +1,88 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 24 Jun 2010 16:43:09 -0700
-Subject: [PATCH v2 1/3] OMAP: PM: initial runtime PM core support
+Date: Thu, 24 Jun 2010 16:43:10 -0700
+Subject: [PATCH v2 2/3] OMAP: bus-level PM: enable use of runtime PM API for
+	suspend/resume
 In-Reply-To: <1277422991-25350-1-git-send-email-khilman@deeprootsystems.com>
 References: <1277422991-25350-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1277422991-25350-2-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1277422991-25350-3-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the new runtime PM framework as a thin layer on top of the
-omap_device API.  Since we don't have an OMAP-specific bus, override
-the runtime PM hooks for the platform_bus for the OMAP specific
-implementation.
+Hook into the platform bus methods for suspend and resume and use the
+runtime PM API to allow the OMAP runtime PM core (based on
+omap_device) to automatically idle and enable the device on suspend
+and resume.
 
-While the runtime PM API has three main states (idle, suspend, resume)
-This version treats idle and suspend the same way by implementing both
-on top of omap_device_disable(), which follows closely with how driver
-are currently using clock enable/disable calls. Longer-termm
-pm_runtime_idle() could take other constraints into consideration to
-make the decision, but the current
+This allows device drivers to get rid of direct management of their
+clocks in their suspend/resume paths, and let omap_device do it for
+them .
 
-Device driver ->runtime_suspend() hooks are called just before the
-device is disabled (via omap_device_idle()), and device driver
-->runtime_resume() hooks are called just after device has been
-enabled (via omap_device_enable().)
+We currently use the _noirq (late suspend, early resume) versions of
+the suspend/resume methods to ensure that the device is not disabled
+too early for any drivers also using the _noirq methods.
+
+NOTE: only works for devices with omap_hwmod support.
 
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/Makefile |    7 +++-
- arch/arm/mach-omap2/pm_bus.c |   70 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 76 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-omap2/pm_bus.c
+ arch/arm/mach-omap2/pm_bus.c |   48 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 48 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index ea52b03..8ed47ea 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -46,12 +46,17 @@ obj-$(CONFIG_ARCH_OMAP2)		+= sdrc2xxx.o
- ifeq ($(CONFIG_PM),y)
- obj-$(CONFIG_ARCH_OMAP2)		+= pm24xx.o
- obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o
--obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o cpuidle34xx.o
-+obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o cpuidle34xx.o \
-+					   pm_bus.o
- obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
- 
- AFLAGS_sleep24xx.o			:=-Wa,-march=armv6
- AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-a
- 
-+ifeq ($(CONFIG_PM_VERBOSE),y)
-+CFLAGS_pm_bus.o				+= -DDEBUG
-+endif
-+
- endif
- 
- # PRCM
 diff --git a/arch/arm/mach-omap2/pm_bus.c b/arch/arm/mach-omap2/pm_bus.c
-new file mode 100644
-index 0000000..9719a9f
---- /dev/null
+index 9719a9f..5e453dc 100644
+--- a/arch/arm/mach-omap2/pm_bus.c
 +++ b/arch/arm/mach-omap2/pm_bus.c
-@@ -0,0 +1,70 @@
-+/*
-+ * Runtime PM support code for OMAP
-+ *
-+ * Author: Kevin Hilman, Deep Root Systems, LLC
-+ *
-+ * Copyright (C) 2010 Texas Instruments, Inc.
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/io.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/platform_device.h>
-+#include <linux/mutex.h>
-+
-+#include <plat/omap_device.h>
-+#include <plat/omap-pm.h>
-+
-+#ifdef CONFIG_PM_RUNTIME
-+int platform_pm_runtime_suspend(struct device *dev)
+@@ -68,3 +68,51 @@ int platform_pm_runtime_idle(struct device *dev)
+ };
+ #endif /* CONFIG_PM_RUNTIME */
+ 
++#ifdef CONFIG_SUSPEND
++int platform_pm_suspend_noirq(struct device *dev)
 +{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct omap_device *odev = to_omap_device(pdev);
-+	int r, ret = 0;
++	struct device_driver *drv = dev->driver;
++	int ret = 0;
 +
-+	dev_dbg(dev, "%s\n", __func__);
++	if (!drv)
++		return 0;
 +
-+	if (dev->driver->pm && dev->driver->pm->runtime_suspend)
-+		ret = dev->driver->pm->runtime_suspend(dev);
-+	if (!ret && omap_device_is_valid(odev)) {
-+		r = omap_device_idle(pdev);
-+		WARN_ON(r);
++	if (drv->pm) {
++		if (drv->pm->suspend_noirq)
++			ret = drv->pm->suspend_noirq(dev);
++	}
++
++	/*
++	 * The DPM core has done a 'get' to prevent runtime PM
++	 * transitions during system PM.  This put is to balance
++	 * out that get so that this device can now be runtime
++	 * suspended.
++	 */
++	pm_runtime_put_sync(dev);
++
++	return ret;
++}
++
++int platform_pm_resume_noirq(struct device *dev)
++{
++	struct device_driver *drv = dev->driver;
++	int ret = 0;
++
++	/* 
++	 * This 'get' is to balance the 'put' in the above suspend_noirq
++	 * method so that the runtime PM usage counting is in the same
++	 * state it was when suspend was called.
++	 */
++	pm_runtime_get_sync(dev);
++
++	if (!drv)
++		return 0;
++
++	if (drv->pm) {
++		if (drv->pm->resume_noirq)
++			ret = drv->pm->resume_noirq(dev);
 +	}
 +
 +	return ret;
-+};
-+
-+int platform_pm_runtime_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct omap_device *odev = to_omap_device(pdev);
-+	int r, ret = 0;
-+
-+	dev_dbg(dev, "%s\n", __func__);
-+
-+	if (omap_device_is_valid(odev)) {
-+		r = omap_device_enable(pdev);
-+		WARN_ON(r);
-+	}
-+
-+	if (dev->driver->pm && dev->driver->pm->runtime_resume)
-+		ret = dev->driver->pm->runtime_resume(dev);
-+
-+	return ret;
-+};
-+
-+int platform_pm_runtime_idle(struct device *dev)
-+{
-+	int ret;
-+
-+	ret = pm_runtime_suspend(dev);
-+	dev_dbg(dev, "%s [%d]\n", __func__, ret);
-+
-+	return 0;
-+};
-+#endif /* CONFIG_PM_RUNTIME */
-+
++}
++#endif /* CONFIG_SUSPEND */
 -- 
 1.7.0.2
