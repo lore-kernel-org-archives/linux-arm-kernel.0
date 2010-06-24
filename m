@@ -1,52 +1,64 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 24 Jun 2010 10:20:35 +0200
-Subject: [RFC PATCH] Rework gpio cansleep (was Re: gpiolib and
-	sleepinggpios)
-In-Reply-To: <70E876B0EA86DD4BAF101844BC814DFE08E0855B97@Cloud.RL.local>
-References: <70E876B0EA86DD4BAF101844BC814DFE08E0855B97@Cloud.RL.local>
-Message-ID: <4C231553.3030001@metafoo.de>
+From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
+Date: Thu, 24 Jun 2010 11:19:15 +0300
+Subject: [PATCH 3/3] add ARM crashdump support
+In-Reply-To: <20100624163356.dbb849bc.igawa@mxs.nes.nec.co.jp>
+References: <cover.1277188127.git.ext-mika.1.westerberg@nokia.com>
+	<b567a76e7f4502ccd56f818ebd3d6509ebd4a96d.1277188128.git.ext-mika.1.westerberg@nokia.com>
+	<20100624163356.dbb849bc.igawa@mxs.nes.nec.co.jp>
+Message-ID: <20100624081915.GF29920@esdhcp04058.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jon Povey wrote:
-> Ryan Mallon wrote:
->
->   
->> If we strip my patch back to just introducing gpio_request_cansleep,
->> which would be used in any driver where all of the calls are
->> gpio_(set/get)_cansleep, and make gpio_request only allow non-sleeping
->> gpios then incorrect use of gpios would be caught at request time and
->> returned to the caller as an error.
->>     
->
-> It seems like a good idea to catch these at request time. There is support in the API for this already (gpio_cansleep), but driver writers are not steered towards checking and thinking in these ways by the current API or documentation. Perhaps a documentation change with some cut and paste boilerplate would be enough, but I think some API enforcement/encouragement would be helpful.
->
-> I think this agrees with you, Ryan:
->
-> gpio_request_cansleep would be the same as current gpio_request
-> gpio_request changes to error if this is a sleepy gpio.
->
-> Imagine a situation where GPIOs are being assigned and passed around between drivers in some dynamic way, or some way unpredictable to the driver writer. In development only non-sleeping GPIOs have been seen and everything is fine. One day someone feeds it a GPIO on an I2C expander and the driver crashes.
-> If gpio_request had this built-in check the driver could gracefuly fail to load instead with an appropriate error message.
->
->
->   
-Hi
+On Thu, Jun 24, 2010 at 09:33:56AM +0200, ext Masayuki Igawa wrote:
+> Hi, Mika.
 
-Given that that most users will only access the gpios in context where
-sleeping is possible it would make more sense to add a special case for
-those who use it in contexts where sleeping is not possible.
-This wouldn't change the semantics of the current API and furthermore it
-is possible to implement it as a small helper function on top of the
-current API.
+(...)
 
-Something like:
-int gpio_request_atomic(unsigned gpio, const char *label)
-{
-    if (gpio_cansleep(gpio))
-       return -EINVAL;
-    return gpio_request(gpio, label);
-}
+> > +unsigned long long
+> > +vaddr_to_paddr_arm(unsigned long vaddr)
+> > +{
+> > +	unsigned long long paddr;
+> > +
+> > +	if ((paddr = vaddr_to_paddr_general(vaddr)) != NOT_PADDR)
+> > +		return paddr;
+> 
+> Here is a checkpatche.pl's error.
+> ====
+> ERROR: do not use assignment in if condition
+> #303: FILE: arm.c:189:
+> +       if ((paddr = vaddr_to_paddr_general(vaddr)) != NOT_PADDR)
+> 
+> total: 1 errors, 0 warnings, 261 lines checked
+> ====
 
+Ah, didn't notice that. Thanks.
 
-- Lars
+> How about is this?
+> ====
+> +unsigned long long
+> +vaddr_to_paddr_arm(unsigned long vaddr)
+> +{
+> +	unsigned long long paddr = vaddr_to_paddr_general(vaddr);
+> +
+> +	if (paddr != NOT_PADDR)
+> +		return paddr;
+> ====
+
+Yeah, looks OK to me.
+
+Do you want me to send a revisited version of the patches or do you change that
+yourself?
+
+> BTW, I'm testing these patches for x86/x86_64 arch now.
+> I'll merge these patches after my testing.
+
+Cool, thanks.
+
+> But I cannot test for ARM because have no test machines of ARM.
+
+Well I can do the testing for ARM (unless someone else, who is using ARM kdump
+currently, wants to test this). If the above is the only change it should still
+work.
+
+Thanks,
+MW
