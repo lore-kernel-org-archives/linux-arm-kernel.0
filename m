@@ -1,85 +1,89 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 24 Jun 2010 15:49:09 +0200
-Subject: [PATCH 13/61] ARM: mxc: grammar fix
+Date: Thu, 24 Jun 2010 15:49:44 +0200
+Subject: [PATCH 48/61] ARM: imx: dynamically register spi_imx devices (generic
+	part)
 In-Reply-To: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1277387397-3467-14-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1277387397-3467-49-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- .../plat-mxc/include/mach/board-eukrea_cpuimx27.h  |    2 +-
- arch/arm/plat-mxc/include/mach/board-mx31lilly.h   |    2 +-
- arch/arm/plat-mxc/include/mach/board-mx31lite.h    |    2 +-
- arch/arm/plat-mxc/include/mach/board-mx31moboard.h |    2 +-
- arch/arm/plat-mxc/include/mach/board-pcm038.h      |    2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/plat-mxc/devices/Kconfig               |    3 ++
+ arch/arm/plat-mxc/devices/Makefile              |    1 +
+ arch/arm/plat-mxc/devices/platform-spi_imx.c    |   30 +++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/devices-common.h |    5 ++++
+ 4 files changed, 39 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/devices/platform-spi_imx.c
 
-diff --git a/arch/arm/plat-mxc/include/mach/board-eukrea_cpuimx27.h b/arch/arm/plat-mxc/include/mach/board-eukrea_cpuimx27.h
-index a1fd583..45b2fb8 100644
---- a/arch/arm/plat-mxc/include/mach/board-eukrea_cpuimx27.h
-+++ b/arch/arm/plat-mxc/include/mach/board-eukrea_cpuimx27.h
-@@ -25,7 +25,7 @@
- #ifndef __ASSEMBLY__
- /*
-  * This CPU module needs a baseboard to work. After basic initializing
-- * its own devices, it calls baseboard's init function.
-+ * its own devices, it calls the baseboard's init function.
-  * TODO: Add your own baseboard init function and call it from
-  * inside eukrea_cpuimx27_init().
-  *
-diff --git a/arch/arm/plat-mxc/include/mach/board-mx31lilly.h b/arch/arm/plat-mxc/include/mach/board-mx31lilly.h
-index eb5a502..0df71bf 100644
---- a/arch/arm/plat-mxc/include/mach/board-mx31lilly.h
-+++ b/arch/arm/plat-mxc/include/mach/board-mx31lilly.h
-@@ -31,7 +31,7 @@ enum mx31lilly_boards {
+diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
+index c50a7d6..166c0c8 100644
+--- a/arch/arm/plat-mxc/devices/Kconfig
++++ b/arch/arm/plat-mxc/devices/Kconfig
+@@ -3,3 +3,6 @@ config IMX_HAVE_PLATFORM_IMX_I2C
  
- /*
-  * This CPU module needs a baseboard to work. After basic initializing
-- * its own devices, it calls baseboard's init function.
-+ * its own devices, it calls the baseboard's init function.
-  */
- 
- extern void mx31lilly_db_init(void);
-diff --git a/arch/arm/plat-mxc/include/mach/board-mx31lite.h b/arch/arm/plat-mxc/include/mach/board-mx31lite.h
-index 2b2da03..c1ad0ae 100644
---- a/arch/arm/plat-mxc/include/mach/board-mx31lite.h
-+++ b/arch/arm/plat-mxc/include/mach/board-mx31lite.h
-@@ -32,7 +32,7 @@ enum mx31lite_boards {
- 
- /*
-  * This CPU module needs a baseboard to work. After basic initializing
-- * its own devices, it calls baseboard's init function.
-+ * its own devices, it calls the baseboard's init function.
-  */
- 
- extern void mx31lite_db_init(void);
-diff --git a/arch/arm/plat-mxc/include/mach/board-mx31moboard.h b/arch/arm/plat-mxc/include/mach/board-mx31moboard.h
-index 36ff3ce..de14543 100644
---- a/arch/arm/plat-mxc/include/mach/board-mx31moboard.h
-+++ b/arch/arm/plat-mxc/include/mach/board-mx31moboard.h
-@@ -31,7 +31,7 @@ enum mx31moboard_boards {
- 
- /*
-  * This CPU module needs a baseboard to work. After basic initializing
-- * its own devices, it calls baseboard's init function.
-+ * its own devices, it calls the baseboard's init function.
-  */
- 
- extern void mx31moboard_devboard_init(void);
-diff --git a/arch/arm/plat-mxc/include/mach/board-pcm038.h b/arch/arm/plat-mxc/include/mach/board-pcm038.h
-index 410f978..6f371e3 100644
---- a/arch/arm/plat-mxc/include/mach/board-pcm038.h
-+++ b/arch/arm/plat-mxc/include/mach/board-pcm038.h
-@@ -22,7 +22,7 @@
- #ifndef __ASSEMBLY__
- /*
-  * This CPU module needs a baseboard to work. After basic initializing
-- * its own devices, it calls baseboard's init function.
-+ * its own devices, it calls the baseboard's init function.
-  * TODO: Add your own baseboard init function and call it from
-  * inside pcm038_init().
-  *
+ config IMX_HAVE_PLATFORM_MXC_NAND
+ 	bool
++
++config IMX_HAVE_PLATFORM_SPI_IMX
++	bool
+diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
+index 4a2b2de..ceb6a42 100644
+--- a/arch/arm/plat-mxc/devices/Makefile
++++ b/arch/arm/plat-mxc/devices/Makefile
+@@ -1,2 +1,3 @@
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_I2C) += platform-imx-i2c.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_NAND) += platform-mxc_nand.o
++obj-$(CONFIG_IMX_HAVE_PLATFORM_SPI_IMX) +=  platform-spi_imx.o
+diff --git a/arch/arm/plat-mxc/devices/platform-spi_imx.c b/arch/arm/plat-mxc/devices/platform-spi_imx.c
+new file mode 100644
+index 0000000..2831a6d
+--- /dev/null
++++ b/arch/arm/plat-mxc/devices/platform-spi_imx.c
+@@ -0,0 +1,30 @@
++/*
++ * Copyright (C) 2009-2010 Pengutronix
++ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License version 2 as published by the
++ * Free Software Foundation.
++ */
++#include <asm/sizes.h>
++#include <mach/devices-common.h>
++
++struct platform_device *__init imx_add_spi_imx(int id,
++		resource_size_t iobase, resource_size_t iosize, int irq,
++		const struct spi_imx_master *pdata)
++{
++	struct resource res[] = {
++		{
++			.start = iobase,
++			.end = iobase + iosize - 1,
++			.flags = IORESOURCE_MEM,
++		}, {
++			.start = irq,
++			.end = irq,
++			.flags = IORESOURCE_IRQ,
++		},
++	};
++
++	return imx_add_platform_device("spi_imx", id, res, ARRAY_SIZE(res),
++			pdata, sizeof(*pdata));
++}
+diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
+index 8388f90..f67df87 100644
+--- a/arch/arm/plat-mxc/include/mach/devices-common.h
++++ b/arch/arm/plat-mxc/include/mach/devices-common.h
+@@ -24,3 +24,8 @@ struct platform_device *__init imx_add_mxc_nand_v1(resource_size_t iobase,
+ 		int irq, const struct mxc_nand_platform_data *pdata);
+ struct platform_device *__init imx_add_mxc_nand_v21(resource_size_t iobase,
+ 		int irq, const struct mxc_nand_platform_data *pdata);
++
++#include <mach/spi.h>
++struct platform_device *__init imx_add_spi_imx(int id,
++		resource_size_t iobase, resource_size_t iosize, int irq,
++		const struct spi_imx_master *pdata);
 -- 
 1.7.1
