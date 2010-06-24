@@ -1,31 +1,42 @@
-From: alan@linux.intel.com (Alan Cox)
-Date: Thu, 24 Jun 2010 14:34:26 +0100
-Subject: Regression in next-20100618
-In-Reply-To: <CEE6BB42CAD6E947908279175AF8470A025FD0D69A@EXDCVYMBSTM006.EQ1STM.local>
-References: <CEE6BB42CAD6E947908279175AF8470A025FD0D69A@EXDCVYMBSTM006.EQ1STM.local>
-Message-ID: <20100624143426.083f49e9@linux.intel.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 24 Jun 2010 15:57:12 +0200
+Subject: [PATCH 2/3] pxa2xx/cpufreq: Simplify DRI recomputation routine
+In-Reply-To: <1277387833-5419-1-git-send-email-marek.vasut@gmail.com>
+References: <1277387833-5419-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1277387833-5419-2-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Jun 2010 14:17:51 +0200
-Linus WALLEIJ <linus.walleij@stericsson.com> wrote:
+This patch:
+1) Simpifies the DRI recomputation routine by pulling out the common code
+2) Fixes a bug in PXA27x DRI recomputation caused by incorrect parenthesis
 
-> Looping in linux-arm-kernel in case there are more people having
-> this regression on -next since 20100618.
-> 
-> I verified that the regression also appears on U300, and I
-> suspect all platforms using PL011 to suffer from it, including
-> Versatile, RealView and SPEAr for example.
-> 
-> Symptom: garbage characters at TTY prompt after boot.
-> 
-> Trying to figure out what is causing this but failing :-/
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ arch/arm/mach-pxa/cpufreq-pxa2xx.c |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
 
-I know what the problem is - I've just not yet had time to fix it (or a
-stable electricity supply this afternoon).
-
-The serial layer doesn't cope with the fact the tty_port code manages
-the active flag so needs to switch to its own - and clear it in
-->shutdown/set it in open
-
-Alan
+diff --git a/arch/arm/mach-pxa/cpufreq-pxa2xx.c b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
+index 9e4d981..bb5f21e 100644
+--- a/arch/arm/mach-pxa/cpufreq-pxa2xx.c
++++ b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
+@@ -256,12 +256,13 @@ static void init_sdram_rows(void)
+ 
+ static u32 mdrefr_dri(unsigned int freq)
+ {
+-	u32 dri = 0;
++	u32 dri = freq * SDRAM_TREF / sdram_rows;
+ 
+-	if (cpu_is_pxa25x())
+-		dri = ((freq * SDRAM_TREF) / (sdram_rows * 32));
+ 	if (cpu_is_pxa27x())
+-		dri = ((freq * SDRAM_TREF) / (sdram_rows - 31)) / 32;
++		dri -= 31;
++
++	dri /= 32;
++
+ 	return dri;
+ }
+ 
+-- 
+1.7.1
