@@ -1,217 +1,153 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 24 Jun 2010 15:49:51 +0200
-Subject: [PATCH 55/61] ARM: imx: dynamically register imx-uart devices (imx1)
+Date: Thu, 24 Jun 2010 15:49:11 +0200
+Subject: [PATCH 15/61] ARM: imx/mx1: fold crm_regs.h into its only consumer
 In-Reply-To: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1277387397-3467-56-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1277387397-3467-16-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+As crm_regs.h is GPL-v2 only don't allow "(at your option) any later
+version" for clock.c any more.
+
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-imx/Kconfig            |    2 ++
- arch/arm/mach-imx/devices-imx1.h     |    5 +++++
- arch/arm/mach-imx/devices.c          |   31 -------------------------------
- arch/arm/mach-imx/devices.h          |    2 --
- arch/arm/mach-imx/mach-mx1ads.c      |   17 ++++++++---------
- arch/arm/mach-imx/mach-scb9328.c     |    6 +++---
- arch/arm/plat-mxc/include/mach/mx1.h |   24 ++++++++++++------------
- 7 files changed, 30 insertions(+), 57 deletions(-)
+ arch/arm/mach-mx1/clock.c    |   47 ++++++++++++++++++++++++++++++-----
+ arch/arm/mach-mx1/crm_regs.h |   55 ------------------------------------------
+ 2 files changed, 40 insertions(+), 62 deletions(-)
+ delete mode 100644 arch/arm/mach-mx1/crm_regs.h
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index c185ec3..445ce10 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -17,11 +17,13 @@ config ARCH_MX1ADS
- 	bool "MX1ADS platform"
- 	select MACH_MXLADS
- 	select IMX_HAVE_PLATFORM_IMX_I2C
-+	select IMX_HAVE_PLATFORM_IMX_UART
- 	help
- 	  Say Y here if you are using Motorola MX1ADS/MXLADS boards
+diff --git a/arch/arm/mach-mx1/clock.c b/arch/arm/mach-mx1/clock.c
+index 610b88d..c05096c 100644
+--- a/arch/arm/mach-mx1/clock.c
++++ b/arch/arm/mach-mx1/clock.c
+@@ -2,18 +2,17 @@
+  *  Copyright (C) 2008 Sascha Hauer <s.hauer@pengutronix.de>, Pengutronix
+  *
+  * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
+  *
+  * This program is distributed in the hope that it will be useful,
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+  */
  
- config MACH_SCB9328
- 	bool "Synertronixx scb9328"
-+	select IMX_HAVE_PLATFORM_IMX_UART
- 	help
- 	  Say Y here if you are using a Synertronixx scb9328 board
- 
-diff --git a/arch/arm/mach-imx/devices-imx1.h b/arch/arm/mach-imx/devices-imx1.h
-index a5cfe04..a8d94f0 100644
---- a/arch/arm/mach-imx/devices-imx1.h
-+++ b/arch/arm/mach-imx/devices-imx1.h
-@@ -11,3 +11,8 @@
- 
- #define imx1_add_i2c_imx(pdata)		\
- 	imx_add_imx_i2c(0, MX1_I2C_BASE_ADDR, SZ_4K, MX1_INT_I2C, pdata)
+ #include <linux/kernel.h>
+@@ -29,7 +28,41 @@
+ #include <mach/clock.h>
+ #include <mach/hardware.h>
+ #include <mach/common.h>
+-#include "crm_regs.h"
 +
-+#define imx1_add_imx_uart0(pdata)	\
-+	imx_add_imx_uart_3irq(0, MX1_UART1_BASE_ADDR, 0xd0, MX1_INT_UART1RX, MX1_INT_UART1TX, MX1_INT_UART1RTS, pdata)
-+#define imx1_add_imx_uart1(pdata)	\
-+	imx_add_imx_uart_3irq(0, MX1_UART2_BASE_ADDR, 0xd0, MX1_INT_UART2RX, MX1_INT_UART2TX, MX1_INT_UART2RTS, pdata)
-diff --git a/arch/arm/mach-imx/devices.c b/arch/arm/mach-imx/devices.c
-index 84e6da6..b4bf8fc 100644
---- a/arch/arm/mach-imx/devices.c
-+++ b/arch/arm/mach-imx/devices.c
-@@ -70,37 +70,6 @@ struct platform_device imx1_camera_device = {
- 	.num_resources  = ARRAY_SIZE(imx1_camera_resources),
- };
++#define IO_ADDR_CCM(off)	(MX1_IO_ADDRESS(MX1_CCM_BASE_ADDR + (off)))
++
++/* CCM register addresses */
++#define CCM_CSCR	IO_ADDR_CCM(0x0)
++#define CCM_MPCTL0	IO_ADDR_CCM(0x4)
++#define CCM_SPCTL0	IO_ADDR_CCM(0xc)
++#define CCM_PCDR	IO_ADDR_CCM(0x20)
++
++#define CCM_CSCR_CLKO_OFFSET	29
++#define CCM_CSCR_CLKO_MASK	(0x7 << 29)
++#define CCM_CSCR_USB_OFFSET	26
++#define CCM_CSCR_USB_MASK	(0x7 << 26)
++#define CCM_CSCR_OSC_EN_SHIFT	17
++#define CCM_CSCR_SYSTEM_SEL	(1 << 16)
++#define CCM_CSCR_BCLK_OFFSET	10
++#define CCM_CSCR_BCLK_MASK	(0xf << 10)
++#define CCM_CSCR_PRESC		(1 << 15)
++
++#define CCM_PCDR_PCLK3_OFFSET	16
++#define CCM_PCDR_PCLK3_MASK	(0x7f << 16)
++#define CCM_PCDR_PCLK2_OFFSET	4
++#define CCM_PCDR_PCLK2_MASK	(0xf << 4)
++#define CCM_PCDR_PCLK1_OFFSET	0
++#define CCM_PCDR_PCLK1_MASK	0xf
++
++#define IO_ADDR_SCM(off)	(MX1_IO_ADDRESS(MX1_SCM_BASE_ADDR + (off)))
++
++/* SCM register addresses */
++#define SCM_GCCR	IO_ADDR_SCM(0xc)
++
++#define SCM_GCCR_DMA_CLK_EN_OFFSET	3
++#define SCM_GCCR_CSI_CLK_EN_OFFSET	2
++#define SCM_GCCR_MMA_CLK_EN_OFFSET	1
++#define SCM_GCCR_USBD_CLK_EN_OFFSET	0
  
--#define DEFINE_IMX1_UART_DEVICE(n, baseaddr, irqrx, irqtx, irqrts)	\
--	static struct resource imx1_uart_resources ## n[] = {		\
--		{							\
--			.start = baseaddr,				\
--			.end = baseaddr + 0xd0,				\
--			.flags = IORESOURCE_MEM,			\
--		}, {							\
--			.start = irqrx,					\
--			.end = irqrx,					\
--			.flags = IORESOURCE_IRQ,			\
--		}, {							\
--			.start = irqtx,					\
--			.end = irqtx,					\
--			.flags = IORESOURCE_IRQ,			\
--		}, {							\
--			.start = irqrts,				\
--			.end = irqrts,					\
--			.flags = IORESOURCE_IRQ,			\
--		},							\
--	};								\
--									\
--	struct platform_device imx1_uart_device ## n = {		\
--		.name = "imx-uart",					\
--		.id = n,						\
--		.num_resources = ARRAY_SIZE(imx1_uart_resources ## n),	\
--		.resource = imx1_uart_resources ## n,			\
--	}
--
--DEFINE_IMX1_UART_DEVICE(0, MX1_UART1_BASE_ADDR, MX1_UART1_MINT_RX, MX1_UART1_MINT_TX, MX1_UART1_MINT_RTS);
--DEFINE_IMX1_UART_DEVICE(1, MX1_UART2_BASE_ADDR, MX1_UART2_MINT_RX, MX1_UART2_MINT_TX, MX1_UART2_MINT_RTS);
--
- static struct resource imx_rtc_resources[] = {
- 	{
- 		.start  = 0x00204000,
-diff --git a/arch/arm/mach-imx/devices.h b/arch/arm/mach-imx/devices.h
-index db995b1..e56efbc 100644
---- a/arch/arm/mach-imx/devices.h
-+++ b/arch/arm/mach-imx/devices.h
-@@ -1,7 +1,5 @@
- #ifdef CONFIG_ARCH_MX1
- extern struct platform_device imx1_camera_device;
--extern struct platform_device imx1_uart_device0;
--extern struct platform_device imx1_uart_device1;
- extern struct platform_device imx_rtc_device;
- extern struct platform_device imx_wdt_device;
- extern struct platform_device imx_usb_device;
-diff --git a/arch/arm/mach-imx/mach-mx1ads.c b/arch/arm/mach-imx/mach-mx1ads.c
-index 339d41a..77a760c 100644
---- a/arch/arm/mach-imx/mach-mx1ads.c
-+++ b/arch/arm/mach-imx/mach-mx1ads.c
-@@ -26,7 +26,6 @@
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <mach/i2c.h>
--#include <mach/imx-uart.h>
- #include <mach/iomux-mx1.h>
- #include <mach/irqs.h>
- 
-@@ -59,12 +58,12 @@ static int mx1ads_pins[] = {
-  * UARTs platform data
-  */
- 
--static struct imxuart_platform_data uart_pdata[] = {
--	{
--		.flags = IMXUART_HAVE_RTSCTS,
--	}, {
--		.flags = IMXUART_HAVE_RTSCTS,
--	},
-+static const struct imxuart_platform_data uart0_pdata __initconst = {
-+	.flags = IMXUART_HAVE_RTSCTS,
-+};
-+       
-+static const struct imxuart_platform_data uart1_pdata __initconst = {
-+	.flags = IMXUART_HAVE_RTSCTS,
- };
- 
- /*
-@@ -122,8 +121,8 @@ static void __init mx1ads_init(void)
- 		ARRAY_SIZE(mx1ads_pins), "mx1ads");
- 
- 	/* UART */
--	mxc_register_device(&imx1_uart_device0, &uart_pdata[0]);
--	mxc_register_device(&imx1_uart_device1, &uart_pdata[1]);
-+	imx1_add_imx_uart0(&uart0_pdata);
-+	imx1_add_imx_uart1(&uart1_pdata);
- 
- 	/* Physmap flash */
- 	mxc_register_device(&flash_device, &mx1ads_flash_data);
-diff --git a/arch/arm/mach-imx/mach-scb9328.c b/arch/arm/mach-imx/mach-scb9328.c
-index 482b24d..88bf0d1 100644
---- a/arch/arm/mach-imx/mach-scb9328.c
-+++ b/arch/arm/mach-imx/mach-scb9328.c
-@@ -22,9 +22,9 @@
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <mach/irqs.h>
--#include <mach/imx-uart.h>
- #include <mach/iomux-mx1.h>
- 
-+#include "devices-imx1.h"
- #include "devices.h"
- 
- /*
-@@ -114,7 +114,7 @@ static void uart1_mxc_exit(struct platform_device *pdev)
- 			ARRAY_SIZE(mxc_uart1_pins));
- }
- 
--static struct imxuart_platform_data uart_pdata = {
-+static const struct imxuart_platform_data uart_pdata __initconst = {
- 	.init = uart1_mxc_init,
- 	.exit = uart1_mxc_exit,
- 	.flags = IMXUART_HAVE_RTSCTS,
-@@ -130,7 +130,7 @@ static struct platform_device *devices[] __initdata = {
-  */
- static void __init scb9328_init(void)
+ static int _clk_enable(struct clk *clk)
  {
--	mxc_register_device(&imx1_uart_device0, &uart_pdata);
-+	imx1_add_imx_uart0(&uart_pdata);
- 
- 	printk(KERN_INFO"Scb9328: Adding devices\n");
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
-diff --git a/arch/arm/plat-mxc/include/mach/mx1.h b/arch/arm/plat-mxc/include/mach/mx1.h
-index e99c0b2..641b246 100644
---- a/arch/arm/plat-mxc/include/mach/mx1.h
-+++ b/arch/arm/plat-mxc/include/mach/mx1.h
-@@ -91,18 +91,18 @@
- #define MX1_SIM_DATA_INT	16
- #define MX1_RTC_INT		17
- #define MX1_RTC_SAMINT		18
--#define MX1_UART2_MINT_PFERR	19
--#define MX1_UART2_MINT_RTS	20
--#define MX1_UART2_MINT_DTR	21
--#define MX1_UART2_MINT_UARTC	22
--#define MX1_UART2_MINT_TX	23
--#define MX1_UART2_MINT_RX	24
--#define MX1_UART1_MINT_PFERR	25
--#define MX1_UART1_MINT_RTS	26
--#define MX1_UART1_MINT_DTR	27
--#define MX1_UART1_MINT_UARTC	28
--#define MX1_UART1_MINT_TX	29
--#define MX1_UART1_MINT_RX	30
-+#define MX1_INT_UART2PFERR	19
-+#define MX1_INT_UART2RTS	20
-+#define MX1_INT_UART2DTR	21
-+#define MX1_INT_UART2UARTC	22
-+#define MX1_INT_UART2TX		23
-+#define MX1_INT_UART2RX		24
-+#define MX1_INT_UART1PFERR	25
-+#define MX1_INT_UART1RTS	26
-+#define MX1_INT_UART1DTR	27
-+#define MX1_INT_UART1UARTC	28
-+#define MX1_INT_UART1TX		29
-+#define MX1_INT_UART1RX		30
- #define MX1_VOICE_DAC_INT	31
- #define MX1_VOICE_ADC_INT	32
- #define MX1_PEN_DATA_INT	33
+diff --git a/arch/arm/mach-mx1/crm_regs.h b/arch/arm/mach-mx1/crm_regs.h
+deleted file mode 100644
+index 13e81e6..0000000
+--- a/arch/arm/mach-mx1/crm_regs.h
++++ /dev/null
+@@ -1,55 +0,0 @@
+-/*
+- * Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright (c) 2008 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- *
+- * This file may be distributed under the terms of the GNU General
+- * Public License, version 2.
+- */
+-
+-#ifndef __ARCH_ARM_MACH_MX1_CRM_REGS_H__
+-#define __ARCH_ARM_MACH_MX1_CRM_REGS_H__
+-
+-#define CCM_BASE	MX1_IO_ADDRESS(MX1_CCM_BASE_ADDR)
+-#define SCM_BASE	MX1_IO_ADDRESS(MX1_SCM_BASE_ADDR)
+-
+-/* CCM register addresses */
+-#define CCM_CSCR	(CCM_BASE + 0x0)
+-#define CCM_MPCTL0	(CCM_BASE + 0x4)
+-#define CCM_MPCTL1	(CCM_BASE + 0x8)
+-#define CCM_SPCTL0	(CCM_BASE + 0xC)
+-#define CCM_SPCTL1	(CCM_BASE + 0x10)
+-#define CCM_PCDR	(CCM_BASE + 0x20)
+-
+-#define CCM_CSCR_CLKO_OFFSET	29
+-#define CCM_CSCR_CLKO_MASK	(0x7 << 29)
+-#define CCM_CSCR_USB_OFFSET	26
+-#define CCM_CSCR_USB_MASK	(0x7 << 26)
+-#define CCM_CSCR_SPLL_RESTART	(1 << 22)
+-#define CCM_CSCR_MPLL_RESTART	(1 << 21)
+-#define CCM_CSCR_OSC_EN_SHIFT	17
+-#define CCM_CSCR_SYSTEM_SEL	(1 << 16)
+-#define CCM_CSCR_BCLK_OFFSET	10
+-#define CCM_CSCR_BCLK_MASK	(0xF << 10)
+-#define CCM_CSCR_PRESC		(1 << 15)
+-#define CCM_CSCR_SPEN		(1 << 1)
+-#define CCM_CSCR_MPEN		(1 << 0)
+-
+-#define CCM_PCDR_PCLK3_OFFSET	16
+-#define CCM_PCDR_PCLK3_MASK	(0x7F << 16)
+-#define CCM_PCDR_PCLK2_OFFSET	4
+-#define CCM_PCDR_PCLK2_MASK	(0xF << 4)
+-#define CCM_PCDR_PCLK1_OFFSET	0
+-#define CCM_PCDR_PCLK1_MASK	0xF
+-
+-/* SCM register addresses */
+-#define SCM_SIDR	(SCM_BASE + 0x0)
+-#define SCM_FMCR	(SCM_BASE + 0x4)
+-#define SCM_GPCR	(SCM_BASE + 0x8)
+-#define SCM_GCCR	(SCM_BASE + 0xC)
+-
+-#define SCM_GCCR_DMA_CLK_EN_OFFSET	3
+-#define SCM_GCCR_CSI_CLK_EN_OFFSET	2
+-#define SCM_GCCR_MMA_CLK_EN_OFFSET	1
+-#define SCM_GCCR_USBD_CLK_EN_OFFSET	0
+-
+-#endif /* __ARCH_ARM_MACH_MX2_CRM_REGS_H__ */
 -- 
 1.7.1
