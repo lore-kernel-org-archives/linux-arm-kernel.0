@@ -1,409 +1,187 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Thu, 24 Jun 2010 14:38:59 +0900
-Subject: [PATCH v4] S5PV210 Correct clock register properties
-In-Reply-To: <1277356687-9500-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1277356687-9500-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <4C22EF73.8030108@samsung.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 24 Jun 2010 07:52:16 +0200
+Subject: Samsung SoCs: preparation for single kernel
+In-Reply-To: <AANLkTimqQyHLm4KcxYwYC8slSoy9udi2gganKdsD_8Nw@mail.gmail.com>
+References: <AANLkTinGwWzIAOe2tj6V2kCrMiPT7PHlYs1kFS-IsiN4@mail.gmail.com>
+	<AANLkTil-AOEqhMOXydaiA1X_v0rjoNQxALrO0UY638AS@mail.gmail.com>
+	<AANLkTil1i_ZGI8bY14HhjrAk9RooVreAJsTteqqrMgqJ@mail.gmail.com>
+	<AANLkTikDml6gQAsiRrCjIt4bUD3hnpAATr1erqCGOJMd@mail.gmail.com>
+	<002301cb129c$ec59fe30$c50dfa90$%szyprowski@samsung.com>
+	<AANLkTikspf9zHuSKe86wDQxI12HpJo_occBlLUXBkjef@mail.gmail.com>
+	<003e01cb12b5$656c0670$30441350$%szyprowski@samsung.com>
+	<AANLkTimqQyHLm4KcxYwYC8slSoy9udi2gganKdsD_8Nw@mail.gmail.com>
+Message-ID: <002d01cb1361$69372c10$3ba58430$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On 6/24/2010 2:18 PM, MyungJoo Ham wrote:
-> 1. Corrected shift values of I2S and UART clocks (CLK_GATE_IP3), which were
-> defined incorrectly.
-> 
-> 2. Corrected shift values of sclk_audio, uclk1, sclk_fimd, sclk_mmc,
-> sclk_spi, sclk_pwm, which had duplicated .enable/.ctrlbit with their
-> twins defined in struct clk init_clocks_disable[] and struct clk
-> init_clocks[]. We've changed their .enable/.ctrlbit to use CLK_SRC_MASK
-> register to avoid the duplicated clock problem described below.
-> 
-> --- Duplicated Clock Problem ---
-> Please note that each clock definition should access different control
-> register; otherwise, the system may suffer lockups. For example, if we
-> have two clock definitions "a" and "b" which access the same register
-> (and the shift value). Then, when we do:
-> 
-> 	module A
-> 	clk = clk_get("a");
-> 	clk->clk_enable(clk);
-> 
-> 	module B (context switch)
-> 	clk = clk_get("b");
-> 	clk->clk_enable(clk);
-> 	do something with clk.
-> 	clk->clk_disable(clk);
-> 
-> 	module A (context switch)
-> 	do something with clk
-> 	* At this point, the system may hang.
-> 
-> Therefore, there should be no clock definitions with the same contol
-> register/shift. If we need to create "aliases", then, creating child
-> clocks sharing the clock should be fine.
-> 
-> 3. Corrected other sclk_* shift values and access registers.
-> 
-> 
-> Note that becuase UART clocks are properly disabled at boot time with
-> this patch, UART drivers or somebody else should turn on the clock
-> to read the console; otherwise, JIG willl not show any message.
-> 
-> 
-> Note that this patch revises and merges the two previous patches:
-> [PATCH] S5PV210 Correct clock register properties
-> [PATCH] S5PV210 Correct clock source control register properties
-> And follows the previous patch
-> [PATCH v2] S5PV210 Correct clock register properties
-> [PATCH v3] S5PV210 Correct clock register properties
-> 
+On Thursday, June 24, 2010 4:08 AM Kyungmin Park wrote:
 
-The history about patch is better to go to below --- line. The contents 
-of below --- line aren't included to commit message at the git.
-
+> On Wed, Jun 23, 2010 at 6:20 PM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+> > Hello,
+> >
+> > On Wednesday, June 23, 2010 10:02 AM Eric Miao wrote:
+> >
+> >> >> Now you have
+> >> >>
+> >> >> s5pv210_device_hsmmc0
+> >> >> s5pc100_device_hsmmc0
+> >> >> s3c64xx_device_hsmmc0
+> >> >> ....
+> >> >>
+> >> >> each with a different base.
+> >> >
+> >> > There is no need for such code duplication.
+> >>
+> >> However, I believe this is the right way to go. A certain level of
+> >> duplication is the price to pay for a generic and clean solution.
+> >>
+> >> When a peripheral controller or IP is moved from one SoC to the
+> >> next generation, there are several things could have been changed:
+> >>
+> >> 1. new base address and IRQ number
+> >> 2. fixes and enhancements to the original IP
+> >>
+> >> 1. will result in a different 'struct resource', and 2. will result in a
+> >> different 'struct platform_device' with a different name, so the driver
+> >> can match the platform_device_id table as you agreed I'm right on
+> >> that recommendation.
+> >>
+> >> They are actually _two_ different devices.
+> >
+> > Right, they are separate entities, but would be really good if a similar
+> > git brcode could be merged together.
+> >
+> >> > Ben is working on a solution for
+> >> > a single kernel which supports multiple SoCs. Some of his work in
+> >> progress can
+> >> > be found here: git://git.fluff.org/bjdooks/linux branch wip-samsung-
+> dev
+> >> and
+> >> > wip-samsung-dev2.
+> >>
+> >> Could you describe it a bit here and bring it on table for discussion?
+> >
+> > The idea behind his patches is to provide a table for each SoC with short
+> > description of all available devices and generate platform_device entries
+> > dynamically from that table.
+> >
+> > Here is a short code example:
+> >
+> > struct s3c_pdev_table s3c6xxx_dev_table[] __initdata = {
+> > ? ? ? ?{
+> > ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_UART,
+> > ? ? ? ? ? ? ? ?.name ? = "s3c6400-uart",
+> > ? ? ? ? ? ? ? ?.index ?= 0,
+> > ? ? ? ? ? ? ? ?.base ? = S3C_PA_UART0,
+> > ? ? ? ? ? ? ? ?.irq ? ?= IRQ_S3CUART_RX0,
+> > ? ? ? ? ? ? ? ?.template = &template_uart_s3c64xx,
+> > ? ? ? ?}, {
+> > ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_UART,
+> > ? ? ? ? ? ? ? ?.name ? = "s3c6400-uart",
+> > ? ? ? ? ? ? ? ?.index ?= 1,
+> > ? ? ? ? ? ? ? ?.base ? = S3C_PA_UART1,
+> > ? ? ? ? ? ? ? ?.irq ? ?= IRQ_S3CUART_RX1,
+> > ? ? ? ? ? ? ? ?.template = &template_uart_s3c64xx,
+> > ? ? ? ?}, {
+> > ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_UART,
+> > ? ? ? ? ? ? ? ?.name ? = "s3c6400-uart",
+> > ? ? ? ? ? ? ? ?.index ?= 2,
+> > ? ? ? ? ? ? ? ?.base ? = S3C_PA_UART2,
+> > ? ? ? ? ? ? ? ?.irq ? ?= IRQ_S3CUART_RX2,
+> > ? ? ? ? ? ? ? ?.template = &template_uart_s3c64xx,
+> > ? ? ? ?}, {
+> > ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_UART,
+> > ? ? ? ? ? ? ? ?.name ? = "s3c6400-uart",
+> > ? ? ? ? ? ? ? ?.index ?= 3,
+> > ? ? ? ? ? ? ? ?.base ? = S3C_PA_UART3,
+> > ? ? ? ? ? ? ? ?.irq ? ?= IRQ_S3CUART_RX3,
+> > ? ? ? ? ? ? ? ?.template = &template_uart_s3c64xx,
+> > ? ? ? ?}, {
+> > ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_WATCHDOG,
+> > ? ? ? ? ? ? ? ?.name ? = "s3c2410-wdt",
+> > ? ? ? ? ? ? ? ?.index ?= -1,
+> > ? ? ? ? ? ? ? ?.base ? = S3C64XX_PA_WATCHDOG,
+> > ? ? ? ? ? ? ? ?.irq ? ?= IRQ_WDT,
+> > ? ? ? ?}, {
+> > ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_SDHCI,
+> > ? ? ? ? ? ? ? ?.name ? = "s3c-sdhci",
+> > ? ? ? ? ? ? ? ?.index ?= 0,
+> > ? ? ? ? ? ? ? ?.base ? = S3C64XX_PA_HSMMC0 ,
+> > ? ? ? ? ? ? ? ?.irq ? ?= IRQ_HSMMC0,
+> > ? ? ? ? ? ? ? ?.dma ? ?= &samsung_std_dma_mask,
+> > ? ? ? ?}, {
+> > ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_SDHCI,
+> > ? ? ? ? ? ? ? ?.name ? = "s3c-sdhci",
+> > ? ? ? ? ? ? ? ?.index ?= 1,
+> > ? ? ? ? ? ? ? ?.base ? = S3C64XX_PA_HSMMC1,
+> > ? ? ? ? ? ? ? ?.irq ? ?= IRQ_HSMMC1,
+> > ? ? ? ? ? ? ? ?.dma ? ?= &samsung_std_dma_mask,
+> > ? ? ? ?}, {
+> > ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_SDHCI,
+> > ? ? ? ? ? ? ? ?.name ? = "s3c-sdhci",
+> > ? ? ? ? ? ? ? ?.index ?= 2,
+> > ? ? ? ? ? ? ? ?.base ? = S3C64XX_PA_HSMMC2,
+> > ? ? ? ? ? ? ? ?.irq ? ?= IRQ_HSMMC1,
+> > ? ? ? ? ? ? ? ?.dma ? ?= &samsung_std_dma_mask,
+> > ? ? ? ?}, {
+> > ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_OHCI,
+> > ? ? ? ? ? ? ? ?.name ? = "s3c2410-ohci",
+> > ? ? ? ? ? ? ? ?.index ?= -1,
+> > ? ? ? ? ? ? ? ?.base ? = S3C64XX_PA_USBHOST,
+> > ? ? ? ? ? ? ? ?.irq ? ?= IRQ_USBH,
+> > ? ? ? ? ? ? ? ?.dma ? ?= &samsung_std_dma_mask,
+> > ? ? ? ?}, {
+> > ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_NAND,
+> > ? ? ? ? ? ? ? ?.name ? = "s3c6400-nand",
+> > ? ? ? ? ? ? ? ?.index ?= -1,
+> > ? ? ? ? ? ? ? ?.base ? = 0x4E000000,
+> > ? ? ? ? ? ? ? ?.irq ? ?= IRQ_NFC,
+> > ? ? ? ?}, {
+> > ? ? ? ? ? ? ? ?.type ? = SAMSUNG_DEVICE_I2C,
+> > ? ? ? ? ? ? ? ?.name ? = "s3c2440-i2c",
+> > ? ? ? ? ? ? ? ?.index ?= 0,
+> > ? ? ? ? ? ? ? ?.base ? = S3C64XX_PA_IIC0,
+> > ? ? ? ? ? ? ? ?.irq ? ?= IRQ_IIC,
+> > ? ? ? ?}, {
+> > ...
+> >
+> > This solution is imho really clean an easy to understand. It is also
+> > easy to check which SoC has which peripherals defined and how.
 > 
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
+> Question. recently it's changed to use MMC0, MMC2, MMC3, then how to define
+> it?
 
-Here.
+There is index parameter that defines the instance of the device.
 
->  arch/arm/mach-s5pv210/clock.c |  115 ++++++++++++++++++++++-------------------
->  1 files changed, 62 insertions(+), 53 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-> index 154bca4..b3d156c 100644
-> --- a/arch/arm/mach-s5pv210/clock.c
-> +++ b/arch/arm/mach-s5pv210/clock.c
-> @@ -183,6 +183,11 @@ static int s5pv210_clk_mask0_ctrl(struct clk *clk, int enable)
->  	return s5p_gatectrl(S5P_CLK_SRC_MASK0, clk, enable);
->  }
->  
-> +static int s5pv210_clk_mask1_ctrl(struct clk *clk, int enable)
-> +{
-> +	return s5p_gatectrl(S5P_CLK_SRC_MASK1, clk, enable);
-> +}
-> +
->  static struct clk clk_sclk_hdmi27m = {
->  	.name		= "sclk_hdmi27m",
->  	.id		= -1,
-> @@ -406,14 +411,14 @@ static struct clk init_clocks_disable[] = {
->  		.id		= 0,
->  		.parent		= &clk_p,
->  		.enable		= s5pv210_clk_ip3_ctrl,
-> -		.ctrlbit	= (1<<4),
-> +		.ctrlbit	= (1 << 5),
->  	}, {
->  		.name		= "i2s_v32",
->  		.id		= 1,
->  		.parent		= &clk_p,
->  		.enable		= s5pv210_clk_ip3_ctrl,
-> -		.ctrlbit	= (1<<4),
-> -	}
-> +		.ctrlbit	= (1 << 6),
-> +	},
->  };
->  
->  static struct clk init_clocks[] = {
-> @@ -429,25 +434,25 @@ static struct clk init_clocks[] = {
->  		.id		= 0,
->  		.parent		= &clk_pclk_psys.clk,
->  		.enable		= s5pv210_clk_ip3_ctrl,
-> -		.ctrlbit	= (1<<7),
-> +		.ctrlbit	= (1 << 17),
->  	}, {
->  		.name		= "uart",
->  		.id		= 1,
->  		.parent		= &clk_pclk_psys.clk,
->  		.enable		= s5pv210_clk_ip3_ctrl,
-> -		.ctrlbit	= (1<<8),
-> +		.ctrlbit	= (1 << 18),
->  	}, {
->  		.name		= "uart",
->  		.id		= 2,
->  		.parent		= &clk_pclk_psys.clk,
->  		.enable		= s5pv210_clk_ip3_ctrl,
-> -		.ctrlbit	= (1<<9),
-> +		.ctrlbit	= (1 << 19),
->  	}, {
->  		.name		= "uart",
->  		.id		= 3,
->  		.parent		= &clk_pclk_psys.clk,
->  		.enable		= s5pv210_clk_ip3_ctrl,
-> -		.ctrlbit	= (1<<10),
-> +		.ctrlbit	= (1 << 20),
->  	},
->  };
->  
-> @@ -497,8 +502,8 @@ static struct clksrc_clk clk_sclk_dac = {
->  	.clk		= {
->  		.name		= "sclk_dac",
->  		.id		= -1,
-> -		.ctrlbit	= (1 << 10),
-> -		.enable		= s5pv210_clk_ip1_ctrl,
-> +		.ctrlbit	= (1 << 2),
-> +		.enable		= s5pv210_clk_mask0_ctrl,
->  	},
->  	.sources	= &clkset_sclk_dac,
->  	.reg_src	= { .reg = S5P_CLK_SRC1, .shift = 8, .size = 1 },
-> @@ -527,8 +532,8 @@ static struct clksrc_clk clk_sclk_hdmi = {
->  	.clk		= {
->  		.name		= "sclk_hdmi",
->  		.id		= -1,
-> -		.enable		= s5pv210_clk_ip1_ctrl,
-> -		.ctrlbit	= (1 << 11),
-> +		.ctrlbit	= (1 << 0),
-> +		.enable		= s5pv210_clk_mask0_ctrl,
->  	},
->  	.sources	= &clkset_sclk_hdmi,
->  	.reg_src	= { .reg = S5P_CLK_SRC1, .shift = 0, .size = 1 },
-> @@ -565,8 +570,8 @@ static struct clksrc_clk clk_sclk_audio0 = {
->  	.clk		= {
->  		.name		= "sclk_audio",
->  		.id		= 0,
-> -		.enable		= s5pv210_clk_ip3_ctrl,
-> -		.ctrlbit	= (1 << 4),
-> +		.enable		= s5pv210_clk_mask0_ctrl,
-> +		.ctrlbit	= (1 << 24),
->  	},
->  	.sources = &clkset_sclk_audio0,
->  	.reg_src = { .reg = S5P_CLK_SRC6, .shift = 0, .size = 4 },
-> @@ -594,8 +599,8 @@ static struct clksrc_clk clk_sclk_audio1 = {
->  	.clk		= {
->  		.name		= "sclk_audio",
->  		.id		= 1,
-> -		.enable		= s5pv210_clk_ip3_ctrl,
-> -		.ctrlbit	= (1 << 5),
-> +		.enable		= s5pv210_clk_mask0_ctrl,
-> +		.ctrlbit	= (1 << 25),
->  	},
->  	.sources = &clkset_sclk_audio1,
->  	.reg_src = { .reg = S5P_CLK_SRC6, .shift = 4, .size = 4 },
-> @@ -623,8 +628,8 @@ static struct clksrc_clk clk_sclk_audio2 = {
->  	.clk		= {
->  		.name		= "sclk_audio",
->  		.id		= 2,
-> -		.enable		= s5pv210_clk_ip3_ctrl,
-> -		.ctrlbit	= (1 << 6),
-> +		.enable		= s5pv210_clk_mask0_ctrl,
-> +		.ctrlbit	= (1 << 26),
->  	},
->  	.sources = &clkset_sclk_audio2,
->  	.reg_src = { .reg = S5P_CLK_SRC6, .shift = 8, .size = 4 },
-> @@ -680,8 +685,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk	= {
->  			.name		= "uclk1",
->  			.id		= 0,
-> -			.ctrlbit	= (1<<17),
-> -			.enable		= s5pv210_clk_ip3_ctrl,
-> +			.enable		= s5pv210_clk_mask0_ctrl,
-> +			.ctrlbit	= (1 << 12),
->  		},
->  		.sources = &clkset_uart,
->  		.reg_src = { .reg = S5P_CLK_SRC4, .shift = 16, .size = 4 },
-> @@ -690,8 +695,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk		= {
->  			.name		= "uclk1",
->  			.id		= 1,
-> -			.enable		= s5pv210_clk_ip3_ctrl,
-> -			.ctrlbit	= (1 << 18),
-> +			.enable		= s5pv210_clk_mask0_ctrl,
-> +			.ctrlbit	= (1 << 13),
->  		},
->  		.sources = &clkset_uart,
->  		.reg_src = { .reg = S5P_CLK_SRC4, .shift = 20, .size = 4 },
-> @@ -700,8 +705,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk		= {
->  			.name		= "uclk1",
->  			.id		= 2,
-> -			.enable		= s5pv210_clk_ip3_ctrl,
-> -			.ctrlbit	= (1 << 19),
-> +			.enable		= s5pv210_clk_mask0_ctrl,
-> +			.ctrlbit	= (1 << 14),
->  		},
->  		.sources = &clkset_uart,
->  		.reg_src = { .reg = S5P_CLK_SRC4, .shift = 24, .size = 4 },
-> @@ -710,8 +715,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk		= {
->  			.name		= "uclk1",
->  			.id		= 3,
-> -			.enable		= s5pv210_clk_ip3_ctrl,
-> -			.ctrlbit	= (1 << 20),
-> +			.enable		= s5pv210_clk_mask0_ctrl,
-> +			.ctrlbit	= (1 << 15),
->  		},
->  		.sources = &clkset_uart,
->  		.reg_src = { .reg = S5P_CLK_SRC4, .shift = 28, .size = 4 },
-> @@ -720,8 +725,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk	= {
->  			.name		= "sclk_mixer",
->  			.id		= -1,
-> -			.enable		= s5pv210_clk_ip1_ctrl,
-> -			.ctrlbit	= (1 << 9),
-> +			.enable		= s5pv210_clk_mask0_ctrl,
-> +			.ctrlbit	= (1 << 1),
->  		},
->  		.sources = &clkset_sclk_mixer,
->  		.reg_src = { .reg = S5P_CLK_SRC1, .shift = 4, .size = 1 },
-> @@ -738,8 +743,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk	= {
->  			.name		= "sclk_fimc",
->  			.id		= 0,
-> -			.enable		= s5pv210_clk_ip0_ctrl,
-> -			.ctrlbit	= (1 << 24),
-> +			.enable		= s5pv210_clk_mask1_ctrl,
-> +			.ctrlbit	= (1 << 2),
->  		},
->  		.sources = &clkset_group2,
->  		.reg_src = { .reg = S5P_CLK_SRC3, .shift = 12, .size = 4 },
-> @@ -748,8 +753,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk	= {
->  			.name		= "sclk_fimc",
->  			.id		= 1,
-> -			.enable		= s5pv210_clk_ip0_ctrl,
-> -			.ctrlbit	= (1 << 25),
-> +			.enable		= s5pv210_clk_mask1_ctrl,
-> +			.ctrlbit	= (1 << 3),
->  		},
->  		.sources = &clkset_group2,
->  		.reg_src = { .reg = S5P_CLK_SRC3, .shift = 16, .size = 4 },
-> @@ -758,8 +763,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk	= {
->  			.name		= "sclk_fimc",
->  			.id		= 2,
-> -			.enable		= s5pv210_clk_ip0_ctrl,
-> -			.ctrlbit	= (1 << 26),
-> +			.enable		= s5pv210_clk_mask1_ctrl,
-> +			.ctrlbit	= (1 << 4),
->  		},
->  		.sources = &clkset_group2,
->  		.reg_src = { .reg = S5P_CLK_SRC3, .shift = 20, .size = 4 },
-> @@ -768,6 +773,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk		= {
->  			.name		= "sclk_cam",
->  			.id		= 0,
-> +			.enable		= s5pv210_clk_mask0_ctrl,
-> +			.ctrlbit	= (1 << 3),
->  		},
->  		.sources = &clkset_group2,
->  		.reg_src = { .reg = S5P_CLK_SRC1, .shift = 12, .size = 4 },
-> @@ -776,6 +783,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk		= {
->  			.name		= "sclk_cam",
->  			.id		= 1,
-> +			.enable		= s5pv210_clk_mask0_ctrl,
-> +			.ctrlbit	= (1 << 4),
->  		},
->  		.sources = &clkset_group2,
->  		.reg_src = { .reg = S5P_CLK_SRC1, .shift = 16, .size = 4 },
-> @@ -784,8 +793,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk		= {
->  			.name		= "sclk_fimd",
->  			.id		= -1,
-> -			.enable		= s5pv210_clk_ip1_ctrl,
-> -			.ctrlbit	= (1 << 0),
-> +			.enable		= s5pv210_clk_mask0_ctrl,
-> +			.ctrlbit	= (1 << 5),
->  		},
->  		.sources = &clkset_group2,
->  		.reg_src = { .reg = S5P_CLK_SRC1, .shift = 20, .size = 4 },
-> @@ -794,8 +803,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk		= {
->  			.name		= "sclk_mmc",
->  			.id		= 0,
-> -			.enable		= s5pv210_clk_ip2_ctrl,
-> -			.ctrlbit	= (1 << 16),
-> +			.enable		= s5pv210_clk_mask0_ctrl,
-> +			.ctrlbit	= (1 << 8),
->  		},
->  		.sources = &clkset_group2,
->  		.reg_src = { .reg = S5P_CLK_SRC4, .shift = 0, .size = 4 },
-> @@ -804,8 +813,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk		= {
->  			.name		= "sclk_mmc",
->  			.id		= 1,
-> -			.enable		= s5pv210_clk_ip2_ctrl,
-> -			.ctrlbit	= (1 << 17),
-> +			.enable		= s5pv210_clk_mask0_ctrl,
-> +			.ctrlbit	= (1 << 9),
->  		},
->  		.sources = &clkset_group2,
->  		.reg_src = { .reg = S5P_CLK_SRC4, .shift = 4, .size = 4 },
-> @@ -814,8 +823,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk		= {
->  			.name		= "sclk_mmc",
->  			.id		= 2,
-> -			.enable		= s5pv210_clk_ip2_ctrl,
-> -			.ctrlbit	= (1 << 18),
-> +			.enable		= s5pv210_clk_mask0_ctrl,
-> +			.ctrlbit	= (1 << 10),
->  		},
->  		.sources = &clkset_group2,
->  		.reg_src = { .reg = S5P_CLK_SRC4, .shift = 8, .size = 4 },
-> @@ -824,8 +833,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk		= {
->  			.name		= "sclk_mmc",
->  			.id		= 3,
-> -			.enable		= s5pv210_clk_ip2_ctrl,
-> -			.ctrlbit	= (1 << 19),
-> +			.enable		= s5pv210_clk_mask0_ctrl,
-> +			.ctrlbit	= (1 << 11),
->  		},
->  		.sources = &clkset_group2,
->  		.reg_src = { .reg = S5P_CLK_SRC4, .shift = 12, .size = 4 },
-> @@ -864,8 +873,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk		= {
->  			.name		= "sclk_csis",
->  			.id		= -1,
-> -			.enable		= s5pv210_clk_ip0_ctrl,
-> -			.ctrlbit	= (1 << 31),
-> +			.enable		= s5pv210_clk_mask0_ctrl,
-> +			.ctrlbit	= (1 << 6),
->  		},
->  		.sources = &clkset_group2,
->  		.reg_src = { .reg = S5P_CLK_SRC1, .shift = 24, .size = 4 },
-> @@ -874,8 +883,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk		= {
->  			.name		= "sclk_spi",
->  			.id		= 0,
-> -			.enable		= s5pv210_clk_ip3_ctrl,
-> -			.ctrlbit	= (1 << 12),
-> +			.enable		= s5pv210_clk_mask0_ctrl,
-> +			.ctrlbit	= (1 << 16),
->  		},
->  		.sources = &clkset_group2,
->  		.reg_src = { .reg = S5P_CLK_SRC5, .shift = 0, .size = 4 },
-> @@ -884,8 +893,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk		= {
->  			.name		= "sclk_spi",
->  			.id		= 1,
-> -			.enable		= s5pv210_clk_ip3_ctrl,
-> -			.ctrlbit	= (1 << 13),
-> +			.enable		= s5pv210_clk_mask0_ctrl,
-> +			.ctrlbit	= (1 << 17),
->  		},
->  		.sources = &clkset_group2,
->  		.reg_src = { .reg = S5P_CLK_SRC5, .shift = 4, .size = 4 },
-> @@ -894,8 +903,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk		= {
->  			.name		= "sclk_pwi",
->  			.id		= -1,
-> -			.enable		= &s5pv210_clk_ip4_ctrl,
-> -			.ctrlbit	= (1 << 2),
-> +			.enable		= s5pv210_clk_mask0_ctrl,
-> +			.ctrlbit	= (1 << 29),
->  		},
->  		.sources = &clkset_group2,
->  		.reg_src = { .reg = S5P_CLK_SRC6, .shift = 20, .size = 4 },
-> @@ -904,8 +913,8 @@ static struct clksrc_clk clksrcs[] = {
->  		.clk		= {
->  			.name		= "sclk_pwm",
->  			.id		= -1,
-> -			.enable		= s5pv210_clk_ip3_ctrl,
-> -			.ctrlbit	= (1 << 23),
-> +			.enable		= s5pv210_clk_mask0_ctrl,
-> +			.ctrlbit	= (1 << 19),
->  		},
->  		.sources = &clkset_group2,
->  		.reg_src = { .reg = S5P_CLK_SRC5, .shift = 12, .size = 4 },
+> More basically, where these info are defined for chip or board?
+
+The above table is defined per SoC. Each board then registers the particular
+devices like it is done in the current kernels. The following diff should
+explain it better:
+
+-static struct platform_device *smdk6400_devices[] __initdata = {
+-	&s3c_device_hsmmc1,
+-	&s3c_device_i2c0,
++static struct s3c_devtable  smdk6400_devtable[] __initdata = {
++	{ .type = SAMSUNG_DEVICE_SDHCI,	.index = 1, },
++	{ .type = SAMSUNG_DEVICE_I2C,	.index = 0, },
+
+static void __init smdk6400_machine_init(void)
+ {
+ 	i2c_register_board_info(0, i2c_devs, ARRAY_SIZE(i2c_devs));
+-	platform_add_devices(smdk6400_devices, ARRAY_SIZE(smdk6400_devices));
++	samsung_add_devices(smdk6400_devtable, ARRAY_SIZE(smdk6400_devtable));
+ }
+
+> If chip, the how to handle several variants?
+
+The same way it is handled in the current kernels. Machine init code can
+even do some additional fixups if required.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
