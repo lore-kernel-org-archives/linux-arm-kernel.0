@@ -1,24 +1,28 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Thu, 24 Jun 2010 20:05:53 +0200
-Subject: [PATCH] mx31_3ds: Allow selection between host/device modes on
-	the OTG port
-In-Reply-To: <343567.80487.qm@web51007.mail.re2.yahoo.com>
-References: <343567.80487.qm@web51007.mail.re2.yahoo.com>
-Message-ID: <4C239E81.4040805@gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 24 Jun 2010 20:51:27 +0200
+Subject: [PATCH 3/4] pxa2xx/cpufreq: Fix PCMCIA frequency scaling
+In-Reply-To: <87mxulabaw.fsf@free.fr>
+References: <1276840135-5982-1-git-send-email-marek.vasut@gmail.com>
+	<1276840135-5982-3-git-send-email-marek.vasut@gmail.com>
+	<87mxulabaw.fsf@free.fr>
+Message-ID: <201006242051.27790.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-On 2010-06-23 22:52, Fabio Estevam wrote:
-> Allow selection between host/device modes on the OTG port.
+Dne St 23. ?ervna 2010 19:49:59 Robert Jarzmik napsal(a):
+> Marek Vasut <marek.vasut@gmail.com> writes:
+> > The MCxx values must be based off memory clock, not CPU core clock.
+> > 
+> > This also fixes the bug where on some machines the LCD went crazy while
+> > using PCMCIA.
 > 
-> Selection is made via kernel command line option:
+> That looks correct to me.
 > 
-> 'otg_mode=host' or 'otg_mode=device'. Default mode is device.
+> Reviewed-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> 
+> Cheers.
+> 
+> --
+> Robert
 
-
-Would it be possible to select between host and device during run-time, e.g. when the USB modules are loaded? I'm asking out of curiosity, I don't know if Linux supports this at all.
-
-
-Regards, Magnus
+Actually lemme rethink this ... it might still be incorrect.
