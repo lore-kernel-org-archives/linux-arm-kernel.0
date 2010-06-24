@@ -1,64 +1,53 @@
-From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Thu, 24 Jun 2010 11:19:15 +0300
-Subject: [PATCH 3/3] add ARM crashdump support
-In-Reply-To: <20100624163356.dbb849bc.igawa@mxs.nes.nec.co.jp>
-References: <cover.1277188127.git.ext-mika.1.westerberg@nokia.com>
-	<b567a76e7f4502ccd56f818ebd3d6509ebd4a96d.1277188128.git.ext-mika.1.westerberg@nokia.com>
-	<20100624163356.dbb849bc.igawa@mxs.nes.nec.co.jp>
-Message-ID: <20100624081915.GF29920@esdhcp04058.research.nokia.com>
+From: rabin.vincent@stericsson.com (Rabin VINCENT)
+Date: Thu, 24 Jun 2010 13:57:47 +0530
+Subject: [PATCH 07/12] mmci: pass power_mode to the translate_vdd callback
+In-Reply-To: <AANLkTil2Cb4alVFkfEjXApMgIdkmNvEEarWkT9AhXIdU@mail.gmail.com>
+References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
+	<1277198267-10860-7-git-send-email-rabin.vincent@stericsson.com>
+	<AANLkTil2Cb4alVFkfEjXApMgIdkmNvEEarWkT9AhXIdU@mail.gmail.com>
+Message-ID: <20100624082746.GA12453@bnru01.bnr.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 24, 2010 at 09:33:56AM +0200, ext Masayuki Igawa wrote:
-> Hi, Mika.
-
-(...)
-
-> > +unsigned long long
-> > +vaddr_to_paddr_arm(unsigned long vaddr)
-> > +{
-> > +	unsigned long long paddr;
-> > +
-> > +	if ((paddr = vaddr_to_paddr_general(vaddr)) != NOT_PADDR)
-> > +		return paddr;
+On Wed, Jun 23, 2010 at 00:03:47 +0200, Linus Walleij wrote:
+> 2010/6/22 Rabin Vincent <rabin.vincent@stericsson.com>:
+> > @@ -17,7 +17,8 @@
+> > ?* mmc/host.h
+> > ?* @translate_vdd: a callback function to translate a MMC_VDD_*
+> > ?* mask into a value to be binary or:ed and written into the
+> > - * MMCIPWR register of the block
+> > + * MMCIPWR register of the block. ?May also control external power
+> > + * based on the power_mode.
 > 
-> Here is a checkpatche.pl's error.
-> ====
-> ERROR: do not use assignment in if condition
-> #303: FILE: arm.c:189:
-> +       if ((paddr = vaddr_to_paddr_general(vaddr)) != NOT_PADDR)
+> Actually this callback is named like that for a reason: it is to be used
+> to translate the MMC_VDD_* into a u8:4 bitmask for the MMCIPWR
+> register, 4 bits possibly routed out of the PL180 block on some
+> designs (never seen in practice, but could be used in theory).
 > 
-> total: 1 errors, 0 warnings, 261 lines checked
-> ====
+> So it translates a voltage into a 4-bit bitmask, hence the name.
+> 
+> Now the semantics are altered to have other side-effects in
+> the platform, so the function should be renamed, something like
+> platform_vdd_handler() would be more appropriate.
+> 
 
-Ah, didn't notice that. Thanks.
+This is already inside platform data, so how about just ->vdd_handler()?
+Or ->set_power(), like some other drivers?
 
-> How about is this?
-> ====
-> +unsigned long long
-> +vaddr_to_paddr_arm(unsigned long vaddr)
-> +{
-> +	unsigned long long paddr = vaddr_to_paddr_general(vaddr);
-> +
-> +	if (paddr != NOT_PADDR)
-> +		return paddr;
-> ====
+Note that we'd also like to use this to do the board-specific settings
+for the *DIREN and FBCLK bits, which replace the Voltage bits on some ST
+variants, like so:
 
-Yeah, looks OK to me.
++static u32 mop500_sdi0_translate_vdd(struct device *dev, unsigned int vdd,
++				     unsigned char power_mode)
++{
++	if (power_mode == MMC_POWER_UP)
++		gpio_set_value(gpio_sdmmc_en, 1);
++	else if (power_mode == MMC_POWER_OFF)
++		gpio_set_value(gpio_sdmmc_en, 0);
++
++	return MCI_FBCLKEN | MCI_CMDDIREN | MCI_DATA0DIREN |
++	       MCI_DATA2DIREN | MCI_DATA31DIREN;
++}
 
-Do you want me to send a revisited version of the patches or do you change that
-yourself?
-
-> BTW, I'm testing these patches for x86/x86_64 arch now.
-> I'll merge these patches after my testing.
-
-Cool, thanks.
-
-> But I cannot test for ARM because have no test machines of ARM.
-
-Well I can do the testing for ARM (unless someone else, who is using ARM kdump
-currently, wants to test this). If the above is the only change it should still
-work.
-
-Thanks,
-MW
+Rabin
