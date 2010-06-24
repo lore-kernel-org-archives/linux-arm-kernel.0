@@ -1,319 +1,288 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 24 Jun 2010 15:49:41 +0200
-Subject: [PATCH 45/61] ARM: imx: dynamically register imx-i2c devices (imx27)
-In-Reply-To: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1277387397-3467-46-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Thu, 24 Jun 2010 15:48:56 +0200
+Subject: No subject
+Message-ID: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-imx/Kconfig             |    5 +++++
- arch/arm/mach-imx/devices-imx27.h     |    5 +++++
- arch/arm/mach-imx/devices.c           |   26 --------------------------
- arch/arm/mach-imx/devices.h           |    4 ----
- arch/arm/mach-imx/mach-cpuimx27.c     |    5 ++---
- arch/arm/mach-imx/mach-mx27ads.c      |    5 ++---
- arch/arm/mach-imx/mach-mxt_td60.c     |    9 ++++-----
- arch/arm/mach-imx/mach-pca100.c       |    5 ++---
- arch/arm/mach-imx/mach-pcm038.c       |    5 ++---
- arch/arm/plat-mxc/include/mach/mx27.h |    4 ++--
- 10 files changed, 24 insertions(+), 49 deletions(-)
+Hello,
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 3f88d4a..2bf8078 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -82,6 +82,7 @@ comment "MX27 platforms:"
- 
- config MACH_MX27ADS
- 	bool "MX27ADS platform"
-+	select IMX_HAVE_PLATFORM_IMX_I2C
- 	select IMX_HAVE_PLATFORM_MXC_NAND
- 	help
- 	  Include support for MX27ADS platform. This includes specific
-@@ -89,6 +90,7 @@ config MACH_MX27ADS
- 
- config MACH_PCM038
- 	bool "Phytec phyCORE-i.MX27 CPU module (pcm038)"
-+	select IMX_HAVE_PLATFORM_IMX_I2C
- 	select IMX_HAVE_PLATFORM_MXC_NAND
- 	select MXC_ULPI if USB_ULPI
- 	help
-@@ -111,6 +113,7 @@ endchoice
- 
- config MACH_CPUIMX27
- 	bool "Eukrea CPUIMX27 module"
-+	select IMX_HAVE_PLATFORM_IMX_I2C
- 	select IMX_HAVE_PLATFORM_MXC_NAND
- 	help
- 	  Include support for Eukrea CPUIMX27 platform. This includes
-@@ -151,6 +154,7 @@ config MACH_IMX27LITE
- 
- config MACH_PCA100
- 	bool "Phytec phyCARD-s (pca100)"
-+	select IMX_HAVE_PLATFORM_IMX_I2C
- 	select IMX_HAVE_PLATFORM_MXC_NAND
- 	select MXC_ULPI if USB_ULPI
- 	help
-@@ -159,6 +163,7 @@ config MACH_PCA100
- 
- config MACH_MXT_TD60
- 	bool "Maxtrack i-MXT TD60"
-+	select IMX_HAVE_PLATFORM_IMX_I2C
- 	select IMX_HAVE_PLATFORM_MXC_NAND
- 	help
- 	  Include support for i-MXT (aka td60) platform. This
-diff --git a/arch/arm/mach-imx/devices-imx27.h b/arch/arm/mach-imx/devices-imx27.h
-index b2f6a12..5e0c40c 100644
---- a/arch/arm/mach-imx/devices-imx27.h
-+++ b/arch/arm/mach-imx/devices-imx27.h
-@@ -9,5 +9,10 @@
- #include <mach/mx27.h>
- #include <mach/devices-common.h>
- 
-+#define imx27_add_i2c_imx0(pdata)	\
-+	imx_add_imx_i2c(0, MX27_I2C1_BASE_ADDR, SZ_4K, MX27_INT_I2C1, pdata)
-+#define imx27_add_i2c_imx1(pdata)	\
-+	imx_add_imx_i2c(1, MX27_I2C2_BASE_ADDR, SZ_4K, MX27_INT_I2C2, pdata)
-+
- #define imx27_add_mxc_nand(pdata)	\
- 	imx_add_mxc_nand_v1(MX27_NFC_BASE_ADDR, MX27_INT_NANDFC, pdata)
-diff --git a/arch/arm/mach-imx/devices.c b/arch/arm/mach-imx/devices.c
-index b9f5b69..f8641c2 100644
---- a/arch/arm/mach-imx/devices.c
-+++ b/arch/arm/mach-imx/devices.c
-@@ -368,32 +368,6 @@ struct platform_device mxc_fec_device = {
- };
- #endif
- 
--#ifdef CONFIG_MACH_MX27
--#define DEFINE_IMX_I2C_DEVICE(n, baseaddr, irq)				\
--	static struct resource mxc_i2c_resources ## n[] = {		\
--		{							\
--			.start = baseaddr,				\
--			.end = baseaddr + SZ_4K - 1,			\
--			.flags = IORESOURCE_MEM,			\
--		}, {							\
--			.start = irq,					\
--			.end = irq,					\
--			.flags = IORESOURCE_IRQ,			\
--		}							\
--	};								\
--									\
--	struct platform_device mxc_i2c_device ## n = {			\
--		.name = "imx-i2c",					\
--		.id = n,						\
--		.num_resources = ARRAY_SIZE(mxc_i2c_resources ## n),	\
--		.resource = mxc_i2c_resources ## n,			\
--	}
--
--DEFINE_IMX_I2C_DEVICE(0, MX2x_I2C_BASE_ADDR, MX2x_INT_I2C);
--
--DEFINE_IMX_I2C_DEVICE(1, MX27_I2C2_BASE_ADDR, MX27_INT_I2C2);
--#endif
--
- static struct resource mxc_pwm_resources[] = {
- 	{
- 		.start = MX2x_PWM_BASE_ADDR,
-diff --git a/arch/arm/mach-imx/devices.h b/arch/arm/mach-imx/devices.h
-index dcaa4f9..4fe9935 100644
---- a/arch/arm/mach-imx/devices.h
-+++ b/arch/arm/mach-imx/devices.h
-@@ -28,10 +28,6 @@ extern struct platform_device mxc_w1_master_device;
- extern struct platform_device mxc_fb_device;
- extern struct platform_device mxc_fec_device;
- extern struct platform_device mxc_pwm_device;
--#ifdef CONFIG_MACH_MX27
--extern struct platform_device mxc_i2c_device0;
--extern struct platform_device mxc_i2c_device1;
--#endif
- extern struct platform_device mxc_sdhc_device0;
- extern struct platform_device mxc_sdhc_device1;
- extern struct platform_device mxc_otg_udc_device;
-diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
-index 5d07c2a..06dcd23 100644
---- a/arch/arm/mach-imx/mach-cpuimx27.c
-+++ b/arch/arm/mach-imx/mach-cpuimx27.c
-@@ -35,7 +35,6 @@
- #include <mach/board-eukrea_cpuimx27.h>
- #include <mach/common.h>
- #include <mach/hardware.h>
--#include <mach/i2c.h>
- #include <mach/iomux-mx27.h>
- #include <mach/imx-uart.h>
- #include <mach/mxc_nand.h>
-@@ -131,7 +130,7 @@ static struct platform_device *platform_devices[] __initdata = {
- 	&mxc_fec_device,
- };
- 
--static struct imxi2c_platform_data eukrea_cpuimx27_i2c_1_data = {
-+static const struct imxi2c_platform_data cpuimx27_i2c1_data __initconst = {
- 	.bitrate = 100000,
- };
- 
-@@ -196,7 +195,7 @@ static void __init eukrea_cpuimx27_init(void)
- 	i2c_register_board_info(0, eukrea_cpuimx27_i2c_devices,
- 				ARRAY_SIZE(eukrea_cpuimx27_i2c_devices));
- 
--	mxc_register_device(&mxc_i2c_device0, &eukrea_cpuimx27_i2c_1_data);
-+	imx27_add_i2c_imx1(&cpuimx27_i2c1_data);
- 
- 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
- 
-diff --git a/arch/arm/mach-imx/mach-mx27ads.c b/arch/arm/mach-imx/mach-mx27ads.c
-index 1a3ebf5..f1ee335 100644
---- a/arch/arm/mach-imx/mach-mx27ads.c
-+++ b/arch/arm/mach-imx/mach-mx27ads.c
-@@ -31,7 +31,6 @@
- #include <mach/imx-uart.h>
- #include <mach/iomux-mx27.h>
- #include <mach/mxc_nand.h>
--#include <mach/i2c.h>
- #include <mach/imxfb.h>
- #include <mach/mmc.h>
- 
-@@ -195,7 +194,7 @@ static struct platform_device mx27ads_nor_mtd_device = {
- 	.resource = &mx27ads_flash_resource,
- };
- 
--static struct imxi2c_platform_data mx27ads_i2c_data = {
-+static const struct imxi2c_platform_data mx27ads_i2c1_data __initconst = {
- 	.bitrate = 100000,
- };
- 
-@@ -322,7 +321,7 @@ static void __init mx27ads_board_init(void)
- 	/* only the i2c master 1 is used on this CPU card */
- 	i2c_register_board_info(1, mx27ads_i2c_devices,
- 				ARRAY_SIZE(mx27ads_i2c_devices));
--	mxc_register_device(&mxc_i2c_device1, &mx27ads_i2c_data);
-+	imx27_add_i2c_imx1(&mx27ads_i2c1_data);
- 	mxc_register_device(&mxc_fb_device, &mx27ads_fb_data);
- 	mxc_register_device(&mxc_sdhc_device0, &sdhc1_pdata);
- 	mxc_register_device(&mxc_sdhc_device1, &sdhc2_pdata);
-diff --git a/arch/arm/mach-imx/mach-mxt_td60.c b/arch/arm/mach-imx/mach-mxt_td60.c
-index 447c68f..b80b41e 100644
---- a/arch/arm/mach-imx/mach-mxt_td60.c
-+++ b/arch/arm/mach-imx/mach-mxt_td60.c
-@@ -31,7 +31,6 @@
- #include <mach/imx-uart.h>
- #include <mach/iomux-mx27.h>
- #include <mach/mxc_nand.h>
--#include <mach/i2c.h>
- #include <linux/i2c/pca953x.h>
- #include <mach/imxfb.h>
- #include <mach/mmc.h>
-@@ -131,7 +130,7 @@ mxt_td60_nand_board_info __initconst = {
- 	.hw_ecc = 1,
- };
- 
--static struct imxi2c_platform_data mxt_td60_i2c_data = {
-+static const struct imxi2c_platform_data mxt_td60_i2c0_data __initconst = {
- 	.bitrate = 100000,
- };
- 
-@@ -171,7 +170,7 @@ static struct i2c_board_info mxt_td60_i2c_devices[] = {
- 	},
- };
- 
--static struct imxi2c_platform_data mxt_td60_i2c2_data = {
-+static const struct imxi2c_platform_data mxt_td60_i2c1_data __initconst = {
- 	.bitrate = 100000,
- };
- 
-@@ -263,8 +262,8 @@ static void __init mxt_td60_board_init(void)
- 	i2c_register_board_info(1, mxt_td60_i2c2_devices,
- 				ARRAY_SIZE(mxt_td60_i2c2_devices));
- 
--	mxc_register_device(&mxc_i2c_device0, &mxt_td60_i2c_data);
--	mxc_register_device(&mxc_i2c_device1, &mxt_td60_i2c2_data);
-+	imx27_add_i2c_imx0(&mxt_td60_i2c0_data);
-+	imx27_add_i2c_imx1(&mxt_td60_i2c1_data);
- 	mxc_register_device(&mxc_fb_device, &mxt_td60_fb_data);
- 	mxc_register_device(&mxc_sdhc_device0, &sdhc1_pdata);
- 
-diff --git a/arch/arm/mach-imx/mach-pca100.c b/arch/arm/mach-imx/mach-pca100.c
-index 6efbc6e..6501a7a 100644
---- a/arch/arm/mach-imx/mach-pca100.c
-+++ b/arch/arm/mach-imx/mach-pca100.c
-@@ -36,7 +36,6 @@
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <mach/iomux-mx27.h>
--#include <mach/i2c.h>
- #include <asm/mach/time.h>
- #if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
- #include <mach/spi.h>
-@@ -150,7 +149,7 @@ static struct platform_device *platform_devices[] __initdata = {
- 	&mxc_wdt,
- };
- 
--static struct imxi2c_platform_data pca100_i2c_1_data = {
-+static const struct imxi2c_platform_data pca100_i2c1_data __initconst = {
- 	.bitrate = 100000,
- };
- 
-@@ -333,7 +332,7 @@ static void __init pca100_init(void)
- 	i2c_register_board_info(1, pca100_i2c_devices,
- 				ARRAY_SIZE(pca100_i2c_devices));
- 
--	mxc_register_device(&mxc_i2c_device1, &pca100_i2c_1_data);
-+	imx27_add_i2c_imx1(&pca100_i2c1_data);
- 
- 	mxc_gpio_mode(GPIO_PORTD | 28 | GPIO_GPIO | GPIO_OUT);
- 	mxc_gpio_mode(GPIO_PORTD | 27 | GPIO_GPIO | GPIO_OUT);
-diff --git a/arch/arm/mach-imx/mach-pcm038.c b/arch/arm/mach-imx/mach-pcm038.c
-index bc44d6f..7559e0f 100644
---- a/arch/arm/mach-imx/mach-pcm038.c
-+++ b/arch/arm/mach-imx/mach-pcm038.c
-@@ -35,7 +35,6 @@
- #include <mach/board-pcm038.h>
- #include <mach/common.h>
- #include <mach/hardware.h>
--#include <mach/i2c.h>
- #include <mach/iomux-mx27.h>
- #include <mach/imx-uart.h>
- #include <mach/mxc_nand.h>
-@@ -194,7 +193,7 @@ static void __init pcm038_init_sram(void)
- 	mx27_setup_weimcs(1, 0x0000d843, 0x22252521, 0x22220a00);
- }
- 
--static struct imxi2c_platform_data pcm038_i2c_1_data = {
-+static const struct imxi2c_platform_data pcm038_i2c1_data __initconst = {
- 	.bitrate = 100000,
- };
- 
-@@ -318,7 +317,7 @@ static void __init pcm038_init(void)
- 	i2c_register_board_info(1, pcm038_i2c_devices,
- 				ARRAY_SIZE(pcm038_i2c_devices));
- 
--	mxc_register_device(&mxc_i2c_device1, &pcm038_i2c_1_data);
-+	imx27_add_i2c_imx1(&pcm038_i2c1_data);
- 
- 	/* PE18 for user-LED D40 */
- 	mxc_gpio_mode(GPIO_PORTE | 18 | GPIO_GPIO | GPIO_OUT);
-diff --git a/arch/arm/plat-mxc/include/mach/mx27.h b/arch/arm/plat-mxc/include/mach/mx27.h
-index bae9cd7..a8ab2e0 100644
---- a/arch/arm/plat-mxc/include/mach/mx27.h
-+++ b/arch/arm/plat-mxc/include/mach/mx27.h
-@@ -48,7 +48,7 @@
- #define MX27_CSPI2_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x0f000)
- #define MX27_SSI1_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x10000)
- #define MX27_SSI2_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x11000)
--#define MX27_I2C_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x12000)
-+#define MX27_I2C1_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x12000)
- #define MX27_SDHC1_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x13000)
- #define MX27_SDHC2_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x14000)
- #define MX27_GPIO_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x15000)
-@@ -150,7 +150,7 @@ static inline void mx27_setup_weimcs(size_t cs,
- #define MX27_INT_SDHC3		9
- #define MX27_INT_SDHC2		10
- #define MX27_INT_SDHC1		11
--#define MX27_INT_I2C		12
-+#define MX27_INT_I2C1		12
- #define MX27_INT_SSI2		13
- #define MX27_INT_SSI1		14
- #define MX27_INT_CSPI2		15
--- 
-1.7.1
+this is the next step in the project "clean up the imx port" targeting
+2.6.36.  The highlights this time are:
+
+ - Unification of mach-mx2 and mach-mx1 into mach-imx
+ - start allocating devices dynamically
+   This should reduce the memory footprint because (in the end) no
+   unused struct platform_device, struct resource or struct
+   $platformdatafordriverX are kept in memory.  This also cleans up
+   with naming conflicts.
+
+This is intermixed with various fixes and simplifications.
+
+I have to admit that some patches could have squashed but squashing them
+now would be more work that it's worth so I kept them as they are now.
+
+The patches are based on 67a3e12b05e055c0415c556a315a3d3eb637e29e
+
+  Linux 2.6.35-rc1 (2010-05-30 13:21:02 -0700)
+
+and are available in the git repository at:
+  git://git.pengutronix.de/git/ukl/linux-2.6.git imx/for-2.6.36
+
+plus sent as a reply to this mail.  Shortlog and diffstat are to be
+found below.
+
+Have fun
+Uwe
+
+Uwe Kleine-K?nig (61):
+      ARM: mx3: rename mach-mx35pdk.c to mach-mx35_3ds.c matching its arch number
+      ARM: mx25: rename mach-mx25pdk.c to mach-mx25_3ds.c matching its arch number
+      ARM: mx1: don't use deprecated symbol names
+      ARM: mx1/scb9328: fix type of uart1_mxc_exit to make compiler happy
+      ARM: mx2/mx27_3ds: document alternative names and remove empty header
+      ARM: imx: remove empty and unused board headers
+      ARM: mx3/kzm_arm11_01: fold board header in its only user
+      ARM: mx2/mx21ads: fold board header in its only user
+      ARM: mx2/mx27ads: fold board header in its only user
+      ARM: mx3/qong: get rid of nearly empty header
+      ARM: mx3/mx31_3ds: fold board header in its only user
+      ARM: mx3/mx31ads: fold board header in its only user
+      ARM: mxc: grammar fix
+      ARM: imx: rename mach dir for mx21 and mx27 to mach-imx
+      ARM: imx/mx1: fold crm_regs.h into its only consumer
+      ARM: imx: get rid of mxc_gpio_init
+      ARM: imx: fold serial.c into devices.c
+      ARM: imx1: rename imx_csi_device to match its .name
+      ARM: imx1: rename imx_i2c_device to follow a common naming scheme
+      ARM: imx1: rename imx_uart[12]_device to follow a common naming scheme
+      ARM: mx3: mx31lilly: fix build error for !CONFIG_USB_ULPI
+      ARM: imx: rename mxc_uart_devicex to follow a common naming scheme
+      ARM: imx: move mx1 support to mach-imx
+      ARM: imx: Kconfig: use an if block instead of a depend for many symbols
+      ARM: imx: prepare deprecating ARCH_MX1, MACH_MX2, MACH_MX21 and MACH_MX27
+      ARM: imx: prepare deprecating ARCH_MX1, MACH_MX2, MACH_MX21 and MACH_MX27
+      ARM: imx: new Kconfig symbol and feature test macro for DMA on mx1 and mx2
+      ARM: imx: new helper function imx_add_platform_device
+      MTD: mxc_nand: make bit fields unsigned to please sparse
+      ARM: imx: remove paragraphs with old address of the FSF
+      ARM: mx25: remove paragraphs with old address of the FSF
+      ARM: mx3: remove paragraphs with old address of the FSF
+      ARM: mxc91231: remove paragraphs with old address of the FSF
+      ARM: mxc: remove paragraphs with old address of the FSF
+      ARM: imx: Change the way nand devices are registered (generic part)
+      ARM: imx: Change the way nand devices are registered (imx21)
+      ARM: imx: Change the way nand devices are registered (imx25)
+      ARM: imx: Change the way nand devices are registered (imx27)
+      ARM: imx: Change the way nand devices are registered (imx31)
+      ARM: imx: Change the way nand devices are registered (imx35)
+      ARM: imx: dynamically register imx-i2c devices (generic part)
+      ARM: imx: dynamically register imx-i2c devices (imx1)
+      ARM: imx: dynamically register imx-i2c devices (imx21)
+      ARM: imx: dynamically register imx-i2c devices (imx25)
+      ARM: imx: dynamically register imx-i2c devices (imx27)
+      ARM: imx: dynamically register imx-i2c devices (imx31)
+      ARM: imx: dynamically register imx-i2c devices (imx35)
+      ARM: imx: dynamically register spi_imx devices (generic part)
+      ARM: imx: dynamically register spi_imx devices (imx21)
+      ARM: imx: dynamically register spi_imx devices (imx25)
+      ARM: imx: dynamically register spi_imx devices (imx27)
+      ARM: imx: dynamically register spi_imx devices (imx31)
+      ARM: imx: dynamically register spi_imx devices (imx35)
+      ARM: imx: dynamically register imx-uart devices (generic part)
+      ARM: imx: dynamically register imx-uart devices (imx1)
+      ARM: imx: dynamically register imx-uart devices (imx21)
+      ARM: imx: dynamically register imx-uart devices (imx25)
+      ARM: imx: dynamically register imx-uart devices (imx27)
+      ARM: imx: dynamically register imx-uart devices (imx31)
+      ARM: imx: dynamically register imx-uart devices (imx35)
+      ARM: mx3: complement uart init routine with an exit routine
+
+ arch/arm/Makefile                                  |    4 +-
+ arch/arm/mach-imx/Kconfig                          |  186 +++++++++++
+ arch/arm/{mach-mx2 => mach-imx}/Makefile           |   18 +-
+ arch/arm/{mach-mx2 => mach-imx}/Makefile.boot      |    4 +
+ .../{mach-mx1/clock.c => mach-imx/clock-imx1.c}    |   50 +++-
+ .../clock_imx21.c => mach-imx/clock-imx21.c}       |    0
+ .../clock_imx27.c => mach-imx/clock-imx27.c}       |    0
+ .../{mach-mx2/cpu_imx27.c => mach-imx/cpu-imx27.c} |    0
+ arch/arm/mach-imx/devices-imx1.h                   |   18 +
+ arch/arm/mach-imx/devices-imx21.h                  |   30 ++
+ arch/arm/mach-imx/devices-imx27.h                  |   38 +++
+ arch/arm/{mach-mx2 => mach-imx}/devices.c          |  250 +++++++++------
+ arch/arm/{mach-mx2 => mach-imx}/devices.h          |   30 +--
+ .../{plat-mxc/dma-mx1-mx2.c => mach-imx/dma-v1.c}  |    4 +-
+ .../eukrea_mbimx27-baseboard.c                     |   19 +-
+ arch/arm/mach-imx/include/mach/dma-mx1-mx2.h       |   10 +
+ .../include/mach/dma-v1.h}                         |   10 +-
+ arch/arm/{mach-mx2 => mach-imx}/mach-cpuimx27.c    |   25 +-
+ arch/arm/{mach-mx2 => mach-imx}/mach-imx27lite.c   |   11 +-
+ arch/arm/{mach-mx1 => mach-imx}/mach-mx1ads.c      |   34 +-
+ arch/arm/{mach-mx2 => mach-imx}/mach-mx21ads.c     |   58 +++-
+ arch/arm/{mach-mx2 => mach-imx}/mach-mx27_3ds.c    |   17 +-
+ arch/arm/{mach-mx2 => mach-imx}/mach-mx27ads.c     |   76 +++--
+ arch/arm/{mach-mx2 => mach-imx}/mach-mxt_td60.c    |   36 +--
+ arch/arm/{mach-mx2 => mach-imx}/mach-pca100.c      |   23 +-
+ arch/arm/{mach-mx2 => mach-imx}/mach-pcm038.c      |   33 +--
+ arch/arm/{mach-mx1 => mach-imx}/mach-scb9328.c     |   21 +-
+ .../arm/{mach-mx1/generic.c => mach-imx/mm-imx1.c} |   23 +-
+ arch/arm/{mach-mx2 => mach-imx}/mm-imx21.c         |    5 +-
+ arch/arm/{mach-mx2 => mach-imx}/mm-imx27.c         |    5 +-
+ .../ksym_mx1.c => mach-imx/mx1-camera-fiq-ksym.c}  |    0
+ .../mx1_camera_fiq.S => mach-imx/mx1-camera-fiq.S} |    0
+ arch/arm/{mach-mx2 => mach-imx}/pcm970-baseboard.c |    0
+ arch/arm/mach-mx1/Kconfig                          |   19 -
+ arch/arm/mach-mx1/Makefile                         |   15 -
+ arch/arm/mach-mx1/Makefile.boot                    |    4 -
+ arch/arm/mach-mx1/crm_regs.h                       |   55 ---
+ arch/arm/mach-mx1/devices.c                        |  242 --------------
+ arch/arm/mach-mx1/devices.h                        |    7 -
+ arch/arm/mach-mx2/Kconfig                          |  116 -------
+ arch/arm/mach-mx2/serial.c                         |  141 --------
+ arch/arm/mach-mx25/Kconfig                         |    2 +
+ arch/arm/mach-mx25/Makefile                        |    2 +-
+ arch/arm/mach-mx25/devices-imx25.h                 |   38 +++
+ arch/arm/mach-mx25/devices.c                       |  231 +-------------
+ arch/arm/mach-mx25/devices.h                       |   12 -
+ .../mach-mx25/{mach-mx25pdk.c => mach-mx25_3ds.c}  |   21 +-
+ arch/arm/mach-mx25/mm.c                            |    7 +-
+ arch/arm/mach-mx3/Kconfig                          |   26 ++
+ arch/arm/mach-mx3/Makefile                         |    2 +-
+ arch/arm/mach-mx3/devices-imx31.h                  |   38 +++
+ arch/arm/mach-mx3/devices-imx35.h                  |   32 ++
+ arch/arm/mach-mx3/devices.c                        |  247 +--------------
+ arch/arm/mach-mx3/devices.h                        |   13 -
+ arch/arm/mach-mx3/mach-armadillo5x0.c              |   17 +-
+ arch/arm/mach-mx3/mach-kzm_arm11_01.c              |   31 ++-
+ arch/arm/mach-mx3/mach-mx31_3ds.c                  |   64 +++--
+ arch/arm/mach-mx3/mach-mx31ads.c                   |   55 +++-
+ arch/arm/mach-mx3/mach-mx31lilly.c                 |   47 ++--
+ arch/arm/mach-mx3/mach-mx31lite.c                  |   17 +-
+ arch/arm/mach-mx3/mach-mx31moboard.c               |   50 ++--
+ .../mach-mx3/{mach-mx35pdk.c => mach-mx35_3ds.c}   |   16 +-
+ arch/arm/mach-mx3/mach-pcm037.c                    |   31 +-
+ arch/arm/mach-mx3/mach-pcm037_eet.c                |    7 +-
+ arch/arm/mach-mx3/mach-pcm043.c                    |   25 +-
+ arch/arm/mach-mx3/mach-qong.c                      |   16 +-
+ arch/arm/mach-mx3/mm.c                             |    7 +-
+ arch/arm/mach-mx3/mx31lilly-db.c                   |   14 +-
+ arch/arm/mach-mx3/mx31lite-db.c                    |   15 +-
+ arch/arm/mach-mx3/mx31moboard-devboard.c           |   10 +-
+ arch/arm/mach-mx3/mx31moboard-marxbot.c            |    4 -
+ arch/arm/mach-mx3/mx31moboard-smartbot.c           |   11 +-
+ arch/arm/mach-mx5/devices.c                        |    2 +-
+ arch/arm/mach-mx5/mm.c                             |    3 +
+ arch/arm/mach-mxc91231/crm_regs.h                  |    5 -
+ arch/arm/mach-mxc91231/devices.c                   |    2 +-
+ arch/arm/mach-mxc91231/mm.c                        |    8 +-
+ arch/arm/plat-mxc/Kconfig                          |   10 +-
+ arch/arm/plat-mxc/Makefile                         |    4 +-
+ arch/arm/plat-mxc/audmux-v1.c                      |    4 -
+ arch/arm/plat-mxc/audmux-v2.c                      |    4 -
+ arch/arm/plat-mxc/devices.c                        |   33 ++
+ arch/arm/plat-mxc/devices/Kconfig                  |   11 +
+ arch/arm/plat-mxc/devices/Makefile                 |    4 +
+ arch/arm/plat-mxc/devices/platform-imx-i2c.c       |   29 ++
+ arch/arm/plat-mxc/devices/platform-imx-uart.c      |   60 ++++
+ arch/arm/plat-mxc/devices/platform-mxc_nand.c      |   44 +++
+ arch/arm/plat-mxc/devices/platform-spi_imx.c       |   30 ++
+ arch/arm/plat-mxc/ehci.c                           |    4 -
+ .../arm/plat-mxc/include/mach/board-armadillo5x0.h |   15 -
+ .../plat-mxc/include/mach/board-eukrea_cpuimx27.h  |    2 +-
+ arch/arm/plat-mxc/include/mach/board-kzmarm11.h    |   39 ---
+ arch/arm/plat-mxc/include/mach/board-mx21ads.h     |   52 ---
+ arch/arm/plat-mxc/include/mach/board-mx27ads.h     |  344 --------------------
+ arch/arm/plat-mxc/include/mach/board-mx27lite.h    |   14 -
+ arch/arm/plat-mxc/include/mach/board-mx27pdk.h     |   14 -
+ arch/arm/plat-mxc/include/mach/board-mx31_3ds.h    |   59 ----
+ arch/arm/plat-mxc/include/mach/board-mx31ads.h     |  117 -------
+ arch/arm/plat-mxc/include/mach/board-mx31lilly.h   |    2 +-
+ arch/arm/plat-mxc/include/mach/board-mx31lite.h    |    2 +-
+ arch/arm/plat-mxc/include/mach/board-mx31moboard.h |    2 +-
+ arch/arm/plat-mxc/include/mach/board-mx35pdk.h     |   22 --
+ arch/arm/plat-mxc/include/mach/board-pcm037.h      |   22 --
+ arch/arm/plat-mxc/include/mach/board-pcm038.h      |    2 +-
+ arch/arm/plat-mxc/include/mach/board-pcm043.h      |   22 --
+ arch/arm/plat-mxc/include/mach/board-qong.h        |   17 -
+ arch/arm/plat-mxc/include/mach/devices-common.h    |   42 +++
+ arch/arm/plat-mxc/include/mach/iomux-mxc91231.h    |    4 -
+ arch/arm/plat-mxc/include/mach/mx1.h               |   28 +-
+ arch/arm/plat-mxc/include/mach/mx25.h              |   28 ++-
+ arch/arm/plat-mxc/include/mach/mx27.h              |    4 +-
+ arch/arm/plat-mxc/include/mach/mx31.h              |    4 +-
+ arch/arm/plat-mxc/include/mach/mx35.h              |    4 +-
+ arch/arm/plat-mxc/include/mach/mx3_camera.h        |    4 -
+ arch/arm/plat-mxc/include/mach/mxc91231.h          |    4 -
+ arch/arm/plat-mxc/include/mach/mxc_nand.h          |    6 +-
+ arch/arm/plat-mxc/include/mach/system.h            |    4 -
+ arch/arm/plat-mxc/include/mach/timex.h             |    4 -
+ arch/arm/plat-mxc/include/mach/uncompress.h        |    4 -
+ arch/arm/plat-mxc/include/mach/vmalloc.h           |    4 -
+ arch/arm/plat-mxc/irq.c                            |    3 -
+ arch/arm/plat-mxc/system.c                         |    4 -
+ arch/arm/plat-mxc/tzic.c                           |    2 -
+ 123 files changed, 1424 insertions(+), 2478 deletions(-)
+ create mode 100644 arch/arm/mach-imx/Kconfig
+ rename arch/arm/{mach-mx2 => mach-imx}/Makefile (55%)
+ rename arch/arm/{mach-mx2 => mach-imx}/Makefile.boot (67%)
+ rename arch/arm/{mach-mx1/clock.c => mach-imx/clock-imx1.c} (90%)
+ rename arch/arm/{mach-mx2/clock_imx21.c => mach-imx/clock-imx21.c} (100%)
+ rename arch/arm/{mach-mx2/clock_imx27.c => mach-imx/clock-imx27.c} (100%)
+ rename arch/arm/{mach-mx2/cpu_imx27.c => mach-imx/cpu-imx27.c} (100%)
+ create mode 100644 arch/arm/mach-imx/devices-imx1.h
+ create mode 100644 arch/arm/mach-imx/devices-imx21.h
+ create mode 100644 arch/arm/mach-imx/devices-imx27.h
+ rename arch/arm/{mach-mx2 => mach-imx}/devices.c (73%)
+ rename arch/arm/{mach-mx2 => mach-imx}/devices.h (54%)
+ rename arch/arm/{plat-mxc/dma-mx1-mx2.c => mach-imx/dma-v1.c} (99%)
+ rename arch/arm/{mach-mx2 => mach-imx}/eukrea_mbimx27-baseboard.c (93%)
+ create mode 100644 arch/arm/mach-imx/include/mach/dma-mx1-mx2.h
+ rename arch/arm/{plat-mxc/include/mach/dma-mx1-mx2.h => mach-imx/include/mach/dma-v1.h} (93%)
+ rename arch/arm/{mach-mx2 => mach-imx}/mach-cpuimx27.c (90%)
+ rename arch/arm/{mach-mx2 => mach-imx}/mach-imx27lite.c (86%)
+ rename arch/arm/{mach-mx1 => mach-imx}/mach-mx1ads.c (81%)
+ rename arch/arm/{mach-mx2 => mach-imx}/mach-mx21ads.c (77%)
+ rename arch/arm/{mach-mx2 => mach-imx}/mach-mx27_3ds.c (85%)
+ rename arch/arm/{mach-mx2 => mach-imx}/mach-mx27ads.c (82%)
+ rename arch/arm/{mach-mx2 => mach-imx}/mach-mxt_td60.c (86%)
+ rename arch/arm/{mach-mx2 => mach-imx}/mach-pca100.c (93%)
+ rename arch/arm/{mach-mx2 => mach-imx}/mach-pcm038.c (91%)
+ rename arch/arm/{mach-mx1 => mach-imx}/mach-scb9328.c (89%)
+ rename arch/arm/{mach-mx1/generic.c => mach-imx/mm-imx1.c} (68%)
+ rename arch/arm/{mach-mx2 => mach-imx}/mm-imx21.c (95%)
+ rename arch/arm/{mach-mx2 => mach-imx}/mm-imx27.c (95%)
+ rename arch/arm/{mach-mx1/ksym_mx1.c => mach-imx/mx1-camera-fiq-ksym.c} (100%)
+ rename arch/arm/{mach-mx1/mx1_camera_fiq.S => mach-imx/mx1-camera-fiq.S} (100%)
+ rename arch/arm/{mach-mx2 => mach-imx}/pcm970-baseboard.c (100%)
+ delete mode 100644 arch/arm/mach-mx1/Kconfig
+ delete mode 100644 arch/arm/mach-mx1/Makefile
+ delete mode 100644 arch/arm/mach-mx1/Makefile.boot
+ delete mode 100644 arch/arm/mach-mx1/crm_regs.h
+ delete mode 100644 arch/arm/mach-mx1/devices.c
+ delete mode 100644 arch/arm/mach-mx1/devices.h
+ delete mode 100644 arch/arm/mach-mx2/Kconfig
+ delete mode 100644 arch/arm/mach-mx2/serial.c
+ create mode 100644 arch/arm/mach-mx25/devices-imx25.h
+ rename arch/arm/mach-mx25/{mach-mx25pdk.c => mach-mx25_3ds.c} (91%)
+ create mode 100644 arch/arm/mach-mx3/devices-imx31.h
+ create mode 100644 arch/arm/mach-mx3/devices-imx35.h
+ rename arch/arm/mach-mx3/{mach-mx35pdk.c => mach-mx35_3ds.c} (89%)
+ create mode 100644 arch/arm/plat-mxc/devices/Kconfig
+ create mode 100644 arch/arm/plat-mxc/devices/Makefile
+ create mode 100644 arch/arm/plat-mxc/devices/platform-imx-i2c.c
+ create mode 100644 arch/arm/plat-mxc/devices/platform-imx-uart.c
+ create mode 100644 arch/arm/plat-mxc/devices/platform-mxc_nand.c
+ create mode 100644 arch/arm/plat-mxc/devices/platform-spi_imx.c
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-armadillo5x0.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-kzmarm11.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-mx21ads.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-mx27ads.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-mx27lite.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-mx27pdk.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-mx31_3ds.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-mx31ads.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-mx35pdk.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-pcm037.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-pcm043.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/board-qong.h
+ create mode 100644 arch/arm/plat-mxc/include/mach/devices-common.h
