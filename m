@@ -1,89 +1,236 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 24 Jun 2010 15:49:44 +0200
-Subject: [PATCH 48/61] ARM: imx: dynamically register spi_imx devices (generic
-	part)
+Date: Thu, 24 Jun 2010 15:49:13 +0200
+Subject: [PATCH 17/61] ARM: imx: fold serial.c into devices.c
 In-Reply-To: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1277387397-3467-49-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1277387397-3467-18-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+... and use cpp magic to reduce repetition.
+
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/plat-mxc/devices/Kconfig               |    3 ++
- arch/arm/plat-mxc/devices/Makefile              |    1 +
- arch/arm/plat-mxc/devices/platform-spi_imx.c    |   30 +++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/devices-common.h |    5 ++++
- 4 files changed, 39 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-mxc/devices/platform-spi_imx.c
+ arch/arm/mach-imx/Makefile  |    2 +-
+ arch/arm/mach-imx/devices.c |   32 ++++++++++
+ arch/arm/mach-imx/serial.c  |  141 -------------------------------------------
+ 3 files changed, 33 insertions(+), 142 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/serial.c
 
-diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
-index c50a7d6..166c0c8 100644
---- a/arch/arm/plat-mxc/devices/Kconfig
-+++ b/arch/arm/plat-mxc/devices/Kconfig
-@@ -3,3 +3,6 @@ config IMX_HAVE_PLATFORM_IMX_I2C
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 068f493..9d57ba6 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -4,7 +4,7 @@
  
- config IMX_HAVE_PLATFORM_MXC_NAND
- 	bool
+ # Object file lists.
+ 
+-obj-y	:=  devices.o serial.o
++obj-y	:=  devices.o
+ 
+ obj-$(CONFIG_MACH_MX21) += clock-imx21.o mm-imx21.o
+ 
+diff --git a/arch/arm/mach-imx/devices.c b/arch/arm/mach-imx/devices.c
+index e708bfd..08ae763 100644
+--- a/arch/arm/mach-imx/devices.c
++++ b/arch/arm/mach-imx/devices.c
+@@ -32,11 +32,13 @@
+ #include <linux/platform_device.h>
+ #include <linux/gpio.h>
+ #include <linux/dma-mapping.h>
++#include <linux/serial.h>
+ 
+ #include <mach/irqs.h>
+ #include <mach/hardware.h>
+ #include <mach/common.h>
+ #include <mach/mmc.h>
++#include <mach/imx-uart.h>
+ 
+ #include "devices.h"
+ 
+@@ -424,6 +426,36 @@ struct platform_device mxc_usbh2 = {
+ DEFINE_IMX_SSI_DEVICE(0, 1, MX2x_SSI1_BASE_ADDR, MX2x_INT_SSI1);
+ DEFINE_IMX_SSI_DEVICE(1, 2, MX2x_SSI1_BASE_ADDR, MX2x_INT_SSI1);
+ 
++#define DEFINE_IMX_UART_DEVICE(n, baseaddr, irq)			\
++	static struct resource imx2x_uart_resources ## n[] = {		\
++		{							\
++			.start = baseaddr,				\
++			.end = baseaddr + 0xb5,				\
++			.flags = IORESOURCE_MEM,			\
++		}, {							\
++			.start = irq,					\
++			.end = irq,					\
++			.flags = IORESOURCE_IRQ,			\
++		},							\
++	};								\
++									\
++	struct platform_device mxc_uart_device ## n = {			\
++		.name = "imx-uart",					\
++		.id = n,						\
++		.num_resources = ARRAY_SIZE(imx2x_uart_resources ## n),	\
++		.resource = imx2x_uart_resources ## n,			\
++	}
 +
-+config IMX_HAVE_PLATFORM_SPI_IMX
-+	bool
-diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
-index 4a2b2de..ceb6a42 100644
---- a/arch/arm/plat-mxc/devices/Makefile
-+++ b/arch/arm/plat-mxc/devices/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_I2C) += platform-imx-i2c.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_NAND) += platform-mxc_nand.o
-+obj-$(CONFIG_IMX_HAVE_PLATFORM_SPI_IMX) +=  platform-spi_imx.o
-diff --git a/arch/arm/plat-mxc/devices/platform-spi_imx.c b/arch/arm/plat-mxc/devices/platform-spi_imx.c
-new file mode 100644
-index 0000000..2831a6d
---- /dev/null
-+++ b/arch/arm/plat-mxc/devices/platform-spi_imx.c
-@@ -0,0 +1,30 @@
-+/*
-+ * Copyright (C) 2009-2010 Pengutronix
-+ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
-+ */
-+#include <asm/sizes.h>
-+#include <mach/devices-common.h>
++DEFINE_IMX_UART_DEVICE(0, MX2x_UART1_BASE_ADDR, MX2x_INT_UART1);
++DEFINE_IMX_UART_DEVICE(1, MX2x_UART2_BASE_ADDR, MX2x_INT_UART2);
++DEFINE_IMX_UART_DEVICE(2, MX2x_UART3_BASE_ADDR, MX2x_INT_UART3);
++DEFINE_IMX_UART_DEVICE(3, MX2x_UART4_BASE_ADDR, MX2x_INT_UART4);
 +
-+struct platform_device *__init imx_add_spi_imx(int id,
-+		resource_size_t iobase, resource_size_t iosize, int irq,
-+		const struct spi_imx_master *pdata)
-+{
-+	struct resource res[] = {
-+		{
-+			.start = iobase,
-+			.end = iobase + iosize - 1,
-+			.flags = IORESOURCE_MEM,
-+		}, {
-+			.start = irq,
-+			.end = irq,
-+			.flags = IORESOURCE_IRQ,
-+		},
-+	};
++#ifdef CONFIG_MACH_MX27
++DEFINE_IMX_UART_DEVICE(4, MX27_UART5_BASE_ADDR, MX27_INT_UART5);
++DEFINE_IMX_UART_DEVICE(5, MX27_UART6_BASE_ADDR, MX27_INT_UART6);
++#endif
 +
-+	return imx_add_platform_device("spi_imx", id, res, ARRAY_SIZE(res),
-+			pdata, sizeof(*pdata));
-+}
-diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-index 8388f90..f67df87 100644
---- a/arch/arm/plat-mxc/include/mach/devices-common.h
-+++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-@@ -24,3 +24,8 @@ struct platform_device *__init imx_add_mxc_nand_v1(resource_size_t iobase,
- 		int irq, const struct mxc_nand_platform_data *pdata);
- struct platform_device *__init imx_add_mxc_nand_v21(resource_size_t iobase,
- 		int irq, const struct mxc_nand_platform_data *pdata);
-+
-+#include <mach/spi.h>
-+struct platform_device *__init imx_add_spi_imx(int id,
-+		resource_size_t iobase, resource_size_t iosize, int irq,
-+		const struct spi_imx_master *pdata);
+ /* GPIO port description */
+ #define DEFINE_MXC_GPIO_PORT_IRQ(SOC, n, _irq)				\
+ 	{								\
+diff --git a/arch/arm/mach-imx/serial.c b/arch/arm/mach-imx/serial.c
+deleted file mode 100644
+index 1c0c835..0000000
+--- a/arch/arm/mach-imx/serial.c
++++ /dev/null
+@@ -1,141 +0,0 @@
+-/*
+- * Copyright 2006-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+- * MA 02110-1301, USA.
+- */
+-
+-#include <linux/module.h>
+-#include <linux/platform_device.h>
+-#include <linux/serial.h>
+-#include <mach/hardware.h>
+-#include <mach/imx-uart.h>
+-#include "devices.h"
+-
+-static struct resource uart0[] = {
+-	{
+-		.start = MX2x_UART1_BASE_ADDR,
+-		.end = MX2x_UART1_BASE_ADDR + 0x0B5,
+-		.flags = IORESOURCE_MEM,
+-	}, {
+-		.start = MX2x_INT_UART1,
+-		.end = MX2x_INT_UART1,
+-		.flags = IORESOURCE_IRQ,
+-	},
+-};
+-
+-struct platform_device mxc_uart_device0 = {
+-	.name = "imx-uart",
+-	.id = 0,
+-	.resource = uart0,
+-	.num_resources = ARRAY_SIZE(uart0),
+-};
+-
+-static struct resource uart1[] = {
+-	{
+-		.start = MX2x_UART2_BASE_ADDR,
+-		.end = MX2x_UART2_BASE_ADDR + 0x0B5,
+-		.flags = IORESOURCE_MEM,
+-	}, {
+-		.start = MX2x_INT_UART2,
+-		.end = MX2x_INT_UART2,
+-		.flags = IORESOURCE_IRQ,
+-	},
+-};
+-
+-struct platform_device mxc_uart_device1 = {
+-	.name = "imx-uart",
+-	.id = 1,
+-	.resource = uart1,
+-	.num_resources = ARRAY_SIZE(uart1),
+-};
+-
+-static struct resource uart2[] = {
+-	{
+-		.start = MX2x_UART3_BASE_ADDR,
+-		.end = MX2x_UART3_BASE_ADDR + 0x0B5,
+-		.flags = IORESOURCE_MEM,
+-	}, {
+-		.start = MX2x_INT_UART3,
+-		.end = MX2x_INT_UART3,
+-		.flags = IORESOURCE_IRQ,
+-	},
+-};
+-
+-struct platform_device mxc_uart_device2 = {
+-	.name = "imx-uart",
+-	.id = 2,
+-	.resource = uart2,
+-	.num_resources = ARRAY_SIZE(uart2),
+-};
+-
+-static struct resource uart3[] = {
+-	{
+-		.start = MX2x_UART4_BASE_ADDR,
+-		.end = MX2x_UART4_BASE_ADDR + 0x0B5,
+-		.flags = IORESOURCE_MEM,
+-	}, {
+-		.start = MX2x_INT_UART4,
+-		.end = MX2x_INT_UART4,
+-		.flags = IORESOURCE_IRQ,
+-	},
+-};
+-
+-struct platform_device mxc_uart_device3 = {
+-	.name = "imx-uart",
+-	.id = 3,
+-	.resource = uart3,
+-	.num_resources = ARRAY_SIZE(uart3),
+-};
+-
+-#ifdef CONFIG_MACH_MX27
+-static struct resource uart4[] = {
+-	{
+-		.start = MX27_UART5_BASE_ADDR,
+-		.end = MX27_UART5_BASE_ADDR + 0x0B5,
+-		.flags = IORESOURCE_MEM,
+-	}, {
+-		.start = MX27_INT_UART5,
+-		.end = MX27_INT_UART5,
+-		.flags = IORESOURCE_IRQ,
+-	},
+-};
+-
+-struct platform_device mxc_uart_device4 = {
+-	.name = "imx-uart",
+-	.id = 4,
+-	.resource = uart4,
+-	.num_resources = ARRAY_SIZE(uart4),
+-};
+-
+-static struct resource uart5[] = {
+-	{
+-		.start = MX27_UART6_BASE_ADDR,
+-		.end = MX27_UART6_BASE_ADDR + 0x0B5,
+-		.flags = IORESOURCE_MEM,
+-	}, {
+-		.start = MX27_INT_UART6,
+-		.end = MX27_INT_UART6,
+-		.flags = IORESOURCE_IRQ,
+-	},
+-};
+-
+-struct platform_device mxc_uart_device5 = {
+-	.name = "imx-uart",
+-	.id = 5,
+-	.resource = uart5,
+-	.num_resources = ARRAY_SIZE(uart5),
+-};
+-#endif
 -- 
 1.7.1
