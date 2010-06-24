@@ -1,77 +1,33 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 24 Jun 2010 10:34:52 -0700
-Subject: [PATCH 2/3] OMAP: PM: use omap_device API for suspend/resume
-In-Reply-To: <alpine.DEB.2.00.1006232128390.1550@utopia.booyaka.com> (Paul
-	Walmsley's message of "Thu, 24 Jun 2010 00:30:37 -0600 (MDT)")
-References: <1277336224-24826-1-git-send-email-khilman@deeprootsystems.com>
-	<1277336224-24826-3-git-send-email-khilman@deeprootsystems.com>
-	<alpine.DEB.2.00.1006232128390.1550@utopia.booyaka.com>
-Message-ID: <87bpb0gwqr.fsf@deeprootsystems.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 24 Jun 2010 19:55:28 +0200
+Subject: 
+In-Reply-To: <4C236EC2.8090506@eukrea.com>
+References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<4C236EC2.8090506@eukrea.com>
+Message-ID: <20100624175528.GA14838@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Walmsley <paul@pwsan.com> writes:
+Hello Eric,
 
-> Hi Kevin,
+On Thu, Jun 24, 2010 at 04:42:10PM +0200, Eric B?nard wrote:
+> Hi Uwe,
 >
-> aside from these comments:
->
->    http://marc.info/?l=linux-omap&m=127735008820992&w=2
->
-> one other minor issue -
->
-> On Wed, 23 Jun 2010, Kevin Hilman wrote:
->
->> Hook into the platform bus methods for suspend and resume and
->> use the omap_device API to automatically idle and enable the
->> device on suspend and resume.
->> 
->> This allows device drivers to get rid of direct management of their
->> clocks in their suspend/resume paths, and let omap_device do it for
->> them.
->> 
->> We currently use the _noirq (late suspend, early resume) versions of
->> the suspend/resume methods to ensure that the device is not disabled
->> too early for any drivers also using the _noirq methods.
->> 
->> NOTE: only works for devices with omap_hwmod support.
->> 
->> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
->> ---
->>  arch/arm/mach-omap2/pm_bus.c |   61 ++++++++++++++++++++++++++++++++++++++++++
->>  1 files changed, 61 insertions(+), 0 deletions(-)
->> 
->> diff --git a/arch/arm/mach-omap2/pm_bus.c b/arch/arm/mach-omap2/pm_bus.c
->> index 69acaa5..3787da8 100644
->> --- a/arch/arm/mach-omap2/pm_bus.c
->> +++ b/arch/arm/mach-omap2/pm_bus.c
->> @@ -70,3 +70,64 @@ int platform_pm_runtime_idle(struct device *dev)
->>  };
->>  #endif /* CONFIG_PM_RUNTIME */
->>  
->> +#ifdef CONFIG_SUSPEND
->> +int platform_pm_suspend_noirq(struct device *dev)
->> +{
->> +	struct device_driver *drv = dev->driver;
->> +	struct platform_device *pdev = to_platform_device(dev);
->> +	struct omap_device *odev = to_omap_device(pdev);
->> +	int ret = 0;
->> +
->> +	if (!drv)
->> +		return 0;
->> +
->> +	if (drv->pm) {
->> +		if (drv->pm->suspend_noirq)
->> +			ret = drv->pm->suspend_noirq(dev);
->> +	}
->> +
->> +	if (omap_device_is_valid(odev)) {
->> +		if (odev->flags & OMAP_DEVICE_NO_BUS_SUSPEND) {
->> +			dev_dbg(dev, "no automatic bus-level system resume.\n");
->
-> I guess this should read "suspend" above?
->
+> Le 24/06/2010 15:48, Uwe Kleine-K?nig a ?crit :
+>> this is the next step in the project "clean up the imx port" targeting
+>> 2.6.36.  The highlights this time are:
+>>
+> maybe that would be interesting to rebase your patch serie against
+> Sascha's imx-for-2.6.36 in order to include new boards (especially for  
+> the patches which change registering nand, i2c, spi and uart) ?
+No, I don't want to rebase it.  I hope Sascha just merges my tree.  Do
+you know of any problems, I havn't checked if Sascha's branch introduces
+any new users of devices I removed.  I make a mental note to check that
+after Sascha merged.
 
-Yup, thanks.
+Best regards
+Uwe
 
-Kevin
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
