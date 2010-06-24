@@ -1,56 +1,53 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 24 Jun 2010 15:49:15 +0200
-Subject: [PATCH 19/61] ARM: imx1: rename imx_i2c_device to follow a common
-	naming scheme
+Date: Thu, 24 Jun 2010 15:49:29 +0200
+Subject: [PATCH 33/61] ARM: mxc91231: remove paragraphs with old address of
+	the FSF
 In-Reply-To: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1277387397-3467-20-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1277387397-3467-34-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+As the kernel contains a copy of the GPL anyhow just get rid of the address
+specification instead of fixing it.
+
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-mx1/devices.c     |    2 +-
- arch/arm/mach-mx1/devices.h     |    2 +-
- arch/arm/mach-mx1/mach-mx1ads.c |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-mxc91231/crm_regs.h |    5 -----
+ arch/arm/mach-mxc91231/mm.c       |    5 -----
+ 2 files changed, 0 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-mx1/devices.c b/arch/arm/mach-mx1/devices.c
-index fa3809d..c770aa0 100644
---- a/arch/arm/mach-mx1/devices.c
-+++ b/arch/arm/mach-mx1/devices.c
-@@ -66,7 +66,7 @@ static struct resource imx_i2c_resources[] = {
- 	},
- };
+diff --git a/arch/arm/mach-mxc91231/crm_regs.h b/arch/arm/mach-mxc91231/crm_regs.h
+index ce4f590..b989bac 100644
+--- a/arch/arm/mach-mxc91231/crm_regs.h
++++ b/arch/arm/mach-mxc91231/crm_regs.h
+@@ -11,11 +11,6 @@
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- *
+  */
  
--struct platform_device imx_i2c_device = {
-+struct platform_device imx_i2c_device0 = {
- 	.name           = "imx-i2c",
- 	.id             = 0,
- 	.resource       = imx_i2c_resources,
-diff --git a/arch/arm/mach-mx1/devices.h b/arch/arm/mach-mx1/devices.h
-index 899f8d9..851d6df 100644
---- a/arch/arm/mach-mx1/devices.h
-+++ b/arch/arm/mach-mx1/devices.h
-@@ -1,5 +1,5 @@
- extern struct platform_device imx1_camera_device;
--extern struct platform_device imx_i2c_device;
-+extern struct platform_device imx_i2c_device0;
- extern struct platform_device imx_uart1_device;
- extern struct platform_device imx_uart2_device;
- extern struct platform_device imx_rtc_device;
-diff --git a/arch/arm/mach-mx1/mach-mx1ads.c b/arch/arm/mach-mx1/mach-mx1ads.c
-index 27c8222..16adc61 100644
---- a/arch/arm/mach-mx1/mach-mx1ads.c
-+++ b/arch/arm/mach-mx1/mach-mx1ads.c
-@@ -131,7 +131,7 @@ static void __init mx1ads_init(void)
- 	i2c_register_board_info(0, mx1ads_i2c_devices,
- 				ARRAY_SIZE(mx1ads_i2c_devices));
+ #ifndef _ARCH_ARM_MACH_MXC91231_CRM_REGS_H_
+diff --git a/arch/arm/mach-mxc91231/mm.c b/arch/arm/mach-mxc91231/mm.c
+index 1f23c74..aeccfd7 100644
+--- a/arch/arm/mach-mxc91231/mm.c
++++ b/arch/arm/mach-mxc91231/mm.c
+@@ -15,11 +15,6 @@
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- *
+  */
  
--	mxc_register_device(&imx_i2c_device, &mx1ads_i2c_data);
-+	mxc_register_device(&imx_i2c_device0, &mx1ads_i2c_data);
- }
- 
- static void __init mx1ads_timer_init(void)
+ #include <linux/mm.h>
 -- 
 1.7.1
