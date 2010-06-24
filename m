@@ -1,132 +1,147 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 24 Jun 2010 15:49:52 +0200
-Subject: [PATCH 56/61] ARM: imx: dynamically register imx-uart devices (imx21)
+Date: Thu, 24 Jun 2010 15:49:36 +0200
+Subject: [PATCH 40/61] ARM: imx: Change the way nand devices are registered
+	(imx35)
 In-Reply-To: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1277387397-3467-57-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1277387397-3467-41-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Make use of new mechanism to register a nand device.
+
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-imx/Kconfig         |    1 +
- arch/arm/mach-imx/devices-imx21.h |    9 +++++++++
- arch/arm/mach-imx/devices.c       |    3 +--
- arch/arm/mach-imx/devices.h       |    2 +-
- arch/arm/mach-imx/mach-mx21ads.c  |   12 +++++-------
- 5 files changed, 17 insertions(+), 10 deletions(-)
+ arch/arm/mach-mx3/Kconfig         |    1 +
+ arch/arm/mach-mx3/devices-imx35.h |   13 +++++++++++++
+ arch/arm/mach-mx3/devices.c       |   23 -----------------------
+ arch/arm/mach-mx3/devices.h       |    3 ---
+ arch/arm/mach-mx3/mach-pcm043.c   |    7 ++++---
+ 5 files changed, 18 insertions(+), 29 deletions(-)
+ create mode 100644 arch/arm/mach-mx3/devices-imx35.h
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 445ce10..0fa8acc 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -71,6 +71,7 @@ comment "MX21 platforms:"
- 
- config MACH_MX21ADS
- 	bool "MX21ADS platform"
-+	select IMX_HAVE_PLATFORM_IMX_UART
- 	select IMX_HAVE_PLATFORM_MXC_NAND
+diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
+index cb9368f..5611b23 100644
+--- a/arch/arm/mach-mx3/Kconfig
++++ b/arch/arm/mach-mx3/Kconfig
+@@ -100,6 +100,7 @@ config MACH_QONG
+ config MACH_PCM043
+ 	bool "Support Phytec pcm043 (i.MX35) platforms"
+ 	select ARCH_MX35
++	select IMX_HAVE_PLATFORM_MXC_NAND
+ 	select MXC_ULPI if USB_ULPI
  	help
- 	  Include support for MX21ADS platform. This includes specific
-diff --git a/arch/arm/mach-imx/devices-imx21.h b/arch/arm/mach-imx/devices-imx21.h
-index de80ccd..42788e9 100644
---- a/arch/arm/mach-imx/devices-imx21.h
-+++ b/arch/arm/mach-imx/devices-imx21.h
-@@ -12,6 +12,15 @@
- #define imx21_add_i2c_imx(pdata)	\
- 	imx_add_imx_i2c(0, MX2x_I2C_BASE_ADDR, SZ_4K, MX2x_INT_I2C, pdata)
- 
-+#define imx21_add_imx_uart0(pdata)	\
-+	imx_add_imx_uart_1irq(0, MX21_UART1_BASE_ADDR, SZ_4K, MX21_INT_UART1, pdata)
-+#define imx21_add_imx_uart1(pdata)	\
-+	imx_add_imx_uart_1irq(1, MX21_UART2_BASE_ADDR, SZ_4K, MX21_INT_UART2, pdata)
-+#define imx21_add_imx_uart2(pdata)	\
-+	imx_add_imx_uart_1irq(2, MX21_UART3_BASE_ADDR, SZ_4K, MX21_INT_UART3, pdata)
-+#define imx21_add_imx_uart3(pdata)	\
-+	imx_add_imx_uart_1irq(3, MX21_UART4_BASE_ADDR, SZ_4K, MX21_INT_UART4, pdata)
+ 	  Include support for Phytec pcm043 platform. This includes
+diff --git a/arch/arm/mach-mx3/devices-imx35.h b/arch/arm/mach-mx3/devices-imx35.h
+new file mode 100644
+index 0000000..69dac76
+--- /dev/null
++++ b/arch/arm/mach-mx3/devices-imx35.h
+@@ -0,0 +1,13 @@
++/*
++ * Copyright (C) 2010 Pengutronix
++ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License version 2 as published by the
++ * Free Software Foundation.
++ */
++#include <mach/mx35.h>
++#include <mach/devices-common.h>
 +
- #define imx21_add_mxc_nand(pdata)	\
- 	imx_add_mxc_nand_v1(MX21_NFC_BASE_ADDR, MX21_INT_NANDFC, pdata)
++#define imx35_add_mxc_nand(pdata)	\
++	imx_add_mxc_nand_v21(MX35_NFC_BASE_ADDR, MX35_INT_NANDFC, pdata)
+diff --git a/arch/arm/mach-mx3/devices.c b/arch/arm/mach-mx3/devices.c
+index baa4bd1..c8db849 100644
+--- a/arch/arm/mach-mx3/devices.c
++++ b/arch/arm/mach-mx3/devices.c
+@@ -167,27 +167,6 @@ struct platform_device mxc_w1_master_device = {
+ 	.resource = mxc_w1_master_resources,
+ };
  
-diff --git a/arch/arm/mach-imx/devices.c b/arch/arm/mach-imx/devices.c
-index b4bf8fc..9ea2ef1 100644
---- a/arch/arm/mach-imx/devices.c
-+++ b/arch/arm/mach-imx/devices.c
-@@ -483,6 +483,7 @@ struct platform_device mxc_usbh2 = {
- DEFINE_IMX_SSI_DEVICE(0, 1, MX2x_SSI1_BASE_ADDR, MX2x_INT_SSI1);
- DEFINE_IMX_SSI_DEVICE(1, 2, MX2x_SSI1_BASE_ADDR, MX2x_INT_SSI1);
- 
-+#ifdef CONFIG_MACH_MX27
- #define DEFINE_IMX2x_UART_DEVICE(n, baseaddr, irq)			\
- 	static struct resource imx2x_uart_resources ## n[] = {		\
- 		{							\
-@@ -507,8 +508,6 @@ DEFINE_IMX2x_UART_DEVICE(0, MX2x_UART1_BASE_ADDR, MX2x_INT_UART1);
- DEFINE_IMX2x_UART_DEVICE(1, MX2x_UART2_BASE_ADDR, MX2x_INT_UART2);
- DEFINE_IMX2x_UART_DEVICE(2, MX2x_UART3_BASE_ADDR, MX2x_INT_UART3);
- DEFINE_IMX2x_UART_DEVICE(3, MX2x_UART4_BASE_ADDR, MX2x_INT_UART4);
+-#if defined(CONFIG_ARCH_MX35)
+-static struct resource mxc_nand_resources[] = {
+-	{
+-		.start	= 0, /* runtime dependent */
+-		.end	= 0,
+-		.flags	= IORESOURCE_MEM,
+-	}, {
+-		.start	= MXC_INT_NANDFC,
+-		.end	= MXC_INT_NANDFC,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
 -
--#ifdef CONFIG_MACH_MX27
- DEFINE_IMX2x_UART_DEVICE(4, MX27_UART5_BASE_ADDR, MX27_INT_UART5);
- DEFINE_IMX2x_UART_DEVICE(5, MX27_UART6_BASE_ADDR, MX27_INT_UART6);
- #endif
-diff --git a/arch/arm/mach-imx/devices.h b/arch/arm/mach-imx/devices.h
-index e56efbc..13790fb 100644
---- a/arch/arm/mach-imx/devices.h
-+++ b/arch/arm/mach-imx/devices.h
-@@ -14,11 +14,11 @@ extern struct platform_device mxc_gpt4;
- extern struct platform_device mxc_gpt5;
- #endif
- extern struct platform_device mxc_wdt;
-+#ifdef CONFIG_MACH_MX27
- extern struct platform_device imx2x_uart_device0;
- extern struct platform_device imx2x_uart_device1;
- extern struct platform_device imx2x_uart_device2;
- extern struct platform_device imx2x_uart_device3;
--#ifdef CONFIG_MACH_MX27
- extern struct platform_device imx2x_uart_device4;
- extern struct platform_device imx2x_uart_device5;
- #endif
-diff --git a/arch/arm/mach-imx/mach-mx21ads.c b/arch/arm/mach-imx/mach-mx21ads.c
-index fde2a57..96d7f81 100644
---- a/arch/arm/mach-imx/mach-mx21ads.c
-+++ b/arch/arm/mach-imx/mach-mx21ads.c
-@@ -24,7 +24,6 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- #include <asm/mach/map.h>
--#include <mach/imx-uart.h>
- #include <mach/imxfb.h>
- #include <mach/iomux-mx21.h>
- #include <mach/mxc_nand.h>
-@@ -164,14 +163,13 @@ static struct platform_device mx21ads_nor_mtd_device = {
- 	.resource = &mx21ads_flash_resource,
- };
- 
--static struct imxuart_platform_data uart_pdata = {
-+static const struct imxuart_platform_data uart_pdata_rts __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
- };
- 
--static struct imxuart_platform_data uart_norts_pdata = {
-+static const struct imxuart_platform_data uart_pdata_norts __initconst = {
- };
- 
+-struct platform_device mxc_nand_device = {
+-	.name = "mxc_nand",
+-	.id = 0,
+-	.num_resources = ARRAY_SIZE(mxc_nand_resources),
+-	.resource = mxc_nand_resources,
+-};
+-#endif
 -
- static int mx21ads_fb_init(struct platform_device *pdev)
- {
- 	u16 tmp;
-@@ -295,9 +293,9 @@ static void __init mx21ads_board_init(void)
- 	mxc_gpio_setup_multiple_pins(mx21ads_pins, ARRAY_SIZE(mx21ads_pins),
- 			"mx21ads");
+ static struct resource mxc_i2c0_resources[] = {
+ 	{
+ 		.start = I2C_BASE_ADDR,
+@@ -639,8 +618,6 @@ static int __init mx3_devices_init(void)
+ #endif
+ #if defined(CONFIG_ARCH_MX35)
+ 	if (cpu_is_mx35()) {
+-		mxc_nand_resources[0].start = MX35_NFC_BASE_ADDR;
+-		mxc_nand_resources[0].end = MX35_NFC_BASE_ADDR + 0x1fff;
+ 		otg_resources[0].start = MX35_OTG_BASE_ADDR;
+ 		otg_resources[0].end = MX35_OTG_BASE_ADDR + 0x1ff;
+ 		otg_resources[1].start = MXC_INT_USBOTG;
+diff --git a/arch/arm/mach-mx3/devices.h b/arch/arm/mach-mx3/devices.h
+index 6bb71d3..4a224e6 100644
+--- a/arch/arm/mach-mx3/devices.h
++++ b/arch/arm/mach-mx3/devices.h
+@@ -5,9 +5,6 @@ extern struct platform_device mxc_uart_device2;
+ extern struct platform_device mxc_uart_device3;
+ extern struct platform_device mxc_uart_device4;
+ extern struct platform_device mxc_w1_master_device;
+-#if defined(CONFIG_ARCH_MX35)
+-extern struct platform_device mxc_nand_device;
+-#endif
+ extern struct platform_device mxc_i2c_device0;
+ extern struct platform_device mxc_i2c_device1;
+ extern struct platform_device mxc_i2c_device2;
+diff --git a/arch/arm/mach-mx3/mach-pcm043.c b/arch/arm/mach-mx3/mach-pcm043.c
+index 100bb77..58de305 100644
+--- a/arch/arm/mach-mx3/mach-pcm043.c
++++ b/arch/arm/mach-mx3/mach-pcm043.c
+@@ -43,12 +43,12 @@
+ #include <mach/iomux-mx35.h>
+ #include <mach/ipu.h>
+ #include <mach/mx3fb.h>
+-#include <mach/mxc_nand.h>
+ #include <mach/mxc_ehci.h>
+ #include <mach/ulpi.h>
+ #include <mach/audmux.h>
+ #include <mach/ssi.h>
  
--	mxc_register_device(&imx2x_uart_device0, &uart_pdata);
--	mxc_register_device(&imx2x_uart_device2, &uart_norts_pdata);
--	mxc_register_device(&imx2x_uart_device3, &uart_pdata);
-+	imx21_add_imx_uart0(&uart_pdata_rts);
-+	imx21_add_imx_uart2(&uart_pdata_norts);
-+	imx21_add_imx_uart3(&uart_pdata_rts);
- 	mxc_register_device(&mxc_fb_device, &mx21ads_fb_data);
- 	mxc_register_device(&mxc_sdhc_device0, &mx21ads_sdhc_pdata);
- 	imx21_add_mxc_nand(&mx21ads_nand_board_info);
++#include "devices-imx35.h"
+ #include "devices.h"
+ 
+ static const struct fb_videomode fb_modedb[] = {
+@@ -300,7 +300,8 @@ static struct imx_ssi_platform_data pcm043_ssi_pdata = {
+ 	.flags = IMX_SSI_USE_AC97,
+ };
+ 
+-static struct mxc_nand_platform_data pcm037_nand_board_info = {
++static const struct mxc_nand_platform_data
++pcm037_nand_board_info __initconst = {
+ 	.width = 1,
+ 	.hw_ecc = 1,
+ };
+@@ -358,7 +359,7 @@ static void __init mxc_board_init(void)
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ 
+ 	mxc_register_device(&mxc_uart_device0, &uart_pdata);
+-	mxc_register_device(&mxc_nand_device, &pcm037_nand_board_info);
++	imx35_add_mxc_nand(&pcm037_nand_board_info);
+ 	mxc_register_device(&imx_ssi_device0, &pcm043_ssi_pdata);
+ 
+ 	mxc_register_device(&mxc_uart_device1, &uart_pdata);
 -- 
 1.7.1
