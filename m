@@ -1,40 +1,42 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 25 Jun 2010 17:16:01 +0100
-Subject: Question about SMP
-In-Reply-To: <AANLkTilJOUmarsLJJtNzbVwrZLbLAD29gp2SHL0TZCUQ@mail.gmail.com>
-References: <AANLkTilJOUmarsLJJtNzbVwrZLbLAD29gp2SHL0TZCUQ@mail.gmail.com>
-Message-ID: <1277482561.13134.68.camel@e102109-lin.cambridge.arm.com>
+Date: Fri, 25 Jun 2010 18:18:43 +0100
+Subject: [PATCH 1/1] ARM: unwind - optimise linked-list searches for
+	modules
+In-Reply-To: <1276605998-19275-1-git-send-email-ext-phil.2.carmody@nokia.com>
+References: <1276605998-19275-1-git-send-email-ext-phil.2.carmody@nokia.com>
+Message-ID: <1277486323.13134.82.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-06-07 at 21:11 +0100, Dave Hylands wrote:
-> I'm trying to understand what I need to be concerned about with SMP
-> processors and sharing global data (in particular a dual Cortex-A9)
+On Tue, 2010-06-15 at 13:46 +0100, Phil Carmody wrote:
+> With several sections per module, and dozens of modules, the
+> searches down the linked list would dominate the lookup time,
+> dwarfing any savings from the binary search within the section.
 > 
-> I'm familiar with spinlocks, but in this case I'm trying to work with
-> some lockless data structures.
-
-You should be really concerned about memory ordering and barriers :).
-See Documentation/memory-barriers.txt in the kernel source.
-
-> What I'm not sure is whether the following would work. Suppose I have
-> a couple of 8-bit get/put indicies which are in adjacent memory
-> locations (within the same 32-bit word).
+> A simple move-to-front optimisation exploits the commonality
+> of the code paths taken, and in simple real-world tests reduces
+> the number of steps in the search to barely more than 1.
 > 
-> If I have an ISR and a thread running on an SMP core, and the ISR is
-> running on one core and the thread is running on a second core, if the
-> ISR were to only write to the put pointer and the thread were only to
-> write to the get pointer, does the cache maintain consistency? Or do
-> the get and put pointers need to be in separate cache lines?
+> Signed-off-by: Phil Carmody <ext-phil.2.carmody@nokia.com>
+> ---
+>  arch/arm/kernel/unwind.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+> index dd81a91..2e88abf 100644
+> --- a/arch/arm/kernel/unwind.c
+> +++ b/arch/arm/kernel/unwind.c
+> @@ -146,6 +146,8 @@ static struct unwind_idx *unwind_find_idx(unsigned long addr)
+>                             addr < table->end_addr) {
+>                                 idx = search_index(addr, table->start,
+>                                                    table->stop - 1);
+> +                               /* MTF with 50 modules: 80 steps becomes ~1 */
+> +                               list_move(&table->list, &unwind_tables);
 
-The consistency is maintained (though be careful about memory ordering
-and when the put/get pointers become visible to the other CPUs).
+That's a good optimisation. Could you please expand the "MTF" comment in
+the code a bit more? Otherwise,
 
-> Another way of asking this: If both cores are writing to the same
-> 32-bit word (but different bytes) do the writes collide?
-
-No, though it's not very efficient because of cache line being moved
-between CPUs. See http://en.wikipedia.org/wiki/MESI_protocol.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
 -- 
 Catalin
