@@ -1,61 +1,35 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Fri, 25 Jun 2010 19:39:49 +0900
-Subject: [PATCH v5 3/3] input: samsung-keypad - Add samsung keypad driver
-In-Reply-To: <4C24840C.1000701@samsung.com>
-References: <1277101605-2435-1-git-send-email-jy0922.shim@samsung.com>
-	<1277101605-2435-3-git-send-email-jy0922.shim@samsung.com>
-	<20100625083019.GD8546@core.coreip.homeip.net>
-	<4C24840C.1000701@samsung.com>
-Message-ID: <4C248775.5080306@samsung.com>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Fri, 25 Jun 2010 13:55:31 +0300
+Subject: S3C2416 fixes (gpiolib, SDHCI, compilation without FB device)
+In-Reply-To: <1277212585-25605-1-git-send-email-jekhor@gmail.com>
+References: <1277212585-25605-1-git-send-email-jekhor@gmail.com>
+Message-ID: <4C248B23.7060905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/25/2010 7:25 PM, Joonyoung Shim wrote:
-> On 6/25/2010 5:30 PM, Dmitry Torokhov wrote:
->> Hi Joonyoung,
->>
->> On Mon, Jun 21, 2010 at 03:26:45PM +0900, Joonyoung Shim wrote:
->>> This patch adds support for keypad driver running on Samsung cpus. This
->>> driver is tested on GONI and Aquila board using S5PC110 cpu.
->>>
->>> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
->>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> Following my conversation with Thomas Gleixner reagrding "long playing"
->> threaded interrupt handlers I tried to convert your driver to use this
->> concept. The idea is to keep polling within IRQ thread context instead
->> of using additional work/timer structures to simplify code and ensure
->> race-free shutdown/unbind.
->>
->> I think it was based on v4 of your driver and I'd appreciate if you could
->> give it a try.
->>
-> 
-> Your patch gives me below patch errors.
-> 
+On 06/22/2010 04:16 PM, Yauhen Kharuzhy wrote:
+> This patch series fixes SDHCI on S3C2416. I got SD card working with this patches
+> and with patches for GPIO card detection support by Marek Szyprowski.
+>
 
-Your patch maybe seems be based on my v3 patch :)
+Unfortunately I did not get SD card working with these patches. I'm 
+using custom board, not SMDK2416, but SD slot connection and schematics 
+are the same like in SMDK2416. I've tried to debug a bit this problem 
+and this is what I got: kernel do detection of card insert/remove, 
+driver prints messages:
 
-> $ patch -p1 --dry-run < 2.patch
-> (Stripping trailing CRs from patch.)
-> patching file drivers/input/keyboard/samsung-keypad.c
-> Hunk #3 FAILED at 68.
-> Hunk #4 FAILED at 116.
-> Hunk #5 FAILED at 158.
-> Hunk #6 succeeded at 196 (offset -7 lines).
-> Hunk #7 succeeded at 212 (offset -7 lines).
-> Hunk #8 FAILED at 230.
-> Hunk #9 FAILED at 365.
-> Hunk #10 FAILED at 418.
-> 6 out of 10 hunks FAILED -- saving rejects to file
-> drivers/input/keyboard/samsung-keypad.c.rej
-> 
-> Can you give me your patch based on my v5 patches? If not, i should try
-> manual merge.
-> 
-> Thanks.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+s3c-sdhci s3c-sdhci.1: card inserted.
+s3c-sdhci s3c-sdhci.1: card removed.
+
+Then I put some printk in s3c-sdhci driver and MMC core and found that 
+mmc_rescan() is called only once at startup and no more when 
+inserting/removing SD card. Also mmc_rescan() stops at that point where 
+mmc_power_up() is called and does not return. And mmc_power_up() stops 
+where mmc_delay(10) is called and does not return too.
+Every time when inserting/removing SD card only functions 
+sdhci_tasklet_card() and mmc_detect_change() are called, and nothing 
+happens. Kernel doesn't detect the card inserted.
+Maybe this info could help to debug where the problem is - in my custom 
+board or in your patches?
+
+Darius.
