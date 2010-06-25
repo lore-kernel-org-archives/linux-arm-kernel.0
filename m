@@ -1,24 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 25 Jun 2010 11:35:45 +0100
-Subject: [PATCH 0/2] add perf-probe support on ARM
-In-Reply-To: <AANLkTimU1W0feaSKyKCFHdZSG_RE6G_sFiAZ6jtU434w@mail.gmail.com>
-References: <1277285763-16213-1-git-send-email-will.deacon@arm.com>
-	<AANLkTimU1W0feaSKyKCFHdZSG_RE6G_sFiAZ6jtU434w@mail.gmail.com>
-Message-ID: <001401cb1452$2b409e40$81c1dac0$@deacon@arm.com>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Fri, 25 Jun 2010 19:39:49 +0900
+Subject: [PATCH v5 3/3] input: samsung-keypad - Add samsung keypad driver
+In-Reply-To: <4C24840C.1000701@samsung.com>
+References: <1277101605-2435-1-git-send-email-jy0922.shim@samsung.com>
+	<1277101605-2435-3-git-send-email-jy0922.shim@samsung.com>
+	<20100625083019.GD8546@core.coreip.homeip.net>
+	<4C24840C.1000701@samsung.com>
+Message-ID: <4C248775.5080306@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi Will,
+On 6/25/2010 7:25 PM, Joonyoung Shim wrote:
+> On 6/25/2010 5:30 PM, Dmitry Torokhov wrote:
+>> Hi Joonyoung,
+>>
+>> On Mon, Jun 21, 2010 at 03:26:45PM +0900, Joonyoung Shim wrote:
+>>> This patch adds support for keypad driver running on Samsung cpus. This
+>>> driver is tested on GONI and Aquila board using S5PC110 cpu.
+>>>
+>>> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> Following my conversation with Thomas Gleixner reagrding "long playing"
+>> threaded interrupt handlers I tried to convert your driver to use this
+>> concept. The idea is to keep polling within IRQ thread context instead
+>> of using additional work/timer structures to simplify code and ensure
+>> race-free shutdown/unbind.
+>>
+>> I think it was based on v4 of your driver and I'd appreciate if you could
+>> give it a try.
+>>
+> 
+> Your patch gives me below patch errors.
+> 
 
-Hi Jean,
+Your patch maybe seems be based on my v3 patch :)
 
-> Are more tests needed for ARMv7 (OMAP3430/3530/3517)? I hope to find some time to test it if required.
-
-The patches don't do anything special for the different architectures
-and I've tried it on a quad-core A9 board so I don't think you're required
-to test it as well. Having said that, it's a pretty neat tool so you might
-want to have a play :)
-
-Thanks,
-
-Will
+> $ patch -p1 --dry-run < 2.patch
+> (Stripping trailing CRs from patch.)
+> patching file drivers/input/keyboard/samsung-keypad.c
+> Hunk #3 FAILED at 68.
+> Hunk #4 FAILED at 116.
+> Hunk #5 FAILED at 158.
+> Hunk #6 succeeded at 196 (offset -7 lines).
+> Hunk #7 succeeded at 212 (offset -7 lines).
+> Hunk #8 FAILED at 230.
+> Hunk #9 FAILED at 365.
+> Hunk #10 FAILED at 418.
+> 6 out of 10 hunks FAILED -- saving rejects to file
+> drivers/input/keyboard/samsung-keypad.c.rej
+> 
+> Can you give me your patch based on my v5 patches? If not, i should try
+> manual merge.
+> 
+> Thanks.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
