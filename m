@@ -1,121 +1,40 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 24 Jun 2010 16:43:11 -0700
-Subject: [PATCH v2 3/3] OMAP1: PM: add simple runtime PM layer to manage clocks
-In-Reply-To: <1277422991-25350-1-git-send-email-khilman@deeprootsystems.com>
-References: <1277422991-25350-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1277422991-25350-4-git-send-email-khilman@deeprootsystems.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Fri, 25 Jun 2010 07:39:22 +0530
+Subject: strange segfaults with CompactFlash in "true-ide" mode on PXA270
+In-Reply-To: <19490.10015.10027.750374@ipc1.ka-ro>
+References: <201006231706.33182.schindele@nentec.de>
+	<19490.10015.10027.750374@ipc1.ka-ro>
+Message-ID: <AANLkTilj-ma9RgIBZNtJLlNFWsSDLG5tHfdllG_0_wNY@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP1, we do not have omap_device + omap_hwmod to manage the
-device-specific idle, enable and shutdown.  Instead, just
-enable/disable device clocks automatically at the runtime PM level.
+On Wed, Jun 23, 2010 at 8:54 PM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
+>> we have a strange problem when booting from a Compact Flash card
+>> as root-device. In one of 10 cases while booting an application from
+>> root-filesystem dies with "Segmentation fault" without a visible error.
+>> After booting the same application runs hundred times without error.
+>> (we're talking about standard appl. like chat, pppd, hwclock and so on)
+>>
+>> For debugging purposes we put printk's in kernels IDE driver
+>> and the problem disappeared. But replacing the printk by a usleep
+>> or so (which is not a solution !) brings the problem back.
+>> It seems that the application received faulty data from CF.
+>> But how and why ?????????????????????????????
+>>
+>> We tested with a custom PXA270 board with a CompactFlash in
+>> "true ide" on processor bus driven by "generic ide / pata_platform"
+>> driver from linux-2.6.27.x.
+>> (by the way linux-2.6.20.x showed the same problem).
+>>
+>> Any ideas, hints, experiences, patches are very welcome :-)
+>> --------------------------------------------------------------
+> I guess that is the old cache problem that apparently was never really
+> fixed:
+> http://marc.info/?t=108537828400002&r=1&w=2
 
-This allows drivers to not have any OMAP1 specific clock management
-and allows them to simply use the runtime PM API to manage clocks.
+Catalin recently posted some patches addressing the cache
+problem:
 
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
----
- arch/arm/mach-omap1/Makefile |    2 +-
- arch/arm/mach-omap1/pm_bus.c |   77 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 78 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-omap1/pm_bus.c
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/82987
 
-diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
-index ea231c7..fd4df71 100644
---- a/arch/arm/mach-omap1/Makefile
-+++ b/arch/arm/mach-omap1/Makefile
-@@ -12,7 +12,7 @@ obj-$(CONFIG_OMAP_MPU_TIMER)	+= time.o
- obj-$(CONFIG_OMAP_32K_TIMER)	+= timer32k.o
- 
- # Power Management
--obj-$(CONFIG_PM) += pm.o sleep.o
-+obj-$(CONFIG_PM) += pm.o sleep.o pm_bus.o
- 
- # DSP
- obj-$(CONFIG_OMAP_MBOX_FWK)	+= mailbox_mach.o
-diff --git a/arch/arm/mach-omap1/pm_bus.c b/arch/arm/mach-omap1/pm_bus.c
-new file mode 100644
-index 0000000..29d651a
---- /dev/null
-+++ b/arch/arm/mach-omap1/pm_bus.c
-@@ -0,0 +1,77 @@
-+/*
-+ * Runtime PM support code for OMAP1
-+ *
-+ * Author: Kevin Hilman, Deep Root Systems, LLC
-+ *
-+ * Copyright (C) 2010 Texas Instruments, Inc.
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/io.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/platform_device.h>
-+#include <linux/mutex.h>
-+
-+#include <plat/omap_device.h>
-+#include <plat/omap-pm.h>
-+
-+#ifdef CONFIG_PM_RUNTIME
-+int platform_pm_runtime_suspend(struct device *dev)
-+{
-+	struct clk *iclk, *fclk;
-+
-+	dev_dbg(dev, "%s\n", __func__);
-+
-+	if (dev->driver->pm && dev->driver->pm->runtime_suspend)
-+		ret = dev->driver->pm->runtime_suspend(dev);
-+
-+	fclk = clk_get(dev, "fck");
-+	if (!IS_ERR(fclk)) {
-+		clk_disable(fclk);
-+		clk_put(fclk);
-+	}
-+
-+	iclk = clk_get(dev, "ick");
-+	if (!IS_ERR(iclk)) {
-+		clk_disable(iclk);
-+		clk_put(iclk);
-+	}
-+
-+	return 0;
-+};
-+
-+int platform_pm_runtime_resume(struct device *dev)
-+{
-+	int r, ret = 0;
-+	struct clk *iclk, *fclk;
-+
-+	iclk = clk_get(dev, "ick");
-+	if (!IS_ERR(iclk)) {
-+		clk_enable(iclk);
-+		clk_put(iclk);
-+	}
-+
-+	fclk = clk_get(dev, "fck");
-+	if (!IS_ERR(fclk)) {
-+		clk_enable(fclk);
-+		clk_put(fclk);
-+	}
-+
-+	if (dev->driver->pm && dev->driver->pm->runtime_resume)
-+		ret = dev->driver->pm->runtime_resume(dev);
-+
-+	return ret;
-+};
-+
-+int platform_pm_runtime_idle(struct device *dev)
-+{
-+	ret = pm_runtime_suspend(dev);
-+	dev_dbg(dev, "%s [%d]\n", __func__, ret);
-+
-+	return 0;
-+};
-+#endif /* CONFIG_PM_RUNTIME */
--- 
-1.7.0.2
+Rabin
