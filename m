@@ -1,161 +1,171 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 25 Jun 2010 13:01:32 +0100
-Subject: [PATCH 1/3] ARM: Assume new page cache pages have dirty D-cache
+Date: Fri, 25 Jun 2010 13:01:38 +0100
+Subject: [PATCH 2/3] ARM: Introduce __sync_icache_dcache() for VIPT caches
 In-Reply-To: <20100625115826.30030.89790.stgit@e102109-lin.cambridge.arm.com>
 References: <20100625115826.30030.89790.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100625120132.30030.5577.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100625120138.30030.87455.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are places in Linux where writes to newly allocated page cache
-pages happen without a subsequent call to flush_dcache_page() (several
-PIO drivers including USB HCD). This patch changes the meaning of
-PG_arch_1 to be PG_dcache_clean and always flush the D-cache for a newly
-mapped page in update_mmu_cache().
+On SMP systems, there is a small chance of a PTE becoming visible to a
+different CPU before the current cache maintenance operations in
+update_mmu_cache(). To avoid this, cache maintenance must be handled in
+set_pte_at() (similar to IA-64 and PowerPC).
 
-The patch also sets the PG_arch_1 bit in the DMA cache maintenance
-function to avoid additional cache flushing in update_mmu_cache().
+This patch provides a unified VIPT cache handling mechanism and
+implements the __sync_icache_dcache() function for ARMv6 onwards
+architectures. It is called from set_pte_at() and replaces the
+update_mmu_cache(). The latter is still used on VIVT hardware where a
+vm_area_struct is required.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Rabin Vincent <rabin.vincent@stericsson.com>
 ---
- arch/arm/include/asm/cacheflush.h |    6 +++---
- arch/arm/include/asm/tlbflush.h   |    2 +-
- arch/arm/mm/copypage-v4mc.c       |    2 +-
- arch/arm/mm/copypage-v6.c         |    2 +-
- arch/arm/mm/copypage-xscale.c     |    2 +-
- arch/arm/mm/dma-mapping.c         |    6 ++++++
- arch/arm/mm/fault-armv.c          |    4 ++--
- arch/arm/mm/flush.c               |    3 ++-
- 8 files changed, 17 insertions(+), 10 deletions(-)
+ arch/arm/include/asm/pgtable.h  |   26 +++++++++++++++++++++++---
+ arch/arm/include/asm/tlbflush.h |   10 +++++++++-
+ arch/arm/mm/fault-armv.c        |    4 ++--
+ arch/arm/mm/flush.c             |   30 ++++++++++++++++++++++++++++++
+ 4 files changed, 64 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index 4656a24..d3730f0 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -137,10 +137,10 @@
- #endif
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index ab68cf1..42e694f 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -278,9 +278,24 @@ extern struct page *empty_zero_page;
+ 
+ #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
+ 
+-#define set_pte_at(mm,addr,ptep,pteval) do { \
+-	set_pte_ext(ptep, pteval, (addr) >= TASK_SIZE ? 0 : PTE_EXT_NG); \
+- } while (0)
++#if __LINUX_ARM_ARCH__ < 6
++static inline void __sync_icache_dcache(pte_t pteval)
++{
++}
++#else
++extern void __sync_icache_dcache(pte_t pteval);
++#endif
++
++static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
++			      pte_t *ptep, pte_t pteval)
++{
++	if (addr >= TASK_SIZE)
++		set_pte_ext(ptep, pteval, 0);
++	else {
++		__sync_icache_dcache(pteval);
++		set_pte_ext(ptep, pteval, PTE_EXT_NG);
++	}
++}
  
  /*
-- * This flag is used to indicate that the page pointed to by a pte
-- * is dirty and requires cleaning before returning it to the user.
-+ * This flag is used to indicate that the page pointed to by a pte is clean
-+ * and does not require cleaning before returning it to the user.
-  */
--#define PG_dcache_dirty PG_arch_1
-+#define PG_dcache_clean PG_arch_1
+  * The following only work if pte_present() is true.
+@@ -290,8 +305,13 @@ extern struct page *empty_zero_page;
+ #define pte_write(pte)		(pte_val(pte) & L_PTE_WRITE)
+ #define pte_dirty(pte)		(pte_val(pte) & L_PTE_DIRTY)
+ #define pte_young(pte)		(pte_val(pte) & L_PTE_YOUNG)
++#define pte_exec(pte)		(pte_val(pte) & L_PTE_EXEC)
+ #define pte_special(pte)	(0)
  
- /*
-  *	MM Cache Management
++#define pte_present_user(pte) \
++	((pte_val(pte) & (L_PTE_PRESENT | L_PTE_USER)) == \
++	 (L_PTE_PRESENT | L_PTE_USER))
++
+ #define PTE_BIT_FUNC(fn,op) \
+ static inline pte_t pte_##fn(pte_t pte) { pte_val(pte) op; return pte; }
+ 
 diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index bd863d8..40a7092 100644
+index 40a7092..8ec4775 100644
 --- a/arch/arm/include/asm/tlbflush.h
 +++ b/arch/arm/include/asm/tlbflush.h
-@@ -552,7 +552,7 @@ extern void flush_tlb_kernel_range(unsigned long start, unsigned long end);
- #endif
- 
+@@ -554,10 +554,18 @@ extern void flush_tlb_kernel_range(unsigned long start, unsigned long end);
  /*
-- * if PG_dcache_dirty is set for the page, we need to ensure that any
-+ * If PG_dcache_clean is not set for the page, we need to ensure that any
+  * If PG_dcache_clean is not set for the page, we need to ensure that any
   * cache entries for the kernels virtual memory range are written
-  * back to the page.
+- * back to the page.
++ * back to the page. On ARMv6 and later, the cache coherency is handled via
++ * the set_pte_at() function.
   */
-diff --git a/arch/arm/mm/copypage-v4mc.c b/arch/arm/mm/copypage-v4mc.c
-index 598c51a..b806151 100644
---- a/arch/arm/mm/copypage-v4mc.c
-+++ b/arch/arm/mm/copypage-v4mc.c
-@@ -73,7 +73,7 @@ void v4_mc_copy_user_highpage(struct page *to, struct page *from,
- {
- 	void *kto = kmap_atomic(to, KM_USER1);
++#if __LINUX_ARM_ARCH__ < 6
+ extern void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
+ 	pte_t *ptep);
++#else
++static inline void update_mmu_cache(struct vm_area_struct *vma,
++				    unsigned long addr, pte_t *ptep)
++{
++}
++#endif
  
--	if (test_and_clear_bit(PG_dcache_dirty, &from->flags))
-+	if (!test_and_set_bit(PG_dcache_clean, &from->flags))
- 		__flush_dcache_page(page_mapping(from), from);
- 
- 	spin_lock(&minicache_lock);
-diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
-index f55fa10..bdba6c6 100644
---- a/arch/arm/mm/copypage-v6.c
-+++ b/arch/arm/mm/copypage-v6.c
-@@ -79,7 +79,7 @@ static void v6_copy_user_highpage_aliasing(struct page *to,
- 	unsigned int offset = CACHE_COLOUR(vaddr);
- 	unsigned long kfrom, kto;
- 
--	if (test_and_clear_bit(PG_dcache_dirty, &from->flags))
-+	if (!test_and_set_bit(PG_dcache_clean, &from->flags))
- 		__flush_dcache_page(page_mapping(from), from);
- 
- 	/* FIXME: not highmem safe */
-diff --git a/arch/arm/mm/copypage-xscale.c b/arch/arm/mm/copypage-xscale.c
-index 9920c0a..649bbcd 100644
---- a/arch/arm/mm/copypage-xscale.c
-+++ b/arch/arm/mm/copypage-xscale.c
-@@ -95,7 +95,7 @@ void xscale_mc_copy_user_highpage(struct page *to, struct page *from,
- {
- 	void *kto = kmap_atomic(to, KM_USER1);
- 
--	if (test_and_clear_bit(PG_dcache_dirty, &from->flags))
-+	if (!test_and_set_bit(PG_dcache_clean, &from->flags))
- 		__flush_dcache_page(page_mapping(from), from);
- 
- 	spin_lock(&minicache_lock);
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 9e7742f..97c4744 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -508,6 +508,12 @@ void ___dma_page_dev_to_cpu(struct page *page, unsigned long off,
- 		outer_inv_range(paddr, paddr + size);
- 
- 	dma_cache_maint_page(page, off, size, dir, dmac_unmap_area);
-+
-+	/*
-+	 * Mark the D-cache clean for this page to avoid extra flushing.
-+	 */
-+	if (dir != DMA_TO_DEVICE)
-+		set_bit(PG_dcache_clean, &page->flags);
- }
- EXPORT_SYMBOL(___dma_page_dev_to_cpu);
+ #endif
  
 diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
-index 9b906de..58846cb 100644
+index 58846cb..8440d95 100644
 --- a/arch/arm/mm/fault-armv.c
 +++ b/arch/arm/mm/fault-armv.c
-@@ -141,7 +141,7 @@ make_coherent(struct address_space *mapping, struct vm_area_struct *vma,
-  * a page table, or changing an existing PTE.  Basically, there are two
-  * things that we need to take care of:
-  *
-- *  1. If PG_dcache_dirty is set for the page, we need to ensure
-+ *  1. If PG_dcache_clean is not set for the page, we need to ensure
-  *     that any cache entries for the kernels virtual memory
-  *     range are written back to the page.
-  *  2. If we have multiple shared mappings of the same space in
-@@ -169,7 +169,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
+@@ -28,6 +28,7 @@
+ 
+ static unsigned long shared_pte_mask = L_PTE_MT_BUFFERABLE;
+ 
++#if __LINUX_ARM_ARCH__ < 6
+ /*
+  * We take the easy way out of this problem - we make the
+  * PTE uncacheable.  However, we leave the write buffer on.
+@@ -168,10 +169,8 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
+ 		return;
  
  	mapping = page_mapping(page);
- #ifndef CONFIG_SMP
--	if (test_and_clear_bit(PG_dcache_dirty, &page->flags))
-+	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
+-#ifndef CONFIG_SMP
+ 	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
  		__flush_dcache_page(mapping, page);
- #endif
+-#endif
  	if (mapping) {
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index c6844cb..9f9919b 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -248,7 +248,7 @@ void flush_dcache_page(struct page *page)
- 
- #ifndef CONFIG_SMP
- 	if (!PageHighMem(page) && mapping && !mapping_mapped(mapping))
--		set_bit(PG_dcache_dirty, &page->flags);
-+		clear_bit(PG_dcache_clean, &page->flags);
- 	else
- #endif
- 	{
-@@ -257,6 +257,7 @@ void flush_dcache_page(struct page *page)
- 			__flush_dcache_aliases(mapping, page);
- 		else if (mapping)
+ 		if (cache_is_vivt())
+ 			make_coherent(mapping, vma, addr, ptep, pfn);
+@@ -179,6 +178,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
  			__flush_icache_all();
-+		set_bit(PG_dcache_clean, &page->flags);
  	}
  }
- EXPORT_SYMBOL(flush_dcache_page);
++#endif	/* __LINUX_ARM_ARCH__ < 6 */
+ 
+ /*
+  * Check whether the write buffer has physical address aliasing
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 9f9919b..78134f5 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -215,6 +215,36 @@ static void __flush_dcache_aliases(struct address_space *mapping, struct page *p
+ 	flush_dcache_mmap_unlock(mapping);
+ }
+ 
++#if __LINUX_ARM_ARCH__ >= 6
++void __sync_icache_dcache(pte_t pteval)
++{
++	unsigned long pfn;
++	struct page *page;
++	struct address_space *mapping;
++
++	if (!pte_present_user(pteval))
++		return;
++	if (cache_is_vipt_nonaliasing() && !pte_exec(pteval))
++		/* only flush non-aliasing VIPT caches for exec mappings */
++		return;
++	pfn = pte_pfn(pteval);
++	if (!pfn_valid(pfn))
++		return;
++
++	page = pfn_to_page(pfn);
++	if (cache_is_vipt_aliasing())
++		mapping = page_mapping(page);
++	else
++		mapping = NULL;
++
++	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
++		__flush_dcache_page(mapping, page);
++	/* pte_exec() already checked above for non-aliasing VIPT cache */
++	if (cache_is_vipt_nonaliasing() || pte_exec(pteval))
++		__flush_icache_all();
++}
++#endif
++
+ /*
+  * Ensure cache coherency between kernel mapping and userspace mapping
+  * of this page.
