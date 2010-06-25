@@ -1,93 +1,82 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 25 Jun 2010 15:44:31 +0800
-Subject: [PATCH 4/4] [ARM] Make pxa and mmp to USE_DEFAULT_IO_H
-In-Reply-To: <1277451871-15319-1-git-send-email-eric.y.miao@gmail.com>
-References: <1277451871-15319-1-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <1277451871-15319-5-git-send-email-eric.y.miao@gmail.com>
+From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
+Date: Fri, 25 Jun 2010 09:53:20 +0200
+Subject: [PATCH] imxfb: add the possibility to control PWMR
+Message-ID: <1277452400-6032-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Miao <eric.miao@canonical.com>
+this adds the possibility to enable/disable the backlight through
+the PWMR register, as offered in mx3fb.
 
-Signed-off-by: Eric Miao <eric.miao@canonical.com>
+Signed-off-by: Eric B?nard <eric@eukrea.com>
 ---
- arch/arm/Kconfig                    |    2 ++
- arch/arm/mach-mmp/include/mach/io.h |   21 ---------------------
- arch/arm/mach-pxa/include/mach/io.h |   18 ------------------
- 3 files changed, 2 insertions(+), 39 deletions(-)
- delete mode 100644 arch/arm/mach-mmp/include/mach/io.h
- delete mode 100644 arch/arm/mach-pxa/include/mach/io.h
+ arch/arm/plat-mxc/include/mach/imxfb.h |    1 +
+ drivers/video/imxfb.c                  |   14 ++++++++++++++
+ 2 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 46c00a1..f2da68a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -517,6 +517,7 @@ config ARCH_MMP
- 	select GENERIC_CLOCKEVENTS
- 	select TICK_ONESHOT
- 	select PLAT_PXA
-+	select USE_DEFAULT_IO_H
- 	help
- 	  Support for Marvell's PXA168/PXA910(MMP) and MMP2 processor line.
+diff --git a/arch/arm/plat-mxc/include/mach/imxfb.h b/arch/arm/plat-mxc/include/mach/imxfb.h
+index 5263506..3c24778 100644
+--- a/arch/arm/plat-mxc/include/mach/imxfb.h
++++ b/arch/arm/plat-mxc/include/mach/imxfb.h
+@@ -67,6 +67,7 @@ struct imx_fb_platform_data {
+ 	u_int		pwmr;
+ 	u_int		lscr1;
+ 	u_int		dmacr;
++	u_int		backlight_level;
  
-@@ -582,6 +583,7 @@ config ARCH_PXA
- 	select GENERIC_CLOCKEVENTS
- 	select TICK_ONESHOT
- 	select PLAT_PXA
-+	select USE_DEFAULT_IO_H
- 	help
- 	  Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
+ 	u_char * fixed_screen_cpu;
+ 	dma_addr_t fixed_screen_dma;
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index b4b6dec..9451200 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -169,6 +169,7 @@ struct imxfb_info {
+ 	u_int			pwmr;
+ 	u_int			lscr1;
+ 	u_int			dmacr;
++	u_int			backlight_level;
+ 	u_int			cmap_inverse:1,
+ 				cmap_static:1,
+ 				unused:30;
+@@ -302,6 +303,14 @@ static int imxfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+ 	return ret;
+ }
  
-diff --git a/arch/arm/mach-mmp/include/mach/io.h b/arch/arm/mach-mmp/include/mach/io.h
-deleted file mode 100644
-index e7adf3d..0000000
---- a/arch/arm/mach-mmp/include/mach/io.h
-+++ /dev/null
-@@ -1,21 +0,0 @@
--/*
-- * linux/arch/arm/mach-mmp/include/mach/io.h
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef __ASM_MACH_IO_H
--#define __ASM_MACH_IO_H
--
--#define IO_SPACE_LIMIT 0xffffffff
--
--/*
-- * We don't actually have real ISA nor PCI buses, but there is so many
-- * drivers out there that might just work if we fake them...
-- */
--#define __io(a)		__typesafe_io(a)
--#define __mem_pci(a)	(a)
--
--#endif /* __ASM_MACH_IO_H */
-diff --git a/arch/arm/mach-pxa/include/mach/io.h b/arch/arm/mach-pxa/include/mach/io.h
-deleted file mode 100644
-index 262691f..0000000
---- a/arch/arm/mach-pxa/include/mach/io.h
-+++ /dev/null
-@@ -1,18 +0,0 @@
--/*
-- * arch/arm/mach-pxa/include/mach/io.h
-- *
-- * Copied from asm/arch/sa1100/io.h
-- */
--#ifndef __ASM_ARM_ARCH_IO_H
--#define __ASM_ARM_ARCH_IO_H
--
--#define IO_SPACE_LIMIT 0xffffffff
--
--/*
-- * We don't actually have real ISA nor PCI buses, but there is so many
-- * drivers out there that might just work if we fake them...
-- */
--#define __io(a)		__typesafe_io(a)
--#define __mem_pci(a)	(a)
--
--#endif
++static void imx_fb_set_brightness(struct imxfb_info *fbi, uint8_t value)
++{
++	pr_debug("%s: value = %d\n", __func__, value);
++	/* This might be board-specific */
++	writel((fbi->pwmr & ~0xFF) | value, fbi->regs + LCDC_PWMR);
++	return;
++}
++
+ static const struct imx_fb_videomode *imxfb_find_mode(struct imxfb_info *fbi)
+ {
+ 	struct imx_fb_videomode *m;
+@@ -470,12 +479,16 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ 		fbi->backlight_power(1);
+ 	if (fbi->lcd_power)
+ 		fbi->lcd_power(1);
++	if (fbi->backlight_level)
++		imx_fb_set_brightness(fbi, fbi->backlight_level);
+ }
+ 
+ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ {
+ 	pr_debug("Disabling LCD controller\n");
+ 
++	if (fbi->backlight_level)
++		imx_fb_set_brightness(fbi, 0);
+ 	if (fbi->backlight_power)
+ 		fbi->backlight_power(0);
+ 	if (fbi->lcd_power)
+@@ -660,6 +673,7 @@ static int __init imxfb_init_fbinfo(struct platform_device *pdev)
+ 	fbi->pwmr			= pdata->pwmr;
+ 	fbi->lcd_power			= pdata->lcd_power;
+ 	fbi->backlight_power		= pdata->backlight_power;
++	fbi->backlight_level		= pdata->backlight_level;
+ 
+ 	for (i = 0, m = &pdata->mode[0]; i < pdata->num_modes; i++, m++)
+ 		info->fix.smem_len = max_t(size_t, info->fix.smem_len,
 -- 
-1.7.1
+1.6.3.3
