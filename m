@@ -1,50 +1,91 @@
-From: jpihet@mvista.com (Jean Pihet)
-Date: Fri, 25 Jun 2010 12:26:48 +0200
-Subject: [PATCH 0/2] add perf-probe support on ARM
-In-Reply-To: <1277285763-16213-1-git-send-email-will.deacon@arm.com>
-References: <1277285763-16213-1-git-send-email-will.deacon@arm.com>
-Message-ID: <AANLkTimU1W0feaSKyKCFHdZSG_RE6G_sFiAZ6jtU434w@mail.gmail.com>
+From: jason77.wang@gmail.com (jason)
+Date: Fri, 25 Jun 2010 20:30:58 +0800
+Subject: [PATCH] spi/omap2_mcspi: disable and enable chan between each
+	SPI 	transfer
+In-Reply-To: <AANLkTin7mqe_zJIbyDcRPpCLaxPhl_dZQrSGua2z1nYW@mail.gmail.com>
+References: <1277381565-6305-1-git-send-email-jason77.wang@gmail.com>
+	<AANLkTin7mqe_zJIbyDcRPpCLaxPhl_dZQrSGua2z1nYW@mail.gmail.com>
+Message-ID: <4C24A182.4060009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Grant Likely wrote:
+> On Thu, Jun 24, 2010 at 6:12 AM, Jason Wang <jason77.wang@gmail.com> wrote:
+>   
+>> In current design, the SPI channel is always enable during the period
+>> of handling a SPI message, it is risky when more than one SPI transfer
+>> are included in a message. Current working route like that:
+>> [
+>>  SPI channel enable
+>>  configure channel
+>>  handle transfer #1
+>>  configure channel
+>>  handle transfer #2
+>>  ...
+>>  SPI channel disable
+>> ]
+>> If we can disable channel before configure it and reenable
+>> channel after it is configured, it will be more safe.
+>>
+>> The commit a330ce2 "omap2_mcspi: Flush posted writes" make this risk
+>> to a real problem for ads7846 driver on omap3530evm. The
+>> ads7846 driver will send a SPI messge which includes,
+>> [
+>>  TX_ONLY transfer (1 byte)
+>>  RX_ONLY transfer (2 bytes)
+>>  TX_ONLY transfer (1 byte)
+>>  RX_ONLY transfer (2 bytes)
+>> ]
+>> If we don't add disable/reenable channel between TX and RX transfers,
+>> the RX transfer will get wrong datas sent from slave.
+>>     
+>
+> I don't understand the problem description.  Are you talking about
+> manipulation of the SS line, or a problem with the internal state on
+> the mcspi controller device?  What is the cause of the wrong data (ie.
+> is there a protocol error on the wire, or is the SPI controller not
+> performing the read correctly?)
+>
+> Thanks,
+> g.
+>
+>   
+Sorry for unclear description.  The problem is like that, when a TX_ONLY 
+transfer is
+followed by a RX_ONLY transfer, the first data received in RX_ONLY 
+transfer will be
+the last data(random data) which is received in TX_ONLY transfer instead 
+of a meaningful data.
 
-Are more tests needed for ARMv7 (OMAP3430/3530/3517)? I hope to find some
-time to test it if required.
+Thing like following logic,
+In TX_ONLY transfer:
+write data1(trigger transmit), (will receive a data simultaneously, and 
+keep it in RX register)
+...
+write dataN(last data), (will receive the last random data and keep it 
+in RX register)
+in the following RX_ONLY transfer:
+change SPI controller to RX_ONLY mode,
+the RXS bit will be set to status register immediately,
+write a dummy data to TX register to trigger this session(in fact this  
+trigger  doesn't take  effect),
+check the RXS bit and read the first data(the first data is the last 
+random data received in TX_ONLY transfer).
 
-Regards,
-Jean
 
-On Wed, Jun 23, 2010 at 11:36, Will Deacon <will.deacon@arm.com> wrote:
+But if we disable this channel after the TX_ONLY  transfer and reenable 
+it  before  the RX_ONLY  transfer,
+the trigger action will take effect and a meaningful data  will be  
+transfered to RX register.
 
-> Perf-probe uses the KProbe events tracer to place and monitor probes
-> on the running Kernel.
->
-> This patch series adds both Kernel and tool support for this feature
-> on ARM.
->
-> Patches based on 2.6.35-rc3 [although perf record is currently broken
-> on all architectures for probe tracepoints. These patches also apply
-> cleanly to -tip/master where perf record works properly.]
->
-> Cc: Jamie Iles <jamie.iles@picochip.com>
-> Cc: Jean Pihet <jpihet@mvista.com>
->
-> Will Deacon (2):
->  ARM: Add kprobe-based event tracer
->  ARM: perf probe: Add ARM DWARF register number mappings
->
->  arch/arm/Kconfig                      |    1 +
->  arch/arm/include/asm/ptrace.h         |   36 ++++++++++++
->  arch/arm/kernel/ptrace.c              |   96
-> +++++++++++++++++++++++++++++++++
->  tools/perf/arch/arm/Makefile          |    4 ++
->  tools/perf/arch/arm/util/dwarf-regs.c |   64 ++++++++++++++++++++++
->  5 files changed, 201 insertions(+), 0 deletions(-)
->  create mode 100644 tools/perf/arch/arm/Makefile
->  create mode 100644 tools/perf/arch/arm/util/dwarf-regs.c
->
->
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100625/61827ff4/attachment.html>
+Thanks,
+Jason.
+
+>> Signed-off-by: Jason Wang <jason77.wang@gmail.com>
+>> ---
+>>  drivers/spi/omap2_mcspi.c |   16 ++++++----------
+>>  1 files changed, 6 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/drivers/spi/omap2_mcspi.c b/drivers/spi/omap2_mcspi.c
+>>     
+[snip]
