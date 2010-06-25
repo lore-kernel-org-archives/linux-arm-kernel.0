@@ -1,7 +1,7 @@
 From: ivo.clarysse@gmail.com (Ivo Clarysse)
-Date: Fri, 25 Jun 2010 16:46:44 +0200
+Date: Fri, 25 Jun 2010 16:50:45 +0200
 Subject: [PATCHv3 4/5] mtd: mxc_nand fixups
-In-Reply-To: <20100624072732.GQ12115@pengutronix.de>
+In-Reply-To: <807hloag6w.fsf@merkur.tec.linutronix.de>
 References: <20100618205401.GA12115@pengutronix.de>
 	<80sk4ivkga.fsf@merkur.tec.linutronix.de>
 	<AANLkTimA7Rbm_nHpVYpEPqaPCjrOse9s8YyiInWlhfEK@mail.gmail.com>
@@ -13,23 +13,52 @@ References: <20100618205401.GA12115@pengutronix.de>
 	<AANLkTinVaXjCneg-XpxB7YNlmGOwQFTnm5RUcetPdToI@mail.gmail.com>
 	<80lja6awlb.fsf@merkur.tec.linutronix.de>
 	<20100624072732.GQ12115@pengutronix.de>
-Message-ID: <AANLkTilG2AhYtQkb8V0u9851JP1vHhqrJTWKyRDGM36F@mail.gmail.com>
+	<807hloag6w.fsf@merkur.tec.linutronix.de>
+Message-ID: <AANLkTilTbvlPxRhioMiKrBUNggcxZeboi1YpB8Y9Bdpm@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 24, 2010 at 9:27 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-[...]
+On Thu, Jun 24, 2010 at 12:16 PM, John Ogness <john.ogness@linutronix.de> wrote:
+> On 2010-06-24, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>> Ok, if it's the only way out to have 5 cpu_is_* blocks, then lets go
+>> for it.
 >
-> BTW I observed that at least on i.MX27 the latencies introduced by
-> waiting for an interrupt cause a significant performance drop. The
-> driver gets much faster when we just poll all the time. I don't know how
-> this affects system performance otherwise, but it may be a possibility
-> to drop interrupt support at least for i.MX21. I have no idea how long
-> the longest possible time we'd have to poll is though.
+> Here is a new patch that puts the behavior behind a "nfc_avoid_masking"
+> macro. The macro is only used 3 times.
+[...]
 
-I'm noticing the same thing on i.MX21: when using interrupts,
-"Scanning device for bad blocks" takes 982 (!) seconds.  When always
-using polling, the same scan takes 'only' 500 seconds.
+Tested on an MX21ADS board, and it still works.
 
+> This patch is based on linux-next 20100618.
+>
+> Signed-off-by: John Ogness <john.ogness@linutronix.de>
+> ---
+> ?drivers/mtd/nand/mxc_nand.c | ? 81 +++++++++++++++++++++++++---------
+> ?1 file changed, 61 insertions(+), 20 deletions(-)
+>
+> Index: linux-next-20100618/drivers/mtd/nand/mxc_nand.c
+> ===================================================================
+> --- linux-next-20100618.orig/drivers/mtd/nand/mxc_nand.c
+> +++ linux-next-20100618/drivers/mtd/nand/mxc_nand.c
+[...]
+> @@ -100,6 +109,18 @@
+>
+> ?#define NFC_RSLTSPARE_AREA_MASK ?0xff
+>
+> +#define nfc_interrupt_set(_regs) \
+> + ? ? ? ? ? ? ? (readw(_regs + NFC_CONFIG2) & NFC_INT)
+> +#define nfc_clear_interrupt(_regs) \
+> + ? ? ? ? ? ? ? writew(readw(_regs + NFC_CONFIG2) & ~NFC_INT, \
+> + ? ? ? ? ? ? ? ? ? ? ?_regs + NFC_CONFIG2)
 
-Ivo.
+Naming is not very consistent; I'd suggest nfc_set_interrupt /
+nfc_clear_interrupt
+
+> +#define nfc_mask_irq(_regs) \
+> + ? ? ? ? ? ? ? writew(readw(_regs + NFC_CONFIG1) | NFC_INT_MSK, \
+> + ? ? ? ? ? ? ? ? ? ? ?_regs + NFC_CONFIG1)
+> +#define nfc_unmask_irq(_regs) \
+> + ? ? ? ? ? ? ? writew(readw(_regs + NFC_CONFIG1) & ~NFC_INT_MSK, \
+> + ? ? ? ? ? ? ? ? ? ? ?_regs + NFC_CONFIG1)
+> +
+[...]
