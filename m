@@ -1,40 +1,53 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Fri, 25 Jun 2010 07:39:22 +0530
-Subject: strange segfaults with CompactFlash in "true-ide" mode on PXA270
-In-Reply-To: <19490.10015.10027.750374@ipc1.ka-ro>
-References: <201006231706.33182.schindele@nentec.de>
-	<19490.10015.10027.750374@ipc1.ka-ro>
-Message-ID: <AANLkTilj-ma9RgIBZNtJLlNFWsSDLG5tHfdllG_0_wNY@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 25 Jun 2010 12:38:19 +0900
+Subject: [PATCH v4] libata: pata_samsung_cf: Add Samsung PATA controller
+	driver
+In-Reply-To: <4C22704B.50103@pobox.com>
+References: <1276499263-12217-1-git-send-email-kgene.kim@samsung.com>
+	<4C22704B.50103@pobox.com>
+Message-ID: <001f01cb1417$dce8f8d0$96baea70$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 23, 2010 at 8:54 PM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
->> we have a strange problem when booting from a Compact Flash card
->> as root-device. In one of 10 cases while booting an application from
->> root-filesystem dies with "Segmentation fault" without a visible error.
->> After booting the same application runs hundred times without error.
->> (we're talking about standard appl. like chat, pppd, hwclock and so on)
->>
->> For debugging purposes we put printk's in kernels IDE driver
->> and the problem disappeared. But replacing the printk by a usleep
->> or so (which is not a solution !) brings the problem back.
->> It seems that the application received faulty data from CF.
->> But how and why ?????????????????????????????
->>
->> We tested with a custom PXA270 board with a CompactFlash in
->> "true ide" on processor bus driven by "generic ide / pata_platform"
->> driver from linux-2.6.27.x.
->> (by the way linux-2.6.20.x showed the same problem).
->>
->> Any ideas, hints, experiences, patches are very welcome :-)
->> --------------------------------------------------------------
-> I guess that is the old cache problem that apparently was never really
-> fixed:
-> http://marc.info/?t=108537828400002&r=1&w=2
+Jeff Garzik wrote:
+> 
+> On 06/14/2010 03:07 AM, Kukjin Kim wrote:
+> > From: Abhilash Kesavan<a.kesavan@samsung.com>
+> >
+> > Adds support for the Samsung PATA controller. This driver is based on
+the
+> > Libata subsystem and references the earlier patches sent for IDE
+subsystem.
+> >
+> > Signed-off-by: Abhilash Kesavan<a.kesavan@samsung.com>
+> > Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
+> 
+> Acked-by: Jeff Garzik <jgarzik@redhat.com>
+> 
+> Send it through the appropriate subsystem tree for this platform...
 
-Catalin recently posted some patches addressing the cache
-problem:
+Hi,
 
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/82987
+You mean in my case, appropriate subsystem tree is ARM tree.
+But I think, as Ben commented, it's better drivers go to upstream via the
+driver's tree.
+And of course, I read your comments about this like below...
+'platform drivers do not build and/or work without additional platform
+glue...'
 
-Rabin
+Hmm.
+I'm not sure which way is better...
+
+Russell,
+
+How do you think?
+May I send this to your patch tracking system?
+Or...how should I handle this?
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
