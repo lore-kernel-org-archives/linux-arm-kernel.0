@@ -1,33 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 25 Jun 2010 14:50:38 +0100
-Subject: [PATCH 2/2] arm: Make VFPv3 usable on ARMv6
-In-Reply-To: <20100623075703.GB12255@atomide.com>
-References: <20100621135125.24299.91290.stgit@baageli.muru.com>
-	<1277211592.29532.20.camel@e102109-lin.cambridge.arm.com>
-	<20100622132037.GV12255@atomide.com>
-	<20100623075703.GB12255@atomide.com>
-Message-ID: <1277473838.13134.30.camel@e102109-lin.cambridge.arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 25 Jun 2010 22:55:19 +0900
+Subject: [PATCH] serial: samsung.c: Add FRACVAL support for newer UART
+Message-ID: <1277474119-6897-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-06-23 at 08:57 +0100, Tony Lindgren wrote:
-> MVFR0 and MVFR1 are only available starting with ARM1136 r1p0 release
-> according to "B.5 VFP changes" in DDI0211F_arm1136_r1p0_trm.pdf. This is
-> also when TLS register got added, so we can use HAS_TLS also to test for
-> MVFR0 and MVFR1.
-> 
-> Otherwise VFPFMRX and VFPFMXR access fails and we get:
-> 
-> Internal error: Oops - undefined instruction: 0 [#1]
-> PC is at no_old_VFP_process+0x8/0x3c
-> LR is at __und_svc+0x48/0x80
-> ...
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+From: Changhwan Youn <chaos.youn@samsung.com>
 
-The new version looks fine to me.
+FRACVAL register provides the same function as UDIVSLOT register which is
+the 1/16ths adjustment to the baud rate but the implementaiton is easier.
+To support UDIVSLOT register, UDIVSLOT table search is necessary though
+supporting FRACVAL only needs the index value of UDIVSLOT table.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+This patch implements the FRACVAL supports for the newer Samsung SoC UARTs.
 
+Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ drivers/serial/samsung.c |    7 +++++--
+ drivers/serial/samsung.h |    1 +
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/serial/samsung.c b/drivers/serial/samsung.c
+index a9d6c56..09805c7 100644
+--- a/drivers/serial/samsung.c
++++ b/drivers/serial/samsung.c
+@@ -530,7 +530,7 @@ static int s3c24xx_serial_calcbaud(struct baud_calc *calc,
+ 
+ 	calc->clksrc = clksrc;
+ 
+-	if (ourport->info->has_divslot) {
++	if ((ourport->info->has_divslot) || (ourport->info->has_fracval)) {
+ 		unsigned long div = rate / baud;
+ 
+ 		/* The UDIVSLOT register on the newer UARTs allows us to
+@@ -707,6 +707,9 @@ static void s3c24xx_serial_set_termios(struct uart_port *port,
+ 
+ 		udivslot = udivslot_table[div & 15];
+ 		dbg("udivslot = %04x (div %d)\n", udivslot, div & 15);
++	} else if (ourport->info->has_fracval) {
++		udivslot = (ourport->baudclk_rate / baud) & 15;
++		dbg("fracval = %04x\n", udivslot);
+ 	}
+ 
+ 	switch (termios->c_cflag & CSIZE) {
+@@ -755,7 +758,7 @@ static void s3c24xx_serial_set_termios(struct uart_port *port,
+ 	wr_regl(port, S3C2410_UBRDIV, quot);
+ 	wr_regl(port, S3C2410_UMCON, umcon);
+ 
+-	if (ourport->info->has_divslot)
++	if ((ourport->info->has_divslot) || (ourport->info->has_fracval))
+ 		wr_regl(port, S3C2443_DIVSLOT, udivslot);
+ 
+ 	dbg("uart: ulcon = 0x%08x, ucon = 0x%08x, ufcon = 0x%08x\n",
+diff --git a/drivers/serial/samsung.h b/drivers/serial/samsung.h
+index 0ac06a0..124f476 100644
+--- a/drivers/serial/samsung.h
++++ b/drivers/serial/samsung.h
+@@ -24,6 +24,7 @@ struct s3c24xx_uart_info {
+ 	/* uart port features */
+ 
+ 	unsigned int		has_divslot:1;
++	unsigned int		has_fracval:1;
+ 
+ 	/* clock source control */
+ 
 -- 
-Catalin
+1.6.2.5
