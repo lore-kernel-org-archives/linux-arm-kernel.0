@@ -1,50 +1,77 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 25 Jun 2010 07:10:16 +0200
-Subject: 
-In-Reply-To: <4C23B67C.7090207@eukrea.com>
-References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<4C236EC2.8090506@eukrea.com>
-	<20100624175528.GA14838@pengutronix.de>
-	<4C23B67C.7090207@eukrea.com>
-Message-ID: <20100625051016.GA31164@pengutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 25 Jun 2010 07:33:10 +0200
+Subject: [PATCH v2 0/4] ARM: S5P: Support gpio interrupts
+In-Reply-To: <004601cb12a8$c869e560$593db020$%kim@samsung.com>
+References: <4C11F4CA.10802@samsung.com>
+	<004601cb12a8$c869e560$593db020$%kim@samsung.com>
+Message-ID: <000101cb1427$e88bfec0$b9a3fc40$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 24, 2010 at 09:48:12PM +0200, Eric B?nard wrote:
-> Hi Uwe,
->
-> Le 24/06/2010 19:55, Uwe Kleine-K?nig a ?crit :
->> On Thu, Jun 24, 2010 at 04:42:10PM +0200, Eric B?nard wrote:
->>> Le 24/06/2010 15:48, Uwe Kleine-K?nig a ?crit :
->>>> this is the next step in the project "clean up the imx port" targeting
->>>> 2.6.36.  The highlights this time are:
->>>>
->>> maybe that would be interesting to rebase your patch serie against
->>> Sascha's imx-for-2.6.36 in order to include new boards (especially for
->>> the patches which change registering nand, i2c, spi and uart) ?
->> No, I don't want to rebase it.  I hope Sascha just merges my tree.  Do
->> you know of any problems, I havn't checked if Sascha's branch introduces
->> any new users of devices I removed.  I make a mental note to check thatOK
->> after Sascha merged.
->>
-> There are at least my i.MX25 and i.MX35 machines that I would have  
-> updated to you patch serie and tested but trying to merge your branch  
-> over Sasha's imx-for-2.6.36 + kernel.org tree at 2.6.35-rc3 leads to at  
-> least 9 conflitcs.
-> How do you manage to merge this simply in order to test it ?
-> I added your branch as a remote tree, then fetched it, then merged it :  
-> is there any magic git sequence missing here that would help to reduce  
-> the number of conflicts ?
-No, but these conflicts aren't that hard to resolve.  Check out my
-imx/for-2.6.36-merged branch.
+Hello,
 
-BTW there are two warnings about 'otg_pdata' and 'usbh2_pdata' defined
-but not used with the config I tested.  And it would have been more
-consistent to name your machine source file mach-eukrea_cpuimx25.c.
+On Wednesday, June 23, 2010 9:51 AM Kukjin Kim wrote:
+
+> Joonyoung Shim wrote:
+> >
+> > This patch v2 set is to support gpio interrupts of samsung s5p cpus, and
+> > the GPIOlib gpio_to_irq goes to plat-samsung gpiolib, so patch v2 set
+> > has four commit smaller than v1.
+> >
+> > Changes since v1:
+> > - Add irq_base to s3c_gpio_chip struct
+> > - GPIOlib gpio_to_irq() is implemented to samsung_gpiolib_to_irq() of
+> >   plat-samsung gpiolib
+> >
+> > Joonyoung Shim (4):
+> >       ARM: S5PV210: Add gpio interrupt support
+> >       ARM: S5PC100: Use S5P gpio interrupts interface
+> >       ARM: S5PC100: Move external interrupt defines
+> >       ARM: SAMSUNG: Add GPIOlib gpio_to_irq
+> >
+> >  arch/arm/mach-s5pc100/Makefile                 |    2 +-
+> >  arch/arm/mach-s5pc100/gpiolib.c                |   70 ++-----
+> >  arch/arm/mach-s5pc100/include/mach/gpio.h      |    7 -
+> >  arch/arm/mach-s5pc100/include/mach/irqs.h      |   18 ++-
+> >  arch/arm/mach-s5pc100/include/mach/regs-gpio.h |    7 +
+> >  arch/arm/mach-s5pc100/irq-gpio.c               |  266
+> ------------------------
+> >  arch/arm/mach-s5pv210/gpiolib.c                |   18 ++-
+> >  arch/arm/mach-s5pv210/include/mach/irqs.h      |   16 ++-
+> >  arch/arm/plat-s5p/Makefile                     |    2 +-
+> >  arch/arm/plat-s5p/irq-gpioint.c                |  208 ++++++++++++++++++
+> >  arch/arm/plat-samsung/gpiolib.c                |    9 +
+> >  arch/arm/plat-samsung/include/plat/gpio-core.h |    6 +
+> >  12 files changed, 295 insertions(+), 334 deletions(-)
+> >  delete mode 100644 arch/arm/mach-s5pc100/irq-gpio.c
+> >  create mode 100644 arch/arm/plat-s5p/irq-gpioint.c
+> >
+> 
+> I am sure this patchset is working code, but Ben had made suggestion about
+> 'sparse irq'...
+> It is because there are too many gpio interrupts and having support of all
+> of them is unnecessary as realistically only few of them maybe used.
+
+Right. Ben suggested to create a pool for gpio interrupts (for example 16
+interrupts) and selectively assign them in machine startup code to those
+gpio pins that really need it.
+
+The problem is that such solution is not yet ready and we really need the
+gpio interrupt functionality for our boards (Aquila and GONI). 
+
+Maybe these current patches could be merged now, and then, once the new
+solution is prepared, the gpio interrupt support get converted to selective
+registering?
+
+S5PC100 already has gpio interrupt support.
+ 
+> In fact in SMDK board there is no use of gpio in interrupt mode.
+
+We are talking about support for Samsung S5PV210/S5PC110 SoCs in the Linux
+mainline kernel, not the support for only SMDK boards. GPIO interrupts is
+a feature of the SoC not a particular board.
 
 Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+--
+Marek Szyprowski
+Samsung Poland R&D Center
