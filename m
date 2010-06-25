@@ -1,97 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 25 Jun 2010 13:01:43 +0100
-Subject: [PATCH 3/3] ARM: Use lazy cache flushing on ARMv7 SMP systems
-In-Reply-To: <20100625115826.30030.89790.stgit@e102109-lin.cambridge.arm.com>
-References: <20100625115826.30030.89790.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100625120143.30030.35665.stgit@e102109-lin.cambridge.arm.com>
+From: jason77.wang@gmail.com (jason)
+Date: Fri, 25 Jun 2010 20:05:53 +0800
+Subject: [PATCH] spi/omap2_mcspi: disable and enable chan between each
+	SPI transfer
+In-Reply-To: <E1C7579D1379824DAE67858071C810382DD83846FB@NOK-EUMSG-02.mgdnok.nokia.com>
+References: <1277381565-6305-1-git-send-email-jason77.wang@gmail.com>
+	<E1C7579D1379824DAE67858071C810382DD83846FB@NOK-EUMSG-02.mgdnok.nokia.com>
+Message-ID: <4C249BA1.8010808@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv7 processors like Cortex-A9 broadcast the cache maintenance
-operations in hardware. This patch allows the
-flush_dcache_page/update_mmu_cache pair to work in lazy flushing mode
-similar to the UP case.
+roman.tereshonkov at nokia.com wrote:
+>  
+>
+>   
+[snip]
+>> -----Original Message-----
+>>
+>> 					}
+>> 					c = 0;
+>> -				} else if (c == 0 && tx == NULL) {
+>> -					omap2_mcspi_set_enable(spi, 0);
+>> 				}
+>>
+>> 				*rx++ = __raw_readl(rx_reg);
+>>     
+>
+> Why do you do this?
+> Reading the last word from the shift register buffer leads to 
+> the receiving new data to the buffer.
+> The channel needs to be disabled before the last word reading.
+>
+>
+>   
+Yes, you are right. If this patch can be accepted, i will remove those 
+changes in the V2 patch.
+Please see my email replying grant likely's questions.
 
-Note that cache flushing on SMP systems now takes place via the
-set_pte_at() call (__sync_icache_dcache) and there is no race with other
-CPUs executing code from the new PTE before the cache flushing took
-place.
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Rabin Vincent <rabin.vincent@stericsson.com>
----
- arch/arm/include/asm/smp_plat.h |    4 ++++
- arch/arm/mm/flush.c             |   13 ++++---------
- 2 files changed, 8 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index e621530..963a338 100644
---- a/arch/arm/include/asm/smp_plat.h
-+++ b/arch/arm/include/asm/smp_plat.h
-@@ -13,9 +13,13 @@ static inline int tlb_ops_need_broadcast(void)
- 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 2;
- }
- 
-+#if !defined(CONFIG_SMP) || __LINUX_ARM_ARCH__ >= 7
-+#define cache_ops_need_broadcast()	0
-+#else
- static inline int cache_ops_need_broadcast(void)
- {
- 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 1;
- }
-+#endif
- 
- #endif
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 78134f5..53f83a7 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -17,6 +17,7 @@
- #include <asm/smp_plat.h>
- #include <asm/system.h>
- #include <asm/tlbflush.h>
-+#include <asm/smp_plat.h>
- 
- #include "mm.h"
- 
-@@ -93,12 +94,10 @@ void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsig
- #define flush_pfn_alias(pfn,vaddr)	do { } while (0)
- #endif
- 
--#ifdef CONFIG_SMP
- static void flush_ptrace_access_other(void *args)
- {
- 	__flush_icache_all();
- }
--#endif
- 
- static
- void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
-@@ -122,11 +121,9 @@ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
- 	if (vma->vm_flags & VM_EXEC) {
- 		unsigned long addr = (unsigned long)kaddr;
- 		__cpuc_coherent_kern_range(addr, addr + len);
--#ifdef CONFIG_SMP
- 		if (cache_ops_need_broadcast())
- 			smp_call_function(flush_ptrace_access_other,
- 					  NULL, 1);
--#endif
- 	}
- }
- 
-@@ -276,12 +273,10 @@ void flush_dcache_page(struct page *page)
- 
- 	mapping = page_mapping(page);
- 
--#ifndef CONFIG_SMP
--	if (!PageHighMem(page) && mapping && !mapping_mapped(mapping))
-+	if (!cache_ops_need_broadcast() &&
-+	    !PageHighMem(page) && mapping && !mapping_mapped(mapping))
- 		clear_bit(PG_dcache_clean, &page->flags);
--	else
--#endif
--	{
-+	else {
- 		__flush_dcache_page(mapping, page);
- 		if (mapping && cache_is_vivt())
- 			__flush_dcache_aliases(mapping, page);
+Thanks,
+Jason.
+>   
+>> @@ -646,7 +641,7 @@ omap2_mcspi_txrx_pio(struct spi_device 
+>> *spi, struct spi_transfer *xfer)
+>> 			dev_err(&spi->dev, "EOT timed out\n");
+>> 	}
+>> out:
+>> -	omap2_mcspi_set_enable(spi, 1);
+>> +	omap2_mcspi_set_enable(spi, 0);
+>> 	return count - c;
+>> }
+>>
+>> @@ -894,7 +889,6 @@ static void omap2_mcspi_work(struct 
+>> work_struct *work)
+>> 		cs = spi->controller_state;
+>> 		cd = spi->controller_data;
+>>
+>> -		omap2_mcspi_set_enable(spi, 1);
+>> 		list_for_each_entry(t, &m->transfers, transfer_list) {
+>> 			if (t->tx_buf == NULL && t->rx_buf == 
+>> NULL && t->len) {
+>> 				status = -EINVAL;
+>> @@ -931,6 +925,8 @@ static void omap2_mcspi_work(struct 
+>> work_struct *work)
+>>
+>> 			mcspi_write_chconf0(spi, chconf);
+>>
+>> +			omap2_mcspi_set_enable(spi, 1);
+>> +
+>> 			if (t->len) {
+>> 				unsigned	count;
+>>
+>> -- 
+>> 1.5.6.5
+>>
+>>
+>>     
