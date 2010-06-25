@@ -1,77 +1,57 @@
-From: schindele@nentec.de (Juergen Schindele)
-Date: Fri, 25 Jun 2010 09:11:28 +0200
-Subject: strange segfaults with CompactFlash in "true-ide" mode on PXA270
-In-Reply-To: <19490.10015.10027.750374@ipc1.ka-ro>
-References: <201006231706.33182.schindele@nentec.de>
-	<19490.10015.10027.750374@ipc1.ka-ro>
-Message-ID: <201006250911.30277.schindele@nentec.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 25 Jun 2010 09:17:51 +0200
+Subject: 
+In-Reply-To: <4C245238.7010501@eukrea.com>
+References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<4C236EC2.8090506@eukrea.com>
+	<20100624175528.GA14838@pengutronix.de>
+	<4C23B67C.7090207@eukrea.com>
+	<20100625051016.GA31164@pengutronix.de>
+	<4C245238.7010501@eukrea.com>
+Message-ID: <20100625071751.GB31164@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 23. Juni 2010 schrieb Lothar Wa?mann:
-> Hi,
-> 
-> > we have a strange problem when booting from a Compact Flash card
-> > as root-device. In one of 10 cases while booting an application from
-> > root-filesystem dies with "Segmentation fault" without a visible error.
-> > After booting the same application runs hundred times without error.
-> > (we're talking about standard appl. like chat, pppd, hwclock and so on)
-> > 
-> > For debugging purposes we put printk's in kernels IDE driver 
-> > and the problem disappeared. But replacing the printk by a usleep
-> > or so (which is not a solution !) brings the problem back.
-> > It seems that the application received faulty data from CF.
-> > But how and why ?????????????????????????????
-> > 
-> > We tested with a custom PXA270 board with a CompactFlash in 
-> > "true ide" on processor bus driven by "generic ide / pata_platform"
-> > driver from linux-2.6.27.x.
-> > (by the way linux-2.6.20.x showed the same problem).
-> > 
-> > Any ideas, hints, experiences, patches are very welcome :-)
-> > --------------------------------------------------------------
-> I guess that is the old cache problem that apparently was never really
-> fixed:
-> http://marc.info/?t=108537828400002&r=1&w=2
-Hello
-this hint was very helpful for understanding the problem.
-In the mail from Russell King at 
-<http://marc.info/?l=linux-arm-kernel&m=108611676807909&w=2>
-he said : .... the rule is if the CPU writes to a page cache page,
-it must call flush_dcache_page afterwards to ensure cache coherency with user space".
+On Fri, Jun 25, 2010 at 08:52:40AM +0200, Eric B?nard wrote:
+> Le 25/06/2010 07:10, Uwe Kleine-K?nig a ?crit :
+>> On Thu, Jun 24, 2010 at 09:48:12PM +0200, Eric B?nard wrote:
+>>> How do you manage to merge this simply in order to test it ?
+>>> I added your branch as a remote tree, then fetched it, then merged it :
+>>> is there any magic git sequence missing here that would help to reduce
+>>> the number of conflicts ?
+>> No, but these conflicts aren't that hard to resolve.  Check out my
+>> imx/for-2.6.36-merged branch.
+I'm currently fixing mx3, I missed that there appeared a new machine,
+too.  I give you a ping via PM when I'm done.
 
-so i made the following patch in drivers/ide/ide-taskfile.c
-in the function ide_pio_sector() where blocks from disk are read
-into a cached page to apply the rule from Russell. 
-===================================================================
---- ide-taskfile.c
-+++ ide-taskfile.c.new
-@@ -278,6 +278,7 @@
-                hwif->tp_ops->input_data(drive, rq, buf, SECTOR_SIZE);
+> most of them may not be hard to resolve but that creates more work to  
+> test the patches (and that create more work for Sascha to integrate the  
+> patches in its tree). Thanks for your merged branch, I'll test asap.
+rebasing creates more work for me, and if Sascha pulls my merge he has
+no problems.
 
-        kunmap_atomic(buf, KM_BIO_SRC_IRQ);
-+       flush_dcache_page(page);
- #ifdef CONFIG_HIGHMEM
-        local_irq_restore(flags);
- #endif
+>> BTW there are two warnings about 'otg_pdata' and 'usbh2_pdata' defined
+>
+> should already be fixed in :
+> http://git.pengutronix.de/?p=imx/linux-2.6.git;a=commit;h=4ecca63bf70aec86745c4bb631ada8b15e02e855
+>
+>> but not used with the config I tested.  And it would have been more
+>> consistent to name your machine source file mach-eukrea_cpuimx25.c.
+>>
+> OK so this would require the same renaming for cpuimx27 & 35 as actually  
+> its consitent between the 3 boards. Should I send a patch to rename them 
+> ?
+If you don't, then I will do :-)  I would recommend to wait until Sascha
+merged though.
 
-And from there on the problem disappeared :-))
-What are you think about ???
-Isn't this missing for years in IDE PIO driver ???
---------------------------------------------------------------
-J?rgen Schindele  
-Software-Entwicklung
+While testing I found another problem.  There are two definitions of
+MACH_EUKREA_MBIMXSD_BASEBOARD that conflict.  For me
+MACH_EUKREA_MBIMXSD_BASEBOARD doesn't appear in .config if I select
+MACH_EUKREA_CPUIMX25.
 
-PSI NENTEC GmbH
-Greschbachstr. 12
-76229 Karlsruhe
-Deutschland
-Telefon: +49 721 94249-51
-Telefax: +49 721 94249-10
-E-Mail:  schindele at nentec.de
-WEB:     www.nentec.de
- 
-Gesch?ftsf?hrung: Klaus Becker, Roland Knapp
-Sitz der Gesellschaft: Karlsruhe
-Handelsregister: Amtsgericht Mannheim HRB 107658
---------------------------------------------------------------
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
