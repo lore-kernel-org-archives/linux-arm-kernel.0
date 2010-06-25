@@ -1,53 +1,39 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 25 Jun 2010 08:01:45 +0200
-Subject: clock updates
-In-Reply-To: <20100623232422.GB16584@trinity.fluff.org>
-References: <20100623232422.GB16584@trinity.fluff.org>
-Message-ID: <000801cb142b$e6624420$b326cc60$%szyprowski@samsung.com>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Fri, 25 Jun 2010 08:52:40 +0200
+Subject: 
+In-Reply-To: <20100625051016.GA31164@pengutronix.de>
+References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<4C236EC2.8090506@eukrea.com>
+	<20100624175528.GA14838@pengutronix.de>
+	<4C23B67C.7090207@eukrea.com>
+	<20100625051016.GA31164@pengutronix.de>
+Message-ID: <4C245238.7010501@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Le 25/06/2010 07:10, Uwe Kleine-K?nig a ?crit :
+> On Thu, Jun 24, 2010 at 09:48:12PM +0200, Eric B?nard wrote:
+>> How do you manage to merge this simply in order to test it ?
+>> I added your branch as a remote tree, then fetched it, then merged it :
+>> is there any magic git sequence missing here that would help to reduce
+>> the number of conflicts ?
+> No, but these conflicts aren't that hard to resolve.  Check out my
+> imx/for-2.6.36-merged branch.
 
-On Thursday, June 24, 2010 1:24 AM Ben Dooks wrote:
+most of them may not be hard to resolve but that creates more work to 
+test the patches (and that create more work for Sascha to integrate the 
+patches in its tree). Thanks for your merged branch, I'll test asap.
 
-> I've been looking into updating the current samsung socs to use
-> clkdev to lookup clocks. Currently we have a few issues that we
-> could do with sorting before running the conversion to clkdev.
-> 
-> Firstly, the s5pc100 has some clocks that could be merged into
-> common s5p, and a few which don't seem to match the others in
-> the s5p series.
-> 
-> The i2s clocks which we should look at mergining are:
-> 
-> i2s_cdclk<0..2>
-> pcm_cdclk<0..l>
-> 
-> also, clocks that have may need changing:
-> 
-> rotator	     => rot
-> keyif	     => keypad
-> 
-> this isn't an complete list, still working on the changes.
-> 
-> The big changes with respect to drivers is that we will now be using
-> clk_get(dev, NULL) to get the clock names, and any bus clocks such
-> as the sdhci bus clock will be updated.
-> 
-> The intention with both the SDHCI and the SPI is to change the clock
-> lookups to reflect the mux positions, so the sdhci clocks on the
-> s3c64xx would be changed to use the following lookups:
-> 
-> hsmmc	=> mux0
-> mmc_bus	=> mux2
-> 48m	=> mux3
+> BTW there are two warnings about 'otg_pdata' and 'usbh2_pdata' defined
 
-I like this idea, but I wonder how the drivers will be able to get/control
-the additional peripheral clocks (like sclk_fimc and sclk_cam for fimc for
-example)?
+should already be fixed in :
+http://git.pengutronix.de/?p=imx/linux-2.6.git;a=commit;h=4ecca63bf70aec86745c4bb631ada8b15e02e855
 
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+> but not used with the config I tested.  And it would have been more
+> consistent to name your machine source file mach-eukrea_cpuimx25.c.
+>
+OK so this would require the same renaming for cpuimx27 & 35 as actually 
+its consitent between the 3 boards. Should I send a patch to rename them ?
+
+Thanks,
+Eric
