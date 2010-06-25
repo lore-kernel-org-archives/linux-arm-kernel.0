@@ -1,26 +1,20 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 25 Jun 2010 12:22:32 +0100
-Subject: [PATCH] MMC: remove regulator refcount fiddling in mmc core
-In-Reply-To: <1277392337-27627-1-git-send-email-linus.walleij@stericsson.com>
-References: <1277392337-27627-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20100625112232.GA21217@opensource.wolfsonmicro.com>
+Date: Fri, 25 Jun 2010 12:52:46 +0100
+Subject: clock updates
+In-Reply-To: <000801cb142b$e6624420$b326cc60$%szyprowski@samsung.com>
+References: <20100623232422.GB16584@trinity.fluff.org>
+	<000801cb142b$e6624420$b326cc60$%szyprowski@samsung.com>
+Message-ID: <20100625115246.GE2803@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 24, 2010 at 05:12:17PM +0200, Linus Walleij wrote:
+On Fri, Jun 25, 2010 at 08:01:45AM +0200, Marek Szyprowski wrote:
 
-> Currently the mmc_regulator_set_ocr() fiddles with the regulator
-> refcount by selectively calling regulator_[enable|disable]
-> depending on the state of the regulator. This will confuse the
-> reference count if case the regulator is for example shared with
-> other MMC slots or user for other stuff than the MMC card.
+> I like this idea, but I wonder how the drivers will be able to get/control
+> the additional peripheral clocks (like sclk_fimc and sclk_cam for fimc for
+> example)?
 
-> Push regulator_[enable|disable] out into the MMC host drivers
-> and remove this from the MMC core so the reference count can be
-> trusted.
-
-So, the feedback from folks at the time this was originally written was
-that the MMC code was unable to cope with sharing regulators since it
-really needs to be able to set specific voltages.  This needn't be a
-showstopper since people can force a single voltage in the constraints
-but it does need to be considered here.
+You can still do lookups by name for multiple clocks with clkdev
+(personally I prefer to just not make use of the option of using NULL
+for a default clock since it's not always clear what the default should
+be for a block but there we are).
