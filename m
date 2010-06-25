@@ -1,65 +1,21 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 25 Jun 2010 06:18:36 +0200
-Subject: [PATCH v4] libata: pata_samsung_cf: Add Samsung PATA controller
-	driver
-In-Reply-To: <001f01cb1417$dce8f8d0$96baea70$%kim@samsung.com>
-References: <1276499263-12217-1-git-send-email-kgene.kim@samsung.com>
-	<4C22704B.50103@pobox.com>
-	<001f01cb1417$dce8f8d0$96baea70$%kim@samsung.com>
-Message-ID: <201006250618.37076.marek.vasut@gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 24 Jun 2010 22:05:48 -0700 (PDT)
+Subject: [PATCH 1/2] net/fec: clean suspend/resume
+In-Reply-To: <1276853351-20790-1-git-send-email-eric@eukrea.com>
+References: <1276853351-20790-1-git-send-email-eric@eukrea.com>
+Message-ID: <20100624.220548.02285361.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 25. ?ervna 2010 05:38:19 Kukjin Kim napsal(a):
-> Jeff Garzik wrote:
-> > On 06/14/2010 03:07 AM, Kukjin Kim wrote:
-> > > From: Abhilash Kesavan<a.kesavan@samsung.com>
-> > > 
-> > > Adds support for the Samsung PATA controller. This driver is based on
-> 
-> the
-> 
-> > > Libata subsystem and references the earlier patches sent for IDE
-> 
-> subsystem.
-> 
-> > > Signed-off-by: Abhilash Kesavan<a.kesavan@samsung.com>
-> > > Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
-> > 
-> > Acked-by: Jeff Garzik <jgarzik@redhat.com>
-> > 
-> > Send it through the appropriate subsystem tree for this platform...
-> 
-> Hi,
-> 
-> You mean in my case, appropriate subsystem tree is ARM tree.
-> But I think, as Ben commented, it's better drivers go to upstream via the
-> driver's tree.
-> And of course, I read your comments about this like below...
-> 'platform drivers do not build and/or work without additional platform
-> glue...'
-> 
-> Hmm.
-> I'm not sure which way is better...
+From: Eric B?nard <eric@eukrea.com>
+Date: Fri, 18 Jun 2010 11:29:10 +0200
 
-I pushed pata_pxa through Eric as well ... go for the linux-arm tree.
-Cheers
+> Commit 59d4289b83b11379d867e2f7146904b19cc96404 converted fec to dev_pm_ops but
+> didn't update the suspend/resume functions thus leading to the following warning :
+> "initialization from incompatible pointer type" when CONFIG_PM is set.
 > 
-> Russell,
+> This patch also fixe a few indentation and style around CONFIG_PM area.
 > 
-> How do you think?
-> May I send this to your patch tracking system?
-> Or...how should I handle this?
-> 
-> Thanks.
-> 
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-ide" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
+
+So, where's patch 2/2?
