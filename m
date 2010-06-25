@@ -1,29 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 25 Jun 2010 13:36:03 +0100
-Subject: Heads up: Linus plans to kill ARM defconfigs
-In-Reply-To: <201006090807.20810.post@hendrik-sattler.de>
-References: <201006090807.20810.post@hendrik-sattler.de>
-Message-ID: <1277469363.13134.22.camel@e102109-lin.cambridge.arm.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 25 Jun 2010 20:50:31 +0800
+Subject: [RFC PATCH v2] preliminary support for sparse IRQ
+In-Reply-To: <20100521194654.GH11042@n2100.arm.linux.org.uk>
+References: <AANLkTikSXcn9nnvaVHAsoDPmLN30E_TjNVdXu1vCOH74@mail.gmail.com>
+	<20100520082853.GA18885@linux-sh.org>
+	<20100521194654.GH11042@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinjKNQ4cFkpJfL8IdamkN2HuVirkZdzFruchw6c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-06-09 at 07:07 +0100, Hendrik Sattler wrote:
-> Am Mittwoch 09 Juni 2010, 01:21:24 schrieb Ryan Mallon:
-> > Yes. I thought the problem was that Kconfig doesn't work correctly for
-> > this though. Does having 'select MTD_PARTITIONS' automatically cause
-> > CONFIG_MTD to be set? If not, then you basically need to have the full
-> > config option list, which is basically what defconfig is.
-> 
-> Anybody thought about improving Kconfig to make this possible?
-> Specifying CONFIG_MTD and CONFIG_MTD_PARTITIONS again and again will just
-> repeat information (that CONFIG_MTD_PARTITIONS depends on CONFIG_MTD).
-> The recursive 'select' could have a different name.
+On Sat, May 22, 2010 at 3:46 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, May 20, 2010 at 05:28:53PM +0900, Paul Mundt wrote:
+>> On Tue, May 18, 2010 at 06:34:49PM +0800, Eric Miao wrote:
+>> > commit 2e2e087d96630c95dbce57036680cf917e906cf1
+>> > Author: Eric Miao <eric.y.miao@gmail.com>
+>> > Date: ? Mon Dec 28 12:59:59 2009 +0800
+>> >
+>> > ? ? [ARM] preliminary support for sparse IRQ
+>> >
+>> > ? ? So to allow NR_IRQS to be dynamic and platforms to specify the number
+>> > ? ? of IRQs really needed.
+>> >
+>> > ? ? Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+>> >
+>> It would be nice to see this applied, we plan to use sparseirq
+>> unconditionally for shmobile (as sh already does).
+>
+> However, it's a little late in the day for patches for this merge
+> window - which could be over as early as Sunday.
+>
+> However, if Eric wants to submit it to the patch system, I'll see
+> about queuing it, but I can't make any promises that it'll get in.
+>
 
-A first step is a warning when selecting options with unmet dependencies
-- http://lkml.org/lkml/2010/6/8/191.
+Done, as patch #6197.
 
-This could be extended to automatically select the dependencies but it
-many cases it could just be a Kconfig error.
+Russell,
 
--- 
-Catalin
+Guess it's better to merge this into -devel-stable, so other patches can rebase?
