@@ -1,77 +1,47 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 25 Jun 2010 07:33:10 +0200
-Subject: [PATCH v2 0/4] ARM: S5P: Support gpio interrupts
-In-Reply-To: <004601cb12a8$c869e560$593db020$%kim@samsung.com>
-References: <4C11F4CA.10802@samsung.com>
-	<004601cb12a8$c869e560$593db020$%kim@samsung.com>
-Message-ID: <000101cb1427$e88bfec0$b9a3fc40$%szyprowski@samsung.com>
+Date: Fri, 25 Jun 2010 07:52:07 +0200
+Subject: [PATCH 2/2] ARM: S5PV210: Add OneNAND device to the Aquila board
+In-Reply-To: <1277445127-16025-1-git-send-email-m.szyprowski@samsung.com>
+References: <1277445127-16025-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1277445127-16025-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Joonyoung Shim <jy0922.shim@samsung.com>
 
-On Wednesday, June 23, 2010 9:51 AM Kukjin Kim wrote:
+This patch is to support OneNAND device to the Aquila board.
 
-> Joonyoung Shim wrote:
-> >
-> > This patch v2 set is to support gpio interrupts of samsung s5p cpus, and
-> > the GPIOlib gpio_to_irq goes to plat-samsung gpiolib, so patch v2 set
-> > has four commit smaller than v1.
-> >
-> > Changes since v1:
-> > - Add irq_base to s3c_gpio_chip struct
-> > - GPIOlib gpio_to_irq() is implemented to samsung_gpiolib_to_irq() of
-> >   plat-samsung gpiolib
-> >
-> > Joonyoung Shim (4):
-> >       ARM: S5PV210: Add gpio interrupt support
-> >       ARM: S5PC100: Use S5P gpio interrupts interface
-> >       ARM: S5PC100: Move external interrupt defines
-> >       ARM: SAMSUNG: Add GPIOlib gpio_to_irq
-> >
-> >  arch/arm/mach-s5pc100/Makefile                 |    2 +-
-> >  arch/arm/mach-s5pc100/gpiolib.c                |   70 ++-----
-> >  arch/arm/mach-s5pc100/include/mach/gpio.h      |    7 -
-> >  arch/arm/mach-s5pc100/include/mach/irqs.h      |   18 ++-
-> >  arch/arm/mach-s5pc100/include/mach/regs-gpio.h |    7 +
-> >  arch/arm/mach-s5pc100/irq-gpio.c               |  266
-> ------------------------
-> >  arch/arm/mach-s5pv210/gpiolib.c                |   18 ++-
-> >  arch/arm/mach-s5pv210/include/mach/irqs.h      |   16 ++-
-> >  arch/arm/plat-s5p/Makefile                     |    2 +-
-> >  arch/arm/plat-s5p/irq-gpioint.c                |  208 ++++++++++++++++++
-> >  arch/arm/plat-samsung/gpiolib.c                |    9 +
-> >  arch/arm/plat-samsung/include/plat/gpio-core.h |    6 +
-> >  12 files changed, 295 insertions(+), 334 deletions(-)
-> >  delete mode 100644 arch/arm/mach-s5pc100/irq-gpio.c
-> >  create mode 100644 arch/arm/plat-s5p/irq-gpioint.c
-> >
-> 
-> I am sure this patchset is working code, but Ben had made suggestion about
-> 'sparse irq'...
-> It is because there are too many gpio interrupts and having support of all
-> of them is unnecessary as realistically only few of them maybe used.
+Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/mach-s5pv210/Kconfig       |    1 +
+ arch/arm/mach-s5pv210/mach-aquila.c |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-Right. Ben suggested to create a pool for gpio interrupts (for example 16
-interrupts) and selectively assign them in machine startup code to those
-gpio pins that really need it.
-
-The problem is that such solution is not yet ready and we really need the
-gpio interrupt functionality for our boards (Aquila and GONI). 
-
-Maybe these current patches could be merged now, and then, once the new
-solution is prepared, the gpio interrupt support get converted to selective
-registering?
-
-S5PC100 already has gpio interrupt support.
+diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+index d0432c6..7e2e1eb 100644
+--- a/arch/arm/mach-s5pv210/Kconfig
++++ b/arch/arm/mach-s5pv210/Kconfig
+@@ -51,6 +51,7 @@ config MACH_AQUILA
+ 	select ARCH_SPARSEMEM_ENABLE
+ 	select S5PV210_SETUP_FB_24BPP
+ 	select S3C_DEV_FB
++	select S5PC110_DEV_ONENAND
+ 	help
+ 	  Machine support for the Samsung Aquila target based on S5PC110 SoC
  
-> In fact in SMDK board there is no use of gpio in interrupt mode.
-
-We are talking about support for Samsung S5PV210/S5PC110 SoCs in the Linux
-mainline kernel, not the support for only SMDK boards. GPIO interrupts is
-a feature of the SoC not a particular board.
-
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
+index 10bc76e..fb9dbb2 100644
+--- a/arch/arm/mach-s5pv210/mach-aquila.c
++++ b/arch/arm/mach-s5pv210/mach-aquila.c
+@@ -118,6 +118,7 @@ static struct s3c_fb_platdata aquila_lcd_pdata __initdata = {
+ 
+ static struct platform_device *aquila_devices[] __initdata = {
+ 	&s3c_device_fb,
++	&s5pc110_device_onenand,
+ };
+ 
+ static void __init aquila_map_io(void)
+-- 
+1.7.1.569.g6f426
