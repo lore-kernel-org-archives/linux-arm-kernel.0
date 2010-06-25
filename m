@@ -1,115 +1,43 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Fri, 25 Jun 2010 17:38:20 +0900
-Subject: clock updates
-In-Reply-To: <20100623232422.GB16584@trinity.fluff.org>
-References: <20100623232422.GB16584@trinity.fluff.org>
-Message-ID: <AANLkTikIOfUS-hOs8ea3cqBntYJEFTD4pEFgte8qbMTH@mail.gmail.com>
+From: jamie.iles@picochip.com (Jamie Iles)
+Date: Fri, 25 Jun 2010 09:14:01 +0100
+Subject: [PATCH 0/2] add perf-probe support on ARM
+In-Reply-To: <1277285763-16213-1-git-send-email-will.deacon@arm.com>
+References: <1277285763-16213-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20100625081401.GL5160@wear.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Jun 23, 2010 at 10:36:01AM +0100, Will Deacon wrote:
+> Perf-probe uses the KProbe events tracer to place and monitor probes
+> on the running Kernel.
+> 
+> This patch series adds both Kernel and tool support for this feature
+> on ARM.
+> 
+> Patches based on 2.6.35-rc3 [although perf record is currently broken
+> on all architectures for probe tracepoints. These patches also apply
+> cleanly to -tip/master where perf record works properly.]
+> 
+> Cc: Jamie Iles <jamie.iles@picochip.com>
+> Cc: Jean Pihet <jpihet@mvista.com>
+> 
+> Will Deacon (2):
+>   ARM: Add kprobe-based event tracer
+>   ARM: perf probe: Add ARM DWARF register number mappings
+> 
+>  arch/arm/Kconfig                      |    1 +
+>  arch/arm/include/asm/ptrace.h         |   36 ++++++++++++
+>  arch/arm/kernel/ptrace.c              |   96 +++++++++++++++++++++++++++++++++
+>  tools/perf/arch/arm/Makefile          |    4 ++
+>  tools/perf/arch/arm/util/dwarf-regs.c |   64 ++++++++++++++++++++++
+>  5 files changed, 201 insertions(+), 0 deletions(-)
+>  create mode 100644 tools/perf/arch/arm/Makefile
+>  create mode 100644 tools/perf/arch/arm/util/dwarf-regs.c
+Hi Will,
 
-On Thu, Jun 24, 2010 at 8:24 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> I've been looking into updating the current samsung socs to use
-> clkdev to lookup clocks. Currently we have a few issues that we
-> could do with sorting before running the conversion to clkdev.
->
-> Firstly, the s5pc100 has some clocks that could be merged into
-> common s5p, and a few which don't seem to match the others in
-> the s5p series.
->
-> The i2s clocks which we should look at mergining are:
->
-> i2s_cdclk<0..2>
-> pcm_cdclk<0..l>
->
-> also, clocks that have may need changing:
->
-> rotator ? ? ?=> rot
-> keyif ? ? ? ?=> keypad
->
-> this isn't an complete list, still working on the changes.
->
-> The big changes with respect to drivers is that we will now be using
-> clk_get(dev, NULL) to get the clock names, and any bus clocks such
-> as the sdhci bus clock will be updated.
->
-> The intention with both the SDHCI and the SPI is to change the clock
-> lookups to reflect the mux positions, so the sdhci clocks on the
-> s3c64xx would be changed to use the following lookups:
->
-> hsmmc ? => mux0
-> mmc_bus => mux2
-> 48m ? ? => mux3
->
-> This would avoid passing the clock names through the platform data, if
-> the boards or the arch needs to avoid a clock, an array of clock enable
-> or disable bits. Any unimplemented clocks will return NULL to ensure
-> that they can be distinguished from a clock that isn't available.
->
-> The changes would be to remove the .name field from all the s3c struct clk,
-> and replace it with a pointer to a lookup (so that if the clock does not
-> need a name then it doesn't need a lookup).
+I've had a quick play on an ARMv6 board and these patches look good and appear
+to work!
 
-I also like the idea using clk_get based on the name of struct device
-and getting rid of name field from clk.
+Tested-by: Jamie Iles <jamie.iles@picochip.com>
 
-However, what about devices and clocks with the same name and
-different id numbers (i.e., platform_device.id)? Are you going to add
-.id lookup to clkdev's clk_find? There are multiple clocks with the
-same name and different id number.
-
-
->
-> There are also a number of clocks that probably don't need a name as they
-> are part of the clock heirarchy, it would be useful to have a call that
-> returns all possible parents of a given clock.
->
-> I'll post the script whcih runs the changes once i've finished the last
-> few details to show what happens.
->
-> With resepect to the clkdev clk_get() function, we may need to do a couple of
-> updates (ie, override it for ourselves) due to the following two problems:
->
-> 1) The s3c/s5p devices change name depending on the soc they are attached
-> ? to, which means we may need to cut the s3cxxxx- part of the device name
-> ? off before running the lookup
->
-> 2) Some of the lookups are done early for the serial driver, which means
-> ? that the platform devices's name has not been setup, so something needs
-> ? to be done about this.
->
-> --
-> Ben
->
->
->
->
->
->
->
->
->
->
-> --
-> Ben
->
-> Q: ? ? ?What's a light-year?
-> A: ? ? ?One-third less calories than a regular year.
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
-Cheers!
-
--- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+Jamie
