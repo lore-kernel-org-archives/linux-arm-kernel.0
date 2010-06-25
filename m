@@ -1,57 +1,63 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 25 Jun 2010 09:17:51 +0200
-Subject: 
-In-Reply-To: <4C245238.7010501@eukrea.com>
-References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<4C236EC2.8090506@eukrea.com>
-	<20100624175528.GA14838@pengutronix.de>
-	<4C23B67C.7090207@eukrea.com>
-	<20100625051016.GA31164@pengutronix.de>
-	<4C245238.7010501@eukrea.com>
-Message-ID: <20100625071751.GB31164@pengutronix.de>
+From: igawa@mxs.nes.nec.co.jp (Masayuki Igawa)
+Date: Fri, 25 Jun 2010 16:05:44 +0900 (JST)
+Subject: [PATCH 3/3] add ARM crashdump support
+In-Reply-To: <20100625.083133.77342472.igawa@mxs.nes.nec.co.jp>
+References: <20100624163356.dbb849bc.igawa@mxs.nes.nec.co.jp>
+	<20100624081915.GF29920@esdhcp04058.research.nokia.com>
+	<20100625.083133.77342472.igawa@mxs.nes.nec.co.jp>
+Message-ID: <20100625.160544.125902258.igawa@mxs.nes.nec.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 25, 2010 at 08:52:40AM +0200, Eric B?nard wrote:
-> Le 25/06/2010 07:10, Uwe Kleine-K?nig a ?crit :
->> On Thu, Jun 24, 2010 at 09:48:12PM +0200, Eric B?nard wrote:
->>> How do you manage to merge this simply in order to test it ?
->>> I added your branch as a remote tree, then fetched it, then merged it :
->>> is there any magic git sequence missing here that would help to reduce
->>> the number of conflicts ?
->> No, but these conflicts aren't that hard to resolve.  Check out my
->> imx/for-2.6.36-merged branch.
-I'm currently fixing mx3, I missed that there appeared a new machine,
-too.  I give you a ping via PM when I'm done.
+Hi,
 
-> most of them may not be hard to resolve but that creates more work to  
-> test the patches (and that create more work for Sascha to integrate the  
-> patches in its tree). Thanks for your merged branch, I'll test asap.
-rebasing creates more work for me, and if Sascha pulls my merge he has
-no problems.
+From: Masayuki Igawa <igawa@mxs.nes.nec.co.jp>
+Subject: Re: [PATCH 3/3] add ARM crashdump support
+Date: Fri, 25 Jun 2010 08:31:33 +0900 (JST)
+> From: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
+> Date: Thu, 24 Jun 2010 11:19:15 +0300
+>> On Thu, Jun 24, 2010 at 09:33:56AM +0200, ext Masayuki Igawa wrote:
+>>> Hi, Mika.
+>> 
+>> (...)
+> 
+>>> How about is this?
+>>> ====
+>>> +unsigned long long
+>>> +vaddr_to_paddr_arm(unsigned long vaddr)
+>>> +{
+>>> +	unsigned long long paddr = vaddr_to_paddr_general(vaddr);
+>>> +
+>>> +	if (paddr != NOT_PADDR)
+>>> +		return paddr;
+>>> ====
+>> 
+>> Yeah, looks OK to me.
+>> 
+>> Do you want me to send a revisited version of the patches or do you change that
+>> yourself?
+> 
+> I'll change that myself.
+> 
+>> 
+>>> BTW, I'm testing these patches for x86/x86_64 arch now.
+>>> I'll merge these patches after my testing.
+>> 
+>> Cool, thanks.
 
->> BTW there are two warnings about 'otg_pdata' and 'usbh2_pdata' defined
->
-> should already be fixed in :
-> http://git.pengutronix.de/?p=imx/linux-2.6.git;a=commit;h=4ecca63bf70aec86745c4bb631ada8b15e02e855
->
->> but not used with the config I tested.  And it would have been more
->> consistent to name your machine source file mach-eukrea_cpuimx25.c.
->>
-> OK so this would require the same renaming for cpuimx27 & 35 as actually  
-> its consitent between the 3 boards. Should I send a patch to rename them 
-> ?
-If you don't, then I will do :-)  I would recommend to wait until Sascha
-merged though.
+I've finished my tests(x86/x86_64). No problems were found.
+So I've merged and pushed these patches.
 
-While testing I found another problem.  There are two definitions of
-MACH_EUKREA_MBIMXSD_BASEBOARD that conflict.  For me
-MACH_EUKREA_MBIMXSD_BASEBOARD doesn't appear in .config if I select
-MACH_EUKREA_CPUIMX25.
+Thanks,
+-- Masayuki Igawa
 
-Best regards
-Uwe
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>> 
+>>> But I cannot test for ARM because have no test machines of ARM.
+>> 
+>> Well I can do the testing for ARM (unless someone else, who is using ARM kdump
+>> currently, wants to test this). If the above is the only change it should still
+>> work.
+> 
+> OK. I'll merge and push these patches (including this change).
+> And I'd like you to do the testing for ARM after that.
