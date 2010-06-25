@@ -1,38 +1,47 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Fri, 25 Jun 2010 09:23:49 +0200
-Subject: 
-In-Reply-To: <20100625071751.GB31164@pengutronix.de>
-References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<4C236EC2.8090506@eukrea.com>
-	<20100624175528.GA14838@pengutronix.de>
-	<4C23B67C.7090207@eukrea.com>
-	<20100625051016.GA31164@pengutronix.de>
-	<4C245238.7010501@eukrea.com>
-	<20100625071751.GB31164@pengutronix.de>
-Message-ID: <4C245985.6040703@eukrea.com>
+From: byang1@marvell.com (Bin Yang)
+Date: Fri, 25 Jun 2010 00:35:41 -0700
+Subject: kprobe bug. 
+In-Reply-To: <20100623195456.GC25070@n2100.arm.linux.org.uk>
+Message-ID: <AAD1C6EB06EE3649B35B7E026785068D14FCB58138@SC-VEXCH2.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 25/06/2010 09:17, Uwe Kleine-K?nig a ?crit :
->>> but not used with the config I tested.  And it would have been more
->>> consistent to name your machine source file mach-eukrea_cpuimx25.c.
->>>
->> OK so this would require the same renaming for cpuimx27&  35 as actually
->> its consitent between the 3 boards. Should I send a patch to rename them
->> ?
-> If you don't, then I will do :-)  I would recommend to wait until Sascha
-> merged though.
->
-OK will do.
+Hi Russell,
 
-> While testing I found another problem.  There are two definitions of
-> MACH_EUKREA_MBIMXSD_BASEBOARD that conflict.  For me
-> MACH_EUKREA_MBIMXSD_BASEBOARD doesn't appear in .config if I select
-> MACH_EUKREA_CPUIMX25.
->
-Yes I saw this after tewting Sascha's tree as I was initialy working on 
-different branches. I would have expected Kconfig to not care about the 
-one of the unselected architecture but that not the case.
-Please see the patch I just sent to merge the baseboard support in one file.
+	Thanks in advance for your kind to review my question. 
+	I met a kprobe bug while I used it to debug my driver. 
+	Here is the scenario:
+	I add a probe at function xxx(). And the assembly code of xxx() is as following,
+=====================
+	c035ee48 <xxx >:
+c035ee48:       e59f3008        ldr     r3, [pc, #8]    ; c035ee58              <xxx+0x10>
+c035ee4c:       e3a02001        mov     r2, #1  ; 0x1
+c035ee50:       e5032fff        str     r2, [r3, #-4095]
+c035ee54:       e12fff1e        bx      lr
+c035ee58:       fe03dfff        .word   0xfe03dfff 
+=====================
+	The ldr emulate always load e12fff1e to r3 register. 
+	After debugging, I found the pc register should be 8 after current instruction. So we should set pc to pc+8 before instruction emulation and set it back to the next instruction after singe step.
+	Here is my patch: 
+=======================
+diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
+index 60c62c3..6e2567e 100644
+--- a/arch/arm/kernel/kprobes.c
++++ b/arch/arm/kernel/kprobes.c
+@@ -132,8 +132,9 @@ static void __kprobes set_current_kprobe(struct kprobe *p)
+ static void __kprobes singlestep(struct kprobe *p, struct pt_regs *regs,
+ 				 struct kprobe_ctlblk *kcb)
+ {
+-	regs->ARM_pc += 4;
++	regs->ARM_pc += 8;
+ 	p->ainsn.insn_handler(p, regs);
++	regs->ARM_pc -= 4;
+ }
+ 
+ /*
+========================
 
-Eric
+	 
+
+Regards,
+Bin
