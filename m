@@ -1,201 +1,22 @@
-From: eric.miao@canonical.com (eric.miao at canonical.com)
-Date: Sat, 26 Jun 2010 16:47:05 +0800
+From: eric.miao@canonical.com (Eric Miao)
+Date: Sat, 26 Jun 2010 16:50:32 +0800
 Subject: [PATCH] [ARM] Introduce patching of phys_to_virt and vice versa
-Message-ID: <1277542025-19881-1-git-send-email-eric.miao@canonical.com>
+In-Reply-To: <1277542025-19881-1-git-send-email-eric.miao@canonical.com>
+References: <1277542025-19881-1-git-send-email-eric.miao@canonical.com>
+Message-ID: <AANLkTinVZdN0Ltbk6H9YMPDT4OZ2-2S7_3vLKcBEfxgT@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Miao <eric.miao@canonical.com>
+> +config PATCH_PHYS_VIRT
+> + ? ? ? def_bool n
+> +
+> ?source "init/Kconfig"
+>
+> ?source "kernel/Kconfig.freezer"
+> @@ -579,6 +582,7 @@ config ARCH_PXA
+> ? ? ? ?select GENERIC_CLOCKEVENTS
+> ? ? ? ?select TICK_ONESHOT
+> ? ? ? ?select PLAT_PXA
+> + ? ? ? select PATCH_PHYS_VIRT if !XIP_KERNEL
 
-In most cases, the delta between PHYS_OFFSET and PAGE_OFFSET is normally
-16MiB aligned, which means the difference can be handled by a simple ADD
-or SUB instruction with an immediate shift operand in ARM.  This will be
-a bit more efficient and generic when PHYS_OFFSET goes run-time.
-
-This idea can be made generic to allow conversions more than phys_to_virt
-and virt_to_phys. A stub instruction is inserted where applicable, and it
-has a form of 'add rn, rd, #imm', where the lowest 8-bit of #imm is used
-to identify the type of patching.  Currently, only two types are defined,
-but could be expanded in my POV to definitions like __io(), __mem_pci()
-and so on. A __patch_table section is introduced to include the addresses
-of all these stub instructions.
-
-There are several places for improvement:
-
-1. constant parameters which can be optimized by the compiler now needs
-   one additional instruction (although the optimization is neither
-   possible when PHYS_OFFSET goes a variable)
-
-2. flush_cache_all() when patching is done seems to be brute but simple
-   enough here in this patch to show a proof concept
-
-Any thing else?
-
-PS: the general idea comes from Nicolas Pitre, and is drafted at
-    https://wiki.ubuntu.com/Specs/ARMSingleKernel
-
-Cc: Nicolas Pitre <nicolas.pitre@canonical.com>
-Signed-off-by: Eric Miao <eric.miao@canonical.com>
----
- arch/arm/Kconfig              |    4 +++
- arch/arm/include/asm/memory.h |   32 ++++++++++++++++++++++++++
- arch/arm/kernel/setup.c       |   50 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/vmlinux.lds.S |    4 +++
- 4 files changed, 90 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 1f254bd..0c171c2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -189,6 +189,9 @@ config VECTORS_BASE
- 	help
- 	  The base address of exception vectors.
- 
-+config PATCH_PHYS_VIRT
-+	def_bool n
-+
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
-@@ -579,6 +582,7 @@ config ARCH_PXA
- 	select GENERIC_CLOCKEVENTS
- 	select TICK_ONESHOT
- 	select PLAT_PXA
-+	select PATCH_PHYS_VIRT if !XIP_KERNEL
- 	help
- 	  Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
- 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 4312ee5..a5f84bc 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -173,6 +173,37 @@
-  */
- #define PHYS_PFN_OFFSET	(PHYS_OFFSET >> PAGE_SHIFT)
- 
-+#ifdef CONFIG_PATCH_PHYS_VIRT
-+
-+#define PATCH_TYPE_PHYS_TO_VIRT		(0)
-+#define PATCH_TYPE_VIRT_TO_PHYS		(1)
-+
-+#define __patch_stub(from,to,type)			\
-+	__asm__ __volatile__(				\
-+	"1:	add	%0, %1, %2\n"			\
-+	"\n"						\
-+	"	.pushsection __patch_table,\"a\"\n"	\
-+	"	.long	1b\n"				\
-+	"	.popsection\n"				\
-+	: "=r" (to)					\
-+	: "r" (from), "i" (type))
-+
-+static inline unsigned long virt_to_phys(void *x)
-+{
-+	unsigned long t;
-+
-+	__patch_stub(x, t, PATCH_TYPE_VIRT_TO_PHYS);
-+	return t;
-+}
-+
-+static inline void *phys_to_virt(unsigned long x)
-+{
-+	void *t;
-+
-+	__patch_stub(x, t, PATCH_TYPE_PHYS_TO_VIRT);
-+	return t;
-+}
-+#else
- /*
-  * These are *only* valid on the kernel direct mapped RAM memory.
-  * Note: Drivers should NOT use these.  They are the wrong
-@@ -188,6 +219,7 @@ static inline void *phys_to_virt(unsigned long x)
- {
- 	return (void *)(__phys_to_virt((unsigned long)(x)));
- }
-+#endif
- 
- /*
-  * Drivers should NOT use these either.
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 122d999..d265b50 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -663,12 +663,62 @@ static int __init customize_machine(void)
- }
- arch_initcall(customize_machine);
- 
-+#ifdef CONFIG_PATCH_PHYS_VIRT
-+
-+#define PATCH_INSTR_ADD		(0x00800000)
-+#define PATCH_INSTR_SUB		(0x00400000)
-+
-+#define PATCH_STUB_MASK		(0xffe000ff)
-+#define PATCH_STUB_PHYS_TO_VIRT	(0xe2800000 | PATCH_TYPE_PHYS_TO_VIRT)
-+#define PATCH_STUB_VIRT_TO_PHYS	(0xe2800000 | PATCH_TYPE_VIRT_TO_PHYS)
-+
-+/* patch_phys_virt - patch the stub instructions with the delta between
-+ * PHYS_OFFSET and PAGE_OFFSET, which is assumed to be 16MiB aligned and
-+ * can be expressed by an immediate shifter operand. The stub instruction
-+ * has a form of 'add rn, rd, #imm', where the lowest 8-bit of #imm is
-+ * used to identify the type of patching.
-+ */
-+static void __init patch_phys_virt(void)
-+{
-+	extern unsigned int *__patch_table_begin, *__patch_table_end;
-+	unsigned int **p;
-+	unsigned int imm, instr[2];
-+
-+	if (PHYS_OFFSET & 0x00ffffff)
-+		panic("Physical memory start is not 16MiB aligned\n");
-+
-+	if (likely(PHYS_OFFSET < PAGE_OFFSET)) {
-+		imm = 0x400 | ((PAGE_OFFSET >> 24) - (PHYS_OFFSET >> 24));
-+		instr[0] = PATCH_INSTR_ADD | imm;
-+		instr[1] = PATCH_INSTR_SUB | imm;
-+	} else {
-+		imm = 0x400 | ((PHYS_OFFSET >> 24) - (PAGE_OFFSET >> 24));
-+		instr[0] = PATCH_INSTR_SUB | imm;
-+		instr[1] = PATCH_INSTR_ADD | imm;
-+	}
-+
-+	for (p = &__patch_table_begin; p < &__patch_table_end; p++) {
-+		unsigned int *inptr = *p;
-+
-+		if ((*inptr & PATCH_STUB_MASK) == PATCH_STUB_PHYS_TO_VIRT)
-+			*inptr = (*inptr & ~0x00e00fff) | instr[0];
-+		if ((*inptr & PATCH_STUB_MASK) == PATCH_STUB_VIRT_TO_PHYS)
-+			*inptr = (*inptr & ~0x00e00fff) | instr[1];
-+	}
-+	flush_cache_all();
-+}
-+#else
-+static inline void patch_phys_virt(void) {}
-+#endif
-+
- void __init setup_arch(char **cmdline_p)
- {
- 	struct tag *tags = (struct tag *)&init_tags;
- 	struct machine_desc *mdesc;
- 	char *from = default_command_line;
- 
-+	patch_phys_virt();
-+
- 	unwind_init();
- 
- 	setup_processor();
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index b16c079..c48c754 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -41,6 +41,10 @@ SECTIONS
- 			*(.taglist.init)
- 		__tagtable_end = .;
- 
-+		__patch_table_begin = .;
-+			*(__patch_table)
-+		__patch_table_end = .;
-+
- 		INIT_SETUP(16)
- 
- 		INIT_CALLS
--- 
-1.7.1
+Tested on PXA, so ignore this change at the moment.
