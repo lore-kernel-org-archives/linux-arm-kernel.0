@@ -1,195 +1,121 @@
-From: john.ogness@linutronix.de (John Ogness)
-Date: Sat, 26 Jun 2010 11:17:35 +0200
-Subject: [PATCHv3 4/5] mtd: mxc_nand fixups
-In-Reply-To: <AANLkTilTbvlPxRhioMiKrBUNggcxZeboi1YpB8Y9Bdpm@mail.gmail.com>
-	(Ivo Clarysse's message of "Fri, 25 Jun 2010 16:50:45 +0200")
-References: <20100618205401.GA12115@pengutronix.de>
-	<80sk4ivkga.fsf@merkur.tec.linutronix.de>
-	<AANLkTimA7Rbm_nHpVYpEPqaPCjrOse9s8YyiInWlhfEK@mail.gmail.com>
-	<80tyoyhxey.fsf_-_@merkur.tec.linutronix.de>
-	<AANLkTikRj_dMkKLyFhW78yld9jIYAIFncfPaPAF8WqUY@mail.gmail.com>
-	<80iq5bqd07.fsf_-_@merkur.tec.linutronix.de>
-	<AANLkTimJKNEwOoKldq4a4_ufxNY6IY7r6tAfAM055hlW@mail.gmail.com>
-	<80vd9ab0d2.fsf@merkur.tec.linutronix.de>
-	<AANLkTinVaXjCneg-XpxB7YNlmGOwQFTnm5RUcetPdToI@mail.gmail.com>
-	<80lja6awlb.fsf@merkur.tec.linutronix.de>
-	<20100624072732.GQ12115@pengutronix.de>
-	<807hloag6w.fsf@merkur.tec.linutronix.de>
-	<AANLkTilTbvlPxRhioMiKrBUNggcxZeboi1YpB8Y9Bdpm@mail.gmail.com>
-Message-ID: <80y6e2kv9s.fsf@merkur.tec.linutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 26 Jun 2010 10:54:20 +0100
+Subject: [PATCH] [ARM] Introduce patching of phys_to_virt and vice versa
+In-Reply-To: <1277542025-19881-1-git-send-email-eric.miao@canonical.com>
+References: <1277542025-19881-1-git-send-email-eric.miao@canonical.com>
+Message-ID: <20100626095420.GA10340@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2010-06-25, Ivo Clarysse <ivo.clarysse@gmail.com> wrote:
-> Tested on an MX21ADS board, and it still works.
->
-> [...]
->
-> Naming is not very consistent; I'd suggest nfc_set_interrupt /
-> nfc_clear_interrupt
+Mostly like this patch, but there's a couple of issues with it which
+can be worked around by documentation...
 
-Actually, the set function is a query, not an action. I've renamed it
-nfc_isset_interrupt() so that it is clearer. I also fixed a typo in one
-of the comments.
+On Sat, Jun 26, 2010 at 04:47:05PM +0800, eric.miao at canonical.com wrote:
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 1f254bd..0c171c2 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -189,6 +189,9 @@ config VECTORS_BASE
+>  	help
+>  	  The base address of exception vectors.
+>  
+> +config PATCH_PHYS_VIRT
 
-This patch is based on linux-next 20100618.
+ARM_PATCH_PHYS_TO_VIRT might be a better name?
 
-Signed-off-by: John Ogness <john.ogness@linutronix.de>
----
- drivers/mtd/nand/mxc_nand.c |   81 +++++++++++++++++++++++++---------
- 1 file changed, 61 insertions(+), 20 deletions(-)
+> +	def_bool n
+> +
+>  source "init/Kconfig"
+>  
+>  source "kernel/Kconfig.freezer"
+> @@ -579,6 +582,7 @@ config ARCH_PXA
+>  	select GENERIC_CLOCKEVENTS
+>  	select TICK_ONESHOT
+>  	select PLAT_PXA
+> +	select PATCH_PHYS_VIRT if !XIP_KERNEL
 
-Index: linux-next-20100618/drivers/mtd/nand/mxc_nand.c
-===================================================================
---- linux-next-20100618.orig/drivers/mtd/nand/mxc_nand.c
-+++ linux-next-20100618/drivers/mtd/nand/mxc_nand.c
-@@ -30,6 +30,8 @@
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/completion.h>
- 
- #include <asm/mach/flash.h>
- #include <mach/mxc_nand.h>
-@@ -40,6 +42,13 @@
- #define nfc_is_v21()		(cpu_is_mx25() || cpu_is_mx35())
- #define nfc_is_v1()		(cpu_is_mx31() || cpu_is_mx27() || cpu_is_mx21())
- 
-+/* It has been observed that the i.MX21 cannot read the CONFIG2:INT bit
-+ * if interrupts are masked (CONFIG1:INT_MSK is set). To handle this, the
-+ * driver can enable/disable the irq line rather than simply masking the
-+ * interrupts. The nfc_avoid_masking() macro identifies the systems that
-+ * should use this workaround. */
-+#define nfc_avoid_masking()	(cpu_is_mx21())
-+
- /* Addresses for NFC registers */
- #define NFC_BUF_SIZE		0xE00
- #define NFC_BUF_ADDR		0xE04
-@@ -100,6 +109,18 @@
- 
- #define NFC_RSLTSPARE_AREA_MASK  0xff
- 
-+#define nfc_isset_interrupt(_regs) \
-+		(readw(_regs + NFC_CONFIG2) & NFC_INT)
-+#define nfc_clear_interrupt(_regs) \
-+		writew(readw(_regs + NFC_CONFIG2) & ~NFC_INT, \
-+		       _regs + NFC_CONFIG2)
-+#define nfc_mask_irq(_regs) \
-+		writew(readw(_regs + NFC_CONFIG1) | NFC_INT_MSK, \
-+		       _regs + NFC_CONFIG1)
-+#define nfc_unmask_irq(_regs) \
-+		writew(readw(_regs + NFC_CONFIG1) & ~NFC_INT_MSK, \
-+		       _regs + NFC_CONFIG1)
-+
- struct mxc_nand_host {
- 	struct mtd_info		mtd;
- 	struct nand_chip	nand;
-@@ -117,7 +138,7 @@ struct mxc_nand_host {
- 	int			clk_act;
- 	int			irq;
- 
--	wait_queue_head_t	irq_waitq;
-+	struct completion	op_completion;
- 
- 	uint8_t			*data_buf;
- 	unsigned int		buf_start;
-@@ -174,9 +195,18 @@ static irqreturn_t mxc_nfc_irq(int irq, 
- {
- 	struct mxc_nand_host *host = dev_id;
- 
--	disable_irq_nosync(irq);
--
--	wake_up(&host->irq_waitq);
-+	/* If NFC_INT is not set, we have a spurious interrupt! */
-+	if (!nfc_isset_interrupt(host->regs))
-+		return IRQ_NONE;
-+
-+	/* Even with nfc_avoid_masking() we mask the interrupt
-+	 * here to avoid an interrupt flood until the irq line
-+	 * is disabled by the driver thread. */
-+	nfc_mask_irq(host->regs);
-+
-+	/* Notify the driver thread that an interrupt has occurred.
-+	 * The driver thread will clear the interrupt. */
-+	complete(&host->op_completion);
- 
- 	return IRQ_HANDLED;
- }
-@@ -186,27 +216,32 @@ static irqreturn_t mxc_nfc_irq(int irq, 
-  */
- static void wait_op_done(struct mxc_nand_host *host, int useirq)
- {
--	uint16_t tmp;
- 	int max_retries = 8000;
- 
- 	if (useirq) {
--		if ((readw(host->regs + NFC_CONFIG2) & NFC_INT) == 0) {
-+		if (!nfc_isset_interrupt(host->regs)) {
-+
-+			INIT_COMPLETION(host->op_completion);
- 
--			enable_irq(host->irq);
-+			if (nfc_avoid_masking())
-+				enable_irq(host->irq);
-+			else
-+				nfc_unmask_irq(host->regs);
- 
--			wait_event(host->irq_waitq,
--				readw(host->regs + NFC_CONFIG2) & NFC_INT);
-+			/* wait for the interrupt */
-+			wait_for_completion(&host->op_completion);
- 
--			tmp = readw(host->regs + NFC_CONFIG2);
--			tmp  &= ~NFC_INT;
--			writew(tmp, host->regs + NFC_CONFIG2);
-+			if (nfc_avoid_masking()) {
-+				disable_irq(host->irq);
-+				nfc_unmask_irq(host->regs);
-+			}
- 		}
-+
-+		nfc_clear_interrupt(host->regs);
- 	} else {
- 		while (max_retries-- > 0) {
--			if (readw(host->regs + NFC_CONFIG2) & NFC_INT) {
--				tmp = readw(host->regs + NFC_CONFIG2);
--				tmp  &= ~NFC_INT;
--				writew(tmp, host->regs + NFC_CONFIG2);
-+			if (nfc_isset_interrupt(host->regs)) {
-+				nfc_clear_interrupt(host->regs);
- 				break;
- 			}
- 			udelay(1);
-@@ -582,9 +617,8 @@ static void preset(struct mtd_info *mtd)
- 	struct mxc_nand_host *host = nand_chip->priv;
- 	uint16_t tmp;
- 
--	/* enable interrupt, disable spare enable, setup ECC */
-+	/* disable spare-only, setup ECC */
- 	tmp = readw(host->regs + NFC_CONFIG1);
--	tmp &= ~NFC_INT_MSK;
- 	tmp &= ~NFC_SP_EN;
- 	if (nand_chip->ecc.mode == NAND_ECC_HW) {
- 		tmp |= NFC_ECC_EN;
-@@ -842,11 +876,18 @@ static int __init mxcnd_probe(struct pla
- 		this->options |= NAND_USE_FLASH_BBT;
- 	}
- 
--	init_waitqueue_head(&host->irq_waitq);
-+	init_completion(&host->op_completion);
- 
- 	host->irq = platform_get_irq(pdev, 0);
- 
--	err = request_irq(host->irq, mxc_nfc_irq, IRQF_DISABLED, DRIVER_NAME, host);
-+	if (nfc_avoid_masking()) {
-+		set_irq_flags(host->irq, IRQF_VALID | IRQF_NOAUTOEN);
-+		nfc_unmask_irq(host->regs);
-+	} else {
-+		nfc_mask_irq(host->regs);
-+	}
-+
-+	err = request_irq(host->irq, mxc_nfc_irq, 0, DRIVER_NAME, host);
- 	if (err)
- 		goto eirq;
- 
+It needs to be documented that PATCH_PHYS_VIRT is only for non-XIP and
+non-Thumb2 kernels.  I suggest it goes in the help text for the config
+option, or a comment before the option.
+
+>  	help
+>  	  Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
+>  
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index 4312ee5..a5f84bc 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -173,6 +173,37 @@
+>   */
+>  #define PHYS_PFN_OFFSET	(PHYS_OFFSET >> PAGE_SHIFT)
+>  
+> +#ifdef CONFIG_PATCH_PHYS_VIRT
+> +
+> +#define PATCH_TYPE_PHYS_TO_VIRT		(0)
+> +#define PATCH_TYPE_VIRT_TO_PHYS		(1)
+> +
+> +#define __patch_stub(from,to,type)			\
+> +	__asm__ __volatile__(				\
+> +	"1:	add	%0, %1, %2\n"			\
+> +	"\n"						\
+> +	"	.pushsection __patch_table,\"a\"\n"	\
+> +	"	.long	1b\n"				\
+> +	"	.popsection\n"				\
+> +	: "=r" (to)					\
+> +	: "r" (from), "i" (type))
+
+This should be "I" not "i":
+
+    `I'
+          Integer that is valid as an immediate operand in a data
+          processing instruction.  That is, an integer in the range 0
+          to 255 rotated by a multiple of 2
+
+which is what 'add' takes.  "i" means any integer of any size.
+
+> +/* patch_phys_virt - patch the stub instructions with the delta between
+> + * PHYS_OFFSET and PAGE_OFFSET, which is assumed to be 16MiB aligned and
+> + * can be expressed by an immediate shifter operand. The stub instruction
+> + * has a form of 'add rn, rd, #imm', where the lowest 8-bit of #imm is
+
+'add rd, rn, #imm'
+
+> + * used to identify the type of patching.
+> + */
+> +static void __init patch_phys_virt(void)
+> +{
+> +	extern unsigned int *__patch_table_begin, *__patch_table_end;
+> +	unsigned int **p;
+> +	unsigned int imm, instr[2];
+> +
+> +	if (PHYS_OFFSET & 0x00ffffff)
+> +		panic("Physical memory start is not 16MiB aligned\n");
+> +
+> +	if (likely(PHYS_OFFSET < PAGE_OFFSET)) {
+> +		imm = 0x400 | ((PAGE_OFFSET >> 24) - (PHYS_OFFSET >> 24));
+> +		instr[0] = PATCH_INSTR_ADD | imm;
+> +		instr[1] = PATCH_INSTR_SUB | imm;
+> +	} else {
+> +		imm = 0x400 | ((PHYS_OFFSET >> 24) - (PAGE_OFFSET >> 24));
+> +		instr[0] = PATCH_INSTR_SUB | imm;
+> +		instr[1] = PATCH_INSTR_ADD | imm;
+> +	}
+> +
+> +	for (p = &__patch_table_begin; p < &__patch_table_end; p++) {
+> +		unsigned int *inptr = *p;
+> +
+> +		if ((*inptr & PATCH_STUB_MASK) == PATCH_STUB_PHYS_TO_VIRT)
+> +			*inptr = (*inptr & ~0x00e00fff) | instr[0];
+> +		if ((*inptr & PATCH_STUB_MASK) == PATCH_STUB_VIRT_TO_PHYS)
+> +			*inptr = (*inptr & ~0x00e00fff) | instr[1];
+> +	}
+> +	flush_cache_all();
+
+That's not a good idea before the page tables are setup - there is CPU
+support which needs to read data in order to writeback dirty entries in
+the cache.  (eg, StrongARM CPUs - which corresponds with ebsa110,
+footbridge, rpc, sa1100, and shark.)
+
+This mapping does not exist before paging_init() has completed - which
+presents a catch-22 situation here.  This also needs to be documented
+against the config option.
