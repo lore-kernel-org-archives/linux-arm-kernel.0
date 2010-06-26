@@ -1,34 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 26 Jun 2010 12:07:45 +0100
-Subject: [PATCH v2 1/3] OMAP: PM: initial runtime PM core support
-In-Reply-To: <20100626105133.GA762@pengutronix.de>
-References: <1277422991-25350-1-git-send-email-khilman@deeprootsystems.com>
-	<1277422991-25350-2-git-send-email-khilman@deeprootsystems.com>
-	<AANLkTim4p54brsmph6oaKfoEZwO1GOGfgRNV9vJykOjl@mail.gmail.com>
-	<20100625200659.GB22090@n2100.arm.linux.org.uk>
-	<AANLkTikYE6Kg8C_ZClx9aKLvOa9CQRUT587hQnB91sua@mail.gmail.com>
-	<20100625202002.GC22090@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1006251941190.24097@xanadu.home>
-	<20100626105133.GA762@pengutronix.de>
-Message-ID: <20100626110745.GB10340@n2100.arm.linux.org.uk>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Sat, 26 Jun 2010 19:37:20 +0200
+Subject: [PATCH] MMC: remove regulator refcount fiddling in mmc core
+In-Reply-To: <20100625112232.GA21217@opensource.wolfsonmicro.com>
+References: <1277392337-27627-1-git-send-email-linus.walleij@stericsson.com>
+	<20100625112232.GA21217@opensource.wolfsonmicro.com>
+Message-ID: <AANLkTikiPByvzfbj-gwfyozWb5MMJXSWuINFbrLdcwtU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 26, 2010 at 12:51:33PM +0200, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Fri, Jun 25, 2010 at 07:46:05PM -0400, Nicolas Pitre wrote:
-> > On Fri, 25 Jun 2010, Russell King - ARM Linux wrote:
-> > 
-> > > Does anyone know where we are on the defconfig problem?  From what I
-> > > can see, it's mostly stalled for the time being, which is not good
-> > > news for us.
-> > 
-> > What looked to be promizing is the work by Uwe Kleine-K?nig according to 
-> > the preview he posted on June 10:
-> >   
-> > Message-id: <20100610063234.GA22533@pengutronix.de>
-> I think Linus is still away?!  I plan to ping him again asking for an
-> opinion regarding my idea when he will be back.
+2010/6/25 Mark Brown <broonie@opensource.wolfsonmicro.com>:
+> On Thu, Jun 24, 2010 at 05:12:17PM +0200, Linus Walleij wrote:
+>
+>> Currently the mmc_regulator_set_ocr() fiddles with the regulator
+>> refcount by selectively calling regulator_[enable|disable]
+>> depending on the state of the regulator. This will confuse the
+>> reference count if case the regulator is for example shared with
+>> other MMC slots or user for other stuff than the MMC card.
+>
+>> Push regulator_[enable|disable] out into the MMC host drivers
+>> and remove this from the MMC core so the reference count can be
+>> trusted.
+>
+> So, the feedback from folks at the time this was originally written was
+> that the MMC code was unable to cope with sharing regulators since it
+> really needs to be able to set specific voltages. ?This needn't be a
+> showstopper since people can force a single voltage in the constraints
+> but it does need to be considered here.
 
-It looks that way...
+Well hm, that's not strictly true. If you only provide one standard
+voltage ONLY in your OCR mask, i.e. MMC_VDD_* then you can use
+the same regulator for two or more MMC cards.
+
+Further that's a perfectly reasonable thing to do if you have e.g.
+two embedded eMMC cards and you know which voltage they like
+to operate on ... so share the same regulator, why not. The above
+assumption comes from a slot-based world.
+
+Another argument is that a function named
+mmc_regulator_set_ocr() shouldn't be enabling/disabling regulators
+anyway because it's hopeless to read the code, and the other
+functions in mmc/core.c only deals with voltages, not on/off:ing.
+(Maybe it's just me who have a hard time reading code like that.)
+
+Yours,
+Linus Walleij
