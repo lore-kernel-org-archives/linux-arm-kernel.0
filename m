@@ -1,27 +1,21 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 25 Jun 2010 19:46:05 -0400 (EDT)
-Subject: [PATCH v2 1/3] OMAP: PM: initial runtime PM core support
-In-Reply-To: <20100625202002.GC22090@n2100.arm.linux.org.uk>
-References: <1277422991-25350-1-git-send-email-khilman@deeprootsystems.com>
-	<1277422991-25350-2-git-send-email-khilman@deeprootsystems.com>
-	<AANLkTim4p54brsmph6oaKfoEZwO1GOGfgRNV9vJykOjl@mail.gmail.com>
-	<20100625200659.GB22090@n2100.arm.linux.org.uk>
-	<AANLkTikYE6Kg8C_ZClx9aKLvOa9CQRUT587hQnB91sua@mail.gmail.com>
-	<20100625202002.GC22090@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1006251941190.24097@xanadu.home>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 25 Jun 2010 21:36:17 -0700 (PDT)
+Subject: [PATCH 1/2] net/fec: clean suspend/resume
+In-Reply-To: <1276853351-20790-1-git-send-email-eric@eukrea.com>
+References: <1276853351-20790-1-git-send-email-eric@eukrea.com>
+Message-ID: <20100625.213617.235709938.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 Jun 2010, Russell King - ARM Linux wrote:
+From: Eric B?nard <eric@eukrea.com>
+Date: Fri, 18 Jun 2010 11:29:10 +0200
 
-> Does anyone know where we are on the defconfig problem?  From what I
-> can see, it's mostly stalled for the time being, which is not good
-> news for us.
+> Commit 59d4289b83b11379d867e2f7146904b19cc96404 converted fec to dev_pm_ops but
+> didn't update the suspend/resume functions thus leading to the following warning :
+> "initialization from incompatible pointer type" when CONFIG_PM is set.
+> 
+> This patch also fixe a few indentation and style around CONFIG_PM area.
+> 
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
 
-What looked to be promizing is the work by Uwe Kleine-K?nig according to 
-the preview he posted on June 10:
-  
-Message-id: <20100610063234.GA22533@pengutronix.de>
-
-
-Nicolas
+Applied.
