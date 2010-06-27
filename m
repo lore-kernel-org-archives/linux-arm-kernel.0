@@ -1,36 +1,23 @@
 From: davem@davemloft.net (David Miller)
-Date: Sat, 26 Jun 2010 21:07:28 -0700 (PDT)
-Subject: [RFC 9/9] crypto: Add Samsung crypto engine driver
-In-Reply-To: <4C129341.2060407@gmail.com>
-References: <cover.1276284559.git.mcuelenaere@gmail.com>
-	<4C129341.2060407@gmail.com>
-Message-ID: <20100626.210728.90806559.davem@davemloft.net>
+Date: Sat, 26 Jun 2010 21:22:54 -0700 (PDT)
+Subject: [PATCH 1/2 v2] mv643xx_eth: use sw csum for big packets
+In-Reply-To: <20100620115859.GT14513@mail.wantstofly.org>
+References: <20100614093237.GG14513@mail.wantstofly.org>
+	<AANLkTik1QFcRKy95sLTr6MlPfhEyR84iTCcAzpuSg47D@mail.gmail.com>
+	<20100620115859.GT14513@mail.wantstofly.org>
+Message-ID: <20100626.212254.25140964.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maurus Cuelenaere <mcuelenaere@gmail.com>
-Date: Fri, 11 Jun 2010 21:49:21 +0200
+From: Lennert Buytenhek <buytenh@wantstofly.org>
+Date: Sun, 20 Jun 2010 13:58:59 +0200
 
-> This patch adds support for the Samsung crypto engine driver available in the
-> S3C64XX and S5PC100 SoCs. Currently this supports AES and (T)DES with ECB and
-> CBC block ciphers (also CTR for AES). Support for (HMAC)-SHA1 acceleration is
-> also available in this engine, but isn't used in the driver yet.
-> 
-> Support for DMA has been added in the code but is currently disabled due to
-> issues with data transfers.
-> 
-> Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
+> Acked-by: Lennert Buytenhek <buytenh@wantstofly.org>
 
-I would personally queue up new crypto requests directly when there are
-no queued up requests and ->cur_req is NULL, instead of doing all of
-that work to do the submission in the tasklet.  I would also do the
-completion and queue running directly in the hw IRQ handler.
+If the desire is to get this into one of the networking GIT
+trees, sending it to linux-net isn't going to accomplish that.
 
-The tasklet is just pure overhead.
+It needs to go to netdev at vger.kernel.org with all signoffs
+and ACKs.
 
-Basically, when doing async crypto, every cycle that is consumed just
-to implement crypto job submission and completion takes away from the
-gains you get by doing it in hw at all.
-
-You can see this clearly if you do performance comparisons between the
-synchronous crypto routines and your async ones done in HW.
+Thanks.
