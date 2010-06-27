@@ -1,46 +1,109 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Sun, 27 Jun 2010 13:06:03 +0200
-Subject: [RFC 9/9] crypto: Add Samsung crypto engine driver
-In-Reply-To: <20100626.210728.90806559.davem@davemloft.net>
-References: <cover.1276284559.git.mcuelenaere@gmail.com>	<4C129341.2060407@gmail.com>
-	<20100626.210728.90806559.davem@davemloft.net>
-Message-ID: <4C27309B.7010905@gmail.com>
+From: jason77.wang@gmail.com (jason)
+Date: Sun, 27 Jun 2010 21:12:50 +0800
+Subject: [PATCH] spi/omap2_mcspi: disable and enable chan between each
+	SPI 	transfer
+In-Reply-To: <AANLkTinO3kndb9bIAGlz4-h2TW64NGthHBRcVlE3gqun@mail.gmail.com>
+References: <1277381565-6305-1-git-send-email-jason77.wang@gmail.com>
+	<E1C7579D1379824DAE67858071C810382DD83846FB@NOK-EUMSG-02.mgdnok.nokia.com>
+	<4C249BA1.8010808@gmail.com>
+	<AANLkTinO3kndb9bIAGlz4-h2TW64NGthHBRcVlE3gqun@mail.gmail.com>
+Message-ID: <4C274E52.1080003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Op 27-06-10 06:07, David Miller schreef:
-> From: Maurus Cuelenaere <mcuelenaere@gmail.com>
-> Date: Fri, 11 Jun 2010 21:49:21 +0200
+Grant Likely wrote:
+> On Fri, Jun 25, 2010 at 6:05 AM, jason <jason77.wang@gmail.com> wrote:
+>   
+>> roman.tereshonkov at nokia.com wrote:
+>>     
+>>>
+>>>       
+>> [snip]
+>>     
+>>>> -----Original Message-----
+>>>>
+>>>>                                        }
+>>>>                                        c = 0;
+>>>> -                               } else if (c == 0 && tx == NULL) {
+>>>> -                                       omap2_mcspi_set_enable(spi, 0);
+>>>>                                }
+>>>>
+>>>>                                *rx++ = __raw_readl(rx_reg);
+>>>>
+>>>>         
+>>> Why do you do this?
+>>> Reading the last word from the shift register buffer leads to the
+>>> receiving new data to the buffer.
+>>> The channel needs to be disabled before the last word reading.
+>>>
+>>>
+>>>
+>>>       
+>> Yes, you are right. If this patch can be accepted, i will remove those
+>> changes in the V2 patch.
+>> Please see my email replying grant likely's questions.
+>>     
 >
->> This patch adds support for the Samsung crypto engine driver available in the
->> S3C64XX and S5PC100 SoCs. Currently this supports AES and (T)DES with ECB and
->> CBC block ciphers (also CTR for AES). Support for (HMAC)-SHA1 acceleration is
->> also available in this engine, but isn't used in the driver yet.
->>
->> Support for DMA has been added in the code but is currently disabled due to
->> issues with data transfers.
->>
->> Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
-> I would personally queue up new crypto requests directly when there are
-> no queued up requests and ->cur_req is NULL, instead of doing all of
-> that work to do the submission in the tasklet.  I would also do the
-> completion and queue running directly in the hw IRQ handler.
+> Hi Jason.
 >
-> The tasklet is just pure overhead.
+> I'm assuming I can ignore this patch and wait for your V2.  I'll still
+> want an ack from other omap spi users before I apply it though.
 >
-> Basically, when doing async crypto, every cycle that is consumed just
-> to implement crypto job submission and completion takes away from the
-> gains you get by doing it in hw at all.
+> g.
 >
-> You can see this clearly if you do performance comparisons between the
-> synchronous crypto routines and your async ones done in HW.
+>   
+Hi grant,
+OK, i will prepare V2 and send out for review.
 
-I'll rewrite it like you're suggesting.
-I'd go with a threaded interrupt handler in that case then, or do you also consider this as too much overhead?
+Hi roman,
+I don't know if there is a TI omap3530evm board at your hand, if yes, 
+you can
+test touchscreen driver(ads7846) via tslib(ts_calibrate, ts_test).
 
-I'll do some performance comparisons of threaded interrupt handler vs normal and go with the fastest.
-
-Thanks for the review!
-
---
-Maurus Cuelenaere
+Thanks,
+Jason.
+>> Thanks,
+>> Jason.
+>>     
+>>>       
+>>>> @@ -646,7 +641,7 @@ omap2_mcspi_txrx_pio(struct spi_device *spi, struct
+>>>> spi_transfer *xfer)
+>>>>                        dev_err(&spi->dev, "EOT timed out\n");
+>>>>        }
+>>>> out:
+>>>> -       omap2_mcspi_set_enable(spi, 1);
+>>>> +       omap2_mcspi_set_enable(spi, 0);
+>>>>        return count - c;
+>>>> }
+>>>>
+>>>> @@ -894,7 +889,6 @@ static void omap2_mcspi_work(struct work_struct
+>>>> *work)
+>>>>                cs = spi->controller_state;
+>>>>                cd = spi->controller_data;
+>>>>
+>>>> -               omap2_mcspi_set_enable(spi, 1);
+>>>>                list_for_each_entry(t, &m->transfers, transfer_list) {
+>>>>                        if (t->tx_buf == NULL && t->rx_buf == NULL &&
+>>>> t->len) {
+>>>>                                status = -EINVAL;
+>>>> @@ -931,6 +925,8 @@ static void omap2_mcspi_work(struct work_struct
+>>>> *work)
+>>>>
+>>>>                        mcspi_write_chconf0(spi, chconf);
+>>>>
+>>>> +                       omap2_mcspi_set_enable(spi, 1);
+>>>> +
+>>>>                        if (t->len) {
+>>>>                                unsigned        count;
+>>>>
+>>>> --
+>>>> 1.5.6.5
+>>>>
+>>>>
+>>>>
+>>>>         
+>>     
+>
+>
+>
+>   
