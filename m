@@ -1,50 +1,36 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 26 Jun 2010 21:37:52 +0100
-Subject: [PATCH] MMC: remove regulator refcount fiddling in mmc core
-In-Reply-To: <AANLkTikiPByvzfbj-gwfyozWb5MMJXSWuINFbrLdcwtU@mail.gmail.com>
-	(sfid-20100626_183725_929817_AB417141)
-References: <1277392337-27627-1-git-send-email-linus.walleij@stericsson.com>
-	<20100625112232.GA21217@opensource.wolfsonmicro.com>
-	<AANLkTikiPByvzfbj-gwfyozWb5MMJXSWuINFbrLdcwtU@mail.gmail.com>
-	(sfid-20100626_183725_929817_AB417141)
-Message-ID: <DDE00276-5AB7-4A7E-AA93-29755DE8E874@opensource.wolfsonmicro.com>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 26 Jun 2010 21:07:28 -0700 (PDT)
+Subject: [RFC 9/9] crypto: Add Samsung crypto engine driver
+In-Reply-To: <4C129341.2060407@gmail.com>
+References: <cover.1276284559.git.mcuelenaere@gmail.com>
+	<4C129341.2060407@gmail.com>
+Message-ID: <20100626.210728.90806559.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 Jun 2010, at 18:37, Linus Walleij wrote:
-> 2010/6/25 Mark Brown <broonie@opensource.wolfsonmicro.com>:
->> 
+From: Maurus Cuelenaere <mcuelenaere@gmail.com>
+Date: Fri, 11 Jun 2010 21:49:21 +0200
 
->> So, the feedback from folks at the time this was originally written was
->> that the MMC code was unable to cope with sharing regulators since it
->> really needs to be able to set specific voltages.  This needn't be a
->> showstopper since people can force a single voltage in the constraints
->> but it does need to be considered here.
+> This patch adds support for the Samsung crypto engine driver available in the
+> S3C64XX and S5PC100 SoCs. Currently this supports AES and (T)DES with ECB and
+> CBC block ciphers (also CTR for AES). Support for (HMAC)-SHA1 acceleration is
+> also available in this engine, but isn't used in the driver yet.
+> 
+> Support for DMA has been added in the code but is currently disabled due to
+> issues with data transfers.
+> 
+> Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
 
-> Well hm, that's not strictly true. If you only provide one standard
-> voltage ONLY in your OCR mask, i.e. MMC_VDD_* then you can use
-> the same regulator for two or more MMC cards.
+I would personally queue up new crypto requests directly when there are
+no queued up requests and ->cur_req is NULL, instead of doing all of
+that work to do the submission in the tasklet.  I would also do the
+completion and queue running directly in the hw IRQ handler.
 
-This is what I'm saying about forcing a voltage in the constraints - the
-existing code should i believe implement the above automatically.
+The tasklet is just pure overhead.
 
-> Further that's a perfectly reasonable thing to do if you have e.g.
-> two embedded eMMC cards and you know which voltage they like
-> to operate on ... so share the same regulator, why not. The above
-> assumption comes from a slot-based world.
+Basically, when doing async crypto, every cycle that is consumed just
+to implement crypto job submission and completion takes away from the
+gains you get by doing it in hw at all.
 
-Right, but this code supports all MMC cards. To repeat what I said
-above this does need to be considered here. I don't think it's a
-particular problem, probably just turning it into a consumer capable
-of sharing the regulator would be enough.
-
-> Another argument is that a function named
-> mmc_regulator_set_ocr() shouldn't be enabling/disabling regulators
-> anyway because it's hopeless to read the code, and the other
-> functions in mmc/core.c only deals with voltages, not on/off:ing.
-> (Maybe it's just me who have a hard time reading code like that.)
-
-This seems rather surprising - are you saying that no other MMC drivers
-are able to manage power to the slot? There was a strong insistence
-when this code was originally written that it was essential to be able to
-power up and down the regulators for MMC applications.
+You can see this clearly if you do performance comparisons between the
+synchronous crypto routines and your async ones done in HW.
