@@ -1,109 +1,37 @@
-From: jason77.wang@gmail.com (jason)
-Date: Sun, 27 Jun 2010 21:12:50 +0800
-Subject: [PATCH] spi/omap2_mcspi: disable and enable chan between each
-	SPI 	transfer
-In-Reply-To: <AANLkTinO3kndb9bIAGlz4-h2TW64NGthHBRcVlE3gqun@mail.gmail.com>
-References: <1277381565-6305-1-git-send-email-jason77.wang@gmail.com>
-	<E1C7579D1379824DAE67858071C810382DD83846FB@NOK-EUMSG-02.mgdnok.nokia.com>
-	<4C249BA1.8010808@gmail.com>
-	<AANLkTinO3kndb9bIAGlz4-h2TW64NGthHBRcVlE3gqun@mail.gmail.com>
-Message-ID: <4C274E52.1080003@gmail.com>
+From: eric@eukrea.com (=?UTF-8?B?RXJpYyBCw6luYXJk?=)
+Date: Sun, 27 Jun 2010 16:00:31 +0200
+Subject: [PATCH v2] otg/ulpi.c : fix register write
+In-Reply-To: <4C2700C9.2090602@compulab.co.il>
+References: <1277311435-12027-1-git-send-email-eric@eukrea.com>
+	<4C236600.2030605@compulab.co.il> <4C236D9A.4030707@eukrea.com>
+	<4C2700C9.2090602@compulab.co.il>
+Message-ID: <4C27597F.3010902@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely wrote:
-> On Fri, Jun 25, 2010 at 6:05 AM, jason <jason77.wang@gmail.com> wrote:
->   
->> roman.tereshonkov at nokia.com wrote:
->>     
->>>
->>>       
->> [snip]
->>     
->>>> -----Original Message-----
->>>>
->>>>                                        }
->>>>                                        c = 0;
->>>> -                               } else if (c == 0 && tx == NULL) {
->>>> -                                       omap2_mcspi_set_enable(spi, 0);
->>>>                                }
->>>>
->>>>                                *rx++ = __raw_readl(rx_reg);
->>>>
->>>>         
->>> Why do you do this?
->>> Reading the last word from the shift register buffer leads to the
->>> receiving new data to the buffer.
->>> The channel needs to be disabled before the last word reading.
->>>
->>>
->>>
->>>       
->> Yes, you are right. If this patch can be accepted, i will remove those
->> changes in the V2 patch.
->> Please see my email replying grant likely's questions.
->>     
+Le 27/06/2010 09:42, Igor Grinberg a ?crit :
 >
-> Hi Jason.
+> On 06/24/10 17:37, Eric B?nard wrote:
+>> Le 24/06/2010 16:04, Igor Grinberg a ?crit :
+>>> ulpi_set_flags is used to set the OTG flags and not to clear them,
+>>> also it is a static function and is not a part of struct
+>>> otg_transceiver,
+>>> so it cannot be called from outside the ulpi.c, thus after the
+>>> ulpi_create,
+>>> it is never called.
+>>> I think, currently, this should stay as it is.
+>>>
+>> OK, the problem that when one flag is set, you can't clear it without
+>> resetting the PHY.
 >
-> I'm assuming I can ignore this patch and wait for your V2.  I'll still
-> want an ack from other omap spi users before I apply it though.
+> This is correct, but current ulpi driver is not designed for writing
+> multiple times
+> into the ULPI_OTG_CTRL register, only once when ulpi_init function is
+> called.
+> Do you call the ulpi_init function for a couple of times? Looks like a hack.
 >
-> g.
->
->   
-Hi grant,
-OK, i will prepare V2 and send out for review.
+no hack, as I was fixing the other function, I though this one could 
+also be fixed :)
+I'll send a patch with only the other fix.
 
-Hi roman,
-I don't know if there is a TI omap3530evm board at your hand, if yes, 
-you can
-test touchscreen driver(ads7846) via tslib(ts_calibrate, ts_test).
-
-Thanks,
-Jason.
->> Thanks,
->> Jason.
->>     
->>>       
->>>> @@ -646,7 +641,7 @@ omap2_mcspi_txrx_pio(struct spi_device *spi, struct
->>>> spi_transfer *xfer)
->>>>                        dev_err(&spi->dev, "EOT timed out\n");
->>>>        }
->>>> out:
->>>> -       omap2_mcspi_set_enable(spi, 1);
->>>> +       omap2_mcspi_set_enable(spi, 0);
->>>>        return count - c;
->>>> }
->>>>
->>>> @@ -894,7 +889,6 @@ static void omap2_mcspi_work(struct work_struct
->>>> *work)
->>>>                cs = spi->controller_state;
->>>>                cd = spi->controller_data;
->>>>
->>>> -               omap2_mcspi_set_enable(spi, 1);
->>>>                list_for_each_entry(t, &m->transfers, transfer_list) {
->>>>                        if (t->tx_buf == NULL && t->rx_buf == NULL &&
->>>> t->len) {
->>>>                                status = -EINVAL;
->>>> @@ -931,6 +925,8 @@ static void omap2_mcspi_work(struct work_struct
->>>> *work)
->>>>
->>>>                        mcspi_write_chconf0(spi, chconf);
->>>>
->>>> +                       omap2_mcspi_set_enable(spi, 1);
->>>> +
->>>>                        if (t->len) {
->>>>                                unsigned        count;
->>>>
->>>> --
->>>> 1.5.6.5
->>>>
->>>>
->>>>
->>>>         
->>     
->
->
->
->   
+Eric
