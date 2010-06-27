@@ -1,37 +1,46 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 27 Jun 2010 10:42:01 +0300
-Subject: [PATCH v2] otg/ulpi.c : fix register write
-In-Reply-To: <4C236D9A.4030707@eukrea.com>
-References: <1277311435-12027-1-git-send-email-eric@eukrea.com>
-	<4C236600.2030605@compulab.co.il> <4C236D9A.4030707@eukrea.com>
-Message-ID: <4C2700C9.2090602@compulab.co.il>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Sun, 27 Jun 2010 13:06:03 +0200
+Subject: [RFC 9/9] crypto: Add Samsung crypto engine driver
+In-Reply-To: <20100626.210728.90806559.davem@davemloft.net>
+References: <cover.1276284559.git.mcuelenaere@gmail.com>	<4C129341.2060407@gmail.com>
+	<20100626.210728.90806559.davem@davemloft.net>
+Message-ID: <4C27309B.7010905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 06/24/10 17:37, Eric B?nard wrote:
-> Le 24/06/2010 16:04, Igor Grinberg a ?crit :
->> ulpi_set_flags is used to set the OTG flags and not to clear them,
->> also it is a static function and is not a part of struct
->> otg_transceiver,
->> so it cannot be called from outside the ulpi.c, thus after the
->> ulpi_create,
->> it is never called.
->> I think, currently, this should stay as it is.
+ Op 27-06-10 06:07, David Miller schreef:
+> From: Maurus Cuelenaere <mcuelenaere@gmail.com>
+> Date: Fri, 11 Jun 2010 21:49:21 +0200
+>
+>> This patch adds support for the Samsung crypto engine driver available in the
+>> S3C64XX and S5PC100 SoCs. Currently this supports AES and (T)DES with ECB and
+>> CBC block ciphers (also CTR for AES). Support for (HMAC)-SHA1 acceleration is
+>> also available in this engine, but isn't used in the driver yet.
 >>
-> OK, the problem that when one flag is set, you can't clear it without
-> resetting the PHY.
-
-This is correct, but current ulpi driver is not designed for writing
-multiple times
-into the ULPI_OTG_CTRL register, only once when ulpi_init function is
-called.
-Do you call the ulpi_init function for a couple of times? Looks like a hack.
-
+>> Support for DMA has been added in the code but is currently disabled due to
+>> issues with data transfers.
+>>
+>> Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
+> I would personally queue up new crypto requests directly when there are
+> no queued up requests and ->cur_req is NULL, instead of doing all of
+> that work to do the submission in the tasklet.  I would also do the
+> completion and queue running directly in the hw IRQ handler.
 >
-> Eric
+> The tasklet is just pure overhead.
 >
+> Basically, when doing async crypto, every cycle that is consumed just
+> to implement crypto job submission and completion takes away from the
+> gains you get by doing it in hw at all.
+>
+> You can see this clearly if you do performance comparisons between the
+> synchronous crypto routines and your async ones done in HW.
 
--- 
-Regards,
-Igor.
+I'll rewrite it like you're suggesting.
+I'd go with a threaded interrupt handler in that case then, or do you also consider this as too much overhead?
+
+I'll do some performance comparisons of threaded interrupt handler vs normal and go with the fastest.
+
+Thanks for the review!
+
+--
+Maurus Cuelenaere
