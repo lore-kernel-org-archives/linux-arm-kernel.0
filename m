@@ -1,37 +1,26 @@
-From: eric@eukrea.com (=?UTF-8?B?RXJpYyBCw6luYXJk?=)
-Date: Sun, 27 Jun 2010 16:00:31 +0200
-Subject: [PATCH v2] otg/ulpi.c : fix register write
-In-Reply-To: <4C2700C9.2090602@compulab.co.il>
-References: <1277311435-12027-1-git-send-email-eric@eukrea.com>
-	<4C236600.2030605@compulab.co.il> <4C236D9A.4030707@eukrea.com>
-	<4C2700C9.2090602@compulab.co.il>
-Message-ID: <4C27597F.3010902@eukrea.com>
+From: freddy2_es@yahoo.com (=?iso-8859-1?Q?Alfredo_Quesada_S=E1nchez?=)
+Date: Sun, 27 Jun 2010 11:25:34 -0700 (PDT)
+Subject: Using SPI in a kernel module
+Message-ID: <419523.332.qm@web33805.mail.mud.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 27/06/2010 09:42, Igor Grinberg a ?crit :
->
-> On 06/24/10 17:37, Eric B?nard wrote:
->> Le 24/06/2010 16:04, Igor Grinberg a ?crit :
->>> ulpi_set_flags is used to set the OTG flags and not to clear them,
->>> also it is a static function and is not a part of struct
->>> otg_transceiver,
->>> so it cannot be called from outside the ulpi.c, thus after the
->>> ulpi_create,
->>> it is never called.
->>> I think, currently, this should stay as it is.
->>>
->> OK, the problem that when one flag is set, you can't clear it without
->> resetting the PHY.
->
-> This is correct, but current ulpi driver is not designed for writing
-> multiple times
-> into the ULPI_OTG_CTRL register, only once when ulpi_init function is
-> called.
-> Do you call the ulpi_init function for a couple of times? Looks like a hack.
->
-no hack, as I was fixing the other function, I though this one could 
-also be fixed :)
-I'll send a patch with only the other fix.
+After reading many things about SPI in linux (including the kernel Documentation, that is, spi_summary.txt) and having read many source files in the kernel itself I'm not sure which is the right way to deal with SPI from a kernel module if you don't want to use the spidev (neither the spi-gpio) implementation.
 
-Eric
+My goal is to create an spidev-like module, which generates a /dev entry (that is the easy part) and hides the details of the device, such as an EEPROM. The way to communicate with userspace using /dev files is simple, but the access to spi.h features isn't that much.
+
+According to some board specific code there is one spi device registered in the system (it's wired to a serial dataflash in my development board), but I don't know how I can get a reference to the spi_device that should give me access to it.
+
+By looking to other existing drivers I should register my own spi_driver, mostly providing probe and remove functions. And the questions are:
+- When should I receive a probe call?
+- What if I have more than 1 spi device on my system (let's say.. 3)? Will I receive 3 calls to probe?
+- Is this the only way to get valid references to spi_device's? Is there any other way to access to the "list" of available spi_device's?
+
+I did a small test with a fake module, which registers a spi_driver, but I did not receive any probe call, that's why this might not be the right way to access to the spi_device.
+Besides in other low level code I can see calls to 
+
+Regards
+
+
+
+      
