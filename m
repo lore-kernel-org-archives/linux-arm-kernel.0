@@ -1,119 +1,96 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 28 Jun 2010 11:42:08 +0800
-Subject: [PATCH 1/4] pxa/z2: Add regulator support
-In-Reply-To: <1277388132-5549-1-git-send-email-marek.vasut@gmail.com>
+Date: Mon, 28 Jun 2010 11:42:28 +0800
+Subject: [PATCH 2/4] pxa/colibri320: Add UDC support
+In-Reply-To: <1277388132-5549-2-git-send-email-marek.vasut@gmail.com>
 References: <1277388132-5549-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <AANLkTimk9zvCogCJh8bNvS5h_Ergfpz3JI0ERU87eiD4@mail.gmail.com>
+	<1277388132-5549-2-git-send-email-marek.vasut@gmail.com>
+Message-ID: <AANLkTinfZB-hznbD60wF9tO_6hI5pG-3EjNZPXksjSVL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Jun 24, 2010 at 10:02 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Register TPS65021 regulator in Zipit Z2.
+> Add support for PXA UDC.
 >
 > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 
 Applied.
 
 > ---
-> ?arch/arm/mach-pxa/z2.c | ? 71 ++++++++++++++++++++++++++++++++++++++++++++++++
-> ?1 files changed, 71 insertions(+), 0 deletions(-)
+> ?arch/arm/mach-pxa/colibri-pxa320.c | ? 40 ++++++++++++++++++++++++++++++++++++
+> ?1 files changed, 40 insertions(+), 0 deletions(-)
 >
-> diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
-> index 4cba5b6..1bafb23 100644
-> --- a/arch/arm/mach-pxa/z2.c
-> +++ b/arch/arm/mach-pxa/z2.c
-> @@ -26,6 +26,7 @@
+> diff --git a/arch/arm/mach-pxa/colibri-pxa320.c b/arch/arm/mach-pxa/colibri-pxa320.c
+> index ae835fa..99e850d 100644
+> --- a/arch/arm/mach-pxa/colibri-pxa320.c
+> +++ b/arch/arm/mach-pxa/colibri-pxa320.c
+> @@ -16,6 +16,7 @@
+> ?#include <linux/platform_device.h>
 > ?#include <linux/gpio.h>
-> ?#include <linux/gpio_keys.h>
-> ?#include <linux/delay.h>
-> +#include <linux/regulator/machine.h>
+> ?#include <linux/interrupt.h>
+> +#include <linux/usb/gpio_vbus.h>
 >
 > ?#include <asm/mach-types.h>
-> ?#include <asm/mach/arch.h>
-> @@ -616,6 +617,75 @@ static inline void z2_spi_init(void) {}
-> ?#endif
+> ?#include <asm/sizes.h>
+> @@ -28,6 +29,8 @@
+> ?#include <mach/pxafb.h>
+> ?#include <mach/ohci.h>
+> ?#include <mach/audio.h>
+> +#include <mach/pxa27x-udc.h>
+> +#include <mach/udc.h>
 >
-> ?/******************************************************************************
-> + * Core power regulator
-> + ******************************************************************************/
-> +#if defined(CONFIG_REGULATOR_TPS65023) || \
-> + ? ? ? defined(CONFIG_REGULATOR_TPS65023_MODULE)
-> +static struct regulator_consumer_supply z2_tps65021_consumers[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .supply = "vcc_core",
-> + ? ? ? }
+> ?#include "generic.h"
+> ?#include "devices.h"
+> @@ -101,6 +104,42 @@ void __init colibri_pxa320_init_ohci(void)
+> ?static inline void colibri_pxa320_init_ohci(void) {}
+> ?#endif /* CONFIG_USB_OHCI_HCD || CONFIG_USB_OHCI_HCD_MODULE */
+>
+> +#if defined(CONFIG_USB_GADGET_PXA27X)||defined(CONFIG_USB_GADGET_PXA27X_MODULE)
+> +static struct gpio_vbus_mach_info colibri_pxa320_gpio_vbus_info = {
+> + ? ? ? .gpio_vbus ? ? ? ? ? ? ?= mfp_to_gpio(MFP_PIN_GPIO96),
+> + ? ? ? .gpio_pullup ? ? ? ? ? ?= -1,
 > +};
 > +
-> +static struct regulator_init_data z2_tps65021_info[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .constraints = {
-> + ? ? ? ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "vcc_core range",
-> + ? ? ? ? ? ? ? ? ? ? ? .min_uV ? ? ? ? = 800000,
-> + ? ? ? ? ? ? ? ? ? ? ? .max_uV ? ? ? ? = 1600000,
-> + ? ? ? ? ? ? ? ? ? ? ? .always_on ? ? ?= 1,
-> + ? ? ? ? ? ? ? ? ? ? ? .valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
-> + ? ? ? ? ? ? ? },
-> + ? ? ? ? ? ? ? .consumer_supplies ? ? ?= z2_tps65021_consumers,
-> + ? ? ? ? ? ? ? .num_consumer_supplies ?= ARRAY_SIZE(z2_tps65021_consumers),
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .constraints = {
-> + ? ? ? ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "DCDC2",
-> + ? ? ? ? ? ? ? ? ? ? ? .min_uV ? ? ? ? = 3300000,
-> + ? ? ? ? ? ? ? ? ? ? ? .max_uV ? ? ? ? = 3300000,
-> + ? ? ? ? ? ? ? ? ? ? ? .always_on ? ? ?= 1,
-> + ? ? ? ? ? ? ? },
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .constraints = {
-> + ? ? ? ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "DCDC3",
-> + ? ? ? ? ? ? ? ? ? ? ? .min_uV ? ? ? ? = 1800000,
-> + ? ? ? ? ? ? ? ? ? ? ? .max_uV ? ? ? ? = 1800000,
-> + ? ? ? ? ? ? ? ? ? ? ? .always_on ? ? ?= 1,
-> + ? ? ? ? ? ? ? },
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .constraints = {
-> + ? ? ? ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "LDO1",
-> + ? ? ? ? ? ? ? ? ? ? ? .min_uV ? ? ? ? = 1000000,
-> + ? ? ? ? ? ? ? ? ? ? ? .max_uV ? ? ? ? = 3150000,
-> + ? ? ? ? ? ? ? ? ? ? ? .always_on ? ? ?= 1,
-> + ? ? ? ? ? ? ? },
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .constraints = {
-> + ? ? ? ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "LDO2",
-> + ? ? ? ? ? ? ? ? ? ? ? .min_uV ? ? ? ? = 1050000,
-> + ? ? ? ? ? ? ? ? ? ? ? .max_uV ? ? ? ? = 3300000,
-> + ? ? ? ? ? ? ? ? ? ? ? .always_on ? ? ?= 1,
-> + ? ? ? ? ? ? ? },
-> + ? ? ? }
-> +};
-> +
-> +static struct i2c_board_info __initdata z2_pi2c_board_info[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? I2C_BOARD_INFO("tps65021", 0x48),
-> + ? ? ? ? ? ? ? .platform_data ?= &z2_tps65021_info,
+> +static struct platform_device colibri_pxa320_gpio_vbus = {
+> + ? ? ? .name ? = "gpio-vbus",
+> + ? ? ? .id ? ? = -1,
+> + ? ? ? .dev ? ?= {
+> + ? ? ? ? ? ? ? .platform_data ?= &colibri_pxa320_gpio_vbus_info,
 > + ? ? ? },
 > +};
 > +
-> +static void __init z2_pmic_init(void)
+> +static void colibri_pxa320_udc_command(int cmd)
 > +{
-> + ? ? ? pxa27x_set_i2c_power_info(NULL);
-> + ? ? ? i2c_register_board_info(1, ARRAY_AND_SIZE(z2_pi2c_board_info));
+> + ? ? ? if (cmd == PXA2XX_UDC_CMD_CONNECT)
+> + ? ? ? ? ? ? ? UP2OCR = UP2OCR_HXOE | UP2OCR_DPPUE;
+> + ? ? ? else if (cmd == PXA2XX_UDC_CMD_DISCONNECT)
+> + ? ? ? ? ? ? ? UP2OCR = UP2OCR_HXOE;
+> +}
+> +
+> +static struct pxa2xx_udc_mach_info colibri_pxa320_udc_info __initdata = {
+> + ? ? ? .udc_command ? ? ? ? ? ?= colibri_pxa320_udc_command,
+> + ? ? ? .gpio_pullup ? ? ? ? ? ?= -1,
+> +};
+> +
+> +static void __init colibri_pxa320_init_udc(void)
+> +{
+> + ? ? ? pxa_set_udc_info(&colibri_pxa320_udc_info);
+> + ? ? ? platform_device_register(&colibri_pxa320_gpio_vbus);
 > +}
 > +#else
-> +static inline void z2_pmic_init(void) {}
+> +static inline void colibri_pxa320_init_udc(void) {}
 > +#endif
 > +
-> +/******************************************************************************
-> ?* Machine init
-> ?******************************************************************************/
-> ?static void __init z2_init(void)
-> @@ -635,6 +705,7 @@ static void __init z2_init(void)
-> ? ? ? ?z2_pwm_init();
-> ? ? ? ?z2_leds_init();
-> ? ? ? ?z2_keys_init();
-> + ? ? ? z2_pmic_init();
+> ?static mfp_cfg_t colibri_pxa320_mmc_pin_config[] __initdata = {
+> ? ? ? ?GPIO22_MMC1_CLK,
+> ? ? ? ?GPIO23_MMC1_CMD,
+> @@ -212,6 +251,7 @@ void __init colibri_pxa320_init(void)
+> ? ? ? ?colibri_pxa3xx_init_mmc(ARRAY_AND_SIZE(colibri_pxa320_mmc_pin_config),
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?mfp_to_gpio(MFP_PIN_GPIO28));
+> ? ? ? ?colibri_pxa320_init_uart();
+> + ? ? ? colibri_pxa320_init_udc();
 > ?}
 >
-> ?MACHINE_START(ZIPIT2, "Zipit Z2")
+> ?MACHINE_START(COLIBRI320, "Toradex Colibri PXA320")
 > --
 > 1.7.1
 >
