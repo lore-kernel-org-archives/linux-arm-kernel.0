@@ -1,34 +1,35 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Mon, 28 Jun 2010 12:11:13 -0700
-Subject: [PATCH] ASoC: DaVinci: Added support for cpu clocking I2S
-In-Reply-To: <1277707487-3371-1-git-send-email-lamiaposta71@gmail.com>
-References: <1277707487-3371-1-git-send-email-lamiaposta71@gmail.com>
-Message-ID: <4C28F3D1.5060806@boundarydevices.com>
+From: xiachendong@hotmail.com (Xiachen Dong)
+Date: Mon, 28 Jun 2010 16:39:07 -0400
+Subject: Flash write endurance (write cycle) test for AT91RM9200 boards
+Message-ID: <BAY134-W19D664FC2A596F0209D21FBDCA0@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Raffaele Recalcati wrote:
-> +		if (dev->i2s_fast_clock) {
-> +			clk_div = 256;
-can you have
-   f = (freq / params->rate_num) * params->rate_den;
-> +			do {
-> +				framesize = (freq / (--clk_div)) /
-> +					    params->rate_num *
-> +					    params->rate_den;
-and
-				framesize = f / (--clk_div);
-> +			} while (((framesize < 33) || (framesize > 4095)) &&
-> +				 (clk_div));
-> +			clk_div--;
-looks like clk_div can go negative here, should the above while say (clk_div > 1)
-> +			srgr |= DAVINCI_MCBSP_SRGR_FPER(framesize - 1);
-> +		} else {
-> +			/* symmetric waveforms */
-> +			clk_div = freq / (mcbsp_word_length * 16) /
-> +				  params->rate_num * params->rate_den;
-> +			srgr |= DAVINCI_MCBSP_SRGR_FPER(mcbsp_word_length *
-> +							16 - 1);
-> +		}
-> +		clk_div &= 0xFF;
-> +		srgr |= clk_div;
+
+Hi,
+
+We use AT91RM9200 MCU and made our own motherboard for it. We wish to know how many write cycles the flash (MicroSD and DataFlash) may survive under both OS and non-OS situation. We also wish to know the behavior of the flash when the flash becomes dead.
+
+After doing some searching on the web, we found the following information helpful:
+
+1) Write Endurance in Flash Drives: Measurements and Analysis
+http://www.ccs.neu.edu/home/pjd/papers/fast10-flash.pdf
+
+2) NAND Testing
+http://wiki.laptop.org/go/NAND_Testing
+
+3) How Long Does a Flash Drive Last?
+http://www.bress.net/blog/archives/114-How-Long-Does-a-Flash-Drive-Last.html
+
+What we plan to do is to test the flash both under u-boot (raw, without JFFS2) and Linux OS (with ext2 fs). The test will be done with flash empty and flash full. We will also do the test under different room temperatures.
+
+We searched the archive of the list. It looks like no posts mentioned such tests. We wonder anyone on the list has done similar test before and are there any special attention need to pay while doing such tests. Are there any professional software (either open source or commercial) for such tests? Any suggestions and comments are welcomed.
+
+Thanks,
+
+Xiachen
+
+ 		 	   		  
+_________________________________________________________________
+Turn down-time into play-time with Messenger games
+http://go.microsoft.com/?linkid=9734385
