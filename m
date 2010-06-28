@@ -1,35 +1,74 @@
-From: xiachendong@hotmail.com (Xiachen Dong)
-Date: Mon, 28 Jun 2010 16:39:07 -0400
-Subject: Flash write endurance (write cycle) test for AT91RM9200 boards
-Message-ID: <BAY134-W19D664FC2A596F0209D21FBDCA0@phx.gbl>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 28 Jun 2010 14:49:23 -0700
+Subject: [PATCH v2 1/3] OMAP: PM: initial runtime PM core support
+In-Reply-To: <AANLkTimB0_OfLDvtkwwTE-kVeZrardIxVIsD5IEia-vL@mail.gmail.com>
+	(Grant Likely's message of "Fri, 25 Jun 2010 17:04:13 -0600")
+References: <1277422991-25350-1-git-send-email-khilman@deeprootsystems.com>
+	<1277422991-25350-2-git-send-email-khilman@deeprootsystems.com>
+	<AANLkTim4p54brsmph6oaKfoEZwO1GOGfgRNV9vJykOjl@mail.gmail.com>
+	<874ogrng3j.fsf@deeprootsystems.com>
+	<AANLkTimMnJvOJrRHDiE6PH1BXpRz2-6pY1M9nKHw7vpn@mail.gmail.com>
+	<876316eno5.fsf@deeprootsystems.com>
+	<AANLkTimB0_OfLDvtkwwTE-kVeZrardIxVIsD5IEia-vL@mail.gmail.com>
+Message-ID: <87d3vaygik.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Grant Likely <grant.likely@secretlab.ca> writes:
 
-Hi,
+> On Fri, Jun 25, 2010 at 4:46 PM, Kevin Hilman
+> <khilman@deeprootsystems.com> wrote:
+>> Grant Likely <grant.likely@secretlab.ca> writes:
+>>
+>>> Another way to look at the problem is that these runtime
+>>> customizations are kind of a property of the parent device (the bus,
+>>> not the bus_type). ?Would it make sense for parent devices to have
+>>> runtime ops to perform for each child that is suspended/resumed? ?That
+>>> would make it simple to register another device that implements the
+>>> bus behaviour and attach it at runtime instead of compile time.
+>>
+>> Maybe I didn't fully understand your idea, but the problem here is
+>> devices do not have dev_pm_ops. ?Only busses, classes, and types have
+>> dev_pm_ops.
+>
+> Sorry, I mistyped.  What I meant was for the parent device's
+> device_driver to be able to have a set of child dev_pm_ops; but I'm
+> wading into territory (power management) I'm not particularly familiar
+> with, and that might be making things far too complex.
 
-We use AT91RM9200 MCU and made our own motherboard for it. We wish to know how many write cycles the flash (MicroSD and DataFlash) may survive under both OS and non-OS situation. We also wish to know the behavior of the flash when the flash becomes dead.
+I see your point now, but I think this indeed might complicate things
+too much.  
 
-After doing some searching on the web, we found the following information helpful:
+Also, I'm not crazy about how this would delay the per-device PM hooks
+to be essentially batched until all devices under the parent are
+"ready."
 
-1) Write Endurance in Flash Drives: Measurements and Analysis
-http://www.ccs.neu.edu/home/pjd/papers/fast10-flash.pdf
+But anyways, it just needs some more research on my part.
+Unfortunately, I'll be away from this work on vacation for most of July,
+so this won't get any attention from me until August.
 
-2) NAND Testing
-http://wiki.laptop.org/go/NAND_Testing
+>> Though I'm horribly unfamiliar with the intended usage of 'struct
+>> device_type', an interesing discovery is that dev->type also has
+>> dev_pm_ops, and it takes precedence over the bus type in the
+>> suspend/resume. ?IOW, when suspending, when deciding which dev_pm_ops to
+>> use, it checks class, type, then bus in that order.
+>
+> So I guess my suggestion above boils down to somehow inserting
+> "parent" between type and bus in that list.
+>
+>> I need to explore this 'type' feature a little more, but using that or
+>> the 'class' might be another way to have custom PM ops for certain
+>> platform_devices.
+>
+> Should maybe start cc'ing Greg and linux-kernel/linux-pm in this discussion.
 
-3) How Long Does a Flash Drive Last?
-http://www.bress.net/blog/archives/114-How-Long-Does-a-Flash-Drive-Last.html
+They were involved in the early discussions about overriding the
+platform_bus dev_pm_ops methods, which led us to the current
+implementation.
 
-What we plan to do is to test the flash both under u-boot (raw, without JFFS2) and Linux OS (with ext2 fs). The test will be done with flash empty and flash full. We will also do the test under different room temperatures.
+But as I explore the custom bus approach a bit more (in August) I'll
+broaden the audience.
 
-We searched the archive of the list. It looks like no posts mentioned such tests. We wonder anyone on the list has done similar test before and are there any special attention need to pay while doing such tests. Are there any professional software (either open source or commercial) for such tests? Any suggestions and comments are welcomed.
+Thanks again for all your helpful suggestions,
 
-Thanks,
-
-Xiachen
-
- 		 	   		  
-_________________________________________________________________
-Turn down-time into play-time with Messenger games
-http://go.microsoft.com/?linkid=9734385
+Kevin
