@@ -1,173 +1,61 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Mon, 28 Jun 2010 13:28:57 +0200
-Subject: [PATCH v3 05/12] s3c-fb: Add support for display panning
-In-Reply-To: <1277712538-23188-6-git-send-email-p.osciak@samsung.com>
-References: <1277712538-23188-1-git-send-email-p.osciak@samsung.com>
-	<1277712538-23188-6-git-send-email-p.osciak@samsung.com>
-Message-ID: <4C288779.8040702@gmail.com>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Mon, 28 Jun 2010 20:34:09 +0900
+Subject: [PATCH v6 0/3] Add samsung keypad
+Message-ID: <4C2888B1.7080704@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Op 28-06-10 10:08, Pawel Osciak schreef:
-> Supports all bpp modes.
->
-> The PRTCON register is used to disable in-hardware updates of registers
-> that store start and end addresses of framebuffer memory. This prevents
-> display corruption in case we do not make it before VSYNC with updating
-> them atomically. With this feature there is no need to wait for a VSYNC
-> interrupt before each such update.
->
-> Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/plat-samsung/include/plat/regs-fb.h |    5 ++
->  drivers/video/s3c-fb.c                       |   71 ++++++++++++++++++++++++++
->  2 files changed, 76 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/plat-samsung/include/plat/regs-fb.h b/arch/arm/plat-samsung/include/plat/regs-fb.h
-> index ac10013..f454e32 100644
-> --- a/arch/arm/plat-samsung/include/plat/regs-fb.h
-> +++ b/arch/arm/plat-samsung/include/plat/regs-fb.h
-> @@ -112,6 +112,11 @@
->  #define VIDCON2_ORGYCbCr			(1 << 8)
->  #define VIDCON2_YUVORDCrCb			(1 << 7)
->  
-> +/* PRTCON (S3C6410, S5PC100) */
-> +
-> +#define PRTCON					(0x0c)
-> +#define PRTCON_PROTECT				(1 << 11)
-> +
->  /* VIDTCON0 */
->  
->  #define VIDTCON0_VBPDE_MASK			(0xff << 24)
-> diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
-> index 59ac76a..4f3680d 100644
-> --- a/drivers/video/s3c-fb.c
-> +++ b/drivers/video/s3c-fb.c
-> @@ -71,6 +71,7 @@ struct s3c_fb;
->   * @buf_end: Offset of buffer end registers.
->   * @osd: The base for the OSD registers.
->   * @palette: Address of palette memory, or 0 if none.
-> + * @has_prtcon: Set if has PRTCON register.
->   */
->  struct s3c_fb_variant {
->  	unsigned int	is_2443:1;
-> @@ -85,6 +86,8 @@ struct s3c_fb_variant {
->  	unsigned short	osd;
->  	unsigned short	osd_stride;
->  	unsigned short	palette[S3C_FB_MAX_WIN];
-> +
-> +	unsigned int	has_prtcon:1;
->  };
->  
->  /**
-> @@ -379,6 +382,9 @@ static int s3c_fb_set_par(struct fb_info *info)
->  
->  	info->fix.line_length = (var->xres_virtual * var->bits_per_pixel) / 8;
->  
-> +	info->fix.xpanstep = info->var.xres_virtual > info->var.xres ? 1 : 0;
-> +	info->fix.ypanstep = info->var.yres_virtual > info->var.yres ? 1 : 0;
+This is patch v6 series to add Samsung keypad.
 
-No need for the '? 1 : 0'
+Changes since v1:
+- Include linux/gpio.h instead of mach/gpio.h
+- Switch to dev_pm_ops in the samsung keypad driver
 
-> +
->  	/* disable the window whilst we update it */
->  	writel(0, regs + WINCON(win_no));
->  
-> @@ -735,6 +741,66 @@ static int s3c_fb_blank(int blank_mode, struct fb_info *info)
->  	return 0;
->  }
->  
-> +/**
-> + * s3c_fb_pan_display() - Pan the display.
-> + *
-> + * Note that the offsets can be written to the device at any time, as their
-> + * values are latched at each vsync automatically. This also means that only
-> + * the last call to this function will have any effect on next vsync, but
-> + * there is no need to sleep waiting for it to prevent tearing.
-> + *
-> + * @var: The screen information to verify.
-> + * @info: The framebuffer device.
-> + */
-> +static int s3c_fb_pan_display(struct fb_var_screeninfo *var,
-> +			      struct fb_info *info)
-> +{
-> +	struct s3c_fb_win *win	= info->par;
-> +	struct s3c_fb *sfb	= win->parent;
-> +	void __iomem *buf	= sfb->regs + win->index * 8;
-> +	unsigned int start_byte_offset, end_byte_offset;
-> +
-> +	/* Offset in bytes to the start of the displayed area */
-> +	start_byte_offset = var->yoffset * info->fix.line_length;
-> +	/* X offset depends on the current bpp */
-> +	if (info->var.bits_per_pixel >= 8) {
-> +		start_byte_offset +=
-> +			var->xoffset * (info->var.bits_per_pixel >> 3);
-> +	} else {
-> +		switch (info->var.bits_per_pixel) {
-> +		case 4:
-> +			start_byte_offset += var->xoffset >> 1;
-> +			break;
-> +		case 2:
-> +			start_byte_offset += var->xoffset >> 2;
-> +			break;
-> +		case 1:
-> +			start_byte_offset += var->xoffset >> 3;
-> +			break;
-> +		default:
-> +			dev_err(sfb->dev, "invalid bpp\n");
-> +			return -EINVAL;
-> +		}
-> +	}
-> +	/* Offset in bytes to the end of the displayed area */
-> +	end_byte_offset = start_byte_offset + var->yres * info->fix.line_length;
-> +
-> +	/* Temporarily turn off per-vsync update from shadow registers until
-> +	 * both start and end addresses are updated to prevent corruption */
-> +	if (sfb->variant.has_prtcon)
-> +		writel(PRTCON_PROTECT, sfb->regs + PRTCON);
-> +
-> +	writel(info->fix.smem_start + start_byte_offset,
-> +		buf + sfb->variant.buf_start);
-> +	writel(info->fix.smem_start + end_byte_offset,
-> +		buf + sfb->variant.buf_end);
-> +
-> +	if (sfb->variant.has_prtcon)
-> +		writel(0, sfb->regs + PRTCON);
-> +
-> +	return 0;
-> +}
-> +
->  static struct fb_ops s3c_fb_ops = {
->  	.owner		= THIS_MODULE,
->  	.fb_check_var	= s3c_fb_check_var,
-> @@ -744,6 +810,7 @@ static struct fb_ops s3c_fb_ops = {
->  	.fb_fillrect	= cfb_fillrect,
->  	.fb_copyarea	= cfb_copyarea,
->  	.fb_imageblit	= cfb_imageblit,
-> +	.fb_pan_display	= s3c_fb_pan_display,
->  };
->  
->  /**
-> @@ -1243,6 +1310,8 @@ static struct s3c_fb_driverdata s3c_fb_data_64xx __devinitdata = {
->  			[3] = 0x320,
->  			[4] = 0x340,
->  		},
-> +
-> +		.has_prtcon	= 1,
->  	},
->  	.win[0]	= &s3c_fb_data_64xx_wins[0],
->  	.win[1]	= &s3c_fb_data_64xx_wins[1],
-> @@ -1271,6 +1340,8 @@ static struct s3c_fb_driverdata s3c_fb_data_s5pc100 __devinitdata = {
->  			[3] = 0x3000,
->  			[4] = 0x3400,
->  		},
-> +
-> +		.has_prtcon	= 1,
->  	},
->  	.win[0]	= &s3c_fb_data_64xx_wins[0],
->  	.win[1]	= &s3c_fb_data_64xx_wins[1],
+Changes since v2:
+- Add keypad device types to remove platform specific #ifdef
+- Remove unnecessary include and checking codes.
+- Rename from 'kp' to 'keypad'
+- Rename keypad registers definition
+- Modify 'rep' variable declaration
 
+Changes since v3:
+- Use schedule_delayed_work and remove timer
+- Modify memory alloc codes
+- Add MODULE_ALIAS() and missing error printk
+- Change from rep to no_autorepeat and it's type to bool
+- Add report EV_MSC/MSC_SCAN and wakeup control
+- Remove s3c_set_platdata() call because there is not yet
 
--- 
-Maurus Cuelenaere
+Changes since v4:
+- Add and use samsung_keypad_setname function
+- Add more specific gpio comments
+
+Changes since v5:
+- Add Dmitry patch about threaded IRQs and some fixing
+- Remove clock gating for irq
+
+Joonyoung Shim (3):
+      ARM: SAMSUNG: Add keypad device support
+      ARM: S5PV210: Add keypad device helpers
+      input: samsung-keypad - Add samsung keypad driver
+
+ arch/arm/mach-s5pv210/Kconfig                    |    5 +
+ arch/arm/mach-s5pv210/Makefile                   |    1 +
+ arch/arm/mach-s5pv210/cpu.c                      |    4 +
+ arch/arm/mach-s5pv210/include/mach/map.h         |    3 +
+ arch/arm/mach-s5pv210/setup-keypad.c             |   34 ++
+ arch/arm/plat-samsung/Kconfig                    |    5 +
+ arch/arm/plat-samsung/Makefile                   |    1 +
+ arch/arm/plat-samsung/dev-keypad.c               |   58 +++
+ arch/arm/plat-samsung/include/plat/devs.h        |    2 +
+ arch/arm/plat-samsung/include/plat/keypad-core.h |   31 ++
+ arch/arm/plat-samsung/include/plat/keypad.h      |   59 +++
+ drivers/input/keyboard/Kconfig                   |    9 +
+ drivers/input/keyboard/Makefile                  |    1 +
+ drivers/input/keyboard/samsung-keypad.c          |  491 ++++++++++++++++++++++
+ 14 files changed, 704 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s5pv210/setup-keypad.c
+ create mode 100644 arch/arm/plat-samsung/dev-keypad.c
+ create mode 100644 arch/arm/plat-samsung/include/plat/keypad-core.h
+ create mode 100644 arch/arm/plat-samsung/include/plat/keypad.h
+ create mode 100644 drivers/input/keyboard/samsung-keypad.c
