@@ -1,133 +1,173 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 28 Jun 2010 11:30:30 +0100
-Subject: [PATCH] ASoC: DaVinci: Added support for cpu clocking I2S
-In-Reply-To: <1277707487-3371-1-git-send-email-lamiaposta71@gmail.com>
-References: <1277707487-3371-1-git-send-email-lamiaposta71@gmail.com>
-Message-ID: <20100628103030.GB14247@rakim.wolfsonmicro.main>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Mon, 28 Jun 2010 13:28:57 +0200
+Subject: [PATCH v3 05/12] s3c-fb: Add support for display panning
+In-Reply-To: <1277712538-23188-6-git-send-email-p.osciak@samsung.com>
+References: <1277712538-23188-1-git-send-email-p.osciak@samsung.com>
+	<1277712538-23188-6-git-send-email-p.osciak@samsung.com>
+Message-ID: <4C288779.8040702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 28, 2010 at 08:44:46AM +0200, Raffaele Recalcati wrote:
-> From: Raffaele Recalcati <raffaele.recalcati@bticino.it>
-
-It's still very hard to understand what this patch is supposed to do.
-As previously mentioned this would probably be a lot clearer if you
-split this into multiple patches, for example one adding support for the
-fast clock mode, one adding support for selecting the pin used for any
-external clock and then further patches with any other changes.
-
-I strongly suggest looking at the commit messages for other patches in
-the kernel and trying to follow a similar style.
-
->     Added audio playback support with [frame sync master - clock master] mode
->     and with [frame sync master - clock slave].
-
-What are these modes - which clock are you talking about?
-
->        i2s_fast_clock switch can be used to have better approximate or
->        symmetric waveforms.
-
-Why would someone choose not to use this?
-
->        clk_input_pin board info can be used to select it depending on hw
->        connections
-
->     3. We haven't changed the evmdm365 support (due also to CPLD that doesn't
->                                                 help to understand)
->         We don't know in this mode if audio stereo works on evmdm365.
->         Probably it does.
-
-This is what makes me unsure if you're trying to add new modes or not -
-if you're adding new modes then I'd expect that existing boards would be
-unaffected with any changes to use the new feature being easily
-seperable.
-
-> +	/*
-> +	 * This define works when both clock and FS are output for the cpu
-> +	 * and makes clock very fast (FS is not simmetrical, but sampling
-
-symmetrical.
-
-> +	 * frequency is better approximated
-> +	 */
-> +	int i2s_fast_clock;
-
-Is this a bool?
-
-> +	/* To be used when cpu gets clock from extenal pin */
-> +	int clk_input_pin;
+ Op 28-06-10 10:08, Pawel Osciak schreef:
+> Supports all bpp modes.
+>
+> The PRTCON register is used to disable in-hardware updates of registers
+> that store start and end addresses of framebuffer memory. This prevents
+> display corruption in case we do not make it before VSYNC with updating
+> them atomically. With this feature there is no need to wait for a VSYNC
+> interrupt before each such update.
+>
+> Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/plat-samsung/include/plat/regs-fb.h |    5 ++
+>  drivers/video/s3c-fb.c                       |   71 ++++++++++++++++++++++++++
+>  2 files changed, 76 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/plat-samsung/include/plat/regs-fb.h b/arch/arm/plat-samsung/include/plat/regs-fb.h
+> index ac10013..f454e32 100644
+> --- a/arch/arm/plat-samsung/include/plat/regs-fb.h
+> +++ b/arch/arm/plat-samsung/include/plat/regs-fb.h
+> @@ -112,6 +112,11 @@
+>  #define VIDCON2_ORGYCbCr			(1 << 8)
+>  #define VIDCON2_YUVORDCrCb			(1 << 7)
+>  
+> +/* PRTCON (S3C6410, S5PC100) */
 > +
+> +#define PRTCON					(0x0c)
+> +#define PRTCON_PROTECT				(1 << 11)
+> +
+>  /* VIDTCON0 */
+>  
+>  #define VIDTCON0_VBPDE_MASK			(0xff << 24)
+> diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
+> index 59ac76a..4f3680d 100644
+> --- a/drivers/video/s3c-fb.c
+> +++ b/drivers/video/s3c-fb.c
+> @@ -71,6 +71,7 @@ struct s3c_fb;
+>   * @buf_end: Offset of buffer end registers.
+>   * @osd: The base for the OSD registers.
+>   * @palette: Address of palette memory, or 0 if none.
+> + * @has_prtcon: Set if has PRTCON register.
+>   */
+>  struct s3c_fb_variant {
+>  	unsigned int	is_2443:1;
+> @@ -85,6 +86,8 @@ struct s3c_fb_variant {
+>  	unsigned short	osd;
+>  	unsigned short	osd_stride;
+>  	unsigned short	palette[S3C_FB_MAX_WIN];
+> +
+> +	unsigned int	has_prtcon:1;
+>  };
+>  
+>  /**
+> @@ -379,6 +382,9 @@ static int s3c_fb_set_par(struct fb_info *info)
+>  
+>  	info->fix.line_length = (var->xres_virtual * var->bits_per_pixel) / 8;
+>  
+> +	info->fix.xpanstep = info->var.xres_virtual > info->var.xres ? 1 : 0;
+> +	info->fix.ypanstep = info->var.yres_virtual > info->var.yres ? 1 : 0;
 
-How would one use this?
+No need for the '? 1 : 0'
 
->  	case SND_SOC_DAIFMT_CBM_CFS:
-> -		/* McBSP CLKR pin is the input for the Sample Rate Generator.
-> -		 * McBSP FSR and FSX are driven by the Sample Rate Generator. */
-> -		pcr = DAVINCI_MCBSP_PCR_SCLKME |
-> -			DAVINCI_MCBSP_PCR_FSXM |
-> -			DAVINCI_MCBSP_PCR_FSRM;
-> +		pcr = DAVINCI_MCBSP_PCR_FSRM | DAVINCI_MCBSP_PCR_FSXM;
-> +		if (dev->clk_input_pin == MCBSP_CLKS)
-> +			pcr |= DAVINCI_MCBSP_PCR_CLKXM |
-> +				DAVINCI_MCBSP_PCR_CLKRM;
-> +		else
-> +			/*
-> +			 * McBSP CLKR pin is the input for the Sample Rate
-> +			 * Generator.
-> +			 * McBSP FSR and FSX are driven by the Sample Rate
-> +			 * Generator.
-> +			 */
-> +			pcr |= DAVINCI_MCBSP_PCR_SCLKME;
-
-This looks like you need a switch statement for the clock selection.
-
-> +static int davinci_i2s_dai_set_clkdiv(struct snd_soc_dai *cpu_dai,
-> +				int div_id, int div)
+> +
+>  	/* disable the window whilst we update it */
+>  	writel(0, regs + WINCON(win_no));
+>  
+> @@ -735,6 +741,66 @@ static int s3c_fb_blank(int blank_mode, struct fb_info *info)
+>  	return 0;
+>  }
+>  
+> +/**
+> + * s3c_fb_pan_display() - Pan the display.
+> + *
+> + * Note that the offsets can be written to the device at any time, as their
+> + * values are latched at each vsync automatically. This also means that only
+> + * the last call to this function will have any effect on next vsync, but
+> + * there is no need to sleep waiting for it to prevent tearing.
+> + *
+> + * @var: The screen information to verify.
+> + * @info: The framebuffer device.
+> + */
+> +static int s3c_fb_pan_display(struct fb_var_screeninfo *var,
+> +			      struct fb_info *info)
 > +{
-> +	struct davinci_mcbsp_dev *dev = cpu_dai->private_data;
-> +	int srgr;
+> +	struct s3c_fb_win *win	= info->par;
+> +	struct s3c_fb *sfb	= win->parent;
+> +	void __iomem *buf	= sfb->regs + win->index * 8;
+> +	unsigned int start_byte_offset, end_byte_offset;
 > +
-> +	dev->clk_div = div;
+> +	/* Offset in bytes to the start of the displayed area */
+> +	start_byte_offset = var->yoffset * info->fix.line_length;
+> +	/* X offset depends on the current bpp */
+> +	if (info->var.bits_per_pixel >= 8) {
+> +		start_byte_offset +=
+> +			var->xoffset * (info->var.bits_per_pixel >> 3);
+> +	} else {
+> +		switch (info->var.bits_per_pixel) {
+> +		case 4:
+> +			start_byte_offset += var->xoffset >> 1;
+> +			break;
+> +		case 2:
+> +			start_byte_offset += var->xoffset >> 2;
+> +			break;
+> +		case 1:
+> +			start_byte_offset += var->xoffset >> 3;
+> +			break;
+> +		default:
+> +			dev_err(sfb->dev, "invalid bpp\n");
+> +			return -EINVAL;
+> +		}
+> +	}
+> +	/* Offset in bytes to the end of the displayed area */
+> +	end_byte_offset = start_byte_offset + var->yres * info->fix.line_length;
+> +
+> +	/* Temporarily turn off per-vsync update from shadow registers until
+> +	 * both start and end addresses are updated to prevent corruption */
+> +	if (sfb->variant.has_prtcon)
+> +		writel(PRTCON_PROTECT, sfb->regs + PRTCON);
+> +
+> +	writel(info->fix.smem_start + start_byte_offset,
+> +		buf + sfb->variant.buf_start);
+> +	writel(info->fix.smem_start + end_byte_offset,
+> +		buf + sfb->variant.buf_end);
+> +
+> +	if (sfb->variant.has_prtcon)
+> +		writel(0, sfb->regs + PRTCON);
+> +
 > +	return 0;
 > +}
 > +
+>  static struct fb_ops s3c_fb_ops = {
+>  	.owner		= THIS_MODULE,
+>  	.fb_check_var	= s3c_fb_check_var,
+> @@ -744,6 +810,7 @@ static struct fb_ops s3c_fb_ops = {
+>  	.fb_fillrect	= cfb_fillrect,
+>  	.fb_copyarea	= cfb_copyarea,
+>  	.fb_imageblit	= cfb_imageblit,
+> +	.fb_pan_display	= s3c_fb_pan_display,
+>  };
+>  
+>  /**
+> @@ -1243,6 +1310,8 @@ static struct s3c_fb_driverdata s3c_fb_data_64xx __devinitdata = {
+>  			[3] = 0x320,
+>  			[4] = 0x340,
+>  		},
+> +
+> +		.has_prtcon	= 1,
+>  	},
+>  	.win[0]	= &s3c_fb_data_64xx_wins[0],
+>  	.win[1]	= &s3c_fb_data_64xx_wins[1],
+> @@ -1271,6 +1340,8 @@ static struct s3c_fb_driverdata s3c_fb_data_s5pc100 __devinitdata = {
+>  			[3] = 0x3000,
+>  			[4] = 0x3400,
+>  		},
+> +
+> +		.has_prtcon	= 1,
+>  	},
+>  	.win[0]	= &s3c_fb_data_64xx_wins[0],
+>  	.win[1]	= &s3c_fb_data_64xx_wins[1],
 
-I would add a clock ID here in case someone wants to configure another
-clock in the patch.
 
-> +	if (master == SND_SOC_DAIFMT_CBS_CFS) {
-
-Use a switch staetment for this too.
-
-> +		clk = clk_get(NULL, "pll1_sysclk6");
-
-You're doing a clk_get() every time you go through here but never
-freeing it - it would seem better to just do the clk_get() at startup.
-I'd also expect this to be doing a clk_get() using the struct device for
-the DAI so that the driver can function even if the clock tree for a new
-SoC is different.
-
-> +		if (clk)
-> +			freq = clk_get_rate(clk);
-
-clk_get() returns an error pointer on error, not NULL, and...
-
-> +		freq = 122000000; /* FIXME ask to Texas */
-
-...this presumably ought to be in an else clause (or perhaps just not
-using this clocking at all if you can't find the clock?).
-
-> +	} else if (master == SND_SOC_DAIFMT_CBM_CFS) {
-> +		/* Clock given on CLKS */
-
-What if the user selected a different clock source?
-
-> +		if (master == SND_SOC_DAIFMT_CBS_CFS ||
-> +				master == SND_SOC_DAIFMT_CBS_CFM) {
-
-Again, switch statement.
-
-> +	if (master == SND_SOC_DAIFMT_CBS_CFS ||
-> +			master == SND_SOC_DAIFMT_CBS_CFM) {
-
-Here too.
+-- 
+Maurus Cuelenaere
