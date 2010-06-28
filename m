@@ -1,65 +1,38 @@
-From: mishal@softerra.com (Mykhail Lodygin)
-Date: Mon, 28 Jun 2010 01:30:24 +0300
-Subject: Using SPI in a kernel module
-In-Reply-To: <385275.91392.qm@web33802.mail.mud.yahoo.com>
-References: <385275.91392.qm@web33802.mail.mud.yahoo.com>
-Message-ID: <4C27D100.2030405@softerra.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Jun 2010 10:00:36 +0100
+Subject: soft lockup - CPU#0 stuck for 61s! problem
+In-Reply-To: <AANLkTimqNv37LkJDyKJp9PnJapXH4naINhx-T2ysQi4D@mail.gmail.com>
+References: <AANLkTimqNv37LkJDyKJp9PnJapXH4naINhx-T2ysQi4D@mail.gmail.com>
+Message-ID: <20100628090036.GA28510@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2010 12:47 AM, Alfredo Quesada S?nchez wrote:
-> I expected to receive a call to probe as soon as i register an 
-> spi_driver, which doesn't
-> seem to happen.
->
-of course , you havn't fullfill the appropriate structure fields.
-> If my driver must be already registered before the machine init then it
-> can't be a module, it must be inside the kernel,
->
-Why do you think so? spi works for many years - your driver is not the 
-first and definitely not the last, please exame other drivers - you will 
-see how to register.
->
+On Mon, Jun 28, 2010 at 11:25:04AM +0530, Harishkumar V wrote:
+> BUG: soft lockup - CPU#0 stuck for 61s! [linphone-3:764]
+> Modules linked in:
+> 
+> Pid: 764, comm:           linphone-3
+> CPU: 0    Not tainted  (2.6.28-rc9 #14)
+> PC is at handle_IRQ_event+0x28/0x74
+> LR is at handle_level_irq+0x94/0xec
 
-> What I don't understand is where the spi_device instance is created, 
-> and where. Looks like
-> it's appearing from nowhere.
->
-come on! drivers/spi/spi.c spi_alloc_device 
-<http://lxr.linux.no/linux+*/+code=spi_alloc_device>
-> But even more strange is the fact that spidev only registers
-> its own spi_driver and according to other people it works, so the only 
-> explanation for me
-> is that it can only be done as long as it's part of the kernel. But 
-> even being part of the
-> kernel spi_driver's register should be done before the machine init, 
-> which makes no sense
-> imho.
->
-Sorry but again - why do you think so? please look at several drivers 
-which utilize spi_driver structure carefully - and you'll see how to do 
-it yourself.
-> Regards
->
->
-> --- El *dom, 27/6/10, Mykhail Lodygin /<mishal@softerra.com>/* escribi?:
->
->
->     De: Mykhail Lodygin <mishal@softerra.com>
->     Asunto: Re: Using SPI in a kernel module
->     Para: "Alfredo Quesada S?nchez" <freddy2_es@yahoo.com>
->     CC: linux-arm-kernel at lists.infradead.org
->     Fecha: domingo, 27 de junio, 2010 23:26
->
->           Invocation sequence is the same as described   in   ek_spi_devices. So since there is no YOUR driver in ek_spi_devices - i can't say when it would be called - for now - never.
->     which device? - you define it by setting .chip_select, i believe.
->         
->
->     You could see all calls -  just set verbosity to debug function in
->     the configuration.
->
->
+That suggests a stuck IRQ.
 
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100628/da8f9102/attachment-0001.html>
+> pc : [<c008cc30>]    lr : [<c008e18c>]    psr: 48000113
+> sp : c7eede90  ip : c7eedeb0  fp : c7eedeac
+> r10: 0000001d  r9 : c0638ba8  r8 : 00000000
+> r7 : 0000005c  r6 : 00000000  r5 : 0000005c  r4 : c7a1b360
+> r3 : 00000000  r2 : 0000006e  r1 : c7a1b360  r0 : 0000005c
+
+which might be irq 92.
+
+> Exception stack(0xc7eede48 to 0xc7eede90)
+> de40:                   0000005c c7a1b360 0000006e 00000000 c7a1b360
+> 0000005c
+> de60: 00000000 0000005c 00000000 c0638ba8 0000001d c7eedeac c7eedeb0
+> c7eede90
+> de80: c008e18c c008cc30 48000113 ffffffff
+>  r5:d8200000 r4:ffffffff
+
+These messages should continue - and contain some further useful
+information to confirm the stuck IRQ.
