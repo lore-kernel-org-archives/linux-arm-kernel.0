@@ -1,193 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 28 Jun 2010 17:49:48 +0100
-Subject: [PATCH 1/3] ARM: Assume new page cache pages have dirty D-cache
-In-Reply-To: <20100628142201.GA3287@debian>
-References: <20100625115826.30030.89790.stgit@e102109-lin.cambridge.arm.com>
-	<20100625120132.30030.5577.stgit@e102109-lin.cambridge.arm.com>
-	<20100628142201.GA3287@debian>
-Message-ID: <1277743788.25271.196.camel@e102109-lin.cambridge.arm.com>
+From: fabioestevam@yahoo.com (Fabio Estevam)
+Date: Mon, 28 Jun 2010 10:47:26 -0700 (PDT)
+Subject: [PATCH] mx31_3ds: Allow selection between host/device modes on
+	the OTG port
+In-Reply-To: <4C239E81.4040805@gmail.com>
+Message-ID: <538995.53508.qm@web51008.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-06-28 at 15:22 +0100, Rabin Vincent wrote:
-> On Fri, Jun 25, 2010 at 01:01:32PM +0100, Catalin Marinas wrote:
-> > @@ -508,6 +508,12 @@ void ___dma_page_dev_to_cpu(struct page *page, unsigned long off,
-> >               outer_inv_range(paddr, paddr + size);
-> > 
-> >       dma_cache_maint_page(page, off, size, dir, dmac_unmap_area);
-> > +
-> > +     /*
-> > +      * Mark the D-cache clean for this page to avoid extra flushing.
-> > +      */
-> > +     if (dir != DMA_TO_DEVICE)
-> > +             set_bit(PG_dcache_clean, &page->flags);
+Hi Magnus,
+
+--- On Thu, 6/24/10, Magnus Lilja <lilja.magnus@gmail.com> wrote:
+
+> From: Magnus Lilja <lilja.magnus@gmail.com>
+> Subject: Re: [PATCH] mx31_3ds: Allow selection between host/device modes on the OTG port
+> To: "Fabio Estevam" <fabioestevam@yahoo.com>
+> Cc: linux-arm-kernel at lists.infradead.org, s.hauer at pengutronix.de, maramaopercheseimorto at gmail.com
+> Date: Thursday, June 24, 2010, 3:05 PM
+> Hi Fabio,
 > 
-> off + size does not necessarily cover the full page.  We probably
-> shouldn't be setting it as clean unless it does?
+> On 2010-06-23 22:52, Fabio Estevam wrote:
+> > Allow selection between host/device modes on the OTG
+> port.
+> > 
+> > Selection is made via kernel command line option:
+> > 
+> > 'otg_mode=host' or 'otg_mode=device'. Default mode is
+> device.
+> 
+> 
+> Would it be possible to select between host and device
+> during run-time, e.g. when the USB modules are loaded? I'm
+> asking out of curiosity, I don't know if Linux supports this
+> at all.
 
-Good point. See below for an updated patch.
+Not sure if would be possible to make the selection in run-time. 
 
-> Also, off + size can cover multiple physically contiguous pages, so
-> perhaps they too can be set as clean if they're fully covered.
+I will let others comment.
 
-While it may be possible, I don't think that's common. I would only care
-about the "page" argument, otherwise you have to do some conversion to
-find the page structure and it may not be worth.
+Sascha,
+
+I will resend this patch based on the current imx-for-2.6.26 branch.
+
+Regards,
+
+Fabio Estevam
 
 
-ARM: Assume new page cache pages have dirty D-cache
-
-From: Catalin Marinas <catalin.marinas@arm.com>
-
-There are places in Linux where writes to newly allocated page cache
-pages happen without a subsequent call to flush_dcache_page() (several
-PIO drivers including USB HCD). This patch changes the meaning of
-PG_arch_1 to be PG_dcache_clean and always flush the D-cache for a newly
-mapped page in update_mmu_cache().
-
-The patch also sets the PG_arch_1 bit in the DMA cache maintenance
-function to avoid additional cache flushing in update_mmu_cache().
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Rabin Vincent <rabin.vincent@stericsson.com>
----
- arch/arm/include/asm/cacheflush.h |    6 +++---
- arch/arm/include/asm/tlbflush.h   |    2 +-
- arch/arm/mm/copypage-v4mc.c       |    2 +-
- arch/arm/mm/copypage-v6.c         |    2 +-
- arch/arm/mm/copypage-xscale.c     |    2 +-
- arch/arm/mm/dma-mapping.c         |    6 ++++++
- arch/arm/mm/fault-armv.c          |    4 ++--
- arch/arm/mm/flush.c               |    3 ++-
- 8 files changed, 17 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index 4656a24..d3730f0 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -137,10 +137,10 @@
- #endif
- 
- /*
-- * This flag is used to indicate that the page pointed to by a pte
-- * is dirty and requires cleaning before returning it to the user.
-+ * This flag is used to indicate that the page pointed to by a pte is clean
-+ * and does not require cleaning before returning it to the user.
-  */
--#define PG_dcache_dirty PG_arch_1
-+#define PG_dcache_clean PG_arch_1
- 
- /*
-  *	MM Cache Management
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index bd863d8..40a7092 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -552,7 +552,7 @@ extern void flush_tlb_kernel_range(unsigned long start, unsigned long end);
- #endif
- 
- /*
-- * if PG_dcache_dirty is set for the page, we need to ensure that any
-+ * If PG_dcache_clean is not set for the page, we need to ensure that any
-  * cache entries for the kernels virtual memory range are written
-  * back to the page.
-  */
-diff --git a/arch/arm/mm/copypage-v4mc.c b/arch/arm/mm/copypage-v4mc.c
-index 598c51a..b806151 100644
---- a/arch/arm/mm/copypage-v4mc.c
-+++ b/arch/arm/mm/copypage-v4mc.c
-@@ -73,7 +73,7 @@ void v4_mc_copy_user_highpage(struct page *to, struct page *from,
- {
- 	void *kto = kmap_atomic(to, KM_USER1);
- 
--	if (test_and_clear_bit(PG_dcache_dirty, &from->flags))
-+	if (!test_and_set_bit(PG_dcache_clean, &from->flags))
- 		__flush_dcache_page(page_mapping(from), from);
- 
- 	spin_lock(&minicache_lock);
-diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
-index f55fa10..bdba6c6 100644
---- a/arch/arm/mm/copypage-v6.c
-+++ b/arch/arm/mm/copypage-v6.c
-@@ -79,7 +79,7 @@ static void v6_copy_user_highpage_aliasing(struct page *to,
- 	unsigned int offset = CACHE_COLOUR(vaddr);
- 	unsigned long kfrom, kto;
- 
--	if (test_and_clear_bit(PG_dcache_dirty, &from->flags))
-+	if (!test_and_set_bit(PG_dcache_clean, &from->flags))
- 		__flush_dcache_page(page_mapping(from), from);
- 
- 	/* FIXME: not highmem safe */
-diff --git a/arch/arm/mm/copypage-xscale.c b/arch/arm/mm/copypage-xscale.c
-index 9920c0a..649bbcd 100644
---- a/arch/arm/mm/copypage-xscale.c
-+++ b/arch/arm/mm/copypage-xscale.c
-@@ -95,7 +95,7 @@ void xscale_mc_copy_user_highpage(struct page *to, struct page *from,
- {
- 	void *kto = kmap_atomic(to, KM_USER1);
- 
--	if (test_and_clear_bit(PG_dcache_dirty, &from->flags))
-+	if (!test_and_set_bit(PG_dcache_clean, &from->flags))
- 		__flush_dcache_page(page_mapping(from), from);
- 
- 	spin_lock(&minicache_lock);
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 9e7742f..fa3d07d 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -508,6 +508,12 @@ void ___dma_page_dev_to_cpu(struct page *page, unsigned long off,
- 		outer_inv_range(paddr, paddr + size);
- 
- 	dma_cache_maint_page(page, off, size, dir, dmac_unmap_area);
-+
-+	/*
-+	 * Mark the D-cache clean for this page to avoid extra flushing.
-+	 */
-+	if (dir != DMA_TO_DEVICE && off == 0 && size >= PAGE_SIZE)
-+		set_bit(PG_dcache_clean, &page->flags);
- }
- EXPORT_SYMBOL(___dma_page_dev_to_cpu);
- 
-diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
-index 9b906de..58846cb 100644
---- a/arch/arm/mm/fault-armv.c
-+++ b/arch/arm/mm/fault-armv.c
-@@ -141,7 +141,7 @@ make_coherent(struct address_space *mapping, struct vm_area_struct *vma,
-  * a page table, or changing an existing PTE.  Basically, there are two
-  * things that we need to take care of:
-  *
-- *  1. If PG_dcache_dirty is set for the page, we need to ensure
-+ *  1. If PG_dcache_clean is not set for the page, we need to ensure
-  *     that any cache entries for the kernels virtual memory
-  *     range are written back to the page.
-  *  2. If we have multiple shared mappings of the same space in
-@@ -169,7 +169,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
- 
- 	mapping = page_mapping(page);
- #ifndef CONFIG_SMP
--	if (test_and_clear_bit(PG_dcache_dirty, &page->flags))
-+	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
- 		__flush_dcache_page(mapping, page);
- #endif
- 	if (mapping) {
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index c6844cb..9f9919b 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -248,7 +248,7 @@ void flush_dcache_page(struct page *page)
- 
- #ifndef CONFIG_SMP
- 	if (!PageHighMem(page) && mapping && !mapping_mapped(mapping))
--		set_bit(PG_dcache_dirty, &page->flags);
-+		clear_bit(PG_dcache_clean, &page->flags);
- 	else
- #endif
- 	{
-@@ -257,6 +257,7 @@ void flush_dcache_page(struct page *page)
- 			__flush_dcache_aliases(mapping, page);
- 		else if (mapping)
- 			__flush_icache_all();
-+		set_bit(PG_dcache_clean, &page->flags);
- 	}
- }
- EXPORT_SYMBOL(flush_dcache_page);
+      
