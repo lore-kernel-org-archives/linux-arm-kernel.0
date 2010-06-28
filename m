@@ -1,38 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Jun 2010 10:00:36 +0100
-Subject: soft lockup - CPU#0 stuck for 61s! problem
-In-Reply-To: <AANLkTimqNv37LkJDyKJp9PnJapXH4naINhx-T2ysQi4D@mail.gmail.com>
-References: <AANLkTimqNv37LkJDyKJp9PnJapXH4naINhx-T2ysQi4D@mail.gmail.com>
-Message-ID: <20100628090036.GA28510@n2100.arm.linux.org.uk>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 28 Jun 2010 02:01:56 -0700
+Subject: [PATCH v5 3/3] input: samsung-keypad - Add samsung keypad driver
+In-Reply-To: <4C285FCB.3070100@samsung.com>
+References: <1277101605-2435-1-git-send-email-jy0922.shim@samsung.com>
+	<1277101605-2435-3-git-send-email-jy0922.shim@samsung.com>
+	<20100625083019.GD8546@core.coreip.homeip.net>
+	<4C285FCB.3070100@samsung.com>
+Message-ID: <20100628090156.GB13523@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 28, 2010 at 11:25:04AM +0530, Harishkumar V wrote:
-> BUG: soft lockup - CPU#0 stuck for 61s! [linphone-3:764]
-> Modules linked in:
+On Mon, Jun 28, 2010 at 05:39:39PM +0900, Joonyoung Shim wrote:
+> Hi, Dmitry.
 > 
-> Pid: 764, comm:           linphone-3
-> CPU: 0    Not tainted  (2.6.28-rc9 #14)
-> PC is at handle_IRQ_event+0x28/0x74
-> LR is at handle_level_irq+0x94/0xec
+> On 6/25/2010 5:30 PM, Dmitry Torokhov wrote:
+> > Hi Joonyoung,
+> > 
+> > On Mon, Jun 21, 2010 at 03:26:45PM +0900, Joonyoung Shim wrote:
+> >> This patch adds support for keypad driver running on Samsung cpus. This
+> >> driver is tested on GONI and Aquila board using S5PC110 cpu.
+> >>
+> >> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > 
+> > Following my conversation with Thomas Gleixner reagrding "long playing"
+> > threaded interrupt handlers I tried to convert your driver to use this
+> > concept. The idea is to keep polling within IRQ thread context instead
+> > of using additional work/timer structures to simplify code and ensure
+> > race-free shutdown/unbind.
+> > 
+> > I think it was based on v4 of your driver and I'd appreciate if you could
+> > give it a try.
+> > 
+> > Thank you.
+> > 
+> 
+> I have tested your patch on my v5 patchset and it is working after some
+> fixing. I will post v6 patchset appling your patch.
 
-That suggests a stuck IRQ.
+Cool, thanks.
 
-> pc : [<c008cc30>]    lr : [<c008e18c>]    psr: 48000113
-> sp : c7eede90  ip : c7eedeb0  fp : c7eedeac
-> r10: 0000001d  r9 : c0638ba8  r8 : 00000000
-> r7 : 0000005c  r6 : 00000000  r5 : 0000005c  r4 : c7a1b360
-> r3 : 00000000  r2 : 0000006e  r1 : c7a1b360  r0 : 0000005c
-
-which might be irq 92.
-
-> Exception stack(0xc7eede48 to 0xc7eede90)
-> de40:                   0000005c c7a1b360 0000006e 00000000 c7a1b360
-> 0000005c
-> de60: 00000000 0000005c 00000000 c0638ba8 0000001d c7eedeac c7eedeb0
-> c7eede90
-> de80: c008e18c c008cc30 48000113 ffffffff
->  r5:d8200000 r4:ffffffff
-
-These messages should continue - and contain some further useful
-information to confirm the stuck IRQ.
+-- 
+Dmitry
