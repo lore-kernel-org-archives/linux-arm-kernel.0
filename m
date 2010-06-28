@@ -1,53 +1,120 @@
-From: ccross@android.com (Colin Cross)
-Date: Sun, 27 Jun 2010 19:30:01 -0700
-Subject: [PATCH V2] [ARM] Add ARCH_PROVIDES_UDELAY config option
-In-Reply-To: <4C200E62.4090604@codeaurora.org>
-References: <1272654736-28837-1-git-send-email-ccross@android.com>
-	<u2pd73d4eaf1004301237k3ceb859dobe74fe53abec774d@mail.gmail.com>
-	<87d3xgd20n.fsf@deeprootsystems.com>
-	<20100501100148.GE12172@n2100.arm.linux.org.uk>
-	<4BF702CC.5000401@codeaurora.org>
-	<20100521220653.GL11042@n2100.arm.linux.org.uk>
-	<4BFF112A.2060700@codeaurora.org> <4C200E62.4090604@codeaurora.org>
-Message-ID: <AANLkTim_Ct2EKfvQ119KRvMkqUyNivgnchEBkK7W4P_-@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 28 Jun 2010 11:42:08 +0800
+Subject: [PATCH 1/4] pxa/z2: Add regulator support
+In-Reply-To: <1277388132-5549-1-git-send-email-marek.vasut@gmail.com>
+References: <1277388132-5549-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <AANLkTimk9zvCogCJh8bNvS5h_Ergfpz3JI0ERU87eiD4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am using this patch in our Tegra development tree.  So far, I
-haven't come across any need for supporting udelay before iomap, but
-if it is necessary, it could be handled in the per-architecture
-implementation by using a busy loop with a worst-case count if a
-sched_clock initialization flag is not set.
+On Thu, Jun 24, 2010 at 10:02 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Register TPS65021 regulator in Zipit Z2.
+>
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 
-On Mon, Jun 21, 2010 at 6:14 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
-> Russel,
+Applied.
+
+> ---
+> ?arch/arm/mach-pxa/z2.c | ? 71 ++++++++++++++++++++++++++++++++++++++++++++++++
+> ?1 files changed, 71 insertions(+), 0 deletions(-)
 >
-> Would appreciate your thoughts on this.
+> diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
+> index 4cba5b6..1bafb23 100644
+> --- a/arch/arm/mach-pxa/z2.c
+> +++ b/arch/arm/mach-pxa/z2.c
+> @@ -26,6 +26,7 @@
+> ?#include <linux/gpio.h>
+> ?#include <linux/gpio_keys.h>
+> ?#include <linux/delay.h>
+> +#include <linux/regulator/machine.h>
 >
-> Colin,
+> ?#include <asm/mach-types.h>
+> ?#include <asm/mach/arch.h>
+> @@ -616,6 +617,75 @@ static inline void z2_spi_init(void) {}
+> ?#endif
 >
-> Are you continuing to use the approach used in your patch in your
-> development tree? I just want to make sure we have a solution that everyone
-> can agree to.
+> ?/******************************************************************************
+> + * Core power regulator
+> + ******************************************************************************/
+> +#if defined(CONFIG_REGULATOR_TPS65023) || \
+> + ? ? ? defined(CONFIG_REGULATOR_TPS65023_MODULE)
+> +static struct regulator_consumer_supply z2_tps65021_consumers[] = {
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .supply = "vcc_core",
+> + ? ? ? }
+> +};
+> +
+> +static struct regulator_init_data z2_tps65021_info[] = {
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .constraints = {
+> + ? ? ? ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "vcc_core range",
+> + ? ? ? ? ? ? ? ? ? ? ? .min_uV ? ? ? ? = 800000,
+> + ? ? ? ? ? ? ? ? ? ? ? .max_uV ? ? ? ? = 1600000,
+> + ? ? ? ? ? ? ? ? ? ? ? .always_on ? ? ?= 1,
+> + ? ? ? ? ? ? ? ? ? ? ? .valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
+> + ? ? ? ? ? ? ? },
+> + ? ? ? ? ? ? ? .consumer_supplies ? ? ?= z2_tps65021_consumers,
+> + ? ? ? ? ? ? ? .num_consumer_supplies ?= ARRAY_SIZE(z2_tps65021_consumers),
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .constraints = {
+> + ? ? ? ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "DCDC2",
+> + ? ? ? ? ? ? ? ? ? ? ? .min_uV ? ? ? ? = 3300000,
+> + ? ? ? ? ? ? ? ? ? ? ? .max_uV ? ? ? ? = 3300000,
+> + ? ? ? ? ? ? ? ? ? ? ? .always_on ? ? ?= 1,
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .constraints = {
+> + ? ? ? ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "DCDC3",
+> + ? ? ? ? ? ? ? ? ? ? ? .min_uV ? ? ? ? = 1800000,
+> + ? ? ? ? ? ? ? ? ? ? ? .max_uV ? ? ? ? = 1800000,
+> + ? ? ? ? ? ? ? ? ? ? ? .always_on ? ? ?= 1,
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .constraints = {
+> + ? ? ? ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "LDO1",
+> + ? ? ? ? ? ? ? ? ? ? ? .min_uV ? ? ? ? = 1000000,
+> + ? ? ? ? ? ? ? ? ? ? ? .max_uV ? ? ? ? = 3150000,
+> + ? ? ? ? ? ? ? ? ? ? ? .always_on ? ? ?= 1,
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .constraints = {
+> + ? ? ? ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "LDO2",
+> + ? ? ? ? ? ? ? ? ? ? ? .min_uV ? ? ? ? = 1050000,
+> + ? ? ? ? ? ? ? ? ? ? ? .max_uV ? ? ? ? = 3300000,
+> + ? ? ? ? ? ? ? ? ? ? ? .always_on ? ? ?= 1,
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }
+> +};
+> +
+> +static struct i2c_board_info __initdata z2_pi2c_board_info[] = {
+> + ? ? ? {
+> + ? ? ? ? ? ? ? I2C_BOARD_INFO("tps65021", 0x48),
+> + ? ? ? ? ? ? ? .platform_data ?= &z2_tps65021_info,
+> + ? ? ? },
+> +};
+> +
+> +static void __init z2_pmic_init(void)
+> +{
+> + ? ? ? pxa27x_set_i2c_power_info(NULL);
+> + ? ? ? i2c_register_board_info(1, ARRAY_AND_SIZE(z2_pi2c_board_info));
+> +}
+> +#else
+> +static inline void z2_pmic_init(void) {}
+> +#endif
+> +
+> +/******************************************************************************
+> ?* Machine init
+> ?******************************************************************************/
+> ?static void __init z2_init(void)
+> @@ -635,6 +705,7 @@ static void __init z2_init(void)
+> ? ? ? ?z2_pwm_init();
+> ? ? ? ?z2_leds_init();
+> ? ? ? ?z2_keys_init();
+> + ? ? ? z2_pmic_init();
+> ?}
 >
-> Thanks,
-> Saravana
->
-> Saravana Kannan wrote:
->>
->> Russell King - ARM Linux wrote:
->>>
->>> My point is not specific to sched_clock, but to counters which on ARM
->>> are 99.9% always memory mapped, and therefore inaccessible during the
->>> very early kernel boot. ?sched_clock was merely an illustration of the
->>> problem.
->>
->> Do you know any code which uses udelay that early? I can't imagine any
->> non-driver code using udelay. If it's just drivers using udelay, then they
->> need IO mapping to have been completed for the device register access to
->> work and hence udelay won't have any problems.
->>
->> -Saravana
->>
+> ?MACHINE_START(ZIPIT2, "Zipit Z2")
+> --
+> 1.7.1
 >
 >
