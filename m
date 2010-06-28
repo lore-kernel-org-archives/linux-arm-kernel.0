@@ -1,21 +1,23 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 27 Jun 2010 21:57:25 -0700 (PDT)
-Subject: [RFC 9/9] crypto: Add Samsung crypto engine driver
-In-Reply-To: <4C27309B.7010905@gmail.com>
-References: <4C129341.2060407@gmail.com>
-	<20100626.210728.90806559.davem@davemloft.net>
-	<4C27309B.7010905@gmail.com>
-Message-ID: <20100627.215725.226777011.davem@davemloft.net>
+From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
+Date: Mon, 28 Jun 2010 08:14:46 +0300
+Subject: [PATCH 3/3] add ARM crashdump support
+In-Reply-To: <20100625.160544.125902258.igawa@mxs.nes.nec.co.jp>
+References: <20100624163356.dbb849bc.igawa@mxs.nes.nec.co.jp>
+	<20100624081915.GF29920@esdhcp04058.research.nokia.com>
+	<20100625.083133.77342472.igawa@mxs.nes.nec.co.jp>
+	<20100625.160544.125902258.igawa@mxs.nes.nec.co.jp>
+Message-ID: <20100628051446.GG29920@esdhcp04058.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maurus Cuelenaere <mcuelenaere@gmail.com>
-Date: Sun, 27 Jun 2010 13:06:03 +0200
-
-> I'd go with a threaded interrupt handler in that case then, or do
-> you also consider this as too much overhead?
+On Fri, Jun 25, 2010 at 09:05:44AM +0200, ext Masayuki Igawa wrote:
 > 
-> I'll do some performance comparisons of threaded interrupt handler
-> vs normal and go with the fastest.
+> I've finished my tests(x86/x86_64). No problems were found.
+> So I've merged and pushed these patches.
 
-Yes, best to just measure it in order to decide which is best.
+Thanks!
+
+I just pulled your latest tree and tested on ARM -> works well.
+
+Regards,
+MW
