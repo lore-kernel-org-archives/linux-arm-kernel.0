@@ -1,98 +1,48 @@
-From: lamiaposta71@gmail.com (Raffaele Recalcati)
-Date: Mon, 28 Jun 2010 08:47:35 +0200
-Subject: [PATCH] spi: davinci: Added support for chip select using gpio
-Message-ID: <1277707655-3468-1-git-send-email-lamiaposta71@gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 28 Jun 2010 08:01:40 +0200
+Subject: S3C2416 fixes (gpiolib, SDHCI, compilation without FB device)
+In-Reply-To: <4C248B23.7060905@gmail.com>
+References: <1277212585-25605-1-git-send-email-jekhor@gmail.com>
+	<4C248B23.7060905@gmail.com>
+Message-ID: <000001cb1687$638b2310$2aa16930$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Raffaele Recalcati <raffaele.recalcati@bticino.it>
+Hello,
 
-    It is not everytime possible, due to hardware constraints,
-    to use the hw chip select available on spi port.
-    So I add this possibility using a gpio as chip select.
-    If controller_data variable is not null it is
-    the gpio to be used as chip select.
-    The default case is compatible with evmdm365.
-    This patch has been developed against the
-    http://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-davinci.git
-    git tree and has been tested on bmx board (similar to dm365 evm but with
-    gpio as spi chip select).
+On Friday, June 25, 2010 12:56 PM Darius Augulis wrote:
 
-Signed-off-by: Raffaele Recalcati <raffaele.recalcati@bticino.it>
-Signed-off-by: Davide Bonfanti <davide.bonfanti@bticino.it>
----
- arch/arm/mach-davinci/dm365.c |   10 ++++++----
- drivers/spi/davinci_spi.c     |   27 ++++++++++++++++++---------
- 2 files changed, 24 insertions(+), 13 deletions(-)
+> On 06/22/2010 04:16 PM, Yauhen Kharuzhy wrote:
+> > This patch series fixes SDHCI on S3C2416. I got SD card working with this
+> patches
+> > and with patches for GPIO card detection support by Marek Szyprowski.
+> >
+> 
+> Unfortunately I did not get SD card working with these patches. I'm
+> using custom board, not SMDK2416, but SD slot connection and schematics
+> are the same like in SMDK2416. I've tried to debug a bit this problem
+> and this is what I got: kernel do detection of card insert/remove,
+> driver prints messages:
+> 
+> s3c-sdhci s3c-sdhci.1: card inserted.
+> s3c-sdhci s3c-sdhci.1: card removed.
+> 
+> Then I put some printk in s3c-sdhci driver and MMC core and found that
+> mmc_rescan() is called only once at startup and no more when
+> inserting/removing SD card. Also mmc_rescan() stops at that point where
+> mmc_power_up() is called and does not return. And mmc_power_up() stops
+> where mmc_delay(10) is called and does not return too.
+> Every time when inserting/removing SD card only functions
+> sdhci_tasklet_card() and mmc_detect_change() are called, and nothing
+> happens. Kernel doesn't detect the card inserted.
+> Maybe this info could help to debug where the problem is - in my custom
+> board or in your patches?
 
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index a146849..42fd4a4 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -677,10 +677,12 @@ void __init dm365_init_spi0(unsigned chipselect_mask,
- 	davinci_cfg_reg(DM365_SPI0_SDO);
- 
- 	/* not all slaves will be wired up */
--	if (chipselect_mask & BIT(0))
--		davinci_cfg_reg(DM365_SPI0_SDENA0);
--	if (chipselect_mask & BIT(1))
--		davinci_cfg_reg(DM365_SPI0_SDENA1);
-+	if  (!((unsigned long) info->controller_data)) {
-+		if (chipselect_mask & BIT(0))
-+			davinci_cfg_reg(DM365_SPI0_SDENA0);
-+		if (chipselect_mask & BIT(1))
-+			davinci_cfg_reg(DM365_SPI0_SDENA1);
-+	}
- 
- 	spi_register_board_info(info, len);
- 
-diff --git a/drivers/spi/davinci_spi.c b/drivers/spi/davinci_spi.c
-index 95afb6b..621ae46 100644
---- a/drivers/spi/davinci_spi.c
-+++ b/drivers/spi/davinci_spi.c
-@@ -29,6 +29,7 @@
- #include <linux/spi/spi_bitbang.h>
- #include <linux/slab.h>
- 
-+#include <mach/gpio.h>
- #include <mach/spi.h>
- #include <mach/edma.h>
- 
-@@ -270,18 +271,26 @@ static void davinci_spi_chipselect(struct spi_device *spi, int value)
- 	pdata = davinci_spi->pdata;
- 
- 	/*
--	 * Board specific chip select logic decides the polarity and cs
--	 * line for the controller
--	 */
-+	* Board specific chip select logic decides the polarity and cs
-+	* line for the controller
-+	*/
- 	if (value == BITBANG_CS_INACTIVE) {
--		set_io_bits(davinci_spi->base + SPIDEF, CS_DEFAULT);
--
--		data1_reg_val |= CS_DEFAULT << SPIDAT1_CSNR_SHIFT;
--		iowrite32(data1_reg_val, davinci_spi->base + SPIDAT1);
--
-+		if  ((unsigned long) spi->controller_data) {
-+			gpio_set_value(spi->controller_data, \
-+				!(spi->mode & SPI_CS_HIGH));
-+		} else {
-+			set_io_bits(davinci_spi->base + SPIDEF, CS_DEFAULT);
-+
-+			data1_reg_val |= CS_DEFAULT << SPIDAT1_CSNR_SHIFT;
-+			iowrite32(data1_reg_val, davinci_spi->base + SPIDAT1);
-+		}
- 		while ((ioread32(davinci_spi->base + SPIBUF)
--					& SPIBUF_RXEMPTY_MASK) == 0)
-+				& SPIBUF_RXEMPTY_MASK) == 0)
- 			cpu_relax();
-+	} else {
-+		if  ((unsigned long) spi->controller_data)
-+			gpio_set_value(spi->controller_data, \
-+				(spi->mode & SPI_CS_HIGH));
- 	}
- }
- 
--- 
-1.7.0.4
+Have you tried with polled card detection method (SDHCI_CD_NONE)? If it
+doesn't work I suspect something with the hardware. Checking with mmc debug
+enabled might also help figuring this issue out.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
