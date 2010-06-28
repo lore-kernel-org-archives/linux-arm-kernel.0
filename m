@@ -1,100 +1,53 @@
-From: byang1@marvell.com (Bin Yang)
-Date: Sun, 27 Jun 2010 19:27:32 -0700
-Subject: kprobe bug.
-In-Reply-To: <alpine.LFD.2.00.1006251630500.24097@xanadu.home>
-Message-ID: <AAD1C6EB06EE3649B35B7E026785068D14FCBC756F@SC-VEXCH2.marvell.com>
+From: ccross@android.com (Colin Cross)
+Date: Sun, 27 Jun 2010 19:30:01 -0700
+Subject: [PATCH V2] [ARM] Add ARCH_PROVIDES_UDELAY config option
+In-Reply-To: <4C200E62.4090604@codeaurora.org>
+References: <1272654736-28837-1-git-send-email-ccross@android.com>
+	<u2pd73d4eaf1004301237k3ceb859dobe74fe53abec774d@mail.gmail.com>
+	<87d3xgd20n.fsf@deeprootsystems.com>
+	<20100501100148.GE12172@n2100.arm.linux.org.uk>
+	<4BF702CC.5000401@codeaurora.org>
+	<20100521220653.GL11042@n2100.arm.linux.org.uk>
+	<4BFF112A.2060700@codeaurora.org> <4C200E62.4090604@codeaurora.org>
+Message-ID: <AANLkTim_Ct2EKfvQ119KRvMkqUyNivgnchEBkK7W4P_-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks. 
-It looks "emulate_str" had considered PC register situation already. Only " emulate_ldr" has this problem. 
+I am using this patch in our Tegra development tree.  So far, I
+haven't come across any need for supporting udelay before iomap, but
+if it is necessary, it could be handled in the per-architecture
+implementation by using a busy loop with a worst-case count if a
+sched_clock initialization flag is not set.
 
-Here is my new patch, thanks in advance to review it. 
-
-===============================
->From 554a86a94836d5f6c89c1253f2c2d85773cbe5eb Mon Sep 17 00:00:00 2001
-From: Bin Yang <bin.yang@marvell.com>
-Date: Mon, 28 Jun 2010 10:40:56 +0800
-Subject: [PATCH] ARM: fix kprobe ldr instr emulate bug
-
-Signed-off-by: Bin Yang <bin.yang@marvell.com>
----
- arch/arm/kernel/kprobes-decode.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/kprobes-decode.c b/arch/arm/kernel/kprobes-decode.c
-index 81b1737..80511d5 100644
---- a/arch/arm/kernel/kprobes-decode.c
-+++ b/arch/arm/kernel/kprobes-decode.c
-@@ -583,13 +583,14 @@ static void __kprobes emulate_ldr(struct kprobe *p, struct pt_regs *regs)
- {
-        insn_llret_3arg_fn_t *i_fn = (insn_llret_3arg_fn_t *)&p->ainsn.insn[0];
-        kprobe_opcode_t insn = p->opcode;
-+       long ppc = (long)p->addr + 8;
-        union reg_pair fnr;
-        int rd = (insn >> 12) & 0xf;
-        int rn = (insn >> 16) & 0xf;
-        int rm = insn & 0xf;
-        long rdv;
--       long rnv  = regs->uregs[rn];
--       long rmv  = regs->uregs[rm]; /* rm/rmv may be invalid, don't care. */
-+       long rnv = (rn == 15) ? ppc : regs->uregs[rn];
-+       long rmv = (rm == 15) ? ppc : regs->uregs[rm];
-        long cpsr = regs->ARM_cpsr;
-
-
-Bin Yang
-
------Original Message-----
-From: Nicolas Pitre [mailto:nico at fluxnic.net] 
-Sent: 2010?6?26? 4:50
-To: Bin Yang
-Cc: Russell King - ARM Linux; Eric Miao; Haojian Zhuang; linux-arm-kernel
-Subject: Re: kprobe bug.
-
-On Fri, 25 Jun 2010, Bin Yang wrote:
-
-> Hi Russell,
-> 
-> 	Thanks in advance for your kind to review my question. 
-> 	I met a kprobe bug while I used it to debug my driver. 
-> 	Here is the scenario:
-> 	I add a probe at function xxx(). And the assembly code of xxx() is as following,
-> =====================
-> 	c035ee48 <xxx >:
-> c035ee48:       e59f3008        ldr     r3, [pc, #8]    ; c035ee58              <xxx+0x10>
-> c035ee4c:       e3a02001        mov     r2, #1  ; 0x1
-> c035ee50:       e5032fff        str     r2, [r3, #-4095]
-> c035ee54:       e12fff1e        bx      lr
-> c035ee58:       fe03dfff        .word   0xfe03dfff 
-> =====================
-> 	The ldr emulate always load e12fff1e to r3 register. 
-> 	After debugging, I found the pc register should be 8 after current instruction. So we should set pc to pc+8 before instruction emulation and set it back to the next instruction after singe step.
-> 	Here is my patch: 
-> =======================
-> diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
-> index 60c62c3..6e2567e 100644
-> --- a/arch/arm/kernel/kprobes.c
-> +++ b/arch/arm/kernel/kprobes.c
-> @@ -132,8 +132,9 @@ static void __kprobes set_current_kprobe(struct kprobe *p)
->  static void __kprobes singlestep(struct kprobe *p, struct pt_regs *regs,
->  				 struct kprobe_ctlblk *kcb)
->  {
-> -	regs->ARM_pc += 4;
-> +	regs->ARM_pc += 8;
->  	p->ainsn.insn_handler(p, regs);
-> +	regs->ARM_pc -= 4;
->  }
->  
->  /*
-> ========================
-
-This is wrong.  You are breaking all the emulated instructions changing 
-the pc value.
-
-What needs to be done is to add a special case in emulate_ldr() to fixup 
-rnv when rn is 15.  The same fixup would be needed in emulate_str().
-See emulate_alu_rflags() for example.
-
-
-Nicolas
+On Mon, Jun 21, 2010 at 6:14 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
+> Russel,
+>
+> Would appreciate your thoughts on this.
+>
+> Colin,
+>
+> Are you continuing to use the approach used in your patch in your
+> development tree? I just want to make sure we have a solution that everyone
+> can agree to.
+>
+> Thanks,
+> Saravana
+>
+> Saravana Kannan wrote:
+>>
+>> Russell King - ARM Linux wrote:
+>>>
+>>> My point is not specific to sched_clock, but to counters which on ARM
+>>> are 99.9% always memory mapped, and therefore inaccessible during the
+>>> very early kernel boot. ?sched_clock was merely an illustration of the
+>>> problem.
+>>
+>> Do you know any code which uses udelay that early? I can't imagine any
+>> non-driver code using udelay. If it's just drivers using udelay, then they
+>> need IO mapping to have been completed for the device register access to
+>> work and hence udelay won't have any problems.
+>>
+>> -Saravana
+>>
+>
+>
