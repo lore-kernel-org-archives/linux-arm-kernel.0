@@ -1,23 +1,20 @@
-From: igawa@mxs.nes.nec.co.jp (Masayuki Igawa)
-Date: Mon, 28 Jun 2010 14:25:52 +0900 (JST)
-Subject: [PATCH 3/3] add ARM crashdump support
-In-Reply-To: <20100628051446.GG29920@esdhcp04058.research.nokia.com>
-References: <20100625.083133.77342472.igawa@mxs.nes.nec.co.jp>
-	<20100625.160544.125902258.igawa@mxs.nes.nec.co.jp>
-	<20100628051446.GG29920@esdhcp04058.research.nokia.com>
-Message-ID: <20100628.142552.80399420.igawa@mxs.nes.nec.co.jp>
+From: avictor.za@gmail.com (avictor.za at gmail.com)
+Date: Mon, 28 Jun 2010 07:41:43 +0200
+Subject: [PATCH 1/3] AT91: Define NR_BUILTIN_GPIO
+In-Reply-To: <1277699955-9931-2-git-send-email-ryan@bluewatersys.com>
+References: <1277699955-9931-1-git-send-email-ryan@bluewatersys.com>
+	<1277699955-9931-2-git-send-email-ryan@bluewatersys.com>
+Message-ID: <AANLkTin3DLp5sizIdr7DEbfIgXrfNhl6vgqCscNR094d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+hi Ryan,
 
-From: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
-Subject: Re: [PATCH 3/3] add ARM crashdump support
-Date: Mon, 28 Jun 2010 08:14:46 +0300
-> I just pulled your latest tree and tested on ARM -> works well.
+> Add definition for NR_BUILTIN_GPIO for AT91 family
+>
+> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 
-Thank you for your testing!
-I'm glad to hear that.
+Acked-by: Andrew Victor <linux@maxim.org.za>
 
-Regards,
--- Masayuki Igawa
+
+Please submit to Russell King's patch system.
