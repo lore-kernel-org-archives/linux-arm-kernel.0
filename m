@@ -1,154 +1,164 @@
 From: p.osciak@samsung.com (Pawel Osciak)
-Date: Mon, 28 Jun 2010 10:08:50 +0200
-Subject: [PATCH v3 04/12] s3c-fb: Add device name initialization
+Date: Mon, 28 Jun 2010 10:08:55 +0200
+Subject: [PATCH v3 09/12] s3c-fb: Correct window osd size and alpha register
+	handling
 In-Reply-To: <1277712538-23188-1-git-send-email-p.osciak@samsung.com>
 References: <1277712538-23188-1-git-send-email-p.osciak@samsung.com>
-Message-ID: <1277712538-23188-5-git-send-email-p.osciak@samsung.com>
+Message-ID: <1277712538-23188-10-git-send-email-p.osciak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add framebuffer device name initialization calls for S3C2443, S3C64xx
-and S5P machines.
+S3C64xx and S5P OSD registers for OSD size and alpha are as follows:
+VIDOSDC: win 0 - size, win 1-4: alpha
+VIDOSDD: win 1-2 - size; not present for windows 0, 3 and 4
 
 Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s3c2416/s3c2416.c              |    3 +-
- arch/arm/mach-s3c2443/s3c2443.c              |    2 +
- arch/arm/mach-s5pc100/cpu.c                  |    3 ++
- arch/arm/mach-s5pv210/cpu.c                  |    7 ++---
- arch/arm/plat-samsung/include/plat/fb-core.h |   29 ++++++++++++++++++++++++++
- 5 files changed, 39 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/plat-samsung/include/plat/fb-core.h
+ drivers/video/s3c-fb.c |   58 ++++++++++++++++++++++++++++++++++++++++++-----
+ 1 files changed, 51 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2416/s3c2416.c b/arch/arm/mach-s3c2416/s3c2416.c
-index 35dabcc..bc30245 100644
---- a/arch/arm/mach-s3c2416/s3c2416.c
-+++ b/arch/arm/mach-s3c2416/s3c2416.c
-@@ -55,6 +55,7 @@
- #include <plat/cpu.h>
+diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
+index 94423c5..3b2c7fe 100644
+--- a/drivers/video/s3c-fb.c
++++ b/drivers/video/s3c-fb.c
+@@ -64,6 +64,9 @@ struct s3c_fb;
+ #define VIDOSD_B(win, variant) (OSD_BASE(win, variant) + 0x04)
+ #define VIDOSD_C(win, variant) (OSD_BASE(win, variant) + 0x08)
+ #define VIDOSD_D(win, variant) (OSD_BASE(win, variant) + 0x0C)
++#define VIDOSD_SIZE(win, variant, win_variant) \
++	(OSD_BASE(win, variant) + (win_variant).osd_size_off)
++#define VIDOSD_ALPHA(win, variant, win_variant) VIDOSD_C(win, variant)
  
- #include <plat/iic-core.h>
-+#include <plat/fb-core.h>
- 
- static struct map_desc s3c2416_iodesc[] __initdata = {
- 	IODESC_ENT(WATCHDOG),
-@@ -90,7 +91,7 @@ int __init s3c2416_init(void)
- 	s3c_i2c0_setname("s3c2440-i2c");
- 	s3c_i2c1_setname("s3c2440-i2c");
- 
--	s3c_device_fb.name = "s3c2443-fb";
-+	s3c_fb_setname("s3c2443-fb");
- 
- 	return sysdev_register(&s3c2416_sysdev);
- }
-diff --git a/arch/arm/mach-s3c2443/s3c2443.c b/arch/arm/mach-s3c2443/s3c2443.c
-index ce2ec32..839b6b2 100644
---- a/arch/arm/mach-s3c2443/s3c2443.c
-+++ b/arch/arm/mach-s3c2443/s3c2443.c
-@@ -35,6 +35,7 @@
- #include <plat/s3c2443.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-+#include <plat/fb-core.h>
- 
- static struct map_desc s3c2443_iodesc[] __initdata = {
- 	IODESC_ENT(WATCHDOG),
-@@ -62,6 +63,7 @@ int __init s3c2443_init(void)
- 	s3c24xx_reset_hook = s3c2443_hard_reset;
- 
- 	s3c_device_nand.name = "s3c2412-nand";
-+	s3c_fb_setname("s3c2443-fb");
- 
- 	/* change WDT IRQ number */
- 	s3c_device_wdt.resource[1].start = IRQ_S3C2443_WDT;
-diff --git a/arch/arm/mach-s5pc100/cpu.c b/arch/arm/mach-s5pc100/cpu.c
-index 7b5bdbc..d10276a 100644
---- a/arch/arm/mach-s5pc100/cpu.c
-+++ b/arch/arm/mach-s5pc100/cpu.c
-@@ -41,6 +41,7 @@
- #include <plat/iic-core.h>
- #include <plat/sdhci.h>
- #include <plat/onenand-core.h>
-+#include <plat/fb-core.h>
- 
- #include <plat/s5pc100.h>
- 
-@@ -92,6 +93,8 @@ void __init s5pc100_map_io(void)
- 	s3c_i2c1_setname("s3c2440-i2c");
- 
- 	s3c_onenand_setname("s5pc100-onenand");
-+
-+	s3c_fb_setname("s5pc100-fb");
+ /**
+  * struct s3c_fb_variant - fb variant information
+@@ -112,7 +115,10 @@ struct s3c_fb_variant {
+ struct s3c_fb_win_variant {
+ 	unsigned int	has_osd_c:1;
+ 	unsigned int	has_osd_d:1;
++	unsigned int	has_osd_size:1;
++	unsigned int	has_osd_alpha:1;
+ 	unsigned int	palette_16bpp:1;
++	unsigned short	osd_size_off;
+ 	unsigned short	palette_sz;
+ 	u32		valid_bpp;
+ };
+@@ -365,6 +371,36 @@ static int s3c_fb_align_word(unsigned int bpp, unsigned int pix)
  }
  
- void __init s5pc100_init_clocks(int xtal)
-diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
-index f42c507..4d3580a 100644
---- a/arch/arm/mach-s5pv210/cpu.c
-+++ b/arch/arm/mach-s5pv210/cpu.c
-@@ -34,6 +34,7 @@
- #include <plat/s5pv210.h>
- #include <plat/iic-core.h>
- #include <plat/sdhci.h>
-+#include <plat/fb-core.h>
- 
- /* Initial IO mappings */
- 
-@@ -80,10 +81,6 @@ void __init s5pv210_map_io(void)
- 	s3c_device_adc.name	= "s3c64xx-adc";
- #endif
- 
--#ifdef CONFIG_S3C_DEV_FB
--	s3c_device_fb.name	= "s5p-fb";
--#endif
--
- 	iotable_init(s5pv210_iodesc, ARRAY_SIZE(s5pv210_iodesc));
- 
- 	/* initialise device information early */
-@@ -95,6 +92,8 @@ void __init s5pv210_map_io(void)
- 	s3c_i2c0_setname("s3c2440-i2c");
- 	s3c_i2c1_setname("s3c2440-i2c");
- 	s3c_i2c2_setname("s3c2440-i2c");
-+
-+	s3c_fb_setname("s5pv210-fb");
- }
- 
- void __init s5pv210_init_clocks(int xtal)
-diff --git a/arch/arm/plat-samsung/include/plat/fb-core.h b/arch/arm/plat-samsung/include/plat/fb-core.h
-new file mode 100644
-index 0000000..bca383e
---- /dev/null
-+++ b/arch/arm/plat-samsung/include/plat/fb-core.h
-@@ -0,0 +1,29 @@
-+/*
-+ * arch/arm/plat-samsung/include/plat/fb-core.h
+ /**
++ * vidosd_set_size() - set OSD size for a window
 + *
-+ * Copyright 2010 Samsung Electronics Co., Ltd.
-+ *	Pawel Osciak <p.osciak@samsung.com>
-+ *
-+ * Samsung framebuffer driver core functions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * @win: the window to set OSD size for
++ * @size: OSD size register value
 + */
-+#ifndef __ASM_PLAT_FB_CORE_H
-+#define __ASM_PLAT_FB_CORE_H __FILE__
-+
-+/*
-+ * These functions are only for use with the core support code, such as
-+ * the CPU-specific initialization code.
-+ */
-+
-+/* Re-define device name depending on support. */
-+static inline void s3c_fb_setname(char *name)
++static void vidosd_set_size(struct s3c_fb_win *win, u32 size)
 +{
-+#ifdef CONFIG_S3C_DEV_FB
-+	s3c_device_fb.name = name;
-+#endif
++	struct s3c_fb *sfb = win->parent;
++
++	if (win->variant.has_osd_size)
++		writel(size, sfb->regs + VIDOSD_SIZE(win->index, sfb->variant,
++							win->variant));
 +}
 +
-+#endif /* __ASM_PLAT_FB_CORE_H */
++/**
++ * vidosd_set_alpha() - set alpha transparency for a window
++ *
++ * @win: the window to set OSD size for
++ * @alpha: alpha register value
++ */
++static void vidosd_set_alpha(struct s3c_fb_win *win, u32 alpha)
++{
++	struct s3c_fb *sfb = win->parent;
++
++	if (win->variant.has_osd_alpha)
++		writel(alpha, sfb->regs + VIDOSD_ALPHA(win->index,
++						sfb->variant, win->variant));
++}
++
++/**
+  * shadow_protect_win() - disable updating values from shadow registers at vsync
+  *
+  * @win: window to protect registers for
+@@ -408,7 +444,7 @@ static int s3c_fb_set_par(struct fb_info *info)
+ 	void __iomem *regs = sfb->regs;
+ 	void __iomem *buf = regs;
+ 	int win_no = win->index;
+-	u32 osdc_data = 0;
++	u32 alpha = 0;
+ 	u32 data;
+ 	u32 pagewidth;
+ 	int clkdiv;
+@@ -511,15 +547,12 @@ static int s3c_fb_set_par(struct fb_info *info)
+ 
+ 	data = var->xres * var->yres;
+ 
+-	osdc_data = VIDISD14C_ALPHA1_R(0xf) |
++	alpha = VIDISD14C_ALPHA1_R(0xf) |
+ 		VIDISD14C_ALPHA1_G(0xf) |
+ 		VIDISD14C_ALPHA1_B(0xf);
+ 
+-	if (win->variant.has_osd_d) {
+-		writel(data, regs + VIDOSD_D(win_no, sfb->variant));
+-		writel(osdc_data, regs + VIDOSD_C(win_no, sfb->variant));
+-	} else
+-		writel(data, regs + VIDOSD_C(win_no, sfb->variant));
++	vidosd_set_alpha(win, alpha);
++	vidosd_set_size(win, data);
+ 
+ 	data = WINCONx_ENWIN;
+ 
+@@ -1445,12 +1478,17 @@ static int s3c_fb_resume(struct platform_device *pdev)
+ static struct s3c_fb_win_variant s3c_fb_data_64xx_wins[] __devinitdata = {
+ 	[0] = {
+ 		.has_osd_c	= 1,
++		.has_osd_size	= 1,
++		.osd_size_off	= 0x8,
+ 		.palette_sz	= 256,
+ 		.valid_bpp	= VALID_BPP1248 | VALID_BPP(16) | VALID_BPP(24),
+ 	},
+ 	[1] = {
+ 		.has_osd_c	= 1,
+ 		.has_osd_d	= 1,
++		.has_osd_size	= 1,
++		.osd_size_off	= 0x12,
++		.has_osd_alpha	= 1,
+ 		.palette_sz	= 256,
+ 		.valid_bpp	= (VALID_BPP1248 | VALID_BPP(16) |
+ 				   VALID_BPP(18) | VALID_BPP(19) |
+@@ -1459,6 +1497,9 @@ static struct s3c_fb_win_variant s3c_fb_data_64xx_wins[] __devinitdata = {
+ 	[2] = {
+ 		.has_osd_c	= 1,
+ 		.has_osd_d	= 1,
++		.has_osd_size	= 1,
++		.osd_size_off	= 0x12,
++		.has_osd_alpha	= 1,
+ 		.palette_sz	= 16,
+ 		.palette_16bpp	= 1,
+ 		.valid_bpp	= (VALID_BPP1248 | VALID_BPP(16) |
+@@ -1467,6 +1508,7 @@ static struct s3c_fb_win_variant s3c_fb_data_64xx_wins[] __devinitdata = {
+ 	},
+ 	[3] = {
+ 		.has_osd_c	= 1,
++		.has_osd_alpha	= 1,
+ 		.palette_sz	= 16,
+ 		.palette_16bpp	= 1,
+ 		.valid_bpp	= (VALID_BPP124  | VALID_BPP(16) |
+@@ -1475,6 +1517,7 @@ static struct s3c_fb_win_variant s3c_fb_data_64xx_wins[] __devinitdata = {
+ 	},
+ 	[4] = {
+ 		.has_osd_c	= 1,
++		.has_osd_alpha	= 1,
+ 		.palette_sz	= 4,
+ 		.palette_16bpp	= 1,
+ 		.valid_bpp	= (VALID_BPP(1) | VALID_BPP(2) |
+@@ -1600,6 +1643,7 @@ static struct s3c_fb_driverdata s3c_fb_data_s3c2443 __devinitdata = {
+ 	},
+ 	.win[1] = &(struct s3c_fb_win_variant) {
+ 		.has_osd_c	= 1,
++		.has_osd_alpha	= 1,
+ 		.palette_sz	= 256,
+ 		.valid_bpp	= (VALID_BPP1248 | VALID_BPP(16) |
+ 				   VALID_BPP(18) | VALID_BPP(19) |
 -- 
 1.7.1.569.g6f426
