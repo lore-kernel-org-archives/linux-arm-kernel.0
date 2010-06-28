@@ -1,49 +1,60 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 28 Jun 2010 12:48:58 +0800
-Subject: [PATCH 3/4] pxa2xx/cpufreq: Fix PCMCIA frequency scaling
-In-Reply-To: <alpine.LFD.2.00.1006241542380.24097@xanadu.home>
-References: <1276840135-5982-1-git-send-email-marek.vasut@gmail.com>
-	<1276840135-5982-3-git-send-email-marek.vasut@gmail.com>
-	<87mxulabaw.fsf@free.fr>
-	<201006242051.27790.marek.vasut@gmail.com>
-	<20100624191208.GB7974@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1006241542380.24097@xanadu.home>
-Message-ID: <AANLkTikcn4RTbyKe8i0I3QaPayZawTk7mIaqpIWP6_6B@mail.gmail.com>
+Date: Mon, 28 Jun 2010 12:53:00 +0800
+Subject: [PATCH 3/3] pxa2xx/cpufreq: Fix PCMCIA frequency scaling
+In-Reply-To: <1277387833-5419-3-git-send-email-marek.vasut@gmail.com>
+References: <1277387833-5419-1-git-send-email-marek.vasut@gmail.com>
+	<1277387833-5419-3-git-send-email-marek.vasut@gmail.com>
+Message-ID: <AANLkTil1i0RIW1-DizTnPHszKshRWIfj8BtJmgXg2jX6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 25, 2010 at 3:46 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Thu, 24 Jun 2010, Russell King - ARM Linux wrote:
+On Thu, Jun 24, 2010 at 9:57 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> The MCxx values must be based off memory clock, not CPU core clock.
 >
->> On Thu, Jun 24, 2010 at 08:51:27PM +0200, Marek Vasut wrote:
->> > Dne St 23. ?ervna 2010 19:49:59 Robert Jarzmik napsal(a):
->> > > Marek Vasut <marek.vasut@gmail.com> writes:
->> > > > The MCxx values must be based off memory clock, not CPU core clock.
->> > > >
->> > > > This also fixes the bug where on some machines the LCD went crazy while
->> > > > using PCMCIA.
->> > >
->> > > That looks correct to me.
->> > >
->> > > Reviewed-by: Robert Jarzmik <robert.jarzmik@free.fr>
->> > >
->> > > Cheers.
->> > >
->> > > --
->> > > Robert
->> >
->> > Actually lemme rethink this ... it might still be incorrect.
->>
->> As Nicolas was the one who originally wrote that code, while he was
->> working for Montavista and interacting with Intel, I'd be surprised
->> if he didn't try finding out what the right answer is to that fixme.
+> This also fixes the bug where on some machines the LCD went crazy while using
+> PCMCIA.
 >
-> Well, I might have tried, or I might not have and this simply was never
-> revisited. But I clearly don't remember any of the context anymore.
->
->> I suspect as the fixme remained that there was no clear answer.
->
-> Whatever works in practice is probably the best answer at this point.
->
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 
-Fair enough. And this looks correct to me as well. Applied to 'fix'.
++ Reviewed-by: Robert Jarzmik <robert.jarzmik@free.fr>
+
+Applied to 'fix'.
+
+> ---
+> ?drivers/pcmcia/pxa2xx_base.c | ? ?5 ++---
+> ?1 files changed, 2 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
+> index df4532e..f370476 100644
+> --- a/drivers/pcmcia/pxa2xx_base.c
+> +++ b/drivers/pcmcia/pxa2xx_base.c
+> @@ -178,7 +178,6 @@ pxa2xx_pcmcia_frequency_change(struct soc_pcmcia_socket *skt,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long val,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpufreq_freqs *freqs)
+> ?{
+> -#warning "it's not clear if this is right since the core CPU (N) clock has no effect on the memory (L) clock"
+> ? ? ? ?switch (val) {
+> ? ? ? ?case CPUFREQ_PRECHANGE:
+> ? ? ? ? ? ? ? ?if (freqs->new > freqs->old) {
+> @@ -186,7 +185,7 @@ pxa2xx_pcmcia_frequency_change(struct soc_pcmcia_socket *skt,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "pre-updating\n",
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? freqs->new / 1000, (freqs->new / 100) % 10,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? freqs->old / 1000, (freqs->old / 100) % 10);
+> - ? ? ? ? ? ? ? ? ? ? ? pxa2xx_pcmcia_set_mcxx(skt, freqs->new);
+> + ? ? ? ? ? ? ? ? ? ? ? pxa2xx_pcmcia_set_timing(skt);
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ? ? ? ? ?break;
+>
+> @@ -196,7 +195,7 @@ pxa2xx_pcmcia_frequency_change(struct soc_pcmcia_socket *skt,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "post-updating\n",
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? freqs->new / 1000, (freqs->new / 100) % 10,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? freqs->old / 1000, (freqs->old / 100) % 10);
+> - ? ? ? ? ? ? ? ? ? ? ? pxa2xx_pcmcia_set_mcxx(skt, freqs->new);
+> + ? ? ? ? ? ? ? ? ? ? ? pxa2xx_pcmcia_set_timing(skt);
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ? ? ? ? ?break;
+> ? ? ? ?}
+> --
+> 1.7.1
+>
+>
