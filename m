@@ -1,26 +1,39 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 28 Jun 2010 13:46:50 +0530
-Subject: [PATCH resend] Watchdog: Adding support for ARM Primecell	SP805
-	Watchdog
-In-Reply-To: <20100611053049.GM3788@infomag.iguana.be>
-References: <1275465783-14052-1-git-send-email-viresh.kumar@st.com>	<4C11B711.70907@st.com>
-	<20100611053049.GM3788@infomag.iguana.be>
-Message-ID: <4C285A72.7030303@st.com>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Mon, 28 Jun 2010 17:39:39 +0900
+Subject: [PATCH v5 3/3] input: samsung-keypad - Add samsung keypad driver
+In-Reply-To: <20100625083019.GD8546@core.coreip.homeip.net>
+References: <1277101605-2435-1-git-send-email-jy0922.shim@samsung.com>
+	<1277101605-2435-3-git-send-email-jy0922.shim@samsung.com>
+	<20100625083019.GD8546@core.coreip.homeip.net>
+Message-ID: <4C285FCB.3070100@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/11/2010 11:00 AM, Wim Van Sebroeck wrote:
-> Hi Viresh,
+Hi, Dmitry.
+
+On 6/25/2010 5:30 PM, Dmitry Torokhov wrote:
+> Hi Joonyoung,
 > 
-> Still need to look at it. First finishing up another project.
-> Probably for this weekend.
+> On Mon, Jun 21, 2010 at 03:26:45PM +0900, Joonyoung Shim wrote:
+>> This patch adds support for keypad driver running on Samsung cpus. This
+>> driver is tested on GONI and Aquila board using S5PC110 cpu.
+>>
+>> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > 
-> Kind regards,
-> Wim.
+> Following my conversation with Thomas Gleixner reagrding "long playing"
+> threaded interrupt handlers I tried to convert your driver to use this
+> concept. The idea is to keep polling within IRQ thread context instead
+> of using additional work/timer structures to simplify code and ensure
+> race-free shutdown/unbind.
+> 
+> I think it was based on v4 of your driver and I'd appreciate if you could
+> give it a try.
+> 
+> Thank you.
 > 
 
-Wim,
+I have tested your patch on my v5 patchset and it is working after some
+fixing. I will post v6 patchset appling your patch.
 
-Have you reviewed this patch or still need to look at it?
-
-viresh.
+Thanks.
