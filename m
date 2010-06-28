@@ -1,49 +1,34 @@
-From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Mon, 28 Jun 2010 10:47:26 -0700 (PDT)
-Subject: [PATCH] mx31_3ds: Allow selection between host/device modes on
-	the OTG port
-In-Reply-To: <4C239E81.4040805@gmail.com>
-Message-ID: <538995.53508.qm@web51008.mail.re2.yahoo.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Mon, 28 Jun 2010 12:11:13 -0700
+Subject: [PATCH] ASoC: DaVinci: Added support for cpu clocking I2S
+In-Reply-To: <1277707487-3371-1-git-send-email-lamiaposta71@gmail.com>
+References: <1277707487-3371-1-git-send-email-lamiaposta71@gmail.com>
+Message-ID: <4C28F3D1.5060806@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
-
---- On Thu, 6/24/10, Magnus Lilja <lilja.magnus@gmail.com> wrote:
-
-> From: Magnus Lilja <lilja.magnus@gmail.com>
-> Subject: Re: [PATCH] mx31_3ds: Allow selection between host/device modes on the OTG port
-> To: "Fabio Estevam" <fabioestevam@yahoo.com>
-> Cc: linux-arm-kernel at lists.infradead.org, s.hauer at pengutronix.de, maramaopercheseimorto at gmail.com
-> Date: Thursday, June 24, 2010, 3:05 PM
-> Hi Fabio,
-> 
-> On 2010-06-23 22:52, Fabio Estevam wrote:
-> > Allow selection between host/device modes on the OTG
-> port.
-> > 
-> > Selection is made via kernel command line option:
-> > 
-> > 'otg_mode=host' or 'otg_mode=device'. Default mode is
-> device.
-> 
-> 
-> Would it be possible to select between host and device
-> during run-time, e.g. when the USB modules are loaded? I'm
-> asking out of curiosity, I don't know if Linux supports this
-> at all.
-
-Not sure if would be possible to make the selection in run-time. 
-
-I will let others comment.
-
-Sascha,
-
-I will resend this patch based on the current imx-for-2.6.26 branch.
-
-Regards,
-
-Fabio Estevam
-
-
-      
+Raffaele Recalcati wrote:
+> +		if (dev->i2s_fast_clock) {
+> +			clk_div = 256;
+can you have
+   f = (freq / params->rate_num) * params->rate_den;
+> +			do {
+> +				framesize = (freq / (--clk_div)) /
+> +					    params->rate_num *
+> +					    params->rate_den;
+and
+				framesize = f / (--clk_div);
+> +			} while (((framesize < 33) || (framesize > 4095)) &&
+> +				 (clk_div));
+> +			clk_div--;
+looks like clk_div can go negative here, should the above while say (clk_div > 1)
+> +			srgr |= DAVINCI_MCBSP_SRGR_FPER(framesize - 1);
+> +		} else {
+> +			/* symmetric waveforms */
+> +			clk_div = freq / (mcbsp_word_length * 16) /
+> +				  params->rate_num * params->rate_den;
+> +			srgr |= DAVINCI_MCBSP_SRGR_FPER(mcbsp_word_length *
+> +							16 - 1);
+> +		}
+> +		clk_div &= 0xFF;
+> +		srgr |= clk_div;
