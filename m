@@ -1,31 +1,34 @@
 From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Tue, 29 Jun 2010 09:41:36 +0300
-Subject: [PATCH] mxc_nand: fix PM
-In-Reply-To: <4C15D542.2060102@eukrea.com>
-References: <1274942000-3580-2-git-send-email-eric@eukrea.com>
-	<1274982919-13251-1-git-send-email-eric@eukrea.com>
-	<4C15D542.2060102@eukrea.com>
-Message-ID: <1277793696.1041.967.camel@localhost>
+Date: Tue, 29 Jun 2010 09:47:48 +0300
+Subject: [PATCH] ixp4xx: add support for static flash partitions
+In-Reply-To: <20100614161519.GB24877@riccoc20.at.omicron.at>
+References: <20100531162434.GA4599@riccoc20.at.omicron.at>
+	<1276420566.19028.184.camel@localhost>
+	<20100614161519.GB24877@riccoc20.at.omicron.at>
+Message-ID: <1277794068.1041.971.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-06-14 at 09:07 +0200, Eric B?nard wrote:
-> Hi Sascha,
+On Mon, 2010-06-14 at 18:15 +0200, Richard Cochran wrote:
+> On Sun, Jun 13, 2010 at 12:16:06PM +0300, Artem Bityutskiy wrote:
+> > I could fix your patch up myself, but I do not know the code, so please,
+> > re-send a patch against the latest mtd-2.6 tree.
 > 
-> Le 27/05/2010 19:55, Eric B?nard a ?crit :
-> > * when resuming, we get the following log :
-> > nand_resume called for a chip which is not in suspended state
-> > * this happens because mtd->suspend and mtd->resume are already
-> > called from the mtd layer, thus they were called a second time
-> > in mxc_nand so mtd complains when trying to resume for the
-> > second time
-> > * the fix is to remove these call and thus remove the supend and
-> > resume functions of mxc_nand
-> >
-> any news concerning this patch ?
+> Okay, here it is again, this time against today's master branch of 
+> git://git.infradead.org/mtd-2.6.git
 > 
+> Thanks,
+> Richard
+> 
+> 
+> This patch adds support for static flash partitioning from a platform
+> device. Also, we clean up some weirdness where statements were separated
+> by commas instead of semicolons. While we are at it, fix some minor bad
+> white space, too.
+> 
+> Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
 
-Pushed to l2-mtd-2.6.git / dunno
+Pushed to l2-mtd-2.6.git / dunno.
 
 -- 
 Best Regards,
