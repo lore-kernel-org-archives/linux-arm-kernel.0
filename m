@@ -1,86 +1,194 @@
-From: PeterHuewe@gmx.de (Peter =?iso-8859-1?q?H=FCwe?=)
-Date: Tue, 29 Jun 2010 19:35:39 +0200
-Subject: [PATCH] serial: fix rs485 for atmel_serial on avr32
-Message-ID: <201006291935.40229.PeterHuewe@gmx.de>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Tue, 29 Jun 2010 20:33:06 +0200
+Subject: [PATCH v5] libata: pata_samsung: Add Samsung PATA controller
+	driver
+In-Reply-To: <1277809518-1122-1-git-send-email-kgene.kim@samsung.com>
+References: <1277809518-1122-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <4C2A3C62.4090101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Huewe <peterhuewe@gmx.de>
+ Op 29-06-10 13:05, Kukjin Kim schreef:
+> From: Abhilash Kesavan <a.kesavan@samsung.com>
+>
+> Adds support for the Samsung PATA controller. This driver is based on the
+> Libata subsystem and references the earlier patches sent for IDE subsystem.
+>
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> ---
+>  drivers/ata/Kconfig           |    9 +
+>  drivers/ata/Makefile          |    1 +
+>  drivers/ata/pata_samsung_cf.c |  728 +++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 738 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/ata/pata_samsung_cf.c
+>
+> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+> index 73f8833..51e28e7 100644
+> --- a/drivers/ata/Kconfig
+> +++ b/drivers/ata/Kconfig
+> @@ -796,6 +796,15 @@ config PATA_RZ1000
+>  
+>  	  If unsure, say N.
+>  
+> +config PATA_SAMSUNG_CF
+> +	tristate "Samsung SoC PATA support"
+> +	depends on SAMSUNG_DEV_IDE
+> +	help
+> +	  This option enables basic support for Samsung's S3C/S5P board
+> +	  PATA controllers via the new ATA layer
+> +
+> +	  If unsure, say N.
+> +
+>  config PATA_WINBOND_VLB
+>  	tristate "Winbond W83759A VLB PATA support (Experimental)"
+>  	depends on ISA && EXPERIMENTAL
+> diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
+> index 7ef89d7..9576776 100644
+> --- a/drivers/ata/Makefile
+> +++ b/drivers/ata/Makefile
+> @@ -87,6 +87,7 @@ obj-$(CONFIG_PATA_OF_PLATFORM)	+= pata_of_platform.o
+>  obj-$(CONFIG_PATA_QDI)		+= pata_qdi.o
+>  obj-$(CONFIG_PATA_RB532)	+= pata_rb532_cf.o
+>  obj-$(CONFIG_PATA_RZ1000)	+= pata_rz1000.o
+> +obj-$(CONFIG_PATA_SAMSUNG_CF)	+= pata_samsung_cf.o
+>  obj-$(CONFIG_PATA_WINBOND_VLB)	+= pata_winbond.o
+>  
+>  # Should be last but two libata driver
+> diff --git a/drivers/ata/pata_samsung_cf.c b/drivers/ata/pata_samsung_cf.c
+> new file mode 100644
+> index 0000000..26b96c3
+> --- /dev/null
+> +++ b/drivers/ata/pata_samsung_cf.c
+> @@ -0,0 +1,728 @@
+> +/*
+> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * PATA driver for Samsung SoCs.
+> + * Supports CF Interface in True IDE mode. Currently only PIO mode has been
+> + * implemented; UDMA support has to be added.
+> + *
+> + * Based on:
+> + *	PATA driver for AT91SAM9260 Static Memory Controller
+> + *	PATA driver for Toshiba SCC controller
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License version 2
+> + * as published by the Free Software Foundation.
+> +*/
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/init.h>
+> +#include <linux/clk.h>
+> +#include <linux/libata.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +
+> +#include <plat/ata.h>
+> +#include <plat/regs-ata.h>
+> +
+> +#define DRV_NAME "pata_samsung_cf"
+> +#define DRV_VERSION "0.1"
+> +
+> +enum s3c_cpu_type {
+> +	TYPE_S3C64XX,
+> +	TYPE_S5PC100,
+> +	TYPE_S5PV210,
+> +};
+> +
+> +/*
+> + * struct s3c_ide_info - S3C PATA instance.
+> + * @clk: The clock resource for this controller.
+> + * @ide_addr: The area mapped for the hardware registers.
+> + * @sfr_addr: The area mapped for the special function registers.
+> + * @irq: The IRQ number we are using.
+> + * @cpu_type: The exact type of this controller.
+> + * @fifo_status_reg: The ATA_FIFO_STATUS register offset.
+> + */
+> +struct s3c_ide_info {
+> +	struct clk *clk;
+> +	void __iomem *ide_addr;
+> +	void __iomem *sfr_addr;
+> +	unsigned int irq;
+> +	enum s3c_cpu_type cpu_type;
+> +	unsigned int fifo_status_reg;
+> +};
+> +
+> +static void pata_s3c_set_endian(void __iomem *s3c_ide_regbase, u8 mode)
+> +{
+> +	u32 reg = readl(s3c_ide_regbase + S3C_ATA_CFG);
+> +	reg = mode ? (reg & ~S3C_ATA_CFG_SWAP) : (reg | S3C_ATA_CFG_SWAP);
+> +	writel(reg, s3c_ide_regbase + S3C_ATA_CFG);
+> +}
+> +
+> +static void pata_s3c_cfg_mode(void __iomem *s3c_ide_sfrbase)
+> +{
+> +	/* Select true-ide as the internal operating mode */
+> +	writel(readl(s3c_ide_sfrbase + S3C_CFATA_MUX) | S3C_CFATA_MUX_TRUEIDE,
+> +		s3c_ide_sfrbase + S3C_CFATA_MUX);
+> +}
+> +
+> +static unsigned long
+> +pata_s3c_setup_timing(struct s3c_ide_info *info, const struct ata_timing *ata)
+> +{
+> +	int t1 = ata->setup;
+> +	int t2 = ata->act8b;
+> +	int t2i = ata->rec8b;
+> +	ulong piotime;
+> +
+> +	piotime = ((t2i & 0xff) << 12) | ((t2 & 0xff) << 4) | (t1 & 0xf);
+> +
+> +	return piotime;
+> +}
+> +
+> +static void pata_s3c_set_piomode(struct ata_port *ap, struct ata_device *adev)
+> +{
+> +	struct s3c_ide_info *info = ap->host->private_data;
+> +	struct ata_timing timing;
+> +	int cycle_time;
+> +	ulong ata_cfg = readl(info->ide_addr + S3C_ATA_CFG);
+> +	ulong piotime;
+> +
+> +	/* Enables IORDY if mode requires it */
+> +	if (ata_pio_need_iordy(adev))
+> +		ata_cfg |= S3C_ATA_CFG_IORDYEN;
+> +	else
+> +		ata_cfg &= ~S3C_ATA_CFG_IORDYEN;
+> +
+> +	cycle_time = (int)(1000000000UL / clk_get_rate(info->clk));
+> +
+> +	ata_timing_compute(adev, adev->pio_mode, &timing,
+> +					cycle_time * 1000, 0);
+> +
+> +	piotime = pata_s3c_setup_timing(info, &timing);
+> +
+> +	writel(ata_cfg, info->ide_addr + S3C_ATA_CFG);
+> +	writel(piotime, info->ide_addr + S3C_ATA_PIO_TIME);
+> +}
+> +
+> +/*
+> + * Waits until the IDE controller is able to perform next read/write
+> + * operation to the disk. Needed for 64XX series boards only.
+> + */
+> +static int wait_for_host_ready(struct s3c_ide_info *info)
+> +{
+> +	ulong timeout;
+> +	void __iomem *fifo_reg = info->ide_addr + info->fifo_status_reg;
+> +
 
-This patch fixes a build failure [1-4] in the atmel_serial code introduced by
-patch the patch ARM: 6092/1: atmel_serial: support for RS485
-communications (e8faff7330a3501eafc9bfe5f4f15af444be29f5)
+Shouldn't this have an if (type != S3C64XX) return 0; ?
 
-The build failure was caused by missing struct field and missing defines
-for the avr32 board - the patch fixes this.
+> +	/* wait for maximum of 20 msec */
+> +	timeout = jiffies + msecs_to_jiffies(20);
+> +	while (time_before(jiffies, timeout)) {
+> +		if ((readl(fifo_reg) >> 28) == 0)
+> +			return 0;
+> +	}
+> +	return -EBUSY;
+> +}
 
-Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
----
-Despite so many reviewers of the original patch no one seemed to 
-notice this issue :/
-
-KernelVersion: linux-next-20100629
-
-References:
-[1] http://kisskb.ellerman.id.au/kisskb/buildresult/2575242/ - first failure
-in linux-next, may 11th
-[2] http://kisskb.ellerman.id.au/kisskb/buildresult/2816418/ - still
-exists as of today
-[3] http://kisskb.ellerman.id.au/kisskb/buildresult/2617511/ - first
-failure in Linus' tree - May 20th - did really no one notice this?!
-[4] http://kisskb.ellerman.id.au/kisskb/buildresult/2813956/ - still
-exists in Linus' tree as of today
-
- arch/avr32/include/asm/ioctls.h             |    3 +++
- arch/avr32/mach-at32ap/include/mach/board.h |    2 ++
- drivers/serial/atmel_serial.c               |    1 +
- 3 files changed, 6 insertions(+), 0 deletions(-)
-
-diff --git a/arch/avr32/include/asm/ioctls.h b/arch/avr32/include/asm/ioctls.h
-index bb32b6f..b7dd324 100644
---- a/arch/avr32/include/asm/ioctls.h
-+++ b/arch/avr32/include/asm/ioctls.h
-@@ -55,6 +55,9 @@
- #define TIOCSPTLCK	_IOW('T',0x31, int)  /* Lock/unlock Pty */
- #define TIOCSIG		_IOW('T',0x36, int)  /* Generate signal on Pty slave */
- 
-+#define TIOCGRS485      0x542E
-+#define TIOCSRS485      0x542F
-+
- #define FIONCLEX	0x5450
- #define FIOCLEX		0x5451
- #define FIOASYNC	0x5452
-diff --git a/arch/avr32/mach-at32ap/include/mach/board.h b/arch/avr32/mach-at32ap/include/mach/board.h
-index c7f25bb..6174020 100644
---- a/arch/avr32/mach-at32ap/include/mach/board.h
-+++ b/arch/avr32/mach-at32ap/include/mach/board.h
-@@ -5,6 +5,7 @@
- #define __ASM_ARCH_BOARD_H
- 
- #include <linux/types.h>
-+#include <linux/serial.h>
- 
- #define GPIO_PIN_NONE	(-1)
- 
-@@ -35,6 +36,7 @@ struct atmel_uart_data {
- 	short		use_dma_tx;	/* use transmit DMA? */
- 	short		use_dma_rx;	/* use receive DMA? */
- 	void __iomem	*regs;		/* virtual base address, if any */
-+	struct serial_rs485	rs485;		/* rs485 settings */
- };
- void at32_map_usart(unsigned int hw_id, unsigned int line, int flags);
- struct platform_device *at32_add_device_usart(unsigned int id);
-diff --git a/drivers/serial/atmel_serial.c b/drivers/serial/atmel_serial.c
-index eed3c2d..a182def 100644
---- a/drivers/serial/atmel_serial.c
-+++ b/drivers/serial/atmel_serial.c
-@@ -41,6 +41,7 @@
- #include <linux/uaccess.h>
- 
- #include <asm/io.h>
-+#include <asm/ioctls.h>
- 
- #include <asm/mach/serial_at91.h>
- #include <mach/board.h>
 -- 
-1.7.1
+Maurus Cuelenaere
