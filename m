@@ -1,39 +1,61 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 29 Jun 2010 17:39:44 +0900
-Subject: [PATCH v4] libata: pata_samsung_cf: Add Samsung PATA	controller
-	driver
-In-Reply-To: <20100626193310.GA19339@n2100.arm.linux.org.uk>
-References: <1276499263-12217-1-git-send-email-kgene.kim@samsung.com>
-	<4C22704B.50103@pobox.com>
-	<001f01cb1417$dce8f8d0$96baea70$%kim@samsung.com>
-	<20100626193310.GA19339@n2100.arm.linux.org.uk>
-Message-ID: <00c901cb1766$a36c2df0$ea4489d0$%kim@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 29 Jun 2010 10:31:05 +0100
+Subject: PB1176 broken in 2.6.35-rc1, bisected
+In-Reply-To: <AANLkTilcyi6Tjwvz1eU211Q41RcwQAwYAAkoQwhDe-Vj@mail.gmail.com>
+References: <AANLkTikoCy2FH_5ICh-iiI_wzGj6D6oszyM-zCXkNC_4@mail.gmail.com>
+	<1275518783.27834.2.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTimJkaadEM1xvG30WVvEjJPZQXHwx216SeqWFKNp@mail.gmail.com>
+	<1275581709.8775.14.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTilcyi6Tjwvz1eU211Q41RcwQAwYAAkoQwhDe-Vj@mail.gmail.com>
+Message-ID: <1277803865.19746.9.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote:
-> 
-> On Fri, Jun 25, 2010 at 12:38:19PM +0900, Kukjin Kim wrote:
-> > Russell,
+On Tue, 2010-06-29 at 01:42 +0100, Linus Walleij wrote:
+> 2010/6/3 Catalin Marinas <catalin.marinas@arm.com>:
+> > On Thu, 2010-06-03 at 09:48 +0100, Linus Walleij wrote:
+> >> 2010/6/3 Catalin Marinas <catalin.marinas@arm.com>:
+> >> > On Wed, 2010-06-02 at 23:33 +0100, Linus Walleij wrote:
+> >> >> my PB1176 doesn't boot properly in 2.6.35-rc1, it goes to this point
+> >> >> and hangs:
+> >> >>
+> >> >> (...)
+> >> >> Switching to clocksource timer3
+> >> >> NET: Registered protocol family 2
+> >> >> IP route cache hash table entries: 1024 (order: 0, 4096 bytes)
+> >> >> TCP established hash table entries: 4096 (order: 3, 32768 bytes)
+> >> >> TCP bind hash table entries: 4096 (order: 2, 16384 bytes)
+> >> >> TCP: Hash tables configured (established 4096 bind 4096)
+> >> >> TCP reno registered
+> >> >> UDP hash table entries: 256 (order: 0, 4096 bytes)
+> >> >> UDP-Lite hash table entries: 256 (order: 0, 4096 bytes)
+> >> >> NET: Registered protocol family 1
+> >> >> RPC: Registered udp transport module.
+> >> >> RPC: Registered tcp transport module.
+> >> >> RPC: Registered tcp NFSv4.1 backchannel transport module.
+> >> >
+> >> > Have you tried disabling CONFIG_CACHE_L2X0?
+> >>
+> >> Hey it works! :-)
+> >>
+> >> I suppose your latest patches will hopefully  get the defconfig with
+> >> l2x0 working again in -rc2 if they're merged?
 > >
-> > How do you think?
-> > May I send this to your patch tracking system?
-> > Or...how should I handle this?
+> > I think there is an L2 erratum (and trying to get the right workaround).
+> > It may be triggered by commit e7c5650f6.
+> >
+> > I'll get back on the list with a patch.
 > 
-> If Jeff is happy, then I'm happy.  However, shouldn't it also have Ben's
-> ack?
+> Have I missed this? My 2.6.35's and -next trees still require me to
+> disable the L2X0 cache on the PB1176 for it to boot.
+> 
+> It's a bit sad if we have a 2.6.35 which cannot even boot on this
+> card...
 
-Sounds good :-)
+I posted some patches couple of times but I haven't received any
+comments. I'm posting another version (now only affecting the RealView
+code) and cc you. If it works for you as well, I'll send it to the patch
+system.
 
-Hmm..submitted has been addressed comments from Ben.
-So maybe can get the Ben's ack.
-
-But will waiting for Ben's ack.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Catalin
