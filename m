@@ -1,103 +1,32 @@
-From: coffbeta@gmail.com (CoffBeta)
-Date: Tue, 29 Jun 2010 16:29:04 +0800
-Subject: gpiolib and sleeping gpios
-In-Reply-To: <4C1E88AE.5070808@bluewatersys.com>
-References: <386783.17931.qm@web180310.mail.gq1.yahoo.com>
-	<4C1E88AE.5070808@bluewatersys.com>
-Message-ID: <AANLkTinunR-mrXFh8uLV5YfeArC-_A1NJWz708n7r4pU@mail.gmail.com>
+From: inki.dae@samsung.com (InKi Dae)
+Date: Tue, 29 Jun 2010 17:31:46 +0900
+Subject: [PATCH 0/3] ARM: S5PV210: Add MIPI-DSI support.
+Message-ID: <4C29AF72.6090200@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- non-sleeping
+Hello all,
 
-On Mon, Jun 21, 2010 at 05:31, Ryan Mallon <ryan@bluewatersys.com> wrote:
-> On 06/19/2010 06:21 PM, David Brownell wrote:
->>
->>>
->>> The runtime warnings will only show instances where the
->>> non-sleeping
->>> versions where called instead of the sleeping versions.
->>
->> ... *AND* the GPIO requires the cansleep() version...
->>
->> Right; such calls are errors. ?We issue
->> warnings since fault returns are inapplicable.
->
-> A driver which only uses the non-sleeping versions, but _could_ use the
-> cansleep variants (ie all calls to gpio_(set/get)_value are made from
-> contexts where it is possible to sleep) is not so easy to spot. Passing
-> a sleeping to gpio to such a driver will result in spurious warnings.
->
->>> There is no
->>> warning to say that we are calling the spinlock safe
->>> version, where it is possible to sleep.
->>
->> The call context isn't what controls whether
->> gpio_get_value() or gpio_get_value_cansleep()
->> is appropriate ... it's the GPIO itself, and
->> how its implementation works.
->
-> No, a driver should not know anything about a gpio which is passed to
-> it. If a driver is able to call the cansleep variants, then it should,
-> and it will allow any gpio, sleeping or non-sleeping, to be used with
-> that driver.
->
-> If a driver uses a gpio in such a way that it cannot sleep, ie the
-> gpio_(get/set)_value calls are made from spinlock context, then only
-> gpios which do not sleep may be used with that driver.
->
-> Thats why I think specifying whether the gpio is able to sleep when it
-> is requested is a good idea. A driver which cannot use a sleeping gpio
->
->
->> "possible to sleep" is a GPIO attribute,
->> exposed by a predicate. ?If spinlock-safe
->> calls are used on GPIOs with that attribute,
->> ?a warning *IS* issued.
->
-> Possible to sleep is also an attribute of how a driver _uses_ a gpio.
->
->>>
->>> The point I was trying to make is that there are lots of
->>> drivers which
->>> will not work with gpios on sleeping io expanders because
->>> they call the
->>> spinlock safe gpio calls.
->>
->> And they will trigger runtime warnings, and
->> thus eventually get fixed. ?The way to do that
->> is to check if the GPIO needs the cansleep()
->> call
->
-> Hmm, maybe this then for drivers which cannot accept sleeping gpios:
->
-> ?if (gpio_cansleep(some_gpio)) {
-> ? ? ? ? ?dev_err(&dev, "This driver only supports non-sleeping gpios");
-> ? ? ? ? ?return -EINVAL;
-> ?}
->
-> ?err = gpio_request(some_gpio, "some_gpio");
->
-> I think ideally, gpio_request should specify this via a flags argument, ie:
->
-> ?#define GPIOF_NO_SLEEP ? ? ? ?0x0
-> ?#define GPIOF_CANSLEEP ? ? ? ?0x1
->
-> ?err = gpio_request(some_gpio, "some_gpio", GPIOF_NO_SLEEP);
->
-> ~Ryan
->
-> --
-> Bluewater Systems Ltd - ARM Technology Solution Centre
->
-> Ryan Mallon ? ? ? ? ? ? ? ? ? ? 5 Amuri Park, 404 Barbadoes St
-> ryan at bluewatersys.com ? ? ? ? ? PO Box 13 889, Christchurch 8013
-> http://www.bluewatersys.com ? ? New Zealand
-> Phone: +64 3 3779127 ? ? ? ? ? ?Freecall: Australia 1800 148 751
-> Fax: ? +64 3 3779135 ? ? ? ? ? ? ? ? ? ? ?USA 1800 261 2934
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
->
+This patch is for MIPI-DSI controller based on S5PV210 (or S5PC110).
+
+LCD Panel can use following interfaces,
+- RGB or CPU Interface.
+- RGB or CPU Interface based on MIPI-DSI.
+
+In case of small size lcd panel, it was ok only rgb or cpu interface not
+using mipi controller.
+But big size panel(more then 480x800) needs MIPI-DSI Interface or other
+hardwares like LVDS
+To transfer image data to lcd panel fine.
+
+I tested this patch on cpu interface based on MIPI so for this patch,
+Some mainline codes should be modified and also considered RGB interface.
+
+This patch set consists of the following patches,
+
+[PATCH 1/3] FB: Add some members for CPU Interface.
+[PATCH 2/3] S5PV210: FB: Add MIPI-DSI and CPU Interface features.
+[PATCH 3/3] S5PV210: Add MIPI-DSI Driver.
+
+Best regards,
+InKi Dae
