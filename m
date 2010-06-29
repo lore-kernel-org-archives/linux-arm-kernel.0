@@ -1,50 +1,42 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Jun 2010 14:47:38 +0300
-Subject: [PATCH 6/6] omap2/3/4: Add Kconfig option to compile in typical omap
-	features
-In-Reply-To: <20100629113229.16008.2931.stgit@baageli.muru.com>
-References: <20100629113229.16008.2931.stgit@baageli.muru.com>
-Message-ID: <20100629114738.16008.62006.stgit@baageli.muru.com>
+Date: Tue, 29 Jun 2010 14:47:08 +0300
+Subject: [PATCH 0/6] omap Kconfig improvments for 2.6.36 merge window
+Message-ID: <20100629113229.16008.2931.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This produces a sane config that's suitable for using as the
-base for most omap2/3/4 boards.
+Hi all,
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Here are some Kconfig improvments to produce a mostly sane .config for
+omap2/3/4 without a defconfig. This assumes that CONFIG_ARCH_OMAP is
+selected, for example with:
+
+$ echo "CONFIG_ARCH_OMAP=y" > .config && yes "" | ARCH=arm make oldconfig
+
+or
+
+$ rm .config; ARCH=arm make xconfig, then select System Type -> TI OMAP
+
+Regards,
+
+Tony
+
 ---
- arch/arm/mach-omap2/Kconfig |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 4802988..84fecd0 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -2,6 +2,27 @@ if ARCH_OMAP2PLUS
- 
- menu "TI OMAP2/3/4 Specific Features"
- 
-+config ARCH_OMAP2PLUS_TYPICAL
-+	bool "Typical OMAP configuration"
-+	default y
-+	select AEABI
-+	select REGULATOR
-+	select PM
-+	select PM_RUNTIME
-+	select VFP
-+	select NEON if ARCH_OMAP3 || ARCH_OMAP4
-+	select SERIAL_8250
-+	select SERIAL_CORE_CONSOLE
-+	select SERIAL_8250_CONSOLE
-+	select I2C
-+	select I2C_OMAP
-+	select MFD
-+	select MENELAUS if ARCH_OMAP2
-+	select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
-+	select TWL4030_POWER if ARCH_OMAP3 || ARCH_OMAP4
-+	help
-+	  Compile a kernel suitable for booting most boards
-+
- config ARCH_OMAP2
- 	bool "TI OMAP2"
- 	depends on ARCH_OMAP2PLUS
+Tony Lindgren (6):
+      omap: Disable VGA console for omaps
+      omap: Use 32KiHZ timer by default
+      omap: Make omap specific features appear under Kconfig menu
+      omap2/3/4: Move Kconfig options to mach-omap2/Kconfig
+      omap2/3/4: Select all omaps and boards by default
+      omap2/3/4: Add Kconfig option to compile in typical omap features
+
+
+ arch/arm/mach-omap1/Kconfig   |    7 ++++
+ arch/arm/mach-omap2/Kconfig   |   74 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/plat-omap/Kconfig    |   22 +-----------
+ drivers/video/console/Kconfig |    2 +
+ 4 files changed, 84 insertions(+), 21 deletions(-)
+
+-- 
+Signature
