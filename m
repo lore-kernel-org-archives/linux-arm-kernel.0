@@ -1,32 +1,39 @@
-From: inki.dae@samsung.com (InKi Dae)
-Date: Tue, 29 Jun 2010 17:31:46 +0900
-Subject: [PATCH 0/3] ARM: S5PV210: Add MIPI-DSI support.
-Message-ID: <4C29AF72.6090200@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 29 Jun 2010 17:39:44 +0900
+Subject: [PATCH v4] libata: pata_samsung_cf: Add Samsung PATA	controller
+	driver
+In-Reply-To: <20100626193310.GA19339@n2100.arm.linux.org.uk>
+References: <1276499263-12217-1-git-send-email-kgene.kim@samsung.com>
+	<4C22704B.50103@pobox.com>
+	<001f01cb1417$dce8f8d0$96baea70$%kim@samsung.com>
+	<20100626193310.GA19339@n2100.arm.linux.org.uk>
+Message-ID: <00c901cb1766$a36c2df0$ea4489d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+Russell King wrote:
+> 
+> On Fri, Jun 25, 2010 at 12:38:19PM +0900, Kukjin Kim wrote:
+> > Russell,
+> >
+> > How do you think?
+> > May I send this to your patch tracking system?
+> > Or...how should I handle this?
+> 
+> If Jeff is happy, then I'm happy.  However, shouldn't it also have Ben's
+> ack?
 
-This patch is for MIPI-DSI controller based on S5PV210 (or S5PC110).
+Sounds good :-)
 
-LCD Panel can use following interfaces,
-- RGB or CPU Interface.
-- RGB or CPU Interface based on MIPI-DSI.
+Hmm..submitted has been addressed comments from Ben.
+So maybe can get the Ben's ack.
 
-In case of small size lcd panel, it was ok only rgb or cpu interface not
-using mipi controller.
-But big size panel(more then 480x800) needs MIPI-DSI Interface or other
-hardwares like LVDS
-To transfer image data to lcd panel fine.
+But will waiting for Ben's ack.
 
-I tested this patch on cpu interface based on MIPI so for this patch,
-Some mainline codes should be modified and also considered RGB interface.
-
-This patch set consists of the following patches,
-
-[PATCH 1/3] FB: Add some members for CPU Interface.
-[PATCH 2/3] S5PV210: FB: Add MIPI-DSI and CPU Interface features.
-[PATCH 3/3] S5PV210: Add MIPI-DSI Driver.
+Thanks.
 
 Best regards,
-InKi Dae
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
