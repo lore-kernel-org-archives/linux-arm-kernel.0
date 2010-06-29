@@ -1,71 +1,69 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 29 Jun 2010 20:23:28 +0900
-Subject: [PATCH 5/8] ARM: S5PV310: Add Timer support
-In-Reply-To: <20100628151918.GC3287@debian>
-References: <1277476037-8806-1-git-send-email-kgene.kim@samsung.com>
-	<1277476037-8806-6-git-send-email-kgene.kim@samsung.com>
-	<20100628151918.GC3287@debian>
-Message-ID: <00e501cb177d$821387e0$863a97a0$%kim@samsung.com>
+Date: Tue, 29 Jun 2010 20:32:13 +0900
+Subject: [PATCH v4] libata: pata_samsung_cf: Add Samsung PATA controller
+	driver
+In-Reply-To: <201006250618.37076.marek.vasut@gmail.com>
+References: <1276499263-12217-1-git-send-email-kgene.kim@samsung.com>
+	<4C22704B.50103@pobox.com>
+	<001f01cb1417$dce8f8d0$96baea70$%kim@samsung.com>
+	<201006250618.37076.marek.vasut@gmail.com>
+Message-ID: <00e701cb177e$bab1e550$3015aff0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rabin Vincent wrote:
+Marek Vasut wrote:
 > 
-Hi Rabin,
+Hello Marek,
 
-Thanks for your comments. :-)
-
-> On Fri, Jun 25, 2010 at 11:27:14PM +0900, Kukjin Kim wrote:
-> > +static void s5pv310_pwm_init(unsigned int pwm_id, unsigned long tcnt)
-> > +{
-> > +	unsigned long tcon;
-> > +
-> > +	tcon = __raw_readl(S3C2410_TCON);
-> > +
-> > +	/* timers reload after counting zero, so reduce the count by 1 */
-> > +	tcnt--;
-> > +
-> > +	printk(KERN_DEBUG "timer tcon=%08lx, tcnt %08lx\n", tcon, tcnt);
+> Dne P? 25. ?ervna 2010 05:38:19 Kukjin Kim napsal(a):
+> > Jeff Garzik wrote:
+> > > On 06/14/2010 03:07 AM, Kukjin Kim wrote:
+> > > > From: Abhilash Kesavan<a.kesavan@samsung.com>
+> > > >
+> > > > Adds support for the Samsung PATA controller. This driver is based on
+> >
+> > the
+> >
+> > > > Libata subsystem and references the earlier patches sent for IDE
+> >
+> > subsystem.
+> >
+> > > > Signed-off-by: Abhilash Kesavan<a.kesavan@samsung.com>
+> > > > Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
+> > >
+> > > Acked-by: Jeff Garzik <jgarzik@redhat.com>
+> > >
+> > > Send it through the appropriate subsystem tree for this platform...
+> >
+> > Hi,
+> >
+> > You mean in my case, appropriate subsystem tree is ARM tree.
+> > But I think, as Ben commented, it's better drivers go to upstream via the
+> > driver's tree.
+> > And of course, I read your comments about this like below...
+> > 'platform drivers do not build and/or work without additional platform
+> > glue...'
+> >
+> > Hmm.
+> > I'm not sure which way is better...
 > 
-> This function is called from set_event().  Do you really want this
-> printk every time a tick is programmed?
-> 
-Yeah, you're right.
-Will modify it.
+> I pushed pata_pxa through Eric as well ... go for the linux-arm tree.
 
-> > +static void __init s5pv310_clocksource_init(void)
-> > +{
-> > +	unsigned long pclk;
-> > +	unsigned long clock_rate;
-> > +
-> > +	pclk = clk_get_rate(timerclk);
-> > +
-> > +	clk_set_rate(tdiv2, pclk / 2);
-> > +	clk_set_parent(tin2, tdiv2);
-> > +
-> > +	clock_rate = clk_get_rate(tin2);
-> > +
-> > +	pwm_clocksource.mult =
-> > +		clocksource_khz2mult(clock_rate/1000,
-pwm_clocksource.shift);
-> > +
-> > +	if (clocksource_register(&pwm_clocksource))
-> > +		panic("%s: can't register clocksource\n",
-> pwm_clocksource.name);
-> > +
-> > +	s5pv310_pwm_init(2, ~0);
-> > +	s5pv310_pwm_start(2, 1);
-> > +}
-> > +
-> 
-> It would probably be prudent to start the clocksource before registering
-> it, rather than after.
+Thanks for your help ;-)
 
-Oh, yes.
-Will change it.
-
+But if possible, rmk patch tracking system is better to me.
+As Russell's comments, I will send to rmk with Ben's ack.
 
 Thanks.
+
+> Cheers
+> >
+> > Russell,
+> >
+> > How do you think?
+> > May I send this to your patch tracking system?
+> > Or...how should I handle this?
+> >
 
 Best regards,
 Kgene.
