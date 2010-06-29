@@ -1,72 +1,57 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 28 Jun 2010 16:47:49 -0700
-Subject: [PATCH v2 1/3] OMAP: PM: initial runtime PM core support
-In-Reply-To: <87fx06viuc.fsf@deeprootsystems.com>
-References: <1277422991-25350-1-git-send-email-khilman@deeprootsystems.com>
-	<1277422991-25350-2-git-send-email-khilman@deeprootsystems.com>
-	<AANLkTim4p54brsmph6oaKfoEZwO1GOGfgRNV9vJykOjl@mail.gmail.com>
-	<874ogrng3j.fsf@deeprootsystems.com>
-	<AANLkTimMnJvOJrRHDiE6PH1BXpRz2-6pY1M9nKHw7vpn@mail.gmail.com>
-	<87fx06viuc.fsf@deeprootsystems.com>
-Message-ID: <AANLkTimgPdrhpDKxd9YhficNddzLEbw_hxkM6_6rh4Wg@mail.gmail.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Tue, 29 Jun 2010 02:42:16 +0200
+Subject: PB1176 broken in 2.6.35-rc1, bisected
+In-Reply-To: <1275581709.8775.14.camel@e102109-lin.cambridge.arm.com>
+References: <AANLkTikoCy2FH_5ICh-iiI_wzGj6D6oszyM-zCXkNC_4@mail.gmail.com>
+	<1275518783.27834.2.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTimJkaadEM1xvG30WVvEjJPZQXHwx216SeqWFKNp@mail.gmail.com>
+	<1275581709.8775.14.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <AANLkTilcyi6Tjwvz1eU211Q41RcwQAwYAAkoQwhDe-Vj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 28, 2010 at 4:27 PM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
-> Grant Likely <grant.likely@secretlab.ca> writes:
->
-> [...]
->
+2010/6/3 Catalin Marinas <catalin.marinas@arm.com>:
+> On Thu, 2010-06-03 at 09:48 +0100, Linus Walleij wrote:
+>> 2010/6/3 Catalin Marinas <catalin.marinas@arm.com>:
+>> > On Wed, 2010-06-02 at 23:33 +0100, Linus Walleij wrote:
+>> >> my PB1176 doesn't boot properly in 2.6.35-rc1, it goes to this point
+>> >> and hangs:
+>> >>
+>> >> (...)
+>> >> Switching to clocksource timer3
+>> >> NET: Registered protocol family 2
+>> >> IP route cache hash table entries: 1024 (order: 0, 4096 bytes)
+>> >> TCP established hash table entries: 4096 (order: 3, 32768 bytes)
+>> >> TCP bind hash table entries: 4096 (order: 2, 16384 bytes)
+>> >> TCP: Hash tables configured (established 4096 bind 4096)
+>> >> TCP reno registered
+>> >> UDP hash table entries: 256 (order: 0, 4096 bytes)
+>> >> UDP-Lite hash table entries: 256 (order: 0, 4096 bytes)
+>> >> NET: Registered protocol family 1
+>> >> RPC: Registered udp transport module.
+>> >> RPC: Registered tcp transport module.
+>> >> RPC: Registered tcp NFSv4.1 backchannel transport module.
+>> >
+>> > Have you tried disabling CONFIG_CACHE_L2X0?
 >>
->>> This affects many aspects of all drivers, from register and probe (for
->>> early devices/drivers too!) to all the plaform_get_resource() usage, all
->>> of which assumes a platform_driver and platform_device. ?I didn't look
->>> closely, but I didn't see if (or how) OF was handling early devices.
+>> Hey it works! :-)
 >>
->> You don't have to reimplement the entire platform bus. ?You could
->> simply create a new bus type, but reuse all the existing platform bus
->> code. ?All that changes is the bus type that the device and the driver
->> gets registered on. ?Then you could easily replace only the functions
->> that matter. ?(do a git grep platform_bus_type to see how few
->> references there actually are. ?It looks like there are only 5
->> references to it in drivers/base/platform.c that you'd need to work
->> around; in platform_device_add(), platform_driver_register(), 2 in
->> platform_driver_probe(), and the register in platform_bus_init(). ?You
->> may not even need to reimplement platform_driver_probe().
->>
->> It might even be as simple as doing this:
->> - ? ? ? ?pdev->dev.bus = &platform_bus_type;
->> + ? ? ? if (!pdev->dev.bus)
->> + ? ? ? ? ? ? ? ?pdev->dev.bus = &platform_bus_type;
->>
->> So that a different bus type can be selected at device registration
->> time
+>> I suppose your latest patches will hopefully ?get the defconfig with
+>> l2x0 working again in -rc2 if they're merged?
 >
-> just FYI...
+> I think there is an L2 erratum (and trying to get the right workaround).
+> It may be triggered by commit e7c5650f6.
 >
-> as a quick proof of concept, I've done a quick hack just to prove to
-> myself that I could use platform_devices on a custom bus, and it indeed
-> works. ?The small patch below[1] shows the changes required to the
-> platform code.
->
-> Next step was to hack up minimal custom bus code. ?The quickest (and
-> dirtiest) way was to simply memcpy platform_bus_type into my new
-> omap_bus_type and then override the few dev_pm_ops functions I needed[2].
->
-> So, with these in place, and using the dev_pm_ops functions from
-> $SUBJECT patch, I was able register a platform_device and
-> platform_driver onto my custom bus and see my custom dev_pm_ops
-> functions being used as expected.
+> I'll get back on the list with a patch.
 
-Nice!
+Have I missed this? My 2.6.35's and -next trees still require me to
+disable the L2X0 cache on the PB1176 for it to boot.
 
-> While admittedly a bit hacky, at least this paves the way in my head
-> that this is indeed do-able, and I can take my vacation in peace without
-> this particular problem haunting me (too much.)
+It's a bit sad if we have a 2.6.35 which cannot even boot on this
+card...
 
-indeed.  It could be less hacky also by adding a
-platform_bus_type_init() function to the common platform code.
+Can you send me a copy of the errata so I can look at it if
+you're swamped with other stuff?
 
-Cheers,
-g.
+Yours,
+Linus Walleij
