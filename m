@@ -1,84 +1,76 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 29 Jun 2010 19:23:15 +0530
-Subject: [PATCH 6/6] omap2/3/4: Add Kconfig option to compile in typical
-	omap	features
-In-Reply-To: <20100629114738.16008.62006.stgit@baageli.muru.com>
-References: <20100629113229.16008.2931.stgit@baageli.muru.com>
-	<20100629114738.16008.62006.stgit@baageli.muru.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C5DB6FC3@dbde02.ent.ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 29 Jun 2010 17:18:36 +0300
+Subject: [PATCH 1/2] arm: Replace CONFIG_HAS_TLS_REG with HWCAP_TLS and
+	check for it on V6
+In-Reply-To: <20100623133636.GC7058@shareable.org>
+References: <20100621133749.24299.36154.stgit@baageli.muru.com>
+	<20100621135120.24299.98499.stgit@baageli.muru.com>
+	<20100622170020.GF4371@shareable.org>
+	<20100623073912.GA12255@atomide.com>
+	<20100623133636.GC7058@shareable.org>
+Message-ID: <20100629141836.GM2822@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Tony Lindgren
-> Sent: Tuesday, June 29, 2010 5:18 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: linux-omap at vger.kernel.org
-> Subject: [PATCH 6/6] omap2/3/4: Add Kconfig option to compile in typical
-> omap features
+* Jamie Lokier <jamie@shareable.org> [100623 16:30]:
+> Tony Lindgren wrote:
+> > * Jamie Lokier <jamie@shareable.org> [100622 19:54]:
+> > > Tony Lindgren wrote:
+> > > >  __kuser_get_tls:				@ 0xffff0fe0
+> > > > -
+> > > > -#if !defined(CONFIG_HAS_TLS_REG) && !defined(CONFIG_TLS_REG_EMUL)
+> > > > -	ldr	r0, [pc, #(16 - 8)]		@ TLS stored at 0xffff0ff0
+> > > > -#else
+> > > > -	mrc	p15, 0, r0, c13, c0, 3		@ read TLS register
+> > > > -#endif
+> > > > +	ldr     r0, [pc, #(20 - 8)]		@ software TLS set in 0xffff0ff4?
+> > > > +	cmp	r0, #0				@ hardware TLS if flag not set
+> > > > +	mrceq	p15, 0, r0, c13, c0, 3		@ read hardware TLS register
+> > > > +	ldrne	r0, [pc, #(12 - 8)]		@ software TLS val at 0xffff0ff8
+> > > >  	usr_ret	lr
+> > > > -
+> > > > -	.rep	5
+> > > > -	.word	0			@ pad up to __kuser_helper_version
+> > > > -	.endr
+> > > > +	.word	0				@ non-zero for software TLS
+> > > > +	.word	0				@ software TLS value
+> > > 
+> > > It'd be nice not to waste instructions checking for HWCAP_TLS on archs
+> > > which definitely don't have it.  I guess it doesn't matter elsewhere;
+> > > I'd expect this to be a warm path for some programs making extensive
+> > > use of TLS (I haven't measured though).
+> > 
+> > OK, but let's try to figure out a way that does not add more ifdef else
+> > code as that makes it harder to build support for multiple ARM cores.
+> >  
+> > > As it's only a single instruction, and the code is in a writable page
+> > > already (copied at init), how about just patching the instruction
+> > > when ELF_HWCAP is set?
+> > 
+> > Yeah that can be done for __kuser_get_tls if it's always writable.
+> > But __switch_to is trickier because of the CONFIG_MMU ifdefs there.
 > 
-> This produces a sane config that's suitable for using as the
-> base for most omap2/3/4 boards.
+> __kuser_get_tls must be writable in kernels where !HAS_TLS_REG is
+> supported, because the TLS value is written to the same page.
 > 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/Kconfig |   21 +++++++++++++++++++++
->  1 files changed, 21 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 4802988..84fecd0 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -2,6 +2,27 @@ if ARCH_OMAP2PLUS
-> 
->  menu "TI OMAP2/3/4 Specific Features"
-> 
-> +config ARCH_OMAP2PLUS_TYPICAL
-> +	bool "Typical OMAP configuration"
-> +	default y
-> +	select AEABI
-> +	select REGULATOR
-> +	select PM
-> +	select PM_RUNTIME
-> +	select VFP
-> +	select NEON if ARCH_OMAP3 || ARCH_OMAP4
-> +	select SERIAL_8250
-> +	select SERIAL_CORE_CONSOLE
-> +	select SERIAL_8250_CONSOLE
-> +	select I2C
-> +	select I2C_OMAP
-> +	select MFD
-> +	select MENELAUS if ARCH_OMAP2
-> +	select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
-> +	select TWL4030_POWER if ARCH_OMAP3 || ARCH_OMAP4
-> +	help
-> +	  Compile a kernel suitable for booting most boards
-> +
->  config ARCH_OMAP2
->  	bool "TI OMAP2"
->  	depends on ARCH_OMAP2PLUS
-> 
-With your series OMAP4 build breaks because of PM and SMP dependencies.
-To ensure that build doesn't break on OMAP4, I needed below change. With
-This change I tried your series and it boots OK on OMAP4430 SDP
+> I was thinking of changing *only* __kuser_get_tls, by the way.  Out of
+> all the different places, that's the only one I'd expect to be a hot
+> path in some TLS-using programs.
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 84fecd0..f48f275 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -7,8 +7,8 @@ config ARCH_OMAP2PLUS_TYPICAL
-        default y
-        select AEABI
-        select REGULATOR
--       select PM
--       select PM_RUNTIME
-+       select PM if !ARCH_OMAP4
-+       select PM_RUNTIME if !ARCH_OMAP4
-        select VFP
-        select NEON if ARCH_OMAP3 || ARCH_OMAP4
-        select SERIAL_8250
+OK. Sorry for the delay again. Here's an updated version that sets
+__kuser_get_tls instruction dynamically. Does this do what you were
+thinking, or did I miss something?
 
-Regards
-Santosh
+Also, can we detect somehow the hardware that uses CONFIG_TLS_REG_EMUL?
+Might be possible to remove that Kconfig option too later on..
+
+Regards,
+
+Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: arm-tls-v3.patch
+Type: text/x-diff
+Size: 7349 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100629/99ddda56/attachment.bin>
