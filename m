@@ -1,30 +1,75 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Jun 2010 14:47:20 +0300
-Subject: [PATCH 1/6] omap: Disable VGA console for omaps
+Date: Tue, 29 Jun 2010 14:47:32 +0300
+Subject: [PATCH 4/6] omap2/3/4: Move Kconfig options to mach-omap2/Kconfig
 In-Reply-To: <20100629113229.16008.2931.stgit@baageli.muru.com>
 References: <20100629113229.16008.2931.stgit@baageli.muru.com>
-Message-ID: <20100629114720.16008.84291.stgit@baageli.muru.com>
+Message-ID: <20100629114732.16008.56598.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise we have to disable it manually to avoid compile errors.
+Move omap2/3/4 specific Kconfig options to mach-omap2/Kconfig
 
-Cc: linux-fbdev at vger.kernel.org
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- drivers/video/console/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/Kconfig |   18 ++++++++++++++++++
+ arch/arm/plat-omap/Kconfig  |   18 ------------------
+ 2 files changed, 18 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/video/console/Kconfig b/drivers/video/console/Kconfig
-index 8e8f18d..467a966 100644
---- a/drivers/video/console/Kconfig
-+++ b/drivers/video/console/Kconfig
-@@ -6,7 +6,7 @@ menu "Console display driver support"
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index e94ee6b..d306aa1 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -2,6 +2,24 @@ if ARCH_OMAP2PLUS
  
- config VGA_CONSOLE
- 	bool "VGA text console" if EMBEDDED || !X86
--	depends on !ARCH_ACORN && !ARCH_EBSA110 && !4xx && !8xx && !SPARC && !M68K && !PARISC && !FRV && !ARCH_VERSATILE && !SUPERH && !BLACKFIN && !AVR32 && !MN10300
-+	depends on !ARCH_ACORN && !ARCH_EBSA110 && !4xx && !8xx && !SPARC && !M68K && !PARISC && !FRV && !ARCH_VERSATILE && !SUPERH && !BLACKFIN && !AVR32 && !MN10300 && !ARCH_OMAP
- 	default y
+ menu "TI OMAP2/3/4 Specific Features"
+ 
++config ARCH_OMAP2
++	bool "TI OMAP2"
++	depends on ARCH_OMAP2PLUS
++	select CPU_V6
++
++config ARCH_OMAP3
++	bool "TI OMAP3"
++	depends on ARCH_OMAP2PLUS
++	select CPU_V7
++	select USB_ARCH_HAS_EHCI
++	select ARM_L1_CACHE_SHIFT_6
++
++config ARCH_OMAP4
++	bool "TI OMAP4"
++	depends on ARCH_OMAP2PLUS
++	select CPU_V7
++	select ARM_GIC
++
+ comment "OMAP Core Type"
+ 	depends on ARCH_OMAP2
+ 
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index a4e8727..b7a3d80 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -21,24 +21,6 @@ config ARCH_OMAP2PLUS
  	help
- 	  Saying Y here will allow you to use Linux in text mode through a
+ 	  "Systems based on omap24xx, omap34xx or omap44xx"
+ 
+-config ARCH_OMAP2
+-	bool "TI OMAP2"
+-	depends on ARCH_OMAP2PLUS
+-	select CPU_V6
+-
+-config ARCH_OMAP3
+-	bool "TI OMAP3"
+-	depends on ARCH_OMAP2PLUS
+-	select CPU_V7
+-	select USB_ARCH_HAS_EHCI
+-	select ARM_L1_CACHE_SHIFT_6
+-
+-config ARCH_OMAP4
+-	bool "TI OMAP4"
+-	depends on ARCH_OMAP2PLUS
+-	select CPU_V7
+-	select ARM_GIC
+-
+ endchoice
+ 
+ comment "OMAP Feature Selections"
