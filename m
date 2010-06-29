@@ -1,76 +1,32 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Jun 2010 17:18:36 +0300
-Subject: [PATCH 1/2] arm: Replace CONFIG_HAS_TLS_REG with HWCAP_TLS and
-	check for it on V6
-In-Reply-To: <20100623133636.GC7058@shareable.org>
-References: <20100621133749.24299.36154.stgit@baageli.muru.com>
-	<20100621135120.24299.98499.stgit@baageli.muru.com>
-	<20100622170020.GF4371@shareable.org>
-	<20100623073912.GA12255@atomide.com>
-	<20100623133636.GC7058@shareable.org>
-Message-ID: <20100629141836.GM2822@atomide.com>
+Date: Tue, 29 Jun 2010 17:21:45 +0300
+Subject: [PATCH 1/6] omap: Disable VGA console for omaps
+In-Reply-To: <20100629120724.GA23884@oksana.dev.rtsoft.ru>
+References: <20100629113229.16008.2931.stgit@baageli.muru.com>
+	<20100629114720.16008.84291.stgit@baageli.muru.com>
+	<20100629120724.GA23884@oksana.dev.rtsoft.ru>
+Message-ID: <20100629142144.GN2822@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jamie Lokier <jamie@shareable.org> [100623 16:30]:
-> Tony Lindgren wrote:
-> > * Jamie Lokier <jamie@shareable.org> [100622 19:54]:
-> > > Tony Lindgren wrote:
-> > > >  __kuser_get_tls:				@ 0xffff0fe0
-> > > > -
-> > > > -#if !defined(CONFIG_HAS_TLS_REG) && !defined(CONFIG_TLS_REG_EMUL)
-> > > > -	ldr	r0, [pc, #(16 - 8)]		@ TLS stored at 0xffff0ff0
-> > > > -#else
-> > > > -	mrc	p15, 0, r0, c13, c0, 3		@ read TLS register
-> > > > -#endif
-> > > > +	ldr     r0, [pc, #(20 - 8)]		@ software TLS set in 0xffff0ff4?
-> > > > +	cmp	r0, #0				@ hardware TLS if flag not set
-> > > > +	mrceq	p15, 0, r0, c13, c0, 3		@ read hardware TLS register
-> > > > +	ldrne	r0, [pc, #(12 - 8)]		@ software TLS val at 0xffff0ff8
-> > > >  	usr_ret	lr
-> > > > -
-> > > > -	.rep	5
-> > > > -	.word	0			@ pad up to __kuser_helper_version
-> > > > -	.endr
-> > > > +	.word	0				@ non-zero for software TLS
-> > > > +	.word	0				@ software TLS value
-> > > 
-> > > It'd be nice not to waste instructions checking for HWCAP_TLS on archs
-> > > which definitely don't have it.  I guess it doesn't matter elsewhere;
-> > > I'd expect this to be a warm path for some programs making extensive
-> > > use of TLS (I haven't measured though).
+* Anton Vorontsov <cbouatmailru@gmail.com> [100629 15:04]:
+> On Tue, Jun 29, 2010 at 02:47:20PM +0300, Tony Lindgren wrote:
+> > Otherwise we have to disable it manually to avoid compile errors.
 > > 
-> > OK, but let's try to figure out a way that does not add more ifdef else
-> > code as that makes it harder to build support for multiple ARM cores.
-> >  
-> > > As it's only a single instruction, and the code is in a writable page
-> > > already (copied at init), how about just patching the instruction
-> > > when ELF_HWCAP is set?
-> > 
-> > Yeah that can be done for __kuser_get_tls if it's always writable.
-> > But __switch_to is trickier because of the CONFIG_MMU ifdefs there.
+> > Cc: linux-fbdev at vger.kernel.org
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
 > 
-> __kuser_get_tls must be writable in kernels where !HAS_TLS_REG is
-> supported, because the TLS value is written to the same page.
+> We'll need this for mach-cns3xxx too. And doing that change for
+> every ARM subarch is going to produce lots of rejects.
 > 
-> I was thinking of changing *only* __kuser_get_tls, by the way.  Out of
-> all the different places, that's the only one I'd expect to be a hot
-> path in some TLS-using programs.
+> I'd suggest to disable (or make it 'default n') for all ARMs,
+> except these:
+> 
+> $ git grep VGA_CONSOLE= arch/arm/configs/
+> arch/arm/configs/footbridge_defconfig:CONFIG_VGA_CONSOLE=y
+> arch/arm/configs/integrator_defconfig:CONFIG_VGA_CONSOLE=y
+> arch/arm/configs/netwinder_defconfig:CONFIG_VGA_CONSOLE=y
 
-OK. Sorry for the delay again. Here's an updated version that sets
-__kuser_get_tls instruction dynamically. Does this do what you were
-thinking, or did I miss something?
-
-Also, can we detect somehow the hardware that uses CONFIG_TLS_REG_EMUL?
-Might be possible to remove that Kconfig option too later on..
-
-Regards,
+Good idea, will post a modified patch tomorrow.
 
 Tony
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: arm-tls-v3.patch
-Type: text/x-diff
-Size: 7349 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100629/99ddda56/attachment.bin>
