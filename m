@@ -1,39 +1,103 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 29 Jun 2010 17:28:34 +0900
-Subject: [PATCH v4] libata: pata_samsung_cf: Add Samsung PATA	controller
-	driver
-In-Reply-To: <4C2874DE.7070806@ru.mvista.com>
-References: <1276499263-12217-1-git-send-email-kgene.kim@samsung.com>
-	<4C22704B.50103@pobox.com>
-	<001f01cb1417$dce8f8d0$96baea70$%kim@samsung.com>
-	<20100626193310.GA19339@n2100.arm.linux.org.uk>
-	<4C2874DE.7070806@ru.mvista.com>
-Message-ID: <00c701cb1765$12c6df30$38549d90$%kim@samsung.com>
+From: coffbeta@gmail.com (CoffBeta)
+Date: Tue, 29 Jun 2010 16:29:04 +0800
+Subject: gpiolib and sleeping gpios
+In-Reply-To: <4C1E88AE.5070808@bluewatersys.com>
+References: <386783.17931.qm@web180310.mail.gq1.yahoo.com>
+	<4C1E88AE.5070808@bluewatersys.com>
+Message-ID: <AANLkTinunR-mrXFh8uLV5YfeArC-_A1NJWz708n7r4pU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei Shtylyov wrote:
-> 
-> Hello.
-> 
-> Russell King - ARM Linux wrote:
-> 
-> >> How do you think?
-> >> May I send this to your patch tracking system?
-> >> Or...how should I handle this?
-> 
-> > If Jeff is happy, then I'm happy.  However, shouldn't it also have Ben's
-> > ack?
-> 
->     I for one still have comments to be addressed, will post in a jiffy...
-> 
+ non-sleeping
 
-OK..will address comments from you as soon as possible.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+On Mon, Jun 21, 2010 at 05:31, Ryan Mallon <ryan@bluewatersys.com> wrote:
+> On 06/19/2010 06:21 PM, David Brownell wrote:
+>>
+>>>
+>>> The runtime warnings will only show instances where the
+>>> non-sleeping
+>>> versions where called instead of the sleeping versions.
+>>
+>> ... *AND* the GPIO requires the cansleep() version...
+>>
+>> Right; such calls are errors. ?We issue
+>> warnings since fault returns are inapplicable.
+>
+> A driver which only uses the non-sleeping versions, but _could_ use the
+> cansleep variants (ie all calls to gpio_(set/get)_value are made from
+> contexts where it is possible to sleep) is not so easy to spot. Passing
+> a sleeping to gpio to such a driver will result in spurious warnings.
+>
+>>> There is no
+>>> warning to say that we are calling the spinlock safe
+>>> version, where it is possible to sleep.
+>>
+>> The call context isn't what controls whether
+>> gpio_get_value() or gpio_get_value_cansleep()
+>> is appropriate ... it's the GPIO itself, and
+>> how its implementation works.
+>
+> No, a driver should not know anything about a gpio which is passed to
+> it. If a driver is able to call the cansleep variants, then it should,
+> and it will allow any gpio, sleeping or non-sleeping, to be used with
+> that driver.
+>
+> If a driver uses a gpio in such a way that it cannot sleep, ie the
+> gpio_(get/set)_value calls are made from spinlock context, then only
+> gpios which do not sleep may be used with that driver.
+>
+> Thats why I think specifying whether the gpio is able to sleep when it
+> is requested is a good idea. A driver which cannot use a sleeping gpio
+>
+>
+>> "possible to sleep" is a GPIO attribute,
+>> exposed by a predicate. ?If spinlock-safe
+>> calls are used on GPIOs with that attribute,
+>> ?a warning *IS* issued.
+>
+> Possible to sleep is also an attribute of how a driver _uses_ a gpio.
+>
+>>>
+>>> The point I was trying to make is that there are lots of
+>>> drivers which
+>>> will not work with gpios on sleeping io expanders because
+>>> they call the
+>>> spinlock safe gpio calls.
+>>
+>> And they will trigger runtime warnings, and
+>> thus eventually get fixed. ?The way to do that
+>> is to check if the GPIO needs the cansleep()
+>> call
+>
+> Hmm, maybe this then for drivers which cannot accept sleeping gpios:
+>
+> ?if (gpio_cansleep(some_gpio)) {
+> ? ? ? ? ?dev_err(&dev, "This driver only supports non-sleeping gpios");
+> ? ? ? ? ?return -EINVAL;
+> ?}
+>
+> ?err = gpio_request(some_gpio, "some_gpio");
+>
+> I think ideally, gpio_request should specify this via a flags argument, ie:
+>
+> ?#define GPIOF_NO_SLEEP ? ? ? ?0x0
+> ?#define GPIOF_CANSLEEP ? ? ? ?0x1
+>
+> ?err = gpio_request(some_gpio, "some_gpio", GPIOF_NO_SLEEP);
+>
+> ~Ryan
+>
+> --
+> Bluewater Systems Ltd - ARM Technology Solution Centre
+>
+> Ryan Mallon ? ? ? ? ? ? ? ? ? ? 5 Amuri Park, 404 Barbadoes St
+> ryan at bluewatersys.com ? ? ? ? ? PO Box 13 889, Christchurch 8013
+> http://www.bluewatersys.com ? ? New Zealand
+> Phone: +64 3 3779127 ? ? ? ? ? ?Freecall: Australia 1800 148 751
+> Fax: ? +64 3 3779135 ? ? ? ? ? ? ? ? ? ? ?USA 1800 261 2934
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
+>
