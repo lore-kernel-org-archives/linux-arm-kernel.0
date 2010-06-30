@@ -1,37 +1,42 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 30 Jun 2010 14:59:05 -0400 (EDT)
-Subject: [PATCH 08/33] Removing dead SA1101
-In-Reply-To: <201006302020.52270.marek.vasut@gmail.com>
-References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<7488ec29cdb90212e965f6cd1173141c576c0955.1277911346.git.siccegge@cs.fau.de>
-	<alpine.LFD.2.00.1006301255260.24097@xanadu.home>
-	<201006302020.52270.marek.vasut@gmail.com>
-Message-ID: <alpine.LFD.2.00.1006301453450.24097@xanadu.home>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 30 Jun 2010 21:16:37 +0200
+Subject: [PATCH] Add support for Vista Silicon i.MX27 Visstrim_M10 board.
+In-Reply-To: <4C2B80B1.1090308@eukrea.com>
+References: <1277912661-24065-1-git-send-email-javier.martin@vista-silicon.com>
+	<20100630170025.GD23534@tarshish> <4C2B80B1.1090308@eukrea.com>
+Message-ID: <20100630191637.GA11643@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Jun 2010, Marek Vasut wrote:
+On Wed, Jun 30, 2010 at 07:36:49PM +0200, Eric B?nard wrote:
+> Hi Baruch,
+>
+> Le 30/06/2010 19:00, Baruch Siach a ?crit :
+>> On Wed, Jun 30, 2010 at 05:44:21PM +0200, Javier Martin wrote:
+>>>
+>>> Signed-off-by: Javier Martin<javier.martin@vista-silicon.com>
+>>> ---
+>>>   arch/arm/mach-mx2/Kconfig                          |    8 +
+>>>   arch/arm/mach-mx2/Makefile                         |    1 +
+>>>   arch/arm/mach-mx2/mach-imx27_visstrim_m10.c        |  279 ++++++++++++++++++++
+>>
+>> This directory are no more. You should rebase your work on the imx-for-2.6.36
+>> branch of the imx tree at git://git.pengutronix.de/git/imx/linux-2.6.git
+>>
+> unless I made a mistake with git, Uwe's patch serie seems to have been  
+> removed from this branch (I think it was merged this morning but I don't  
+> find it anymore now).
+>
+> It is still available here :  
+> git://git.pengutronix.de/git/ukl/linux-2.6.git in branch  
+> imx/for-2.6.36-merged
+Note that this changed earlier today, too.  Sascha rebased his branch
+and I merged his new tree after doing some cosmetics to mine, too.  I
+expect Sascha to pull my -merged branch soon.
 
-> Dne St 30. ?ervna 2010 18:57:43 Nicolas Pitre napsal(a):
-> > On Wed, 30 Jun 2010, Christoph Egger wrote:
-> > > SA1101 doesn't exist in Kconfig, therefore removing all
-> > > references for it from the source code.
-> > > 
-> > > Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
-> > 
-> > Acked-by: Nicolas Pitre <nico@fluxnic.net>
-> 
-> You're dropping support for a whole CPU here ... is the code redundant or 
-> something ?
+Best regards
+Uwe
 
-The SA1101 is not a CPU.  It is a companion chipset for the SA1100.  And 
-so far we have no target using it in the tree, and that isn't likely to 
-change more than 10 years after the chip availability.  Needless to say 
-that the SA1101 has long been unavailable either.
-
-We also have support for the SA1111 which is a similar companion chipset 
-for the SA1110.  This is not going away as at least the Neponset 
-expansion board for the Assabet development board is using a SA1111.
-
-
-Nicolas
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
