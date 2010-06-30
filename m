@@ -1,77 +1,63 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 30 Jun 2010 22:14:27 +0800
-Subject: [PATCH 4/4] pxa/spitz: Rework spitz
-In-Reply-To: <201006301609.04907.marek.vasut@gmail.com>
-References: <1277388132-5549-1-git-send-email-marek.vasut@gmail.com>
-	<201006281729.38591.marek.vasut@gmail.com>
-	<AANLkTinRkgIg1q8LfRF6jWOoxLNY__xMi3iJjEv1FhWL@mail.gmail.com>
-	<201006301609.04907.marek.vasut@gmail.com>
-Message-ID: <AANLkTil1qsmLVgaBnLTy31NaW2T2_PzFioUf1BgtHkMw@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 30 Jun 2010 16:17:46 +0200
+Subject: Flash write endurance (write cycle) test for AT91RM9200 boards
+In-Reply-To: <BAY134-W19D664FC2A596F0209D21FBDCA0@phx.gbl>
+References: <BAY134-W19D664FC2A596F0209D21FBDCA0@phx.gbl>
+Message-ID: <201006301617.46700.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 30, 2010 at 10:09 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Dne St 30. ?ervna 2010 08:57:57 Eric Miao napsal(a):
->> On Mon, Jun 28, 2010 at 11:29 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
->> > Dne Po 28. ?ervna 2010 14:19:46 Eric Miao napsal(a):
->> >> On Mon, Jun 28, 2010 at 8:07 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
->> >> > Dne Po 28. ?ervna 2010 05:43:12 Eric Miao napsal(a):
->> >> >> On Thu, Jun 24, 2010 at 10:02 PM, Marek Vasut <marek.vasut@gmail.com>
->> >
->> > wrote:
->> >> >> > This huge patch mostly shuffles code. The spitz.c file contained
->> >> >> > terrible mess and needed a cleanup, here it is:
->> >> >> >
->> >> >> > 1) Made every part modular, components are not built in if not
->> >> >> > selected. 2) Removed loads of preprocessor goo, mostly "#ifdef
->> >> >> > MACH_AKITA .... #endif" and similar code. The kernel size will grow
->> >> >> > by a few kb now, but the file is much more readable.
->> >> >> > 3) Reworked SD/CF power setting function and made it reentrant.
->> >> >> > 4) Add ISL6271A regulator support
->> >> >> > 5) Correctly register WM8750
->> >> >> >
->> >> >> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
->> >> >>
->> >> >> I'd prefer to see separate small patches for this?
->> >> >
->> >> > This is nearly a replacement for the whole file ... maybe we could
->> >> > merge spitz2.c or something ... or do it this way. I understand your
->> >> > point about spliting it into smaller chunks, but I don't see a reason
->> >> > in this case.
->> >>
->> >> I guess the above 1, 2, 3, 4, 5 can be well separated into 5 patches,
->> >> I don't mind merge many patches, but I'd really like to see small and
->> >> consistent changes (make it regression test friendly BTW), ;-)
->> >
->> > I said I get your point, but I don't see the benefit here.
->> > 1) already does most of the rewrite of the file,
->> > 2) only removes the #ifdef MACH_PLAT around MACHINE_START (as the rest
->> > was done in 1) ),
->> > 3) is actually a part of 1) as well
->> > 4) ok, this could be separated out, but I see no benefit
->> > 5) well this is already in if I recall well, but I put it here for
->> > completeness
->>
->> Several of other comments, though:
->>
->> 1. It doesn't look necessary to me to change spitz_* to sharpslc_*. spitz_*
->> ? ?isn't a good prefix, neither is sharpslc_* (think about the corgi
->> series, which is normally called Sharp SL-C7xx). And this is also going to
->> save many unnecessary changes.
->
-> I know, but what prefix do you sugest then?
+Dne Po 28. ?ervna 2010 22:39:07 Xiachen Dong napsal(a):
+> Hi,
+> 
+> We use AT91RM9200 MCU and made our own motherboard for it. We wish to know
+> how many write cycles the flash (MicroSD and DataFlash) may survive under
+> both OS and non-OS situation. We also wish to know the behavior of the
+> flash when the flash becomes dead.
 
-spitz_* is just OK in my POV if there is nothing better, provided it doesn't
-introduce too many naming changes.
+I believe the number of write cycles is unlimited, but at some point, you won't 
+be able to read the data back ;-) If the flash becomes dead, kernel will mark a 
+bad block and that's all (you'll be informed). Writes to this block will be 
+redirected to some healthy block. You'll probably have the flash partitioned and 
+run some FS on top of it, which will take care of load balancing the flash 
+blocks. You don't have to worry that the flash will die fast if you don't swap 
+on it.
 
->>
->> 2. Direct references of spitzscoop[12]_device are still there, which I'd
->> ? ?prefer a cleaner patch for this
->
-> I'd prefer rewriting the whole scoop driver and patching the pcmcia driver so
-> all this crap can get lot.
->>
->> 3. Others seem to be coding style changes - which can be separated
->
-> You're right.
->
+Cheers 
+> 
+> After doing some searching on the web, we found the following information
+> helpful:
+> 
+> 1) Write Endurance in Flash Drives: Measurements and Analysis
+> http://www.ccs.neu.edu/home/pjd/papers/fast10-flash.pdf
+> 
+> 2) NAND Testing
+> http://wiki.laptop.org/go/NAND_Testing
+> 
+> 3) How Long Does a Flash Drive Last?
+> http://www.bress.net/blog/archives/114-How-Long-Does-a-Flash-Drive-Last.htm
+> l
+> 
+> What we plan to do is to test the flash both under u-boot (raw, without
+> JFFS2) and Linux OS (with ext2 fs). The test will be done with flash empty
+> and flash full. We will also do the test under different room
+> temperatures.
+> 
+> We searched the archive of the list. It looks like no posts mentioned such
+> tests. We wonder anyone on the list has done similar test before and are
+> there any special attention need to pay while doing such tests. Are there
+> any professional software (either open source or commercial) for such
+> tests? Any suggestions and comments are welcomed.
+> 
+> Thanks,
+> 
+> Xiachen
+> 
+> 
+> _________________________________________________________________
+> Turn down-time into play-time with Messenger games
+> http://go.microsoft.com/?linkid=9734385
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
