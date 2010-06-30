@@ -1,29 +1,32 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 30 Jun 2010 12:57:43 -0400 (EDT)
-Subject: [PATCH 08/33] Removing dead SA1101
-In-Reply-To: <7488ec29cdb90212e965f6cd1173141c576c0955.1277911346.git.siccegge@cs.fau.de>
-References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<7488ec29cdb90212e965f6cd1173141c576c0955.1277911346.git.siccegge@cs.fau.de>
-Message-ID: <alpine.LFD.2.00.1006301255260.24097@xanadu.home>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 30 Jun 2010 20:00:26 +0300
+Subject: [PATCH] Add support for Vista Silicon i.MX27 Visstrim_M10 board.
+In-Reply-To: <1277912661-24065-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1277912661-24065-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <20100630170025.GD23534@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Jun 2010, Christoph Egger wrote:
+Hi Javier,
 
-> SA1101 doesn't exist in Kconfig, therefore removing all
-> references for it from the source code.
+On Wed, Jun 30, 2010 at 05:44:21PM +0200, Javier Martin wrote:
 > 
-> Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
-
-Acked-by: Nicolas Pitre <nico@fluxnic.net>
-
+> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 > ---
->  arch/arm/mach-sa1100/include/mach/SA-1101.h  |  925 --------------------------
->  arch/arm/mach-sa1100/include/mach/hardware.h |    4 -
->  2 files changed, 0 insertions(+), 929 deletions(-)
->  delete mode 100644 arch/arm/mach-sa1100/include/mach/SA-1101.h
-> 
-[...]
+>  arch/arm/mach-mx2/Kconfig                          |    8 +
+>  arch/arm/mach-mx2/Makefile                         |    1 +
+>  arch/arm/mach-mx2/mach-imx27_visstrim_m10.c        |  279 ++++++++++++++++++++
 
+This directory are no more. You should rebase your work on the imx-for-2.6.36 
+branch of the imx tree at git://git.pengutronix.de/git/imx/linux-2.6.git
 
-Nicolas
+>  .../include/mach/board-imx27_visstrim_m10.h        |   24 ++
+
+Any reason not to fold this file into mach-imx27_visstrim_m10.c?
+
+baruch
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
