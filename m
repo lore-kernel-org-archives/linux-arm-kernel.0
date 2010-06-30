@@ -1,119 +1,67 @@
 From: siccegge@cs.fau.de (Christoph Egger)
-Date: Wed, 30 Jun 2010 17:53:01 +0200
-Subject: [PATCH 00/33] Removing dead code
-Message-ID: <cover.1277911345.git.siccegge@cs.fau.de>
+Date: Wed, 30 Jun 2010 15:55:22 +0000
+Subject: [PATCH] Removing dead OMAP_IR
+Message-ID: <mailman.62.1278317711.27306.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all!
+OMAP_IR doesn't exist in Kconfig, therefore removing all references
+for it from the source code.
 
-        As part of the VAMOS[0] research project at the University of
-Erlangen we are looking at multiple integrity errors in linux'
-configuration system.
+Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
+[tony at atomide.com: updated for new mux code]
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-	I've been running a check on the arch/arm sourcetree for
-config Items not defined in Kconfig and found 33 such cases. Sourcecode
-blocks depending on these Items are not reachable from a vanilla
-kernel -- dead code. I've seen such dead blocks made on purpose
-e.g. while integrating new features into the kernel but generally
-they're just useless.
+diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
+index ee46974..2efa427 100644
+--- a/arch/arm/mach-omap1/board-h2.c
++++ b/arch/arm/mach-omap1/board-h2.c
+@@ -292,15 +292,6 @@ static struct platform_device h2_kp_device = {
+ 
+ #define H2_IRDA_FIRSEL_GPIO_PIN	17
+ 
+-#if defined(CONFIG_OMAP_IR) || defined(CONFIG_OMAP_IR_MODULE)
+-static int h2_transceiver_mode(struct device *dev, int state)
+-{
+-	/* SIR when low, else MIR/FIR when HIGH */
+-	gpio_set_value(H2_IRDA_FIRSEL_GPIO_PIN, !(state & IR_SIRMODE));
+-	return 0;
+-}
+-#endif
+-
+ static struct omap_irda_config h2_irda_data = {
+ 	.transceiver_cap	= IR_SIRMODE | IR_MIRMODE | IR_FIRMODE,
+ 	.rx_channel		= OMAP_DMA_UART3_RX,
+@@ -450,15 +441,6 @@ static void __init h2_init(void)
+ 	omap_cfg_reg(E19_1610_KBR4);
+ 	omap_cfg_reg(N19_1610_KBR5);
+ 
+-	/* Irda */
+-#if defined(CONFIG_OMAP_IR) || defined(CONFIG_OMAP_IR_MODULE)
+-	omap_writel(omap_readl(FUNC_MUX_CTRL_A) | 7, FUNC_MUX_CTRL_A);
+-	if (gpio_request(H2_IRDA_FIRSEL_GPIO_PIN, "IRDA mode") < 0)
+-		BUG();
+-	gpio_direction_output(H2_IRDA_FIRSEL_GPIO_PIN, 0);
+-	h2_irda_data.transceiver_mode = h2_transceiver_mode;
+-#endif
+-
+ 	platform_add_devices(h2_devices, ARRAY_SIZE(h2_devices));
+ 	omap_board_config = h2_config;
+ 	omap_board_config_size = ARRAY_SIZE(h2_config);
+diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
+index 2d9ff0f..9044dcf 100644
+--- a/arch/arm/mach-omap2/board-h4.c
++++ b/arch/arm/mach-omap2/board-h4.c
+@@ -356,10 +356,6 @@ static void __init omap_h4_init(void)
+ 	 * You have to mux them off in device drivers later on
+ 	 * if not needed.
+ 	 */
+-#if defined(CONFIG_OMAP_IR) || defined(CONFIG_OMAP_IR_MODULE)
+-	omap_mux_init_signal("uart3_tx_irtx.uart3_tx_irtx", 0);
+-	omap_mux_init_signal("uart3_rx_irrx.uart3_rx_irrx", 0);
+-#endif
+ 
+ #if defined(CONFIG_KEYBOARD_OMAP) || defined(CONFIG_KEYBOARD_OMAP_MODULE)
+ 	omap_mux_init_gpio(88, OMAP_PULL_ENA | OMAP_PULL_UP);
 
-	Each of the patches in this patchset removes on such dead
-config Item, I'd be glad if you consider applying them. I've been
-doing deeper analysis of such issues before and can do so again but
-I'm not so sure they were fastly usefull. Unfortunately arm doesn't
-allow some allyesconfig build covering all of that code so I couldn't
-build-test all of them, sorry for that.
-
-        Please keep me informed of this patch getting confirmed /
-merged so we can keep track of it.
-
-Regards
-
-        Christoph Egger
-
-[0] http://vamos1.informatik.uni-erlangen.de/
-
-Christoph Egger (33):
-  Removing dead MTD_NAND_AT91_BUSWIDTH_16
-  Removing dead ARCH_DAVINCI_TNETV107X
-  Removing dead OMAP_MUX_ERRORS
-  Removing dead MSM7X00A_IDLE
-  Removing dead OMAP_IR
-  Removing dead SHARPSL_LOCOMO
-  Removing dead CPU_S3C2400
-  Removing dead SA1101
-  Removing dead MAGICV
-  Removing dead VIDEO_AT91_ISI
-  Removing dead OMAP_DSP
-  Removing dead OMAP_STI
-  Replacing LEDS_OMAP_DEBUG with OMAP_DEBUG_LEDS
-  Removing dead SDMA_IRAM
-  Removing dead PROCESSOR_NS9750
-  Removing dead APM
-  Removing dead SX1_OLD_FLASH
-  Removing dead OMAP_ARM_96MHZ
-  Removing dead MACH_OMAP_H4_OTG
-  Removing dead MACH_OMAP2_H4_USB1
-  Removing dead OMAP2_VENC_OUT_TYPE_SVIDEO,
-    OMAP2_VENC_OUT_TYPE_COMPOSITE
-  Removing dead MPU_{BRIDGE,TESLA}_IOMMU
-  Removing dead BACKLIGHT_CORGI
-  Removing dead ARCH_GUMSTIX_ORIG
-  Removing dead CORGI_SSP_DEPRECATED
-  Removing dead XSCALE_CACHE_ERRATA
-  Removing dead IDE_PXA_CF
-  Removing dead CPU_S3C24XX
-  Removing dead SND_SOC_SMDK2443_WM9710
-  Removing dead S3C_DEV_ADC
-  Removing dead MACH_U300_BS26
-  Removing dead CPU_ICACHE_STREAMING_DISABLE
-  Removing dead MACH_U300_USE_I2S_AS_MASTER
-
- arch/arm/mach-at91/at572d940hf_devices.c       |   73 --
- arch/arm/mach-at91/at91sam9263_devices.c       |   49 --
- arch/arm/mach-at91/board-at572d940hf_ek.c      |    4 -
- arch/arm/mach-at91/board-sam9m10g45ek.c        |    4 -
- arch/arm/mach-davinci/include/mach/cputype.h   |    6 -
- arch/arm/mach-msm/idle.S                       |   13 -
- arch/arm/mach-ns9xxx/gpio.c                    |    8 -
- arch/arm/mach-omap1/board-h2.c                 |   18 -
- arch/arm/mach-omap1/board-nokia770.c           |  132 ----
- arch/arm/mach-omap1/board-palmte.c             |   84 ---
- arch/arm/mach-omap1/board-sx1.c                |   26 -
- arch/arm/mach-omap1/devices.c                  |   72 --
- arch/arm/mach-omap1/mcbsp.c                    |    3 -
- arch/arm/mach-omap1/mux.c                      |    5 -
- arch/arm/mach-omap1/opp_data.c                 |    3 -
- arch/arm/mach-omap2/board-h4.c                 |   26 -
- arch/arm/mach-omap2/board-omap3stalker.c       |    5 -
- arch/arm/mach-omap2/devices.c                  |   57 --
- arch/arm/mach-omap2/omap-iommu.c               |   22 -
- arch/arm/mach-pxa/corgi_pm.c                   |    2 -
- arch/arm/mach-pxa/include/mach/gumstix.h       |   12 +-
- arch/arm/mach-pxa/sharpsl_pm.c                 |   20 -
- arch/arm/mach-pxa/sleep.S                      |    7 -
- arch/arm/mach-pxa/spitz_pm.c                   |    2 -
- arch/arm/mach-pxa/trizeps4.c                   |    6 +-
- arch/arm/mach-s3c2410/include/mach/gpio-fns.h  |    5 -
- arch/arm/mach-s3c2410/include/mach/gpio.h      |    4 -
- arch/arm/mach-s3c2410/include/mach/regs-gpio.h |    4 -
- arch/arm/mach-s3c2443/mach-smdk2443.c          |    7 -
- arch/arm/mach-s5pv210/cpu.c                    |    4 -
- arch/arm/mach-sa1100/include/mach/SA-1101.h    |  925 ------------------------
- arch/arm/mach-sa1100/include/mach/hardware.h   |    4 -
- arch/arm/mach-sa1100/include/mach/irqs.h       |    2 -
- arch/arm/mach-u300/clock.c                     |   91 ---
- arch/arm/mach-u300/core.c                      |    7 -
- arch/arm/mm/proc-arm925.S                      |    3 -
- arch/arm/plat-mxc/include/mach/mx51.h          |    4 -
- arch/arm/plat-omap/Kconfig                     |    2 +-
- arch/arm/plat-omap/debug-leds.c                |    2 +-
- arch/arm/plat-omap/devices.c                   |   62 --
- arch/arm/plat-omap/include/plat/dsp_common.h   |   40 -
- arch/arm/plat-s3c24xx/cpu.c                    |   15 -
- arch/arm/plat-s3c24xx/include/plat/s3c2400.h   |   31 -
- 43 files changed, 4 insertions(+), 1867 deletions(-)
- delete mode 100644 arch/arm/mach-sa1100/include/mach/SA-1101.h
- delete mode 100644 arch/arm/plat-omap/include/plat/dsp_common.h
- delete mode 100644 arch/arm/plat-s3c24xx/include/plat/s3c2400.h
+--6TrnltStXW4iwmi0--
