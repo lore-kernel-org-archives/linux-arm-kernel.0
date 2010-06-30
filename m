@@ -1,38 +1,32 @@
 From: siccegge@cs.fau.de (Christoph Egger)
-Date: Wed, 30 Jun 2010 18:02:32 +0200
-Subject: [PATCH 27/33] Removing dead IDE_PXA_CF
+Date: Wed, 30 Jun 2010 18:02:51 +0200
+Subject: [PATCH 28/33] Removing dead CPU_S3C24XX
 In-Reply-To: <cover.1277911345.git.siccegge@cs.fau.de>
 References: <cover.1277911345.git.siccegge@cs.fau.de>
-Message-ID: <a332e637ee15cb15f7099f5dfc19a384b2bf772b.1277911346.git.siccegge@cs.fau.de>
+Message-ID: <787416813d524b042dc933fbcfbbae22fd5ca2ca.1277911346.git.siccegge@cs.fau.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IDE_PXA_CF doesn't exist in Kconfig, therefore removing all references
-for it from the source code.
+CPU_S3C24XX doesn't exist in Kconfig, therefore removing all
+references for it from the source code.
 
 Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
 ---
- arch/arm/mach-pxa/trizeps4.c |    6 +-----
- 1 files changed, 1 insertions(+), 5 deletions(-)
+ arch/arm/mach-s3c2410/include/mach/gpio.h |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/trizeps4.c b/arch/arm/mach-pxa/trizeps4.c
-index 6968911..0acff17 100644
---- a/arch/arm/mach-pxa/trizeps4.c
-+++ b/arch/arm/mach-pxa/trizeps4.c
-@@ -530,13 +530,9 @@ static void __init trizeps4_init(void)
- 	i2c_register_board_info(0, trizeps4_i2c_devices,
- 					ARRAY_SIZE(trizeps4_i2c_devices));
+diff --git a/arch/arm/mach-s3c2410/include/mach/gpio.h b/arch/arm/mach-s3c2410/include/mach/gpio.h
+index b649bf2..a37d274 100644
+--- a/arch/arm/mach-s3c2410/include/mach/gpio.h
++++ b/arch/arm/mach-s3c2410/include/mach/gpio.h
+@@ -30,8 +30,4 @@
+ #include <mach/gpio-nrs.h>
+ #include <mach/gpio-fns.h>
  
--#ifdef CONFIG_IDE_PXA_CF
--	/* if boot direct from compact flash dont disable power */
--	trizeps_conxs_bcr = 0x0009;
+-#ifdef CONFIG_CPU_S3C24XX
+-#define S3C_GPIO_END	(S3C2410_GPIO_BANKJ + 32)
 -#else
- 	/* this is the reset value */
- 	trizeps_conxs_bcr = 0x00A0;
+ #define S3C_GPIO_END	(S3C2410_GPIO_BANKH + 32)
 -#endif
-+
- 	BCR_writew(trizeps_conxs_bcr);
- 	board_backlight_power(1);
- }
 -- 
 1.7.0.4
