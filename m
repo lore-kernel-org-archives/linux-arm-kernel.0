@@ -1,35 +1,37 @@
 From: siccegge@cs.fau.de (Christoph Egger)
-Date: Wed, 30 Jun 2010 18:00:23 +0200
-Subject: [PATCH 20/33] Removing dead MACH_OMAP2_H4_USB1
+Date: Wed, 30 Jun 2010 18:00:41 +0200
+Subject: [PATCH 21/33] Removing dead OMAP2_VENC_OUT_TYPE_SVIDEO,
+	OMAP2_VENC_OUT_TYPE_COMPOSITE
 In-Reply-To: <cover.1277911345.git.siccegge@cs.fau.de>
 References: <cover.1277911345.git.siccegge@cs.fau.de>
-Message-ID: <24b01f2edebd09e37306c35f14401819d8219549.1277911346.git.siccegge@cs.fau.de>
+Message-ID: <2709d1406900af2436f6f8af00555507baf8dac9.1277911346.git.siccegge@cs.fau.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MACH_OMAP2_H4_USB1 doesn't exist in Kconfig, therefore removing all
-references for it from the source code.
+OMAP2_VENC_OUT_TYPE_SVIDEO, OMAP2_VENC_OUT_TYPE_COMPOSITE doesn't
+exist in Kconfig, therefore removing all references for it from the
+source code.
 
 Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
 ---
- arch/arm/mach-omap2/board-h4.c |    5 -----
+ arch/arm/mach-omap2/board-omap3stalker.c |    5 -----
  1 files changed, 0 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
-index 85d7fb8..f0c2701 100644
---- a/arch/arm/mach-omap2/board-h4.c
-+++ b/arch/arm/mach-omap2/board-h4.c
-@@ -272,11 +272,6 @@ static struct omap_lcd_config h4_lcd_config __initdata = {
- };
- 
- static struct omap_usb_config h4_usb_config __initdata = {
--#ifdef	CONFIG_MACH_OMAP2_H4_USB1
--	/* NOTE:  usb1 could also be used with 3 wire signaling */
--	.pins[1]	= 4,
+diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
+index f848ba8..b38afd5 100644
+--- a/arch/arm/mach-omap2/board-omap3stalker.c
++++ b/arch/arm/mach-omap2/board-omap3stalker.c
+@@ -181,11 +181,6 @@ static struct omap_dss_device omap3_stalker_tv_device = {
+ 	.name			= "tv",
+ 	.driver_name		= "venc",
+ 	.type			= OMAP_DISPLAY_TYPE_VENC,
+-#if defined(CONFIG_OMAP2_VENC_OUT_TYPE_SVIDEO)
+-	.phy.venc.type		= OMAP_DSS_VENC_TYPE_SVIDEO,
+-#elif defined(CONFIG_OMAP2_VENC_OUT_TYPE_COMPOSITE)
+-	.u.venc.type		= OMAP_DSS_VENC_TYPE_COMPOSITE,
 -#endif
--
- 	/* S1.10 OFF -- usb "download port"
- 	 * usb0 switched to Mini-B port and isp1105 transceiver;
- 	 * S2.POS3 = ON, S2.POS4 = OFF ... to enable battery charging
+ 	.platform_enable	= omap3_stalker_enable_tv,
+ 	.platform_disable	= omap3_stalker_disable_tv,
+ };
 -- 
 1.7.0.4
