@@ -1,57 +1,51 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Wed, 30 Jun 2010 11:53:10 +0200
-Subject: pxa27x_udc: Oops on probe with usb cable connected.
-Message-ID: <20100630115310.bcf967c1.ospite@studenti.unina.it>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 30 Jun 2010 11:12:23 +0100
+Subject: Pending patches for -rc
+Message-ID: <20100630101223.GA24284@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Given Linus' concerns about the code which is going in during the -rc
+period, and the clamp-down we had for -rc3, I've re-reviewed the
+changes which I have in my master branch.  The following changes do not
+feel like critical rc material:
 
-this is a quite old issue but I'd like to bring it back on.
-I get this Oops when pxa27x_udc is probed with the usb cable plugged,
-this happens on a Motorola A780 phone using the openezx kernel[1] and
-the gen-blob[2] second stage bootloader which disables the UDC before
-booting the kernel from flash.
+ARM: mx3: pcm037: remove unused variable
+pcm037/pcm043/pca100: fix ULPI-related build warnings
+eukrea_mbimx27-baseboard: add generic-bl and platform-lcd controls
+eukrea_mbimx27-baseboard: add timings for DVI output
+cpuimx27 and mbimx27: allow fine control of UART4 and SDHC2 usage
+mach-cpuimx27: add USB Host2 and OTG support
+mach-cpuimx27: register wdt and w1_master resources
+mxcmmc: add card detect through DAT3 possibility
+eukrea_mbimx27: use card detect through DAT3 for SDHC1
+MX2X: Add Keypad device definition for MX2X arch
+eukrea_mbimx27: add support for the keyboard
+eukrea_mbimx27: add audio codec
+mxc_nand: add support for platform defined partitions
+mx25: add platform code for imx-keypad
+mx25pdk: add keypad support
+mx5: Add i2c to Freescale MX51 Babbage HW
+mx5: Register i2c on Freescale MX51 Babbage HW
+ARM: 6189/1: Add support for the MOVW/MOVT relocations in Thumb-2
+ARM: 6190/1: Remove dummy loads from the original relocation address
+ARM: 6191/1: Do not compile the Thumb-2 module relocations on an ARM kernel
 
-See the trace here:
-http://people.openezx.org/ao2/tmp/pxa27x-udc_BUG/log_CRASH.txt
+The diffstat looks like this (worst offenders):
 
-Here is the log of a working case (cable not plugged):
-http://people.openezx.org/ao2/tmp/pxa27x-udc_BUG/log_OK.txt
+ arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c |  181 +++++++++++++++++++++++---
+ arch/arm/mach-mx2/mach-cpuimx27.c            |   93 +++++++++++++-
+ arch/arm/mach-mx5/devices.c                  |   58 ++++++++
+ arch/arm/plat-mxc/clock.c                    |   37 ++++--
+ arch/arm/mach-mx25/mach-mx25pdk.c            |   36 +++++
+ arch/arm/kernel/module.c                     |   34 +++++
+ arch/arm/mach-mx3/mach-mx31lilly.c           |   34 ++++--
+ drivers/mtd/nand/mxc_nand.c                  |   33 +----
+ 44 files changed, 659 insertions(+), 139 deletions(-)
 
-Note that using the original blob bootloader from Motorola there is no
-Oops but the UDC does not work at all, but maybe this is another
-issue, I mean: should pxa27x_udc probe consider the case when UDC is
-already active?
+and I think that if I try to push these to Linus, we'll be on the receipt
+of another complaint - quite rightfully too - the above does not look like
+bug fixes.
 
-Here a log for this last case:
-http://people.openezx.org/ao2/tmp/pxa27x-udc_BUG/log_NOCRASH_NOT_WORKING.txt
-
-Tell me how can i help debugging this, I've put the binary and the
-disassembled code in http://people.openezx.org/ao2/tmp/pxa27x-udc_BUG/
-plus some notes about old discussions on the same matter.
-
-Thanks,
-   Antonio
-
-[1] http://git.openezx.org/openezx.git
-[2] http://git.openezx.org/gen-blob.git
-
--- 
-Antonio Ospite
-http://ao2.it
-
-PGP public key ID: 0x4553B001
-
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100630/1326cb47/attachment.sig>
+Therefore, I won't be pushing my master branch to Linus, but instead merging
+it into -devel and re-starting my master branch afresh.
