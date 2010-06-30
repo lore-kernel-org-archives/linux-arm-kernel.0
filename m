@@ -1,60 +1,39 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 30 Jun 2010 15:06:29 +0300
-Subject: [PATCH 01/16] omap: mux: Fix omap_mux_init_gpio for omap24xx
+Date: Wed, 30 Jun 2010 15:06:35 +0300
+Subject: [PATCH 02/16] omap: mux: Renumber package defines to make room for
+	older 24xx packages
 In-Reply-To: <20100630120226.2637.31198.stgit@baageli.muru.com>
 References: <20100630120226.2637.31198.stgit@baageli.muru.com>
-Message-ID: <20100630120629.2637.28177.stgit@baageli.muru.com>
+Message-ID: <20100630120635.2637.4819.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like 24xx uses mode3 instead of mode4 for muxable GPIO pins.
-This will be needed when 24xx mux code is converted to use the new
-mux functions.
+Only POP and SIP are known to exist for 2420, 2430 seems to only have
+SIP package available.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/mux.c |   10 +++++++++-
- 1 files changed, 9 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/mux.h |   10 ++++++----
+ 1 files changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index 8b3d269..76b5bf7 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -43,6 +43,7 @@
+diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
+index 480abc5..46315f2 100644
+--- a/arch/arm/mach-omap2/mux.h
++++ b/arch/arm/mach-omap2/mux.h
+@@ -56,10 +56,12 @@
  
- #define OMAP_MUX_BASE_OFFSET		0x30	/* Offset from CTRL_BASE */
- #define OMAP_MUX_BASE_SZ		0x5ca
-+#define MUXABLE_GPIO_MODE3		BIT(0)
+ /* Flags for omap_mux_init */
+ #define OMAP_PACKAGE_MASK		0xffff
+-#define OMAP_PACKAGE_CBP		4		/* 515-pin 0.40 0.50 */
+-#define OMAP_PACKAGE_CUS		3		/* 423-pin 0.65 */
+-#define OMAP_PACKAGE_CBB		2		/* 515-pin 0.40 0.50 */
+-#define OMAP_PACKAGE_CBC		1		/* 515-pin 0.50 0.65 */
++#define OMAP_PACKAGE_CBP		6		/* 515-pin 0.40 0.50 */
++#define OMAP_PACKAGE_CUS		5		/* 423-pin 0.65 */
++#define OMAP_PACKAGE_CBB		4		/* 515-pin 0.40 0.50 */
++#define OMAP_PACKAGE_CBC		3		/* 515-pin 0.50 0.65 */
++#define OMAP_PACKAGE_ZAC		2		/* 24xx 447-pin POP */
++#define OMAP_PACKAGE_ZAF		1		/* 2420 447-pin SIP */
  
- struct omap_mux_entry {
- 	struct omap_mux		mux;
-@@ -51,6 +52,7 @@ struct omap_mux_entry {
  
- static unsigned long mux_phys;
- static void __iomem *mux_base;
-+static u8 omap_mux_flags;
- 
- u16 omap_mux_read(u16 reg)
- {
-@@ -394,7 +396,10 @@ int __init omap_mux_init_gpio(int gpio, int val)
- 
- 			old_mode = omap_mux_read(m->reg_offset);
- 			mux_mode = val & ~(OMAP_MUX_NR_MODES - 1);
--			mux_mode |= OMAP_MUX_MODE4;
-+			if (omap_mux_flags & MUXABLE_GPIO_MODE3)
-+				mux_mode |= OMAP_MUX_MODE3;
-+			else
-+				mux_mode |= OMAP_MUX_MODE4;
- 			printk(KERN_DEBUG "mux: Setting signal "
- 				"%s.gpio%i 0x%04x -> 0x%04x\n",
- 				m->muxnames[0], gpio, old_mode, mux_mode);
-@@ -1032,6 +1037,9 @@ int __init omap_mux_init(u32 mux_pbase, u32 mux_size,
- 		return -ENODEV;
- 	}
- 
-+	if (cpu_is_omap24xx())
-+		omap_mux_flags = MUXABLE_GPIO_MODE3;
-+
- 	omap_mux_init_package(superset, package_subset, package_balls);
- 	omap_mux_init_list(superset);
- 	omap_mux_init_signals(board_mux);
+ #define OMAP_MUX_NR_MODES	8			/* Available modes */
