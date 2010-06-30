@@ -1,37 +1,25 @@
 From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 30 Jun 2010 23:32:09 +0200
-Subject: [PATCH] ARM: RealView: Do not use outer_sync() on certain with
-	L210/L220
-In-Reply-To: <1277888217.13942.0.camel@e102109-lin.cambridge.arm.com>
-References: <20100629093135.10365.99959.stgit@e102109-lin.cambridge.arm.com>
-	<AANLkTinpAz52QfsnvzIY5fleJoflVr0Z40JpRNrlXY9k@mail.gmail.com>
-	<1277888217.13942.0.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <AANLkTimyCm7K-3clFnxl1BirvozucaDrj4Abl3899jtN@mail.gmail.com>
+Date: Wed, 30 Jun 2010 23:58:42 +0200
+Subject: [PATCH 0/2] RealView barriers and ARM_DMA_MEM_BUFFERABLE
+In-Reply-To: <20100630104105.16712.66741.stgit@e102109-lin.cambridge.arm.com>
+References: <20100630104105.16712.66741.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <AANLkTikBTz8qqohhcfhSWW9cO384pientK2tXPtKuYVv@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2010/6/30 Catalin Marinas <catalin.marinas@arm.com>:
 
-> On Wed, 2010-06-30 at 09:13 +0100, Linus Walleij wrote:
->> 2010/6/29 Catalin Marinas <catalin.marinas@arm.com>:
->>
->> > RealView boards with certain revisions of the L210/L220 cache controller
->> > may have issues (hardware deadlock) with the recent changes to the mb()
->> > barrier implementation (DSB followed by an L2 cache sync). The patch
->> > disables ARM_DMA_MEM_BUFFERABLE for the RealView boards with L210/L220
->> > and redefines the mandatory barriers without the outer_sync() call.
->> >
->> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
->> > Cc: Linus Walleij <linus.ml.walleij@gmail.com>
->>
->> Works like a charm on the PB1176!
->>
->> Tested-by: Linus Walleij <linus.walleij@stericsson.com>
->
-> Thanks for testing. Just to be sure - was this with the CACHE_L2X0
-> enabled in your configuration?
+> Linus, could you please confirm that the second patch still fixes the
+> PB1176 issues for you?
 
-Yep it was!
+It does, the system comes up, prints:
+L2x0 series cache controller enabled
+l2x0: 8 ways, CACHE_ID 0x41000486, AUX_CTRL 0x02730fff
+
+No hangs whatsoever.
+Tested-by: Linus Walleij <linus.walleij@stericsson.com>
+
+Please queue this up for the -rc series...
 
 Yours,
 Linus Walleij
