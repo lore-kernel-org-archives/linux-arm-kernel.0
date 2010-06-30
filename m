@@ -1,30 +1,27 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 30 Jun 2010 09:37:06 +0200
-Subject: [PATCH 21/61] ARM: mx3: mx31lilly: fix build error for
-	!CONFIG_USB_ULPI
-In-Reply-To: <1277387397-3467-22-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1277387397-3467-22-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20100630073706.GE11746@pengutronix.de>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Wed, 30 Jun 2010 10:13:59 +0200
+Subject: [PATCH] ARM: RealView: Do not use outer_sync() on certain with
+	L210/L220
+In-Reply-To: <20100629093135.10365.99959.stgit@e102109-lin.cambridge.arm.com>
+References: <20100629093135.10365.99959.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <AANLkTinpAz52QfsnvzIY5fleJoflVr0Z40JpRNrlXY9k@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 24, 2010 at 03:49:17PM +0200, Uwe Kleine-K?nig wrote:
-> arch/arm/mach-mx3/built-in.o: In function `mx31lilly_board_init':
-> mach-kzm_arm11_01.c:(.init.text+0x674): undefined reference to `otg_ulpi_create'
-> mach-kzm_arm11_01.c:(.init.text+0x68c): undefined reference to `otg_ulpi_create'
-> mach-kzm_arm11_01.c:(.init.text+0x744): undefined reference to `mxc_ulpi_access_ops'
-> make: *** [.tmp_vmlinux1] Error 1
-> 
-> Signed-off-by: Daniel Mack <daniel@caiaq.de>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-I dropped this from my series as it's only cherry-picked from Sascha's
-tree for my build tests.
+2010/6/29 Catalin Marinas <catalin.marinas@arm.com>:
 
-Best regards
-Uwe
+> RealView boards with certain revisions of the L210/L220 cache controller
+> may have issues (hardware deadlock) with the recent changes to the mb()
+> barrier implementation (DSB followed by an L2 cache sync). The patch
+> disables ARM_DMA_MEM_BUFFERABLE for the RealView boards with L210/L220
+> and redefines the mandatory barriers without the outer_sync() call.
+>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Linus Walleij <linus.ml.walleij@gmail.com>
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Works like a charm on the PB1176!
+
+Tested-by: Linus Walleij <linus.walleij@stericsson.com>
+
+Yours,
+Linus Walleij
