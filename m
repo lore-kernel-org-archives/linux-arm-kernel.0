@@ -1,59 +1,61 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 30 Jun 2010 09:20:36 +0200 (CEST)
-Subject: [PATCHv4 1/3] mx2_camera: Add soc_camera support for i.MX25/i.MX27
-In-Reply-To: <20100630070717.GA11746@pengutronix.de>
-References: <cover.1277096909.git.baruch@tkos.co.il>
-	<03d6e55c39690618e92a91a580ec34549a135c79.1277096909.git.baruch@tkos.co.il>
-	<20100630070717.GA11746@pengutronix.de>
-Message-ID: <Pine.LNX.4.64.1006300918190.17489@axis700.grange>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 30 Jun 2010 10:24:44 +0300
+Subject: [PATCH 6/6] omap2/3/4: Add Kconfig option to compile in
+	typical omap	features
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C5E4124A@dbde02.ent.ti.com>
+References: <20100629113229.16008.2931.stgit@baageli.muru.com>
+	<20100629114738.16008.62006.stgit@baageli.muru.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C5DB6FC3@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C5DB7026@dbde02.ent.ti.com>
+	<20100630061726.GQ2822@atomide.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C5E4124A@dbde02.ent.ti.com>
+Message-ID: <20100630072443.GW2822@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Jun 2010, Uwe Kleine-K?nig wrote:
-
-> On Mon, Jun 21, 2010 at 08:15:58AM +0300, Baruch Siach wrote:
-> > This is the soc_camera support developed by Sascha Hauer for the i.MX27.  Alan
-> > Carvalho de Assis modified the original driver to get it working on more recent
-> > kernels. I modified it further to add support for i.MX25. This driver has been
-> > tested on i.MX25 and i.MX27 based platforms.
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [100630 09:41]:
+> > -----Original Message-----
+> > From: Tony Lindgren [mailto:tony at atomide.com]
+> > Sent: Wednesday, June 30, 2010 11:47 AM
+> > To: Shilimkar, Santosh
+> > Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
+> > Subject: Re: [PATCH 6/6] omap2/3/4: Add Kconfig option to compile in
+> > typical omap features
 > > 
-> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > ---
-> >  arch/arm/plat-mxc/include/mach/memory.h  |    4 +-
-> >  arch/arm/plat-mxc/include/mach/mx2_cam.h |   46 +
-> >  drivers/media/video/Kconfig              |   13 +
-> >  drivers/media/video/Makefile             |    1 +
-> >  drivers/media/video/mx2_camera.c         | 1493 ++++++++++++++++++++++++++++++
-> >  5 files changed, 1555 insertions(+), 2 deletions(-)
-> >  create mode 100644 arch/arm/plat-mxc/include/mach/mx2_cam.h
-> >  create mode 100644 drivers/media/video/mx2_camera.c
+> > * Shilimkar, Santosh <santosh.shilimkar@ti.com> [100629 17:40]:
+> > > > >
+> > > > With your series OMAP4 build breaks because of PM and SMP
+> > dependencies.
+> > > > To ensure that build doesn't break on OMAP4, I needed below change.
+> > With
+> > > > This change I tried your series and it boots OK on OMAP4430 SDP
 > > 
-> > diff --git a/arch/arm/plat-mxc/include/mach/memory.h b/arch/arm/plat-mxc/include/mach/memory.h
-> > index c4b40c3..5803836 100644
-> > --- a/arch/arm/plat-mxc/include/mach/memory.h
-> > +++ b/arch/arm/plat-mxc/include/mach/memory.h
-> > @@ -44,12 +44,12 @@
-> >   */
-> >  #define CONSISTENT_DMA_SIZE SZ_8M
-> >  
-> > -#elif defined(CONFIG_MX1_VIDEO)
-> > +#elif defined(CONFIG_MX1_VIDEO) || defined(CONFIG_MX2_VIDEO)
-> >  /*
-> >   * Increase size of DMA-consistent memory region.
-> >   * This is required for i.MX camera driver to capture at least four VGA frames.
-> >   */
-> >  #define CONSISTENT_DMA_SIZE SZ_4M
-> > -#endif /* CONFIG_MX1_VIDEO */
-> > +#endif /* CONFIG_MX1_VIDEO || CONFIG_MX2_VIDEO */
-> Why not use CONFIG_VIDEO_MX2 here and get rid of CONFIG_MX2_VIDEO?
+> > Hmm the build does not break for me?
+> >
+> Looks like I am missing something here. How do you build OMAP4 alone with
+> these new changes ??
 
-Well, firstly for uniformity with MX1 and MX3, secondly not to have to use 
-(CONFIG_VIDEO_MX2 || CONFIG_VIDEO_MX2_MODULE), also note, that 
-CONFIG_MX1_VIDEO is also used for linking of the FIQ handler for the camera.
+Use your old config file, or just unselect CONFIG_ARCH_OMAP2
+and CONFIG_ARCH_OMAP3. Note that if you now do:
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+$ yes "" | ARCH=arm make oldconfig
+
+with your old omap4 only config file, then by default the
+typical features get added by default. So what you probably
+want to do is (untested):
+
+$ echo "# CONFIG_ARCH_OMAP2PLUS_TYPICAL is not set" >> .config
+$ yes "" | ARCH=arm make oldconfig
+
+Then it should not change your old config file.
+
+To see how the boards and features show up, you can also play
+with it with make xconfig:
+
+System Type -> TI OMAP2/3/4 Specific Features
+
+Uncheck TI OMAP2 and TI OMAP3 so only TI OMAP4 is selected.
+
+Regards,
+
+Tony
