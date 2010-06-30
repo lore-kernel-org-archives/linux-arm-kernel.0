@@ -1,36 +1,59 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 30 Jun 2010 11:45:23 +0100
-Subject: [PATCH 0/2] RealView barriers and ARM_DMA_MEM_BUFFERABLE
-Message-ID: <20100630104105.16712.66741.stgit@e102109-lin.cambridge.arm.com>
+Date: Wed, 30 Jun 2010 11:45:29 +0100
+Subject: [PATCH 1/2] ARM: RealView: Do not use outer_sync() on ARM11MPCore
+	boards with L220
+In-Reply-To: <20100630104105.16712.66741.stgit@e102109-lin.cambridge.arm.com>
+References: <20100630104105.16712.66741.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100630104528.16712.39066.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+RealView boards with certain revisions of the L220 cache controller (ARM11*
+processors only) may have issues (hardware deadlock) with the recent changes to
+the mb() barrier implementation (DSB followed by an L2 cache sync). The patch
+redefines the RealView ARM11MPCore mandatory barriers without the outer_sync()
+call.
 
-This series is quite similar to the patch that Linus W. tested on
-PB1176. The difference is that the RealView mandatory barriers are only
-redefined for the ARM11MPCore boards in SMP configurations. For the UP
-ones, the second patch is sufficient because of the #ifdef in system.h.
-
-I split the patch in two so that the first one is applicable to 2.6.34
-can can be sent to stable at kernel.org.
-
-Linus, could you please confirm that the second patch still fixes the
-PB1176 issues for you?
-
-Thanks.
-
-
-Catalin Marinas (2):
-      ARM: RealView: Do not use outer_sync() on ARM11MPCore boards with L220
-      ARM: Do not ARM_DMA_MEM_BUFFERABLE on RealView boards with L210/L220
-
-
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King <rmk@arm.linux.org.uk>
+Cc: Linus Walleij <linus.walleij@stericsson.com>
+---
  arch/arm/mach-realview/Kconfig                 |    2 ++
  arch/arm/mach-realview/include/mach/barriers.h |    8 ++++++++
- arch/arm/mm/Kconfig                            |    2 ++
- 3 files changed, 12 insertions(+), 0 deletions(-)
+ 2 files changed, 10 insertions(+), 0 deletions(-)
  create mode 100644 arch/arm/mach-realview/include/mach/barriers.h
 
--- 
-Catalin
+diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
+index ee5e392..b4575ae 100644
+--- a/arch/arm/mach-realview/Kconfig
++++ b/arch/arm/mach-realview/Kconfig
+@@ -18,6 +18,7 @@ config REALVIEW_EB_ARM11MP
+ 	bool "Support ARM11MPCore tile"
+ 	depends on MACH_REALVIEW_EB
+ 	select CPU_V6
++	select ARCH_HAS_BARRIERS if SMP
+ 	help
+ 	  Enable support for the ARM11MPCore tile on the Realview platform.
+ 
+@@ -35,6 +36,7 @@ config MACH_REALVIEW_PB11MP
+ 	select CPU_V6
+ 	select ARM_GIC
+ 	select HAVE_PATA_PLATFORM
++	select ARCH_HAS_BARRIERS if SMP
+ 	help
+ 	  Include support for the ARM(R) RealView MPCore Platform Baseboard.
+ 	  PB11MPCore is a platform with an on-board ARM11MPCore and has
+diff --git a/arch/arm/mach-realview/include/mach/barriers.h b/arch/arm/mach-realview/include/mach/barriers.h
+new file mode 100644
+index 0000000..0c5d749
+--- /dev/null
++++ b/arch/arm/mach-realview/include/mach/barriers.h
+@@ -0,0 +1,8 @@
++/*
++ * Barriers redefined for RealView ARM11MPCore platforms with L220 cache
++ * controller to work around hardware errata causing the outer_sync()
++ * operation to deadlock the system.
++ */
++#define mb()		dsb()
++#define rmb()		dmb()
++#define wmb()		mb()
