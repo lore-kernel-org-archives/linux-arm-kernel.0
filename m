@@ -1,62 +1,52 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 30 Jun 2010 14:57:57 +0800
-Subject: [PATCH 4/4] pxa/spitz: Rework spitz
-In-Reply-To: <201006281729.38591.marek.vasut@gmail.com>
-References: <1277388132-5549-1-git-send-email-marek.vasut@gmail.com>
-	<201006281407.50202.marek.vasut@gmail.com>
-	<AANLkTikdxoqofUUpxB1c9wSlsU-zxc-uSNMmnQX_kE8m@mail.gmail.com>
-	<201006281729.38591.marek.vasut@gmail.com>
-Message-ID: <AANLkTinRkgIg1q8LfRF6jWOoxLNY__xMi3iJjEv1FhWL@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 30 Jun 2010 09:07:17 +0200
+Subject: [PATCHv4 1/3] mx2_camera: Add soc_camera support for i.MX25/i.MX27
+In-Reply-To: <03d6e55c39690618e92a91a580ec34549a135c79.1277096909.git.baruch@tkos.co.il>
+References: <cover.1277096909.git.baruch@tkos.co.il>
+	<03d6e55c39690618e92a91a580ec34549a135c79.1277096909.git.baruch@tkos.co.il>
+Message-ID: <20100630070717.GA11746@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 28, 2010 at 11:29 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Dne Po 28. ?ervna 2010 14:19:46 Eric Miao napsal(a):
->> On Mon, Jun 28, 2010 at 8:07 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
->> > Dne Po 28. ?ervna 2010 05:43:12 Eric Miao napsal(a):
->> >> On Thu, Jun 24, 2010 at 10:02 PM, Marek Vasut <marek.vasut@gmail.com>
-> wrote:
->> >> > This huge patch mostly shuffles code. The spitz.c file contained
->> >> > terrible mess and needed a cleanup, here it is:
->> >> >
->> >> > 1) Made every part modular, components are not built in if not
->> >> > selected. 2) Removed loads of preprocessor goo, mostly "#ifdef
->> >> > MACH_AKITA .... #endif" and similar code. The kernel size will grow
->> >> > by a few kb now, but the file is much more readable.
->> >> > 3) Reworked SD/CF power setting function and made it reentrant.
->> >> > 4) Add ISL6271A regulator support
->> >> > 5) Correctly register WM8750
->> >> >
->> >> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
->> >>
->> >> I'd prefer to see separate small patches for this?
->> >
->> > This is nearly a replacement for the whole file ... maybe we could merge
->> > spitz2.c or something ... or do it this way. I understand your point
->> > about spliting it into smaller chunks, but I don't see a reason in this
->> > case.
->>
->> I guess the above 1, 2, 3, 4, 5 can be well separated into 5 patches,
->> I don't mind merge many patches, but I'd really like to see small and
->> consistent changes (make it regression test friendly BTW), ;-)
->
-> I said I get your point, but I don't see the benefit here.
-> 1) already does most of the rewrite of the file,
-> 2) only removes the #ifdef MACH_PLAT around MACHINE_START (as the rest was done
-> in 1) ),
-> 3) is actually a part of 1) as well
-> 4) ok, this could be separated out, but I see no benefit
-> 5) well this is already in if I recall well, but I put it here for completeness
->
+On Mon, Jun 21, 2010 at 08:15:58AM +0300, Baruch Siach wrote:
+> This is the soc_camera support developed by Sascha Hauer for the i.MX27.  Alan
+> Carvalho de Assis modified the original driver to get it working on more recent
+> kernels. I modified it further to add support for i.MX25. This driver has been
+> tested on i.MX25 and i.MX27 based platforms.
+> 
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  arch/arm/plat-mxc/include/mach/memory.h  |    4 +-
+>  arch/arm/plat-mxc/include/mach/mx2_cam.h |   46 +
+>  drivers/media/video/Kconfig              |   13 +
+>  drivers/media/video/Makefile             |    1 +
+>  drivers/media/video/mx2_camera.c         | 1493 ++++++++++++++++++++++++++++++
+>  5 files changed, 1555 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/plat-mxc/include/mach/mx2_cam.h
+>  create mode 100644 drivers/media/video/mx2_camera.c
+> 
+> diff --git a/arch/arm/plat-mxc/include/mach/memory.h b/arch/arm/plat-mxc/include/mach/memory.h
+> index c4b40c3..5803836 100644
+> --- a/arch/arm/plat-mxc/include/mach/memory.h
+> +++ b/arch/arm/plat-mxc/include/mach/memory.h
+> @@ -44,12 +44,12 @@
+>   */
+>  #define CONSISTENT_DMA_SIZE SZ_8M
+>  
+> -#elif defined(CONFIG_MX1_VIDEO)
+> +#elif defined(CONFIG_MX1_VIDEO) || defined(CONFIG_MX2_VIDEO)
+>  /*
+>   * Increase size of DMA-consistent memory region.
+>   * This is required for i.MX camera driver to capture at least four VGA frames.
+>   */
+>  #define CONSISTENT_DMA_SIZE SZ_4M
+> -#endif /* CONFIG_MX1_VIDEO */
+> +#endif /* CONFIG_MX1_VIDEO || CONFIG_MX2_VIDEO */
+Why not use CONFIG_VIDEO_MX2 here and get rid of CONFIG_MX2_VIDEO?
+ 
+Best regards
+Uwe
 
-Several of other comments, though:
-
-1. It doesn't look necessary to me to change spitz_* to sharpslc_*. spitz_*
-   isn't a good prefix, neither is sharpslc_* (think about the corgi series,
-   which is normally called Sharp SL-C7xx). And this is also going to save
-   many unnecessary changes.
-
-2. Direct references of spitzscoop[12]_device are still there, which I'd
-   prefer a cleaner patch for this
-
-3. Others seem to be coding style changes - which can be separated
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
