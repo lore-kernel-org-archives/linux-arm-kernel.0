@@ -1,24 +1,37 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 30 Jun 2010 13:36:16 -0700
-Subject: [PATCH 02/33] Removing dead ARCH_DAVINCI_TNETV107X
-In-Reply-To: <88ee583babc6f0aecb2238a57644f64159d5c395.1277911346.git.siccegge@cs.fau.de>
-	(Christoph Egger's message of "Wed, 30 Jun 2010 18:05:38 +0200")
-References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<88ee583babc6f0aecb2238a57644f64159d5c395.1277911346.git.siccegge@cs.fau.de>
-Message-ID: <87vd90jm0v.fsf@deeprootsystems.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Wed, 30 Jun 2010 23:32:09 +0200
+Subject: [PATCH] ARM: RealView: Do not use outer_sync() on certain with
+	L210/L220
+In-Reply-To: <1277888217.13942.0.camel@e102109-lin.cambridge.arm.com>
+References: <20100629093135.10365.99959.stgit@e102109-lin.cambridge.arm.com>
+	<AANLkTinpAz52QfsnvzIY5fleJoflVr0Z40JpRNrlXY9k@mail.gmail.com>
+	<1277888217.13942.0.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <AANLkTimyCm7K-3clFnxl1BirvozucaDrj4Abl3899jtN@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christoph Egger <siccegge@cs.fau.de> writes:
+2010/6/30 Catalin Marinas <catalin.marinas@arm.com>:
 
-> ARCH_DAVINCI_TNETV107X doesn't exist in Kconfig, therefore removing
-> all references for it from the source code.
+> On Wed, 2010-06-30 at 09:13 +0100, Linus Walleij wrote:
+>> 2010/6/29 Catalin Marinas <catalin.marinas@arm.com>:
+>>
+>> > RealView boards with certain revisions of the L210/L220 cache controller
+>> > may have issues (hardware deadlock) with the recent changes to the mb()
+>> > barrier implementation (DSB followed by an L2 cache sync). The patch
+>> > disables ARM_DMA_MEM_BUFFERABLE for the RealView boards with L210/L220
+>> > and redefines the mandatory barriers without the outer_sync() call.
+>> >
+>> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+>> > Cc: Linus Walleij <linus.ml.walleij@gmail.com>
+>>
+>> Works like a charm on the PB1176!
+>>
+>> Tested-by: Linus Walleij <linus.walleij@stericsson.com>
 >
-> Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
+> Thanks for testing. Just to be sure - was this with the CACHE_L2X0
+> enabled in your configuration?
 
-Please leave this define in.
+Yep it was!
 
-The full support for this platform is currently in linux-next and will
-be merged for 2.6.36.
-
-Kevin
+Yours,
+Linus Walleij
