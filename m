@@ -1,62 +1,62 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 30 Jun 2010 12:17:23 +0530
-Subject: [PATCH 6/6] omap2/3/4: Add Kconfig option to compile in typical
-	omap	features
-In-Reply-To: <20100630061726.GQ2822@atomide.com>
-References: <20100629113229.16008.2931.stgit@baageli.muru.com>
-	<20100629114738.16008.62006.stgit@baageli.muru.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C5DB6FC3@dbde02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C5DB7026@dbde02.ent.ti.com>
-	<20100630061726.GQ2822@atomide.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C5E4124A@dbde02.ent.ti.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 30 Jun 2010 14:57:57 +0800
+Subject: [PATCH 4/4] pxa/spitz: Rework spitz
+In-Reply-To: <201006281729.38591.marek.vasut@gmail.com>
+References: <1277388132-5549-1-git-send-email-marek.vasut@gmail.com>
+	<201006281407.50202.marek.vasut@gmail.com>
+	<AANLkTikdxoqofUUpxB1c9wSlsU-zxc-uSNMmnQX_kE8m@mail.gmail.com>
+	<201006281729.38591.marek.vasut@gmail.com>
+Message-ID: <AANLkTinRkgIg1q8LfRF6jWOoxLNY__xMi3iJjEv1FhWL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Wednesday, June 30, 2010 11:47 AM
-> To: Shilimkar, Santosh
-> Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
-> Subject: Re: [PATCH 6/6] omap2/3/4: Add Kconfig option to compile in
-> typical omap features
-> 
-> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [100629 17:40]:
-> > > >
-> > > With your series OMAP4 build breaks because of PM and SMP
-> dependencies.
-> > > To ensure that build doesn't break on OMAP4, I needed below change.
-> With
-> > > This change I tried your series and it boots OK on OMAP4430 SDP
-> 
-> Hmm the build does not break for me?
+On Mon, Jun 28, 2010 at 11:29 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Dne Po 28. ?ervna 2010 14:19:46 Eric Miao napsal(a):
+>> On Mon, Jun 28, 2010 at 8:07 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+>> > Dne Po 28. ?ervna 2010 05:43:12 Eric Miao napsal(a):
+>> >> On Thu, Jun 24, 2010 at 10:02 PM, Marek Vasut <marek.vasut@gmail.com>
+> wrote:
+>> >> > This huge patch mostly shuffles code. The spitz.c file contained
+>> >> > terrible mess and needed a cleanup, here it is:
+>> >> >
+>> >> > 1) Made every part modular, components are not built in if not
+>> >> > selected. 2) Removed loads of preprocessor goo, mostly "#ifdef
+>> >> > MACH_AKITA .... #endif" and similar code. The kernel size will grow
+>> >> > by a few kb now, but the file is much more readable.
+>> >> > 3) Reworked SD/CF power setting function and made it reentrant.
+>> >> > 4) Add ISL6271A regulator support
+>> >> > 5) Correctly register WM8750
+>> >> >
+>> >> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+>> >>
+>> >> I'd prefer to see separate small patches for this?
+>> >
+>> > This is nearly a replacement for the whole file ... maybe we could merge
+>> > spitz2.c or something ... or do it this way. I understand your point
+>> > about spliting it into smaller chunks, but I don't see a reason in this
+>> > case.
+>>
+>> I guess the above 1, 2, 3, 4, 5 can be well separated into 5 patches,
+>> I don't mind merge many patches, but I'd really like to see small and
+>> consistent changes (make it regression test friendly BTW), ;-)
 >
-Looks like I am missing something here. How do you build OMAP4 alone with
-these new changes ??
- 
-> > Also tested the multi-omap build on OMAP3430 SDP and OMAP4430 SDP. Both
-> boots OK.
-> >
-> > > diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> > > index 84fecd0..f48f275 100644
-> > > --- a/arch/arm/mach-omap2/Kconfig
-> > > +++ b/arch/arm/mach-omap2/Kconfig
-> > > @@ -7,8 +7,8 @@ config ARCH_OMAP2PLUS_TYPICAL
-> > >         default y
-> > >         select AEABI
-> > >         select REGULATOR
-> > > -       select PM
-> > > -       select PM_RUNTIME
-> > > +       select PM if !ARCH_OMAP4
-> > > +       select PM_RUNTIME if !ARCH_OMAP4
-> > >         select VFP
-> > >         select NEON if ARCH_OMAP3 || ARCH_OMAP4
-> > >         select SERIAL_8250
-> 
-> Let's rather fix whatever the issue is for booting (or building?)
-> omap4 with CONFIG_PM and CONFIG_PM_RUNTIME. If we can't implement
-> PM yet for omap4, we can just return early if cpu_is_omap44xx.
-> 
-> CONFIG_SMP we can't enable as that requires various ARM changes
-> to work on unicore systems. But hopefully we can enable that too
-> at some point with select SMP if ARCH_OMAP4.
-> 
+> I said I get your point, but I don't see the benefit here.
+> 1) already does most of the rewrite of the file,
+> 2) only removes the #ifdef MACH_PLAT around MACHINE_START (as the rest was done
+> in 1) ),
+> 3) is actually a part of 1) as well
+> 4) ok, this could be separated out, but I see no benefit
+> 5) well this is already in if I recall well, but I put it here for completeness
+>
+
+Several of other comments, though:
+
+1. It doesn't look necessary to me to change spitz_* to sharpslc_*. spitz_*
+   isn't a good prefix, neither is sharpslc_* (think about the corgi series,
+   which is normally called Sharp SL-C7xx). And this is also going to save
+   many unnecessary changes.
+
+2. Direct references of spitzscoop[12]_device are still there, which I'd
+   prefer a cleaner patch for this
+
+3. Others seem to be coding style changes - which can be separated
