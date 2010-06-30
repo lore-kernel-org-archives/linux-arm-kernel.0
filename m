@@ -1,35 +1,37 @@
-From: h-kanigeri2@ti.com (Kanigeri, Hari)
-Date: Wed, 30 Jun 2010 13:44:14 -0500
-Subject: [PATCH 22/33] Removing dead MPU_{BRIDGE,TESLA}_IOMMU
-In-Reply-To: <20100630.212346.226780589.Hiroshi.DOYU@nokia.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 30 Jun 2010 14:59:05 -0400 (EDT)
+Subject: [PATCH 08/33] Removing dead SA1101
+In-Reply-To: <201006302020.52270.marek.vasut@gmail.com>
 References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<fcfa44a43c21c70f89ced96b96d7c1489d28cc51.1277911346.git.siccegge@cs.fau.de>
-	<20100630.212346.226780589.Hiroshi.DOYU@nokia.com>
-Message-ID: <8F7AF80515AF0D4D93307E594F3CB40E4CA55915@dlee03.ent.ti.com>
+	<7488ec29cdb90212e965f6cd1173141c576c0955.1277911346.git.siccegge@cs.fau.de>
+	<alpine.LFD.2.00.1006301255260.24097@xanadu.home>
+	<201006302020.52270.marek.vasut@gmail.com>
+Message-ID: <alpine.LFD.2.00.1006301453450.24097@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 30 Jun 2010, Marek Vasut wrote:
 
-> -----Original Message-----
-> From: Hiroshi DOYU [mailto:Hiroshi.DOYU at nokia.com]
-> Sent: Wednesday, June 30, 2010 1:24 PM
-> To: siccegge at cs.fau.de; Kanigeri, Hari
-> Cc: tony at atomide.com; linux at arm.linux.org.uk; linux-omap at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> vamos at i4.informatik.uni-erlangen.de
-> Subject: Re: [PATCH 22/33] Removing dead MPU_{BRIDGE,TESLA}_IOMMU
+> Dne St 30. ?ervna 2010 18:57:43 Nicolas Pitre napsal(a):
+> > On Wed, 30 Jun 2010, Christoph Egger wrote:
+> > > SA1101 doesn't exist in Kconfig, therefore removing all
+> > > references for it from the source code.
+> > > 
+> > > Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
+> > 
+> > Acked-by: Nicolas Pitre <nico@fluxnic.net>
 > 
-> From: ext Christoph Egger <siccegge@cs.fau.de>
-> Subject: [PATCH 22/33] Removing dead MPU_{BRIDGE,TESLA}_IOMMU
-> Date: Wed, 30 Jun 2010 18:01:01 +0200
-> 
-> > MPU_{BRIDGE,TESLA}_IOMMU doesn't exist in Kconfig, therefore removing
-> > all references for it from the source code.
-> 
-> Coming soon, I guess. Hari?
+> You're dropping support for a whole CPU here ... is the code redundant or 
+> something ?
 
-Coming soon for both Bridge and Tesla. As I am writing this email, Fernando is preparing the Bridge patches to migrate to iommu.
+The SA1101 is not a CPU.  It is a companion chipset for the SA1100.  And 
+so far we have no target using it in the tree, and that isn't likely to 
+change more than 10 years after the chip availability.  Needless to say 
+that the SA1101 has long been unavailable either.
 
-Thank you,
-Best regards,
-Hari
+We also have support for the SA1111 which is a similar companion chipset 
+for the SA1110.  This is not going away as at least the Neponset 
+expansion board for the Assabet development board is using a SA1111.
+
+
+Nicolas
