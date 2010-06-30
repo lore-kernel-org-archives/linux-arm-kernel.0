@@ -1,39 +1,44 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 30 Jun 2010 15:06:35 +0300
-Subject: [PATCH 02/16] omap: mux: Renumber package defines to make room for
-	older 24xx packages
+Date: Wed, 30 Jun 2010 15:06:39 +0300
+Subject: [PATCH 03/16] omap: mux: Allow compiling in new mux code on all
+	mach-omap2 systems
 In-Reply-To: <20100630120226.2637.31198.stgit@baageli.muru.com>
 References: <20100630120226.2637.31198.stgit@baageli.muru.com>
-Message-ID: <20100630120635.2637.4819.stgit@baageli.muru.com>
+Message-ID: <20100630120639.2637.54819.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only POP and SIP are known to exist for 2420, 2430 seems to only have
-SIP package available.
+Allow compiling in new mux code on all mach-omap2 systems
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/mux.h |   10 ++++++----
- 1 files changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/mux.c |    2 +-
+ arch/arm/mach-omap2/mux.h |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+index 76b5bf7..197e295 100644
+--- a/arch/arm/mach-omap2/mux.c
++++ b/arch/arm/mach-omap2/mux.c
+@@ -372,7 +372,7 @@ int __init omap2_mux_init(void)
+ 
+ /*----------------------------------------------------------------------------*/
+ 
+-#ifdef CONFIG_ARCH_OMAP3
++#ifdef CONFIG_ARCH_OMAP2PLUS
+ static LIST_HEAD(muxmodes);
+ static DEFINE_MUTEX(muxmode_mutex);
+ 
 diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
-index 480abc5..46315f2 100644
+index 46315f2..937a8ca 100644
 --- a/arch/arm/mach-omap2/mux.h
 +++ b/arch/arm/mach-omap2/mux.h
-@@ -56,10 +56,12 @@
+@@ -104,7 +104,7 @@ struct omap_board_mux {
+ 	u16	value;
+ };
  
- /* Flags for omap_mux_init */
- #define OMAP_PACKAGE_MASK		0xffff
--#define OMAP_PACKAGE_CBP		4		/* 515-pin 0.40 0.50 */
--#define OMAP_PACKAGE_CUS		3		/* 423-pin 0.65 */
--#define OMAP_PACKAGE_CBB		2		/* 515-pin 0.40 0.50 */
--#define OMAP_PACKAGE_CBC		1		/* 515-pin 0.50 0.65 */
-+#define OMAP_PACKAGE_CBP		6		/* 515-pin 0.40 0.50 */
-+#define OMAP_PACKAGE_CUS		5		/* 423-pin 0.65 */
-+#define OMAP_PACKAGE_CBB		4		/* 515-pin 0.40 0.50 */
-+#define OMAP_PACKAGE_CBC		3		/* 515-pin 0.50 0.65 */
-+#define OMAP_PACKAGE_ZAC		2		/* 24xx 447-pin POP */
-+#define OMAP_PACKAGE_ZAF		1		/* 2420 447-pin SIP */
+-#if defined(CONFIG_OMAP_MUX) && defined(CONFIG_ARCH_OMAP3)
++#if defined(CONFIG_OMAP_MUX)
  
- 
- #define OMAP_MUX_NR_MODES	8			/* Available modes */
+ /**
+  * omap_mux_init_gpio - initialize a signal based on the GPIO number
