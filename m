@@ -1,35 +1,26 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 30 Jun 2010 11:45:35 +0100
-Subject: [PATCH 2/2] ARM: Do not ARM_DMA_MEM_BUFFERABLE on RealView boards
-	with L210/L220
-In-Reply-To: <20100630104105.16712.66741.stgit@e102109-lin.cambridge.arm.com>
-References: <20100630104105.16712.66741.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100630104534.16712.60870.stgit@e102109-lin.cambridge.arm.com>
+Date: Wed, 30 Jun 2010 11:48:32 +0100
+Subject: Pending patches for -rc
+In-Reply-To: <20100630101223.GA24284@n2100.arm.linux.org.uk>
+References: <20100630101223.GA24284@n2100.arm.linux.org.uk>
+Message-ID: <1277894912.13942.29.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RealView boards with certain revisions of the L210/L220 cache controller
-may have issues (hardware deadlock) with the mandatory barriers (DSB
-followed by an L2 cache sync) when ARM_DMA_MEM_BUFFERABLE is enabled.
-The patch disables ARM_DMA_MEM_BUFFERABLE for these boards.
+On Wed, 2010-06-30 at 11:12 +0100, Russell King - ARM Linux wrote:
+> ARM: 6189/1: Add support for the MOVW/MOVT relocations in Thumb-2
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Russell King <rmk@arm.linux.org.uk>
-Cc: Linus Walleij <linus.walleij@stericsson.com>
----
- arch/arm/mm/Kconfig |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Thumb-2 modules of certain size may get these relocations and they'll
+fail to load.
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 3053731..9f10a9b 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -828,6 +828,8 @@ config ARM_L1_CACHE_SHIFT
- 
- config ARM_DMA_MEM_BUFFERABLE
- 	bool "Use non-cacheable memory for DMA" if CPU_V6 && !CPU_V7
-+	depends on !(MACH_REALVIEW_PB1176 || REALVIEW_EB_ARM11MP || \
-+		     MACH_REALVIEW_PB11MP)
- 	default y if CPU_V6 || CPU_V7
- 	help
- 	  Historically, the kernel has used strongly ordered mappings to
+> ARM: 6190/1: Remove dummy loads from the original relocation address
+> ARM: 6191/1: Do not compile the Thumb-2 module relocations on an ARM
+> kernel
+
+These two aren't critical, I agree.
+
+BTW, should these patches be re-submitted or you would carry them to the
+next merging window?
+
+-- 
+Catalin
