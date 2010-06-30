@@ -1,64 +1,59 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 30 Jun 2010 09:18:51 +0200
-Subject: [PATCH 26/61] ARM: imx: prepare deprecating ARCH_MX1,
-	MACH_MX2, MACH_MX21 and MACH_MX27
-In-Reply-To: <1277387397-3467-27-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1277387397-3467-27-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20100630071851.GC11746@pengutronix.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 30 Jun 2010 09:20:36 +0200 (CEST)
+Subject: [PATCHv4 1/3] mx2_camera: Add soc_camera support for i.MX25/i.MX27
+In-Reply-To: <20100630070717.GA11746@pengutronix.de>
+References: <cover.1277096909.git.baruch@tkos.co.il>
+	<03d6e55c39690618e92a91a580ec34549a135c79.1277096909.git.baruch@tkos.co.il>
+	<20100630070717.GA11746@pengutronix.de>
+Message-ID: <Pine.LNX.4.64.1006300918190.17489@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 24, 2010 at 03:49:22PM +0200, Uwe Kleine-K?nig wrote:
-> MACH_... is reserved for machine support, so use SOC as prefix, not MACH.
-> 
-> This introduces new symbols SOC_IMX1, SOC_IMX21 and SOC_IMX27.  They are
-> selected by the old symbols for now.  There is no substitute for MACH_MX2
-> as most usages of MX2 only means MX21 + MX27 but not MX25.
-> 
-> Later the choice about CPU and CPU family should go away and the individual
-> machines should select the right SOC symbol.  This is a precondition to
-> support more than one SOC in a single kernel image.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-I squash this into patch 25 as it reverts changes that currently are in
-that patch but belong (only) into patch 27.
+On Wed, 30 Jun 2010, Uwe Kleine-K?nig wrote:
 
-Uwe
-> ---
->  arch/arm/mach-imx/Kconfig |    3 ---
->  1 files changed, 0 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 08002df..5edead2 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -2,7 +2,6 @@ if ARCH_MX1
->  
->  config SOC_IMX1
->  	select CPU_ARM920T
-> -	select IMX_HAVE_DMA_V1
->  	select IMX_HAVE_IOMUX_V1
->  	bool
->  
-> @@ -28,14 +27,12 @@ if ARCH_MX2
->  config SOC_IMX21
->  	select CPU_ARM926T
->  	select ARCH_MXC_AUDMUX_V1
-> -	select IMX_HAVE_DMA_V1
->  	select IMX_HAVE_IOMUX_V1
->  	bool
->  
->  config SOC_IMX27
->  	select CPU_ARM926T
->  	select ARCH_MXC_AUDMUX_V1
-> -	select IMX_HAVE_DMA_V1
->  	select IMX_HAVE_IOMUX_V1
->  	bool
->  
-> -- 
-> 1.7.1
+> On Mon, Jun 21, 2010 at 08:15:58AM +0300, Baruch Siach wrote:
+> > This is the soc_camera support developed by Sascha Hauer for the i.MX27.  Alan
+> > Carvalho de Assis modified the original driver to get it working on more recent
+> > kernels. I modified it further to add support for i.MX25. This driver has been
+> > tested on i.MX25 and i.MX27 based platforms.
+> > 
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > ---
+> >  arch/arm/plat-mxc/include/mach/memory.h  |    4 +-
+> >  arch/arm/plat-mxc/include/mach/mx2_cam.h |   46 +
+> >  drivers/media/video/Kconfig              |   13 +
+> >  drivers/media/video/Makefile             |    1 +
+> >  drivers/media/video/mx2_camera.c         | 1493 ++++++++++++++++++++++++++++++
+> >  5 files changed, 1555 insertions(+), 2 deletions(-)
+> >  create mode 100644 arch/arm/plat-mxc/include/mach/mx2_cam.h
+> >  create mode 100644 drivers/media/video/mx2_camera.c
+> > 
+> > diff --git a/arch/arm/plat-mxc/include/mach/memory.h b/arch/arm/plat-mxc/include/mach/memory.h
+> > index c4b40c3..5803836 100644
+> > --- a/arch/arm/plat-mxc/include/mach/memory.h
+> > +++ b/arch/arm/plat-mxc/include/mach/memory.h
+> > @@ -44,12 +44,12 @@
+> >   */
+> >  #define CONSISTENT_DMA_SIZE SZ_8M
+> >  
+> > -#elif defined(CONFIG_MX1_VIDEO)
+> > +#elif defined(CONFIG_MX1_VIDEO) || defined(CONFIG_MX2_VIDEO)
+> >  /*
+> >   * Increase size of DMA-consistent memory region.
+> >   * This is required for i.MX camera driver to capture at least four VGA frames.
+> >   */
+> >  #define CONSISTENT_DMA_SIZE SZ_4M
+> > -#endif /* CONFIG_MX1_VIDEO */
+> > +#endif /* CONFIG_MX1_VIDEO || CONFIG_MX2_VIDEO */
+> Why not use CONFIG_VIDEO_MX2 here and get rid of CONFIG_MX2_VIDEO?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Well, firstly for uniformity with MX1 and MX3, secondly not to have to use 
+(CONFIG_VIDEO_MX2 || CONFIG_VIDEO_MX2_MODULE), also note, that 
+CONFIG_MX1_VIDEO is also used for linking of the FIQ handler for the camera.
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
