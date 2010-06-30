@@ -1,93 +1,184 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 30 Jun 2010 19:49:14 +0900
-Subject: [PATCH v5] ARM: S5PV210: Correct clock register properties
-In-Reply-To: <1277873811-2823-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1277873811-2823-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <017001cb1841$e43d8910$acb89b30$%kim@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 30 Jun 2010 14:08:29 +0300
+Subject: [PATCH 1/2] arm: Replace CONFIG_HAS_TLS_REG with HWCAP_TLS and
+	check for it on V6
+In-Reply-To: <alpine.LFD.2.00.1006291355520.24097@xanadu.home>
+References: <20100621133749.24299.36154.stgit@baageli.muru.com>
+	<20100621135120.24299.98499.stgit@baageli.muru.com>
+	<20100622170020.GF4371@shareable.org>
+	<20100623073912.GA12255@atomide.com>
+	<20100623133636.GC7058@shareable.org>
+	<20100629141836.GM2822@atomide.com>
+	<alpine.LFD.2.00.1006291355520.24097@xanadu.home>
+Message-ID: <20100630110828.GZ2822@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
+* Nicolas Pitre <nico@fluxnic.net> [100629 22:14]:
+> On Tue, 29 Jun 2010, Tony Lindgren wrote:
 > 
-Hi MyungJoo,
+> > Also, can we detect somehow the hardware that uses CONFIG_TLS_REG_EMUL?
+> > Might be possible to remove that Kconfig option too later on..
+> 
+> Well... I don't think we _should_ try to detect it as it is not widely 
+> available if at all.
 
-Didn't check my previous reply?
-Would be helpful to me if you could reply at that time about your any
-problem or other opinion.
+OK
+ 
+> And there is actually a "bug" with __kuser_get_tls because if ever 
+> CONFIG_TLS_REG_EMUL is selected then a call to __kuser_get_tls is 
+> currently doing nothing while it should actually use the mrc 
+> instruction.
 
-Actually, already applied your updated v4 patch.
+I've changed it to initialize to mrc if (tls_emu || has_tls).
 
-> 1. Corrected shift values of I2S and UART clocks (CLK_GATE_IP3), which
-were
-> defined incorrectly.
+> Could this be a tristate instead?  There are actually 3 cases:
 > 
-> 2. Corrected shift values of sclk_audio, uclk1, sclk_fimd, sclk_mmc,
-> sclk_spi, sclk_pwm, which had duplicated .enable/.ctrlbit with their
-> twins defined in struct clk init_clocks_disable[] and struct clk
-> init_clocks[]. We've changed their .enable/.ctrlbit to use CLK_SRC_MASK
-> register to avoid the duplicated clock problem described below.
+> 1) We know the TLS reg is _always_ available i.e. ARMv6K, ARMV7 and 
+>    above.  In that case the test on elf_hwcap is redundant and wasteful.
 > 
+> 2) We know the TLS reg is _never_ available i.e. pre-ARMv6.  The test on 
+>    elf_hwcap is again redundant and wasteful.
 > 
-> What is Duplicated Clock Problem?
+> 3) We're unsure as the actual CPU is known only at run time.
 > 
-> Please note that each clock definition should access different control
-> register; otherwise, the system may suffer lockups. For example, if we
-> have two clock definitions "a" and "b" which access the same register
-> (and the shift value). Then, when we do:
-> 
-> 	module A
-> 	clk = clk_get("a");
-> 	clk->clk_enable(clk);
-> 
-> 	module B (context switch)
-> 	clk = clk_get("b");
-> 	clk->clk_enable(clk);
-> 	do something with clk.
-> 	clk->clk_disable(clk);
-> 
-> 	module A (context switch)
-> 	do something with clk
-> 	* At this point, the system may hang.
-> 
-> Therefore, there should be no clock definitions with the same contol
-> register/shift. If we need to create "aliases", then, creating child
-> clocks sharing the clock should be fine.
-> 
-> 3. Corrected other sclk_* shift values and access registers.
-> 
-> 
-> Note that becuase UART clocks are properly disabled at boot time with
-> this patch, UART drivers or somebody else should turn on the clock
-> to read the console; otherwise, JIG willl not show any message.
-> 
-Please check my previous reply.
-> 
-> 
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> Note that this patch revises and merges the two previous patches:
-> [PATCH] S5PV210 Correct clock register properties
-> [PATCH] S5PV210 Correct clock source control register properties
-> And follows the previous patch
-> [PATCH v2] S5PV210 Correct clock register properties
-> [PATCH v3] S5PV210 Correct clock register properties
-> [PATCH v4] S5PV210 Correct clock register properties
-> v5 revises comments only from v4.
->  arch/arm/mach-s5pv210/clock.c |  115
-++++++++++++++++++++++-------------------
->  1 files changed, 62 insertions(+), 53 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-> index 154bca4..b3d156c 100644
-> --- a/arch/arm/mach-s5pv210/clock.c
-> +++ b/arch/arm/mach-s5pv210/clock.c
-(snip)
+> Case #1 will become the common case in the future.  Case #2 is still 
+> widely relevant for deployed systems in the field, and some popular 
+> ARMv5TE based SOCs are still produced right now.  So instead of 
+> replacing #1 and #2 with #3, I think you should add #3 to the other 
+> cases instead.
 
-Thanks.
+OK. I've implemented this logic in new file tls.h.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> >  #ifdef CONFIG_MMU
+> >  	mcr	p15, 0, r6, c3, c0, 0		@ Set domain register
+> > @@ -1009,16 +1011,13 @@ kuser_cmpxchg_fixup:
+> >   */
+> >  
+> >  __kuser_get_tls:				@ 0xffff0fe0
+> > -
+> > -#if !defined(CONFIG_HAS_TLS_REG) && !defined(CONFIG_TLS_REG_EMUL)
+> > -	ldr	r0, [pc, #(16 - 8)]		@ TLS stored at 0xffff0ff0
+> > -#else
+> > -	mrc	p15, 0, r0, c13, c0, 3		@ read TLS register
+> > -#endif
+> > +	nop				@ read TLS, set in kuser_get_tls_init
+> >  	usr_ret	lr
+> > -
+> > -	.rep	5
+> > -	.word	0			@ pad up to __kuser_helper_version
+> > +	mrc	p15, 0, r0, c13, c0, 3	@ 0xffff0fe8 hardware TLS code
+> > +	ldr	r0, [pc, #(16 - 8)]	@ 0xffff0fec software TLS code
+> > +	.word	0			@ 0xffff0ff0 software TLS value
+> > +	nop				@ pad up to __kuser_helper_version
+> > +	nop
+> >  	.endr
+> 
+> This looks obscur.  The idea of patching the appropriate instruction at 
+> runtime here is a good one.  However I'd simply keep the ldr version in 
+> place otherwise the pc displacement doesn't match anymore when 
+> disassembling.  And simply overwrite it with the mrc version when 
+> necessary.
+
+OK, changed to use the ldr by default.
+ 
+> BTW you left a stray .endr here.
+
+Oops. I've put back the .rep .endrep instead of the nops now.
+ 
+> > +	if ((((id >> 4) & 0xfff) == 0xb36) && (((id >> 20) & 3) == 0))
+> > +		elf_hwcap &= ~HWCAP_TLS;
+> 
+> You should probably test for the vendor ID as well (ARM in this case).
+
+OK, added.
+ 
+> > +}
+> > +#else
+> > +static inline void feat_v6_fixup(void)
+> > +{
+> > +}
+> > +#endif
+> 
+> I think the #ifdef is unnecessary here.  This is __init code anyway, so 
+> this could as well be always compiled in.
+
+Removed.
+ 
+> > diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> > index 1621e53..85dd001 100644
+> > --- a/arch/arm/kernel/traps.c
+> > +++ b/arch/arm/kernel/traps.c
+> > @@ -518,16 +518,19 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
+> >  
+> >  	case NR(set_tls):
+> >  		thread->tp_value = regs->ARM_r0;
+> > -#if defined(CONFIG_HAS_TLS_REG)
+> > -		asm ("mcr p15, 0, %0, c13, c0, 3" : : "r" (regs->ARM_r0) );
+> > -#elif !defined(CONFIG_TLS_REG_EMUL)
+> > -		/*
+> > -		 * User space must never try to access this directly.
+> > -		 * Expect your app to break eventually if you do so.
+> > -		 * The user helper at 0xffff0fe0 must be used instead.
+> > -		 * (see entry-armv.S for details)
+> > -		 */
+> > -		*((unsigned int *)0xffff0ff0) = regs->ARM_r0;
+> > +#if !defined(CONFIG_TLS_REG_EMUL)
+> > +		if (elf_hwcap & HWCAP_TLS) {
+> > +			asm ("mcr p15, 0, %0, c13, c0, 3"
+> > +				: : "r" (regs->ARM_r0));
+> > +		} else {
+> > +			/*
+> > +			 * User space must never try to access this directly.
+> > +			 * Expect your app to break eventually if you do so.
+> > +			 * The user helper at 0xffff0fe0 must be used instead.
+> > +			 * (see entry-armv.S for details)
+> > +			 */
+> > +			*((unsigned int *)0xffff0ff0) = regs->ARM_r0;
+> > +		}
+> >  #endif
+> 
+> The same comment as for __kuser_get_tls would apply here.  However, 
+> instead of duplicating the code block, you could define a macro, such as 
+> has_tls_reg(), that would be either 0, 1, or ((elf_hwcap & HWCAP_TLS).
+
+Now using tls_emu and has_tls defines.
+ 
+> >  		return 0;
+> >  
+> > @@ -743,6 +746,21 @@ void __init trap_init(void)
+> >  	return;
+> >  }
+> >  
+> > +#if defined(CONFIG_TLS_REG_EMUL)
+> > +static void __init kuser_get_tls_init(unsigned long vectors)
+> > +{
+> > +	memcpy((void *)vectors + 0xfe0, (void *)vectors + 0xfe8, 4);
+> > +}
+> > +#else
+> > +static void __init kuser_get_tls_init(unsigned long vectors)
+> > +{
+> > +	if (elf_hwcap & HWCAP_TLS)
+> > +		memcpy((void *)vectors + 0xfe0, (void *)vectors + 0xfe8, 4);
+> > +	else
+> > +		memcpy((void *)vectors + 0xfe0, (void *)vectors + 0xfec, 4);
+> > +}
+> > +#endif
+> 
+> Please move the #ifdef within the function body.  Also it would be nice 
+> to add comments about what those magic offsets are.
+
+This is now cleaner too with if (tls_emu || has_tls).
+
+Updated patch below.
+
+Regards,
+
+Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: arm-tls-v4.patch
+Type: text/x-diff
+Size: 8804 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100630/5ef872de/attachment.bin>
