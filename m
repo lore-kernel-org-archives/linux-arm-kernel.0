@@ -1,67 +1,46 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Wed, 30 Jun 2010 20:53:24 +0300
-Subject: [PATCH 01/33] Removing dead MTD_NAND_AT91_BUSWIDTH_16
-In-Reply-To: <4c6fe9a4c298214223ff89d06401ac7b66f81c98.1277911346.git.siccegge@cs.fau.de>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 30 Jun 2010 19:19:45 +0300
+Subject: [PATCH 28/33] Removing dead CPU_S3C24XX
+In-Reply-To: <787416813d524b042dc933fbcfbbae22fd5ca2ca.1277911346.git.siccegge@cs.fau.de>
 References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<4c6fe9a4c298214223ff89d06401ac7b66f81c98.1277911346.git.siccegge@cs.fau.de>
-Message-ID: <20100630175324.GA3969@shutemov.name>
+	<787416813d524b042dc933fbcfbbae22fd5ca2ca.1277911346.git.siccegge@cs.fau.de>
+Message-ID: <201006301919.51697.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 30, 2010 at 05:53:52PM +0200, Christoph Egger wrote:
-> MTD_NAND_AT91_BUSWIDTH_16 doesn't exist in Kconfig, therefore removing
-> all references for it from the source code.
-
-It was renamed to MTD_NAND_ATMEL_BUSWIDTH_16 (see f6ed6f7).
-
-I think better to rename it here too.
-
+? ????????? ?? 30 ???? 2010 19:02:51 ????? Christoph Egger ???????:
+> CPU_S3C24XX doesn't exist in Kconfig, therefore removing all
+> references for it from the source code.
+> 
 > Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
 > ---
->  arch/arm/mach-at91/board-at572d940hf_ek.c |    4 ----
->  arch/arm/mach-at91/board-sam9m10g45ek.c   |    4 ----
->  2 files changed, 0 insertions(+), 8 deletions(-)
+>  arch/arm/mach-s3c2410/include/mach/gpio.h |    4 ----
+>  1 files changed, 0 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm/mach-at91/board-at572d940hf_ek.c b/arch/arm/mach-at91/board-at572d940hf_ek.c
-> index 5daff27..889a442 100644
-> --- a/arch/arm/mach-at91/board-at572d940hf_ek.c
-> +++ b/arch/arm/mach-at91/board-at572d940hf_ek.c
-> @@ -216,11 +216,7 @@ static struct atmel_nand_data __initdata eb_nand_data = {
->  /*	.rdy_pin	= AT91_PIN_PC16, */
->  	.enable_pin	= AT91_PIN_PA15,
->  	.partition_info	= nand_partitions,
-> -#if defined(CONFIG_MTD_NAND_AT91_BUSWIDTH_16)
-> -	.bus_width_16	= 1,
+> diff --git a/arch/arm/mach-s3c2410/include/mach/gpio.h
+> b/arch/arm/mach-s3c2410/include/mach/gpio.h index b649bf2..a37d274 100644
+> --- a/arch/arm/mach-s3c2410/include/mach/gpio.h
+> +++ b/arch/arm/mach-s3c2410/include/mach/gpio.h
+> @@ -30,8 +30,4 @@
+>  #include <mach/gpio-nrs.h>
+>  #include <mach/gpio-fns.h>
+> 
+> -#ifdef CONFIG_CPU_S3C24XX
+> -#define S3C_GPIO_END	(S3C2410_GPIO_BANKJ + 32)
 > -#else
->  	.bus_width_16	= 0,
+>  #define S3C_GPIO_END	(S3C2410_GPIO_BANKH + 32)
 > -#endif
->  };
->  
->  static struct sam9_smc_config __initdata eb_nand_smc_config = {
-> diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-> index ee80059..49ef850 100644
-> --- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-> +++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-> @@ -135,11 +135,7 @@ static struct atmel_nand_data __initdata ek_nand_data = {
->  	.rdy_pin	= AT91_PIN_PC8,
->  	.enable_pin	= AT91_PIN_PC14,
->  	.partition_info	= nand_partitions,
-> -#if defined(CONFIG_MTD_NAND_AT91_BUSWIDTH_16)
-> -	.bus_width_16	= 1,
-> -#else
->  	.bus_width_16	= 0,
-> -#endif
->  };
->  
->  static struct sam9_smc_config __initdata ek_nand_smc_config = {
-> -- 
-> 1.7.0.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
--- 
- Kirill A. Shutemov
+This patch conflicts with Yaugen Kharuzhy patch (ARM: S3C24XX: Fix gpiolib 
+support for ports K..M), S3C24XX is just a typo, it should be S3C244X and that 
+was fixed by mentioned patch
+
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100630/cc4d4690/attachment.sig>
