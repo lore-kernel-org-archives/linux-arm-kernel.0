@@ -1,33 +1,67 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Wed, 30 Jun 2010 19:36:49 +0200
-Subject: [PATCH] Add support for Vista Silicon i.MX27 Visstrim_M10 board.
-In-Reply-To: <20100630170025.GD23534@tarshish>
-References: <1277912661-24065-1-git-send-email-javier.martin@vista-silicon.com>
-	<20100630170025.GD23534@tarshish>
-Message-ID: <4C2B80B1.1090308@eukrea.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Wed, 30 Jun 2010 20:53:24 +0300
+Subject: [PATCH 01/33] Removing dead MTD_NAND_AT91_BUSWIDTH_16
+In-Reply-To: <4c6fe9a4c298214223ff89d06401ac7b66f81c98.1277911346.git.siccegge@cs.fau.de>
+References: <cover.1277911345.git.siccegge@cs.fau.de>
+	<4c6fe9a4c298214223ff89d06401ac7b66f81c98.1277911346.git.siccegge@cs.fau.de>
+Message-ID: <20100630175324.GA3969@shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+On Wed, Jun 30, 2010 at 05:53:52PM +0200, Christoph Egger wrote:
+> MTD_NAND_AT91_BUSWIDTH_16 doesn't exist in Kconfig, therefore removing
+> all references for it from the source code.
 
-Le 30/06/2010 19:00, Baruch Siach a ?crit :
-> On Wed, Jun 30, 2010 at 05:44:21PM +0200, Javier Martin wrote:
->>
->> Signed-off-by: Javier Martin<javier.martin@vista-silicon.com>
->> ---
->>   arch/arm/mach-mx2/Kconfig                          |    8 +
->>   arch/arm/mach-mx2/Makefile                         |    1 +
->>   arch/arm/mach-mx2/mach-imx27_visstrim_m10.c        |  279 ++++++++++++++++++++
->
-> This directory are no more. You should rebase your work on the imx-for-2.6.36
-> branch of the imx tree at git://git.pengutronix.de/git/imx/linux-2.6.git
->
-unless I made a mistake with git, Uwe's patch serie seems to have been 
-removed from this branch (I think it was merged this morning but I don't 
-find it anymore now).
+It was renamed to MTD_NAND_ATMEL_BUSWIDTH_16 (see f6ed6f7).
 
-It is still available here : 
-git://git.pengutronix.de/git/ukl/linux-2.6.git in branch 
-imx/for-2.6.36-merged
+I think better to rename it here too.
 
-Eric
+> Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
+> ---
+>  arch/arm/mach-at91/board-at572d940hf_ek.c |    4 ----
+>  arch/arm/mach-at91/board-sam9m10g45ek.c   |    4 ----
+>  2 files changed, 0 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/board-at572d940hf_ek.c b/arch/arm/mach-at91/board-at572d940hf_ek.c
+> index 5daff27..889a442 100644
+> --- a/arch/arm/mach-at91/board-at572d940hf_ek.c
+> +++ b/arch/arm/mach-at91/board-at572d940hf_ek.c
+> @@ -216,11 +216,7 @@ static struct atmel_nand_data __initdata eb_nand_data = {
+>  /*	.rdy_pin	= AT91_PIN_PC16, */
+>  	.enable_pin	= AT91_PIN_PA15,
+>  	.partition_info	= nand_partitions,
+> -#if defined(CONFIG_MTD_NAND_AT91_BUSWIDTH_16)
+> -	.bus_width_16	= 1,
+> -#else
+>  	.bus_width_16	= 0,
+> -#endif
+>  };
+>  
+>  static struct sam9_smc_config __initdata eb_nand_smc_config = {
+> diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
+> index ee80059..49ef850 100644
+> --- a/arch/arm/mach-at91/board-sam9m10g45ek.c
+> +++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
+> @@ -135,11 +135,7 @@ static struct atmel_nand_data __initdata ek_nand_data = {
+>  	.rdy_pin	= AT91_PIN_PC8,
+>  	.enable_pin	= AT91_PIN_PC14,
+>  	.partition_info	= nand_partitions,
+> -#if defined(CONFIG_MTD_NAND_AT91_BUSWIDTH_16)
+> -	.bus_width_16	= 1,
+> -#else
+>  	.bus_width_16	= 0,
+> -#endif
+>  };
+>  
+>  static struct sam9_smc_config __initdata ek_nand_smc_config = {
+> -- 
+> 1.7.0.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+ Kirill A. Shutemov
