@@ -1,44 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 30 Jun 2010 09:33:53 +0300
-Subject: [PATCH] ARM: Disable VGA console for ARM in most cases (Re: [PATCH
-	1/6] omap: Disable VGA console for omaps)
-In-Reply-To: <20100629142144.GN2822@atomide.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 30 Jun 2010 12:17:23 +0530
+Subject: [PATCH 6/6] omap2/3/4: Add Kconfig option to compile in typical
+	omap	features
+In-Reply-To: <20100630061726.GQ2822@atomide.com>
 References: <20100629113229.16008.2931.stgit@baageli.muru.com>
-	<20100629114720.16008.84291.stgit@baageli.muru.com>
-	<20100629120724.GA23884@oksana.dev.rtsoft.ru>
-	<20100629142144.GN2822@atomide.com>
-Message-ID: <20100630063352.GR2822@atomide.com>
+	<20100629114738.16008.62006.stgit@baageli.muru.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C5DB6FC3@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C5DB7026@dbde02.ent.ti.com>
+	<20100630061726.GQ2822@atomide.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C5E4124A@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [100629 17:15]:
-> * Anton Vorontsov <cbouatmailru@gmail.com> [100629 15:04]:
-> > On Tue, Jun 29, 2010 at 02:47:20PM +0300, Tony Lindgren wrote:
-> > > Otherwise we have to disable it manually to avoid compile errors.
-> > > 
-> > > Cc: linux-fbdev at vger.kernel.org
-> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > 
-> > We'll need this for mach-cns3xxx too. And doing that change for
-> > every ARM subarch is going to produce lots of rejects.
-> > 
-> > I'd suggest to disable (or make it 'default n') for all ARMs,
-> > except these:
-> > 
-> > $ git grep VGA_CONSOLE= arch/arm/configs/
-> > arch/arm/configs/footbridge_defconfig:CONFIG_VGA_CONSOLE=y
-> > arch/arm/configs/integrator_defconfig:CONFIG_VGA_CONSOLE=y
-> > arch/arm/configs/netwinder_defconfig:CONFIG_VGA_CONSOLE=y
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com]
+> Sent: Wednesday, June 30, 2010 11:47 AM
+> To: Shilimkar, Santosh
+> Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
+> Subject: Re: [PATCH 6/6] omap2/3/4: Add Kconfig option to compile in
+> typical omap features
 > 
-> Good idea, will post a modified patch tomorrow.
-
-Here's this one updated.
-
-Tony
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: kconfig-disable-vgacon.patch
-Type: text/x-diff
-Size: 1452 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100630/06631be0/attachment.bin>
+> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [100629 17:40]:
+> > > >
+> > > With your series OMAP4 build breaks because of PM and SMP
+> dependencies.
+> > > To ensure that build doesn't break on OMAP4, I needed below change.
+> With
+> > > This change I tried your series and it boots OK on OMAP4430 SDP
+> 
+> Hmm the build does not break for me?
+>
+Looks like I am missing something here. How do you build OMAP4 alone with
+these new changes ??
+ 
+> > Also tested the multi-omap build on OMAP3430 SDP and OMAP4430 SDP. Both
+> boots OK.
+> >
+> > > diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> > > index 84fecd0..f48f275 100644
+> > > --- a/arch/arm/mach-omap2/Kconfig
+> > > +++ b/arch/arm/mach-omap2/Kconfig
+> > > @@ -7,8 +7,8 @@ config ARCH_OMAP2PLUS_TYPICAL
+> > >         default y
+> > >         select AEABI
+> > >         select REGULATOR
+> > > -       select PM
+> > > -       select PM_RUNTIME
+> > > +       select PM if !ARCH_OMAP4
+> > > +       select PM_RUNTIME if !ARCH_OMAP4
+> > >         select VFP
+> > >         select NEON if ARCH_OMAP3 || ARCH_OMAP4
+> > >         select SERIAL_8250
+> 
+> Let's rather fix whatever the issue is for booting (or building?)
+> omap4 with CONFIG_PM and CONFIG_PM_RUNTIME. If we can't implement
+> PM yet for omap4, we can just return early if cpu_is_omap44xx.
+> 
+> CONFIG_SMP we can't enable as that requires various ARM changes
+> to work on unicore systems. But hopefully we can enable that too
+> at some point with select SMP if ARCH_OMAP4.
+> 
