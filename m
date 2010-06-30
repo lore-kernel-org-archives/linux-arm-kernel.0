@@ -1,71 +1,32 @@
 From: siccegge@cs.fau.de (Christoph Egger)
-Date: Wed, 30 Jun 2010 17:55:22 +0200
-Subject: [PATCH 05/33] Removing dead OMAP_IR
+Date: Wed, 30 Jun 2010 17:55:42 +0200
+Subject: [PATCH 06/33] Removing dead SHARPSL_LOCOMO
 In-Reply-To: <cover.1277911345.git.siccegge@cs.fau.de>
 References: <cover.1277911345.git.siccegge@cs.fau.de>
-Message-ID: <b7209c2cb666c73a3affbb44c2637a4f2086af08.1277911346.git.siccegge@cs.fau.de>
+Message-ID: <b43850b1a1909496718e39687d1ca00543aa30ec.1277911346.git.siccegge@cs.fau.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP_IR doesn't exist in Kconfig, therefore removing all references
-for it from the source code.
+SHARPSL_LOCOMO doesn't exist in Kconfig, therefore removing all
+references for it from the source code.
 
 Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
 ---
- arch/arm/mach-omap1/board-h2.c |   18 ------------------
- arch/arm/mach-omap2/board-h4.c |    4 ----
- 2 files changed, 0 insertions(+), 22 deletions(-)
+ arch/arm/mach-sa1100/include/mach/irqs.h |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
-index d1100e4..d7640d3 100644
---- a/arch/arm/mach-omap1/board-h2.c
-+++ b/arch/arm/mach-omap1/board-h2.c
-@@ -292,15 +292,6 @@ static struct platform_device h2_kp_device = {
- 
- #define H2_IRDA_FIRSEL_GPIO_PIN	17
- 
--#if defined(CONFIG_OMAP_IR) || defined(CONFIG_OMAP_IR_MODULE)
--static int h2_transceiver_mode(struct device *dev, int state)
--{
--	/* SIR when low, else MIR/FIR when HIGH */
--	gpio_set_value(H2_IRDA_FIRSEL_GPIO_PIN, !(state & IR_SIRMODE));
--	return 0;
--}
--#endif
--
- static struct omap_irda_config h2_irda_data = {
- 	.transceiver_cap	= IR_SIRMODE | IR_MIRMODE | IR_FIRMODE,
- 	.rx_channel		= OMAP_DMA_UART3_RX,
-@@ -437,15 +428,6 @@ static void __init h2_init(void)
- 	/* omap_cfg_reg(U19_ARMIO1); */		/* CD */
- 	omap_cfg_reg(BALLOUT_V8_ARMIO3);	/* WP */
- 
--	/* Irda */
--#if defined(CONFIG_OMAP_IR) || defined(CONFIG_OMAP_IR_MODULE)
--	omap_writel(omap_readl(FUNC_MUX_CTRL_A) | 7, FUNC_MUX_CTRL_A);
--	if (gpio_request(H2_IRDA_FIRSEL_GPIO_PIN, "IRDA mode") < 0)
--		BUG();
--	gpio_direction_output(H2_IRDA_FIRSEL_GPIO_PIN, 0);
--	h2_irda_data.transceiver_mode = h2_transceiver_mode;
--#endif
--
- 	platform_add_devices(h2_devices, ARRAY_SIZE(h2_devices));
- 	omap_board_config = h2_config;
- 	omap_board_config_size = ARRAY_SIZE(h2_config);
-diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
-index 0665f2c..ce4292b 100644
---- a/arch/arm/mach-omap2/board-h4.c
-+++ b/arch/arm/mach-omap2/board-h4.c
-@@ -345,10 +345,6 @@ static void __init omap_h4_init(void)
- 	 * You have to mux them off in device drivers later on
- 	 * if not needed.
- 	 */
--#if defined(CONFIG_OMAP_IR) || defined(CONFIG_OMAP_IR_MODULE)
--	omap_cfg_reg(K15_24XX_UART3_TX);
--	omap_cfg_reg(K14_24XX_UART3_RX);
--#endif
- 
- #if defined(CONFIG_KEYBOARD_OMAP) || defined(CONFIG_KEYBOARD_OMAP_MODULE)
- 	if (omap_has_menelaus()) {
+diff --git a/arch/arm/mach-sa1100/include/mach/irqs.h b/arch/arm/mach-sa1100/include/mach/irqs.h
+index 8c8845b..123c6c9 100644
+--- a/arch/arm/mach-sa1100/include/mach/irqs.h
++++ b/arch/arm/mach-sa1100/include/mach/irqs.h
+@@ -77,8 +77,6 @@
+  */
+ #ifdef CONFIG_SA1111
+ #define NR_IRQS			(IRQ_BOARD_END + 55)
+-#elif defined(CONFIG_SHARPSL_LOCOMO)
+-#define NR_IRQS			(IRQ_BOARD_START + 4)
+ #else
+ #define NR_IRQS			(IRQ_BOARD_START)
+ #endif
 -- 
 1.7.0.4
