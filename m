@@ -1,32 +1,78 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 30 Jun 2010 09:56:56 +0100
-Subject: [PATCH] ARM: RealView: Do not use outer_sync() on certain with
-	L210/L220
-In-Reply-To: <AANLkTinpAz52QfsnvzIY5fleJoflVr0Z40JpRNrlXY9k@mail.gmail.com>
-References: <20100629093135.10365.99959.stgit@e102109-lin.cambridge.arm.com>
-	<AANLkTinpAz52QfsnvzIY5fleJoflVr0Z40JpRNrlXY9k@mail.gmail.com>
-Message-ID: <1277888217.13942.0.camel@e102109-lin.cambridge.arm.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 30 Jun 2010 11:08:41 +0200 (CEST)
+Subject: [PATCHv4 1/3] mx2_camera: Add soc_camera support for i.MX25/i.MX27
+In-Reply-To: <20100630072808.GD11746@pengutronix.de>
+References: <cover.1277096909.git.baruch@tkos.co.il>
+	<03d6e55c39690618e92a91a580ec34549a135c79.1277096909.git.baruch@tkos.co.il>
+	<20100630070717.GA11746@pengutronix.de>
+	<Pine.LNX.4.64.1006300918190.17489@axis700.grange>
+	<20100630072808.GD11746@pengutronix.de>
+Message-ID: <Pine.LNX.4.64.1006301058170.17489@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-06-30 at 09:13 +0100, Linus Walleij wrote:
-> 2010/6/29 Catalin Marinas <catalin.marinas@arm.com>:
-> 
-> > RealView boards with certain revisions of the L210/L220 cache controller
-> > may have issues (hardware deadlock) with the recent changes to the mb()
-> > barrier implementation (DSB followed by an L2 cache sync). The patch
-> > disables ARM_DMA_MEM_BUFFERABLE for the RealView boards with L210/L220
-> > and redefines the mandatory barriers without the outer_sync() call.
-> >
-> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Linus Walleij <linus.ml.walleij@gmail.com>
-> 
-> Works like a charm on the PB1176!
-> 
-> Tested-by: Linus Walleij <linus.walleij@stericsson.com>
+Mauro, there's a question for you below.
 
-Thanks for testing. Just to be sure - was this with the CACHE_L2X0
-enabled in your configuration?
+On Wed, 30 Jun 2010, Uwe Kleine-K?nig wrote:
 
--- 
-Catalin
+> Hi Guennadi,
+> 
+> On Wed, Jun 30, 2010 at 09:20:36AM +0200, Guennadi Liakhovetski wrote:
+> > > > --- a/arch/arm/plat-mxc/include/mach/memory.h
+> > > > +++ b/arch/arm/plat-mxc/include/mach/memory.h
+> > > > @@ -44,12 +44,12 @@
+> > > >   */
+> > > >  #define CONSISTENT_DMA_SIZE SZ_8M
+> > > >  
+> > > > -#elif defined(CONFIG_MX1_VIDEO)
+> > > > +#elif defined(CONFIG_MX1_VIDEO) || defined(CONFIG_MX2_VIDEO)
+> > > >  /*
+> > > >   * Increase size of DMA-consistent memory region.
+> > > >   * This is required for i.MX camera driver to capture at least four VGA frames.
+> > > >   */
+> > > >  #define CONSISTENT_DMA_SIZE SZ_4M
+> > > > -#endif /* CONFIG_MX1_VIDEO */
+> > > > +#endif /* CONFIG_MX1_VIDEO || CONFIG_MX2_VIDEO */
+> > > Why not use CONFIG_VIDEO_MX2 here and get rid of CONFIG_MX2_VIDEO?
+> > 
+> > Well, firstly for uniformity with MX1 and MX3,
+> Using a common scheme for names on all platforms is fine, but if the
+> existing names are bad better establish a nicer scheme.
+> 
+> >                                                secondly not to have to use 
+> > (CONFIG_VIDEO_MX2 || CONFIG_VIDEO_MX2_MODULE),
+> ah, didn't notice that MX?_VIDEO is bool while VIDEO_MX? is tristate.
+> That's fine.  Still I would prefer a better naming that doesn't force
+> having to look up which variable is for the driver and which is for the
+> arch stuff.
+> 
+> >                                                also note, that 
+> > CONFIG_MX1_VIDEO is also used for linking of the FIQ handler for the camera.
+> This is just a matter of fixing the corresponding Makefile.
+
+So, you call a change like
+
+ # Support for CMOS sensor interface
+-obj-$(CONFIG_MX1_VIDEO)	+= ksym_mx1.o mx1_camera_fiq.o
++ifneq ($(CONFIG_VIDEO_MX1),)
++obj-y				+= ksym_mx1.o mx1_camera_fiq.o
++endif
+
+a fix?... In any case, I'm fine with the patch as it is, so, here's
+
+Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+
+I think, it would be better if you, Uwe, or Sascha pull all these 3 
+patches via one of your tree, because patches 2/3 and 3/3 are ARM/MX2 
+stuff anyway and this patch changes some files under arch/arm and collides 
+with some mx2 changes. Mauro, do you agree? Do we need your ack too? So, 
+taking them all via IMX/MXC would make synchronisation easier. However, if 
+you change anything under drivers/media (including Makefile / Kconfig) or 
+include/media, please let me know, so that I can ack it again.
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
