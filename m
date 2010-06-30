@@ -1,51 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Jun 2010 11:12:23 +0100
-Subject: Pending patches for -rc
-Message-ID: <20100630101223.GA24284@n2100.arm.linux.org.uk>
+From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
+Date: Wed, 30 Jun 2010 13:09:10 +0300
+Subject: [PATCH 2/4] crash: add support for ARM kernel image
+In-Reply-To: <cover.1277891104.git.ext-mika.1.westerberg@nokia.com>
+References: <cover.1277891104.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <55d51316a7423a6da6ce952744933f9d8e532b7c.1277891104.git.ext-mika.1.westerberg@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Given Linus' concerns about the code which is going in during the -rc
-period, and the clamp-down we had for -rc3, I've re-reviewed the
-changes which I have in my master branch.  The following changes do not
-feel like critical rc material:
+ARM kernel image is slightly different than the currently supported images so
+implement necessary support for it.
 
-ARM: mx3: pcm037: remove unused variable
-pcm037/pcm043/pca100: fix ULPI-related build warnings
-eukrea_mbimx27-baseboard: add generic-bl and platform-lcd controls
-eukrea_mbimx27-baseboard: add timings for DVI output
-cpuimx27 and mbimx27: allow fine control of UART4 and SDHC2 usage
-mach-cpuimx27: add USB Host2 and OTG support
-mach-cpuimx27: register wdt and w1_master resources
-mxcmmc: add card detect through DAT3 possibility
-eukrea_mbimx27: use card detect through DAT3 for SDHC1
-MX2X: Add Keypad device definition for MX2X arch
-eukrea_mbimx27: add support for the keyboard
-eukrea_mbimx27: add audio codec
-mxc_nand: add support for platform defined partitions
-mx25: add platform code for imx-keypad
-mx25pdk: add keypad support
-mx5: Add i2c to Freescale MX51 Babbage HW
-mx5: Register i2c on Freescale MX51 Babbage HW
-ARM: 6189/1: Add support for the MOVW/MOVT relocations in Thumb-2
-ARM: 6190/1: Remove dummy loads from the original relocation address
-ARM: 6191/1: Do not compile the Thumb-2 module relocations on an ARM kernel
+Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
+---
+ kernel.c            |    2 +-
+ lkcd_vmdump_v2_v3.h |    4 ++--
+ symbols.c           |    8 +++++++-
+ 3 files changed, 10 insertions(+), 4 deletions(-)
 
-The diffstat looks like this (worst offenders):
-
- arch/arm/mach-mx2/eukrea_mbimx27-baseboard.c |  181 +++++++++++++++++++++++---
- arch/arm/mach-mx2/mach-cpuimx27.c            |   93 +++++++++++++-
- arch/arm/mach-mx5/devices.c                  |   58 ++++++++
- arch/arm/plat-mxc/clock.c                    |   37 ++++--
- arch/arm/mach-mx25/mach-mx25pdk.c            |   36 +++++
- arch/arm/kernel/module.c                     |   34 +++++
- arch/arm/mach-mx3/mach-mx31lilly.c           |   34 ++++--
- drivers/mtd/nand/mxc_nand.c                  |   33 +----
- 44 files changed, 659 insertions(+), 139 deletions(-)
-
-and I think that if I try to push these to Linus, we'll be on the receipt
-of another complaint - quite rightfully too - the above does not look like
-bug fixes.
-
-Therefore, I won't be pushing my master branch to Linus, but instead merging
-it into -devel and re-starting my master branch afresh.
+diff --git a/kernel.c b/kernel.c
+index 5fc27d3..c24f7a4 100644
+--- a/kernel.c
++++ b/kernel.c
+@@ -736,7 +736,7 @@ verify_version(void)
+ 
+ 	if (!(sp = symbol_search("linux_banner")))
+ 		error(FATAL, "linux_banner symbol does not exist?\n");
+-	else if ((sp->type == 'R') || (sp->type == 'r'))
++	else if ((sp->type == 'R') || (sp->type == 'r') || (sp->type == 'T'))
+ 		linux_banner = symbol_value("linux_banner");
+ 	else
+ 		get_symbol_data("linux_banner", sizeof(ulong), &linux_banner);
+diff --git a/lkcd_vmdump_v2_v3.h b/lkcd_vmdump_v2_v3.h
+index 006b0b6..afdcc53 100644
+--- a/lkcd_vmdump_v2_v3.h
++++ b/lkcd_vmdump_v2_v3.h
+@@ -35,7 +35,7 @@
+ #include <asm/vmdump.h>                 /* for architecture-specific header */
+ #endif
+ 
+-#if defined(X86) || defined(PPC) || defined(S390) || defined(S390X)
++#if defined(ARM) || defined(X86) || defined(PPC) || defined(S390) || defined(S390X)
+ 
+ /*
+  * Kernel header file for Linux crash dumps.
+@@ -92,7 +92,7 @@ typedef struct _dump_header_asm_s {
+ 
+ #endif /* _ASM_VMDUMP_H */
+ 
+-#endif /* X86 || PPC */
++#endif /* ARM || X86 || PPC */
+ 
+ #if defined(ALPHA) || defined(IA64) || defined(X86_64) || defined(PPC64)
+ 
+diff --git a/symbols.c b/symbols.c
+index e92de1a..a6c0449 100644
+--- a/symbols.c
++++ b/symbols.c
+@@ -490,7 +490,8 @@ get_text_init_space(void)
+ 		return;
+ 
+ 	if (((section = get_kernel_section(".text.init")) == NULL) &&
+-	    ((section = get_kernel_section(".init.text")) == NULL)) {
++	    ((section = get_kernel_section(".init.text")) == NULL) &&
++	    ((section = get_kernel_section(".init")) == NULL)) {
+ 		error(WARNING, "cannot determine text init space\n");
+ 		return;
+ 	}
+@@ -2660,6 +2661,11 @@ is_kernel(char *file)
+ 				goto bailout;
+ 			break;
+ 
++		case EM_ARM:
++			if (machine_type_mismatch(file, "ARM", NULL, 0))
++				goto bailout;
++			break;
++
+ 		default:
+ 			if (machine_type_mismatch(file, "(unknown)", NULL, 0))
+ 				goto bailout;
+-- 
+1.5.6.5
