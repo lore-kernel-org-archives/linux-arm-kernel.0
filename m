@@ -1,348 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 Jun 2010 15:04:47 +0100
-Subject: [PATCH 3/4] ARM: atomic ops: add memory constraints to inline asm
-In-Reply-To: <1277906688-12065-3-git-send-email-will.deacon@arm.com>
-References: <1277906688-12065-1-git-send-email-will.deacon@arm.com>
-	<1277906688-12065-2-git-send-email-will.deacon@arm.com>
-	<1277906688-12065-3-git-send-email-will.deacon@arm.com>
-Message-ID: <1277906688-12065-4-git-send-email-will.deacon@arm.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 30 Jun 2010 16:09:04 +0200
+Subject: [PATCH 4/4] pxa/spitz: Rework spitz
+In-Reply-To: <AANLkTinRkgIg1q8LfRF6jWOoxLNY__xMi3iJjEv1FhWL@mail.gmail.com>
+References: <1277388132-5549-1-git-send-email-marek.vasut@gmail.com>
+	<201006281729.38591.marek.vasut@gmail.com>
+	<AANLkTinRkgIg1q8LfRF6jWOoxLNY__xMi3iJjEv1FhWL@mail.gmail.com>
+Message-ID: <201006301609.04907.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the 32-bit and 64-bit atomic operations on ARM do not
-include memory constraints in the inline assembly blocks. In the
-case of barrier-less operations [for example, atomic_add], this
-means that the compiler may constant fold values which have actually
-been modified by a call to an atomic operation.
+Dne St 30. ?ervna 2010 08:57:57 Eric Miao napsal(a):
+> On Mon, Jun 28, 2010 at 11:29 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> > Dne Po 28. ?ervna 2010 14:19:46 Eric Miao napsal(a):
+> >> On Mon, Jun 28, 2010 at 8:07 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> >> > Dne Po 28. ?ervna 2010 05:43:12 Eric Miao napsal(a):
+> >> >> On Thu, Jun 24, 2010 at 10:02 PM, Marek Vasut <marek.vasut@gmail.com>
+> > 
+> > wrote:
+> >> >> > This huge patch mostly shuffles code. The spitz.c file contained
+> >> >> > terrible mess and needed a cleanup, here it is:
+> >> >> > 
+> >> >> > 1) Made every part modular, components are not built in if not
+> >> >> > selected. 2) Removed loads of preprocessor goo, mostly "#ifdef
+> >> >> > MACH_AKITA .... #endif" and similar code. The kernel size will grow
+> >> >> > by a few kb now, but the file is much more readable.
+> >> >> > 3) Reworked SD/CF power setting function and made it reentrant.
+> >> >> > 4) Add ISL6271A regulator support
+> >> >> > 5) Correctly register WM8750
+> >> >> > 
+> >> >> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> >> >> 
+> >> >> I'd prefer to see separate small patches for this?
+> >> > 
+> >> > This is nearly a replacement for the whole file ... maybe we could
+> >> > merge spitz2.c or something ... or do it this way. I understand your
+> >> > point about spliting it into smaller chunks, but I don't see a reason
+> >> > in this case.
+> >> 
+> >> I guess the above 1, 2, 3, 4, 5 can be well separated into 5 patches,
+> >> I don't mind merge many patches, but I'd really like to see small and
+> >> consistent changes (make it regression test friendly BTW), ;-)
+> > 
+> > I said I get your point, but I don't see the benefit here.
+> > 1) already does most of the rewrite of the file,
+> > 2) only removes the #ifdef MACH_PLAT around MACHINE_START (as the rest
+> > was done in 1) ),
+> > 3) is actually a part of 1) as well
+> > 4) ok, this could be separated out, but I see no benefit
+> > 5) well this is already in if I recall well, but I put it here for
+> > completeness
+> 
+> Several of other comments, though:
+> 
+> 1. It doesn't look necessary to me to change spitz_* to sharpslc_*. spitz_*
+>    isn't a good prefix, neither is sharpslc_* (think about the corgi
+> series, which is normally called Sharp SL-C7xx). And this is also going to
+> save many unnecessary changes.
 
-This issue can be observed in the atomic64_test routine in
-<kernel root>/lib/atomic64_test.c:
+I know, but what prefix do you sugest then?
+> 
+> 2. Direct references of spitzscoop[12]_device are still there, which I'd
+>    prefer a cleaner patch for this
 
-00000000 <test_atomic64>:
-   0:	e1a0c00d 	mov	ip, sp
-   4:	e92dd830 	push	{r4, r5, fp, ip, lr, pc}
-   8:	e24cb004 	sub	fp, ip, #4
-   c:	e24dd008 	sub	sp, sp, #8
-  10:	e24b3014 	sub	r3, fp, #20
-  14:	e30d000d 	movw	r0, #53261	; 0xd00d
-  18:	e3011337 	movw	r1, #4919	; 0x1337
-  1c:	e34c0001 	movt	r0, #49153	; 0xc001
-  20:	e34a1aa3 	movt	r1, #43683	; 0xaaa3
-  24:	e16300f8 	strd	r0, [r3, #-8]!
-  28:	e30c0afe 	movw	r0, #51966	; 0xcafe
-  2c:	e30b1eef 	movw	r1, #48879	; 0xbeef
-  30:	e34d0eaf 	movt	r0, #57007	; 0xdeaf
-  34:	e34d1ead 	movt	r1, #57005	; 0xdead
-  38:	e1b34f9f 	ldrexd	r4, [r3]
-  3c:	e1a34f90 	strexd	r4, r0, [r3]
-  40:	e3340000 	teq	r4, #0
-  44:	1afffffb 	bne	38 <test_atomic64+0x38>
-  48:	e59f0004 	ldr	r0, [pc, #4]	; 54 <test_atomic64+0x54>
-  4c:	e3a0101e 	mov	r1, #30
-  50:	ebfffffe 	bl	0 <__bug>
-  54:	00000000 	.word	0x00000000
+I'd prefer rewriting the whole scoop driver and patching the pcmcia driver so 
+all this crap can get lot.
+> 
+> 3. Others seem to be coding style changes - which can be separated
 
-The atomic64_set (0x38-0x44) writes to the atomic64_t, but the
-compiler doesn't see this, assumes the test condition is always
-false and generates an unconditional branch to __bug. The rest of the
-test is optimised away.
-
-This patch adds suitable memory constraints to the atomic operations on ARM
-to ensure that the compiler is informed of the correct data hazards. We have
-to use the "Qo" constraints to avoid hitting the GCC anomaly described at
-http://gcc.gnu.org/bugzilla/show_bug.cgi?id=44492 , where the compiler
-makes assumptions about the writeback in the addressing mode used by the
-inline assembly. These constraints forbid the use of auto{inc,dec} addressing
-modes, so it doesn't matter if we don't use the operand exactly once.
-
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/atomic.h |  132 ++++++++++++++++++++--------------------
- 1 files changed, 66 insertions(+), 66 deletions(-)
-
-diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
-index 4f0f282..99ab659 100644
---- a/arch/arm/include/asm/atomic.h
-+++ b/arch/arm/include/asm/atomic.h
-@@ -40,12 +40,12 @@ static inline void atomic_add(int i, atomic_t *v)
- 	int result;
- 
- 	__asm__ __volatile__("@ atomic_add\n"
--"1:	ldrex	%0, [%2]\n"
--"	add	%0, %0, %3\n"
--"	strex	%1, %0, [%2]\n"
-+"1:	ldrex	%0, [%3]\n"
-+"	add	%0, %0, %4\n"
-+"	strex	%1, %0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
--	: "=&r" (result), "=&r" (tmp)
-+	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
- 	: "r" (&v->counter), "Ir" (i)
- 	: "cc");
- }
-@@ -58,12 +58,12 @@ static inline int atomic_add_return(int i, atomic_t *v)
- 	smp_mb();
- 
- 	__asm__ __volatile__("@ atomic_add_return\n"
--"1:	ldrex	%0, [%2]\n"
--"	add	%0, %0, %3\n"
--"	strex	%1, %0, [%2]\n"
-+"1:	ldrex	%0, [%3]\n"
-+"	add	%0, %0, %4\n"
-+"	strex	%1, %0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
--	: "=&r" (result), "=&r" (tmp)
-+	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
- 	: "r" (&v->counter), "Ir" (i)
- 	: "cc");
- 
-@@ -78,12 +78,12 @@ static inline void atomic_sub(int i, atomic_t *v)
- 	int result;
- 
- 	__asm__ __volatile__("@ atomic_sub\n"
--"1:	ldrex	%0, [%2]\n"
--"	sub	%0, %0, %3\n"
--"	strex	%1, %0, [%2]\n"
-+"1:	ldrex	%0, [%3]\n"
-+"	sub	%0, %0, %4\n"
-+"	strex	%1, %0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
--	: "=&r" (result), "=&r" (tmp)
-+	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
- 	: "r" (&v->counter), "Ir" (i)
- 	: "cc");
- }
-@@ -96,12 +96,12 @@ static inline int atomic_sub_return(int i, atomic_t *v)
- 	smp_mb();
- 
- 	__asm__ __volatile__("@ atomic_sub_return\n"
--"1:	ldrex	%0, [%2]\n"
--"	sub	%0, %0, %3\n"
--"	strex	%1, %0, [%2]\n"
-+"1:	ldrex	%0, [%3]\n"
-+"	sub	%0, %0, %4\n"
-+"	strex	%1, %0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
--	: "=&r" (result), "=&r" (tmp)
-+	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
- 	: "r" (&v->counter), "Ir" (i)
- 	: "cc");
- 
-@@ -118,11 +118,11 @@ static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
- 
- 	do {
- 		__asm__ __volatile__("@ atomic_cmpxchg\n"
--		"ldrex	%1, [%2]\n"
-+		"ldrex	%1, [%3]\n"
- 		"mov	%0, #0\n"
--		"teq	%1, %3\n"
--		"strexeq %0, %4, [%2]\n"
--		    : "=&r" (res), "=&r" (oldval)
-+		"teq	%1, %4\n"
-+		"strexeq %0, %5, [%3]\n"
-+		    : "=&r" (res), "=&r" (oldval), "+Qo" (ptr->counter)
- 		    : "r" (&ptr->counter), "Ir" (old), "r" (new)
- 		    : "cc");
- 	} while (res);
-@@ -137,12 +137,12 @@ static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
- 	unsigned long tmp, tmp2;
- 
- 	__asm__ __volatile__("@ atomic_clear_mask\n"
--"1:	ldrex	%0, [%2]\n"
--"	bic	%0, %0, %3\n"
--"	strex	%1, %0, [%2]\n"
-+"1:	ldrex	%0, [%3]\n"
-+"	bic	%0, %0, %4\n"
-+"	strex	%1, %0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
--	: "=&r" (tmp), "=&r" (tmp2)
-+	: "=&r" (tmp), "=&r" (tmp2), "+Qo" (*addr)
- 	: "r" (addr), "Ir" (mask)
- 	: "cc");
- }
-@@ -249,7 +249,7 @@ static inline u64 atomic64_read(atomic64_t *v)
- 	__asm__ __volatile__("@ atomic64_read\n"
- "	ldrexd	%0, %H0, [%1]"
- 	: "=&r" (result)
--	: "r" (&v->counter)
-+	: "r" (&v->counter), "Qo" (v->counter)
- 	);
- 
- 	return result;
-@@ -260,11 +260,11 @@ static inline void atomic64_set(atomic64_t *v, u64 i)
- 	u64 tmp;
- 
- 	__asm__ __volatile__("@ atomic64_set\n"
--"1:	ldrexd	%0, %H0, [%1]\n"
--"	strexd	%0, %2, %H2, [%1]\n"
-+"1:	ldrexd	%0, %H0, [%2]\n"
-+"	strexd	%0, %3, %H3, [%2]\n"
- "	teq	%0, #0\n"
- "	bne	1b"
--	: "=&r" (tmp)
-+	: "=&r" (tmp), "=Qo" (v->counter)
- 	: "r" (&v->counter), "r" (i)
- 	: "cc");
- }
-@@ -275,13 +275,13 @@ static inline void atomic64_add(u64 i, atomic64_t *v)
- 	unsigned long tmp;
- 
- 	__asm__ __volatile__("@ atomic64_add\n"
--"1:	ldrexd	%0, %H0, [%2]\n"
--"	adds	%0, %0, %3\n"
--"	adc	%H0, %H0, %H3\n"
--"	strexd	%1, %0, %H0, [%2]\n"
-+"1:	ldrexd	%0, %H0, [%3]\n"
-+"	adds	%0, %0, %4\n"
-+"	adc	%H0, %H0, %H4\n"
-+"	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
--	: "=&r" (result), "=&r" (tmp)
-+	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
- 	: "r" (&v->counter), "r" (i)
- 	: "cc");
- }
-@@ -294,13 +294,13 @@ static inline u64 atomic64_add_return(u64 i, atomic64_t *v)
- 	smp_mb();
- 
- 	__asm__ __volatile__("@ atomic64_add_return\n"
--"1:	ldrexd	%0, %H0, [%2]\n"
--"	adds	%0, %0, %3\n"
--"	adc	%H0, %H0, %H3\n"
--"	strexd	%1, %0, %H0, [%2]\n"
-+"1:	ldrexd	%0, %H0, [%3]\n"
-+"	adds	%0, %0, %4\n"
-+"	adc	%H0, %H0, %H4\n"
-+"	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
--	: "=&r" (result), "=&r" (tmp)
-+	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
- 	: "r" (&v->counter), "r" (i)
- 	: "cc");
- 
-@@ -315,13 +315,13 @@ static inline void atomic64_sub(u64 i, atomic64_t *v)
- 	unsigned long tmp;
- 
- 	__asm__ __volatile__("@ atomic64_sub\n"
--"1:	ldrexd	%0, %H0, [%2]\n"
--"	subs	%0, %0, %3\n"
--"	sbc	%H0, %H0, %H3\n"
--"	strexd	%1, %0, %H0, [%2]\n"
-+"1:	ldrexd	%0, %H0, [%3]\n"
-+"	subs	%0, %0, %4\n"
-+"	sbc	%H0, %H0, %H4\n"
-+"	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
--	: "=&r" (result), "=&r" (tmp)
-+	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
- 	: "r" (&v->counter), "r" (i)
- 	: "cc");
- }
-@@ -334,13 +334,13 @@ static inline u64 atomic64_sub_return(u64 i, atomic64_t *v)
- 	smp_mb();
- 
- 	__asm__ __volatile__("@ atomic64_sub_return\n"
--"1:	ldrexd	%0, %H0, [%2]\n"
--"	subs	%0, %0, %3\n"
--"	sbc	%H0, %H0, %H3\n"
--"	strexd	%1, %0, %H0, [%2]\n"
-+"1:	ldrexd	%0, %H0, [%3]\n"
-+"	subs	%0, %0, %4\n"
-+"	sbc	%H0, %H0, %H4\n"
-+"	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
--	: "=&r" (result), "=&r" (tmp)
-+	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
- 	: "r" (&v->counter), "r" (i)
- 	: "cc");
- 
-@@ -359,11 +359,11 @@ static inline u64 atomic64_cmpxchg(atomic64_t *ptr, u64 old, u64 new)
- 	do {
- 		__asm__ __volatile__("@ atomic64_cmpxchg\n"
- 		"mov		%0, #0\n"
--		"ldrexd		%1, %H1, [%2]\n"
--		"teq		%1, %3\n"
--		"teqeq		%H1, %H3\n"
--		"strexdeq	%0, %4, %H4, [%2]"
--		: "=&r" (res), "=&r" (oldval)
-+		"ldrexd		%1, %H1, [%3]\n"
-+		"teq		%1, %4\n"
-+		"teqeq		%H1, %H4\n"
-+		"strexdeq	%0, %5, %H5, [%3]"
-+		: "=&r" (res), "=&r" (oldval), "+Qo" (ptr->counter)
- 		: "r" (&ptr->counter), "r" (old), "r" (new)
- 		: "cc");
- 	} while (res);
-@@ -381,11 +381,11 @@ static inline u64 atomic64_xchg(atomic64_t *ptr, u64 new)
- 	smp_mb();
- 
- 	__asm__ __volatile__("@ atomic64_xchg\n"
--"1:	ldrexd	%0, %H0, [%2]\n"
--"	strexd	%1, %3, %H3, [%2]\n"
-+"1:	ldrexd	%0, %H0, [%3]\n"
-+"	strexd	%1, %4, %H4, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
--	: "=&r" (result), "=&r" (tmp)
-+	: "=&r" (result), "=&r" (tmp), "+Qo" (ptr->counter)
- 	: "r" (&ptr->counter), "r" (new)
- 	: "cc");
- 
-@@ -402,16 +402,16 @@ static inline u64 atomic64_dec_if_positive(atomic64_t *v)
- 	smp_mb();
- 
- 	__asm__ __volatile__("@ atomic64_dec_if_positive\n"
--"1:	ldrexd	%0, %H0, [%2]\n"
-+"1:	ldrexd	%0, %H0, [%3]\n"
- "	subs	%0, %0, #1\n"
- "	sbc	%H0, %H0, #0\n"
- "	teq	%H0, #0\n"
- "	bmi	2f\n"
--"	strexd	%1, %0, %H0, [%2]\n"
-+"	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b\n"
- "2:"
--	: "=&r" (result), "=&r" (tmp)
-+	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
- 	: "r" (&v->counter)
- 	: "cc");
- 
-@@ -429,18 +429,18 @@ static inline int atomic64_add_unless(atomic64_t *v, u64 a, u64 u)
- 	smp_mb();
- 
- 	__asm__ __volatile__("@ atomic64_add_unless\n"
--"1:	ldrexd	%0, %H0, [%3]\n"
--"	teq	%0, %4\n"
--"	teqeq	%H0, %H4\n"
-+"1:	ldrexd	%0, %H0, [%4]\n"
-+"	teq	%0, %5\n"
-+"	teqeq	%H0, %H5\n"
- "	moveq	%1, #0\n"
- "	beq	2f\n"
--"	adds	%0, %0, %5\n"
--"	adc	%H0, %H0, %H5\n"
--"	strexd	%2, %0, %H0, [%3]\n"
-+"	adds	%0, %0, %6\n"
-+"	adc	%H0, %H0, %H6\n"
-+"	strexd	%2, %0, %H0, [%4]\n"
- "	teq	%2, #0\n"
- "	bne	1b\n"
- "2:"
--	: "=&r" (val), "+r" (ret), "=&r" (tmp)
-+	: "=&r" (val), "+r" (ret), "=&r" (tmp), "+Qo" (v->counter)
- 	: "r" (&v->counter), "r" (u), "r" (a)
- 	: "cc");
- 
--- 
-1.6.3.3
+You're right.
