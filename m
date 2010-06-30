@@ -1,33 +1,60 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 30 Jun 2010 20:38:10 +0900
-Subject: [PATCH] Add OneNAND devices to Aquila and GONI boards
-In-Reply-To: <1277445127-16025-1-git-send-email-m.szyprowski@samsung.com>
-References: <1277445127-16025-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <000901cb1848$bac66ff0$30534fd0$%kim@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 30 Jun 2010 14:39:19 +0300
+Subject: [GIT PULL] omap fixes for 2.6.35-rc3
+Message-ID: <20100630113919.GB2822@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> 
-> Hello,
-> 
-> This short patch serie adds OneNAND devices to Aquila and GONI boards.
-> The patches were earlier posted to mailing list but it looks they were
-> lost, so I decided to resend them again.
-> 
-> The series contains the following patches:
-> 
-> [PATCH 1/2] ARM: S5PV210: Add OneNAND device to the GONI board
-> [PATCH 2/2] ARM: S5PV210: Add OneNAND device to the Aquila board
-> 
-OK..will apply.
+Hi Linus,
 
-And please add Ben Dooks to 'cc'.
+Please pull omap fixes from:
 
-Thanks.
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+These all should match your "major bugs or regressions" criteria for
+various omaps :)
+
+Regards,
+
+Tony
+
+
+The following changes since commit 7e27d6e778cd87b6f2415515d7127eba53fe5d02:
+
+  Linux 2.6.35-rc3 (2010-06-11 19:14:04 -0700)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes
+
+Amit Kucheria (1):
+      omap: fix build failure due to missing include dma-mapping.h
+
+Benoit Cousson (1):
+      OMAP: hwmod: Fix the missing braces
+
+Kevin Hilman (2):
+      omap: GPIO: fix auto-disable of debounce clock
+      OMAP3: PM: fix IO daisy chain enable to use PM_WKEN reg
+
+Santosh Shilimkar (2):
+      omap: Stalker board: switch over to gpio_set_debounce
+      OMAP4: clock: Fix multi-omap boot with reset un-used clocks
+
+Satish (1):
+      omap iommu: Fix Memory leak
+
+Tero Kristo (1):
+      omap: DMTIMER: Ack pending interrupt always when stopping a timer
+
+Tony Lindgren (1):
+      Merge branch 'for_2.6.35rc' of git://git.pwsan.com/linux-2.6 into omap-fixes-for-linus
+
+ arch/arm/mach-omap2/board-omap3stalker.c |    4 +---
+ arch/arm/mach-omap2/clock44xx_data.c     |    2 ++
+ arch/arm/mach-omap2/omap_hwmod.c         |    9 ++++++---
+ arch/arm/mach-omap2/pm34xx.c             |    4 ++--
+ arch/arm/mach-omap2/usb-ehci.c           |    2 ++
+ arch/arm/plat-omap/dmtimer.c             |    6 +++---
+ arch/arm/plat-omap/gpio.c                |    1 +
+ arch/arm/plat-omap/iovmm.c               |    4 +++-
+ 8 files changed, 20 insertions(+), 12 deletions(-)
