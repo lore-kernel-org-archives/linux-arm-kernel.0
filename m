@@ -1,81 +1,186 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sun, 11 Jul 2010 14:35:37 +0530
-Subject: [PATCH 6/8 v2] ARM: l2x0: Determine the cache size
-Message-ID: <mailman.3.1286341987.18775.linux-arm-kernel@lists.infradead.org>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Thu, 01 Jul 2010 09:02:05 +1200
+Subject: [PATCH 2/3] at91_udc: Add vbus polarity and polling mode
+In-Reply-To: <1277699955-9931-3-git-send-email-ryan@bluewatersys.com>
+References: <1277699955-9931-1-git-send-email-ryan@bluewatersys.com>
+	<1277699955-9931-3-git-send-email-ryan@bluewatersys.com>
+Message-ID: <4C2BB0CD.3020700@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cache size is needed for to optimise range based
-maintainance operations
+On 06/28/2010 04:39 PM, Ryan Mallon wrote:
+> Allow the vbus signal to optionally use polling. This is required if
+> the vbus signal is connected to an non-interrupting io expander for
+> example. If vbus is in polling mode, then it is assumed that the vbus
+> gpio may sleep. Also add an option to have vbus be an active low
+> signal. Both options are set in the platform data for the device.
+> 
+> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
----
- arch/arm/include/asm/hardware/cache-l2x0.h |    1 +
- arch/arm/mm/cache-l2x0.c                   |   13 +++++++++++--
- 2 files changed, 12 insertions(+), 2 deletions(-)
+Is anybody able to review this patch please? I have an ack for a patch
+which depends on this one. This patch should have no impact (other than
+slight code/data size increase) on existing users of the at91 udc driver
+since it only adds an alternative code path for the case where vbus is
+on a gpio which may sleep. The addition of the vbus polarity should also
+not affect existing users since the default is active high.
 
-diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/=
-asm/hardware/cache-l2x0.h
-index d833355..4633d2a 100644
---- a/arch/arm/include/asm/hardware/cache-l2x0.h
-+++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-@@ -55,6 +55,7 @@
- #define L2X0_CACHE_ID_PART_MASK		(0xf << 6)
- #define L2X0_CACHE_ID_PART_L210		(1 << 6)
- #define L2X0_CACHE_ID_PART_L310		(3 << 6)
-+#define L2X0_AUX_CTRL_WAY_SIZE_MASK	(0x3 << 17)
-=20
- #ifndef __ASSEMBLY__
- extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_=
-mask);
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 9310d61..262c752 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -28,6 +28,7 @@
- static void __iomem *l2x0_base;
- static DEFINE_SPINLOCK(l2x0_lock);
- static uint32_t l2x0_way_mask;	/* Bitmask of active ways */
-+static uint32_t l2x0_size;
-=20
- static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
- {
-@@ -242,6 +243,7 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val=
-, __u32 aux_mask)
- {
- 	__u32 aux;
- 	__u32 cache_id;
-+	__u32 way_size =3D 0;
- 	int ways;
- 	const char *type;
-=20
-@@ -276,6 +278,13 @@ void __init l2x0_init(void __iomem *base, __u32 aux_va=
-l, __u32 aux_mask)
- 	l2x0_way_mask =3D (1 << ways) - 1;
-=20
- 	/*
-+	 * L2 cache Size =3D  Way size * Number of ways
-+	 */
-+	way_size =3D (aux & L2X0_AUX_CTRL_WAY_SIZE_MASK) >> 17;
-+	way_size =3D 1 << (way_size + 3);
-+	l2x0_size =3D ways * way_size * SZ_1K;
-+
-+	/*
- 	 * Check if l2x0 controller is already enabled.
- 	 * If you are booting from non-secure mode
- 	 * accessing the below registers will fault.
-@@ -300,6 +309,6 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val=
-, __u32 aux_mask)
- 	outer_cache.disable =3D l2x0_disable;
-=20
- 	printk(KERN_INFO "%s cache controller enabled\n", type);
--	printk(KERN_INFO "l2x0: %d ways, CACHE_ID 0x%08x, AUX_CTRL 0x%08x\n",
--			 ways, cache_id, aux);
-+	printk(KERN_INFO "l2x0: %d ways, CACHE_ID 0x%08x, AUX_CTRL 0x%08x, Cache =
-size: %d B\n",
-+			ways, cache_id, aux, l2x0_size);
- }
---=20
-1.6.0.4
+Thanks,
+~Ryan
+
+> ---
+>  arch/arm/mach-at91/include/mach/board.h |    2 +
+>  drivers/usb/gadget/at91_udc.c           |   66 +++++++++++++++++++++++++------
+>  drivers/usb/gadget/at91_udc.h           |    2 +
+>  3 files changed, 57 insertions(+), 13 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
+> index df2ed84..58528aa 100644
+> --- a/arch/arm/mach-at91/include/mach/board.h
+> +++ b/arch/arm/mach-at91/include/mach/board.h
+> @@ -44,6 +44,8 @@
+>   /* USB Device */
+>  struct at91_udc_data {
+>  	u8	vbus_pin;		/* high == host powering us */
+> +	u8	vbus_active_low;	/* vbus polarity */
+> +	u8	vbus_polled;		/* Use polling, not interrupt */
+>  	u8	pullup_pin;		/* active == D+ pulled up */
+>  	u8	pullup_active_low;	/* true == pullup_pin is active low */
+>  };
+> diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+> index eaa79c8..469a64c 100644
+> --- a/drivers/usb/gadget/at91_udc.c
+> +++ b/drivers/usb/gadget/at91_udc.c
+> @@ -76,6 +76,7 @@
+>  static const char driver_name [] = "at91_udc";
+>  static const char ep0name[] = "ep0";
+>  
+> +#define VBUS_POLL_TIMEOUT	msecs_to_jiffies(1000)
+>  
+>  #define at91_udp_read(dev, reg) \
+>  	__raw_readl((dev)->udp_baseaddr + (reg))
+> @@ -1556,20 +1557,49 @@ static struct at91_udc controller = {
+>  	/* ep6 and ep7 are also reserved (custom silicon might use them) */
+>  };
+>  
+> +static void at91_vbus_update(struct at91_udc *udc, unsigned value)
+> +{
+> +	if (udc->board.vbus_active_low)
+> +		value ^= 1;
+> +	if (value != udc->vbus)
+> +		at91_vbus_session(&udc->gadget, value);
+> +}
+> +
+>  static irqreturn_t at91_vbus_irq(int irq, void *_udc)
+>  {
+>  	struct at91_udc	*udc = _udc;
+> -	unsigned	value;
+>  
+>  	/* vbus needs at least brief debouncing */
+>  	udelay(10);
+> -	value = gpio_get_value(udc->board.vbus_pin);
+> -	if (value != udc->vbus)
+> -		at91_vbus_session(&udc->gadget, value);
+> +	at91_vbus_update(udc, gpio_get_value(udc->board.vbus_pin));
+>  
+>  	return IRQ_HANDLED;
+>  }
+>  
+> +static void at91_vbus_timer_work(struct work_struct *work)
+> +{
+> +	struct at91_udc *udc = container_of(work, struct at91_udc, 
+> +					    vbus_timer_work);
+> +
+> +	at91_vbus_update(udc, gpio_get_value_cansleep(udc->board.vbus_pin));
+> +
+> +	if (!timer_pending(&udc->vbus_timer))
+> +		mod_timer(&udc->vbus_timer, jiffies + VBUS_POLL_TIMEOUT);
+> +}
+> +
+> +static void at91_vbus_timer(unsigned long data)
+> +{
+> +	struct at91_udc *udc = (struct at91_udc *)data;
+> +
+> +	/*
+> +	 * If we are polling vbus it is likely that the gpio is on an
+> +	 * bus such as i2c or spi which may sleep, so schedule some work
+> +	 * to read the vbus gpio
+> +	 */
+> +	if (!work_pending(&udc->vbus_timer_work))
+> +		schedule_work(&udc->vbus_timer_work);
+> +}
+> +
+>  int usb_gadget_register_driver (struct usb_gadget_driver *driver)
+>  {
+>  	struct at91_udc	*udc = &controller;
+> @@ -1763,13 +1793,22 @@ static int __init at91udc_probe(struct platform_device *pdev)
+>  		 * Get the initial state of VBUS - we cannot expect
+>  		 * a pending interrupt.
+>  		 */
+> -		udc->vbus = gpio_get_value(udc->board.vbus_pin);
+> -		if (request_irq(udc->board.vbus_pin, at91_vbus_irq,
+> -				IRQF_DISABLED, driver_name, udc)) {
+> -			DBG("request vbus irq %d failed\n",
+> -					udc->board.vbus_pin);
+> -			retval = -EBUSY;
+> -			goto fail3;
+> +		if (udc->board.vbus_polled) {
+> +			udc->vbus = gpio_get_value_cansleep(udc->board.vbus_pin);
+> +			INIT_WORK(&udc->vbus_timer_work, at91_vbus_timer_work);
+> +			setup_timer(&udc->vbus_timer, at91_vbus_timer,
+> +				    (unsigned long)udc);		
+> +			mod_timer(&udc->vbus_timer,
+> +				  jiffies + VBUS_POLL_TIMEOUT);
+> +		} else {
+> +			udc->vbus = gpio_get_value(udc->board.vbus_pin);
+> +			if (request_irq(udc->board.vbus_pin, at91_vbus_irq,
+> +					IRQF_DISABLED, driver_name, udc)) {
+> +				DBG("request vbus irq %d failed\n",
+> +				    udc->board.vbus_pin);
+> +				retval = -EBUSY;
+> +				goto fail3;
+> +			}
+>  		}
+>  	} else {
+>  		DBG("no VBUS detection, assuming always-on\n");
+> @@ -1855,7 +1894,7 @@ static int at91udc_suspend(struct platform_device *pdev, pm_message_t mesg)
+>  		enable_irq_wake(udc->udp_irq);
+>  
+>  	udc->active_suspend = wake;
+> -	if (udc->board.vbus_pin > 0 && wake)
+> +	if (udc->board.vbus_pin > 0 && !udc->board.vbus_polled && wake)
+>  		enable_irq_wake(udc->board.vbus_pin);
+>  	return 0;
+>  }
+> @@ -1864,7 +1903,8 @@ static int at91udc_resume(struct platform_device *pdev)
+>  {
+>  	struct at91_udc *udc = platform_get_drvdata(pdev);
+>  
+> -	if (udc->board.vbus_pin > 0 && udc->active_suspend)
+> +	if (udc->board.vbus_pin > 0 && !udc->board.vbus_polled && 
+> +	    udc->active_suspend)
+>  		disable_irq_wake(udc->board.vbus_pin);
+>  
+>  	/* maybe reconnect to host; if so, clocks on */
+> diff --git a/drivers/usb/gadget/at91_udc.h b/drivers/usb/gadget/at91_udc.h
+> index c65d622..a1f4f54 100644
+> --- a/drivers/usb/gadget/at91_udc.h
+> +++ b/drivers/usb/gadget/at91_udc.h
+> @@ -144,6 +144,8 @@ struct at91_udc {
+>  	struct proc_dir_entry		*pde;
+>  	void __iomem			*udp_baseaddr;
+>  	int				udp_irq;
+> +	struct timer_list		vbus_timer;
+> +	struct work_struct		vbus_timer_work;
+>  };
+>  
+>  static inline struct at91_udc *to_udc(struct usb_gadget *g)
+
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
