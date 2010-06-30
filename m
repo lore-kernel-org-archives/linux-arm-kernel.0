@@ -1,54 +1,104 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 30 Jun 2010 10:42:18 -0400 (EDT)
-Subject: [PATCH 1/2] arm: Replace CONFIG_HAS_TLS_REG with HWCAP_TLS and
-	check for it on V6
-In-Reply-To: <20100630131737.GF2822@atomide.com>
-References: <20100621133749.24299.36154.stgit@baageli.muru.com>
-	<20100621135120.24299.98499.stgit@baageli.muru.com>
-	<20100622170020.GF4371@shareable.org>
-	<20100623073912.GA12255@atomide.com>
-	<20100623133636.GC7058@shareable.org>
-	<20100629141836.GM2822@atomide.com>
-	<alpine.LFD.2.00.1006291355520.24097@xanadu.home>
-	<20100630110828.GZ2822@atomide.com> <20100630131737.GF2822@atomide.com>
-Message-ID: <alpine.LFD.2.00.1006301011520.24097@xanadu.home>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 30 Jun 2010 15:53:42 +0100
+Subject: [PATCH] ASoC: DaVinci: Added support for cpu clocking I2S
+In-Reply-To: <AANLkTimedG3X-rQbZvS6QfxUGkPIAtCgliI0xWknmNA9@mail.gmail.com>
+References: <1277707487-3371-1-git-send-email-lamiaposta71@gmail.com>
+	<20100628103030.GB14247@rakim.wolfsonmicro.main>
+	<AANLkTimedG3X-rQbZvS6QfxUGkPIAtCgliI0xWknmNA9@mail.gmail.com>
+Message-ID: <20100630145342.GE3634@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Jun 2010, Tony Lindgren wrote:
+On Wed, Jun 30, 2010 at 10:17:40AM +0200, Raffaele Recalcati wrote:
+> 2010/6/28 Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-> * Tony Lindgren <tony@atomide.com> [100630 14:02]:
-> > * Nicolas Pitre <nico@fluxnic.net> [100629 22:14]:
-> > 
-> > Updated patch below.
-> 
-> And a bug crept in..
-> 
-> > +	.macro set_tls_v6, tp, tmp1, tmp2
-> > +	ldr	\tmp1, =elf_hwcap
-> > +	ldr	\tmp1, [\tmp1, #0]
-> > +	mov	\tmp2, #0xffff0fff
-> > +	tst	\tmp2, #HWCAP_TLS		@ hardware TLS available?
-> > +	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
-> > +	streq	\tp, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
-> > +	.endm
-> 
-> The tst	\tmp2, #HWCAP_TLS should of course use \tmp1.
-> 
-> Also fixed a warning about adding parentheses around comparison
-> if (id & 0x410f0000) != 0x41070000).
+> > It's still very hard to understand what this patch is supposed to do.
+> > As previously mentioned this would probably be a lot clearer if you
+> > split this into multiple patches, for example one adding support for the
+> > fast clock mode, one adding support for selecting the pin used for any
+> > external clock and then further patches with any other changes.
 
-Here you probably want (id & 0xff0f0000) and not (id & 0x410f0000).
+> Looking at other paches, they are simpler than mine.
 
-> Again, updated patch below.
+The big problem is you're just making some general (and not particularly
+clear) statements about features without saying anything concrete about
+what the patch actually does - is there a bug being fixed, a feature
+implemented, or what?  
 
-I like it.  However, in proc-v6.S, you don't need to add a reference to 
-feat_v6_fixup() to the __pj4_v6_proc_info block.  Simply adding 
-HWCAP_TLS in that case should be fine as PJ4 always has the TLS reg.
+> > >     Added audio playback support with [frame sync master - clock master]
+> > mode
+> > >     and with [frame sync master - clock slave].
 
-With the above fixes, you can add
+> > What are these modes - which clock are you talking about?
 
-Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> McBSP i2s interface to external codec.
 
+Perhaps you mean the bit clock on the I2S interface?  There are multiple
+clocks on the actual I2S link itself, and often people lump in the
+master clock for the I2S interface into the interface itself.
 
-Nicolas
+> > >        i2s_fast_clock switch can be used to have better approximate or
+> > >        symmetric waveforms.
+
+> > Why would someone choose not to use this?
+
+> I was not sure if symmetric waveform can be a must.
+> In general I think it is better a non symmetric, but better approximate,
+> waveform.
+> Anyway, it is better to have the possibility to choose in my opinion,
+> because I have not so much experience in i2s communication.
+
+If I understand this correctly when you say "approximate" what you mean
+is "approximate clock rate" so the tradeoff is between the accuracy of
+the rate generated and the duty cycle of the output signal?
+
+> > > +     /* To be used when cpu gets clock from extenal pin */
+> > > +     int clk_input_pin;
+
+> > How would one use this?
+
+> looking at 2.5 Clock, Frames, and Data in
+> you can select MCBSP_CLKS or other input clock pins.
+
+You need to put this in the comments.
+
+> > > +static int davinci_i2s_dai_set_clkdiv(struct snd_soc_dai *cpu_dai,
+> > > +                             int div_id, int div)
+> > > +{
+> > > +     struct davinci_mcbsp_dev *dev = cpu_dai->private_data;
+> > > +     int srgr;
+> > > +
+> > > +     dev->clk_div = div;
+> > > +     return 0;
+> > > +}
+
+> > I would add a clock ID here in case someone wants to configure another
+> > clock in the patch.
+
+> Can you explain better,
+> please?
+
+You need to require a value for div_id.
+
+> > I'd also expect this to be doing a clk_get() using the struct device for
+> > the DAI so that the driver can function even if the clock tree for a new..
+> > SoC is different.
+
+> Sorry, I don't understand, can you explain me better?
+
+clk_get() takes two parameters, a struct device and a name.  You should
+be using a clock specified in terms of a particular device, not one with
+a NULL pointer for the struct device.
+
+> > > +             freq = 122000000; /* FIXME ask to Texas */
+
+> > ...this presumably ought to be in an else clause (or perhaps just not
+> > using this clocking at all if you can't find the clock?).
+
+> freq is used to obtain clk_div.
+> The real problem is that, as explained in the manual, it is not clear its
+> value.
+> I hope someone can help!!
+
+I would very strongly expect that the division would be from the clock
+rate of the source clock which you can obtain by using clk_get().
