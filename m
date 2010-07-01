@@ -1,48 +1,62 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 01 Jul 2010 15:32:17 +0200
-Subject: [PATCH 2/3] arm: s5pv210: Aquila: add support for MAX8998 PMIC
-In-Reply-To: <20100701122451.GA17698@sirena.org.uk>
-References: <1277964466-23891-1-git-send-email-m.szyprowski@samsung.com>
-	<1277964466-23891-3-git-send-email-m.szyprowski@samsung.com>
-	<20100701122451.GA17698@sirena.org.uk>
-Message-ID: <000001cb1921$d75de060$8619a120$%szyprowski@samsung.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 01 Jul 2010 15:45:02 +0200
+Subject: [PATCH 2/3] at91_udc: Add vbus polarity and polling mode
+In-Reply-To: <1277699955-9931-3-git-send-email-ryan@bluewatersys.com>
+References: <1277699955-9931-1-git-send-email-ryan@bluewatersys.com>
+	<1277699955-9931-3-git-send-email-ryan@bluewatersys.com>
+Message-ID: <4C2C9BDE.8090504@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thursday, July 01, 2010 2:25 PM Mark Brown wrote:
-
-> On Thu, Jul 01, 2010 at 08:07:45AM +0200, Marek Szyprowski wrote:
+Le 28/06/2010 06:39, Ryan Mallon :
+> Allow the vbus signal to optionally use polling. This is required if
+> the vbus signal is connected to an non-interrupting io expander for
+> example. If vbus is in polling mode, then it is assumed that the vbus
+> gpio may sleep. Also add an option to have vbus be an active low
+> signal. Both options are set in the platform data for the device.
 > 
-> > +static struct regulator_consumer_supply aquila_ldo3_consumers[] = {
-> > +	{	.supply	= "VMIPI_1.1V",	},
-> > +};
-> 
-> > +static struct regulator_consumer_supply aquila_ldo8_consumers[] = {
-> > +	{	.supply	= "VADC_3.3V", },
-> > +};
-> 
-> Almost all of these regulator supplies should be removed.  Except in
-> some exceptional cases all supplies should specify a struct device (the
-> only one that really exists at the minute is CPU core due to lack of
-> devices for CPUfreq).  In general if you're defining a supply name that
-> is the same as the rail on the board rather than a pin on a chip you're
-> not using the API correctly.
+> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 
-Ok. I will remove them now and add later with the appropriate devices.
+Looks good, but... one question:
 
-One more question - should I enable the regulators in the driver itself
-or in the platform callback (like a "poweron()" callback)?
+> @@ -1763,13 +1793,22 @@ static int __init at91udc_probe(struct platform_device *pdev)
+>  		 * Get the initial state of VBUS - we cannot expect
+>  		 * a pending interrupt.
+>  		 */
+> -		udc->vbus = gpio_get_value(udc->board.vbus_pin);
+> -		if (request_irq(udc->board.vbus_pin, at91_vbus_irq,
+> -				IRQF_DISABLED, driver_name, udc)) {
+> -			DBG("request vbus irq %d failed\n",
+> -					udc->board.vbus_pin);
+> -			retval = -EBUSY;
+> -			goto fail3;
+> +		if (udc->board.vbus_polled) {
+> +			udc->vbus = gpio_get_value_cansleep(udc->board.vbus_pin);
 
-If I put regulator enabling into the driver how can one make it working
-on a board without regulators (chip powered all the time)? Should the
-driver ignore errors from regulator_get()?
+Shouldn't we need here something like:
+udc->vbus =  (udc->board.vbus_active_low) ^ gpio_get_value_cansleep(udc->board.vbus_pin);
 
-What if one regulator needs enabling other to operate properly 
-(parent-child hierarchy)?
+?
 
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+> +			INIT_WORK(&udc->vbus_timer_work, at91_vbus_timer_work);
+> +			setup_timer(&udc->vbus_timer, at91_vbus_timer,
+> +				    (unsigned long)udc);		
+> +			mod_timer(&udc->vbus_timer,
+> +				  jiffies + VBUS_POLL_TIMEOUT);
+> +		} else {
+> +			udc->vbus = gpio_get_value(udc->board.vbus_pin);
+
+Ditto.
+
+> +			if (request_irq(udc->board.vbus_pin, at91_vbus_irq,
+> +					IRQF_DISABLED, driver_name, udc)) {
+> +				DBG("request vbus irq %d failed\n",
+> +				    udc->board.vbus_pin);
+> +				retval = -EBUSY;
+> +				goto fail3;
+> +			}
+
+
+Best regards,
+-- 
+Nicolas Ferre
