@@ -1,18 +1,172 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 1 Jul 2010 13:25:45 +0100
-Subject: [PATCH 3/3] arm: s5pv210: GONI: add support for MAX8998 PMIC
-In-Reply-To: <1277964466-23891-4-git-send-email-m.szyprowski@samsung.com>
-References: <1277964466-23891-1-git-send-email-m.szyprowski@samsung.com>
-	<1277964466-23891-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20100701122544.GB17698@sirena.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 1 Jul 2010 14:28:03 +0200
+Subject: [PATCHv5] mx2_camera: Add soc_camera support for i.MX25/i.MX27
+In-Reply-To: <47538fc4c6ffbc6a4c80ba55ecdd03603e67095c.1277981781.git.baruch@tkos.co.il>
+References: <47538fc4c6ffbc6a4c80ba55ecdd03603e67095c.1277981781.git.baruch@tkos.co.il>
+Message-ID: <20100701122803.GE28535@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 01, 2010 at 08:07:46AM +0200, Marek Szyprowski wrote:
+On Thu, Jul 01, 2010 at 02:03:19PM +0300, Baruch Siach wrote:
+> This is the soc_camera support developed by Sascha Hauer for the i.MX27.  Alan
+> Carvalho de Assis modified the original driver to get it working on more recent
+> kernels. I modified it further to add support for i.MX25. This driver has been
+> tested on i.MX25 and i.MX27 based platforms.
+> 
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> ---
+> Changes v4 -> v5
+>     Comments from Uwe Kleine-K?nig:
+> 
+>     Enclose mx27 DMA related stuff in #ifdefs since the dma-mx1-mx2.h is no 
+>     longer accessible to mx25 builds
+> 
+>     s/MX2_VIDEO/VIDEO_MX2_HOSTSUPPORT/
+> 
+> Changes v3 -> v4
+>     Address more comments from Guennadi Liakhovetski, including:
+> 
+>     * Fix the double trigger handling of mx27 eMMA
+> 
+>     * Add a FIXME comment in the code of eMMA overflow handling
+> 
+> Changes v2 -> v3
+>     Address more comments from Guennadi Liakhovetski.
+> 
+>     Applied part of Sashca's patch that I forgot in v2.
+> 
+> Changes v1 -> v2
+>     Addressed the comments of Guennadi Liakhovetski except from the following:
+> 
+>     1. The mclk_get_divisor implementation, since I don't know what this code 
+>        is good for
+> 
+>     2. mx2_videobuf_release should not set pcdev->active on i.MX27, because 
+>        mx27_camera_frame_done needs this pointer
+> 
+>     3. In mx27_camera_emma_buf_init I don't know the meaning of those hard 
+>        coded magic numbers
+> 
+>     Applied i.MX27 fixes from Sascha.
+> 
+>  arch/arm/plat-mxc/include/mach/memory.h  |    4 +-
+>  arch/arm/plat-mxc/include/mach/mx2_cam.h |   46 +
+>  drivers/media/video/Kconfig              |   13 +
+>  drivers/media/video/Makefile             |    1 +
+>  drivers/media/video/mx2_camera.c         | 1513 ++++++++++++++++++++++++++++++
+>  5 files changed, 1575 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/plat-mxc/include/mach/mx2_cam.h
+>  create mode 100644 drivers/media/video/mx2_camera.c
+> 
+> diff --git a/arch/arm/plat-mxc/include/mach/memory.h b/arch/arm/plat-mxc/include/mach/memory.h
+> index c4b40c3..849d891 100644
+> --- a/arch/arm/plat-mxc/include/mach/memory.h
+> +++ b/arch/arm/plat-mxc/include/mach/memory.h
+> @@ -44,12 +44,12 @@
+>   */
+>  #define CONSISTENT_DMA_SIZE SZ_8M
+>  
+> -#elif defined(CONFIG_MX1_VIDEO)
+> +#elif defined(CONFIG_MX1_VIDEO) || defined(CONFIG_VIDEO_MX2_HOSTSUPPORT)
+>  /*
+>   * Increase size of DMA-consistent memory region.
+>   * This is required for i.MX camera driver to capture at least four VGA frames.
+>   */
+>  #define CONSISTENT_DMA_SIZE SZ_4M
+> -#endif /* CONFIG_MX1_VIDEO */
+> +#endif /* CONFIG_MX1_VIDEO || CONFIG_MX2_VIDEO */
+s/CONFIG_MX2_VIDEO/CONFIG_VIDEO_MX2_HOSTSUPPORT/ please
 
-> +static struct regulator_consumer_supply goni_ldo3_consumers[] = {
-> +	{	.supply	= "VMIPI_1.1V",	},
-> +};
+>  #endif /* __ASM_ARCH_MXC_MEMORY_H__ */
+> diff --git a/arch/arm/plat-mxc/include/mach/mx2_cam.h b/arch/arm/plat-mxc/include/mach/mx2_cam.h
+> new file mode 100644
+> index 0000000..3c080a3
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/include/mach/mx2_cam.h
+Do you expect users of this header other than your driver?  If not you
+can fold it into the latter.
 
-A similar issue to the previous patch applies here - you should be
-defining consumers using struct device based lookups only.
+[...snip...]
+
+> diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
+> index bdbc9d3..27e2acc 100644
+> --- a/drivers/media/video/Kconfig
+> +++ b/drivers/media/video/Kconfig
+> @@ -969,6 +969,19 @@ config VIDEO_OMAP2
+>  	---help---
+>  	  This is a v4l2 driver for the TI OMAP2 camera capture interface
+>  
+> +config VIDEO_MX2_HOSTSUPPORT
+> +        bool
+> +
+> +config VIDEO_MX2
+> +	tristate "i.MX27/i.MX25 Camera Sensor Interface driver"
+> +	depends on VIDEO_DEV && SOC_CAMERA && (MACH_MX27 || ARCH_MX25)
+> +	select VIDEOBUF_DMA_CONTIG
+CONTIG?
+
+[...snap...]
+
+> diff --git a/drivers/media/video/mx2_camera.c b/drivers/media/video/mx2_camera.c
+> new file mode 100644
+> index 0000000..98c93fa
+> --- /dev/null
+> +++ b/drivers/media/video/mx2_camera.c
+> @@ -0,0 +1,1513 @@
+
+[...snip...]
+
+> +static int __devexit mx2_camera_remove(struct platform_device *pdev)
+> +{
+> +	struct soc_camera_host *soc_host = to_soc_camera_host(&pdev->dev);
+> +	struct mx2_camera_dev *pcdev = container_of(soc_host,
+> +			struct mx2_camera_dev, soc_host);
+> +	struct resource *res;
+> +
+> +	clk_put(pcdev->clk_csi);
+> +#ifdef CONFIG_MACH_MX27
+> +	if (cpu_is_mx27())
+> +		imx_dma_free(pcdev->dma);
+> +#endif /* CONFIG_MACH_MX27 */
+> +	free_irq(pcdev->irq_csi, pcdev);
+> +	if (mx27_camera_emma(pcdev))
+> +		free_irq(pcdev->irq_emma, pcdev);
+> +
+> +	soc_camera_host_unregister(&pcdev->soc_host);
+> +
+> +	iounmap(pcdev->base_csi);
+> +
+> +	if (mx27_camera_emma(pcdev)) {
+> +		clk_disable(pcdev->clk_emma);
+> +		clk_put(pcdev->clk_emma);
+> +		iounmap(pcdev->base_emma);
+> +		res = pcdev->res_emma;
+> +		release_mem_region(res->start, resource_size(res));
+> +	}
+> +
+> +	res = pcdev->res_csi;
+> +	release_mem_region(res->start, resource_size(res));
+> +
+> +	kfree(pcdev);
+> +
+> +	dev_info(&pdev->dev, "MX2 Camera driver unloaded\n");
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver mx2_camera_driver = {
+> +	.driver 	= {
+> +		.name	= MX2_CAM_DRV_NAME,
+I'm always unsure if you need
+
+		.owner  = THIS_MODULE,
+
+here.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
