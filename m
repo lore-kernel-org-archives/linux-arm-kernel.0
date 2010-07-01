@@ -1,38 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 1 Jul 2010 11:56:34 +0200
-Subject: Pending patches for -rc
-In-Reply-To: <20100630101223.GA24284@n2100.arm.linux.org.uk>
-References: <20100630101223.GA24284@n2100.arm.linux.org.uk>
-Message-ID: <20100701095634.GA5929@pengutronix.de>
+From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
+Date: Thu, 1 Jul 2010 11:58:13 +0200
+Subject: [PATCH 25/33] Removing dead CORGI_SSP_DEPRECATED
+In-Reply-To: <80c10751fb5b7d9be55656ac35827a403a5d6b2b.1277911346.git.siccegge@cs.fau.de>
+References: <cover.1277911345.git.siccegge@cs.fau.de>
+	<80c10751fb5b7d9be55656ac35827a403a5d6b2b.1277911346.git.siccegge@cs.fau.de>
+Message-ID: <20100701095812.GA1096@boggieman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 30, 2010 at 11:12:23AM +0100, Russell King - ARM Linux wrote:
-> Given Linus' concerns about the code which is going in during the -rc
-> period, and the clamp-down we had for -rc3, I've re-reviewed the
-> changes which I have in my master branch.  The following changes do not
-> feel like critical rc material:
+On Wed, Jun 30, 2010 at 06:01:56PM +0200, Christoph Egger wrote:
+> CORGI_SSP_DEPRECATED doesn't exist in Kconfig, therefore removing all
+> references for it from the source code.
+> 
+> Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
 
-I agree for the bulk of the i.MX patches. There is one patch I'd like to
-have for 2.6.36, find it here:
+Cant see anything wrong with this.
 
-The following changes since commit 980019d74e4b2428362b36a0506519d6d9460800:
+acked-by: Kristoffer Ericson <kristoffer.ericson@gmail.com>
 
-  Merge git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/staging-2.6 (2010-06-30 15:45:59 -0700)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git imx-for-2.6.35
-
-Daniel Mack (1):
-      ARM: mx3: mx31lilly: fix build error for !CONFIG_USB_ULPI
-
- arch/arm/mach-mx3/mach-mx31lilly.c |   33 ++++++++++++++++++++++-----------
- 1 files changed, 22 insertions(+), 11 deletions(-)
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> ---
+>  arch/arm/mach-pxa/sharpsl_pm.c |    5 -----
+>  1 files changed, 0 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
+> index 582701e..d8c5301 100644
+> --- a/arch/arm/mach-pxa/sharpsl_pm.c
+> +++ b/arch/arm/mach-pxa/sharpsl_pm.c
+> @@ -180,17 +180,12 @@ int sharpsl_pm_pxa_read_max1111(int channel)
+>  	if (machine_is_tosa())
+>  	    return 0;
+>  
+> -#ifdef CONFIG_CORGI_SSP_DEPRECATED
+> -	return corgi_ssp_max1111_get((channel << MAXCTRL_SEL_SH) | MAXCTRL_PD0 | MAXCTRL_PD1
+> -			| MAXCTRL_SGL | MAXCTRL_UNI | MAXCTRL_STR);
+> -#else
+>  	extern int max1111_read_channel(int);
+>  
+>  	/* max1111 accepts channels from 0-3, however,
+>  	 * it is encoded from 0-7 here in the code.
+>  	 */
+>  	return max1111_read_channel(channel >> 1);
+> -#endif
+>  }
+>  
+>  static int get_percentage(int voltage)
+> -- 
+> 1.7.0.4
