@@ -1,44 +1,60 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 1 Jul 2010 15:37:51 -0700
-Subject: [PATCH] serial: fix rs485 for atmel_serial on avr32
-In-Reply-To: <201006291935.40229.PeterHuewe@gmx.de>
-References: <201006291935.40229.PeterHuewe@gmx.de>
-Message-ID: <20100701153751.ef384583.akpm@linux-foundation.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 1 Jul 2010 17:47:06 -0500
+Subject: [PATCH] ARM: Stop secondary cpus in machine_halt()
+Message-ID: <20100701224706.GA26473@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Jun 2010 19:35:39 +0200
-Peter H__we <PeterHuewe@gmx.de> wrote:
+ARM doesn't spin down secondary cpus on halt, which results in interrupts
+being delivered even after the "System halted" message, etc.
 
-> From: Peter Huewe <peterhuewe@gmx.de>
-> 
-> This patch fixes a build failure [1-4] in the atmel_serial code introduced by
-> patch the patch ARM: 6092/1: atmel_serial: support for RS485
-> communications (e8faff7330a3501eafc9bfe5f4f15af444be29f5)
-> 
-> The build failure was caused by missing struct field and missing defines
-> for the avr32 board - the patch fixes this.
-> 
-> Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
-> ---
-> Despite so many reviewers of the original patch no one seemed to 
-> notice this issue :/
-> 
-> KernelVersion: linux-next-20100629
-> 
-> References:
-> [1] http://kisskb.ellerman.id.au/kisskb/buildresult/2575242/ - first failure
-> in linux-next, may 11th
-> [2] http://kisskb.ellerman.id.au/kisskb/buildresult/2816418/ - still
-> exists as of today
-> [3] http://kisskb.ellerman.id.au/kisskb/buildresult/2617511/ - first
-> failure in Linus' tree - May 20th - did really no one notice this?!
-> [4] http://kisskb.ellerman.id.au/kisskb/buildresult/2813956/ - still
-> exists in Linus' tree as of today
-> 
->  arch/avr32/include/asm/ioctls.h             |    3 +++
->  arch/avr32/mach-at32ap/include/mach/board.h |    2 ++
->  drivers/serial/atmel_serial.c               |    1 +
->  3 files changed, 6 insertions(+), 0 deletions(-)
+Change that to use smp_send_stop() to halt them. Also, change the
+smp_send_stop() on ARM to not do a stack dump when stopping.
 
-ooookay.  Thanks, I'll take it if nobody else will ;)
+Signed-off-by: Olof Johansson <olof@lixom.net>
+
+---
+ arch/arm/kernel/process.c |    6 ++++++
+ arch/arm/kernel/smp.c     |   10 ++++++----
+ 2 files changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index acf5e6f..203fc1b 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -191,6 +191,12 @@ __setup("reboot=", reboot_setup);
+ 
+ void machine_halt(void)
+ {
++#ifdef CONFIG_SMP
++	smp_send_stop();
++#endif
++	printk(KERN_EMERG "System halted, OK to turn off power\n");
++	local_irq_disable();
++	while (1) ;
+ }
+ 
+ 
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index b8c3d0f..5496dea 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -467,10 +467,12 @@ static DEFINE_SPINLOCK(stop_lock);
+  */
+ static void ipi_cpu_stop(unsigned int cpu)
+ {
+-	spin_lock(&stop_lock);
+-	printk(KERN_CRIT "CPU%u: stopping\n", cpu);
+-	dump_stack();
+-	spin_unlock(&stop_lock);
++	if (system_state != SYSTEM_HALT) {
++		spin_lock(&stop_lock);
++		printk(KERN_CRIT "CPU%u: stopping\n", cpu);
++		dump_stack();
++		spin_unlock(&stop_lock);
++	}
+ 
+ 	set_cpu_online(cpu, false);
+ 
+-- 
+1.5.6.5
