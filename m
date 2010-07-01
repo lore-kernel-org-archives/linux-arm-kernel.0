@@ -1,14 +1,26 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 01 Jul 2010 17:35:23 +0100
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 1 Jul 2010 22:08:37 +0530
 Subject: [patch 0/2] ARM: Disable outer cache before kexec call
 In-Reply-To: <alpine.LFD.2.00.1007011820000.4507@localhost.localdomain>
-References: <alpine.LFD.2.00.1007011820000.4507@localhost.localdomain>
-Message-ID: <1278002123.7482.18.camel@e102109-lin.cambridge.arm.com>
+References: <20100701160206.539545857@linutronix.de>
+	<1278000887.7482.12.camel@e102109-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1007011820000.4507@localhost.localdomain>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C5E41E0C@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-07-01 at 17:28 +0100, Thomas Gleixner wrote:
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> kernel-bounces at lists.infradead.org] On Behalf Of Thomas Gleixner
+> Sent: Thursday, July 01, 2010 9:59 PM
+> To: Catalin Marinas
+> Cc: LAK
+> Subject: Re: [patch 0/2] ARM: Disable outer cache before kexec call
+> 
+> Catalin,
+> 
 > On Thu, 1 Jul 2010, Catalin Marinas wrote:
+> >
 > > On Thu, 2010-07-01 at 17:05 +0100, Thomas Gleixner wrote:
 > > > The following patch series addresses the problem, that the kexec code
 > > > does not disable the outer cache before disabling the inner cache and
@@ -20,23 +32,14 @@ On Thu, 2010-07-01 at 17:28 +0100, Thomas Gleixner wrote:
 > > running in non-secure (normal) mode.
 > 
 > But it can disable the inner caches? That's weird.
-
-That's because the CP15 SCTLR register is a banked one, so independent
-configuration for secure and normal worlds.
-
-The outer cache controller doesn't have banked registers and I'm not
-even sure it has a notion of secure or non-secure cache line.
+> 
+If the C bit is disabled then it is as good as L1 and L2 are disabled.
 
 > > Cannot some extra cache flushing work around this problem?
 > 
 > We tried to keep the L2 on and just doing the l2x0_inv_all() call and
 > it hangs.
+>
 
-You would probably need an l2x0_flush_all() function which does clean
-+invalidate. If you only do invalidate you may just remove valid cache
-lines that have reached the RAM.
-
-We only use the l2x0_inv_all() prior to enabling the L2 cache.
-
--- 
-Catalin
+Regards,
+Santosh
