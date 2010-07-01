@@ -1,73 +1,59 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 1 Jul 2010 16:46:23 +0200
-Subject: [PATCHv5] mx2_camera: Add soc_camera support for i.MX25/i.MX27
-In-Reply-To: <Pine.LNX.4.64.1007011612580.17489@axis700.grange>
-References: <47538fc4c6ffbc6a4c80ba55ecdd03603e67095c.1277981781.git.baruch@tkos.co.il>
-	<20100701122803.GE28535@pengutronix.de>
-	<Pine.LNX.4.64.1007011612580.17489@axis700.grange>
-Message-ID: <20100701144622.GG28535@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 1 Jul 2010 16:01:40 +0100
+Subject: [PATCH 3/3] ASoC: DaVinci: Added fast clock timing for McBSP (I2S)
+In-Reply-To: <1277905678-4695-4-git-send-email-lamiaposta71@gmail.com>
+References: <1277905678-4695-1-git-send-email-lamiaposta71@gmail.com>
+	<1277905678-4695-4-git-send-email-lamiaposta71@gmail.com>
+Message-ID: <20100701150140.GE8742@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+On Wed, Jun 30, 2010 at 03:47:58PM +0200, Raffaele Recalcati wrote:
 
-On Thu, Jul 01, 2010 at 04:23:23PM +0200, Guennadi Liakhovetski wrote:
-> > > +config VIDEO_MX2
-> > > +	tristate "i.MX27/i.MX25 Camera Sensor Interface driver"
-> > > +	depends on VIDEO_DEV && SOC_CAMERA && (MACH_MX27 || ARCH_MX25)
-> > > +	select VIDEOBUF_DMA_CONTIG
-> > CONTIG?
-> 
-> What exactly was your question here?
-I thought it to be a mistyped "CONFIG", I was wrong.
- 
-> > > diff --git a/drivers/media/video/mx2_camera.c b/drivers/media/video/mx2_camera.c
-> > > new file mode 100644
-> > > index 0000000..98c93fa
-> > > --- /dev/null
-> > > +++ b/drivers/media/video/mx2_camera.c
-> > > @@ -0,0 +1,1513 @@
-> > 
-> > [...snip...]
-> 
-> > > +static struct platform_driver mx2_camera_driver = {
-> > > +	.driver 	= {
-> > > +		.name	= MX2_CAM_DRV_NAME,
-> > I'm always unsure if you need
-> > 
-> > 		.owner  = THIS_MODULE,
-> > 
-> > here.
-> 
-> It is not needed in this case. See the "owner" field in struct 
-> soc_camera_host_ops mx2_soc_camera_host_ops.
-> 
-> But that's not the reason why I'm replying. What I didn't like in these 
-> your reviews, was the fact, that this driver has been submitted a number 
-> of times to the arm-kernel ML, it has "mx2" in its subject, so, you had 
-> enough chances to review it, just like Sascha did. Instead, you review it 
-> now, making the author create new versions of his patch. You have been 
-> asked for advise, because this patch potentially collided with other your 
-> patches, your help in resolving this question is appreciated. But then you 
-> suddenly decide to review the whole patch... Several of my patches have 
-> been treated similarly in the past, so, I know how annoying it is to have 
-> to re-iterate them because at v5 someone suddenly decided to take part in 
-> the patch review process too...
-OK it might annoying but still I cannot understand why this is a reason to
-lament.  I don't necessarily feel part of the intended audience for each
-patch on LAKML that contains mx2 in it's subject, still less if the
-patch changes very little in arch/arm/{plat-mxc,arch-mx*} as Baruch's
-patch does.  Now he cc:d me and I had a look and even took the time to
-point out the things that I noticed.  From my POV a late reviewer is
-better than getting code in that is less optimal.  And let me point out
-that reviewing sequentially is more efficient in the sum---at least for
-the reviewers.
+> +	/*
+> +	 * This define works when both clock and FS are output for the cpu
+> +	 * and makes clock very fast (FS is not symmetrical, but sampling
+> +	 * frequency is better approximated
+> +	 */
+> +	bool i2s_fast_clock;
 
-So should I ignore patches that are say already > v3?
+I'm having a hard time following the description here - which clock is
+being made very fast?  The output clocks, which are the ones people can
+observe, will presumably not suddenly start running very fast.
 
-Best regards
-Uwe
+It's probably better to rename this option to reflect the actual
+function (trading off between frequency accuracy and mark/space ratio)
+rather than the way it's implemented internally.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> -		srgr |= DAVINCI_MCBSP_SRGR_FPER(mcbsp_word_length *
+> -						16 - 1);
+> +		if (dev->i2s_fast_clock) {
+> +			clk_div = 256;
+> +			do {
+> +				framesize = (freq / (--clk_div)) /
+> +					    params->rate_num *
+> +					    params->rate_den;
+> +			} while (((framesize < 33) || (framesize > 4095)) &&
+> +				 (clk_div));
+> +			clk_div--;
+> +			srgr |= DAVINCI_MCBSP_SRGR_FPER(framesize - 1);
+> +		} else {
+> +			/* symmetric waveforms */
+> +			clk_div = freq / (mcbsp_word_length * 16) /
+> +				  params->rate_num * params->rate_den;
+> +			srgr |= DAVINCI_MCBSP_SRGR_FPER(mcbsp_word_length *
+> +							16 - 1);
+> +		}
+
+Hrm.  This doesn't really correspond to your commit message at all.
+Your commit message makes it sound like you've changed something about
+the clocking setup of the device, such as adding another clock source,
+but what you've actually done here is change the method used to
+calculate the divider.
+
+I'm *guessing* that the actual effect of your change is that you will
+normally end up selecting a very much higher bit clock than would
+otherwise be the case.  It strikes me that there must be a better
+algorithm for the calculation - for example, working up from the minimum
+clock rate - which will give the same results as we currently have where
+the driver is already generating accurate rates.
