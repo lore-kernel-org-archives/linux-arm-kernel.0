@@ -1,323 +1,658 @@
-From: randy.dunlap@oracle.com (Randy Dunlap)
-Date: Thu, 1 Jul 2010 10:17:46 -0700
-Subject: [RFC 3/3] mm: iommu: The Virtual Contiguous Memory Manager
-In-Reply-To: <1277877350-2147-3-git-send-email-zpfeffer@codeaurora.org>
-References: <1277877350-2147-1-git-send-email-zpfeffer@codeaurora.org>
-	<1277877350-2147-3-git-send-email-zpfeffer@codeaurora.org>
-Message-ID: <20100701101746.3810cc3b.randy.dunlap@oracle.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Jul 2010 18:21:28 +0100
+Subject: [patch 0/2] ARM: Disable outer cache before kexec call
+In-Reply-To: <20100701170653.GA15162@n2100.arm.linux.org.uk>
+References: <20100701160206.539545857@linutronix.de>
+	<1278000887.7482.12.camel@e102109-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1007011820000.4507@localhost.localdomain>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C5E41E0C@dbde02.ent.ti.com>
+	<20100701170653.GA15162@n2100.arm.linux.org.uk>
+Message-ID: <20100701172128.GB15162@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Jun 2010 22:55:50 -0700 Zach Pfeffer wrote:
+On Thu, Jul 01, 2010 at 06:06:53PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 01, 2010 at 10:08:37PM +0530, Shilimkar, Santosh wrote:
+> > > -----Original Message-----
+> > > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> > > kernel-bounces at lists.infradead.org] On Behalf Of Thomas Gleixner
+> > > To: Catalin Marinas
+> > > Cc: LAK
+> > > 
+> > > Catalin,
+> > > 
+> > > But it can disable the inner caches? That's weird.
+> > > 
+> > If the C bit is disabled then it is as good as L1 and L2 are disabled.
+> 
+> However, if L2 contains valid cache lines which haven't been written
+> back, the result of disabling the C bit effectively is instantaneous
+> memory corruption.
+> 
+> We know that some L2 caches aren't searched if the C bit in the MMU
+> tables is disabled, and for those caches I'd imagine the same thing
+> happens when you clear the C bit in the SCTLR when turning off the
+> MMU.  What we currently do for L1 is:
+> 
+> - disable interrupts
+> - clean all caches (optionally invalidating)
+> - turn off I & C bits
+> - invalidate all caches
+> 
+> The 'clean' is there to push dirty data out of the caches back into
+> memory.  We then turn off the I & C bits, ensuring that no new cache
+> lines are read in.  At this point, some caches are no longer searched.
+> 
+> We then invalidate all caches to ensure that when _something_ later
+> re-enables the caches, that they don't see our stale data.
+> 
+> As L2 needs this same handling, what I propose is, for both
+> machine_restart() and machine_kexec():
+> 
+> 1. we move the IRQ (and FIQ) disable out of each CPUs proc_fin()
+> 2. call flush_cache_all() immediately after IRQs are disabled
+>    (removing any cache flushing from proc_fin() implementations.)
+> 3. call outer_flush_all() (new function) after that
+> 4. call proc_fin() to disable the C & I bits.
+> 5. call flush_cache_all() again to invalidate the inner caches
+> 6. call outer_flush_all() again to invalidate the outer caches
+> 7. whatever's next after the existing cpu_proc_fin()...
+> 
+> The only potential problem I see with this is that (5) and (6) may end
+> up writing back some dirty data associated with the stack, and one of
+> these functions may overwrite its return address - thereby causing us
+> to loop back to (2) or (3).  I don't think that's a problem as the next
+> time around this 'loop' we won't be creating new dirty cache lines, and
+> we should get to step 7.
 
->  arch/arm/mm/vcm.c         | 1901 +++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/vcm.h       |  701 +++++++++++++++++
->  include/linux/vcm_types.h |  318 ++++++++
->  3 files changed, 2920 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mm/vcm.c
->  create mode 100644 include/linux/vcm.h
->  create mode 100644 include/linux/vcm_types.h
+Right, something like this.  I've not made an effort to fix the L2 bits,
+but I have marked the places where attention is required.  The interesting
+bit is the first two files.
 
+The next question this provokes is whether we need a dsb() between steps 3
+and 4, and maybe again between 4 and 5, and possibly after 6 ?
 
-> diff --git a/include/linux/vcm.h b/include/linux/vcm.h
-> new file mode 100644
-> index 0000000..d2a1cd1
-> --- /dev/null
-> +++ b/include/linux/vcm.h
-> @@ -0,0 +1,701 @@
-> +/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-> + *
-> + * Redistribution and use in source and binary forms, with or without
-> + * modification, are permitted provided that the following conditions are
-> + * met:
-> + *     * Redistributions of source code must retain the above copyright
-> + *       notice, this list of conditions and the following disclaimer.
-> + *     * Redistributions in binary form must reproduce the above
-> + *       copyright notice, this list of conditions and the following
-> + *       disclaimer in the documentation and/or other materials provided
-> + *       with the distribution.
-> + *     * Neither the name of Code Aurora Forum, Inc. nor the names of its
-> + *       contributors may be used to endorse or promote products derived
-> + *       from this software without specific prior written permission.
-> + *
-> + * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
-> + * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
-> + * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
-> + * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
-> + * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-> + * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-> + * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
-> + * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-> + * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
-> + * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
-> + * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-> + *
-> + */
+ arch/arm/kernel/machine_kexec.c |    8 +++++++-
+ arch/arm/kernel/process.c       |   20 ++++++++++++++++----
+ arch/arm/mm/proc-arm1020.S      |    6 +-----
+ arch/arm/mm/proc-arm1020e.S     |    6 +-----
+ arch/arm/mm/proc-arm1022.S      |    6 +-----
+ arch/arm/mm/proc-arm1026.S      |    6 +-----
+ arch/arm/mm/proc-arm6_7.S       |    2 --
+ arch/arm/mm/proc-arm720.S       |    6 +-----
+ arch/arm/mm/proc-arm740.S       |    6 +-----
+ arch/arm/mm/proc-arm7tdmi.S     |    2 --
+ arch/arm/mm/proc-arm920.S       |   10 +---------
+ arch/arm/mm/proc-arm922.S       |   10 +---------
+ arch/arm/mm/proc-arm925.S       |    6 +-----
+ arch/arm/mm/proc-arm926.S       |    6 +-----
+ arch/arm/mm/proc-arm940.S       |    6 +-----
+ arch/arm/mm/proc-arm946.S       |    6 +-----
+ arch/arm/mm/proc-arm9tdmi.S     |    2 --
+ arch/arm/mm/proc-fa526.S        |    6 +-----
+ arch/arm/mm/proc-feroceon.S     |    8 ++------
+ arch/arm/mm/proc-mohawk.S       |    6 +-----
+ arch/arm/mm/proc-sa110.S        |    8 ++------
+ arch/arm/mm/proc-sa1100.S       |    6 +-----
+ arch/arm/mm/proc-v6.S           |    5 +----
+ arch/arm/mm/proc-v7.S           |    5 +----
+ arch/arm/mm/proc-xsc3.S         |    6 +-----
+ arch/arm/mm/proc-xscale.S       |    6 +-----
+ 26 files changed, 46 insertions(+), 124 deletions(-)
 
-What license (name/type) is this?
-
-> +
-> +#ifndef _VCM_H_
-> +#define _VCM_H_
-> +
-> +/* All undefined types must be defined using platform specific headers */
-> +
-> +#include <linux/vcm_types.h>
-> +
-
-> +/*
-> + * Creating, freeing and managing VCMs.
-> + *
-> + * A VCM region is a virtual space that can be reserved from and
-> + * associated with one or more devices. At creation the user can
-> + * specify an offset to start addresses and a length of the entire VCM
-> + * region. Reservations out of a VCM region are always contiguous.
-> + */
-> +
-> +/**
-> + * vcm_create() - Create a VCM region
-> + * @start_addr	The starting address of the VCM region.
-
- * @start_addr:		text
- * @len:		text
-
-I.e., need a colon (':') after each param name. (in multiple places)
-
-
-> + * @len		The len of the VCM region. This must be at least
-> + *		vcm_get_min_page_size() bytes.
-> + *
-> + * A VCM typically abstracts a page table.
-> + *
-> + * All functions in this API are passed and return opaque things
-> + * because the underlying implementations will vary. The goal
-> + * is really graph management. vcm_create() creates the "device end"
-> + * of an edge in the mapping graph.
-> + *
-> + * The return value is non-zero if a VCM has successfully been
-> + * created. It will return zero if a VCM region cannot be created or
-> + * len is invalid.
-> + */
-> +struct vcm *vcm_create(size_t start_addr, size_t len);
-
-
-> +/**
-> + * vcm_get_physmem_from_res() - Return a reservation's physmem_id
-> + * @ res_id	An existing reservation of interest.
-
- * @res_id: <text>
-
-No space between @ and res_id.
-
-> + *
-> + * The return value will be non-zero on success, otherwise it will be:
-> + * -EINVAL	res is invalid
-> + * -ENOMEM	res is unbacked
-> + */
-> +struct physmem *vcm_get_physmem_from_res(struct res *res_id);
-
-
-
-> diff --git a/include/linux/vcm_types.h b/include/linux/vcm_types.h
-> new file mode 100644
-> index 0000000..2cc4770
-> --- /dev/null
-> +++ b/include/linux/vcm_types.h
-> @@ -0,0 +1,318 @@
-
-
-> +/**
-> + * enum memtarget_t - A logical location in a VCM.
-> + *
-> + * VCM_START	Indicates the start of a VCM_REGION.
-
-This is not quite kernel-doc notation (as indicated by the beginning /**).
-Please see Documentation/kernel-doc-nano-HOWTO.txt for details, or ask me
-if you need help with it.
-
-> + */
-> +enum memtarget_t {
-> +	VCM_START
-> +};
-> +
-> +
-> +/**
-> + * enum memtype_t - A logical location in a VCM.
-
-not quite kernel-doc notation...
-
-> + *
-> + * VCM_MEMTYPE_0	Generic memory type 0
-> + * VCM_MEMTYPE_1	Generic memory type 1
-> + * VCM_MEMTYPE_2	Generic memory type 2
-> + *
-> + * A memtype encapsulates a platform specific memory arrangement. The
-> + * memtype needn't refer to a single type of memory, it can refer to a
-> + * set of memories that can back a reservation.
-> + *
-> + */
-> +enum memtype_t {
-> +	VCM_INVALID,
-> +	VCM_MEMTYPE_0,
-> +	VCM_MEMTYPE_1,
-> +	VCM_MEMTYPE_2,
-> +};
-> +
-> +
-> +/**
-> + * vcm_handler - The signature of the fault hook.
-> + * @dev_id	The device id of the faulting device.
-> + * @data	The generic data pointer.
-> + * @fault_data	System specific common fault data.
-
-ditto.
-
-> + *
-> + * The handler should return 0 for success. This indicates that the
-> + * fault was handled. A non-zero return value is an error and will be
-> + * propagated up the stack.
-> + */
-> +typedef int (*vcm_handler)(size_t dev_id, void *data, void *fault_data);
-> +
-> +
-> +enum vcm_type {
-> +	VCM_DEVICE,
-> +	VCM_EXT_KERNEL,
-> +	VCM_EXT_USER,
-> +	VCM_ONE_TO_ONE,
-> +};
-> +
-> +
-> +/**
-> + * vcm - A Virtually Contiguous Memory region.
-
- * struct vcm - ...
-
-and add colon after each struct @member:
-
-> + * @start_addr	The starting address of the VCM region.
-> + * @len 	The len of the VCM region. This must be at least
-> + *		vcm_min() bytes.
-
-and missing lots of struct members here.
-If some of them are private, you can use:
-
-	/* private: */
-...
-	/* public: */
-comments in the struct below and then don't add the private ones to the
-kernel-doc notation above.
-
-> + */
-> +struct vcm {
-> +	enum vcm_type type;
-> +
-> +	size_t start_addr;
-> +	size_t len;
-> +
-> +	size_t dev_id; /* opaque device control */
-> +
-> +	/* allocator dependent */
-> +	struct gen_pool *pool;
-> +
-> +	struct list_head res_head;
-> +
-> +	/* this will be a very short list */
-> +	struct list_head assoc_head;
-> +};
-> +
-> +/**
-> + * avcm - A VCM to device association
-
-not quite kernel-doc notation.
-
-> + * @vcm		The VCM region of interest.
-> + * @dev_id	The device to associate the VCM with.
-> + * @attr	See 'Association Attributes'.
-> + */
-> +struct avcm {
-> +	struct vcm *vcm_id;
-> +	size_t dev_id;
-> +	uint32_t attr;
-> +
-> +	struct list_head assoc_elm;
-> +
-> +	int is_active; /* is this particular association active */
-> +};
-> +
-> +/**
-> + * bound - A boundary to reserve from in a VCM region.
-
-ditto.
-
-> + * @vcm		The VCM that needs a bound.
-> + * @len		The len of the bound.
-> + */
-> +struct bound {
-> +	struct vcm *vcm_id;
-> +	size_t len;
-> +};
-> +
-> +
-> +/**
-> + * physmem - A physical memory allocation.
-
-ditto.
-
-> + * @memtype	The memory type of the VCM region.
-> + * @len		The len of the physical memory allocation.
-> + * @attr 	See 'Physical Allocation Attributes'.
-> + *
-> + */
-> +
-> +struct physmem {
-> +	enum memtype_t memtype;
-> +	size_t len;
-> +	uint32_t attr;
-> +
-> +	struct phys_chunk alloc_head;
-> +
-> +	/* if the physmem is cont then use the built in VCM */
-> +	int is_cont;
-> +	struct res *res;
-> +};
-> +
-> +/**
-> + * res - A reservation in a VCM region.
-
-ditto.
-
-> + * @vcm		The VCM region to reserve from.
-> + * @len		The length of the reservation. Must be at least vcm_min()
-> + *		bytes.
-> + * @attr	See 'Reservation Attributes'.
-> + */
-> +struct res {
-> +	struct vcm *vcm_id;
-> +	struct physmem *physmem_id;
-> +	size_t len;
-> +	uint32_t attr;
-> +
-> +	/* allocator dependent */
-> +	size_t alignment_req;
-> +	size_t aligned_len;
-> +	unsigned long ptr;
-> +	size_t aligned_ptr;
-> +
-> +	struct list_head res_elm;
-> +
-> +
-> +	/* type VCM_EXT_KERNEL */
-> +	struct vm_struct *vm_area;
-> +	int mapped;
-> +};
-> +
-> +extern int chunk_sizes[NUM_CHUNK_SIZES];
-> +
-> +#endif /* VCM_TYPES_H */
-> -- 
-
-
----
-~Randy
-*** Remember to use Documentation/SubmitChecklist when testing your code ***
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index 598ca61..53f5dc4 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -74,7 +74,13 @@ void machine_kexec(struct kimage *image)
+ 			   (unsigned long) reboot_code_buffer + KEXEC_CONTROL_PAGE_SIZE);
+ 	printk(KERN_INFO "Bye!\n");
+ 
+-	cpu_proc_fin();
++	local_irq_disable();
++	local_fiq_disable();
+ 	setup_mm_for_reboot(0); /* mode is not used, so just pass 0*/
++	flush_cache_all();
++	/* XXX: L2 cache flush */
++	cpu_proc_fin();
++	flush_cache_all();
++	/* XXX: L2 cache flush */
+ 	cpu_reset(reboot_code_buffer_phys);
+ }
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index acf5e6f..3736887 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -84,10 +84,9 @@ __setup("hlt", hlt_setup);
+ 
+ void arm_machine_restart(char mode, const char *cmd)
+ {
+-	/*
+-	 * Clean and disable cache, and turn off interrupts
+-	 */
+-	cpu_proc_fin();
++	/* Disable interrupts first */
++	local_irq_disable();
++	local_fiq_disable();
+ 
+ 	/*
+ 	 * Tell the mm system that we are going to reboot -
+@@ -96,6 +95,19 @@ void arm_machine_restart(char mode, const char *cmd)
+ 	 */
+ 	setup_mm_for_reboot(mode);
+ 
++	/* Clean and invalidate caches */
++	flush_cache_all();
++
++	/* XXX: L2 cache flush */
++
++	/* Turn off caching */
++	cpu_proc_fin();
++
++	/* Push out any further dirty data, and ensure cache is empty */
++	flush_cache_all();
++
++	/* XXX: L2 cache flush */
++
+ 	/*
+ 	 * Now call the architecture specific reboot code.
+ 	 */
+diff --git a/arch/arm/mm/proc-arm1020.S b/arch/arm/mm/proc-arm1020.S
+index 72507c6..203a4e9 100644
+--- a/arch/arm/mm/proc-arm1020.S
++++ b/arch/arm/mm/proc-arm1020.S
+@@ -79,15 +79,11 @@ ENTRY(cpu_arm1020_proc_init)
+  * cpu_arm1020_proc_fin()
+  */
+ ENTRY(cpu_arm1020_proc_fin)
+-	stmfd	sp!, {lr}
+-	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-	msr	cpsr_c, ip
+-	bl	arm1020_flush_kern_cache_all
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x1000 		@ ...i............
+ 	bic	r0, r0, #0x000e 		@ ............wca.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ 
+ /*
+  * cpu_arm1020_reset(loc)
+diff --git a/arch/arm/mm/proc-arm1020e.S b/arch/arm/mm/proc-arm1020e.S
+index d278298..1a511e7 100644
+--- a/arch/arm/mm/proc-arm1020e.S
++++ b/arch/arm/mm/proc-arm1020e.S
+@@ -79,15 +79,11 @@ ENTRY(cpu_arm1020e_proc_init)
+  * cpu_arm1020e_proc_fin()
+  */
+ ENTRY(cpu_arm1020e_proc_fin)
+-	stmfd	sp!, {lr}
+-	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-	msr	cpsr_c, ip
+-	bl	arm1020e_flush_kern_cache_all
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x1000 		@ ...i............
+ 	bic	r0, r0, #0x000e 		@ ............wca.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ 
+ /*
+  * cpu_arm1020e_reset(loc)
+diff --git a/arch/arm/mm/proc-arm1022.S b/arch/arm/mm/proc-arm1022.S
+index ce13e4a..1ffa4eb 100644
+--- a/arch/arm/mm/proc-arm1022.S
++++ b/arch/arm/mm/proc-arm1022.S
+@@ -68,15 +68,11 @@ ENTRY(cpu_arm1022_proc_init)
+  * cpu_arm1022_proc_fin()
+  */
+ ENTRY(cpu_arm1022_proc_fin)
+-	stmfd	sp!, {lr}
+-	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-	msr	cpsr_c, ip
+-	bl	arm1022_flush_kern_cache_all
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x1000 		@ ...i............
+ 	bic	r0, r0, #0x000e 		@ ............wca.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ 
+ /*
+  * cpu_arm1022_reset(loc)
+diff --git a/arch/arm/mm/proc-arm1026.S b/arch/arm/mm/proc-arm1026.S
+index 636672a..5697c34 100644
+--- a/arch/arm/mm/proc-arm1026.S
++++ b/arch/arm/mm/proc-arm1026.S
+@@ -68,15 +68,11 @@ ENTRY(cpu_arm1026_proc_init)
+  * cpu_arm1026_proc_fin()
+  */
+ ENTRY(cpu_arm1026_proc_fin)
+-	stmfd	sp!, {lr}
+-	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-	msr	cpsr_c, ip
+-	bl	arm1026_flush_kern_cache_all
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x1000 		@ ...i............
+ 	bic	r0, r0, #0x000e 		@ ............wca.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ 
+ /*
+  * cpu_arm1026_reset(loc)
+diff --git a/arch/arm/mm/proc-arm6_7.S b/arch/arm/mm/proc-arm6_7.S
+index 795dc61..64e0b32 100644
+--- a/arch/arm/mm/proc-arm6_7.S
++++ b/arch/arm/mm/proc-arm6_7.S
+@@ -184,8 +184,6 @@ ENTRY(cpu_arm7_proc_init)
+ 
+ ENTRY(cpu_arm6_proc_fin)
+ ENTRY(cpu_arm7_proc_fin)
+-		mov	r0, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-		msr	cpsr_c, r0
+ 		mov	r0, #0x31			@ ....S..DP...M
+ 		mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+ 		mov	pc, lr
+diff --git a/arch/arm/mm/proc-arm720.S b/arch/arm/mm/proc-arm720.S
+index 0b62de2..9d96824 100644
+--- a/arch/arm/mm/proc-arm720.S
++++ b/arch/arm/mm/proc-arm720.S
+@@ -54,15 +54,11 @@ ENTRY(cpu_arm720_proc_init)
+ 		mov	pc, lr
+ 
+ ENTRY(cpu_arm720_proc_fin)
+-		stmfd	sp!, {lr}
+-		mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-		msr	cpsr_c, ip
+ 		mrc	p15, 0, r0, c1, c0, 0
+ 		bic	r0, r0, #0x1000			@ ...i............
+ 		bic	r0, r0, #0x000e			@ ............wca.
+ 		mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-		mcr	p15, 0, r1, c7, c7, 0		@ invalidate cache
+-		ldmfd	sp!, {pc}
++		mov	pc, lr
+ 
+ /*
+  * Function: arm720_proc_do_idle(void)
+diff --git a/arch/arm/mm/proc-arm740.S b/arch/arm/mm/proc-arm740.S
+index 01860cd..6c1a9ab 100644
+--- a/arch/arm/mm/proc-arm740.S
++++ b/arch/arm/mm/proc-arm740.S
+@@ -36,15 +36,11 @@ ENTRY(cpu_arm740_switch_mm)
+  * cpu_arm740_proc_fin()
+  */
+ ENTRY(cpu_arm740_proc_fin)
+-	stmfd	sp!, {lr}
+-	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-	msr	cpsr_c, ip
+ 	mrc	p15, 0, r0, c1, c0, 0
+ 	bic	r0, r0, #0x3f000000		@ bank/f/lock/s
+ 	bic	r0, r0, #0x0000000c		@ w-buffer/cache
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	mcr	p15, 0, r0, c7, c0, 0		@ invalidate cache
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ 
+ /*
+  * cpu_arm740_reset(loc)
+diff --git a/arch/arm/mm/proc-arm7tdmi.S b/arch/arm/mm/proc-arm7tdmi.S
+index 1201b98..6a850db 100644
+--- a/arch/arm/mm/proc-arm7tdmi.S
++++ b/arch/arm/mm/proc-arm7tdmi.S
+@@ -36,8 +36,6 @@ ENTRY(cpu_arm7tdmi_switch_mm)
+  * cpu_arm7tdmi_proc_fin()
+  */
+ ENTRY(cpu_arm7tdmi_proc_fin)
+-		mov	r0, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-		msr	cpsr_c, r0
+ 		mov	pc, lr
+ 
+ /*
+diff --git a/arch/arm/mm/proc-arm920.S b/arch/arm/mm/proc-arm920.S
+index 8be8199..86f80aa 100644
+--- a/arch/arm/mm/proc-arm920.S
++++ b/arch/arm/mm/proc-arm920.S
+@@ -69,19 +69,11 @@ ENTRY(cpu_arm920_proc_init)
+  * cpu_arm920_proc_fin()
+  */
+ ENTRY(cpu_arm920_proc_fin)
+-	stmfd	sp!, {lr}
+-	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-	msr	cpsr_c, ip
+-#ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
+-	bl	arm920_flush_kern_cache_all
+-#else
+-	bl	v4wt_flush_kern_cache_all
+-#endif
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x1000			@ ...i............
+ 	bic	r0, r0, #0x000e			@ ............wca.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ 
+ /*
+  * cpu_arm920_reset(loc)
+diff --git a/arch/arm/mm/proc-arm922.S b/arch/arm/mm/proc-arm922.S
+index c0ff8e4..f76ce9b 100644
+--- a/arch/arm/mm/proc-arm922.S
++++ b/arch/arm/mm/proc-arm922.S
+@@ -71,19 +71,11 @@ ENTRY(cpu_arm922_proc_init)
+  * cpu_arm922_proc_fin()
+  */
+ ENTRY(cpu_arm922_proc_fin)
+-	stmfd	sp!, {lr}
+-	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-	msr	cpsr_c, ip
+-#ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
+-	bl	arm922_flush_kern_cache_all
+-#else
+-	bl	v4wt_flush_kern_cache_all
+-#endif
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x1000			@ ...i............
+ 	bic	r0, r0, #0x000e			@ ............wca.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ 
+ /*
+  * cpu_arm922_reset(loc)
+diff --git a/arch/arm/mm/proc-arm925.S b/arch/arm/mm/proc-arm925.S
+index 3c6cffe..657bd3f 100644
+--- a/arch/arm/mm/proc-arm925.S
++++ b/arch/arm/mm/proc-arm925.S
+@@ -92,15 +92,11 @@ ENTRY(cpu_arm925_proc_init)
+  * cpu_arm925_proc_fin()
+  */
+ ENTRY(cpu_arm925_proc_fin)
+-	stmfd	sp!, {lr}
+-	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-	msr	cpsr_c, ip
+-	bl	arm925_flush_kern_cache_all
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x1000			@ ...i............
+ 	bic	r0, r0, #0x000e			@ ............wca.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ 
+ /*
+  * cpu_arm925_reset(loc)
+diff --git a/arch/arm/mm/proc-arm926.S b/arch/arm/mm/proc-arm926.S
+index 75b707c..73f1f3c 100644
+--- a/arch/arm/mm/proc-arm926.S
++++ b/arch/arm/mm/proc-arm926.S
+@@ -61,15 +61,11 @@ ENTRY(cpu_arm926_proc_init)
+  * cpu_arm926_proc_fin()
+  */
+ ENTRY(cpu_arm926_proc_fin)
+-	stmfd	sp!, {lr}
+-	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-	msr	cpsr_c, ip
+-	bl	arm926_flush_kern_cache_all
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x1000			@ ...i............
+ 	bic	r0, r0, #0x000e			@ ............wca.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ 
+ /*
+  * cpu_arm926_reset(loc)
+diff --git a/arch/arm/mm/proc-arm940.S b/arch/arm/mm/proc-arm940.S
+index 1af1657..fffb061 100644
+--- a/arch/arm/mm/proc-arm940.S
++++ b/arch/arm/mm/proc-arm940.S
+@@ -37,15 +37,11 @@ ENTRY(cpu_arm940_switch_mm)
+  * cpu_arm940_proc_fin()
+  */
+ ENTRY(cpu_arm940_proc_fin)
+-	stmfd	sp!, {lr}
+-	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-	msr	cpsr_c, ip
+-	bl	arm940_flush_kern_cache_all
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x00001000		@ i-cache
+ 	bic	r0, r0, #0x00000004		@ d-cache
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ 
+ /*
+  * cpu_arm940_reset(loc)
+diff --git a/arch/arm/mm/proc-arm946.S b/arch/arm/mm/proc-arm946.S
+index 1664b6a..249a605 100644
+--- a/arch/arm/mm/proc-arm946.S
++++ b/arch/arm/mm/proc-arm946.S
+@@ -44,15 +44,11 @@ ENTRY(cpu_arm946_switch_mm)
+  * cpu_arm946_proc_fin()
+  */
+ ENTRY(cpu_arm946_proc_fin)
+-	stmfd	sp!, {lr}
+-	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-	msr	cpsr_c, ip
+-	bl	arm946_flush_kern_cache_all
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x00001000		@ i-cache
+ 	bic	r0, r0, #0x00000004		@ d-cache
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ 
+ /*
+  * cpu_arm946_reset(loc)
+diff --git a/arch/arm/mm/proc-arm9tdmi.S b/arch/arm/mm/proc-arm9tdmi.S
+index 28545c2..db47566 100644
+--- a/arch/arm/mm/proc-arm9tdmi.S
++++ b/arch/arm/mm/proc-arm9tdmi.S
+@@ -36,8 +36,6 @@ ENTRY(cpu_arm9tdmi_switch_mm)
+  * cpu_arm9tdmi_proc_fin()
+  */
+ ENTRY(cpu_arm9tdmi_proc_fin)
+-		mov	r0, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-		msr	cpsr_c, r0
+ 		mov	pc, lr
+ 
+ /*
+diff --git a/arch/arm/mm/proc-fa526.S b/arch/arm/mm/proc-fa526.S
+index 08f5ac2..7803fdf 100644
+--- a/arch/arm/mm/proc-fa526.S
++++ b/arch/arm/mm/proc-fa526.S
+@@ -39,17 +39,13 @@ ENTRY(cpu_fa526_proc_init)
+  * cpu_fa526_proc_fin()
+  */
+ ENTRY(cpu_fa526_proc_fin)
+-	stmfd	sp!, {lr}
+-	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-	msr	cpsr_c, ip
+-	bl	fa_flush_kern_cache_all
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x1000			@ ...i............
+ 	bic	r0, r0, #0x000e			@ ............wca.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+ 	nop
+ 	nop
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ 
+ /*
+  * cpu_fa526_reset(loc)
+diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
+index 53e6323..f8eff28 100644
+--- a/arch/arm/mm/proc-feroceon.S
++++ b/arch/arm/mm/proc-feroceon.S
+@@ -75,13 +75,9 @@ ENTRY(cpu_feroceon_proc_init)
+  * cpu_feroceon_proc_fin()
+  */
+ ENTRY(cpu_feroceon_proc_fin)
+-	stmfd	sp!, {lr}
+-	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-	msr	cpsr_c, ip
+-	bl	feroceon_flush_kern_cache_all
+-
+ #if defined(CONFIG_CACHE_FEROCEON_L2) && \
+ 	!defined(CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH)
++	XXX: move me to L2 cache support
+ 	mov	r0, #0
+ 	mcr	p15, 1, r0, c15, c9, 0		@ clean L2
+ 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
+@@ -91,7 +87,7 @@ ENTRY(cpu_feroceon_proc_fin)
+ 	bic	r0, r0, #0x1000			@ ...i............
+ 	bic	r0, r0, #0x000e			@ ............wca.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ 
+ /*
+  * cpu_feroceon_reset(loc)
+diff --git a/arch/arm/mm/proc-mohawk.S b/arch/arm/mm/proc-mohawk.S
+index caa3115..5f6892f 100644
+--- a/arch/arm/mm/proc-mohawk.S
++++ b/arch/arm/mm/proc-mohawk.S
+@@ -51,15 +51,11 @@ ENTRY(cpu_mohawk_proc_init)
+  * cpu_mohawk_proc_fin()
+  */
+ ENTRY(cpu_mohawk_proc_fin)
+-	stmfd	sp!, {lr}
+-	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-	msr	cpsr_c, ip
+-	bl	mohawk_flush_kern_cache_all
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x1800			@ ...iz...........
+ 	bic	r0, r0, #0x0006			@ .............ca.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ 
+ /*
+  * cpu_mohawk_reset(loc)
+diff --git a/arch/arm/mm/proc-sa110.S b/arch/arm/mm/proc-sa110.S
+index 7b706b3..a201eb0 100644
+--- a/arch/arm/mm/proc-sa110.S
++++ b/arch/arm/mm/proc-sa110.S
+@@ -44,17 +44,13 @@ ENTRY(cpu_sa110_proc_init)
+  * cpu_sa110_proc_fin()
+  */
+ ENTRY(cpu_sa110_proc_fin)
+-	stmfd	sp!, {lr}
+-	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-	msr	cpsr_c, ip
+-	bl	v4wb_flush_kern_cache_all	@ clean caches
+-1:	mov	r0, #0
++	mov	r0, #0
+ 	mcr	p15, 0, r0, c15, c2, 2		@ Disable clock switching
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x1000			@ ...i............
+ 	bic	r0, r0, #0x000e			@ ............wca.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ 
+ /*
+  * cpu_sa110_reset(loc)
+diff --git a/arch/arm/mm/proc-sa1100.S b/arch/arm/mm/proc-sa1100.S
+index 5c47760..7ddc480 100644
+--- a/arch/arm/mm/proc-sa1100.S
++++ b/arch/arm/mm/proc-sa1100.S
+@@ -55,16 +55,12 @@ ENTRY(cpu_sa1100_proc_init)
+  *  - Clean and turn off caches.
+  */
+ ENTRY(cpu_sa1100_proc_fin)
+-	stmfd	sp!, {lr}
+-	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
+-	msr	cpsr_c, ip
+-	bl	v4wb_flush_kern_cache_all
+ 	mcr	p15, 0, ip, c15, c2, 2		@ Disable clock switching
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x1000			@ ...i............
+ 	bic	r0, r0, #0x000e			@ ............wca.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ 
+ /*
+  * cpu_sa1100_reset(loc)
+diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
+index 7a5337e..e55ffd7 100644
+--- a/arch/arm/mm/proc-v6.S
++++ b/arch/arm/mm/proc-v6.S
+@@ -42,14 +42,11 @@ ENTRY(cpu_v6_proc_init)
+ 	mov	pc, lr
+ 
+ ENTRY(cpu_v6_proc_fin)
+-	stmfd	sp!, {lr}
+-	cpsid	if				@ disable interrupts
+-	bl	v6_flush_kern_cache_all
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x1000			@ ...i............
+ 	bic	r0, r0, #0x0006			@ .............ca.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ 
+ /*
+  *	cpu_v6_reset(loc)
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 7aaf88a..b0f8873 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -45,14 +45,11 @@ ENTRY(cpu_v7_proc_init)
+ ENDPROC(cpu_v7_proc_init)
+ 
+ ENTRY(cpu_v7_proc_fin)
+-	stmfd	sp!, {lr}
+-	cpsid	if				@ disable interrupts
+-	bl	v7_flush_kern_cache_all
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x1000			@ ...i............
+ 	bic	r0, r0, #0x0006			@ .............ca.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldmfd	sp!, {pc}
++	mov	pc, lr
+ ENDPROC(cpu_v7_proc_fin)
+ 
+ /*
+diff --git a/arch/arm/mm/proc-xsc3.S b/arch/arm/mm/proc-xsc3.S
+index e5797f1..361a51e 100644
+--- a/arch/arm/mm/proc-xsc3.S
++++ b/arch/arm/mm/proc-xsc3.S
+@@ -90,15 +90,11 @@ ENTRY(cpu_xsc3_proc_init)
+  * cpu_xsc3_proc_fin()
+  */
+ ENTRY(cpu_xsc3_proc_fin)
+-	str	lr, [sp, #-4]!
+-	mov	r0, #PSR_F_BIT|PSR_I_BIT|SVC_MODE
+-	msr	cpsr_c, r0
+-	bl	xsc3_flush_kern_cache_all	@ clean caches
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x1800			@ ...IZ...........
+ 	bic	r0, r0, #0x0006			@ .............CA.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldr	pc, [sp], #4
++	mov	pc, lr
+ 
+ /*
+  * cpu_xsc3_reset(loc)
+diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
+index 63037e2..1407597 100644
+--- a/arch/arm/mm/proc-xscale.S
++++ b/arch/arm/mm/proc-xscale.S
+@@ -124,15 +124,11 @@ ENTRY(cpu_xscale_proc_init)
+  * cpu_xscale_proc_fin()
+  */
+ ENTRY(cpu_xscale_proc_fin)
+-	str	lr, [sp, #-4]!
+-	mov	r0, #PSR_F_BIT|PSR_I_BIT|SVC_MODE
+-	msr	cpsr_c, r0
+-	bl	xscale_flush_kern_cache_all	@ clean caches
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+ 	bic	r0, r0, #0x1800			@ ...IZ...........
+ 	bic	r0, r0, #0x0006			@ .............CA.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+-	ldr	pc, [sp], #4
++	mov	pc, lr
+ 
+ /*
+  * cpu_xscale_reset(loc)
