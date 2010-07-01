@@ -1,41 +1,55 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Thu, 01 Jul 2010 10:05:54 +0300
-Subject: [PATCH 13/16] omap: mux: Mux Apollon LCD power in board-apollon.c
-In-Reply-To: <20100630120719.2637.65586.stgit@baageli.muru.com>
-References: <20100630120226.2637.31198.stgit@baageli.muru.com>
-	<20100630120719.2637.65586.stgit@baageli.muru.com>
-Message-ID: <1277967954.2474.269.camel@tubuntu.research.nokia.com>
+From: zpfeffer@codeaurora.org (Zach Pfeffer)
+Date: Thu, 01 Jul 2010 00:16:18 -0700
+Subject: [RFC 1/3] mm: iommu: An API to unify IOMMU, CPU and device memory
+	management
+In-Reply-To: <20100630164058.aa6aa3a2.randy.dunlap@oracle.com>
+References: <1277877350-2147-1-git-send-email-zpfeffer@codeaurora.org>
+	<20100630164058.aa6aa3a2.randy.dunlap@oracle.com>
+Message-ID: <4C2C40C2.50106@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-06-30 at 14:07 +0200, ext Tony Lindgren wrote:
-> Use the new mux function for that.
+Thank you for the corrections. I'm correcting them now. Some responses:
+
+Randy Dunlap wrote:
+>> +    struct vcm *vcm_create(size_t start_addr, size_t len);
 > 
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Tomi Valkeinen <tomi.valkeinen@nokia.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/board-apollon.c |    3 +++
->  drivers/video/omap/lcd_apollon.c    |    3 ---
->  2 files changed, 3 insertions(+), 3 deletions(-)
+> Seems odd to use size_t for start_addr.
+
+I used size_t because I wanted to allow the start_addr the same range
+as len. Is there a better type to use? I see 'unsigned long' used
+throughout the mm code. Perhaps that's better for both the start_addr
+and len.
+
+
+>> +A Reservation is created and destroyed with:
+>> +
+>> +    struct res *vcm_reserve(struct vcm *vcm, size_t len, uint32_t attr);
 > 
-> diff --git a/arch/arm/mach-omap2/board-apollon.c b/arch/arm/mach-omap2/board-apollon.c
-> index b86a879..bc67026 100644
-> --- a/arch/arm/mach-omap2/board-apollon.c
-> +++ b/arch/arm/mach-omap2/board-apollon.c
-> @@ -332,6 +332,9 @@ static void __init omap_apollon_init(void)
->  	/* REVISIT: where's the correct place */
->  	omap_cfg_reg(W19_24XX_SYS_NIRQ);
->  
-> +	/* LCD PWR_EN */
-> +	omap_mux_init_signal("mcbsp2_dr.gpio_11", OMAP_PULL_ENA | OMAP_PULL_UP);
+> s/uint32_t/u32/ ?
 
-LCD_PWR_EN sounds like output pin. However, I don't see lcd_apollon.c
-nor board-apollon.c set the gpio.
+Sure.
 
-I don't know what omap_cfg_reg(M21_242X_GPIO11) does, but if it does the
-same thing as the line above, then does the apollon LCD work by luck?
-OMAP pulling the line up, and by chance the pull is stronger than the
-LCDs (possible) pull down, and thus the LCD is powered up...
 
- Tomi
+>> +    Associate and activate all three to their respective devices:
+>> +
+>> +        avcm_iommu = vcm_assoc(vcm_iommu, dev_iommu, attr0);
+>> +        avcm_onetoone = vcm_assoc(vcm_onetoone, dev_onetoone, attr1);
+>> +        avcm_vmm = vcm_assoc(vcm_vmm, dev_cpu, attr2);
+> 
+> error handling on vcm_assoc() failures?
+
+I'll add the deassociate call to the example.
+
+
+>> +        res_iommu = vcm_reserve(vcm_iommu, SZ_2MB + SZ_4K, attr);
+>> +        res_onetoone = vcm_reserve(vcm_onetoone, SZ_2MB + SZ_4K, attr);
+>> +        res_vmm = vcm_reserve(vcm_vmm, SZ_2MB + SZ_4K, attr);
+> 
+> error handling?
+
+I'll add it here too.
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
