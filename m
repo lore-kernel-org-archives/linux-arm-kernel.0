@@ -1,60 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 1 Jul 2010 17:47:06 -0500
-Subject: [PATCH] ARM: Stop secondary cpus in machine_halt()
-Message-ID: <20100701224706.GA26473@lixom.net>
+From: hari.kanigeri@gmail.com (Hari Kanigeri)
+Date: Thu, 1 Jul 2010 17:51:01 -0500
+Subject: [RFC 3/3] mm: iommu: The Virtual Contiguous Memory Manager
+In-Reply-To: <4C2D0FF1.6010206@codeaurora.org>
+References: <1277877350-2147-1-git-send-email-zpfeffer@codeaurora.org>
+	<1277877350-2147-3-git-send-email-zpfeffer@codeaurora.org>
+	<20100701101746.3810cc3b.randy.dunlap@oracle.com>
+	<20100701180241.GA3594@basil.fritz.box>
+	<1278012503.7738.17.camel@c-dwalke-linux.qualcomm.com>
+	<20100701193850.GB3594@basil.fritz.box>
+	<4C2D0FF1.6010206@codeaurora.org>
+Message-ID: <AANLkTilQnopqrS-KrR3btOIkH68fIEdipWFF6fkO6fNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM doesn't spin down secondary cpus on halt, which results in interrupts
-being delivered even after the "System halted" message, etc.
+> The VCMM takes the long view. Its designed for a future in which the
+> number of IOMMUs will go up and the ways in which these IOMMUs are
+> composed will vary from system to system, and may vary at
+> runtime. Already, there are ~20 different IOMMU map implementations in
+> the kernel. Had the Linux kernel had the VCMM, many of those
+> implementations could have leveraged the mapping and topology management
+> of a VCMM, while focusing on a few key hardware specific functions (map
+> this physical address, program the page table base register).
+>
 
-Change that to use smp_send_stop() to halt them. Also, change the
-smp_send_stop() on ARM to not do a stack dump when stopping.
+-- Sounds good.
+Did you think of a way to handle the cases where one of the Device
+that is using the mapped address crashed ?
+How is the physical address unbacked in this case ?
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
-
----
- arch/arm/kernel/process.c |    6 ++++++
- arch/arm/kernel/smp.c     |   10 ++++++----
- 2 files changed, 12 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index acf5e6f..203fc1b 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -191,6 +191,12 @@ __setup("reboot=", reboot_setup);
- 
- void machine_halt(void)
- {
-+#ifdef CONFIG_SMP
-+	smp_send_stop();
-+#endif
-+	printk(KERN_EMERG "System halted, OK to turn off power\n");
-+	local_irq_disable();
-+	while (1) ;
- }
- 
- 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index b8c3d0f..5496dea 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -467,10 +467,12 @@ static DEFINE_SPINLOCK(stop_lock);
-  */
- static void ipi_cpu_stop(unsigned int cpu)
- {
--	spin_lock(&stop_lock);
--	printk(KERN_CRIT "CPU%u: stopping\n", cpu);
--	dump_stack();
--	spin_unlock(&stop_lock);
-+	if (system_state != SYSTEM_HALT) {
-+		spin_lock(&stop_lock);
-+		printk(KERN_CRIT "CPU%u: stopping\n", cpu);
-+		dump_stack();
-+		spin_unlock(&stop_lock);
-+	}
- 
- 	set_cpu_online(cpu, false);
- 
--- 
-1.5.6.5
+Hari
