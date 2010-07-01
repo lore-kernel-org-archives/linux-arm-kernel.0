@@ -1,32 +1,44 @@
 From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 1 Jul 2010 15:26:43 -0700
-Subject: [PATCH 1/3] FB: Add some members for CPU Interface.
-In-Reply-To: <4C29CABE.9020208@samsung.com>
-References: <4C29AF72.6090200@samsung.com> <4C29B1C1.2000209@samsung.com>
-	<4C29CABE.9020208@samsung.com>
-Message-ID: <20100701152643.41834b17.akpm@linux-foundation.org>
+Date: Thu, 1 Jul 2010 15:37:51 -0700
+Subject: [PATCH] serial: fix rs485 for atmel_serial on avr32
+In-Reply-To: <201006291935.40229.PeterHuewe@gmx.de>
+References: <201006291935.40229.PeterHuewe@gmx.de>
+Message-ID: <20100701153751.ef384583.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Jun 2010 19:28:14 +0900
-InKi Dae <inki.dae@samsung.com> wrote:
+On Tue, 29 Jun 2010 19:35:39 +0200
+Peter H__we <PeterHuewe@gmx.de> wrote:
 
+> From: Peter Huewe <peterhuewe@gmx.de>
 > 
-> CPU interface needs cs, wr setup, wr act and hold delay.
-> I added some members for them to common framework.
+> This patch fixes a build failure [1-4] in the atmel_serial code introduced by
+> patch the patch ARM: 6092/1: atmel_serial: support for RS485
+> communications (e8faff7330a3501eafc9bfe5f4f15af444be29f5)
 > 
-> Signed-off-by: InKi Dae <inki.dae at samsung.com <mailto:p.osciak@samsung.com>>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com
-> <mailto:kyungmin.park@samsung.com>>
+> The build failure was caused by missing struct field and missing defines
+> for the avr32 board - the patch fixes this.
+> 
+> Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
+> ---
+> Despite so many reviewers of the original patch no one seemed to 
+> notice this issue :/
+> 
+> KernelVersion: linux-next-20100629
+> 
+> References:
+> [1] http://kisskb.ellerman.id.au/kisskb/buildresult/2575242/ - first failure
+> in linux-next, may 11th
+> [2] http://kisskb.ellerman.id.au/kisskb/buildresult/2816418/ - still
+> exists as of today
+> [3] http://kisskb.ellerman.id.au/kisskb/buildresult/2617511/ - first
+> failure in Linus' tree - May 20th - did really no one notice this?!
+> [4] http://kisskb.ellerman.id.au/kisskb/buildresult/2813956/ - still
+> exists in Linus' tree as of today
+> 
+>  arch/avr32/include/asm/ioctls.h             |    3 +++
+>  arch/avr32/mach-at32ap/include/mach/board.h |    2 ++
+>  drivers/serial/atmel_serial.c               |    1 +
+>  3 files changed, 6 insertions(+), 0 deletions(-)
 
-These email addresses are mangled.
-
-> --- a/drivers/video/modedb.c
-> +++ b/drivers/video/modedb.c
-> ...
-> --- a/include/linux/fb.h
-> +++ b/include/linux/fb.h
-
-The patch seems pretty specific to s3c-fb.  Is it possible and sensible
-to somhow avoid adding code to generic files?  Can we push more (or
-all) of these changes into s3c-fb.c or into the arch/arm support code?
+ooookay.  Thanks, I'll take it if nobody else will ;)
