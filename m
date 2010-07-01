@@ -1,172 +1,40 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 1 Jul 2010 14:28:03 +0200
-Subject: [PATCHv5] mx2_camera: Add soc_camera support for i.MX25/i.MX27
-In-Reply-To: <47538fc4c6ffbc6a4c80ba55ecdd03603e67095c.1277981781.git.baruch@tkos.co.il>
-References: <47538fc4c6ffbc6a4c80ba55ecdd03603e67095c.1277981781.git.baruch@tkos.co.il>
-Message-ID: <20100701122803.GE28535@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 1 Jul 2010 15:42:53 +0300
+Subject: [PATCH 2/2] arm: Make VFPv3 usable on ARMv6
+In-Reply-To: <1277473838.13134.30.camel@e102109-lin.cambridge.arm.com>
+References: <20100621135125.24299.91290.stgit@baageli.muru.com>
+	<1277211592.29532.20.camel@e102109-lin.cambridge.arm.com>
+	<20100622132037.GV12255@atomide.com>
+	<20100623075703.GB12255@atomide.com>
+	<1277473838.13134.30.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100701124252.GR2822@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 01, 2010 at 02:03:19PM +0300, Baruch Siach wrote:
-> This is the soc_camera support developed by Sascha Hauer for the i.MX27.  Alan
-> Carvalho de Assis modified the original driver to get it working on more recent
-> kernels. I modified it further to add support for i.MX25. This driver has been
-> tested on i.MX25 and i.MX27 based platforms.
+* Catalin Marinas <catalin.marinas@arm.com> [100625 16:44]:
+> On Wed, 2010-06-23 at 08:57 +0100, Tony Lindgren wrote:
+> > MVFR0 and MVFR1 are only available starting with ARM1136 r1p0 release
+> > according to "B.5 VFP changes" in DDI0211F_arm1136_r1p0_trm.pdf. This is
+> > also when TLS register got added, so we can use HAS_TLS also to test for
+> > MVFR0 and MVFR1.
+> > 
+> > Otherwise VFPFMRX and VFPFMXR access fails and we get:
+> > 
+> > Internal error: Oops - undefined instruction: 0 [#1]
+> > PC is at no_old_VFP_process+0x8/0x3c
+> > LR is at __und_svc+0x48/0x80
+> > ...
+> > 
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
 > 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> ---
-> Changes v4 -> v5
->     Comments from Uwe Kleine-K?nig:
+> The new version looks fine to me.
 > 
->     Enclose mx27 DMA related stuff in #ifdefs since the dma-mx1-mx2.h is no 
->     longer accessible to mx25 builds
-> 
->     s/MX2_VIDEO/VIDEO_MX2_HOSTSUPPORT/
-> 
-> Changes v3 -> v4
->     Address more comments from Guennadi Liakhovetski, including:
-> 
->     * Fix the double trigger handling of mx27 eMMA
-> 
->     * Add a FIXME comment in the code of eMMA overflow handling
-> 
-> Changes v2 -> v3
->     Address more comments from Guennadi Liakhovetski.
-> 
->     Applied part of Sashca's patch that I forgot in v2.
-> 
-> Changes v1 -> v2
->     Addressed the comments of Guennadi Liakhovetski except from the following:
-> 
->     1. The mclk_get_divisor implementation, since I don't know what this code 
->        is good for
-> 
->     2. mx2_videobuf_release should not set pcdev->active on i.MX27, because 
->        mx27_camera_frame_done needs this pointer
-> 
->     3. In mx27_camera_emma_buf_init I don't know the meaning of those hard 
->        coded magic numbers
-> 
->     Applied i.MX27 fixes from Sascha.
-> 
->  arch/arm/plat-mxc/include/mach/memory.h  |    4 +-
->  arch/arm/plat-mxc/include/mach/mx2_cam.h |   46 +
->  drivers/media/video/Kconfig              |   13 +
->  drivers/media/video/Makefile             |    1 +
->  drivers/media/video/mx2_camera.c         | 1513 ++++++++++++++++++++++++++++++
->  5 files changed, 1575 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm/plat-mxc/include/mach/mx2_cam.h
->  create mode 100644 drivers/media/video/mx2_camera.c
-> 
-> diff --git a/arch/arm/plat-mxc/include/mach/memory.h b/arch/arm/plat-mxc/include/mach/memory.h
-> index c4b40c3..849d891 100644
-> --- a/arch/arm/plat-mxc/include/mach/memory.h
-> +++ b/arch/arm/plat-mxc/include/mach/memory.h
-> @@ -44,12 +44,12 @@
->   */
->  #define CONSISTENT_DMA_SIZE SZ_8M
->  
-> -#elif defined(CONFIG_MX1_VIDEO)
-> +#elif defined(CONFIG_MX1_VIDEO) || defined(CONFIG_VIDEO_MX2_HOSTSUPPORT)
->  /*
->   * Increase size of DMA-consistent memory region.
->   * This is required for i.MX camera driver to capture at least four VGA frames.
->   */
->  #define CONSISTENT_DMA_SIZE SZ_4M
-> -#endif /* CONFIG_MX1_VIDEO */
-> +#endif /* CONFIG_MX1_VIDEO || CONFIG_MX2_VIDEO */
-s/CONFIG_MX2_VIDEO/CONFIG_VIDEO_MX2_HOSTSUPPORT/ please
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
->  #endif /* __ASM_ARCH_MXC_MEMORY_H__ */
-> diff --git a/arch/arm/plat-mxc/include/mach/mx2_cam.h b/arch/arm/plat-mxc/include/mach/mx2_cam.h
-> new file mode 100644
-> index 0000000..3c080a3
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/include/mach/mx2_cam.h
-Do you expect users of this header other than your driver?  If not you
-can fold it into the latter.
+Thanks. Added your ack and posted to Russell's patch system:
 
-[...snip...]
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6203/1
 
-> diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
-> index bdbc9d3..27e2acc 100644
-> --- a/drivers/media/video/Kconfig
-> +++ b/drivers/media/video/Kconfig
-> @@ -969,6 +969,19 @@ config VIDEO_OMAP2
->  	---help---
->  	  This is a v4l2 driver for the TI OMAP2 camera capture interface
->  
-> +config VIDEO_MX2_HOSTSUPPORT
-> +        bool
-> +
-> +config VIDEO_MX2
-> +	tristate "i.MX27/i.MX25 Camera Sensor Interface driver"
-> +	depends on VIDEO_DEV && SOC_CAMERA && (MACH_MX27 || ARCH_MX25)
-> +	select VIDEOBUF_DMA_CONTIG
-CONTIG?
+Regards,
 
-[...snap...]
-
-> diff --git a/drivers/media/video/mx2_camera.c b/drivers/media/video/mx2_camera.c
-> new file mode 100644
-> index 0000000..98c93fa
-> --- /dev/null
-> +++ b/drivers/media/video/mx2_camera.c
-> @@ -0,0 +1,1513 @@
-
-[...snip...]
-
-> +static int __devexit mx2_camera_remove(struct platform_device *pdev)
-> +{
-> +	struct soc_camera_host *soc_host = to_soc_camera_host(&pdev->dev);
-> +	struct mx2_camera_dev *pcdev = container_of(soc_host,
-> +			struct mx2_camera_dev, soc_host);
-> +	struct resource *res;
-> +
-> +	clk_put(pcdev->clk_csi);
-> +#ifdef CONFIG_MACH_MX27
-> +	if (cpu_is_mx27())
-> +		imx_dma_free(pcdev->dma);
-> +#endif /* CONFIG_MACH_MX27 */
-> +	free_irq(pcdev->irq_csi, pcdev);
-> +	if (mx27_camera_emma(pcdev))
-> +		free_irq(pcdev->irq_emma, pcdev);
-> +
-> +	soc_camera_host_unregister(&pcdev->soc_host);
-> +
-> +	iounmap(pcdev->base_csi);
-> +
-> +	if (mx27_camera_emma(pcdev)) {
-> +		clk_disable(pcdev->clk_emma);
-> +		clk_put(pcdev->clk_emma);
-> +		iounmap(pcdev->base_emma);
-> +		res = pcdev->res_emma;
-> +		release_mem_region(res->start, resource_size(res));
-> +	}
-> +
-> +	res = pcdev->res_csi;
-> +	release_mem_region(res->start, resource_size(res));
-> +
-> +	kfree(pcdev);
-> +
-> +	dev_info(&pdev->dev, "MX2 Camera driver unloaded\n");
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver mx2_camera_driver = {
-> +	.driver 	= {
-> +		.name	= MX2_CAM_DRV_NAME,
-I'm always unsure if you need
-
-		.owner  = THIS_MODULE,
-
-here.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Tony
