@@ -1,28 +1,47 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 1 Jul 2010 19:41:16 +0900
-Subject: [PATCH 13/16] omap: mux: Mux Apollon LCD power in board-apollon.c
-In-Reply-To: <20100701103359.GI2822@atomide.com>
-References: <20100630120226.2637.31198.stgit@baageli.muru.com>
-	<20100630120719.2637.65586.stgit@baageli.muru.com>
-	<1277967954.2474.269.camel@tubuntu.research.nokia.com>
-	<004d01cb18f5$ff27be80$fd773b80$%park@samsung.com>
-	<20100701103359.GI2822@atomide.com>
-Message-ID: <AANLkTimbk7NP6VFT0WZAsBKVuY5jMZ3omNwhl7kR7b5A@mail.gmail.com>
+From: l.fu@pengutronix.de (Luotao Fu)
+Date: Thu, 1 Jul 2010 12:50:43 +0200
+Subject: [PATCH] imxfb: add flag to avoid disabling clk multiple times
+In-Reply-To: <4C1CE6B8.4090504@gmail.com>
+References: <1275561288-20661-1-git-send-email-l.fu@pengutronix.de>
+	<4C1CE6B8.4090504@gmail.com>
+Message-ID: <20100701105043.GB4092@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 1, 2010 at 7:33 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Kyungmin Park <kyungmin.park@samsung.com> [100701 11:12]:
->> Hi,
->>
->> This value is set from bootloader, and kernel side only change the mode.
->> Right it runs by luck.
->
-> So should we just drop the omap_cfg_reg for now, then add it back
-> later with proper gpio_request etc?
+Hi Martin,
 
-I mean the original patch is okay. Now that's find. I'll send a patch
-if require.
+On Sat, Jun 19, 2010 at 05:48:08PM +0200, Martin Fuzzey wrote:
+> Hi Luotao,
+> 
+> Luotao Fu wrote:
 
-Thank you,
-Kyungmin Park
+....
+> Your patch fixes the clock_disable problem but fbi->backlight_power()
+> and fbi->lcd_power() can still be called multiple times.
+> Not sure if that is really a problem - they should be idempotent.
+> 
+> I did it by making all of imxfb_disable_controller() do nothing if the
+> disable was already done like this  (just for illustration not submission,
+> lines may be mangled):
+> 
+
+Anything new on this? 'd be nice if you could resend a clean patch based
+on the described you sent in this mail. There're about 3 Patches about
+this issue out there. More might come in, as long as the bug still
+exists. ;-) So let's pack it up and push a proper fix to Sascha.
+
+cheers
+Luotao Fu
+
+-- 
+Pengutronix e.K.                           | Dipl.-Ing. Luotao Fu        |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100701/6ed2ac84/attachment.sig>
