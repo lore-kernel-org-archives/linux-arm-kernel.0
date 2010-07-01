@@ -1,55 +1,42 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 1 Jul 2010 07:51:56 +0300
-Subject: [PATCH 27/61] ARM: imx: new Kconfig symbol and feature test
-	macro for?DMA on mx1 and mx2
-In-Reply-To: <20100630071718.GB11746@pengutronix.de>
-References: <1277387397-3467-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1277387397-3467-28-git-send-email-u.kleine-koenig@pengutronix.de>
-	<loom.20100629T075846-421@post.gmane.org>
-	<20100630071718.GB11746@pengutronix.de>
-Message-ID: <20100701045156.GA16981@jasper.tkos.co.il>
+Date: Thu, 1 Jul 2010 08:00:03 +0300
+Subject: [PATCHv4 1/3] mx2_camera: Add soc_camera support for i.MX25/i.MX27
+In-Reply-To: <Pine.LNX.4.64.1006301058170.17489@axis700.grange>
+References: <cover.1277096909.git.baruch@tkos.co.il>
+	<03d6e55c39690618e92a91a580ec34549a135c79.1277096909.git.baruch@tkos.co.il>
+	<20100630070717.GA11746@pengutronix.de>
+	<Pine.LNX.4.64.1006300918190.17489@axis700.grange>
+	<20100630072808.GD11746@pengutronix.de>
+	<Pine.LNX.4.64.1006301058170.17489@axis700.grange>
+Message-ID: <20100701050002.GB16981@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi Guennadi,
 
-On Wed, Jun 30, 2010 at 09:17:18AM +0200, Uwe Kleine-K?nig wrote:
-> On Tue, Jun 29, 2010 at 06:04:52AM +0000, Baruch Siach wrote:
-> > Uwe Kleine-K?nig <u.kleine-koenig <at> pengutronix.de> writes:
-> > > This should be used instead of hard coding the corresponding platforms.
-> > > The feature test macro is needed to support different SOCs in a single
-> > > kernel image.  While at it rename dma-mx1-mx2 to dma-v1 as mx25 doesn't
-> > > use it and so the mx2 part is wrong and move the header to
-> > > arch/arm/mach-imx.
-> > > 
-> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig <at> pengutronix.de>
-> > 
-> > This commit breaks build of the (hopefully) soon to-be-merged mx2_camera driver.
-> > This driver is for both mx25 and mx27. Since dma-mx1-mx2.h is now under the
-> > non-mx25 mach-imx/ directory, mx25 build can't find this header.
-> > 
-> > The solution is either:
-> > 
-> > 1. move mx25 to mach-imx/ as well, or
-> > 
-> > 2. postpone the dma-mx1-mx2.h header move for now, and leave it under plat-mxc/
-> 
-> 3. don't include dma-mx1-mx2.h for mx25 builds.
-> 
-> An mx25 kernel doesn't provide the functions declared in dma-mx1-mx2.h,
-> so I assume it's due to compiler optimizations that you don't get a
-> build failure.
-> 
-> I wouldn't do 1. in the .36 merge window because I want to continue with
-> some cleanups first.  I have no problems with 2 and can do it, but I
-> think 3 is more correct, though it add #ifdefery to your driver, which
-> is bad.  What do you think?
+On Wed, Jun 30, 2010 at 11:08:41AM +0200, Guennadi Liakhovetski wrote:
 
-Doing (3) adds quite a few #ifdefs throughout the driver. For a temporary 
-solution (until mx25 moves to mach-imx/) I think (2) is better. Since this 
-driver should go via your/Shascha's tree, I'll accept your decision.
+[snip]
+
+> In any case, I'm fine with the patch as it is, so, here's
+> 
+> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+
+Thanks for your thorough review and ack.
+
+> I think, it would be better if you, Uwe, or Sascha pull all these 3 patches 
+> via one of your tree, because patches 2/3 and 3/3 are ARM/MX2 stuff anyway 
+> and this patch changes some files under arch/arm and collides with some mx2 
+> changes.
+
+Patches 2/3 and 3/3 are already in the imx-for-2.6.36 branch.
 
 baruch
+
+> Mauro, do you agree? Do we need your ack too? So, taking them all 
+> via IMX/MXC would make synchronisation easier. However, if you change 
+> anything under drivers/media (including Makefile / Kconfig) or 
+> include/media, please let me know, so that I can ack it again.
 
 -- 
                                                      ~. .~   Tk Open Systems
