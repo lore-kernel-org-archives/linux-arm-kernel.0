@@ -1,58 +1,73 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 1 Jul 2010 22:40:51 +0800
-Subject: [PATCH 06/33] Removing dead SHARPSL_LOCOMO
-In-Reply-To: <20100701132351.GB32541@faui48a.informatik.uni-erlangen.de>
-References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<b43850b1a1909496718e39687d1ca00543aa30ec.1277911346.git.siccegge@cs.fau.de>
-	<AANLkTimVRdxeeQKazgFSIQJYtbmHnjDN5lUnTrVv6uoI@mail.gmail.com>
-	<20100701132351.GB32541@faui48a.informatik.uni-erlangen.de>
-Message-ID: <AANLkTilxNz_iEWKtgvLHjce6PTN_G-7bt2jxeLbIXxVa@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 1 Jul 2010 16:46:23 +0200
+Subject: [PATCHv5] mx2_camera: Add soc_camera support for i.MX25/i.MX27
+In-Reply-To: <Pine.LNX.4.64.1007011612580.17489@axis700.grange>
+References: <47538fc4c6ffbc6a4c80ba55ecdd03603e67095c.1277981781.git.baruch@tkos.co.il>
+	<20100701122803.GE28535@pengutronix.de>
+	<Pine.LNX.4.64.1007011612580.17489@axis700.grange>
+Message-ID: <20100701144622.GG28535@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 1, 2010 at 9:23 PM, Christoph Egger <siccegge@cs.fau.de> wrote:
-> On Thu, Jul 01, 2010 at 10:34:13AM +0800, Eric Miao wrote:
->> On Wed, Jun 30, 2010 at 11:55 PM, Christoph Egger <siccegge@cs.fau.de> wrote:
->> > SHARPSL_LOCOMO doesn't exist in Kconfig, therefore removing all
->> > references for it from the source code.
->> >
->>
->> A good catch, though SHARPSL_LOCOMO has be changed to SHARP_LOCOMO
->> later, so a better fix would be the name change only.
->
-> Hi! Updated patch below
->
-> ----
-> From: Christoph Egger <siccegge@cs.fau.de>
-> Date: Wed, 30 Jun 2010 12:36:20 +0200
-> Subject: [PATCH 06/33] Replacing dead SHARPSL_LOCOMO with SHARP_LOCOMO
->
-> SHARP_LOCOMO doesn't exist in Kconfig, therefore replacing all
-> references for it with SHARP_LOCOMO in the source code.
->
-> Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
+Hi Guennadi,
 
-Acked-by: Eric Miao <eric.y.miao@gmail.com>
+On Thu, Jul 01, 2010 at 04:23:23PM +0200, Guennadi Liakhovetski wrote:
+> > > +config VIDEO_MX2
+> > > +	tristate "i.MX27/i.MX25 Camera Sensor Interface driver"
+> > > +	depends on VIDEO_DEV && SOC_CAMERA && (MACH_MX27 || ARCH_MX25)
+> > > +	select VIDEOBUF_DMA_CONTIG
+> > CONTIG?
+> 
+> What exactly was your question here?
+I thought it to be a mistyped "CONFIG", I was wrong.
+ 
+> > > diff --git a/drivers/media/video/mx2_camera.c b/drivers/media/video/mx2_camera.c
+> > > new file mode 100644
+> > > index 0000000..98c93fa
+> > > --- /dev/null
+> > > +++ b/drivers/media/video/mx2_camera.c
+> > > @@ -0,0 +1,1513 @@
+> > 
+> > [...snip...]
+> 
+> > > +static struct platform_driver mx2_camera_driver = {
+> > > +	.driver 	= {
+> > > +		.name	= MX2_CAM_DRV_NAME,
+> > I'm always unsure if you need
+> > 
+> > 		.owner  = THIS_MODULE,
+> > 
+> > here.
+> 
+> It is not needed in this case. See the "owner" field in struct 
+> soc_camera_host_ops mx2_soc_camera_host_ops.
+> 
+> But that's not the reason why I'm replying. What I didn't like in these 
+> your reviews, was the fact, that this driver has been submitted a number 
+> of times to the arm-kernel ML, it has "mx2" in its subject, so, you had 
+> enough chances to review it, just like Sascha did. Instead, you review it 
+> now, making the author create new versions of his patch. You have been 
+> asked for advise, because this patch potentially collided with other your 
+> patches, your help in resolving this question is appreciated. But then you 
+> suddenly decide to review the whole patch... Several of my patches have 
+> been treated similarly in the past, so, I know how annoying it is to have 
+> to re-iterate them because at v5 someone suddenly decided to take part in 
+> the patch review process too...
+OK it might annoying but still I cannot understand why this is a reason to
+lament.  I don't necessarily feel part of the intended audience for each
+patch on LAKML that contains mx2 in it's subject, still less if the
+patch changes very little in arch/arm/{plat-mxc,arch-mx*} as Baruch's
+patch does.  Now he cc:d me and I had a look and even took the time to
+point out the things that I noticed.  From my POV a late reviewer is
+better than getting code in that is less optimal.  And let me point out
+that reviewing sequentially is more efficient in the sum---at least for
+the reviewers.
 
-> ---
-> ?arch/arm/mach-sa1100/include/mach/irqs.h | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-sa1100/include/mach/irqs.h b/arch/arm/mach-sa1100/include/mach/irqs.h
-> index 8c8845b..d18f21a 100644
-> --- a/arch/arm/mach-sa1100/include/mach/irqs.h
-> +++ b/arch/arm/mach-sa1100/include/mach/irqs.h
-> @@ -77,7 +77,7 @@
-> ?*/
-> ?#ifdef CONFIG_SA1111
-> ?#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ? ?(IRQ_BOARD_END + 55)
-> -#elif defined(CONFIG_SHARPSL_LOCOMO)
-> +#elif defined(CONFIG_SHARP_LOCOMO)
-> ?#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ? ?(IRQ_BOARD_START + 4)
-> ?#else
-> ?#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ? ?(IRQ_BOARD_START)
-> --
-> 1.7.0.4
->
->
->
+So should I ignore patches that are say already > v3?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
