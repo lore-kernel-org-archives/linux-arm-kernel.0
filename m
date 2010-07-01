@@ -1,7 +1,7 @@
 From: coffbeta@gmail.com (CoffBeta)
-Date: Thu, 1 Jul 2010 10:26:50 +0800
-Subject: TQ 2440 problem
-Message-ID: <AANLkTildbEzpPZsFyx7vGD36MNeNTUlAqoqQNxMraLvw@mail.gmail.com>
+Date: Thu, 1 Jul 2010 10:31:43 +0800
+Subject: tq 2440
+Message-ID: <AANLkTimyBHliUa62qmfja_ke6YTTysiVAtJcZfi8l2gG@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,7 +15,7 @@ s3c24xx_serial_init_port: c03939ec (hw 0)...
 resource c0387c38 (50000000..50003fff)
 port: map=50000000, mem=f5000000, irq=70, clock=1
 s3c2440_serial_resetport: port=c03939ec (50000000), cfg=c03a367c
-                                                                s3c24xx_serial_0
+                                                               s3c24xx_serial_0
 s3c24xx_serial_init_port: c0393a84 (hw 1)...
 resource c0387c70 (50004000..50007fff)
 port: map=50004000, mem=f5004000, irq=73, clock=1
@@ -367,7 +367,7 @@ usbcore: registered new interface driver usbhid
 usbhid: v2.6:USB HID core driver
 Advanced Linux Sound Architecture Driver Version 1.0.17.
 ALSA device list:
-  No soundcards found.
+ No soundcards found.
 TCP cubic registered
 NET: Registered protocol family 17
 RPC: Registered udp transport module.
