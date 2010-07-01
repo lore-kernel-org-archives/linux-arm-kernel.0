@@ -1,44 +1,29 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 01 Jul 2010 15:05:44 -0700
+From: hari.kanigeri@gmail.com (Hari Kanigeri)
+Date: Thu, 1 Jul 2010 17:15:27 -0500
 Subject: [RFC 3/3] mm: iommu: The Virtual Contiguous Memory Manager
-In-Reply-To: <4C2D0FF1.6010206@codeaurora.org>
+In-Reply-To: <1278013320.7738.19.camel@c-dwalke-linux.qualcomm.com>
 References: <1277877350-2147-1-git-send-email-zpfeffer@codeaurora.org>
 	<1277877350-2147-3-git-send-email-zpfeffer@codeaurora.org>
 	<20100701101746.3810cc3b.randy.dunlap@oracle.com>
 	<20100701180241.GA3594@basil.fritz.box>
 	<1278012503.7738.17.camel@c-dwalke-linux.qualcomm.com>
 	<20100701193850.GB3594@basil.fritz.box>
-	<4C2D0FF1.6010206@codeaurora.org>
-Message-ID: <1278021944.7738.43.camel@c-dwalke-linux.qualcomm.com>
+	<1278013320.7738.19.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <AANLkTinABCSdN6hnXVOvVZ12f1QBMR_UAi62qW8GmlkL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-07-01 at 15:00 -0700, Zach Pfeffer wrote:
+>
+> He demonstrated the usage of his code in one of the emails he sent out
+> initially. Did you go over that, and what (or how many) step would you
+> use with the current code to do the same thing?
 
+-- So is this patch set adding layers and abstractions to help the User ?
 
-> Additionally, the current IOMMU interface does not allow users to
-> associate one page table with multiple IOMMUs unless the user explicitly
-> wrote a muxed device underneith the IOMMU interface. This also could be
-> done, but would have to be done for every such use case. Since the
-> particular topology is run-time configurable all of these use-cases and
-> more can be expressed without pushing the topology into the low-level
-> IOMMU driver.
-> 
-> The VCMM takes the long view. Its designed for a future in which the
-> number of IOMMUs will go up and the ways in which these IOMMUs are
-> composed will vary from system to system, and may vary at
-> runtime. Already, there are ~20 different IOMMU map implementations in
-> the kernel. Had the Linux kernel had the VCMM, many of those
-> implementations could have leveraged the mapping and topology management
-> of a VCMM, while focusing on a few key hardware specific functions (map
-> this physical address, program the page table base register).
+If the idea is to share some memory across multiple devices, I guess
+you can achieve the same by calling the map function provided by iommu
+module and sharing the mapped address to the 10's or 100's of devices
+to access the buffers. You would only need a dedicated virtual pool
+per IOMMU device to manage its virtual memory allocations.
 
-So if we include this code which "map implementations" could you
-collapse into this implementations ? Generally , what currently existing
-code can VCMM help to eliminate?
-
-Daniel
-
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Hari
