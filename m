@@ -1,48 +1,22 @@
-From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
-Date: Thu, 1 Jul 2010 11:58:13 +0200
-Subject: [PATCH 25/33] Removing dead CORGI_SSP_DEPRECATED
-In-Reply-To: <80c10751fb5b7d9be55656ac35827a403a5d6b2b.1277911346.git.siccegge@cs.fau.de>
-References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<80c10751fb5b7d9be55656ac35827a403a5d6b2b.1277911346.git.siccegge@cs.fau.de>
-Message-ID: <20100701095812.GA1096@boggieman>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 1 Jul 2010 13:33:59 +0300
+Subject: [PATCH 13/16] omap: mux: Mux Apollon LCD power in board-apollon.c
+In-Reply-To: <004d01cb18f5$ff27be80$fd773b80$%park@samsung.com>
+References: <20100630120226.2637.31198.stgit@baageli.muru.com>
+	<20100630120719.2637.65586.stgit@baageli.muru.com>
+	<1277967954.2474.269.camel@tubuntu.research.nokia.com>
+	<004d01cb18f5$ff27be80$fd773b80$%park@samsung.com>
+Message-ID: <20100701103359.GI2822@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 30, 2010 at 06:01:56PM +0200, Christoph Egger wrote:
-> CORGI_SSP_DEPRECATED doesn't exist in Kconfig, therefore removing all
-> references for it from the source code.
+* Kyungmin Park <kyungmin.park@samsung.com> [100701 11:12]:
+> Hi,
 > 
-> Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
+> This value is set from bootloader, and kernel side only change the mode.
+> Right it runs by luck.
 
-Cant see anything wrong with this.
+So should we just drop the omap_cfg_reg for now, then add it back
+later with proper gpio_request etc?
 
-acked-by: Kristoffer Ericson <kristoffer.ericson@gmail.com>
-
-> ---
->  arch/arm/mach-pxa/sharpsl_pm.c |    5 -----
->  1 files changed, 0 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
-> index 582701e..d8c5301 100644
-> --- a/arch/arm/mach-pxa/sharpsl_pm.c
-> +++ b/arch/arm/mach-pxa/sharpsl_pm.c
-> @@ -180,17 +180,12 @@ int sharpsl_pm_pxa_read_max1111(int channel)
->  	if (machine_is_tosa())
->  	    return 0;
->  
-> -#ifdef CONFIG_CORGI_SSP_DEPRECATED
-> -	return corgi_ssp_max1111_get((channel << MAXCTRL_SEL_SH) | MAXCTRL_PD0 | MAXCTRL_PD1
-> -			| MAXCTRL_SGL | MAXCTRL_UNI | MAXCTRL_STR);
-> -#else
->  	extern int max1111_read_channel(int);
->  
->  	/* max1111 accepts channels from 0-3, however,
->  	 * it is encoded from 0-7 here in the code.
->  	 */
->  	return max1111_read_channel(channel >> 1);
-> -#endif
->  }
->  
->  static int get_percentage(int voltage)
-> -- 
-> 1.7.0.4
+Tony
