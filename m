@@ -1,40 +1,14 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 1 Jul 2010 15:42:53 +0300
-Subject: [PATCH 2/2] arm: Make VFPv3 usable on ARMv6
-In-Reply-To: <1277473838.13134.30.camel@e102109-lin.cambridge.arm.com>
-References: <20100621135125.24299.91290.stgit@baageli.muru.com>
-	<1277211592.29532.20.camel@e102109-lin.cambridge.arm.com>
-	<20100622132037.GV12255@atomide.com>
-	<20100623075703.GB12255@atomide.com>
-	<1277473838.13134.30.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100701124252.GR2822@atomide.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 1 Jul 2010 21:55:47 +0900
+Subject: [PATCH 29/33] Removing dead SND_SOC_SMDK2443_WM9710
+In-Reply-To: <e5391de6858597bbfd43874aed124a73f74850b5.1277911346.git.siccegge@cs.fau.de>
+References: <cover.1277911345.git.siccegge@cs.fau.de>
+	<e5391de6858597bbfd43874aed124a73f74850b5.1277911346.git.siccegge@cs.fau.de>
+Message-ID: <AANLkTinZa7_TEjYFTu9V6obndpVvMmHppaOArM1AJg_t@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Catalin Marinas <catalin.marinas@arm.com> [100625 16:44]:
-> On Wed, 2010-06-23 at 08:57 +0100, Tony Lindgren wrote:
-> > MVFR0 and MVFR1 are only available starting with ARM1136 r1p0 release
-> > according to "B.5 VFP changes" in DDI0211F_arm1136_r1p0_trm.pdf. This is
-> > also when TLS register got added, so we can use HAS_TLS also to test for
-> > MVFR0 and MVFR1.
-> > 
-> > Otherwise VFPFMRX and VFPFMXR access fails and we get:
-> > 
-> > Internal error: Oops - undefined instruction: 0 [#1]
-> > PC is at no_old_VFP_process+0x8/0x3c
-> > LR is at __und_svc+0x48/0x80
-> > ...
-> > 
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> The new version looks fine to me.
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
-Thanks. Added your ack and posted to Russell's patch system:
-
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6203/1
-
-Regards,
-
-Tony
+On Thu, Jul 1, 2010 at 1:03 AM, Christoph Egger <siccegge@cs.fau.de> wrote:
+> SND_SOC_SMDK2443_WM9710 doesn't exist in Kconfig, therefore removing
+> all references for it from the source code.
+I'd rather have the code compiled unconditionally.
