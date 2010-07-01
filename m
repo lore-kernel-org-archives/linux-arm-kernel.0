@@ -1,20 +1,48 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 1 Jul 2010 14:07:25 +0100
-Subject: [PATCH 29/33] Removing dead SND_SOC_SMDK2443_WM9710
-In-Reply-To: <AANLkTinZa7_TEjYFTu9V6obndpVvMmHppaOArM1AJg_t@mail.gmail.com>
+From: siccegge@cs.fau.de (Christoph Egger)
+Date: Thu, 1 Jul 2010 15:22:55 +0200
+Subject: [PATCH 03/33] Removing dead OMAP_MUX_ERRORS
+In-Reply-To: <20100630195409.GC3969@shutemov.name>
 References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<e5391de6858597bbfd43874aed124a73f74850b5.1277911346.git.siccegge@cs.fau.de>
-	<AANLkTinZa7_TEjYFTu9V6obndpVvMmHppaOArM1AJg_t@mail.gmail.com>
-Message-ID: <20100701130724.GC17698@sirena.org.uk>
+	<b6ca168f9459162f2c96aa8ef999047a3c4f6f9c.1277911346.git.siccegge@cs.fau.de>
+	<20100630195409.GC3969@shutemov.name>
+Message-ID: <20100701132255.GA32541@faui48a.informatik.uni-erlangen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 01, 2010 at 09:55:47PM +0900, Jassi Brar wrote:
-> On Thu, Jul 1, 2010 at 1:03 AM, Christoph Egger <siccegge@cs.fau.de> wrote:
-> > SND_SOC_SMDK2443_WM9710 doesn't exist in Kconfig, therefore removing
-> > all references for it from the source code.
+On Wed, Jun 30, 2010 at 10:54:09PM +0300, Kirill A. Shutemov wrote:
+> On Wed, Jun 30, 2010 at 05:54:42PM +0200, Christoph Egger wrote:
+> > OMAP_MUX_ERRORS doesn't exist in Kconfig, therefore removing all
+> > references for it from the source code.
+> 
+> IIUC, CONFIG_OMAP_MUX_WARNINGS should be used here instead of it.
 
-> I'd rather have the code compiled unconditionally.
+Something like the patch below?
 
-Hrm, if this is part of the default hardware build we should get the
-driver merged.
+----
+From: Christoph Egger <siccegge@cs.fau.de>
+Date: Wed, 30 Jun 2010 12:30:36 +0200
+Subject: [PATCH 03/33] Replace dead OMAP_MUX_ERRORS with OMAP_MUX_WARNINGS
+
+OMAP_MUX_ERRORS doesn't exist in Kconfig, therefore replacing all
+references for it with OMAP_MUX_WARNINGS in the source code.
+
+Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
+---
+ arch/arm/mach-omap1/mux.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap1/mux.c b/arch/arm/mach-omap1/mux.c
+index 8434137..3e98835 100644
+--- a/arch/arm/mach-omap1/mux.c
++++ b/arch/arm/mach-omap1/mux.c
+@@ -440,7 +440,7 @@ int __init_or_module omap1_cfg_reg(const struct pin_config *cfg)
+ 	}
+ #endif
+ 
+-#ifdef CONFIG_OMAP_MUX_ERRORS
++#ifdef CONFIG_OMAP_MUX_WARNINGS
+ 	return warn ? -ETXTBSY : 0;
+ #else
+ 	return 0;
+-- 
+1.7.0.4
