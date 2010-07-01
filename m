@@ -1,64 +1,67 @@
-From: jayakumar.lkml@gmail.com (Jaya Kumar)
-Date: Fri, 2 Jul 2010 07:47:29 +0800
-Subject: [PATCH 1/3] FB: Add some members for CPU Interface.
-In-Reply-To: <AANLkTikxu_p-F4iJnwiY7GvP0Zkf-WsZEAeLzfJuljlB@mail.gmail.com>
-References: <4C29CFBD.3040205@samsung.com>
-	<AANLkTilgB3s8hy5Qg7IYpyBzwHCgK_GswVZqpxhryU5L@mail.gmail.com>
-	<AANLkTikxu_p-F4iJnwiY7GvP0Zkf-WsZEAeLzfJuljlB@mail.gmail.com>
-Message-ID: <AANLkTilwTdyKptIWPsnZF4kXAERCsQb2f6Ymyrkz_v5q@mail.gmail.com>
+From: jayakumar.arm@gmail.com (Jaya Kumar)
+Date: Fri, 2 Jul 2010 07:57:19 +0800
+Subject: [PATCH 24/33] Removing dead ARCH_GUMSTIX_ORIG
+In-Reply-To: <AANLkTim9icxxarxlcC39tCnnAIwwBOF8l8a68nQy7xHQ@mail.gmail.com>
+References: <cover.1277911345.git.siccegge@cs.fau.de>
+	<e2a294ec1d41f1198f7ffae0e8bed2f67b41bbe8.1277911346.git.siccegge@cs.fau.de>
+	<AANLkTim9icxxarxlcC39tCnnAIwwBOF8l8a68nQy7xHQ@mail.gmail.com>
+Message-ID: <AANLkTinaExfjcAFTSvvZV3Hi3nLAa8bDY6mkqBf9WgvM@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi InKi,
-
-Thanks for your reply.
-
-On Wed, Jun 30, 2010 at 12:36 PM, InKi Dae <daeinki@gmail.com> wrote:
-> Hi Jaya,
->
-> 2010/6/30 Jaya Kumar <jayakumar.lkml@gmail.com>:
->> 2010/6/29 InKi Dae <inki.dae@samsung.com>:
->>> CPU interface needs cs, wr setup, wr act and hold delay.
->>> I added some members for them to common framework.
+On Thu, Jul 1, 2010 at 12:27 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Thu, Jul 1, 2010 at 12:01 AM, Christoph Egger <siccegge@cs.fau.de> wrote:
+>> ARCH_GUMSTIX_ORIG doesn't exist in Kconfig, therefore removing all
+>> references for it from the source code.
 >>
->> Hi InKi Dae,
+>> Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
+>
+> Acked-by: Eric Miao <eric.y.miao@gmail.com>
+>
+> Cc'ed Jaya Kumar for additional thoughts.
+
+Looks okay to me too. Thanks.
+
+Acked-by: Jaya Kumar <jayakumar.lkml@gmail.com>
+
+>
+>> ---
+>> ?arch/arm/mach-pxa/include/mach/gumstix.h | ? 12 +-----------
+>> ?1 files changed, 1 insertions(+), 11 deletions(-)
 >>
->> The patch looks interesting. Could you help us understand more about
->> it from a big picture perspective? ie: how is this "cpu interface"
->> used? I think fb_var_screeninfo is intended to be a very generic data
->> structure and since it is exposed to userspace we should be cautious
->> about what we add to it. I didn't understand the purpose of exposing
->> cs, wr setup, wr act and hold delay to userspace.
+>> diff --git a/arch/arm/mach-pxa/include/mach/gumstix.h b/arch/arm/mach-pxa/include/mach/gumstix.h
+>> index 06abd41..9b89868 100644
+>> --- a/arch/arm/mach-pxa/include/mach/gumstix.h
+>> +++ b/arch/arm/mach-pxa/include/mach/gumstix.h
+>> @@ -14,25 +14,15 @@
+>>
+>> ?/*
+>> ?GPIOn - Input from MAX823 (or equiv), normalizing USB +5V into a clean
+>> -interrupt signal for determining cable presence. On the original gumstix,
+>> -this is GPIO81, and GPIO83 needs to be defined as well. On the gumstix F,
+>> +interrupt signal for determining cable presence. On the gumstix F,
+>> ?this moves to GPIO17 and GPIO37. */
+>>
+>> ?/* GPIOx - Connects to USB D+ and used as a pull-up after GPIOn
+>> ?has detected a cable insertion; driven low otherwise. */
+>>
+>> -#ifdef CONFIG_ARCH_GUMSTIX_ORIG
+>> -
+>> -#define GPIO_GUMSTIX_USB_GPIOn ? ? ? ? 81
+>> -#define GPIO_GUMSTIX_USB_GPIOx ? ? ? ? 83
+>> -
+>> -#else
+>> -
+>> ?#define GPIO_GUMSTIX_USB_GPIOn ? ? ? ? 35
+>> ?#define GPIO_GUMSTIX_USB_GPIOx ? ? ? ? 41
+>>
+>> -#endif
+>> -
+>> ?/* usb state change */
+>> ?#define GUMSTIX_USB_INTR_IRQ ? ? ? ? ? IRQ_GPIO(GPIO_GUMSTIX_USB_GPIOn)
+>>
+>> --
+>> 1.7.0.4
+>>
+>>
 >
-> in case of lcd panel with cpu interface, it could get screen data
-> through arm core
-> or display controller supporting cpu interface mode.
-> display controller of s5pv210 chip can create cpu interface signal according to
-> cs, wr setup, wr act and hold time setting.
-> the reason I added cpu timing variables to fb_var_screeninfo is for using common
-> framework when setting them to the display controller as cpu timing info.
-> please, see [PATCH 2/3], s3c_fb_set_timing function part.
->
-> and cpu timing could be adjusted by user through fb_var_screeninfo,
-> for this, suitable checking should be considered at machine specific
-> fb_check_var func.
-> also you can see that through [PATCH 2/3], s3c_fb_check_var.
-
-I'm still having difficulty understanding this. I guess what I am
-asking is why do these new variables "cs, wr setup, wr act and hold
-time setting", have to be in fb_var_screeninfo which is a generic
-platform/implementation independent structure exposed to userspace? If
-I've understood things correctly, the variables themselves, eg: wr
-setup seem to be specific to this implementation rather than being
-generic like the other members of fb_var_sreeninfo. Have you
-considered an alternative way by which you can achieve the desired
-functionality. Also, I'm confused when you say "cpu timing" could be
-adjusted by user through fb_var_screeninfo. Could you elaborate on
-that?
-
-I haven't read through the remaining part of the message about
-mipi-dsi issues, I'm hoping developers who have implemented the other
-MIPI-DSI implementations in fbdev could chime in.
-
-Thanks,
-jaya
