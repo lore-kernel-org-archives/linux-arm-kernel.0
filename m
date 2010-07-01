@@ -1,49 +1,61 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 1 Jul 2010 10:48:28 +0200
-Subject: [PATCH 14/33] Removing dead SDMA_IRAM
-In-Reply-To: <3dc9983ca244c19f18da8951444e1cc9fae0226f.1277911346.git.siccegge@cs.fau.de>
-References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<3dc9983ca244c19f18da8951444e1cc9fae0226f.1277911346.git.siccegge@cs.fau.de>
-Message-ID: <20100701084828.GE12115@pengutronix.de>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Thu, 01 Jul 2010 17:18:33 +0900
+Subject: [PATCH 13/16] omap: mux: Mux Apollon LCD power in board-apollon.c
+In-Reply-To: <1277967954.2474.269.camel@tubuntu.research.nokia.com>
+References: <20100630120226.2637.31198.stgit@baageli.muru.com>
+	<20100630120719.2637.65586.stgit@baageli.muru.com>
+	<1277967954.2474.269.camel@tubuntu.research.nokia.com>
+Message-ID: <004d01cb18f5$ff27be80$fd773b80$%park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 30, 2010 at 05:58:25PM +0200, Christoph Egger wrote:
-> SDMA_IRAM doesn't exist in Kconfig, therefore removing all references
-> for it from the source code.
-> 
-> Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
+Hi,
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+This value is set from bootloader, and kernel side only change the mode.
+Right it runs by luck.
 
+Thank you,
+Kyungmin Park
 
-> ---
->  arch/arm/plat-mxc/include/mach/mx51.h |    4 ----
->  1 files changed, 0 insertions(+), 4 deletions(-)
+> -----Original Message-----
+> From: Tomi Valkeinen [mailto:tomi.valkeinen at nokia.com]
+> Sent: Thursday, July 01, 2010 4:06 PM
+> To: ext Tony Lindgren
+> Cc: linux-arm-kernel at lists.infradead.org; Kyungmin Park; linux-
+> omap at vger.kernel.org
+> Subject: Re: [PATCH 13/16] omap: mux: Mux Apollon LCD power in board-
+> apollon.c
 > 
-> diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
-> index 5aad344..fd5ec07 100644
-> --- a/arch/arm/plat-mxc/include/mach/mx51.h
-> +++ b/arch/arm/plat-mxc/include/mach/mx51.h
-> @@ -149,11 +149,7 @@
->  #define MX51_MXC_DMA_CHANNEL_SSI1_RX	MXC_DMA_DYNAMIC_CHANNEL
->  #define MX51_MXC_DMA_CHANNEL_SSI1_TX	MXC_DMA_DYNAMIC_CHANNEL
->  #define MX51_MXC_DMA_CHANNEL_SSI2_RX	MXC_DMA_DYNAMIC_CHANNEL
-> -#ifdef CONFIG_SDMA_IRAM
-> -#define MX51_MXC_DMA_CHANNEL_SSI2_TX	(MX51_MXC_DMA_CHANNEL_IRAM + 1)
-> -#else				/*CONFIG_SDMA_IRAM */
->  #define MX51_MXC_DMA_CHANNEL_SSI2_TX	MXC_DMA_DYNAMIC_CHANNEL
-> -#endif				/*CONFIG_SDMA_IRAM */
->  #define MX51_MXC_DMA_CHANNEL_CSPI1_RX	MXC_DMA_DYNAMIC_CHANNEL
->  #define MX51_MXC_DMA_CHANNEL_CSPI1_TX	MXC_DMA_DYNAMIC_CHANNEL
->  #define MX51_MXC_DMA_CHANNEL_CSPI2_RX	MXC_DMA_DYNAMIC_CHANNEL
-> -- 
-> 1.7.0.4
+> On Wed, 2010-06-30 at 14:07 +0200, ext Tony Lindgren wrote:
+> > Use the new mux function for that.
+> >
+> > Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> > Cc: Tomi Valkeinen <tomi.valkeinen@nokia.com>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> >  arch/arm/mach-omap2/board-apollon.c |    3 +++
+> >  drivers/video/omap/lcd_apollon.c    |    3 ---
+> >  2 files changed, 3 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/board-apollon.c b/arch/arm/mach-
+> omap2/board-apollon.c
+> > index b86a879..bc67026 100644
+> > --- a/arch/arm/mach-omap2/board-apollon.c
+> > +++ b/arch/arm/mach-omap2/board-apollon.c
+> > @@ -332,6 +332,9 @@ static void __init omap_apollon_init(void)
+> >  	/* REVISIT: where's the correct place */
+> >  	omap_cfg_reg(W19_24XX_SYS_NIRQ);
+> >
+> > +	/* LCD PWR_EN */
+> > +	omap_mux_init_signal("mcbsp2_dr.gpio_11", OMAP_PULL_ENA |
+> OMAP_PULL_UP);
 > 
+> LCD_PWR_EN sounds like output pin. However, I don't see lcd_apollon.c
+> nor board-apollon.c set the gpio.
 > 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> I don't know what omap_cfg_reg(M21_242X_GPIO11) does, but if it does the
+> same thing as the line above, then does the apollon LCD work by luck?
+> OMAP pulling the line up, and by chance the pull is stronger than the
+> LCDs (possible) pull down, and thus the LCD is powered up...
+> 
+>  Tomi
