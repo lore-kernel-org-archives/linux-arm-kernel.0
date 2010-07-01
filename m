@@ -1,48 +1,50 @@
 From: siccegge@cs.fau.de (Christoph Egger)
-Date: Thu, 1 Jul 2010 15:22:55 +0200
-Subject: [PATCH 03/33] Removing dead OMAP_MUX_ERRORS
-In-Reply-To: <20100630195409.GC3969@shutemov.name>
+Date: Thu, 1 Jul 2010 15:23:51 +0200
+Subject: [PATCH 06/33] Removing dead SHARPSL_LOCOMO
+In-Reply-To: <AANLkTimVRdxeeQKazgFSIQJYtbmHnjDN5lUnTrVv6uoI@mail.gmail.com>
 References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<b6ca168f9459162f2c96aa8ef999047a3c4f6f9c.1277911346.git.siccegge@cs.fau.de>
-	<20100630195409.GC3969@shutemov.name>
-Message-ID: <20100701132255.GA32541@faui48a.informatik.uni-erlangen.de>
+	<b43850b1a1909496718e39687d1ca00543aa30ec.1277911346.git.siccegge@cs.fau.de>
+	<AANLkTimVRdxeeQKazgFSIQJYtbmHnjDN5lUnTrVv6uoI@mail.gmail.com>
+Message-ID: <20100701132351.GB32541@faui48a.informatik.uni-erlangen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 30, 2010 at 10:54:09PM +0300, Kirill A. Shutemov wrote:
-> On Wed, Jun 30, 2010 at 05:54:42PM +0200, Christoph Egger wrote:
-> > OMAP_MUX_ERRORS doesn't exist in Kconfig, therefore removing all
+On Thu, Jul 01, 2010 at 10:34:13AM +0800, Eric Miao wrote:
+> On Wed, Jun 30, 2010 at 11:55 PM, Christoph Egger <siccegge@cs.fau.de> wrote:
+> > SHARPSL_LOCOMO doesn't exist in Kconfig, therefore removing all
 > > references for it from the source code.
+> >
 > 
-> IIUC, CONFIG_OMAP_MUX_WARNINGS should be used here instead of it.
+> A good catch, though SHARPSL_LOCOMO has be changed to SHARP_LOCOMO
+> later, so a better fix would be the name change only.
 
-Something like the patch below?
+Hi! Updated patch below
 
 ----
 From: Christoph Egger <siccegge@cs.fau.de>
-Date: Wed, 30 Jun 2010 12:30:36 +0200
-Subject: [PATCH 03/33] Replace dead OMAP_MUX_ERRORS with OMAP_MUX_WARNINGS
+Date: Wed, 30 Jun 2010 12:36:20 +0200
+Subject: [PATCH 06/33] Replacing dead SHARPSL_LOCOMO with SHARP_LOCOMO
 
-OMAP_MUX_ERRORS doesn't exist in Kconfig, therefore replacing all
-references for it with OMAP_MUX_WARNINGS in the source code.
+SHARP_LOCOMO doesn't exist in Kconfig, therefore replacing all
+references for it with SHARP_LOCOMO in the source code.
 
 Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
 ---
- arch/arm/mach-omap1/mux.c |    2 +-
+ arch/arm/mach-sa1100/include/mach/irqs.h |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/mux.c b/arch/arm/mach-omap1/mux.c
-index 8434137..3e98835 100644
---- a/arch/arm/mach-omap1/mux.c
-+++ b/arch/arm/mach-omap1/mux.c
-@@ -440,7 +440,7 @@ int __init_or_module omap1_cfg_reg(const struct pin_config *cfg)
- 	}
- #endif
- 
--#ifdef CONFIG_OMAP_MUX_ERRORS
-+#ifdef CONFIG_OMAP_MUX_WARNINGS
- 	return warn ? -ETXTBSY : 0;
+diff --git a/arch/arm/mach-sa1100/include/mach/irqs.h b/arch/arm/mach-sa1100/include/mach/irqs.h
+index 8c8845b..d18f21a 100644
+--- a/arch/arm/mach-sa1100/include/mach/irqs.h
++++ b/arch/arm/mach-sa1100/include/mach/irqs.h
+@@ -77,7 +77,7 @@
+  */
+ #ifdef CONFIG_SA1111
+ #define NR_IRQS			(IRQ_BOARD_END + 55)
+-#elif defined(CONFIG_SHARPSL_LOCOMO)
++#elif defined(CONFIG_SHARP_LOCOMO)
+ #define NR_IRQS			(IRQ_BOARD_START + 4)
  #else
- 	return 0;
+ #define NR_IRQS			(IRQ_BOARD_START)
 -- 
 1.7.0.4
