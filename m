@@ -1,48 +1,41 @@
-From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Thu, 1 Jul 2010 09:42:55 +0300
-Subject: [PATCH 0/4] crash utility: add ARM crashdump support
-In-Reply-To: <482970280.508981277903458507.JavaMail.root@zmail05.collab.prod.int.phx2.redhat.com>
-References: <1093965077.507331277902686384.JavaMail.root@zmail05.collab.prod.int.phx2.redhat.com>
-	<482970280.508981277903458507.JavaMail.root@zmail05.collab.prod.int.phx2.redhat.com>
-Message-ID: <20100701064255.GA25358@esdhcp04058.research.nokia.com>
+From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
+Date: Thu, 01 Jul 2010 10:05:54 +0300
+Subject: [PATCH 13/16] omap: mux: Mux Apollon LCD power in board-apollon.c
+In-Reply-To: <20100630120719.2637.65586.stgit@baageli.muru.com>
+References: <20100630120226.2637.31198.stgit@baageli.muru.com>
+	<20100630120719.2637.65586.stgit@baageli.muru.com>
+Message-ID: <1277967954.2474.269.camel@tubuntu.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 30, 2010 at 03:10:58PM +0200, ext Dave Anderson wrote:
+On Wed, 2010-06-30 at 14:07 +0200, ext Tony Lindgren wrote:
+> Use the new mux function for that.
 > 
-> Actually I have a problem with this -- although I think it's a good one for you...
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Tomi Valkeinen <tomi.valkeinen@nokia.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/board-apollon.c |    3 +++
+>  drivers/video/omap/lcd_apollon.c    |    3 ---
+>  2 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> As I understand it, this patch-set will run on an ARM host against either
-> an ARM kdump-ELF or makedumpfile-generated dumpfile, and presumably on a
-> live ARM system.
+> diff --git a/arch/arm/mach-omap2/board-apollon.c b/arch/arm/mach-omap2/board-apollon.c
+> index b86a879..bc67026 100644
+> --- a/arch/arm/mach-omap2/board-apollon.c
+> +++ b/arch/arm/mach-omap2/board-apollon.c
+> @@ -332,6 +332,9 @@ static void __init omap_apollon_init(void)
+>  	/* REVISIT: where's the correct place */
+>  	omap_cfg_reg(W19_24XX_SYS_NIRQ);
+>  
+> +	/* LCD PWR_EN */
+> +	omap_mux_init_signal("mcbsp2_dr.gpio_11", OMAP_PULL_ENA | OMAP_PULL_UP);
 
-Right. Except that current patch set only supports makedumpfile generated
-dumpfile.
+LCD_PWR_EN sounds like output pin. However, I don't see lcd_apollon.c
+nor board-apollon.c set the gpio.
 
-> As it turns out, over the last couple of weeks, I've been going back-and-forth
-> with another ARM-support patch-set created by Jan Karlsson and Thomas Fange of 
-> Sony Ericcson.  However, their patch set is designed to be built on and run
-> on a 32-bit x86 host, although I think that with a very minor tweak, it could
-> also could be built and run on an ARM host.  For that reason, it doesn't support
-> running on a live ARM system, but rather only for ARM dumpfiles running
-> on an x86 host (or x86_64 given its capability of running 32-bit binaries).
+I don't know what omap_cfg_reg(M21_242X_GPIO11) does, but if it does the
+same thing as the line above, then does the apollon LCD work by luck?
+OMAP pulling the line up, and by chance the pull is stronger than the
+LCDs (possible) pull down, and thus the LCD is powered up...
 
-Good to know. I didn't notice that someone else was doing the similar thing.
-
-As there is no cross-architecture support in current crash, I decided to take
-the easiest route and make it run natively on ARM. It works on i386 as well but
-only because of the same endianess and word size. So I'm currently running this
-on the target device or under ARM linux-user QEMU.
-
-> In any case, I'm more than happy to fold in ARM support, but I don't know what
-> to do in this case.
-> 
-> I wonder if it would it be possible for you, Jan and Thomas to somehow collaborate
-> on this effort?  It seems that both sides would benefit from the work of the other
-> side.  I've added them to the cc list.
-
-Sure. Can those patches be found in some public ML? I quickly searched but
-couldn't find anything.
-
-Regards,
-MW
+ Tomi
