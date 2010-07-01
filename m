@@ -1,59 +1,48 @@
-From: siccegge@cs.fau.de (Christoph Egger)
-Date: Thu, 1 Jul 2010 15:25:16 +0200
-Subject: [PATCH 29/33] Removing dead SND_SOC_SMDK2443_WM9710
-In-Reply-To: <AANLkTinZa7_TEjYFTu9V6obndpVvMmHppaOArM1AJg_t@mail.gmail.com>
-References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<e5391de6858597bbfd43874aed124a73f74850b5.1277911346.git.siccegge@cs.fau.de>
-	<AANLkTinZa7_TEjYFTu9V6obndpVvMmHppaOArM1AJg_t@mail.gmail.com>
-Message-ID: <20100701132515.GC32541@faui48a.informatik.uni-erlangen.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 01 Jul 2010 15:32:17 +0200
+Subject: [PATCH 2/3] arm: s5pv210: Aquila: add support for MAX8998 PMIC
+In-Reply-To: <20100701122451.GA17698@sirena.org.uk>
+References: <1277964466-23891-1-git-send-email-m.szyprowski@samsung.com>
+	<1277964466-23891-3-git-send-email-m.szyprowski@samsung.com>
+	<20100701122451.GA17698@sirena.org.uk>
+Message-ID: <000001cb1921$d75de060$8619a120$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 01, 2010 at 09:55:47PM +0900, Jassi Brar wrote:
-> On Thu, Jul 1, 2010 at 1:03 AM, Christoph Egger <siccegge@cs.fau.de> wrote:
-> > SND_SOC_SMDK2443_WM9710 doesn't exist in Kconfig, therefore removing
-> > all references for it from the source code.
-> I'd rather have the code compiled unconditionally.
+Hello,
 
-OK that would be done by the patch below
+On Thursday, July 01, 2010 2:25 PM Mark Brown wrote:
 
-----
-From: Christoph Egger <siccegge@cs.fau.de>
-Date: Wed, 30 Jun 2010 17:18:52 +0200
-Subject: [PATCH 29/33] Removing dead SND_SOC_SMDK2443_WM9710
+> On Thu, Jul 01, 2010 at 08:07:45AM +0200, Marek Szyprowski wrote:
+> 
+> > +static struct regulator_consumer_supply aquila_ldo3_consumers[] = {
+> > +	{	.supply	= "VMIPI_1.1V",	},
+> > +};
+> 
+> > +static struct regulator_consumer_supply aquila_ldo8_consumers[] = {
+> > +	{	.supply	= "VADC_3.3V", },
+> > +};
+> 
+> Almost all of these regulator supplies should be removed.  Except in
+> some exceptional cases all supplies should specify a struct device (the
+> only one that really exists at the minute is CPU core due to lack of
+> devices for CPUfreq).  In general if you're defining a supply name that
+> is the same as the rail on the board rather than a pin on a chip you're
+> not using the API correctly.
 
-SND_SOC_SMDK2443_WM9710 doesn't exist in Kconfig, therefore removing
-all references for it from the source code, building the parts
-unconditionally
+Ok. I will remove them now and add later with the appropriate devices.
 
-Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
----
- arch/arm/mach-s3c2443/mach-smdk2443.c |    4 ----
- 1 files changed, 0 insertions(+), 4 deletions(-)
+One more question - should I enable the regulators in the driver itself
+or in the platform callback (like a "poweron()" callback)?
 
-diff --git a/arch/arm/mach-s3c2443/mach-smdk2443.c b/arch/arm/mach-s3c2443/mach-smdk2443.c
-index 4c863d3..764144a 100644
---- a/arch/arm/mach-s3c2443/mach-smdk2443.c
-+++ b/arch/arm/mach-s3c2443/mach-smdk2443.c
-@@ -106,9 +106,7 @@ static struct platform_device *smdk2443_devices[] __initdata = {
- 	&s3c_device_wdt,
- 	&s3c_device_i2c0,
- 	&s3c_device_hsmmc0,
--#ifdef CONFIG_SND_SOC_SMDK2443_WM9710
- 	&s3c_device_ac97,
--#endif
- };
- 
- static void __init smdk2443_map_io(void)
-@@ -122,9 +120,7 @@ static void __init smdk2443_machine_init(void)
- {
- 	s3c_i2c0_set_platdata(NULL);
- 
--#ifdef CONFIG_SND_SOC_SMDK2443_WM9710
- 	s3c24xx_ac97_setup_gpio(S3C24XX_AC97_GPE0);
--#endif
- 
- 	platform_add_devices(smdk2443_devices, ARRAY_SIZE(smdk2443_devices));
- 	smdk_machine_init();
--- 
-1.7.0.4
+If I put regulator enabling into the driver how can one make it working
+on a board without regulators (chip powered all the time)? Should the
+driver ignore errors from regulator_get()?
+
+What if one regulator needs enabling other to operate properly 
+(parent-child hierarchy)?
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
