@@ -1,40 +1,55 @@
-From: p.osciak@samsung.com (Pawel Osciak)
-Date: Fri, 02 Jul 2010 14:56:06 +0200
-Subject: [PATCH v3 01/12] s3c-fb: Fix various null references on
-	framebuffer memory alloc failure
-In-Reply-To: <4C2DB6A2.2040005@simtec.co.uk>
-References: <1277712538-23188-1-git-send-email-p.osciak@samsung.com>
-	<1277712538-23188-2-git-send-email-p.osciak@samsung.com>
-	<4C2DB6A2.2040005@simtec.co.uk>
-Message-ID: <003c01cb19e5$ef8c5df0$cea519d0$%osciak@samsung.com>
+From: jamie.iles@picochip.com (Jamie Iles)
+Date: Fri, 2 Jul 2010 14:05:03 -0400
+Subject: [PATCH] ARM: perf: ensure counter delta is limited to 32-bits
+In-Reply-To: <1278074642-3045-1-git-send-email-will.deacon@arm.com>
+References: <1278074642-3045-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20100702180503.GF2357@wear.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->Ben Dooks <ben@simtec.co.uk> wrote:
->On 28/06/10 09:08, Pawel Osciak wrote:
->> @@ -819,7 +820,8 @@ static void s3c_fb_release_win(struct s3c_fb *sfb,
->struct s3c_fb_win *win)
->>  {
->>  	if (win->fbinfo) {
->>  		unregister_framebuffer(win->fbinfo);
->> -		fb_dealloc_cmap(&win->fbinfo->cmap);
->> +		if (&win->fbinfo->cmap)
->> +			fb_dealloc_cmap(&win->fbinfo->cmap);
->
->did you really mean &win->fbinfo->cmap? surely that will end up
->always evaluating to true?
->
+On Fri, Jul 02, 2010 at 01:44:02PM +0100, Will Deacon wrote:
+> Hardware performance counters on ARM are 32-bits wide but
+> atomic64_t variables are used to represent counter data
+> in the hw_perf_event structure.
+> 
+> The armpmu_event_update function right-shifts a signed
+> 64-bit delta variable and adds the result to the event count.
+> This can lead to shifting in sign-bits if the MSB of the
+> 32-bit counter value is set. This results in perf output such as:
+> 
+>  Performance counter stats for 'sleep 20':
+> 
+>  18446744073460670464  cycles             <-- 0xFFFFFFFFF12A6000
+>         7783773  instructions             #      0.000 IPC
+>             465  context-switches
+>             161  page-faults
+>         1172393  branches
+>    20.154242147  seconds time elapsed
+> 
+> This patch ensures that only the bottom 32 bits of the delta
+> value are used.
+> 
+> Cc: Jamie Iles <jamie.iles@picochip.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Hi Will,
 
-It should have actually been:
+Well spotted! I think this may have actually been a typo when porting to ARM
+from the sparc and x86 code, and this should address it so we do the same:
 
-+		if (win->fbinfo->cmap.len)
-+			fb_dealloc_cmap(&win->fbinfo->cmap);
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 9e70f20..6c0f3ca 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -164,7 +164,7 @@ armpmu_event_update(struct perf_event *event,
+ 		    int idx)
+ {
+ 	int shift = 64 - 32;
+-	s64 prev_raw_count, new_raw_count;
++	u64 prev_raw_count, new_raw_count;
+ 	s64 delta;
+ 
+ again:
 
-Thanks, will post a fix for this patch.
+This way we can cope with negative deltas if we ever need to.
 
-
-Best regards
---
-Pawel Osciak
-Linux Platform Group
-Samsung Poland R&D Center
+Jamie
