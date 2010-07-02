@@ -1,30 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 2 Jul 2010 08:30:01 +0100
-Subject: [PATCH 1/3] FB: Add some members for CPU Interface.
-In-Reply-To: <AANLkTilgB3s8hy5Qg7IYpyBzwHCgK_GswVZqpxhryU5L@mail.gmail.com>
-References: <4C29CFBD.3040205@samsung.com>
-	<AANLkTilgB3s8hy5Qg7IYpyBzwHCgK_GswVZqpxhryU5L@mail.gmail.com>
-Message-ID: <20100702073001.GA25492@n2100.arm.linux.org.uk>
+From: zpfeffer@codeaurora.org (Zach Pfeffer)
+Date: Fri, 02 Jul 2010 00:33:51 -0700
+Subject: [RFC 3/3] mm: iommu: The Virtual Contiguous Memory Manager
+In-Reply-To: <1278021944.7738.43.camel@c-dwalke-linux.qualcomm.com>
+References: <1277877350-2147-1-git-send-email-zpfeffer@codeaurora.org>
+	<1277877350-2147-3-git-send-email-zpfeffer@codeaurora.org>
+	<20100701101746.3810cc3b.randy.dunlap@oracle.com>
+	<20100701180241.GA3594@basil.fritz.box>
+	<1278012503.7738.17.camel@c-dwalke-linux.q
+	<1278021944.7738.43.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <4C2D965F.5000206@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 30, 2010 at 08:02:31AM +0800, Jaya Kumar wrote:
-> > diff --git a/include/linux/fb.h b/include/linux/fb.h
-> > index 907ace3..73381c3 100644
-> > --- a/include/linux/fb.h
-> > +++ b/include/linux/fb.h
-> > @@ -269,6 +269,12 @@ struct fb_var_screeninfo {
-> >  	__u32 vmode;			/* see FB_VMODE_*		*/
-> >  	__u32 rotate;			/* angle we rotate counter clockwise */
-> >  	__u32 reserved[5];		/* Reserved for future compatibility */
-> > +
-> > +	/* For cpu interface timing. */
-> > +	__u32 cs_setup;
-> > +	__u32 wr_setup;
-> > +	__u32 wr_act;
-> > +	__u32 wr_hold;
+Daniel Walker wrote:
+> On Thu, 2010-07-01 at 15:00 -0700, Zach Pfeffer wrote:
+> 
+> 
+>> Additionally, the current IOMMU interface does not allow users to
+>> associate one page table with multiple IOMMUs unless the user explicitly
+>> wrote a muxed device underneith the IOMMU interface. This also could be
+>> done, but would have to be done for every such use case. Since the
+>> particular topology is run-time configurable all of these use-cases and
+>> more can be expressed without pushing the topology into the low-level
+>> IOMMU driver.
+>>
+>> The VCMM takes the long view. Its designed for a future in which the
+>> number of IOMMUs will go up and the ways in which these IOMMUs are
+>> composed will vary from system to system, and may vary at
+>> runtime. Already, there are ~20 different IOMMU map implementations in
+>> the kernel. Had the Linux kernel had the VCMM, many of those
+>> implementations could have leveraged the mapping and topology management
+>> of a VCMM, while focusing on a few key hardware specific functions (map
+>> this physical address, program the page table base register).
+> 
+> So if we include this code which "map implementations" could you
+> collapse into this implementations ? Generally , what currently existing
+> code can VCMM help to eliminate?
 
-This changes the framebuffer userspace API, making it incompatible with
-existing users.  What this means is that stuff using the framebuffer API
-in userspace has to be upgraded/downgraded in lock-step with this change
-- which is not a good idea.
+In theory, it can eliminate all code the interoperates between IOMMU,
+CPU and non-IOMMU based devices and all the mapping code, alignment,
+mapping attribute and special block size support that's been
+implemented.
+
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
