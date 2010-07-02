@@ -1,24 +1,19 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 2 Jul 2010 10:33:10 +0100
-Subject: [PATCH 29/33] Removing dead SND_SOC_SMDK2443_WM9710
-In-Reply-To: <AANLkTim0usB99K6orH0lxP73e-XK69ytdECtR5D1dPJt@mail.gmail.com>
+From: ben@simtec.co.uk (Ben Dooks)
+Date: Fri, 02 Jul 2010 10:38:38 +0100
+Subject: [PATCH 30/33] Removing dead S3C_DEV_ADC
+In-Reply-To: <7baaebb4983ce9482e3f83ca42240b864157cb79.1277911346.git.siccegge@cs.fau.de>
 References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<e5391de6858597bbfd43874aed124a73f74850b5.1277911346.git.siccegge@cs.fau.de>
-	<AANLkTinZa7_TEjYFTu9V6obndpVvMmHppaOArM1AJg_t@mail.gmail.com>
-	<20100701130724.GC17698@sirena.org.uk>
-	<AANLkTim0usB99K6orH0lxP73e-XK69ytdECtR5D1dPJt@mail.gmail.com>
-Message-ID: <20100702093310.GA19712@opensource.wolfsonmicro.com>
+	<7baaebb4983ce9482e3f83ca42240b864157cb79.1277911346.git.siccegge@cs.fau.de>
+Message-ID: <4C2DB39E.8050600@simtec.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 02, 2010 at 04:08:56PM +0900, Jassi Brar wrote:
-> On Thu, Jul 1, 2010 at 10:07 PM, Mark Brown
+On 30/06/10 17:03, Christoph Egger wrote:
+> S3C_DEV_ADC doesn't exist in Kconfig, therefore removing all
+> references for it from the source code.
 
-> > Hrm, if this is part of the default hardware build we should get the
-> > driver merged.
+This is going to be fixed in the next kernel release, one way
+or the other, so please drop this patch
 
-> But the machine driver is already there
->    sound/soc/s3c24xx/smdk2443_wm9710.c
-
-Oh, right.  I was just assuming that it wasn't there since the symbol
-isn't defined in mainline, I hadn't actually looked.
+-- 
+Ben
