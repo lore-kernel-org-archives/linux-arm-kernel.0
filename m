@@ -1,32 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 1 Jul 2010 19:10:47 -0500
-Subject: [PATCH] ARM: Stop secondary cpus in machine_halt()
-In-Reply-To: <20100701231128.GA19906@n2100.arm.linux.org.uk>
-References: <20100701224706.GA26473@lixom.net>
-	<20100701231128.GA19906@n2100.arm.linux.org.uk>
-Message-ID: <20100702001047.GA26647@lixom.net>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 1 Jul 2010 18:46:46 -0700
+Subject: [PATCH 1/3] FB: Add some members for CPU Interface.
+In-Reply-To: <5572310.15091278033672605.JavaMail.weblogic@epml12>
+References: <5572310.15091278033672605.JavaMail.weblogic@epml12>
+Message-ID: <20100701184646.0d33340c.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 02, 2010 at 12:11:28AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 01, 2010 at 05:47:06PM -0500, Olof Johansson wrote:
-> > ARM doesn't spin down secondary cpus on halt, which results in interrupts
-> > being delivered even after the "System halted" message, etc.
-> > 
-> > Change that to use smp_send_stop() to halt them. Also, change the
-> > smp_send_stop() on ARM to not do a stack dump when stopping.
+On Fri, 02 Jul 2010 01:21:12 +0000 (GMT) In-Ki Dae <inki.dae@samsung.com> wrote:
+
+> Hi, Andrew,
 > 
-> Actually, we want stack dumps - sometimes.  For instance, when we
-> panic() or similar.
+> cpu timing variables could be used generically.
+> now fb.h and modedb.c file have been considered only for video mode.
+> but the way of transfering screen data includes also command mode(cpu mode or i80 mode)
+> so I thought it should be added things for it to fb_varscreeninfo struct.
+> 
+> Could you please tell me why cpu timing variables are specific to s3c-fb?
 
-Do we really want the stack dumps of all cpus at panic time? They won't be
-printed precisely since the IPI takes a while to make it over.
+I dunno - I was just looking at the code.
 
-As the size of SMP systems grow, it'll also become too spammy.
+I don't even know what "cpu timing variables" _are_, in the context of
+video drivers.  Look at this:
 
-Anyway, the patch only changes behaviour when the system_state is
-SYSTEM_HALT, i.e. during shutdown so all other panics will still
-dump stacks from all cpus.
+> > CPU interface needs cs, wr setup, wr act and hold delay.
+> > I added some members for them to common framework.
 
-
--Olof
+It's gobbledigook!  Please, write patch descriptions which help poor
+dumb people who don't have detailed knowledge of the particular
+hardware understand your patch?
