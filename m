@@ -1,65 +1,71 @@
-From: schindele@nentec.de (Juergen Schindele)
-Date: Fri, 2 Jul 2010 09:45:41 +0200
-Subject: [PATCH 27/33] Removing dead IDE_PXA_CF
-In-Reply-To: <AANLkTikXk-NPcDlf0lCSbf8HYHfoZoWh-7bnQar80UMC@mail.gmail.com>
-References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<a332e637ee15cb15f7099f5dfc19a384b2bf772b.1277911346.git.siccegge@cs.fau.de>
-	<AANLkTikXk-NPcDlf0lCSbf8HYHfoZoWh-7bnQar80UMC@mail.gmail.com>
-Message-ID: <201007020945.42597.schindele@nentec.de>
+From: andi@firstfloor.org (Andi Kleen)
+Date: Fri, 2 Jul 2010 10:22:25 +0200
+Subject: [RFC 3/3] mm: iommu: The Virtual Contiguous Memory Manager
+In-Reply-To: <4C2D847E.5080602@codeaurora.org>
+References: <1277877350-2147-1-git-send-email-zpfeffer@codeaurora.org>
+	<1277877350-2147-3-git-send-email-zpfeffer@codeaurora.org>
+	<20100701101746.3810cc3b.randy.dunlap@oracle.com>
+	<20100701180241.GA3594@basil.fritz.box>
+	<1278012503.7738.17.camel@c-dwalke-linux.qualcomm.com>
+	<20100701193850.GB3594@basil.fritz.box>
+	<4C2D0FF1.6010206@codeaurora.org>
+	<20100701230056.GD3594@basil.fritz.box>
+	<4C2D847E.5080602@codeaurora.org>
+Message-ID: <20100702082225.GA12221@basil.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 1. Juli 2010 schrieb Eric Miao:
-> On Thu, Jul 1, 2010 at 12:02 AM, Christoph Egger <siccegge@cs.fau.de> wrote:
-> > IDE_PXA_CF doesn't exist in Kconfig, therefore removing all references
-> > for it from the source code.
-> >
-> > Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
+On Thu, Jul 01, 2010 at 11:17:34PM -0700, Zach Pfeffer wrote:
+> Andi Kleen wrote:
+> >> The VCMM provides a more abstract, global view with finer-grained
+> >> control of each mapping a user wants to create. For instance, the
+> >> semantics of iommu_map preclude its use in setting up just the IOMMU
+> >> side of a mapping. With a one-sided map, two IOMMU devices can be
+> > 
+> > Hmm? dma_map_* does not change any CPU mappings. It only sets up
+> > DMA mapping(s).
 > 
-> Acked-by: Eric Miao <eric.y.miao@gmail.com>
-> 
-> Include Jurgen though, in case he has any idea.
-> 
-> > ---
-> > ?arch/arm/mach-pxa/trizeps4.c | ? ?6 +-----
-> > ?1 files changed, 1 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-pxa/trizeps4.c b/arch/arm/mach-pxa/trizeps4.c
-> > index 6968911..0acff17 100644
-> > --- a/arch/arm/mach-pxa/trizeps4.c
-> > +++ b/arch/arm/mach-pxa/trizeps4.c
-> > @@ -530,13 +530,9 @@ static void __init trizeps4_init(void)
-> > ? ? ? ?i2c_register_board_info(0, trizeps4_i2c_devices,
-> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?ARRAY_SIZE(trizeps4_i2c_devices));
-> >
-Its OK for me to remove this because i can use pata_platform
-instead and a rework of trizeps4/5 is planned.  
-Recently it was very hard for me to follow all changes.
-> > -#ifdef CONFIG_IDE_PXA_CF
-> > - ? ? ? /* if boot direct from compact flash dont disable power */
-> > - ? ? ? trizeps_conxs_bcr = 0x0009;
-> > -#else
-> > ? ? ? ?/* this is the reset value */
-> > ? ? ? ?trizeps_conxs_bcr = 0x00A0;
-> > -#endif
-> > +
-> > ? ? ? ?BCR_writew(trizeps_conxs_bcr);
-> > ? ? ? ?board_backlight_power(1);
-> > ?}
-> > --
-> > 1.7.0.4
-> >
-> >
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> Sure, but I was saying that iommu_map() doesn't just set up the IOMMU
+> mappings, its sets up both the iommu and kernel buffer mappings.
 
+Normally the data is already in the kernel or mappings, so why
+would you need another CPU mapping too? Sometimes the CPU
+code has to scatter-gather, but that is considered acceptable
+(and if it really cannot be rewritten to support sg it's better
+to have an explicit vmap operation) 
 
+In general on larger systems with many CPUs changing CPU mappings
+also gets expensive (because you have to communicate with all cores), 
+and is not a good idea on frequent IO paths.
 
+> 
+> > 
+> >> Additionally, the current IOMMU interface does not allow users to
+> >> associate one page table with multiple IOMMUs unless the user explicitly
+> > 
+> > That assumes that all the IOMMUs on the system support the same page table
+> > format, right?
+> 
+> Actually no. Since the VCMM abstracts a page-table as a Virtual
+> Contiguous Region (VCM) a VCM can be associated with any device,
+> regardless of their individual page table format.
+
+But then there is no real page table sharing, isn't it? 
+The real information should be in the page tables, nowhere else.
+
+> > The standard Linux approach to such a problem is to write
+> > a library that drivers can use for common functionality, not put a middle 
+> > layer in between. Libraries are much more flexible than layers.
+> 
+> That's true up to the, "is this middle layer so useful that its worth
+> it" point. The VM is a middle layer, you could make the same argument
+> about it, "the mapping code isn't too hard, just map in the memory
+> that you need and be done with it". But the VM middle layer provides a
+> clean separation between page frames and pages which turns out to be
+
+Actually we use both PFNs and struct page *s in many layers up
+and down, there's not really any layering in that.
+
+-Andi
 -- 
---------------------------------------------------------------
-J?rgen Schindele  
---------------------------------------------------------------
+ak at linux.intel.com -- Speaking for myself only.
