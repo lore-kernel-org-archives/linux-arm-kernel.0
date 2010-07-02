@@ -1,30 +1,63 @@
-From: inki.dae@samsung.com (InKi Dae)
-Date: Fri, 02 Jul 2010 17:47:58 +0900
-Subject: [PATCH 0/2] ARM: S5PV210: Add MIPI-DSI support.
-In-Reply-To: <4C29AF72.6090200@samsung.com>
-References: <4C29AF72.6090200@samsung.com>
-Message-ID: <4C2DA7BE.6070701@samsung.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 2 Jul 2010 11:24:03 +0200
+Subject: [PATCH 27/33] Removing dead IDE_PXA_CF
+In-Reply-To: <201007020945.42597.schindele@nentec.de>
+References: <cover.1277911345.git.siccegge@cs.fau.de>
+	<AANLkTikXk-NPcDlf0lCSbf8HYHfoZoWh-7bnQar80UMC@mail.gmail.com>
+	<201007020945.42597.schindele@nentec.de>
+Message-ID: <201007021124.03456.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+Dne P? 2. ?ervence 2010 09:45:41 Juergen Schindele napsal(a):
+> Am Donnerstag, 1. Juli 2010 schrieb Eric Miao:
+> > On Thu, Jul 1, 2010 at 12:02 AM, Christoph Egger <siccegge@cs.fau.de> wrote:
+> > > IDE_PXA_CF doesn't exist in Kconfig, therefore removing all references
+> > > for it from the source code.
+> > > 
+> > > Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
+> > 
+> > Acked-by: Eric Miao <eric.y.miao@gmail.com>
+> > 
+> > Include Jurgen though, in case he has any idea.
+> > 
+> > > ---
+> > >  arch/arm/mach-pxa/trizeps4.c |    6 +-----
+> > >  1 files changed, 1 insertions(+), 5 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-pxa/trizeps4.c
+> > > b/arch/arm/mach-pxa/trizeps4.c index 6968911..0acff17 100644
+> > > --- a/arch/arm/mach-pxa/trizeps4.c
+> > > +++ b/arch/arm/mach-pxa/trizeps4.c
+> > > @@ -530,13 +530,9 @@ static void __init trizeps4_init(void)
+> > >        i2c_register_board_info(0, trizeps4_i2c_devices,
+> > >                                      
+> > >  ARRAY_SIZE(trizeps4_i2c_devices));
+> 
+> Its OK for me to remove this because i can use pata_platform
+> instead and a rework of trizeps4/5 is planned.
+> Recently it was very hard for me to follow all changes.
 
-This patch is for MIPI-DSI controller based on S5PV210 (or S5PC110), and solved the problem, added cpu timing variables to fb_varscreen_info and Andrew Morton, Russell King and Jaya Kumar pointed out.
-so I'm sending these patch series again.
+Are you using U-Boot on that trizeps V ? btw. maybe you can even use pata-pxa if 
+your hardware supports pxa dma?
 
-LCD Panel can use following interfaces,
-- RGB or CPU Interface.
-- RGB or CPU Interface based on MIPI-DSI.
-
-in case of small size lcd panel, it was ok only rgb or cpu interface not using mipi controller.
-but big size panel(more then 480x800) needs MIPI-DSI Interface or other hardwares like LVDS To transfer image data to lcd panel fine.
-
-I tested this patch on cpu interface based on MIPI so for this patch, Some mainline codes should be modified and also considered RGB interface.
-
-This patch set consists of the following patches,
-
-[PATCH 1/2] S5PV210: FB: Add MIPI-DSI and CPU Interface features.
-[PATCH 1/2] S5PV210: Add MIPI-DSI Driver.
-
-Best regards,
-InKi Dae
+Cheers
+> 
+> > > -#ifdef CONFIG_IDE_PXA_CF
+> > > -       /* if boot direct from compact flash dont disable power */
+> > > -       trizeps_conxs_bcr = 0x0009;
+> > > -#else
+> > >        /* this is the reset value */
+> > >        trizeps_conxs_bcr = 0x00A0;
+> > > -#endif
+> > > +
+> > >        BCR_writew(trizeps_conxs_bcr);
+> > >        board_backlight_power(1);
+> > >  }
+> > > --
+> > > 1.7.0.4
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
