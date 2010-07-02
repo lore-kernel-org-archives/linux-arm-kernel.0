@@ -1,23 +1,40 @@
-From: per.xx.fransson@stericsson.com (Per Fransson)
-Date: Fri, 2 Jul 2010 14:48:36 +0200
-Subject: [PATCH v2 0/8] Initial implementation of kdump for ARM
-In-Reply-To: <20100611063605.GB11156@esdhcp04058.research.nokia.com>
-References: <20100611063605.GB11156@esdhcp04058.research.nokia.com>
-Message-ID: <4C2DE024.8060308@stericsson.com>
+From: p.osciak@samsung.com (Pawel Osciak)
+Date: Fri, 02 Jul 2010 14:56:06 +0200
+Subject: [PATCH v3 01/12] s3c-fb: Fix various null references on
+	framebuffer memory alloc failure
+In-Reply-To: <4C2DB6A2.2040005@simtec.co.uk>
+References: <1277712538-23188-1-git-send-email-p.osciak@samsung.com>
+	<1277712538-23188-2-git-send-email-p.osciak@samsung.com>
+	<4C2DB6A2.2040005@simtec.co.uk>
+Message-ID: <003c01cb19e5$ef8c5df0$cea519d0$%osciak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+>Ben Dooks <ben@simtec.co.uk> wrote:
+>On 28/06/10 09:08, Pawel Osciak wrote:
+>> @@ -819,7 +820,8 @@ static void s3c_fb_release_win(struct s3c_fb *sfb,
+>struct s3c_fb_win *win)
+>>  {
+>>  	if (win->fbinfo) {
+>>  		unregister_framebuffer(win->fbinfo);
+>> -		fb_dealloc_cmap(&win->fbinfo->cmap);
+>> +		if (&win->fbinfo->cmap)
+>> +			fb_dealloc_cmap(&win->fbinfo->cmap);
+>
+>did you really mean &win->fbinfo->cmap? surely that will end up
+>always evaluating to true?
+>
 
-I have a question regarding these patches. It seems to me that the kexec 
-will be done with the MMU left on for the ARMv7 case. Looking at the 
-code in the cpu_arm926_reset() routine in arch/arm/mm/proc-arm926.S this 
-is not the case there. Instead, the MMU is turned off and the last 
-instruction that is fetched using the virtual address mapping is a jump 
-to a physical address.
+It should have actually been:
 
-Shouldn't this be handled as consistently as possible for the different 
-ARM sub-archs?
++		if (win->fbinfo->cmap.len)
++			fb_dealloc_cmap(&win->fbinfo->cmap);
 
-Regards,
-Per Fransson
+Thanks, will post a fix for this patch.
+
+
+Best regards
+--
+Pawel Osciak
+Linux Platform Group
+Samsung Poland R&D Center
