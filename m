@@ -1,59 +1,72 @@
 From: ben@simtec.co.uk (Ben Dooks)
-Date: Fri, 02 Jul 2010 10:50:05 +0100
-Subject: [PATCH 1/2] DMAENGINE: correct PL080 register header file
-In-Reply-To: <1277811367-17694-1-git-send-email-linus.walleij@stericsson.com>
-References: <1277811367-17694-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <4C2DB64D.8010000@simtec.co.uk>
+Date: Fri, 02 Jul 2010 10:51:30 +0100
+Subject: [PATCH v3 01/12] s3c-fb: Fix various null references on
+	framebuffer memory alloc failure
+In-Reply-To: <1277712538-23188-2-git-send-email-p.osciak@samsung.com>
+References: <1277712538-23188-1-git-send-email-p.osciak@samsung.com>
+	<1277712538-23188-2-git-send-email-p.osciak@samsung.com>
+Message-ID: <4C2DB6A2.2040005@simtec.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/06/10 12:36, Linus Walleij wrote:
-> This PL008 among all other variables named PL080 doesn't seem
-> right. Fix it. Also add some missing defined that I use in the
-> new PL08x driver.
+On 28/06/10 09:08, Pawel Osciak wrote:
+> The following problems were found in the above situation:
 > 
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-> ---
-> Ben can you ACK this? Shouldn't be any big deal.
-Acked-by: Ben Dooks <ben-linux@fluff.org>
-> ---
->  arch/arm/include/asm/hardware/pl080.h |    4 +++-
->  arch/arm/mach-s3c64xx/dma.c           |    2 +-
->  2 files changed, 4 insertions(+), 2 deletions(-)
+> sfb->windows[win] was being assigned at the end of s3c_fb_probe_win only.
+> This resulted in passing a NULL to s3c_fb_release_win if probe_win returned
+> early and a memory leak.
 > 
-> diff --git a/arch/arm/include/asm/hardware/pl080.h b/arch/arm/include/asm/hardware/pl080.h
-> index 6a6c66b..f35b86e 100644
-> --- a/arch/arm/include/asm/hardware/pl080.h
-> +++ b/arch/arm/include/asm/hardware/pl080.h
-> @@ -43,7 +43,7 @@
+> dma_free_writecombine does not allow its third argument to be NULL.
+> 
+> fb_dealloc_cmap does not verify whether its argument is not NULL.
+> 
+> Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  drivers/video/s3c-fb.c |    8 +++++---
+>  1 files changed, 5 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
+> index b00c064..d998324 100644
+> --- a/drivers/video/s3c-fb.c
+> +++ b/drivers/video/s3c-fb.c
+> @@ -804,7 +804,8 @@ static void s3c_fb_free_memory(struct s3c_fb *sfb, struct s3c_fb_win *win)
+>  {
+>  	struct fb_info *fbi = win->fbinfo;
 >  
->  /* Per channel configuration registers */
+> -	dma_free_writecombine(sfb->dev, PAGE_ALIGN(fbi->fix.smem_len),
+> +	if (fbi->screen_base)
+> +		dma_free_writecombine(sfb->dev, PAGE_ALIGN(fbi->fix.smem_len),
+>  			      fbi->screen_base, fbi->fix.smem_start);
+>  }
 >  
-> -#define PL008_Cx_STRIDE				(0x20)
-> +#define PL080_Cx_STRIDE				(0x20)
->  #define PL080_Cx_BASE(x)			((0x100 + (x * 0x20)))
->  #define PL080_Cx_SRC_ADDR(x)			((0x100 + (x * 0x20)))
->  #define PL080_Cx_DST_ADDR(x)			((0x104 + (x * 0x20)))
-> @@ -68,6 +68,8 @@
->  #define PL080_CONTROL_TC_IRQ_EN			(1 << 31)
->  #define PL080_CONTROL_PROT_MASK			(0x7 << 28)
->  #define PL080_CONTROL_PROT_SHIFT		(28)
-> +#define PL080_CONTROL_PROT_CACHE		(1 << 30)
-> +#define PL080_CONTROL_PROT_BUFF			(1 << 29)
->  #define PL080_CONTROL_PROT_SYS			(1 << 28)
->  #define PL080_CONTROL_DST_INCR			(1 << 27)
->  #define PL080_CONTROL_SRC_INCR			(1 << 26)
-> diff --git a/arch/arm/mach-s3c64xx/dma.c b/arch/arm/mach-s3c64xx/dma.c
-> index 5567e03..e7d03ab 100644
-> --- a/arch/arm/mach-s3c64xx/dma.c
-> +++ b/arch/arm/mach-s3c64xx/dma.c
-> @@ -697,7 +697,7 @@ static int s3c64xx_dma_init1(int chno, enum dma_ch chbase,
->  		chptr->number = chno;
->  		chptr->dmac = dmac;
->  		chptr->regs = regptr;
-> -		regptr += PL008_Cx_STRIDE;
-> +		regptr += PL080_Cx_STRIDE;
+> @@ -819,7 +820,8 @@ static void s3c_fb_release_win(struct s3c_fb *sfb, struct s3c_fb_win *win)
+>  {
+>  	if (win->fbinfo) {
+>  		unregister_framebuffer(win->fbinfo);
+> -		fb_dealloc_cmap(&win->fbinfo->cmap);
+> +		if (&win->fbinfo->cmap)
+> +			fb_dealloc_cmap(&win->fbinfo->cmap);
+
+did you really mean &win->fbinfo->cmap? surely that will end up
+always evaluating to true?
+
+>  		s3c_fb_free_memory(sfb, win);
+>  		framebuffer_release(win->fbinfo);
+>  	}
+> @@ -865,6 +867,7 @@ static int __devinit s3c_fb_probe_win(struct s3c_fb *sfb, unsigned int win_no,
+>  	WARN_ON(windata->win_mode.yres == 0);
+>  
+>  	win = fbinfo->par;
+> +	*res = win;
+>  	var = &fbinfo->var;
+>  	win->variant = *variant;
+>  	win->fbinfo = fbinfo;
+> @@ -939,7 +942,6 @@ static int __devinit s3c_fb_probe_win(struct s3c_fb *sfb, unsigned int win_no,
+>  		return ret;
 >  	}
 >  
->  	/* for the moment, permanently enable the controller */
+> -	*res = win;
+>  	dev_info(sfb->dev, "window %d: fb %s\n", win_no, fbinfo->fix.id);
+>  
+>  	return 0;
