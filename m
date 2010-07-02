@@ -1,43 +1,135 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 02 Jul 2010 09:29:10 -0600
-Subject: [PATCH 01/20] OMAP3: wait on IDLEST after enabling USBTLL fclk
+Date: Fri, 02 Jul 2010 09:29:20 -0600
+Subject: [PATCH 06/20] OMAP2/3: hwmod: L3 and L4 CORE/PER/WKUP hwmods don't
+	have IDLEST
 In-Reply-To: <20100702152703.6221.33529.stgit@localhost.localdomain>
 References: <20100702152703.6221.33529.stgit@localhost.localdomain>
-Message-ID: <20100702152906.6221.27841.stgit@localhost.localdomain>
+Message-ID: <20100702152918.6221.71045.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anand Gadiyar <gadiyar@ti.com>
+From: Kevin Hilman <khilman@deeprootsystems.com>
 
-We need to wait on the IDLEST bit after the clocks are enabled
-before attempting to access any register.
+Since these hwmods do not have IDLEST, set the HWMOD_NO_IDLEST flag,
+otherwise _enable() will fail due to failing _wait_target_ready().
 
-Currently, the USBTLL i-clock ops uses the clkops_omap2_dflt_wait,
-while the USBTLL f-clock ops uses clkops_omap2_dflt. If the
-i-clock is enabled first, the clkops_omap2_dflt_wait is
-short-circuited as the companion f-clock is not enabled.
-This can cause a data abort if the IDLEST has not transitioned,
-and we try to access a USBTLL register.
-
-Since the USBTLL i-clock and f-clock could be enabled in any order,
-this is a bug. Fix it by changing the clkops for the f-clock.
-
-Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/clock3xxx_data.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |    9 ++++++---
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |    9 ++++++---
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   12 ++++++++----
+ 3 files changed, 20 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
-index 41b155a..c226798 100644
---- a/arch/arm/mach-omap2/clock3xxx_data.c
-+++ b/arch/arm/mach-omap2/clock3xxx_data.c
-@@ -1408,7 +1408,7 @@ static struct clk ts_fck = {
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+index e5530c5..a8b57a6 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+@@ -65,7 +65,8 @@ static struct omap_hwmod omap2420_l3_hwmod = {
+ 	.masters_cnt	= ARRAY_SIZE(omap2420_l3_masters),
+ 	.slaves		= omap2420_l3_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap2420_l3_slaves),
+-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2420)
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2420),
++	.flags		= HWMOD_NO_IDLEST,
+ };
  
- static struct clk usbtll_fck = {
- 	.name		= "usbtll_fck",
--	.ops		= &clkops_omap2_dflt,
-+	.ops		= &clkops_omap2_dflt_wait,
- 	.parent		= &dpll5_m2_ck,
- 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP3430ES2_CM_FCLKEN3),
- 	.enable_bit	= OMAP3430ES2_EN_USBTLL_SHIFT,
+ static struct omap_hwmod omap2420_l4_wkup_hwmod;
+@@ -95,7 +96,8 @@ static struct omap_hwmod omap2420_l4_core_hwmod = {
+ 	.masters_cnt	= ARRAY_SIZE(omap2420_l4_core_masters),
+ 	.slaves		= omap2420_l4_core_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap2420_l4_core_slaves),
+-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2420)
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2420),
++	.flags		= HWMOD_NO_IDLEST,
+ };
+ 
+ /* Slave interfaces on the L4_WKUP interconnect */
+@@ -115,7 +117,8 @@ static struct omap_hwmod omap2420_l4_wkup_hwmod = {
+ 	.masters_cnt	= ARRAY_SIZE(omap2420_l4_wkup_masters),
+ 	.slaves		= omap2420_l4_wkup_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap2420_l4_wkup_slaves),
+-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2420)
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2420),
++	.flags		= HWMOD_NO_IDLEST,
+ };
+ 
+ /* Master interfaces on the MPU device */
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+index 0852d95..8b1f74b 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+@@ -65,7 +65,8 @@ static struct omap_hwmod omap2430_l3_hwmod = {
+ 	.masters_cnt	= ARRAY_SIZE(omap2430_l3_masters),
+ 	.slaves		= omap2430_l3_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap2430_l3_slaves),
+-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430)
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
++	.flags		= HWMOD_NO_IDLEST,
+ };
+ 
+ static struct omap_hwmod omap2430_l4_wkup_hwmod;
+@@ -97,7 +98,8 @@ static struct omap_hwmod omap2430_l4_core_hwmod = {
+ 	.masters_cnt	= ARRAY_SIZE(omap2430_l4_core_masters),
+ 	.slaves		= omap2430_l4_core_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap2430_l4_core_slaves),
+-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430)
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
++	.flags		= HWMOD_NO_IDLEST,
+ };
+ 
+ /* Slave interfaces on the L4_WKUP interconnect */
+@@ -117,7 +119,8 @@ static struct omap_hwmod omap2430_l4_wkup_hwmod = {
+ 	.masters_cnt	= ARRAY_SIZE(omap2430_l4_wkup_masters),
+ 	.slaves		= omap2430_l4_wkup_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap2430_l4_wkup_slaves),
+-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430)
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
++	.flags		= HWMOD_NO_IDLEST,
+ };
+ 
+ /* Master interfaces on the MPU device */
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 39b0c0e..e288b20 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -76,7 +76,8 @@ static struct omap_hwmod omap3xxx_l3_hwmod = {
+ 	.masters_cnt	= ARRAY_SIZE(omap3xxx_l3_masters),
+ 	.slaves		= omap3xxx_l3_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap3xxx_l3_slaves),
+-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
++	.flags		= HWMOD_NO_IDLEST,
+ };
+ 
+ static struct omap_hwmod omap3xxx_l4_wkup_hwmod;
+@@ -106,7 +107,8 @@ static struct omap_hwmod omap3xxx_l4_core_hwmod = {
+ 	.masters_cnt	= ARRAY_SIZE(omap3xxx_l4_core_masters),
+ 	.slaves		= omap3xxx_l4_core_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap3xxx_l4_core_slaves),
+-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
++	.flags		= HWMOD_NO_IDLEST,
+ };
+ 
+ /* Slave interfaces on the L4_PER interconnect */
+@@ -126,7 +128,8 @@ static struct omap_hwmod omap3xxx_l4_per_hwmod = {
+ 	.masters_cnt	= ARRAY_SIZE(omap3xxx_l4_per_masters),
+ 	.slaves		= omap3xxx_l4_per_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap3xxx_l4_per_slaves),
+-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
++	.flags		= HWMOD_NO_IDLEST,
+ };
+ 
+ /* Slave interfaces on the L4_WKUP interconnect */
+@@ -146,7 +149,8 @@ static struct omap_hwmod omap3xxx_l4_wkup_hwmod = {
+ 	.masters_cnt	= ARRAY_SIZE(omap3xxx_l4_wkup_masters),
+ 	.slaves		= omap3xxx_l4_wkup_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap3xxx_l4_wkup_slaves),
+-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
++	.flags		= HWMOD_NO_IDLEST,
+ };
+ 
+ /* Master interfaces on the MPU device */
