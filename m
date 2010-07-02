@@ -1,27 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 2 Jul 2010 18:23:17 +0100
-Subject: [patch 2/2] arm: Implement l2x0 cache disable function
-In-Reply-To: <1278089680.10162.279.camel@e102109-lin.cambridge.arm.com>
-References: <alpine.LFD.2.00.1007021658300.2525@localhost.localdomain>
-	<1278087010.10162.271.camel@e102109-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1007021835512.2525@localhost.localdomain>
-	<1278089680.10162.279.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100702172317.GB2978@n2100.arm.linux.org.uk>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Fri, 2 Jul 2010 20:02:57 +0200
+Subject: Some benchmarks on ARM
+Message-ID: <20100702180257.GA8767@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 02, 2010 at 05:54:40PM +0100, Catalin Marinas wrote:
-> On Fri, 2010-07-02 at 17:39 +0100, Thomas Gleixner wrote:
-> > Simply because you need to flush the cache in the decompressor of the
-> > new kernel before jumping into it and I doubt that Russell will be
-> > happy about adding an utter L2 mess to the decompressor.
-> 
-> The decompressor can create mappings as inner cacheable outer
-> non-cacheable and it would not pollute the L2 cache.
+Hi,
 
-Doesn't solve the problem of boot loaders.  Doesn't solve the problem
-that there may be dirty cache lines left in the L2 cache which could
-be searched.
+We have recently made some benchmarks, in order to get a little bit
+better fealing about where ARM cpus are today, especially when it comes
+to the "recent" ones, and in comparism to the Atom. So we collected a
+few benchmarks (most from lmbench) and did some actual measurements.
 
-There's too many "implementation" possibilities to bite us.  The only
-safe thing to do is to disable the L2 cache.
+Here is a little article:
+http://www.pengutronix.de/development/kernel/arm-benchmarks-20100702_en.html
+
+I'm pretty sure that there are quite a few things where people on ALKML
+have good ideas where the effects come from or how to improve the
+methodology - so I'd be glad to get some feedback from the community!
+
+All measurements have been done on 2.6.34.
+
+Thanks,
+
+rsc
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
