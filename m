@@ -1,25 +1,44 @@
-From: ben@simtec.co.uk (Ben Dooks)
-Date: Fri, 02 Jul 2010 14:34:27 +0100
-Subject: [PATCH 0/3] ARM: S5PV210: Add MIPI-DSI support.
-In-Reply-To: <4C29AF72.6090200@samsung.com>
-References: <4C29AF72.6090200@samsung.com>
-Message-ID: <4C2DEAE3.9030903@simtec.co.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 2 Jul 2010 14:38:58 +0100
+Subject: [PATCH] ARM: perf: ensure counter delta is limited to 32-bits
+In-Reply-To: <20100702180503.GF2357@wear.picochip.com>
+References: <1278074642-3045-1-git-send-email-will.deacon@arm.com>
+	<20100702180503.GF2357@wear.picochip.com>
+Message-ID: <004401cb19eb$ecab2840$c60178c0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/06/10 09:31, InKi Dae wrote:
-> Hello all,
-> 
-> This patch is for MIPI-DSI controller based on S5PV210 (or S5PC110).
-> 
-> LCD Panel can use following interfaces,
-> - RGB or CPU Interface.
-> - RGB or CPU Interface based on MIPI-DSI.
-> 
-> In case of small size lcd panel, it was ok only rgb or cpu interface not
-> using mipi controller.
-> But big size panel(more then 480x800) needs MIPI-DSI Interface or other
-> hardwares like LVDS
+Ok, the results are in!
 
-Hmm, I must have imagined connecting up an 1024x768 panel to an RGB
-interface then.
+> Well spotted! I think this may have actually been a typo when porting to ARM
+> from the sparc and x86 code, and this should address it so we do the same:
+> 
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index 9e70f20..6c0f3ca 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -164,7 +164,7 @@ armpmu_event_update(struct perf_event *event,
+>  		    int idx)
+>  {
+>  	int shift = 64 - 32;
+> -	s64 prev_raw_count, new_raw_count;
+> +	u64 prev_raw_count, new_raw_count;
+>  	s64 delta;
+> 
+>  again:
+
+ Performance counter stats for 'git status':
+
+         3650781413  cycles                  
+          289950734  instructions             #      0.079 IPC  
+             144882  context-switches        
+              13677  page-faults             
+          473580406  branches                
+
+       82.426290000  seconds time elapsed
+
+
+Which looks insane to me. The IPC is appalling and we've taken
+more branches than we've executed instructions!
+
+Will
