@@ -1,23 +1,59 @@
 From: ben@simtec.co.uk (Ben Dooks)
-Date: Fri, 02 Jul 2010 10:41:34 +0100
-Subject: [PATCH] ARM: SAMSUNG: Implement set_name function for ADC devices
-In-Reply-To: <1277902749-12882-1-git-send-email-kgene.kim@samsung.com>
-References: <1277902749-12882-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <4C2DB44E.3090305@simtec.co.uk>
+Date: Fri, 02 Jul 2010 10:50:05 +0100
+Subject: [PATCH 1/2] DMAENGINE: correct PL080 register header file
+In-Reply-To: <1277811367-17694-1-git-send-email-linus.walleij@stericsson.com>
+References: <1277811367-17694-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <4C2DB64D.8010000@simtec.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/06/10 13:59, Kukjin Kim wrote:
-> From: Naveen Krishna Ch <ch.naveen@samsung.com>
+On 29/06/10 12:36, Linus Walleij wrote:
+> This PL008 among all other variables named PL080 doesn't seem
+> right. Fix it. Also add some missing defined that I use in the
+> new PL08x driver.
 > 
-> This patch implements s3c_adc_setname() for Samsung SoCs.
-> Also updates its usage in S3C64XX, S5P6440, and S5PV210.
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+> Ben can you ACK this? Shouldn't be any big deal.
+Acked-by: Ben Dooks <ben-linux@fluff.org>
+> ---
+>  arch/arm/include/asm/hardware/pl080.h |    4 +++-
+>  arch/arm/mach-s3c64xx/dma.c           |    2 +-
+>  2 files changed, 4 insertions(+), 2 deletions(-)
 > 
-> Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-
-assuming we don't fix this another way, then lets go with
-this
-
--- 
-Ben
+> diff --git a/arch/arm/include/asm/hardware/pl080.h b/arch/arm/include/asm/hardware/pl080.h
+> index 6a6c66b..f35b86e 100644
+> --- a/arch/arm/include/asm/hardware/pl080.h
+> +++ b/arch/arm/include/asm/hardware/pl080.h
+> @@ -43,7 +43,7 @@
+>  
+>  /* Per channel configuration registers */
+>  
+> -#define PL008_Cx_STRIDE				(0x20)
+> +#define PL080_Cx_STRIDE				(0x20)
+>  #define PL080_Cx_BASE(x)			((0x100 + (x * 0x20)))
+>  #define PL080_Cx_SRC_ADDR(x)			((0x100 + (x * 0x20)))
+>  #define PL080_Cx_DST_ADDR(x)			((0x104 + (x * 0x20)))
+> @@ -68,6 +68,8 @@
+>  #define PL080_CONTROL_TC_IRQ_EN			(1 << 31)
+>  #define PL080_CONTROL_PROT_MASK			(0x7 << 28)
+>  #define PL080_CONTROL_PROT_SHIFT		(28)
+> +#define PL080_CONTROL_PROT_CACHE		(1 << 30)
+> +#define PL080_CONTROL_PROT_BUFF			(1 << 29)
+>  #define PL080_CONTROL_PROT_SYS			(1 << 28)
+>  #define PL080_CONTROL_DST_INCR			(1 << 27)
+>  #define PL080_CONTROL_SRC_INCR			(1 << 26)
+> diff --git a/arch/arm/mach-s3c64xx/dma.c b/arch/arm/mach-s3c64xx/dma.c
+> index 5567e03..e7d03ab 100644
+> --- a/arch/arm/mach-s3c64xx/dma.c
+> +++ b/arch/arm/mach-s3c64xx/dma.c
+> @@ -697,7 +697,7 @@ static int s3c64xx_dma_init1(int chno, enum dma_ch chbase,
+>  		chptr->number = chno;
+>  		chptr->dmac = dmac;
+>  		chptr->regs = regptr;
+> -		regptr += PL008_Cx_STRIDE;
+> +		regptr += PL080_Cx_STRIDE;
+>  	}
+>  
+>  	/* for the moment, permanently enable the controller */
