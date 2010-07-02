@@ -1,59 +1,42 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 2 Jul 2010 16:10:53 +0900
-Subject: [PATCH 29/33] Removing dead SND_SOC_SMDK2443_WM9710
-In-Reply-To: <20100701132515.GC32541@faui48a.informatik.uni-erlangen.de>
-References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<e5391de6858597bbfd43874aed124a73f74850b5.1277911346.git.siccegge@cs.fau.de>
-	<AANLkTinZa7_TEjYFTu9V6obndpVvMmHppaOArM1AJg_t@mail.gmail.com>
-	<20100701132515.GC32541@faui48a.informatik.uni-erlangen.de>
-Message-ID: <AANLkTimtrIdkBbAJDfBj5a_Y8n6MnvBN2FlTztSB610X@mail.gmail.com>
+From: inki.dae@samsung.com (In-Ki Dae)
+Date: Fri, 02 Jul 2010 01:21:12 +0000 (GMT)
+Subject: [PATCH 1/3] FB: Add some members for CPU Interface.
+Message-ID: <5572310.15091278033672605.JavaMail.weblogic@epml12>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 1, 2010 at 10:25 PM, Christoph Egger <siccegge@cs.fau.de> wrote:
-> On Thu, Jul 01, 2010 at 09:55:47PM +0900, Jassi Brar wrote:
->> On Thu, Jul 1, 2010 at 1:03 AM, Christoph Egger <siccegge@cs.fau.de> wrote:
->> > SND_SOC_SMDK2443_WM9710 doesn't exist in Kconfig, therefore removing
->> > all references for it from the source code.
->> I'd rather have the code compiled unconditionally.
->
-> OK that would be done by the patch below
->
-> ----
-> From: Christoph Egger <siccegge@cs.fau.de>
-> Date: Wed, 30 Jun 2010 17:18:52 +0200
-> Subject: [PATCH 29/33] Removing dead SND_SOC_SMDK2443_WM9710
->
-> SND_SOC_SMDK2443_WM9710 doesn't exist in Kconfig, therefore removing
-> all references for it from the source code, building the parts
-> unconditionally
->
-> Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
-> ---
-> ?arch/arm/mach-s3c2443/mach-smdk2443.c | ? ?4 ----
-> ?1 files changed, 0 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-s3c2443/mach-smdk2443.c b/arch/arm/mach-s3c2443/mach-smdk2443.c
-> index 4c863d3..764144a 100644
-> --- a/arch/arm/mach-s3c2443/mach-smdk2443.c
-> +++ b/arch/arm/mach-s3c2443/mach-smdk2443.c
-> @@ -106,9 +106,7 @@ static struct platform_device *smdk2443_devices[] __initdata = {
-> ? ? ? ?&s3c_device_wdt,
-> ? ? ? ?&s3c_device_i2c0,
-> ? ? ? ?&s3c_device_hsmmc0,
-> -#ifdef CONFIG_SND_SOC_SMDK2443_WM9710
-> ? ? ? ?&s3c_device_ac97,
-> -#endif
-This is ok provided 2440 support is included.
+Hi, Andrew,
 
-> ?};
->
-> ?static void __init smdk2443_map_io(void)
-> @@ -122,9 +120,7 @@ static void __init smdk2443_machine_init(void)
-> ?{
-> ? ? ? ?s3c_i2c0_set_platdata(NULL);
->
-> -#ifdef CONFIG_SND_SOC_SMDK2443_WM9710
-> ? ? ? ?s3c24xx_ac97_setup_gpio(S3C24XX_AC97_GPE0);
-> -#endif
-This gpio setup is nowhere implemented. So might as well discard it.
+cpu timing variables could be used generically.
+now fb.h and modedb.c file have been considered only for video mode.
+but the way of transfering screen data includes also command mode(cpu mode or i80 mode)
+so I thought it should be added things for it to fb_varscreeninfo struct.
+
+Could you please tell me why cpu timing variables are specific to s3c-fb?
+------- Original Message -------
+Sender : Andrew Morton<akpm@linux-foundation.org> 
+Date   : 2010-07-02 07:26 (GMT+09:00)
+Title  : Re: [PATCH 1/3] FB: Add some members for CPU Interface.
+
+On Tue, 29 Jun 2010 19:28:14 +0900
+InKi Dae <inki.dae@samsung.com> wrote:
+
+> 
+> CPU interface needs cs, wr setup, wr act and hold delay.
+> I added some members for them to common framework.
+> 
+> Signed-off-by: InKi Dae <inki.dae at samsung.com <mailto:p.osciak@samsung.com>>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com
+> <mailto:kyungmin.park@samsung.com>>
+
+These email addresses are mangled.
+
+> --- a/drivers/video/modedb.c
+> +++ b/drivers/video/modedb.c
+> ...
+> --- a/include/linux/fb.h
+> +++ b/include/linux/fb.h
+
+The patch seems pretty specific to s3c-fb.  Is it possible and sensible
+to somhow avoid adding code to generic files?  Can we push more (or
+all) of these changes into s3c-fb.c or into the arch/arm support code?
