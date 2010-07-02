@@ -1,36 +1,27 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 2 Jul 2010 22:21:53 +0530
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 02 Jul 2010 17:54:40 +0100
 Subject: [patch 2/2] arm: Implement l2x0 cache disable function
 In-Reply-To: <alpine.LFD.2.00.1007021835512.2525@localhost.localdomain>
 References: <alpine.LFD.2.00.1007021658300.2525@localhost.localdomain>
 	<1278087010.10162.271.camel@e102109-lin.cambridge.arm.com>
 	<alpine.LFD.2.00.1007021835512.2525@localhost.localdomain>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C5ECEEDC@dbde02.ent.ti.com>
+Message-ID: <1278089680.10162.279.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-bounces at lists.infradead.org] On Behalf Of Thomas Gleixner
-> Sent: Friday, July 02, 2010 10:10 PM
-> To: Catalin Marinas
-> Cc: Tony Lindgren; LAK
-> Subject: Re: [patch 2/2] arm: Implement l2x0 cache disable function
-> 
+On Fri, 2010-07-02 at 17:39 +0100, Thomas Gleixner wrote:
 > On Fri, 2 Jul 2010, Catalin Marinas wrote:
 > 
 > > On Fri, 2010-07-02 at 16:29 +0100, Thomas Gleixner wrote:
 > > > On Fri, 2 Jul 2010, Catalin Marinas wrote:
 > > >
 > > > > On Thu, 2010-07-01 at 17:05 +0100, Thomas Gleixner wrote:
-> > > > > This function is called from kexec code before the inner caches
-> are
+> > > > > This function is called from kexec code before the inner caches are
 > > > > > disabled to prevent random crashes in the new kernel.
 > > > > >
 > > > > > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 > > > > > Index: linux-2.6/arch/arm/mm/cache-l2x0.c
-> > > > >
-> ===================================================================
+> > > > > ===================================================================
 > > > > > --- linux-2.6.orig/arch/arm/mm/cache-l2x0.c
 > > > > > +++ linux-2.6/arch/arm/mm/cache-l2x0.c
 > > > > > @@ -206,6 +206,12 @@ static void l2x0_flush_range(unsigned lo
@@ -44,8 +35,7 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > > > > > +}
 > > > >
 > > > > Even if we go this route, we need an l2x0_flush_all() rather than
-> > > > invalidate here as the latter removes dirty cache lines without
-> evicting
+> > > > invalidate here as the latter removes dirty cache lines without evicting
 > > > > them first.
 > > >
 > > > True, but that's an implementation detail. What's more important is to
@@ -59,7 +49,13 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > Simply because you need to flush the cache in the decompressor of the
 > new kernel before jumping into it and I doubt that Russell will be
 > happy about adding an utter L2 mess to the decompressor.
-> 
+
+The decompressor can create mappings as inner cacheable outer
+non-cacheable and it would not pollute the L2 cache.
+
+I wonder how the OMAP guys deal with an already enabled L2 cache during
+decompressing.
+
 > > > I think the correct way to deal with this is disabling L2 and let the
 > > > OMAP3 folks deal with it. As Tony said there is some SMI magic to do
 > > > that, so we can do the following:
@@ -83,8 +79,9 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > 
 > And how does the kernel decide whether it needs to use that SMI code
 > in sleep34xx.S or not ?
-> 
-It's OMAP3 specific code and SMI is the only way to enable or disable L2.
 
-Regards,
-Santosh 
+I think that's done at configuration time. But ideally we shouldn't have
+different configurations for secure and non-secure modes.
+
+-- 
+Catalin
