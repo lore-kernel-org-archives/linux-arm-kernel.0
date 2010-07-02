@@ -1,82 +1,149 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 02 Jul 2010 09:29:51 -0600
-Subject: [PATCH 18/20] OMAP2+: hwmod/device: update documentation and copyright
+Date: Fri, 02 Jul 2010 09:30:06 -0600
+Subject: [PATCH 20/20] OMAP: PM constraints: add omap_pm_set_min_clk_rate()
 In-Reply-To: <20100702152703.6221.33529.stgit@localhost.localdomain>
 References: <20100702152703.6221.33529.stgit@localhost.localdomain>
-Message-ID: <20100702152948.6221.19663.stgit@localhost.localdomain>
+Message-ID: <20100702152958.6221.35036.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update some minor documentation issues and update copyright for
-omap_device/omap_hwmod code.
+Add omap_pm_set_min_clk_rate().  This constraint is meant for use by
+device drivers to translate a certain device-specific performance
+constraint (e.g., "minimum polygons per second") to a clock rate for
+the driver's device, given the driver's intimate knowledge of the
+device hardware (e.g., device type, device hardware revision, firmware
+revision, etc.)  From a general PM core perspective, clock rate is
+probably the closest general analog to "performance" that is
+available, but the exact mapping from a use-case-specific performance
+constraint to clock rate must be done by the driver.  Drivers intended for
+upstream merging shouldn't hardcode specific clock rates in their code
+without basing those rates on some performance criteria requested through
+the driver's subsystem (ideally, from userspace).
+
+Imre Deak <imre.deak@nokia.com> described the need and use-case for
+this constraint, and discussed the implementation - thanks, Imre.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
-Cc: Beno?t Cousson <b-cousson@ti.com>
+Cc: Imre Deak <imre.deak@nokia.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   17 ++++++++++++++++-
- arch/arm/plat-omap/omap_device.c |    9 ++++++---
- 2 files changed, 22 insertions(+), 4 deletions(-)
+ arch/arm/plat-omap/include/plat/omap-pm.h |   61 +++++++++++++++++++++++++++++
+ arch/arm/plat-omap/omap-pm-noop.c         |   27 +++++++++++++
+ 2 files changed, 88 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index b012057..4002774 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -422,7 +422,7 @@ static int _init_main_clk(struct omap_hwmod *oh)
- }
+diff --git a/arch/arm/plat-omap/include/plat/omap-pm.h b/arch/arm/plat-omap/include/plat/omap-pm.h
+index 3d468ba..728fbb9 100644
+--- a/arch/arm/plat-omap/include/plat/omap-pm.h
++++ b/arch/arm/plat-omap/include/plat/omap-pm.h
+@@ -16,6 +16,7 @@
  
- /**
-- * _init_interface_clk - get a struct clk * for the the hwmod's interface clks
-+ * _init_interface_clks - get a struct clk * for the the hwmod's interface clks
-  * @oh: struct omap_hwmod *
-  *
-  * Called from _init_clocks().  Populates the @oh OCP slave interface
-@@ -1074,6 +1074,21 @@ void omap_hwmod_writel(u32 v, struct omap_hwmod *oh, u16 reg_offs)
- 	__raw_writel(v, oh->_mpu_rt_va + reg_offs);
- }
+ #include <linux/device.h>
+ #include <linux/cpufreq.h>
++#include <linux/clk.h>
+ 
+ #include "powerdomain.h"
+ 
+@@ -212,6 +213,66 @@ int omap_pm_set_max_dev_wakeup_lat(struct device *req_dev, struct device *dev,
+ int omap_pm_set_max_sdma_lat(struct device *dev, long t);
+ 
  
 +/**
-+ * omap_hwmod_set_slave_idlemode - set the hwmod's OCP slave idlemode
-+ * @oh: struct omap_hwmod *
-+ * @idlemode: SIDLEMODE field bits (shifted to bit 0)
++ * omap_pm_set_min_clk_rate - set minimum clock rate requested by @dev
++ * @dev: struct device * requesting the constraint
++ * @clk: struct clk * to set the minimum rate constraint on
++ * @r: minimum rate in Hz
 + *
-+ * Sets the IP block's OCP slave idlemode in hardware, and updates our
-+ * local copy.  Intended to be used by drivers that have some erratum
-+ * that requires direct manipulation of the SIDLEMODE bits.  Returns
-+ * -EINVAL if @oh is null, or passes along the return value from
-+ * _set_slave_idlemode().
++ * Request that the minimum clock rate on the device @dev's clk @clk
++ * be no less than @r Hz.
 + *
-+ * XXX Does this function have any current users?  If not, we should
-+ * remove it; it is better to let the rest of the hwmod code handle this.
-+ * Any users of this function should be scrutinized carefully.
++ * It is expected that the OMAP PM code will use this information to
++ * find an OPP or clock setting that will satisfy this clock rate
++ * constraint, along with any other applicable system constraints on
++ * the clock rate or corresponding voltage, etc.
++ *
++ * omap_pm_set_min_clk_rate() differs from the clock code's
++ * clk_set_rate() in that it considers other constraints before taking
++ * any hardware action, and may change a system OPP rather than just a
++ * clock rate.  clk_set_rate() is intended to be a low-level
++ * interface.
++ *
++ * omap_pm_set_min_clk_rate() is easily open to abuse.  A better API
++ * would be something like "omap_pm_set_min_dev_performance()";
++ * however, there is no easily-generalizable concept of performance
++ * that applies to all devices.  Only a device (and possibly the
++ * device subsystem) has both the subsystem-specific knowledge, and
++ * the hardware IP block-specific knowledge, to translate a constraint
++ * on "touchscreen sampling accuracy" or "number of pixels or polygons
++ * rendered per second" to a clock rate.  This translation can be
++ * dependent on the hardware IP block's revision, or firmware version,
++ * and the driver is the only code on the system that has this
++ * information and can know how to translate that into a clock rate.
++ *
++ * The intended use-case for this function is for userspace or other
++ * kernel code to communicate a particular performance requirement to
++ * a subsystem; then for the subsystem to communicate that requirement
++ * to something that is meaningful to the device driver; then for the
++ * device driver to convert that requirement to a clock rate, and to
++ * then call omap_pm_set_min_clk_rate().
++ *
++ * Users of this function (such as device drivers) should not simply
++ * call this function with some high clock rate to ensure "high
++ * performance."  Rather, the device driver should take a performance
++ * constraint from its subsystem, such as "render at least X polygons
++ * per second," and use some formula or table to convert that into a
++ * clock rate constraint given the hardware type and hardware
++ * revision.  Device drivers or subsystems should not assume that they
++ * know how to make a power/performance tradeoff - some device use
++ * cases may tolerate a lower-fidelity device function for lower power
++ * consumption; others may demand a higher-fidelity device function,
++ * no matter what the power consumption.
++ *
++ * Multiple calls to omap_pm_set_min_clk_rate() will replace the
++ * previous rate value for the device @dev.  To remove the minimum clock
++ * rate constraint for the device, call with r = 0.
++ *
++ * Returns -EINVAL for an invalid argument, -ERANGE if the constraint
++ * is not satisfiable, or 0 upon success.
 + */
- int omap_hwmod_set_slave_idlemode(struct omap_hwmod *oh, u8 idlemode)
- {
- 	u32 v;
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index dee4629..ea0d659 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -1,7 +1,7 @@
++int omap_pm_set_min_clk_rate(struct device *dev, struct clk *c, long r);
++
  /*
-  * omap_device implementation
-  *
-- * Copyright (C) 2009 Nokia Corporation
-+ * Copyright (C) 2009-2010 Nokia Corporation
-  * Paul Walmsley, Kevin Hilman
-  *
-  * Developed in collaboration with (alphabetical order): Benoit
-@@ -90,8 +90,11 @@
- #define USE_WAKEUP_LAT			0
- #define IGNORE_WAKEUP_LAT		1
+  * DSP Bridge-specific constraints
+  */
+diff --git a/arch/arm/plat-omap/omap-pm-noop.c b/arch/arm/plat-omap/omap-pm-noop.c
+index b0414f9..e129ce8 100644
+--- a/arch/arm/plat-omap/omap-pm-noop.c
++++ b/arch/arm/plat-omap/omap-pm-noop.c
+@@ -149,6 +149,33 @@ int omap_pm_set_max_sdma_lat(struct device *dev, long t)
+ 	return 0;
+ }
  
--
--#define OMAP_DEVICE_MAGIC 0xf00dcafe
-+/*
-+ * OMAP_DEVICE_MAGIC: used to determine whether a struct omap_device
-+ * obtained via container_of() is in fact a struct omap_device
-+ */
-+#define OMAP_DEVICE_MAGIC		 0xf00dcafe
++int omap_pm_set_min_clk_rate(struct device *dev, struct clk *c, long r)
++{
++	if (!dev || !c || r < 0) {
++		WARN(1, "OMAP PM: %s: invalid parameter(s)", __func__);
++		return -EINVAL;
++	}
++
++	if (r == 0)
++		pr_debug("OMAP PM: remove min clk rate constraint: "
++			 "dev %s\n", dev_name(dev));
++	else
++		pr_debug("OMAP PM: add min clk rate constraint: "
++			 "dev %s, rate = %ld Hz\n", dev_name(dev), r);
++
++	/*
++	 * Code in a real implementation should keep track of these
++	 * constraints on the clock, and determine the highest minimum
++	 * clock rate.  It should iterate over each OPP and determine
++	 * whether the OPP will result in a clock rate that would
++	 * satisfy this constraint (and any other PM constraint in effect
++	 *@that time).  Once it finds the lowest-voltage OPP that
++	 * meets those conditions, it should switch to it, or return
++	 * an error if the code is not capable of doing so.
++	 */
++
++	return 0;
++}
  
- /* Private functions */
- 
+ /*
+  * DSP Bridge-specific constraints
