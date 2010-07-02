@@ -1,76 +1,185 @@
-From: mfuzzey@gmail.com (Martin Fuzzey)
-Date: Fri, 02 Jul 2010 16:38:29 +0200
-Subject: [PATCH] IMX framebuffer: Prevent clock being disabled multiple times
-Message-ID: <20100702143828.26700.45721.stgit@srv002.fuzzey.net>
+From: p.osciak@samsung.com (Pawel Osciak)
+Date: Fri, 02 Jul 2010 16:39:38 +0200
+Subject: [PATCH v3 06/12] s3c-fb: Add wait for VSYNC ioctl
+In-Reply-To: <4C2DCF5C.4020600@simtec.co.uk>
+References: <1277712538-23188-1-git-send-email-p.osciak@samsung.com>
+	<1277712538-23188-7-git-send-email-p.osciak@samsung.com>
+	<4C2DCF5C.4020600@simtec.co.uk>
+Message-ID: <004301cb19f4$66453f80$32cfbe80$%osciak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When multiple successive types of blanking are used
-(such as FB_BLANK_VSYNC_SUSPEND followed by FB_BLANK_POWERDOWN)
-clk_disable() is called multiple times which causes a WARN
-but more importantly the reference count to become negative
-resulting in multiple unblank operations being required to
-restore the display.
+>Ben Dooks <mailto:ben@simtec.co.uk> wrote:
+>On 28/06/10 09:08, Pawel Osciak wrote:
+>> @@ -801,6 +825,124 @@ static int s3c_fb_pan_display(struct fb_var_screeninfo *var,
+>>  	return 0;
+>>  }
+>>
+>> +/**
+>> + * s3c_fb_enable_irq() - enable framebuffer interrupts
+>> + * @sfb: main hardware state
+>> + */
+>> +static void s3c_fb_enable_irq(struct s3c_fb *sfb)
+>> +{
+>> +	void __iomem *regs = sfb->regs;
+>> +	u32 irq_ctrl_reg;
+>> +
+>> +	if (!test_and_set_bit(S3C_FB_VSYNC_IRQ_EN, &sfb->irq_flags)) {
+>> +		/* IRQ disabled, enable it */
+>> +		irq_ctrl_reg = readl(regs + VIDINTCON0);
+>> +
+>> +		irq_ctrl_reg |= VIDINTCON0_INT_ENABLE;
+>> +		irq_ctrl_reg |= VIDINTCON0_INT_FRAME;
+>> +
+>> +		irq_ctrl_reg &= ~VIDINTCON0_FRAMESEL0_MASK;
+>> +		irq_ctrl_reg |= VIDINTCON0_FRAMESEL0_VSYNC;
+>> +		irq_ctrl_reg &= ~VIDINTCON0_FRAMESEL1_MASK;
+>> +		irq_ctrl_reg |= VIDINTCON0_FRAMESEL1_NONE;
+>> +
+>> +		writel(irq_ctrl_reg, regs + VIDINTCON0);
+>> +	}
+>> +}
+>
+>there should probably be some form of locking so that an irq
+>doesn't come through and disable this. possibly in the call
+>that queues the request to reduce the likelyhood of any races.
+>
 
-Furthermore the call to clk_disable() in imxfb_remove() is
-unnecessary since it is already done by imxfb_disable_controller()
+Swapping the count and enable_irq below will fix this.
 
-Signed-off-by: Martin Fuzzey <mfuzzey@gmail.com>
+>> +
+>> +/**
+>> + * s3c_fb_disable_irq() - disable framebuffer interrupts
+>> + * @sfb: main hardware state
+>> + */
+>> +static void s3c_fb_disable_irq(struct s3c_fb *sfb)
+>> +{
+>> +	void __iomem *regs = sfb->regs;
+>> +	u32 irq_ctrl_reg;
+>> +
+>> +	if (test_and_clear_bit(S3C_FB_VSYNC_IRQ_EN, &sfb->irq_flags)) {
+>> +		/* IRQ enabled, disable it */
+>> +		irq_ctrl_reg = readl(regs + VIDINTCON0);
+>> +
+>> +		irq_ctrl_reg &= ~VIDINTCON0_INT_FRAME;
+>> +		irq_ctrl_reg &= ~VIDINTCON0_INT_ENABLE;
+>> +
+>> +		writel(irq_ctrl_reg, regs + VIDINTCON0);
+>> +	}
+>> +}
+>> +
+>> +static irqreturn_t s3c_fb_irq(int irq, void *dev_id)
+>> +{
+>> +	struct s3c_fb *sfb = dev_id;
+>> +	void __iomem  *regs = sfb->regs;
+>> +	u32 irq_sts_reg;
+>> +
+>> +	irq_sts_reg = readl(regs + VIDINTCON1);
+>> +
+>> +	if (irq_sts_reg & VIDINTCON1_INT_FRAME) {
+>> +
+>> +		/* VSYNC interrupt, accept it */
+>> +		writel(VIDINTCON1_INT_FRAME, regs + VIDINTCON1);
+>> +
+>> +		sfb->vsync_info.count++;
+>> +		wake_up_interruptible(&sfb->vsync_info.wait);
+>> +	}
+>> +
+>> +	/* We only support waiting for VSYNC for now, so it's safe
+>> +	 * to always disable irqs here.
+>> +	 */
+>> +	s3c_fb_disable_irq(sfb);
+>> +
+>> +	return IRQ_HANDLED;
+>> +}
+>> +
+>> +/**
+>> + * s3c_fb_wait_for_vsync() - sleep until next VSYNC interrupt or timeout
+>> + * @sfb: main hardware state
+>> + * @crtc: head index.
+>> + */
+>> +static int s3c_fb_wait_for_vsync(struct s3c_fb *sfb, u32 crtc)
+>> +{
+>> +	unsigned long count;
+>> +	int ret;
+>> +
+>> +	if (crtc != 0)
+>> +		return -ENODEV;
+>> +
+>> +	s3c_fb_enable_irq(sfb);
+>> +	count = sfb->vsync_info.count;
+>
+>possibly doing count before enabling the irq.
+>
 
----
+yes... can't get my head around to what I've been thinking when writing this,
+it's been a year ago... I remember being quite sure that it'd work that way
+then though, as ridiculous as it looks right now...
+Will swap them.
 
- drivers/video/imxfb.c |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
+>> +	ret = wait_event_interruptible_timeout(sfb->vsync_info.wait,
+>> +				       count != sfb->vsync_info.count,
+>> +				       msecs_to_jiffies(VSYNC_TIMEOUT_MSEC));
+>> +	if (ret == 0)
+>> +		return -ETIMEDOUT;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int s3c_fb_ioctl(struct fb_info *info, unsigned int cmd,
+>> +			unsigned long arg)
+>> +{
+>> +	struct s3c_fb_win *win = info->par;
+>> +	struct s3c_fb *sfb = win->parent;
+>> +	int ret;
+>> +	u32 crtc;
+>> +
+>> +	switch (cmd) {
+>> +	case FBIO_WAITFORVSYNC:
+>> +		if (get_user(crtc, (u32 __user *)arg)) {
+>> +			ret = -EFAULT;
+>> +			break;
+>> +		}
+>
+>can't find any info on what the argument is meant to be.
+>
 
-diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-index b4b6dec..d0771d0 100644
---- a/drivers/video/imxfb.c
-+++ b/drivers/video/imxfb.c
-@@ -175,6 +175,7 @@ struct imxfb_info {
- 
- 	struct imx_fb_videomode *mode;
- 	int			num_modes;
-+	bool			enabled;
- 
- 	void (*lcd_power)(int);
- 	void (*backlight_power)(int);
-@@ -451,6 +452,9 @@ static int imxfb_set_par(struct fb_info *info)
- 
- static void imxfb_enable_controller(struct imxfb_info *fbi)
- {
-+	if (fbi->enabled)
-+		return;
-+
- 	pr_debug("Enabling LCD controller\n");
- 
- 	writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
-@@ -470,10 +474,13 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
- 		fbi->backlight_power(1);
- 	if (fbi->lcd_power)
- 		fbi->lcd_power(1);
-+	fbi->enabled = 1;
- }
- 
- static void imxfb_disable_controller(struct imxfb_info *fbi)
- {
-+	if (!fbi->enabled)
-+		return;
- 	pr_debug("Disabling LCD controller\n");
- 
- 	if (fbi->backlight_power)
-@@ -484,6 +491,7 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
- 	clk_disable(fbi->clk);
- 
- 	writel(0, fbi->regs + LCDC_RMCR);
-+	fbi->enabled = 0;
- }
- 
- static int imxfb_blank(int blank, struct fb_info *info)
-@@ -828,7 +836,6 @@ static int __devexit imxfb_remove(struct platform_device *pdev)
- 
- 	iounmap(fbi->regs);
- 	release_mem_region(res->start, resource_size(res));
--	clk_disable(fbi->clk);
- 	clk_put(fbi->clk);
- 
- 	platform_set_drvdata(pdev, NULL);
+Head number, i.e. crt no I believe. Not sure though.
+
+>> +
+>> +		ret = s3c_fb_wait_for_vsync(sfb, crtc);
+>> +		break;
+>> +	default:
+>> +		ret = -ENOTTY;
+>
+>Can someone else confirm this is the correct err?
+>
+
+Linux Device Drivers 3, page 140, or see the online version here:
+http://www.makelinux.net/ldd3/chp-6-sect-1.shtml
+section 6.1.2. The Return Value
+
+man ioctl:
+ENOTTY 
+The specified request does not apply to the kind of object that the
+descriptor d references.
+
+>> @@ -1370,6 +1534,7 @@ static struct s3c_fb_driverdata s3c_fb_data_s5pv210
+>__devinitdata = {
+>>  			[3] = 0x3000,
+>>  			[4] = 0x3400,
+>>  		},
+>> +
+>>  	},
+>
+>oops, added whitespace.
+>
+
+will fix.
+
+
+Best regards
+--
+Pawel Osciak
+Linux Platform Group
+Samsung Poland R&D Center
