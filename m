@@ -1,76 +1,47 @@
-From: p.osciak@samsung.com (Pawel Osciak)
-Date: Fri, 02 Jul 2010 16:53:54 +0200
-Subject: [PATCH v3 09/12] s3c-fb: Correct window osd size and alpha
-	register handling
-In-Reply-To: <4C2DE691.6050209@simtec.co.uk>
-References: <1277712538-23188-1-git-send-email-p.osciak@samsung.com>
-	<1277712538-23188-10-git-send-email-p.osciak@samsung.com>
-	<4C2DE691.6050209@simtec.co.uk>
-Message-ID: <004501cb19f6$6416dbe0$2c4493a0$%osciak@samsung.com>
+From: jamie.iles@picochip.com (Jamie Iles)
+Date: Fri, 2 Jul 2010 16:04:56 -0400
+Subject: [PATCH] ARM: perf: ensure counter delta is limited to 32-bits
+In-Reply-To: <004501cb19f1$4a9a25a0$dfce70e0$@deacon@arm.com>
+References: <1278074642-3045-1-git-send-email-will.deacon@arm.com>
+	<20100702180503.GF2357@wear.picochip.com>
+	<004401cb19eb$ecab2840$c60178c0$@deacon@arm.com>
+	<20100702184848.GH2357@wear.picochip.com>
+	<004501cb19f1$4a9a25a0$dfce70e0$@deacon@arm.com>
+Message-ID: <20100702200456.GI2357@wear.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->Ben Dooks <ben@simtec.co.uk> wrote:
->On 28/06/10 09:08, Pawel Osciak wrote:
->> S3C64xx and S5P OSD registers for OSD size and alpha are as follows:
->> VIDOSDC: win 0 - size, win 1-4: alpha
->> VIDOSDD: win 1-2 - size; not present for windows 0, 3 and 4
->>
->> Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  drivers/video/s3c-fb.c |   58 ++++++++++++++++++++++++++++++++++++++++++--
->---
->>  1 files changed, 51 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
->> index 94423c5..3b2c7fe 100644
->> --- a/drivers/video/s3c-fb.c
->> +++ b/drivers/video/s3c-fb.c
->> @@ -64,6 +64,9 @@ struct s3c_fb;
->>  #define VIDOSD_B(win, variant) (OSD_BASE(win, variant) + 0x04)
->>  #define VIDOSD_C(win, variant) (OSD_BASE(win, variant) + 0x08)
->>  #define VIDOSD_D(win, variant) (OSD_BASE(win, variant) + 0x0C)
->> +#define VIDOSD_SIZE(win, variant, win_variant) \
->> +	(OSD_BASE(win, variant) + (win_variant).osd_size_off)
->> +#define VIDOSD_ALPHA(win, variant, win_variant) VIDOSD_C(win, variant)
->
->hmm, this is becoming a bit complicated. if we have a function to
->set it then maybe we should just calculate it there.
->
+On Fri, Jul 02, 2010 at 03:17:23PM +0100, Will Deacon wrote:
+> I don't think the signedness of atomic64_t actually matters because everything
+> is handled in assembly anyway.
+Good point. I guess we could probably cast the new value to an s32 before
+doing the cmpxchng to get the sign extension, but a lot of this stuff isn't
+obvious anyway and your fix is certainly cleaner.
 
->> @@ -1445,12 +1478,17 @@ static int s3c_fb_resume(struct platform_device
->*pdev)
->>  static struct s3c_fb_win_variant s3c_fb_data_64xx_wins[] __devinitdata = {
->>  	[0] = {
->>  		.has_osd_c	= 1,
->> +		.has_osd_size	= 1,
->> +		.osd_size_off	= 0x8,
->>  		.palette_sz	= 256,
->>  		.valid_bpp	= VALID_BPP1248 | VALID_BPP(16) | VALID_BPP(24),
->>  	},
->>  	[1] = {
->>  		.has_osd_c	= 1,
->>  		.has_osd_d	= 1,
->> +		.has_osd_size	= 1,
->> +		.osd_size_off	= 0x12,
->> +		.has_osd_alpha	= 1,
->
->how about osd_size_off !=0 => has_osd_size ?
->
+[...]
+> 
+> Actually, a much neater fix to this problem is to make delta unsigned and
+> leave everything else as-is (although I'm not a massive fan of all the
+> 64-bit shifting).
+> 
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index c457686..de12536 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -201,7 +201,7 @@ armpmu_event_update(struct perf_event *event,
+>  {
+>         int shift = 64 - 32;
+>         s64 prev_raw_count, new_raw_count;
+> -       s64 delta;
+> +       u64 delta;
+>  
+>  again:
+>         prev_raw_count = atomic64_read(&hwc->prev_count);
+> 
+> 
+> What do you think?
+Yes, that looks good to me.
 
-Could be done that way, yes... I'm not aware of any SoC with osd_size_off == 0
-till now.
+Acked-by: Jamie Iles <jamie.iles@picochip.com>
 
->do we need to change the osd c and d definitions?
-
-I'd prefer not using "OSD_C" and "OSD_D" names at all. How they are changing
-their usage across hw versions and windows is confusing enough. Maybe we should
-only be using osd_sizeand osd_alpha instead? Would you agree?
-
-
-Best regards
---
-Pawel Osciak
-Linux Platform Group
-Samsung Poland R&D Center
+Jamie
