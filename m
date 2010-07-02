@@ -1,25 +1,34 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 2 Jul 2010 16:08:56 +0900
-Subject: [PATCH 29/33] Removing dead SND_SOC_SMDK2443_WM9710
-In-Reply-To: <20100701130724.GC17698@sirena.org.uk>
-References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<e5391de6858597bbfd43874aed124a73f74850b5.1277911346.git.siccegge@cs.fau.de>
-	<AANLkTinZa7_TEjYFTu9V6obndpVvMmHppaOArM1AJg_t@mail.gmail.com>
-	<20100701130724.GC17698@sirena.org.uk>
-Message-ID: <AANLkTim0usB99K6orH0lxP73e-XK69ytdECtR5D1dPJt@mail.gmail.com>
+From: zpfeffer@codeaurora.org (Zach Pfeffer)
+Date: Fri, 02 Jul 2010 00:09:02 -0700
+Subject: [RFC 3/3] mm: iommu: The Virtual Contiguous Memory Manager
+In-Reply-To: <AANLkTinABCSdN6hnXVOvVZ12f1QBMR_UAi62qW8GmlkL@mail.gmail.com>
+References: <1277877350-2147-1-git-send-email-zpfeffer@codeaurora.org>
+	<1277877350-2147-3-git-send-email-zpfeffer@codeaurora.org>
+	<20100701101746.3810cc3b.randy.dunlap@oracle.com>
+	<20100701180241.GA3594@basil.fritz.box>
+	<1278012503.7738.17.camel@c-dwalke-linux.qualc
+	<AANLkTinABCSdN6hnXVOvVZ12f1QBMR_UAi62qW8GmlkL@mail.gmail.com>
+Message-ID: <4C2D908E.9030309@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 1, 2010 at 10:07 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Thu, Jul 01, 2010 at 09:55:47PM +0900, Jassi Brar wrote:
->> On Thu, Jul 1, 2010 at 1:03 AM, Christoph Egger <siccegge@cs.fau.de> wrote:
->> > SND_SOC_SMDK2443_WM9710 doesn't exist in Kconfig, therefore removing
->> > all references for it from the source code.
->
->> I'd rather have the code compiled unconditionally.
->
-> Hrm, if this is part of the default hardware build we should get the
-> driver merged.
-But the machine driver is already there
-   sound/soc/s3c24xx/smdk2443_wm9710.c
+Hari Kanigeri wrote:
+>> He demonstrated the usage of his code in one of the emails he sent out
+>> initially. Did you go over that, and what (or how many) step would you
+>> use with the current code to do the same thing?
+> 
+> -- So is this patch set adding layers and abstractions to help the User ?
+> 
+> If the idea is to share some memory across multiple devices, I guess
+> you can achieve the same by calling the map function provided by iommu
+> module and sharing the mapped address to the 10's or 100's of devices
+> to access the buffers. You would only need a dedicated virtual pool
+> per IOMMU device to manage its virtual memory allocations.
+
+Yeah, you can do that. My idea is to get away from explicit addressing
+and encapsulate the "device address to physical address" link into a
+mapping.
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
