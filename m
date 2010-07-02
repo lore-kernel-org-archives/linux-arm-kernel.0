@@ -1,21 +1,77 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 2 Jul 2010 12:52:05 +0100
-Subject: [PATCH v3 05/12] s3c-fb: Add support for display panning
-In-Reply-To: <4C2DCCAD.9080306@simtec.co.uk>
-References: <1277712538-23188-1-git-send-email-p.osciak@samsung.com>
-	<1277712538-23188-6-git-send-email-p.osciak@samsung.com>
-	<4C288779.8040702@gmail.com> <4C2DCCAD.9080306@simtec.co.uk>
-Message-ID: <20100702115205.GB30655@sirena.org.uk>
+From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
+Date: Fri,  2 Jul 2010 15:05:04 +0300
+Subject: [PATCH 2/3] omap mailbox: prevent multiple concurrent receivers race
+In-Reply-To: <1278072305-17943-1-git-send-email-Hiroshi.DOYU@nokia.com>
+References: <1278072305-17943-1-git-send-email-Hiroshi.DOYU@nokia.com>
+Message-ID: <1278072305-17943-2-git-send-email-Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 02, 2010 at 12:25:33PM +0100, Ben Dooks wrote:
-> On 28/06/10 12:28, Maurus Cuelenaere wrote:
+From: ext Ohad Ben-Cohen <ohad@wizery.com>
 
-> > No need for the '? 1 : 0'
+We currently maintain only a single mailbox receiver callback.
+To prevent multiple receivers race scenarios (in which receivers
+will end up overwriting each other's callback pointers), we make
+sure that mailbox instances cannot be taken by more than
+one receiver at the same time.
 
-> I tihnk there is, IIRC there is no neccessity for a compiler to produce
-> one for true, just that the result be !0
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+---
+ arch/arm/plat-omap/include/plat/mailbox.h |    1 +
+ arch/arm/plat-omap/mailbox.c              |   12 +++++++++++-
+ 2 files changed, 12 insertions(+), 1 deletions(-)
 
-The compiler will *produce* 1 for true, but it will accept any non-zero
-value as true.
+diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
+index 0b45664..5df35b4 100644
+--- a/arch/arm/plat-omap/include/plat/mailbox.h
++++ b/arch/arm/plat-omap/include/plat/mailbox.h
+@@ -57,6 +57,7 @@ struct omap_mbox {
+ 	struct omap_mbox_ops	*ops;
+ 	struct device		*dev;
+ 	void			*priv;
++	atomic_t		count;
+ };
+ 
+ int omap_mbox_msg_send(struct omap_mbox *, mbox_msg_t msg);
+diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+index 14b716d..aafa63f 100644
+--- a/arch/arm/plat-omap/mailbox.c
++++ b/arch/arm/plat-omap/mailbox.c
+@@ -320,9 +320,17 @@ struct omap_mbox *omap_mbox_get(const char *name, int (*callback)(void *))
+ 	if (!mbox)
+ 		return ERR_PTR(-ENOENT);
+ 
++	if (atomic_inc_return(&mbox->count) > 1) {
++		pr_err("%s: mbox %s already in use\n", __func__, name);
++		atomic_dec(&mbox->count);
++		return ERR_PTR(-EBUSY);
++	}
++
+ 	ret = omap_mbox_startup(mbox);
+-	if (ret)
++	if (ret) {
++		atomic_dec(&mbox->count);
+ 		return ERR_PTR(-ENODEV);
++	}
+ 
+ 	mbox->rxq->callback = callback;
+ 
+@@ -333,6 +341,7 @@ EXPORT_SYMBOL(omap_mbox_get);
+ void omap_mbox_put(struct omap_mbox *mbox)
+ {
+ 	omap_mbox_fini(mbox);
++	atomic_dec(&mbox->count);
+ }
+ EXPORT_SYMBOL(omap_mbox_put);
+ 
+@@ -349,6 +358,7 @@ int omap_mbox_register(struct device *parent, struct omap_mbox **list)
+ 
+ 	for (i = 0; mboxes[i]; i++) {
+ 		struct omap_mbox *mbox = mboxes[i];
++		atomic_set(&mbox->count, 0);
+ 		mbox->dev = device_create(&omap_mbox_class,
+ 				parent, 0, mbox, "%s", mbox->name);
+ 		if (IS_ERR(mbox->dev)) {
+-- 
+1.7.1.rc2
