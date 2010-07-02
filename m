@@ -1,39 +1,109 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 2 Jul 2010 14:22:09 +0100
-Subject: [PATCH] ARM: perf: ensure counter delta is limited to 32-bits
-In-Reply-To: <20100702180503.GF2357@wear.picochip.com>
-References: <1278074642-3045-1-git-send-email-will.deacon@arm.com>
-	<20100702180503.GF2357@wear.picochip.com>
-Message-ID: <004301cb19e9$9314a830$b93df890$@deacon@arm.com>
+From: p.osciak@samsung.com (Pawel Osciak)
+Date: Fri, 02 Jul 2010 15:29:24 +0200
+Subject: [PATCH v3 05/12] s3c-fb: Add support for display panning
+In-Reply-To: <4C2DCC5B.2000100@simtec.co.uk>
+References: <1277712538-23188-1-git-send-email-p.osciak@samsung.com>
+	<1277712538-23188-6-git-send-email-p.osciak@samsung.com>
+	<4C2DCC5B.2000100@simtec.co.uk>
+Message-ID: <003e01cb19ea$969e0090$c3da01b0$%osciak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jamie,
+>Ben Dooks <ben@simtec.co.uk> wrote:
+>On 28/06/10 09:08, Pawel Osciak wrote:
 
-> Well spotted! I think this may have actually been a typo when porting to ARM
-> from the sparc and x86 code, and this should address it so we do the same:
-> 
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index 9e70f20..6c0f3ca 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -164,7 +164,7 @@ armpmu_event_update(struct perf_event *event,
->  		    int idx)
->  {
->  	int shift = 64 - 32;
-> -	s64 prev_raw_count, new_raw_count;
-> +	u64 prev_raw_count, new_raw_count;
->  	s64 delta;
-> 
->  again:
+>> diff --git a/arch/arm/plat-samsung/include/plat/regs-fb.h b/arch/arm/plat-
+>samsung/include/plat/regs-fb.h
+>> index ac10013..f454e32 100644
+>> --- a/arch/arm/plat-samsung/include/plat/regs-fb.h
+>> +++ b/arch/arm/plat-samsung/include/plat/regs-fb.h
+>> @@ -112,6 +112,11 @@
+>>  #define VIDCON2_ORGYCbCr			(1 << 8)
+>>  #define VIDCON2_YUVORDCrCb			(1 << 7)
+>>
+>> +/* PRTCON (S3C6410, S5PC100) */
+>
+>Not listed in my S3C6410 manual?
+>
 
-I wondered about this approach, but I couldn't convince myself it was
-correct. When armpmu_event_set_period updates hwc->prev_count, it sets
-the top 32-bits to 1. When we do the cmpxchg in armpmu_event_update, we
-will only be writing the bottom 32-bits. This means that prev_count
-alternates between s64 and u64 and I'm not sure what the rest of the perf
-framework will do in that case.
+Not in my either. It is there in the S5PC100 docs though. This is not an
+"official statement", but I've been testing panning on my 6410 *very*
+intensively and experienced a lot of crashes without it. Not a single one
+with it though. So it's either almost impossible luck or it is there,
+undocumented. There is a hole at this address anyway, so this shouldn't
+hurt anything.
 
-Tell you what, I'll make the change and see what happens to the numbers...
+>> @@ -735,6 +741,66 @@ static int s3c_fb_blank(int blank_mode, struct fb_info
+>*info)
+>>  	return 0;
+>>  }
+>>
+>> +/**
+>> + * s3c_fb_pan_display() - Pan the display.
+>> + *
+>> + * Note that the offsets can be written to the device at any time, as
+>their
+>> + * values are latched at each vsync automatically. This also means that
+>only
+>> + * the last call to this function will have any effect on next vsync, but
+>> + * there is no need to sleep waiting for it to prevent tearing.
+>> + *
+>> + * @var: The screen information to verify.
+>> + * @info: The framebuffer device.
+>> + */
+>> +static int s3c_fb_pan_display(struct fb_var_screeninfo *var,
+>> +			      struct fb_info *info)
+>> +{
+>> +	struct s3c_fb_win *win	= info->par;
+>> +	struct s3c_fb *sfb	= win->parent;
+>> +	void __iomem *buf	= sfb->regs + win->index * 8;
+>> +	unsigned int start_byte_offset, end_byte_offset;
+>
+>could have shortened to start and end, might have made some of the
+>calculation easier.
+>
 
-Will
+Ok, will fix.
+
+>> +	/* Offset in bytes to the start of the displayed area */
+>> +	start_byte_offset = var->yoffset * info->fix.line_length;
+>> +	/* X offset depends on the current bpp */
+>> +	if (info->var.bits_per_pixel >= 8) {
+>> +		start_byte_offset +=
+>> +			var->xoffset * (info->var.bits_per_pixel >> 3);
+>> +	} else {
+>> +		switch (info->var.bits_per_pixel) {
+>> +		case 4:
+>> +			start_byte_offset += var->xoffset >> 1;
+>> +			break;
+>> +		case 2:
+>> +			start_byte_offset += var->xoffset >> 2;
+>> +			break;
+>> +		case 1:
+>> +			start_byte_offset += var->xoffset >> 3;
+>> +			break;
+>> +		default:
+>> +			dev_err(sfb->dev, "invalid bpp\n");
+>> +			return -EINVAL;
+>> +		}
+>> +	}
+>
+>this could have been done by changing it to
+>start_byte_offset += var->xoffset / (8 / info->var.bits_per_pixel);
+>
+
+Good point, although I wanted to have no division here... Whichever you
+prefer then...
+
+>note, you always set pan step to 1, evne if the case of bpp less than 8.
+>
+
+Hmm... so I guess I should be changing xpanstep on bpp switch in fb_set_par
+if needed?
+
+
+Best regards
+--
+Pawel Osciak
+Linux Platform Group
+Samsung Poland R&D Center
