@@ -1,181 +1,69 @@
 From: p.osciak@samsung.com (Pawel Osciak)
-Date: Fri, 02 Jul 2010 16:39:38 +0200
-Subject: [PATCH v3 06/12] s3c-fb: Add wait for VSYNC ioctl
-In-Reply-To: <4C2DCF5C.4020600@simtec.co.uk>
+Date: Fri, 02 Jul 2010 16:45:03 +0200
+Subject: [PATCH v3 08/12] s3c-fb: Add SHADOWCON shadow register locking
+	support	for S5PV210
+In-Reply-To: <4C2DE587.6000306@simtec.co.uk>
 References: <1277712538-23188-1-git-send-email-p.osciak@samsung.com>
-	<1277712538-23188-7-git-send-email-p.osciak@samsung.com>
-	<4C2DCF5C.4020600@simtec.co.uk>
-Message-ID: <004301cb19f4$66453f80$32cfbe80$%osciak@samsung.com>
+	<1277712538-23188-9-git-send-email-p.osciak@samsung.com>
+	<4C2DE587.6000306@simtec.co.uk>
+Message-ID: <004401cb19f5$27b9efd0$772dcf70$%osciak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->Ben Dooks <mailto:ben@simtec.co.uk> wrote:
+>Ben Dooks <ben@simtec.co.uk> wrote:
 >On 28/06/10 09:08, Pawel Osciak wrote:
->> @@ -801,6 +825,124 @@ static int s3c_fb_pan_display(struct fb_var_screeninfo *var,
->>  	return 0;
+>> @@ -218,6 +218,9 @@
+>>  #define WINCON1_BPPMODE_25BPP_A1888		(0xd << 2)
+>>  #define WINCON1_BPPMODE_28BPP_A4888		(0xd << 2)
+>>
+>> +/* S5PV210 */
+>> +#define SHADOWCON				(0x34)
+>> +#define SHADOWCON_WINx_PROTECT(_win)		(1 << (10 + _win))
+>
+>you should have () around the _win arg.
+>
+
+Good catch, thanks.
+
+>>
+>>  #define VIDOSDxA_TOPLEFT_X_MASK			(0x7ff << 11)
+>>  #define VIDOSDxA_TOPLEFT_X_SHIFT		(11)
+>> diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
+>> index 0a93fca..94423c5 100644
+>> --- a/drivers/video/s3c-fb.c
+>> +++ b/drivers/video/s3c-fb.c
+>> @@ -79,6 +79,7 @@ struct s3c_fb;
+>>   * @osd: The base for the OSD registers.
+>>   * @palette: Address of palette memory, or 0 if none.
+>>   * @has_prtcon: Set if has PRTCON register.
+>> + * @has_shadowcon: Set if has SHADOWCON register.
+>>   */
+>>  struct s3c_fb_variant {
+>>  	unsigned int	is_2443:1;
+>> @@ -95,6 +96,7 @@ struct s3c_fb_variant {
+>>  	unsigned short	palette[S3C_FB_MAX_WIN];
+>>
+>>  	unsigned int	has_prtcon:1;
+>> +	unsigned int	has_shadowcon:1;
+>>  };
+>>
+>>  /**
+>> @@ -363,6 +365,36 @@ static int s3c_fb_align_word(unsigned int bpp,
+>unsigned int pix)
 >>  }
 >>
->> +/**
->> + * s3c_fb_enable_irq() - enable framebuffer interrupts
->> + * @sfb: main hardware state
+>>  /**
+>> + * shadow_protect_win() - disable updating values from shadow registers at
+>vsync
+>> + *
+>> + * @win: window to protect registers for
+>> + * @protect: 1 to protect (disable updates)
 >> + */
->> +static void s3c_fb_enable_irq(struct s3c_fb *sfb)
->> +{
->> +	void __iomem *regs = sfb->regs;
->> +	u32 irq_ctrl_reg;
->> +
->> +	if (!test_and_set_bit(S3C_FB_VSYNC_IRQ_EN, &sfb->irq_flags)) {
->> +		/* IRQ disabled, enable it */
->> +		irq_ctrl_reg = readl(regs + VIDINTCON0);
->> +
->> +		irq_ctrl_reg |= VIDINTCON0_INT_ENABLE;
->> +		irq_ctrl_reg |= VIDINTCON0_INT_FRAME;
->> +
->> +		irq_ctrl_reg &= ~VIDINTCON0_FRAMESEL0_MASK;
->> +		irq_ctrl_reg |= VIDINTCON0_FRAMESEL0_VSYNC;
->> +		irq_ctrl_reg &= ~VIDINTCON0_FRAMESEL1_MASK;
->> +		irq_ctrl_reg |= VIDINTCON0_FRAMESEL1_NONE;
->> +
->> +		writel(irq_ctrl_reg, regs + VIDINTCON0);
->> +	}
->> +}
+>> +static void shadow_protect_win(struct s3c_fb_win *win, int protect)
 >
->there should probably be some form of locking so that an irq
->doesn't come through and disable this. possibly in the call
->that queues the request to reduce the likelyhood of any races.
->
+>technically, protect should be of type 'bool'
 
-Swapping the count and enable_irq below will fix this.
-
->> +
->> +/**
->> + * s3c_fb_disable_irq() - disable framebuffer interrupts
->> + * @sfb: main hardware state
->> + */
->> +static void s3c_fb_disable_irq(struct s3c_fb *sfb)
->> +{
->> +	void __iomem *regs = sfb->regs;
->> +	u32 irq_ctrl_reg;
->> +
->> +	if (test_and_clear_bit(S3C_FB_VSYNC_IRQ_EN, &sfb->irq_flags)) {
->> +		/* IRQ enabled, disable it */
->> +		irq_ctrl_reg = readl(regs + VIDINTCON0);
->> +
->> +		irq_ctrl_reg &= ~VIDINTCON0_INT_FRAME;
->> +		irq_ctrl_reg &= ~VIDINTCON0_INT_ENABLE;
->> +
->> +		writel(irq_ctrl_reg, regs + VIDINTCON0);
->> +	}
->> +}
->> +
->> +static irqreturn_t s3c_fb_irq(int irq, void *dev_id)
->> +{
->> +	struct s3c_fb *sfb = dev_id;
->> +	void __iomem  *regs = sfb->regs;
->> +	u32 irq_sts_reg;
->> +
->> +	irq_sts_reg = readl(regs + VIDINTCON1);
->> +
->> +	if (irq_sts_reg & VIDINTCON1_INT_FRAME) {
->> +
->> +		/* VSYNC interrupt, accept it */
->> +		writel(VIDINTCON1_INT_FRAME, regs + VIDINTCON1);
->> +
->> +		sfb->vsync_info.count++;
->> +		wake_up_interruptible(&sfb->vsync_info.wait);
->> +	}
->> +
->> +	/* We only support waiting for VSYNC for now, so it's safe
->> +	 * to always disable irqs here.
->> +	 */
->> +	s3c_fb_disable_irq(sfb);
->> +
->> +	return IRQ_HANDLED;
->> +}
->> +
->> +/**
->> + * s3c_fb_wait_for_vsync() - sleep until next VSYNC interrupt or timeout
->> + * @sfb: main hardware state
->> + * @crtc: head index.
->> + */
->> +static int s3c_fb_wait_for_vsync(struct s3c_fb *sfb, u32 crtc)
->> +{
->> +	unsigned long count;
->> +	int ret;
->> +
->> +	if (crtc != 0)
->> +		return -ENODEV;
->> +
->> +	s3c_fb_enable_irq(sfb);
->> +	count = sfb->vsync_info.count;
->
->possibly doing count before enabling the irq.
->
-
-yes... can't get my head around to what I've been thinking when writing this,
-it's been a year ago... I remember being quite sure that it'd work that way
-then though, as ridiculous as it looks right now...
-Will swap them.
-
->> +	ret = wait_event_interruptible_timeout(sfb->vsync_info.wait,
->> +				       count != sfb->vsync_info.count,
->> +				       msecs_to_jiffies(VSYNC_TIMEOUT_MSEC));
->> +	if (ret == 0)
->> +		return -ETIMEDOUT;
->> +
->> +	return 0;
->> +}
->> +
->> +static int s3c_fb_ioctl(struct fb_info *info, unsigned int cmd,
->> +			unsigned long arg)
->> +{
->> +	struct s3c_fb_win *win = info->par;
->> +	struct s3c_fb *sfb = win->parent;
->> +	int ret;
->> +	u32 crtc;
->> +
->> +	switch (cmd) {
->> +	case FBIO_WAITFORVSYNC:
->> +		if (get_user(crtc, (u32 __user *)arg)) {
->> +			ret = -EFAULT;
->> +			break;
->> +		}
->
->can't find any info on what the argument is meant to be.
->
-
-Head number, i.e. crt no I believe. Not sure though.
-
->> +
->> +		ret = s3c_fb_wait_for_vsync(sfb, crtc);
->> +		break;
->> +	default:
->> +		ret = -ENOTTY;
->
->Can someone else confirm this is the correct err?
->
-
-Linux Device Drivers 3, page 140, or see the online version here:
-http://www.makelinux.net/ldd3/chp-6-sect-1.shtml
-section 6.1.2. The Return Value
-
-man ioctl:
-ENOTTY 
-The specified request does not apply to the kind of object that the
-descriptor d references.
-
->> @@ -1370,6 +1534,7 @@ static struct s3c_fb_driverdata s3c_fb_data_s5pv210
->__devinitdata = {
->>  			[3] = 0x3000,
->>  			[4] = 0x3400,
->>  		},
->> +
->>  	},
->
->oops, added whitespace.
->
-
-will fix.
+Well... ok, I guess it's the "new" trend ;)
 
 
 Best regards
