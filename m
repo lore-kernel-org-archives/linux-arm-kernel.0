@@ -1,71 +1,30 @@
-From: andi@firstfloor.org (Andi Kleen)
-Date: Fri, 2 Jul 2010 10:22:25 +0200
-Subject: [RFC 3/3] mm: iommu: The Virtual Contiguous Memory Manager
-In-Reply-To: <4C2D847E.5080602@codeaurora.org>
-References: <1277877350-2147-1-git-send-email-zpfeffer@codeaurora.org>
-	<1277877350-2147-3-git-send-email-zpfeffer@codeaurora.org>
-	<20100701101746.3810cc3b.randy.dunlap@oracle.com>
-	<20100701180241.GA3594@basil.fritz.box>
-	<1278012503.7738.17.camel@c-dwalke-linux.qualcomm.com>
-	<20100701193850.GB3594@basil.fritz.box>
-	<4C2D0FF1.6010206@codeaurora.org>
-	<20100701230056.GD3594@basil.fritz.box>
-	<4C2D847E.5080602@codeaurora.org>
-Message-ID: <20100702082225.GA12221@basil.fritz.box>
+From: inki.dae@samsung.com (InKi Dae)
+Date: Fri, 02 Jul 2010 17:47:58 +0900
+Subject: [PATCH 0/2] ARM: S5PV210: Add MIPI-DSI support.
+In-Reply-To: <4C29AF72.6090200@samsung.com>
+References: <4C29AF72.6090200@samsung.com>
+Message-ID: <4C2DA7BE.6070701@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 01, 2010 at 11:17:34PM -0700, Zach Pfeffer wrote:
-> Andi Kleen wrote:
-> >> The VCMM provides a more abstract, global view with finer-grained
-> >> control of each mapping a user wants to create. For instance, the
-> >> semantics of iommu_map preclude its use in setting up just the IOMMU
-> >> side of a mapping. With a one-sided map, two IOMMU devices can be
-> > 
-> > Hmm? dma_map_* does not change any CPU mappings. It only sets up
-> > DMA mapping(s).
-> 
-> Sure, but I was saying that iommu_map() doesn't just set up the IOMMU
-> mappings, its sets up both the iommu and kernel buffer mappings.
+Hello all,
 
-Normally the data is already in the kernel or mappings, so why
-would you need another CPU mapping too? Sometimes the CPU
-code has to scatter-gather, but that is considered acceptable
-(and if it really cannot be rewritten to support sg it's better
-to have an explicit vmap operation) 
+This patch is for MIPI-DSI controller based on S5PV210 (or S5PC110), and solved the problem, added cpu timing variables to fb_varscreen_info and Andrew Morton, Russell King and Jaya Kumar pointed out.
+so I'm sending these patch series again.
 
-In general on larger systems with many CPUs changing CPU mappings
-also gets expensive (because you have to communicate with all cores), 
-and is not a good idea on frequent IO paths.
+LCD Panel can use following interfaces,
+- RGB or CPU Interface.
+- RGB or CPU Interface based on MIPI-DSI.
 
-> 
-> > 
-> >> Additionally, the current IOMMU interface does not allow users to
-> >> associate one page table with multiple IOMMUs unless the user explicitly
-> > 
-> > That assumes that all the IOMMUs on the system support the same page table
-> > format, right?
-> 
-> Actually no. Since the VCMM abstracts a page-table as a Virtual
-> Contiguous Region (VCM) a VCM can be associated with any device,
-> regardless of their individual page table format.
+in case of small size lcd panel, it was ok only rgb or cpu interface not using mipi controller.
+but big size panel(more then 480x800) needs MIPI-DSI Interface or other hardwares like LVDS To transfer image data to lcd panel fine.
 
-But then there is no real page table sharing, isn't it? 
-The real information should be in the page tables, nowhere else.
+I tested this patch on cpu interface based on MIPI so for this patch, Some mainline codes should be modified and also considered RGB interface.
 
-> > The standard Linux approach to such a problem is to write
-> > a library that drivers can use for common functionality, not put a middle 
-> > layer in between. Libraries are much more flexible than layers.
-> 
-> That's true up to the, "is this middle layer so useful that its worth
-> it" point. The VM is a middle layer, you could make the same argument
-> about it, "the mapping code isn't too hard, just map in the memory
-> that you need and be done with it". But the VM middle layer provides a
-> clean separation between page frames and pages which turns out to be
+This patch set consists of the following patches,
 
-Actually we use both PFNs and struct page *s in many layers up
-and down, there's not really any layering in that.
+[PATCH 1/2] S5PV210: FB: Add MIPI-DSI and CPU Interface features.
+[PATCH 1/2] S5PV210: Add MIPI-DSI Driver.
 
--Andi
--- 
-ak at linux.intel.com -- Speaking for myself only.
+Best regards,
+InKi Dae
