@@ -1,67 +1,32 @@
-From: jayakumar.arm@gmail.com (Jaya Kumar)
-Date: Fri, 2 Jul 2010 07:57:19 +0800
-Subject: [PATCH 24/33] Removing dead ARCH_GUMSTIX_ORIG
-In-Reply-To: <AANLkTim9icxxarxlcC39tCnnAIwwBOF8l8a68nQy7xHQ@mail.gmail.com>
-References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<e2a294ec1d41f1198f7ffae0e8bed2f67b41bbe8.1277911346.git.siccegge@cs.fau.de>
-	<AANLkTim9icxxarxlcC39tCnnAIwwBOF8l8a68nQy7xHQ@mail.gmail.com>
-Message-ID: <AANLkTinaExfjcAFTSvvZV3Hi3nLAa8bDY6mkqBf9WgvM@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 1 Jul 2010 19:10:47 -0500
+Subject: [PATCH] ARM: Stop secondary cpus in machine_halt()
+In-Reply-To: <20100701231128.GA19906@n2100.arm.linux.org.uk>
+References: <20100701224706.GA26473@lixom.net>
+	<20100701231128.GA19906@n2100.arm.linux.org.uk>
+Message-ID: <20100702001047.GA26647@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 1, 2010 at 12:27 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Thu, Jul 1, 2010 at 12:01 AM, Christoph Egger <siccegge@cs.fau.de> wrote:
->> ARCH_GUMSTIX_ORIG doesn't exist in Kconfig, therefore removing all
->> references for it from the source code.
->>
->> Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
->
-> Acked-by: Eric Miao <eric.y.miao@gmail.com>
->
-> Cc'ed Jaya Kumar for additional thoughts.
+On Fri, Jul 02, 2010 at 12:11:28AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 01, 2010 at 05:47:06PM -0500, Olof Johansson wrote:
+> > ARM doesn't spin down secondary cpus on halt, which results in interrupts
+> > being delivered even after the "System halted" message, etc.
+> > 
+> > Change that to use smp_send_stop() to halt them. Also, change the
+> > smp_send_stop() on ARM to not do a stack dump when stopping.
+> 
+> Actually, we want stack dumps - sometimes.  For instance, when we
+> panic() or similar.
 
-Looks okay to me too. Thanks.
+Do we really want the stack dumps of all cpus at panic time? They won't be
+printed precisely since the IPI takes a while to make it over.
 
-Acked-by: Jaya Kumar <jayakumar.lkml@gmail.com>
+As the size of SMP systems grow, it'll also become too spammy.
 
->
->> ---
->> ?arch/arm/mach-pxa/include/mach/gumstix.h | ? 12 +-----------
->> ?1 files changed, 1 insertions(+), 11 deletions(-)
->>
->> diff --git a/arch/arm/mach-pxa/include/mach/gumstix.h b/arch/arm/mach-pxa/include/mach/gumstix.h
->> index 06abd41..9b89868 100644
->> --- a/arch/arm/mach-pxa/include/mach/gumstix.h
->> +++ b/arch/arm/mach-pxa/include/mach/gumstix.h
->> @@ -14,25 +14,15 @@
->>
->> ?/*
->> ?GPIOn - Input from MAX823 (or equiv), normalizing USB +5V into a clean
->> -interrupt signal for determining cable presence. On the original gumstix,
->> -this is GPIO81, and GPIO83 needs to be defined as well. On the gumstix F,
->> +interrupt signal for determining cable presence. On the gumstix F,
->> ?this moves to GPIO17 and GPIO37. */
->>
->> ?/* GPIOx - Connects to USB D+ and used as a pull-up after GPIOn
->> ?has detected a cable insertion; driven low otherwise. */
->>
->> -#ifdef CONFIG_ARCH_GUMSTIX_ORIG
->> -
->> -#define GPIO_GUMSTIX_USB_GPIOn ? ? ? ? 81
->> -#define GPIO_GUMSTIX_USB_GPIOx ? ? ? ? 83
->> -
->> -#else
->> -
->> ?#define GPIO_GUMSTIX_USB_GPIOn ? ? ? ? 35
->> ?#define GPIO_GUMSTIX_USB_GPIOx ? ? ? ? 41
->>
->> -#endif
->> -
->> ?/* usb state change */
->> ?#define GUMSTIX_USB_INTR_IRQ ? ? ? ? ? IRQ_GPIO(GPIO_GUMSTIX_USB_GPIOn)
->>
->> --
->> 1.7.0.4
->>
->>
->
+Anyway, the patch only changes behaviour when the system_state is
+SYSTEM_HALT, i.e. during shutdown so all other panics will still
+dump stacks from all cpus.
+
+
+-Olof
