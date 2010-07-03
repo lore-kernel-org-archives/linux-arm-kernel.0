@@ -1,153 +1,29 @@
-From: gbean@codeaurora.org (Gregory Bean)
-Date: Sat,  3 Jul 2010 12:25:28 -0700
-Subject: [PATCH v2] msm: gpio: Add set_wake support to msm7200a-gpio's
-	irq_chip.
-Message-ID: <1278185128-29161-1-git-send-email-gbean@codeaurora.org>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sat, 3 Jul 2010 22:48:04 +0300
+Subject: Some benchmarks on ARM
+In-Reply-To: <20100702180257.GA8767@pengutronix.de>
+References: <20100702180257.GA8767@pengutronix.de>
+Message-ID: <20100703194803.GA29907@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add power-management and irq_chip hooks to allow configuration
-of msm-gpio irq lines as wakeup sources.
+Hi Robert,
 
-Signed-off-by: Gregory Bean <gbean@codeaurora.org>
----
- arch/arm/mach-msm/msm7200a-gpio.c |   72 +++++++++++++++++++++++++++++++++++-
- 1 files changed, 70 insertions(+), 2 deletions(-)
+On Fri, Jul 02, 2010 at 08:02:57PM +0200, Robert Schwebel wrote:
+> We have recently made some benchmarks, in order to get a little bit
+> better fealing about where ARM cpus are today, especially when it comes
+> to the "recent" ones, and in comparism to the Atom. So we collected a
+> few benchmarks (most from lmbench) and did some actual measurements.
+> 
+> Here is a little article:
+> http://www.pengutronix.de/development/kernel/arm-benchmarks-20100702_en.html
 
-diff --git a/arch/arm/mach-msm/msm7200a-gpio.c b/arch/arm/mach-msm/msm7200a-gpio.c
-index 1f9d53c..a490765 100644
---- a/arch/arm/mach-msm/msm7200a-gpio.c
-+++ b/arch/arm/mach-msm/msm7200a-gpio.c
-@@ -30,6 +30,12 @@
- #include <linux/slab.h>
- #include "msm7200a-gpio.h"
- 
-+enum {
-+	IRQ_MASK_NORMAL = 0,
-+	IRQ_MASK_WAKE_ON,
-+	IRQ_MASK_MAX
-+};
-+
- struct msm_gpio_dev {
- 	struct gpio_chip		gpio_chip;
- 	spinlock_t			lock;
-@@ -37,6 +43,8 @@ struct msm_gpio_dev {
- 	unsigned			irq_summary;
- 	bool				latch_level_irqs;
- 	struct msm7200a_gpio_regs	regs;
-+	u32				irq_masks[IRQ_MASK_MAX];
-+	int				nsuspend;
- };
- 
- static inline struct msm_gpio_dev *to_msm_gpio_dev(struct gpio_chip *chip)
-@@ -140,7 +148,8 @@ static void msm_gpio_irq_mask(unsigned int irq)
- 
- 	spin_lock_irqsave(&msm_gpio->lock, irq_flags);
- 	forget_level_irq(msm_gpio, offset);
--	clr_gpio_bit(offset, msm_gpio->regs.int_en);
-+	msm_gpio->irq_masks[IRQ_MASK_NORMAL] &= ~BIT(offset);
-+	writel(msm_gpio->irq_masks[IRQ_MASK_NORMAL], msm_gpio->regs.int_en);
- 	spin_unlock_irqrestore(&msm_gpio->lock, irq_flags);
- }
- 
-@@ -152,7 +161,8 @@ static void msm_gpio_irq_unmask(unsigned int irq)
- 
- 	spin_lock_irqsave(&msm_gpio->lock, irq_flags);
- 	forget_level_irq(msm_gpio, offset);
--	set_gpio_bit(offset, msm_gpio->regs.int_en);
-+	msm_gpio->irq_masks[IRQ_MASK_NORMAL] |= BIT(offset);
-+	writel(msm_gpio->irq_masks[IRQ_MASK_NORMAL], msm_gpio->regs.int_en);
- 	spin_unlock_irqrestore(&msm_gpio->lock, irq_flags);
- }
- 
-@@ -194,6 +204,22 @@ static void msm_gpio_irq_mask_ack(unsigned int irq)
- 	msm_gpio_irq_mask(irq);
- }
- 
-+static int msm_gpio_irq_set_wake(unsigned int irq, unsigned int on)
-+{
-+	struct msm_gpio_dev *msm_gpio = get_irq_chip_data(irq);
-+	unsigned offset = irq - msm_gpio->irq_base;
-+	unsigned long irq_flags;
-+
-+	spin_lock_irqsave(&msm_gpio->lock, irq_flags);
-+	if (on)
-+		msm_gpio->irq_masks[IRQ_MASK_WAKE_ON] |= BIT(offset);
-+	else
-+		msm_gpio->irq_masks[IRQ_MASK_WAKE_ON] &= ~BIT(offset);
-+	spin_unlock_irqrestore(&msm_gpio->lock, irq_flags);
-+
-+	return set_irq_wake(msm_gpio->irq_summary, on);
-+}
-+
- static irqreturn_t msm_gpio_irq_handler(int irq, void *dev)
- {
- 	struct msm_gpio_dev *msm_gpio = dev;
-@@ -232,6 +258,7 @@ static struct irq_chip msm_gpio_irq_chip = {
- 	.mask_ack		= msm_gpio_irq_mask_ack,
- 	.unmask			= msm_gpio_irq_unmask,
- 	.set_type		= msm_gpio_irq_set_type,
-+	.set_wake		= msm_gpio_irq_set_wake,
- };
- 
- static int __devinit msm_gpio_probe(struct platform_device *dev)
-@@ -325,12 +352,53 @@ static int __devexit msm_gpio_remove(struct platform_device *dev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM
-+static int msm_gpio_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct msm_gpio_dev *msm_gpio = platform_get_drvdata(pdev);
-+	unsigned long irq_flags;
-+	unsigned long irq_mask;
-+
-+	spin_lock_irqsave(&msm_gpio->lock, irq_flags);
-+	if ((msm_gpio->nsuspend)++ == 0) {
-+		irq_mask = msm_gpio->irq_masks[IRQ_MASK_NORMAL] &
-+			   msm_gpio->irq_masks[IRQ_MASK_WAKE_ON];
-+		writel(irq_mask, msm_gpio->regs.int_en);
-+	}
-+	spin_unlock_irqrestore(&msm_gpio->lock, irq_flags);
-+
-+	return 0;
-+}
-+
-+static int msm_gpio_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct msm_gpio_dev *msm_gpio = platform_get_drvdata(pdev);
-+	unsigned long irq_flags;
-+
-+	spin_lock_irqsave(&msm_gpio->lock, irq_flags);
-+	if (--(msm_gpio->nsuspend) == 0)
-+		writel(msm_gpio->irq_masks[IRQ_MASK_NORMAL],
-+		       msm_gpio->regs.int_en);
-+	spin_unlock_irqrestore(&msm_gpio->lock, irq_flags);
-+
-+	return 0;
-+}
-+#else
-+#define msm_gpio_suspend NULL
-+#define msm_gpio_resume NULL
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(msm_gpio_pm_ops, msm_gpio_suspend, msm_gpio_resume);
-+
- static struct platform_driver msm_gpio_driver = {
- 	.probe = msm_gpio_probe,
- 	.remove = __devexit_p(msm_gpio_remove),
- 	.driver = {
- 		.name = "msm7200a-gpio",
- 		.owner = THIS_MODULE,
-+		.pm = &msm_gpio_pm_ops,
- 	},
- };
- 
+The ARM architecture version in the list of tested hardware is wrong for the 
+ARM1136 and Cortex-A8 cores. Should be ARMv6 and ARMv7, respectively.
+
+baruch
+
 -- 
-1.7.0.4
-
---
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
