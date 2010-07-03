@@ -1,73 +1,96 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sat, 3 Jul 2010 12:31:53 +0530
-Subject: [patch 2/2] arm: Implement l2x0 cache disable function
-In-Reply-To: <1278089680.10162.279.camel@e102109-lin.cambridge.arm.com>
-References: <alpine.LFD.2.00.1007021658300.2525@localhost.localdomain>
-	<1278087010.10162.271.camel@e102109-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1007021835512.2525@localhost.localdomain>
-	<1278089680.10162.279.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C5ECEF1D@dbde02.ent.ti.com>
+From: daeinki@gmail.com (InKi Dae)
+Date: Sat, 3 Jul 2010 16:20:16 +0900
+Subject: [PATCH 2/2] S5PV210: Add MIPI-DSI Driver.
+In-Reply-To: <AANLkTilusz69vyqJE9v_8t3vDOeNex1wWC_u0m11kzjD@mail.gmail.com>
+References: <4C29AF72.6090200@samsung.com> <4C29C766.7010901@samsung.com>
+	<4C2DA889.5010809@samsung.com>
+	<AANLkTinQ2jC1w6B9q-pirShQ9GJODDwmS6e80KWYRpMm@mail.gmail.com>
+	<AANLkTilusz69vyqJE9v_8t3vDOeNex1wWC_u0m11kzjD@mail.gmail.com>
+Message-ID: <AANLkTimPUEdMOgEIXbfYf8WwNwy0jGz5CVYxxl3-rb9u@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-bounces at lists.infradead.org] On Behalf Of Catalin Marinas
-> Sent: Friday, July 02, 2010 10:25 PM
-> To: Thomas Gleixner
-> Cc: Tony Lindgren; LAK
-> Subject: Re: [patch 2/2] arm: Implement l2x0 cache disable function
-> 
-> On Fri, 2010-07-02 at 17:39 +0100, Thomas Gleixner wrote:
-> > On Fri, 2 Jul 2010, Catalin Marinas wrote:
-> >
-> > > On Fri, 2010-07-02 at 16:29 +0100, Thomas Gleixner wrote:
-> > > > On Fri, 2 Jul 2010, Catalin Marinas wrote:
-> > > >
-> > > > > On Thu, 2010-07-01 at 17:05 +0100, Thomas Gleixner wrote:
-> > > > > > This function is called from kexec code before the inner caches
-> are
-> > > > > > disabled to prevent random crashes in the new kernel.
-> > > > > >
-> > > > > > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> > > > > > Index: linux-2.6/arch/arm/mm/cache-l2x0.c
-> > > > > >
-> ===================================================================
-> > > > > > --- linux-2.6.orig/arch/arm/mm/cache-l2x0.c
-> > > > > > +++ linux-2.6/arch/arm/mm/cache-l2x0.c
-> > > > > > @@ -206,6 +206,12 @@ static void l2x0_flush_range(unsigned lo
-> > > > > >         spin_unlock_irqrestore(&l2x0_lock, flags);
-> > > > > >  }
-> > > > > >
-> > > > > > +static void l2x0_cache_disable(void)
-> > > > > > +{
-> > > > > > +       l2x0_inv_all();
-> > > > > > +       writel(0, l2x0_base + L2X0_CTRL);
-> > > > > > +}
-> > > > >
-> > > > > Even if we go this route, we need an l2x0_flush_all() rather than
-> > > > > invalidate here as the latter removes dirty cache lines without
-> evicting
-> > > > > them first.
-> > > >
-> > > > True, but that's an implementation detail. What's more important is
-> to
-> > > > make a decision how to solve the problem as kexec is completely
-> > > > unusable for all L2 systems right now.
-> > >
-> > > My view is that we should try to find why cache flushing doesn't work
-> > > but unfortunately I don't have any spare time to look into this (would
-> > > need to use tools like ICE debugging/tracing).
-> >
-> > Simply because you need to flush the cache in the decompressor of the
-> > new kernel before jumping into it and I doubt that Russell will be
-> > happy about adding an utter L2 mess to the decompressor.
-> 
-> The decompressor can create mappings as inner cacheable outer
-> non-cacheable and it would not pollute the L2 cache.
-> 
-> I wonder how the OMAP guys deal with an already enabled L2 cache during
-> decompressing.
+oops, sorry.
 
-$L2 isn't enabled during the decompression. It's done " __v7_setup" on OMAP3
-and just before " l2x0_init" on OMAP4
+it changed header file name to another.
+
+2010/7/3 InKi Dae <daeinki@gmail.com>:
+> Hi, Jaya.
+>
+> below is my answer.
+>
+> 2010/7/3 Jaya Kumar <jayakumar.lkml@gmail.com>:
+>> Hi InKi,
+>>
+>> 2010/7/2 InKi Dae <inki.dae@samsung.com>:
+>>> this patch addes MIPI-DSI Driver.
+>>>
+>>> to use this driver, some structures below should be added to machine
+>>> specific file.
+>>
+>> A quick question. I'm having difficulty understanding the larger
+>> picture here. There's the MIPI-DSI host controller driver (which I
+>> think is what this patch is) which is specific to this platform. Then
+>> there's the MIPI-DSI LCD panels which are supposed to be fully
+>> platform independent, right? and would thus ideally have a platform
+>> independent MIPI-DSI client driver?
+>>
+>
+> hmm, is there any mipi-dsi master framework that it can use commonly
+> in linux kernel? my driver is dependent on platform a little because
+> lcd panel driver should include two header files.
+>
+>> Would I be correct in saying this patch below does not provide such an
+>> abstraction and so structures that would be necessary for such a
+>> display driver (eg: struct mipi_lcd_driver ) appear to be declared in
+>> the samsung platform specific files. In other words, if we wanted to
+>> support a particular MIPI-DSI LCD panel, it would require a client
+>> driver that is tied intimately to this platform?
+>>
+>> Could you point us to an example mipi-dsi client driver that is using
+>> the patch you provided? ie: something that is calling
+>> s5p_dsim_register_lcd_driver. That would help us understand the
+>> abstraction that is being made here.
+>
+> Ok, below is example code to mipi-dsi based lcd panel driver.
+>
+> #include <plat/dsim.h>
+> #include <plat/mipi_ddi.h>
+>
+> static struct mipi_lcd_driver xxx_mipi_driver = {
+> ? ? ? ? ? .name ?= "xxx",
+> ? ? ? ? ? .init ?= xxx_init,
+> ? ? ? ? ? .display_on = xxx_displsy_on,
+> ? ? ? ? ? .set_link = xxx_set_link,
+> ? ? ? ? ? .probe = xxx_probe,
+> ? ? ? ? ? .suspend = xxx_suspend,
+> ? ? ? ? ? .resume = xxx_resume,
+> };
+>
+> static int xxx_init(void)
+> {
+> ? ? ? ? ? s5p_dsim_register_lcd_driver(&xxx_mipi_driver);
+> ? ? ? ? ? return 0;
+> }
+>
+> static void xxx_exit(void)
+> {
+> ? ? ? ? ?return;
+> }
+>
+> module_init(xxx_init);
+> module_exit(xxx_exit);
+>
+> at module_init, xxx_mipi_driver would be registered to mipi master
+> driver through
+> s5p_dsim_register_lcd_driver func and when master driver is probed, xxx_probe
+> would be called by probe func of master driver.
+>
+> I wonder there is mipi-dsi master driver indenpendent on platform
+> fully in linux kernel.
+> if exsiting, I will use it as master driver. of course, the part
+> dependent on platform
+> would be implemented using that framework.
+>
+> Thank you.
+>
