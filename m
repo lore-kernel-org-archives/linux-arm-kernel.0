@@ -1,180 +1,27 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 03 Jul 2010 10:08:01 +0900
-Subject: [PATCH 2/3] ARM: S5PV210: Add support SDMMC WP through EXT_INT on
-	SMDKV210
-In-Reply-To: <AANLkTimQwmFGwRgXASba1ECwYDJaay_D1q4_L6tvIo9y@mail.gmail.com>
-References: <1276601268-7226-1-git-send-email-kgene.kim@samsung.com>
-	<1276601268-7226-3-git-send-email-kgene.kim@samsung.com>
-	<AANLkTimQwmFGwRgXASba1ECwYDJaay_D1q4_L6tvIo9y@mail.gmail.com>
-Message-ID: <009101cb1a4c$3105a000$9310e000$%kim@samsung.com>
+Date: Sat,  3 Jul 2010 10:00:41 +0900
+Subject: [PATCH v2] Add support WP on SMDKV210 and SDHCI_QUIRK_NO_WP_BIT quirk
+Message-ID: <1278118844-21770-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> On Tue, Jun 15, 2010 at 8:27 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > From: Lee Hyuk <hyuk1.lee@samsung.com>
-> >
-> > S5PV210 HSMMC host controller doesn't have the Write Protection pin
-which
-> > should be connnected with SDMMC card WP pin. So allocated a GPIO in
-order
-> to
-> > get the data from SDMMC card WP pin with EXT_INT and implement get_ro
-and
-> > cfg_wp function.
-> >
-> > Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> > ?arch/arm/mach-s5pv210/mach-smdkv210.c | ? ?2 +
-> > ?arch/arm/mach-s5pv210/setup-sdhci.c ? | ? 72
-> +++++++++++++++++++++++++++++++++
-> > ?2 files changed, 74 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-
-> s5pv210/mach-smdkv210.c
-> > index b08f376..18cdb8c 100644
-> > --- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-> > +++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-> > @@ -27,6 +27,7 @@
-> > ?#include <plat/cpu.h>
-> > ?#include <plat/adc.h>
-> > ?#include <plat/ts.h>
-> > +#include <plat/sdhci.h>
-> >
-> > ?/* Following are default values for UCON, ULCON and UFCON UART
-registers */
-> > ?#define S5PV210_UCON_DEFAULT ? (S3C2410_UCON_TXILEVEL | ? ? ? ?\
-> > @@ -101,6 +102,7 @@ static void __init smdkv210_map_io(void)
-> > ?static void __init smdkv210_machine_init(void)
-> > ?{
-> > ? ? ? ?s3c24xx_ts_set_platdata(&s3c_ts_platform);
-> > + ? ? ? s3c_sdhci_set_platdata();
-> > ? ? ? ?platform_add_devices(smdkv210_devices,
-> ARRAY_SIZE(smdkv210_devices));
-> > ?}
-> >
-> > diff --git a/arch/arm/mach-s5pv210/setup-sdhci.c b/arch/arm/mach-
-> s5pv210/setup-sdhci.c
-> > index 51815ec..b553b36 100644
-> > --- a/arch/arm/mach-s5pv210/setup-sdhci.c
-> > +++ b/arch/arm/mach-s5pv210/setup-sdhci.c
-> > @@ -15,13 +15,17 @@
-> > ?#include <linux/interrupt.h>
-> > ?#include <linux/platform_device.h>
-> > ?#include <linux/io.h>
-> > +#include <linux/gpio.h>
-> >
-> > ?#include <linux/mmc/card.h>
-> > ?#include <linux/mmc/host.h>
-> >
-> > +#include <plat/gpio-cfg.h>
-> > ?#include <plat/regs-sdhci.h>
-> > ?#include <plat/sdhci.h>
-> >
-> > +#include <mach/map.h>
-> > +
-> > ?/* clock sources for the mmc bus clock, order as for the ctrl2[5..4] */
-> >
-> > ?char *s5pv210_hsmmc_clksrcs[4] = {
-> > @@ -61,3 +65,71 @@ void s5pv210_setup_sdhci_cfg_card(struct
-> platform_device *dev,
-> > ? ? ? ?writel(ctrl2, r + S3C_SDHCI_CONTROL2);
-> > ? ? ? ?writel(ctrl3, r + S3C_SDHCI_CONTROL3);
-> > ?}
-> > +
-> > +static int s5pv210_sdhci_get_ro(struct mmc_host *mmc)
-> > +{
-> > + ? ? ? int gpio_dat;
-> > +
-> > + ? ? ? if ((mmc->index == 0 && s3c_hsmmc0_def_platdata.cfg_wp != NULL)
-||
-> > + ? ? ? ? ? ? ? (mmc->index == 1 && s3c_hsmmc1_def_platdata.cfg_wp !=
-> NULL)) {
-> > + ? ? ? ? ? ? ? gpio_dat = __raw_readl((S5P_VA_GPIO + 0xC00) + 0x04);
-> > + ? ? ? ? ? ? ? return !!(gpio_dat & 0x80);
-> 
-> It's GPIO values, and it's smdk specific values. So it should go smdk
-> board files instead of platform common one.
-> 
-Yes, you're right..moved.
+This patch adds support SDMMC write protection pin on SMDKV210.
 
-> > + ? ? ? } else if (mmc->index == 2 && s3c_hsmmc2_def_platdata.cfg_wp !=
-> NULL) {
-> > + ? ? ? ? ? ? ? gpio_dat = __raw_readl((S5P_VA_GPIO + 0xC00) + 0x64);
-> > + ? ? ? ? ? ? ? return !!(gpio_dat & 0x2);
-> > + ? ? ? } else if (mmc->index == 3 && s3c_hsmmc3_def_platdata.cfg_wp !=
-> NULL) {
-> > + ? ? ? ? ? ? ? gpio_dat = __raw_readl((S5P_VA_GPIO + 0xC00) + 0x24);
-> > + ? ? ? ? ? ? ? return !!(gpio_dat & 0x1);
-> > + ? ? ? } else
-> > + ? ? ? ? ? ? ? return 0;
-> > +}
-> > +
-> > +static void s5pv210_setup_sdhci_gpio_wp(int dev_id)
-> > +{
-> > + ? ? ? switch (dev_id) {
-> > + ? ? ? case 0:
-> > + ? ? ? case 1:
-> > + ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5PV210_GPH0(7), S3C_GPIO_INPUT);
-> > + ? ? ? ? ? ? ? s3c_gpio_setpull(S5PV210_GPH0(7), S3C_GPIO_PULL_UP);
-> > + ? ? ? ? ? ? ? break;
-> > + ? ? ? case 2:
-> > + ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5PV210_GPH3(1), S3C_GPIO_INPUT);
-> > + ? ? ? ? ? ? ? s3c_gpio_setpull(S5PV210_GPH3(1), S3C_GPIO_PULL_UP);
-> > + ? ? ? ? ? ? ? break;
-> > + ? ? ? case 3:
-> > + ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5PV210_GPH1(0), S3C_GPIO_INPUT);
-> > + ? ? ? ? ? ? ? s3c_gpio_setpull(S5PV210_GPH1(0), S3C_GPIO_PULL_UP);
-> 
-> Ditto. board specific configurations. should go smdk board file.
-> 
-Moved.
+Changes since v1:
+Addressed comments from Ben Dooks, Maurus Cuelenaere and Kyungmin Park
 
-> > + ? ? ? ? ? ? ? break;
-> > + ? ? ? default:
-> > + ? ? ? ? ? ? ? break;
-> > + ? ? ? }
-> > +}
-> > +
-> > +static struct s3c_sdhci_platdata hsmmc0_platdata = {
-> > + ? ? ? .cfg_wp ? ? ? ? = s5pv210_setup_sdhci_gpio_wp,
-> > + ? ? ? .get_ro ? ? ? ? = s5pv210_sdhci_get_ro,
-> > +};
-> > +
-> > +static struct s3c_sdhci_platdata hsmmc1_platdata = {
-> > + ? ? ? .cfg_wp ? ? ? ? = s5pv210_setup_sdhci_gpio_wp,
-> > + ? ? ? .get_ro ? ? ? ? = s5pv210_sdhci_get_ro,
-> > +};
-> > +
-> > +static struct s3c_sdhci_platdata hsmmc2_platdata = {
-> > + ? ? ? .cfg_wp ? ? ? ? = s5pv210_setup_sdhci_gpio_wp,
-> > + ? ? ? .get_ro ? ? ? ? = s5pv210_sdhci_get_ro,
-> > +};
-> > +
-> > +static struct s3c_sdhci_platdata hsmmc3_platdata = {
-> > + ? ? ? .cfg_wp ? ? ? ? = s5pv210_setup_sdhci_gpio_wp,
-> > + ? ? ? .get_ro ? ? ? ? = s5pv210_sdhci_get_ro,
-> > +};
-> > +
-> > +void s3c_sdhci_set_platdata(void)
-> > +{
-> > + ? ? ? s3c_sdhci0_set_platdata(&hsmmc0_platdata);
-> > + ? ? ? s3c_sdhci1_set_platdata(&hsmmc1_platdata);
-> > + ? ? ? s3c_sdhci2_set_platdata(&hsmmc2_platdata);
-> > + ? ? ? s3c_sdhci3_set_platdata(&hsmmc3_platdata);
-> > +}
-> > +EXPORT_SYMBOL(s3c_sdhci_set_platdata);
-> 
-> I think all added lines should go smdk totally.
-> 
-Fixed in v2 patches as your comments.
+- just pass gpio numbers for support WP as Ben's suggestion
+- use the gpio layer for specific machine
+- use s3c_sdhcix_set_platdata() in machine_init()
+- removed unnecessary EXPORT_SYMBOL
 
-Thanks.
+Note: Depends on following patch set
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+[PATCH v2 1/2] ARM: SAMSUNG: Add device definition for HSMMC3
+[PATCH v2 2/2] ARM: S5PV210: Add support HSMMC on SMDKV210
+
+And this patch set includes the following patches:
+
+[PATCH v2 1/3] ARM: SAMSUNG: Add the member of platdata to implement SDMMC Write Protection
+[PATCH v2 2/3] ARM: S5PV210: Add support SDMMC WP through EXT_INT on SMDKV210
+[PATCH v2 3/3] sdhci-s3c: Add SDHCI_QUIRK_NO_WP_BIT quirk
