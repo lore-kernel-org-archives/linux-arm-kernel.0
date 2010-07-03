@@ -1,59 +1,49 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Sat, 3 Jul 2010 22:10:22 +0200
-Subject: pxa27x_udc: Oops on probe with usb cable connected.
-In-Reply-To: <877hld7np5.fsf@free.fr>
-References: <20100630115310.bcf967c1.ospite@studenti.unina.it>
-	<877hld7np5.fsf@free.fr>
-Message-ID: <20100703221022.27df1a2e.ospite@studenti.unina.it>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 3 Jul 2010 21:28:45 +0100
+Subject: Some benchmarks on ARM
+In-Reply-To: <4C2F98BD.9020803@xenomai.org>
+References: <20100702180257.GA8767@pengutronix.de>
+	<4C2F98BD.9020803@xenomai.org>
+Message-ID: <20100703202845.GA23954@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 02 Jul 2010 20:17:42 +0200
-Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-
-> Antonio Ospite <ospite@studenti.unina.it> writes:
-> > Note that using the original blob bootloader from Motorola there is no
-> > Oops but the UDC does not work at all, but maybe this is another
-> > issue, I mean: should pxa27x_udc probe consider the case when UDC is
-> > already active?
-> It was not designed for, but it actually works on my platform, when I launch
-> linux kernel from haret without disabling the UDC.
->
-
-I see.
-
-> > Tell me how can i help debugging this, I've put the binary and the
-> > disassembled code in http://people.openezx.org/ao2/tmp/pxa27x-udc_BUG/
-> > plus some notes about old discussions on the same matter.
-> There are a few things I can do with a little more information.
+On Sat, Jul 03, 2010 at 10:08:29PM +0200, Gilles Chanteperdrix wrote:
+> Robert Schwebel wrote:
+> > Hi,
+> > 
+> > We have recently made some benchmarks, in order to get a little bit
+> > better fealing about where ARM cpus are today, especially when it comes
+> > to the "recent" ones, and in comparism to the Atom. So we collected a
+> > few benchmarks (most from lmbench) and did some actual measurements.
+> > 
+> > Here is a little article:
+> > http://www.pengutronix.de/development/kernel/arm-benchmarks-20100702_en.html
+> > 
+> > I'm pretty sure that there are quite a few things where people on ALKML
+> > have good ideas where the effects come from or how to improve the
+> > methodology - so I'd be glad to get some feedback from the community!
+> > 
+> > All measurements have been done on 2.6.34.
 > 
->  - Prevent gcc from being too smart by inlining functions : I think the right
->    flag is -fno-inline. This will prevent irq_handle_data() and others to be
->    inlined into pxa_udc_irq(), and ease the debugging.
->
+> The context switch time for PXA270 looks really suspicious. The worst
+> case context switch time of an AT91RM9200, an armv4 running at 180MHz,
+> is less than 300us, so, I doubt that the context switch time of a PXA
+> can be that worse.
 
-Done that as well this time. See
-http://people.openezx.org/ao2/tmp/pxa27x-udc_BUG/
-I replaced the old files with the new ones as per your instructions.
+The measurement is of the thread and MM switch time, which'll involve
+cache flushes on <= ARMv5.
 
-Thanks,
-   Antonio
+On PXA, we have to 'read' (via means of D cache line allocations) 32K
+of data into the cache in order to cause the existing data to be written
+out.  These are done from a range of addresses which don't exist in the
+page tables, and so should not cause any bus activity other than the
+write-outs.  However, the cache still has to interact with the MMU to
+try to fetch the requested data - which probably consumes some cycles.
 
--- 
-Antonio Ospite
-http://ao2.it
+ARM920 on the other hand can walk through every cache line and clean+
+invalidate it.  It has 64 lines in each segment, and 8 segments, each
+line 32 bytes long, which gives a cache size of 16K.
 
-PGP public key ID: 0x4553B001
-
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100703/c34854b0/attachment.sig>
+I'd therefore expect ARM920's cache flushing to be quicker (in terms
+of cycles consumed) than PXA.
