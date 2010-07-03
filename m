@@ -1,24 +1,27 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 03 Jul 2010 10:11:59 +0900
-Subject: [PATCH 2/3] ARM: S5PV210: Add support SDMMC WP through EXT_INT on
+Date: Sat, 03 Jul 2010 10:14:19 +0900
+Subject: [PATCH 2/3] ARM: S5PV210: Add support SDMMC WP through EXT_INT	on
 	SMDKV210
-In-Reply-To: <4C1769D0.7040904@gmail.com>
+In-Reply-To: <20100615115947.GC7248@trinity.fluff.org>
 References: <1276601268-7226-1-git-send-email-kgene.kim@samsung.com>
 	<1276601268-7226-3-git-send-email-kgene.kim@samsung.com>
-	<4C1769D0.7040904@gmail.com>
-Message-ID: <009201cb1a4c$bea62fb0$3bf28f10$%kim@samsung.com>
+	<20100615115947.GC7248@trinity.fluff.org>
+Message-ID: <009301cb1a4d$12ac8050$380580f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maurus Cuelenaere wrote:
+Ben Dooks wrote:
 > 
-> Op 15-06-10 13:27, Kukjin Kim schreef:
+> On Tue, Jun 15, 2010 at 08:27:47PM +0900, Kukjin Kim wrote:
 > > From: Lee Hyuk <hyuk1.lee@samsung.com>
 > >
-> > S5PV210 HSMMC host controller doesn't have the Write Protection pin which
-> > should be connnected with SDMMC card WP pin. So allocated a GPIO in order
+> > S5PV210 HSMMC host controller doesn't have the Write Protection pin
+which
+> > should be connnected with SDMMC card WP pin. So allocated a GPIO in
+order
 > to
-> > get the data from SDMMC card WP pin with EXT_INT and implement get_ro and
+> > get the data from SDMMC card WP pin with EXT_INT and implement get_ro
+and
 > > cfg_wp function.
 > >
 > > Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
@@ -40,7 +43,8 @@ Maurus Cuelenaere wrote:
 > >  #include <plat/ts.h>
 > > +#include <plat/sdhci.h>
 > >
-> >  /* Following are default values for UCON, ULCON and UFCON UART registers
+> >  /* Following are default values for UCON, ULCON and UFCON UART
+registers
 > */
 > >  #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
 > > @@ -101,6 +102,7 @@ static void __init smdkv210_map_io(void)
@@ -48,12 +52,10 @@ Maurus Cuelenaere wrote:
 > >  {
 > >  	s3c24xx_ts_set_platdata(&s3c_ts_platform);
 > > +	s3c_sdhci_set_platdata();
-> >
 > 
-> Wouldn't it be better to name this s5pv210_sdhci_set_platdata() ?
-> Also, see below.
+> hmm, did you really want to call it this? also, no argument specified.
 > 
-Ok..so used s3c_sdhciX_set_platdata() instead of using above.
+No..fixed it.
 
 > >  	platform_add_devices(smdkv210_devices,
 > ARRAY_SIZE(smdkv210_devices));
@@ -107,6 +109,12 @@ Ok..so used s3c_sdhciX_set_platdata() instead of using above.
 > > +		return !!(gpio_dat & 0x1);
 > > +	} else
 > > +		return 0;
+> 
+> Why not use the gpio layer? really, this sort of thing is what it is
+> there for.
+> 
+Ok..used it.
+
 > > +}
 > > +
 > > +static void s5pv210_setup_sdhci_gpio_wp(int dev_id)
@@ -127,6 +135,12 @@ Ok..so used s3c_sdhciX_set_platdata() instead of using above.
 > > +		break;
 > > +	default:
 > > +		break;
+> 
+> again, if you'd use the gpio layer, at-lesat the cfgpin() wouldn't
+> have been necessary.
+> 
+OK.
+
 > > +	}
 > > +}
 > > +
@@ -158,13 +172,11 @@ Ok..so used s3c_sdhciX_set_platdata() instead of using above.
 > > +	s3c_sdhci3_set_platdata(&hsmmc3_platdata);
 > > +}
 > > +EXPORT_SYMBOL(s3c_sdhci_set_platdata);
-> >
 > 
-> Why do you export this function? I don't see this being used anywhere
-> except in mach-s5pv210.
-> 
-You're right..so machine specific functions moved in the machine file.
-And removed unnecessary above function. EXPORT_SYMBOL also.
+> There is _NO NEED_ to export these, they really should not be used outside
+> of the machine initialisation.
+
+Yeah, you're right.
 
 Thanks.
 
