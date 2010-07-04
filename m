@@ -1,41 +1,53 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Sun, 4 Jul 2010 14:50:10 +0100
-Subject: [PATCH v3 05/12] s3c-fb: Add support for display panning
-In-Reply-To: <003e01cb19ea$969e0090$c3da01b0$%osciak@samsung.com>
-References: <1277712538-23188-1-git-send-email-p.osciak@samsung.com>
-	<1277712538-23188-6-git-send-email-p.osciak@samsung.com>
-	<4C2DCC5B.2000100@simtec.co.uk>
-	<003e01cb19ea$969e0090$c3da01b0$%osciak@samsung.com>
-Message-ID: <20100704135010.GA1201@shareable.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sun, 04 Jul 2010 15:07:24 +0100
+Subject: [patch 2/2] arm: Implement l2x0 cache disable function
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C5ECEF1D@dbde02.ent.ti.com>
+References: <alpine.LFD.2.00.1007021658300.2525@localhost.localdomain>
+	<1278087010.10162.271.camel@e102109-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1007021835512.2525@localhost.localdomain>
+	<1278089680.10162.279.camel@e102109-lin.cambridge.arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C5ECEF1D@dbde02.ent.ti.com>
+Message-ID: <1278252444.22408.9.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pawel Osciak wrote:
-> >Ben Dooks <ben@simtec.co.uk> wrote:
-> >On 28/06/10 09:08, Pawel Osciak wrote:
-> 
-> >> diff --git a/arch/arm/plat-samsung/include/plat/regs-fb.h b/arch/arm/plat-
-> >samsung/include/plat/regs-fb.h
-> >> index ac10013..f454e32 100644
-> >> --- a/arch/arm/plat-samsung/include/plat/regs-fb.h
-> >> +++ b/arch/arm/plat-samsung/include/plat/regs-fb.h
-> >> @@ -112,6 +112,11 @@
-> >>  #define VIDCON2_ORGYCbCr			(1 << 8)
-> >>  #define VIDCON2_YUVORDCrCb			(1 << 7)
-> >>
-> >> +/* PRTCON (S3C6410, S5PC100) */
+On Sat, 2010-07-03 at 08:01 +0100, Shilimkar, Santosh wrote:
+> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> > kernel-bounces at lists.infradead.org] On Behalf Of Catalin Marinas
+> > On Fri, 2010-07-02 at 17:39 +0100, Thomas Gleixner wrote:
+> > > On Fri, 2 Jul 2010, Catalin Marinas wrote:
+> > > > My view is that we should try to find why cache flushing doesn't work
+> > > > but unfortunately I don't have any spare time to look into this (would
+> > > > need to use tools like ICE debugging/tracing).
+> > >
+> > > Simply because you need to flush the cache in the decompressor of the
+> > > new kernel before jumping into it and I doubt that Russell will be
+> > > happy about adding an utter L2 mess to the decompressor.
 > >
-> >Not listed in my S3C6410 manual?
+> > The decompressor can create mappings as inner cacheable outer
+> > non-cacheable and it would not pollute the L2 cache.
 > >
+> > I wonder how the OMAP guys deal with an already enabled L2 cache during
+> > decompressing.
 > 
-> Not in my either. It is there in the S5PC100 docs though. This is not an
-> "official statement", but I've been testing panning on my 6410 *very*
-> intensively and experienced a lot of crashes without it. Not a single one
-> with it though. So it's either almost impossible luck or it is there,
-> undocumented. There is a hole at this address anyway, so this shouldn't
-> hurt anything.
+> $L2 isn't enabled during the decompression. It's done " __v7_setup" on OMAP3
+> and just before " l2x0_init" on OMAP4
 
-Probably a good idea to put that in a comment, for the person who
-looks at it in 5 years time and wonders if the code is mistaken.
+Another approach would have been to mark the page tables as outer
+non-cacheable in the decompressor.
 
--- Jamie
+Anyway, if you already handle L2 cache initialisation during __v7_setup
+(and we could go back to a thread where I asked for per-platform CPU
+initialisation support), you could handle L2 cache disabling as well.
+
+As per Thomas' patches, the outer_cache_fns structure has a .disable()
+function and this can be overridden by the OMAP code after l2x0_init().
+
+The only additional comment I have to Thomas' second patch is that the
+l2x0_cache_disable() implementation has to flush (clean+inv) the L2
+cache (rather than just invalidate) and then disable by writing the L2
+control register. The L2 flushing function doesn't need to be exported
+via outer_cache_fns since it's only the disabling that would handle it.
+
+-- 
+Catalin
