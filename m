@@ -1,40 +1,20 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Sun, 04 Jul 2010 11:22:59 +0200
-Subject: [PATCH v2 1/2] ARM: SAMSUNG: Add device definition for HSMMC3
-In-Reply-To: <009501cb1a4e$04f57ec0$0ee07c40$%kim@samsung.com>
-References: <1278115660-20969-1-git-send-email-kgene.kim@samsung.com>
-	<1278115660-20969-2-git-send-email-kgene.kim@samsung.com>
-	<4C2E81AC.3090707@gmail.com>
-	<009501cb1a4e$04f57ec0$0ee07c40$%kim@samsung.com>
-Message-ID: <4C3052F3.4080208@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 4 Jul 2010 18:42:48 +0900
+Subject: [PATCH 2/3] ASoC: Add SmartQ sound driver
+In-Reply-To: <4C305229.30409@gmail.com>
+References: <4c2e8856.487e0e0a.3bb5.3ec0@mx.google.com>
+	<20100704090549.GD16825@opensource.wolfsonmicro.com>
+	<4C305229.30409@gmail.com>
+Message-ID: <20100704094246.GA2455@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Op 03-07-10 03:21, Kukjin Kim schreef:
-> Maurus Cuelenaere wrote:
->>  Op 03-07-10 02:07, Kukjin Kim schreef:
->>
->>>  /* S3C6400 SDHCI setup */
->>>
->>> @@ -264,10 +267,22 @@ static inline void s5pv210_default_sdhci2(void)
->>>  static inline void s5pv210_default_sdhci2(void) { }
->>>  #endif /* CONFIG_S3C_DEV_HSMMC2 */
->>>
->>> +#ifdef CONFIG_S3C_DEV_HSMMC3
->>> +static inline void s5pv210_default_sdhci3(void)
->>> +{
->>> +	s3c_hsmmc3_def_platdata.clocks = s5pv210_hsmmc_clksrcs;
->>> +	s3c_hsmmc3_def_platdata.cfg_gpio = s5pv210_setup_sdhci3_cfg_gpio;
->>> +	s3c_hsmmc3_def_platdata.cfg_card = s5pv210_setup_sdhci_cfg_card;
->>> +}
->>> +#else
->>> +static inline void s5pv210_default_sdhci3(void) { }
->>> +#endif /* CONFIG_S3C_DEV_HSMMC3 */
->> This could be simplified by putting the #ifdef inside the function.
-> Yeah, you're right..but used same style with others in this file.
-> ...so will modify it as your comment with others soon.
+On Sun, Jul 04, 2010 at 11:19:37AM +0200, Maurus Cuelenaere wrote:
 
-Hmm yes, I guess it's just a matter of personal taste.
+> I don't see what power there is to save? The speaker and headphone
+> jack are connected to the same physical pins, so when disabling the
+> pins for one of them, the other is also disabled.
 
--- 
-Maurus Cuelenaere
+Meh, so they are.  That's a slightly unusual design - normally you'd
+wire the speaker amplifier to a separate set of outputs to the
+headphone.
