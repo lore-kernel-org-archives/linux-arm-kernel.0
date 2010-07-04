@@ -1,39 +1,28 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun,  4 Jul 2010 11:47:29 +0300
-Subject: [PATCH] mx25: set GPT clock source to PER
-In-Reply-To: <20100704084343.GB19559@jasper.tkos.co.il>
-References: <20100704084343.GB19559@jasper.tkos.co.il>
-Message-ID: <40bc9462f125233cc9c63631a9b987ed684b6d97.1278233166.git.baruch@tkos.co.il>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 4 Jul 2010 18:05:50 +0900
+Subject: [PATCH 2/3] ASoC: Add SmartQ sound driver
+In-Reply-To: <4c2e8856.487e0e0a.3bb5.3ec0@mx.google.com>
+References: <4c2e8856.487e0e0a.3bb5.3ec0@mx.google.com>
+Message-ID: <20100704090549.GD16825@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes time accounting on mx25 base systems.
+On Sat, Jul 03, 2010 at 02:46:12AM +0200, Maurus Cuelenaere wrote:
+> This adds sound support for the SmartQ board.
+> 
+> The hardware consists of a S3C6410 coupled with a WM8987 over I?S. The WM8750
+> driver is used for driving the WM8987, as they are register compatible.
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/plat-mxc/time.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+I've applied this, but...
 
-diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
-index f9a1b05..0d7e0f9 100644
---- a/arch/arm/plat-mxc/time.c
-+++ b/arch/arm/plat-mxc/time.c
-@@ -56,6 +56,7 @@
- /* MX31, MX35, MX25, MXC91231, MX5 */
- #define V2_TCTL_WAITEN		(1 << 3) /* Wait enable mode */
- #define V2_TCTL_CLK_IPG		(1 << 6)
-+#define V2_TCTL_CLK_PER		(2 << 6)
- #define V2_TCTL_FRR		(1 << 9)
- #define V2_IR			0x0c
- #define V2_TSTAT		0x08
-@@ -308,7 +309,7 @@ void __init mxc_timer_init(struct clk *timer_clk, void __iomem *base, int irq)
- 	__raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
- 
- 	if (timer_is_v2())
--		tctl_val = V2_TCTL_CLK_IPG | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
-+		tctl_val = V2_TCTL_CLK_PER | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
- 	else
- 		tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
- 
--- 
-1.7.1
+> +static struct snd_soc_jack_pin smartq_jack_pins[] = {
+> +	/* Disable speaker when headphone is plugged in */
+> +	{
+> +		.pin	= "Internal Speaker",
+> +		.mask	= SND_JACK_HEADPHONE,
+> +		.invert	= true,
+> +	},
+> +};
+
+...it probably also make sense to disable the headphone output when the
+headphone is not plugged in to save power?
