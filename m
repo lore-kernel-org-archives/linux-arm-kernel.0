@@ -1,30 +1,41 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Sun, 04 Jul 2010 15:12:11 +0200
-Subject: [PATCH] ASoC: Invert speaker enabling behaviour in SmartQ sound driver
-In-Reply-To: <F182A883-DE14-4BE4-8430-9C925E59893B@opensource.wolfsonmicro.com>
-Message-ID: <4c3088ad.487e0e0a.3402.6e62@mx.google.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Sun, 4 Jul 2010 14:50:10 +0100
+Subject: [PATCH v3 05/12] s3c-fb: Add support for display panning
+In-Reply-To: <003e01cb19ea$969e0090$c3da01b0$%osciak@samsung.com>
+References: <1277712538-23188-1-git-send-email-p.osciak@samsung.com>
+	<1277712538-23188-6-git-send-email-p.osciak@samsung.com>
+	<4C2DCC5B.2000100@simtec.co.uk>
+	<003e01cb19ea$969e0090$c3da01b0$%osciak@samsung.com>
+Message-ID: <20100704135010.GA1201@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The speaker was enabled when the headphone was plugged in, which isn't the
-wanted behaviour so correct this.
+Pawel Osciak wrote:
+> >Ben Dooks <ben@simtec.co.uk> wrote:
+> >On 28/06/10 09:08, Pawel Osciak wrote:
+> 
+> >> diff --git a/arch/arm/plat-samsung/include/plat/regs-fb.h b/arch/arm/plat-
+> >samsung/include/plat/regs-fb.h
+> >> index ac10013..f454e32 100644
+> >> --- a/arch/arm/plat-samsung/include/plat/regs-fb.h
+> >> +++ b/arch/arm/plat-samsung/include/plat/regs-fb.h
+> >> @@ -112,6 +112,11 @@
+> >>  #define VIDCON2_ORGYCbCr			(1 << 8)
+> >>  #define VIDCON2_YUVORDCrCb			(1 << 7)
+> >>
+> >> +/* PRTCON (S3C6410, S5PC100) */
+> >
+> >Not listed in my S3C6410 manual?
+> >
+> 
+> Not in my either. It is there in the S5PC100 docs though. This is not an
+> "official statement", but I've been testing panning on my 6410 *very*
+> intensively and experienced a lot of crashes without it. Not a single one
+> with it though. So it's either almost impossible luck or it is there,
+> undocumented. There is a hole at this address anyway, so this shouldn't
+> hurt anything.
 
-Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
----
- sound/soc/s3c24xx/smartq_wm8987.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+Probably a good idea to put that in a comment, for the person who
+looks at it in 5 years time and wonders if the code is mistaken.
 
-diff --git a/sound/soc/s3c24xx/smartq_wm8987.c b/sound/soc/s3c24xx/smartq_wm8987.c
-index c90ef96..b480348 100644
---- a/sound/soc/s3c24xx/smartq_wm8987.c
-+++ b/sound/soc/s3c24xx/smartq_wm8987.c
-@@ -112,7 +112,6 @@ static struct snd_soc_jack_pin smartq_jack_pins[] = {
- 	{
- 		.pin	= "Internal Speaker",
- 		.mask	= SND_JACK_HEADPHONE,
--		.invert	= true,
- 	},
- };
- 
--- 
-1.7.0.4
+-- Jamie
