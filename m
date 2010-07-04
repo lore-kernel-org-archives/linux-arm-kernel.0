@@ -1,146 +1,97 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun,  4 Jul 2010 10:15:13 +0300
-Subject: [RFC PATCH] arm/imx/gpio: add spinlock protection
-Message-ID: <7fe710a6bc27460852588d2e561ec4c4a4644ab0.1278227668.git.baruch@tkos.co.il>
+Date: Sun, 4 Jul 2010 11:43:44 +0300
+Subject: [PATCH 3/4] mx25: fix time accounting
+In-Reply-To: <20100512094642.GB31199@pengutronix.de>
+References: <20100125105439.GE6724@jasper.tkos.co.il>
+	<fe6ca311cc749bf23a8f99e27ad460ff0aafa69a.1264416923.git.baruch@tkos.co.il>
+	<20100511154349.GZ31199@pengutronix.de>
+	<20100512050627.GA19283@jasper.tkos.co.il>
+	<20100512094642.GB31199@pengutronix.de>
+Message-ID: <20100704084343.GB19559@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIO and IRQ/GPIO registers need protection from concurrent access for
-operations that are not atomic.
+Hi Sascha,
 
-Cc: Juergen Beisert <j.beisert@pengutronix.de>
-Cc: Daniel Mack <daniel@caiaq.de>
-Reported-by: rpkamiak at rockwellcollins.com
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/plat-mxc/gpio.c              |   28 +++++++++++++++++++++++++---
- arch/arm/plat-mxc/include/mach/gpio.h |    3 +++
- 2 files changed, 28 insertions(+), 3 deletions(-)
+On Wed, May 12, 2010 at 11:46:42AM +0200, Sascha Hauer wrote:
+> On Wed, May 12, 2010 at 08:06:28AM +0300, Baruch Siach wrote:
+> > On Tue, May 11, 2010 at 05:43:49PM +0200, Sascha Hauer wrote:
+> > > On Mon, Jan 25, 2010 at 12:58:21PM +0200, Baruch Siach wrote:
+> > > > The gpt_clk rate function doesn't consider the PER divider. This causes a
+> > > > significant drift in time accounting. Fix this by introducing the correct rate
+> > > > calculation function.
+> > > 
+> > > Should have tested this one. In fact with this patch applied my clock
+> > > goes wrong.
+> > > 
+> > > The i.MX Timer code makes sure the gpt clock is sourced from the ipg
+> > > clock (GPTCR[6:8] = 1), so the behaviour should be correct the way it
+> > > was before this patch. Any idea why it was wrong on your hardware? Have
+> > > you changed the GPTCR bits?
+> > 
+> > No. My current platform is the i.MX25 PDK. I've added the following to my 
+> > mx25pdk_init():
+> > 
+> > debugfs_create_x32("gptcr", 0444, NULL,
+> >     (u32*)MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR));
+> > 
+> > When the system is running I get:
+> > 
+> > # cat /debugfs/gptcr 
+> > 0x00000249
+> > 
+> > That is GPTCR[6:8] = 1.
+> > 
+> > The same clock calculation is being done in the platform code of the Freescale 
+> > supplied kernel (now based on 2.6.31).  Can you get this one running on your 
+> > platform?
+> 
+> I just checked the fsl 2.6.31 source. They really pass the per_clk to
+> the timer, but they also change the timer source to MX3_TCTL_CLK_PER
+> (2<<6).
+> Here are the relevant bits from arch/arm/plat-mxc/time.c in the fsl
+> 2.6.31 source:
+> 
+> /* MX31, MX35 */
+> #define MX3_TCTL_WAITEN		(1 << 3)
+> #define MX3_TCTL_CLK_IPG	(1 << 6)
+> #define MX3_TCTL_CLK_PER	(2 << 6)
+> #define MX3_TCTL_FRR		(1 << 9)
+> #define MX3_IR			0x0c
+> #define MX3_TSTAT		0x08
+> #define MX3_TSTAT_OF1		(1 << 0)
+> #define MX3_TCN			0x24
+> #define MX3_TCMP		0x10
+> 
+> #define timer_is_v2()	(!(cpu_is_mx1() || cpu_is_mx2()) || cpu_is_mx25())
+> 
+> void __init mxc_timer_init(struct clk *timer_clk, void __iomem *base, int irq)
+> {
+> 	...
+> 
+> 	if (timer_is_v2())
+> 		tctl_val = MX3_TCTL_CLK_PER | MX3_TCTL_FRR | MX3_TCTL_WAITEN | MXC_TCTL_TEN;
+> 	else
+> 		tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
+> 
+> 	...
+> }
+> 
+> I wonder what is going wrong here.
 
-diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-index 71437c6..a8a33cd 100644
---- a/arch/arm/plat-mxc/gpio.c
-+++ b/arch/arm/plat-mxc/gpio.c
-@@ -56,10 +56,13 @@ static void _set_gpio_irqenable(struct mxc_gpio_port *port, u32 index,
- 				int enable)
- {
- 	u32 l;
-+	unsigned long flags;
- 
-+	spin_lock_irqsave(&port->irq_lock, flags);
- 	l = __raw_readl(port->base + GPIO_IMR);
- 	l = (l & (~(1 << index))) | (!!enable << index);
- 	__raw_writel(l, port->base + GPIO_IMR);
-+	spin_unlock_irqrestore(&port->irq_lock, flags);
- }
- 
- static void gpio_ack_irq(u32 irq)
-@@ -87,8 +90,11 @@ static int gpio_set_irq_type(u32 irq, u32 type)
- 	u32 gpio = irq_to_gpio(irq);
- 	struct mxc_gpio_port *port = &mxc_gpio_ports[gpio / 32];
- 	u32 bit, val;
--	int edge;
-+	int edge, rc = 0;
- 	void __iomem *reg = port->base;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&port->irq_lock, flags);
- 
- 	port->both_edges &= ~(1 << (gpio & 31));
- 	switch (type) {
-@@ -116,7 +122,8 @@ static int gpio_set_irq_type(u32 irq, u32 type)
- 		edge = GPIO_INT_HIGH_LEV;
- 		break;
- 	default:
--		return -EINVAL;
-+		rc = -EINVAL;
-+		goto out;
- 	}
- 
- 	reg += GPIO_ICR1 + ((gpio & 0x10) >> 2); /* lower or upper register */
-@@ -125,9 +132,12 @@ static int gpio_set_irq_type(u32 irq, u32 type)
- 	__raw_writel(val | (edge << (bit << 1)), reg);
- 	_clear_gpio_irqstatus(port, gpio & 0x1f);
- 
--	return 0;
-+out:
-+	spin_unlock_irqrestore(&port->irq_lock, flags);
-+	return rc;
- }
- 
-+/* caller must hold port->irq_lock */
- static void mxc_flip_edge(struct mxc_gpio_port *port, u32 gpio)
- {
- 	void __iomem *reg = port->base;
-@@ -157,12 +167,15 @@ static void mxc_flip_edge(struct mxc_gpio_port *port, u32 gpio)
- static void mxc_gpio_irq_handler(struct mxc_gpio_port *port, u32 irq_stat)
- {
- 	u32 gpio_irq_no_base = port->virtual_irq_start;
-+	unsigned long flags;
- 
- 	while (irq_stat != 0) {
- 		int irqoffset = fls(irq_stat) - 1;
- 
-+		spin_lock_irqsave(&port->irq_lock, flags);
- 		if (port->both_edges & (1 << irqoffset))
- 			mxc_flip_edge(port, irqoffset);
-+		spin_unlock_irqrestore(&port->irq_lock, flags);
- 
- 		generic_handle_irq(gpio_irq_no_base + irqoffset);
- 
-@@ -214,13 +227,16 @@ static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
- 	struct mxc_gpio_port *port =
- 		container_of(chip, struct mxc_gpio_port, chip);
- 	u32 l;
-+	unsigned long flags;
- 
-+	spin_lock_irqsave(&port->lock, flags);
- 	l = __raw_readl(port->base + GPIO_GDIR);
- 	if (dir)
- 		l |= 1 << offset;
- 	else
- 		l &= ~(1 << offset);
- 	__raw_writel(l, port->base + GPIO_GDIR);
-+	spin_unlock_irqrestore(&port->lock, flags);
- }
- 
- static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
-@@ -229,9 +245,12 @@ static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
- 		container_of(chip, struct mxc_gpio_port, chip);
- 	void __iomem *reg = port->base + GPIO_DR;
- 	u32 l;
-+	unsigned long flags;
- 
-+	spin_lock_irqsave(&port->lock, flags);
- 	l = (__raw_readl(reg) & (~(1 << offset))) | (value << offset);
- 	__raw_writel(l, reg);
-+	spin_unlock_irqrestore(&port->lock, flags);
- }
- 
- static int mxc_gpio_get(struct gpio_chip *chip, unsigned offset)
-@@ -285,6 +304,9 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
- 		port[i].chip.base = i * 32;
- 		port[i].chip.ngpio = 32;
- 
-+		spin_lock_init(&port[i].lock);
-+		spin_lock_init(&port[i].irq_lock);
-+
- 		/* its a serious configuration bug when it fails */
- 		BUG_ON( gpiochip_add(&port[i].chip) < 0 );
- 
-diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
-index 894d2f8..a37724a 100644
---- a/arch/arm/plat-mxc/include/mach/gpio.h
-+++ b/arch/arm/plat-mxc/include/mach/gpio.h
-@@ -36,6 +36,9 @@ struct mxc_gpio_port {
- 	int virtual_irq_start;
- 	struct gpio_chip chip;
- 	u32 both_edges;
-+
-+	spinlock_t	lock;		/* GPIO registers */
-+	spinlock_t	irq_lock;	/* IRQ registers */
- };
- 
- int mxc_gpio_init(struct mxc_gpio_port*, int);
+Our target board has finally arrived and I now see the same problem (i.e., the 
+clock runs at half rate).  Setting the clock source to PER as is shown in the 
+fsl code fixes the problem on this target board.
+
+The strange thing is that the i.MX25 PDK works fine both ways. Maybe the move 
+from RedBoot to Barebox has something to do with this ;-). I haven't tried 
+Barebox on the PDK while booting from flash.
+
+Anyway, I'm sending a patch in reply to this message.
+
+baruch
+
 -- 
-1.7.1
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
