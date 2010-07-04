@@ -1,26 +1,57 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Sun, 04 Jul 2010 11:45:40 +0200
-Subject: [PATCH 2/3] ASoC: Add SmartQ sound driver
-In-Reply-To: <20100704094246.GA2455@opensource.wolfsonmicro.com>
-References: <4c2e8856.487e0e0a.3bb5.3ec0@mx.google.com>
-	<20100704090549.GD16825@opensource.wolfsonmicro.com>
-	<4C305229.30409@gmail.com>
-	<20100704094246.GA2455@opensource.wolfsonmicro.com>
-Message-ID: <4C305844.9000503@gmail.com>
+From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
+Date: Sun, 04 Jul 2010 11:47:34 +0200
+Subject: Some benchmarks on ARM
+In-Reply-To: <20100703202845.GA23954@n2100.arm.linux.org.uk>
+References: <20100702180257.GA8767@pengutronix.de>
+	<4C2F98BD.9020803@xenomai.org>
+	<20100703202845.GA23954@n2100.arm.linux.org.uk>
+Message-ID: <4C3058B6.1060103@xenomai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Op 04-07-10 11:42, Mark Brown schreef:
-> On Sun, Jul 04, 2010 at 11:19:37AM +0200, Maurus Cuelenaere wrote:
->
->> I don't see what power there is to save? The speaker and headphone
->> jack are connected to the same physical pins, so when disabling the
->> pins for one of them, the other is also disabled.
-> Meh, so they are.  That's a slightly unusual design - normally you'd
-> wire the speaker amplifier to a separate set of outputs to the
-> headphone.
+Russell King - ARM Linux wrote:
+> On Sat, Jul 03, 2010 at 10:08:29PM +0200, Gilles Chanteperdrix wrote:
+>> Robert Schwebel wrote:
+>>> Hi,
+>>>
+>>> We have recently made some benchmarks, in order to get a little bit
+>>> better fealing about where ARM cpus are today, especially when it comes
+>>> to the "recent" ones, and in comparism to the Atom. So we collected a
+>>> few benchmarks (most from lmbench) and did some actual measurements.
+>>>
+>>> Here is a little article:
+>>> http://www.pengutronix.de/development/kernel/arm-benchmarks-20100702_en.html
+>>>
+>>> I'm pretty sure that there are quite a few things where people on ALKML
+>>> have good ideas where the effects come from or how to improve the
+>>> methodology - so I'd be glad to get some feedback from the community!
+>>>
+>>> All measurements have been done on 2.6.34.
+>> The context switch time for PXA270 looks really suspicious. The worst
+>> case context switch time of an AT91RM9200, an armv4 running at 180MHz,
+>> is less than 300us, so, I doubt that the context switch time of a PXA
+>> can be that worse.
+> 
+> The measurement is of the thread and MM switch time, which'll involve
+> cache flushes on <= ARMv5.
+> 
+> On PXA, we have to 'read' (via means of D cache line allocations) 32K
+> of data into the cache in order to cause the existing data to be written
+> out.  These are done from a range of addresses which don't exist in the
+> page tables, and so should not cause any bus activity other than the
+> write-outs.  However, the cache still has to interact with the MMU to
+> try to fetch the requested data - which probably consumes some cycles.
+> 
+> ARM920 on the other hand can walk through every cache line and clean+
+> invalidate it.  It has 64 lines in each segment, and 8 segments, each
+> line 32 bytes long, which gives a cache size of 16K.
+> 
+> I'd therefore expect ARM920's cache flushing to be quicker (in terms
+> of cycles consumed) than PXA.
 
-I know, most of the SmartQ design is "slightly unusual"..
+Ok. But, the cache flush only accounts for only around 70us on the 290us
+of context switch time of the AT91RM9200. Lokks like the cache flush on
+PXA would have to be a lot longer.
 
 -- 
-Maurus Cuelenaere
+					    Gilles.
