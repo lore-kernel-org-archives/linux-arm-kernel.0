@@ -1,25 +1,41 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 4 Jul 2010 23:56:46 +0800
-Subject: [PATCH 26/33] Removing dead XSCALE_CACHE_ERRATA
-In-Reply-To: <AANLkTikhv1JxmAS8wYksEELII-5YzKi-a5by0EV_ESYH@mail.gmail.com>
+Date: Sun, 4 Jul 2010 23:57:40 +0800
+Subject: [PATCH 27/33] Removing dead IDE_PXA_CF
+In-Reply-To: <201007020945.42597.schindele@nentec.de>
 References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<e9515441013afc8e866f3081dd35bbe0122ece5e.1277911346.git.siccegge@cs.fau.de>
-	<AANLkTikhv1JxmAS8wYksEELII-5YzKi-a5by0EV_ESYH@mail.gmail.com>
-Message-ID: <AANLkTilRaITmDNfN03RyA4Hj9EmIFnDIy6KbOPlaLzdu@mail.gmail.com>
+	<a332e637ee15cb15f7099f5dfc19a384b2bf772b.1277911346.git.siccegge@cs.fau.de>
+	<AANLkTikXk-NPcDlf0lCSbf8HYHfoZoWh-7bnQar80UMC@mail.gmail.com>
+	<201007020945.42597.schindele@nentec.de>
+Message-ID: <AANLkTikXwl6rb8Fz7NcnUHhZBBVC5718ERl-kPZ8dPYH@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 1, 2010 at 12:25 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Thu, Jul 1, 2010 at 12:02 AM, Christoph Egger <siccegge@cs.fau.de> wrote:
->> XSCALE_CACHE_ERRATA doesn't exist in Kconfig, therefore removing all
->> references for it from the source code.
+On Fri, Jul 2, 2010 at 3:45 PM, Juergen Schindele <schindele@nentec.de> wrote:
+> Am Donnerstag, 1. Juli 2010 schrieb Eric Miao:
+>> On Thu, Jul 1, 2010 at 12:02 AM, Christoph Egger <siccegge@cs.fau.de> wrote:
+>> > IDE_PXA_CF doesn't exist in Kconfig, therefore removing all references
+>> > for it from the source code.
+>> >
+>> > Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
 >>
->> Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
->
-> Acked-by: Eric Miao <eric.y.miao@gmail.com>
->
-> It's not been there since 2.6, found some references in 2.4 kernel though. And
-> I doubt anyone has encountered this issue in real products on market.
->
+>> Acked-by: Eric Miao <eric.y.miao@gmail.com>
+>>
+>> Include Jurgen though, in case he has any idea.
+>>
+>> > ---
+>> > ?arch/arm/mach-pxa/trizeps4.c | ? ?6 +-----
+>> > ?1 files changed, 1 insertions(+), 5 deletions(-)
+>> >
+>> > diff --git a/arch/arm/mach-pxa/trizeps4.c b/arch/arm/mach-pxa/trizeps4.c
+>> > index 6968911..0acff17 100644
+>> > --- a/arch/arm/mach-pxa/trizeps4.c
+>> > +++ b/arch/arm/mach-pxa/trizeps4.c
+>> > @@ -530,13 +530,9 @@ static void __init trizeps4_init(void)
+>> > ? ? ? ?i2c_register_board_info(0, trizeps4_i2c_devices,
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?ARRAY_SIZE(trizeps4_i2c_devices));
+>> >
+> Its OK for me to remove this because i can use pata_platform
+> instead and a rework of trizeps4/5 is planned.
+> Recently it was very hard for me to follow all changes.
 
-Applied.
+I took this as an Acked-by and patch applied.
