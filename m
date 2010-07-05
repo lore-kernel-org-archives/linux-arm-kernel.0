@@ -1,256 +1,115 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 05 Jul 2010 11:31:13 -0400 (EDT)
-Subject: [PATCH 11/11] Auto calculate ZRELADDR and provide option for
-	exceptions
-In-Reply-To: <1278339329-23739-11-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Mon, 05 Jul 2010 11:36:56 -0400 (EDT)
+Subject: [PATCH 06/11] ARM: remove bit-rotten STANDALONE_DEBUG for
+	decompressor
+In-Reply-To: <1278339329-23739-6-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <20100705141344.GA25407@pengutronix.de>
-	<1278339329-23739-11-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <alpine.LFD.2.00.1007051128300.6020@xanadu.home>
+	<1278339329-23739-6-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <alpine.LFD.2.00.1007051136110.6020@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 5 Jul 2010, Uwe Kleine-K?nig wrote:
 
-> From: Eric Miao <eric.miao@canonical.com>
+> I tried to get this running to debug the regression introduced by
+> e7db7b4 without success.  But this has several problems that make it
+> hard to fix:
 > 
-> As long as the zImage is placed within the 128MB range from the start of
-> memory, ZRELADDR (Address where the decompressed kernel will be placed,
-> usually == PHYS_OFFSET + TEXT_OFFSET) can be determined at run-time by
-> masking PC with 0xf80000000.
+>   - lib/decompress_inflate.c includes in-kernel headers that make
+>     it difficult to compile for user space.
+>   - the binary formats changed both in kernel and user space and
+>     at least for the kernel side there isn't only a single
+>     variant.
 > 
-> Running through all the Makefile.boot, all those zreladdr-y
-> addresses == 0x[0-f][08]00_0000 + TEXT_OFFSET can be determined at
-> run-time.
-> 
-> Option CONFIG_AUTO_ZRELADDR and CONFIG_ZRELADDR are introduced,
-> CONFIG_ZRELADDR _must_ be explicitly specified if:
-> 
-> - ((zreladdr-y - TEXT_OFFSET) & ~0xf8000000) != 0, which means
->   masking PC with 0xf8000000 will result in an incorrect address.
->   Currently this is only a problem on u300.
-> 
-> - or the assumption of the zImage being loaded by the bootloader within
->   the first 128MB of RAM is incorrect
-> 
-> - or when ZBOOT_ROM is used, where the above assumption is usually wrong.
-> 
-> [ukleinek: changed mask from 0xf0000000 to 0xf8000000 for mx1 and shark
-> + some review fixes from the mailing list]
-> 
-> Signed-off-by: Eric Miao <eric.miao@canonical.com>
 > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Although Eric did all the work, the original idea was mine.  Therefore:
-
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-
-
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
 
 > ---
->  arch/arm/Kconfig                  |   99 +++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/Makefile            |    8 +--
->  arch/arm/boot/compressed/Makefile |    3 +-
->  arch/arm/boot/compressed/head.S   |   12 +++-
->  4 files changed, 112 insertions(+), 10 deletions(-)
+>  arch/arm/boot/compressed/Makefile.debug |   23 -----------------------
+>  arch/arm/boot/compressed/misc.c         |   20 --------------------
+>  2 files changed, 0 insertions(+), 43 deletions(-)
+>  delete mode 100644 arch/arm/boot/compressed/Makefile.debug
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a53ac65..0b0cf0d 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1490,6 +1490,105 @@ config ATAGS_PROC
->  	  Should the atags used to boot the kernel be exported in an "atags"
->  	  file in procfs. Useful with kexec.
+> diff --git a/arch/arm/boot/compressed/Makefile.debug b/arch/arm/boot/compressed/Makefile.debug
+> deleted file mode 100644
+> index 491a037..0000000
+> --- a/arch/arm/boot/compressed/Makefile.debug
+> +++ /dev/null
+> @@ -1,23 +0,0 @@
+> -#
+> -# linux/arch/arm/boot/compressed/Makefile
+> -#
+> -# create a compressed vmlinux image from the original vmlinux
+> -#
+> -
+> -COMPRESSED_EXTRA=../../lib/ll_char_wr.o
+> -OBJECTS=misc-debug.o ll_char_wr.aout.o
+> -
+> -CFLAGS=-D__KERNEL__ -O2 -DSTDC_HEADERS -DSTANDALONE_DEBUG -Wall -I../../../../include -c
+> -
+> -test-gzip: piggy.aout.o $(OBJECTS)
+> -	$(CC) -o $@ $(OBJECTS) piggy.aout.o
+> -
+> -misc-debug.o: misc.c
+> -	$(CC) $(CFLAGS) -o $@ misc.c
+> -
+> -piggy.aout.o: piggy.o
+> -	arm-linuxelf-objcopy --change-leading-char -I elf32-arm -O arm-aout32-linux piggy.o piggy.aout.o
+> -
+> -ll_char_wr.aout.o: $(COMPRESSED_EXTRA)
+> -	arm-linuxelf-objcopy --change-leading-char -I elf32-arm -O arm-aout32-linux $(COMPRESSED_EXTRA) ll_char_wr.aout.o
+> -
+> diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+> index d2b2ef4..e653a6d 100644
+> --- a/arch/arm/boot/compressed/misc.c
+> +++ b/arch/arm/boot/compressed/misc.c
+> @@ -28,9 +28,6 @@ unsigned int __machine_arch_type;
 >  
-> +config AUTO_ZRELADDR
-> +	bool "Auto calculation of the decompressed kernel image address"
-> +	depends on !ZBOOT_ROM && !ARCH_U300
-> +	help
-> +	  ZRELADDR is the physical address where the decompressed kernel
-> +	  image will be placed. If AUTO_ZRELADDR is selected, the address
-> +	  will be determined at run-time by masking the current IP with
-> +	  0xf8000000. This assumes the zImage being placed in the first 128MB
-> +	  from start of memory.
-> +
-> +config ZRELADDR
-> +	hex "Physical address of the decompressed kernel image"
-> +	depends on !AUTO_ZRELADDR
-> +	default 0x00008000 if ARCH_BCMRING ||\
-> +		ARCH_CNS3XXX ||\
-> +		ARCH_DOVE ||\
-> +		ARCH_EBSA110 ||\
-> +		ARCH_FOOTBRIDGE ||\
-> +		ARCH_INTEGRATOR ||\
-> +		ARCH_IOP13XX ||\
-> +		ARCH_IOP33X ||\
-> +		ARCH_IXP2000 ||\
-> +		ARCH_IXP23XX ||\
-> +		ARCH_IXP4XX ||\
-> +		ARCH_KIRKWOOD ||\
-> +		ARCH_KS8695 ||\
-> +		ARCH_LOKI ||\
-> +		ARCH_MMP ||\
-> +		ARCH_MV78XX0 ||\
-> +		ARCH_NOMADIK ||\
-> +		ARCH_NUC93X ||\
-> +		ARCH_NS9XXX ||\
-> +		ARCH_ORION5X ||\
-> +		ARCH_SPEAR3XX ||\
-> +		ARCH_SPEAR6XX ||\
-> +		ARCH_U8500 ||\
-> +		ARCH_VERSATILE ||\
-> +		ARCH_W90X900
-> +	default 0x08008000 if ARCH_MX1 ||\
-> +		ARCH_SHARK
-> +	default 0x10008000 if ARCH_MSM ||\
-> +		ARCH_OMAP1 ||\
-> +		ARCH_RPC
-> +	default 0x20008000 if ARCH_S5P6440 ||\
-> +		ARCH_S5P6442 ||\
-> +		ARCH_S5PC100 ||\
-> +		ARCH_S5PV210
-> +	default 0x30008000 if ARCH_S3C2410 ||\
-> +		ARCH_S3C2400 ||\
-> +		ARCH_S3C2412 ||\
-> +		ARCH_S3C2416 ||\
-> +		ARCH_S3C2440 ||\
-> +		ARCH_S3C2443
-> +	default 0x40008000 if ARCH_STMP378X ||\
-> +		ARCH_STMP37XX ||\
-> +		ARCH_SH7372 ||\
-> +		ARCH_SH7377
-> +	default 0x50008000 if ARCH_S3C64XX ||\
-> +		ARCH_SH7367
-> +	default 0x60008000 if ARCH_VEXPRESS
-> +	default 0x80008000 if ARCH_MX25 ||\
-> +		ARCH_MX3 ||\
-> +		ARCH_NETX ||\
-> +		ARCH_OMAP2PLUS ||\
-> +		ARCH_PNX4008
-> +	default 0x90008000 if ARCH_MX5 ||\
-> +		ARCH_MX91231
-> +	default 0xa0008000 if ARCH_IOP32X ||\
-> +		ARCH_PXA ||\
-> +		MACH_MX27
-> +	default 0xc0008000 if ARCH_LH7A40X ||\
-> +		MACH_MX21
-> +	default 0xf0008000 if ARCH_AAEC2000 ||\
-> +		ARCH_L7200
-> +	default 0xc0028000 if ARCH_CLPS711X
-> +	default 0x70008000 if ARCH_AT91 && (ARCH_AT91CAP9 || ARCH_AT91SAM9G45)
-> +	default 0x20008000 if ARCH_AT91 && !(ARCH_AT91CAP9 || ARCH_AT91SAM9G45)
-> +	default 0xc0008000 if ARCH_DAVINCI && ARCH_DAVINCI_DA8XX
-> +	default 0x80008000 if ARCH_DAVINCI && !ARCH_DAVINCI_DA8XX
-> +	default 0x00008000 if ARCH_EP93XX && EP93XX_SDCE3_SYNC_PHYS_OFFSET
-> +	default 0xc0008000 if ARCH_EP93XX && EP93XX_SDCE0_PHYS_OFFSET
-> +	default 0xd0008000 if ARCH_EP93XX && EP93XX_SDCE1_PHYS_OFFSET
-> +	default 0xe0008000 if ARCH_EP93XX && EP93XX_SDCE2_PHYS_OFFSET
-> +	default 0xf0008000 if ARCH_EP93XX && EP93XX_SDCE3_ASYNC_PHYS_OFFSET
-> +	default 0x00008000 if ARCH_GEMINI && GEMINI_MEM_SWAP
-> +	default 0x10008000 if ARCH_GEMINI && !GEMINI_MEM_SWAP
-> +	default 0x70008000 if ARCH_REALVIEW && REALVIEW_HIGH_PHYS_OFFSET
-> +	default 0x00008000 if ARCH_REALVIEW && !REALVIEW_HIGH_PHYS_OFFSET
-> +	default 0xc0208000 if ARCH_SA1100 && SA1111
-> +	default 0xc0008000 if ARCH_SA1100 && !SA1111
-> +	default 0x30108000 if ARCH_S3C2410 && PM_H1940
-> +	default 0x28E08000 if ARCH_U300 && MACH_U300_SINGLE_RAM
-> +	default 0x48008000 if ARCH_U300 && !MACH_U300_SINGLE_RAM
-> +	help
-> +	  ZRELADDR is the physical address where the decompressed kernel
-> +	  image will be placed. ZRELADDR has to be specified when the
-> +	  assumption of AUTO_ZRELADDR is not valid, or when ZBOOT_ROM is
-> +	  selected.
-> +
->  endmenu
+>  #include <asm/unaligned.h>
 >  
->  menu "CPU Power Management"
-> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-> index 264dccf..5e89c2c 100644
-> --- a/arch/arm/boot/Makefile
-> +++ b/arch/arm/boot/Makefile
-> @@ -14,18 +14,16 @@
->  MKIMAGE         := $(srctree)/scripts/mkuboot.sh
+> -#ifdef STANDALONE_DEBUG
+> -#define putstr printf
+> -#else
 >  
->  ifneq ($(MACHINE),)
-> -include $(srctree)/$(MACHINE)/Makefile.boot
-> +-include $(srctree)/$(MACHINE)/Makefile.boot
->  endif
+>  static void putstr(const char *ptr);
+>  extern void error(char *x);
+> @@ -116,7 +113,6 @@ static void putstr(const char *ptr)
+>  	flush();
+>  }
 >  
->  # Note: the following conditions must always be true:
-> -#   ZRELADDR == virt_to_phys(PAGE_OFFSET + TEXT_OFFSET)
->  #   PARAMS_PHYS must be within 4MB of ZRELADDR
->  #   INITRD_PHYS must be in RAM
-> -ZRELADDR    := $(zreladdr-y)
->  PARAMS_PHYS := $(params_phys-y)
->  INITRD_PHYS := $(initrd_phys-y)
+> -#endif
 >  
-> -export ZRELADDR INITRD_PHYS PARAMS_PHYS
-> +export INITRD_PHYS PARAMS_PHYS
+>  void *memcpy(void *__dest, __const void *__src, size_t __n)
+>  {
+> @@ -186,7 +182,6 @@ asmlinkage void __div0(void)
 >  
->  targets := Image zImage xipImage bootpImage uImage
+>  extern void do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x));
 >  
-> @@ -68,7 +66,7 @@ ifeq ($(CONFIG_RUNTIME_PHYS_OFFSET),)
->  ifeq ($(CONFIG_ZBOOT_ROM),y)
->  $(obj)/uImage: LOADADDR=$(CONFIG_ZBOOT_ROM_TEXT)
->  else
-> -$(obj)/uImage: LOADADDR=$(ZRELADDR)
-> +$(obj)/uImage: LOADADDR=$(CONFIG_ZRELADDR)
->  endif
->  endif
+> -#ifndef STANDALONE_DEBUG
 >  
-> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-> index 2a80c9d..cc8380b 100644
-> --- a/arch/arm/boot/compressed/Makefile
-> +++ b/arch/arm/boot/compressed/Makefile
-> @@ -4,6 +4,7 @@
->  # create a compressed vmlinuz image from the original vmlinux
->  #
->  
-> +AFLAGS_head.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
->  HEAD	= head.o
->  OBJS	= misc.o decompress.o
->  FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
-> @@ -79,8 +80,6 @@ endif
->  EXTRA_CFLAGS  := -fpic -fno-builtin
->  EXTRA_AFLAGS  := -Wa,-march=all
->  
-> -# Supply ZRELADDR to the decompressor via a linker symbol.
-> -LDFLAGS_vmlinux := --defsym zreladdr=$(ZRELADDR)
->  ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
->  LDFLAGS_vmlinux += --be8
->  endif
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index d27faa1..abf4d65 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -170,9 +170,16 @@ not_angel:
->  
->  		.text
->  		adr	r0, LC0
-> - ARM(		ldmia	r0, {r1, r2, r3, r4, r5, r6, r11, ip, sp})
-> - THUMB(		ldmia	r0, {r1, r2, r3, r4, r5, r6, r11, ip}	)
-> + ARM(		ldmia	r0, {r1, r2, r3, r5, r6, r11, ip, sp})
-> + THUMB(		ldmia	r0, {r1, r2, r3, r5, r6, r11, ip}	)
->   THUMB(		ldr	sp, [r0, #32]				)
-> +#ifdef CONFIG_AUTO_ZRELADDR
-> +		@ determine final kernel image address
-> +		and	r4, pc, #0xf8000000
-> +		add	r4, r4, #TEXT_OFFSET
-> +#else
-> +		ldr	r4, =CONFIG_ZRELADDR
-> +#endif
->  		subs	r0, r0, r1		@ calculate the delta offset
->  
->  						@ if delta is zero, we are
-> @@ -310,7 +317,6 @@ wont_overwrite:	mov	r0, r4
->  LC0:		.word	LC0			@ r1
->  		.word	__bss_start		@ r2
->  		.word	_end			@ r3
-> -		.word	zreladdr		@ r4
->  		.word	_start			@ r5
->  		.word	_image_size		@ r6
->  		.word	_got_start		@ r11
+>  unsigned long
+>  decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
+> @@ -211,18 +206,3 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
+>  	putstr(" done, booting the kernel.\n");
+>  	return output_ptr;
+>  }
+> -#else
+> -
+> -char output_buffer[1500*1024];
+> -
+> -int main()
+> -{
+> -	output_data = output_buffer;
+> -
+> -	putstr("Uncompressing Linux...");
+> -	decompress(input_data, input_data_end - input_data,
+> -			NULL, NULL, output_data, NULL, error);
+> -	putstr("done.\n");
+> -	return 0;
+> -}
+> -#endif
 > -- 
 > 1.7.1
 > 
