@@ -1,99 +1,124 @@
-From: philippe.langlais@stericsson.com (Philippe Langlais)
-Date: Mon, 5 Jul 2010 09:09:23 +0200
-Subject: [PATCH 2/6] U6715 clocks gating management U6 clock generic	driver
-	& U6715 cgu clock specific (V2)
-In-Reply-To: <20100624141418.GB6523@n2100.arm.linux.org.uk>
-References: <1274948852-9179-1-git-send-email-philippe.langlais@stericsson.com>
-	<1274948852-9179-3-git-send-email-philippe.langlais@stericsson.com>
-	<20100624141418.GB6523@n2100.arm.linux.org.uk>
-Message-ID: <4C318523.1060706@stericsson.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 05 Jul 2010 09:14:06 +0200
+Subject: [PATCH v2 3/3] sdhci-s3c: Add SDHCI_QUIRK_NO_WP_BIT quirk
+In-Reply-To: <1278118844-21770-4-git-send-email-kgene.kim@samsung.com>
+References: <1278118844-21770-1-git-send-email-kgene.kim@samsung.com>
+	<1278118844-21770-4-git-send-email-kgene.kim@samsung.com>
+Message-ID: <006301cb1c11$aa7d47f0$ff77d7d0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-OK for all your remarks, we have changed our implementation to follow
-the new one using clkdev.
-The new patch will be sent today.
+On Saturday, July 03, 2010 3:01 AM Kukjin Kim wrote:
 
-Regards
+> From: Hyuk Lee <hyuk1.lee@samsung.com>
+> 
+> If host controller doesn't have WP pin which should be connnected with
+> SDMMC
+> card WP pin, can implement get_ro function with using the allocated gpio.
+> In order to use this quirk wp_gpio in the platform data must be set.
+> 
+> Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  drivers/mmc/host/sdhci-s3c.c |   44
+> ++++++++++++++++++++++++++++++++++++++++++
+>  drivers/mmc/host/sdhci.c     |    3 ++
+>  drivers/mmc/host/sdhci.h     |    3 ++
+>  3 files changed, 50 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index af21792..ed9376d 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -18,11 +18,13 @@
+>  #include <linux/slab.h>
+>  #include <linux/clk.h>
+>  #include <linux/io.h>
+> +#include <linux/gpio.h>
+> 
+>  #include <linux/mmc/host.h>
+> 
+>  #include <plat/sdhci.h>
+>  #include <plat/regs-sdhci.h>
+> +#include <plat/gpio-cfg.h>
+> 
+>  #include "sdhci.h"
+> 
+> @@ -209,6 +211,36 @@ static void sdhci_s3c_set_clock(struct sdhci_host
+> *host, unsigned int clock)
+>  	}
+>  }
+> 
+> +/**
+> + * sdhci_s3c_get_ro - callback for get_ro
+> + * @host: The SDHCI host being changed
+> + *
+> + * If the WP pin is connected with GPIO, can get the value which indicates
+> + * the card is locked or not.
+> +*/
+> +static int sdhci_s3c_get_ro(struct mmc_host *mmc)
+> +{
+> +	struct sdhci_s3c *sc;
+> +	struct sdhci_host *host;
+> +
+> +	host = mmc_priv(mmc);
+> +	sc = sdhci_priv(host);
+> +
+> +	return gpio_get_value(sc->pdata->wp_gpio);
+> +}
+> +
+> +/**
+> + * sdhci_s3c_cfg_wp - configure GPIO for WP pin
+> + * @gpio_num: GPIO number which connected with WP line from SD/MMC slot
+> + *
+> + * Configure GPIO for using WP line
+> +*/
+> +static void sdhci_s3c_cfg_wp(unsigned int gpio_num)
+> +{
+> +	s3c_gpio_cfgpin(gpio_num, S3C_GPIO_INPUT);
+> +	s3c_gpio_setpull(gpio_num, S3C_GPIO_PULL_UP);
+> +}
+> +
+>  static struct sdhci_ops sdhci_s3c_ops = {
+>  	.get_max_clock		= sdhci_s3c_get_max_clk,
+>  	.get_timeout_clock	= sdhci_s3c_get_timeout_clk,
+> @@ -311,6 +343,9 @@ static int __devinit sdhci_s3c_probe(struct
+> platform_device *pdev)
+>  	if (pdata->cfg_gpio)
+>  		pdata->cfg_gpio(pdev, pdata->max_width);
+> 
+> +	if (pdata->wp_gpio)
+> +		sdhci_s3c_ops.get_ro = sdhci_s3c_get_ro;
+> +
+>  	host->hw_name = "samsung-hsmmc";
+>  	host->ops = &sdhci_s3c_ops;
+>  	host->quirks = 0;
+> @@ -335,6 +370,15 @@ static int __devinit sdhci_s3c_probe(struct
+> platform_device *pdev)
+>  	host->quirks |= (SDHCI_QUIRK_32BIT_DMA_ADDR |
+>  			 SDHCI_QUIRK_32BIT_DMA_SIZE);
+> 
+> +	/* Controller's WP pin donsn't connected with SD card. So we allocate
+> +	 * a GPIO for getting WP data from SD card and use that data as
+> +	 * the return value of the get_ro function */
+> +	host->quirks |= SDHCI_QUIRK_NO_WP_BIT;
+> +
+> +	/* to configure gpio pin as a card write protection signal */
+> +	if (pdata->wp_gpio)
+> +		sdhci_s3c_cfg_wp(pdata->wp_gpio);
+> +
 
-Philippe
+Assuming that pdata->wp_gpio == 0 means that the board has no additional wp
+feature is wrong from the 'good and clean' API point of view. For example
+GPIO_A0(0) pin for S5PV210 is gpio number 0. This would mean that it cannot
+be used for this feature at all. 
 
-On 06/24/10 16:14, Russell King - ARM Linux wrote:
-> On Thu, May 27, 2010 at 10:27:28AM +0200, Philippe Langlais wrote:
->    
->> +#if defined(DEBUG_CGU)
->> +#define debug(fmt, args...)                                          \
->> +	printk(PKMOD fmt, ## args)
->> +#else
->> +#define debug(fmt, args...)
->> +#endif
->>      
-> pr_debug?
->    
->> +
->> +/**
->> + * U6 hw low level access clock functions
->> + **/
->> +static void u6_clk_disable(struct clk *clk);
->> +static int u6_clk_enable(struct clk *clk);
->> +
->> +/**
->> + * HW enable clock function.
->> + **/
->> +
->> +static int u67xx_cgu_enable_fake_clock(struct clk *clk)
->> +{
->> +	debug("u67xx_cgu_enable_fake_clock for %s\n", clk->name);
->> +	return 0;
->> +}
->> +
->> +static int u67xx_cgu_enable_hw_clock(struct clk *clk)
->> +{
->> +	unsigned long value;
->> +	debug("u67xx_cgu_enable_hw_clock for %s\n", clk->name);
->> +
->> +	if (unlikely(clk->enable_reg == 0)) {
->>      
-> These are pointers.  0 is an integer.  Use NULL.  Check your code with
-> sparse and you'll get warnings for these things.
->
->    
->> +/*** Basic clocks ***/
->> +
->> +/* Base external input clocks */
->> +static struct clk func_32k_ck = {
->> +	.name = "func_32k_ck",
->> +	.rate = 32000,
->> +	.flags = RATE_FIXED | ALWAYS_ENABLED,
->> +	.usecount = 1,
->> +};
->>      
-> Don't put data definitions in header files.
->
->    
->> +static struct clk *onchip_clks[] = {
->> +	/* external root sources */
->> +	&func_32k_ck,
->> +	&osc_ck,
->> +	&sys_ck,
->> +	&sc_ck,
->> +	&fix_ck,
->> +	&tv_ck,
->> +#ifndef U6_OPTIMIZED_TREE
->> +	&dsp2_ck,
->> +#endif
->> +	&sdm_ck,
->> +	&arm_ck,
->> +	&hclk_ck,
->> +	&hclk2_ck,
->> +	&pclk1_ck,
->> +	&pclk2_ck,
->> +	&tvclk_ck,
->>      
-> This all looks very much like it was copied from the OMAP code as of about
-> a year ago.  The OMAP code has moved forwards with lots of improvements,
-> including using clkdev to eliminate the disgusting SoC specific code from
-> drivers (which clkdev is there to prevent.)
->    
+I was told to use gpio_is_valid() macro and use -1 as 'invalid gpio' pin
+number for implementing similar checks.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
