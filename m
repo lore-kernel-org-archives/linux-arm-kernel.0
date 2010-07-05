@@ -1,10 +1,10 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 05 Jul 2010 14:29:35 +0200
+Date: Mon, 05 Jul 2010 14:41:46 +0200
 Subject: Some benchmarks on ARM
 In-Reply-To: <F01D8B85CFF58440B2A13965FBA90CA42DA3944FD5@GEORGE.Emea.Arm.com>
 References: <20100702180257.GA8767@pengutronix.de>
 	<F01D8B85CFF58440B2A13965FBA90CA42DA3944FD5@GEORGE.Emea.Arm.com>
-Message-ID: <4C31D02F.7030608@pengutronix.de>
+Message-ID: <4C31D30A.9010601@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,11 +23,13 @@ Colin Tuckley wrote:
 >> All measurements have been done on 2.6.34.
 > 
 > How were the kernels compiled? Was thumb mode used for the ones that support it?
-
-gcc version 4.3.2 was for all kernels. The kernel .config will be added
-to the website.
-
+> 
 > You didn't mention the cache state anywhere - it can make a big difference.
+
+After booting all tests are done via ssh, the system was "idle" otherwise.
+
+We're just repeating the tests with "echo 1 > /proc/sys/vm/drop_caches"
+prior to each test.
 
 cheers, Marc
 
@@ -43,4 +45,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 260 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100705/811861cb/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100705/c98aa45f/attachment.sig>
