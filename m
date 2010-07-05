@@ -1,1667 +1,2792 @@
 From: philippe.langlais@stericsson.com (Philippe Langlais)
-Date: Mon, 5 Jul 2010 09:58:58 +0200
-Subject: [PATCH 1/5] U6/U6715 ARM architecture files
+Date: Mon, 5 Jul 2010 09:58:59 +0200
+Subject: [PATCH 2/5] U6715 clocks gating management U6 clock generic driver &
+	U6715 cgu clock specific
 In-Reply-To: <1278316742-11219-1-git-send-email-philippe.langlais@stericsson.com>
 References: <1278316742-11219-1-git-send-email-philippe.langlais@stericsson.com>
-Message-ID: <1278316742-11219-2-git-send-email-philippe.langlais@stericsson.com>
+Message-ID: <1278316742-11219-3-git-send-email-philippe.langlais@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Philippe Langlais <philippe.langlais@stericsson.com>
 ---
- arch/arm/Kconfig                               |   10 +
- arch/arm/Makefile                              |    2 +
- arch/arm/mach-u67xx/Kconfig                    |   11 +
- arch/arm/mach-u67xx/Makefile                   |   11 +
- arch/arm/mach-u67xx/Makefile.boot              |    4 +
- arch/arm/mach-u67xx/board_u67xx_wavex.c        |   47 +++
- arch/arm/mach-u67xx/devices.c                  |   28 ++
- arch/arm/plat-u6xxx/Kconfig                    |   20 +
- arch/arm/plat-u6xxx/Makefile                   |    8 +
- arch/arm/plat-u6xxx/include/mach/cpu.h         |   36 ++
- arch/arm/plat-u6xxx/include/mach/debug-macro.S |   38 ++
- arch/arm/plat-u6xxx/include/mach/entry-macro.S |   32 ++
- arch/arm/plat-u6xxx/include/mach/hardware.h    |   41 +++
- arch/arm/plat-u6xxx/include/mach/io.h          |   20 +
- arch/arm/plat-u6xxx/include/mach/irqs.h        |  102 ++++++
- arch/arm/plat-u6xxx/include/mach/memory.h      |   17 +
- arch/arm/plat-u6xxx/include/mach/regs-u6.h     |  121 +++++++
- arch/arm/plat-u6xxx/include/mach/system.h      |   42 +++
- arch/arm/plat-u6xxx/include/mach/timer.h       |   16 +
- arch/arm/plat-u6xxx/include/mach/timex.h       |   23 ++
- arch/arm/plat-u6xxx/include/mach/uncompress.h  |   50 +++
- arch/arm/plat-u6xxx/include/mach/vmalloc.h     |   10 +
- arch/arm/plat-u6xxx/io.c                       |   34 ++
- arch/arm/plat-u6xxx/irq.c                      |  252 +++++++++++++
- arch/arm/plat-u6xxx/timer.c                    |  455 ++++++++++++++++++++++++
- 25 files changed, 1430 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-u67xx/Kconfig
- create mode 100644 arch/arm/mach-u67xx/Makefile
- create mode 100644 arch/arm/mach-u67xx/Makefile.boot
- create mode 100644 arch/arm/mach-u67xx/board_u67xx_wavex.c
- create mode 100644 arch/arm/mach-u67xx/devices.c
- create mode 100644 arch/arm/plat-u6xxx/Kconfig
- create mode 100644 arch/arm/plat-u6xxx/Makefile
- create mode 100644 arch/arm/plat-u6xxx/include/mach/cpu.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/debug-macro.S
- create mode 100644 arch/arm/plat-u6xxx/include/mach/entry-macro.S
- create mode 100644 arch/arm/plat-u6xxx/include/mach/hardware.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/io.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/irqs.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/memory.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/regs-u6.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/system.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/timer.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/timex.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/uncompress.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/vmalloc.h
- create mode 100644 arch/arm/plat-u6xxx/io.c
- create mode 100644 arch/arm/plat-u6xxx/irq.c
- create mode 100644 arch/arm/plat-u6xxx/timer.c
+ arch/arm/Kconfig                          |    1 +
+ arch/arm/mach-u67xx/Makefile              |    5 +-
+ arch/arm/mach-u67xx/cgu.c                 |  753 +++++++++++++++++++++++++
+ arch/arm/mach-u67xx/cgu.h                 |   57 ++
+ arch/arm/mach-u67xx/clock_data_u67xx.c    |  865 +++++++++++++++++++++++++++++
+ arch/arm/plat-u6xxx/Makefile              |    2 +-
+ arch/arm/plat-u6xxx/clock.c               |  621 +++++++++++++++++++++
+ arch/arm/plat-u6xxx/include/mach/clkdev.h |   13 +
+ arch/arm/plat-u6xxx/include/mach/clock.h  |  376 +++++++++++++
+ 9 files changed, 2691 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-u67xx/cgu.c
+ create mode 100644 arch/arm/mach-u67xx/cgu.h
+ create mode 100644 arch/arm/mach-u67xx/clock_data_u67xx.c
+ create mode 100644 arch/arm/plat-u6xxx/clock.c
+ create mode 100644 arch/arm/plat-u6xxx/include/mach/clkdev.h
+ create mode 100644 arch/arm/plat-u6xxx/include/mach/clock.h
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index cf30fc9..7045a05 100644
+index 7045a05..d7a08ba 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -739,6 +739,13 @@ config ARCH_U300
+@@ -741,6 +741,7 @@ config ARCH_U300
+ 
+ config PLAT_U6XXX
+ 	bool "ST-Ericsson U6XXX Series"
++	select COMMON_CLKDEV
+ 	select GENERIC_GPIO
+ 	select ARCH_REQUIRE_GPIOLIB
  	help
- 	  Support for ST-Ericsson U300 series mobile platforms.
- 
-+config PLAT_U6XXX
-+	bool "ST-Ericsson U6XXX Series"
-+	select GENERIC_GPIO
-+	select ARCH_REQUIRE_GPIOLIB
-+	help
-+	  Support for ST-Ericsson's U6XXX architecture
-+
- config ARCH_U8500
- 	bool "ST-Ericsson U8500 Series"
- 	select CPU_V7
-@@ -910,6 +917,9 @@ source "arch/arm/mach-tegra/Kconfig"
- 
- source "arch/arm/mach-u300/Kconfig"
- 
-+source "arch/arm/plat-u6xxx/Kconfig"
-+source "arch/arm/mach-u67xx/Kconfig"
-+
- source "arch/arm/mach-ux500/Kconfig"
- 
- source "arch/arm/mach-versatile/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 2de67c9..c510a64 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -176,6 +176,7 @@ machine-$(CONFIG_ARCH_STMP378X)		:= stmp378x
- machine-$(CONFIG_ARCH_STMP37XX)		:= stmp37xx
- machine-$(CONFIG_ARCH_TEGRA)		:= tegra
- machine-$(CONFIG_ARCH_U300)		:= u300
-+machine-$(CONFIG_ARCH_U67XX)		:= u67xx
- machine-$(CONFIG_ARCH_U8500)		:= ux500
- machine-$(CONFIG_ARCH_VERSATILE)	:= versatile
- machine-$(CONFIG_ARCH_VEXPRESS)		:= vexpress
-@@ -200,6 +201,7 @@ plat-$(CONFIG_PLAT_PXA)		:= pxa
- plat-$(CONFIG_PLAT_S3C24XX)	:= s3c24xx samsung
- plat-$(CONFIG_PLAT_S5P)		:= s5p samsung
- plat-$(CONFIG_PLAT_SPEAR)	:= spear
-+plat-$(CONFIG_PLAT_U6XXX)	:= u6xxx
- plat-$(CONFIG_PLAT_VERSATILE)	:= versatile
- 
- ifeq ($(CONFIG_ARCH_EBSA110),y)
-diff --git a/arch/arm/mach-u67xx/Kconfig b/arch/arm/mach-u67xx/Kconfig
-new file mode 100644
-index 0000000..48f53fb
---- /dev/null
-+++ b/arch/arm/mach-u67xx/Kconfig
-@@ -0,0 +1,11 @@
-+comment "U67XX Board Type"
-+	depends on ARCH_U67XX
-+
-+choice
-+	prompt "Choose the U67XX Board type"
-+	default MACH_U67XX_WAVEC_2GB
-+	help
-+		"Choose the ST-Ericsson Reference Design Board"
-+	config MACH_U67XX_WAVEC_2GB
-+		bool "U67XX WaveC Board with 2Gb Micron combo"
-+endchoice
 diff --git a/arch/arm/mach-u67xx/Makefile b/arch/arm/mach-u67xx/Makefile
-new file mode 100644
-index 0000000..38cf624
---- /dev/null
+index 38cf624..8c1dad8 100644
+--- a/arch/arm/mach-u67xx/Makefile
 +++ b/arch/arm/mach-u67xx/Makefile
-@@ -0,0 +1,11 @@
-+#
-+## Makefile for the linux kernel, hardware dependent part of ST-Ericsson U67xx
-+#
-+#
-+## Object file lists.
+@@ -5,7 +5,10 @@
+ ## Object file lists.
+ 
+ # Common support
+-obj-y			:= devices.o
++obj-y			:= devices.o cgu.o
 +
-+# Common support
-+obj-y			:= devices.o
-+
-+# Specific board support
-+obj-$(CONFIG_MACH_U67XX_WAVEC_2GB) += board_u67xx_wavex.o
-diff --git a/arch/arm/mach-u67xx/Makefile.boot b/arch/arm/mach-u67xx/Makefile.boot
++# Specific machine support
++obj-$(CONFIG_ARCH_U67XX) += clock_data_u67xx.o
+ 
+ # Specific board support
+ obj-$(CONFIG_MACH_U67XX_WAVEC_2GB) += board_u67xx_wavex.o
+diff --git a/arch/arm/mach-u67xx/cgu.c b/arch/arm/mach-u67xx/cgu.c
 new file mode 100644
-index 0000000..c4e8c02
+index 0000000..f5f09f5
 --- /dev/null
-+++ b/arch/arm/mach-u67xx/Makefile.boot
-@@ -0,0 +1,4 @@
-+   zreladdr-y		:= 0x20008000
-+params_phys-y		:= 0x20000100
-+initrd_phys-y		:= 0x26000000
-+
-diff --git a/arch/arm/mach-u67xx/board_u67xx_wavex.c b/arch/arm/mach-u67xx/board_u67xx_wavex.c
-new file mode 100644
-index 0000000..21ee1bd
---- /dev/null
-+++ b/arch/arm/mach-u67xx/board_u67xx_wavex.c
-@@ -0,0 +1,47 @@
++++ b/arch/arm/mach-u67xx/cgu.c
+@@ -0,0 +1,753 @@
 +/*
-+ * linux/arch/arm/mach-u67xx/board_u67xx_wavex.c
++ *  arch/arm/mach-u67xx/cgu.c
 + *
 + * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
++ * Author: Arnaud Troel <arnaud.troel@stericsson.com> for ST-Ericsson.
 + * License terms:  GNU General Public License (GPL), version 2
 + *
-+ * Platform machine definition for U6XXX WAVEx Board.
++ * U67XX Clock Gating Unit basic driver/wrapper
++ * Based on the code from Michel Jaouen
 + */
 +
-+#include <linux/kernel.h>
-+#include <linux/ioport.h>
-+#include <linux/types.h>
-+#include <linux/sched.h>
-+#include <linux/interrupt.h>
++/*#define DEBUG */
++
 +#include <linux/init.h>
-+#include <linux/platform_device.h>
-+
-+#include <asm/setup.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+
++#include <linux/module.h>
++#include <linux/device.h>
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/string.h>
++#include <linux/delay.h>
++#include <asm/clkdev.h>
 +#include <mach/hardware.h>
-+#include <mach/irqs.h>
-+#include <mach/timer.h>
++#include <mach/clock.h>
++#include "cgu.h"
 +
-+/* List of board specific devices */
-+static struct platform_device *devices[] __initdata = {
-+};
++#define MODULE_NAME "U6_CGU"
++#define PKMOD MODULE_NAME ": "
 +
-+void __init u67xx_init(void)
++/*
++ * Public U6 platform access clock functions
++ */
++
++/**
++ * @brief Disable a device clock.
++ * @param clk clock description structure
++ */
++void u6_clk_disable(struct clk *clk)
 +{
-+	/* Add specific board devices */
-+	platform_add_devices(devices, ARRAY_SIZE(devices));
++	/*    BUG_ON(!clk->ref_count); */
++	if ((clk->flags & ALWAYS_ENABLED) == ALWAYS_ENABLED)
++		return;
++
++	if (clk->usecount > 0 && !(--clk->usecount)) {
++		if (clk->disable)
++			clk->disable(clk);
++		else
++			u67xx_cgu_disable_clock(clk);
++
++		if (likely((u32) clk->parent))
++			u6_clk_disable(clk->parent);
++	}
 +}
 +
-+MACHINE_START(U6715, "STE_U67xx_refd")
-+	/* Maintainer: Philippe Langlais <philippe.langlais@stericsson.com> */
-+	.phys_io	= UART1_BASE,
-+	.io_pg_offst	= (IO_ADDRESS(UART1_BASE) >> 18) & 0xfffc,
-+	.boot_params	= PHYS_OFFSET + 0x100,
-+	.map_io		= u67xx_map_io,
-+	.init_irq	= u6_init_irq,
-+	.init_machine	= u67xx_init,
-+	.timer		= &u6_timer,
-+MACHINE_END
-+
-diff --git a/arch/arm/mach-u67xx/devices.c b/arch/arm/mach-u67xx/devices.c
-new file mode 100644
-index 0000000..1d00b35
---- /dev/null
-+++ b/arch/arm/mach-u67xx/devices.c
-@@ -0,0 +1,28 @@
-+/*
-+ * linux/arch/arm/mach-u67xx/devices.c
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ *
-+ * Device specification for the U67XX
++/**
++ * @brief Enable a device clock.
++ * @param clk clock description structure
 + */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/device.h>
-+#include <linux/platform_device.h>
-+
-+/* list of devices */
-+static struct platform_device *platform_devs[] __initdata = {
-+};
-+
-+/* register generic devices */
-+
-+static int __init u67xx_devices_init(void)
++int u6_clk_enable(struct clk *clk)
 +{
-+	platform_add_devices(platform_devs, ARRAY_SIZE(platform_devs));
++	int ret = 0;
++
++	/*   BUG_ON(!clk->ref_count); */
++	if ((clk->flags & ALWAYS_ENABLED) == ALWAYS_ENABLED)
++		return 0;
++
++	if (clk->usecount++ == 0) {
++		if (likely((u32) clk->parent))
++			ret = u6_clk_enable(clk->parent);
++
++		if (unlikely(ret != 0)) {
++			clk->usecount--;
++			return ret;
++		}
++
++		if (clk->enable)
++			ret = clk->enable(clk);
++		else
++			ret = u67xx_cgu_enable_clock(clk);
++
++		if (unlikely(ret != 0) && clk->parent) {
++			u6_clk_disable(clk->parent);
++			clk->usecount--;
++		}
++	}
 +	return 0;
 +}
 +
-+arch_initcall(u67xx_devices_init);
-diff --git a/arch/arm/plat-u6xxx/Kconfig b/arch/arm/plat-u6xxx/Kconfig
-new file mode 100644
-index 0000000..b01f77c
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/Kconfig
-@@ -0,0 +1,20 @@
-+menu "STE U6XXX Implementations"
-+
-+choice
-+	prompt "U67XX System Type"
-+	default ARCH_U67XX
-+
-+config ARCH_U67XX
-+	bool "U67XX"
-+	select PLAT_U6XXX
-+	select CPU_ARM926T
-+	select GENERIC_TIME
-+	select GENERIC_CLOCKEVENTS
-+	select U6_MTU_TIMER
-+endchoice
-+
-+endmenu
-+
-+config U6_MTU_TIMER
-+	bool
-+	default y
-diff --git a/arch/arm/plat-u6xxx/Makefile b/arch/arm/plat-u6xxx/Makefile
-new file mode 100644
-index 0000000..12c832c
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/Makefile
-@@ -0,0 +1,8 @@
-+#
-+# Makefile for the linux kernel hardware independant part of STE U6XXX.
-+#
-+
-+# Common support
-+obj-y := io.o irq.o
-+
-+obj-$(CONFIG_U6_MTU_TIMER) += timer.o
-diff --git a/arch/arm/plat-u6xxx/include/mach/cpu.h b/arch/arm/plat-u6xxx/include/mach/cpu.h
-new file mode 100644
-index 0000000..7512ce6
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/cpu.h
-@@ -0,0 +1,36 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/cpu.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ * U6 cpu type detection
-+ */
-+
-+#ifndef __ASM_PLAT_CPU_H
-+#define __ASM_PLAT_CPU_H
-+
-+/*
-+ * Macros to group U6xxx into cpu classes.
-+ * These can be used in most places.
-+ * cpu_is_u67xx():	True for U67XX
-+ */
-+
-+#define GET_U6XXX_CLASS		((inl(SCON_SYSVER_REG)&0x0F00)>>8)
-+#define GET_U6XXX_SUBCLASS	((inl(SCON_SYSVER_REG)&0x0FF0)>>4)
-+
-+#define cpu_is_u67xx()		0
-+#define cpu_is_u67xx_v2()	0
-+#define cpu_is_u67xx_v3()	0
-+
-+#if defined(CONFIG_ARCH_U67XX)
-+#  undef cpu_is_u67xx
-+#  undef cpu_is_u67xx_v2
-+#  undef cpu_is_u67xx_v3
-+#  define cpu_is_u67xx()	(GET_U6XXX_CLASS == 0x6)
-+#  define cpu_is_u67xx_v2()	(GET_U6XXX_SUBCLASS == 0x62)
-+#  define cpu_is_u67xx_v3()	(GET_U6XXX_SUBCLASS == 0x63)
-+#endif
-+
-+#endif /* __ASM_PLAT_CPU_H */
-+
-diff --git a/arch/arm/plat-u6xxx/include/mach/debug-macro.S b/arch/arm/plat-u6xxx/include/mach/debug-macro.S
-new file mode 100644
-index 0000000..039c810
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/debug-macro.S
-@@ -0,0 +1,38 @@
-+/* linux/arch/arm/plat-u6xxx/include/mach/debug-macro.S
-+ *
-+ * Debugging macro include header
-+ *
-+ *  Copyright (C) 2010 ST-Ericsson
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+*/
-+
-+#include <mach/hardware.h>
-+
-+		.macro	addruart,rx
-+		mrc	p15, 0, \rx, c1, c0
-+		tst	\rx, #1                       @ MMU enabled?
-+		ldreq	\rx, = UART1_BASE             @ physical base address
-+		ldrne	\rx, = IO_ADDRESS(UART1_BASE) @ virtual base
-+		.endm
-+
-+		.macro	senduart,rd,rx
-+		strb	\rd, [\rx]
-+		.endm
-+
-+		.macro	waituart,rd,rx
-+1001:
-+		ldr	\rd, [\rx, #20]
-+		tst	\rd, #1 << 5	@ LSR_THRE - 0 when full
-+		beq	1001b
-+		.endm
-+
-+		.macro	busyuart,rd,rx
-+1001:
-+		ldr	\rd, [\rx, #20]
-+		tst	\rd, #1 << 6	@ LSR_TEMT - 0 when busy
-+		beq	1001b
-+		.endm
-diff --git a/arch/arm/plat-u6xxx/include/mach/entry-macro.S b/arch/arm/plat-u6xxx/include/mach/entry-macro.S
-new file mode 100644
-index 0000000..cae8824
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/entry-macro.S
-@@ -0,0 +1,32 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/entry-macro.S
-+ *
-+ * Low-level IRQ helper macros for U6-based platforms
-+ * Copyright (C) ST-Ericsson SA 2010
-+ *
-+ * This file is licensed under  the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+#include <mach/hardware.h>
-+#include <mach/irqs.h>
-+
-+	.macro  arch_ret_to_user, tmp1, tmp2
-+	.endm
-+
-+	.macro	disable_fiq
-+	.endm
-+
-+	.macro  get_irqnr_preamble, base, tmp
-+	ldr	\base, =IO_ADDRESS(INTC_BASE)
-+	.endm
-+
-+	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
-+	ldr	\irqnr, [\base, #INTC_VECTOR_IRQ_OFFSET] @ load intc vector reg
-+	mov	\irqnr, \irqnr, lsr #3              @ Bits[0..2] are reserved
-+	ands	\irqnr, \irqnr, #0x00FF             @ mask Bits[11..31]
-+	.endm
-+
-+	.macro	irq_prio_table
-+	.endm
-+
-diff --git a/arch/arm/plat-u6xxx/include/mach/hardware.h b/arch/arm/plat-u6xxx/include/mach/hardware.h
-new file mode 100644
-index 0000000..79199ec
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/hardware.h
-@@ -0,0 +1,41 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/hardware.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#ifndef __ASM_ARCH_HARDWARE_H
-+#define __ASM_ARCH_HARDWARE_H
-+
-+#include <asm/sizes.h>
-+#ifndef __ASSEMBLER__
-+#include <mach/cpu.h>
-+#endif
-+
-+/*
-+ * Processor specific registers defines
-+ */
-+#include "regs-u6.h"
-+
-+/*
-+ * Where in virtual memory the IO devices (timers, system controllers
-+ * and so on)
-+ */
-+
-+#define IO_BASE_VIRT            0xE8000000        /* VA of IO */
-+
-+/* macro to get at IO space when running virtually */
-+/* this version gives more IO address range to map*/
-+#define IO_ADDRESS(x)   ((x) - IO_BASE_PHYS + IO_BASE_VIRT)
-+
-+/* typesafe io address */
-+#define __io_address(n)		__io(IO_ADDRESS(n))
-+
-+/*
-+ * Board specific defines
-+ */
-+
-+#endif
-+
-diff --git a/arch/arm/plat-u6xxx/include/mach/io.h b/arch/arm/plat-u6xxx/include/mach/io.h
-new file mode 100644
-index 0000000..058b5e4
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/io.h
-@@ -0,0 +1,20 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/io.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ *
-+ * Dummy IO map & IO definitions
-+ */
-+#ifndef __ASM_ARM_ARCH_IO_H
-+#define __ASM_ARM_ARCH_IO_H
-+
-+#define IO_SPACE_LIMIT 0xffffffff
-+
-+#define __io(a)       __typesafe_io(a)
-+#define __mem_pci(a)  (a)
-+
-+void u67xx_map_io(void);
-+
-+#endif /* __ASM_ARM_ARCH_IO_H */
-diff --git a/arch/arm/plat-u6xxx/include/mach/irqs.h b/arch/arm/plat-u6xxx/include/mach/irqs.h
-new file mode 100644
-index 0000000..fb4aaa8
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/irqs.h
-@@ -0,0 +1,102 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/irqs.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#ifndef __ASM_PLAT_U6_IRQS_H
-+#define __ASM_PLAT_U6_IRQS_H
-+
-+#define IRQ_COUNT             65
-+
-+/* external IRQ definition EXTINT */
-+#define IRQ_EXTINT(num)       (IRQ_COUNT+(num))
-+#define EXTINT_NUM(irq)       ((irq)-IRQ_COUNT)
-+
-+#define NR_EXTINT             24
-+#define NR_IRQS	              (IRQ_COUNT+NR_EXTINT)
-+
-+#ifndef __ASSEMBLY__
-+extern unsigned char extint_to_gpio[NR_EXTINT];
-+
-+#define EXTINT_TO_GPIO(gpio_irq)    extint_to_gpio[gpio_irq-IRQ_COUNT]
-+
-+void /*__init */ u6_init_irq(void);
-+void u6_monitor_irq_enter(unsigned int irq);
-+void u6_monitor_irq_exit(unsigned int irq);
-+#endif /* __ASSEMBLY__ */
-+
-+/*
-+ * Interrupt numbers
-+ */
-+#define IRQ_GHOST                       0
-+#define IRQ_EXTINT1                     1
-+#define IRQ_EXTINT2                     2
-+#define IRQ_EXTINT3                     3
-+#define IRQ_RFRD                        4
-+#define IRQ_MMTU                        5
-+#define IRQ_IIS                         6
-+#define IRQ_USB                         7
-+#define IRQ_I2C2                        8
-+#define IRQ_TVO                         9
-+#define IRQ_3G_WUP                      10
-+#define IRQ_3G_CALINT                   11
-+#define IRQ_3G_FRAME_IT                 12
-+#define IRQ_GPADCINT                    13
-+#define IRQ_ARM9_COMMTX                 14
-+#define IRQ_ARM9_COMMRX                 15
-+#define IRQ_KBS                         16
-+#define IRQ_SCTU2                       17
-+#define IRQ_SCTU1                       18
-+#define IRQ_PIO1                        19
-+#define IRQ_PIO2                        20
-+#define IRQ_FINT0                       21
-+#define IRQ_FINT1                       22
-+#define IRQ_UART2                       23
-+#define IRQ_UART1                       24
-+#define IRQ_SPI2                        25
-+#define IRQ_SPI1                        26
-+#define IRQ_FCI                         27
-+#define IRQ_I2C1                        28
-+#define IRQ_DMAU                        29
-+#define IRQ_USIM                        30
-+#define IRQ_HSDPA                       31    /* reserved */
-+#define IRQ_MSI                         32
-+#define IRQ_JDI                         33
-+#define IRQ_JDU                         34
-+#define IRQ_NFI                         35
-+#define IRQ_IPP                         36
-+#define IRQ_VDC                         37
-+#define IRQ_VEC                         38
-+#define IRQ_VDE                         39
-+#define IRQ_CAM                         40
-+#define IRQ_ETB_ACQ                     41
-+#define IRQ_ETB_FULL                    42
-+#define IRQ_RESERVED43                  43
-+#define IRQ_RESERVED44                  44
-+#define IRQ_RESERVED45                  45    /* reserved */
-+#define IRQ_RESERVED46                  46
-+#define IRQ_RESERVED47                  47
-+#define IRQ_PDCU                        48
-+#define IRQ_MC2SC0                      49
-+#define IRQ_MC2SC1                      50
-+#define IRQ_MC2SC2                      51
-+#define IRQ_MC2SC3                      52
-+#define IRQ_MC2SC4                      53
-+#define IRQ_MC2SC5                      54
-+#define IRQ_MC2SC6                      55
-+#define IRQ_MC2SC7                      56
-+
-+/* INTC VECTOR_IRQ Register (32 bits) */
-+#define INTC_VECTOR_IRQ_OFFSET   0x100
-+
-+/* INTC REQUEST 64 Registers (32 bits) */
-+#define INTC_REQUEST1_OFFSET     0x404
-+#define INTC_REQUEST64_OFFSET    0x500
-+
-+/* interrupt x [1..64] request configuration */
-+#define INTC_REQUESTx(x)  IO_ADDRESS(INTC_BASE+INTC_REQUEST1_OFFSET+(x-1)*4)
-+
-+#endif /* __ASM_PLAT_U6_IRQS_H */
-diff --git a/arch/arm/plat-u6xxx/include/mach/memory.h b/arch/arm/plat-u6xxx/include/mach/memory.h
-new file mode 100644
-index 0000000..71a5c60
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/memory.h
-@@ -0,0 +1,17 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/memory.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#ifndef __ASM_ARCH_MEMORY_H
-+#define __ASM_ARCH_MEMORY_H
-+
-+/*
-+ * Physical DRAM offset.
-+ */
-+#define PHYS_OFFSET		UL(0x20000000)
-+
-+#endif
-diff --git a/arch/arm/plat-u6xxx/include/mach/regs-u6.h b/arch/arm/plat-u6xxx/include/mach/regs-u6.h
-new file mode 100644
-index 0000000..aa2fbb0
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/regs-u6.h
-@@ -0,0 +1,121 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/regs-u6.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ * Basic register address definitions in physical memory
-+ */
-+
-+#if !defined(__REGS_U6_H__)
-+#define __REGS_U6_H__
-+
-+#define IO_BASE_PHYS              0xC1000000  /* phys base address of reg */
-+#define IO_SIZE                   0x03400000  /* How much */
-+
-+/*
-+ * System Controller Core devices base address table
-+ */
-+
-+/* DMA Controller */
-+#define DMAU_BASE                 (IO_BASE_PHYS + 0x0000000)
-+
-+/* Interrupt Controller */
-+#define INTC_BASE                 (IO_BASE_PHYS + 0x0100000)
-+
-+/* SDRam controller */
-+#define SDI_BASE                  (IO_BASE_PHYS + 0x0200000)
-+
-+/* Nand Flash Inteface controller */
-+#define NFI_BASE                  (IO_BASE_PHYS + 0x0300000)
-+
-+/* USB controller */
-+#define USB_BASE                  (IO_BASE_PHYS + 0x0400000)
-+
-+/* Video Display Engine */
-+#define VDE_BASE                  (IO_BASE_PHYS + 0x0500000)
-+
-+/* Video Decoder */
-+#define VDC_BASE                  (IO_BASE_PHYS + 0x1000000)
-+
-+/* Viedo Encoder */
-+#define VEC_BASE                  (IO_BASE_PHYS + 0x1100000)
-+
-+/* Texture Codec, MPEG4 encoder sub module */
-+#define TC_BASE                   (IO_BASE_PHYS + 0x1102000)
-+
-+/* Image Post-Processor */
-+#define IPP2_BASE                 (IO_BASE_PHYS + 0x1200000)
-+
-+/* JPEG Decoder Unit */
-+#define JDU_BASE                  (IO_BASE_PHYS + 0x1300000)
-+
-+/* TV output controller */
-+#define TVO_BASE                  (IO_BASE_PHYS + 0x1400000)
-+
-+/* Camera controller */
-+#define CAM_BASE                  (IO_BASE_PHYS + 0x1800000)
-+
-+/* External Bus Interfaces */
-+#define EBI_BASE                  (IO_BASE_PHYS + 0x2001000)
-+
-+/* SPI controllers */
-+#define SPI1_BASE                 (IO_BASE_PHYS + 0x2002000)
-+#define SPI2_BASE                 (IO_BASE_PHYS + 0x2003000)
-+
-+/* SD/MMC controller */
-+#define FCI_BASE                  (IO_BASE_PHYS + 0x2008000)
-+
-+/* Crypto Acceleration Engine */
-+#define CAE_BASE                  (IO_BASE_PHYS + 0x2009000)
-+
-+/* Multimedia Timer Unit, aka MTU in Datasheet */
-+#define MMTU_BASE                 (IO_BASE_PHYS + 0x2101000)
-+
-+/* System controller timer units */
-+#define SCTU1_BASE                (IO_BASE_PHYS + 0x2102000)
-+#define SCTU2_BASE                (IO_BASE_PHYS + 0x2103000)
-+
-+/* General Purpose I/O units */
-+#define GPIOA_BASE                (IO_BASE_PHYS + 0x2104000)
-+#define GPIOB_BASE                (IO_BASE_PHYS + 0x2104200)
-+#define GPIOC_BASE                (IO_BASE_PHYS + 0x2104400)
-+#define GPIOD_BASE                (IO_BASE_PHYS + 0x2104600)
-+#define GPIOE_BASE                (IO_BASE_PHYS + 0x2104800)
-+#define GPIOF_BASE                (IO_BASE_PHYS + 0x2104A00)
-+
-+/* External Interrupt controller */
-+#define EXTINT_BASE               (IO_BASE_PHYS + 0x2105000)
-+
-+/* Keyboard Scanner */
-+#define KBS_BASE                  (IO_BASE_PHYS + 0x2106000)
-+
-+/* Pulse Width Modulators */
-+#define PWM1_BASE                 (IO_BASE_PHYS + 0x2108000)
-+#define PWM2_BASE                 (IO_BASE_PHYS + 0x2109000)
-+#define PWM3_BASE                 (IO_BASE_PHYS + 0x210A000)
-+
-+/* I2C controllers */
-+#define I2C1_BASE                 (IO_BASE_PHYS + 0x210C000)
-+#define I2C2_BASE                 (IO_BASE_PHYS + 0x210D000)
-+
-+/* UARTs */
-+#define UART1_BASE                (IO_BASE_PHYS + 0x210E000)
-+#define UART2_BASE                (IO_BASE_PHYS + 0x210F000)
-+
-+/* Clock Generation Unit */
-+#define CGU_BASE                  (IO_BASE_PHYS + 0x2200000)
-+
-+/* Time base Unit */
-+#define TBU_BASE                  (IO_BASE_PHYS + 0x2201000)
-+
-+/* Power Down Control Unit */
-+#define PDCU_BASE                 (IO_BASE_PHYS + 0x2202000)
-+
-+/* Watchdog & Reset Unit */
-+#define WDRU_BASE                 (IO_BASE_PHYS + 0x2203000)
-+
-+/* System Configuration */
-+#define SCON_BASE                 (IO_BASE_PHYS + 0x2204000)
-+
-+#endif /* __REGS_U6_H__ */
-diff --git a/arch/arm/plat-u6xxx/include/mach/system.h b/arch/arm/plat-u6xxx/include/mach/system.h
-new file mode 100644
-index 0000000..d3a9143
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/system.h
-@@ -0,0 +1,42 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/system.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#ifndef __ASM_ARCH_SYSTEM_H
-+#define __ASM_ARCH_SYSTEM_H
-+
-+#include <mach/hardware.h>
-+
-+/* Watchdog & Reset Unit TIMER Register (16 bits) */
-+#define WDRU_TIM_OFFSET                0x4
-+
-+static inline void arch_idle(void)
++/**
++ * HW enable clock function.
++ **/
++
++int u67xx_cgu_enable_fake_clock(struct clk *clk)
 +{
-+	/*
-+	 * This should do all the clock switching
-+	 * and wait for interrupt tricks
-+	 */
-+	cpu_do_idle();
++	pr_debug("u67xx_cgu_enable_fake_clock for %s\n", clk->name);
++	return 0;
 +}
 +
-+static inline void arch_reset(char mode, const char *cmd)
++int u67xx_cgu_enable_hw_clock(struct clk *clk)
 +{
-+	unsigned long flags;
-+	/*
-+	 * To reset, we hit the on-board reset register
-+	 * in the system FPGA
-+	 */
-+	/* diasble HW interruption */
-+	raw_local_irq_save(flags);
-+	/* load watchdog with reset value */
-+	outl(0x5, IO_ADDRESS(WDRU_BASE + WDRU_TIM_OFFSET));
-+	/* wait for wachdog expiration */
-+	while (1)
-+		;
-+}
++	unsigned long value;
++	pr_debug("u67xx_cgu_enable_hw_clock for %s\n", clk->name);
 +
-+#endif
-diff --git a/arch/arm/plat-u6xxx/include/mach/timer.h b/arch/arm/plat-u6xxx/include/mach/timer.h
-new file mode 100644
-index 0000000..614d6cf
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/timer.h
-@@ -0,0 +1,16 @@
-+/*
-+ *  linux/arch/arm/plat-u6xxx/include/mach/timer.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#ifndef __PLAT_TIMER_H
-+#define __PLAT_TIMER_H
-+
-+struct sys_timer;
-+
-+extern struct sys_timer u6_timer;
-+
-+#endif
-diff --git a/arch/arm/plat-u6xxx/include/mach/timex.h b/arch/arm/plat-u6xxx/include/mach/timex.h
-new file mode 100644
-index 0000000..1e71241
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/timex.h
-@@ -0,0 +1,23 @@
-+/*
-+ *  linux/arch/arm/plat-u6xxx/include/mach/timex.h
-+ *
-+ *  Integrator architecture timex specifications
-+ *
-+ *  Copyright (C) 1999 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#define CLOCK_TICK_RATE		(50000000 / 16)
-diff --git a/arch/arm/plat-u6xxx/include/mach/uncompress.h b/arch/arm/plat-u6xxx/include/mach/uncompress.h
-new file mode 100644
-index 0000000..7dae14d
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/uncompress.h
-@@ -0,0 +1,50 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/uncompress.h
-+ *
-+ * Copyright (C) 2010 ST-Ericsson SA
-+ * Copyright (C) 2003 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#include <linux/io.h>
-+#include "mach/hardware.h"
-+
-+/* UART THR Register (8 bits) */
-+#define UART1_THR_OFFSET      0x0
-+#define UART1_THR_REG         IO_ADDRESS(UART1_BASE + UART1_THR_OFFSET)
-+
-+/* UART LSR Register (8 bits) */
-+#define UART1_LSR_OFFSET      0x14
-+#define UART1_LSR_REG         IO_ADDRESS(UART1_BASE + UART1_LSR_OFFSET)
-+
-+static void putc(int c)
-+{
-+	if (c == '\n')
-+		putc('\r');
-+
-+	while (!(readb(UART1_LSR_REG) & (1<<5)))
-+		barrier();
-+	writeb(c, UART1_THR_REG);
-+}
-+
-+static inline void flush(void)
-+{
-+}
-+
-+/* nothing to do */
-+#define arch_decomp_setup()
-+
-+#define arch_decomp_wdog()
-diff --git a/arch/arm/plat-u6xxx/include/mach/vmalloc.h b/arch/arm/plat-u6xxx/include/mach/vmalloc.h
-new file mode 100644
-index 0000000..cb89107
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/vmalloc.h
-@@ -0,0 +1,10 @@
-+/*
-+ * linux/arch/arm/plat-u6/include/mach/vmalloc.h
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ *
-+ * Virtual memory allocations
-+ * End must be above the I/O registers and on an even 2MiB boundary.
-+ */
-+#define VMALLOC_END       0xe8000000UL
-diff --git a/arch/arm/plat-u6xxx/io.c b/arch/arm/plat-u6xxx/io.c
-new file mode 100644
-index 0000000..d4ae93b
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/io.c
-@@ -0,0 +1,34 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/io.c
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#include <linux/sched.h>
-+#include <linux/mm.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+
-+#include <mach/hardware.h>
-+#include <asm/pgtable.h>
-+#include <asm/page.h>
-+
-+#include <asm/mach/map.h>
-+
-+
-+static struct map_desc u67xx_io_desc[] __initdata = {
-+	{
-+		.virtual  = IO_BASE_VIRT,	/* only peripherals */
-+		.pfn      = __phys_to_pfn(IO_BASE_PHYS),
-+		.length   = IO_SIZE,
-+		.type     = MT_DEVICE,
-+	}
-+};
-+
-+void __init u67xx_map_io(void)
-+{
-+    iotable_init(u67xx_io_desc, ARRAY_SIZE(u67xx_io_desc));
-+}
-+
-diff --git a/arch/arm/plat-u6xxx/irq.c b/arch/arm/plat-u6xxx/irq.c
-new file mode 100644
-index 0000000..3eab97d
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/irq.c
-@@ -0,0 +1,252 @@
-+/*
-+ *  linux/arch/arm/plat-u6xxx/irq.c
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Loic Pallardy <loic.pallardy@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#include <linux/types.h>
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/clk.h>
-+#include <linux/device.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <asm/irq.h>
-+#include <mach/hardware.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/irq.h>
-+#include <mach/irqs.h>		/* U6 specific constants, types */
-+
-+/* INTC PRIOMASK_IRQ Register (32 bits) */
-+#define INTC_PRIOMASK_IRQ_OFFSET 0x0
-+#define INTC_PRIOMASK_IRQ_REG  IO_ADDRESS(INTC_BASE + INTC_PRIOMASK_IRQ_OFFSET)
-+
-+/* INTC PRIOMASK_FIQ Register (32 bits) */
-+#define INTC_PRIOMASK_FIQ_OFFSET 0x4
-+#define INTC_PRIOMASK_FIQ_REG  IO_ADDRESS(INTC_BASE + INTC_PRIOMASK_FIQ_OFFSET)
-+
-+/* INTC VECTOR_IRQ Register (32 bits) */
-+#define INTC_VECTOR_IRQ_REG      IO_ADDRESS(INTC_BASE + INTC_VECTOR_IRQ_OFFSET)
-+
-+/* INTC VECTOR_FIQ Register (32 bits) */
-+#define INTC_VECTOR_FIQ_OFFSET   0x104
-+#define INTC_VECTOR_FIQ_REG      IO_ADDRESS(INTC_BASE + INTC_VECTOR_FIQ_OFFSET)
-+
-+/* INTC PENDING_* Registers (32 bits) */
-+#define INTC_PENDING_1_OFFSET    0x200
-+#define INTC_PENDING_2_OFFSET    0x204
-+#define INTC_PENDING_3_OFFSET    0x208
-+#define INTC_FEATURES_OFFSET     0x300
-+
-+#define INTC_REQUESTx_PENDING_MASK       (1 << 31)
-+#define INTC_REQUESTx_SET_SWINT_MASK     (1 << 30)
-+#define INTC_REQUESTx_CLR_SWINT_MASK     (1 << 29)
-+#define INTC_REQUESTx_WE_PRIORITY_MASK   (1 << 28)
-+#define INTC_REQUESTx_WE_TARGET_MASK     (1 << 27)
-+#define INTC_REQUESTx_WE_ENABLE_MASK     (1 << 26)
-+#define INTC_REQUESTx_WE_ACTIVE_LOW_MASK (1 << 25)
-+#define INTC_REQUESTx_ACTIVE_LOW_MASK    (1 << 17)
-+#define INTC_REQUESTx_ENABLE_MASK        (1 << 16)
-+#define INTC_REQUESTx_TARGET_MASK        (1 <<  8)
-+
-+#define INTC_IID_USB_LP_INT 13
-+
-+static void u6_irq_mask(uint32_t irqno)
-+{
-+	if (irqno > 0 || irqno < IRQ_COUNT) {
-+		unsigned long flags;
-+		uint32_t a, v;
-+
-+		raw_local_irq_save(flags);
-+
-+		a = INTC_REQUESTx(irqno);
-+		v = readl(a);
-+		v &= ~INTC_REQUESTx_ENABLE_MASK;
-+		v |= INTC_REQUESTx_WE_ENABLE_MASK;
-+		v |= INTC_REQUESTx_CLR_SWINT_MASK;
-+		writel(v, a);
-+
-+		raw_local_irq_restore(flags);
-+	}
-+}
-+
-+static void u6_irq_unmask(uint32_t irqno)
-+{
-+	if (irqno > 0 || irqno < IRQ_COUNT) {
-+		unsigned long flags;
-+		uint32_t a, v;
-+
-+		raw_local_irq_save(flags);
-+
-+		a = INTC_REQUESTx(irqno);
-+		v = readl(a);
-+		v |= INTC_REQUESTx_ENABLE_MASK;
-+		v |= INTC_REQUESTx_WE_ENABLE_MASK;
-+		v |= INTC_REQUESTx_CLR_SWINT_MASK;
-+		writel(v, a);
-+
-+		raw_local_irq_restore(flags);
-+	}
-+}
-+
-+static int u6_irq_type(unsigned irqno, unsigned type)
-+{
-+	int l;
-+	uint32_t reg = INTC_REQUESTx(irqno);
-+
-+	if (irqno > 0 || irqno < IRQ_COUNT) {
-+		if (type == IRQF_TRIGGER_LOW) {
-+			l = (INTC_REQUESTx_ACTIVE_LOW_MASK
-+			     | INTC_REQUESTx_WE_ACTIVE_LOW_MASK);
-+		} else if (type == IRQF_TRIGGER_HIGH) {
-+			l = (INTC_REQUESTx_WE_ACTIVE_LOW_MASK);
-+		} else {
-+			goto bad;
-+		}
-+
-+		writel(l, reg);
++	if (unlikely(clk->enable_reg == 0)) {
++		printk(KERN_ERR "Enable for %s without enable register\n",
++		       clk->name);
 +		return 0;
-+
 +	}
 +
-+bad:
-+	return -EINVAL;
++	value = readl(clk->enable_reg);
++	value |= 1 << clk->enable_bit;
++	writel(value, clk->enable_reg);
++
++	return 0;
 +}
 +
-+int u6_irq_enabled(uint32_t irqno)
++int u67xx_cgu_enable_tvo_pll_clock(struct clk *clk)
 +{
-+	if (irqno > 0 || irqno < IRQ_COUNT) {
-+		uint32_t a = INTC_REQUESTx(irqno);
-+		uint32_t v = readl(a);
++	unsigned long value;
 +
-+		return v & INTC_REQUESTx_ENABLE_MASK;
++	pr_debug("u67xx_cgu_enable_tvo_pll_clock for %s\n", clk->name);
++
++	if (unlikely(clk->enable_reg == 0)) {
++		printk(KERN_ERR "Enable for %s without enable register\n",
++		       clk->name);
++		return 0;
++	}
++
++	value = readl(clk->enable_reg);
++	value |= 1 << clk->enable_bit;
++	writel(value, clk->enable_reg);
++
++	/* wait pll lock */
++	do {
++		value = readl(clk->enable_reg);
++	} while (!(value & (0x1 << 16)));
++
++	return 0;
++}
++
++int u67xx_cgu_enable_shared_clock(struct clk *clk)
++{
++	unsigned long value;
++
++	pr_debug("u67xx_cgu_enable_shared_clock for %s\n", clk->name);
++
++	if (unlikely(clk->enable_reg == 0)) {
++		printk(KERN_ERR "Enable for %s without enable register\n",
++		       clk->name);
++		return 0;
++	}
++
++	value = readl(clk->enable_reg);
++	value |= 1 << clk->enable_bit;
++	writel(value, clk->enable_reg);
++
++	return 0;
++}
++
++int u67xx_cgu_enable_clock(struct clk *clk)
++{
++	printk(PKMOD "No enable clock method for %s."
++	       " You should use new one !!!\n", clk->name);
++	return 0;
++}
++
++int u67xx_cgu_enable_camout(struct clk *clk)
++{
++	unsigned long value;
++	pr_debug("u67xx_cgu_enable_hw_clock for %s\n", clk->name);
++
++	if (unlikely(clk->enable_reg == 0)) {
++		printk(KERN_ERR "Enable for %s without enable register\n",
++		       clk->name);
++		return 0;
++	}
++
++	u6_clk_enable(&fix_ck);
++	u6_clk_enable(&plltv_ck);
++
++	value = readl(clk->enable_reg);
++	value |= 1 << clk->enable_bit;
++	writel(value, clk->enable_reg);
++
++	udelay(1);
++
++	u6_clk_disable(&fix_ck);
++	u6_clk_disable(&plltv_ck);
++
++	return 0;
++}
++
++/**
++ * HW disable clock function.
++ **/
++
++void u67xx_cgu_disable_fake_clock(struct clk *clk)
++{
++	pr_debug("u67xx_cgu_disable_fake_clock for %s\n", clk->name);
++}
++
++void u67xx_cgu_disable_hw_clock(struct clk *clk)
++{
++	unsigned long value;
++
++	pr_debug("u67xx_cgu_disable_hw_clock for %s\n", clk->name);
++
++	if (unlikely(clk->enable_reg == 0)) {
++		printk(KERN_ERR "Disable for %s without enable register\n",
++		       clk->name);
++		return;
++	}
++
++	value = readl(clk->enable_reg);
++	value &= ~(1 << clk->enable_bit);
++	writel(value, clk->enable_reg);
++
++	return;
++}
++
++void u67xx_cgu_disable_shared_clock(struct clk *clk)
++{
++	unsigned long value;
++
++	pr_debug("u67xx_cgu_disable_shared_clock for %s\n", clk->name);
++
++	if (unlikely(clk->enable_reg == 0)) {
++		printk(KERN_ERR "Disable for %s without enable register\n",
++		       clk->name);
++		return;
++	}
++
++	value = readl(clk->enable_reg);
++	value &= ~(1 << clk->enable_bit);
++	writel(value, clk->enable_reg);
++}
++
++void u67xx_cgu_disable_clock(struct clk *clk)
++{
++	printk(PKMOD
++	       " No disable clock method for %s. You should use one !!!\n",
++	       clk->name);
++}
++
++/**
++ * set rate clock function.
++ **/
++
++int u6_clk_set_rate_fci(struct clk *clk, unsigned long rate)
++{
++	int ret = 0;
++	unsigned long ratio = 0;
++	unsigned long reg;
++
++	if (!rate)
++		ratio = 31;
++	else {
++		if (rate > CLK_FC_CLK_MAX_FREQ)
++			rate = CLK_FC_CLK_MAX_FREQ;
++
++		/* compute diviser ratio */
++		ratio = (clk->parent->rate / rate) - 1;
++		if (ratio < 2)
++			ratio = 2;
++		if (ratio > 31)
++			ratio = 31;
++	}
++	clk->rate = clk->parent->rate / (ratio + 1);
++
++	/* for voltage working point only */
++	/* u67xx_set_freq(FC_CLK, clk->rate/1000 , clk->rate/1000); */
++
++	reg = readl(CGU_FIXCON_REG);
++	reg &= ~(0x1F << 22);
++	reg |= (ratio << 22);
++	writel(reg, CGU_FIXCON_REG);
++
++	reg = readl(CGU_SCCON_REG);
++	writel(reg, CGU_SCCON_REG);
++
++	return ret;
++}
++
++int u6_clk_set_rate_camout(struct clk *clk, unsigned long rate)
++{
++	int ret = 0;
++	unsigned long ratio = 0;
++	unsigned long reg;
++
++	if (!rate)
++		return -EINVAL;
++
++	if (rate > CLK_CAM_CLK_MAX_FREQ)
++		rate = CLK_CAM_CLK_MAX_FREQ;
++
++	/* compute diviser ratio */
++	ratio = (clk->parent->rate / rate) - 1;
++	if (ratio < 1)
++		ratio = 1;
++	if (ratio > 63)
++		ratio = 63;
++
++	clk->rate = clk->parent->rate / (ratio + 1);
++
++	/* for voltage working point only */
++	/* u67xx_set_freq(CAM_CLK, clk->rate/1000 , clk->rate/1000); */
++
++	reg = readl(CGU_CAMCON_REG);
++
++	reg &= ~(0x3F << 0);
++	reg |= (ratio << 0);
++
++	writel(reg, CGU_CAMCON_REG);
++
++	return ret;
++}
++
++/**
++ * set parent clock function.
++ **/
++int u6_clk_set_parent_camout(struct clk *clk, struct clk *parent)
++{
++	int ret = 0;
++	unsigned long srce = 0;
++	unsigned long reg;
++
++	if (!strcmp(parent->name, "TVOPLL"))
++		srce = 0;
++	else if (!strcmp(parent->name, "fix_ck"))
++		srce = 1;
++	else
++		return -EINVAL;
++
++	u6_clk_enable(&fix_ck);
++	u6_clk_enable(&plltv_ck);
++
++	reg = readl(CGU_CAMCON_REG);
++
++	reg &= ~(0x1 << 6);
++	reg |= (srce << 6);
++
++	writel(reg, CGU_CAMCON_REG);
++
++	udelay(1);
++
++	u6_clk_disable(&fix_ck);
++	u6_clk_disable(&plltv_ck);
++
++	clk->parent = parent;
++
++	return ret;
++}
++
++int u6_clk_set_parent_uart(struct clk *clk, struct clk *parent)
++{
++
++	if (!strcmp(parent->name, "pclk2_ck")) {
++		clk->parent = parent;
++		return 0;
++	} else if (!strcmp(parent->name, "clk26m_ck")) {
++		clk->parent = parent;
++		return 0;
++	} else if (!strcmp(parent->name, "clk13m_ck")) {
++		clk->parent = parent;
++		return 0;
++	} else {
++		return -1;
++	}
++}
++
++/**
++ * HW init clock function.
++ **/
++
++void u6_clk_dflt_init(struct clk *clk)
++{
++	if (clk->usecount == 0)
++		u67xx_cgu_disable_hw_clock(clk);
++	else
++		u67xx_cgu_enable_hw_clock(clk);
++	/* default rate to parent one */
++	clk->rate = clk->parent->rate;
++}
++
++void u6_clk_init_hclk2(struct clk *clk)
++{
++	/* nothing to do */
++}
++
++void u6_clk_init_fci(struct clk *clk)
++{
++	u6_clk_set_rate_fci(clk, clk->rate);
++}
++
++void u6_clk_init_camout(struct clk *clk)
++{
++	u6_clk_set_parent_camout(clk, &fix_ck);
++	u6_clk_set_rate_camout(clk, clk->rate);
++}
++
++/*
++ * Update clock rate
++ */
++void followparent_ivs_recalc(struct clk *clk)
++{
++	clk->rate = clk->parent->rate;
++	propagate_rate(clk);
++}
++
++/*
++ * Private U6 platform access clock functions
++ */
++static long u6_clk_round_rate(struct clk *clk, unsigned long rate)
++{
++	if (clk->round_rate)
++		return clk->round_rate(clk, rate);
++	else
++		return rate;
++}
++
++static int u6_clk_set_rate(struct clk *clk, unsigned long rate)
++{
++	int ret = 0;
++
++	/*   BUG_ON(!clk->ref_count); */
++	if (clk->usecount > 0) {
++		if (clk->disable)
++			clk->disable(clk);
++		else
++			u67xx_cgu_disable_clock(clk);
++	}
++
++	if (clk->set_rate)
++		ret = clk->set_rate(clk, rate);
++	else
++		ret = -EINVAL;
++
++	if (clk->usecount > 0) {
++		if (clk->enable)
++			clk->enable(clk);
++		else
++			u67xx_cgu_enable_clock(clk);
++	}
++
++	/* propagate rate */
++	propagate_rate(clk);
++
++	return ret;
++}
++
++static int u6_clk_set_parent(struct clk *clk, struct clk *parent)
++{
++	int ret = 0;
++	int old_rate;
++
++	if (clk->usecount > 0) {
++		if (clk->disable)
++			clk->disable(clk);
++		else
++			u67xx_cgu_disable_clock(clk);
++
++		if (likely((u32) clk->parent))
++			u6_clk_disable(clk->parent);
++	}
++
++	old_rate = clk->rate;
++
++	if (clk->set_parent)
++		ret = clk->set_parent(clk, parent);
++	else
++		ret = -EINVAL;
++
++	if (clk->round_rate)
++		old_rate = clk->round_rate(clk, old_rate);
++
++	u6_clk_set_rate(clk, old_rate);
++
++	if (clk->usecount > 0) {
++		if (likely((u32) clk->parent))
++			u6_clk_enable(clk->parent);
++
++		if (clk->enable)
++			ret = clk->enable(clk);
++		else
++			ret = u67xx_cgu_enable_clock(clk);
++	}
++
++	/* propagate rate */
++	if (clk->flags & RATE_PROPAGATES)
++		propagate_rate(clk);
++
++	return ret;
++}
++
++static struct clk *u6_clk_get_parent(struct clk *clk)
++{
++	return clk->parent;
++}
++
++/*
++ * U6 platform clock constraint functions
++ */
++
++unsigned long clk_get_hw_constraint(unsigned long reg_addr)
++{
++	unsigned long reg;
++
++	reg = readl(reg_addr);
++
++	return reg;
++}
++
++ssize_t u6_clk_show_hw_rates(struct kobject *kobj, char *buf)
++{
++	int size = 0;
++	unsigned long reg, rate, msc, psc, mclk;
++
++	size += sprintf(&buf[size], "--HW-- : \n");
++
++	mclk = clk_get_hw_constraint(CGU_FIXCON_REG);
++	mclk = osc_ck.rate / 1000000 / (((mclk & (0x3 << 17)) >> 17) + 1);
++
++	reg = clk_get_hw_constraint(CGU_SCCON_REG);
++
++	msc = (((reg & (0xF << 25)) >> 25) + 1);
++	psc = (((reg & (0x3 << 15)) >> 15) + 1);
++	size += sprintf(&buf[size], "arm_ck is ");
++	if (reg & (1 << 17)) {
++		if (reg & (1 << 18))
++			rate = 312;
++		else
++			rate = 156;
++		rate = rate / msc / psc;
++		size += sprintf(&buf[size], "%lu", rate);
++		size += sprintf(&buf[size], "Mhz fix_ck pll\n");
++	} else {
++		rate = mclk * (((reg & (0xFF << 3)) >> 3) + 1)
++		    / (((reg & (0xF << 11)) >> 11) + 1);
++		rate = rate / msc / psc;
++		size += sprintf(&buf[size], "%lu", rate);
++		size += sprintf(&buf[size], "Mhz sc_ck pll\n");
++	}
++
++	rate = rate / (((reg & (0xF << 21)) >> 21) + 1);
++
++	size += sprintf(&buf[size], "hclk_ck is %luMhz\n", rate);
++
++	reg = clk_get_hw_constraint(CGU_FIXCON_REG);
++
++	rate = 13 * (((reg & (0x3 << 20)) >> 20) + 1);
++
++	size += sprintf(&buf[size], "pclk2_ck is %luMhz\n", rate);
++
++	if (reg & (1 << 31)) {
++		if (reg & (1 << 29))
++			rate = 104;
++		else
++			rate = 78;
 +	} else
-+		return 0;
-+}
++		rate = 13 + (13 * ((reg & (0x7 << 29)) >> 29));
 +
-+static struct irq_chip u6_irq_chip = {
-+	.ack = u6_irq_mask,
-+	.mask = u6_irq_mask,	/* disable irqs */
-+	.unmask = u6_irq_unmask,	/* enable irqs */
-+	.set_type = u6_irq_type,
-+};
++	size += sprintf(&buf[size], "hclk2_ck is %luMhz\n", rate);
 +
++	reg = clk_get_hw_constraint(CGU_SDMCON_REG);
 +
-+#if defined(CONFIG_ARCH_U67XX)
++	msc = (((reg & (0x7 << 0)) >> 0) + 1);
 +
-+static const uint32_t u6_irq_config[] = {
-+	0,			/* GHOST      0 */
-+	INTC_REQUESTx_ACTIVE_LOW_MASK,	/* EXTINT1    1 */
-+	INTC_REQUESTx_ACTIVE_LOW_MASK,	/* EXTINT2    2 */
-+	INTC_REQUESTx_ACTIVE_LOW_MASK,	/* EXTINT3    3 */
-+	0,			/* RFRD       4 */
-+	0,			/* MTU        5 */
-+	0,			/* IIS        6 */
-+	0,			/* USB        7 */
-+	INTC_REQUESTx_ACTIVE_LOW_MASK,	/* I2C2       8 */
-+	0,			/* TVO        9 */
-+	0,			/* 3G_WUP     10 */
-+	0,			/* 3G_CALINT  11 */
-+	0,			/* 3G_FRAME_IT 12 */
-+	0,			/* GPADCINT    13 */
-+	0,			/* ARM9_COMMTX 14 */
-+	0,			/* ARM9_COMMRX 15 */
-+	0,			/* KBS        16 */
-+	0,			/* SCTU2      17 */
-+	0,			/* SCTU1      18 */
-+	0,			/* PIO1       19 */
-+	0,			/* PIO2       20 */
-+	0,			/* FINT0      21 */
-+	0,			/* FINT1      22 */
-+	0,			/* UART2      23 */
-+	0,			/* UART1      24 */
-+	0,			/* SPI2       25 */
-+	0,			/* SPI1       26 */
-+	0,			/* FCI        27 */
-+	INTC_REQUESTx_ACTIVE_LOW_MASK,	/* I2C1       28 */
-+	0,			/* DMAU       29 */
-+	0,			/* USIM       30 */
-+	0,			/* RESERVED31 31 */
-+	INTC_REQUESTx_ACTIVE_LOW_MASK,	/* MSI        32 */
-+	0,			/* JDI        33 */
-+	0,			/* JDU        34 */
-+	0,			/* NFI        35 */
-+	0,			/* IPP        36 */
-+	0,			/* VDC        37 */
-+	0,			/* VEC        38 */
-+	0,			/* VDE        39 */
-+	INTC_REQUESTx_ACTIVE_LOW_MASK,	/* CAM        40 */
-+	0,			/* ETB_ACQ    41 */
-+	0,			/* ETB_FULL   42 */
-+	0,			/* DIGRF_TX   43 */
-+	0,			/* DIGRF_RX   44 */
-+	0,			/* RESERVED45 45 */
-+	0,			/* FIR_FI     46 */
-+	0,			/* FIR        47 */
-+	0,			/* PDCU       48 */
-+	0,			/* MC2SC0     49 */
-+	0,			/* MC2SC1     50 */
-+	0,			/* MC2SC2     51 */
-+	0,			/* MC2SC3     52 */
-+	0,			/* MC2SC4     53 */
-+	0,			/* MC2SC5     54 */
-+	0,			/* MC2SC6     55 */
-+	0,			/* MC2SC7     56 */
-+	0,			/* Reserved   57 */
-+	0,			/* Reserved   58 */
-+	0,			/* Reserved   59 */
-+	0,			/* Reserved   60 */
-+	0,			/* Reserved   61 */
-+	0,			/* Reserved   62 */
-+	0,			/* Reserved   63 */
-+	0,			/* Reserved   64 */
-+};
-+
-+#endif
-+
-+static const uint32_t u6_irq_irq_priority;
-+static const uint32_t u6_irq_fiq_priority;
-+
-+void __init u6_init_irq(void)
-+{
-+	unsigned int irqno;
-+
-+	/* Clock interrupt controller.
-+	 */
-+	struct clk *clk = clk_get(NULL, "INTC");
-+	clk_enable(clk);
-+	clk_put(clk);
-+
-+	/* The address of the vector table INTCdata.asm is assumed to be aligned
-+	 * to a 2KB boundary. Thus the register access value will be padded with
-+	 * zeroes, which is conforming to the 'READ_ONLY' attributes of the LS
-+	 * 11 bits. We are using the same table for both IRQ and FIQ.
-+	 */
-+	writel(0, INTC_VECTOR_FIQ_REG);	/* no vector IRQ */
-+	writel(0, INTC_VECTOR_IRQ_REG);	/* no vector FIQ */
-+
-+	writel(u6_irq_irq_priority, INTC_PRIOMASK_IRQ_REG);
-+	writel(u6_irq_fiq_priority, INTC_PRIOMASK_FIQ_REG);
-+
-+	/* Initialize the individual interrupt sources.
-+	 */
-+	for (irqno = 1; irqno < IRQ_COUNT; irqno += 1) {
-+		uint32_t a = INTC_REQUESTx(irqno);
-+		uint32_t v = u6_irq_config[irqno];
-+
-+		v |= 4;
-+		v |= INTC_REQUESTx_WE_ACTIVE_LOW_MASK;
-+		v |= INTC_REQUESTx_WE_TARGET_MASK;
-+		v |= INTC_REQUESTx_WE_PRIORITY_MASK;
-+		v |= INTC_REQUESTx_WE_ENABLE_MASK;
-+		v |= INTC_REQUESTx_CLR_SWINT_MASK;
-+
-+		writel(v, a);
-+
-+		set_irq_chip(irqno, &u6_irq_chip);
-+		set_irq_handler(irqno, handle_level_irq);
-+		set_irq_flags(irqno, IRQF_VALID | IRQF_PROBE);
++	size += sprintf(&buf[size], "sdm_ck is ");
++	if (reg & (1 << 17)) {
++		if (reg & (1 << 18))
++			rate = 312;
++		else
++			rate = 156;
++		size += sprintf(&buf[size], "%lu", rate / msc);
++		size += sprintf(&buf[size], "Mhz fix_ck pll\n");
++	} else {
++		rate = mclk * 2 * (((reg & (0xFF << 3)) >> 3) + 1)
++		    / (((reg & (0x3F << 11)) >> 11) + 1);
++		size += sprintf(&buf[size], "%lu", rate / msc);
++		size += sprintf(&buf[size], "Mhz sdm pll\n");
 +	}
++
++	if (reg & (1 << 23))
++		size += sprintf(&buf[size], "ivs-sdm concentrator is enable\n");
++	else
++		size += sprintf(&buf[size],
++				"ivs-sdm concentrator is disable\n");
++
++	return size;
 +}
-diff --git a/arch/arm/plat-u6xxx/timer.c b/arch/arm/plat-u6xxx/timer.c
-new file mode 100644
-index 0000000..90464b1
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/timer.c
-@@ -0,0 +1,455 @@
++
++unsigned char *cgu_name_sc1[32] = {
++	"EBI", "01", "NFI", "SDI", "04", "MSI", "UCC", "JDI",
++	"08", "09", "10", "DMAU", "RFSM1", "IIS", "USBD", "FCI",
++	"USIM", "GEAC", "PWM3", "PWM2", "PWM1", "KBS", "GPIO", "UART2",
++	"UART1", "IIC2", "IIC1", "SPI2", "SPI1", "SCTU", "EXTINT", "INTC"
++};
++
++unsigned char *cgu_name_sc2[32] = {
++	"32", "33", "34", "35", "36", "37", "38", "39",
++	"40", "41", "42", "43", "44", "45", "46", "47",
++	"48", "49", "50", "51", "52", "53", "BBIP", "55",
++	"56", "57", "58", "ETB", "60", "MMTU", "62", "CAE"
++};
++
++ssize_t u6_clk_show_sc_constraints(struct kobject *kobj, char *buf)
++{
++	int i, size = 0;
++	unsigned long reg;
++
++	size += sprintf(&buf[size], "--SC-- : \n");
++
++	reg = clk_get_hw_constraint(CGU_GATESC1_REG);
++
++	for (i = 0; i < 32; i++) {
++		if ((reg >> i) & 0x1)
++			size +=
++			    sprintf(&buf[size], "%s ,", cgu_name_sc1[31 - i]);
++	}
++
++	size += sprintf(&buf[size], "\n");
++
++	reg = clk_get_hw_constraint(CGU_GATESC2_REG);
++
++	for (i = 0; i < 32; i++) {
++		if ((reg >> i) & 0x1)
++			size +=
++			    sprintf(&buf[size], "%s ,", cgu_name_sc2[31 - i]);
++	}
++
++	size += sprintf(&buf[size], "\n");
++
++	return size;
++}
++
++unsigned char *cgu_name_ivs[32] = {
++	"", "", "", "", "", "", "", "",
++	"", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
++	"CAMJPE", "TVO", "JDU", "VDC", "VEC", "IPP", "VDE", "CAM"
++};
++
++ssize_t u6_clk_show_ivs_constraints(struct kobject *kobj, char *buf)
++{
++	int i, size = 0;
++	unsigned long reg;
++
++	size += sprintf(&buf[size], "--IVS-- : \n");
++
++	reg = clk_get_hw_constraint(CGU_GATEIVS_REG);
++
++	for (i = 0; i < 32; i++) {
++		if ((reg >> i) & 0x1)
++			size +=
++			    sprintf(&buf[size], "%s ,", cgu_name_ivs[31 - i]);
++	}
++
++	size += sprintf(&buf[size], "\n");
++
++	return size;
++}
++
++ssize_t u6_clk_show_tvo_constraints(struct kobject *kobj, char *buf)
++{
++	int size = 0;
++	unsigned long reg;
++
++	size += sprintf(&buf[size], "--TVO-- : \n");
++
++	reg = clk_get_hw_constraint(CGU_TVCON_REG);
++
++	if ((reg >> 15) & 0x1)
++		size += sprintf(&buf[size], "tvclk_ck pll enable\n");
++	else
++		size += sprintf(&buf[size], "tvclk_ck pll disable\n");
++
++	if ((reg >> 12) & 0x1)
++		size += sprintf(&buf[size], "TVOPLL enable\n");
++	else
++		size += sprintf(&buf[size], "TVOPLL disable\n");
++
++	return size;
++}
++
++ssize_t u6_clk_show_cam_constraints(struct kobject *kobj, char *buf)
++{
++	int size = 0;
++	unsigned long reg, rate, div;
++
++	size += sprintf(&buf[size], "--CAM-- : \n");
++
++	reg = clk_get_hw_constraint(CGU_CAMCON_REG);
++
++	if ((reg >> 6) & 0x1) {
++		size += sprintf(&buf[size], "fix_clock is source\n");
++		rate = 312;
++	} else {
++		size += sprintf(&buf[size], "TVOPLL is source\n");
++		rate = 216;
++	}
++
++	div = ((reg & (0x3F << 0)) >> 0);
++
++	size += sprintf(&buf[size], "camo_ck is %luMhz\n", rate / (div + 1));
++
++	if ((reg >> 7) & 0x1)
++		size += sprintf(&buf[size], "camo_ck enable\n");
++	else
++		size += sprintf(&buf[size], "camo_ck disable\n");
++
++	return size;
++}
++
 +/*
-+ * linux/arch/arm/plat-u6xxx/timer.c
++ * U6 clock reset and init functions
++ */
++
++static struct clk_functions u6_clk_functions = {
++	.clk_enable = u6_clk_enable,
++	.clk_disable = u6_clk_disable,
++	.clk_round_rate = u6_clk_round_rate,
++	.clk_set_rate = u6_clk_set_rate,
++	.clk_set_parent = u6_clk_set_parent,
++	.clk_get_parent = u6_clk_get_parent,
++};
++
++/**
++ * @brief Attempts to connect the primary description structure for DMA case.
++ *
++ * We don't do any initialization since we expect the primary OS to have done
++ * it for us.
++ */
++static int __init u67xx_cgu_init(void)
++{
++	struct clk_lookup *clkp;
++	printk(PKMOD "clk management init\n");
++
++	if (mpurate)
++		sc_ck.rate = mpurate;
++
++	/* init clock function pointer table */
++	clk_init(&u6_clk_functions);
++
++	/* register and init clock elements */
++	for (clkp = onchip_clks; clkp->clk != NULL; clkp++) {
++		clkp->con_id = clkp->clk->name;
++		clkdev_add(clkp);
++		clk_register(clkp->clk);
++	}
++
++	return 0;
++}
++
++arch_initcall(u67xx_cgu_init);
+diff --git a/arch/arm/mach-u67xx/cgu.h b/arch/arm/mach-u67xx/cgu.h
+new file mode 100644
+index 0000000..c029991
+--- /dev/null
++++ b/arch/arm/mach-u67xx/cgu.h
+@@ -0,0 +1,57 @@
++/*
++ *  arch/arm/mach-u67xx/cgu.h
 + *
 + * Copyright (C) ST-Ericsson SA 2010
 + * Author: Vincent Guittot <vincent.guittot@stericsson.com> for ST-Ericsson.
 + * License terms:  GNU General Public License (GPL), version 2
 + */
 +
-+#include <linux/types.h>
-+#include <linux/kernel.h>
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/interrupt.h>
-+#include <linux/clk.h>
-+#include <linux/clocksource.h>
-+#include <linux/clockchips.h>
++#ifndef CGU_INC
++#define CGU_INC
 +
-+#include <asm/mach/time.h>
-+#include <asm/mach/irq.h>
++extern struct clk arm_ck;
++extern struct clk hclk_ck;
++extern struct clk sdm_ck;
++extern struct clk hclk2_ck;
++extern struct clk pclk2_ck;
++extern struct clk sc_ck;
++extern struct clk fix_ck;
++extern struct clk plltv_ck;
++extern struct clk osc_ck;
 +
++extern struct clk_lookup onchip_clks[];
++
++extern void u6_clk_init_hclk2(struct clk *clk);
++extern void u6_clk_init_rtke(struct clk *clk);
++extern void u6_clk_init_fci(struct clk *clk);
++extern void u6_clk_init_camout(struct clk *clk);
++
++extern void followparent_ivs_recalc(struct clk *clk);
++
++extern void u6_clk_rtke_recalc(struct clk *clk);
++
++extern int u67xx_cgu_enable_fake_clock(struct clk *clk);
++extern int u67xx_cgu_enable_hw_clock(struct clk *clk);
++extern int u67xx_cgu_enable_tvo_pll_clock(struct clk *clk);
++extern int u67xx_cgu_enable_rtke_clock(struct clk *clk);
++extern int u67xx_cgu_enable_shared_clock(struct clk *clk);
++extern int u67xx_cgu_enable_clock(struct clk *clk);
++extern int u67xx_cgu_enable_camout(struct clk *clk);
++
++extern void u67xx_cgu_disable_fake_clock(struct clk *clk);
++extern void u67xx_cgu_disable_hw_clock(struct clk *clk);
++extern void u67xx_cgu_disable_rtke_clock(struct clk *clk);
++extern void u67xx_cgu_disable_shared_clock(struct clk *clk);
++extern void u67xx_cgu_disable_clock(struct clk *clk);
++
++extern int u6_clk_set_rate_fci(struct clk *clk, unsigned long rate);
++extern int u6_clk_set_rate_camout(struct clk *clk, unsigned long rate);
++extern int u6_clk_set_rate_rtke(struct clk *clk, unsigned long rate);
++
++extern int u6_clk_set_parent_camout(struct clk *clk, struct clk *parent);
++extern int u6_clk_set_parent_uart(struct clk *clk, struct clk *parent);
++
++extern void u6_clk_dflt_init(struct clk *clk);
++
++#endif   /* ----- #ifndef CGU_INC  ----- */
++
+diff --git a/arch/arm/mach-u67xx/clock_data_u67xx.c b/arch/arm/mach-u67xx/clock_data_u67xx.c
+new file mode 100644
+index 0000000..05f295d
+--- /dev/null
++++ b/arch/arm/mach-u67xx/clock_data_u67xx.c
+@@ -0,0 +1,865 @@
++/*
++ *  arch/arm/mach-u67xx/clock_data_u67xx.c
++ *
++ * Copyright (C) ST-Ericsson SA 2010
++ * Author: Vincent Guittot <vincent.guittot@stericsson.com> for ST-Ericsson.
++ * License terms:  GNU General Public License (GPL), version 2
++ *
++ * Based on clocks.h by Tony Lindgren, Gordon McNutt and RidgeRun, Inc
++ */
++#include <linux/device.h>
++#include <asm/clkdev.h>
 +#include <mach/hardware.h>
-+#include <mach/irqs.h>
 +#include <mach/clock.h>
++#include "cgu.h"
 +
-+/*** System timer variable ***/
-+struct sys_timer u6_timer;
-+
-+/*** Module definition ***/
-+/*************************/
-+
-+#define MODULE_NAME "U6_TIMER"
++#define MODULE_NAME "U6_CGU"
 +#define PKMOD MODULE_NAME ": "
 +
-+/*#define DEBUG*/
-+#define U6_MMTU_CLOCK_SOURCE
++/* used to remove useless clock cells */
++#undef U6_OPTIMIZED_TREE
 +
-+/*** MMTU clock devices ***/
-+/*************************/
-+
-+/*** MMTU HW ip register index definition ***/
-+#define MMTU_CON_IDX  0
-+#define MMTU_TCVAL_IDX 1
-+#define MMTU_PRESCALER_IDX 2
-+#define MMTU_MATCH_CON_IDX 3
-+#define MMTU_MATCH0_IDX 5
-+#define MMTU_MATCH1_IDX 6
-+#define MMTU_INT_OFFSET 0x3F4
-+#define MMTU_MOD_CONF_IDX 1
-+#define MMTU_INT_CLR_ENA_IDX 2
-+#define MMTU_INT_SET_ENA_IDX 3
-+#define MMTU_INT_STATUS_IDX 4
-+#define MMTU_INT_ENABLE_IDX 5
-+#define MMTU_INT_CLR_STAT_IDX 6
-+#define MMTU_INT_SET_STAT_IDX 7
-+
-+#define MMTU_IRQ_MASK		0x1
-+#define MMTU_USED_MATCH_IDX	MMTU_MATCH0_IDX
-+
-+/* MMTU sys clock definition */
-+#define MMTU_SYS_FRQ 13000000
-+
-+/*** MMTU Clock event device ***/
-+#define MMTU_ROOT_FRQ 8000
-+static int u6_mmtu_set_next_event(unsigned long cycles,
-+				struct clock_event_device *evt);
-+static void u6_mmtu_set_mode(enum clock_event_mode mode,
-+				struct clock_event_device *evt);
-+
-+static struct clock_event_device clockevent_mmtu = {
-+	.name = "mmtu_timer",
-+	.rating = 360,
-+	.shift = 30,
-+	.features = CLOCK_EVT_FEAT_ONESHOT,
-+	.set_next_event = u6_mmtu_set_next_event,
-+	.set_mode = u6_mmtu_set_mode,
-+};
-+
-+/*** MMTU Clock source device ***/
-+#ifdef U6_MMTU_CLOCK_SOURCE
-+static cycle_t u6_mmtu_read(struct clocksource *);
-+
-+static struct clocksource clocksource_mmtu = {
-+	.name = "mmtu_timer",
-+	.rating = 360,
-+	.read = u6_mmtu_read,
-+	.mask = CLOCKSOURCE_MASK(32),
-+	.shift = 8,
-+	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
-+};
-+#endif
-+
-+/*** MMTU driver ***/
-+#define RELOAD_COUNTER_POWER_MMTU 32
-+#define RELOAD_COUNTER_MMTU (1 << RELOAD_COUNTER_POWER_MMTU)
-+
-+struct mmtu_ctxt {
-+	unsigned long *base;
-+	int autoreload;
-+	uint32_t compvalue;
-+	uint32_t endvalue;
-+	struct clk *clk;
-+	int mode;
-+};
-+
-+struct mmtu_ctxt mmtu_table[1] = {
-+	{
-+	 .base = (unsigned long *)IO_ADDRESS(MMTU_BASE),
-+	 .autoreload = 0,
-+	 .compvalue = 0,
-+	 .endvalue = 0,
-+	 .clk = NULL,
-+	 .mode = 0,
-+	 },
-+};
-+
-+static inline struct mmtu_ctxt *u6_mmtu_get_context(int id)
-+{
-+	return &(mmtu_table[id]);
-+}
-+
-+static inline int u6_mmtu_timer_start(unsigned long cycles, int id);
-+static inline void u6_mmtu_clk_enable(int id);
-+static inline void u6_mmtu_clk_disable(int id);
-+
-+static irqreturn_t
-+u6_mmtu_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
-+{
-+	uint8_t status, enable;
-+	struct mmtu_ctxt *mmtu;
-+
-+	mmtu = u6_mmtu_get_context(0);
-+
-+	status = readl((mmtu->base + MMTU_INT_OFFSET + MMTU_INT_STATUS_IDX));
-+	enable = readl((mmtu->base + MMTU_INT_OFFSET + MMTU_INT_ENABLE_IDX));
-+
-+	pr_debug(PKMOD "mmtu_timer_interrupt %d\n", status);
-+
-+	if (status & enable & MMTU_IRQ_MASK) {
-+		struct clock_event_device *evt = &clockevent_mmtu;
-+
-+		writel(MMTU_IRQ_MASK, (mmtu->base + MMTU_INT_OFFSET
-+					+ MMTU_INT_CLR_STAT_IDX));
-+		writel(MMTU_IRQ_MASK,
-+				(mmtu->base + MMTU_INT_OFFSET +
-+				 MMTU_INT_CLR_ENA_IDX));
-+
-+		if (evt->event_handler)
-+			evt->event_handler(evt);
-+	}
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction u6_mmtu_timer_irq = {
-+	.name = "U6 MMTU timer Tick",
-+	.flags = IRQF_DISABLED,
-+	.handler = (irq_handler_t) u6_mmtu_timer_interrupt,
-+};
-+
-+static inline void u6_mmtu_clk_enable(int id)
-+{
-+	struct mmtu_ctxt *mmtu = u6_mmtu_get_context(id);
-+
-+	/* Clock Multimedia Timer Unit.
-+	 */
-+	if ((mmtu->clk != NULL) && (mmtu->mode == 0)) {
-+		pr_debug(PKMOD "mmtu_clk_enable\n");
-+		mmtu->mode = 1;
-+		clk_enable(mmtu->clk);
-+	}
-+}
-+
-+static inline void u6_mmtu_clk_disable(int id)
-+{
-+	struct mmtu_ctxt *mmtu = u6_mmtu_get_context(id);
-+
-+	/* Clock Multimedia Timer Unit.
-+	 */
-+	if ((mmtu->clk != NULL) && (mmtu->mode == 1)) {
-+		pr_debug(PKMOD "mmtu_clk_disable\n");
-+		clk_disable(mmtu->clk);
-+		mmtu->mode = 0;
-+	}
-+}
-+
-+static inline int u6_mmtu_timer_start(unsigned long cycles, int id)
-+{
-+	struct mmtu_ctxt *mmtu = u6_mmtu_get_context(id);
-+
-+	pr_debug(PKMOD "mmtu_timer_start %ld\n", cycles);
-+	u6_mmtu_clk_enable(id);
-+
-+	/* MMTU limitation : can't set a value smaller or equal to tcval + 1 */
-+	cycles = cycles < 2 ? 2 : cycles;
-+
-+	mmtu->compvalue = cycles;
-+
-+	mmtu->endvalue = mmtu->compvalue
-+		+ readl((mmtu->base + MMTU_TCVAL_IDX));
-+
-+	writel(MMTU_IRQ_MASK,
-+	       (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_CLR_STAT_IDX));
-+
-+	writel(mmtu->endvalue, (mmtu->base + MMTU_USED_MATCH_IDX));
-+
-+	writel(MMTU_IRQ_MASK,
-+	       (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_SET_ENA_IDX));
-+
-+	/* the value has already expired */
-+	if ((mmtu->endvalue <= readl((mmtu->base + MMTU_TCVAL_IDX)))
-+	    && (mmtu->endvalue > mmtu->compvalue)
-+	    && !(readl((mmtu->base + MMTU_INT_OFFSET
-+				    + MMTU_INT_STATUS_IDX)) & MMTU_IRQ_MASK))
-+		writel(MMTU_IRQ_MASK, (mmtu->base + MMTU_INT_OFFSET
-+					+ MMTU_INT_SET_STAT_IDX));
-+
-+	return 0;
-+}
-+
-+static int u6_mmtu_timer_init(int id, unsigned long reload,
-+			     unsigned long prescale, int over_it)
-+{
-+
-+	struct mmtu_ctxt *mmtu = u6_mmtu_get_context(id);
-+
-+	pr_debug(PKMOD "mmtu_timer_init %d\n", id);
-+
-+	/* Enable clock */
 +/*
-+	u6_mmtu_clk_enable(id);
-+	clk mngt not available yet
-+	directly enable it
-+*/
-+	{
-+		unsigned long flags;
-+		unsigned long reg;
-+		local_irq_save(flags);
-+		reg = readl(CGU_GATESC2_REG);
-+		reg |= 0x1 << 2;
-+		writel(reg, CGU_GATESC2_REG);
-+		local_irq_restore(flags);
-+	}
++ * U6 clock tree.
++ *
++ * NOTE:In many cases here we are assigning a 'default' parent.	In many
++ *	cases the parent is selectable.	The get/set parent calls will also
++ *	switch sources.
++ *
++ *	Many some clocks say always_enabled, but they can be auto idled for
++ *	power savings. They will always be available upon clock request.
++ *
++ *	Several sources are given initial rates which may be wrong, this will
++ *	be fixed up in the init func.
++ *
++ *	Things are broadly separated below by clock domains. It is
++ *	noteworthy that most periferals have dependencies on multiple clock
++ *	domains. Many get their interface clocks from the L4 domain, but get
++ *	functional clocks from fixed sources or other core domain derived
++ *	clock.
++ */
 +
-+	/* Reset timer */
-+	/* reset control register */
-+	writel(0x0000, (mmtu->base + MMTU_CON_IDX));
-+	writel(0x0002, (mmtu->base + MMTU_CON_IDX));
-+	/* reset control register */
-+	writel(0x0000, (mmtu->base + MMTU_CON_IDX));
++/*** Basic clocks ***/
 +
-+	/* clear whole enable irq register */
-+	writel(0xFF, (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_CLR_ENA_IDX));
-+	/* clear whole status register */
-+	writel(0xFF, (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_CLR_STAT_IDX));
-+
-+	/* reset pre-scaler reload register */
-+	writel(0x00000000, (mmtu->base + MMTU_PRESCALER_IDX));
-+
-+	/* reset match control register */
-+	writel(0x0000, (mmtu->base + MMTU_MATCH_CON_IDX));
-+	/* reset match 0 register */
-+	writel(0x00000000, (mmtu->base + MMTU_MATCH0_IDX));
-+	/* reset match 1 register */
-+	writel(0x00000000, (mmtu->base + MMTU_MATCH1_IDX));
-+
-+	/* Initialize timer */
-+	writel(prescale - 1, (mmtu->base + MMTU_PRESCALER_IDX));
-+	/* power of 2 system clock */
-+	writel(reload, (mmtu->base + MMTU_MATCH0_IDX));
-+
-+	/* enable counter register */
-+	writel(0x0001, (mmtu->base + MMTU_CON_IDX));
-+
-+	/* clear whole status register */
-+	writel(0xFF, (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_CLR_STAT_IDX));
-+
-+	if (id == 0)
-+		setup_irq(IRQ_MMTU, &u6_mmtu_timer_irq);
-+
-+	/* Disable clock */
-+#ifndef U6_MMTU_CLOCK_SOURCE
-+	u6_mmtu_clk_disable(id);
-+#endif
-+	return 0;
-+}
-+
-+/*** MMTU Clock event device ***/
-+
-+static int u6_mmtu_set_next_event(unsigned long cycles,
-+				 struct clock_event_device *evt)
-+{
-+	pr_debug(PKMOD "mmtu_set_next_event %ld\n", cycles);
-+	u6_mmtu_timer_start(cycles, 0);
-+
-+	return 0;
-+}
-+
-+static void u6_mmtu_set_mode(enum clock_event_mode mode,
-+			    struct clock_event_device *evt)
-+{
-+	struct mmtu_ctxt *mmtu = u6_mmtu_get_context(0);
-+	unsigned long reg;
-+
-+	pr_debug(PKMOD "mmtu_set_mode %d\n", mode);
-+
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_UNUSED:
-+		writel(MMTU_IRQ_MASK,
-+		       (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_CLR_ENA_IDX));
-+		writel(MMTU_IRQ_MASK,
-+		       (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_CLR_STAT_IDX));
-+
-+		reg = readl((mmtu->base + MMTU_TCVAL_IDX));
-+		writel(reg - 1, (mmtu->base + MMTU_USED_MATCH_IDX));
-+
-+#ifndef U6_MMTU_CLOCK_SOURCE
-+		u6_mmtu_clk_disable(0);
-+
-+		if (mmtu->clk != NULL)
-+			clk_put(mmtu->clk);
-+#endif
-+		mmtu->autoreload = 0;
-+		break;
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+		mmtu->autoreload = 0;
-+
-+		if (mmtu->clk == NULL) {
-+			mmtu->clk = clk_get(0, "MMTU");
-+			if (IS_ERR(mmtu->clk))
-+				mmtu->clk = NULL;
-+		}
-+
-+		writel(MMTU_IRQ_MASK,
-+		       (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_CLR_STAT_IDX));
-+		writel(MMTU_IRQ_MASK,
-+		       (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_SET_ENA_IDX));
-+	case CLOCK_EVT_MODE_ONESHOT:
-+	case CLOCK_EVT_MODE_RESUME:
-+		mmtu->autoreload = 0;
-+		break;
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		writel(MMTU_IRQ_MASK,
-+		       (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_SET_ENA_IDX));
-+		mmtu->autoreload = 1;
-+		break;
-+	}
-+}
-+
-+static void u6_clockevent_init_mmtu(void)
-+{
-+	printk(PKMOD "clockevent_init_mmtu\n");
-+
-+	/* prescale 13Mhz -> 1Mhz */
-+#ifndef U6_MMTU_CLOCK_SOURCE
-+	u6_mmtu_timer_init(0, 0, (MMTU_SYS_FRQ / MMTU_ROOT_FRQ), 0);
-+#endif
-+
-+/* issue it is shorter than reality and generates spurious irq */
-+/*      clockevent_mmtu.mult = div_sc(MMTU_ROOT_FRQ, NSEC_PER_SEC,
-+ *      clockevent_mmtu.shift) + 1;*/
-+	clockevent_mmtu.mult =
-+	    div_sc(MMTU_ROOT_FRQ, NSEC_PER_SEC, clockevent_mmtu.shift);
-+
-+/*      clockevent_mmtu.max_delta_ns = div_sc(RELOAD_COUNTER_MMTU,
-+ *      clockevent_mmtu.mult, clockevent_mmtu.shift);*/
-+/*  In fact it is wider than the 32bits variable !!! */
-+	clockevent_mmtu.max_delta_ns = 0xFFFFFFFF;
-+
-+/*  MMTU HW limitation: match register can't be set w/ tcval+1 */
-+/*      clockevent_mmtu.min_delta_ns = div_sc(1, clockevent_mmtu.mult,
-+ *      clockevent_mmtu.shift)+1;*/
-+	clockevent_mmtu.min_delta_ns =
-+	    div_sc(2, clockevent_mmtu.mult, clockevent_mmtu.shift) + 1;
-+	/* avoid to much timer interrupt with 10us min between 2 irq */
-+	if (clockevent_mmtu.min_delta_ns < 10000)
-+		clockevent_mmtu.min_delta_ns = 10000;
-+	else if (clockevent_mmtu.max_delta_ns < 10000)
-+		clockevent_mmtu.min_delta_ns = clockevent_mmtu.max_delta_ns>>1;
-+
-+	clockevent_mmtu.cpumask = get_cpu_mask(0);
-+	clockevents_register_device(&clockevent_mmtu);
-+
-+	u6_mmtu_set_next_event(MMTU_ROOT_FRQ / HZ, &clockevent_mmtu);
-+}
-+
-+/*** MMTU Clock source device ***/
-+#ifdef U6_MMTU_CLOCK_SOURCE
-+
-+static cycle_t u6_mmtu_read(struct clocksource *source)
-+{
-+	struct mmtu_ctxt *mmtu = u6_mmtu_get_context(0);
-+
-+	return readl(mmtu->base + MMTU_TCVAL_IDX);
-+}
-+
-+static void u6_clocksource_init_mmtu(void)
-+{
-+	printk(PKMOD "clocksource_init_mmtu\n");
-+
-+	if (MMTU_ROOT_FRQ >= 1000000)
-+		clocksource_mmtu.mult =
-+			clocksource_khz2mult((MMTU_ROOT_FRQ / 1000),
-+					clocksource_mmtu.shift);
-+	else
-+		clocksource_mmtu.mult = clocksource_hz2mult((MMTU_ROOT_FRQ),
-+				clocksource_mmtu.shift);
-+
-+	u6_mmtu_timer_init(0, 0, (MMTU_SYS_FRQ / MMTU_ROOT_FRQ), 0);
-+
-+	clocksource_register(&clocksource_mmtu);
-+}
-+
-+#endif
-+
-+/*** System timer init ***/
-+/*************************/
-+
-+void __init u6_timer_init(void)
-+{
-+	printk(PKMOD "mmtu_timer_init\n");
-+
-+#ifdef U6_MMTU_CLOCK_SOURCE
-+	u6_clocksource_init_mmtu();
-+#endif
-+
-+	u6_clockevent_init_mmtu();
-+}
-+
-+struct sys_timer u6_timer = {
-+	.init = u6_timer_init,
-+#ifndef CONFIG_GENERIC_TIME
-+	.offset = NULL,
-+#endif
++/* Base external input clocks */
++static struct clk func_32k_ck = {
++	.name = "func_32k_ck",
++	.rate = 32000,
++	.flags = RATE_FIXED | ALWAYS_ENABLED,
++	.usecount = 1,
 +};
++
++/* Typical 26MHz in standalone mode */
++struct clk osc_ck = {	/* (*12, *13, 19.2, *26, 38.4)MHz */
++	.name = "osc_ck",
++	.rate = 26000000,	/* fixed up in clock init */
++	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
++	.usecount = 1,
++};
++
++/* System clock MCLK */
++/* With out modem likely 12MHz, with modem likely 13MHz */
++static struct clk sys_ck = {	/* (*12, *13, 19.2, 26, 38.4)MHz */
++	.name = "sys_ck",	/* ~ ref_clk also */
++	.parent = &osc_ck,
++	.rate = 13000000,
++	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
++	.usecount = 1,
++};
++
++/*** System PLLs ***/
++
++struct clk sc_ck = {	/* 275-550MHz */
++	.name = "sc_ck",
++	.parent = &sys_ck,
++	.rate = 416000000,
++	.flags = RATE_PROPAGATES,
++	.enable = u67xx_cgu_enable_fake_clock,
++	.disable = u67xx_cgu_disable_fake_clock,
++};
++
++struct clk fix_ck = {	/* 312MHz */
++	.name = "fix_ck",
++	.parent = &sys_ck,
++	.rate = 312000000,
++	.flags = RATE_FIXED,
++	.enable = u67xx_cgu_enable_fake_clock,
++	.disable = u67xx_cgu_disable_fake_clock,
++	.enable_bit = 0,
++};
++
++static struct clk tv_ck = {	/* 216MHz */
++	.name = "tv_ck",
++	.parent = &fix_ck,
++	.rate = 216000000,
++	.flags = RATE_FIXED,
++	.enable = u67xx_cgu_enable_fake_clock,
++	.disable = u67xx_cgu_disable_fake_clock,
++};
++
++#ifndef U6_OPTIMIZED_TREE
++static struct clk dsp2_ck = {	/* 156-320MHz */
++	.name = "dsp2_ck",
++	.parent = &sys_ck,
++	.rate = 208000000,
++	.flags = RATE_PROPAGATES,
++	.enable = u67xx_cgu_enable_fake_clock,
++	.disable = u67xx_cgu_disable_fake_clock,
++	.enable_bit = 8,
++};
++#endif
++
++struct clk sdm_ck = {	/* 275-550MHz */
++	.name = "sdm_ck",
++	.parent = &sys_ck,
++	.rate = 200000000,
++/*      .flags          = RATE_PROPAGATES,*/
++	.enable = u67xx_cgu_enable_fake_clock,
++	.disable = u67xx_cgu_disable_fake_clock,
++	.enable_bit = 3,
++};
++
++/*** Master clock sources ***/
++
++struct clk arm_ck = {
++	.name = "arm_ck",
++	.rate = 416000000,
++	.parent = &sc_ck,
++/*	.flags          = RATE_PROPAGATES,*/
++	.enable = u67xx_cgu_enable_fake_clock,
++	.disable = u67xx_cgu_disable_fake_clock,
++};
++
++struct clk hclk_ck = {
++	.name = "hclk_ck",
++	.rate = 208000000,
++	.parent = &arm_ck,
++	.flags = RATE_PROPAGATES,
++	.enable = u67xx_cgu_enable_fake_clock,
++	.disable = u67xx_cgu_disable_fake_clock,
++	.enable_bit = 1,
++};
++
++struct clk hclk2_ck = {
++	.name = "hclk2_ck",
++/*	.rate           = 104000000,*/
++	.rate = 52000000,
++	.parent = &fix_ck,
++	.flags = RATE_PROPAGATES,
++	.init = u6_clk_init_hclk2,
++	.enable = u67xx_cgu_enable_fake_clock,
++	.disable = u67xx_cgu_disable_fake_clock,
++	.enable_bit = 2,
++};
++
++static struct clk sdm_ivs_ck = {
++	.name = "sdm_ivs_ck",
++	.parent = &hclk2_ck,
++	.rate = 104000000,
++	.flags = RATE_PROPAGATES,
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_ivs_recalc,
++	.enable_reg = CGU_SDMCON_REG,
++	.enable_bit = 23,
++};
++
++static struct clk pclk1_ck = {
++	.name = "pclk1_ck",
++	.rate = 104000000,
++	.parent = &hclk2_ck,
++	.flags = RATE_PROPAGATES,
++	.enable = u67xx_cgu_enable_fake_clock,
++	.disable = u67xx_cgu_disable_fake_clock,
++};
++
++static struct clk tvclk_ck = {
++	.name = "tvclk_ck",
++	.rate = 27000000,
++	.parent = &tv_ck,
++	.flags = RATE_FIXED,
++	.enable = u67xx_cgu_enable_tvo_pll_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.enable_reg = CGU_TVCON_REG,
++	.enable_bit = 15,
++};
++
++struct clk pclk2_ck = {
++	.name = "pclk2_ck",
++	.rate = 52000000,
++	.parent = &fix_ck,
++	.flags = RATE_PROPAGATES,
++	.enable = u67xx_cgu_enable_fake_clock,
++	.disable = u67xx_cgu_disable_fake_clock,
++	.enable_bit = 4,
++};
++
++static struct clk clk24m_ck = {
++	.name = "clk24m_ck",
++	.rate = 24000000,
++	.parent = &fix_ck,
++	.flags = RATE_FIXED,
++	.enable = u67xx_cgu_enable_fake_clock,
++	.disable = u67xx_cgu_disable_fake_clock,
++	.enable_bit = 5,
++};
++
++static struct clk clk26m_ck = {
++	.name = "clk26m_ck",
++	.rate = 26000000,
++	.parent = &fix_ck,
++	.flags = RATE_FIXED,
++	.enable = u67xx_cgu_enable_fake_clock,
++	.disable = u67xx_cgu_disable_fake_clock,
++	.enable_bit = 6,
++};
++
++static struct clk clk13m_ck = {
++	.name = "clk13m_ck",
++	.rate = 13000000,
++	.parent = &fix_ck,
++	.flags = RATE_FIXED,
++	.enable = u67xx_cgu_enable_fake_clock,
++	.disable = u67xx_cgu_disable_fake_clock,
++	.enable_bit = 7,
++};
++
++static struct clk clk4m_ck = {
++	.name = "clk4m_ck",
++	.rate = 4000000,
++	.parent = &fix_ck,
++	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
++	.enable = u67xx_cgu_enable_fake_clock,
++	.disable = u67xx_cgu_disable_fake_clock,
++};
++
++#ifndef U6_OPTIMIZED_TREE
++static struct clk sioy1clk_ck = {
++	.name = "sioy1clk_ck",
++	.rate = 208000000,
++	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
++};
++
++static struct clk sioy2clk_ck = {
++	.name = "sioy2clk_ck",
++	.rate = 208000000,
++	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
++};
++
++static struct clk rfclk_ck = {
++	.name = "rfclk_ck",
++	.rate = 208000000,
++	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
++};
++#endif
++
++static struct clk fc_ck = {
++	.name = "fc_ck",
++/*	.rate = 104000000,*/
++	.rate = 52000000,
++	.init = u6_clk_init_fci,
++	.enable = u67xx_cgu_enable_fake_clock,
++	.disable = u67xx_cgu_disable_fake_clock,
++	.set_rate = u6_clk_set_rate_fci,
++	.parent = &fix_ck,
++};
++
++static struct clk usb_d_ck = {
++	.name = "usb_d_ck",
++	.rate = 24000000,
++	.parent = &clk24m_ck,
++	.enable = u67xx_cgu_enable_fake_clock,
++	.disable = u67xx_cgu_disable_fake_clock,
++};
++
++static struct clk usb_h_ck = {
++	.name = "usb_h_ck",
++	.rate = 24000000,
++	.parent = &clk24m_ck,
++	.flags = RATE_FIXED,
++	.enable = u67xx_cgu_enable_fake_clock,
++	.disable = u67xx_cgu_disable_fake_clock,
++};
++
++#ifndef U6_OPTIMIZED_TREE
++static struct clk dcclk1_ck = {
++	.name = "dcclk1_ck",
++	.rate = 130000000,
++	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
++};
++
++static struct clk diclk1_ck = {
++	.name = "diclk1_ck",
++	.rate = 130000000,
++	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
++};
++
++static struct clk dcclk2_ck = {
++	.name = "dcclk2_ck",
++	.rate = 130000000,
++	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
++};
++
++static struct clk diclk2_ck = {
++	.name = "dicl2_ck",
++	.rate = 130000000,
++	.flags = RATE_FIXED | ALWAYS_ENABLED | RATE_PROPAGATES,
++};
++#endif
++
++static struct clk camo_ck = {
++	.name = "camo_ck",
++	.rate = 12000000,
++	.parent = &fix_ck,
++	.flags = RATE_PROPAGATES,
++	.init = u6_clk_init_camout,
++	.enable = u67xx_cgu_enable_camout,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.set_rate = u6_clk_set_rate_camout,
++	.set_parent = u6_clk_set_parent_camout,
++	.enable_reg = CGU_CAMCON_REG,
++	.enable_bit = 7,
++};
++
++/*** Peripheral clocks ***/
++
++/* CGUTVCON */
++struct clk plltv_ck = {
++	.name = "TVOPLL",
++	.enable_reg = CGU_TVCON_REG,
++	.enable_bit = 12,
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.parent = &tvclk_ck,
++};
++
++/* CGUGATESC1 */
++#ifndef U6_OPTIMIZED_TREE
++static struct clk intc_ck = {
++	.name = "INTC",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 0,
++	.parent = &hclk2_ck,
++	.usecount = 1,
++};
++
++static struct clk extint_ck = {
++	.name = "EXTINT",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 1,
++	.parent = &pclk2_ck,
++	.usecount = 1,
++};
++
++static struct clk sctu_ck = {
++	.name = "SCTU",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 2,
++	.parent = &clk13m_ck,
++};
++#endif
++
++static struct clk spi1_ck = {
++	.name = "SPI1",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 3,
++	.parent = &pclk1_ck,
++};
++
++static struct clk spi2_ck = {
++	.name = "SPI2",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 4,
++	.parent = &pclk1_ck,
++};
++
++static struct clk iic1_ck = {
++	.name = "IIC1",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 5,
++	.parent = &pclk2_ck,
++};
++
++static struct clk iic2_ck = {
++	.name = "IIC2",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 6,
++	.parent = &pclk2_ck,
++};
++
++static struct clk uart1_ck = {
++	.name = "UART1",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.set_parent = u6_clk_set_parent_uart,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 7,
++	.parent = &clk13m_ck,
++	.usecount = 1,
++};
++
++static struct clk uart2_ck = {
++	.name = "UART2",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.set_parent = u6_clk_set_parent_uart,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 8,
++	.parent = &clk13m_ck,
++};
++
++#ifndef U6_OPTIMIZED_TREE
++static struct clk gpio_ck = {
++	.name = "GPIO",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 9,
++	.parent = &pclk2_ck,
++	.usecount = 1,
++};
++#endif
++
++static struct clk kbs_ck = {
++	.name = "KBS",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 10,
++	.parent = &func_32k_ck,
++};
++
++static struct clk pwm1_ck = {
++	.name = "PWM1",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 11,
++	.parent = &clk13m_ck,
++};
++
++static struct clk pwm2_ck = {
++	.name = "PWM2",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 12,
++	.parent = &clk13m_ck,
++};
++
++static struct clk pwm3_ck = {
++	.name = "PWM3",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 13,
++	.parent = &clk13m_ck,
++};
++
++static struct clk geac_ck = {
++	.name = "GEAC",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 14,
++	.parent = &pclk1_ck,
++};
++
++#ifndef U6_OPTIMIZED_TREE
++static struct clk usim_ck = {
++	.name = "USIM",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 15,
++	.parent = &pclk2_ck,
++};
++#endif
++
++static struct clk fci_ck = {
++	.name = "FCI",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 16,
++	.parent = &fc_ck,
++};
++
++static struct clk usbd_ck = {
++	.name = "USBD",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 17,
++	.parent = &hclk2_ck,
++};
++
++#ifndef U6_OPTIMIZED_TREE
++static struct clk iis_ck = {
++	.name = "IIS",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 18,
++	.parent = &clk24m_ck,
++};
++
++static struct clk rfsm1_ck = {
++	.name = "RFSM1",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 19,
++	.parent = &pclk1_ck,
++};
++#endif
++
++static struct clk dmau_ck = {
++	.name = "DMAU",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_shared_clock,
++	.disable = u67xx_cgu_disable_shared_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 20,
++	.parent = &hclk2_ck,
++};
++
++static struct clk jdi_ck = {
++	.name = "JDI",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 24,
++	.parent = &pclk2_ck,
++};
++
++#ifndef U6_OPTIMIZED_TREE
++static struct clk ucc_ck = {
++	.name = "UCC",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 25,
++	.parent = &pclk1_ck,
++};
++#endif
++
++static struct clk msi_ck = {
++	.name = "MSI",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 26,
++	.parent = &fc_ck,
++};
++
++static struct clk sdi_ck = {
++	.name = "SDI",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 28,
++	.parent = &hclk2_ck,
++};
++
++static struct clk nfi_ck = {
++	.name = "NFI",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 29,
++	.parent = &hclk2_ck,
++
++};
++
++static struct clk ebi_ck = {
++	.name = "EBI",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATESC1_REG,
++	.enable_bit = 31,
++	.parent = &hclk2_ck,
++
++};
++
++/* CGUGATESC2 */
++static struct clk cae_ck = {
++	.name = "CAE",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.enable_reg = CGU_GATESC2_REG,
++	.enable_bit = 0,
++	.parent = &pclk1_ck,
++};
++
++static struct clk mmtu_ck = {
++	.name = "MMTU",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_shared_clock,
++	.disable = u67xx_cgu_disable_shared_clock,
++	.enable_reg = CGU_GATESC2_REG,
++	.enable_bit = 2,
++	.parent = &clk13m_ck,
++	.usecount = 1,
++};
++
++/* OCL-2008-07-02: how to manage etbclk ? */
++/* static struct clk ETB_ck = */
++/* { */
++/* 	.name = "ETB", */
++/* 	.enable_reg = CGU_GATESC2_REG, */
++/* 	.enable_bit = 4, */
++/* 	.parent = &etbclk_ck, */
++/* }; */
++
++/* CGUGATEIVS */
++static struct clk cam_ck = {
++	.name = "CAM",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATEIVS_REG,
++	.enable_bit = 0,
++	.parent = &sdm_ivs_ck,
++};
++
++static struct clk vde_ck = {
++	.name = "VDE",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATEIVS_REG,
++	.enable_bit = 1,
++	.parent = &hclk2_ck,
++};
++
++static struct clk ipp_ck = {
++	.name = "IPP",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATEIVS_REG,
++	.enable_bit = 2,
++	.parent = &sdm_ivs_ck,
++};
++
++static struct clk vec_ck = {
++	.name = "VEC",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATEIVS_REG,
++	.enable_bit = 3,
++	.parent = &sdm_ivs_ck,
++};
++
++static struct clk vdc_ck = {
++	.name = "VDC",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATEIVS_REG,
++	.enable_bit = 4,
++	.parent = &sdm_ivs_ck,
++};
++
++static struct clk jdu_ck = {
++	.name = "JDU",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATEIVS_REG,
++	.enable_bit = 5,
++	.parent = &sdm_ivs_ck,
++};
++
++static struct clk tvoclk_ck = {
++	.name = "TVO",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATEIVS_REG,
++	.enable_bit = 6,
++	.parent = &sdm_ivs_ck,
++};
++
++static struct clk camjpe_ck = {
++	.name = "CAMJPE",
++	.init = u6_clk_dflt_init,
++	.enable = u67xx_cgu_enable_hw_clock,
++	.disable = u67xx_cgu_disable_hw_clock,
++	.recalc = followparent_recalc,
++	.enable_reg = CGU_GATEIVS_REG,
++	.enable_bit = 7,
++	.parent = &hclk_ck,
++};
++
++#define CLK(pck)	\
++	{			\
++		.dev_id = NULL,	\
++		.con_id = NULL,	\
++		.clk = pck,	\
++	}
++
++struct clk_lookup onchip_clks[] = {
++	/* external root sources */
++	CLK(&func_32k_ck),
++	CLK(&osc_ck),
++	CLK(&sys_ck),
++	CLK(&sc_ck),
++	CLK(&fix_ck),
++	CLK(&tv_ck),
++#ifndef U6_OPTIMIZED_TREE
++	CLK(&dsp2_ck),
++#endif
++	CLK(&sdm_ck),
++	CLK(&arm_ck),
++	CLK(&hclk_ck),
++	CLK(&hclk2_ck),
++	CLK(&pclk1_ck),
++	CLK(&pclk2_ck),
++	CLK(&tvclk_ck),
++	CLK(&clk24m_ck),
++	CLK(&clk26m_ck),
++	CLK(&clk13m_ck),
++	CLK(&clk4m_ck),
++	CLK(&fc_ck),
++#ifndef U6_OPTIMIZED_TREE
++	CLK(&sioy1clk_ck),
++	CLK(&sioy2clk_ck),
++	CLK(&rfclk_ck),
++#endif
++	CLK(&usb_h_ck),
++	CLK(&usb_d_ck),
++#ifndef U6_OPTIMIZED_TREE
++	CLK(&dcclk1_ck),
++	CLK(&diclk1_ck),
++	CLK(&dcclk2_ck),
++	CLK(&diclk2_ck),
++#endif
++	CLK(&camo_ck),
++	CLK(&tvoclk_ck),
++	CLK(&plltv_ck),
++#ifndef U6_OPTIMIZED_TREE
++	CLK(&intc_ck),
++	CLK(&extint_ck),
++	CLK(&sctu_ck),
++#endif
++	CLK(&spi1_ck),
++	CLK(&spi2_ck),
++	CLK(&iic1_ck),
++	CLK(&iic2_ck),
++	CLK(&uart1_ck),
++	CLK(&uart2_ck),
++#ifndef U6_OPTIMIZED_TREE
++	CLK(&gpio_ck),
++#endif
++	CLK(&kbs_ck),
++	CLK(&pwm1_ck),
++	CLK(&pwm2_ck),
++	CLK(&pwm3_ck),
++	CLK(&geac_ck),
++#ifndef U6_OPTIMIZED_TREE
++	CLK(&usim_ck),
++#endif
++	CLK(&fci_ck),
++	CLK(&usbd_ck),
++#ifndef U6_OPTIMIZED_TREE
++	CLK(&iis_ck),
++	CLK(&rfsm1_ck),
++#endif
++	CLK(&dmau_ck),
++	CLK(&jdi_ck),
++#ifndef U6_OPTIMIZED_TREE
++	CLK(&ucc_ck),
++#endif
++	CLK(&msi_ck),
++	CLK(&sdi_ck),
++	CLK(&nfi_ck),
++	CLK(&ebi_ck),
++	CLK(&cae_ck),
++	CLK(&mmtu_ck),
++	CLK(&sdm_ivs_ck),
++	CLK(&cam_ck),
++	CLK(&vde_ck),
++	CLK(&vdc_ck),
++	CLK(&vec_ck),
++	CLK(&ipp_ck),
++	CLK(&jdu_ck),
++	CLK(&camjpe_ck),
++	CLK(NULL)
++};
++
+diff --git a/arch/arm/plat-u6xxx/Makefile b/arch/arm/plat-u6xxx/Makefile
+index 12c832c..afdf82b 100644
+--- a/arch/arm/plat-u6xxx/Makefile
++++ b/arch/arm/plat-u6xxx/Makefile
+@@ -3,6 +3,6 @@
+ #
+ 
+ # Common support
+-obj-y := io.o irq.o
++obj-y := io.o irq.o clock.o
+ 
+ obj-$(CONFIG_U6_MTU_TIMER) += timer.o
+diff --git a/arch/arm/plat-u6xxx/clock.c b/arch/arm/plat-u6xxx/clock.c
+new file mode 100644
+index 0000000..ecff187
+--- /dev/null
++++ b/arch/arm/plat-u6xxx/clock.c
+@@ -0,0 +1,621 @@
++/*
++ * linux/arch/arm/plat-u6xxx/clock.c
++ *
++ *  Copyright (C) 2004 - 2005 Nokia corporation
++ *  Written by Tuukka Tikkanen <tuukka.tikkanen@elektrobit.com>
++ *  Copyright (C) 2010 ST-Ericsson SA
++ *
++ *  Modified for omap shared clock framework by Tony Lindgren <tony@atomide.com>
++ *
++ *  Modified for u6 shared clock framework by Loic Pallardy @ ST-Ericsson.com
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/version.h>
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/list.h>
++#include <linux/errno.h>
++#include <linux/err.h>
++#include <linux/string.h>
++#include <linux/clk.h>
++#include <linux/mutex.h>
++#include <linux/notifier.h>
++
++#include <linux/io.h>
++
++#include <mach/clock.h>
++
++LIST_HEAD(clocks);
++
++static DEFINE_MUTEX(clocks_mutex);
++DEFINE_SPINLOCK(clockfw_lock);
++
++static struct clk_functions *arch_clock;
++
++/*
++ * Additionnal specific clock functions define in include/mach/clock.h
++ */
++
++/**
++ *	clk_register_notifier - register a driver with clock mngt
++ *	@nb: notifier function to register
++ *  @clk: clock element rate change to be notified
++ *
++ *	Add a driver to one of two lists: either a list of drivers that
++ *      are notified about clock rate changes (once before and once after
++ *      the transition),
++ *	This function may sleep, and has the same return conditions as
++ *	sru_blocking_notifier_chain_register.
++ */
++int clk_register_notifier(struct notifier_block *nb, struct clk *clk)
++{
++	int ret;
++
++	if (clk == ERR_PTR(-ENOENT))
++		return -EINVAL;
++
++	mutex_lock(&clocks_mutex);
++	if (clk->notifier)
++		ret = srcu_notifier_chain_register(clk->notifier, nb);
++	else
++		ret = -EINVAL;
++	mutex_unlock(&clocks_mutex);
++
++	return ret;
++}
++EXPORT_SYMBOL(clk_register_notifier);
++
++/**
++ *	clk_unregister_notifier - unregister a driver with clock mngt
++ *	@nb: notifier function to be unregistered
++ *  @clk: clock element rate change to be notified
++ *
++ *	Remove a driver from the clock mngt notifier list.
++ *
++ *	This function may sleep, and has the same return conditions as
++ *	sru_blocking_notifier_chain_unregister.
++ */
++int clk_unregister_notifier(struct notifier_block *nb, struct clk *clk)
++{
++	int ret;
++
++	if (clk == ERR_PTR(-ENOENT))
++		return -EINVAL;
++
++	mutex_lock(&clocks_mutex);
++	if (clk->notifier)
++		ret = srcu_notifier_chain_unregister(clk->notifier, nb);
++	else
++		ret = -EINVAL;
++	mutex_unlock(&clocks_mutex);
++
++	return ret;
++}
++EXPORT_SYMBOL(clk_unregister_notifier);
++
++/**
++ * clk_notify_transition - call notifier chain
++ *
++ * This function calls the transition notifiers and the and set rate
++ * It is called twice on all frequency changes that have
++ * external effects.
++ */
++int clk_notify_transition(struct clk *clk, unsigned int state, void *data)
++{
++	BUG_ON(irqs_disabled());
++
++	if (clk == ERR_PTR(-ENOENT))
++		return NOTIFY_BAD;
++
++	switch (state) {
++
++	case CLK_RATE_PRECHANGE:
++	case CLK_RATE_POSTCHANGE:
++/*		printk("notif %u of frequency transition of %s to %lu Hz\n",
++			state, clk->name, (unsigned long)data);
++*/
++		break;
++
++	case CLK_SRCE_PRECHANGE:
++	case CLK_SRCE_POSTCHANGE:
++/*              printk("notif %u of srce transition of %s to %s\n",
++			state, clk->name, ((struct clk *)data)->name);
++*/
++		break;
++	default:
++		printk(KERN_ERR "Unknown notification srce transition\n");
++		return NOTIFY_BAD;
++		break;
++	}
++
++	return srcu_notifier_call_chain(clk->notifier, state, data);
++}
++
++/*
++ * Standard clock functions defined in include/linux/clk.h
++ */
++int clk_enable(struct clk *clk)
++{
++	unsigned long flags;
++	int ret = 0;
++
++	if (clk == ERR_PTR(-ENOENT))
++		return -EINVAL;
++
++	spin_lock_irqsave(&clockfw_lock, flags);
++	if (arch_clock->clk_enable)
++		ret = arch_clock->clk_enable(clk);
++	spin_unlock_irqrestore(&clockfw_lock, flags);
++
++	return ret;
++}
++EXPORT_SYMBOL(clk_enable);
++
++void clk_disable(struct clk *clk)
++{
++	unsigned long flags;
++
++	if (clk == ERR_PTR(-ENOENT))
++		return;
++
++	spin_lock_irqsave(&clockfw_lock, flags);
++	if (arch_clock->clk_disable)
++		arch_clock->clk_disable(clk);
++	spin_unlock_irqrestore(&clockfw_lock, flags);
++}
++EXPORT_SYMBOL(clk_disable);
++
++int clk_get_usecount(struct clk *clk)
++{
++	unsigned long flags;
++	int ret = 0;
++
++	if (clk == ERR_PTR(-ENOENT))
++		return -EINVAL;
++
++	spin_lock_irqsave(&clockfw_lock, flags);
++	ret = clk->usecount;
++	spin_unlock_irqrestore(&clockfw_lock, flags);
++
++	return ret;
++}
++EXPORT_SYMBOL(clk_get_usecount);
++
++unsigned long clk_get_rate(struct clk *clk)
++{
++	unsigned long flags;
++	unsigned long ret = 0;
++
++	if (clk == ERR_PTR(-ENOENT))
++		return -EINVAL;
++
++	spin_lock_irqsave(&clockfw_lock, flags);
++	ret = clk->rate;
++	spin_unlock_irqrestore(&clockfw_lock, flags);
++
++	return ret;
++}
++EXPORT_SYMBOL(clk_get_rate);
++
++/*
++ * Optional clock functions defined in include/linux/clk.h
++ */
++
++long clk_round_rate(struct clk *clk, unsigned long rate)
++{
++	unsigned long flags;
++	long ret = rate;
++
++	if (clk == ERR_PTR(-ENOENT))
++		return -EINVAL;
++
++	spin_lock_irqsave(&clockfw_lock, flags);
++	if (arch_clock->clk_round_rate)
++		ret = arch_clock->clk_round_rate(clk, rate);
++	spin_unlock_irqrestore(&clockfw_lock, flags);
++
++	return ret;
++}
++EXPORT_SYMBOL(clk_round_rate);
++
++int clk_set_rate(struct clk *clk, unsigned long rate)
++{
++	unsigned long flags;
++	int ret = 0;
++
++	if (clk == ERR_PTR(-ENOENT))
++		return -EINVAL;
++
++	/* notification pre change */
++	if (clk->notifier)
++		ret = clk_notify_transition(clk,
++					    CLK_RATE_PRECHANGE, (void *)rate);
++
++	if (!(ret & NOTIFY_STOP_MASK)) {
++		spin_lock_irqsave(&clockfw_lock, flags);
++		if (arch_clock->clk_set_rate)
++			ret = arch_clock->clk_set_rate(clk, rate);
++		spin_unlock_irqrestore(&clockfw_lock, flags);
++
++		/* notification post change */
++		if (clk->notifier)
++			clk_notify_transition(clk,
++					      CLK_RATE_POSTCHANGE,
++					      (void *)clk->rate);
++	}
++
++	return ret;
++}
++EXPORT_SYMBOL(clk_set_rate);
++
++int clk_set_parent(struct clk *clk, struct clk *parent)
++{
++	unsigned long flags;
++	int ret = 0;
++
++	if (clk == ERR_PTR(-ENOENT))
++		return -EINVAL;
++
++	/* notification pre change */
++	if (clk->notifier)
++		ret = clk_notify_transition(clk,
++					    CLK_SRCE_PRECHANGE, (void *)parent);
++
++	if (!(ret & NOTIFY_STOP_MASK)) {
++		spin_lock_irqsave(&clockfw_lock, flags);
++		if (arch_clock->clk_set_parent)
++			ret = arch_clock->clk_set_parent(clk, parent);
++		spin_unlock_irqrestore(&clockfw_lock, flags);
++
++		/* notification post change */
++		if (clk->notifier)
++			clk_notify_transition(clk,
++					      CLK_SRCE_POSTCHANGE,
++					      (void *)clk->parent);
++	}
++
++	return ret;
++}
++EXPORT_SYMBOL(clk_set_parent);
++
++struct clk *clk_get_parent(struct clk *clk)
++{
++	unsigned long flags;
++	struct clk *ret = ERR_PTR(-ENOENT);
++
++	if (clk == ERR_PTR(-ENOENT))
++		return ret;
++
++	spin_lock_irqsave(&clockfw_lock, flags);
++	if (arch_clock->clk_get_parent)
++		ret = arch_clock->clk_get_parent(clk);
++	spin_unlock_irqrestore(&clockfw_lock, flags);
++
++	return ret;
++}
++EXPORT_SYMBOL(clk_get_parent);
++
++/*
++ * Internal clock functions
++ */
++
++unsigned int __initdata mpurate;
++/*
++ * By default we use the rate set by the bootloader.
++ * You can override this with mpurate= cmdline option.
++ */
++static int __init u6_clk_setup(char *str)
++{
++	unsigned int tmp_rate;
++
++	get_option(&str, &tmp_rate);
++
++	if (!tmp_rate)
++		return 1;
++
++	mpurate = tmp_rate;
++
++	return 1;
++}
++
++__setup("mpurate=", u6_clk_setup);
++
++/* Used for clocks that always have same value as the parent clock */
++void followparent_recalc(struct clk *clk)
++{
++	clk->rate = clk->parent->rate;
++}
++
++/* Propagate rate to children */
++void propagate_rate(struct clk *tclk)
++{
++	struct clk *clkp;
++
++	list_for_each_entry(clkp, &clocks, node) {
++		if (likely(clkp->parent != tclk))
++			continue;
++		if (likely((u32) clkp->recalc))
++			clkp->recalc(clkp);
++	}
++}
++
++int clk_register(struct clk *clk)
++{
++	mutex_lock(&clocks_mutex);
++	list_add(&clk->node, &clocks);
++	if (clk->init)
++		clk->init(clk);
++	mutex_unlock(&clocks_mutex);
++
++	return 0;
++}
++EXPORT_SYMBOL(clk_register);
++
++void clk_unregister(struct clk *clk)
++{
++	mutex_lock(&clocks_mutex);
++	list_del(&clk->node);
++	mutex_unlock(&clocks_mutex);
++}
++EXPORT_SYMBOL(clk_unregister);
++
++void clk_deny_idle(struct clk *clk)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&clockfw_lock, flags);
++	if (arch_clock->clk_deny_idle)
++		arch_clock->clk_deny_idle(clk);
++	spin_unlock_irqrestore(&clockfw_lock, flags);
++}
++EXPORT_SYMBOL(clk_deny_idle);
++
++void clk_allow_idle(struct clk *clk)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&clockfw_lock, flags);
++	if (arch_clock->clk_allow_idle)
++		arch_clock->clk_allow_idle(clk);
++	spin_unlock_irqrestore(&clockfw_lock, flags);
++}
++EXPORT_SYMBOL(clk_allow_idle);
 +
 +#ifdef CONFIG_U6_POWER_SYSFS
-+static int __init u6_mmtu_init_sysfs(void)
-+{
-+	printk(PKMOD "mmtu_init_sysfs\n");
++/*
++ * SysFs interface
++ */
 +
-+#ifdef U6_MMTU_CLOCK_SOURCE
-+	if (sysfs_create_group(&u6_power_kobj, &dbs_attr_srce_group))
-+		printk(PKMOD "Unable to register %s in sysfs\n",
-+		       dbs_attr_srce_group.name);
++/*** Clock mngt sysfs interface **/
++static char clk_name[64] = "MMTU";
++
++static ssize_t show_select(struct kobject *kobj, char *buf)
++{
++	return sprintf(buf, "%s \n", clk_name);
++}
++
++static ssize_t store_select(struct kobject *kobj, const char *buf, size_t size)
++{
++	strcpy(clk_name, buf);
++
++	clk_name[strlen(clk_name) - 1] = 0;
++
++	return size;
++}
++
++static ssize_t show_enable(struct kobject *kobj, char *buf)
++{
++	struct clk *clk;
++	clk = clk_get(NULL, clk_name);
++	if (clk == ERR_PTR(-ENOENT))
++		return sprintf(buf, "unable to get clk\n");
++	clk_put(clk);
++	return sprintf(buf, "%d \n", clk_get_usecount(clk));
++}
++
++static ssize_t store_enable(struct kobject *kobj, const char *buf, size_t size)
++{
++	struct clk *clk;
++	clk = clk_get(NULL, clk_name);
++	if (clk == ERR_PTR(-ENOENT))
++		return size;
++	clk_enable(clk);
++	clk_put(clk);
++	return size;
++}
++
++static ssize_t show_disable(struct kobject *kobj, char *buf)
++{
++	struct clk *clk;
++	clk = clk_get(NULL, clk_name);
++	if (clk == ERR_PTR(-ENOENT))
++		return sprintf(buf, "unable to get clk\n");
++	clk_put(clk);
++	return sprintf(buf, "%d \n", clk_get_usecount(clk));
++}
++
++static ssize_t store_disable(struct kobject *kobj, const char *buf, size_t size)
++{
++	struct clk *clk;
++	clk = clk_get(NULL, clk_name);
++	if (clk == ERR_PTR(-ENOENT))
++		return size;
++	clk_disable(clk);
++	clk_put(clk);
++	return size;
++}
++
++static ssize_t show_usecount(struct kobject *kobj, char *buf)
++{
++	struct clk *clk;
++	clk = clk_get(NULL, clk_name);
++	if (clk == ERR_PTR(-ENOENT))
++		return sprintf(buf, "unable to get clk\n");
++	clk_put(clk);
++	return sprintf(buf, "%d \n", clk_get_usecount(clk));
++}
++
++static ssize_t show_rate(struct kobject *kobj, char *buf)
++{
++	struct clk *clk;
++	clk = clk_get(NULL, clk_name);
++	if (clk == ERR_PTR(-ENOENT))
++		return sprintf(buf, "unable to get clk\n");
++	clk_put(clk);
++	return sprintf(buf, "%lu \n", clk_get_rate(clk));
++}
++
++static ssize_t store_rate(struct kobject *kobj, const char *buf, size_t size)
++{
++	struct clk *clk;
++	unsigned long rate;
++	if (strict_strtoul(buf, 10, &rate) == 0) {
++		clk = clk_get(NULL, clk_name);
++		if (clk == ERR_PTR(-ENOENT))
++			return size;
++		clk_set_rate(clk, rate);
++		clk_put(clk);
++	}
++	return size;
++}
++
++static ssize_t show_parent(struct kobject *kobj, char *buf)
++{
++	struct clk *clk, *pclk;
++	clk = clk_get(NULL, clk_name);
++	if (clk == ERR_PTR(-ENOENT))
++		return sprintf(buf, "unable to get clk\n");
++	pclk = clk_get_parent(clk);
++	clk_put(clk);
++	if ((pclk) && (pclk->name))
++		return sprintf(buf, "%s\n", pclk->name);
++	else
++		return sprintf(buf, "root\n");
++}
++
++static ssize_t store_parent(struct kobject *kobj, const char *buf, size_t size)
++{
++	struct clk *clk, *pclk;
++	char parent[32];
++	strcpy(parent, buf);
++	parent[strlen(parent) - 1] = 0;
++
++	clk = clk_get(NULL, clk_name);
++	if (clk == ERR_PTR(-ENOENT))
++		return size;
++
++	pclk = clk_get(NULL, parent);
++	if (pclk == ERR_PTR(-ENOENT)) {
++		clk_put(clk);
++		return size;
++	}
++	clk_put(pclk);
++	clk_set_parent(clk, pclk);
++	clk_put(clk);
++	return size;
++}
++
++static ssize_t show_list(struct kobject *kobj, char *buf)
++{
++	int size = 0;
++
++	struct clk *p;
++
++	list_for_each_entry(p, &clocks, node) {
++		size += sprintf(&buf[size], "%s\n", p->name);
++	}
++	return size;
++}
++
++/*** Clock mngt hw debug ***/
++static ssize_t show_hw_constraints(struct kobject *kobj, char *buf)
++{
++	int size = 0;
++
++	size += u6_clk_show_hw_rates(kobj, &buf[size]);
++
++	size += u6_clk_show_sc_constraints(kobj, &buf[size]);
++
++	size += u6_clk_show_ivs_constraints(kobj, &buf[size]);
++
++	size += u6_clk_show_tvo_constraints(kobj, &buf[size]);
++
++	size += u6_clk_show_cam_constraints(kobj, &buf[size]);
++
++	return size;
++}
++
++static ssize_t show_hw_rates(struct kobject *kobj, char *buf)
++{
++	int size = 0;
++
++	size += u6_clk_show_hw_rates(kobj, buf);
++
++	return size;
++}
++
++define_one_ro(hw_rates);
++define_one_ro(hw_constraints);
++define_one_rw(parent);
++define_one_rw(rate);
++define_one_ro(usecount);
++define_one_rw(disable);
++define_one_rw(enable);
++define_one_rw(select);
++define_one_ro(list);
++
++static struct attribute *dbs_attributes_clock[] = {
++
++	&hw_rates.attr,
++	&hw_constraints.attr,
++	&parent.attr,
++	&rate.attr,
++	&usecount.attr,
++	&disable.attr,
++	&enable.attr,
++	&select.attr,
++	&list.attr,
++	NULL
++};
++
++static struct attribute_group dbs_attr_clock_group = {
++	.attrs = dbs_attributes_clock,
++	.name = "clk_mngt",
++};
++
 +#endif
 +
-+	if (sysfs_create_group(&u6_power_kobj, &dbs_attr_event_group))
-+		printk(PKMOD "Unable to register %s in sysfs\n",
-+		       dbs_attr_event_group.name);
++/*
++ * Init functions
++ */
++
++int __init clk_init(struct clk_functions *custom_clocks)
++{
++	if (!custom_clocks) {
++		printk(KERN_ERR "No custom clock functions registered\n");
++		BUG();
++	}
++
++	arch_clock = custom_clocks;
 +
 +	return 0;
 +}
 +
-+module_init(u6_mmtu_init_sysfs);
++#ifdef CONFIG_U6_POWER_SYSFS
++static int __init u6_clock_init_sysfs(void)
++{
++	if (sysfs_create_group(&u6_power_kobj, &dbs_attr_clock_group))
++		printk(KERN_ERR "Unable to register %s in sysfs\n",
++		       dbs_attr_clock_group.name);
++
++	return 0;
++}
++
++module_init(u6_clock_init_sysfs);
++#endif
++
+diff --git a/arch/arm/plat-u6xxx/include/mach/clkdev.h b/arch/arm/plat-u6xxx/include/mach/clkdev.h
+new file mode 100644
+index 0000000..730c49d
+--- /dev/null
++++ b/arch/arm/plat-u6xxx/include/mach/clkdev.h
+@@ -0,0 +1,13 @@
++#ifndef __MACH_CLKDEV_H
++#define __MACH_CLKDEV_H
++
++static inline int __clk_get(struct clk *clk)
++{
++	return 1;
++}
++
++static inline void __clk_put(struct clk *clk)
++{
++}
++
++#endif
+diff --git a/arch/arm/plat-u6xxx/include/mach/clock.h b/arch/arm/plat-u6xxx/include/mach/clock.h
+new file mode 100644
+index 0000000..bc83414
+--- /dev/null
++++ b/arch/arm/plat-u6xxx/include/mach/clock.h
+@@ -0,0 +1,376 @@
++/*
++ * linux/arch/arm/plat-u6xxx/include/mach/clock.h
++ *
++ * Copyright (C) ST-Ericsson SA 2010
++ * Author: Loic Pallardy <loic.pallardy@stericsson.com> for ST-Ericsson
++ * License terms:  GNU General Public License (GPL), version 2
++ *
++ * Based on clocks.h by Tony Lindgren, Gordon McNutt and RidgeRun, Inc
++ */
++
++#ifndef __PLAT_CLOCK_H
++#define __PLAT_CLOCK_H
++
++struct module;
++
++struct clk {
++	struct list_head	node;
++	struct module		*owner;
++	const char		*name;
++	struct clk		*parent;
++	unsigned long		rate;
++	__u32			flags;
++	u32			enable_reg;
++	__u8			enable_bit;
++	__u8			rate_offset;
++	__u8			src_offset;
++	__s8			usecount;
++	void			(*recalc)(struct clk *);
++	int			(*set_rate)(struct clk *, unsigned long);
++	long			(*round_rate)(struct clk *, unsigned long);
++	void			(*init)(struct clk *);
++	int			(*enable)(struct clk *);
++	void			(*disable)(struct clk *);
++	int			(*set_parent)(struct clk *, struct clk *);
++	struct srcu_notifier_head *notifier;
++};
++
++struct clk_functions {
++	int		(*clk_enable)(struct clk *clk);
++	void		(*clk_disable)(struct clk *clk);
++	long		(*clk_round_rate)(struct clk *clk, unsigned long rate);
++	int		(*clk_set_rate)(struct clk *clk, unsigned long rate);
++	int		(*clk_set_parent)(struct clk *clk, struct clk *parent);
++	struct clk *	(*clk_get_parent)(struct clk *clk);
++	void		(*clk_allow_idle)(struct clk *clk);
++	void		(*clk_deny_idle)(struct clk *clk);
++};
++
++extern unsigned int mpurate;
++extern struct list_head clocks;
++extern spinlock_t clockfw_lock;
++
++extern int clk_init(struct clk_functions *custom_clocks);
++extern int clk_register(struct clk *clk);
++extern void clk_unregister(struct clk *clk);
++
++extern void propagate_rate(struct clk *clk);
++extern void followparent_recalc(struct clk *clk);
++extern void clk_allow_idle(struct clk *clk);
++extern void clk_deny_idle(struct clk *clk);
++extern int clk_get_usecount(struct clk *clk);
++
++extern ssize_t u6_clk_show_hw_rates(struct kobject *kobj, char *buf);
++extern ssize_t u6_clk_show_sc_constraints(struct kobject *kobj, char *buf);
++extern ssize_t u6_clk_show_usb_constraints(struct kobject *kobj, char *buf);
++extern ssize_t u6_clk_show_ivs_constraints(struct kobject *kobj, char *buf);
++extern ssize_t u6_clk_show_tvo_constraints(struct kobject *kobj, char *buf);
++extern ssize_t u6_clk_show_cam_constraints(struct kobject *kobj, char *buf);
++
++extern unsigned long clk_get_hw_constraint(unsigned long reg_addr);
++
++
++/* Clock flags */
++#define RATE_CKCTL		(1 << 0)	/* Main fixed ratio clocks */
++#define RATE_FIXED		(1 << 1)	/* Fixed clock rate */
++#define RATE_PROPAGATES		(1 << 2)	/* Program children too */
++#define VIRTUAL_CLOCK		(1 << 3)	/* Composite clock from table */
++#define ALWAYS_ENABLED		(1 << 4)	/* Clock cannot be disabled */
++#define ENABLE_REG_32BIT	(1 << 5)	/* Use 32-bit access */
++#define VIRTUAL_IO_ADDRESS	(1 << 6)	/* Clock in virtual address */
++#define CLOCK_IDLE_CONTROL	(1 << 7)
++#define CLOCK_NO_IDLE_PARENT	(1 << 8)
++#define DELAYED_APP		(1 << 9)	/* Delay application of clock */
++#define CONFIG_PARTICIPANT	(1 << 10)	/* Fundamental clock */
++
++
++#define CLK_HCLK2_MAX_FREQ	104000000
++#define CLK_FC_CLK_MAX_FREQ	104000000
++#define CLK_CAM_CLK_MAX_FREQ	 78000000
++
++/**
++ * clk_register_notifier - register a driver with clock mngt
++ *	@nb: notifier function to register
++ *  @clk: clock element rate change to be notified
++ */
++extern int clk_register_notifier(struct notifier_block *nb, struct clk *clk);
++
++/**
++ * clk_unregister_notifier - unregister a driver with clock mngt
++ *	@nb: notifier function to register
++ *  @clk: clock element rate change to be notified
++ */
++extern int clk_unregister_notifier(struct notifier_block *nb, struct clk *clk);
++
++/**
++ * clk_notify_transition - call notifier chain
++ *
++ * This function calls the transition notifiers and the and set rate
++ * It is called twice on all frequency changes that have
++ * external effects.
++ */
++extern int clk_notify_transition(struct clk *clk,
++		unsigned int state, void *data);
++
++#define CLK_RATE_PRECHANGE 0
++#define CLK_RATE_POSTCHANGE 1
++#define CLK_SRCE_PRECHANGE 2
++#define CLK_SRCE_POSTCHANGE 3
++
++/* Hardware Register Definitions CGU (Clock Gating Unit) */
++
++/* CGU DSP1CON Register (32 bits) */
++#define CGU_DSP1CON_OFFSET             0x0
++#define CGU_DSP1CON_REG                IO_ADDRESS(CGU_BASE + CGU_DSP1CON_OFFSET)
++
++/* CGU SCCON Register (32 bits) */
++#define CGU_SCCON_OFFSET               0x4
++#define CGU_SCCON_REG                  IO_ADDRESS(CGU_BASE + CGU_SCCON_OFFSET)
++
++/* CGU GATESC1 Register (32 bits) */
++#define CGU_GATESC1_OFFSET             0x8
++#define CGU_GATESC1_REG                IO_ADDRESS(CGU_BASE + CGU_GATESC1_OFFSET)
++
++/* CGU SLEEPSC Register (32 bits) */
++#define CGU_SLEEPSC_OFFSET             0xC
++#define CGU_SLEEPSC_REG                IO_ADDRESS(CGU_BASE + CGU_SLEEPSC_OFFSET)
++
++/* CGU FDIV Register (32 bits) */
++#define CGU_FDIV_OFFSET                0x10
++#define CGU_FDIV_REG                   IO_ADDRESS(CGU_BASE + CGU_FDIV_OFFSET)
++
++/* CGU GATEIVS Register (32 bits) */
++#define CGU_GATEIVS_OFFSET             0x14
++#define CGU_GATEIVS_REG                IO_ADDRESS(CGU_BASE + CGU_GATEIVS_OFFSET)
++
++/* CGU DSP2CON Register (32 bits) */
++#define CGU_DSP2CON_OFFSET             0x18
++#define CGU_DSP2CON_REG                IO_ADDRESS(CGU_BASE + CGU_DSP2CON_OFFSET)
++
++/* CGU CAMCON Register (32 bits) */
++#define CGU_CAMCON_OFFSET              0x1C
++#define CGU_CAMCON_REG                 IO_ADDRESS(CGU_BASE + CGU_CAMCON_OFFSET)
++
++/* CGU GATESC2 Register (32 bits) */
++#define CGU_GATESC2_OFFSET             0x20
++#define CGU_GATESC2_REG                IO_ADDRESS(CGU_BASE + CGU_GATESC2_OFFSET)
++
++/* CGU SDMCON Register (32 bits) */
++#define CGU_SDMCON_OFFSET              0x24
++#define CGU_SDMCON_REG                 IO_ADDRESS(CGU_BASE + CGU_SDMCON_OFFSET)
++
++/* CGU TVCON Register (32 bits) */
++#define CGU_TVCON_OFFSET               0x28
++#define CGU_TVCON_REG                  IO_ADDRESS(CGU_BASE + CGU_TVCON_OFFSET)
++
++/* CGU IDLESC Register (32 bits) */
++#define CGU_IDLESC_OFFSET              0x2C
++#define CGU_IDLESC_REG                 IO_ADDRESS(CGU_BASE + CGU_IDLESC_OFFSET)
++
++/* CGU FIXCON Register (32 bits) */
++#define CGU_FIXCON_OFFSET              0x30
++#define CGU_FIXCON_REG                 IO_ADDRESS(CGU_BASE + CGU_FIXCON_OFFSET)
++
++/* CGU CNTCON Register (32 bits) */
++#define CGU_CNTCON_OFFSET              0x38
++#define CGU_CNTCON_REG                 IO_ADDRESS(CGU_BASE + CGU_CNTCON_OFFSET)
++
++/* Register description for GATESC1 */
++
++/* Bits definition for register CGU_GATESC1 */
++#define CGU_EBIEN_SHIFT            31
++#define CGU_EBIEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_EBIEN_SHIFT))
++#define CGU_EBIEN_0                (0x0UL<<CGU_EBIEN_SHIFT)
++#define CGU_EBIEN_1                (0x1UL<<CGU_EBIEN_SHIFT)
++#define CGU_EBIEN                  (0x1UL<<CGU_EBIEN_SHIFT)
++#define CGU_NFIEN_SHIFT            29
++#define CGU_NFIEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_NFIEN_SHIFT))
++#define CGU_NFIEN_0                (0x0UL<<CGU_NFIEN_SHIFT)
++#define CGU_NFIEN_1                (0x1UL<<CGU_NFIEN_SHIFT)
++#define CGU_NFIEN                  (0x1UL<<CGU_NFIEN_SHIFT)
++#define CGU_SDIEN_SHIFT            28
++#define CGU_SDIEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_SDIEN_SHIFT))
++#define CGU_SDIEN_0                (0x0UL<<CGU_SDIEN_SHIFT)
++#define CGU_SDIEN_1                (0x1UL<<CGU_SDIEN_SHIFT)
++#define CGU_SDIEN                  (0x1UL<<CGU_SDIEN_SHIFT)
++#define CGU_MSIEN_SHIFT            26
++#define CGU_MSIEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_MSIEN_SHIFT))
++#define CGU_MSIEN_0                (0x0UL<<CGU_MSIEN_SHIFT)
++#define CGU_MSIEN_1                (0x1UL<<CGU_MSIEN_SHIFT)
++#define CGU_MSIEN                  (0x1UL<<CGU_MSIEN_SHIFT)
++#define CGU_UCCEN_SHIFT            25
++#define CGU_UCCEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_UCCEN_SHIFT))
++#define CGU_UCCEN_0                (0x0UL<<CGU_UCCEN_SHIFT)
++#define CGU_UCCEN_1                (0x1UL<<CGU_UCCEN_SHIFT)
++#define CGU_UCCEN                  (0x1UL<<CGU_UCCEN_SHIFT)
++#define CGU_JDIEN_SHIFT            24
++#define CGU_JDIEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_JDIEN_SHIFT))
++#define CGU_JDIEN_0                (0x0UL<<CGU_JDIEN_SHIFT)
++#define CGU_JDIEN_1                (0x1UL<<CGU_JDIEN_SHIFT)
++#define CGU_JDIEN                  (0x1UL<<CGU_JDIEN_SHIFT)
++#define CGU_DMAUEN_SHIFT           20
++#define CGU_DMAUEN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_DMAUEN_SHIFT))
++#define CGU_DMAUEN_0               (0x0UL<<CGU_DMAUEN_SHIFT)
++#define CGU_DMAUEN_1               (0x1UL<<CGU_DMAUEN_SHIFT)
++#define CGU_DMAUEN                 (0x1UL<<CGU_DMAUEN_SHIFT)
++#define CGU_RFSM1EN_SHIFT          19
++#define CGU_RFSM1EN_FIELD          (0xFFFFFFFF - (0x1UL<<CGU_RFSM1EN_SHIFT))
++#define CGU_RFSM1EN_0              (0x0UL<<CGU_RFSM1EN_SHIFT)
++#define CGU_RFSM1EN_1              (0x1UL<<CGU_RFSM1EN_SHIFT)
++#define CGU_RFSM1EN                (0x1UL<<CGU_RFSM1EN_SHIFT)
++#define CGU_SIISEN_SHIFT           18
++#define CGU_SIISEN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_SIISEN_SHIFT))
++#define CGU_SIISEN_0               (0x0UL<<CGU_SIISEN_SHIFT)
++#define CGU_SIISEN_1               (0x1UL<<CGU_SIISEN_SHIFT)
++#define CGU_SIISEN                 (0x1UL<<CGU_SIISEN_SHIFT)
++#define CGU_USBEN_SHIFT            17
++#define CGU_USBEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_USBEN_SHIFT))
++#define CGU_USBEN_0                (0x0UL<<CGU_USBEN_SHIFT)
++#define CGU_USBEN_1                (0x1UL<<CGU_USBEN_SHIFT)
++#define CGU_USBEN                  (0x1UL<<CGU_USBEN_SHIFT)
++#define CGU_FCIEN_SHIFT            16
++#define CGU_FCIEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_FCIEN_SHIFT))
++#define CGU_FCIEN_0                (0x0UL<<CGU_FCIEN_SHIFT)
++#define CGU_FCIEN_1                (0x1UL<<CGU_FCIEN_SHIFT)
++#define CGU_FCIEN                  (0x1UL<<CGU_FCIEN_SHIFT)
++#define CGU_USIMEN_SHIFT           15
++#define CGU_USIMEN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_USIMEN_SHIFT))
++#define CGU_USIMEN_0               (0x0UL<<CGU_USIMEN_SHIFT)
++#define CGU_USIMEN_1               (0x1UL<<CGU_USIMEN_SHIFT)
++#define CGU_USIMEN                 (0x1UL<<CGU_USIMEN_SHIFT)
++#define CGU_GEACEN_SHIFT           14
++#define CGU_GEACEN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_GEACEN_SHIFT))
++#define CGU_GEACEN_0               (0x0UL<<CGU_GEACEN_SHIFT)
++#define CGU_GEACEN_1               (0x1UL<<CGU_GEACEN_SHIFT)
++#define CGU_GEACEN                 (0x1UL<<CGU_GEACEN_SHIFT)
++#define CGU_PWM3EN_SHIFT           13
++#define CGU_PWM3EN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_PWM3EN_SHIFT))
++#define CGU_PWM3EN_0               (0x0UL<<CGU_PWM3EN_SHIFT)
++#define CGU_PWM3EN_1               (0x1UL<<CGU_PWM3EN_SHIFT)
++#define CGU_PWM3EN                 (0x1UL<<CGU_PWM3EN_SHIFT)
++#define CGU_PWM2EN_SHIFT           12
++#define CGU_PWM2EN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_PWM2EN_SHIFT))
++#define CGU_PWM2EN_0               (0x0UL<<CGU_PWM2EN_SHIFT)
++#define CGU_PWM2EN_1               (0x1UL<<CGU_PWM2EN_SHIFT)
++#define CGU_PWM2EN                 (0x1UL<<CGU_PWM2EN_SHIFT)
++#define CGU_PWM1EN_SHIFT           11
++#define CGU_PWM1EN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_PWM1EN_SHIFT))
++#define CGU_PWM1EN_0               (0x0UL<<CGU_PWM1EN_SHIFT)
++#define CGU_PWM1EN_1               (0x1UL<<CGU_PWM1EN_SHIFT)
++#define CGU_PWM1EN                 (0x1UL<<CGU_PWM1EN_SHIFT)
++#define CGU_KBSEN_SHIFT            10
++#define CGU_KBSEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_KBSEN_SHIFT))
++#define CGU_KBSEN_0                (0x0UL<<CGU_KBSEN_SHIFT)
++#define CGU_KBSEN_1                (0x1UL<<CGU_KBSEN_SHIFT)
++#define CGU_KBSEN                  (0x1UL<<CGU_KBSEN_SHIFT)
++#define CGU_GPIOEN_SHIFT           9
++#define CGU_GPIOEN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_GPIOEN_SHIFT))
++#define CGU_GPIOEN_0               (0x0UL<<CGU_GPIOEN_SHIFT)
++#define CGU_GPIOEN_1               (0x1UL<<CGU_GPIOEN_SHIFT)
++#define CGU_GPIOEN                 (0x1UL<<CGU_GPIOEN_SHIFT)
++#define CGU_UART2EN_SHIFT          8
++#define CGU_UART2EN_FIELD          (0xFFFFFFFF - (0x1UL<<CGU_UART2EN_SHIFT))
++#define CGU_UART2EN_0              (0x0UL<<CGU_UART2EN_SHIFT)
++#define CGU_UART2EN_1              (0x1UL<<CGU_UART2EN_SHIFT)
++#define CGU_UART2EN                (0x1UL<<CGU_UART2EN_SHIFT)
++#define CGU_UART1EN_SHIFT          7
++#define CGU_UART1EN_FIELD          (0xFFFFFFFF - (0x1UL<<CGU_UART1EN_SHIFT))
++#define CGU_UART1EN_0              (0x0UL<<CGU_UART1EN_SHIFT)
++#define CGU_UART1EN_1              (0x1UL<<CGU_UART1EN_SHIFT)
++#define CGU_UART1EN                (0x1UL<<CGU_UART1EN_SHIFT)
++#define CGU_IIC2EN_SHIFT           6
++#define CGU_IIC2EN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_IIC2EN_SHIFT))
++#define CGU_IIC2EN_0               (0x0UL<<CGU_IIC2EN_SHIFT)
++#define CGU_IIC2EN_1               (0x1UL<<CGU_IIC2EN_SHIFT)
++#define CGU_IIC2EN                 (0x1UL<<CGU_IIC2EN_SHIFT)
++#define CGU_IIC1EN_SHIFT           5
++#define CGU_IIC1EN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_IIC1EN_SHIFT))
++#define CGU_IIC1EN_0               (0x0UL<<CGU_IIC1EN_SHIFT)
++#define CGU_IIC1EN_1               (0x1UL<<CGU_IIC1EN_SHIFT)
++#define CGU_IIC1EN                 (0x1UL<<CGU_IIC1EN_SHIFT)
++#define CGU_SPI2EN_SHIFT           4
++#define CGU_SPI2EN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_SPI2EN_SHIFT))
++#define CGU_SPI2EN_0               (0x0UL<<CGU_SPI2EN_SHIFT)
++#define CGU_SPI2EN_1               (0x1UL<<CGU_SPI2EN_SHIFT)
++#define CGU_SPI2EN                 (0x1UL<<CGU_SPI2EN_SHIFT)
++#define CGU_SPI1EN_SHIFT           3
++#define CGU_SPI1EN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_SPI1EN_SHIFT))
++#define CGU_SPI1EN_0               (0x0UL<<CGU_SPI1EN_SHIFT)
++#define CGU_SPI1EN_1               (0x1UL<<CGU_SPI1EN_SHIFT)
++#define CGU_SPI1EN                 (0x1UL<<CGU_SPI1EN_SHIFT)
++#define CGU_SCTUEN_SHIFT           2
++#define CGU_SCTUEN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_SCTUEN_SHIFT))
++#define CGU_SCTUEN_0               (0x0UL<<CGU_SCTUEN_SHIFT)
++#define CGU_SCTUEN_1               (0x1UL<<CGU_SCTUEN_SHIFT)
++#define CGU_SCTUEN                 (0x1UL<<CGU_SCTUEN_SHIFT)
++#define CGU_EXTINTEN_SHIFT         1
++#define CGU_EXTINTEN_FIELD         (0xFFFFFFFF - (0x1UL<<CGU_EXTINTEN_SHIFT))
++#define CGU_EXTINTEN_0             (0x0UL<<CGU_EXTINTEN_SHIFT)
++#define CGU_EXTINTEN_1             (0x1UL<<CGU_EXTINTEN_SHIFT)
++#define CGU_EXTINTEN               (0x1UL<<CGU_EXTINTEN_SHIFT)
++#define CGU_INTCEN_SHIFT           0
++#define CGU_INTCEN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_INTCEN_SHIFT))
++#define CGU_INTCEN_0               (0x0UL<<CGU_INTCEN_SHIFT)
++#define CGU_INTCEN_1               (0x1UL<<CGU_INTCEN_SHIFT)
++#define CGU_INTCEN                 (0x1UL<<CGU_INTCEN_SHIFT)
++
++/* Register description for GATESC2 */
++
++/* Bits definition for register CGU_GATESC2 */
++#define CGU_TRAUPCLKEN_SHIFT       15
++#define CGU_TRAUPCLKEN_FIELD       (0xFFFFFFFF - (0x1UL<<CGU_TRAUPCLKEN_SHIFT))
++#define CGU_TRAUPCLKEN_0           (0x0UL<<CGU_TRAUPCLKEN_SHIFT)
++#define CGU_TRAUPCLKEN_1           (0x1UL<<CGU_TRAUPCLKEN_SHIFT)
++#define CGU_TRAUPCLKEN             (0x1UL<<CGU_TRAUPCLKEN_SHIFT)
++#define CGU_AUTRXPCLKEN_SHIFT      12
++#define CGU_AUTRXPCLKEN_FIELD      (0xFFFFFFFF - (0x1UL<<CGU_AUTRXPCLKEN_SHIFT))
++#define CGU_AUTRXPCLKEN_0          (0x0UL<<CGU_AUTRXPCLKEN_SHIFT)
++#define CGU_AUTRXPCLKEN_1          (0x1UL<<CGU_AUTRXPCLKEN_SHIFT)
++#define CGU_AUTRXPCLKEN            (0x1UL<<CGU_AUTRXPCLKEN_SHIFT)
++#define CGU_AUTRXMCLK2EN_SHIFT     11
++#define CGU_AUTRXMCLK2EN_FIELD    (0xFFFFFFFF - (0x1UL<<CGU_AUTRXMCLK2EN_SHIFT))
++#define CGU_AUTRXMCLK2EN_0         (0x0UL<<CGU_AUTRXMCLK2EN_SHIFT)
++#define CGU_AUTRXMCLK2EN_1         (0x1UL<<CGU_AUTRXMCLK2EN_SHIFT)
++#define CGU_AUTRXMCLK2EN           (0x1UL<<CGU_AUTRXMCLK2EN_SHIFT)
++#define CGU_AUTRXMCLK1EN_SHIFT     10
++#define CGU_AUTRXMCLK1EN_FIELD    (0xFFFFFFFF - (0x1UL<<CGU_AUTRXMCLK1EN_SHIFT))
++#define CGU_AUTRXMCLK1EN_0         (0x0UL<<CGU_AUTRXMCLK1EN_SHIFT)
++#define CGU_AUTRXMCLK1EN_1         (0x1UL<<CGU_AUTRXMCLK1EN_SHIFT)
++#define CGU_AUTRXMCLK1EN           (0x1UL<<CGU_AUTRXMCLK1EN_SHIFT)
++#define CGU_BBIPCLKEN_SHIFT        9
++#define CGU_BBIPCLKEN_FIELD        (0xFFFFFFFF - (0x1UL<<CGU_BBIPCLKEN_SHIFT))
++#define CGU_BBIPCLKEN_0            (0x0UL<<CGU_BBIPCLKEN_SHIFT)
++#define CGU_BBIPCLKEN_1            (0x1UL<<CGU_BBIPCLKEN_SHIFT)
++#define CGU_BBIPCLKEN              (0x1UL<<CGU_BBIPCLKEN_SHIFT)
++#define CGU_HSDPAHCLKEN_SHIFT      8
++#define CGU_HSDPAHCLKEN_FIELD      (0xFFFFFFFF - (0x1UL<<CGU_HSDPAHCLKEN_SHIFT))
++#define CGU_HSDPAHCLKEN_0          (0x0UL<<CGU_HSDPAHCLKEN_SHIFT)
++#define CGU_HSDPAHCLKEN_1          (0x1UL<<CGU_HSDPAHCLKEN_SHIFT)
++#define CGU_HSDPAHCLKEN            (0x1UL<<CGU_HSDPAHCLKEN_SHIFT)
++#define CGU_3GMHCLKEN_SHIFT        7
++#define CGU_3GMHCLKEN_FIELD        (0xFFFFFFFF - (0x1UL<<CGU_3GMHCLKEN_SHIFT))
++#define CGU_3GMHCLKEN_0            (0x0UL<<CGU_3GMHCLKEN_SHIFT)
++#define CGU_3GMHCLKEN_1            (0x1UL<<CGU_3GMHCLKEN_SHIFT)
++#define CGU_3GMHCLKEN              (0x1UL<<CGU_3GMHCLKEN_SHIFT)
++#define CGU_3GMMCLKEN_SHIFT        6
++#define CGU_3GMMCLKEN_FIELD        (0xFFFFFFFF - (0x1UL<<CGU_3GMMCLKEN_SHIFT))
++#define CGU_3GMMCLKEN_0            (0x0UL<<CGU_3GMMCLKEN_SHIFT)
++#define CGU_3GMMCLKEN_1            (0x1UL<<CGU_3GMMCLKEN_SHIFT)
++#define CGU_3GMMCLKEN              (0x1UL<<CGU_3GMMCLKEN_SHIFT)
++#define CGU_ETBEN_SHIFT            4
++#define CGU_ETBEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_ETBEN_SHIFT))
++#define CGU_ETBEN_0                (0x0UL<<CGU_ETBEN_SHIFT)
++#define CGU_ETBEN_1                (0x1UL<<CGU_ETBEN_SHIFT)
++#define CGU_ETBEN                  (0x1UL<<CGU_ETBEN_SHIFT)
++#define CGU_MMTUEN_SHIFT           2
++#define CGU_MMTUEN_FIELD           (0xFFFFFFFF - (0x1UL<<CGU_MMTUEN_SHIFT))
++#define CGU_MMTUEN_0               (0x0UL<<CGU_MMTUEN_SHIFT)
++#define CGU_MMTUEN_1               (0x1UL<<CGU_MMTUEN_SHIFT)
++#define CGU_MMTUEN                 (0x1UL<<CGU_MMTUEN_SHIFT)
++#define CGU_CAEEN_SHIFT            0
++#define CGU_CAEEN_FIELD            (0xFFFFFFFF - (0x1UL<<CGU_CAEEN_SHIFT))
++#define CGU_CAEEN_0                (0x0UL<<CGU_CAEEN_SHIFT)
++#define CGU_CAEEN_1                (0x1UL<<CGU_CAEEN_SHIFT)
++#define CGU_CAEEN                  (0x1UL<<CGU_CAEEN_SHIFT)
++
 +#endif
 -- 
 1.7.1
