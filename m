@@ -1,128 +1,95 @@
-From: roger.quadros@nokia.com (Roger Quadros)
-Date: Tue, 06 Jul 2010 15:33:17 +0300
-Subject: [PATCH 14/15] omap: zoom: add WLAN device
-In-Reply-To: <1278376666-3509-15-git-send-email-ohad@wizery.com>
-References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
-	<1278376666-3509-15-git-send-email-ohad@wizery.com>
-Message-ID: <4C33228D.8000908@nokia.com>
+From: inki.dae@samsung.com (In-Ki Dae)
+Date: Mon, 05 Jul 2010 01:08:07 +0000 (GMT)
+Subject: [PATCH v1 2/2] S5PV210: Add MIPI-DSI Driver.
+Message-ID: <1292245.80511278292086837.JavaMail.weblogic@epml01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+Hi, Guennadi,
 
-On 07/06/2010 03:37 AM, ext Ohad Ben-Cohen wrote:
-> From: Ohad Ben-Cohen<ohadb@ti.com>
->
-> Add WLAN platform device and control
-> functions (power and virtual card detect)
-> in order to allow software to control the
-> embedded SDIO WLAN device which resides on
-> the ZOOM board (TI's wl1271 device).
->
-> Based on Android's WLAN control functions by
-> San Mehat<san@android.com>.
->
-> Signed-off-by: Ohad Ben-Cohen<ohadb@ti.com>
+You mean is that it uses include/video/mipi_display.h file instead of plat/dsim.h?
+I cann't find mipi_display.h in mainline kernel.
+
+otherwise, it creates generic parts of my dsim.h header file as mipi_display.h and
+use that header file?
+
+Please, give me more detailed.
+
+Thank you.
+
+------- Original Message -------
+Sender : Guennadi Liakhovetski<g.liakhovetski@gmx.de> 
+Date   : 2010-07-05 04:33 (GMT+09:00)
+Title  : Re: [PATCH v1 2/2] S5PV210: Add MIPI-DSI Driver.
+
+On Sat, 3 Jul 2010, InKi Dae wrote:
+
+> this patch addes MIPI-DSI Driver.
+> 
+> to use this driver, some structures below should be added to machine
+> specific file.
+> 
+> struct dsim_config
+> - define clock info, data lane count and video mode info for MIPI-DSI
+> Controller.
+> 
+> struct dsim_lcd_config
+> - define interface mode, channel ID, Pixel format and so on.
+> 
+> struct s5p_platform_dsim
+> - define callbacks for initializing D-PHY, MIPI reset and trigger
+> releated interfaces of s3c-fb.c file.
+> 
+> struct mipi_ddi_platform_data
+> - define following callbacks.
+> - a function for transferring and receiving command data to mipi based
+> lcd panel.
+> - a function for getting framedone status of mipi-dsi controller.
+> - a function for clearing framedone interrupt of mipi-dsi controller.
+> - a function for checking i80 framedone status of display controller.(fimd)
+> - a function for triggering to display controller.(fimd)
+> 
+> Signed-off-by: InKi Dae <inki.dae at samsung.com <mailto:p.osciak@samsung.com>>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com
+> <mailto:kyungmin.park@samsung.com>>
 > ---
->   arch/arm/mach-omap2/board-zoom-wlan.c         |  129 +++++++++++++++++++++++++
->   arch/arm/mach-omap2/include/mach/board-zoom.h |    5 +
->   2 files changed, 134 insertions(+), 0 deletions(-)
->   create mode 100644 arch/arm/mach-omap2/board-zoom-wlan.c
->
-> diff --git a/arch/arm/mach-omap2/board-zoom-wlan.c b/arch/arm/mach-omap2/board-zoom-wlan.c
+> 
+> diff --git a/arch/arm/plat-samsung/include/plat/dsim.h b/arch/arm/plat-samsung/include/plat/dsim.h
 > new file mode 100644
-> index 0000000..7ed5139
+> index 0000000..49d8946
 > --- /dev/null
-> +++ b/arch/arm/mach-omap2/board-zoom-wlan.c
-> @@ -0,0 +1,129 @@
-> +/* mach-omap2/board-zoom-wlan.c
-> + *
-> + * Board support for wl1271 embedded SDIO device.
-> + *
-> + * Copyright (C) 2010 Texas Instruments, Inc.
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2. This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +
-> +#include<linux/kernel.h>
-> +#include<linux/init.h>
-> +#include<linux/platform_device.h>
-> +#include<linux/mmc/host.h>
-> +#include<linux/mmc/sdio_ids.h>
-> +#include<linux/err.h>
-> +#include<linux/gpio.h>
-> +#include<linux/wl12xx.h>
-> +
-> +#include "mux.h"
-> +
-> +#ifdef CONFIG_OMAP_ZOOM_WLAN
-> +
-> +/* these are zoom-specific board numbers */
-> +#define OMAP_ZOOM_WLAN_PMENA_GPIO	(101)
-> +#define OMAP_ZOOM_WLAN_IRQ_GPIO		(162)
-> +
-> +/* wl1271 virtual 'card detect' status */
-> +static int omap_zoom_wlan_cd;
-> +static void (*wlan_set_virtual_cd)(void *dev_id, int card_present);
-> +static void (*wlan_set_data)(void *dev_id, void *priv);
-> +static void *wlan_host_devid;
-> +
-> +int omap_zoom_wlan_register_embedded_control(void *dev_id,
-> +			void (*set_virtual_cd)(void *dev_id, int card_present),
-> +			void (*set_data)(void *dev_id, void *priv))
-> +{
-> +	if (wlan_host_devid || wlan_set_virtual_cd || wlan_set_data)
-> +		return -EBUSY;
-> +
-> +	wlan_set_virtual_cd = set_virtual_cd;
-> +	wlan_set_data = set_data;
-> +	wlan_host_devid = dev_id;
-> +
-> +	return 0;
-> +}
-> +
-> +int omap_zoom_wlan_get_virtual_cd(void)
-> +{
-> +	return omap_zoom_wlan_cd;
-> +}
-> +
-> +static void omap_zoom_wlan_set_embedded_data(void *priv)
-> +{
-> +	if (wlan_set_data)
-> +		wlan_set_data(wlan_host_devid, priv);
-> +	else
-> +		pr_err("%s: host controller not registered yet\n", __func__);
-> +}
-> +
-> +static void omap_zoom_wlan_set_carddetect(bool card_present)
-> +{
-> +	omap_zoom_wlan_cd = card_present ? 1 : 0;
-> +
-> +	pr_info("%s: %d\n", __func__, omap_zoom_wlan_cd);
-> +
-> +	if (wlan_set_virtual_cd)
-> +		wlan_set_virtual_cd(wlan_host_devid, omap_zoom_wlan_cd);
-> +	else
-> +		pr_err("%s: host controller not registered yet\n", __func__);
-> +}
-> +
-> +static void omap_zoom_wlan_power(bool enable)
-> +{
-> +	int val = enable ? 1 : 0;
-> +
-> +	pr_info("%s: set power %d\n", __func__, val);
-> +
-> +	gpio_set_value(OMAP_ZOOM_WLAN_PMENA_GPIO, val);
-> +}
+> +++ b/arch/arm/plat-samsung/include/plat/dsim.h
+> @@ -0,0 +1,493 @@
 
-Can we consider that OMAP_ZOOM_WLAN_PMENA_GPIO is equivalent to vmmc supply or 
-equivalent to supply voltage to the SDIO card?
+[snip]
 
-If yes, then did you consider using the fixed regulator framework to define a 
-'vmmc' supply (based on OMAP_ZOOM_WLAN_PMENA_GPIO). Then the SDIO/MMC core 
-should take care of controlling this supply.
+> +enum dsim_fifo_state {
+> +	DSIM_RX_DATA_FULL = (1 << 25),
+> +	DSIM_RX_DATA_EMPTY = (1 << 24),
+> +	SFR_HEADER_FULL = (1 << 23),
+> +	SFR_HEADER_EMPTY = (1 << 22),
+> +	SFR_PAYLOAD_FULL = (1 << 21),
+> +	SFR_PAYLOAD_EMPTY = (1 << 20),
+> +	I80_HEADER_FULL = (1 << 19),
+> +	I80_HEADER_EMPTY = (1 << 18),
+> +	I80_PALOAD_FULL = (1 << 17),
+> +	I80_PALOAD_EMPTY = (1 << 16),
+> +	SUB_DISP_HEADER_FULL = (1 << 15),
+> +	SUB_DISP_HEADER_EMPTY = (1 << 14),
+> +	SUB_DISP_PAYLOAD_FULL = (1 << 13),
+> +	SUB_DISP_PAYLOAD_EMPTY = (1 << 12),
+> +	MAIN_DISP_HEADER_FULL = (1 << 11),
+> +	MAIN_DISP_HEADER_EMPTY = (1 << 10),
+> +	MAIN_DISP_PAYLOAD_FULL = (1 << 9),
+> +	MAIN_DISP_PAYLOAD_EMPTY = (1 << 8),
+> +};
 
-regards,
--roger
+Please use include/video/mipi_display.h for these transaction types and, 
+possibly, for other generic MIPI DSI defines.
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
