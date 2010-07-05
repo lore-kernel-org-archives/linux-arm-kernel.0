@@ -1,52 +1,99 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 5 Jul 2010 09:08:26 +0200
-Subject: [PATCH 2/4] mx25: properly initialize clocks
-In-Reply-To: <5e4894af4009cbc44b69fb5eef925f98a2f44eb4.1264416923.git.baruch@tkos.co.il>
-References: <20100125105439.GE6724@jasper.tkos.co.il>
-	<5e4894af4009cbc44b69fb5eef925f98a2f44eb4.1264416923.git.baruch@tkos.co.il>
-Message-ID: <20100705070826.GC18865@pengutronix.de>
+From: philippe.langlais@stericsson.com (Philippe Langlais)
+Date: Mon, 5 Jul 2010 09:09:23 +0200
+Subject: [PATCH 2/6] U6715 clocks gating management U6 clock generic	driver
+	& U6715 cgu clock specific (V2)
+In-Reply-To: <20100624141418.GB6523@n2100.arm.linux.org.uk>
+References: <1274948852-9179-1-git-send-email-philippe.langlais@stericsson.com>
+	<1274948852-9179-3-git-send-email-philippe.langlais@stericsson.com>
+	<20100624141418.GB6523@n2100.arm.linux.org.uk>
+Message-ID: <4C318523.1060706@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Baruch,
+Hi,
 
-On Mon, Jan 25, 2010 at 12:58:20PM +0200, Baruch Siach wrote:
-> This patch disables all unnecessary clock in mx25_clocks_init() to make a clean
-> start, the same as is being done for the rest of the i.MX chips.
-> 
-> This patch was tested on i.MX25 PDK.
-> 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> ---
->  arch/arm/mach-mx25/clock.c |    8 ++++++++
->  1 files changed, 8 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
-> index abd303b..08aaa38 100644
-> --- a/arch/arm/mach-mx25/clock.c
-> +++ b/arch/arm/mach-mx25/clock.c
-> @@ -218,6 +218,14 @@ int __init mx25_clocks_init(void)
->  	for (i = 0; i < ARRAY_SIZE(lookups); i++)
->  		clkdev_add(&lookups[i]);
->  
-> +	/* Turn off all clocks except the ones we need to survive, namely:
-> +	 * EMI, GPIO1-3 (CCM_CGCR1[18:16]), GPT1, IOMUXC (CCM_CGCR1[27]), IIM,
-> +	 * SCC
-> +	 */
-> +	__raw_writel((1 << 19), CRM_BASE + CCM_CGCR0);
-> +	__raw_writel((0xf << 16) | (3 << 26), CRM_BASE + CCM_CGCR1);
-> +	__raw_writel((1 << 5), CRM_BASE + CCM_CGCR2);
-> +
-I would prefer having symbolic names for the constants used here because
-otherwise comment and code tend to diverge.
+OK for all your remarks, we have changed our implementation to follow
+the new one using clkdev.
+The new patch will be sent today.
 
-And I didn't check the manuals, but some other imx clock code (e.g.
-arch/arm/mach-mx3/clock-imx35.c) pay attention to CONFIG_DEBUG_LL being
-defined.  Is this needed here, too?
+Regards
 
-Best regards
-Uwe
+Philippe
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+On 06/24/10 16:14, Russell King - ARM Linux wrote:
+> On Thu, May 27, 2010 at 10:27:28AM +0200, Philippe Langlais wrote:
+>    
+>> +#if defined(DEBUG_CGU)
+>> +#define debug(fmt, args...)                                          \
+>> +	printk(PKMOD fmt, ## args)
+>> +#else
+>> +#define debug(fmt, args...)
+>> +#endif
+>>      
+> pr_debug?
+>    
+>> +
+>> +/**
+>> + * U6 hw low level access clock functions
+>> + **/
+>> +static void u6_clk_disable(struct clk *clk);
+>> +static int u6_clk_enable(struct clk *clk);
+>> +
+>> +/**
+>> + * HW enable clock function.
+>> + **/
+>> +
+>> +static int u67xx_cgu_enable_fake_clock(struct clk *clk)
+>> +{
+>> +	debug("u67xx_cgu_enable_fake_clock for %s\n", clk->name);
+>> +	return 0;
+>> +}
+>> +
+>> +static int u67xx_cgu_enable_hw_clock(struct clk *clk)
+>> +{
+>> +	unsigned long value;
+>> +	debug("u67xx_cgu_enable_hw_clock for %s\n", clk->name);
+>> +
+>> +	if (unlikely(clk->enable_reg == 0)) {
+>>      
+> These are pointers.  0 is an integer.  Use NULL.  Check your code with
+> sparse and you'll get warnings for these things.
+>
+>    
+>> +/*** Basic clocks ***/
+>> +
+>> +/* Base external input clocks */
+>> +static struct clk func_32k_ck = {
+>> +	.name = "func_32k_ck",
+>> +	.rate = 32000,
+>> +	.flags = RATE_FIXED | ALWAYS_ENABLED,
+>> +	.usecount = 1,
+>> +};
+>>      
+> Don't put data definitions in header files.
+>
+>    
+>> +static struct clk *onchip_clks[] = {
+>> +	/* external root sources */
+>> +	&func_32k_ck,
+>> +	&osc_ck,
+>> +	&sys_ck,
+>> +	&sc_ck,
+>> +	&fix_ck,
+>> +	&tv_ck,
+>> +#ifndef U6_OPTIMIZED_TREE
+>> +	&dsp2_ck,
+>> +#endif
+>> +	&sdm_ck,
+>> +	&arm_ck,
+>> +	&hclk_ck,
+>> +	&hclk2_ck,
+>> +	&pclk1_ck,
+>> +	&pclk2_ck,
+>> +	&tvclk_ck,
+>>      
+> This all looks very much like it was copied from the OMAP code as of about
+> a year ago.  The OMAP code has moved forwards with lots of improvements,
+> including using clkdev to eliminate the disgusting SoC specific code from
+> drivers (which clkdev is there to prevent.)
+>    
