@@ -1,34 +1,22 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Mon, 5 Jul 2010 11:28:35 +0300
-Subject: [PATCH v2 0/8] Initial implementation of kdump for ARM
-In-Reply-To: <4C2DE024.8060308@stericsson.com>
-References: <20100611063605.GB11156@esdhcp04058.research.nokia.com>
-	<4C2DE024.8060308@stericsson.com>
-Message-ID: <20100705082835.GA32178@gw.healthdatacare.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Jul 2010 11:31:15 +0300
+Subject: [PATCH 16/33] Removing dead APM
+In-Reply-To: <201006302023.47382.marek.vasut@gmail.com>
+References: <cover.1277911345.git.siccegge@cs.fau.de>
+	<51c095a4c49baacbfdd6ed332d1375ab64209753.1277911346.git.siccegge@cs.fau.de>
+	<201006302023.47382.marek.vasut@gmail.com>
+Message-ID: <20100705083114.GH15951@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Marek Vasut <marek.vasut@gmail.com> [100630 21:19]:
+> Dne St 30. ?ervna 2010 17:59:06 Christoph Egger napsal(a):
+> > APM doesn't exist in Kconfig, therefore removing all references for it
+> > from the source code.
+> 
+> Tony, do you know Andrzej Zaborowski's new email address? Maybe he should be 
+> CCed here
 
-On Fri, Jul 02, 2010 at 02:48:36PM +0200, Per Fransson wrote:
->
-> I have a question regarding these patches. It seems to me that the kexec  
-> will be done with the MMU left on for the ARMv7 case. Looking at the  
-> code in the cpu_arm926_reset() routine in arch/arm/mm/proc-arm926.S this  
-> is not the case there. Instead, the MMU is turned off and the last  
-> instruction that is fetched using the virtual address mapping is a jump  
-> to a physical address.
+Sorry I don't have any other email address for him either. I've applied this.
 
-This seems to be the case for both ARMv6 and ARMv7. I don't know
-why the MMU is not switched off there. Anyway, I've been testing
-this on ARMv7 and at least for panic kernel it works even when MMU
-is left on (didn't check but maybe the decompressor disables that
-before jumping to the kernel).
-
-> Shouldn't this be handled as consistently as possible for the different  
-> ARM sub-archs?
-
-Yes, I guess. I'm still wondering why this hasn't been fixed already?
-
-Regards,
-MW
+Tony
