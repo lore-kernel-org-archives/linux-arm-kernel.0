@@ -1,61 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 05 Jul 2010 14:20:30 +0100
-Subject: [RFC PATCH 3/3] ARM: Add barriers to the I/O accessors if
-	ARM_DMA_MEM_BUFFERABLE
-In-Reply-To: <20100705130010.5157.32032.stgit@e102109-lin.cambridge.arm.com>
-References: <20100705130010.5157.32032.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100705132030.5157.97921.stgit@e102109-lin.cambridge.arm.com>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Mon, 5 Jul 2010 15:23:39 +0200
+Subject: Some benchmarks on ARM
+In-Reply-To: <4C31D861.607@gmail.com>
+References: <20100702180257.GA8767@pengutronix.de>
+	<alpine.LFD.2.00.1007030136510.32016@xanadu.home>
+	<4C31D861.607@gmail.com>
+Message-ID: <20100705132339.GY20855@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the coherent DMA buffers are mapped as Normal Non-cacheable
-(ARM_DMA_MEM_BUFFERABLE enabled), buffer accesses are no longer ordered
-with Device memory accesses causing failures in device drivers that do
-not use the mandatory memory barriers before starting a DMA transfer.
-LKML discussions led to the conclusion that such barriers have to be
-added to the I/O accessors:
+Maurus,
 
-http://thread.gmane.org/gmane.linux.kernel/683509/focus=686153
-http://thread.gmane.org/gmane.linux.ide/46414
-http://thread.gmane.org/gmane.linux.kernel.cross-arch/5250
+On Mon, Jul 05, 2010 at 03:04:33PM +0200, Maurus Cuelenaere wrote:
+> Some quick tests of lmbench on a Sheevaplug:
 
-This patch introduces a wmb() barrier to the write*() I/O accessors to
-handle the situations where Normal Non-cacheable writes are still in the
-processor (or L2 cache controller) write buffer before a DMA transfer
-command is issued. For the read*() accessors, a rmb() is introduced
-after the I/O to avoid speculative loads where the driver polls for a
-DMA transfer ready bit.
+Thanks a lot - we'll update the document soon, wiht the exact command
+lines included.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/include/asm/io.h |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+> I'm not sure if I'm doing this right, but it looks like the Sheevaplug
+> beats all ARM chips (except on FP) on the tests done at [1]. Looks
+> like these tests heavily depend on the clock frequency.
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 97fb9aa..8f3edef 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -191,6 +191,15 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
- #define writel_relaxed(v,c)	__raw_writel((__force u32) \
- 					cpu_to_le32(v),__mem_pci(c))
- 
-+#ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
-+#define readb(c)		({ u8  __v = readb_relaxed(c); rmb(); __v; })
-+#define readw(c)		({ u16 __v = readw_relaxed(c); rmb(); __v; })
-+#define readl(c)		({ u32 __v = readl_relaxed(c); rmb(); __v; })
-+
-+#define writeb(v,c)		do { wmb(); writeb_relaxed(v,c); } while (0)
-+#define writew(v,c)		do { wmb(); writew_relaxed(v,c); } while (0)
-+#define writel(v,c)		do { wmb(); writel_relaxed(v,c); } while (0)
-+#else
- #define readb(c)		readb_relaxed(c)
- #define readw(c)		readw_relaxed(c)
- #define readl(c)		readl_relaxed(c)
-@@ -198,6 +207,7 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
- #define writeb(v,c)		writeb_relaxed(v,c)
- #define writew(v,c)		writew_relaxed(v,c)
- #define writel(v,c)		writel_relaxed(v,c)
-+#endif
- 
- #define readsb(p,d,l)		__raw_readsb(__mem_pci(p),d,l)
- #define readsw(p,d,l)		__raw_readsw(__mem_pci(p),d,l)
+If anyone has an idea for better benchmarks, I'd be very interested. We
+have been searching for benchmarks which:
+
+- can be easily cross compiled to all involved platforms
+- show the different aspects of the systems
+
+rsc
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
