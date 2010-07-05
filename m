@@ -1,40 +1,167 @@
-From: philippe.langlais@stericsson.com (Philippe Langlais)
-Date: Mon, 5 Jul 2010 09:39:34 +0200
-Subject: [PATCH 5/6] U6715 8250 serial like driver
-In-Reply-To: <20100624143129.GE6523@n2100.arm.linux.org.uk>
-References: <1274948852-9179-1-git-send-email-philippe.langlais@stericsson.com>
-	<1274948852-9179-6-git-send-email-philippe.langlais@stericsson.com>
-	<20100624143129.GE6523@n2100.arm.linux.org.uk>
-Message-ID: <4C318C36.9010501@stericsson.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 5 Jul 2010 09:52:18 +0200
+Subject: [RFC PATCH] arm/imx/gpio: add spinlock protection
+In-Reply-To: <7fe710a6bc27460852588d2e561ec4c4a4644ab0.1278227668.git.baruch@tkos.co.il>
+References: <7fe710a6bc27460852588d2e561ec4c4a4644ab0.1278227668.git.baruch@tkos.co.il>
+Message-ID: <20100705075218.GC26079@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Sun, Jul 04, 2010 at 10:15:13AM +0300, Baruch Siach wrote:
+> The GPIO and IRQ/GPIO registers need protection from concurrent access for
+> operations that are not atomic.
 
-On 06/24/10 16:31, Russell King - ARM Linux wrote:
-> On Thu, May 27, 2010 at 10:27:31AM +0200, Philippe Langlais wrote:
->    
->> Some modifications in 16550A/8250 serial driver
->> and clock management specificity
->>      
-> Can't say much about this; you need to get people interested in serial to
-> review this.  The comments about header file ordering apply.
->
->    
->> @@ -199,10 +199,16 @@ static const struct serial8250_config uart_config[] = {
->>   	},
->>   	[PORT_16550A] = {
->>   		.name		= "16550A",
->> +#if defined(CONFIG_SERIAL_8250_U6)
->> +		.fifo_size	= 64,
->> +		.tx_loadsz	= 64,
->> +		.flags		= UART_CAP_FIFO | UART_CAP_AFE,
->>      
-> If you have auto flow control, then you don't have a 16550A.  You have
-> something that is compatible with a 16550A - maybe it's more closely
-> related to a 16750?
->    
-I'll send our serial driver to the LKML and discuss about that.
+I don't think we need locking here. mxc_gpio_irq_handler is called with
+desc->lock held (from the parent interrupt, not the chained interrupts).
+Other functions like enable_irq/disable_irq which result in mask/unmask
+operations run with interrupts disabled.
 
-Regards
-Philippe
+Apart from this other architectures do not use locking here aswell.
+
+Sascha
+
+> 
+> Cc: Juergen Beisert <j.beisert@pengutronix.de>
+> Cc: Daniel Mack <daniel@caiaq.de>
+> Reported-by: rpkamiak at rockwellcollins.com
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  arch/arm/plat-mxc/gpio.c              |   28 +++++++++++++++++++++++++---
+>  arch/arm/plat-mxc/include/mach/gpio.h |    3 +++
+>  2 files changed, 28 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
+> index 71437c6..a8a33cd 100644
+> --- a/arch/arm/plat-mxc/gpio.c
+> +++ b/arch/arm/plat-mxc/gpio.c
+> @@ -56,10 +56,13 @@ static void _set_gpio_irqenable(struct mxc_gpio_port *port, u32 index,
+>  				int enable)
+>  {
+>  	u32 l;
+> +	unsigned long flags;
+>  
+> +	spin_lock_irqsave(&port->irq_lock, flags);
+>  	l = __raw_readl(port->base + GPIO_IMR);
+>  	l = (l & (~(1 << index))) | (!!enable << index);
+>  	__raw_writel(l, port->base + GPIO_IMR);
+> +	spin_unlock_irqrestore(&port->irq_lock, flags);
+>  }
+>  
+>  static void gpio_ack_irq(u32 irq)
+> @@ -87,8 +90,11 @@ static int gpio_set_irq_type(u32 irq, u32 type)
+>  	u32 gpio = irq_to_gpio(irq);
+>  	struct mxc_gpio_port *port = &mxc_gpio_ports[gpio / 32];
+>  	u32 bit, val;
+> -	int edge;
+> +	int edge, rc = 0;
+>  	void __iomem *reg = port->base;
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&port->irq_lock, flags);
+>  
+>  	port->both_edges &= ~(1 << (gpio & 31));
+>  	switch (type) {
+> @@ -116,7 +122,8 @@ static int gpio_set_irq_type(u32 irq, u32 type)
+>  		edge = GPIO_INT_HIGH_LEV;
+>  		break;
+>  	default:
+> -		return -EINVAL;
+> +		rc = -EINVAL;
+> +		goto out;
+>  	}
+>  
+>  	reg += GPIO_ICR1 + ((gpio & 0x10) >> 2); /* lower or upper register */
+> @@ -125,9 +132,12 @@ static int gpio_set_irq_type(u32 irq, u32 type)
+>  	__raw_writel(val | (edge << (bit << 1)), reg);
+>  	_clear_gpio_irqstatus(port, gpio & 0x1f);
+>  
+> -	return 0;
+> +out:
+> +	spin_unlock_irqrestore(&port->irq_lock, flags);
+> +	return rc;
+>  }
+>  
+> +/* caller must hold port->irq_lock */
+>  static void mxc_flip_edge(struct mxc_gpio_port *port, u32 gpio)
+>  {
+>  	void __iomem *reg = port->base;
+> @@ -157,12 +167,15 @@ static void mxc_flip_edge(struct mxc_gpio_port *port, u32 gpio)
+>  static void mxc_gpio_irq_handler(struct mxc_gpio_port *port, u32 irq_stat)
+>  {
+>  	u32 gpio_irq_no_base = port->virtual_irq_start;
+> +	unsigned long flags;
+>  
+>  	while (irq_stat != 0) {
+>  		int irqoffset = fls(irq_stat) - 1;
+>  
+> +		spin_lock_irqsave(&port->irq_lock, flags);
+>  		if (port->both_edges & (1 << irqoffset))
+>  			mxc_flip_edge(port, irqoffset);
+> +		spin_unlock_irqrestore(&port->irq_lock, flags);
+>  
+>  		generic_handle_irq(gpio_irq_no_base + irqoffset);
+>  
+> @@ -214,13 +227,16 @@ static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
+>  	struct mxc_gpio_port *port =
+>  		container_of(chip, struct mxc_gpio_port, chip);
+>  	u32 l;
+> +	unsigned long flags;
+>  
+> +	spin_lock_irqsave(&port->lock, flags);
+>  	l = __raw_readl(port->base + GPIO_GDIR);
+>  	if (dir)
+>  		l |= 1 << offset;
+>  	else
+>  		l &= ~(1 << offset);
+>  	__raw_writel(l, port->base + GPIO_GDIR);
+> +	spin_unlock_irqrestore(&port->lock, flags);
+>  }
+>  
+>  static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+> @@ -229,9 +245,12 @@ static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+>  		container_of(chip, struct mxc_gpio_port, chip);
+>  	void __iomem *reg = port->base + GPIO_DR;
+>  	u32 l;
+> +	unsigned long flags;
+>  
+> +	spin_lock_irqsave(&port->lock, flags);
+>  	l = (__raw_readl(reg) & (~(1 << offset))) | (value << offset);
+>  	__raw_writel(l, reg);
+> +	spin_unlock_irqrestore(&port->lock, flags);
+>  }
+>  
+>  static int mxc_gpio_get(struct gpio_chip *chip, unsigned offset)
+> @@ -285,6 +304,9 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
+>  		port[i].chip.base = i * 32;
+>  		port[i].chip.ngpio = 32;
+>  
+> +		spin_lock_init(&port[i].lock);
+> +		spin_lock_init(&port[i].irq_lock);
+> +
+>  		/* its a serious configuration bug when it fails */
+>  		BUG_ON( gpiochip_add(&port[i].chip) < 0 );
+>  
+> diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
+> index 894d2f8..a37724a 100644
+> --- a/arch/arm/plat-mxc/include/mach/gpio.h
+> +++ b/arch/arm/plat-mxc/include/mach/gpio.h
+> @@ -36,6 +36,9 @@ struct mxc_gpio_port {
+>  	int virtual_irq_start;
+>  	struct gpio_chip chip;
+>  	u32 both_edges;
+> +
+> +	spinlock_t	lock;		/* GPIO registers */
+> +	spinlock_t	irq_lock;	/* IRQ registers */
+>  };
+>  
+>  int mxc_gpio_init(struct mxc_gpio_port*, int);
+> -- 
+> 1.7.1
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
