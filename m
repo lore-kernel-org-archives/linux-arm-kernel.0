@@ -1,146 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 05 Jul 2010 21:44:06 +0900
-Subject: [PATCH] ARM: S5P: Add PMU device
-In-Reply-To: <1278294411-5104-1-git-send-email-jy0922.shim@samsung.com>
-References: <1278294411-5104-1-git-send-email-jy0922.shim@samsung.com>
-Message-ID: <005f01cb1c3f$c464d150$4d2e73f0$%kim@samsung.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 05 Jul 2010 14:45:34 +0200
+Subject: Some benchmarks on ARM
+In-Reply-To: <4C31D30A.9010601@pengutronix.de>
+References: <20100702180257.GA8767@pengutronix.de>
+	<F01D8B85CFF58440B2A13965FBA90CA42DA3944FD5@GEORGE.Emea.Arm.com>
+	<4C31D30A.9010601@pengutronix.de>
+Message-ID: <4C31D3EE.7050407@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joonyoung Shim wrote:
+Marc Kleine-Budde wrote:
+> Colin Tuckley wrote:
+>>> -----Original Message-----
+>>> kernel-bounces at lists.infradead.org] On Behalf Of Robert Schwebel
+>>> Sent: 02 July 2010 19:03
+>>> We have recently made some benchmarks, in order to get a little bit
+>>> better fealing about where ARM cpus are today, especially when it comes
+>>> to the "recent" ones, and in comparism to the Atom. So we collected a
+>>> few benchmarks (most from lmbench) and did some actual measurements.
+>> You have the family wrong for (at least) the Cortex-A8, it's a v7. This probably accounts for some of it's slow relative performance since you probably used incorrect compiler switches.
+>>
+>>> All measurements have been done on 2.6.34.
+>> How were the kernels compiled? Was thumb mode used for the ones that support it?
+>>
+>> You didn't mention the cache state anywhere - it can make a big difference.
 > 
-> This patch adds an initcall for the s5p platforms so that they register
-> their PMU IRQs with the PMU framework in the Kernel.
+> After booting all tests are done via ssh, the system was "idle" otherwise.
 > 
-Please include Ben Dooks email address in the CC.
+> We're just repeating the tests with "echo 1 > /proc/sys/vm/drop_caches"
+> prior to each test.
 
-> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-> ---
->  arch/arm/mach-s5p6442/include/mach/irqs.h |    2 +-
->  arch/arm/mach-s5pc100/include/mach/irqs.h |    1 +
->  arch/arm/mach-s5pv210/include/mach/irqs.h |    1 +
->  arch/arm/plat-s5p/Makefile                |    1 +
->  arch/arm/plat-s5p/dev-pmu.c               |   37
-> +++++++++++++++++++++++++++++
->  5 files changed, 41 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/plat-s5p/dev-pmu.c
-> 
-> diff --git a/arch/arm/mach-s5p6442/include/mach/irqs.h b/arch/arm/mach-
-> s5p6442/include/mach/irqs.h
-> index 02c2374..22173cc 100644
-> --- a/arch/arm/mach-s5p6442/include/mach/irqs.h
-> +++ b/arch/arm/mach-s5p6442/include/mach/irqs.h
-> @@ -32,7 +32,7 @@
->  #define IRQ_GPIOINT		S5P_IRQ_VIC0(30)
-> 
->  /* VIC1 */
-> -#define IRQ_nPMUIRQ 		S5P_IRQ_VIC1(0)
-> +#define IRQ_PMUIRQ		S5P_IRQ_VIC1(0)
+We'll use "sync; echo 3 > /proc/sys/vm/drop_caches"
 
-I'm not sure this changing is better..as you know, nXXX has some meaning.
+Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
->  #define IRQ_ONENAND 		S5P_IRQ_VIC1(7)
->  #define IRQ_UART0 		S5P_IRQ_VIC1(10)
->  #define IRQ_UART1 		S5P_IRQ_VIC1(11)
-> diff --git a/arch/arm/mach-s5pc100/include/mach/irqs.h b/arch/arm/mach-
-> s5pc100/include/mach/irqs.h
-> index 28aa551..9cc1b0d 100644
-> --- a/arch/arm/mach-s5pc100/include/mach/irqs.h
-> +++ b/arch/arm/mach-s5pc100/include/mach/irqs.h
-> @@ -110,5 +110,6 @@
->  #define IRQ_LCD_FIFO		IRQ_LCD0
->  #define IRQ_LCD_VSYNC		IRQ_LCD1
->  #define IRQ_LCD_SYSTEM		IRQ_LCD2
-> +#define IRQ_PMUIRQ		IRQ_CORTEX0
-> 
-I think, we don't need remapping in here.
-How about use direct mapping like following:
-#define IRQ_PMUIRQ	S5P_IRQ_VIC1(0)
-
->  #endif /* __ASM_ARCH_IRQS_H */
-> diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-
-> s5pv210/include/mach/irqs.h
-> index 9689537..3972f8d 100644
-> --- a/arch/arm/mach-s5pv210/include/mach/irqs.h
-> +++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
-> @@ -128,5 +128,6 @@
->  #define IRQ_LCD_FIFO		IRQ_LCD0
->  #define IRQ_LCD_VSYNC		IRQ_LCD1
->  #define IRQ_LCD_SYSTEM		IRQ_LCD2
-> +#define IRQ_PMUIRQ		IRQ_CORTEX0
-> 
-same.
-
->  #endif /* ASM_ARCH_IRQS_H */
-> diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
-> index 39c242b..7e34194 100644
-> --- a/arch/arm/plat-s5p/Makefile
-> +++ b/arch/arm/plat-s5p/Makefile
-> @@ -12,6 +12,7 @@ obj-				:=
-> 
->  # Core files
-> 
-> +obj-y				+= dev-pmu.o
->  obj-y				+= dev-uart.o
->  obj-y				+= cpu.o
->  obj-y				+= clock.o
-> diff --git a/arch/arm/plat-s5p/dev-pmu.c b/arch/arm/plat-s5p/dev-pmu.c
-> new file mode 100644
-> index 0000000..de3b118
-> --- /dev/null
-> +++ b/arch/arm/plat-s5p/dev-pmu.c
-> @@ -0,0 +1,37 @@
-> +/*
-> + * linux/arch/arm/plat-s5p/dev-pmu.c
-> + *
-> + * Copyright (C) 2010 Samsung Electronics Co.Ltd
-> + * Author: Joonyoung Shim <jy0922.shim@samsung.com>
-> + *
-> + *  This program is free software; you can redistribute  it and/or modify
-it
-> + *  under  the terms of  the GNU General  Public License as published by
-the
-> + *  Free Software Foundation;  either version 2 of the  License, or (at
-your
-> + *  option) any later version.
-> + *
-> + */
-> +
-> +#include <linux/platform_device.h>
-> +#include <asm/pmu.h>
-> +#include <mach/irqs.h>
-> +#include <mach/map.h>
-
-really need mach/map.h?
-
-> +
-> +static struct resource s5p_pmu_resource = {
-> +	.start	= IRQ_PMUIRQ,
-> +	.end	= IRQ_PMUIRQ,
-> +	.flags	= IORESOURCE_IRQ,
-> +};
-> +
-> +struct platform_device s5p_device_pmu = {
-> +	.name		= "arm-pmu",
-> +	.id		= ARM_PMU_DEVICE_CPU,
-> +	.num_resources	= 1,
-> +	.resource	= &s5p_pmu_resource,
-> +};
-> +
-> +static int __init s5p_pmu_init(void)
-> +{
-> +	platform_device_register(&s5p_device_pmu);
-> +	return 0;
-> +}
-> +arch_initcall(s5p_pmu_init);
-> --
-
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 260 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100705/af25163f/attachment.sig>
