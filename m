@@ -1,40 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Jul 2010 19:14:21 +0100
-Subject: [PATCH v2 0/8] Initial implementation of kdump for ARM
-In-Reply-To: <4C31FC27.4010102@stericsson.com>
-References: <20100611063605.GB11156@esdhcp04058.research.nokia.com>
-	<4C2DE024.8060308@stericsson.com>
-	<20100705082835.GA32178@gw.healthdatacare.com>
-	<4C31AD62.6070805@stericsson.com>
-	<20100705101852.GA19338@n2100.arm.linux.org.uk>
-	<4C31B527.8060401@stericsson.com>
-	<20100705135552.GB19338@n2100.arm.linux.org.uk>
-	<4C31E6C4.8030200@stericsson.com>
-	<20100705141926.GA23860@n2100.arm.linux.org.uk>
-	<4C31FC27.4010102@stericsson.com>
-Message-ID: <20100705181421.GA27771@n2100.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 05 Jul 2010 15:01:04 -0400 (EDT)
+Subject: [PATCH 2/3] leds: add LED driver for Network Space v2 LEDs
+In-Reply-To: <1278325866-3890-2-git-send-email-simon@sequanux.org>
+References: <1278325866-3890-1-git-send-email-simon@sequanux.org>
+	<1278325866-3890-2-git-send-email-simon@sequanux.org>
+Message-ID: <alpine.LFD.2.00.1007051444030.6020@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 05, 2010 at 05:37:11PM +0200, Per Fransson wrote:
-> On 07/05/2010 04:19 PM, Russell King - ARM Linux wrote:
-> > On Mon, Jul 05, 2010 at 04:05:56PM +0200, Per Fransson wrote:
-> >> Well, I had another suggestion in my last mail.
-> > 
-> > Which is going to need per-CPU type support in order to achieve.  Do
-> > we really want to implement relocate_new_kernel for each of the 24
-> > CPU types which we currently support?
-> > 
-> 
-> Perhaps not. Couldn't the variable delay be macrofied then, i.e. a
-> macro like
-> 
-> MMU_DISABLED_DELAY_AND_EXEC(<asm instr>)
-> 
-> which would do nothing for an appropriate amount of time and put the
-> instruction in the last MMU mapped slot?
+On Mon, 5 Jul 2010, Simon Guinot wrote:
 
-There is no "appropriate amount of time" - some CPUs depend on many
-effects that a "3 nops and you'll be fine" approach doesn't work.
+> From: Simon Guinot <sguinot@lacie.com>
+> 
+> This patch add a LED class driver for the dual-GPIO LEDs found on the
+> Network Space v2 board (and parents). This include Internet Space v2,
+> Network Space (Max) v2 and d2 Network v2 boards.
+> 
+> This dual-GPIO LED is wired to a CPLD and can blink in relation with the
+> SATA activity. The driver expose this capability through a "sata" sysfs
+> attribute.
+> 
+> Signed-off-by: Simon Guinot <sguinot@lacie.com>
+[...]
 
-Also, what about kernels that support multiple different CPU types.
+> +config LEDS_NS2
+> +	tristate "LED support for Network Space v2 GPIO LEDs"
+> +	depends on MACH_NETSPACE_V2 || MACH_INETSPACE_V2 || MACH_NETSPACE_MAX_V2
+
+You could add a "default y" here.
+
+> +enum ns2_led_modes {
+> +	NS_V2_LED_OFF,
+> +	NS_V2_LED_ON,
+> +	NS_V2_LED_SATA,
+> +};
+> +
+> +struct ns2_led_mode_value {
+> +	enum ns2_led_modes	mode;
+> +	int			cmd_level;
+> +	int			slow_level;
+> +};
+> +
+> +struct ns2_led_mode_value ns2_led_modval[] = {
+> +	{ NS_V2_LED_OFF	, 1, 0 },
+> +	{ NS_V2_LED_ON	, 0, 1 },
+> +	{ NS_V2_LED_ON	, 1, 1 },
+> +	{ NS_V2_LED_SATA, 0, 0 },
+> +};
+
+You probably want to make this static.
+
+> diff --git a/include/linux/leds-ns2.h b/include/linux/leds-ns2.h
+> new file mode 100644
+> index 0000000..c76ebbb
+> --- /dev/null
+> +++ b/include/linux/leds-ns2.h
+
+This is probably not the best location for this file as it is really 
+specific to a particular device and not generic for the kernel.  You 
+could create it in arch/arm/mach-kirkwood/include/mach/leds-ns2.h 
+instead, and include it with #include <mach/leds-ns2.h>.
+
+
+Nicolas
