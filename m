@@ -1,23 +1,51 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Jul 2010 11:55:20 +0300
-Subject: [PATCH 20/33] Removing dead MACH_OMAP2_H4_USB1
-In-Reply-To: <20100701073523.GT3843@nokia.com>
+Date: Mon, 5 Jul 2010 11:56:56 +0300
+Subject: [PATCH 21/33] Removing dead OMAP2_VENC_OUT_TYPE_SVIDEO,
+	OMAP2_VENC_OUT_TYPE_COMPOSITE
+In-Reply-To: <2709d1406900af2436f6f8af00555507baf8dac9.1277911346.git.siccegge@cs.fau.de>
 References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<24b01f2edebd09e37306c35f14401819d8219549.1277911346.git.siccegge@cs.fau.de>
-	<20100701073523.GT3843@nokia.com>
-Message-ID: <20100705085518.GK15951@atomide.com>
+	<2709d1406900af2436f6f8af00555507baf8dac9.1277911346.git.siccegge@cs.fau.de>
+Message-ID: <20100705085654.GL15951@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <felipe.balbi@nokia.com> [100701 10:32]:
-> On Wed, Jun 30, 2010 at 06:00:23PM +0200, ext Christoph Egger wrote:
-> >MACH_OMAP2_H4_USB1 doesn't exist in Kconfig, therefore removing all
-> >references for it from the source code.
-> >
-> >Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
-> 
-> Does this apply on top of Tony's recent patches ??
+* Christoph Egger <siccegge@cs.fau.de> [100630 18:58]:
+> OMAP2_VENC_OUT_TYPE_SVIDEO, OMAP2_VENC_OUT_TYPE_COMPOSITE doesn't
+> exist in Kconfig, therefore removing all references for it from the
+> source code.
 
-Yes, I've applied both this and the previous patch.
+Let's let Tomi figure out this one, added him to Cc.
+
+Regards,
 
 Tony
+ 
+> Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
+> ---
+>  arch/arm/mach-omap2/board-omap3stalker.c |    5 -----
+>  1 files changed, 0 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
+> index f848ba8..b38afd5 100644
+> --- a/arch/arm/mach-omap2/board-omap3stalker.c
+> +++ b/arch/arm/mach-omap2/board-omap3stalker.c
+> @@ -181,11 +181,6 @@ static struct omap_dss_device omap3_stalker_tv_device = {
+>  	.name			= "tv",
+>  	.driver_name		= "venc",
+>  	.type			= OMAP_DISPLAY_TYPE_VENC,
+> -#if defined(CONFIG_OMAP2_VENC_OUT_TYPE_SVIDEO)
+> -	.phy.venc.type		= OMAP_DSS_VENC_TYPE_SVIDEO,
+> -#elif defined(CONFIG_OMAP2_VENC_OUT_TYPE_COMPOSITE)
+> -	.u.venc.type		= OMAP_DSS_VENC_TYPE_COMPOSITE,
+> -#endif
+>  	.platform_enable	= omap3_stalker_enable_tv,
+>  	.platform_disable	= omap3_stalker_disable_tv,
+>  };
+> -- 
+> 1.7.0.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
