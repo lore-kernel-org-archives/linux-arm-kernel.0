@@ -1,112 +1,452 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Mon, 05 Jul 2010 10:46:51 +0900
-Subject: [PATCH] ARM: S5P: Add PMU device
-Message-ID: <1278294411-5104-1-git-send-email-jy0922.shim@samsung.com>
+From: myungjoo.ham@gmail.com (MyungJoo Ham)
+Date: Mon, 5 Jul 2010 11:33:51 +0900
+Subject: [PATCH 1/2] Add a common struct clk
+In-Reply-To: <1277098513.947633.945838133095.1.gpush@pororo>
+References: <1277098513.947165.104554431018.0.gpush@pororo>
+	<1277098513.947633.945838133095.1.gpush@pororo>
+Message-ID: <AANLkTilitnz8eiBclky74FTOeKua3LjM3cbRdfwzkpnW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an initcall for the s5p platforms so that they register
-their PMU IRQs with the PMU framework in the Kernel.
+Hello Jeremy,
 
-Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
----
- arch/arm/mach-s5p6442/include/mach/irqs.h |    2 +-
- arch/arm/mach-s5pc100/include/mach/irqs.h |    1 +
- arch/arm/mach-s5pv210/include/mach/irqs.h |    1 +
- arch/arm/plat-s5p/Makefile                |    1 +
- arch/arm/plat-s5p/dev-pmu.c               |   37 +++++++++++++++++++++++++++++
- 5 files changed, 41 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/plat-s5p/dev-pmu.c
+On Mon, Jun 21, 2010 at 2:35 PM, Jeremy Kerr <jeremy.kerr@canonical.com> wrote:
+> We currently have 21 definitions of struct clk in the ARM architecture,
+> each defined on a per-platform basis. This makes it difficult to define
+> platform- (or architecture-) independent clock sources without making
+> assumptions about struct clk, and impossible to compile two
+> platforms with different struct clks into a single image.
+>
+> This change is an effort to unify struct clk where possible, by defining
+> a common struct clk, containing a set of clock operations. Different
+> clock implementations can set their own operations, and have a standard
+> interface for generic code. The callback interface is exposed to the
+> kernel proper, while the clock implementations only need to be seen by
+> the platform internals.
+>
+> This allows us to share clock code among platforms, and makes it
+> possible to dynamically create clock devices in platform-independent
+> code.
+>
+> Platforms can enable the generic struct clock through
+> CONFIG_USE_COMMON_STRUCT_CLK. In this case, the clock infrastructure
+> consists of a common struct clk:
+>
+> struct clk {
+> ? ? ? ?const struct clk_ops ? ?*ops;
+> ? ? ? ?unsigned int ? ? ? ? ? ?enable_count;
+> ? ? ? ?struct mutex ? ? ? ? ? ?mutex;
+> };
+>
+> And a set of clock operations (defined per type of clock):
+>
+> struct clk_operations {
+> ? ? ? int ? ? ? ? ? ? (*enable)(struct clk *);
+> ? ? ? void ? ? ? ? ? ?(*disable)(struct clk *);
+> ? ? ? unsigned long ? (*get_rate)(struct clk *);
+> ? ? ? [...]
+> };
+>
+> To define a hardware-specific clock, machine code can "subclass" the
+> struct clock into a new struct (adding any device-specific data), and
+> provide a set of operations:
+>
+> struct clk_foo {
+> ? ? ? ?struct clk ? ? ?clk;
+> ? ? ? ?void __iomem ? ?*some_register;
+> };
+>
+> struct clk_operations clk_foo_ops = {
+> ? ? ? ?.get_rate = clk_foo_get_rate,
+> };
+>
+> The common clock definitions are based on a development patch from Ben
+> Herrenschmidt <benh@kernel.crashing.org>.
+>
+> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+>
+> ---
+> ?arch/Kconfig ? ? ? ?| ? ?3 +
+> ?include/linux/clk.h | ? 77 +++++++++++++++++++++++++++++----
+> ?kernel/Makefile ? ? | ? ?1
+> ?kernel/clk.c ? ? ? ?| ?101 ++++++++++++++++++++++++++++++++++++++++++++
+> ?4 files changed, 173 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/Kconfig b/arch/Kconfig
+> index acda512..2458b5e 100644
+> --- a/arch/Kconfig
+> +++ b/arch/Kconfig
+> @@ -151,4 +151,7 @@ config HAVE_MIXED_BREAKPOINTS_REGS
+> ?config HAVE_USER_RETURN_NOTIFIER
+> ? ? ? ?bool
+>
+> +config USE_COMMON_STRUCT_CLK
+> + ? ? ? bool
+> +
+> ?source "kernel/gcov/Kconfig"
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index 1d37f42..5c1098b 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -3,6 +3,7 @@
+> ?*
+> ?* ?Copyright (C) 2004 ARM Limited.
+> ?* ?Written by Deep Blue Solutions Limited.
+> + * ?Copyright (c) 2010 Jeremy Kerr <jeremy.kerr@canonical.com>
+> ?*
+> ?* This program is free software; you can redistribute it and/or modify
+> ?* it under the terms of the GNU General Public License version 2 as
+> @@ -11,18 +12,82 @@
+> ?#ifndef __LINUX_CLK_H
+> ?#define __LINUX_CLK_H
+>
+> +#include <linux/err.h>
+> +#include <linux/mutex.h>
+> +
+> ?struct device;
+>
+> -/*
+> - * The base API.
+> +#ifdef CONFIG_USE_COMMON_STRUCT_CLK
+> +
+> +/* If we're using the common struct clk, we define the base clk object here */
+> +
+> +/**
+> + * struct clk - hardware independent clock structure
+> + * @clk_ops: ? ? ? ? ? implementation-specific ops for this clock
+> + * @enable_count: ? ? ?count of clk_enable() calls active on this clock
+> + * @mutex: ? ? ? ? ? ? lock for enable/disable or other HW-specific ops
+> + *
+> + * The base clock object, used by drivers for hardware-independent manipulation
+> + * of clock lines. This will be 'subclassed' by device-specific implementations,
+> + * which add device-specific data to struct clk. For example:
+> + *
+> + * ?struct clk_foo {
+> + * ? ? ?struct clk;
+> + * ? ? ?[device specific fields]
+> + * ?};
+> + *
+> + * The clock driver code will manage the device-specific data, and pass
+> + * clk_foo.clk to the common clock code. The clock driver will be called
+> + * through the @ops callbacks.
+> + *
+> + * The @enable_count and @mutex members are initialised when a clock is
+> + * registered with the arch-specific clock management code; the clock driver
+> + * code does not need to handle these.
+> + */
+> +struct clk {
+> + ? ? ? const struct clk_ops ? ?*ops;
+> + ? ? ? unsigned int ? ? ? ? ? ?enable_count;
+> + ? ? ? struct mutex ? ? ? ? ? ?mutex;
+> +};
+> +
+> +#define INIT_CLK(o) { .ops = &o, }
+> +
+> +struct clk_ops {
+> + ? ? ? int ? ? ? ? ? ? (*enable)(struct clk *);
+> + ? ? ? void ? ? ? ? ? ?(*disable)(struct clk *);
+> + ? ? ? int ? ? ? ? ? ? (*get)(struct clk *);
+> + ? ? ? void ? ? ? ? ? ?(*put)(struct clk *);
+> + ? ? ? unsigned long ? (*get_rate)(struct clk *);
+> + ? ? ? long ? ? ? ? ? ?(*round_rate)(struct clk *, unsigned long);
+> + ? ? ? int ? ? ? ? ? ? (*set_rate)(struct clk *, unsigned long);
+> + ? ? ? int ? ? ? ? ? ? (*set_parent)(struct clk *, struct clk *);
+> + ? ? ? struct clk * ? ?(*get_parent)(struct clk *);
+> +};
+> +
+> +/**
+> + * __clk_get - update clock-specific refcounter
+> + *
+> + * @clk: The clock to refcount
+> + *
+> + * Before a clock is returned from clk_get, this function should be called
+> + * to update any clock-specific refcounting.
+> + *
+> + * Returns non-zero on success, zero on failure.
+> + *
+> + * Drivers should not need this function; it is only needed by the
+> + * arch-specific clk_get() implementations.
+> ?*/
+> +int __clk_get(struct clk *clk);
+>
+> +#else /* !CONFIG_USE_COMMON_STRUCT_CLK */
+>
+> ?/*
+> - * struct clk - an machine class defined object / cookie.
+> + * Global clock object, actual structure is declared per-machine
+> ?*/
+> ?struct clk;
+>
+> +#endif /* !CONFIG_USE_COMMON_STRUCT_CLK */
+> +
+> ?/**
+> ?* clk_get - lookup and obtain a reference to a clock producer.
+> ?* @dev: device for clock "consumer"
+> @@ -83,12 +148,6 @@ unsigned long clk_get_rate(struct clk *clk);
+> ?*/
+> ?void clk_put(struct clk *clk);
+>
+> -
+> -/*
+> - * The remaining APIs are optional for machine class support.
+> - */
+> -
+> -
+> ?/**
+> ?* clk_round_rate - adjust a rate to the exact rate a clock can provide
+> ?* @clk: clock source
+> diff --git a/kernel/Makefile b/kernel/Makefile
+> index 057472f..1ae15aa 100644
+> --- a/kernel/Makefile
+> +++ b/kernel/Makefile
+> @@ -105,6 +105,7 @@ obj-$(CONFIG_PERF_EVENTS) += perf_event.o
+> ?obj-$(CONFIG_HAVE_HW_BREAKPOINT) += hw_breakpoint.o
+> ?obj-$(CONFIG_USER_RETURN_NOTIFIER) += user-return-notifier.o
+> ?obj-$(CONFIG_PADATA) += padata.o
+> +obj-$(CONFIG_USE_COMMON_STRUCT_CLK) += clk.o
+>
+> ?ifneq ($(CONFIG_SCHED_OMIT_FRAME_POINTER),y)
+> ?# According to Alan Modra <alan@linuxcare.com.au>, the -fno-omit-frame-pointer is
+> diff --git a/kernel/clk.c b/kernel/clk.c
+> new file mode 100644
+> index 0000000..cdea25f
+> --- /dev/null
+> +++ b/kernel/clk.c
+> @@ -0,0 +1,101 @@
+> +/*
+> + * Copyright (C) 2010 Canonical Ltd <jeremy.kerr@canonical.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * Standard functionality for the common clock API.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/mutex.h>
+> +#include <linux/module.h>
+> +
+> +int clk_enable(struct clk *clk)
+> +{
+> + ? ? ? int ret = 0;
+> +
+> + ? ? ? if (!clk->ops->enable)
+> + ? ? ? ? ? ? ? return 0;
 
-diff --git a/arch/arm/mach-s5p6442/include/mach/irqs.h b/arch/arm/mach-s5p6442/include/mach/irqs.h
-index 02c2374..22173cc 100644
---- a/arch/arm/mach-s5p6442/include/mach/irqs.h
-+++ b/arch/arm/mach-s5p6442/include/mach/irqs.h
-@@ -32,7 +32,7 @@
- #define IRQ_GPIOINT		S5P_IRQ_VIC0(30)
- 
- /* VIC1 */
--#define IRQ_nPMUIRQ 		S5P_IRQ_VIC1(0)
-+#define IRQ_PMUIRQ		S5P_IRQ_VIC1(0)
- #define IRQ_ONENAND 		S5P_IRQ_VIC1(7)
- #define IRQ_UART0 		S5P_IRQ_VIC1(10)
- #define IRQ_UART1 		S5P_IRQ_VIC1(11)
-diff --git a/arch/arm/mach-s5pc100/include/mach/irqs.h b/arch/arm/mach-s5pc100/include/mach/irqs.h
-index 28aa551..9cc1b0d 100644
---- a/arch/arm/mach-s5pc100/include/mach/irqs.h
-+++ b/arch/arm/mach-s5pc100/include/mach/irqs.h
-@@ -110,5 +110,6 @@
- #define IRQ_LCD_FIFO		IRQ_LCD0
- #define IRQ_LCD_VSYNC		IRQ_LCD1
- #define IRQ_LCD_SYSTEM		IRQ_LCD2
-+#define IRQ_PMUIRQ		IRQ_CORTEX0
- 
- #endif /* __ASM_ARCH_IRQS_H */
-diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-s5pv210/include/mach/irqs.h
-index 9689537..3972f8d 100644
---- a/arch/arm/mach-s5pv210/include/mach/irqs.h
-+++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
-@@ -128,5 +128,6 @@
- #define IRQ_LCD_FIFO		IRQ_LCD0
- #define IRQ_LCD_VSYNC		IRQ_LCD1
- #define IRQ_LCD_SYSTEM		IRQ_LCD2
-+#define IRQ_PMUIRQ		IRQ_CORTEX0
- 
- #endif /* ASM_ARCH_IRQS_H */
-diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
-index 39c242b..7e34194 100644
---- a/arch/arm/plat-s5p/Makefile
-+++ b/arch/arm/plat-s5p/Makefile
-@@ -12,6 +12,7 @@ obj-				:=
- 
- # Core files
- 
-+obj-y				+= dev-pmu.o
- obj-y				+= dev-uart.o
- obj-y				+= cpu.o
- obj-y				+= clock.o
-diff --git a/arch/arm/plat-s5p/dev-pmu.c b/arch/arm/plat-s5p/dev-pmu.c
-new file mode 100644
-index 0000000..de3b118
---- /dev/null
-+++ b/arch/arm/plat-s5p/dev-pmu.c
-@@ -0,0 +1,37 @@
-+/*
-+ * linux/arch/arm/plat-s5p/dev-pmu.c
-+ *
-+ * Copyright (C) 2010 Samsung Electronics Co.Ltd
-+ * Author: Joonyoung Shim <jy0922.shim@samsung.com>
-+ *
-+ *  This program is free software; you can redistribute  it and/or modify it
-+ *  under  the terms of  the GNU General  Public License as published by the
-+ *  Free Software Foundation;  either version 2 of the  License, or (at your
-+ *  option) any later version.
-+ *
-+ */
+Wouldn't it be better (safer?) to check "clk" and "clk->ops" before
+accessing clk->ops->enable?
+For example,
+
+        if (IS_ERR_OR_NULL(clk))
+                return -EINVAL;
+
+        if (!clk->ops || !clk->ops->enable)
+                return 0;
+
+Or, do you think it'd be better not to check and save some time?
+
+Anyway, if we intend to check the input, the patch for the patch
+including kernel/clk.c would be...
+
+----------------------------------------------------
+diff --git a/kernel/clk.c b/kernel/clk.c
+index 32f25ef..c35f0ac 100644
+--- a/kernel/clk.c
++++ b/kernel/clk.c
+@@ -16,7 +16,10 @@ int clk_enable(struct clk *clk)
+ {
+        int ret = 0;
+
+-       if (!clk->ops->enable)
++       if (IS_ERR_OR_NULL(clk))
++               return -EINVAL;
 +
-+#include <linux/platform_device.h>
-+#include <asm/pmu.h>
-+#include <mach/irqs.h>
-+#include <mach/map.h>
++       if (!clk->ops || !clk->ops->enable)
+                return 0;
+
+        mutex_lock(&clk->mutex);
+@@ -33,7 +36,12 @@ EXPORT_SYMBOL_GPL(clk_enable);
+
+ void clk_disable(struct clk *clk)
+ {
+-       if (!clk->ops->disable)
++       if (IS_ERR_OR_NULL(clk)) {
++               printk(KERN_ERR "clk_disable(NULL) is called.\n");
++               return;
++       }
 +
-+static struct resource s5p_pmu_resource = {
-+	.start	= IRQ_PMUIRQ,
-+	.end	= IRQ_PMUIRQ,
-+	.flags	= IORESOURCE_IRQ,
-+};
++       if (!clk->ops || !clk->ops->disable)
+                return;
+
+        mutex_lock(&clk->mutex);
+@@ -47,7 +55,9 @@ EXPORT_SYMBOL_GPL(clk_disable);
+
+ unsigned long clk_get_rate(struct clk *clk)
+ {
+-       if (clk->ops->get_rate)
++       if (IS_ERR_OR_NULL(clk))
++               return -EINVAL;
++       if (clk->ops && clk->ops->get_rate)
+                return clk->ops->get_rate(clk);
+        return 0;
+ }
+@@ -55,7 +65,9 @@ EXPORT_SYMBOL_GPL(clk_get_rate);
+
+ int __clk_get(struct clk *clk)
+ {
+-       if (clk->ops->get)
++       if (IS_ERR_OR_NULL(clk))
++               return -EINVAL;
++       if (clk->ops && clk->ops->get)
+                return clk->ops->get(clk);
+        return 1;
+ }
+@@ -63,14 +75,19 @@ EXPORT_SYMBOL_GPL(__clk_get);
+
+ void clk_put(struct clk *clk)
+ {
+-       if (clk->ops->put)
++       if (IS_ERR_OR_NULL(clk)) {
++               printk(KERN_ERR "clk_disable(NULL) is called.\n");
++               return;
++       }
 +
-+struct platform_device s5p_device_pmu = {
-+	.name		= "arm-pmu",
-+	.id		= ARM_PMU_DEVICE_CPU,
-+	.num_resources	= 1,
-+	.resource	= &s5p_pmu_resource,
-+};
-+
-+static int __init s5p_pmu_init(void)
-+{
-+	platform_device_register(&s5p_device_pmu);
-+	return 0;
-+}
-+arch_initcall(s5p_pmu_init);
++       if (clk->ops && clk->ops->put)
+                clk->ops->put(clk);
+ }
+ EXPORT_SYMBOL_GPL(clk_put);
+
+ long clk_round_rate(struct clk *clk, unsigned long rate)
+ {
+-       if (clk->ops->round_rate)
++       if (!IS_ERR_OR_NULL(clk) && clk->ops && clk->ops->round_rate)
+                return clk->ops->round_rate(clk, rate);
+        return -ENOSYS;
+ }
+@@ -78,7 +95,7 @@ EXPORT_SYMBOL_GPL(clk_round_rate);
+
+ int clk_set_rate(struct clk *clk, unsigned long rate)
+ {
+-       if (clk->ops->set_rate)
++       if (!IS_ERR_OR_NULL(clk) && clk->ops && clk->ops->set_rate)
+                return clk->ops->set_rate(clk, rate);
+        return -ENOSYS;
+ }
+@@ -86,7 +103,7 @@ EXPORT_SYMBOL_GPL(clk_set_rate);
+
+ int clk_set_parent(struct clk *clk, struct clk *parent)
+ {
+-       if (clk->ops->set_parent)
++       if (!IS_ERR_OR_NULL(clk) && clk->ops && clk->ops->set_parent)
+                return clk->ops->set_parent(clk, parent);
+        return -ENOSYS;
+ }
+@@ -94,7 +111,7 @@ EXPORT_SYMBOL_GPL(clk_set_parent);
+
+ struct clk *clk_get_parent(struct clk *clk)
+ {
+-       if (clk->ops->get_parent)
++       if (!IS_ERR_OR_NULL(clk) && clk->ops && clk->ops->get_parent)
+                return clk->ops->get_parent(clk);
+        return ERR_PTR(-ENOSYS);
+ }
+
+
+
+> +
+> + ? ? ? mutex_lock(&clk->mutex);
+> + ? ? ? if (!clk->enable_count)
+> + ? ? ? ? ? ? ? ret = clk->ops->enable(clk);
+> +
+> + ? ? ? if (!ret)
+> + ? ? ? ? ? ? ? clk->enable_count++;
+> + ? ? ? mutex_unlock(&clk->mutex);
+> +
+> + ? ? ? return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(clk_enable);
+> +
+> +void clk_disable(struct clk *clk)
+> +{
+> + ? ? ? if (!clk->ops->disable)
+> + ? ? ? ? ? ? ? return;
+> +
+> + ? ? ? mutex_lock(&clk->mutex);
+> +
+> + ? ? ? if (!--clk->enable_count)
+> + ? ? ? ? ? ? ? clk->ops->disable(clk);
+> +
+> + ? ? ? mutex_unlock(&clk->mutex);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_disable);
+> +
+> +unsigned long clk_get_rate(struct clk *clk)
+> +{
+> + ? ? ? if (clk->ops->get_rate)
+> + ? ? ? ? ? ? ? return clk->ops->get_rate(clk);
+> + ? ? ? return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(clk_get_rate);
+> +
+> +int __clk_get(struct clk *clk)
+> +{
+> + ? ? ? if (clk->ops->get)
+> + ? ? ? ? ? ? ? return clk->ops->get(clk);
+> + ? ? ? return 1;
+> +}
+> +EXPORT_SYMBOL_GPL(__clk_get);
+> +
+> +void clk_put(struct clk *clk)
+> +{
+> + ? ? ? if (clk->ops->put)
+> + ? ? ? ? ? ? ? clk->ops->put(clk);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_put);
+> +
+> +long clk_round_rate(struct clk *clk, unsigned long rate)
+> +{
+> + ? ? ? if (clk->ops->round_rate)
+> + ? ? ? ? ? ? ? return clk->ops->round_rate(clk, rate);
+> + ? ? ? return -ENOSYS;
+> +}
+> +EXPORT_SYMBOL_GPL(clk_round_rate);
+> +
+> +int clk_set_rate(struct clk *clk, unsigned long rate)
+> +{
+> + ? ? ? if (clk->ops->set_rate)
+> + ? ? ? ? ? ? ? return clk->ops->set_rate(clk, rate);
+> + ? ? ? return -ENOSYS;
+> +}
+> +EXPORT_SYMBOL_GPL(clk_set_rate);
+> +
+> +int clk_set_parent(struct clk *clk, struct clk *parent)
+> +{
+> + ? ? ? if (clk->ops->set_parent)
+> + ? ? ? ? ? ? ? return clk->ops->set_parent(clk, parent);
+> + ? ? ? return -ENOSYS;
+> +}
+> +EXPORT_SYMBOL_GPL(clk_set_parent);
+> +
+> +struct clk *clk_get_parent(struct clk *clk)
+> +{
+> + ? ? ? if (clk->ops->get_parent)
+> + ? ? ? ? ? ? ? return clk->ops->get_parent(clk);
+> + ? ? ? return ERR_PTR(-ENOSYS);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_get_parent);
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+
+
+
 -- 
-1.7.0.4
+MyungJoo Ham (???), Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
