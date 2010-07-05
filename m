@@ -1,60 +1,55 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon,  5 Jul 2010 16:15:28 +0200
-Subject: [PATCH 10/11] ARM: Remove unused PARAMS_PHYS from
-	arch/arm/boot/compressed
+Date: Mon,  5 Jul 2010 16:15:27 +0200
+Subject: [PATCH 09/11] ARM: uImage: require passing a LOADADDR when building
+	with RUNTIME_PHYSOFFSET
 In-Reply-To: <20100705141344.GA25407@pengutronix.de>
 References: <20100705141344.GA25407@pengutronix.de>
-Message-ID: <1278339329-23739-10-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1278339329-23739-9-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Miao <eric.y.miao@gmail.com>
+the default load address (in the CONFIG_ZBOOT_ROM=n case) is ZRELADDR
+which (apart from being a stupid load address for the
+RUNTIME_PHYSOFFSET=n case) might not be a valid read/write memory on the
+target machine at all.  So require passing a LOADADDR on the command
+line.  This obiously makes the uImage more machine dependant than the
+zImage.
 
-The only reference in arch/arm/boot/compressed to PARAMS_PHYS is
-params() in head.S, which can be directly converted to the exact
-address as specified by arch/arm/mach-rpc/Makefile.boot.
+Note RUNTIME_PHYSOFFSET doesn't exist yet, but is about to come soon.
 
-Signed-off-by: Eric Miao <eric.miao@canonical.com>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/boot/compressed/Makefile |    7 +------
- arch/arm/boot/compressed/head.S   |    2 +-
- 2 files changed, 2 insertions(+), 7 deletions(-)
+ arch/arm/boot/Makefile |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 5419448..2a80c9d 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -79,16 +79,11 @@ endif
- EXTRA_CFLAGS  := -fpic -fno-builtin
- EXTRA_AFLAGS  := -Wa,-march=all
+diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+index 4a590f4..264dccf 100644
+--- a/arch/arm/boot/Makefile
++++ b/arch/arm/boot/Makefile
+@@ -64,11 +64,13 @@ quiet_cmd_uimage = UIMAGE  $@
+ 		   -C none -a $(LOADADDR) -e $(STARTADDR) \
+ 		   -n 'Linux-$(KERNELRELEASE)' -d $< $@
  
--# Supply ZRELADDR and PARAMS_PHYS to the decompressor via linker symbols.  We
--# only define params_phys if the machine class defined the corresponding
--# makefile variable.
-+# Supply ZRELADDR to the decompressor via a linker symbol.
- LDFLAGS_vmlinux := --defsym zreladdr=$(ZRELADDR)
- ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
- LDFLAGS_vmlinux += --be8
++ifeq ($(CONFIG_RUNTIME_PHYS_OFFSET),)
+ ifeq ($(CONFIG_ZBOOT_ROM),y)
+ $(obj)/uImage: LOADADDR=$(CONFIG_ZBOOT_ROM_TEXT)
+ else
+ $(obj)/uImage: LOADADDR=$(ZRELADDR)
  endif
--ifneq ($(PARAMS_PHYS),)
--LDFLAGS_vmlinux += --defsym params_phys=$(PARAMS_PHYS)
--endif
- # ?
- LDFLAGS_vmlinux += -p
- # Report unresolved symbol references
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index f61c76e..d27faa1 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -321,7 +321,7 @@ LC1:		.word	reloc_end - reloc_start
++endif
  
- #ifdef CONFIG_ARCH_RPC
- 		.globl	params
--params:		ldr	r0, =params_phys
-+params:		ldr	r0, =0x10000100		@ params_phys for RPC
- 		mov	pc, lr
- 		.ltorg
- 		.align
+ ifeq ($(CONFIG_THUMB2_KERNEL),y)
+ # Set bit 0 to 1 so that "mov pc, rx" switches to Thumb-2 mode
+@@ -77,7 +79,9 @@ else
+ $(obj)/uImage: STARTADDR=$(LOADADDR)
+ endif
+ 
+-$(obj)/uImage:	$(obj)/zImage FORCE
++$(obj)/uImage: $(obj)/zImage FORCE
++	@test -n "$(LOADADDR)" || \
++	(echo "You must specify a load address (i.e. make uImage LOADADDR=0x...)"; exit 1)
+ 	$(call if_changed,uimage)
+ 	@echo '  Image $@ is ready'
+ 
 -- 
 1.7.1
