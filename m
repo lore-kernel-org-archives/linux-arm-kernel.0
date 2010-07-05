@@ -1,45 +1,23 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 05 Jul 2010 21:57:26 +0900
-Subject: [PATCH] ARM: S5P: Add PMU device
-In-Reply-To: <4C31C47C.1050905@gmail.com>
-References: <1278294411-5104-1-git-send-email-jy0922.shim@samsung.com>
-	<4C31C47C.1050905@gmail.com>
-Message-ID: <006c01cb1c41$a0af5c10$e20e1430$%kim@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Jul 2010 15:57:16 +0300
+Subject: [PATCHv2 04/11] OMAP2: Devkit8000: Setup LCD reset
+In-Reply-To: <1275478671-24563-5-git-send-email-weber@corscience.de>
+References: <1275478671-24563-1-git-send-email-weber@corscience.de>
+	<1275478671-24563-5-git-send-email-weber@corscience.de>
+Message-ID: <20100705125714.GW15951@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maurus Cuelenaere wrote:
+* Thomas Weber <weber@corscience.de> [100602 14:33]:
+> From: Kan-Ru Chen <kanru@0xlab.org>
 > 
->  Op 05-07-10 03:46, Joonyoung Shim schreef:
-> > This patch adds an initcall for the s5p platforms so that they register
-> > their PMU IRQs with the PMU framework in the Kernel.
-> >
-> > Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-> > ---
-> >  arch/arm/mach-s5p6442/include/mach/irqs.h |    2 +-
-> >  arch/arm/mach-s5pc100/include/mach/irqs.h |    1 +
-> >  arch/arm/mach-s5pv210/include/mach/irqs.h |    1 +
-> >  arch/arm/plat-s5p/Makefile                |    1 +
-> >  arch/arm/plat-s5p/dev-pmu.c               |   37
-> +++++++++++++++++++++++++++++
-> >  5 files changed, 41 insertions(+), 1 deletions(-)
-> >  create mode 100644 arch/arm/plat-s5p/dev-pmu.c
+> This patch corrects the LCD reset pin configuration.
 > 
-> Wouldn't it be better if this was in plat-samsung? I can see that the S3C6410
-> datasheet mentions a PMU_IRQ_ENABLE bit in SYS_OTHERS so I suspect that it
-> has
-> the same functionality (even though there's no mention of which interrupt this
-> is).
-> 
-Yes, I also found PMU_IRQ_ENABLE bit in System Others register of S3C6410 datasheet. But as your comments, could not found the interrupt number and any description...Actually, need to check whether it's available or not.
+> Original code from early devkit8000 patch sets the TWL4030 GPIO_1
+> to EHCI_nOC and TWL4030_GPIO_MAX+1 to ledA. Indeed these two pins
+> are both LCD_PWREN. Setup the lcd reset_gpio properly so it can be
+> disabled when other display is turned on.
 
-And S5P6440 has it.
-So Joonyoung, it would be helpful if you could add 6440 PMUIRQ (VIC1[23]) in this patch.
+Applied this and the rest of the series too.
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Tony
