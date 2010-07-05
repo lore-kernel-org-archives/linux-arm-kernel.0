@@ -1,21 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Jul 2010 11:44:50 +0300
-Subject: [PATCH 18/33] Removing dead OMAP_ARM_96MHZ
-In-Reply-To: <201006302025.14881.marek.vasut@gmail.com>
-References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<8304abb0dbda307c488b6fe2b3cc8df3c9909eb6.1277911346.git.siccegge@cs.fau.de>
-	<201006302025.14881.marek.vasut@gmail.com>
-Message-ID: <20100705084448.GJ15951@atomide.com>
+From: Colin.Tuckley@arm.com (Colin Tuckley)
+Date: Mon, 5 Jul 2010 09:51:35 +0100
+Subject: Some benchmarks on ARM
+In-Reply-To: <20100702180257.GA8767@pengutronix.de>
+References: <20100702180257.GA8767@pengutronix.de>
+Message-ID: <F01D8B85CFF58440B2A13965FBA90CA42DA3944FD5@GEORGE.Emea.Arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Marek Vasut <marek.vasut@gmail.com> [100630 21:21]:
-> Dne St 30. ?ervna 2010 17:59:45 Christoph Egger napsal(a):
-> > OMAP_ARM_96MHZ doesn't exist in Kconfig, therefore removing all
-> > references for it from the source code.
-> 
-> I'd be for adding it to Kconfig rather than removing from here
+> -----Original Message-----
+> kernel-bounces at lists.infradead.org] On Behalf Of Robert Schwebel
+> Sent: 02 July 2010 19:03
 
-Looks like Paul has queued a patch to do this.
+> We have recently made some benchmarks, in order to get a little bit
+> better fealing about where ARM cpus are today, especially when it comes
+> to the "recent" ones, and in comparism to the Atom. So we collected a
+> few benchmarks (most from lmbench) and did some actual measurements.
 
-Tony
+You have the family wrong for (at least) the Cortex-A8, it's a v7. This probably accounts for some of it's slow relative performance since you probably used incorrect compiler switches.
+
+> All measurements have been done on 2.6.34.
+
+How were the kernels compiled? Was thumb mode used for the ones that support it?
+
+You didn't mention the cache state anywhere - it can make a big difference.
+
+Regards,
+
+Colin
+
+--
+Colin Tuckley - ARM Ltd.
+110 Fulbourn Rd
+Cambridge, CB1 9NJ
+Tel: +44 1223 400536
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
