@@ -1,452 +1,163 @@
-From: myungjoo.ham@gmail.com (MyungJoo Ham)
-Date: Mon, 5 Jul 2010 11:33:51 +0900
-Subject: [PATCH 1/2] Add a common struct clk
-In-Reply-To: <1277098513.947633.945838133095.1.gpush@pororo>
-References: <1277098513.947165.104554431018.0.gpush@pororo>
-	<1277098513.947633.945838133095.1.gpush@pororo>
-Message-ID: <AANLkTilitnz8eiBclky74FTOeKua3LjM3cbRdfwzkpnW@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 5 Jul 2010 09:02:22 +0200
+Subject: [RFC PATCH] arm/imx/gpio: add spinlock protection
+In-Reply-To: <7fe710a6bc27460852588d2e561ec4c4a4644ab0.1278227668.git.baruch@tkos.co.il>
+References: <7fe710a6bc27460852588d2e561ec4c4a4644ab0.1278227668.git.baruch@tkos.co.il>
+Message-ID: <20100705070222.GB18865@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jeremy,
+Hello,
 
-On Mon, Jun 21, 2010 at 2:35 PM, Jeremy Kerr <jeremy.kerr@canonical.com> wrote:
-> We currently have 21 definitions of struct clk in the ARM architecture,
-> each defined on a per-platform basis. This makes it difficult to define
-> platform- (or architecture-) independent clock sources without making
-> assumptions about struct clk, and impossible to compile two
-> platforms with different struct clks into a single image.
->
-> This change is an effort to unify struct clk where possible, by defining
-> a common struct clk, containing a set of clock operations. Different
-> clock implementations can set their own operations, and have a standard
-> interface for generic code. The callback interface is exposed to the
-> kernel proper, while the clock implementations only need to be seen by
-> the platform internals.
->
-> This allows us to share clock code among platforms, and makes it
-> possible to dynamically create clock devices in platform-independent
-> code.
->
-> Platforms can enable the generic struct clock through
-> CONFIG_USE_COMMON_STRUCT_CLK. In this case, the clock infrastructure
-> consists of a common struct clk:
->
-> struct clk {
-> ? ? ? ?const struct clk_ops ? ?*ops;
-> ? ? ? ?unsigned int ? ? ? ? ? ?enable_count;
-> ? ? ? ?struct mutex ? ? ? ? ? ?mutex;
-> };
->
-> And a set of clock operations (defined per type of clock):
->
-> struct clk_operations {
-> ? ? ? int ? ? ? ? ? ? (*enable)(struct clk *);
-> ? ? ? void ? ? ? ? ? ?(*disable)(struct clk *);
-> ? ? ? unsigned long ? (*get_rate)(struct clk *);
-> ? ? ? [...]
-> };
->
-> To define a hardware-specific clock, machine code can "subclass" the
-> struct clock into a new struct (adding any device-specific data), and
-> provide a set of operations:
->
-> struct clk_foo {
-> ? ? ? ?struct clk ? ? ?clk;
-> ? ? ? ?void __iomem ? ?*some_register;
-> };
->
-> struct clk_operations clk_foo_ops = {
-> ? ? ? ?.get_rate = clk_foo_get_rate,
-> };
->
-> The common clock definitions are based on a development patch from Ben
-> Herrenschmidt <benh@kernel.crashing.org>.
->
-> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
->
+[I added David to Cc and so didn't strip the patch.]
+
+On Sun, Jul 04, 2010 at 10:15:13AM +0300, Baruch Siach wrote:
+> The GPIO and IRQ/GPIO registers need protection from concurrent access for
+> operations that are not atomic.
+> 
+> Cc: Juergen Beisert <j.beisert@pengutronix.de>
+> Cc: Daniel Mack <daniel@caiaq.de>
+> Reported-by: rpkamiak at rockwellcollins.com
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+I think this is OK, I just wonder if it's worth to introduce two
+spinlocks.
+
+Best regards
+Uwe
+
 > ---
-> ?arch/Kconfig ? ? ? ?| ? ?3 +
-> ?include/linux/clk.h | ? 77 +++++++++++++++++++++++++++++----
-> ?kernel/Makefile ? ? | ? ?1
-> ?kernel/clk.c ? ? ? ?| ?101 ++++++++++++++++++++++++++++++++++++++++++++
-> ?4 files changed, 173 insertions(+), 9 deletions(-)
->
-> diff --git a/arch/Kconfig b/arch/Kconfig
-> index acda512..2458b5e 100644
-> --- a/arch/Kconfig
-> +++ b/arch/Kconfig
-> @@ -151,4 +151,7 @@ config HAVE_MIXED_BREAKPOINTS_REGS
-> ?config HAVE_USER_RETURN_NOTIFIER
-> ? ? ? ?bool
->
-> +config USE_COMMON_STRUCT_CLK
-> + ? ? ? bool
+>  arch/arm/plat-mxc/gpio.c              |   28 +++++++++++++++++++++++++---
+>  arch/arm/plat-mxc/include/mach/gpio.h |    3 +++
+>  2 files changed, 28 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
+> index 71437c6..a8a33cd 100644
+> --- a/arch/arm/plat-mxc/gpio.c
+> +++ b/arch/arm/plat-mxc/gpio.c
+> @@ -56,10 +56,13 @@ static void _set_gpio_irqenable(struct mxc_gpio_port *port, u32 index,
+>  				int enable)
+>  {
+>  	u32 l;
+> +	unsigned long flags;
+>  
+> +	spin_lock_irqsave(&port->irq_lock, flags);
+>  	l = __raw_readl(port->base + GPIO_IMR);
+>  	l = (l & (~(1 << index))) | (!!enable << index);
+>  	__raw_writel(l, port->base + GPIO_IMR);
+> +	spin_unlock_irqrestore(&port->irq_lock, flags);
+>  }
+>  
+>  static void gpio_ack_irq(u32 irq)
+> @@ -87,8 +90,11 @@ static int gpio_set_irq_type(u32 irq, u32 type)
+>  	u32 gpio = irq_to_gpio(irq);
+>  	struct mxc_gpio_port *port = &mxc_gpio_ports[gpio / 32];
+>  	u32 bit, val;
+> -	int edge;
+> +	int edge, rc = 0;
+>  	void __iomem *reg = port->base;
+> +	unsigned long flags;
 > +
-> ?source "kernel/gcov/Kconfig"
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> index 1d37f42..5c1098b 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
-> @@ -3,6 +3,7 @@
-> ?*
-> ?* ?Copyright (C) 2004 ARM Limited.
-> ?* ?Written by Deep Blue Solutions Limited.
-> + * ?Copyright (c) 2010 Jeremy Kerr <jeremy.kerr@canonical.com>
-> ?*
-> ?* This program is free software; you can redistribute it and/or modify
-> ?* it under the terms of the GNU General Public License version 2 as
-> @@ -11,18 +12,82 @@
-> ?#ifndef __LINUX_CLK_H
-> ?#define __LINUX_CLK_H
->
-> +#include <linux/err.h>
-> +#include <linux/mutex.h>
+> +	spin_lock_irqsave(&port->irq_lock, flags);
+>  
+>  	port->both_edges &= ~(1 << (gpio & 31));
+>  	switch (type) {
+> @@ -116,7 +122,8 @@ static int gpio_set_irq_type(u32 irq, u32 type)
+>  		edge = GPIO_INT_HIGH_LEV;
+>  		break;
+>  	default:
+> -		return -EINVAL;
+> +		rc = -EINVAL;
+> +		goto out;
+>  	}
+>  
+>  	reg += GPIO_ICR1 + ((gpio & 0x10) >> 2); /* lower or upper register */
+> @@ -125,9 +132,12 @@ static int gpio_set_irq_type(u32 irq, u32 type)
+>  	__raw_writel(val | (edge << (bit << 1)), reg);
+>  	_clear_gpio_irqstatus(port, gpio & 0x1f);
+>  
+> -	return 0;
+> +out:
+> +	spin_unlock_irqrestore(&port->irq_lock, flags);
+> +	return rc;
+>  }
+>  
+> +/* caller must hold port->irq_lock */
+>  static void mxc_flip_edge(struct mxc_gpio_port *port, u32 gpio)
+>  {
+>  	void __iomem *reg = port->base;
+> @@ -157,12 +167,15 @@ static void mxc_flip_edge(struct mxc_gpio_port *port, u32 gpio)
+>  static void mxc_gpio_irq_handler(struct mxc_gpio_port *port, u32 irq_stat)
+>  {
+>  	u32 gpio_irq_no_base = port->virtual_irq_start;
+> +	unsigned long flags;
+>  
+>  	while (irq_stat != 0) {
+>  		int irqoffset = fls(irq_stat) - 1;
+>  
+> +		spin_lock_irqsave(&port->irq_lock, flags);
+>  		if (port->both_edges & (1 << irqoffset))
+>  			mxc_flip_edge(port, irqoffset);
+> +		spin_unlock_irqrestore(&port->irq_lock, flags);
+>  
+>  		generic_handle_irq(gpio_irq_no_base + irqoffset);
+>  
+> @@ -214,13 +227,16 @@ static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
+>  	struct mxc_gpio_port *port =
+>  		container_of(chip, struct mxc_gpio_port, chip);
+>  	u32 l;
+> +	unsigned long flags;
+>  
+> +	spin_lock_irqsave(&port->lock, flags);
+>  	l = __raw_readl(port->base + GPIO_GDIR);
+>  	if (dir)
+>  		l |= 1 << offset;
+>  	else
+>  		l &= ~(1 << offset);
+>  	__raw_writel(l, port->base + GPIO_GDIR);
+> +	spin_unlock_irqrestore(&port->lock, flags);
+>  }
+>  
+>  static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+> @@ -229,9 +245,12 @@ static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+>  		container_of(chip, struct mxc_gpio_port, chip);
+>  	void __iomem *reg = port->base + GPIO_DR;
+>  	u32 l;
+> +	unsigned long flags;
+>  
+> +	spin_lock_irqsave(&port->lock, flags);
+>  	l = (__raw_readl(reg) & (~(1 << offset))) | (value << offset);
+>  	__raw_writel(l, reg);
+> +	spin_unlock_irqrestore(&port->lock, flags);
+>  }
+>  
+>  static int mxc_gpio_get(struct gpio_chip *chip, unsigned offset)
+> @@ -285,6 +304,9 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
+>  		port[i].chip.base = i * 32;
+>  		port[i].chip.ngpio = 32;
+>  
+> +		spin_lock_init(&port[i].lock);
+> +		spin_lock_init(&port[i].irq_lock);
 > +
-> ?struct device;
->
-> -/*
-> - * The base API.
-> +#ifdef CONFIG_USE_COMMON_STRUCT_CLK
+>  		/* its a serious configuration bug when it fails */
+>  		BUG_ON( gpiochip_add(&port[i].chip) < 0 );
+>  
+> diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
+> index 894d2f8..a37724a 100644
+> --- a/arch/arm/plat-mxc/include/mach/gpio.h
+> +++ b/arch/arm/plat-mxc/include/mach/gpio.h
+> @@ -36,6 +36,9 @@ struct mxc_gpio_port {
+>  	int virtual_irq_start;
+>  	struct gpio_chip chip;
+>  	u32 both_edges;
 > +
-> +/* If we're using the common struct clk, we define the base clk object here */
-> +
-> +/**
-> + * struct clk - hardware independent clock structure
-> + * @clk_ops: ? ? ? ? ? implementation-specific ops for this clock
-> + * @enable_count: ? ? ?count of clk_enable() calls active on this clock
-> + * @mutex: ? ? ? ? ? ? lock for enable/disable or other HW-specific ops
-> + *
-> + * The base clock object, used by drivers for hardware-independent manipulation
-> + * of clock lines. This will be 'subclassed' by device-specific implementations,
-> + * which add device-specific data to struct clk. For example:
-> + *
-> + * ?struct clk_foo {
-> + * ? ? ?struct clk;
-> + * ? ? ?[device specific fields]
-> + * ?};
-> + *
-> + * The clock driver code will manage the device-specific data, and pass
-> + * clk_foo.clk to the common clock code. The clock driver will be called
-> + * through the @ops callbacks.
-> + *
-> + * The @enable_count and @mutex members are initialised when a clock is
-> + * registered with the arch-specific clock management code; the clock driver
-> + * code does not need to handle these.
-> + */
-> +struct clk {
-> + ? ? ? const struct clk_ops ? ?*ops;
-> + ? ? ? unsigned int ? ? ? ? ? ?enable_count;
-> + ? ? ? struct mutex ? ? ? ? ? ?mutex;
-> +};
-> +
-> +#define INIT_CLK(o) { .ops = &o, }
-> +
-> +struct clk_ops {
-> + ? ? ? int ? ? ? ? ? ? (*enable)(struct clk *);
-> + ? ? ? void ? ? ? ? ? ?(*disable)(struct clk *);
-> + ? ? ? int ? ? ? ? ? ? (*get)(struct clk *);
-> + ? ? ? void ? ? ? ? ? ?(*put)(struct clk *);
-> + ? ? ? unsigned long ? (*get_rate)(struct clk *);
-> + ? ? ? long ? ? ? ? ? ?(*round_rate)(struct clk *, unsigned long);
-> + ? ? ? int ? ? ? ? ? ? (*set_rate)(struct clk *, unsigned long);
-> + ? ? ? int ? ? ? ? ? ? (*set_parent)(struct clk *, struct clk *);
-> + ? ? ? struct clk * ? ?(*get_parent)(struct clk *);
-> +};
-> +
-> +/**
-> + * __clk_get - update clock-specific refcounter
-> + *
-> + * @clk: The clock to refcount
-> + *
-> + * Before a clock is returned from clk_get, this function should be called
-> + * to update any clock-specific refcounting.
-> + *
-> + * Returns non-zero on success, zero on failure.
-> + *
-> + * Drivers should not need this function; it is only needed by the
-> + * arch-specific clk_get() implementations.
-> ?*/
-> +int __clk_get(struct clk *clk);
->
-> +#else /* !CONFIG_USE_COMMON_STRUCT_CLK */
->
-> ?/*
-> - * struct clk - an machine class defined object / cookie.
-> + * Global clock object, actual structure is declared per-machine
-> ?*/
-> ?struct clk;
->
-> +#endif /* !CONFIG_USE_COMMON_STRUCT_CLK */
-> +
-> ?/**
-> ?* clk_get - lookup and obtain a reference to a clock producer.
-> ?* @dev: device for clock "consumer"
-> @@ -83,12 +148,6 @@ unsigned long clk_get_rate(struct clk *clk);
-> ?*/
-> ?void clk_put(struct clk *clk);
->
-> -
-> -/*
-> - * The remaining APIs are optional for machine class support.
-> - */
-> -
-> -
-> ?/**
-> ?* clk_round_rate - adjust a rate to the exact rate a clock can provide
-> ?* @clk: clock source
-> diff --git a/kernel/Makefile b/kernel/Makefile
-> index 057472f..1ae15aa 100644
-> --- a/kernel/Makefile
-> +++ b/kernel/Makefile
-> @@ -105,6 +105,7 @@ obj-$(CONFIG_PERF_EVENTS) += perf_event.o
-> ?obj-$(CONFIG_HAVE_HW_BREAKPOINT) += hw_breakpoint.o
-> ?obj-$(CONFIG_USER_RETURN_NOTIFIER) += user-return-notifier.o
-> ?obj-$(CONFIG_PADATA) += padata.o
-> +obj-$(CONFIG_USE_COMMON_STRUCT_CLK) += clk.o
->
-> ?ifneq ($(CONFIG_SCHED_OMIT_FRAME_POINTER),y)
-> ?# According to Alan Modra <alan@linuxcare.com.au>, the -fno-omit-frame-pointer is
-> diff --git a/kernel/clk.c b/kernel/clk.c
-> new file mode 100644
-> index 0000000..cdea25f
-> --- /dev/null
-> +++ b/kernel/clk.c
-> @@ -0,0 +1,101 @@
-> +/*
-> + * Copyright (C) 2010 Canonical Ltd <jeremy.kerr@canonical.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * Standard functionality for the common clock API.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/mutex.h>
-> +#include <linux/module.h>
-> +
-> +int clk_enable(struct clk *clk)
-> +{
-> + ? ? ? int ret = 0;
-> +
-> + ? ? ? if (!clk->ops->enable)
-> + ? ? ? ? ? ? ? return 0;
-
-Wouldn't it be better (safer?) to check "clk" and "clk->ops" before
-accessing clk->ops->enable?
-For example,
-
-        if (IS_ERR_OR_NULL(clk))
-                return -EINVAL;
-
-        if (!clk->ops || !clk->ops->enable)
-                return 0;
-
-Or, do you think it'd be better not to check and save some time?
-
-Anyway, if we intend to check the input, the patch for the patch
-including kernel/clk.c would be...
-
-----------------------------------------------------
-diff --git a/kernel/clk.c b/kernel/clk.c
-index 32f25ef..c35f0ac 100644
---- a/kernel/clk.c
-+++ b/kernel/clk.c
-@@ -16,7 +16,10 @@ int clk_enable(struct clk *clk)
- {
-        int ret = 0;
-
--       if (!clk->ops->enable)
-+       if (IS_ERR_OR_NULL(clk))
-+               return -EINVAL;
-+
-+       if (!clk->ops || !clk->ops->enable)
-                return 0;
-
-        mutex_lock(&clk->mutex);
-@@ -33,7 +36,12 @@ EXPORT_SYMBOL_GPL(clk_enable);
-
- void clk_disable(struct clk *clk)
- {
--       if (!clk->ops->disable)
-+       if (IS_ERR_OR_NULL(clk)) {
-+               printk(KERN_ERR "clk_disable(NULL) is called.\n");
-+               return;
-+       }
-+
-+       if (!clk->ops || !clk->ops->disable)
-                return;
-
-        mutex_lock(&clk->mutex);
-@@ -47,7 +55,9 @@ EXPORT_SYMBOL_GPL(clk_disable);
-
- unsigned long clk_get_rate(struct clk *clk)
- {
--       if (clk->ops->get_rate)
-+       if (IS_ERR_OR_NULL(clk))
-+               return -EINVAL;
-+       if (clk->ops && clk->ops->get_rate)
-                return clk->ops->get_rate(clk);
-        return 0;
- }
-@@ -55,7 +65,9 @@ EXPORT_SYMBOL_GPL(clk_get_rate);
-
- int __clk_get(struct clk *clk)
- {
--       if (clk->ops->get)
-+       if (IS_ERR_OR_NULL(clk))
-+               return -EINVAL;
-+       if (clk->ops && clk->ops->get)
-                return clk->ops->get(clk);
-        return 1;
- }
-@@ -63,14 +75,19 @@ EXPORT_SYMBOL_GPL(__clk_get);
-
- void clk_put(struct clk *clk)
- {
--       if (clk->ops->put)
-+       if (IS_ERR_OR_NULL(clk)) {
-+               printk(KERN_ERR "clk_disable(NULL) is called.\n");
-+               return;
-+       }
-+
-+       if (clk->ops && clk->ops->put)
-                clk->ops->put(clk);
- }
- EXPORT_SYMBOL_GPL(clk_put);
-
- long clk_round_rate(struct clk *clk, unsigned long rate)
- {
--       if (clk->ops->round_rate)
-+       if (!IS_ERR_OR_NULL(clk) && clk->ops && clk->ops->round_rate)
-                return clk->ops->round_rate(clk, rate);
-        return -ENOSYS;
- }
-@@ -78,7 +95,7 @@ EXPORT_SYMBOL_GPL(clk_round_rate);
-
- int clk_set_rate(struct clk *clk, unsigned long rate)
- {
--       if (clk->ops->set_rate)
-+       if (!IS_ERR_OR_NULL(clk) && clk->ops && clk->ops->set_rate)
-                return clk->ops->set_rate(clk, rate);
-        return -ENOSYS;
- }
-@@ -86,7 +103,7 @@ EXPORT_SYMBOL_GPL(clk_set_rate);
-
- int clk_set_parent(struct clk *clk, struct clk *parent)
- {
--       if (clk->ops->set_parent)
-+       if (!IS_ERR_OR_NULL(clk) && clk->ops && clk->ops->set_parent)
-                return clk->ops->set_parent(clk, parent);
-        return -ENOSYS;
- }
-@@ -94,7 +111,7 @@ EXPORT_SYMBOL_GPL(clk_set_parent);
-
- struct clk *clk_get_parent(struct clk *clk)
- {
--       if (clk->ops->get_parent)
-+       if (!IS_ERR_OR_NULL(clk) && clk->ops && clk->ops->get_parent)
-                return clk->ops->get_parent(clk);
-        return ERR_PTR(-ENOSYS);
- }
-
-
-
-> +
-> + ? ? ? mutex_lock(&clk->mutex);
-> + ? ? ? if (!clk->enable_count)
-> + ? ? ? ? ? ? ? ret = clk->ops->enable(clk);
-> +
-> + ? ? ? if (!ret)
-> + ? ? ? ? ? ? ? clk->enable_count++;
-> + ? ? ? mutex_unlock(&clk->mutex);
-> +
-> + ? ? ? return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(clk_enable);
-> +
-> +void clk_disable(struct clk *clk)
-> +{
-> + ? ? ? if (!clk->ops->disable)
-> + ? ? ? ? ? ? ? return;
-> +
-> + ? ? ? mutex_lock(&clk->mutex);
-> +
-> + ? ? ? if (!--clk->enable_count)
-> + ? ? ? ? ? ? ? clk->ops->disable(clk);
-> +
-> + ? ? ? mutex_unlock(&clk->mutex);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_disable);
-> +
-> +unsigned long clk_get_rate(struct clk *clk)
-> +{
-> + ? ? ? if (clk->ops->get_rate)
-> + ? ? ? ? ? ? ? return clk->ops->get_rate(clk);
-> + ? ? ? return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(clk_get_rate);
-> +
-> +int __clk_get(struct clk *clk)
-> +{
-> + ? ? ? if (clk->ops->get)
-> + ? ? ? ? ? ? ? return clk->ops->get(clk);
-> + ? ? ? return 1;
-> +}
-> +EXPORT_SYMBOL_GPL(__clk_get);
-> +
-> +void clk_put(struct clk *clk)
-> +{
-> + ? ? ? if (clk->ops->put)
-> + ? ? ? ? ? ? ? clk->ops->put(clk);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_put);
-> +
-> +long clk_round_rate(struct clk *clk, unsigned long rate)
-> +{
-> + ? ? ? if (clk->ops->round_rate)
-> + ? ? ? ? ? ? ? return clk->ops->round_rate(clk, rate);
-> + ? ? ? return -ENOSYS;
-> +}
-> +EXPORT_SYMBOL_GPL(clk_round_rate);
-> +
-> +int clk_set_rate(struct clk *clk, unsigned long rate)
-> +{
-> + ? ? ? if (clk->ops->set_rate)
-> + ? ? ? ? ? ? ? return clk->ops->set_rate(clk, rate);
-> + ? ? ? return -ENOSYS;
-> +}
-> +EXPORT_SYMBOL_GPL(clk_set_rate);
-> +
-> +int clk_set_parent(struct clk *clk, struct clk *parent)
-> +{
-> + ? ? ? if (clk->ops->set_parent)
-> + ? ? ? ? ? ? ? return clk->ops->set_parent(clk, parent);
-> + ? ? ? return -ENOSYS;
-> +}
-> +EXPORT_SYMBOL_GPL(clk_set_parent);
-> +
-> +struct clk *clk_get_parent(struct clk *clk)
-> +{
-> + ? ? ? if (clk->ops->get_parent)
-> + ? ? ? ? ? ? ? return clk->ops->get_parent(clk);
-> + ? ? ? return ERR_PTR(-ENOSYS);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_get_parent);
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
+> +	spinlock_t	lock;		/* GPIO registers */
+> +	spinlock_t	irq_lock;	/* IRQ registers */
+>  };
+>  
+>  int mxc_gpio_init(struct mxc_gpio_port*, int);
+> -- 
+> 1.7.1
 
 -- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
