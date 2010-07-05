@@ -1,34 +1,44 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon,  5 Jul 2010 16:15:21 +0200
-Subject: [PATCH 03/11] ARM: zImage: __armv3_mpu_cache_flush: respect
-	should-be-zero specification
+Date: Mon,  5 Jul 2010 16:15:25 +0200
+Subject: [PATCH 07/11] ARM: zImage: don't define unused symbol initrd_phys
 In-Reply-To: <20100705141344.GA25407@pengutronix.de>
 References: <20100705141344.GA25407@pengutronix.de>
-Message-ID: <1278339329-23739-3-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1278339329-23739-7-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Probably the register content for cache operations is "don't care" in
-practice, but as r1 is explicitly zeroed, use that one.
+The only user of initrd_phys is arch/arm/boot/bootp/init.S which still
+gets the value passed to.
 
 Acked-by: Eric Miao <eric.miao@canonical.com>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/boot/compressed/head.S |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/boot/compressed/Makefile |    9 +++------
+ 1 files changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 7b7d95c..2366613 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -994,7 +994,7 @@ no_cache_id:
- __armv3_mmu_cache_flush:
- __armv3_mpu_cache_flush:
- 		mov	r1, #0
--		mcr	p15, 0, r0, c7, c0, 0	@ invalidate whole cache v3
-+		mcr	p15, 0, r1, c7, c0, 0	@ invalidate whole cache v3
- 		mov	pc, lr
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 53faa90..5419448 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -79,16 +79,13 @@ endif
+ EXTRA_CFLAGS  := -fpic -fno-builtin
+ EXTRA_AFLAGS  := -Wa,-march=all
  
- /*
+-# Supply ZRELADDR, INITRD_PHYS and PARAMS_PHYS to the decompressor via
+-# linker symbols.  We only define initrd_phys and params_phys if the
+-# machine class defined the corresponding makefile variable.
++# Supply ZRELADDR and PARAMS_PHYS to the decompressor via linker symbols.  We
++# only define params_phys if the machine class defined the corresponding
++# makefile variable.
+ LDFLAGS_vmlinux := --defsym zreladdr=$(ZRELADDR)
+ ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
+ LDFLAGS_vmlinux += --be8
+ endif
+-ifneq ($(INITRD_PHYS),)
+-LDFLAGS_vmlinux += --defsym initrd_phys=$(INITRD_PHYS)
+-endif
+ ifneq ($(PARAMS_PHYS),)
+ LDFLAGS_vmlinux += --defsym params_phys=$(PARAMS_PHYS)
+ endif
 -- 
 1.7.1
