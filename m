@@ -1,41 +1,61 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 05 Jul 2010 14:20:24 +0100
-Subject: [RFC PATCH 2/3] ARM: Convert L2x0 to use the IO relaxed operations
-	for cache sync
+Date: Mon, 05 Jul 2010 14:20:30 +0100
+Subject: [RFC PATCH 3/3] ARM: Add barriers to the I/O accessors if
+	ARM_DMA_MEM_BUFFERABLE
 In-Reply-To: <20100705130010.5157.32032.stgit@e102109-lin.cambridge.arm.com>
 References: <20100705130010.5157.32032.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100705132024.5157.93765.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100705132030.5157.97921.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is in preparation for a subsequent patch which adds barriers
-to the I/O accessors. Since the mandatory barriers may do an L2 cache
-sync, this patch avoids a recursive call into l2x0_cache_sync() via the
-write*() accessors and wmb().
+When the coherent DMA buffers are mapped as Normal Non-cacheable
+(ARM_DMA_MEM_BUFFERABLE enabled), buffer accesses are no longer ordered
+with Device memory accesses causing failures in device drivers that do
+not use the mandatory memory barriers before starting a DMA transfer.
+LKML discussions led to the conclusion that such barriers have to be
+added to the I/O accessors:
+
+http://thread.gmane.org/gmane.linux.kernel/683509/focus=686153
+http://thread.gmane.org/gmane.linux.ide/46414
+http://thread.gmane.org/gmane.linux.kernel.cross-arch/5250
+
+This patch introduces a wmb() barrier to the write*() I/O accessors to
+handle the situations where Normal Non-cacheable writes are still in the
+processor (or L2 cache controller) write buffer before a DMA transfer
+command is issued. For the read*() accessors, a rmb() is introduced
+after the I/O to avoid speculative loads where the driver polls for a
+DMA transfer ready bit.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/mm/cache-l2x0.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/io.h |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 9819869..086d7e2 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -32,14 +32,14 @@ static uint32_t l2x0_way_mask;	/* Bitmask of active ways */
- static inline void cache_wait(void __iomem *reg, unsigned long mask)
- {
- 	/* wait for the operation to complete */
--	while (readl(reg) & mask)
-+	while (readl_relaxed(reg) & mask)
- 		;
- }
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 97fb9aa..8f3edef 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -191,6 +191,15 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+ #define writel_relaxed(v,c)	__raw_writel((__force u32) \
+ 					cpu_to_le32(v),__mem_pci(c))
  
- static inline void cache_sync(void)
- {
- 	void __iomem *base = l2x0_base;
--	writel(0, base + L2X0_CACHE_SYNC);
-+	writel_relaxed(0, base + L2X0_CACHE_SYNC);
- 	cache_wait(base + L2X0_CACHE_SYNC, 1);
- }
++#ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
++#define readb(c)		({ u8  __v = readb_relaxed(c); rmb(); __v; })
++#define readw(c)		({ u16 __v = readw_relaxed(c); rmb(); __v; })
++#define readl(c)		({ u32 __v = readl_relaxed(c); rmb(); __v; })
++
++#define writeb(v,c)		do { wmb(); writeb_relaxed(v,c); } while (0)
++#define writew(v,c)		do { wmb(); writew_relaxed(v,c); } while (0)
++#define writel(v,c)		do { wmb(); writel_relaxed(v,c); } while (0)
++#else
+ #define readb(c)		readb_relaxed(c)
+ #define readw(c)		readw_relaxed(c)
+ #define readl(c)		readl_relaxed(c)
+@@ -198,6 +207,7 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+ #define writeb(v,c)		writeb_relaxed(v,c)
+ #define writew(v,c)		writew_relaxed(v,c)
+ #define writel(v,c)		writel_relaxed(v,c)
++#endif
  
+ #define readsb(p,d,l)		__raw_readsb(__mem_pci(p),d,l)
+ #define readsw(p,d,l)		__raw_readsw(__mem_pci(p),d,l)
