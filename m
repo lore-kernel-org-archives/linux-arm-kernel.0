@@ -1,64 +1,20 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Jul 2010 11:07:59 +0300
-Subject: [PATCH 03/33] Removing dead OMAP_MUX_ERRORS
-In-Reply-To: <20100701152743.GA8588@shutemov.name>
+Date: Mon, 5 Jul 2010 11:14:55 +0300
+Subject: [PATCH 05/33] Removing dead OMAP_IR
+In-Reply-To: <b7209c2cb666c73a3affbb44c2637a4f2086af08.1277911346.git.siccegge@cs.fau.de>
 References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<b6ca168f9459162f2c96aa8ef999047a3c4f6f9c.1277911346.git.siccegge@cs.fau.de>
-	<20100630195409.GC3969@shutemov.name>
-	<20100701132255.GA32541@faui48a.informatik.uni-erlangen.de>
-	<20100701152743.GA8588@shutemov.name>
-Message-ID: <20100705080757.GC15951@atomide.com>
+	<b7209c2cb666c73a3affbb44c2637a4f2086af08.1277911346.git.siccegge@cs.fau.de>
+Message-ID: <20100705081453.GD15951@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kirill A. Shutemov <kirill@shutemov.name> [100701 18:21]:
-> On Thu, Jul 01, 2010 at 03:22:55PM +0200, Christoph Egger wrote:
-> > On Wed, Jun 30, 2010 at 10:54:09PM +0300, Kirill A. Shutemov wrote:
-> > > On Wed, Jun 30, 2010 at 05:54:42PM +0200, Christoph Egger wrote:
-> > > > OMAP_MUX_ERRORS doesn't exist in Kconfig, therefore removing all
-> > > > references for it from the source code.
-> > > 
-> > > IIUC, CONFIG_OMAP_MUX_WARNINGS should be used here instead of it.
-> > 
-> > Something like the patch below?
-> 
-> Acked-by: Kirill A. Shutemov <kirill@shutemov.name>
+* Christoph Egger <siccegge@cs.fau.de> [100630 18:49]:
+> OMAP_IR doesn't exist in Kconfig, therefore removing all references
+> for it from the source code.
 
-Thanks, I've queued up this.
+Thanks I've updated this for the new mux code for board-h4.c and applied it.
+Updated patch below.
+
+Regards,
 
 Tony
- 
-> > 
-> > ----
-> > From: Christoph Egger <siccegge@cs.fau.de>
-> > Date: Wed, 30 Jun 2010 12:30:36 +0200
-> > Subject: [PATCH 03/33] Replace dead OMAP_MUX_ERRORS with OMAP_MUX_WARNINGS
-> > 
-> > OMAP_MUX_ERRORS doesn't exist in Kconfig, therefore replacing all
-> > references for it with OMAP_MUX_WARNINGS in the source code.
-> > 
-> > Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
-> > ---
-> >  arch/arm/mach-omap1/mux.c |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap1/mux.c b/arch/arm/mach-omap1/mux.c
-> > index 8434137..3e98835 100644
-> > --- a/arch/arm/mach-omap1/mux.c
-> > +++ b/arch/arm/mach-omap1/mux.c
-> > @@ -440,7 +440,7 @@ int __init_or_module omap1_cfg_reg(const struct pin_config *cfg)
-> >  	}
-> >  #endif
-> >  
-> > -#ifdef CONFIG_OMAP_MUX_ERRORS
-> > +#ifdef CONFIG_OMAP_MUX_WARNINGS
-> >  	return warn ? -ETXTBSY : 0;
-> >  #else
-> >  	return 0;
-> > -- 
-> > 1.7.0.4
-> > 
-> > 
-> 
-> -- 
->  Kirill A. Shutemov
