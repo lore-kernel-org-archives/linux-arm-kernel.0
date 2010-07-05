@@ -1,22 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Jul 2010 15:19:26 +0100
-Subject: [PATCH v2 0/8] Initial implementation of kdump for ARM
-In-Reply-To: <4C31E6C4.8030200@stericsson.com>
-References: <20100611063605.GB11156@esdhcp04058.research.nokia.com>
-	<4C2DE024.8060308@stericsson.com>
-	<20100705082835.GA32178@gw.healthdatacare.com>
-	<4C31AD62.6070805@stericsson.com>
-	<20100705101852.GA19338@n2100.arm.linux.org.uk>
-	<4C31B527.8060401@stericsson.com>
-	<20100705135552.GB19338@n2100.arm.linux.org.uk>
-	<4C31E6C4.8030200@stericsson.com>
-Message-ID: <20100705141926.GA23860@n2100.arm.linux.org.uk>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Mon, 05 Jul 2010 16:14:45 +0100
+Subject: Some benchmarks on ARM
+References: <20100702180257.GA8767@pengutronix.de>
+	<4C2E4D59.8030300@gmail.com> <4C31CEE3.2050202@pengutronix.de>
+	<20100705140050.GC19338@n2100.arm.linux.org.uk>
+Message-ID: <yw1xocemarkq.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 05, 2010 at 04:05:56PM +0200, Per Fransson wrote:
-> Well, I had another suggestion in my last mail.
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-Which is going to need per-CPU type support in order to achieve.  Do
-we really want to implement relocate_new_kernel for each of the 24
-CPU types which we currently support?
+> On Mon, Jul 05, 2010 at 02:24:03PM +0200, Marc Kleine-Budde wrote:
+>> We used a compiler generating hardware floating point instruction by
+>> default:
+>> 
+>> gcc was configured with:
+>> "--with-float=softfp --with-fpu=vfp --with-cpu=arm1136jf-s"
+>
+> This is unclear that it's generating hardware floating point instructions.
+> The --with-float=softfp suggests its using soft-fp.
+
+That configuration will generate hardware vfp instructions while using
+softfloat calling conventions (arguments passed in integer registers).
+A pure softfloat configuration would be --with-float=soft.
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
