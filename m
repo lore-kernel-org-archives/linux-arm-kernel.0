@@ -1,30 +1,36 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 05 Jul 2010 10:15:07 -0400 (EDT)
-Subject: Some benchmarks on ARM
-In-Reply-To: <20100705134252.GA20855@pengutronix.de>
-References: <20100702180257.GA8767@pengutronix.de>
-	<alpine.LFD.2.00.1007030136510.32016@xanadu.home>
-	<4C31D861.607@gmail.com> <20100705132339.GY20855@pengutronix.de>
-	<4C31DEAF.6020205@compulab.co.il>
-	<20100705134252.GA20855@pengutronix.de>
-Message-ID: <alpine.LFD.2.00.1007051009330.6020@xanadu.home>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon,  5 Jul 2010 16:15:19 +0200
+Subject: [PATCH 01/11] ARM: zImage: don't hard code the stack size twice
+In-Reply-To: <20100705141344.GA25407@pengutronix.de>
+References: <20100705141344.GA25407@pengutronix.de>
+Message-ID: <1278339329-23739-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 5 Jul 2010, Robert Schwebel wrote:
+Acked-by: Eric Miao <eric.miao@canonical.com>
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/boot/compressed/head.S |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-> On Mon, Jul 05, 2010 at 04:31:27PM +0300, Mike Rapoport wrote:
-> > Native kernel build? ;-)
-> 
-> Hmm, I don't have a native compiler for all platforms yet.
-
-Kernel compile is a really bad test in this context anyway, unless you 
-compile the exact same kernel target using the same config with the SAME 
-gcc version on all test machines, and using the same filesystem type and 
-medium.
-
-It is best to keep kernel compilation test for validation of 
-improvements to a single system.
-
-
-Nicolas
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index c5191b1..390aa92 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -315,7 +315,7 @@ LC0:		.word	LC0			@ r1
+ 		.word	_image_size		@ r6
+ 		.word	_got_start		@ r11
+ 		.word	_got_end		@ ip
+-		.word	user_stack+4096		@ sp
++		.word	user_stack_end		@ sp
+ LC1:		.word	reloc_end - reloc_start
+ 		.size	LC0, . - LC0
+ 
+@@ -1070,3 +1070,4 @@ reloc_end:
+ 		.align
+ 		.section ".stack", "w"
+ user_stack:	.space	4096
++user_stack_end:
+-- 
+1.7.1
