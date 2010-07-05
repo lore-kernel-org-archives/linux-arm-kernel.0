@@ -1,68 +1,31 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 05 Jul 2010 20:21:56 +0900
-Subject: About cachetype on ARMv7
-Message-ID: <004c01cb1c34$49773f60$dc65be20$%kim@samsung.com>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Mon, 05 Jul 2010 13:39:40 +0200
+Subject: [PATCH] ARM: S5P: Add PMU device
+In-Reply-To: <1278294411-5104-1-git-send-email-jy0922.shim@samsung.com>
+References: <1278294411-5104-1-git-send-email-jy0922.shim@samsung.com>
+Message-ID: <4C31C47C.1050905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+ Op 05-07-10 03:46, Joonyoung Shim schreef:
+> This patch adds an initcall for the s5p platforms so that they register
+> their PMU IRQs with the PMU framework in the Kernel.
+>
+> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> ---
+>  arch/arm/mach-s5p6442/include/mach/irqs.h |    2 +-
+>  arch/arm/mach-s5pc100/include/mach/irqs.h |    1 +
+>  arch/arm/mach-s5pv210/include/mach/irqs.h |    1 +
+>  arch/arm/plat-s5p/Makefile                |    1 +
+>  arch/arm/plat-s5p/dev-pmu.c               |   37 +++++++++++++++++++++++++++++
+>  5 files changed, 41 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/plat-s5p/dev-pmu.c
 
-I have a query about cachetype on ARMv7.
+Wouldn't it be better if this was in plat-samsung? I can see that the S3C6410
+datasheet mentions a PMU_IRQ_ENABLE bit in SYS_OTHERS so I suspect that it has
+the same functionality (even though there's no mention of which interrupt this
+is).
 
-Following is from arch/arm/kernel/setup.c
 
-static void __init cacheid_init(void)
-{
-	unsigned int cachetype = read_cpuid_cachetype();
-	unsigned int arch = cpu_architecture();
-
-	if (arch >= CPU_ARCH_ARMv6) {
-		if ((cachetype & (7 << 29)) == 4 << 29) {
-			/* ARMv7 register format */
-			cacheid = CACHEID_VIPT_NONALIASING;
-
-(snip)
-
-	printk("CPU: %s data cache, %s instruction cache\n",
-		cache_is_vivt() ? "VIVT" :
-		cache_is_vipt_aliasing() ? "VIPT aliasing" :
-		cache_is_vipt_nonaliasing() ? "VIPT nonaliasing" :
-"unknown",
-		cache_is_vivt() ? "VIVT" :
-		icache_is_vivt_asid_tagged() ? "VIVT ASID tagged" :
-		cache_is_vipt_aliasing() ? "VIPT aliasing" :
-		cache_is_vipt_nonaliasing() ? "VIPT nonaliasing" :
-"unknown");
-}
-
-The cachetype access cp15 CTR register through read_cpuid_cachetype(). And
-if ARMv7, then its [31:29] value is 100(b).
-
-[31:29] = 100(b) on ARMv7
-[31:29] = 000(b) on ARMv6
-
-So, if ARMv7, then cacheid is mapped VIPT cache and non-aliasing,
-CACHEID_VIPT_NONALIASING.
-
-But actually, didn't check L1Ip which has policy of instruction cache, and
-policy of data cache from other register at that time. Nevertheless, if
-ARMv7, printed like following and used.
-'CPU: VIPT nonaliasing data cache, VIPT nonaliasing instruction cache'
-
-If every ARMv7 SoCs have VIPT non-aliasing d-cache and i-cache, then no
-problem. But actually, Samsung S5PV310(cortex-A9) has PIPT d-cache and VIPT
-non-aliasing i-cache. I think PIPT does not mean VIPT non-aliasing even
-though their functionality is similar.
-Isn't there any functionality difference?
-And..in this case, isn't there any problems?
-...
-
-How do you think about this?
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Maurus Cuelenaere
