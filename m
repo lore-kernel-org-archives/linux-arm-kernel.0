@@ -1,141 +1,40 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 05 Jul 2010 16:38:21 +0900
-Subject: [PATCH v2 3/3] sdhci-s3c: Add SDHCI_QUIRK_NO_WP_BIT quirk
-In-Reply-To: <006301cb1c11$aa7d47f0$ff77d7d0$%szyprowski@samsung.com>
-References: <1278118844-21770-1-git-send-email-kgene.kim@samsung.com>
-	<1278118844-21770-4-git-send-email-kgene.kim@samsung.com>
-	<006301cb1c11$aa7d47f0$ff77d7d0$%szyprowski@samsung.com>
-Message-ID: <001b01cb1c15$111e23f0$335a6bd0$%kim@samsung.com>
+From: philippe.langlais@stericsson.com (Philippe Langlais)
+Date: Mon, 5 Jul 2010 09:39:34 +0200
+Subject: [PATCH 5/6] U6715 8250 serial like driver
+In-Reply-To: <20100624143129.GE6523@n2100.arm.linux.org.uk>
+References: <1274948852-9179-1-git-send-email-philippe.langlais@stericsson.com>
+	<1274948852-9179-6-git-send-email-philippe.langlais@stericsson.com>
+	<20100624143129.GE6523@n2100.arm.linux.org.uk>
+Message-ID: <4C318C36.9010501@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> 
-> Hello,
-> 
-Hello :-)
+Hi
 
-> On Saturday, July 03, 2010 3:01 AM Kukjin Kim wrote:
-> 
-> > From: Hyuk Lee <hyuk1.lee@samsung.com>
-> >
-> > If host controller doesn't have WP pin which should be connnected with
-> > SDMMC
-> > card WP pin, can implement get_ro function with using the allocated
-gpio.
-> > In order to use this quirk wp_gpio in the platform data must be set.
-> >
-> > Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> >  drivers/mmc/host/sdhci-s3c.c |   44
-> > ++++++++++++++++++++++++++++++++++++++++++
-> >  drivers/mmc/host/sdhci.c     |    3 ++
-> >  drivers/mmc/host/sdhci.h     |    3 ++
-> >  3 files changed, 50 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> > index af21792..ed9376d 100644
-> > --- a/drivers/mmc/host/sdhci-s3c.c
-> > +++ b/drivers/mmc/host/sdhci-s3c.c
-> > @@ -18,11 +18,13 @@
-> >  #include <linux/slab.h>
-> >  #include <linux/clk.h>
-> >  #include <linux/io.h>
-> > +#include <linux/gpio.h>
-> >
-> >  #include <linux/mmc/host.h>
-> >
-> >  #include <plat/sdhci.h>
-> >  #include <plat/regs-sdhci.h>
-> > +#include <plat/gpio-cfg.h>
-> >
-> >  #include "sdhci.h"
-> >
-> > @@ -209,6 +211,36 @@ static void sdhci_s3c_set_clock(struct sdhci_host
-> > *host, unsigned int clock)
-> >  	}
-> >  }
-> >
-> > +/**
-> > + * sdhci_s3c_get_ro - callback for get_ro
-> > + * @host: The SDHCI host being changed
-> > + *
-> > + * If the WP pin is connected with GPIO, can get the value which
-indicates
-> > + * the card is locked or not.
-> > +*/
-> > +static int sdhci_s3c_get_ro(struct mmc_host *mmc)
-> > +{
-> > +	struct sdhci_s3c *sc;
-> > +	struct sdhci_host *host;
-> > +
-> > +	host = mmc_priv(mmc);
-> > +	sc = sdhci_priv(host);
-> > +
-> > +	return gpio_get_value(sc->pdata->wp_gpio);
-> > +}
-> > +
-> > +/**
-> > + * sdhci_s3c_cfg_wp - configure GPIO for WP pin
-> > + * @gpio_num: GPIO number which connected with WP line from SD/MMC slot
-> > + *
-> > + * Configure GPIO for using WP line
-> > +*/
-> > +static void sdhci_s3c_cfg_wp(unsigned int gpio_num)
-> > +{
-> > +	s3c_gpio_cfgpin(gpio_num, S3C_GPIO_INPUT);
-> > +	s3c_gpio_setpull(gpio_num, S3C_GPIO_PULL_UP);
-> > +}
-> > +
-> >  static struct sdhci_ops sdhci_s3c_ops = {
-> >  	.get_max_clock		= sdhci_s3c_get_max_clk,
-> >  	.get_timeout_clock	= sdhci_s3c_get_timeout_clk,
-> > @@ -311,6 +343,9 @@ static int __devinit sdhci_s3c_probe(struct
-> > platform_device *pdev)
-> >  	if (pdata->cfg_gpio)
-> >  		pdata->cfg_gpio(pdev, pdata->max_width);
-> >
-> > +	if (pdata->wp_gpio)
-> > +		sdhci_s3c_ops.get_ro = sdhci_s3c_get_ro;
-> > +
-> >  	host->hw_name = "samsung-hsmmc";
-> >  	host->ops = &sdhci_s3c_ops;
-> >  	host->quirks = 0;
-> > @@ -335,6 +370,15 @@ static int __devinit sdhci_s3c_probe(struct
-> > platform_device *pdev)
-> >  	host->quirks |= (SDHCI_QUIRK_32BIT_DMA_ADDR |
-> >  			 SDHCI_QUIRK_32BIT_DMA_SIZE);
-> >
-> > +	/* Controller's WP pin donsn't connected with SD card. So we
-allocate
-> > +	 * a GPIO for getting WP data from SD card and use that data as
-> > +	 * the return value of the get_ro function */
-> > +	host->quirks |= SDHCI_QUIRK_NO_WP_BIT;
-> > +
-> > +	/* to configure gpio pin as a card write protection signal */
-> > +	if (pdata->wp_gpio)
-> > +		sdhci_s3c_cfg_wp(pdata->wp_gpio);
-> > +
-> 
-> Assuming that pdata->wp_gpio == 0 means that the board has no additional
-wp
-> feature is wrong from the 'good and clean' API point of view. For example
-> GPIO_A0(0) pin for S5PV210 is gpio number 0. This would mean that it
-cannot
-> be used for this feature at all.
-> 
-Oh, you're right. missed that point.
+On 06/24/10 16:31, Russell King - ARM Linux wrote:
+> On Thu, May 27, 2010 at 10:27:31AM +0200, Philippe Langlais wrote:
+>    
+>> Some modifications in 16550A/8250 serial driver
+>> and clock management specificity
+>>      
+> Can't say much about this; you need to get people interested in serial to
+> review this.  The comments about header file ordering apply.
+>
+>    
+>> @@ -199,10 +199,16 @@ static const struct serial8250_config uart_config[] = {
+>>   	},
+>>   	[PORT_16550A] = {
+>>   		.name		= "16550A",
+>> +#if defined(CONFIG_SERIAL_8250_U6)
+>> +		.fifo_size	= 64,
+>> +		.tx_loadsz	= 64,
+>> +		.flags		= UART_CAP_FIFO | UART_CAP_AFE,
+>>      
+> If you have auto flow control, then you don't have a 16550A.  You have
+> something that is compatible with a 16550A - maybe it's more closely
+> related to a 16750?
+>    
+I'll send our serial driver to the LKML and discuss about that.
 
-> I was told to use gpio_is_valid() macro and use -1 as 'invalid gpio' pin
-> number for implementing similar checks.
-
-OK..will fix it.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Regards
+Philippe
