@@ -1,81 +1,112 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Sun, 4 Jul 2010 21:33:04 +0200 (CEST)
-Subject: [PATCH v1 2/2] S5PV210: Add MIPI-DSI Driver.
-In-Reply-To: <4C2EF7F1.7010309@samsung.com>
-References: <4C29AF72.6090200@samsung.com> <4C29C766.7010901@samsung.com>
-	<4C2DA889.5010809@samsung.com> <4C2EF7F1.7010309@samsung.com>
-Message-ID: <Pine.LNX.4.64.1007042128390.1131@axis700.grange>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Mon, 05 Jul 2010 10:46:51 +0900
+Subject: [PATCH] ARM: S5P: Add PMU device
+Message-ID: <1278294411-5104-1-git-send-email-jy0922.shim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 3 Jul 2010, InKi Dae wrote:
+This patch adds an initcall for the s5p platforms so that they register
+their PMU IRQs with the PMU framework in the Kernel.
 
-> this patch addes MIPI-DSI Driver.
-> 
-> to use this driver, some structures below should be added to machine
-> specific file.
-> 
-> struct dsim_config
-> - define clock info, data lane count and video mode info for MIPI-DSI
-> Controller.
-> 
-> struct dsim_lcd_config
-> - define interface mode, channel ID, Pixel format and so on.
-> 
-> struct s5p_platform_dsim
-> - define callbacks for initializing D-PHY, MIPI reset and trigger
-> releated interfaces of s3c-fb.c file.
-> 
-> struct mipi_ddi_platform_data
-> - define following callbacks.
-> - a function for transferring and receiving command data to mipi based
-> lcd panel.
-> - a function for getting framedone status of mipi-dsi controller.
-> - a function for clearing framedone interrupt of mipi-dsi controller.
-> - a function for checking i80 framedone status of display controller.(fimd)
-> - a function for triggering to display controller.(fimd)
-> 
-> Signed-off-by: InKi Dae <inki.dae at samsung.com <mailto:p.osciak@samsung.com>>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com
-> <mailto:kyungmin.park@samsung.com>>
-> ---
-> 
-> diff --git a/arch/arm/plat-samsung/include/plat/dsim.h b/arch/arm/plat-samsung/include/plat/dsim.h
-> new file mode 100644
-> index 0000000..49d8946
-> --- /dev/null
-> +++ b/arch/arm/plat-samsung/include/plat/dsim.h
-> @@ -0,0 +1,493 @@
-
-[snip]
-
-> +enum dsim_fifo_state {
-> +	DSIM_RX_DATA_FULL = (1 << 25),
-> +	DSIM_RX_DATA_EMPTY = (1 << 24),
-> +	SFR_HEADER_FULL = (1 << 23),
-> +	SFR_HEADER_EMPTY = (1 << 22),
-> +	SFR_PAYLOAD_FULL = (1 << 21),
-> +	SFR_PAYLOAD_EMPTY = (1 << 20),
-> +	I80_HEADER_FULL = (1 << 19),
-> +	I80_HEADER_EMPTY = (1 << 18),
-> +	I80_PALOAD_FULL = (1 << 17),
-> +	I80_PALOAD_EMPTY = (1 << 16),
-> +	SUB_DISP_HEADER_FULL = (1 << 15),
-> +	SUB_DISP_HEADER_EMPTY = (1 << 14),
-> +	SUB_DISP_PAYLOAD_FULL = (1 << 13),
-> +	SUB_DISP_PAYLOAD_EMPTY = (1 << 12),
-> +	MAIN_DISP_HEADER_FULL = (1 << 11),
-> +	MAIN_DISP_HEADER_EMPTY = (1 << 10),
-> +	MAIN_DISP_PAYLOAD_FULL = (1 << 9),
-> +	MAIN_DISP_PAYLOAD_EMPTY = (1 << 8),
-> +};
-
-Please use include/video/mipi_display.h for these transaction types and, 
-possibly, for other generic MIPI DSI defines.
-
-Thanks
-Guennadi
+Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
 ---
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+ arch/arm/mach-s5p6442/include/mach/irqs.h |    2 +-
+ arch/arm/mach-s5pc100/include/mach/irqs.h |    1 +
+ arch/arm/mach-s5pv210/include/mach/irqs.h |    1 +
+ arch/arm/plat-s5p/Makefile                |    1 +
+ arch/arm/plat-s5p/dev-pmu.c               |   37 +++++++++++++++++++++++++++++
+ 5 files changed, 41 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/plat-s5p/dev-pmu.c
+
+diff --git a/arch/arm/mach-s5p6442/include/mach/irqs.h b/arch/arm/mach-s5p6442/include/mach/irqs.h
+index 02c2374..22173cc 100644
+--- a/arch/arm/mach-s5p6442/include/mach/irqs.h
++++ b/arch/arm/mach-s5p6442/include/mach/irqs.h
+@@ -32,7 +32,7 @@
+ #define IRQ_GPIOINT		S5P_IRQ_VIC0(30)
+ 
+ /* VIC1 */
+-#define IRQ_nPMUIRQ 		S5P_IRQ_VIC1(0)
++#define IRQ_PMUIRQ		S5P_IRQ_VIC1(0)
+ #define IRQ_ONENAND 		S5P_IRQ_VIC1(7)
+ #define IRQ_UART0 		S5P_IRQ_VIC1(10)
+ #define IRQ_UART1 		S5P_IRQ_VIC1(11)
+diff --git a/arch/arm/mach-s5pc100/include/mach/irqs.h b/arch/arm/mach-s5pc100/include/mach/irqs.h
+index 28aa551..9cc1b0d 100644
+--- a/arch/arm/mach-s5pc100/include/mach/irqs.h
++++ b/arch/arm/mach-s5pc100/include/mach/irqs.h
+@@ -110,5 +110,6 @@
+ #define IRQ_LCD_FIFO		IRQ_LCD0
+ #define IRQ_LCD_VSYNC		IRQ_LCD1
+ #define IRQ_LCD_SYSTEM		IRQ_LCD2
++#define IRQ_PMUIRQ		IRQ_CORTEX0
+ 
+ #endif /* __ASM_ARCH_IRQS_H */
+diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-s5pv210/include/mach/irqs.h
+index 9689537..3972f8d 100644
+--- a/arch/arm/mach-s5pv210/include/mach/irqs.h
++++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
+@@ -128,5 +128,6 @@
+ #define IRQ_LCD_FIFO		IRQ_LCD0
+ #define IRQ_LCD_VSYNC		IRQ_LCD1
+ #define IRQ_LCD_SYSTEM		IRQ_LCD2
++#define IRQ_PMUIRQ		IRQ_CORTEX0
+ 
+ #endif /* ASM_ARCH_IRQS_H */
+diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
+index 39c242b..7e34194 100644
+--- a/arch/arm/plat-s5p/Makefile
++++ b/arch/arm/plat-s5p/Makefile
+@@ -12,6 +12,7 @@ obj-				:=
+ 
+ # Core files
+ 
++obj-y				+= dev-pmu.o
+ obj-y				+= dev-uart.o
+ obj-y				+= cpu.o
+ obj-y				+= clock.o
+diff --git a/arch/arm/plat-s5p/dev-pmu.c b/arch/arm/plat-s5p/dev-pmu.c
+new file mode 100644
+index 0000000..de3b118
+--- /dev/null
++++ b/arch/arm/plat-s5p/dev-pmu.c
+@@ -0,0 +1,37 @@
++/*
++ * linux/arch/arm/plat-s5p/dev-pmu.c
++ *
++ * Copyright (C) 2010 Samsung Electronics Co.Ltd
++ * Author: Joonyoung Shim <jy0922.shim@samsung.com>
++ *
++ *  This program is free software; you can redistribute  it and/or modify it
++ *  under  the terms of  the GNU General  Public License as published by the
++ *  Free Software Foundation;  either version 2 of the  License, or (at your
++ *  option) any later version.
++ *
++ */
++
++#include <linux/platform_device.h>
++#include <asm/pmu.h>
++#include <mach/irqs.h>
++#include <mach/map.h>
++
++static struct resource s5p_pmu_resource = {
++	.start	= IRQ_PMUIRQ,
++	.end	= IRQ_PMUIRQ,
++	.flags	= IORESOURCE_IRQ,
++};
++
++struct platform_device s5p_device_pmu = {
++	.name		= "arm-pmu",
++	.id		= ARM_PMU_DEVICE_CPU,
++	.num_resources	= 1,
++	.resource	= &s5p_pmu_resource,
++};
++
++static int __init s5p_pmu_init(void)
++{
++	platform_device_register(&s5p_device_pmu);
++	return 0;
++}
++arch_initcall(s5p_pmu_init);
+-- 
+1.7.0.4
