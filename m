@@ -1,69 +1,112 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 05 Jul 2010 10:12:04 +0100
-Subject: [patch 2/2] arm: Implement l2x0 cache disable function
-In-Reply-To: <20100704190913.GA8596@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1007021658300.2525@localhost.localdomain>
-	<1278087010.10162.271.camel@e102109-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1007021835512.2525@localhost.localdomain>
-	<1278089680.10162.279.camel@e102109-lin.cambridge.arm.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C5ECEF1D@dbde02.ent.ti.com>
-	<20100704190913.GA8596@n2100.arm.linux.org.uk>
-Message-ID: <1278321124.11315.6.camel@e102109-lin.cambridge.arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 05 Jul 2010 11:16:54 +0200
+Subject: [PATCH 1/3] arm: s5pv210: GONI: add support for framebuffer
+In-Reply-To: <1278321416-32524-1-git-send-email-m.szyprowski@samsung.com>
+References: <1278321416-32524-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1278321416-32524-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2010-07-04 at 20:09 +0100, Russell King - ARM Linux wrote:
-> On Sat, Jul 03, 2010 at 12:31:53PM +0530, Shilimkar, Santosh wrote:
-> > > -----Original Message-----
-> > > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> > > kernel-bounces at lists.infradead.org] On Behalf Of Catalin Marinas
-> > > Sent: Friday, July 02, 2010 10:25 PM
-> > > To: Thomas Gleixner
-> > > Cc: Tony Lindgren; LAK
-> > > Subject: Re: [patch 2/2] arm: Implement l2x0 cache disable function
-> > >
-> > > On Fri, 2010-07-02 at 17:39 +0100, Thomas Gleixner wrote:
-> > > > Simply because you need to flush the cache in the decompressor of the
-> > > > new kernel before jumping into it and I doubt that Russell will be
-> > > > happy about adding an utter L2 mess to the decompressor.
-> > >
-> > > The decompressor can create mappings as inner cacheable outer
-> > > non-cacheable and it would not pollute the L2 cache.
-> > >
-> > > I wonder how the OMAP guys deal with an already enabled L2 cache during
-> > > decompressing.
-> >
-> > $L2 isn't enabled during the decompression. It's done " __v7_setup" on OMAP3
-> > and just before " l2x0_init" on OMAP4
-[...]
-> I think it's overkill to add L2 support to the decompressor - and I
-> also think it's overkill to teach the decompressor about the XP format
-> tables, 
+This patch adds required platform definitions to enable s3c-fb
+driver on GONI board. One framebuffer window in 480x800x16bpp mode is
+defined.
 
-Even if we did this, the secure software needs to be aware of OS
-rebooting since it may have a non-secure cacheable mapping which is
-speculatively fetched (and I was also told that the L2 treats the secure
-access bit as an address one - so you get separate cache lines for
-secure and non-secure).
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv210/Kconfig     |    2 +
+ arch/arm/mach-s5pv210/mach-goni.c |   39 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+), 0 deletions(-)
 
-> Also consider the case where the kernel you're booting into doesn't
-> have L2 support enabled - maybe you disabled L2 support because it's
-> causing problems.  If you boot with L2 already enabled, then this
-> kernel is going to struggle because it can't handle the enabled L2.
-
-You could have an outer non-cacheable cache policy and set the page
-table bits accordingly. But I agree with you, it's not worth the extra
-effort.
-
-> Let's ensure that we bring L2 to a clean and disabled state prior to
-> invoking a boot loader or subsequent kernel - even if that means we
-> have to make SMC calls to achieve that.
-
-So Thomas' original patches are pretty much OK, with the exception of
-using clean+invalidate instead of just invalidate during disabling.
-
-An additional question - do we need to flush the L2 cache again after it
-was disabled, just in case we got some speculative loads?
-
+diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+index 5e88941..8ab4bb0 100644
+--- a/arch/arm/mach-s5pv210/Kconfig
++++ b/arch/arm/mach-s5pv210/Kconfig
+@@ -59,6 +59,8 @@ config MACH_GONI
+ 	bool "GONI"
+ 	select CPU_S5PV210
+ 	select ARCH_SPARSEMEM_ENABLE
++	select S5PV210_SETUP_FB_24BPP
++	select S3C_DEV_FB
+ 	select S5PC110_DEV_ONENAND
+ 	help
+ 	  Machine support for Samsung GONI board
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index 88c38e3..05b4a1a 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -12,6 +12,9 @@
+ #include <linux/types.h>
+ #include <linux/init.h>
+ #include <linux/serial_core.h>
++#include <linux/fb.h>
++#include <linux/delay.h>
++#include <linux/clk.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -20,11 +23,15 @@
+ 
+ #include <mach/map.h>
+ #include <mach/regs-clock.h>
++#include <mach/regs-fb.h>
++#include <mach/gpio.h>
+ 
++#include <plat/gpio-cfg.h>
+ #include <plat/regs-serial.h>
+ #include <plat/s5pv210.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
++#include <plat/fb.h>
+ 
+ /* Following are default values for UCON, ULCON and UFCON UART registers */
+ #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+@@ -73,7 +80,35 @@ static struct s3c2410_uartcfg goni_uartcfgs[] __initdata = {
+ 	},
+ };
+ 
++/* Frame Buffer */
++static struct s3c_fb_pd_win goni_fb_win0 = {
++	.win_mode = {
++		.pixclock = 1000000000000ULL / ((16+16+2+480)*(28+3+2+800)*55),
++		.left_margin = 16,
++		.right_margin = 16,
++		.upper_margin = 3,
++		.lower_margin = 28,
++		.hsync_len = 2,
++		.vsync_len = 2,
++		.xres = 480,
++		.yres = 800,
++		.refresh = 55,
++	},
++	.max_bpp = 32,
++	.default_bpp = 16,
++};
++
++static struct s3c_fb_platdata goni_lcd_pdata __initdata = {
++	.win[0]	= &goni_fb_win0,
++	.vidcon0		= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB |
++					VIDCON0_CLKSEL_LCD,
++	.vidcon1		= VIDCON1_INV_VCLK | VIDCON1_INV_VDEN
++				| VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
++	.setup_gpio		= s5pv210_fb_gpio_setup_24bpp,
++};
++
+ static struct platform_device *goni_devices[] __initdata = {
++	&s3c_device_fb,
+ 	&s5pc110_device_onenand,
+ };
+ 
+@@ -86,6 +121,10 @@ static void __init goni_map_io(void)
+ 
+ static void __init goni_machine_init(void)
+ {
++
++	/* FB */
++	s3c_fb_set_platdata(&goni_lcd_pdata);
++
+ 	platform_add_devices(goni_devices, ARRAY_SIZE(goni_devices));
+ }
+ 
 -- 
-Catalin
+1.7.1.569.g6f426
