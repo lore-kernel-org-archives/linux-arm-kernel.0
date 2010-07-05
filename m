@@ -1,17 +1,17 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Jul 2010 11:24:46 +0300
-Subject: [PATCH 12/33] Removing dead OMAP_STI
-In-Reply-To: <35d3c6a25b5cc05a5eee3037075ccede85b1917f.1277911346.git.siccegge@cs.fau.de>
+Date: Mon, 5 Jul 2010 11:28:12 +0300
+Subject: [PATCH 13/33] Replacing LEDS_OMAP_DEBUG with OMAP_DEBUG_LEDS
+In-Reply-To: <b1363abf63cf2e35450acae82765ba679f1979bc.1277911346.git.siccegge@cs.fau.de>
 References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<35d3c6a25b5cc05a5eee3037075ccede85b1917f.1277911346.git.siccegge@cs.fau.de>
-Message-ID: <20100705082444.GF15951@atomide.com>
+	<b1363abf63cf2e35450acae82765ba679f1979bc.1277911346.git.siccegge@cs.fau.de>
+Message-ID: <20100705082810.GG15951@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Christoph Egger <siccegge@cs.fau.de> [100630 18:51]:
-> OMAP_STI doesn't exist in Kconfig, therefore removing all
-> references for it from the source code.
+* Christoph Egger <siccegge@cs.fau.de> [100630 18:58]:
+> LEDS_OMAP_DEBUG doesn't exist in Kconfig, therefore replacing all
+> references for it with OMAP_DEBUG_LEDS from the source code.
 
-Thanks, applied.
+Applied.
 
 Tony
