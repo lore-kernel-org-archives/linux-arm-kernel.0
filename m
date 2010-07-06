@@ -1,86 +1,47 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue,  6 Jul 2010 03:37:36 +0300
-Subject: [PATCH 05/15] omap: hsmmc: add virtual card detect support
+Date: Tue,  6 Jul 2010 03:37:38 +0300
+Subject: [PATCH 07/15] omap zoom3: wlan board muxing
 In-Reply-To: <1278376666-3509-1-git-send-email-ohad@wizery.com>
 References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
-Message-ID: <1278376666-3509-6-git-send-email-ohad@wizery.com>
+Message-ID: <1278376666-3509-8-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ohad Ben-Cohen <ohadb@ti.com>
 
-Add support for software emulation of card detect
-events.
-
-This is required for specific controllers
-that are hard wired with embedded SDIO devices
-(such as TI's wl1271 WLAN device).
-
-Board-specific configuration is required to
-enable this software card detect control.
-
-Based on Android's EMBEDDED SDIO patch by
-San Mehat <san@android.com>.
+Add board muxing to support the wlan wl1271 chip that is
+hardwired to mmc2 (third mmc controller) on the ZOOM3.
 
 Signed-off-by: Ohad Ben-Cohen <ohadb@ti.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |   37 ++++++++++++++++++++++++++++++++++++-
- 1 files changed, 36 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/board-zoom3.c |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index b032828..60694df 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -1208,6 +1208,38 @@ static void omap_hsmmc_detect(struct work_struct *work)
- 		mmc_detect_change(host->mmc, (HZ * 50) / 1000);
- }
+diff --git a/arch/arm/mach-omap2/board-zoom3.c b/arch/arm/mach-omap2/board-zoom3.c
+index 3314704..0b62663 100644
+--- a/arch/arm/mach-omap2/board-zoom3.c
++++ b/arch/arm/mach-omap2/board-zoom3.c
+@@ -46,6 +46,21 @@ static void __init omap_zoom_init_irq(void)
  
-+#ifdef CONFIG_MMC_EMBEDDED_SDIO
-+static void omap_hsmmc_set_embedded_data(void *dev_id, void *priv)
-+{
-+	struct omap_hsmmc_host *host = dev_id;
-+	struct mmc_host *mmc = host->mmc;
-+
-+	mmc_set_embedded_data(mmc, priv);
-+}
-+
-+static void omap_hsmmc_virtual_detect(void *dev_id, int carddetect)
-+{
-+	struct omap_hsmmc_host *host = dev_id;
-+
-+	printk(KERN_DEBUG "%s: card detect %d\n", mmc_hostname(host->mmc),
-+							carddetect);
-+
-+	sysfs_notify(&host->mmc->class_dev.kobj, NULL, "cover_switch");
-+
-+	if (carddetect)
-+		mmc_detect_change(host->mmc, (HZ * 200) / 1000);
-+	else
-+		mmc_detect_change(host->mmc, (HZ * 50) / 1000);
-+}
-+#else
-+static void omap_hsmmc_set_embedded_data(void *dev_id, void *priv)
-+{
-+}
-+static void omap_hsmmc_virtual_detect(void *dev_id, int carddetect)
-+{
-+}
+ #ifdef CONFIG_OMAP_MUX
+ static struct omap_board_mux board_mux[] __initdata = {
++#ifdef CONFIG_OMAP_ZOOM_WLAN
++	/* WLAN IRQ - GPIO 162 */
++	OMAP3_MUX(MCBSP1_CLKX, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
++	/* WLAN POWER ENABLE - GPIO 101 */
++	OMAP3_MUX(CAM_D2, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
++	/* WLAN SDIO: MMC3 CMD */
++	OMAP3_MUX(MCSPI1_CS1, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLUP),
++	/* WLAN SDIO: MMC3 CLK */
++	OMAP3_MUX(ETK_CLK, OMAP_MUX_MODE2 | OMAP_PIN_INPUT_PULLUP),
++	/* WLAN SDIO: MMC3 DAT[0-3] */
++	OMAP3_MUX(ETK_D3, OMAP_MUX_MODE2 | OMAP_PIN_INPUT_PULLUP),
++	OMAP3_MUX(ETK_D4, OMAP_MUX_MODE2 | OMAP_PIN_INPUT_PULLUP),
++	OMAP3_MUX(ETK_D5, OMAP_MUX_MODE2 | OMAP_PIN_INPUT_PULLUP),
++	OMAP3_MUX(ETK_D6, OMAP_MUX_MODE2 | OMAP_PIN_INPUT_PULLUP),
 +#endif
-+
- /*
-  * ISR for handling card insertion and removal
-  */
-@@ -2170,7 +2202,10 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
- 				"Unable to grab MMC CD IRQ\n");
- 			goto err_irq_cd;
- 		}
--	}
-+	} else if (mmc_slot(host).register_embedded_control)
-+		mmc_slot(host).register_embedded_control(host,
-+					omap_hsmmc_virtual_detect,
-+					omap_hsmmc_set_embedded_data);
- 
- 	omap_hsmmc_disable_irq(host);
- 
+ 	{ .reg_offset = OMAP_MUX_TERMINATOR },
+ };
+ #else
 -- 
 1.7.0.4
