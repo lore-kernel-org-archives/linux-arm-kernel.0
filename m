@@ -1,147 +1,54 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue,  6 Jul 2010 03:37:39 +0300
-Subject: [PATCH 08/15] wireless: wl1271: make wl12xx.h common to both spi and
-	sdio
+Date: Tue,  6 Jul 2010 03:37:40 +0300
+Subject: [PATCH 09/15] wireless: wl12xx: support pdata SDIO handlers
 In-Reply-To: <1278376666-3509-1-git-send-email-ohad@wizery.com>
 References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
-Message-ID: <1278376666-3509-9-git-send-email-ohad@wizery.com>
+Message-ID: <1278376666-3509-10-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ohad Ben-Cohen <ohadb@ti.com>
 
-Move wl12xx.h outside of the spi-specific location,
-so it can be shared with both spi and sdio solutions.
+Make it possible for board code to send SDIO handlers to
+the wl12xx driver.
+
+These SDIO handlers are needed to allow software to trigger
+card detect events for hard-wired SDIO devices such as the
+wl1271 device.
 
 Signed-off-by: Ohad Ben-Cohen <ohadb@ti.com>
 ---
- drivers/net/wireless/wl12xx/wl1251_sdio.c |    2 +-
- drivers/net/wireless/wl12xx/wl1251_spi.c  |    2 +-
- drivers/net/wireless/wl12xx/wl1271_spi.c  |    2 +-
- include/linux/spi/wl12xx.h                |   34 -----------------------------
- include/linux/wl12xx.h                    |   34 +++++++++++++++++++++++++++++
- 5 files changed, 37 insertions(+), 37 deletions(-)
- delete mode 100644 include/linux/spi/wl12xx.h
- create mode 100644 include/linux/wl12xx.h
+ drivers/net/wireless/wl12xx/wl1271.h |    4 ++++
+ include/linux/wl12xx.h               |    2 ++
+ 2 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/net/wireless/wl12xx/wl1251_sdio.c b/drivers/net/wireless/wl12xx/wl1251_sdio.c
-index c561332..416d5aa 100644
---- a/drivers/net/wireless/wl12xx/wl1251_sdio.c
-+++ b/drivers/net/wireless/wl12xx/wl1251_sdio.c
-@@ -24,7 +24,7 @@
- #include <linux/mmc/sdio_func.h>
- #include <linux/mmc/sdio_ids.h>
- #include <linux/platform_device.h>
--#include <linux/spi/wl12xx.h>
-+#include <linux/wl12xx.h>
- #include <linux/irq.h>
+diff --git a/drivers/net/wireless/wl12xx/wl1271.h b/drivers/net/wireless/wl12xx/wl1271.h
+index 6f1b6b5..fc4d122 100644
+--- a/drivers/net/wireless/wl12xx/wl1271.h
++++ b/drivers/net/wireless/wl12xx/wl1271.h
+@@ -356,6 +356,10 @@ struct wl1271 {
+ 	struct wl1271_if_operations *if_ops;
  
- #include "wl1251.h"
-diff --git a/drivers/net/wireless/wl12xx/wl1251_spi.c b/drivers/net/wireless/wl12xx/wl1251_spi.c
-index e814742..4847b6a 100644
---- a/drivers/net/wireless/wl12xx/wl1251_spi.c
-+++ b/drivers/net/wireless/wl12xx/wl1251_spi.c
-@@ -26,7 +26,7 @@
- #include <linux/slab.h>
- #include <linux/crc7.h>
- #include <linux/spi/spi.h>
--#include <linux/spi/wl12xx.h>
-+#include <linux/wl12xx.h>
+ 	void (*set_power)(bool enable);
++	/* SDIO card detect emulation */
++	void (*set_carddetect)(bool card_present);
++	void (*set_embedded_data)(void *priv);
++
+ 	int irq;
  
- #include "wl1251.h"
- #include "wl1251_reg.h"
-diff --git a/drivers/net/wireless/wl12xx/wl1271_spi.c b/drivers/net/wireless/wl12xx/wl1271_spi.c
-index 5189b81..e866049 100644
---- a/drivers/net/wireless/wl12xx/wl1271_spi.c
-+++ b/drivers/net/wireless/wl12xx/wl1271_spi.c
-@@ -25,7 +25,7 @@
- #include <linux/module.h>
- #include <linux/crc7.h>
- #include <linux/spi/spi.h>
--#include <linux/spi/wl12xx.h>
-+#include <linux/wl12xx.h>
- #include <linux/slab.h>
- 
- #include "wl1271.h"
-diff --git a/include/linux/spi/wl12xx.h b/include/linux/spi/wl12xx.h
-deleted file mode 100644
-index a223ecb..0000000
---- a/include/linux/spi/wl12xx.h
-+++ /dev/null
-@@ -1,34 +0,0 @@
--/*
-- * This file is part of wl12xx
-- *
-- * Copyright (C) 2009 Nokia Corporation
-- *
-- * Contact: Kalle Valo <kalle.valo@nokia.com>
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-- * 02110-1301 USA
-- *
-- */
--
--#ifndef _LINUX_SPI_WL12XX_H
--#define _LINUX_SPI_WL12XX_H
--
--struct wl12xx_platform_data {
--	void (*set_power)(bool enable);
--	/* SDIO only: IRQ number if WLAN_IRQ line is used, 0 for SDIO IRQs */
--	int irq;
--	bool use_eeprom;
--};
--
--#endif
+ 	spinlock_t wl_lock;
 diff --git a/include/linux/wl12xx.h b/include/linux/wl12xx.h
-new file mode 100644
-index 0000000..137ac89
---- /dev/null
+index 137ac89..4106184 100644
+--- a/include/linux/wl12xx.h
 +++ b/include/linux/wl12xx.h
-@@ -0,0 +1,34 @@
-+/*
-+ * This file is part of wl12xx
-+ *
-+ * Copyright (C) 2009 Nokia Corporation
-+ *
-+ * Contact: Kalle Valo <kalle.valo@nokia.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-+ * 02110-1301 USA
-+ *
-+ */
-+
-+#ifndef _LINUX_WL12XX_H
-+#define _LINUX_WL12XX_H
-+
-+struct wl12xx_platform_data {
-+	void (*set_power)(bool enable);
-+	/* SDIO only: IRQ number if WLAN_IRQ line is used, 0 for SDIO IRQs */
-+	int irq;
-+	bool use_eeprom;
-+};
-+
-+#endif
+@@ -26,6 +26,8 @@
+ 
+ struct wl12xx_platform_data {
+ 	void (*set_power)(bool enable);
++	void (*set_carddetect)(bool card_present);
++	void (*set_embedded_data)(void *priv);
+ 	/* SDIO only: IRQ number if WLAN_IRQ line is used, 0 for SDIO IRQs */
+ 	int irq;
+ 	bool use_eeprom;
 -- 
 1.7.0.4
