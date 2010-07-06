@@ -1,38 +1,19 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 7 Jul 2010 00:24:49 +0800
-Subject: pxa u2dc driver
-In-Reply-To: <1278428859.3657.387.camel@balakrishnan-desktop>
-References: <1278428859.3657.387.camel@balakrishnan-desktop>
-Message-ID: <AANLkTilhY0hJ96TW5t2syRkdK8aQqINTuoNfaIcPVPMH@mail.gmail.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 06 Jul 2010 09:47:37 -0700
+Subject: [PATCH v2] msm: gpio: Add set_wake support to msm7200a-gpio's
+	irq_chip.
+In-Reply-To: <1278185128-29161-1-git-send-email-gbean@codeaurora.org>
+References: <1278185128-29161-1-git-send-email-gbean@codeaurora.org>
+Message-ID: <1278434857.27490.2.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 6, 2010 at 11:07 PM, balakrishnan
-<balakrishnan@e-consystems.com> wrote:
-> Hi,
-> ? I am working on pxa300 based development board and using Linux
-> 2.6.34. In this usb 1.1 device controller driver support "pxa27x_udc" is
-> available but usb 2.0 device controller driver is not available. Any
-> patches is there for 2.6.34? or anybody tried for pxa3xx u2dc gadget?
->
+On Sat, 2010-07-03 at 12:25 -0700, Gregory Bean wrote:
+> Add power-management and irq_chip hooks to allow configuration
+> of msm-gpio irq lines as wakeup sources.
+> 
 
-The only available version at the moment is the one provided within Marvell's
-BSP. There is currently no support in mainline yet. Igor and Mike have been
-working on this for quite a time I think. There is not only the U2D controller
-itself, but also the ULPI interface support, and to complicate things
-a bit more,
-there is also a backward compatibility consideration for U2D + 1.1 Host to
-form a strange OTG solution.
+What level of correlation is there between power management and the wake
+up hooks? Just irq_masks ?
 
-I didn't look into that for a long time, but if you are interested in working on
-it, please let us know (Cc'ed Igor and Mike).
-
-> With Regards
-> J.Balakrishnan
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Daniel
