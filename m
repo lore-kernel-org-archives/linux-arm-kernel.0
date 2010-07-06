@@ -1,67 +1,56 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 6 Jul 2010 13:22:26 +0300
-Subject: [PATCH 05/15] omap: hsmmc: add virtual card detect support
-In-Reply-To: <alpine.LFD.2.00.1007052134460.6020@xanadu.home>
-References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
-	<1278376666-3509-6-git-send-email-ohad@wizery.com>
-	<alpine.LFD.2.00.1007052134460.6020@xanadu.home>
-Message-ID: <AANLkTim4E4LlFERmfYA1M0HLBOoRAsQuvdW6QBNu6pC0@mail.gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 06 Jul 2010 13:31:34 +0300
+Subject: [PATCH v2] otg/ulpi.c : fix register write
+In-Reply-To: <4C27597F.3010902@eukrea.com>
+References: <1277311435-12027-1-git-send-email-eric@eukrea.com>
+	<4C236600.2030605@compulab.co.il> <4C236D9A.4030707@eukrea.com>
+	<4C2700C9.2090602@compulab.co.il> <4C27597F.3010902@eukrea.com>
+Message-ID: <4C330606.90207@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
 
-On Tue, Jul 6, 2010 at 4:45 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Tue, 6 Jul 2010, Ohad Ben-Cohen wrote:
->
->> From: Ohad Ben-Cohen <ohadb@ti.com>
+
+On 06/27/10 17:00, Eric B?nard wrote:
+> Le 27/06/2010 09:42, Igor Grinberg a ?crit :
 >>
->> Add support for software emulation of card detect
->> events.
+>> On 06/24/10 17:37, Eric B?nard wrote:
+>>> Le 24/06/2010 16:04, Igor Grinberg a ?crit :
+>>>> ulpi_set_flags is used to set the OTG flags and not to clear them,
+>>>> also it is a static function and is not a part of struct
+>>>> otg_transceiver,
+>>>> so it cannot be called from outside the ulpi.c, thus after the
+>>>> ulpi_create,
+>>>> it is never called.
+>>>> I think, currently, this should stay as it is.
+>>>>
+>>> OK, the problem that when one flag is set, you can't clear it without
+>>> resetting the PHY.
 >>
->> This is required for specific controllers
->> that are hard wired with embedded SDIO devices
->> (such as TI's wl1271 WLAN device).
+>> This is correct, but current ulpi driver is not designed for writing
+>> multiple times
+>> into the ULPI_OTG_CTRL register, only once when ulpi_init function is
+>> called.
+>> Do you call the ulpi_init function for a couple of times? Looks like
+>> a hack.
+>>
+> no hack, as I was fixing the other function, I though this one could
+> also be fixed :)
+> I'll send a patch with only the other fix.
 >
-> Why?
+> Eric
 >
-> Many instances of hardwired SDIO based WLAN devices do exist already,
-> and they don't need extra card detect events to be generated. ?The core
-> MMC code already triggers a probe for cards whenever a new host
-> controller is registered.
 
-We prefer not to power up the chip as early as boot time; instead, we
-would like to have it powered off until the wlan interface is brought
-up, power it on when the interface is brought up,
-and power it off again as soon as the interface is brought down again
-(to minimize power consumption when the wlan is not in use).
+I've found in the ulpi specification that there are some bits in the
+OTG Control Register that are set by default after power-on.
+Current ulpi driver can only set those bits and not clear them,
+making it impossible for the platform to clear them even at
+initialization time.
+So, after all v2 of your patch is correct.
+Sorry, for not seeing this at first time :( , so
 
-For that we can't rely on the probing done when the controller is
-registered, we want to have a mechanism to allow dynamic detection and
-removal of the card.
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 
-Note: the wl1271 device does support standard card detection, but
-AFAIK there's a limitation to use that with the specific omap
-controller the device is hardwired to. I will try to get more info
-about that, but probably Madhu can comment on that better.
-
->> Board-specific configuration is required to
->> enable this software card detect control.
->
-> Could you elaborate please?
-
-Please check out the last patch - that patch is doing that configuration.
-In essence, this virtual card detect mechanism is enabled only for
-specific controllers which we know there's an embedded sdio device
-hardwired to. This knowledge is board-specific, and that's why we
-enable this mechanism in the board files, per a specific mmc
-controller.
-
-Thanks,
-Ohad.
-
-
->
->
-> Nicolas
->
+-- 
+Regards,
+Igor.
