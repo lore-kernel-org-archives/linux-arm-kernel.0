@@ -1,193 +1,94 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 06 Jul 2010 09:01:42 +1200
-Subject: [PATCH 2/3] at91_udc: Add vbus polarity and polling mode
-In-Reply-To: <4C2D6DBE.4030504@bluewatersys.com>
-References: <1277699955-9931-1-git-send-email-ryan@bluewatersys.com>	<1277699955-9931-3-git-send-email-ryan@bluewatersys.com>	<4C2C9BDE.8090504@atmel.com>
-	<4C2D6DBE.4030504@bluewatersys.com>
-Message-ID: <4C324836.3060400@bluewatersys.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue,  6 Jul 2010 03:37:31 +0300
+Subject: [PATCH 00/15] wlan+omap+mmc: out-of-the-box WLAN support for ZOOM2/3
+Message-ID: <1278376666-3509-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/2010 04:40 PM, Ryan Mallon wrote:
-> On 07/02/2010 01:45 AM, Nicolas Ferre wrote:
->> Le 28/06/2010 06:39, Ryan Mallon :
->>   
->>> +		if (udc->board.vbus_polled) {
->>> +			udc->vbus = gpio_get_value_cansleep(udc->board.vbus_pin);
->>>     
->> Shouldn't we need here something like:
->> udc->vbus =  (udc->board.vbus_active_low) ^ gpio_get_value_cansleep(udc->board.vbus_pin);
->>   
-> 
-> Yes, thanks. The updated patch below fixes it. Also simplify
-> at91_vbus_update (always do the xor) and move the initial setting of
-> udc->vbus outside of the udc->board.vbus_polled test, since we can use
-> gpio_get_value_cansleep in both cases.
+From: Ohad Ben-Cohen <ohadb@ti.com>
 
-Nicolas, can I get your ack on this now to put this through to the patch
-system please?
+The ZOOM2/3 boards include TI's wl1271 wlan sdio device,
+hardwired to the 3rd mmc controller.
 
-~Ryan
+These patches add support for WLAN on the ZOOM2/3 boards
+using only mainline components (most notably mac80211 and wl1271).
 
-> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
-> ---
-> 
-> diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-> index df2ed84..58528aa 100644
-> --- a/arch/arm/mach-at91/include/mach/board.h
-> +++ b/arch/arm/mach-at91/include/mach/board.h
-> @@ -44,6 +44,8 @@
->   /* USB Device */
->  struct at91_udc_data {
->  	u8	vbus_pin;		/* high == host powering us */
-> +	u8	vbus_active_low;	/* vbus polarity */
-> +	u8	vbus_polled;		/* Use polling, not interrupt */
->  	u8	pullup_pin;		/* active == D+ pulled up */
->  	u8	pullup_active_low;	/* true == pullup_pin is active low */
->  };
-> diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-> index eaa79c8..be36f2f 100644
-> --- a/drivers/usb/gadget/at91_udc.c
-> +++ b/drivers/usb/gadget/at91_udc.c
-> @@ -76,6 +76,7 @@
->  static const char driver_name [] = "at91_udc";
->  static const char ep0name[] = "ep0";
->  
-> +#define VBUS_POLL_TIMEOUT	msecs_to_jiffies(1000)
->  
->  #define at91_udp_read(dev, reg) \
->  	__raw_readl((dev)->udp_baseaddr + (reg))
-> @@ -1556,20 +1557,48 @@ static struct at91_udc controller = {
->  	/* ep6 and ep7 are also reserved (custom silicon might use them) */
->  };
->  
-> +static void at91_vbus_update(struct at91_udc *udc, unsigned value)
-> +{
-> +	value ^= udc->board.vbus_active_low;
-> +	if (value != udc->vbus)
-> +		at91_vbus_session(&udc->gadget, value);
-> +}
-> +
->  static irqreturn_t at91_vbus_irq(int irq, void *_udc)
->  {
->  	struct at91_udc	*udc = _udc;
-> -	unsigned	value;
->  
->  	/* vbus needs at least brief debouncing */
->  	udelay(10);
-> -	value = gpio_get_value(udc->board.vbus_pin);
-> -	if (value != udc->vbus)
-> -		at91_vbus_session(&udc->gadget, value);
-> +	at91_vbus_update(udc, gpio_get_value(udc->board.vbus_pin));
->  
->  	return IRQ_HANDLED;
->  }
->  
-> +static void at91_vbus_timer_work(struct work_struct *work)
-> +{
-> +	struct at91_udc *udc = container_of(work, struct at91_udc, 
-> +					    vbus_timer_work);
-> +
-> +	at91_vbus_update(udc, gpio_get_value_cansleep(udc->board.vbus_pin));
-> +
-> +	if (!timer_pending(&udc->vbus_timer))
-> +		mod_timer(&udc->vbus_timer, jiffies + VBUS_POLL_TIMEOUT);
-> +}
-> +
-> +static void at91_vbus_timer(unsigned long data)
-> +{
-> +	struct at91_udc *udc = (struct at91_udc *)data;
-> +
-> +	/*
-> +	 * If we are polling vbus it is likely that the gpio is on an
-> +	 * bus such as i2c or spi which may sleep, so schedule some work
-> +	 * to read the vbus gpio
-> +	 */
-> +	if (!work_pending(&udc->vbus_timer_work))
-> +		schedule_work(&udc->vbus_timer_work);
-> +}
-> +
->  int usb_gadget_register_driver (struct usb_gadget_driver *driver)
->  {
->  	struct at91_udc	*udc = &controller;
-> @@ -1763,13 +1792,23 @@ static int __init at91udc_probe(struct platform_device *pdev)
->  		 * Get the initial state of VBUS - we cannot expect
->  		 * a pending interrupt.
->  		 */
-> -		udc->vbus = gpio_get_value(udc->board.vbus_pin);
-> -		if (request_irq(udc->board.vbus_pin, at91_vbus_irq,
-> -				IRQF_DISABLED, driver_name, udc)) {
-> -			DBG("request vbus irq %d failed\n",
-> -					udc->board.vbus_pin);
-> -			retval = -EBUSY;
-> -			goto fail3;
-> +		udc->vbus = gpio_get_value_cansleep(udc->board.vbus_pin) ^
-> +			udc->board.vbus_active_low;
-> +
-> +		if (udc->board.vbus_polled) {
-> +			INIT_WORK(&udc->vbus_timer_work, at91_vbus_timer_work);
-> +			setup_timer(&udc->vbus_timer, at91_vbus_timer,
-> +				    (unsigned long)udc);		
-> +			mod_timer(&udc->vbus_timer,
-> +				  jiffies + VBUS_POLL_TIMEOUT);
-> +		} else {
-> +			if (request_irq(udc->board.vbus_pin, at91_vbus_irq,
-> +					IRQF_DISABLED, driver_name, udc)) {
-> +				DBG("request vbus irq %d failed\n",
-> +				    udc->board.vbus_pin);
-> +				retval = -EBUSY;
-> +				goto fail3;
-> +			}
->  		}
->  	} else {
->  		DBG("no VBUS detection, assuming always-on\n");
-> @@ -1855,7 +1894,7 @@ static int at91udc_suspend(struct platform_device *pdev, pm_message_t mesg)
->  		enable_irq_wake(udc->udp_irq);
->  
->  	udc->active_suspend = wake;
-> -	if (udc->board.vbus_pin > 0 && wake)
-> +	if (udc->board.vbus_pin > 0 && !udc->board.vbus_polled && wake)
->  		enable_irq_wake(udc->board.vbus_pin);
->  	return 0;
->  }
-> @@ -1864,7 +1903,8 @@ static int at91udc_resume(struct platform_device *pdev)
->  {
->  	struct at91_udc *udc = platform_get_drvdata(pdev);
->  
-> -	if (udc->board.vbus_pin > 0 && udc->active_suspend)
-> +	if (udc->board.vbus_pin > 0 && !udc->board.vbus_polled && 
-> +	    udc->active_suspend)
->  		disable_irq_wake(udc->board.vbus_pin);
->  
->  	/* maybe reconnect to host; if so, clocks on */
-> diff --git a/drivers/usb/gadget/at91_udc.h b/drivers/usb/gadget/at91_udc.h
-> index c65d622..a1f4f54 100644
-> --- a/drivers/usb/gadget/at91_udc.h
-> +++ b/drivers/usb/gadget/at91_udc.h
-> @@ -144,6 +144,8 @@ struct at91_udc {
->  	struct proc_dir_entry		*pde;
->  	void __iomem			*udp_baseaddr;
->  	int				udp_irq;
-> +	struct timer_list		vbus_timer;
-> +	struct work_struct		vbus_timer_work;
->  };
->  
->  static inline struct at91_udc *to_udc(struct usb_gadget *g)
-> 
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Patches were tested on both ZOOM2 and ZOOM3.
 
+In short, these patches add software control for emulating
+card detect events, add board configurations to support the
+wl1271 device, and update the wl1271 driver to make use of
+these new mechanisms.
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
+Software card detect emulation is based on Android's
+EMBEDDED_SDIO patch by San Mehat <san@google.com> (thanks, San!).
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+These patches span over several differnt subsystems, but since
+they are highly dependent on each other, it is preferrable
+to pull them all together into a single tree (once approved).
+
+Patches are available at:
+
+git://wizery.com/pub/linux-2.6.git wl1271
+
+And will also be sent as a follow-on to this message to the
+omap, mmc, arm and wireless mailing lists.
+
+Patches are based on mainline 2.6.35-rc4, but can easily be applied
+on wireless-testing (with two minor conflicts). If desired, I can
+rebase to wireless-testing and resend.
+
+Note: last missing part for full mainline community support
+of the wl1271 on ZOOM is the firmware, and for that there is already
+on-going TI work to provide it in linux-firmware. Hopefully
+that would be resolved soon.
+
+Thanks,
+
+Ohad Ben-Cohen (15):
+  sdio: add TI + wl1271 ids
+  wireless: wl1271: remove SDIO IDs from driver
+  omap: mmc: prepare for software card detect support
+  mmc: support embedded data field in mmc_host
+  omap: hsmmc: add virtual card detect support
+  omap zoom2: wlan board muxing
+  omap zoom3: wlan board muxing
+  wireless: wl1271: make wl12xx.h common to both spi and sdio
+  wireless: wl12xx: support pdata SDIO handlers
+  wireless: wl1271: support return value for the set power func
+  wireless: wl1271: introduce platform device support
+  wireless: wl1271: take irq info from platform data
+  wireless: wl1271: make ref_clock configurable by board
+  omap: zoom: add WLAN device
+  omap: zoom: enable WLAN device
+
+ arch/arm/mach-omap2/Kconfig                   |    5 +
+ arch/arm/mach-omap2/Makefile                  |    1 +
+ arch/arm/mach-omap2/board-zoom-peripherals.c  |   15 ++
+ arch/arm/mach-omap2/board-zoom-wlan.c         |  129 ++++++++++++++++
+ arch/arm/mach-omap2/board-zoom2.c             |   15 ++
+ arch/arm/mach-omap2/board-zoom3.c             |   15 ++
+ arch/arm/mach-omap2/hsmmc.c                   |    4 +
+ arch/arm/mach-omap2/hsmmc.h                   |    5 +
+ arch/arm/mach-omap2/include/mach/board-zoom.h |    5 +
+ arch/arm/plat-omap/include/plat/mmc.h         |    5 +
+ drivers/mmc/core/Kconfig                      |    8 +
+ drivers/mmc/host/omap_hsmmc.c                 |   37 +++++-
+ drivers/net/wireless/wl12xx/Kconfig           |    1 +
+ drivers/net/wireless/wl12xx/wl1251_sdio.c     |    2 +-
+ drivers/net/wireless/wl12xx/wl1251_spi.c      |    2 +-
+ drivers/net/wireless/wl12xx/wl1271.h          |    8 +-
+ drivers/net/wireless/wl12xx/wl1271_boot.c     |   13 +-
+ drivers/net/wireless/wl12xx/wl1271_boot.h     |    1 -
+ drivers/net/wireless/wl12xx/wl1271_io.h       |    8 +-
+ drivers/net/wireless/wl12xx/wl1271_main.c     |    4 +-
+ drivers/net/wireless/wl12xx/wl1271_sdio.c     |  204 +++++++++++++++++++------
+ drivers/net/wireless/wl12xx/wl1271_spi.c      |    8 +-
+ include/linux/mmc/host.h                      |   16 ++
+ include/linux/mmc/sdio_ids.h                  |    3 +
+ include/linux/spi/wl12xx.h                    |   34 ----
+ include/linux/wl12xx.h                        |   37 +++++
+ 26 files changed, 486 insertions(+), 99 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/board-zoom-wlan.c
+ delete mode 100644 include/linux/spi/wl12xx.h
+ create mode 100644 include/linux/wl12xx.h
