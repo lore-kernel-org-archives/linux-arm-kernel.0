@@ -1,47 +1,46 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 06 Jul 2010 14:44:38 +0400
-Subject: [PATCH] ARM: S5PV210: Fix on SECTION_SIZE_BITS on S5PV210/S5PC110.
-In-Reply-To: <1278391007-11144-1-git-send-email-kgene.kim@samsung.com>
-References: <1278391007-11144-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <4C330916.1070201@ru.mvista.com>
+From: roger.quadros@nokia.com (Roger Quadros)
+Date: Tue, 06 Jul 2010 14:02:15 +0300
+Subject: [PATCH 05/15] omap: hsmmc: add virtual card detect support
+In-Reply-To: <AANLkTim4E4LlFERmfYA1M0HLBOoRAsQuvdW6QBNu6pC0@mail.gmail.com>
+References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
+	<1278376666-3509-6-git-send-email-ohad@wizery.com>
+	<alpine.LFD.2.00.1007052134460.6020@xanadu.home>
+	<AANLkTim4E4LlFERmfYA1M0HLBOoRAsQuvdW6QBNu6pC0@mail.gmail.com>
+Message-ID: <4C330D37.4090104@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 07/06/2010 01:22 PM, ext Ohad Ben-Cohen wrote:
+> Hi Nicolas,
+>
+> On Tue, Jul 6, 2010 at 4:45 AM, Nicolas Pitre<nico@fluxnic.net>  wrote:
+>> On Tue, 6 Jul 2010, Ohad Ben-Cohen wrote:
+>>
+>>> From: Ohad Ben-Cohen<ohadb@ti.com>
+>>>
+>>> Add support for software emulation of card detect
+>>> events.
+>>>
+>>> This is required for specific controllers
+>>> that are hard wired with embedded SDIO devices
+>>> (such as TI's wl1271 WLAN device).
+>>
+>> Why?
+>>
+>> Many instances of hardwired SDIO based WLAN devices do exist already,
+>> and they don't need extra card detect events to be generated.  The core
+>> MMC code already triggers a probe for cards whenever a new host
+>> controller is registered.
+>
+> We prefer not to power up the chip as early as boot time; instead, we
+Why? if the card is hard wired with no card detect then it should be powered up. 
+The function driver should power it down later if required. no?
 
-Kukjin Kim wrote:
+> would like to have it powered off until the wlan interface is brought
+> up, power it on when the interface is brought up,
 
-> This patch fixes on SECTION_SIZE_BITS for Sparsemem on S5PV210/S5PC110.
-> Because smallest size of a bank on S5PV210/S5PC110 is aligned by 16MB.
-> So each section's maximum size should be 16MB.
+If it was powered OFF then how did the wlan interface come into picture?
 
-> Reported-by: Kyongho Cho <pullip.cho@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/mach-s5pv210/include/mach/memory.h |    8 ++++++--
->  1 files changed, 6 insertions(+), 2 deletions(-)
-
-> diff --git a/arch/arm/mach-s5pv210/include/mach/memory.h b/arch/arm/mach-s5pv210/include/mach/memory.h
-> index 379117e..4a372d8 100644
-> --- a/arch/arm/mach-s5pv210/include/mach/memory.h
-> +++ b/arch/arm/mach-s5pv210/include/mach/memory.h
-> @@ -16,8 +16,12 @@
->  #define PHYS_OFFSET		UL(0x20000000)
->  #define CONSISTENT_DMA_SIZE	(SZ_8M + SZ_4M + SZ_2M)
->  
-> -/* Maximum of 256MiB in one bank */
-> +/* Sparsemem support. Each section is a maximum of 16MB.
-> + * Because there are many different memory type on S5PC110(MCP),
-> + * and there is a case that having 80MB, 128MB or 256MB in one
-> + * bank.
-> +*/
-
-    According to CodingStyle, the prefrerrable format for multi-line comments 
-is this:
-
-/*
-  * bla
-  * bla
-  */
-
-WBR, Sergei
+> and power it off again as soon as the interface is brought down again
+> (to minimize power consumption when the wlan is not in use).
+I agree, we some how need to power down the card when not in use in the right way.
