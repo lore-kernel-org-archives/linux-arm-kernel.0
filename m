@@ -1,50 +1,70 @@
-From: eric.miao@canonical.com (Eric Miao)
-Date: Tue, 6 Jul 2010 10:09:23 +0800
-Subject: [PATCH 11/11] Auto calculate ZRELADDR and provide option for
-	exceptions
-In-Reply-To: <alpine.LFD.2.00.1007051128300.6020@xanadu.home>
-References: <20100705141344.GA25407@pengutronix.de>
-	<1278339329-23739-11-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.00.1007051128300.6020@xanadu.home>
-Message-ID: <AANLkTilyVi1ieW8uKvn4b5V80pP1jZ-WeiOruRIIL829@mail.gmail.com>
+From: redhatter@gentoo.org (Stuart Longland)
+Date: Tue, 6 Jul 2010 12:12:07 +1000
+Subject: i.MX KPP usage as interrupt-enabled GPIOs
+Message-ID: <20100706021204.GA32310@www.longlandclan.yi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/5 Nicolas Pitre <nico@fluxnic.net>:
-> On Mon, 5 Jul 2010, Uwe Kleine-K?nig wrote:
->
->> From: Eric Miao <eric.miao@canonical.com>
->>
->> As long as the zImage is placed within the 128MB range from the start of
->> memory, ZRELADDR (Address where the decompressed kernel will be placed,
->> usually == PHYS_OFFSET + TEXT_OFFSET) can be determined at run-time by
->> masking PC with 0xf80000000.
->>
->> Running through all the Makefile.boot, all those zreladdr-y
->> addresses == 0x[0-f][08]00_0000 + TEXT_OFFSET can be determined at
->> run-time.
->>
->> Option CONFIG_AUTO_ZRELADDR and CONFIG_ZRELADDR are introduced,
->> CONFIG_ZRELADDR _must_ be explicitly specified if:
->>
->> - ((zreladdr-y - TEXT_OFFSET) & ~0xf8000000) != 0, which means
->> ? masking PC with 0xf8000000 will result in an incorrect address.
->> ? Currently this is only a problem on u300.
->>
->> - or the assumption of the zImage being loaded by the bootloader within
->> ? the first 128MB of RAM is incorrect
->>
->> - or when ZBOOT_ROM is used, where the above assumption is usually wrong.
->>
->> [ukleinek: changed mask from 0xf0000000 to 0xf8000000 for mx1 and shark
->> + some review fixes from the mailing list]
->>
->> Signed-off-by: Eric Miao <eric.miao@canonical.com>
->> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->
-> Although Eric did all the work, the original idea was mine. ?Therefore:
->
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
->
+Hi all,
 
-Yep. Uwe, please add this, thanks.
+I'm working on an i.MX27-based device which uses the keypad column and
+row signals as GPIOs.  A few of the lines are outputs, and for these
+I've written a GPIO chip driver (attached) that permits me to use them
+as if they were regular GPIOs.
+
+As far as I know the keypad device pins do not route via IOMUX, and
+therefore do not have any corresponding GPIO pins that I could utilise.
+The Keypad controller was chosen for this since it supports totem-pole
+outputs on the columns, and it can act as a wake-up source for the
+i.MX27.  (We're not sure if the GPIOs can; the datasheet suggests this
+isn't possible.)
+
+I can read the state of the row pins just fine, however I get an
+infinite loop when I try to make the KPP interrupt the MCU.  It's
+important to remember that they are not connected to a keypad here, but
+rather, to logic buffers on other peripherals which will pull these
+signal lines low to interrupt the MCU.
+
+I'm also not sure, having determined which of the ROW pins is being
+pulled low, how to signal to a device driver that its device wants its
+attention.  I've created an irq_chip device, and registered it... but I
+can't seem to figure out how to report this back to the driver.
+
+I'm testing at the moment using the gpio_keys driver, as a simple
+test... and manually shorting a row pin to 0V.  If I leave interrupts
+disabled, everything works; and I can see the state when I monitor the
+GPIO via SYSFS.
+
+However, with interrupts enabled, I get both "key press" and "key
+release" events reported ... even long after I've stopped shorting the
+pins... and after acknowledging those "key presses".  So I might be
+doing something wrong in the interrupts.  Some of the ideas have been
+taken from the imx-keypad driver in later kernels (I'm working with
+2.6.28 here) and from other GPIO drivers in the kernel.
+
+Does anyone have any idea what I might be doing wrong, or how I can get
+this to work?
+
+Regards,
+-- 
+Stuart Longland (aka Redhatter, VK4MSL)      .'''.
+Gentoo Linux/MIPS Cobalt and Docs Developer  '.'` :
+. . . . . . . . . . . . . . . . . . . . . .   .'.'
+http://dev.gentoo.org/~redhatter             :.'
+
+I haven't lost my mind...
+  ...it's backed up on a tape somewhere.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: imx-kpp-gpio.c
+Type: text/x-c
+Size: 13071 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100706/3c6f9d3d/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: imx-kpp-gpio.h
+Type: text/x-c
+Size: 1430 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100706/3c6f9d3d/attachment-0001.bin>
