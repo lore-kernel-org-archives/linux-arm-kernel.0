@@ -1,28 +1,18 @@
-From: luciano.coelho@nokia.com (Luciano Coelho)
-Date: Tue, 06 Jul 2010 10:11:29 +0300
-Subject: [PATCH 10/15] wireless: wl1271: support return value for the
-	set power func
-In-Reply-To: <1278376666-3509-11-git-send-email-ohad@wizery.com>
-References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
-	<1278376666-3509-11-git-send-email-ohad@wizery.com>
-Message-ID: <1278400289.18287.15.camel@chilepepper>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Jul 2010 08:12:45 +0100
+Subject: [PATCH] ARM: S5PV210: Fix on SECTION_SIZE_BITS on S5PV210/S5PC110.
+In-Reply-To: <1278391007-11144-1-git-send-email-kgene.kim@samsung.com>
+References: <1278391007-11144-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20100706071245.GA5058@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-07-06 at 02:37 +0200, ext Ohad Ben-Cohen wrote:
-> From: Ohad Ben-Cohen <ohadb@ti.com>
-> 
-> Make it possible for the set power method to indicate a
-> success/failure return value. This is needed to support
-> more complex power on/off operations such as bringing up
-> (and down) sdio functions.
-> 
-> Signed-off-by: Ohad Ben-Cohen <ohadb@ti.com>
-> --- 
+On Tue, Jul 06, 2010 at 01:36:47PM +0900, Kukjin Kim wrote:
+> This patch fixes on SECTION_SIZE_BITS for Sparsemem on S5PV210/S5PC110.
+> Because smallest size of a bank on S5PV210/S5PC110 is aligned by 16MB.
+> So each section's maximum size should be 16MB.
 
-Acked-by: Luciano Coelho <luciano.coelho@nokia.com>
+What is the spacing of chunks of memory, and minimum alignment of those
+chunks in physical address space?
 
-
--- 
-Cheers,
-Luca.
+Also, what is the maximum physical address which memory can be located?
