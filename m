@@ -1,46 +1,83 @@
-From: roger.quadros@nokia.com (Roger Quadros)
-Date: Tue, 06 Jul 2010 14:02:15 +0300
-Subject: [PATCH 05/15] omap: hsmmc: add virtual card detect support
-In-Reply-To: <AANLkTim4E4LlFERmfYA1M0HLBOoRAsQuvdW6QBNu6pC0@mail.gmail.com>
-References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
-	<1278376666-3509-6-git-send-email-ohad@wizery.com>
-	<alpine.LFD.2.00.1007052134460.6020@xanadu.home>
-	<AANLkTim4E4LlFERmfYA1M0HLBOoRAsQuvdW6QBNu6pC0@mail.gmail.com>
-Message-ID: <4C330D37.4090104@nokia.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue,  6 Jul 2010 14:03:22 +0300
+Subject: [PATCH v2] arm/imx/gpio: add spinlock protection
+In-Reply-To: <20100706103748.GE28547@jasper.tkos.co.il>
+References: <20100706103748.GE28547@jasper.tkos.co.il>
+Message-ID: <a1d5b20ff1b6e39355fcad2e882489df55c7bf2a.1278413731.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2010 01:22 PM, ext Ohad Ben-Cohen wrote:
-> Hi Nicolas,
->
-> On Tue, Jul 6, 2010 at 4:45 AM, Nicolas Pitre<nico@fluxnic.net>  wrote:
->> On Tue, 6 Jul 2010, Ohad Ben-Cohen wrote:
->>
->>> From: Ohad Ben-Cohen<ohadb@ti.com>
->>>
->>> Add support for software emulation of card detect
->>> events.
->>>
->>> This is required for specific controllers
->>> that are hard wired with embedded SDIO devices
->>> (such as TI's wl1271 WLAN device).
->>
->> Why?
->>
->> Many instances of hardwired SDIO based WLAN devices do exist already,
->> and they don't need extra card detect events to be generated.  The core
->> MMC code already triggers a probe for cards whenever a new host
->> controller is registered.
->
-> We prefer not to power up the chip as early as boot time; instead, we
-Why? if the card is hard wired with no card detect then it should be powered up. 
-The function driver should power it down later if required. no?
+The GPIO registers need protection from concurrent access for operations that
+are not atomic.
 
-> would like to have it powered off until the wlan interface is brought
-> up, power it on when the interface is brought up,
+Cc: stable at kernel.org
+Cc: Juergen Beisert <j.beisert@pengutronix.de>
+Cc: Daniel Mack <daniel@caiaq.de>
+Reported-by: rpkamiak at rockwellcollins.com
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+Changes v1 -> v2
 
-If it was powered OFF then how did the wlan interface come into picture?
+    Remove redundant protection of GPIO/IRQ registers
 
-> and power it off again as soon as the interface is brought down again
-> (to minimize power consumption when the wlan is not in use).
-I agree, we some how need to power down the card when not in use in the right way.
+ arch/arm/plat-mxc/gpio.c              |    8 ++++++++
+ arch/arm/plat-mxc/include/mach/gpio.h |    1 +
+ 2 files changed, 9 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
+index 71437c6..9ebbd31 100644
+--- a/arch/arm/plat-mxc/gpio.c
++++ b/arch/arm/plat-mxc/gpio.c
+@@ -214,13 +214,16 @@ static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
+ 	struct mxc_gpio_port *port =
+ 		container_of(chip, struct mxc_gpio_port, chip);
+ 	u32 l;
++	unsigned long flags;
+ 
++	spin_lock_irqsave(&port->lock, flags);
+ 	l = __raw_readl(port->base + GPIO_GDIR);
+ 	if (dir)
+ 		l |= 1 << offset;
+ 	else
+ 		l &= ~(1 << offset);
+ 	__raw_writel(l, port->base + GPIO_GDIR);
++	spin_unlock_irqrestore(&port->lock, flags);
+ }
+ 
+ static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+@@ -229,9 +232,12 @@ static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+ 		container_of(chip, struct mxc_gpio_port, chip);
+ 	void __iomem *reg = port->base + GPIO_DR;
+ 	u32 l;
++	unsigned long flags;
+ 
++	spin_lock_irqsave(&port->lock, flags);
+ 	l = (__raw_readl(reg) & (~(1 << offset))) | (value << offset);
+ 	__raw_writel(l, reg);
++	spin_unlock_irqrestore(&port->lock, flags);
+ }
+ 
+ static int mxc_gpio_get(struct gpio_chip *chip, unsigned offset)
+@@ -285,6 +291,8 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
+ 		port[i].chip.base = i * 32;
+ 		port[i].chip.ngpio = 32;
+ 
++		spin_lock_init(&port[i].lock);
++
+ 		/* its a serious configuration bug when it fails */
+ 		BUG_ON( gpiochip_add(&port[i].chip) < 0 );
+ 
+diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
+index 894d2f8..6bd932c 100644
+--- a/arch/arm/plat-mxc/include/mach/gpio.h
++++ b/arch/arm/plat-mxc/include/mach/gpio.h
+@@ -36,6 +36,7 @@ struct mxc_gpio_port {
+ 	int virtual_irq_start;
+ 	struct gpio_chip chip;
+ 	u32 both_edges;
++	spinlock_t lock;
+ };
+ 
+ int mxc_gpio_init(struct mxc_gpio_port*, int);
+-- 
+1.7.1
