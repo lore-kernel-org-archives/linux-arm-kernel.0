@@ -1,1135 +1,391 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Tue, 06 Jul 2010 14:41:14 +0900
-Subject: [RFC PATCH 3/3] ARM: S5PV210: common struct clk support.
-In-Reply-To: <1278394874-8695-3-git-send-email-myungjoo.ham@samsung.com>
-References: <1278394874-8695-1-git-send-email-myungjoo.ham@samsung.com>
-	<1278394874-8695-2-git-send-email-myungjoo.ham@samsung.com>
-	<1278394874-8695-3-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <1278394874-8695-4-git-send-email-myungjoo.ham@samsung.com>
+Date: Tue, 06 Jul 2010 14:48:47 +0900
+Subject: [PATCH] ARM: S5PV210: add clocks (struct clk).
+Message-ID: <1278395327-9072-1-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows S5PV210 to be ready for the common struct clk.
-"arch/arm/mach-s5pv210/clock-common-clk.c" has clock definitions
-compatible with struct clk_samsung of common struct clk support for
-Samsung SoCs.
+Many clocks were not listed in the previous
+arch/arm/mach-s5pv210/clock.c
 
-This patch contains machine-specific (S5PV210) codes for the series.
+We have added clocks defined as CLK_GATE_IPx[] in the user manual of
+S5PV210. However, the clocks that were not turned on at the boot time
+when tested with the previous kernel versions (2.6.32, 2.6.29) are
+defined in "init_clocks_disabled" so that they are turned off at the
+boot time.
 
+The clocks added from CLK_GATE_IPx are:
+	CSIS, JPEG, FIMC0 - 2, NFCON, SROMC, TVENC, HDMI, MIXER, VP,
+	DSIM, TSI, HOSTIF, MODEM, PCM0 - 2, I2C-HDMI-PHY, I2C-HDMI-DDC,
+	AC97, SPDIF, SECKEY, IEM-APC, IEM-IEC, CHIP-ID, PDMA0 - 1,
+	MDMA, DMC0 - 1, NANDXL, TZIC0 - 3, VIC0 - 3, SECJTAG, CORESIGHT,
+	SDM, SECSS, SYSCON, GPIO, TZPC0 - 3
 
 Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s5pv210/Kconfig            |   10 +
- arch/arm/mach-s5pv210/Makefile           |    5 +-
- arch/arm/mach-s5pv210/clock-common-clk.c | 1062 ++++++++++++++++++++++++++++++
- 3 files changed, 1076 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/clock-common-clk.c
+ arch/arm/mach-s5pv210/clock.c |  298 ++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 297 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 0761eac..1aa468b 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -88,4 +88,14 @@ config MACH_SMDKC110
- 	  Machine support for Samsung SMDKC110
- 	  S5PC110(MCP) is one of package option of S5PV210
+diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+index b3d156c..aa2b1c5 100644
+--- a/arch/arm/mach-s5pv210/clock.c
++++ b/arch/arm/mach-s5pv210/clock.c
+@@ -275,12 +275,72 @@ static struct clk_ops clk_hclk_imem_ops = {
  
-+config S5PV210_USE_COMMON_STRUCT_CLK
-+	bool "Use Common struct clk for S5PV210 clock framework"
-+	default	n
-+	depends on CPU_S5PV210
-+	select USE_COMMON_STRUCT_CLK
-+
-+config S5PV210_USE_NONCOMMON_STRUCT_CLK
-+	def_bool (!S5PV210_USE_COMMON_STRUCT_CLK && CPU_S5PV210)
-+	default y
-+
- endif
-diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-index 30be9a6..9051fd7 100644
---- a/arch/arm/mach-s5pv210/Makefile
-+++ b/arch/arm/mach-s5pv210/Makefile
-@@ -12,9 +12,12 @@ obj-				:=
- 
- # Core support for S5PV210 system
- 
--obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o dma.o gpiolib.o
-+obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o dma.o gpiolib.o
- obj-$(CONFIG_CPU_S5PV210)	+= setup-i2c0.o
- 
-+obj-$(CONFIG_S5PV210_USE_COMMON_STRUCT_CLK)	+= clock-common-clk.o
-+obj-$(CONFIG_S5PV210_USE_NONCOMMON_STRUCT_CLK)	+= clock.o
-+
- # machine support
- 
- obj-$(CONFIG_MACH_AQUILA)	+= mach-aquila.o
-diff --git a/arch/arm/mach-s5pv210/clock-common-clk.c b/arch/arm/mach-s5pv210/clock-common-clk.c
-new file mode 100644
-index 0000000..681c2e0
---- /dev/null
-+++ b/arch/arm/mach-s5pv210/clock-common-clk.c
-@@ -0,0 +1,1062 @@
-+/* linux/arch/arm/mach-s5pv210/clock.c
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * S5PV210 - Clock support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/list.h>
-+#include <linux/errno.h>
-+#include <linux/err.h>
-+#include <linux/clk.h>
-+#include <linux/sysdev.h>
-+#include <linux/io.h>
-+
-+#include <mach/map.h>
-+
-+#include <plat/cpu-freq.h>
-+#include <mach/regs-clock.h>
-+#include <plat/clock.h>
-+#include <plat/cpu.h>
-+#include <plat/pll.h>
-+#include <plat/s5p-clock.h>
-+#include <plat/clock-clksrc.h>
-+#include <plat/s5pv210.h>
-+
-+static struct clksrc_clk clk_mout_apll = {
-+	.clk	= {
-+		.name		= "mout_apll",
+ static struct clk init_clocks_disable[] = {
+ 	{
++		.name		= "csis",
 +		.id		= -1,
-+	},
-+	.sources	= &clk_src_apll,
-+	.reg_src	= { .reg = S5P_CLK_SRC0, .shift = 0, .size = 1 },
-+};
-+
-+static struct clksrc_clk clk_mout_epll = {
-+	.clk	= {
-+		.name		= "mout_epll",
-+		.id		= -1,
-+	},
-+	.sources	= &clk_src_epll,
-+	.reg_src	= { .reg = S5P_CLK_SRC0, .shift = 8, .size = 1 },
-+};
-+
-+static struct clksrc_clk clk_mout_mpll = {
-+	.clk = {
-+		.name		= "mout_mpll",
-+		.id		= -1,
-+	},
-+	.sources	= &clk_src_mpll,
-+	.reg_src	= { .reg = S5P_CLK_SRC0, .shift = 4, .size = 1 },
-+};
-+
-+static struct clk_samsung *clkset_armclk_list[] = {
-+	[0] = &clk_mout_apll.clk,
-+	[1] = &clk_mout_mpll.clk,
-+};
-+
-+static struct clksrc_sources clkset_armclk = {
-+	.sources	= clkset_armclk_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_armclk_list),
-+};
-+
-+static struct clksrc_clk clk_armclk = {
-+	.clk	= {
-+		.name		= "armclk",
-+		.id		= -1,
-+	},
-+	.sources	= &clkset_armclk,
-+	.reg_src	= { .reg = S5P_CLK_SRC0, .shift = 16, .size = 1 },
-+	.reg_div	= { .reg = S5P_CLK_DIV0, .shift = 0, .size = 3 },
-+};
-+
-+static struct clksrc_clk clk_hclk_msys = {
-+	.clk	= {
-+		.name		= "hclk_msys",
-+		.id		= -1,
-+		.parent		= &clk_armclk.clk.clk,
-+	},
-+	.reg_div	= { .reg = S5P_CLK_DIV0, .shift = 8, .size = 3 },
-+};
-+
-+static struct clksrc_clk clk_pclk_msys = {
-+	.clk	= {
-+		.name		= "pclk_msys",
-+		.id		= -1,
-+		.parent		= &clk_hclk_msys.clk.clk,
-+	},
-+	.reg_div        = { .reg = S5P_CLK_DIV0, .shift = 12, .size = 3 },
-+};
-+
-+static struct clksrc_clk clk_sclk_a2m = {
-+	.clk	= {
-+		.name		= "sclk_a2m",
-+		.id		= -1,
-+		.parent		= &clk_mout_apll.clk.clk,
-+	},
-+	.reg_div	= { .reg = S5P_CLK_DIV0, .shift = 4, .size = 3 },
-+};
-+
-+static struct clk_samsung *clkset_hclk_sys_list[] = {
-+	[0] = &clk_mout_mpll.clk,
-+	[1] = &clk_sclk_a2m.clk,
-+};
-+
-+static struct clksrc_sources clkset_hclk_sys = {
-+	.sources	= clkset_hclk_sys_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_hclk_sys_list),
-+};
-+
-+static struct clksrc_clk clk_hclk_dsys = {
-+	.clk	= {
-+		.name	= "hclk_dsys",
-+		.id	= -1,
-+	},
-+	.sources	= &clkset_hclk_sys,
-+	.reg_src        = { .reg = S5P_CLK_SRC0, .shift = 20, .size = 1 },
-+	.reg_div        = { .reg = S5P_CLK_DIV0, .shift = 16, .size = 4 },
-+};
-+
-+static struct clksrc_clk clk_pclk_dsys = {
-+	.clk	= {
-+		.name	= "pclk_dsys",
-+		.id	= -1,
-+		.parent	= &clk_hclk_dsys.clk.clk,
-+	},
-+	.reg_div = { .reg = S5P_CLK_DIV0, .shift = 20, .size = 3 },
-+};
-+
-+static struct clksrc_clk clk_hclk_psys = {
-+	.clk	= {
-+		.name	= "hclk_psys",
-+		.id	= -1,
-+	},
-+	.sources	= &clkset_hclk_sys,
-+	.reg_src        = { .reg = S5P_CLK_SRC0, .shift = 24, .size = 1 },
-+	.reg_div        = { .reg = S5P_CLK_DIV0, .shift = 24, .size = 4 },
-+};
-+
-+static struct clksrc_clk clk_pclk_psys = {
-+	.clk	= {
-+		.name	= "pclk_psys",
-+		.id	= -1,
-+		.parent	= &clk_hclk_psys.clk.clk,
-+	},
-+	.reg_div        = { .reg = S5P_CLK_DIV0, .shift = 28, .size = 3 },
-+};
-+
-+static int s5pv210_clk_ip0_ctrl(struct clk_samsung *clk, int enable)
-+{
-+	return s5p_gatectrl(S5P_CLKGATE_IP0, clk, enable);
-+}
-+
-+static int s5pv210_clk_ip1_ctrl(struct clk_samsung *clk, int enable)
-+{
-+	return s5p_gatectrl(S5P_CLKGATE_IP1, clk, enable);
-+}
-+
-+static int s5pv210_clk_ip2_ctrl(struct clk_samsung *clk, int enable)
-+{
-+	return s5p_gatectrl(S5P_CLKGATE_IP2, clk, enable);
-+}
-+
-+static int s5pv210_clk_ip3_ctrl(struct clk_samsung *clk, int enable)
-+{
-+	return s5p_gatectrl(S5P_CLKGATE_IP3, clk, enable);
-+}
-+
-+static int s5pv210_clk_ip4_ctrl(struct clk_samsung *clk, int enable)
-+{
-+	return s5p_gatectrl(S5P_CLKGATE_IP4, clk, enable);
-+}
-+
-+static int s5pv210_clk_mask0_ctrl(struct clk_samsung *clk, int enable)
-+{
-+	return s5p_gatectrl(S5P_CLK_SRC_MASK0, clk, enable);
-+}
-+
-+static struct clk_samsung clk_sclk_hdmi27m = {
-+	.name		= "sclk_hdmi27m",
-+	.id		= -1,
-+	.rate		= 27000000,
-+};
-+
-+static struct clk_samsung clk_sclk_hdmiphy = {
-+	.name		= "sclk_hdmiphy",
-+	.id		= -1,
-+};
-+
-+static struct clk_samsung clk_sclk_usbphy0 = {
-+	.name		= "sclk_usbphy0",
-+	.id		= -1,
-+};
-+
-+static struct clk_samsung clk_sclk_usbphy1 = {
-+	.name		= "sclk_usbphy1",
-+	.id		= -1,
-+};
-+
-+static struct clk_samsung clk_pcmcdclk0 = {
-+	.name		= "pcmcdclk",
-+	.id		= -1,
-+};
-+
-+static struct clk_samsung clk_pcmcdclk1 = {
-+	.name		= "pcmcdclk",
-+	.id		= -1,
-+};
-+
-+static struct clk_samsung clk_pcmcdclk2 = {
-+	.name		= "pcmcdclk",
-+	.id		= -1,
-+};
-+
-+static struct clk_samsung *clkset_vpllsrc_list[] = {
-+	[0] = &clk_fin_vpll,
-+	[1] = &clk_sclk_hdmi27m,
-+};
-+
-+static struct clksrc_sources clkset_vpllsrc = {
-+	.sources	= clkset_vpllsrc_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_vpllsrc_list),
-+};
-+
-+static struct clksrc_clk clk_vpllsrc = {
-+	.clk	= {
-+		.name		= "vpll_src",
-+		.id		= -1,
-+		.enable		= s5pv210_clk_mask0_ctrl,
-+		.ctrlbit	= (1 << 7),
-+	},
-+	.sources	= &clkset_vpllsrc,
-+	.reg_src	= { .reg = S5P_CLK_SRC1, .shift = 28, .size = 1 },
-+};
-+
-+static struct clk_samsung *clkset_sclk_vpll_list[] = {
-+	[0] = &clk_vpllsrc.clk,
-+	[1] = &clk_fout_vpll,
-+};
-+
-+static struct clksrc_sources clkset_sclk_vpll = {
-+	.sources	= clkset_sclk_vpll_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_sclk_vpll_list),
-+};
-+
-+static struct clksrc_clk clk_sclk_vpll = {
-+	.clk	= {
-+		.name		= "sclk_vpll",
-+		.id		= -1,
-+	},
-+	.sources	= &clkset_sclk_vpll,
-+	.reg_src	= { .reg = S5P_CLK_SRC0, .shift = 12, .size = 1 },
-+};
-+
-+static unsigned long s5pv210_clk_imem_get_rate(struct clk *_clk)
-+{
-+	struct clk_samsung *clk = to_clk_samsung(_clk);
-+	return clk_get_rate(clk->parent) / 2;
-+}
-+
-+static struct clk_ops clk_hclk_imem_ops = {
-+	.enable		= ps_default_clk_enable,
-+	.disable	= ps_default_clk_disable,
-+	.get		= ps_default_clk_get,
-+	.put		= ps_default_clk_put,
-+	.round_rate	= ps_default_clk_round_rate,
-+	.set_rate	= ps_default_clk_set_rate,
-+	.set_parent	= ps_default_clk_set_parent,
-+	.get_parent	= ps_default_clk_get_parent,
-+
-+	.get_rate	= s5pv210_clk_imem_get_rate,
-+};
-+
-+/* Note that .clk.clk.ops are set later with init function */
-+static struct clk_samsung init_clocks_disable[] = {
-+	{
-+		.name		= "rot",
-+		.id		= -1,
-+		.parent		= &clk_hclk_dsys.clk.clk,
++		.parent		= &clk_pclk_dsys.clk,
 +		.enable		= s5pv210_clk_ip0_ctrl,
-+		.ctrlbit	= (1 << 29),
++		.ctrlbit	= (1 << 31),
 +	}, {
-+		.name		= "otg",
+ 		.name		= "rot",
+ 		.id		= -1,
+ 		.parent		= &clk_hclk_dsys.clk,
+ 		.enable		= s5pv210_clk_ip0_ctrl,
+ 		.ctrlbit	= (1<<29),
+ 	}, {
++		.name		= "jpeg",
 +		.id		= -1,
-+		.parent		= &clk_hclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip1_ctrl,
-+		.ctrlbit	= (1 << 16),
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 28),
 +	}, {
-+		.name		= "usb-host",
-+		.id		= -1,
-+		.parent		= &clk_hclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip1_ctrl,
-+		.ctrlbit	= (1 << 17),
-+	}, {
-+		.name		= "lcd",
-+		.id		= -1,
-+		.parent		= &clk_hclk_dsys.clk.clk,
-+		.enable		= s5pv210_clk_ip1_ctrl,
-+		.ctrlbit	= (1 << 0),
-+	}, {
-+		.name		= "cfcon",
++		.name		= "fimc",
 +		.id		= 0,
-+		.parent		= &clk_hclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip1_ctrl,
-+		.ctrlbit	= (1 << 25),
-+	}, {
-+		.name		= "hsmmc",
-+		.id		= 0,
-+		.parent		= &clk_hclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip2_ctrl,
-+		.ctrlbit	= (1 << 16),
-+	}, {
-+		.name		= "hsmmc",
-+		.id		= 1,
-+		.parent		= &clk_hclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip2_ctrl,
-+		.ctrlbit	= (1 << 17),
-+	}, {
-+		.name		= "hsmmc",
-+		.id		= 2,
-+		.parent		= &clk_hclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip2_ctrl,
-+		.ctrlbit	= (1 << 18),
-+	}, {
-+		.name		= "hsmmc",
-+		.id		= 3,
-+		.parent		= &clk_hclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip2_ctrl,
-+		.ctrlbit	= (1 << 19),
-+	}, {
-+		.name		= "systimer",
-+		.id		= -1,
-+		.parent		= &clk_pclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 16),
-+	}, {
-+		.name		= "watchdog",
-+		.id		= -1,
-+		.parent		= &clk_pclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 22),
-+	}, {
-+		.name		= "rtc",
-+		.id		= -1,
-+		.parent		= &clk_pclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 15),
-+	}, {
-+		.name		= "i2c",
-+		.id		= 0,
-+		.parent		= &clk_pclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 7),
-+	}, {
-+		.name		= "i2c",
-+		.id		= 1,
-+		.parent		= &clk_pclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 8),
-+	}, {
-+		.name		= "i2c",
-+		.id		= 2,
-+		.parent		= &clk_pclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 9),
-+	}, {
-+		.name		= "spi",
-+		.id		= 0,
-+		.parent		= &clk_pclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 12),
-+	}, {
-+		.name		= "spi",
-+		.id		= 1,
-+		.parent		= &clk_pclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 13),
-+	}, {
-+		.name		= "spi",
-+		.id		= 2,
-+		.parent		= &clk_pclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 14),
-+	}, {
-+		.name		= "timers",
-+		.id		= -1,
-+		.parent		= &clk_pclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 23),
-+	}, {
-+		.name		= "adc",
-+		.id		= -1,
-+		.parent		= &clk_pclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
 +		.ctrlbit	= (1 << 24),
 +	}, {
-+		.name		= "keypad",
-+		.id		= -1,
-+		.parent		= &clk_pclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 21),
-+	}, {
-+		.name		= "i2s_v50",
-+		.id		= 0,
-+		.parent		= &clk_p.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 4),
-+	}, {
-+		.name		= "i2s_v32",
-+		.id		= 0,
-+		.parent		= &clk_p.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 5),
-+	}, {
-+		.name		= "i2s_v32",
++		.name		= "fimc",
 +		.id		= 1,
-+		.parent		= &clk_p.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 6),
-+	}
-+};
-+
-+/* Note that .clk.clk.ops are set later with init function */
-+static struct clk_samsung init_clocks[] = {
-+	{
-+		.clk		= {
-+			.ops		= &clk_hclk_imem_ops,
-+		},
-+		.name		= "hclk_imem",
-+		.id		= -1,
-+		.parent		= &clk_hclk_msys.clk.clk,
-+		.ctrlbit	= (1 << 5),
++		.parent		= &clk_hclk_dsys.clk,
 +		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 25),
 +	}, {
-+		.name		= "uart",
-+		.id		= 0,
-+		.parent		= &clk_pclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 17),
-+	}, {
-+		.name		= "uart",
-+		.id		= 1,
-+		.parent		= &clk_pclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 18),
-+	}, {
-+		.name		= "uart",
++		.name		= "fimc",
 +		.id		= 2,
-+		.parent		= &clk_pclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 19),
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 26),
 +	}, {
-+		.name		= "uart",
-+		.id		= 3,
-+		.parent		= &clk_pclk_psys.clk.clk,
-+		.enable		= s5pv210_clk_ip3_ctrl,
-+		.ctrlbit	= (1 << 20),
-+	},
-+};
-+
-+static struct clk_samsung *clkset_uart_list[] = {
-+	[6] = &clk_mout_mpll.clk,
-+	[7] = &clk_mout_epll.clk,
-+};
-+
-+static struct clksrc_sources clkset_uart = {
-+	.sources	= clkset_uart_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_uart_list),
-+};
-+
-+static struct clk_samsung *clkset_group1_list[] = {
-+	[0] = &clk_sclk_a2m.clk,
-+	[1] = &clk_mout_mpll.clk,
-+	[2] = &clk_mout_epll.clk,
-+	[3] = &clk_sclk_vpll.clk,
-+};
-+
-+static struct clksrc_sources clkset_group1 = {
-+	.sources	= clkset_group1_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_group1_list),
-+};
-+
-+static struct clk_samsung *clkset_sclk_onenand_list[] = {
-+	[0] = &clk_hclk_psys.clk,
-+	[1] = &clk_hclk_dsys.clk,
-+};
-+
-+static struct clksrc_sources clkset_sclk_onenand = {
-+	.sources	= clkset_sclk_onenand_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_sclk_onenand_list),
-+};
-+
-+static struct clk_samsung *clkset_sclk_dac_list[] = {
-+	[0] = &clk_sclk_vpll.clk,
-+	[1] = &clk_sclk_hdmiphy,
-+};
-+
-+static struct clksrc_sources clkset_sclk_dac = {
-+	.sources	= clkset_sclk_dac_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_sclk_dac_list),
-+};
-+
-+static struct clksrc_clk clk_sclk_dac = {
-+	.clk		= {
-+		.name		= "sclk_dac",
++		.name		= "nfcon",
 +		.id		= -1,
-+		.ctrlbit	= (1 << 10),
++		.parent		= &clk_hclk_psys.clk,
 +		.enable		= s5pv210_clk_ip1_ctrl,
-+	},
-+	.sources	= &clkset_sclk_dac,
-+	.reg_src	= { .reg = S5P_CLK_SRC1, .shift = 8, .size = 1 },
-+};
-+
-+static struct clksrc_clk clk_sclk_pixel = {
-+	.clk		= {
-+		.name		= "sclk_pixel",
++		.ctrlbit	= (1 << 28),
++	}, {
++		.name		= "sromc",
 +		.id		= -1,
-+		.parent		= &clk_sclk_vpll.clk.clk,
-+	},
-+	.reg_div	= { .reg = S5P_CLK_DIV1, .shift = 0, .size = 4},
-+};
-+
-+static struct clk_samsung *clkset_sclk_hdmi_list[] = {
-+	[0] = &clk_sclk_pixel.clk,
-+	[1] = &clk_sclk_hdmiphy,
-+};
-+
-+static struct clksrc_sources clkset_sclk_hdmi = {
-+	.sources	= clkset_sclk_hdmi_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_sclk_hdmi_list),
-+};
-+
-+static struct clksrc_clk clk_sclk_hdmi = {
-+	.clk		= {
-+		.name		= "sclk_hdmi",
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip1_ctrl,
++		.ctrlbit	= (1 << 26),
++	}, {
++		.name		= "tvenc",
 +		.id		= -1,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip1_ctrl,
++		.ctrlbit	= (1 << 10),
++	}, {
++		.name		= "hdmi",
++		.id		= -1,
++		.parent		= &clk_hclk_dsys.clk,
 +		.enable		= s5pv210_clk_ip1_ctrl,
 +		.ctrlbit	= (1 << 11),
-+	},
-+	.sources	= &clkset_sclk_hdmi,
-+	.reg_src	= { .reg = S5P_CLK_SRC1, .shift = 0, .size = 1 },
-+};
-+
-+static struct clk_samsung *clkset_sclk_mixer_list[] = {
-+	[0] = &clk_sclk_dac.clk,
-+	[1] = &clk_sclk_hdmi.clk,
-+};
-+
-+static struct clksrc_sources clkset_sclk_mixer = {
-+	.sources	= clkset_sclk_mixer_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_sclk_mixer_list),
-+};
-+
-+static struct clk_samsung *clkset_sclk_audio0_list[] = {
-+	[0] = &clk_ext_xtal_mux,
-+	[1] = &clk_pcmcdclk0,
-+	[2] = &clk_sclk_hdmi27m,
-+	[3] = &clk_sclk_usbphy0,
-+	[4] = &clk_sclk_usbphy1,
-+	[5] = &clk_sclk_hdmiphy,
-+	[6] = &clk_mout_mpll.clk,
-+	[7] = &clk_mout_epll.clk,
-+	[8] = &clk_sclk_vpll.clk,
-+};
-+
-+static struct clksrc_sources clkset_sclk_audio0 = {
-+	.sources	= clkset_sclk_audio0_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_sclk_audio0_list),
-+};
-+
-+static struct clksrc_clk clk_sclk_audio0 = {
-+	.clk		= {
-+		.name		= "sclk_audio",
++	}, {
++		.name		= "mixer",
++		.id		= -1,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip1_ctrl,
++		.ctrlbit	= (1 << 9),
++	}, {
+ 		.name		= "otg",
+ 		.id		= -1,
+ 		.parent		= &clk_hclk_psys.clk,
+@@ -305,6 +365,18 @@ static struct clk init_clocks_disable[] = {
+ 		.enable		= s5pv210_clk_ip1_ctrl,
+ 		.ctrlbit	= (1<<25),
+ 	}, {
++		.name		= "vp",
++		.id		= -1,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip1_ctrl,
++		.ctrlbit	= (1 << 8),
++	}, {
++		.name		= "dsim",
++		.id		= -1,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip1_ctrl,
++		.ctrlbit	= (1 << 2),
++	}, {
+ 		.name		= "hsmmc",
+ 		.id		= 0,
+ 		.parent		= &clk_hclk_psys.clk,
+@@ -329,6 +401,42 @@ static struct clk init_clocks_disable[] = {
+ 		.enable		= s5pv210_clk_ip2_ctrl,
+ 		.ctrlbit	= (1<<19),
+ 	}, {
++		.name		= "tsi",
++		.id		= -1,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 20),
++	}, {
++		.name		= "hostif",
++		.id		= -1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 10),
++	}, {
++		.name		= "modem",
++		.id		= -1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 9),
++	}, {
++		.name		= "pcm",
 +		.id		= 0,
-+		.enable		= s5pv210_clk_mask0_ctrl,
-+		.ctrlbit	= (1 << 24),
-+	},
-+	.sources = &clkset_sclk_audio0,
-+	.reg_src = { .reg = S5P_CLK_SRC6, .shift = 0, .size = 4 },
-+	.reg_div = { .reg = S5P_CLK_DIV6, .shift = 0, .size = 4 },
-+};
-+
-+static struct clk_samsung *clkset_sclk_audio1_list[] = {
-+	[0] = &clk_ext_xtal_mux,
-+	[1] = &clk_pcmcdclk1,
-+	[2] = &clk_sclk_hdmi27m,
-+	[3] = &clk_sclk_usbphy0,
-+	[4] = &clk_sclk_usbphy1,
-+	[5] = &clk_sclk_hdmiphy,
-+	[6] = &clk_mout_mpll.clk,
-+	[7] = &clk_mout_epll.clk,
-+	[8] = &clk_sclk_vpll.clk,
-+};
-+
-+static struct clksrc_sources clkset_sclk_audio1 = {
-+	.sources	= clkset_sclk_audio1_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_sclk_audio1_list),
-+};
-+
-+static struct clksrc_clk clk_sclk_audio1 = {
-+	.clk		= {
-+		.name		= "sclk_audio",
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 28),
++	}, {
++		.name		= "pcm",
 +		.id		= 1,
-+		.enable		= s5pv210_clk_mask0_ctrl,
-+		.ctrlbit	= (1 << 25),
-+	},
-+	.sources = &clkset_sclk_audio1,
-+	.reg_src = { .reg = S5P_CLK_SRC6, .shift = 4, .size = 4 },
-+	.reg_div = { .reg = S5P_CLK_DIV6, .shift = 4, .size = 4 },
-+};
-+
-+static struct clk_samsung *clkset_sclk_audio2_list[] = {
-+	[0] = &clk_ext_xtal_mux,
-+	[1] = &clk_pcmcdclk0,
-+	[2] = &clk_sclk_hdmi27m,
-+	[3] = &clk_sclk_usbphy0,
-+	[4] = &clk_sclk_usbphy1,
-+	[5] = &clk_sclk_hdmiphy,
-+	[6] = &clk_mout_mpll.clk,
-+	[7] = &clk_mout_epll.clk,
-+	[8] = &clk_sclk_vpll.clk,
-+};
-+
-+static struct clksrc_sources clkset_sclk_audio2 = {
-+	.sources	= clkset_sclk_audio2_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_sclk_audio2_list),
-+};
-+
-+static struct clksrc_clk clk_sclk_audio2 = {
-+	.clk		= {
-+		.name		= "sclk_audio",
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 29),
++	}, {
++		.name		= "pcm",
 +		.id		= 2,
-+		.enable		= s5pv210_clk_mask0_ctrl,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 30),
++	}, {
+ 		.name		= "systimer",
+ 		.id		= -1,
+ 		.parent		= &clk_pclk_psys.clk,
+@@ -401,6 +509,18 @@ static struct clk init_clocks_disable[] = {
+ 		.enable		= s5pv210_clk_ip3_ctrl,
+ 		.ctrlbit	= (1<<21),
+ 	}, {
++		.name		= "i2c_hdmi_phy",
++		.id		= -1,
++		.parent		= &clk_pclk_dsys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 11),
++	}, {
++		.name		= "i2c_hdmi_ddc",
++		.id		= -1,
++		.parent		= &clk_pclk_dsys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 10),
++	}, {
+ 		.name		= "i2s_v50",
+ 		.id		= 0,
+ 		.parent		= &clk_p,
+@@ -418,6 +538,41 @@ static struct clk init_clocks_disable[] = {
+ 		.parent		= &clk_p,
+ 		.enable		= s5pv210_clk_ip3_ctrl,
+ 		.ctrlbit	= (1 << 6),
++	}, {
++		.name		= "ac97",
++		.id		= -1,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 1),
++	}, {
++		.name		= "spdif",
++		.id		= -1,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 0),
++	}, {
++		.name		= "seckey",
++		.id		= -1,
++		.enable		= s5pv210_clk_ip4_ctrl,
++		.ctrlbit	= (1 << 3),
++	}, {
++		.name		= "iem_apc",
++		.id		= -1,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip4_ctrl,
++		.ctrlbit	= (1 << 2),
++	}, {
++		.name		= "iem_iec",
++		.id		= -1,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip4_ctrl,
++		.ctrlbit	= (1 << 1),
++	}, {
++		.name		= "chip_id",
++		.id		= -1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip4_ctrl,
++		.ctrlbit	= (1 << 0),
+ 	},
+ };
+ 
+@@ -426,10 +581,129 @@ static struct clk init_clocks[] = {
+ 		.name		= "hclk_imem",
+ 		.id		= -1,
+ 		.parent		= &clk_hclk_msys.clk,
+-		.ctrlbit	= (1 << 5),
+ 		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 5),
+ 		.ops		= &clk_hclk_imem_ops,
+ 	}, {
++		.name		= "pdma",
++		.id		= 0,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 3),
++	}, {
++		.name		= "pdma",
++		.id		= 1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 4),
++	}, {
++		.name		= "mdma",
++		.id		= -1,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 2),
++	}, {
++		.name		= "dmc",
++		.id		= 0,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 0),
++	}, {
++		.name		= "dmc",
++		.id		= 1,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 1),
++	}, {
++		.name		= "nandxl",
++		.id		= -1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip1_ctrl,
++		.ctrlbit	= (1 << 24),
++	}, {
++		.name		= "tzic",
++		.id		= 0,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 28),
++	}, {
++		.name		= "tzic",
++		.id		= 1,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 29),
++	}, {
++		.name		= "tzic",
++		.id		= 2,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 30),
++	}, {
++		.name		= "tzic",
++		.id		= 3,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 31),
++	}, {
++		.name		= "vic",
++		.id		= 0,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 24),
++	}, {
++		.name		= "vic",
++		.id		= 1,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 25),
++	}, {
++		.name		= "vic",
++		.id		= 2,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
 +		.ctrlbit	= (1 << 26),
-+	},
-+	.sources = &clkset_sclk_audio2,
-+	.reg_src = { .reg = S5P_CLK_SRC6, .shift = 8, .size = 4 },
-+	.reg_div = { .reg = S5P_CLK_DIV6, .shift = 8, .size = 4 },
-+};
-+
-+static struct clk_samsung *clkset_sclk_spdif_list[] = {
-+	[0] = &clk_sclk_audio0.clk,
-+	[1] = &clk_sclk_audio1.clk,
-+	[2] = &clk_sclk_audio2.clk,
-+};
-+
-+static struct clksrc_sources clkset_sclk_spdif = {
-+	.sources	= clkset_sclk_spdif_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_sclk_spdif_list),
-+};
-+
-+static struct clk_samsung *clkset_group2_list[] = {
-+	[0] = &clk_ext_xtal_mux,
-+	[1] = &clk_xusbxti,
-+	[2] = &clk_sclk_hdmi27m,
-+	[3] = &clk_sclk_usbphy0,
-+	[4] = &clk_sclk_usbphy1,
-+	[5] = &clk_sclk_hdmiphy,
-+	[6] = &clk_mout_mpll.clk,
-+	[7] = &clk_mout_epll.clk,
-+	[8] = &clk_sclk_vpll.clk,
-+};
-+
-+static struct clksrc_sources clkset_group2 = {
-+	.sources	= clkset_group2_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_group2_list),
-+};
-+
-+/* Note that .clk.clk.ops are set later with init function */
-+static struct clksrc_clk clksrcs[] = {
-+	{
-+		.clk	= {
-+			.name		= "sclk_dmc",
-+			.id		= -1,
-+		},
-+		.sources = &clkset_group1,
-+		.reg_src = { .reg = S5P_CLK_SRC6, .shift = 24, .size = 2 },
-+		.reg_div = { .reg = S5P_CLK_DIV6, .shift = 28, .size = 4 },
 +	}, {
-+		.clk	= {
-+			.name		= "sclk_onenand",
-+			.id		= -1,
-+		},
-+		.sources = &clkset_sclk_onenand,
-+		.reg_src = { .reg = S5P_CLK_SRC0, .shift = 28, .size = 1 },
-+		.reg_div = { .reg = S5P_CLK_DIV6, .shift = 12, .size = 3 },
++		.name		= "vic",
++		.id		= 3,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 27),
 +	}, {
-+		.clk	= {
-+			.name		= "uclk1",
-+			.id		= 0,
-+			.enable		= s5pv210_clk_mask0_ctrl,
-+			.ctrlbit	= (1 << 12),
-+		},
-+		.sources = &clkset_uart,
-+		.reg_src = { .reg = S5P_CLK_SRC4, .shift = 16, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV4, .shift = 16, .size = 4 },
++		.name		= "secjtag",
++		.id		= -1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 11),
 +	}, {
-+		.clk		= {
-+			.name		= "uclk1",
-+			.id		= 1,
-+			.enable		= s5pv210_clk_mask0_ctrl,
-+			.ctrlbit	= (1 << 13),
-+		},
-+		.sources = &clkset_uart,
-+		.reg_src = { .reg = S5P_CLK_SRC4, .shift = 20, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV4, .shift = 20, .size = 4 },
++		.name		= "coresight",
++		.id		= -1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 8),
 +	}, {
-+		.clk		= {
-+			.name		= "uclk1",
-+			.id		= 2,
-+			.enable		= s5pv210_clk_mask0_ctrl,
-+			.ctrlbit	= (1 << 14),
-+		},
-+		.sources = &clkset_uart,
-+		.reg_src = { .reg = S5P_CLK_SRC4, .shift = 24, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV4, .shift = 24, .size = 4 },
++		.name		= "sdm",
++		.id		= -1,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 1),
 +	}, {
-+		.clk		= {
-+			.name		= "uclk1",
-+			.id		= 3,
-+			.enable		= s5pv210_clk_mask0_ctrl,
-+			.ctrlbit	= (1 << 15),
-+		},
-+		.sources = &clkset_uart,
-+		.reg_src = { .reg = S5P_CLK_SRC4, .shift = 28, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV4, .shift = 28, .size = 4 },
++		.name		= "secss",
++		.id		= -1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 0),
 +	}, {
-+		.clk	= {
-+			.name		= "sclk_mixer",
-+			.id		= -1,
-+			.enable		= s5pv210_clk_ip1_ctrl,
-+			.ctrlbit	= (1 << 9),
-+		},
-+		.sources = &clkset_sclk_mixer,
-+		.reg_src = { .reg = S5P_CLK_SRC1, .shift = 4, .size = 1 },
++		.name		= "syscon",
++		.id		= -1,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 27),
 +	}, {
-+		.clk		= {
-+			.name		= "sclk_spdif",
-+			.id		= -1,
-+			.enable		= s5pv210_clk_mask0_ctrl,
-+			.ctrlbit	= (1 << 27),
-+		},
-+		.sources = &clkset_sclk_spdif,
-+		.reg_src = { .reg = S5P_CLK_SRC6, .shift = 12, .size = 2 },
++		.name		= "gpio",
++		.id		= -1,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 26),
 +	}, {
-+		.clk	= {
-+			.name		= "sclk_fimc",
-+			.id		= 0,
-+			.enable		= s5pv210_clk_ip0_ctrl,
-+			.ctrlbit	= (1 << 24),
-+		},
-+		.sources = &clkset_group2,
-+		.reg_src = { .reg = S5P_CLK_SRC3, .shift = 12, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV3, .shift = 12, .size = 4 },
+ 		.name		= "uart",
+ 		.id		= 0,
+ 		.parent		= &clk_pclk_psys.clk,
+@@ -453,6 +727,28 @@ static struct clk init_clocks[] = {
+ 		.parent		= &clk_pclk_psys.clk,
+ 		.enable		= s5pv210_clk_ip3_ctrl,
+ 		.ctrlbit	= (1 << 20),
 +	}, {
-+		.clk	= {
-+			.name		= "sclk_fimc",
-+			.id		= 1,
-+			.enable		= s5pv210_clk_ip0_ctrl,
-+			.ctrlbit	= (1 << 25),
-+		},
-+		.sources = &clkset_group2,
-+		.reg_src = { .reg = S5P_CLK_SRC3, .shift = 16, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV3, .shift = 16, .size = 4 },
++		.name		= "tzpc",
++		.id		= 0,
++		.parent		= &clk_pclk_msys.clk,
++		.enable		= s5pv210_clk_ip4_ctrl,
++		.ctrlbit	= (1 << 5),
 +	}, {
-+		.clk	= {
-+			.name		= "sclk_fimc",
-+			.id		= 2,
-+			.enable		= s5pv210_clk_ip0_ctrl,
-+			.ctrlbit	= (1 << 26),
-+		},
-+		.sources = &clkset_group2,
-+		.reg_src = { .reg = S5P_CLK_SRC3, .shift = 20, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV3, .shift = 20, .size = 4 },
++		.name		= "tzpc",
++		.id		= 1,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip4_ctrl,
++		.ctrlbit	= (1 << 6),
 +	}, {
-+		.clk		= {
-+			.name		= "sclk_cam",
-+			.id		= 0,
-+		},
-+		.sources = &clkset_group2,
-+		.reg_src = { .reg = S5P_CLK_SRC1, .shift = 12, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV1, .shift = 12, .size = 4 },
++		.name		= "tzpc",
++		.id		= 2,
++		.enable		= s5pv210_clk_ip4_ctrl,
++		.ctrlbit	= (1 << 7),
 +	}, {
-+		.clk		= {
-+			.name		= "sclk_cam",
-+			.id		= 1,
-+		},
-+		.sources = &clkset_group2,
-+		.reg_src = { .reg = S5P_CLK_SRC1, .shift = 16, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV1, .shift = 16, .size = 4 },
-+	}, {
-+		.clk		= {
-+			.name		= "sclk_fimd",
-+			.id		= -1,
-+			.enable		= s5pv210_clk_mask0_ctrl,
-+			.ctrlbit	= (1 << 5),
-+		},
-+		.sources = &clkset_group2,
-+		.reg_src = { .reg = S5P_CLK_SRC1, .shift = 20, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV1, .shift = 20, .size = 4 },
-+	}, {
-+		.clk		= {
-+			.name		= "sclk_mmc",
-+			.id		= 0,
-+			.enable		= s5pv210_clk_mask0_ctrl,
-+			.ctrlbit	= (1 << 8),
-+		},
-+		.sources = &clkset_group2,
-+		.reg_src = { .reg = S5P_CLK_SRC4, .shift = 0, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV4, .shift = 0, .size = 4 },
-+	}, {
-+		.clk		= {
-+			.name		= "sclk_mmc",
-+			.id		= 1,
-+			.enable		= s5pv210_clk_mask0_ctrl,
-+			.ctrlbit	= (1 << 9),
-+		},
-+		.sources = &clkset_group2,
-+		.reg_src = { .reg = S5P_CLK_SRC4, .shift = 4, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV4, .shift = 4, .size = 4 },
-+	}, {
-+		.clk		= {
-+			.name		= "sclk_mmc",
-+			.id		= 2,
-+			.enable		= s5pv210_clk_mask0_ctrl,
-+			.ctrlbit	= (1 << 10),
-+		},
-+		.sources = &clkset_group2,
-+		.reg_src = { .reg = S5P_CLK_SRC4, .shift = 8, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV4, .shift = 8, .size = 4 },
-+	}, {
-+		.clk		= {
-+			.name		= "sclk_mmc",
-+			.id		= 3,
-+			.enable		= s5pv210_clk_mask0_ctrl,
-+			.ctrlbit	= (1 << 11),
-+		},
-+		.sources = &clkset_group2,
-+		.reg_src = { .reg = S5P_CLK_SRC4, .shift = 12, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV4, .shift = 12, .size = 4 },
-+	}, {
-+		.clk		= {
-+			.name		= "sclk_mfc",
-+			.id		= -1,
-+			.enable		= s5pv210_clk_ip0_ctrl,
-+			.ctrlbit	= (1 << 16),
-+		},
-+		.sources = &clkset_group1,
-+		.reg_src = { .reg = S5P_CLK_SRC2, .shift = 4, .size = 2 },
-+		.reg_div = { .reg = S5P_CLK_DIV2, .shift = 4, .size = 4 },
-+	}, {
-+		.clk		= {
-+			.name		= "sclk_g2d",
-+			.id		= -1,
-+			.enable		= s5pv210_clk_ip0_ctrl,
-+			.ctrlbit	= (1 << 12),
-+		},
-+		.sources = &clkset_group1,
-+		.reg_src = { .reg = S5P_CLK_SRC2, .shift = 8, .size = 2 },
-+		.reg_div = { .reg = S5P_CLK_DIV2, .shift = 8, .size = 4 },
-+	}, {
-+		.clk		= {
-+			.name		= "sclk_g3d",
-+			.id		= -1,
-+			.enable		= s5pv210_clk_ip0_ctrl,
-+			.ctrlbit	= (1 << 8),
-+		},
-+		.sources = &clkset_group1,
-+		.reg_src = { .reg = S5P_CLK_SRC2, .shift = 0, .size = 2 },
-+		.reg_div = { .reg = S5P_CLK_DIV2, .shift = 0, .size = 4 },
-+	}, {
-+		.clk		= {
-+			.name		= "sclk_csis",
-+			.id		= -1,
-+			.enable		= s5pv210_clk_ip0_ctrl,
-+			.ctrlbit	= (1 << 31),
-+		},
-+		.sources = &clkset_group2,
-+		.reg_src = { .reg = S5P_CLK_SRC1, .shift = 24, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV1, .shift = 28, .size = 4 },
-+	}, {
-+		.clk		= {
-+			.name		= "sclk_spi",
-+			.id		= 0,
-+			.enable		= s5pv210_clk_mask0_ctrl,
-+			.ctrlbit	= (1 << 16),
-+		},
-+		.sources = &clkset_group2,
-+		.reg_src = { .reg = S5P_CLK_SRC5, .shift = 0, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV5, .shift = 0, .size = 4 },
-+	}, {
-+		.clk		= {
-+			.name		= "sclk_spi",
-+			.id		= 1,
-+			.enable		= s5pv210_clk_mask0_ctrl,
-+			.ctrlbit	= (1 << 17),
-+		},
-+		.sources = &clkset_group2,
-+		.reg_src = { .reg = S5P_CLK_SRC5, .shift = 4, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV5, .shift = 4, .size = 4 },
-+	}, {
-+		.clk		= {
-+			.name		= "sclk_pwi",
-+			.id		= -1,
-+			.enable		= &s5pv210_clk_ip4_ctrl,
-+			.ctrlbit	= (1 << 2),
-+		},
-+		.sources = &clkset_group2,
-+		.reg_src = { .reg = S5P_CLK_SRC6, .shift = 20, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV6, .shift = 24, .size = 4 },
-+	}, {
-+		.clk		= {
-+			.name		= "sclk_pwm",
-+			.id		= -1,
-+			.enable		= s5pv210_clk_mask0_ctrl,
-+			.ctrlbit	= (1 << 19),
-+		},
-+		.sources = &clkset_group2,
-+		.reg_src = { .reg = S5P_CLK_SRC5, .shift = 12, .size = 4 },
-+		.reg_div = { .reg = S5P_CLK_DIV5, .shift = 12, .size = 4 },
-+	},
-+};
-+
-+/* Clock initialisation code */
-+static struct clksrc_clk *sysclks[] = {
-+	&clk_mout_apll,
-+	&clk_mout_epll,
-+	&clk_mout_mpll,
-+	&clk_armclk,
-+	&clk_hclk_msys,
-+	&clk_sclk_a2m,
-+	&clk_hclk_dsys,
-+	&clk_hclk_psys,
-+	&clk_pclk_msys,
-+	&clk_pclk_dsys,
-+	&clk_pclk_psys,
-+	&clk_vpllsrc,
-+	&clk_sclk_vpll,
-+	&clk_sclk_dac,
-+	&clk_sclk_pixel,
-+	&clk_sclk_hdmi,
-+};
-+
-+void __init_or_cpufreq s5pv210_setup_clocks(void)
-+{
-+	struct clk *xtal_clk;
-+	unsigned long xtal;
-+	unsigned long vpllsrc;
-+	unsigned long armclk;
-+	unsigned long hclk_msys;
-+	unsigned long hclk_dsys;
-+	unsigned long hclk_psys;
-+	unsigned long pclk_msys;
-+	unsigned long pclk_dsys;
-+	unsigned long pclk_psys;
-+	unsigned long apll;
-+	unsigned long mpll;
-+	unsigned long epll;
-+	unsigned long vpll;
-+	unsigned int ptr;
-+	u32 clkdiv0, clkdiv1;
-+
-+	printk(KERN_DEBUG "%s: registering clocks\n", __func__);
-+
-+	clkdiv0 = __raw_readl(S5P_CLK_DIV0);
-+	clkdiv1 = __raw_readl(S5P_CLK_DIV1);
-+
-+	printk(KERN_DEBUG "%s: clkdiv0 = %08x, clkdiv1 = %08x\n",
-+				__func__, clkdiv0, clkdiv1);
-+
-+	xtal_clk = clk_get(NULL, "xtal");
-+	BUG_ON(IS_ERR(xtal_clk));
-+
-+	xtal = clk_get_rate(xtal_clk);
-+	clk_put(xtal_clk);
-+
-+	printk(KERN_DEBUG "%s: xtal is %ld\n", __func__, xtal);
-+
-+	apll = s5p_get_pll45xx(xtal, __raw_readl(S5P_APLL_CON), pll_4508);
-+	mpll = s5p_get_pll45xx(xtal, __raw_readl(S5P_MPLL_CON), pll_4502);
-+	epll = s5p_get_pll45xx(xtal, __raw_readl(S5P_EPLL_CON), pll_4500);
-+	vpllsrc = clk_get_rate(&clk_vpllsrc.clk.clk);
-+	vpll = s5p_get_pll45xx(vpllsrc, __raw_readl(S5P_VPLL_CON), pll_4502);
-+
-+	clk_fout_apll.rate = apll;
-+	clk_fout_mpll.rate = mpll;
-+	clk_fout_epll.rate = epll;
-+	clk_fout_vpll.rate = vpll;
-+
-+	printk(KERN_INFO "S5PV210: PLL settings, A=%ld, M=%ld, E=%ld V=%ld",
-+			apll, mpll, epll, vpll);
-+
-+	armclk = clk_get_rate(&clk_armclk.clk.clk);
-+	hclk_msys = clk_get_rate(&clk_hclk_msys.clk.clk);
-+	hclk_dsys = clk_get_rate(&clk_hclk_dsys.clk.clk);
-+	hclk_psys = clk_get_rate(&clk_hclk_psys.clk.clk);
-+	pclk_msys = clk_get_rate(&clk_pclk_msys.clk.clk);
-+	pclk_dsys = clk_get_rate(&clk_pclk_dsys.clk.clk);
-+	pclk_psys = clk_get_rate(&clk_pclk_psys.clk.clk);
-+
-+	printk(KERN_INFO "S5PV210: ARMCLK=%ld, HCLKM=%ld, HCLKD=%ld\n"
-+			 "HCLKP=%ld, PCLKM=%ld, PCLKD=%ld, PCLKP=%ld\n",
-+			armclk, hclk_msys, hclk_dsys, hclk_psys,
-+			pclk_msys, pclk_dsys, pclk_psys);
-+
-+	clk_f.rate = armclk;
-+	clk_h.rate = hclk_psys;
-+	clk_p.rate = pclk_psys;
-+
-+	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
-+		s3c_set_clksrc(&clksrcs[ptr], false);
-+}
-+
-+static struct clk_samsung *clks[] __initdata = {
-+	&clk_sclk_hdmi27m,
-+	&clk_sclk_hdmiphy,
-+	&clk_sclk_usbphy0,
-+	&clk_sclk_usbphy1,
-+	&clk_pcmcdclk0,
-+	&clk_pcmcdclk1,
-+	&clk_pcmcdclk2,
-+};
-+
-+void __init s5pv210_register_clocks(void)
-+{
-+	struct clk_samsung *clkp;
-+	int ret;
-+	int ptr;
-+
-+	ret = s3c24xx_register_clocks(clks, ARRAY_SIZE(clks));
-+	if (ret > 0)
-+		printk(KERN_ERR "Failed to register %u clocks\n", ret);
-+
-+	for (ptr = 0; ptr < ARRAY_SIZE(sysclks); ptr++)
-+		s3c_register_clksrc(sysclks[ptr], 1);
-+
-+	s3c_register_clksrc(clksrcs, ARRAY_SIZE(clksrcs));
-+
-+	s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
-+	for (ptr = 0; ptr < ARRAY_SIZE(init_clocks); ptr++)
-+		(init_clocks[ptr].enable)(&init_clocks[ptr], 1);
-+
-+	clkp = init_clocks_disable;
-+	for (ptr = 0; ptr < ARRAY_SIZE(init_clocks_disable); ptr++, clkp++) {
-+		ret = s3c24xx_register_clock(clkp);
-+		if (ret < 0) {
-+			printk(KERN_ERR "Failed to register clock %s (%d)\n",
-+			       clkp->name, ret);
-+		}
-+		(clkp->enable)(clkp, 0);
-+	}
-+
-+	s3c_pwmclk_init();
-+
-+}
++		.name		= "tzpc",
++		.id		= 3,
++		.enable		= s5pv210_clk_ip4_ctrl,
++		.ctrlbit	= (1 << 8),
+ 	},
+ };
+ 
 -- 
 1.6.3.3
