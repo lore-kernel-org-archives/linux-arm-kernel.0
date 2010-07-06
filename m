@@ -1,85 +1,47 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Tue, 6 Jul 2010 14:03:05 +0000
-Subject: [PATCH 2/3] leds: add LED driver for Network Space v2 LEDs
-In-Reply-To: <alpine.LFD.2.00.1007051444030.6020@xanadu.home>
-References: <1278325866-3890-1-git-send-email-simon@sequanux.org>
-	<1278325866-3890-2-git-send-email-simon@sequanux.org>
-	<alpine.LFD.2.00.1007051444030.6020@xanadu.home>
-Message-ID: <20100706140305.GA31660@kw.sim.vm.gnt>
+From: r.herring@freescale.com (Rob Herring)
+Date: Tue, 06 Jul 2010 09:06:55 -0500
+Subject: [PATCH] mx25: set GPT clock source to PER
+In-Reply-To: <20100706073314.GJ26079@pengutronix.de>
+References: <20100704084343.GB19559@jasper.tkos.co.il>
+	<40bc9462f125233cc9c63631a9b987ed684b6d97.1278233166.git.baruch@tkos.co.il>
+	<20100705082123.GD26079@pengutronix.de>
+	<20100706063511.GB28547@jasper.tkos.co.il>
+	<20100706073314.GJ26079@pengutronix.de>
+Message-ID: <1278425215.4396.45.camel@ra7055-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
-
-On Mon, Jul 05, 2010 at 03:01:04PM -0400, Nicolas Pitre wrote:
-> On Mon, 5 Jul 2010, Simon Guinot wrote:
-> 
-> > From: Simon Guinot <sguinot@lacie.com>
+On Tue, 2010-07-06 at 09:33 +0200, Sascha Hauer wrote:
+> On Tue, Jul 06, 2010 at 09:35:11AM +0300, Baruch Siach wrote:
+> > > In any case, we can't apply your patch because it would break other v2
+> > > based architectures like i.MX35.
 > > 
-> > This patch add a LED class driver for the dual-GPIO LEDs found on the
-> > Network Space v2 board (and parents). This include Internet Space v2,
-> > Network Space (Max) v2 and d2 Network v2 boards.
-> > 
-> > This dual-GPIO LED is wired to a CPLD and can blink in relation with the
-> > SATA activity. The driver expose this capability through a "sata" sysfs
-> > attribute.
-> > 
-> > Signed-off-by: Simon Guinot <sguinot@lacie.com>
-> [...]
+> > What do you suggest then?
 > 
-> > +config LEDS_NS2
-> > +	tristate "LED support for Network Space v2 GPIO LEDs"
-> > +	depends on MACH_NETSPACE_V2 || MACH_INETSPACE_V2 || MACH_NETSPACE_MAX_V2
+> Tell the timer code which clock to use with an argument to
+> mxc_timer_init() and add the missing clocks to the clock.c file. You
+> also have to pass this argument through from the board to
+> mx25_clocks_init(). That's a lot of work and in the end we still do not
+> know why some i.MX25 variants need the peripheral clock and others need
+> the ipg clock. So what I really suggest is that you invest some
+> research to find the source of this strangeness. Some things that could
+> help you are:
 > 
-> You could add a "default y" here.
-
-OK
-
+> - the clko pin
+> - Do both boards have identical i.MX25 tapeout versions?
+> - Are the clocks initialized identically?
 > 
-> > +enum ns2_led_modes {
-> > +	NS_V2_LED_OFF,
-> > +	NS_V2_LED_ON,
-> > +	NS_V2_LED_SATA,
-> > +};
-> > +
-> > +struct ns2_led_mode_value {
-> > +	enum ns2_led_modes	mode;
-> > +	int			cmd_level;
-> > +	int			slow_level;
-> > +};
-> > +
-> > +struct ns2_led_mode_value ns2_led_modval[] = {
-> > +	{ NS_V2_LED_OFF	, 1, 0 },
-> > +	{ NS_V2_LED_ON	, 0, 1 },
-> > +	{ NS_V2_LED_ON	, 1, 1 },
-> > +	{ NS_V2_LED_SATA, 0, 0 },
-> > +};
-> 
-> You probably want to make this static.
+> I bricked my i.MX25 PDK so unfortunately I do not have any hardware to
+> do some tests myself.
 
-Yes, I want.
+There are no Si issues with MX25 that would cause per_clk to not work. 
 
-> 
-> > diff --git a/include/linux/leds-ns2.h b/include/linux/leds-ns2.h
-> > new file mode 100644
-> > index 0000000..c76ebbb
-> > --- /dev/null
-> > +++ b/include/linux/leds-ns2.h
-> 
-> This is probably not the best location for this file as it is really 
-> specific to a particular device and not generic for the kernel.  You 
-> could create it in arch/arm/mach-kirkwood/include/mach/leds-ns2.h 
-> instead, and include it with #include <mach/leds-ns2.h>.
+There are 2 possible clocking configurations and it is not tied to v1
+vs. v2 timer hardware:
+ipg_clk and per_clk are same clock source - MX1, MX21, MX31
+per_clk is independent clock - every other i.MX chip
 
-OK
+The correct setup is to use per_clk as ipg_clk can change frequencies
+for bus scaling in the latter case. 
 
-Thanks for your review.
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100706/1907afce/attachment.sig>
+Rob
