@@ -1,185 +1,61 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 6 Jul 2010 08:00:34 +0300
-Subject: [RFC PATCH] arm/imx/gpio: add spinlock protection
-In-Reply-To: <20100705075218.GC26079@pengutronix.de>
-References: <7fe710a6bc27460852588d2e561ec4c4a4644ab0.1278227668.git.baruch@tkos.co.il>
-	<20100705075218.GC26079@pengutronix.de>
-Message-ID: <20100706050033.GA28547@jasper.tkos.co.il>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 6 Jul 2010 14:29:26 +0900
+Subject: [PATCH v2] SDHCI-S3C fixes and enhancements (driver specific
+	code)
+In-Reply-To: <1276670996-17729-1-git-send-email-m.szyprowski@samsung.com>
+References: <1276670996-17729-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <AANLkTinY8-9ubunlbbQY8Le1OluqqGbPNa9r_GcCyHwZ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Hi Andrew,
 
-On Mon, Jul 05, 2010 at 09:52:18AM +0200, Sascha Hauer wrote:
-> On Sun, Jul 04, 2010 at 10:15:13AM +0300, Baruch Siach wrote:
-> > The GPIO and IRQ/GPIO registers need protection from concurrent access for
-> > operations that are not atomic.
-> 
-> I don't think we need locking here. mxc_gpio_irq_handler is called with
-> desc->lock held (from the parent interrupt, not the chained interrupts).
-> Other functions like enable_irq/disable_irq which result in mask/unmask
-> operations run with interrupts disabled.
+I hope to merge it at next merge windows.
 
-What about the .set_type method?
+Others any comments?
 
-Adding David Brownell to CC.
+Thank you,
+Kyungmin Park
 
-> Apart from this other architectures do not use locking here aswell.
-
-The Nomadic gpio driver does use a spinlock for mask/unmask operations.
-
-What about the _set_gpio_direction, and mxc_gpio_set? These functions may be 
-called from a process context (e.g., via sysfs). A context switch between 
-__raw_readl and __raw_writel will cause corruption.
-
-baruch
-
-> > Cc: Juergen Beisert <j.beisert@pengutronix.de>
-> > Cc: Daniel Mack <daniel@caiaq.de>
-> > Reported-by: rpkamiak at rockwellcollins.com
-> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > ---
-> >  arch/arm/plat-mxc/gpio.c              |   28 +++++++++++++++++++++++++---
-> >  arch/arm/plat-mxc/include/mach/gpio.h |    3 +++
-> >  2 files changed, 28 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-> > index 71437c6..a8a33cd 100644
-> > --- a/arch/arm/plat-mxc/gpio.c
-> > +++ b/arch/arm/plat-mxc/gpio.c
-> > @@ -56,10 +56,13 @@ static void _set_gpio_irqenable(struct mxc_gpio_port *port, u32 index,
-> >  				int enable)
-> >  {
-> >  	u32 l;
-> > +	unsigned long flags;
-> >  
-> > +	spin_lock_irqsave(&port->irq_lock, flags);
-> >  	l = __raw_readl(port->base + GPIO_IMR);
-> >  	l = (l & (~(1 << index))) | (!!enable << index);
-> >  	__raw_writel(l, port->base + GPIO_IMR);
-> > +	spin_unlock_irqrestore(&port->irq_lock, flags);
-> >  }
-> >  
-> >  static void gpio_ack_irq(u32 irq)
-> > @@ -87,8 +90,11 @@ static int gpio_set_irq_type(u32 irq, u32 type)
-> >  	u32 gpio = irq_to_gpio(irq);
-> >  	struct mxc_gpio_port *port = &mxc_gpio_ports[gpio / 32];
-> >  	u32 bit, val;
-> > -	int edge;
-> > +	int edge, rc = 0;
-> >  	void __iomem *reg = port->base;
-> > +	unsigned long flags;
-> > +
-> > +	spin_lock_irqsave(&port->irq_lock, flags);
-> >  
-> >  	port->both_edges &= ~(1 << (gpio & 31));
-> >  	switch (type) {
-> > @@ -116,7 +122,8 @@ static int gpio_set_irq_type(u32 irq, u32 type)
-> >  		edge = GPIO_INT_HIGH_LEV;
-> >  		break;
-> >  	default:
-> > -		return -EINVAL;
-> > +		rc = -EINVAL;
-> > +		goto out;
-> >  	}
-> >  
-> >  	reg += GPIO_ICR1 + ((gpio & 0x10) >> 2); /* lower or upper register */
-> > @@ -125,9 +132,12 @@ static int gpio_set_irq_type(u32 irq, u32 type)
-> >  	__raw_writel(val | (edge << (bit << 1)), reg);
-> >  	_clear_gpio_irqstatus(port, gpio & 0x1f);
-> >  
-> > -	return 0;
-> > +out:
-> > +	spin_unlock_irqrestore(&port->irq_lock, flags);
-> > +	return rc;
-> >  }
-> >  
-> > +/* caller must hold port->irq_lock */
-> >  static void mxc_flip_edge(struct mxc_gpio_port *port, u32 gpio)
-> >  {
-> >  	void __iomem *reg = port->base;
-> > @@ -157,12 +167,15 @@ static void mxc_flip_edge(struct mxc_gpio_port *port, u32 gpio)
-> >  static void mxc_gpio_irq_handler(struct mxc_gpio_port *port, u32 irq_stat)
-> >  {
-> >  	u32 gpio_irq_no_base = port->virtual_irq_start;
-> > +	unsigned long flags;
-> >  
-> >  	while (irq_stat != 0) {
-> >  		int irqoffset = fls(irq_stat) - 1;
-> >  
-> > +		spin_lock_irqsave(&port->irq_lock, flags);
-> >  		if (port->both_edges & (1 << irqoffset))
-> >  			mxc_flip_edge(port, irqoffset);
-> > +		spin_unlock_irqrestore(&port->irq_lock, flags);
-> >  
-> >  		generic_handle_irq(gpio_irq_no_base + irqoffset);
-> >  
-> > @@ -214,13 +227,16 @@ static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
-> >  	struct mxc_gpio_port *port =
-> >  		container_of(chip, struct mxc_gpio_port, chip);
-> >  	u32 l;
-> > +	unsigned long flags;
-> >  
-> > +	spin_lock_irqsave(&port->lock, flags);
-> >  	l = __raw_readl(port->base + GPIO_GDIR);
-> >  	if (dir)
-> >  		l |= 1 << offset;
-> >  	else
-> >  		l &= ~(1 << offset);
-> >  	__raw_writel(l, port->base + GPIO_GDIR);
-> > +	spin_unlock_irqrestore(&port->lock, flags);
-> >  }
-> >  
-> >  static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
-> > @@ -229,9 +245,12 @@ static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
-> >  		container_of(chip, struct mxc_gpio_port, chip);
-> >  	void __iomem *reg = port->base + GPIO_DR;
-> >  	u32 l;
-> > +	unsigned long flags;
-> >  
-> > +	spin_lock_irqsave(&port->lock, flags);
-> >  	l = (__raw_readl(reg) & (~(1 << offset))) | (value << offset);
-> >  	__raw_writel(l, reg);
-> > +	spin_unlock_irqrestore(&port->lock, flags);
-> >  }
-> >  
-> >  static int mxc_gpio_get(struct gpio_chip *chip, unsigned offset)
-> > @@ -285,6 +304,9 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
-> >  		port[i].chip.base = i * 32;
-> >  		port[i].chip.ngpio = 32;
-> >  
-> > +		spin_lock_init(&port[i].lock);
-> > +		spin_lock_init(&port[i].irq_lock);
-> > +
-> >  		/* its a serious configuration bug when it fails */
-> >  		BUG_ON( gpiochip_add(&port[i].chip) < 0 );
-> >  
-> > diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
-> > index 894d2f8..a37724a 100644
-> > --- a/arch/arm/plat-mxc/include/mach/gpio.h
-> > +++ b/arch/arm/plat-mxc/include/mach/gpio.h
-> > @@ -36,6 +36,9 @@ struct mxc_gpio_port {
-> >  	int virtual_irq_start;
-> >  	struct gpio_chip chip;
-> >  	u32 both_edges;
-> > +
-> > +	spinlock_t	lock;		/* GPIO registers */
-> > +	spinlock_t	irq_lock;	/* IRQ registers */
-> >  };
-> >  
-> >  int mxc_gpio_init(struct mxc_gpio_port*, int);
-> > -- 
-> > 1.7.1
-> > 
-> > 
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+On Wed, Jun 16, 2010 at 3:49 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello,
+>
+> This series includes various fixes to sdhci-s3c driver as well as a
+> major feature enhancement. This patch series is prepared to get complete
+> sdhci support on Samsung Aquila board.
+>
+> A quick overview on the patches:
+>
+> #1 - add missing sdhci_s3c_driver_remove() function
+> #2 - introduce new sdhci quirk to get rid of anoying runtime warning and
+> ? ? possible problems with slow mmc/sd cards
+> #3 - add support for various methods of notifying the host driver about
+> ? ? the card insertion/removal (should be compatible with existing code)
+>
+> Last patch requires changes to the Samsung platform setup code, which
+> has been posted in a separate patch series for easier merging, please
+> refer to the "[PATCH v2] SDHCI-S3C fixes and enhancements (platform
+> specific code)" thread.
+>
+> Changes since V1:
+> - added support for gpio external interrupt card based detect method
+> ?directly to sdhci-s3c driver
+> - removed duplicate Kconfig patch
+> - removed timeout patch (not really needed)
+>
+> A complete list of patches:
+>
+> [PATCH 1/3] sdhci-s3c: add missing remove function
+> [PATCH 2/3] sdhci-s3c: add support for the non standard minimal clock value
+> [PATCH 3/3] sdhci-s3c: add support for new card detection methods
+>
+> Best regards
+> --
+> Marek Szyprowski
+> Samsung Poland R&D Center
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
