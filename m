@@ -1,122 +1,83 @@
-From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Tue, 06 Jul 2010 22:51:03 +0300
-Subject: [PATCH 11/15] wireless: wl1271: introduce platform device support
-In-Reply-To: <alpine.LFD.2.00.1007061316010.6020@xanadu.home>
-References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
-	<1278376666-3509-12-git-send-email-ohad@wizery.com>
-	<4C32EF19.1000604@nokia.com>
-	<AANLkTintIz-N7MwwtqhVq2LR3Ln5JTNYSbJUBSSClcA-@mail.gmail.com>
-	<4C3306F4.8060907@nokia.com>
-	<AANLkTin5W52fPzWToRrAzm56SLZI-taSuI16rCEhLWqH@mail.gmail.com>
-	<4C333E0D.2070601@nokia.com>
-	<alpine.LFD.2.00.1007061316010.6020@xanadu.home>
-Message-ID: <4C338927.5020400@nokia.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 07 Jul 2010 00:34:46 +0200
+Subject: pxa27x_udc: Oops on probe with usb cable connected.
+In-Reply-To: <20100705104043.c72d4a5b.ospite@studenti.unina.it> (Antonio
+	Ospite's message of "Mon\, 5 Jul 2010 10\:40\:43 +0200")
+References: <20100630115310.bcf967c1.ospite@studenti.unina.it>
+	<877hld7np5.fsf@free.fr>
+	<20100703221022.27df1a2e.ospite@studenti.unina.it>
+	<87r5jkxh1y.fsf@free.fr>
+	<20100705104043.c72d4a5b.ospite@studenti.unina.it>
+Message-ID: <87r5jgw86x.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre wrote:
-> On Tue, 6 Jul 2010, Roger Quadros wrote:
-> 
->> On 07/06/2010 03:53 PM, ext Ohad Ben-Cohen wrote:
->>> Hi Roger,
->>>
->>> On Tue, Jul 6, 2010 at 1:35 PM, Roger Quadros<roger.quadros@nokia.com>
->>> wrote:
->>>> My point is that shouldn't this be handled by SDIO core?
->>> Care to explain what you mean / give a code example ?
->> If the Power enable GPIO can be treated as SDIO slot supply (i.e. vmmc), then
->> the SDIO/MMC core should tackle it, just like it deals with supply for slots
->> with removable cards.
-> 
-> Exact.
-> 
->>> You need card detect events in order to trigger card&  sdio function
->>> initialization and removals.
-> 
-> Why would you trigger function initialization and removal?  Just to turn 
-> off power?  That's a bit like pulling off the battery from your laptop 
-> when you want to suspend it.  There is a better way to go about things.
-> 
->>> Please share any alternative approach you may be thinking on.
->> OK, this is how I see it.
->>
->> - Treat the non-removable card as non-removable. So no need to do card detect
->> emulation.
->>
->> - Treat the GPIO power enable on wl1271 as VMMC supply. Use fixed regulator
->> framework to define this regulator & supply. Even though you mention that it
->> is not actually a supply, it fits well in the fixed supply framework.
->>
->> - When the host controller is enumerated, the mmc core will power up the slot,
->> find the sdio card, and probe the function driver (i.e. wl1271_sdio).
->>
->> - if interface is not in use, the function driver must release the sdio host,
->> and this should eventually disable the vmmc supply.
->>
->> - Whenever the wlan interface must be brought up, wl1271_sdio, can claim the
->> sdio host. this will cause the vmmc supply to be enabled, for as long as the
->> interface is up.
->>
->> Does this address all issues?
-> 
-> This is mostly all good, except that claiming/releasing the SDIO host is 
-> about access to the bus.  It must be claimed right before doing any IO, 
-> and released right after that, even when the card is expected to remain 
-> powered.  This is not the proper place to hook power control.
-> 
-> Another function pair would be needed instead, which would do almost 
-> like the suspend/resume code is already doing.  Something like:
-> 
-> /*
->  * Indicate to the core SDIO layer that we're not requiring that the
->  * function remain powered.  If all functions for the card are in the 
->  * same "no power" state, then the host controller can remove power from
->  * the card.  Note: the function driver must preserve hardware states if
->  * necessary.
->  */
-> int sdio_release_power(struct sdio_func *func);
-> 
-> /*
->  * Indicate to the core SDIO layer that we want power back for this
->  * SDIO function.  The power may or may not actually have been removed
->  * since last call to sdio_release_power(), so the function driver must 
->  * not assume any preserved state at the hardware level and re-perform
->  * all the necessary hardware config.  This function returns 0 when
->  * power is actually restored, or some error code if this cannot be 
->  * achieved.  One error reason might be that the card is no longer 
->  * available on the bus (was removed while powered down and card 
->  * detection didn't trigger yet).
->  */
-> int sdio_claim_power(struct sdio_func *func);
-> 
-> That's it.  When the network interface is down and the hardware is not 
-> needed, you call sdio_release_power().  When the request to activate the 
-> network interface is received, you call sdio_claim_power() and configure 
-> the hardware appropriately.  If sdio_claim_power() returns an error, 
-> then you just return an error to the network request, and eventually the 
-> driver's remove method will be called if this is indeed because the card 
-> was removed.
-> 
-> In the core SDIO code, this is almost identical to a suspend/resume 
-> request, except that the request comes from the function driver instead 
-> of the core MMC code.
+Antonio Ospite <ospite@studenti.unina.it> writes:
 
-For eMMC in omap_hsmmc, this is all done via claim_host / release_host
-which call ->enable() / ->disable() methods.  omap_hsmmc makes use of
-mmc_power_restore_host() which calls host->bus_ops->power_restore()
-which is not implemented for SDIO, but for MMC and SD it reinitializes
-the card.
+>> Now, would you test the patch attached in this mail to see if :
+>>  - it fixes your Oops
+>>  - the UDC is usable after you attach a gadget driver to pxa27x_udc
+>>
+>
+> The Oops does not occurr anymore but UDC does not work yet, with DEBUG
+> disabled I see kernel stops here, no more messages _at_all_ after that:
+> <6>[    7.196467] pxa27x_udc: version 2008-04-18
+> <6>[    7.201653] pxa27x-udc pxa27x-udc: USB reset
+>
+> And on the host side I get:
+> [ 6512.104045] usb 4-2: new full speed USB device using ohci_hcd and address 50
+> [ 6512.512030] usb 4-2: device not accepting address 50, error -62
+> [ 6512.512063] hub 4-0:1.0: unable to enumerate USB device on port 2
+>
+> If I enable debug back I can see some messages repeated over
+> and over:
+>
+> <7>[   12.545381] pxa27x-udc pxa27x-udc: ep0:handle_ep0_ctrl_req: protocol STALL, udccsr0=0c1 err 1
+> <7>[   12.554164] pxa27x-udc pxa27x-udc: ep0:set_ep0state: state=SETUP_STAGE->STALL, udccsr0=0x0c1, udcbcr=8
+> <7>[   12.562987] pxa27x-udc pxa27x-udc: ep0:handle_ep0: state=STALL, req=(null), udccsr0=0x0c1, udcbcr=8, irq_msk=1
+> <7>[   12.571818] pxa27x-udc pxa27x-udc: ep0:set_ep0state: state=STALL->SETUP_STAGE, udccsr0=0x0c1, udcbcr=8
+> <7>[   12.580628] pxa27x-udc pxa27x-udc: ep0:handle_ep0_ctrl_req: protocol STALL, udccsr0=0c1 err 1
+> <7>[   12.589416] pxa27x-udc pxa27x-udc: ep0:set_ep0state: state=SETUP_STAGE->STALL, udccsr0=0x0c1, udcbcr=8
+> <7>[   12.598241] pxa27x-udc pxa27x-udc: ep0:handle_ep0: state=STALL, req=(null), udccsr0=0x0c1, udcbcr=8, irq_msk=1
+> <7>[   12.607076] pxa27x-udc pxa27x-udc: ep0:set_ep0state: state=STALL->SETUP_STAGE, udccsr0=0x0c1, udcbcr=8
+> <7>[   12.615890] pxa27x-udc pxa27x-udc: ep0:handle_ep0_ctrl_req: protocol STALL, udccsr0=0c1 err 1
+> <7>[   12.624681] pxa27x-udc pxa27x-udc: ep0:set_ep0state: state=SETUP_STAGE->STALL, udccsr0=0x0c1, udcbcr=8
+> <7>[   12.633513] pxa27x-udc pxa27x-udc: ep0:handle_ep0: state=STALL, req=(null), udccsr0=0x0c1, udcbcr=8, irq_msk=1
+> <7>[   12.642354] pxa27x-udc pxa27x-udc: ep0:set_ep0state: state=STALL->SETUP_STAGE, udccsr0=0x0c1, udcbcr=8
+That sequence prooves the patch works.
+The patch purpose is to stall the control endpoint as long as no gadget driver
+regitered itself and prevent the Oops.
 
-Set omap2_hsmmc_info mmc[x] {.nonremovable=true, .power_saving=true} and 
-implement host->bus_ops->power_restore() for SDIO, then the power will
-go off 9 seconds after sdio_release_host() is called.  Then tweak omap_hsmmc
-so that it doesn't wait 9 seconds for the SDIO case
+What should be happening is that you didn't inserted one of the modules :
+ - g_ether
+ - or g_zero
+ - or g_storage
 
-> 
-> 
-> Nicolas
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Or, if you did, there is a sequence that somehow prevents the correct hook up
+between the pxa27_udc and g_ether for instance. If you want to be convinced, add
+a printk() at the beginning of usb_gadget_register_driver() in pxa27x_udc.c, and
+you shall see that it is never called in your case.
+
+That's pretty wierd, because as soon as g_ether is inserted, and because
+pxa27x_udc was inserted before, the gadget layer calls the register function of
+pxa27x_udc, which should link the gadget and the gadget driver.
+
+> I noted that (either with or without this patch) a quite similar phone
+> works, it's Motorola A1200 and has a different bootloader.
+> Maybe comparing some registers can help here?
+Mmmm. I would rather bet on modules order if I had to. Or some wierd sequence.
+
+Do you have the possibility, in your boot sequence, in one of the init scripts,
+to add :
+modprobe pxa27x_udc
+modprobe g_ether
+
+And see what comes out of it ?
+
+I'm afraid I'm a bit at a loss to investigate further, as I can't reproduce the
+test case myself ... All I can think of is modules ordering ATM.
+
+Cheers.
+
+--
+Robert
