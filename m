@@ -1,40 +1,50 @@
-From: luciano.coelho@nokia.com (Luciano Coelho)
-Date: Tue, 06 Jul 2010 10:08:28 +0300
-Subject: [PATCH 08/15] wireless: wl1271: make wl12xx.h common to both
-	spi and sdio
-In-Reply-To: <1278376666-3509-9-git-send-email-ohad@wizery.com>
-References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
-	<1278376666-3509-9-git-send-email-ohad@wizery.com>
-Message-ID: <1278400108.18287.14.camel@chilepepper>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 6 Jul 2010 09:17:02 +0200
+Subject: [RFC PATCH] arm/imx/gpio: add spinlock protection
+In-Reply-To: <20100706050033.GA28547@jasper.tkos.co.il>
+References: <7fe710a6bc27460852588d2e561ec4c4a4644ab0.1278227668.git.baruch@tkos.co.il>
+	<20100705075218.GC26079@pengutronix.de>
+	<20100706050033.GA28547@jasper.tkos.co.il>
+Message-ID: <20100706071702.GI26079@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-07-06 at 02:37 +0200, ext Ohad Ben-Cohen wrote:
-> From: Ohad Ben-Cohen <ohadb@ti.com>
+On Tue, Jul 06, 2010 at 08:00:34AM +0300, Baruch Siach wrote:
+> Hi Sascha,
 > 
-> Move wl12xx.h outside of the spi-specific location,
-> so it can be shared with both spi and sdio solutions.
+> On Mon, Jul 05, 2010 at 09:52:18AM +0200, Sascha Hauer wrote:
+> > On Sun, Jul 04, 2010 at 10:15:13AM +0300, Baruch Siach wrote:
+> > > The GPIO and IRQ/GPIO registers need protection from concurrent access for
+> > > operations that are not atomic.
+> > 
+> > I don't think we need locking here. mxc_gpio_irq_handler is called with
+> > desc->lock held (from the parent interrupt, not the chained interrupts).
+> > Other functions like enable_irq/disable_irq which result in mask/unmask
+> > operations run with interrupts disabled.
 > 
-> Signed-off-by: Ohad Ben-Cohen <ohadb@ti.com>
-> ---
->  drivers/net/wireless/wl12xx/wl1251_sdio.c |    2 +-
->  drivers/net/wireless/wl12xx/wl1251_spi.c  |    2 +-
->  drivers/net/wireless/wl12xx/wl1271_spi.c  |    2 +-
->  include/linux/spi/wl12xx.h                |   34
-> -----------------------------
->  include/linux/wl12xx.h                    |   34
-> +++++++++++++++++++++++++++++
->  5 files changed, 37 insertions(+), 37 deletions(-)
->  delete mode 100644 include/linux/spi/wl12xx.h
->  create mode 100644 include/linux/wl12xx.h 
+> What about the .set_type method?
 
-For the wl1271 part:
+Is only called with interrupts disabled.
 
-Acked-by: Luciano Coelho <luciano.coelho@nokia.com>
+> 
+> Adding David Brownell to CC.
+> 
+> > Apart from this other architectures do not use locking here aswell.
+> 
+> The Nomadic gpio driver does use a spinlock for mask/unmask operations.
+> 
+> What about the _set_gpio_direction, and mxc_gpio_set? These functions may be 
+> called from a process context (e.g., via sysfs). A context switch between 
+> __raw_readl and __raw_writel will cause corruption.
 
-For the wl12xx.h and wl1251 parts, this needs to be acked by Kalle Valo.
+The gpio_chip functions are protected by a single spinlock in
+gpiolib. The gpio related registers and the irq related regsiters are
+totally orthogonal, so we need no locking between these registers.
 
+Sascha
 
 -- 
-Cheers,
-Luca.
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
