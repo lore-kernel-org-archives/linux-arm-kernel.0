@@ -1,40 +1,73 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 6 Jul 2010 11:55:31 +0900
-Subject: [PATCH] Add maintainer of s5pc100
-In-Reply-To: <20100604121427.GA3190@july>
-References: <20100604121427.GA3190@july>
-Message-ID: <AANLkTim8WpevcIllcanGPNHB5ENIusrT364ByCR12AW_@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 06 Jul 2010 12:12:37 +0900
+Subject: [PATCH] ARM: S5P: Add PMU device
+In-Reply-To: <AANLkTik3WGvkUsvKHllgSlj9fJJy90y7L4me4tywCoE0@mail.gmail.com>
+References: <1278294411-5104-1-git-send-email-jy0922.shim@samsung.com>
+	<4C31C47C.1050905@gmail.com>
+	<006c01cb1c41$a0af5c10$e20e1430$%kim@samsung.com>
+	<AANLkTik3WGvkUsvKHllgSlj9fJJy90y7L4me4tywCoE0@mail.gmail.com>
+Message-ID: <009f01cb1cb9$188332d0$49899870$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping
+Kyungmin Park wrote:
+> 
+> On Mon, Jul 5, 2010 at 9:57 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Maurus Cuelenaere wrote:
+> >>
+> >> ?Op 05-07-10 03:46, Joonyoung Shim schreef:
+> >> > This patch adds an initcall for the s5p platforms so that they
+register
+> >> > their PMU IRQs with the PMU framework in the Kernel.
+> >> >
+> >> > Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> >> > ---
+> >> > ?arch/arm/mach-s5p6442/include/mach/irqs.h | ? ?2 +-
+> >> > ?arch/arm/mach-s5pc100/include/mach/irqs.h | ? ?1 +
+> >> > ?arch/arm/mach-s5pv210/include/mach/irqs.h | ? ?1 +
+> >> > ?arch/arm/plat-s5p/Makefile ? ? ? ? ? ? ? ?| ? ?1 +
+> >> > ?arch/arm/plat-s5p/dev-pmu.c ? ? ? ? ? ? ? | ? 37
+> >> +++++++++++++++++++++++++++++
+> >> > ?5 files changed, 41 insertions(+), 1 deletions(-)
+> >> > ?create mode 100644 arch/arm/plat-s5p/dev-pmu.c
+> >>
+> >> Wouldn't it be better if this was in plat-samsung? I can see that the
+S3C6410
+> >> datasheet mentions a PMU_IRQ_ENABLE bit in SYS_OTHERS so I suspect
+> that it
+> >> has
+> >> the same functionality (even though there's no mention of which
+interrupt this
+> >> is).
+> >>
+> > Yes, I also found PMU_IRQ_ENABLE bit in System Others register of
+S3C6410
+> datasheet. But as your comments, could not found the interrupt number and
+any
+> description...Actually, need to check whether it's available or not.
+> >
+> > And S5P6440 has it.
+> > So Joonyoung, it would be helpful if you could add 6440 PMUIRQ
+(VIC1[23]) in
+> this patch.
+> 
+> It's another story. Can you explain the difference between 6440 and 6442?
+> As I heard it's same chip and type is difference. If true, how about
+> to delete the 6442 directory?
+> It makes a single kernel simple.
+> 
 
-On Fri, Jun 4, 2010 at 9:14 PM, Kyungmin Park <kmpark@infradead.org> wrote:
-> Add s5pc100 maintainer as Marek.
-> We already acked from original author, Byungho Min <bhmin@samsung.com>
->
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 2652ebc..d85b962 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -944,6 +944,12 @@ W: http://www.fluff.org/ben/linux/
-> ?S: ? ? Maintained
-> ?F: ? ? arch/arm/mach-s3c6410/
->
-> +ARM/S5PC100 ARM ARCHITECTURE
-> +M: ? ? Marek Szyprowski <m.szyprowski@samsung.com>
-> +L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S: ? ? Maintained
-> +F: ? ? arch/arm/mach-s5pc100/
-> +
-> ?ARM/SHMOBILE ARM ARCHITECTURE
-> ?M: ? ? Paul Mundt <lethal@linux-sh.org>
-> ?M: ? ? Magnus Damm <magnus.damm@gmail.com>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+I remember, already explained about that.
+Hmm..Where did you hear wrong information that they are same? :-(
+Absolutely, they are different !! not same chip.
+...
+
+But actually, I'm working on merge some S5P SoCs...
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
