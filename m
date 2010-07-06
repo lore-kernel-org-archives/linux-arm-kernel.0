@@ -1,71 +1,67 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 6 Jul 2010 12:07:48 +0200
-Subject: [RFC PATCH] arm/imx/gpio: add spinlock protection
-In-Reply-To: <20100706074043.GC28547@jasper.tkos.co.il>
-References: <7fe710a6bc27460852588d2e561ec4c4a4644ab0.1278227668.git.baruch@tkos.co.il>
-	<20100705075218.GC26079@pengutronix.de>
-	<20100706050033.GA28547@jasper.tkos.co.il>
-	<20100706071702.GI26079@pengutronix.de>
-	<20100706074043.GC28547@jasper.tkos.co.il>
-Message-ID: <20100706100747.GN26079@pengutronix.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 6 Jul 2010 13:22:26 +0300
+Subject: [PATCH 05/15] omap: hsmmc: add virtual card detect support
+In-Reply-To: <alpine.LFD.2.00.1007052134460.6020@xanadu.home>
+References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
+	<1278376666-3509-6-git-send-email-ohad@wizery.com>
+	<alpine.LFD.2.00.1007052134460.6020@xanadu.home>
+Message-ID: <AANLkTim4E4LlFERmfYA1M0HLBOoRAsQuvdW6QBNu6pC0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 06, 2010 at 10:40:43AM +0300, Baruch Siach wrote:
-> Hi Sascha,
-> 
-> On Tue, Jul 06, 2010 at 09:17:02AM +0200, Sascha Hauer wrote:
-> > On Tue, Jul 06, 2010 at 08:00:34AM +0300, Baruch Siach wrote:
-> > > On Mon, Jul 05, 2010 at 09:52:18AM +0200, Sascha Hauer wrote:
-> > > > On Sun, Jul 04, 2010 at 10:15:13AM +0300, Baruch Siach wrote:
-> > > > > The GPIO and IRQ/GPIO registers need protection from concurrent access for
-> > > > > operations that are not atomic.
-> > > > 
-> > > > I don't think we need locking here. mxc_gpio_irq_handler is called with
-> > > > desc->lock held (from the parent interrupt, not the chained interrupts).
-> > > > Other functions like enable_irq/disable_irq which result in mask/unmask
-> > > > operations run with interrupts disabled.
-> > > 
-> > > What about the .set_type method?
-> > 
-> > Is only called with interrupts disabled.
-> 
-> OK.
-> 
-> > > > Apart from this other architectures do not use locking here aswell.
-> > > 
-> > > The Nomadic gpio driver does use a spinlock for mask/unmask operations.
-> > > 
-> > > What about the _set_gpio_direction, and mxc_gpio_set? These functions may be 
-> > > called from a process context (e.g., via sysfs). A context switch between 
-> > > __raw_readl and __raw_writel will cause corruption.
-> > 
-> > The gpio_chip functions are protected by a single spinlock in
-> > gpiolib.
-> 
-> gpio_direction_input uses the gpio_lock for its own internal sanity check, and 
-> releases it before calling chip->direction_input. The same goes for 
-> gpio_direction_output.
+Hi Nicolas,
 
-Ok, true.
+On Tue, Jul 6, 2010 at 4:45 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Tue, 6 Jul 2010, Ohad Ben-Cohen wrote:
+>
+>> From: Ohad Ben-Cohen <ohadb@ti.com>
+>>
+>> Add support for software emulation of card detect
+>> events.
+>>
+>> This is required for specific controllers
+>> that are hard wired with embedded SDIO devices
+>> (such as TI's wl1271 WLAN device).
+>
+> Why?
+>
+> Many instances of hardwired SDIO based WLAN devices do exist already,
+> and they don't need extra card detect events to be generated. ?The core
+> MMC code already triggers a probe for cards whenever a new host
+> controller is registered.
 
-> 
-> The __gpio_set_value function seems not acquire any lock before calling 
-> chip->set.
-> 
-> > The gpio related registers and the irq related regsiters are
-> > totally orthogonal, so we need no locking between these registers.
-> 
-> True.
+We prefer not to power up the chip as early as boot time; instead, we
+would like to have it powered off until the wlan interface is brought
+up, power it on when the interface is brought up,
+and power it off again as soon as the interface is brought down again
+(to minimize power consumption when the wlan is not in use).
 
-This means we need locking for the gpio functions but not for the irq
-functions.
+For that we can't rely on the probing done when the controller is
+registered, we want to have a mechanism to allow dynamic detection and
+removal of the card.
 
-Sascha
+Note: the wl1271 device does support standard card detection, but
+AFAIK there's a limitation to use that with the specific omap
+controller the device is hardwired to. I will try to get more info
+about that, but probably Madhu can comment on that better.
+
+>> Board-specific configuration is required to
+>> enable this software card detect control.
+>
+> Could you elaborate please?
+
+Please check out the last patch - that patch is doing that configuration.
+In essence, this virtual card detect mechanism is enabled only for
+specific controllers which we know there's an embedded sdio device
+hardwired to. This knowledge is board-specific, and that's why we
+enable this mechanism in the board files, per a specific mmc
+controller.
+
+Thanks,
+Ohad.
 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>
+>
+> Nicolas
+>
