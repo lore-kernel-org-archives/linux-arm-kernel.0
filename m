@@ -1,62 +1,74 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 6 Jul 2010 11:26:03 +0530
-Subject: [PATCH 21/33] Removing dead OMAP2_VENC_OUT_TYPE_SVIDEO,
-	OMAP2_VENC_OUT_TYPE_COMPOSITE
-In-Reply-To: <2709d1406900af2436f6f8af00555507baf8dac9.1277911346.git.siccegge@cs.fau.de>
-References: <cover.1277911345.git.siccegge@cs.fau.de>
-	<2709d1406900af2436f6f8af00555507baf8dac9.1277911346.git.siccegge@cs.fau.de>
-Message-ID: <19F8576C6E063C45BE387C64729E7394044EAAD9EF@dbde02.ent.ti.com>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Tue, 6 Jul 2010 14:58:00 +0900
+Subject: [RFC PATCH 0/3] ARM: S5PV210: common struct clk support
+In-Reply-To: <1278394874-8695-1-git-send-email-myungjoo.ham@samsung.com>
+References: <1278394874-8695-1-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <AANLkTinlQw7KfnOjQxMOI-3I9pqFwUE4hnQ6hLNNmefF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+I forgot to update copyright statements in these patches.
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Christoph Egger
-> Sent: Wednesday, June 30, 2010 9:31 PM
-> To: Tony Lindgren; Russell King; Jason Lam; linux-omap at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Cc: vamos at i4.informatik.uni-erlangen.de
-> Subject: [PATCH 21/33] Removing dead OMAP2_VENC_OUT_TYPE_SVIDEO,
-> OMAP2_VENC_OUT_TYPE_COMPOSITE
-> 
-> OMAP2_VENC_OUT_TYPE_SVIDEO, OMAP2_VENC_OUT_TYPE_COMPOSITE doesn't
-> exist in Kconfig, therefore removing all references for it from the
-> source code.
-> 
-> Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
-> ---
->  arch/arm/mach-omap2/board-omap3stalker.c |    5 -----
->  1 files changed, 0 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-
-> omap2/board-omap3stalker.c
-> index f848ba8..b38afd5 100644
-> --- a/arch/arm/mach-omap2/board-omap3stalker.c
-> +++ b/arch/arm/mach-omap2/board-omap3stalker.c
-> @@ -181,11 +181,6 @@ static struct omap_dss_device omap3_stalker_tv_device =
-> {
->  	.name			= "tv",
->  	.driver_name		= "venc",
->  	.type			= OMAP_DISPLAY_TYPE_VENC,
-> -#if defined(CONFIG_OMAP2_VENC_OUT_TYPE_SVIDEO)
-> -	.phy.venc.type		= OMAP_DSS_VENC_TYPE_SVIDEO,
-> -#elif defined(CONFIG_OMAP2_VENC_OUT_TYPE_COMPOSITE)
-> -	.u.venc.type		= OMAP_DSS_VENC_TYPE_COMPOSITE,
-> -#endif
-[Hiremath, Vaibhav] I understand that currently we do not have any mechanism to dynamically change the VENC output type, but I think we should make some default type assumption and keep that initialization here, which is anyway happening to CONFIG_OMAP2_VENC_OUT_TYPE_COMPOSITE. But explicitly initialize it to CONFIG_OMAP2_VENC_OUT_TYPE_COMPOSITE for completeness/readability.
+I will update them when I revise the patches with the comments.
 
-Just wanted to add one more thing here is, in our internal releases we do have config option to choose between this. But ideally it would be configurable dynamically.
 
-Thanks,
-Vaibhav
->  	.platform_enable	= omap3_stalker_enable_tv,
->  	.platform_disable	= omap3_stalker_disable_tv,
->  };
-> --
-> 1.7.0.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+Cheers!
+
+- MyungJoo
+
+On Tue, Jul 6, 2010 at 2:41 PM, MyungJoo Ham <myungjoo.ham@samsung.com> wrote:
+> These patches enable S5PV210 to use the common struct clk patch:
+> ([PATCH 0/2] Common struct clk implementation, v5) when a user selects
+> "S5PV210_USE_COMMON_STRUCT_CLK" (Use common struct clk for S5PV210
+> clock framework). Because the common struct clk implementation patches
+> appear to be still in-progress, these patches allow users to turn-on and
+> off common struct clk feature for S5PV210.
+>
+>
+> Note that when common struct clk is used, a clock should be defined
+> with struct clk_samsung, not with struct clk although struck clk can
+> be registered because the behavior can be erratic.
+>
+>
+> We will update the patch when Common struct clk implementation is updated.
+> This patch is for v5 patch.
+>
+>
+> MyungJoo Ham (3):
+> ?ARM: SAMSUNG: Add common struct clk support for Samsung SoCs
+> ?ARM: S5P: common struct clk support.
+> ?ARM: S5PV210: common struct clk support.
+>
+> ?arch/arm/mach-s5pv210/Kconfig ? ? ? ? ? ? ? ? ? ? | ? 10 +
+> ?arch/arm/mach-s5pv210/Makefile ? ? ? ? ? ? ? ? ? ?| ? ?5 +-
+> ?arch/arm/mach-s5pv210/clock-common-clk.c ? ? ? ? ?| 1062 +++++++++++++++++++++
+> ?arch/arm/plat-s5p/Makefile ? ? ? ? ? ? ? ? ? ? ? ?| ? ?3 +-
+> ?arch/arm/plat-s5p/clock-common-clk.c ? ? ? ? ? ? ?| ?163 ++++
+> ?arch/arm/plat-s5p/include/plat/s5p-clock.h ? ? ? ?| ? 18 +
+> ?arch/arm/plat-samsung/Kconfig ? ? ? ? ? ? ? ? ? ? | ? ?9 +
+> ?arch/arm/plat-samsung/Makefile ? ? ? ? ? ? ? ? ? ?| ? ?9 +-
+> ?arch/arm/plat-samsung/clock-clksrc-common-clk.c ? | ?238 +++++
+> ?arch/arm/plat-samsung/clock-common-clk.c ? ? ? ? ?| ?471 +++++++++
+> ?arch/arm/plat-samsung/include/plat/clock-clksrc.h | ? ?8 +
+> ?arch/arm/plat-samsung/include/plat/clock.h ? ? ? ?| ? 68 ++
+> ?arch/arm/plat-samsung/pwm-clock-common-clk.c ? ? ?| ?499 ++++++++++
+> ?13 files changed, 2558 insertions(+), 5 deletions(-)
+> ?create mode 100644 arch/arm/mach-s5pv210/clock-common-clk.c
+> ?create mode 100644 arch/arm/plat-s5p/clock-common-clk.c
+> ?create mode 100644 arch/arm/plat-samsung/clock-clksrc-common-clk.c
+> ?create mode 100644 arch/arm/plat-samsung/clock-common-clk.c
+> ?create mode 100644 arch/arm/plat-samsung/pwm-clock-common-clk.c
+>
+>
+
+
+
+-- 
+MyungJoo Ham (???), Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
