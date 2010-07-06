@@ -1,31 +1,32 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 6 Jul 2010 16:47:33 +0300
-Subject: [PATCH 14/15] omap: zoom: add WLAN device
-In-Reply-To: <4C33228D.8000908@nokia.com>
-References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
-	<1278376666-3509-15-git-send-email-ohad@wizery.com>
-	<4C33228D.8000908@nokia.com>
-Message-ID: <AANLkTilARXB6NVMOAC7lW1HSOzDnONveS0oK6MomvDy0@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 6 Jul 2010 16:02:47 +0200
+Subject: Some benchmarks on ARM
+In-Reply-To: <20100705132339.GY20855@pengutronix.de>
+References: <20100702180257.GA8767@pengutronix.de>
+	<alpine.LFD.2.00.1007030136510.32016@xanadu.home>
+	<4C31D861.607@gmail.com> <20100705132339.GY20855@pengutronix.de>
+Message-ID: <20100706140246.GA15402@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
+Hi!
 
-On Tue, Jul 6, 2010 at 3:33 PM, Roger Quadros <roger.quadros@nokia.com> wrote:
->> +static void omap_zoom_wlan_power(bool enable)
->> +{
->> + ? ? ? int val = enable ? 1 : 0;
->> +
->> + ? ? ? pr_info("%s: set power %d\n", __func__, val);
->> +
->> + ? ? ? gpio_set_value(OMAP_ZOOM_WLAN_PMENA_GPIO, val);
->> +}
->
-> Can we consider that OMAP_ZOOM_WLAN_PMENA_GPIO is equivalent to vmmc supply
-> or equivalent to supply voltage to the SDIO card?
+> > I'm not sure if I'm doing this right, but it looks like the Sheevaplug
+> > beats all ARM chips (except on FP) on the tests done at [1]. Looks
+> > like these tests heavily depend on the clock frequency.
+> 
+> If anyone has an idea for better benchmarks, I'd be very interested. We
+> have been searching for benchmarks which:
+> 
+> - can be easily cross compiled to all involved platforms
+> - show the different aspects of the systems
 
-Not really, this gpio does not supply power to the chip. It's only a
-digital indication that instructs the chip to go into on or off mode.
-
-Thanks,
-Ohad.
+You tested stuff like syscalls/fork latencies... but usually most of
+the time is spent in kernel. What about pure userlevel computing
+stuff, like mp3 encoding (lame), maybe video transcoding, maybe grep
+could be benchmarked, and maybe factor is worth benchmarking
+(http://pavelmachek.livejournal.com/77425.html)...
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
