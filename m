@@ -1,74 +1,104 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Tue, 6 Jul 2010 14:58:00 +0900
-Subject: [RFC PATCH 0/3] ARM: S5PV210: common struct clk support
-In-Reply-To: <1278394874-8695-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1278394874-8695-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <AANLkTinlQw7KfnOjQxMOI-3I9pqFwUE4hnQ6hLNNmefF@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 6 Jul 2010 09:35:11 +0300
+Subject: [PATCH] mx25: set GPT clock source to PER
+In-Reply-To: <20100705082123.GD26079@pengutronix.de>
+References: <20100704084343.GB19559@jasper.tkos.co.il>
+	<40bc9462f125233cc9c63631a9b987ed684b6d97.1278233166.git.baruch@tkos.co.il>
+	<20100705082123.GD26079@pengutronix.de>
+Message-ID: <20100706063511.GB28547@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I forgot to update copyright statements in these patches.
+Hi Sascha,
 
-I will update them when I revise the patches with the comments.
+On Mon, Jul 05, 2010 at 10:21:23AM +0200, Sascha Hauer wrote:
+> On Sun, Jul 04, 2010 at 11:47:29AM +0300, Baruch Siach wrote:
+> > This fixes time accounting on mx25 base systems.
+> > 
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > ---
+> >  arch/arm/plat-mxc/time.c |    3 ++-
+> >  1 files changed, 2 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
+> > index f9a1b05..0d7e0f9 100644
+> > --- a/arch/arm/plat-mxc/time.c
+> > +++ b/arch/arm/plat-mxc/time.c
+> > @@ -56,6 +56,7 @@
+> >  /* MX31, MX35, MX25, MXC91231, MX5 */
+> >  #define V2_TCTL_WAITEN		(1 << 3) /* Wait enable mode */
+> >  #define V2_TCTL_CLK_IPG		(1 << 6)
+> > +#define V2_TCTL_CLK_PER		(2 << 6)
+> >  #define V2_TCTL_FRR		(1 << 9)
+> >  #define V2_IR			0x0c
+> >  #define V2_TSTAT		0x08
+> > @@ -308,7 +309,7 @@ void __init mxc_timer_init(struct clk *timer_clk, void __iomem *base, int irq)
+> >  	__raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
+> >  
+> >  	if (timer_is_v2())
+> > -		tctl_val = V2_TCTL_CLK_IPG | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
+> > +		tctl_val = V2_TCTL_CLK_PER | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
+> >  	else
+> >  		tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
+> > 
+> 
+> I wonder why I applied
+> 
+> commit faed40665d2d81b7e0e537d14ef680ab3da9f22d
+> Author: Baruch Siach <baruch@tkos.co.il>
+> Date:   Mon Jan 25 12:58:21 2010 +0200
+> 
+>     mx25: fix time accounting
+>     
+>     The gpt_clk rate function doesn't consider the PER divider. This causes a
+>     significant drift in time accounting. Fix this by introducing the correct rate
+>     calculation function.
+>     
+>     Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+>     Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> 
+> diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
+> index 08aaa38..c003ac4 100644
+> --- a/arch/arm/mach-mx25/clock.c
+> +++ b/arch/arm/mach-mx25/clock.c
+> @@ -119,6 +119,11 @@ static unsigned long get_rate_nfc(struct clk *clk)
+>  	return get_rate_per(8);
+>  }
+>  
+> +static unsigned long get_rate_gpt(struct clk *clk)
+> +{
+> +	return get_rate_per(5);
+> +}
+> +
+>  static unsigned long get_rate_otg(struct clk *clk)
+>  {
+>  	return 48000000; /* FIXME */
+> @@ -156,7 +161,7 @@ static void clk_cgcr_disable(struct clk *clk)
+>  		.secondary	= s,			\
+>  	}
+>  
+> -DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_ipg, NULL, NULL);
+> +DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_gpt, NULL, NULL);
+>  DEFINE_CLOCK(uart_per_clk, 0, CCM_CGCR0, 15, get_rate_uart, NULL, NULL);
+>  DEFINE_CLOCK(cspi1_clk,  0, CCM_CGCR1,  5, get_rate_ipg, NULL, NULL);
+>  DEFINE_CLOCK(cspi2_clk,  0, CCM_CGCR1,  6, get_rate_ipg, NULL, NULL);
+> 
+> This changed the gpt clock from ipg to the peripheral clock and I
+> explained why this is wrong. Now of course we now must use the
+> peripheral clock in the timer code.
+> 
+> Does it work when you revert faed40665d2d81b7e0e537d14ef680ab3da9f22d?
 
+Reverting faed406 works on our target board, but breaks the i.MX25 PDK.
 
+> In any case, we can't apply your patch because it would break other v2
+> based architectures like i.MX35.
 
+What do you suggest then?
 
-
-Cheers!
-
-- MyungJoo
-
-On Tue, Jul 6, 2010 at 2:41 PM, MyungJoo Ham <myungjoo.ham@samsung.com> wrote:
-> These patches enable S5PV210 to use the common struct clk patch:
-> ([PATCH 0/2] Common struct clk implementation, v5) when a user selects
-> "S5PV210_USE_COMMON_STRUCT_CLK" (Use common struct clk for S5PV210
-> clock framework). Because the common struct clk implementation patches
-> appear to be still in-progress, these patches allow users to turn-on and
-> off common struct clk feature for S5PV210.
->
->
-> Note that when common struct clk is used, a clock should be defined
-> with struct clk_samsung, not with struct clk although struck clk can
-> be registered because the behavior can be erratic.
->
->
-> We will update the patch when Common struct clk implementation is updated.
-> This patch is for v5 patch.
->
->
-> MyungJoo Ham (3):
-> ?ARM: SAMSUNG: Add common struct clk support for Samsung SoCs
-> ?ARM: S5P: common struct clk support.
-> ?ARM: S5PV210: common struct clk support.
->
-> ?arch/arm/mach-s5pv210/Kconfig ? ? ? ? ? ? ? ? ? ? | ? 10 +
-> ?arch/arm/mach-s5pv210/Makefile ? ? ? ? ? ? ? ? ? ?| ? ?5 +-
-> ?arch/arm/mach-s5pv210/clock-common-clk.c ? ? ? ? ?| 1062 +++++++++++++++++++++
-> ?arch/arm/plat-s5p/Makefile ? ? ? ? ? ? ? ? ? ? ? ?| ? ?3 +-
-> ?arch/arm/plat-s5p/clock-common-clk.c ? ? ? ? ? ? ?| ?163 ++++
-> ?arch/arm/plat-s5p/include/plat/s5p-clock.h ? ? ? ?| ? 18 +
-> ?arch/arm/plat-samsung/Kconfig ? ? ? ? ? ? ? ? ? ? | ? ?9 +
-> ?arch/arm/plat-samsung/Makefile ? ? ? ? ? ? ? ? ? ?| ? ?9 +-
-> ?arch/arm/plat-samsung/clock-clksrc-common-clk.c ? | ?238 +++++
-> ?arch/arm/plat-samsung/clock-common-clk.c ? ? ? ? ?| ?471 +++++++++
-> ?arch/arm/plat-samsung/include/plat/clock-clksrc.h | ? ?8 +
-> ?arch/arm/plat-samsung/include/plat/clock.h ? ? ? ?| ? 68 ++
-> ?arch/arm/plat-samsung/pwm-clock-common-clk.c ? ? ?| ?499 ++++++++++
-> ?13 files changed, 2558 insertions(+), 5 deletions(-)
-> ?create mode 100644 arch/arm/mach-s5pv210/clock-common-clk.c
-> ?create mode 100644 arch/arm/plat-s5p/clock-common-clk.c
-> ?create mode 100644 arch/arm/plat-samsung/clock-clksrc-common-clk.c
-> ?create mode 100644 arch/arm/plat-samsung/clock-common-clk.c
-> ?create mode 100644 arch/arm/plat-samsung/pwm-clock-common-clk.c
->
->
-
-
+baruch
 
 -- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
