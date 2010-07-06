@@ -1,24 +1,77 @@
-From: gbean@codeaurora.org (Greg Bean)
-Date: Tue, 06 Jul 2010 09:56:00 -0700
-Subject: [PATCH v2] msm: gpio: Add set_wake support to msm7200a-gpio's
-	irq_chip.
-In-Reply-To: <1278434857.27490.2.camel@c-dwalke-linux.qualcomm.com>
-References: <1278185128-29161-1-git-send-email-gbean@codeaurora.org>
-	<1278434857.27490.2.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <4C336020.3090206@codeaurora.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 06 Jul 2010 13:00:11 -0400 (EDT)
+Subject: [PATCH 05/15] omap: hsmmc: add virtual card detect support
+In-Reply-To: <822D79B5C25543B1A6F148B39E061459@am.dhcp.ti.com>
+References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
+	<1278376666-3509-6-git-send-email-ohad@wizery.com>
+	<alpine.LFD.2.00.1007052134460.6020@xanadu.home>
+	<AANLkTim4E4LlFERmfYA1M0HLBOoRAsQuvdW6QBNu6pC0@mail.gmail.com>
+	<AANLkTinE5LygUWJsJSEE2miZF1GK58LTr8zErkuu_7yM@mail.gmail.com>
+	<822D79B5C25543B1A6F148B39E061459@am.dhcp.ti.com>
+Message-ID: <alpine.LFD.2.00.1007061249280.6020@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Add power-management and irq_chip hooks to allow configuration
->> of msm-gpio irq lines as wakeup sources.
->
-> What level of correlation is there between power management and the wake
-> up hooks? Just irq_masks ?
+On Tue, 6 Jul 2010, Madhusudhan wrote:
 
-When the system sleeps, gpio-based irqs which are not configured as wake-up 
-sources are disabled in the controller hardware to prevent latching and 
-unwanted wakeups.
+> 
+> 
+> > -----Original Message-----
+> > From: Ohad Ben-Cohen [mailto:ohad at wizery.com]
+> > Sent: Tuesday, July 06, 2010 6:48 AM
+> > To: Nicolas Pitre
+> > Cc: linux-wireless at vger.kernel.org; linux-mmc at vger.kernel.org; linux-
+> > omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > linux at arm.linux.org.uk; Chikkature Rajashekar Madhusudhan; Luciano Coelho;
+> > Andrew Morton; San Mehat; Pandita, Vikram
+> > Subject: Re: [PATCH 05/15] omap: hsmmc: add virtual card detect support
+> > 
+> > On Tue, Jul 6, 2010 at 1:22 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> > > Note: the wl1271 device does support standard card detection, but
+> > > AFAIK there's a limitation to use that with the specific omap
+> > > controller the device is hardwired to. I will try to get more info
+> > > about that, but probably Madhu can comment on that better.
+> > 
+> > 
+> > Some correction and additional info:
+> > 
+> > The wl1271 device has an issue which makes the standard card detect
+> > mechanism irrelevant: it is always up, even if the power enable gpio
+> > input of the device is down (the power enable input does not supply
+> > the power to the chip, it's just logical digital high/low input upon
+> > which the device reacts).  That's why we must use software control for
+> > emulating card detect with that device.
+> > 
+> > In addition, as far as I could find out, the card detect mechanism on
+> > the ZOOM is implemented by mechanical means, and thus is not relevant
+> > for hardwired embedded SDIO devices (I'm not even sure card detect is
+> > supported for the 3rd mmc controller).
+> 
+> The card detect is supported through T2 GPIO interrupts only for MMC1 and
+> MMC2. Such a mechanism is not present for MMC3 to which the WLAN chip is
+> hardwired.
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Many existing implementations simply have no (or a broken) card 
+detection signal.  In that case, either the host controller passes the 
+MMC_CAP_NEEDS_POLL flag to the core so that the bus is probed on a 
+regular interval for card presence.  Or, like in this case where the 
+"card" is always hardwired on the board, you simply rely on the initial 
+probe which is always performed at least once when the host controller 
+driver is registered.
+
+Now the issue of having the card powered off when not in use is a valid 
+one, whether or not it is actually hardwired on the board or 
+hot insertable/removable.  This fake insertion thing is not the best way 
+to go about it.
+
+It would be way more useful, generic, and less hackish to simply improve 
+the generic code so to power down the card when it is 1) not claimed by 
+any function driver, and 2) provide an API to let a function driver 
+signify to the core and host controller that it is not interested by the 
+hardware at the moment (if the network interface is not up for example) 
+and therefore the core could again power down the card.  This would work 
+in all cases with no need for exceptions  for so called "enbedded 
+controllers".
+
+
+Nicolas
