@@ -1,84 +1,61 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Tue, 06 Jul 2010 16:40:17 +0900
-Subject: [PATCH v2 0/4] ARM: S5P: Support gpio interrupts
-In-Reply-To: <000101cb1427$e88bfec0$b9a3fc40$%szyprowski@samsung.com>
-References: <4C11F4CA.10802@samsung.com>
-	<004601cb12a8$c869e560$593db020$%kim@samsung.com>
-	<000101cb1427$e88bfec0$b9a3fc40$%szyprowski@samsung.com>
-Message-ID: <4C32DDE1.8070906@samsung.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 6 Jul 2010 10:40:43 +0300
+Subject: [RFC PATCH] arm/imx/gpio: add spinlock protection
+In-Reply-To: <20100706071702.GI26079@pengutronix.de>
+References: <7fe710a6bc27460852588d2e561ec4c4a4644ab0.1278227668.git.baruch@tkos.co.il>
+	<20100705075218.GC26079@pengutronix.de>
+	<20100706050033.GA28547@jasper.tkos.co.il>
+	<20100706071702.GI26079@pengutronix.de>
+Message-ID: <20100706074043.GC28547@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/25/2010 2:33 PM, Marek Szyprowski wrote:
-> Hello,
-> 
-> On Wednesday, June 23, 2010 9:51 AM Kukjin Kim wrote:
-> 
->> Joonyoung Shim wrote:
->>> This patch v2 set is to support gpio interrupts of samsung s5p cpus, and
->>> the GPIOlib gpio_to_irq goes to plat-samsung gpiolib, so patch v2 set
->>> has four commit smaller than v1.
->>>
->>> Changes since v1:
->>> - Add irq_base to s3c_gpio_chip struct
->>> - GPIOlib gpio_to_irq() is implemented to samsung_gpiolib_to_irq() of
->>>   plat-samsung gpiolib
->>>
->>> Joonyoung Shim (4):
->>>       ARM: S5PV210: Add gpio interrupt support
->>>       ARM: S5PC100: Use S5P gpio interrupts interface
->>>       ARM: S5PC100: Move external interrupt defines
->>>       ARM: SAMSUNG: Add GPIOlib gpio_to_irq
->>>
->>>  arch/arm/mach-s5pc100/Makefile                 |    2 +-
->>>  arch/arm/mach-s5pc100/gpiolib.c                |   70 ++-----
->>>  arch/arm/mach-s5pc100/include/mach/gpio.h      |    7 -
->>>  arch/arm/mach-s5pc100/include/mach/irqs.h      |   18 ++-
->>>  arch/arm/mach-s5pc100/include/mach/regs-gpio.h |    7 +
->>>  arch/arm/mach-s5pc100/irq-gpio.c               |  266
->> ------------------------
->>>  arch/arm/mach-s5pv210/gpiolib.c                |   18 ++-
->>>  arch/arm/mach-s5pv210/include/mach/irqs.h      |   16 ++-
->>>  arch/arm/plat-s5p/Makefile                     |    2 +-
->>>  arch/arm/plat-s5p/irq-gpioint.c                |  208 ++++++++++++++++++
->>>  arch/arm/plat-samsung/gpiolib.c                |    9 +
->>>  arch/arm/plat-samsung/include/plat/gpio-core.h |    6 +
->>>  12 files changed, 295 insertions(+), 334 deletions(-)
->>>  delete mode 100644 arch/arm/mach-s5pc100/irq-gpio.c
->>>  create mode 100644 arch/arm/plat-s5p/irq-gpioint.c
->>>
->> I am sure this patchset is working code, but Ben had made suggestion about
->> 'sparse irq'...
->> It is because there are too many gpio interrupts and having support of all
->> of them is unnecessary as realistically only few of them maybe used.
-> 
-> Right. Ben suggested to create a pool for gpio interrupts (for example 16
-> interrupts) and selectively assign them in machine startup code to those
-> gpio pins that really need it.
-> 
-> The problem is that such solution is not yet ready and we really need the
-> gpio interrupt functionality for our boards (Aquila and GONI). 
-> 
-> Maybe these current patches could be merged now, and then, once the new
-> solution is prepared, the gpio interrupt support get converted to selective
-> registering?
-> 
+Hi Sascha,
 
-I agree with Marek.
+On Tue, Jul 06, 2010 at 09:17:02AM +0200, Sascha Hauer wrote:
+> On Tue, Jul 06, 2010 at 08:00:34AM +0300, Baruch Siach wrote:
+> > On Mon, Jul 05, 2010 at 09:52:18AM +0200, Sascha Hauer wrote:
+> > > On Sun, Jul 04, 2010 at 10:15:13AM +0300, Baruch Siach wrote:
+> > > > The GPIO and IRQ/GPIO registers need protection from concurrent access for
+> > > > operations that are not atomic.
+> > > 
+> > > I don't think we need locking here. mxc_gpio_irq_handler is called with
+> > > desc->lock held (from the parent interrupt, not the chained interrupts).
+> > > Other functions like enable_irq/disable_irq which result in mask/unmask
+> > > operations run with interrupts disabled.
+> > 
+> > What about the .set_type method?
+> 
+> Is only called with interrupts disabled.
 
-Ben and Kukjin, how do you think about this?
+OK.
 
-> S5PC100 already has gpio interrupt support.
->  
->> In fact in SMDK board there is no use of gpio in interrupt mode.
+> > > Apart from this other architectures do not use locking here aswell.
+> > 
+> > The Nomadic gpio driver does use a spinlock for mask/unmask operations.
+> > 
+> > What about the _set_gpio_direction, and mxc_gpio_set? These functions may be 
+> > called from a process context (e.g., via sysfs). A context switch between 
+> > __raw_readl and __raw_writel will cause corruption.
 > 
-> We are talking about support for Samsung S5PV210/S5PC110 SoCs in the Linux
-> mainline kernel, not the support for only SMDK boards. GPIO interrupts is
-> a feature of the SoC not a particular board.
-> 
-> Best regards
-> --
-> Marek Szyprowski
-> Samsung Poland R&D Center
-> 
-> 
+> The gpio_chip functions are protected by a single spinlock in
+> gpiolib.
+
+gpio_direction_input uses the gpio_lock for its own internal sanity check, and 
+releases it before calling chip->direction_input. The same goes for 
+gpio_direction_output.
+
+The __gpio_set_value function seems not acquire any lock before calling 
+chip->set.
+
+> The gpio related registers and the irq related regsiters are
+> totally orthogonal, so we need no locking between these registers.
+
+True.
+
+baruch
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
