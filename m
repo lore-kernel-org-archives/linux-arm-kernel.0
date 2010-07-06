@@ -1,46 +1,59 @@
-From: roger.quadros@nokia.com (Roger Quadros)
-Date: Tue, 06 Jul 2010 13:35:32 +0300
-Subject: [PATCH 11/15] wireless: wl1271: introduce platform device support
-In-Reply-To: <AANLkTintIz-N7MwwtqhVq2LR3Ln5JTNYSbJUBSSClcA-@mail.gmail.com>
-References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
-	<1278376666-3509-12-git-send-email-ohad@wizery.com>
-	<4C32EF19.1000604@nokia.com>
-	<AANLkTintIz-N7MwwtqhVq2LR3Ln5JTNYSbJUBSSClcA-@mail.gmail.com>
-Message-ID: <4C3306F4.8060907@nokia.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 6 Jul 2010 13:37:49 +0300
+Subject: [RFC PATCH] arm/imx/gpio: add spinlock protection
+In-Reply-To: <20100706100747.GN26079@pengutronix.de>
+References: <7fe710a6bc27460852588d2e561ec4c4a4644ab0.1278227668.git.baruch@tkos.co.il>
+	<20100705075218.GC26079@pengutronix.de>
+	<20100706050033.GA28547@jasper.tkos.co.il>
+	<20100706071702.GI26079@pengutronix.de>
+	<20100706074043.GC28547@jasper.tkos.co.il>
+	<20100706100747.GN26079@pengutronix.de>
+Message-ID: <20100706103748.GE28547@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+On Tue, Jul 06, 2010 at 12:07:48PM +0200, Sascha Hauer wrote:
+> On Tue, Jul 06, 2010 at 10:40:43AM +0300, Baruch Siach wrote:
+> > On Tue, Jul 06, 2010 at 09:17:02AM +0200, Sascha Hauer wrote:
+> > > On Tue, Jul 06, 2010 at 08:00:34AM +0300, Baruch Siach wrote:
+> > > > On Mon, Jul 05, 2010 at 09:52:18AM +0200, Sascha Hauer wrote:
+> > > > > On Sun, Jul 04, 2010 at 10:15:13AM +0300, Baruch Siach wrote:
+> > > > > > The GPIO and IRQ/GPIO registers need protection from concurrent access for
+> > > > > > operations that are not atomic.
+> > > > > Apart from this other architectures do not use locking here aswell.
+> > > > 
+> > > > The Nomadic gpio driver does use a spinlock for mask/unmask operations.
+> > > > 
+> > > > What about the _set_gpio_direction, and mxc_gpio_set? These functions may be 
+> > > > called from a process context (e.g., via sysfs). A context switch between 
+> > > > __raw_readl and __raw_writel will cause corruption.
+> > > 
+> > > The gpio_chip functions are protected by a single spinlock in
+> > > gpiolib.
+> > 
+> > gpio_direction_input uses the gpio_lock for its own internal sanity check, and 
+> > releases it before calling chip->direction_input. The same goes for 
+> > gpio_direction_output.
+> 
+> Ok, true.
+> 
+> > 
+> > The __gpio_set_value function seems not acquire any lock before calling 
+> > chip->set.
+> > 
+> > > The gpio related registers and the irq related regsiters are
+> > > totally orthogonal, so we need no locking between these registers.
+> > 
+> > True.
+> 
+> This means we need locking for the gpio functions but not for the irq
+> functions.
 
-On 07/06/2010 12:30 PM, ext Ohad Ben-Cohen wrote:
-> Hi Roger,
->
-> On Tue, Jul 6, 2010 at 11:53 AM, Roger Quadros<roger.quadros@nokia.com>  wrote:
->> Could you please explain why you need to do this?
->
-> To minimize power consumption when the wlan device is not in use, we
-> would like to keep the device powered off as long as the interface is
-> down, and only power it on when the user brings up the interface.
->
-Agreed.
+Agreed. I'll post an updated patch shortly.
 
-> Whenever the chip is powered on, it must be initialized and
-> reconfigured by mmc_attach_sdio, and the wl1271 driver have to wait
-> for that phase to successfully complete (essentially waiting for the
-> sdio_driver's probe function to be called).
->
-> To make sure this SDIO init step occurs correctly every time we toggle
-> the device's power back on, and to prevent potential races, we also
-> have to make sure that the sdio function is removed every time we
-> power off the chip (the driver waits for the sdio_driver's remove
-> function to be called).
->
-> That's why we let the mmc layer think that the card is removed:
-> physically it is still there, but for all practical purposes it is
-> really removed, because once you power off the chip, you must
-> reinitialize it again next time you power it on, as if the card was
-> really removed and re-inserted.
->
-My point is that shouldn't this be handled by SDIO core?
-If there are no users for the SDIO function and the card, doesn't the SDIO core 
-power down the slot, and take care of re-initialization when it is powered up?
+baruch
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
