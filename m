@@ -1,63 +1,71 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Tue, 6 Jul 2010 18:49:24 +0300
-Subject: [PATCH 04/15] mmc: support embedded data field in mmc_host
-In-Reply-To: <1278376666-3509-5-git-send-email-ohad@wizery.com>
-References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
-	<1278376666-3509-5-git-send-email-ohad@wizery.com>
-Message-ID: <AANLkTilfjBIbylUDKlTGiEC_U6pJnkC6HoENOzK2eFFq@mail.gmail.com>
+From: triad@df.lth.se (Linus Walleij)
+Date: Tue,  6 Jul 2010 17:21:18 +0200
+Subject: [PATCH 2/3] ARM: register character LCD for PB1176
+Message-ID: <1278429678-4837-1-git-send-email-triad@df.lth.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 6, 2010 at 3:37 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> From: Ohad Ben-Cohen <ohadb@ti.com>
->
-> Add support to set/get mmc_host private embedded
-> data.
->
-> This is needed to allow software to dynamically
-> create (and remove) SDIO functions which represents
-> embedded SDIO devices.
->
-> Typically, it will be used to set the context of
-> a driver that is creating a new SDIO function
-> (and would then expect to be able to get that context
-> back upon creation of the new sdio func).
->
-> Signed-off-by: Ohad Ben-Cohen <ohadb@ti.com>
-> ---
-> ?drivers/mmc/core/Kconfig | ? ?8 ++++++++
-> ?include/linux/mmc/host.h | ? 16 ++++++++++++++++
-> ?2 files changed, 24 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/mmc/core/Kconfig b/drivers/mmc/core/Kconfig
-> index bb22ffd..ab27eb3 100644
-> --- a/drivers/mmc/core/Kconfig
-> +++ b/drivers/mmc/core/Kconfig
-> @@ -16,3 +16,11 @@ config MMC_UNSAFE_RESUME
->
-> ? ? ? ? ?This option sets a default which can be overridden by the
-> ? ? ? ? ?module parameter "removable=0" or "removable=1".
-> +
-> +config MMC_EMBEDDED_SDIO
-> + ? ? ? boolean "MMC embedded SDIO device support"
-> + ? ? ? help
-> + ? ? ? ? If you say Y here, support will be added for embedded SDIO
-> + ? ? ? ? devices (e.g. hardwired embedded WLAN SDIO devices).
-> + ? ? ? ? Such devices require software support for emulating
-> + ? ? ? ? card detect events.
-> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-> index f65913c..9a48486 100644
-> --- a/include/linux/mmc/host.h
-> +++ b/include/linux/mmc/host.h
-> @@ -209,6 +209,10 @@ struct mmc_host {
-> ? ? ? ?struct led_trigger ? ? ?*led; ? ? ? ? ? /* activity led */
-> ?#endif
->
-> +#ifdef CONFIG_MMC_EMBEDDED_SDIO
-> + ? ? ? void ? ? ? ? ? ? ? ? ? ?*embedded_data;
-> +#endif
-> +
+This registers the character LCD device for the ARM RealView
+PB1176.
 
-Hm, do we really need a Kconfig option just for a single pointer? It
-only saves sizeof(void *) bytes per host, but adds rather confusing
-config option for users and some ifdef complexity.
+Signed-off-by: Linus Walleij <triad@df.lth.se>
+---
+This one is tested on the PB1176 and works fine.
+---
+ arch/arm/mach-realview/Kconfig           |    1 +
+ arch/arm/mach-realview/realview_pb1176.c |   21 +++++++++++++++++++++
+ 2 files changed, 22 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
+index ee5e392..511d67d 100644
+--- a/arch/arm/mach-realview/Kconfig
++++ b/arch/arm/mach-realview/Kconfig
+@@ -44,6 +44,7 @@ config MACH_REALVIEW_PB1176
+ 	bool "Support RealView/PB1176 platform"
+ 	select CPU_V6
+ 	select ARM_GIC
++	select ARM_CHAR_LCD
+ 	help
+ 	  Include support for the ARM(R) RealView ARM1176 Platform Baseboard.
+ 
+diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
+index 9f02350..eb7979c 100644
+--- a/arch/arm/mach-realview/realview_pb1176.c
++++ b/arch/arm/mach-realview/realview_pb1176.c
+@@ -274,6 +274,26 @@ static struct platform_device pmu_device = {
+ 	.resource		= &pmu_resource,
+ };
+ 
++static struct resource char_lcd_resources[] = {
++	{
++		.start = REALVIEW_CHAR_LCD_BASE,
++		.end   = (REALVIEW_CHAR_LCD_BASE + SZ_4K - 1),
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.start	= IRQ_PB1176_CHARLCD,
++		.end	= IRQ_PB1176_CHARLCD,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device char_lcd_device = {
++	.name		=	"arm-charlcd",
++	.id		=	-1,
++	.num_resources	=	ARRAY_SIZE(char_lcd_resources),
++	.resource	=	char_lcd_resources,
++};
++
+ static void __init gic_init_irq(void)
+ {
+ 	/* ARM1176 DevChip GIC, primary */
+@@ -336,6 +356,7 @@ static void __init realview_pb1176_init(void)
+ 	platform_device_register(&realview_i2c_device);
+ 	realview_usb_register(realview_pb1176_isp1761_resources);
+ 	platform_device_register(&pmu_device);
++	platform_device_register(&char_lcd_device);
+ 
+ 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
+ 		struct amba_device *d = amba_devs[i];
+-- 
+1.7.0.1
