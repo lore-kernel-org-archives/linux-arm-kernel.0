@@ -1,53 +1,59 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 07 Jul 2010 08:27:53 +0900
-Subject: [PATCH] ARM: S5PV210: Fix on SECTION_SIZE_BITS on	S5PV210/S5PC110.
-In-Reply-To: <20100706071245.GA5058@n2100.arm.linux.org.uk>
+Date: Wed, 07 Jul 2010 08:29:38 +0900
+Subject: [PATCH] ARM: S5PV210: Fix on SECTION_SIZE_BITS on S5PV210/S5PC110.
+In-Reply-To: <4C330916.1070201@ru.mvista.com>
 References: <1278391007-11144-1-git-send-email-kgene.kim@samsung.com>
-	<20100706071245.GA5058@n2100.arm.linux.org.uk>
-Message-ID: <013001cb1d62$de72ff30$9b58fd90$%kim@samsung.com>
+	<4C330916.1070201@ru.mvista.com>
+Message-ID: <013101cb1d63$1c8cd2f0$55a678d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote:
-> 
-Hi Russell :-)
+Sergei Shtylyov wrote:
 
-> On Tue, Jul 06, 2010 at 01:36:47PM +0900, Kukjin Kim wrote:
+> 
+> Hello.
+
+Hi :-)
+> 
+> Kukjin Kim wrote:
+> 
 > > This patch fixes on SECTION_SIZE_BITS for Sparsemem on S5PV210/S5PC110.
 > > Because smallest size of a bank on S5PV210/S5PC110 is aligned by 16MB.
 > > So each section's maximum size should be 16MB.
 > 
-> What is the spacing of chunks of memory, and minimum alignment of those
-> chunks in physical address space?
-
-Some S5PC110(MCP D-type) has only available 80MiB in a bank.
-So the space accounts for 432MiB in a DMC0, but larger memory(256MiB +
-128MiB) exists in a DMC1.
-
-As you know, the size of a section should be a power of 2 and a physical
-address space of a section should be contiguous.
-If a section size is greater than 16MiB, a section have a hole. So the
-SECTION_SIZE_BITS should be 16MiB.
-
+> > Reported-by: Kyongho Cho <pullip.cho@samsung.com>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> >  arch/arm/mach-s5pv210/include/mach/memory.h |    8 ++++++--
+> >  1 files changed, 6 insertions(+), 2 deletions(-)
 > 
-> Also, what is the maximum physical address which memory can be located?
-
-Following is memory map of S5PV210/S5PC110.
-
-0x80000000  -------------------
-            |          |
-0x70000000  |          |
-            |          |
-0x60000000  |  DMC 1  |  up to 1GiB
-            |          |
-0x50000000  |          |
-            |          |
-0x40000000  ----------------- 
-            |          |
-0x30000000  |  DMC 0  |  up to 512MiB
-            |          |
-0x20000000  -------------------
-
+> > diff --git a/arch/arm/mach-s5pv210/include/mach/memory.h
+b/arch/arm/mach-
+> s5pv210/include/mach/memory.h
+> > index 379117e..4a372d8 100644
+> > --- a/arch/arm/mach-s5pv210/include/mach/memory.h
+> > +++ b/arch/arm/mach-s5pv210/include/mach/memory.h
+> > @@ -16,8 +16,12 @@
+> >  #define PHYS_OFFSET		UL(0x20000000)
+> >  #define CONSISTENT_DMA_SIZE	(SZ_8M + SZ_4M + SZ_2M)
+> >
+> > -/* Maximum of 256MiB in one bank */
+> > +/* Sparsemem support. Each section is a maximum of 16MB.
+> > + * Because there are many different memory type on S5PC110(MCP),
+> > + * and there is a case that having 80MB, 128MB or 256MB in one
+> > + * bank.
+> > +*/
+> 
+>     According to CodingStyle, the prefrerrable format for multi-line
+comments
+> is this:
+> 
+> /*
+>   * bla
+>   * bla
+>   */
+> 
+Oh, ok..will modify.
 
 Thanks.
 
