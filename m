@@ -1,204 +1,129 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 06 Jul 2010 10:32:40 +0200
-Subject: [PATCH 2/3] at91_udc: Add vbus polarity and polling mode
-In-Reply-To: <4C2D6DBE.4030504@bluewatersys.com>
-References: <1277699955-9931-1-git-send-email-ryan@bluewatersys.com>
-	<1277699955-9931-3-git-send-email-ryan@bluewatersys.com>
-	<4C2C9BDE.8090504@atmel.com> <4C2D6DBE.4030504@bluewatersys.com>
-Message-ID: <4C32EA28.9080800@atmel.com>
+From: lamiaposta71@gmail.com (Raffaele Recalcati)
+Date: Tue,  6 Jul 2010 10:39:04 +0200
+Subject: [PATCH 3/3] ASoC: DaVinci: More accurate continuous serial clock for
+	McBSP (I2S)
+In-Reply-To: <1278405544-3852-1-git-send-email-lamiaposta71@gmail.com>
+References: <1278405544-3852-1-git-send-email-lamiaposta71@gmail.com>
+Message-ID: <1278405544-3852-4-git-send-email-lamiaposta71@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 02/07/2010 06:40, Ryan Mallon :
-> On 07/02/2010 01:45 AM, Nicolas Ferre wrote:
->> Le 28/06/2010 06:39, Ryan Mallon :
->>   
->>> Allow the vbus signal to optionally use polling. This is required if
->>> the vbus signal is connected to an non-interrupting io expander for
->>> example. If vbus is in polling mode, then it is assumed that the vbus
->>> gpio may sleep. Also add an option to have vbus be an active low
->>> signal. Both options are set in the platform data for the device.
->>>
->>> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
->>>     
->> Looks good, but... one question:
->>
->>   
->>> @@ -1763,13 +1793,22 @@ static int __init at91udc_probe(struct platform_device *pdev)
->>>  		 * Get the initial state of VBUS - we cannot expect
->>>  		 * a pending interrupt.
->>>  		 */
->>> -		udc->vbus = gpio_get_value(udc->board.vbus_pin);
->>> -		if (request_irq(udc->board.vbus_pin, at91_vbus_irq,
->>> -				IRQF_DISABLED, driver_name, udc)) {
->>> -			DBG("request vbus irq %d failed\n",
->>> -					udc->board.vbus_pin);
->>> -			retval = -EBUSY;
->>> -			goto fail3;
->>> +		if (udc->board.vbus_polled) {
->>> +			udc->vbus = gpio_get_value_cansleep(udc->board.vbus_pin);
->>>     
->> Shouldn't we need here something like:
->> udc->vbus =  (udc->board.vbus_active_low) ^ gpio_get_value_cansleep(udc->board.vbus_pin);
->>   
-> 
-> Yes, thanks. The updated patch below fixes it. Also simplify
-> at91_vbus_update (always do the xor) and move the initial setting of
-> udc->vbus outside of the udc->board.vbus_polled test, since we can use
-> gpio_get_value_cansleep in both cases.
-> 
-> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+From: Raffaele Recalcati <raffaele.recalcati@bticino.it>
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+    i2s_accurate_sck switch can be used to have a better approximate
+    sampling frequency.
+    The clock is an externally visible bit clock and it is named
+    i2s continuous serial clock (I2S_SCK).
+    The trade off is between more accurate clock (fast clock)
+    and less accurate clock (slow clock).
+    The waveform will be not symmetric.
+    Probably it is possible to get a better algorithm for calculating
+    the divider, trying to keep a slower clock as possible.
 
-> ---
-> 
-> diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-> index df2ed84..58528aa 100644
-> --- a/arch/arm/mach-at91/include/mach/board.h
-> +++ b/arch/arm/mach-at91/include/mach/board.h
-> @@ -44,6 +44,8 @@
->   /* USB Device */
->  struct at91_udc_data {
->  	u8	vbus_pin;		/* high == host powering us */
-> +	u8	vbus_active_low;	/* vbus polarity */
-> +	u8	vbus_polled;		/* Use polling, not interrupt */
->  	u8	pullup_pin;		/* active == D+ pulled up */
->  	u8	pullup_active_low;	/* true == pullup_pin is active low */
->  };
-> diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-> index eaa79c8..be36f2f 100644
-> --- a/drivers/usb/gadget/at91_udc.c
-> +++ b/drivers/usb/gadget/at91_udc.c
-> @@ -76,6 +76,7 @@
->  static const char driver_name [] = "at91_udc";
->  static const char ep0name[] = "ep0";
->  
-> +#define VBUS_POLL_TIMEOUT	msecs_to_jiffies(1000)
->  
->  #define at91_udp_read(dev, reg) \
->  	__raw_readl((dev)->udp_baseaddr + (reg))
-> @@ -1556,20 +1557,48 @@ static struct at91_udc controller = {
->  	/* ep6 and ep7 are also reserved (custom silicon might use them) */
->  };
->  
-> +static void at91_vbus_update(struct at91_udc *udc, unsigned value)
-> +{
-> +	value ^= udc->board.vbus_active_low;
-> +	if (value != udc->vbus)
-> +		at91_vbus_session(&udc->gadget, value);
-> +}
-> +
->  static irqreturn_t at91_vbus_irq(int irq, void *_udc)
->  {
->  	struct at91_udc	*udc = _udc;
-> -	unsigned	value;
->  
->  	/* vbus needs at least brief debouncing */
->  	udelay(10);
-> -	value = gpio_get_value(udc->board.vbus_pin);
-> -	if (value != udc->vbus)
-> -		at91_vbus_session(&udc->gadget, value);
-> +	at91_vbus_update(udc, gpio_get_value(udc->board.vbus_pin));
->  
->  	return IRQ_HANDLED;
->  }
->  
-> +static void at91_vbus_timer_work(struct work_struct *work)
-> +{
-> +	struct at91_udc *udc = container_of(work, struct at91_udc, 
-> +					    vbus_timer_work);
-> +
-> +	at91_vbus_update(udc, gpio_get_value_cansleep(udc->board.vbus_pin));
-> +
-> +	if (!timer_pending(&udc->vbus_timer))
-> +		mod_timer(&udc->vbus_timer, jiffies + VBUS_POLL_TIMEOUT);
-> +}
-> +
-> +static void at91_vbus_timer(unsigned long data)
-> +{
-> +	struct at91_udc *udc = (struct at91_udc *)data;
-> +
-> +	/*
-> +	 * If we are polling vbus it is likely that the gpio is on an
-> +	 * bus such as i2c or spi which may sleep, so schedule some work
-> +	 * to read the vbus gpio
-> +	 */
-> +	if (!work_pending(&udc->vbus_timer_work))
-> +		schedule_work(&udc->vbus_timer_work);
-> +}
-> +
->  int usb_gadget_register_driver (struct usb_gadget_driver *driver)
->  {
->  	struct at91_udc	*udc = &controller;
-> @@ -1763,13 +1792,23 @@ static int __init at91udc_probe(struct platform_device *pdev)
->  		 * Get the initial state of VBUS - we cannot expect
->  		 * a pending interrupt.
->  		 */
-> -		udc->vbus = gpio_get_value(udc->board.vbus_pin);
-> -		if (request_irq(udc->board.vbus_pin, at91_vbus_irq,
-> -				IRQF_DISABLED, driver_name, udc)) {
-> -			DBG("request vbus irq %d failed\n",
-> -					udc->board.vbus_pin);
-> -			retval = -EBUSY;
-> -			goto fail3;
-> +		udc->vbus = gpio_get_value_cansleep(udc->board.vbus_pin) ^
-> +			udc->board.vbus_active_low;
-> +
-> +		if (udc->board.vbus_polled) {
-> +			INIT_WORK(&udc->vbus_timer_work, at91_vbus_timer_work);
-> +			setup_timer(&udc->vbus_timer, at91_vbus_timer,
-> +				    (unsigned long)udc);		
-> +			mod_timer(&udc->vbus_timer,
-> +				  jiffies + VBUS_POLL_TIMEOUT);
-> +		} else {
-> +			if (request_irq(udc->board.vbus_pin, at91_vbus_irq,
-> +					IRQF_DISABLED, driver_name, udc)) {
-> +				DBG("request vbus irq %d failed\n",
-> +				    udc->board.vbus_pin);
-> +				retval = -EBUSY;
-> +				goto fail3;
-> +			}
->  		}
->  	} else {
->  		DBG("no VBUS detection, assuming always-on\n");
-> @@ -1855,7 +1894,7 @@ static int at91udc_suspend(struct platform_device *pdev, pm_message_t mesg)
->  		enable_irq_wake(udc->udp_irq);
->  
->  	udc->active_suspend = wake;
-> -	if (udc->board.vbus_pin > 0 && wake)
-> +	if (udc->board.vbus_pin > 0 && !udc->board.vbus_polled && wake)
->  		enable_irq_wake(udc->board.vbus_pin);
->  	return 0;
->  }
-> @@ -1864,7 +1903,8 @@ static int at91udc_resume(struct platform_device *pdev)
->  {
->  	struct at91_udc *udc = platform_get_drvdata(pdev);
->  
-> -	if (udc->board.vbus_pin > 0 && udc->active_suspend)
-> +	if (udc->board.vbus_pin > 0 && !udc->board.vbus_polled && 
-> +	    udc->active_suspend)
->  		disable_irq_wake(udc->board.vbus_pin);
->  
->  	/* maybe reconnect to host; if so, clocks on */
-> diff --git a/drivers/usb/gadget/at91_udc.h b/drivers/usb/gadget/at91_udc.h
-> index c65d622..a1f4f54 100644
-> --- a/drivers/usb/gadget/at91_udc.h
-> +++ b/drivers/usb/gadget/at91_udc.h
-> @@ -144,6 +144,8 @@ struct at91_udc {
->  	struct proc_dir_entry		*pde;
->  	void __iomem			*udp_baseaddr;
->  	int				udp_irq;
-> +	struct timer_list		vbus_timer;
-> +	struct work_struct		vbus_timer_work;
->  };
->  
->  static inline struct at91_udc *to_udc(struct usb_gadget *g)
-> 
-> 
-> 
-> 
+    This patch has been developed against the
+        http://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-davinci.git
+    git tree and has been tested on bmx board (similar to dm365 evm, but using
+    uda1345 as external audio codec).
 
+Signed-off-by: Raffaele Recalcati <raffaele.recalcati@bticino.it>
+Signed-off-by: Davide Bonfanti <davide.bonfanti@bticino.it>
+---
+ arch/arm/mach-davinci/include/mach/asp.h |   33 ++++++++++++++++++++++++++++++
+ sound/soc/davinci/davinci-i2s.c          |   24 +++++++++++++++++----
+ 2 files changed, 52 insertions(+), 5 deletions(-)
 
+diff --git a/arch/arm/mach-davinci/include/mach/asp.h b/arch/arm/mach-davinci/include/mach/asp.h
+index 0847d21..b12c69e 100644
+--- a/arch/arm/mach-davinci/include/mach/asp.h
++++ b/arch/arm/mach-davinci/include/mach/asp.h
+@@ -73,6 +73,39 @@ struct snd_platform_data {
+ 	 */
+ 	int clk_input_pin;
+ 
++	/*
++	 * This flag works when both clock and FS are outputs for the cpu
++	 * and makes clock more accurate (FS is not symmetrical and the
++	 * clock is very fast.
++	 * The clock becoming faster is named
++	 * i2s continuous serial clock (I2S_SCK) and it is an externally
++	 * visible bit clock.
++	 *
++	 * first line : WordSelect
++	 * second line : ContinuousSerialClock
++	 * third line: SerialData
++	 *
++	 * SYMMETRICAL APPROACH:
++	 *   _______________________          LEFT
++	 * _|         RIGHT         |______________________|
++	 *     _   _         _   _   _   _         _   _
++	 *   _| |_| |_ x16 _| |_| |_| |_| |_ x16 _| |_| |_
++	 *     _   _         _   _   _   _         _   _
++	 *   _/ \_/ \_ ... _/ \_/ \_/ \_/ \_ ... _/ \_/ \_
++	 *    \_/ \_/       \_/ \_/ \_/ \_/       \_/ \_/
++	 *
++	 * ACCURATE CLOCK APPROACH:
++	 *   ______________          LEFT
++	 * _|     RIGHT    |_______________________________|
++	 *     _         _   _         _   _   _   _   _   _
++	 *   _| |_ x16 _| |_| |_ x16 _| |_| |_| |_| |_| |_| |
++	 *     _         _   _          _      dummy cycles
++	 *   _/ \_ ... _/ \_/ \_  ... _/ \__________________
++	 *    \_/       \_/ \_/        \_/
++	 *
++	 */
++	bool i2s_accurate_sck;
++
+ 	/* McASP specific fields */
+ 	int tdm_slots;
+ 	u8 op_mode;
+diff --git a/sound/soc/davinci/davinci-i2s.c b/sound/soc/davinci/davinci-i2s.c
+index ba5644b..b251bc9 100644
+--- a/sound/soc/davinci/davinci-i2s.c
++++ b/sound/soc/davinci/davinci-i2s.c
+@@ -155,6 +155,7 @@ struct davinci_mcbsp_dev {
+ 	unsigned int fmt;
+ 	int clk_div;
+ 	int clk_input_pin;
++	bool i2s_accurate_sck;
+ };
+ 
+ static inline void davinci_mcbsp_write_reg(struct davinci_mcbsp_dev *dev,
+@@ -447,11 +448,23 @@ static int davinci_i2s_hw_params(struct snd_pcm_substream *substream,
+ 		       DAVINCI_MCBSP_SRGR_CLKSM;
+ 		srgr |= DAVINCI_MCBSP_SRGR_FWID(mcbsp_word_length *
+ 						8 - 1);
+-		/* symmetric waveforms */
+-		clk_div = freq / (mcbsp_word_length * 16) /
+-			  params->rate_num * params->rate_den;
+-		srgr |= DAVINCI_MCBSP_SRGR_FPER(mcbsp_word_length *
+-						16 - 1);
++		if (dev->i2s_accurate_sck) {
++			clk_div = 256;
++			do {
++				framesize = (freq / (--clk_div)) /
++				params->rate_num *
++					params->rate_den;
++			} while (((framesize < 33) || (framesize > 4095)) &&
++				 (clk_div));
++			clk_div--;
++			srgr |= DAVINCI_MCBSP_SRGR_FPER(framesize - 1);
++		} else {
++			/* symmetric waveforms */
++			clk_div = freq / (mcbsp_word_length * 16) /
++				  params->rate_num * params->rate_den;
++			srgr |= DAVINCI_MCBSP_SRGR_FPER(mcbsp_word_length *
++							16 - 1);
++		}
+ 		clk_div &= 0xFF;
+ 		srgr |= clk_div;
+ 		break;
+@@ -662,6 +675,7 @@ static int davinci_i2s_probe(struct platform_device *pdev)
+ 		dev->dma_params[SNDRV_PCM_STREAM_CAPTURE].sram_size =
+ 			pdata->sram_size_capture;
+ 		dev->clk_input_pin = pdata->clk_input_pin;
++		dev->i2s_accurate_sck = pdata->i2s_accurate_sck;
+ 	}
+ 	dev->clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(dev->clk)) {
 -- 
-Nicolas Ferre
+1.7.0.4
