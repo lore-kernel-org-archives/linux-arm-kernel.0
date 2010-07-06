@@ -1,123 +1,84 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 6 Jul 2010 09:33:14 +0200
-Subject: [PATCH] mx25: set GPT clock source to PER
-In-Reply-To: <20100706063511.GB28547@jasper.tkos.co.il>
-References: <20100704084343.GB19559@jasper.tkos.co.il>
-	<40bc9462f125233cc9c63631a9b987ed684b6d97.1278233166.git.baruch@tkos.co.il>
-	<20100705082123.GD26079@pengutronix.de>
-	<20100706063511.GB28547@jasper.tkos.co.il>
-Message-ID: <20100706073314.GJ26079@pengutronix.de>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Tue, 06 Jul 2010 16:40:17 +0900
+Subject: [PATCH v2 0/4] ARM: S5P: Support gpio interrupts
+In-Reply-To: <000101cb1427$e88bfec0$b9a3fc40$%szyprowski@samsung.com>
+References: <4C11F4CA.10802@samsung.com>
+	<004601cb12a8$c869e560$593db020$%kim@samsung.com>
+	<000101cb1427$e88bfec0$b9a3fc40$%szyprowski@samsung.com>
+Message-ID: <4C32DDE1.8070906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 06, 2010 at 09:35:11AM +0300, Baruch Siach wrote:
-> Hi Sascha,
+On 6/25/2010 2:33 PM, Marek Szyprowski wrote:
+> Hello,
 > 
-> On Mon, Jul 05, 2010 at 10:21:23AM +0200, Sascha Hauer wrote:
-> > On Sun, Jul 04, 2010 at 11:47:29AM +0300, Baruch Siach wrote:
-> > > This fixes time accounting on mx25 base systems.
-> > > 
-> > > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > > ---
-> > >  arch/arm/plat-mxc/time.c |    3 ++-
-> > >  1 files changed, 2 insertions(+), 1 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
-> > > index f9a1b05..0d7e0f9 100644
-> > > --- a/arch/arm/plat-mxc/time.c
-> > > +++ b/arch/arm/plat-mxc/time.c
-> > > @@ -56,6 +56,7 @@
-> > >  /* MX31, MX35, MX25, MXC91231, MX5 */
-> > >  #define V2_TCTL_WAITEN		(1 << 3) /* Wait enable mode */
-> > >  #define V2_TCTL_CLK_IPG		(1 << 6)
-> > > +#define V2_TCTL_CLK_PER		(2 << 6)
-> > >  #define V2_TCTL_FRR		(1 << 9)
-> > >  #define V2_IR			0x0c
-> > >  #define V2_TSTAT		0x08
-> > > @@ -308,7 +309,7 @@ void __init mxc_timer_init(struct clk *timer_clk, void __iomem *base, int irq)
-> > >  	__raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
-> > >  
-> > >  	if (timer_is_v2())
-> > > -		tctl_val = V2_TCTL_CLK_IPG | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
-> > > +		tctl_val = V2_TCTL_CLK_PER | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
-> > >  	else
-> > >  		tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
-> > > 
-> > 
-> > I wonder why I applied
-> > 
-> > commit faed40665d2d81b7e0e537d14ef680ab3da9f22d
-> > Author: Baruch Siach <baruch@tkos.co.il>
-> > Date:   Mon Jan 25 12:58:21 2010 +0200
-> > 
-> >     mx25: fix time accounting
-> >     
-> >     The gpt_clk rate function doesn't consider the PER divider. This causes a
-> >     significant drift in time accounting. Fix this by introducing the correct rate
-> >     calculation function.
-> >     
-> >     Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> >     Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > 
-> > diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
-> > index 08aaa38..c003ac4 100644
-> > --- a/arch/arm/mach-mx25/clock.c
-> > +++ b/arch/arm/mach-mx25/clock.c
-> > @@ -119,6 +119,11 @@ static unsigned long get_rate_nfc(struct clk *clk)
-> >  	return get_rate_per(8);
-> >  }
-> >  
-> > +static unsigned long get_rate_gpt(struct clk *clk)
-> > +{
-> > +	return get_rate_per(5);
-> > +}
-> > +
-> >  static unsigned long get_rate_otg(struct clk *clk)
-> >  {
-> >  	return 48000000; /* FIXME */
-> > @@ -156,7 +161,7 @@ static void clk_cgcr_disable(struct clk *clk)
-> >  		.secondary	= s,			\
-> >  	}
-> >  
-> > -DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_ipg, NULL, NULL);
-> > +DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_gpt, NULL, NULL);
-> >  DEFINE_CLOCK(uart_per_clk, 0, CCM_CGCR0, 15, get_rate_uart, NULL, NULL);
-> >  DEFINE_CLOCK(cspi1_clk,  0, CCM_CGCR1,  5, get_rate_ipg, NULL, NULL);
-> >  DEFINE_CLOCK(cspi2_clk,  0, CCM_CGCR1,  6, get_rate_ipg, NULL, NULL);
-> > 
-> > This changed the gpt clock from ipg to the peripheral clock and I
-> > explained why this is wrong. Now of course we now must use the
-> > peripheral clock in the timer code.
-> > 
-> > Does it work when you revert faed40665d2d81b7e0e537d14ef680ab3da9f22d?
+> On Wednesday, June 23, 2010 9:51 AM Kukjin Kim wrote:
 > 
-> Reverting faed406 works on our target board, but breaks the i.MX25 PDK.
+>> Joonyoung Shim wrote:
+>>> This patch v2 set is to support gpio interrupts of samsung s5p cpus, and
+>>> the GPIOlib gpio_to_irq goes to plat-samsung gpiolib, so patch v2 set
+>>> has four commit smaller than v1.
+>>>
+>>> Changes since v1:
+>>> - Add irq_base to s3c_gpio_chip struct
+>>> - GPIOlib gpio_to_irq() is implemented to samsung_gpiolib_to_irq() of
+>>>   plat-samsung gpiolib
+>>>
+>>> Joonyoung Shim (4):
+>>>       ARM: S5PV210: Add gpio interrupt support
+>>>       ARM: S5PC100: Use S5P gpio interrupts interface
+>>>       ARM: S5PC100: Move external interrupt defines
+>>>       ARM: SAMSUNG: Add GPIOlib gpio_to_irq
+>>>
+>>>  arch/arm/mach-s5pc100/Makefile                 |    2 +-
+>>>  arch/arm/mach-s5pc100/gpiolib.c                |   70 ++-----
+>>>  arch/arm/mach-s5pc100/include/mach/gpio.h      |    7 -
+>>>  arch/arm/mach-s5pc100/include/mach/irqs.h      |   18 ++-
+>>>  arch/arm/mach-s5pc100/include/mach/regs-gpio.h |    7 +
+>>>  arch/arm/mach-s5pc100/irq-gpio.c               |  266
+>> ------------------------
+>>>  arch/arm/mach-s5pv210/gpiolib.c                |   18 ++-
+>>>  arch/arm/mach-s5pv210/include/mach/irqs.h      |   16 ++-
+>>>  arch/arm/plat-s5p/Makefile                     |    2 +-
+>>>  arch/arm/plat-s5p/irq-gpioint.c                |  208 ++++++++++++++++++
+>>>  arch/arm/plat-samsung/gpiolib.c                |    9 +
+>>>  arch/arm/plat-samsung/include/plat/gpio-core.h |    6 +
+>>>  12 files changed, 295 insertions(+), 334 deletions(-)
+>>>  delete mode 100644 arch/arm/mach-s5pc100/irq-gpio.c
+>>>  create mode 100644 arch/arm/plat-s5p/irq-gpioint.c
+>>>
+>> I am sure this patchset is working code, but Ben had made suggestion about
+>> 'sparse irq'...
+>> It is because there are too many gpio interrupts and having support of all
+>> of them is unnecessary as realistically only few of them maybe used.
 > 
-> > In any case, we can't apply your patch because it would break other v2
-> > based architectures like i.MX35.
+> Right. Ben suggested to create a pool for gpio interrupts (for example 16
+> interrupts) and selectively assign them in machine startup code to those
+> gpio pins that really need it.
 > 
-> What do you suggest then?
+> The problem is that such solution is not yet ready and we really need the
+> gpio interrupt functionality for our boards (Aquila and GONI). 
+> 
+> Maybe these current patches could be merged now, and then, once the new
+> solution is prepared, the gpio interrupt support get converted to selective
+> registering?
+> 
 
-Tell the timer code which clock to use with an argument to
-mxc_timer_init() and add the missing clocks to the clock.c file. You
-also have to pass this argument through from the board to
-mx25_clocks_init(). That's a lot of work and in the end we still do not
-know why some i.MX25 variants need the peripheral clock and others need
-the ipg clock. So what I really suggest is that you invest some
-research to find the source of this strangeness. Some things that could
-help you are:
+I agree with Marek.
 
-- the clko pin
-- Do both boards have identical i.MX25 tapeout versions?
-- Are the clocks initialized identically?
+Ben and Kukjin, how do you think about this?
 
-I bricked my i.MX25 PDK so unfortunately I do not have any hardware to
-do some tests myself.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> S5PC100 already has gpio interrupt support.
+>  
+>> In fact in SMDK board there is no use of gpio in interrupt mode.
+> 
+> We are talking about support for Samsung S5PV210/S5PC110 SoCs in the Linux
+> mainline kernel, not the support for only SMDK boards. GPIO interrupts is
+> a feature of the SoC not a particular board.
+> 
+> Best regards
+> --
+> Marek Szyprowski
+> Samsung Poland R&D Center
+> 
+> 
