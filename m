@@ -1,45 +1,34 @@
-From: roger.quadros@nokia.com (Roger Quadros)
-Date: Tue, 06 Jul 2010 15:39:06 +0300
-Subject: [PATCH 05/15] omap: hsmmc: add virtual card detect support
-In-Reply-To: <AANLkTinE5LygUWJsJSEE2miZF1GK58LTr8zErkuu_7yM@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 6 Jul 2010 15:53:03 +0300
+Subject: [PATCH 11/15] wireless: wl1271: introduce platform device support
+In-Reply-To: <4C3306F4.8060907@nokia.com>
 References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
-	<1278376666-3509-6-git-send-email-ohad@wizery.com>
-	<alpine.LFD.2.00.1007052134460.6020@xanadu.home>
-	<AANLkTim4E4LlFERmfYA1M0HLBOoRAsQuvdW6QBNu6pC0@mail.gmail.com>
-	<AANLkTinE5LygUWJsJSEE2miZF1GK58LTr8zErkuu_7yM@mail.gmail.com>
-Message-ID: <4C3323EA.902@nokia.com>
+	<1278376666-3509-12-git-send-email-ohad@wizery.com>
+	<4C32EF19.1000604@nokia.com>
+	<AANLkTintIz-N7MwwtqhVq2LR3Ln5JTNYSbJUBSSClcA-@mail.gmail.com>
+	<4C3306F4.8060907@nokia.com>
+Message-ID: <AANLkTin5W52fPzWToRrAzm56SLZI-taSuI16rCEhLWqH@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Roger,
 
-On 07/06/2010 02:48 PM, ext Ohad Ben-Cohen wrote:
-> On Tue, Jul 6, 2010 at 1:22 PM, Ohad Ben-Cohen<ohad@wizery.com>  wrote:
->> Note: the wl1271 device does support standard card detection, but
->> AFAIK there's a limitation to use that with the specific omap
->> controller the device is hardwired to. I will try to get more info
->> about that, but probably Madhu can comment on that better.
+On Tue, Jul 6, 2010 at 1:35 PM, Roger Quadros <roger.quadros@nokia.com> wrote:
+> My point is that shouldn't this be handled by SDIO core?
+
+Care to explain what you mean / give a code example ?
+
+> If there are no users for the SDIO function and the card, doesn't the SDIO
+> core power down the slot and take care of re-initialization when it is
+> powered up?
+
+You need card detect events in order to trigger card & sdio function
+initialization and removals.
+
+Please share any alternative approach you may be thinking on.
+
+Thanks,
+Ohad.
+
+
 >
->
-> Some correction and additional info:
->
-> The wl1271 device has an issue which makes the standard card detect
-> mechanism irrelevant: it is always up, even if the power enable gpio
-> input of the device is down (the power enable input does not supply
-> the power to the chip, it's just logical digital high/low input upon
-> which the device reacts).  That's why we must use software control for
-> emulating card detect with that device.
-
-Just to clarify, is the wl1271 device always powered on the board?
-
-And this GPIO power enable (OMAP_ZOOM_WLAN_PMENA_GPIO) is used to gate this 
-supply internally?
-
-and what do these do ?
-
-set_bit(WL1271_FLAG_GPIO_POWER, &wl->flags);
-
-clear_bit(WL1271_FLAG_GPIO_POWER, &wl->flags);
-
-regards,
--roger
