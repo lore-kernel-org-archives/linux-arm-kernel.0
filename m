@@ -1,77 +1,65 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 06 Jul 2010 13:00:11 -0400 (EDT)
-Subject: [PATCH 05/15] omap: hsmmc: add virtual card detect support
-In-Reply-To: <822D79B5C25543B1A6F148B39E061459@am.dhcp.ti.com>
-References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
-	<1278376666-3509-6-git-send-email-ohad@wizery.com>
-	<alpine.LFD.2.00.1007052134460.6020@xanadu.home>
-	<AANLkTim4E4LlFERmfYA1M0HLBOoRAsQuvdW6QBNu6pC0@mail.gmail.com>
-	<AANLkTinE5LygUWJsJSEE2miZF1GK58LTr8zErkuu_7yM@mail.gmail.com>
-	<822D79B5C25543B1A6F148B39E061459@am.dhcp.ti.com>
-Message-ID: <alpine.LFD.2.00.1007061249280.6020@xanadu.home>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Tue, 06 Jul 2010 20:02:52 +0300
+Subject: S3C2416 fixes (gpiolib, SDHCI, compilation without FB device)
+In-Reply-To: <000001cb1687$638b2310$2aa16930$%szyprowski@samsung.com>
+References: <1277212585-25605-1-git-send-email-jekhor@gmail.com>
+	<4C248B23.7060905@gmail.com>
+	<000001cb1687$638b2310$2aa16930$%szyprowski@samsung.com>
+Message-ID: <4C3361BC.2040204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 6 Jul 2010, Madhusudhan wrote:
-
-> 
-> 
-> > -----Original Message-----
-> > From: Ohad Ben-Cohen [mailto:ohad at wizery.com]
-> > Sent: Tuesday, July 06, 2010 6:48 AM
-> > To: Nicolas Pitre
-> > Cc: linux-wireless at vger.kernel.org; linux-mmc at vger.kernel.org; linux-
-> > omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > linux at arm.linux.org.uk; Chikkature Rajashekar Madhusudhan; Luciano Coelho;
-> > Andrew Morton; San Mehat; Pandita, Vikram
-> > Subject: Re: [PATCH 05/15] omap: hsmmc: add virtual card detect support
-> > 
-> > On Tue, Jul 6, 2010 at 1:22 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> > > Note: the wl1271 device does support standard card detection, but
-> > > AFAIK there's a limitation to use that with the specific omap
-> > > controller the device is hardwired to. I will try to get more info
-> > > about that, but probably Madhu can comment on that better.
-> > 
-> > 
-> > Some correction and additional info:
-> > 
-> > The wl1271 device has an issue which makes the standard card detect
-> > mechanism irrelevant: it is always up, even if the power enable gpio
-> > input of the device is down (the power enable input does not supply
-> > the power to the chip, it's just logical digital high/low input upon
-> > which the device reacts).  That's why we must use software control for
-> > emulating card detect with that device.
-> > 
-> > In addition, as far as I could find out, the card detect mechanism on
-> > the ZOOM is implemented by mechanical means, and thus is not relevant
-> > for hardwired embedded SDIO devices (I'm not even sure card detect is
-> > supported for the 3rd mmc controller).
-> 
-> The card detect is supported through T2 GPIO interrupts only for MMC1 and
-> MMC2. Such a mechanism is not present for MMC3 to which the WLAN chip is
-> hardwired.
-
-Many existing implementations simply have no (or a broken) card 
-detection signal.  In that case, either the host controller passes the 
-MMC_CAP_NEEDS_POLL flag to the core so that the bus is probed on a 
-regular interval for card presence.  Or, like in this case where the 
-"card" is always hardwired on the board, you simply rely on the initial 
-probe which is always performed at least once when the host controller 
-driver is registered.
-
-Now the issue of having the card powered off when not in use is a valid 
-one, whether or not it is actually hardwired on the board or 
-hot insertable/removable.  This fake insertion thing is not the best way 
-to go about it.
-
-It would be way more useful, generic, and less hackish to simply improve 
-the generic code so to power down the card when it is 1) not claimed by 
-any function driver, and 2) provide an API to let a function driver 
-signify to the core and host controller that it is not interested by the 
-hardware at the moment (if the network interface is not up for example) 
-and therefore the core could again power down the card.  This would work 
-in all cases with no need for exceptions  for so called "enbedded 
-controllers".
+Hi,
 
 
-Nicolas
+On 06/28/2010 09:01 AM, Marek Szyprowski wrote:
+> Hello,
+>
+> On Friday, June 25, 2010 12:56 PM Darius Augulis wrote:
+>
+>> On 06/22/2010 04:16 PM, Yauhen Kharuzhy wrote:
+>>> This patch series fixes SDHCI on S3C2416. I got SD card working with this
+>> patches
+>>> and with patches for GPIO card detection support by Marek Szyprowski.
+>>>
+>>
+>> Unfortunately I did not get SD card working with these patches. I'm
+>> using custom board, not SMDK2416, but SD slot connection and schematics
+>> are the same like in SMDK2416. I've tried to debug a bit this problem
+>> and this is what I got: kernel do detection of card insert/remove,
+>> driver prints messages:
+>>
+>> s3c-sdhci s3c-sdhci.1: card inserted.
+>> s3c-sdhci s3c-sdhci.1: card removed.
+>>
+>> Then I put some printk in s3c-sdhci driver and MMC core and found that
+>> mmc_rescan() is called only once at startup and no more when
+>> inserting/removing SD card. Also mmc_rescan() stops at that point where
+>> mmc_power_up() is called and does not return. And mmc_power_up() stops
+>> where mmc_delay(10) is called and does not return too.
+>> Every time when inserting/removing SD card only functions
+>> sdhci_tasklet_card() and mmc_detect_change() are called, and nothing
+>> happens. Kernel doesn't detect the card inserted.
+>> Maybe this info could help to debug where the problem is - in my custom
+>> board or in your patches?
+>
+> Have you tried with polled card detection method (SDHCI_CD_NONE)? If it
+> doesn't work I suspect something with the hardware. Checking with mmc debug
+> enabled might also help figuring this issue out.
+
+yes, I've tried that, but didn't get sd card working. I got schematics 
+from China manufacturer, SD card connection is the same like in 
+smdk2416. with mmc debug enabled I found that SD card is detected when 
+inserted or removed, but after detection card initialisation is not 
+performed.
+
+Darius.
+
+
+>
+> Best regards
+> --
+> Marek Szyprowski
+> Samsung Poland R&D Center
+>
+>
