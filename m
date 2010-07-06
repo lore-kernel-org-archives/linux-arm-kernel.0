@@ -1,69 +1,60 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 07 Jul 2010 08:49:16 +0900
-Subject: [PATCH] ARM: S5PV210: Fix on SECTION_SIZE_BITS on	S5PV210/S5PC110.
-In-Reply-To: <AANLkTimqquLc7lW7TdMD2q84d4uATvHKppt5gVfKcMFT@mail.gmail.com>
-References: <1278391007-11144-1-git-send-email-kgene.kim@samsung.com>
-	<AANLkTimqquLc7lW7TdMD2q84d4uATvHKppt5gVfKcMFT@mail.gmail.com>
-Message-ID: <013301cb1d65$daf2f8d0$90d8ea70$%kim@samsung.com>
+Date: Wed, 07 Jul 2010 08:52:59 +0900
+Subject: [PATCH v6 3/3] input: samsung-keypad - Add samsung keypad driver
+In-Reply-To: <4C32E21A.8080100@samsung.com>
+References: <1277724824-13308-1-git-send-email-jy0922.shim@samsung.com>
+	<1277724824-13308-3-git-send-email-jy0922.shim@samsung.com>
+	<4C32E21A.8080100@samsung.com>
+Message-ID: <013401cb1d66$5fbf3fb0$1f3dbf10$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
+Joonyoung Shim wrote:
 > 
-> On Tue, Jul 6, 2010 at 1:36 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > This patch fixes on SECTION_SIZE_BITS for Sparsemem on S5PV210/S5PC110.
-> > Because smallest size of a bank on S5PV210/S5PC110 is aligned by 16MB.
-> > So each section's maximum size should be 16MB.
+> Hi, Naveen.
 > 
-> Could you explain what's the problem?
-> 
-The size of a section for use in Sparsemem should be a power of 2.
-And as you know, S5PC110 D-type has only 80MiB in a bank(DMC0).
-
-80 = 2^4 * 5, thus should be 16MiB.
-
-In case the section size is greater than 16MiB, a section will have a hole
-in it.
-
-> Even though 80MiB is used at logical size. it used the physical 128MiB
-> so. it's reasonable to use 128MiB align instead of 16MiB. Are there
-> boards use 64MiB or less?
-> 
-> I think if decrease the SECTIONS_SIZE_BITS, it wastes the memory.
-> 
-> Thank you,
-> Kyungmin Park
-> 
+> On 6/28/2010 8:33 PM, Joonyoung Shim wrote:
+> > This patch adds support for keypad driver running on Samsung cpus. This
+> > driver is tested on GONI and Aquila board using S5PC110 cpu.
 > >
-> > Reported-by: Kyongho Cho <pullip.cho@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > > ---
-> > ?arch/arm/mach-s5pv210/include/mach/memory.h | ? ?8 ++++++--
-> > ?1 files changed, 6 insertions(+), 2 deletions(-)
+> >  drivers/input/keyboard/Kconfig          |    9 +
+> >  drivers/input/keyboard/Makefile         |    1 +
+> >  drivers/input/keyboard/samsung-keypad.c |  491
+> +++++++++++++++++++++++++++++++
+> >  3 files changed, 501 insertions(+), 0 deletions(-)
+> >  create mode 100644 drivers/input/keyboard/samsung-keypad.c
 > >
-> > diff --git a/arch/arm/mach-s5pv210/include/mach/memory.h
-b/arch/arm/mach-
-> s5pv210/include/mach/memory.h
-> > index 379117e..4a372d8 100644
-> > --- a/arch/arm/mach-s5pv210/include/mach/memory.h
-> > +++ b/arch/arm/mach-s5pv210/include/mach/memory.h
-> > @@ -16,8 +16,12 @@
-> > ?#define PHYS_OFFSET ? ? ? ? ? ?UL(0x20000000)
-> > ?#define CONSISTENT_DMA_SIZE ? ?(SZ_8M + SZ_4M + SZ_2M)
-> >
-> > -/* Maximum of 256MiB in one bank */
-> > +/* Sparsemem support. Each section is a maximum of 16MB.
-> > + * Because there are many different memory type on S5PC110(MCP),
-> > + * and there is a case that having 80MB, 128MB or 256MB in one
-> > + * bank.
-> > +*/
-> > ?#define MAX_PHYSMEM_BITS ? ? ? 32
-> > -#define SECTION_SIZE_BITS ? ? ?28
-> > +#define SECTION_SIZE_BITS ? ? ?24
-> >
-> > ?#endif /* __ASM_ARCH_MEMORY_H */
-> > --
+> 
+> Could you please test this v6 keypad driver on your various targets?
 
+Hi,
+
+I received the test result from Naveen.
+And now he is debugging about that.
+
+..his e-mail client has some problem..so I replied...
+
+---
+From: Naveen Ch
+
+I've tested with v6 patches and they are working fine on SMDK6410, SMDKC100 and SMDKV210, except for some header inclusion (linux/sched.h) in samsung-keypad.c.
+
+The build breaking error is like following:
+(make s5pc100_defconfig and select input->keypad->samsung keypad)
+
+drivers/input/keyboard/samsung-keypad.c: In function 'samsung_keypad_irq':
+drivers/input/keyboard/samsung-keypad.c:170: error: 'TASK_UNINTERRUPTIBLE' undeclared (first use in this function)
+drivers/input/keyboard/samsung-keypad.c:170: error: (Each undeclared identifier is reported only once
+drivers/input/keyboard/samsung-keypad.c:170: error: for each function it appears in.)
+drivers/input/keyboard/samsung-keypad.c:170: error: implicit declaration of function 'schedule_timeout'
+drivers/input/keyboard/samsung-keypad.c: In function 'samsung_keypad_stop':
+drivers/input/keyboard/samsung-keypad.c:202: error: 'TASK_NORMAL' undeclared (first use in this function)
+make[3]: *** [drivers/input/keyboard/samsung-keypad.o] Error 1
+
+---
 
 Thanks.
 
