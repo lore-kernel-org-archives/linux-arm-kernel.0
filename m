@@ -1,77 +1,31 @@
-From: roger.quadros@nokia.com (Roger Quadros)
-Date: Wed, 07 Jul 2010 10:48:05 +0300
-Subject: [PATCH 11/15] wireless: wl1271: introduce platform device support
-In-Reply-To: <alpine.LFD.2.00.1007061316010.6020@xanadu.home>
-References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
-	<1278376666-3509-12-git-send-email-ohad@wizery.com>
-	<4C32EF19.1000604@nokia.com>
-	<AANLkTintIz-N7MwwtqhVq2LR3Ln5JTNYSbJUBSSClcA-@mail.gmail.com>
-	<4C3306F4.8060907@nokia.com>
-	<AANLkTin5W52fPzWToRrAzm56SLZI-taSuI16rCEhLWqH@mail.gmail.com>
-	<4C333E0D.2070601@nokia.com>
-	<alpine.LFD.2.00.1007061316010.6020@xanadu.home>
-Message-ID: <4C343135.1090101@nokia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Jul 2010 08:49:43 +0100
+Subject: About cachetype on ARMv7
+In-Reply-To: <013501cb1d6a$47682ea0$d6388be0$%kim@samsung.com>
+References: <004c01cb1c34$49773f60$dc65be20$%kim@samsung.com>
+	<20100705141719.GA23556@n2100.arm.linux.org.uk>
+	<013501cb1d6a$47682ea0$d6388be0$%kim@samsung.com>
+Message-ID: <20100707074943.GA21884@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2010 08:42 PM, ext Nicolas Pitre wrote:
-> On Tue, 6 Jul 2010, Roger Quadros wrote:
->
->> On 07/06/2010 03:53 PM, ext Ohad Ben-Cohen wrote:
->>> Hi Roger,
->>>
->>> On Tue, Jul 6, 2010 at 1:35 PM, Roger Quadros<roger.quadros@nokia.com>
->>> wrote:
->>>> My point is that shouldn't this be handled by SDIO core?
->>>
->>> Care to explain what you mean / give a code example ?
->>
->> If the Power enable GPIO can be treated as SDIO slot supply (i.e. vmmc), then
->> the SDIO/MMC core should tackle it, just like it deals with supply for slots
->> with removable cards.
->
-> Exact.
->
->>> You need card detect events in order to trigger card&   sdio function
->>> initialization and removals.
->
-> Why would you trigger function initialization and removal?  Just to turn
-> off power?  That's a bit like pulling off the battery from your laptop
-> when you want to suspend it.  There is a better way to go about things.
->
->>> Please share any alternative approach you may be thinking on.
->>
->> OK, this is how I see it.
->>
->> - Treat the non-removable card as non-removable. So no need to do card detect
->> emulation.
->>
->> - Treat the GPIO power enable on wl1271 as VMMC supply. Use fixed regulator
->> framework to define this regulator&  supply. Even though you mention that it
->> is not actually a supply, it fits well in the fixed supply framework.
->>
->> - When the host controller is enumerated, the mmc core will power up the slot,
->> find the sdio card, and probe the function driver (i.e. wl1271_sdio).
->>
->> - if interface is not in use, the function driver must release the sdio host,
->> and this should eventually disable the vmmc supply.
->>
->> - Whenever the wlan interface must be brought up, wl1271_sdio, can claim the
->> sdio host. this will cause the vmmc supply to be enabled, for as long as the
->> interface is up.
->>
->> Does this address all issues?
->
-> This is mostly all good, except that claiming/releasing the SDIO host is
-> about access to the bus.  It must be claimed right before doing any IO,
-> and released right after that, even when the card is expected to remain
-> powered.  This is not the proper place to hook power control.
+On Wed, Jul 07, 2010 at 09:20:57AM +0900, Kukjin Kim wrote:
+> > The requirements for N is such the CPU visible conditions which qualify a
+> > cache as being VIPT non-aliasing also satisfy PIPT - and a non-aliasing
+> > VIPT cache has the same properties as a PIPT cache.
+> 
+> Thanks for your reply :-)
+> 
+> You mean PIPT is the same as VIPT non-aliasing.
 
-Agreed, but is it so that SDIO power may be removed between a host_release and 
-claim? This appears so from omap_hsmmc host controller.
+No, because that's not the case - they are different at the hardware
+level.  At the software level, they can be treated the same though.
 
-if we have sdio_claim_power() and sdio_release_power() in place then power 
-control should depend on it.
+> Hmm..there is no need to show exactly cachetype in the kernel boot message?
 
-regards,
--roger
+The boot message shows how the kernel drives the cache, not what the
+actual cache is - which is far more informative about what the kernel
+is doing.
+
+We can find out what the hardware is by looking in specification docs;
+we don't need the kernel to tell us that.
