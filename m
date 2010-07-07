@@ -1,49 +1,64 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  7 Jul 2010 17:23:00 +0100
-Subject: [PATCH 4/4] ARM: hw-breakpoint: add HAVE_HW_BREAKPOINT to Kconfig
-In-Reply-To: <1278519780-13317-4-git-send-email-will.deacon@arm.com>
+Date: Wed,  7 Jul 2010 17:22:57 +0100
+Subject: [PATCH 1/4] ARM: hw-breakpoint: add mechanism for hooking into
+	prefetch aborts
+In-Reply-To: <1278519780-13317-1-git-send-email-will.deacon@arm.com>
 References: <1278519780-13317-1-git-send-email-will.deacon@arm.com>
-	<1278519780-13317-2-git-send-email-will.deacon@arm.com>
-	<1278519780-13317-3-git-send-email-will.deacon@arm.com>
-	<1278519780-13317-4-git-send-email-will.deacon@arm.com>
-Message-ID: <1278519780-13317-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1278519780-13317-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we're targetting a v6 or v7 core and have at least software perf events
-available, then automatically add support for hardware breakpoints.
+On ARM processors with hardware breakpoint and watchpoint support,
+triggering these events results in a debug exception. These manifest
+as prefetch and data aborts respectively.
+
+arch/arm/mm/fault.c already provides hook_fault_code for hooking
+into data aborts dependent on the DFSR. This patch adds a new function,
+hook_ifault_code for hooking into prefetch aborts in the same manner.
 
 Cc: Frederic Weisbecker <fweisbec@gmail.com>
 Cc: S. Karthikeyan <informkarthik@gmail.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/Kconfig         |    1 +
- arch/arm/kernel/Makefile |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/system.h |    3 +++
+ arch/arm/mm/fault.c           |   11 +++++++++++
+ 2 files changed, 14 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e57cb24..7ed4d58 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -24,6 +24,7 @@ config ARM
- 	select HAVE_KERNEL_LZMA
- 	select HAVE_PERF_EVENTS
- 	select PERF_USE_VMALLOC
-+	select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V7))
- 	help
- 	  The ARM series is a line of low-power-consumption RISC chip designs
- 	  licensed by ARM Ltd and targeted at embedded applications and
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 26d302c..e679fb0 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -39,6 +39,7 @@ obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
- obj-$(CONFIG_KGDB)		+= kgdb.o
- obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
- obj-$(CONFIG_HAVE_TCM)		+= tcm.o
-+obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+index 5f4f480..42da2f8 100644
+--- a/arch/arm/include/asm/system.h
++++ b/arch/arm/include/asm/system.h
+@@ -84,6 +84,9 @@ void arm_notify_die(const char *str, struct pt_regs *regs, struct siginfo *info,
+ void hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+ 				       struct pt_regs *),
+ 		     int sig, const char *name);
++void hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int,
++				       struct pt_regs *),
++		     int sig, const char *name);
  
- obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
- AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
+ #define xchg(ptr,x) \
+ 	((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index cbfb2ed..fb7cbe7 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -575,6 +575,17 @@ static struct fsr_info ifsr_info[] = {
+ 	{ do_bad,		SIGBUS,  0,		"unknown 31"			   },
+ };
+ 
++void __init
++hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *),
++			int sig, const char *name)
++{
++	if (nr >= 0 && nr < ARRAY_SIZE(ifsr_info)) {
++		ifsr_info[nr].fn   = fn;
++		ifsr_info[nr].sig  = sig;
++		ifsr_info[nr].name = name;
++	}
++}
++
+ asmlinkage void __exception
+ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
+ {
 -- 
 1.6.3.3
