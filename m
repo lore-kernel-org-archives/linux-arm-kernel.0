@@ -1,28 +1,28 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 07 Jul 2010 12:43:54 +0300
-Subject: [PATCH 01/13] omap: zoom2: wlan board muxing
+Date: Wed, 07 Jul 2010 12:44:04 +0300
+Subject: [PATCH 02/13] omap: zoom3: wlan board muxing
 In-Reply-To: <20100707094308.2562.91921.stgit@baageli.muru.com>
 References: <20100707094308.2562.91921.stgit@baageli.muru.com>
-Message-ID: <20100707094354.2562.48930.stgit@baageli.muru.com>
+Message-ID: <20100707094404.2562.29882.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ohad Ben-Cohen <ohadb@ti.com>
 
 Add board muxing to support the wlan wl1271 chip that is
-hardwired to mmc2 (third mmc controller) on the ZOOM2.
+hardwired to mmc2 (third mmc controller) on the ZOOM3.
 
 Signed-off-by: Ohad Ben-Cohen <ohadb@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-zoom2.c |   15 +++++++++++++++
+ arch/arm/mach-omap2/board-zoom3.c |   15 +++++++++++++++
  1 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-zoom2.c b/arch/arm/mach-omap2/board-zoom2.c
-index 803ef14..00871be 100644
---- a/arch/arm/mach-omap2/board-zoom2.c
-+++ b/arch/arm/mach-omap2/board-zoom2.c
-@@ -71,6 +71,21 @@ static struct twl4030_platform_data zoom2_twldata = {
+diff --git a/arch/arm/mach-omap2/board-zoom3.c b/arch/arm/mach-omap2/board-zoom3.c
+index 3314704..0b62663 100644
+--- a/arch/arm/mach-omap2/board-zoom3.c
++++ b/arch/arm/mach-omap2/board-zoom3.c
+@@ -46,6 +46,21 @@ static void __init omap_zoom_init_irq(void)
  
  #ifdef CONFIG_OMAP_MUX
  static struct omap_board_mux board_mux[] __initdata = {
