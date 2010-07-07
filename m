@@ -1,28 +1,71 @@
-From: Colin.Tuckley@arm.com (Colin Tuckley)
-Date: Wed, 7 Jul 2010 09:51:10 +0100
-Subject: [PATCH 3/3] ARM: register character LCD for RealView EB
-In-Reply-To: <1278429686-5109-1-git-send-email-triad@df.lth.se>
-References: <1278429686-5109-1-git-send-email-triad@df.lth.se>
-Message-ID: <F01D8B85CFF58440B2A13965FBA90CA42DA39B5222@GEORGE.Emea.Arm.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Wed, 7 Jul 2010 11:56:01 +0300
+Subject: [patch 071/149] ARM: 6166/1: Proper prefetch abort handling on
+	pre-ARMv6
+In-Reply-To: <20100706225815.GA21834@flint.arm.linux.org.uk>
+References: <20100701175144.GA2116@kroah.com>
+	<20100701173212.785441106@clark.site>
+	<20100701221420.GA10481@shutemov.name>
+	<20100701221728.GA12187@suse.de>
+	<20100701222541.GB10481@shutemov.name>
+	<20100701224837.GA27389@flint.arm.linux.org.uk>
+	<20100701225911.GC10481@shutemov.name>
+	<20100701231207.GB27389@flint.arm.linux.org.uk>
+	<20100706130618.GA14177@shutemov.name>
+	<20100706225815.GA21834@flint.arm.linux.org.uk>
+Message-ID: <20100707085601.GA18732@shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> kernel-bounces at lists.infradead.org] On Behalf Of Linus Walleij
+On Tue, Jul 06, 2010 at 11:58:15PM +0100, Russell King wrote:
+> On Tue, Jul 06, 2010 at 04:06:18PM +0300, Kirill A. Shutemov wrote:
+> > I've investigated the issue. It's reproducible if you try to jump to
+> > the megabyte next to section mapping.
+> 
+> Okay, this is specific to the way that OMAP sets up its mappings, which
+> is why it doesn't appear everywhere.
+> 
+> > On ARM one Linux PGD entry contains two hardware entry. But there is error
+> > in do_translation_fault(). It's always call pmd_none() check for the first
+> > entry of two, not for the entry corresponded to address. So in case if we
+> > try to jump the megabyte next to section mapping, we will have inifinity
+> > loop of translation faults.
+> 
+> Okay, now that we know _why_ it happens, I'm satisfied that the fix
+> previously committed will help this situation.
+> 
+> > diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+> > index 9634fe1..825b9da 100644
+> > --- a/arch/arm/mm/fault.c
+> > +++ b/arch/arm/mm/fault.c
+> > @@ -406,7 +406,8 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
+> >         pmd_k = pmd_offset(pgd_k, addr);
+> >         pmd   = pmd_offset(pgd, addr);
+> >  
+> > -       if (pmd_none(*pmd_k))
+> > +       index = (addr >> SECTION_SHIFT) & 1;
+> > +       if (pmd_none(pmd_k[index]))
+> 
+> I do think this is extremely obscure, and therefore requires a comment
+> to help people understand what is going on here and why.  Leaving it
+> in the commit log would be an invitation for this to be needlessly
+> cut'n'pasted.
 
-> The remaining PB11MPCore, PB-A8 and PBX-A9 seem to be those boxen
-> without any LCD fitted, so no point in adding the device on those,
-> even though the driver logic appears to be in the circuitry for all
-> of them.
+Ok, I'll fix it.
 
-Correct, these boards are normally fitted inside cases so the LCD is not useful.
+But it seems that the problem is more global. Potentially, any of
+pmd_none() check may produce false results. I don't see an easy way to fix
+it.
 
-Colin
+It's not so big problem since we don't have [super]section in userspace,
+but I guess, we want to have huge pages support in the future.
 
---
-Colin Tuckley - ARM Ltd.
-110 Fulbourn Rd
-Cambridge, CB1 9NJ
-Tel: +44 1223 400536
+Any ideas how to fix it in the right way?
 
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+Does Linux VM still expect one PTE table per page?
+
+CC list modified. Removed persons who unlikely interested in ARM-specific
+stuff. linux-arm-kernel and linux-mm added.
+
+-- 
+ Kirill A. Shutemov
