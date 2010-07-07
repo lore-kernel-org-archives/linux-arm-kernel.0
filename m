@@ -1,71 +1,62 @@
-From: madhu.cr@ti.com (Madhusudhan)
-Date: Wed, 7 Jul 2010 09:54:08 -0500
-Subject: [PATCH 11/15] wireless: wl1271: introduce platform device support
-In-Reply-To: <alpine.LFD.2.00.1007070954010.6020@xanadu.home>
-References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
-	<1278376666-3509-12-git-send-email-ohad@wizery.com>
-	<4C32EF19.1000604@nokia.com>
-	<AANLkTintIz-N7MwwtqhVq2LR3Ln5JTNYSbJUBSSClcA-@mail.gmail.com>
-	<4C3306F4.8060907@nokia.com>
-	<AANLkTin5W52fPzWToRrAzm56SLZI-taSuI16rCEhLWqH@mail.gmail.com>
-	<4C333E0D.2070601@nokia.com>
-	<alpine.LFD.2.00.1007061316010.6020@xanadu.home>
-	<4C338927.5020400@nokia.com> <4C34347F.8030000@nokia.com>
-	<alpine.LFD.2.00.1007070954010.6020@xanadu.home>
-Message-ID: <E6AFC02D8D114C129C8140932818E578@am.dhcp.ti.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 07 Jul 2010 11:03:35 -0400 (EDT)
+Subject: [PATCH RFC] Introduce one machine_desc instance and
+	get_machine_desc()
+In-Reply-To: <AANLkTinxZYUrIva6vOVwTY3yDDl5ziAI4Jhx1UJsYssn@mail.gmail.com>
+References: <AANLkTinWPkI2zVCVw_yx87WVuAGZuWpBUuvGbxx_luIr@mail.gmail.com>
+	<alpine.LFD.2.00.1007070918320.6020@xanadu.home>
+	<AANLkTinxZYUrIva6vOVwTY3yDDl5ziAI4Jhx1UJsYssn@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1007071057350.6020@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 7 Jul 2010, Eric Miao wrote:
+
+> On Wed, Jul 7, 2010 at 9:32 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> > On Wed, 7 Jul 2010, Eric Miao wrote:
+> >
+> >> commit 5d5d90e5d41bb0842559dd2b00f00f2a0f532a3a
+> >> Author: Eric Miao <eric.miao@canonical.com>
+> >> Date: ? Wed Jul 7 16:47:20 2010 +0800
+> >>
+> >> ? ? [ARM] Introduce one machine_desc instance and get_machine_desc()
+> >>
+> >> ? ? If some of the fields remains useful in 'struct machine_desc', it's
+> >> ? ? normally a bit convenient to keep one instance there for reference.
+> >>
+> >> ? ? (along with more and more machine specific fields coming into this
+> >> ? ? structure, e.g. pcibios_min_{io,mem})
+> >>
+> >> ? ? It also improves modularity a bit by not exporting variables like
+> >> ? ? system_timer, init_arch_irq etc.
+> >>
+> >> ? ? However, the drawbacks are 1) a bit increased data and 2) increased
+> >> ? ? risk of accessing those fields which are marked as __init.
+> >
+> > That makes me worried. ?Access to __init data/functions after __init
+> > stuff is freed is amongst the nastiest subtle bugs that are hard to
+> > reproduce and therefore fix. ?And copying such pointers is probably
+> > defeating the simple compile time checks we currently have against that.
+> 
+> Indeed I was upset as well :-)
+> 
+> >
+> > Maybe those fields should be partitioned differently. ?Having a new
+> > structure to encapsulate all fields that should be kept after __init
+> > stuff is gone might be a better way.
+> 
+> That's going to invent another similar structure and produce more code
+> when copying over. What about keeping those __init function pointers
+> as NULL, and copying the rest?
+
+Sure, that would be better.  But how many will remain?
+
+Right now the majority of the mdesc fields are about __init stuff.  If 
+we're going to add more then maybe we could put them into another 
+structure that could be encapsulated into the mdesc structure and only 
+copy that part to permanent storage.  That would be a good way to 
+distinguish between inittialization time params and post-init 
+operational ones.
 
 
-> -----Original Message-----
-> From: Nicolas Pitre [mailto:nico at fluxnic.net]
-> Sent: Wednesday, July 07, 2010 9:03 AM
-> To: Roger Quadros
-> Cc: Hunter Adrian (Nokia-MS/Helsinki); Ohad Ben-Cohen; linux-
-> wireless at vger.kernel.org; linux-mmc at vger.kernel.org; linux-
-> omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linux at arm.linux.org.uk; Chikkature Rajashekar Madhusudhan; Coelho Luciano
-> (Nokia-MS/Helsinki); akpm at linux-foundation.org; San Mehat
-> Subject: Re: [PATCH 11/15] wireless: wl1271: introduce platform device
-> support
-> 
-> On Wed, 7 Jul 2010, Roger Quadros wrote:
-> 
-> > On 07/06/2010 10:51 PM, Hunter Adrian (Nokia-MS/Helsinki) wrote:
-> > > For eMMC in omap_hsmmc, this is all done via claim_host / release_host
-> > > which call ->enable() / ->disable() methods.  omap_hsmmc makes use of
-> > > mmc_power_restore_host() which calls host->bus_ops->power_restore()
-> > > which is not implemented for SDIO, but for MMC and SD it reinitializes
-> > > the card.
-> 
-> This is IMHO a really bad design.  The power control decision has to
-> come from the top, not from the bottom.  And certainly not with a
-> U-turn dependency the omap_hsmmc is using.
-> 
-> I regret to say this, but the omap_hsmmc driver is becoming a total
-> mess.  The host controller driver has to be a dumb interface serving
-> requests from the hardware used by the upper layer stack, not the place
-> where decisions such as power handling should be made.  Think of it like
-> an ethernet driver.  No ethernet driver in Linux is telling the IP stack
-> when to shut down.
-> 
-
-The point is that MMC/SD core files were patched to provide this kind of a
-support. Any controller driver can use that framework today, right?. As an
-example omap_hsmmc driver was patched and it works fine.
-
-Why blame the controller driver for using a support provided by core files?
-
-Regards,
-Madhu
-
-> > Shouldn't the power control intelligence (i.e. when to turn power
-> ON/OFF) lie
-> > with the bus drivers?
-> 
-> Absolutely!  And in the SDIO case that should lie with each function
-> drivers.  Please let's stop this omap_hsmmc madness.
-> 
-> 
-> Nicolas
+Nicolas
