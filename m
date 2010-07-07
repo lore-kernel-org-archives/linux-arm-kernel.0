@@ -1,144 +1,125 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 7 Jul 2010 11:00:13 +0300
-Subject: [PATCH] mx25: set GPT clock source to PER
-In-Reply-To: <20100706073314.GJ26079@pengutronix.de>
-References: <20100704084343.GB19559@jasper.tkos.co.il>
-	<40bc9462f125233cc9c63631a9b987ed684b6d97.1278233166.git.baruch@tkos.co.il>
-	<20100705082123.GD26079@pengutronix.de>
-	<20100706063511.GB28547@jasper.tkos.co.il>
-	<20100706073314.GJ26079@pengutronix.de>
-Message-ID: <20100707080012.GE24774@jasper.tkos.co.il>
+From: roger.quadros@nokia.com (Roger Quadros)
+Date: Wed, 07 Jul 2010 11:02:07 +0300
+Subject: [PATCH 11/15] wireless: wl1271: introduce platform device support
+In-Reply-To: <4C338927.5020400@nokia.com>
+References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
+	<1278376666-3509-12-git-send-email-ohad@wizery.com>
+	<4C32EF19.1000604@nokia.com>
+	<AANLkTintIz-N7MwwtqhVq2LR3Ln5JTNYSbJUBSSClcA-@mail.gmail.com>
+	<4C3306F4.8060907@nokia.com>
+	<AANLkTin5W52fPzWToRrAzm56SLZI-taSuI16rCEhLWqH@mail.gmail.com>
+	<4C333E0D.2070601@nokia.com>
+	<alpine.LFD.2.00.1007061316010.6020@xanadu.home>
+	<4C338927.5020400@nokia.com>
+Message-ID: <4C34347F.8030000@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On 07/06/2010 10:51 PM, Hunter Adrian (Nokia-MS/Helsinki) wrote:
+> Nicolas Pitre wrote:
+>> On Tue, 6 Jul 2010, Roger Quadros wrote:
+>>
+>>> On 07/06/2010 03:53 PM, ext Ohad Ben-Cohen wrote:
+>>>> Hi Roger,
+>>>>
+>>>> On Tue, Jul 6, 2010 at 1:35 PM, Roger Quadros<roger.quadros@nokia.com>
+>>>> wrote:
+>>>>> My point is that shouldn't this be handled by SDIO core?
+>>>> Care to explain what you mean / give a code example ?
+>>> If the Power enable GPIO can be treated as SDIO slot supply (i.e. vmmc), then
+>>> the SDIO/MMC core should tackle it, just like it deals with supply for slots
+>>> with removable cards.
+>>
+>> Exact.
+>>
+>>>> You need card detect events in order to trigger card&   sdio function
+>>>> initialization and removals.
+>>
+>> Why would you trigger function initialization and removal?  Just to turn
+>> off power?  That's a bit like pulling off the battery from your laptop
+>> when you want to suspend it.  There is a better way to go about things.
+>>
+>>>> Please share any alternative approach you may be thinking on.
+>>> OK, this is how I see it.
+>>>
+>>> - Treat the non-removable card as non-removable. So no need to do card detect
+>>> emulation.
+>>>
+>>> - Treat the GPIO power enable on wl1271 as VMMC supply. Use fixed regulator
+>>> framework to define this regulator&  supply. Even though you mention that it
+>>> is not actually a supply, it fits well in the fixed supply framework.
+>>>
+>>> - When the host controller is enumerated, the mmc core will power up the slot,
+>>> find the sdio card, and probe the function driver (i.e. wl1271_sdio).
+>>>
+>>> - if interface is not in use, the function driver must release the sdio host,
+>>> and this should eventually disable the vmmc supply.
+>>>
+>>> - Whenever the wlan interface must be brought up, wl1271_sdio, can claim the
+>>> sdio host. this will cause the vmmc supply to be enabled, for as long as the
+>>> interface is up.
+>>>
+>>> Does this address all issues?
+>>
+>> This is mostly all good, except that claiming/releasing the SDIO host is
+>> about access to the bus.  It must be claimed right before doing any IO,
+>> and released right after that, even when the card is expected to remain
+>> powered.  This is not the proper place to hook power control.
+>>
+>> Another function pair would be needed instead, which would do almost
+>> like the suspend/resume code is already doing.  Something like:
+>>
+>> /*
+>>   * Indicate to the core SDIO layer that we're not requiring that the
+>>   * function remain powered.  If all functions for the card are in the
+>>   * same "no power" state, then the host controller can remove power from
+>>   * the card.  Note: the function driver must preserve hardware states if
+>>   * necessary.
+>>   */
+>> int sdio_release_power(struct sdio_func *func);
+>>
+>> /*
+>>   * Indicate to the core SDIO layer that we want power back for this
+>>   * SDIO function.  The power may or may not actually have been removed
+>>   * since last call to sdio_release_power(), so the function driver must
+>>   * not assume any preserved state at the hardware level and re-perform
+>>   * all the necessary hardware config.  This function returns 0 when
+>>   * power is actually restored, or some error code if this cannot be
+>>   * achieved.  One error reason might be that the card is no longer
+>>   * available on the bus (was removed while powered down and card
+>>   * detection didn't trigger yet).
+>>   */
+>> int sdio_claim_power(struct sdio_func *func);
+>>
+>> That's it.  When the network interface is down and the hardware is not
+>> needed, you call sdio_release_power().  When the request to activate the
+>> network interface is received, you call sdio_claim_power() and configure
+>> the hardware appropriately.  If sdio_claim_power() returns an error,
+>> then you just return an error to the network request, and eventually the
+>> driver's remove method will be called if this is indeed because the card
+>> was removed.
+>>
+>> In the core SDIO code, this is almost identical to a suspend/resume
+>> request, except that the request comes from the function driver instead
+>> of the core MMC code.
+>
+> For eMMC in omap_hsmmc, this is all done via claim_host / release_host
+> which call ->enable() / ->disable() methods.  omap_hsmmc makes use of
+> mmc_power_restore_host() which calls host->bus_ops->power_restore()
+> which is not implemented for SDIO, but for MMC and SD it reinitializes
+> the card.
 
-On Tue, Jul 06, 2010 at 09:33:14AM +0200, Sascha Hauer wrote:
-> On Tue, Jul 06, 2010 at 09:35:11AM +0300, Baruch Siach wrote:
-> > On Mon, Jul 05, 2010 at 10:21:23AM +0200, Sascha Hauer wrote:
-> > > On Sun, Jul 04, 2010 at 11:47:29AM +0300, Baruch Siach wrote:
-> > > > This fixes time accounting on mx25 base systems.
-> > > > 
-> > > > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > > > ---
-> > > >  arch/arm/plat-mxc/time.c |    3 ++-
-> > > >  1 files changed, 2 insertions(+), 1 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
-> > > > index f9a1b05..0d7e0f9 100644
-> > > > --- a/arch/arm/plat-mxc/time.c
-> > > > +++ b/arch/arm/plat-mxc/time.c
-> > > > @@ -56,6 +56,7 @@
-> > > >  /* MX31, MX35, MX25, MXC91231, MX5 */
-> > > >  #define V2_TCTL_WAITEN		(1 << 3) /* Wait enable mode */
-> > > >  #define V2_TCTL_CLK_IPG		(1 << 6)
-> > > > +#define V2_TCTL_CLK_PER		(2 << 6)
-> > > >  #define V2_TCTL_FRR		(1 << 9)
-> > > >  #define V2_IR			0x0c
-> > > >  #define V2_TSTAT		0x08
-> > > > @@ -308,7 +309,7 @@ void __init mxc_timer_init(struct clk *timer_clk, void __iomem *base, int irq)
-> > > >  	__raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
-> > > >  
-> > > >  	if (timer_is_v2())
-> > > > -		tctl_val = V2_TCTL_CLK_IPG | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
-> > > > +		tctl_val = V2_TCTL_CLK_PER | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
-> > > >  	else
-> > > >  		tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
-> > > > 
-> > > 
-> > > I wonder why I applied
-> > > 
-> > > commit faed40665d2d81b7e0e537d14ef680ab3da9f22d
-> > > Author: Baruch Siach <baruch@tkos.co.il>
-> > > Date:   Mon Jan 25 12:58:21 2010 +0200
-> > > 
-> > >     mx25: fix time accounting
-> > >     
-> > >     The gpt_clk rate function doesn't consider the PER divider. This causes a
-> > >     significant drift in time accounting. Fix this by introducing the correct rate
-> > >     calculation function.
-> > >     
-> > >     Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > >     Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > > 
-> > > diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
-> > > index 08aaa38..c003ac4 100644
-> > > --- a/arch/arm/mach-mx25/clock.c
-> > > +++ b/arch/arm/mach-mx25/clock.c
-> > > @@ -119,6 +119,11 @@ static unsigned long get_rate_nfc(struct clk *clk)
-> > >  	return get_rate_per(8);
-> > >  }
-> > >  
-> > > +static unsigned long get_rate_gpt(struct clk *clk)
-> > > +{
-> > > +	return get_rate_per(5);
-> > > +}
-> > > +
-> > >  static unsigned long get_rate_otg(struct clk *clk)
-> > >  {
-> > >  	return 48000000; /* FIXME */
-> > > @@ -156,7 +161,7 @@ static void clk_cgcr_disable(struct clk *clk)
-> > >  		.secondary	= s,			\
-> > >  	}
-> > >  
-> > > -DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_ipg, NULL, NULL);
-> > > +DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_gpt, NULL, NULL);
-> > >  DEFINE_CLOCK(uart_per_clk, 0, CCM_CGCR0, 15, get_rate_uart, NULL, NULL);
-> > >  DEFINE_CLOCK(cspi1_clk,  0, CCM_CGCR1,  5, get_rate_ipg, NULL, NULL);
-> > >  DEFINE_CLOCK(cspi2_clk,  0, CCM_CGCR1,  6, get_rate_ipg, NULL, NULL);
-> > > 
-> > > This changed the gpt clock from ipg to the peripheral clock and I
-> > > explained why this is wrong. Now of course we now must use the
-> > > peripheral clock in the timer code.
-> > > 
-> > > Does it work when you revert faed40665d2d81b7e0e537d14ef680ab3da9f22d?
-> > 
-> > Reverting faed406 works on our target board, but breaks the i.MX25 PDK.
-> > 
-> > > In any case, we can't apply your patch because it would break other v2
-> > > based architectures like i.MX35.
-> > 
-> > What do you suggest then?
-> 
-> Tell the timer code which clock to use with an argument to
-> mxc_timer_init() and add the missing clocks to the clock.c file. You
-> also have to pass this argument through from the board to
-> mx25_clocks_init(). That's a lot of work and in the end we still do not
-> know why some i.MX25 variants need the peripheral clock and others need
-> the ipg clock. So what I really suggest is that you invest some
-> research to find the source of this strangeness.
+Shouldn't the power control intelligence (i.e. when to turn power ON/OFF) lie 
+with the bus drivers?
 
-OK. I think I've nailed it down. The CCM MCR register was initialized 
-differently.  
+>
+> Set omap2_hsmmc_info mmc[x] {.nonremovable=true, .power_saving=true} and
+> implement host->bus_ops->power_restore() for SDIO, then the power will
+> go off 9 seconds after sdio_release_host() is called.  Then tweak omap_hsmmc
+> so that it doesn't wait 9 seconds for the SDIO case
+>
+is the wl1271 supposed to be used only with omap_hsmmc? We need to have a 
+solution that works neatly irrespective of which host controller is being used.
 
-On the PDK I use the factory installed RedBoot bootloader. RedBoot leaves the 
-PER CLK MUX field at its default state, that is, MCR[15:0] = 0.
-
-On our target board I use a port of Barebox based on the built-in PDK support.  
-The board_init_lowlevel routine of the PDK platform code includes the 
-following line:
-
-    writel(0x0000FEFF, IMX_CCM_BASE + MX25_CCM_MCR)
-
-This makes MCR[15:0] = 0xfeff. Commenting out this line makes both boards 
-behave the same way. The timer clock runs correctly with or without setting 
-the V2_TCTL_CLK_PER bit.  Reverting faed406, however, breaks both boards.
-
-So, I thing we should keep faed406. You may also consider applying this patch 
-setting V2_TCTL_CLK_PER, For the reason Rob Herring has stated.
-
-baruch
-
-> Some things that could help you are:
-> 
-> - the clko pin
-> - Do both boards have identical i.MX25 tapeout versions?
-> - Are the clocks initialized identically?
-> 
-> I bricked my i.MX25 PDK so unfortunately I do not have any hardware to
-> do some tests myself.
-
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+regards,
+-roger
