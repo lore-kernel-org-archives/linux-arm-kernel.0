@@ -1,39 +1,74 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Wed, 7 Jul 2010 21:54:06 +0400
-Subject: [PATCH RFC 0/4] ARM/KGDB: Some fixes for SMP machines
-In-Reply-To: <20100707171222.GA16448@oksana.dev.rtsoft.ru>
-References: <20100707171222.GA16448@oksana.dev.rtsoft.ru>
-Message-ID: <20100707175406.GA28424@oksana.dev.rtsoft.ru>
+From: adrian.hunter@nokia.com (Adrian Hunter)
+Date: Wed, 07 Jul 2010 22:59:14 +0300
+Subject: [PATCH 11/15] wireless: wl1271: introduce platform device support
+In-Reply-To: <alpine.LFD.2.00.1007070954010.6020@xanadu.home>
+References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
+	<1278376666-3509-12-git-send-email-ohad@wizery.com>
+	<4C32EF19.1000604@nokia.com>
+	<AANLkTintIz-N7MwwtqhVq2LR3Ln5JTNYSbJUBSSClcA-@mail.gmail.com>
+	<4C3306F4.8060907@nokia.com>
+	<AANLkTin5W52fPzWToRrAzm56SLZI-taSuI16rCEhLWqH@mail.gmail.com>
+	<4C333E0D.2070601@nokia.com>
+	<alpine.LFD.2.00.1007061316010.6020@xanadu.home>
+	<4C338927.5020400@nokia.com> <4C34347F.8030000@nokia.com>
+	<alpine.LFD.2.00.1007070954010.6020@xanadu.home>
+Message-ID: <4C34DC92.80908@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 07, 2010 at 09:12:22PM +0400, Anton Vorontsov wrote:
-[...] 
-> 2. The patches are against a heavily patched kernel, and so far
->    I didn't rebase them onto the 'debug core' rework as found
->    in the very latest mainline kernels. I'll rebase the patches
->    soon, so for now this is just an RFC.
+Nicolas Pitre wrote:
+> On Wed, 7 Jul 2010, Roger Quadros wrote:
+> 
+>> On 07/06/2010 10:51 PM, Hunter Adrian (Nokia-MS/Helsinki) wrote:
+>>> For eMMC in omap_hsmmc, this is all done via claim_host / release_host
+>>> which call ->enable() / ->disable() methods.  omap_hsmmc makes use of
+>>> mmc_power_restore_host() which calls host->bus_ops->power_restore()
+>>> which is not implemented for SDIO, but for MMC and SD it reinitializes
+>>> the card.
+> 
+> This is IMHO a really bad design.  The power control decision has to 
+> come from the top, not from the bottom.  And certainly not with a 
+> U-turn dependency the omap_hsmmc is using.
 
-BTW, I'm testing with another small fixup applied, I didn't send
-it as a patch because this deadlock was already fixed in the
-debug_core implementation (which KGDB is using nowadays). But
-for the completeness, here it is:
+The power control decision does come from the top via mmc_claim_host /
+mmc_release_host.
 
-(Don't deadlock if there's a wannabe-master CPUs, which entered
-KGDB via exception, not NMI/IPI).
+> 
+> I regret to say this, but the omap_hsmmc driver is becoming a total 
+> mess.  The host controller driver has to be a dumb interface serving 
+> requests from the hardware used by the upper layer stack, not the place 
+> where decisions such as power handling should be made.  Think of it like 
+> an ethernet driver.  No ethernet driver in Linux is telling the IP stack 
+> when to shut down.
 
-diff --git a/kernel/kgdb.c b/kernel/kgdb.c
-index e7a2274..65bf75d 100644
---- a/kernel/kgdb.c
-+++ b/kernel/kgdb.c
-@@ -1522,7 +1522,9 @@ return_normal:
- 		 * from the debugger.
- 		 */
- 		for_each_online_cpu(i) {
--			while (atomic_read(&cpu_in_kgdb[i]))
-+			while (atomic_read(&cpu_in_kgdb[i]) &&
-+					!(kgdb_info[i].exception_state &
-+						DCPU_WANT_MASTER))
- 				cpu_relax();
- 		}
- 	}
+The omap_hsmmc driver does not tell the core to shut down the upper layers.
+Instead the core tells the omap_hsmmc driver that it is "disabled" i.e.
+not currently being used so it can start taking steps to save power.
+That is sensible because not even the upper layers know when the next
+activity will be.
+
+> 
+>> Shouldn't the power control intelligence (i.e. when to turn power ON/OFF) lie
+>> with the bus drivers?
+> 
+> Absolutely!  And in the SDIO case that should lie with each function 
+> drivers.  Please let's stop this omap_hsmmc madness.
+
+You are dealing with a trivial case - turn off the power when not in use.
+We have 3 power saving actions: enable DPS, put the card to sleep,
+and finally power it off.  Each increases the latency to start up
+again and so must be staggered.  With DPS-enabled the host controller can
+be powered off at any time.  In that case the controller registers must be
+restored.  There are numerous entry points to the driver.  Checking whether
+to restore registers at every entry point is error prone and messy.
+Instead we require that the core tells the driver when to enable and
+disable.
+
+> 
+> 
+> Nicolas
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
