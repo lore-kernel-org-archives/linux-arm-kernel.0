@@ -1,71 +1,59 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Wed, 7 Jul 2010 11:56:01 +0300
-Subject: [patch 071/149] ARM: 6166/1: Proper prefetch abort handling on
-	pre-ARMv6
-In-Reply-To: <20100706225815.GA21834@flint.arm.linux.org.uk>
-References: <20100701175144.GA2116@kroah.com>
-	<20100701173212.785441106@clark.site>
-	<20100701221420.GA10481@shutemov.name>
-	<20100701221728.GA12187@suse.de>
-	<20100701222541.GB10481@shutemov.name>
-	<20100701224837.GA27389@flint.arm.linux.org.uk>
-	<20100701225911.GC10481@shutemov.name>
-	<20100701231207.GB27389@flint.arm.linux.org.uk>
-	<20100706130618.GA14177@shutemov.name>
-	<20100706225815.GA21834@flint.arm.linux.org.uk>
-Message-ID: <20100707085601.GA18732@shutemov.name>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Wed, 07 Jul 2010 12:15:26 +0300
+Subject: pxa u2dc driver
+In-Reply-To: <AANLkTilhY0hJ96TW5t2syRkdK8aQqINTuoNfaIcPVPMH@mail.gmail.com>
+References: <1278428859.3657.387.camel@balakrishnan-desktop>
+	<AANLkTilhY0hJ96TW5t2syRkdK8aQqINTuoNfaIcPVPMH@mail.gmail.com>
+Message-ID: <4C3445AE.3060106@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 06, 2010 at 11:58:15PM +0100, Russell King wrote:
-> On Tue, Jul 06, 2010 at 04:06:18PM +0300, Kirill A. Shutemov wrote:
-> > I've investigated the issue. It's reproducible if you try to jump to
-> > the megabyte next to section mapping.
-> 
-> Okay, this is specific to the way that OMAP sets up its mappings, which
-> is why it doesn't appear everywhere.
-> 
-> > On ARM one Linux PGD entry contains two hardware entry. But there is error
-> > in do_translation_fault(). It's always call pmd_none() check for the first
-> > entry of two, not for the entry corresponded to address. So in case if we
-> > try to jump the megabyte next to section mapping, we will have inifinity
-> > loop of translation faults.
-> 
-> Okay, now that we know _why_ it happens, I'm satisfied that the fix
-> previously committed will help this situation.
-> 
-> > diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-> > index 9634fe1..825b9da 100644
-> > --- a/arch/arm/mm/fault.c
-> > +++ b/arch/arm/mm/fault.c
-> > @@ -406,7 +406,8 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
-> >         pmd_k = pmd_offset(pgd_k, addr);
-> >         pmd   = pmd_offset(pgd, addr);
-> >  
-> > -       if (pmd_none(*pmd_k))
-> > +       index = (addr >> SECTION_SHIFT) & 1;
-> > +       if (pmd_none(pmd_k[index]))
-> 
-> I do think this is extremely obscure, and therefore requires a comment
-> to help people understand what is going on here and why.  Leaving it
-> in the commit log would be an invitation for this to be needlessly
-> cut'n'pasted.
+On 07/06/10 19:24, Eric Miao wrote:
+> On Tue, Jul 6, 2010 at 11:07 PM, balakrishnan
+> <balakrishnan@e-consystems.com> wrote:
+>   
+>> Hi,
+>>   I am working on pxa300 based development board and using Linux
+>> 2.6.34. In this usb 1.1 device controller driver support "pxa27x_udc" is
+>> available but usb 2.0 device controller driver is not available. Any
+>> patches is there for 2.6.34? or anybody tried for pxa3xx u2dc gadget?
+>>
+>>     
+> The only available version at the moment is the one provided within Marvell's
+> BSP. There is currently no support in mainline yet. Igor and Mike have been
+> working on this for quite a time I think. There is not only the U2D controller
+> itself, but also the ULPI interface support, and to complicate things
+> a bit more,
+> there is also a backward compatibility consideration for U2D + 1.1 Host to
+> form a strange OTG solution.
+>   
 
-Ok, I'll fix it.
+Just to clear things out.
+We are working only on the host side functionality of the U2D and ULPI
+drivers,
+though keeping in mind future work (ours or anybody else) on the device
+side functionality.
 
-But it seems that the problem is more global. Potentially, any of
-pmd_none() check may produce false results. I don't see an easy way to fix
-it.
 
-It's not so big problem since we don't have [super]section in userspace,
-but I guess, we want to have huge pages support in the future.
+> I didn't look into that for a long time, but if you are interested in working on
+> it, please let us know (Cc'ed Igor and Mike).
+>   
 
-Any ideas how to fix it in the right way?
+Will be appreciated. Thanks.
 
-Does Linux VM still expect one PTE table per page?
-
-CC list modified. Removed persons who unlikely interested in ARM-specific
-stuff. linux-arm-kernel and linux-mm added.
+>   
+>> With Regards
+>> J.Balakrishnan
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>>     
+>   
 
 -- 
- Kirill A. Shutemov
+Regards,
+Igor.
