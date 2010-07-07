@@ -1,41 +1,71 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 07 Jul 2010 09:32:24 -0400 (EDT)
-Subject: [PATCH RFC] Introduce one machine_desc instance and
-	get_machine_desc()
-In-Reply-To: <AANLkTinWPkI2zVCVw_yx87WVuAGZuWpBUuvGbxx_luIr@mail.gmail.com>
-References: <AANLkTinWPkI2zVCVw_yx87WVuAGZuWpBUuvGbxx_luIr@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1007070918320.6020@xanadu.home>
+Date: Wed, 07 Jul 2010 09:52:15 -0400 (EDT)
+Subject: [PATCH 11/15] wireless: wl1271: introduce platform device support
+In-Reply-To: <4C343135.1090101@nokia.com>
+References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
+	<1278376666-3509-12-git-send-email-ohad@wizery.com>
+	<4C32EF19.1000604@nokia.com>
+	<AANLkTintIz-N7MwwtqhVq2LR3Ln5JTNYSbJUBSSClcA-@mail.gmail.com>
+	<4C3306F4.8060907@nokia.com>
+	<AANLkTin5W52fPzWToRrAzm56SLZI-taSuI16rCEhLWqH@mail.gmail.com>
+	<4C333E0D.2070601@nokia.com>
+	<alpine.LFD.2.00.1007061316010.6020@xanadu.home>
+	<4C343135.1090101@nokia.com>
+Message-ID: <alpine.LFD.2.00.1007070937040.6020@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 Jul 2010, Eric Miao wrote:
+On Wed, 7 Jul 2010, Roger Quadros wrote:
 
-> commit 5d5d90e5d41bb0842559dd2b00f00f2a0f532a3a
-> Author: Eric Miao <eric.miao@canonical.com>
-> Date:   Wed Jul 7 16:47:20 2010 +0800
+> On 07/06/2010 08:42 PM, ext Nicolas Pitre wrote:
+> > On Tue, 6 Jul 2010, Roger Quadros wrote:
+> > 
+> > > OK, this is how I see it.
+> > > 
+> > > - Treat the non-removable card as non-removable. So no need to do card
+> > > detect
+> > > emulation.
+> > > 
+> > > - Treat the GPIO power enable on wl1271 as VMMC supply. Use fixed
+> > > regulator
+> > > framework to define this regulator&  supply. Even though you mention that
+> > > it
+> > > is not actually a supply, it fits well in the fixed supply framework.
+> > > 
+> > > - When the host controller is enumerated, the mmc core will power up the
+> > > slot,
+> > > find the sdio card, and probe the function driver (i.e. wl1271_sdio).
+> > > 
+> > > - if interface is not in use, the function driver must release the sdio
+> > > host,
+> > > and this should eventually disable the vmmc supply.
+> > > 
+> > > - Whenever the wlan interface must be brought up, wl1271_sdio, can claim
+> > > the
+> > > sdio host. this will cause the vmmc supply to be enabled, for as long as
+> > > the
+> > > interface is up.
+> > > 
+> > > Does this address all issues?
+> > 
+> > This is mostly all good, except that claiming/releasing the SDIO host is
+> > about access to the bus.  It must be claimed right before doing any IO,
+> > and released right after that, even when the card is expected to remain
+> > powered.  This is not the proper place to hook power control.
 > 
->     [ARM] Introduce one machine_desc instance and get_machine_desc()
-> 
->     If some of the fields remains useful in 'struct machine_desc', it's
->     normally a bit convenient to keep one instance there for reference.
-> 
->     (along with more and more machine specific fields coming into this
->     structure, e.g. pcibios_min_{io,mem})
-> 
->     It also improves modularity a bit by not exporting variables like
->     system_timer, init_arch_irq etc.
-> 
->     However, the drawbacks are 1) a bit increased data and 2) increased
->     risk of accessing those fields which are marked as __init.
+> Agreed, but is it so that SDIO power may be removed between a host_release and
+> claim? This appears so from omap_hsmmc host controller.
 
-That makes me worried.  Access to __init data/functions after __init 
-stuff is freed is amongst the nastiest subtle bugs that are hard to 
-reproduce and therefore fix.  And copying such pointers is probably 
-defeating the simple compile time checks we currently have against that.
+No, it is not because a host is not claimed that power should be 
+dropped.  The host claim/release is meant to provide exclusive access to 
+the card that's all.
 
-Maybe those fields should be partitioned differently.  Having a new 
-structure to encapsulate all fields that should be kept after __init 
-stuff is gone might be a better way.
+If the OMAP controller is dropping power to the card upon 
+host->disable() then it is wrong.  AFAICS only the OMAP controller is 
+playing such games at the moment and I suspect the semantics might not 
+be all right.  Shutting down the _controller_ when it is idle might be a 
+good thing, but not power to the _card_.  Only the function driver might 
+know when it is fine to lose power.
 
 
 Nicolas
