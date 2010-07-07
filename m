@@ -1,50 +1,96 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 07 Jul 2010 09:20:57 +0900
-Subject: About cachetype on ARMv7
-In-Reply-To: <20100705141719.GA23556@n2100.arm.linux.org.uk>
-References: <004c01cb1c34$49773f60$dc65be20$%kim@samsung.com>
-	<20100705141719.GA23556@n2100.arm.linux.org.uk>
-Message-ID: <013501cb1d6a$47682ea0$d6388be0$%kim@samsung.com>
+Date: Wed, 07 Jul 2010 09:26:50 +0900
+Subject: [PATCH] ARM: S5P: Add PMU device
+In-Reply-To: <4C32D6A2.306@samsung.com>
+References: <1278294411-5104-1-git-send-email-jy0922.shim@samsung.com>
+	<005f01cb1c3f$c464d150$4d2e73f0$%kim@samsung.com>
+	<4C328D3A.7060701@samsung.com>
+	<00a201cb1cbd$594371a0$0bca54e0$%kim@samsung.com>
+	<4C32D6A2.306@samsung.com>
+Message-ID: <013601cb1d6b$19cb4850$4d61d8f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote:
+Joonyoung Shim wrote:
 > 
-> On Mon, Jul 05, 2010 at 08:21:56PM +0900, Kukjin Kim wrote:
-> > If every ARMv7 SoCs have VIPT non-aliasing d-cache and i-cache, then no
-> > problem. But actually, Samsung S5PV310(cortex-A9) has PIPT d-cache and
-VIPT
-> > non-aliasing i-cache. I think PIPT does not mean VIPT non-aliasing even
-> > though their functionality is similar.
+> On 7/6/2010 12:43 PM, Kukjin Kim wrote:
+> > Joonyoung Shim wrote:
+> >> On 7/5/2010 9:44 PM, Kukjin Kim wrote:
+> >>> Joonyoung Shim wrote:
+> >>>> This patch adds an initcall for the s5p platforms so that they register
+> >>>> their PMU IRQs with the PMU framework in the Kernel.
+> >>>>
+> >>> Please include Ben Dooks email address in the CC.
+> >> OK.
+> >>
+> >>>> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> >>>> ---
+> >>>>  arch/arm/mach-s5p6442/include/mach/irqs.h |    2 +-
+> >>>>  arch/arm/mach-s5pc100/include/mach/irqs.h |    1 +
+> >>>>  arch/arm/mach-s5pv210/include/mach/irqs.h |    1 +
+> >>>>  arch/arm/plat-s5p/Makefile                |    1 +
+> >>>>  arch/arm/plat-s5p/dev-pmu.c               |   37
+> >>>> +++++++++++++++++++++++++++++
+> >>>>  5 files changed, 41 insertions(+), 1 deletions(-)
+> >>>>  create mode 100644 arch/arm/plat-s5p/dev-pmu.c
+> >>>>
+> >>>> diff --git a/arch/arm/mach-s5p6442/include/mach/irqs.h b/arch/arm/mach-
+> >>>> s5p6442/include/mach/irqs.h
+> >>>> index 02c2374..22173cc 100644
+> >>>> --- a/arch/arm/mach-s5p6442/include/mach/irqs.h
+> >>>> +++ b/arch/arm/mach-s5p6442/include/mach/irqs.h
+> >>>> @@ -32,7 +32,7 @@
+> >>>>  #define IRQ_GPIOINT		S5P_IRQ_VIC0(30)
+> >>>>
+> >>>>  /* VIC1 */
+> >>>> -#define IRQ_nPMUIRQ 		S5P_IRQ_VIC1(0)
+> >>>> +#define IRQ_PMUIRQ		S5P_IRQ_VIC1(0)
+> >>> I'm not sure this changing is better..as you know, nXXX has some meaning.
+> >>>
+> >> Otherwise, we should redefine it and s5p6440 was defined to IRQ_PMUIRQ.
+> >>
+> > Hmm..so I said...I'm not sure... :-)
+> > OK...just IRQ_PMUIRQ looks good.
+> >
+> >>>>  #define IRQ_ONENAND 		S5P_IRQ_VIC1(7)
+> >>>>  #define IRQ_UART0 		S5P_IRQ_VIC1(10)
+> >>>>  #define IRQ_UART1 		S5P_IRQ_VIC1(11)
+> >>>> diff --git a/arch/arm/mach-s5pc100/include/mach/irqs.h b/arch/arm/mach-
+> >>>> s5pc100/include/mach/irqs.h
+> >>>> index 28aa551..9cc1b0d 100644
+> >>>> --- a/arch/arm/mach-s5pc100/include/mach/irqs.h
+> >>>> +++ b/arch/arm/mach-s5pc100/include/mach/irqs.h
+> >>>> @@ -110,5 +110,6 @@
+> >>>>  #define IRQ_LCD_FIFO		IRQ_LCD0
+> >>>>  #define IRQ_LCD_VSYNC		IRQ_LCD1
+> >>>>  #define IRQ_LCD_SYSTEM		IRQ_LCD2
+> >>>> +#define IRQ_PMUIRQ		IRQ_CORTEX0
+> >>>>
+> >>> I think, we don't need remapping in here.
+> >>> How about use direct mapping like following:
+> >>> #define IRQ_PMUIRQ	S5P_IRQ_VIC1(0)
+> >>>
+> >> I don't care, but above codes uses already remapping.
+> >>
+> > Yeah, used remapping..but written by IRQ_LCD[0-2] in datasheet.
+> > In the PMUIRQ case, written by CORTEX0(nPMUIRQ).
+> > ...
+> > Anyway, I mean just no need IRQ_CORTEX0.
+> >
+> > So suggested direct mapping like above.
+> > I think, we don't need to add an unused code.
+> >
 > 
-> There is no visible difference between a non-aliasing VIPT cache and a
-> PIPT cache.  Address bit allocation for a 32-byte cache line VIPT
-> non-aliasing cache with 4K page size:
-> 
-> [0:1] = byte offset into word
-> [4:2] = word offset
-> [N-1:5] = virtual index
-> [31:N] = physical tag
-> 
-> where N <= PAGE_SHIFT, otherwise it would be an aliasing VIPT cache.
-> 
-> For a PIPT non-aliasing cache:
-> 
-> [0:1] = byte offset into word
-> [4:2] = word offset
-> [M-1:5] = physical index
-> [31:M] = physical tag
-> 
-> where M doesn't matter as it can never alias with itself.
-> 
-> The requirements for N is such the CPU visible conditions which qualify a
-> cache as being VIPT non-aliasing also satisfy PIPT - and a non-aliasing
-> VIPT cache has the same properties as a PIPT cache.
+> I don't know what means 'n' character of nPMUIRQ. If you are fine, let
 
-Thanks for your reply :-)
+The 'n' means negative, so its meaning is low-level active.
 
-You mean PIPT is the same as VIPT non-aliasing.
-Hmm..there is no need to show exactly cachetype in the kernel boot message?
+> decide to use IRQ_PMUIRQ instead of IRQ_nPMUIRQ and IRQ_CORTEX0.
+> How about this?
+
+Yes..ok..I mean it's better directly using without remapping from IRQ_CORTEX0.
+
+Hmm...how about simply just IRQ_PMU?
 
 Thanks.
 
