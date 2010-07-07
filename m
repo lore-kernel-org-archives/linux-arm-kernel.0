@@ -1,81 +1,61 @@
-From: triad@df.lth.se (Linus Walleij)
-Date: Wed,  7 Jul 2010 14:05:39 +0200
-Subject: [PATCH] ARM: expose PB1176 ROM in debugfs
-Message-ID: <1278504339-26992-1-git-send-email-triad@df.lth.se>
+From: david.jander@protonic.nl (David Jander)
+Date: Wed, 7 Jul 2010 14:08:50 +0200
+Subject: i.MX51 kernel trees: Where to start?
+Message-ID: <201007071408.50621.david.jander@protonic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This exposes the PB1176 ROM as a simple 16KiB file in debugfs so
-that it can be copied out and disassembled with some
-objcopy+objdump massage for example. I used this to find out how
-the ROM handled the CharLCD.
 
-Signed-off-by: Linus Walleij <triad@df.lth.se>
----
- arch/arm/mach-realview/include/mach/board-pb1176.h |    1 +
- arch/arm/mach-realview/realview_pb1176.c           |   31 ++++++++++++++++++++
- 2 files changed, 32 insertions(+), 0 deletions(-)
+Hi all,
 
-diff --git a/arch/arm/mach-realview/include/mach/board-pb1176.h b/arch/arm/mach-realview/include/mach/board-pb1176.h
-index 2f5ccb2..9f627d4 100644
---- a/arch/arm/mach-realview/include/mach/board-pb1176.h
-+++ b/arch/arm/mach-realview/include/mach/board-pb1176.h
-@@ -69,6 +69,7 @@
- 
- #define REALVIEW_DC1176_GIC_CPU_BASE		0x10120000 /* GIC CPU interface, on devchip */
- #define REALVIEW_DC1176_GIC_DIST_BASE		0x10121000 /* GIC distributor, on devchip */
-+#define REALVIEW_DC1176_ROM_BASE		0x10200000 /* 16KiB NRAM preudo-ROM, on devchip */
- #define REALVIEW_PB1176_GIC_CPU_BASE		0x10040000 /* GIC CPU interface, on FPGA */
- #define REALVIEW_PB1176_GIC_DIST_BASE		0x10041000 /* GIC distributor, on FPGA */
- #define REALVIEW_PB1176_L220_BASE		0x10110000 /* L220 registers */
-diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
-index 099a1f1..cfdfd75 100644
---- a/arch/arm/mach-realview/realview_pb1176.c
-+++ b/arch/arm/mach-realview/realview_pb1176.c
-@@ -26,6 +26,7 @@
- #include <linux/amba/pl061.h>
- #include <linux/amba/mmci.h>
- #include <linux/io.h>
-+#include <linux/debugfs.h>
- 
- #include <mach/hardware.h>
- #include <asm/irq.h>
-@@ -323,6 +324,36 @@ static void realview_pb1176_fixup(struct machine_desc *mdesc,
- 	meminfo->nr_banks = 1;
- }
- 
-+#ifdef CONFIG_DEBUG_FS
-+/*
-+ * This exposes the PB1176 DevChip ROM as a simple file in debugfs
-+ * The reference manual states that this is actually a pseudo-ROM
-+ * programmed in NVRAM.
-+ */
-+static struct debugfs_blob_wrapper devchip_rom_blob;
-+
-+static int __init pb1176_export_rom(void)
-+{
-+	void __iomem *virtbase;
-+	struct dentry *d;
-+
-+	virtbase = ioremap(REALVIEW_DC1176_ROM_BASE, SZ_16K);
-+	if (!virtbase)
-+		return -EIO;
-+	devchip_rom_blob.data = virtbase;
-+	devchip_rom_blob.size = SZ_16K;
-+	d = debugfs_create_blob("pb1176-DevChip-ROM",
-+				S_IFREG | S_IRUSR,
-+				NULL, &devchip_rom_blob);
-+	if (!d)
-+		return -EIO;
-+
-+	return 0;
-+}
-+
-+device_initcall(pb1176_export_rom);
-+#endif
-+
- static void __init realview_pb1176_init(void)
- {
- 	int i;
+I just subscribed to this list, in the hope that I have picked the right place 
+to ask questions about linux kernel development for the Freescale i.MX51 SoC. 
+If there are better/other places to be for that, I'd be very happy to know.
+
+We are busy designing a new board based on the i.MX51 SoC, that will be 
+running linux. This is the first ARM-linux development we are doing, after a 
+few powerpc-linux developments.
+
+To aid in design decision-making, we decided to purchase a MX51EVK board and 
+investigate the state of linux/bsp/drivers for that platform, so here I am 
+with quite a lot of newbie questions and the hope to get some of them answered 
+here:
+
+Please forgive me if I am asking something that has been discussed before. I 
+have looked at the archives of this list, but did not find good answers.
+
+1.- What's the most recommended (git-) tree to start from doing BSP 
+development?
+Right now, I am playing with sources downloaded from freescale directly, and 
+AFAICS this is quite similar to the "tracking-fsl-imx_2.6.31" branch from denx 
+git:
+
+http://git.denx.de/?p=linux-2.6-denx.git;a=shortlog;h=refs/heads/tracking-fsl-
+imx_2.6.31
+
+Is this indeed the best place to start? What other trees are there, and how 
+can I get an impression of the state of each one? How far are effords for 
+mainline inclusion of the freescale patches?
+
+2.- Using this kernel, I notice the touchscreen driver, (mxc_ts.c) not working 
+correctly. It looks like it works for a few seconds after boot, and then 
+starts delaying samples very much, to the point that it is unusable. Is this a 
+known problem? Is there someone working on this? Should I use another driver?
+
+Also, at least libts does not recognize touches as clicks, but merely updates 
+the touch coordinates. I have yet to check which kinds of events are generated 
+exactly, but it doesn't seem to be correct.
+
+
+3.- What about the android patches? Is there someone actively working on 
+Android on the i.MX51? What's the state of the Android patches from Freescale? 
+Are they useable/combineable with current "normal" kernel trees?
+We don't have plans currently on using Android, but it seems at least feasible 
+that one of our clients might start asking for it....
+
+
+Best regards,
+
 -- 
-1.7.1
+David Jander
+Protonic Holland.
