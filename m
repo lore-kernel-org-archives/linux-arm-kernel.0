@@ -1,71 +1,71 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 7 Jul 2010 16:45:21 +0200
-Subject: [PATCH 0/5] Makefile.boot cleanup
-In-Reply-To: <20100705141344.GA25407@pengutronix.de>
-References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
-	<20100705141344.GA25407@pengutronix.de>
-Message-ID: <20100707144521.GB10470@pengutronix.de>
+From: madhu.cr@ti.com (Madhusudhan)
+Date: Wed, 7 Jul 2010 09:54:08 -0500
+Subject: [PATCH 11/15] wireless: wl1271: introduce platform device support
+In-Reply-To: <alpine.LFD.2.00.1007070954010.6020@xanadu.home>
+References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
+	<1278376666-3509-12-git-send-email-ohad@wizery.com>
+	<4C32EF19.1000604@nokia.com>
+	<AANLkTintIz-N7MwwtqhVq2LR3Ln5JTNYSbJUBSSClcA-@mail.gmail.com>
+	<4C3306F4.8060907@nokia.com>
+	<AANLkTin5W52fPzWToRrAzm56SLZI-taSuI16rCEhLWqH@mail.gmail.com>
+	<4C333E0D.2070601@nokia.com>
+	<alpine.LFD.2.00.1007061316010.6020@xanadu.home>
+	<4C338927.5020400@nokia.com> <4C34347F.8030000@nokia.com>
+	<alpine.LFD.2.00.1007070954010.6020@xanadu.home>
+Message-ID: <E6AFC02D8D114C129C8140932818E578@am.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
 
-On Mon, Jul 05, 2010 at 04:13:44PM +0200, Uwe Kleine-K?nig wrote:
-> this series is a merge between Eric's and my patches that we did to
-> clean up the early boot code.  It doesn't contain runtime physoffset
-> support for now, but I plan to pick that up later.
 
-I added Nicolas' Acks to my tree and dropped the one patch he objected.
-
-Are you willing to pull these now?
-
-Best regards
-Uwe
-
-> The following changes since commit 7e27d6e778cd87b6f2415515d7127eba53fe5d02:
+> -----Original Message-----
+> From: Nicolas Pitre [mailto:nico at fluxnic.net]
+> Sent: Wednesday, July 07, 2010 9:03 AM
+> To: Roger Quadros
+> Cc: Hunter Adrian (Nokia-MS/Helsinki); Ohad Ben-Cohen; linux-
+> wireless at vger.kernel.org; linux-mmc at vger.kernel.org; linux-
+> omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> linux at arm.linux.org.uk; Chikkature Rajashekar Madhusudhan; Coelho Luciano
+> (Nokia-MS/Helsinki); akpm at linux-foundation.org; San Mehat
+> Subject: Re: [PATCH 11/15] wireless: wl1271: introduce platform device
+> support
 > 
->   Linux 2.6.35-rc3 (2010-06-11 19:14:04 -0700)
+> On Wed, 7 Jul 2010, Roger Quadros wrote:
 > 
-> are available in the git repository at:
->   git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
+> > On 07/06/2010 10:51 PM, Hunter Adrian (Nokia-MS/Helsinki) wrote:
+> > > For eMMC in omap_hsmmc, this is all done via claim_host / release_host
+> > > which call ->enable() / ->disable() methods.  omap_hsmmc makes use of
+> > > mmc_power_restore_host() which calls host->bus_ops->power_restore()
+> > > which is not implemented for SDIO, but for MMC and SD it reinitializes
+> > > the card.
 > 
-> Eric Miao (2):
->       ARM: Remove unused PARAMS_PHYS from arch/arm/boot/compressed
->       Auto calculate ZRELADDR and provide option for exceptions
+> This is IMHO a really bad design.  The power control decision has to
+> come from the top, not from the bottom.  And certainly not with a
+> U-turn dependency the omap_hsmmc is using.
 > 
-> Uwe Kleine-K?nig (9):
->       ARM: zImage: don't hard code the stack size twice
->       ARM: zImage: some comments for __armv3_mpu_cache_on
->       ARM: zImage: __armv3_mpu_cache_flush: respect should-be-zero specification
->       ARM: zImage: fix comments for cache_on, cache_off and cache_clean_flush
->       ARM: zImage: annotate debug functions about corrupted registers
->       ARM: remove bit-rotten STANDALONE_DEBUG for decompressor
->       ARM: zImage: don't define unused symbol initrd_phys
->       ARM: deprecate support for old way to pass kernel parameters
->       ARM: uImage: require passing a LOADADDR when building with RUNTIME_PHYSOFFSET
-> 
->  arch/arm/Kconfig                        |  105 +++++++++++++++++++++++++++++++
->  arch/arm/boot/Makefile                  |   14 +++--
->  arch/arm/boot/compressed/Makefile       |   11 +---
->  arch/arm/boot/compressed/Makefile.debug |   23 -------
->  arch/arm/boot/compressed/head.S         |   40 +++++++++---
->  arch/arm/boot/compressed/misc.c         |   20 ------
->  arch/arm/kernel/Makefile                |    4 +-
->  arch/arm/kernel/compat.c                |    7 --
->  arch/arm/kernel/compat.h                |    2 -
->  arch/arm/kernel/setup.c                 |   11 +++
->  10 files changed, 157 insertions(+), 80 deletions(-)
->  delete mode 100644 arch/arm/boot/compressed/Makefile.debug
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I regret to say this, but the omap_hsmmc driver is becoming a total
+> mess.  The host controller driver has to be a dumb interface serving
+> requests from the hardware used by the upper layer stack, not the place
+> where decisions such as power handling should be made.  Think of it like
+> an ethernet driver.  No ethernet driver in Linux is telling the IP stack
+> when to shut down.
 > 
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+The point is that MMC/SD core files were patched to provide this kind of a
+support. Any controller driver can use that framework today, right?. As an
+example omap_hsmmc driver was patched and it works fine.
+
+Why blame the controller driver for using a support provided by core files?
+
+Regards,
+Madhu
+
+> > Shouldn't the power control intelligence (i.e. when to turn power
+> ON/OFF) lie
+> > with the bus drivers?
+> 
+> Absolutely!  And in the SDIO case that should lie with each function
+> drivers.  Please let's stop this omap_hsmmc madness.
+> 
+> 
+> Nicolas
