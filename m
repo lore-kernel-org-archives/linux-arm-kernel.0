@@ -1,60 +1,57 @@
 From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Wed, 07 Jul 2010 10:28:57 +0900
-Subject: [PATCH v6 3/3] input: samsung-keypad - Add samsung keypad driver
-In-Reply-To: <013401cb1d66$5fbf3fb0$1f3dbf10$%kim@samsung.com>
-References: <1277724824-13308-1-git-send-email-jy0922.shim@samsung.com>
-	<1277724824-13308-3-git-send-email-jy0922.shim@samsung.com>
-	<4C32E21A.8080100@samsung.com>
-	<013401cb1d66$5fbf3fb0$1f3dbf10$%kim@samsung.com>
-Message-ID: <4C33D859.9050708@samsung.com>
+Date: Wed, 07 Jul 2010 11:15:59 +0900
+Subject: [PATCH] ARM: S5PV210: Fix on SECTION_SIZE_BITS on	S5PV210/S5PC110.
+In-Reply-To: <013001cb1d62$de72ff30$9b58fd90$%kim@samsung.com>
+References: <1278391007-11144-1-git-send-email-kgene.kim@samsung.com>
+	<20100706071245.GA5058@n2100.arm.linux.org.uk>
+	<013001cb1d62$de72ff30$9b58fd90$%kim@samsung.com>
+Message-ID: <4C33E35F.8060409@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/7/2010 8:52 AM, Kukjin Kim wrote:
-> Joonyoung Shim wrote:
->> Hi, Naveen.
->>
->> On 6/28/2010 8:33 PM, Joonyoung Shim wrote:
->>> This patch adds support for keypad driver running on Samsung cpus. This
->>> driver is tested on GONI and Aquila board using S5PC110 cpu.
->>>
->>> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
->>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->>> ---
->>>  drivers/input/keyboard/Kconfig          |    9 +
->>>  drivers/input/keyboard/Makefile         |    1 +
->>>  drivers/input/keyboard/samsung-keypad.c |  491
->> +++++++++++++++++++++++++++++++
->>>  3 files changed, 501 insertions(+), 0 deletions(-)
->>>  create mode 100644 drivers/input/keyboard/samsung-keypad.c
->>>
->> Could you please test this v6 keypad driver on your various targets?
+On 7/7/2010 8:27 AM, Kukjin Kim wrote:
+> Russell King wrote:
+> Hi Russell :-)
 > 
-> Hi,
+>> On Tue, Jul 06, 2010 at 01:36:47PM +0900, Kukjin Kim wrote:
+>>> This patch fixes on SECTION_SIZE_BITS for Sparsemem on S5PV210/S5PC110.
+>>> Because smallest size of a bank on S5PV210/S5PC110 is aligned by 16MB.
+>>> So each section's maximum size should be 16MB.
+>> What is the spacing of chunks of memory, and minimum alignment of those
+>> chunks in physical address space?
 > 
-> I received the test result from Naveen.
-> And now he is debugging about that.
+> Some S5PC110(MCP D-type) has only available 80MiB in a bank.
+> So the space accounts for 432MiB in a DMC0, but larger memory(256MiB +
+> 128MiB) exists in a DMC1.
 > 
-> ..his e-mail client has some problem..so I replied...
+> As you know, the size of a section should be a power of 2 and a physical
+> address space of a section should be contiguous.
+> If a section size is greater than 16MiB, a section have a hole. So the
+> SECTION_SIZE_BITS should be 16MiB.
 > 
-> ---
-> From: Naveen Ch
+>> Also, what is the maximum physical address which memory can be located?
 > 
-> I've tested with v6 patches and they are working fine on SMDK6410, SMDKC100 and SMDKV210, except for some header inclusion (linux/sched.h) in samsung-keypad.c.
+> Following is memory map of S5PV210/S5PC110.
 > 
-> The build breaking error is like following:
-> (make s5pc100_defconfig and select input->keypad->samsung keypad)
-> 
-> drivers/input/keyboard/samsung-keypad.c: In function 'samsung_keypad_irq':
-> drivers/input/keyboard/samsung-keypad.c:170: error: 'TASK_UNINTERRUPTIBLE' undeclared (first use in this function)
-> drivers/input/keyboard/samsung-keypad.c:170: error: (Each undeclared identifier is reported only once
-> drivers/input/keyboard/samsung-keypad.c:170: error: for each function it appears in.)
-> drivers/input/keyboard/samsung-keypad.c:170: error: implicit declaration of function 'schedule_timeout'
-> drivers/input/keyboard/samsung-keypad.c: In function 'samsung_keypad_stop':
-> drivers/input/keyboard/samsung-keypad.c:202: error: 'TASK_NORMAL' undeclared (first use in this function)
-> make[3]: *** [drivers/input/keyboard/samsung-keypad.o] Error 1
+> 0x80000000  -------------------
+>             |          |
+> 0x70000000  |          |
+>             |          |
+> 0x60000000  |  DMC 1  |  up to 1GiB
+>             |          |
+> 0x50000000  |          |
+>             |          |
+> 0x40000000  ----------------- 
+>             |          |
+> 0x30000000  |  DMC 0  |  up to 512MiB
+>             |          |
+> 0x20000000  -------------------
 > 
 
-This error occurs on s5pc100_defconfig having disabled CONFIG_PREEMPT 
-option. I think sched.h should be included to remove like this 
-dependency in driver, are there other ways?
+Please see arch/arm/include/asm/sparsemem.h
+
+ * SECTION_SIZE_BITS: The number of physical address bits to cover                                
+ *   the maximum amount of memory in a section.
+
+I know 1 bank of S5PV210/S5PC110 have maximum 256MB, so i think
+SECTION_SIZE_BITS is 28.
