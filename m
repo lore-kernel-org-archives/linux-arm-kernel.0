@@ -1,60 +1,99 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 07 Jul 2010 12:43:44 +0300
-Subject: [PATCH 00/13] omap2/3/4 board updates for 2.6.36 merge window
-Message-ID: <20100707094308.2562.91921.stgit@baageli.muru.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 7 Jul 2010 12:28:45 +0200
+Subject: [PATCH] mx25: set GPT clock source to PER
+In-Reply-To: <20100707080012.GE24774@jasper.tkos.co.il>
+References: <20100704084343.GB19559@jasper.tkos.co.il>
+	<40bc9462f125233cc9c63631a9b987ed684b6d97.1278233166.git.baruch@tkos.co.il>
+	<20100705082123.GD26079@pengutronix.de>
+	<20100706063511.GB28547@jasper.tkos.co.il>
+	<20100706073314.GJ26079@pengutronix.de>
+	<20100707080012.GE24774@jasper.tkos.co.il>
+Message-ID: <20100707102845.GW26079@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Wed, Jul 07, 2010 at 11:00:13AM +0300, Baruch Siach wrote:
+> > 
+> > Tell the timer code which clock to use with an argument to
+> > mxc_timer_init() and add the missing clocks to the clock.c file. You
+> > also have to pass this argument through from the board to
+> > mx25_clocks_init(). That's a lot of work and in the end we still do not
+> > know why some i.MX25 variants need the peripheral clock and others need
+> > the ipg clock. So what I really suggest is that you invest some
+> > research to find the source of this strangeness.
+> 
+> OK. I think I've nailed it down. The CCM MCR register was initialized 
+> differently.  
+> 
+> On the PDK I use the factory installed RedBoot bootloader. RedBoot leaves the 
+> PER CLK MUX field at its default state, that is, MCR[15:0] = 0.
+> 
+> On our target board I use a port of Barebox based on the built-in PDK support.  
+> The board_init_lowlevel routine of the PDK platform code includes the 
+> following line:
+> 
+>     writel(0x0000FEFF, IMX_CCM_BASE + MX25_CCM_MCR)
+> 
+> This makes MCR[15:0] = 0xfeff. Commenting out this line makes both boards 
+> behave the same way. The timer clock runs correctly with or without setting 
+> the V2_TCTL_CLK_PER bit.  Reverting faed406, however, breaks both boards.
+> 
+> So, I thing we should keep faed406. You may also consider applying this patch 
+> setting V2_TCTL_CLK_PER, For the reason Rob Herring has stated.
 
-Here are some omap board updates for review.
+I made some tests on a custom i.MX25 board using barebox (no kernel
+started)
 
-Regards,
+CCM_MCR		GPT_TCTL[8:6]	get_gpt_clk returns	result
+----------------------------------------------------------------------
+1. 0xfeff	1 (ipgclk)	ipgclk (66.5MHz)	works
+2. 0x0		1 (ipgclk)	ipgclk (66.5MHz)	works
+3. 0xfeff	2 (perclk)	perclk5 (8.87MHz)	works
+4. 0x0		2 (perclk)	perclk5 (16MHz)		works
+5. 0x0		1 (ipgclk)	perclk5 (16MHz)		does not work
 
-Tony
+1 and 2 work because the MCR value only affects perclk, but not ipgclk.
+3 and 4 work after I adjusted the per_clk5 divider so that the resulting
+clock is < ipgclk / 4. That seems to be what Martin stated.
+5 does not work because the timer runs at ipgclk but the clock code
+returns per_clk5. This is exactly what the kernel currently does and
+it's imho wrong.
+reverting faed406 would mean switching to 1 or 2 which should both work.
 
----
+We may switch to use perclk in the gpt later, but this would require
+adjusting the other i.MXs aswell. I'm not convinced this is a good idea
+though because currently we have a timer resolution of 1/66.5MHz, we
+would go to at least 1/4 of this when using perclk.
 
-Ameya Palande (1):
-      tsl2563 ALS support for Nokia N900
+I found the following patch in our repository which I forgot to post and
+push upstream. Currenty the kernel returns wrong rates for the perclks
+when the corresponding CCM_MCR bit is cleared. I hope this patch clears
+some confusion instead of adding more...
 
-David Anders (1):
-      Add OMAP4 Panda Support
+commit 98901d5f62de56d87d3a31e46ebe9624edeac62b
+Author: Sascha Hauer <s.hauer@pengutronix.de>
+Date:   Mon Sep 14 09:01:13 2009 +0200
 
-Grazvydas Ignotas (2):
-      omap3: pandora: update gpio-keys data
-      omap3: pandora: add NAND and wifi support
+    mx25 clock: Peripheral parent clock is ahb, not ipg
+    
+    Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Hemanth V (1):
-      OMAP4: Add GPIO LED support for SDP board
-
-Jarkko Nikula (4):
-      omap: rx51: Set regulator V28 always on
-      omap: rx51: Add platform_data for tlv320aic3x with reset gpionumber
-      omap: rx51: Use REGULATOR_SUPPLY macro when initializingregulator consumers
-      omap: rx51: Add supply and data for the tpa6130a2 headphoneamplifier
-
-Ohad Ben-Cohen (2):
-      omap: zoom2: wlan board muxing
-      omap: zoom3: wlan board muxing
-
-Santosh Shilimkar (1):
-      omap4: mmc: Fix the regulator resource for MMC2 on 4430sdp
-
-Shubhrajyoti Datta (1):
-      omap4: Board changes for 4430sdp tmp105 temperature sensor
-
-
- arch/arm/mach-omap2/Kconfig                  |    5 
- arch/arm/mach-omap2/Makefile                 |    2 
- arch/arm/mach-omap2/board-4430sdp.c          |   70 ++++++
- arch/arm/mach-omap2/board-omap3pandora.c     |  148 +++++++++++--
- arch/arm/mach-omap2/board-omap4panda.c       |  304 ++++++++++++++++++++++++++
- arch/arm/mach-omap2/board-rx51-peripherals.c |   71 +++---
- arch/arm/mach-omap2/board-zoom2.c            |   15 +
- arch/arm/mach-omap2/board-zoom3.c            |   15 +
- 8 files changed, 574 insertions(+), 56 deletions(-)
- create mode 100644 arch/arm/mach-omap2/board-omap4panda.c
+diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
+index 7d8bca5..cb58b32 100644
+--- a/arch/arm/mach-mx25/clock.c
++++ b/arch/arm/mach-mx25/clock.c
+@@ -99,7 +99,7 @@ static unsigned long get_rate_per(int per)
+ 	if (readl(CRM_BASE + 0x64) & (1 << per))
+ 		fref = get_rate_upll();
+ 	else
+-		fref = get_rate_ipg(NULL);
++		fref = get_rate_ahb(NULL);
+ 
+ 	return fref / (val + 1);
+ }
 
 -- 
-Signature
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
