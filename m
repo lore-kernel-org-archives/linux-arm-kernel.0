@@ -1,30 +1,71 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Wed, 07 Jul 2010 17:17:11 +0300
-Subject: [PATCH v2] mtd/mxc_nand: don't call mtd->{suspend,resume}
-	explicitly
-In-Reply-To: <1276801147-4103-4-git-send-email-eric@eukrea.com>
-References: <1276801147-4103-1-git-send-email-eric@eukrea.com>
-	<1276801147-4103-2-git-send-email-eric@eukrea.com>
-	<1276801147-4103-3-git-send-email-eric@eukrea.com>
-	<1276801147-4103-4-git-send-email-eric@eukrea.com>
-Message-ID: <1278512231.12733.23.camel@localhost>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 7 Jul 2010 16:45:21 +0200
+Subject: [PATCH 0/5] Makefile.boot cleanup
+In-Reply-To: <20100705141344.GA25407@pengutronix.de>
+References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
+	<20100705141344.GA25407@pengutronix.de>
+Message-ID: <20100707144521.GB10470@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-06-17 at 20:59 +0200, Eric B?nard wrote:
-> The mtd layer is responsible to call mtd->{suspend,resume}.  Doing it
-> again in the driver is wrong and results in a warning:
-> 
-> 	nand_resume called for a chip which is not in suspended state
-> 
-> at resume time.  Removing the calls from the resume and suspend
-> functions makes them empty allowing them to be deleted completely.
-> 
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Hi Russell,
 
-Pushed to l2-mtd-2.6.git / dunno
+On Mon, Jul 05, 2010 at 04:13:44PM +0200, Uwe Kleine-K?nig wrote:
+> this series is a merge between Eric's and my patches that we did to
+> clean up the early boot code.  It doesn't contain runtime physoffset
+> support for now, but I plan to pick that up later.
+
+I added Nicolas' Acks to my tree and dropped the one patch he objected.
+
+Are you willing to pull these now?
+
+Best regards
+Uwe
+
+> The following changes since commit 7e27d6e778cd87b6f2415515d7127eba53fe5d02:
+> 
+>   Linux 2.6.35-rc3 (2010-06-11 19:14:04 -0700)
+> 
+> are available in the git repository at:
+>   git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
+> 
+> Eric Miao (2):
+>       ARM: Remove unused PARAMS_PHYS from arch/arm/boot/compressed
+>       Auto calculate ZRELADDR and provide option for exceptions
+> 
+> Uwe Kleine-K?nig (9):
+>       ARM: zImage: don't hard code the stack size twice
+>       ARM: zImage: some comments for __armv3_mpu_cache_on
+>       ARM: zImage: __armv3_mpu_cache_flush: respect should-be-zero specification
+>       ARM: zImage: fix comments for cache_on, cache_off and cache_clean_flush
+>       ARM: zImage: annotate debug functions about corrupted registers
+>       ARM: remove bit-rotten STANDALONE_DEBUG for decompressor
+>       ARM: zImage: don't define unused symbol initrd_phys
+>       ARM: deprecate support for old way to pass kernel parameters
+>       ARM: uImage: require passing a LOADADDR when building with RUNTIME_PHYSOFFSET
+> 
+>  arch/arm/Kconfig                        |  105 +++++++++++++++++++++++++++++++
+>  arch/arm/boot/Makefile                  |   14 +++--
+>  arch/arm/boot/compressed/Makefile       |   11 +---
+>  arch/arm/boot/compressed/Makefile.debug |   23 -------
+>  arch/arm/boot/compressed/head.S         |   40 +++++++++---
+>  arch/arm/boot/compressed/misc.c         |   20 ------
+>  arch/arm/kernel/Makefile                |    4 +-
+>  arch/arm/kernel/compat.c                |    7 --
+>  arch/arm/kernel/compat.h                |    2 -
+>  arch/arm/kernel/setup.c                 |   11 +++
+>  10 files changed, 157 insertions(+), 80 deletions(-)
+>  delete mode 100644 arch/arm/boot/compressed/Makefile.debug
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 -- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
