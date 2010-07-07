@@ -1,43 +1,46 @@
-From: zpfeffer@codeaurora.org (Zach Pfeffer)
-Date: Wed, 07 Jul 2010 15:44:27 -0700
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Jul 2010 00:07:10 +0100
 Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
 	memory management
-In-Reply-To: <m14oggpepx.fsf@fess.ebiederm.org>
+In-Reply-To: <4C35034B.6040906@codeaurora.org>
 References: <1278135507-20294-1-git-send-email-zpfeffer@codeaurora.org>
 	<m14oggpepx.fsf@fess.ebiederm.org>
-Message-ID: <4C35034B.6040906@codeaurora.org>
+	<4C35034B.6040906@codeaurora.org>
+Message-ID: <20100707230710.GA31792@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric W. Biederman wrote:
-> Zach Pfeffer <zpfeffer@codeaurora.org> writes:
-> 
->> This patch contains the documentation for the API, termed the Virtual
->> Contiguous Memory Manager. Its use would allow all of the IOMMU to VM,
->> VM to device and device to IOMMU interoperation code to be refactored
->> into platform independent code.
->>
->> Comments, suggestions and criticisms are welcome and wanted.
-> 
-> How does this differ from the dma api?
+On Wed, Jul 07, 2010 at 03:44:27PM -0700, Zach Pfeffer wrote:
+> The DMA API handles the allocation and use of DMA channels. It can
+> configure physical transfer settings, manage scatter-gather lists,
+> etc. 
 
-The DMA API handles the allocation and use of DMA channels. It can
-configure physical transfer settings, manage scatter-gather lists,
-etc. 
+You're confused about what the DMA API is.  You're talking about
+the DMA engine subsystem (drivers/dma) not the DMA API (see
+Documentation/DMA-API.txt, include/linux/dma-mapping.h, and
+arch/arm/include/asm/dma-mapping.h)
 
-The VCM is a different thing. The VCM allows a Virtual Contiguous
-Memory region to be created and associated with a device that
-addresses the bus virtually or physically. If the bus is addressed
-physically the Virtual Contiguous Memory is one-to-one mapped. If the
-bus is virtually mapped than a contiguous virtual reservation may be
-backed by a discontiguous list of physical blocks. This discontiguous
-list could be a SG list of just a list of physical blocks that would
-back the entire virtual reservation.
+> The VCM allows all device buffers to be passed between all devices in
+> the system without passing those buffers through each domain's
+> API. This means that instead of writing code to interoperate between
+> DMA engines, IOMMU mapped spaces, CPUs and physically addressed
+> devices the user can simply target a device with a buffer using the
+> same API regardless of how that device maps or otherwise accesses the
+> buffer.
 
-The VCM allows all device buffers to be passed between all devices in
-the system without passing those buffers through each domain's
-API. This means that instead of writing code to interoperate between
-DMA engines, IOMMU mapped spaces, CPUs and physically addressed
-devices the user can simply target a device with a buffer using the
-same API regardless of how that device maps or otherwise accesses the
-buffer.
+With the DMA API, if we have a SG list which refers to the physical
+pages (as a struct page, offset, length tuple), the DMA API takes
+care of dealing with CPU caches and IOMMUs to make the data in the
+buffer visible to the target device.  It provides you with a set of
+cookies referring to the SG lists, which may be coalesced if the
+IOMMU can do so.
+
+If you have a kernel virtual address, the DMA API has single buffer
+mapping/unmapping functions to do the same thing, and provide you
+with a cookie to pass to the device to refer to that buffer.
+
+These cookies are whatever the device needs to be able to access
+the buffer - for instance, if system SDRAM is located at 0xc0000000
+virtual, 0x80000000 physical and 0x40000000 as far as the DMA device
+is concerned, then the cookie for a buffer at 0xc0000000 virtual will
+be 0x40000000 and not 0x80000000.
