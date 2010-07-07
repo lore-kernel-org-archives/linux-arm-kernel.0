@@ -1,22 +1,33 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 7 Jul 2010 22:34:17 +0200
-Subject: [PATCH 01/12] mmci: use sg_miter API to fix multi-page sg
-	handling
-In-Reply-To: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
-References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <AANLkTikv1jFoRfTIVb_DtAjB-K5QqmacIA5FPB4am4SW@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Jul 2010 23:34:18 +0100
+Subject: [patch 071/149] ARM: 6166/1: Proper prefetch abort handling on
+	pre-ARMv6
+In-Reply-To: <20100707085601.GA18732@shutemov.name>
+References: <20100701173212.785441106@clark.site>
+	<20100701221420.GA10481@shutemov.name>
+	<20100701221728.GA12187@suse.de>
+	<20100701222541.GB10481@shutemov.name>
+	<20100701224837.GA27389@flint.arm.linux.org.uk>
+	<20100701225911.GC10481@shutemov.name>
+	<20100701231207.GB27389@flint.arm.linux.org.uk>
+	<20100706130618.GA14177@shutemov.name>
+	<20100706225815.GA21834@flint.arm.linux.org.uk>
+	<20100707085601.GA18732@shutemov.name>
+Message-ID: <20100707223417.GA22673@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've tested this MMCI patch set on RealView PB1176 and
-U300, mounted cards, copied files back and forth, unmount
-diff files. No problems.
+On Wed, Jul 07, 2010 at 11:56:01AM +0300, Kirill A. Shutemov wrote:
+> But it seems that the problem is more global. Potentially, any of
+> pmd_none() check may produce false results. I don't see an easy way to fix
+> it.
 
-This should cover all MMCI variants, since the PB1176 is a
-vanilla ARM variant.
+It isn't.  We normally guarantee that we always fill on both L1 entries.
+The only exception is for the mappings specified via create_mapping()
+which is used for the static platform mappings.
 
-Just fix the comments on patch #7 and it should be ripe for
-the patch tracker methinks.
+> Does Linux VM still expect one PTE table per page?
 
-Yours,
-Linus Walleij
+Yes, and as far as I can see probably always will.  Hence why we need
+to put two L1 entries in one page and lie to the kernel about the sizes
+of the hardware entries.
