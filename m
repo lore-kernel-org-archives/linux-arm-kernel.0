@@ -1,31 +1,49 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 07 Jul 2010 11:54:14 -0400 (EDT)
-Subject: [PATCH 0/5] Makefile.boot cleanup
-In-Reply-To: <20100707144521.GB10470@pengutronix.de>
-References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
-	<20100705141344.GA25407@pengutronix.de>
-	<20100707144521.GB10470@pengutronix.de>
-Message-ID: <alpine.LFD.2.00.1007071150390.6020@xanadu.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed,  7 Jul 2010 17:23:00 +0100
+Subject: [PATCH 4/4] ARM: hw-breakpoint: add HAVE_HW_BREAKPOINT to Kconfig
+In-Reply-To: <1278519780-13317-4-git-send-email-will.deacon@arm.com>
+References: <1278519780-13317-1-git-send-email-will.deacon@arm.com>
+	<1278519780-13317-2-git-send-email-will.deacon@arm.com>
+	<1278519780-13317-3-git-send-email-will.deacon@arm.com>
+	<1278519780-13317-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1278519780-13317-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 Jul 2010, Uwe Kleine-K?nig wrote:
+If we're targetting a v6 or v7 core and have at least software perf events
+available, then automatically add support for hardware breakpoints.
 
-> Hi Russell,
-> 
-> On Mon, Jul 05, 2010 at 04:13:44PM +0200, Uwe Kleine-K?nig wrote:
-> > this series is a merge between Eric's and my patches that we did to
-> > clean up the early boot code.  It doesn't contain runtime physoffset
-> > support for now, but I plan to pick that up later.
-> 
-> I added Nicolas' Acks to my tree and dropped the one patch he objected.
-> 
-> Are you willing to pull these now?
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Cc: S. Karthikeyan <informkarthik@gmail.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/Kconfig         |    1 +
+ arch/arm/kernel/Makefile |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-FWIW, I'm fine with Russell pulling this into his tree for the next 
-merge window.  Maybe you could just resend an official pull request with 
-the updated info.  I'll include it in the Linaro consolidation tree in 
-the mean time if you don't mind.
-
-
-Nicolas
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e57cb24..7ed4d58 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -24,6 +24,7 @@ config ARM
+ 	select HAVE_KERNEL_LZMA
+ 	select HAVE_PERF_EVENTS
+ 	select PERF_USE_VMALLOC
++	select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V7))
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 26d302c..e679fb0 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -39,6 +39,7 @@ obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
+ obj-$(CONFIG_KGDB)		+= kgdb.o
+ obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
+ obj-$(CONFIG_HAVE_TCM)		+= tcm.o
++obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
+ 
+ obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
+ AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
+-- 
+1.6.3.3
