@@ -1,7 +1,7 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed,  7 Jul 2010 14:39:12 +0200
+Date: Wed,  7 Jul 2010 14:48:48 +0200
 Subject: [PATCH 1/2] pxa/spitz: Rework spitz
-Message-ID: <1278506353-4143-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1278506929-12553-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
