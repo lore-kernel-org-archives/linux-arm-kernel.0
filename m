@@ -1,57 +1,30 @@
-From: eric.miao@canonical.com (Eric Miao)
-Date: Wed, 7 Jul 2010 22:14:12 +0800
-Subject: [PATCH RFC] Introduce one machine_desc instance and
-	get_machine_desc()
-In-Reply-To: <alpine.LFD.2.00.1007070918320.6020@xanadu.home>
-References: <AANLkTinWPkI2zVCVw_yx87WVuAGZuWpBUuvGbxx_luIr@mail.gmail.com>
-	<alpine.LFD.2.00.1007070918320.6020@xanadu.home>
-Message-ID: <AANLkTinxZYUrIva6vOVwTY3yDDl5ziAI4Jhx1UJsYssn@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 07 Jul 2010 17:17:11 +0300
+Subject: [PATCH v2] mtd/mxc_nand: don't call mtd->{suspend,resume}
+	explicitly
+In-Reply-To: <1276801147-4103-4-git-send-email-eric@eukrea.com>
+References: <1276801147-4103-1-git-send-email-eric@eukrea.com>
+	<1276801147-4103-2-git-send-email-eric@eukrea.com>
+	<1276801147-4103-3-git-send-email-eric@eukrea.com>
+	<1276801147-4103-4-git-send-email-eric@eukrea.com>
+Message-ID: <1278512231.12733.23.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 7, 2010 at 9:32 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Wed, 7 Jul 2010, Eric Miao wrote:
->
->> commit 5d5d90e5d41bb0842559dd2b00f00f2a0f532a3a
->> Author: Eric Miao <eric.miao@canonical.com>
->> Date: ? Wed Jul 7 16:47:20 2010 +0800
->>
->> ? ? [ARM] Introduce one machine_desc instance and get_machine_desc()
->>
->> ? ? If some of the fields remains useful in 'struct machine_desc', it's
->> ? ? normally a bit convenient to keep one instance there for reference.
->>
->> ? ? (along with more and more machine specific fields coming into this
->> ? ? structure, e.g. pcibios_min_{io,mem})
->>
->> ? ? It also improves modularity a bit by not exporting variables like
->> ? ? system_timer, init_arch_irq etc.
->>
->> ? ? However, the drawbacks are 1) a bit increased data and 2) increased
->> ? ? risk of accessing those fields which are marked as __init.
->
-> That makes me worried. ?Access to __init data/functions after __init
-> stuff is freed is amongst the nastiest subtle bugs that are hard to
-> reproduce and therefore fix. ?And copying such pointers is probably
-> defeating the simple compile time checks we currently have against that.
+On Thu, 2010-06-17 at 20:59 +0200, Eric B?nard wrote:
+> The mtd layer is responsible to call mtd->{suspend,resume}.  Doing it
+> again in the driver is wrong and results in a warning:
+> 
+> 	nand_resume called for a chip which is not in suspended state
+> 
+> at resume time.  Removing the calls from the resume and suspend
+> functions makes them empty allowing them to be deleted completely.
+> 
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
+> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Indeed I was upset as well :-)
+Pushed to l2-mtd-2.6.git / dunno
 
->
-> Maybe those fields should be partitioned differently. ?Having a new
-> structure to encapsulate all fields that should be kept after __init
-> stuff is gone might be a better way.
-
-That's going to invent another similar structure and produce more code
-when copying over. What about keeping those __init function pointers
-as NULL, and copying the rest?
-
->
->
-> Nicolas
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+-- 
+Best Regards,
+Artem Bityutskiy (????? ????????)
