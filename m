@@ -1,43 +1,55 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 07 Jul 2010 12:44:16 +0300
-Subject: [PATCH 05/13] omap: rx51: Set regulator V28 always on
+Date: Wed, 07 Jul 2010 12:44:20 +0300
+Subject: [PATCH 06/13] omap: rx51: Add platform_data for tlv320aic3x with
+	reset gpionumber
 In-Reply-To: <20100707094308.2562.91921.stgit@baageli.muru.com>
 References: <20100707094308.2562.91921.stgit@baageli.muru.com>
-Message-ID: <20100707094416.2562.89163.stgit@baageli.muru.com>
+Message-ID: <20100707094420.2562.76871.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jarkko Nikula <jhnikula@gmail.com>
 
-It seems that the battery cover sensor in Nokia N900 is powered from the
-V28 domain. Now if this regulator is disabled it causes that the gpio 160
-reads only zero which effectively causes uSD removal detection.
-
-Currently the bootloader enabled V28 is kept on but this may change in the
-future according to comment in
-drivers/regulator/core.c: regulator_has_full_constraints.
-
-Also if there are any consumers on the V28 domain doing regulator_enable
-regulator_disable cycle the V28 will be disabled after that.
-
-Prepare for these by defining the V28 as always_on regulator.
+Proper operation of the tlv320aic3x audio codec requires that reset
+sequencing is done in pair with supply voltages when using the regulator
+framework. Add the codec reset gpio used in Nokia RX51 to tlv320aic3x
+data.
 
 Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
-Cc: Adrian Hunter <adrian.hunter@nokia.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-rx51-peripherals.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/board-rx51-peripherals.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
-index 5ddf156..3d95534 100644
+index 3d95534..e350f0b 100644
 --- a/arch/arm/mach-omap2/board-rx51-peripherals.c
 +++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
-@@ -361,6 +361,7 @@ static struct regulator_init_data rx51_vaux1 = {
- 		.name			= "V28",
- 		.min_uV			= 2800000,
- 		.max_uV			= 2800000,
-+		.always_on		= true, /* due battery cover sensor */
- 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
- 					| REGULATOR_MODE_STANDBY,
- 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+@@ -32,6 +32,8 @@
+ #include <plat/onenand.h>
+ #include <plat/gpmc-smc91x.h>
+ 
++#include <sound/tlv320aic3x.h>
++
+ #include "mux.h"
+ #include "hsmmc.h"
+ 
+@@ -707,6 +709,10 @@ static struct twl4030_platform_data rx51_twldata __initdata = {
+ 	.vio			= &rx51_vio,
+ };
+ 
++static struct aic3x_pdata rx51_aic3x_data __initdata = {
++	.gpio_reset		= 60,
++};
++
+ static struct i2c_board_info __initdata rx51_peripherals_i2c_board_info_1[] = {
+ 	{
+ 		I2C_BOARD_INFO("twl5030", 0x48),
+@@ -719,6 +725,7 @@ static struct i2c_board_info __initdata rx51_peripherals_i2c_board_info_1[] = {
+ static struct i2c_board_info __initdata rx51_peripherals_i2c_board_info_2[] = {
+ 	{
+ 		I2C_BOARD_INFO("tlv320aic3x", 0x18),
++		.platform_data = &rx51_aic3x_data,
+ 	},
+ };
+ 
