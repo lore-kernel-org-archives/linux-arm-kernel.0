@@ -1,52 +1,49 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 08 Jul 2010 00:37:34 -0400 (EDT)
-Subject: [PATCH 1/4] ARM: atomic ops: fix register constraints for
-	atomic64_add_unless
-In-Reply-To: <1277906688-12065-2-git-send-email-will.deacon@arm.com>
+Date: Thu, 08 Jul 2010 00:49:24 -0400 (EDT)
+Subject: [PATCH 2/4] ARM: atomic ops: reduce critical region in
+	atomic64_cmpxchg
+In-Reply-To: <1277906688-12065-3-git-send-email-will.deacon@arm.com>
 References: <1277906688-12065-1-git-send-email-will.deacon@arm.com>
 	<1277906688-12065-2-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.00.1007080037020.6020@xanadu.home>
+	<1277906688-12065-3-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.00.1007080045450.6020@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 30 Jun 2010, Will Deacon wrote:
 
-> The atomic64_add_unless function compares an atomic variable with
-> a given value and, if they are not equal, adds another given value
-> to the atomic variable. The function returns zero if the addition
-> did not occur and non-zero otherwise.
+> In order to reduce the likelihood of failure in a load/store
+> exclusive block, the number of intervening instructions should
+> be kept to a minimum.
 > 
-> On ARM, the return value is initialised to 1 in C code. Inline assembly
-> code then performs the atomic64_add_unless operation, setting the
-> return value to 0 iff the addition does not occur. This means that
-> when the addition *does* occur, the value of ret must be preserved
-> across the inline assembly and therefore requires a "+r" constraint
-> rather than the current one of "=&r".
-> 
-> Thanks to Nicolas Pitre for helping to spot this.
+> This patch hoists a mov operation out of the critical region
+> in atomic64_cmpxchg.
 > 
 > Cc: Nicolas Pitre <nico@fluxnic.net>
 > Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
 > ---
 >  arch/arm/include/asm/atomic.h |    2 +-
 >  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
 > diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
-> index a0162fa..e9e56c0 100644
+> index e9e56c0..4f0f282 100644
 > --- a/arch/arm/include/asm/atomic.h
 > +++ b/arch/arm/include/asm/atomic.h
-> @@ -440,7 +440,7 @@ static inline int atomic64_add_unless(atomic64_t *v, u64 a, u64 u)
->  "	teq	%2, #0\n"
->  "	bne	1b\n"
->  "2:"
-> -	: "=&r" (val), "=&r" (ret), "=&r" (tmp)
-> +	: "=&r" (val), "+r" (ret), "=&r" (tmp)
->  	: "r" (&v->counter), "r" (u), "r" (a)
->  	: "cc");
+> @@ -358,8 +358,8 @@ static inline u64 atomic64_cmpxchg(atomic64_t *ptr, u64 old, u64 new)
 >  
-> -- 
-> 1.6.3.3
-> 
+>  	do {
+>  		__asm__ __volatile__("@ atomic64_cmpxchg\n"
+> -		"ldrexd		%1, %H1, [%2]\n"
+>  		"mov		%0, #0\n"
+> +		"ldrexd		%1, %H1, [%2]\n"
+>  		"teq		%1, %3\n"
+>  		"teqeq		%H1, %H3\n"
+>  		"strexdeq	%0, %4, %H4, [%2]"
+
+I'm not sure you gain anything here.  The ldrexd probably requires at 
+least one result delay cycle which is filled by the  mov instruction.  
+By moving the mov insn before the ldrexd you are probably making the 
+whole sequence one cycle longer.
+
+
+Nicolas
