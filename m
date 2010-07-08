@@ -1,43 +1,26 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 08 Jul 2010 19:18:29 +0900
-Subject: About cachetype on ARMv7
-In-Reply-To: <20100708080827.GB5297@n2100.arm.linux.org.uk>
-References: <004c01cb1c34$49773f60$dc65be20$%kim@samsung.com>
-	<20100705141719.GA23556@n2100.arm.linux.org.uk>
-	<013501cb1d6a$47682ea0$d6388be0$%kim@samsung.com>
-	<20100707074943.GA21884@n2100.arm.linux.org.uk>
-	<01c101cb1e37$d60e7f60$822b7e20$%kim@samsung.com>
-	<20100708080827.GB5297@n2100.arm.linux.org.uk>
-Message-ID: <01ff01cb1e86$ec381360$c4a83a20$%kim@samsung.com>
+From: pieterg@gmx.com (pieterg)
+Date: Thu, 8 Jul 2010 12:36:39 +0200
+Subject: machine definition for colibri-pxa3xx
+Message-ID: <201007081236.39550.pieterg@gmx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote:
-> 
-> On Thu, Jul 08, 2010 at 09:52:23AM +0900, Kukjin Kim wrote:
-> > I agree with you in principle.
-> > But I think, it would be helpful to someone if it could be shown more
-exact
-> > feature in the kernel boot message especially in this case, it differs
-with
-> > actual hardware information.
-> 
-> I disagree.  What's interesting is how the kernel drives the cache,
-> not what the cache actually is - what you want to know is "the docs
-> say that it's a X cache, is the kernel driving it correctly" not
-> "can the kernel decode the cache type register and tell me what the
-> documentation says the cache is".
-> 
-Ok..I see. :-) so as I said, agree with your opinion.
+At the moment, colibri-pxa300.c as well as colibri-pxa320.c have their own 
+machine definition.
 
-> The former is what the kernel tells you today.  The latter is useless
-> to working out if the kernel is doing the right thing, and is just a
-> proof that you can decode register values to strings.
+However, running a kernel built with CONFIG_MACH_COLIBRI300 and 
+CONFIG_MACH_COLIBRI320 on a colibri 300 or 310, it will match the 320 
+machine definition, and therefore use colibri-pxa320.c.
 
-Anyway, thanks for your kindly description.
+I believe it's not possible to differentiate colibri pxa3xx based on machine 
+definitions, but only by checking the their cpu.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Wouldn't it make sense to place a single "Toradex Colibri PXA3xx" machine 
+definition in colibri-pxa3xx.c, and use cpu_is_pxa3nn to do cpu specific 
+initialisation?
+This is exactly how things are done for zylonite by the way.
+
+I have some colibri pxa310 patches, but we need a working machine detection 
+before they will actually do anything.
+
+Rgds, Pieter
