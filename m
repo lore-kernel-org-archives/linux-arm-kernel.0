@@ -1,36 +1,51 @@
-From: gadiyar@ti.com (Gadiyar, Anand)
-Date: Thu, 8 Jul 2010 23:07:27 +0530
-Subject: Tony mostly offline for the rest of July
-In-Reply-To: <20100708100013.GC1920@atomide.com>
-References: <20100708100013.GC1920@atomide.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB032391EFCE@dbde02.ent.ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 8 Jul 2010 21:22:30 +0200
+Subject: linux 2.6.34 bug
+In-Reply-To: <201007081842.16347.marek.vasut@gmail.com>
+References: <20100708173621.00003527@unknown>
+	<201007081842.16347.marek.vasut@gmail.com>
+Message-ID: <20100708192230.GA27952@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren wrote:
-> Hi all,
+Hello,
+
+On Thu, Jul 08, 2010 at 06:42:16PM +0200, Marek Vasut wrote:
+> Dne ?t 8. ?ervence 2010 17:36:21 dylan cristiani napsal(a):
+> > Hi Marek,
+> > we were in touch few moths ago about a ucb1400 touchscreen, issue if you
+> > remember: you sent me a patch to pass the platform specific codec irq,
+> > through ucb1400_pdata; after that i went from 3.6.32 to 2.6.34 and
+> > i noticed that your patch was into mainline; in this kernel, related to
+> > the ucb1400 codec again, i noticed one bug about the ac97 codec reset
+> > that is bulverde platform specific: i don't know hot to submit a patch
+> > and to whom to submit it, so i bother, you sorry in advance....; in
+> > particular: in new kernel the function
+> > "void pxa27x_assert_ac97reset(int reset_gpio, int on)"
+> > has been moved to arch/arm/mach-pxa/pxa27x.c file:
 > 
-> FYI, I'll be mostly offline after Friday for several weeks.
+> CCing linux-arm-kernel and Eric.
 > 
-> I'll post few more patchsets for review, but will not be merging
-> any other omap code after that for the upcoming merge window.
+> btw. to submit patch :
 > 
-> Cheers,
+> git add <list of changed files>
 > 
-> Tony
+> git commit -s
+> <editor will pop up, type the commit message>
+> 
+> git log # here check the hash of the last commit before yours
+> 
+> git send-email --to="linux-arm-kernel at lists.infradead.org" --
+> cc="eric.y.miao at gmail.com" --cc="marek.vasut at gmail.com" <the hash from previous 
+> step>
+> 
+> That's probably the easiest way :)
+No.  Instead of checking the hash of the last commit via git log, you
+can simply pass "HEAD~1" instead of the actual hash.
 
-Tony,
+Best regards
+Uwe
 
-The 3630 ES1.1 ID code patch is pending in patchworks for a while [1].
-
-I missed pinging you on this earlier. It would be nice to queue this
-up for the merge window as well.
-
-
-https://patchwork.kernel.org/patch/95684/
-
-
-Also, we now have ES1.2 silicon as well; should I submit an updated
-patch now, or just a delta patch later?
-
-- Anand
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
