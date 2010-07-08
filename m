@@ -1,50 +1,19 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 08 Jul 2010 20:17:47 +0900
-Subject: [PATCH] s5pc110: Reduce the iodesc length of systimer
-References: <20100708023647.GA8320@july>
-Message-ID: <020401cb1e8f$3459fb60$9d0df220$%kim@samsung.com>
+Date: Thu, 08 Jul 2010 20:19:36 +0900
+Subject: [GIT PULL] Samsung fixes for 2.6.35-rc5
+Message-ID: <020501cb1e8f$756067c0$60213740$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> 
-> Kyungmin Park wrote:
-> >
-> > From: Kyungmin Park <kyungmin.park@samsung.com>
-> >
-> > It's enough to use 4KiB.
-> >
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Where is submitter(kmpark at infradead.org)'s Signed-off-by?
-> I know submitter and author in here are same...but e-mail.
-> So added 'From' in your patch.
-> 
-> It would be helpful to me if you use same e-mail in a patch.
-> 
-> Also, the commit message needs to be more descriptive.
-> 
-I mean following is better.
-'This patch reduces the iodesc length of System Timer from 1M to 4K.'
+Hello Linus,
 
-May I apply this patch with above modified message?
+Please pull Samsung fixes from:
 
-> > ---
-> > diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
-> > index 411a4a9..07b86d2 100644
-> > --- a/arch/arm/mach-s5pv210/cpu.c
-> > +++ b/arch/arm/mach-s5pv210/cpu.c
-> > @@ -41,7 +41,7 @@ static struct map_desc s5pv210_iodesc[] __initdata = {
-> >  	{
-> >  		.virtual	= (unsigned long)S5P_VA_SYSTIMER,
-> >  		.pfn		= __phys_to_pfn(S5PV210_PA_SYSTIMER),
-> > -		.length		= SZ_1M,
-> > +		.length		= SZ_4K,
-> >  		.type		= MT_DEVICE,
-> >  	}, {
-> >  		.virtual	= (unsigned long)VA_VIC2,
-> >
-> 
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+s5p-fixes-for-linus
+
+These things are for bug fix on 2.6.35-rc.
+If any problems, please let me know.
 
 Thanks.
 
@@ -53,3 +22,34 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+
+The following changes since commit 815c4163b6c8ebf8152f42b0a5fd015cfdcedc78
+
+  Linux 2.6.35-rc4
+
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+s5p-fixes-for-linus
+
+Boojin Kim (1):
+      ARM: S5P: Bug fix on external interrupt for S5P SoCs
+
+Hyuk Lee (1):
+      ARM: SAMSUNG: Fix on wrong function name for S5PV210 sdhci0
+
+Marek Szyprowski (1):
+      ARM: SAMSUNG: Fix build without SDHCI controllers for S3C64XX
+
+MyungJoo Ham (1):
+      ARM: S5PV210: Correct clock register properties
+
+Thomas Abraham (1):
+      ARM: S5P6442: Fix PLL setting announce message.
+
+ arch/arm/mach-s5p6442/clock.c              |    2 +-
+ arch/arm/mach-s5pv210/clock.c              |  115
++++++++++++++++-------------
+ arch/arm/plat-s5p/irq-eint.c               |    2 +-
+ arch/arm/plat-samsung/include/plat/sdhci.h |    4 +-
+ 4 files changed, 67 insertions(+), 56 deletions(-)
