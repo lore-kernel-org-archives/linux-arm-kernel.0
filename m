@@ -1,39 +1,32 @@
-From: pieterg@gmx.com (pieterg)
-Date: Thu, 8 Jul 2010 22:45:59 +0200
-Subject: [PATCH 5/5] colibri-pxa3xx: add touchscreen support
-In-Reply-To: <201007082203.40209.marek.vasut@gmail.com>
-References: <201007081904.16262.pieterg@gmx.com>
-	<201007082203.40209.marek.vasut@gmail.com>
-Message-ID: <201007082245.59738.pieterg@gmx.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 08 Jul 2010 16:49:35 -0400 (EDT)
+Subject: [PATCH 0/5] Makefile.boot cleanup
+In-Reply-To: <20100708070826.GB21565@pengutronix.de>
+References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
+	<20100705141344.GA25407@pengutronix.de>
+	<20100707144521.GB10470@pengutronix.de>
+	<alpine.LFD.2.00.1007071150390.6020@xanadu.home>
+	<20100708070826.GB21565@pengutronix.de>
+Message-ID: <alpine.LFD.2.00.1007081638060.6020@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 July 2010 22:03:40 Marek Vasut wrote:
-> Dne ?t 8. ?ervence 2010 19:04:16 pieterg napsal(a):
-> > Signed-off-by: pieter <p.grimmerink@inepro.com>
-> > ---
-> >  arch/arm/mach-pxa/colibri-pxa300.c       |    2 +
-> >  arch/arm/mach-pxa/colibri-pxa320.c       |    1 +
-> >  arch/arm/mach-pxa/colibri-pxa3xx.c       |   31
-> > ++++++++++++++++++++++++++++++
-> >  arch/arm/mach-pxa/include/mach/colibri.h |    6 +++++
-> >  4 files changed, 40 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-pxa/colibri-pxa300.c
-> > b/arch/arm/mach-pxa/colibri-pxa300.c
-> > index 27f403d..edd48e2 100644
-> > --- a/arch/arm/mach-pxa/colibri-pxa300.c
-> > +++ b/arch/arm/mach-pxa/colibri-pxa300.c
-> > @@ -229,6 +229,8 @@ void __init colibri_pxa300_init(void)
-> >  				mfp_to_gpio(MFP_PIN_GPIO13));
-> >  	colibri_pxa300_init_uart();
-> >  	colibri_pxa300_init_i2c();
-> > +	if (cpu_is_pxa310())
-> > +	    colibri_pxa3xx_init_touchscreen();
->
-> Is the indent ok here? did you run the patches through checkpatch.pl ?
+On Thu, 8 Jul 2010, Uwe Kleine-K?nig wrote:
 
-You're right, I'm missing a tab there. Should have used checkpatch...
-I'll send a v2.
+> >                    I'll include it in the Linaro consolidation tree in 
+> > the mean time if you don't mind.
+> I don't know what the "Linaro consolidation tree" is, but I'm sure that
+> even if I minded I couldn't stop you to take it. :-)
 
-Rds, Pieter
+I think it is good courtesy to ask.
+
+FYI: Linaro is http://www.linaro.org.
+
+The consolidation tree is described here: 
+https://wiki.ubuntu.com/Specs/M/ARMKernelVersionAlignment
+
+And the result can be found here:
+http://git.linaro.org/gitweb?p=linux/arm_next.git;a=summary
+
+
+Nicolas
