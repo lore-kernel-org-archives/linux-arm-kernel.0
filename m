@@ -1,73 +1,95 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 08 Jul 2010 21:34:32 +0900
-Subject: [PATCH] s5pc110: Reduce the iodesc length of systimer
-In-Reply-To: <AANLkTilA5_kKf_CYE98ul1znzF1AT_mektC2TrFd9vyv@mail.gmail.com>
-References: <20100708023647.GA8320@july>
-	<020201cb1e8d$7d90ba50$78b22ef0$%kim@samsung.com>
-	<AANLkTilA5_kKf_CYE98ul1znzF1AT_mektC2TrFd9vyv@mail.gmail.com>
-Message-ID: <020701cb1e99$edb8c550$c92a4ff0$%kim@samsung.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 08 Jul 2010 08:42:05 -0400 (EDT)
+Subject: [PATCH 3/4] ARM: atomic ops: add memory constraints to inline asm
+In-Reply-To: <004b01cb1e81$0b745960$225d0c20$%deacon@arm.com>
+References: <1277906688-12065-1-git-send-email-will.deacon@arm.com>
+	<1277906688-12065-2-git-send-email-will.deacon@arm.com>
+	<1277906688-12065-3-git-send-email-will.deacon@arm.com>
+	<1277906688-12065-4-git-send-email-will.deacon@arm.com>
+	<alpine.LFD.2.00.1007080109590.6020@xanadu.home>
+	<004b01cb1e81$0b745960$225d0c20$%deacon@arm.com>
+Message-ID: <alpine.LFD.2.00.1007080830210.6020@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> Hi Andrew,
-> 
-> Can you explain Mr. Kim request?
-> As your suggestion, If the sender and signed-off are different, add
-> the From filed at body.
-> 
-Yes I know, didn't see my posing?
-In this case, my suggestion is just use same e-mail in a patch.
+On Thu, 8 Jul 2010, Will Deacon wrote:
 
-> I think no need to add duplicated signed-off since it's same person.
+> Hi Nicolas,
 > 
-Maybe you misunderstood my comments.
+> > > Currently, the 32-bit and 64-bit atomic operations on ARM do not
+> > > include memory constraints in the inline assembly blocks. In the
+> > > case of barrier-less operations [for example, atomic_add], this
+> > > means that the compiler may constant fold values which have actually
+> > > been modified by a call to an atomic operation.
+> 
+> Thanks a lot for looking at this.
+> 
+> > Why do you use the "o" constraint?  That's for an offsetable
+> > memory reference.  Since we already use the actual address value with a
+> > register constraint, it would be more logical to simply use the "Q"
+> > constraint alone without any "o".  The gcc manual says:
+> > 
+> > |    `Q'
+> > |          A memory reference where the exact address is in a single
+> > |          register
+> > 
+> > Both "Qo" and "Q" provide the same wanted end result in this
+> > case.  But a quick test shows that "Q" produces exactly what we need,
+> > more so than "Qo", because of the other operand which is the actual
+> > address (the same register is used in both cases).
+> 
+> Whilst using "Q" on its own does generate correct code, using "Qo" is
+> a slight optimisation. The issue with "Q" is that GCC computes the address
+> again, even though it has already done so for the "r" constraint. Ideally,
+> we'd ditch the "r" constraint and just use "Q", but unfortunately this results
+> in code like ldrex r0, [r1, #0] which GAS refuses to accept. If we use "o",
+> then GCC doesn't compute the address twice, but can fail if it ends up with
+> a non-offsettable address (complaining that the constraints are impossible
+> to satisfy). Using "Qo" results in "o" being used if possible but, where
+> it doesn't match, "Q" is used at the expense of an extra register:
+> 
+> With "Q":
+> 
+>  740:   f57ff05f        dmb     sy
+>  744:   e30f4001        movw    r4, #61441      ; 0xf001
+>  748:   e30a5bad        movw    r5, #43949      ; 0xabad
+>  74c:   e34f400d        movt    r4, #61453      ; 0xf00d
+>  750:   e34f5ace        movt    r5, #64206      ; 0xface
+>  754:   e24be034        sub     lr, fp, #52     ; 0x34    <--- Redundant address computation
+>  758:   e3a02000        mov     r2, #0
+>  75c:   e1b36f9f        ldrexd  r6, [r3]
+>  760:   e1360004        teq     r6, r4
+>  764:   01370005        teqeq   r7, r5
+>  768:   01a32f90        strexdeq        r2, r0, [r3]
+>  76c:   e3520000        cmp     r2, #0
+>  770:   1afffff7        bne     754 <test_atomic64+0x754>
+>  774:   f57ff05f        dmb     sy
 
-> Thank you,
-> Kyungmin Park
-> 
-> 
-> On Thu, Jul 8, 2010 at 8:05 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Kyungmin Park wrote:
-> >>
-> >> From: Kyungmin Park <kyungmin.park@samsung.com>
-> >>
-> >> It's enough to use 4KiB.
-> >>
-> >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> >
-> > Where is submitter(kmpark at infradead.org)'s Signed-off-by?
-> > I know submitter and author in here are same...but e-mail.
-> > So added 'From' in your patch.
-> >
-> > It would be helpful to me if you use same e-mail in a patch.
-> >
-> > Also, the commit message needs to be more descriptive.
-> >
-> >> ---
-> >> diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
-> >> index 411a4a9..07b86d2 100644
-> >> --- a/arch/arm/mach-s5pv210/cpu.c
-> >> +++ b/arch/arm/mach-s5pv210/cpu.c
-> >> @@ -41,7 +41,7 @@ static struct map_desc s5pv210_iodesc[] __initdata =
+That's weird.  The simple test I did was:
+
+int foo(int *x)
 {
-> >> ? ? ? {
-> >> ? ? ? ? ? ? ? .virtual ? ? ? ?= (unsigned long)S5P_VA_SYSTIMER,
-> >> ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(S5PV210_PA_SYSTIMER),
-> >> - ? ? ? ? ? ? .length ? ? ? ? = SZ_1M,
-> >> + ? ? ? ? ? ? .length ? ? ? ? = SZ_4K,
-> >> ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
-> >> ? ? ? }, {
-> >> ? ? ? ? ? ? ? .virtual ? ? ? ?= (unsigned long)VA_VIC2,
-> >>
-> >
+        int r;
+        asm("%1 %2" : "=&r" (r), "+Q" (x[2]) : "r" (&x[2]));
+        return r;
+}
 
+which resulted in:
 
-Thanks.
+        add     r0, r0, #8
+#APP
+@ 4 "t.c" 1
+        [r0, #0] r0
+@ 0 "" 2
+        mov     r0, r1
+        bx      lr
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+So the address is clearly computed only once.
+
+> > In any case:
+> > 
+> > Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> 
+> Thanks, I'll submit this to the patch system today.
+
+Nicolas
