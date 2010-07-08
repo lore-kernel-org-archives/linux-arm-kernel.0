@@ -1,44 +1,24 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 8 Jul 2010 10:43:31 +0100
-Subject: [PATCH 2/4] ARM: atomic ops: reduce critical region in
-	atomic64_cmpxchg
-In-Reply-To: <alpine.LFD.2.00.1007080045450.6020@xanadu.home>
-References: <1277906688-12065-1-git-send-email-will.deacon@arm.com>
-	<1277906688-12065-2-git-send-email-will.deacon@arm.com>
-	<1277906688-12065-3-git-send-email-will.deacon@arm.com>
-	<alpine.LFD.2.00.1007080045450.6020@xanadu.home>
-Message-ID: <004c01cb1e82$070aa130$151fe390$@deacon@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Jul 2010 12:45:48 +0300
+Subject: [PATCH 06/15] omap zoom2: wlan board muxing
+In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B030E10C9B3@dbde02.ent.ti.com>
+References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
+	<1278376666-3509-7-git-send-email-ohad@wizery.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B030E10C9B3@dbde02.ent.ti.com>
+Message-ID: <20100708094548.GB1920@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+* Ghorai, Sukumar <s-ghorai@ti.com> [100708 06:34]:
+> > @@ -71,6 +71,21 @@ static struct twl4030_platform_data zoom2_twldata = {
+> > 
+> >  #ifdef CONFIG_OMAP_MUX
+> >  static struct omap_board_mux board_mux[] __initdata = {
+> > +#ifdef CONFIG_OMAP_ZOOM_WLAN
+>
+> [Ghorai] This is zoom board specific file, So why need this additional flag?
 
-> > diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
-> > index e9e56c0..4f0f282 100644
-> > --- a/arch/arm/include/asm/atomic.h
-> > +++ b/arch/arm/include/asm/atomic.h
-> > @@ -358,8 +358,8 @@ static inline u64 atomic64_cmpxchg(atomic64_t *ptr, u64 old, u64 new)
-> >
-> >  	do {
-> >  		__asm__ __volatile__("@ atomic64_cmpxchg\n"
-> > -		"ldrexd		%1, %H1, [%2]\n"
-> >  		"mov		%0, #0\n"
-> > +		"ldrexd		%1, %H1, [%2]\n"
-> >  		"teq		%1, %3\n"
-> >  		"teqeq		%H1, %H3\n"
-> >  		"strexdeq	%0, %4, %H4, [%2]"
-> 
-> I'm not sure you gain anything here.  The ldrexd probably requires at
-> least one result delay cycle which is filled by the  mov instruction.
-> By moving the mov insn before the ldrexd you are probably making the
-> whole sequence one cycle longer.
+Good point, the ifdef is unnecessary in for both zoom2 and zoom3.
+Will update in my queue to remove the ifdefs.
 
-You're right. In fact, thinking about it, this patch is largely
-superficial because if the core can do exclusive load/stores then
-the mov will be issued down a separate pipeline anyway.
-
-I'll drop this one from the patch series and submit the other three.
-
-Thanks,
-
-Will
+Tony
