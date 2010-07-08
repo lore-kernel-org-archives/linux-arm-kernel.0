@@ -1,107 +1,67 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 9 Jul 2010 01:03:14 +0200
-Subject: [PATCH v2 5/5] colibri-pxa3xx: add touchscreen support
-In-Reply-To: <201007082249.59852.pieterg@gmx.com>
-References: <201007082249.59852.pieterg@gmx.com>
-Message-ID: <201007090103.14418.marek.vasut@gmail.com>
+From: zpfeffer@codeaurora.org (Zach Pfeffer)
+Date: Thu, 08 Jul 2010 16:59:52 -0700
+Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
+	memory management
+In-Reply-To: <20100707230710.GA31792@n2100.arm.linux.org.uk>
+References: <1278135507-20294-1-git-send-email-zpfeffer@codeaurora.org>
+	<m14oggpepx.fsf@fess.ebiederm.org>
+	<4C35034B.6040906@codeaurora.org>
+	<20100707230710.GA31792@n2100.arm.linux.org.uk>
+Message-ID: <4C366678.60605@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 8. ?ervence 2010 22:49:59 pieterg napsal(a):
-> Signed-off-by: pieter <p.grimmerink@inepro.com>
-> ---
->  arch/arm/mach-pxa/colibri-pxa300.c       |    2 +
->  arch/arm/mach-pxa/colibri-pxa320.c       |    1 +
->  arch/arm/mach-pxa/colibri-pxa3xx.c       |   31
-> ++++++++++++++++++++++++++++++
->  arch/arm/mach-pxa/include/mach/colibri.h |    6 +++++
->  4 files changed, 40 insertions(+), 0 deletions(-)
+Russell King - ARM Linux wrote:
+> On Wed, Jul 07, 2010 at 03:44:27PM -0700, Zach Pfeffer wrote:
+>> The DMA API handles the allocation and use of DMA channels. It can
+>> configure physical transfer settings, manage scatter-gather lists,
+>> etc. 
 > 
-> diff --git a/arch/arm/mach-pxa/colibri-pxa300.c
-> b/arch/arm/mach-pxa/colibri-pxa300.c
-> index 27f403d..3e50466 100644
-> --- a/arch/arm/mach-pxa/colibri-pxa300.c
-> +++ b/arch/arm/mach-pxa/colibri-pxa300.c
-> @@ -229,6 +229,8 @@ void __init colibri_pxa300_init(void)
->  				mfp_to_gpio(MFP_PIN_GPIO13));
->  	colibri_pxa300_init_uart();
->  	colibri_pxa300_init_i2c();
-> +	if (cpu_is_pxa310())
-> +		colibri_pxa3xx_init_touchscreen();
->  }
-> 
->  MACHINE_START(COLIBRI300, "Toradex Colibri PXA300")
-> diff --git a/arch/arm/mach-pxa/colibri-pxa320.c
-> b/arch/arm/mach-pxa/colibri-pxa320.c
-> index 0755087..43fadf6 100644
-> --- a/arch/arm/mach-pxa/colibri-pxa320.c
-> +++ b/arch/arm/mach-pxa/colibri-pxa320.c
-> @@ -229,6 +229,7 @@ void __init colibri_pxa320_init(void)
->  				mfp_to_gpio(MFP_PIN_GPIO28));
->  	colibri_pxa320_init_uart();
->  	colibri_pxa320_init_i2c();
-> +	colibri_pxa3xx_init_touchscreen();
->  }
-> 
->  MACHINE_START(COLIBRI320, "Toradex Colibri PXA320")
-> diff --git a/arch/arm/mach-pxa/colibri-pxa3xx.c
-> b/arch/arm/mach-pxa/colibri-pxa3xx.c
-> index 199afa2..097aef5 100644
-> --- a/arch/arm/mach-pxa/colibri-pxa3xx.c
-> +++ b/arch/arm/mach-pxa/colibri-pxa3xx.c
-> @@ -198,3 +198,34 @@ void __init colibri_pxa3xx_init_nand(void)
->  }
->  #endif
-> 
-> +#if defined(CONFIG_INPUT_TOUCHSCREEN)
-> +
-> +#if defined(CONFIG_TOUCHSCREEN_WM97XX) || \
-> +	defined(CONFIG_TOUCHSCREEN_WM97XX_MODULE)
-> +static struct platform_device colibri_ts_wm97xx_device = {
-> +	.name	= "wm97xx-ts",
-> +	.id	= -1,
-> +};
-> +#endif
-> +
-> +#if defined(CONFIG_TOUCHSCREEN_UCB1400) || \
-> +	defined(CONFIG_TOUCHSCREEN_UCB1400_MODULE)
-> +static struct platform_device colibri_ts_ucb1400_device = {
-> +	.name	= "ucb1400_core",
-> +	.id	= -1,
-> +};
-> +#endif
-> +
-> +void __init colibri_pxa3xx_init_touchscreen(void)
-> +{
-> +#if defined(CONFIG_TOUCHSCREEN_WM97XX) || \
-> +	defined(CONFIG_TOUCHSCREEN_WM97XX_MODULE)
-> +	platform_device_register(&colibri_ts_wm97xx_device);
-> +#endif
-> +#if defined(CONFIG_TOUCHSCREEN_UCB1400) || \
-> +	defined(CONFIG_TOUCHSCREEN_UCB1400_MODULE)
-> +	platform_device_register(&colibri_ts_ucb1400_device);
-> +#endif
-> +}
-> +
-> +#endif
-> diff --git a/arch/arm/mach-pxa/include/mach/colibri.h
-> b/arch/arm/mach-pxa/include/mach/colibri.h
-> index 5f2ba8d..299dab9 100644
-> --- a/arch/arm/mach-pxa/include/mach/colibri.h
-> +++ b/arch/arm/mach-pxa/include/mach/colibri.h
-> @@ -30,6 +30,12 @@ extern void colibri_pxa3xx_init_nand(void);
->  static inline void colibri_pxa3xx_init_nand(void) {}
->  #endif
-> 
-> +#if defined(CONFIG_INPUT_TOUCHSCREEN)
-> +extern void colibri_pxa3xx_init_touchscreen(void);
-> +#else
-> +static inline void colibri_pxa3xx_init_touchscreen(void) {}
-> +#endif
-> +
->  /* physical memory regions */
->  #define COLIBRI_SDRAM_BASE	0xa0000000      /* SDRAM region */
+> You're confused about what the DMA API is.  You're talking about
+> the DMA engine subsystem (drivers/dma) not the DMA API (see
+> Documentation/DMA-API.txt, include/linux/dma-mapping.h, and
+> arch/arm/include/asm/dma-mapping.h)
 
-What will happen if both of the TS devices are selected? You'd better figure out 
-a way to enable that particular TSC chip based on hardware revision (the new 
-colibri 320 v2.0 will have this information in the CPLD I believe).
+Thanks for the clarification. 
+
+> 
+>> The VCM allows all device buffers to be passed between all devices in
+>> the system without passing those buffers through each domain's
+>> API. This means that instead of writing code to interoperate between
+>> DMA engines, IOMMU mapped spaces, CPUs and physically addressed
+>> devices the user can simply target a device with a buffer using the
+>> same API regardless of how that device maps or otherwise accesses the
+>> buffer.
+> 
+> With the DMA API, if we have a SG list which refers to the physical
+> pages (as a struct page, offset, length tuple), the DMA API takes
+> care of dealing with CPU caches and IOMMUs to make the data in the
+> buffer visible to the target device.  It provides you with a set of
+> cookies referring to the SG lists, which may be coalesced if the
+> IOMMU can do so.
+> 
+> If you have a kernel virtual address, the DMA API has single buffer
+> mapping/unmapping functions to do the same thing, and provide you
+> with a cookie to pass to the device to refer to that buffer.
+> 
+> These cookies are whatever the device needs to be able to access
+> the buffer - for instance, if system SDRAM is located at 0xc0000000
+> virtual, 0x80000000 physical and 0x40000000 as far as the DMA device
+> is concerned, then the cookie for a buffer at 0xc0000000 virtual will
+> be 0x40000000 and not 0x80000000.
+
+It sounds like I've got some work to do. I appreciate the feedback.
+
+The problem I'm trying to solve boils down to this: map a set of
+contiguous physical buffers to an aligned IOMMU address. I need to
+allocate the set of physical buffers in a particular way: use 1 MB
+contiguous physical memory, then 64 KB, then 4 KB, etc. and I need to
+align the IOMMU address in a particular way. I also need to swap out the
+IOMMU address spaces and map the buffers into the kernel.
+
+I have this all solved, but it sounds like I'll need to migrate to the DMA
+API to upstream it.
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
