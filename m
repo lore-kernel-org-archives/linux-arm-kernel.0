@@ -1,43 +1,38 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 08 Jul 2010 01:50:16 -0400 (EDT)
-Subject: [PATCH 4/4] ARM: atomic64_test: add ARM as supported architecture
-In-Reply-To: <1277906688-12065-5-git-send-email-will.deacon@arm.com>
+Date: Thu, 08 Jul 2010 01:58:56 -0400 (EDT)
+Subject: [PATCH 3/4] ARM: atomic ops: add memory constraints to inline asm
+In-Reply-To: <004101cb1df3$5825ecd0$0871c670$%deacon@arm.com>
 References: <1277906688-12065-1-git-send-email-will.deacon@arm.com>
 	<1277906688-12065-2-git-send-email-will.deacon@arm.com>
 	<1277906688-12065-3-git-send-email-will.deacon@arm.com>
 	<1277906688-12065-4-git-send-email-will.deacon@arm.com>
-	<1277906688-12065-5-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.00.1007080149470.6020@xanadu.home>
+	<004101cb1df3$5825ecd0$0871c670$%deacon@arm.com>
+Message-ID: <alpine.LFD.2.00.1007080154050.6020@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Jun 2010, Will Deacon wrote:
+On Wed, 7 Jul 2010, Will Deacon wrote:
 
-> ARM has support for the atomic64_dec_if_positive operation
-> so ensure that it is tested by the atomic64_test routine.
+> Hello,
 > 
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > Subject: [PATCH 3/4] ARM: atomic ops: add memory constraints to inline asm
+> > 
+> > This patch adds suitable memory constraints to the atomic operations on ARM
+> 
+> Does anybody have any feedback on this patch? The other three in the
+> series are straightforward, but I'd like another set of eyes to go over this
+> code [I know it makes for tough reading!] before submitted to the patch
+> system.
+> 
+> Any comments appreciated!
 
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+In addition to the comments I've just provided, I think you should also 
+add a
 
-> ---
->  lib/atomic64_test.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/lib/atomic64_test.c b/lib/atomic64_test.c
-> index 250ed11..44524cc 100644
-> --- a/lib/atomic64_test.c
-> +++ b/lib/atomic64_test.c
-> @@ -114,7 +114,7 @@ static __init int test_atomic64(void)
->  	BUG_ON(v.counter != r);
->  
->  #if defined(CONFIG_X86) || defined(CONFIG_MIPS) || defined(CONFIG_PPC) || \
-> -    defined(CONFIG_S390) || defined(_ASM_GENERIC_ATOMIC64_H)
-> +    defined(CONFIG_S390) || defined(_ASM_GENERIC_ATOMIC64_H) || defined(CONFIG_ARM)
->  	INIT(onestwos);
->  	BUG_ON(atomic64_dec_if_positive(&v) != (onestwos - 1));
->  	r -= one;
-> -- 
-> 1.6.3.3
-> 
+Cc: stable at kernel.org
+
+to the list of tags for those patches.  They are definitely fixing real 
+correctness issues.
+
+
+Nicolas
