@@ -1,28 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Jul 2010 09:08:27 +0100
-Subject: About cachetype on ARMv7
-In-Reply-To: <01c101cb1e37$d60e7f60$822b7e20$%kim@samsung.com>
-References: <004c01cb1c34$49773f60$dc65be20$%kim@samsung.com>
-	<20100705141719.GA23556@n2100.arm.linux.org.uk>
-	<013501cb1d6a$47682ea0$d6388be0$%kim@samsung.com>
-	<20100707074943.GA21884@n2100.arm.linux.org.uk>
-	<01c101cb1e37$d60e7f60$822b7e20$%kim@samsung.com>
-Message-ID: <20100708080827.GB5297@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 8 Jul 2010 09:48:56 +0100
+Subject: [PATCH RFC 0/4] ARM/KGDB: Some fixes for SMP machines
+In-Reply-To: <20100707171222.GA16448@oksana.dev.rtsoft.ru>
+References: <20100707171222.GA16448@oksana.dev.rtsoft.ru>
+Message-ID: <004701cb1e7a$66a78890$33f699b0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 08, 2010 at 09:52:23AM +0900, Kukjin Kim wrote:
-> I agree with you in principle.
-> But I think, it would be helpful to someone if it could be shown more exact
-> feature in the kernel boot message especially in this case, it differs with
-> actual hardware information.
+Hi Anton,
 
-I disagree.  What's interesting is how the kernel drives the cache,
-not what the cache actually is - what you want to know is "the docs
-say that it's a X cache, is the kernel driving it correctly" not
-"can the kernel decode the cache type register and tell me what the
-documentation says the cache is".
+> It appears that KGDB can easily hang SMP ARM machines.
 
-The former is what the kernel tells you today.  The latter is useless
-to working out if the kernel is doing the right thing, and is just a
-proof that you can decode register values to strings.
+Yep. As pointed out at:
+
+http://lkml.org/lkml/2010/4/8/214
+
+Commit ae6bf53e broke kgdb on SMP systems because it incorrectly assumes
+that atomic_{inc,dec} imply barriers. Until this is fixed, it will never
+work reliably on ARM. Try reverting the patch [this doesn't completely
+resolve the situation, but it might help].
+
+> 1. I'm testing with I/D caches disabled. With enabled caches,
+>    ARMv6K still locks-up. I'll test ARMv7 soon, and will try
+>    to debug cache issues on ARMv6K.
+
+This patch might help if you're using the ARM11MPCore:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-May/016567.html
+
+Hope that helps,
+
+Will
