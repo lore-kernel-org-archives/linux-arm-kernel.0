@@ -1,60 +1,38 @@
-From: david.jander@protonic.nl (David Jander)
-Date: Thu, 8 Jul 2010 09:28:36 +0200
-Subject: i.MX51 kernel trees: Where to start?
-In-Reply-To: <20100708054436.GC25143@jasper.tkos.co.il>
-References: <201007071408.50621.david.jander@protonic.nl>
-	<20100708054436.GC25143@jasper.tkos.co.il>
-Message-ID: <201007080928.36618.david.jander@protonic.nl>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 8 Jul 2010 09:42:42 +0200
+Subject: [PATCH] [arm l2x0] Extend cache-l2x0 to support the
+	16-wayPL310 (v3)
+In-Reply-To: <1278521560.22992.50.camel@e102109-lin.cambridge.arm.com>
+References: <1272985254-5675-1-git-send-email-jason.mcmullan@netronome.com>
+	<1272985254-5675-2-git-send-email-jason.mcmullan@netronome.com>
+	<20100706065907.GH26079@pengutronix.de>
+	<1278521560.22992.50.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100708074241.GY26079@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Baruch,
-
-Thanks a lot for your reply.
-
-On Thursday 08 July 2010 07:44:36 am Baruch Siach wrote:
-> If you want to go with the mainline kernel then the place where i.MX
-> development is happening is
-> http://git.pengutronix.de/?p=imx/linux-2.6.git;a=summary
-
-Is there a way of finding out exactly which peripherals of the i.MX51 are 
-currently supported in this tree?
-The master seems almost 2 months old, is there no ongoing porting work 
-anymore, or is it all going into "for-next"?
-
-> > What other trees are there, and how can I get an impression of the state
-> > of each one?  How far are effords for mainline inclusion of the freescale
-> > patches?
+On Wed, Jul 07, 2010 at 05:52:40PM +0100, Catalin Marinas wrote:
+> On Tue, 2010-07-06 at 07:59 +0100, Sascha Hauer wrote:
+> > commit 7cb529f07fb864816d56000374b2b4aeccba00f0
+> > Author: Sascha Hauer <s.hauer@pengutronix.de>
+> > Date:   Tue Jul 6 08:53:55 2010 +0200
+> > 
+> >     [arm l2x0] Do not rely on reset defaults of L2X0_AUX_CTRL
+> >    
+> >     On i.MX35 the L2X0_AUX_CTRL register does not have sensible reset
+> >     default values. Allow them to be overwritten with the aux_val/aux_mask
+> >     arguments passed to l2x0_init().
+> >    
+> >     Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 > 
-> Freescale are doing very little to push their work for mainline inclusion.
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-That doesn't surprise me anymore, although I get the impression that they have 
-learned at least a little bit form past lessons, since they are now at least 
-"using" git ;-)
+Ok, I put it in the patch system as 6210/1
 
-> Amit Kucheria from Canonical/Linaro has been doing some work on the i.MX5
-> front. This work is in the mainline kernels since 2.6.34.
-
-Sounds great... I'll need to figure out in what state the drivers for each 
-peripheral are. Any hint other than just trying out?
-
-> > 2.- Using this kernel, I notice the touchscreen driver, (mxc_ts.c) not
-> > working correctly. It looks like it works for a few seconds after boot,
-> > and then starts delaying samples very much, to the point that it is
-> > unusable. Is this a known problem? Is there someone working on this?
-> > Should I use another driver?
-> 
-> This driver is not in the mainline kernel, so the help you may get from
->  kernel developers is limited. In any case, questions about the input
->  subsystem should go to the linux-input mailing list
->  (linux-input at vger.kernel.org).
-
-Thanks for the tip. If I get serious plans in porting that driver, I'll 
-contact that list.
-
-Best regards,
+Sascha
 
 -- 
-David Jander
-Protonic Holland.
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
