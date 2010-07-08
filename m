@@ -1,51 +1,374 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 8 Jul 2010 08:44:36 +0300
-Subject: i.MX51 kernel trees: Where to start?
-In-Reply-To: <201007071408.50621.david.jander@protonic.nl>
-References: <201007071408.50621.david.jander@protonic.nl>
-Message-ID: <20100708054436.GC25143@jasper.tkos.co.il>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 08 Jul 2010 01:49:24 -0400 (EDT)
+Subject: [PATCH 3/4] ARM: atomic ops: add memory constraints to inline asm
+In-Reply-To: <1277906688-12065-4-git-send-email-will.deacon@arm.com>
+References: <1277906688-12065-1-git-send-email-will.deacon@arm.com>
+	<1277906688-12065-2-git-send-email-will.deacon@arm.com>
+	<1277906688-12065-3-git-send-email-will.deacon@arm.com>
+	<1277906688-12065-4-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.00.1007080109590.6020@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Wed, 30 Jun 2010, Will Deacon wrote:
 
-On Wed, Jul 07, 2010 at 02:08:50PM +0200, David Jander wrote:
-> 1.- What's the most recommended (git-) tree to start from doing BSP 
-> development?
-> Right now, I am playing with sources downloaded from freescale directly, and 
-> AFAICS this is quite similar to the "tracking-fsl-imx_2.6.31" branch from denx 
-> git:
+> Currently, the 32-bit and 64-bit atomic operations on ARM do not
+> include memory constraints in the inline assembly blocks. In the
+> case of barrier-less operations [for example, atomic_add], this
+> means that the compiler may constant fold values which have actually
+> been modified by a call to an atomic operation.
 > 
-> http://git.denx.de/?p=linux-2.6-denx.git;a=shortlog;h=refs/heads/tracking-fsl-
-> imx_2.6.31
+> This issue can be observed in the atomic64_test routine in
+> <kernel root>/lib/atomic64_test.c:
 > 
-> Is this indeed the best place to start?
+> 00000000 <test_atomic64>:
+>    0:	e1a0c00d 	mov	ip, sp
+>    4:	e92dd830 	push	{r4, r5, fp, ip, lr, pc}
+>    8:	e24cb004 	sub	fp, ip, #4
+>    c:	e24dd008 	sub	sp, sp, #8
+>   10:	e24b3014 	sub	r3, fp, #20
+>   14:	e30d000d 	movw	r0, #53261	; 0xd00d
+>   18:	e3011337 	movw	r1, #4919	; 0x1337
+>   1c:	e34c0001 	movt	r0, #49153	; 0xc001
+>   20:	e34a1aa3 	movt	r1, #43683	; 0xaaa3
+>   24:	e16300f8 	strd	r0, [r3, #-8]!
+>   28:	e30c0afe 	movw	r0, #51966	; 0xcafe
+>   2c:	e30b1eef 	movw	r1, #48879	; 0xbeef
+>   30:	e34d0eaf 	movt	r0, #57007	; 0xdeaf
+>   34:	e34d1ead 	movt	r1, #57005	; 0xdead
+>   38:	e1b34f9f 	ldrexd	r4, [r3]
+>   3c:	e1a34f90 	strexd	r4, r0, [r3]
+>   40:	e3340000 	teq	r4, #0
+>   44:	1afffffb 	bne	38 <test_atomic64+0x38>
+>   48:	e59f0004 	ldr	r0, [pc, #4]	; 54 <test_atomic64+0x54>
+>   4c:	e3a0101e 	mov	r1, #30
+>   50:	ebfffffe 	bl	0 <__bug>
+>   54:	00000000 	.word	0x00000000
+> 
+> The atomic64_set (0x38-0x44) writes to the atomic64_t, but the
+> compiler doesn't see this, assumes the test condition is always
+> false and generates an unconditional branch to __bug. The rest of the
+> test is optimised away.
+> 
+> This patch adds suitable memory constraints to the atomic operations on ARM
+> to ensure that the compiler is informed of the correct data hazards. We have
+> to use the "Qo" constraints to avoid hitting the GCC anomaly described at
+> http://gcc.gnu.org/bugzilla/show_bug.cgi?id=44492 , where the compiler
+> makes assumptions about the writeback in the addressing mode used by the
+> inline assembly. These constraints forbid the use of auto{inc,dec} addressing
+> modes, so it doesn't matter if we don't use the operand exactly once.
 
-If you want to go with the mainline kernel then the place where i.MX 
-development is happening is 
-http://git.pengutronix.de/?p=imx/linux-2.6.git;a=summary
+Why do you use the "o" constraint?  That's for an offsetable 
+memory reference.  Since we already use the actual address value with a 
+register constraint, it would be more logical to simply use the "Q" 
+constraint alone without any "o".  The gcc manual says:
 
-> What other trees are there, and how can I get an impression of the state of 
-> each one?  How far are effords for mainline inclusion of the freescale 
-> patches?
+|    `Q'
+|          A memory reference where the exact address is in a single
+|          register
 
-Freescale are doing very little to push their work for mainline inclusion.  
-Amit Kucheria from Canonical/Linaro has been doing some work on the i.MX5 
-front. This work is in the mainline kernels since 2.6.34.
+Both "Qo" and "Q" provide the same wanted end result in this 
+case.  But a quick test shows that "Q" produces exactly what we need,
+more so than "Qo", because of the other operand which is the actual 
+address (the same register is used in both cases).
 
-> 2.- Using this kernel, I notice the touchscreen driver, (mxc_ts.c) not 
-> working correctly. It looks like it works for a few seconds after boot, and 
-> then starts delaying samples very much, to the point that it is unusable. Is 
-> this a known problem? Is there someone working on this? Should I use another 
-> driver?
+In any case:
 
-This driver is not in the mainline kernel, so the help you may get from kernel 
-developers is limited. In any case, questions about the input subsystem should 
-go to the linux-input mailing list (linux-input at vger.kernel.org).
+Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-baruch
+Also, I'm assuming that such a constraint should be added to the 32 bit 
+versions too for the same correctness reason?
 
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/include/asm/atomic.h |  132 ++++++++++++++++++++--------------------
+>  1 files changed, 66 insertions(+), 66 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
+> index 4f0f282..99ab659 100644
+> --- a/arch/arm/include/asm/atomic.h
+> +++ b/arch/arm/include/asm/atomic.h
+> @@ -40,12 +40,12 @@ static inline void atomic_add(int i, atomic_t *v)
+>  	int result;
+>  
+>  	__asm__ __volatile__("@ atomic_add\n"
+> -"1:	ldrex	%0, [%2]\n"
+> -"	add	%0, %0, %3\n"
+> -"	strex	%1, %0, [%2]\n"
+> +"1:	ldrex	%0, [%3]\n"
+> +"	add	%0, %0, %4\n"
+> +"	strex	%1, %0, [%3]\n"
+>  "	teq	%1, #0\n"
+>  "	bne	1b"
+> -	: "=&r" (result), "=&r" (tmp)
+> +	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
+>  	: "r" (&v->counter), "Ir" (i)
+>  	: "cc");
+>  }
+> @@ -58,12 +58,12 @@ static inline int atomic_add_return(int i, atomic_t *v)
+>  	smp_mb();
+>  
+>  	__asm__ __volatile__("@ atomic_add_return\n"
+> -"1:	ldrex	%0, [%2]\n"
+> -"	add	%0, %0, %3\n"
+> -"	strex	%1, %0, [%2]\n"
+> +"1:	ldrex	%0, [%3]\n"
+> +"	add	%0, %0, %4\n"
+> +"	strex	%1, %0, [%3]\n"
+>  "	teq	%1, #0\n"
+>  "	bne	1b"
+> -	: "=&r" (result), "=&r" (tmp)
+> +	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
+>  	: "r" (&v->counter), "Ir" (i)
+>  	: "cc");
+>  
+> @@ -78,12 +78,12 @@ static inline void atomic_sub(int i, atomic_t *v)
+>  	int result;
+>  
+>  	__asm__ __volatile__("@ atomic_sub\n"
+> -"1:	ldrex	%0, [%2]\n"
+> -"	sub	%0, %0, %3\n"
+> -"	strex	%1, %0, [%2]\n"
+> +"1:	ldrex	%0, [%3]\n"
+> +"	sub	%0, %0, %4\n"
+> +"	strex	%1, %0, [%3]\n"
+>  "	teq	%1, #0\n"
+>  "	bne	1b"
+> -	: "=&r" (result), "=&r" (tmp)
+> +	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
+>  	: "r" (&v->counter), "Ir" (i)
+>  	: "cc");
+>  }
+> @@ -96,12 +96,12 @@ static inline int atomic_sub_return(int i, atomic_t *v)
+>  	smp_mb();
+>  
+>  	__asm__ __volatile__("@ atomic_sub_return\n"
+> -"1:	ldrex	%0, [%2]\n"
+> -"	sub	%0, %0, %3\n"
+> -"	strex	%1, %0, [%2]\n"
+> +"1:	ldrex	%0, [%3]\n"
+> +"	sub	%0, %0, %4\n"
+> +"	strex	%1, %0, [%3]\n"
+>  "	teq	%1, #0\n"
+>  "	bne	1b"
+> -	: "=&r" (result), "=&r" (tmp)
+> +	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
+>  	: "r" (&v->counter), "Ir" (i)
+>  	: "cc");
+>  
+> @@ -118,11 +118,11 @@ static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
+>  
+>  	do {
+>  		__asm__ __volatile__("@ atomic_cmpxchg\n"
+> -		"ldrex	%1, [%2]\n"
+> +		"ldrex	%1, [%3]\n"
+>  		"mov	%0, #0\n"
+> -		"teq	%1, %3\n"
+> -		"strexeq %0, %4, [%2]\n"
+> -		    : "=&r" (res), "=&r" (oldval)
+> +		"teq	%1, %4\n"
+> +		"strexeq %0, %5, [%3]\n"
+> +		    : "=&r" (res), "=&r" (oldval), "+Qo" (ptr->counter)
+>  		    : "r" (&ptr->counter), "Ir" (old), "r" (new)
+>  		    : "cc");
+>  	} while (res);
+> @@ -137,12 +137,12 @@ static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
+>  	unsigned long tmp, tmp2;
+>  
+>  	__asm__ __volatile__("@ atomic_clear_mask\n"
+> -"1:	ldrex	%0, [%2]\n"
+> -"	bic	%0, %0, %3\n"
+> -"	strex	%1, %0, [%2]\n"
+> +"1:	ldrex	%0, [%3]\n"
+> +"	bic	%0, %0, %4\n"
+> +"	strex	%1, %0, [%3]\n"
+>  "	teq	%1, #0\n"
+>  "	bne	1b"
+> -	: "=&r" (tmp), "=&r" (tmp2)
+> +	: "=&r" (tmp), "=&r" (tmp2), "+Qo" (*addr)
+>  	: "r" (addr), "Ir" (mask)
+>  	: "cc");
+>  }
+> @@ -249,7 +249,7 @@ static inline u64 atomic64_read(atomic64_t *v)
+>  	__asm__ __volatile__("@ atomic64_read\n"
+>  "	ldrexd	%0, %H0, [%1]"
+>  	: "=&r" (result)
+> -	: "r" (&v->counter)
+> +	: "r" (&v->counter), "Qo" (v->counter)
+>  	);
+>  
+>  	return result;
+> @@ -260,11 +260,11 @@ static inline void atomic64_set(atomic64_t *v, u64 i)
+>  	u64 tmp;
+>  
+>  	__asm__ __volatile__("@ atomic64_set\n"
+> -"1:	ldrexd	%0, %H0, [%1]\n"
+> -"	strexd	%0, %2, %H2, [%1]\n"
+> +"1:	ldrexd	%0, %H0, [%2]\n"
+> +"	strexd	%0, %3, %H3, [%2]\n"
+>  "	teq	%0, #0\n"
+>  "	bne	1b"
+> -	: "=&r" (tmp)
+> +	: "=&r" (tmp), "=Qo" (v->counter)
+>  	: "r" (&v->counter), "r" (i)
+>  	: "cc");
+>  }
+> @@ -275,13 +275,13 @@ static inline void atomic64_add(u64 i, atomic64_t *v)
+>  	unsigned long tmp;
+>  
+>  	__asm__ __volatile__("@ atomic64_add\n"
+> -"1:	ldrexd	%0, %H0, [%2]\n"
+> -"	adds	%0, %0, %3\n"
+> -"	adc	%H0, %H0, %H3\n"
+> -"	strexd	%1, %0, %H0, [%2]\n"
+> +"1:	ldrexd	%0, %H0, [%3]\n"
+> +"	adds	%0, %0, %4\n"
+> +"	adc	%H0, %H0, %H4\n"
+> +"	strexd	%1, %0, %H0, [%3]\n"
+>  "	teq	%1, #0\n"
+>  "	bne	1b"
+> -	: "=&r" (result), "=&r" (tmp)
+> +	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
+>  	: "r" (&v->counter), "r" (i)
+>  	: "cc");
+>  }
+> @@ -294,13 +294,13 @@ static inline u64 atomic64_add_return(u64 i, atomic64_t *v)
+>  	smp_mb();
+>  
+>  	__asm__ __volatile__("@ atomic64_add_return\n"
+> -"1:	ldrexd	%0, %H0, [%2]\n"
+> -"	adds	%0, %0, %3\n"
+> -"	adc	%H0, %H0, %H3\n"
+> -"	strexd	%1, %0, %H0, [%2]\n"
+> +"1:	ldrexd	%0, %H0, [%3]\n"
+> +"	adds	%0, %0, %4\n"
+> +"	adc	%H0, %H0, %H4\n"
+> +"	strexd	%1, %0, %H0, [%3]\n"
+>  "	teq	%1, #0\n"
+>  "	bne	1b"
+> -	: "=&r" (result), "=&r" (tmp)
+> +	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
+>  	: "r" (&v->counter), "r" (i)
+>  	: "cc");
+>  
+> @@ -315,13 +315,13 @@ static inline void atomic64_sub(u64 i, atomic64_t *v)
+>  	unsigned long tmp;
+>  
+>  	__asm__ __volatile__("@ atomic64_sub\n"
+> -"1:	ldrexd	%0, %H0, [%2]\n"
+> -"	subs	%0, %0, %3\n"
+> -"	sbc	%H0, %H0, %H3\n"
+> -"	strexd	%1, %0, %H0, [%2]\n"
+> +"1:	ldrexd	%0, %H0, [%3]\n"
+> +"	subs	%0, %0, %4\n"
+> +"	sbc	%H0, %H0, %H4\n"
+> +"	strexd	%1, %0, %H0, [%3]\n"
+>  "	teq	%1, #0\n"
+>  "	bne	1b"
+> -	: "=&r" (result), "=&r" (tmp)
+> +	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
+>  	: "r" (&v->counter), "r" (i)
+>  	: "cc");
+>  }
+> @@ -334,13 +334,13 @@ static inline u64 atomic64_sub_return(u64 i, atomic64_t *v)
+>  	smp_mb();
+>  
+>  	__asm__ __volatile__("@ atomic64_sub_return\n"
+> -"1:	ldrexd	%0, %H0, [%2]\n"
+> -"	subs	%0, %0, %3\n"
+> -"	sbc	%H0, %H0, %H3\n"
+> -"	strexd	%1, %0, %H0, [%2]\n"
+> +"1:	ldrexd	%0, %H0, [%3]\n"
+> +"	subs	%0, %0, %4\n"
+> +"	sbc	%H0, %H0, %H4\n"
+> +"	strexd	%1, %0, %H0, [%3]\n"
+>  "	teq	%1, #0\n"
+>  "	bne	1b"
+> -	: "=&r" (result), "=&r" (tmp)
+> +	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
+>  	: "r" (&v->counter), "r" (i)
+>  	: "cc");
+>  
+> @@ -359,11 +359,11 @@ static inline u64 atomic64_cmpxchg(atomic64_t *ptr, u64 old, u64 new)
+>  	do {
+>  		__asm__ __volatile__("@ atomic64_cmpxchg\n"
+>  		"mov		%0, #0\n"
+> -		"ldrexd		%1, %H1, [%2]\n"
+> -		"teq		%1, %3\n"
+> -		"teqeq		%H1, %H3\n"
+> -		"strexdeq	%0, %4, %H4, [%2]"
+> -		: "=&r" (res), "=&r" (oldval)
+> +		"ldrexd		%1, %H1, [%3]\n"
+> +		"teq		%1, %4\n"
+> +		"teqeq		%H1, %H4\n"
+> +		"strexdeq	%0, %5, %H5, [%3]"
+> +		: "=&r" (res), "=&r" (oldval), "+Qo" (ptr->counter)
+>  		: "r" (&ptr->counter), "r" (old), "r" (new)
+>  		: "cc");
+>  	} while (res);
+> @@ -381,11 +381,11 @@ static inline u64 atomic64_xchg(atomic64_t *ptr, u64 new)
+>  	smp_mb();
+>  
+>  	__asm__ __volatile__("@ atomic64_xchg\n"
+> -"1:	ldrexd	%0, %H0, [%2]\n"
+> -"	strexd	%1, %3, %H3, [%2]\n"
+> +"1:	ldrexd	%0, %H0, [%3]\n"
+> +"	strexd	%1, %4, %H4, [%3]\n"
+>  "	teq	%1, #0\n"
+>  "	bne	1b"
+> -	: "=&r" (result), "=&r" (tmp)
+> +	: "=&r" (result), "=&r" (tmp), "+Qo" (ptr->counter)
+>  	: "r" (&ptr->counter), "r" (new)
+>  	: "cc");
+>  
+> @@ -402,16 +402,16 @@ static inline u64 atomic64_dec_if_positive(atomic64_t *v)
+>  	smp_mb();
+>  
+>  	__asm__ __volatile__("@ atomic64_dec_if_positive\n"
+> -"1:	ldrexd	%0, %H0, [%2]\n"
+> +"1:	ldrexd	%0, %H0, [%3]\n"
+>  "	subs	%0, %0, #1\n"
+>  "	sbc	%H0, %H0, #0\n"
+>  "	teq	%H0, #0\n"
+>  "	bmi	2f\n"
+> -"	strexd	%1, %0, %H0, [%2]\n"
+> +"	strexd	%1, %0, %H0, [%3]\n"
+>  "	teq	%1, #0\n"
+>  "	bne	1b\n"
+>  "2:"
+> -	: "=&r" (result), "=&r" (tmp)
+> +	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
+>  	: "r" (&v->counter)
+>  	: "cc");
+>  
+> @@ -429,18 +429,18 @@ static inline int atomic64_add_unless(atomic64_t *v, u64 a, u64 u)
+>  	smp_mb();
+>  
+>  	__asm__ __volatile__("@ atomic64_add_unless\n"
+> -"1:	ldrexd	%0, %H0, [%3]\n"
+> -"	teq	%0, %4\n"
+> -"	teqeq	%H0, %H4\n"
+> +"1:	ldrexd	%0, %H0, [%4]\n"
+> +"	teq	%0, %5\n"
+> +"	teqeq	%H0, %H5\n"
+>  "	moveq	%1, #0\n"
+>  "	beq	2f\n"
+> -"	adds	%0, %0, %5\n"
+> -"	adc	%H0, %H0, %H5\n"
+> -"	strexd	%2, %0, %H0, [%3]\n"
+> +"	adds	%0, %0, %6\n"
+> +"	adc	%H0, %H0, %H6\n"
+> +"	strexd	%2, %0, %H0, [%4]\n"
+>  "	teq	%2, #0\n"
+>  "	bne	1b\n"
+>  "2:"
+> -	: "=&r" (val), "+r" (ret), "=&r" (tmp)
+> +	: "=&r" (val), "+r" (ret), "=&r" (tmp), "+Qo" (v->counter)
+>  	: "r" (&v->counter), "r" (u), "r" (a)
+>  	: "cc");
+>  
+> -- 
+> 1.6.3.3
+> 
