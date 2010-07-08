@@ -1,78 +1,70 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 8 Jul 2010 09:08:26 +0200
-Subject: [PATCH 0/5] Makefile.boot cleanup
-In-Reply-To: <alpine.LFD.2.00.1007071150390.6020@xanadu.home>
-References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
-	<20100705141344.GA25407@pengutronix.de>
-	<20100707144521.GB10470@pengutronix.de>
-	<alpine.LFD.2.00.1007071150390.6020@xanadu.home>
-Message-ID: <20100708070826.GB21565@pengutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 08 Jul 2010 09:23:59 +0200
+Subject: S3C2416 fixes (gpiolib, SDHCI, compilation without FB device)
+In-Reply-To: <4C3361BC.2040204@gmail.com>
+References: <1277212585-25605-1-git-send-email-jekhor@gmail.com>
+	<4C248B23.7060905@gmail.com>
+	<000001cb1687$638b2310$2aa16930$%szyprowski@samsung.com>
+	<4C3361BC.2040204@gmail.com>
+Message-ID: <000201cb1e6e$8b3f7a20$a1be6e60$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Hello,
 
-On Wed, Jul 07, 2010 at 11:54:14AM -0400, Nicolas Pitre wrote:
-> On Wed, 7 Jul 2010, Uwe Kleine-K?nig wrote:
-> > On Mon, Jul 05, 2010 at 04:13:44PM +0200, Uwe Kleine-K?nig wrote:
-> > > this series is a merge between Eric's and my patches that we did to
-> > > clean up the early boot code.  It doesn't contain runtime physoffset
-> > > support for now, but I plan to pick that up later.
-> > 
-> > I added Nicolas' Acks to my tree and dropped the one patch he objected.
-> > 
-> > Are you willing to pull these now?
+On Tuesday, July 06, 2010 7:03 PM Darius Augulis wrote:
+
+> On 06/28/2010 09:01 AM, Marek Szyprowski wrote:
+> > Hello,
+> >
+> > On Friday, June 25, 2010 12:56 PM Darius Augulis wrote:
+> >
+> >> On 06/22/2010 04:16 PM, Yauhen Kharuzhy wrote:
+> >>> This patch series fixes SDHCI on S3C2416. I got SD card working with
+> this
+> >> patches
+> >>> and with patches for GPIO card detection support by Marek Szyprowski.
+> >>>
+> >>
+> >> Unfortunately I did not get SD card working with these patches. I'm
+> >> using custom board, not SMDK2416, but SD slot connection and schematics
+> >> are the same like in SMDK2416. I've tried to debug a bit this problem
+> >> and this is what I got: kernel do detection of card insert/remove,
+> >> driver prints messages:
+> >>
+> >> s3c-sdhci s3c-sdhci.1: card inserted.
+> >> s3c-sdhci s3c-sdhci.1: card removed.
+> >>
+> >> Then I put some printk in s3c-sdhci driver and MMC core and found that
+> >> mmc_rescan() is called only once at startup and no more when
+> >> inserting/removing SD card. Also mmc_rescan() stops at that point where
+> >> mmc_power_up() is called and does not return. And mmc_power_up() stops
+> >> where mmc_delay(10) is called and does not return too.
+> >> Every time when inserting/removing SD card only functions
+> >> sdhci_tasklet_card() and mmc_detect_change() are called, and nothing
+> >> happens. Kernel doesn't detect the card inserted.
+> >> Maybe this info could help to debug where the problem is - in my custom
+> >> board or in your patches?
+> >
+> > Have you tried with polled card detection method (SDHCI_CD_NONE)? If it
+> > doesn't work I suspect something with the hardware. Checking with mmc
+> debug
+> > enabled might also help figuring this issue out.
 > 
-> FWIW, I'm fine with Russell pulling this into his tree for the next 
-> merge window.  Maybe you could just resend an official pull request with 
-> the updated info.
-OK, I thought it similar enough to the original request, but if it helps
-I can do that:
+> yes, I've tried that, but didn't get sd card working. I got schematics
+> from China manufacturer, SD card connection is the same like in
+> smdk2416. with mmc debug enabled I found that SD card is detected when
+> inserted or removed, but after detection card initialisation is not
+> performed.
 
-The following changes since commit 7e27d6e778cd87b6f2415515d7127eba53fe5d02:
+Does it work without my patches or with other Linux kernel? You can try to 
+check the custom Linux 2.6.29 from 
+git://git.kernel.org/pub/scm/linux/kernel/git/kki_ap/linux-2.6-samsung.git
 
-  Linux 2.6.35-rc3 (2010-06-11 19:14:04 -0700)
-
-are available in the git repository at:
-  git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
-
-Eric Miao (2):
-      ARM: Remove unused PARAMS_PHYS from arch/arm/boot/compressed
-      Auto calculate ZRELADDR and provide option for exceptions
-
-Uwe Kleine-K?nig (8):
-      ARM: zImage: don't hard code the stack size twice
-      ARM: zImage: some comments for __armv3_mpu_cache_on
-      ARM: zImage: __armv3_mpu_cache_flush: respect should-be-zero specification
-      ARM: zImage: fix comments for cache_on, cache_off and cache_clean_flush
-      ARM: zImage: annotate debug functions about corrupted registers
-      ARM: remove bit-rotten STANDALONE_DEBUG for decompressor
-      ARM: zImage: don't define unused symbol initrd_phys
-      ARM: deprecate support for old way to pass kernel parameters
-
- arch/arm/Kconfig                        |  105 +++++++++++++++++++++++++++++++
- arch/arm/boot/Makefile                  |    8 +--
- arch/arm/boot/compressed/Makefile       |   11 +---
- arch/arm/boot/compressed/Makefile.debug |   23 -------
- arch/arm/boot/compressed/head.S         |   40 +++++++++---
- arch/arm/boot/compressed/misc.c         |   20 ------
- arch/arm/kernel/Makefile                |    4 +-
- arch/arm/kernel/compat.c                |    7 --
- arch/arm/kernel/compat.h                |    2 -
- arch/arm/kernel/setup.c                 |   11 +++
- 10 files changed, 152 insertions(+), 79 deletions(-)
- delete mode 100644 arch/arm/boot/compressed/Makefile.debug
-
-Russell, can you please pull this for the next merge window?
-
->                    I'll include it in the Linaro consolidation tree in 
-> the mean time if you don't mind.
-I don't know what the "Linaro consolidation tree" is, but I'm sure that
-even if I minded I couldn't stop you to take it. :-)
+I would like to know whether my patches cause the problem or there is some
+kind of hardware issue with your board.
 
 Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+--
+Marek Szyprowski
+Samsung Poland R&D Center
