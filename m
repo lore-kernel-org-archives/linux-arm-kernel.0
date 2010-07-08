@@ -1,27 +1,88 @@
-From: ameya.palande@nokia.com (Ameya Palande)
-Date: Thu, 08 Jul 2010 16:01:23 +0300
-Subject: [PATCH 09/13] tsl2563 ALS support for Nokia N900
-In-Reply-To: <20100707094432.2562.30773.stgit@baageli.muru.com>
-References: <20100707094308.2562.91921.stgit@baageli.muru.com>
-	<20100707094432.2562.30773.stgit@baageli.muru.com>
-Message-ID: <1278594083.1955.3.camel@chotu>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 08 Jul 2010 16:54:17 +0300
+Subject: [PATCH 00/13] omap updates for 2.6.36 merge window
+Message-ID: <20100708135342.26276.80936.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi all,
 
-On Wed, 2010-07-07 at 11:44 +0200, ext Tony Lindgren wrote:
-> From: Ameya Palande <ameya.palande@nokia.com>
-> 
-> This commit will enable usage of tsl2563 ambient light sensor on Nokia N900.
-> 
-> Signed-off-by: Ameya Palande <ameya.palande@nokia.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+Here are some omap updates for the upcoming merge window.
 
-This patch is not correct, sorry for that. You can drop this one.
-Mathias Nyman will send a new one with correction.
+Regards,
 
-Thanks!
+Tony
 
-Cheers,
-Ameya.
+---
+
+Cory Maccarrone (1):
+      omap1: omap7xx clocks, mux, serial fixes
+
+Grazvydas Ignotas (1):
+      omap: mux: fix multipath gpio handling
+
+Kan-Ru Chen (3):
+      omap: Add new interface omap_get_die_id
+      omap: Use omap_get_die_id() to get the DIE ids
+      omap: Devkit8000: Use DIE id to initialize dm9000 MAC address
+
+Mike Rapoport (1):
+      omap3: introduce omap3_map_io
+
+Nishanth Menon (1):
+      omap2/3: id: fix sparse warning
+
+Samu Onkalo (1):
+      omap: dma: Support for prefetch in destination synchronizedtransfer
+
+Sergio Aguirre (1):
+      omap3: Unify omap2_set_globals_3[43,6x]x functions
+
+Steve Sakoman (1):
+      omap: Overo: Fix support for second ethernet port
+
+Tony Lindgren (2):
+      omap: Add back UART MDR1 check into uncompress.h
+      omap2: Fix GPIO numbers and smc91x for 2430sdp
+
+stanley.miao (1):
+      OMAP3: AM3505/3517 do not have IO wakeup capability
+
+
+ arch/arm/mach-omap1/clock_data.c             |   20 ++++++++++
+ arch/arm/mach-omap1/mux.c                    |    4 ++
+ arch/arm/mach-omap1/serial.c                 |    7 ++++
+ arch/arm/mach-omap2/board-2430sdp.c          |    6 +--
+ arch/arm/mach-omap2/board-3430sdp.c          |    8 +---
+ arch/arm/mach-omap2/board-3630sdp.c          |    8 +---
+ arch/arm/mach-omap2/board-am3517evm.c        |    8 +---
+ arch/arm/mach-omap2/board-cm-t35.c           |    8 +---
+ arch/arm/mach-omap2/board-devkit8000.c       |   22 ++++++++---
+ arch/arm/mach-omap2/board-igep0020.c         |    8 +---
+ arch/arm/mach-omap2/board-ldp.c              |    8 +---
+ arch/arm/mach-omap2/board-omap3beagle.c      |    8 +---
+ arch/arm/mach-omap2/board-omap3evm.c         |    8 +---
+ arch/arm/mach-omap2/board-omap3pandora.c     |    8 +---
+ arch/arm/mach-omap2/board-omap3stalker.c     |    8 +---
+ arch/arm/mach-omap2/board-omap3touchbook.c   |    8 +---
+ arch/arm/mach-omap2/board-overo.c            |   50 +++++++++++++++++++++-----
+ arch/arm/mach-omap2/board-rx51.c             |    2 +
+ arch/arm/mach-omap2/board-zoom2.c            |    8 +---
+ arch/arm/mach-omap2/board-zoom3.c            |    8 +---
+ arch/arm/mach-omap2/id.c                     |   36 ++++++++++++-------
+ arch/arm/mach-omap2/include/mach/id.h        |   22 +++++++++++
+ arch/arm/mach-omap2/mux.c                    |   38 ++++++++++----------
+ arch/arm/mach-omap2/pm34xx.c                 |    7 ++--
+ arch/arm/plat-omap/common.c                  |   10 +++--
+ arch/arm/plat-omap/dma.c                     |   11 ++++--
+ arch/arm/plat-omap/gpio.c                    |    4 ++
+ arch/arm/plat-omap/include/plat/common.h     |    5 ++-
+ arch/arm/plat-omap/include/plat/cpu.h        |    2 +
+ arch/arm/plat-omap/include/plat/dma.h        |    1 +
+ arch/arm/plat-omap/include/plat/mux.h        |    4 ++
+ arch/arm/plat-omap/include/plat/uncompress.h |    6 +++
+ 32 files changed, 202 insertions(+), 159 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/include/mach/id.h
+
+-- 
+Signature
