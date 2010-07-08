@@ -1,49 +1,51 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 08 Jul 2010 00:49:24 -0400 (EDT)
-Subject: [PATCH 2/4] ARM: atomic ops: reduce critical region in
-	atomic64_cmpxchg
-In-Reply-To: <1277906688-12065-3-git-send-email-will.deacon@arm.com>
-References: <1277906688-12065-1-git-send-email-will.deacon@arm.com>
-	<1277906688-12065-2-git-send-email-will.deacon@arm.com>
-	<1277906688-12065-3-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.00.1007080045450.6020@xanadu.home>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 8 Jul 2010 08:44:36 +0300
+Subject: i.MX51 kernel trees: Where to start?
+In-Reply-To: <201007071408.50621.david.jander@protonic.nl>
+References: <201007071408.50621.david.jander@protonic.nl>
+Message-ID: <20100708054436.GC25143@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Jun 2010, Will Deacon wrote:
+Hi David,
 
-> In order to reduce the likelihood of failure in a load/store
-> exclusive block, the number of intervening instructions should
-> be kept to a minimum.
+On Wed, Jul 07, 2010 at 02:08:50PM +0200, David Jander wrote:
+> 1.- What's the most recommended (git-) tree to start from doing BSP 
+> development?
+> Right now, I am playing with sources downloaded from freescale directly, and 
+> AFAICS this is quite similar to the "tracking-fsl-imx_2.6.31" branch from denx 
+> git:
 > 
-> This patch hoists a mov operation out of the critical region
-> in atomic64_cmpxchg.
+> http://git.denx.de/?p=linux-2.6-denx.git;a=shortlog;h=refs/heads/tracking-fsl-
+> imx_2.6.31
 > 
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/include/asm/atomic.h |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
-> index e9e56c0..4f0f282 100644
-> --- a/arch/arm/include/asm/atomic.h
-> +++ b/arch/arm/include/asm/atomic.h
-> @@ -358,8 +358,8 @@ static inline u64 atomic64_cmpxchg(atomic64_t *ptr, u64 old, u64 new)
->  
->  	do {
->  		__asm__ __volatile__("@ atomic64_cmpxchg\n"
-> -		"ldrexd		%1, %H1, [%2]\n"
->  		"mov		%0, #0\n"
-> +		"ldrexd		%1, %H1, [%2]\n"
->  		"teq		%1, %3\n"
->  		"teqeq		%H1, %H3\n"
->  		"strexdeq	%0, %4, %H4, [%2]"
+> Is this indeed the best place to start?
 
-I'm not sure you gain anything here.  The ldrexd probably requires at 
-least one result delay cycle which is filled by the  mov instruction.  
-By moving the mov insn before the ldrexd you are probably making the 
-whole sequence one cycle longer.
+If you want to go with the mainline kernel then the place where i.MX 
+development is happening is 
+http://git.pengutronix.de/?p=imx/linux-2.6.git;a=summary
 
+> What other trees are there, and how can I get an impression of the state of 
+> each one?  How far are effords for mainline inclusion of the freescale 
+> patches?
 
-Nicolas
+Freescale are doing very little to push their work for mainline inclusion.  
+Amit Kucheria from Canonical/Linaro has been doing some work on the i.MX5 
+front. This work is in the mainline kernels since 2.6.34.
+
+> 2.- Using this kernel, I notice the touchscreen driver, (mxc_ts.c) not 
+> working correctly. It looks like it works for a few seconds after boot, and 
+> then starts delaying samples very much, to the point that it is unusable. Is 
+> this a known problem? Is there someone working on this? Should I use another 
+> driver?
+
+This driver is not in the mainline kernel, so the help you may get from kernel 
+developers is limited. In any case, questions about the input subsystem should 
+go to the linux-input mailing list (linux-input at vger.kernel.org).
+
+baruch
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
