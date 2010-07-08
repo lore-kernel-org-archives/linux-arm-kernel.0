@@ -1,55 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 08 Jul 2010 20:19:36 +0900
-Subject: [GIT PULL] Samsung fixes for 2.6.35-rc5
-Message-ID: <020501cb1e8f$756067c0$60213740$%kim@samsung.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Thu, 8 Jul 2010 14:31:22 +0300
+Subject: [patch 071/149] ARM: 6166/1: Proper prefetch abort handling on
+	pre-ARMv6
+In-Reply-To: <20100707223417.GA22673@n2100.arm.linux.org.uk>
+References: <20100701221420.GA10481@shutemov.name>
+	<20100701221728.GA12187@suse.de>
+	<20100701222541.GB10481@shutemov.name>
+	<20100701224837.GA27389@flint.arm.linux.org.uk>
+	<20100701225911.GC10481@shutemov.name>
+	<20100701231207.GB27389@flint.arm.linux.org.uk>
+	<20100706130618.GA14177@shutemov.name>
+	<20100706225815.GA21834@flint.arm.linux.org.uk>
+	<20100707085601.GA18732@shutemov.name>
+	<20100707223417.GA22673@n2100.arm.linux.org.uk>
+Message-ID: <20100708113122.GA23854@shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Linus,
+On Wed, Jul 07, 2010 at 11:34:18PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jul 07, 2010 at 11:56:01AM +0300, Kirill A. Shutemov wrote:
+> > But it seems that the problem is more global. Potentially, any of
+> > pmd_none() check may produce false results. I don't see an easy way to fix
+> > it.
+> 
+> It isn't.  We normally guarantee that we always fill on both L1 entries.
+> The only exception is for the mappings specified via create_mapping()
+> which is used for the static platform mappings.
+ 
+Why do not to change create_mapping() to follow the same rules?
+I mean, create sections only if it asked for 2*SECTION_SIZE with
+appropriate alignment. It reduces number of section mappings, but,
+probably, will be a bit cleaner and less error-prune.
 
-Please pull Samsung fixes from:
+> > Does Linux VM still expect one PTE table per page?
+> 
+> Yes, and as far as I can see probably always will.  Hence why we need
+> to put two L1 entries in one page and lie to the kernel about the sizes
+> of the hardware entries.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-s5p-fixes-for-linus
+Another option is leave half of page with PTE table free. Is it very bad
+idea?
 
-These things are for bug fix on 2.6.35-rc.
-If any problems, please let me know.
+How other architectures handle it? Or only on ARM PTL table size is less
+than page size?
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-
-The following changes since commit 815c4163b6c8ebf8152f42b0a5fd015cfdcedc78
-
-  Linux 2.6.35-rc4
-
-are available in the git repository at:
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-s5p-fixes-for-linus
-
-Boojin Kim (1):
-      ARM: S5P: Bug fix on external interrupt for S5P SoCs
-
-Hyuk Lee (1):
-      ARM: SAMSUNG: Fix on wrong function name for S5PV210 sdhci0
-
-Marek Szyprowski (1):
-      ARM: SAMSUNG: Fix build without SDHCI controllers for S3C64XX
-
-MyungJoo Ham (1):
-      ARM: S5PV210: Correct clock register properties
-
-Thomas Abraham (1):
-      ARM: S5P6442: Fix PLL setting announce message.
-
- arch/arm/mach-s5p6442/clock.c              |    2 +-
- arch/arm/mach-s5pv210/clock.c              |  115
-+++++++++++++++-------------
- arch/arm/plat-s5p/irq-eint.c               |    2 +-
- arch/arm/plat-samsung/include/plat/sdhci.h |    4 +-
- 4 files changed, 67 insertions(+), 56 deletions(-)
+-- 
+ Kirill A. Shutemov
