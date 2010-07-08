@@ -1,48 +1,64 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Thu, 8 Jul 2010 14:31:22 +0300
-Subject: [patch 071/149] ARM: 6166/1: Proper prefetch abort handling on
-	pre-ARMv6
-In-Reply-To: <20100707223417.GA22673@n2100.arm.linux.org.uk>
-References: <20100701221420.GA10481@shutemov.name>
-	<20100701221728.GA12187@suse.de>
-	<20100701222541.GB10481@shutemov.name>
-	<20100701224837.GA27389@flint.arm.linux.org.uk>
-	<20100701225911.GC10481@shutemov.name>
-	<20100701231207.GB27389@flint.arm.linux.org.uk>
-	<20100706130618.GA14177@shutemov.name>
-	<20100706225815.GA21834@flint.arm.linux.org.uk>
-	<20100707085601.GA18732@shutemov.name>
-	<20100707223417.GA22673@n2100.arm.linux.org.uk>
-Message-ID: <20100708113122.GA23854@shutemov.name>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Thu, 8 Jul 2010 20:40:39 +0900
+Subject: [PATCH] s5pc110: Reduce the iodesc length of systimer
+In-Reply-To: <020201cb1e8d$7d90ba50$78b22ef0$%kim@samsung.com>
+References: <20100708023647.GA8320@july>
+	<020201cb1e8d$7d90ba50$78b22ef0$%kim@samsung.com>
+Message-ID: <AANLkTilA5_kKf_CYE98ul1znzF1AT_mektC2TrFd9vyv@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 07, 2010 at 11:34:18PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jul 07, 2010 at 11:56:01AM +0300, Kirill A. Shutemov wrote:
-> > But it seems that the problem is more global. Potentially, any of
-> > pmd_none() check may produce false results. I don't see an easy way to fix
-> > it.
-> 
-> It isn't.  We normally guarantee that we always fill on both L1 entries.
-> The only exception is for the mappings specified via create_mapping()
-> which is used for the static platform mappings.
- 
-Why do not to change create_mapping() to follow the same rules?
-I mean, create sections only if it asked for 2*SECTION_SIZE with
-appropriate alignment. It reduces number of section mappings, but,
-probably, will be a bit cleaner and less error-prune.
+Hi Andrew,
 
-> > Does Linux VM still expect one PTE table per page?
-> 
-> Yes, and as far as I can see probably always will.  Hence why we need
-> to put two L1 entries in one page and lie to the kernel about the sizes
-> of the hardware entries.
+Can you explain Mr. Kim request?
+As your suggestion, If the sender and signed-off are different, add
+the From filed at body.
 
-Another option is leave half of page with PTE table free. Is it very bad
-idea?
+I think no need to add duplicated signed-off since it's same person.
 
-How other architectures handle it? Or only on ARM PTL table size is less
-than page size?
+Thank you,
+Kyungmin Park
 
--- 
- Kirill A. Shutemov
+
+On Thu, Jul 8, 2010 at 8:05 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Kyungmin Park wrote:
+>>
+>> From: Kyungmin Park <kyungmin.park@samsung.com>
+>>
+>> It's enough to use 4KiB.
+>>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>
+> Where is submitter(kmpark at infradead.org)'s Signed-off-by?
+> I know submitter and author in here are same...but e-mail.
+> So added 'From' in your patch.
+>
+> It would be helpful to me if you use same e-mail in a patch.
+>
+> Also, the commit message needs to be more descriptive.
+>
+>> ---
+>> diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
+>> index 411a4a9..07b86d2 100644
+>> --- a/arch/arm/mach-s5pv210/cpu.c
+>> +++ b/arch/arm/mach-s5pv210/cpu.c
+>> @@ -41,7 +41,7 @@ static struct map_desc s5pv210_iodesc[] __initdata = {
+>> ? ? ? {
+>> ? ? ? ? ? ? ? .virtual ? ? ? ?= (unsigned long)S5P_VA_SYSTIMER,
+>> ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(S5PV210_PA_SYSTIMER),
+>> - ? ? ? ? ? ? .length ? ? ? ? = SZ_1M,
+>> + ? ? ? ? ? ? .length ? ? ? ? = SZ_4K,
+>> ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
+>> ? ? ? }, {
+>> ? ? ? ? ? ? ? .virtual ? ? ? ?= (unsigned long)VA_VIC2,
+>>
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
