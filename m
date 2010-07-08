@@ -1,32 +1,36 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 8 Jul 2010 10:31:47 -0700
-Subject: [PATCH] s5pc110: Reduce the iodesc length of systimer
-In-Reply-To: <AANLkTilA5_kKf_CYE98ul1znzF1AT_mektC2TrFd9vyv@mail.gmail.com>
-References: <20100708023647.GA8320@july>
-	<020201cb1e8d$7d90ba50$78b22ef0$%kim@samsung.com>
-	<AANLkTilA5_kKf_CYE98ul1znzF1AT_mektC2TrFd9vyv@mail.gmail.com>
-Message-ID: <20100708103147.b2e30323.akpm@linux-foundation.org>
+From: gadiyar@ti.com (Gadiyar, Anand)
+Date: Thu, 8 Jul 2010 23:07:27 +0530
+Subject: Tony mostly offline for the rest of July
+In-Reply-To: <20100708100013.GC1920@atomide.com>
+References: <20100708100013.GC1920@atomide.com>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB032391EFCE@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Jul 2010 20:40:39 +0900 Kyungmin Park <kmpark@infradead.org> wrote:
-
-> Can you explain Mr. Kim request?
-> As your suggestion, If the sender and signed-off are different, add
-> the From filed at body.
+Tony Lindgren wrote:
+> Hi all,
 > 
-> I think no need to add duplicated signed-off since it's same person.
+> FYI, I'll be mostly offline after Friday for several weeks.
+> 
+> I'll post few more patchsets for review, but will not be merging
+> any other omap code after that for the upcoming merge window.
+> 
+> Cheers,
+> 
+> Tony
 
-If you're sending a patch which someone else wrote then at a minimum it
-should have that person's From: at the top of the changelog and it
-should have your Signed-off-by:.
+Tony,
+
+The 3630 ES1.1 ID code patch is pending in patchworks for a while [1].
+
+I missed pinging you on this earlier. It would be nice to queue this
+up for the merge window as well.
 
 
+https://patchwork.kernel.org/patch/95684/
 
-However it is not required that the patch have the author's
-Signed-off-by:.  See Documentation/SubmittingPatches, section 12.  If
-you sent the patch and signed it then _you_ assert that it's OK to
-include the patch in Linux.
 
-That being said, we do prefer that both the author and the sender
-include their signoffs.
+Also, we now have ES1.2 silicon as well; should I submit an updated
+patch now, or just a delta patch later?
+
+- Anand
