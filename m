@@ -1,136 +1,52 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Fri, 9 Jul 2010 13:17:37 +0900
-Subject: [PATCH] ARM: S5PV210: add clocks (struct clk).
-In-Reply-To: <AANLkTimCd5cDOZI1ylQEble1RQT6mYypTV9laizbNO2h@mail.gmail.com>
-References: <1278395327-9072-1-git-send-email-myungjoo.ham@samsung.com>
-	<023a01cb1f0f$90a5da30$b1f18e90$%kim@samsung.com>
-	<AANLkTimCd5cDOZI1ylQEble1RQT6mYypTV9laizbNO2h@mail.gmail.com>
-Message-ID: <AANLkTinAKps803FT_XiiBKqBRv0UNo4RYnpv8EPSn9-C@mail.gmail.com>
+Date: Fri, 09 Jul 2010 14:47:29 +0900
+Subject: [RFC PATCH 0/3 v2] ARM: S5PV210: common struct clk support
+Message-ID: <1278654452-24156-1-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, again.
-
-On Fri, Jul 9, 2010 at 11:59 AM, MyungJoo Ham <myungjoo.ham@samsung.com> wrote:
-> Hello,
->
-> On Fri, Jul 9, 2010 at 11:36 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> MyungJoo Ham wrote:
->>>
->> Hi,
->>
->> Please include Ben Dooks in the Cc..
->> And...excuse me..who is benh at kernel.crashing.org?
->
-> Ah.. I was confused by my own reply regarding common struct clk, which
-> had benh at kernel.crashing.org as Cc. I'll update the CC setting.
->
->>
->>> Many clocks were not listed in the previous
->>> arch/arm/mach-s5pv210/clock.c
->>>
->>> We have added clocks defined as CLK_GATE_IPx[] in the user manual of
->>> S5PV210. However, the clocks that were not turned on at the boot time
->>> when tested with the previous kernel versions (2.6.32, 2.6.29) are
->>> defined in "init_clocks_disabled" so that they are turned off at the
->>> boot time.
->>
->> I think, no need to register all of clocks which are in the CLK_GATE_IPx
->> into 'init_clocks_disabled'..because it depends on each platform or project.
->>
->>>
->>> The clocks added from CLK_GATE_IPx are:
->>> ? ? ? CSIS, JPEG, FIMC0 - 2, NFCON, SROMC, TVENC, HDMI, MIXER, VP,
->>> ? ? ? DSIM, TSI, HOSTIF, MODEM, PCM0 - 2, I2C-HDMI-PHY, I2C-HDMI-DDC,
->>> ? ? ? AC97, SPDIF, SECKEY, IEM-APC, IEM-IEC, CHIP-ID, PDMA0 - 1,
->>> ? ? ? MDMA, DMC0 - 1, NANDXL, TZIC0 - 3, VIC0 - 3, SECJTAG, CORESIGHT,
->>> ? ? ? SDM, SECSS, SYSCON, GPIO, TZPC0 - 3
->>>
->>
->> For example...in the case of JPEG, FIMC, disabling is better at the booting
->> time..because can be enabled dynamically in the device driver when it is
->> used.
->> But if CORESIGHT which does not having own driver is disabled at that time,
->> basically can't use JTAG debugger.
->>
->> So need to sort out clocks to register into 'init_clocks_disabled'
->>
->
-> Yes, I agree. I'll put some clocks including CORESIGHT out of
-> init_clocks_disabled.
->
-
-Oh.. well, CORESIGHT is not included in init_clocks_disabled in the patch.
-
-In this patch, PDMA, MDMA, DMC, NANDXL, TZIC, VIC, SECJTAG, CORESIGHT,
-SDM, SECSS, SYSCON, GPIO, and TZPC are not added to
-init_clocks_disabled, but to init_clocks.
-
-Only others including CSIS, JPEG, FIMC0 - 2, NFCON, SROMC, TVENC,
-HDMI, MIXER, VP, DSIM, TSI, HOSTIF, MODEM, PCM0 - 2, I2C-HDMI-PHY,
-I2C-HDMI-DDC, AC97, SPDIF, SECKEY, IEM-APC, IEM-IEC, and CHIP-ID are
-added to init_clocks_disabled. In this list, are there any clocks that
-should be out of init_clocks_disabled?
-
->
-> Anyway, I've been considering adding "flag" to struct clk, which has
-> the following bits:
->
-> #define CLKFLAGS_BOOT_ON ? ? ? ?(0x1)
-> #define CLKFLAGS_CANNOT_DISABLE (0x2)
-> #define CLKFLAGS_ALWAYS_ON ? ? ?(CLKFLAGS_BOOT_ON | CLKFLAGS_CANNOT_DISABLE)
-> #define CLKFLAGS_BOOT_OFF ? ? ? (0x4) /* Force off when boot */
-> #define CLKFLAGS_DEPRECATED ? ? (0x8) /* Warn when clk_get'd */
-> /* Note that CLKFLAGS_BOOT_ON and CLKFLAGS_CANNOT_DISABLE overrides
-> ?* CLKFLAGS_BOOT_OFF */
->
-> and merging init_clocks and init_clocks_disabled. This provides more
-> precise control on clocks, and we've been using such features in other
-> versions of the kernel. Besides, combined with
-> powerdomain control, these flags are helpful on implementing
-> powerdomain/block-gating control.
->
->
->>> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
->>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->>> ---
->>> ?arch/arm/mach-s5pv210/clock.c | ?298
->>> ++++++++++++++++++++++++++++++++++++++++-
->>> ?1 files changed, 297 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
->>> index b3d156c..aa2b1c5 100644
->>> --- a/arch/arm/mach-s5pv210/clock.c
->>> +++ b/arch/arm/mach-s5pv210/clock.c
->>
->> (snip)
->>
->> Thanks.
->>
->> Best regards,
->> Kgene.
->> --
->> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
->> SW Solution Development Team, Samsung Electronics Co., Ltd.
->>
->>
->
-> Cheers!
-> - MyungJoo
->
-> --
-> MyungJoo Ham (???), Ph.D.
-> Mobile Software Platform Lab,
-> Digital Media and Communications (DMC) Business
-> Samsung Electronics
-> cell: 82-10-6714-2858
->
+These patches enable S5PV210 to use the common struct clk patch:
+([PATCH 0/2] Common struct clk implementation, v5) when a user selects
+"S5PV210_USE_COMMON_STRUCT_CLK" (Use common struct clk for S5PV210
+clock framework). Because the common struct clk implementation patches
+appear to be still in-progress, these patches allow users to turn-on and
+off common struct clk feature for S5PV210. We plan to merge (patching
+*.c directly) the separated *-common-clk.c files when the common struct
+clk patch is finalized and merged.
 
 
+Note that when common struct clk is used, a clock should be defined
+with struct clk_samsung, not with struct clk although struck clk can
+be registered because the behavior can be erratic.
 
--- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+
+We will update the patch when Common struct clk implementation is updated.
+This patch is for v5 patch.
+
+At v2, we have corrected minor style glitches and copyright sentences.
+
+
+MyungJoo Ham (3):
+  ARM: SAMSUNG: Add common struct clk support for Samsung SoCs
+  ARM: S5P: common struct clk support.
+  ARM: S5PV210: common struct clk support.
+
+ arch/arm/mach-s5pv210/Kconfig                     |   10 +
+ arch/arm/mach-s5pv210/Makefile                    |    5 +-
+ arch/arm/mach-s5pv210/clock-common-clk.c          | 1064 +++++++++++++++++++++
+ arch/arm/plat-s5p/Makefile                        |    3 +-
+ arch/arm/plat-s5p/clock-common-clk.c              |  163 ++++
+ arch/arm/plat-s5p/include/plat/s5p-clock.h        |   18 +
+ arch/arm/plat-samsung/Kconfig                     |    9 +
+ arch/arm/plat-samsung/Makefile                    |    9 +-
+ arch/arm/plat-samsung/clock-clksrc-common-clk.c   |  239 +++++
+ arch/arm/plat-samsung/clock-common-clk.c          |  468 +++++++++
+ arch/arm/plat-samsung/include/plat/clock-clksrc.h |    8 +
+ arch/arm/plat-samsung/include/plat/clock.h        |   68 ++
+ arch/arm/plat-samsung/pwm-clock-common-clk.c      |  500 ++++++++++
+ 13 files changed, 2559 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/mach-s5pv210/clock-common-clk.c
+ create mode 100644 arch/arm/plat-s5p/clock-common-clk.c
+ create mode 100644 arch/arm/plat-samsung/clock-clksrc-common-clk.c
+ create mode 100644 arch/arm/plat-samsung/clock-common-clk.c
+ create mode 100644 arch/arm/plat-samsung/pwm-clock-common-clk.c
