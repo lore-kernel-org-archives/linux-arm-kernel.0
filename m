@@ -1,80 +1,144 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Jul 2010 13:22:48 +0100
-Subject: [PATCH] Versatile Express: add support for local timers on	CA9X4
-	daughterboard
-In-Reply-To: <20100709101657.GB22845@n2100.arm.linux.org.uk>
-References: <1275904430-15995-1-git-send-email-will.deacon@arm.com>
-	<20100709101657.GB22845@n2100.arm.linux.org.uk>
-Message-ID: <005201cb1f61$7162f2f0$5428d8d0$@deacon@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Jul 2010 13:40:50 +0100
+Subject: [PATCH v4] GPIO PL061: Adding Clk framework support
+In-Reply-To: <1277183247-4557-1-git-send-email-viresh.kumar@st.com>
+References: <1277183247-4557-1-git-send-email-viresh.kumar@st.com>
+Message-ID: <20100709124050.GF22845@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+On Tue, Jun 22, 2010 at 10:37:27AM +0530, Viresh KUMAR wrote:
+> -	spin_lock_init(&chip->lock);
+> -	spin_lock_init(&chip->irq_lock);
+> -	INIT_LIST_HEAD(&chip->list);
+> +	chip->clk = clk_get(&dev->dev, NULL);
+> +	if (IS_ERR(chip->clk)) {
+> +		ret = PTR_ERR(chip->clk);
+> +		/* clk Not present */
+> +		if (ret == -ENOENT)
+> +			chip->clk = NULL;
 
-> On Mon, Jun 07, 2010 at 10:53:50AM +0100, Will Deacon wrote:
-> > This patch adds support for the Cortex-A9 local timers available when
-> > using the CA9X4 daughterboard with the Versatile Express.
-> 
-> I'd rather we didn't change the timer stuff like this - all that you
-> seem to want is some way to setup the twd base address.  Can this be
-> done via .map_io method instead?
+Please don't assume that NULL is not a valid value for a 'struct clk'.
+Eg,
 
-That's a lot tidier, how about something like this?:
+struct clk *clk_get(struct device *dev, const char *id)
+{
+        return dev && strcmp(dev_name(dev), "mb:16") == 0 ? NULL : ERR_PTR(-ENOENT);
+}
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 98922f7..7b117b1 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1172,9 +1172,10 @@ config HOTPLUG_CPU
- config LOCAL_TIMERS
-        bool "Use local timer interrupts"
-        depends on SMP && (REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || \
--               REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || ARCH_U8500)
-+               REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
-+               ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
-        default y
--       select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500)
-+       select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_VEXPRESS || ARCH_OMAP4 || ARCH_U8500)
-        help
-          Enable support for local timers on SMP platforms, rather then the
-          legacy IPI broadcast method.  Local timers allows the system
-diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
-index 6353459..577df6c 100644
---- a/arch/arm/mach-vexpress/ct-ca9x4.c
-+++ b/arch/arm/mach-vexpress/ct-ca9x4.c
-@@ -16,6 +16,7 @@
- #include <asm/hardware/gic.h>
- #include <asm/mach-types.h>
- #include <asm/pmu.h>
-+#include <asm/smp_twd.h>
- 
- #include <mach/clkdev.h>
- #include <mach/ct-ca9x4.h>
-@@ -53,6 +54,7 @@ static struct map_desc ct_ca9x4_io_desc[] __initdata = {
- 
- static void __init ct_ca9x4_map_io(void)
+However, this patch begs the question about what you're trying to do,
+as the primecell doesn't take a clock for its operation other than the
+AMBA bus clock.
+
+As I've already pointed out, the current primecell implementations do
+not assume that the bus clock is switched - and so they aren't written
+such that the bus clock will be fiddled with when they do clk_enable
+and clk_disable on their functional clocks.
+
+As there do seem to be platforms which can switch the bus clock to
+individual primecells, we need to add this support - and using the
+existing clk API calls won't do, especially as we have primecell code
+which accesses registers prior to doing anything with the clk API.
+
+How about we have the core primecell code request the bus clock on
+driver probe, enable it, and then call the drivers probe method.  On
+driver remove, the bus clock is disabled and put after the drivers
+remove method has been called.  We provide two new function calls,
+amba_bus_clk_enable() and amba_bus_clk_disable() which primecell
+drivers can use to control the bus clock to the peripheral - these
+can be just macros to clk_enable and clk_disable respectively.
+
+So something like the patch below (untested):
+
+ drivers/amba/bus.c       |   35 +++++++++++++++++++++++++++++++----
+ include/linux/amba/bus.h |   10 ++++++++++
+ 2 files changed, 41 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index f60b2b6..1b9f5f8 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -130,17 +130,44 @@ static int amba_probe(struct device *dev)
  {
-+       twd_base = MMIO_P2V(A9_MPCORE_TWD);
-        v2m_map_io(ct_ca9x4_io_desc, ARRAY_SIZE(ct_ca9x4_io_desc));
+ 	struct amba_device *pcdev = to_amba_device(dev);
+ 	struct amba_driver *pcdrv = to_amba_driver(dev->driver);
+-	struct amba_id *id;
++	struct amba_id *id = amba_lookup(pcdrv->id_table, pcdev);
++	struct clk *clk;
++	int ret;
++
++	do {
++		pcdev->busck = clk = clk_get(dev, "busck");
++		if (IS_ERR(clk) && PTR_ERR(clk) != -ENOENT) {
++			ret = PTR_ERR(clk);
++			break;
++		}
++
++		if (!IS_ERR(clk)) {
++			ret = clk_enable(clk);
++			if (ret)
++				break;
++		}
+ 
+-	id = amba_lookup(pcdrv->id_table, pcdev);
++		ret = pcdrv->probe(pcdev, id);
++		if (ret == 0)
++			break;
+ 
+-	return pcdrv->probe(pcdev, id);
++		clk_disable(clk);
++	} while (0);
++
++	return ret;
  }
  
-diff --git a/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h b/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
-index 8650f04..f9e2f8d 100644
---- a/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
-+++ b/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
-@@ -28,6 +28,7 @@
- #define A9_MPCORE_SCU          (CT_CA9X4_MPIC + 0x0000)
- #define A9_MPCORE_GIC_CPU      (CT_CA9X4_MPIC + 0x0100)
- #define A9_MPCORE_GIT          (CT_CA9X4_MPIC + 0x0200)
-+#define A9_MPCORE_TWD          (CT_CA9X4_MPIC + 0x0600)
- #define A9_MPCORE_GIC_DIST     (CT_CA9X4_MPIC + 0x1000)
+ static int amba_remove(struct device *dev)
+ {
++	struct amba_device *pcdev = to_amba_device(dev);
+ 	struct amba_driver *drv = to_amba_driver(dev->driver);
+-	return drv->remove(to_amba_device(dev));
++	int ret = drv->remove(pcdev);
++
++	if (!IS_ERR(pcdev->busck)) {
++		clk_disable(pcdev->busck);
++		clk_put(pcdev->busck);
++	}
++	return ret;
+ }
  
- /*
-
-
-My only question is; what is the commented-out timer code for in
-ct-ca9x4.c? It would be nice to get rid of it if it's not useful.
-
-Cheers,
-
-Will
+ static void amba_shutdown(struct device *dev)
+diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
+index 8b10386..f880c58 100644
+--- a/include/linux/amba/bus.h
++++ b/include/linux/amba/bus.h
+@@ -15,13 +15,17 @@
+ #define ASMARM_AMBA_H
+ 
+ #include <linux/device.h>
++#include <linux/err.h>
+ #include <linux/resource.h>
+ 
+ #define AMBA_NR_IRQS	2
+ 
++struct clk;
++
+ struct amba_device {
+ 	struct device		dev;
+ 	struct resource		res;
++	struct clk		*busck;
+ 	u64			dma_mask;
+ 	unsigned int		periphid;
+ 	unsigned int		irq[AMBA_NR_IRQS];
+@@ -59,6 +63,12 @@ struct amba_device *amba_find_device(const char *, struct device *, unsigned int
+ int amba_request_regions(struct amba_device *, const char *);
+ void amba_release_regions(struct amba_device *);
+ 
++#define amba_bus_clk_enable(d)	\
++	(IS_ERR((d)->busck) ? 0 : clk_enable((d)->busck))
++
++#define amba_bus_clk_disable(d)	\
++	do { if (!IS_ERR((d)->busck)) clk_disable((d)->busck); } while (0)
++
+ #define amba_config(d)	(((d)->periphid >> 24) & 0xff)
+ #define amba_rev(d)	(((d)->periphid >> 20) & 0x0f)
+ #define amba_manf(d)	(((d)->periphid >> 12) & 0xff)
