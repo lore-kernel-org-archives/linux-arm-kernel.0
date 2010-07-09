@@ -1,24 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 9 Jul 2010 18:08:01 +0200
-Subject: [PATCH v2 1/3] ARM: Introduce *_relaxed() I/O accessors
-In-Reply-To: <20100709110801.11333.22995.stgit@e102109-lin.cambridge.arm.com>
-References: <20100709110350.11333.34303.stgit@e102109-lin.cambridge.arm.com>
-	<20100709110801.11333.22995.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <201007091808.01536.arnd@arndb.de>
+Date: Fri, 9 Jul 2010 18:14:24 +0200
+Subject: [PATCH v2 5/5] colibri-pxa3xx: add touchscreen support
+In-Reply-To: <201007090903.50318.pieterg@gmx.com>
+References: <201007082249.59852.pieterg@gmx.com>
+	<201007090103.14418.marek.vasut@gmail.com>
+	<201007090903.50318.pieterg@gmx.com>
+Message-ID: <201007091814.25040.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 July 2010, Catalin Marinas wrote:
-> This patch introduces readl*_relaxed()/write*_relaxed() as the main I/O
-> accessors (when __mem_pci is defined). The standard read*()/write*()
-> macros are now based on the relaxed accessors.
+On Friday 09 July 2010, pieterg wrote:
+> > > --- a/arch/arm/mach-pxa/include/mach/colibri.h
+> > > +++ b/arch/arm/mach-pxa/include/mach/colibri.h
+> > > @@ -30,6 +30,12 @@ extern void colibri_pxa3xx_init_nand(void);
+> > >  static inline void colibri_pxa3xx_init_nand(void) {}
+> > >  #endif
+> > >
+> > > +#if defined(CONFIG_INPUT_TOUCHSCREEN)
+> > > +extern void colibri_pxa3xx_init_touchscreen(void);
+> > > +#else
+> > > +static inline void colibri_pxa3xx_init_touchscreen(void) {}
+> > > +#endif
+> > > +
+> > >  /* physical memory regions */
+> > >  #define COLIBRI_SDRAM_BASE 0xa0000000      /* SDRAM region */
+> >
+> > What will happen if both of the TS devices are selected?
+> 
+> That's no problem.
+> I actually have both configs enabled, so I can run the same kernel on the 
+> 310 (which is using wm97 for a while now) and the 320 (which still has 
+> ucb1400 at the moment)
 
-Are these new macros valid for both PCI and non-PCI mmio addresses?
-The way I understand it, the regular readl/writel family is only
-valid for __iomem addresses in PCI BARs, while anything else
-has to go through either ioread32/iowrite32 or something arch
-specific.
-
-Does this mean we also need an ioread32_releaxed etc?
+But doesn't the code still create both devices in /sys/devices/platform then?
+AFAICT, there is no runtime probing support to make sure you only register
+the device that is there.
 
 	Arnd
