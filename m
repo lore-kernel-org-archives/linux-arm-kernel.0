@@ -1,55 +1,63 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 9 Jul 2010 14:26:17 -0700
-Subject: [PATCH 1/3] sdhci-s3c: add missing remove function
-In-Reply-To: <1276670996-17729-2-git-send-email-m.szyprowski@samsung.com>
-References: <1276670996-17729-1-git-send-email-m.szyprowski@samsung.com>
-	<1276670996-17729-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20100709142617.50892f8b.akpm@linux-foundation.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 09 Jul 2010 23:31:54 +0100
+Subject: [PATCH v2 1/3] ARM: Introduce *_relaxed() I/O accessors
+In-Reply-To: <201007092130.17504.arnd@arndb.de>
+References: <20100709110350.11333.34303.stgit@e102109-lin.cambridge.arm.com>
+	<201007091808.01536.arnd@arndb.de>
+	<20100709182417.GL22845@n2100.arm.linux.org.uk>
+	<201007092130.17504.arnd@arndb.de>
+Message-ID: <1278714714.30012.14.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Jun 2010 08:49:54 +0200
-Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/mmc/host/sdhci-s3c.c |   20 ++++++++++++++++++++
->  1 files changed, 20 insertions(+), 0 deletions(-)
+On Fri, 2010-07-09 at 20:30 +0100, Arnd Bergmann wrote:
+> On Friday 09 July 2010 20:24:17 Russell King - ARM Linux wrote:
+> > On Fri, Jul 09, 2010 at 06:08:01PM +0200, Arnd Bergmann wrote:
+> > > On Friday 09 July 2010, Catalin Marinas wrote:
+> > > > This patch introduces readl*_relaxed()/write*_relaxed() as the main I/O
+> > > > accessors (when __mem_pci is defined). The standard read*()/write*()
+> > > > macros are now based on the relaxed accessors.
+> > >
+> > > Are these new macros valid for both PCI and non-PCI mmio addresses?
+> > > The way I understand it, the regular readl/writel family is only
+> > > valid for __iomem addresses in PCI BARs, while anything else
+> > > has to go through either ioread32/iowrite32 or something arch
+> > > specific.
+> > >
+> > > Does this mean we also need an ioread32_releaxed etc?
+> >
+> > Only if you want to deal with PCI IO accesses as well.  The
+> > ioread*/iowrite* interfaces are more complex implementations than
+> > plain read/write[bwl], because they have to work out whether the
+> > void __iomem * cookie relates to an ioremapped cookie or a PCI IO
+> > cookie.  (That's the only reason to use the io* variants - if you
+> > want a driver which can portably access its registers via either
+> > PCI MEM or PCI IO access methods.)
 > 
-> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> index af21792..ad30f07 100644
-> --- a/drivers/mmc/host/sdhci-s3c.c
-> +++ b/drivers/mmc/host/sdhci-s3c.c
-> @@ -365,6 +365,26 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
->  
->  static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
->  {
-> +	struct sdhci_host *host =  platform_get_drvdata(pdev);
-> +	struct sdhci_s3c *sc = sdhci_priv(host);
-> +	int ptr;
-> +
-> +	sdhci_remove_host(host, 1);
-> +
-> +	for (ptr = 0; ptr < 3; ptr++) {
-> +		clk_disable(sc->clk_bus[ptr]);
-> +		clk_put(sc->clk_bus[ptr]);
-> +	}
-> +	clk_disable(sc->clk_io);
-> +	clk_put(sc->clk_io);
-> +
-> +	iounmap(host->ioaddr);
-> +	release_resource(sc->ioarea);
-> +	kfree(sc->ioarea);
-> +
-> +	sdhci_free_host(host);
-> +	platform_set_drvdata(pdev, NULL);
-> +
->  	return 0;
->  }
+> Right. IMHO the PCI IO variants should get the same barriers that
+> Catalin is introducing in the PCI MEM variants. The ordering requirements
+> for IO accesses are stricter than those for MEM, the main difference
+> being that MEM writes are posted while IO writes are synchronizing.
 
-This looks like it fixes a pretty serious omission.  What happens if
-the user rmmods this driver on a 2.6.34 kernel?
+Linux docs don't clearly define the ordering requirements. There are
+various e-mail threads but not a finalised document. In principle,
+trying to be as close to x86 as possible, in which case we probably need
+barriers here as well.
 
-Because I have a suspicion that this fix should be backported into
-2.6.34.x?
+> Thinking about it from this angle, I'm not even sure that x86 compatibility
+> requires arm to add wmb() after writel(). IIRC, PCI memory space writes are
+> required to be ordered with regard to each other, but not necessarily
+> with regard to other CPU instructions or DMA transfers, unlike memory
+> space reads and IO space read/write accesses.
+
+We don't need a wmb() after writel(), my patch only adds wmb() before
+writel(). We need previous DMA buffer writes to be visible before
+writel(), otherwise we get corrupted DMA transfers.
+
+There were past discussions about writel() and spin_unlock() ordering.
+For PCI, people introduced mmiowb(). In general, that's not needed on
+ARM as the DMB in spin_unlock() should in general suffice (but it may
+depend on whether the bus gets notified about the DMB).
+
+-- 
+Catalin
