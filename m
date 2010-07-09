@@ -1,119 +1,78 @@
 From: p.osciak@samsung.com (Pawel Osciak)
-Date: Fri, 09 Jul 2010 10:49:55 +0200
-Subject: [PATCH 07/19] s3c-fb: Integrate palette setup code into main driver
+Date: Fri, 09 Jul 2010 10:49:58 +0200
+Subject: [PATCH 10/19] s3c-fb: Separate S5PC100 and S5PV210 framebuffer driver
+	data structures
 In-Reply-To: <1278665407-18002-1-git-send-email-p.osciak@samsung.com>
 References: <1278665407-18002-1-git-send-email-p.osciak@samsung.com>
-Message-ID: <1278665407-18002-8-git-send-email-p.osciak@samsung.com>
+Message-ID: <1278665407-18002-11-git-send-email-p.osciak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Dooks <ben-linux@fluff.org>
+S5PC100 and S5PV210 framebuffer devices differ slightly in terms of
+available registers and their driver data structures have to be separate.
+Those differences include dissimilar ways to control shadow register
+updates.
 
-Remove the palette setup code from the header files and
-put it into the main driver.
-
-Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-samsung/include/plat/regs-fb-v4.h |   34 -----------------------
- drivers/video/s3c-fb.c                          |   33 +++++++++++++++++++++-
- 2 files changed, 32 insertions(+), 35 deletions(-)
+ drivers/video/s3c-fb.c |   37 ++++++++++++++++++++++++++++++++++---
+ 1 files changed, 34 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/regs-fb-v4.h b/arch/arm/plat-samsung/include/plat/regs-fb-v4.h
-index 8352f5dc..4c3647f 100644
---- a/arch/arm/plat-samsung/include/plat/regs-fb-v4.h
-+++ b/arch/arm/plat-samsung/include/plat/regs-fb-v4.h
-@@ -137,40 +137,6 @@
- #define WPALCON_W2PAL_16BPP_A555		(1 << 6)
- 
- 
--/* system specific implementation code for palette sizes, and other
-- * information that changes depending on which architecture is being
-- * compiled.
--*/
--
--struct s3c_fb_palette {
--	struct fb_bitfield	r;
--	struct fb_bitfield	g;
--	struct fb_bitfield	b;
--	struct fb_bitfield	a;
--};
--
--static inline void s3c_fb_init_palette(unsigned int window,
--				       struct s3c_fb_palette *palette)
--{
--	if (window < 2) {
--		/* Windows 0/1 are 8/8/8 or A/8/8/8 */
--		palette->r.offset = 16;
--		palette->r.length = 8;
--		palette->g.offset = 8;
--		palette->g.length = 8;
--		palette->b.offset = 0;
--		palette->b.length = 8;
--	} else {
--		/* currently we assume RGB 5/6/5 */
--		palette->r.offset = 11;
--		palette->r.length = 5;
--		palette->g.offset = 5;
--		palette->g.length = 6;
--		palette->b.offset = 0;
--		palette->b.length = 5;
--	}
--}
--
- /* Notes on per-window bpp settings
-  *
-  * Value	Win0	 Win1	  Win2	   Win3	    Win 4
 diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
-index 5c7ac01..b00c064 100644
+index 77f5765..5f931b4 100644
 --- a/drivers/video/s3c-fb.c
 +++ b/drivers/video/s3c-fb.c
-@@ -116,6 +116,20 @@ struct s3c_fb_driverdata {
+@@ -1251,7 +1251,35 @@ static struct s3c_fb_driverdata s3c_fb_data_64xx __devinitdata = {
+ 	.win[4]	= &s3c_fb_data_64xx_wins[4],
  };
  
- /**
-+ * struct s3c_fb_palette - palette information
-+ * @r: Red bitfield.
-+ * @g: Green bitfield.
-+ * @b: Blue bitfield.
-+ * @a: Alpha bitfield.
-+ */
-+struct s3c_fb_palette {
-+	struct fb_bitfield	r;
-+	struct fb_bitfield	g;
-+	struct fb_bitfield	b;
-+	struct fb_bitfield	a;
+-static struct s3c_fb_driverdata s3c_fb_data_s5p __devinitdata = {
++static struct s3c_fb_driverdata s3c_fb_data_s5pc100 __devinitdata = {
++	.variant = {
++		.nr_windows	= 5,
++		.vidtcon	= VIDTCON0,
++		.wincon		= WINCON(0),
++		.winmap		= WINxMAP(0),
++		.keycon		= WKEYCON,
++		.osd		= VIDOSD_BASE,
++		.osd_stride	= 16,
++		.buf_start	= VIDW_BUF_START(0),
++		.buf_size	= VIDW_BUF_SIZE(0),
++		.buf_end	= VIDW_BUF_END(0),
++
++		.palette = {
++			[0] = 0x2400,
++			[1] = 0x2800,
++			[2] = 0x2c00,
++			[3] = 0x3000,
++			[4] = 0x3400,
++		},
++	},
++	.win[0]	= &s3c_fb_data_64xx_wins[0],
++	.win[1]	= &s3c_fb_data_64xx_wins[1],
++	.win[2]	= &s3c_fb_data_64xx_wins[2],
++	.win[3]	= &s3c_fb_data_64xx_wins[3],
++	.win[4]	= &s3c_fb_data_64xx_wins[4],
 +};
 +
-+/**
-  * struct s3c_fb_win - per window private data for each framebuffer.
-  * @windata: The platform data supplied for the window configuration.
-  * @parent: The hardware that this window is part of.
-@@ -866,7 +880,24 @@ static int __devinit s3c_fb_probe_win(struct s3c_fb *sfb, unsigned int win_no,
- 	}
- 
- 	/* setup the r/b/g positions for the window's palette */
--	s3c_fb_init_palette(win_no, &win->palette);
-+	if (win->variant.palette_16bpp) {
-+		/* Set RGB 5:6:5 as default */
-+		win->palette.r.offset = 11;
-+		win->palette.r.length = 5;
-+		win->palette.g.offset = 5;
-+		win->palette.g.length = 6;
-+		win->palette.b.offset = 0;
-+		win->palette.b.length = 5;
-+
-+	} else {
-+		/* Set 8bpp or 8bpp and 1bit alpha */
-+		win->palette.r.offset = 16;
-+		win->palette.r.length = 8;
-+		win->palette.g.offset = 8;
-+		win->palette.g.length = 8;
-+		win->palette.b.offset = 0;
-+		win->palette.b.length = 8;
-+	}
- 
- 	/* setup the initial video mode from the window */
- 	fb_videomode_to_var(&fbinfo->var, initmode);
++static struct s3c_fb_driverdata s3c_fb_data_s5pv210 __devinitdata = {
+ 	.variant = {
+ 		.nr_windows	= 5,
+ 		.vidtcon	= VIDTCON0,
+@@ -1319,8 +1347,11 @@ static struct platform_device_id s3c_fb_driver_ids[] = {
+ 		.name		= "s3c-fb",
+ 		.driver_data	= (unsigned long)&s3c_fb_data_64xx,
+ 	}, {
+-		.name		= "s5p-fb",
+-		.driver_data	= (unsigned long)&s3c_fb_data_s5p,
++		.name		= "s5pc100-fb",
++		.driver_data	= (unsigned long)&s3c_fb_data_s5pc100,
++	}, {
++		.name		= "s5pv210-fb",
++		.driver_data	= (unsigned long)&s3c_fb_data_s5pv210,
+ 	}, {
+ 		.name		= "s3c2443-fb",
+ 		.driver_data	= (unsigned long)&s3c_fb_data_s3c2443,
 -- 
 1.7.1.569.g6f426
