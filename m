@@ -1,15 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Jul 2010 12:29:16 +0100
-Subject: [PATCH v2 0/3] Ordered I/O accessors
-In-Reply-To: <20100709110350.11333.34303.stgit@e102109-lin.cambridge.arm.com>
-References: <20100709110350.11333.34303.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100709112915.GC22845@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 09 Jul 2010 20:33:28 +0900
+Subject: [PATCH 01/19] s3c-fb: Change to depending on CONFIG_S3C_FB_DEV
+In-Reply-To: <1278665407-18002-2-git-send-email-p.osciak@samsung.com>
+References: <1278665407-18002-1-git-send-email-p.osciak@samsung.com>
+	<1278665407-18002-2-git-send-email-p.osciak@samsung.com>
+Message-ID: <028801cb1f5a$8fe5c970$afb15c50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 09, 2010 at 12:07:56PM +0100, Catalin Marinas wrote:
-> This updated series fixes a bug in the L2x0 code causing a deadlock
-> (thanks to Adrian Kwong at Trident). The solution is to convert the
-> entire cache-l2x0.c file to the *_relaxed() I/O accessors.
+Pawel Osciak wrote:
+> 
+> From: Ben Dooks <ben-linux@fluff.org>
+> 
+> As suggested by Marek Szyprowski, we should make the driver depend on
+> the configuration currently being used to build the platform device
+> into the kernel.
+> 
+> Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+> Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
 
-Ok.
+Actually, already submitted by Ben Dooks.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-May/015616.html
+
+So...I'm not sure adding your signedoff and re-submitting are right.
+
+In my opinion, it's enough to add comments which includes information about
+that without re-submitting.
+
+> ---
+>  drivers/video/Kconfig |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+> index 3d94a14..858f1ca 100644
+> --- a/drivers/video/Kconfig
+> +++ b/drivers/video/Kconfig
+> @@ -1930,7 +1930,7 @@ config FB_TMIO_ACCELL
+> 
+>  config FB_S3C
+>  	tristate "Samsung S3C framebuffer support"
+> -	depends on FB && ARCH_S3C64XX
+> +	depends on FB && S3C_DEV_FB
+>  	select FB_CFB_FILLRECT
+>  	select FB_CFB_COPYAREA
+>  	select FB_CFB_IMAGEBLIT
+> --
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
