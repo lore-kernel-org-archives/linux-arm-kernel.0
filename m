@@ -1,70 +1,39 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 9 Jul 2010 17:07:43 +0300
-Subject: [PATCH 2/3] Add s3c-adc-battery driver
-In-Reply-To: <20100709135345.GA4351@oksana.dev.rtsoft.ru>
-References: <1278674842-17583-1-git-send-email-anarsoul@gmail.com>
-	<201007091619.20454.anarsoul@gmail.com>
-	<20100709135345.GA4351@oksana.dev.rtsoft.ru>
-Message-ID: <201007091707.47807.anarsoul@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Jul 2010 15:14:16 +0100
+Subject: Memory type used for ioremap
+In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B030E181CAD@dbde02.ent.ti.com>
+References: <2A3DCF3DA181AD40BDE86A3150B27B6B030E181724@dbde02.ent.ti.com>
+	<1278677464.11895.41.camel@e102109-lin.cambridge.arm.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B030E181CAD@dbde02.ent.ti.com>
+Message-ID: <20100709141416.GI22845@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 9 ???? 2010 16:53:45 ????? Anton Vorontsov ???????:
+On Fri, Jul 09, 2010 at 07:32:46PM +0530, Pedanekar, Hemant wrote:
+> Catalin,
 > 
-> I guess you can remove all the cable_plugged handling from s3c
-> battery driver, and then use power_supply.external_power_changed
-> callback to get cable_plugged notification (you should fill
-> pda_power.supplied_to properly to make it work).
+> I was trying to map peripheral region (memory mapped) nd faced problem with w
 > 
-> See drivers/power/ds2760_battery.c and arch/arm/mach-pxa/hx4700.c
-> as an example.
+> This prompted me to check if there were any differences in mapping the region
 > 
-> You probably will need to change .external_power_changed() hook
-> to accept 'pst' argument (the supply that caused the change),
-> so that you could write something like this:
-> 
-> s3c_external_power_changed(struct power_supply *psy,
-> 			   struct power_supply *ext)
-> {
-> 	...
-> 	ext->get_property(ext, ONLINE, &val);
-> 	s3c->is_plugged = val.intval;
-> 
-> 	s3c_kick_cable_plugged_handler(s3c);
-> }
-> 
-> Or, instead of ext->get_property() you could just use
-> power_supply_is_system_supplied(). Not very elegant, but
-> should work.
+> As per ARM ARM, TEX=0 is "Strongly-ordered" while TEX=1 is "Normal" memory ty
 
-You didn't get the point. Here's workflow:
+It'd help if I could see more of your mail than just the above when
+replying to it.  Please wrap your messages rather than typing entire
+paragraphs on one single line.
 
-cable plugged -> GPF2 goes to 0, irq is generated
-cable plugged irq handler -> cable_plugged ? enable_charger : disable_charger
-charging....
-battery is charged, GPF3 goes to 0, irq is generated
-battery charged irq handler -> disable_charger
-cable unplugged -> GPF2 goest to 1, irq is generated
+<save this message, go back and read your original, re-edit reply>
 
-pda_power driver does not support 'battery_charged' pin handling, but I need 
-to handle this pin (and IRQ from it) to prevent battery overcharge
+I think your problem might be to do with how the interconnects work.
+Each different memory type can have a different memory map.  If your
+peripheral is _only_ visible via the strongly ordered memory type,
+then it won't be visible via (shared or non-shared) device or memory
+like mappings.
 
-> Timer is a softirq, atomic context. It adds latency to your
-> embedded, underpowered device. Plus with timer you can't use
-> sleepable GPIOs (we should change it for pda_power too, btw).
-> 
-> Jitter filtering isn't urgent task for the kernel (or user)
-> needs, right? So it's fine to postpone it for non-atomic
-> context.
+We have had devices in the past where certain peripherals are only
+visible via non-shared device mappings.  Could this be one of them?
 
-Ok, will replace timer with delayed works
-
-Regards
-Vasily
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100709/0dfa45f9/attachment.sig>
+Without knowing more about the device you're using, in particular
+how the bus matrix is setup, there's no way to comment definitively.
+What does the documentation for your device say about the type of
+mappings required for this peripheral?
