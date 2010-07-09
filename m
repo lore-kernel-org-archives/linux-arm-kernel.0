@@ -1,68 +1,30 @@
 From: p.osciak@samsung.com (Pawel Osciak)
-Date: Fri, 09 Jul 2010 10:49:56 +0200
-Subject: [PATCH 08/19] s3c-fb: Fix various null references on framebuffer
-	memory alloc failure
+Date: Fri, 09 Jul 2010 10:50:02 +0200
+Subject: [PATCH 14/19] s3c-fb: window 3 of 64xx+ does not have an osd_d
+	register
 In-Reply-To: <1278665407-18002-1-git-send-email-p.osciak@samsung.com>
 References: <1278665407-18002-1-git-send-email-p.osciak@samsung.com>
-Message-ID: <1278665407-18002-9-git-send-email-p.osciak@samsung.com>
+Message-ID: <1278665407-18002-15-git-send-email-p.osciak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-The following problems were found in the above situation:
-
-sfb->windows[win] was being assigned at the end of s3c_fb_probe_win only.
-This resulted in passing a NULL to s3c_fb_release_win if probe_win returned
-early and a memory leak.
-
-dma_free_writecombine does not allow its third argument to be NULL.
-
-fb_dealloc_cmap does not verify whether its argument is not NULL.
 
 Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/video/s3c-fb.c |    8 +++++---
- 1 files changed, 5 insertions(+), 3 deletions(-)
+ drivers/video/s3c-fb.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
-index b00c064..77f5765 100644
+index 2e82adf..6cbddc4 100644
 --- a/drivers/video/s3c-fb.c
 +++ b/drivers/video/s3c-fb.c
-@@ -804,7 +804,8 @@ static void s3c_fb_free_memory(struct s3c_fb *sfb, struct s3c_fb_win *win)
- {
- 	struct fb_info *fbi = win->fbinfo;
- 
--	dma_free_writecombine(sfb->dev, PAGE_ALIGN(fbi->fix.smem_len),
-+	if (fbi->screen_base)
-+		dma_free_writecombine(sfb->dev, PAGE_ALIGN(fbi->fix.smem_len),
- 			      fbi->screen_base, fbi->fix.smem_start);
- }
- 
-@@ -819,7 +820,8 @@ static void s3c_fb_release_win(struct s3c_fb *sfb, struct s3c_fb_win *win)
- {
- 	if (win->fbinfo) {
- 		unregister_framebuffer(win->fbinfo);
--		fb_dealloc_cmap(&win->fbinfo->cmap);
-+		if (win->fbinfo->cmap.len)
-+			fb_dealloc_cmap(&win->fbinfo->cmap);
- 		s3c_fb_free_memory(sfb, win);
- 		framebuffer_release(win->fbinfo);
- 	}
-@@ -865,6 +867,7 @@ static int __devinit s3c_fb_probe_win(struct s3c_fb *sfb, unsigned int win_no,
- 	WARN_ON(windata->win_mode.yres == 0);
- 
- 	win = fbinfo->par;
-+	*res = win;
- 	var = &fbinfo->var;
- 	win->variant = *variant;
- 	win->fbinfo = fbinfo;
-@@ -939,7 +942,6 @@ static int __devinit s3c_fb_probe_win(struct s3c_fb *sfb, unsigned int win_no,
- 		return ret;
- 	}
- 
--	*res = win;
- 	dev_info(sfb->dev, "window %d: fb %s\n", win_no, fbinfo->fix.id);
- 
- 	return 0;
+@@ -1434,7 +1434,6 @@ static struct s3c_fb_win_variant s3c_fb_data_64xx_wins[] __devinitdata = {
+ 	},
+ 	[3] = {
+ 		.has_osd_c	= 1,
+-		.has_osd_d	= 1,
+ 		.palette_sz	= 16,
+ 		.palette_16bpp	= 1,
+ 		.valid_bpp	= (VALID_BPP124  | VALID_BPP(16) |
 -- 
 1.7.1.569.g6f426
