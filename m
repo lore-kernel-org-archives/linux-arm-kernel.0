@@ -1,61 +1,136 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 9 Jul 2010 12:38:02 +0900
-Subject: [PATCH v2 0/8] Initial implementation of kdump for ARM
-In-Reply-To: <20100705135552.GB19338@n2100.arm.linux.org.uk>
-References: <20100611063605.GB11156@esdhcp04058.research.nokia.com>
-	<4C2DE024.8060308@stericsson.com>
-	<20100705082835.GA32178@gw.healthdatacare.com>
-	<4C31AD62.6070805@stericsson.com>
-	<20100705101852.GA19338@n2100.arm.linux.org.uk>
-	<4C31B527.8060401@stericsson.com>
-	<20100705135552.GB19338@n2100.arm.linux.org.uk>
-Message-ID: <20100709033802.GA2951@verge.net.au>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Fri, 9 Jul 2010 13:17:37 +0900
+Subject: [PATCH] ARM: S5PV210: add clocks (struct clk).
+In-Reply-To: <AANLkTimCd5cDOZI1ylQEble1RQT6mYypTV9laizbNO2h@mail.gmail.com>
+References: <1278395327-9072-1-git-send-email-myungjoo.ham@samsung.com>
+	<023a01cb1f0f$90a5da30$b1f18e90$%kim@samsung.com>
+	<AANLkTimCd5cDOZI1ylQEble1RQT6mYypTV9laizbNO2h@mail.gmail.com>
+Message-ID: <AANLkTinAKps803FT_XiiBKqBRv0UNo4RYnpv8EPSn9-C@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 05, 2010 at 02:55:52PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 05, 2010 at 12:34:15PM +0200, Per Fransson wrote:
-> > On 07/05/2010 12:18 PM, Russell King - ARM Linux wrote:
-> >> On Mon, Jul 05, 2010 at 12:01:06PM +0200, Per Fransson wrote:
-> >>> In machine_kexec an identity mapping is set up for the user space part
-> >>> of the virtual address space, through a call to setup_mm_for_reboot(). I
-> >>> believe this mapping is only necessary because the MMU is kept on and if
-> >>> the kexec is done to facilitate the collection of a dump it would be
-> >>> nice if a large part of the page table for the crashing context has not
-> >>> been corrupted. Don't you agree?
-> >>
-> >> No.  The identity mapping is there so that we can safely disable the MMU
-> >> and jump to the intended address.
-> >>
-> >> There is an implementation defined delay between writing the control
-> >> register and the point in the instruction stream that the effect of that
-> >> write is seen.
-> >>
-> >
-> > But the identity mapping is only set up for user space part.
-> 
-> That's because we're normally calling back into the boot loader.
-> 
-> > It needs to  
-> > be set up around the code which turns off the MMU for the case when  
-> > there is no delay at all.
-> 
-> There is always a delay as the ARM architecture is pipelined.  By the
-> time the instruction which writes to the control register has got to
-> the writeback stage, the following instruction has long since been
-> fetched from memory, and has probably been decoded and partially
-> executed.
-> 
-> > And it would still be nice to not corrupt the page table of the
-> > crashing context.
-> 
-> What you're then asking for is the crashing kernel to allocate 16K of
-> memory to setup some page tables, and then context switch to that table
-> so that the MMU can be turned off.
-> 
-> That's never going to be anywhere near reliable.
+Hello, again.
 
-Can this be addresses by allocating the memory at the time that kdump
-is loaded rather than when it is executed (because of a crash)?
+On Fri, Jul 9, 2010 at 11:59 AM, MyungJoo Ham <myungjoo.ham@samsung.com> wrote:
+> Hello,
+>
+> On Fri, Jul 9, 2010 at 11:36 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> MyungJoo Ham wrote:
+>>>
+>> Hi,
+>>
+>> Please include Ben Dooks in the Cc..
+>> And...excuse me..who is benh at kernel.crashing.org?
+>
+> Ah.. I was confused by my own reply regarding common struct clk, which
+> had benh at kernel.crashing.org as Cc. I'll update the CC setting.
+>
+>>
+>>> Many clocks were not listed in the previous
+>>> arch/arm/mach-s5pv210/clock.c
+>>>
+>>> We have added clocks defined as CLK_GATE_IPx[] in the user manual of
+>>> S5PV210. However, the clocks that were not turned on at the boot time
+>>> when tested with the previous kernel versions (2.6.32, 2.6.29) are
+>>> defined in "init_clocks_disabled" so that they are turned off at the
+>>> boot time.
+>>
+>> I think, no need to register all of clocks which are in the CLK_GATE_IPx
+>> into 'init_clocks_disabled'..because it depends on each platform or project.
+>>
+>>>
+>>> The clocks added from CLK_GATE_IPx are:
+>>> ? ? ? CSIS, JPEG, FIMC0 - 2, NFCON, SROMC, TVENC, HDMI, MIXER, VP,
+>>> ? ? ? DSIM, TSI, HOSTIF, MODEM, PCM0 - 2, I2C-HDMI-PHY, I2C-HDMI-DDC,
+>>> ? ? ? AC97, SPDIF, SECKEY, IEM-APC, IEM-IEC, CHIP-ID, PDMA0 - 1,
+>>> ? ? ? MDMA, DMC0 - 1, NANDXL, TZIC0 - 3, VIC0 - 3, SECJTAG, CORESIGHT,
+>>> ? ? ? SDM, SECSS, SYSCON, GPIO, TZPC0 - 3
+>>>
+>>
+>> For example...in the case of JPEG, FIMC, disabling is better at the booting
+>> time..because can be enabled dynamically in the device driver when it is
+>> used.
+>> But if CORESIGHT which does not having own driver is disabled at that time,
+>> basically can't use JTAG debugger.
+>>
+>> So need to sort out clocks to register into 'init_clocks_disabled'
+>>
+>
+> Yes, I agree. I'll put some clocks including CORESIGHT out of
+> init_clocks_disabled.
+>
 
-IIRC, x86 uses a double page table approach and it is done reliably.
+Oh.. well, CORESIGHT is not included in init_clocks_disabled in the patch.
+
+In this patch, PDMA, MDMA, DMC, NANDXL, TZIC, VIC, SECJTAG, CORESIGHT,
+SDM, SECSS, SYSCON, GPIO, and TZPC are not added to
+init_clocks_disabled, but to init_clocks.
+
+Only others including CSIS, JPEG, FIMC0 - 2, NFCON, SROMC, TVENC,
+HDMI, MIXER, VP, DSIM, TSI, HOSTIF, MODEM, PCM0 - 2, I2C-HDMI-PHY,
+I2C-HDMI-DDC, AC97, SPDIF, SECKEY, IEM-APC, IEM-IEC, and CHIP-ID are
+added to init_clocks_disabled. In this list, are there any clocks that
+should be out of init_clocks_disabled?
+
+>
+> Anyway, I've been considering adding "flag" to struct clk, which has
+> the following bits:
+>
+> #define CLKFLAGS_BOOT_ON ? ? ? ?(0x1)
+> #define CLKFLAGS_CANNOT_DISABLE (0x2)
+> #define CLKFLAGS_ALWAYS_ON ? ? ?(CLKFLAGS_BOOT_ON | CLKFLAGS_CANNOT_DISABLE)
+> #define CLKFLAGS_BOOT_OFF ? ? ? (0x4) /* Force off when boot */
+> #define CLKFLAGS_DEPRECATED ? ? (0x8) /* Warn when clk_get'd */
+> /* Note that CLKFLAGS_BOOT_ON and CLKFLAGS_CANNOT_DISABLE overrides
+> ?* CLKFLAGS_BOOT_OFF */
+>
+> and merging init_clocks and init_clocks_disabled. This provides more
+> precise control on clocks, and we've been using such features in other
+> versions of the kernel. Besides, combined with
+> powerdomain control, these flags are helpful on implementing
+> powerdomain/block-gating control.
+>
+>
+>>> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>> ---
+>>> ?arch/arm/mach-s5pv210/clock.c | ?298
+>>> ++++++++++++++++++++++++++++++++++++++++-
+>>> ?1 files changed, 297 insertions(+), 1 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+>>> index b3d156c..aa2b1c5 100644
+>>> --- a/arch/arm/mach-s5pv210/clock.c
+>>> +++ b/arch/arm/mach-s5pv210/clock.c
+>>
+>> (snip)
+>>
+>> Thanks.
+>>
+>> Best regards,
+>> Kgene.
+>> --
+>> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+>> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>>
+>>
+>
+> Cheers!
+> - MyungJoo
+>
+> --
+> MyungJoo Ham (???), Ph.D.
+> Mobile Software Platform Lab,
+> Digital Media and Communications (DMC) Business
+> Samsung Electronics
+> cell: 82-10-6714-2858
+>
+
+
+
+-- 
+MyungJoo Ham (???), Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
