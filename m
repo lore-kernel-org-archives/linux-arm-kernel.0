@@ -1,73 +1,119 @@
 From: p.osciak@samsung.com (Pawel Osciak)
-Date: Fri, 09 Jul 2010 10:49:50 +0200
-Subject: [PATCH 02/19] s3c-fb: add default window feature.
+Date: Fri, 09 Jul 2010 10:49:55 +0200
+Subject: [PATCH 07/19] s3c-fb: Integrate palette setup code into main driver
 In-Reply-To: <1278665407-18002-1-git-send-email-p.osciak@samsung.com>
 References: <1278665407-18002-1-git-send-email-p.osciak@samsung.com>
-Message-ID: <1278665407-18002-3-git-send-email-p.osciak@samsung.com>
+Message-ID: <1278665407-18002-8-git-send-email-p.osciak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: InKi Dae <inki.dae@samsung.com>
+From: Ben Dooks <ben-linux@fluff.org>
 
-s5pv210 has five window layers (window0 ~ 4), among them,
-window0 ~ 2 could be used for local path with fimc(capture device)
-and fimd writeback feature so this patch makes default window layer
-for UI to be set at machine code.
+Remove the palette setup code from the header files and
+put it into the main driver.
 
-Signed-off-by: InKi Dae <inki.dae@samsung.com>
-Reviewed-by: KyungMin Park <kyungmin.park.samsung.com>
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
 ---
- arch/arm/plat-samsung/include/plat/fb.h |    3 +++
- drivers/video/s3c-fb.c                  |    6 +++---
- 2 files changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/plat-samsung/include/plat/regs-fb-v4.h |   34 -----------------------
+ drivers/video/s3c-fb.c                          |   33 +++++++++++++++++++++-
+ 2 files changed, 32 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
-index 27d3b49..cb3ca3a 100644
---- a/arch/arm/plat-samsung/include/plat/fb.h
-+++ b/arch/arm/plat-samsung/include/plat/fb.h
-@@ -42,6 +42,7 @@ struct s3c_fb_pd_win {
-  * @setup_gpio: Setup the external GPIO pins to the right state to transfer
-  *		the data from the display system to the connected display
-  *		device.
-+ * @default_win: default window layer number to be used for UI layer.
-  * @vidcon0: The base vidcon0 values to control the panel data format.
-  * @vidcon1: The base vidcon1 values to control the panel data output.
-  * @win: The setup data for each hardware window, or NULL for unused.
-@@ -58,6 +59,8 @@ struct s3c_fb_platdata {
+diff --git a/arch/arm/plat-samsung/include/plat/regs-fb-v4.h b/arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+index 8352f5dc..4c3647f 100644
+--- a/arch/arm/plat-samsung/include/plat/regs-fb-v4.h
++++ b/arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+@@ -137,40 +137,6 @@
+ #define WPALCON_W2PAL_16BPP_A555		(1 << 6)
  
- 	struct s3c_fb_pd_win	*win[S3C_FB_MAX_WIN];
  
-+	u32			 default_win;
-+
- 	u32			 vidcon0;
- 	u32			 vidcon1;
- };
+-/* system specific implementation code for palette sizes, and other
+- * information that changes depending on which architecture is being
+- * compiled.
+-*/
+-
+-struct s3c_fb_palette {
+-	struct fb_bitfield	r;
+-	struct fb_bitfield	g;
+-	struct fb_bitfield	b;
+-	struct fb_bitfield	a;
+-};
+-
+-static inline void s3c_fb_init_palette(unsigned int window,
+-				       struct s3c_fb_palette *palette)
+-{
+-	if (window < 2) {
+-		/* Windows 0/1 are 8/8/8 or A/8/8/8 */
+-		palette->r.offset = 16;
+-		palette->r.length = 8;
+-		palette->g.offset = 8;
+-		palette->g.length = 8;
+-		palette->b.offset = 0;
+-		palette->b.length = 8;
+-	} else {
+-		/* currently we assume RGB 5/6/5 */
+-		palette->r.offset = 11;
+-		palette->r.length = 5;
+-		palette->g.offset = 5;
+-		palette->g.length = 6;
+-		palette->b.offset = 0;
+-		palette->b.length = 5;
+-	}
+-}
+-
+ /* Notes on per-window bpp settings
+  *
+  * Value	Win0	 Win1	  Win2	   Win3	    Win 4
 diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
-index 9682ecc..c4639c4 100644
+index 5c7ac01..b00c064 100644
 --- a/drivers/video/s3c-fb.c
 +++ b/drivers/video/s3c-fb.c
-@@ -300,9 +300,9 @@ static int s3c_fb_set_par(struct fb_info *info)
- 	/* disable the window whilst we update it */
- 	writel(0, regs + WINCON(win_no));
+@@ -116,6 +116,20 @@ struct s3c_fb_driverdata {
+ };
  
--	/* use window 0 as the basis for the lcd output timings */
-+	/* use platform specified window as the basis for the lcd timings */
+ /**
++ * struct s3c_fb_palette - palette information
++ * @r: Red bitfield.
++ * @g: Green bitfield.
++ * @b: Blue bitfield.
++ * @a: Alpha bitfield.
++ */
++struct s3c_fb_palette {
++	struct fb_bitfield	r;
++	struct fb_bitfield	g;
++	struct fb_bitfield	b;
++	struct fb_bitfield	a;
++};
++
++/**
+  * struct s3c_fb_win - per window private data for each framebuffer.
+  * @windata: The platform data supplied for the window configuration.
+  * @parent: The hardware that this window is part of.
+@@ -866,7 +880,24 @@ static int __devinit s3c_fb_probe_win(struct s3c_fb *sfb, unsigned int win_no,
+ 	}
  
--	if (win_no == 0) {
-+	if (win_no == sfb->pdata->default_win) {
- 		clkdiv = s3c_fb_calc_pixclk(sfb, var->pixclock);
+ 	/* setup the r/b/g positions for the window's palette */
+-	s3c_fb_init_palette(win_no, &win->palette);
++	if (win->variant.palette_16bpp) {
++		/* Set RGB 5:6:5 as default */
++		win->palette.r.offset = 11;
++		win->palette.r.length = 5;
++		win->palette.g.offset = 5;
++		win->palette.g.length = 6;
++		win->palette.b.offset = 0;
++		win->palette.b.length = 5;
++
++	} else {
++		/* Set 8bpp or 8bpp and 1bit alpha */
++		win->palette.r.offset = 16;
++		win->palette.r.length = 8;
++		win->palette.g.offset = 8;
++		win->palette.g.length = 8;
++		win->palette.b.offset = 0;
++		win->palette.b.length = 8;
++	}
  
- 		data = sfb->pdata->vidcon0;
-@@ -636,7 +636,7 @@ static int s3c_fb_blank(int blank_mode, struct fb_info *info)
- 	/* we're stuck with this until we can do something about overriding
- 	 * the power control using the blanking event for a single fb.
- 	 */
--	if (index == 0)
-+	if (index == sfb->pdata->default_win)
- 		s3c_fb_enable(sfb, blank_mode != FB_BLANK_POWERDOWN ? 1 : 0);
- 
- 	return 0;
+ 	/* setup the initial video mode from the window */
+ 	fb_videomode_to_var(&fbinfo->var, initmode);
 -- 
 1.7.1.569.g6f426
