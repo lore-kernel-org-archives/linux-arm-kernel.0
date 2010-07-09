@@ -1,136 +1,98 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 9 Jul 2010 15:32:29 +0200
-Subject: [PATCH v2 5/5] colibri-pxa3xx: add touchscreen support
-In-Reply-To: <201007090903.50318.pieterg@gmx.com>
-References: <201007082249.59852.pieterg@gmx.com>
-	<201007090103.14418.marek.vasut@gmail.com>
-	<201007090903.50318.pieterg@gmx.com>
-Message-ID: <201007091532.29372.marek.vasut@gmail.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Fri, 9 Jul 2010 17:53:45 +0400
+Subject: [PATCH 2/3] Add s3c-adc-battery driver
+In-Reply-To: <201007091619.20454.anarsoul@gmail.com>
+References: <1278674842-17583-1-git-send-email-anarsoul@gmail.com>
+	<1278674842-17583-3-git-send-email-anarsoul@gmail.com>
+	<20100709125701.GA28316@oksana.dev.rtsoft.ru>
+	<201007091619.20454.anarsoul@gmail.com>
+Message-ID: <20100709135345.GA4351@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 9. ?ervence 2010 09:03:50 pieterg napsal(a):
-> On Friday 09 July 2010 01:03:14 Marek Vasut wrote:
-> > Dne ?t 8. ?ervence 2010 22:49:59 pieterg napsal(a):
-> > > Signed-off-by: pieter <p.grimmerink@inepro.com>
-> > > ---
-> > > 
-> > >  arch/arm/mach-pxa/colibri-pxa300.c       |    2 +
-> > >  arch/arm/mach-pxa/colibri-pxa320.c       |    1 +
-> > >  arch/arm/mach-pxa/colibri-pxa3xx.c       |   31
-> > > 
-> > > ++++++++++++++++++++++++++++++
-> > > 
-> > >  arch/arm/mach-pxa/include/mach/colibri.h |    6 +++++
-> > >  4 files changed, 40 insertions(+), 0 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-pxa/colibri-pxa300.c
-> > > b/arch/arm/mach-pxa/colibri-pxa300.c
-> > > index 27f403d..3e50466 100644
-> > > --- a/arch/arm/mach-pxa/colibri-pxa300.c
-> > > +++ b/arch/arm/mach-pxa/colibri-pxa300.c
-> > > @@ -229,6 +229,8 @@ void __init colibri_pxa300_init(void)
-> > > 
-> > >  				mfp_to_gpio(MFP_PIN_GPIO13));
-> > >  	
-> > >  	colibri_pxa300_init_uart();
-> > >  	colibri_pxa300_init_i2c();
-> > > 
-> > > +	if (cpu_is_pxa310())
-> > > +		colibri_pxa3xx_init_touchscreen();
-> > > 
-> > >  }
-> > >  
-> > >  MACHINE_START(COLIBRI300, "Toradex Colibri PXA300")
-> > > 
-> > > diff --git a/arch/arm/mach-pxa/colibri-pxa320.c
-> > > b/arch/arm/mach-pxa/colibri-pxa320.c
-> > > index 0755087..43fadf6 100644
-> > > --- a/arch/arm/mach-pxa/colibri-pxa320.c
-> > > +++ b/arch/arm/mach-pxa/colibri-pxa320.c
-> > > @@ -229,6 +229,7 @@ void __init colibri_pxa320_init(void)
-> > > 
-> > >  				mfp_to_gpio(MFP_PIN_GPIO28));
-> > >  	
-> > >  	colibri_pxa320_init_uart();
-> > >  	colibri_pxa320_init_i2c();
-> > > 
-> > > +	colibri_pxa3xx_init_touchscreen();
-> > > 
-> > >  }
-> > >  
-> > >  MACHINE_START(COLIBRI320, "Toradex Colibri PXA320")
-> > > 
-> > > diff --git a/arch/arm/mach-pxa/colibri-pxa3xx.c
-> > > b/arch/arm/mach-pxa/colibri-pxa3xx.c
-> > > index 199afa2..097aef5 100644
-> > > --- a/arch/arm/mach-pxa/colibri-pxa3xx.c
-> > > +++ b/arch/arm/mach-pxa/colibri-pxa3xx.c
-> > > @@ -198,3 +198,34 @@ void __init colibri_pxa3xx_init_nand(void)
-> > > 
-> > >  }
-> > >  #endif
-> > > 
-> > > +#if defined(CONFIG_INPUT_TOUCHSCREEN)
-> > > +
-> > > +#if defined(CONFIG_TOUCHSCREEN_WM97XX) || \
-> > > +	defined(CONFIG_TOUCHSCREEN_WM97XX_MODULE)
-> > > +static struct platform_device colibri_ts_wm97xx_device = {
-> > > +	.name	= "wm97xx-ts",
-> > > +	.id	= -1,
+On Fri, Jul 09, 2010 at 04:19:14PM +0300, Vasily Khoruzhick wrote:
+[...]
+> > > +	.get_property = s3c_adc_ac_get_property,
 > > > +};
-> > > +#endif
-> > > +
-> > > +#if defined(CONFIG_TOUCHSCREEN_UCB1400) || \
-> > > +	defined(CONFIG_TOUCHSCREEN_UCB1400_MODULE)
-> > > +static struct platform_device colibri_ts_ucb1400_device = {
-> > > +	.name	= "ucb1400_core",
-> > > +	.id	= -1,
-> > > +};
-> > > +#endif
-> > > +
-> > > +void __init colibri_pxa3xx_init_touchscreen(void)
-> > > +{
-> > > +#if defined(CONFIG_TOUCHSCREEN_WM97XX) || \
-> > > +	defined(CONFIG_TOUCHSCREEN_WM97XX_MODULE)
-> > > +	platform_device_register(&colibri_ts_wm97xx_device);
-> > > +#endif
-> > > +#if defined(CONFIG_TOUCHSCREEN_UCB1400) || \
-> > > +	defined(CONFIG_TOUCHSCREEN_UCB1400_MODULE)
-> > > +	platform_device_register(&colibri_ts_ucb1400_device);
-> > > +#endif
-> > > +}
-> > > +
-> > > +#endif
-> > > diff --git a/arch/arm/mach-pxa/include/mach/colibri.h
-> > > b/arch/arm/mach-pxa/include/mach/colibri.h
-> > > index 5f2ba8d..299dab9 100644
-> > > --- a/arch/arm/mach-pxa/include/mach/colibri.h
-> > > +++ b/arch/arm/mach-pxa/include/mach/colibri.h
-> > > @@ -30,6 +30,12 @@ extern void colibri_pxa3xx_init_nand(void);
-> > > 
-> > >  static inline void colibri_pxa3xx_init_nand(void) {}
-> > >  #endif
-> > > 
-> > > +#if defined(CONFIG_INPUT_TOUCHSCREEN)
-> > > +extern void colibri_pxa3xx_init_touchscreen(void);
-> > > +#else
-> > > +static inline void colibri_pxa3xx_init_touchscreen(void) {}
-> > > +#endif
-> > > +
-> > > 
-> > >  /* physical memory regions */
-> > >  #define COLIBRI_SDRAM_BASE	0xa0000000      /* SDRAM region */
 > > 
-> > What will happen if both of the TS devices are selected?
+> > You really shouldn't create yet another "ac" power supply
+> > instance. You can use drivers/power/pda_power.c for this.
+> > 
+> > Yep, it's duplication of pda_power.c functionality.
+> > 
+> > So, you probably want to register S3C ADC battery and pda-power
+> > platform devices. And S3C ADC battery driver would only do
+> > battery stuff, and pda-power would do the AC stuff.
 > 
-> That's no problem.
-> I actually have both configs enabled, so I can run the same kernel on the
-> 310 (which is using wm97 for a while now) and the 320 (which still has
-> ucb1400 at the moment)
+> Nope, I can't use pda_power here, as it can't control whether battery is 
+> already charged (it's separate gpio pin, and I need to disable charger in this 
+> case)
 
-Ah ok then!
+I guess you can remove all the cable_plugged handling from s3c
+battery driver, and then use power_supply.external_power_changed
+callback to get cable_plugged notification (you should fill
+pda_power.supplied_to properly to make it work).
 
-Acked-by: Marek Vasut <marek.vasut@gmail.com>
+See drivers/power/ds2760_battery.c and arch/arm/mach-pxa/hx4700.c
+as an example.
+
+You probably will need to change .external_power_changed() hook
+to accept 'pst' argument (the supply that caused the change),
+so that you could write something like this:
+
+s3c_external_power_changed(struct power_supply *psy,
+			   struct power_supply *ext)
+{
+	...
+	ext->get_property(ext, ONLINE, &val);
+	s3c->is_plugged = val.intval;
+
+	s3c_kick_cable_plugged_handler(s3c);
+}
+
+Or, instead of ext->get_property() you could just use
+power_supply_is_system_supplied(). Not very elegant, but
+should work.
+
+[...]
+> > > +			lut_volt1 = calc_full_volt(lut[0].volt, lut[0].cur);
+> > > +			lut_volt2 = calc_full_volt(lut[1].volt, lut[1].cur);
+> > > +			if (full_volt < lut_volt1 && full_volt >= lut_volt2) {
+> > > +				new_level = (lut[1].level +
+> > > +					(lut[0].level - lut[1].level) *
+> > > +					(full_volt - lut_volt2) /
+> > > +					(lut_volt1 - lut_volt2)) * 1000;
+> > > +				break;
+> > > +			}
+> > > +			new_level = lut[1].level * 1000;
+> > > +			lut++;
+> > > +		}
+> > > +	}
+> > 
+> > Cool!
 > 
-> Rgds, Pieter
+> Is it some kind of sarcasm? :)
+
+Nope. ;-)
+
+[...]
+> > You probably don't need a timer for this.
+> > Use schedule_work() instead.
+> 
+> Timer's used to prevet jitter on gpio pins, and here it's used to check pins 
+> state on startup. I don't see any reason to replace it with delayed work.
+
+Timer is a softirq, atomic context. It adds latency to your
+embedded, underpowered device. Plus with timer you can't use
+sleepable GPIOs (we should change it for pda_power too, btw).
+
+Jitter filtering isn't urgent task for the kernel (or user)
+needs, right? So it's fine to postpone it for non-atomic
+context.
+
+Thanks,
+
+-- 
+Anton Vorontsov
+email: cbouatmailru at gmail.com
+irc://irc.freenode.net/bd2
