@@ -1,55 +1,55 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 09 Jul 2010 20:33:28 +0900
-Subject: [PATCH 01/19] s3c-fb: Change to depending on CONFIG_S3C_FB_DEV
-In-Reply-To: <1278665407-18002-2-git-send-email-p.osciak@samsung.com>
-References: <1278665407-18002-1-git-send-email-p.osciak@samsung.com>
-	<1278665407-18002-2-git-send-email-p.osciak@samsung.com>
-Message-ID: <028801cb1f5a$8fe5c970$afb15c50$%kim@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 09 Jul 2010 12:41:36 +0100
+Subject: [PATCH v2 3/3] ARM: Add barriers to the I/O accessors if
+	ARM_DMA_MEM_BUFFERABLE
+In-Reply-To: <20100709110814.11333.83771.stgit@e102109-lin.cambridge.arm.com>
+References: <20100709110350.11333.34303.stgit@e102109-lin.cambridge.arm.com>
+	<20100709110814.11333.83771.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <1278675696.11895.37.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pawel Osciak wrote:
+On Fri, 2010-07-09 at 12:08 +0100, Catalin Marinas wrote:
+> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> index 97fb9aa..8f3edef 100644
+> --- a/arch/arm/include/asm/io.h
+> +++ b/arch/arm/include/asm/io.h
+> @@ -191,6 +191,15 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+>  #define writel_relaxed(v,c)    __raw_writel((__force u32) \
+>                                         cpu_to_le32(v),__mem_pci(c))
 > 
-> From: Ben Dooks <ben-linux@fluff.org>
-> 
-> As suggested by Marek Szyprowski, we should make the driver depend on
-> the configuration currently being used to build the platform device
-> into the kernel.
-> 
-> Signed-off-by: Ben Dooks <ben-linux@fluff.org>
-> Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
+> +#ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
+> +#define readb(c)               ({ u8  __v = readb_relaxed(c); rmb(); __v; })
+> +#define readw(c)               ({ u16 __v = readw_relaxed(c); rmb(); __v; })
+> +#define readl(c)               ({ u32 __v = readl_relaxed(c); rmb(); __v; })
+> +
+> +#define writeb(v,c)            do { wmb(); writeb_relaxed(v,c); } while (0)
+> +#define writew(v,c)            do { wmb(); writew_relaxed(v,c); } while (0)
+> +#define writel(v,c)            do { wmb(); writel_relaxed(v,c); } while (0)
 
-Actually, already submitted by Ben Dooks.
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-May/015616.html
+This part requires a small change. It looks like the e1000e driver
+doesn't like the do {...} while (0) constructs in the write*() accessors
+(the E1000_WRITE_REG_ARRAY macro). Thanks to Giuseppe for finding this.
 
-So...I'm not sure adding your signedoff and re-submitting are right.
 
-In my opinion, it's enough to add comments which includes information about
-that without re-submitting.
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 8f3edef..b572986 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -196,9 +196,9 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+ #define readw(c)		({ u16 __v = readw_relaxed(c); rmb(); __v; })
+ #define readl(c)		({ u32 __v = readl_relaxed(c); rmb(); __v; })
+ 
+-#define writeb(v,c)		do { wmb(); writeb_relaxed(v,c); } while (0)
+-#define writew(v,c)		do { wmb(); writew_relaxed(v,c); } while (0)
+-#define writel(v,c)		do { wmb(); writel_relaxed(v,c); } while (0)
++#define writeb(v,c)		({ wmb(); writeb_relaxed(v,c); })
++#define writew(v,c)		({ wmb(); writew_relaxed(v,c); })
++#define writel(v,c)		({ wmb(); writel_relaxed(v,c); })
+ #else
+ #define readb(c)		readb_relaxed(c)
+ #define readw(c)		readw_relaxed(c)
 
-> ---
->  drivers/video/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-> index 3d94a14..858f1ca 100644
-> --- a/drivers/video/Kconfig
-> +++ b/drivers/video/Kconfig
-> @@ -1930,7 +1930,7 @@ config FB_TMIO_ACCELL
-> 
->  config FB_S3C
->  	tristate "Samsung S3C framebuffer support"
-> -	depends on FB && ARCH_S3C64XX
-> +	depends on FB && S3C_DEV_FB
->  	select FB_CFB_FILLRECT
->  	select FB_CFB_COPYAREA
->  	select FB_CFB_IMAGEBLIT
-> --
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Catalin
