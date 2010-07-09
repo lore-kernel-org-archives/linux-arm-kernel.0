@@ -1,25 +1,61 @@
-From: hemantp@ti.com (Pedanekar, Hemant)
-Date: Fri, 9 Jul 2010 07:46:31 +0530
-Subject: Memory type used for ioremap
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B030E181724@dbde02.ent.ti.com>
+From: roger.quadros@nokia.com (Roger Quadros)
+Date: Fri, 09 Jul 2010 11:12:52 +0300
+Subject: [PATCH 11/15] wireless: wl1271: introduce platform device support
+In-Reply-To: <AANLkTin7jIAIiN_JHMxX74K-EBDtDNwUQMlIf4C6RCHD@mail.gmail.com>
+References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
+	<1278376666-3509-12-git-send-email-ohad@wizery.com>
+	<4C32EF19.1000604@nokia.com>
+	<AANLkTintIz-N7MwwtqhVq2LR3Ln5JTNYSbJUBSSClcA-@mail.gmail.com>
+	<4C3306F4.8060907@nokia.com>
+	<AANLkTin5W52fPzWToRrAzm56SLZI-taSuI16rCEhLWqH@mail.gmail.com>
+	<4C333E0D.2070601@nokia.com>
+	<alpine.LFD.2.00.1007061316010.6020@xanadu.home>
+	<AANLkTin7jIAIiN_JHMxX74K-EBDtDNwUQMlIf4C6RCHD@mail.gmail.com>
+Message-ID: <4C36DA04.3090209@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Ohad,
 
-I have few doubts regarding the memory type configured when we call ioremap for mapping a region (e.g., on-chip peripheral MMRs):
+On 07/08/2010 11:10 PM, ext Ohad Ben-Cohen wrote:
+> Hi Nicolas and Roger,
+>
+> On Tue, Jul 6, 2010 at 8:42 PM, Nicolas Pitre<nico@fluxnic.net>  wrote:
+>> On Tue, 6 Jul 2010, Roger Quadros wrote:
+>>> If the Power enable GPIO can be treated as SDIO slot supply (i.e. vmmc), then
+>>> the SDIO/MMC core should tackle it, just like it deals with supply for slots
+>>> with removable cards.
+>>
+> ...
+>> Another function pair would be needed instead, which would do almost
+>> like the suspend/resume code is already doing.  Something like:
+>
+> Thanks a lot for your review and comments, and for taking the time to
+> present your approach.
 
-Please note that this is regarding Cortx A8.
+you're welcome :)
+>
+> I like it !
+>
+> It'd allow us to lose the software (or fake if you want ;) card detect
+> mechanism, which is something that should have been added to each
+> platform we wanted to support.
+>
+> We would only need to make it possible to deliver board-specific data
+> to the function driver (e.g., in the case of the wl1271, we need irq
+> and board_ref_clock data).  That would require some board-level
+> platform-data configuration, which will be specific to the controller
+> to which the device is hardwired to. This data should propagate
+> through the host controller to the SDIO core so it would eventually be
 
-After examining 2nd level page descriptor, I see that the memory type configured for ioremapped region (as per TEX[2:0]=1 and CB=0) is "Outer and Inner Non-cacheable - Normal". Is this correct observation? I thought the ioremap would set memory type as one of the "Device".
+why should platform data go through the host controller? You are already 
+creating a new platform device for wl1271_sdio just to pass platform_data so the 
+platform data for that can be passed directly from board files to this platform 
+device. It doesn't need to go via host controller.
 
-What is the recommended method if I want to map some region as "Strongly-ordered" or "Device"?
+I think this case is specific to wl1271. Ideally wl1271 should have used the 
+SDIO's in-band interrupt delivery mechanism and SDIO Configuration space to 
+provide this information to make it truly plug n play.
 
-Thanks
--
-Hemant
-
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100709/0b637f70/attachment.html>
+br,
+-roger
