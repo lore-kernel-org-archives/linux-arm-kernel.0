@@ -1,61 +1,54 @@
-From: roger.quadros@nokia.com (Roger Quadros)
-Date: Fri, 09 Jul 2010 11:12:52 +0300
-Subject: [PATCH 11/15] wireless: wl1271: introduce platform device support
-In-Reply-To: <AANLkTin7jIAIiN_JHMxX74K-EBDtDNwUQMlIf4C6RCHD@mail.gmail.com>
-References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
-	<1278376666-3509-12-git-send-email-ohad@wizery.com>
-	<4C32EF19.1000604@nokia.com>
-	<AANLkTintIz-N7MwwtqhVq2LR3Ln5JTNYSbJUBSSClcA-@mail.gmail.com>
-	<4C3306F4.8060907@nokia.com>
-	<AANLkTin5W52fPzWToRrAzm56SLZI-taSuI16rCEhLWqH@mail.gmail.com>
-	<4C333E0D.2070601@nokia.com>
-	<alpine.LFD.2.00.1007061316010.6020@xanadu.home>
-	<AANLkTin7jIAIiN_JHMxX74K-EBDtDNwUQMlIf4C6RCHD@mail.gmail.com>
-Message-ID: <4C36DA04.3090209@nokia.com>
+From: per.xx.fransson@stericsson.com (Per Fransson)
+Date: Fri, 9 Jul 2010 10:19:08 +0200
+Subject: [PATCH v2 0/8] Initial implementation of kdump for ARM
+In-Reply-To: <20100709033802.GA2951@verge.net.au>
+References: <20100611063605.GB11156@esdhcp04058.research.nokia.com>
+	<4C2DE024.8060308@stericsson.com>
+	<20100705082835.GA32178@gw.healthdatacare.com>
+	<4C31AD62.6070805@stericsson.com>
+	<20100705101852.GA19338@n2100.arm.linux.org.uk>
+	<4C31B527.8060401@stericsson.com>
+	<20100705135552.GB19338@n2100.arm.linux.org.uk>
+	<20100709033802.GA2951@verge.net.au>
+Message-ID: <4C36DB7C.6030908@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
 
-On 07/08/2010 11:10 PM, ext Ohad Ben-Cohen wrote:
-> Hi Nicolas and Roger,
->
-> On Tue, Jul 6, 2010 at 8:42 PM, Nicolas Pitre<nico@fluxnic.net>  wrote:
->> On Tue, 6 Jul 2010, Roger Quadros wrote:
->>> If the Power enable GPIO can be treated as SDIO slot supply (i.e. vmmc), then
->>> the SDIO/MMC core should tackle it, just like it deals with supply for slots
->>> with removable cards.
+
+On 07/09/2010 05:38 AM, Simon Horman wrote:
+>>> And it would still be nice to not corrupt the page table of the
+>>> crashing context.
 >>
-> ...
->> Another function pair would be needed instead, which would do almost
->> like the suspend/resume code is already doing.  Something like:
+>> What you're then asking for is the crashing kernel to allocate 16K of
+>> memory to setup some page tables, and then context switch to that table
+>> so that the MMU can be turned off.
+>>
+>> That's never going to be anywhere near reliable.
 >
-> Thanks a lot for your review and comments, and for taking the time to
-> present your approach.
-
-you're welcome :)
+> Can this be addresses by allocating the memory at the time that kdump
+> is loaded rather than when it is executed (because of a crash)?
 >
-> I like it !
+> IIRC, x86 uses a double page table approach and it is done reliably.
 >
-> It'd allow us to lose the software (or fake if you want ;) card detect
-> mechanism, which is something that should have been added to each
-> platform we wanted to support.
 >
-> We would only need to make it possible to deliver board-specific data
-> to the function driver (e.g., in the case of the wl1271, we need irq
-> and board_ref_clock data).  That would require some board-level
-> platform-data configuration, which will be specific to the controller
-> to which the device is hardwired to. This data should propagate
-> through the host controller to the SDIO core so it would eventually be
 
-why should platform data go through the host controller? You are already 
-creating a new platform device for wl1271_sdio just to pass platform_data so the 
-platform data for that can be passed directly from board files to this platform 
-device. It doesn't need to go via host controller.
+We could do that.
 
-I think this case is specific to wl1271. Ideally wl1271 should have used the 
-SDIO's in-band interrupt delivery mechanism and SDIO Configuration space to 
-provide this information to make it truly plug n play.
+Admittedly, this is getting very "hacky", but if we want to set up a new 
+L1 page table in which we really only need one entry (for the code 
+running until we're sure the MMU is off), we could set up this one entry 
+all by itself placed at just the right offset within a page and then set 
+the PGD to point at the start of that page (since we're talking about 
+mappings for 0x00000000-0x40000000). The rest of the page could still be 
+used for other stuff - and even if this turns out to be more trouble 
+than it's worth, the other 12KB do not need to be allocated.
 
-br,
--roger
+However, I still think we could work within the old L1 table and:
+
+1) only modify one entry
+
+2) save that entry before overwriting it
+
+Regards,
+Per
