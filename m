@@ -1,114 +1,83 @@
-From: pieterg@gmx.com (pieterg)
-Date: Fri, 9 Jul 2010 09:03:50 +0200
-Subject: [PATCH v2 5/5] colibri-pxa3xx: add touchscreen support
-In-Reply-To: <201007090103.14418.marek.vasut@gmail.com>
-References: <201007082249.59852.pieterg@gmx.com>
-	<201007090103.14418.marek.vasut@gmail.com>
-Message-ID: <201007090903.50318.pieterg@gmx.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 09 Jul 2010 16:07:24 +0900
+Subject: [PATCH v6 3/3] input: samsung-keypad - Add samsung keypad driver
+In-Reply-To: <4C33D859.9050708@samsung.com>
+References: <1277724824-13308-1-git-send-email-jy0922.shim@samsung.com>
+	<1277724824-13308-3-git-send-email-jy0922.shim@samsung.com>
+	<4C32E21A.8080100@samsung.com>
+	<013401cb1d66$5fbf3fb0$1f3dbf10$%kim@samsung.com>
+	<4C33D859.9050708@samsung.com>
+Message-ID: <026901cb1f35$64c63470$2e529d50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 July 2010 01:03:14 Marek Vasut wrote:
-> Dne ?t 8. ?ervence 2010 22:49:59 pieterg napsal(a):
-> > Signed-off-by: pieter <p.grimmerink@inepro.com>
+Joonyoung Shim wrote:
+> 
+> On 7/7/2010 8:52 AM, Kukjin Kim wrote:
+> > Joonyoung Shim wrote:
+> >> Hi, Naveen.
+> >>
+> >> On 6/28/2010 8:33 PM, Joonyoung Shim wrote:
+> >>> This patch adds support for keypad driver running on Samsung cpus. This
+> >>> driver is tested on GONI and Aquila board using S5PC110 cpu.
+> >>>
+> >>> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> >>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> >>> ---
+> >>>  drivers/input/keyboard/Kconfig          |    9 +
+> >>>  drivers/input/keyboard/Makefile         |    1 +
+> >>>  drivers/input/keyboard/samsung-keypad.c |  491
+> >> +++++++++++++++++++++++++++++++
+> >>>  3 files changed, 501 insertions(+), 0 deletions(-)
+> >>>  create mode 100644 drivers/input/keyboard/samsung-keypad.c
+> >>>
+> >> Could you please test this v6 keypad driver on your various targets?
+> >
+> > Hi,
+> >
+> > I received the test result from Naveen.
+> > And now he is debugging about that.
+> >
+> > ..his e-mail client has some problem..so I replied...
+> >
 > > ---
-> >  arch/arm/mach-pxa/colibri-pxa300.c       |    2 +
-> >  arch/arm/mach-pxa/colibri-pxa320.c       |    1 +
-> >  arch/arm/mach-pxa/colibri-pxa3xx.c       |   31
-> > ++++++++++++++++++++++++++++++
-> >  arch/arm/mach-pxa/include/mach/colibri.h |    6 +++++
-> >  4 files changed, 40 insertions(+), 0 deletions(-)
+> > From: Naveen Ch
 > >
-> > diff --git a/arch/arm/mach-pxa/colibri-pxa300.c
-> > b/arch/arm/mach-pxa/colibri-pxa300.c
-> > index 27f403d..3e50466 100644
-> > --- a/arch/arm/mach-pxa/colibri-pxa300.c
-> > +++ b/arch/arm/mach-pxa/colibri-pxa300.c
-> > @@ -229,6 +229,8 @@ void __init colibri_pxa300_init(void)
-> >  				mfp_to_gpio(MFP_PIN_GPIO13));
-> >  	colibri_pxa300_init_uart();
-> >  	colibri_pxa300_init_i2c();
-> > +	if (cpu_is_pxa310())
-> > +		colibri_pxa3xx_init_touchscreen();
-> >  }
+> > I've tested with v6 patches and they are working fine on SMDK6410, SMDKC100
+> and SMDKV210, except for some header inclusion (linux/sched.h) in samsung-
+> keypad.c.
 > >
-> >  MACHINE_START(COLIBRI300, "Toradex Colibri PXA300")
-> > diff --git a/arch/arm/mach-pxa/colibri-pxa320.c
-> > b/arch/arm/mach-pxa/colibri-pxa320.c
-> > index 0755087..43fadf6 100644
-> > --- a/arch/arm/mach-pxa/colibri-pxa320.c
-> > +++ b/arch/arm/mach-pxa/colibri-pxa320.c
-> > @@ -229,6 +229,7 @@ void __init colibri_pxa320_init(void)
-> >  				mfp_to_gpio(MFP_PIN_GPIO28));
-> >  	colibri_pxa320_init_uart();
-> >  	colibri_pxa320_init_i2c();
-> > +	colibri_pxa3xx_init_touchscreen();
-> >  }
+> > The build breaking error is like following:
+> > (make s5pc100_defconfig and select input->keypad->samsung keypad)
 > >
-> >  MACHINE_START(COLIBRI320, "Toradex Colibri PXA320")
-> > diff --git a/arch/arm/mach-pxa/colibri-pxa3xx.c
-> > b/arch/arm/mach-pxa/colibri-pxa3xx.c
-> > index 199afa2..097aef5 100644
-> > --- a/arch/arm/mach-pxa/colibri-pxa3xx.c
-> > +++ b/arch/arm/mach-pxa/colibri-pxa3xx.c
-> > @@ -198,3 +198,34 @@ void __init colibri_pxa3xx_init_nand(void)
-> >  }
-> >  #endif
+> > drivers/input/keyboard/samsung-keypad.c: In function 'samsung_keypad_irq':
+> > drivers/input/keyboard/samsung-keypad.c:170: error: 'TASK_UNINTERRUPTIBLE'
+> undeclared (first use in this function)
+> > drivers/input/keyboard/samsung-keypad.c:170: error: (Each undeclared identifier
+> is reported only once
+> > drivers/input/keyboard/samsung-keypad.c:170: error: for each function it appears
+> in.)
+> > drivers/input/keyboard/samsung-keypad.c:170: error: implicit declaration of
+> function 'schedule_timeout'
+> > drivers/input/keyboard/samsung-keypad.c: In function 'samsung_keypad_stop':
+> > drivers/input/keyboard/samsung-keypad.c:202: error: 'TASK_NORMAL'
+> undeclared (first use in this function)
+> > make[3]: *** [drivers/input/keyboard/samsung-keypad.o] Error 1
 > >
-> > +#if defined(CONFIG_INPUT_TOUCHSCREEN)
-> > +
-> > +#if defined(CONFIG_TOUCHSCREEN_WM97XX) || \
-> > +	defined(CONFIG_TOUCHSCREEN_WM97XX_MODULE)
-> > +static struct platform_device colibri_ts_wm97xx_device = {
-> > +	.name	= "wm97xx-ts",
-> > +	.id	= -1,
-> > +};
-> > +#endif
-> > +
-> > +#if defined(CONFIG_TOUCHSCREEN_UCB1400) || \
-> > +	defined(CONFIG_TOUCHSCREEN_UCB1400_MODULE)
-> > +static struct platform_device colibri_ts_ucb1400_device = {
-> > +	.name	= "ucb1400_core",
-> > +	.id	= -1,
-> > +};
-> > +#endif
-> > +
-> > +void __init colibri_pxa3xx_init_touchscreen(void)
-> > +{
-> > +#if defined(CONFIG_TOUCHSCREEN_WM97XX) || \
-> > +	defined(CONFIG_TOUCHSCREEN_WM97XX_MODULE)
-> > +	platform_device_register(&colibri_ts_wm97xx_device);
-> > +#endif
-> > +#if defined(CONFIG_TOUCHSCREEN_UCB1400) || \
-> > +	defined(CONFIG_TOUCHSCREEN_UCB1400_MODULE)
-> > +	platform_device_register(&colibri_ts_ucb1400_device);
-> > +#endif
-> > +}
-> > +
-> > +#endif
-> > diff --git a/arch/arm/mach-pxa/include/mach/colibri.h
-> > b/arch/arm/mach-pxa/include/mach/colibri.h
-> > index 5f2ba8d..299dab9 100644
-> > --- a/arch/arm/mach-pxa/include/mach/colibri.h
-> > +++ b/arch/arm/mach-pxa/include/mach/colibri.h
-> > @@ -30,6 +30,12 @@ extern void colibri_pxa3xx_init_nand(void);
-> >  static inline void colibri_pxa3xx_init_nand(void) {}
-> >  #endif
-> >
-> > +#if defined(CONFIG_INPUT_TOUCHSCREEN)
-> > +extern void colibri_pxa3xx_init_touchscreen(void);
-> > +#else
-> > +static inline void colibri_pxa3xx_init_touchscreen(void) {}
-> > +#endif
-> > +
-> >  /* physical memory regions */
-> >  #define COLIBRI_SDRAM_BASE	0xa0000000      /* SDRAM region */
->
-> What will happen if both of the TS devices are selected?
+> 
+> This error occurs on s5pc100_defconfig having disabled CONFIG_PREEMPT
+> option. I think sched.h should be included to remove like this
+> dependency in driver, are there other ways?
 
-That's no problem.
-I actually have both configs enabled, so I can run the same kernel on the 
-310 (which is using wm97 for a while now) and the 320 (which still has 
-ucb1400 at the moment)
+I'm not sure root cause is that. But as you said, I think need inclusion it for prevent the problem.
+Actually didn't happen it before..so maybe the some core functions have moved between rc-3 and earlier versions...
 
-Rgds, Pieter
+Anyway, if no any issues, could you please re-submit updated it soon?
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
