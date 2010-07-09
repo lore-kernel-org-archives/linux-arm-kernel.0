@@ -1,55 +1,66 @@
 From: p.osciak@samsung.com (Pawel Osciak)
-Date: Fri, 09 Jul 2010 10:49:51 +0200
-Subject: [PATCH 03/19] s3c-fb: fixed distortedness situation for the mode more
-	then 24bpp.
+Date: Fri, 09 Jul 2010 10:49:52 +0200
+Subject: [PATCH 04/19] s3c-fb: only init window colour key controls for windows
+	with blending
 In-Reply-To: <1278665407-18002-1-git-send-email-p.osciak@samsung.com>
 References: <1278665407-18002-1-git-send-email-p.osciak@samsung.com>
-Message-ID: <1278665407-18002-4-git-send-email-p.osciak@samsung.com>
+Message-ID: <1278665407-18002-5-git-send-email-p.osciak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: InKi Dae <inki.dae@samsung.com>
+From: Ben Dooks <ben-linux@fluff.org>
 
-it has been working fine at 16bpp but in case of pixel format more then
-24bpp
-it would occur distortedness situation on that mode. so this patch set
-the word swap control bit of WINCONx to 1 as default value. but it
-should be set to 0
-in case that each ENLOCAL bit of WINCON0 ~ 2 registers is enabled.
-this issue would be solved with local path feature soon.
+The driver clears all windows, but also sets the windows' colour key
+controls at the same time. However, the last window does not have these
+registers as it is always blended into the previous window.
 
-Signed-off-by: InKi Dae <inki.dae@samsung.com>
-Reviewed-by: KyungMin Park <kyungmin.park.samsung.com>
+Move the colour key initialisation into the probe, and run it for only
+nr_win-1 windows.
+
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
 ---
- arch/arm/plat-samsung/include/plat/regs-fb.h |    1 +
- drivers/video/s3c-fb.c                       |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+ drivers/video/s3c-fb.c |   14 +++++++++++---
+ 1 files changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/regs-fb.h b/arch/arm/plat-samsung/include/plat/regs-fb.h
-index 0ef806e..41c68ac 100644
---- a/arch/arm/plat-samsung/include/plat/regs-fb.h
-+++ b/arch/arm/plat-samsung/include/plat/regs-fb.h
-@@ -173,6 +173,7 @@
- #define WINCONx_BITSWP				(1 << 18)
- #define WINCONx_BYTSWP				(1 << 17)
- #define WINCONx_HAWSWP				(1 << 16)
-+#define WINCONx_WSWP				(1 << 15)
- #define WINCONx_BURSTLEN_MASK			(0x3 << 9)
- #define WINCONx_BURSTLEN_SHIFT			(9)
- #define WINCONx_BURSTLEN_16WORD			(0x0 << 9)
 diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
-index c4639c4..9c46f95 100644
+index 9c46f95..f9d0170 100644
 --- a/drivers/video/s3c-fb.c
 +++ b/drivers/video/s3c-fb.c
-@@ -424,6 +424,7 @@ static int s3c_fb_set_par(struct fb_info *info)
- 		else
- 			data |= WINCON0_BPPMODE_24BPP_888;
+@@ -845,9 +845,6 @@ static void s3c_fb_clear_win(struct s3c_fb *sfb, int win)
+ 	void __iomem *regs = sfb->regs;
  
-+		data |= WINCONx_WSWP;
- 		data |= WINCONx_BURSTLEN_16WORD;
- 		break;
- 	}
+ 	writel(0, regs + WINCON(win));
+-	writel(0xffffff, regs + WxKEYCONy(win, 0));
+-	writel(0xffffff, regs + WxKEYCONy(win, 1));
+-
+ 	writel(0, regs + VIDOSD_A(win));
+ 	writel(0, regs + VIDOSD_B(win));
+ 	writel(0, regs + VIDOSD_C(win));
+@@ -920,6 +917,12 @@ static int __devinit s3c_fb_probe(struct platform_device *pdev)
+ 	for (win = 0; win < S3C_FB_MAX_WIN; win++)
+ 		s3c_fb_clear_win(sfb, win);
+ 
++	/* initialise colour key controls */
++	for (win = 0; win < (S3C_FB_MAX_WIN - 1); win++) {
++		writel(0xffffff, sfb->regs + WxKEYCONy(win, 0));
++		writel(0xffffff, sfb->regs + WxKEYCONy(win, 1));
++	}
++
+ 	/* we have the register setup, start allocating framebuffers */
+ 
+ 	for (win = 0; win < S3C_FB_MAX_WIN; win++) {
+@@ -1020,6 +1023,11 @@ static int s3c_fb_resume(struct platform_device *pdev)
+ 	for (win_no = 0; win_no < S3C_FB_MAX_WIN; win_no++)
+ 		s3c_fb_clear_win(sfb, win_no);
+ 
++	for (win_no = 0; win_no < S3C_FB_MAX_WIN - 1; win_no++) {
++		writel(0xffffff, sfb->regs + WxKEYCONy(win_no, 1));
++		writel(0xffffff, sfb->regs + WxKEYCONy(win_no, 1));
++	}
++
+ 	/* restore framebuffers */
+ 	for (win_no = 0; win_no < S3C_FB_MAX_WIN; win_no++) {
+ 		win = sfb->windows[win_no];
 -- 
 1.7.1.569.g6f426
