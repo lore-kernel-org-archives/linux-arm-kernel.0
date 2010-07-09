@@ -1,75 +1,73 @@
 From: p.osciak@samsung.com (Pawel Osciak)
-Date: Fri, 09 Jul 2010 10:49:48 +0200
-Subject: [PATCH v4 0/19] Various s3c-fb updates
-Message-ID: <1278665407-18002-1-git-send-email-p.osciak@samsung.com>
+Date: Fri, 09 Jul 2010 10:49:50 +0200
+Subject: [PATCH 02/19] s3c-fb: add default window feature.
+In-Reply-To: <1278665407-18002-1-git-send-email-p.osciak@samsung.com>
+References: <1278665407-18002-1-git-send-email-p.osciak@samsung.com>
+Message-ID: <1278665407-18002-3-git-send-email-p.osciak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: InKi Dae <inki.dae@samsung.com>
 
-This series contains various Samsung framebuffer driver updates.
-I believe that it has reached the stage of being ready for merging.
+s5pv210 has five window layers (window0 ~ 4), among them,
+window0 ~ 2 could be used for local path with fimc(capture device)
+and fimd writeback feature so this patch makes default window layer
+for UI to be set at machine code.
 
-The main highlights of this series are:
-- Ben Dook's unification of the plethora of Samsung framebuffer header
-files with configuration selection at probe time, machine naming;
-- palette setup code moved to the main driver;
-- added ability to wait for VSYNC and to pan the display;
-- better support for new features found in S5PV210 SoCs, including
-  shadow register handling and DMA channel control,
-- various small changes,
-- a number of bugs has also been fixed.
+Signed-off-by: InKi Dae <inki.dae@samsung.com>
+Reviewed-by: KyungMin Park <kyungmin.park.samsung.com>
+Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
+---
+ arch/arm/plat-samsung/include/plat/fb.h |    3 +++
+ drivers/video/s3c-fb.c                  |    6 +++---
+ 2 files changed, 6 insertions(+), 3 deletions(-)
 
-
-Changes in v4:
-- corrected fb_dealloc_cmap condition on window probe failure
-- fixed a race condition in wait for VSYNC ioctl
-- removed has_osd_size flag from window variant; osd_size_off != 0
-  now implies has_osd_size = 1
-- cosmetic changes, as suggested by Ben Dooks, and more comments
-
-Changes in v3:
-- new patches:
-  * fixing a section mismatch error
-  * adding support for DMA channel control (enable/disable) found on S5PV210
-  * disabling shadow register updates during set_par
-
-- unified function for disabling register updates
-- no need to initialize names for 64xx-type framebuffers (is being set as
-  default anyway)
-- updated to the new version of Ben's branch
-- minor fixes
-
-Changes in v2:
-- added SHADOWCON register support found on S3C6410 and S5PC100 for disabling
-  shadow register updates
-- fixed osd and alpha register handling (different configurations for different
-  machines)
-
-The series includes:
-
-[PATCH 01/19] s3c-fb: Change to depending on CONFIG_S3C_FB_DEV
-[PATCH 02/19] s3c-fb: add default window feature.
-[PATCH 03/19] s3c-fb: fixed distortedness situation for the mode more then 24bpp.
-[PATCH 04/19] s3c-fb: only init window colour key controls for windows with blending
-[PATCH 05/19] s3c-fb: Initial move to unifying the header files
-[PATCH 06/19] s3c-fb: udpate to support s3c2416/s3c2443 style hardware
-[PATCH 07/19] s3c-fb: Integrate palette setup code into main driver
-[PATCH 08/19] s3c-fb: Fix various null references on framebuffer memory alloc failure
-[PATCH 09/19] s3c-fb: Correct FRAMESEL1 bitfield defines for VIDINTCON0 register
-[PATCH 10/19] s3c-fb: Separate S5PC100 and S5PV210 framebuffer driver data structures
-[PATCH 11/19] s3c-fb: Add device name initialization
-[PATCH 12/19] s3c-fb: Add support for display panning
-[PATCH 13/19] s3c-fb: Add wait for VSYNC ioctl
-[PATCH 14/19] s3c-fb: window 3 of 64xx+ does not have an osd_d register
-[PATCH 15/19] s3c-fb: Add SHADOWCON shadow register locking support for S5PV210
-[PATCH 16/19] s3c-fb: Correct window osd size and alpha register handling
-[PATCH 17/19] s3c-fb: Protect window-specific registers during updates
-[PATCH 18/19] s3c-fb: fix section mismatch
-[PATCH 19/19] s3c-fb: Add support for DMA channel control on S5PV210
-
-Best regards
---
-Pawel Osciak
-Linux Platform Group
-Samsung Poland R&D Center
+diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
+index 27d3b49..cb3ca3a 100644
+--- a/arch/arm/plat-samsung/include/plat/fb.h
++++ b/arch/arm/plat-samsung/include/plat/fb.h
+@@ -42,6 +42,7 @@ struct s3c_fb_pd_win {
+  * @setup_gpio: Setup the external GPIO pins to the right state to transfer
+  *		the data from the display system to the connected display
+  *		device.
++ * @default_win: default window layer number to be used for UI layer.
+  * @vidcon0: The base vidcon0 values to control the panel data format.
+  * @vidcon1: The base vidcon1 values to control the panel data output.
+  * @win: The setup data for each hardware window, or NULL for unused.
+@@ -58,6 +59,8 @@ struct s3c_fb_platdata {
+ 
+ 	struct s3c_fb_pd_win	*win[S3C_FB_MAX_WIN];
+ 
++	u32			 default_win;
++
+ 	u32			 vidcon0;
+ 	u32			 vidcon1;
+ };
+diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
+index 9682ecc..c4639c4 100644
+--- a/drivers/video/s3c-fb.c
++++ b/drivers/video/s3c-fb.c
+@@ -300,9 +300,9 @@ static int s3c_fb_set_par(struct fb_info *info)
+ 	/* disable the window whilst we update it */
+ 	writel(0, regs + WINCON(win_no));
+ 
+-	/* use window 0 as the basis for the lcd output timings */
++	/* use platform specified window as the basis for the lcd timings */
+ 
+-	if (win_no == 0) {
++	if (win_no == sfb->pdata->default_win) {
+ 		clkdiv = s3c_fb_calc_pixclk(sfb, var->pixclock);
+ 
+ 		data = sfb->pdata->vidcon0;
+@@ -636,7 +636,7 @@ static int s3c_fb_blank(int blank_mode, struct fb_info *info)
+ 	/* we're stuck with this until we can do something about overriding
+ 	 * the power control using the blanking event for a single fb.
+ 	 */
+-	if (index == 0)
++	if (index == sfb->pdata->default_win)
+ 		s3c_fb_enable(sfb, blank_mode != FB_BLANK_POWERDOWN ? 1 : 0);
+ 
+ 	return 0;
+-- 
+1.7.1.569.g6f426
