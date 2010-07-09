@@ -1,71 +1,143 @@
 From: p.osciak@samsung.com (Pawel Osciak)
-Date: Fri, 09 Jul 2010 10:50:07 +0200
-Subject: [PATCH 19/19] s3c-fb: Add support for DMA channel control on S5PV210
+Date: Fri, 09 Jul 2010 10:49:59 +0200
+Subject: [PATCH 11/19] s3c-fb: Add device name initialization
 In-Reply-To: <1278665407-18002-1-git-send-email-p.osciak@samsung.com>
 References: <1278665407-18002-1-git-send-email-p.osciak@samsung.com>
-Message-ID: <1278665407-18002-20-git-send-email-p.osciak@samsung.com>
+Message-ID: <1278665407-18002-12-git-send-email-p.osciak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-S5PV210 SoCs allow enabling/disabling DMA channels per window. For a window
-to display data from framebuffer memory, its channel has to be enabled.
+Add framebuffer device name initialization calls for S3C2443, S3C64xx
+and S5P machines.
 
 Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-samsung/include/plat/regs-fb.h |    4 ++++
- drivers/video/s3c-fb.c                       |   15 +++++++++++++++
- 2 files changed, 19 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c2416/s3c2416.c              |    3 +-
+ arch/arm/mach-s3c2443/s3c2443.c              |    2 +
+ arch/arm/mach-s5pc100/cpu.c                  |    3 ++
+ arch/arm/mach-s5pv210/cpu.c                  |    3 ++
+ arch/arm/plat-samsung/include/plat/fb-core.h |   29 ++++++++++++++++++++++++++
+ 5 files changed, 39 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/plat-samsung/include/plat/fb-core.h
 
-diff --git a/arch/arm/plat-samsung/include/plat/regs-fb.h b/arch/arm/plat-samsung/include/plat/regs-fb.h
-index 4359918..8f39aa5 100644
---- a/arch/arm/plat-samsung/include/plat/regs-fb.h
-+++ b/arch/arm/plat-samsung/include/plat/regs-fb.h
-@@ -223,6 +223,10 @@
- /* S5PV210 */
- #define SHADOWCON				(0x34)
- #define SHADOWCON_WINx_PROTECT(_win)		(1 << (10 + (_win)))
-+/* DMA channels (all windows) */
-+#define SHADOWCON_CHx_ENABLE(_win)		(1 << (_win))
-+/* Local input channels (windows 0-2) */
-+#define SHADOWCON_CHx_LOCAL_ENABLE(_win)	(1 << (5 + (_win)))
+diff --git a/arch/arm/mach-s3c2416/s3c2416.c b/arch/arm/mach-s3c2416/s3c2416.c
+index 35dabcc..bc30245 100644
+--- a/arch/arm/mach-s3c2416/s3c2416.c
++++ b/arch/arm/mach-s3c2416/s3c2416.c
+@@ -55,6 +55,7 @@
+ #include <plat/cpu.h>
  
- #define VIDOSDxA_TOPLEFT_X_MASK			(0x7ff << 11)
- #define VIDOSDxA_TOPLEFT_X_SHIFT		(11)
-diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
-index a95314d..8ea974d 100644
---- a/drivers/video/s3c-fb.c
-+++ b/drivers/video/s3c-fb.c
-@@ -634,6 +634,13 @@ static int s3c_fb_set_par(struct fb_info *info)
- 	writel(data, regs + sfb->variant.wincon + (win_no * 4));
- 	writel(0x0, regs + sfb->variant.winmap + (win_no * 4));
+ #include <plat/iic-core.h>
++#include <plat/fb-core.h>
  
-+	/* Enable DMA channel for this window */
-+	if (sfb->variant.has_shadowcon) {
-+		data = readl(sfb->regs + SHADOWCON);
-+		data |= SHADOWCON_CHx_ENABLE(win_no);
-+		writel(data, sfb->regs + SHADOWCON);
-+	}
+ static struct map_desc s3c2416_iodesc[] __initdata = {
+ 	IODESC_ENT(WATCHDOG),
+@@ -90,7 +91,7 @@ int __init s3c2416_init(void)
+ 	s3c_i2c0_setname("s3c2440-i2c");
+ 	s3c_i2c1_setname("s3c2440-i2c");
+ 
+-	s3c_device_fb.name = "s3c2443-fb";
++	s3c_fb_setname("s3c2443-fb");
+ 
+ 	return sysdev_register(&s3c2416_sysdev);
+ }
+diff --git a/arch/arm/mach-s3c2443/s3c2443.c b/arch/arm/mach-s3c2443/s3c2443.c
+index ce2ec32..839b6b2 100644
+--- a/arch/arm/mach-s3c2443/s3c2443.c
++++ b/arch/arm/mach-s3c2443/s3c2443.c
+@@ -35,6 +35,7 @@
+ #include <plat/s3c2443.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
++#include <plat/fb-core.h>
+ 
+ static struct map_desc s3c2443_iodesc[] __initdata = {
+ 	IODESC_ENT(WATCHDOG),
+@@ -62,6 +63,7 @@ int __init s3c2443_init(void)
+ 	s3c24xx_reset_hook = s3c2443_hard_reset;
+ 
+ 	s3c_device_nand.name = "s3c2412-nand";
++	s3c_fb_setname("s3c2443-fb");
+ 
+ 	/* change WDT IRQ number */
+ 	s3c_device_wdt.resource[1].start = IRQ_S3C2443_WDT;
+diff --git a/arch/arm/mach-s5pc100/cpu.c b/arch/arm/mach-s5pc100/cpu.c
+index 7b5bdbc..d10276a 100644
+--- a/arch/arm/mach-s5pc100/cpu.c
++++ b/arch/arm/mach-s5pc100/cpu.c
+@@ -41,6 +41,7 @@
+ #include <plat/iic-core.h>
+ #include <plat/sdhci.h>
+ #include <plat/onenand-core.h>
++#include <plat/fb-core.h>
+ 
+ #include <plat/s5pc100.h>
+ 
+@@ -92,6 +93,8 @@ void __init s5pc100_map_io(void)
+ 	s3c_i2c1_setname("s3c2440-i2c");
+ 
+ 	s3c_onenand_setname("s5pc100-onenand");
 +
- 	shadow_protect_win(win, 0);
++	s3c_fb_setname("s5pc100-fb");
+ }
  
- 	return 0;
-@@ -1091,7 +1098,15 @@ static void s3c_fb_free_memory(struct s3c_fb *sfb, struct s3c_fb_win *win)
-  */
- static void s3c_fb_release_win(struct s3c_fb *sfb, struct s3c_fb_win *win)
- {
-+	u32 data;
+ void __init s5pc100_init_clocks(int xtal)
+diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
+index 411a4a9..4d3580a 100644
+--- a/arch/arm/mach-s5pv210/cpu.c
++++ b/arch/arm/mach-s5pv210/cpu.c
+@@ -34,6 +34,7 @@
+ #include <plat/s5pv210.h>
+ #include <plat/iic-core.h>
+ #include <plat/sdhci.h>
++#include <plat/fb-core.h>
+ 
+ /* Initial IO mappings */
+ 
+@@ -91,6 +92,8 @@ void __init s5pv210_map_io(void)
+ 	s3c_i2c0_setname("s3c2440-i2c");
+ 	s3c_i2c1_setname("s3c2440-i2c");
+ 	s3c_i2c2_setname("s3c2440-i2c");
 +
- 	if (win->fbinfo) {
-+		if (sfb->variant.has_shadowcon) {
-+			data = readl(sfb->regs + SHADOWCON);
-+			data &= ~SHADOWCON_CHx_ENABLE(win->index);
-+			data &= ~SHADOWCON_CHx_LOCAL_ENABLE(win->index);
-+			writel(data, sfb->regs + SHADOWCON);
-+		}
- 		unregister_framebuffer(win->fbinfo);
- 		if (win->fbinfo->cmap.len)
- 			fb_dealloc_cmap(&win->fbinfo->cmap);
++	s3c_fb_setname("s5pv210-fb");
+ }
+ 
+ void __init s5pv210_init_clocks(int xtal)
+diff --git a/arch/arm/plat-samsung/include/plat/fb-core.h b/arch/arm/plat-samsung/include/plat/fb-core.h
+new file mode 100644
+index 0000000..bca383e
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/plat/fb-core.h
+@@ -0,0 +1,29 @@
++/*
++ * arch/arm/plat-samsung/include/plat/fb-core.h
++ *
++ * Copyright 2010 Samsung Electronics Co., Ltd.
++ *	Pawel Osciak <p.osciak@samsung.com>
++ *
++ * Samsung framebuffer driver core functions
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#ifndef __ASM_PLAT_FB_CORE_H
++#define __ASM_PLAT_FB_CORE_H __FILE__
++
++/*
++ * These functions are only for use with the core support code, such as
++ * the CPU-specific initialization code.
++ */
++
++/* Re-define device name depending on support. */
++static inline void s3c_fb_setname(char *name)
++{
++#ifdef CONFIG_S3C_DEV_FB
++	s3c_device_fb.name = name;
++#endif
++}
++
++#endif /* __ASM_PLAT_FB_CORE_H */
 -- 
 1.7.1.569.g6f426
