@@ -1,285 +1,619 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri,  9 Jul 2010 14:27:20 +0300
-Subject: [PATCH 1/3] rx1950: add rx1950 LEDs driver
+Date: Fri,  9 Jul 2010 14:27:21 +0300
+Subject: [PATCH 2/3] Add s3c-adc-battery driver
 In-Reply-To: <1278674842-17583-1-git-send-email-anarsoul@gmail.com>
 References: <1278674842-17583-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1278674842-17583-2-git-send-email-anarsoul@gmail.com>
+Message-ID: <1278674842-17583-3-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+s3c-adc-battery is driver for monitoring
+and charging battery on iPAQ H1930/H1940/RX1950.
+It depends on s3c-adc driver to get battery voltage and current.
+
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- arch/arm/mach-s3c2440/mach-rx1950.c |    6 +
- drivers/leds/Kconfig                |    6 +
- drivers/leds/Makefile               |    1 +
- drivers/leds/leds-rx1950.c          |  206 +++++++++++++++++++++++++++++++++++
- 4 files changed, 219 insertions(+), 0 deletions(-)
- create mode 100644 drivers/leds/leds-rx1950.c
+ drivers/power/Kconfig           |    6 +
+ drivers/power/Makefile          |    1 +
+ drivers/power/s3c_adc_battery.c |  518 +++++++++++++++++++++++++++++++++++++++
+ include/linux/s3c_adc_battery.h |   37 +++
+ 4 files changed, 562 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/power/s3c_adc_battery.c
+ create mode 100644 include/linux/s3c_adc_battery.h
 
-diff --git a/arch/arm/mach-s3c2440/mach-rx1950.c b/arch/arm/mach-s3c2440/mach-rx1950.c
-index 8603b57..55b806a 100644
---- a/arch/arm/mach-s3c2440/mach-rx1950.c
-+++ b/arch/arm/mach-s3c2440/mach-rx1950.c
-@@ -126,6 +126,11 @@ static struct s3c2410fb_display rx1950_display = {
- 
- };
- 
-+static struct platform_device rx1950_device_leds = {
-+	.name             = "rx1950-leds",
-+	.id               = -1,
-+};
-+
- static struct s3c2410fb_mach_info rx1950_lcd_cfg = {
- 	.displays = &rx1950_display,
- 	.num_displays = 1,
-@@ -502,6 +507,7 @@ static struct platform_device *rx1950_devices[] __initdata = {
- 	&s3c_device_timer[1],
- 	&rx1950_backlight,
- 	&rx1950_device_gpiokeys,
-+	&rx1950_device_leds,
- };
- 
- static struct clk *rx1950_clocks[] __initdata = {
-diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-index 81bf25e..f986825 100644
---- a/drivers/leds/Kconfig
-+++ b/drivers/leds/Kconfig
-@@ -102,6 +102,12 @@ config LEDS_H1940
+diff --git a/drivers/power/Kconfig b/drivers/power/Kconfig
+index 8e9ba17..645baa5 100644
+--- a/drivers/power/Kconfig
++++ b/drivers/power/Kconfig
+@@ -136,6 +136,12 @@ config BATTERY_Z2
  	help
- 	  This option enables support for the LEDs on the h1940.
+ 	  Say Y to include support for the battery on the Zipit Z2.
  
-+config LEDS_RX1950
-+	tristate "LED Support for iPAQ RX1950 device"
-+	depends on MACH_RX1950
++config BATTERY_S3C_ADC
++	tristate "Battery driver for Samsung ADC based monitoring"
++	depends on S3C_ADC
 +	help
-+	  This option enables support for the LEDs on the rx1950.
++	  Say Y here to enable support for iPAQ h1930/h1940/rx1950 battery
 +
- config LEDS_COBALT_QUBE
- 	tristate "LED Support for the Cobalt Qube series front LED"
- 	depends on MIPS_COBALT
-diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
-index 2493de4..faa0d5d 100644
---- a/drivers/leds/Makefile
-+++ b/drivers/leds/Makefile
-@@ -17,6 +17,7 @@ obj-$(CONFIG_LEDS_NET5501)		+= leds-net5501.o
- obj-$(CONFIG_LEDS_WRAP)			+= leds-wrap.o
- obj-$(CONFIG_LEDS_ALIX2)		+= leds-alix2.o
- obj-$(CONFIG_LEDS_H1940)		+= leds-h1940.o
-+obj-$(CONFIG_LEDS_RX1950)		+= leds-rx1950.o
- obj-$(CONFIG_LEDS_COBALT_QUBE)		+= leds-cobalt-qube.o
- obj-$(CONFIG_LEDS_COBALT_RAQ)		+= leds-cobalt-raq.o
- obj-$(CONFIG_LEDS_SUNFIRE)		+= leds-sunfire.o
-diff --git a/drivers/leds/leds-rx1950.c b/drivers/leds/leds-rx1950.c
+ config CHARGER_PCF50633
+ 	tristate "NXP PCF50633 MBC"
+ 	depends on MFD_PCF50633
+diff --git a/drivers/power/Makefile b/drivers/power/Makefile
+index 0005080..166bcbf 100644
+--- a/drivers/power/Makefile
++++ b/drivers/power/Makefile
+@@ -33,4 +33,5 @@ obj-$(CONFIG_BATTERY_BQ27x00)	+= bq27x00_battery.o
+ obj-$(CONFIG_BATTERY_DA9030)	+= da9030_battery.o
+ obj-$(CONFIG_BATTERY_MAX17040)	+= max17040_battery.o
+ obj-$(CONFIG_BATTERY_Z2)	+= z2_battery.o
++obj-$(CONFIG_BATTERY_S3C_ADC)	+= s3c_adc_battery.o
+ obj-$(CONFIG_CHARGER_PCF50633)	+= pcf50633-charger.o
+diff --git a/drivers/power/s3c_adc_battery.c b/drivers/power/s3c_adc_battery.c
 new file mode 100644
-index 0000000..1eed583
+index 0000000..d2b729b
 --- /dev/null
-+++ b/drivers/leds/leds-rx1950.c
-@@ -0,0 +1,206 @@
++++ b/drivers/power/s3c_adc_battery.c
+@@ -0,0 +1,518 @@
 +/*
-+ * drivers/leds/leds-rx1950.c
-+ *
-+ * Based on leds-h1940 by Arnaud Patard <arnaud.patard@rtp-net.org>
-+ * Copyright (c) Vasily Khoruzhick <anarsoul@gmail.com>
++ * drivers/power/s3c_adc_battery.c
++ *	Copyright (c) Vasily Khoruzhick
++ *	Based on h1940_battery.c by Arnaud Patard
 + *
 + * This file is subject to the terms and conditions of the GNU General Public
 + * License.  See the file COPYING in the main directory of this archive for
 + * more details.
 + *
-+ * RX1950 leds driver
-+ *
++ *	    iPAQ h1930/h1940/rx1950 battery controler driver
 + */
 +
-+#include <linux/module.h>
++#include <linux/interrupt.h>
 +#include <linux/platform_device.h>
-+#include <linux/delay.h>
-+#include <linux/string.h>
-+#include <linux/ctype.h>
++#include <linux/power_supply.h>
 +#include <linux/leds.h>
 +#include <linux/gpio.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/timer.h>
++#include <linux/jiffies.h>
++#include <linux/s3c_adc_battery.h>
 +
++#include <asm/irq.h>
 +#include <mach/regs-gpio.h>
 +#include <mach/regs-gpioj.h>
-+#include <mach/hardware.h>
 +
-+/*
-+ * Green led.
-+ */
-+static void rx1950_greenled_set(struct led_classdev *led_dev,
-+			       enum led_brightness value)
++#include <plat/adc.h>
++
++#define BAT_POLL_INTERVAL			10000 /* ms */
++#define JITTER_DELAY				500 /* ms */
++
++struct s3c_adc_bat {
++	struct power_supply	psy;
++	struct s3c_adc_client	*client;
++	struct s3c_adc_batt_pdata *pdata;
++};
++
++#ifdef CONFIG_LEDS_CLASS
++DEFINE_LED_TRIGGER(charger_led_trigger);
++#endif
++
++static int s3c_adc_ac_get_property(struct power_supply *psy,
++				enum power_supply_property psp,
++				union power_supply_propval *val);
++
++static char *s3c_adc_supplied_to[] = {
++	"main-battery",
++};
++
++static enum power_supply_property s3c_adc_ac_props[] = {
++	POWER_SUPPLY_PROP_ONLINE,
++};
++
++static struct power_supply s3c_adc_ac = {
++	.name = "ac",
++	.type = POWER_SUPPLY_TYPE_MAINS,
++	.supplied_to = s3c_adc_supplied_to,
++	.num_supplicants = ARRAY_SIZE(s3c_adc_supplied_to),
++	.properties = s3c_adc_ac_props,
++	.num_properties = ARRAY_SIZE(s3c_adc_ac_props),
++	.get_property = s3c_adc_ac_get_property,
++};
++
++static enum power_supply_property s3c_adc_backup_bat_props[] = {
++	POWER_SUPPLY_PROP_VOLTAGE_NOW,
++	POWER_SUPPLY_PROP_VOLTAGE_MIN,
++	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
++};
++
++static int s3c_adc_backup_bat_get_property(struct power_supply *psy,
++				enum power_supply_property psp,
++				union power_supply_propval *val);
++
++static struct s3c_adc_bat backup_bat = {
++	.psy = {
++		.name		= "backup-battery",
++		.type		= POWER_SUPPLY_TYPE_BATTERY,
++		.properties	= s3c_adc_backup_bat_props,
++		.num_properties = ARRAY_SIZE(s3c_adc_backup_bat_props),
++		.get_property	= s3c_adc_backup_bat_get_property,
++		.use_for_apm	= 1,
++	},
++};
++
++static enum power_supply_property s3c_adc_main_bat_props[] = {
++	POWER_SUPPLY_PROP_STATUS,
++	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
++	POWER_SUPPLY_PROP_CHARGE_EMPTY_DESIGN,
++	POWER_SUPPLY_PROP_CHARGE_NOW,
++	POWER_SUPPLY_PROP_VOLTAGE_NOW,
++	POWER_SUPPLY_PROP_CURRENT_NOW,
++};
++
++static int s3c_adc_bat_get_property(struct power_supply *psy,
++				enum power_supply_property psp,
++				union power_supply_propval *val);
++
++static struct s3c_adc_bat main_bat = {
++	.psy = {
++		.name		= "main-battery",
++		.type		= POWER_SUPPLY_TYPE_BATTERY,
++		.properties	= s3c_adc_main_bat_props,
++		.num_properties = ARRAY_SIZE(s3c_adc_main_bat_props),
++		.get_property	= s3c_adc_bat_get_property,
++		.use_for_apm	= 1,
++	},
++};
++
++static int s3c_adc_ac_get_property(struct power_supply *psy,
++				enum power_supply_property psp,
++				union power_supply_propval *val)
 +{
-+	switch (value) {
-+	case LED_HALF:
-+		gpio_direction_output(S3C2410_GPA(4), 1);
-+		gpio_direction_output(S3C2410_GPA(6), 0);
-+		gpio_direction_output(S3C2410_GPJ(6), 1);
-+		break;
-+	case LED_FULL:
-+		gpio_direction_output(S3C2410_GPA(4), 0);
-+		gpio_direction_output(S3C2410_GPA(6), 1);
-+		gpio_direction_output(S3C2410_GPJ(6), 0);
++	int ret = 0;
++
++	switch (psp) {
++	case POWER_SUPPLY_PROP_ONLINE:
++		val->intval =
++			!gpio_get_value(main_bat.pdata->gpio_cable_plugged);
 +		break;
 +	default:
-+	case LED_OFF:
-+		gpio_direction_output(S3C2410_GPA(4), 0);
-+		gpio_direction_output(S3C2410_GPA(6), 0);
-+		gpio_direction_output(S3C2410_GPJ(6), 0);
++		ret = -EINVAL;
 +		break;
 +	}
-+}
-+
-+static struct led_classdev rx1950_greenled = {
-+	.name			= "rx1950:green",
-+	.brightness_set		= rx1950_greenled_set,
-+	.default_trigger	= "s3c-adc-charger",
-+};
-+
-+static void rx1950_redled_set(struct led_classdev *led_dev,
-+			     enum led_brightness value)
-+{
-+	switch (value) {
-+	case LED_HALF:
-+		gpio_direction_output(S3C2410_GPA(3), 1);
-+		gpio_direction_output(S3C2410_GPA(7), 0);
-+		gpio_direction_output(S3C2410_GPJ(6), 1);
-+		break;
-+	case LED_FULL:
-+		gpio_direction_output(S3C2410_GPA(3), 0);
-+		gpio_direction_output(S3C2410_GPA(7), 1);
-+		gpio_direction_output(S3C2410_GPJ(6), 0);
-+		break;
-+	default:
-+	case LED_OFF:
-+		gpio_direction_output(S3C2410_GPA(3), 0);
-+		gpio_direction_output(S3C2410_GPA(7), 0);
-+		gpio_direction_output(S3C2410_GPJ(6), 0);
-+		break;
-+	}
-+}
-+
-+static struct led_classdev rx1950_redled = {
-+	.name			= "rx1950:red",
-+	.brightness_set		= rx1950_redled_set,
-+	.default_trigger	= "s3c-adc-charger",
-+};
-+
-+/*
-+ * Blue led.
-+ */
-+static void rx1950_blueled_set(struct led_classdev *led_dev,
-+			      enum led_brightness value)
-+{
-+	if (value)
-+		gpio_direction_output(S3C2410_GPA(11), 1);
-+	else
-+		gpio_direction_output(S3C2410_GPA(11), 0);
-+}
-+
-+static struct led_classdev rx1950_blueled = {
-+	.name			= "rx1950:blue",
-+	.brightness_set		= rx1950_blueled_set,
-+	.default_trigger	= "rx1950-acx-mem",
-+};
-+
-+static int __devinit rx1950leds_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+
-+	ret = gpio_request(S3C2410_GPA(3), "rx1950:red_led_blink");
-+	if (ret)
-+		goto err_blink_red;
-+
-+	ret = gpio_request(S3C2410_GPA(4), "rx1950:green_led_blink");
-+	if (ret)
-+		goto err_blink_green;
-+
-+	ret = gpio_request(S3C2410_GPJ(6), "rx1950:led_blink");
-+	if (ret)
-+		goto err_blink;
-+
-+	ret = gpio_request(S3C2410_GPA(6), "rx1950:green_led");
-+	if (ret)
-+		goto err_green;
-+	ret = led_classdev_register(&pdev->dev, &rx1950_greenled);
-+	if (ret)
-+		goto err_green_gpio;
-+
-+	ret = gpio_request(S3C2410_GPA(7), "rx1950:red_led");
-+	if (ret)
-+		goto err_red;
-+	ret = led_classdev_register(&pdev->dev, &rx1950_redled);
-+	if (ret)
-+		goto err_red_gpio;
-+
-+	ret = gpio_request(S3C2410_GPA(11), "rx1950:blue_led");
-+	if (ret)
-+		goto err_blue;
-+	ret = led_classdev_register(&pdev->dev, &rx1950_blueled);
-+	if (ret)
-+		goto err_blue_gpio;
-+
-+	return 0;
-+
-+err_blue_gpio:
-+	gpio_free(S3C2410_GPA(11));
-+err_blue:
-+	led_classdev_unregister(&rx1950_redled);
-+err_red_gpio:
-+	gpio_free(S3C2410_GPA(6));
-+err_red:
-+	led_classdev_unregister(&rx1950_greenled);
-+err_green_gpio:
-+	gpio_free(S3C2410_GPA7);
-+err_green:
-+	gpio_free(S3C2410_GPJ(6));
-+err_blink:
-+	gpio_free(S3C2410_GPA(4));
-+err_blink_green:
-+	gpio_free(S3C2410_GPA(3));
-+err_blink_red:
 +	return ret;
 +}
 +
-+static int rx1950leds_remove(struct platform_device *pdev)
++static int s3c_adc_backup_bat_get_property(struct power_supply *psy,
++				enum power_supply_property psp,
++				union power_supply_propval *val)
 +{
-+	led_classdev_unregister(&rx1950_greenled);
-+	led_classdev_unregister(&rx1950_redled);
-+	led_classdev_unregister(&rx1950_blueled);
-+	gpio_free(S3C2410_GPA(11));
-+	gpio_free(S3C2410_GPA(6));
-+	gpio_free(S3C2410_GPA(7));
-+	gpio_free(S3C2410_GPJ(6));
-+	gpio_free(S3C2410_GPA(3));
-+	gpio_free(S3C2410_GPA(4));
++	struct s3c_adc_bat *bat = container_of(psy, struct s3c_adc_bat, psy);
++	static int volt_value = -1;
++	static unsigned int timestamp;
++
++	if (!bat) {
++		printk(KERN_ERR "%s: no battery infos ?!\n", __func__);
++		return -EINVAL;
++	}
++
++	if (volt_value < 0 ||
++		jiffies_to_msecs(jiffies - timestamp) > BAT_POLL_INTERVAL) {
++		volt_value = s3c_adc_read(bat->client,
++			bat->pdata->backup_volt_channel);
++		volt_value *= bat->pdata->backup_volt_mult;
++		timestamp = jiffies;
++	}
++
++	switch (psp) {
++	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
++		val->intval = volt_value;
++		return 0;
++	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
++		val->intval = bat->pdata->backup_volt_min;
++		return 0;
++	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
++		val->intval = bat->pdata->backup_volt_max;
++		return 0;
++	default:
++		return -EINVAL;
++	}
++}
++
++static void cable_plugged_handler(unsigned long data)
++{
++	static int old_status;
++	int is_plugged = !gpio_get_value(main_bat.pdata->gpio_cable_plugged);
++
++	if (old_status == is_plugged)
++		return;
++
++	printk(KERN_INFO "Power cable %s\n",\
++			is_plugged ? "plugged" : "unplugged");
++	if (is_plugged) {
++		main_bat.pdata->enable_charger();
++#ifdef CONFIG_LEDS_CLASS
++		led_trigger_event(charger_led_trigger, LED_HALF);
++#endif
++	} else {
++		main_bat.pdata->disable_charger();
++#ifdef CONFIG_LEDS_CLASS
++		led_trigger_event(charger_led_trigger, LED_OFF);
++#endif
++	}
++
++	old_status = is_plugged;
++	power_supply_changed(&s3c_adc_ac);
++}
++
++static void charge_finished_handler(unsigned long data)
++{
++	static int old_status;
++	int is_plugged = !gpio_get_value(main_bat.pdata->gpio_cable_plugged);
++	int is_charged = gpio_get_value(main_bat.pdata->gpio_charge_finished);
++
++	if (old_status == is_charged)
++		return;
++
++	if (!is_plugged)
++		return;
++
++	if (is_charged) {
++#ifdef CONFIG_LEDS_CLASS
++		led_trigger_event(charger_led_trigger, LED_FULL);
++#endif
++		main_bat.pdata->disable_charger();
++	} else {
++#ifdef CONFIG_LEDS_CLASS
++		led_trigger_event(charger_led_trigger, LED_HALF);
++#endif
++		main_bat.pdata->enable_charger();
++	}
++
++	old_status = is_charged;
++	power_supply_changed(&main_bat.psy);
++}
++
++static DEFINE_TIMER(cable_plugged_timer, cable_plugged_handler, 0, 0);
++static DEFINE_TIMER(charge_finished_timer, charge_finished_handler, 0, 0);
++
++static irqreturn_t s3c_adc_batt_cable(int irq, void *dev_id)
++{
++	mod_timer(&cable_plugged_timer,
++		jiffies + msecs_to_jiffies(JITTER_DELAY));
++	return IRQ_HANDLED;
++}
++
++static irqreturn_t s3c_adc_batt_charged(int irq, void *dev_id)
++{
++	mod_timer(&charge_finished_timer,
++		jiffies + msecs_to_jiffies(JITTER_DELAY));
++	return IRQ_HANDLED;
++}
++
++static int calc_full_volt(int volt_val, int cur_val)
++{
++	return volt_val +
++		cur_val * main_bat.pdata->internal_impedance / 1000;
++}
++
++static int s3c_adc_bat_get_property(struct power_supply *psy,
++				enum power_supply_property psp,
++				union power_supply_propval *val)
++{
++	struct s3c_adc_bat *bat = container_of(psy, struct s3c_adc_bat, psy);
++	static int volt_value = -1, cur_value = -1;
++	static unsigned int timestamp;
++	static int level = 1000000;
++
++	int status = POWER_SUPPLY_STATUS_DISCHARGING, new_level, full_volt;
++	const struct s3c_adc_batt_thresh *lut = bat->pdata->lut_noac;
++	unsigned int lut_size = bat->pdata->lut_noac_cnt;
++
++	if (!bat) {
++		printk(KERN_ERR "%s: no battery infos ?!\n", __func__);
++		return -EINVAL;
++	}
++
++	if (volt_value < 0 || cur_value < 0 ||
++		jiffies_to_msecs(jiffies - timestamp) > BAT_POLL_INTERVAL) {
++		volt_value = s3c_adc_read(bat->client,
++			bat->pdata->volt_channel) * bat->pdata->volt_mult;
++		cur_value = s3c_adc_read(bat->client,
++			bat->pdata->current_channel) * bat->pdata->current_mult;
++		timestamp = jiffies;
++	}
++
++	if (!gpio_get_value(bat->pdata->gpio_cable_plugged)) {
++		if (gpio_get_value(bat->pdata->gpio_charge_finished))
++			status = POWER_SUPPLY_STATUS_FULL;
++		else {
++			status = POWER_SUPPLY_STATUS_CHARGING;
++			lut = bat->pdata->lut_acin;
++			lut_size = bat->pdata->lut_acin_cnt;
++		}
++	}
++
++	new_level = 100000;
++	full_volt = calc_full_volt((volt_value / 1000), (cur_value / 1000));
++
++	if (full_volt < calc_full_volt(lut->volt, lut->cur)) {
++		lut_size--;
++		while (lut_size--) {
++			int lut_volt1, lut_volt2;
++			lut_volt1 = calc_full_volt(lut[0].volt, lut[0].cur);
++			lut_volt2 = calc_full_volt(lut[1].volt, lut[1].cur);
++			if (full_volt < lut_volt1 && full_volt >= lut_volt2) {
++				new_level = (lut[1].level +
++					(lut[0].level - lut[1].level) *
++					(full_volt - lut_volt2) /
++					(lut_volt1 - lut_volt2)) * 1000;
++				break;
++			}
++			new_level = lut[1].level * 1000;
++			lut++;
++		}
++	}
++
++#if 0
++	/* Battery level can't go up during discharging, and
++	 * can't go down during charging
++	 */
++	if ((status == POWER_SUPPLY_STATUS_DISCHARGING && new_level < level) ||
++		(status == POWER_SUPPLY_STATUS_CHARGING && new_level > level) ||
++		status == POWER_SUPPLY_STATUS_FULL)
++		level = new_level;
++#else
++	level = new_level;
++#endif
++
++	switch (psp) {
++	case POWER_SUPPLY_PROP_STATUS:
++		val->intval = status;
++		return 0;
++	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
++		val->intval = 100000;
++		return 0;
++	case POWER_SUPPLY_PROP_CHARGE_EMPTY_DESIGN:
++		val->intval = 0;
++		return 0;
++	case POWER_SUPPLY_PROP_CHARGE_NOW:
++		val->intval = level;
++		return 0;
++	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
++		val->intval = volt_value;
++		return 0;
++	case POWER_SUPPLY_PROP_CURRENT_NOW:
++		val->intval = cur_value;
++		return 0;
++	default:
++		return -EINVAL;
++	}
++}
++
++static int __init s3c_adc_batt_probe(struct platform_device *pdev)
++{
++	struct s3c_adc_client	*client;
++	struct s3c_adc_batt_pdata *pdata = pdev->dev.platform_data;
++	int ret;
++
++	client = s3c_adc_register(pdev, NULL, NULL, 0);
++	if (IS_ERR(client)) {
++		dev_err(&pdev->dev, "cannot register adc\n");
++		return PTR_ERR(client);
++	}
++
++	platform_set_drvdata(pdev, client);
++
++	main_bat.client = client;
++	main_bat.pdata = pdev->dev.platform_data;
++
++	ret = power_supply_register(&pdev->dev, &main_bat.psy);
++	if (ret)
++		goto err_reg_main;
++	if (pdata->backup_volt_mult) {
++		backup_bat.client = client;
++		backup_bat.pdata = pdev->dev.platform_data;
++		ret = power_supply_register(&pdev->dev, &backup_bat.psy);
++		if (ret)
++			goto err_reg_backup;
++	}
++	ret = power_supply_register(&pdev->dev, &s3c_adc_ac);
++	if (ret)
++		goto err_reg_ac;
++
++
++	ret = gpio_request(main_bat.pdata->gpio_cable_plugged, "batcable");
++	if (ret)
++		goto err_gpio1;
++
++	ret = request_irq(gpio_to_irq(main_bat.pdata->gpio_cable_plugged),
++			s3c_adc_batt_cable,
++			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
++			pdev->name, NULL);
++	if (ret)
++		goto err_irq1;
++
++	ret = gpio_request(main_bat.pdata->gpio_charge_finished, "charged");
++	if (ret)
++		goto err_gpio2;
++
++	ret = request_irq(gpio_to_irq(main_bat.pdata->gpio_charge_finished),
++			s3c_adc_batt_charged,
++			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
++			pdev->name, NULL);
++	if (ret)
++		goto err_irq2;
++
++	ret = pdata->init();
++	if (ret)
++		goto err_platform;
++
++#ifdef CONFIG_LEDS_CLASS
++	led_trigger_register_simple("s3c-adc-charger", &charger_led_trigger);
++#endif
++	printk(KERN_INFO "s3c-adc-batt successfully loaded\n");
++
++	device_init_wakeup(&pdev->dev, 1);
++
++	/* Schedule timer to check current status */
++	mod_timer(&cable_plugged_timer,
++		jiffies + msecs_to_jiffies(JITTER_DELAY));
++
++	return 0;
++
++err_platform:
++	free_irq(gpio_to_irq(main_bat.pdata->gpio_charge_finished), NULL);
++	del_timer_sync(&charge_finished_timer);
++err_irq2:
++	gpio_free(main_bat.pdata->gpio_charge_finished);
++err_gpio2:
++	free_irq(gpio_to_irq(main_bat.pdata->gpio_cable_plugged), NULL);
++	del_timer_sync(&cable_plugged_timer);
++err_irq1:
++	gpio_free(main_bat.pdata->gpio_cable_plugged);
++err_gpio1:
++	power_supply_unregister(&s3c_adc_ac);
++err_reg_ac:
++	if (pdata->backup_volt_mult)
++		power_supply_unregister(&backup_bat.psy);
++err_reg_backup:
++	power_supply_unregister(&main_bat.psy);
++err_reg_main:
++	return ret;
++}
++
++static int s3c_adc_batt_remove(struct platform_device *pdev)
++{
++	struct s3c_adc_client *client = platform_get_drvdata(pdev);
++	struct s3c_adc_batt_pdata *pdata = pdev->dev.platform_data;
++
++#ifdef CONFIG_LEDS_CLASS
++	led_trigger_unregister_simple(charger_led_trigger);
++#endif
++
++	power_supply_unregister(&s3c_adc_ac);
++	power_supply_unregister(&main_bat.psy);
++	if (pdata->backup_volt_mult)
++		power_supply_unregister(&backup_bat.psy);
++
++	s3c_adc_release(client);
++
++	free_irq(gpio_to_irq(pdata->gpio_charge_finished), NULL);
++	gpio_free(pdata->gpio_charge_finished);
++	del_timer_sync(&charge_finished_timer);
++	free_irq(gpio_to_irq(pdata->gpio_cable_plugged), NULL);
++	gpio_free(pdata->gpio_cable_plugged);
++	del_timer_sync(&cable_plugged_timer);
++
 +	return 0;
 +}
 +
++#ifdef CONFIG_PM
++static int s3c_adc_batt_suspend(struct platform_device *pdev,
++	pm_message_t state)
++{
++	struct s3c_adc_batt_pdata *pdata = pdev->dev.platform_data;
++	if (device_may_wakeup(&pdev->dev)) {
++		enable_irq_wake(gpio_to_irq(pdata->gpio_charge_finished));
++		enable_irq_wake(gpio_to_irq(pdata->gpio_cable_plugged));
++	} else {
++		disable_irq(gpio_to_irq(pdata->gpio_charge_finished));
++		disable_irq(gpio_to_irq(pdata->gpio_cable_plugged));
++		main_bat.pdata->disable_charger();
++	}
 +
-+static struct platform_driver rx1950leds_driver = {
++	return 0;
++}
++
++static int s3c_adc_batt_resume(struct platform_device *pdev)
++{
++	struct s3c_adc_batt_pdata *pdata = pdev->dev.platform_data;
++	if (device_may_wakeup(&pdev->dev)) {
++		disable_irq_wake(gpio_to_irq(pdata->gpio_charge_finished));
++		disable_irq_wake(gpio_to_irq(pdata->gpio_cable_plugged));
++	} else {
++		enable_irq(gpio_to_irq(pdata->gpio_charge_finished));
++		enable_irq(gpio_to_irq(pdata->gpio_cable_plugged));
++	}
++
++	/* Schedule timer to check current status */
++	mod_timer(&cable_plugged_timer,
++		jiffies + msecs_to_jiffies(JITTER_DELAY));
++
++	return 0;
++}
++#else
++#define s3c_adc_battery_suspend NULL
++#define s3c_adc_battery_resume NULL
++#endif
++
++static struct platform_driver s3c_adc_batt_driver = {
 +	.driver		= {
-+		.name	= "rx1950-leds",
-+		.owner	= THIS_MODULE,
++		.name	= "s3c-adc-battery",
 +	},
-+	.probe		= rx1950leds_probe,
-+	.remove		= rx1950leds_remove,
++	.probe		= s3c_adc_batt_probe,
++	.remove		= s3c_adc_batt_remove,
++	.suspend	= s3c_adc_batt_suspend,
++	.resume		= s3c_adc_batt_resume,
 +};
 +
 +
-+static int __init rx1950leds_init(void)
++static int __init s3c_adc_batt_init(void)
 +{
-+	return platform_driver_register(&rx1950leds_driver);
++	return platform_driver_register(&s3c_adc_batt_driver);
 +}
 +
-+static void __exit rx1950leds_exit(void)
++static void __exit s3c_adc_batt_exit(void)
 +{
-+	platform_driver_unregister(&rx1950leds_driver);
++	platform_driver_unregister(&s3c_adc_batt_driver);
 +}
 +
-+module_init(rx1950leds_init);
-+module_exit(rx1950leds_exit);
++module_init(s3c_adc_batt_init);
++module_exit(s3c_adc_batt_exit);
 +
 +MODULE_AUTHOR("Vasily Khoruzhick <anarsoul@gmail.com>");
-+MODULE_DESCRIPTION("LED driver for the iPAQ RX1950");
++MODULE_DESCRIPTION("iPAQ H1930/H1940/RX1950 battery controler driver");
 +MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:rx1950-leds");
+diff --git a/include/linux/s3c_adc_battery.h b/include/linux/s3c_adc_battery.h
+new file mode 100644
+index 0000000..a8dad74
+--- /dev/null
++++ b/include/linux/s3c_adc_battery.h
+@@ -0,0 +1,37 @@
++#ifndef _S3C_ADC_BATTERY_H
++#define _S3C_ADC_BATTERY_H
++
++struct s3c_adc_batt_thresh {
++	int volt; /* mV */
++	int cur; /* mA */
++	int level; /* percent */
++};
++
++struct s3c_adc_batt_pdata {
++	int (*init)(void);
++	void (*exit)(void);
++	void (*enable_charger)(void);
++	void (*disable_charger)(void);
++
++	unsigned int gpio_cable_plugged;
++	unsigned int gpio_charge_finished;
++
++	const struct s3c_adc_batt_thresh *lut_noac;
++	unsigned int lut_noac_cnt;
++	const struct s3c_adc_batt_thresh *lut_acin;
++	unsigned int lut_acin_cnt;
++
++	const unsigned int volt_channel;
++	const unsigned int current_channel;
++	const unsigned int backup_volt_channel;
++
++	const unsigned int volt_mult;
++	const unsigned int current_mult;
++	const unsigned int backup_volt_mult;
++	const unsigned int internal_impedance;
++
++	const unsigned int backup_volt_max;
++	const unsigned int backup_volt_min;
++};
++
++#endif
 -- 
 1.7.1
