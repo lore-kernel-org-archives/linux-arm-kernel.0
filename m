@@ -1,32 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 09 Jul 2010 13:11:04 +0100
-Subject: Memory type used for ioremap
-In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B030E181724@dbde02.ent.ti.com>
-References: <2A3DCF3DA181AD40BDE86A3150B27B6B030E181724@dbde02.ent.ti.com>
-Message-ID: <1278677464.11895.41.camel@e102109-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Jul 2010 13:16:29 +0100
+Subject: [PATCH v2 3/3] ARM: Add barriers to the I/O accessors if
+	ARM_DMA_MEM_BUFFERABLE
+In-Reply-To: <1278675696.11895.37.camel@e102109-lin.cambridge.arm.com>
+References: <20100709110350.11333.34303.stgit@e102109-lin.cambridge.arm.com>
+	<20100709110814.11333.83771.stgit@e102109-lin.cambridge.arm.com>
+	<1278675696.11895.37.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100709121629.GE22845@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-07-09 at 03:16 +0100, Pedanekar, Hemant wrote:
-> I have few doubts regarding the memory type configured when we call
-> ioremap for mapping a region (e.g., on-chip peripheral MMRs):
->  
-> Please note that this is regarding Cortx A8.
->  
-> After examining 2nd level page descriptor, I see that the memory type
-> configured for ioremapped region (as per TEX[2:0]=1 and CB=0) is
-> "Outer and Inner Non-cacheable - Normal". Is this correct
-> observation? I thought the ioremap would set memory type as one of the
-> "Device". 
->  
-> What is the recommended method if I want to map some region as
-> "Strongly-ordered" or "Device"?
+On Fri, Jul 09, 2010 at 12:41:36PM +0100, Catalin Marinas wrote:
+> This part requires a small change. It looks like the e1000e driver
+> doesn't like the do {...} while (0) constructs in the write*() accessors
+> (the E1000_WRITE_REG_ARRAY macro). Thanks to Giuseppe for finding this.
 
-If you are trying to ioremap normal RAM, we no longer allow this and
-force the memory type to be Normal Non-cacheable. This is an ARM
-architecture requirement (otherwise you create mismatched memory
-attributes aliases).
+Hmm.  I think those additional parens in drivers/net/e1000e/hw.h should
+be killed off instead.  They aren't serving any useful purpose.
 
+In fact, this is potentially dangerous - it causes write[bwl]() not to
+be 'void' - in that if you do use write[bwl]() in an expression that
+wants its return value, write[bwl]() will generate a read.  (While you
+might not use the value, you're relying on the compiler being able to
+spot that you're not using the value.)
 
--- 
-Catalin
+Keeping the do { } while() there prevents write[bwl]() being used as
+an expression, and therefore avoids nasty surprises when the compiler
+decides to read the register after writing.
