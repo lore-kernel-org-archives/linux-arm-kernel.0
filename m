@@ -1,68 +1,120 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 09 Jul 2010 12:08:02 +0100
-Subject: [PATCH v2 1/3] ARM: Introduce *_relaxed() I/O accessors
+Date: Fri, 09 Jul 2010 12:08:08 +0100
+Subject: [PATCH v2 2/3] ARM: Convert L2x0 to use the IO relaxed operations
+	for cache sync
 In-Reply-To: <20100709110350.11333.34303.stgit@e102109-lin.cambridge.arm.com>
 References: <20100709110350.11333.34303.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100709110801.11333.22995.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100709110808.11333.47652.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces readl*_relaxed()/write*_relaxed() as the main I/O
-accessors (when __mem_pci is defined). The standard read*()/write*()
-macros are now based on the relaxed accessors.
-
 This patch is in preparation for a subsequent patch which adds barriers
-to the I/O accessors.
+to the I/O accessors. Since the mandatory barriers may do an L2 cache
+sync, this patch avoids a recursive call into l2x0_cache_sync() via the
+write*() accessors and wmb().
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/io.h |   29 +++++++++++++++++------------
- 1 files changed, 17 insertions(+), 12 deletions(-)
+ arch/arm/mm/cache-l2x0.c |   26 +++++++++++++-------------
+ 1 files changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index c980156..97fb9aa 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -179,25 +179,30 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
-  * IO port primitives for more information.
-  */
- #ifdef __mem_pci
--#define readb(c) ({ __u8  __v = __raw_readb(__mem_pci(c)); __v; })
--#define readw(c) ({ __u16 __v = le16_to_cpu((__force __le16) \
-+#define readb_relaxed(c) ({ u8  __v = __raw_readb(__mem_pci(c)); __v; })
-+#define readw_relaxed(c) ({ u16 __v = le16_to_cpu((__force __le16) \
- 					__raw_readw(__mem_pci(c))); __v; })
--#define readl(c) ({ __u32 __v = le32_to_cpu((__force __le32) \
-+#define readl_relaxed(c) ({ u32 __v = le32_to_cpu((__force __le32) \
- 					__raw_readl(__mem_pci(c))); __v; })
--#define readb_relaxed(addr) readb(addr)
--#define readw_relaxed(addr) readw(addr)
--#define readl_relaxed(addr) readl(addr)
-+
-+#define writeb_relaxed(v,c)	__raw_writeb(v,__mem_pci(c))
-+#define writew_relaxed(v,c)	__raw_writew((__force u16) \
-+					cpu_to_le16(v),__mem_pci(c))
-+#define writel_relaxed(v,c)	__raw_writel((__force u32) \
-+					cpu_to_le32(v),__mem_pci(c))
-+
-+#define readb(c)		readb_relaxed(c)
-+#define readw(c)		readw_relaxed(c)
-+#define readl(c)		readl_relaxed(c)
-+
-+#define writeb(v,c)		writeb_relaxed(v,c)
-+#define writew(v,c)		writew_relaxed(v,c)
-+#define writel(v,c)		writel_relaxed(v,c)
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 9819869..532c35c 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -32,14 +32,14 @@ static uint32_t l2x0_way_mask;	/* Bitmask of active ways */
+ static inline void cache_wait(void __iomem *reg, unsigned long mask)
+ {
+ 	/* wait for the operation to complete */
+-	while (readl(reg) & mask)
++	while (readl_relaxed(reg) & mask)
+ 		;
+ }
  
- #define readsb(p,d,l)		__raw_readsb(__mem_pci(p),d,l)
- #define readsw(p,d,l)		__raw_readsw(__mem_pci(p),d,l)
- #define readsl(p,d,l)		__raw_readsl(__mem_pci(p),d,l)
+ static inline void cache_sync(void)
+ {
+ 	void __iomem *base = l2x0_base;
+-	writel(0, base + L2X0_CACHE_SYNC);
++	writel_relaxed(0, base + L2X0_CACHE_SYNC);
+ 	cache_wait(base + L2X0_CACHE_SYNC, 1);
+ }
  
--#define writeb(v,c)		__raw_writeb(v,__mem_pci(c))
--#define writew(v,c)		__raw_writew((__force __u16) \
--					cpu_to_le16(v),__mem_pci(c))
--#define writel(v,c)		__raw_writel((__force __u32) \
--					cpu_to_le32(v),__mem_pci(c))
--
- #define writesb(p,d,l)		__raw_writesb(__mem_pci(p),d,l)
- #define writesw(p,d,l)		__raw_writesw(__mem_pci(p),d,l)
- #define writesl(p,d,l)		__raw_writesl(__mem_pci(p),d,l)
+@@ -47,14 +47,14 @@ static inline void l2x0_clean_line(unsigned long addr)
+ {
+ 	void __iomem *base = l2x0_base;
+ 	cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
+-	writel(addr, base + L2X0_CLEAN_LINE_PA);
++	writel_relaxed(addr, base + L2X0_CLEAN_LINE_PA);
+ }
+ 
+ static inline void l2x0_inv_line(unsigned long addr)
+ {
+ 	void __iomem *base = l2x0_base;
+ 	cache_wait(base + L2X0_INV_LINE_PA, 1);
+-	writel(addr, base + L2X0_INV_LINE_PA);
++	writel_relaxed(addr, base + L2X0_INV_LINE_PA);
+ }
+ 
+ #ifdef CONFIG_PL310_ERRATA_588369
+@@ -75,9 +75,9 @@ static inline void l2x0_flush_line(unsigned long addr)
+ 
+ 	/* Clean by PA followed by Invalidate by PA */
+ 	cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
+-	writel(addr, base + L2X0_CLEAN_LINE_PA);
++	writel_relaxed(addr, base + L2X0_CLEAN_LINE_PA);
+ 	cache_wait(base + L2X0_INV_LINE_PA, 1);
+-	writel(addr, base + L2X0_INV_LINE_PA);
++	writel_relaxed(addr, base + L2X0_INV_LINE_PA);
+ }
+ #else
+ 
+@@ -90,7 +90,7 @@ static inline void l2x0_flush_line(unsigned long addr)
+ {
+ 	void __iomem *base = l2x0_base;
+ 	cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
+-	writel(addr, base + L2X0_CLEAN_INV_LINE_PA);
++	writel_relaxed(addr, base + L2X0_CLEAN_INV_LINE_PA);
+ }
+ #endif
+ 
+@@ -109,7 +109,7 @@ static inline void l2x0_inv_all(void)
+ 
+ 	/* invalidate all ways */
+ 	spin_lock_irqsave(&l2x0_lock, flags);
+-	writel(l2x0_way_mask, l2x0_base + L2X0_INV_WAY);
++	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_INV_WAY);
+ 	cache_wait(l2x0_base + L2X0_INV_WAY, l2x0_way_mask);
+ 	cache_sync();
+ 	spin_unlock_irqrestore(&l2x0_lock, flags);
+@@ -215,8 +215,8 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+ 
+ 	l2x0_base = base;
+ 
+-	cache_id = readl(l2x0_base + L2X0_CACHE_ID);
+-	aux = readl(l2x0_base + L2X0_AUX_CTRL);
++	cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
++	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+ 
+ 	/* Determine the number of ways */
+ 	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
+@@ -245,17 +245,17 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+ 	 * If you are booting from non-secure mode
+ 	 * accessing the below registers will fault.
+ 	 */
+-	if (!(readl(l2x0_base + L2X0_CTRL) & 1)) {
++	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
+ 
+ 		/* l2x0 controller is disabled */
+ 		aux &= aux_mask;
+ 		aux |= aux_val;
+-		writel(aux, l2x0_base + L2X0_AUX_CTRL);
++		writel_relaxed(aux, l2x0_base + L2X0_AUX_CTRL);
+ 
+ 		l2x0_inv_all();
+ 
+ 		/* enable L2X0 */
+-		writel(1, l2x0_base + L2X0_CTRL);
++		writel_relaxed(1, l2x0_base + L2X0_CTRL);
+ 	}
+ 
+ 	outer_cache.inv_range = l2x0_inv_range;
