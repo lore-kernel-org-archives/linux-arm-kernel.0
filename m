@@ -1,36 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Jul 2010 19:24:17 +0100
-Subject: [PATCH v2 1/3] ARM: Introduce *_relaxed() I/O accessors
-In-Reply-To: <201007091808.01536.arnd@arndb.de>
-References: <20100709110350.11333.34303.stgit@e102109-lin.cambridge.arm.com>
-	<20100709110801.11333.22995.stgit@e102109-lin.cambridge.arm.com>
-	<201007091808.01536.arnd@arndb.de>
-Message-ID: <20100709182417.GL22845@n2100.arm.linux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 9 Jul 2010 21:07:41 +0200
+Subject: [PATCH 2/2] pxa/spitz: Rework spitz
+In-Reply-To: <201006111752.08130.marek.vasut@gmail.com>
+References: <1276238740-10640-1-git-send-email-marek.vasut@gmail.com>
+	<201006110852.45838.marek.vasut@gmail.com>
+	<20100611143600.GA1307@ucw.cz>
+	<201006111752.08130.marek.vasut@gmail.com>
+Message-ID: <20100709190741.GA1669@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 09, 2010 at 06:08:01PM +0200, Arnd Bergmann wrote:
-> On Friday 09 July 2010, Catalin Marinas wrote:
-> > This patch introduces readl*_relaxed()/write*_relaxed() as the main I/O
-> > accessors (when __mem_pci is defined). The standard read*()/write*()
-> > macros are now based on the relaxed accessors.
-> 
-> Are these new macros valid for both PCI and non-PCI mmio addresses?
-> The way I understand it, the regular readl/writel family is only
-> valid for __iomem addresses in PCI BARs, while anything else
-> has to go through either ioread32/iowrite32 or something arch
-> specific.
-> 
-> Does this mean we also need an ioread32_releaxed etc?
+Hi!
 
-Only if you want to deal with PCI IO accesses as well.  The
-ioread*/iowrite* interfaces are more complex implementations than
-plain read/write[bwl], because they have to work out whether the
-void __iomem * cookie relates to an ioremapped cookie or a PCI IO
-cookie.  (That's the only reason to use the io* variants - if you
-want a driver which can portably access its registers via either
-PCI MEM or PCI IO access methods.)
+> > > > 1) Made every part modular, components are not built in if not
+> > > > selected. 2) Removed loads of preprocessor goo, mostly "#ifdef
+> > > > MACH_AKITA .... #endif" and similar code. The kernel size will grow by
+> > > > a few kb now, but the file is much more readable.
+> > > > 3) Reworked SD/CF power setting function and made it reentrant.
+> > > > 
+> > > > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> > > > ---
+> > > > 
+> > > >  arch/arm/mach-pxa/include/mach/spitz.h |    2 -
+> > > >  arch/arm/mach-pxa/spitz.c              |  748
+> > > > 
+> > > > ++++++++++++++++++-------------- 2 files changed, 420 insertions(+),
+> > > > 330 deletions(-)
+> > > 
+> > > Pavel, Eric, I tested this on metan's Z, could you give it a go ?
+> > 
+> > quick test on 2.6.35-rc2 (of the 2nd version), and all seems
+> > well. What should I look for?
+> 
+> Nothing, the functionality should be the same ... I just felt like it needs 
+> rework, it was frustrating digging in it in the state it is in now. The way it 
+> is now it's much easier to hack on it. There are still open issues:
+> 
+> 1) CPUfreq on Zaurus is still broken. (doesn't work on other devices - causes 
+> freezes)
+> 2) PCMCIA driver looses interrupts. (pcmcia-sharpsl needs rework)
 
-Plain read/write[bwl] are much simpler, and on ARM are just pointer
-dereferences (and now with an additional barrier), so we allow their
-use in architecture specific drivers.
+hda timeouts?
+
+> 3) We need driver for the CPU PMIC. (I already wrote it)
+
+Can you cc me on that one? That should fix the random segfaults, right?
+
+> 4) Weird mess on the LCD when using DMA (also happens on other devices)
+> 
+> So we'll have at least another four following patches sometimes later.
+> 
+> Pavel, can we get this in? Can I get your Ack and get this one applied? Thanks
+
+Sorry, I was busy... 2) mixes all kinds of things together -- it would
+be better to split such patches in future, but yes, it looks ok.
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
