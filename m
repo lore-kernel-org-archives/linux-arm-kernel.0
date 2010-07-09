@@ -1,60 +1,70 @@
-From: hemantp@ti.com (Pedanekar, Hemant)
-Date: Fri, 9 Jul 2010 19:32:46 +0530
-Subject: Memory type used for ioremap
-In-Reply-To: <1278677464.11895.41.camel@e102109-lin.cambridge.arm.com>
-References: <2A3DCF3DA181AD40BDE86A3150B27B6B030E181724@dbde02.ent.ti.com>
-	<1278677464.11895.41.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B030E181CAD@dbde02.ent.ti.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Fri, 9 Jul 2010 17:07:43 +0300
+Subject: [PATCH 2/3] Add s3c-adc-battery driver
+In-Reply-To: <20100709135345.GA4351@oksana.dev.rtsoft.ru>
+References: <1278674842-17583-1-git-send-email-anarsoul@gmail.com>
+	<201007091619.20454.anarsoul@gmail.com>
+	<20100709135345.GA4351@oksana.dev.rtsoft.ru>
+Message-ID: <201007091707.47807.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin,
-
-I was trying to map peripheral region (memory mapped) nd faced problem with writes not working from kernel (ioremapped address), while writes using user space (devmem2) worked fine.
-
-This prompted me to check if there were any differences in mapping the region when using devmem2 (mmap)and when using ioremap from kernel module. I observed that, when mapped using devmem2, the 2nd level page descriptor had TEX[2:0]=0 while in case of ioremap, the entry had TEX[2:0]=0 (C & B were 0 in both the cases).
-
-As per ARM ARM, TEX=0 is "Strongly-ordered" while TEX=1 is "Normal" memory type, but of course as Russell has explained in the other mail, I had ignored TRE (assumed =0). So what could be wrong here? Why does userspace access work while kernel space doesn't? Of course, after *hacking* 2nd level page descriptor (ioremapped) entry to force TEX=0, I was able to write from kernel module!
-
-Any inputs?
-
-Thanks
--
-Hemant
- 
- 
-
-> -----Original Message-----
-> From: Catalin Marinas [mailto:catalin.marinas at arm.com] 
-> Sent: Friday, July 09, 2010 5:41 PM
-> To: Pedanekar, Hemant
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: Re: Memory type used for ioremap
+? ????????? ?? 9 ???? 2010 16:53:45 ????? Anton Vorontsov ???????:
 > 
-> On Fri, 2010-07-09 at 03:16 +0100, Pedanekar, Hemant wrote:
-> > I have few doubts regarding the memory type configured when we call
-> > ioremap for mapping a region (e.g., on-chip peripheral MMRs):
-> >  
-> > Please note that this is regarding Cortx A8.
-> >  
-> > After examining 2nd level page descriptor, I see that the 
-> memory type
-> > configured for ioremapped region (as per TEX[2:0]=1 and CB=0) is
-> > "Outer and Inner Non-cacheable - Normal". Is this correct
-> > observation? I thought the ioremap would set memory type as 
-> one of the
-> > "Device". 
-> >  
-> > What is the recommended method if I want to map some region as
-> > "Strongly-ordered" or "Device"?
+> I guess you can remove all the cable_plugged handling from s3c
+> battery driver, and then use power_supply.external_power_changed
+> callback to get cable_plugged notification (you should fill
+> pda_power.supplied_to properly to make it work).
 > 
-> If you are trying to ioremap normal RAM, we no longer allow this and
-> force the memory type to be Normal Non-cacheable. This is an ARM
-> architecture requirement (otherwise you create mismatched memory
-> attributes aliases).
+> See drivers/power/ds2760_battery.c and arch/arm/mach-pxa/hx4700.c
+> as an example.
 > 
+> You probably will need to change .external_power_changed() hook
+> to accept 'pst' argument (the supply that caused the change),
+> so that you could write something like this:
 > 
-> -- 
-> Catalin
+> s3c_external_power_changed(struct power_supply *psy,
+> 			   struct power_supply *ext)
+> {
+> 	...
+> 	ext->get_property(ext, ONLINE, &val);
+> 	s3c->is_plugged = val.intval;
 > 
+> 	s3c_kick_cable_plugged_handler(s3c);
+> }
 > 
+> Or, instead of ext->get_property() you could just use
+> power_supply_is_system_supplied(). Not very elegant, but
+> should work.
+
+You didn't get the point. Here's workflow:
+
+cable plugged -> GPF2 goes to 0, irq is generated
+cable plugged irq handler -> cable_plugged ? enable_charger : disable_charger
+charging....
+battery is charged, GPF3 goes to 0, irq is generated
+battery charged irq handler -> disable_charger
+cable unplugged -> GPF2 goest to 1, irq is generated
+
+pda_power driver does not support 'battery_charged' pin handling, but I need 
+to handle this pin (and IRQ from it) to prevent battery overcharge
+
+> Timer is a softirq, atomic context. It adds latency to your
+> embedded, underpowered device. Plus with timer you can't use
+> sleepable GPIOs (we should change it for pda_power too, btw).
+> 
+> Jitter filtering isn't urgent task for the kernel (or user)
+> needs, right? So it's fine to postpone it for non-atomic
+> context.
+
+Ok, will replace timer with delayed works
+
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100709/0dfa45f9/attachment.sig>
