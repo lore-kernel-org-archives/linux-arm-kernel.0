@@ -1,285 +1,218 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sat, 10 Jul 2010 19:57:47 +0300
-Subject: [PATCH v2 1/3] rx1950: add rx1950 LEDs driver
+Date: Sat, 10 Jul 2010 19:57:49 +0300
+Subject: [PATCH v2 3/3] rx1950: add battery support
 In-Reply-To: <1278781069-30521-1-git-send-email-anarsoul@gmail.com>
 References: <1278781069-30521-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1278781069-30521-2-git-send-email-anarsoul@gmail.com>
+Message-ID: <1278781069-30521-4-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- arch/arm/mach-s3c2440/mach-rx1950.c |    6 +
- drivers/leds/Kconfig                |    6 +
- drivers/leds/Makefile               |    1 +
- drivers/leds/leds-rx1950.c          |  206 +++++++++++++++++++++++++++++++++++
- 4 files changed, 219 insertions(+), 0 deletions(-)
- create mode 100644 drivers/leds/leds-rx1950.c
+ arch/arm/mach-s3c2440/Kconfig       |    3 +
+ arch/arm/mach-s3c2440/mach-rx1950.c |  160 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 163 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
+index cd8e7de..9b6b026 100644
+--- a/arch/arm/mach-s3c2440/Kconfig
++++ b/arch/arm/mach-s3c2440/Kconfig
+@@ -198,6 +198,9 @@ config MACH_RX1950
+ 	select S3C_DEV_NAND
+ 	select S3C2410_IOTIMING if S3C2440_CPUFREQ
+ 	select S3C2440_XTAL_16934400
++	select S3C_ADC
++	select PDA_POWER
++	select BATTERY_S3C_ADC
+ 	help
+ 	   Say Y here if you're using HP iPAQ rx1950
+ 
 diff --git a/arch/arm/mach-s3c2440/mach-rx1950.c b/arch/arm/mach-s3c2440/mach-rx1950.c
-index 8603b57..55b806a 100644
+index 55b806a..7342f36 100644
 --- a/arch/arm/mach-s3c2440/mach-rx1950.c
 +++ b/arch/arm/mach-s3c2440/mach-rx1950.c
-@@ -126,6 +126,11 @@ static struct s3c2410fb_display rx1950_display = {
+@@ -24,8 +24,10 @@
+ #include <linux/input.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/sysdev.h>
++#include <linux/pda_power.h>
+ #include <linux/pwm_backlight.h>
+ #include <linux/pwm.h>
++#include <linux/s3c_adc_battery.h>
  
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+@@ -131,6 +133,162 @@ static struct platform_device rx1950_device_leds = {
+ 	.id               = -1,
  };
  
-+static struct platform_device rx1950_device_leds = {
-+	.name             = "rx1950-leds",
++static int power_supply_init(struct device *dev)
++{
++	return gpio_request(S3C2410_GPF(2), "cable plugged");
++}
++
++static int rx1950_is_ac_online(void)
++{
++	return !gpio_get_value(S3C2410_GPF(2));
++}
++
++static void power_supply_exit(struct device *dev)
++{
++	gpio_free(S3C2410_GPF(2));
++}
++
++static char *rx1950_supplicants[] = {
++	"main-battery"
++};
++
++static struct pda_power_pdata power_supply_info = {
++	.init				= power_supply_init,
++	.is_ac_online		= rx1950_is_ac_online,
++	.exit				= power_supply_exit,
++	.supplied_to		= rx1950_supplicants,
++	.num_supplicants	= ARRAY_SIZE(rx1950_supplicants),
++};
++
++static struct resource power_supply_resources[] = {
++	[0] = {
++			.name	= "ac",
++			.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE |
++					  IORESOURCE_IRQ_HIGHEDGE,
++			.start	= IRQ_EINT2,
++			.end	= IRQ_EINT2,
++	},
++};
++
++static struct platform_device power_supply = {
++	.name			= "pda-power",
++	.id				= -1,
++	.dev			= {
++						.platform_data =
++							&power_supply_info,
++	},
++	.resource		= power_supply_resources,
++	.num_resources	= ARRAY_SIZE(power_supply_resources),
++};
++
++static const struct s3c_adc_bat_thresh bat_lut_noac[] = {
++	{4100, 156, 100},
++	{4050, 156, 95},
++	{4025, 141, 90},
++	{3995, 144, 85},
++	{3957, 162, 80},
++	{3931, 147, 75},
++	{3902, 147, 70},
++	{3863, 153, 65},
++	{3838, 150, 60},
++	{3800, 153, 55},
++	{3765, 153, 50},
++	{3748, 172, 45},
++	{3740, 153, 40},
++	{3714, 175, 35},
++	{3710, 156, 30},
++	{3963, 156, 25},
++	{3672, 178, 20},
++	{3651, 178, 15},
++	{3629, 178, 10},
++	{3612, 162, 5},
++	{3605, 162, 0},
++};
++
++static const struct s3c_adc_bat_thresh bat_lut_acin[] = {
++	{4200, 0, 100},
++	{4190, 0, 99},
++	{4178, 0, 95},
++	{4110, 0, 70},
++	{4076, 0, 65},
++	{4046, 0, 60},
++	{4021, 0, 55},
++	{3999, 0, 50},
++	{3982, 0, 45},
++	{3965, 0, 40},
++	{3957, 0, 35},
++	{3948, 0, 30},
++	{3936, 0, 25},
++	{3927, 0, 20},
++	{3906, 0, 15},
++	{3880, 0, 10},
++	{3829, 0, 5},
++	{3820, 0, 0},
++};
++
++int rx1950_bat_init(void)
++{
++	int ret;
++
++	ret = gpio_request(S3C2410_GPJ(2), "rx1950-charger-enable-1");
++	if (ret)
++		goto err_gpio1;
++	ret = gpio_request(S3C2410_GPJ(3), "rx1950-charger-enable-2");
++	if (ret)
++		goto err_gpio2;
++
++	return 0;
++
++err_gpio2:
++	gpio_free(S3C2410_GPJ(2));
++err_gpio1:
++	return ret;
++}
++
++void rx1950_bat_exit(void)
++{
++	gpio_free(S3C2410_GPJ(2));
++	gpio_free(S3C2410_GPJ(3));
++}
++
++void rx1950_enable_charger(void)
++{
++	gpio_direction_output(S3C2410_GPJ(2), 1);
++	gpio_direction_output(S3C2410_GPJ(3), 1);
++}
++
++void rx1950_disable_charger(void)
++{
++	gpio_direction_output(S3C2410_GPJ(2), 0);
++	gpio_direction_output(S3C2410_GPJ(3), 0);
++}
++
++static struct s3c_adc_bat_pdata rx1950_bat_cfg = {
++	.init = rx1950_bat_init,
++	.exit = rx1950_bat_exit,
++	.enable_charger = rx1950_enable_charger,
++	.disable_charger = rx1950_disable_charger,
++	.gpio_charge_finished = S3C2410_GPF(3),
++	.lut_noac = bat_lut_noac,
++	.lut_noac_cnt = ARRAY_SIZE(bat_lut_noac),
++	.lut_acin = bat_lut_acin,
++	.lut_acin_cnt = ARRAY_SIZE(bat_lut_acin),
++	.volt_channel = 0,
++	.current_channel = 1,
++	.volt_mult = 4235,
++	.current_mult = 2900,
++	.internal_impedance = 200,
++};
++
++static struct platform_device rx1950_battery = {
++	.name             = "s3c-adc-battery",
 +	.id               = -1,
++	.dev = {
++		.parent = &s3c_device_adc.dev,
++		.platform_data = &rx1950_bat_cfg,
++	},
 +};
 +
  static struct s3c2410fb_mach_info rx1950_lcd_cfg = {
  	.displays = &rx1950_display,
  	.num_displays = 1,
-@@ -502,6 +507,7 @@ static struct platform_device *rx1950_devices[] __initdata = {
- 	&s3c_device_timer[1],
+@@ -508,6 +666,8 @@ static struct platform_device *rx1950_devices[] __initdata = {
  	&rx1950_backlight,
  	&rx1950_device_gpiokeys,
-+	&rx1950_device_leds,
+ 	&rx1950_device_leds,
++	&power_supply,
++	&rx1950_battery,
  };
  
  static struct clk *rx1950_clocks[] __initdata = {
-diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-index 81bf25e..f986825 100644
---- a/drivers/leds/Kconfig
-+++ b/drivers/leds/Kconfig
-@@ -102,6 +102,12 @@ config LEDS_H1940
- 	help
- 	  This option enables support for the LEDs on the h1940.
- 
-+config LEDS_RX1950
-+	tristate "LED Support for iPAQ RX1950 device"
-+	depends on MACH_RX1950
-+	help
-+	  This option enables support for the LEDs on the rx1950.
-+
- config LEDS_COBALT_QUBE
- 	tristate "LED Support for the Cobalt Qube series front LED"
- 	depends on MIPS_COBALT
-diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
-index 2493de4..faa0d5d 100644
---- a/drivers/leds/Makefile
-+++ b/drivers/leds/Makefile
-@@ -17,6 +17,7 @@ obj-$(CONFIG_LEDS_NET5501)		+= leds-net5501.o
- obj-$(CONFIG_LEDS_WRAP)			+= leds-wrap.o
- obj-$(CONFIG_LEDS_ALIX2)		+= leds-alix2.o
- obj-$(CONFIG_LEDS_H1940)		+= leds-h1940.o
-+obj-$(CONFIG_LEDS_RX1950)		+= leds-rx1950.o
- obj-$(CONFIG_LEDS_COBALT_QUBE)		+= leds-cobalt-qube.o
- obj-$(CONFIG_LEDS_COBALT_RAQ)		+= leds-cobalt-raq.o
- obj-$(CONFIG_LEDS_SUNFIRE)		+= leds-sunfire.o
-diff --git a/drivers/leds/leds-rx1950.c b/drivers/leds/leds-rx1950.c
-new file mode 100644
-index 0000000..1eed583
---- /dev/null
-+++ b/drivers/leds/leds-rx1950.c
-@@ -0,0 +1,206 @@
-+/*
-+ * drivers/leds/leds-rx1950.c
-+ *
-+ * Based on leds-h1940 by Arnaud Patard <arnaud.patard@rtp-net.org>
-+ * Copyright (c) Vasily Khoruzhick <anarsoul@gmail.com>
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file COPYING in the main directory of this archive for
-+ * more details.
-+ *
-+ * RX1950 leds driver
-+ *
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/delay.h>
-+#include <linux/string.h>
-+#include <linux/ctype.h>
-+#include <linux/leds.h>
-+#include <linux/gpio.h>
-+
-+#include <mach/regs-gpio.h>
-+#include <mach/regs-gpioj.h>
-+#include <mach/hardware.h>
-+
-+/*
-+ * Green led.
-+ */
-+static void rx1950_greenled_set(struct led_classdev *led_dev,
-+			       enum led_brightness value)
-+{
-+	switch (value) {
-+	case LED_HALF:
-+		gpio_direction_output(S3C2410_GPA(4), 1);
-+		gpio_direction_output(S3C2410_GPA(6), 0);
-+		gpio_direction_output(S3C2410_GPJ(6), 1);
-+		break;
-+	case LED_FULL:
-+		gpio_direction_output(S3C2410_GPA(4), 0);
-+		gpio_direction_output(S3C2410_GPA(6), 1);
-+		gpio_direction_output(S3C2410_GPJ(6), 0);
-+		break;
-+	default:
-+	case LED_OFF:
-+		gpio_direction_output(S3C2410_GPA(4), 0);
-+		gpio_direction_output(S3C2410_GPA(6), 0);
-+		gpio_direction_output(S3C2410_GPJ(6), 0);
-+		break;
-+	}
-+}
-+
-+static struct led_classdev rx1950_greenled = {
-+	.name			= "rx1950:green",
-+	.brightness_set		= rx1950_greenled_set,
-+	.default_trigger	= "s3c-adc-charger",
-+};
-+
-+static void rx1950_redled_set(struct led_classdev *led_dev,
-+			     enum led_brightness value)
-+{
-+	switch (value) {
-+	case LED_HALF:
-+		gpio_direction_output(S3C2410_GPA(3), 1);
-+		gpio_direction_output(S3C2410_GPA(7), 0);
-+		gpio_direction_output(S3C2410_GPJ(6), 1);
-+		break;
-+	case LED_FULL:
-+		gpio_direction_output(S3C2410_GPA(3), 0);
-+		gpio_direction_output(S3C2410_GPA(7), 1);
-+		gpio_direction_output(S3C2410_GPJ(6), 0);
-+		break;
-+	default:
-+	case LED_OFF:
-+		gpio_direction_output(S3C2410_GPA(3), 0);
-+		gpio_direction_output(S3C2410_GPA(7), 0);
-+		gpio_direction_output(S3C2410_GPJ(6), 0);
-+		break;
-+	}
-+}
-+
-+static struct led_classdev rx1950_redled = {
-+	.name			= "rx1950:red",
-+	.brightness_set		= rx1950_redled_set,
-+	.default_trigger	= "s3c-adc-charger",
-+};
-+
-+/*
-+ * Blue led.
-+ */
-+static void rx1950_blueled_set(struct led_classdev *led_dev,
-+			      enum led_brightness value)
-+{
-+	if (value)
-+		gpio_direction_output(S3C2410_GPA(11), 1);
-+	else
-+		gpio_direction_output(S3C2410_GPA(11), 0);
-+}
-+
-+static struct led_classdev rx1950_blueled = {
-+	.name			= "rx1950:blue",
-+	.brightness_set		= rx1950_blueled_set,
-+	.default_trigger	= "rx1950-acx-mem",
-+};
-+
-+static int __devinit rx1950leds_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+
-+	ret = gpio_request(S3C2410_GPA(3), "rx1950:red_led_blink");
-+	if (ret)
-+		goto err_blink_red;
-+
-+	ret = gpio_request(S3C2410_GPA(4), "rx1950:green_led_blink");
-+	if (ret)
-+		goto err_blink_green;
-+
-+	ret = gpio_request(S3C2410_GPJ(6), "rx1950:led_blink");
-+	if (ret)
-+		goto err_blink;
-+
-+	ret = gpio_request(S3C2410_GPA(6), "rx1950:green_led");
-+	if (ret)
-+		goto err_green;
-+	ret = led_classdev_register(&pdev->dev, &rx1950_greenled);
-+	if (ret)
-+		goto err_green_gpio;
-+
-+	ret = gpio_request(S3C2410_GPA(7), "rx1950:red_led");
-+	if (ret)
-+		goto err_red;
-+	ret = led_classdev_register(&pdev->dev, &rx1950_redled);
-+	if (ret)
-+		goto err_red_gpio;
-+
-+	ret = gpio_request(S3C2410_GPA(11), "rx1950:blue_led");
-+	if (ret)
-+		goto err_blue;
-+	ret = led_classdev_register(&pdev->dev, &rx1950_blueled);
-+	if (ret)
-+		goto err_blue_gpio;
-+
-+	return 0;
-+
-+err_blue_gpio:
-+	gpio_free(S3C2410_GPA(11));
-+err_blue:
-+	led_classdev_unregister(&rx1950_redled);
-+err_red_gpio:
-+	gpio_free(S3C2410_GPA(6));
-+err_red:
-+	led_classdev_unregister(&rx1950_greenled);
-+err_green_gpio:
-+	gpio_free(S3C2410_GPA7);
-+err_green:
-+	gpio_free(S3C2410_GPJ(6));
-+err_blink:
-+	gpio_free(S3C2410_GPA(4));
-+err_blink_green:
-+	gpio_free(S3C2410_GPA(3));
-+err_blink_red:
-+	return ret;
-+}
-+
-+static int rx1950leds_remove(struct platform_device *pdev)
-+{
-+	led_classdev_unregister(&rx1950_greenled);
-+	led_classdev_unregister(&rx1950_redled);
-+	led_classdev_unregister(&rx1950_blueled);
-+	gpio_free(S3C2410_GPA(11));
-+	gpio_free(S3C2410_GPA(6));
-+	gpio_free(S3C2410_GPA(7));
-+	gpio_free(S3C2410_GPJ(6));
-+	gpio_free(S3C2410_GPA(3));
-+	gpio_free(S3C2410_GPA(4));
-+	return 0;
-+}
-+
-+
-+static struct platform_driver rx1950leds_driver = {
-+	.driver		= {
-+		.name	= "rx1950-leds",
-+		.owner	= THIS_MODULE,
-+	},
-+	.probe		= rx1950leds_probe,
-+	.remove		= rx1950leds_remove,
-+};
-+
-+
-+static int __init rx1950leds_init(void)
-+{
-+	return platform_driver_register(&rx1950leds_driver);
-+}
-+
-+static void __exit rx1950leds_exit(void)
-+{
-+	platform_driver_unregister(&rx1950leds_driver);
-+}
-+
-+module_init(rx1950leds_init);
-+module_exit(rx1950leds_exit);
-+
-+MODULE_AUTHOR("Vasily Khoruzhick <anarsoul@gmail.com>");
-+MODULE_DESCRIPTION("LED driver for the iPAQ RX1950");
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:rx1950-leds");
 -- 
 1.7.1
