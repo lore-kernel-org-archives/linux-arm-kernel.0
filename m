@@ -1,73 +1,52 @@
-From: dev.c0debabe@gmail.com (Stefan Schoenleitner)
-Date: Sat, 10 Jul 2010 09:10:07 +0200
-Subject: SAM9-L9260: TXD1 is not working on AT91SAM9260
-Message-ID: <4C381CCF.2050305@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 10 Jul 2010 08:19:13 +0100
+Subject: [PATCH v4] GPIO PL061: Adding Clk framework support
+In-Reply-To: <AANLkTikm-wupuQA1_zsmqf3jrpavkMaw8Bt-GWb04TSo@mail.gmail.com>
+References: <1277183247-4557-1-git-send-email-viresh.kumar@st.com>
+	<20100709124050.GF22845@n2100.arm.linux.org.uk>
+	<AANLkTikm-wupuQA1_zsmqf3jrpavkMaw8Bt-GWb04TSo@mail.gmail.com>
+Message-ID: <20100710071913.GM22845@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Jul 10, 2010 at 01:55:26AM +0200, Linus Walleij wrote:
+> This looks mostly good to me (comments below) but will have as
+> a side effect that all clock frameworks on all platforms using PrimeCells
+> will need to be initialized *before* the PrimeCell devices are added.
 
-I have an Olimex SAM9-L9260 board with an AT91SAM9260 controller on it.
-The board is running a sound-2.6 git kernel (2.6.35).
+No it doesn't - it needs the clock API to be initialized before the
+first driver is probed.  As drivers are registered during the initcalls,
+later than postcore level
 
-My problem is that for USART1 (which uses the RXD1 and TXD1 pins), the
-transmit pin (i.e. TXD1) is not working.
-I looked at it with my scope and discovered that it is high all the time
-(which is most likely due to the configured pull-up resistor).
+> > - ? ? ? id = amba_lookup(pcdrv->id_table, pcdev);
+> > + ? ? ? ? ? ? ? ret = pcdrv->probe(pcdev, id);
+> > + ? ? ? ? ? ? ? if (ret == 0)
+> > + ? ? ? ? ? ? ? ? ? ? ? break;
+> 
+> So this means you always turn on the block clock at
+> probe, and then leave it on if the probe was successful.
 
-Here is what I did to get the UART up and running (just like what I
-already did for the DBG UART and UART0):
+Correct, which is what drivers currently expect.  This is also why
+two additional amba_* callbacks are supplied - if it is appropriate
+for a driver to disable their bus clock after being probed, they can
+do that but they have to participate in that.
 
+Basically, they have to call amba_bus_clk_disable() on successful
+probe, and then amba_bus_clk_enable() each time that they want to
+access their registers, followed by an amba_bus_clk_disable() when
+they've finished.  Finally, they must call amba_bus_clk_enable()
+in their remove method and avoid amba_bus_clk_disable() before
+returning.
 
-In my board file (arch/arm/mach-at91/board-sam9-l9260.c) I added the
-following line to ek_map_io(), to register USART1 as ttyS2:
+> For drivers that need to conserve power, also the block
+> clock has to be gated when the device is not in use,
+> sometimes since that affects some hardware that keep
+> track of the usecount of the clock tree for a larger region of
+> silicon, so the power savings can be drastic.
 
------------------------------------------------------------------------
-at91_register_uart(AT91SAM9260_ID_US1, 2, 0);
------------------------------------------------------------------------
+You can't have the core code doing that.  If you unconditionally turn
+the bus clock off after probe, what happens when a driver receives an
+interrupt and tries to access its registers?
 
-
-A look at at91sam9260_devices.c reveals that this will lead to a call of
------------------------------------------------------------------------
-configure_usart1_pins(pins);
------------------------------------------------------------------------
-
-which in turn does the following:
------------------------------------------------------------------------
-at91_set_A_periph(AT91_PIN_PB6, 1);     /* TXD1 */
-at91_set_A_periph(AT91_PIN_PB7, 0);     /* RXD1 */
------------------------------------------------------------------------
-
-
-Hence the pins PB6 and PB7 are configured to be UART pins.
-I also made sure that there is no other code, that sets the
-functionality of those pins to something else (e.g. pin PB6 could also
-be used as TCLK1).
-
-
-
-Then, when I boot the kernel, I get the following lines, which show that
-the UARTs are recognized:
-
------------------------------------------------------------------------
-atmel_usart.0: ttyS0 at MMIO 0xfefff200 (irq = 1) is a ATMEL_SERIAL
-atmel_usart.1: ttyS1 at MMIO 0xfffb0000 (irq = 6) is a ATMEL_SERIAL
-atmel_usart.2: ttyS2 at MMIO 0xfffb4000 (irq = 7) is a ATMEL_SERIAL
------------------------------------------------------------------------
-
-
-While this looks good so far, the odd behavior is that I can correctly
-receive data on /dev/ttyS2 (i.e. data is received on the RXD1/PB7 pin),
-but I can not send (i.e. *no* data is being transmitted on the TXD1/PB6
-pin).
-
-
-* Is this a bug in the kernel or am I doing something wrong here ?
-
-* Did you experience similar behavior on the at91sam9260 ?
-
-As I already said, I have done this with other UART devices as well
-(i.e. USART0) and it worked flawlessly.
-
-cheers,
-stefan
+Hint: the core code can't know that the driver has registered an IRQ
+handler.
