@@ -1,23 +1,20 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Sat, 10 Jul 2010 17:36:54 +0200
-Subject: [PATCH v4] GPIO PL061: Adding Clk framework support
-In-Reply-To: <20100710071913.GM22845@n2100.arm.linux.org.uk>
-References: <1277183247-4557-1-git-send-email-viresh.kumar@st.com>
-	<20100709124050.GF22845@n2100.arm.linux.org.uk>
-	<AANLkTikm-wupuQA1_zsmqf3jrpavkMaw8Bt-GWb04TSo@mail.gmail.com>
-	<20100710071913.GM22845@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimskXW4Nnxhc5bxwKiNrfJkMb-9NeWKhVOGaA1k@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sat, 10 Jul 2010 19:57:46 +0300
+Subject: [PATCH v2 0/3] s3c24xx: iPAQ rx1950 series
+Message-ID: <1278781069-30521-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/10 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+This patch series adds more support for iPAQ rx1950 PDA to linux:
+1. LEDs driver -- it controls blue, green and red LEDs on rx1950
+2. Battery driver -- adds ability to monitor and charge battery.
+This driver is suitable for H1940 PDA aswell (just need to write
+some machine specific callbacks and get voltage LUTs)
 
-> Correct, which is what drivers currently expect. ?This is also why
-> two additional amba_* callbacks are supplied - if it is appropriate
-> for a driver to disable their bus clock after being probed, they can
-> do that but they have to participate in that.
+v2: removed ac registration from s3c_adc_battery driver, use
+pda_power instead for ac support.
 
-Aha I get it, then it looks good...
-
-Yours,
-Linus Walleij
+P.S. I prefer to keep own LED triggers for s3c_adc_battery as
+generic power supply triggers do not support LED_HALF brightness
+(on h1940/rx1950 it's used for blink) and I want to keep same
+LEDs behavior as in WinMo.
