@@ -1,89 +1,37 @@
-From: eric.miao@canonical.com (Eric Miao)
-Date: Sat, 10 Jul 2010 17:16:18 +0800
-Subject: [PATCH 0/5] Makefile.boot cleanup
-In-Reply-To: <20100708070826.GB21565@pengutronix.de>
-References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
-	<20100705141344.GA25407@pengutronix.de>
-	<20100707144521.GB10470@pengutronix.de>
-	<alpine.LFD.2.00.1007071150390.6020@xanadu.home>
-	<20100708070826.GB21565@pengutronix.de>
-Message-ID: <AANLkTikDXh1xVW-UjtU2bCWvOz1kvijp6QuPJi-SY0_F@mail.gmail.com>
+From: coffbeta@gmail.com (CoffBeta)
+Date: Sat, 10 Jul 2010 14:01:19 +0800
+Subject: TQ2440 problem
+Message-ID: <AANLkTimQ62x7qhzNj2WDsi6D6XI-H1ayXx4-Hd6dg6Yt@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/8 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Russell,
->
-> On Wed, Jul 07, 2010 at 11:54:14AM -0400, Nicolas Pitre wrote:
->> On Wed, 7 Jul 2010, Uwe Kleine-K?nig wrote:
->> > On Mon, Jul 05, 2010 at 04:13:44PM +0200, Uwe Kleine-K?nig wrote:
->> > > this series is a merge between Eric's and my patches that we did to
->> > > clean up the early boot code. ?It doesn't contain runtime physoffset
->> > > support for now, but I plan to pick that up later.
->> >
->> > I added Nicolas' Acks to my tree and dropped the one patch he objected.
->> >
->> > Are you willing to pull these now?
->>
->> FWIW, I'm fine with Russell pulling this into his tree for the next
->> merge window. ?Maybe you could just resend an official pull request with
->> the updated info.
-> OK, I thought it similar enough to the original request, but if it helps
-> I can do that:
->
-> The following changes since commit 7e27d6e778cd87b6f2415515d7127eba53fe5d02:
->
-> ?Linux 2.6.35-rc3 (2010-06-11 19:14:04 -0700)
->
-> are available in the git repository at:
-> ?git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
->
-> Eric Miao (2):
-> ? ? ?ARM: Remove unused PARAMS_PHYS from arch/arm/boot/compressed
-> ? ? ?Auto calculate ZRELADDR and provide option for exceptions
+CHK     include/linux/compile.h
+  GEN     .version
+  CHK     include/linux/compile.h
+  UPD     include/linux/compile.h
+  CC      init/version.o
+  LD      init/built-in.o
+  LD      .tmp_vmlinux1
+init/built-in.o: In function `do_one_initcall':
+/home/ymcheng/linux-2.6.27/init/main.c:704: undefined reference to
+`__gnu_mcount_nc'
+init/built-in.o: In function `init_post':
+/home/ymcheng/linux-2.6.27/init/main.c:796: undefined reference to
+`__gnu_mcount_nc'
+init/built-in.o: In function `name_to_dev_t':
+/home/ymcheng/linux-2.6.27/init/do_mounts.c:76: undefined reference to
+`__gnu_mcount_nc'
+init/built-in.o: In function `set_reset_devices':
+/home/ymcheng/linux-2.6.27/init/main.c:183: undefined reference to
+`__gnu_mcount_nc'
+init/built-in.o: In function `debug_kernel':
+/home/ymcheng/linux-2.6.27/init/main.c:234: undefined reference to
+`__gnu_mcount_nc'
+init/built-in.o:/home/ymcheng/linux-2.6.27/init/main.c:240: more undefined
+references to `__gnu_mcount_nc' follow
+make: *** [.tmp_vmlinux1] ?? 1
 
-This seems to miss the "ARM:" prefix, though a small issue.
-
->
-> Uwe Kleine-K?nig (8):
-> ? ? ?ARM: zImage: don't hard code the stack size twice
-> ? ? ?ARM: zImage: some comments for __armv3_mpu_cache_on
-> ? ? ?ARM: zImage: __armv3_mpu_cache_flush: respect should-be-zero specification
-> ? ? ?ARM: zImage: fix comments for cache_on, cache_off and cache_clean_flush
-> ? ? ?ARM: zImage: annotate debug functions about corrupted registers
-> ? ? ?ARM: remove bit-rotten STANDALONE_DEBUG for decompressor
-> ? ? ?ARM: zImage: don't define unused symbol initrd_phys
-> ? ? ?ARM: deprecate support for old way to pass kernel parameters
->
-> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ?| ?105 +++++++++++++++++++++++++++++++
-> ?arch/arm/boot/Makefile ? ? ? ? ? ? ? ? ?| ? ?8 +--
-> ?arch/arm/boot/compressed/Makefile ? ? ? | ? 11 +---
-> ?arch/arm/boot/compressed/Makefile.debug | ? 23 -------
-> ?arch/arm/boot/compressed/head.S ? ? ? ? | ? 40 +++++++++---
-> ?arch/arm/boot/compressed/misc.c ? ? ? ? | ? 20 ------
-> ?arch/arm/kernel/Makefile ? ? ? ? ? ? ? ?| ? ?4 +-
-> ?arch/arm/kernel/compat.c ? ? ? ? ? ? ? ?| ? ?7 --
-> ?arch/arm/kernel/compat.h ? ? ? ? ? ? ? ?| ? ?2 -
-> ?arch/arm/kernel/setup.c ? ? ? ? ? ? ? ? | ? 11 +++
-> ?10 files changed, 152 insertions(+), 79 deletions(-)
-> ?delete mode 100644 arch/arm/boot/compressed/Makefile.debug
->
-> Russell, can you please pull this for the next merge window?
->
->> ? ? ? ? ? ? ? ? ? ?I'll include it in the Linaro consolidation tree in
->> the mean time if you don't mind.
-> I don't know what the "Linaro consolidation tree" is, but I'm sure that
-> even if I minded I couldn't stop you to take it. :-)
->
-> Best regards
-> Uwe
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+why????how can I do it? thanks
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100710/2a253192/attachment.html>
