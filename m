@@ -1,173 +1,89 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 10 Jul 2010 17:05:18 +0800
-Subject: [RFC PATCH 1/2] allow each machine to specify it's own IRQ
-	handlers at run-time
-In-Reply-To: <alpine.LFD.2.00.1005222106500.15379@xanadu.home>
-References: <AANLkTin9OHUGtKSg7554ucVhufQ3PiKXALmD0Lh7A-yt@mail.gmail.com>
-	<alpine.LFD.2.00.1005222106500.15379@xanadu.home>
-Message-ID: <AANLkTikzB7Rcla0s05W7fBGkB-09mUM2ASiGSvnRrGn-@mail.gmail.com>
+From: eric.miao@canonical.com (Eric Miao)
+Date: Sat, 10 Jul 2010 17:16:18 +0800
+Subject: [PATCH 0/5] Makefile.boot cleanup
+In-Reply-To: <20100708070826.GB21565@pengutronix.de>
+References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
+	<20100705141344.GA25407@pengutronix.de>
+	<20100707144521.GB10470@pengutronix.de>
+	<alpine.LFD.2.00.1007071150390.6020@xanadu.home>
+	<20100708070826.GB21565@pengutronix.de>
+Message-ID: <AANLkTikDXh1xVW-UjtU2bCWvOz1kvijp6QuPJi-SY0_F@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 23, 2010 at 9:15 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Sat, 22 May 2010, Eric Miao wrote:
+2010/7/8 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello Russell,
 >
->> commit edec494b3dbf52a61a18b484dd05cce6a9d90e2f
->> Author: Eric Miao <eric.y.miao@gmail.com>
->> Date: ? Sat May 22 11:58:01 2010 +0800
+> On Wed, Jul 07, 2010 at 11:54:14AM -0400, Nicolas Pitre wrote:
+>> On Wed, 7 Jul 2010, Uwe Kleine-K?nig wrote:
+>> > On Mon, Jul 05, 2010 at 04:13:44PM +0200, Uwe Kleine-K?nig wrote:
+>> > > this series is a merge between Eric's and my patches that we did to
+>> > > clean up the early boot code. ?It doesn't contain runtime physoffset
+>> > > support for now, but I plan to pick that up later.
+>> >
+>> > I added Nicolas' Acks to my tree and dropped the one patch he objected.
+>> >
+>> > Are you willing to pull these now?
 >>
->> ? ? [ARM] allow each machine to specify it's own IRQ handlers at run-time
->>
->> ? ? Normally different ARM platform has different way to decode the IRQ
->> ? ? hardware status and demultiplex to the corresponding IRQ handler.
->> ? ? This is highly optimized by macro irq_handler in entry-armv.S, and
->> ? ? each machine class defines their own macro to decode the IRQ number.
->> ? ? However, this prevents multiple machine classes to be built into a
->> ? ? single kernel.
->>
->> ? ? By allowing each machine to specify thier own handler, and making
->> ? ? function pointer 'handle_arch_irq' to point to it at run time, this
->> ? ? can be solved. And introduce CONFIG_MULTI_IRQ_HANDLER to allow both
->> ? ? solutions to work.
->>
->> ? ? Comparing with the highly optimized macro of irq_handler, the new
->> ? ? function must be written with care not to lose too much performance.
->>
->> ? ? Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+>> FWIW, I'm fine with Russell pulling this into his tree for the next
+>> merge window. ?Maybe you could just resend an official pull request with
+>> the updated info.
+> OK, I thought it similar enough to the original request, but if it helps
+> I can do that:
 >
-> Looks fine to me.
+> The following changes since commit 7e27d6e778cd87b6f2415515d7127eba53fe5d02:
 >
-
-I took that as an Ack-by.
-
-> Might be a good idea to mention in the patch description text that the
-> IPI stuff on SMP is expected to move to the provided arch IRQ handler as
-> well. ?That would probably be a good thing given the current comment
-> above that code.
+> ?Linux 2.6.35-rc3 (2010-06-11 19:14:04 -0700)
 >
+> are available in the git repository at:
+> ?git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
+>
+> Eric Miao (2):
+> ? ? ?ARM: Remove unused PARAMS_PHYS from arch/arm/boot/compressed
+> ? ? ?Auto calculate ZRELADDR and provide option for exceptions
 
-Patch updated as below, and will send to Russell's patch system soon.
+This seems to miss the "ARM:" prefix, though a small issue.
 
-commit 01d49a963aee4b598de17f2542f45bd5a54191b3
-Author: Eric Miao <eric.miao@canonical.com>
-Date:   Sat May 22 11:58:01 2010 +0800
-
-    [ARM] allow each machine to specify it's own IRQ handlers at run-time
-
-    Normally different ARM platform has different way to decode the IRQ
-    hardware status and demultiplex to the corresponding IRQ handler.
-    This is highly optimized by macro irq_handler in entry-armv.S, and
-    each machine class defines their own macro to decode the IRQ number.
-    However, this prevents multiple machine classes to be built into a
-    single kernel.
-
-    By allowing each machine to specify thier own handler, and making
-    function pointer 'handle_arch_irq' to point to it at run time, this
-    can be solved. And introduce CONFIG_MULTI_IRQ_HANDLER to allow both
-    solutions to work.
-
-    Comparing with the highly optimized macro of irq_handler, the new
-    function must be written with care not to lose too much performance.
-    And the IPI stuff on SMP is expected to move to the provided arch
-    IRQ handler as well.
-
-    Signed-off-by: Eric Miao <eric.miao@canonical.com>
-    Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4ab7523..2dab426 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -959,6 +959,11 @@ config CPU_HAS_PMU
- 	default y
- 	bool
-
-+config MULTI_IRQ_HANDLER
-+	bool
-+	help
-+	  Allow each machine to specify it's own IRQ handler at run time.
-+
- if !MMU
- source "arch/arm/Kconfig-nommu"
- endif
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index dd15c0f..73afd4d 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -43,6 +43,9 @@ struct machine_desc {
- 	void			(*init_irq)(void);
- 	struct sys_timer	*timer;		/* system tick timer	*/
- 	void			(*init_machine)(void);
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+	void			(*handle_irq)(struct pt_regs *);
-+#endif
- };
-
- /*
-diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
-index ce3eee9..6ecdad9 100644
---- a/arch/arm/include/asm/mach/irq.h
-+++ b/arch/arm/include/asm/mach/irq.h
-@@ -22,6 +22,10 @@ extern void (*init_arch_irq)(void);
- extern void init_FIQ(void);
- extern int show_fiq_list(struct seq_file *, void *);
-
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+extern void (*handle_arch_irq)(struct pt_regs *);
-+#endif
-+
- /*
-  * This is for easy migration, but should be changed in the source
-  */
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 7ee48e7..ecb8492 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -28,6 +28,7 @@
- /*
-  * Interrupt handling.  Preserves r7, r8, r9
-  */
-+#ifndef CONFIG_MULTI_IRQ_HANDLER
- 	.macro	irq_handler
- 	get_irqnr_preamble r5, lr
- 1:	get_irqnr_and_base r0, r6, r5, lr
-@@ -59,6 +60,14 @@
- #endif
-
- 	.endm
-+#else
-+	.macro	irq_handler
-+	ldr	r4, =handle_arch_irq
-+	mov	r0, sp
-+	mov	lr, pc
-+	ldr	pc, [r4]
-+	.endm
-+#endif	/* CONFIG_MULTI_IRQ_HANDLER */
-
- #ifdef CONFIG_KPROBES
- 	.section	.kprobes.text,"ax",%progbits
-@@ -1251,3 +1260,9 @@ cr_alignment:
- 	.space	4
- cr_no_alignment:
- 	.space	4
-+
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+	.globl	handle_arch_irq
-+handle_arch_irq:
-+	.long	0
-+#endif
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index a70c8b7..bcccee6 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -736,6 +736,10 @@ void __init setup_arch(char **cmdline_p)
- 	system_timer = mdesc->timer;
- 	init_machine = mdesc->init_machine;
-
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+	handle_arch_irq = mdesc->handle_irq;
-+#endif
-+
- #ifdef CONFIG_VT
- #if defined(CONFIG_VGA_CONSOLE)
- 	conswitchp = &vga_con;
+>
+> Uwe Kleine-K?nig (8):
+> ? ? ?ARM: zImage: don't hard code the stack size twice
+> ? ? ?ARM: zImage: some comments for __armv3_mpu_cache_on
+> ? ? ?ARM: zImage: __armv3_mpu_cache_flush: respect should-be-zero specification
+> ? ? ?ARM: zImage: fix comments for cache_on, cache_off and cache_clean_flush
+> ? ? ?ARM: zImage: annotate debug functions about corrupted registers
+> ? ? ?ARM: remove bit-rotten STANDALONE_DEBUG for decompressor
+> ? ? ?ARM: zImage: don't define unused symbol initrd_phys
+> ? ? ?ARM: deprecate support for old way to pass kernel parameters
+>
+> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ?| ?105 +++++++++++++++++++++++++++++++
+> ?arch/arm/boot/Makefile ? ? ? ? ? ? ? ? ?| ? ?8 +--
+> ?arch/arm/boot/compressed/Makefile ? ? ? | ? 11 +---
+> ?arch/arm/boot/compressed/Makefile.debug | ? 23 -------
+> ?arch/arm/boot/compressed/head.S ? ? ? ? | ? 40 +++++++++---
+> ?arch/arm/boot/compressed/misc.c ? ? ? ? | ? 20 ------
+> ?arch/arm/kernel/Makefile ? ? ? ? ? ? ? ?| ? ?4 +-
+> ?arch/arm/kernel/compat.c ? ? ? ? ? ? ? ?| ? ?7 --
+> ?arch/arm/kernel/compat.h ? ? ? ? ? ? ? ?| ? ?2 -
+> ?arch/arm/kernel/setup.c ? ? ? ? ? ? ? ? | ? 11 +++
+> ?10 files changed, 152 insertions(+), 79 deletions(-)
+> ?delete mode 100644 arch/arm/boot/compressed/Makefile.debug
+>
+> Russell, can you please pull this for the next merge window?
+>
+>> ? ? ? ? ? ? ? ? ? ?I'll include it in the Linaro consolidation tree in
+>> the mean time if you don't mind.
+> I don't know what the "Linaro consolidation tree" is, but I'm sure that
+> even if I minded I couldn't stop you to take it. :-)
+>
+> Best regards
+> Uwe
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
