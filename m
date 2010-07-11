@@ -1,63 +1,87 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 11 Jul 2010 10:13:56 +0200
-Subject: pxa27x_udc: Oops on probe with usb cable connected.
-References: <20100630115310.bcf967c1.ospite@studenti.unina.it>
-	<877hld7np5.fsf@free.fr>
-	<20100703221022.27df1a2e.ospite@studenti.unina.it>
-	<87r5jkxh1y.fsf@free.fr>
-	<20100705104043.c72d4a5b.ospite@studenti.unina.it>
-Message-ID: <87zkxyv3jv.fsf@free.fr>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sun, 11 Jul 2010 14:31:39 +0400
+Subject: [PATCH v5] libata: pata_samsung: Add Samsung PATA controller
+	driver
+In-Reply-To: <1277809518-1122-1-git-send-email-kgene.kim@samsung.com>
+References: <1277809518-1122-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <4C399D8B.2050700@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Antonio Ospite <ospite@studenti.unina.it> writes:
+Hello.
 
-> The Oops does not occurr anymore but UDC does not work yet, with DEBUG
-> disabled I see kernel stops here, no more messages _at_all_ after that:
-> <6>[    7.196467] pxa27x_udc: version 2008-04-18
-> <6>[    7.201653] pxa27x-udc pxa27x-udc: USB reset
->
-> And on the host side I get:
-> [ 6512.104045] usb 4-2: new full speed USB device using ohci_hcd and address 50
-> [ 6512.512030] usb 4-2: device not accepting address 50, error -62
-> [ 6512.512063] hub 4-0:1.0: unable to enumerate USB device on port 2
->
-> If I enable debug back I can see some messages repeated over
-> and over:
->
-> <7>[   12.545381] pxa27x-udc pxa27x-udc: ep0:handle_ep0_ctrl_req: protocol STALL, udccsr0=0c1 err 1
-> <7>[   12.554164] pxa27x-udc pxa27x-udc: ep0:set_ep0state: state=SETUP_STAGE->STALL, udccsr0=0x0c1, udcbcr=8
-> <7>[   12.562987] pxa27x-udc pxa27x-udc: ep0:handle_ep0: state=STALL, req=(null), udccsr0=0x0c1, udcbcr=8, irq_msk=1
-> <7>[   12.571818] pxa27x-udc pxa27x-udc: ep0:set_ep0state: state=STALL->SETUP_STAGE, udccsr0=0x0c1, udcbcr=8
-> <7>[   12.580628] pxa27x-udc pxa27x-udc: ep0:handle_ep0_ctrl_req: protocol STALL, udccsr0=0c1 err 1
-> <7>[   12.589416] pxa27x-udc pxa27x-udc: ep0:set_ep0state: state=SETUP_STAGE->STALL, udccsr0=0x0c1, udcbcr=8
-> <7>[   12.598241] pxa27x-udc pxa27x-udc: ep0:handle_ep0: state=STALL, req=(null), udccsr0=0x0c1, udcbcr=8, irq_msk=1
-> <7>[   12.607076] pxa27x-udc pxa27x-udc: ep0:set_ep0state: state=STALL->SETUP_STAGE, udccsr0=0x0c1, udcbcr=8
-> <7>[   12.615890] pxa27x-udc pxa27x-udc: ep0:handle_ep0_ctrl_req: protocol STALL, udccsr0=0c1 err 1
-> <7>[   12.624681] pxa27x-udc pxa27x-udc: ep0:set_ep0state: state=SETUP_STAGE->STALL, udccsr0=0x0c1, udcbcr=8
-> <7>[   12.633513] pxa27x-udc pxa27x-udc: ep0:handle_ep0: state=STALL, req=(null), udccsr0=0x0c1, udcbcr=8, irq_msk=1
-> <7>[   12.642354] pxa27x-udc pxa27x-udc: ep0:set_ep0state:
-> state=STALL->SETUP_STAGE, udccsr0=0x0c1, udcbcr=8
+Kukjin Kim wrote:
 
-Well, the UDC is responding to each request from the USB host by stalling the
-USB endpoint (and not by stalling the full kernel). This shows that at least
-kernel interrupts are still alive and working.
+> From: Abhilash Kesavan <a.kesavan@samsung.com>
 
-> I noted that (either with or without this patch) a quite similar phone
-> works, it's Motorola A1200 and has a different bootloader.
-> Maybe comparing some registers can help here?
+> Adds support for the Samsung PATA controller. This driver is based on the
+> Libata subsystem and references the earlier patches sent for IDE subsystem.
 
-I'm still not fully convinced the pxa27x_udc is blocking the kernel. As the
-interrupt is working properly, and the interrupt handler relies on a spinlock,
-the spinlock is correcly released after each interrupt, and the driver should
-work normally.
-Now, the interrupt "storm" could block the kernel. That would rather be an host
-issue. Did you try to connect your phone to another computer ?
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
 
-I would ask for a last test : on the first line of function pxa_udc_probe(),
-insert "return 0;". If kernel still stalls, the pxa27x-udc is not involved.
+    Looks like there's issues still...
 
-Cheers.
+[...]
 
---
-Robert
+> diff --git a/drivers/ata/pata_samsung_cf.c b/drivers/ata/pata_samsung_cf.c
+> new file mode 100644
+> index 0000000..26b96c3
+> --- /dev/null
+> +++ b/drivers/ata/pata_samsung_cf.c
+> @@ -0,0 +1,728 @@
+> +/*
+> + * pata_s3c_tf_load - send taskfile registers to host controller
+> + */
+> +static void pata_s3c_tf_load(struct ata_port *ap,
+> +				const struct ata_taskfile *tf)
+> +{
+> +	struct ata_ioports *ioaddr = &ap->ioaddr;
+> +	unsigned int is_addr = tf->flags & ATA_TFLAG_ISADDR;
+> +
+> +	if (tf->ctl != ap->last_ctl) {
+> +		ata_outb(ap->host, tf->ctl, ioaddr->ctl_addr);
+> +		ap->last_ctl = tf->ctl;
+> +		ata_wait_idle(ap);
+> +	}
+> +
+
+[...]
+
+> +/*
+> + * pata_s3c_tf_read - input device's ATA taskfile shadow registers
+> + */
+> +static void pata_s3c_tf_read(struct ata_port *ap, struct ata_taskfile *tf)
+> +{
+> +	struct ata_ioports *ioaddr = &ap->ioaddr;
+> +
+> +	tf->feature = ata_inb(ap->host, ioaddr->error_addr);
+> +	tf->nsect = ata_inb(ap->host, ioaddr->nsect_addr);
+> +	tf->lbal = ata_inb(ap->host, ioaddr->lbal_addr);
+> +	tf->lbam = ata_inb(ap->host, ioaddr->lbam_addr);
+> +	tf->lbah = ata_inb(ap->host, ioaddr->lbah_addr);
+> +	tf->device = ata_inb(ap->host, ioaddr->device_addr);
+> +
+> +	if (tf->flags & ATA_TFLAG_LBA48) {
+> +		iowrite8(tf->ctl | ATA_HOB, ioaddr->ctl_addr);
+> +		tf->hob_feature = ata_inb(ap->host, ioaddr->error_addr);
+> +		tf->hob_nsect = ata_inb(ap->host, ioaddr->nsect_addr);
+> +		tf->hob_lbal = ata_inb(ap->host, ioaddr->lbal_addr);
+> +		tf->hob_lbam = ata_inb(ap->host, ioaddr->lbam_addr);
+> +		tf->hob_lbah = ata_inb(ap->host, ioaddr->lbah_addr);
+> +		iowrite8(tf->ctl, ioaddr->ctl_addr);
+
+    I don't understand why you're using ata_outb() to awrite to the device 
+control register in tf_load() method but use iowrite8() here...
+
+> +#ifdef CONFIG_PM
+> +static int pata_s3c_suspend(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct ata_host *host = platform_get_drvdata(pdev);
+> +	pm_message_t state = PMSG_SUSPEND;
+
+    Don't see why this variable is needed...
+
+MBR, Sergei
