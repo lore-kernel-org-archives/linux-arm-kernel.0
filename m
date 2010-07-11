@@ -1,7 +1,7 @@
-From: Lukas-David@htc-linux.org (Lukas-David Gorris)
-Date: Sun, 11 Jul 2010 13:08:08 +0100
-Subject: linux-arm-kernel@lists.infradead.org
-Message-ID: <20100711130808.nrax1v1vxckgs0cs@webmail.htc-linux.org>
+From: lukas@htc-linux.org (lukas gorris)
+Date: Sun, 11 Jul 2010 15:11:42 +0100
+Subject: machine-registry: htckovsky(2006)
+Message-ID: <20100711151142.qo27dka4gwsgs0o0@webmail.htc-linux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
