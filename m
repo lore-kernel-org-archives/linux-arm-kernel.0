@@ -1,531 +1,618 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sat, 10 Jul 2010 19:57:48 +0300
-Subject: [PATCH v2 2/3] Add s3c-adc-battery driver
-In-Reply-To: <1278781069-30521-1-git-send-email-anarsoul@gmail.com>
-References: <1278781069-30521-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1278781069-30521-3-git-send-email-anarsoul@gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Sun, 11 Jul 2010 02:43:09 +0200
+Subject: [PATCH 1/2] SPI: moved the PL022 test chip out to the SPI subsystem
+Message-ID: <1278808989-29677-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-s3c-adc-battery is driver for monitoring
-and charging battery on iPAQ H1930/H1940/RX1950.
-It depends on s3c-adc driver to get battery voltage and current.
+This moves the SPI test chip from the U300 architecture to the
+SPI subsystem. This is where the code belongs: we want the
+loopback test chip to be available to all users of PL022.
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+This just moves the file, the following patch makes it work
+in the new location.
+
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- drivers/power/Kconfig           |    6 +
- drivers/power/Makefile          |    1 +
- drivers/power/s3c_adc_battery.c |  431 +++++++++++++++++++++++++++++++++++++++
- include/linux/s3c_adc_battery.h |   36 ++++
- 4 files changed, 474 insertions(+), 0 deletions(-)
- create mode 100644 drivers/power/s3c_adc_battery.c
- create mode 100644 include/linux/s3c_adc_battery.h
+ arch/arm/mach-u300/dummyspichip.c |  291 -------------------------------------
+ drivers/spi/amba-pl022-looptest.c |  291 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 291 insertions(+), 291 deletions(-)
+ delete mode 100644 arch/arm/mach-u300/dummyspichip.c
+ create mode 100644 drivers/spi/amba-pl022-looptest.c
 
-diff --git a/drivers/power/Kconfig b/drivers/power/Kconfig
-index 8e9ba17..645baa5 100644
---- a/drivers/power/Kconfig
-+++ b/drivers/power/Kconfig
-@@ -136,6 +136,12 @@ config BATTERY_Z2
- 	help
- 	  Say Y to include support for the battery on the Zipit Z2.
- 
-+config BATTERY_S3C_ADC
-+	tristate "Battery driver for Samsung ADC based monitoring"
-+	depends on S3C_ADC
-+	help
-+	  Say Y here to enable support for iPAQ h1930/h1940/rx1950 battery
-+
- config CHARGER_PCF50633
- 	tristate "NXP PCF50633 MBC"
- 	depends on MFD_PCF50633
-diff --git a/drivers/power/Makefile b/drivers/power/Makefile
-index 0005080..166bcbf 100644
---- a/drivers/power/Makefile
-+++ b/drivers/power/Makefile
-@@ -33,4 +33,5 @@ obj-$(CONFIG_BATTERY_BQ27x00)	+= bq27x00_battery.o
- obj-$(CONFIG_BATTERY_DA9030)	+= da9030_battery.o
- obj-$(CONFIG_BATTERY_MAX17040)	+= max17040_battery.o
- obj-$(CONFIG_BATTERY_Z2)	+= z2_battery.o
-+obj-$(CONFIG_BATTERY_S3C_ADC)	+= s3c_adc_battery.o
- obj-$(CONFIG_CHARGER_PCF50633)	+= pcf50633-charger.o
-diff --git a/drivers/power/s3c_adc_battery.c b/drivers/power/s3c_adc_battery.c
+diff --git a/arch/arm/mach-u300/dummyspichip.c b/arch/arm/mach-u300/dummyspichip.c
+deleted file mode 100644
+index 5f55012..0000000
+--- a/arch/arm/mach-u300/dummyspichip.c
++++ /dev/null
+@@ -1,291 +0,0 @@
+-/*
+- * arch/arm/mach-u300/dummyspichip.c
+- *
+- * Copyright (C) 2007-2009 ST-Ericsson AB
+- * License terms: GNU General Public License (GPL) version 2
+- * This is a dummy loopback SPI "chip" used for testing SPI.
+- * Author: Linus Walleij <linus.walleij@stericsson.com>
+- */
+-#include <linux/init.h>
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/device.h>
+-#include <linux/err.h>
+-#include <linux/sysfs.h>
+-#include <linux/mutex.h>
+-#include <linux/spi/spi.h>
+-#include <linux/dma-mapping.h>
+-#include <linux/slab.h>
+-/*
+- * WARNING! Do not include this pl022-specific controller header
+- * for any generic driver. It is only done in this dummy chip
+- * because we alter the chip configuration in order to test some
+- * different settings on the loopback device. Normal chip configs
+- * shall be STATIC and not altered by the driver!
+- */
+-#include <linux/amba/pl022.h>
+-
+-struct dummy {
+-	struct device *dev;
+-	struct mutex lock;
+-};
+-
+-#define DMA_TEST_SIZE 2048
+-
+-/* When we cat /sys/bus/spi/devices/spi0.0/looptest this will be triggered */
+-static ssize_t dummy_looptest(struct device *dev,
+-		struct device_attribute *attr, char *buf)
+-{
+-	struct spi_device *spi = to_spi_device(dev);
+-	struct dummy *p_dummy = dev_get_drvdata(&spi->dev);
+-
+-	/*
+-	 * WARNING! Do not dereference the chip-specific data in any normal
+-	 * driver for a chip. It is usually STATIC and shall not be read
+-	 * or written to. Your chip driver should NOT depend on fields in this
+-	 * struct, this is just used here to alter the behaviour of the chip
+-	 * in order to perform tests.
+-	 */
+-	struct pl022_config_chip *chip_info = spi->controller_data;
+-	int status;
+-	u8 txbuf[14] = {0xDE, 0xAD, 0xBE, 0xEF, 0x2B, 0xAD,
+-			0xCA, 0xFE, 0xBA, 0xBE, 0xB1, 0x05,
+-			0xF0, 0x0D};
+-	u8 rxbuf[14];
+-	u8 *bigtxbuf_virtual;
+-	u8 *bigrxbuf_virtual;
+-
+-	if (mutex_lock_interruptible(&p_dummy->lock))
+-		return -ERESTARTSYS;
+-
+-	bigtxbuf_virtual = kmalloc(DMA_TEST_SIZE, GFP_KERNEL);
+-	if (bigtxbuf_virtual == NULL) {
+-		status = -ENOMEM;
+-		goto out;
+-	}
+-	bigrxbuf_virtual = kmalloc(DMA_TEST_SIZE, GFP_KERNEL);
+-
+-	/* Fill TXBUF with some happy pattern */
+-	memset(bigtxbuf_virtual, 0xAA, DMA_TEST_SIZE);
+-
+-	/*
+-	 * Force chip to 8 bit mode
+-	 * WARNING: NEVER DO THIS IN REAL DRIVER CODE, THIS SHOULD BE STATIC!
+-	 */
+-	chip_info->data_size = SSP_DATA_BITS_8;
+-	/* You should NOT DO THIS EITHER */
+-	spi->master->setup(spi);
+-
+-	/* Now run the tests for 8bit mode */
+-	pr_info("Simple test 1: write 0xAA byte, read back garbage byte "
+-		"in 8bit mode\n");
+-	status = spi_w8r8(spi, 0xAA);
+-	if (status < 0)
+-		pr_warning("Siple test 1: FAILURE: spi_write_then_read "
+-			   "failed with status %d\n", status);
+-	else
+-		pr_info("Simple test 1: SUCCESS!\n");
+-
+-	pr_info("Simple test 2: write 8 bytes, read back 8 bytes garbage "
+-		"in 8bit mode (full FIFO)\n");
+-	status = spi_write_then_read(spi, &txbuf[0], 8, &rxbuf[0], 8);
+-	if (status < 0)
+-		pr_warning("Simple test 2: FAILURE: spi_write_then_read() "
+-			   "failed with status %d\n", status);
+-	else
+-		pr_info("Simple test 2: SUCCESS!\n");
+-
+-	pr_info("Simple test 3: write 14 bytes, read back 14 bytes garbage "
+-		"in 8bit mode (see if we overflow FIFO)\n");
+-	status = spi_write_then_read(spi, &txbuf[0], 14, &rxbuf[0], 14);
+-	if (status < 0)
+-		pr_warning("Simple test 3: FAILURE: failed with status %d "
+-			   "(probably FIFO overrun)\n", status);
+-	else
+-		pr_info("Simple test 3: SUCCESS!\n");
+-
+-	pr_info("Simple test 4: write 8 bytes with spi_write(), read 8 "
+-		"bytes garbage with spi_read() in 8bit mode\n");
+-	status = spi_write(spi, &txbuf[0], 8);
+-	if (status < 0)
+-		pr_warning("Simple test 4 step 1: FAILURE: spi_write() "
+-			   "failed with status %d\n", status);
+-	else
+-		pr_info("Simple test 4 step 1: SUCCESS!\n");
+-	status = spi_read(spi, &rxbuf[0], 8);
+-	if (status < 0)
+-		pr_warning("Simple test 4 step 2: FAILURE: spi_read() "
+-			   "failed with status %d\n", status);
+-	else
+-		pr_info("Simple test 4 step 2: SUCCESS!\n");
+-
+-	pr_info("Simple test 5: write 14 bytes with spi_write(), read "
+-		"14 bytes garbage with spi_read() in 8bit mode\n");
+-	status = spi_write(spi, &txbuf[0], 14);
+-	if (status < 0)
+-		pr_warning("Simple test 5 step 1: FAILURE: spi_write() "
+-			   "failed with status %d (probably FIFO overrun)\n",
+-			   status);
+-	else
+-		pr_info("Simple test 5 step 1: SUCCESS!\n");
+-	status = spi_read(spi, &rxbuf[0], 14);
+-	if (status < 0)
+-		pr_warning("Simple test 5 step 2: FAILURE: spi_read() "
+-			   "failed with status %d (probably FIFO overrun)\n",
+-			   status);
+-	else
+-		pr_info("Simple test 5: SUCCESS!\n");
+-
+-	pr_info("Simple test 6: write %d bytes with spi_write(), "
+-		"read %d bytes garbage with spi_read() in 8bit mode\n",
+-		DMA_TEST_SIZE, DMA_TEST_SIZE);
+-	status = spi_write(spi, &bigtxbuf_virtual[0], DMA_TEST_SIZE);
+-	if (status < 0)
+-		pr_warning("Simple test 6 step 1: FAILURE: spi_write() "
+-			   "failed with status %d (probably FIFO overrun)\n",
+-			   status);
+-	else
+-		pr_info("Simple test 6 step 1: SUCCESS!\n");
+-	status = spi_read(spi, &bigrxbuf_virtual[0], DMA_TEST_SIZE);
+-	if (status < 0)
+-		pr_warning("Simple test 6 step 2: FAILURE: spi_read() "
+-			   "failed with status %d (probably FIFO overrun)\n",
+-			   status);
+-	else
+-		pr_info("Simple test 6: SUCCESS!\n");
+-
+-
+-	/*
+-	 * Force chip to 16 bit mode
+-	 * WARNING: NEVER DO THIS IN REAL DRIVER CODE, THIS SHOULD BE STATIC!
+-	 */
+-	chip_info->data_size = SSP_DATA_BITS_16;
+-	/* You should NOT DO THIS EITHER */
+-	spi->master->setup(spi);
+-
+-	pr_info("Simple test 7: write 0xAA byte, read back garbage byte "
+-		"in 16bit bus mode\n");
+-	status = spi_w8r8(spi, 0xAA);
+-	if (status == -EIO)
+-		pr_info("Simple test 7: SUCCESS! (expected failure with "
+-			"status EIO)\n");
+-	else if (status < 0)
+-		pr_warning("Siple test 7: FAILURE: spi_write_then_read "
+-			   "failed with status %d\n", status);
+-	else
+-		pr_warning("Siple test 7: FAILURE: spi_write_then_read "
+-			   "succeeded but it was expected to fail!\n");
+-
+-	pr_info("Simple test 8: write 8 bytes, read back 8 bytes garbage "
+-		"in 16bit mode (full FIFO)\n");
+-	status = spi_write_then_read(spi, &txbuf[0], 8, &rxbuf[0], 8);
+-	if (status < 0)
+-		pr_warning("Simple test 8: FAILURE: spi_write_then_read() "
+-			   "failed with status %d\n", status);
+-	else
+-		pr_info("Simple test 8: SUCCESS!\n");
+-
+-	pr_info("Simple test 9: write 14 bytes, read back 14 bytes garbage "
+-		"in 16bit mode (see if we overflow FIFO)\n");
+-	status = spi_write_then_read(spi, &txbuf[0], 14, &rxbuf[0], 14);
+-	if (status < 0)
+-		pr_warning("Simple test 9: FAILURE: failed with status %d "
+-			   "(probably FIFO overrun)\n", status);
+-	else
+-		pr_info("Simple test 9: SUCCESS!\n");
+-
+-	pr_info("Simple test 10: write %d bytes with spi_write(), "
+-	       "read %d bytes garbage with spi_read() in 16bit mode\n",
+-	       DMA_TEST_SIZE, DMA_TEST_SIZE);
+-	status = spi_write(spi, &bigtxbuf_virtual[0], DMA_TEST_SIZE);
+-	if (status < 0)
+-		pr_warning("Simple test 10 step 1: FAILURE: spi_write() "
+-			   "failed with status %d (probably FIFO overrun)\n",
+-			   status);
+-	else
+-		pr_info("Simple test 10 step 1: SUCCESS!\n");
+-
+-	status = spi_read(spi, &bigrxbuf_virtual[0], DMA_TEST_SIZE);
+-	if (status < 0)
+-		pr_warning("Simple test 10 step 2: FAILURE: spi_read() "
+-			   "failed with status %d (probably FIFO overrun)\n",
+-			   status);
+-	else
+-		pr_info("Simple test 10: SUCCESS!\n");
+-
+-	status = sprintf(buf, "loop test complete\n");
+-	kfree(bigrxbuf_virtual);
+-	kfree(bigtxbuf_virtual);
+- out:
+-	mutex_unlock(&p_dummy->lock);
+-	return status;
+-}
+-
+-static DEVICE_ATTR(looptest, S_IRUGO, dummy_looptest, NULL);
+-
+-static int __devinit pl022_dummy_probe(struct spi_device *spi)
+-{
+-	struct dummy *p_dummy;
+-	int status;
+-
+-	dev_info(&spi->dev, "probing dummy SPI device\n");
+-
+-	p_dummy = kzalloc(sizeof *p_dummy, GFP_KERNEL);
+-	if (!p_dummy)
+-		return -ENOMEM;
+-
+-	dev_set_drvdata(&spi->dev, p_dummy);
+-	mutex_init(&p_dummy->lock);
+-
+-	/* sysfs hook */
+-	status = device_create_file(&spi->dev, &dev_attr_looptest);
+-	if (status) {
+-		dev_dbg(&spi->dev, "device_create_file looptest failure.\n");
+-		goto out_dev_create_looptest_failed;
+-	}
+-
+-	return 0;
+-
+-out_dev_create_looptest_failed:
+-	dev_set_drvdata(&spi->dev, NULL);
+-	kfree(p_dummy);
+-	return status;
+-}
+-
+-static int __devexit pl022_dummy_remove(struct spi_device *spi)
+-{
+-	struct dummy *p_dummy = dev_get_drvdata(&spi->dev);
+-
+-	dev_info(&spi->dev, "removing dummy SPI device\n");
+-	device_remove_file(&spi->dev, &dev_attr_looptest);
+-	dev_set_drvdata(&spi->dev, NULL);
+-	kfree(p_dummy);
+-
+-	return 0;
+-}
+-
+-static struct spi_driver pl022_dummy_driver = {
+-	.driver = {
+-		.name	= "spi-dummy",
+-		.owner	= THIS_MODULE,
+-	},
+-	.probe	= pl022_dummy_probe,
+-	.remove	= __devexit_p(pl022_dummy_remove),
+-};
+-
+-static int __init pl022_init_dummy(void)
+-{
+-	return spi_register_driver(&pl022_dummy_driver);
+-}
+-
+-static void __exit pl022_exit_dummy(void)
+-{
+-	spi_unregister_driver(&pl022_dummy_driver);
+-}
+-
+-module_init(pl022_init_dummy);
+-module_exit(pl022_exit_dummy);
+-
+-MODULE_AUTHOR("Linus Walleij <linus.walleij@stericsson.com>");
+-MODULE_DESCRIPTION("PL022 SSP/SPI DUMMY Linux driver");
+-MODULE_LICENSE("GPL");
+diff --git a/drivers/spi/amba-pl022-looptest.c b/drivers/spi/amba-pl022-looptest.c
 new file mode 100644
-index 0000000..d4cecc4
+index 0000000..5f55012
 --- /dev/null
-+++ b/drivers/power/s3c_adc_battery.c
-@@ -0,0 +1,431 @@
++++ b/drivers/spi/amba-pl022-looptest.c
+@@ -0,0 +1,291 @@
 +/*
-+ *	iPAQ h1930/h1940/rx1950 battery controler driver
-+ *	Copyright (c) Vasily Khoruzhick
-+ *	Based on h1940_battery.c by Arnaud Patard
++ * arch/arm/mach-u300/dummyspichip.c
 + *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file COPYING in the main directory of this archive for
-+ * more details.
-+ *
++ * Copyright (C) 2007-2009 ST-Ericsson AB
++ * License terms: GNU General Public License (GPL) version 2
++ * This is a dummy loopback SPI "chip" used for testing SPI.
++ * Author: Linus Walleij <linus.walleij@stericsson.com>
 + */
-+
-+#include <linux/interrupt.h>
-+#include <linux/platform_device.h>
-+#include <linux/power_supply.h>
-+#include <linux/leds.h>
-+#include <linux/gpio.h>
-+#include <linux/err.h>
-+#include <linux/timer.h>
-+#include <linux/jiffies.h>
-+#include <linux/s3c_adc_battery.h>
-+#include <linux/errno.h>
 +#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/device.h>
++#include <linux/err.h>
++#include <linux/sysfs.h>
++#include <linux/mutex.h>
++#include <linux/spi/spi.h>
++#include <linux/dma-mapping.h>
++#include <linux/slab.h>
++/*
++ * WARNING! Do not include this pl022-specific controller header
++ * for any generic driver. It is only done in this dummy chip
++ * because we alter the chip configuration in order to test some
++ * different settings on the loopback device. Normal chip configs
++ * shall be STATIC and not altered by the driver!
++ */
++#include <linux/amba/pl022.h>
 +
-+#include <plat/adc.h>
-+
-+#define BAT_POLL_INTERVAL			10000 /* ms */
-+#define JITTER_DELAY				500 /* ms */
-+
-+struct s3c_adc_bat {
-+	struct power_supply			psy;
-+	struct s3c_adc_client		*client;
-+	struct s3c_adc_bat_pdata	*pdata;
-+	int							volt_value;
-+	int							cur_value;
-+	unsigned int				timestamp;
-+	int							level;
-+	int							status;
-+	int							cable_plugged:1;
++struct dummy {
++	struct device *dev;
++	struct mutex lock;
 +};
 +
-+#ifdef CONFIG_LEDS_TRIGGERS
-+DEFINE_LED_TRIGGER(charger_led_trigger);
-+#endif
++#define DMA_TEST_SIZE 2048
 +
-+static struct delayed_work bat_work;
-+
-+static void s3c_adc_bat_ext_power_changed(struct power_supply *psy)
++/* When we cat /sys/bus/spi/devices/spi0.0/looptest this will be triggered */
++static ssize_t dummy_looptest(struct device *dev,
++		struct device_attribute *attr, char *buf)
 +{
-+	schedule_delayed_work(&bat_work,
-+		msecs_to_jiffies(JITTER_DELAY));
-+}
++	struct spi_device *spi = to_spi_device(dev);
++	struct dummy *p_dummy = dev_get_drvdata(&spi->dev);
 +
-+static enum power_supply_property s3c_adc_backup_bat_props[] = {
-+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
-+	POWER_SUPPLY_PROP_VOLTAGE_MIN,
-+	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
-+};
++	/*
++	 * WARNING! Do not dereference the chip-specific data in any normal
++	 * driver for a chip. It is usually STATIC and shall not be read
++	 * or written to. Your chip driver should NOT depend on fields in this
++	 * struct, this is just used here to alter the behaviour of the chip
++	 * in order to perform tests.
++	 */
++	struct pl022_config_chip *chip_info = spi->controller_data;
++	int status;
++	u8 txbuf[14] = {0xDE, 0xAD, 0xBE, 0xEF, 0x2B, 0xAD,
++			0xCA, 0xFE, 0xBA, 0xBE, 0xB1, 0x05,
++			0xF0, 0x0D};
++	u8 rxbuf[14];
++	u8 *bigtxbuf_virtual;
++	u8 *bigrxbuf_virtual;
 +
-+static int s3c_adc_backup_bat_get_property(struct power_supply *psy,
-+				enum power_supply_property psp,
-+				union power_supply_propval *val);
++	if (mutex_lock_interruptible(&p_dummy->lock))
++		return -ERESTARTSYS;
 +
-+static struct s3c_adc_bat backup_bat = {
-+	.psy = {
-+		.name		= "backup-battery",
-+		.type		= POWER_SUPPLY_TYPE_BATTERY,
-+		.properties	= s3c_adc_backup_bat_props,
-+		.num_properties = ARRAY_SIZE(s3c_adc_backup_bat_props),
-+		.get_property	= s3c_adc_backup_bat_get_property,
-+		.use_for_apm	= 1,
-+	},
-+};
-+
-+static enum power_supply_property s3c_adc_main_bat_props[] = {
-+	POWER_SUPPLY_PROP_STATUS,
-+	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
-+	POWER_SUPPLY_PROP_CHARGE_EMPTY_DESIGN,
-+	POWER_SUPPLY_PROP_CHARGE_NOW,
-+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
-+	POWER_SUPPLY_PROP_CURRENT_NOW,
-+};
-+
-+static int s3c_adc_bat_get_property(struct power_supply *psy,
-+				enum power_supply_property psp,
-+				union power_supply_propval *val);
-+
-+static struct s3c_adc_bat main_bat = {
-+	.psy = {
-+		.name				= "main-battery",
-+		.type				= POWER_SUPPLY_TYPE_BATTERY,
-+		.properties			= s3c_adc_main_bat_props,
-+		.num_properties		= ARRAY_SIZE(s3c_adc_main_bat_props),
-+		.get_property		= s3c_adc_bat_get_property,
-+		.external_power_changed = s3c_adc_bat_ext_power_changed,
-+		.use_for_apm	= 1,
-+	},
-+};
-+
-+static int s3c_adc_backup_bat_get_property(struct power_supply *psy,
-+				enum power_supply_property psp,
-+				union power_supply_propval *val)
-+{
-+	struct s3c_adc_bat *bat = container_of(psy, struct s3c_adc_bat, psy);
-+
-+	if (!bat) {
-+		dev_err(psy->dev, "%s: no battery infos ?!\n", __func__);
-+		return -EINVAL;
++	bigtxbuf_virtual = kmalloc(DMA_TEST_SIZE, GFP_KERNEL);
++	if (bigtxbuf_virtual == NULL) {
++		status = -ENOMEM;
++		goto out;
 +	}
++	bigrxbuf_virtual = kmalloc(DMA_TEST_SIZE, GFP_KERNEL);
 +
-+	if (bat->volt_value < 0 ||
-+		jiffies_to_msecs(jiffies - bat->timestamp) >
-+			BAT_POLL_INTERVAL) {
-+		bat->volt_value = s3c_adc_read(bat->client,
-+			bat->pdata->backup_volt_channel);
-+		bat->volt_value *= bat->pdata->backup_volt_mult;
-+		bat->timestamp = jiffies;
-+	}
++	/* Fill TXBUF with some happy pattern */
++	memset(bigtxbuf_virtual, 0xAA, DMA_TEST_SIZE);
 +
-+	switch (psp) {
-+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-+		val->intval = bat->volt_value;
-+		return 0;
-+	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
-+		val->intval = bat->pdata->backup_volt_min;
-+		return 0;
-+	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
-+		val->intval = bat->pdata->backup_volt_max;
-+		return 0;
-+	default:
-+		return -EINVAL;
-+	}
-+}
++	/*
++	 * Force chip to 8 bit mode
++	 * WARNING: NEVER DO THIS IN REAL DRIVER CODE, THIS SHOULD BE STATIC!
++	 */
++	chip_info->data_size = SSP_DATA_BITS_8;
++	/* You should NOT DO THIS EITHER */
++	spi->master->setup(spi);
 +
-+static void s3c_adc_bat_work(struct work_struct *work)
-+{
-+	struct s3c_adc_bat *bat = &main_bat;
-+	int is_charged;
-+	int is_plugged;
-+	static int was_plugged;
-+
-+	is_plugged = power_supply_am_i_supplied(&bat->psy);
-+	bat->cable_plugged = is_plugged;
-+	if (is_plugged != was_plugged) {
-+		was_plugged = is_plugged;
-+		if (is_plugged) {
-+#ifdef CONFIG_LEDS_TRIGGERS
-+			led_trigger_event(charger_led_trigger, LED_HALF);
-+#endif
-+			bat->pdata->enable_charger();
-+			bat->status = POWER_SUPPLY_STATUS_CHARGING;
-+		} else {
-+#ifdef CONFIG_LEDS_TRIGGERS
-+			led_trigger_event(charger_led_trigger, LED_OFF);
-+#endif
-+			bat->pdata->disable_charger();
-+			bat->status = POWER_SUPPLY_STATUS_DISCHARGING;
-+		}
-+	} else {
-+		if (is_plugged) {
-+			is_charged = gpio_get_value(
-+				main_bat.pdata->gpio_charge_finished);
-+			if (is_charged) {
-+#ifdef CONFIG_LEDS_TRIGGERS
-+				led_trigger_event(charger_led_trigger,
-+					LED_FULL);
-+#endif
-+				bat->pdata->disable_charger();
-+				bat->status = POWER_SUPPLY_STATUS_FULL;
-+			} else {
-+#ifdef CONFIG_LEDS_TRIGGERS
-+				led_trigger_event(charger_led_trigger,
-+					LED_HALF);
-+#endif
-+				bat->pdata->enable_charger();
-+				bat->status = POWER_SUPPLY_STATUS_CHARGING;
-+			}
-+		}
-+	}
-+
-+	power_supply_changed(&bat->psy);
-+}
-+
-+static irqreturn_t s3c_adc_bat_charged(int irq, void *dev_id)
-+{
-+	schedule_delayed_work(&bat_work,
-+		msecs_to_jiffies(JITTER_DELAY));
-+	return IRQ_HANDLED;
-+}
-+
-+static int calc_full_volt(int volt_val, int cur_val)
-+{
-+	return volt_val +
-+		cur_val * main_bat.pdata->internal_impedance / 1000;
-+}
-+
-+static int s3c_adc_bat_get_property(struct power_supply *psy,
-+				enum power_supply_property psp,
-+				union power_supply_propval *val)
-+{
-+	struct s3c_adc_bat *bat = container_of(psy, struct s3c_adc_bat, psy);
-+
-+	int new_level;
-+	int full_volt;
-+	const struct s3c_adc_bat_thresh *lut = bat->pdata->lut_noac;
-+	unsigned int lut_size = bat->pdata->lut_noac_cnt;
-+
-+	if (!bat) {
-+		dev_err(psy->dev, "no battery infos ?!\n");
-+		return -EINVAL;
-+	}
-+
-+	if (bat->volt_value < 0 || bat->cur_value < 0 ||
-+		jiffies_to_msecs(jiffies - bat->timestamp) >
-+			BAT_POLL_INTERVAL) {
-+		bat->volt_value = s3c_adc_read(bat->client,
-+			bat->pdata->volt_channel) * bat->pdata->volt_mult;
-+		bat->cur_value = s3c_adc_read(bat->client,
-+			bat->pdata->current_channel) * bat->pdata->current_mult;
-+		bat->timestamp = jiffies;
-+	}
-+
-+	new_level = 100000;
-+	full_volt = calc_full_volt((bat->volt_value / 1000),
-+		(bat->cur_value / 1000));
-+
-+	if (full_volt < calc_full_volt(lut->volt, lut->cur)) {
-+		lut_size--;
-+		while (lut_size--) {
-+			int lut_volt1;
-+			int lut_volt2;
-+
-+			lut_volt1 = calc_full_volt(lut[0].volt, lut[0].cur);
-+			lut_volt2 = calc_full_volt(lut[1].volt, lut[1].cur);
-+			if (full_volt < lut_volt1 && full_volt >= lut_volt2) {
-+				new_level = (lut[1].level +
-+					(lut[0].level - lut[1].level) *
-+					(full_volt - lut_volt2) /
-+					(lut_volt1 - lut_volt2)) * 1000;
-+				break;
-+			}
-+			new_level = lut[1].level * 1000;
-+			lut++;
-+		}
-+	}
-+
-+	bat->level = new_level;
-+
-+	switch (psp) {
-+	case POWER_SUPPLY_PROP_STATUS:
-+		val->intval = bat->status;
-+		return 0;
-+	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
-+		val->intval = 100000;
-+		return 0;
-+	case POWER_SUPPLY_PROP_CHARGE_EMPTY_DESIGN:
-+		val->intval = 0;
-+		return 0;
-+	case POWER_SUPPLY_PROP_CHARGE_NOW:
-+		val->intval = bat->level;
-+		return 0;
-+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-+		val->intval = bat->volt_value;
-+		return 0;
-+	case POWER_SUPPLY_PROP_CURRENT_NOW:
-+		val->intval = bat->cur_value;
-+		return 0;
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+
-+static int __init s3c_adc_bat_probe(struct platform_device *pdev)
-+{
-+	struct s3c_adc_client	*client;
-+	struct s3c_adc_bat_pdata *pdata = pdev->dev.platform_data;
-+	int ret;
-+
-+	client = s3c_adc_register(pdev, NULL, NULL, 0);
-+	if (IS_ERR(client)) {
-+		dev_err(&pdev->dev, "cannot register adc\n");
-+		return PTR_ERR(client);
-+	}
-+
-+	platform_set_drvdata(pdev, client);
-+
-+	main_bat.client = client;
-+	main_bat.pdata = pdev->dev.platform_data;
-+	main_bat.volt_value = -1;
-+	main_bat.cur_value = -1;
-+	main_bat.cable_plugged = 0;
-+	main_bat.status = POWER_SUPPLY_STATUS_DISCHARGING;
-+
-+	ret = power_supply_register(&pdev->dev, &main_bat.psy);
-+	if (ret)
-+		goto err_reg_main;
-+	if (pdata->backup_volt_mult) {
-+		backup_bat.client = client;
-+		backup_bat.pdata = pdev->dev.platform_data;
-+		backup_bat.volt_value = -1;
-+		ret = power_supply_register(&pdev->dev, &backup_bat.psy);
-+		if (ret)
-+			goto err_reg_backup;
-+	}
-+
-+	INIT_DELAYED_WORK(&bat_work, s3c_adc_bat_work);
-+
-+	ret = gpio_request(main_bat.pdata->gpio_charge_finished, "charged");
-+	if (ret)
-+		goto err_gpio;
-+
-+	ret = request_irq(gpio_to_irq(main_bat.pdata->gpio_charge_finished),
-+			s3c_adc_bat_charged,
-+			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
-+			"battery charged", NULL);
-+	if (ret)
-+		goto err_irq;
-+
-+	ret = pdata->init();
-+	if (ret)
-+		goto err_platform;
-+
-+#ifdef CONFIG_LEDS_TRIGGERS
-+	led_trigger_register_simple("s3c-adc-charger", &charger_led_trigger);
-+#endif
-+
-+	dev_info(&pdev->dev, "successfully loaded\n");
-+	device_init_wakeup(&pdev->dev, 1);
-+
-+	/* Schedule timer to check current status */
-+	schedule_delayed_work(&bat_work,
-+		msecs_to_jiffies(JITTER_DELAY));
-+
-+	return 0;
-+
-+err_platform:
-+	free_irq(gpio_to_irq(main_bat.pdata->gpio_charge_finished), NULL);
-+err_irq:
-+	gpio_free(main_bat.pdata->gpio_charge_finished);
-+err_gpio:
-+	if (pdata->backup_volt_mult)
-+		power_supply_unregister(&backup_bat.psy);
-+err_reg_backup:
-+	power_supply_unregister(&main_bat.psy);
-+err_reg_main:
-+	return ret;
-+}
-+
-+static int s3c_adc_bat_remove(struct platform_device *pdev)
-+{
-+	struct s3c_adc_client *client = platform_get_drvdata(pdev);
-+	struct s3c_adc_bat_pdata *pdata = pdev->dev.platform_data;
-+
-+#ifdef CONFIG_LEDS_TRIGGERS
-+	led_trigger_unregister_simple(charger_led_trigger);
-+#endif
-+
-+	power_supply_unregister(&main_bat.psy);
-+	if (pdata->backup_volt_mult)
-+		power_supply_unregister(&backup_bat.psy);
-+
-+	s3c_adc_release(client);
-+
-+	free_irq(gpio_to_irq(pdata->gpio_charge_finished), NULL);
-+	gpio_free(pdata->gpio_charge_finished);
-+
-+	cancel_delayed_work(&bat_work);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM
-+static int s3c_adc_bat_suspend(struct platform_device *pdev,
-+	pm_message_t state)
-+{
-+	struct s3c_adc_bat_pdata *pdata = pdev->dev.platform_data;
-+	if (device_may_wakeup(&pdev->dev))
-+		enable_irq_wake(gpio_to_irq(pdata->gpio_charge_finished));
-+	else {
-+		disable_irq(gpio_to_irq(pdata->gpio_charge_finished));
-+		main_bat.pdata->disable_charger();
-+	}
-+
-+	return 0;
-+}
-+
-+static int s3c_adc_bat_resume(struct platform_device *pdev)
-+{
-+	struct s3c_adc_bat_pdata *pdata = pdev->dev.platform_data;
-+	if (device_may_wakeup(&pdev->dev))
-+		disable_irq_wake(gpio_to_irq(pdata->gpio_charge_finished));
++	/* Now run the tests for 8bit mode */
++	pr_info("Simple test 1: write 0xAA byte, read back garbage byte "
++		"in 8bit mode\n");
++	status = spi_w8r8(spi, 0xAA);
++	if (status < 0)
++		pr_warning("Siple test 1: FAILURE: spi_write_then_read "
++			   "failed with status %d\n", status);
 +	else
-+		enable_irq(gpio_to_irq(pdata->gpio_charge_finished));
++		pr_info("Simple test 1: SUCCESS!\n");
 +
-+	/* Schedule timer to check current status */
-+	schedule_delayed_work(&bat_work,
-+		msecs_to_jiffies(JITTER_DELAY));
++	pr_info("Simple test 2: write 8 bytes, read back 8 bytes garbage "
++		"in 8bit mode (full FIFO)\n");
++	status = spi_write_then_read(spi, &txbuf[0], 8, &rxbuf[0], 8);
++	if (status < 0)
++		pr_warning("Simple test 2: FAILURE: spi_write_then_read() "
++			   "failed with status %d\n", status);
++	else
++		pr_info("Simple test 2: SUCCESS!\n");
++
++	pr_info("Simple test 3: write 14 bytes, read back 14 bytes garbage "
++		"in 8bit mode (see if we overflow FIFO)\n");
++	status = spi_write_then_read(spi, &txbuf[0], 14, &rxbuf[0], 14);
++	if (status < 0)
++		pr_warning("Simple test 3: FAILURE: failed with status %d "
++			   "(probably FIFO overrun)\n", status);
++	else
++		pr_info("Simple test 3: SUCCESS!\n");
++
++	pr_info("Simple test 4: write 8 bytes with spi_write(), read 8 "
++		"bytes garbage with spi_read() in 8bit mode\n");
++	status = spi_write(spi, &txbuf[0], 8);
++	if (status < 0)
++		pr_warning("Simple test 4 step 1: FAILURE: spi_write() "
++			   "failed with status %d\n", status);
++	else
++		pr_info("Simple test 4 step 1: SUCCESS!\n");
++	status = spi_read(spi, &rxbuf[0], 8);
++	if (status < 0)
++		pr_warning("Simple test 4 step 2: FAILURE: spi_read() "
++			   "failed with status %d\n", status);
++	else
++		pr_info("Simple test 4 step 2: SUCCESS!\n");
++
++	pr_info("Simple test 5: write 14 bytes with spi_write(), read "
++		"14 bytes garbage with spi_read() in 8bit mode\n");
++	status = spi_write(spi, &txbuf[0], 14);
++	if (status < 0)
++		pr_warning("Simple test 5 step 1: FAILURE: spi_write() "
++			   "failed with status %d (probably FIFO overrun)\n",
++			   status);
++	else
++		pr_info("Simple test 5 step 1: SUCCESS!\n");
++	status = spi_read(spi, &rxbuf[0], 14);
++	if (status < 0)
++		pr_warning("Simple test 5 step 2: FAILURE: spi_read() "
++			   "failed with status %d (probably FIFO overrun)\n",
++			   status);
++	else
++		pr_info("Simple test 5: SUCCESS!\n");
++
++	pr_info("Simple test 6: write %d bytes with spi_write(), "
++		"read %d bytes garbage with spi_read() in 8bit mode\n",
++		DMA_TEST_SIZE, DMA_TEST_SIZE);
++	status = spi_write(spi, &bigtxbuf_virtual[0], DMA_TEST_SIZE);
++	if (status < 0)
++		pr_warning("Simple test 6 step 1: FAILURE: spi_write() "
++			   "failed with status %d (probably FIFO overrun)\n",
++			   status);
++	else
++		pr_info("Simple test 6 step 1: SUCCESS!\n");
++	status = spi_read(spi, &bigrxbuf_virtual[0], DMA_TEST_SIZE);
++	if (status < 0)
++		pr_warning("Simple test 6 step 2: FAILURE: spi_read() "
++			   "failed with status %d (probably FIFO overrun)\n",
++			   status);
++	else
++		pr_info("Simple test 6: SUCCESS!\n");
++
++
++	/*
++	 * Force chip to 16 bit mode
++	 * WARNING: NEVER DO THIS IN REAL DRIVER CODE, THIS SHOULD BE STATIC!
++	 */
++	chip_info->data_size = SSP_DATA_BITS_16;
++	/* You should NOT DO THIS EITHER */
++	spi->master->setup(spi);
++
++	pr_info("Simple test 7: write 0xAA byte, read back garbage byte "
++		"in 16bit bus mode\n");
++	status = spi_w8r8(spi, 0xAA);
++	if (status == -EIO)
++		pr_info("Simple test 7: SUCCESS! (expected failure with "
++			"status EIO)\n");
++	else if (status < 0)
++		pr_warning("Siple test 7: FAILURE: spi_write_then_read "
++			   "failed with status %d\n", status);
++	else
++		pr_warning("Siple test 7: FAILURE: spi_write_then_read "
++			   "succeeded but it was expected to fail!\n");
++
++	pr_info("Simple test 8: write 8 bytes, read back 8 bytes garbage "
++		"in 16bit mode (full FIFO)\n");
++	status = spi_write_then_read(spi, &txbuf[0], 8, &rxbuf[0], 8);
++	if (status < 0)
++		pr_warning("Simple test 8: FAILURE: spi_write_then_read() "
++			   "failed with status %d\n", status);
++	else
++		pr_info("Simple test 8: SUCCESS!\n");
++
++	pr_info("Simple test 9: write 14 bytes, read back 14 bytes garbage "
++		"in 16bit mode (see if we overflow FIFO)\n");
++	status = spi_write_then_read(spi, &txbuf[0], 14, &rxbuf[0], 14);
++	if (status < 0)
++		pr_warning("Simple test 9: FAILURE: failed with status %d "
++			   "(probably FIFO overrun)\n", status);
++	else
++		pr_info("Simple test 9: SUCCESS!\n");
++
++	pr_info("Simple test 10: write %d bytes with spi_write(), "
++	       "read %d bytes garbage with spi_read() in 16bit mode\n",
++	       DMA_TEST_SIZE, DMA_TEST_SIZE);
++	status = spi_write(spi, &bigtxbuf_virtual[0], DMA_TEST_SIZE);
++	if (status < 0)
++		pr_warning("Simple test 10 step 1: FAILURE: spi_write() "
++			   "failed with status %d (probably FIFO overrun)\n",
++			   status);
++	else
++		pr_info("Simple test 10 step 1: SUCCESS!\n");
++
++	status = spi_read(spi, &bigrxbuf_virtual[0], DMA_TEST_SIZE);
++	if (status < 0)
++		pr_warning("Simple test 10 step 2: FAILURE: spi_read() "
++			   "failed with status %d (probably FIFO overrun)\n",
++			   status);
++	else
++		pr_info("Simple test 10: SUCCESS!\n");
++
++	status = sprintf(buf, "loop test complete\n");
++	kfree(bigrxbuf_virtual);
++	kfree(bigtxbuf_virtual);
++ out:
++	mutex_unlock(&p_dummy->lock);
++	return status;
++}
++
++static DEVICE_ATTR(looptest, S_IRUGO, dummy_looptest, NULL);
++
++static int __devinit pl022_dummy_probe(struct spi_device *spi)
++{
++	struct dummy *p_dummy;
++	int status;
++
++	dev_info(&spi->dev, "probing dummy SPI device\n");
++
++	p_dummy = kzalloc(sizeof *p_dummy, GFP_KERNEL);
++	if (!p_dummy)
++		return -ENOMEM;
++
++	dev_set_drvdata(&spi->dev, p_dummy);
++	mutex_init(&p_dummy->lock);
++
++	/* sysfs hook */
++	status = device_create_file(&spi->dev, &dev_attr_looptest);
++	if (status) {
++		dev_dbg(&spi->dev, "device_create_file looptest failure.\n");
++		goto out_dev_create_looptest_failed;
++	}
++
++	return 0;
++
++out_dev_create_looptest_failed:
++	dev_set_drvdata(&spi->dev, NULL);
++	kfree(p_dummy);
++	return status;
++}
++
++static int __devexit pl022_dummy_remove(struct spi_device *spi)
++{
++	struct dummy *p_dummy = dev_get_drvdata(&spi->dev);
++
++	dev_info(&spi->dev, "removing dummy SPI device\n");
++	device_remove_file(&spi->dev, &dev_attr_looptest);
++	dev_set_drvdata(&spi->dev, NULL);
++	kfree(p_dummy);
 +
 +	return 0;
 +}
-+#else
-+#define s3c_adc_battery_suspend NULL
-+#define s3c_adc_battery_resume NULL
-+#endif
 +
-+static struct platform_driver s3c_adc_bat_driver = {
-+	.driver		= {
-+		.name	= "s3c-adc-battery",
++static struct spi_driver pl022_dummy_driver = {
++	.driver = {
++		.name	= "spi-dummy",
++		.owner	= THIS_MODULE,
 +	},
-+	.probe		= s3c_adc_bat_probe,
-+	.remove		= s3c_adc_bat_remove,
-+	.suspend	= s3c_adc_bat_suspend,
-+	.resume		= s3c_adc_bat_resume,
++	.probe	= pl022_dummy_probe,
++	.remove	= __devexit_p(pl022_dummy_remove),
 +};
 +
-+
-+static int __init s3c_adc_bat_init(void)
++static int __init pl022_init_dummy(void)
 +{
-+	return platform_driver_register(&s3c_adc_bat_driver);
++	return spi_register_driver(&pl022_dummy_driver);
 +}
 +
-+static void __exit s3c_adc_bat_exit(void)
++static void __exit pl022_exit_dummy(void)
 +{
-+	platform_driver_unregister(&s3c_adc_bat_driver);
++	spi_unregister_driver(&pl022_dummy_driver);
 +}
 +
-+module_init(s3c_adc_bat_init);
-+module_exit(s3c_adc_bat_exit);
++module_init(pl022_init_dummy);
++module_exit(pl022_exit_dummy);
 +
-+MODULE_AUTHOR("Vasily Khoruzhick <anarsoul@gmail.com>");
-+MODULE_DESCRIPTION("iPAQ H1930/H1940/RX1950 battery controler driver");
++MODULE_AUTHOR("Linus Walleij <linus.walleij@stericsson.com>");
++MODULE_DESCRIPTION("PL022 SSP/SPI DUMMY Linux driver");
 +MODULE_LICENSE("GPL");
-diff --git a/include/linux/s3c_adc_battery.h b/include/linux/s3c_adc_battery.h
-new file mode 100644
-index 0000000..624d29a
---- /dev/null
-+++ b/include/linux/s3c_adc_battery.h
-@@ -0,0 +1,36 @@
-+#ifndef _S3C_ADC_BATTERY_H
-+#define _S3C_ADC_BATTERY_H
-+
-+struct s3c_adc_bat_thresh {
-+	int volt; /* mV */
-+	int cur; /* mA */
-+	int level; /* percent */
-+};
-+
-+struct s3c_adc_bat_pdata {
-+	int (*init)(void);
-+	void (*exit)(void);
-+	void (*enable_charger)(void);
-+	void (*disable_charger)(void);
-+
-+	unsigned int gpio_charge_finished;
-+
-+	const struct s3c_adc_bat_thresh *lut_noac;
-+	unsigned int lut_noac_cnt;
-+	const struct s3c_adc_bat_thresh *lut_acin;
-+	unsigned int lut_acin_cnt;
-+
-+	const unsigned int volt_channel;
-+	const unsigned int current_channel;
-+	const unsigned int backup_volt_channel;
-+
-+	const unsigned int volt_mult;
-+	const unsigned int current_mult;
-+	const unsigned int backup_volt_mult;
-+	const unsigned int internal_impedance;
-+
-+	const unsigned int backup_volt_max;
-+	const unsigned int backup_volt_min;
-+};
-+
-+#endif
 -- 
 1.7.1
