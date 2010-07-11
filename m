@@ -1,31 +1,27 @@
-From: lukas@htc-linux.org (lukas gorris)
-Date: Sun, 11 Jul 2010 15:11:42 +0100
-Subject: machine-registry: htckovsky(2006)
-Message-ID: <20100711151142.qo27dka4gwsgs0o0@webmail.htc-linux.org>
+From: geomatsi@gmail.com (Sergey Matyukevich)
+Date: Sun, 11 Jul 2010 21:05:58 +0400
+Subject: SAM9-L9260: TXD1 is not working on AT91SAM9260
+In-Reply-To: <4C381CCF.2050305@gmail.com>
+References: <4C381CCF.2050305@gmail.com>
+Message-ID: <20100711210558.75ce662f@realm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hello Stefan,
 
-Sat, 29 Nov 2008 20:43:04 GMT I added Sony Ericsson Xperia X1 machine
-at http://www.arm.linux.org.uk/developer/machines/list.php?id=2006
+> In my board file (arch/arm/mach-at91/board-sam9-l9260.c) I added the
+> following line to ek_map_io(), to register USART1 as ttyS2:
+> 
+> -----------------------------------------------------------------------
+> at91_register_uart(AT91SAM9260_ID_US1, 2, 0);
+> -----------------------------------------------------------------------
 
-At that point I didn't know official HTC codename (the one that's in
-the machine's bootloader- which we always use with htc prefixed) is
-kovsky rather than venus.
+You modify here default configuration which is 
+	at91_register_uart(AT91SAM9260_ID_US1, 2, 
+		ATMEL_UART_CTS | ATMEL_UART_RTS);
 
-Can somebody please convert
+Do you turn off hardware handshake when you configure 
+your test setup for ttyS2 ?
 
-CONFIG_MACH_HTCVENUS
-MACH_TYPE_HTCVENUS
-
-into
-
-CONFIG_MACH_HTCKOVSKY
-MACH_TYPE_HTCKOVSKY
-
-I am sorry for the inconvenience.
-
-Thanks
-
-Lukas
+Thanks,
+Sergey
