@@ -1,45 +1,81 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 31 Jul 2010 23:07:06 +0200
-Subject: [PATCH] PXA: Fix wakealarm capability for pxa-rtc
-In-Reply-To: <201007312215.45771.marek.vasut@gmail.com> (Marek Vasut's message
-	of "Sat\, 31 Jul 2010 22\:15\:45 +0200")
-References: <1280550147-12380-1-git-send-email-marek.vasut@gmail.com>
-	<87k4ob1x29.fsf@free.fr> <201007312215.45771.marek.vasut@gmail.com>
-Message-ID: <87mxt7z7gl.fsf@free.fr>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sun, 11 Jul 2010 14:35:37 +0530
+Subject: [PATCH 6/8 v2] ARM: l2x0: Determine the cache size
+Message-ID: <mailman.3.1286341987.18775.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Vasut <marek.vasut@gmail.com> writes:
+The cache size is needed for to optimise range based
+maintainance operations
 
-> Dne So 31. ?ervence 2010 17:38:06 Robert Jarzmik napsal(a):
->> Marek Vasut <marek.vasut@gmail.com> writes:
->> > The wakealarm capability was incorrectly set after the RTC was
->> > registered, which resulted into the sysfs node not being created.
->> 
->> On my platform, without this patch:
->> > cat /sys/devices/platform/pxa-rtc/power/wakeup
->> > enabled
->> 
->> The sysfs node is created. What's the issue you're having ?
->
-> It's not created for me without this patch (and if you read the code, it is 
-> impossible to be created without this patch).
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/include/asm/hardware/cache-l2x0.h |    1 +
+ arch/arm/mm/cache-l2x0.c                   |   13 +++++++++++--
+ 2 files changed, 12 insertions(+), 2 deletions(-)
 
-I read the code, and I see:
-rtc_device_register()
-  -> device_register()
-    -> device_initialize()
-      -> device_init_wakeup(dev, 0)
-
-So with or without your patch, device_init_wakeup() is called. The difference is
-that with your patch, we end up with a disabled wakeup capability.
-I showed the code sequence, your turn to show your "if you read the code".
-
-Moreover, my platform without your patch prooves that the sysfs entry is created.
-
-So unless you prove me wrong, I will reject the patch.
-
-Cheers.
-
--- 
-Robert
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/=
+asm/hardware/cache-l2x0.h
+index d833355..4633d2a 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -55,6 +55,7 @@
+ #define L2X0_CACHE_ID_PART_MASK		(0xf << 6)
+ #define L2X0_CACHE_ID_PART_L210		(1 << 6)
+ #define L2X0_CACHE_ID_PART_L310		(3 << 6)
++#define L2X0_AUX_CTRL_WAY_SIZE_MASK	(0x3 << 17)
+=20
+ #ifndef __ASSEMBLY__
+ extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_=
+mask);
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 9310d61..262c752 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -28,6 +28,7 @@
+ static void __iomem *l2x0_base;
+ static DEFINE_SPINLOCK(l2x0_lock);
+ static uint32_t l2x0_way_mask;	/* Bitmask of active ways */
++static uint32_t l2x0_size;
+=20
+ static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
+ {
+@@ -242,6 +243,7 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val=
+, __u32 aux_mask)
+ {
+ 	__u32 aux;
+ 	__u32 cache_id;
++	__u32 way_size =3D 0;
+ 	int ways;
+ 	const char *type;
+=20
+@@ -276,6 +278,13 @@ void __init l2x0_init(void __iomem *base, __u32 aux_va=
+l, __u32 aux_mask)
+ 	l2x0_way_mask =3D (1 << ways) - 1;
+=20
+ 	/*
++	 * L2 cache Size =3D  Way size * Number of ways
++	 */
++	way_size =3D (aux & L2X0_AUX_CTRL_WAY_SIZE_MASK) >> 17;
++	way_size =3D 1 << (way_size + 3);
++	l2x0_size =3D ways * way_size * SZ_1K;
++
++	/*
+ 	 * Check if l2x0 controller is already enabled.
+ 	 * If you are booting from non-secure mode
+ 	 * accessing the below registers will fault.
+@@ -300,6 +309,6 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val=
+, __u32 aux_mask)
+ 	outer_cache.disable =3D l2x0_disable;
+=20
+ 	printk(KERN_INFO "%s cache controller enabled\n", type);
+-	printk(KERN_INFO "l2x0: %d ways, CACHE_ID 0x%08x, AUX_CTRL 0x%08x\n",
+-			 ways, cache_id, aux);
++	printk(KERN_INFO "l2x0: %d ways, CACHE_ID 0x%08x, AUX_CTRL 0x%08x, Cache =
+size: %d B\n",
++			ways, cache_id, aux, l2x0_size);
+ }
+--=20
+1.6.0.4
