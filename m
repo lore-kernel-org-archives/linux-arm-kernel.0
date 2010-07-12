@@ -1,27 +1,42 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 12 Jul 2010 08:33:19 -0400 (EDT)
-Subject: [RFC PATCH 1/2] allow each machine to specify it's own IRQ
-	handlers at run-time
-In-Reply-To: <20100712081245.GC22138@n2100.arm.linux.org.uk>
-References: <AANLkTin9OHUGtKSg7554ucVhufQ3PiKXALmD0Lh7A-yt@mail.gmail.com>
-	<20100712081106.GB1532@pengutronix.de>
-	<20100712081245.GC22138@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1007120832170.10598@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Jul 2010 13:42:25 +0100
+Subject: About SECTION_SIZE_BITS for Sparsemem
+In-Reply-To: <20100712122816.GA1889@barrios-desktop>
+References: <000601cb219c$c7830b60$56892220$%kim@samsung.com>
+	<AANLkTinTrt7VKuKvleiJj4lv2tWqCcDYHVXAQIHLA7bh@mail.gmail.com>
+	<20100712104541.GA6577@n2100.arm.linux.org.uk>
+	<20100712122816.GA1889@barrios-desktop>
+Message-ID: <20100712124225.GB6577@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Jul 2010, Russell King - ARM Linux wrote:
+On Mon, Jul 12, 2010 at 09:28:16PM +0900, Minchan Kim wrote:
+> It just checks that there is a section and section_mem_map has SECTION_HAS_MEM_MAP.
+> The first section in above case has just 80M memory but section has 256M. 
+> So, 0x25000000 - 28000000 is the hole. If you pass pfn whihc is 0x2500000,
+> let's see pfn_valid.
 
-> On Mon, Jul 12, 2010 at 10:11:06AM +0200, Uwe Kleine-K?nig wrote:
-> > I didn't thought it would be that easy.  Nice.
-> > Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+That's not a hole as such.  It's an incompletely filled section, which is
+precisely what sparsemem is all about.
+
+> 1. We pass pfn_to_section_nr check 
+> 2. Both __nr_to_section and valid_section is vaild.
 > 
-> It isn't - if you enable this, your platform will break because
-> there's no implementations of it.  That makes this patch rather
-> hard to ack on its own.
+> static inline int pfn_valid(unsigned long pfn) 
+> {
+>         if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
+>                 return 0;
+>         return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
+> }
+> 
+> 
+> What prevent above hole's case?
 
-I think Eric posted additional patches to enable this on PXA in his 
-series.
+That looks too loose to be useful - that means invalid page table entries
+can pass the pfn_valid() test when they should actually fail, and I'd
+imagine there will be many more such problems like that.
 
+> I think at least pfn_valid in sparsemem need bank range check like pfn_valid of ARM 
+> in FLATMEM.
 
-Nicolas
+I agree - pfn_valid() on sparsemem needs to be tightened.
