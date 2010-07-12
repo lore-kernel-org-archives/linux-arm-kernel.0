@@ -1,110 +1,177 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 12 Jul 2010 11:38:26 +0900
-Subject: [PATCH v5] libata: pata_samsung: Add Samsung PATA controller
-	driver
-In-Reply-To: <4C399D8B.2050700@ru.mvista.com>
-References: <1277809518-1122-1-git-send-email-kgene.kim@samsung.com>
-	<4C399D8B.2050700@ru.mvista.com>
-Message-ID: <038a01cb216b$50d143a0$f273cae0$%kim@samsung.com>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Mon, 12 Jul 2010 11:56:08 +0900
+Subject: [PATCH] ARM: S5PV210: add clocks (struct clk).
+In-Reply-To: <038901cb216a$77f78030$67e68090$%kim@samsung.com>
+References: <1278395327-9072-1-git-send-email-myungjoo.ham@samsung.com>
+	<023a01cb1f0f$90a5da30$b1f18e90$%kim@samsung.com>
+	<AANLkTimCd5cDOZI1ylQEble1RQT6mYypTV9laizbNO2h@mail.gmail.com>
+	<AANLkTinAKps803FT_XiiBKqBRv0UNo4RYnpv8EPSn9-C@mail.gmail.com>
+	<038901cb216a$77f78030$67e68090$%kim@samsung.com>
+Message-ID: <AANLkTik-4PhFkUpzgssqlIkpYXeTOlI9OZjXLYlIQwKI@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei Shtylyov wrote:
-> 
-> Hello.
+Hello.
 
-Hi ;-)
-> 
-> Kukjin Kim wrote:
-> 
-> > From: Abhilash Kesavan <a.kesavan@samsung.com>
-> 
-> > Adds support for the Samsung PATA controller. This driver is based on
-the
-> > Libata subsystem and references the earlier patches sent for IDE
-subsystem.
-> 
-> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > Cc: Ben Dooks <ben-linux@fluff.org>
-> 
->     Looks like there's issues still...
-> 
-Ok...thanks for your review.
+On Mon, Jul 12, 2010 at 11:32 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> MyungJoo Ham wrote:
+>>
+>> Hello, again.
+>>
+> Hi :-)
+>
+>> On Fri, Jul 9, 2010 at 11:59 AM, MyungJoo Ham <myungjoo.ham@samsung.com>
+>> wrote:
+>> > Hello,
+>> >
+>> > On Fri, Jul 9, 2010 at 11:36 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> >> MyungJoo Ham wrote:
+>> >>>
+>> >> Hi,
+>> >>
+>> >> Please include Ben Dooks in the Cc..
+>> >> And...excuse me..who is benh at kernel.crashing.org?
+>> >
+>> > Ah.. I was confused by my own reply regarding common struct clk, which
+>> > had benh at kernel.crashing.org as Cc. I'll update the CC setting.
+>> >
+>> >>
+>> >>> Many clocks were not listed in the previous
+>> >>> arch/arm/mach-s5pv210/clock.c
+>> >>>
+>> >>> We have added clocks defined as CLK_GATE_IPx[] in the user manual of
+>> >>> S5PV210. However, the clocks that were not turned on at the boot time
+>> >>> when tested with the previous kernel versions (2.6.32, 2.6.29) are
+>> >>> defined in "init_clocks_disabled" so that they are turned off at the
+>> >>> boot time.
+>> >>
+>> >> I think, no need to register all of clocks which are in the CLK_GATE_IPx
+>> >> into 'init_clocks_disabled'..because it depends on each platform or project.
+>> >>
+>> >>>
+>> >>> The clocks added from CLK_GATE_IPx are:
+>> >>> ? ? ? CSIS, JPEG, FIMC0 - 2, NFCON, SROMC, TVENC, HDMI, MIXER, VP,
+>> >>> ? ? ? DSIM, TSI, HOSTIF, MODEM, PCM0 - 2, I2C-HDMI-PHY, I2C-HDMI-DDC,
+>> >>> ? ? ? AC97, SPDIF, SECKEY, IEM-APC, IEM-IEC, CHIP-ID, PDMA0 - 1,
+>> >>> ? ? ? MDMA, DMC0 - 1, NANDXL, TZIC0 - 3, VIC0 - 3, SECJTAG,
+>> CORESIGHT,
+>> >>> ? ? ? SDM, SECSS, SYSCON, GPIO, TZPC0 - 3
+>> >>>
+>> >>
+>> >> For example...in the case of JPEG, FIMC, disabling is better at the booting
+>> >> time..because can be enabled dynamically in the device driver when it is
+>> >> used.
+>> >> But if CORESIGHT which does not having own driver is disabled at that time,
+>> >> basically can't use JTAG debugger.
+>> >>
+>> >> So need to sort out clocks to register into 'init_clocks_disabled'
+>> >>
+>> >
+>> > Yes, I agree. I'll put some clocks including CORESIGHT out of
+>> > init_clocks_disabled.
+>> >
+>>
+>> Oh.. well, CORESIGHT is not included in init_clocks_disabled in the patch.
+>>
+>> In this patch, PDMA, MDMA, DMC, NANDXL, TZIC, VIC, SECJTAG, CORESIGHT,
+>> SDM, SECSS, SYSCON, GPIO, and TZPC are not added to
+>> init_clocks_disabled, but to init_clocks.
+>>
+>> Only others including CSIS, JPEG, FIMC0 - 2, NFCON, SROMC, TVENC,
+>> HDMI, MIXER, VP, DSIM, TSI, HOSTIF, MODEM, PCM0 - 2, I2C-HDMI-PHY,
+>> I2C-HDMI-DDC, AC97, SPDIF, SECKEY, IEM-APC, IEM-IEC, and CHIP-ID are
+>> added to init_clocks_disabled. In this list, are there any clocks that
+>> should be out of init_clocks_disabled?
+>>
+> Hmm..SROMC should be in 'init_clocks'...because eg., generally network which connected SROM bank, driver doesn't have clock enable code...
+> And others, looks ok...but frankly, need to check again ;-)
 
-> [...]
-> 
-> > diff --git a/drivers/ata/pata_samsung_cf.c
-b/drivers/ata/pata_samsung_cf.c
-> > new file mode 100644
-> > index 0000000..26b96c3
-> > --- /dev/null
-> > +++ b/drivers/ata/pata_samsung_cf.c
-> > @@ -0,0 +1,728 @@
-> > +/*
-> > + * pata_s3c_tf_load - send taskfile registers to host controller
-> > + */
-> > +static void pata_s3c_tf_load(struct ata_port *ap,
-> > +				const struct ata_taskfile *tf)
-> > +{
-> > +	struct ata_ioports *ioaddr = &ap->ioaddr;
-> > +	unsigned int is_addr = tf->flags & ATA_TFLAG_ISADDR;
-> > +
-> > +	if (tf->ctl != ap->last_ctl) {
-> > +		ata_outb(ap->host, tf->ctl, ioaddr->ctl_addr);
-> > +		ap->last_ctl = tf->ctl;
-> > +		ata_wait_idle(ap);
-> > +	}
-> > +
-> 
-> [...]
-> 
-> > +/*
-> > + * pata_s3c_tf_read - input device's ATA taskfile shadow registers
-> > + */
-> > +static void pata_s3c_tf_read(struct ata_port *ap, struct ata_taskfile
-*tf)
-> > +{
-> > +	struct ata_ioports *ioaddr = &ap->ioaddr;
-> > +
-> > +	tf->feature = ata_inb(ap->host, ioaddr->error_addr);
-> > +	tf->nsect = ata_inb(ap->host, ioaddr->nsect_addr);
-> > +	tf->lbal = ata_inb(ap->host, ioaddr->lbal_addr);
-> > +	tf->lbam = ata_inb(ap->host, ioaddr->lbam_addr);
-> > +	tf->lbah = ata_inb(ap->host, ioaddr->lbah_addr);
-> > +	tf->device = ata_inb(ap->host, ioaddr->device_addr);
-> > +
-> > +	if (tf->flags & ATA_TFLAG_LBA48) {
-> > +		iowrite8(tf->ctl | ATA_HOB, ioaddr->ctl_addr);
-> > +		tf->hob_feature = ata_inb(ap->host, ioaddr->error_addr);
-> > +		tf->hob_nsect = ata_inb(ap->host, ioaddr->nsect_addr);
-> > +		tf->hob_lbal = ata_inb(ap->host, ioaddr->lbal_addr);
-> > +		tf->hob_lbam = ata_inb(ap->host, ioaddr->lbam_addr);
-> > +		tf->hob_lbah = ata_inb(ap->host, ioaddr->lbah_addr);
-> > +		iowrite8(tf->ctl, ioaddr->ctl_addr);
-> 
->     I don't understand why you're using ata_outb() to awrite to the device
-> control register in tf_load() method but use iowrite8() here...
-> 
-Oh, I missed these two calls..will replace with ata_outb().
+Fine.
 
-> > +#ifdef CONFIG_PM
-> > +static int pata_s3c_suspend(struct device *dev)
-> > +{
-> > +	struct platform_device *pdev = to_platform_device(dev);
-> > +	struct ata_host *host = platform_get_drvdata(pdev);
-> > +	pm_message_t state = PMSG_SUSPEND;
-> 
->     Don't see why this variable is needed...
-> 
-Ok..will directly use PMSG_SUSPEND.
+Anyway, I'm planning to include the initial states of clocks in struct clk.
 
-Will re-submit soon.
+That is, adding "unsigned int flag", which include "BOOT_ON", "BOOT",
+and "CANNOT_DISABLE", and let s3c_register_clock function do the
+operation accordingly.
 
-Thanks.
+This will merge init_clocks_disable and init_clocks and allow us more
+control over clocks.Besides, it makes it easier to support powerdomain
+and block-gating control. Note that if a powerdomain is controlled
+with only reference counter, it may turn off a powerdomain with a
+clock actually enabled (by the bootloader or by the process default)
+but not ever "clk_enable"'d. Adding such information explicitly with
+such flags can help.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+I will send patches of clock-powerdomain support and clock-flag support soon.
+
+
+>
+>> >
+>> > Anyway, I've been considering adding "flag" to struct clk, which has
+>> > the following bits:
+>> >
+>> > #define CLKFLAGS_BOOT_ON ? ? ? ?(0x1)
+>> > #define CLKFLAGS_CANNOT_DISABLE (0x2)
+>> > #define CLKFLAGS_ALWAYS_ON ? ? ?(CLKFLAGS_BOOT_ON |
+>> CLKFLAGS_CANNOT_DISABLE)
+>> > #define CLKFLAGS_BOOT_OFF ? ? ? (0x4) /* Force off when boot */
+>> > #define CLKFLAGS_DEPRECATED ? ? (0x8) /* Warn when clk_get'd */
+>> > /* Note that CLKFLAGS_BOOT_ON and CLKFLAGS_CANNOT_DISABLE
+>> overrides
+>> > ?* CLKFLAGS_BOOT_OFF */
+>> >
+>> > and merging init_clocks and init_clocks_disabled. This provides more
+>> > precise control on clocks, and we've been using such features in other
+>> > versions of the kernel. Besides, combined with
+>> > powerdomain control, these flags are helpful on implementing
+>> > powerdomain/block-gating control.
+>> >
+>> >
+>> >>> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+>> >>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> >>> ---
+>> >>> ?arch/arm/mach-s5pv210/clock.c | ?298
+>> >>> ++++++++++++++++++++++++++++++++++++++++-
+>> >>> ?1 files changed, 297 insertions(+), 1 deletions(-)
+>> >>>
+>> >>> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+>> >>> index b3d156c..aa2b1c5 100644
+>> >>> --- a/arch/arm/mach-s5pv210/clock.c
+>> >>> +++ b/arch/arm/mach-s5pv210/clock.c
+>> >>
+>> >> (snip)
+>> >>
+>> >> Thanks.
+>> >>
+>> >> Best regards,
+>> >> Kgene.
+>> >> --
+>> >> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+>> >> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>> >>
+>> >>
+>
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+
+
+
+-- 
+MyungJoo Ham (???), Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
