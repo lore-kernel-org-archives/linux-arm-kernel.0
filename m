@@ -1,98 +1,48 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 12 Jul 2010 13:04:09 +0200
-Subject: [PATCH 3/3] sdhci-s3c: add support for new card detection methods
-In-Reply-To: <20100709142440.3ce31714.akpm@linux-foundation.org>
-References: <1276670996-17729-1-git-send-email-m.szyprowski@samsung.com>
-	<1276670996-17729-4-git-send-email-m.szyprowski@samsung.com>
-	<20100709142440.3ce31714.akpm@linux-foundation.org>
-Message-ID: <000101cb21b1$f9accad0$ed066070$%szyprowski@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Jul 2010 13:39:48 +0200
+Subject: [PATCH v2 1/3] ARM: Introduce *_relaxed() I/O accessors
+In-Reply-To: <1278714714.30012.14.camel@e102109-lin.cambridge.arm.com>
+References: <20100709110350.11333.34303.stgit@e102109-lin.cambridge.arm.com>
+	<201007092130.17504.arnd@arndb.de>
+	<1278714714.30012.14.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <201007121339.48719.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Friday, July 09, 2010 11:25 PM Andrew Morton wrote:
-
-On Wed, 16 Jun 2010 08:49:56 +0200
-> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+On Saturday 10 July 2010, Catalin Marinas wrote:
+> > Right. IMHO the PCI IO variants should get the same barriers that
+> > Catalin is introducing in the PCI MEM variants. The ordering requirements
+> > for IO accesses are stricter than those for MEM, the main difference
+> > being that MEM writes are posted while IO writes are synchronizing.
 > 
-> > On some Samsung SoCs not all SDHCI controllers have card detect (CD)
-> > line. For some embedded designs it is not even needed, because ususally
-> > the device (like SDIO flash memory or wifi controller) is permanently
-> > wired to the controller. There are also systems which have a card detect
-> > line connected to some of the external interrupt lines or the presence
-> > of the card depends on some other actions (like enabling a power
-> > regulator).
-> >
-> > This patch adds support for all these cases. The following card
-> > detection methods are possible:
-> >
-> > 1. internal sdhci host card detect line
-> > 2. external event
-> > 3. external gpio interrupt
-> > 4. no card detect line, controller will poll for the card
-> > 5. no card detect line, card is permanently wired to the controller
-> > (once detected host won't poll it any more)
-> >
-> > By default, all existing code would use method #1, what is compatible
-> > with the previous version of the driver.
-> >
-> > In case of external event, two callbacks must be provided in platdata:
-> > ext_cd_init and ext_cd_cleanup. Both of them get a callback to a
-> > function that notifies the s3c-sdhci host contoller as their argument.
-> > That callback function should be called from the even dispatcher to let
-> > host notice the card insertion/removal.
-> >
-> > In case of external gpio interrupt, a gpio pin number must be provided
-> > in platdata (ext_cd_gpio parameter), as well as the information about
-> > the polarity of that gpio pin (ext_cd_gpio_invert). By default
-> > (ext_cd_gpio_invert == 0) gpio value 0 means 'card has been removed',
-> > but this can be changed to 'card has been removed' when
-> > ext_cd_gpio_invert == 1.
-> >
-> > This patch adds changes to sdhci-s3c driver.
-> >
-> > ...
-> >
-> > +static void sdhci_s3c_notify_change(struct platform_device *dev, int
-> state)
-> > +{
-> > +	struct sdhci_host *host;
-> > +	unsigned long flags;
-> > +
-> > +	local_irq_save(flags);
-> > +	host = platform_get_drvdata(dev);
-> > +	if (host) {
-> > +		if (state) {
-> > +			dev_dbg(&dev->dev, "card inserted.\n");
-> > +			host->flags &= ~SDHCI_DEVICE_DEAD;
-> > +			host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
-> > +			tasklet_schedule(&host->card_tasklet);
-> > +		} else {
-> > +			dev_dbg(&dev->dev, "card removed.\n");
-> > +			host->flags |= SDHCI_DEVICE_DEAD;
-> > +			host->quirks &= ~SDHCI_QUIRK_BROKEN_CARD_DETECTION;
-> > +			tasklet_schedule(&host->card_tasklet);
-> > +		}
-> > +	}
-> > +	local_irq_restore(flags);
-> > +}
-> 
-> What's the local_irq_save() there for?
-> 
-> Presumably it is for local-cpu-only protection of some data.  But which
-> data is it there to protect?
-> 
-> It doesn't provide protection on SMP systems and if I'm guessing
-> correctly about why it was added, it would be much better to use
-> spin_lock_irq[save]() here.  That sets a better example, it means the
-> code has a hope of working correctly on SMP systems and will devolve to
-> local_irq_save() on UP kernels anyway.
+> Linux docs don't clearly define the ordering requirements. There are
+> various e-mail threads but not a finalised document. In principle,
+> trying to be as close to x86 as possible, in which case we probably need
+> barriers here as well.
 
-Ok. I will change local_irq_save to spin_lock_irqsave. Thanks for spotting
-this!
+Right, emulating x86 behaviour for any PCI access with inl/readl/ioread32
+and their counterparts seems to be the only practical answer.
+It would be nice to have an architecture independent way of doing non-PCI
+register access, and more importantly relaxed accesses to those.
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Note that no other architecture currently defines write*_relaxed(), only
+read*_relaxed(). Maybe we should add them everywhere, not just on ARM.
+
+> > Thinking about it from this angle, I'm not even sure that x86 compatibility
+> > requires arm to add wmb() after writel(). IIRC, PCI memory space writes are
+> > required to be ordered with regard to each other, but not necessarily
+> > with regard to other CPU instructions or DMA transfers, unlike memory
+> > space reads and IO space read/write accesses.
+> 
+> We don't need a wmb() after writel(), my patch only adds wmb() before
+> writel(). We need previous DMA buffer writes to be visible before
+> writel(), otherwise we get corrupted DMA transfers.
+
+Ah, that's right: writel and outl both need the barrier before the access,
+but writel will never need a barrier after the access.
+The x86 variant of outl also has the implicit ordering after the access,
+but I'm not sure if we need to emulate that. I can't currently think
+of a case where it's strictly required because any later access to the same
+PCI function will be ordered anyway.
+
+	Arnd
