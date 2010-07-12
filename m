@@ -1,119 +1,43 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 12 Jul 2010 10:00:51 +0200
-Subject: [PATCH 1/2] ARM: move SPEAr to use common mult/shift calculation
-	code
-In-Reply-To: <1275067996-17233-1-git-send-email-linus.walleij@stericsson.com>
-References: <1275067996-17233-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <AANLkTimo6TUs2YS-GpbiasI3mhatlPVXKq7UonJCicnv@mail.gmail.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Mon, 12 Jul 2010 16:05:35 +0800
+Subject: [RFC,PATCH 0/2] Allow late mdesc detection
+In-Reply-To: <alpine.LFD.2.00.1007112334390.10598@xanadu.home>
+References: <1278903792.387175.713057245098.0.gpush@pororo>
+	<alpine.LFD.2.00.1007112334390.10598@xanadu.home>
+Message-ID: <1278921935.9235.90.camel@pororo.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping on this patch, if it looks OK then please ACK it.
+Hi Nicolas,
 
-Yours,
-Linus Walleij
+> The fundamental problem with those patches is that we actually want to 
+> move in the opposite direction for the eventual support of multiple SOCs 
+> in the same kernel, i.e. rely on the machine ID -> mdesc to determine 
+> the right debug addresses at run time and eventually make the addruart 
+> into something that is not hardcoded at compile time.
 
-2010/5/28 Linus Walleij <linus.walleij@stericsson.com>:
-> Since the infrastructure for determining shift/mult values from a
-> clock rate and a minimum programmable rate is now in the kernel,
-> lets remove this custom code.
->
-> Cc: Viresh KUMAR <viresh.kumar@st.com>
-> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-> ---
-> Viresh: I cannot test this change, but I have compiled it against
-> spear600_defconfig. You'd have to test it and Acked-by: it before
-> I do anything else with it. Try to think about what a minimum range
-> would be for the generic SPEAr platform...
-> ---
-> ?arch/arm/plat-spear/time.c | ? 47 ++++++-------------------------------------
-> ?1 files changed, 7 insertions(+), 40 deletions(-)
->
-> diff --git a/arch/arm/plat-spear/time.c b/arch/arm/plat-spear/time.c
-> index a1025d3..ab21165 100644
-> --- a/arch/arm/plat-spear/time.c
-> +++ b/arch/arm/plat-spear/time.c
-> @@ -58,6 +58,11 @@
->
-> ?#define INT_STATUS ? ? ? ? ? ? 0x1
->
-> +/*
-> + * Minimum clocksource/clockevent timer range in seconds
-> + */
-> +#define SPEAR_MIN_RANGE 4
-> +
-> ?static __iomem void *gpt_base;
-> ?static struct clk *gpt_clk;
->
-> @@ -66,44 +71,6 @@ static void clockevent_set_mode(enum clock_event_mode mode,
-> ?static int clockevent_next_event(unsigned long evt,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct clock_event_device *clk_event_dev);
->
-> -/*
-> - * Following clocksource_set_clock and clockevent_set_clock picked
-> - * from arch/mips/kernel/time.c
-> - */
-> -
-> -void __init clocksource_set_clock(struct clocksource *cs, unsigned int clock)
-> -{
-> - ? ? ? u64 temp;
-> - ? ? ? u32 shift;
-> -
-> - ? ? ? /* Find a shift value */
-> - ? ? ? for (shift = 32; shift > 0; shift--) {
-> - ? ? ? ? ? ? ? temp = (u64) NSEC_PER_SEC << shift;
-> - ? ? ? ? ? ? ? do_div(temp, clock);
-> - ? ? ? ? ? ? ? if ((temp >> 32) == 0)
-> - ? ? ? ? ? ? ? ? ? ? ? break;
-> - ? ? ? }
-> - ? ? ? cs->shift = shift;
-> - ? ? ? cs->mult = (u32) temp;
-> -}
-> -
-> -void __init clockevent_set_clock(struct clock_event_device *cd,
-> - ? ? ? unsigned int clock)
-> -{
-> - ? ? ? u64 temp;
-> - ? ? ? u32 shift;
-> -
-> - ? ? ? /* Find a shift value */
-> - ? ? ? for (shift = 32; shift > 0; shift--) {
-> - ? ? ? ? ? ? ? temp = (u64) clock << shift;
-> - ? ? ? ? ? ? ? do_div(temp, NSEC_PER_SEC);
-> - ? ? ? ? ? ? ? if ((temp >> 32) == 0)
-> - ? ? ? ? ? ? ? ? ? ? ? break;
-> - ? ? ? }
-> - ? ? ? cd->shift = shift;
-> - ? ? ? cd->mult = (u32) temp;
-> -}
-> -
-> ?static cycle_t clocksource_read_cycles(struct clocksource *cs)
-> ?{
-> ? ? ? ?return (cycle_t) readw(gpt_base + COUNT(CLKSRC));
-> @@ -138,7 +105,7 @@ static void spear_clocksource_init(void)
-> ? ? ? ?val |= CTRL_ENABLE ;
-> ? ? ? ?writew(val, gpt_base + CR(CLKSRC));
->
-> - ? ? ? clocksource_set_clock(&clksrc, tick_rate);
-> + ? ? ? clocksource_calc_mult_shift(&clksrc, tick_rate, SPEAR_MIN_RANGE);
->
-> ? ? ? ?/* register the clocksource */
-> ? ? ? ?clocksource_register(&clksrc);
-> @@ -233,7 +200,7 @@ static void __init spear_clockevent_init(void)
-> ? ? ? ?tick_rate = clk_get_rate(gpt_clk);
-> ? ? ? ?tick_rate >>= CTRL_PRESCALER16;
->
-> - ? ? ? clockevent_set_clock(&clkevt, tick_rate);
-> + ? ? ? clockevents_calc_mult_shift(&clkevt, tick_rate, SPEAR_MIN_RANGE);
->
-> ? ? ? ?clkevt.max_delta_ns = clockevent_delta2ns(0xfff0,
-> ? ? ? ? ? ? ? ? ? ? ? ?&clkevt);
-> --
-> 1.6.3.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Sure, I think that's where we're going in general, but I think the debug
+stuff is an exception - we want that up as early as possible, and with
+as few dependencies on other bits of code as possible.
+
+At present we can only ever select one implementation of addruart in a
+kernel build, so we just can't have a multiplatform kernel with debug
+support. We *could* add other trickery to select a debug implementation
+at runtime, but I think adding complexity to the debug path is a bad
+idea.
+
+I think allowing a hard-coded debug system is fine; it can be enabled
+when we're debugging a specific problem, and removed to enable the true
+multiplatform support. This is also what is done on powerpc - you can
+select a "udbg" output method suitable for your platform at compile
+time, but this doesn't affect the other parts of the kernel.
+
+I also think it's good to only specify the debug parameters in one place
+(addruart), rather than have to provide them in adduart *and* the mdesc.
+
+Thoughts?
+
+Cheers,
+
+
+Jeremy
