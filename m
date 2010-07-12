@@ -1,46 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Jul 2010 14:52:59 +0100
-Subject: [RFC,PATCH 2/2] arm: use addruart macro to establish debug
-	mappings
-In-Reply-To: <1278903792.388155.428219242752.2.gpush@pororo>
-References: <1278903792.387175.713057245098.0.gpush@pororo>
-	<1278903792.388155.428219242752.2.gpush@pororo>
-Message-ID: <20100712135259.GC6577@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 12 Jul 2010 17:55:18 +0200
+Subject: ARM defconfig files
+In-Reply-To: <20100630104043.GG11746@pengutronix.de>
+References: <20100603074548.GA12104@flint.arm.linux.org.uk>
+	<alpine.LFD.2.00.1006030725420.8175@i5.linux-foundation.org>
+	<20100603181010.GA25779@flint.arm.linux.org.uk>
+	<1275589230.23384.19.camel@c-dwalke-linux.qualcomm.com>
+	<alpine.LFD.2.00.1006031119440.8175@i5.linux-foundation.org>
+	<20100614083214.GA2104@pengutronix.de>
+	<20100630104043.GG11746@pengutronix.de>
+Message-ID: <20100712155518.GA24144@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 12, 2010 at 11:03:12AM +0800, Jeremy Kerr wrote:
-> -	ldr	r3, [r8, #MACHINFO_PGOFFIO]
-> +	mov	r3, #1
-> +	addruart r3, r0
-> +	lsr	r3, r3, #20
-> +	lsl	r3, r3, #2
-> +
->  	add	r0, r4, r3
->  	rsb	r3, r3, #0x4000			@ PTRS_PER_PGD*sizeof(long)
->  	cmp	r3, #0x0800			@ limit to 512MB
->  	movhi	r3, #0x0800
->  	add	r6, r0, r3
-> -	ldr	r3, [r8, #MACHINFO_PHYSIO]
-> +	mov	r3, #0
-> +	addruart r3, r7
+Hi Linus,
 
-This is insufficient.  We are setting up section mappings here, which
-must have both the physical and virtual addresses aligned to a megabyte
-boundary.  You're aligning the virtual address but doing nothing with
-the physical one.
+On Wed, Jun 30, 2010 at 12:40:43PM +0200, Uwe Kleine-K?nig wrote:
+> I think my mail hit your inbox during your vacation.  As this is quite
+> important for the ARM people and there isn't much time left, can you
+> please comment?
+As you havn't replied up to now I wonder if that just means that you
+still plan to remove all defconfig files or if you are just busy doing
+other things.
 
-I also agree with Nicolas - if we're going to do this, we want addruart
-to return the virtual and physical addresses in two separate registers,
-and then have the debug code select the appropriate one itself.  That
-will simply this code.
+Thanks
+Uwe
 
-So I suggest:
-
-Patch #1 - re-jig addruart to return both virtual and physical addresses.
-Patch #2 - implement setup of debug mapping using addruart.
-Patch #3 - remove phys_io and pgoffio from machine_desc.
-
-I'd also suggest that the patches are against a recent kernel, esp.
-patch #3 as there's been some changes recently in some of the
-initializers.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
