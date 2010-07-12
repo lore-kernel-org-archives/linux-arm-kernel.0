@@ -1,48 +1,220 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Mon, 12 Jul 2010 10:19:13 +0800
-Subject: [PATCH 1/2] Add a common struct clk
-In-Reply-To: <AANLkTilitnz8eiBclky74FTOeKua3LjM3cbRdfwzkpnW@mail.gmail.com>
-References: <1277098513.947165.104554431018.0.gpush@pororo>
-	<1277098513.947633.945838133095.1.gpush@pororo>
-	<AANLkTilitnz8eiBclky74FTOeKua3LjM3cbRdfwzkpnW@mail.gmail.com>
-Message-ID: <1278901153.9235.6.camel@pororo.lan>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 12 Jul 2010 11:27:28 +0900
+Subject: [PATCH] ARM: S5PV210: allow clk to use clksrc as parents
+In-Reply-To: <AANLkTimvA_gSxZsrkEWZMLRFl82MsW5tV9g4trFmaMIr@mail.gmail.com>
+References: <1278395553-9228-1-git-send-email-myungjoo.ham@samsung.com>
+	<027d01cb1f51$99a74780$ccf5d680$%kim@samsung.com>
+	<AANLkTimvA_gSxZsrkEWZMLRFl82MsW5tV9g4trFmaMIr@mail.gmail.com>
+Message-ID: <038201cb2169$c92ccbf0$5b8663d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi MyungJoo,
-
-> > +int clk_enable(struct clk *clk)
-> > +{
-> > +       int ret = 0;
-> > +
-> > +       if (!clk->ops->enable)
-> > +               return 0;
+MyungJoo Ham wrote:
 > 
-> Wouldn't it be better (safer?) to check "clk" and "clk->ops" before
-> accessing clk->ops->enable?
-> For example,
+> Hello,
 > 
->         if (IS_ERR_OR_NULL(clk))
->                 return -EINVAL;
+> On Fri, Jul 9, 2010 at 7:29 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > MyungJoo Ham wrote:
+> >>
+> > Hi,
+> >
+> > Cc'ed Ben Dooks.
+> >
+> >> This patch allows clk in init_clocks[] and init_clocks_disable[] to use
+> >> clksrc_clk.clk in clksrcs[].
+> >>
+> >> For example, clk "lcd" may need to set "sclk-fimd" as a parent if
+> >> the div and src settting of sclk-fimd changes and a user of "lcd" wants
+> >> to get the exact information about the rate. If "sclk-fimd" is set as a
+> >> parent of "lcd", then the clk framework can provide the wanted
+> >> information; otherwise, the change in "sclk-fimd" does not update "lcd"
+> >> properly.
+> >>
+> > I don't think so.
+> >
+> > This can be problem because the parent clock of LCD(FIMD) is not always
+> > SCLK_FIMD. And LCD block is on DSYS clock domain, so the parent clock of
+> > 'lcd' should be dsys clock, not sclk_fimd.
+> > Basically used dsys bus clock as LCD IP clock and can be used sclk_fimd or
+> > not. So should separate them and need to separate control.
 > 
->         if (!clk->ops || !clk->ops->enable)
->                 return 0;
+> Well, yes SCLK_FIMD is not ALWAYS the parent of LCD(FIMD), but it is one of the
+> possible parents of LCD(FIMD); thus, SCLK_FIMD should be able to become the
+> parent. I'm not saying that SCLK_FIMD should be the parent, but SCLK_FIMD
+> should
+> be ABLE to be the parent. That's why I made it just "possible', not making it an
+> actual parent.
 > 
-> Or, do you think it'd be better not to check and save some time?
+More correctly, the clk 'lcd' means clock that should be used basically at FIMD block.
+So it means used clock on system bus, should be SCLK_ACLK.
+
+Actually, if disabled clk 'lcd', we can't access FIMD block such as its register.
+
+As I say again, clk 'lcd' is on dsys clock domain, because of these meaning, so the parent clock of 'lcd' should be dsys clock.
+
+> However, in order to make it look better, we may need to make LCD(FIMD) easier
+> to switch between SCLK_ACLK and SCLK_FIMD; e.g., by making it another
+> clksrc_clk
+> with source clocks of SCLK_ACLK and SCLK_FIMD controlling with CLK_GATE_IP.
 > 
-> Anyway, if we intend to check the input, the patch for the patch
-> including kernel/clk.c would be...
+> >
+> > As I still saying, the CLK_GATE_IP1[0] for LCD block can gate clock of
+> > SCLK_ACLK and SCLK_FIMD which can be source of LCD block, and
+> > CLK_SRC_MASK0[5] can gate only SCLK_FIMD, output clock of MUX FIMD.
+> >
+> >> To do so, we have relocated clksrcs[] and put enum indexes to clksrcs in
+> >> order to allow clk in init_clocks[] and init_clocks_disable[] may refer
+> >> one of clksrcs[] as its parent. (enum clksrc_refer)
+> >>
+> >> For example, "lcd" may set "sclk-fimd" as a parent if the following line
+> >> replaces the line 878:
+> >>
+> >>               .parent         = &clk_hclk_dsys.clk,
+> >>
+> >> to
+> >>
+> >>               .parent         = &clksrcs[_clksrc_sclk_fimd],
+> >>
+> >
+> >
+> >> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+> >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> >> ---
+> >>  arch/arm/mach-s5pv210/clock.c |  986
+> > ++++++++++++++++++++++-------------------
+> >>  1 files changed, 520 insertions(+), 466 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+> >> index aa2b1c5..e33c6ed 100644
+> >> --- a/arch/arm/mach-s5pv210/clock.c
+> >> +++ b/arch/arm/mach-s5pv210/clock.c
+> >> @@ -264,6 +264,526 @@ static struct clksrc_clk clk_sclk_vpll = {
+> >>       .reg_src        = { .reg = S5P_CLK_SRC0, .shift = 12, .size = 1 },
+> >>  };
+> >>
+> >
+> > And...hmm...maybe made this patch with wrong way...
+> >
+> >> +static struct clk *clkset_uart_list[] = {
+> >> +     [6] = &clk_mout_mpll.clk,
+> >> +     [7] = &clk_mout_epll.clk,
+> >> +};
+> >> +
+> >
+> > Following is from this patch...
+> >
+> > -static struct clk *clkset_uart_list[] = {
+> > -       [6] = &clk_mout_mpll.clk,
+> > -       [7] = &clk_mout_epll.clk,
+> > -};
+> > -
+> >
+> > Same? :-(
+> > Why did you remove and add same code?
+> 
+> It is done so in order to make clksrc_clk to be able to be parents of
+> clk. (same with the
+> later parts)
+> 
+> To do so, I moved clksrc_clk to the front of clk definitions, which in
+> turn moved
+> clock source list to the front of clksrc_clk.
+> 
+> Or, in order to reduce the changed lines number, would it be better to declare
+> the list of struct clksrc_clk before and keep the locations of the lists?
+> 
+> 
+> >
+> > (snip)
+> >
+> > And...see the below.
+> >
+> > Added like below...
+> >
+> >> +static struct clksrc_clk clksrcs[] = {
+> >> +     [_clksrc_sclk_dmc] = {
+> >> +             .clk    = {
+> >> +                     .name           = "sclk_dmc",
+> >> +                     .id             = -1,
+> >> +             },
+> >> +             .sources = &clkset_group1,
+> >> +             .reg_src = { .reg = S5P_CLK_SRC6, .shift = 24, .size = 2 },
+> >> +             .reg_div = { .reg = S5P_CLK_DIV6, .shift = 28, .size = 4 },
+> >> +     },
+> >> +     [_clksrc_sclk_onenand] = {
+> >> +             .clk    = {
+> >> +                     .name           = "sclk_onenand",
+> >> +                     .id             = -1,
+> >> +             },
+> >> +             .sources = &clkset_sclk_onenand,
+> >> +             .reg_src = { .reg = S5P_CLK_SRC0, .shift = 28, .size = 1 },
+> >> +             .reg_div = { .reg = S5P_CLK_DIV6, .shift = 12, .size = 3 },
+> >> +     },
+> >
+> > (snip)
+> >
+> > And removed like below...
+> >
+> >> -static struct clksrc_clk clksrcs[] = {
+> >> -     {
+> >> -             .clk    = {
+> >> -                     .name           = "sclk_dmc",
+> >> -                     .id             = -1,
+> >> -             },
+> >> -             .sources = &clkset_group1,
+> >> -             .reg_src = { .reg = S5P_CLK_SRC6, .shift = 24, .size = 2 },
+> >> -             .reg_div = { .reg = S5P_CLK_DIV6, .shift = 28, .size = 4 },
+> >> -     }, {
+> >> -             .clk    = {
+> >> -                     .name           = "sclk_onenand",
+> >> -                     .id             = -1,
+> >> -             },
+> >> -             .sources = &clkset_sclk_onenand,
+> >> -             .reg_src = { .reg = S5P_CLK_SRC0, .shift = 28, .size = 1 },
+> >> -             .reg_div = { .reg = S5P_CLK_DIV6, .shift = 12, .size = 3 },
+> >> -     }, {
+> >
+> > But only changed small lines not every.
+> > Following is from my local machine.
+> >
+> > @@ -665,7 +665,7 @@ static struct clksrc_sources clkset_group2 = {
+> >  };
+> >
+> >  static struct clksrc_clk clksrcs[] = {
+> > -       {
+> > +       [_clksrc_sclk_dmc] = {
+> >                .clk    = {
+> >                        .name           = "sclk_dmc",
+> >                        .id             = -1,
+> > @@ -673,7 +673,8 @@ static struct clksrc_clk clksrcs[] = {
+> >                .sources = &clkset_group1,
+> >                .reg_src = { .reg = S5P_CLK_SRC6, .shift = 24, .size = 2 },
+> >                .reg_div = { .reg = S5P_CLK_DIV6, .shift = 28, .size = 4 },
+> > -       }, {
+> > +       },
+> > +       [_clksrc_sclk_onenand] = {
+> >                .clk    = {
+> >                        .name           = "sclk_onenand",
+> >                        .id             = -1,
+> >  (snip)
+> >
+> > Please make sure your patch has no problem before submitting.
+> >
+> > Thanks.
+> >
+> > Best regards,
+> > Kgene.
+> > --
+> > Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> > SW Solution Development Team, Samsung Electronics Co., Ltd.
+> >
+> >
 
-I think that we should leave it as-is; although it may be 'safer', it
-may mean more subtle bugs can arise because we've been handed an invalid
-clock pointer.
 
-I'd rather the code oops on first usage so that the developer realises
-that something is broken, rather than fail with an error code.
+Thanks.
 
-BTW - nice work on the samsung implementation, I will check it out soon.
-
-Cheers,
-
-
-Jeremy
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
