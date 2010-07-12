@@ -1,33 +1,39 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 12 Jul 2010 15:02:22 +0200
-Subject: [RFC PATCH 1/2] allow each machine to specify it's own IRQ
-	handlers at run-time
-In-Reply-To: <20100712081245.GC22138@n2100.arm.linux.org.uk>
-References: <AANLkTin9OHUGtKSg7554ucVhufQ3PiKXALmD0Lh7A-yt@mail.gmail.com>
-	<20100712081106.GB1532@pengutronix.de>
-	<20100712081245.GC22138@n2100.arm.linux.org.uk>
-Message-ID: <20100712130222.GA14425@pengutronix.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 12 Jul 2010 09:11:06 -0400 (EDT)
+Subject: [RFC,PATCH 0/2] Allow late mdesc detection
+In-Reply-To: <1278921935.9235.90.camel@pororo.lan>
+References: <1278903792.387175.713057245098.0.gpush@pororo>
+	<alpine.LFD.2.00.1007112334390.10598@xanadu.home>
+	<1278921935.9235.90.camel@pororo.lan>
+Message-ID: <alpine.LFD.2.00.1007120904240.10598@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 12, 2010 at 09:12:45AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 12, 2010 at 10:11:06AM +0200, Uwe Kleine-K?nig wrote:
-> > I didn't thought it would be that easy.  Nice.
-> > Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On Mon, 12 Jul 2010, Jeremy Kerr wrote:
+
+> Hi Nicolas,
 > 
-> It isn't - if you enable this, your platform will break because
-> there's no implementations of it.  That makes this patch rather
-> hard to ack on its own.
-Well, I didn't test the patch but still noticed that additional code is
-needed to make use of it.  And what I saw looked reasonable.  As the
-Kconfig symbol isn't selected (until now) it doesn't seem to break
-anything.
+> > The fundamental problem with those patches is that we actually want to 
+> > move in the opposite direction for the eventual support of multiple SOCs 
+> > in the same kernel, i.e. rely on the machine ID -> mdesc to determine 
+> > the right debug addresses at run time and eventually make the addruart 
+> > into something that is not hardcoded at compile time.
+> 
+> Sure, I think that's where we're going in general, but I think the debug
+> stuff is an exception - we want that up as early as possible, and with
+> as few dependencies on other bits of code as possible.
+[...]
+> I also think it's good to only specify the debug parameters in one place
+> (addruart), rather than have to provide them in adduart *and* the mdesc.
 
-Does I need more to give my Ack?
+OK I'm convinced.
 
-Best regards
-Uwe
+I'll comment on the actual implementation separately.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+PS: I still believe in a per SOC machine ID for DT despite of this, at 
+    least for now.  If we end up not needing it eventually then it could 
+    be ignored which is a far easier thing to do (start to ignore stuff) 
+    than bite our fingers because we prematurely ditched it.
+
+
+Nicolas
