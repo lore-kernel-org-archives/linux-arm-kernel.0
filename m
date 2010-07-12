@@ -1,64 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Jul 2010 11:45:41 +0100
-Subject: About SECTION_SIZE_BITS for Sparsemem
-In-Reply-To: <AANLkTinTrt7VKuKvleiJj4lv2tWqCcDYHVXAQIHLA7bh@mail.gmail.com>
-References: <000601cb219c$c7830b60$56892220$%kim@samsung.com>
-	<AANLkTinTrt7VKuKvleiJj4lv2tWqCcDYHVXAQIHLA7bh@mail.gmail.com>
-Message-ID: <20100712104541.GA6577@n2100.arm.linux.org.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 12 Jul 2010 13:04:09 +0200
+Subject: [PATCH 1/3] sdhci-s3c: add missing remove function
+In-Reply-To: <20100709142617.50892f8b.akpm@linux-foundation.org>
+References: <1276670996-17729-1-git-send-email-m.szyprowski@samsung.com>
+	<1276670996-17729-2-git-send-email-m.szyprowski@samsung.com>
+	<20100709142617.50892f8b.akpm@linux-foundation.org>
+Message-ID: <000201cb21b1$fc69c7f0$f53d57d0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 12, 2010 at 06:52:28PM +0900, Minchan Kim wrote:
-> Hello.
+Hello,
+
+On Friday, July 09, 2010 11:26 PM Andrew Morton wrote:
+
+> On Wed, 16 Jun 2010 08:49:54 +0200
+> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 > 
-> On Mon, Jul 12, 2010 at 5:32 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Russell,
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  drivers/mmc/host/sdhci-s3c.c |   20 ++++++++++++++++++++
+> >  1 files changed, 20 insertions(+), 0 deletions(-)
 > >
-> > Hi,
+> > diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> > index af21792..ad30f07 100644
+> > --- a/drivers/mmc/host/sdhci-s3c.c
+> > +++ b/drivers/mmc/host/sdhci-s3c.c
+> > @@ -365,6 +365,26 @@ static int __devinit sdhci_s3c_probe(struct
+> platform_device *pdev)
 > >
-> > Kukjin Kim wrote:
-> >> Russell wrote:
-> >> > So, memory starts at 0x20000000 and finishes at 0x25000000. ?That's
-> > fine.
-> >> > That doesn't mean the section size is 16MB.
-> >> >
-> >> > As I've already said, the section size has _nothing_ what so ever to do
-> >> > with the size of memory, or the granularity of the size of memory. ?By
-> >> > way of illustration, it is perfectly legal to have a section size of
-> >> > 256MB but only have 1MB in a section and this is perfectly legal. ?So
-> >> > sections do not have to be completely filled.
-> >> >
-> >> Actually, as you know, the hole's area of mem_map is freed from bootmem if
-> > a
-> >> section has a hole when initializing sparse memory.
-> >>
-> >> I identified that a section doesn't need to be a contiguous area of
-> > physical
-> >> memory when reading your comment with the fact that the mem_map of a
-> > section
-> >> can be smaller than the size of a section.
-> >>
-> >> I found, however, the kernel panics when modifying min_free_kbytes file in
-> >> the proc filesystem if a section has a hole.
-> >>
-> >> While processing the change of min_free_kbytes in the kernel, page
-> >> descriptors in a hole of an online section is accessed.
-> >
-> > As I said, following error happens.
-> > It would be helpful to me if any opinions or comments.
-> >
+> >  static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
+> >  {
+> > +	struct sdhci_host *host =  platform_get_drvdata(pdev);
+> > +	struct sdhci_s3c *sc = sdhci_priv(host);
+> > +	int ptr;
+> > +
+> > +	sdhci_remove_host(host, 1);
+> > +
+> > +	for (ptr = 0; ptr < 3; ptr++) {
+> > +		clk_disable(sc->clk_bus[ptr]);
+> > +		clk_put(sc->clk_bus[ptr]);
+> > +	}
+> > +	clk_disable(sc->clk_io);
+> > +	clk_put(sc->clk_io);
+> > +
+> > +	iounmap(host->ioaddr);
+> > +	release_resource(sc->ioarea);
+> > +	kfree(sc->ioarea);
+> > +
+> > +	sdhci_free_host(host);
+> > +	platform_set_drvdata(pdev, NULL);
+> > +
+> >  	return 0;
+> >  }
 > 
-> Could you test below patch?
-> Also, you should select ARCH_HAS_HOLES_MEMORYMODEL in your config.
+> This looks like it fixes a pretty serious omission.  What happens if
+> the user rmmods this driver on a 2.6.34 kernel?
 
-But hang on.  Where are the hole(s)?
+System will crash sooner or later once the memory with the code of the
+s3c-sdhci.ko module is reused for something else. I really have no idea
+how the lack of remove function went unnoticed into the mainline code.
+ 
+> Because I have a suspicion that this fix should be backported into
+> 2.6.34.x?
 
-The DRAM setup is:
-0x20000000-0x25000000, 0x40000000-0x50000000, 0x50000000-0x58000000
+Right, this is really a good idea. This patch applies cleanly onto
+v2.6.34 too.
 
-which with SECTION_SIZE_BITS set to 28 gives three sections of memory,
-and each sparsemem section does not have a hole.
-
-No zone should cross a sparsemem section boundary.
-
-Moreover, our pfn_valid() now returns false for any and all invalid PFNs.
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
