@@ -1,726 +1,318 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Mon, 12 Jul 2010 11:03:12 +0800
-Subject: [RFC,PATCH 1/2] arm: don't check MMU status in every addruart macro
-In-Reply-To: <1278903792.387175.713057245098.0.gpush@pororo>
-Message-ID: <1278903792.387860.948595132082.1.gpush@pororo>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Mon, 12 Jul 2010 12:04:17 +0900
+Subject: [PATCH] ARM: S5PV210: allow clk to use clksrc as parents
+In-Reply-To: <038201cb2169$c92ccbf0$5b8663d0$%kim@samsung.com>
+References: <1278395553-9228-1-git-send-email-myungjoo.ham@samsung.com>
+	<027d01cb1f51$99a74780$ccf5d680$%kim@samsung.com>
+	<AANLkTimvA_gSxZsrkEWZMLRFl82MsW5tV9g4trFmaMIr@mail.gmail.com>
+	<038201cb2169$c92ccbf0$5b8663d0$%kim@samsung.com>
+Message-ID: <AANLkTilbDABhIIIWCtiHLsvQtss8A99XYWyCy0MkihD3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than checking the MMU status in every instance of addruart, do it
-once in kernel/debug.S, and change the existing addruart macros to
-expect the uart status in the macro argument register.
+Hello,
 
-This will also allow us to retreive the address of a uart for the MMU
-state that we're not current in.
+On Mon, Jul 12, 2010 at 11:27 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> MyungJoo Ham wrote:
+>>
+>> Hello,
+>>
+>> On Fri, Jul 9, 2010 at 7:29 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> > MyungJoo Ham wrote:
+>> >>
+>> > Hi,
+>> >
+>> > Cc'ed Ben Dooks.
+>> >
+>> >> This patch allows clk in init_clocks[] and init_clocks_disable[] to use
+>> >> clksrc_clk.clk in clksrcs[].
+>> >>
+>> >> For example, clk "lcd" may need to set "sclk-fimd" as a parent if
+>> >> the div and src settting of sclk-fimd changes and a user of "lcd" wants
+>> >> to get the exact information about the rate. If "sclk-fimd" is set as a
+>> >> parent of "lcd", then the clk framework can provide the wanted
+>> >> information; otherwise, the change in "sclk-fimd" does not update "lcd"
+>> >> properly.
+>> >>
+>> > I don't think so.
+>> >
+>> > This can be problem because the parent clock of LCD(FIMD) is not always
+>> > SCLK_FIMD. And LCD block is on DSYS clock domain, so the parent clock of
+>> > 'lcd' should be dsys clock, not sclk_fimd.
+>> > Basically used dsys bus clock as LCD IP clock and can be used sclk_fimd or
+>> > not. So should separate them and need to separate control.
+>>
+>> Well, yes SCLK_FIMD is not ALWAYS the parent of LCD(FIMD), but it is one of the
+>> possible parents of LCD(FIMD); thus, SCLK_FIMD should be able to become the
+>> parent. I'm not saying that SCLK_FIMD should be the parent, but SCLK_FIMD
+>> should
+>> be ABLE to be the parent. That's why I made it just "possible', not making it an
+>> actual parent.
+>>
+> More correctly, the clk 'lcd' means clock that should be used basically at FIMD block.
+> So it means used clock on system bus, should be SCLK_ACLK.
+>
+> Actually, if disabled clk 'lcd', we can't access FIMD block such as its register.
+>
+> As I say again, clk 'lcd' is on dsys clock domain, because of these meaning, so the parent clock of 'lcd' should be dsys clock.
 
-Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+Ok, then, clk_get_rate(lcd) returns 166MHz, always, which in turn,
+makes it more difficult
+for lcd clock users to get the correct current rate when sclk_fimd's
+DIV changes. When we need to show that lcd is in dsys domain, isn't it
+enough to set dsys is an ancestor (grandparent) of lcd?
 
----
- arch/arm/kernel/debug.S                             |    9 +++++++--
- arch/arm/mach-aaec2000/include/mach/debug-macro.S   |    1 -
- arch/arm/mach-at91/include/mach/debug-macro.S       |    1 -
- arch/arm/mach-clps711x/include/mach/debug-macro.S   |    1 -
- arch/arm/mach-cns3xxx/include/mach/debug-macro.S    |    1 -
- arch/arm/mach-davinci/include/mach/debug-macro.S    |    1 -
- arch/arm/mach-dove/include/mach/debug-macro.S       |    1 -
- arch/arm/mach-ep93xx/include/mach/debug-macro.S     |    1 -
- arch/arm/mach-footbridge/include/mach/debug-macro.S |    2 --
- arch/arm/mach-gemini/include/mach/debug-macro.S     |    1 -
- arch/arm/mach-h720x/include/mach/debug-macro.S      |    1 -
- arch/arm/mach-integrator/include/mach/debug-macro.S |    1 -
- arch/arm/mach-iop13xx/include/mach/debug-macro.S    |    1 -
- arch/arm/mach-iop33x/include/mach/debug-macro.S     |    1 -
- arch/arm/mach-ixp2000/include/mach/debug-macro.S    |    1 -
- arch/arm/mach-ixp23xx/include/mach/debug-macro.S    |    1 -
- arch/arm/mach-ixp4xx/include/mach/debug-macro.S     |    1 -
- arch/arm/mach-kirkwood/include/mach/debug-macro.S   |    1 -
- arch/arm/mach-ks8695/include/mach/debug-macro.S     |    1 -
- arch/arm/mach-l7200/include/mach/debug-macro.S      |    1 -
- arch/arm/mach-lh7a40x/include/mach/debug-macro.S    |    1 -
- arch/arm/mach-loki/include/mach/debug-macro.S       |    1 -
- arch/arm/mach-mmp/include/mach/debug-macro.S        |    1 -
- arch/arm/mach-msm/include/mach/debug-macro.S        |    1 -
- arch/arm/mach-mv78xx0/include/mach/debug-macro.S    |    1 -
- arch/arm/mach-netx/include/mach/debug-macro.S       |    1 -
- arch/arm/mach-nomadik/include/mach/debug-macro.S    |    1 -
- arch/arm/mach-ns9xxx/include/mach/debug-macro.S     |    1 -
- arch/arm/mach-omap1/include/mach/debug-macro.S      |    7 +++----
- arch/arm/mach-omap2/include/mach/debug-macro.S      |    7 +++----
- arch/arm/mach-orion5x/include/mach/debug-macro.S    |    1 -
- arch/arm/mach-pnx4008/include/mach/debug-macro.S    |    1 -
- arch/arm/mach-pxa/include/mach/debug-macro.S        |    1 -
- arch/arm/mach-realview/include/mach/debug-macro.S   |    1 -
- arch/arm/mach-rpc/include/mach/debug-macro.S        |    1 -
- arch/arm/mach-s3c2410/include/mach/debug-macro.S    |    1 -
- arch/arm/mach-s3c24a0/include/mach/debug-macro.S    |    1 -
- arch/arm/mach-s3c64xx/include/mach/debug-macro.S    |    1 -
- arch/arm/mach-s5p6440/include/mach/debug-macro.S    |    1 -
- arch/arm/mach-s5p6442/include/mach/debug-macro.S    |    1 -
- arch/arm/mach-s5pc100/include/mach/debug-macro.S    |    1 -
- arch/arm/mach-s5pv210/include/mach/debug-macro.S    |    1 -
- arch/arm/mach-sa1100/include/mach/debug-macro.S     |    1 -
- arch/arm/mach-u300/include/mach/debug-macro.S       |    1 -
- arch/arm/mach-ux500/include/mach/debug-macro.S      |    1 -
- arch/arm/mach-versatile/include/mach/debug-macro.S  |    1 -
- arch/arm/mach-vexpress/include/mach/debug-macro.S   |    1 -
- arch/arm/plat-mxc/include/mach/debug-macro.S        |    1 -
- arch/arm/plat-spear/include/plat/debug-macro.S      |    1 -
- arch/arm/plat-stmp3xxx/include/mach/debug-macro.S   |    1 -
- 50 files changed, 13 insertions(+), 58 deletions(-)
+I thought it'd contain more semantics if lcd's parent is fimd and
+fimd's parent is dsys; i.e., dsys is still an ancestor of lcd and
+clk_get_rate(lcd) may return the clock value of lcd while DIV/SRC
+changes. When lcd does not use sclk_fimd anymore, we can
+set_parent(lcd, something) anytime (to do this more easily, we may
+need to define lcd within clksrc_clk).
 
-diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-index a38b487..e1d0ab9 100644
---- a/arch/arm/kernel/debug.S
-+++ b/arch/arm/kernel/debug.S
-@@ -130,6 +130,11 @@ wait:		mrc	p14, 0, pc, c0, c1, 0
- #include <mach/debug-macro.S>
- #endif	/* CONFIG_DEBUG_ICEDCC */
- 
-+		.macro	__addruart, rx, tmp
-+		mrc	p15, 0, \rx, c1, c0
-+		addruart \rx,\tmp
-+		.endm
+
+Besides, we may need to allow clock-clksrc.c's s3c_register_clksrc
+function to use the default .parent value to set the SRC register
+accordingly. For example (a patch under construction, not uploaded yet
+and requires patches submitted before):
+
+
+Author: MyungJoo Ham <myungjoo.ham@samsung.com>
+Date:   Thu Jul 8 18:34:01 2010 +0900
+
+    ARM: SAMSUNG SoC: clksrc register uses parent value to set default src.
+
+    If .parent field is filled when a struct clksrc_clk is registered,
+    s3c_register_clksrc sets the source clock register accordingly to the
+    parent clock.
+
+    In the previous versions, the parent value was "ignored" because the
+    value of default register value overwrites the parent field.
+
+diff --git a/arch/arm/plat-samsung/clock-clksrc.c
+b/arch/arm/plat-samsung/clock-clksrc.c
+index ae8b850..236fb59 100644
+--- a/arch/arm/plat-samsung/clock-clksrc.c
++++ b/arch/arm/plat-samsung/clock-clksrc.c
+@@ -177,7 +177,7 @@ static struct clk_ops clksrc_ops_nosrc = {
+
+ void __init s3c_register_clksrc(struct clksrc_clk *clksrc, int size)
+ {
+-       int ret;
++       int ret, err = 0;
+
+        for (; size > 0; size--, clksrc++) {
+                if (!clksrc->reg_div.reg && !clksrc->reg_src.reg)
+@@ -195,12 +195,25 @@ void __init s3c_register_clksrc(struct
+clksrc_clk *clksrc, int size)
+                                clksrc->clk.ops = &clksrc_ops;
+                }
+
++               if (clksrc->clk.parent && clksrc->sources &&
++                               clksrc->reg_src.reg) {
++                       err = s3c_setparent_clksrc(&clksrc->clk,
++                                       clksrc->clk.parent);
++                       if (err < 0)
++                               printk(KERN_ERR "[%s:%d] setparent error@reg"
++                                               "ister_clksrc %s p = %s...\n",
++                                               __FILE__, __LINE__,
++                                               clksrc->clk.name,
++                                               clksrc->clk.parent->name);
++               }
 +
- /*
-  * Useful debugging routines
-  */
-@@ -164,7 +169,7 @@ ENDPROC(printhex2)
- 		.ltorg
- 
- ENTRY(printascii)
--		addruart r3, r1
-+		__addruart r3, r1
- 		b	2f
- 1:		waituart r2, r3
- 		senduart r1, r3
-@@ -180,7 +185,7 @@ ENTRY(printascii)
- ENDPROC(printascii)
- 
- ENTRY(printch)
--		addruart r3, r1
-+		__addruart r3, r1
- 		mov	r1, r0
- 		mov	r0, #0
- 		b	1b
-diff --git a/arch/arm/mach-aaec2000/include/mach/debug-macro.S b/arch/arm/mach-aaec2000/include/mach/debug-macro.S
-index a9cac36..7a8f904 100644
---- a/arch/arm/mach-aaec2000/include/mach/debug-macro.S
-+++ b/arch/arm/mach-aaec2000/include/mach/debug-macro.S
-@@ -11,7 +11,6 @@
- 
- #include "hardware.h"
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx, #0x80000000		@ physical
- 		movne	\rx, #io_p2v(0x80000000)	@ virtual
-diff --git a/arch/arm/mach-at91/include/mach/debug-macro.S b/arch/arm/mach-at91/include/mach/debug-macro.S
-index 9e750a1..0a7c233 100644
---- a/arch/arm/mach-at91/include/mach/debug-macro.S
-+++ b/arch/arm/mach-at91/include/mach/debug-macro.S
-@@ -15,7 +15,6 @@
- #include <mach/at91_dbgu.h>
- 
- 	.macro	addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
- 	tst	\rx, #1						@ MMU enabled?
- 	ldreq	\rx, =(AT91_BASE_SYS + AT91_DBGU)		@ System peripherals (phys address)
- 	ldrne	\rx, =(AT91_VA_BASE_SYS	+ AT91_DBGU)		@ System peripherals (virt address)
-diff --git a/arch/arm/mach-clps711x/include/mach/debug-macro.S b/arch/arm/mach-clps711x/include/mach/debug-macro.S
-index fedd807..7e7d996 100644
---- a/arch/arm/mach-clps711x/include/mach/debug-macro.S
-+++ b/arch/arm/mach-clps711x/include/mach/debug-macro.S
-@@ -14,7 +14,6 @@
- #include <asm/hardware/clps7111.h>
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx, #CLPS7111_PHYS_BASE
- 		movne	\rx, #CLPS7111_VIRT_BASE
-diff --git a/arch/arm/mach-cns3xxx/include/mach/debug-macro.S b/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
-index d16ce7e..02501e8 100644
---- a/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
-@@ -11,7 +11,6 @@
-  */
- 
- 		.macro	addruart,rx
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx,      #0x10000000
- 		movne	\rx,      #0xf0000000	@ virtual base
-diff --git a/arch/arm/mach-davinci/include/mach/debug-macro.S b/arch/arm/mach-davinci/include/mach/debug-macro.S
-index 3cd93a8..56ae184 100644
---- a/arch/arm/mach-davinci/include/mach/debug-macro.S
-+++ b/arch/arm/mach-davinci/include/mach/debug-macro.S
-@@ -20,7 +20,6 @@
- #define UART_SHIFT	2
- 
- 		.macro addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx, #0x01000000	@ physical base address
- 		movne	\rx, #0xfe000000	@ virtual base
-diff --git a/arch/arm/mach-dove/include/mach/debug-macro.S b/arch/arm/mach-dove/include/mach/debug-macro.S
-index 1521d13..2ab3f88 100644
---- a/arch/arm/mach-dove/include/mach/debug-macro.S
-+++ b/arch/arm/mach-dove/include/mach/debug-macro.S
-@@ -9,7 +9,6 @@
- #include <mach/bridge-regs.h>
- 
- 	.macro	addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
- 	tst	\rx, #1					@ MMU enabled?
- 	ldreq	\rx, =DOVE_SB_REGS_PHYS_BASE
- 	ldrne	\rx, =DOVE_SB_REGS_VIRT_BASE
-diff --git a/arch/arm/mach-ep93xx/include/mach/debug-macro.S b/arch/arm/mach-ep93xx/include/mach/debug-macro.S
-index 5cd2244..0b774f7 100644
---- a/arch/arm/mach-ep93xx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-ep93xx/include/mach/debug-macro.S
-@@ -12,7 +12,6 @@
- #include <mach/ep93xx-regs.h>
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1				@ MMU enabled?
- 		ldreq	\rx, =EP93XX_APB_PHYS_BASE	@ Physical base
- 		ldrne	\rx, =EP93XX_APB_VIRT_BASE	@ virtual base
-diff --git a/arch/arm/mach-footbridge/include/mach/debug-macro.S b/arch/arm/mach-footbridge/include/mach/debug-macro.S
-index 60dda13..3bc7b4c 100644
---- a/arch/arm/mach-footbridge/include/mach/debug-macro.S
-+++ b/arch/arm/mach-footbridge/include/mach/debug-macro.S
-@@ -16,7 +16,6 @@
- #ifndef CONFIG_DEBUG_DC21285_PORT
- 	/* For NetWinder debugging */
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx, #0x7c000000	@ physical
- 		movne	\rx, #0xff000000	@ virtual
-@@ -33,7 +32,6 @@
- 		.equ	dc21285_low,  ARMCSR_BASE & 0x00ffffff
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx, #0x42000000
- 		movne	\rx, #dc21285_high
-diff --git a/arch/arm/mach-gemini/include/mach/debug-macro.S b/arch/arm/mach-gemini/include/mach/debug-macro.S
-index ad47704..a232a6c 100644
---- a/arch/arm/mach-gemini/include/mach/debug-macro.S
-+++ b/arch/arm/mach-gemini/include/mach/debug-macro.S
-@@ -12,7 +12,6 @@
- #include <mach/hardware.h>
- 
- 	.macro	addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
- 	tst	\rx, #1					@ MMU enabled?
- 	ldreq	\rx, =GEMINI_UART_BASE			@ physical
- 	ldrne	\rx, =IO_ADDRESS(GEMINI_UART_BASE)	@ virtual
-diff --git a/arch/arm/mach-h720x/include/mach/debug-macro.S b/arch/arm/mach-h720x/include/mach/debug-macro.S
-index a9ee8f0..229c7dc 100644
---- a/arch/arm/mach-h720x/include/mach/debug-macro.S
-+++ b/arch/arm/mach-h720x/include/mach/debug-macro.S
-@@ -15,7 +15,6 @@
- 		.equ    io_phys, IO_START
- 
- 		.macro  addruart, rx, tmp
--		mrc     p15, 0, \rx, c1, c0
- 		tst     \rx, #1  	       @ MMU enabled?
- 		moveq   \rx, #io_phys	       @ physical base address
- 		movne   \rx, #io_virt	       @ virtual address
-diff --git a/arch/arm/mach-integrator/include/mach/debug-macro.S b/arch/arm/mach-integrator/include/mach/debug-macro.S
-index 87a6888..79ae58e 100644
---- a/arch/arm/mach-integrator/include/mach/debug-macro.S
-+++ b/arch/arm/mach-integrator/include/mach/debug-macro.S
-@@ -12,7 +12,6 @@
- */
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx, #0x16000000	@ physical base address
- 		movne	\rx, #0xf0000000	@ virtual base
-diff --git a/arch/arm/mach-iop13xx/include/mach/debug-macro.S b/arch/arm/mach-iop13xx/include/mach/debug-macro.S
-index c9d6ba4..0430c46 100644
---- a/arch/arm/mach-iop13xx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-iop13xx/include/mach/debug-macro.S
-@@ -12,7 +12,6 @@
-  */
- 
- 	.macro	addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
- 	tst	\rx, #1			@ mmu enabled?
- 	moveq	\rx, #0xff000000	@ physical
- 	orreq	\rx, \rx, #0x00d80000
-diff --git a/arch/arm/mach-iop33x/include/mach/debug-macro.S b/arch/arm/mach-iop33x/include/mach/debug-macro.S
-index addb2da..91f9a0a 100644
---- a/arch/arm/mach-iop33x/include/mach/debug-macro.S
-+++ b/arch/arm/mach-iop33x/include/mach/debug-macro.S
-@@ -12,7 +12,6 @@
-  */
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ mmu enabled?
- 		moveq	\rx, #0xff000000	@ physical
- 		movne	\rx, #0xfe000000	@ virtual
-diff --git a/arch/arm/mach-ixp2000/include/mach/debug-macro.S b/arch/arm/mach-ixp2000/include/mach/debug-macro.S
-index 6a82768..d355129 100644
---- a/arch/arm/mach-ixp2000/include/mach/debug-macro.S
-+++ b/arch/arm/mach-ixp2000/include/mach/debug-macro.S
-@@ -12,7 +12,6 @@
- */
- 
- 		.macro  addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx, #0xc0000000	@ Physical base
- 		movne	\rx, #0xfe000000	@ virtual base
-diff --git a/arch/arm/mach-ixp23xx/include/mach/debug-macro.S b/arch/arm/mach-ixp23xx/include/mach/debug-macro.S
-index a82e375..c24d1bd 100644
---- a/arch/arm/mach-ixp23xx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-ixp23xx/include/mach/debug-macro.S
-@@ -13,7 +13,6 @@
- #include <mach/ixp23xx.h>
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1				@ mmu enabled?
- 		ldreq	\rx, =IXP23XX_PERIPHERAL_PHYS 	@ physical
- 		ldrne	\rx, =IXP23XX_PERIPHERAL_VIRT	@ virtual
-diff --git a/arch/arm/mach-ixp4xx/include/mach/debug-macro.S b/arch/arm/mach-ixp4xx/include/mach/debug-macro.S
-index 893873e..245685b 100644
---- a/arch/arm/mach-ixp4xx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-ixp4xx/include/mach/debug-macro.S
-@@ -11,7 +11,6 @@
- */
- 
-                 .macro  addruart, rx, tmp
--                mrc     p15, 0, \rx, c1, c0
-                 tst     \rx, #1                 @ MMU enabled?
-                 moveq   \rx, #0xc8000000
-                 movne   \rx, #0xff000000
-diff --git a/arch/arm/mach-kirkwood/include/mach/debug-macro.S b/arch/arm/mach-kirkwood/include/mach/debug-macro.S
-index d060677..fbda2e6 100644
---- a/arch/arm/mach-kirkwood/include/mach/debug-macro.S
-+++ b/arch/arm/mach-kirkwood/include/mach/debug-macro.S
-@@ -9,7 +9,6 @@
- #include <mach/bridge-regs.h>
- 
- 	.macro	addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
- 	tst	\rx, #1					@ MMU enabled?
- 	ldreq	\rx, =KIRKWOOD_REGS_PHYS_BASE
- 	ldrne	\rx, =KIRKWOOD_REGS_VIRT_BASE
-diff --git a/arch/arm/mach-ks8695/include/mach/debug-macro.S b/arch/arm/mach-ks8695/include/mach/debug-macro.S
-index cf2095d..8587635 100644
---- a/arch/arm/mach-ks8695/include/mach/debug-macro.S
-+++ b/arch/arm/mach-ks8695/include/mach/debug-macro.S
-@@ -15,7 +15,6 @@
- #include <mach/regs-uart.h>
- 
- 	.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1				@ MMU enabled?
- 		ldreq	\rx, =KS8695_UART_PA		@ physical base address
- 		ldrne	\rx, =KS8695_UART_VA		@ virtual base address
-diff --git a/arch/arm/mach-l7200/include/mach/debug-macro.S b/arch/arm/mach-l7200/include/mach/debug-macro.S
-index b69ed34..912e924 100644
---- a/arch/arm/mach-l7200/include/mach/debug-macro.S
-+++ b/arch/arm/mach-l7200/include/mach/debug-macro.S
-@@ -15,7 +15,6 @@
- 		.equ	io_phys, IO_START
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx, #io_phys		@ physical base address
- 		movne	\rx, #io_virt		@ virtual address
-diff --git a/arch/arm/mach-lh7a40x/include/mach/debug-macro.S b/arch/arm/mach-lh7a40x/include/mach/debug-macro.S
-index c0dcbbb..60d7d70 100644
---- a/arch/arm/mach-lh7a40x/include/mach/debug-macro.S
-+++ b/arch/arm/mach-lh7a40x/include/mach/debug-macro.S
-@@ -15,7 +15,6 @@
- 	@ board.
- 
- 		.macro  addruart, rx, tmp
--		mrc     p15, 0, \rx, c1, c0
- 		tst     \rx, #1                 @ MMU enabled?
- 		mov     \rx, #0x00000700        @ offset from base
- 		orreq   \rx, \rx, #0x80000000   @ physical base
-diff --git a/arch/arm/mach-loki/include/mach/debug-macro.S b/arch/arm/mach-loki/include/mach/debug-macro.S
-index 3136c91..2cbbdec 100644
---- a/arch/arm/mach-loki/include/mach/debug-macro.S
-+++ b/arch/arm/mach-loki/include/mach/debug-macro.S
-@@ -9,7 +9,6 @@
- #include <mach/loki.h>
- 
- 	.macro	addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
- 	tst	\rx, #1					@ MMU enabled?
- 	ldreq	\rx, =LOKI_REGS_PHYS_BASE
- 	ldrne	\rx, =LOKI_REGS_VIRT_BASE
-diff --git a/arch/arm/mach-mmp/include/mach/debug-macro.S b/arch/arm/mach-mmp/include/mach/debug-macro.S
-index 76deff2..6d57a05 100644
---- a/arch/arm/mach-mmp/include/mach/debug-macro.S
-+++ b/arch/arm/mach-mmp/include/mach/debug-macro.S
-@@ -12,7 +12,6 @@
- #include <mach/addr-map.h>
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1				@ MMU enabled?
- 		ldreq	\rx, =APB_PHYS_BASE		@ physical
- 		ldrne	\rx, =APB_VIRT_BASE		@ virtual
-diff --git a/arch/arm/mach-msm/include/mach/debug-macro.S b/arch/arm/mach-msm/include/mach/debug-macro.S
-index 528750f..121d803 100644
---- a/arch/arm/mach-msm/include/mach/debug-macro.S
-+++ b/arch/arm/mach-msm/include/mach/debug-macro.S
-@@ -22,7 +22,6 @@
- #ifdef CONFIG_MSM_DEBUG_UART
- 	.macro	addruart, rx, tmp
- 	@ see if the MMU is enabled and select appropriate base address
--	mrc	p15, 0, \rx, c1, c0
- 	tst	\rx, #1
- 	ldreq	\rx, =MSM_DEBUG_UART_PHYS
- 	ldrne	\rx, =MSM_DEBUG_UART_BASE
-diff --git a/arch/arm/mach-mv78xx0/include/mach/debug-macro.S b/arch/arm/mach-mv78xx0/include/mach/debug-macro.S
-index cd81689..96c04ea 100644
---- a/arch/arm/mach-mv78xx0/include/mach/debug-macro.S
-+++ b/arch/arm/mach-mv78xx0/include/mach/debug-macro.S
-@@ -9,7 +9,6 @@
- #include <mach/mv78xx0.h>
- 
- 	.macro	addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
- 	tst	\rx, #1					@ MMU enabled?
- 	ldreq	\rx, =MV78XX0_REGS_PHYS_BASE
- 	ldrne	\rx, =MV78XX0_REGS_VIRT_BASE
-diff --git a/arch/arm/mach-netx/include/mach/debug-macro.S b/arch/arm/mach-netx/include/mach/debug-macro.S
-index e96339e..c7d2a9e 100644
---- a/arch/arm/mach-netx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-netx/include/mach/debug-macro.S
-@@ -14,7 +14,6 @@
- #include "hardware.h"
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx, #0x00100000		@ physical
- 		movne	\rx, #io_p2v(0x00100000)	@ virtual
-diff --git a/arch/arm/mach-nomadik/include/mach/debug-macro.S b/arch/arm/mach-nomadik/include/mach/debug-macro.S
-index 4f92acf..04ae6e3 100644
---- a/arch/arm/mach-nomadik/include/mach/debug-macro.S
-+++ b/arch/arm/mach-nomadik/include/mach/debug-macro.S
-@@ -11,7 +11,6 @@
- */
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx, #0x10000000	@ physical base address
- 		movne	\rx, #0xf0000000	@ virtual base
-diff --git a/arch/arm/mach-ns9xxx/include/mach/debug-macro.S b/arch/arm/mach-ns9xxx/include/mach/debug-macro.S
-index 0859336..864de81 100644
---- a/arch/arm/mach-ns9xxx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-ns9xxx/include/mach/debug-macro.S
-@@ -12,7 +12,6 @@
- #include <mach/regs-board-a9m9750dev.h>
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1
- 		ldreq	\rx, =NS9XXX_CSxSTAT_PHYS(0)
- 		ldrne	\rx, =io_p2v(NS9XXX_CSxSTAT_PHYS(0))
-diff --git a/arch/arm/mach-omap1/include/mach/debug-macro.S b/arch/arm/mach-omap1/include/mach/debug-macro.S
-index e8a8cf3..4b9371c 100644
---- a/arch/arm/mach-omap1/include/mach/debug-macro.S
-+++ b/arch/arm/mach-omap1/include/mach/debug-macro.S
-@@ -31,8 +31,8 @@ omap_uart_virt:	.word	0x0
- 		.macro	addruart, rx, tmp
- 
- 		/* Use omap_uart_phys/virt if already configured */
--9:		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
-+9:		mov	\tmp,\rx
-+		tst	\tmp, #1			@ MMU enabled?
- 		ldreq	\rx, =omap_uart_phys	@ physical base address
- 		ldrne	\rx, =omap_uart_virt	@ virtual base
- 		ldr	\rx, [\rx, #0]
-@@ -40,8 +40,7 @@ omap_uart_virt:	.word	0x0
- 		bne	99f			@ already configured
- 
- 		/* Check the debug UART configuration set in uncompress.h */
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
-+		tst	\tmp, #1			@ MMU enabled?
- 		ldreq	\rx, =OMAP_UART_INFO
- 		ldrne	\rx, =__phys_to_virt(OMAP_UART_INFO)
- 		ldr	\rx, [\rx, #0]
-diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S b/arch/arm/mach-omap2/include/mach/debug-macro.S
-index 35b2440..d483f08 100644
---- a/arch/arm/mach-omap2/include/mach/debug-macro.S
-+++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
-@@ -34,8 +34,8 @@ omap_uart_lsr:	.word	0
- 		.macro	addruart, rx, tmp
- 
- 		/* Use omap_uart_phys/virt if already configured */
--10:		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
-+10:		mov	\tmp, \rx
-+		tst	\tmp, #1			@ MMU enabled?
- 		ldreq	\rx, =omap_uart_phys	@ physical base address
- 		ldrne	\rx, =omap_uart_virt	@ virtual base address
- 		ldr	\rx, [\rx, #0]
-@@ -43,8 +43,7 @@ omap_uart_lsr:	.word	0
- 		bne	99f			@ already configured
- 
- 		/* Check the debug UART configuration set in uncompress.h */
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
-+		tst	\tmp, #1			@ MMU enabled?
- 		ldreq	\rx, =OMAP_UART_INFO
- 		ldrne	\rx, =__phys_to_virt(OMAP_UART_INFO)
- 		ldr	\rx, [\rx, #0]
-diff --git a/arch/arm/mach-orion5x/include/mach/debug-macro.S b/arch/arm/mach-orion5x/include/mach/debug-macro.S
-index 91e0e39..6ba020c 100644
---- a/arch/arm/mach-orion5x/include/mach/debug-macro.S
-+++ b/arch/arm/mach-orion5x/include/mach/debug-macro.S
-@@ -11,7 +11,6 @@
- #include <mach/orion5x.h>
- 
- 	.macro  addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
- 	tst	\rx, #1					@ MMU enabled?
- 	ldreq	\rx, =ORION5X_REGS_PHYS_BASE
- 	ldrne	\rx, =ORION5X_REGS_VIRT_BASE
-diff --git a/arch/arm/mach-pnx4008/include/mach/debug-macro.S b/arch/arm/mach-pnx4008/include/mach/debug-macro.S
-index 6ca8bd3..7596b02 100644
---- a/arch/arm/mach-pnx4008/include/mach/debug-macro.S
-+++ b/arch/arm/mach-pnx4008/include/mach/debug-macro.S
-@@ -12,7 +12,6 @@
- */
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		mov	\rx, #0x00090000
- 		addeq	\rx, \rx, #0x40000000
-diff --git a/arch/arm/mach-pxa/include/mach/debug-macro.S b/arch/arm/mach-pxa/include/mach/debug-macro.S
-index 01cf813..645f927 100644
---- a/arch/arm/mach-pxa/include/mach/debug-macro.S
-+++ b/arch/arm/mach-pxa/include/mach/debug-macro.S
-@@ -14,7 +14,6 @@
- #include "hardware.h"
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx, #0x40000000		@ physical
- 		movne	\rx, #io_p2v(0x40000000)	@ virtual
-diff --git a/arch/arm/mach-realview/include/mach/debug-macro.S b/arch/arm/mach-realview/include/mach/debug-macro.S
-index 8662228..801f68b 100644
---- a/arch/arm/mach-realview/include/mach/debug-macro.S
-+++ b/arch/arm/mach-realview/include/mach/debug-macro.S
-@@ -34,7 +34,6 @@
- #endif
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx,      #0x10000000
- 		movne	\rx,      #0xfb000000	@ virtual base
-diff --git a/arch/arm/mach-rpc/include/mach/debug-macro.S b/arch/arm/mach-rpc/include/mach/debug-macro.S
-index 6fc8d66..088335c 100644
---- a/arch/arm/mach-rpc/include/mach/debug-macro.S
-+++ b/arch/arm/mach-rpc/include/mach/debug-macro.S
-@@ -12,7 +12,6 @@
- */
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx, #0x03000000
- 		movne	\rx, #0xe0000000
-diff --git a/arch/arm/mach-s3c2410/include/mach/debug-macro.S b/arch/arm/mach-s3c2410/include/mach/debug-macro.S
-index 0eef78b..6db8f51 100644
---- a/arch/arm/mach-s3c2410/include/mach/debug-macro.S
-+++ b/arch/arm/mach-s3c2410/include/mach/debug-macro.S
-@@ -20,7 +20,6 @@
- #define SHIFT_2440TXF (14-9)
- 
- 	.macro addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1
- 		ldreq	\rx, = S3C24XX_PA_UART
- 		ldrne	\rx, = S3C24XX_VA_UART
-diff --git a/arch/arm/mach-s3c24a0/include/mach/debug-macro.S b/arch/arm/mach-s3c24a0/include/mach/debug-macro.S
-index 239476b..bcc7875 100644
---- a/arch/arm/mach-s3c24a0/include/mach/debug-macro.S
-+++ b/arch/arm/mach-s3c24a0/include/mach/debug-macro.S
-@@ -11,7 +11,6 @@
- #include <plat/regs-serial.h>
- 
- 	.macro addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1
- 		ldreq	\rx, = S3C24XX_PA_UART
- 		ldrne	\rx, = S3C24XX_VA_UART
-diff --git a/arch/arm/mach-s3c64xx/include/mach/debug-macro.S b/arch/arm/mach-s3c64xx/include/mach/debug-macro.S
-index f9ab5d2..4dbe876 100644
---- a/arch/arm/mach-s3c64xx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-s3c64xx/include/mach/debug-macro.S
-@@ -22,7 +22,6 @@
- 	 */
- 
- 	.macro addruart, rx, rtmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1
- 		ldreq	\rx, = S3C_PA_UART
- 		ldrne	\rx, = (S3C_VA_UART + S3C_PA_UART & 0xfffff)
-diff --git a/arch/arm/mach-s5p6440/include/mach/debug-macro.S b/arch/arm/mach-s5p6440/include/mach/debug-macro.S
-index 1347d7f..88e5b94 100644
---- a/arch/arm/mach-s5p6440/include/mach/debug-macro.S
-+++ b/arch/arm/mach-s5p6440/include/mach/debug-macro.S
-@@ -20,7 +20,6 @@
- 	 */
- 
- 	.macro addruart, rx, rtmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1
- 		ldreq	\rx, = S3C_PA_UART
- 		ldrne	\rx, = S3C_VA_UART
-diff --git a/arch/arm/mach-s5p6442/include/mach/debug-macro.S b/arch/arm/mach-s5p6442/include/mach/debug-macro.S
-index bb65361..6877b67 100644
---- a/arch/arm/mach-s5p6442/include/mach/debug-macro.S
-+++ b/arch/arm/mach-s5p6442/include/mach/debug-macro.S
-@@ -16,7 +16,6 @@
- #include <plat/regs-serial.h>
- 
- 	.macro addruart, rx, rtmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1
- 		ldreq	\rx, = S3C_PA_UART
- 		ldrne	\rx, = S3C_VA_UART
-diff --git a/arch/arm/mach-s5pc100/include/mach/debug-macro.S b/arch/arm/mach-s5pc100/include/mach/debug-macro.S
-index 70e02e9..9be36b2 100644
---- a/arch/arm/mach-s5pc100/include/mach/debug-macro.S
-+++ b/arch/arm/mach-s5pc100/include/mach/debug-macro.S
-@@ -23,7 +23,6 @@
- 	 */
- 
- 	.macro addruart, rx, rtmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1
- 		ldreq	\rx, = S3C_PA_UART
- 		ldrne	\rx, = S3C_VA_UART
-diff --git a/arch/arm/mach-s5pv210/include/mach/debug-macro.S b/arch/arm/mach-s5pv210/include/mach/debug-macro.S
-index 7872f5c..53c18de 100644
---- a/arch/arm/mach-s5pv210/include/mach/debug-macro.S
-+++ b/arch/arm/mach-s5pv210/include/mach/debug-macro.S
-@@ -22,7 +22,6 @@
- 	 */
- 
- 	.macro addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1
- 		ldreq	\rx, = S3C_PA_UART
- 		ldrne	\rx, = S3C_VA_UART
-diff --git a/arch/arm/mach-sa1100/include/mach/debug-macro.S b/arch/arm/mach-sa1100/include/mach/debug-macro.S
-index 336adcc..c8426cc 100644
---- a/arch/arm/mach-sa1100/include/mach/debug-macro.S
-+++ b/arch/arm/mach-sa1100/include/mach/debug-macro.S
-@@ -13,7 +13,6 @@
- #include <mach/hardware.h>
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx, #0x80000000	@ physical base address
- 		movne	\rx, #0xf8000000	@ virtual address
-diff --git a/arch/arm/mach-u300/include/mach/debug-macro.S b/arch/arm/mach-u300/include/mach/debug-macro.S
-index 92c1242..fb17f1e 100644
---- a/arch/arm/mach-u300/include/mach/debug-macro.S
-+++ b/arch/arm/mach-u300/include/mach/debug-macro.S
-@@ -12,7 +12,6 @@
- 
- 	.macro	addruart, rx, tmp
- 	/* If we move the address using MMU, use this. */
--	mrc	p15, 0, \rx, c1, c0
- 	tst	\rx, #1			@ MMU enabled?
- 	ldreq	\rx,	  = U300_SLOW_PER_PHYS_BASE @ MMU off, physical address
- 	ldrne	\rx,	  = U300_SLOW_PER_VIRT_BASE @ MMU on, virtual address
-diff --git a/arch/arm/mach-ux500/include/mach/debug-macro.S b/arch/arm/mach-ux500/include/mach/debug-macro.S
-index c5203b7..c17a27f 100644
---- a/arch/arm/mach-ux500/include/mach/debug-macro.S
-+++ b/arch/arm/mach-ux500/include/mach/debug-macro.S
-@@ -19,7 +19,6 @@
- #define UART_BASE	UX500_UART(CONFIG_UX500_DEBUG_UART)
- 
- 	.macro	addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
- 	tst	\rx, #1					@ MMU enabled?
- 	ldreq	\rx, =UART_BASE				@ no, physical address
- 	ldrne	\rx, =IO_ADDRESS(UART_BASE)		@ yes, virtual address
-diff --git a/arch/arm/mach-versatile/include/mach/debug-macro.S b/arch/arm/mach-versatile/include/mach/debug-macro.S
-index 6fea719..1a500ff 100644
---- a/arch/arm/mach-versatile/include/mach/debug-macro.S
-+++ b/arch/arm/mach-versatile/include/mach/debug-macro.S
-@@ -12,7 +12,6 @@
- */
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx,      #0x10000000
- 		movne	\rx,      #0xf1000000	@ virtual base
-diff --git a/arch/arm/mach-vexpress/include/mach/debug-macro.S b/arch/arm/mach-vexpress/include/mach/debug-macro.S
-index 5167e2a..b67863b 100644
---- a/arch/arm/mach-vexpress/include/mach/debug-macro.S
-+++ b/arch/arm/mach-vexpress/include/mach/debug-macro.S
-@@ -13,7 +13,6 @@
- #define DEBUG_LL_UART_OFFSET	0x00009000
- 
- 		.macro	addruart,rx,tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx,      #0x10000000
- 		movne	\rx,      #0xf8000000	@ virtual base
-diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
-index 0b6e11e..30a57b9 100644
---- a/arch/arm/plat-mxc/include/mach/debug-macro.S
-+++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
-@@ -63,7 +63,6 @@
- #define UART_VADDR	MXC91231_IO_ADDRESS(MXC91231_UART2_BASE_ADDR)
- #endif
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		ldreq	\rx, =UART_PADDR	@ physical
- 		ldrne	\rx, =UART_VADDR	@ virtual
-diff --git a/arch/arm/plat-spear/include/plat/debug-macro.S b/arch/arm/plat-spear/include/plat/debug-macro.S
-index 1670734..2fa1522 100644
---- a/arch/arm/plat-spear/include/plat/debug-macro.S
-+++ b/arch/arm/plat-spear/include/plat/debug-macro.S
-@@ -15,7 +15,6 @@
- #include <mach/spear.h>
- 
- 		.macro	addruart, rx
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1					@ MMU enabled?
- 		moveq	\rx, =SPEAR_DBG_UART_BASE		@ Physical base
- 		movne	\rx, =VA_SPEAR_DBG_UART_BASE		@ Virtual base
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/debug-macro.S b/arch/arm/plat-stmp3xxx/include/mach/debug-macro.S
-index 1b9348b..2a3ebca 100644
---- a/arch/arm/plat-stmp3xxx/include/mach/debug-macro.S
-+++ b/arch/arm/plat-stmp3xxx/include/mach/debug-macro.S
-@@ -17,7 +17,6 @@
-  */
- 
- 		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
- 		tst	\rx, #1			@ MMU enabled?
- 		moveq	\rx, #0x80000000	@ physical base address
- 		addeq	\rx, \rx, #0x00070000
+                /* setup the clocksource, but do not announce it
+                 * as it may be re-set by the setup routines
+                 * called after the rest of the clocks have been
+                 * registered
+                 */
+-               s3c_set_clksrc(clksrc, false);
++               if (err < 0)
++                       s3c_set_clksrc(clksrc, false);
+
+                ret = s3c24xx_register_clock(&clksrc->clk);
+
+
+
+
+>
+>> However, in order to make it look better, we may need to make LCD(FIMD) easier
+>> to switch between SCLK_ACLK and SCLK_FIMD; e.g., by making it another
+>> clksrc_clk
+>> with source clocks of SCLK_ACLK and SCLK_FIMD controlling with CLK_GATE_IP.
+>>
+>> >
+>> > As I still saying, the CLK_GATE_IP1[0] for LCD block can gate clock of
+>> > SCLK_ACLK and SCLK_FIMD which can be source of LCD block, and
+>> > CLK_SRC_MASK0[5] can gate only SCLK_FIMD, output clock of MUX FIMD.
+>> >
+>> >> To do so, we have relocated clksrcs[] and put enum indexes to clksrcs in
+>> >> order to allow clk in init_clocks[] and init_clocks_disable[] may refer
+>> >> one of clksrcs[] as its parent. (enum clksrc_refer)
+>> >>
+>> >> For example, "lcd" may set "sclk-fimd" as a parent if the following line
+>> >> replaces the line 878:
+>> >>
+>> >> ? ? ? ? ? ? ? .parent ? ? ? ? = &clk_hclk_dsys.clk,
+>> >>
+>> >> to
+>> >>
+>> >> ? ? ? ? ? ? ? .parent ? ? ? ? = &clksrcs[_clksrc_sclk_fimd],
+>> >>
+>> >
+>> >
+>> >> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+>> >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> >> ---
+>> >> ?arch/arm/mach-s5pv210/clock.c | ?986
+>> > ++++++++++++++++++++++-------------------
+>> >> ?1 files changed, 520 insertions(+), 466 deletions(-)
+>> >>
+>> >> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+>> >> index aa2b1c5..e33c6ed 100644
+>> >> --- a/arch/arm/mach-s5pv210/clock.c
+>> >> +++ b/arch/arm/mach-s5pv210/clock.c
+>> >> @@ -264,6 +264,526 @@ static struct clksrc_clk clk_sclk_vpll = {
+>> >> ? ? ? .reg_src ? ? ? ?= { .reg = S5P_CLK_SRC0, .shift = 12, .size = 1 },
+>> >> ?};
+>> >>
+>> >
+>> > And...hmm...maybe made this patch with wrong way...
+>> >
+>> >> +static struct clk *clkset_uart_list[] = {
+>> >> + ? ? [6] = &clk_mout_mpll.clk,
+>> >> + ? ? [7] = &clk_mout_epll.clk,
+>> >> +};
+>> >> +
+>> >
+>> > Following is from this patch...
+>> >
+>> > -static struct clk *clkset_uart_list[] = {
+>> > - ? ? ? [6] = &clk_mout_mpll.clk,
+>> > - ? ? ? [7] = &clk_mout_epll.clk,
+>> > -};
+>> > -
+>> >
+>> > Same? :-(
+>> > Why did you remove and add same code?
+>>
+>> It is done so in order to make clksrc_clk to be able to be parents of
+>> clk. (same with the
+>> later parts)
+>>
+>> To do so, I moved clksrc_clk to the front of clk definitions, which in
+>> turn moved
+>> clock source list to the front of clksrc_clk.
+>>
+>> Or, in order to reduce the changed lines number, would it be better to declare
+>> the list of struct clksrc_clk before and keep the locations of the lists?
+>>
+>>
+>> >
+>> > (snip)
+>> >
+>> > And...see the below.
+>> >
+>> > Added like below...
+>> >
+>> >> +static struct clksrc_clk clksrcs[] = {
+>> >> + ? ? [_clksrc_sclk_dmc] = {
+>> >> + ? ? ? ? ? ? .clk ? ?= {
+>> >> + ? ? ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "sclk_dmc",
+>> >> + ? ? ? ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+>> >> + ? ? ? ? ? ? },
+>> >> + ? ? ? ? ? ? .sources = &clkset_group1,
+>> >> + ? ? ? ? ? ? .reg_src = { .reg = S5P_CLK_SRC6, .shift = 24, .size = 2 },
+>> >> + ? ? ? ? ? ? .reg_div = { .reg = S5P_CLK_DIV6, .shift = 28, .size = 4 },
+>> >> + ? ? },
+>> >> + ? ? [_clksrc_sclk_onenand] = {
+>> >> + ? ? ? ? ? ? .clk ? ?= {
+>> >> + ? ? ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "sclk_onenand",
+>> >> + ? ? ? ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+>> >> + ? ? ? ? ? ? },
+>> >> + ? ? ? ? ? ? .sources = &clkset_sclk_onenand,
+>> >> + ? ? ? ? ? ? .reg_src = { .reg = S5P_CLK_SRC0, .shift = 28, .size = 1 },
+>> >> + ? ? ? ? ? ? .reg_div = { .reg = S5P_CLK_DIV6, .shift = 12, .size = 3 },
+>> >> + ? ? },
+>> >
+>> > (snip)
+>> >
+>> > And removed like below...
+>> >
+>> >> -static struct clksrc_clk clksrcs[] = {
+>> >> - ? ? {
+>> >> - ? ? ? ? ? ? .clk ? ?= {
+>> >> - ? ? ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "sclk_dmc",
+>> >> - ? ? ? ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+>> >> - ? ? ? ? ? ? },
+>> >> - ? ? ? ? ? ? .sources = &clkset_group1,
+>> >> - ? ? ? ? ? ? .reg_src = { .reg = S5P_CLK_SRC6, .shift = 24, .size = 2 },
+>> >> - ? ? ? ? ? ? .reg_div = { .reg = S5P_CLK_DIV6, .shift = 28, .size = 4 },
+>> >> - ? ? }, {
+>> >> - ? ? ? ? ? ? .clk ? ?= {
+>> >> - ? ? ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "sclk_onenand",
+>> >> - ? ? ? ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+>> >> - ? ? ? ? ? ? },
+>> >> - ? ? ? ? ? ? .sources = &clkset_sclk_onenand,
+>> >> - ? ? ? ? ? ? .reg_src = { .reg = S5P_CLK_SRC0, .shift = 28, .size = 1 },
+>> >> - ? ? ? ? ? ? .reg_div = { .reg = S5P_CLK_DIV6, .shift = 12, .size = 3 },
+>> >> - ? ? }, {
+>> >
+>> > But only changed small lines not every.
+>> > Following is from my local machine.
+>> >
+>> > @@ -665,7 +665,7 @@ static struct clksrc_sources clkset_group2 = {
+>> > ?};
+>> >
+>> > ?static struct clksrc_clk clksrcs[] = {
+>> > - ? ? ? {
+>> > + ? ? ? [_clksrc_sclk_dmc] = {
+>> > ? ? ? ? ? ? ? ?.clk ? ?= {
+>> > ? ? ? ? ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "sclk_dmc",
+>> > ? ? ? ? ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = -1,
+>> > @@ -673,7 +673,8 @@ static struct clksrc_clk clksrcs[] = {
+>> > ? ? ? ? ? ? ? ?.sources = &clkset_group1,
+>> > ? ? ? ? ? ? ? ?.reg_src = { .reg = S5P_CLK_SRC6, .shift = 24, .size = 2 },
+>> > ? ? ? ? ? ? ? ?.reg_div = { .reg = S5P_CLK_DIV6, .shift = 28, .size = 4 },
+>> > - ? ? ? }, {
+>> > + ? ? ? },
+>> > + ? ? ? [_clksrc_sclk_onenand] = {
+>> > ? ? ? ? ? ? ? ?.clk ? ?= {
+>> > ? ? ? ? ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "sclk_onenand",
+>> > ? ? ? ? ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = -1,
+>> > ?(snip)
+>> >
+>> > Please make sure your patch has no problem before submitting.
+>> >
+>> > Thanks.
+>> >
+>> > Best regards,
+>> > Kgene.
+>> > --
+>> > Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+>> > SW Solution Development Team, Samsung Electronics Co., Ltd.
+>> >
+>> >
+>
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+
+
+
+-- 
+MyungJoo Ham (???), Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
