@@ -1,42 +1,46 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 12 Jul 2010 09:42:52 -0400 (EDT)
-Subject: [RFC,
-	PATCH 2/2] arm: use addruart macro to establish debug mappings
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Jul 2010 14:52:59 +0100
+Subject: [RFC,PATCH 2/2] arm: use addruart macro to establish debug
+	mappings
 In-Reply-To: <1278903792.388155.428219242752.2.gpush@pororo>
-References: <1278903792.388155.428219242752.2.gpush@pororo>
-Message-ID: <alpine.LFD.2.00.1007120932510.10598@xanadu.home>
+References: <1278903792.387175.713057245098.0.gpush@pororo>
+	<1278903792.388155.428219242752.2.gpush@pororo>
+Message-ID: <20100712135259.GC6577@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Jul 2010, Jeremy Kerr wrote:
+On Mon, Jul 12, 2010 at 11:03:12AM +0800, Jeremy Kerr wrote:
+> -	ldr	r3, [r8, #MACHINFO_PGOFFIO]
+> +	mov	r3, #1
+> +	addruart r3, r0
+> +	lsr	r3, r3, #20
+> +	lsl	r3, r3, #2
+> +
+>  	add	r0, r4, r3
+>  	rsb	r3, r3, #0x4000			@ PTRS_PER_PGD*sizeof(long)
+>  	cmp	r3, #0x0800			@ limit to 512MB
+>  	movhi	r3, #0x0800
+>  	add	r6, r0, r3
+> -	ldr	r3, [r8, #MACHINFO_PHYSIO]
+> +	mov	r3, #0
+> +	addruart r3, r7
 
-> Since we can call addruart with an argument to specify that we want a
-> physical or virtual address, use addruart in the debug mapping code to
-> find these addresses.
-> 
-> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-> 
-> ---
->  arch/arm/Kconfig.debug |    1 -
->  arch/arm/kernel/head.S |   15 ++++++++++++---
->  2 files changed, 12 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index fbb094a..91344af 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -65,7 +65,6 @@ config DEBUG_STACK_USAGE
->  # These options are only for real kernel hackers who want to get their hands dirty.
->  config DEBUG_LL
->  	bool "Kernel low-level debugging functions"
-> -	depends on !OF
+This is insufficient.  We are setting up section mappings here, which
+must have both the physical and virtual addresses aligned to a megabyte
+boundary.  You're aligning the virtual address but doing nothing with
+the physical one.
 
-Make sure you start a new topic branch for such features so to be sure 
-it applies on top of a vanilla kernel independently.
+I also agree with Nicolas - if we're going to do this, we want addruart
+to return the virtual and physical addresses in two separate registers,
+and then have the debug code select the appropriate one itself.  That
+will simply this code.
 
-BTW I'd like to see patch #3 of this series removing the now unused 
-phys_io and io_pg_offst from struct machine_desc, and all corresponding 
-initializations.
+So I suggest:
 
+Patch #1 - re-jig addruart to return both virtual and physical addresses.
+Patch #2 - implement setup of debug mapping using addruart.
+Patch #3 - remove phys_io and pgoffio from machine_desc.
 
-Nicolas
+I'd also suggest that the patches are against a recent kernel, esp.
+patch #3 as there's been some changes recently in some of the
+initializers.
