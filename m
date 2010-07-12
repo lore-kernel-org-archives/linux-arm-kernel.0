@@ -1,128 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Jul 2010 21:22:32 +0200
-Subject: [PATCH][RFC] arm: Add basic support for VIA/WonderMedia SoC's
-In-Reply-To: <20100712165025.GA13818@alchark-u3s.alchark.ru>
-References: <20100712165025.GA13818@alchark-u3s.alchark.ru>
-Message-ID: <201007122122.32623.arnd@arndb.de>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Mon, 12 Jul 2010 12:34:59 -0700
+Subject: ARM defconfig files
+In-Reply-To: <alpine.LFD.2.00.1007121510260.10598@xanadu.home>
+References: <alpine.LFD.2.00.1006030725420.8175@i5.linux-foundation.org>
+	<20100603181010.GA25779@flint.arm.linux.org.uk>
+	<1275589230.23384.19.camel@c-dwalke-linux.qualcomm.com>
+	<alpine.LFD.2.00.1006031119440.8175@i5.linux-foundation.org>
+	<20100614083214.GA2104@pengutronix.de>
+	<20100630104043.GG11746@pengutronix.de>
+	<20100712155518.GA24144@pengutronix.de>
+	<AANLkTilhI9O6YwnuAylo_jNgwR8VXmpSVJ1kylIYPCGT@mail.gmail.com>
+	<20100712173228.GC9897@n2100.arm.linux.org.uk>
+	<AANLkTinxUqzxClVDTyruJ6kzFTganXUGJJHJ5wRi9Iak@mail.gmail.com>
+	<20100712185029.GB14425@pengutronix.de>
+	<AANLkTinOuU-VVXaMwMp69CBp2Y4wxpoWybEQ34H5j0lJ@mail.gmail.com>
+	<alpine.LFD.2.00.1007121510260.10598@xanadu.home>
+Message-ID: <AANLkTim-O00n9YPv7w4VCKjN-ETLijyTHomWUn4mZtTV@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 July 2010 18:50:25 Alexey Charkov wrote:
-> 
-> This adds basic support for machine initialization, interrupts, timers and
-> serial console on VIA/WonderMedia VT8500 and WM8505 Systems-on-Chip.
-> 
-> Signed-off-by: Alexey Charkov <alchark@gmail.com>
-> ---
-> 
-> These SoC's are used in quite many netbooks and tablets produced in China
-> and sold online at relatively low prices (typically below 100 USD).
-> 
-> Support for WM8505 is known incomplete, while VT8500 is tested by me on the
-> hardware and at least prints kernel messages to the serial console with timing
-> information.
+On Mon, Jul 12, 2010 at 12:17 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+>>
+>> ? ?Put another way: I realize that fairly late in the -rc series is
+>> actually a really good time to do this, rather than during the merge
+>> window itself when things are in flux. However, while it would be a
+>> good time to pull this for that reason, it's also a _horrible_ time to
+>> pull if it then regresses the defconfig uses, or if it causes horrible
+>> problems for linux-next merging etc.
+>
+> This cannot be any worse than wholesale removal of those files as you
+> were contemplating at some point. ?Furthermore, on ARM we have someone
+> providing automatic rebuild of all defconfigs already, so any serious
+> issue should be noticed right away.
 
-That was quick. Marek already said most of what I had to say about the
-patch, and more. Here are some other minor comments. First of all, I'd
-suggest moving all of the descriptory text above into the changelog
-(above ---), since that looks like useful information to people that might
-want to try out the code.
+You aren't really answering the question. The thing is, the wholesale
+removal wouldn't happen during the late -rc anyway, and it wouldn't
+cause any merge issues (merge conflicts where the file is just to be
+removed are trivial to take care of).
 
-> +		.section        ".start", "ax"
-> +
-> +__VT8500_start:
-> +		/* Override the obscure machine id from bootloader */
-> +#ifdef CONFIG_MACH_BV07
-> +		mov	r7, #(MACH_TYPE_BV07 & ~0xf)
-> +		orr	r7, r7, #(MACH_TYPE_BV07 & 0xf)
-> +#elif defined CONFIG_MACH_WM8505_7IN_NETBOOK
-> +		mov	r7, #(MACH_TYPE_WM8505_7IN_NETBOOK & ~0xf)
-> +		orr	r7, r7, #(MACH_TYPE_WM8505_7IN_NETBOOK & 0xf)
-> +#endif
+So I'm really asking about the issue of "how does this work during the
+late -rc phase". Where the _timing_ is the important thing.
 
-Do you have any way to detect the actual machines from the existing
-boot loader? The way you do it here, the kernel ends up being usable
-on only one of the machines at a time.
+Because I could as easily pull after 2.6.35 is out. That has it's own
+downsides (with all the merging going on), but at the same time, it's
+clearly the right time for a large change.
 
-> +#ifdef CONFIG_MMU
-> +/* macro to get at IO space when running virtually */
-> +#define IO_ADDRESS(x) ((x) | 0xf0000000)
-> +#else
-> +#define IO_ADDRESS(x) (x)
-> +#endif
+So when I ask about timing and "how does this work in late -rc", it's
+really about how safe it is to do now. Because if it isn't very
+obviously safe, I can't pull it.
 
-I don't know yet what the general consensus in the arm world is about this,
-but this looks hacky to me. I'd recommend killing off the IO_ADDRESS macro
-and replacing it with proper calls to ioremap.
+One part of the "obviously safe" thing is verification for each
+defconfig file that the end result is identical with the reduced
+version. Uwe implied that it was, and that was clearly the intention,
+but was there some explicit verification that yes, the
+before-and-after configurations are 100% the same?
 
+Also, I assume that while it's _mostly_ a transparent change to users,
+it does require that people do "make oldconfig" with the reduced
+defconfig file first, in order to avoid having to answer with the
+defaults. No? And the reduced defconfig files obviously do depend on
+the default in the Kconfig files themselves, so it does have that kind
+of fairly subtle semantic change that may not be entirely obvious or
+easy to notice.
 
-> diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
-> index 8f10d24..f5745d1 100644
-> --- a/arch/arm/tools/mach-types
-> +++ b/arch/arm/tools/mach-types
-> @@ -12,7 +12,7 @@
->  #
->  #   http://www.arm.linux.org.uk/developer/machines/?action=new
->  #
-> -# Last update: Sat May 1 10:36:42 2010
-> +# Last update: Sat Jun 19 13:07:40 2010
->  #
->  # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
->  #
+So from a timing standpoint, I just want to be convinced that "late
+-rc" really is the right thing. I'm not entirely sure it is, even
+though I do see advantages.
 
-If you need the updated version of this file, it would probably make
-sense to build the patch instead a kernel tree that already contains
-the latest version, rather than Linus' tree.
+> I think Uwe could provide his script and add it to the kernel tree.
+> Then all architectures could benefit from it. ?Having the defconfig
+> files contain only those options which are different from the defaults
+> is certainly more readable, even on x86.
 
-> diff --git a/drivers/serial/vt8500_serial.c b/drivers/serial/vt8500_serial.c
-> new file mode 100644
-> index 0000000..21e0462
-> --- /dev/null
-> +++ b/drivers/serial/vt8500_serial.c
-> @@ -0,0 +1,612 @@
-> +/*
-> + * drivers/serial/vt8500_serial.c
-> + *
-> + * Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
-> + *
-> + * Based on msm_serial.c, which is:
-> + * Copyright (C) 2007 Google, Inc.
-> + * Author: Robert Love <rlove@google.com>
+Quite possible. But maintainers would need to be on the lookout of
+people actually using the script, and refusing to apply patches that
+re-introduce the whole big thing.
 
-This device driver should probably go to the tty maintainer,
-Greg Kroah-Hartman <gregkh@suse.de>, with the linux-arm-kernel and
-linux-serial at vger.kernel.org mailing lists on Cc.
+I also haven't actually seen the script - I don't think Uwe ever
+posted it - so maybe it's some very fragile thing. Hard to judge on no
+real information ;^p
 
-> +struct vt8500_port {
-> +	struct uart_port	uart;
-> +	char			name[16];
-> +	struct clk		*clk;
-> +	unsigned int		ier;
-> +};
-> +
-> +#define UART_TO_VT8500(uart_port)	((struct vt8500_port *) uart_port)
-
-Instead of the direct cast from one type to another, please use
-container_of(), which is more type safe.
-
-> diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
-> index f10db6e..20ba8c3 100644
-> --- a/include/linux/serial_core.h
-> +++ b/include/linux/serial_core.h
-> @@ -186,6 +186,9 @@
->  #define PORT_ALTERA_JTAGUART	91
->  #define PORT_ALTERA_UART	92
->  
-> +/* VIA VT8500 SoC */
-> +#define PORT_VT8500    93
-> +
->  #ifdef __KERNEL__
->  
-
-In the linux-next tree, number 94 is already being used, so you should
-probably use 95 as the next free number when sending the driver to the
-serial list.
-
-Otherwise, as I mentioned before, nice work!
-
-	Arnd
+               Linus
