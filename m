@@ -1,33 +1,99 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Jul 2010 11:13:12 +0100
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 12 Jul 2010 19:13:50 +0900
 Subject: About SECTION_SIZE_BITS for Sparsemem
-In-Reply-To: <AANLkTimsEDWv9X3PeX2EBjvxl53j9R6tnAkxQuOS3CQD@mail.gmail.com>
+In-Reply-To: <AANLkTinTrt7VKuKvleiJj4lv2tWqCcDYHVXAQIHLA7bh@mail.gmail.com>
 References: <000601cb219c$c7830b60$56892220$%kim@samsung.com>
-	<AANLkTin1M4CnLb1sj9mZiePjF4SvgRXySyJmT4eWpJlj@mail.gmail.com>
-	<001601cb21a8$d1cdd120$75697360$%kim@samsung.com>
-	<AANLkTimsEDWv9X3PeX2EBjvxl53j9R6tnAkxQuOS3CQD@mail.gmail.com>
-Message-ID: <20100712101312.GE22138@n2100.arm.linux.org.uk>
+	<AANLkTinTrt7VKuKvleiJj4lv2tWqCcDYHVXAQIHLA7bh@mail.gmail.com>
+Message-ID: <001b01cb21aa$ef0e4d80$cd2ae880$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 12, 2010 at 07:08:11PM +0900, Kyungmin Park wrote:
-> 27 for our board. 28 for generic.
+Minchan Kim wrote:
 > 
-> Note that I enabled HIGHMEM and modify the VMALLOC_END to 0xd000'0000
-> to test HIGHMEM.
+> Hello.
+> 
+Hello :-)
 
-If you want to test HIGHMEM, the way to do it is to specify a vmalloc=
-parameter to the kernel, not to modify VMALLOC_END.
+> On Mon, Jul 12, 2010 at 5:32 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Russell,
+> >
+> > Hi,
+> >
+> > Kukjin Kim wrote:
+> >> Russell wrote:
+> >> > So, memory starts at 0x20000000 and finishes at 0x25000000. ?That's
+> > fine.
+> >> > That doesn't mean the section size is 16MB.
+> >> >
+> >> > As I've already said, the section size has _nothing_ what so ever to
+do
+> >> > with the size of memory, or the granularity of the size of memory.
+?By
+> >> > way of illustration, it is perfectly legal to have a section size of
+> >> > 256MB but only have 1MB in a section and this is perfectly legal. ?So
+> >> > sections do not have to be completely filled.
+> >> >
+> >> Actually, as you know, the hole's area of mem_map is freed from bootmem
+if
+> > a
+> >> section has a hole when initializing sparse memory.
+> >>
+> >> I identified that a section doesn't need to be a contiguous area of
+> > physical
+> >> memory when reading your comment with the fact that the mem_map of a
+> > section
+> >> can be smaller than the size of a section.
+> >>
+> >> I found, however, the kernel panics when modifying min_free_kbytes file
+in
+> >> the proc filesystem if a section has a hole.
+> >>
+> >> While processing the change of min_free_kbytes in the kernel, page
+> >> descriptors in a hole of an online section is accessed.
+> >
+> > As I said, following error happens.
+> > It would be helpful to me if any opinions or comments.
+> >
+> 
+> Could you test below patch?
+> Also, you should select ARCH_HAS_HOLES_MEMORYMODEL in your config.
+> 
+Yes, I did it, and no kernel panic happens :-)
 
-> Universal # bdinfo
-> arch_number = 0x00000B2E
-> env_t       = 0x00000000
-> boot_params = 0x30000100
-> DRAM bank   = 0x00000000
-> -> start    = 0x30000000
-> -> size     = 0x05000000
-> DRAM bank   = 0x00000001
-> -> start    = 0x40000000
-> -> size     = 0x18000000
+Same test...
+[root at Samsung ~]# cat /proc/sys/vm/min_free_kbytes
+2736
+[root at Samsung ~]# echo "2730" > /proc/sys/vm/min_free_kbytes
+[root at Samsung ~]#
+[root at Samsung ~]# cat /proc/sys/vm/min_free_kbytes
+2730
 
-28 will work for this too.
+
+> @@ -2824,8 +2825,13 @@ static void setup_zone_migrate_reserve(struct zone
+> *zone)
+>         for (pfn = start_pfn; pfn < end_pfn; pfn += pageblock_nr_pages) {
+>                 if (!pfn_valid(pfn))
+>                         continue;
+> +
+>                 page = pfn_to_page(pfn);
+> 
+> +                /* Watch for unexpected holes punched in the memmap */
+> +                if (!memmap_valid_within(pfn, page, zone))
+> +                        continue;
+> +
+>                 /* Watch out for overlapping nodes */
+>                 if (page_to_nid(page) != zone_to_nid(zone))
+>                         continue;
+> 
+> 
+> 
+
+...Could you please explain about this issue?
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
