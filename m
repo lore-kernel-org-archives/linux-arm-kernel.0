@@ -1,68 +1,119 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 12 Jul 2010 17:29:02 +0800
-Subject: [PATCH 1/5] cpufreq-pxa3xx: use HSIO 312MHz on the pxa310
-In-Reply-To: <4C3ADCD4.7080608@compulab.co.il>
-References: <201007081904.01464.pieterg@gmx.com>
-	<201007091031.44681.pieterg@gmx.com>
-	<4C396F4E.3080704@compulab.co.il> <201007121037.14387.pieterg@gmx.com>
-	<4C3ADCD4.7080608@compulab.co.il>
-Message-ID: <AANLkTinI5mJZfQm_Ewd7qShSkB3jlsdJIiiA_W1E2F0s@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 12 Jul 2010 13:33:40 +0400
+Subject: [PATCH v6] libata: pata_samsung: Add Samsung PATA controller
+	driver
+In-Reply-To: <1278904780-20592-1-git-send-email-kgene.kim@samsung.com>
+References: <1278904780-20592-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <4C3AE174.7090509@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 12, 2010 at 5:13 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->
->
-> On 07/12/10 11:37, pieterg wrote:
->> On Sunday 11 July 2010 09:14:22 Igor Grinberg wrote:
->>
->>> On 07/09/10 11:31, pieterg wrote:
->>>
->>>> On Friday 09 July 2010 10:02:16 Eric Miao wrote:
->>>>
->>>>> What's wrong with 208MHz HSS on PXA310?
->>>>>
->>>> I haven't done any benchmarking, but Marvell found it worth to
->>>> introduce 312MHz for the pxa310. (I assume it might have something to
->>>> do with the video accelerator, which is unique to the pxa310).
->>>>
->>>> And to me it makes sense to use the highest supported speeds in the top
->>>> cpufreq entry.
->>>>
->>> According to Marvell's PXA3xx Specification Update document
->>> (page 68 - SCr#3), the above is correct starting from silicon revision
->>> A2. What about earlier revisions? Shouldn't we support all of them?
->>>
->> OK, I missed that. In that case we should leave this one out.
->>
->
-> If you really want this to go, you can check the cpu stepping (cpuid
-> register)
-> and fixup the table accordingly. Something like:
->
-> if (cpu_is_pxa310())
-> ? ? ? ?ret = setup_freqs_table(policy, (read_cpuid_id() & 0xf) ?
->
-> ARRAY_AND_SIZE(pxa310_freqs) :
->
-> ARRAY_AND_SIZE(pxa300_freqs));
->
-> but I don't know if Eric will like it ;)
->
+Hello.
 
-Nah, I was thinking of introducing a cpu_is_pxa310_a2() or something,
-but that's really hard to make generic, since for this case, we'd
-have to use cpu_is_pxa310_a2_or_above(), which is #!$!%!@#$
+Kukjin Kim wrote:
 
-So to put it simple, I think a command line parameter would make
-more sense in this case. e.g. pxa310_use_312mhz.
+> From: Abhilash Kesavan <a.kesavan@samsung.com>
 
->> Rgds, Pieter
->>
->>
->
-> --
-> Regards,
-> Igor.
->
->
+> Adds support for the Samsung PATA controller. This driver is based on the
+> Libata subsystem and references the earlier patches sent for IDE subsystem.
+
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+
+    There's probably still a place for improvement... sorry that I dind't 
+notice before. Other than that:
+
+Acked-by: Sergei Shtylyov <sshtylyov@mvista.com>
+
+[...]
+
+> diff --git a/drivers/ata/pata_samsung_cf.c b/drivers/ata/pata_samsung_cf.c
+> new file mode 100644
+> index 0000000..5718220
+> --- /dev/null
+> +++ b/drivers/ata/pata_samsung_cf.c
+> @@ -0,0 +1,727 @@
+[...]
+> +/*
+> + * pata_s3c_wait_after_reset - wait for devices to become ready after reset
+> + */
+> +static int pata_s3c_wait_after_reset(struct ata_link *link,
+> +		unsigned int devmask, unsigned long deadline)
+> +{
+> +	struct ata_port *ap = link->ap;
+> +	struct ata_ioports *ioaddr = &ap->ioaddr;
+> +	unsigned int dev0 = devmask & (1 << 0);
+> +	unsigned int dev1 = devmask & (1 << 1);
+> +	int rc, ret = 0;
+> +
+> +	msleep(ATA_WAIT_AFTER_RESET);
+> +
+> +	/* always check readiness of the master device */
+> +	rc = ata_sff_wait_ready(link, deadline);
+> +	/* -ENODEV means the odd clown forgot the D7 pulldown resistor
+> +	 * and TF status is 0xff, bail out on it too.
+> +	 */
+> +	if (rc)
+> +		return rc;
+> +
+> +	/* if device 1 was found in ata_devchk, wait for register
+> +	 * access briefly, then wait for BSY to clear.
+> +	 */
+
+    You don't call pata_s3c_devchk() for device 1, so in principle you can 
+drop the following block:
+
+> +	if (dev1) {
+> +		int i;
+> +
+> +		pata_s3c_dev_select(ap, 1);
+> +
+> +		/* Wait for register access.  Some ATAPI devices fail
+> +		 * to set nsect/lbal after reset, so don't waste too
+> +		 * much time on it.  We're gonna wait for !BSY anyway.
+> +		 */
+> +		for (i = 0; i < 2; i++) {
+> +			u8 nsect, lbal;
+> +
+> +			nsect = ata_inb(ap->host, ioaddr->nsect_addr);
+> +			lbal = ata_inb(ap->host, ioaddr->lbal_addr);
+> +			if ((nsect == 1) && (lbal == 1))
+> +				break;
+> +			msleep(50);	/* give drive a breather */
+> +		}
+> +
+> +		rc = ata_sff_wait_ready(link, deadline);
+> +		if (rc) {
+> +			if (rc != -ENODEV)
+> +				return rc;
+> +			ret = rc;
+> +		}
+> +	}
+> +
+> +	/* is all this really necessary? */
+> +	pata_s3c_dev_select(ap, 0);
+> +	if (dev1)
+> +		pata_s3c_dev_select(ap, 1);
+
+    This too...
+
+> +	if (dev0)
+> +		pata_s3c_dev_select(ap, 0);
+> +
+> +	return ret;
+> +}
+> +
+[...]
+> +static int pata_s3c_resume(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct ata_host *host = platform_get_drvdata(pdev);
+> +	struct s3c_ide_platdata *pdata = pdev->dev.platform_data;
+> +	struct s3c_ide_info *info;
+> +
+> +	info = host->private_data;
+
+    Could be initializer...
+
+MBR, Sergei
