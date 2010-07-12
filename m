@@ -1,26 +1,48 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Mon, 12 Jul 2010 10:25:08 +0900
-Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
-	memory management
-In-Reply-To: <4C366678.60605@codeaurora.org>
-References: <4C35034B.6040906@codeaurora.org>
-	<20100707230710.GA31792@n2100.arm.linux.org.uk>
-	<4C366678.60605@codeaurora.org>
-Message-ID: <20100712102435B.fujita.tomonori@lab.ntt.co.jp>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Mon, 12 Jul 2010 10:19:13 +0800
+Subject: [PATCH 1/2] Add a common struct clk
+In-Reply-To: <AANLkTilitnz8eiBclky74FTOeKua3LjM3cbRdfwzkpnW@mail.gmail.com>
+References: <1277098513.947165.104554431018.0.gpush@pororo>
+	<1277098513.947633.945838133095.1.gpush@pororo>
+	<AANLkTilitnz8eiBclky74FTOeKua3LjM3cbRdfwzkpnW@mail.gmail.com>
+Message-ID: <1278901153.9235.6.camel@pororo.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 08 Jul 2010 16:59:52 -0700
-Zach Pfeffer <zpfeffer@codeaurora.org> wrote:
+Hi MyungJoo,
 
-> The problem I'm trying to solve boils down to this: map a set of
-> contiguous physical buffers to an aligned IOMMU address. I need to
-> allocate the set of physical buffers in a particular way: use 1 MB
-> contiguous physical memory, then 64 KB, then 4 KB, etc. and I need to
-> align the IOMMU address in a particular way.
+> > +int clk_enable(struct clk *clk)
+> > +{
+> > +       int ret = 0;
+> > +
+> > +       if (!clk->ops->enable)
+> > +               return 0;
+> 
+> Wouldn't it be better (safer?) to check "clk" and "clk->ops" before
+> accessing clk->ops->enable?
+> For example,
+> 
+>         if (IS_ERR_OR_NULL(clk))
+>                 return -EINVAL;
+> 
+>         if (!clk->ops || !clk->ops->enable)
+>                 return 0;
+> 
+> Or, do you think it'd be better not to check and save some time?
+> 
+> Anyway, if we intend to check the input, the patch for the patch
+> including kernel/clk.c would be...
 
-Sounds like the DMA API already supports what you want.
+I think that we should leave it as-is; although it may be 'safer', it
+may mean more subtle bugs can arise because we've been handed an invalid
+clock pointer.
 
-You can set segment_boundary_mask in struct device_dma_parameters if
-you want to align the IOMMU address. See IOMMU implementations that
-support dma_get_seg_boundary() properly.
+I'd rather the code oops on first usage so that the developer realises
+that something is broken, rather than fail with an error code.
+
+BTW - nice work on the samsung implementation, I will check it out soon.
+
+Cheers,
+
+
+Jeremy
