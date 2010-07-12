@@ -1,74 +1,52 @@
 From: jeremy.kerr@canonical.com (Jeremy Kerr)
 Date: Mon, 12 Jul 2010 11:03:12 +0800
-Subject: [RFC,PATCH 2/2] arm: use addruart macro to establish debug mappings
-In-Reply-To: <1278903792.387175.713057245098.0.gpush@pororo>
-Message-ID: <1278903792.388155.428219242752.2.gpush@pororo>
+Subject: [RFC,PATCH 0/2] Allow late mdesc detection
+Message-ID: <1278903792.387175.713057245098.0.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we can call addruart with an argument to specify that we want a
-physical or virtual address, use addruart in the debug mapping code to
-find these addresses.
+Hi all,
 
-Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+Currently, we probe for a mdesc early in boot. At this early stage, the
+only thing we use the mdesc for is to determine the debug page mapping.
+
+However, the debug addresses (phys and virt) need to be coded into the
+addruart macro anyway; the dynamic probing is only going to tell us what
+we already know.
+
+These (experimental!) changes allow us to use the addruart macros to
+find the debug mapping addresses, rather than pulling them out of the
+mdesc. This means that the addresses are only kept in the one place, and
+that we don't need the mdesc nearly as early.
+
+The first change updates all of the addruart macros to take an argument
+in the first macro register, indicating whether we want a physical or
+virtual address returned. This argument replaces the check present
+in the existing macro implementations.
+
+The second change updates the debug setup routine to use the addruart
+macro to establish the debug mapping, now that we invoke the macro to
+find the phyical and virtual addresses.
+
+This allows us to delay the requirement to have a mdesc available until
+much later. For example, we can parse one from the device tree once
+we've reached C code.
+
+Tested on versatile only. May break OMAP1/2, as the addruart macros are
+more complex on these platforms. I'd appreciate input from OMAP folks
+who may well tell me that this isn't possible.
+
+These patches are not suitable for merging yet (no documentation updates
+for the new format of addruart, very little testing, no handling of
+DEBUG_ICEDCC). More of a request for you folks to tell me whether or
+not this is a stupid idea :)
+
+Cheers,
+
+
+Jeremy
 
 ---
- arch/arm/Kconfig.debug |    1 -
- arch/arm/kernel/head.S |   15 ++++++++++++---
- 2 files changed, 12 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index fbb094a..91344af 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -65,7 +65,6 @@ config DEBUG_STACK_USAGE
- # These options are only for real kernel hackers who want to get their hands dirty.
- config DEBUG_LL
- 	bool "Kernel low-level debugging functions"
--	depends on !OF
- 	depends on DEBUG_KERNEL
- 	help
- 	  Say Y here to include definitions of printascii, printch, printhex
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 8bfc4bb..9571996 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -22,6 +22,10 @@
- #include <asm/thread_info.h>
- #include <asm/system.h>
- 
-+#ifdef CONFIG_DEBUG_LL
-+#include <mach/debug-macro.S>
-+#endif
-+
- #if (PHYS_OFFSET & 0x001fffff)
- #error "PHYS_OFFSET must be at an even 2MiB boundary!"
- #endif
-@@ -305,19 +309,24 @@ __create_page_tables:
- 	str	r6, [r0]
- 
- #ifdef CONFIG_DEBUG_LL
--	ldr	r7, [r10, #PROCINFO_IO_MMUFLAGS] @ io_mmuflags
- 	/*
- 	 * Map in IO space for serial debugging.
- 	 * This allows debug messages to be output
- 	 * via a serial console before paging_init.
- 	 */
--	ldr	r3, [r8, #MACHINFO_PGOFFIO]
-+	mov	r3, #1
-+	addruart r3, r0
-+	lsr	r3, r3, #20
-+	lsl	r3, r3, #2
-+
- 	add	r0, r4, r3
- 	rsb	r3, r3, #0x4000			@ PTRS_PER_PGD*sizeof(long)
- 	cmp	r3, #0x0800			@ limit to 512MB
- 	movhi	r3, #0x0800
- 	add	r6, r0, r3
--	ldr	r3, [r8, #MACHINFO_PHYSIO]
-+	mov	r3, #0
-+	addruart r3, r7
-+	ldr	r7, [r10, #PROCINFO_IO_MMUFLAGS] @ io_mmuflags
- 	orr	r3, r3, r7
- 1:	str	r3, [r0], #4
- 	add	r3, r3, #1 << 20
+Jeremy Kerr (2):
+      arm: don't check MMU status in every addruart macro
+      arm: use addruart macro to establish debug mappings
