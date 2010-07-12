@@ -1,32 +1,41 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 12 Jul 2010 16:28:47 +0300
-Subject: [PATCH v2 0/3] s3c24xx: iPAQ rx1950 series
-In-Reply-To: <1278781069-30521-1-git-send-email-anarsoul@gmail.com>
-References: <1278781069-30521-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <201007121628.58271.anarsoul@gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 12 Jul 2010 09:32:17 -0400 (EDT)
+Subject: [RFC,
+	PATCH 1/2] arm: don't check MMU status in every addruart macro
+In-Reply-To: <1278903792.387860.948595132082.1.gpush@pororo>
+References: <1278903792.387860.948595132082.1.gpush@pororo>
+Message-ID: <alpine.LFD.2.00.1007120912450.10598@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 10 ???? 2010 19:57:46 ????? Vasily Khoruzhick ???????:
-> This patch series adds more support for iPAQ rx1950 PDA to linux:
-> 1. LEDs driver -- it controls blue, green and red LEDs on rx1950
-> 2. Battery driver -- adds ability to monitor and charge battery.
-> This driver is suitable for H1940 PDA aswell (just need to write
-> some machine specific callbacks and get voltage LUTs)
-> 
-> v2: removed ac registration from s3c_adc_battery driver, use
-> pda_power instead for ac support.
-> 
-> P.S. I prefer to keep own LED triggers for s3c_adc_battery as
-> generic power supply triggers do not support LED_HALF brightness
-> (on h1940/rx1950 it's used for blink) and I want to keep same
-> LEDs behavior as in WinMo.
+On Mon, 12 Jul 2010, Jeremy Kerr wrote:
 
-Ping :)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100712/722bcf65/attachment.sig>
+> Rather than checking the MMU status in every instance of addruart, do it
+> once in kernel/debug.S, and change the existing addruart macros to
+> expect the uart status in the macro argument register.
+> 
+> This will also allow us to retreive the address of a uart for the MMU
+> state that we're not current in.
+> 
+> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+
+Many issues with this:
+
+- __addruart vs addruart is rather confusing.  Normally the __xyz form 
+  is used by the higher level xyz which is opposite to what is done 
+  here.
+
+- While at it, this should be replaced altogether by a macro that simply 
+  returns both the physical address and the virtual address for the 
+  debugging IO peripheral to use.  This would make your patch #2 much 
+  straight forward too.
+
+- The test to determine whether the MMU is active and select the 
+  appropriate address to use should remain close together and actually 
+  can be moved to a common place instead of being duplicated everywhere. 
+  The code is really testing a specific bit in a hardware register, and 
+  with this patch that now looks as if this was a simple boolean 
+  argument which is not a good thing.
+
+
+Nicolas
