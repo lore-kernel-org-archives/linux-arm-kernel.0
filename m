@@ -1,99 +1,88 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 12 Jul 2010 19:13:50 +0900
-Subject: About SECTION_SIZE_BITS for Sparsemem
-In-Reply-To: <AANLkTinTrt7VKuKvleiJj4lv2tWqCcDYHVXAQIHLA7bh@mail.gmail.com>
-References: <000601cb219c$c7830b60$56892220$%kim@samsung.com>
-	<AANLkTinTrt7VKuKvleiJj4lv2tWqCcDYHVXAQIHLA7bh@mail.gmail.com>
-Message-ID: <001b01cb21aa$ef0e4d80$cd2ae880$%kim@samsung.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 12 Jul 2010 13:20:22 +0300
+Subject: [PATCH 1/5] cpufreq-pxa3xx: use HSIO 312MHz on the pxa310
+In-Reply-To: <AANLkTinI5mJZfQm_Ewd7qShSkB3jlsdJIiiA_W1E2F0s@mail.gmail.com>
+References: <201007081904.01464.pieterg@gmx.com>
+	<201007091031.44681.pieterg@gmx.com>
+	<4C396F4E.3080704@compulab.co.il>
+	<201007121037.14387.pieterg@gmx.com>
+	<4C3ADCD4.7080608@compulab.co.il>
+	<AANLkTinI5mJZfQm_Ewd7qShSkB3jlsdJIiiA_W1E2F0s@mail.gmail.com>
+Message-ID: <4C3AEC66.4090907@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Minchan Kim wrote:
-> 
-> Hello.
-> 
-Hello :-)
+On 07/12/10 12:29, Eric Miao wrote:
+> On Mon, Jul 12, 2010 at 5:13 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>   
+>>
+>> On 07/12/10 11:37, pieterg wrote:
+>>     
+>>> On Sunday 11 July 2010 09:14:22 Igor Grinberg wrote:
+>>>
+>>>       
+>>>> On 07/09/10 11:31, pieterg wrote:
+>>>>
+>>>>         
+>>>>> On Friday 09 July 2010 10:02:16 Eric Miao wrote:
+>>>>>
+>>>>>           
+>>>>>> What's wrong with 208MHz HSS on PXA310?
+>>>>>>
+>>>>>>             
+>>>>> I haven't done any benchmarking, but Marvell found it worth to
+>>>>> introduce 312MHz for the pxa310. (I assume it might have something to
+>>>>> do with the video accelerator, which is unique to the pxa310).
+>>>>>
+>>>>> And to me it makes sense to use the highest supported speeds in the top
+>>>>> cpufreq entry.
+>>>>>
+>>>>>           
+>>>> According to Marvell's PXA3xx Specification Update document
+>>>> (page 68 - SCr#3), the above is correct starting from silicon revision
+>>>> A2. What about earlier revisions? Shouldn't we support all of them?
+>>>>
+>>>>         
+>>> OK, I missed that. In that case we should leave this one out.
+>>>
+>>>       
+>> If you really want this to go, you can check the cpu stepping (cpuid
+>> register)
+>> and fixup the table accordingly. Something like:
+>>
+>> if (cpu_is_pxa310())
+>>        ret = setup_freqs_table(policy, (read_cpuid_id() & 0xf) ?
+>>
+>> ARRAY_AND_SIZE(pxa310_freqs) :
+>>
+>> ARRAY_AND_SIZE(pxa300_freqs));
+>>
+>> but I don't know if Eric will like it ;)
+>>
+>>     
+> Nah, I was thinking of introducing a cpu_is_pxa310_a2() or something,
+> but that's really hard to make generic, since for this case, we'd
+> have to use cpu_is_pxa310_a2_or_above(), which is #!$!%!@#$
+>
+> So to put it simple, I think a command line parameter would make
+> more sense in this case. e.g. pxa310_use_312mhz.
+>   
 
-> On Mon, Jul 12, 2010 at 5:32 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Russell,
-> >
-> > Hi,
-> >
-> > Kukjin Kim wrote:
-> >> Russell wrote:
-> >> > So, memory starts at 0x20000000 and finishes at 0x25000000. ?That's
-> > fine.
-> >> > That doesn't mean the section size is 16MB.
-> >> >
-> >> > As I've already said, the section size has _nothing_ what so ever to
-do
-> >> > with the size of memory, or the granularity of the size of memory.
-?By
-> >> > way of illustration, it is perfectly legal to have a section size of
-> >> > 256MB but only have 1MB in a section and this is perfectly legal. ?So
-> >> > sections do not have to be completely filled.
-> >> >
-> >> Actually, as you know, the hole's area of mem_map is freed from bootmem
-if
-> > a
-> >> section has a hole when initializing sparse memory.
-> >>
-> >> I identified that a section doesn't need to be a contiguous area of
-> > physical
-> >> memory when reading your comment with the fact that the mem_map of a
-> > section
-> >> can be smaller than the size of a section.
-> >>
-> >> I found, however, the kernel panics when modifying min_free_kbytes file
-in
-> >> the proc filesystem if a section has a hole.
-> >>
-> >> While processing the change of min_free_kbytes in the kernel, page
-> >> descriptors in a hole of an online section is accessed.
-> >
-> > As I said, following error happens.
-> > It would be helpful to me if any opinions or comments.
-> >
-> 
-> Could you test below patch?
-> Also, you should select ARCH_HAS_HOLES_MEMORYMODEL in your config.
-> 
-Yes, I did it, and no kernel panic happens :-)
+Indeed, command line parameter pxa310.hss=312/208 sounds good
 
-Same test...
-[root at Samsung ~]# cat /proc/sys/vm/min_free_kbytes
-2736
-[root at Samsung ~]# echo "2730" > /proc/sys/vm/min_free_kbytes
-[root at Samsung ~]#
-[root at Samsung ~]# cat /proc/sys/vm/min_free_kbytes
-2730
+>   
+>>> Rgds, Pieter
+>>>
+>>>
+>>>       
+>> --
+>> Regards,
+>> Igor.
+>>
+>>
+>>     
+>   
 
-
-> @@ -2824,8 +2825,13 @@ static void setup_zone_migrate_reserve(struct zone
-> *zone)
->         for (pfn = start_pfn; pfn < end_pfn; pfn += pageblock_nr_pages) {
->                 if (!pfn_valid(pfn))
->                         continue;
-> +
->                 page = pfn_to_page(pfn);
-> 
-> +                /* Watch for unexpected holes punched in the memmap */
-> +                if (!memmap_valid_within(pfn, page, zone))
-> +                        continue;
-> +
->                 /* Watch out for overlapping nodes */
->                 if (page_to_nid(page) != zone_to_nid(zone))
->                         continue;
-> 
-> 
-> 
-
-...Could you please explain about this issue?
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Regards,
+Igor.
