@@ -1,177 +1,74 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Mon, 12 Jul 2010 11:56:08 +0900
-Subject: [PATCH] ARM: S5PV210: add clocks (struct clk).
-In-Reply-To: <038901cb216a$77f78030$67e68090$%kim@samsung.com>
-References: <1278395327-9072-1-git-send-email-myungjoo.ham@samsung.com>
-	<023a01cb1f0f$90a5da30$b1f18e90$%kim@samsung.com>
-	<AANLkTimCd5cDOZI1ylQEble1RQT6mYypTV9laizbNO2h@mail.gmail.com>
-	<AANLkTinAKps803FT_XiiBKqBRv0UNo4RYnpv8EPSn9-C@mail.gmail.com>
-	<038901cb216a$77f78030$67e68090$%kim@samsung.com>
-Message-ID: <AANLkTik-4PhFkUpzgssqlIkpYXeTOlI9OZjXLYlIQwKI@mail.gmail.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Mon, 12 Jul 2010 11:03:12 +0800
+Subject: [RFC,PATCH 2/2] arm: use addruart macro to establish debug mappings
+In-Reply-To: <1278903792.387175.713057245098.0.gpush@pororo>
+Message-ID: <1278903792.388155.428219242752.2.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Since we can call addruart with an argument to specify that we want a
+physical or virtual address, use addruart in the debug mapping code to
+find these addresses.
 
-On Mon, Jul 12, 2010 at 11:32 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> MyungJoo Ham wrote:
->>
->> Hello, again.
->>
-> Hi :-)
->
->> On Fri, Jul 9, 2010 at 11:59 AM, MyungJoo Ham <myungjoo.ham@samsung.com>
->> wrote:
->> > Hello,
->> >
->> > On Fri, Jul 9, 2010 at 11:36 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> >> MyungJoo Ham wrote:
->> >>>
->> >> Hi,
->> >>
->> >> Please include Ben Dooks in the Cc..
->> >> And...excuse me..who is benh at kernel.crashing.org?
->> >
->> > Ah.. I was confused by my own reply regarding common struct clk, which
->> > had benh at kernel.crashing.org as Cc. I'll update the CC setting.
->> >
->> >>
->> >>> Many clocks were not listed in the previous
->> >>> arch/arm/mach-s5pv210/clock.c
->> >>>
->> >>> We have added clocks defined as CLK_GATE_IPx[] in the user manual of
->> >>> S5PV210. However, the clocks that were not turned on at the boot time
->> >>> when tested with the previous kernel versions (2.6.32, 2.6.29) are
->> >>> defined in "init_clocks_disabled" so that they are turned off at the
->> >>> boot time.
->> >>
->> >> I think, no need to register all of clocks which are in the CLK_GATE_IPx
->> >> into 'init_clocks_disabled'..because it depends on each platform or project.
->> >>
->> >>>
->> >>> The clocks added from CLK_GATE_IPx are:
->> >>> ? ? ? CSIS, JPEG, FIMC0 - 2, NFCON, SROMC, TVENC, HDMI, MIXER, VP,
->> >>> ? ? ? DSIM, TSI, HOSTIF, MODEM, PCM0 - 2, I2C-HDMI-PHY, I2C-HDMI-DDC,
->> >>> ? ? ? AC97, SPDIF, SECKEY, IEM-APC, IEM-IEC, CHIP-ID, PDMA0 - 1,
->> >>> ? ? ? MDMA, DMC0 - 1, NANDXL, TZIC0 - 3, VIC0 - 3, SECJTAG,
->> CORESIGHT,
->> >>> ? ? ? SDM, SECSS, SYSCON, GPIO, TZPC0 - 3
->> >>>
->> >>
->> >> For example...in the case of JPEG, FIMC, disabling is better at the booting
->> >> time..because can be enabled dynamically in the device driver when it is
->> >> used.
->> >> But if CORESIGHT which does not having own driver is disabled at that time,
->> >> basically can't use JTAG debugger.
->> >>
->> >> So need to sort out clocks to register into 'init_clocks_disabled'
->> >>
->> >
->> > Yes, I agree. I'll put some clocks including CORESIGHT out of
->> > init_clocks_disabled.
->> >
->>
->> Oh.. well, CORESIGHT is not included in init_clocks_disabled in the patch.
->>
->> In this patch, PDMA, MDMA, DMC, NANDXL, TZIC, VIC, SECJTAG, CORESIGHT,
->> SDM, SECSS, SYSCON, GPIO, and TZPC are not added to
->> init_clocks_disabled, but to init_clocks.
->>
->> Only others including CSIS, JPEG, FIMC0 - 2, NFCON, SROMC, TVENC,
->> HDMI, MIXER, VP, DSIM, TSI, HOSTIF, MODEM, PCM0 - 2, I2C-HDMI-PHY,
->> I2C-HDMI-DDC, AC97, SPDIF, SECKEY, IEM-APC, IEM-IEC, and CHIP-ID are
->> added to init_clocks_disabled. In this list, are there any clocks that
->> should be out of init_clocks_disabled?
->>
-> Hmm..SROMC should be in 'init_clocks'...because eg., generally network which connected SROM bank, driver doesn't have clock enable code...
-> And others, looks ok...but frankly, need to check again ;-)
+Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
 
-Fine.
+---
+ arch/arm/Kconfig.debug |    1 -
+ arch/arm/kernel/head.S |   15 ++++++++++++---
+ 2 files changed, 12 insertions(+), 4 deletions(-)
 
-Anyway, I'm planning to include the initial states of clocks in struct clk.
-
-That is, adding "unsigned int flag", which include "BOOT_ON", "BOOT",
-and "CANNOT_DISABLE", and let s3c_register_clock function do the
-operation accordingly.
-
-This will merge init_clocks_disable and init_clocks and allow us more
-control over clocks.Besides, it makes it easier to support powerdomain
-and block-gating control. Note that if a powerdomain is controlled
-with only reference counter, it may turn off a powerdomain with a
-clock actually enabled (by the bootloader or by the process default)
-but not ever "clk_enable"'d. Adding such information explicitly with
-such flags can help.
-
-I will send patches of clock-powerdomain support and clock-flag support soon.
-
-
->
->> >
->> > Anyway, I've been considering adding "flag" to struct clk, which has
->> > the following bits:
->> >
->> > #define CLKFLAGS_BOOT_ON ? ? ? ?(0x1)
->> > #define CLKFLAGS_CANNOT_DISABLE (0x2)
->> > #define CLKFLAGS_ALWAYS_ON ? ? ?(CLKFLAGS_BOOT_ON |
->> CLKFLAGS_CANNOT_DISABLE)
->> > #define CLKFLAGS_BOOT_OFF ? ? ? (0x4) /* Force off when boot */
->> > #define CLKFLAGS_DEPRECATED ? ? (0x8) /* Warn when clk_get'd */
->> > /* Note that CLKFLAGS_BOOT_ON and CLKFLAGS_CANNOT_DISABLE
->> overrides
->> > ?* CLKFLAGS_BOOT_OFF */
->> >
->> > and merging init_clocks and init_clocks_disabled. This provides more
->> > precise control on clocks, and we've been using such features in other
->> > versions of the kernel. Besides, combined with
->> > powerdomain control, these flags are helpful on implementing
->> > powerdomain/block-gating control.
->> >
->> >
->> >>> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
->> >>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> >>> ---
->> >>> ?arch/arm/mach-s5pv210/clock.c | ?298
->> >>> ++++++++++++++++++++++++++++++++++++++++-
->> >>> ?1 files changed, 297 insertions(+), 1 deletions(-)
->> >>>
->> >>> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
->> >>> index b3d156c..aa2b1c5 100644
->> >>> --- a/arch/arm/mach-s5pv210/clock.c
->> >>> +++ b/arch/arm/mach-s5pv210/clock.c
->> >>
->> >> (snip)
->> >>
->> >> Thanks.
->> >>
->> >> Best regards,
->> >> Kgene.
->> >> --
->> >> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
->> >> SW Solution Development Team, Samsung Electronics Co., Ltd.
->> >>
->> >>
->
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
-
--- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index fbb094a..91344af 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -65,7 +65,6 @@ config DEBUG_STACK_USAGE
+ # These options are only for real kernel hackers who want to get their hands dirty.
+ config DEBUG_LL
+ 	bool "Kernel low-level debugging functions"
+-	depends on !OF
+ 	depends on DEBUG_KERNEL
+ 	help
+ 	  Say Y here to include definitions of printascii, printch, printhex
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 8bfc4bb..9571996 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -22,6 +22,10 @@
+ #include <asm/thread_info.h>
+ #include <asm/system.h>
+ 
++#ifdef CONFIG_DEBUG_LL
++#include <mach/debug-macro.S>
++#endif
++
+ #if (PHYS_OFFSET & 0x001fffff)
+ #error "PHYS_OFFSET must be at an even 2MiB boundary!"
+ #endif
+@@ -305,19 +309,24 @@ __create_page_tables:
+ 	str	r6, [r0]
+ 
+ #ifdef CONFIG_DEBUG_LL
+-	ldr	r7, [r10, #PROCINFO_IO_MMUFLAGS] @ io_mmuflags
+ 	/*
+ 	 * Map in IO space for serial debugging.
+ 	 * This allows debug messages to be output
+ 	 * via a serial console before paging_init.
+ 	 */
+-	ldr	r3, [r8, #MACHINFO_PGOFFIO]
++	mov	r3, #1
++	addruart r3, r0
++	lsr	r3, r3, #20
++	lsl	r3, r3, #2
++
+ 	add	r0, r4, r3
+ 	rsb	r3, r3, #0x4000			@ PTRS_PER_PGD*sizeof(long)
+ 	cmp	r3, #0x0800			@ limit to 512MB
+ 	movhi	r3, #0x0800
+ 	add	r6, r0, r3
+-	ldr	r3, [r8, #MACHINFO_PHYSIO]
++	mov	r3, #0
++	addruart r3, r7
++	ldr	r7, [r10, #PROCINFO_IO_MMUFLAGS] @ io_mmuflags
+ 	orr	r3, r3, r7
+ 1:	str	r3, [r0], #4
+ 	add	r3, r3, #1 << 20
