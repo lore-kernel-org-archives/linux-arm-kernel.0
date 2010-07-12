@@ -1,37 +1,55 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 12 Jul 2010 16:34:04 -0700
-Subject: ARM defconfig files
-In-Reply-To: <AANLkTimho3rcoCZZ2PlC3B3KIZZhsEiTnTk-__n1q_Dy@mail.gmail.com>
-References: <alpine.LFD.2.00.1006030725420.8175@i5.linux-foundation.org>
-	<201007121605.32462.davidb@codeaurora.org>
-	<AANLkTimho3rcoCZZ2PlC3B3KIZZhsEiTnTk-__n1q_Dy@mail.gmail.com>
-Message-ID: <201007121634.04427.davidb@codeaurora.org>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 12 Jul 2010 16:52:28 -0700
+Subject: [PATCH 1/3] sdhci-s3c: add missing remove function
+In-Reply-To: <000201cb21b1$fc69c7f0$f53d57d0$%szyprowski@samsung.com>
+References: <1276670996-17729-1-git-send-email-m.szyprowski@samsung.com>
+	<1276670996-17729-2-git-send-email-m.szyprowski@samsung.com>
+	<20100709142617.50892f8b.akpm@linux-foundation.org>
+	<000201cb21b1$fc69c7f0$f53d57d0$%szyprowski@samsung.com>
+Message-ID: <20100712165228.ea719738.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 July 2010 16:18:01 Linus Torvalds wrote:
+On Mon, 12 Jul 2010 13:04:09 +0200
+Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 
-> 2010/7/12 David Brown <davidb@codeaurora.org>:
-> >
-> > Do you have scripts or tools that you did this with, or is a manual
-> > process.  We're about to add several new (ARM) targets, and it'd be
-> > nice to be able to make small defconfigs for those targets as well.
+> > >  static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
+> > >  {
+> > > +	struct sdhci_host *host =  platform_get_drvdata(pdev);
+> > > +	struct sdhci_s3c *sc = sdhci_priv(host);
+> > > +	int ptr;
+> > > +
+> > > +	sdhci_remove_host(host, 1);
+> > > +
+> > > +	for (ptr = 0; ptr < 3; ptr++) {
+> > > +		clk_disable(sc->clk_bus[ptr]);
+> > > +		clk_put(sc->clk_bus[ptr]);
+> > > +	}
+> > > +	clk_disable(sc->clk_io);
+> > > +	clk_put(sc->clk_io);
+> > > +
+> > > +	iounmap(host->ioaddr);
+> > > +	release_resource(sc->ioarea);
+> > > +	kfree(sc->ioarea);
+> > > +
+> > > +	sdhci_free_host(host);
+> > > +	platform_set_drvdata(pdev, NULL);
+> > > +
+> > >  	return 0;
+> > >  }
+> > 
+> > This looks like it fixes a pretty serious omission.  What happens if
+> > the user rmmods this driver on a 2.6.34 kernel?
 > 
-> Uwe posted it earlier in this thread as an attachement, and I put the
-> python script into the merge commit message too. And we should
-> probably put it somewhere in scripts too, and/or make a 'make' target
-> to create the small config files.
+> System will crash sooner or later once the memory with the code of the
+> s3c-sdhci.ko module is reused for something else. I really have no idea
+> how the lack of remove function went unnoticed into the mainline code.
+>  
+> > Because I have a suspicion that this fix should be backported into
+> > 2.6.34.x?
 > 
-> I pushed it all out, and tagged it as -rc5.
+> Right, this is really a good idea. This patch applies cleanly onto
+> v2.6.34 too.
 
-Got it, thanks.  I just pulled a bit soon.
-
-It seems a bit brute force, probably not something I can make part of
-our regular build process, but I can definitely run it before sending
-patches out.
-
-I wonder if there's a more efficient way of doing it that doesn't
-involve invoking make for each line of the file.  It at least
-shouldn't be necessary to actually build the kernel each time.
-
-David
+OK, thanks, I added the Cc: <stable@kernel.org> to the changelog and
+moved the patch into my for-2.6.35 queue.
