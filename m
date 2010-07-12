@@ -1,62 +1,28 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 12 Jul 2010 13:20:08 +0900
-Subject: [PATCH] ARM: S5P: Add PMU device
-In-Reply-To: <4C328B51.5000500@samsung.com>
-References: <1278294411-5104-1-git-send-email-jy0922.shim@samsung.com>
-	<4C31C47C.1050905@gmail.com>
-	<006c01cb1c41$a0af5c10$e20e1430$%kim@samsung.com>
-	<4C328B51.5000500@samsung.com>
-Message-ID: <038e01cb2179$861f9fd0$925edf70$%kim@samsung.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sun, 11 Jul 2010 23:39:07 -0400 (EDT)
+Subject: [RFC,PATCH 0/2] Allow late mdesc detection
+In-Reply-To: <1278903792.387175.713057245098.0.gpush@pororo>
+References: <1278903792.387175.713057245098.0.gpush@pororo>
+Message-ID: <alpine.LFD.2.00.1007112334390.10598@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joonyoung Shim wrote:
-> 
-> On 7/5/2010 9:57 PM, Kukjin Kim wrote:
-> > Maurus Cuelenaere wrote:
-> >>  Op 05-07-10 03:46, Joonyoung Shim schreef:
-> >>> This patch adds an initcall for the s5p platforms so that they register
-> >>> their PMU IRQs with the PMU framework in the Kernel.
-> >>>
-> >>> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-> >>> ---
-> >>>  arch/arm/mach-s5p6442/include/mach/irqs.h |    2 +-
-> >>>  arch/arm/mach-s5pc100/include/mach/irqs.h |    1 +
-> >>>  arch/arm/mach-s5pv210/include/mach/irqs.h |    1 +
-> >>>  arch/arm/plat-s5p/Makefile                |    1 +
-> >>>  arch/arm/plat-s5p/dev-pmu.c               |   37
-> >> +++++++++++++++++++++++++++++
-> >>>  5 files changed, 41 insertions(+), 1 deletions(-)
-> >>>  create mode 100644 arch/arm/plat-s5p/dev-pmu.c
-> >> Wouldn't it be better if this was in plat-samsung? I can see that the S3C6410
-> >> datasheet mentions a PMU_IRQ_ENABLE bit in SYS_OTHERS so I suspect
-> that it
-> >> has
-> >> the same functionality (even though there's no mention of which interrupt this
-> >> is).
-> >>
-> > Yes, I also found PMU_IRQ_ENABLE bit in System Others register of S3C6410
-> datasheet. But as your comments, could not found the interrupt number and any
-> description...Actually, need to check whether it's available or not.
-> >
-> 
-> Right, please check it, i cannot do it.
-> 
-As you know, there is PMU_IRQ_ENABLE bit on S3C6410.
-But don't have any interrupt line. So cannot support PMU on S3C6410 as is.
+On Mon, 12 Jul 2010, Jeremy Kerr wrote:
 
-> > And S5P6440 has it.
-> > So Joonyoung, it would be helpful if you could add 6440 PMUIRQ (VIC1[23]) in
-> this patch.
-> >
+> Hi all,
 > 
-> It already was added.
+> Currently, we probe for a mdesc early in boot. At this early stage, the
+> only thing we use the mdesc for is to determine the debug page mapping.
 > 
+> However, the debug addresses (phys and virt) need to be coded into the
+> addruart macro anyway; the dynamic probing is only going to tell us what
+> we already know.
 
-Thanks.
+The fundamental problem with those patches is that we actually want to 
+move in the opposite direction for the eventual support of multiple SOCs 
+in the same kernel, i.e. rely on the machine ID -> mdesc to determine 
+the right debug addresses at run time and eventually make the addruart 
+into something that is not hardcoded at compile time.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+Nicolas
