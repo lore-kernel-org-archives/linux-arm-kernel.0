@@ -1,27 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Jul 2010 09:07:40 +0100
-Subject: [PATCH v4] GPIO PL061: Adding Clk framework support
-In-Reply-To: <4C3A950F.5040900@st.com>
-References: <1277183247-4557-1-git-send-email-viresh.kumar@st.com>
-	<20100709124050.GF22845@n2100.arm.linux.org.uk>
-	<4C3A950F.5040900@st.com>
-Message-ID: <20100712080740.GB22138@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 12 Jul 2010 10:11:06 +0200
+Subject: [RFC PATCH 1/2] allow each machine to specify it's own IRQ
+	handlers at run-time
+In-Reply-To: <AANLkTin9OHUGtKSg7554ucVhufQ3PiKXALmD0Lh7A-yt@mail.gmail.com>
+References: <AANLkTin9OHUGtKSg7554ucVhufQ3PiKXALmD0Lh7A-yt@mail.gmail.com>
+Message-ID: <20100712081106.GB1532@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 12, 2010 at 09:37:43AM +0530, Viresh KUMAR wrote:
-> This issue is different from the issue i raised which was common to
-> all amba devices. This is just for this GPIO driver, we need to enable clk
-> before using any gpio pin.
+Hello Eric,
 
-PL061 does not have any other clock signal other than PCLK, the APB (AMBA
-peripheral bus) clock.  This clock needs to be running to access any
-register in an APB peripheral.  The primecell drivers and AMBA support
-is currently implemented with the assumtion that this clock is
-permanently running.
+On Sat, May 22, 2010 at 12:23:29PM +0800, Eric Miao wrote:
+> commit edec494b3dbf52a61a18b484dd05cce6a9d90e2f
+> Author: Eric Miao <eric.y.miao@gmail.com>
+> Date:   Sat May 22 11:58:01 2010 +0800
+> 
+>     [ARM] allow each machine to specify it's own IRQ handlers at run-time
+> 
+>     Normally different ARM platform has different way to decode the IRQ
+>     hardware status and demultiplex to the corresponding IRQ handler.
+>     This is highly optimized by macro irq_handler in entry-armv.S, and
+>     each machine class defines their own macro to decode the IRQ number.
+>     However, this prevents multiple machine classes to be built into a
+>     single kernel.
+> 
+>     By allowing each machine to specify thier own handler, and making
+>     function pointer 'handle_arch_irq' to point to it at run time, this
+>     can be solved. And introduce CONFIG_MULTI_IRQ_HANDLER to allow both
+>     solutions to work.
+> 
+>     Comparing with the highly optimized macro of irq_handler, the new
+>     function must be written with care not to lose too much performance.
+> 
+>     Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+I didn't thought it would be that easy.  Nice.
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-If you need to enable a clock before using any GPIO pin, and it's not the
-APB clock, then that's a platform extension that is outside of the PL061
-domain, and probably also affects alternate functions of the GPIO pins as
-well.  That means the PL061 code shouldn't manage that clock signal as it
-won't know what's going on with the alternate functions.
+Best regards
+Uwe
