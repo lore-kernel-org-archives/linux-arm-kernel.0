@@ -1,69 +1,32 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 12 Jul 2010 15:26:00 +0200
-Subject: [PATCH 02/19] arm pxafb: add Pixel Clock Divisor (LCCR4_PCDDIV)
-	bit support.
-In-Reply-To: <1270121891-3193-1-git-send-email-giometti@linux.it>
-References: <1270121891-3193-1-git-send-email-giometti@linux.it>
-Message-ID: <201007121526.00937.marek.vasut@gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 12 Jul 2010 16:28:47 +0300
+Subject: [PATCH v2 0/3] s3c24xx: iPAQ rx1950 series
+In-Reply-To: <1278781069-30521-1-git-send-email-anarsoul@gmail.com>
+References: <1278781069-30521-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <201007121628.58271.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 1. dubna 2010 13:38:11 Rodolfo Giometti napsal(a):
-> Signed-off-by: Rodolfo Giometti <giometti@linux.it>
-> Acked-by: Raffaele Recalcati <raffaele.recalcati@bticino.it>
-> Acked-by: Enrico Valtolina <enrico.valtolina@bticino.it>
+? ????????? ?? 10 ???? 2010 19:57:46 ????? Vasily Khoruzhick ???????:
+> This patch series adds more support for iPAQ rx1950 PDA to linux:
+> 1. LEDs driver -- it controls blue, green and red LEDs on rx1950
+> 2. Battery driver -- adds ability to monitor and charge battery.
+> This driver is suitable for H1940 PDA aswell (just need to write
+> some machine specific callbacks and get voltage LUTs)
+> 
+> v2: removed ac registration from s3c_adc_battery driver, use
+> pda_power instead for ac support.
+> 
+> P.S. I prefer to keep own LED triggers for s3c_adc_battery as
+> generic power supply triggers do not support LED_HALF brightness
+> (on h1940/rx1950 it's used for blink) and I want to keep same
+> LEDs behavior as in WinMo.
 
-Any updates?
-> ---
->  arch/arm/mach-pxa/include/mach/pxafb.h    |    1 +
->  arch/arm/mach-pxa/include/mach/regs-lcd.h |    1 +
->  drivers/video/pxafb.c                     |    4 +++-
->  3 files changed, 5 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/include/mach/pxafb.h
-> b/arch/arm/mach-pxa/include/mach/pxafb.h index 160ec83..b2530c5 100644
-> --- a/arch/arm/mach-pxa/include/mach/pxafb.h
-> +++ b/arch/arm/mach-pxa/include/mach/pxafb.h
-> @@ -61,6 +61,7 @@
->  #define LCD_PCLK_EDGE_RISE	(0 << 19)
->  #define LCD_PCLK_EDGE_FALL	(1 << 19)
->  #define LCD_ALTERNATE_MAPPING	(1 << 20)
-> +#define LCD_PCDDIV_1		(1 << 21)
-> 
->  /*
->   * This structure describes the machine which we are running on.
-> diff --git a/arch/arm/mach-pxa/include/mach/regs-lcd.h
-> b/arch/arm/mach-pxa/include/mach/regs-lcd.h index f82dcea..65b711a 100644
-> --- a/arch/arm/mach-pxa/include/mach/regs-lcd.h
-> +++ b/arch/arm/mach-pxa/include/mach/regs-lcd.h
-> @@ -46,6 +46,7 @@
->  #define LCCR4_PAL_FOR_2	(2 << 15)
->  #define LCCR4_PAL_FOR_3	(3 << 15)
->  #define LCCR4_PAL_FOR_MASK	(3 << 15)
-> +#define LCCR4_PCDDIV	(1 << 31)
-> 
->  #define FDADR0		(0x200)	/* DMA Channel 0 Frame Descriptor 
-Address Register
-> */ #define FDADR1		(0x210)	/* DMA Channel 1 Frame Descriptor 
-Address
-> Register */ diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
-> index 825b665..8cba420 100644
-> --- a/drivers/video/pxafb.c
-> +++ b/drivers/video/pxafb.c
-> @@ -1355,7 +1355,7 @@ static int pxafb_activate_var(struct
-> fb_var_screeninfo *var, fbi->reg_lccr3 |= pxafb_var_to_lccr3(var);
-> 
->  	fbi->reg_lccr4 = lcd_readl(fbi, LCCR4) & ~LCCR4_PAL_FOR_MASK;
-> -	fbi->reg_lccr4 |= (fbi->lccr4 & LCCR4_PAL_FOR_MASK);
-> +	fbi->reg_lccr4 |= (fbi->lccr4 & (LCCR4_PAL_FOR_MASK | LCCR4_PCDDIV));
->  	local_irq_restore(flags);
-> 
->  	/*
-> @@ -1738,6 +1738,8 @@ static void pxafb_decode_mach_info(struct pxafb_info
-> *fbi, fbi->lccr3 |= (lcd_conn & LCD_BIAS_ACTIVE_LOW) ? LCCR3_OEP : 0;
->  	fbi->lccr3 |= (lcd_conn & LCD_PCLK_EDGE_FALL)  ? LCCR3_PCP : 0;
-> 
-> +	fbi->lccr4 |= (lcd_conn & LCD_PCDDIV_1) ? LCCR4_PCDDIV : 0;
-> +
->  decode_mode:
->  	pxafb_setmode(&fbi->fb.var, &inf->modes[0]);
+Ping :)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100712/722bcf65/attachment.sig>
