@@ -1,35 +1,69 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 12 Jul 2010 09:12:10 -0400 (EDT)
-Subject: [RFC PATCH 1/2] allow each machine to specify it's own IRQ
-	handlers at run-time
-In-Reply-To: <20100712130222.GA14425@pengutronix.de>
-References: <AANLkTin9OHUGtKSg7554ucVhufQ3PiKXALmD0Lh7A-yt@mail.gmail.com>
-	<20100712081106.GB1532@pengutronix.de>
-	<20100712081245.GC22138@n2100.arm.linux.org.uk>
-	<20100712130222.GA14425@pengutronix.de>
-Message-ID: <alpine.LFD.2.00.1007120911110.10598@xanadu.home>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 12 Jul 2010 15:26:00 +0200
+Subject: [PATCH 02/19] arm pxafb: add Pixel Clock Divisor (LCCR4_PCDDIV)
+	bit support.
+In-Reply-To: <1270121891-3193-1-git-send-email-giometti@linux.it>
+References: <1270121891-3193-1-git-send-email-giometti@linux.it>
+Message-ID: <201007121526.00937.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Jul 2010, Uwe Kleine-K?nig wrote:
+Dne ?t 1. dubna 2010 13:38:11 Rodolfo Giometti napsal(a):
+> Signed-off-by: Rodolfo Giometti <giometti@linux.it>
+> Acked-by: Raffaele Recalcati <raffaele.recalcati@bticino.it>
+> Acked-by: Enrico Valtolina <enrico.valtolina@bticino.it>
 
-> On Mon, Jul 12, 2010 at 09:12:45AM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Jul 12, 2010 at 10:11:06AM +0200, Uwe Kleine-K?nig wrote:
-> > > I didn't thought it would be that easy.  Nice.
-> > > Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > 
-> > It isn't - if you enable this, your platform will break because
-> > there's no implementations of it.  That makes this patch rather
-> > hard to ack on its own.
-> Well, I didn't test the patch but still noticed that additional code is
-> needed to make use of it.  And what I saw looked reasonable.  As the
-> Kconfig symbol isn't selected (until now) it doesn't seem to break
-> anything.
+Any updates?
+> ---
+>  arch/arm/mach-pxa/include/mach/pxafb.h    |    1 +
+>  arch/arm/mach-pxa/include/mach/regs-lcd.h |    1 +
+>  drivers/video/pxafb.c                     |    4 +++-
+>  3 files changed, 5 insertions(+), 1 deletions(-)
 > 
-> Does I need more to give my Ack?
-
-FYI, I'm NAKing the patch for the moment.  Please see the comment I'm 
-about to post.
-
-
-Nicolas
+> diff --git a/arch/arm/mach-pxa/include/mach/pxafb.h
+> b/arch/arm/mach-pxa/include/mach/pxafb.h index 160ec83..b2530c5 100644
+> --- a/arch/arm/mach-pxa/include/mach/pxafb.h
+> +++ b/arch/arm/mach-pxa/include/mach/pxafb.h
+> @@ -61,6 +61,7 @@
+>  #define LCD_PCLK_EDGE_RISE	(0 << 19)
+>  #define LCD_PCLK_EDGE_FALL	(1 << 19)
+>  #define LCD_ALTERNATE_MAPPING	(1 << 20)
+> +#define LCD_PCDDIV_1		(1 << 21)
+> 
+>  /*
+>   * This structure describes the machine which we are running on.
+> diff --git a/arch/arm/mach-pxa/include/mach/regs-lcd.h
+> b/arch/arm/mach-pxa/include/mach/regs-lcd.h index f82dcea..65b711a 100644
+> --- a/arch/arm/mach-pxa/include/mach/regs-lcd.h
+> +++ b/arch/arm/mach-pxa/include/mach/regs-lcd.h
+> @@ -46,6 +46,7 @@
+>  #define LCCR4_PAL_FOR_2	(2 << 15)
+>  #define LCCR4_PAL_FOR_3	(3 << 15)
+>  #define LCCR4_PAL_FOR_MASK	(3 << 15)
+> +#define LCCR4_PCDDIV	(1 << 31)
+> 
+>  #define FDADR0		(0x200)	/* DMA Channel 0 Frame Descriptor 
+Address Register
+> */ #define FDADR1		(0x210)	/* DMA Channel 1 Frame Descriptor 
+Address
+> Register */ diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
+> index 825b665..8cba420 100644
+> --- a/drivers/video/pxafb.c
+> +++ b/drivers/video/pxafb.c
+> @@ -1355,7 +1355,7 @@ static int pxafb_activate_var(struct
+> fb_var_screeninfo *var, fbi->reg_lccr3 |= pxafb_var_to_lccr3(var);
+> 
+>  	fbi->reg_lccr4 = lcd_readl(fbi, LCCR4) & ~LCCR4_PAL_FOR_MASK;
+> -	fbi->reg_lccr4 |= (fbi->lccr4 & LCCR4_PAL_FOR_MASK);
+> +	fbi->reg_lccr4 |= (fbi->lccr4 & (LCCR4_PAL_FOR_MASK | LCCR4_PCDDIV));
+>  	local_irq_restore(flags);
+> 
+>  	/*
+> @@ -1738,6 +1738,8 @@ static void pxafb_decode_mach_info(struct pxafb_info
+> *fbi, fbi->lccr3 |= (lcd_conn & LCD_BIAS_ACTIVE_LOW) ? LCCR3_OEP : 0;
+>  	fbi->lccr3 |= (lcd_conn & LCD_PCLK_EDGE_FALL)  ? LCCR3_PCP : 0;
+> 
+> +	fbi->lccr4 |= (lcd_conn & LCD_PCDDIV_1) ? LCCR4_PCDDIV : 0;
+> +
+>  decode_mode:
+>  	pxafb_setmode(&fbi->fb.var, &inf->modes[0]);
