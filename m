@@ -1,24 +1,33 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Mon, 12 Jul 2010 12:50:35 +0100
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 12 Jul 2010 12:53:33 +0100
 Subject: [PATCH v2 1/3] ARM: Introduce *_relaxed() I/O accessors
-In-Reply-To: <201007121339.48719.arnd@arndb.de>
+In-Reply-To: <20100712115035.GA7559@shareable.org>
 References: <20100709110350.11333.34303.stgit@e102109-lin.cambridge.arm.com>
 	<201007092130.17504.arnd@arndb.de>
 	<1278714714.30012.14.camel@e102109-lin.cambridge.arm.com>
 	<201007121339.48719.arnd@arndb.de>
-Message-ID: <20100712115035.GA7559@shareable.org>
+	<20100712115035.GA7559@shareable.org>
+Message-ID: <1278935613.9481.20.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> Ah, that's right: writel and outl both need the barrier before the access,
-> but writel will never need a barrier after the access.
-> The x86 variant of outl also has the implicit ordering after the access,
-> but I'm not sure if we need to emulate that. I can't currently think
-> of a case where it's strictly required because any later access to the same
-> PCI function will be ordered anyway.
+On Mon, 2010-07-12 at 12:50 +0100, Jamie Lokier wrote:
+> Arnd Bergmann wrote:
+> > Ah, that's right: writel and outl both need the barrier before the access,
+> > but writel will never need a barrier after the access.
+> > The x86 variant of outl also has the implicit ordering after the access,
+> > but I'm not sure if we need to emulate that. I can't currently think
+> > of a case where it's strictly required because any later access to the same
+> > PCI function will be ordered anyway.
+> 
+> What about those ARMs which can buffer a write for an indefinite period?
+> Do any drivers expect writes to be posted in a reasonably short time?
 
-What about those ARMs which can buffer a write for an indefinite period?
-Do any drivers expect writes to be posted in a reasonably short time?
+Writing to any device is not guaranteed to succeed (i.e. change the
+state of the device) in a certain amount of time (this is probably the
+case on x86 as well). If you need this certainty in the code, you do a
+read back from the device. Since Device memory accesses are ordered in
+ARM, we don't need additional barriers for such situations.
 
--- Jamie
+-- 
+Catalin
