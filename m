@@ -1,64 +1,110 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Mon, 12 Jul 2010 10:37:25 +0800
-Subject: [PATCH 2/2] clk: Generic support for fixed-rate clocks
-In-Reply-To: <1278902245.965352.293245076889.0.gpush@pororo>
-Message-ID: <1278902245.966134.443547423568.2.gpush@pororo>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 12 Jul 2010 11:38:26 +0900
+Subject: [PATCH v5] libata: pata_samsung: Add Samsung PATA controller
+	driver
+In-Reply-To: <4C399D8B.2050700@ru.mvista.com>
+References: <1277809518-1122-1-git-send-email-kgene.kim@samsung.com>
+	<4C399D8B.2050700@ru.mvista.com>
+Message-ID: <038a01cb216b$50d143a0$f273cae0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since most platforms will need a fixed-rate clock, add one. This will
-also serve as a basic example of an implementation of struct clk.
+Sergei Shtylyov wrote:
+> 
+> Hello.
 
-Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+Hi ;-)
+> 
+> Kukjin Kim wrote:
+> 
+> > From: Abhilash Kesavan <a.kesavan@samsung.com>
+> 
+> > Adds support for the Samsung PATA controller. This driver is based on
+the
+> > Libata subsystem and references the earlier patches sent for IDE
+subsystem.
+> 
+> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > Cc: Ben Dooks <ben-linux@fluff.org>
+> 
+>     Looks like there's issues still...
+> 
+Ok...thanks for your review.
 
----
- include/linux/clk.h |   13 +++++++++++++
- kernel/clk.c        |   14 ++++++++++++++
- 2 files changed, 27 insertions(+)
+> [...]
+> 
+> > diff --git a/drivers/ata/pata_samsung_cf.c
+b/drivers/ata/pata_samsung_cf.c
+> > new file mode 100644
+> > index 0000000..26b96c3
+> > --- /dev/null
+> > +++ b/drivers/ata/pata_samsung_cf.c
+> > @@ -0,0 +1,728 @@
+> > +/*
+> > + * pata_s3c_tf_load - send taskfile registers to host controller
+> > + */
+> > +static void pata_s3c_tf_load(struct ata_port *ap,
+> > +				const struct ata_taskfile *tf)
+> > +{
+> > +	struct ata_ioports *ioaddr = &ap->ioaddr;
+> > +	unsigned int is_addr = tf->flags & ATA_TFLAG_ISADDR;
+> > +
+> > +	if (tf->ctl != ap->last_ctl) {
+> > +		ata_outb(ap->host, tf->ctl, ioaddr->ctl_addr);
+> > +		ap->last_ctl = tf->ctl;
+> > +		ata_wait_idle(ap);
+> > +	}
+> > +
+> 
+> [...]
+> 
+> > +/*
+> > + * pata_s3c_tf_read - input device's ATA taskfile shadow registers
+> > + */
+> > +static void pata_s3c_tf_read(struct ata_port *ap, struct ata_taskfile
+*tf)
+> > +{
+> > +	struct ata_ioports *ioaddr = &ap->ioaddr;
+> > +
+> > +	tf->feature = ata_inb(ap->host, ioaddr->error_addr);
+> > +	tf->nsect = ata_inb(ap->host, ioaddr->nsect_addr);
+> > +	tf->lbal = ata_inb(ap->host, ioaddr->lbal_addr);
+> > +	tf->lbam = ata_inb(ap->host, ioaddr->lbam_addr);
+> > +	tf->lbah = ata_inb(ap->host, ioaddr->lbah_addr);
+> > +	tf->device = ata_inb(ap->host, ioaddr->device_addr);
+> > +
+> > +	if (tf->flags & ATA_TFLAG_LBA48) {
+> > +		iowrite8(tf->ctl | ATA_HOB, ioaddr->ctl_addr);
+> > +		tf->hob_feature = ata_inb(ap->host, ioaddr->error_addr);
+> > +		tf->hob_nsect = ata_inb(ap->host, ioaddr->nsect_addr);
+> > +		tf->hob_lbal = ata_inb(ap->host, ioaddr->lbal_addr);
+> > +		tf->hob_lbam = ata_inb(ap->host, ioaddr->lbam_addr);
+> > +		tf->hob_lbah = ata_inb(ap->host, ioaddr->lbah_addr);
+> > +		iowrite8(tf->ctl, ioaddr->ctl_addr);
+> 
+>     I don't understand why you're using ata_outb() to awrite to the device
+> control register in tf_load() method but use iowrite8() here...
+> 
+Oh, I missed these two calls..will replace with ata_outb().
 
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index a95cc82..85e1d44 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -90,6 +90,19 @@ static inline void clk_common_init(struct clk *clk)
- 	clk->enable_count = 0;
- }
- 
-+/* Simple fixed-rate clock */
-+struct clk_fixed {
-+	struct clk	clk;
-+	unsigned long	rate;
-+};
-+
-+extern struct clk_ops clk_fixed_ops;
-+
-+#define INIT_CLK_FIXED(r) { \
-+	.clk = INIT_CLK(clk_fixed_ops), \
-+	.rate = (r) \
-+}
-+
- #else /* !CONFIG_USE_COMMON_STRUCT_CLK */
- 
- /*
-diff --git a/kernel/clk.c b/kernel/clk.c
-index cdea25f..32f25ef 100644
---- a/kernel/clk.c
-+++ b/kernel/clk.c
-@@ -99,3 +99,17 @@ struct clk *clk_get_parent(struct clk *clk)
- 	return ERR_PTR(-ENOSYS);
- }
- EXPORT_SYMBOL_GPL(clk_get_parent);
-+
-+/* clk_fixed support */
-+
-+#define to_clk_fixed(clk) (container_of(clk, struct clk_fixed, clk))
-+
-+static unsigned long clk_fixed_get_rate(struct clk *clk)
-+{
-+	return to_clk_fixed(clk)->rate;
-+}
-+
-+struct clk_ops clk_fixed_ops = {
-+	.get_rate = clk_fixed_get_rate,
-+};
-+EXPORT_SYMBOL_GPL(clk_fixed_ops);
+> > +#ifdef CONFIG_PM
+> > +static int pata_s3c_suspend(struct device *dev)
+> > +{
+> > +	struct platform_device *pdev = to_platform_device(dev);
+> > +	struct ata_host *host = platform_get_drvdata(pdev);
+> > +	pm_message_t state = PMSG_SUSPEND;
+> 
+>     Don't see why this variable is needed...
+> 
+Ok..will directly use PMSG_SUSPEND.
+
+Will re-submit soon.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
