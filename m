@@ -1,66 +1,115 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 12 Jul 2010 12:16:34 +0200
-Subject: [PATCH 2/3] sdhci-s3c: add support for the non standard minimal
-	clock value
-In-Reply-To: <20100709141903.d883ad05.akpm@linux-foundation.org>
-References: <1276670996-17729-1-git-send-email-m.szyprowski@samsung.com>
-	<1276670996-17729-3-git-send-email-m.szyprowski@samsung.com>
-	<20100709141903.d883ad05.akpm@linux-foundation.org>
-Message-ID: <000001cb21ab$525bc020$f7134060$%szyprowski@samsung.com>
+From: minchan.kim@gmail.com (Minchan Kim)
+Date: Mon, 12 Jul 2010 19:35:17 +0900
+Subject: About SECTION_SIZE_BITS for Sparsemem
+In-Reply-To: <001b01cb21aa$ef0e4d80$cd2ae880$%kim@samsung.com>
+References: <000601cb219c$c7830b60$56892220$%kim@samsung.com>
+	<AANLkTinTrt7VKuKvleiJj4lv2tWqCcDYHVXAQIHLA7bh@mail.gmail.com>
+	<001b01cb21aa$ef0e4d80$cd2ae880$%kim@samsung.com>
+Message-ID: <AANLkTinkujX3VbL0sXjjghovr8eX9Os0huw3OTBut2UP@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi, Mel and Kame.
 
-On Friday, July 09, 2010 11:19 PM Andrew Morton wrote:
+On Mon, Jul 12, 2010 at 7:13 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Minchan Kim wrote:
+>>
+>> Hello.
+>>
+> Hello :-)
+>
+>> On Mon, Jul 12, 2010 at 5:32 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> > Russell,
+>> >
+>> > Hi,
+>> >
+>> > Kukjin Kim wrote:
+>> >> Russell wrote:
+>> >> > So, memory starts at 0x20000000 and finishes at 0x25000000. ?That's
+>> > fine.
+>> >> > That doesn't mean the section size is 16MB.
+>> >> >
+>> >> > As I've already said, the section size has _nothing_ what so ever to
+> do
+>> >> > with the size of memory, or the granularity of the size of memory.
+> ?By
+>> >> > way of illustration, it is perfectly legal to have a section size of
+>> >> > 256MB but only have 1MB in a section and this is perfectly legal. ?So
+>> >> > sections do not have to be completely filled.
+>> >> >
+>> >> Actually, as you know, the hole's area of mem_map is freed from bootmem
+> if
+>> > a
+>> >> section has a hole when initializing sparse memory.
+>> >>
+>> >> I identified that a section doesn't need to be a contiguous area of
+>> > physical
+>> >> memory when reading your comment with the fact that the mem_map of a
+>> > section
+>> >> can be smaller than the size of a section.
+>> >>
+>> >> I found, however, the kernel panics when modifying min_free_kbytes file
+> in
+>> >> the proc filesystem if a section has a hole.
+>> >>
+>> >> While processing the change of min_free_kbytes in the kernel, page
+>> >> descriptors in a hole of an online section is accessed.
+>> >
+>> > As I said, following error happens.
+>> > It would be helpful to me if any opinions or comments.
+>> >
+>>
+>> Could you test below patch?
+>> Also, you should select ARCH_HAS_HOLES_MEMORYMODEL in your config.
+>>
+> Yes, I did it, and no kernel panic happens :-)
+>
+> Same test...
+> [root at Samsung ~]# cat /proc/sys/vm/min_free_kbytes
+> 2736
+> [root at Samsung ~]# echo "2730" > /proc/sys/vm/min_free_kbytes
+> [root at Samsung ~]#
+> [root at Samsung ~]# cat /proc/sys/vm/min_free_kbytes
+> 2730
+>
+>
+>> @@ -2824,8 +2825,13 @@ static void setup_zone_migrate_reserve(struct zone
+>> *zone)
+>> ? ? ? ? for (pfn = start_pfn; pfn < end_pfn; pfn += pageblock_nr_pages) {
+>> ? ? ? ? ? ? ? ? if (!pfn_valid(pfn))
+>> ? ? ? ? ? ? ? ? ? ? ? ? continue;
+>> +
+>> ? ? ? ? ? ? ? ? page = pfn_to_page(pfn);
+>>
+>> + ? ? ? ? ? ? ? ?/* Watch for unexpected holes punched in the memmap */
+>> + ? ? ? ? ? ? ? ?if (!memmap_valid_within(pfn, page, zone))
+>> + ? ? ? ? ? ? ? ? ? ? ? ?continue;
+>> +
+>> ? ? ? ? ? ? ? ? /* Watch out for overlapping nodes */
+>> ? ? ? ? ? ? ? ? if (page_to_nid(page) != zone_to_nid(zone))
+>> ? ? ? ? ? ? ? ? ? ? ? ? continue;
+>>
+>>
+>>
+>
+> ...Could you please explain about this issue?
 
-> On Wed, 16 Jun 2010 08:49:55 +0200
-> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> 
-> > S3C SDHCI host controller can change the source for generating mmc clock.
-> > By default host bus clock is used, what causes some problems on machines
-> > with 133MHz bus, because the SDHCI divider cannot be as high get proper
-> > clock value for identification mode. This is not a problem for the
-> > controller, because it can generate lower frequencies from other clock
-> > sources. This patch adds a new quirk to SDHCI driver to calculate the
-> > minimal supported clock frequency.
-> >
-> > This fixes the flood of the following warnings on Samsung S5PV210 SoCs:
-> > mmc0: Minimum clock frequency too high for identification mode
-> >
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >  drivers/mmc/host/sdhci-of-esdhc.c |    1 +
-> >  drivers/mmc/host/sdhci-s3c.c      |   29 +++++++++++++++++++++++++++++
-> >  drivers/mmc/host/sdhci.c          |    2 +-
-> >  drivers/mmc/host/sdhci.h          |    2 ++
-> >  4 files changed, 33 insertions(+), 1 deletions(-)
-> 
-> This patch doesn't know about Anton's
-> sdhci-pltfm-add-support-for-cns3xxx-soc-devices.patch.  Please check my
-> fixup:
-> 
-> --- a/drivers/mmc/host/sdhci-cns3xxx.c~sdhci-s3c-add-support-for-the-non-
-> standard-minimal-clock-value-fix
-> +++ a/drivers/mmc/host/sdhci-cns3xxx.c
-> @@ -93,5 +93,6 @@ struct sdhci_pltfm_data sdhci_cns3xxx_pd
->  		  SDHCI_QUIRK_INVERTED_WRITE_PROTECT |
->  		  SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN |
->  		  SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
-> +		  SDHCI_QUIRK_NONSTANDARD_MINCLOCK |
->  		  SDHCI_QUIRK_NONSTANDARD_CLOCK,
->  };
+The setup_zone_migrate_reserve doesn't check memmap hole. I think
+compaction would have the  same problem, too. I don't know there is a
+problem in elsewhere.
+Anyway, I think memmap_valid_within calling whenever walking whole pfn
+range isn't a good solution. We already have pfn_valid. Could we check
+this in there?
+For example, mem_section have a valid pfn range and then valid section
+can test it in pfn_valid.
 
-cns3xxx-soc shdci implementation does not provide get_min_clock callback,
-although it uses non standard clock management. In this case it doesn't
-matter if this quirk is set or not - in both cases the min clock value is
-calculated by default formula: host->max_clk/256.
+What do you think about it?
 
-I would prefer not to set this quirk for cns3xxx-soc to make the code easier
-to understand.
+P.S)
+I know Mel is very busy to test to avoid writeback in direct reclaim.
+I can wait on you. :)
+Kukjin. Is this a urgent issue? If it isn't, please wait on our mm guys. :)
 
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+-- 
+Kind regards,
+Minchan Kim
