@@ -1,54 +1,52 @@
 From: eric.miao@canonical.com (Eric Miao)
-Date: Tue, 13 Jul 2010 23:33:24 +0800
-Subject: [PATCH 09/13] [ARM] Introduce ARCH_USES_DEFAULT_GPIO_H for default
-	GPIO API definitions
+Date: Tue, 13 Jul 2010 23:33:25 +0800
+Subject: [PATCH 10/13] [ARM] Introduce ARCH_USES_DEFAULT_TIMEX_H for default
+	CLOCK_TICK_RATE
 In-Reply-To: <1279035208-7249-1-git-send-email-eric.miao@canonical.com>
 References: <1279035208-7249-1-git-send-email-eric.miao@canonical.com>
-Message-ID: <1279035208-7249-10-git-send-email-eric.miao@canonical.com>
+Message-ID: <1279035208-7249-11-git-send-email-eric.miao@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+CLOCK_TICK_RATE is actually a don't-care value. Make it default to
+(100 * HZ) when USE_DEFAULT_TIMEX_H is defined, and so no machine
+specific timex.h needs to be included.
+
 Signed-off-by: Eric Miao <eric.miao@canonical.com>
 ---
- arch/arm/Kconfig            |    3 +++
- arch/arm/include/asm/gpio.h |   10 ++++++++++
- 2 files changed, 13 insertions(+), 0 deletions(-)
+ arch/arm/Kconfig             |    3 +++
+ arch/arm/include/asm/timex.h |    4 ++++
+ 2 files changed, 7 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 70221ef..44aa8b3 100644
+index 44aa8b3..57180ae 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -53,6 +53,9 @@ config ARCH_USES_GETTIMEOFFSET
- config ARCH_USES_DEFAULT_IO_H
+@@ -56,6 +56,9 @@ config ARCH_USES_DEFAULT_IO_H
+ config ARCH_USES_DEFAULT_GPIO_H
  	def_bool n
  
-+config ARCH_USES_DEFAULT_GPIO_H
++config ARCH_USES_DEFAULT_TIMEX_H
 +	def_bool n
 +
  config GENERIC_CLOCKEVENTS
  	bool
  
-diff --git a/arch/arm/include/asm/gpio.h b/arch/arm/include/asm/gpio.h
-index 166a7a3..aa80d3c 100644
---- a/arch/arm/include/asm/gpio.h
-+++ b/arch/arm/include/asm/gpio.h
-@@ -1,7 +1,17 @@
- #ifndef _ARCH_ARM_GPIO_H
- #define _ARCH_ARM_GPIO_H
+diff --git a/arch/arm/include/asm/timex.h b/arch/arm/include/asm/timex.h
+index 3be8de3..8df3b2e 100644
+--- a/arch/arm/include/asm/timex.h
++++ b/arch/arm/include/asm/timex.h
+@@ -12,7 +12,11 @@
+ #ifndef _ASMARM_TIMEX_H
+ #define _ASMARM_TIMEX_H
  
-+#ifndef CONFIG_ARCH_USES_DEFAULT_GPIO_H
- /* not all ARM platforms necessarily support this API ... */
- #include <mach/gpio.h>
++#ifndef CONFIG_ARCH_USES_DEFAULT_TIMEX_H
+ #include <mach/timex.h>
 +#else
-+
-+#include <asm-generic/gpio.h>
-+
-+#define gpio_get_value	__gpio_get_value
-+#define gpio_set_value	__gpio_set_value
-+#define gpio_cansleep	__gpio_cansleep
-+#define gpio_to_irq	__gpio_to_irq
++#define CLOCK_TICK_RATE	(100 * HZ)
 +#endif
  
- #endif /* _ARCH_ARM_GPIO_H */
+ typedef unsigned long cycles_t;
+ 
 -- 
 1.7.1
