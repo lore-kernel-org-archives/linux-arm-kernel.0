@@ -1,43 +1,139 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Tue, 13 Jul 2010 09:42:55 +0800
-Subject: [RFC,PATCH 2/2] arm: use addruart macro to establish debug
-	mappings
-In-Reply-To: <20100712135259.GC6577@n2100.arm.linux.org.uk>
-References: <1278903792.387175.713057245098.0.gpush@pororo>
-	<1278903792.388155.428219242752.2.gpush@pororo>
-	<20100712135259.GC6577@n2100.arm.linux.org.uk>
-Message-ID: <1278985375.2521.6.camel@pororo.lan>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 13 Jul 2010 09:50:56 +0800
+Subject: linux 2.6.34 bug
+In-Reply-To: <201007081842.16347.marek.vasut@gmail.com>
+References: <20100708173621.00003527@unknown>
+	<201007081842.16347.marek.vasut@gmail.com>
+Message-ID: <AANLkTimhjwiBzJ5kIe3doYawlhw_XZgmE6ys2Yg-Ucl9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Fri, Jul 9, 2010 at 12:42 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Dne ?t 8. ?ervence 2010 17:36:21 dylan cristiani napsal(a):
+>> Hi Marek,
+>> we were in touch few moths ago about a ucb1400 touchscreen, issue if you
+>> remember: you sent me a patch to pass the platform specific codec irq,
+>> through ucb1400_pdata; after that i went from 3.6.32 to 2.6.34 and
+>> i noticed that your patch was into mainline; in this kernel, related to
+>> the ucb1400 codec again, i noticed one bug about the ac97 codec reset
+>> that is bulverde platform specific: i don't know hot to submit a patch
+>> and to whom to submit it, so i bother, you sorry in advance....; in
+>> particular: in new kernel the function
+>> "void pxa27x_assert_ac97reset(int reset_gpio, int on)"
+>> has been moved to arch/arm/mach-pxa/pxa27x.c file:
+>
+> CCing linux-arm-kernel and Eric.
+>
+> btw. to submit patch :
+>
+> git add <list of changed files>
+>
+> git commit -s
+> <editor will pop up, type the commit message>
+>
+> git log # here check the hash of the last commit before yours
+>
+> git send-email --to="linux-arm-kernel at lists.infradead.org" --
+> cc="eric.y.miao at gmail.com" --cc="marek.vasut at gmail.com" <the hash from previous
+> step>
+>
+> That's probably the easiest way :)
+>>
+>> ......
+>> static unsigned long ac97_reset_config[] = {
+>> ? ? ? GPIO95_AC97_nRESET,
+>> ? ? ? GPIO95_GPIO,
+>> ? ? ? GPIO113_AC97_nRESET,
+>> ? ? ? GPIO113_GPIO,
+>> };
+>>
+>> void pxa27x_assert_ac97reset(int reset_gpio, int on)
+>> {
+>> ? ? ? if (reset_gpio == 113)
+>> ? ? ? ? ? ? ? pxa2xx_mfp_config(on ? &ac97_reset_config[0] :
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&ac97_reset_config[1], 1);
+>>
+>> ? ? ? if (reset_gpio == 95)
+>> ? ? ? ? ? ? ? pxa2xx_mfp_config(on ? &ac97_reset_config[2] :
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&ac97_reset_config[3], 1);
+>> }
+>> EXPORT_SYMBOL_GPL(pxa27x_assert_ac97reset);
+>> .......
+>>
+>> but, as it seems to me, there are two bugs: the first is the cross
+>> exchange of the position of the
+>> ? ? ? 'if (reset_gpio == 113)'
+>> with position of
+>> ? ? ? 'if (reset_gpio == 95)'
+>> with regard to the position of the members of the array
+>> "static unsigned long ac97_reset_config[]"
+>
+> Seems like a good catch, Eric ?
+>>
+>> The 2nd one regards the "pxa2xx_mfp_config(..)" function's call at
+>> sound/arm/pxa2xx-ac97-lib.c line 340:
+>>
+>> ? ? ? if (cpu_is_pxa27x()) {
+>> ? ? ? ? ? ? ? /* Use GPIO 113 as AC97 Reset on Bulverde */
+>> ? ? ? ? ? ? ? pxa27x_assert_ac97reset(reset_gpio, 0);
+>> ? ? ? ? ? ? ? ac97conf_clk = clk_get(&dev->dev, "AC97CONFCLK");
+>> ? ? ? ? ? ? ? .....
+>>
+>> so, if the second param is 0, (as the comment /**/ states) you want to
+>> use gpio 113 as AC97 reset (that is the Alternative Function 2 of the
+>> pin), so the function call into arch/arm/mach-pxa/pxa27x.c has to be:
+>>
+>> ? ? ? if (reset_gpio == 113)
+>> ? ? ? ? ? ? ? pxa2xx_mfp_config(on ? &ac97_reset_config[3] :
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&ac97_reset_config[2], 1);
+>>
+>> instead the current:
+>>
+>> ? ? ? if (reset_gpio == 113)
+>> ? ? ? ? ? ? ? pxa2xx_mfp_config(on ? &ac97_reset_config[2] :
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&ac97_reset_config[3], 1);
+>>
+>> i noticed that you can solve the whole bugs just moving the array
+>> members of "ac97_reset_config[]" into this:
+>>
+>> static unsigned long ac97_reset_config[] = {
+>> ? ? ? GPIO113_GPIO,
+>> ? ? ? GPIO113_AC97_nRESET,
+>> ? ? ? GPIO95_GPIO,
+>> ? ? ? GPIO95_AC97_nRESET,
+>> };
+>>
+>> i tryed this and for me it works; i'm sorry again to bother you but i
+>> don't really know how to submit a bug report so maybe you can do this
+>> if it sounds good to your expert ears
+>>
+>> tks and sorry for the noise and don't hate me if i wrote some
+>> garbage stuff...
+>
+> Eric, care to explain? I see a valid point here.
 
-> This is insufficient.  We are setting up section mappings here, which
-> must have both the physical and virtual addresses aligned to a megabyte
-> boundary.  You're aligning the virtual address but doing nothing with
-> the physical one.
+It was my bad. Fixed updated as below. Dylan, please help review:
 
-Ah, I didn't look at the descriptor setup code closely enough. Will do
-the proper masking in the next series.
+    [ARM] pxa: fix incorrect order of AC97 reset pin configs
 
-> I also agree with Nicolas - if we're going to do this, we want addruart
-> to return the virtual and physical addresses in two separate registers,
-> and then have the debug code select the appropriate one itself.  That
-> will simply this code.
-> 
-> So I suggest:
-> 
-> Patch #1 - re-jig addruart to return both virtual and physical addresses.
-> Patch #2 - implement setup of debug mapping using addruart.
-> Patch #3 - remove phys_io and pgoffio from machine_desc.
-> 
-> I'd also suggest that the patches are against a recent kernel, esp.
-> patch #3 as there's been some changes recently in some of the
-> initializers.
+    Reported-by: Dylan Cristiani <d.cristiani@idem-tech.it>
+    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 
-Yep, sounds like a good approach. Patches coming...
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index 0af3617..c059dac 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -41,10 +41,10 @@ void pxa27x_clear_otgph(void)
+ EXPORT_SYMBOL(pxa27x_clear_otgph);
 
-Cheers,
+ static unsigned long ac97_reset_config[] = {
+-	GPIO95_AC97_nRESET,
+-	GPIO95_GPIO,
+-	GPIO113_AC97_nRESET,
+ 	GPIO113_GPIO,
++	GPIO113_AC97_nRESET,
++	GPIO95_GPIO,
++	GPIO95_AC97_nRESET,
+ };
 
-
-Jeremy
+ void pxa27x_assert_ac97reset(int reset_gpio, int on)
