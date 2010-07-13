@@ -1,45 +1,22 @@
-From: kamezawa.hiroyu@jp.fujitsu.com (KAMEZAWA Hiroyuki)
-Date: Tue, 13 Jul 2010 12:03:15 +0900
-Subject: About SECTION_SIZE_BITS for Sparsemem
-In-Reply-To: <AANLkTimHNBUo30sp1azUcWQiDpADGyEW_N-dwU0nJy9u@mail.gmail.com>
-References: <000601cb219c$c7830b60$56892220$%kim@samsung.com>
-	<AANLkTinTrt7VKuKvleiJj4lv2tWqCcDYHVXAQIHLA7bh@mail.gmail.com>
-	<001b01cb21aa$ef0e4d80$cd2ae880$%kim@samsung.com>
-	<AANLkTinkujX3VbL0sXjjghovr8eX9Os0huw3OTBut2UP@mail.gmail.com>
-	<20100713092522.6d9939ac.kamezawa.hiroyu@jp.fujitsu.com>
-	<AANLkTimHNBUo30sp1azUcWQiDpADGyEW_N-dwU0nJy9u@mail.gmail.com>
-Message-ID: <20100713120315.c6c418f4.kamezawa.hiroyu@jp.fujitsu.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 12 Jul 2010 20:36:11 -0700 (PDT)
+Subject: [PATCH] fec: use interrupt for MDIO completion indication
+In-Reply-To: <006416d38a8e51ba8dd8631613a991528dc7976a.1278918594.git.baruch@tkos.co.il>
+References: <006416d38a8e51ba8dd8631613a991528dc7976a.1278918594.git.baruch@tkos.co.il>
+Message-ID: <20100712.203611.67894902.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Jul 2010 11:05:26 +0900
-Minchan Kim <minchan.kim@gmail.com> wrote:
+From: Baruch Siach <baruch@tkos.co.il>
+Date: Mon, 12 Jul 2010 10:12:51 +0300
 
-> On Tue, Jul 13, 2010 at 9:25 AM, KAMEZAWA Hiroyuki
-> <kamezawa.hiroyu@jp.fujitsu.com> wrote:
-
-> > For example, prepare a page filled with (1 << PG_reserved).
-> > and replace it with unnecessary memmap rather than freeing a page for memmap.
+> With the move to phylib (commit e6b043d) I was seeing sporadic "MDIO write
+> timeout" messages. Measure of the actual time spent showed latency times of
+> more than 1600us.
 > 
-> Hmm. I don't got your point.
-> The problem is that we access struct page by pfn number not address.
+> This patch uses the MII event indication of the FEC hardware to detect
+> completion of MDIO transactions.
 > 
-> You mean let's remain memmap on hole with changing PageReseved instead of free?
-> 
-Like a ZERO_PAGE, preparing RESERVED_PAGE, 
-which is filled with (1 << PG_reserved) as
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
-  0x00000400,0x00000400,0x00000400,0x00000400
-  .....
-
-And map this pages to every hole. Then, you only waste a page to fill all holes
-because "struct page" is aligned to 4bytes.
-
-
-> I think it's not a good idea to add new flag. If
-> Kame. Could you review my RFC patch which makes pfn_valid check more
-> tightly on sparsemem?
-Sure.
-
-Thanks,
--Kame
+Applied.
