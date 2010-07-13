@@ -1,36 +1,57 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Tue, 13 Jul 2010 19:13:10 +0400
-Subject: [PATCH v2 0/3] s3c24xx: iPAQ rx1950 series
-In-Reply-To: <1278781069-30521-1-git-send-email-anarsoul@gmail.com>
-References: <1278781069-30521-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <20100713151310.GA12234@oksana.dev.rtsoft.ru>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 13 Jul 2010 16:21:44 +0100
+Subject: [PATCH v2 1/3] ARM: Introduce *_relaxed() I/O accessors
+In-Reply-To: <20100712124606.GB7559@shareable.org>
+References: <20100709110350.11333.34303.stgit@e102109-lin.cambridge.arm.com>
+	<201007092130.17504.arnd@arndb.de>
+	<1278714714.30012.14.camel@e102109-lin.cambridge.arm.com>
+	<201007121339.48719.arnd@arndb.de>
+	<20100712115035.GA7559@shareable.org>
+	<1278935613.9481.20.camel@e102109-lin.cambridge.arm.com>
+	<20100712124606.GB7559@shareable.org>
+Message-ID: <1279034504.16166.74.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 10, 2010 at 07:57:46PM +0300, Vasily Khoruzhick wrote:
-> This patch series adds more support for iPAQ rx1950 PDA to linux:
-> 1. LEDs driver -- it controls blue, green and red LEDs on rx1950
-> 2. Battery driver -- adds ability to monitor and charge battery.
-> This driver is suitable for H1940 PDA aswell (just need to write
-> some machine specific callbacks and get voltage LUTs)
+On Mon, 2010-07-12 at 13:46 +0100, Jamie Lokier wrote:
+> Catalin Marinas wrote:
+> > On Mon, 2010-07-12 at 12:50 +0100, Jamie Lokier wrote:
+> > > Arnd Bergmann wrote:
+> > > > Ah, that's right: writel and outl both need the barrier before the access,
+> > > > but writel will never need a barrier after the access.
+> > > > The x86 variant of outl also has the implicit ordering after the access,
+> > > > but I'm not sure if we need to emulate that. I can't currently think
+> > > > of a case where it's strictly required because any later access to the same
+> > > > PCI function will be ordered anyway.
+> > >
+> > > What about those ARMs which can buffer a write for an indefinite period?
+> > > Do any drivers expect writes to be posted in a reasonably short time?
+> >
+> > Writing to any device is not guaranteed to succeed (i.e. change the
+> > state of the device) in a certain amount of time (this is probably the
+> > case on x86 as well). If you need this certainty in the code, you do a
+> > read back from the device. Since Device memory accesses are ordered in
+> > ARM, we don't need additional barriers for such situations.
 > 
-> v2: removed ac registration from s3c_adc_battery driver, use
-> pda_power instead for ac support.
+> There's a time between a "certain amount" and "infinite".
 > 
-> P.S. I prefer to keep own LED triggers for s3c_adc_battery as
-> generic power supply triggers do not support LED_HALF brightness
-> (on h1940/rx1950 it's used for blink) and I want to keep same
-> LEDs behavior as in WinMo.
+> I'm pretty sure the write buffering time for x86 is guaranteed to be
+> finite and quite short (without specifying exactly how short - just
+> like instructions don't specify how long they take to execute), as in
+> it's just a buffer, whose delay is a similar order of magnitude to bus
+> transactions.  It's not a cache.
+> 
+> A recent commit changes ARM cpu_relax() because it can keep writes
+> buffered indefinitely.  The commit message does say it's because reads
+> are prioritised over writes, so perhaps that's only an issue in loops
+> which use cpu_relax() anyway.
 
-No, please. Factor out LED triggers addition into a separate patch
-and we will discuss* it. That way it won't block this driver merge.
-
-Thanks,
-
-* IIRC, using LED_HALF for blinking is wrong, see
-  drivers/leds/leds-pwm.c for a preferred approach.
+That was an issue visible on ARM11MPCore. On ARMv7 cores, it is
+mandatory for the write buffer to drain in a finite amount of time
+(though I'm not sure how long this could be). The cpu_relax() problem
+that we've seen won't happen on ARMv7 cores. Pre-v6 processors have a
+stronger memory order model, especially in relation to uncached DMA
+buffers.
 
 -- 
-Anton Vorontsov
-email: cbouatmailru at gmail.com
-irc://irc.freenode.net/bd2
+Catalin
