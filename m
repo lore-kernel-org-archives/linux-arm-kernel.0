@@ -1,37 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 13 Jul 2010 09:29:07 +0100
-Subject: [PATCH][RFC] arm: Add basic support for VIA/WonderMedia SoC's
-In-Reply-To: <AANLkTiml5z34rz7HKhZ-HyLJbfqctIrfar2ZpKyyTlYz@mail.gmail.com>
-References: <20100712165025.GA13818@alchark-u3s.alchark.ru>
-	<201007122122.32623.arnd@arndb.de>
-	<AANLkTilWwclstZiIkpiQQ_CPXgjGD2xz-GEw27hTvAp-@mail.gmail.com>
-	<alpine.LFD.2.00.1007121855470.10598@xanadu.home>
-	<20100713072407.GB19839@n2100.arm.linux.org.uk>
-	<AANLkTiml5z34rz7HKhZ-HyLJbfqctIrfar2ZpKyyTlYz@mail.gmail.com>
-Message-ID: <20100713082907.GA20590@n2100.arm.linux.org.uk>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Tue, 13 Jul 2010 17:30:43 +0900
+Subject: [RFC 3/3] mm: iommu: The Virtual Contiguous Memory Manager
+In-Reply-To: <20100713092012.7c1fe53e@lxorguk.ukuu.org.uk>
+References: <4C3BFDD3.8040209@codeaurora.org>
+	<20100713145852C.fujita.tomonori@lab.ntt.co.jp>
+	<20100713092012.7c1fe53e@lxorguk.ukuu.org.uk>
+Message-ID: <20100713173028M.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 13, 2010 at 12:26:20PM +0400, Alexey Charkov wrote:
-> 2010/7/13 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > On Mon, Jul 12, 2010 at 08:38:26PM -0400, Nicolas Pitre wrote:
-> >> I think what you did is OK. ?It is best to include the whole file as
-> >> generated from the machine registry database when you need it. ?This way
-> >> the merge conflict can easily be resolved by simply keeping the latest
-> >> version from either merged branches.
-> >
-> > Not quite - I'm now undoing some of the changes a mach-types update would
-> > bring because people aren't talking to me to fix stuff in the machine
-> > registry. ?So I'm no longer just committing the updated file off the
-> > website.
-> >
-> > The problem is that git will automatically merge those "updates", which
-> > makes it much more difficult to sort out.
-> >
-> 
-> So the correct way is to submit a patch and just state that it
-> requires an update of mach-types containing FOO and BAR, is it?
+On Tue, 13 Jul 2010 09:20:12 +0100
+Alan Cox <alan@lxorguk.ukuu.org.uk> wrote:
 
-Yes please - that way I get a prompt to update mach-types.  I've
-already done so last night, so it should already be up to date
-there.  It'll be in mainline in a couple of days or so.
+> > Why video4linux can't use the DMA API? Doing DMA with vmalloc'ed
+> > buffers is a thing that we should avoid (there are some exceptions
+> > like xfs though).
+> 
+> Vmalloc is about the only API for creating virtually linear memory areas.
+> The video stuff really needs that to avoid lots of horrible special cases
+> when doing buffer processing and the like.
+> 
+> Pretty much each driver using it has a pair of functions 'rvmalloc' and
+> 'rvfree' so given a proper "vmalloc_for_dma()" type interface can easily
+> be switched
+
+We already have helper functions for DMA with vmap pages,
+flush_kernel_vmap_range and invalidate_kernel_vmap_range.
+
+I think that the current DMA API with the above helper functions
+should work well drivers that want virtually linear large memory areas
+(such as xfs).
