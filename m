@@ -1,87 +1,47 @@
-From: alchark@gmail.com (Alexey Charkov)
-Date: Tue, 13 Jul 2010 16:02:02 +0400
-Subject: [PATCH][RFC] arm: Add basic support for VIA/WonderMedia SoC's
-In-Reply-To: <AANLkTil8aDUl2T-P1eZIdiLrXc05VyWWvpCg8QmfuZDp@mail.gmail.com>
-References: <20100712165025.GA13818@alchark-u3s.alchark.ru>
-	<201007122122.32623.arnd@arndb.de>
-	<AANLkTilWwclstZiIkpiQQ_CPXgjGD2xz-GEw27hTvAp-@mail.gmail.com>
-	<alpine.LFD.2.00.1007121855470.10598@xanadu.home>
-	<AANLkTil8aDUl2T-P1eZIdiLrXc05VyWWvpCg8QmfuZDp@mail.gmail.com>
-Message-ID: <AANLkTilOcHnZwI5L0X6yozRYLolpSkouoEFMuQAy7T1a@mail.gmail.com>
+From: zpfeffer@codeaurora.org (Zach Pfeffer)
+Date: Tue, 13 Jul 2010 05:06:55 -0700
+Subject: [RFC 3/3] mm: iommu: The Virtual Contiguous Memory Manager
+In-Reply-To: <20100713145852C.fujita.tomonori@lab.ntt.co.jp>
+References: <4C2D965F.5000206@codeaurora.org>
+	<20100710145639.GC10080@8bytes.org>
+	<4C3BFDD3.8040209@codeaurora.org>
+	<20100713145852C.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <20100713120654.GA4263@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/13 Alexey Charkov <alchark@gmail.com>:
-> 2010/7/13 Nicolas Pitre <nico@fluxnic.net>:
->> On Tue, 13 Jul 2010, Alexey Charkov wrote:
->>
->>> Actually, as the devices using these SoC's are mainly generic Chinese
->>> products, I would not expect any consistency in this area. The
->>> bootloader is a modification of an old U-boot, but I could not find
->>> the sources for my version (yes, a GPL violation). It seems to use
->>> some machine IDs in the range of 4000+, but again I would not trust
->>> that. That's why I decided to hardcode the intended target devices
->>> here (which is what some of the other machines do).
->>
->> We try to avoid those as much as possible of course.
->>
->> What U-Boot version is this? ?The mainline U-Boot has had the ability to
->> override the built-in machine ID with an env variable for a while.
->>
->
-> When booting, it prints "VT8500 U-Boot 1.2.19.1 (Dec ?4 2009 -
-> 17:14:38)". If there is a way to drop a couple of hacks, I would be
-> really glad, of course :) A quick grep through U-boot's commit history
-> did not provide me with any clue about this feature, though. Need to
-> search better...
->
+On Tue, Jul 13, 2010 at 02:59:08PM +0900, FUJITA Tomonori wrote:
+> On Mon, 12 Jul 2010 22:46:59 -0700
+> Zach Pfeffer <zpfeffer@codeaurora.org> wrote:
+> 
+> > Joerg Roedel wrote:
+> > > On Fri, Jul 02, 2010 at 12:33:51AM -0700, Zach Pfeffer wrote:
+> > >> Daniel Walker wrote:
+> > > 
+> > >>> So if we include this code which "map implementations" could you
+> > >>> collapse into this implementations ? Generally , what currently existing
+> > >>> code can VCMM help to eliminate?
+> > >> In theory, it can eliminate all code the interoperates between IOMMU,
+> > >> CPU and non-IOMMU based devices and all the mapping code, alignment,
+> > >> mapping attribute and special block size support that's been
+> > >> implemented.
+> > > 
+> > > Thats a very abstract statement. Can you point to particular code files
+> > > and give a rough sketch how it could be improved using VCMM?
+> > 
+> > I can. Not to single out a particular subsystem, but the video4linux
+> > code contains interoperation code to abstract the difference between
+> > sg buffers, vmalloc buffers and physically contiguous buffers. The
+> > VCMM is an attempt to provide a framework where these and all the
+> > other buffer types can be unified.
+> 
+> Why video4linux can't use the DMA API? Doing DMA with vmalloc'ed
+> buffers is a thing that we should avoid (there are some exceptions
+> like xfs though).
 
-The feature in question is added by commit 3c234efa693 in U-Boot's git
-repo (machid env variable). It is dated Thu, 14 Feb 2008, which was in
-the 1.3.* release cycle, thus missing from the vendor-provided binary
-on my board, unfortunately.
+I'm not sure, but I know that it makes the distinction. From
+video4linux/videobuf:
 
->>> >> +#ifdef CONFIG_MMU
->>> >> +/* macro to get at IO space when running virtually */
->>> >> +#define IO_ADDRESS(x) ((x) | 0xf0000000)
->>> >> +#else
->>> >> +#define IO_ADDRESS(x) (x)
->>> >> +#endif
->>> >
->>> > I don't know yet what the general consensus in the arm world is about this,
->>> > but this looks hacky to me. I'd recommend killing off the IO_ADDRESS macro
->>> > and replacing it with proper calls to ioremap.
->>> >
->>> >
->>>
->>> I just followed the way how some of the other machine code functions:
->>> mach-versatile and mach-realview both define similar macros. If using
->>> ioremap is a better way, I could try to rework it.
->>
->> Versatile and RealView are development boards where things like MMU-less
->> builds of Linux are tested. ?I doubt you'll want to run MMU-less Linux
->> on your target. ?So this macro is most probably irrelevant for your
->> purpose. ?And this is unrelated to whether ioremap is a better solution
->> (obviously on MMU-less systems ioremap is unavailable).
->>
->
-> I see the point. Will have to understand better how the whole remapped
-> IO works and remove the macro.
->
-
-It seems that other boards (omap2, msm) define separate sets of
-registers with physical and virtual addresses. Will it be ok if I
-retain only one set (with physical addresses, following the SoC
-documentation) and use:
-
-#define IO_ADDRESS(x) ((x) | 0xf0000000)
-
-to refer to virtual addresses as IO_ADDRESS(PHYS_ADDR) when needed?
-And should those addresses be accessed through readl/writel only, and
-not through pointer dereferencing? Probably any other peculiarities
-that I am missing here?
-
-Sorry for a load of questions: I am quite new to all of these but wish
-to do things the right way :)
-
-Alexey
+    <media/videobuf-dma-sg.h>           /* Physically scattered */              
+    <media/videobuf-vmalloc.h>          /* vmalloc() buffers    */              
+    <media/videobuf-dma-contig.h>       /* Physically contiguous */
