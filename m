@@ -1,35 +1,61 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Tue, 13 Jul 2010 16:14:41 -0700
-Subject: [RFC PATCH] Kconfig: Enable Kconfig fragments to be used for
-	defconfig
-In-Reply-To: <20100713230352.6781.18644.stgit@angua>
-References: <20100713230352.6781.18644.stgit@angua>
-Message-ID: <1279062881.4609.34.camel@c-dwalke-linux.qualcomm.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 14 Jul 2010 00:44:27 +0200
+Subject: [PATCH 2/2] ARM: PL022 SSP platform data for the Versatile
+Message-ID: <1279061067-20573-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-07-13 at 17:04 -0600, Grant Likely wrote:
+This adds platform data for the PL022 to the ARM Versatile reference
+design, and adds the necessary clock definition.
 
-> - I haven't figured out a way for the fragment to force an option to
->   be "n", or to set a value, for example "CONFIG_LOG_BUF_SHIFT=16".
->   This may require changing the syntax.
-> - It still doesn't resolve dependencies.  A solver would help with this.
->   For the time being I work around the problem by running the generated
->   config through 'oldconfig' and looking for differences.  If the files
->   differ (ignoring comments and generateconfig_* options) after oldconfig,
->   then the <board>_defconfig target returns a failure.  (but leaves the
->   new .config intact so the user can resolve it with menuconfig).  This
->   way at least the user is told when a Kconfig fragment is invalid.
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/mach-versatile/core.c |   12 +++++++++++-
+ 1 files changed, 11 insertions(+), 1 deletions(-)
 
-The solver would fix the whole issues with the defconfigs , we wouldn't
-need this Kconfig change .. From my perspective we shouldn't be fooling
-around with anything but the solver approach ..
-
-It just doesn't feel like Kconfig was meant to do this, it feel like
-somewhat of an abuse ..
-
-Daniel
-
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+index 3dff864..f3a0e07 100644
+--- a/arch/arm/mach-versatile/core.c
++++ b/arch/arm/mach-versatile/core.c
+@@ -28,6 +28,7 @@
+ #include <linux/amba/clcd.h>
+ #include <linux/amba/pl061.h>
+ #include <linux/amba/mmci.h>
++#include <linux/amba/pl022.h>
+ #include <linux/io.h>
+ #include <linux/gfp.h>
+ 
+@@ -425,6 +426,9 @@ static struct clk_lookup lookups[] = {
+ 	}, {	/* MMC1 */
+ 		.dev_id		= "fpga:0b",
+ 		.clk		= &ref24_clk,
++	}, {	/* SSP */
++		.dev_id		= "dev:f4",
++		.clk		= &ref24_clk,
+ 	}, {	/* CLCD */
+ 		.dev_id		= "dev:20",
+ 		.clk		= &osc4_clk,
+@@ -703,6 +707,12 @@ static struct pl061_platform_data gpio1_plat_data = {
+ 	.irq_base	= IRQ_GPIO1_START,
+ };
+ 
++static struct pl022_ssp_controller ssp0_plat_data = {
++	.bus_id = 0,
++	.enable_dma = 0,
++	.num_chipselect = 1,
++};
++
+ #define AACI_IRQ	{ IRQ_AACI, NO_IRQ }
+ #define AACI_DMA	{ 0x80, 0x81 }
+ #define MMCI0_IRQ	{ IRQ_MMCI0A,IRQ_SIC_MMCI0B }
+@@ -772,7 +782,7 @@ AMBA_DEVICE(sci0,  "dev:f0",  SCI,      NULL);
+ AMBA_DEVICE(uart0, "dev:f1",  UART0,    NULL);
+ AMBA_DEVICE(uart1, "dev:f2",  UART1,    NULL);
+ AMBA_DEVICE(uart2, "dev:f3",  UART2,    NULL);
+-AMBA_DEVICE(ssp0,  "dev:f4",  SSP,      NULL);
++AMBA_DEVICE(ssp0,  "dev:f4",  SSP,      &ssp0_plat_data);
+ 
+ static struct amba_device *amba_devs[] __initdata = {
+ 	&dmac_device,
 -- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.1
