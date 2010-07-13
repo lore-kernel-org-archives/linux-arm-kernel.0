@@ -1,30 +1,103 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 13 Jul 2010 08:44:49 +0100
-Subject: [PATCH v4] GPIO PL061: Adding Clk framework support
-In-Reply-To: <AANLkTimskXW4Nnxhc5bxwKiNrfJkMb-9NeWKhVOGaA1k@mail.gmail.com>
-References: <1277183247-4557-1-git-send-email-viresh.kumar@st.com>
-	<20100709124050.GF22845@n2100.arm.linux.org.uk>
-	<AANLkTikm-wupuQA1_zsmqf3jrpavkMaw8Bt-GWb04TSo@mail.gmail.com>
-	<20100710071913.GM22845@n2100.arm.linux.org.uk>
-	<AANLkTimskXW4Nnxhc5bxwKiNrfJkMb-9NeWKhVOGaA1k@mail.gmail.com>
-Message-ID: <20100713074449.GA20118@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 13 Jul 2010 09:51:07 +0200
+Subject: [PATCH 4/5] pxa: Add core pmic support for Palm27x
+In-Reply-To: <1279007468-20872-1-git-send-email-marek.vasut@gmail.com>
+References: <1279007468-20872-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1279007468-20872-4-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 10, 2010 at 05:36:54PM +0200, Linus Walleij wrote:
-> 2010/7/10 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> 
-> > Correct, which is what drivers currently expect. ?This is also why
-> > two additional amba_* callbacks are supplied - if it is appropriate
-> > for a driver to disable their bus clock after being probed, they can
-> > do that but they have to participate in that.
-> 
-> Aha I get it, then it looks good...
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ arch/arm/mach-pxa/palm27x.c |   57 +++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 57 insertions(+), 0 deletions(-)
 
-Is that an Ack for the patch?
-
-I think there's one change I'd like, which is to change "busck" to
-"apb_pclk" to make it clear what it's referring to.
-
-Also, is there any chance you can convert your platform(s) over to use
-it before I merge this patch?
+diff --git a/arch/arm/mach-pxa/palm27x.c b/arch/arm/mach-pxa/palm27x.c
+index ff5ee8c..a1009ec 100644
+--- a/arch/arm/mach-pxa/palm27x.c
++++ b/arch/arm/mach-pxa/palm27x.c
+@@ -21,6 +21,7 @@
+ #include <linux/wm97xx.h>
+ #include <linux/power_supply.h>
+ #include <linux/usb/gpio_vbus.h>
++#include <linux/regulator/max1586.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -35,6 +36,8 @@
+ #include <mach/palmasoc.h>
+ #include <mach/palm27x.h>
+ 
++#include <plat/i2c.h>
++
+ #include "generic.h"
+ #include "devices.h"
+ 
+@@ -458,6 +461,59 @@ static void __init palm27x_power_init(int ac, int usb)
+ static inline void palm27x_power_init(int ac, int usb) {}
+ #endif
+ 
++/******************************************************************************
++ * Core power regulator
++ ******************************************************************************/
++#if defined(CONFIG_REGULATOR_MAX1586) || \
++    defined(CONFIG_REGULATOR_MAX1586_MODULE)
++static struct regulator_consumer_supply palm27x_max1587a_consumers[] = {
++	{
++		.supply	= "vcc_core",
++	}
++};
++
++static struct regulator_init_data palm27x_max1587a_v3_info = {
++	.constraints = {
++		.name		= "vcc_core range",
++		.min_uV		= 900000,
++		.max_uV		= 1705000,
++		.always_on	= 1,
++		.valid_ops_mask	= REGULATOR_CHANGE_VOLTAGE,
++	},
++	.consumer_supplies	= palm27x_max1587a_consumers,
++	.num_consumer_supplies	= ARRAY_SIZE(palm27x_max1587a_consumers),
++};
++
++static struct max1586_subdev_data palm27x_max1587a_subdevs[] = {
++	{
++		.name		= "vcc_core",
++		.id		= MAX1586_V3,
++		.platform_data	= &palm27x_max1587a_v3_info,
++	}
++};
++
++static struct max1586_platform_data palm27x_max1587a_info = {
++	.subdevs     = palm27x_max1587a_subdevs,
++	.num_subdevs = ARRAY_SIZE(palm27x_max1587a_subdevs),
++	.v3_gain     = MAX1586_GAIN_R24_3k32, /* 730..1550 mV */
++};
++
++static struct i2c_board_info __initdata palm27x_pi2c_board_info[] = {
++	{
++		I2C_BOARD_INFO("max1586", 0x14),
++		.platform_data	= &palm27x_max1587a_info,
++	},
++};
++
++static void __init palm27x_pmic_init(void)
++{
++	i2c_register_board_info(1, ARRAY_AND_SIZE(palm27x_pi2c_board_info));
++	pxa27x_set_i2c_power_info(NULL);
++}
++#else
++static inline void palm27x_pmic_init(void) {}
++#endif
++
+ void __init palm27x_common_init(struct palm27x_handheld *palm)
+ {
+ 	pxa_set_ffuart_info(NULL);
+@@ -472,4 +528,5 @@ void __init palm27x_common_init(struct palm27x_handheld *palm)
+ 	palm27x_ac97_init(palm->batt_minv, palm->batt_maxv, palm->jack_gpio);
+ 	palm27x_pwm_init(palm->bl_bl, palm->bl_lcd);
+ 	palm27x_power_init(palm->power_ac, palm->power_usb);
++	palm27x_pmic_init();
+ }
+-- 
+1.7.1
