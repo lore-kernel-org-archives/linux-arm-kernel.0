@@ -1,44 +1,59 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Tue, 13 Jul 2010 15:03:25 +0900
-Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
-	memory management
-In-Reply-To: <4C3C0032.5020702@codeaurora.org>
-References: <4C366678.60605@codeaurora.org>
-	<20100712102435B.fujita.tomonori@lab.ntt.co.jp>
-	<4C3C0032.5020702@codeaurora.org>
-Message-ID: <20100713150311B.fujita.tomonori@lab.ntt.co.jp>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 13 Jul 2010 15:17:58 +0900
+Subject: [PATCH v2] ARM: s5pv210_defconfig: Update for removing
+	s5pc110_defconfig
+In-Reply-To: <AANLkTilAKmCrHm5pZU5s6oJkSGGZyYihsnPsG4Z1uKFw@mail.gmail.com>
+References: <1278987726-10803-1-git-send-email-kgene.kim@samsung.com>
+	<AANLkTilAKmCrHm5pZU5s6oJkSGGZyYihsnPsG4Z1uKFw@mail.gmail.com>
+Message-ID: <00fc01cb2253$27307c30$75917490$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Jul 2010 22:57:06 -0700
-Zach Pfeffer <zpfeffer@codeaurora.org> wrote:
-
-> FUJITA Tomonori wrote:
-> > On Thu, 08 Jul 2010 16:59:52 -0700
-> > Zach Pfeffer <zpfeffer@codeaurora.org> wrote:
-> > 
-> >> The problem I'm trying to solve boils down to this: map a set of
-> >> contiguous physical buffers to an aligned IOMMU address. I need to
-> >> allocate the set of physical buffers in a particular way: use 1 MB
-> >> contiguous physical memory, then 64 KB, then 4 KB, etc. and I need to
-> >> align the IOMMU address in a particular way.
-> > 
-> > Sounds like the DMA API already supports what you want.
-> > 
-> > You can set segment_boundary_mask in struct device_dma_parameters if
-> > you want to align the IOMMU address. See IOMMU implementations that
-> > support dma_get_seg_boundary() properly.
+Kyungmin Park wrote:
 > 
-> That function takes the wrong argument in a VCM world:
+> Question?
 > 
-> unsigned long dma_get_seg_boundary(struct device *dev);
+> Are there difference between smdkc110 and smdkv210?
+
+Yes.
+
+The components on the board are different such as default LCD module,
+external memory, connector, and so on.
+
 > 
-> The boundary should be an attribute of the device side mapping,
-> independent of the device. This would allow better code reuse.
+> Thank you,
+> Kyungmin Park
+> 
+> On Tue, Jul 13, 2010 at 11:22 AM, Kukjin Kim <kgene.kim@samsung.com>
+wrote:
+> > Now that S5PC110 machines and S5PV210 machines can be built into
+> > one kernel, update mach-s5pv210/Kconfig and s5pv210_defconfig.
+> >
+> > Tested on SMDKC110(S5PC110) and SMDKV210(S5PV210).
+> > Note that GONI machine ID is not included in the kernel.
+> >
+> > Created and tested against linux-2.6.35-rc5.
+> >
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> > Changes since v1:
+> > - This patch re-based against linux-2.6.35-rc5 which includes
+> > ?'ARM: reduce defconfigs' from Uwe Kleine-Konig.
+> >
+> > ?arch/arm/configs/s5pc110_defconfig | ? 66
+------------------------------------
+> > ?arch/arm/configs/s5pv210_defconfig | ? ?4 ++
+> > ?arch/arm/mach-s5pv210/Kconfig ? ? ?| ? 28 +++++++++------
+> > ?3 files changed, 21 insertions(+), 77 deletions(-)
+> > ?delete mode 100644 arch/arm/configs/s5pc110_defconfig
 
-You mean that you want to specify this alignment attribute every time
-you create an IOMMU mapping? Then you can set segment_boundary_mask
-every time you create an IOMMU mapping. It's odd but it should work.
+(snip)
 
-Another possible solution is extending struct dma_attrs. We could add
-the alignment attribute to it.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
