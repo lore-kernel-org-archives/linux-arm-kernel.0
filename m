@@ -1,136 +1,226 @@
-From: jason77.wang@gmail.com (jason)
-Date: Tue, 13 Jul 2010 21:26:09 +0800
-Subject: [PATCH] spi/omap2_mcspi: disable and enable chan between each
-	SPI 	transfer
-In-Reply-To: <E1C7579D1379824DAE67858071C810382DD859571A@NOK-EUMSG-02.mgdnok.nokia.com>
-References: <1277381565-6305-1-git-send-email-jason77.wang@gmail.com>
-	<AANLkTin7mqe_zJIbyDcRPpCLaxPhl_dZQrSGua2z1nYW@mail.gmail.com>
-	<4C24A182.4060009@gmail.com>
-	<E1C7579D1379824DAE67858071C810382DD8495B26@NOK-EUMSG-02.mgdnok.nokia.com>
-	<4C289CCB.7010409@gmail.com>
-	<E1C7579D1379824DAE67858071C810382DD84963BC@NOK-EUMSG-02.mgdnok.nokia.com>
-	<4C2C82E9.2010103@gmail.com>
-	<E1C7579D1379824DAE67858071C810382DD859571A@NOK-EUMSG-02.mgdnok.nokia.com>
-Message-ID: <4C3C6971.5010004@gmail.com>
+From: sundar.iyer@stericsson.com (Sundar Iyer)
+Date: Tue, 13 Jul 2010 19:39:33 +0530
+Subject: [PATCH v2 2/2] ux500: add ab8500-regulators machine specific data
+In-Reply-To: <1279030173-3086-1-git-send-email-sundar.iyer@stericsson.com>
+References: <1279030173-3086-1-git-send-email-sundar.iyer@stericsson.com>
+Message-ID: <1279030173-3086-2-git-send-email-sundar.iyer@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi roman,
+From: Sundar R Iyer <sundar.iyer@stericsson.com>
 
-How about my test case, does it expose the real problem?
-
-I know my original patch was a big change both for PIO mode and for
-DMA mode, because there is no DMA mode device on my platform and
-i can't validate whether DMA mode works fine with that patch, it is a bit
-risky to apply that patch to upstream.
-
-This time i limit my patch to PIO mode, In theory, it is safe for all 
-PIO transfers.
-The side effect is to add a little bit overhead for a sequence of 
-TX_ONLY transfers.
-But it really can solve my touch panel issue.
-
-Is the following patch acceptable?
-
- From 7b310e690fcccff400233a4c3340f42168016c92 Mon Sep 17 00:00:00 2001
-From: Jason Wang <jason77.wang@gmail.com>
-Date: Tue, 13 Jul 2010 18:05:59 +0800
-Subject: [PATCH] spi/omap2_mcspi: disable channel after TX_ONLY transfer 
-in PIO mode
-
-In TX_ONLY transfer, the spi controller will receive datas
-simultaneously and hold them in the rx register, these datas will
-affect the direct following RX_ONLY transfer. So add disable channel
-to purge those rx datas.
-
-Signed-off-by: Jason Wang <jason77.wang@gmail.com>
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+Acked-by: Bengt JONSSON <bengt.g.jonsson@stericsson.com>
+Signed-off-by: Sundar R Iyer <sundar.iyer@stericsson.com>
 ---
-drivers/spi/omap2_mcspi.c | 6 ++++++
-1 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/mach-ux500/Makefile                  |    1 +
+ arch/arm/mach-ux500/board-mop500-regulators.c |  189 +++++++++++++++++++++++++
+ 2 files changed, 190 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/board-mop500-regulators.c
 
-diff --git a/drivers/spi/omap2_mcspi.c b/drivers/spi/omap2_mcspi.c
-index b3a94ca..43fab41 100644
---- a/drivers/spi/omap2_mcspi.c
-+++ b/drivers/spi/omap2_mcspi.c
-@@ -644,6 +644,12 @@ omap2_mcspi_txrx_pio(struct spi_device *spi, struct 
-spi_transfer *xfer)
-} else if (mcspi_wait_for_reg_bit(chstat_reg,
-OMAP2_MCSPI_CHSTAT_EOT) < 0)
-dev_err(&spi->dev, "EOT timed out\n");
-+
-+ /* disable chan to purge rx datas received in TX_ONLY transfer,
-+ * otherwise these rx datas will affect the direct following
-+ * RX_ONLY transfer.
+diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+index 0753a69..311f996 100644
+--- a/arch/arm/mach-ux500/Makefile
++++ b/arch/arm/mach-ux500/Makefile
+@@ -12,3 +12,4 @@ obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
+ obj-$(CONFIG_HOTPLUG_CPU)       += hotplug.o
+ obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+ obj-$(CONFIG_AB8500_PRCMU_I2C)	+= ab8500-prcmu-i2c.o
++obj-$(CONFIG_REGULATOR_AB8500)	+= board-mop500-regulators.o
+diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
+new file mode 100644
+index 0000000..34d16c6
+--- /dev/null
++++ b/arch/arm/mach-ux500/board-mop500-regulators.c
+@@ -0,0 +1,189 @@
++/*
++ * Copyright (C) ST-Ericsson SA 2010
++ *
++ * License Terms: GNU General Public License v2
++ *
++ * Author: Sundar Iyer <sundar.iyer@stericsson.com> for ST-Ericsson
++ *
++ * MOP500 board specific initialization for regulators
 + */
-+ omap2_mcspi_set_enable(spi, 0);
-}
-out:
-omap2_mcspi_set_enable(spi, 1);
++#include <linux/kernel.h>
++#include <linux/regulator/machine.h>
++
++static struct regulator_consumer_supply ab8500_vaux1_consumers[] = {
++	{ .supply = "vaux1", },
++};
++
++struct regulator_init_data ab8500_vaux1_regulator = {
++	.supply_regulator_dev = NULL,
++	.constraints = {
++		.name = "ab8500-vaux1",
++		.min_uV = 1100000,
++		.max_uV = 3300000,
++		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE|
++					REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(ab8500_vaux1_consumers),
++	.consumer_supplies = ab8500_vaux1_consumers,
++};
++
++static struct regulator_consumer_supply ab8500_vaux2_consumers[] = {
++	{ .supply = "vaux2", },
++};
++
++struct regulator_init_data ab8500_vaux2_regulator = {
++	.supply_regulator_dev = NULL,
++	.constraints = {
++		.name = "ab8500-vaux2",
++		.min_uV = 1100000,
++		.max_uV = 3300000,
++		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE|
++					REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(ab8500_vaux2_consumers),
++	.consumer_supplies = ab8500_vaux2_consumers,
++};
++
++static struct regulator_consumer_supply ab8500_vaux3_consumers[] = {
++	{ .supply = "vaux3", },
++};
++
++struct regulator_init_data ab8500_vaux3_regulator = {
++	.supply_regulator_dev = NULL,
++	.constraints = {
++		.name = "ab8500-vaux3",
++		.min_uV = 1100000,
++		.max_uV = 3300000,
++		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE|
++					REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(ab8500_vaux3_consumers),
++	.consumer_supplies = ab8500_vaux3_consumers,
++};
++
++/* supply for tvout, gpadc, TVOUT LDO */
++static struct regulator_consumer_supply ab8500_vtvout_consumers[] = {
++	{ .supply = "vtvout", },
++};
++
++struct regulator_init_data ab8500_vtvout_init = {
++	.supply_regulator_dev = NULL,
++	.constraints = {
++		.name = "ab8500-vtvout",
++		.min_uV = 1900000,
++		.max_uV = 2100000,
++		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE|
++					REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(ab8500_vtvout_consumers),
++	.consumer_supplies = ab8500_vtvout_consumers,
++};
++
++/* supply for ab8500-vaudio, VAUDIO LDO */
++static struct regulator_consumer_supply ab8500_vaudio_consumers[] = {
++	{ .supply = "vaudio", },
++};
++
++struct regulator_init_data ab8500_vaudio_init = {
++	.supply_regulator_dev = NULL,
++	.constraints = {
++		.name = "ab8500-vaudio",
++		.min_uV = 1925000,
++		.max_uV = 2075000,
++		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE|
++					REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(ab8500_vaudio_consumers),
++	.consumer_supplies = ab8500_vaudio_consumers,
++};
++
++/* supply for v-anamic1 VAMic1-LDO */
++static struct regulator_consumer_supply ab8500_vamic1_consumers[] = {
++	{ .supply = "vana-mic1", },
++};
++
++struct regulator_init_data ab8500_vamic1_init = {
++	.supply_regulator_dev = NULL,
++	.constraints = {
++		.name = "ab8500-vamic1",
++		.min_uV = 2000000,
++		.max_uV = 2100000,
++		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE|
++					REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(ab8500_vamic1_consumers),
++	.consumer_supplies = ab8500_vamic1_consumers,
++};
++
++/* supply for v-amic2, VAMIC2 LDO*/
++static struct regulator_consumer_supply ab8500_vamic2_consumers[] = {
++	{ .supply = "vana-mic2", },
++};
++
++struct regulator_init_data ab8500_vamic2_init = {
++	.supply_regulator_dev = NULL,
++	.constraints = {
++		.name = "ab8500-vamic2",
++		.min_uV = 2000000,
++		.max_uV = 2100000,
++		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE|
++					REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(ab8500_vamic2_consumers),
++	.consumer_supplies = ab8500_vamic2_consumers,
++};
++
++/* supply for v-dmic, VDMIC LDO */
++static struct regulator_consumer_supply ab8500_vdmic_consumers[] = {
++	{ .supply = "vdig-mic", },
++};
++
++struct regulator_init_data ab8500_vdmic_init = {
++	.supply_regulator_dev = NULL,
++	.constraints = {
++		.name = "ab8500-vdmic",
++		.min_uV = 1700000,
++		.max_uV = 1950000,
++		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE|
++					REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(ab8500_vdmic_consumers),
++	.consumer_supplies = ab8500_vdmic_consumers,
++};
++
++/* supply for v-intcore12, VINTCORE12 LDO */
++static struct regulator_consumer_supply ab8500_vintcore_consumers[] = {
++	{ .supply = "vintcore", },
++};
++
++struct regulator_init_data ab8500_vintcore_init = {
++	.supply_regulator_dev = NULL,
++	.constraints = {
++		.name = "ab8500-vintcore",
++		.min_uV = 1200000,
++		.max_uV = 1350000,
++		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE|
++					REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(ab8500_vintcore_consumers),
++	.consumer_supplies = ab8500_vintcore_consumers,
++};
++
++/* supply for U8500 CSI/DSI, VANA LDO */
++static struct regulator_consumer_supply ab8500_vana_consumers[] = {
++	{ .supply = "vana", },
++};
++
++struct regulator_init_data ab8500_vana_init = {
++	.supply_regulator_dev = NULL,
++	.constraints = {
++		.name = "ab8500-vana",
++		.min_uV = 0,
++		.max_uV = 1200000,
++		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE|
++					REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(ab8500_vana_consumers),
++	.consumer_supplies = ab8500_vana_consumers,
++};
++
 -- 
-1.5.6.5
-
-
-
-roman.tereshonkov at nokia.com wrote:
-> Hi Jason,
->
-> Your logs do not show what I wanted to see.
-> But what I can see now at least is the case when TX is full and RX is full at the same time.
->
-> 1.  Put 
-> 	dev_dbg(&spi->dev, "status reg: %08x\n", __raw_readl(chstat_reg));
-> 	after "do" and before "while (c)" in omap2_mcspi_txrx_pio function.
-> 	I want to see how status is changed before and after TX or RX transaction.
-> 2. Also try to make fake reading 
-> 	__raw_readl(tx_reg)
-> 	 after TX write in omap2_mcspi_txrx_pio.
-> 	and 
-> 	__raw_readl(cs->base + OMAP2_MCSPI_TX0);
-> 	in mcspi_work function.
-> 	This should exclude the posted write effect if such present.
->
-> If you put more logging info from other spi registers it might be also usefull in problem analyzing.
-> And it is better to concentrate on your test case 1. 
-> So as it is the test which gives the bug with unknown yet nature.
->
->
->
-> Regards
-> Roman Tereshonkov
->
->   
->> -----Original Message-----
->> From: ext jason [mailto:jason77.wang at gmail.com] 
->> Sent: 01 July, 2010 14:59
->> To: Tereshonkov Roman (Nokia-MS/Helsinki)
->> Cc: grant.likely at secretlab.ca; david-b at pacbell.net; 
->> spi-devel-general at lists.sourceforge.net; 
->> linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH] spi/omap2_mcspi: disable and enable chan 
->> between each SPI transfer
->>
->> roman.tereshonkov at nokia.com wrote:
->>     
->>> Hi Jason,
->>>
->>> It is a little bit hard to analyze your logs.
->>> 1. You showed the bytes read in your own way but there is 
->>>       
->> the data reading in omap2_mcspi_txrx_pio function also.
->>     
->>> 2. For your third test case. You try to read data after 
->>>       
->> TX_ONLY, before triggering RX_ONLY, and get the right word.
->>     
->>> Looks like there is something wrong.
->>>
->>> Try to log MCSPI_CHxSTAT register to follow when RXS bit 
->>>       
->> (register RX is full) is set.
->>     
->>> And do not use the RX register reading in you own way. If 
->>>       
->> you need RX logging do it from omap2_mcspi_txrx_pio function.
->>     
->>>       
-<snip>
+1.7.0
