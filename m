@@ -1,58 +1,57 @@
-From: mel@csn.ul.ie (Mel Gorman)
-Date: Tue, 13 Jul 2010 10:28:52 +0100
-Subject: About SECTION_SIZE_BITS for Sparsemem
-In-Reply-To: <20100713120315.c6c418f4.kamezawa.hiroyu@jp.fujitsu.com>
-References: <000601cb219c$c7830b60$56892220$%kim@samsung.com>
-	<AANLkTinTrt7VKuKvleiJj4lv2tWqCcDYHVXAQIHLA7bh@mail.gmail.com>
-	<001b01cb21aa$ef0e4d80$cd2ae880$%kim@samsung.com>
-	<AANLkTinkujX3VbL0sXjjghovr8eX9Os0huw3OTBut2UP@mail.gmail.com>
-	<20100713092522.6d9939ac.kamezawa.hiroyu@jp.fujitsu.com>
-	<AANLkTimHNBUo30sp1azUcWQiDpADGyEW_N-dwU0nJy9u@mail.gmail.com>
-	<20100713120315.c6c418f4.kamezawa.hiroyu@jp.fujitsu.com>
-Message-ID: <20100713092852.GC29885@csn.ul.ie>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 13 Jul 2010 10:33:46 +0100
+Subject: [RFC,PATCH 0/2] Allow late mdesc detection
+In-Reply-To: <1279011746.2521.394.camel@pororo.lan>
+References: <1278903792.387175.713057245098.0.gpush@pororo>
+	<alpine.LFD.2.00.1007112334390.10598@xanadu.home>
+	<1278921935.9235.90.camel@pororo.lan>
+	<alpine.LFD.2.00.1007120904240.10598@xanadu.home>
+	<AANLkTikXejaVsFsudO3ABKzR80V6yCBHm7c6y32hurdt@mail.gmail.com>
+	<20100713072848.GC19839@n2100.arm.linux.org.uk>
+	<1279011746.2521.394.camel@pororo.lan>
+Message-ID: <20100713093346.GC20590@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 13, 2010 at 12:03:15PM +0900, KAMEZAWA Hiroyuki wrote:
-> On Tue, 13 Jul 2010 11:05:26 +0900
-> Minchan Kim <minchan.kim@gmail.com> wrote:
-> 
-> > On Tue, Jul 13, 2010 at 9:25 AM, KAMEZAWA Hiroyuki
-> > <kamezawa.hiroyu@jp.fujitsu.com> wrote:
-> 
-> > > For example, prepare a page filled with (1 << PG_reserved).
-> > > and replace it with unnecessary memmap rather than freeing a page for memmap.
-> > 
-> > Hmm. I don't got your point.
-> > The problem is that we access struct page by pfn number not address.
-> > 
-> > You mean let's remain memmap on hole with changing PageReseved instead of free?
-> > 
-> Like a ZERO_PAGE, preparing RESERVED_PAGE, 
-> which is filled with (1 << PG_reserved) as
-> 
->   0x00000400,0x00000400,0x00000400,0x00000400
->   .....
-> 
-> And map this pages to every hole. Then, you only waste a page to fill all holes
-> because "struct page" is aligned to 4bytes.
-> 
+On Tue, Jul 13, 2010 at 05:02:26PM +0800, Jeremy Kerr wrote:
+> It's been about 5 months since I started work on DT on ARM; I'm not sure
+> who's been working on it previously, if anyone.
 
-I like this idea. It would allow memmap_valid_within to be thrown away
-altogether and it maintains the assumptions of the memory model and
-sounds "cheap".
+Grant promised me a DT implementation on a 'real platform' quite
+some time ago.
 
-> 
-> > I think it's not a good idea to add new flag. If
-> > Kame. Could you review my RFC patch which makes pfn_valid check more
-> > tightly on sparsemem?
-> Sure.
-> 
-> Thanks,
-> -Kame
-> 
+> So far, most of the time has been preparation work - things like the clk
+> infrastructure, and smaller bits like these addruart patches. We're (me,
+> gcl and nico) also working carefully to specify the interfaces and
+> standards correctly, for example getting the boot interface right, and
+> standard formats for ARM device representation in the DT.
 
--- 
-Mel Gorman
-Part-time Phd Student                          Linux Technology Center
-University of Limerick                         IBM Dublin Software Lab
+Things like a grand unification of the clk infrastructure, addruart,
+and boot interface all seem to be relatively minor things compared
+to determining whether platform support really benefits from DT,
+which is whole point of my statement on wanting to see a real
+implementation of it.
+
+What I'm interested in its impact on the numerous board support files
+that we currently have - some 348 of them at the present time.  For
+example, currently these are used to provide small fragments of code
+to drivers to support what are effectively board quirks.  What I'm
+particularly interested in is how these quirks get attached to their
+relevant drivers - and whether this becomes easier with DT or harder
+with it.
+
+If it makes this stuff simpler, then all well and good - it's a net
+benefit.  If it makes this a lot more complicated - eg, because we
+need to declare every bit of quirk code into some kind of table for
+DT to pick up and bind in some manner to a driver - then moving to
+DT will be a disaster for maintainability and readability, and we
+lose type checking on these quirk functions.
+
+It's this area, and related areas to it that I'm really interested
+in, rather than these grand unification schemes which seem to be top
+priority at the moment.
+
+What really concerns me at the moment is that there's soo much work
+being put into the peripheral DT issues without first answering the
+question about whether DT on ARM is viable by providing a working
+real complex platform implementation.
