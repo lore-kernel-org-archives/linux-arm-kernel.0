@@ -1,14 +1,33 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 13 Jul 2010 10:49:36 +0100
-Subject: [PATCH 1/3] ab8500-mfd: add regulator support to ab8500 mfd device
-In-Reply-To: <1279002090-11234-2-git-send-email-sundar.iyer@stericsson.com>
-References: <1279002090-11234-1-git-send-email-sundar.iyer@stericsson.com>
-	<1279002090-11234-2-git-send-email-sundar.iyer@stericsson.com>
-Message-ID: <20100713094936.GA12686@rakim.wolfsonmicro.main>
+From: dave.bueso@gmail.com (Davidlohr Bueso)
+Date: Tue, 13 Jul 2010 05:49:21 -0400
+Subject: [PATCH RESEND padmux.c] Fix typo in kerneldoc
+Message-ID: <1279014561.18280.0.camel@cowboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 13, 2010 at 11:51:28AM +0530, Sundar Iyer wrote:
-> From: Sundar R Iyer <sundar.iyer@stericsson.com>
+Trivial fix in a typo (enalbed for enabled).
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Thanks,
+Davidlohr
+
+
+Signed-off-by: Davidlohr Bueso <dave@gnu.org>
+---
+ arch/arm/plat-spear/padmux.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/plat-spear/padmux.c b/arch/arm/plat-spear/padmux.c
+index d2aab3a..555eec6 100644
+--- a/arch/arm/plat-spear/padmux.c
++++ b/arch/arm/plat-spear/padmux.c
+@@ -66,7 +66,7 @@ static int pmx_mode_set(struct pmx_mode *mode)
+  * If peripheral is not supported by current mode then request is rejected.
+  * Conflicts between peripherals are not handled and peripherals will be
+  * enabled in the order they are present in pmx_dev array.
+- * In case of conflicts last peripheral enalbed will be present.
++ * In case of conflicts last peripheral enabled will be present.
+  * Returns -ve on Err otherwise 0
+  */
+ static int pmx_devs_enable(struct pmx_dev **devs, u8 count)
+-- 
+1.7.0.4
