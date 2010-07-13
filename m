@@ -1,137 +1,108 @@
-From: kamezawa.hiroyu@jp.fujitsu.com (KAMEZAWA Hiroyuki)
-Date: Tue, 13 Jul 2010 09:25:22 +0900
-Subject: About SECTION_SIZE_BITS for Sparsemem
-In-Reply-To: <AANLkTinkujX3VbL0sXjjghovr8eX9Os0huw3OTBut2UP@mail.gmail.com>
-References: <000601cb219c$c7830b60$56892220$%kim@samsung.com>
-	<AANLkTinTrt7VKuKvleiJj4lv2tWqCcDYHVXAQIHLA7bh@mail.gmail.com>
-	<001b01cb21aa$ef0e4d80$cd2ae880$%kim@samsung.com>
-	<AANLkTinkujX3VbL0sXjjghovr8eX9Os0huw3OTBut2UP@mail.gmail.com>
-Message-ID: <20100713092522.6d9939ac.kamezawa.hiroyu@jp.fujitsu.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 12 Jul 2010 20:38:26 -0400 (EDT)
+Subject: [PATCH][RFC] arm: Add basic support for VIA/WonderMedia SoC's
+In-Reply-To: <AANLkTilWwclstZiIkpiQQ_CPXgjGD2xz-GEw27hTvAp-@mail.gmail.com>
+References: <20100712165025.GA13818@alchark-u3s.alchark.ru>
+	<201007122122.32623.arnd@arndb.de>
+	<AANLkTilWwclstZiIkpiQQ_CPXgjGD2xz-GEw27hTvAp-@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1007121855470.10598@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Jul 2010 19:35:17 +0900
-Minchan Kim <minchan.kim@gmail.com> wrote:
+On Tue, 13 Jul 2010, Alexey Charkov wrote:
 
-> Hi, Mel and Kame.
+> Actually, as the devices using these SoC's are mainly generic Chinese
+> products, I would not expect any consistency in this area. The
+> bootloader is a modification of an old U-boot, but I could not find
+> the sources for my version (yes, a GPL violation). It seems to use
+> some machine IDs in the range of 4000+, but again I would not trust
+> that. That's why I decided to hardcode the intended target devices
+> here (which is what some of the other machines do).
+
+We try to avoid those as much as possible of course.
+
+What U-Boot version is this?  The mainline U-Boot has had the ability to 
+override the built-in machine ID with an env variable for a while.
+
+> >> +#ifdef CONFIG_MMU
+> >> +/* macro to get at IO space when running virtually */
+> >> +#define IO_ADDRESS(x) ((x) | 0xf0000000)
+> >> +#else
+> >> +#define IO_ADDRESS(x) (x)
+> >> +#endif
+> >
+> > I don't know yet what the general consensus in the arm world is about this,
+> > but this looks hacky to me. I'd recommend killing off the IO_ADDRESS macro
+> > and replacing it with proper calls to ioremap.
+> >
+> >
 > 
-> On Mon, Jul 12, 2010 at 7:13 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Minchan Kim wrote:
-> >>
-> >> Hello.
-> >>
-> > Hello :-)
+> I just followed the way how some of the other machine code functions:
+> mach-versatile and mach-realview both define similar macros. If using
+> ioremap is a better way, I could try to rework it.
+
+Versatile and RealView are development boards where things like MMU-less 
+builds of Linux are tested.  I doubt you'll want to run MMU-less Linux 
+on your target.  So this macro is most probably irrelevant for your 
+purpose.  And this is unrelated to whether ioremap is a better solution 
+(obviously on MMU-less systems ioremap is unavailable).
+
+> >> diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
+> >> index 8f10d24..f5745d1 100644
+> >> --- a/arch/arm/tools/mach-types
+> >> +++ b/arch/arm/tools/mach-types
+> >> @@ -12,7 +12,7 @@
+> >> ?#
+> >> ?# ? http://www.arm.linux.org.uk/developer/machines/?action=new
+> >> ?#
+> >> -# Last update: Sat May 1 10:36:42 2010
+> >> +# Last update: Sat Jun 19 13:07:40 2010
+> >> ?#
+> >> ?# machine_is_xxx ? ? CONFIG_xxxx ? ? ? ? ? ? MACH_TYPE_xxx ? ? ? ? ? number
+> >> ?#
 > >
-> >> On Mon, Jul 12, 2010 at 5:32 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> >> > Russell,
-> >> >
-> >> > Hi,
-> >> >
-> >> > Kukjin Kim wrote:
-> >> >> Russell wrote:
-> >> >> > So, memory starts at 0x20000000 and finishes at 0x25000000. ?That's
-> >> > fine.
-> >> >> > That doesn't mean the section size is 16MB.
-> >> >> >
-> >> >> > As I've already said, the section size has _nothing_ what so ever to
-> > do
-> >> >> > with the size of memory, or the granularity of the size of memory.
-> > ?By
-> >> >> > way of illustration, it is perfectly legal to have a section size of
-> >> >> > 256MB but only have 1MB in a section and this is perfectly legal. ?So
-> >> >> > sections do not have to be completely filled.
-> >> >> >
-> >> >> Actually, as you know, the hole's area of mem_map is freed from bootmem
-> > if
-> >> > a
-> >> >> section has a hole when initializing sparse memory.
-> >> >>
-> >> >> I identified that a section doesn't need to be a contiguous area of
-> >> > physical
-> >> >> memory when reading your comment with the fact that the mem_map of a
-> >> > section
-> >> >> can be smaller than the size of a section.
-> >> >>
-> >> >> I found, however, the kernel panics when modifying min_free_kbytes file
-> > in
-> >> >> the proc filesystem if a section has a hole.
-> >> >>
-> >> >> While processing the change of min_free_kbytes in the kernel, page
-> >> >> descriptors in a hole of an online section is accessed.
-> >> >
-> >> > As I said, following error happens.
-> >> > It would be helpful to me if any opinions or comments.
-> >> >
-> >>
-> >> Could you test below patch?
-> >> Also, you should select ARCH_HAS_HOLES_MEMORYMODEL in your config.
-> >>
-> > Yes, I did it, and no kernel panic happens :-)
+> > If you need the updated version of this file, it would probably make
+> > sense to build the patch instead a kernel tree that already contains
+> > the latest version, rather than Linus' tree.
 > >
-> > Same test...
-> > [root at Samsung ~]# cat /proc/sys/vm/min_free_kbytes
-> > 2736
-> > [root at Samsung ~]# echo "2730" > /proc/sys/vm/min_free_kbytes
-> > [root at Samsung ~]#
-> > [root at Samsung ~]# cat /proc/sys/vm/min_free_kbytes
-> > 2730
-> >
-> >
-> >> @@ -2824,8 +2825,13 @@ static void setup_zone_migrate_reserve(struct zone
-> >> *zone)
-> >> ? ? ? ? for (pfn = start_pfn; pfn < end_pfn; pfn += pageblock_nr_pages) {
-> >> ? ? ? ? ? ? ? ? if (!pfn_valid(pfn))
-> >> ? ? ? ? ? ? ? ? ? ? ? ? continue;
-> >> +
-> >> ? ? ? ? ? ? ? ? page = pfn_to_page(pfn);
-> >>
-> >> + ? ? ? ? ? ? ? ?/* Watch for unexpected holes punched in the memmap */
-> >> + ? ? ? ? ? ? ? ?if (!memmap_valid_within(pfn, page, zone))
-> >> + ? ? ? ? ? ? ? ? ? ? ? ?continue;
-> >> +
-> >> ? ? ? ? ? ? ? ? /* Watch out for overlapping nodes */
-> >> ? ? ? ? ? ? ? ? if (page_to_nid(page) != zone_to_nid(zone))
-> >> ? ? ? ? ? ? ? ? ? ? ? ? continue;
-> >>
-> >>
-> >>
-> >
-> > ...Could you please explain about this issue?
 > 
-> The setup_zone_migrate_reserve doesn't check memmap hole. I think
-> compaction would have the  same problem, too. I don't know there is a
-> problem in elsewhere.
-> Anyway, I think memmap_valid_within calling whenever walking whole pfn
-> range isn't a good solution. We already have pfn_valid. Could we check
-> this in there?
-> For example, mem_section have a valid pfn range and then valid section
-> can test it in pfn_valid.
+> I just couldn't find any. It seems that most (all?) trees have at most
+> 99a0099a8, which is dated May 1 (too old).
+
+I think what you did is OK.  It is best to include the whole file as 
+generated from the machine registry database when you need it.  This way 
+the merge conflict can easily be resolved by simply keeping the latest 
+version from either merged branches.
+
+
+> >> diff --git a/drivers/serial/vt8500_serial.c b/drivers/serial/vt8500_serial.c
+> >> new file mode 100644
+> >> index 0000000..21e0462
+> >> --- /dev/null
+> >> +++ b/drivers/serial/vt8500_serial.c
+> >> @@ -0,0 +1,612 @@
+> >> +/*
+> >> + * drivers/serial/vt8500_serial.c
+> >> + *
+> >> + * Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
+> >> + *
+> >> + * Based on msm_serial.c, which is:
+> >> + * Copyright (C) 2007 Google, Inc.
+> >> + * Author: Robert Love <rlove@google.com>
+> >
+> > This device driver should probably go to the tty maintainer,
+> > Greg Kroah-Hartman <gregkh@suse.de>, with the linux-arm-kernel and
+> > linux-serial at vger.kernel.org mailing lists on Cc.
+> >
 > 
-> What do you think about it?
-> 
+> Ok, I will split it out and submit separately. However, this code
+> depends on at least <mach/vt8500.h> to compile, so should I wait for
+> integration of the remaining parts before submitting the serial
+> driver?
 
-please map another "fake" page when you free memmap.
-
-For example, prepare a page filled with (1 << PG_reserved).
-and replace it with unnecessary memmap rather than freeing a page for memmap.
-
-Then, you can find a PageReserved() page there. However it doesn't have valid
-nid,zid,secitonID, I don't think it can cause trouble.
-But you may see some BUG_ON() hit. If so, I think ARM guys can add
-
-#define PageHole(page) (PageReserved(page) && PageXXXXX(page))
-for avoiding BUG_ON() hit. (and this will help to skip unnecessary
-memmap_init_zone())
-
-By this, you can finaly remove CONFIG_MEMMAP_HOLES_IN_ZONE, and makes ARM's
-sparsemem much easier for maintainance.
-
-section ID is not important as far as you call page_to_pfn().
-You may able to add WARNING when page_to_pfn() is called against a HOLE page.
-
-You may feel above as a big work but I don't think it's very difficult@the
-first thought.
+You should certainly split it up.  However if you can get ACKs from the 
+relevant subsystem maintainers, then it can be agreed that you push that 
+(still separate) patch along with the one it depends on.
 
 
-Thanks,
--Kame
+Nicolas
