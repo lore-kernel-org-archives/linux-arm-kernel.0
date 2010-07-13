@@ -1,24 +1,35 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 13 Jul 2010 17:11:00 -0600
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 13 Jul 2010 16:14:41 -0700
 Subject: [RFC PATCH] Kconfig: Enable Kconfig fragments to be used for
 	defconfig
 In-Reply-To: <20100713230352.6781.18644.stgit@angua>
 References: <20100713230352.6781.18644.stgit@angua>
-Message-ID: <AANLkTilG016R6nnpy7COX4NZE6qWWO8ILvHAyyT4-bgV@mail.gmail.com>
+Message-ID: <1279062881.4609.34.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Typo correction:
+On Tue, 2010-07-13 at 17:04 -0600, Grant Likely wrote:
 
-2010/7/13 Grant Likely <grant.likely@secretlab.ca>:
-[...]
-> <board>.Kconfig defines new board specific config items (prefixed with
-> "generateconfig_" which default to 'y' or 'm' and select the options
-> that the platform cares about. ?It also then either the architecture
+> - I haven't figured out a way for the fragment to force an option to
+>   be "n", or to set a value, for example "CONFIG_LOG_BUF_SHIFT=16".
+>   This may require changing the syntax.
+> - It still doesn't resolve dependencies.  A solver would help with this.
+>   For the time being I work around the problem by running the generated
+>   config through 'oldconfig' and looking for differences.  If the files
+>   differ (ignoring comments and generateconfig_* options) after oldconfig,
+>   then the <board>_defconfig target returns a failure.  (but leaves the
+>   new .config intact so the user can resolve it with menuconfig).  This
+>   way at least the user is told when a Kconfig fragment is invalid.
 
-s/either the/either includes the/
+The solver would fix the whole issues with the defconfigs , we wouldn't
+need this Kconfig change .. From my perspective we shouldn't be fooling
+around with anything but the solver approach ..
 
-> default Kconfig, or another Kconfig fragment that includes the default
-> one (therefore the fragments can be 'stacked' to include, say, default
-> options for the architecture, or particular chipset).
-[...]
+It just doesn't feel like Kconfig was meant to do this, it feel like
+somewhat of an abuse ..
+
+Daniel
+
+-- 
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
