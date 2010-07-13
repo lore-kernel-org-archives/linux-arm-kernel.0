@@ -1,70 +1,24 @@
-From: triad@df.lth.se (Linus Walleij)
-Date: Wed, 14 Jul 2010 01:08:11 +0200
-Subject: [PATCH] ARM: add character LCD platform data to the Versatile
-Message-ID: <1279062491-21164-1-git-send-email-triad@df.lth.se>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 13 Jul 2010 17:11:00 -0600
+Subject: [RFC PATCH] Kconfig: Enable Kconfig fragments to be used for
+	defconfig
+In-Reply-To: <20100713230352.6781.18644.stgit@angua>
+References: <20100713230352.6781.18644.stgit@angua>
+Message-ID: <AANLkTilG016R6nnpy7COX4NZE6qWWO8ILvHAyyT4-bgV@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This activates the character LCD found on the Versatile boards.
-This silicon does not seem to have an IRQ line routed to the char
-LCD so we're not definining this and the code shall fall back to
-polling mode.
+Typo correction:
 
-Signed-off-by: Linus Walleij <triad@df.lth.se>
----
-I don't have this hardware (if you have one you can send me, thank
-you very much) so I cannot test this on real HW. Testing
-appreciated.
----
- arch/arm/Kconfig               |    1 +
- arch/arm/mach-versatile/core.c |   16 ++++++++++++++++
- 2 files changed, 17 insertions(+), 0 deletions(-)
+2010/7/13 Grant Likely <grant.likely@secretlab.ca>:
+[...]
+> <board>.Kconfig defines new board specific config items (prefixed with
+> "generateconfig_" which default to 'y' or 'm' and select the options
+> that the platform cares about. ?It also then either the architecture
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index cf30fc9..c50669a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -254,6 +254,7 @@ config ARCH_VERSATILE
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select PLAT_VERSATILE
- 	select ARM_TIMER_SP804
-+	select ARM_CHAR_LCD
- 	help
- 	  This enables support for ARM Ltd Versatile board.
- 
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index f3a0e07..6ccd261 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -355,6 +355,21 @@ static struct mmci_platform_data mmc0_plat_data = {
- 	.gpio_cd	= -1,
- };
- 
-+static struct resource char_lcd_resources[] = {
-+	{
-+		.start = VERSATILE_CHAR_LCD_BASE,
-+		.end   = (VERSATILE_CHAR_LCD_BASE + SZ_4K - 1),
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device char_lcd_device = {
-+	.name           =       "arm-charlcd",
-+	.id             =       -1,
-+	.num_resources  =       ARRAY_SIZE(char_lcd_resources),
-+	.resource       =       char_lcd_resources,
-+};
-+
- /*
-  * Clock handling
-  */
-@@ -853,6 +868,7 @@ void __init versatile_init(void)
- 	platform_device_register(&versatile_flash_device);
- 	platform_device_register(&versatile_i2c_device);
- 	platform_device_register(&smc91x_device);
-+	platform_device_register(&char_lcd_device);
- 
- 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
- 		struct amba_device *d = amba_devs[i];
--- 
-1.7.1
+s/either the/either includes the/
+
+> default Kconfig, or another Kconfig fragment that includes the default
+> one (therefore the fragments can be 'stacked' to include, say, default
+> options for the architecture, or particular chipset).
+[...]
