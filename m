@@ -1,115 +1,48 @@
-From: s-ghorai@ti.com (Sukumar Ghorai)
-Date: Tue, 13 Jul 2010 10:15:36 +0530
-Subject: [PATCH v3 3/4] omap: nand: ecc layout select from board file
-In-Reply-To: <1278996337-25172-3-git-send-email-s-ghorai@ti.com>
-References: <1278996337-25172-1-git-send-email-s-ghorai@ti.com>
-	<1278996337-25172-2-git-send-email-s-ghorai@ti.com>
-	<1278996337-25172-3-git-send-email-s-ghorai@ti.com>
-Message-ID: <1278996337-25172-4-git-send-email-s-ghorai@ti.com>
+From: zpfeffer@codeaurora.org (Zach Pfeffer)
+Date: Mon, 12 Jul 2010 22:21:05 -0700
+Subject: [RFC 3/3] mm: iommu: The Virtual Contiguous Memory Manager
+In-Reply-To: <20100710143635.GA10080@8bytes.org>
+References: <1277877350-2147-1-git-send-email-zpfeffer@codeaurora.org>
+	<1277877350-2147-3-git-send-email-zpfeffer@codeaurora.org>
+	<20100701101746.3810cc3b.randy.dunlap@oracle.com>
+	<20100701180241.GA3594@basil.fritz.box>
+	<AANLkTinABCSdN6hnXVOvVZ12f1QBMR_UAi62qW8GmlkL@mail.gmail.com>
+	<4C2D908E.9030309@codeaurora.org>
+	<20100710143635.GA10080@8bytes.org>
+Message-ID: <4C3BF7C1.9040904@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-    This patch makes it possible to select sw or hw (different layout options)
-    ecc scheme supported by omap nand driver.  And hw ecc layout selected for
-    sdp and zoom boards, by default.
+Joerg Roedel wrote:
+> On Fri, Jul 02, 2010 at 12:09:02AM -0700, Zach Pfeffer wrote:
+>> Hari Kanigeri wrote:
+>>>> He demonstrated the usage of his code in one of the emails he sent out
+>>>> initially. Did you go over that, and what (or how many) step would you
+>>>> use with the current code to do the same thing?
+>>> -- So is this patch set adding layers and abstractions to help the User ?
+>>>
+>>> If the idea is to share some memory across multiple devices, I guess
+>>> you can achieve the same by calling the map function provided by iommu
+>>> module and sharing the mapped address to the 10's or 100's of devices
+>>> to access the buffers. You would only need a dedicated virtual pool
+>>> per IOMMU device to manage its virtual memory allocations.
+>> Yeah, you can do that. My idea is to get away from explicit addressing
+>> and encapsulate the "device address to physical address" link into a
+>> mapping.
+> 
+> The DMA-API already does this with the help of IOMMUs if they are
+> present. What is the benefit of your approach over that?
 
-Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
-Signed-off-by: Vimal Singh <vimalsingh@ti.com>
----
- arch/arm/mach-omap2/board-flash.c      |    3 ++-
- arch/arm/plat-omap/include/plat/nand.h |    6 ++++++
- drivers/mtd/nand/omap2.c               |   29 +++++++++++++----------------
- 3 files changed, 21 insertions(+), 17 deletions(-)
+The grist to the DMA-API mill is the opaque scatterlist. Each
+scatterlist element brings together a physical address and a bus
+address that may be different. The set of scatterlist elements
+constitute both the set of physical buffers and the mappings to those
+buffers. My approach separates these two things into a struct physmem
+which contains the set of physical buffers and a struct reservation
+which contains the set of bus addresses (or device addresses). Each
+element in the struct physmem may be of various lengths (without
+resorting to chaining). A map call maps the one set to the other. 
 
-diff --git a/arch/arm/mach-omap2/board-flash.c b/arch/arm/mach-omap2/board-flash.c
-index c6a07dd..ab31e7f 100644
---- a/arch/arm/mach-omap2/board-flash.c
-+++ b/arch/arm/mach-omap2/board-flash.c
-@@ -143,7 +143,8 @@ __init board_nand_init(struct mtd_partition *nand_parts, u8 nr_parts, u8 cs)
- {
- 	board_nand_data.cs		= cs;
- 	board_nand_data.parts		= nand_parts;
--	board_nand_data.nr_parts		= nr_parts;
-+	board_nand_data.nr_parts	= nr_parts;
-+	board_nand_data.ecc_opt		= OMAP_ECC_HAMMING_CODE_DIFF_LAYOUT;
- 
- 	gpmc_nand_init(&board_nand_data);
- }
-diff --git a/arch/arm/plat-omap/include/plat/nand.h b/arch/arm/plat-omap/include/plat/nand.h
-index 5e69463..2e026e4 100644
---- a/arch/arm/plat-omap/include/plat/nand.h
-+++ b/arch/arm/plat-omap/include/plat/nand.h
-@@ -23,6 +23,12 @@ struct omap_nand_platform_data {
- 	int			gpmc_irq;
- 	unsigned long		phys_base;
- 	int			devsize;
-+	enum {
-+		OMAP_ECC_HAMMING_CODE_DIFF_LAYOUT = 0,
-+		/* 1-bit s/w ecc and layout different from romcode */
-+		OMAP_ECC_HAMMING_CODE_HW,/* 1-bit ecc, romcode layout */
-+		OMAP_ECC_HAMMING_CODE_SW,/* 1-bit ecc, romcode layout */
-+	} ecc_opt;
- };
- 
- /* minimum size for IO mapping */
-diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-index d5fad84..0464a19 100644
---- a/drivers/mtd/nand/omap2.c
-+++ b/drivers/mtd/nand/omap2.c
-@@ -7,7 +7,6 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
--#define CONFIG_MTD_NAND_OMAP_HWECC
- 
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
-@@ -658,8 +657,6 @@ static int omap_verify_buf(struct mtd_info *mtd, const u_char * buf, int len)
- 	return 0;
- }
- 
--#ifdef CONFIG_MTD_NAND_OMAP_HWECC
--
- /**
-  * gen_true_ecc - This function will generate true ECC value
-  * @ecc_buf: buffer to store ecc code
-@@ -879,8 +876,6 @@ static void omap_enable_hwecc(struct mtd_info *mtd, int mode)
- 	gpmc_enable_hwecc(info->gpmc_cs, mode, dev_width, info->nand.ecc.size);
- }
- 
--#endif
--
- /**
-  * omap_wait - wait until the command is done
-  * @mtd: MTD device structure
-@@ -1059,17 +1054,19 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
- 	}
- 	info->nand.verify_buf = omap_verify_buf;
- 
--#ifdef CONFIG_MTD_NAND_OMAP_HWECC
--	info->nand.ecc.bytes		= 3;
--	info->nand.ecc.size		= 512;
--	info->nand.ecc.calculate	= omap_calculate_ecc;
--	info->nand.ecc.hwctl		= omap_enable_hwecc;
--	info->nand.ecc.correct		= omap_correct_data;
--	info->nand.ecc.mode		= NAND_ECC_HW;
--
--#else
--	info->nand.ecc.mode = NAND_ECC_SOFT;
--#endif
-+	/* selsect the ecc type */
-+	if ((pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_DIFF_LAYOUT) ||
-+		(pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_HW)) {
-+		info->nand.ecc.bytes		= 3;
-+		info->nand.ecc.size		= 512;
-+		info->nand.ecc.calculate	= omap_calculate_ecc;
-+		info->nand.ecc.hwctl		= omap_enable_hwecc;
-+		info->nand.ecc.correct		= omap_correct_data;
-+		info->nand.ecc.mode		= NAND_ECC_HW;
-+
-+	} else if (pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_SW) {
-+		info->nand.ecc.mode = NAND_ECC_SOFT;
-+	}
- 
- 	/* DIP switches on some boards change between 8 and 16 bit
- 	 * bus widths for flash.  Try the other width if the first try fails.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
