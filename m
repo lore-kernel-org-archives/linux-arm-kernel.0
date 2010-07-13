@@ -1,47 +1,91 @@
-From: mel@csn.ul.ie (Mel Gorman)
-Date: Tue, 13 Jul 2010 10:50:35 +0100
-Subject: About SECTION_SIZE_BITS for Sparsemem
-In-Reply-To: <20100713093815.GD20590@n2100.arm.linux.org.uk>
-References: <000601cb219c$c7830b60$56892220$%kim@samsung.com>
-	<AANLkTinTrt7VKuKvleiJj4lv2tWqCcDYHVXAQIHLA7bh@mail.gmail.com>
-	<001b01cb21aa$ef0e4d80$cd2ae880$%kim@samsung.com>
-	<AANLkTinkujX3VbL0sXjjghovr8eX9Os0huw3OTBut2UP@mail.gmail.com>
-	<20100713092658.GB29885@csn.ul.ie>
-	<20100713093815.GD20590@n2100.arm.linux.org.uk>
-Message-ID: <20100713095035.GE29885@csn.ul.ie>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 13 Jul 2010 10:55:56 +0100
+Subject: [PATCH 2/3] regulator: add support for regulators on the
+	ab8500 MFD
+In-Reply-To: <1279002090-11234-3-git-send-email-sundar.iyer@stericsson.com>
+References: <1279002090-11234-1-git-send-email-sundar.iyer@stericsson.com>
+	<1279002090-11234-3-git-send-email-sundar.iyer@stericsson.com>
+Message-ID: <20100713095556.GB12686@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 13, 2010 at 10:38:15AM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jul 13, 2010 at 10:26:58AM +0100, Mel Gorman wrote:
-> > There is also an assumption that a section is fully populated or empty.
-> 
-> That is absolutely absurd. 
+On Tue, Jul 13, 2010 at 11:51:29AM +0530, Sundar Iyer wrote:
 
-Arguably, violating the memory model by punching unexpected holes in it
-is a also absurd.
+> + * @mask: mask to enable/disable regulator
+> + * @enable: enable bits to enable the regulator
 
-> So, I have a platform which has 256MB at
-> 64MB intervals in 4 chunks. I can fit 512kB to any slot. 
+Presumably these two will always be identical?
 
-I'm afraid I'm not quite getting your example.
+> + * @typical_voltages: typical supported voltage table
 
-If the granularity of the banks is 64MB and the alignment is 256MB, I
-don't see what hole you'd be punching anyway.
+Why typical - might the set of supported values change, and if they do
+how will that be detected and handled?
 
-> It starts
-> at 0x10000000.  Do I really need 1024 sparsemem sections to cater for
-> this?
-> 
+> +	ret = ab8500_read(info->ab8500, info->update_reg);
+> +	if (ret < 0)
+> +		dev_dbg(rdev_get_dev(rdev),
+> +			"couldnt read 0x%x register\n", info->update_reg);
+> +
+> +	if (ret & info->mask)
+> +		return true;
+> +	else
+> +		return false;
 
-Not necessarily, just don't punch holes within section boundaries when using
-sparsemem. If mapping in a PageReserved page is not an option due to complexity
-(it's possible by remapping pages in kernel space which x86 used to do for
-discontig) then the size of mem_section as suggested by Minchan Kim would be
-another option. This would increase the overhead of sparsemem in terms of space
-and performance. - at worst by an amount matching the memory freed by memmap.
+This should return the error code if the read failed.
 
--- 
-Mel Gorman
-Part-time Phd Student                          Linux Technology Center
-University of Limerick                         IBM Dublin Software Lab
+> +static int ab8500_get_best_voltage_index(struct regulator_dev *rdev,
+> +		int min_uV, int max_uV)
+> +{
+> +	struct ab8500_regulator_info *info = rdev_get_drvdata(rdev);
+> +	int i;
+> +
+> +	/* check the supported voltage */
+> +	for (i = 0; i < info->voltages_len; i++) {
+> +		if ((info->typical_voltages[i] >= min_uV) &&
+> +			(info->typical_voltages[i] <= max_uV))
+> +			return i;
+
+The indentation here is confusing - the second line of the if () is
+aligned with the return statement not the first line.
+
+> +	/* get the appropriate voltages within the range */
+> +	ret = ab8500_get_best_voltage_index(rdev, min_uV, max_uV);
+> +	if (ret < 0) {
+> +		dev_dbg(rdev_get_dev(rdev),
+> +				"coudlnt get best voltage for regulator\n");
+> +	}
+
+Should return an error here.
+
+> +	/* set the registers for the request */
+> +	ret = ab8500_set_bits(info->ab8500, info->voltage_reg,
+> +				info->voltage_mask, ret);
+> +	if (ret < 0) {
+> +		dev_dbg(rdev_get_dev(rdev),
+> +		"couldnt set voltage reg for regulator\n");
+> +		return -EINVAL;
+
+Should return the error you got back from set_bits() to provide maximum
+information to the caller (besides, this isn't an invalid value - it's
+an I/O issue).
+
+> +static int ab8500_fixed_get_voltage(struct regulator_dev *rdev)
+> +{
+> +	int regulator_id;
+> +	struct ab8500_regulator_info *info = rdev_get_drvdata(rdev);
+> +
+> +	regulator_id = rdev_get_id(rdev);
+> +	if (regulator_id >= AB8500_NUM_REGULATORS)
+> +		return -EINVAL;
+> +
+> +	return info->fixed_uV;
+> +}
+> +
+> +static struct regulator_ops ab8500_ldo_fixed_ops = {
+> +	.enable		= ab8500_regulator_enable,
+> +	.disable	= ab8500_regulator_disable,
+> +	.is_enabled	= ab8500_regulator_is_enabled,
+> +	.get_voltage	= ab8500_fixed_get_voltage,
+> +};
+
+Should have list_voltage() support also ideally.
