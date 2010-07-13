@@ -1,35 +1,38 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Tue, 13 Jul 2010 17:39:06 +0300
-Subject: [PATCH 0/3]Add imx51_3ds platform support
-In-Reply-To: <1279026162-6634-1-git-send-email-jason77.wang@gmail.com>
-References: <1279026162-6634-1-git-send-email-jason77.wang@gmail.com>
-Message-ID: <20100713143906.GB6727@matterhorn.lan>
+From: sundar.iyer@stericsson.com (Sundar R IYER)
+Date: Tue, 13 Jul 2010 16:41:34 +0200
+Subject: [PATCH v2 2/2] ux500: add ab8500-regulators machine specific data
+In-Reply-To: <20100713141828.GB24260@rakim.wolfsonmicro.main>
+References: <1279030173-3086-1-git-send-email-sundar.iyer@stericsson.com>
+	<1279030173-3086-2-git-send-email-sundar.iyer@stericsson.com>
+	<20100713141828.GB24260@rakim.wolfsonmicro.main>
+Message-ID: <33A307AF30D7BF4F811B1568FE7A9B1810E7E88D@EXDCVYMBSTM006.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Jul 13, Jason Wang wrote:
-> part3:
-> 
->  [PATCH 1/3] mx51_3ds: Add support for the imx51 3-stack board
->  [PATCH 2/3] mx51: add imx_keypad device definition for mx51 platforms
->  [PATCH 3/3] mx51_3ds: add keypad support on 3ds platform
->  This patchset will add imx51_3ds platform in the linux kernel,
->  These 3 patches are generated based off imx-for-2.6.36 branch,
->  and passed build test.
+Mark,
 
-I think the 3ds support is clean enough for merging now.
+>It is extremely disappointing to see you reposting this without engaging
+>with my previous review at all.
+Sincere apologies. As I said, I tried to repost after fixing your comments; but my
+mistake that I didn't engage prior to the posting.
 
-Acked-by: Amit Kucheria <amit.kucheria@canonical.com>
+>> +static struct regulator_consumer_supply ab8500_vaux1_consumers[] = {
+>> +	{ .dev = NULL, .supply = "vaux1", },
+>> +};
+>
+>All these supplies with NULL devices are bogus, supplies are in terms of
+>the device being supplied not the labels on the board.  If you've got a
+>supply with no device and the name of the supply on either the regulator
+>or the board you're most likely doing it wrong.  The only exception is
+>for supplies used in cpufreq since we don't have a struct device we can
+>use there.
 
->  But currently in imx-for-2.6.36 branch, there is a recently applied
->  patch which will affect all imx gpio chained irqs. The lan driver
->  on imx51_3ds can't raise irq(through gpio) because of this potential
->  issue. I generate the following patch to fix it.
->  [PATCH] imx: move gpio init after to irq init
+I had these supplies as NULL, so that later on, when we add devices for our platform, 
+each developer can edit this file to hook up his own device. The reason I wanted this
+file in the patch set was to include the machine constraints for the regulators on AB8500.
 
-Acked separately.
+As admitted earlier, I will wait for your valuable comments before posting the next patch set.
+(Also, I will try to make sure(still learning) to post the next patches into the same thread.)
 
--- 
-----------------------------------------------------------------------
-Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-----------------------------------------------------------------------
+Regards,
+Sundar
