@@ -1,29 +1,39 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 13 Jul 2010 09:20:01 -0700
-Subject: [PATCH 1/5] pxa: Sane naming of gpios for palm platform
-In-Reply-To: <AANLkTilWYmIFgh7SYDQM07FKbk2RlwUpEhKd4nEKb6nw@mail.gmail.com>
-References: <1279006733-17731-1-git-send-email-marek.vasut@gmail.com>
-	<AANLkTikH7VE6W8x5Y_r0YO1SDhOvEBEIeDUibuZ4lzKx@mail.gmail.com>
-	<201007131158.38699.marek.vasut@gmail.com>
-	<AANLkTilWYmIFgh7SYDQM07FKbk2RlwUpEhKd4nEKb6nw@mail.gmail.com>
-Message-ID: <1279038001.1501.408.camel@Joe-Laptop.home>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Tue, 13 Jul 2010 20:27:47 +0400
+Subject: [PATCH v2 0/3] s3c24xx: iPAQ rx1950 series
+In-Reply-To: <201007131845.10426.anarsoul@gmail.com>
+References: <1278781069-30521-1-git-send-email-anarsoul@gmail.com>
+	<20100713151310.GA12234@oksana.dev.rtsoft.ru>
+	<201007131845.10426.anarsoul@gmail.com>
+Message-ID: <20100713162747.GA21613@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-07-13 at 18:20 +0800, Eric Miao wrote:
-> > GPIO_NR was never intended to be used. It's some stupidity with historic roots.
-> > (NR == number ... it was intended to be substituted, but never was ... time to
-> > do it).
-> I think it's acceptable - my preferable choice would be GPIO_xxxx. But
-> the idea of encoding GPIO number into the macro itself is not good. E.g.
-> GPIO_MMC_DETECT is self explanatory, no need for GPIO9_MMC_DETECT.
-> Later you find the GPIO number is actually 10, now you have to modify
-> _every_ place this macro appears, instead of a one liner patch.
+On Tue, Jul 13, 2010 at 06:45:04PM +0300, Vasily Khoruzhick wrote:
+> ? ????????? ?? 13 ???? 2010 18:13:10 ????? Anton Vorontsov ???????:
+> 
+> > No, please. Factor out LED triggers addition into a separate patch
+> > and we will discuss* it. That way it won't block this driver merge.
+> 
+> I'm not in hurry :)
 
-I agree with Eric.
-Another scenario is another board comes along nearly
-but not quite identical.
+But you should. Months later you'll not have time/energy to
+continue, and if you not merge your patches ASAP, then all
+the great work that you did will quickly become outdated
+(like most of handhelds.org projects nowadays. ;-)
 
->>> +70kb duplicated email reply crud
+> But I want it to be merged with all functionality 
+> (getting status/charging/LEDs).
 
-Please remember to trim unnecessary stuff.
+Sure thing, in the end it will have all the functionality.
+
+But let's do one thing at a time? Just factor out the LEDs
+stuff into a separate patch, and we'll think how to deal with
+these LEDs.
+
+Thanks,
+
+-- 
+Anton Vorontsov
+email: cbouatmailru at gmail.com
+irc://irc.freenode.net/bd2
