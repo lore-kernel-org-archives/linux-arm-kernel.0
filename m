@@ -1,47 +1,46 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Tue, 13 Jul 2010 17:02:26 +0800
-Subject: [RFC,PATCH 0/2] Allow late mdesc detection
-In-Reply-To: <20100713072848.GC19839@n2100.arm.linux.org.uk>
-References: <1278903792.387175.713057245098.0.gpush@pororo>
-	<alpine.LFD.2.00.1007112334390.10598@xanadu.home>
-	<1278921935.9235.90.camel@pororo.lan>
-	<alpine.LFD.2.00.1007120904240.10598@xanadu.home>
-	<AANLkTikXejaVsFsudO3ABKzR80V6yCBHm7c6y32hurdt@mail.gmail.com>
-	<20100713072848.GC19839@n2100.arm.linux.org.uk>
-Message-ID: <1279011746.2521.394.camel@pororo.lan>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 13 Jul 2010 10:02:23 +0100
+Subject: [RFC 3/3] mm: iommu: The Virtual Contiguous Memory Manager
+In-Reply-To: <20100713174519D.fujita.tomonori@lab.ntt.co.jp>
+References: <20100713092012.7c1fe53e@lxorguk.ukuu.org.uk>
+	<20100713173028M.fujita.tomonori@lab.ntt.co.jp>
+	<20100713094244.7eb84f1b@lxorguk.ukuu.org.uk>
+	<20100713174519D.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <20100713090223.GB20590@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Tue, Jul 13, 2010 at 05:45:39PM +0900, FUJITA Tomonori wrote:
+> Drivers can tell the USB layer that these are vmapped buffers? Adding
+> something to struct urb? I might be totally wrong since I don't know
+> anything about the USB layer.
 
-> As far as I can see, DT isn't getting anywhere - certainly my request
-> to see it on a real platform rather than the ARM Ltd hardware seems to
-> have been "forgotten" about.
+With non-DMA coherent aliasing caches, you need to know where the page
+is mapped into the virtual address space, so you can deal with aliases.
 
-No, definitely not forgotten.
+You'd need to tell the USB layer about the other mappings of the page
+which you'd like to be coherent (such as the vmalloc area - and there's
+also the possible userspace mapping to think about too, but that's
+a separate issue.)
 
-In addition to versatile, I have mx51 booting with a device tree at the
-moment. The patches are still a little hackish (and a little behind
-mainline now), but the basic support is there.
+I wonder if we should have had:
 
-If you'd like a solid demo of mx51, I can get these patches updated to
-my most recent arm-dt branch.
+	vmalloc_prepare_dma(void *, size_t, enum dma_direction)
+	vmalloc_finish_dma(void *, size_t, enum dma_direction)
 
-> As it's taking soo long (it's getting to be a couple of years) to come
-> up with a DT implementation for a real machine,
+rather than flush_kernel_vmap_range and invalidate_kernel_vmap_range,
+which'd make their use entirely obvious.
 
-It's been about 5 months since I started work on DT on ARM; I'm not sure
-who's been working on it previously, if anyone.
+However, this brings up a question - how does the driver (eg, v4l, xfs)
+which is preparing the buffer for another driver (eg, usb host, block
+dev) know that DMA will be performed on the buffer rather than PIO?
 
-So far, most of the time has been preparation work - things like the clk
-infrastructure, and smaller bits like these addruart patches. We're (me,
-gcl and nico) also working carefully to specify the interfaces and
-standards correctly, for example getting the boot interface right, and
-standard formats for ARM device representation in the DT.
+That's a very relevant question, because for speculatively prefetching
+CPUs, we need to invalidate caches after a DMA-from-device operation -
+but if PIO-from-device happened, this would destroy data read from the
+device.
 
-So no, there are no massive problems, it's coming along.
-
-Cheers,
-
-
-Jeremy
+That problem goes away if we decide that PIO drivers must have the same
+apparant semantics as DMA drivers - in that data must end up beyond the
+point of DMA coherency (eg, physical page) - but that's been proven to
+be very hard to achieve, especially with block device drivers.
