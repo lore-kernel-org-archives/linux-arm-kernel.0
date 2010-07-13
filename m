@@ -1,202 +1,120 @@
-From: jason77.wang@gmail.com (jason)
-Date: Wed, 14 Jul 2010 07:48:03 +0800
-Subject: [PATCH] spi/omap2_mcspi: disable and enable chan between each
-	SPI 	transfer
-In-Reply-To: <E1C7579D1379824DAE67858071C810382DD8772AB3@NOK-EUMSG-02.mgdnok.nokia.com>
-References: <1277381565-6305-1-git-send-email-jason77.wang@gmail.com>
-	<AANLkTin7mqe_zJIbyDcRPpCLaxPhl_dZQrSGua2z1nYW@mail.gmail.com>
-	<4C24A182.4060009@gmail.com>
-	<E1C7579D1379824DAE67858071C810382DD8495B26@NOK-EUMSG-02.mgdnok.nokia.com>
-	<4C289CCB.7010409@gmail.com>
-	<E1C7579D1379824DAE67858071C810382DD84963BC@NOK-EUMSG-02.mgdnok.nokia.com>
-	<4C2C82E9.2010103@gmail.com>
-	<E1C7579D1379824DAE67858071C810382DD859571A@NOK-EUMSG-02.mgdnok.nokia.com>
-	<4C3C6971.5010004@gmail.com>
-	<E1C7579D1379824DAE67858071C810382DD8772AB3@NOK-EUMSG-02.mgdnok.nokia.com>
-Message-ID: <4C3CFB33.3090301@gmail.com>
+From: minchan.kim@gmail.com (Minchan Kim)
+Date: Wed, 14 Jul 2010 08:59:06 +0900
+Subject: About SECTION_SIZE_BITS for Sparsemem
+In-Reply-To: <20100713203250.GA21600@csn.ul.ie>
+References: <000601cb219c$c7830b60$56892220$%kim@samsung.com>
+	<AANLkTinTrt7VKuKvleiJj4lv2tWqCcDYHVXAQIHLA7bh@mail.gmail.com>
+	<001b01cb21aa$ef0e4d80$cd2ae880$%kim@samsung.com>
+	<AANLkTinkujX3VbL0sXjjghovr8eX9Os0huw3OTBut2UP@mail.gmail.com>
+	<20100713092658.GB29885@csn.ul.ie>
+	<20100713093815.GD20590@n2100.arm.linux.org.uk>
+	<20100713095035.GE29885@csn.ul.ie>
+	<20100713173744.GB30142@n2100.arm.linux.org.uk>
+	<20100713203250.GA21600@csn.ul.ie>
+Message-ID: <AANLkTim55BDz4_vWhTnDVj1EP42MxAMZzP2PR80j5fLN@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-roman.tereshonkov at nokia.com wrote:
-> Hi,
->
-> I tried to find the board with the same touchscreen but failed.
->
-> Your patch solves the problem but does not fix the bug.
-> It would be nice if you find the roots of the bug to exclude future headackes.
->  
->
-> I am leaving to vacation and will be silent some time.
->
->
-> Regards
-> Roman Tereshonkov
->
->   
-OK, Thanks, If possible, i will ask for help from IC designers to 
-explain it.
+Hi, Mel.
 
-Thanks,
-Jason.
->   
->> -----Original Message-----
->> From: ext jason [mailto:jason77.wang at gmail.com] 
->> Sent: 13 July, 2010 16:26
->> To: Tereshonkov Roman (Nokia-MS/Helsinki)
->> Cc: grant.likely at secretlab.ca; david-b at pacbell.net; 
->> spi-devel-general at lists.sourceforge.net; 
->> linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH] spi/omap2_mcspi: disable and enable chan 
->> between each SPI transfer
+On Wed, Jul 14, 2010 at 5:32 AM, Mel Gorman <mel@csn.ul.ie> wrote:
+> On Tue, Jul 13, 2010 at 06:37:44PM +0100, Russell King - ARM Linux wrote:
+>> On Tue, Jul 13, 2010 at 10:50:35AM +0100, Mel Gorman wrote:
+>> > On Tue, Jul 13, 2010 at 10:38:15AM +0100, Russell King - ARM Linux wrote:
+>> > > On Tue, Jul 13, 2010 at 10:26:58AM +0100, Mel Gorman wrote:
+>> > > > There is also an assumption that a section is fully populated or empty.
+>> > >
+>> > > That is absolutely absurd.
+>> >
+>> > Arguably, violating the memory model by punching unexpected holes in it
+>> > is a also absurd.
 >>
->> Hi roman,
+>> Well, it's something we've done since 1.2.xx, and actually it's a new
+>> requirement that's evolved into the code that these page structs need
+>> to be populated.
+>
+> It's not that new. It evolved over a long period of time probably starting
+> from where the buddy bitmap was moved into the page->flags to save space.
+> Over time, this assumptions became more strict. Anyway, this is neither here
+> nor there so lets not fall down that hole.
+>
+>> So it's arguably a regression in the MM code which
+>> hasn't been detected.
 >>
->> How about my test case, does it expose the real problem?
+>> > > So, I have a platform which has 256MB at
+>> > > 64MB intervals in 4 chunks. I can fit 512kB to any slot.
+>> >
+>> > I'm afraid I'm not quite getting your example.
+>> >
+>> > If the granularity of the banks is 64MB and the alignment is 256MB, I
+>> > don't see what hole you'd be punching anyway.
 >>
->> I know my original patch was a big change both for PIO mode and for
->> DMA mode, because there is no DMA mode device on my platform and
->> i can't validate whether DMA mode works fine with that patch, 
->> it is a bit
->> risky to apply that patch to upstream.
+>> I didn't say the alignment is 256MB. ?I was referring to the *size* of
+>> memory.
 >>
->> This time i limit my patch to PIO mode, In theory, it is safe for all 
->> PIO transfers.
->> The side effect is to add a little bit overhead for a sequence of 
->> TX_ONLY transfers.
->> But it really can solve my touch panel issue.
+>> > Not necessarily, just don't punch holes within section boundaries when using
+>> > sparsemem.
 >>
->> Is the following patch acceptable?
+>> Err, you've just changed your story.
 >>
->> From 7b310e690fcccff400233a4c3340f42168016c92 Mon Sep 17 00:00:00 2001
->> From: Jason Wang <jason77.wang@gmail.com>
->> Date: Tue, 13 Jul 2010 18:05:59 +0800
->> Subject: [PATCH] spi/omap2_mcspi: disable channel after 
->> TX_ONLY transfer 
->> in PIO mode
+>
+> How so? I'd rather you didn't punch holes in the memmap allocated by sparsemem
+> at all.
+>
+>> Let's take an example setup which is perfectly valid. ?512kB at 0x10000000.
+>> 512kB at 0x14000000. 32MB at 0x1c000000.
 >>
->> In TX_ONLY transfer, the spi controller will receive datas
->> simultaneously and hold them in the rx register, these datas will
->> affect the direct following RX_ONLY transfer. So add disable channel
->> to purge those rx datas.
+>
+> Ok, that is a clear example, thanks.
+>
+>> You're saying that MAX_PHYSMEM_BITS=29 SECTION_SIZE_BITS=26 is wrong.
 >>
->> Signed-off-by: Jason Wang <jason77.wang@gmail.com>
->> ---
->> drivers/spi/omap2_mcspi.c | 6 ++++++
->> 1 files changed, 6 insertions(+), 0 deletions(-)
+>
+> Not wrong. It's fine as long as you're ok with some unnecessary memmap
+> being allocated. There is wastage of memory but functionally it'll be
+> fine with existing sparsemem and the assumptions it makes.
+>
+> Obviously you're not ok with this wastage or this discussion would not even
+> be happening and with SECTION_SIZE_BITS=26, there is quite a bit of wastage.
+>
+>> So, what do you suggest would be the correct sparsemem settings for this?
+>> MAX_PHYSMEM_BITS=29 SECTION_SIZE_BITS=19 maybe?
 >>
->> diff --git a/drivers/spi/omap2_mcspi.c b/drivers/spi/omap2_mcspi.c
->> index b3a94ca..43fab41 100644
->> --- a/drivers/spi/omap2_mcspi.c
->> +++ b/drivers/spi/omap2_mcspi.c
->> @@ -644,6 +644,12 @@ omap2_mcspi_txrx_pio(struct spi_device 
->> *spi, struct 
->> spi_transfer *xfer)
->> } else if (mcspi_wait_for_reg_bit(chstat_reg,
->> OMAP2_MCSPI_CHSTAT_EOT) < 0)
->> dev_err(&spi->dev, "EOT timed out\n");
->> +
->> + /* disable chan to purge rx datas received in TX_ONLY transfer,
->> + * otherwise these rx datas will affect the direct following
->> + * RX_ONLY transfer.
->> + */
->> + omap2_mcspi_set_enable(spi, 0);
->> }
->> out:
->> omap2_mcspi_set_enable(spi, 1);
->> -- 
->> 1.5.6.5
->>
->>
->>
->> roman.tereshonkov at nokia.com wrote:
->>     
->>> Hi Jason,
->>>
->>> Your logs do not show what I wanted to see.
->>> But what I can see now at least is the case when TX is full 
->>>       
->> and RX is full at the same time.
->>     
->>> 1.  Put 
->>> 	dev_dbg(&spi->dev, "status reg: %08x\n", 
->>>       
->> __raw_readl(chstat_reg));
->>     
->>> 	after "do" and before "while (c)" in 
->>>       
->> omap2_mcspi_txrx_pio function.
->>     
->>> 	I want to see how status is changed before and after TX 
->>>       
->> or RX transaction.
->>     
->>> 2. Also try to make fake reading 
->>> 	__raw_readl(tx_reg)
->>> 	 after TX write in omap2_mcspi_txrx_pio.
->>> 	and 
->>> 	__raw_readl(cs->base + OMAP2_MCSPI_TX0);
->>> 	in mcspi_work function.
->>> 	This should exclude the posted write effect if such present.
->>>
->>> If you put more logging info from other spi registers it 
->>>       
->> might be also usefull in problem analyzing.
->>     
->>> And it is better to concentrate on your test case 1. 
->>> So as it is the test which gives the bug with unknown yet nature.
->>>
->>>
->>>
->>> Regards
->>> Roman Tereshonkov
->>>
->>>   
->>>       
->>>> -----Original Message-----
->>>> From: ext jason [mailto:jason77.wang at gmail.com] 
->>>> Sent: 01 July, 2010 14:59
->>>> To: Tereshonkov Roman (Nokia-MS/Helsinki)
->>>> Cc: grant.likely at secretlab.ca; david-b at pacbell.net; 
->>>> spi-devel-general at lists.sourceforge.net; 
->>>> linux-arm-kernel at lists.infradead.org
->>>> Subject: Re: [PATCH] spi/omap2_mcspi: disable and enable chan 
->>>> between each SPI transfer
->>>>
->>>> roman.tereshonkov at nokia.com wrote:
->>>>     
->>>>         
->>>>> Hi Jason,
->>>>>
->>>>> It is a little bit hard to analyze your logs.
->>>>> 1. You showed the bytes read in your own way but there is 
->>>>>       
->>>>>           
->>>> the data reading in omap2_mcspi_txrx_pio function also.
->>>>     
->>>>         
->>>>> 2. For your third test case. You try to read data after 
->>>>>       
->>>>>           
->>>> TX_ONLY, before triggering RX_ONLY, and get the right word.
->>>>     
->>>>         
->>>>> Looks like there is something wrong.
->>>>>
->>>>> Try to log MCSPI_CHxSTAT register to follow when RXS bit 
->>>>>       
->>>>>           
->>>> (register RX is full) is set.
->>>>     
->>>>         
->>>>> And do not use the RX register reading in you own way. If 
->>>>>       
->>>>>           
->>>> you need RX logging do it from omap2_mcspi_txrx_pio function.
->>>>     
->>>>         
->>>>>       
->>>>>           
->> <snip>
->>
->>
->>     
+>
+> I haven't worked it out but I would think that wastes more memory than having
+> the larger section with some memmap wasted so I'm not going to advocate it
+> even though it'd "work".
+>
+> I haven't researched this so apologies if it turns out to be stupid but
+> I think the bit SECTION_MAP_LAST_BIT is actually unused and should be
+> safe to use. Has the option being considered of using this bit to mean
+> "section has holes punched in it". If set, the architecture must provide
+> an additional arch_holey_section_pfn_valid() that does additional checking
+> based on information sparsemem doesn't have? ?This would avoid the worst of
+> the performance issues of making pfn_valid() slower without increasing the
+> size of mem_section.
+
+I think it's a very good idea.
+
+We can know if any section has the hole with memory_present so can set
+the bit in there.
+Then, if pfn_valid find the section which has hole, it can call
+arch_holey_section_pfn_valid.
+
+But I think Kukjin case's best solution is to make section size 16M, not 256M.
+Regardless of this, Your idea is the direction we should proceed, I think.
+
+Thanks, Mel.
+
+>
+> --
+> Mel Gorman
+> Part-time Phd Student ? ? ? ? ? ? ? ? ? ? ? ? ?Linux Technology Center
+> University of Limerick ? ? ? ? ? ? ? ? ? ? ? ? IBM Dublin Software Lab
+>
+
+
+
+-- 
+Kind regards,
+Minchan Kim
