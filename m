@@ -1,35 +1,28 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 13 Jul 2010 08:24:07 +0100
-Subject: [PATCH][RFC] arm: Add basic support for VIA/WonderMedia SoC's
-In-Reply-To: <alpine.LFD.2.00.1007121855470.10598@xanadu.home>
-References: <20100712165025.GA13818@alchark-u3s.alchark.ru>
-	<201007122122.32623.arnd@arndb.de>
-	<AANLkTilWwclstZiIkpiQQ_CPXgjGD2xz-GEw27hTvAp-@mail.gmail.com>
-	<alpine.LFD.2.00.1007121855470.10598@xanadu.home>
-Message-ID: <20100713072407.GB19839@n2100.arm.linux.org.uk>
+Date: Tue, 13 Jul 2010 08:28:48 +0100
+Subject: [RFC,PATCH 0/2] Allow late mdesc detection
+In-Reply-To: <AANLkTikXejaVsFsudO3ABKzR80V6yCBHm7c6y32hurdt@mail.gmail.com>
+References: <1278903792.387175.713057245098.0.gpush@pororo>
+	<alpine.LFD.2.00.1007112334390.10598@xanadu.home>
+	<1278921935.9235.90.camel@pororo.lan>
+	<alpine.LFD.2.00.1007120904240.10598@xanadu.home>
+	<AANLkTikXejaVsFsudO3ABKzR80V6yCBHm7c6y32hurdt@mail.gmail.com>
+Message-ID: <20100713072848.GC19839@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 12, 2010 at 08:38:26PM -0400, Nicolas Pitre wrote:
-> Versatile and RealView are development boards where things like MMU-less 
-> builds of Linux are tested.
+On Tue, Jul 13, 2010 at 01:44:59PM +0800, Eric Miao wrote:
+> With the introduction of 'struct machine_class', I guess this is especially
+> true for 1 SoC for one DT machine ID :-)
+> 
+> Finally, if we can decide the 'struct machine_class' by something else,
+> then we can merge all DT machine IDs into one or completely ignore it.
 
-That's not the reason they invented IO_ADDRESS - that exists because
-I never pressed the issue early on when the Integrator port was merged,
-and their use has spread and become more or less acceptable.
+As far as I can see, DT isn't getting anywhere - certainly my request
+to see it on a real platform rather than the ARM Ltd hardware seems to
+have been "forgotten" about.
 
-It's just the same as your io_p2v() macro that you used in your SA1100
-port.
-
-> I think what you did is OK.  It is best to include the whole file as 
-> generated from the machine registry database when you need it.  This way 
-> the merge conflict can easily be resolved by simply keeping the latest 
-> version from either merged branches.
-
-Not quite - I'm now undoing some of the changes a mach-types update would
-bring because people aren't talking to me to fix stuff in the machine
-registry.  So I'm no longer just committing the updated file off the
-website.
-
-The problem is that git will automatically merge those "updates", which
-makes it much more difficult to sort out.
+As it's taking soo long (it's getting to be a couple of years) to come
+up with a DT implementation for a real machine, I can only think that
+there must be some massive problem(s) with DT which makes it completely
+unsuitable for use on ARM.
