@@ -1,37 +1,29 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 14 Jul 2010 15:33:39 +0200
-Subject: [PATCH 1/3] mx51_3ds: Add support for the imx51 3-stack board
-In-Reply-To: <1279026162-6634-2-git-send-email-jason77.wang@gmail.com>
-References: <1279026162-6634-1-git-send-email-jason77.wang@gmail.com>
-	<1279026162-6634-2-git-send-email-jason77.wang@gmail.com>
-Message-ID: <20100714133339.GC18343@pengutronix.de>
+From: vapier.adi@gmail.com (Mike Frysinger)
+Date: Wed, 14 Jul 2010 09:35:39 -0400
+Subject: [PATCH 3/3] usb/host || arch/arm: Remove dead CONFIG_ARCH_KARO
+In-Reply-To: <9df7166bb950e7fbc12d1be9f2b9f9cbb9961187.1279104996.git.qy03fugy@stud.informatik.uni-erlangen.de>
+References: <cover.1279104996.git.qy03fugy@stud.informatik.uni-erlangen.de>
+	<9df7166bb950e7fbc12d1be9f2b9f9cbb9961187.1279104996.git.qy03fugy@stud.informatik.uni-erlangen.de>
+Message-ID: <AANLkTimsHAAvMI8euhr11n5JXX5iQTMG9hMx08Nfpemp@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+On Wed, Jul 14, 2010 at 07:32, Christian Dietrich wrote:
+> CONFIG_ARCH_KARO doesn't exist in Kconfig and is never defined anywhere
+> else, therefore removing all references for it from the source code.
+>
+> --- a/arch/arm/tools/mach-types
+> +++ b/arch/arm/tools/mach-types
+> @@ -204,7 +204,6 @@ omaha ? ? ? ? ? ? ? ? ? ? ? ARCH_OMAHA ? ? ? ? ? ? ?OMAHA ? ? ? ? ? ? ? ? ? 186
+> ?ta7 ? ? ? ? ? ? ? ? ? ?ARCH_TA7 ? ? ? ? ? ? ? ?TA7 ? ? ? ? ? ? ? ? ? ? 187
+> ?nova ? ? ? ? ? ? ? ? ? SA1100_NOVA ? ? ? ? ? ? NOVA ? ? ? ? ? ? ? ? ? ?188
+> ?hmk ? ? ? ? ? ? ? ? ? ?ARCH_HMK ? ? ? ? ? ? ? ?HMK ? ? ? ? ? ? ? ? ? ? 189
+> -karo ? ? ? ? ? ? ? ? ? ARCH_KARO ? ? ? ? ? ? ? KARO ? ? ? ? ? ? ? ? ? ?190
+> ?fester ? ? ? ? ? ? ? ? SA1100_FESTER ? ? ? ? ? FESTER ? ? ? ? ? ? ? ? ?191
+> ?gpi ? ? ? ? ? ? ? ? ? ?ARCH_GPI ? ? ? ? ? ? ? ?GPI ? ? ? ? ? ? ? ? ? ? 192
+> ?smdk2410 ? ? ? ? ? ? ? ARCH_SMDK2410 ? ? ? ? ? SMDK2410 ? ? ? ? ? ? ? ?193
 
-On Tue, Jul 13, 2010 at 09:02:39PM +0800, Jason Wang wrote:
-> new file mode 100644
-> index 0000000..b51da63
-> --- /dev/null
-> +++ b/arch/arm/mach-mx5/board-mx51_3ds.c
-> @@ -0,0 +1,102 @@
-> +/*
-> + * Copyright 2008-2009 Freescale Semiconductor, Inc. All Rights Reserved.
-> + * Copyright (C) 2010 Jason Wang <jason77.wang@gmail.com>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-I think this is the usual FSL boiler plate, but IMHO this is bogus.
-You/they want to have the "version 2 or later" part in the first
-senctence, not the second.
-
-(Note, this shouldn't be a nack, just a general comment.)
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+i dont think you should be modifying the arm registry.  there are
+probably a lot of boards listed here that you wont find referenced in
+the tree, but this is by design.
+-mike
