@@ -1,25 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Jul 2010 23:05:36 +0100
-Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
-	memory management
-In-Reply-To: <20100714201149.GA14008@codeaurora.org>
-References: <4C3C0032.5020702@codeaurora.org>
-	<20100713150311B.fujita.tomonori@lab.ntt.co.jp>
-	<20100713121420.GB4263@codeaurora.org>
-	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
-	<20100714201149.GA14008@codeaurora.org>
-Message-ID: <20100714220536.GE18138@n2100.arm.linux.org.uk>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Thu, 15 Jul 2010 00:37:08 +0200
+Subject: [PATCH] RFC: U300 clock updates to match PrimeCell clocking
+In-Reply-To: <20100714190311.GA18649@debian>
+References: <1279065807-22238-1-git-send-email-linus.walleij@stericsson.com>
+	<20100714190311.GA18649@debian>
+Message-ID: <AANLkTikas8Xnlajfr3QYvlnfC_Gbs1MQRjVNLsFMdByy@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 14, 2010 at 01:11:49PM -0700, Zach Pfeffer wrote:
-> If the DMA-API contained functions to allocate virtual space separate
-> from physical space and reworked how chained buffers functioned it
-> would probably work - but then things start to look like the VCM API
-> which does graph based map management.
+2010/7/14 Rabin Vincent <rabin@rab.in>:
 
-Every additional virtual mapping of a physical buffer results in
-additional cache aliases on aliasing caches, and more workload for
-developers to sort out the cache aliasing issues.
+> In order to be able to remove your clock enabling around the
+> amba_device_register() calls, the busclk get/enabling would need to be
+> also added around the peripheral ID read in amba_device_register(), not
+> just before the probe call, where Russell's patch added it.
 
-What does VCM to do mitigate that?
+Of course. You see everything...
+Russell seems to be onto it.
+
+Rabin do you have a rough enough idea of how the ahb_pclock and
+e.g. SSPCLK are routed to different PRCMU things in the U8500?
+IIRC what we have registered there right now are actually mostly
+the correct SSPCLK etc for external clocking, but we might want to
+add the ahb_pclk references as well.
+
+Yours,
+Linus Walleij
