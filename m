@@ -1,77 +1,97 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Wed, 14 Jul 2010 12:11:52 +0800
-Subject: [RFC,PATCH 0/2] Allow late mdesc detection
-In-Reply-To: <20100713093346.GC20590@n2100.arm.linux.org.uk>
-References: <1278903792.387175.713057245098.0.gpush@pororo>
-	<alpine.LFD.2.00.1007112334390.10598@xanadu.home>
-	<1278921935.9235.90.camel@pororo.lan>
-	<alpine.LFD.2.00.1007120904240.10598@xanadu.home>
-	<AANLkTikXejaVsFsudO3ABKzR80V6yCBHm7c6y32hurdt@mail.gmail.com>
-	<20100713072848.GC19839@n2100.arm.linux.org.uk>
-	<1279011746.2521.394.camel@pororo.lan>
-	<20100713093346.GC20590@n2100.arm.linux.org.uk>
-Message-ID: <1279080712.15089.53.camel@pororo.lan>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Wed, 14 Jul 2010 13:24:43 +0900
+Subject: [PATCH 08/13] [ARM] Make VMALLOC_END into a global variable if
+	not defined
+In-Reply-To: <AANLkTik8M5RN-hK8P--rJZ-aPcVzIwSs2xVy4QZUz5M0@mail.gmail.com>
+References: <1279035208-7249-1-git-send-email-eric.miao@canonical.com>
+	<1279035208-7249-9-git-send-email-eric.miao@canonical.com>
+	<AANLkTin_6kl-VkN1h6PGHXPHOBir9dKsNUeHpiF30nBt@mail.gmail.com>
+	<AANLkTik8M5RN-hK8P--rJZ-aPcVzIwSs2xVy4QZUz5M0@mail.gmail.com>
+Message-ID: <AANLkTilKNo-1EcjwP11SiSj_guOfgmUr3sP9tJwD9iEG@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Wed, Jul 14, 2010 at 1:11 PM, Eric Miao <eric.miao@canonical.com> wrote:
+> On Wed, Jul 14, 2010 at 10:57 AM, Kyungmin Park <kmpark@infradead.org> wrote:
+>> Good idea!
+>> Each board can use each own vmalloc_end. no need to bound chip global
+>> vmalloc_end.
+>>
+>> On Wed, Jul 14, 2010 at 12:33 AM, Eric Miao <eric.miao@canonical.com> wrote:
+>>> Signed-off-by: Eric Miao <eric.miao@canonical.com>
+>>> ---
+>>> ?arch/arm/include/asm/mach/arch.h | ? ?1 +
+>>> ?arch/arm/include/asm/pgtable.h ? | ? ?5 +++++
+>>> ?arch/arm/kernel/setup.c ? ? ? ? ?| ? ?6 ++++++
+>>> ?3 files changed, 12 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+>>> index 52bea4c..2191d40 100644
+>>> --- a/arch/arm/include/asm/mach/arch.h
+>>> +++ b/arch/arm/include/asm/mach/arch.h
+>>> @@ -27,6 +27,7 @@ struct machine_class {
+>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? * page tabe entry ? ? ?*/
+>>> ? ? ? ?const char ? ? ? ? ? ? ?*name; ? ? ? ? ?/* machine class name ? */
+>>> ? ? ? ?unsigned long ? ? ? ? ? boot_params; ? ?/* tagged list ? ? ? ? ?*/
+>>> + ? ? ? unsigned long ? ? ? ? ? vmalloc_end; ? ?/* VMALLOC_END ? ? ? ? ?*/
+>>>
+>>> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*map_io)(void);/* IO mapping function */
+>>> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*init_irq)(void);
+>>> diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+>>> index ab68cf1..478249a 100644
+>>> --- a/arch/arm/include/asm/pgtable.h
+>>> +++ b/arch/arm/include/asm/pgtable.h
+>>> @@ -40,6 +40,11 @@
+>>> ?#define VMALLOC_START ? ? ? ? ?(((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
+>>> ?#endif
+>>>
+>>> +#ifndef VMALLOC_END
+>>> +extern unsigned long vmalloc_end;
+>>> +#define VMALLOC_END (vmalloc_end)
+>>> +#endif
+>>> +
+>>> ?/*
+>>> ?* Hardware-wise, we have a two level page table structure, where the first
+>>> ?* level has 4096 entries, and the second level has 256 entries. ?Each entry
+>>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>>> index 295de99..672a8ec 100644
+>>> --- a/arch/arm/kernel/setup.c
+>>> +++ b/arch/arm/kernel/setup.c
+>>> @@ -95,6 +95,9 @@ EXPORT_SYMBOL(isa_dma_threshold);
+>>> ?unsigned long max_dma_address = 0xffffffffUL;
+>>> ?EXPORT_SYMBOL(max_dma_address);
+>>>
+>>> +unsigned long vmalloc_end = 0xffffffffUL;
+>>> +EXPORT_SYMBOL(vmalloc_end);
+>>
+>> At current code, 0xfe800000UL is the largest number. If we set end
+>> vmalloc_end to 0xffffffffUL and use it. maybe system can't boot.
+>> arch/arm/mach-loki/include/mach/vmalloc.h:#define VMALLOC_END ? 0xfe800000UL
+>>
+>
+> So the platform has to setup vmalloc correct :-)
+>
+>>> +
+>>> ?#ifdef MULTI_CPU
+>>> ?struct processor processor;
+>>> ?#endif
+>>> @@ -684,6 +687,9 @@ void __init setup_arch(char **cmdline_p)
+>>> ? ? ? ?class = mdesc->class;
+>>> ? ? ? ?machine_name = mdesc->name;
+>>>
+>>> + ? ? ? if (class)
+>>> + ? ? ? ? ? ? ? vmalloc_end = class->vmalloc_end;
+>>
+>> Don't check 'if (class->vmalloc_end)'?
+>>
+>
+> Better to check that, but not sure if that's necessary. I'd expect
+> every machine_class to get this correct, instead of leaving it
+> uninitialized (i.e. == 0).
+>
+Then this patch is intermediate patch and VMALLOC_END will be removed finally?
+At first I understand there's global VMALLOC_END on each chip and each
+board can override it.
 
-> What I'm interested in its impact on the numerous board support files
-> that we currently have - some 348 of them at the present time.  For
-> example, currently these are used to provide small fragments of code
-> to drivers to support what are effectively board quirks.  What I'm
-> particularly interested in is how these quirks get attached to their
-> relevant drivers - and whether this becomes easier with DT or harder
-> with it.
-> 
-> If it makes this stuff simpler, then all well and good - it's a net
-> benefit.  If it makes this a lot more complicated - eg, because we
-> need to declare every bit of quirk code into some kind of table for
-> DT to pick up and bind in some manner to a driver - then moving to
-> DT will be a disaster for maintainability and readability, and we
-> lose type checking on these quirk functions.
-
-OK, I'll do some work to get the mx51 port improved, with a particular
-focus on demonstrating how the board-specific stuff can be handled.
-
-However, we still have a bit of a chicken-and-egg problem here - in
-order to properly demonstrate what the DT will mean for board support
-(ie, years down the line), we'd need a larger base of machines ported to
-DT. I don't see people committing to that work if it may be thrown away
-if we don't end up using the DT approach.
-
-Perhaps we could provide information in two different ways - first, the
-mx51 and versatile ports as an example of how specific things are done
-with the DT, and we can chat separately about what you'd like to know
-about the overall architectural stuff, which can't really be covered in
-the single-board ports.
-
-> It's this area, and related areas to it that I'm really interested
-> in, rather than these grand unification schemes which seem to be top
-> priority at the moment.
-
-A lot of the unification work is separate from the DT - Nicolas and Eric
-are working on general kernel consolidation stuff, which is intended to
-be useful without the DT. At present (and as far as I know), Grant and I
-are the only ones doing DT-specific infrastructure changes for ARM.
-
-> What really concerns me at the moment is that there's soo much work
-> being put into the peripheral DT issues without first answering the
-> question about whether DT on ARM is viable by providing a working
-> real complex platform implementation.
-
-They're not all peripheral DT issues, more "core design" of DT on ARM.
-For example, if there's no way to have a common clk, the DT stuff gets a
-lot harder.  I'm trying to get some of those issues sorted (in a way
-that is useful even without the DT work) in the process of my overall
-porting.
-
-But yeah, I understand that these don't really help you with evaluating
-DT on ARM, they're more for my own benefit to work out the issues we'll
-face doing the work. As these are being resolved, I'm getting closer to
-demonstratable stuff without gross hacks :)
-
-Cheers,
-
-
-Jeremy
+Thank you,
+Kyungmin park
