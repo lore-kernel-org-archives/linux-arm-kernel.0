@@ -1,172 +1,210 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 14 Jul 2010 15:47:58 +0900
-Subject: [PATCH 1/3] arm: s5pv210: GONI: add support for framebuffer
-In-Reply-To: <1278321416-32524-2-git-send-email-m.szyprowski@samsung.com>
-References: <1278321416-32524-1-git-send-email-m.szyprowski@samsung.com>
-	<1278321416-32524-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <006301cb2320$822639e0$8672ada0$%kim@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 14 Jul 2010 08:56:13 +0200
+Subject: [PATCH 1/3] mx51_3ds: Add support for the imx51 3-stack board
+In-Reply-To: <1279026162-6634-2-git-send-email-jason77.wang@gmail.com>
+References: <1279026162-6634-1-git-send-email-jason77.wang@gmail.com>
+	<1279026162-6634-2-git-send-email-jason77.wang@gmail.com>
+Message-ID: <20100714065613.GB26079@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
+On Tue, Jul 13, 2010 at 09:02:39PM +0800, Jason Wang wrote:
+> 3-stack is a reference board from Freescale for their i.MX51 SoC.
 > 
-> This patch adds required platform definitions to enable s3c-fb
-> driver on GONI board. One framebuffer window in 480x800x16bpp mode is
-> defined.
+> Add board definition, Kconfig and Makefile to enable Freescale 3-stack
+> board.
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Boot tested on a i.MX51 3-stack Rev2.0 board
+> 
+> Signed-off-by: Jason Wang <jason77.wang@gmail.com>
 > ---
->  arch/arm/mach-s5pv210/Kconfig     |    2 +
->  arch/arm/mach-s5pv210/mach-goni.c |   39
-> +++++++++++++++++++++++++++++++++++++
->  2 files changed, 41 insertions(+), 0 deletions(-)
+>  arch/arm/mach-mx5/Kconfig                       |    6 ++
+>  arch/arm/mach-mx5/Makefile                      |    2 +-
+>  arch/arm/mach-mx5/board-mx51_3ds.c              |  102 +++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/board-mx51_3ds.h |   27 ++++++
+>  4 files changed, 136 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/mach-mx5/board-mx51_3ds.c
+>  create mode 100644 arch/arm/plat-mxc/include/mach/board-mx51_3ds.h
 > 
-> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-> index 5e88941..8ab4bb0 100644
-> --- a/arch/arm/mach-s5pv210/Kconfig
-> +++ b/arch/arm/mach-s5pv210/Kconfig
-> @@ -59,6 +59,8 @@ config MACH_GONI
->  	bool "GONI"
->  	select CPU_S5PV210
->  	select ARCH_SPARSEMEM_ENABLE
-> +	select S5PV210_SETUP_FB_24BPP
-> +	select S3C_DEV_FB
->  	select S5PC110_DEV_ONENAND
->  	help
->  	  Machine support for Samsung GONI board
-> diff --git a/arch/arm/mach-s5pv210/mach-goni.c
-b/arch/arm/mach-s5pv210/mach-
-> goni.c
-> index 88c38e3..05b4a1a 100644
-> --- a/arch/arm/mach-s5pv210/mach-goni.c
-> +++ b/arch/arm/mach-s5pv210/mach-goni.c
-> @@ -12,6 +12,9 @@
->  #include <linux/types.h>
->  #include <linux/init.h>
->  #include <linux/serial_core.h>
-> +#include <linux/fb.h>
-> +#include <linux/delay.h>
-
-need linux/delay.h in here?
-
-> +#include <linux/clk.h>
-
-same...need linux/clk.h?
-
-> 
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
-> @@ -20,11 +23,15 @@
-> 
->  #include <mach/map.h>
->  #include <mach/regs-clock.h>
-> +#include <mach/regs-fb.h>
-> +#include <mach/gpio.h>
-
-linux/gpio.h
-
-> 
-> +#include <plat/gpio-cfg.h>
->  #include <plat/regs-serial.h>
->  #include <plat/s5pv210.h>
->  #include <plat/devs.h>
->  #include <plat/cpu.h>
-> +#include <plat/fb.h>
-> 
->  /* Following are default values for UCON, ULCON and UFCON UART registers
-*/
->  #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-> @@ -73,7 +80,35 @@ static struct s3c2410_uartcfg goni_uartcfgs[]
-__initdata = {
->  	},
->  };
-> 
-> +/* Frame Buffer */
-
-No need this comment because we know _fb_ means frame buffer...
-
-> +static struct s3c_fb_pd_win goni_fb_win0 = {
-
-How about to use goni_fb_win[] array so that can be extended easily...
-
-> +	.win_mode = {
-> +		.pixclock = 1000000000000ULL /
-> ((16+16+2+480)*(28+3+2+800)*55),
-> +		.left_margin = 16,
-> +		.right_margin = 16,
-> +		.upper_margin = 3,
-> +		.lower_margin = 28,
-> +		.hsync_len = 2,
-> +		.vsync_len = 2,
-> +		.xres = 480,
-> +		.yres = 800,
-> +		.refresh = 55,
-> +	},
-> +	.max_bpp = 32,
-> +	.default_bpp = 16,
-
-If possible, please keep the align like below...for easily reading...
-But...it depends on your taste...:-)
-
-+	.win_mode = {
-+		.pixclock	= 1000000000000ULL /
-((16+16+2+480)*(28+3+2+800)*55),
-+		.left_margin	= 16,
-+		.right_margin	= 16,
-+		.upper_margin	= 3,
-+		.lower_margin	= 28,
-+		.hsync_len	= 2,
-+		.vsync_len	= 2,
-+		.xres		= 480,
-+		.yres		= 800,
-+		.refresh		= 55,
-+	},
-+	.max_bpp	= 32,
-+	.default_bpp	= 16,
-
-
+> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+> index 1576d51..6ef3428 100644
+> --- a/arch/arm/mach-mx5/Kconfig
+> +++ b/arch/arm/mach-mx5/Kconfig
+> @@ -15,4 +15,10 @@ config MACH_MX51_BABBAGE
+>  	  u-boot. This includes specific configurations for the board and its
+>  	  peripherals.
+>  
+> +config MACH_MX51_3DS
+> +	bool "Support MX51PDK (3DS)"
+> +	select MXC_DEBUG_BOARD
+> +	help
+> +	  Include support for MX51PDK (3DS) platform. This includes specific
+> +	  configurations for the board and its peripherals.
+>  endif
+> diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
+> index bf23f86..c757c59 100644
+> --- a/arch/arm/mach-mx5/Makefile
+> +++ b/arch/arm/mach-mx5/Makefile
+> @@ -6,4 +6,4 @@
+>  obj-y   := cpu.o mm.o clock-mx51.o devices.o
+>  
+>  obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
+> -
+> +obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
+> diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
+> new file mode 100644
+> index 0000000..b51da63
+> --- /dev/null
+> +++ b/arch/arm/mach-mx5/board-mx51_3ds.c
+> @@ -0,0 +1,102 @@
+> +/*
+> + * Copyright 2008-2009 Freescale Semiconductor, Inc. All Rights Reserved.
+> + * Copyright (C) 2010 Jason Wang <jason77.wang@gmail.com>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include <linux/irq.h>
+> +#include <linux/platform_device.h>
+> +
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/time.h>
+> +
+> +#include <mach/hardware.h>
+> +#include <mach/common.h>
+> +#include <mach/iomux-mx51.h>
+> +#include <mach/board-mx51_3ds.h>
+> +#include <mach/imx-uart.h>
+> +#include <mach/3ds_debugboard.h>
+> +
+> +#include "devices.h"
+> +
+> +static struct pad_desc mx51_3ds_pads[] = {
+> +	/* UART1 */
+> +	MX51_PAD_UART1_RXD__UART1_RXD,
+> +	MX51_PAD_UART1_TXD__UART1_TXD,
+> +	MX51_PAD_UART1_RTS__UART1_RTS,
+> +	MX51_PAD_UART1_CTS__UART1_CTS,
+> +
+> +	/* UART2 */
+> +	MX51_PAD_UART2_RXD__UART2_RXD,
+> +	MX51_PAD_UART2_TXD__UART2_TXD,
+> +	MX51_PAD_EIM_D25__UART2_CTS,
+> +	MX51_PAD_EIM_D26__UART2_RTS,
+> +
+> +	/* UART3 */
+> +	MX51_PAD_UART3_RXD__UART3_RXD,
+> +	MX51_PAD_UART3_TXD__UART3_TXD,
+> +	MX51_PAD_EIM_D24__UART3_CTS,
+> +	MX51_PAD_EIM_D27__UART3_RTS,
+> +
+> +	/* CPLD PARENT IRQ PIN */
+> +	MX51_PAD_GPIO_1_6__GPIO_1_6,
 > +};
 > +
-> +static struct s3c_fb_platdata goni_lcd_pdata __initdata = {
-> +	.win[0]	= &goni_fb_win0,
-> +	.vidcon0		= VIDCON0_VIDOUT_RGB |
-> VIDCON0_PNRMODE_RGB |
-> +					VIDCON0_CLKSEL_LCD,
-> +	.vidcon1		= VIDCON1_INV_VCLK | VIDCON1_INV_VDEN
-> +				| VIDCON1_INV_HSYNC |
-> VIDCON1_INV_VSYNC,
-> +	.setup_gpio		= s5pv210_fb_gpio_setup_24bpp,
+> +/* Serial ports */
+> +#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
+> +static struct imxuart_platform_data uart_pdata = {
+> +	.flags = IMXUART_HAVE_RTSCTS,
 > +};
+> +
+> +static inline void mxc_init_imx_uart(void)
+> +{
+> +	mxc_register_device(&mxc_uart_device0, &uart_pdata);
+> +	mxc_register_device(&mxc_uart_device1, &uart_pdata);
+> +	mxc_register_device(&mxc_uart_device2, &uart_pdata);
+> +}
+> +#else /* !SERIAL_IMX */
+> +static inline void mxc_init_imx_uart(void)
+> +{
+> +}
+> +#endif /* SERIAL_IMX */
+> +
+> +/*
+> + * Board specific initialization.
+> + */
+> +static void __init mxc_board_init(void)
+> +{
+> +	mxc_iomux_v3_setup_multiple_pads(mx51_3ds_pads,
+> +					ARRAY_SIZE(mx51_3ds_pads));
+> +	mxc_init_imx_uart();
+> +
+> +	if (mxc_expio_init(MX51_CS5_BASE_ADDR, EXPIO_PARENT_INT))
+> +		printk(KERN_WARNING "Init of the debugboard failed, all "
+> +				    "devices on the board are unusable.\n");
+> +}
+> +
+> +static void __init mx51_3ds_timer_init(void)
+> +{
+> +	mx51_clocks_init(32768, 24000000, 22579200, 0);
+> +}
+> +
+> +static struct sys_timer mxc_timer = {
+> +	.init	= mx51_3ds_timer_init,
+> +};
+> +
+> +MACHINE_START(MX51_3DS, "Freescale MX51 3-Stack Board")
+> +	/* Maintainer: Freescale Semiconductor, Inc. */
+> +	.phys_io = MX51_AIPS1_BASE_ADDR,
+> +	.io_pg_offst = ((MX51_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+> +	.boot_params = PHYS_OFFSET + 0x100,
+> +	.map_io = mx51_map_io,
+> +	.init_irq = mx51_init_irq,
+> +	.init_machine = mxc_board_init,
+> +	.timer = &mxc_timer,
+> +MACHINE_END
+> diff --git a/arch/arm/plat-mxc/include/mach/board-mx51_3ds.h b/arch/arm/plat-mxc/include/mach/board-mx51_3ds.h
+> new file mode 100644
+> index 0000000..c2aa016
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/include/mach/board-mx51_3ds.h
+> @@ -0,0 +1,27 @@
+> +/*
+> + * Copyright 2008-2009 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#ifndef __ASM_ARCH_MXC_BOARD_MX51_3DS_H__
+> +#define __ASM_ARCH_MXC_BOARD_MX51_3DS_H__
+> +
+> +/*
+> + * plat-mxc/include/mach/board-mx51_3ds.h
+> + *
+> + * This file contains all the board level configuration options.
+> + *
+> + * It currently hold the options defined for MX51 3Stack Platform.
+> + *
+> + */
+> +
+> +#define EXPIO_PARENT_INT	(MXC_INTERNAL_IRQS + GPIO_PORTA + 6)
 
-Same...as previous comment.
+Please don't add board header files for things only used in the board
+file.
+
+Sascha
 
 > +
->  static struct platform_device *goni_devices[] __initdata = {
-> +	&s3c_device_fb,
->  	&s5pc110_device_onenand,
->  };
+> +#endif	/* __ASM_ARCH_MXC_BOARD_MX51_3DS_H__ */
+> -- 
+> 1.5.6.5
 > 
-> @@ -86,6 +121,10 @@ static void __init goni_map_io(void)
 > 
->  static void __init goni_machine_init(void)
->  {
-> +
 
-no need above empty line.
-
-> +	/* FB */
-> +	s3c_fb_set_platdata(&goni_lcd_pdata);
-> +
->  	platform_add_devices(goni_devices, ARRAY_SIZE(goni_devices));
->  }
-> 
-> --
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
