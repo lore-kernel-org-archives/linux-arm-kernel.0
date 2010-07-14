@@ -1,75 +1,15 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Wed, 14 Jul 2010 21:46:40 +0200
-Subject: [PATCH] ARM: OMAP3: Add S-Video output to IGEPv2 board
-Message-ID: <4c3e1422.d37b0e0a.7b5e.092d@mx.google.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Jul 2010 21:03:45 +0100
+Subject: [PATCH] arm: fix mach-versatile booting in qemu
+In-Reply-To: <201007141716.09384.arnd@arndb.de>
+References: <201007141716.09384.arnd@arndb.de>
+Message-ID: <20100714200345.GB18138@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds S-Video DSS and VDAC regulator platform definitions to the IGEPv2
-board. There isn't a physical connector on-board but one can solder one at test
-points provided by ISEE.
+On Wed, Jul 14, 2010 at 05:16:09PM +0200, Arnd Bergmann wrote:
+> The versatile platform has not been able to boot in qemu since 2.6.34-rc2,
+> because e388771 "ARM: Realview/Versatile: separate out common SP804
+> timer code" changed the behavior of the versatile_set_mode function.
 
-Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
----
- arch/arm/mach-omap2/board-igep0020.c |   31 +++++++++++++++++++++++++++++--
- 1 files changed, 29 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index d55c57b..3ec48bd 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -310,8 +310,16 @@ static struct omap_dss_device igep2_dvi_device = {
- 	.platform_disable	= igep2_disable_dvi,
- };
- 
-+static struct omap_dss_device igep2_tv_device = {
-+	.name			= "tv",
-+	.driver_name		= "venc",
-+	.type			= OMAP_DISPLAY_TYPE_VENC,
-+	.phy.venc.type		= OMAP_DSS_VENC_TYPE_SVIDEO,
-+};
-+
- static struct omap_dss_device *igep2_dss_devices[] = {
--	&igep2_dvi_device
-+	&igep2_dvi_device,
-+	&igep2_tv_device,
- };
- 
- static struct omap_dss_board_info igep2_dss_data = {
-@@ -328,6 +336,25 @@ static struct platform_device igep2_dss_device = {
- 	},
- };
- 
-+static struct regulator_consumer_supply igep2_vdda_dac_supply = {
-+	.supply = "vdda_dac",
-+	.dev    = &igep2_dss_device.dev,
-+};
-+
-+/* VDAC for DSS driving S-Video (8 mA unloaded, max 65 mA) */
-+static struct regulator_init_data igep2_vdac = {
-+	.constraints = {
-+		.min_uV			= 1800000,
-+		.max_uV			= 1800000,
-+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-+					| REGULATOR_MODE_STANDBY,
-+		.valid_ops_mask		= REGULATOR_CHANGE_MODE
-+					| REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies	= 1,
-+	.consumer_supplies	= &igep2_vdda_dac_supply,
-+};
-+
- static struct regulator_consumer_supply igep2_vpll2_supply = {
- 	.supply	= "vdds_dsi",
- 	.dev	= &igep2_dss_device.dev,
-@@ -429,7 +456,7 @@ static struct twl4030_platform_data igep2_twldata = {
- 	.vmmc1          = &igep2_vmmc1,
- 	.vmmc2		= &igep2_vmmc2,
- 	.vpll2		= &igep2_vpll2,
--
-+	.vdac		= &igep2_vdac,
- };
- 
- static struct i2c_board_info __initdata igep2_i2c_boardinfo[] = {
--- 
-1.7.0.4
+NAK.  qemu is broken.
