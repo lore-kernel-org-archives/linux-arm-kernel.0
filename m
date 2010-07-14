@@ -1,34 +1,30 @@
 From: jeremy.kerr@canonical.com (Jeremy Kerr)
 Date: Wed, 14 Jul 2010 15:29:46 +0800
-Subject: [PATCH 2/6] arm/h720x: fix debug macro compilation failure
-In-Reply-To: <1279092586.619523.10182482328.0.gpush@pororo>
-Message-ID: <1279092586.620199.626882342808.2.gpush@pororo>
+Subject: [PATCH 0/6] debug macro fixups, v2
+Message-ID: <1279092586.619523.10182482328.0.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IO_BASE shoule be IO_VIRT, and IO_START should be IO_PHYS. We also need
-mach/hardware.h for these definitions.
+As part of the DEBUG_LL mapping changes, I ran all of the defconfigs
+with DEBUG_LL=y. Some of the configs are broken, so I'm posting the
+fixups.
 
-Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+mx1 is still broken, as IMX_IO_ADDRESS() (used by the mx1 debug macros)
+uses C syntax, and so it not suitable for asm.
+
+Cheers,
+
+
+Jeremy
+
+v2:
+ * rebased to remotes/rmk/master directly, without addruart changes
 
 ---
- arch/arm/mach-h720x/include/mach/debug-macro.S |    6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-h720x/include/mach/debug-macro.S b/arch/arm/mach-h720x/include/mach/debug-macro.S
-index a9ee8f0..27cafd1 100644
---- a/arch/arm/mach-h720x/include/mach/debug-macro.S
-+++ b/arch/arm/mach-h720x/include/mach/debug-macro.S
-@@ -11,8 +11,10 @@
-  *
- */
- 
--		.equ    io_virt, IO_BASE
--		.equ    io_phys, IO_START
-+#include <mach/hardware.h>
-+
-+		.equ    io_virt, IO_VIRT
-+		.equ    io_phys, IO_PHYS
- 
- 		.macro  addruart, rx, tmp
- 		mrc     p15, 0, \rx, c1, c0
+Jeremy Kerr (6):
+      arm/clps711x: fix debug macro compilation failure
+      arm/h720x: fix debug macro compilation failure
+      arm/l7200: fix debug macro compilation failure
+      arm/plat-spear: fix debug macro compilation failure
+      arm/ns9xxx: fix debug macro compilation failure
+      arm/shark: fix debug macro compilation failure
