@@ -1,201 +1,46 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 14 Jul 2010 15:15:23 +0200
-Subject: [PATCH v2] ARM: s5pv210_defconfig: Update for removing
-	s5pc110_defconfig
-In-Reply-To: <1278987726-10803-1-git-send-email-kgene.kim@samsung.com>
-References: <1278987726-10803-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <00c801cb2356$a1b2f290$e518d7b0$%szyprowski@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 14 Jul 2010 15:20:46 +0200
+Subject: ARM defconfig files
+In-Reply-To: <201007121634.04427.davidb@codeaurora.org>
+References: <alpine.LFD.2.00.1006030725420.8175@i5.linux-foundation.org>
+	<201007121605.32462.davidb@codeaurora.org>
+	<AANLkTimho3rcoCZZ2PlC3B3KIZZhsEiTnTk-__n1q_Dy@mail.gmail.com>
+	<201007121634.04427.davidb@codeaurora.org>
+Message-ID: <20100714132046.GA18343@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tuesday, July 13, 2010 4:22 AM Kukjin Kim wrote:
-
-> Now that S5PC110 machines and S5PV210 machines can be built into
-> one kernel, update mach-s5pv210/Kconfig and s5pv210_defconfig.
+On Mon, Jul 12, 2010 at 04:34:04PM -0700, David Brown wrote:
+> On Monday 12 July 2010 16:18:01 Linus Torvalds wrote:
 > 
-> Tested on SMDKC110(S5PC110) and SMDKV210(S5PV210).
-> Note that GONI machine ID is not included in the kernel.
-
-Russell finally updated mach-types in his latest kernel tree: 
-http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-2.6-arm.git/
-(master branch).
-
-I've tested this patch with Aquila and GONI boards and it's ok.
- 
-> Created and tested against linux-2.6.35-rc5.
+> > 2010/7/12 David Brown <davidb@codeaurora.org>:
+> > >
+> > > Do you have scripts or tools that you did this with, or is a manual
+> > > process.  We're about to add several new (ARM) targets, and it'd be
+> > > nice to be able to make small defconfigs for those targets as well.
+> > 
+> > Uwe posted it earlier in this thread as an attachement, and I put the
+> > python script into the merge commit message too. And we should
+> > probably put it somewhere in scripts too, and/or make a 'make' target
+> > to create the small config files.
+> > 
+> > I pushed it all out, and tagged it as -rc5.
 > 
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-> ---
-> Changes since v1:
-> - This patch re-based against linux-2.6.35-rc5 which includes
->   'ARM: reduce defconfigs' from Uwe Kleine-Konig.
+> Got it, thanks.  I just pulled a bit soon.
 > 
->  arch/arm/configs/s5pc110_defconfig |   66 --------------------------------
-> ----
->  arch/arm/configs/s5pv210_defconfig |    4 ++
->  arch/arm/mach-s5pv210/Kconfig      |   28 +++++++++------
->  3 files changed, 21 insertions(+), 77 deletions(-)
->  delete mode 100644 arch/arm/configs/s5pc110_defconfig
+> It seems a bit brute force, probably not something I can make part of
+> our regular build process, but I can definitely run it before sending
+> patches out.
 > 
-> diff --git a/arch/arm/configs/s5pc110_defconfig
-> b/arch/arm/configs/s5pc110_defconfig
-> deleted file mode 100644
-> index 22c2d14..0000000
-> --- a/arch/arm/configs/s5pc110_defconfig
-> +++ /dev/null
-> @@ -1,66 +0,0 @@
-> -CONFIG_EXPERIMENTAL=y
-> -CONFIG_SYSFS_DEPRECATED_V2=y
-> -CONFIG_BLK_DEV_INITRD=y
-> -CONFIG_KALLSYMS_ALL=y
-> -CONFIG_MODULES=y
-> -CONFIG_MODULE_UNLOAD=y
-> -# CONFIG_BLK_DEV_BSG is not set
-> -CONFIG_ARCH_S5PV210=y
-> -CONFIG_S3C_LOWLEVEL_UART_PORT=1
-> -CONFIG_MACH_SMDKC110=y
-> -CONFIG_VMSPLIT_2G=y
-> -CONFIG_PREEMPT=y
-> -CONFIG_AEABI=y
-> -CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x20800000,8M
-> console=ttySAC1,115200 init=/linuxrc"
-> -CONFIG_VFP=y
-> -CONFIG_NEON=y
-> -CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-> -CONFIG_BLK_DEV_LOOP=y
-> -CONFIG_BLK_DEV_RAM=y
-> -CONFIG_BLK_DEV_RAM_SIZE=8192
-> -# CONFIG_MISC_DEVICES is not set
-> -CONFIG_SCSI=y
-> -CONFIG_BLK_DEV_SD=y
-> -CONFIG_CHR_DEV_SG=y
-> -CONFIG_INPUT_EVDEV=y
-> -# CONFIG_INPUT_KEYBOARD is not set
-> -# CONFIG_INPUT_MOUSE is not set
-> -CONFIG_INPUT_TOUCHSCREEN=y
-> -CONFIG_SERIAL_8250=y
-> -CONFIG_SERIAL_SAMSUNG=y
-> -CONFIG_SERIAL_SAMSUNG_CONSOLE=y
-> -CONFIG_HW_RANDOM=y
-> -# CONFIG_HWMON is not set
-> -# CONFIG_VGA_CONSOLE is not set
-> -# CONFIG_HID_SUPPORT is not set
-> -# CONFIG_USB_SUPPORT is not set
-> -CONFIG_EXT2_FS=y
-> -CONFIG_INOTIFY=y
-> -CONFIG_MSDOS_FS=y
-> -CONFIG_VFAT_FS=y
-> -CONFIG_TMPFS=y
-> -CONFIG_TMPFS_POSIX_ACL=y
-> -CONFIG_CRAMFS=y
-> -CONFIG_ROMFS_FS=y
-> -CONFIG_PARTITION_ADVANCED=y
-> -CONFIG_BSD_DISKLABEL=y
-> -CONFIG_SOLARIS_X86_PARTITION=y
-> -CONFIG_NLS_CODEPAGE_437=y
-> -CONFIG_NLS_ASCII=y
-> -CONFIG_NLS_ISO8859_1=y
-> -CONFIG_MAGIC_SYSRQ=y
-> -CONFIG_DEBUG_KERNEL=y
-> -# CONFIG_DEBUG_PREEMPT is not set
-> -CONFIG_DEBUG_RT_MUTEXES=y
-> -CONFIG_DEBUG_SPINLOCK=y
-> -CONFIG_DEBUG_MUTEXES=y
-> -CONFIG_DEBUG_SPINLOCK_SLEEP=y
-> -CONFIG_DEBUG_INFO=y
-> -# CONFIG_RCU_CPU_STALL_DETECTOR is not set
-> -CONFIG_SYSCTL_SYSCALL_CHECK=y
-> -CONFIG_DEBUG_USER=y
-> -CONFIG_DEBUG_ERRORS=y
-> -CONFIG_DEBUG_LL=y
-> -CONFIG_EARLY_PRINTK=y
-> -CONFIG_DEBUG_S3C_UART=1
-> -CONFIG_CRC_CCITT=y
-> diff --git a/arch/arm/configs/s5pv210_defconfig
-> b/arch/arm/configs/s5pv210_defconfig
-> index 1753836..b2fbbff 100644
-> --- a/arch/arm/configs/s5pv210_defconfig
-> +++ b/arch/arm/configs/s5pv210_defconfig
-> @@ -7,6 +7,10 @@ CONFIG_MODULE_UNLOAD=y
->  # CONFIG_BLK_DEV_BSG is not set
->  CONFIG_ARCH_S5PV210=y
->  CONFIG_S3C_LOWLEVEL_UART_PORT=1
-> +CONFIG_S3C_DEV_FB=y
-> +CONFIG_S5PV210_SETUP_FB_24BPP=y
-> +CONFIG_MACH_AQUILA=y
-> +CONFIG_MACH_SMDKC110=y
->  CONFIG_MACH_SMDKV210=y
->  CONFIG_VMSPLIT_2G=y
->  CONFIG_PREEMPT=y
-> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-> index 7e2e1eb..e7b98bf 100644
-> --- a/arch/arm/mach-s5pv210/Kconfig
-> +++ b/arch/arm/mach-s5pv210/Kconfig
-> @@ -43,10 +43,10 @@ config S5PV210_SETUP_SDHCI_GPIO
->  	help
->  	  Common setup code for SDHCI gpio.
-> 
-> -# machine support
-> +menu "S5PC110 Machines"
-> 
->  config MACH_AQUILA
-> -	bool "Samsung Aquila"
-> +	bool "Aquila"
->  	select CPU_S5PV210
->  	select ARCH_SPARSEMEM_ENABLE
->  	select S5PV210_SETUP_FB_24BPP
-> @@ -64,11 +64,25 @@ config MACH_GONI
->  	  Machine support for Samsung GONI board
->  	  S5PC110(MCP) is one of package option of S5PV210
-> 
-> +config MACH_SMDKC110
-> +	bool "SMDKC110"
-> +	select CPU_S5PV210
-> +	select ARCH_SPARSEMEM_ENABLE
-> +	select S3C_DEV_WDT
-> +	select HAVE_S3C2410_WATCHDOG
-> +	help
-> +	  Machine support for Samsung SMDKC110
-> +	  S5PC110(MCP) is one of package option of S5PV210
-> +
-> +endmenu
-> +
->  config S5PC110_DEV_ONENAND
->  	bool
->  	help
->  	  Compile in platform device definition for OneNAND1 controller
-> 
-> +menu "S5PV210 Machines"
-> +
->  config MACH_SMDKV210
->  	bool "SMDKV210"
->  	select CPU_S5PV210
-> @@ -80,14 +94,6 @@ config MACH_SMDKV210
->  	help
->  	  Machine support for Samsung SMDKV210
-> 
-> -config MACH_SMDKC110
-> -	bool "SMDKC110"
-> -	select CPU_S5PV210
-> -	select ARCH_SPARSEMEM_ENABLE
-> -	select S3C_DEV_WDT
-> -	select HAVE_S3C2410_WATCHDOG
-> -	help
-> -	  Machine support for Samsung SMDKC110
-> -	  S5PC110(MCP) is one of package option of S5PV210
-> +endmenu
-> 
->  endif
-> --
-> 1.6.2.5
-
+> I wonder if there's a more efficient way of doing it that doesn't
+> involve invoking make for each line of the file.  It at least
+> shouldn't be necessary to actually build the kernel each time.
+Note that no kernel is built at all, only the config is regenerated once
+for each line.
 
 Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
