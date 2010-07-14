@@ -1,52 +1,63 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 13 Jul 2010 23:58:10 -0400 (EDT)
-Subject: [RFC,
-	PATCH 2/3] arm: use addruart macro to establish debug mappings
-In-Reply-To: <1279073377.401935.180250562939.2.gpush@pororo>
-References: <1279073377.401935.180250562939.2.gpush@pororo>
-Message-ID: <alpine.LFD.2.00.1007132343410.10598@xanadu.home>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Tue, 13 Jul 2010 21:04:06 -0700
+Subject: [PATCH] kbuild: Enable building defconfigs from Kconfig files
+In-Reply-To: <AANLkTimC_vXCAOrfTSndZyk8lgkjTlILVSYVYeIg6cUt@mail.gmail.com>
+References: <20100713114322.57c8b166.sfr@canb.auug.org.au>
+	<AANLkTimC_vXCAOrfTSndZyk8lgkjTlILVSYVYeIg6cUt@mail.gmail.com>
+Message-ID: <AANLkTik-QCXFnjma3J28B9h27uajOcDhthTGz99zKgVi@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Jul 2010, Jeremy Kerr wrote:
+On Tue, Jul 13, 2010 at 7:26 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>
+> I chose to use -D /dev/null (defconfig from an empty file) instead of
+> -n (allnoconfig) so that default values in Kconfig would get
+> respected. ?For the benefit of everyone else, here's an excerpt from
+> our IRC conversation this afternoon:
+>
+> 19:49 < gcl> sfr: [...] Your patch and my patch are
+> ? ? ? ? ? ? essentially doing exactly the same thing, except that I used '-d'
+> ? ? ? ? ? ? and you used '-n'.
+> 19:50 < gcl> s/-d/-D/
+> 19:55 < sfr> right
+> 19:55 < sfr> Linus wanted us to use -n
 
-> @@ -289,19 +293,24 @@ __create_page_tables:
->  	str	r6, [r0]
->  
->  #ifdef CONFIG_DEBUG_LL
-> -	ldr	r7, [r10, #PROCINFO_IO_MMUFLAGS] @ io_mmuflags
->  	/*
->  	 * Map in IO space for serial debugging.
->  	 * This allows debug messages to be output
->  	 * via a serial console before paging_init.
->  	 */
-> -	ldr	r3, [r8, #MACHINFO_PGOFFIO]
-> +	addruart r7, r3
-> +	lsr	r3, r3, #20
-> +	lsl	r3, r3, #2
+Just a note: Linus doesn't really care.
 
-Not all binutils versions support that syntax. You should rather use:
+IOW, I used -n not because of any fundamental belief that it is
+correct, but just because ti happened to be how I happened to decide
+to solve it. It's entirely possible that starting from the Kconfig
+defaults (rather than "no") is the right way to go.
 
-	mov	r3, r3, lsr #20
-	mov	r3, r3, lsl #2
+I think either approach is likely fine. The -D /dev/null approach
+would presumably give smaller Kconfig.xyz files, assuming our defaults
+are sane (an maybe that could be at least a partial validation of the
+defaults we do have). While the -n approach is in some ways more
+stable, in that the resulting Kconfig.xyz entires would presumably be
+more stand-alone, and there wouldn't be any subtle interactions when
+somebody changes a default value int he Kconfig file.
 
->  	add	r0, r4, r3
->  	rsb	r3, r3, #0x4000			@ PTRS_PER_PGD*sizeof(long)
->  	cmp	r3, #0x0800			@ limit to 512MB
->  	movhi	r3, #0x0800
->  	add	r6, r0, r3
-> -	ldr	r3, [r8, #MACHINFO_PHYSIO]
-> +	mov	r3, #0xff000000
-> +	orr	r3, r3, #0x00c00000
-> +	and	r3, r7, r3
-> +	ldr	r7, [r10, #PROCINFO_IO_MMUFLAGS] @ io_mmuflags
->  	orr	r3, r3, r7
+So I can see advantages to either model. And either model clearly
+would want the improvements to "select" that are independent (ie warn
+about unsatisfied 'depends on' constraints, and select recursively.
+Maybe we already fixed the recursive select thing, I forget).
 
-You may replace those last 5 instructions with:
+I also think we need to allow setting of actual values. I don't know
+what the syntax would be. A "set" statement that overrides a default
+in the Kconfig file, so that you can do
 
-	ldr	r3, [r10, #PROCINFO_IO_MMUFLAGS] @ io_mmuflags
-	mov	r7, r7, lsr #20
-	orr	r3, r3, r7, lsl #20	
+          set NODES_SHIFT 10
 
+which would basically be equivalent to a "select" of a tristate
+variable, but instead set the actual value? I dunno.
 
-Nicolas
+And quite frankly, maybe somebody comes up with a better model
+entirely. I like the Kconfig.xyz model, in that it should be
+human-readable/writable and shouldn't introduce any fundamentally new
+concepts (except the fairly simple extensions to the Kconfig
+language), but maybe there are better models.
+
+Regardless, I don't have anything against either set of patches
+(Grant's or Stephen's).
+
+                       Linus
