@@ -1,22 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Jul 2010 19:55:00 +0200
-Subject: [PATCH] arm: fix mach-versatile booting in qemu
-In-Reply-To: <20100714172319.GA8933@debian>
-References: <201007141716.09384.arnd@arndb.de> <20100714172319.GA8933@debian>
-Message-ID: <201007141955.00607.arnd@arndb.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 14 Jul 2010 11:05:46 -0700
+Subject: Meaning of clk_round_rate()?
+Message-ID: <4C3DFC7A.8020002@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 July 2010 19:23:19 Rabin Vincent wrote:
-> On Wed, Jul 14, 2010 at 05:16:09PM +0200, Arnd Bergmann wrote:
-> > I also don't know if the same problem exists on actual versatile
-> > hardware or if it's really a qemu bug.
-> 
-> It's a QEMU bug.  It was fixed with this patch to QEMU:
-> 
-> http://www.mail-archive.com/qemu-devel at nongnu.org/msg30785.html
+  What is the meaning of clk_round_rate() in the clk API 
+(include/linux/clk.h)? The function documentation says "adjust a rate to 
+the exact rate a clock can provide". That seems pretty vague. I'm lead 
+to believe that it rounds the rate to the closest rate supported. Is 
+that correct? Is there some sort of error margin where beyond that it's 
+no longer possible to be rounded? 0.5%? 1%?
 
-Ok, thanks for the info. I was sure I was using the latest qemu
-checkout, but apparently I made a mistake there.
+Assuming it's doing closest matching, I don't see how it's very useful 
+in practice. Some users of clk_round_rate() are blindly searching up and 
+down in the frequency space until they find a suitable rate (see 
+sound/atmel/abdac.c and sound/spi/at73c213.c). These drivers might be 
+better served by something like a clk_round_rate_up() and a 
+clk_round_rate_down() which would round the rate to the nearest higher 
+and lower frequency respectively without requiring complex loops around 
+clk_round_rate().
 
-	Arnd
+In addition, an up/down rounding approach would make it simpler for 
+drivers to find a min/max rate (for example display panels have a max 
+frequency they can support).
+
+A similar approach was suggested by David Brownell [1] but nothing came 
+of it.
+
+[1] http://article.gmane.org/gmane.linux.ports.arm.kernel/38076
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
