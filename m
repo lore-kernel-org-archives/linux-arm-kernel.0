@@ -1,25 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Jul 2010 21:05:53 +0100
-Subject: [PATCH] RFC: U300 clock updates to match PrimeCell clocking
-In-Reply-To: <20100714190311.GA18649@debian>
-References: <1279065807-22238-1-git-send-email-linus.walleij@stericsson.com>
-	<20100714190311.GA18649@debian>
-Message-ID: <20100714200553.GC18138@n2100.arm.linux.org.uk>
+From: zpfeffer@codeaurora.org (Zach Pfeffer)
+Date: Wed, 14 Jul 2010 13:11:49 -0700
+Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
+	memory management
+In-Reply-To: <20100714104353B.fujita.tomonori@lab.ntt.co.jp>
+References: <4C3C0032.5020702@codeaurora.org>
+	<20100713150311B.fujita.tomonori@lab.ntt.co.jp>
+	<20100713121420.GB4263@codeaurora.org>
+	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <20100714201149.GA14008@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 15, 2010 at 12:33:11AM +0530, Rabin Vincent wrote:
-> (corrected lakml address)
+On Wed, Jul 14, 2010 at 10:59:38AM +0900, FUJITA Tomonori wrote:
+> On Tue, 13 Jul 2010 05:14:21 -0700
+> Zach Pfeffer <zpfeffer@codeaurora.org> wrote:
 > 
-> On Wed, Jul 14, 2010 at 02:03:27AM +0200, Linus Walleij wrote:
-> > This makes the U300 architecture use the PrimeCell (AMBA) bus
-> > clocking method suggested by Russell King. Since the bus will
-> > now clock itself, we can remove the special PrimeCell clocking
-> > hooks in the clock file.
+> > > You mean that you want to specify this alignment attribute every time
+> > > you create an IOMMU mapping? Then you can set segment_boundary_mask
+> > > every time you create an IOMMU mapping. It's odd but it should work.
+> > 
+> > Kinda. I want to forget about IOMMUs, devices and CPUs. I just want to
+> > create a mapping that has the alignment I specify, regardless of the
+> > mapper. The mapping is created on a VCM and the VCM is associated with
+> > a mapper: a CPU, an IOMMU'd device or a direct mapped device.
 > 
-> In order to be able to remove your clock enabling around the
-> amba_device_register() calls, the busclk get/enabling would need to be
-> also added around the peripheral ID read in amba_device_register(), not
-> just before the probe call, where Russell's patch added it.
+> Sounds like you can do the above with the combination of the current
+> APIs, create a virtual address and then an I/O address.
+> 
 
-Ok, let's do that too.
+Yes, and that's what the implementation does - and all the other
+implementations that need to do this same thing. Why not solve the
+problem once?
+
+> The above can't be a reason to add a new infrastructure includes more
+> than 3,000 lines.
+
+Right now its 3000 lines because I haven't converted to a function
+pointer based implementation. Once I do that the size of the
+implementation will shrink and the code will act as a lib. Users pass
+buffer mappers and the lib will ease the management of of those
+buffers.
+
+>  
+> 
+> > > Another possible solution is extending struct dma_attrs. We could add
+> > > the alignment attribute to it.
+> > 
+> > That may be useful, but in the current DMA-API may be seen as
+> > redundant info.
+> 
+> If there is real requirement, we can extend the DMA-API.
+
+If the DMA-API contained functions to allocate virtual space separate
+from physical space and reworked how chained buffers functioned it
+would probably work - but then things start to look like the VCM API
+which does graph based map management.
+
+> 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
