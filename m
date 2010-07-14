@@ -1,97 +1,172 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 13 Jul 2010 23:47:46 -0600
-Subject: [PATCH] kbuild: Enable building defconfigs from Kconfig files
-In-Reply-To: <AANLkTik-QCXFnjma3J28B9h27uajOcDhthTGz99zKgVi@mail.gmail.com>
-References: <20100713114322.57c8b166.sfr@canb.auug.org.au>
-	<AANLkTimC_vXCAOrfTSndZyk8lgkjTlILVSYVYeIg6cUt@mail.gmail.com>
-	<AANLkTik-QCXFnjma3J28B9h27uajOcDhthTGz99zKgVi@mail.gmail.com>
-Message-ID: <AANLkTimYDDviG2no6RVPZZj8rD2d2URMAPUCWuftiFiB@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 14 Jul 2010 15:47:58 +0900
+Subject: [PATCH 1/3] arm: s5pv210: GONI: add support for framebuffer
+In-Reply-To: <1278321416-32524-2-git-send-email-m.szyprowski@samsung.com>
+References: <1278321416-32524-1-git-send-email-m.szyprowski@samsung.com>
+	<1278321416-32524-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <006301cb2320$822639e0$8672ada0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 13, 2010 at 10:04 PM, Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
-> On Tue, Jul 13, 2010 at 7:26 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->>
->> I chose to use -D /dev/null (defconfig from an empty file) instead of
->> -n (allnoconfig) so that default values in Kconfig would get
->> respected. ?For the benefit of everyone else, here's an excerpt from
->> our IRC conversation this afternoon:
->>
->> 19:49 < gcl> sfr: [...] Your patch and my patch are
->> ? ? ? ? ? ? essentially doing exactly the same thing, except that I used '-d'
->> ? ? ? ? ? ? and you used '-n'.
->> 19:50 < gcl> s/-d/-D/
->> 19:55 < sfr> right
->> 19:55 < sfr> Linus wanted us to use -n
->
-> Just a note: Linus doesn't really care.
->
-> IOW, I used -n not because of any fundamental belief that it is
-> correct, but just because ti happened to be how I happened to decide
-> to solve it. It's entirely possible that starting from the Kconfig
-> defaults (rather than "no") is the right way to go.
->
-> I think either approach is likely fine. The -D /dev/null approach
-> would presumably give smaller Kconfig.xyz files, assuming our defaults
-> are sane (an maybe that could be at least a partial validation of the
-> defaults we do have). While the -n approach is in some ways more
-> stable, in that the resulting Kconfig.xyz entires would presumably be
-> more stand-alone, and there wouldn't be any subtle interactions when
-> somebody changes a default value int he Kconfig file.
+Marek Szyprowski wrote:
+> 
+> This patch adds required platform definitions to enable s3c-fb
+> driver on GONI board. One framebuffer window in 480x800x16bpp mode is
+> defined.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pv210/Kconfig     |    2 +
+>  arch/arm/mach-s5pv210/mach-goni.c |   39
+> +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 41 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+> index 5e88941..8ab4bb0 100644
+> --- a/arch/arm/mach-s5pv210/Kconfig
+> +++ b/arch/arm/mach-s5pv210/Kconfig
+> @@ -59,6 +59,8 @@ config MACH_GONI
+>  	bool "GONI"
+>  	select CPU_S5PV210
+>  	select ARCH_SPARSEMEM_ENABLE
+> +	select S5PV210_SETUP_FB_24BPP
+> +	select S3C_DEV_FB
+>  	select S5PC110_DEV_ONENAND
+>  	help
+>  	  Machine support for Samsung GONI board
+> diff --git a/arch/arm/mach-s5pv210/mach-goni.c
+b/arch/arm/mach-s5pv210/mach-
+> goni.c
+> index 88c38e3..05b4a1a 100644
+> --- a/arch/arm/mach-s5pv210/mach-goni.c
+> +++ b/arch/arm/mach-s5pv210/mach-goni.c
+> @@ -12,6 +12,9 @@
+>  #include <linux/types.h>
+>  #include <linux/init.h>
+>  #include <linux/serial_core.h>
+> +#include <linux/fb.h>
+> +#include <linux/delay.h>
 
-Okay, well I advocate for the -D /dev/null approach then.  I think
-that validating our defaults, and looking for the subtle interactions
-are exactly what we want to be doing when it comes to defconfigs.  The
-fact that a defconfig does *not* want the default value is exactly
-what the defconfigs should be capturing.
+need linux/delay.h in here?
 
-> So I can see advantages to either model. And either model clearly
-> would want the improvements to "select" that are independent (ie warn
-> about unsatisfied 'depends on' constraints, and select recursively.
-> Maybe we already fixed the recursive select thing, I forget).
->
-> I also think we need to allow setting of actual values. I don't know
-> what the syntax would be. A "set" statement that overrides a default
-> in the Kconfig file, so that you can do
->
-> ? ? ? ? ?set NODES_SHIFT 10
->
-> which would basically be equivalent to a "select" of a tristate
-> variable, but instead set the actual value? I dunno.
+> +#include <linux/clk.h>
 
-I'm partial to extending select statements myself because it fits
-nicely into the existing grammer; but I can see value in having a set
-statement too.  It would eliminate the temporary config options that
-both my and Stephen's patch would add.
+same...need linux/clk.h?
 
-> And quite frankly, maybe somebody comes up with a better model
-> entirely. I like the Kconfig.xyz model, in that it should be
-> human-readable/writable and shouldn't introduce any fundamentally new
-> concepts (except the fairly simple extensions to the Kconfig
-> language), but maybe there are better models.
+> 
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+> @@ -20,11 +23,15 @@
+> 
+>  #include <mach/map.h>
+>  #include <mach/regs-clock.h>
+> +#include <mach/regs-fb.h>
+> +#include <mach/gpio.h>
 
-Perhaps, but I can't think of anything and this one is simple,
-elegant, and easy to implement.
+linux/gpio.h
 
-> Regardless, I don't have anything against either set of patches
-> (Grant's or Stephen's).
+> 
+> +#include <plat/gpio-cfg.h>
+>  #include <plat/regs-serial.h>
+>  #include <plat/s5pv210.h>
+>  #include <plat/devs.h>
+>  #include <plat/cpu.h>
+> +#include <plat/fb.h>
+> 
+>  /* Following are default values for UCON, ULCON and UFCON UART registers
+*/
+>  #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+> @@ -73,7 +80,35 @@ static struct s3c2410_uartcfg goni_uartcfgs[]
+__initdata = {
+>  	},
+>  };
+> 
+> +/* Frame Buffer */
 
-I think we should run with this.  Since the patch has been merged to
-warn on unmet Kconfig dependences, the only major hole left is being
-able to do negative selects and to select specific values.  Stephen,
-I'm happy to either keep working on this, or drop my patch in favor of
-yours.  Whichever you prefer.  I'll try to find some time to look at
-the Kconfig grammer.
+No need this comment because we know _fb_ means frame buffer...
 
-The solver would also be useful and could further reduce the size of
-the Kconfig fragments, but it isn't necessary so we don't need to wait
-for it to get implemented to take this approach..
+> +static struct s3c_fb_pd_win goni_fb_win0 = {
 
-Cheers,
-g.
+How about to use goni_fb_win[] array so that can be extended easily...
+
+> +	.win_mode = {
+> +		.pixclock = 1000000000000ULL /
+> ((16+16+2+480)*(28+3+2+800)*55),
+> +		.left_margin = 16,
+> +		.right_margin = 16,
+> +		.upper_margin = 3,
+> +		.lower_margin = 28,
+> +		.hsync_len = 2,
+> +		.vsync_len = 2,
+> +		.xres = 480,
+> +		.yres = 800,
+> +		.refresh = 55,
+> +	},
+> +	.max_bpp = 32,
+> +	.default_bpp = 16,
+
+If possible, please keep the align like below...for easily reading...
+But...it depends on your taste...:-)
+
++	.win_mode = {
++		.pixclock	= 1000000000000ULL /
+((16+16+2+480)*(28+3+2+800)*55),
++		.left_margin	= 16,
++		.right_margin	= 16,
++		.upper_margin	= 3,
++		.lower_margin	= 28,
++		.hsync_len	= 2,
++		.vsync_len	= 2,
++		.xres		= 480,
++		.yres		= 800,
++		.refresh		= 55,
++	},
++	.max_bpp	= 32,
++	.default_bpp	= 16,
 
 
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+> +};
+> +
+> +static struct s3c_fb_platdata goni_lcd_pdata __initdata = {
+> +	.win[0]	= &goni_fb_win0,
+> +	.vidcon0		= VIDCON0_VIDOUT_RGB |
+> VIDCON0_PNRMODE_RGB |
+> +					VIDCON0_CLKSEL_LCD,
+> +	.vidcon1		= VIDCON1_INV_VCLK | VIDCON1_INV_VDEN
+> +				| VIDCON1_INV_HSYNC |
+> VIDCON1_INV_VSYNC,
+> +	.setup_gpio		= s5pv210_fb_gpio_setup_24bpp,
+> +};
+
+Same...as previous comment.
+
+> +
+>  static struct platform_device *goni_devices[] __initdata = {
+> +	&s3c_device_fb,
+>  	&s5pc110_device_onenand,
+>  };
+> 
+> @@ -86,6 +121,10 @@ static void __init goni_map_io(void)
+> 
+>  static void __init goni_machine_init(void)
+>  {
+> +
+
+no need above empty line.
+
+> +	/* FB */
+> +	s3c_fb_set_platdata(&goni_lcd_pdata);
+> +
+>  	platform_add_devices(goni_devices, ARRAY_SIZE(goni_devices));
+>  }
+> 
+> --
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
