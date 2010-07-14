@@ -1,29 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Jul 2010 21:03:24 +0100
-Subject: Meaning of clk_round_rate()?
-In-Reply-To: <4C3DFC7A.8020002@codeaurora.org>
-References: <4C3DFC7A.8020002@codeaurora.org>
-Message-ID: <20100714200324.GA18138@n2100.arm.linux.org.uk>
+Date: Wed, 14 Jul 2010 21:05:53 +0100
+Subject: [PATCH] RFC: U300 clock updates to match PrimeCell clocking
+In-Reply-To: <20100714190311.GA18649@debian>
+References: <1279065807-22238-1-git-send-email-linus.walleij@stericsson.com>
+	<20100714190311.GA18649@debian>
+Message-ID: <20100714200553.GC18138@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 14, 2010 at 11:05:46AM -0700, Stephen Boyd wrote:
->  What is the meaning of clk_round_rate() in the clk API  
-> (include/linux/clk.h)? The function documentation says "adjust a rate to  
-> the exact rate a clock can provide". That seems pretty vague. I'm lead  
-> to believe that it rounds the rate to the closest rate supported. Is  
-> that correct? Is there some sort of error margin where beyond that it's  
-> no longer possible to be rounded? 0.5%? 1%?
+On Thu, Jul 15, 2010 at 12:33:11AM +0530, Rabin Vincent wrote:
+> (corrected lakml address)
+> 
+> On Wed, Jul 14, 2010 at 02:03:27AM +0200, Linus Walleij wrote:
+> > This makes the U300 architecture use the PrimeCell (AMBA) bus
+> > clocking method suggested by Russell King. Since the bus will
+> > now clock itself, we can remove the special PrimeCell clocking
+> > hooks in the clock file.
+> 
+> In order to be able to remove your clock enabling around the
+> amba_device_register() calls, the busclk get/enabling would need to be
+> also added around the peripheral ID read in amba_device_register(), not
+> just before the probe call, where Russell's patch added it.
 
-clk_round_rate() returns the clock rate which will be set if you ask
-clk_set_rate() to set that rate.  It provides a way to query from
-the implementation exactly what rate you'll get if you use clk_set_rate()
-with that same argument.
-
-So essentially, clk_set_rate() should be:
-
-static int clk_set_rate(struct clk *clk, unsigned long rate)
-{
-	rate = clk_round_rate(clk, rate);
-	return set_actual_rate(clk, rate);
-}
+Ok, let's do that too.
