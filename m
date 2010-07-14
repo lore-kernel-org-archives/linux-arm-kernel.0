@@ -1,43 +1,31 @@
 From: jeremy.kerr@canonical.com (Jeremy Kerr)
 Date: Wed, 14 Jul 2010 10:32:39 +0800
-Subject: [PATCH 5/6] arm/ns9xxx: fix debug macro compilation failure
+Subject: [PATCH 4/6] arm/plat-spear: fix debug macro compilation failure
 In-Reply-To: <1279074759.517724.734812272398.0.gpush@pororo>
-Message-ID: <1279074759.519643.866429356172.5.gpush@pororo>
+Message-ID: <1279074759.519307.502743529753.4.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need mach/memory.h for NS9XXX_CSxSTAT_PHYS, and mach/memory.h needs
-asm/memory.h for UL().
+mov rx, =<immediate> isn't valid, use #<immediate> instead.
 
 Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
 
 ---
- arch/arm/mach-ns9xxx/include/mach/debug-macro.S |    1 +
- arch/arm/mach-ns9xxx/include/mach/memory.h      |    2 ++
- 2 files changed, 3 insertions(+)
+ arch/arm/plat-spear/include/plat/debug-macro.S |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-ns9xxx/include/mach/debug-macro.S b/arch/arm/mach-ns9xxx/include/mach/debug-macro.S
-index ae770fd..06f41f7 100644
---- a/arch/arm/mach-ns9xxx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-ns9xxx/include/mach/debug-macro.S
-@@ -8,6 +8,7 @@
-  * the Free Software Foundation.
-  */
- #include <mach/hardware.h>
-+#include <mach/memory.h>
+diff --git a/arch/arm/plat-spear/include/plat/debug-macro.S b/arch/arm/plat-spear/include/plat/debug-macro.S
+index d922310..e91270e 100644
+--- a/arch/arm/plat-spear/include/plat/debug-macro.S
++++ b/arch/arm/plat-spear/include/plat/debug-macro.S
+@@ -15,8 +15,8 @@
+ #include <mach/spear.h>
  
- #include <mach/regs-board-a9m9750dev.h>
+ 		.macro	addruart, rp, rv
+-		mov	\rp, =SPEAR_DBG_UART_BASE		@ Physical base
+-		mov	\rv, =VA_SPEAR_DBG_UART_BASE		@ Virtual base
++		mov	\rp, #SPEAR_DBG_UART_BASE		@ Physical base
++		mov	\rv, #VA_SPEAR_DBG_UART_BASE		@ Virtual base
+ 		.endm
  
-diff --git a/arch/arm/mach-ns9xxx/include/mach/memory.h b/arch/arm/mach-ns9xxx/include/mach/memory.h
-index 6107193..b5bbda5 100644
---- a/arch/arm/mach-ns9xxx/include/mach/memory.h
-+++ b/arch/arm/mach-ns9xxx/include/mach/memory.h
-@@ -11,6 +11,8 @@
- #ifndef __ASM_ARCH_MEMORY_H
- #define __ASM_ARCH_MEMORY_H
- 
-+#include <asm/memory.h>
-+
- /* x in [0..3] */
- #define NS9XXX_CSxSTAT_PHYS(x)	UL(((x) + 4) << 28)
- 
+ 		.macro	senduart, rd, rx
