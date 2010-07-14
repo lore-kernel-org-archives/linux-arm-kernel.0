@@ -1,56 +1,170 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 14 Jul 2010 19:20:29 +0900
-Subject: [Bug] make ARCH=arm menuconfig is abnormal due to commit ID:
-	63b1f51b2405573d47bf5b9ab6e7cd5c697d3dcc
-In-Reply-To: <AANLkTinreCm2ioVWpjknDMwGNhDRlqyENJuOkUZhsB_I@mail.gmail.com>
-References: <AANLkTinreCm2ioVWpjknDMwGNhDRlqyENJuOkUZhsB_I@mail.gmail.com>
-Message-ID: <001301cb233e$32566b60$97034220$%kim@samsung.com>
+Date: Wed, 14 Jul 2010 19:26:12 +0900
+Subject: [PATCH 1/3] arm: s5pv210: GONI: add support for framebuffer
+In-Reply-To: <AANLkTinFFwWBQ3ZgjBBDVHrfVUCg3kjVjkHYURn3Jr4m@mail.gmail.com>
+References: <1278321416-32524-1-git-send-email-m.szyprowski@samsung.com>
+	<1278321416-32524-2-git-send-email-m.szyprowski@samsung.com>
+	<006301cb2320$822639e0$8672ada0$%kim@samsung.com>
+	<00bf01cb2326$705e9fd0$511bdf70$%szyprowski@samsung.com>
+	<AANLkTinFFwWBQ3ZgjBBDVHrfVUCg3kjVjkHYURn3Jr4m@mail.gmail.com>
+Message-ID: <001401cb233e$fe80ceb0$fb826c10$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-os user wrote:
+Kyungmin Park wrote:
 > 
-> Hi all,
+> On Wed, Jul 14, 2010 at 4:30 PM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+> > Hello,
+> >
+> > On Wednesday, July 14, 2010 8:48 AM Kukjin Kim wrote:
+> >
+> >> Marek Szyprowski wrote:
+> >> >
+> >> > This patch adds required platform definitions to enable s3c-fb
+> >> > driver on GONI board. One framebuffer window in 480x800x16bpp mode is
+> >> > defined.
+> >> >
+> >> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> >> > ---
+> >> > ?arch/arm/mach-s5pv210/Kconfig ? ? | ? ?2 +
+> >> > ?arch/arm/mach-s5pv210/mach-goni.c | ? 39
+> >> > +++++++++++++++++++++++++++++++++++++
+> >> > ?2 files changed, 41 insertions(+), 0 deletions(-)
+> >> >
+> >> > diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-
+> >> s5pv210/Kconfig
+> >> > index 5e88941..8ab4bb0 100644
+> >> > --- a/arch/arm/mach-s5pv210/Kconfig
+> >> > +++ b/arch/arm/mach-s5pv210/Kconfig
+> >> > @@ -59,6 +59,8 @@ config MACH_GONI
+> >> > ? ? bool "GONI"
+> >> > ? ? select CPU_S5PV210
+> >> > ? ? select ARCH_SPARSEMEM_ENABLE
+> >> > + ? select S5PV210_SETUP_FB_24BPP
+> >> > + ? select S3C_DEV_FB
+> >> > ? ? select S5PC110_DEV_ONENAND
+> >> > ? ? help
+> >> > ? ? ? Machine support for Samsung GONI board
+> >> > diff --git a/arch/arm/mach-s5pv210/mach-goni.c
+> >> b/arch/arm/mach-s5pv210/mach-
+> >> > goni.c
+> >> > index 88c38e3..05b4a1a 100644
+> >> > --- a/arch/arm/mach-s5pv210/mach-goni.c
+> >> > +++ b/arch/arm/mach-s5pv210/mach-goni.c
+> >> > @@ -12,6 +12,9 @@
+> >> > ?#include <linux/types.h>
+> >> > ?#include <linux/init.h>
+> >> > ?#include <linux/serial_core.h>
+> >> > +#include <linux/fb.h>
+> >> > +#include <linux/delay.h>
+> >>
+> >> need linux/delay.h in here?
+> >>
+> >> > +#include <linux/clk.h>
+> >>
+> >> same...need linux/clk.h?
+> >>
+> >> >
+> >> > ?#include <asm/mach/arch.h>
+> >> > ?#include <asm/mach/map.h>
+> >> > @@ -20,11 +23,15 @@
+> >> >
+> >> > ?#include <mach/map.h>
+> >> > ?#include <mach/regs-clock.h>
+> >> > +#include <mach/regs-fb.h>
+> >> > +#include <mach/gpio.h>
+> >>
+> >> linux/gpio.h
+> >
+> > Ok.
+> >
+> >> >
+> >> > +#include <plat/gpio-cfg.h>
+> >> > ?#include <plat/regs-serial.h>
+> >> > ?#include <plat/s5pv210.h>
+> >> > ?#include <plat/devs.h>
+> >> > ?#include <plat/cpu.h>
+> >> > +#include <plat/fb.h>
+> >> >
+> >> > ?/* Following are default values for UCON, ULCON and UFCON UART
+> registers
+> >> */
+> >> > ?#define S5PV210_UCON_DEFAULT ? ? ? (S3C2410_UCON_TXILEVEL
+> | ? ? ? ?\
+> >> > @@ -73,7 +80,35 @@ static struct s3c2410_uartcfg goni_uartcfgs[]
+> >> __initdata = {
+> >> > ? ? },
+> >> > ?};
+> >> >
+> >> > +/* Frame Buffer */
+> >>
+> >> No need this comment because we know _fb_ means frame buffer...
+> >
+> > Comments in the source code are imho always welcome. As you know
+mach-*.c
+> files
+> > grows to very large sizes and it is much easier to read them if all
+definitions
+> > and items are grouped and commented with a header on top of them (with
+such
+> > comments you easily can notice where one group starts and ends without
+> reading
+> > the code).
+> >
+> >> > +static struct s3c_fb_pd_win goni_fb_win0 = {
+> >>
+> >> How about to use goni_fb_win[] array so that can be extended easily...
+> >
+> > I've just followed the style used in the other mach-*.c files. No
+problem to
+> > change it.
+> >
+> >>
+> >> > + ? .win_mode = {
+> >> > + ? ? ? ? ? .pixclock = 1000000000000ULL /
+> >> > ((16+16+2+480)*(28+3+2+800)*55),
+> 
+> Marugu(?) send the patch remove pixclock at fb mailing list. So If
 
-Hi,
-> 
-> I found since the commit ID: 63b1f51b2405573d47bf5b9ab6e7cd5c697d3dcc
-> 
-> $ make ARCH=arm menuconfig
-> 
-> is abnormal:
-> 
-> Items in [System Type --> ARM system type (xxxx) -->] can not be
-> displayed correctly. It seems the line,
-> 
-> <snip>
-> bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442,
-> S3C2443, S3C2450"
-> </snip>
-> 
-> is too long.
-> 
-Already reported about this issue.
+Yeah, I saw Maurus' patch, [PATCH v2] s3c-fb: Automatically calculate pixel
+clock when none is given.
 
-Following is Ben's reply at that time:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/017030.html
+> >> > + ? ? ? ? ? .left_margin = 16,
+> >> > + ? ? ? ? ? .right_margin = 16,
+> >> > + ? ? ? ? ? .upper_margin = 3,
+> >> > + ? ? ? ? ? .lower_margin = 28,
+> >> > + ? ? ? ? ? .hsync_len = 2,
+> >> > + ? ? ? ? ? .vsync_len = 2,
+> >> > + ? ? ? ? ? .xres = 480,
+> >> > + ? ? ? ? ? .yres = 800,
+> >> > + ? ? ? ? ? .refresh = 55,
+> >> > + ? },
+> >> > + ? .max_bpp = 32,
+> >> > + ? .default_bpp = 16,
+> >>
+> >> If possible, please keep the align like below...for easily reading...
+> >> But...it depends on your taste...:-)
+> >
+> > Ok, no problem with this.
+> >
+> >>
+> >> + ? ? .win_mode = {
+> >> + ? ? ? ? ? ? .pixclock ? ? ? = 1000000000000ULL /
+> >> ((16+16+2+480)*(28+3+2+800)*55),
+> 
+> Maurus send the patch remove pixclock calculation so I hope his patch
+> merge and we just remove it at here.
 
-But I'm not sure how it was going on...
+But as far as I know, not applied yet.
+So I think, need .pixclock member now..and maybe can be removed later.
 
-> My host machine is,
 > 
-> Ubuntu 8.10
-> Intel(R) Pentium(R) 4 CPU 2.80GHz
-> 
-> $ gcc --version
-> gcc (Ubuntu 4.3.2-1ubuntu12) 4.3.2
-> Copyright (C) 2008 Free Software Foundation, Inc.
-> This is free software; see the source for copying conditions.  There is NO
-> warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR
-> PURPOSE.
-> 
-> BR
-> 
+> Thank you,
+> Kyungmin Park
+
+(snip)
 
 Thanks.
 
