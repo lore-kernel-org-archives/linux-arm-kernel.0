@@ -1,124 +1,59 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 14 Jul 2010 19:36:01 +0900
-Subject: [PATCH 1/3] ARM: S5PV210: GONI: add support for framebuffer
-In-Reply-To: <1279095416-24871-2-git-send-email-m.szyprowski@samsung.com>
-References: <1279095416-24871-1-git-send-email-m.szyprowski@samsung.com>
-	<1279095416-24871-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <001601cb2340$5d4e9020$17ebb060$%kim@samsung.com>
+From: minchan.kim@gmail.com (Minchan Kim)
+Date: Wed, 14 Jul 2010 20:04:07 +0900
+Subject: About SECTION_SIZE_BITS for Sparsemem
+In-Reply-To: <20100714084943.GA9115@n2100.arm.linux.org.uk>
+References: <000601cb219c$c7830b60$56892220$%kim@samsung.com>
+	<AANLkTinTrt7VKuKvleiJj4lv2tWqCcDYHVXAQIHLA7bh@mail.gmail.com>
+	<001b01cb21aa$ef0e4d80$cd2ae880$%kim@samsung.com>
+	<AANLkTinkujX3VbL0sXjjghovr8eX9Os0huw3OTBut2UP@mail.gmail.com>
+	<20100713092658.GB29885@csn.ul.ie>
+	<20100713093815.GD20590@n2100.arm.linux.org.uk>
+	<20100713095035.GE29885@csn.ul.ie>
+	<20100713173744.GB30142@n2100.arm.linux.org.uk>
+	<20100713203250.GA21600@csn.ul.ie>
+	<AANLkTim55BDz4_vWhTnDVj1EP42MxAMZzP2PR80j5fLN@mail.gmail.com>
+	<20100714084943.GA9115@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTilrLJb97NkK4Q-Oan_ufXRdafIw7n6060mItaXj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> 
-> This patch adds required platform definitions to enable s3c-fb
-> driver on GONI board. One framebuffer window in 480x800x16bpp mode is
-> defined.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pv210/Kconfig     |    2 ++
->  arch/arm/mach-s5pv210/mach-goni.c |   34
-> ++++++++++++++++++++++++++++++++++
->  2 files changed, 36 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-> index 5e88941..8ab4bb0 100644
-> --- a/arch/arm/mach-s5pv210/Kconfig
-> +++ b/arch/arm/mach-s5pv210/Kconfig
-> @@ -59,6 +59,8 @@ config MACH_GONI
->  	bool "GONI"
->  	select CPU_S5PV210
->  	select ARCH_SPARSEMEM_ENABLE
-> +	select S5PV210_SETUP_FB_24BPP
-> +	select S3C_DEV_FB
->  	select S5PC110_DEV_ONENAND
->  	help
->  	  Machine support for Samsung GONI board
-> diff --git a/arch/arm/mach-s5pv210/mach-goni.c
-b/arch/arm/mach-s5pv210/mach-
-> goni.c
-> index 88c38e3..bec488e 100644
-> --- a/arch/arm/mach-s5pv210/mach-goni.c
-> +++ b/arch/arm/mach-s5pv210/mach-goni.c
-> @@ -12,6 +12,7 @@
->  #include <linux/types.h>
->  #include <linux/init.h>
->  #include <linux/serial_core.h>
-> +#include <linux/fb.h>
-> 
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
-> @@ -20,11 +21,13 @@
-> 
->  #include <mach/map.h>
->  #include <mach/regs-clock.h>
-> +#include <mach/regs-fb.h>
-> 
->  #include <plat/regs-serial.h>
->  #include <plat/s5pv210.h>
->  #include <plat/devs.h>
->  #include <plat/cpu.h>
-> +#include <plat/fb.h>
-> 
->  /* Following are default values for UCON, ULCON and UFCON UART registers
-*/
->  #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-> @@ -73,7 +76,35 @@ static struct s3c2410_uartcfg goni_uartcfgs[]
-__initdata = {
->  	},
->  };
-> 
-> +/* Frame Buffer */
-> +static struct s3c_fb_pd_win goni_fb_win0 = {
-> +	.win_mode = {
-> +		.pixclock = 1000000000000ULL /
-> ((16+16+2+480)*(28+3+2+800)*55),
-> +		.left_margin	= 16,
-> +		.right_margin	= 16,
-> +		.upper_margin	= 3,
-> +		.lower_margin	= 28,
-> +		.hsync_len	= 2,
-> +		.vsync_len	= 2,
-> +		.xres		= 480,
-> +		.yres		= 800,
-> +		.refresh	= 55,
-> +	},
-> +	.max_bpp	= 32,
-> +	.default_bpp	= 16,
-> +};
-> +
-> +static struct s3c_fb_platdata goni_lcd_pdata __initdata = {
-> +	.win[0]		= &goni_fb_win0,
-> +	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB |
-> +			  VIDCON0_CLKSEL_LCD,
-> +	.vidcon1	= VIDCON1_INV_VCLK | VIDCON1_INV_VDEN
-> +			  | VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
-> +	.setup_gpio	= s5pv210_fb_gpio_setup_24bpp,
-> +};
-> +
->  static struct platform_device *goni_devices[] __initdata = {
-> +	&s3c_device_fb,
->  	&s5pc110_device_onenand,
->  };
-> 
-> @@ -86,6 +117,9 @@ static void __init goni_map_io(void)
-> 
->  static void __init goni_machine_init(void)
->  {
-> +	/* FB */
-> +	s3c_fb_set_platdata(&goni_lcd_pdata);
-> +
->  	platform_add_devices(goni_devices, ARRAY_SIZE(goni_devices));
->  }
-> 
-> --
-Looks ok..will apply.
+On Wed, Jul 14, 2010 at 5:49 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jul 14, 2010 at 08:59:06AM +0900, Minchan Kim wrote:
+>> But I think Kukjin case's best solution is to make section size 16M, not 256M.
+>> Regardless of this, Your idea is the direction we should proceed, I think.
+>
+> So what if someone decides to fit 8MB DRAMs to the board?
+>
 
-Thanks.
+Hmm. It might be a problem.
+Should we consider all configuration?
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Then, in below cases ram size never can change?
+How does it acked and merged?
+I don't know below board can't configurable ram size. Just out of curiosity.
+
+
+   #   line  filename / context / line
+   1     76  arch/arm/mach-clps711x/include/mach/memory.h <<SECTION_SIZE_BITS>>
+             #define SECTION_SIZE_BITS 24
+   2     26  arch/arm/mach-lh7a40x/include/mach/memory.h <<SECTION_SIZE_BITS>>
+             #define SECTION_SIZE_BITS 24
+   3     62  arch/arm/mach-realview/include/mach/memory.h <<SECTION_SIZE_BITS>>
+             #define SECTION_SIZE_BITS 28
+   4     38  arch/arm/mach-rpc/include/mach/memory.h <<SECTION_SIZE_BITS>>
+             #define SECTION_SIZE_BITS 26
+   5     21  arch/arm/mach-s5pv210/include/mach/memory.h <<SECTION_SIZE_BITS>>
+             #define SECTION_SIZE_BITS 28
+   6     46  arch/arm/mach-sa1100/include/mach/memory.h <<SECTION_SIZE_BITS>>
+             #define SECTION_SIZE_BITS 27
+   7     19  drivers/staging/msm/memory_ll.h <<SECTION_SIZE_BITS>>
+             #define SECTION_SIZE_BITS 25
+
+
+
+
+
+-- 
+Kind regards,
+Minchan Kim
