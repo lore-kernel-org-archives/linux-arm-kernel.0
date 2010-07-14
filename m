@@ -1,22 +1,75 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 14 Jul 2010 09:33:33 +0100
-Subject: [PATCH 3/3] ARM: S5PV210: GONI: add support for MAX8998 PMIC
-In-Reply-To: <1279095416-24871-4-git-send-email-m.szyprowski@samsung.com>
-References: <1279095416-24871-1-git-send-email-m.szyprowski@samsung.com>
-	<1279095416-24871-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20100714083332.GB5933@sirena.org.uk>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Wed, 14 Jul 2010 16:42:58 +0800
+Subject: [PATCH v2] serial/imx: only parse for iomem resources once
+Message-ID: <1279096978.487304.715979328697.1.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 14, 2010 at 10:16:56AM +0200, Marek Szyprowski wrote:
-> This patch adds required platform definitions for MAX8998 PMIC driver. Power
-> regulators for LDO and BUCK outputs has been defined as well as a simple
-> gpio-keys button for power key (to enable wakeup functionality with
-> external interrupt).
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Currently, the iomem resources are parsed in serial_imx_probe, then
+again in imx_request_port and imx_release_port.
 
-For the regulator API usage:
+This change uses the imx_port data to retrieve the start and size of the
+memory region, rather than re-parsing the resources through
+platform_get_resource.
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+
+---
+v2: use resource_size()
+
+---
+ drivers/serial/imx.c |   18 ++++++------------
+ 1 file changed, 6 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/serial/imx.c b/drivers/serial/imx.c
+index eacb588..f72d7c2 100644
+--- a/drivers/serial/imx.c
++++ b/drivers/serial/imx.c
+@@ -194,6 +194,7 @@ struct imx_port {
+ 	unsigned int		irda_inv_tx:1;
+ 	unsigned short		trcv_delay; /* transceiver delay */
+ 	struct clk		*clk;
++	unsigned long		mapsize;
+ };
+ 
+ #ifdef CONFIG_IRDA
+@@ -954,11 +955,8 @@ static const char *imx_type(struct uart_port *port)
+  */
+ static void imx_release_port(struct uart_port *port)
+ {
+-	struct platform_device *pdev = to_platform_device(port->dev);
+-	struct resource *mmres;
+-
+-	mmres = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	release_mem_region(mmres->start, mmres->end - mmres->start + 1);
++	struct imx_port *imx_port = container_of(port, struct imx_port, port);
++	release_mem_region(imx_port->port.mapbase, imx_port->mapsize);
+ }
+ 
+ /*
+@@ -966,15 +964,10 @@ static void imx_release_port(struct uart_port *port)
+  */
+ static int imx_request_port(struct uart_port *port)
+ {
+-	struct platform_device *pdev = to_platform_device(port->dev);
+-	struct resource *mmres;
++	struct imx_port *imx_port = container_of(port, struct imx_port, port);
+ 	void *ret;
+ 
+-	mmres = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!mmres)
+-		return -ENODEV;
+-
+-	ret = request_mem_region(mmres->start, mmres->end - mmres->start + 1,
++	ret = request_mem_region(imx_port->port.mapbase, imx_port->mapsize,
+ 			"imx-uart");
+ 
+ 	return  ret ? 0 : -EBUSY;
+@@ -1254,6 +1247,7 @@ static int serial_imx_probe(struct platform_device *pdev)
+ 	sport->port.dev = &pdev->dev;
+ 	sport->port.mapbase = res->start;
+ 	sport->port.membase = base;
++	sport->mapsize = resource_size(res);
+ 	sport->port.type = PORT_IMX,
+ 	sport->port.iotype = UPIO_MEM;
+ 	sport->port.irq = platform_get_irq(pdev, 0);
