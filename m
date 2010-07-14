@@ -1,67 +1,32 @@
-From: qy03fugy@stud.informatik.uni-erlangen.de (Christian Dietrich)
-Date: Wed, 14 Jul 2010 13:32:12 +0200
-Subject: [PATCH 3/3] usb/host || arch/arm: Remove dead CONFIG_ARCH_KARO
-In-Reply-To: <cover.1279104996.git.qy03fugy@stud.informatik.uni-erlangen.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 14 Jul 2010 20:30:23 +0800
+Subject: [PATCH 2/3] usb/{gadget,host}: Remove dead CONFIG_CPU_PXA27x
+In-Reply-To: <e75b6cb0826c24f3c0583fb409473c494aff0f63.1279104996.git.qy03fugy@stud.informatik.uni-erlangen.de>
 References: <cover.1279104996.git.qy03fugy@stud.informatik.uni-erlangen.de>
-Message-ID: <9df7166bb950e7fbc12d1be9f2b9f9cbb9961187.1279104996.git.qy03fugy@stud.informatik.uni-erlangen.de>
+	<e75b6cb0826c24f3c0583fb409473c494aff0f63.1279104996.git.qy03fugy@stud.informatik.uni-erlangen.de>
+Message-ID: <AANLkTimQnt8_OLGOp8VIUk6A10wBDNT3H_prpWNuYhc9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_ARCH_KARO doesn't exist in Kconfig and is never defined anywhere
-else, therefore removing all references for it from the source code.
+On Wed, Jul 14, 2010 at 7:32 PM, Christian Dietrich
+<qy03fugy@stud.informatik.uni-erlangen.de> wrote:
+> CONFIG_CPU_PXA27x doesn't exist in Kconfig, therefore removing all
+> references for it from the source code.
+>
+> Signed-off-by: Christian Dietrich <qy03fugy@stud.informatik.uni-erlangen.de>
+> ---
+> ?drivers/usb/gadget/pxa27x_udc.c | ? 16 ----------------
+> ?drivers/usb/host/ohci-pxa27x.c ?| ? ?8 --------
+> ?2 files changed, 0 insertions(+), 24 deletions(-)
+>
+> diff --git a/drivers/usb/gadget/pxa27x_udc.c b/drivers/usb/gadget/pxa27x_udc.c
+> index 85b0d89..73783f5 100644
+> --- a/drivers/usb/gadget/pxa27x_udc.c
+> +++ b/drivers/usb/gadget/pxa27x_udc.c
+> @@ -2561,12 +2561,6 @@ static void pxa_udc_shutdown(struct platform_device *_dev)
+> ? ? ? ? ? ? ? ?udc_disable(udc);
+> ?}
+>
+> -#ifdef CONFIG_CPU_PXA27x
 
-Signed-off-by: Christian Dietrich <qy03fugy@stud.informatik.uni-erlangen.de>
----
- arch/arm/tools/mach-types  |    1 -
- drivers/usb/host/isp1362.h |   24 +-----------------------
- 2 files changed, 1 insertions(+), 24 deletions(-)
-
-diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
-index 8f10d24..3d86318 100644
---- a/arch/arm/tools/mach-types
-+++ b/arch/arm/tools/mach-types
-@@ -204,7 +204,6 @@ omaha			ARCH_OMAHA		OMAHA			186
- ta7			ARCH_TA7		TA7			187
- nova			SA1100_NOVA		NOVA			188
- hmk			ARCH_HMK		HMK			189
--karo			ARCH_KARO		KARO			190
- fester			SA1100_FESTER		FESTER			191
- gpi			ARCH_GPI		GPI			192
- smdk2410		ARCH_SMDK2410		SMDK2410		193
-diff --git a/drivers/usb/host/isp1362.h b/drivers/usb/host/isp1362.h
-index d995351..0f97820 100644
---- a/drivers/usb/host/isp1362.h
-+++ b/drivers/usb/host/isp1362.h
-@@ -8,29 +8,7 @@
- /*
-  * Platform specific compile time options
-  */
--#if defined(CONFIG_ARCH_KARO)
--#include <asm/arch/hardware.h>
--#include <asm/arch/pxa-regs.h>
--#include <asm/arch/karo.h>
--
--#define USE_32BIT		1
--
--
--/* These options are mutually eclusive */
--#define USE_PLATFORM_DELAY	1
--#define USE_NDELAY		0
--/*
-- * MAX_ROOT_PORTS: Number of downstream ports
-- *
-- * The chip has two USB ports, one of which can be configured as
-- * an USB device port, so the value of this constant is implementation
-- * specific.
-- */
--#define MAX_ROOT_PORTS		2
--#define DUMMY_DELAY_ACCESS do {} while (0)
--
--/* insert platform specific definitions for other machines here */
--#elif defined(CONFIG_BLACKFIN)
-+#if defined(CONFIG_BLACKFIN)
- 
- #include <linux/io.h>
- #define USE_32BIT		0
--- 
-1.7.0.4
+This should be CONFIG_PXA27x, I'll prepare a patch on this.
