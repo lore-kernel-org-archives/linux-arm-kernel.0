@@ -1,30 +1,31 @@
 From: jeremy.kerr@canonical.com (Jeremy Kerr)
 Date: Wed, 14 Jul 2010 15:29:46 +0800
-Subject: [PATCH 0/6] debug macro fixups, v2
-Message-ID: <1279092586.619523.10182482328.0.gpush@pororo>
+Subject: [PATCH 4/6] arm/plat-spear: fix debug macro compilation failure
+In-Reply-To: <1279092586.619523.10182482328.0.gpush@pororo>
+Message-ID: <1279092586.620769.218300709098.4.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As part of the DEBUG_LL mapping changes, I ran all of the defconfigs
-with DEBUG_LL=y. Some of the configs are broken, so I'm posting the
-fixups.
+mov rx, =<immediate> isn't valid, use #<immediate> instead.
 
-mx1 is still broken, as IMX_IO_ADDRESS() (used by the mx1 debug macros)
-uses C syntax, and so it not suitable for asm.
-
-Cheers,
-
-
-Jeremy
-
-v2:
- * rebased to remotes/rmk/master directly, without addruart changes
+Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
 
 ---
-Jeremy Kerr (6):
-      arm/clps711x: fix debug macro compilation failure
-      arm/h720x: fix debug macro compilation failure
-      arm/l7200: fix debug macro compilation failure
-      arm/plat-spear: fix debug macro compilation failure
-      arm/ns9xxx: fix debug macro compilation failure
-      arm/shark: fix debug macro compilation failure
+ arch/arm/plat-spear/include/plat/debug-macro.S |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/plat-spear/include/plat/debug-macro.S b/arch/arm/plat-spear/include/plat/debug-macro.S
+index 1670734..37fa593 100644
+--- a/arch/arm/plat-spear/include/plat/debug-macro.S
++++ b/arch/arm/plat-spear/include/plat/debug-macro.S
+@@ -17,8 +17,8 @@
+ 		.macro	addruart, rx
+ 		mrc	p15, 0, \rx, c1, c0
+ 		tst	\rx, #1					@ MMU enabled?
+-		moveq	\rx, =SPEAR_DBG_UART_BASE		@ Physical base
+-		movne	\rx, =VA_SPEAR_DBG_UART_BASE		@ Virtual base
++		moveq	\rx, #SPEAR_DBG_UART_BASE		@ Physical base
++		movne	\rx, #VA_SPEAR_DBG_UART_BASE		@ Virtual base
+ 		.endm
+ 
+ 		.macro	senduart, rd, rx
