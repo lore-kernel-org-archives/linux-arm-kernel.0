@@ -1,45 +1,45 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 15 Jul 2010 00:51:50 +0200
-Subject: [PATCH v2 2/2] ux500: add ab8500-regulators machine specific data
-In-Reply-To: <20100714184251.GG5933@sirena.org.uk>
-References: <20100713203852.GA1756@rakim.wolfsonmicro.main>
-	<20100714145053.GA1689@bnru01.bnr.st.com>
-	<20100714145748.GF31073@rakim.wolfsonmicro.main>
-	<20100714153643.GB1689@bnru01.bnr.st.com>
-	<20100714154726.GH31073@rakim.wolfsonmicro.main>
-	<20100714160941.GC1689@bnru01.bnr.st.com>
-	<20100714162048.GA27512@rakim.wolfsonmicro.main>
-	<20100714164708.GD1689@bnru01.bnr.st.com>
-	<20100714170323.GF5933@sirena.org.uk>
-	<20100714173650.GA21893@bnru01.bnr.st.com>
-	<20100714184251.GG5933@sirena.org.uk>
-Message-ID: <AANLkTimWjozzhTG491JVLUIICh6YonO4Emp07AG1nMj-@mail.gmail.com>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Thu, 15 Jul 2010 08:07:28 +0900
+Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
+	memory management
+In-Reply-To: <20100714201149.GA14008@codeaurora.org>
+References: <20100713121420.GB4263@codeaurora.org>
+	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
+	<20100714201149.GA14008@codeaurora.org>
+Message-ID: <20100715080710T.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/14 Mark Brown <broonie@opensource.wolfsonmicro.com>:
+On Wed, 14 Jul 2010 13:11:49 -0700
+Zach Pfeffer <zpfeffer@codeaurora.org> wrote:
 
->> > This is normal, but for fairly obvious reasons the very lowest power
->> > states are generally handled outside of the regulator API at a hardware
->> > level via hardware signals to the regulator. ?It's not normally part of
->> > the runtime constraints for use while the CPU is live.
->
->> Yes. But my point was that even at a lower level than kernel (BIOS/firmware?)
->> the switching would happen via SW. Please correct me if I am wrong!
->
-> Well, ultimately it's always triggered by software but the actual signal
-> to the regulator is often a logic level output by the SoC as the
-> processor enters a low power state rather than an I2C/SPI write.
+> On Wed, Jul 14, 2010 at 10:59:38AM +0900, FUJITA Tomonori wrote:
+> > On Tue, 13 Jul 2010 05:14:21 -0700
+> > Zach Pfeffer <zpfeffer@codeaurora.org> wrote:
+> > 
+> > > > You mean that you want to specify this alignment attribute every time
+> > > > you create an IOMMU mapping? Then you can set segment_boundary_mask
+> > > > every time you create an IOMMU mapping. It's odd but it should work.
+> > > 
+> > > Kinda. I want to forget about IOMMUs, devices and CPUs. I just want to
+> > > create a mapping that has the alignment I specify, regardless of the
+> > > mapper. The mapping is created on a VCM and the VCM is associated with
+> > > a mapper: a CPU, an IOMMU'd device or a direct mapped device.
+> > 
+> > Sounds like you can do the above with the combination of the current
+> > APIs, create a virtual address and then an I/O address.
+> > 
+> 
+> Yes, and that's what the implementation does - and all the other
+> implementations that need to do this same thing. Why not solve the
+> problem once?
 
-I can answer this: on the U300 we had such autonomous signals that
-would augment the power state of the regulators by special sleep
-signals.
+Why we we need a new abstraction layer to solve the problem that the
+current API can handle?
 
-For U8500 there is a dedicated autonomous system in the silicon, called
-PRCMU (Power Reset Clock Management Unit) that will actually do
-this using I2C because it has its own CPU and can transmit I2C
-messages even when the ARM CPU cores are turned off. So this is
-indeed a first-timer and not strange that it looks unfamiliar ...
+The above two operations don't sound too complicated. The combination
+of the current API sounds much simpler than your new abstraction.
 
-Yours,
-Linus Walleij
+Please show how the combination of the current APIs doesn't
+work. Otherwise, we can't see what's the benefit of your new
+abstraction.
