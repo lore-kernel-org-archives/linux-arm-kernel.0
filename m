@@ -1,61 +1,40 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 14 Jul 2010 17:22:59 +0300
-Subject: [PATCH v2] otg/ulpi.c : fix register write
-In-Reply-To: <1277311435-12027-1-git-send-email-eric@eukrea.com>
-References: <1277311435-12027-1-git-send-email-eric@eukrea.com>
-Message-ID: <4C3DC843.7060502@compulab.co.il>
+From: sundar.iyer@stericsson.com (Sundar R IYER)
+Date: Wed, 14 Jul 2010 20:20:54 +0530
+Subject: [PATCH v2 2/2] ux500: add ab8500-regulators machine specific data
+In-Reply-To: <20100713203852.GA1756@rakim.wolfsonmicro.main>
+References: <1279030173-3086-1-git-send-email-sundar.iyer@stericsson.com>
+	<1279030173-3086-2-git-send-email-sundar.iyer@stericsson.com>
+	<20100713141828.GB24260@rakim.wolfsonmicro.main>
+	<33A307AF30D7BF4F811B1568FE7A9B1810E7E88D@EXDCVYMBSTM006.EQ1STM.local>
+	<20100713145645.GA24626@rakim.wolfsonmicro.main>
+	<20100713150814.GA13767@bnru01.bnr.st.com>
+	<20100713150905.GD24626@rakim.wolfsonmicro.main>
+	<20100713161343.GA25342@bnru01.bnr.st.com>
+	<20100713203852.GA1756@rakim.wolfsonmicro.main>
+Message-ID: <20100714145053.GA1689@bnru01.bnr.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+Hello Mark,
 
-I have a patch set, I want to submit in the very near future and it
-relies on this one.
-Will this patch get to your tree?
+> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Thanks
 
-> ulpi_set_vbus and ulpi_set_flags are using ULPI_SET(register) to write
-> to the PHY's registers, which means we can only set bits in the PHY's
-> register and not clear them.
-> By directly using the address of the register without any offset, we
-> now get the expected behaviour for these functions.
->
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> Cc: Daniel Mack <daniel@caiaq.de>
-> Cc: linux-usb at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> ---
-> v2 :
-> drop reg/val swap which is handled in a better way by Igor's patch here :
-> http://comments.gmane.org/gmane.linux.usb.general/32092 
->  
->  drivers/usb/otg/ulpi.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/usb/otg/ulpi.c b/drivers/usb/otg/ulpi.c
-> index b1b3469..086853b 100644
-> --- a/drivers/usb/otg/ulpi.c
-> +++ b/drivers/usb/otg/ulpi.c
-> @@ -54,7 +54,7 @@ static int ulpi_set_flags(struct otg_transceiver *otg)
->  	if (otg->flags & USB_OTG_EXT_VBUS_INDICATOR)
->  		flags |= ULPI_OTG_CTRL_EXTVBUSIND;
->  
-> -	return otg_io_write(otg, flags, ULPI_SET(ULPI_OTG_CTRL));
-> +	return otg_io_write(otg, flags, ULPI_OTG_CTRL);
->  }
->  
->  static int ulpi_init(struct otg_transceiver *otg)
-> @@ -90,7 +90,7 @@ static int ulpi_set_vbus(struct otg_transceiver *otg, bool on)
->  			flags |= ULPI_OTG_CTRL_DRVVBUS_EXT;
->  	}
->  
-> -	return otg_io_write(otg, flags, ULPI_SET(ULPI_OTG_CTRL));
-> +	return otg_io_write(otg, flags, ULPI_OTG_CTRL);
->  }
->  
->  struct otg_transceiver *
->   
+> > +struct regulator_init_data ab8500_vaudio_init = {
+> > +	.supply_regulator_dev = NULL,
+> > +	.constraints = {
+> > +		.name = "ab8500-vaudio",
+> > +		.min_uV = 1925000,
+> > +		.max_uV = 2075000,
+> 
+> Are you *sure* that all these constraints are accurate for the board?
+As far as the min/max values of the voltage go, yes they are as per the
+data sheet.
 
--- 
-Regards,
-Igor.
+> It seems every single voltage is variable even though there are no
+> consumers set up, and they can all be disabled too.
+Yes. all these regulators can be disabled/enabled. does this answer your
+qeury? ( or i didnt understand it properly??)
+
+Thanks,
+Sundar
