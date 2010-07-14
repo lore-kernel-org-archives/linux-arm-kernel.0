@@ -1,75 +1,23 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Wed, 14 Jul 2010 16:42:58 +0800
-Subject: [PATCH v2] serial/imx: only parse for iomem resources once
-Message-ID: <1279096978.487304.715979328697.1.gpush@pororo>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Jul 2010 09:49:43 +0100
+Subject: About SECTION_SIZE_BITS for Sparsemem
+In-Reply-To: <AANLkTim55BDz4_vWhTnDVj1EP42MxAMZzP2PR80j5fLN@mail.gmail.com>
+References: <000601cb219c$c7830b60$56892220$%kim@samsung.com>
+	<AANLkTinTrt7VKuKvleiJj4lv2tWqCcDYHVXAQIHLA7bh@mail.gmail.com>
+	<001b01cb21aa$ef0e4d80$cd2ae880$%kim@samsung.com>
+	<AANLkTinkujX3VbL0sXjjghovr8eX9Os0huw3OTBut2UP@mail.gmail.com>
+	<20100713092658.GB29885@csn.ul.ie>
+	<20100713093815.GD20590@n2100.arm.linux.org.uk>
+	<20100713095035.GE29885@csn.ul.ie>
+	<20100713173744.GB30142@n2100.arm.linux.org.uk>
+	<20100713203250.GA21600@csn.ul.ie>
+	<AANLkTim55BDz4_vWhTnDVj1EP42MxAMZzP2PR80j5fLN@mail.gmail.com>
+Message-ID: <20100714084943.GA9115@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the iomem resources are parsed in serial_imx_probe, then
-again in imx_request_port and imx_release_port.
+On Wed, Jul 14, 2010 at 08:59:06AM +0900, Minchan Kim wrote:
+> But I think Kukjin case's best solution is to make section size 16M, not 256M.
+> Regardless of this, Your idea is the direction we should proceed, I think.
 
-This change uses the imx_port data to retrieve the start and size of the
-memory region, rather than re-parsing the resources through
-platform_get_resource.
-
-Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-
----
-v2: use resource_size()
-
----
- drivers/serial/imx.c |   18 ++++++------------
- 1 file changed, 6 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/serial/imx.c b/drivers/serial/imx.c
-index eacb588..f72d7c2 100644
---- a/drivers/serial/imx.c
-+++ b/drivers/serial/imx.c
-@@ -194,6 +194,7 @@ struct imx_port {
- 	unsigned int		irda_inv_tx:1;
- 	unsigned short		trcv_delay; /* transceiver delay */
- 	struct clk		*clk;
-+	unsigned long		mapsize;
- };
- 
- #ifdef CONFIG_IRDA
-@@ -954,11 +955,8 @@ static const char *imx_type(struct uart_port *port)
-  */
- static void imx_release_port(struct uart_port *port)
- {
--	struct platform_device *pdev = to_platform_device(port->dev);
--	struct resource *mmres;
--
--	mmres = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	release_mem_region(mmres->start, mmres->end - mmres->start + 1);
-+	struct imx_port *imx_port = container_of(port, struct imx_port, port);
-+	release_mem_region(imx_port->port.mapbase, imx_port->mapsize);
- }
- 
- /*
-@@ -966,15 +964,10 @@ static void imx_release_port(struct uart_port *port)
-  */
- static int imx_request_port(struct uart_port *port)
- {
--	struct platform_device *pdev = to_platform_device(port->dev);
--	struct resource *mmres;
-+	struct imx_port *imx_port = container_of(port, struct imx_port, port);
- 	void *ret;
- 
--	mmres = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!mmres)
--		return -ENODEV;
--
--	ret = request_mem_region(mmres->start, mmres->end - mmres->start + 1,
-+	ret = request_mem_region(imx_port->port.mapbase, imx_port->mapsize,
- 			"imx-uart");
- 
- 	return  ret ? 0 : -EBUSY;
-@@ -1254,6 +1247,7 @@ static int serial_imx_probe(struct platform_device *pdev)
- 	sport->port.dev = &pdev->dev;
- 	sport->port.mapbase = res->start;
- 	sport->port.membase = base;
-+	sport->mapsize = resource_size(res);
- 	sport->port.type = PORT_IMX,
- 	sport->port.iotype = UPIO_MEM;
- 	sport->port.irq = platform_get_irq(pdev, 0);
+So what if someone decides to fit 8MB DRAMs to the board?
