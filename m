@@ -1,78 +1,201 @@
-From: mel@csn.ul.ie (Mel Gorman)
-Date: Wed, 14 Jul 2010 14:14:15 +0100
-Subject: About SECTION_SIZE_BITS for Sparsemem
-In-Reply-To: <20100714085918.GB9115@n2100.arm.linux.org.uk>
-References: <000601cb219c$c7830b60$56892220$%kim@samsung.com>
-	<AANLkTinTrt7VKuKvleiJj4lv2tWqCcDYHVXAQIHLA7bh@mail.gmail.com>
-	<001b01cb21aa$ef0e4d80$cd2ae880$%kim@samsung.com>
-	<AANLkTinkujX3VbL0sXjjghovr8eX9Os0huw3OTBut2UP@mail.gmail.com>
-	<20100713092658.GB29885@csn.ul.ie>
-	<20100713093815.GD20590@n2100.arm.linux.org.uk>
-	<20100713095035.GE29885@csn.ul.ie>
-	<20100713173744.GB30142@n2100.arm.linux.org.uk>
-	<20100713203250.GA21600@csn.ul.ie>
-	<20100714085918.GB9115@n2100.arm.linux.org.uk>
-Message-ID: <20100714131415.GC13117@csn.ul.ie>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 14 Jul 2010 15:15:23 +0200
+Subject: [PATCH v2] ARM: s5pv210_defconfig: Update for removing
+	s5pc110_defconfig
+In-Reply-To: <1278987726-10803-1-git-send-email-kgene.kim@samsung.com>
+References: <1278987726-10803-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <00c801cb2356$a1b2f290$e518d7b0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 14, 2010 at 09:59:18AM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jul 13, 2010 at 09:32:50PM +0100, Mel Gorman wrote:
-> > On Tue, Jul 13, 2010 at 06:37:44PM +0100, Russell King - ARM Linux wrote:
-> > > You're saying that MAX_PHYSMEM_BITS=29 SECTION_SIZE_BITS=26 is wrong.
-> > > 
-> > 
-> > Not wrong. It's fine as long as you're ok with some unnecessary memmap
-> > being allocated. There is wastage of memory but functionally it'll be
-> > fine with existing sparsemem and the assumptions it makes.
-> > 
-> > Obviously you're not ok with this wastage or this discussion would not even
-> > be happening and with SECTION_SIZE_BITS=26, there is quite a bit of wastage.
-> 
-> Absolutely I'm not ok with this wastage - it's 127 + 127 + 64 pages, or
-> 1.2MB - that's 4% of system memory wasted in stuff which isn't going to
-> be used.
-> 
-> Moreover, the mem_map array for each populated bank is 512K - which is
-> the size of the RAM in the first two banks.  At that point, there's
-> absolutely no point in populating them.  The overhead of populating
-> those banks exactly equals the gain from populating them.
-> 
-> Sparsemem is absolutely absurd in this requirement - it can't handle
-> sparse memory efficiently without wasting lots of memory in the
-> process.
-> 
+Hello,
 
-I wasn't around when sparsemem was designed, but I strongly suspect it
-wasn't considered that a bank would only be 512K. The requirement of a
-section being fully populated to allow pfn_valid to be very cheap still
-seems very reasonable to me in the majority of cases. It's just no ok in
-ARMs case because of the size of banks.
+On Tuesday, July 13, 2010 4:22 AM Kukjin Kim wrote:
 
-> > I haven't researched this so apologies if it turns out to be stupid but
-> > I think the bit SECTION_MAP_LAST_BIT is actually unused and should be
-> > safe to use. Has the option being considered of using this bit to mean
-> > "section has holes punched in it". If set, the architecture must provide
-> > an additional arch_holey_section_pfn_valid() that does additional checking
-> > based on information sparsemem doesn't have?  This would avoid the worst of
-> > the performance issues of making pfn_valid() slower without increasing the
-> > size of mem_section.
+> Now that S5PC110 machines and S5PV210 machines can be built into
+> one kernel, update mach-s5pv210/Kconfig and s5pv210_defconfig.
 > 
-> As I've already said, how about just allowing pfn_valid() to be overridden
-> by architectures, even for the sparsemem case. 
+> Tested on SMDKC110(S5PC110) and SMDKV210(S5PV210).
+> Note that GONI machine ID is not included in the kernel.
 
-If nothing else pans out, I won't resist that approach. It's not my No.1
-perference because it results in SparseMem-on-ARM behaving one way and
-SparseMem-on-everything-else behaving another with respect to pfn_valid().
-I'd prefer that an architecture-specific pfn_valid() only be called for
-the sections that are known to have holes punched in them.
+Russell finally updated mach-types in his latest kernel tree: 
+http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-2.6-arm.git/
+(master branch).
 
-> We have a perfectly good
-> pfn_valid() implementation that'll work across the board, and will fix
-> this issue.
+I've tested this patch with Aquila and GONI boards and it's ok.
+ 
+> Created and tested against linux-2.6.35-rc5.
 > 
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 
--- 
-Mel Gorman
-Part-time Phd Student                          Linux Technology Center
-University of Limerick                         IBM Dublin Software Lab
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
+> ---
+> Changes since v1:
+> - This patch re-based against linux-2.6.35-rc5 which includes
+>   'ARM: reduce defconfigs' from Uwe Kleine-Konig.
+> 
+>  arch/arm/configs/s5pc110_defconfig |   66 --------------------------------
+> ----
+>  arch/arm/configs/s5pv210_defconfig |    4 ++
+>  arch/arm/mach-s5pv210/Kconfig      |   28 +++++++++------
+>  3 files changed, 21 insertions(+), 77 deletions(-)
+>  delete mode 100644 arch/arm/configs/s5pc110_defconfig
+> 
+> diff --git a/arch/arm/configs/s5pc110_defconfig
+> b/arch/arm/configs/s5pc110_defconfig
+> deleted file mode 100644
+> index 22c2d14..0000000
+> --- a/arch/arm/configs/s5pc110_defconfig
+> +++ /dev/null
+> @@ -1,66 +0,0 @@
+> -CONFIG_EXPERIMENTAL=y
+> -CONFIG_SYSFS_DEPRECATED_V2=y
+> -CONFIG_BLK_DEV_INITRD=y
+> -CONFIG_KALLSYMS_ALL=y
+> -CONFIG_MODULES=y
+> -CONFIG_MODULE_UNLOAD=y
+> -# CONFIG_BLK_DEV_BSG is not set
+> -CONFIG_ARCH_S5PV210=y
+> -CONFIG_S3C_LOWLEVEL_UART_PORT=1
+> -CONFIG_MACH_SMDKC110=y
+> -CONFIG_VMSPLIT_2G=y
+> -CONFIG_PREEMPT=y
+> -CONFIG_AEABI=y
+> -CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x20800000,8M
+> console=ttySAC1,115200 init=/linuxrc"
+> -CONFIG_VFP=y
+> -CONFIG_NEON=y
+> -CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+> -CONFIG_BLK_DEV_LOOP=y
+> -CONFIG_BLK_DEV_RAM=y
+> -CONFIG_BLK_DEV_RAM_SIZE=8192
+> -# CONFIG_MISC_DEVICES is not set
+> -CONFIG_SCSI=y
+> -CONFIG_BLK_DEV_SD=y
+> -CONFIG_CHR_DEV_SG=y
+> -CONFIG_INPUT_EVDEV=y
+> -# CONFIG_INPUT_KEYBOARD is not set
+> -# CONFIG_INPUT_MOUSE is not set
+> -CONFIG_INPUT_TOUCHSCREEN=y
+> -CONFIG_SERIAL_8250=y
+> -CONFIG_SERIAL_SAMSUNG=y
+> -CONFIG_SERIAL_SAMSUNG_CONSOLE=y
+> -CONFIG_HW_RANDOM=y
+> -# CONFIG_HWMON is not set
+> -# CONFIG_VGA_CONSOLE is not set
+> -# CONFIG_HID_SUPPORT is not set
+> -# CONFIG_USB_SUPPORT is not set
+> -CONFIG_EXT2_FS=y
+> -CONFIG_INOTIFY=y
+> -CONFIG_MSDOS_FS=y
+> -CONFIG_VFAT_FS=y
+> -CONFIG_TMPFS=y
+> -CONFIG_TMPFS_POSIX_ACL=y
+> -CONFIG_CRAMFS=y
+> -CONFIG_ROMFS_FS=y
+> -CONFIG_PARTITION_ADVANCED=y
+> -CONFIG_BSD_DISKLABEL=y
+> -CONFIG_SOLARIS_X86_PARTITION=y
+> -CONFIG_NLS_CODEPAGE_437=y
+> -CONFIG_NLS_ASCII=y
+> -CONFIG_NLS_ISO8859_1=y
+> -CONFIG_MAGIC_SYSRQ=y
+> -CONFIG_DEBUG_KERNEL=y
+> -# CONFIG_DEBUG_PREEMPT is not set
+> -CONFIG_DEBUG_RT_MUTEXES=y
+> -CONFIG_DEBUG_SPINLOCK=y
+> -CONFIG_DEBUG_MUTEXES=y
+> -CONFIG_DEBUG_SPINLOCK_SLEEP=y
+> -CONFIG_DEBUG_INFO=y
+> -# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+> -CONFIG_SYSCTL_SYSCALL_CHECK=y
+> -CONFIG_DEBUG_USER=y
+> -CONFIG_DEBUG_ERRORS=y
+> -CONFIG_DEBUG_LL=y
+> -CONFIG_EARLY_PRINTK=y
+> -CONFIG_DEBUG_S3C_UART=1
+> -CONFIG_CRC_CCITT=y
+> diff --git a/arch/arm/configs/s5pv210_defconfig
+> b/arch/arm/configs/s5pv210_defconfig
+> index 1753836..b2fbbff 100644
+> --- a/arch/arm/configs/s5pv210_defconfig
+> +++ b/arch/arm/configs/s5pv210_defconfig
+> @@ -7,6 +7,10 @@ CONFIG_MODULE_UNLOAD=y
+>  # CONFIG_BLK_DEV_BSG is not set
+>  CONFIG_ARCH_S5PV210=y
+>  CONFIG_S3C_LOWLEVEL_UART_PORT=1
+> +CONFIG_S3C_DEV_FB=y
+> +CONFIG_S5PV210_SETUP_FB_24BPP=y
+> +CONFIG_MACH_AQUILA=y
+> +CONFIG_MACH_SMDKC110=y
+>  CONFIG_MACH_SMDKV210=y
+>  CONFIG_VMSPLIT_2G=y
+>  CONFIG_PREEMPT=y
+> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+> index 7e2e1eb..e7b98bf 100644
+> --- a/arch/arm/mach-s5pv210/Kconfig
+> +++ b/arch/arm/mach-s5pv210/Kconfig
+> @@ -43,10 +43,10 @@ config S5PV210_SETUP_SDHCI_GPIO
+>  	help
+>  	  Common setup code for SDHCI gpio.
+> 
+> -# machine support
+> +menu "S5PC110 Machines"
+> 
+>  config MACH_AQUILA
+> -	bool "Samsung Aquila"
+> +	bool "Aquila"
+>  	select CPU_S5PV210
+>  	select ARCH_SPARSEMEM_ENABLE
+>  	select S5PV210_SETUP_FB_24BPP
+> @@ -64,11 +64,25 @@ config MACH_GONI
+>  	  Machine support for Samsung GONI board
+>  	  S5PC110(MCP) is one of package option of S5PV210
+> 
+> +config MACH_SMDKC110
+> +	bool "SMDKC110"
+> +	select CPU_S5PV210
+> +	select ARCH_SPARSEMEM_ENABLE
+> +	select S3C_DEV_WDT
+> +	select HAVE_S3C2410_WATCHDOG
+> +	help
+> +	  Machine support for Samsung SMDKC110
+> +	  S5PC110(MCP) is one of package option of S5PV210
+> +
+> +endmenu
+> +
+>  config S5PC110_DEV_ONENAND
+>  	bool
+>  	help
+>  	  Compile in platform device definition for OneNAND1 controller
+> 
+> +menu "S5PV210 Machines"
+> +
+>  config MACH_SMDKV210
+>  	bool "SMDKV210"
+>  	select CPU_S5PV210
+> @@ -80,14 +94,6 @@ config MACH_SMDKV210
+>  	help
+>  	  Machine support for Samsung SMDKV210
+> 
+> -config MACH_SMDKC110
+> -	bool "SMDKC110"
+> -	select CPU_S5PV210
+> -	select ARCH_SPARSEMEM_ENABLE
+> -	select S3C_DEV_WDT
+> -	select HAVE_S3C2410_WATCHDOG
+> -	help
+> -	  Machine support for Samsung SMDKC110
+> -	  S5PC110(MCP) is one of package option of S5PV210
+> +endmenu
+> 
+>  endif
+> --
+> 1.6.2.5
+
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
