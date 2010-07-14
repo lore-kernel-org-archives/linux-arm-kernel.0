@@ -1,47 +1,35 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 14 Jul 2010 17:11:40 +0900
-Subject: s5pv210: Why don't use the FIFO for Tx/Rx at MMC
-Message-ID: <AANLkTilTnE4wDBgS5kxh_kosJjcVHwPKp-oye8aKPjmn@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 14 Jul 2010 10:16:53 +0200
+Subject: [PATCH v3] Samsung Aquila & GONI update
+Message-ID: <1279095416-24871-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-In mmc card configuration it don't use the FIFO control for Tx/Rx. Can
-you explain it?
+This short patch series adds basic framebuffer defintion to Samsung GONI
+board as well as PMIC8998 support for both Samsung Aquila and GONI
+boards. MAX8998 PMIC driver has been accepted by regulator subsystem
+maintainers and is already available in the 'next' kernel tree (see
+commit 8d017ab9f81089cb5ffde0e354d13130c1c19999). 
 
-In the spec it can support 512 bytes FIFO for data Tx/Rx.
+Changes since v2:
+- cleaned some tabs&spaces errors, renamed max8998_platform_data to
+  {aquila,goni}_max8998_pdata
+- removed some superfluous includes
+(suggested by Kukjin Kim) 
 
-void s5pv210_setup_sdhci_cfg_card(struct platform_device *dev,
-                                    void __iomem *r,
-                                    struct mmc_ios *ios,
-                                    struct mmc_card *card)
-{
-        u32 ctrl2, ctrl3;
+Changes since v1:
+- removed all consumer entries, will be readded with aproperiate devices
+(suggested by Mark Brown)
 
-        /* don't need to alter anything acording to card-type */
+The series contains the following patches:
 
-        writel(S3C64XX_SDHCI_CONTROL4_DRIVE_9mA, r + S3C64XX_SDHCI_CONTROL4);
+[PATCH 1/3] ARM: S5PV210: GONI: add support for framebuffer
+[PATCH 2/3] ARM: S5PV210: Aquila: add support for MAX8998 PMIC
+[PATCH 3/3] ARM: S5PV210: GONI: add support for MAX8998 PMIC
 
-        ctrl2 = readl(r + S3C_SDHCI_CONTROL2);
-        ctrl2 &= S3C_SDHCI_CTRL2_SELBASECLK_MASK;
-        ctrl2 |= (S3C64XX_SDHCI_CTRL2_ENSTAASYNCCLR |
-                  S3C64XX_SDHCI_CTRL2_ENCMDCNFMSK |
-                  S3C_SDHCI_CTRL2_ENFBCLKRX |
-                  S3C_SDHCI_CTRL2_DFCNT_NONE |
-                  S3C_SDHCI_CTRL2_ENCLKOUTHOLD);
-
-        if (ios->clock < 25 * 1000000)
-                ctrl3 = (S3C_SDHCI_CTRL3_FCSEL3 |
-                         S3C_SDHCI_CTRL3_FCSEL2 |
-                         S3C_SDHCI_CTRL3_FCSEL1 |
-                         S3C_SDHCI_CTRL3_FCSEL0);
-        else
-                ctrl3 = (S3C_SDHCI_CTRL3_FCSEL1 | S3C_SDHCI_CTRL3_FCSEL0);
-
-        writel(ctrl2, r + S3C_SDHCI_CONTROL2);
-        writel(ctrl3, r + S3C_SDHCI_CONTROL3);
-}
-
-Thank you,
-Kyungmin Park
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
