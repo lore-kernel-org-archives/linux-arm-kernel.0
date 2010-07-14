@@ -1,64 +1,68 @@
-From: zpfeffer@codeaurora.org (Zach Pfeffer)
-Date: Wed, 14 Jul 2010 13:11:49 -0700
-Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
-	memory management
-In-Reply-To: <20100714104353B.fujita.tomonori@lab.ntt.co.jp>
-References: <4C3C0032.5020702@codeaurora.org>
-	<20100713150311B.fujita.tomonori@lab.ntt.co.jp>
-	<20100713121420.GB4263@codeaurora.org>
-	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <20100714201149.GA14008@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Jul 2010 21:49:52 +0100
+Subject: About SECTION_SIZE_BITS for Sparsemem
+In-Reply-To: <AANLkTilrLJb97NkK4Q-Oan_ufXRdafIw7n6060mItaXj@mail.gmail.com>
+References: <001b01cb21aa$ef0e4d80$cd2ae880$%kim@samsung.com>
+	<AANLkTinkujX3VbL0sXjjghovr8eX9Os0huw3OTBut2UP@mail.gmail.com>
+	<20100713092658.GB29885@csn.ul.ie>
+	<20100713093815.GD20590@n2100.arm.linux.org.uk>
+	<20100713095035.GE29885@csn.ul.ie>
+	<20100713173744.GB30142@n2100.arm.linux.org.uk>
+	<20100713203250.GA21600@csn.ul.ie>
+	<AANLkTim55BDz4_vWhTnDVj1EP42MxAMZzP2PR80j5fLN@mail.gmail.com>
+	<20100714084943.GA9115@n2100.arm.linux.org.uk>
+	<AANLkTilrLJb97NkK4Q-Oan_ufXRdafIw7n6060mItaXj@mail.gmail.com>
+Message-ID: <20100714204952.GD18138@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 14, 2010 at 10:59:38AM +0900, FUJITA Tomonori wrote:
-> On Tue, 13 Jul 2010 05:14:21 -0700
-> Zach Pfeffer <zpfeffer@codeaurora.org> wrote:
+On Wed, Jul 14, 2010 at 08:04:07PM +0900, Minchan Kim wrote:
+> On Wed, Jul 14, 2010 at 5:49 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Wed, Jul 14, 2010 at 08:59:06AM +0900, Minchan Kim wrote:
+> >> But I think Kukjin case's best solution is to make section size 16M, not 256M.
+> >> Regardless of this, Your idea is the direction we should proceed, I think.
+> >
+> > So what if someone decides to fit 8MB DRAMs to the board?
+> >
 > 
-> > > You mean that you want to specify this alignment attribute every time
-> > > you create an IOMMU mapping? Then you can set segment_boundary_mask
-> > > every time you create an IOMMU mapping. It's odd but it should work.
-> > 
-> > Kinda. I want to forget about IOMMUs, devices and CPUs. I just want to
-> > create a mapping that has the alignment I specify, regardless of the
-> > mapper. The mapping is created on a VCM and the VCM is associated with
-> > a mapper: a CPU, an IOMMU'd device or a direct mapped device.
+> Hmm. It might be a problem.
+> Should we consider all configuration?
 > 
-> Sounds like you can do the above with the combination of the current
-> APIs, create a virtual address and then an I/O address.
-> 
+> Then, in below cases ram size never can change?
+> How does it acked and merged?
+> I don't know below board can't configurable ram size. Just out of curiosity.
 
-Yes, and that's what the implementation does - and all the other
-implementations that need to do this same thing. Why not solve the
-problem once?
+All of these, SECTION_SIZE_BITS refers to the _spacing_ of memory, not
+the minimum size of DRAM which can ever be fitted.
 
-> The above can't be a reason to add a new infrastructure includes more
-> than 3,000 lines.
+Reducing SECTION_SIZE_BITS is really not an option for some of these
+platforms - just look at where memory starts in physical space:
 
-Right now its 3000 lines because I haven't converted to a function
-pointer based implementation. Once I do that the size of the
-implementation will shrink and the code will act as a lib. Users pass
-buffer mappers and the lib will ease the management of of those
-buffers.
+arch/arm/mach-clps711x/include/mach/memory.h:#define PHYS_OFFSET UL(0xc0000000)
+arch/arm/mach-clps711x/include/mach/memory.h:#define SECTION_SIZE_BITS  24
+arch/arm/mach-lh7a40x/include/mach/memory.h:#define PHYS_OFFSET UL(0xc0000000)
+arch/arm/mach-lh7a40x/include/mach/memory.h:#define SECTION_SIZE_BITS   24
+arch/arm/mach-realview/include/mach/memory.h:#define PHYS_OFFSET UL(0x70000000)
+arch/arm/mach-realview/include/mach/memory.h:#define SECTION_SIZE_BITS  28
+arch/arm/mach-realview/include/mach/memory.h:#define PHYS_OFFSET UL(0x00000000)
+arch/arm/mach-rpc/include/mach/memory.h:#define PHYS_OFFSET UL(0x10000000)
+arch/arm/mach-rpc/include/mach/memory.h:#define SECTION_SIZE_BITS       26
+arch/arm/mach-s5pv210/include/mach/memory.h:#define PHYS_OFFSET UL(0x20000000)
+arch/arm/mach-s5pv210/include/mach/memory.h:#define SECTION_SIZE_BITS   28
+arch/arm/mach-sa1100/include/mach/memory.h:#define PHYS_OFFSET UL(0xc0000000)
+arch/arm/mach-sa1100/include/mach/memory.h:#define SECTION_SIZE_BITS    27
 
->  
-> 
-> > > Another possible solution is extending struct dma_attrs. We could add
-> > > the alignment attribute to it.
-> > 
-> > That may be useful, but in the current DMA-API may be seen as
-> > redundant info.
-> 
-> If there is real requirement, we can extend the DMA-API.
+If physical memory starts at 3GB, with SECTION_SIZE_BITS set at 24,
+there's 256 sections already.  Reducing SECTION_SIZE_BITS to the multiple
+of RAM size will increase the number of sections to many thousands.
+Clearly, sparsemem doesn't handle sparse memory very well, and is
+defficient.
 
-If the DMA-API contained functions to allocate virtual space separate
-from physical space and reworked how chained buffers functioned it
-would probably work - but then things start to look like the VCM API
-which does graph based map management.
+I don't know what the answer is to this; I'm totally fed up with being
+pushed into using things, and then later down the line being told that
+its all wrong and shouldn't be used like we are.  Maybe we should just
+delete these sub-architectures which use sparsemem and say to people
+that the kernel just doesn't support their memory layouts.
 
-> 
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+<depressed>.
