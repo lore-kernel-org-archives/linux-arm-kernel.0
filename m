@@ -1,66 +1,63 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 13 Jul 2010 20:07:00 -0400 (EDT)
-Subject: [RFC PATCH] Kconfig: Enable Kconfig fragments to be used for
-	defconfig
-In-Reply-To: <1279064008.4609.48.camel@c-dwalke-linux.qualcomm.com>
-References: <20100713230352.6781.18644.stgit@angua>
-	<1279062881.4609.34.camel@c-dwalke-linux.qualcomm.com>
-	<AANLkTin69tN3NQHD2wvkA0G-lj3f9tSZEnhzdyJdTh9m@mail.gmail.com>
-	<1279064008.4609.48.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <alpine.LFD.2.00.1007131941140.10598@xanadu.home>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Wed, 14 Jul 2010 10:59:43 +0900
+Subject: [RFC 3/3] mm: iommu: The Virtual Contiguous Memory Manager
+In-Reply-To: <20100713090223.GB20590@n2100.arm.linux.org.uk>
+References: <20100713094244.7eb84f1b@lxorguk.ukuu.org.uk>
+	<20100713174519D.fujita.tomonori@lab.ntt.co.jp>
+	<20100713090223.GB20590@n2100.arm.linux.org.uk>
+Message-ID: <20100714105922D.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Jul 2010, Daniel Walker wrote:
-> On Tue, 2010-07-13 at 17:21 -0600, Grant Likely wrote:
-> > On Tue, Jul 13, 2010 at 5:14 PM, Daniel Walker <dwalker@codeaurora.org> wrote:
-> > > It just doesn't feel like Kconfig was meant to do this, it feel like
-> > > somewhat of an abuse ..
-> > 
-> > Why?  It uses the Kconfig language itself to specify additional
-> > constraints on the final configuration.  Seems to be the essence of
-> > elegance to me.  :-)
+On Tue, 13 Jul 2010 10:02:23 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> On Tue, Jul 13, 2010 at 05:45:39PM +0900, FUJITA Tomonori wrote:
+> > Drivers can tell the USB layer that these are vmapped buffers? Adding
+> > something to struct urb? I might be totally wrong since I don't know
+> > anything about the USB layer.
 > 
-> To my mind the only problem with the current defconfig formatting is the
-> size of the files. If those files are 5-10 lines instead of 2000 lines,
-> then I think the readability problem isn't really an issue any more..
+> With non-DMA coherent aliasing caches, you need to know where the page
+> is mapped into the virtual address space, so you can deal with aliases.
+> 
+> You'd need to tell the USB layer about the other mappings of the page
+> which you'd like to be coherent (such as the vmalloc area - and there's
+> also the possible userspace mapping to think about too, but that's
+> a separate issue.)
+> 
+> I wonder if we should have had:
+> 
+> 	vmalloc_prepare_dma(void *, size_t, enum dma_direction)
+> 	vmalloc_finish_dma(void *, size_t, enum dma_direction)
+> 
+> rather than flush_kernel_vmap_range and invalidate_kernel_vmap_range,
+> which'd make their use entirely obvious.
+> 
+> However, this brings up a question - how does the driver (eg, v4l, xfs)
+> which is preparing the buffer for another driver (eg, usb host, block
+> dev) know that DMA will be performed on the buffer rather than PIO?
+> 
+> That's a very relevant question, because for speculatively prefetching
+> CPUs, we need to invalidate caches after a DMA-from-device operation -
+> but if PIO-from-device happened, this would destroy data read from the
+> device.
+> 
+> That problem goes away if we decide that PIO drivers must have the same
+> apparant semantics as DMA drivers - in that data must end up beyond the
+> point of DMA coherency (eg, physical page) - but that's been proven to
+> be very hard to achieve, especially with block device drivers.
 
-That's one issue indeed.
+Yeah, the last thing we want to do is converting all the PIO drivers.
 
-But there is another issue that is somewhat related, which is to be able 
-to categorize config options.
-
-Currently the defconfig files carry information about the proper driver 
-to enable in order to support devices soldered on the board and 
-therefore which are not "optional".  That might be a particular RTC 
-chip, or a particular ethernet block integrated into a SOC, etc.  Of 
-course we want to preserve the ability to disable support for those 
-things, but by default people want to have all the right drivers 
-selected for all the built-in hardware when selecting a target 
-machine/board without having to dig into a datasheet for that target.
-
-The defconfig files also carry config options that are totally 
-arbitrary.  What type of filesystem, what kind of network protocol, what 
-USB device drivers (not host controller driver), what amount of 
-debugging options, all those are unrelated to the actual hardware and 
-may vary from one user to another.
-
-Furthermore, in order to reduce the number of defconfig files, we tried 
-to combine as many targets into a single kernel image.  That increases 
-build test coverage with fewer builds which is good, but then the info 
-about specific drivers required for a specific target but not for 
-another target in the same defconfig is now lost.  It is therefore quite 
-hard to produce a highly optimized configuration for a single target 
-without doing some digging again.
-
-So it is really in the Kconfig file that all those hardware specific 
-options can be expressed in a clear and readable way.  When BOARD_XYZ is 
-selected and STD_CONFIG is selected, then automatically select RTC_FOO, 
-select ETH_BAR, select LED_BAZ, etc. Of course we would want required 
-dependencies to be automatically selected as well.
-
-But all the rest is arbitrary and could be part of common shared 
-profiles or the like in defconfig format.
+Seems that we are far from the original discussion (the most of the
+above topics have been discussed in the past and we kinda agree that
+we have to do something some time, I guess).
 
 
-Nicolas
+Zach Pfeffer said this new VCM infrastructure can be useful for
+video4linux. However, I don't think we need 3,000-lines another
+abstraction layer to solve video4linux's issue nicely.
+
+I can't find any reasonable reasons that we need to merge VCM; seems
+that the combination of the current APIs (or with some small
+extensions) can work for the issues that VCM tries to solve.
