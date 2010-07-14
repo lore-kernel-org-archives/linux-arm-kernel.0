@@ -1,61 +1,135 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Wed, 14 Jul 2010 10:09:37 +0800
-Subject: [RFC,PATCH 2/3] arm: use addruart macro to establish debug mappings
-In-Reply-To: <1279073377.400469.233833413341.0.gpush@pororo>
-Message-ID: <1279073377.401935.180250562939.2.gpush@pororo>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 13 Jul 2010 20:26:16 -0600
+Subject: [PATCH] kbuild: Enable building defconfigs from Kconfig files
+In-Reply-To: <20100713114322.57c8b166.sfr@canb.auug.org.au>
+References: <20100713114322.57c8b166.sfr@canb.auug.org.au>
+Message-ID: <AANLkTimC_vXCAOrfTSndZyk8lgkjTlILVSYVYeIg6cUt@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we can call addruart with an argument to specify that we want a
-physical or virtual address, use addruart in the debug mapping code to
-find these addresses.
+[cc'ing rmk and linux-arm-kernel]
 
-Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+On Mon, Jul 12, 2010 at 7:43 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> After this change, doing a "make xxx_defconfig" will check first for
+> a file called arch/<arch>/configs/Kconfig.xxx and use that to generate
+> the .config (effectively starting from an allnoconfig). ?If that file
+> doesn't exist, it will use arch/<ARCH>/configs/xxx_defconfig as now.
 
----
- arch/arm/kernel/head.S |   15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+Oops, I hadn't seen this patch when I wrote mine this afternoon[1].
+:-)  A few minor differences, but essentially the same solution.
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index eb62bf9..001f286 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -22,6 +22,10 @@
- #include <asm/thread_info.h>
- #include <asm/system.h>
- 
-+#ifdef CONFIG_DEBUG_LL
-+#include <mach/debug-macro.S>
-+#endif
-+
- #if (PHYS_OFFSET & 0x001fffff)
- #error "PHYS_OFFSET must be at an even 2MiB boundary!"
- #endif
-@@ -289,19 +293,24 @@ __create_page_tables:
- 	str	r6, [r0]
- 
- #ifdef CONFIG_DEBUG_LL
--	ldr	r7, [r10, #PROCINFO_IO_MMUFLAGS] @ io_mmuflags
- 	/*
- 	 * Map in IO space for serial debugging.
- 	 * This allows debug messages to be output
- 	 * via a serial console before paging_init.
- 	 */
--	ldr	r3, [r8, #MACHINFO_PGOFFIO]
-+	addruart r7, r3
-+	lsr	r3, r3, #20
-+	lsl	r3, r3, #2
-+
- 	add	r0, r4, r3
- 	rsb	r3, r3, #0x4000			@ PTRS_PER_PGD*sizeof(long)
- 	cmp	r3, #0x0800			@ limit to 512MB
- 	movhi	r3, #0x0800
- 	add	r6, r0, r3
--	ldr	r3, [r8, #MACHINFO_PHYSIO]
-+	mov	r3, #0xff000000
-+	orr	r3, r3, #0x00c00000
-+	and	r3, r7, r3
-+	ldr	r7, [r10, #PROCINFO_IO_MMUFLAGS] @ io_mmuflags
- 	orr	r3, r3, r7
- 1:	str	r3, [r0], #4
- 	add	r3, r3, #1 << 20
+[1] http://patchwork.ozlabs.org/patch/58823/
+
+I chose to use -D /dev/null (defconfig from an empty file) instead of
+-n (allnoconfig) so that default values in Kconfig would get
+respected.  For the benefit of everyone else, here's an excerpt from
+our IRC conversation this afternoon:
+
+19:49 < gcl> sfr: [...] Your patch and my patch are
+             essentially doing exactly the same thing, except that I used '-d'
+             and you used '-n'.
+19:50 < gcl> s/-d/-D/
+19:55 < sfr> right
+19:55 < sfr> Linus wanted us to use -n
+19:55 < sfr> because that way you get what you asked for, not what the defaults
+             say ...
+19:58 < gcl> I suppose we don't currently have a way to say "select FOO=n", so
+             I suppose that makes sense
+19:58 < gcl> although I think using the defaults unless told not to is a better
+             approach in the long run
+19:59 < gcl> most of the time I *don't want* to ask for something in the
+             defconfig.  :-)
+20:00 < gcl> I just want TheBestOrCorrectAnswer to be chosen for me
+20:04 < sfr> gcl: go read Linus' vision :-)
+
+> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> ---
+> ?scripts/kconfig/Makefile | ? 14 +++++++++++++-
+> ?1 files changed, 13 insertions(+), 1 deletions(-)
+>
+> Hi Linus,
+>
+> Is this more the direction you want to take?
+>
+> There are still 2 main problems with is approach:
+>
+> ? ? ? ?- there are some config options that are globally and
+> unconditionally enabled that some platforms may not want. ?The only way
+> currently to turn them off is to reproduce the config entry with the
+> different default. ?I am not sure if we need a wa to turn them off or to
+> just change them to being neede to be selected by those that do want them.
+> ? ? ? ?- we have no way to select options that are neither bool or
+> tristate to suitable values. ?Again the only way to do that currently is
+> to reproduce the config entry with a different default value.
+
+For both of the above problems, what if we added syntax like the
+following to Kconfig?
+
+config FOO
+        bool
+        select BAR = n
+        select FOO_VALUE = 54
+
+> I am currently working towards using this to recreate the PowerPC
+> defconfigs, but it is a slow process as they have some much stuff enabled
+> in them and some of it is probably actually not relevant.
+
+If the trimmed configs are merged, then there is no rush on this.  We
+can keep them around and switch them over as people want to make
+changes.
+
+> This process is made easier by the recent commit "kbuild: Warn on
+> selecting symbols with unmet direct dependencies" that is in the kbuild
+> tree (and linux-next).
+
+Ah, I didn't know that change was being merged.  That indeed makes
+things easier, and eliminates the post-test that I do to make sure
+that the resulting config is actually valid.
+
+> diff --git a/scripts/kconfig/Makefile b/scripts/kconfig/Makefile
+> index 7ea649d..1ab8f45 100644
+> --- a/scripts/kconfig/Makefile
+> +++ b/scripts/kconfig/Makefile
+> @@ -117,9 +117,21 @@ else
+> ? ? ? ?$(Q)$< -D arch/$(SRCARCH)/configs/$(KBUILD_DEFCONFIG) $(Kconfig)
+> ?endif
+>
+> -%_defconfig: $(obj)/conf
+> +configs_dir := $(srctree)/arch/$(SRCARCH)/configs
+> +# We check a level of sub directories because arch/powerpc
+> +# has its defconfig files arranged that way
+> +old_defconfigs := $(patsubst $(configs_dir)/%,%,\
+> + ? ? ? $(wildcard $(configs_dir)/*_defconfig) \
+> + ? ? ? $(wildcard $(configs_dir)/*/*_defconfig))
+> +defconfigs := $(patsubst $(configs_dir)/Kconfig.%,%_defconfig,\
+> + ? ? ? $(wildcard $(configs_dir)/Kconfig.*))
+> +
+
+Ugh.  My first impression is that all this shouldn't be necessary, and
+it should be okay to just make the two following rules include a
+pattern dependency for the source file.  However, as I play with it, I
+cannot seem to get the rules right to handle the sub directories.  The
+$(defconfigs) patsubst at least could be done solely with dependencies
+on the target rule if the files were named *.Kconfig instead of
+Kconfig.* (because subdirectories are not handled in that case).  For
+example:
+
+%_defconfig: $(obj)/conf arch/$(SRCARCH)/configs/%.Kconfig
+        $(Q)$< -n arch/$(SRCARCH)/configs/$*.Kconfig
+
+> +$(old_defconfigs): %_defconfig: $(obj)/conf
+> ? ? ? ?$(Q)$< -D arch/$(SRCARCH)/configs/$@ $(Kconfig)
+>
+> +$(defconfigs): %_defconfig: $(obj)/conf
+> + ? ? ? $(Q)$< -n arch/$(SRCARCH)/configs/Kconfig.$*
+> +
+> ?# Help text used by make help
+> ?help:
+> ? ? ? ?@echo ?' ?config ? ? ? ? ?- Update current config utilising a line-oriented program'
+
+Cheers,
+g.
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
