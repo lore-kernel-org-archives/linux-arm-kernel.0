@@ -1,45 +1,97 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 14 Jul 2010 08:31:55 +0300
-Subject: [PATCH 0/6] debug macro fixups
-In-Reply-To: <1279074759.517724.734812272398.0.gpush@pororo>
-References: <1279074759.517724.734812272398.0.gpush@pororo>
-Message-ID: <20100714053154.GA15994@jasper.tkos.co.il>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 13 Jul 2010 23:47:46 -0600
+Subject: [PATCH] kbuild: Enable building defconfigs from Kconfig files
+In-Reply-To: <AANLkTik-QCXFnjma3J28B9h27uajOcDhthTGz99zKgVi@mail.gmail.com>
+References: <20100713114322.57c8b166.sfr@canb.auug.org.au>
+	<AANLkTimC_vXCAOrfTSndZyk8lgkjTlILVSYVYeIg6cUt@mail.gmail.com>
+	<AANLkTik-QCXFnjma3J28B9h27uajOcDhthTGz99zKgVi@mail.gmail.com>
+Message-ID: <AANLkTimYDDviG2no6RVPZZj8rD2d2URMAPUCWuftiFiB@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
+On Tue, Jul 13, 2010 at 10:04 PM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+> On Tue, Jul 13, 2010 at 7:26 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>>
+>> I chose to use -D /dev/null (defconfig from an empty file) instead of
+>> -n (allnoconfig) so that default values in Kconfig would get
+>> respected. ?For the benefit of everyone else, here's an excerpt from
+>> our IRC conversation this afternoon:
+>>
+>> 19:49 < gcl> sfr: [...] Your patch and my patch are
+>> ? ? ? ? ? ? essentially doing exactly the same thing, except that I used '-d'
+>> ? ? ? ? ? ? and you used '-n'.
+>> 19:50 < gcl> s/-d/-D/
+>> 19:55 < sfr> right
+>> 19:55 < sfr> Linus wanted us to use -n
+>
+> Just a note: Linus doesn't really care.
+>
+> IOW, I used -n not because of any fundamental belief that it is
+> correct, but just because ti happened to be how I happened to decide
+> to solve it. It's entirely possible that starting from the Kconfig
+> defaults (rather than "no") is the right way to go.
+>
+> I think either approach is likely fine. The -D /dev/null approach
+> would presumably give smaller Kconfig.xyz files, assuming our defaults
+> are sane (an maybe that could be at least a partial validation of the
+> defaults we do have). While the -n approach is in some ways more
+> stable, in that the resulting Kconfig.xyz entires would presumably be
+> more stand-alone, and there wouldn't be any subtle interactions when
+> somebody changes a default value int he Kconfig file.
 
-On Wed, Jul 14, 2010 at 10:32:39AM +0800, Jeremy Kerr wrote:
-> As part of the DEBUG_LL mapping changes, I ran all of the defconfigs
-> with DEBUG_LL=y. Some of the configs are broken, so I'm posting the
-> fixups.
-> 
-> mx1 is still broken, as IMX_IO_ADDRESS() (used by the mx1 debug macros)
-> uses C syntax, and so it not suitable for asm.
+Okay, well I advocate for the -D /dev/null approach then.  I think
+that validating our defaults, and looking for the subtle interactions
+are exactly what we want to be doing when it comes to defconfigs.  The
+fact that a defconfig does *not* want the default value is exactly
+what the defconfigs should be capturing.
 
-You can use the patches from 
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/75691 to make mx1 (and 
-mx25) pass your tests.
+> So I can see advantages to either model. And either model clearly
+> would want the improvements to "select" that are independent (ie warn
+> about unsatisfied 'depends on' constraints, and select recursively.
+> Maybe we already fixed the recursive select thing, I forget).
+>
+> I also think we need to allow setting of actual values. I don't know
+> what the syntax would be. A "set" statement that overrides a default
+> in the Kconfig file, so that you can do
+>
+> ? ? ? ? ?set NODES_SHIFT 10
+>
+> which would basically be equivalent to a "select" of a tristate
+> variable, but instead set the actual value? I dunno.
 
-baruch
+I'm partial to extending select statements myself because it fits
+nicely into the existing grammer; but I can see value in having a set
+statement too.  It would eliminate the temporary config options that
+both my and Stephen's patch would add.
 
-> These changes are on top of the DEBUG_LL mapping changes.
-> 
-> Cheers,
-> 
-> 
-> Jeremy
-> 
-> ---
-> Jeremy Kerr (6):
->       arm/clps711x: fix debug macro compilation failure
->       arm/h720x: fix debug macro compilation failure
->       arm/l7200: fix debug macro compilation failure
->       arm/plat-spear: fix debug macro compilation failure
->       arm/ns9xxx: fix debug macro compilation failure
->       arm/shark: fix debug macro compilation failure
+> And quite frankly, maybe somebody comes up with a better model
+> entirely. I like the Kconfig.xyz model, in that it should be
+> human-readable/writable and shouldn't introduce any fundamentally new
+> concepts (except the fairly simple extensions to the Kconfig
+> language), but maybe there are better models.
+
+Perhaps, but I can't think of anything and this one is simple,
+elegant, and easy to implement.
+
+> Regardless, I don't have anything against either set of patches
+> (Grant's or Stephen's).
+
+I think we should run with this.  Since the patch has been merged to
+warn on unmet Kconfig dependences, the only major hole left is being
+able to do negative selects and to select specific values.  Stephen,
+I'm happy to either keep working on this, or drop my patch in favor of
+yours.  Whichever you prefer.  I'll try to find some time to look at
+the Kconfig grammer.
+
+The solver would also be useful and could further reduce the size of
+the Kconfig fragments, but it isn't necessary so we don't need to wait
+for it to get implemented to take this approach..
+
+Cheers,
+g.
+
 
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
