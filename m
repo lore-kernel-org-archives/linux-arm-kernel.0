@@ -1,86 +1,57 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 14 Jul 2010 09:22:43 -0700
-Subject: [RFC PATCH] Kconfig: Enable Kconfig fragments to be used for
-	defconfig
-In-Reply-To: <alpine.LFD.2.00.1007131941140.10598@xanadu.home>
-References: <20100713230352.6781.18644.stgit@angua>
-	<1279062881.4609.34.camel@c-dwalke-linux.qualcomm.com>
-	<AANLkTin69tN3NQHD2wvkA0G-lj3f9tSZEnhzdyJdTh9m@mail.gmail.com>
-	<1279064008.4609.48.camel@c-dwalke-linux.qualcomm.com>
-	<alpine.LFD.2.00.1007131941140.10598@xanadu.home>
-Message-ID: <1279124563.21162.14.camel@c-dwalke-linux.qualcomm.com>
+From: sundar.iyer@stericsson.com (Sundar R IYER)
+Date: Wed, 14 Jul 2010 22:17:09 +0530
+Subject: [PATCH v2 2/2] ux500: add ab8500-regulators machine specific data
+In-Reply-To: <20100714162048.GA27512@rakim.wolfsonmicro.main>
+References: <20100713150814.GA13767@bnru01.bnr.st.com>
+	<20100713150905.GD24626@rakim.wolfsonmicro.main>
+	<20100713161343.GA25342@bnru01.bnr.st.com>
+	<20100713203852.GA1756@rakim.wolfsonmicro.main>
+	<20100714145053.GA1689@bnru01.bnr.st.com>
+	<20100714145748.GF31073@rakim.wolfsonmicro.main>
+	<20100714153643.GB1689@bnru01.bnr.st.com>
+	<20100714154726.GH31073@rakim.wolfsonmicro.main>
+	<20100714160941.GC1689@bnru01.bnr.st.com>
+	<20100714162048.GA27512@rakim.wolfsonmicro.main>
+Message-ID: <20100714164708.GD1689@bnru01.bnr.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-07-13 at 20:07 -0400, Nicolas Pitre wrote:
+> Are you positive that in your system it is sensible for consumers to
+> enable and disable all the supplies?  Usually there are restrictions on
+> what can sensibly be done on a given system.  For example, disabling the
+> CPU core or RAM supplies from software would normally not work terribly
+> well.
+As I said earlier, there are other supplies which I havent exposed here,
+simply because,
+ 1. they are controlled out of the kernel, which makes it meaningless
+    to include them for kernel modules
+ 2. Even if those were included, the risk of mis-controlling them due
+    to bad SW is very high as you say and hence safely out of SW control.
 
-> That's one issue indeed.
-> 
-> But there is another issue that is somewhat related, which is to be able 
-> to categorize config options.
-> 
-> Currently the defconfig files carry information about the proper driver 
-> to enable in order to support devices soldered on the board and 
-> therefore which are not "optional".  That might be a particular RTC 
-> chip, or a particular ethernet block integrated into a SOC, etc.  Of 
-> course we want to preserve the ability to disable support for those 
-> things, but by default people want to have all the right drivers 
-> selected for all the built-in hardware when selecting a target 
-> machine/board without having to dig into a datasheet for that target.
-> 
-> The defconfig files also carry config options that are totally 
-> arbitrary.  What type of filesystem, what kind of network protocol, what 
-> USB device drivers (not host controller driver), what amount of 
-> debugging options, all those are unrelated to the actual hardware and 
-> may vary from one user to another.
+I assure you that such supplies are *not* included in this list.
 
-Right.
+> CPU core or RAM supplies from software would normally not work terribly
+Also, usually the deepest(lowest) power state for the CPU core is
+~0V(atleast on our platform); which can be possible only by switching
+off the supplies to the core; thus effectively resulting in being
+controlled by SW. Further, I dont see the point of running full supplies
+to the RAM in a system idle state, when it is okay for the RAM to be
+powered @ a half rating OIW accountable to the idle state latencies.
 
-> Furthermore, in order to reduce the number of defconfig files, we tried 
-> to combine as many targets into a single kernel image.  That increases 
-> build test coverage with fewer builds which is good, but then the info 
-> about specific drivers required for a specific target but not for 
-> another target in the same defconfig is now lost.  It is therefore quite 
-> hard to produce a highly optimized configuration for a single target 
-> without doing some digging again.
-> 
-> So it is really in the Kconfig file that all those hardware specific 
-> options can be expressed in a clear and readable way.  When BOARD_XYZ is 
-> selected and STD_CONFIG is selected, then automatically select RTC_FOO, 
-> select ETH_BAR, select LED_BAZ, etc. Of course we would want required 
-> dependencies to be automatically selected as well.
+> Right, but think about the case I'm talking about: if you've only hooked
+> up some but not all of the consumers then the core has no idea about the
+> consumers you didn't hook up.  You can only do power control when *all*
+> the consumers needed are configured.
+I see your point. But from an other perspective - it is *not* neccessary
+to have power control only when *all* consumers are in. For eg: we have
+2 peripherals sharing one of the VAUX supplies. At this moment, both the
+peripherals drivers are integrated with the regulator APIs; which means
+the core handles most of the work regarding control. If, one of the
+peripherals isnt included in the final configuration, still, IMO, it
+*does* make sense that the other active peripheral optimally manage the
+supply control; which is gauranteed by the core. IOW & IMO, a consumer
+that hasnt hooked up to the regulator and thus is *aware* that it isnt
+sourced can be safely assumed to be non-existent. 
 
-I see..
-
-> But all the rest is arbitrary and could be part of common shared 
-> profiles or the like in defconfig format.
-
-I'm sure most people will want to have a config isolated to their
-specific device. That to me seems reasonable because everyone wants the
-smallest possible kernel they can get for their given device.
-
-Then there would be a smaller group who wants to create multi-device
-images. I don't see this being the average users tho, or kernel hackers.
-
-To me there is little difference between doing,
-
-CONFIG_ARCH_MSM=y
-
-or
-
-select ARCH_MSM
-
-they are basically doing the same thing. So doing anything in Kconfig is
-a lateral move .. Converting over to Kconfig in this case doesn't makes
-sense to me.
-
-Could we do something more like adding an "#include" option into the
-defconfigs .. Then you could create defconfigs that hold multiple
-devices without a massive rework to what we currently have. 
-
-Daniel
-
-
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Regards,
+Sundar 
