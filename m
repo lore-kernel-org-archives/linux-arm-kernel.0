@@ -1,23 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Jul 2010 09:49:43 +0100
-Subject: About SECTION_SIZE_BITS for Sparsemem
-In-Reply-To: <AANLkTim55BDz4_vWhTnDVj1EP42MxAMZzP2PR80j5fLN@mail.gmail.com>
-References: <000601cb219c$c7830b60$56892220$%kim@samsung.com>
-	<AANLkTinTrt7VKuKvleiJj4lv2tWqCcDYHVXAQIHLA7bh@mail.gmail.com>
-	<001b01cb21aa$ef0e4d80$cd2ae880$%kim@samsung.com>
-	<AANLkTinkujX3VbL0sXjjghovr8eX9Os0huw3OTBut2UP@mail.gmail.com>
-	<20100713092658.GB29885@csn.ul.ie>
-	<20100713093815.GD20590@n2100.arm.linux.org.uk>
-	<20100713095035.GE29885@csn.ul.ie>
-	<20100713173744.GB30142@n2100.arm.linux.org.uk>
-	<20100713203250.GA21600@csn.ul.ie>
-	<AANLkTim55BDz4_vWhTnDVj1EP42MxAMZzP2PR80j5fLN@mail.gmail.com>
-Message-ID: <20100714084943.GA9115@n2100.arm.linux.org.uk>
+From: gnusercn@gmail.com (os user)
+Date: Wed, 14 Jul 2010 16:59:23 +0800
+Subject: [Bug] make ARCH=arm menuconfig is abnormal due to commit ID:
+	63b1f51b2405573d47bf5b9ab6e7cd5c697d3dcc
+Message-ID: <AANLkTinreCm2ioVWpjknDMwGNhDRlqyENJuOkUZhsB_I@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 14, 2010 at 08:59:06AM +0900, Minchan Kim wrote:
-> But I think Kukjin case's best solution is to make section size 16M, not 256M.
-> Regardless of this, Your idea is the direction we should proceed, I think.
+Hi all,
 
-So what if someone decides to fit 8MB DRAMs to the board?
+I found since the commit ID: 63b1f51b2405573d47bf5b9ab6e7cd5c697d3dcc
+
+$ make ARCH=arm menuconfig
+
+is abnormal:
+
+Items in [System Type --> ARM system type (xxxx) -->] can not be
+displayed correctly. It seems the line,
+
+<snip>
+bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442,
+S3C2443, S3C2450"
+</snip>
+
+is too long.
+
+My host machine is,
+
+Ubuntu 8.10
+Intel(R) Pentium(R) 4 CPU 2.80GHz
+
+$ gcc --version
+gcc (Ubuntu 4.3.2-1ubuntu12) 4.3.2
+Copyright (C) 2008 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+BR
