@@ -1,63 +1,88 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Tue, 13 Jul 2010 21:04:06 -0700
-Subject: [PATCH] kbuild: Enable building defconfigs from Kconfig files
-In-Reply-To: <AANLkTimC_vXCAOrfTSndZyk8lgkjTlILVSYVYeIg6cUt@mail.gmail.com>
-References: <20100713114322.57c8b166.sfr@canb.auug.org.au>
-	<AANLkTimC_vXCAOrfTSndZyk8lgkjTlILVSYVYeIg6cUt@mail.gmail.com>
-Message-ID: <AANLkTik-QCXFnjma3J28B9h27uajOcDhthTGz99zKgVi@mail.gmail.com>
+From: eric.miao@canonical.com (Eric Miao)
+Date: Wed, 14 Jul 2010 12:11:35 +0800
+Subject: [PATCH 08/13] [ARM] Make VMALLOC_END into a global variable if
+	not defined
+In-Reply-To: <AANLkTin_6kl-VkN1h6PGHXPHOBir9dKsNUeHpiF30nBt@mail.gmail.com>
+References: <1279035208-7249-1-git-send-email-eric.miao@canonical.com>
+	<1279035208-7249-9-git-send-email-eric.miao@canonical.com>
+	<AANLkTin_6kl-VkN1h6PGHXPHOBir9dKsNUeHpiF30nBt@mail.gmail.com>
+Message-ID: <AANLkTik8M5RN-hK8P--rJZ-aPcVzIwSs2xVy4QZUz5M0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 13, 2010 at 7:26 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+On Wed, Jul 14, 2010 at 10:57 AM, Kyungmin Park <kmpark@infradead.org> wrote:
+> Good idea!
+> Each board can use each own vmalloc_end. no need to bound chip global
+> vmalloc_end.
 >
-> I chose to use -D /dev/null (defconfig from an empty file) instead of
-> -n (allnoconfig) so that default values in Kconfig would get
-> respected. ?For the benefit of everyone else, here's an excerpt from
-> our IRC conversation this afternoon:
+> On Wed, Jul 14, 2010 at 12:33 AM, Eric Miao <eric.miao@canonical.com> wrote:
+>> Signed-off-by: Eric Miao <eric.miao@canonical.com>
+>> ---
+>> ?arch/arm/include/asm/mach/arch.h | ? ?1 +
+>> ?arch/arm/include/asm/pgtable.h ? | ? ?5 +++++
+>> ?arch/arm/kernel/setup.c ? ? ? ? ?| ? ?6 ++++++
+>> ?3 files changed, 12 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+>> index 52bea4c..2191d40 100644
+>> --- a/arch/arm/include/asm/mach/arch.h
+>> +++ b/arch/arm/include/asm/mach/arch.h
+>> @@ -27,6 +27,7 @@ struct machine_class {
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? * page tabe entry ? ? ?*/
+>> ? ? ? ?const char ? ? ? ? ? ? ?*name; ? ? ? ? ?/* machine class name ? */
+>> ? ? ? ?unsigned long ? ? ? ? ? boot_params; ? ?/* tagged list ? ? ? ? ?*/
+>> + ? ? ? unsigned long ? ? ? ? ? vmalloc_end; ? ?/* VMALLOC_END ? ? ? ? ?*/
+>>
+>> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*map_io)(void);/* IO mapping function */
+>> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*init_irq)(void);
+>> diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+>> index ab68cf1..478249a 100644
+>> --- a/arch/arm/include/asm/pgtable.h
+>> +++ b/arch/arm/include/asm/pgtable.h
+>> @@ -40,6 +40,11 @@
+>> ?#define VMALLOC_START ? ? ? ? ?(((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
+>> ?#endif
+>>
+>> +#ifndef VMALLOC_END
+>> +extern unsigned long vmalloc_end;
+>> +#define VMALLOC_END (vmalloc_end)
+>> +#endif
+>> +
+>> ?/*
+>> ?* Hardware-wise, we have a two level page table structure, where the first
+>> ?* level has 4096 entries, and the second level has 256 entries. ?Each entry
+>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>> index 295de99..672a8ec 100644
+>> --- a/arch/arm/kernel/setup.c
+>> +++ b/arch/arm/kernel/setup.c
+>> @@ -95,6 +95,9 @@ EXPORT_SYMBOL(isa_dma_threshold);
+>> ?unsigned long max_dma_address = 0xffffffffUL;
+>> ?EXPORT_SYMBOL(max_dma_address);
+>>
+>> +unsigned long vmalloc_end = 0xffffffffUL;
+>> +EXPORT_SYMBOL(vmalloc_end);
 >
-> 19:49 < gcl> sfr: [...] Your patch and my patch are
-> ? ? ? ? ? ? essentially doing exactly the same thing, except that I used '-d'
-> ? ? ? ? ? ? and you used '-n'.
-> 19:50 < gcl> s/-d/-D/
-> 19:55 < sfr> right
-> 19:55 < sfr> Linus wanted us to use -n
+> At current code, 0xfe800000UL is the largest number. If we set end
+> vmalloc_end to 0xffffffffUL and use it. maybe system can't boot.
+> arch/arm/mach-loki/include/mach/vmalloc.h:#define VMALLOC_END ? 0xfe800000UL
+>
 
-Just a note: Linus doesn't really care.
+So the platform has to setup vmalloc correct :-)
 
-IOW, I used -n not because of any fundamental belief that it is
-correct, but just because ti happened to be how I happened to decide
-to solve it. It's entirely possible that starting from the Kconfig
-defaults (rather than "no") is the right way to go.
+>> +
+>> ?#ifdef MULTI_CPU
+>> ?struct processor processor;
+>> ?#endif
+>> @@ -684,6 +687,9 @@ void __init setup_arch(char **cmdline_p)
+>> ? ? ? ?class = mdesc->class;
+>> ? ? ? ?machine_name = mdesc->name;
+>>
+>> + ? ? ? if (class)
+>> + ? ? ? ? ? ? ? vmalloc_end = class->vmalloc_end;
+>
+> Don't check 'if (class->vmalloc_end)'?
+>
 
-I think either approach is likely fine. The -D /dev/null approach
-would presumably give smaller Kconfig.xyz files, assuming our defaults
-are sane (an maybe that could be at least a partial validation of the
-defaults we do have). While the -n approach is in some ways more
-stable, in that the resulting Kconfig.xyz entires would presumably be
-more stand-alone, and there wouldn't be any subtle interactions when
-somebody changes a default value int he Kconfig file.
-
-So I can see advantages to either model. And either model clearly
-would want the improvements to "select" that are independent (ie warn
-about unsatisfied 'depends on' constraints, and select recursively.
-Maybe we already fixed the recursive select thing, I forget).
-
-I also think we need to allow setting of actual values. I don't know
-what the syntax would be. A "set" statement that overrides a default
-in the Kconfig file, so that you can do
-
-          set NODES_SHIFT 10
-
-which would basically be equivalent to a "select" of a tristate
-variable, but instead set the actual value? I dunno.
-
-And quite frankly, maybe somebody comes up with a better model
-entirely. I like the Kconfig.xyz model, in that it should be
-human-readable/writable and shouldn't introduce any fundamentally new
-concepts (except the fairly simple extensions to the Kconfig
-language), but maybe there are better models.
-
-Regardless, I don't have anything against either set of patches
-(Grant's or Stephen's).
-
-                       Linus
+Better to check that, but not sure if that's necessary. I'd expect
+every machine_class to get this correct, instead of leaving it
+uninitialized (i.e. == 0).
