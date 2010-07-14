@@ -1,25 +1,22 @@
-From: tony.luck@gmail.com (Tony Luck)
-Date: Wed, 14 Jul 2010 10:37:07 -0700
-Subject: ARM defconfig files
-In-Reply-To: <20100714132046.GA18343@pengutronix.de>
-References: <alpine.LFD.2.00.1006030725420.8175@i5.linux-foundation.org>
-	<201007121605.32462.davidb@codeaurora.org>
-	<AANLkTimho3rcoCZZ2PlC3B3KIZZhsEiTnTk-__n1q_Dy@mail.gmail.com>
-	<201007121634.04427.davidb@codeaurora.org>
-	<20100714132046.GA18343@pengutronix.de>
-Message-ID: <AANLkTinMZw7ZuUpNPePwIRgkYCwFuxbk-xiuDm7HHBwF@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Jul 2010 19:55:00 +0200
+Subject: [PATCH] arm: fix mach-versatile booting in qemu
+In-Reply-To: <20100714172319.GA8933@debian>
+References: <201007141716.09384.arnd@arndb.de> <20100714172319.GA8933@debian>
+Message-ID: <201007141955.00607.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/14 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Note that no kernel is built at all, only the config is regenerated once
-> for each line.
+On Wednesday 14 July 2010 19:23:19 Rabin Vincent wrote:
+> On Wed, Jul 14, 2010 at 05:16:09PM +0200, Arnd Bergmann wrote:
+> > I also don't know if the same problem exists on actual versatile
+> > hardware or if it's really a qemu bug.
+> 
+> It's a QEMU bug.  It was fixed with this patch to QEMU:
+> 
+> http://www.mail-archive.com/qemu-devel at nongnu.org/msg30785.html
 
-You could special case blank lines and comments (other than ones
-like "# CONFIG_FOO is not set" which do matter).  They account for
-~15% of the lines in my .config files.  But it probably doesn't matter
-all that much. I just ran reduce_defconfig in parallel on all the ia64
-defconfig files (in separate build trees) and they were all done when
-I looked back an hour or so later.  Nice tool!
+Ok, thanks for the info. I was sure I was using the latest qemu
+checkout, but apparently I made a mistake there.
 
--Tony
+	Arnd
