@@ -1,132 +1,61 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Wed, 14 Jul 2010 12:13:31 +0200
-Subject: [PATCH 1/3] ab8500-mfd: add regulator support to ab8500 mfd device
-In-Reply-To: <1279002090-11234-2-git-send-email-sundar.iyer@stericsson.com>
-References: <1279002090-11234-1-git-send-email-sundar.iyer@stericsson.com>
-	<1279002090-11234-2-git-send-email-sundar.iyer@stericsson.com>
-Message-ID: <20100714101330.GD2771@sortiz-mobl>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 14 Jul 2010 19:20:29 +0900
+Subject: [Bug] make ARCH=arm menuconfig is abnormal due to commit ID:
+	63b1f51b2405573d47bf5b9ab6e7cd5c697d3dcc
+In-Reply-To: <AANLkTinreCm2ioVWpjknDMwGNhDRlqyENJuOkUZhsB_I@mail.gmail.com>
+References: <AANLkTinreCm2ioVWpjknDMwGNhDRlqyENJuOkUZhsB_I@mail.gmail.com>
+Message-ID: <001301cb233e$32566b60$97034220$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 13, 2010 at 11:51:28AM +0530, Sundar Iyer wrote:
-> From: Sundar R Iyer <sundar.iyer@stericsson.com>
+os user wrote:
 > 
-> Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-> Acked-By: Mattias Wallin <mattias.wallin@stericsson.com>
-> Acked-By: Bengt JONSSON <bengt.g.jonsson@stericsson.com>
-> Signed-off-by: Sundar R Iyer <sundar.iyer@stericsson.com>
-Liam, I guess this should make it upstream through your regulator tree.
+> Hi all,
 
-For the mfd part though:
-Acked-by: Samuel Ortiz <sameo@linux.intel.com>
-
-Cheers,
-Samuel.
-
-
-> ---
->  drivers/mfd/ab8500-core.c        |    4 +++-
->  include/linux/mfd/ab8500.h       |    6 ++++++
->  include/linux/regulator/ab8500.h |   25 +++++++++++++++++++++++++
->  3 files changed, 34 insertions(+), 1 deletions(-)
->  create mode 100644 include/linux/regulator/ab8500.h
+Hi,
 > 
-> diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-> index f3d26fa..defa786 100644
-> --- a/drivers/mfd/ab8500-core.c
-> +++ b/drivers/mfd/ab8500-core.c
-> @@ -16,6 +16,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/mfd/core.h>
->  #include <linux/mfd/ab8500.h>
-> +#include <linux/regulator/ab8500.h>
->  
->  /*
->   * Interrupt register offsets
-> @@ -352,6 +353,7 @@ static struct mfd_cell ab8500_devs[] = {
->  	{ .name = "ab8500-audio", },
->  	{ .name = "ab8500-usb", },
->  	{ .name = "ab8500-pwm", },
-> +	{ .name = "ab8500-regulator", },
->  };
->  
->  int __devinit ab8500_init(struct ab8500 *ab8500)
-> @@ -411,7 +413,7 @@ int __devinit ab8500_init(struct ab8500 *ab8500)
->  			goto out_removeirq;
->  	}
->  
-> -	ret = mfd_add_devices(ab8500->dev, -1, ab8500_devs,
-> +	ret = mfd_add_devices(ab8500->dev, 0, ab8500_devs,
->  			      ARRAY_SIZE(ab8500_devs), NULL,
->  			      ab8500->irq_base);
->  	if (ret)
-> diff --git a/include/linux/mfd/ab8500.h b/include/linux/mfd/ab8500.h
-> index b63ff3b..f5cec45 100644
-> --- a/include/linux/mfd/ab8500.h
-> +++ b/include/linux/mfd/ab8500.h
-> @@ -76,6 +76,8 @@
->  #define AB8500_NR_IRQS			104
->  #define AB8500_NUM_IRQ_REGS		13
->  
-> +#define AB8500_NUM_REGULATORS   15
-> +
->  /**
->   * struct ab8500 - ab8500 internal structure
->   * @dev: parent device
-> @@ -108,14 +110,18 @@ struct ab8500 {
->  	u8 oldmask[AB8500_NUM_IRQ_REGS];
->  };
->  
-> +struct regulator_init_data;
-> +
->  /**
->   * struct ab8500_platform_data - AB8500 platform data
->   * @irq_base: start of AB8500 IRQs, AB8500_NR_IRQS will be used
->   * @init: board-specific initialization after detection of ab8500
-> + * @regulator: machine-specific constraints for regulators
->   */
->  struct ab8500_platform_data {
->  	int irq_base;
->  	void (*init) (struct ab8500 *);
-> +	struct regulator_init_data *regulator[AB8500_NUM_REGULATORS];
->  };
->  
->  extern int ab8500_write(struct ab8500 *a8500, u16 addr, u8 data);
-> diff --git a/include/linux/regulator/ab8500.h b/include/linux/regulator/ab8500.h
-> new file mode 100644
-> index 0000000..f509877
-> --- /dev/null
-> +++ b/include/linux/regulator/ab8500.h
-> @@ -0,0 +1,25 @@
-> +/*
-> + * Copyright (C) ST-Ericsson SA 2010
-> + *
-> + * License Terms: GNU General Public License v2
-> + *
-> + * Author: Sundar Iyer <sundar.iyer@stericsson.com> for ST-Ericsson
-> + *
-> + */
-> +
-> +#ifndef __LINUX_MFD_AB8500_REGULATOR_H
-> +#define __LINUX_MFD_AB8500_REGULATOR_H
-> +
-> +/* AB8500 regulators */
-> +#define AB8500_LDO_AUX1         0
-> +#define AB8500_LDO_AUX2         1
-> +#define AB8500_LDO_AUX3         2
-> +#define AB8500_LDO_INTCORE      3
-> +#define AB8500_LDO_TVOUT        4
-> +#define AB8500_LDO_AUDIO	5
-> +#define AB8500_LDO_ANAMIC1      6
-> +#define AB8500_LDO_ANAMIC2      7
-> +#define AB8500_LDO_DMIC         8
-> +#define AB8500_LDO_ANA          9
-> +
-> +#endif
-> -- 
-> 1.7.0
+> I found since the commit ID: 63b1f51b2405573d47bf5b9ab6e7cd5c697d3dcc
+> 
+> $ make ARCH=arm menuconfig
+> 
+> is abnormal:
+> 
+> Items in [System Type --> ARM system type (xxxx) -->] can not be
+> displayed correctly. It seems the line,
+> 
+> <snip>
+> bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442,
+> S3C2443, S3C2450"
+> </snip>
+> 
+> is too long.
+> 
+Already reported about this issue.
+
+Following is Ben's reply at that time:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/017030.html
+
+But I'm not sure how it was going on...
+
+> My host machine is,
+> 
+> Ubuntu 8.10
+> Intel(R) Pentium(R) 4 CPU 2.80GHz
+> 
+> $ gcc --version
+> gcc (Ubuntu 4.3.2-1ubuntu12) 4.3.2
+> Copyright (C) 2008 Free Software Foundation, Inc.
+> This is free software; see the source for copying conditions.  There is NO
+> warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR
+> PURPOSE.
+> 
+> BR
 > 
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
