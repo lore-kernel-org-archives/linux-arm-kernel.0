@@ -1,38 +1,45 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Thu, 15 Jul 2010 18:06:04 +0900
-Subject: [PATCH 1/5] ARM: Samsung SoC: added hclk/pclk info to s3c_freq for
-	s5pv210 cpu-freq
-In-Reply-To: <1279184768-28971-1-git-send-email-myungjoo.ham@samsung.com>
+Date: Thu, 15 Jul 2010 18:06:05 +0900
+Subject: [PATCH 2/5] ARM: S5P: Added default pll values for APLL 800/1000MHz
+In-Reply-To: <1279184768-28971-2-git-send-email-myungjoo.ham@samsung.com>
 References: <1279184768-28971-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <1279184768-28971-2-git-send-email-myungjoo.ham@samsung.com>
+	<1279184768-28971-2-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <1279184768-28971-3-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-S5PV210 requires msys/dsys info as well; thus, we've included those at
-struct s3c_freq, which is used by CPUFREQ of S5PV210.
+CPUFREQ of S5PV210 uses different APLL settings and we provide
+such values for CPUFREQ at pll.h. We have been using differently
+between EVT0 and EVT1 machines. Although this version of kernel
+assumes that the CPU is EVT1, users may use code for EVT0 later.
+
+Note that at 1GHz of ARMCLK, APLL should be 1GHz and for other lower
+ARMCLK, APLL should be 800MHz.
 
 Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-samsung/include/plat/cpu-freq.h |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/plat-s5p/include/plat/pll.h |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/cpu-freq.h b/arch/arm/plat-samsung/include/plat/cpu-freq.h
-index 80c4a80..9e97df7 100644
---- a/arch/arm/plat-samsung/include/plat/cpu-freq.h
-+++ b/arch/arm/plat-samsung/include/plat/cpu-freq.h
-@@ -38,6 +38,12 @@ struct s3c_freq {
- 	unsigned long	hclk_tns;	/* in 10ths of ns */
- 	unsigned long	hclk;
- 	unsigned long	pclk;
-+#ifdef CONFIG_ARCH_S5PV210
-+	unsigned long	hclk_msys;
-+	unsigned long	pclk_msys;
-+	unsigned long	hclk_dsys;
-+	unsigned long	pclk_dsys;
-+#endif
- };
+diff --git a/arch/arm/plat-s5p/include/plat/pll.h b/arch/arm/plat-s5p/include/plat/pll.h
+index 7db3227..3112aba 100644
+--- a/arch/arm/plat-s5p/include/plat/pll.h
++++ b/arch/arm/plat-s5p/include/plat/pll.h
+@@ -21,6 +21,14 @@
  
- /**
+ #include <asm/div64.h>
+ 
++#ifdef CONFIG_CPU_S5PC110_EVT0_ERRATA
++#define PLL45XX_APLL_VAL_1000	(1 << 31) | (0xfa<<16) | (0x6<<8) | (0x1)
++#define PLL45XX_APLL_VAL_800	(1 << 31) | (0xc8<<16) | (0x6<<8) | (0x1)
++#else
++#define PLL45XX_APLL_VAL_1000	(1 << 31) | (125<<16) | (3<<8) | (1)
++#define PLL45XX_APLL_VAL_800	(1 << 31) | (100<<16) | (3<<8) | (1)
++#endif
++
+ enum pll45xx_type_t {
+ 	pll_4500,
+ 	pll_4502,
 -- 
 1.6.3.3
