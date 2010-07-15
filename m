@@ -1,59 +1,34 @@
-From: zpfeffer@codeaurora.org (Zach Pfeffer)
-Date: Wed, 14 Jul 2010 22:35:46 -0700
-Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
-	memory management
-In-Reply-To: <20100715012958.GB2239@codeaurora.org>
-References: <4C3C0032.5020702@codeaurora.org>
-	<20100713150311B.fujita.tomonori@lab.ntt.co.jp>
-	<20100713121420.GB4263@codeaurora.org>
-	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
-	<20100714201149.GA14008@codeaurora.org>
-	<20100714220536.GE18138@n2100.arm.linux.org.uk>
-	<20100715012958.GB2239@codeaurora.org>
-Message-ID: <20100715053546.GA3623@codeaurora.org>
+From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
+Date: Thu, 15 Jul 2010 08:39:31 +0300 (EEST)
+Subject: [RFC][PATCH 1/1] ARM: Add initial hibernation support
+In-Reply-To: <201007150648.50521.marek.vasut@gmail.com>
+References: <1277908081-17195-1-git-send-email-Hiroshi.DOYU@nokia.com>
+	<1277908081-17195-2-git-send-email-Hiroshi.DOYU@nokia.com>
+	<201007150648.50521.marek.vasut@gmail.com>
+Message-ID: <20100715.083931.226798141.Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 14, 2010 at 06:29:58PM -0700, Zach Pfeffer wrote:
-> On Wed, Jul 14, 2010 at 11:05:36PM +0100, Russell King - ARM Linux wrote:
-> > On Wed, Jul 14, 2010 at 01:11:49PM -0700, Zach Pfeffer wrote:
-> > > If the DMA-API contained functions to allocate virtual space separate
-> > > from physical space and reworked how chained buffers functioned it
-> > > would probably work - but then things start to look like the VCM API
-> > > which does graph based map management.
-> > 
-> > Every additional virtual mapping of a physical buffer results in
-> > additional cache aliases on aliasing caches, and more workload for
-> > developers to sort out the cache aliasing issues.
-> > 
-> > What does VCM to do mitigate that?
+From: ext Marek Vasut <marek.vasut@gmail.com>
+Subject: Re: [RFC][PATCH 1/1] ARM: Add initial hibernation support
+Date: Thu, 15 Jul 2010 06:48:50 +0200
+
+> Dne St 30. ?ervna 2010 16:28:01 Hiroshi DOYU napsal(a):
+>> From: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+>> 
+>> Hibernation (a.k.a: Suspend-To-Disk) support for ARM
+>> 
+>> Based on the original work from Romit and Raghu at TI. The original
+>> patch(*1) was sent to LOML by Teerth Reddy <teerth@ti.com>
+>> 
+>> *1: https://patchwork.kernel.org/patch/96442/
+>> 
+>> Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 > 
-> The VCM ensures that all mappings that map a given physical buffer:
-> IOMMU mappings, CPU mappings and one-to-one device mappings all map
-> that buffer using the same (or compatible) attributes. At this point
-> the only attribute that users can pass is CACHED. In the absence of
-> CACHED all accesses go straight through to the physical memory.
 > 
-> The architecture of the VCM allows these sorts of consistency checks
-> to be made since all mappers of a given physical resource are
-> tracked. This is feasible because the physical resources we're
-> tracking are typically large.
+> Hey, can this also run on pre-v7 arms ? Or is there something I missed that'd 
+> make that impossible?
 
-A few more things...
+What I verified is with OMAP3(Cortex A8) based board.
 
-In addition to CACHED, the VCMM can support different cache policies
-as long as the architecture can support it - they get passed down
-through the device map call.
-
-In addition, handling physical mappings in the VCMM enables it to
-perform refcounting on the physical chunks (ie, to see how many
-virtual spaces it's been mapped to, including the kernel's). This
-allows it to turn on any coherency protocols that are available in
-hardware (ie, setting the shareable bit on something that is mapped to
-more than one virtual space). That same attribute can be left off on a
-buffer that has only one virtual mapping (ie, scratch buffers used by
-one device only). It is then up to the underlying system to deal with
-that shared attribute - to enable redirection if it's supported, or to
-force something to be non-cacheable, etc. Doing it all through the
-VCMM allows all these mechanisms be worked out once per architecture
-and then reused.
+cp15 part has to be modified, but it might work without this part itself, I guess.
