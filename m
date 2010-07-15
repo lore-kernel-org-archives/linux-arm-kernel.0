@@ -1,56 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Jul 2010 12:39:39 +0100
-Subject: [PATCH] NUC900: patch for implement clk_get_rate
-In-Reply-To: <4C175ED4.8080303@gmail.com>
-References: <4C175ED4.8080303@gmail.com>
-Message-ID: <20100715113939.GE29322@n2100.arm.linux.org.uk>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Thu, 15 Jul 2010 13:49:28 +0200
+Subject: [PATCH 1/3] ARM: driver for the character LCD found in ARM
+	refdesigns
+In-Reply-To: <20100715102237.GI26212@n2100.arm.linux.org.uk>
+References: <1278429668-4564-1-git-send-email-triad@df.lth.se>
+	<20100715102237.GI26212@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinxE6hbgVWqvxen6yDNM1VLgK2DFnMyN_o_zbsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 15, 2010 at 07:07:00PM +0800, Wan ZongShun wrote:
-> According to Baruch's advice, I re-orgnize previous patch named
-> 'Add platform support for nuc900 i2c driver'.
-> 
-> This patch is for implementing clk_get_rate, there are four clk
-> rates were needed to get, cpufreq,ahb,apb and external crystal.
-> clk_get_rate return value is for external crystal.
-> 
-> ---
->  arch/arm/mach-w90x900/clock.c |    9 +++++++
->  arch/arm/mach-w90x900/clock.h |    5 ++++
->  arch/arm/mach-w90x900/cpu.c   |   50 +++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 64 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-w90x900/clock.c b/arch/arm/mach-w90x900/clock.c
-> index 2c371ff..6325642 100644
-> --- a/arch/arm/mach-w90x900/clock.c
-> +++ b/arch/arm/mach-w90x900/clock.c
-> @@ -57,6 +57,15 @@ EXPORT_SYMBOL(clk_disable);
-> 
->  unsigned long clk_get_rate(struct clk *clk)
->  {
-> +	unsigned long flags, ret;
-> +
-> +	if (clk == NULL || IS_ERR(clk))
-> +		return -EPERM;
+2010/7/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Tue, Jul 06, 2010 at 05:21:08PM +0200, Linus Walleij wrote:
 
-Is there a reason to check for these cases?
+>> This adds a driver for the character LCD found on the ARM Versatile
+>> and RealView Platform Baseboards. It doesn't do very much more than
+>> display the text "ARM Linux" on the first line and the linux banner
+>> on the second line, but that's still useful.
+>
+> I think the only questionable thing on this is the location of the
+> driver. ?As we now have plat-versatile for the shared stuff between
+> integrator, verastile, realview and versatile express, maybe it'd
+> make more sense to be in plat-versatile?
 
-> +	spin_lock_irqsave(&clocks_lock, flags);
-> +	ret = nuc900_get_cpuclock(&clk->cpufreq, &clk->ahbfreq, &clk->apbfreq);
-> +	spin_unlock_irqrestore(&clocks_lock, flags);
-> +	if (ret)
-> +		return ret;
+OK I can move it there.
 
-Hmm, I don't follow this - and it doesn't seem to sit with the clk API
-model at all well.  cpufreq/ahbfreq/apbfreq seem to only ever be
-written, but never read.  I'm not sure either why every struct clk has
-to have these - they seem to be separate clocks unrelated to the
-struct clk that's being dealt with.
+> Or maybe drivers/platform/arm/ (to avoid Linus' complaint about
+> drivers under arch/ ?)
 
-Wouldn't it make more sense to have these three as separate struct clks?
+Creating that for a single driver seems weird, I could just as well
+create drivers/lcd for all LCDs in that case. But there is another
+LCD-like driver for a USB-connected LCD under drivers/misc
+IIRC, maybe I can make a patch for that as well and let the misc
+maintainer decide if he wants it.
 
-The other issue is that we're introducing an "apb_pclk" for all
-primecells using drivers/amba/bus.c in order to support SoCs which gate
-the APB pclk signal to individual primecells.  It sounds like this clock
-would be the natural owner what you call 'apbfreq' in your patch.
+Yours,
+Linus Walleij
