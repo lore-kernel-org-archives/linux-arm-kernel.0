@@ -1,60 +1,39 @@
-From: zpfeffer@codeaurora.org (Zach Pfeffer)
-Date: Wed, 14 Jul 2010 22:40:51 -0700
-Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
-	memory management
-In-Reply-To: <m1mxttiki1.fsf@fess.ebiederm.org>
-References: <4C3C0032.5020702@codeaurora.org>
-	<20100713150311B.fujita.tomonori@lab.ntt.co.jp>
-	<20100713121420.GB4263@codeaurora.org>
-	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
-	<20100714201149.GA14008@codeaurora.org>
-	<20100714220536.GE18138@n2100.arm.linux.org.uk>
-	<20100715012958.GB2239@codeaurora.org>
-	<m1mxttiki1.fsf@fess.ebiederm.org>
-Message-ID: <20100715054050.GB3623@codeaurora.org>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 15 Jul 2010 07:56:11 +0200
+Subject: [RFC][PATCH 1/1] ARM: Add initial hibernation support
+In-Reply-To: <20100715.083931.226798141.Hiroshi.DOYU@nokia.com>
+References: <1277908081-17195-1-git-send-email-Hiroshi.DOYU@nokia.com>
+	<201007150648.50521.marek.vasut@gmail.com>
+	<20100715.083931.226798141.Hiroshi.DOYU@nokia.com>
+Message-ID: <201007150756.11817.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 14, 2010 at 06:47:34PM -0700, Eric W. Biederman wrote:
-> Zach Pfeffer <zpfeffer@codeaurora.org> writes:
+Dne ?t 15. ?ervence 2010 07:39:31 Hiroshi DOYU napsal(a):
+> From: ext Marek Vasut <marek.vasut@gmail.com>
+> Subject: Re: [RFC][PATCH 1/1] ARM: Add initial hibernation support
+> Date: Thu, 15 Jul 2010 06:48:50 +0200
 > 
-> > On Wed, Jul 14, 2010 at 11:05:36PM +0100, Russell King - ARM Linux wrote:
-> >> On Wed, Jul 14, 2010 at 01:11:49PM -0700, Zach Pfeffer wrote:
-> >> > If the DMA-API contained functions to allocate virtual space separate
-> >> > from physical space and reworked how chained buffers functioned it
-> >> > would probably work - but then things start to look like the VCM API
-> >> > which does graph based map management.
+> > Dne St 30. ?ervna 2010 16:28:01 Hiroshi DOYU napsal(a):
+> >> From: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 > >> 
-> >> Every additional virtual mapping of a physical buffer results in
-> >> additional cache aliases on aliasing caches, and more workload for
-> >> developers to sort out the cache aliasing issues.
+> >> Hibernation (a.k.a: Suspend-To-Disk) support for ARM
 > >> 
-> >> What does VCM to do mitigate that?
-> >
-> > The VCM ensures that all mappings that map a given physical buffer:
-> > IOMMU mappings, CPU mappings and one-to-one device mappings all map
-> > that buffer using the same (or compatible) attributes. At this point
-> > the only attribute that users can pass is CACHED. In the absence of
-> > CACHED all accesses go straight through to the physical memory.
-> >
-> > The architecture of the VCM allows these sorts of consistency checks
-> > to be made since all mappers of a given physical resource are
-> > tracked. This is feasible because the physical resources we're
-> > tracking are typically large.
+> >> Based on the original work from Romit and Raghu at TI. The original
+> >> patch(*1) was sent to LOML by Teerth Reddy <teerth@ti.com>
+> >> 
+> >> *1: https://patchwork.kernel.org/patch/96442/
+> >> 
+> >> Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+> > 
+> > Hey, can this also run on pre-v7 arms ? Or is there something I missed
+> > that'd make that impossible?
 > 
-> On x86 this is implemented in the pat code, and could reasonably be
-> generalized to be cross platform.
+> What I verified is with OMAP3(Cortex A8) based board.
 > 
-> This is controlled by HAVE_PFNMAP_TRACKING and with entry points
-> like track_pfn_vma_new.
-> 
-> Given that we already have an implementation that tracks the cached
-> vs non-cached attribute using the dma api.  I don't see that the
-> API has to change.  An implementation of the cached vs non-cached
-> status for arm and other architectures is probably appropriate.
-> 
-> It is definitely true that getting your mapping caching attributes
-> out of sync can be a problem.
+> cp15 part has to be modified, but it might work without this part itself, I
+> guess.
 
-Sure, but we're still stuck with needing lots of scatterlist list
-elements and needing to copy them to share physical buffers.
+I see ... do I need any special support on the bootloader or userland side ?
+
+Sorry for stupid questions :)
