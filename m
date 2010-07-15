@@ -1,30 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Jul 2010 17:22:47 +0100
-Subject: [PATCH v4] GPIO PL061: Adding Clk framework support
-In-Reply-To: <20100715160922.GA4119@debian>
-References: <20100710071913.GM22845@n2100.arm.linux.org.uk>
-	<AANLkTimskXW4Nnxhc5bxwKiNrfJkMb-9NeWKhVOGaA1k@mail.gmail.com>
-	<20100713074449.GA20118@n2100.arm.linux.org.uk>
-	<AANLkTilZJTHh_iFS37UL7XoUs_DhAB50A3tHfcfEr5JM@mail.gmail.com>
-	<20100713182644.GC30142@n2100.arm.linux.org.uk>
-	<4C3EA46B.1000709@st.com>
-	<20100715083032.GA26212@n2100.arm.linux.org.uk>
-	<4C3ED678.7010308@st.com>
-	<20100715095637.GF26212@n2100.arm.linux.org.uk>
-	<20100715160922.GA4119@debian>
-Message-ID: <20100715162247.GH29322@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 15 Jul 2010 17:32:13 +0100
+Subject: [PATCH 1/2] ARM: errata: TLBIASIDIS and TLBIMVAIS operations
+	can	broadcast a faulty ASID
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C60875D6@dbde02.ent.ti.com>
+References: <1279209238-16234-1-git-send-email-will.deacon@arm.com>
+	<1279209238-16234-2-git-send-email-will.deacon@arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C60875D6@dbde02.ent.ti.com>
+Message-ID: <002701cb243b$47befb40$d73cf1c0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 15, 2010 at 09:39:22PM +0530, Rabin Vincent wrote:
-> In your earlier patch, you proceeded with the probe if the error from
-> clk_get() was -ENOENT, but not in this version.  Isn't the -ENOENT
-> special handling preferable, since it avoids the need to change all
-> existing platforms?
+Hi Santosh,
 
-Well, the problem is that most platforms now declare their clocks
-such that asking for the pclk will match the functional clock.
+> > Subject: [PATCH 1/2] ARM: errata: TLBIASIDIS and TLBIMVAIS operations can
+> > broadcast a faulty ASID
+> >
+> > On versions of the Cortex-A9 prior to r2p0, performing TLB invalidations
+> > by
+> > ASID match can result in the incorrect ASID being broadcast to other CPUs.
+> > As a consequence of this, the targetted TLB entries are not invalidated
+> > across the system.
+> >
+> > This workaround changes the TLB flushing routines to invalidate entries
+> > regardless of the ASID.
+> >
+> Just a curious question. How costly is this ?
+ 
+I think the cost really depends on whether or not the evicted TLB entries
+are available in the D-cache. If they are, then a TLB miss occurring because
+of this workaround will hit in the data cache and the overhead will be small.
+Missing in the D-cache is certainly going to add an overhead, but that depends
+on your memory system.
 
-I have a patch which adds dummy pclks to all ARM AMBA using platforms.
-This patch comes before the pclk-using patch to so that things
-shouldn't break.
+Of course, this workaround should only be enabled on platforms that suffer
+from the erratum, where it's worth sacrificing a few cycles in order to get
+a working virtual memory system!
+
+Will
