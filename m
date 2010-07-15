@@ -1,97 +1,67 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 15 Jul 2010 13:39:54 -0700
-Subject: [PATCH v3] Samsung: sdhci-s3c: add support for new card
-	detection methods
-In-Reply-To: <1279181721-23333-1-git-send-email-m.szyprowski@samsung.com>
-References: <1279181721-23333-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20100715133954.7fcb797a.akpm@linux-foundation.org>
+From: gregkh@suse.de (Greg KH)
+Date: Thu, 15 Jul 2010 13:51:53 -0700
+Subject: tq 2440
+In-Reply-To: <20100715173322.GL29322@n2100.arm.linux.org.uk>
+References: <AANLkTimyBHliUa62qmfja_ke6YTTysiVAtJcZfi8l2gG@mail.gmail.com>
+	<AANLkTil8GE1OguyAfp3XgfJvEmH98yNrlvGAx684a-qL@mail.gmail.com>
+	<20100715163526.GJ29322@n2100.arm.linux.org.uk>
+	<20100715165141.GA21272@suse.de>
+	<20100715171029.GK29322@n2100.arm.linux.org.uk>
+	<20100715172218.GA22197@suse.de>
+	<20100715173322.GL29322@n2100.arm.linux.org.uk>
+Message-ID: <20100715205153.GC24463@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Jul 2010 10:15:21 +0200
-Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+On Thu, Jul 15, 2010 at 06:33:22PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 15, 2010 at 10:22:18AM -0700, Greg KH wrote:
+> > On Thu, Jul 15, 2010 at 06:10:29PM +0100, Russell King - ARM Linux wrote:
+> > > On Thu, Jul 15, 2010 at 09:51:41AM -0700, Greg KH wrote:
+> > > > On Thu, Jul 15, 2010 at 05:35:26PM +0100, Russell King - ARM Linux wrote:
+> > > > > On Thu, Jul 15, 2010 at 11:16:30PM +0800, Conke Hu wrote:
+> > > > > > ever notice to the following kernel log?
+> > > > > > "Device 's3c2440-nand' does not have a release() function, it is
+> > > > > > broken and must."
+> > > > > > release() function should be implemented  in the platform_device.
+> > > > > 
+> > > > > That's not telling you to provide a release function.  The warning is
+> > > > > telling you that a device is being unregistered which doesn't have a
+> > > > > release function.
+> > > > > 
+> > > > > Consider this point - maybe it doesn't have a release function because
+> > > > > it's not supposed to be unregistered?
+> > > > 
+> > > > Heh, well, it is being unregistered, and at that point in time, the
+> > > > kernel complains.
+> > > 
+> > > The unregistration occurs because platform_register_devices() (which is
+> > > used by arch code to register a block of platform devices) undoes its
+> > > work if one of the devices fails to register.
+> > > 
+> > > I've long since thought, since I created that function, that this probably
+> > > isn't desirable behaviour, and it should continue to register as many
+> > > devices as it possibly can.
+> > > 
+> > > > All kobjects need a release function that actually frees it.  If not,
+> > > > that is a logic bug.  Please see the Documentation/kobject.txt file for
+> > > > details.
+> > > 
+> > > How do you free a statically declared platform device?
+> > 
+> > You never unregister it :)
+> 
+> Indeed, and one way to do that is to fix the double-registration of
+> dm9000.0.
 
-> On some Samsung SoCs not all SDHCI controllers have card detect (CD)
-> line. For some embedded designs it is not even needed, because ususally
-> the device (like SDIO flash memory or wifi controller) is permanently
-> wired to the controller. There are also systems which have a card detect
-> line connected to some of the external interrupt lines or the presence
-> of the card depends on some other actions (like enabling a power
-> regulator).
-> 
-> This patch adds support for all these cases. The following card
-> detection methods are possible:
-> 
-> 1. internal sdhci host card detect line
-> 2. external event
-> 3. external gpio interrupt
-> 4. no card detect line, controller will poll for the card
-> 5. no card detect line, card is permanently wired to the controller
-> (once detected host won't poll it any more)
-> 
-> By default, all existing code would use method #1, what is compatible
-> with the previous version of the driver.
-> 
-> In case of external event, two callbacks must be provided in platdata:
-> ext_cd_init and ext_cd_cleanup. Both of them get a callback to a
-> function that notifies the s3c-sdhci host contoller as their argument.
-> That callback function should be called from the even dispatcher to let
-> host notice the card insertion/removal.
-> 
-> In case of external gpio interrupt, a gpio pin number must be provided
-> in platdata (ext_cd_gpio parameter), as well as the information about
-> the polarity of that gpio pin (ext_cd_gpio_invert). By default
-> (ext_cd_gpio_invert == 0) gpio value 0 means 'card has been removed',
-> but this can be changed to 'card has been removed' when
-> ext_cd_gpio_invert == 1.
-> 
-> This patch adds all required changes to platform support code.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> 
-> This a resend of the previous patch. Relevant patches for sdhci-s3c
-> driver has been posted in a separate patch series for easier merging,
-> please refer to the "[PATCH] SDHCI-S3C fixes and enhancements (driver
-> specific code)" thread. They have been already taken by Andrew Morton
-> into his patch tracking tree.
-> 
-> I hope these changes to platform specific code gets merged soon, so the
-> changes to the driver can be merged as well.
-> 
-> The patch has been prepared for the following git tree:
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git for-next
-> 
-> Changes since V2:
-> - added support for HSMMC3 device
-> 
-> Changes since V1:
-> - added support for gpio external interrupt card based detect method
->   directly to sdhci-s3c driver
-> - removed s3c64xx compilation fix patch from the series
-> 
-> Best regards
-> -- 
-> Marek Szyprowski
-> Samsung Poland R&D Center
-> 
-> ---
-> 
->  arch/arm/mach-s3c64xx/setup-sdhci-gpio.c   |   14 +++++++++---
->  arch/arm/mach-s5pc100/setup-sdhci-gpio.c   |   21 ++++++++++++++-----
->  arch/arm/mach-s5pv210/setup-sdhci-gpio.c   |   22 +++++++++++++++-----
->  arch/arm/plat-samsung/dev-hsmmc.c          |    5 ++++
->  arch/arm/plat-samsung/dev-hsmmc1.c         |    5 ++++
->  arch/arm/plat-samsung/dev-hsmmc2.c         |    5 ++++
->  arch/arm/plat-samsung/dev-hsmmc3.c         |    5 ++++
->  arch/arm/plat-samsung/include/plat/sdhci.h |   29 ++++++++++++++++++++++++++++
->  8 files changed, 90 insertions(+), 16 deletions(-)
+I agree.
 
-This is quite confusing.  You've already sent a patch called
-"sdhci-s3c: add support for new card detection methods".  It had the
-same changelog as this patch and the same title, but the two patches
-are utterly different!
+> Another way to avoid the other complaints is to remove
+> the unregistration in platform_register_devices().
 
-I suggest that you resend this patch under an appropriate title and
-with a more specific changelog, please.
+No, because you could have created a platform device with a call to
+platform_device_alloc() and then called platform_device_register() and
+then later, platform_device_unregister(), right?
+
+thanks,
+
+greg k-h
