@@ -1,31 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Jul 2010 10:38:31 +0100
-Subject: Problem with dma_alloc_coherent at linux-2.6.33-arm1 , with
-	RealView platform,board PBX-A9 and armv7 instructions.
-In-Reply-To: <20100715093107.GB17605@trinity.fluff.org>
-References: <AANLkTimtpIQaKVHidWP9fvOKGGiQRc0tne1kO5mO-Zzs@mail.gmail.com>
-	<20100715093107.GB17605@trinity.fluff.org>
-Message-ID: <20100715093831.GE26212@n2100.arm.linux.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 15 Jul 2010 17:38:36 +0800
+Subject: [PATCH 2/3] usb/{gadget,host}: Remove dead CONFIG_CPU_PXA27x
+In-Reply-To: <AANLkTimQnt8_OLGOp8VIUk6A10wBDNT3H_prpWNuYhc9@mail.gmail.com>
+References: <cover.1279104996.git.qy03fugy@stud.informatik.uni-erlangen.de>
+	<e75b6cb0826c24f3c0583fb409473c494aff0f63.1279104996.git.qy03fugy@stud.informatik.uni-erlangen.de>
+	<AANLkTimQnt8_OLGOp8VIUk6A10wBDNT3H_prpWNuYhc9@mail.gmail.com>
+Message-ID: <AANLkTim6SD-dy6iK-QspagJeWQJPAJ-FrE0AW8pAlXTb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 15, 2010 at 10:31:07AM +0100, Ben Dooks wrote:
-> On Thu, Jul 15, 2010 at 05:13:57PM +0800, David Yang wrote:
-> >        I don't know the reason until now.I guess the memory allocated by the
-> > dma_alloc_coherent may be cached....if not , why it is so slowly?
-> 
-> The dma_alloc_coherent coherent should return uncachable and un-bufferable
-> memory, otherwise you meed explicit flushing commands when changing between
-> the HW and CPU ownership.
+On Wed, Jul 14, 2010 at 8:30 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Wed, Jul 14, 2010 at 7:32 PM, Christian Dietrich
+> <qy03fugy@stud.informatik.uni-erlangen.de> wrote:
+>> CONFIG_CPU_PXA27x doesn't exist in Kconfig, therefore removing all
+>> references for it from the source code.
+>>
+>> Signed-off-by: Christian Dietrich <qy03fugy@stud.informatik.uni-erlangen.de>
+>> ---
+>> ?drivers/usb/gadget/pxa27x_udc.c | ? 16 ----------------
+>> ?drivers/usb/host/ohci-pxa27x.c ?| ? ?8 --------
+>> ?2 files changed, 0 insertions(+), 24 deletions(-)
+>>
+>> diff --git a/drivers/usb/gadget/pxa27x_udc.c b/drivers/usb/gadget/pxa27x_udc.c
+>> index 85b0d89..73783f5 100644
+>> --- a/drivers/usb/gadget/pxa27x_udc.c
+>> +++ b/drivers/usb/gadget/pxa27x_udc.c
+>> @@ -2561,12 +2561,6 @@ static void pxa_udc_shutdown(struct platform_device *_dev)
+>> ? ? ? ? ? ? ? ?udc_disable(udc);
+>> ?}
+>>
+>> -#ifdef CONFIG_CPU_PXA27x
+>
+> This should be CONFIG_PXA27x, I'll prepare a patch on this.
+>
 
-It's a result of the weakly ordered memory model - writes to memory
-are now delayed and can be re-ordered, but not across the appropriate
-barrier instructions.
+    [ARM] pxa: fix incorrect CONFIG_CPU_PXA27x to CONFIG_PXA27x
 
-Lack of barrier instructions makes that these writes can arrive in
-unexpected orders, which will cause exactly these kinds of problems.
+    Reported-by: Christian Dietrich <qy03fugy@stud.informatik.uni-erlangen.de>
+    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 
-Catalin has been tracking down where these barriers need to be added,
-so we're getting these issues solved - but we can only find them
-through people using the kernel, reporting problems like this, and
-fixing the missing places.
+diff --git a/drivers/usb/gadget/pxa27x_udc.c b/drivers/usb/gadget/pxa27x_udc.c
+index 85b0d89..9807624 100644
+--- a/drivers/usb/gadget/pxa27x_udc.c
++++ b/drivers/usb/gadget/pxa27x_udc.c
+@@ -2561,7 +2561,7 @@ static void pxa_udc_shutdown(struct platform_device *_dev)
+ 		udc_disable(udc);
+ }
+
+-#ifdef CONFIG_CPU_PXA27x
++#ifdef CONFIG_PXA27x
+ extern void pxa27x_clear_otgph(void);
+ #else
+ #define pxa27x_clear_otgph()   do {} while (0)
+diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
+index a18debd..4181638 100644
+--- a/drivers/usb/host/ohci-pxa27x.c
++++ b/drivers/usb/host/ohci-pxa27x.c
+@@ -203,7 +203,7 @@ static inline void pxa27x_reset_hc(struct pxa27x_ohci *ohci)
+ 	__raw_writel(uhchr & ~UHCHR_FHR, ohci->mmio_base + UHCHR);
+ }
+
+-#ifdef CONFIG_CPU_PXA27x
++#ifdef CONFIG_PXA27x
+ extern void pxa27x_clear_otgph(void);
+ #else
+ #define pxa27x_clear_otgph()	do {} while (0)
