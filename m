@@ -1,67 +1,64 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 15 Jul 2010 17:38:36 +0800
-Subject: [PATCH 2/3] usb/{gadget,host}: Remove dead CONFIG_CPU_PXA27x
-In-Reply-To: <AANLkTimQnt8_OLGOp8VIUk6A10wBDNT3H_prpWNuYhc9@mail.gmail.com>
-References: <cover.1279104996.git.qy03fugy@stud.informatik.uni-erlangen.de>
-	<e75b6cb0826c24f3c0583fb409473c494aff0f63.1279104996.git.qy03fugy@stud.informatik.uni-erlangen.de>
-	<AANLkTimQnt8_OLGOp8VIUk6A10wBDNT3H_prpWNuYhc9@mail.gmail.com>
-Message-ID: <AANLkTim6SD-dy6iK-QspagJeWQJPAJ-FrE0AW8pAlXTb@mail.gmail.com>
+From: david.yangshuai@gmail.com (David Yang)
+Date: Thu, 15 Jul 2010 17:40:17 +0800
+Subject: Problem with dma_alloc_coherent at linux-2.6.33-arm1 , with
+	RealView platform,board PBX-A9 and armv7 instructions.
+In-Reply-To: <20100715093107.GB17605@trinity.fluff.org>
+References: <AANLkTimtpIQaKVHidWP9fvOKGGiQRc0tne1kO5mO-Zzs@mail.gmail.com>
+	<20100715093107.GB17605@trinity.fluff.org>
+Message-ID: <AANLkTilBMPA9jwnWy4sTRx_YHq4jcDPDs0dcS8LFe7df@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 14, 2010 at 8:30 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Wed, Jul 14, 2010 at 7:32 PM, Christian Dietrich
-> <qy03fugy@stud.informatik.uni-erlangen.de> wrote:
->> CONFIG_CPU_PXA27x doesn't exist in Kconfig, therefore removing all
->> references for it from the source code.
+I think so ?but it looks like that it did not return uncacheble and
+unbufferable memory.
+
+what flushing command could I use in driver for  testing?
+
+On Thu, Jul 15, 2010 at 5:31 PM, Ben Dooks <ben-linux@fluff.org> wrote:
+> On Thu, Jul 15, 2010 at 05:13:57PM +0800, David Yang wrote:
+>> hi ,everybody:
 >>
->> Signed-off-by: Christian Dietrich <qy03fugy@stud.informatik.uni-erlangen.de>
->> ---
->> ?drivers/usb/gadget/pxa27x_udc.c | ? 16 ----------------
->> ?drivers/usb/host/ohci-pxa27x.c ?| ? ?8 --------
->> ?2 files changed, 0 insertions(+), 24 deletions(-)
+>> ? ? ? ?I encountered this problem when porting my ethernet driver from
+>> linux-2.6.28 to linux-2.6.33-arm1.
 >>
->> diff --git a/drivers/usb/gadget/pxa27x_udc.c b/drivers/usb/gadget/pxa27x_udc.c
->> index 85b0d89..73783f5 100644
->> --- a/drivers/usb/gadget/pxa27x_udc.c
->> +++ b/drivers/usb/gadget/pxa27x_udc.c
->> @@ -2561,12 +2561,6 @@ static void pxa_udc_shutdown(struct platform_device *_dev)
->> ? ? ? ? ? ? ? ?udc_disable(udc);
->> ?}
+>> ? ? ? ?In the linux-2.6.28, I used the dma_alloc_coherent to share the
+>> informations between cpu and ethernet device.The program flow in the
+>> function ndo_start_xmit:
+>> ? ? ? ? ? ? ? ?1,preparing the struct sk_buff->data for device internal DMA to
+>> read,using the dma_map_single function.
+>> ? ? ? ? ? ? ? ?2,update the information in the memory which is allocated by
+>> dma_alloc_coherent to tell the device DMA the data is readable.
+>> ? ? ? ? ? ? ? ?3,write the device register to inform the device DMA
+>> to read the data.
+>> ? ? ? ? ? ? ? ?4,cpu captures the interrupt of reading completion
+>> form the device.
 >>
->> -#ifdef CONFIG_CPU_PXA27x
+>> ? ? ? ?In the linux-2.6.28,the whole program flow soon complete in order.
+>> ? ? ? ?But when the driver was ported to the linux-2.6.33-arm1,the problem
+>> came:
+>> ? ? ? ? ? ? ? ? I found when the cpu executed from step 1-3, the
+>> device DMA alarm the
+>> step 2 was not completed.As a result,the step 4 was not triggered.This
+>> is different form linux-2.6.28.
+>>
+>> ? ? ? ? ? ? ? ?After some tests, I think the problem comes from the
+>> dma_alloc_coherent.It looks like ,in the linux-2.6.33-arm1, when the
+>> memory allocated by dma_alloc_coherent is written,the data entry into
+>> the ddr much slower than the same process in linux-2.6.28.Therefore,when
+>> cpu has executed the step 3, the step 2 has not yet completed.So the DMA
+>> can't get the correct information ,and the step 4 will never be reached.
+>>
+>> ? ? ? ?I don't know the reason until now.I guess the memory allocated by the
+>> dma_alloc_coherent may be cached....if not , why it is so slowly?
 >
-> This should be CONFIG_PXA27x, I'll prepare a patch on this.
+> The dma_alloc_coherent coherent should return uncachable and un-bufferable
+> memory, otherwise you meed explicit flushing commands when changing between
+> the HW and CPU ownership.
 >
-
-    [ARM] pxa: fix incorrect CONFIG_CPU_PXA27x to CONFIG_PXA27x
-
-    Reported-by: Christian Dietrich <qy03fugy@stud.informatik.uni-erlangen.de>
-    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-
-diff --git a/drivers/usb/gadget/pxa27x_udc.c b/drivers/usb/gadget/pxa27x_udc.c
-index 85b0d89..9807624 100644
---- a/drivers/usb/gadget/pxa27x_udc.c
-+++ b/drivers/usb/gadget/pxa27x_udc.c
-@@ -2561,7 +2561,7 @@ static void pxa_udc_shutdown(struct platform_device *_dev)
- 		udc_disable(udc);
- }
-
--#ifdef CONFIG_CPU_PXA27x
-+#ifdef CONFIG_PXA27x
- extern void pxa27x_clear_otgph(void);
- #else
- #define pxa27x_clear_otgph()   do {} while (0)
-diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
-index a18debd..4181638 100644
---- a/drivers/usb/host/ohci-pxa27x.c
-+++ b/drivers/usb/host/ohci-pxa27x.c
-@@ -203,7 +203,7 @@ static inline void pxa27x_reset_hc(struct pxa27x_ohci *ohci)
- 	__raw_writel(uhchr & ~UHCHR_FHR, ohci->mmio_base + UHCHR);
- }
-
--#ifdef CONFIG_CPU_PXA27x
-+#ifdef CONFIG_PXA27x
- extern void pxa27x_clear_otgph(void);
- #else
- #define pxa27x_clear_otgph()	do {} while (0)
+> --
+> Ben
+>
+> Q: ? ? ?What's a light-year?
+> A: ? ? ?One-third less calories than a regular year.
+>
+>
