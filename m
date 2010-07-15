@@ -1,130 +1,66 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Thu, 15 Jul 2010 10:31:34 +0900
-Subject: [PATCH v2] ARM: S5P: Add PMU device
-Message-ID: <1279157494-22329-1-git-send-email-jy0922.shim@samsung.com>
+From: zpfeffer@codeaurora.org (Zach Pfeffer)
+Date: Wed, 14 Jul 2010 18:41:48 -0700
+Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
+	memory management
+In-Reply-To: <20100715080710T.fujita.tomonori@lab.ntt.co.jp>
+References: <20100713121420.GB4263@codeaurora.org>
+	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
+	<20100714201149.GA14008@codeaurora.org>
+	<20100715080710T.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <20100715014148.GC2239@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an initcall for the s5p platforms so that they register
-their PMU IRQs with the PMU framework in the Kernel.
+On Thu, Jul 15, 2010 at 08:07:28AM +0900, FUJITA Tomonori wrote:
+> On Wed, 14 Jul 2010 13:11:49 -0700
+> Zach Pfeffer <zpfeffer@codeaurora.org> wrote:
+> 
+> > On Wed, Jul 14, 2010 at 10:59:38AM +0900, FUJITA Tomonori wrote:
+> > > On Tue, 13 Jul 2010 05:14:21 -0700
+> > > Zach Pfeffer <zpfeffer@codeaurora.org> wrote:
+> > > 
+> > > > > You mean that you want to specify this alignment attribute every time
+> > > > > you create an IOMMU mapping? Then you can set segment_boundary_mask
+> > > > > every time you create an IOMMU mapping. It's odd but it should work.
+> > > > 
+> > > > Kinda. I want to forget about IOMMUs, devices and CPUs. I just want to
+> > > > create a mapping that has the alignment I specify, regardless of the
+> > > > mapper. The mapping is created on a VCM and the VCM is associated with
+> > > > a mapper: a CPU, an IOMMU'd device or a direct mapped device.
+> > > 
+> > > Sounds like you can do the above with the combination of the current
+> > > APIs, create a virtual address and then an I/O address.
+> > > 
+> > 
+> > Yes, and that's what the implementation does - and all the other
+> > implementations that need to do this same thing. Why not solve the
+> > problem once?
+> 
+> Why we we need a new abstraction layer to solve the problem that the
+> current API can handle?
 
-Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-s5p6440/include/mach/irqs.h |    2 +-
- arch/arm/mach-s5p6442/include/mach/irqs.h |    2 +-
- arch/arm/mach-s5pc100/include/mach/irqs.h |    2 +-
- arch/arm/mach-s5pv210/include/mach/irqs.h |    2 +-
- arch/arm/plat-s5p/Makefile                |    1 +
- arch/arm/plat-s5p/dev-pmu.c               |   36 +++++++++++++++++++++++++++++
- 6 files changed, 41 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/plat-s5p/dev-pmu.c
+The current API can't really handle it because the DMA API doesn't
+separate buffer allocation from buffer mapping. To use the DMA API a
+scatterlist would need to be synthesized from the physical buffers
+that we've allocated. 
 
-diff --git a/arch/arm/mach-s5p6440/include/mach/irqs.h b/arch/arm/mach-s5p6440/include/mach/irqs.h
-index 911854d..16a7612 100644
---- a/arch/arm/mach-s5p6440/include/mach/irqs.h
-+++ b/arch/arm/mach-s5p6440/include/mach/irqs.h
-@@ -51,7 +51,7 @@
- #define IRQ_DISPCON3		S5P_IRQ_VIC1(19)
- #define IRQ_FIMGVG		S5P_IRQ_VIC1(20)
- #define IRQ_EINT_GROUPS		S5P_IRQ_VIC1(21)
--#define IRQ_PMUIRQ		S5P_IRQ_VIC1(23)
-+#define IRQ_PMU			S5P_IRQ_VIC1(23)
- #define IRQ_HSMMC0		S5P_IRQ_VIC1(24)
- #define IRQ_HSMMC1		S5P_IRQ_VIC1(25)
- #define IRQ_HSMMC2		IRQ_SPI1	/* shared with SPI1 */
-diff --git a/arch/arm/mach-s5p6442/include/mach/irqs.h b/arch/arm/mach-s5p6442/include/mach/irqs.h
-index 02c2374..3fbc6c3 100644
---- a/arch/arm/mach-s5p6442/include/mach/irqs.h
-+++ b/arch/arm/mach-s5p6442/include/mach/irqs.h
-@@ -32,7 +32,7 @@
- #define IRQ_GPIOINT		S5P_IRQ_VIC0(30)
- 
- /* VIC1 */
--#define IRQ_nPMUIRQ 		S5P_IRQ_VIC1(0)
-+#define IRQ_PMU			S5P_IRQ_VIC1(0)
- #define IRQ_ONENAND 		S5P_IRQ_VIC1(7)
- #define IRQ_UART0 		S5P_IRQ_VIC1(10)
- #define IRQ_UART1 		S5P_IRQ_VIC1(11)
-diff --git a/arch/arm/mach-s5pc100/include/mach/irqs.h b/arch/arm/mach-s5pc100/include/mach/irqs.h
-index 28aa551..59e90bf 100644
---- a/arch/arm/mach-s5pc100/include/mach/irqs.h
-+++ b/arch/arm/mach-s5pc100/include/mach/irqs.h
-@@ -29,7 +29,7 @@
- #define IRQ_GPIOINT		S5P_IRQ_VIC0(30)
- 
- /* VIC1: ARM, power, memory, connectivity */
--#define IRQ_CORTEX0		S5P_IRQ_VIC1(0)
-+#define IRQ_PMU			S5P_IRQ_VIC1(0)
- #define IRQ_CORTEX1		S5P_IRQ_VIC1(1)
- #define IRQ_CORTEX2		S5P_IRQ_VIC1(2)
- #define IRQ_CORTEX3		S5P_IRQ_VIC1(3)
-diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-s5pv210/include/mach/irqs.h
-index 9689537..b55f9e0 100644
---- a/arch/arm/mach-s5pv210/include/mach/irqs.h
-+++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
-@@ -36,7 +36,7 @@
- 
- /* VIC1: ARM, Power, Memory, Connectivity, Storage */
- 
--#define IRQ_CORTEX0		S5P_IRQ_VIC1(0)
-+#define IRQ_PMU			S5P_IRQ_VIC1(0)
- #define IRQ_CORTEX1		S5P_IRQ_VIC1(1)
- #define IRQ_CORTEX2		S5P_IRQ_VIC1(2)
- #define IRQ_CORTEX3		S5P_IRQ_VIC1(3)
-diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
-index 39c242b..7e34194 100644
---- a/arch/arm/plat-s5p/Makefile
-+++ b/arch/arm/plat-s5p/Makefile
-@@ -12,6 +12,7 @@ obj-				:=
- 
- # Core files
- 
-+obj-y				+= dev-pmu.o
- obj-y				+= dev-uart.o
- obj-y				+= cpu.o
- obj-y				+= clock.o
-diff --git a/arch/arm/plat-s5p/dev-pmu.c b/arch/arm/plat-s5p/dev-pmu.c
-new file mode 100644
-index 0000000..a08576d
---- /dev/null
-+++ b/arch/arm/plat-s5p/dev-pmu.c
-@@ -0,0 +1,36 @@
-+/*
-+ * linux/arch/arm/plat-s5p/dev-pmu.c
-+ *
-+ * Copyright (C) 2010 Samsung Electronics Co.Ltd
-+ * Author: Joonyoung Shim <jy0922.shim@samsung.com>
-+ *
-+ *  This program is free software; you can redistribute  it and/or modify it
-+ *  under  the terms of  the GNU General  Public License as published by the
-+ *  Free Software Foundation;  either version 2 of the  License, or (at your
-+ *  option) any later version.
-+ *
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <asm/pmu.h>
-+#include <mach/irqs.h>
-+
-+static struct resource s5p_pmu_resource = {
-+	.start	= IRQ_PMU,
-+	.end	= IRQ_PMU,
-+	.flags	= IORESOURCE_IRQ,
-+};
-+
-+struct platform_device s5p_device_pmu = {
-+	.name		= "arm-pmu",
-+	.id		= ARM_PMU_DEVICE_CPU,
-+	.num_resources	= 1,
-+	.resource	= &s5p_pmu_resource,
-+};
-+
-+static int __init s5p_pmu_init(void)
-+{
-+	platform_device_register(&s5p_device_pmu);
-+	return 0;
-+}
-+arch_initcall(s5p_pmu_init);
--- 
-1.7.0.4
+For instance: I need 10, 1 MB physical buffers and a 64 KB physical
+buffer. With the DMA API I need to allocate 10*1MB/PAGE_SIZE + 64
+KB/PAGE_SIZE scatterlist elements, fix them all up to follow the
+chaining specification and then go through all of them again to fix up
+their virtual mappings for the mapper that's mapping the physical
+buffer. If I want to share the buffer with another device I have to
+make a copy of the entire thing then fix up the virtual mappings for
+the other device I'm sharing with. The VCM splits the two things up so
+that I do a physical allocation, then 2 virtual allocations and then
+map both.
+
+> 
+> The above two operations don't sound too complicated. The combination
+> of the current API sounds much simpler than your new abstraction.
+> 
+> Please show how the combination of the current APIs doesn't
+> work. Otherwise, we can't see what's the benefit of your new
+> abstraction.
+
+See above.
