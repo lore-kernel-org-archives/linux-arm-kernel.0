@@ -1,44 +1,35 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Jul 2010 16:53:58 +0100
-Subject: [PATCH 2/2] ARM: flush_ptrace_access: invalidate all I-caches
-In-Reply-To: <1279209238-16234-2-git-send-email-will.deacon@arm.com>
-References: <1279209238-16234-1-git-send-email-will.deacon@arm.com>
-	<1279209238-16234-2-git-send-email-will.deacon@arm.com>
-Message-ID: <1279209238-16234-3-git-send-email-will.deacon@arm.com>
+Date: Thu, 15 Jul 2010 16:53:56 +0100
+Subject: [PATCH 0/2] Fix ptrace software breakpoints
+Message-ID: <1279209238-16234-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-copy_to_user_page can be used by access_process_vm to write to an
-executable page of a process using a mapping acquired by kmap.
-For systems with I-cache aliasing, flushing the I-cache using the
-Kernel mapping may leave stale data in the I-cache if the user
-mapping is of a different colour.
+When using GDB on a quad-core Cortex-A9 (Versatile Express) board, software
+breakpoints do not work if the inferior is scheduled onto a different CPU from
+the debugger.
 
-This patch replaces the coherent_kern_range call in flush_ptrace_access
-with a D-cache flush followed by a system-wide I-cache invalidation.
-This is required on all systems where the size of a way in the I-cache
-is larger than PAGE_SIZE.
+When GDB changes the code of another context via the ptrace POKETEXT mechanism,
+the I-cache must be invalidated before the inferior is allowed to resume. If a
+copy-on-write is triggered by the copy_to_user_page function, the new page
+mappings must be used by the inferior in order to pick up the new instructions.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mm/flush.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+This patch series addresses this problem by:
 
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index c6844cb..45896a9 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -120,8 +120,8 @@ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
- 
- 	/* VIPT non-aliasing cache */
- 	if (vma->vm_flags & VM_EXEC) {
--		unsigned long addr = (unsigned long)kaddr;
--		__cpuc_coherent_kern_range(addr, addr + len);
-+		__cpuc_flush_dcache_area(kaddr, len);
-+		__flush_icache_all();
- #ifdef CONFIG_SMP
- 		if (cache_ops_need_broadcast())
- 			smp_call_function(flush_ptrace_access_other,
--- 
-1.6.3.3
+(a) Providing a workaround for a known TLB issue on some revisions of the Cortex-A9.
+(b) Performing correct I-cache invalidation in the flush_ptrace_access code.
+
+All feedback/comments/tested-bys welcome.
+
+Cc: Rob Clark <rob@ti.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+
+Will Deacon (2):
+  ARM: errata: TLBIASIDIS and TLBIMVAIS operations can broadcast a
+    faulty ASID
+  ARM: flush_ptrace_access: invalidate all I-caches
+
+ arch/arm/Kconfig                |   12 ++++++++++++
+ arch/arm/include/asm/tlbflush.h |    8 ++++++++
+ arch/arm/mm/flush.c             |    4 ++--
+ 3 files changed, 22 insertions(+), 2 deletions(-)
