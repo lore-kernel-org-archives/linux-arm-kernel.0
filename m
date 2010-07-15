@@ -1,35 +1,37 @@
-From: gregkh@suse.de (Greg KH)
-Date: Thu, 15 Jul 2010 09:51:41 -0700
-Subject: tq 2440
-In-Reply-To: <20100715163526.GJ29322@n2100.arm.linux.org.uk>
-References: <AANLkTimyBHliUa62qmfja_ke6YTTysiVAtJcZfi8l2gG@mail.gmail.com>
-	<AANLkTil8GE1OguyAfp3XgfJvEmH98yNrlvGAx684a-qL@mail.gmail.com>
-	<20100715163526.GJ29322@n2100.arm.linux.org.uk>
-Message-ID: <20100715165141.GA21272@suse.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 15 Jul 2010 17:54:33 +0100
+Subject: [PATCH 2/2] ARM: flush_ptrace_access: invalidate all I-caches
+In-Reply-To: <002801cb243c$e0a70130$a1f50390$@deacon@arm.com>
+References: <1279209238-16234-1-git-send-email-will.deacon@arm.com>
+	<1279209238-16234-2-git-send-email-will.deacon@arm.com>
+	<1279209238-16234-3-git-send-email-will.deacon@arm.com>
+	<20100715163216.GI29322@n2100.arm.linux.org.uk>
+	<002801cb243c$e0a70130$a1f50390$@deacon@arm.com>
+Message-ID: <1279212873.6664.60.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 15, 2010 at 05:35:26PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 15, 2010 at 11:16:30PM +0800, Conke Hu wrote:
-> > ever notice to the following kernel log?
-> > "Device 's3c2440-nand' does not have a release() function, it is
-> > broken and must."
-> > release() function should be implemented  in the platform_device.
+On Thu, 2010-07-15 at 17:43 +0100, Will Deacon wrote:
+> Russell King wrote:
+> > So, what CPUs report themselves as having VIPT non-aliasing caches but
+> > actually have an aliasing I-cache?
 > 
-> That's not telling you to provide a release function.  The warning is
-> telling you that a device is being unregistered which doesn't have a
-> release function.
-> 
-> Consider this point - maybe it doesn't have a release function because
-> it's not supposed to be unregistered?
+> As far as I understand, all ARM cores have aliasing I-caches if it's a
+> VIPT cache with way size greater than the page size. The D-cache has
+> additional logic for handling aliasing which is what the VIPT non-aliasing
+> characteristics refer to.
 
-Heh, well, it is being unregistered, and at that point in time, the
-kernel complains.
+Just to confirm what Will said (and I checked this in the past with our
+lead architect) - if the CTR reports VIPT I-cache, it is a true VIPT
+I-cache with potential aliases if the way size is greater than the page
+size (e.g. on vexpress, C-A9 has 32K I-cache and 4 ways).
 
-All kobjects need a release function that actually frees it.  If not,
-that is a logic bug.  Please see the Documentation/kobject.txt file for
-details.
+On the D side, the VIPT on ARMv7 is always non-aliasing (e.g. it behaves
+like PIPT).
 
-thanks,
+Anyway, it's not that bad since most places where this matters use
+__flush_icache_all(). This includes my patches for cache maintenance via
+set_pte_at().
 
-greg k-h
+-- 
+Catalin
