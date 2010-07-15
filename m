@@ -1,59 +1,35 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 15 Jul 2010 22:13:58 +0530
-Subject: [PATCH 1/2] ARM: errata: TLBIASIDIS and TLBIMVAIS operations
-	can	broadcast a faulty ASID
-In-Reply-To: <002701cb243b$47befb40$d73cf1c0$@deacon@arm.com>
-References: <1279209238-16234-1-git-send-email-will.deacon@arm.com>
-	<1279209238-16234-2-git-send-email-will.deacon@arm.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C60875D6@dbde02.ent.ti.com>
-	<002701cb243b$47befb40$d73cf1c0$@deacon@arm.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C60875E2@dbde02.ent.ti.com>
+From: gregkh@suse.de (Greg KH)
+Date: Thu, 15 Jul 2010 09:51:41 -0700
+Subject: tq 2440
+In-Reply-To: <20100715163526.GJ29322@n2100.arm.linux.org.uk>
+References: <AANLkTimyBHliUa62qmfja_ke6YTTysiVAtJcZfi8l2gG@mail.gmail.com>
+	<AANLkTil8GE1OguyAfp3XgfJvEmH98yNrlvGAx684a-qL@mail.gmail.com>
+	<20100715163526.GJ29322@n2100.arm.linux.org.uk>
+Message-ID: <20100715165141.GA21272@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: Thursday, July 15, 2010 10:02 PM
-> To: Shilimkar, Santosh; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH 1/2] ARM: errata: TLBIASIDIS and TLBIMVAIS operations
-> can broadcast a faulty ASID
+On Thu, Jul 15, 2010 at 05:35:26PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 15, 2010 at 11:16:30PM +0800, Conke Hu wrote:
+> > ever notice to the following kernel log?
+> > "Device 's3c2440-nand' does not have a release() function, it is
+> > broken and must."
+> > release() function should be implemented  in the platform_device.
 > 
-> Hi Santosh,
+> That's not telling you to provide a release function.  The warning is
+> telling you that a device is being unregistered which doesn't have a
+> release function.
 > 
-> > > Subject: [PATCH 1/2] ARM: errata: TLBIASIDIS and TLBIMVAIS operations
-> can
-> > > broadcast a faulty ASID
-> > >
-> > > On versions of the Cortex-A9 prior to r2p0, performing TLB
-> invalidations
-> > > by
-> > > ASID match can result in the incorrect ASID being broadcast to other
-> CPUs.
-> > > As a consequence of this, the targetted TLB entries are not
-> invalidated
-> > > across the system.
-> > >
-> > > This workaround changes the TLB flushing routines to invalidate
-> entries
-> > > regardless of the ASID.
-> > >
-> > Just a curious question. How costly is this ?
-> 
-> I think the cost really depends on whether or not the evicted TLB entries
-> are available in the D-cache. If they are, then a TLB miss occurring
-> because
-> of this workaround will hit in the data cache and the overhead will be
-> small.
-> Missing in the D-cache is certainly going to add an overhead, but that
-> depends
-> on your memory system.
-> 
-> Of course, this workaround should only be enabled on platforms that suffer
-> from the erratum, where it's worth sacrificing a few cycles in order to
-> get
-> a working virtual memory system!
+> Consider this point - maybe it doesn't have a release function because
+> it's not supposed to be unregistered?
 
-Thanks for quick response!!
+Heh, well, it is being unregistered, and at that point in time, the
+kernel complains.
 
-Regards
-Santosh
+All kobjects need a release function that actually frees it.  If not,
+that is a logic bug.  Please see the Documentation/kobject.txt file for
+details.
+
+thanks,
+
+greg k-h
