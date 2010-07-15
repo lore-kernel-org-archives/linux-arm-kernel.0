@@ -1,32 +1,52 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 15 Jul 2010 16:10:43 +0300
-Subject: [PATCH 0/3] Enable pxa310 usb otg port host mode
-Message-ID: <1279199446-30526-1-git-send-email-grinberg@compulab.co.il>
+Date: Thu, 15 Jul 2010 16:10:45 +0300
+Subject: [PATCH 2/3] [ARM] usb/host/ohci-pxa27x: enable OHCI over U2DC
+In-Reply-To: <1279199446-30526-1-git-send-email-grinberg@compulab.co.il>
+References: <1279199446-30526-1-git-send-email-grinberg@compulab.co.il>
+Message-ID: <1279199446-30526-3-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series introduces the U2D Controller and
-Host driver for PXA3xx and enables cm-x300 usb host port2.
+U2D Controller of pxa3xx is able to work in host mode.
+Make pxa specific ohci implementation aware of it.
 
-This patch series depends on
-"Generic ULPI driver extention" patch series,
-which is currently sent for review to
-linux-usb at vger.kernel.org mailing list
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+---
+ drivers/usb/host/ohci-pxa27x.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-Igor Grinberg (3):
-  [ARM] pxa3xx: Add U2D controller and driver
-  [ARM] usb/host/ohci-pxa27x: enable OHCI over U2DC
-  [ARM] pxa/cm-x300: enable USB host port2
-
- arch/arm/mach-pxa/Kconfig                   |    4 +
- arch/arm/mach-pxa/Makefile                  |    2 +-
- arch/arm/mach-pxa/cm-x300.c                 |   77 ++++++
- arch/arm/mach-pxa/devices.c                 |   28 ++
- arch/arm/mach-pxa/devices.h                 |    1 +
- arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h |   35 +++
- arch/arm/mach-pxa/pxa3xx-u2d.c              |  392 +++++++++++++++++++++++++++
- arch/arm/mach-pxa/pxa3xx.c                  |    2 +-
- drivers/usb/host/ohci-pxa27x.c              |    7 +
- 9 files changed, 546 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h
- create mode 100644 arch/arm/mach-pxa/pxa3xx-u2d.c
+diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
+index a18debd..7ca7f4c 100644
+--- a/drivers/usb/host/ohci-pxa27x.c
++++ b/drivers/usb/host/ohci-pxa27x.c
+@@ -24,6 +24,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/clk.h>
+ #include <mach/ohci.h>
++#include <mach/pxa3xx-u2d.h>
+ 
+ /*
+  * UHC: USB Host Controller (OHCI-like) register definitions
+@@ -235,6 +236,9 @@ static int pxa27x_start_hc(struct pxa27x_ohci *ohci, struct device *dev)
+ 	if (retval < 0)
+ 		return retval;
+ 
++	if (cpu_is_pxa3xx())
++		pxa3xx_u2d_start_hc(&ohci_to_hcd(&ohci->ohci)->self);
++
+ 	uhchr = __raw_readl(ohci->mmio_base + UHCHR) & ~UHCHR_SSE;
+ 	__raw_writel(uhchr, ohci->mmio_base + UHCHR);
+ 	__raw_writel(UHCHIE_UPRIE | UHCHIE_RWIE, ohci->mmio_base + UHCHIE);
+@@ -251,6 +255,9 @@ static void pxa27x_stop_hc(struct pxa27x_ohci *ohci, struct device *dev)
+ 
+ 	inf = dev->platform_data;
+ 
++	if (cpu_is_pxa3xx())
++		pxa3xx_u2d_stop_hc(&ohci_to_hcd(&ohci->ohci)->self);
++
+ 	if (inf->exit)
+ 		inf->exit(dev);
+ 
+-- 
+1.7.1
