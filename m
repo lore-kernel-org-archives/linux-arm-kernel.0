@@ -1,45 +1,35 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Thu, 15 Jul 2010 18:06:05 +0900
-Subject: [PATCH 2/5] ARM: S5P: Added default pll values for APLL 800/1000MHz
-In-Reply-To: <1279184768-28971-2-git-send-email-myungjoo.ham@samsung.com>
-References: <1279184768-28971-1-git-send-email-myungjoo.ham@samsung.com>
-	<1279184768-28971-2-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <1279184768-28971-3-git-send-email-myungjoo.ham@samsung.com>
+From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
+Date: Thu, 15 Jul 2010 12:08:07 +0300 (EEST)
+Subject: [RFC][PATCH 1/1] ARM: Add initial hibernation support
+In-Reply-To: <20100715084118.GB26212@n2100.arm.linux.org.uk>
+References: <20100714132255.GB3103@ucw.cz>
+	<20100715.083450.193689911.Hiroshi.DOYU@nokia.com>
+	<20100715084118.GB26212@n2100.arm.linux.org.uk>
+Message-ID: <20100715.120807.39160135.Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPUFREQ of S5PV210 uses different APLL settings and we provide
-such values for CPUFREQ at pll.h. We have been using differently
-between EVT0 and EVT1 machines. Although this version of kernel
-assumes that the CPU is EVT1, users may use code for EVT0 later.
+From: ext Russell King - ARM Linux <linux@arm.linux.org.uk>
+Subject: Re: [RFC][PATCH 1/1] ARM: Add initial hibernation support
+Date: Thu, 15 Jul 2010 10:41:18 +0200
 
-Note that at 1GHz of ARMCLK, APLL should be 1GHz and for other lower
-ARMCLK, APLL should be 800MHz.
+> On Thu, Jul 15, 2010 at 08:34:50AM +0300, Hiroshi DOYU wrote:
+>> Russell, would it be possible to put this into your next merge queue?
+> 
+> I think it needs quite a bit of rework - I certainly don't like all
+> those CP15 register accesses there - that's asking for lots of ifdefs
+> to spring up as more CPUs are supported.
+>
+> Eg, what about ensuring that state such as iWMMXt on PXA CPUs is
+> properly restored?
 
-Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/plat-s5p/include/plat/pll.h |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+Right. This arch specific part can be something like
+"suspend-v[3-7].S" to accomodate those differences
 
-diff --git a/arch/arm/plat-s5p/include/plat/pll.h b/arch/arm/plat-s5p/include/plat/pll.h
-index 7db3227..3112aba 100644
---- a/arch/arm/plat-s5p/include/plat/pll.h
-+++ b/arch/arm/plat-s5p/include/plat/pll.h
-@@ -21,6 +21,14 @@
- 
- #include <asm/div64.h>
- 
-+#ifdef CONFIG_CPU_S5PC110_EVT0_ERRATA
-+#define PLL45XX_APLL_VAL_1000	(1 << 31) | (0xfa<<16) | (0x6<<8) | (0x1)
-+#define PLL45XX_APLL_VAL_800	(1 << 31) | (0xc8<<16) | (0x6<<8) | (0x1)
-+#else
-+#define PLL45XX_APLL_VAL_1000	(1 << 31) | (125<<16) | (3<<8) | (1)
-+#define PLL45XX_APLL_VAL_800	(1 << 31) | (100<<16) | (3<<8) | (1)
-+#endif
-+
- enum pll45xx_type_t {
- 	pll_4500,
- 	pll_4502,
--- 
-1.6.3.3
+> We already have code which knows what needs to be saved across a
+> power-off transition - its what we use for our normal suspend/resume
+> functionality, so we should look at re-using that code for hibernate
+> as well.  We really don't want to be maintaining two sets of code
+> doing the same thing.
+
+Could you explain which code you're refering for the existing one?
