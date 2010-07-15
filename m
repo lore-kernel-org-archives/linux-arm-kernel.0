@@ -1,29 +1,68 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 15 Jul 2010 10:09:33 +0100
-Subject: [PATCH v2 2/2] ux500: add ab8500-regulators machine specific data
-In-Reply-To: <AANLkTimWjozzhTG491JVLUIICh6YonO4Emp07AG1nMj-@mail.gmail.com>
-References: <20100714145748.GF31073@rakim.wolfsonmicro.main>
-	<20100714153643.GB1689@bnru01.bnr.st.com>
-	<20100714154726.GH31073@rakim.wolfsonmicro.main>
-	<20100714160941.GC1689@bnru01.bnr.st.com>
-	<20100714162048.GA27512@rakim.wolfsonmicro.main>
-	<20100714164708.GD1689@bnru01.bnr.st.com>
-	<20100714170323.GF5933@sirena.org.uk>
-	<20100714173650.GA21893@bnru01.bnr.st.com>
-	<20100714184251.GG5933@sirena.org.uk>
-	<AANLkTimWjozzhTG491JVLUIICh6YonO4Emp07AG1nMj-@mail.gmail.com>
-Message-ID: <20100715090932.GC23529@rakim.wolfsonmicro.main>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 15 Jul 2010 11:10:34 +0200
+Subject: [PATCH 03/10 v2] ARM: Samsung: Add platform definitions for local
+	FIMC/FIMD fifo path
+In-Reply-To: <1279185041-6004-1-git-send-email-s.nawrocki@samsung.com>
+References: <1279185041-6004-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1279185041-6004-4-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 15, 2010 at 12:51:50AM +0200, Linus Walleij wrote:
+From: Marek Szyprowski <m.szyprowski@samsung.com>
 
-> For U8500 there is a dedicated autonomous system in the silicon, called
-> PRCMU (Power Reset Clock Management Unit) that will actually do
-> this using I2C because it has its own CPU and can transmit I2C
-> messages even when the ARM CPU cores are turned off. So this is
-> indeed a first-timer and not strange that it looks unfamiliar ...
+Add a common s3c_fifo_link structure that describes a local path link
+between 2 multimedia devices (like FIMC and FrameBuffer).
 
-This sort of design is becoming more and more common but it's still the
-same thing from the point of view of the kernel - something else goes
-off and does magic without the kernel explicitly doing anything.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ arch/arm/plat-samsung/include/plat/fifo.h |   37 +++++++++++++++++++++++++++++
+ 1 files changed, 37 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-samsung/include/plat/fifo.h
+
+diff --git a/arch/arm/plat-samsung/include/plat/fifo.h b/arch/arm/plat-samsung/include/plat/fifo.h
+new file mode 100644
+index 0000000..84d242b
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/plat/fifo.h
+@@ -0,0 +1,37 @@
++/*
++ * Copyright (c) 2010 Samsung Electronics
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef FIFO_H_
++#define FIFO_H_
++
++#include <linux/device.h>
++#include <media/v4l2-subdev.h>
++
++/*
++ * The multimedia devices contained in Samsung S3C/S5P SoC series
++ * like framebuffer, camera interface or tv scaler can transfer data
++ * directly between each other through hardware fifo channels.
++ * s3c_fifo_link data structure is an abstraction for such links,
++ * it allows to define V4L2 device drivers hierarchy according to
++ * the hardware structure. Fifo links are mostly unidirectional, exclusive
++ * data buses. To control data transfer in fifo mode synchronization is
++ * is required between drivers at both ends of the fifo channel
++ * (master_dev, slave_dev). s3c_fifo_link:sub_dev is intended  to export
++ * in a consistent way all the functionality of the slave device required
++ * at master device driver to enable transfer through fifo channel.
++ * master_dev and slave_dev is to be setup by the platform code whilst
++ * sub_dev entry will mostly be initlized during slave_dev probe().
++ */
++struct s3c_fifo_link {
++	struct device		*master_dev;
++	struct device		*slave_dev;
++	struct v4l2_subdev	*sub_dev;
++};
++
++#endif /* FIFO_H_ */
++
+-- 
+1.7.0.4
