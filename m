@@ -1,44 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Jul 2010 17:35:26 +0100
-Subject: tq 2440
-In-Reply-To: <AANLkTil8GE1OguyAfp3XgfJvEmH98yNrlvGAx684a-qL@mail.gmail.com>
-References: <AANLkTimyBHliUa62qmfja_ke6YTTysiVAtJcZfi8l2gG@mail.gmail.com>
-	<AANLkTil8GE1OguyAfp3XgfJvEmH98yNrlvGAx684a-qL@mail.gmail.com>
-Message-ID: <20100715163526.GJ29322@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 15 Jul 2010 17:43:39 +0100
+Subject: [PATCH 2/2] ARM: flush_ptrace_access: invalidate all I-caches
+In-Reply-To: <20100715163216.GI29322@n2100.arm.linux.org.uk>
+References: <1279209238-16234-1-git-send-email-will.deacon@arm.com>
+	<1279209238-16234-2-git-send-email-will.deacon@arm.com>
+	<1279209238-16234-3-git-send-email-will.deacon@arm.com>
+	<20100715163216.GI29322@n2100.arm.linux.org.uk>
+Message-ID: <002801cb243c$e0a70130$a1f50390$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 15, 2010 at 11:16:30PM +0800, Conke Hu wrote:
-> ever notice to the following kernel log?
-> "Device 's3c2440-nand' does not have a release() function, it is
-> broken and must."
-> release() function should be implemented  in the platform_device.
+Hi Russell,
 
-That's not telling you to provide a release function.  The warning is
-telling you that a device is being unregistered which doesn't have a
-release function.
+> > diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> > index c6844cb..45896a9 100644
+> > --- a/arch/arm/mm/flush.c
+> > +++ b/arch/arm/mm/flush.c
+> > @@ -120,8 +120,8 @@ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+> >
+> >  	/* VIPT non-aliasing cache */
+> >  	if (vma->vm_flags & VM_EXEC) {
+> > -		unsigned long addr = (unsigned long)kaddr;
+> > -		__cpuc_coherent_kern_range(addr, addr + len);
+> > +		__cpuc_flush_dcache_area(kaddr, len);
+> > +		__flush_icache_all();
+> 
+> NAK.
+>
+> If we have aliases in the I-cache, there's probably more places that
+> need to be fixed - and in any case I think the VIPT aliasing case
+> should be used in that instance.
+> 
+> This code is for non-aliasing D and I caches, and works as follows.
+> 
+> 1. We flush the data out of the D cache, line by line, on at least the
+>    local CPU (and optionally the other CPUs.)  Since we disable
+>    preemption, we will own the cache lines.
+> 
+> 2. We invalidate the I cache, line by line, on at least local CPU
+>    (and optionally the other CPUs.)
 
-Consider this point - maybe it doesn't have a release function because
-it's not supposed to be unregistered?
+(1) and (2) are done in __cpuc_coherent_kern_range. The problem is
+that the (2) part doesn't deal with aliases and only invalidates for
+the given MVA.
+ 
+> 3. If the I-cache invalidate wasn't broadcast, we flush the entire
+>    I-cache on the other CPUs.
 
-> > ------------[ cut here ]------------
-> > WARNING: at fs/sysfs/dir.c:463 sysfs_add_one+0x30/0x44()
-> > sysfs: duplicate filename 'dm9000.0' can not be created
+Yep.
 
-This is the cause of the problem.  You're registering two dm9000.0
-devices.  That's illegal, and it then causes all these:
+> So, what CPUs report themselves as having VIPT non-aliasing caches but
+> actually have an aliasing I-cache?
 
-> > WARNING: at drivers/base/core.c:122 device_release+0x6c/0x78()
-> > Device 's3c24xx_led.3' does not have a release() function, it is broken and mus.
-> > WARNING: at drivers/base/core.c:122 device_release+0x6c/0x78()
-> > Device 's3c24xx_led.2' does not have a release() function, it is broken and mus.
-> > WARNING: at drivers/base/core.c:122 device_release+0x6c/0x78()
-> > Device 's3c24xx_led.1' does not have a release() function, it is broken and mus.
-> > WARNING: at drivers/base/core.c:122 device_release+0x6c/0x78()
-> > Device 's3c24xx_led.0' does not have a release() function, it is broken and mus.
-> > WARNING: at drivers/base/core.c:122 device_release+0x6c/0x78()
-> > Device 's3c2440-nand' does not have a release() function, it is broken and must.
-...
+As far as I understand, all ARM cores have aliasing I-caches if it's a
+VIPT cache with way size greater than the page size. The D-cache has
+additional logic for handling aliasing which is what the VIPT non-aliasing
+characteristics refer to.
 
-Fix the first problem (which is the real one) and you won't have these
-other problems (which aren't actually a problem.)
+Will
