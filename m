@@ -1,36 +1,133 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Thu, 15 Jul 2010 11:29:37 +0100
-Subject: [PATCH 1/3] ab8500-mfd: add regulator support to ab8500 mfd device
-In-Reply-To: <20100714101330.GD2771@sortiz-mobl>
-References: <1279002090-11234-1-git-send-email-sundar.iyer@stericsson.com>
-	<1279002090-11234-2-git-send-email-sundar.iyer@stericsson.com>
-	<20100714101330.GD2771@sortiz-mobl>
-Message-ID: <1279189777.3072.24.camel@odin>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Thu, 15 Jul 2010 12:32:26 +0200
+Subject: [PATCH 05/10 v2] s3c-fb: Add v4l2 subdevice to support framebuffer
+	local fifo input path
+In-Reply-To: <1279185041-6004-6-git-send-email-s.nawrocki@samsung.com>
+References: <1279185041-6004-1-git-send-email-s.nawrocki@samsung.com>
+	<1279185041-6004-6-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <4C3EE3BA.9020307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-07-14 at 12:13 +0200, Samuel Ortiz wrote:
-> On Tue, Jul 13, 2010 at 11:51:28AM +0530, Sundar Iyer wrote:
-> > From: Sundar R Iyer <sundar.iyer@stericsson.com>
-> > 
-> > Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-> > Acked-By: Mattias Wallin <mattias.wallin@stericsson.com>
-> > Acked-By: Bengt JONSSON <bengt.g.jonsson@stericsson.com>
-> > Signed-off-by: Sundar R Iyer <sundar.iyer@stericsson.com>
-> Liam, I guess this should make it upstream through your regulator tree.
-> 
-> For the mfd part though:
-> Acked-by: Samuel Ortiz <sameo@linux.intel.com>
-> 
-> Cheers,
-> Samuel.
+ Op 15-07-10 11:10, Sylwester Nawrocki schreef:
+> Selected multimedia devices in Samsung S3C/S5P SoC series are capable of
+> transferring data directly between each other, bypassing the main system
+> bus. Such a datapath exists between the camera interface/video
+> postprocessor and the lcd controller. To control the data flow from the
+> fimc driver level v4l2-subdevice driver is added to the framebuffer.
+> It enables to configure the lcd controller into FIFO or DMA input mode.
+>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  arch/arm/plat-samsung/include/plat/fb.h |    6 +
+>  drivers/video/s3c-fb.c                  |  487 +++++++++++++++++++++++++++++--
+>  2 files changed, 472 insertions(+), 21 deletions(-)
 
-Applied.
+<snip>
 
-Thanks
+>  /**
+> + * s3c_fb_enable_local() - switch window between input DMA and fifo modes
+> + *
+> + * @fb_sd: window subdevice for fifo input
+> + * @en:    1 - switch from input DMA to fifo mode and apply
+> + *	       window size and position set by the window's subdevice
+> + *         0 - restore from fifo to DMA mode
+> + */
+> +static int s3c_fb_enable_local_in(struct s3c_fb_win_sd *fb_sd, int en)
+> +{
+> +	struct s3c_fb_win *win = fb_sd->win;
+> +	struct s3c_fb *sfb = win->parent;
+> +	static u32 wincon;
+> +	u32 reg, data;
+> +	int ret = 0, bpp = 32;
+> +
+> +	/* disable video output and the window logic */
+> +	reg = readl(sfb->regs + WINCON(win->index));
+> +	writel(reg & ~WINCONx_ENWIN, sfb->regs + WINCON(win->index));
+> +
+> +	shadow_protect_win(win, 1);
+> +
+> +	if (en == 1) {
+> +		if (fb_sd->streaming)
+> +			return 0;
 
-Liam
+Shouldn't you do shadow_protect_win(win, 0) before returning here?
+
+> +
+> +		wincon = reg;
+> +
+> +		switch (fb_sd->fmt.fmt.pix.pixelformat) {
+> +		case V4L2_PIX_FMT_YUYV: /* YCbCr 4:4:4 */
+> +			reg |= WINCONx_YCbCr | WINCONx_ENLOCAL;
+> +			bpp = 16;
+> +			break;
+> +
+> +		case V4L2_PIX_FMT_RGB24:
+> +		default:
+> +			reg &= ~(WINCONx_YCbCr | WINCONx_WSWP | WINCONx_HAWSWP |
+> +				 WINCONx_BYTSWP | WINCONx_BITSWP |
+> +				 WINCON0_BPPMODE_MASK | WINCONx_BURSTLEN_MASK);
+> +
+> +			reg |=	WINCON0_BPPMODE_24BPP_888 |
+> +				WINCONx_BURSTLEN_4WORD;
+> +			bpp = 24;
+> +			break;
+> +		}
+> +
+> +		fb_sd->streaming = 1;
+> +		writel(reg, sfb->regs + WINCON(win->index));
+> +
+> +		s3c_fb_set_osd(fb_sd->win, &fb_sd->curr_osd_win, bpp);
+> +
+> +		writel(reg | WINCONx_ENLOCAL, sfb->regs + WINCON(win->index));
+> +
+> +		shadow_protect_win(win, 0);
+> +
+> +		reg = readl(sfb->regs + WINCON(win->index));
+> +		writel(reg | WINCONx_ENWIN, sfb->regs + WINCON(win->index));
+> +
+> +		if (sfb->variant.has_shadowcon)	{
+> +			data = readl(sfb->regs + SHADOWCON);
+> +			data |=	SHADOWCON_CHx_LOCAL_ENABLE(win->index);
+> +			writel(data, sfb->regs + SHADOWCON);
+> +		}
+> +
+> +	} else if (en == 0) {
+> +		if (!fb_sd->streaming)
+> +			return 0;
+
+Same comment
+
+> +
+> +		fb_sd->streaming = 0;
+> +
+> +		/* need to be aligned with VSYNC interrupt */
+> +		writel(wincon & ~WINCONx_ENLOCAL,
+> +		       sfb->regs + WINCON(win->index));
+> +
+> +		/* restore OSD values from before we enabled local mode */
+> +		bpp = win->fbinfo->var.bits_per_pixel;
+> +		s3c_fb_set_osd(fb_sd->win, &fb_sd->default_osd_win, bpp);
+> +
+> +		shadow_protect_win(win, 0);
+> +
+> +		if (sfb->variant.has_shadowcon)	{
+> +			data = readl(sfb->regs + SHADOWCON);
+> +			data &=	~SHADOWCON_CHx_LOCAL_ENABLE(win->index);
+> +			writel(data, sfb->regs + SHADOWCON);
+> +		}
+> +
+> +		reg = readl(sfb->regs + WINCON(win->index));
+> +		writel(reg | WINCONx_ENWIN, sfb->regs + WINCON(win->index));
+> +	} else {
+> +		return -EINVAL;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+
 -- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+Maurus Cuelenaere
