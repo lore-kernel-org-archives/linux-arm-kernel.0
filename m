@@ -1,105 +1,174 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Jul 2010 12:18:23 +0100
-Subject: [PATCH 3/6] U6715 gpio platform driver This driver is U6XXX
-	platform generic
-In-Reply-To: <1278688913-26417-4-git-send-email-philippe.langlais@stericsson.com>
-References: <1278688913-26417-1-git-send-email-philippe.langlais@stericsson.com>
-	<1278688913-26417-4-git-send-email-philippe.langlais@stericsson.com>
-Message-ID: <20100715111823.GB29322@n2100.arm.linux.org.uk>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 15 Jul 2010 13:18:28 +0200
+Subject: [PATCH 05/10 v2] s3c-fb: Add v4l2 subdevice to support framebuffer
+	local fifo input path
+In-Reply-To: <4C3EE3BA.9020307@gmail.com>
+References: <1279185041-6004-1-git-send-email-s.nawrocki@samsung.com>
+	<1279185041-6004-6-git-send-email-s.nawrocki@samsung.com>
+	<4C3EE3BA.9020307@gmail.com>
+Message-ID: <000601cb240f$730f19f0$592d4dd0$%nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks, this is much better.  Just a few remaining niggles.
+Hello,
 
-On Fri, Jul 09, 2010 at 05:21:50PM +0200, Philippe Langlais wrote:
-> diff --git a/arch/arm/mach-u67xx/board_u67xx_wavex.c b/arch/arm/mach-u67xx/board_u67xx_wavex.c
-> index 633989f..235e80d 100644
-> --- a/arch/arm/mach-u67xx/board_u67xx_wavex.c
-> +++ b/arch/arm/mach-u67xx/board_u67xx_wavex.c
-> @@ -23,6 +23,473 @@
->  #include <mach/hardware.h>
->  #include <mach/irqs.h>
->  #include <mach/timer.h>
-> +#include <mach/gpio.h>
+> -----Original Message-----
+> From: linux-samsung-soc-owner at vger.kernel.org [mailto:linux-samsung-
+> soc-owner at vger.kernel.org] On Behalf Of Maurus Cuelenaere
+> Sent: Thursday, July 15, 2010 12:32 PM
+> To: Sylwester Nawrocki
+> Cc: linux-samsung-soc at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; p.osciak at samsung.com;
+> m.szyprowski at samsung.com; kyungmin.park at samsung.com;
+> kgene.kim at samsung.com; ben-linux at fluff.org; linux-fbdev at vger.kernel.org
+> Subject: Re: [PATCH 05/10 v2] s3c-fb: Add v4l2 subdevice to support
+> framebuffer local fifo input path
+> 
+>  Op 15-07-10 11:10, Sylwester Nawrocki schreef:
+> > Selected multimedia devices in Samsung S3C/S5P SoC series are capable
+> of
+> > transferring data directly between each other, bypassing the main
+> system
+> > bus. Such a datapath exists between the camera interface/video
+> > postprocessor and the lcd controller. To control the data flow from
+> the
+> > fimc driver level v4l2-subdevice driver is added to the framebuffer.
+> > It enables to configure the lcd controller into FIFO or DMA input
+> mode.
+> >
+> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > ---
+> >  arch/arm/plat-samsung/include/plat/fb.h |    6 +
+> >  drivers/video/s3c-fb.c                  |  487
+> +++++++++++++++++++++++++++++--
+> >  2 files changed, 472 insertions(+), 21 deletions(-)
+> 
+> <snip>
+> 
+> >  /**
+> > + * s3c_fb_enable_local() - switch window between input DMA and fifo
+> modes
+> > + *
+> > + * @fb_sd: window subdevice for fifo input
+> > + * @en:    1 - switch from input DMA to fifo mode and apply
+> > + *	       window size and position set by the window's subdevice
+> > + *         0 - restore from fifo to DMA mode
+> > + */
+> > +static int s3c_fb_enable_local_in(struct s3c_fb_win_sd *fb_sd, int
+> en)
+> > +{
+> > +	struct s3c_fb_win *win = fb_sd->win;
+> > +	struct s3c_fb *sfb = win->parent;
+> > +	static u32 wincon;
+> > +	u32 reg, data;
+> > +	int ret = 0, bpp = 32;
+> > +
+> > +	/* disable video output and the window logic */
+> > +	reg = readl(sfb->regs + WINCON(win->index));
+> > +	writel(reg & ~WINCONx_ENWIN, sfb->regs + WINCON(win->index));
+> > +
+> > +	shadow_protect_win(win, 1);
+> > +
+> > +	if (en == 1) {
+> > +		if (fb_sd->streaming)
+> > +			return 0;
+> 
+> Shouldn't you do shadow_protect_win(win, 0) before returning here?
 
-Should be linux/gpio.h
+Yes, indeed the error path is wrong and also WINCONx_ENWIN
+needs to be restored.
+Thank you for pointing this out. 
 
-> diff --git a/arch/arm/mach-u67xx/devices.c b/arch/arm/mach-u67xx/devices.c
-> index 1d00b35..e88a106 100644
-> --- a/arch/arm/mach-u67xx/devices.c
-> +++ b/arch/arm/mach-u67xx/devices.c
-> @@ -11,10 +11,78 @@
->  #include <linux/kernel.h>
->  #include <linux/init.h>
->  #include <linux/device.h>
-> +#include <linux/ioport.h>
->  #include <linux/platform_device.h>
-> +#include <linux/fs.h>
-> +#include <linux/gpio.h>
-> +#include <mach/hardware.h>
-> +#include <mach/scon.h>
-> +#include <mach/gpio.h>
+> 
+> > +
+> > +		wincon = reg;
+> > +
+> > +		switch (fb_sd->fmt.fmt.pix.pixelformat) {
+> > +		case V4L2_PIX_FMT_YUYV: /* YCbCr 4:4:4 */
+> > +			reg |= WINCONx_YCbCr | WINCONx_ENLOCAL;
+> > +			bpp = 16;
+> > +			break;
+> > +
+> > +		case V4L2_PIX_FMT_RGB24:
+> > +		default:
+> > +			reg &= ~(WINCONx_YCbCr | WINCONx_WSWP |
+> WINCONx_HAWSWP |
+> > +				 WINCONx_BYTSWP | WINCONx_BITSWP |
+> > +				 WINCON0_BPPMODE_MASK | WINCONx_BURSTLEN_MASK);
+> > +
+> > +			reg |=	WINCON0_BPPMODE_24BPP_888 |
+> > +				WINCONx_BURSTLEN_4WORD;
+> > +			bpp = 24;
+> > +			break;
+> > +		}
+> > +
+> > +		fb_sd->streaming = 1;
+> > +		writel(reg, sfb->regs + WINCON(win->index));
+> > +
+> > +		s3c_fb_set_osd(fb_sd->win, &fb_sd->curr_osd_win, bpp);
+> > +
+> > +		writel(reg | WINCONx_ENLOCAL, sfb->regs + WINCON(win-
+> >index));
+> > +
+> > +		shadow_protect_win(win, 0);
+> > +
+> > +		reg = readl(sfb->regs + WINCON(win->index));
+> > +		writel(reg | WINCONx_ENWIN, sfb->regs + WINCON(win-
+> >index));
+> > +
+> > +		if (sfb->variant.has_shadowcon)	{
+> > +			data = readl(sfb->regs + SHADOWCON);
+> > +			data |=	SHADOWCON_CHx_LOCAL_ENABLE(win->index);
+> > +			writel(data, sfb->regs + SHADOWCON);
+> > +		}
+> > +
+> > +	} else if (en == 0) {
+> > +		if (!fb_sd->streaming)
+> > +			return 0;
+> 
+> Same comment
+> 
+> > +
+> > +		fb_sd->streaming = 0;
+> > +
+> > +		/* need to be aligned with VSYNC interrupt */
+> > +		writel(wincon & ~WINCONx_ENLOCAL,
+> > +		       sfb->regs + WINCON(win->index));
+> > +
+> > +		/* restore OSD values from before we enabled local mode */
+> > +		bpp = win->fbinfo->var.bits_per_pixel;
+> > +		s3c_fb_set_osd(fb_sd->win, &fb_sd->default_osd_win, bpp);
+> > +
+> > +		shadow_protect_win(win, 0);
+> > +
+> > +		if (sfb->variant.has_shadowcon)	{
+> > +			data = readl(sfb->regs + SHADOWCON);
+> > +			data &=	~SHADOWCON_CHx_LOCAL_ENABLE(win->index);
+> > +			writel(data, sfb->regs + SHADOWCON);
+> > +		}
+> > +
+> > +		reg = readl(sfb->regs + WINCON(win->index));
+> > +		writel(reg | WINCONx_ENWIN, sfb->regs + WINCON(win-
+> >index));
+> > +	} else {
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	return ret;
+> > +}
+> > +
+> 
+> --
+> Maurus Cuelenaere
 
-You're already including linux/gpio.h, so this shouldn't be required.
+Regards,
+--
+Sylwester Nawrocki
 
-> diff --git a/arch/arm/plat-u6xxx/gpio.c b/arch/arm/plat-u6xxx/gpio.c
-> new file mode 100644
-> index 0000000..40205d2
-> --- /dev/null
-> +++ b/arch/arm/plat-u6xxx/gpio.c
-> @@ -0,0 +1,672 @@
-> +/*
-> + * linux/arch/arm/plat-u6xxx/gpio.c
-> + *
-> + * Copyright (C) ST-Ericsson SA 2010
-> + * Author: Loic Pallardy <loic.pallardy@stericsson.com> for ST-Ericsson.
-> + * License terms:  GNU General Public License (GPL), version 2
-> + * Support functions for GPIO
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/sched.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/ptrace.h>
-> +#include <linux/sysdev.h>
-> +#include <linux/err.h>
-> +#include <linux/clk.h>
-> +#include <linux/io.h>
-> +
-> +#include <asm/irq.h>
-> +#include <asm/mach/irq.h>
-> +
-> +#include <mach/hardware.h>
-> +#include <mach/irqs.h>
-> +#include <mach/gpio.h>
-
-linux/gpio.h again please.
-
-> +static struct platform_driver u6_gpio_driver = {
-> +	.probe = u6_gpio_probe,
-> +	.remove = NULL,
-> +	.suspend = NULL,
-> +	.resume = NULL,
-
-NULL initializers aren't required.
-
-> +	.driver = {
-> +		   .name = "u6-gpio",
-> +		   },
-
-} should be aligned with the '.' of '.driver'.
-
-Lastly, I'm confused by this in a few places:
-
-	local_irq_save(flags);
-	writel(some value, register);
-	local_irq_restore(flags);
-
-Is there a reason why this apparantly simple register write need IRQs to
-be disabled?
-
-I don't think this patch needs another review cycle, unless someone else
-wants to comment on it.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-
+> samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
