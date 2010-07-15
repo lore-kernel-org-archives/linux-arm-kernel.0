@@ -1,48 +1,33 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 15 Jul 2010 08:04:06 +0200
-Subject: [RFC][PATCH 1/1] ARM: Add initial hibernation support
-In-Reply-To: <20100715.090028.189718162.Hiroshi.DOYU@nokia.com>
-References: <201007150648.50521.marek.vasut@gmail.com>
-	<201007150756.11817.marek.vasut@gmail.com>
-	<20100715.090028.189718162.Hiroshi.DOYU@nokia.com>
-Message-ID: <201007150804.06217.marek.vasut@gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Wed, 14 Jul 2010 23:27:16 -0700
+Subject: Meaning of clk_round_rate()?
+In-Reply-To: <20100714200324.GA18138@n2100.arm.linux.org.uk>
+References: <4C3DFC7A.8020002@codeaurora.org>
+	<20100714200324.GA18138@n2100.arm.linux.org.uk>
+Message-ID: <4C3EAA44.7040607@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 15. ?ervence 2010 08:00:28 Hiroshi DOYU napsal(a):
-> From: ext Marek Vasut <marek.vasut@gmail.com>
-> Subject: Re: [RFC][PATCH 1/1] ARM: Add initial hibernation support
-> Date: Thu, 15 Jul 2010 07:56:11 +0200
-> 
-> > Dne ?t 15. ?ervence 2010 07:39:31 Hiroshi DOYU napsal(a):
-> >> From: ext Marek Vasut <marek.vasut@gmail.com>
-> >> Subject: Re: [RFC][PATCH 1/1] ARM: Add initial hibernation support
-> >> Date: Thu, 15 Jul 2010 06:48:50 +0200
-> >> 
-> >> > Dne St 30. ?ervna 2010 16:28:01 Hiroshi DOYU napsal(a):
-> >> >> From: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
-> >> >> 
-> >> >> Hibernation (a.k.a: Suspend-To-Disk) support for ARM
-> >> >> 
-> >> >> Based on the original work from Romit and Raghu at TI. The original
-> >> >> patch(*1) was sent to LOML by Teerth Reddy <teerth@ti.com>
-> >> >> 
-> >> >> *1: https://patchwork.kernel.org/patch/96442/
-> >> >> 
-> >> >> Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
-> >> > 
-> >> > Hey, can this also run on pre-v7 arms ? Or is there something I missed
-> >> > that'd make that impossible?
-> >> 
-> >> What I verified is with OMAP3(Cortex A8) based board.
-> >> 
-> >> cp15 part has to be modified, but it might work without this part
-> >> itself, I guess.
-> > 
-> > I see ... do I need any special support on the bootloader or userland
-> > side ?
-> 
-> No, I don't think so. The resuming boot could set up most of states
-> basically.
+Russell King - ARM Linux wrote:
+> On Wed, Jul 14, 2010 at 11:05:46AM -0700, Stephen Boyd wrote:
+> clk_round_rate() returns the clock rate which will be set if you ask
+> clk_set_rate() to set that rate.  It provides a way to query from
+> the implementation exactly what rate you'll get if you use clk_set_rate()
+> with that same argument.
 
-I'll test it on xscale/pxa270 ... if it works, I can test on various pxa3xx too.
+Fair enough explanation for clk_round_rate(). I guess I should take it 
+as "it's up to the specific clock implementation on what it wants to do".
+
+But what about the problem of a clock consumer trying to find a suitable 
+frequency amongst the ones provided by a particular clock?
+
+What are your thoughts on adding the following two APIs to linux/clk.h?
+clk_round_rate_down/floor()
+clk_round_rate_up/ceil()
+
+Thanks,
+Saravana
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
