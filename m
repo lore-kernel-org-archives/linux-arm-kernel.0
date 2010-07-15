@@ -1,195 +1,38 @@
-From: thara@ti.com (Gopinath, Thara)
-Date: Thu, 15 Jul 2010 10:55:45 +0530
-Subject: [PATCH 12/20] OMAP: PM: create omap_devices for MPU, DSP, L3
-In-Reply-To: <20100702152930.6221.32877.stgit@localhost.localdomain>
-References: <20100702152703.6221.33529.stgit@localhost.localdomain>
-	<20100702152930.6221.32877.stgit@localhost.localdomain>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0323A2C2A5@dbde02.ent.ti.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 15 Jul 2010 08:26:44 +0300
+Subject: [PATCH v2] otg/ulpi.c : fix register write
+In-Reply-To: <20100714204740.GA29417@suse.de>
+References: <1277311435-12027-1-git-send-email-eric@eukrea.com>
+	<4C3DC843.7060502@compulab.co.il> <20100714204740.GA29417@suse.de>
+Message-ID: <4C3E9C14.8020404@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+>
+> On Wed, Jul 14, 2010 at 05:22:59PM +0300, Igor Grinberg wrote:
+>   
+>> Greg,
+>>
+>> I have a patch set, I want to submit in the very near future and it
+>> relies on this one.
+>> Will this patch get to your tree?
+>>     
+> Odd, I don't see it in my "to-apply" queue.  Did you cc: me on it?  Care
+> to resend it if you want me to apply it?
+>
+>   
 
+Well, you were in "To:", when Eric sent it the first time.
+Nevertheless, Eric does not seem to care resending it.
+I can send it along with my patch set (with Eric's Signed-off).
+Also, this patch will make more sense then.
 
->>-----Original Message-----
->>From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Paul
->>Walmsley
->>Sent: Friday, July 02, 2010 9:00 PM
->>To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->>Cc: Kevin Hilman
->>Subject: [PATCH 12/20] OMAP: PM: create omap_devices for MPU, DSP, L3
->>
->>From: Kevin Hilman <khilman@deeprootsystems.com>
->>
->>Create simple omap_devices for the main processors and busses.
->>
->>This is required to support the forth-coming device-based OPP
->>approach, where OPPs are managed and tracked at the device level.
->>
->>Also, move these common PM init functions into a common_pm_init call
->>that is called as a device_initcall().  The PM init is done at this level
->>to ensure that the driver core is initialized before initialized.
->>
->>Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
->>[paul at pwsan.com: sparse warnings cleaned up; newly-created functions moved
->> from mach-omap2/io.c to mach-omap2/pm.c; newly-created functions renamed
->> to start with "omap2" rather than "omap"]
->>Signed-off-by: Paul Walmsley <paul@pwsan.com>
->>---
->> arch/arm/mach-omap2/Makefile             |    2 -
->> arch/arm/mach-omap2/io.c                 |    2 -
->> arch/arm/mach-omap2/pm.c                 |   84 ++++++++++++++++++++++++++++++
->> arch/arm/plat-omap/include/plat/common.h |    4 +
->> 4 files changed, 90 insertions(+), 2 deletions(-)
->> create mode 100644 arch/arm/mach-omap2/pm.c
->>
->>diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
->>index 2fa3418..213f1df 100644
->>--- a/arch/arm/mach-omap2/Makefile
->>+++ b/arch/arm/mach-omap2/Makefile
->>@@ -3,7 +3,7 @@
->> #
->>
->> # Common support
->>-obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer-gp.o
->>+obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer-gp.o pm.o
->>
->> omap-2-3-common				= irq.o sdrc.o
->> hwmod-common				= omap_hwmod.o \
->>diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
->>index 05c9cdb..2b983ac 100644
->>--- a/arch/arm/mach-omap2/io.c
->>+++ b/arch/arm/mach-omap2/io.c
->>@@ -44,6 +44,7 @@
->>
->> #include <plat/clockdomain.h>
->> #include "clockdomains.h"
->>+
->> #include <plat/omap_hwmod.h>
->>
->> /*
->>@@ -346,7 +347,6 @@ void __init omap2_init_common_hw(struct omap_sdrc_params *sdrc_cs0,
->> 	if (cpu_is_omap24xx() || cpu_is_omap34xx())   /* FIXME: OMAP4 */
->> 		omap_hwmod_late_init(skip_setup_idle);
->>
->>-	omap_pm_if_init();
->> 	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
->> 		omap2_sdrc_init(sdrc_cs0, sdrc_cs1);
->> 		_omap2_init_reprogram_sdrc();
->>diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
->>new file mode 100644
->>index 0000000..68f9f2e
->>--- /dev/null
->>+++ b/arch/arm/mach-omap2/pm.c
->>@@ -0,0 +1,84 @@
->>+/*
->>+ * pm.c - Common OMAP2+ power management-related code
->>+ *
->>+ * Copyright (C) 2010 Texas Instruments, Inc.
->>+ * Copyright (C) 2010 Nokia Corporation
->>+ *
->>+ * This program is free software; you can redistribute it and/or modify
->>+ * it under the terms of the GNU General Public License version 2 as
->>+ * published by the Free Software Foundation.
->>+ */
->>+
->>+#include <linux/kernel.h>
->>+#include <linux/init.h>
->>+#include <linux/io.h>
->>+#include <linux/err.h>
->>+
->>+#include <plat/omap-pm.h>
->>+#include <plat/omap_device.h>
->>+#include <plat/common.h>
->>+
->>+static struct omap_device_pm_latency *pm_lats;
->>+
->>+static struct device *mpu_dev;
->>+static struct device *dsp_dev;
->>+static struct device *l3_dev;
->>+
->>+struct device *omap2_get_mpuss_device(void)
->>+{
->>+	WARN_ON_ONCE(!mpu_dev);
->>+	return mpu_dev;
->>+}
->>+
->>+struct device *omap2_get_dsp_device(void)
->>+{
->>+	WARN_ON_ONCE(!dsp_dev);
->>+	return dsp_dev;
->>+}
-First of all, apologies for so late posting of the comment. IMHO it would be good to rename this API as omap2_get_iva_device. This is because OMAP4 has separate IVA and DSP devices and we will need to build the omap_device for both. If we could rename this as omap2_get_iva_device, we could introduce another API omap4_get_iva_device until bridge starts doing a omap_device_build for all these devices.
+> thanks,
+>
+> greg k-h
+>
+>   
 
->>+
->>+struct device *omap2_get_l3_device(void)
->>+{
->>+	WARN_ON_ONCE(!l3_dev);
->>+	return l3_dev;
->>+}
->>+
->>+/* static int _init_omap_device(struct omap_hwmod *oh, void *user) */
->>+static int _init_omap_device(char *name, struct device **new_dev)
->>+{
->>+	struct omap_hwmod *oh;
->>+	struct omap_device *od;
->>+
->>+	oh = omap_hwmod_lookup(name);
->>+	if (WARN(!oh, "%s: could not find omap_hwmod for %s\n",
->>+		 __func__, name))
->>+		return -ENODEV;
->>+
->>+	od = omap_device_build(oh->name, 0, oh, NULL, 0, pm_lats, 0, false);
->>+	if (WARN(IS_ERR(od), "%s: could not build omap_device for %s\n",
->>+		 __func__, name))
->>+		return -ENODEV;
->>+
->>+	*new_dev = &od->pdev.dev;
->>+
->>+	return 0;
->>+}
->>+
->>+/*
->>+ * Build omap_devices for processors and bus.
->>+ */
->>+static void omap2_init_processor_devices(void)
->>+{
->>+	_init_omap_device("mpu", &mpu_dev);
->>+	_init_omap_device("iva", &dsp_dev);
-
-Similar to earlier comment rename dsp_dev to iva_dev.
-Paul, I could rebase this patch fixing these and post it out if you are ok with it.
-
-Regards
-Thara
-
->>+	_init_omap_device("l3_main", &l3_dev);
->>+}
->>+
->>+static int __init omap2_common_pm_init(void)
->>+{
->>+	omap2_init_processor_devices();
->>+	omap_pm_if_init();
->>+
->>+	return 0;
->>+}
->>+device_initcall(omap2_common_pm_init);
->>+
->>diff --git a/arch/arm/plat-omap/include/plat/common.h b/arch/arm/plat-omap/include/plat/common.h
->>index 5e4afbe..5cf9509 100644
->>--- a/arch/arm/plat-omap/include/plat/common.h
->>+++ b/arch/arm/plat-omap/include/plat/common.h
->>@@ -89,4 +89,8 @@ void omap2_set_globals_uart(struct omap_globals *);
->> 	}							\
->> })
->>
->>+extern struct device *omap2_get_mpuss_device(void);
->>+extern struct device *omap2_get_dsp_device(void);
->>+extern struct device *omap2_get_l3_device(void);
->>+
->> #endif /* __ARCH_ARM_MACH_OMAP_COMMON_H */
->>
->>
->>--
->>To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->>the body of a message to majordomo at vger.kernel.org
->>More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Regards,
+Igor.
