@@ -1,68 +1,54 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Jul 2010 12:27:14 +0100
-Subject: [PATCH 2/6] U6715 clocks gating management U6 clock generic
-	driver & U6715 cgu clock specific
-In-Reply-To: <1278688913-26417-3-git-send-email-philippe.langlais@stericsson.com>
-References: <1278688913-26417-1-git-send-email-philippe.langlais@stericsson.com>
-	<1278688913-26417-3-git-send-email-philippe.langlais@stericsson.com>
-Message-ID: <20100715112714.GC29322@n2100.arm.linux.org.uk>
+Date: Thu, 15 Jul 2010 12:28:51 +0100
+Subject: Problem with dma_alloc_coherent at linux-2.6.33-arm1 , with
+	RealView platform,board PBX-A9 and armv7 instructions.
+In-Reply-To: <AANLkTilyVdWrsrDy8tk9_vAxya8o5MSeKJJLEpxjDlSQ@mail.gmail.com>
+References: <AANLkTimtpIQaKVHidWP9fvOKGGiQRc0tne1kO5mO-Zzs@mail.gmail.com>
+	<20100715093107.GB17605@trinity.fluff.org>
+	<20100715093831.GE26212@n2100.arm.linux.org.uk>
+	<AANLkTil1z_o2fBmnw4TljMmu1rbL7hzr0qQDFITs04go@mail.gmail.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C6087300@dbde02.ent.ti.com>
+	<20100715100938.GH26212@n2100.arm.linux.org.uk>
+	<AANLkTilyVdWrsrDy8tk9_vAxya8o5MSeKJJLEpxjDlSQ@mail.gmail.com>
+Message-ID: <20100715112851.GD29322@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 09, 2010 at 05:21:49PM +0200, Philippe Langlais wrote:
-> diff --git a/arch/arm/mach-u67xx/Makefile b/arch/arm/mach-u67xx/Makefile
-> index 38cf624..8c1dad8 100644
-> --- a/arch/arm/mach-u67xx/Makefile
-> +++ b/arch/arm/mach-u67xx/Makefile
-> @@ -5,7 +5,10 @@
->  ## Object file lists.
->  
->  # Common support
-> -obj-y			:= devices.o
-> +obj-y			:= devices.o cgu.o
-> +
-> +# Specific machine support
-> +obj-$(CONFIG_ARCH_U67XX) += clock_data_u67xx.o
+Catalin, can you help with this please?
 
-Aren't we already using this makefile because CONFIG_ARCH_U67XX is set?
+Thanks.
 
-> +int u6_clk_set_parent_uart(struct clk *clk, struct clk *parent)
-> +{
-> +
-> +	if (!strcmp(parent->name, "pclk2_ck")) {
-> +		clk->parent = parent;
-> +		return 0;
-> +	} else if (!strcmp(parent->name, "clk26m_ck")) {
-> +		clk->parent = parent;
-> +		return 0;
-> +	} else if (!strcmp(parent->name, "clk13m_ck")) {
-> +		clk->parent = parent;
-> +		return 0;
-> +	} else {
-> +		return -1;
-
-Ouch.  This will cause clk_set_parent() to return -1, which is -EPERM.
-I don't think you mean "operation not permitted".  Maybe -ENOENT, -ENXIO,
-or -EINVAL would be more appropriate?
-
-> +/*
-> + * Standard clock functions defined in include/linux/clk.h
-> + */
-> +int clk_enable(struct clk *clk)
-> +{
-> +	unsigned long flags;
-> +	int ret = 0;
-> +
-> +	if (clk == ERR_PTR(-ENOENT))
-> +		return -EINVAL;
-> +
-> +	spin_lock_irqsave(&clockfw_lock, flags);
-> +	if (arch_clock->clk_enable)
-> +		ret = arch_clock->clk_enable(clk);
-> +	spin_unlock_irqrestore(&clockfw_lock, flags);
-
-Hmm.  This looks like it's been modelled on OMAP.
-
-Wouldn't it be better to move some of the U67xx stuff into here,
-such as the use-count tracking - rather than having each sub-arch
-reimplement it?
+On Thu, Jul 15, 2010 at 07:16:24PM +0800, David Yang wrote:
+> patch-6220/1   can't be  patched on kernel version linux-2.6.33-arm1.
+> 
+> the file arch/arm/mm/cache-l2x0.c  may be too old for the patch.
+> 
+> 
+> On Thu, Jul 15, 2010 at 6:09 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Jul 15, 2010 at 03:34:58PM +0530, Shilimkar, Santosh wrote:
+> >> > -----Original Message-----
+> >> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> >> > kernel-bounces at lists.infradead.org] On Behalf Of David Yang
+> >> > Sent: Thursday, July 15, 2010 3:27 PM
+> >> > To: Russell King - ARM Linux
+> >> > Cc: linux-arm-kernel at lists.infradead.org; Ben Dooks
+> >> > Subject: Re: Problem with dma_alloc_coherent at linux-2.6.33-arm1 , with
+> >> > RealView platform,board PBX-A9 and armv7 instructions.
+> >> >
+> >> > I have explicitly added the barrier() in my driver, but it did't work.
+> >> >
+> >> > I will go on testing until solve the problem. I need more advice.
+> >> >
+> >> The 'barrier()' is just a compiler barrier. You should be using "mb" "rmb"
+> >> or "wmb" ?depending on the usage.
+> >
+> > It'd be useful if the patches which are destined for mainline get some
+> > independent testing by people who have experienced the problem, rather
+> > than creating their own solutions.
+> >
+> > We can then have much more confidence in the patch which may eventually
+> > be applied is solving problems people are seeing - and more importantly
+> > identify any defficiencies in the patch so we don't have to repeatedly
+> > patch the same area multiple times.
+> >
