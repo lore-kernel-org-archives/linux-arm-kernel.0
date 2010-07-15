@@ -1,44 +1,39 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 15 Jul 2010 16:00:15 +0300
-Subject: [PATCH 2/3] usb/otg/ulpi: add support for SMSC USB3319 ulpi phy
-In-Reply-To: <1279198816-30367-1-git-send-email-grinberg@compulab.co.il>
-References: <1279198816-30367-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1279198816-30367-3-git-send-email-grinberg@compulab.co.il>
+Date: Thu, 15 Jul 2010 16:00:13 +0300
+Subject: [PATCH 0/3] Generic ULPI driver extention
+Message-ID: <1279198816-30367-1-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch series add support for SMSC USB3319 ulpi phy,
+introduces the ulpi specific flags for control over the
+ulpi phy and extends the generic ulpi driver with
+support for Function and Interface control of upli phy.
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-Signed-off-by: Mike Rapoport <mike@compulab.co.il>
----
- drivers/usb/otg/Kconfig |    2 --
- drivers/usb/otg/ulpi.c  |    1 +
- 2 files changed, 1 insertions(+), 2 deletions(-)
+Depends on:
+From: Ajay Kumar Gupta <ajay.gupta@ti.com>
+Date: Thu,  8 Jul 2010 14:03:01 +0530
+Subject: USB: ulpi: fix compilation warning
 
-diff --git a/drivers/usb/otg/Kconfig b/drivers/usb/otg/Kconfig
-index 3d2d3e5..3b12895 100644
---- a/drivers/usb/otg/Kconfig
-+++ b/drivers/usb/otg/Kconfig
-@@ -49,8 +49,6 @@ config USB_ULPI
- 	  Enable this to support ULPI connected USB OTG transceivers which
- 	  are likely found on embedded boards.
- 
--	  The only chip currently supported is NXP's ISP1504
--
- config TWL4030_USB
- 	tristate "TWL4030 USB Transceiver Driver"
- 	depends on TWL4030_CORE && REGULATOR_TWL4030
-diff --git a/drivers/usb/otg/ulpi.c b/drivers/usb/otg/ulpi.c
-index 448d643..ef7dbe4 100644
---- a/drivers/usb/otg/ulpi.c
-+++ b/drivers/usb/otg/ulpi.c
-@@ -34,6 +34,7 @@
- /* ULPI hardcoded IDs, used for probing */
- static unsigned int ulpi_ids[] = {
- 	ULPI_ID(0x04cc, 0x1504),	/* NXP ISP1504 */
-+	ULPI_ID(0x0424, 0x0006),        /* SMSC USB3319 */
- };
- 
- static int ulpi_set_flags(struct otg_transceiver *otg)
--- 
-1.7.1
+From: Eric B?nard <eric@eukrea.com>
+Date: Thu, 15 Jul 2010 09:20:19 +0200
+Subject: [PATCH v2] otg/ulpi.c : fix register write
+
+Igor Grinberg (3):
+  usb/otg/ulpi: remove unused macro
+  usb/otg/ulpi: add support for SMSC USB3319 ulpi phy
+  usb/otg/ulpi: extend the generic ulpi driver.
+
+ arch/arm/mach-mx2/mach-pca100.c          |    4 +-
+ arch/arm/mach-mx3/mach-armadillo5x0.c    |    4 +-
+ arch/arm/mach-mx3/mach-mx31lilly.c       |    4 +-
+ arch/arm/mach-mx3/mach-mx31lite.c        |    2 +-
+ arch/arm/mach-mx3/mach-mx31moboard.c     |    2 +-
+ arch/arm/mach-mx3/mach-pcm037.c          |    4 +-
+ arch/arm/mach-mx3/mach-pcm043.c          |    2 +-
+ arch/arm/mach-mx3/mx31moboard-smartbot.c |    2 +-
+ drivers/usb/otg/Kconfig                  |    2 -
+ drivers/usb/otg/ulpi.c                   |  130 +++++++++++++++++++++++++++---
+ include/linux/usb/otg.h                  |    7 --
+ include/linux/usb/ulpi.h                 |   39 +++++++++
+ 12 files changed, 169 insertions(+), 33 deletions(-)
