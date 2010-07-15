@@ -1,54 +1,56 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Jul 2010 12:28:51 +0100
-Subject: Problem with dma_alloc_coherent at linux-2.6.33-arm1 , with
-	RealView platform,board PBX-A9 and armv7 instructions.
-In-Reply-To: <AANLkTilyVdWrsrDy8tk9_vAxya8o5MSeKJJLEpxjDlSQ@mail.gmail.com>
-References: <AANLkTimtpIQaKVHidWP9fvOKGGiQRc0tne1kO5mO-Zzs@mail.gmail.com>
-	<20100715093107.GB17605@trinity.fluff.org>
-	<20100715093831.GE26212@n2100.arm.linux.org.uk>
-	<AANLkTil1z_o2fBmnw4TljMmu1rbL7hzr0qQDFITs04go@mail.gmail.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C6087300@dbde02.ent.ti.com>
-	<20100715100938.GH26212@n2100.arm.linux.org.uk>
-	<AANLkTilyVdWrsrDy8tk9_vAxya8o5MSeKJJLEpxjDlSQ@mail.gmail.com>
-Message-ID: <20100715112851.GD29322@n2100.arm.linux.org.uk>
+Date: Thu, 15 Jul 2010 12:39:39 +0100
+Subject: [PATCH] NUC900: patch for implement clk_get_rate
+In-Reply-To: <4C175ED4.8080303@gmail.com>
+References: <4C175ED4.8080303@gmail.com>
+Message-ID: <20100715113939.GE29322@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin, can you help with this please?
+On Tue, Jun 15, 2010 at 07:07:00PM +0800, Wan ZongShun wrote:
+> According to Baruch's advice, I re-orgnize previous patch named
+> 'Add platform support for nuc900 i2c driver'.
+> 
+> This patch is for implementing clk_get_rate, there are four clk
+> rates were needed to get, cpufreq,ahb,apb and external crystal.
+> clk_get_rate return value is for external crystal.
+> 
+> ---
+>  arch/arm/mach-w90x900/clock.c |    9 +++++++
+>  arch/arm/mach-w90x900/clock.h |    5 ++++
+>  arch/arm/mach-w90x900/cpu.c   |   50 +++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 64 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-w90x900/clock.c b/arch/arm/mach-w90x900/clock.c
+> index 2c371ff..6325642 100644
+> --- a/arch/arm/mach-w90x900/clock.c
+> +++ b/arch/arm/mach-w90x900/clock.c
+> @@ -57,6 +57,15 @@ EXPORT_SYMBOL(clk_disable);
+> 
+>  unsigned long clk_get_rate(struct clk *clk)
+>  {
+> +	unsigned long flags, ret;
+> +
+> +	if (clk == NULL || IS_ERR(clk))
+> +		return -EPERM;
 
-Thanks.
+Is there a reason to check for these cases?
 
-On Thu, Jul 15, 2010 at 07:16:24PM +0800, David Yang wrote:
-> patch-6220/1   can't be  patched on kernel version linux-2.6.33-arm1.
-> 
-> the file arch/arm/mm/cache-l2x0.c  may be too old for the patch.
-> 
-> 
-> On Thu, Jul 15, 2010 at 6:09 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Thu, Jul 15, 2010 at 03:34:58PM +0530, Shilimkar, Santosh wrote:
-> >> > -----Original Message-----
-> >> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> >> > kernel-bounces at lists.infradead.org] On Behalf Of David Yang
-> >> > Sent: Thursday, July 15, 2010 3:27 PM
-> >> > To: Russell King - ARM Linux
-> >> > Cc: linux-arm-kernel at lists.infradead.org; Ben Dooks
-> >> > Subject: Re: Problem with dma_alloc_coherent at linux-2.6.33-arm1 , with
-> >> > RealView platform,board PBX-A9 and armv7 instructions.
-> >> >
-> >> > I have explicitly added the barrier() in my driver, but it did't work.
-> >> >
-> >> > I will go on testing until solve the problem. I need more advice.
-> >> >
-> >> The 'barrier()' is just a compiler barrier. You should be using "mb" "rmb"
-> >> or "wmb" ?depending on the usage.
-> >
-> > It'd be useful if the patches which are destined for mainline get some
-> > independent testing by people who have experienced the problem, rather
-> > than creating their own solutions.
-> >
-> > We can then have much more confidence in the patch which may eventually
-> > be applied is solving problems people are seeing - and more importantly
-> > identify any defficiencies in the patch so we don't have to repeatedly
-> > patch the same area multiple times.
-> >
+> +	spin_lock_irqsave(&clocks_lock, flags);
+> +	ret = nuc900_get_cpuclock(&clk->cpufreq, &clk->ahbfreq, &clk->apbfreq);
+> +	spin_unlock_irqrestore(&clocks_lock, flags);
+> +	if (ret)
+> +		return ret;
+
+Hmm, I don't follow this - and it doesn't seem to sit with the clk API
+model at all well.  cpufreq/ahbfreq/apbfreq seem to only ever be
+written, but never read.  I'm not sure either why every struct clk has
+to have these - they seem to be separate clocks unrelated to the
+struct clk that's being dealt with.
+
+Wouldn't it make more sense to have these three as separate struct clks?
+
+The other issue is that we're introducing an "apb_pclk" for all
+primecells using drivers/amba/bus.c in order to support SoCs which gate
+the APB pclk signal to individual primecells.  It sounds like this clock
+would be the natural owner what you call 'apbfreq' in your patch.
