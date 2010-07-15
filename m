@@ -1,32 +1,68 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 15 Jul 2010 14:22:34 +0300
-Subject: [PATCHv6] mx2_camera: Add soc_camera support for i.MX25/i.MX27
-In-Reply-To: <40ccd21d0e857660038d193af3bb4cc6edd1067d.1278218817.git.baruch@tkos.co.il>
-References: <40ccd21d0e857660038d193af3bb4cc6edd1067d.1278218817.git.baruch@tkos.co.il>
-Message-ID: <20100715112234.GC7690@jasper.tkos.co.il>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Jul 2010 12:27:14 +0100
+Subject: [PATCH 2/6] U6715 clocks gating management U6 clock generic
+	driver & U6715 cgu clock specific
+In-Reply-To: <1278688913-26417-3-git-send-email-philippe.langlais@stericsson.com>
+References: <1278688913-26417-1-git-send-email-philippe.langlais@stericsson.com>
+	<1278688913-26417-3-git-send-email-philippe.langlais@stericsson.com>
+Message-ID: <20100715112714.GC29322@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jul 09, 2010 at 05:21:49PM +0200, Philippe Langlais wrote:
+> diff --git a/arch/arm/mach-u67xx/Makefile b/arch/arm/mach-u67xx/Makefile
+> index 38cf624..8c1dad8 100644
+> --- a/arch/arm/mach-u67xx/Makefile
+> +++ b/arch/arm/mach-u67xx/Makefile
+> @@ -5,7 +5,10 @@
+>  ## Object file lists.
+>  
+>  # Common support
+> -obj-y			:= devices.o
+> +obj-y			:= devices.o cgu.o
+> +
+> +# Specific machine support
+> +obj-$(CONFIG_ARCH_U67XX) += clock_data_u67xx.o
 
-On Sun, Jul 04, 2010 at 07:55:10AM +0300, Baruch Siach wrote:
-> This is the soc_camera support developed by Sascha Hauer for the i.MX27.  Alan
-> Carvalho de Assis modified the original driver to get it working on more recent
-> kernels. I modified it further to add support for i.MX25. This driver has been
-> tested on i.MX25 and i.MX27 based platforms.
-> 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> ---
+Aren't we already using this makefile because CONFIG_ARCH_U67XX is set?
 
-Ping?
+> +int u6_clk_set_parent_uart(struct clk *clk, struct clk *parent)
+> +{
+> +
+> +	if (!strcmp(parent->name, "pclk2_ck")) {
+> +		clk->parent = parent;
+> +		return 0;
+> +	} else if (!strcmp(parent->name, "clk26m_ck")) {
+> +		clk->parent = parent;
+> +		return 0;
+> +	} else if (!strcmp(parent->name, "clk13m_ck")) {
+> +		clk->parent = parent;
+> +		return 0;
+> +	} else {
+> +		return -1;
 
-I'm currently working on a series of some small fixes and tweaks, but first I 
-want to see the main code getting into mainline.
+Ouch.  This will cause clk_set_parent() to return -1, which is -EPERM.
+I don't think you mean "operation not permitted".  Maybe -ENOENT, -ENXIO,
+or -EINVAL would be more appropriate?
 
-baruch
+> +/*
+> + * Standard clock functions defined in include/linux/clk.h
+> + */
+> +int clk_enable(struct clk *clk)
+> +{
+> +	unsigned long flags;
+> +	int ret = 0;
+> +
+> +	if (clk == ERR_PTR(-ENOENT))
+> +		return -EINVAL;
+> +
+> +	spin_lock_irqsave(&clockfw_lock, flags);
+> +	if (arch_clock->clk_enable)
+> +		ret = arch_clock->clk_enable(clk);
+> +	spin_unlock_irqrestore(&clockfw_lock, flags);
 
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Hmm.  This looks like it's been modelled on OMAP.
+
+Wouldn't it be better to move some of the U67xx stuff into here,
+such as the use-count tracking - rather than having each sub-arch
+reimplement it?
