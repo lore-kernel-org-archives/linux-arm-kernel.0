@@ -1,43 +1,94 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Jul 2010 09:55:35 +0100
-Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
-	memory management
-In-Reply-To: <20100715012958.GB2239@codeaurora.org>
-References: <4C3C0032.5020702@codeaurora.org>
-	<20100713150311B.fujita.tomonori@lab.ntt.co.jp>
-	<20100713121420.GB4263@codeaurora.org>
-	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
-	<20100714201149.GA14008@codeaurora.org>
-	<20100714220536.GE18138@n2100.arm.linux.org.uk>
-	<20100715012958.GB2239@codeaurora.org>
-Message-ID: <20100715085535.GC26212@n2100.arm.linux.org.uk>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Thu, 15 Jul 2010 18:06:06 +0900
+Subject: [PATCH 3/5] ARM: S5PV210: macros for clock registers at regs-clock.h
+In-Reply-To: <1279184768-28971-3-git-send-email-myungjoo.ham@samsung.com>
+References: <1279184768-28971-1-git-send-email-myungjoo.ham@samsung.com>
+	<1279184768-28971-2-git-send-email-myungjoo.ham@samsung.com>
+	<1279184768-28971-3-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <1279184768-28971-4-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 14, 2010 at 06:29:58PM -0700, Zach Pfeffer wrote:
-> The VCM ensures that all mappings that map a given physical buffer:
-> IOMMU mappings, CPU mappings and one-to-one device mappings all map
-> that buffer using the same (or compatible) attributes. At this point
-> the only attribute that users can pass is CACHED. In the absence of
-> CACHED all accesses go straight through to the physical memory.
+Previously, most of CLK_DIV/SRC register accessing mask and shift
+values were used at arch/arm/mach-s5pv210/clock.c only; thus we
+had not been using macros for these. However, as CPUFREQ uses
+those shift and mask values as well, we'd better define them at a single
+location, whose proper location would be regs-clock.h.
 
-So what you're saying is that if I have a buffer in kernel space
-which I already have its virtual address, I can pass this to VCM and
-tell it !CACHED, and it'll setup another mapping which is not cached
-for me?
+Note that only the information about registers used by CPUFREQ are
+defined. However, we may need to define other registers later if we add
+other parts.
 
-You are aware that multiple V:P mappings for the same physical page
-with different attributes are being outlawed with ARMv6 and ARMv7
-due to speculative prefetching.  The cache can be searched even for
-a mapping specified as 'normal, uncached' and you can get cache hits
-because the data has been speculatively loaded through a separate
-cached mapping of the same physical page.
+Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv210/include/mach/regs-clock.h |   45 +++++++++++++++++++++--
+ 1 files changed, 42 insertions(+), 3 deletions(-)
 
-FYI, during the next merge window, I will be pushing a patch which makes
-ioremap() of system RAM fail, which should be the last core code creator
-of mappings with different memory types.  This behaviour has been outlawed
-(as unpredictable) in the architecture specification and does cause
-problems on some CPUs.
-
-We've also the issue of multiple mappings with differing cache attributes
-which needs addressing too...
+diff --git a/arch/arm/mach-s5pv210/include/mach/regs-clock.h b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+index 2a25ab4..a117ecc 100644
+--- a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
++++ b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+@@ -66,11 +66,30 @@
+ #define S5P_CLKGATE_BUS0	S5P_CLKREG(0x484)
+ #define S5P_CLKGATE_BUS1	S5P_CLKREG(0x488)
+ #define S5P_CLK_OUT		S5P_CLKREG(0x500)
++#define S5P_CLK_DIV_STAT0   S5P_CLKREG(0x1000)
++#define S5P_CLK_DIV_STAT1   S5P_CLKREG(0x1004)
++#define S5P_CLK_MUX_STAT0   S5P_CLKREG(0x1100)
++#define S5P_CLK_MUX_STAT1   S5P_CLKREG(0x1104)
++
++#define S5P_ARM_MCS_CON		S5P_CLKREG(0x6100)
+ 
+ /* CLKSRC0 */
+-#define S5P_CLKSRC0_MUX200_MASK		(0x1<<16)
+-#define S5P_CLKSRC0_MUX166_MASK		(0x1<<20)
+-#define S5P_CLKSRC0_MUX133_MASK		(0x1<<24)
++#define S5P_CLKSRC0_APLL_MASK		(0x1 << 0)
++#define S5P_CLKSRC0_APLL_SHIFT		(0)
++#define S5P_CLKSRC0_MPLL_MASK		(0x1 << 4)
++#define S5P_CLKSRC0_MPLL_SHIFT		(4)
++#define S5P_CLKSRC0_EPLL_MASK		(0x1 << 8)
++#define S5P_CLKSRC0_EPLL_SHIFT		(8)
++#define S5P_CLKSRC0_VPLL_MASK		(0x1 << 12)
++#define S5P_CLKSRC0_VPLL_SHIFT		(12)
++#define S5P_CLKSRC0_MUX200_MASK		(0x1 << 16)
++#define S5P_CLKSRC0_MUX200_SHIFT	(16)
++#define S5P_CLKSRC0_MUX166_MASK		(0x1 << 20)
++#define S5P_CLKSRC0_MUX166_SHIFT	(20)
++#define S5P_CLKSRC0_MUX133_MASK		(0x1 << 24)
++#define S5P_CLKSRC0_MUX133_SHIFT	(24)
++#define S5P_CLKSRC0_ONENAND_MASK	(0x1 << 28)
++#define S5P_CLKSRC0_ONENAND_SHIFT	(28)
+ 
+ /* CLKDIV0 */
+ #define S5P_CLKDIV0_APLL_SHIFT		(0)
+@@ -90,6 +109,26 @@
+ #define S5P_CLKDIV0_PCLK66_SHIFT	(28)
+ #define S5P_CLKDIV0_PCLK66_MASK		(0x7 << S5P_CLKDIV0_PCLK66_SHIFT)
+ 
++/* CLKSRC2 */
++#define S5P_CLKSRC2_G3D_MASK		(0x3 << 0)
++#define S5P_CLKSRC2_G3D_SHIFT		(0)
++#define S5P_CLKSRC2_MFC_MASK		(0x3 << 4)
++#define S5P_CLKSRC2_MFC_SHIFT		(4)
++#define S5P_CLKSRC2_G2D_MASK		(0x3 << 8)
++#define S5P_CLKSRC2_G2D_SHIFT		(8)
++
++/* CLKDIV2 */
++#define S5P_CLKDIV2_G3D_MASK		(0xF << 0)
++#define S5P_CLKDIV2_G3D_SHIFT		(0)
++#define S5P_CLKDIV2_MFC_MASK		(0xF << 4)
++#define S5P_CLKDIV2_MFC_SHIFT		(4)
++#define S5P_CLKDIV2_G2D_MASK		(0xF << 8)
++#define S5P_CLKDIV2_G2D_SHIFT		(8)
++
++/* CLKDIV6 */
++#define S5P_CLKDIV6_ONEDRAM_MASK	(0xf<<28)
++#define S5P_CLKDIV6_ONEDRAM_SHIFT	(28)
++
+ /* Registers related to power management */
+ #define S5P_PWR_CFG		S5P_CLKREG(0xC000)
+ #define S5P_EINT_WAKEUP_MASK	S5P_CLKREG(0xC004)
+-- 
+1.6.3.3
