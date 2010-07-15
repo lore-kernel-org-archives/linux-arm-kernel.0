@@ -1,35 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Jul 2010 16:53:56 +0100
-Subject: [PATCH 0/2] Fix ptrace software breakpoints
-Message-ID: <1279209238-16234-1-git-send-email-will.deacon@arm.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Thu, 15 Jul 2010 21:39:22 +0530
+Subject: [PATCH v4] GPIO PL061: Adding Clk framework support
+In-Reply-To: <20100715095637.GF26212@n2100.arm.linux.org.uk>
+References: <AANLkTikm-wupuQA1_zsmqf3jrpavkMaw8Bt-GWb04TSo@mail.gmail.com>
+	<20100710071913.GM22845@n2100.arm.linux.org.uk>
+	<AANLkTimskXW4Nnxhc5bxwKiNrfJkMb-9NeWKhVOGaA1k@mail.gmail.com>
+	<20100713074449.GA20118@n2100.arm.linux.org.uk>
+	<AANLkTilZJTHh_iFS37UL7XoUs_DhAB50A3tHfcfEr5JM@mail.gmail.com>
+	<20100713182644.GC30142@n2100.arm.linux.org.uk>
+	<4C3EA46B.1000709@st.com>
+	<20100715083032.GA26212@n2100.arm.linux.org.uk>
+	<4C3ED678.7010308@st.com>
+	<20100715095637.GF26212@n2100.arm.linux.org.uk>
+Message-ID: <20100715160922.GA4119@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using GDB on a quad-core Cortex-A9 (Versatile Express) board, software
-breakpoints do not work if the inferior is scheduled onto a different CPU from
-the debugger.
+On Thu, Jul 15, 2010 at 10:56:37AM +0100, Russell King - ARM Linux wrote:
+> +static int amba_get_enable_pclk(struct amba_device *pcdev)
+> +{
+> +	struct clk *pclk = clk_get(&pcdev->dev, "apb_pclk");
+> +	int ret;
+> +
+> +	pcdev->pclk = pclk;
+> +
+> +	if (IS_ERR(pclk))
+> +		return PTR_ERR(pclk);
+> +
+> +	ret = clk_enable(pclk);
+> +	if (ret)
+> +		clk_put(pclk);
+> +
+> +	return ret;
+> +}
+> +
+...
+> @@ -130,17 +155,33 @@ static int amba_probe(struct device *dev)
+>  {
+>  	struct amba_device *pcdev = to_amba_device(dev);
+>  	struct amba_driver *pcdrv = to_amba_driver(dev->driver);
+> -	struct amba_id *id;
+> +	struct amba_id *id = amba_lookup(pcdrv->id_table, pcdev);
+> +	int ret;
+>  
+> -	id = amba_lookup(pcdrv->id_table, pcdev);
+> +	do {
+> +		ret = amba_get_enable_pclk(pcdev);
+> +		if (ret)
+> +			break;
+> +
+> +		ret = pcdrv->probe(pcdev, id);
+> +		if (ret == 0)
+> +			break;
+>  
+> -	return pcdrv->probe(pcdev, id);
+> +		amba_put_disable_pclk(pcdev);
+> +	} while (0);
+> +
+> +	return ret;
+>  }
 
-When GDB changes the code of another context via the ptrace POKETEXT mechanism,
-the I-cache must be invalidated before the inferior is allowed to resume. If a
-copy-on-write is triggered by the copy_to_user_page function, the new page
-mappings must be used by the inferior in order to pick up the new instructions.
-
-This patch series addresses this problem by:
-
-(a) Providing a workaround for a known TLB issue on some revisions of the Cortex-A9.
-(b) Performing correct I-cache invalidation in the flush_ptrace_access code.
-
-All feedback/comments/tested-bys welcome.
-
-Cc: Rob Clark <rob@ti.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-
-Will Deacon (2):
-  ARM: errata: TLBIASIDIS and TLBIMVAIS operations can broadcast a
-    faulty ASID
-  ARM: flush_ptrace_access: invalidate all I-caches
-
- arch/arm/Kconfig                |   12 ++++++++++++
- arch/arm/include/asm/tlbflush.h |    8 ++++++++
- arch/arm/mm/flush.c             |    4 ++--
- 3 files changed, 22 insertions(+), 2 deletions(-)
+In your earlier patch, you proceeded with the probe if the error from
+clk_get() was -ENOENT, but not in this version.  Isn't the -ENOENT
+special handling preferable, since it avoids the need to change all
+existing platforms?
