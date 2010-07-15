@@ -1,27 +1,396 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Jul 2010 09:41:18 +0100
-Subject: [RFC][PATCH 1/1] ARM: Add initial hibernation support
-In-Reply-To: <20100715.083450.193689911.Hiroshi.DOYU@nokia.com>
-References: <1277908081-17195-1-git-send-email-Hiroshi.DOYU@nokia.com>
-	<1277908081-17195-2-git-send-email-Hiroshi.DOYU@nokia.com>
-	<20100714132255.GB3103@ucw.cz>
-	<20100715.083450.193689911.Hiroshi.DOYU@nokia.com>
-Message-ID: <20100715084118.GB26212@n2100.arm.linux.org.uk>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Thu, 15 Jul 2010 17:45:31 +0900
+Subject: [PATCH v2] ARM: S5PV210: add clocks (struct clk).
+Message-ID: <1279183531-27669-1-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 15, 2010 at 08:34:50AM +0300, Hiroshi DOYU wrote:
-> Russell, would it be possible to put this into your next merge queue?
+Many clocks were not listed in the original
+arch/arm/mach-s5pv210/clock.c
 
-I think it needs quite a bit of rework - I certainly don't like all
-those CP15 register accesses there - that's asking for lots of ifdefs
-to spring up as more CPUs are supported.
+We have added clocks defined as CLK_GATE_IPx[] in the user manual of
+S5PV210. However, the clocks that were not turned on at the boot time
+when tested with the previous kernel versions (2.6.32, 2.6.29) are
+defined in "init_clocks_disabled" so that they are turned off at the
+boot time.
 
-Eg, what about ensuring that state such as iWMMXt on PXA CPUs is
-properly restored?
+PDMA, MDMA, DMC, NANDXL, TZIC, VIC, SECJTAG, CORESIGHT,
+SDM, SECSS, SYSCON, GPIO, SROMC, and TZPC are not added to
+init_clocks.
 
-We already have code which knows what needs to be saved across a
-power-off transition - its what we use for our normal suspend/resume
-functionality, so we should look at re-using that code for hibernate
-as well.  We really don't want to be maintaining two sets of code
-doing the same thing.
+Others including CSIS, JPEG, FIMC0 - 2, NFCON, TVENC,
+HDMI, MIXER, VP, DSIM, TSI, HOSTIF, MODEM, PCM0 - 2, I2C-HDMI-PHY,
+I2C-HDMI-DDC, AC97, SPDIF, SECKEY, IEM-APC, IEM-IEC, and CHIP-ID are
+added to init_clocks_disabled.
+
+Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+--
+
+v2: Moved SROMC from init_clocks_disabled to init_clocks
+---
+ arch/arm/mach-s5pv210/clock.c |  298 ++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 297 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+index b3d156c..8219dd5 100644
+--- a/arch/arm/mach-s5pv210/clock.c
++++ b/arch/arm/mach-s5pv210/clock.c
+@@ -275,12 +275,66 @@ static struct clk_ops clk_hclk_imem_ops = {
+ 
+ static struct clk init_clocks_disable[] = {
+ 	{
++		.name		= "csis",
++		.id		= -1,
++		.parent		= &clk_pclk_dsys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 31),
++	}, {
+ 		.name		= "rot",
+ 		.id		= -1,
+ 		.parent		= &clk_hclk_dsys.clk,
+ 		.enable		= s5pv210_clk_ip0_ctrl,
+ 		.ctrlbit	= (1<<29),
+ 	}, {
++		.name		= "jpeg",
++		.id		= -1,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 28),
++	}, {
++		.name		= "fimc",
++		.id		= 0,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 24),
++	}, {
++		.name		= "fimc",
++		.id		= 1,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 25),
++	}, {
++		.name		= "fimc",
++		.id		= 2,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 26),
++	}, {
++		.name		= "nfcon",
++		.id		= -1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip1_ctrl,
++		.ctrlbit	= (1 << 28),
++	}, {
++		.name		= "tvenc",
++		.id		= -1,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip1_ctrl,
++		.ctrlbit	= (1 << 10),
++	}, {
++		.name		= "hdmi",
++		.id		= -1,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip1_ctrl,
++		.ctrlbit	= (1 << 11),
++	}, {
++		.name		= "mixer",
++		.id		= -1,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip1_ctrl,
++		.ctrlbit	= (1 << 9),
++	}, {
+ 		.name		= "otg",
+ 		.id		= -1,
+ 		.parent		= &clk_hclk_psys.clk,
+@@ -305,6 +359,18 @@ static struct clk init_clocks_disable[] = {
+ 		.enable		= s5pv210_clk_ip1_ctrl,
+ 		.ctrlbit	= (1<<25),
+ 	}, {
++		.name		= "vp",
++		.id		= -1,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip1_ctrl,
++		.ctrlbit	= (1 << 8),
++	}, {
++		.name		= "dsim",
++		.id		= -1,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip1_ctrl,
++		.ctrlbit	= (1 << 2),
++	}, {
+ 		.name		= "hsmmc",
+ 		.id		= 0,
+ 		.parent		= &clk_hclk_psys.clk,
+@@ -329,6 +395,42 @@ static struct clk init_clocks_disable[] = {
+ 		.enable		= s5pv210_clk_ip2_ctrl,
+ 		.ctrlbit	= (1<<19),
+ 	}, {
++		.name		= "tsi",
++		.id		= -1,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 20),
++	}, {
++		.name		= "hostif",
++		.id		= -1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 10),
++	}, {
++		.name		= "modem",
++		.id		= -1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 9),
++	}, {
++		.name		= "pcm",
++		.id		= 0,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 28),
++	}, {
++		.name		= "pcm",
++		.id		= 1,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 29),
++	}, {
++		.name		= "pcm",
++		.id		= 2,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 30),
++	}, {
+ 		.name		= "systimer",
+ 		.id		= -1,
+ 		.parent		= &clk_pclk_psys.clk,
+@@ -401,6 +503,18 @@ static struct clk init_clocks_disable[] = {
+ 		.enable		= s5pv210_clk_ip3_ctrl,
+ 		.ctrlbit	= (1<<21),
+ 	}, {
++		.name		= "i2c_hdmi_phy",
++		.id		= -1,
++		.parent		= &clk_pclk_dsys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 11),
++	}, {
++		.name		= "i2c_hdmi_ddc",
++		.id		= -1,
++		.parent		= &clk_pclk_dsys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 10),
++	}, {
+ 		.name		= "i2s_v50",
+ 		.id		= 0,
+ 		.parent		= &clk_p,
+@@ -418,6 +532,41 @@ static struct clk init_clocks_disable[] = {
+ 		.parent		= &clk_p,
+ 		.enable		= s5pv210_clk_ip3_ctrl,
+ 		.ctrlbit	= (1 << 6),
++	}, {
++		.name		= "ac97",
++		.id		= -1,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 1),
++	}, {
++		.name		= "spdif",
++		.id		= -1,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 0),
++	}, {
++		.name		= "seckey",
++		.id		= -1,
++		.enable		= s5pv210_clk_ip4_ctrl,
++		.ctrlbit	= (1 << 3),
++	}, {
++		.name		= "iem_apc",
++		.id		= -1,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip4_ctrl,
++		.ctrlbit	= (1 << 2),
++	}, {
++		.name		= "iem_iec",
++		.id		= -1,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip4_ctrl,
++		.ctrlbit	= (1 << 1),
++	}, {
++		.name		= "chip_id",
++		.id		= -1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip4_ctrl,
++		.ctrlbit	= (1 << 0),
+ 	},
+ };
+ 
+@@ -426,10 +575,135 @@ static struct clk init_clocks[] = {
+ 		.name		= "hclk_imem",
+ 		.id		= -1,
+ 		.parent		= &clk_hclk_msys.clk,
+-		.ctrlbit	= (1 << 5),
+ 		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 5),
+ 		.ops		= &clk_hclk_imem_ops,
+ 	}, {
++		.name		= "pdma",
++		.id		= 0,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 3),
++	}, {
++		.name		= "pdma",
++		.id		= 1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 4),
++	}, {
++		.name		= "mdma",
++		.id		= -1,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 2),
++	}, {
++		.name		= "dmc",
++		.id		= 0,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 0),
++	}, {
++		.name		= "dmc",
++		.id		= 1,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 1),
++	}, {
++		.name		= "nandxl",
++		.id		= -1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip1_ctrl,
++		.ctrlbit	= (1 << 24),
++	}, {
++		.name		= "sromc",
++		.id		= -1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip1_ctrl,
++		.ctrlbit	= (1 << 26),
++	}, {
++		.name		= "tzic",
++		.id		= 0,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 28),
++	}, {
++		.name		= "tzic",
++		.id		= 1,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 29),
++	}, {
++		.name		= "tzic",
++		.id		= 2,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 30),
++	}, {
++		.name		= "tzic",
++		.id		= 3,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 31),
++	}, {
++		.name		= "vic",
++		.id		= 0,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 24),
++	}, {
++		.name		= "vic",
++		.id		= 1,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 25),
++	}, {
++		.name		= "vic",
++		.id		= 2,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 26),
++	}, {
++		.name		= "vic",
++		.id		= 3,
++		.parent		= &clk_hclk_msys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 27),
++	}, {
++		.name		= "secjtag",
++		.id		= -1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 11),
++	}, {
++		.name		= "coresight",
++		.id		= -1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 8),
++	}, {
++		.name		= "sdm",
++		.id		= -1,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 1),
++	}, {
++		.name		= "secss",
++		.id		= -1,
++		.parent		= &clk_hclk_psys.clk,
++		.enable		= s5pv210_clk_ip2_ctrl,
++		.ctrlbit	= (1 << 0),
++	}, {
++		.name		= "syscon",
++		.id		= -1,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 27),
++	}, {
++		.name		= "gpio",
++		.id		= -1,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 26),
++	}, {
+ 		.name		= "uart",
+ 		.id		= 0,
+ 		.parent		= &clk_pclk_psys.clk,
+@@ -453,6 +727,28 @@ static struct clk init_clocks[] = {
+ 		.parent		= &clk_pclk_psys.clk,
+ 		.enable		= s5pv210_clk_ip3_ctrl,
+ 		.ctrlbit	= (1 << 20),
++	}, {
++		.name		= "tzpc",
++		.id		= 0,
++		.parent		= &clk_pclk_msys.clk,
++		.enable		= s5pv210_clk_ip4_ctrl,
++		.ctrlbit	= (1 << 5),
++	}, {
++		.name		= "tzpc",
++		.id		= 1,
++		.parent		= &clk_pclk_psys.clk,
++		.enable		= s5pv210_clk_ip4_ctrl,
++		.ctrlbit	= (1 << 6),
++	}, {
++		.name		= "tzpc",
++		.id		= 2,
++		.enable		= s5pv210_clk_ip4_ctrl,
++		.ctrlbit	= (1 << 7),
++	}, {
++		.name		= "tzpc",
++		.id		= 3,
++		.enable		= s5pv210_clk_ip4_ctrl,
++		.ctrlbit	= (1 << 8),
+ 	},
+ };
+ 
+-- 
+1.6.3.3
