@@ -1,55 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 15 Jul 2010 13:25:52 +0100
-Subject: Problem with dma_alloc_coherent at linux-2.6.33-arm1 , with
-	RealView  platform,board PBX-A9 and armv7 instructions.
-In-Reply-To: <AANLkTimtpIQaKVHidWP9fvOKGGiQRc0tne1kO5mO-Zzs@mail.gmail.com>
-References: <AANLkTimtpIQaKVHidWP9fvOKGGiQRc0tne1kO5mO-Zzs@mail.gmail.com>
-Message-ID: <1279196752.6664.19.camel@e102109-lin.cambridge.arm.com>
+From: david.yangshuai@gmail.com (David Yang)
+Date: Thu, 15 Jul 2010 20:52:05 +0800
+Subject: Problem with dma_alloc_coherent at linux-2.6.33-arm1 ,
+	withRealView platform,board PBX-A9 and armv7 instructions.
+In-Reply-To: <1279196495.6664.14.camel@e102109-lin.cambridge.arm.com>
+References: <20100715093521.GD26212@n2100.arm.linux.org.uk>
+	<1279196495.6664.14.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <AANLkTimq3E7uF4poJkqcDIomEHoS4y24D7sJWt0U44Hd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-07-15 at 17:13 +0800, David Yang wrote:
->        I encountered this problem when porting my ethernet driver from
-> linux-2.6.28 to linux-2.6.33-arm1.
-> 
->        In the linux-2.6.28, I used the dma_alloc_coherent to share the
-> informations between cpu and ethernet device.The program flow in the
-> function ndo_start_xmit:
->                1,preparing the struct sk_buff->data for device internal DMA to
-> read,using the dma_map_single function.
->                2,update the information in the memory which is allocated by
-> dma_alloc_coherent to tell the device DMA the data is readable.
->                3,write the device register to inform the device DMA
-> to read the data.
+hi,Catalin
 
-You need a wmb() before the writel() which tells the device to start the
-DMA transfer. We'd like to make this the default (in the write* macros)
-and there are patches for review on the list.
+the patch v3 2/3 can not be patched to my  arch/arm/mm/cache-l2x0.c
+from linux-2.6.33-arm1
 
-Without the barrier, the card may transfer garbage since the date
-written in step (2) may have not reached the RAM.
+should I modify it manually?
 
->                4,cpu captures the interrupt of reading completion
-> form the device.
-[...]
->                After some tests, I think the problem comes from the
-> dma_alloc_coherent.It looks like ,in the linux-2.6.33-arm1, when the
-> memory allocated by dma_alloc_coherent is written,the data entry into
-> the ddr much slower than the same process in linux-2.6.28.Therefore,when
-> cpu has executed the step 3, the step 2 has not yet completed.So the DMA
-> can't get the correct information ,and the step 4 will never be reached.
 
-Correct.
-
-Note that I haven't fixed this issue in the 2.6.33-arm1 kernel. My
-opinion for some time was that drivers should take care of memory
-ordering and use the correct barriers. But after discussion on LKML, I
-eventually changed my mind (and we now have a small drop in performance
-for PIO drivers on ARMv6/v7).
-
-Could you use a newer kernel? I can backport the I/O accessors patches
-to 2.6.33-arm1 but only after Russell is ok with the latest version (to
-avoid additional work on my side).
-
--- 
-Catalin
+On Thu, Jul 15, 2010 at 8:21 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Thu, 2010-07-15 at 10:35 +0100, Russell King - ARM Linux wrote:
+>> On Thu, Jul 15, 2010 at 05:13:57PM +0800, David Yang wrote:
+>> > ? ? ? ?But when the driver was ported to the linux-2.6.33-arm1,the problem
+>> > came:
+>> > ? ? ? ? ? ? ? ? I found when the cpu executed from step 1-3, the
+>> > device DMA alarm the
+>> > step 2 was not completed.As a result,the step 4 was not triggered.This
+>> > is different form linux-2.6.28.
+>>
+>> Can you try patches 6219/1 6220/1 and 6221/1 from the patch system?
+>> They can be viewed/downloaded via:
+>>
+>> http://www.arm.linux.org.uk/developer/patches/view.php?id=6219/1
+>> http://www.arm.linux.org.uk/developer/patches/view.php?id=6220/1
+>> http://www.arm.linux.org.uk/developer/patches/view.php?id=6221/1
+>
+> I posted an updated set of patches here to avoid the do...while()
+> construct causing compilation errors in some drivers:
+>
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/84948
+>
+> If you are ok with them, I'll push them to the patch system (and discard
+> the previous ones).
+>
+> Thanks.
+>
+> --
+> Catalin
+>
+>
