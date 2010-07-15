@@ -1,108 +1,137 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 15 Jul 2010 11:10:39 +0200
-Subject: [PATCH 08/10 v2] ARM: S5PV210: enable FIMC on Aquila
+Date: Thu, 15 Jul 2010 11:10:37 +0200
+Subject: [PATCH 06/10 v2] ARM: S5PV210: Add fifo link definitions for FIMC and
+	framebuffer
 In-Reply-To: <1279185041-6004-1-git-send-email-s.nawrocki@samsung.com>
 References: <1279185041-6004-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1279185041-6004-9-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1279185041-6004-7-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marek Szyprowski <m.szyprowski@samsung.com>
-
-Add support for FIMC on Samsung Aquila board. Enable support for local
-path mode between fimc and frame buffer.
+Add definition of local paths that are available on Samsung S5PV210 SoCs.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- arch/arm/mach-s5pv210/Kconfig       |    7 +++++++
- arch/arm/mach-s5pv210/mach-aquila.c |   20 ++++++++++++++++++++
- 2 files changed, 27 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pv210/setup-fimc0.c       |   23 +++++++++++++++++++++++
+ arch/arm/mach-s5pv210/setup-fimc1.c       |   23 +++++++++++++++++++++++
+ arch/arm/mach-s5pv210/setup-fimc2.c       |   23 +++++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/fimc.h |    4 ++++
+ 4 files changed, 73 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 5206562..fed64f5 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -63,10 +63,17 @@ menu "S5PC110 Machines"
- config MACH_AQUILA
- 	bool "Aquila"
- 	select CPU_S5PV210
-+	select COMMON_AQUILA_GONI
- 	select ARCH_SPARSEMEM_ENABLE
- 	select S5PV210_SETUP_FB_24BPP
- 	select S5PV210_SETUP_SDHCI
- 	select S3C_DEV_FB
-+	select S5P_DEV_FIMC0
-+	select S5PV210_SETUP_FIMC0
-+	select S5P_DEV_FIMC1
-+	select S5PV210_SETUP_FIMC1
-+	select S5P_DEV_FIMC2
-+	select S5PV210_SETUP_FIMC2
- 	select S5PC110_DEV_ONENAND
- 	select S3C_DEV_HSMMC
- 	select S3C_DEV_HSMMC1
-diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
-index 6b60358..927bf47 100644
---- a/arch/arm/mach-s5pv210/mach-aquila.c
-+++ b/arch/arm/mach-s5pv210/mach-aquila.c
-@@ -13,6 +13,7 @@
- #include <linux/init.h>
- #include <linux/serial_core.h>
- #include <linux/fb.h>
-+#include <linux/clk.h>
- #include <linux/gpio.h>
- #include <linux/i2c.h>
- #include <linux/i2c-gpio.h>
-@@ -41,9 +42,13 @@
- #include <plat/devs.h>
- #include <plat/cpu.h>
- #include <plat/fb.h>
-+#include <plat/fimc.h>
+diff --git a/arch/arm/mach-s5pv210/setup-fimc0.c b/arch/arm/mach-s5pv210/setup-fimc0.c
+index 0e5ef0a..b869d87 100644
+--- a/arch/arm/mach-s5pv210/setup-fimc0.c
++++ b/arch/arm/mach-s5pv210/setup-fimc0.c
+@@ -10,5 +10,28 @@
+  */
+ 
+ #include <plat/fimc.h>
 +#include <plat/fifo.h>
- #include <plat/gpio-cfg.h>
- #include <plat/sdhci.h>
++#include <linux/fb.h>
++#include <plat/fb.h>
++#include <plat/devs.h>
  
-+#include "common-aquila-goni.h"
+ struct samsung_plat_fimc s5p_fimc0_default_data __initdata = {};
 +
- /* Following are default values for UCON, ULCON and UFCON UART registers */
- #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
- 				 S3C2410_UCON_RXILEVEL |	\
-@@ -577,6 +582,9 @@ static struct platform_device *aquila_devices[] __initdata = {
- 	&universal_spi_gpio,
- 	&s5pc110_device_onenand,
- 	&s3c_device_usbgadget,
-+	&s5p_device_fimc0,
-+	&s5p_device_fimc1,
-+	&s5p_device_fimc2,
- 	&s3c_device_hsmmc0,
- 	&s3c_device_hsmmc1,
- 	&s3c_device_hsmmc2,
-@@ -599,13 +607,25 @@ static void __init aquila_machine_init(void)
- 	/* SPI */
- 	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
- 
-+	/* FIMC */
-+	s5p_fimc0_set_platdata(NULL);
-+	s5p_fimc1_set_platdata(NULL);
-+	s5p_fimc2_set_platdata(NULL);
++static struct s3c_fifo_link s5pv210_fimc0_win0_link = {
++	.master_dev	= &s5p_device_fimc0.dev,
++	.slave_dev	= &s3c_device_fb.dev,
++};
 +
- 	/* SDHCI */
- 	aquila_setup_sdhci();
- 
- 	/* FB */
- 	s3c_fb_set_platdata(&aquila_lcd_pdata);
- 
-+	/* FIMC->FB fifo links */
-+	s5pv210_setup_fimc0_fb_link();
-+	s5pv210_setup_fimc1_fb_link();
-+	s5pv210_setup_fimc2_fb_link();
++void __init s5pv210_setup_fimc0_fb_link(void)
++{
++	struct s3c_fb_platdata *fb_pd;
++	struct samsung_plat_fimc *fimc_pd;
 +
- 	platform_add_devices(aquila_devices, ARRAY_SIZE(aquila_devices));
++	fimc_pd = s5p_device_fimc0.dev.platform_data;
++	fb_pd = s3c_device_fb.dev.platform_data;
 +
-+	s5pv210_common_fimc_clk_init();
- }
++	if (fimc_pd && fb_pd && fb_pd->win[0]) {
++		fb_pd->win[0]->fifo_sources[0] = &s5pv210_fimc0_win0_link;
++		fimc_pd->fifo_targets[0] = &s5pv210_fimc0_win0_link;
++	}
++}
+diff --git a/arch/arm/mach-s5pv210/setup-fimc1.c b/arch/arm/mach-s5pv210/setup-fimc1.c
+index 80da0e7..62a7804 100644
+--- a/arch/arm/mach-s5pv210/setup-fimc1.c
++++ b/arch/arm/mach-s5pv210/setup-fimc1.c
+@@ -10,5 +10,28 @@
+  */
  
- MACHINE_START(AQUILA, "Aquila")
+ #include <plat/fimc.h>
++#include <plat/fifo.h>
++#include <linux/fb.h>
++#include <plat/fb.h>
++#include <plat/devs.h>
+ 
+ struct samsung_plat_fimc s5p_fimc1_default_data __initdata = {};
++
++static struct s3c_fifo_link s5pv210_fimc1_win1_link = {
++	.master_dev	= &s5p_device_fimc1.dev,
++	.slave_dev	= &s3c_device_fb.dev,
++};
++
++void __init s5pv210_setup_fimc1_fb_link(void)
++{
++	struct s3c_fb_platdata *fb_pd;
++	struct samsung_plat_fimc *fimc_pd;
++
++	fimc_pd = s5p_device_fimc1.dev.platform_data;
++	fb_pd = s3c_device_fb.dev.platform_data;
++
++	if (fimc_pd && fb_pd && fb_pd->win[1]) {
++		fb_pd->win[1]->fifo_sources[0] = &s5pv210_fimc1_win1_link;
++		fimc_pd->fifo_targets[0] = &s5pv210_fimc1_win1_link;
++	}
++}
+diff --git a/arch/arm/mach-s5pv210/setup-fimc2.c b/arch/arm/mach-s5pv210/setup-fimc2.c
+index bc6a27b..1515eac 100644
+--- a/arch/arm/mach-s5pv210/setup-fimc2.c
++++ b/arch/arm/mach-s5pv210/setup-fimc2.c
+@@ -10,5 +10,28 @@
+  */
+ 
+ #include <plat/fimc.h>
++#include <plat/fifo.h>
++#include <linux/fb.h>
++#include <plat/fb.h>
++#include <plat/devs.h>
+ 
+ struct samsung_plat_fimc s5p_fimc2_default_data __initdata = {};
++
++static struct s3c_fifo_link s5pv210_fimc2_win2_link = {
++	.master_dev	= &s5p_device_fimc2.dev,
++	.slave_dev	= &s3c_device_fb.dev,
++};
++
++void __init s5pv210_setup_fimc2_fb_link(void)
++{
++	struct s3c_fb_platdata *fb_pd;
++	struct samsung_plat_fimc *fimc_pd;
++
++	fimc_pd = s5p_device_fimc2.dev.platform_data;
++	fb_pd = s3c_device_fb.dev.platform_data;
++
++	if (fimc_pd && fb_pd && fb_pd->win[2]) {
++		fb_pd->win[2]->fifo_sources[0] = &s5pv210_fimc2_win2_link;
++		fimc_pd->fifo_targets[0] = &s5pv210_fimc2_win2_link;
++	}
++}
+diff --git a/arch/arm/plat-samsung/include/plat/fimc.h b/arch/arm/plat-samsung/include/plat/fimc.h
+index cf7d2fb..304ef42 100644
+--- a/arch/arm/plat-samsung/include/plat/fimc.h
++++ b/arch/arm/plat-samsung/include/plat/fimc.h
+@@ -39,5 +39,9 @@ extern void s5p_fimc0_set_platdata(struct samsung_plat_fimc *fimc);
+ extern void s5p_fimc1_set_platdata(struct samsung_plat_fimc *fimc);
+ extern void s5p_fimc2_set_platdata(struct samsung_plat_fimc *fimc);
+ 
++extern void __init s5pv210_setup_fimc0_fb_link(void);
++extern void __init s5pv210_setup_fimc1_fb_link(void);
++extern void __init s5pv210_setup_fimc2_fb_link(void);
++
+ #endif /* FIMC_H_ */
+ 
 -- 
 1.7.0.4
