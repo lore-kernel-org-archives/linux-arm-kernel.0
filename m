@@ -1,30 +1,23 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 15 Jul 2010 14:17:52 +0100
-Subject: Problem with dma_alloc_coherent at linux-2.6.33-arm1 ,
-	withRealView platform,board PBX-A9 and armv7 instructions.
-In-Reply-To: <AANLkTikezqBLFd_ECJZ9RoCf2XCNdYyWps_JKfjyQ1se@mail.gmail.com>
-References: <AANLkTimq3E7uF4poJkqcDIomEHoS4y24D7sJWt0U44Hd@mail.gmail.com>
-	<1279198607.6664.20.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTikezqBLFd_ECJZ9RoCf2XCNdYyWps_JKfjyQ1se@mail.gmail.com>
-Message-ID: <1279199872.6664.24.camel@e102109-lin.cambridge.arm.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Thu, 15 Jul 2010 15:47:57 +0200
+Subject: [PATCH 2/3] ARM: register character LCD for PB1176
+In-Reply-To: <20100715115631.GG29322@n2100.arm.linux.org.uk>
+References: <1278429678-4837-1-git-send-email-triad@df.lth.se>
+	<20100715115631.GG29322@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinQEu9Dm5V-8JCQDgbtfGy6jZ-1bLncYSILKuys@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-07-15 at 14:10 +0100, David Yang wrote:
-> I have passed the test,when using wmb() and without PATCH 0/3;
+2010/7/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-Great, so it's a memory ordering issue.
+> On Tue, Jul 06, 2010 at 05:21:18PM +0200, Linus Walleij wrote:
+>> This registers the character LCD device for the ARM RealView
+>> PB1176.
+>
+> Shouldn't ARM_CHAR_LCD be a stand-alone option, rather than something
+> which is always built-in whenever one of these platforms is enabled?
 
-> But,I have a  doubt : if I use the wmb(), then the l2x0.c 's patch is
-> not needed?
+OK I'll break that out when I move it to drivers/misc.
 
-Correct, if you add the wmb(), none of the three ordered accessors
-patches are needed. But we'll probably push them anyway, in which case
-the wmb() becomes superfluous.
-
-> I will test the PATCH v3 0/3  tomorrow, without using wmb();
-
-Thanks.
-
--- 
-Catalin
+Yours,
+Linus Walleij
