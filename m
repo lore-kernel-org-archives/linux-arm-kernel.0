@@ -1,35 +1,29 @@
-From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Thu, 15 Jul 2010 12:08:07 +0300 (EEST)
-Subject: [RFC][PATCH 1/1] ARM: Add initial hibernation support
-In-Reply-To: <20100715084118.GB26212@n2100.arm.linux.org.uk>
-References: <20100714132255.GB3103@ucw.cz>
-	<20100715.083450.193689911.Hiroshi.DOYU@nokia.com>
-	<20100715084118.GB26212@n2100.arm.linux.org.uk>
-Message-ID: <20100715.120807.39160135.Hiroshi.DOYU@nokia.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 15 Jul 2010 10:09:33 +0100
+Subject: [PATCH v2 2/2] ux500: add ab8500-regulators machine specific data
+In-Reply-To: <AANLkTimWjozzhTG491JVLUIICh6YonO4Emp07AG1nMj-@mail.gmail.com>
+References: <20100714145748.GF31073@rakim.wolfsonmicro.main>
+	<20100714153643.GB1689@bnru01.bnr.st.com>
+	<20100714154726.GH31073@rakim.wolfsonmicro.main>
+	<20100714160941.GC1689@bnru01.bnr.st.com>
+	<20100714162048.GA27512@rakim.wolfsonmicro.main>
+	<20100714164708.GD1689@bnru01.bnr.st.com>
+	<20100714170323.GF5933@sirena.org.uk>
+	<20100714173650.GA21893@bnru01.bnr.st.com>
+	<20100714184251.GG5933@sirena.org.uk>
+	<AANLkTimWjozzhTG491JVLUIICh6YonO4Emp07AG1nMj-@mail.gmail.com>
+Message-ID: <20100715090932.GC23529@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: ext Russell King - ARM Linux <linux@arm.linux.org.uk>
-Subject: Re: [RFC][PATCH 1/1] ARM: Add initial hibernation support
-Date: Thu, 15 Jul 2010 10:41:18 +0200
+On Thu, Jul 15, 2010 at 12:51:50AM +0200, Linus Walleij wrote:
 
-> On Thu, Jul 15, 2010 at 08:34:50AM +0300, Hiroshi DOYU wrote:
->> Russell, would it be possible to put this into your next merge queue?
-> 
-> I think it needs quite a bit of rework - I certainly don't like all
-> those CP15 register accesses there - that's asking for lots of ifdefs
-> to spring up as more CPUs are supported.
->
-> Eg, what about ensuring that state such as iWMMXt on PXA CPUs is
-> properly restored?
+> For U8500 there is a dedicated autonomous system in the silicon, called
+> PRCMU (Power Reset Clock Management Unit) that will actually do
+> this using I2C because it has its own CPU and can transmit I2C
+> messages even when the ARM CPU cores are turned off. So this is
+> indeed a first-timer and not strange that it looks unfamiliar ...
 
-Right. This arch specific part can be something like
-"suspend-v[3-7].S" to accomodate those differences
-
-> We already have code which knows what needs to be saved across a
-> power-off transition - its what we use for our normal suspend/resume
-> functionality, so we should look at re-using that code for hibernate
-> as well.  We really don't want to be maintaining two sets of code
-> doing the same thing.
-
-Could you explain which code you're refering for the existing one?
+This sort of design is becoming more and more common but it's still the
+same thing from the point of view of the kernel - something else goes
+off and does magic without the kernel explicitly doing anything.
