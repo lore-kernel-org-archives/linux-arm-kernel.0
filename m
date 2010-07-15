@@ -1,43 +1,63 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 15 Jul 2010 13:15:18 +0100
+Date: Thu, 15 Jul 2010 13:19:25 +0100
 Subject: Problem with dma_alloc_coherent at linux-2.6.33-arm1 ,
 	withRealView platform,board PBX-A9 and armv7 instructions.
-In-Reply-To: <20100715100938.GH26212@n2100.arm.linux.org.uk>
+In-Reply-To: <20100715093107.GB17605@trinity.fluff.org>
 References: <AANLkTimtpIQaKVHidWP9fvOKGGiQRc0tne1kO5mO-Zzs@mail.gmail.com>
 	<20100715093107.GB17605@trinity.fluff.org>
-	<20100715093831.GE26212@n2100.arm.linux.org.uk>
-	<AANLkTil1z_o2fBmnw4TljMmu1rbL7hzr0qQDFITs04go@mail.gmail.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C6087300@dbde02.ent.ti.com>
-	<20100715100938.GH26212@n2100.arm.linux.org.uk>
-Message-ID: <1279196118.6664.8.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <1279196365.6664.12.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-07-15 at 11:09 +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 15, 2010 at 03:34:58PM +0530, Shilimkar, Santosh wrote:
-> > > -----Original Message-----
-> > > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> > > kernel-bounces at lists.infradead.org] On Behalf Of David Yang
-> > > Sent: Thursday, July 15, 2010 3:27 PM
-> > > To: Russell King - ARM Linux
-> > > Cc: linux-arm-kernel at lists.infradead.org; Ben Dooks
-> > > Subject: Re: Problem with dma_alloc_coherent at linux-2.6.33-arm1 , with
-> > > RealView platform,board PBX-A9 and armv7 instructions.
-> > >
-> > > I have explicitly added the barrier() in my driver, but it did't work.
-> > >
-> > > I will go on testing until solve the problem. I need more advice.
-> > >
-> > The 'barrier()' is just a compiler barrier. You should be using "mb" "rmb"
-> > or "wmb"  depending on the usage.
+On Thu, 2010-07-15 at 10:31 +0100, Ben Dooks wrote:
+> On Thu, Jul 15, 2010 at 05:13:57PM +0800, David Yang wrote:
+> >        I encountered this problem when porting my ethernet driver from
+> > linux-2.6.28 to linux-2.6.33-arm1.
+> >
+> >        In the linux-2.6.28, I used the dma_alloc_coherent to share the
+> > informations between cpu and ethernet device.The program flow in the
+> > function ndo_start_xmit:
+> >                1,preparing the struct sk_buff->data for device internal DMA to
+> > read,using the dma_map_single function.
+> >                2,update the information in the memory which is allocated by
+> > dma_alloc_coherent to tell the device DMA the data is readable.
+> >                3,write the device register to inform the device DMA
+> > to read the data.
+> >                4,cpu captures the interrupt of reading completion
+> > form the device.
+> >
+> >        In the linux-2.6.28,the whole program flow soon complete in order.
+> >        But when the driver was ported to the linux-2.6.33-arm1,the problem
+> > came:
+> >                 I found when the cpu executed from step 1-3, the
+> > device DMA alarm the
+> > step 2 was not completed.As a result,the step 4 was not triggered.This
+> > is different form linux-2.6.28.
+> >
+> >                After some tests, I think the problem comes from the
+> > dma_alloc_coherent.It looks like ,in the linux-2.6.33-arm1, when the
+> > memory allocated by dma_alloc_coherent is written,the data entry into
+> > the ddr much slower than the same process in linux-2.6.28.Therefore,when
+> > cpu has executed the step 3, the step 2 has not yet completed.So the DMA
+> > can't get the correct information ,and the step 4 will never be reached.
+> >
+> >        I don't know the reason until now.I guess the memory allocated by the
+> > dma_alloc_coherent may be cached....if not , why it is so slowly?
 > 
-> It'd be useful if the patches which are destined for mainline get some
-> independent testing by people who have experienced the problem, rather
-> than creating their own solutions.
+> The dma_alloc_coherent coherent should return uncachable and un-bufferable
+> memory, otherwise you meed explicit flushing commands when changing between
+> the HW and CPU ownership.
 
-In case I forgot to mention, the people from Trident Micro tested my
-three "ordered" accessors patches and it solved the problem for them
-(unfortunately the discussion was in private e-mails).
+When CONFIG_DMA_MEM_BUFFERABLE is enabled (ARMv6 and ARMv7), the
+coherent DMA buffers are uncached but "buffered". That's because Normal
+Non-cacheable memory is always buffered. While the Device accesses are
+also buffered, the two accesses aren't guaranteed to be ordered with
+each-other and you would need to use a barrier - wmb() usually.
+
+If you have an outer cache (L2), in some hardware configurations (I
+would say most), the DSB doesn't get through to the L2 cache but it
+buffers Normal Non-cacheable accesses. This is solved by doing an L2
+cache sync in the wmb() macro.
 
 -- 
 Catalin
