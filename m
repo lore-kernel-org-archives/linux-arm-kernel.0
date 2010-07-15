@@ -1,72 +1,44 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 15 Jul 2010 11:10:41 +0200
-Subject: [PATCH 10/10 v2] ARM: S5PC100: enable FIMC on SMDKC100
-In-Reply-To: <1279185041-6004-1-git-send-email-s.nawrocki@samsung.com>
-References: <1279185041-6004-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1279185041-6004-11-git-send-email-s.nawrocki@samsung.com>
+From: david.yangshuai@gmail.com (David Yang)
+Date: Thu, 15 Jul 2010 17:13:57 +0800
+Subject: Problem with dma_alloc_coherent at linux-2.6.33-arm1 , with RealView
+	platform,board PBX-A9 and armv7 instructions.
+Message-ID: <AANLkTimtpIQaKVHidWP9fvOKGGiQRc0tne1kO5mO-Zzs@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for FIMC on Samsung SMDKC100 board.
+hi ,everybody:
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-s5pc100/Kconfig         |    6 ++++++
- arch/arm/mach-s5pc100/mach-smdkc100.c |    9 +++++++++
- 2 files changed, 15 insertions(+), 0 deletions(-)
+       I encountered this problem when porting my ethernet driver from
+linux-2.6.28 to linux-2.6.33-arm1.
 
-diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
-index 791270d..8839c07 100644
---- a/arch/arm/mach-s5pc100/Kconfig
-+++ b/arch/arm/mach-s5pc100/Kconfig
-@@ -63,6 +63,12 @@ config MACH_SMDKC100
- 	select S5PC100_SETUP_FB_24BPP
- 	select S5PC100_SETUP_I2C1
- 	select S5PC100_SETUP_SDHCI
-+	select S5P_DEV_FIMC0
-+	select S5PC100_SETUP_FIMC0
-+	select S5P_DEV_FIMC1
-+	select S5PC100_SETUP_FIMC1
-+	select S5P_DEV_FIMC2
-+	select S5PC100_SETUP_FIMC2
- 	help
- 	  Machine support for the Samsung SMDKC100
- 
-diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-s5pc100/mach-smdkc100.c
-index ce3fcde..262de8e 100644
---- a/arch/arm/mach-s5pc100/mach-smdkc100.c
-+++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
-@@ -42,6 +42,7 @@
- #include <plat/s5pc100.h>
- #include <plat/fb.h>
- #include <plat/iic.h>
-+#include <plat/fimc.h>
- 
- /* Following are default values for UCON, ULCON and UFCON UART registers */
- #define S5PC100_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-@@ -160,6 +161,9 @@ static struct platform_device *smdkc100_devices[] __initdata = {
- 	&s5pc100_device_iis0,
- 	&s5pc100_device_ac97,
- 	&s3c_device_onenand,
-+	&s5p_device_fimc0,
-+	&s5p_device_fimc1,
-+	&s5p_device_fimc2,
- };
- 
- static void __init smdkc100_map_io(void)
-@@ -179,6 +183,11 @@ static void __init smdkc100_machine_init(void)
- 
- 	s3c_fb_set_platdata(&smdkc100_lcd_pdata);
- 
-+	/* FIMC */
-+	s5p_fimc0_set_platdata(NULL);
-+	s5p_fimc1_set_platdata(NULL);
-+	s5p_fimc2_set_platdata(NULL);
-+
- 	/* LCD init */
- 	gpio_request(S5PC100_GPD(0), "GPD");
- 	gpio_request(S5PC100_GPH0(6), "GPH0");
--- 
-1.7.0.4
+       In the linux-2.6.28, I used the dma_alloc_coherent to share the
+informations between cpu and ethernet device.The program flow in the
+function ndo_start_xmit:
+               1,preparing the struct sk_buff->data for device internal DMA to
+read,using the dma_map_single function.
+               2,update the information in the memory which is allocated by
+dma_alloc_coherent to tell the device DMA the data is readable.
+               3,write the device register to inform the device DMA
+to read the data.
+               4,cpu captures the interrupt of reading completion
+form the device.
+
+       In the linux-2.6.28,the whole program flow soon complete in order.
+       But when the driver was ported to the linux-2.6.33-arm1,the problem
+came:
+                I found when the cpu executed from step 1-3, the
+device DMA alarm the
+step 2 was not completed.As a result,the step 4 was not triggered.This
+is different form linux-2.6.28.
+
+               After some tests, I think the problem comes from the
+dma_alloc_coherent.It looks like ,in the linux-2.6.33-arm1, when the
+memory allocated by dma_alloc_coherent is written,the data entry into
+the ddr much slower than the same process in linux-2.6.28.Therefore,when
+cpu has executed the step 3, the step 2 has not yet completed.So the DMA
+can't get the correct information ,and the step 4 will never be reached.
+
+       I don't know the reason until now.I guess the memory allocated by the
+dma_alloc_coherent may be cached....if not , why it is so slowly?
+
+ Thanks!
