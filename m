@@ -1,40 +1,44 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 15 Jul 2010 11:32:07 -0500
-Subject: [PATCH 1/3] ARM: driver for the character LCD found in ARM
-	refdesigns
-In-Reply-To: <20100715115358.GF29322@n2100.arm.linux.org.uk>
-References: <1278429668-4564-1-git-send-email-triad@df.lth.se>
-	<20100715102237.GI26212@n2100.arm.linux.org.uk>
-	<AANLkTinxE6hbgVWqvxen6yDNM1VLgK2DFnMyN_o_zbsw@mail.gmail.com>
-	<20100715115358.GF29322@n2100.arm.linux.org.uk>
-Message-ID: <0D753D10438DA54287A00B02708426976373E18707@AUSP01VMBX24.collaborationhost.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Jul 2010 17:35:26 +0100
+Subject: tq 2440
+In-Reply-To: <AANLkTil8GE1OguyAfp3XgfJvEmH98yNrlvGAx684a-qL@mail.gmail.com>
+References: <AANLkTimyBHliUa62qmfja_ke6YTTysiVAtJcZfi8l2gG@mail.gmail.com>
+	<AANLkTil8GE1OguyAfp3XgfJvEmH98yNrlvGAx684a-qL@mail.gmail.com>
+Message-ID: <20100715163526.GJ29322@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 15, 2010 4:54 AM, Russell King wrote:
-> On Thu, Jul 15, 2010 at 01:49:28PM +0200, Linus Walleij wrote:
->> 2010/7/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->>> I think the only questionable thing on this is the location of the
->>> driver. ?As we now have plat-versatile for the shared stuff between
->>> integrator, verastile, realview and versatile express, maybe it'd
->>> make more sense to be in plat-versatile?
->> 
->> OK I can move it there.
->> 
->>> Or maybe drivers/platform/arm/ (to avoid Linus' complaint about
->>> drivers under arch/ ?)
->> 
->> Creating that for a single driver seems weird, I could just as well
->> create drivers/lcd for all LCDs in that case. But there is another
->> LCD-like driver for a USB-connected LCD under drivers/misc
->> IIRC, maybe I can make a patch for that as well and let the misc
->> maintainer decide if he wants it.
->
-> My first preference would be somewhere under drivers/, if not then
-> plat-versatile.  So if you think drivers/misc would be suitable,
-> please try the misc maintainer.
+On Thu, Jul 15, 2010 at 11:16:30PM +0800, Conke Hu wrote:
+> ever notice to the following kernel log?
+> "Device 's3c2440-nand' does not have a release() function, it is
+> broken and must."
+> release() function should be implemented  in the platform_device.
 
-drivers/auxdisplay ?
+That's not telling you to provide a release function.  The warning is
+telling you that a device is being unregistered which doesn't have a
+release function.
 
-Regards,
-Hartley
+Consider this point - maybe it doesn't have a release function because
+it's not supposed to be unregistered?
+
+> > ------------[ cut here ]------------
+> > WARNING: at fs/sysfs/dir.c:463 sysfs_add_one+0x30/0x44()
+> > sysfs: duplicate filename 'dm9000.0' can not be created
+
+This is the cause of the problem.  You're registering two dm9000.0
+devices.  That's illegal, and it then causes all these:
+
+> > WARNING: at drivers/base/core.c:122 device_release+0x6c/0x78()
+> > Device 's3c24xx_led.3' does not have a release() function, it is broken and mus.
+> > WARNING: at drivers/base/core.c:122 device_release+0x6c/0x78()
+> > Device 's3c24xx_led.2' does not have a release() function, it is broken and mus.
+> > WARNING: at drivers/base/core.c:122 device_release+0x6c/0x78()
+> > Device 's3c24xx_led.1' does not have a release() function, it is broken and mus.
+> > WARNING: at drivers/base/core.c:122 device_release+0x6c/0x78()
+> > Device 's3c24xx_led.0' does not have a release() function, it is broken and mus.
+> > WARNING: at drivers/base/core.c:122 device_release+0x6c/0x78()
+> > Device 's3c2440-nand' does not have a release() function, it is broken and must.
+...
+
+Fix the first problem (which is the real one) and you won't have these
+other problems (which aren't actually a problem.)
