@@ -1,37 +1,32 @@
-From: david.yangshuai@gmail.com (David Yang)
-Date: Thu, 15 Jul 2010 21:10:12 +0800
-Subject: Problem with dma_alloc_coherent at linux-2.6.33-arm1 ,
-	withRealView platform,board PBX-A9 and armv7 instructions.
-In-Reply-To: <1279198607.6664.20.camel@e102109-lin.cambridge.arm.com>
-References: <AANLkTimq3E7uF4poJkqcDIomEHoS4y24D7sJWt0U44Hd@mail.gmail.com>
-	<1279198607.6664.20.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <AANLkTikezqBLFd_ECJZ9RoCf2XCNdYyWps_JKfjyQ1se@mail.gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 15 Jul 2010 16:10:43 +0300
+Subject: [PATCH 0/3] Enable pxa310 usb otg port host mode
+Message-ID: <1279199446-30526-1-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have passed the test,when using wmb() and without PATCH 0/3;
+This patch series introduces the U2D Controller and
+Host driver for PXA3xx and enables cm-x300 usb host port2.
 
-But,I have a  doubt : if I use the wmb(), then the l2x0.c 's patch is
-not needed?
+This patch series depends on
+"Generic ULPI driver extention" patch series,
+which is currently sent for review to
+linux-usb at vger.kernel.org mailing list
 
+Igor Grinberg (3):
+  [ARM] pxa3xx: Add U2D controller and driver
+  [ARM] usb/host/ohci-pxa27x: enable OHCI over U2DC
+  [ARM] pxa/cm-x300: enable USB host port2
 
-I will test the PATCH v3 0/3  tomorrow, without using wmb();
-
-
-
-Thanks!
-
-On Thu, Jul 15, 2010 at 8:56 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, 2010-07-15 at 13:52 +0100, David Yang wrote:
->> the patch v3 2/3 can not be patched to my ?arch/arm/mm/cache-l2x0.c
->> from linux-2.6.33-arm1
->>
->> should I modify it manually?
->
-> It's just a simple replacement - s/writel/writel_relaxed/
->
-> --
-> Catalin
->
->
+ arch/arm/mach-pxa/Kconfig                   |    4 +
+ arch/arm/mach-pxa/Makefile                  |    2 +-
+ arch/arm/mach-pxa/cm-x300.c                 |   77 ++++++
+ arch/arm/mach-pxa/devices.c                 |   28 ++
+ arch/arm/mach-pxa/devices.h                 |    1 +
+ arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h |   35 +++
+ arch/arm/mach-pxa/pxa3xx-u2d.c              |  392 +++++++++++++++++++++++++++
+ arch/arm/mach-pxa/pxa3xx.c                  |    2 +-
+ drivers/usb/host/ohci-pxa27x.c              |    7 +
+ 9 files changed, 546 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h
+ create mode 100644 arch/arm/mach-pxa/pxa3xx-u2d.c
