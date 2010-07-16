@@ -1,40 +1,89 @@
-From: miltonm@bga.com (Milton Miller)
-Date: Fri, 16 Jul 2010 11:23:55 -0500
-Subject: [PATCH] Stop ARM boards crashing when CUPS is loaded - 2.6.35-rc5
-In-Reply-To: <4C402746.6080309@canonical.com>
-References: <4C3C72C6.4000005@canonical.com>
-	<20100715130214.4c9303b2.akpm@linux-foundation.org>
-	<20100715200618.GA6773@n2100.arm.linux.org.uk>
-	<4C40218A.4090806@canonical.com>
-	<20100716092018.GB16995@n2100.arm.linux.org.uk>
-Message-ID: <miltonm-arm-parport-1@bga.com>
+From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
+Date: Fri, 16 Jul 2010 18:30:39 +0200
+Subject: [PATCH] mxc_udc: add workaround for ENGcm09152 for i.MX35
+Message-ID: <1279297839-2155-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri Jul 16 2010 about 05:33:06 EST,  Lee Jones wrote:
-> > The best solution is probably for the parport code to go through a
-> > modernisation cycle like the serial code did, essentially using
-> > platform devices to pass the base addresses. This would make the
-> > driver more portable, and eliminates this problem entirely (because
-> > platforms which don't have parports won't register the platform device(s)
-> > necessary for parport to even probe illegal addresses.)
-> 
-> This sounds brilliant - when are you going to start? </kidding>
+this patch gives the possibility to workaround bug ENGcm09152
+on i.MX35 when the hardware workaround is also implemented on
+the board.
 
-It has a long time ago ...
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+---
+ arch/arm/mach-mx3/mach-cpuimx35.c |    1 +
+ drivers/usb/gadget/fsl_mxc_udc.c  |   12 ++++++++++++
+ include/linux/fsl_devices.h       |    3 +++
+ 3 files changed, 16 insertions(+), 0 deletions(-)
 
-drivers/parport/parport_pc.c calls parport_pc_find_nonpci_ports,
-which is in asm/parport.h
-
-> 
-> In all seriousness, do you think anyone is likely to undertake this
-> work anytime soon? I am seeing this problem in a distribution which
-> is due for release in October. I have no problem implementing a config
-> change in the meantime, but as you say, a more _correct_ and portable
-> solution should be sought.
-
-Why not replace the arm asm/parport.h with asm-generic/parport.h which
-already has a check for CONFIG_ISA, which appears to only be selected
-on a few ARM platforms?
-
-milton
+diff --git a/arch/arm/mach-mx3/mach-cpuimx35.c b/arch/arm/mach-mx3/mach-cpuimx35.c
+index 56e5bf0..9d578de 100644
+--- a/arch/arm/mach-mx3/mach-cpuimx35.c
++++ b/arch/arm/mach-mx3/mach-cpuimx35.c
+@@ -154,6 +154,7 @@ static struct mxc_usbh_platform_data usbh1_pdata = {
+ static struct fsl_usb2_platform_data otg_device_pdata = {
+ 	.operating_mode	= FSL_USB2_DR_DEVICE,
+ 	.phy_mode	= FSL_USB2_PHY_UTMI,
++	.workaround	= FLS_USB2_WORKAROUND_ENGCM09152,
+ };
+ 
+ static int otg_mode_host;
+diff --git a/drivers/usb/gadget/fsl_mxc_udc.c b/drivers/usb/gadget/fsl_mxc_udc.c
+index eafa6d2..1a31cf9 100644
+--- a/drivers/usb/gadget/fsl_mxc_udc.c
++++ b/drivers/usb/gadget/fsl_mxc_udc.c
+@@ -22,6 +22,10 @@
+ static struct clk *mxc_ahb_clk;
+ static struct clk *mxc_usb_clk;
+ 
++/* workaround ENGcm09152 for i.MX35 */
++#define USBPHYCTRL_OTGBASE_OFFSET	0x608
++#define USBPHYCTRL_EVDO			(1 << 23)
++
+ int fsl_udc_clk_init(struct platform_device *pdev)
+ {
+ 	struct fsl_usb2_platform_data *pdata;
+@@ -84,6 +88,7 @@ eenahb:
+ void fsl_udc_clk_finalize(struct platform_device *pdev)
+ {
+ 	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
++	unsigned int v;
+ 
+ 	/* ULPI transceivers don't need usbpll */
+ 	if (pdata->phy_mode == FSL_USB2_PHY_ULPI) {
+@@ -91,6 +96,13 @@ void fsl_udc_clk_finalize(struct platform_device *pdev)
+ 		clk_put(mxc_usb_clk);
+ 		mxc_usb_clk = NULL;
+ 	}
++	/* workaround ENGcm09152 for i.MX35 */
++	if (pdata->workaround & FLS_USB2_WORKAROUND_ENGCM09152) {
++		v = readl(MX35_IO_ADDRESS(MX35_OTG_BASE_ADDR +
++				USBPHYCTRL_OTGBASE_OFFSET));
++		writel(v | USBPHYCTRL_EVDO, MX35_IO_ADDRESS(MX35_OTG_BASE_ADDR +
++				USBPHYCTRL_OTGBASE_OFFSET));
++	}
+ }
+ 
+ void fsl_udc_clk_release(void)
+diff --git a/include/linux/fsl_devices.h b/include/linux/fsl_devices.h
+index 28e33fe..01a23fa 100644
+--- a/include/linux/fsl_devices.h
++++ b/include/linux/fsl_devices.h
+@@ -63,12 +63,15 @@ struct fsl_usb2_platform_data {
+ 	enum fsl_usb2_operating_modes	operating_mode;
+ 	enum fsl_usb2_phy_modes		phy_mode;
+ 	unsigned int			port_enables;
++	unsigned int			workaround;
+ };
+ 
+ /* Flags in fsl_usb2_mph_platform_data */
+ #define FSL_USB2_PORT0_ENABLED	0x00000001
+ #define FSL_USB2_PORT1_ENABLED	0x00000002
+ 
++#define FLS_USB2_WORKAROUND_ENGCM09152	(1 << 0)
++
+ struct spi_device;
+ 
+ struct fsl_spi_platform_data {
+-- 
+1.6.3.3
