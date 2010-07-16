@@ -1,27 +1,33 @@
-From: lee.jones@canonical.com (Lee Jones)
-Date: Fri, 16 Jul 2010 12:12:07 +0100
-Subject: [PATCH] Stop ARM boards crashing when CUPS is loaded -	2.6.35-rc5
-In-Reply-To: <4C402746.6080309@canonical.com>
-References: <4C3C72C6.4000005@canonical.com>	<20100715130214.4c9303b2.akpm@linux-foundation.org>	<20100715200618.GA6773@n2100.arm.linux.org.uk>	<4C40218A.4090806@canonical.com>	<20100716092018.GB16995@n2100.arm.linux.org.uk>
-	<4C402746.6080309@canonical.com>
-Message-ID: <4C403E87.4040503@canonical.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Jul 2010 13:13:04 +0200
+Subject: [PATCH v2][RFC] arm: Add basic support for VIA/WonderMedia SoC's
+In-Reply-To: <20100715193136.GA19050@alchark-u3s.alchark.ru>
+References: <20100712165025.GA13818@alchark-u3s.alchark.ru>
+	<201007122122.32623.arnd@arndb.de>
+	<20100715193136.GA19050@alchark-u3s.alchark.ru>
+Message-ID: <201007161313.04667.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/07/10 10:32, Lee Jones wrote:
->> The best solution is probably for the parport code to go through a
->> modernisation cycle like the serial code did, essentially using
->> platform devices to pass the base addresses.  This would make the
->> driver more portable, and eliminates this problem entirely (because
->> platforms which don't have parports won't register the platform device(s)
->> necessary for parport to even probe illegal addresses.)
+On Thursday 15 July 2010, Alexey Charkov wrote:
+> This adds basic support for machine initialization, interrupts, timers and
+> serial console on VIA/WonderMedia VT8500 and WM8505 Systems-on-Chip.
+> 
+> These SoC's are used in quite many netbooks and tablets produced in China
+> and sold online at relatively low prices (typically below 100 USD).
+> 
+> Support for WM8505 is known incomplete, while VT8500 is tested by me on the
+> hardware and at least prints kernel messages to the serial console with timing
+> information.
+> 
+> Signed-off-by: Alexey Charkov <alchark@gmail.com>
+> ---
+> 
+> This is a second attempt, I tried to implement all the comments that I've
+> received previously. Please comment and, if possible, integrate. Serial
+> driver will follow separately.
 
-I have lobbied for one of our partners to conduct this work, but I don't
-think this would be something that is in their interest to fix. 
-Nevertheless, I am currently waiting on a reply from them.
+No more comments from my side, looks good so far. I hope to get my toy
+with this soon so I can try out the code.
 
-FAO GregKH,
-
-Do you think this would be something that may interest you and your Linux 
-drivers project? Or perhaps a student who wants to get their feet wet and
-play with some platform driver code.
+	Arnd
