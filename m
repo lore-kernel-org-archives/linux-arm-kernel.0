@@ -1,12 +1,12 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 16 Jul 2010 21:04:44 +0900
-Subject: [PATCH 2/5] ARM: S5P: Added default pll values for APLL
+Date: Fri, 16 Jul 2010 21:22:08 +0900
+Subject: [PATCH v2 2/5] ARM: S5P: Added default pll values for APLL
 	800/1000MHz
-In-Reply-To: <1279184768-28971-3-git-send-email-myungjoo.ham@samsung.com>
-References: <1279184768-28971-1-git-send-email-myungjoo.ham@samsung.com>
-	<1279184768-28971-2-git-send-email-myungjoo.ham@samsung.com>
-	<1279184768-28971-3-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <012d01cb24df$163b8ee0$42b2aca0$%kim@samsung.com>
+In-Reply-To: <1279267277-6804-3-git-send-email-myungjoo.ham@samsung.com>
+References: <1279267277-6804-1-git-send-email-myungjoo.ham@samsung.com>
+	<1279267277-6804-2-git-send-email-myungjoo.ham@samsung.com>
+	<1279267277-6804-3-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <012f01cb24e1$85628920$90279b60$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -53,8 +53,7 @@ So don't use in here.
 >  	pll_4502,
 > --
 
-And...I got the below result from scripts/checkpatch.pl...
-If this time is first, maybe mistake...but this is not...
+And...I got the below result from scripts/checkpatch.pl.
 
 --
 
@@ -79,8 +78,6 @@ total: 4 errors, 0 warnings, 14 lines checked
 --
 
 I already said to you about that :-(
-Please make sure your patch has no problem to send before submitting.
-
 See the Documentation/SubmittingPatches...
 
 Thanks.
