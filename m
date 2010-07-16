@@ -1,29 +1,27 @@
-From: tbm@cyrius.com (Martin Michlmayr)
-Date: Fri, 16 Jul 2010 16:31:51 +0100
-Subject: [PATCH] Orion: DNS-323 C1 requires phylib
-Message-ID: <20100716153151.GA9307@jirafa.cyrius.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 Jul 2010 17:03:41 +0100
+Subject: [RFC PATCH] Kconfig: Enable Kconfig fragments to be used for
+	defconfig
+In-Reply-To: <20100713230352.6781.18644.stgit@angua>
+References: <20100713230352.6781.18644.stgit@angua>
+Message-ID: <1279296221.17878.66.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code to support the DNS-323 rev C1 added a call to
-phy_register_fixup_for_uid() and therefore phylib has to
-be built in.
+On Wed, 2010-07-14 at 00:04 +0100, Grant Likely wrote:
+> - It still doesn't resolve dependencies.  A solver would help with this.
+>   For the time being I work around the problem by running the generated
+>   config through 'oldconfig' and looking for differences.  If the files
+>   differ (ignoring comments and generateconfig_* options) after oldconfig,
+>   then the <board>_defconfig target returns a failure.  (but leaves the
+>   new .config intact so the user can resolve it with menuconfig).  This
+>   way at least the user is told when a Kconfig fragment is invalid.
 
-Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
+It's not a solver but I'm pushing a patch to warn on selecting symbols
+with unmet dependencies so that you can select further symbols (manual
+solving). The patch is in linux-next but you also can grab it from:
 
-diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
-index 905719a..c897e03 100644
---- a/arch/arm/mach-orion5x/Kconfig
-+++ b/arch/arm/mach-orion5x/Kconfig
-@@ -26,6 +26,7 @@ config MACH_KUROBOX_PRO
- config MACH_DNS323
- 	bool "D-Link DNS-323"
- 	select I2C_BOARDINFO
-+	select PHYLIB
- 	help
- 	  Say 'Y' here if you want your kernel to support the
- 	  D-Link DNS-323 platform.
+http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-2.6-cm.git;a=commitdiff_plain;h=5d87db2d2a332784bbf2b1ec3e141486f4d41d6f
 
 -- 
-Martin Michlmayr
-http://www.cyrius.com/
+Catalin
