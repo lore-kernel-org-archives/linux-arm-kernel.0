@@ -1,198 +1,41 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Fri, 16 Jul 2010 15:00:07 +0800
-Subject: [PATCH] ARM/nuc900: re-organize the nuc900 lcd arch platform data
-	setting
-Message-ID: <4C400377.3020408@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 16 Jul 2010 09:02:57 +0200
+Subject: [PATCHv6] mx2_camera: Add soc_camera support for i.MX25/i.MX27
+In-Reply-To: <Pine.LNX.4.64.1007111315560.30182@axis700.grange>
+References: <40ccd21d0e857660038d193af3bb4cc6edd1067d.1278218817.git.baruch@tkos.co.il>
+	<Pine.LNX.4.64.1007111315560.30182@axis700.grange>
+Message-ID: <20100716070257.GH14113@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch re-organizes the nuc900 lcd arch platform data,
-remove the lcd platform data setting from nuc950.c to dev.c
+On Sun, Jul 11, 2010 at 01:18:27PM +0200, Guennadi Liakhovetski wrote:
+> On Sun, 4 Jul 2010, Baruch Siach wrote:
+> 
+> > This is the soc_camera support developed by Sascha Hauer for the i.MX27.  Alan
+> > Carvalho de Assis modified the original driver to get it working on more recent
+> > kernels. I modified it further to add support for i.MX25. This driver has been
+> > tested on i.MX25 and i.MX27 based platforms.
+> > 
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> 
+> So, who shall be taking this patch? I'd prefer it go via ARM. Then you can 
+> easier satisfy any dependencies and enforce a certain patch order. It has 
+> my ack, just verified v6 - my ack still holds (I hope, Baruch did 
+> compile-test this new version on various i.MX2x versions). However, if you 
+> prefer, I can also take it via soc-camera / v4l. Sascha, what's your take?
 
-It can maximize the share codes between nuc900 series MCUs.
+There won't be conflicts when this goes over v4l, but otoh if Baruch
+plans to add board support till the next window the platform_data will
+be missing and my tree won't compile. So it's probably best to push it
+through the i.MX tree.
 
-Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
----
- arch/arm/mach-w90x900/dev.c            |   55 +++++++++++++++++++++++---------
- arch/arm/mach-w90x900/mach-nuc950evb.c |   44 -------------------------
- arch/arm/mach-w90x900/nuc910.c         |    1 +
- arch/arm/mach-w90x900/nuc950.c         |    2 -
- 4 files changed, 41 insertions(+), 61 deletions(-)
+Will apply this afternoon if noone objects.
 
-diff --git a/arch/arm/mach-w90x900/dev.c b/arch/arm/mach-w90x900/dev.c
-index b2eda4d..73b3eca 100644
---- a/arch/arm/mach-w90x900/dev.c
-+++ b/arch/arm/mach-w90x900/dev.c
-@@ -36,6 +36,7 @@
- #include <mach/nuc900_spi.h>
- #include <mach/map.h>
- #include <mach/fb.h>
-+#include <mach/regs-ldm.h>
+Sascha
 
- #include "cpu.h"
-
-@@ -382,7 +383,44 @@ struct platform_device nuc900_device_kpi = {
- 	.resource	= nuc900_kpi_resource,
- };
-
--#ifdef CONFIG_FB_NUC900
-+/* LCD controller*/
-+
-+static struct nuc900fb_display __initdata nuc900_lcd_info[] = {
-+	/* Giantplus Technology GPM1040A0 320x240 Color TFT LCD */
-+	[0] = {
-+		.type		= LCM_DCCS_VA_SRC_RGB565,
-+		.width		= 320,
-+		.height		= 240,
-+		.xres		= 320,
-+		.yres		= 240,
-+		.bpp		= 16,
-+		.pixclock	= 200000,
-+		.left_margin	= 34,
-+		.right_margin   = 54,
-+		.hsync_len	= 10,
-+		.upper_margin	= 18,
-+		.lower_margin	= 4,
-+		.vsync_len	= 1,
-+		.dccs		= 0x8e00041a,
-+		.devctl		= 0x060800c0,
-+		.fbctrl		= 0x00a000a0,
-+		.scale		= 0x04000400,
-+	},
-+};
-+
-+static struct nuc900fb_mach_info nuc900_fb_info __initdata = {
-+#if defined(CONFIG_GPM1040A0_320X240)
-+	.displays		= &nuc900_lcd_info[0],
-+#else
-+	.displays		= nuc900_lcd_info,
-+#endif
-+	.num_displays		= ARRAY_SIZE(nuc900_lcd_info),
-+	.default_display	= 0,
-+	.gpio_dir		= 0x00000004,
-+	.gpio_dir_mask		= 0xFFFFFFFD,
-+	.gpio_data		= 0x00000004,
-+	.gpio_data_mask		= 0xFFFFFFFD,
-+};
-
- static struct resource nuc900_lcd_resource[] = {
- 	[0] = {
-@@ -406,23 +444,10 @@ struct platform_device nuc900_device_lcd = {
- 	.dev              = {
- 		.dma_mask               = &nuc900_device_lcd_dmamask,
- 		.coherent_dma_mask      = -1,
-+		.platform_data = &nuc900_fb_info,
- 	}
- };
-
--void  nuc900_fb_set_platdata(struct nuc900fb_mach_info *pd)
--{
--	struct nuc900fb_mach_info *npd;
--
--	npd = kmalloc(sizeof(*npd), GFP_KERNEL);
--	if (npd) {
--		memcpy(npd, pd, sizeof(*npd));
--		nuc900_device_lcd.dev.platform_data = npd;
--	} else {
--		printk(KERN_ERR "no memory for LCD platform data\n");
--	}
--}
--#endif
--
- /* AUDIO controller*/
- static u64 nuc900_device_audio_dmamask = -1;
- static struct resource nuc900_ac97_resource[] = {
-diff --git a/arch/arm/mach-w90x900/mach-nuc950evb.c b/arch/arm/mach-w90x900/mach-nuc950evb.c
-index b3edc3c..04d295f 100644
---- a/arch/arm/mach-w90x900/mach-nuc950evb.c
-+++ b/arch/arm/mach-w90x900/mach-nuc950evb.c
-@@ -20,51 +20,10 @@
- #include <asm/mach/map.h>
- #include <asm/mach-types.h>
- #include <mach/map.h>
--#include <mach/regs-ldm.h>
- #include <mach/fb.h>
-
- #include "nuc950.h"
-
--#ifdef CONFIG_FB_NUC900
--/* LCD Controller */
--static struct nuc900fb_display __initdata nuc950_lcd_info[] = {
--	/* Giantplus Technology GPM1040A0 320x240 Color TFT LCD */
--	[0] = {
--		.type		= LCM_DCCS_VA_SRC_RGB565,
--		.width 		= 320,
--		.height		= 240,
--		.xres		= 320,
--		.yres		= 240,
--		.bpp		= 16,
--		.pixclock	= 200000,
--		.left_margin	= 34,
--		.right_margin   = 54,
--		.hsync_len	= 10,
--		.upper_margin	= 18,
--		.lower_margin	= 4,
--		.vsync_len	= 1,
--		.dccs		= 0x8e00041a,
--		.devctl		= 0x060800c0,
--		.fbctrl		= 0x00a000a0,
--		.scale		= 0x04000400,
--	},
--};
--
--static struct nuc900fb_mach_info nuc950_fb_info __initdata = {
--#if defined(CONFIG_GPM1040A0_320X240)
--	.displays		= &nuc950_lcd_info[0],
--#else
--	.displays		= nuc950_lcd_info,
--#endif
--	.num_displays 		= ARRAY_SIZE(nuc950_lcd_info),
--	.default_display	= 0,
--	.gpio_dir		= 0x00000004,
--	.gpio_dir_mask		= 0xFFFFFFFD,
--	.gpio_data		= 0x00000004,
--	.gpio_data_mask		= 0xFFFFFFFD,
--};
--#endif
--
- static void __init nuc950evb_map_io(void)
- {
- 	nuc950_map_io();
-@@ -74,9 +33,6 @@ static void __init nuc950evb_map_io(void)
- static void __init nuc950evb_init(void)
- {
- 	nuc950_board_init();
--#ifdef CONFIG_FB_NUC900
--	nuc900_fb_set_platdata(&nuc950_fb_info);
--#endif
- }
-
- MACHINE_START(W90P950EVB, "W90P950EVB")
-diff --git a/arch/arm/mach-w90x900/nuc910.c b/arch/arm/mach-w90x900/nuc910.c
-index 656f03b..cd49776 100644
---- a/arch/arm/mach-w90x900/nuc910.c
-+++ b/arch/arm/mach-w90x900/nuc910.c
-@@ -26,6 +26,7 @@
- static struct platform_device *nuc910_dev[] __initdata = {
- 	&nuc900_device_ts,
- 	&nuc900_device_rtc,
-+	&nuc900_device_lcd,
- };
-
- /* define specific CPU platform io map */
-diff --git a/arch/arm/mach-w90x900/nuc950.c b/arch/arm/mach-w90x900/nuc950.c
-index 4d1f1ab..5704f74 100644
---- a/arch/arm/mach-w90x900/nuc950.c
-+++ b/arch/arm/mach-w90x900/nuc950.c
-@@ -26,9 +26,7 @@
- static struct platform_device *nuc950_dev[] __initdata = {
- 	&nuc900_device_kpi,
- 	&nuc900_device_fmi,
--#ifdef CONFIG_FB_NUC900
- 	&nuc900_device_lcd,
--#endif
- };
-
- /* define specific CPU platform io map */
 -- 
-1.6.3.3
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
