@@ -1,64 +1,72 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 16 Jul 2010 17:58:27 +0900
-Subject: [PATCH v2 1/8] ARM: S5P: Remove fixed uart offset dependent code
+Date: Fri, 16 Jul 2010 17:58:34 +0900
+Subject: [PATCH v2 8/8] ARM: S5PV310: Add serial port support
 In-Reply-To: <1279270714-15146-1-git-send-email-kgene.kim@samsung.com>
 References: <1279270714-15146-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1279270714-15146-2-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1279270714-15146-9-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Changhwan Youn <chaos.youn@samsung.com>
+From: Jongpill Lee <boyko.lee@samsung.com>
 
-The uart offset between channels has been 0x400 for all S5P series
-and to present virtual and physical offsets, both number 0x400 and
-S3C_UART_OFFSET have been used together.
-This patch removes the use of the number 0x400 and expands the virtual
-mapping size of S3C_VA_UART from 4KB to 512KB to support the CPU with
-S3C_UART_OFFSET being 0x10000.
+This patch adds UART serial port support for S5PV310.
+In the case of that serial device has just one clock source, driver can not
+control clock source. So add check function in get_clksrc and set_clksrc.
 
-Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
+Acked-by: Changhwan Youn <chaos.youn@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/plat-s5p/cpu.c                  |    2 +-
- arch/arm/plat-s5p/include/plat/map-s5p.h |   11 +++++++----
- 2 files changed, 8 insertions(+), 5 deletions(-)
+ drivers/serial/Kconfig   |    4 ++--
+ drivers/serial/s5pv210.c |    8 ++++++++
+ 2 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-s5p/cpu.c b/arch/arm/plat-s5p/cpu.c
-index 75cb8c3..c478441 100644
---- a/arch/arm/plat-s5p/cpu.c
-+++ b/arch/arm/plat-s5p/cpu.c
-@@ -81,7 +81,7 @@ static struct map_desc s5p_iodesc[] __initdata = {
- 	}, {
- 		.virtual	= (unsigned long)S3C_VA_UART,
- 		.pfn		= __phys_to_pfn(S3C_PA_UART),
--		.length		= SZ_4K,
-+		.length		= SZ_512K,
- 		.type		= MT_DEVICE,
- 	}, {
- 		.virtual	= (unsigned long)VA_VIC0,
-diff --git a/arch/arm/plat-s5p/include/plat/map-s5p.h b/arch/arm/plat-s5p/include/plat/map-s5p.h
-index 1482852..3d815f4 100644
---- a/arch/arm/plat-s5p/include/plat/map-s5p.h
-+++ b/arch/arm/plat-s5p/include/plat/map-s5p.h
-@@ -18,12 +18,15 @@
- #define S5P_VA_SYSTIMER		S3C_ADDR(0x01200000)
- #define S5P_VA_SROMC		S3C_ADDR(0x01100000)
+diff --git a/drivers/serial/Kconfig b/drivers/serial/Kconfig
+index 8b23165..aa22010 100644
+--- a/drivers/serial/Kconfig
++++ b/drivers/serial/Kconfig
+@@ -544,8 +544,8 @@ config SERIAL_S3C6400
  
--#define S5P_VA_UART0		(S3C_VA_UART + 0x0)
--#define S5P_VA_UART1		(S3C_VA_UART + 0x400)
--#define S5P_VA_UART2		(S3C_VA_UART + 0x800)
--#define S5P_VA_UART3		(S3C_VA_UART + 0xC00)
-+#define S5P_VA_UART(x)		(S3C_VA_UART + ((x) * S3C_UART_OFFSET))
-+#define S5P_VA_UART0		S5P_VA_UART(0)
-+#define S5P_VA_UART1		S5P_VA_UART(1)
-+#define S5P_VA_UART2		S5P_VA_UART(2)
-+#define S5P_VA_UART3		S5P_VA_UART(3)
+ config SERIAL_S5PV210
+ 	tristate "Samsung S5PV210 Serial port support"
+-	depends on SERIAL_SAMSUNG && (CPU_S5PV210 || CPU_S5P6442)
+-	select SERIAL_SAMSUNG_UARTS_4 if CPU_S5PV210
++	depends on SERIAL_SAMSUNG && (CPU_S5PV210 || CPU_S5P6442 || CPU_S5PV310)
++	select SERIAL_SAMSUNG_UARTS_4 if (CPU_S5PV210 || CPU_S5PV310)
+ 	default y
+ 	help
+ 	  Serial port support for Samsung's S5P Family of SoC's
+diff --git a/drivers/serial/s5pv210.c b/drivers/serial/s5pv210.c
+index 4a789e5..6ebccd7 100644
+--- a/drivers/serial/s5pv210.c
++++ b/drivers/serial/s5pv210.c
+@@ -28,8 +28,12 @@
+ static int s5pv210_serial_setsource(struct uart_port *port,
+ 					struct s3c24xx_uart_clksrc *clk)
+ {
++	struct s3c2410_uartcfg *cfg = port->dev->platform_data;
+ 	unsigned long ucon = rd_regl(port, S3C2410_UCON);
  
-+#ifndef S3C_UART_OFFSET
- #define S3C_UART_OFFSET		(0x400)
-+#endif
++	if ((cfg->clocks_size) == 1)
++		return 0;
++
+ 	if (strcmp(clk->name, "pclk") == 0)
+ 		ucon &= ~S5PV210_UCON_CLKMASK;
+ 	else if (strcmp(clk->name, "uclk1") == 0)
+@@ -47,10 +51,14 @@ static int s5pv210_serial_setsource(struct uart_port *port,
+ static int s5pv210_serial_getsource(struct uart_port *port,
+ 					struct s3c24xx_uart_clksrc *clk)
+ {
++	struct s3c2410_uartcfg *cfg = port->dev->platform_data;
+ 	u32 ucon = rd_regl(port, S3C2410_UCON);
  
- #define VA_VIC(x)		(S3C_VA_IRQ + ((x) * 0x10000))
- #define VA_VIC0			VA_VIC(0)
+ 	clk->divisor = 1;
+ 
++	if ((cfg->clocks_size) == 1)
++		return 0;
++
+ 	switch (ucon & S5PV210_UCON_CLKMASK) {
+ 	case S5PV210_UCON_PCLK:
+ 		clk->name = "pclk";
 -- 
 1.6.2.5
