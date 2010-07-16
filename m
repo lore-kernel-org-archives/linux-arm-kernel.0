@@ -1,32 +1,40 @@
-From: segooon@gmail.com (Kulikov Vasiliy)
-Date: Fri, 16 Jul 2010 20:12:46 +0400
-Subject: [PATCH 02/15] arm/mach-u300: check kmalloc result
-Message-ID: <1279296767-24823-1-git-send-email-segooon@gmail.com>
+From: miltonm@bga.com (Milton Miller)
+Date: Fri, 16 Jul 2010 11:23:55 -0500
+Subject: [PATCH] Stop ARM boards crashing when CUPS is loaded - 2.6.35-rc5
+In-Reply-To: <4C402746.6080309@canonical.com>
+References: <4C3C72C6.4000005@canonical.com>
+	<20100715130214.4c9303b2.akpm@linux-foundation.org>
+	<20100715200618.GA6773@n2100.arm.linux.org.uk>
+	<4C40218A.4090806@canonical.com>
+	<20100716092018.GB16995@n2100.arm.linux.org.uk>
+Message-ID: <miltonm-arm-parport-1@bga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If kmalloc() fails free already allocated memory and exit with -ENOMEM.
+On Fri Jul 16 2010 about 05:33:06 EST,  Lee Jones wrote:
+> > The best solution is probably for the parport code to go through a
+> > modernisation cycle like the serial code did, essentially using
+> > platform devices to pass the base addresses. This would make the
+> > driver more portable, and eliminates this problem entirely (because
+> > platforms which don't have parports won't register the platform device(s)
+> > necessary for parport to even probe illegal addresses.)
+> 
+> This sounds brilliant - when are you going to start? </kidding>
 
-Signed-off-by: Kulikov Vasiliy <segooon@gmail.com>
----
- arch/arm/mach-u300/dummyspichip.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+It has a long time ago ...
 
-diff --git a/arch/arm/mach-u300/dummyspichip.c b/arch/arm/mach-u300/dummyspichip.c
-index 5f55012..452218a 100644
---- a/arch/arm/mach-u300/dummyspichip.c
-+++ b/arch/arm/mach-u300/dummyspichip.c
-@@ -64,6 +64,11 @@ static ssize_t dummy_looptest(struct device *dev,
- 		goto out;
- 	}
- 	bigrxbuf_virtual = kmalloc(DMA_TEST_SIZE, GFP_KERNEL);
-+	if (bigrxbuf_virtual == NULL) {
-+		kfree(bigtxbuf_virtual);
-+		status = -ENOMEM;
-+		goto out;
-+	}
- 
- 	/* Fill TXBUF with some happy pattern */
- 	memset(bigtxbuf_virtual, 0xAA, DMA_TEST_SIZE);
--- 
-1.7.0.4
+drivers/parport/parport_pc.c calls parport_pc_find_nonpci_ports,
+which is in asm/parport.h
+
+> 
+> In all seriousness, do you think anyone is likely to undertake this
+> work anytime soon? I am seeing this problem in a distribution which
+> is due for release in October. I have no problem implementing a config
+> change in the meantime, but as you say, a more _correct_ and portable
+> solution should be sought.
+
+Why not replace the arm asm/parport.h with asm-generic/parport.h which
+already has a check for CONFIG_ISA, which appears to only be selected
+on a few ARM platforms?
+
+milton
