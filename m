@@ -1,80 +1,56 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 16 Jul 2010 18:33:43 +0200
-Subject: [PATCH 04/10 v2] v4l: Add Samsung FIMC (video postprocessor)
-	driver
-In-Reply-To: <012601cb24db$84fb2380$8ef16a80$%kim@samsung.com>
-References: <1279185041-6004-1-git-send-email-s.nawrocki@samsung.com>
-	<1279185041-6004-5-git-send-email-s.nawrocki@samsung.com>
-	<012601cb24db$84fb2380$8ef16a80$%kim@samsung.com>
-Message-ID: <000a01cb2504$a8007410$f8015c30$%nawrocki@samsung.com>
+From: lee.jones@canonical.com (Lee Jones)
+Date: Fri, 16 Jul 2010 17:42:23 +0100
+Subject: [PATCH] Stop ARM boards crashing when CUPS is loaded -	2.6.35-rc5
+In-Reply-To: <miltonm-arm-parport-1@bga.com>
+References: <4C3C72C6.4000005@canonical.com>	<20100715130214.4c9303b2.akpm@linux-foundation.org>	<20100715200618.GA6773@n2100.arm.linux.org.uk>	<4C40218A.4090806@canonical.com>	<20100716092018.GB16995@n2100.arm.linux.org.uk>
+	<miltonm-arm-parport-1@bga.com>
+Message-ID: <4C408BEF.1060302@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Kukjin Kim [mailto:kgene.kim at samsung.com]
-> Sent: Friday, July 16, 2010 1:39 PM
-> To: 'Sylwester Nawrocki'; linux-samsung-soc at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Cc: p.osciak at samsung.com; m.szyprowski at samsung.com;
-> kyungmin.park at samsung.com; linux-media at vger.kernel.org
-> Subject: RE: [PATCH 04/10 v2] v4l: Add Samsung FIMC (video
-> postprocessor) driver
+On 16/07/10 17:23, Milton Miller wrote:
+> On Fri Jul 16 2010 about 05:33:06 EST,  Lee Jones wrote:
+>>> The best solution is probably for the parport code to go through a
+>>> modernisation cycle like the serial code did, essentially using
+>>> platform devices to pass the base addresses. This would make the
+>>> driver more portable, and eliminates this problem entirely (because
+>>> platforms which don't have parports won't register the platform device(s)
+>>> necessary for parport to even probe illegal addresses.)
+>>
+>> This sounds brilliant - when are you going to start? </kidding>
 > 
-> Sylwester Nawrocki wrote:
-> >
-> Hi,
+> It has a long time ago ...
 > 
-> Samsung S.LSI hardly recommends DMA mode to implement the feature not
-> FIFO
-> mode because of H/W limitation.
+> drivers/parport/parport_pc.c calls parport_pc_find_nonpci_ports,
+> which is in asm/parport.h
 
-Does the hardware issue occur in all SoCs or only some specific versions 
-are affected?
-So far we were successful with S5PC110 EVT0, however we could not make 
-it work on S5PV210 (EVT1). That said I have created an option in the FIMC
-variant definition (samsung_fimc_variant::fifo_capable) so that 
-the V4L2 video node for FIMC FIFO operation mode is registered only 
-for selected SoC variants.
+I'm not entirely sure what you're trying to say here?
 
-> 
-> > This driver exports two video device nodes per each FIMC device,
-> > one for for memory to memory (color conversion, image resizing,
-> > flipping and rotation) operations and one for direct
-> > V4L2 output interface to framebuffer.
-> >
-> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > Reviewed-by: Pawel Osciak <p.osciak@samsung.com>
-> > Reviewed-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > ---
-> >  drivers/media/video/Kconfig                  |   20 +
-> >  drivers/media/video/Makefile                 |    1 +
-> >  drivers/media/video/samsung/fimc/Makefile    |    3 +
-> >  drivers/media/video/samsung/fimc/fimc-core.c | 1664
-> > ++++++++++++++++++++++++++
-> >  drivers/media/video/samsung/fimc/fimc-core.h |  541 +++++++++
-> >  drivers/media/video/samsung/fimc/fimc-fifo.c |  814 +++++++++++++
-> >  drivers/media/video/samsung/fimc/fimc-reg.c  |  585 +++++++++
-> >  include/linux/videodev2.h                    |    1 +
-> >  8 files changed, 3629 insertions(+), 0 deletions(-)
-> >  create mode 100644 drivers/media/video/samsung/fimc/Makefile
-> >  create mode 100644 drivers/media/video/samsung/fimc/fimc-core.c
-> >  create mode 100644 drivers/media/video/samsung/fimc/fimc-core.h
-> >  create mode 100644 drivers/media/video/samsung/fimc/fimc-fifo.c
-> >  create mode 100644 drivers/media/video/samsung/fimc/fimc-reg.c
-> >
-> 
-> (snip)
-> 
-> Thanks.
-> 
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
+How does that help with the platformisation of the driver?
 
-Best regards,
---
-Sylwester Nawrocki
-Samsung Poland R&D Center
+>> In all seriousness, do you think anyone is likely to undertake this
+>> work anytime soon? I am seeing this problem in a distribution which
+>> is due for release in October. I have no problem implementing a config
+>> change in the meantime, but as you say, a more _correct_ and portable
+>> solution should be sought.
+> 
+> Why not replace the arm asm/parport.h with asm-generic/parport.h which
+> already has a check for CONFIG_ISA, which appears to only be selected
+> on a few ARM platforms?
+
+static int __devinit parport_pc_find_isa_ports(int autoirq, int autodma);
+static int __devinit parport_pc_find_nonpci_ports(int autoirq, int autodma)
+{
+#ifdef CONFIG_ISA
+	return parport_pc_find_isa_ports(autoirq, autodma);
+#else
+	return 0;
+#endif
+}
+
+That's perfect! 
+
+This would work a treat.
+
+Surely this #ifdef should be in all the parport.h files which call
+parport_pc_find_isa_ports?
