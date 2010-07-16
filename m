@@ -1,24 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Jul 2010 21:54:45 +0100
-Subject: [PATCH] Stop ARM boards crashing when CUPS is loaded - 2.6.35-rc5
-In-Reply-To: <miltonm-arm-parport-2@bga.com>
-References: <4C408BEF.1060302@canonical.com> <4C3C72C6.4000005@canonical.com>
-	<20100715130214.4c9303b2.akpm@linux-foundation.org>
-	<20100715200618.GA6773@n2100.arm.linux.org.uk>
-	<4C40218A.4090806@canonical.com>
-	<20100716092018.GB16995@n2100.arm.linux.org.uk>
-	<miltonm-arm-parport-1@bga.com> <miltonm-arm-parport-2@bga.com>
-Message-ID: <20100716205445.GA28064@n2100.arm.linux.org.uk>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 16 Jul 2010 16:49:27 -0700
+Subject: [PATCH] davinci: Add MityDSP-L138/MityARM-1808 SOM support
+In-Reply-To: <E1OZlTF-0006NW-1I@wanda>
+References: <E1OZlTF-0006NW-1I@wanda>
+Message-ID: <1279324167.4526.85.camel@Joe-Laptop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 16, 2010 at 02:38:38PM -0500, Milton Miller wrote:
-> I just looked at the 8250 code and it abuses the platform device model.
-> Instead of a platform device for each port, it has multiple port
-> descriptions set via platform_data in one or a a few device instances.
+On Fri, 2010-07-16 at 10:00 -0400, Michael Williamson wrote:
+> +static __init void mityomapl138_setup_lcd(void)
+> +{
+[]
+> +			pr_warning("mityomapl138_init: unknown LCD type : %s\n",
+> +				peripheral_config.LCDConfig.PanelName);
 
-I don't agree with that assessment (but then I'm the one who created
-that.)  Having one platform device for each port would have been
-absurd given the number of ISA addresses that 8250 ports appear at.
+I think you'd be better off actually using the actual
+function name rather than the caller name
 
-Who'd want 64+ platform devices for serial ports?
+			pr_warning("%s: unknown LCD type: %s\n",
+				   __func__, peripheral_config.LCDConfig.PanelName);
+
+[]
+> +		if (ret) {
+> +			pr_warning("mityomapl138_init: lcd pinmux failed : "
+> +				   "%d\n", ret);
+
+
+			pr_warning("%s: lcd pinmux failed : %d\n",
+				   __func__, ret);
+
+> +		pr_warning("mityomapl138_init: no LCD device enabled\n");
+
+etc.
+
+> +static __init void mityomapl138_init(void)
+> +{
+> +	int ret;
+> +
+> +	pr_info("mityomapl138_init...\n");
+> +
+> +	ret = pmic_tps65023_init();
+> +	if (ret)
+> +		pr_warning("mityomapl138_init: TPS65023 PMIC init failed: %d\n",
+> +				ret);
+
+		pr_warning("%s: TPS65023 PMIC init failed: %d\n",
+			   __func__, ret);
+
+etc.
+
+> +
+> +	ret = da8xx_register_edma();
+> +	if (ret)
+> +		pr_warning("mityomapl138_init: edma registration failed: %d\n",
+> +				ret);
+> +
+> +	ret = da8xx_register_i2c(0, &mityomap_i2c_0_pdata);
+> +	if (ret)
+> +		pr_warning("mityomapl138_init: i2c0 registration failed: %d\n",
+> +				ret);
+> +
+> +	ret = da8xx_register_watchdog();
+> +	if (ret)
+> +		pr_warning("mityomapl138_init: watchdog registration failed: "
+> +			   "%d\n", ret);
+> +
