@@ -1,62 +1,74 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 16 Jul 2010 15:39:17 +0100
-Subject: [PATCH 0/3] Cache maintenance on VIPT caches
-In-Reply-To: <20100716131908.GA15032@bnru02.bnr.st.com>
-References: <20100625115826.30030.89790.stgit@e102109-lin.cambridge.arm.com>
-	<20100716131908.GA15032@bnru02.bnr.st.com>
-Message-ID: <1279291157.17878.49.camel@e102109-lin.cambridge.arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 16 Jul 2010 16:47:07 +0200
+Subject: [PATCH 01/10 v2] ARM: Samsung: Add FIMC register and platform
+	definitions
+In-Reply-To: <4C40603B.8000208@gmail.com>
+References: <1279185041-6004-1-git-send-email-s.nawrocki@samsung.com>
+	<1279185041-6004-2-git-send-email-s.nawrocki@samsung.com>
+	<012101cb24cb$83187410$89495c30$%kim@samsung.com>
+	<000301cb24eb$13434000$39c9c000$%nawrocki@samsung.com>
+	<4C40603B.8000208@gmail.com>
+Message-ID: <000801cb24f5$c3377490$49a65db0$%nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-07-16 at 14:19 +0100, Rabin VINCENT wrote:
-> On Fri, Jun 25, 2010 at 14:01:27 +0200, Catalin Marinas wrote:
-> > The first and third patches have already been posted in the same form.
-> > The second patch have been modified to handle all the VIPT caches via
-> > __sync_icache_dcache(). The initial use case for this patch was dealing
-> > with an SMP race condition but following suggestions from Rabin, it was
-> > extended to cover ARMv6 onwards, both UP and SMP.
+> -----Original Message-----
+> From: Maurus Cuelenaere [mailto:mcuelenaere at gmail.com]
+> Sent: Friday, July 16, 2010 3:36 PM
+> To: Sylwester Nawrocki
+> Cc: 'Kukjin Kim'; Pawel Osciak; Marek Szyprowski;
+> kyungmin.park at samsung.com; linux-media at vger.kernel.org; linux-samsung-
+> soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 01/10 v2] ARM: Samsung: Add FIMC register and
+> platform definitions
+> 
+>  Op 16-07-10 15:30, Sylwester Nawrocki schreef:
+> > Hi,
 > >
-> > Any Tested-by's are welcome.
+> > thank you for the review. Please se my comments below.
+> >
+> >> -----Original Message-----
+> >> From: Kukjin Kim [mailto:kgene.kim at samsung.com]
+> >> Sent: Friday, July 16, 2010 11:45 AM
+> >> To: 'Sylwester Nawrocki'; linux-samsung-soc at vger.kernel.org; linux-
+> arm-
+> >> kernel at lists.infradead.org
+> >> Cc: p.osciak at samsung.com; m.szyprowski at samsung.com;
+> >> kyungmin.park at samsung.com; linux-media at vger.kernel.org
+> >> Subject: RE: [PATCH 01/10 v2] ARM: Samsung: Add FIMC register and
+> >> platform definitions
+> >>
+
+<snip>
+
+> >>> +
+> >>> +struct samsung_plat_fimc {
+> >>> +	struct s3c_fifo_link	*fifo_targets[FIMC_MAX_FIFO_TARGETS];
+> >>> +};
+> >>> +
+> >>> +#endif /* FIMC_H_ */
+> >>> +
+> >> No need last empty line...
+> > C89 and C99 standard requires a new line character at the end of
+> file.
+> > The compiler should issue a warning when the new line character
+> > at the end of file is missing, otherwise it is not compliant with
+> > the above C standards.
+> > So I would rather add a new line where it is missing rather than
+> > removing it.
+> > There is lots of header files already in arch/arm/plat-samsung where
+> > there is even more than one empty line at the end of file.
 > 
-> This version also fixes the MMC rootfs init crashes, without the need
-> for the flush_kernel_dcache_page() change:
+> AFAIK there *already is* an empty line, git just omits it in diffs.
+> Try removing the last line with your editor and see what git diff
+> gives, it'll
+> show "\ No newline at end of file".
+
+Indeed, I just had two new-line characters with single empty line..
+
 > 
-> Tested-by: Rabin Vincent <rabin.vincent@stericsson.com>
+> --
+> Maurus Cuelenaere
 
-Thanks for testing.
-
-> Will you be submitting this patch for linux-next?  
-
-I'd like to but I'm still waiting for Russell's feedback (the linux-next
-rules are that we shouldn't dump patches there that haven't been
-reviewed yet).
-
-> I ask because the
-> mmci patches that I posted convert that driver to use the sg_miter API
-> (which uses flush_kernel_dcache_page() internally), and not do any
-> flushing inside the driver itself.  Or do you think it would be
-> appropriate to have the driver call flush_dcache_page() explicitly?
-> (Although this would be double flushing on systems with aliasing caches
-> where flush_kernel_dcache_page() is not a no-op.)
-
-I'm not sure why sg_miter doesn't call flush_dcache_page() but
-flush_kernel_dcache_page() (I cc'ed Fujita as he seems to have added
-this code).
-
-Anyway, we could actually set the PG_dcache_clean bit in
-flush_kernel_dcache_page() and thus avoid additional flushing when the
-page gets mapped to user space (on VIPT non-aliasing caches).
-
-I think it's fine for your driver not to call flush_dcache_page() as
-long as a form of page flushing is done in the sg_miter API. The only
-thing we miss is ARM11MPCore with VIPT non-aliasing caches where
-flush_kernel_dcache_page() is a no-op, though we have to do non-lazy
-flushing because the cache maintenance operations aren't broadcast to
-the other CPUs.
-
-There are several places where we can fix this - (1) implement
-flush_kernel_dcache_page() for ARM11MPCore, (2) use flush_dcache_page()
-in the sg_miter code or (3) call flush_dcache_page() in the mmci driver.
-
--- 
-Catalin
+Thanks,
+Sylwester
