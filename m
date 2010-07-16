@@ -1,21 +1,18 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Jul 2010 10:54:18 +0100
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 16 Jul 2010 10:59:50 +0100
 Subject: LMB build failure in -next
-In-Reply-To: <20100716094151.GI9082@rakim.wolfsonmicro.main>
+In-Reply-To: <20100716095418.GB17952@n2100.arm.linux.org.uk>
 References: <20100716094151.GI9082@rakim.wolfsonmicro.main>
-Message-ID: <20100716095418.GB17952@n2100.arm.linux.org.uk>
+	<20100716095418.GB17952@n2100.arm.linux.org.uk>
+Message-ID: <20100716095949.GJ9082@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 16, 2010 at 10:41:51AM +0100, Mark Brown wrote:
-> In -next the patch 'ARM: initial LMB trial' is causing build failures:
-> 
->   CHECK   arch/arm/kernel/setup.c
-> arch/arm/kernel/setup.c:30:11: error: unable to open 'linux/lmb.h'
-> 
-> for me.  Looks like the generic header got missed from the commit or
-> there's some other tree that also needs to be in -next?
+On Fri, Jul 16, 2010 at 10:54:18AM +0100, Russell King - ARM Linux wrote:
 
-Ben asked Linus to pull his LMB updates, which renamed all the LMB
-infrastructure to memblock.  I'll have to rebase the LMB branch -
-possibly later today.
+> Ben asked Linus to pull his LMB updates, which renamed all the LMB
+> infrastructure to memblock.  I'll have to rebase the LMB branch -
+> possibly later today.
+
+Ah, right - so long as the problem is known and will be sorted it's not
+a problem, I just hadn't seen any reports.  Thanks!
