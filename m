@@ -1,1243 +1,953 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 16 Jul 2010 19:58:27 +0900
-Subject: [PATCH v2 2/8] ARM: S5PV310: Add new CPU initialization support
-In-Reply-To: <1279270714-15146-3-git-send-email-kgene.kim@samsung.com>
-References: <1279270714-15146-1-git-send-email-kgene.kim@samsung.com>
-	<1279270714-15146-3-git-send-email-kgene.kim@samsung.com>
-Message-ID: <AANLkTim0vVoCOT9T0YFVkxOnoJP9C2U4dRUgq4DXq14r@mail.gmail.com>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Fri, 16 Jul 2010 13:02:43 +0200
+Subject: [PATCH v2 5/5] ARM: S5PV210: Initial CPUFREQ Support
+In-Reply-To: <1279267277-6804-6-git-send-email-myungjoo.ham@samsung.com>
+References: <1279267277-6804-1-git-send-email-myungjoo.ham@samsung.com>
+	<1279267277-6804-2-git-send-email-myungjoo.ham@samsung.com>
+	<1279267277-6804-3-git-send-email-myungjoo.ham@samsung.com>
+	<1279267277-6804-4-git-send-email-myungjoo.ham@samsung.com>
+	<1279267277-6804-5-git-send-email-myungjoo.ham@samsung.com>
+	<1279267277-6804-6-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <4C403C53.4000204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 16, 2010 at 5:58 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> From: Changhwan Youn <chaos.youn@samsung.com>
+ Op 16-07-10 10:01, MyungJoo Ham schreef:
+> S5PV210 CPUFREQ Support.
 >
-> This patch adds Samsung's S5PV310/S5PC210 CPU support.
-> The S5PV310/S5PC210 integrates a ARM Cortex A9 multi-core.
+> This CPUFREQ may work without PMIC's DVS support. However, it is not
+> as effective without DVS support as supposed. AVS is not supported in
+> this version.
 >
-> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-> Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Note that CLK_SRC of some clocks including ARMCLK, G3D, G2D, MFC,
+> and ONEDRAM are modified directly without updating clksrc_src
+> representations of the clocks.  Because CPUFREQ reverts the CLK_SRC
+> to the supposed values, this does not affect the consistency as long as
+> there are no other modules that modifies clock sources of ARMCLK, G3D,
+> G2D, MFC, and ONEDRAM (and only CPUFREQ should have the control). As
+> soon as clock framework is settled, we may update source clocks
+> (.parent field) of those clocks accordingly later.
+>
+> --
+> v2:
+> 	- Ramp-up delay is removed. (let regulator framework do the job)
+> 	- Provide proper max values for regulator_set_voltage
+> 	- Removed unneccesary #ifdef's.
+> 	- Removed unnecessary initialiser for CLK_OUT
+>
+> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
-> ?arch/arm/mach-s5pv310/cpu.c ? ? ? ? ? ? ? ? ? ? ?| ?122 +++++++++++++
-> ?arch/arm/mach-s5pv310/headsmp.S ? ? ? ? ? ? ? ? ?| ? 41 ++++
-> ?arch/arm/mach-s5pv310/include/mach/debug-macro.S | ? 36 ++++
-> ?arch/arm/mach-s5pv310/include/mach/entry-macro.S | ? 84 +++++++++
-> ?arch/arm/mach-s5pv310/include/mach/gpio.h ? ? ? ?| ?135 ++++++++++++++
-> ?arch/arm/mach-s5pv310/include/mach/hardware.h ? ?| ? 18 ++
-> ?arch/arm/mach-s5pv310/include/mach/io.h ? ? ? ? ?| ? 26 +++
-> ?arch/arm/mach-s5pv310/include/mach/map.h ? ? ? ? | ? 66 +++++++
-> ?arch/arm/mach-s5pv310/include/mach/memory.h ? ? ?| ? 22 +++
-> ?arch/arm/mach-s5pv310/include/mach/smp.h ? ? ? ? | ? 29 +++
-> ?arch/arm/mach-s5pv310/include/mach/system.h ? ? ?| ? 22 +++
-> ?arch/arm/mach-s5pv310/include/mach/timex.h ? ? ? | ? 29 +++
-> ?arch/arm/mach-s5pv310/include/mach/uncompress.h ?| ? 27 +++
-> ?arch/arm/mach-s5pv310/include/mach/vmalloc.h ? ? | ? 22 +++
-> ?arch/arm/mach-s5pv310/init.c ? ? ? ? ? ? ? ? ? ? | ? 41 ++++
-> ?arch/arm/mach-s5pv310/platsmp.c ? ? ? ? ? ? ? ? ?| ?212 ++++++++++++++++++++++
-> ?arch/arm/mach-s5pv310/setup-i2c0.c ? ? ? ? ? ? ? | ? 20 ++
-> ?arch/arm/plat-s5p/cpu.c ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 12 ++
-> ?arch/arm/plat-s5p/include/plat/map-s5p.h ? ? ? ? | ? 12 ++
-> ?arch/arm/plat-s5p/include/plat/s5pv310.h ? ? ? ? | ? 33 ++++
-> ?20 files changed, 1009 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/mach-s5pv310/cpu.c
-> ?create mode 100644 arch/arm/mach-s5pv310/headsmp.S
-> ?create mode 100644 arch/arm/mach-s5pv310/include/mach/debug-macro.S
-> ?create mode 100644 arch/arm/mach-s5pv310/include/mach/entry-macro.S
-> ?create mode 100644 arch/arm/mach-s5pv310/include/mach/gpio.h
-> ?create mode 100644 arch/arm/mach-s5pv310/include/mach/hardware.h
-> ?create mode 100644 arch/arm/mach-s5pv310/include/mach/io.h
-> ?create mode 100644 arch/arm/mach-s5pv310/include/mach/map.h
-> ?create mode 100644 arch/arm/mach-s5pv310/include/mach/memory.h
-> ?create mode 100644 arch/arm/mach-s5pv310/include/mach/smp.h
-> ?create mode 100644 arch/arm/mach-s5pv310/include/mach/system.h
-> ?create mode 100644 arch/arm/mach-s5pv310/include/mach/timex.h
-> ?create mode 100644 arch/arm/mach-s5pv310/include/mach/uncompress.h
-> ?create mode 100644 arch/arm/mach-s5pv310/include/mach/vmalloc.h
-> ?create mode 100644 arch/arm/mach-s5pv310/init.c
-> ?create mode 100644 arch/arm/mach-s5pv310/platsmp.c
-> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c0.c
-> ?create mode 100644 arch/arm/plat-s5p/include/plat/s5pv310.h
+>  arch/arm/Kconfig                              |    1 +
+>  arch/arm/mach-s5pv210/Makefile                |    3 +
+>  arch/arm/mach-s5pv210/cpufreq-s5pv210.c       |  776 +++++++++++++++++++++++++
+>  arch/arm/mach-s5pv210/include/mach/cpu-freq.h |   50 ++
+>  4 files changed, 830 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-s5pv210/cpufreq-s5pv210.c
+>  create mode 100644 arch/arm/mach-s5pv210/include/mach/cpu-freq.h
 >
-> diff --git a/arch/arm/mach-s5pv310/cpu.c b/arch/arm/mach-s5pv310/cpu.c
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 98922f7..d5a5916 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -701,6 +701,7 @@ config ARCH_S5PV210
+>  	select HAVE_CLK
+>  	select ARM_L1_CACHE_SHIFT_6
+>  	select ARCH_USES_GETTIMEOFFSET
+> +	select ARCH_HAS_CPUFREQ
+>  	help
+>  	  Samsung S5PV210/S5PC110 series based systems
+>  
+> diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
+> index aae592a..293dbac 100644
+> --- a/arch/arm/mach-s5pv210/Makefile
+> +++ b/arch/arm/mach-s5pv210/Makefile
+> @@ -34,3 +34,6 @@ obj-$(CONFIG_S5PV210_SETUP_I2C2) 	+= setup-i2c2.o
+>  obj-$(CONFIG_S5PV210_SETUP_KEYPAD)	+= setup-keypad.o
+>  obj-$(CONFIG_S5PV210_SETUP_SDHCI)       += setup-sdhci.o
+>  obj-$(CONFIG_S5PV210_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
+> +
+> +# CPUFREQ (DVFS)
+> +obj-$(CONFIG_CPU_FREQ)		+= cpufreq-s5pv210.o
+> diff --git a/arch/arm/mach-s5pv210/cpufreq-s5pv210.c b/arch/arm/mach-s5pv210/cpufreq-s5pv210.c
 > new file mode 100644
-> index 0000000..196c9f1
+> index 0000000..82ec31b
 > --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/cpu.c
-> @@ -0,0 +1,122 @@
-> +/* linux/arch/arm/mach-s5pv310/cpu.c
+> +++ b/arch/arm/mach-s5pv210/cpufreq-s5pv210.c
+> @@ -0,0 +1,776 @@
+> +/*  linux/arch/arm/plat-s5pc11x/s5pc11x-cpufreq.c
 > + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + * ? ? ? ? ? ? http://www.samsung.com/
+> + *  Copyright (C) 2010 Samsung Electronics Co., Ltd.
+> + *
+> + *  CPU frequency scaling for S5PC110
+> + *  Based on cpu-sa1110.c
 > + *
 > + * This program is free software; you can redistribute it and/or modify
 > + * it under the terms of the GNU General Public License version 2 as
 > + * published by the Free Software Foundation.
-> +*/
-> +
+> + */
+> +#include <linux/types.h>
+> +#include <linux/kernel.h>
 > +#include <linux/sched.h>
-> +#include <linux/sysdev.h>
-> +
-> +#include <asm/mach/map.h>
-> +#include <asm/mach/irq.h>
-> +
-> +#include <asm/proc-fns.h>
-> +
-> +#include <plat/cpu.h>
-> +#include <plat/clock.h>
-> +#include <plat/s5pv310.h>
-> +
-> +#include <mach/regs-irq.h>
-> +
-> +void __iomem *gic_cpu_base_addr;
-> +
-> +extern int combiner_init(unsigned int combiner_nr, void __iomem *base,
-> + ? ? ? ? ? ? ? ? ? ? ? ?unsigned int irq_start);
-> +extern void combiner_cascade_irq(unsigned int combiner_nr, unsigned int irq);
-> +
-> +/* Initial IO mappings */
-> +static struct map_desc s5pv310_iodesc[] __initdata = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .virtual ? ? ? ?= (unsigned long)S5P_VA_COREPERI_BASE,
-> + ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(S5PV310_PA_COREPERI),
-> + ? ? ? ? ? ? ? .length ? ? ? ? = SZ_8K,
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .virtual ? ? ? ?= (unsigned long)S5P_VA_COMBINER_BASE,
-> + ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(S5PV310_PA_COMBINER),
-> + ? ? ? ? ? ? ? .length ? ? ? ? = SZ_4K,
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .virtual ? ? ? ?= (unsigned long)S5P_VA_L2CC,
-> + ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(S5PV310_PA_L2CC),
-> + ? ? ? ? ? ? ? .length ? ? ? ? = SZ_4K,
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
-> + ? ? ? },
-> +};
-> +
-> +static void s5pv310_idle(void)
-> +{
-> + ? ? ? if (!need_resched())
-> + ? ? ? ? ? ? ? cpu_do_idle();
-> +
-> + ? ? ? local_irq_enable();
-> +}
-> +
-> +/* s5pv310_map_io
-> + *
-> + * register the standard cpu IO areas
-> +*/
-> +void __init s5pv310_map_io(void)
-> +{
-> + ? ? ? iotable_init(s5pv310_iodesc, ARRAY_SIZE(s5pv310_iodesc));
-> +}
-> +
-> +void __init s5pv310_init_clocks(int xtal)
-> +{
-> + ? ? ? printk(KERN_DEBUG "%s: initializing clocks\n", __func__);
-> +
-> + ? ? ? s3c24xx_register_baseclocks(xtal);
-> + ? ? ? s5p_register_clocks(xtal);
-> + ? ? ? s5pv310_register_clocks();
-> + ? ? ? s5pv310_setup_clocks();
-> +}
-> +
-> +void __init s5pv310_init_irq(void)
-> +{
-> + ? ? ? int irq;
-> +
-> + ? ? ? gic_cpu_base_addr = S5P_VA_GIC_CPU;
-> + ? ? ? gic_dist_init(0, S5P_VA_GIC_DIST, IRQ_LOCALTIMER);
-> + ? ? ? gic_cpu_init(0, S5P_VA_GIC_CPU);
-> +
-> + ? ? ? for (irq = 0; irq < MAX_COMBINER_NR; irq++) {
-> + ? ? ? ? ? ? ? combiner_init(irq, (void __iomem *)S5P_VA_COMBINER(irq),
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? COMBINER_IRQ(irq, 0));
-> + ? ? ? ? ? ? ? combiner_cascade_irq(irq, IRQ_SPI(irq));
-> + ? ? ? }
-> +
-> + ? ? ? /* The parameters of s5p_init_irq() are for VIC init.
-> + ? ? ? ?* Theses parameters should be NULL and 0 because S5PV310
-> + ? ? ? ?* uses GIC instead of VIC.
-> + ? ? ? ?*/
-> + ? ? ? s5p_init_irq(NULL, 0);
-> +}
-> +
-> +struct sysdev_class s5pv310_sysclass = {
-> + ? ? ? .name ? = "s5pv310-core",
-> +};
-> +
-> +static struct sys_device s5pv310_sysdev = {
-> + ? ? ? .cls ? ?= &s5pv310_sysclass,
-> +};
-> +
-> +static int __init s5pv310_core_init(void)
-> +{
-> + ? ? ? return sysdev_class_register(&s5pv310_sysclass);
-> +}
-> +
-> +core_initcall(s5pv310_core_init);
-
-How about to call core_init at below?
-To make a single kernel we need to remove core_initcall before cpu ID detection.
-
-> +
-> +int __init s5pv310_init(void)
-> +{
-> + ? ? ? printk(KERN_INFO "S5PV310: Initializing architecture\n");
-> +
-> + ? ? ? /* set idle function */
-> + ? ? ? pm_idle = s5pv310_idle;
-> +
-> + ? ? ? return sysdev_register(&s5pv310_sysdev);
-> +}
-> diff --git a/arch/arm/mach-s5pv310/headsmp.S b/arch/arm/mach-s5pv310/headsmp.S
-> new file mode 100644
-> index 0000000..164b7b0
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/headsmp.S
-> @@ -0,0 +1,41 @@
-> +/*
-> + * ?linux/arch/arm/mach-s5pv310/headsmp.S
-> + *
-> + * ?Cloned from linux/arch/arm/mach-realview/headsmp.S
-> + *
-> + * ?Copyright (c) 2003 ARM Limited
-> + * ?All Rights Reserved
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#include <linux/linkage.h>
-> +#include <linux/init.h>
-> +
-> + ? ? ? __INIT
-> +
-> +/*
-> + * s5pv310 specific entry point for secondary CPUs. ?This provides
-> + * a "holding pen" into which all secondary cores are held until we're
-> + * ready for them to initialise.
-> + */
-> +ENTRY(s5pv310_secondary_startup)
-> + ? ? ? mrc ? ? p15, 0, r0, c0, c0, 5
-> + ? ? ? and ? ? r0, r0, #15
-> + ? ? ? adr ? ? r4, 1f
-> + ? ? ? ldmia ? r4, {r5, r6}
-> + ? ? ? sub ? ? r4, r4, r5
-> + ? ? ? add ? ? r6, r6, r4
-> +pen: ? ldr ? ? r7, [r6]
-> + ? ? ? cmp ? ? r7, r0
-> + ? ? ? bne ? ? pen
-> +
-> + ? ? ? /*
-> + ? ? ? ?* we've been released from the holding pen: secondary_stack
-> + ? ? ? ?* should now contain the SVC stack for this core
-> + ? ? ? ?*/
-> + ? ? ? b ? ? ? secondary_startup
-> +
-> +1: ? ? .long ? .
-> + ? ? ? .long ? pen_release
-> diff --git a/arch/arm/mach-s5pv310/include/mach/debug-macro.S b/arch/arm/mach-s5pv310/include/mach/debug-macro.S
-> new file mode 100644
-> index 0000000..6fb3893
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/include/mach/debug-macro.S
-> @@ -0,0 +1,36 @@
-> +/* linux/arch/arm/mach-s5pv310/include/mach/debug-macro.S
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + * ? ? ? ? ? ? http://www.samsung.com/
-> + *
-> + * Based on arch/arm/mach-s3c6400/include/mach/debug-macro.S
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +/* pull in the relevant register and map files. */
-> +
-> +#include <mach/map.h>
-> +
-> + ? ? ? /* note, for the boot process to work we have to keep the UART
-> + ? ? ? ?* virtual address aligned to an 1MiB boundary for the L1
-> + ? ? ? ?* mapping the head code makes. We keep the UART virtual address
-> + ? ? ? ?* aligned and add in the offset when we load the value here.
-> + ? ? ? ?*/
-> +
-> + ? ? ? .macro addruart, rx, tmp
-> + ? ? ? ? ? ? ? mrc ? ? p15, 0, \rx, c1, c0
-> + ? ? ? ? ? ? ? tst ? ? \rx, #1
-> + ? ? ? ? ? ? ? ldreq ? \rx, = S3C_PA_UART
-> + ? ? ? ? ? ? ? ldrne ? \rx, = S3C_VA_UART
-> +#if CONFIG_DEBUG_S3C_UART != 0
-> + ? ? ? ? ? ? ? add ? ? \rx, \rx, #(0x10000 * CONFIG_DEBUG_S3C_UART)
-> +#endif
-> + ? ? ? .endm
-> +
-> +#define fifo_full fifo_full_s5pv210
-> +#define fifo_level fifo_level_s5pv210
-> +
-> +#include <plat/debug-macro.S>
-> diff --git a/arch/arm/mach-s5pv310/include/mach/entry-macro.S b/arch/arm/mach-s5pv310/include/mach/entry-macro.S
-> new file mode 100644
-> index 0000000..e600e1d
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/include/mach/entry-macro.S
-> @@ -0,0 +1,84 @@
-> +/* arch/arm/mach-s5pv310/include/mach/entry-macro.S
-> + *
-> + * Cloned from arch/arm/mach-realview/include/mach/entry-macro.S
-> + *
-> + * Low-level IRQ helper macros for S5PV310 platforms
-> + *
-> + * This file is licensed under ?the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> +*/
-> +
-> +#include <mach/hardware.h>
-> +#include <asm/hardware/gic.h>
-> +
-> + ? ? ? ? ? ? ? .macro ?disable_fiq
-> + ? ? ? ? ? ? ? .endm
-> +
-> + ? ? ? ? ? ? ? .macro ?get_irqnr_preamble, base, tmp
-> + ? ? ? ? ? ? ? ldr ? ? \base, =gic_cpu_base_addr
-> + ? ? ? ? ? ? ? ldr ? ? \base, [\base]
-> + ? ? ? ? ? ? ? .endm
-> +
-> + ? ? ? ? ? ? ? .macro ?arch_ret_to_user, tmp1, tmp2
-> + ? ? ? ? ? ? ? .endm
-> +
-> + ? ? ? ? ? ? ? /*
-> + ? ? ? ? ? ? ? ?* The interrupt numbering scheme is defined in the
-> + ? ? ? ? ? ? ? ?* interrupt controller spec. ?To wit:
-> + ? ? ? ? ? ? ? ?*
-> + ? ? ? ? ? ? ? ?* Interrupts 0-15 are IPI
-> + ? ? ? ? ? ? ? ?* 16-28 are reserved
-> + ? ? ? ? ? ? ? ?* 29-31 are local. ?We allow 30 to be used for the watchdog.
-> + ? ? ? ? ? ? ? ?* 32-1020 are global
-> + ? ? ? ? ? ? ? ?* 1021-1022 are reserved
-> + ? ? ? ? ? ? ? ?* 1023 is "spurious" (no interrupt)
-> + ? ? ? ? ? ? ? ?*
-> + ? ? ? ? ? ? ? ?* For now, we ignore all local interrupts so only return an interrupt if it's
-> + ? ? ? ? ? ? ? ?* between 30 and 1020. ?The test_for_ipi routine below will pick up on IPIs.
-> + ? ? ? ? ? ? ? ?*
-> + ? ? ? ? ? ? ? ?* A simple read from the controller will tell us the number of the highest
-> + ? ? ? ? ? ? ? ? * priority enabled interrupt. ?We then just need to check whether it is in the
-> + ? ? ? ? ? ? ? ?* valid range for an IRQ (30-1020 inclusive).
-> + ? ? ? ? ? ? ? ?*/
-> +
-> + ? ? ? ? ? ? ? .macro ?get_irqnr_and_base, irqnr, irqstat, base, tmp
-> +
-> + ? ? ? ? ? ? ? ldr ? ? \irqstat, [\base, #GIC_CPU_INTACK] /* bits 12-10 = src CPU, 9-0 = int # */
-> +
-> + ? ? ? ? ? ? ? ldr ? ? \tmp, =1021
-> +
-> + ? ? ? ? ? ? ? bic ? ? \irqnr, \irqstat, #0x1c00
-> +
-> + ? ? ? ? ? ? ? cmp ? ? \irqnr, #29
-> + ? ? ? ? ? ? ? cmpcc ? \irqnr, \irqnr
-> + ? ? ? ? ? ? ? cmpne ? \irqnr, \tmp
-> + ? ? ? ? ? ? ? cmpcs ? \irqnr, \irqnr
-> + ? ? ? ? ? ? ? addne ? \irqnr, \irqnr, #32
-> +
-> + ? ? ? ? ? ? ? .endm
-> +
-> + ? ? ? ? ? ? ? /* We assume that irqstat (the raw value of the IRQ acknowledge
-> + ? ? ? ? ? ? ? ?* register) is preserved from the macro above.
-> + ? ? ? ? ? ? ? ?* If there is an IPI, we immediately signal end of interrupt on the
-> + ? ? ? ? ? ? ? ?* controller, since this requires the original irqstat value which
-> + ? ? ? ? ? ? ? ?* we won't easily be able to recreate later.
-> + ? ? ? ? ? ? ? ?*/
-> +
-> + ? ? ? ? ? ? ? .macro test_for_ipi, irqnr, irqstat, base, tmp
-> + ? ? ? ? ? ? ? bic ? ? \irqnr, \irqstat, #0x1c00
-> + ? ? ? ? ? ? ? cmp ? ? \irqnr, #16
-> + ? ? ? ? ? ? ? strcc ? \irqstat, [\base, #GIC_CPU_EOI]
-> + ? ? ? ? ? ? ? cmpcs ? \irqnr, \irqnr
-> + ? ? ? ? ? ? ? .endm
-> +
-> + ? ? ? ? ? ? ? /* As above, this assumes that irqstat and base are preserved.. */
-> +
-> + ? ? ? ? ? ? ? .macro test_for_ltirq, irqnr, irqstat, base, tmp
-> + ? ? ? ? ? ? ? bic ? ? \irqnr, \irqstat, #0x1c00
-> + ? ? ? ? ? ? ? mov ? ? \tmp, #0
-> + ? ? ? ? ? ? ? cmp ? ? \irqnr, #29
-> + ? ? ? ? ? ? ? moveq ? \tmp, #1
-> + ? ? ? ? ? ? ? streq ? \irqstat, [\base, #GIC_CPU_EOI]
-> + ? ? ? ? ? ? ? cmp ? ? \tmp, #0
-> + ? ? ? ? ? ? ? .endm
-> diff --git a/arch/arm/mach-s5pv310/include/mach/gpio.h b/arch/arm/mach-s5pv310/include/mach/gpio.h
-> new file mode 100644
-> index 0000000..20cb80c
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/include/mach/gpio.h
-> @@ -0,0 +1,135 @@
-> +/* linux/arch/arm/mach-s5pv310/include/mach/gpio.h
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + * ? ? ? ? ? ? http://www.samsung.com/
-> + *
-> + * S5PV310 - GPIO lib support
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#ifndef __ASM_ARCH_GPIO_H
-> +#define __ASM_ARCH_GPIO_H __FILE__
-> +
-> +#define gpio_get_value __gpio_get_value
-> +#define gpio_set_value __gpio_set_value
-> +#define gpio_cansleep ?__gpio_cansleep
-> +#define gpio_to_irq ? ?__gpio_to_irq
-> +
-> +/* Practically, GPIO banks upto GPZ are the configurable gpio banks */
-> +
-> +/* GPIO bank sizes */
-> +#define S5PV310_GPIO_A0_NR ? ? (8)
-> +#define S5PV310_GPIO_A1_NR ? ? (6)
-> +#define S5PV310_GPIO_B_NR ? ? ?(8)
-> +#define S5PV310_GPIO_C0_NR ? ? (5)
-> +#define S5PV310_GPIO_C1_NR ? ? (5)
-> +#define S5PV310_GPIO_D0_NR ? ? (4)
-> +#define S5PV310_GPIO_D1_NR ? ? (4)
-> +#define S5PV310_GPIO_E0_NR ? ? (5)
-> +#define S5PV310_GPIO_E1_NR ? ? (8)
-> +#define S5PV310_GPIO_E2_NR ? ? (6)
-> +#define S5PV310_GPIO_E3_NR ? ? (8)
-> +#define S5PV310_GPIO_E4_NR ? ? (8)
-> +#define S5PV310_GPIO_F0_NR ? ? (8)
-> +#define S5PV310_GPIO_F1_NR ? ? (8)
-> +#define S5PV310_GPIO_F2_NR ? ? (8)
-> +#define S5PV310_GPIO_F3_NR ? ? (6)
-> +#define S5PV310_GPIO_J0_NR ? ? (8)
-> +#define S5PV310_GPIO_J1_NR ? ? (5)
-> +#define S5PV310_GPIO_K0_NR ? ? (7)
-> +#define S5PV310_GPIO_K1_NR ? ? (7)
-> +#define S5PV310_GPIO_K2_NR ? ? (7)
-> +#define S5PV310_GPIO_K3_NR ? ? (7)
-> +#define S5PV310_GPIO_L0_NR ? ? (8)
-> +#define S5PV310_GPIO_L1_NR ? ? (3)
-> +#define S5PV310_GPIO_L2_NR ? ? (8)
-> +#define S5PV310_GPIO_X0_NR ? ? (8)
-> +#define S5PV310_GPIO_X1_NR ? ? (8)
-> +#define S5PV310_GPIO_X2_NR ? ? (8)
-> +#define S5PV310_GPIO_X3_NR ? ? (8)
-> +#define S5PV310_GPIO_Z_NR ? ? ?(7)
-> +
-> +/* GPIO bank numbers */
-> +
-> +#define S5PV310_GPIO_NEXT(__gpio) \
-> + ? ? ? ((__gpio##_START) + (__gpio##_NR) + CONFIG_S3C_GPIO_SPACE + 1)
-> +
-> +enum s5p_gpio_number {
-> + ? ? ? S5PV310_GPIO_A0_START ? = 0,
-> + ? ? ? S5PV310_GPIO_A1_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_A0),
-> + ? ? ? S5PV310_GPIO_B_START ? ?= S5PV310_GPIO_NEXT(S5PV310_GPIO_A1),
-> + ? ? ? S5PV310_GPIO_C0_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_B),
-> + ? ? ? S5PV310_GPIO_C1_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_C0),
-> + ? ? ? S5PV310_GPIO_D0_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_C1),
-> + ? ? ? S5PV310_GPIO_D1_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_D0),
-> + ? ? ? S5PV310_GPIO_E0_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_D1),
-> + ? ? ? S5PV310_GPIO_E1_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_E0),
-> + ? ? ? S5PV310_GPIO_E2_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_E1),
-> + ? ? ? S5PV310_GPIO_E3_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_E2),
-> + ? ? ? S5PV310_GPIO_E4_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_E3),
-> + ? ? ? S5PV310_GPIO_F0_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_E4),
-> + ? ? ? S5PV310_GPIO_F1_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_F0),
-> + ? ? ? S5PV310_GPIO_F2_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_F1),
-> + ? ? ? S5PV310_GPIO_F3_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_F2),
-> + ? ? ? S5PV310_GPIO_J0_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_F3),
-> + ? ? ? S5PV310_GPIO_J1_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_J0),
-> + ? ? ? S5PV310_GPIO_K0_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_J1),
-> + ? ? ? S5PV310_GPIO_K1_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_K0),
-> + ? ? ? S5PV310_GPIO_K2_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_K1),
-> + ? ? ? S5PV310_GPIO_K3_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_K2),
-> + ? ? ? S5PV310_GPIO_L0_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_K3),
-> + ? ? ? S5PV310_GPIO_L1_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_L0),
-> + ? ? ? S5PV310_GPIO_L2_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_L1),
-> + ? ? ? S5PV310_GPIO_X0_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_L2),
-> + ? ? ? S5PV310_GPIO_X1_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_X0),
-> + ? ? ? S5PV310_GPIO_X2_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_X1),
-> + ? ? ? S5PV310_GPIO_X3_START ? = S5PV310_GPIO_NEXT(S5PV310_GPIO_X2),
-> + ? ? ? S5PV310_GPIO_Z_START ? ?= S5PV310_GPIO_NEXT(S5PV310_GPIO_X3),
-> +};
-> +
-> +/* S5PV310 GPIO number definitions */
-> +#define S5PV310_GPA0(_nr) ? ? ?(S5PV310_GPIO_A0_START + (_nr))
-> +#define S5PV310_GPA1(_nr) ? ? ?(S5PV310_GPIO_A1_START + (_nr))
-> +#define S5PV310_GPB(_nr) ? ? ? (S5PV310_GPIO_B_START + (_nr))
-> +#define S5PV310_GPC0(_nr) ? ? ?(S5PV310_GPIO_C0_START + (_nr))
-> +#define S5PV310_GPC1(_nr) ? ? ?(S5PV310_GPIO_C1_START + (_nr))
-> +#define S5PV310_GPD0(_nr) ? ? ?(S5PV310_GPIO_D0_START + (_nr))
-> +#define S5PV310_GPD1(_nr) ? ? ?(S5PV310_GPIO_D1_START + (_nr))
-> +#define S5PV310_GPE0(_nr) ? ? ?(S5PV310_GPIO_E0_START + (_nr))
-> +#define S5PV310_GPE1(_nr) ? ? ?(S5PV310_GPIO_E1_START + (_nr))
-> +#define S5PV310_GPE2(_nr) ? ? ?(S5PV310_GPIO_E2_START + (_nr))
-> +#define S5PV310_GPE3(_nr) ? ? ?(S5PV310_GPIO_E3_START + (_nr))
-> +#define S5PV310_GPE4(_nr) ? ? ?(S5PV310_GPIO_E4_START + (_nr))
-> +#define S5PV310_GPF0(_nr) ? ? ?(S5PV310_GPIO_F0_START + (_nr))
-> +#define S5PV310_GPF1(_nr) ? ? ?(S5PV310_GPIO_F1_START + (_nr))
-> +#define S5PV310_GPF2(_nr) ? ? ?(S5PV310_GPIO_F2_START + (_nr))
-> +#define S5PV310_GPF3(_nr) ? ? ?(S5PV310_GPIO_F3_START + (_nr))
-> +#define S5PV310_GPJ0(_nr) ? ? ?(S5PV310_GPIO_J0_START + (_nr))
-> +#define S5PV310_GPJ1(_nr) ? ? ?(S5PV310_GPIO_J1_START + (_nr))
-> +#define S5PV310_GPK0(_nr) ? ? ?(S5PV310_GPIO_K0_START + (_nr))
-> +#define S5PV310_GPK1(_nr) ? ? ?(S5PV310_GPIO_K1_START + (_nr))
-> +#define S5PV310_GPK2(_nr) ? ? ?(S5PV310_GPIO_K2_START + (_nr))
-> +#define S5PV310_GPK3(_nr) ? ? ?(S5PV310_GPIO_K3_START + (_nr))
-> +#define S5PV310_GPL0(_nr) ? ? ?(S5PV310_GPIO_L0_START + (_nr))
-> +#define S5PV310_GPL1(_nr) ? ? ?(S5PV310_GPIO_L1_START + (_nr))
-> +#define S5PV310_GPL2(_nr) ? ? ?(S5PV310_GPIO_L2_START + (_nr))
-> +#define S5PV310_GPX0(_nr) ? ? ?(S5PV310_GPIO_X0_START + (_nr))
-> +#define S5PV310_GPX1(_nr) ? ? ?(S5PV310_GPIO_X1_START + (_nr))
-> +#define S5PV310_GPX2(_nr) ? ? ?(S5PV310_GPIO_X2_START + (_nr))
-> +#define S5PV310_GPX3(_nr) ? ? ?(S5PV310_GPIO_X3_START + (_nr))
-> +#define S5PV310_GPZ(_nr) ? ? ? (S5PV310_GPIO_Z_START + (_nr))
-> +
-> +/* the end of the S5PV310 specific gpios */
-> +#define S5PV310_GPIO_END ? ? ? (S5PV310_GPZ(S5PV310_GPIO_Z_NR) + 1)
-> +#define S3C_GPIO_END ? ? ? ? ? S5PV310_GPIO_END
-> +
-> +/* define the number of gpios we need to the one after the GPZ() range */
-> +#define ARCH_NR_GPIOS ? ? ? ? ?(S5PV310_GPZ(S5PV310_GPIO_Z_NR) + ? ? ? \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?CONFIG_SAMSUNG_GPIO_EXTRA + 1)
-> +
-> +#include <asm-generic/gpio.h>
-> +
-> +#endif /* __ASM_ARCH_GPIO_H */
-> diff --git a/arch/arm/mach-s5pv310/include/mach/hardware.h b/arch/arm/mach-s5pv310/include/mach/hardware.h
-> new file mode 100644
-> index 0000000..28ff988
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/include/mach/hardware.h
-> @@ -0,0 +1,18 @@
-> +/* linux/arch/arm/mach-s5pv310/include/mach/hardware.h
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + * ? ? ? ? ? ? http://www.samsung.com/
-> + *
-> + * S5PV310 - Hardware support
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#ifndef __ASM_ARCH_HARDWARE_H
-> +#define __ASM_ARCH_HARDWARE_H __FILE__
-> +
-> +/* currently nothing here, placeholder */
-> +
-> +#endif /* __ASM_ARCH_HARDWARE_H */
-> diff --git a/arch/arm/mach-s5pv310/include/mach/io.h b/arch/arm/mach-s5pv310/include/mach/io.h
-> new file mode 100644
-> index 0000000..8a7f912
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/include/mach/io.h
-> @@ -0,0 +1,26 @@
-> +/* linux/arch/arm/mach-s5pv310/include/mach/io.h
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + * ? ? ? ? ? ? http://www.samsung.com/
-> + *
-> + * Copyright 2008-2010 Ben Dooks <ben-linux@fluff.org>
-> + *
-> + * Based on arch/arm/mach-s5p6442/include/mach/io.h
-> + *
-> + * Default IO routines for S5PV310
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#ifndef __ASM_ARM_ARCH_IO_H
-> +#define __ASM_ARM_ARCH_IO_H __FILE__
-> +
-> +/* No current ISA/PCI bus support. */
-> +#define __io(a) ? ? ? ? ? ? ? ?__typesafe_io(a)
-> +#define __mem_pci(a) ? (a)
-> +
-> +#define IO_SPACE_LIMIT (0xFFFFFFFF)
-> +
-> +#endif /* __ASM_ARM_ARCH_IO_H */
-> diff --git a/arch/arm/mach-s5pv310/include/mach/map.h b/arch/arm/mach-s5pv310/include/mach/map.h
-> new file mode 100644
-> index 0000000..50e0901
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/include/mach/map.h
-> @@ -0,0 +1,66 @@
-> +/* linux/arch/arm/mach-s5pv310/include/mach/map.h
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + * ? ? ? ? ? ? http://www.samsung.com/
-> + *
-> + * S5PV310 - Memory map definitions
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#ifndef __ASM_ARCH_MAP_H
-> +#define __ASM_ARCH_MAP_H __FILE__
-> +
-> +#include <plat/map-base.h>
-> +
-> +/*
-> + * S5PV310 UART offset is 0x10000 but the older S5P SoCs are 0x400.
-> + * So need to define it, and here is to avoid redefinition warning.
-> + */
-> +#define S3C_UART_OFFSET ? ? ? ? ? ? ? ? ? ? ? ?(0x10000)
-> +
-> +#include <plat/map-s5p.h>
-> +
-> +#define S5PV310_PA_CHIPID ? ? ? ? ? ? ?(0x10000000)
-> +#define S5P_PA_CHIPID ? ? ? ? ? ? ? ? ?S5PV310_PA_CHIPID
-> +
-> +#define S5PV310_PA_SYSCON ? ? ? ? ? ? ?(0x10020000)
-> +#define S5P_PA_SYSCON ? ? ? ? ? ? ? ? ?S5PV310_PA_SYSCON
-> +
-> +#define S5PV310_PA_COMBINER ? ? ? ? ? ?(0x10448000)
-> +
-> +#define S5PV310_PA_COREPERI ? ? ? ? ? ?(0x10500000)
-> +#define S5PV310_PA_GIC_CPU ? ? ? ? ? ? (0x10500100)
-> +#define S5PV310_PA_TWD ? ? ? ? ? ? ? ? (0x10500600)
-> +#define S5PV310_PA_GIC_DIST ? ? ? ? ? ?(0x10501000)
-> +#define S5PV310_PA_L2CC ? ? ? ? ? ? ? ? ? ? ? ?(0x10502000)
-> +
-> +#define S5PV310_PA_GPIO ? ? ? ? ? ? ? ? ? ? ? ?(0x11000000)
-> +#define S5P_PA_GPIO ? ? ? ? ? ? ? ? ? ?S5PV310_PA_GPIO
-> +
-> +#define S5PV310_PA_UART ? ? ? ? ? ? ? ? ? ? ? ?(0x13800000)
-> +
-> +#define S5P_PA_UART(x) ? ? ? ? ? ? ? ? (S5PV310_PA_UART + ((x) * S3C_UART_OFFSET))
-> +#define S5P_PA_UART0 ? ? ? ? ? ? ? ? ? S5P_PA_UART(0)
-> +#define S5P_PA_UART1 ? ? ? ? ? ? ? ? ? S5P_PA_UART(1)
-> +#define S5P_PA_UART2 ? ? ? ? ? ? ? ? ? S5P_PA_UART(2)
-> +#define S5P_PA_UART3 ? ? ? ? ? ? ? ? ? S5P_PA_UART(3)
-> +#define S5P_PA_UART4 ? ? ? ? ? ? ? ? ? S5P_PA_UART(4)
-> +
-> +#define S5P_SZ_UART ? ? ? ? ? ? ? ? ? ?SZ_256
-> +
-> +#define S5PV310_PA_IIC0 ? ? ? ? ? ? ? ? ? ? ? ?(0x13860000)
-> +
-> +#define S5PV310_PA_TIMER ? ? ? ? ? ? ? (0x139D0000)
-> +#define S5P_PA_TIMER ? ? ? ? ? ? ? ? ? S5PV310_PA_TIMER
-> +
-> +#define S5PV310_PA_SDRAM ? ? ? ? ? ? ? (0x40000000)
-> +#define S5P_PA_SDRAM ? ? ? ? ? ? ? ? ? S5PV310_PA_SDRAM
-> +
-> +/* compatibiltiy defines. */
-> +#define S3C_PA_UART ? ? ? ? ? ? ? ? ? ?S5PV310_PA_UART
-> +#define S3C_PA_IIC ? ? ? ? ? ? ? ? ? ? S5PV310_PA_IIC0
-> +
-> +#endif /* __ASM_ARCH_MAP_H */
-> diff --git a/arch/arm/mach-s5pv310/include/mach/memory.h b/arch/arm/mach-s5pv310/include/mach/memory.h
-> new file mode 100644
-> index 0000000..1dffb48
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/include/mach/memory.h
-> @@ -0,0 +1,22 @@
-> +/* linux/arch/arm/mach-s5pv310/include/mach/memory.h
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + * ? ? ? ? ? ? http://www.samsung.com/
-> + *
-> + * S5PV310 - Memory definitions
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#ifndef __ASM_ARCH_MEMORY_H
-> +#define __ASM_ARCH_MEMORY_H __FILE__
-> +
-> +#define PHYS_OFFSET ? ? ? ? ? ?UL(0x40000000)
-> +
-> +/* Maximum of 256MiB in one bank */
-> +#define MAX_PHYSMEM_BITS ? ? ? 32
-> +#define SECTION_SIZE_BITS ? ? ?28
-> +
-> +#endif /* __ASM_ARCH_MEMORY_H */
-> diff --git a/arch/arm/mach-s5pv310/include/mach/smp.h b/arch/arm/mach-s5pv310/include/mach/smp.h
-> new file mode 100644
-> index 0000000..990f3ba
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/include/mach/smp.h
-> @@ -0,0 +1,29 @@
-> +/* linux/arch/arm/mach-s5pv310/include/mach/smp.h
-> + *
-> + * Cloned from arch/arm/mach-realview/include/mach/smp.h
-> +*/
-> +
-> +#ifndef ASM_ARCH_SMP_H
-> +#define ASM_ARCH_SMP_H __FILE__
-> +
-> +#include <asm/hardware/gic.h>
-> +
-> +extern void __iomem *gic_cpu_base_addr;
-> +
-> +#define hard_smp_processor_id() ? ? ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? ({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? ? ? ? ? unsigned int cpunum; ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? ? ? ? ? __asm__("mrc p15, 0, %0, c0, c0, 5" ? ? \
-> + ? ? ? ? ? ? ? ? ? ? ? : "=r" (cpunum)); ? ? ? ? ? ? ? \
-> + ? ? ? ? ? ? ? cpunum &= 0x03; ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? })
-> +
-> +/*
-> + * We use IRQ1 as the IPI
-> + */
-> +static inline void smp_cross_call(const struct cpumask *mask)
-> +{
-> + ? ? ? gic_raise_softirq(mask, 1);
-> +}
-> +
-> +#endif
-> diff --git a/arch/arm/mach-s5pv310/include/mach/system.h b/arch/arm/mach-s5pv310/include/mach/system.h
-> new file mode 100644
-> index 0000000..d10c009
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/include/mach/system.h
-> @@ -0,0 +1,22 @@
-> +/* linux/arch/arm/mach-s5pv310/include/mach/system.h
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + * ? ? ? ? ? ? http://www.samsung.com/
-> + *
-> + * S5PV310 - system support header
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#ifndef __ASM_ARCH_SYSTEM_H
-> +#define __ASM_ARCH_SYSTEM_H __FILE__
-> +
-> +#include <plat/system-reset.h>
-> +
-> +static void arch_idle(void)
-> +{
-> + ? ? ? /* nothing here yet */
-> +}
-> +#endif /* __ASM_ARCH_SYSTEM_H */
-> diff --git a/arch/arm/mach-s5pv310/include/mach/timex.h b/arch/arm/mach-s5pv310/include/mach/timex.h
-> new file mode 100644
-> index 0000000..bd2359b
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/include/mach/timex.h
-> @@ -0,0 +1,29 @@
-> +/* linux/arch/arm/mach-s5pv310/include/mach/timex.h
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + * ? ? ? ? ? ? http://www.samsung.com/
-> + *
-> + * Copyright (c) 2003-2010 Simtec Electronics
-> + * ? ? Ben Dooks <ben@simtec.co.uk>
-> + *
-> + * Based on arch/arm/mach-s5p6442/include/mach/timex.h
-> + *
-> + * S5PV310 - time parameters
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#ifndef __ASM_ARCH_TIMEX_H
-> +#define __ASM_ARCH_TIMEX_H __FILE__
-> +
-> +/* CLOCK_TICK_RATE needs to be evaluatable by the cpp, so making it
-> + * a variable is useless. It seems as long as we make our timers an
-> + * exact multiple of HZ, any value that makes a 1->1 correspondence
-> + * for the time conversion functions to/from jiffies is acceptable.
-> +*/
-> +
-> +#define CLOCK_TICK_RATE 12000000
-> +
-> +#endif /* __ASM_ARCH_TIMEX_H */
-> diff --git a/arch/arm/mach-s5pv310/include/mach/uncompress.h b/arch/arm/mach-s5pv310/include/mach/uncompress.h
-> new file mode 100644
-> index 0000000..ad88c24
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/include/mach/uncompress.h
-> @@ -0,0 +1,27 @@
-> +/* linux/arch/arm/mach-s5pv310/include/mach/uncompress.h
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + * ? ? ? ? ? ? http://www.samsung.com/
-> + *
-> + * S5PV310 - uncompress code
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#ifndef __ASM_ARCH_UNCOMPRESS_H
-> +#define __ASM_ARCH_UNCOMPRESS_H __FILE__
-> +
-> +#include <mach/map.h>
-> +#include <plat/uncompress.h>
-> +
-> +static void arch_detect_cpu(void)
-> +{
-> + ? ? ? /* we do not need to do any cpu detection here at the moment. */
-> +
-> + ? ? ? fifo_mask = S5PV210_UFSTAT_TXMASK;
-> + ? ? ? fifo_max = 63 << S5PV210_UFSTAT_TXSHIFT;
-> +}
-> +
-> +#endif /* __ASM_ARCH_UNCOMPRESS_H */
-> diff --git a/arch/arm/mach-s5pv310/include/mach/vmalloc.h b/arch/arm/mach-s5pv310/include/mach/vmalloc.h
-> new file mode 100644
-> index 0000000..426d997
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/include/mach/vmalloc.h
-> @@ -0,0 +1,22 @@
-> +/* linux/arch/arm/mach-s5pv310/include/mach/vmalloc.h
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + * ? ? ? ? ? ? http://www.samsung.com/
-> + *
-> + * Copyright 2010 Ben Dooks <ben-linux@fluff.org>
-> + *
-> + * Based on arch/arm/mach-s5p6440/include/mach/vmalloc.h
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * S5PV310 vmalloc definition
-> +*/
-> +
-> +#ifndef __ASM_ARCH_VMALLOC_H
-> +#define __ASM_ARCH_VMALLOC_H __FILE__
-> +
-> +#define VMALLOC_END ? ? ?(0xE0000000)
-
-If there's no different reason to use 0xE000'0000, how about to use 0xF000'0000?
-I hope to delay using HIGHMEM as possible
-
-> +
-> +#endif /* __ASM_ARCH_VMALLOC_H */
-> diff --git a/arch/arm/mach-s5pv310/init.c b/arch/arm/mach-s5pv310/init.c
-> new file mode 100644
-> index 0000000..182dcf4
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/init.c
-> @@ -0,0 +1,41 @@
-> +/* linux/arch/arm/mach-s5pv310/init.c
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + * ? ? ? ? ? ? http://www.samsung.com/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#include <linux/serial_core.h>
-> +
-> +#include <plat/cpu.h>
-> +#include <plat/devs.h>
-> +#include <plat/regs-serial.h>
-> +
-> +static struct s3c24xx_uart_clksrc s5pv310_serial_clocks[] = {
-> + ? ? ? [0] = {
-> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "uclk1",
-> + ? ? ? ? ? ? ? .divisor ? ? ? ?= 1,
-> + ? ? ? ? ? ? ? .min_baud ? ? ? = 0,
-> + ? ? ? ? ? ? ? .max_baud ? ? ? = 0,
-> + ? ? ? },
-> +};
-> +
-> +/* uart registration process */
-> +void __init s5pv310_common_init_uarts(struct s3c2410_uartcfg *cfg, int no)
-> +{
-> + ? ? ? struct s3c2410_uartcfg *tcfg = cfg;
-> + ? ? ? u32 ucnt;
-> +
-> + ? ? ? for (ucnt = 0; ucnt < no; ucnt++, tcfg++) {
-> + ? ? ? ? ? ? ? if (!tcfg->clocks) {
-> + ? ? ? ? ? ? ? ? ? ? ? tcfg->has_fracval = 1;
-> + ? ? ? ? ? ? ? ? ? ? ? tcfg->clocks = s5pv310_serial_clocks;
-> + ? ? ? ? ? ? ? ? ? ? ? tcfg->clocks_size = ARRAY_SIZE(s5pv310_serial_clocks);
-> + ? ? ? ? ? ? ? }
-> + ? ? ? }
-> +
-> + ? ? ? s3c24xx_init_uartdevs("s5pv210-uart", s5p_uart_resources, cfg, no);
-> +}
-> diff --git a/arch/arm/mach-s5pv310/platsmp.c b/arch/arm/mach-s5pv310/platsmp.c
-> new file mode 100644
-> index 0000000..9325ac2
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/platsmp.c
-> @@ -0,0 +1,212 @@
-> +/* linux/arch/arm/mach-s5pv310/platsmp.c
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + * ? ? ? ? ? ? http://www.samsung.com/
-> + *
-> + * Cloned from linux/arch/arm/mach-realview/platsmp.c
-> + *
-> + * ?Copyright (C) 2002 ARM Ltd.
-> + * ?All Rights Reserved
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#include <linux/init.h>
-> +#include <linux/errno.h>
 > +#include <linux/delay.h>
-> +#include <linux/device.h>
-> +#include <linux/jiffies.h>
-> +#include <linux/smp.h>
+> +#include <linux/init.h>
+> +#include <linux/err.h>
+> +#include <linux/clk.h>
 > +#include <linux/io.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <linux/gpio.h>
+> +#include <asm/system.h>
 > +
-> +#include <asm/cacheflush.h>
 > +#include <mach/hardware.h>
-> +#include <asm/mach-types.h>
-> +#include <asm/localtimer.h>
-> +#include <asm/unified.h>
-> +
-> +#include <asm/smp_scu.h>
+> +#include <mach/map.h>
 > +#include <mach/regs-clock.h>
+> +#include <mach/regs-gpio.h>
+> +#include <mach/cpu-freq.h>
 > +
-> +extern void s5pv310_secondary_startup(void);
-> +
-> +/*
-> + * control for which core is the next to come out of the secondary
-> + * boot "holding pen"
-> + */
-> +volatile int __cpuinitdata pen_release = -1;
-> +
-> +static void __iomem *scu_base_addr(void)
-> +{
-> + ? ? ? return (void __iomem *)(S5P_VA_SCU);
-> +}
-> +
-> +static inline unsigned int get_core_count(void)
-> +{
-> + ? ? ? void __iomem *scu_base = scu_base_addr();
-> + ? ? ? if (scu_base)
-> + ? ? ? ? ? ? ? return scu_get_core_count(scu_base);
-> + ? ? ? return 1;
-> +}
-> +
-> +static DEFINE_SPINLOCK(boot_lock);
-> +
-> +void __cpuinit platform_secondary_init(unsigned int cpu)
-> +{
-> + ? ? ? trace_hardirqs_off();
-> +
-> + ? ? ? /*
-> + ? ? ? ?* if any interrupts are already enabled for the primary
-> + ? ? ? ?* core (e.g. timer irq), then they will not have been enabled
-> + ? ? ? ?* for us: do so
-> + ? ? ? ?*/
-> + ? ? ? gic_cpu_init(0, gic_cpu_base_addr);
-> +
-> + ? ? ? /*
-> + ? ? ? ?* let the primary processor know we're out of the
-> + ? ? ? ?* pen, then head off into the C entry point
-> + ? ? ? ?*/
-> + ? ? ? pen_release = -1;
-> + ? ? ? smp_wmb();
-> +
-> + ? ? ? /*
-> + ? ? ? ?* Synchronise with the boot thread.
-> + ? ? ? ?*/
-> + ? ? ? spin_lock(&boot_lock);
-> + ? ? ? spin_unlock(&boot_lock);
-> +}
-> +
-> +int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-> +{
-> + ? ? ? unsigned long timeout;
-> +
-> + ? ? ? /*
-> + ? ? ? ?* set synchronisation state between this boot processor
-> + ? ? ? ?* and the secondary one
-> + ? ? ? ?*/
-> + ? ? ? spin_lock(&boot_lock);
-> +
-> + ? ? ? /*
-> + ? ? ? ?* The secondary processor is waiting to be released from
-> + ? ? ? ?* the holding pen - release it, then wait for it to flag
-> + ? ? ? ?* that it has been released by resetting pen_release.
-> + ? ? ? ?*
-> + ? ? ? ?* Note that "pen_release" is the hardware CPU ID, whereas
-> + ? ? ? ?* "cpu" is Linux's internal ID.
-> + ? ? ? ?*/
-> + ? ? ? pen_release = cpu;
-> + ? ? ? flush_cache_all();
-> +
-> + ? ? ? /*
-> + ? ? ? ?* XXX
-> + ? ? ? ?*
-> + ? ? ? ?* This is a later addition to the booting protocol: the
-> + ? ? ? ?* bootMonitor now puts secondary cores into WFI, so
-> + ? ? ? ?* poke_milo() no longer gets the cores moving; we need
-> + ? ? ? ?* to send a soft interrupt to wake the secondary core.
-> + ? ? ? ?* Use smp_cross_call() for this, since there's little
-> + ? ? ? ?* point duplicating the code here
-> + ? ? ? ?*/
-> + ? ? ? smp_cross_call(cpumask_of(cpu));
-> +
-> + ? ? ? timeout = jiffies + (1 * HZ);
-> + ? ? ? while (time_before(jiffies, timeout)) {
-> + ? ? ? ? ? ? ? smp_rmb();
-> + ? ? ? ? ? ? ? if (pen_release == -1)
-> + ? ? ? ? ? ? ? ? ? ? ? break;
-> +
-> + ? ? ? ? ? ? ? udelay(10);
-> + ? ? ? }
-> +
-> + ? ? ? /*
-> + ? ? ? ?* now the secondary core is starting up let it run its
-> + ? ? ? ?* calibrations, then wait for it to finish
-> + ? ? ? ?*/
-> + ? ? ? spin_unlock(&boot_lock);
-> +
-> + ? ? ? return pen_release != -1 ? -ENOSYS : 0;
-> +}
-> +
-> +static void __init poke_milo(void)
-> +{
-> + ? ? ? /* nobody is to be released from the pen yet */
-> + ? ? ? pen_release = -1;
-> +
-> + ? ? ? /*
-> + ? ? ? ?* Write the address of secondary startup into the system-wide flags
-> + ? ? ? ?* register. The BootMonitor waits for this register to become
-> + ? ? ? ?* non-zero.
-> + ? ? ? ?*/
-> + ? ? ? __raw_writel(BSYM(virt_to_phys(s5pv310_secondary_startup)), S5P_INFORM0);
-> +
-> + ? ? ? mb();
-> +}
-> +
-> +/*
-> + * Initialise the CPU possible map early - this describes the CPUs
-> + * which may be present or become present in the system.
-> + */
-> +void __init smp_init_cpus(void)
-> +{
-> + ? ? ? unsigned int i, ncores = get_core_count();
-> +
-> + ? ? ? for (i = 0; i < ncores; i++)
-> + ? ? ? ? ? ? ? set_cpu_possible(i, true);
-> +}
-> +
-> +void __init smp_prepare_cpus(unsigned int max_cpus)
-> +{
-> + ? ? ? unsigned int ncores = get_core_count();
-> + ? ? ? unsigned int cpu = smp_processor_id();
-> + ? ? ? int i;
-> +
-> + ? ? ? /* sanity check */
-> + ? ? ? if (ncores == 0) {
-> + ? ? ? ? ? ? ? printk(KERN_ERR
-> + ? ? ? ? ? ? ? ? ? ? ?"Realview: strange CM count of 0? Default to 1\n");
-> +
-> + ? ? ? ? ? ? ? ncores = 1;
-> + ? ? ? }
-> +
-> + ? ? ? if (ncores > NR_CPUS) {
-> + ? ? ? ? ? ? ? printk(KERN_WARNING
-> + ? ? ? ? ? ? ? ? ? ? ?"Realview: no. of cores (%d) greater than configured "
-> + ? ? ? ? ? ? ? ? ? ? ?"maximum of %d - clipping\n",
-> + ? ? ? ? ? ? ? ? ? ? ?ncores, NR_CPUS);
-> + ? ? ? ? ? ? ? ncores = NR_CPUS;
-> + ? ? ? }
-> +
-> + ? ? ? smp_store_cpu_info(cpu);
-> +
-> + ? ? ? /*
-> + ? ? ? ?* are we trying to boot more cores than exist?
-> + ? ? ? ?*/
-> + ? ? ? if (max_cpus > ncores)
-> + ? ? ? ? ? ? ? max_cpus = ncores;
-> +
-> + ? ? ? /*
-> + ? ? ? ?* Initialise the present map, which describes the set of CPUs
-> + ? ? ? ?* actually populated at the present time.
-> + ? ? ? ?*/
-> + ? ? ? for (i = 0; i < max_cpus; i++)
-> + ? ? ? ? ? ? ? set_cpu_present(i, true);
-> +
-> + ? ? ? /*
-> + ? ? ? ?* Initialise the SCU if there are more than one CPU and let
-> + ? ? ? ?* them know where to start. Note that, on modern versions of
-> + ? ? ? ?* MILO, the "poke" doesn't actually do anything until each
-> + ? ? ? ?* individual core is sent a soft interrupt to get it out of
-> + ? ? ? ?* WFI
-> + ? ? ? ?*/
-> + ? ? ? if (max_cpus > 1) {
-> + ? ? ? ? ? ? ? /*
-> + ? ? ? ? ? ? ? ?* Enable the local timer or broadcast device for the
-> + ? ? ? ? ? ? ? ?* boot CPU, but only if we have more than one CPU.
-> + ? ? ? ? ? ? ? ?*/
-> + ? ? ? ? ? ? ? percpu_timer_setup();
-> +
-> + ? ? ? ? ? ? ? scu_enable(scu_base_addr());
-> + ? ? ? ? ? ? ? poke_milo();
-> + ? ? ? }
-> +}
-> diff --git a/arch/arm/mach-s5pv310/setup-i2c0.c b/arch/arm/mach-s5pv310/setup-i2c0.c
-> new file mode 100644
-> index 0000000..d4f5a81
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/setup-i2c0.c
-> @@ -0,0 +1,20 @@
-> +/* linux/arch/arm/mach-s5pv210/setup-i2c0.c
-> + *
-> + * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
-> + * ? ? ? ? ? ? http://www.samsung.com/
-> + *
-> + * I2C0 GPIO configuration.
-> + *
-> + * Based on plat-s3c64xx/setup-i2c0.c
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +struct platform_device; /* don't need the contents */
-> +
-> +void s3c_i2c0_cfg_gpio(struct platform_device *dev)
-> +{
-> +/* will be implemented later */
-> +}
-> diff --git a/arch/arm/plat-s5p/cpu.c b/arch/arm/plat-s5p/cpu.c
-> index c478441..9261a27 100644
-> --- a/arch/arm/plat-s5p/cpu.c
-> +++ b/arch/arm/plat-s5p/cpu.c
-> @@ -21,6 +21,7 @@
-> ?#include <plat/s5p6442.h>
-> ?#include <plat/s5pc100.h>
-> ?#include <plat/s5pv210.h>
-> +#include <plat/s5pv310.h>
->
-> ?/* table of supported CPUs */
->
-> @@ -28,6 +29,7 @@ static const char name_s5p6440[] = "S5P6440";
-> ?static const char name_s5p6442[] = "S5P6442";
-> ?static const char name_s5pc100[] = "S5PC100";
-> ?static const char name_s5pv210[] = "S5PV210/S5PC110";
-> +static const char name_s5pv310[] = "S5PV310";
->
-> ?static struct cpu_table cpu_ids[] __initdata = {
-> ? ? ? ?{
-> @@ -62,6 +64,14 @@ static struct cpu_table cpu_ids[] __initdata = {
-> ? ? ? ? ? ? ? ?.init_uarts ? ? = s5pv210_init_uarts,
-> ? ? ? ? ? ? ? ?.init ? ? ? ? ? = s5pv210_init,
-> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = name_s5pv210,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .idcode ? ? ? ? = 0x43200000,
-> + ? ? ? ? ? ? ? .idmask ? ? ? ? = 0xfffff000,
-> + ? ? ? ? ? ? ? .map_io ? ? ? ? = s5pv310_map_io,
-> + ? ? ? ? ? ? ? .init_clocks ? ?= s5pv310_init_clocks,
-> + ? ? ? ? ? ? ? .init_uarts ? ? = s5pv310_init_uarts,
-> + ? ? ? ? ? ? ? .init ? ? ? ? ? = s5pv310_init,
-> + ? ? ? ? ? ? ? .name ? ? ? ? ? = name_s5pv310,
-> ? ? ? ?},
-> ?};
->
-> @@ -83,6 +93,7 @@ static struct map_desc s5p_iodesc[] __initdata = {
-> ? ? ? ? ? ? ? ?.pfn ? ? ? ? ? ?= __phys_to_pfn(S3C_PA_UART),
-> ? ? ? ? ? ? ? ?.length ? ? ? ? = SZ_512K,
-> ? ? ? ? ? ? ? ?.type ? ? ? ? ? = MT_DEVICE,
-> +#ifdef CONFIG_ARM_VIC
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.virtual ? ? ? ?= (unsigned long)VA_VIC0,
-> ? ? ? ? ? ? ? ?.pfn ? ? ? ? ? ?= __phys_to_pfn(S5P_PA_VIC0),
-> @@ -93,6 +104,7 @@ static struct map_desc s5p_iodesc[] __initdata = {
-> ? ? ? ? ? ? ? ?.pfn ? ? ? ? ? ?= __phys_to_pfn(S5P_PA_VIC1),
-> ? ? ? ? ? ? ? ?.length ? ? ? ? = SZ_16K,
-> ? ? ? ? ? ? ? ?.type ? ? ? ? ? = MT_DEVICE,
+> +#include <plat/cpu-freq.h>
+> +#include <plat/pll.h>
+> +#include <plat/clock.h>
+> +#include <plat/gpio-cfg.h>
+> +#include <plat/regs-fb.h>
+> +#ifdef CONFIG_PM
+> +#include <plat/pm.h>
 > +#endif
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.virtual ? ? ? ?= (unsigned long)S3C_VA_TIMER,
-> ? ? ? ? ? ? ? ?.pfn ? ? ? ? ? ?= __phys_to_pfn(S5P_PA_TIMER),
-> diff --git a/arch/arm/plat-s5p/include/plat/map-s5p.h b/arch/arm/plat-s5p/include/plat/map-s5p.h
-> index 3d815f4..54e9fb9 100644
-> --- a/arch/arm/plat-s5p/include/plat/map-s5p.h
-> +++ b/arch/arm/plat-s5p/include/plat/map-s5p.h
-> @@ -18,6 +18,18 @@
-> ?#define S5P_VA_SYSTIMER ? ? ? ? ? ? ? ?S3C_ADDR(0x01200000)
-> ?#define S5P_VA_SROMC ? ? ? ? ? S3C_ADDR(0x01100000)
->
-> +#define S5P_VA_COMBINER_BASE ? S3C_ADDR(0x00600000)
-> +#define S5P_VA_COMBINER(x) ? ? (S5P_VA_COMBINER_BASE + ((x) >> 2) * 0x10)
 > +
-> +#define S5P_VA_COREPERI_BASE ? S3C_ADDR(0x00800000)
-> +#define S5P_VA_COREPERI(x) ? ? (S5P_VA_COREPERI_BASE + (x))
-> +#define S5P_VA_SCU ? ? ? ? ? ? S5P_VA_COREPERI(0x0)
-> +#define S5P_VA_GIC_CPU ? ? ? ? S5P_VA_COREPERI(0x100)
-> +#define S5P_VA_TWD ? ? ? ? ? ? S5P_VA_COREPERI(0x600)
-> +#define S5P_VA_GIC_DIST ? ? ? ? ? ? ? ?S5P_VA_COREPERI(0x1000)
+> +static struct clk *mpu_clk;
+> +static struct regulator *arm_regulator;
+> +static struct regulator *internal_regulator;
 > +
-> +#define S5P_VA_L2CC ? ? ? ? ? ?S3C_ADDR(0x00900000)
+> +struct s3c_cpufreq_freqs s3c_freqs;
 > +
-> ?#define S5P_VA_UART(x) ? ? ? ? (S3C_VA_UART + ((x) * S3C_UART_OFFSET))
-> ?#define S5P_VA_UART0 ? ? ? ? ? S5P_VA_UART(0)
-> ?#define S5P_VA_UART1 ? ? ? ? ? S5P_VA_UART(1)
-> diff --git a/arch/arm/plat-s5p/include/plat/s5pv310.h b/arch/arm/plat-s5p/include/plat/s5pv310.h
-> new file mode 100644
-> index 0000000..d2f05e1
-> --- /dev/null
-> +++ b/arch/arm/plat-s5p/include/plat/s5pv310.h
-> @@ -0,0 +1,33 @@
-> +/* linux/arch/arm/plat-s5p/include/plat/s5pv310.h
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + * ? ? ? ? ? ? http://www.samsung.com/
-> + *
-> + * Header file for s5pv310 cpu support
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
+> +#ifdef CONFIG_CPU_S5PC110_EVT0_ERRATA
+> +#define	CPUFREQ_DISABLE_1GHZ
+> +#endif
+> +/* #define	CPUFREQ_DISABLE_100MHZ */
 > +
-> +/* Common init code for S5PV310 related SoCs */
+> +static unsigned long previous_arm_volt;
 > +
-> +extern void s5pv310_common_init_uarts(struct s3c2410_uartcfg *cfg, int no);
-> +extern void s5pv310_register_clocks(void);
-> +extern void s5pv310_setup_clocks(void);
+> +/* frequency */
+> +static struct cpufreq_frequency_table s5pv210_freq_table[] = {
+> +	{L0, 1000*1000},
+> +	{L1, 800*1000},
+> +	{L2, 400*1000},
+> +	{L3, 200*1000},
+> +	{L4, 100*1000},
+> +	{0, CPUFREQ_TABLE_END},
+> +};
 > +
-> +#ifdef CONFIG_CPU_S5PV310
+> +struct s5pc11x_dvs_conf {
+> +	const unsigned long lvl;        /* DVFS level : L0,L1,L2,L3... */
+
+Why add this when you don't use it? You could use the level as the lookup key instead.
+
+> +	unsigned long       arm_volt;   /* uV */
+> +	unsigned long       int_volt;   /* uV */
+> +};
 > +
-> +extern ?int s5pv310_init(void);
-> +extern void s5pv310_init_irq(void);
-> +extern void s5pv310_map_io(void);
-> +extern void s5pv310_init_clocks(int xtal);
-> +
-> +#define s5pv310_init_uarts s5pv310_common_init_uarts
-> +
+> +#ifdef CONFIG_CPU_S5PC110_EVT0_ERRATA
+> +const unsigned long arm_volt_max = 1350000;
+> +const unsigned long int_volt_max = 1250000;
 > +#else
-> +#define s5pv310_init_clocks NULL
-> +#define s5pv310_init_uarts NULL
-> +#define s5pv310_map_io NULL
-> +#define s5pv310_init NULL
+> +const unsigned long arm_volt_max = 1300000;
+> +const unsigned long int_volt_max = 1200000;
 > +#endif
-> --
-> 1.6.2.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+> +
+> +static struct s5pc11x_dvs_conf s5pv210_dvs_conf[] = {
+> +#ifdef CONFIG_CPU_S5PC110_EVT0_ERRATA
+> +	{
+> +		.lvl        = L0,
+> +		.arm_volt   = 1300000,
+> +		.int_volt   = 1200000,
+> +	}, {
+> +		.lvl        = L1,
+> +		.arm_volt   = 1250000,
+> +		.int_volt   = 1200000,
+> +
+> +	}, {
+> +		.lvl        = L2,
+> +		.arm_volt   = 1250000,
+> +		.int_volt   = 1200000,
+> +
+> +	}, {
+> +		.lvl        = L3,
+> +		.arm_volt   = 1250000,
+> +		.int_volt   = 1200000,
+> +	}, {
+> +		.lvl        = L4,
+> +		.arm_volt   = 1250000,
+> +		.int_volt   = 1200000,
+> +	},
+> +#else
+> +	{
+> +		.lvl        = L0,
+> +		.arm_volt   = 1250000,
+> +		.int_volt   = 1100000,
+> +	}, {
+> +		.lvl        = L1,
+> +		.arm_volt   = 1200000,
+> +		.int_volt   = 1100000,
+> +
+> +	}, {
+> +		.lvl        = L2,
+> +		.arm_volt   = 1050000,
+> +		.int_volt   = 1100000,
+> +
+> +	}, {
+> +		.lvl        = L3,
+> +		.arm_volt   = 950000,
+> +		.int_volt   = 1100000,
+> +	}, {
+> +		.lvl        = L4,
+> +		.arm_volt   = 950000,
+> +		.int_volt   = 1000000,
+> +	},
+> +#endif
+> +};
+> +
+> +static u32 clkdiv_val[5][11] = {
+> +	/*{ APLL, A2M, HCLK_MSYS, PCLK_MSYS,
+> +	 * HCLK_DSYS, PCLK_DSYS, HCLK_PSYS, PCLK_PSYS, ONEDRAM,
+> +	 * MFC, G3D }
+> +	 */
+> +	/* L0 : [1000/200/200/100][166/83][133/66][200/200] */
+> +	{0, 4, 4, 1, 3, 1, 4, 1, 3, 0, 0},
+> +	/* L1 : [800/200/200/100][166/83][133/66][200/200] */
+> +	{0, 3, 3, 1, 3, 1, 4, 1, 3, 0, 0},
+> +	/* L2 : [400/200/200/100][166/83][133/66][200/200] */
+> +	{1, 3, 1, 1, 3, 1, 4, 1, 3, 0, 0},
+> +	/* L3 : [200/200/200/100][166/83][133/66][200/200] */
+> +	{3, 3, 0, 1, 3, 1, 4, 1, 3, 0, 0},
+> +	/* L4 : [100/100/100/100][83/83][66/66][100/100] */
+> +	{7, 7, 0, 0, 7, 0, 9, 0, 7, 0, 0},
+> +};
+> +
+> +static struct s3c_freq s5pv210_clk_info[] = {
+> +	[L0] = {	/* L0: 1GHz */
+> +		.fclk       = 1000000,
+> +		.armclk     = 1000000,
+> +		.hclk_tns   = 0,
+> +		.hclk       = 133000,
+> +		.pclk       = 66000,
+> +		.hclk_msys  = 200000,
+> +		.pclk_msys  = 100000,
+> +		.hclk_dsys  = 166750,
+> +		.pclk_dsys  = 83375,
+> +	},
+> +	[L1] = {	/* L1: 800MHz */
+> +		.fclk       = 800000,
+> +		.armclk     = 800000,
+> +		.hclk_tns   = 0,
+> +		.hclk       = 133000,
+> +		.pclk       = 66000,
+> +		.hclk_msys  = 200000,
+> +		.pclk_msys  = 100000,
+> +		.hclk_dsys  = 166750,
+> +		.pclk_dsys  = 83375,
+> +	},
+> +	[L2] = {	/* L2: 400MHz */
+> +		.fclk       = 800000,
+> +		.armclk     = 400000,
+> +		.hclk_tns   = 0,
+> +		.hclk       = 133000,
+> +		.pclk       = 66000,
+> +		.hclk_msys  = 200000,
+> +		.pclk_msys  = 100000,
+> +		.hclk_dsys  = 166750,
+> +		.pclk_dsys  = 83375,
+> +	},
+> +	[L3] = {	/* L3: 200MHz */
+> +		.fclk       = 800000,
+> +		.armclk     = 200000,
+> +		.hclk_tns   = 0,
+> +		.hclk       = 133000,
+> +		.pclk       = 66000,
+> +		.hclk_msys  = 200000,
+> +		.pclk_msys  = 100000,
+> +		.hclk_dsys  = 166750,
+> +		.pclk_dsys  = 83375,
+> +	},
+> +	[L4] = {	/* L4: 100MHz */
+> +		.fclk       = 800000,
+> +		.armclk     = 100000,
+> +		.hclk_tns   = 0,
+> +		.hclk       = 66000,
+> +		.pclk       = 66000,
+> +		.hclk_msys  = 100000,
+> +		.pclk_msys  = 100000,
+> +		.hclk_dsys  = 83375,
+> +		.pclk_dsys  = 83375,
+> +	},
+> +};
+> +
+> +int s5pv210_verify_speed(struct cpufreq_policy *policy)
+> +{
+> +
+> +	if (policy->cpu)
+> +		return -EINVAL;
+> +
+> +	return cpufreq_frequency_table_verify(policy, s5pv210_freq_table);
+> +}
+> +
+> +unsigned int s5pv210_getspeed(unsigned int cpu)
+> +{
+> +	unsigned long rate;
+> +
+> +	if (cpu)
+> +		return 0;
+> +
+> +	rate = clk_get_rate(mpu_clk) / KHZ_T;
+> +
+> +	return rate;
+> +}
+> +
+> +static void s5pv210_target_APLL2MPLL(unsigned int index,
+> +		unsigned int bus_speed_changing)
+> +{
+> +	unsigned int reg;
+> +
+> +	/* 1. Temporarily change divider for MFC and G3D
+> +	 * SCLKA2M(200/1=200)->(200/4=50)MHz
+> +	 **/
+> +	reg = __raw_readl(S5P_CLK_DIV2);
+> +	reg &= ~(S5P_CLKDIV2_G3D_MASK | S5P_CLKDIV2_MFC_MASK);
+> +	reg |= (0x3 << S5P_CLKDIV2_G3D_SHIFT) |
+> +		(0x3 << S5P_CLKDIV2_MFC_SHIFT);
+> +#ifndef CONFIG_CPU_S5PC110_EVT0_ERRATA
+> +	reg &= ~S5P_CLKDIV2_G2D_MASK;
+> +	reg |= (0x2 << S5P_CLKDIV2_G2D_SHIFT);
+> +#endif
+> +	__raw_writel(reg, S5P_CLK_DIV2);
+> +
+> +	/* For MFC, G3D dividing */
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_DIV_STAT0);
+> +	} while (reg & ((1 << 16) | (1 << 17)));
+> +
+> +	/* 2. Change SCLKA2M(200MHz) to SCLKMPLL in MFC_MUX, G3D MUX
+> +	 * (100/4=50)->(667/4=166)MHz
+> +	 **/
+> +	reg = __raw_readl(S5P_CLK_SRC2);
+> +	reg &= ~(S5P_CLKSRC2_G3D_MASK | S5P_CLKSRC2_MFC_MASK);
+> +	reg |= (0x1 << S5P_CLKSRC2_G3D_SHIFT) |
+> +		(0x1 << S5P_CLKSRC2_MFC_SHIFT);
+> +#ifndef CONFIG_CPU_S5PC110_EVT0_ERRATA
+> +	reg &= ~S5P_CLKSRC2_G2D_MASK;
+> +	reg |= (0x1 << S5P_CLKSRC2_G2D_SHIFT);
+> +#endif
+> +	__raw_writel(reg, S5P_CLK_SRC2);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_MUX_STAT1);
+> +	} while (reg & ((1 << 7) | (1 << 3)));
+> +
+> +	/* 3. DMC1 refresh count for 133MHz if (index == L4) is true
+> +	 * refresh counter is already programmed in the outer/upper
+> +	 * code. 0x287 at 83MHz
+> +	 **/
+> +	if (!bus_speed_changing)
+> +		__raw_writel(0x40d, S5P_VA_DMC1 + 0x30);
+> +
+> +	/* 4. SCLKAPLL -> SCLKMPLL */
+> +	reg = __raw_readl(S5P_CLK_SRC0);
+> +	reg &= ~(S5P_CLKSRC0_MUX200_MASK);
+> +	reg |= (0x1 << S5P_CLKSRC0_MUX200_SHIFT);
+> +	__raw_writel(reg, S5P_CLK_SRC0);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_MUX_STAT0);
+> +	} while (reg & (0x1 << 18));
+> +
+> +#if defined(CONFIG_S5PC110_H_TYPE)
+> +	/* DMC0 source clock: SCLKA2M -> SCLKMPLL */
+> +	__raw_writel(0x50e, S5P_VA_DMC0 + 0x30);
+> +
+> +	reg = __raw_readl(S5P_CLK_DIV6);
+> +	reg &= ~(S5P_CLKDIV6_ONEDRAM_MASK);
+> +	reg |= (0x3 << S5P_CLKDIV6_ONEDRAM_SHIFT);
+> +	__raw_writel(reg, S5P_CLK_DIV6);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_DIV_STAT1);
+> +	} while (reg & (1 << 15));
+> +
+> +	reg = __raw_readl(S5P_CLK_SRC6);
+> +	reg &= ~(S5P_CLKSRC6_ONEDRAM_MASK);
+> +	reg |= (0x1 << S5P_CLKSRC6_ONEDRAM_SHIFT);
+> +	__raw_writel(reg, S5P_CLK_SRC6);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_MUX_STAT1);
+> +	} while (reg & (1 << 11));
+> +#endif
+> +}
+> +
+> +static void s5pv210_target_MPLL2APLL(unsigned int index,
+> +		unsigned int bus_speed_changing)
+> +{
+> +	unsigned int reg;
+> +
+> +	/* 7. Set Lock time = 30us*24MHz = 02cf (EVT1) */
+> +#ifdef CONFIG_CPU_S5PC110_EVT0_ERRATA
+> +	/* Lock time = 300us*24Mhz = 7200(0x1c20)*/
+> +	__raw_writel(0x1c20, S5P_APLL_LOCK);
+> +#else
+> +	/* Lock time = 30us*24Mhz = 0x2cf*/
+> +	__raw_writel(0x2cf, S5P_APLL_LOCK);
+> +#endif
+> +
+> +	/* 8. Turn on APLL
+> +	 * 8-1. Set PMS values
+> +	 * 8-3. Wait until the PLL is locked
+> +	 **/
+> +	if (index == L0)
+> +		/* APLL FOUT becomes 1000 Mhz */
+> +		__raw_writel(PLL45XX_APLL_VAL_1000, S5P_APLL_CON);
+> +	else
+> +		/* APLL FOUT becomes 800 Mhz */
+> +		__raw_writel(PLL45XX_APLL_VAL_800, S5P_APLL_CON);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_APLL_CON);
+> +	} while (!(reg & (0x1 << 29)));
+> +
+> +	/* 9. Change source clock from SCLKMPLL(667MHz)
+> +	 * to SCLKA2M(200MHz) in MFC_MUX and G3D_MUX
+> +	 * (667/4=166)->(200/4=50)MHz
+> +	 **/
+> +	reg = __raw_readl(S5P_CLK_SRC2);
+> +	reg &= ~(S5P_CLKSRC2_G3D_MASK | S5P_CLKSRC2_MFC_MASK);
+> +	reg |= (0 << S5P_CLKSRC2_G3D_SHIFT) | (0 << S5P_CLKSRC2_MFC_SHIFT);
+> +#ifndef CONFIG_CPU_S5PC110_EVT0_ERRATA
+> +	reg &= ~S5P_CLKSRC2_G2D_MASK;
+> +	reg |= 0x1 << S5P_CLKSRC2_G2D_SHIFT;
+> +#endif
+> +	__raw_writel(reg, S5P_CLK_SRC2);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_MUX_STAT1);
+> +	} while (reg & ((1 << 7) | (1 << 3)));
+> +
+> +	/* 10. Change divider for MFC and G3D
+> +	 * (200/4=50)->(200/1=200)MHz
+> +	 **/
+> +	reg = __raw_readl(S5P_CLK_DIV2);
+> +	reg &= ~(S5P_CLKDIV2_G3D_MASK | S5P_CLKDIV2_MFC_MASK);
+> +	reg |= (clkdiv_val[index][10] << S5P_CLKDIV2_G3D_SHIFT) |
+> +		(clkdiv_val[index][9] << S5P_CLKDIV2_MFC_SHIFT);
+> +#ifndef CONFIG_CPU_S5PC110_EVT0_ERRATA
+> +	reg &= ~S5P_CLKDIV2_G2D_MASK;
+> +	reg |= 0x2 << S5P_CLKDIV2_G2D_SHIFT;
+> +#endif
+> +	__raw_writel(reg, S5P_CLK_DIV2);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_DIV_STAT0);
+> +	} while (reg & ((1 << 16) | (1 << 17)));
+> +
+> +	/* 11. Change MPLL to APLL in MSYS_MUX */
+> +	reg = __raw_readl(S5P_CLK_SRC0);
+> +	reg &= ~(S5P_CLKSRC0_MUX200_MASK);
+> +	reg |= (0x0 << S5P_CLKSRC0_MUX200_SHIFT); /* SCLKMPLL -> SCLKAPLL   */
+> +	__raw_writel(reg, S5P_CLK_SRC0);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_MUX_STAT0);
+> +	} while (reg & (0x1 << 18));
+> +
+> +	/* 12. DMC1 refresh counter
+> +	 * L4: DMC1 = 100MHz 7.8us/(1/100) = 0x30c
+> +	 * Others: DMC1 = 200MHz 7.8us/(1/200) = 0x618
+> +	 **/
+> +	if (!bus_speed_changing)
+> +		__raw_writel(0x618, S5P_VA_DMC1 + 0x30);
+> +
+> +#if defined(CONFIG_S5PC110_H_TYPE)
+> +	/* DMC0 source clock: SCLKMPLL -> SCLKA2M */
+> +	reg = __raw_readl(S5P_CLK_SRC6);
+> +	reg &= ~(S5P_CLKSRC6_ONEDRAM_MASK);
+> +	reg |= (0x0 << S5P_CLKSRC6_ONEDRAM_SHIFT);
+> +	__raw_writel(reg, S5P_CLK_SRC6);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_MUX_STAT1);
+> +	} while (reg & (1 << 11));
+> +
+> +	reg = __raw_readl(S5P_CLK_DIC6);
+> +	reg &= ~(S5P_CLKDIV6_ONEDRAM_MASK);
+> +	reg |= (0x0 << S5P_CLKDIV6_ONEDRAM_SHIFT);
+> +	__raw_writel(reg, S5P_CLK_DIV6);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_DIV_STAT1);
+> +	} while (reg & (1 << 15));
+> +	__raw_writel(0x618, S5P_VA_DMC0 + 0x30);
+> +#endif
+> +}
+> +
+> +#ifdef CONFIG_PM
+> +static int no_cpufreq_access;
+> +/* s5pv210_target: relation has an additional symantics other than
+> + * the standard
+> + * [0x30]:
+> + *	1: disable further access to target until being re-enabled.
+> + *	2: re-enable access to target */
+> +#endif
+> +static int s5pv210_target(struct cpufreq_policy *policy,
+> +		unsigned int target_freq,
+> +		unsigned int relation)
+> +{
+> +	static int initialized;
+> +	int ret = 0;
+> +	unsigned long arm_clk;
+> +	unsigned int index, reg, arm_volt, int_volt;
+> +	unsigned int pll_changing = 0;
+> +	unsigned int bus_speed_changing = 0;
+> +
+> +#ifdef CONFIG_CPU_FREQ_DEBUG
+> +	printk(KERN_INFO "cpufreq: Entering for %dkHz\n", target_freq);
+> +#endif
+
+cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, <prefix>, ...)
+
+> +#ifdef CONFIG_PM
+> +	if ((relation & ENABLE_FURTHER_CPUFREQ) &&
+> +			(relation & DISABLE_FURTHER_CPUFREQ)) {
+> +		/* Invalidate both if both marked */
+> +		relation &= ~ENABLE_FURTHER_CPUFREQ;
+> +		relation &= ~DISABLE_FURTHER_CPUFREQ;
+> +		printk(KERN_ERR "%s:%d denied marking \"FURTHER_CPUFREQ\""
+> +				" as both marked.\n",
+> +				__FILE__, __LINE__);
+> +	}
+> +	if (relation & ENABLE_FURTHER_CPUFREQ)
+> +		no_cpufreq_access = 0;
+> +	if (no_cpufreq_access == 1) {
+> +#ifdef CONFIG_PM_VERBOSE
+> +		printk(KERN_ERR "%s:%d denied access to %s as it is disabled"
+> +			       " temporarily\n", __FILE__, __LINE__, __func__);
+
+Use pr_err(...)
+
+> +#endif
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +	if (relation & DISABLE_FURTHER_CPUFREQ)
+> +		no_cpufreq_access = 1;
+> +	relation &= ~MASK_FURTHER_CPUFREQ;
+> +#endif
+> +
+> +	s3c_freqs.freqs.old = s5pv210_getspeed(0);
+> +
+> +	if (cpufreq_frequency_table_target(policy, s5pv210_freq_table,
+> +				target_freq, relation, &index)) {
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +#ifdef CPUFREQ_DISABLE_100MHZ
+> +	if (index == L4)
+> +		index = L3;
+> +#endif
+> +#ifdef CPUFREQ_DISABLE_1GHZ
+> +	if (index == L0)
+> +		index = L1;
+> +#endif
+> +
+> +	arm_clk = s5pv210_freq_table[index].frequency;
+> +
+> +	s3c_freqs.freqs.new = arm_clk;
+> +	s3c_freqs.freqs.cpu = 0;
+> +
+> +	if (s3c_freqs.freqs.new == s3c_freqs.freqs.old &&
+> +			initialized >= 2)
+> +		return 0;
+> +	else if (initialized < 2)
+> +		initialized++;
+> +
+> +	arm_volt = s5pv210_dvs_conf[index].arm_volt;
+> +	int_volt = s5pv210_dvs_conf[index].int_volt;
+> +
+> +	/* iNew clock information update */
+> +	memcpy(&s3c_freqs.new, &s5pv210_clk_info[index],
+> +			sizeof(struct s3c_freq));
+> +
+> +	if (s3c_freqs.freqs.new >= s3c_freqs.freqs.old) {
+> +		/* Voltage up code: increase ARM first */
+> +		if (!IS_ERR_OR_NULL(arm_regulator) &&
+> +				!IS_ERR_OR_NULL(internal_regulator)) {
+> +			regulator_set_voltage(arm_regulator,
+> +					arm_volt, arm_volt_max);
+> +			regulator_set_voltage(internal_regulator,
+> +					int_volt, int_volt_max);
+> +		}
+> +	}
+> +	cpufreq_notify_transition(&s3c_freqs.freqs, CPUFREQ_PRECHANGE);
+> +
+> +	if (s3c_freqs.new.fclk != s3c_freqs.old.fclk || initialized < 2)
+> +		pll_changing = 1;
+> +
+> +	if (s3c_freqs.new.hclk_msys != s3c_freqs.old.hclk_msys ||
+> +			initialized < 2)
+> +		bus_speed_changing = 1;
+> +
+> +	if (bus_speed_changing) {
+> +		/* Reconfigure DRAM refresh counter value for minimum
+> +		 * temporary clock while changing divider.
+> +		 * expected clock is 83MHz: 7.8usec/(1/83MHz) = 0x287
+> +		 **/
+> +		if (pll_changing)
+> +			__raw_writel(0x287, S5P_VA_DMC1 + 0x30);
+> +		else
+> +			__raw_writel(0x30c, S5P_VA_DMC1 + 0x30);
+> +
+> +		__raw_writel(0x287, S5P_VA_DMC0 + 0x30);
+> +	}
+> +
+> +	/* APLL should be changed in this level
+> +	 * APLL -> MPLL(for stable transition) -> APLL
+> +	 * Some clock source's clock API  are not prepared. Do not use clock API
+> +	 * in below code.
+> +	 */
+> +	if (pll_changing)
+> +		s5pv210_target_APLL2MPLL(index, bus_speed_changing);
+> +
+> +	/* ARM MCS value changed */
+> +	if (index != L4) {
+> +		reg = __raw_readl(S5P_ARM_MCS_CON);
+> +		reg &= ~0x3;
+> +		reg |= 0x1;
+> +		__raw_writel(reg, S5P_ARM_MCS_CON);
+> +	}
+> +
+> +	reg = __raw_readl(S5P_CLK_DIV0);
+> +
+> +	reg &= ~(S5P_CLKDIV0_APLL_MASK | S5P_CLKDIV0_A2M_MASK
+> +			| S5P_CLKDIV0_HCLK200_MASK | S5P_CLKDIV0_PCLK100_MASK
+> +			| S5P_CLKDIV0_HCLK166_MASK | S5P_CLKDIV0_PCLK83_MASK
+> +			| S5P_CLKDIV0_HCLK133_MASK | S5P_CLKDIV0_PCLK66_MASK);
+> +
+> +	reg |= ((clkdiv_val[index][0]<<S5P_CLKDIV0_APLL_SHIFT)
+> +			| (clkdiv_val[index][1] << S5P_CLKDIV0_A2M_SHIFT)
+> +			| (clkdiv_val[index][2] << S5P_CLKDIV0_HCLK200_SHIFT)
+> +			| (clkdiv_val[index][3] << S5P_CLKDIV0_PCLK100_SHIFT)
+> +			| (clkdiv_val[index][4] << S5P_CLKDIV0_HCLK166_SHIFT)
+> +			| (clkdiv_val[index][5] << S5P_CLKDIV0_PCLK83_SHIFT)
+> +			| (clkdiv_val[index][6] << S5P_CLKDIV0_HCLK133_SHIFT)
+> +			| (clkdiv_val[index][7] << S5P_CLKDIV0_PCLK66_SHIFT));
+> +
+> +	__raw_writel(reg, S5P_CLK_DIV0);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_DIV_STAT0);
+> +	} while (reg & 0xff);
+> +
+> +	/* ARM MCS value changed */
+> +	if (index == L4) {
+> +		reg = __raw_readl(S5P_ARM_MCS_CON);
+> +		reg &= ~0x3;
+> +		reg |= 0x3;
+> +		__raw_writel(reg, S5P_ARM_MCS_CON);
+> +	}
+> +
+> +	if (pll_changing)
+> +		s5pv210_target_MPLL2APLL(index, bus_speed_changing);
+> +
+> +	/* L4 level need to change memory bus speed,
+> +	 * hence onedram clock divier and
+> +	 * memory refresh parameter should be changed
+> +	 */
+> +	if (bus_speed_changing) {
+> +		reg = __raw_readl(S5P_CLK_DIV6);
+> +		reg &= ~S5P_CLKDIV6_ONEDRAM_MASK;
+> +		reg |= (clkdiv_val[index][8] << S5P_CLKDIV6_ONEDRAM_SHIFT);
+> +		/* ONEDRAM Clock Divider Ratio: 7 for L4, 3 for Others */
+> +		__raw_writel(reg, S5P_CLK_DIV6);
+> +
+> +		do {
+> +			reg = __raw_readl(S5P_CLK_DIV_STAT1);
+> +		} while (reg & (1 << 15));
+> +
+> +		/* Reconfigure DRAM refresh counter value */
+> +		if (index != L4) {
+> +			/* DMC0: 166MHz
+> +			 * DMC1: 200MHz
+> +			 **/
+> +			__raw_writel(0x618, S5P_VA_DMC1 + 0x30);
+> +#if !defined(CONFIG_S5PC110_H_TYPE)
+> +			__raw_writel(0x50e, S5P_VA_DMC0 + 0x30);
+> +#else
+> +			__raw_writel(0x618, S5P_VA_DMC0 + 0x30);
+> +#endif
+> +		} else {
+> +			/* DMC0: 83MHz
+> +			 * DMC1: 100MHz
+> +			 **/
+> +			__raw_writel(0x30c, S5P_VA_DMC1 + 0x30);
+> +			__raw_writel(0x287, S5P_VA_DMC0 + 0x30);
+> +		}
+> +	}
+> +
+> +	if (s3c_freqs.freqs.new < s3c_freqs.freqs.old) {
+> +		/* Voltage down: decrease INT first.*/
+> +		if (!IS_ERR_OR_NULL(arm_regulator) &&
+> +				!IS_ERR_OR_NULL(internal_regulator)) {
+> +			regulator_set_voltage(internal_regulator,
+> +					int_volt, int_volt_max);
+> +			regulator_set_voltage(arm_regulator,
+> +					arm_volt, arm_volt_max);
+> +		}
+> +	}
+> +	cpufreq_notify_transition(&s3c_freqs.freqs, CPUFREQ_POSTCHANGE);
+> +
+> +	memcpy(&s3c_freqs.old, &s3c_freqs.new, sizeof(struct s3c_freq));
+> +#ifdef CONFIG_CPU_FREQ_DEBUG
+> +	printk(KERN_INFO "cpufreq: Performance changed[L%d]\n", index);
+
+pr_info
+
+> +#endif
+> +	previous_arm_volt = s5pv210_dvs_conf[index].arm_volt;
+> +out:
+> +	return ret;
+> +}
+> +
+> +
+> +#ifdef CONFIG_PM
+> +static int previous_frequency;
+> +
+> +static int s5pv210_cpufreq_suspend(struct cpufreq_policy *policy,
+> +		pm_message_t pmsg)
+> +{
+> +	int ret = 0;
+> +	printk(KERN_INFO "cpufreq: Entering suspend.\n");
+
+pr_info
+
+> +
+> +	previous_frequency = cpufreq_get(0);
+> +	ret = __cpufreq_driver_target(cpufreq_cpu_get(0), SLEEP_FREQ,
+> +			DISABLE_FURTHER_CPUFREQ);
+> +	return ret;
+> +}
+> +
+> +static int s5pv210_cpufreq_resume(struct cpufreq_policy *policy)
+> +{
+> +	int ret = 0;
+> +	u32 rate;
+> +	int level = CPUFREQ_TABLE_END;
+> +	int i;
+> +
+> +	printk(KERN_INFO "cpufreq: Waking up from a suspend.\n");
+
+pr_info
+
+> +
+> +	__cpufreq_driver_target(cpufreq_cpu_get(0), previous_frequency,
+> +			ENABLE_FURTHER_CPUFREQ);
+> +
+> +	/* Clock information update with wakeup value */
+> +	rate = clk_get_rate(mpu_clk);
+> +
+> +	i = 0;
+> +	while (s5pv210_freq_table[i].frequency != CPUFREQ_TABLE_END) {
+> +		if (s5pv210_freq_table[i].frequency * 1000 == rate) {
+> +			level = s5pv210_freq_table[i].index;
+> +			break;
+> +		}
+> +		i++;
+> +	}
+> +
+> +	if (level == CPUFREQ_TABLE_END) { /* Not found */
+> +		printk(KERN_ERR "[%s:%d] clock speed does not match: "
+> +				"%d. Using L1 of 800MHz.\n",
+> +				__FILE__, __LINE__, rate);
+
+pr_err
+
+> +		level = L1;
+> +	}
+> +
+> +	memcpy(&s3c_freqs.old, &s5pv210_clk_info[level],
+> +			sizeof(struct s3c_freq));
+> +	previous_arm_volt = s5pv210_dvs_conf[level].arm_volt;
+> +	return ret;
+> +}
+> +#endif
+> +
+> +
+> +static int __init s5pv210_cpu_init(struct cpufreq_policy *policy)
+> +{
+> +	u32 rate ;
+> +	int i, level = CPUFREQ_TABLE_END;
+> +
+> +	printk(KERN_INFO "S5PV210 CPUFREQ %s:%d\n", __FILE__, __LINE__);
+
+pr_info
+
+> +#ifdef CONFIG_PM
+> +	no_cpufreq_access = 0;
+> +#endif
+> +#ifdef CLK_OUT_PROBING
+> +	reg = __raw_readl(S5P_CLK_OUT);
+> +	reg &= ~(0x1f << 12 | 0xf << 20); /* CLKSEL and DIVVAL*/
+> +	reg |= (0xf << 12 | 0x1 << 20); /* CLKSEL = ARMCLK/4, DIVVAL = 1 */
+> +	/* Result = ARMCLK / 4 / ( 1 + 1 ) */
+> +	__raw_writel(reg, S5P_CLK_OUT);
+> +#endif
+> +	mpu_clk = clk_get(NULL, MPU_CLK);
+> +	if (IS_ERR(mpu_clk)) {
+> +		printk(KERN_ERR "S5PV210 CPUFREQ cannot get MPU_CLK(%s)\n",
+> +				MPU_CLK);
+
+pr_err
+
+> +		return PTR_ERR(mpu_clk);
+> +	}
+> +
+> +	if (policy->cpu != 0) {
+> +		printk(KERN_ERR "S5PV210 CPUFREQ cannot get proper cpu(%d)\n",
+> +				policy->cpu);
+
+pr_err
+
+> +		return -EINVAL;
+> +	}
+> +	policy->cur = policy->min = policy->max = s5pv210_getspeed(0);
+> +
+> +	cpufreq_frequency_table_get_attr(s5pv210_freq_table, policy->cpu);
+> +
+> +	policy->cpuinfo.transition_latency = 40000;	/*1us*/
+> +
+> +	rate = clk_get_rate(mpu_clk);
+> +	i = 0;
+> +
+> +	while (s5pv210_freq_table[i].frequency != CPUFREQ_TABLE_END) {
+> +		if (s5pv210_freq_table[i].frequency * 1000 == rate) {
+> +			level = s5pv210_freq_table[i].index;
+> +			break;
+> +		}
+> +		i++;
+> +	}
+> +
+> +	if (level == CPUFREQ_TABLE_END) { /* Not found */
+> +		printk(KERN_ERR "[%s:%d] clock speed does not match: "
+> +				"%d. Using L1 of 800MHz.\n",
+> +				__FILE__, __LINE__, rate);
+> +		level = L1;
+> +	}
+> +
+> +	printk(KERN_INFO "S5PV210 CPUFREQ Initialized.\n");
+
+pr_info
+
+> +
+> +	memcpy(&s3c_freqs.old, &s5pv210_clk_info[level],
+> +			sizeof(struct s3c_freq));
+> +	previous_arm_volt = s5pv210_dvs_conf[level].arm_volt;
+> +
+> +	return cpufreq_frequency_table_cpuinfo(policy, s5pv210_freq_table);
+> +}
+> +
+> +static struct cpufreq_driver s5pv210_driver = {
+> +	.flags		= CPUFREQ_STICKY,
+> +	.verify		= s5pv210_verify_speed,
+> +	.target		= s5pv210_target,
+> +	.get		= s5pv210_getspeed,
+> +	.init		= s5pv210_cpu_init,
+> +	.name		= "s5pv210",
+> +#ifdef CONFIG_PM
+> +	.suspend	= s5pv210_cpufreq_suspend,
+> +	.resume		= s5pv210_cpufreq_resume,
+> +#endif
+> +};
+> +
+> +static int __init s5pv210_cpufreq_init(void)
+> +{
+> +	printk(KERN_INFO "S5PV210 CPUFREQ Init.\n");
+
+pr_info
+Also, I guess one banner is enough?
+
+> +	arm_regulator = regulator_get_exclusive(NULL, "vddarm");
+> +	if (IS_ERR(arm_regulator)) {
+> +		printk(KERN_ERR "failed to get regulater resource vddarm\n");
+> +		goto error;
+> +	}
+> +	internal_regulator = regulator_get_exclusive(NULL, "vddint");
+> +	if (IS_ERR(internal_regulator)) {
+> +		printk(KERN_ERR "failed to get regulater resource vddint\n");
+> +		goto error;
+> +	}
+> +	goto finish;
+> +error:
+> +	printk(KERN_WARNING "Cannot get vddarm or vddint. CPUFREQ Will not"
+> +		       " change the voltage.\n");
+
+pr_warn
+
+> +finish:
+> +	return cpufreq_register_driver(&s5pv210_driver);
+> +}
+> +
+> +late_initcall(s5pv210_cpufreq_init);
+> diff --git a/arch/arm/mach-s5pv210/include/mach/cpu-freq.h b/arch/arm/mach-s5pv210/include/mach/cpu-freq.h
+> new file mode 100644
+> index 0000000..d3c31b2
+> --- /dev/null
+> +++ b/arch/arm/mach-s5pv210/include/mach/cpu-freq.h
+> @@ -0,0 +1,50 @@
+> +/* arch/arm/mach-s5pv210/include/mach/cpu-freq.h
+> + *
+> + * Copyright (c) 2010 Samsung Electronics
+> + *
+> + * 	MyungJoo Ham <myungjoo.ham@samsung.com>
+> + *
+> + * S5PV210/S5PC110 CPU frequency scaling support
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#ifndef _ARCH_ARM_MACH_S5PV210_INCLUDE_MACH_CPU_FREQ_H_
+> +#define _ARCH_ARM_MACH_S5PV210_INCLUDE_MACH_CPU_FREQ_H_
+> +
+> +#include <linux/cpufreq.h>
+> +
+> +#ifdef CONFIG_CPU_S5PV210
+> +
+> +#define USE_FREQ_TABLE
+> +
+> +#define KHZ_T           1000
+> +
+> +#define MPU_CLK         "armclk"
+> +
+> +enum perf_level {
+> +	L0 = 0,
+> +	L1,
+> +	L2,
+> +	L3,
+> +	L4,
+> +};
+> +
+> +#define CLK_DIV0_MASK   ((0x7<<0)|(0x7<<8)|(0x7<<12))   /* APLL,HCLK_MSYS,PCLK_MSYS mask value  */
+> +
+> +#ifdef CONFIG_PM
+> +#define SLEEP_FREQ      (800 * 1000) /* Use 800MHz when entering sleep */
+> +
+> +/* additional symantics for "relation" in cpufreq with pm */
+> +#define DISABLE_FURTHER_CPUFREQ         0x10
+> +#define ENABLE_FURTHER_CPUFREQ          0x20
+> +#define MASK_FURTHER_CPUFREQ            0x30
+> +/* With 0x00(NOCHANGE), it depends on the previous "further" status */
+> +
+> +#endif
+> +
+> +
+> +#endif /* CONFIG_CPU_S5PV210 */
+> +#endif /* _ARCH_ARM_MACH_S5PV210_INCLUDE_MACH_CPU_FREQ_H_ */
+
+
+-- 
+Maurus Cuelenaere
