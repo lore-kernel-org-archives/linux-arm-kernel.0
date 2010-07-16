@@ -1,41 +1,58 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 16 Jul 2010 09:02:57 +0200
-Subject: [PATCHv6] mx2_camera: Add soc_camera support for i.MX25/i.MX27
-In-Reply-To: <Pine.LNX.4.64.1007111315560.30182@axis700.grange>
-References: <40ccd21d0e857660038d193af3bb4cc6edd1067d.1278218817.git.baruch@tkos.co.il>
-	<Pine.LNX.4.64.1007111315560.30182@axis700.grange>
-Message-ID: <20100716070257.GH14113@pengutronix.de>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 16 Jul 2010 09:19:24 +0200
+Subject: [PATCH] ARM/nuc900: fix nuc900 touchscreen clk definition bug
+In-Reply-To: <AANLkTinEqScq2E0MSRJrUN5fR-1rs8fB9rLgMdhYW9R6@mail.gmail.com>
+References: <4C3FCBFF.50506@gmail.com>
+	<201007160709.15385.marek.vasut@gmail.com>
+	<AANLkTinEqScq2E0MSRJrUN5fR-1rs8fB9rLgMdhYW9R6@mail.gmail.com>
+Message-ID: <201007160919.24927.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 11, 2010 at 01:18:27PM +0200, Guennadi Liakhovetski wrote:
-> On Sun, 4 Jul 2010, Baruch Siach wrote:
-> 
-> > This is the soc_camera support developed by Sascha Hauer for the i.MX27.  Alan
-> > Carvalho de Assis modified the original driver to get it working on more recent
-> > kernels. I modified it further to add support for i.MX25. This driver has been
-> > tested on i.MX25 and i.MX27 based platforms.
+Dne P? 16. ?ervence 2010 07:34:21 Wan ZongShun napsal(a):
+> 2010/7/16 Marek Vasut <marek.vasut@gmail.com>:
+> > Dne P? 16. ?ervence 2010 05:03:27 Wan ZongShun napsal(a):
+> >> This patch is to fix nuc900 touchscreen clk definition bug,the .dev_id's
+> >> name should be 'nuc900-ts', it should be the same to pdev.name. or else,
+> >> the touchscreen driver will be not working well due to clock engine
+> >> disabled.
+> >> 
+> >> Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+> >> ---
+> >>  arch/arm/mach-w90x900/cpu.c |    2 +-
+> >>  1 files changed, 1 insertions(+), 1 deletions(-)
+> >> 
+> >> diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
+> >> index 642207e..83c5632 100644
+> >> --- a/arch/arm/mach-w90x900/cpu.c
+> >> +++ b/arch/arm/mach-w90x900/cpu.c
+> >> @@ -93,7 +93,7 @@ static struct clk_lookup nuc900_clkregs[] = {
+> >>       DEF_CLKLOOK(&clk_kpi, "nuc900-kpi", NULL),
+> >>       DEF_CLKLOOK(&clk_wdt, "nuc900-wdt", NULL),
+> >>       DEF_CLKLOOK(&clk_gdma, "nuc900-gdma", NULL),
+> >> -     DEF_CLKLOOK(&clk_adc, "nuc900-adc", NULL),
+> >> +     DEF_CLKLOOK(&clk_adc, "nuc900-ts", NULL),
+> >>       DEF_CLKLOOK(&clk_usi, "nuc900-spi", NULL),
+> >>       DEF_CLKLOOK(&clk_ext, NULL, "ext"),
+> >>       DEF_CLKLOOK(&clk_timer0, NULL, "timer0"),
 > > 
-> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> > Hey,
+> > 
+> > Is that thing really touchscreen or general-purpose analog/digital
+> > converter ?
 > 
-> So, who shall be taking this patch? I'd prefer it go via ARM. Then you can 
-> easier satisfy any dependencies and enforce a certain patch order. It has 
-> my ack, just verified v6 - my ack still holds (I hope, Baruch did 
-> compile-test this new version on various i.MX2x versions). However, if you 
-> prefer, I can also take it via soc-camera / v4l. Sascha, what's your take?
+> Oh, it is general-purpose analog/digital converter controller.
+> I only use it to implemnt my touchscreen function, Also it can be use
+> other function.
+> 
+> so, I have to change my touchscreen driver name to nuc900-adc?
 
-There won't be conflicts when this goes over v4l, but otoh if Baruch
-plans to add board support till the next window the platform_data will
-be missing and my tree won't compile. So it's probably best to push it
-through the i.MX tree.
+No, just change the name of clock in the touchscreen driver. So that the 
+touchscreen driver will use nuc900-adc clocksource.
 
-Will apply this afternoon if noone objects.
+You're welcome. :)
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+> Thanks for your Reminder, I appreciate it. :)
+> 
+> > Cheers
