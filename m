@@ -1,79 +1,62 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Fri, 16 Jul 2010 17:05:11 +0800
-Subject: [PATCH] ARM/nuc900: add nuc900 keypad arch platform data
-Message-ID: <4C4020C7.2060001@gmail.com>
+From: lee.jones@canonical.com (Lee Jones)
+Date: Fri, 16 Jul 2010 10:08:26 +0100
+Subject: [PATCH] Stop ARM boards crashing when CUPS is loaded -	2.6.35-rc5
+In-Reply-To: <20100715200618.GA6773@n2100.arm.linux.org.uk>
+References: <4C3C72C6.4000005@canonical.com>
+	<20100715130214.4c9303b2.akpm@linux-foundation.org>
+	<20100715200618.GA6773@n2100.arm.linux.org.uk>
+Message-ID: <4C40218A.4090806@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to add nuc900 keypad arch platform data.
+On 15/07/10 21:06, Russell King - ARM Linux wrote:
+> On Thu, Jul 15, 2010 at 01:02:14PM -0700, Andrew Morton wrote:
+>>> BugLink: http://bugs.launchpad.net/bugs/601226
+>>>
+>>> When CUPS loads, it tries to load several drivers that it may need.
+>>> When one of these drivers, specifically parport_pc is loaded on ARM
+>>> based systems, it causes a segmentation fault as the ISA addresses
+>>> which are attempted are not writable on non-PC based architectures.
+>>> This code prevents ISA addresses from being attempted except on x86.
+>>>
+>>
+>> That sounds like a pretty serious problem.  But presumably it isn't -
+>> otherwise it would have been fixed earlier!
 
-Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+Well it is a problem on OMAP based boards.
 
----
- arch/arm/mach-w90x900/dev.c |   37 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 37 insertions(+), 0 deletions(-)
+I've personally tested it on OMAP3 and OMAP4 based machines. 
 
-diff --git a/arch/arm/mach-w90x900/dev.c b/arch/arm/mach-w90x900/dev.c
-index 73b3eca..7ae5438 100644
---- a/arch/arm/mach-w90x900/dev.c
-+++ b/arch/arm/mach-w90x900/dev.c
-@@ -37,6 +37,7 @@
- #include <mach/map.h>
- #include <mach/fb.h>
- #include <mach/regs-ldm.h>
-+#include <mach/w90p910_keypad.h>
+Perhaps the memory is not reserved correctly.
 
- #include "cpu.h"
+>> So what actions are required to trigger this bug and why aren't others
+>> seeing it?
 
-@@ -362,6 +363,39 @@ struct platform_device nuc900_device_fmi = {
+Probably because most other chips either manage to reserve the memory 
+successfully, or do not attempt to load the parport_pc driver, either as
+a module or built-in.
 
- /* KPI controller*/
+All I have to do to recreate this bug is load the module or build in the
+parport_pc driver.
 
-+static int nuc900_keymap[] = {
-+	KEY(0, 0, KEY_A),
-+	KEY(0, 1, KEY_B),
-+	KEY(0, 2, KEY_C),
-+	KEY(0, 3, KEY_D),
-+
-+	KEY(1, 0, KEY_E),
-+	KEY(1, 1, KEY_F),
-+	KEY(1, 2, KEY_G),
-+	KEY(1, 3, KEY_H),
-+
-+	KEY(2, 0, KEY_I),
-+	KEY(2, 1, KEY_J),
-+	KEY(2, 2, KEY_K),
-+	KEY(2, 3, KEY_L),
-+
-+	KEY(3, 0, KEY_M),
-+	KEY(3, 1, KEY_N),
-+	KEY(3, 2, KEY_O),
-+	KEY(3, 3, KEY_P),
-+};
-+
-+static struct matrix_keymap_data nuc900_map_data = {
-+	.keymap			= nuc900_keymap,
-+	.keymap_size		= ARRAY_SIZE(nuc900_keymap),
-+};
-+
-+struct w90p910_keypad_platform_data nuc900_keypad_info = {
-+	.keymap_data	= &nuc900_map_data,
-+	.prescale	= 0xfa,
-+	.debounce	= 0x50,
-+};
-+
- static struct resource nuc900_kpi_resource[] = {
- 	[0] = {
- 		.start = W90X900_PA_KPI,
-@@ -381,6 +415,9 @@ struct platform_device nuc900_device_kpi = {
- 	.id		= -1,
- 	.num_resources	= ARRAY_SIZE(nuc900_kpi_resource),
- 	.resource	= nuc900_kpi_resource,
-+	.dev		= {
-+				.platform_data = &nuc900_keypad_info,
-+			}
- };
+> Note that we have machines which have ISA parallel ports, so it's not
+> this simple.
 
- /* LCD controller*/
--- 
-1.6.3.3
+Do they have ISA parallel ports, or do they just pretend to?
+
+I found this scattered about:
+
+/*
+ * We don't actually have real ISA nor PCI buses, but there is so many
+ * drivers out there that might just work if we fake them...
+ */
+
+Clearly parport_pc isn't one of them. :)
+
+> Why not just avoid selecting and building parport_pc on these machines?
+
+> I mean, the Beagleboard doesn't have PCI nor ISA, so why is parport_pc
+> being built for production use?
+
+I am happy to make a Kconfig change to disallow OMAP builds from building
+the parport_pc driver. Do you think this would be more sensible?
