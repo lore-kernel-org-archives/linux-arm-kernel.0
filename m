@@ -1,27 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 16 Jul 2010 17:03:41 +0100
-Subject: [RFC PATCH] Kconfig: Enable Kconfig fragments to be used for
-	defconfig
-In-Reply-To: <20100713230352.6781.18644.stgit@angua>
-References: <20100713230352.6781.18644.stgit@angua>
-Message-ID: <1279296221.17878.66.camel@e102109-lin.cambridge.arm.com>
+From: segooon@gmail.com (Kulikov Vasiliy)
+Date: Fri, 16 Jul 2010 20:12:46 +0400
+Subject: [PATCH 02/15] arm/mach-u300: check kmalloc result
+Message-ID: <1279296767-24823-1-git-send-email-segooon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-07-14 at 00:04 +0100, Grant Likely wrote:
-> - It still doesn't resolve dependencies.  A solver would help with this.
->   For the time being I work around the problem by running the generated
->   config through 'oldconfig' and looking for differences.  If the files
->   differ (ignoring comments and generateconfig_* options) after oldconfig,
->   then the <board>_defconfig target returns a failure.  (but leaves the
->   new .config intact so the user can resolve it with menuconfig).  This
->   way at least the user is told when a Kconfig fragment is invalid.
+If kmalloc() fails free already allocated memory and exit with -ENOMEM.
 
-It's not a solver but I'm pushing a patch to warn on selecting symbols
-with unmet dependencies so that you can select further symbols (manual
-solving). The patch is in linux-next but you also can grab it from:
+Signed-off-by: Kulikov Vasiliy <segooon@gmail.com>
+---
+ arch/arm/mach-u300/dummyspichip.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-2.6-cm.git;a=commitdiff_plain;h=5d87db2d2a332784bbf2b1ec3e141486f4d41d6f
-
+diff --git a/arch/arm/mach-u300/dummyspichip.c b/arch/arm/mach-u300/dummyspichip.c
+index 5f55012..452218a 100644
+--- a/arch/arm/mach-u300/dummyspichip.c
++++ b/arch/arm/mach-u300/dummyspichip.c
+@@ -64,6 +64,11 @@ static ssize_t dummy_looptest(struct device *dev,
+ 		goto out;
+ 	}
+ 	bigrxbuf_virtual = kmalloc(DMA_TEST_SIZE, GFP_KERNEL);
++	if (bigrxbuf_virtual == NULL) {
++		kfree(bigtxbuf_virtual);
++		status = -ENOMEM;
++		goto out;
++	}
+ 
+ 	/* Fill TXBUF with some happy pattern */
+ 	memset(bigtxbuf_virtual, 0xAA, DMA_TEST_SIZE);
 -- 
-Catalin
+1.7.0.4
