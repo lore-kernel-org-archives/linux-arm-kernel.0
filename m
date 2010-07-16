@@ -1,119 +1,76 @@
-From: myungjoo.ham@gmail.com (MyungJoo Ham)
-Date: Fri, 16 Jul 2010 17:12:54 +0900
-Subject: [PATCH] regulator: MAX8998: set_voltage bugfix. ramp_up delay and
-	min/max voltage
-In-Reply-To: <1279266388-6013-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1279266388-6013-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <AANLkTil-tdVVOS0HnLbPoAGNgh9IbUZSb5VDsRNF_1to@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 16 Jul 2010 09:17:07 +0100
+Subject: [PATCH 5/5] ARM: S5PV210: Initial CPUFREQ Support
+In-Reply-To: <AANLkTinrrXlh1GQ178_NzwWt5luO_1mdfIGy6G2ZNbPH@mail.gmail.com>
+References: <1279184768-28971-1-git-send-email-myungjoo.ham@samsung.com>
+	<1279184768-28971-2-git-send-email-myungjoo.ham@samsung.com>
+	<1279184768-28971-3-git-send-email-myungjoo.ham@samsung.com>
+	<1279184768-28971-4-git-send-email-myungjoo.ham@samsung.com>
+	<1279184768-28971-5-git-send-email-myungjoo.ham@samsung.com>
+	<1279184768-28971-6-git-send-email-myungjoo.ham@samsung.com>
+	<20100715115942.GA15919@sirena.org.uk>
+	<AANLkTinrrXlh1GQ178_NzwWt5luO_1mdfIGy6G2ZNbPH@mail.gmail.com>
+Message-ID: <20100716081707.GA9082@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please ignore this one. I'm sending again with CCs omitted here.
-Sorry for duplicated mails.
+On Fri, Jul 16, 2010 at 02:37:04PM +0900, MyungJoo Ham wrote:
+> On Thu, Jul 15, 2010 at 8:59 PM, Mark Brown
 
-On Fri, Jul 16, 2010 at 4:46 PM, MyungJoo Ham <myungjoo.ham@samsung.com> wrote:
-> Two issues are addressed for max8998_set_voltage function.
->
-> 1. Min/Max Voltage.
->
-> ? ? ? ?max8998_set_voltage had been using the voltage value of
->
-> ? ? ? ?min ( voltage[i] >= max_vol , i )
->
-> ? ? ? ?This is corrected to use:
->
-> ? ? ? ?min ( voltage[i] >= min_vol , i )
->
-> 2. Ramp Up Delay.
->
-> ? ? ? ?max8998_set_voltage should provide delay for BUCK1/2
-> if ENRAMP is on. It reads RAMP value from ONOFF4 register to determine
-> RAMP delay length. However, when max8998_set_voltage's new voltage is
-> lower than the previous, we don't care because it does not deteriorate
-> the stability.
->
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> ?drivers/regulator/max8998.c | ? 30 ++++++++++++++++++++++++++++--
-> ?1 files changed, 28 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/regulator/max8998.c b/drivers/regulator/max8998.c
-> index 1cca8b5..99c5279 100644
-> --- a/drivers/regulator/max8998.c
-> +++ b/drivers/regulator/max8998.c
-> @@ -28,6 +28,7 @@
-> ?#include <linux/slab.h>
-> ?#include <linux/interrupt.h>
-> ?#include <linux/mutex.h>
-> +#include <linux/delay.h>
-> ?#include <linux/platform_device.h>
-> ?#include <linux/regulator/driver.h>
-> ?#include <linux/mfd/max8998.h>
-> @@ -302,10 +303,13 @@ static int max8998_set_voltage(struct regulator_dev *rdev,
-> ? ? ? ?struct max8998_data *max8998 = rdev_get_drvdata(rdev);
-> ? ? ? ?struct i2c_client *i2c = max8998->iodev->i2c;
-> ? ? ? ?int min_vol = min_uV / 1000, max_vol = max_uV / 1000;
-> + ? ? ? int previous_vol = 0;
-> ? ? ? ?const struct voltage_map_desc *desc;
-> ? ? ? ?int ldo = max8998_get_ldo(rdev);
-> ? ? ? ?int reg, shift = 0, mask, ret;
-> ? ? ? ?int i = 0;
-> + ? ? ? u8 val;
-> + ? ? ? bool en_ramp = false;
->
-> ? ? ? ?if (ldo > ARRAY_SIZE(ldo_voltage_map))
-> ? ? ? ? ? ? ? ?return -EINVAL;
-> @@ -317,15 +321,37 @@ static int max8998_set_voltage(struct regulator_dev *rdev,
-> ? ? ? ?if (max_vol < desc->min || min_vol > desc->max)
-> ? ? ? ? ? ? ? ?return -EINVAL;
->
-> - ? ? ? while (desc->min + desc->step*i < max_vol &&
-> + ? ? ? while (desc->min + desc->step*i < min_vol &&
-> ? ? ? ? ? ? ? desc->min + desc->step*i < desc->max)
-> ? ? ? ? ? ? ? ?i++;
->
-> + ? ? ? if (desc->min + desc->step*i > max_vol)
-> + ? ? ? ? ? ? ? return -EINVAL;
-> +
-> ? ? ? ?ret = max8998_get_voltage_register(rdev, &reg, &shift, &mask);
-> ? ? ? ?if (ret)
-> ? ? ? ? ? ? ? ?return ret;
->
-> - ? ? ? return max8998_update_reg(i2c, reg, i<<shift, mask<<shift);
-> + ? ? ? /* wait for RAMP_UP_DELAY if rdev is BUCK1/2 and
-> + ? ? ? ?* ENRAMP is ON */
-> + ? ? ? if (ldo == MAX8998_BUCK1 || ldo == MAX8998_BUCK2) {
-> + ? ? ? ? ? ? ? max8998_read_reg(i2c, MAX8998_REG_ONOFF4, &val);
-> + ? ? ? ? ? ? ? if (val & (1 << 4)) {
-> + ? ? ? ? ? ? ? ? ? ? ? en_ramp = true;
-> + ? ? ? ? ? ? ? ? ? ? ? previous_vol = max8998_get_voltage(rdev);
-> + ? ? ? ? ? ? ? }
-> + ? ? ? }
-> +
-> + ? ? ? ret = max8998_update_reg(i2c, reg, i<<shift, mask<<shift);
-> +
-> + ? ? ? if (en_ramp == true) {
-> + ? ? ? ? ? ? ? int difference = desc->min + desc->step * i
-> + ? ? ? ? ? ? ? ? ? ? ? - previous_vol / 1000;
-> + ? ? ? ? ? ? ? if (difference > 0)
-> + ? ? ? ? ? ? ? ? ? ? ? udelay(difference / ((val & 0x0f) + 1));
-> + ? ? ? }
-> +
-> + ? ? ? return ret;
-> ?}
->
-> ?static struct regulator_ops max8998_ldo_ops = {
-> --
-> 1.6.3.3
->
->
+> > Doing this through the regulator API avoids hard coding details of an
+> > individual regulator in your driver and ensures that all users of this
+> > regulator can handle the ramp rate.
 
+> Making regulator API wait for the ramp up seems to be something like
+> "synchronous I/O", which in turn, forces CPU to do nothing while CPU
+> may execute some instructions while waiting for the ramp up. However,
 
+Yeah, I know, but even if the actual delay is implemented in the
+consumer driver the ramp time should still be being queried via the
+regulator API so that the details of the specific device aren't hard
+coded into the consumer.  In any case as you say...
 
--- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+> we just do udelay() anyway; thus, it doesn't matter for us as well.
+> I'll try to put those udelay into MAX8998 PMIC drivers, which is for
+> S5PV210. I'll remove these udelay and PMIC_RAMP)UP from cpufreq driver
+> with the next version.
+
+...the ramp times are usually vanishingly small so the overwhelming
+majority of consumers probably don't care anyway.  If it's a problem we
+can add an interface which doesn't do the delay automatically but for
+most users it's going to be simpler to just deal with it transparently.
+
+> >> + ? ? ? ? ? ? ? ? ? ? ? regulator_set_voltage(arm_regulator,
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? arm_volt, arm_volt);
+
+> > You shouldn't be specifying an exact voltage here - there's no guarantee
+> > that the exact voltage you request will be delivered by the regulator,
+> > and some boards may wish to use constraints to eliminate some voltages
+> > (eg, to restrict the maximum operating point for the CPU).
+
+> > What you'd normally have here is that the minimum voltage would be the
+> > desired operating point for the CPU and the maximum voltage would be
+> > fixed at the maximum rated supply for the part. ?This will allow the
+> > regulator API to select the lowest voltage it is able to deliver.
+
+> Currently, there is a bug in MAX8998 PMIC driver that sets VDDARM to
+> minimum possible voltage that is LARGER THAN or EQUAL TO max_vol, not
+> min_vol. I'll correct set_voltage usage of CPUFREQ assuming that
+> bugfix for MAX8998 PMIC driver is sent. (Joonyoung Shim, who's just
+> started submitting MAX8998 PMIC driver, know about this issue and will
+> probably send a patch soon.)
+
+Oh, fail.  Like you say that's a bug in the regulator driver which will
+hopefully be fixed before this gets merged.
+
+> Besides, the whole section enclosed by this CONFIG_REGULATOR will be removed.
+
+> A while ago, WM8994 had been using CLK_OUT as the clock source with
+> APLL dependent setting; thus "target" function accessed CLK_OUT when
+> APLL changed. However, it no longer uses APLL dependent clock source
+> and we no longer access CLK_OUT at the "target" function; thus, this
+> code in "init" function can be removed.
+
+Ah, OK.  If other people use that sort of clocking scheme we will need
+to come up with a reasonable way of coping with it, but let's save that
+for when the problem arises.
