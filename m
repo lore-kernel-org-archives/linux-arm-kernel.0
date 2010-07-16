@@ -1,120 +1,198 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 16 Jul 2010 08:24:26 +0200
-Subject: [PATCH v3] Samsung: sdhci-s3c: add support for new card detection
-	methods
-In-Reply-To: <20100715133954.7fcb797a.akpm@linux-foundation.org>
-References: <1279181721-23333-1-git-send-email-m.szyprowski@samsung.com>
-	<20100715133954.7fcb797a.akpm@linux-foundation.org>
-Message-ID: <011401cb24af$8eb2cb70$ac186250$%szyprowski@samsung.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Fri, 16 Jul 2010 15:00:07 +0800
+Subject: [PATCH] ARM/nuc900: re-organize the nuc900 lcd arch platform data
+	setting
+Message-ID: <4C400377.3020408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The patch re-organizes the nuc900 lcd arch platform data,
+remove the lcd platform data setting from nuc950.c to dev.c
 
-On Thursday, July 15, 2010 10:40 PM Andrew Morton wrote:
+It can maximize the share codes between nuc900 series MCUs.
 
-> On Thu, 15 Jul 2010 10:15:21 +0200
-> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> 
-> > On some Samsung SoCs not all SDHCI controllers have card detect (CD)
-> > line. For some embedded designs it is not even needed, because ususally
-> > the device (like SDIO flash memory or wifi controller) is permanently
-> > wired to the controller. There are also systems which have a card detect
-> > line connected to some of the external interrupt lines or the presence
-> > of the card depends on some other actions (like enabling a power
-> > regulator).
-> >
-> > This patch adds support for all these cases. The following card
-> > detection methods are possible:
-> >
-> > 1. internal sdhci host card detect line
-> > 2. external event
-> > 3. external gpio interrupt
-> > 4. no card detect line, controller will poll for the card
-> > 5. no card detect line, card is permanently wired to the controller
-> > (once detected host won't poll it any more)
-> >
-> > By default, all existing code would use method #1, what is compatible
-> > with the previous version of the driver.
-> >
-> > In case of external event, two callbacks must be provided in platdata:
-> > ext_cd_init and ext_cd_cleanup. Both of them get a callback to a
-> > function that notifies the s3c-sdhci host contoller as their argument.
-> > That callback function should be called from the even dispatcher to let
-> > host notice the card insertion/removal.
-> >
-> > In case of external gpio interrupt, a gpio pin number must be provided
-> > in platdata (ext_cd_gpio parameter), as well as the information about
-> > the polarity of that gpio pin (ext_cd_gpio_invert). By default
-> > (ext_cd_gpio_invert == 0) gpio value 0 means 'card has been removed',
-> > but this can be changed to 'card has been removed' when
-> > ext_cd_gpio_invert == 1.
-> >
-> > This patch adds all required changes to platform support code.
-> >
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >
-> > This a resend of the previous patch. Relevant patches for sdhci-s3c
-> > driver has been posted in a separate patch series for easier merging,
-> > please refer to the "[PATCH] SDHCI-S3C fixes and enhancements (driver
-> > specific code)" thread. They have been already taken by Andrew Morton
-> > into his patch tracking tree.
-> >
-> > I hope these changes to platform specific code gets merged soon, so the
-> > changes to the driver can be merged as well.
-> >
-> > The patch has been prepared for the following git tree:
-> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> for-next
-> >
-> > Changes since V2:
-> > - added support for HSMMC3 device
-> >
-> > Changes since V1:
-> > - added support for gpio external interrupt card based detect method
-> >   directly to sdhci-s3c driver
-> > - removed s3c64xx compilation fix patch from the series
-> >
-> > Best regards
-> > --
-> > Marek Szyprowski
-> > Samsung Poland R&D Center
-> >
-> > ---
-> >
-> >  arch/arm/mach-s3c64xx/setup-sdhci-gpio.c   |   14 +++++++++---
-> >  arch/arm/mach-s5pc100/setup-sdhci-gpio.c   |   21 ++++++++++++++-----
-> >  arch/arm/mach-s5pv210/setup-sdhci-gpio.c   |   22 +++++++++++++++-----
-> >  arch/arm/plat-samsung/dev-hsmmc.c          |    5 ++++
-> >  arch/arm/plat-samsung/dev-hsmmc1.c         |    5 ++++
-> >  arch/arm/plat-samsung/dev-hsmmc2.c         |    5 ++++
-> >  arch/arm/plat-samsung/dev-hsmmc3.c         |    5 ++++
-> >  arch/arm/plat-samsung/include/plat/sdhci.h |   29
-> ++++++++++++++++++++++++++++
-> >  8 files changed, 90 insertions(+), 16 deletions(-)
-> 
-> This is quite confusing.  You've already sent a patch called
-> "sdhci-s3c: add support for new card detection methods".  It had the
-> same changelog as this patch and the same title, but the two patches
-> are utterly different!
+Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+---
+ arch/arm/mach-w90x900/dev.c            |   55 +++++++++++++++++++++++---------
+ arch/arm/mach-w90x900/mach-nuc950evb.c |   44 -------------------------
+ arch/arm/mach-w90x900/nuc910.c         |    1 +
+ arch/arm/mach-w90x900/nuc950.c         |    2 -
+ 4 files changed, 41 insertions(+), 61 deletions(-)
 
-The real patch has been split into two for easier merging: 1. the driver
-part and 2. samsung platform related part. The part which patch belongs
-to is indicated in the last line of the change log.
+diff --git a/arch/arm/mach-w90x900/dev.c b/arch/arm/mach-w90x900/dev.c
+index b2eda4d..73b3eca 100644
+--- a/arch/arm/mach-w90x900/dev.c
++++ b/arch/arm/mach-w90x900/dev.c
+@@ -36,6 +36,7 @@
+ #include <mach/nuc900_spi.h>
+ #include <mach/map.h>
+ #include <mach/fb.h>
++#include <mach/regs-ldm.h>
 
-I'm really confused how to submit properly a patch that requires changes
-to both the driver (which is merged by the proper driver maintainer's
-sub-tree) and the platform (which should go through platform maintainer's
-tree).
+ #include "cpu.h"
 
-> I suggest that you resend this patch under an appropriate title and
-> with a more specific changelog, please.
+@@ -382,7 +383,44 @@ struct platform_device nuc900_device_kpi = {
+ 	.resource	= nuc900_kpi_resource,
+ };
 
-Ok, I will add something like "(platform changes)" to the patch title next time.
+-#ifdef CONFIG_FB_NUC900
++/* LCD controller*/
++
++static struct nuc900fb_display __initdata nuc900_lcd_info[] = {
++	/* Giantplus Technology GPM1040A0 320x240 Color TFT LCD */
++	[0] = {
++		.type		= LCM_DCCS_VA_SRC_RGB565,
++		.width		= 320,
++		.height		= 240,
++		.xres		= 320,
++		.yres		= 240,
++		.bpp		= 16,
++		.pixclock	= 200000,
++		.left_margin	= 34,
++		.right_margin   = 54,
++		.hsync_len	= 10,
++		.upper_margin	= 18,
++		.lower_margin	= 4,
++		.vsync_len	= 1,
++		.dccs		= 0x8e00041a,
++		.devctl		= 0x060800c0,
++		.fbctrl		= 0x00a000a0,
++		.scale		= 0x04000400,
++	},
++};
++
++static struct nuc900fb_mach_info nuc900_fb_info __initdata = {
++#if defined(CONFIG_GPM1040A0_320X240)
++	.displays		= &nuc900_lcd_info[0],
++#else
++	.displays		= nuc900_lcd_info,
++#endif
++	.num_displays		= ARRAY_SIZE(nuc900_lcd_info),
++	.default_display	= 0,
++	.gpio_dir		= 0x00000004,
++	.gpio_dir_mask		= 0xFFFFFFFD,
++	.gpio_data		= 0x00000004,
++	.gpio_data_mask		= 0xFFFFFFFD,
++};
 
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+ static struct resource nuc900_lcd_resource[] = {
+ 	[0] = {
+@@ -406,23 +444,10 @@ struct platform_device nuc900_device_lcd = {
+ 	.dev              = {
+ 		.dma_mask               = &nuc900_device_lcd_dmamask,
+ 		.coherent_dma_mask      = -1,
++		.platform_data = &nuc900_fb_info,
+ 	}
+ };
+
+-void  nuc900_fb_set_platdata(struct nuc900fb_mach_info *pd)
+-{
+-	struct nuc900fb_mach_info *npd;
+-
+-	npd = kmalloc(sizeof(*npd), GFP_KERNEL);
+-	if (npd) {
+-		memcpy(npd, pd, sizeof(*npd));
+-		nuc900_device_lcd.dev.platform_data = npd;
+-	} else {
+-		printk(KERN_ERR "no memory for LCD platform data\n");
+-	}
+-}
+-#endif
+-
+ /* AUDIO controller*/
+ static u64 nuc900_device_audio_dmamask = -1;
+ static struct resource nuc900_ac97_resource[] = {
+diff --git a/arch/arm/mach-w90x900/mach-nuc950evb.c b/arch/arm/mach-w90x900/mach-nuc950evb.c
+index b3edc3c..04d295f 100644
+--- a/arch/arm/mach-w90x900/mach-nuc950evb.c
++++ b/arch/arm/mach-w90x900/mach-nuc950evb.c
+@@ -20,51 +20,10 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach-types.h>
+ #include <mach/map.h>
+-#include <mach/regs-ldm.h>
+ #include <mach/fb.h>
+
+ #include "nuc950.h"
+
+-#ifdef CONFIG_FB_NUC900
+-/* LCD Controller */
+-static struct nuc900fb_display __initdata nuc950_lcd_info[] = {
+-	/* Giantplus Technology GPM1040A0 320x240 Color TFT LCD */
+-	[0] = {
+-		.type		= LCM_DCCS_VA_SRC_RGB565,
+-		.width 		= 320,
+-		.height		= 240,
+-		.xres		= 320,
+-		.yres		= 240,
+-		.bpp		= 16,
+-		.pixclock	= 200000,
+-		.left_margin	= 34,
+-		.right_margin   = 54,
+-		.hsync_len	= 10,
+-		.upper_margin	= 18,
+-		.lower_margin	= 4,
+-		.vsync_len	= 1,
+-		.dccs		= 0x8e00041a,
+-		.devctl		= 0x060800c0,
+-		.fbctrl		= 0x00a000a0,
+-		.scale		= 0x04000400,
+-	},
+-};
+-
+-static struct nuc900fb_mach_info nuc950_fb_info __initdata = {
+-#if defined(CONFIG_GPM1040A0_320X240)
+-	.displays		= &nuc950_lcd_info[0],
+-#else
+-	.displays		= nuc950_lcd_info,
+-#endif
+-	.num_displays 		= ARRAY_SIZE(nuc950_lcd_info),
+-	.default_display	= 0,
+-	.gpio_dir		= 0x00000004,
+-	.gpio_dir_mask		= 0xFFFFFFFD,
+-	.gpio_data		= 0x00000004,
+-	.gpio_data_mask		= 0xFFFFFFFD,
+-};
+-#endif
+-
+ static void __init nuc950evb_map_io(void)
+ {
+ 	nuc950_map_io();
+@@ -74,9 +33,6 @@ static void __init nuc950evb_map_io(void)
+ static void __init nuc950evb_init(void)
+ {
+ 	nuc950_board_init();
+-#ifdef CONFIG_FB_NUC900
+-	nuc900_fb_set_platdata(&nuc950_fb_info);
+-#endif
+ }
+
+ MACHINE_START(W90P950EVB, "W90P950EVB")
+diff --git a/arch/arm/mach-w90x900/nuc910.c b/arch/arm/mach-w90x900/nuc910.c
+index 656f03b..cd49776 100644
+--- a/arch/arm/mach-w90x900/nuc910.c
++++ b/arch/arm/mach-w90x900/nuc910.c
+@@ -26,6 +26,7 @@
+ static struct platform_device *nuc910_dev[] __initdata = {
+ 	&nuc900_device_ts,
+ 	&nuc900_device_rtc,
++	&nuc900_device_lcd,
+ };
+
+ /* define specific CPU platform io map */
+diff --git a/arch/arm/mach-w90x900/nuc950.c b/arch/arm/mach-w90x900/nuc950.c
+index 4d1f1ab..5704f74 100644
+--- a/arch/arm/mach-w90x900/nuc950.c
++++ b/arch/arm/mach-w90x900/nuc950.c
+@@ -26,9 +26,7 @@
+ static struct platform_device *nuc950_dev[] __initdata = {
+ 	&nuc900_device_kpi,
+ 	&nuc900_device_fmi,
+-#ifdef CONFIG_FB_NUC900
+ 	&nuc900_device_lcd,
+-#endif
+ };
+
+ /* define specific CPU platform io map */
+-- 
+1.6.3.3
