@@ -1,58 +1,23 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 16 Jul 2010 09:19:24 +0200
-Subject: [PATCH] ARM/nuc900: fix nuc900 touchscreen clk definition bug
-In-Reply-To: <AANLkTinEqScq2E0MSRJrUN5fR-1rs8fB9rLgMdhYW9R6@mail.gmail.com>
-References: <4C3FCBFF.50506@gmail.com>
-	<201007160709.15385.marek.vasut@gmail.com>
-	<AANLkTinEqScq2E0MSRJrUN5fR-1rs8fB9rLgMdhYW9R6@mail.gmail.com>
-Message-ID: <201007160919.24927.marek.vasut@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 16 Jul 2010 08:46:20 +0100
+Subject: Question of kmap_atomic
+In-Reply-To: <AANLkTilFvE0eyQS7jNQ77OYkJovJugjKRO-fPHjX8CB9@mail.gmail.com>
+References: <AANLkTilFvE0eyQS7jNQ77OYkJovJugjKRO-fPHjX8CB9@mail.gmail.com>
+Message-ID: <20100716074620.GA16124@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 16. ?ervence 2010 07:34:21 Wan ZongShun napsal(a):
-> 2010/7/16 Marek Vasut <marek.vasut@gmail.com>:
-> > Dne P? 16. ?ervence 2010 05:03:27 Wan ZongShun napsal(a):
-> >> This patch is to fix nuc900 touchscreen clk definition bug,the .dev_id's
-> >> name should be 'nuc900-ts', it should be the same to pdev.name. or else,
-> >> the touchscreen driver will be not working well due to clock engine
-> >> disabled.
-> >> 
-> >> Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
-> >> ---
-> >>  arch/arm/mach-w90x900/cpu.c |    2 +-
-> >>  1 files changed, 1 insertions(+), 1 deletions(-)
-> >> 
-> >> diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
-> >> index 642207e..83c5632 100644
-> >> --- a/arch/arm/mach-w90x900/cpu.c
-> >> +++ b/arch/arm/mach-w90x900/cpu.c
-> >> @@ -93,7 +93,7 @@ static struct clk_lookup nuc900_clkregs[] = {
-> >>       DEF_CLKLOOK(&clk_kpi, "nuc900-kpi", NULL),
-> >>       DEF_CLKLOOK(&clk_wdt, "nuc900-wdt", NULL),
-> >>       DEF_CLKLOOK(&clk_gdma, "nuc900-gdma", NULL),
-> >> -     DEF_CLKLOOK(&clk_adc, "nuc900-adc", NULL),
-> >> +     DEF_CLKLOOK(&clk_adc, "nuc900-ts", NULL),
-> >>       DEF_CLKLOOK(&clk_usi, "nuc900-spi", NULL),
-> >>       DEF_CLKLOOK(&clk_ext, NULL, "ext"),
-> >>       DEF_CLKLOOK(&clk_timer0, NULL, "timer0"),
-> > 
-> > Hey,
-> > 
-> > Is that thing really touchscreen or general-purpose analog/digital
-> > converter ?
+On Fri, Jul 16, 2010 at 09:41:59AM +0900, Minchan Kim wrote:
+> I am stuck with looking at ARM's kmap_atomic.
+> I am not familiar with ARM cache model.
+> As I look the code, ARM seems to have a VIPT aliasing model.
 > 
-> Oh, it is general-purpose analog/digital converter controller.
-> I only use it to implemnt my touchscreen function, Also it can be use
-> other function.
+> Before Nicolas's 17ebba1fe, kmap_atomic always calls kmap_high_get to
+> prevent aliasing problem of 7929eb9cf64 regardless of VIVT and VIPT.
 > 
-> so, I have to change my touchscreen driver name to nuc900-adc?
+> But the patch made it to not call kmap_high_get when VIPT-aliasing
+> model in CONFIG_DEBUG_HIGHMEM.
+> Doesn't it cause aliasing problem as 7929eb9cf64 says, again?
 
-No, just change the name of clock in the touchscreen driver. So that the 
-touchscreen driver will use nuc900-adc clocksource.
-
-You're welcome. :)
-
-> 
-> Thanks for your Reminder, I appreciate it. :)
-> 
-> > Cheers
+There's various problems with highmem and VIPT aliasing caches, so we don't
+permit its use with such caches.
