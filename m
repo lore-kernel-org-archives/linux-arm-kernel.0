@@ -1,37 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Jul 2010 22:01:09 +0200
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 Jul 2010 21:09:36 +0100
 Subject: [RFC PATCH] Kconfig: Enable Kconfig fragments to be used for
 	defconfig
-In-Reply-To: <AANLkTinyFBTKYaryFANYheTuP-biJUws2x01NRNZPb4M@mail.gmail.com>
+In-Reply-To: <AANLkTikqHnyFVJF0Pzwy2xtKeNSXYAPFdPkAkLiXK8Ls@mail.gmail.com>
 References: <20100713230352.6781.18644.stgit@angua>
 	<1279296221.17878.66.camel@e102109-lin.cambridge.arm.com>
 	<AANLkTinyFBTKYaryFANYheTuP-biJUws2x01NRNZPb4M@mail.gmail.com>
-Message-ID: <201007162201.09629.arnd@arndb.de>
+	<alpine.LFD.2.00.1007161406120.10598@xanadu.home>
+	<20100716183028.GB26854@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1007161439240.10598@xanadu.home>
+	<AANLkTikqHnyFVJF0Pzwy2xtKeNSXYAPFdPkAkLiXK8Ls@mail.gmail.com>
+Message-ID: <1279310976.18579.8.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 July 2010 19:57:55 Grant Likely wrote:
-> On Fri, Jul 16, 2010 at 10:03 AM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > On Wed, 2010-07-14 at 00:04 +0100, Grant Likely wrote:
+On Fri, 2010-07-16 at 19:46 +0100, Linus Torvalds wrote:
+> On Fri, Jul 16, 2010 at 11:40 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> >
+> > DOH.
 > 
-> sfr and I were talking about your patch the other day.  Just warning
-> on incomplete dependencies is enough to make it actually workable for
-> me (without my ugly post-processing step).  I was very happy to hear
-> that it is in linux-next.
+> Well, it's possible that the correct approach is a mixture.
 > 
-> Last missing piece is being able to do "select FOO = n", which Stephen
-> is currently working on.
+> Automatically do the trivial cases (recursive selects, dependencies
+> that are simple or of the form "x && y" etc), and warn about the cases
+> that aren't trivial (where "not trivial" may not necessarily be about
+> fundamentally ambiguous ones, but just "complex enough that I won't
+> even try").
 
-Are there a lot of symbols for which this is needed? If there is only
-a handful, you could work around this by selectively adding
+There is still a risk with this approach when the Kconfig isn't entirely
+correct. For example, on ARM we have (I pushed a patch already):
 
-config FOO
-	bool "foo"
-	default !FOO_DISABLE
+config CPU_32v6K
+	depends on CPU_V6
 
-config FOO_DISABLE
-	def_bool "n"
+config CPU_V7
+	select CPU_32v6K
 
+In this simple approach, we end up selecting CPU_V6 when we only need
+CPU_V7. There other places like this in the kernel.
 
-		Arnd
+Of course, kbuild could still warn but if people rely on this feature to
+select options automatically I suspect they would ignore the warnings.
+
+-- 
+Catalin
