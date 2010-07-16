@@ -1,91 +1,186 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 16 Jul 2010 21:35:23 +0900
-Subject: [PATCH v2 4/5] ARM: S5PV210: add DMCx access virtual address
-In-Reply-To: <1279267277-6804-5-git-send-email-myungjoo.ham@samsung.com>
-References: <1279267277-6804-1-git-send-email-myungjoo.ham@samsung.com>
-	<1279267277-6804-2-git-send-email-myungjoo.ham@samsung.com>
-	<1279267277-6804-3-git-send-email-myungjoo.ham@samsung.com>
-	<1279267277-6804-4-git-send-email-myungjoo.ham@samsung.com>
-	<1279267277-6804-5-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <013001cb24e3$5ec9ca10$1c5d5e30$%kim@samsung.com>
+From: philippe.langlais@stericsson.com (Philippe Langlais)
+Date: Fri, 16 Jul 2010 15:04:13 +0200
+Subject: [PATCH 1/6] U6/U6715 ARM architecture files
+In-Reply-To: <20100715111746.GA29322@n2100.arm.linux.org.uk>
+References: <1278688913-26417-1-git-send-email-philippe.langlais@stericsson.com>
+	<1278688913-26417-2-git-send-email-philippe.langlais@stericsson.com>
+	<20100715111746.GA29322@n2100.arm.linux.org.uk>
+Message-ID: <4C4058CD.3020303@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
-> 
-> This patch prepares CPUFREQ support for S5PV210 by adding definitions
-> for S5P_VA_DMCx accessed by CPUFREQ, which were not defined previously.
-> 
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pv210/cpu.c              |   12 +++++++++++-
->  arch/arm/mach-s5pv210/include/mach/map.h |    8 ++++++++
->  2 files changed, 19 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
-> index 94c632b..84a6708 100644
-> --- a/arch/arm/mach-s5pv210/cpu.c
-> +++ b/arch/arm/mach-s5pv210/cpu.c
-> @@ -59,7 +59,17 @@ static struct map_desc s5pv210_iodesc[] __initdata = {
->  		.pfn		= __phys_to_pfn(S5PV210_PA_SROMC),
->  		.length		= SZ_4K,
->  		.type		= MT_DEVICE,
-> -	}
-> +	}, {
-> +		.virtual    = (unsigned long)S5P_VA_DMC0,
-> +		.pfn        = __phys_to_pfn(S5P_PA_DMC0),
-> +		.length     = SZ_4K,
-> +		.type       = MT_DEVICE,
-> +	}, {
-> +		.virtual    = (unsigned long)S5P_VA_DMC1,
-> +		.pfn        = __phys_to_pfn(S5P_PA_DMC1),
-> +		.length     = SZ_4K,
-> +		.type       = MT_DEVICE,
-> +	},
->  };
-> 
->  static void s5pv210_idle(void)
-> diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-
-> s5pv210/include/mach/map.h
-> index 17687f0..4945674 100644
-> --- a/arch/arm/mach-s5pv210/include/mach/map.h
-> +++ b/arch/arm/mach-s5pv210/include/mach/map.h
-> @@ -108,4 +108,12 @@
->  #define SAMSUNG_PA_ADC		S5PV210_PA_ADC
->  #define SAMSUNG_PA_KEYPAD	S5PV210_PA_KEYPAD
-> 
-> +/* DMC */
-> +#define S5P_PA_DMC0     (0xF0000000)
+Hi,
 
-Should be S5PV210_PA_DMC0..
-If you need to define S5P_PA_xxx, you can re-define like others in here.
-But right now no need S5P_PA_xxx because used in cpu.c of mach directory not
-plat-s5p.
+On 07/15/10 13:17, Russell King - ARM Linux wrote:
+> Sorry, there's a few more points here.
+>
+>    
+Never mind
+> On Fri, Jul 09, 2010 at 05:21:48PM +0200, Philippe Langlais wrote:
+>    
+>> diff --git a/arch/arm/mach-u67xx/Kconfig b/arch/arm/mach-u67xx/Kconfig
+>> new file mode 100644
+>> index 0000000..48f53fb
+>> --- /dev/null
+>> +++ b/arch/arm/mach-u67xx/Kconfig
+>> @@ -0,0 +1,11 @@
+>> +comment "U67XX Board Type"
+>> +	depends on ARCH_U67XX
+>> +
+>> +choice
+>> +	prompt "Choose the U67XX Board type"
+>> +	default MACH_U67XX_WAVEC_2GB
+>> +	help
+>> +		"Choose the ST-Ericsson Reference Design Board"
+>> +	config MACH_U67XX_WAVEC_2GB
+>> +		bool "U67XX WaveC Board with 2Gb Micron combo"
+>>      
+> I thought convention here was to have the "config" statements all starting
+> on column 1, and a blank line after 'help'.  help shouldn't need the text
+> quoted.
+>
+>    
+OK
+>> diff --git a/arch/arm/plat-u6xxx/Kconfig b/arch/arm/plat-u6xxx/Kconfig
+>> new file mode 100644
+>> index 0000000..b01f77c
+>> --- /dev/null
+>> +++ b/arch/arm/plat-u6xxx/Kconfig
+>> @@ -0,0 +1,20 @@
+>> +menu "STE U6XXX Implementations"
+>> +
+>> +choice
+>> +	prompt "U67XX System Type"
+>> +	default ARCH_U67XX
+>> +
+>> +config ARCH_U67XX
+>> +	bool "U67XX"
+>> +	select PLAT_U6XXX
+>> +	select CPU_ARM926T
+>> +	select GENERIC_TIME
+>> +	select GENERIC_CLOCKEVENTS
+>> +	select U6_MTU_TIMER
+>> +endchoice
+>>      
+> ...
+>    
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index cf30fc9..7045a05 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -739,6 +739,13 @@ config ARCH_U300
+>>   	help
+>>   	  Support for ST-Ericsson U300 series mobile platforms.
+>>
+>> +config PLAT_U6XXX
+>> +	bool "ST-Ericsson U6XXX Series"
+>> +	select GENERIC_GPIO
+>> +	select ARCH_REQUIRE_GPIOLIB
+>> +	help
+>> +	  Support for ST-Ericsson's U6XXX architecture
+>> +
+>>   config ARCH_U8500
+>>   	bool "ST-Ericsson U8500 Series"
+>>   	select CPU_V7
+>>      
+> Hmm.  So, we have PLAT_U6XXX to select support for the U6XXX platform
+> series on the main machine class menu.  We then have a globally visible
+> ARCH_U67XX option, which selects PLAT_U6XXX, and that then gives us a
+> MACH_U67XX_WAVEC_2GB option.
+>
+> This seems to be rather obsure - what if I have some other machine class
+> selected, and I enable ARCH_U67XX ?
+>
+> How about having ARCH_U67XX in the main machine class menu, which allows
+> us to see MACH_U67XX_WAVEC_2GB.  When MACH_U67XX_WAVEC_2GB is enabled,
+> this selects PLAT_U6XXX to pick up the plat-* stuff?
+>
+>    
+You're right, I fix that.
+>> +static inline void arch_reset(char mode, const char *cmd)
+>> +{
+>> +	unsigned long flags;
+>> +	/*
+>> +	 * To reset, we hit the on-board reset register
+>> +	 * in the system FPGA
+>> +	 */
+>> +	/* diasble HW interruption */
+>> +	raw_local_irq_save(flags);
+>> +	/* load watchdog with reset value */
+>> +	outl(0x5, IO_ADDRESS(WDRU_BASE + WDRU_TIM_OFFSET));
+>>      
+> s/outl/writel/ please.
+>    
+OK
+>    
+>> diff --git a/arch/arm/plat-u6xxx/include/mach/uncompress.h b/arch/arm/plat-u6xxx/include/mach/uncompress.h
+>> new file mode 100644
+>> index 0000000..7dae14d
+>> --- /dev/null
+>> +++ b/arch/arm/plat-u6xxx/include/mach/uncompress.h
+>>      
+> ...
+>    
+>> +static void putc(int c)
+>> +{
+>> +	if (c == '\n')
+>> +		putc('\r');
+>>      
+> Hmm, so you want to output \r\r\n for each \n in the output stream?
+>    
+I removed these lines.
+>    
+>> diff --git a/arch/arm/plat-u6xxx/timer.c b/arch/arm/plat-u6xxx/timer.c
+>> new file mode 100644
+>> index 0000000..90464b1
+>> --- /dev/null
+>> +++ b/arch/arm/plat-u6xxx/timer.c
+>>      
+> ...
+>    
+>> +struct mmtu_ctxt {
+>> +	unsigned long *base;
+>>      
+> __iomem ?
+>    
+Yes
+>    
+>> +	int autoreload;
+>>      
+> Is this a write-only variable?  I couldn't find anything which reads it.
+>
+>    
+OK, it's a relicat of auto reload precedent implementation.
+>> +	uint32_t compvalue;
+>> +	uint32_t endvalue;
+>> +	struct clk *clk;
+>> +	int mode;
+>> +};
+>>      
+> ...
+>    
+>> +	case CLOCK_EVT_MODE_SHUTDOWN:
+>> +		mmtu->autoreload = 0;
+>> +
+>> +		if (mmtu->clk == NULL) {
+>> +			mmtu->clk = clk_get(0, "MMTU");
+>>      
+> 	clk_get(NULL, "MMTU")
+>    
+OK
+>    
+>> +struct sys_timer u6_timer = {
+>> +	.init = u6_timer_init,
+>> +#ifndef CONFIG_GENERIC_TIME
+>> +	.offset = NULL,
+>> +#endif
+>>      
+> There's no need to initialize .offset, so this ifdef and initializer can
+> be removed entirely.
+>    
+OK
 
-> +#define S5P_VA_DMC0     S3C_ADDR(0x00a00000)
+A new U6 arch patch will be sent very soon.
 
-If you need to add VA_xxx, should be in plat-s5p/include/plat/map-s5p.h
-
-> +
-> +#define S5P_PA_DMC1     (0xF1400000)
-> +#define S5P_VA_DMC1     S3C_ADDR(0x00b00000)
-
-Same...
-
-> +
-> +
-
-No need 2 empty lines...1 empty line is enough.
-
->  #endif /* __ASM_ARCH_MAP_H */
-> --
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Regards,
+Philippe
