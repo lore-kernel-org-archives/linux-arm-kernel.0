@@ -1,33 +1,64 @@
-From: minchan.kim@gmail.com (Minchan Kim)
-Date: Fri, 16 Jul 2010 09:44:29 +0900
-Subject: Question of kmap_atomic
-In-Reply-To: <AANLkTilFvE0eyQS7jNQ77OYkJovJugjKRO-fPHjX8CB9@mail.gmail.com>
-References: <AANLkTilFvE0eyQS7jNQ77OYkJovJugjKRO-fPHjX8CB9@mail.gmail.com>
-Message-ID: <AANLkTilxlwewy5YqkdCG9qFUDSv4JaJCz_cpmEWPENqp@mail.gmail.com>
+From: zt.tmzt@gmail.com (Tim HRM)
+Date: Thu, 15 Jul 2010 20:48:36 -0400
+Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
+	memory management
+In-Reply-To: <20100715085535.GC26212@n2100.arm.linux.org.uk>
+References: <4C3C0032.5020702@codeaurora.org>
+	<20100713150311B.fujita.tomonori@lab.ntt.co.jp>
+	<20100713121420.GB4263@codeaurora.org>
+	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
+	<20100714201149.GA14008@codeaurora.org>
+	<20100714220536.GE18138@n2100.arm.linux.org.uk>
+	<20100715012958.GB2239@codeaurora.org>
+	<20100715085535.GC26212@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinVZeaZxt_lWKhjKa0dqhu3_j3BRNySO-2LvMdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resend with fixing the mail address.
-
-On Fri, Jul 16, 2010 at 9:41 AM, Minchan Kim <minchan.kim@gmail.com> wrote:
-> I am stuck with looking at ARM's kmap_atomic.
-> I am not familiar with ARM cache model.
-> As I look the code, ARM seems to have a VIPT aliasing model.
+On Thu, Jul 15, 2010 at 4:55 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jul 14, 2010 at 06:29:58PM -0700, Zach Pfeffer wrote:
+>> The VCM ensures that all mappings that map a given physical buffer:
+>> IOMMU mappings, CPU mappings and one-to-one device mappings all map
+>> that buffer using the same (or compatible) attributes. At this point
+>> the only attribute that users can pass is CACHED. In the absence of
+>> CACHED all accesses go straight through to the physical memory.
 >
-> Before Nicolas's 17ebba1fe, kmap_atomic always calls kmap_high_get to
-> prevent aliasing problem of 7929eb9cf64 regardless of VIVT and VIPT.
+> So what you're saying is that if I have a buffer in kernel space
+> which I already have its virtual address, I can pass this to VCM and
+> tell it !CACHED, and it'll setup another mapping which is not cached
+> for me?
 >
-> But the patch made it to not call kmap_high_get when VIPT-aliasing
-> model in CONFIG_DEBUG_HIGHMEM.
-> Doesn't it cause aliasing problem as 7929eb9cf64 says, again?
+> You are aware that multiple V:P mappings for the same physical page
+> with different attributes are being outlawed with ARMv6 and ARMv7
+> due to speculative prefetching. ?The cache can be searched even for
+> a mapping specified as 'normal, uncached' and you can get cache hits
+> because the data has been speculatively loaded through a separate
+> cached mapping of the same physical page.
 >
+> FYI, during the next merge window, I will be pushing a patch which makes
+> ioremap() of system RAM fail, which should be the last core code creator
+> of mappings with different memory types. ?This behaviour has been outlawed
+> (as unpredictable) in the architecture specification and does cause
+> problems on some CPUs.
+>
+> We've also the issue of multiple mappings with differing cache attributes
+> which needs addressing too...
 > --
-> Kind regards,
-> Minchan Kim
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >
 
+Interesting, since I seem to remember the MSM devices mostly conduct
+IO through regions of normal RAM, largely accomplished through
+ioremap() calls.
 
+Without more public domain documentation of the MSM chips and AMSS
+interfaces I wouldn't know how to avoid this, but I can imagine it
+creates a bit of urgency for Qualcomm developers as they attempt to
+upstream support for this most interesting SoC.
 
--- 
-Kind regards,
-Minchan Kim
+--
+Timothy Meade
+tmzt #htc-linux
