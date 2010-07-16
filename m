@@ -1,76 +1,43 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 16 Jul 2010 09:17:07 +0100
-Subject: [PATCH 5/5] ARM: S5PV210: Initial CPUFREQ Support
-In-Reply-To: <AANLkTinrrXlh1GQ178_NzwWt5luO_1mdfIGy6G2ZNbPH@mail.gmail.com>
-References: <1279184768-28971-1-git-send-email-myungjoo.ham@samsung.com>
-	<1279184768-28971-2-git-send-email-myungjoo.ham@samsung.com>
-	<1279184768-28971-3-git-send-email-myungjoo.ham@samsung.com>
-	<1279184768-28971-4-git-send-email-myungjoo.ham@samsung.com>
-	<1279184768-28971-5-git-send-email-myungjoo.ham@samsung.com>
-	<1279184768-28971-6-git-send-email-myungjoo.ham@samsung.com>
-	<20100715115942.GA15919@sirena.org.uk>
-	<AANLkTinrrXlh1GQ178_NzwWt5luO_1mdfIGy6G2ZNbPH@mail.gmail.com>
-Message-ID: <20100716081707.GA9082@rakim.wolfsonmicro.main>
+From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
+Date: Fri, 16 Jul 2010 11:14:05 +0300
+Subject: [PATCH v2 6/8] arm: allow passing an ELF64 header to
+	elf_check_arch()
+In-Reply-To: <20100510122156.GA7796@n2100.arm.linux.org.uk>
+References: <cover.1273041357.git.ext-mika.1.westerberg@nokia.com>
+	<3c8da055f0a84cfd1c6659d9fda24e4eb97ab9fb.1273041358.git.ext-mika.1.westerberg@nokia.com>
+	<20100510112036.GC14337@n2100.arm.linux.org.uk>
+	<20100510120920.GD11783@esdhcp04058.research.nokia.com>
+	<20100510122156.GA7796@n2100.arm.linux.org.uk>
+Message-ID: <20100716081405.GR4247@esdhcp04058.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 16, 2010 at 02:37:04PM +0900, MyungJoo Ham wrote:
-> On Thu, Jul 15, 2010 at 8:59 PM, Mark Brown
+On Mon, May 10, 2010 at 02:21:56PM +0200, ext Russell King - ARM Linux wrote:
+> On Mon, May 10, 2010 at 03:09:20PM +0300, Mika Westerberg wrote:
+[...]
+> > I really don't know but fs/proc/vmcore.c is coded in such way that it supports
+> > both types of ELF headers. It however, passes the header to elf_check_arch()
+> > which in our case should fail if it is something else than ELF32 header.
+> 
+> There's other arches which want elf_check_arch to be a function call, so
+> I think my question needs to be looked at more closely - and possibly
+> the code changed such that we don't end up with this situation.
+> 
+> Maybe a cleaner solution would be for vmcore.c to split its calls to
+> elf_check_arch() - to be elf32_check_arch() and elf64_check_arch() ?
+> Platforms where it's just a macro can define both to be elf_check_arch()
+> but those where only one flavour is supported should define the unsupported
+> flavour to zero - which incidentally would allow the compiler to optimize
+> away the unnecessary parts of parse_crash_elf*_headers().
 
-> > Doing this through the regulator API avoids hard coding details of an
-> > individual regulator in your driver and ensures that all users of this
-> > regulator can handle the ramp rate.
+Russell,
 
-> Making regulator API wait for the ramp up seems to be something like
-> "synchronous I/O", which in turn, forces CPU to do nothing while CPU
-> may execute some instructions while waiting for the ramp up. However,
+I noticed that you applied all the kdump patches except this and the
+CONFIG_CRASH_DUMP patch. Thanks.
 
-Yeah, I know, but even if the actual delay is implemented in the
-consumer driver the ramp time should still be being queried via the
-regulator API so that the details of the specific device aren't hard
-coded into the consumer.  In any case as you say...
+Should I update this patch as you describe above? So that we don't need to
+perform any casting but just have elf_check_arch() separated into 32- and 64-bit
+versions. Or is there something else preventing these 2 patches to be merged?
 
-> we just do udelay() anyway; thus, it doesn't matter for us as well.
-> I'll try to put those udelay into MAX8998 PMIC drivers, which is for
-> S5PV210. I'll remove these udelay and PMIC_RAMP)UP from cpufreq driver
-> with the next version.
-
-...the ramp times are usually vanishingly small so the overwhelming
-majority of consumers probably don't care anyway.  If it's a problem we
-can add an interface which doesn't do the delay automatically but for
-most users it's going to be simpler to just deal with it transparently.
-
-> >> + ? ? ? ? ? ? ? ? ? ? ? regulator_set_voltage(arm_regulator,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? arm_volt, arm_volt);
-
-> > You shouldn't be specifying an exact voltage here - there's no guarantee
-> > that the exact voltage you request will be delivered by the regulator,
-> > and some boards may wish to use constraints to eliminate some voltages
-> > (eg, to restrict the maximum operating point for the CPU).
-
-> > What you'd normally have here is that the minimum voltage would be the
-> > desired operating point for the CPU and the maximum voltage would be
-> > fixed at the maximum rated supply for the part. ?This will allow the
-> > regulator API to select the lowest voltage it is able to deliver.
-
-> Currently, there is a bug in MAX8998 PMIC driver that sets VDDARM to
-> minimum possible voltage that is LARGER THAN or EQUAL TO max_vol, not
-> min_vol. I'll correct set_voltage usage of CPUFREQ assuming that
-> bugfix for MAX8998 PMIC driver is sent. (Joonyoung Shim, who's just
-> started submitting MAX8998 PMIC driver, know about this issue and will
-> probably send a patch soon.)
-
-Oh, fail.  Like you say that's a bug in the regulator driver which will
-hopefully be fixed before this gets merged.
-
-> Besides, the whole section enclosed by this CONFIG_REGULATOR will be removed.
-
-> A while ago, WM8994 had been using CLK_OUT as the clock source with
-> APLL dependent setting; thus "target" function accessed CLK_OUT when
-> APLL changed. However, it no longer uses APLL dependent clock source
-> and we no longer access CLK_OUT at the "target" function; thus, this
-> code in "init" function can be removed.
-
-Ah, OK.  If other people use that sort of clocking scheme we will need
-to come up with a reasonable way of coping with it, but let's save that
-for when the problem arises.
+Thanks,
+MW
