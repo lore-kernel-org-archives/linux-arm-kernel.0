@@ -1,40 +1,82 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 16 Jul 2010 12:52:29 -0600
-Subject: [RFC PATCH] Kconfig: Enable Kconfig fragments to be used for
-	defconfig
-In-Reply-To: <20100716183028.GB26854@n2100.arm.linux.org.uk>
-References: <20100713230352.6781.18644.stgit@angua>
-	<1279296221.17878.66.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTinyFBTKYaryFANYheTuP-biJUws2x01NRNZPb4M@mail.gmail.com>
-	<alpine.LFD.2.00.1007161406120.10598@xanadu.home>
-	<20100716183028.GB26854@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTilSHe2KD-2LJeUZp-I30LgfjCCPuJnObVzG4Bzo@mail.gmail.com>
+From: miltonm@bga.com (Milton Miller)
+Date: Fri, 16 Jul 2010 14:38:38 -0500
+Subject: [PATCH] Stop ARM boards crashing when CUPS is loaded -	2.6.35-rc5
+In-Reply-To: <4C408BEF.1060302@canonical.com>
+References: <4C408BEF.1060302@canonical.com> <4C3C72C6.4000005@canonical.com>
+	<20100715130214.4c9303b2.akpm@linux-foundation.org>
+	<20100715200618.GA6773@n2100.arm.linux.org.uk>
+	<4C40218A.4090806@canonical.com>
+	<20100716092018.GB16995@n2100.arm.linux.org.uk>
+	<miltonm-arm-parport-1@bga.com>
+Message-ID: <miltonm-arm-parport-2@bga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 16, 2010 at 12:30 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jul 16, 2010 at 02:19:31PM -0400, Nicolas Pitre wrote:
->> For example, if I want CONFIG_MTD_CMDLINE_PARTS=y, the system may be
->> smart enough to notice and automatically enable CONFIG_MTD and
->> CONFIG_MTD_PARTITIONS without having to carry those in the defconfig.
+On Fri, 16 Jul 2010 about 10:42:23 -0600 Lee Jones wrote:
+>On 16/07/10 17:23, Milton Miller wrote:
+> > On Fri Jul 16 2010 about 05:33:06 EST,  Lee Jones wrote:
+> > > > The best solution is probably for the parport code to go through a
+> > > > modernisation cycle like the serial code did, essentially using
+> > > > platform devices to pass the base addresses. This would make the
+> > > > driver more portable, and eliminates this problem entirely (because
+> > > > platforms which don't have parports won't register the platform device(s)
+> > > > necessary for parport to even probe illegal addresses.)
+> > >
+> > > This sounds brilliant - when are you going to start? </kidding>
+> > 
+> > It has a long time ago ...
+> > 
+> > drivers/parport/parport_pc.c calls parport_pc_find_nonpci_ports,
+> > which is in asm/parport.h
 >
-> How do you sort out something like this:
+>I'm not entirely sure what you're trying to say here?
 >
-> config FOO
-> ? ? ? ?bool "Foo"
-> ? ? ? ?depends on (A && B) || C
->
-> Do you enable A and B, A, B and C or just C?
->
-> Bear in mind that A could be 'X86', 'M68K' or any other arch specific
-> symbol.
->
-> I prefer the warning method because it prompts you to investigate what's
-> changed and sort out the problem by ensuring that the appropriate symbols
-> are also selected. ?The automatic selection of dependencies method carries
-> the risk that it'll do the wrong thing with the above scenario.
+>How does that help with the platformisation of the driver?
 
-Good point.
+I was reading quickly, but my point was the code already defers to the
+architecture the method of finding the ports to scan, which is the
+important part.
 
-g.
+I just looked at the 8250 code and it abuses the platform device model.
+Instead of a platform device for each port, it has multiple port
+descriptions set via platform_data in one or a a few device instances.
+It then only uses this information to fill in its internal array of all
+ports, which drives the actual registration with the serial core.  It also
+registers a platform device to to get suspend and resume hooks, but now has
+to scan its list of ports for all the instances driven from this "device".
+Yech.  Please don't use this as an example of a modern driver.
+
+
+>
+> > > In all seriousness, do you think anyone is likely to undertake this
+> > > work anytime soon? I am seeing this problem in a distribution which
+> > > is due for release in October. I have no problem implementing a config
+> > > change in the meantime, but as you say, a more _correct_ and portable
+> > > solution should be sought.
+> > 
+> > Why not replace the arm asm/parport.h with asm-generic/parport.h which
+> > already has a check for CONFIG_ISA, which appears to only be selected
+> > on a few ARM platforms?
+>
+>static int __devinit parport_pc_find_isa_ports(int autoirq, int autodma);
+>static int __devinit parport_pc_find_nonpci_ports(int autoirq, int autodma)
+>{
+>#ifdef CONFIG_ISA
+>	return parport_pc_find_isa_ports(autoirq, autodma);
+>#else
+>	return 0;
+>#endif
+>}
+>
+>That's perfect! 
+>
+>This would work a treat.
+>
+>Surely this #ifdef should be in all the parport.h files which call
+>parport_pc_find_isa_ports?
+
+No, as CONFIG_ISA is supposed to be ISA slots, and other architectures
+may frequently have 8250 ports at the pc legacy port numbers without
+ISA slots.
+
+milton
