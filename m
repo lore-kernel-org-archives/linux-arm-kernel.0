@@ -1,62 +1,76 @@
-From: lee.jones@canonical.com (Lee Jones)
-Date: Fri, 16 Jul 2010 10:08:26 +0100
-Subject: [PATCH] Stop ARM boards crashing when CUPS is loaded -	2.6.35-rc5
-In-Reply-To: <20100715200618.GA6773@n2100.arm.linux.org.uk>
-References: <4C3C72C6.4000005@canonical.com>
-	<20100715130214.4c9303b2.akpm@linux-foundation.org>
-	<20100715200618.GA6773@n2100.arm.linux.org.uk>
-Message-ID: <4C40218A.4090806@canonical.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 16 Jul 2010 10:07:19 +0100
+Subject: tq 2440
+In-Reply-To: <20100716085533.GB2419@suse.de>
+References: <AANLkTimyBHliUa62qmfja_ke6YTTysiVAtJcZfi8l2gG@mail.gmail.com>
+	<AANLkTil8GE1OguyAfp3XgfJvEmH98yNrlvGAx684a-qL@mail.gmail.com>
+	<20100715163526.GJ29322@n2100.arm.linux.org.uk>
+	<20100715165141.GA21272@suse.de>
+	<20100715171029.GK29322@n2100.arm.linux.org.uk>
+	<20100715172218.GA22197@suse.de>
+	<20100715173322.GL29322@n2100.arm.linux.org.uk>
+	<20100715205153.GC24463@suse.de>
+	<20100715210936.GB6773@n2100.arm.linux.org.uk>
+	<20100716085533.GB2419@suse.de>
+Message-ID: <20100716090719.GA16995@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/07/10 21:06, Russell King - ARM Linux wrote:
-> On Thu, Jul 15, 2010 at 01:02:14PM -0700, Andrew Morton wrote:
->>> BugLink: http://bugs.launchpad.net/bugs/601226
->>>
->>> When CUPS loads, it tries to load several drivers that it may need.
->>> When one of these drivers, specifically parport_pc is loaded on ARM
->>> based systems, it causes a segmentation fault as the ISA addresses
->>> which are attempted are not writable on non-PC based architectures.
->>> This code prevents ISA addresses from being attempted except on x86.
->>>
->>
->> That sounds like a pretty serious problem.  But presumably it isn't -
->> otherwise it would have been fixed earlier!
+On Fri, Jul 16, 2010 at 01:55:33AM -0700, Greg KH wrote:
+> On Thu, Jul 15, 2010 at 10:09:36PM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Jul 15, 2010 at 01:51:53PM -0700, Greg KH wrote:
+> > > On Thu, Jul 15, 2010 at 06:33:22PM +0100, Russell King - ARM Linux wrote:
+> > > > Another way to avoid the other complaints is to remove
+> > > > the unregistration in platform_register_devices().
+> > > 
+> > > No, because you could have created a platform device with a call to
+> > > platform_device_alloc() and then called platform_device_register() and
+> > > then later, platform_device_unregister(), right?
+> > 
+> > No.  Sorry, platform_register_devices should've been platform_add_devices().
+> > Please look at that function.
+> 
+> Hm, it just calls platform_device_register(), so it's pretty hard to
+> determine that it's a static device from that function.
+> 
+> > It's used to register an array of static platform devices from architecture
+> > code, as I've said in this thread once already.
+> 
+> I can't think of an easy way to prevent these types of devices from
+> being removed, other than the existing warnings we have.  I'll mull it
+> over some more and see if I can come up with something in the future.
 
-Well it is a problem on OMAP based boards.
+platform_add_devices() purpose is to allow platforms to bulk-register
+their statically declared platform devices.  That's what I created it
+for.
 
-I've personally tested it on OMAP3 and OMAP4 based machines. 
+The easiest solution is to arrange for platform_add_devices() to avoid
+unregistering them all if any one fails - eg, we don't particularly want
+the platform device for the serial console being unregistered if a
+subsequent device fails.
 
-Perhaps the memory is not reserved correctly.
+I'd also argue that it should be trying to register as many of the
+platform devices as it possibly can, and only warning about devices
+it can't register.
 
->> So what actions are required to trigger this bug and why aren't others
->> seeing it?
+Of course, it is possible that it's been used for other purposes by now -
+and yes it has:
 
-Probably because most other chips either manage to reserve the memory 
-successfully, or do not attempt to load the parport_pc driver, either as
-a module or built-in.
+drivers/mfd/ab3100-core.c:      platform_add_devices(ab3100_platform_devs,
+drivers/video/backlight/kb3886_bl.c:    platform_add_devices(devices, ARRAY_SIZE(devices));
 
-All I have to do to recreate this bug is load the module or build in the
-parport_pc driver.
+The first one is an oops waiting to happen - it's a modular driver which
+has statically allocated platform devices which it registers, and on
+removal it just unregisters its I2C driver.  Two problems with that:
 
-> Note that we have machines which have ISA parallel ports, so it's not
-> this simple.
+1. references hanging around after registration and the memory backing
+   the driver has been unmapped.
+2. if two ab3100 devices are present, the same platform device structures
+   are attempted to be registered more than once.
 
-Do they have ISA parallel ports, or do they just pretend to?
+kb3886_bl.c has the same problem (1) above.
 
-I found this scattered about:
-
-/*
- * We don't actually have real ISA nor PCI buses, but there is so many
- * drivers out there that might just work if we fake them...
- */
-
-Clearly parport_pc isn't one of them. :)
-
-> Why not just avoid selecting and building parport_pc on these machines?
-
-> I mean, the Beagleboard doesn't have PCI nor ISA, so why is parport_pc
-> being built for production use?
-
-I am happy to make a Kconfig change to disallow OMAP builds from building
-the parport_pc driver. Do you think this would be more sensible?
+These two drivers need to be converted to use the platform_device_alloc()
+et.al. API, which'll then mean that platform_add_devices() goes back to
+its original purpose - bulk registering statically allocated platform
+devices from arch code.
