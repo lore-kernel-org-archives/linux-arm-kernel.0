@@ -1,84 +1,86 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 16 Jul 2010 21:22:08 +0900
-Subject: [PATCH v2 2/5] ARM: S5P: Added default pll values for APLL
-	800/1000MHz
-In-Reply-To: <1279267277-6804-3-git-send-email-myungjoo.ham@samsung.com>
+Date: Fri, 16 Jul 2010 21:35:23 +0900
+Subject: [PATCH v2 4/5] ARM: S5PV210: add DMCx access virtual address
+In-Reply-To: <1279267277-6804-5-git-send-email-myungjoo.ham@samsung.com>
 References: <1279267277-6804-1-git-send-email-myungjoo.ham@samsung.com>
 	<1279267277-6804-2-git-send-email-myungjoo.ham@samsung.com>
 	<1279267277-6804-3-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <012f01cb24e1$85628920$90279b60$%kim@samsung.com>
+	<1279267277-6804-4-git-send-email-myungjoo.ham@samsung.com>
+	<1279267277-6804-5-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <013001cb24e3$5ec9ca10$1c5d5e30$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 MyungJoo Ham wrote:
 > 
-> CPUFREQ of S5PV210 uses different APLL settings and we provide
-> such values for CPUFREQ at pll.h. We have been using differently
-> between EVT0 and EVT1 machines. Although this version of kernel
-> assumes that the CPU is EVT1, users may use code for EVT0 later.
-> 
-> Note that at 1GHz of ARMCLK, APLL should be 1GHz and for other lower
-> ARMCLK, APLL should be 800MHz.
+> This patch prepares CPUFREQ support for S5PV210 by adding definitions
+> for S5P_VA_DMCx accessed by CPUFREQ, which were not defined previously.
 > 
 > Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
 > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/plat-s5p/include/plat/pll.h |    8 ++++++++
->  1 files changed, 8 insertions(+), 0 deletions(-)
+>  arch/arm/mach-s5pv210/cpu.c              |   12 +++++++++++-
+>  arch/arm/mach-s5pv210/include/mach/map.h |    8 ++++++++
+>  2 files changed, 19 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/plat-s5p/include/plat/pll.h
-b/arch/arm/plat-s5p/include/plat/pll.h
-> index 7db3227..3112aba 100644
-> --- a/arch/arm/plat-s5p/include/plat/pll.h
-> +++ b/arch/arm/plat-s5p/include/plat/pll.h
-> @@ -21,6 +21,14 @@
+> diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
+> index 94c632b..84a6708 100644
+> --- a/arch/arm/mach-s5pv210/cpu.c
+> +++ b/arch/arm/mach-s5pv210/cpu.c
+> @@ -59,7 +59,17 @@ static struct map_desc s5pv210_iodesc[] __initdata = {
+>  		.pfn		= __phys_to_pfn(S5PV210_PA_SROMC),
+>  		.length		= SZ_4K,
+>  		.type		= MT_DEVICE,
+> -	}
+> +	}, {
+> +		.virtual    = (unsigned long)S5P_VA_DMC0,
+> +		.pfn        = __phys_to_pfn(S5P_PA_DMC0),
+> +		.length     = SZ_4K,
+> +		.type       = MT_DEVICE,
+> +	}, {
+> +		.virtual    = (unsigned long)S5P_VA_DMC1,
+> +		.pfn        = __phys_to_pfn(S5P_PA_DMC1),
+> +		.length     = SZ_4K,
+> +		.type       = MT_DEVICE,
+> +	},
+>  };
 > 
->  #include <asm/div64.h>
+>  static void s5pv210_idle(void)
+> diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-
+> s5pv210/include/mach/map.h
+> index 17687f0..4945674 100644
+> --- a/arch/arm/mach-s5pv210/include/mach/map.h
+> +++ b/arch/arm/mach-s5pv210/include/mach/map.h
+> @@ -108,4 +108,12 @@
+>  #define SAMSUNG_PA_ADC		S5PV210_PA_ADC
+>  #define SAMSUNG_PA_KEYPAD	S5PV210_PA_KEYPAD
 > 
-> +#ifdef CONFIG_CPU_S5PC110_EVT0_ERRATA
+> +/* DMC */
+> +#define S5P_PA_DMC0     (0xF0000000)
 
-Actually, EVT0 is not real chip and not for mass production.
-So don't use in here.
+Should be S5PV210_PA_DMC0..
+If you need to define S5P_PA_xxx, you can re-define like others in here.
+But right now no need S5P_PA_xxx because used in cpu.c of mach directory not
+plat-s5p.
 
-> +#define PLL45XX_APLL_VAL_1000	(1 << 31) | (0xfa<<16) | (0x6<<8) |
-(0x1)
-> +#define PLL45XX_APLL_VAL_800	(1 << 31) | (0xc8<<16) | (0x6<<8) | (0x1)
-> +#else
-> +#define PLL45XX_APLL_VAL_1000	(1 << 31) | (125<<16) | (3<<8) | (1)
-> +#define PLL45XX_APLL_VAL_800	(1 << 31) | (100<<16) | (3<<8) | (1)
-> +#endif
+> +#define S5P_VA_DMC0     S3C_ADDR(0x00a00000)
+
+If you need to add VA_xxx, should be in plat-s5p/include/plat/map-s5p.h
+
 > +
->  enum pll45xx_type_t {
->  	pll_4500,
->  	pll_4502,
+> +#define S5P_PA_DMC1     (0xF1400000)
+> +#define S5P_VA_DMC1     S3C_ADDR(0x00b00000)
+
+Same...
+
+> +
+> +
+
+No need 2 empty lines...1 empty line is enough.
+
+>  #endif /* __ASM_ARCH_MAP_H */
 > --
 
-And...I got the below result from scripts/checkpatch.pl.
-
---
-
-ERROR: Macros with complex values should be enclosed in parenthesis
-#27: FILE: arch/arm/plat-s5p/include/plat/pll.h:25:
-+#define PLL45XX_APLL_VAL_1000  (1 << 31) | (0xfa<<16) | (0x6<<8) | (0x1)
-
-ERROR: Macros with complex values should be enclosed in parenthesis
-#28: FILE: arch/arm/plat-s5p/include/plat/pll.h:26:
-+#define PLL45XX_APLL_VAL_800   (1 << 31) | (0xc8<<16) | (0x6<<8) | (0x1)
-
-ERROR: Macros with complex values should be enclosed in parenthesis
-#30: FILE: arch/arm/plat-s5p/include/plat/pll.h:28:
-+#define PLL45XX_APLL_VAL_1000  (1 << 31) | (125<<16) | (3<<8) | (1)
-
-ERROR: Macros with complex values should be enclosed in parenthesis
-#31: FILE: arch/arm/plat-s5p/include/plat/pll.h:29:
-+#define PLL45XX_APLL_VAL_800   (1 << 31) | (100<<16) | (3<<8) | (1)
-
-total: 4 errors, 0 warnings, 14 lines checked
-
---
-
-I already said to you about that :-(
-See the Documentation/SubmittingPatches...
 
 Thanks.
 
