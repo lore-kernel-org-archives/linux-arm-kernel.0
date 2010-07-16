@@ -1,54 +1,79 @@
-From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Fri, 16 Jul 2010 12:10:34 +0300 (EEST)
-Subject: [RFC][PATCH 1/1] ARM: Add initial hibernation support
-In-Reply-To: <20100716075243.GB16124@n2100.arm.linux.org.uk>
-References: <20100715084118.GB26212@n2100.arm.linux.org.uk>
-	<20100715.120807.39160135.Hiroshi.DOYU@nokia.com>
-	<20100716075243.GB16124@n2100.arm.linux.org.uk>
-Message-ID: <20100716.121034.193687021.Hiroshi.DOYU@nokia.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Fri, 16 Jul 2010 17:11:43 +0800
+Subject: [PATCH] ARM/nuc900: fix nuc900 touchscreen clk definition bug
+In-Reply-To: <201007160919.24927.marek.vasut@gmail.com>
+References: <4C3FCBFF.50506@gmail.com>
+	<201007160709.15385.marek.vasut@gmail.com>
+	<AANLkTinEqScq2E0MSRJrUN5fR-1rs8fB9rLgMdhYW9R6@mail.gmail.com>
+	<201007160919.24927.marek.vasut@gmail.com>
+Message-ID: <AANLkTimi1FQLu5-gY-AV7Ukq9rBc31XrTWz3gLzZGYd1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: ext Russell King - ARM Linux <linux@arm.linux.org.uk>
-Subject: Re: [RFC][PATCH 1/1] ARM: Add initial hibernation support
-Date: Fri, 16 Jul 2010 09:52:44 +0200
-
-> On Thu, Jul 15, 2010 at 12:08:07PM +0300, Hiroshi DOYU wrote:
->> From: ext Russell King - ARM Linux <linux@arm.linux.org.uk>
->> Subject: Re: [RFC][PATCH 1/1] ARM: Add initial hibernation support
->> Date: Thu, 15 Jul 2010 10:41:18 +0200
->> 
->> > On Thu, Jul 15, 2010 at 08:34:50AM +0300, Hiroshi DOYU wrote:
->> >> Russell, would it be possible to put this into your next merge queue?
->> > 
->> > I think it needs quite a bit of rework - I certainly don't like all
->> > those CP15 register accesses there - that's asking for lots of ifdefs
->> > to spring up as more CPUs are supported.
+2010/7/16 Marek Vasut <marek.vasut@gmail.com>:
+> Dne P? 16. ?ervence 2010 07:34:21 Wan ZongShun napsal(a):
+>> 2010/7/16 Marek Vasut <marek.vasut@gmail.com>:
+>> > Dne P? 16. ?ervence 2010 05:03:27 Wan ZongShun napsal(a):
+>> >> This patch is to fix nuc900 touchscreen clk definition bug,the .dev_id's
+>> >> name should be 'nuc900-ts', it should be the same to pdev.name. or else,
+>> >> the touchscreen driver will be not working well due to clock engine
+>> >> disabled.
+>> >>
+>> >> Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+>> >> ---
+>> >> ?arch/arm/mach-w90x900/cpu.c | ? ?2 +-
+>> >> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>> >>
+>> >> diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
+>> >> index 642207e..83c5632 100644
+>> >> --- a/arch/arm/mach-w90x900/cpu.c
+>> >> +++ b/arch/arm/mach-w90x900/cpu.c
+>> >> @@ -93,7 +93,7 @@ static struct clk_lookup nuc900_clkregs[] = {
+>> >> ? ? ? DEF_CLKLOOK(&clk_kpi, "nuc900-kpi", NULL),
+>> >> ? ? ? DEF_CLKLOOK(&clk_wdt, "nuc900-wdt", NULL),
+>> >> ? ? ? DEF_CLKLOOK(&clk_gdma, "nuc900-gdma", NULL),
+>> >> - ? ? DEF_CLKLOOK(&clk_adc, "nuc900-adc", NULL),
+>> >> + ? ? DEF_CLKLOOK(&clk_adc, "nuc900-ts", NULL),
+>> >> ? ? ? DEF_CLKLOOK(&clk_usi, "nuc900-spi", NULL),
+>> >> ? ? ? DEF_CLKLOOK(&clk_ext, NULL, "ext"),
+>> >> ? ? ? DEF_CLKLOOK(&clk_timer0, NULL, "timer0"),
 >> >
->> > Eg, what about ensuring that state such as iWMMXt on PXA CPUs is
->> > properly restored?
->> 
->> Right. This arch specific part can be something like
->> "suspend-v[3-7].S" to accomodate those differences
-> 
-> It's not quite that simple - things like iWMMXt aren't part of the ARM
-> arch specs.
+>> > Hey,
+>> >
+>> > Is that thing really touchscreen or general-purpose analog/digital
+>> > converter ?
+>>
+>> Oh, it is general-purpose analog/digital converter controller.
+>> I only use it to implemnt my touchscreen function, Also it can be use
+>> other function.
+>>
+>> so, I have to change my touchscreen driver name to nuc900-adc?
 >
->> > We already have code which knows what needs to be saved across a
->> > power-off transition - its what we use for our normal suspend/resume
->> > functionality, so we should look at re-using that code for hibernate
->> > as well.  We really don't want to be maintaining two sets of code
->> > doing the same thing.
->> 
->> Could you explain which code you're refering for the existing one?
-> 
-> The code which handles saving state for the existing suspend/resume
-> support.  This code already saves the necessary state from CP15 and
-> any other state which needs to be saved prior to putting the system
-> into low power mode.
-> 
-> Every machine class which supports suspend today has their own chunk
-> of code which does this, normally called something like sleep.S
+> No, just change the name of clock in the touchscreen driver. So that the
+> touchscreen driver will use nuc900-adc clocksource.
 
-Ok, it seems to be the way to try to make use of the existing one for
-suspend-to-ram with some modifications.
+
+But the clk_get() identifies this clk via looking driver or pdev name.
+so I must change my touchscreen driver name, right?
+>
+> You're welcome. :)
+>
+>>
+>> Thanks for your Reminder, I appreciate it. :)
+>>
+>> > Cheers
+>
+
+
+
+-- 
+*linux-arm-kernel mailing list
+mail addr:linux-arm-kernel at lists.infradead.org
+you can subscribe by:
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+* linux-arm-NUC900 mailing list
+mail addr:NUC900 at googlegroups.com
+main web: https://groups.google.com/group/NUC900
+you can subscribe it by sending me mail:
+mcuos.com at gmail.com
