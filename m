@@ -1,342 +1,120 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Fri, 16 Jul 2010 15:23:20 +0900
-Subject: [PATCH 5/5] ARM: S5PV210: Initial CPUFREQ Support
-In-Reply-To: <AANLkTilH0cLPkdMHgQp31zbPONhTVyedlt_axR3CrrWd@mail.gmail.com>
-References: <1279184768-28971-1-git-send-email-myungjoo.ham@samsung.com>
-	<1279184768-28971-2-git-send-email-myungjoo.ham@samsung.com>
-	<1279184768-28971-3-git-send-email-myungjoo.ham@samsung.com>
-	<1279184768-28971-4-git-send-email-myungjoo.ham@samsung.com>
-	<1279184768-28971-5-git-send-email-myungjoo.ham@samsung.com>
-	<1279184768-28971-6-git-send-email-myungjoo.ham@samsung.com>
-	<20100715115942.GA15919@sirena.org.uk>
-	<AANLkTinrrXlh1GQ178_NzwWt5luO_1mdfIGy6G2ZNbPH@mail.gmail.com>
-	<AANLkTilH0cLPkdMHgQp31zbPONhTVyedlt_axR3CrrWd@mail.gmail.com>
-Message-ID: <AANLkTimKvPCX9ShsmhP_GAGwGL5iYsWeO0aLC05AqTc4@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 16 Jul 2010 08:24:26 +0200
+Subject: [PATCH v3] Samsung: sdhci-s3c: add support for new card detection
+	methods
+In-Reply-To: <20100715133954.7fcb797a.akpm@linux-foundation.org>
+References: <1279181721-23333-1-git-send-email-m.szyprowski@samsung.com>
+	<20100715133954.7fcb797a.akpm@linux-foundation.org>
+Message-ID: <011401cb24af$8eb2cb70$ac186250$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Marek,
+Hello,
 
-On Fri, Jul 16, 2010 at 2:42 PM, Kyungmin Park
-<kyungmin.park@samsung.com> wrote:
-> On Fri, Jul 16, 2010 at 2:37 PM, MyungJoo Ham <myungjoo.ham@samsung.com> wrote:
->> On Thu, Jul 15, 2010 at 8:59 PM, Mark Brown
->> <broonie@opensource.wolfsonmicro.com> wrote:
->>> On Thu, Jul 15, 2010 at 06:06:08PM +0900, MyungJoo Ham wrote:
->>>
->>>> +/* Based on MAX8998 default RAMP time: 10mV/us */
->>>> +#define PMIC_RAMP_UP ? ? ? ? (10)
->>>
->>> This should be handled within the regulator API, not by hard coding
->>> numbers into the CPUfreq drivers. ?With many regulators there will be no
->>> need at all for a ramp delay, they can ramp effectively instantaneously.
->>> Doing this through the regulator API avoids hard coding details of an
->>> individual regulator in your driver and ensures that all users of this
->>> regulator can handle the ramp rate.
->>>
->>> I did have most of a patch to introduce this, I'll go and dust it off
->>> soon. ?You should just be able to remove the ramp rate code from the
->>> CPUfreq driver.
->>
->> Making regulator API wait for the ramp up seems to be something like
->> "synchronous I/O", which in turn, forces CPU to do nothing while CPU
->> may execute some instructions while waiting for the ramp up. However,
->> we just do udelay() anyway; thus, it doesn't matter for us as well.
->> I'll try to put those udelay into MAX8998 PMIC drivers, which is for
->> S5PV210. I'll remove these udelay and PMIC_RAMP)UP from cpufreq driver
->> with the next version.
->>
->>>
->>>> + ? ? ? if (s3c_freqs.freqs.new >= s3c_freqs.freqs.old) {
->>>> + ? ? ? ? ? ? ? /* Voltage up code: increase ARM first */
->>>> + ? ? ? ? ? ? ? if (!IS_ERR(arm_regulator) && !IS_ERR(internal_regulator)) {
->>>> + ? ? ? ? ? ? ? ? ? ? ? regulator_set_voltage(arm_regulator,
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? arm_volt, arm_volt);
->>>> + ? ? ? ? ? ? ? ? ? ? ? regulator_set_voltage(internal_regulator,
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int_volt, int_volt);
->>>> + ? ? ? ? ? ? ? }
->>>
->>> You shouldn't be specifying an exact voltage here - there's no guarantee
->>> that the exact voltage you request will be delivered by the regulator,
->>> and some boards may wish to use constraints to eliminate some voltages
->>> (eg, to restrict the maximum operating point for the CPU).
->>>
->>> What you'd normally have here is that the minimum voltage would be the
->>> desired operating point for the CPU and the maximum voltage would be
->>> fixed at the maximum rated supply for the part. ?This will allow the
->>> regulator API to select the lowest voltage it is able to deliver.
->>
->> Currently, there is a bug in MAX8998 PMIC driver that sets VDDARM to
->> minimum possible voltage that is LARGER THAN or EQUAL TO max_vol, not
->> min_vol. I'll correct set_voltage usage of CPUFREQ assuming that
->> bugfix for MAX8998 PMIC driver is sent. (Joonyoung Shim, who's just
->> started submitting MAX8998 PMIC driver, know about this issue and will
->> probably send a patch soon.)
->
-> Marek submitted the initial max8998 codes. and joonyoung implement the
-> max8998-rtc.
->
-> just explain the bug to marek.
->
-> Thank you,
-> Kyungmin Park
+On Thursday, July 15, 2010 10:40 PM Andrew Morton wrote:
 
-As mentioned in this thread, we need some corrections in the MAX8998
-regulator driver.
+> On Thu, 15 Jul 2010 10:15:21 +0200
+> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> 
+> > On some Samsung SoCs not all SDHCI controllers have card detect (CD)
+> > line. For some embedded designs it is not even needed, because ususally
+> > the device (like SDIO flash memory or wifi controller) is permanently
+> > wired to the controller. There are also systems which have a card detect
+> > line connected to some of the external interrupt lines or the presence
+> > of the card depends on some other actions (like enabling a power
+> > regulator).
+> >
+> > This patch adds support for all these cases. The following card
+> > detection methods are possible:
+> >
+> > 1. internal sdhci host card detect line
+> > 2. external event
+> > 3. external gpio interrupt
+> > 4. no card detect line, controller will poll for the card
+> > 5. no card detect line, card is permanently wired to the controller
+> > (once detected host won't poll it any more)
+> >
+> > By default, all existing code would use method #1, what is compatible
+> > with the previous version of the driver.
+> >
+> > In case of external event, two callbacks must be provided in platdata:
+> > ext_cd_init and ext_cd_cleanup. Both of them get a callback to a
+> > function that notifies the s3c-sdhci host contoller as their argument.
+> > That callback function should be called from the even dispatcher to let
+> > host notice the card insertion/removal.
+> >
+> > In case of external gpio interrupt, a gpio pin number must be provided
+> > in platdata (ext_cd_gpio parameter), as well as the information about
+> > the polarity of that gpio pin (ext_cd_gpio_invert). By default
+> > (ext_cd_gpio_invert == 0) gpio value 0 means 'card has been removed',
+> > but this can be changed to 'card has been removed' when
+> > ext_cd_gpio_invert == 1.
+> >
+> > This patch adds all required changes to platform support code.
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >
+> > This a resend of the previous patch. Relevant patches for sdhci-s3c
+> > driver has been posted in a separate patch series for easier merging,
+> > please refer to the "[PATCH] SDHCI-S3C fixes and enhancements (driver
+> > specific code)" thread. They have been already taken by Andrew Morton
+> > into his patch tracking tree.
+> >
+> > I hope these changes to platform specific code gets merged soon, so the
+> > changes to the driver can be merged as well.
+> >
+> > The patch has been prepared for the following git tree:
+> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> for-next
+> >
+> > Changes since V2:
+> > - added support for HSMMC3 device
+> >
+> > Changes since V1:
+> > - added support for gpio external interrupt card based detect method
+> >   directly to sdhci-s3c driver
+> > - removed s3c64xx compilation fix patch from the series
+> >
+> > Best regards
+> > --
+> > Marek Szyprowski
+> > Samsung Poland R&D Center
+> >
+> > ---
+> >
+> >  arch/arm/mach-s3c64xx/setup-sdhci-gpio.c   |   14 +++++++++---
+> >  arch/arm/mach-s5pc100/setup-sdhci-gpio.c   |   21 ++++++++++++++-----
+> >  arch/arm/mach-s5pv210/setup-sdhci-gpio.c   |   22 +++++++++++++++-----
+> >  arch/arm/plat-samsung/dev-hsmmc.c          |    5 ++++
+> >  arch/arm/plat-samsung/dev-hsmmc1.c         |    5 ++++
+> >  arch/arm/plat-samsung/dev-hsmmc2.c         |    5 ++++
+> >  arch/arm/plat-samsung/dev-hsmmc3.c         |    5 ++++
+> >  arch/arm/plat-samsung/include/plat/sdhci.h |   29
+> ++++++++++++++++++++++++++++
+> >  8 files changed, 90 insertions(+), 16 deletions(-)
+> 
+> This is quite confusing.  You've already sent a patch called
+> "sdhci-s3c: add support for new card detection methods".  It had the
+> same changelog as this patch and the same title, but the two patches
+> are utterly different!
 
-1. max8998_set_voltage(rdev, min_uV, max_uV) max/min value
+The real patch has been split into two for easier merging: 1. the driver
+part and 2. samsung platform related part. The part which patch belongs
+to is indicated in the last line of the change log.
 
-  In the driver, the voltage value set by this function should be the
-minimum possible value that is larger than min_uV. However, currently,
-it sets the minimum possible value that is larger than or equal to
-max_uV, not min_uV. Please correct this one.
+I'm really confused how to submit properly a patch that requires changes
+to both the driver (which is merged by the proper driver maintainer's
+sub-tree) and the platform (which should go through platform maintainer's
+tree).
 
-2. max8998_set_voltage(rdev, min_uV, max_uV) ramp up delay
+> I suggest that you resend this patch under an appropriate title and
+> with a more specific changelog, please.
 
- Depending on which rdev we use and RAMP_UP register (including the EN
-bit) set_voltage, max8998_set_voltage can execute udelay()
-accordingly.
+Ok, I will add something like "(platform changes)" to the patch title next time.
 
-
-Do you plan to keep updating MAX8998 driver from the old kernel
-versions (such as 2.6.32 or 29)? We still have many missing features
-in MAX8998 driver with mainline.
-
-
->
->>
->> Modifying set_voltage usage of CPUFREQ as you've told will also make
->> the driver compatible to AVS; I'm working on AVS - IEM as well. :)
->>
->>>
->>>> +#ifdef CONFIG_REGULATOR
->>>> + ? ? ? arm_regulator = regulator_get_exclusive(NULL, "vddarm");
->>>> + ? ? ? if (IS_ERR(arm_regulator)) {
->>>> + ? ? ? ? ? ? ? printk(KERN_ERR "failed to get regulater resource vddarm\n");
->>>> + ? ? ? ? ? ? ? goto error;
->>>> + ? ? ? }
->>>> + ? ? ? internal_regulator = regulator_get_exclusive(NULL, "vddint");
->>>> + ? ? ? if (IS_ERR(internal_regulator)) {
->>>> + ? ? ? ? ? ? ? printk(KERN_ERR "failed to get regulater resource vddint\n");
->>>> + ? ? ? ? ? ? ? goto error;
->>>> + ? ? ? }
->>>> +#endif
->>>
->>> Remove these ifdefs, they're not needed - the regulator API will stub
->>> out the regulators. ?You should also have code to check that the voltage
->>> ranges for all the operating modes of the CPU can be supported. ?This is
->>> particularly important the way you've got the code at the minute
->>> specifying exact voltages.
->>
->> Got it.
->>
->>>
->>>> +#if defined(CONFIG_REGULATOR)
->>>> +#ifdef CONFIG_REGULATOR_MAX8998
->>>> + ? ? reg = __raw_readl(S5P_CLK_OUT);
->>>> + ? ? reg &= ~(0x1f << 12 | 0xf << 20); /* CLKSEL and DIVVAL*/
->>>> + ? ? apllreg = __raw_readl(S5P_APLL_CON);
->>>
->>> This ifdef for a particular regulator looks *very* suspicious. ?What's
->>> going on here?
->>
->> Good point. That ifdefs should be removed.
->>
->> Besides, the whole section enclosed by this CONFIG_REGULATOR will be removed.
->>
->> A while ago, WM8994 had been using CLK_OUT as the clock source with
->> APLL dependent setting; thus "target" function accessed CLK_OUT when
->> APLL changed. However, it no longer uses APLL dependent clock source
->> and we no longer access CLK_OUT at the "target" function; thus, this
->> code in "init" function can be removed.
->>
->>>
->>>> +#ifdef CPUFREQ_DISABLE_1GHZ
->>>> + ? ? reg |= (0x0 << 12 | 0x9 << 20); /* (800/4) / (9+1) = 20 */
->>>> +#else
->>>> + ? ? if (((apllreg << 16) & 0x3ff) == 0xfa) /* APLL=1GHz */
->>>> + ? ? ? ? ? ? reg |= (0x0 << 12 | 0xb << 20); /* (1000/4) / (11+1) = 20.833 */
->>>> + ? ? else /* APLL=800MHz */
->>>> + ? ? ? ? ? ? reg |= (0x0 << 12 | 0x9 << 20); /* (800/4) / (9+1) = 20 */
->>>> +#endif
->>>> + ? ? __raw_writel(reg, S5P_CLK_OUT);
->>>> +#endif
->>>> +#endif
->>>> +
->>>> + ? ? if (policy->cpu != 0) {
->>>> + ? ? ? ? ? ? printk(KERN_ERR "S5PV210 CPUFREQ cannot get proper cpu(%d)\n",
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? policy->cpu);
->>>> + ? ? ? ? ? ? return -EINVAL;
->>>> + ? ? }
->>>> + ? ? policy->cur = policy->min = policy->max = s5pv210_getspeed(0);
->>>> +
->>>> + ? ? cpufreq_frequency_table_get_attr(s5pv210_freq_table, policy->cpu);
->>>> +
->>>> + ? ? policy->cpuinfo.transition_latency = 40000; ? ? /*1us*/
->>>> +
->>>> + ? ? rate = clk_get_rate(mpu_clk);
->>>> + ? ? i = 0;
->>>> +
->>>> + ? ? while (s5pv210_freq_table[i].frequency != CPUFREQ_TABLE_END) {
->>>> + ? ? ? ? ? ? if (s5pv210_freq_table[i].frequency * 1000 == rate) {
->>>> + ? ? ? ? ? ? ? ? ? ? level = s5pv210_freq_table[i].index;
->>>> + ? ? ? ? ? ? ? ? ? ? break;
->>>> + ? ? ? ? ? ? }
->>>> + ? ? ? ? ? ? i++;
->>>> + ? ? }
->>>> +
->>>> + ? ? if (level == CPUFREQ_TABLE_END) { /* Not found */
->>>> + ? ? ? ? ? ? printk(KERN_ERR "[%s:%d] clock speed does not match: "
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? "%d. Using L1 of 800MHz.\n",
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? __FILE__, __LINE__, rate);
->>>> + ? ? ? ? ? ? level = L1;
->>>> + ? ? }
->>>> +
->>>> + ? ? printk(KERN_INFO "S5PV210 CPUFREQ Initialized.\n");
->>>> +
->>>> + ? ? memcpy(&s3c_freqs.old, &s5pv210_clk_info[level],
->>>> + ? ? ? ? ? ? ? ? ? ? sizeof(struct s3c_freq));
->>>> + ? ? previous_arm_volt = s5pv210_dvs_conf[level].arm_volt;
->>>> +
->>>> + ? ? return cpufreq_frequency_table_cpuinfo(policy, s5pv210_freq_table);
->>>> +}
->>>> +
->>>> +static struct cpufreq_driver s5pv210_driver = {
->>>> + ? ? .flags ? ? ? ? ?= CPUFREQ_STICKY,
->>>> + ? ? .verify ? ? ? ? = s5pv210_verify_speed,
->>>> + ? ? .target ? ? ? ? = s5pv210_target,
->>>> + ? ? .get ? ? ? ? ? ?= s5pv210_getspeed,
->>>> + ? ? .init ? ? ? ? ? = s5pv210_cpu_init,
->>>> + ? ? .name ? ? ? ? ? = "s5pv210",
->>>> +#ifdef CONFIG_PM
->>>> + ? ? .suspend ? ? ? ?= s5pv210_cpufreq_suspend,
->>>> + ? ? .resume ? ? ? ? = s5pv210_cpufreq_resume,
->>>> +#endif
->>>> +};
->>>> +
->>>> +static int __init s5pv210_cpufreq_init(void)
->>>> +{
->>>> + ? ? printk(KERN_INFO "S5PV210 CPUFREQ Init.\n");
->>>> +#ifdef CONFIG_REGULATOR
->>>> + ? ? arm_regulator = regulator_get_exclusive(NULL, "vddarm");
->>>> + ? ? if (IS_ERR(arm_regulator)) {
->>>> + ? ? ? ? ? ? printk(KERN_ERR "failed to get regulater resource vddarm\n");
->>>> + ? ? ? ? ? ? goto error;
->>>> + ? ? }
->>>> + ? ? internal_regulator = regulator_get_exclusive(NULL, "vddint");
->>>> + ? ? if (IS_ERR(internal_regulator)) {
->>>> + ? ? ? ? ? ? printk(KERN_ERR "failed to get regulater resource vddint\n");
->>>> + ? ? ? ? ? ? goto error;
->>>> + ? ? }
->>>> +#endif
->>>> + ? ? goto finish;
->>>> +error:
->>>> + ? ? printk(KERN_WARNING "Cannot get vddarm or vddint. CPUFREQ Will not"
->>>> + ? ? ? ? ? ? ? ? ? ?" change the voltage.\n");
->>>> +finish:
->>>> + ? ? return cpufreq_register_driver(&s5pv210_driver);
->>>> +}
->>>> +
->>>> +late_initcall(s5pv210_cpufreq_init);
->>>> diff --git a/arch/arm/mach-s5pv210/include/mach/cpu-freq.h b/arch/arm/mach-s5pv210/include/mach/cpu-freq.h
->>>> new file mode 100644
->>>> index 0000000..d3c31b2
->>>> --- /dev/null
->>>> +++ b/arch/arm/mach-s5pv210/include/mach/cpu-freq.h
->>>> @@ -0,0 +1,50 @@
->>>> +/* arch/arm/mach-s5pv210/include/mach/cpu-freq.h
->>>> + *
->>>> + * Copyright (c) 2010 Samsung Electronics
->>>> + *
->>>> + * ? MyungJoo Ham <myungjoo.ham@samsung.com>
->>>> + *
->>>> + * S5PV210/S5PC110 CPU frequency scaling support
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or modify
->>>> + * it under the terms of the GNU General Public License version 2 as
->>>> + * published by the Free Software Foundation.
->>>> +*/
->>>> +
->>>> +#ifndef _ARCH_ARM_MACH_S5PV210_INCLUDE_MACH_CPU_FREQ_H_
->>>> +#define _ARCH_ARM_MACH_S5PV210_INCLUDE_MACH_CPU_FREQ_H_
->>>> +
->>>> +#include <linux/cpufreq.h>
->>>> +
->>>> +#ifdef CONFIG_CPU_S5PV210
->>>> +
->>>> +#define USE_FREQ_TABLE
->>>> +
->>>> +#define KHZ_T ? ? ? ? ? 1000
->>>> +
->>>> +#define MPU_CLK ? ? ? ? "armclk"
->>>> +
->>>> +enum perf_level {
->>>> + ? ? L0 = 0,
->>>> + ? ? L1,
->>>> + ? ? L2,
->>>> + ? ? L3,
->>>> + ? ? L4,
->>>> +};
->>>> +
->>>> +#define CLK_DIV0_MASK ? ((0x7<<0)|(0x7<<8)|(0x7<<12)) ? /* APLL,HCLK_MSYS,PCLK_MSYS mask value ?*/
->>>> +
->>>> +#ifdef CONFIG_PM
->>>> +#define SLEEP_FREQ ? ? ?(800 * 1000) /* Use 800MHz when entering sleep */
->>>> +
->>>> +/* additional symantics for "relation" in cpufreq with pm */
->>>> +#define DISABLE_FURTHER_CPUFREQ ? ? ? ? 0x10
->>>> +#define ENABLE_FURTHER_CPUFREQ ? ? ? ? ?0x20
->>>> +#define MASK_FURTHER_CPUFREQ ? ? ? ? ? ?0x30
->>>> +/* With 0x00(NOCHANGE), it depends on the previous "further" status */
->>>> +
->>>> +#endif
->>>> +
->>>> +
->>>> +#endif /* CONFIG_CPU_S5PV210 */
->>>> +#endif /* _ARCH_ARM_MACH_S5PV210_INCLUDE_MACH_CPU_FREQ_H_ */
->>>> --
->>>> 1.6.3.3
->>>>
->>>>
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>>
->>>
->>> --
->>> "You grabbed my hand and we fell into it, like a daydream - or a fever."
->>>
->>
->> Thanks!
->>
->> --
->> MyungJoo Ham (???), Ph.D.
->> Mobile Software Platform Lab,
->> Digital Media and Communications (DMC) Business
->> Samsung Electronics
->> cell: 82-10-6714-2858
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
-Cheers!
-
-- MyungJoo
-
--- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
