@@ -1,89 +1,80 @@
-From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
-Date: Fri, 16 Jul 2010 18:30:39 +0200
-Subject: [PATCH] mxc_udc: add workaround for ENGcm09152 for i.MX35
-Message-ID: <1279297839-2155-1-git-send-email-eric@eukrea.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 16 Jul 2010 18:33:43 +0200
+Subject: [PATCH 04/10 v2] v4l: Add Samsung FIMC (video postprocessor)
+	driver
+In-Reply-To: <012601cb24db$84fb2380$8ef16a80$%kim@samsung.com>
+References: <1279185041-6004-1-git-send-email-s.nawrocki@samsung.com>
+	<1279185041-6004-5-git-send-email-s.nawrocki@samsung.com>
+	<012601cb24db$84fb2380$8ef16a80$%kim@samsung.com>
+Message-ID: <000a01cb2504$a8007410$f8015c30$%nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch gives the possibility to workaround bug ENGcm09152
-on i.MX35 when the hardware workaround is also implemented on
-the board.
+> -----Original Message-----
+> From: Kukjin Kim [mailto:kgene.kim at samsung.com]
+> Sent: Friday, July 16, 2010 1:39 PM
+> To: 'Sylwester Nawrocki'; linux-samsung-soc at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Cc: p.osciak at samsung.com; m.szyprowski at samsung.com;
+> kyungmin.park at samsung.com; linux-media at vger.kernel.org
+> Subject: RE: [PATCH 04/10 v2] v4l: Add Samsung FIMC (video
+> postprocessor) driver
+> 
+> Sylwester Nawrocki wrote:
+> >
+> Hi,
+> 
+> Samsung S.LSI hardly recommends DMA mode to implement the feature not
+> FIFO
+> mode because of H/W limitation.
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
----
- arch/arm/mach-mx3/mach-cpuimx35.c |    1 +
- drivers/usb/gadget/fsl_mxc_udc.c  |   12 ++++++++++++
- include/linux/fsl_devices.h       |    3 +++
- 3 files changed, 16 insertions(+), 0 deletions(-)
+Does the hardware issue occur in all SoCs or only some specific versions 
+are affected?
+So far we were successful with S5PC110 EVT0, however we could not make 
+it work on S5PV210 (EVT1). That said I have created an option in the FIMC
+variant definition (samsung_fimc_variant::fifo_capable) so that 
+the V4L2 video node for FIMC FIFO operation mode is registered only 
+for selected SoC variants.
 
-diff --git a/arch/arm/mach-mx3/mach-cpuimx35.c b/arch/arm/mach-mx3/mach-cpuimx35.c
-index 56e5bf0..9d578de 100644
---- a/arch/arm/mach-mx3/mach-cpuimx35.c
-+++ b/arch/arm/mach-mx3/mach-cpuimx35.c
-@@ -154,6 +154,7 @@ static struct mxc_usbh_platform_data usbh1_pdata = {
- static struct fsl_usb2_platform_data otg_device_pdata = {
- 	.operating_mode	= FSL_USB2_DR_DEVICE,
- 	.phy_mode	= FSL_USB2_PHY_UTMI,
-+	.workaround	= FLS_USB2_WORKAROUND_ENGCM09152,
- };
- 
- static int otg_mode_host;
-diff --git a/drivers/usb/gadget/fsl_mxc_udc.c b/drivers/usb/gadget/fsl_mxc_udc.c
-index eafa6d2..1a31cf9 100644
---- a/drivers/usb/gadget/fsl_mxc_udc.c
-+++ b/drivers/usb/gadget/fsl_mxc_udc.c
-@@ -22,6 +22,10 @@
- static struct clk *mxc_ahb_clk;
- static struct clk *mxc_usb_clk;
- 
-+/* workaround ENGcm09152 for i.MX35 */
-+#define USBPHYCTRL_OTGBASE_OFFSET	0x608
-+#define USBPHYCTRL_EVDO			(1 << 23)
-+
- int fsl_udc_clk_init(struct platform_device *pdev)
- {
- 	struct fsl_usb2_platform_data *pdata;
-@@ -84,6 +88,7 @@ eenahb:
- void fsl_udc_clk_finalize(struct platform_device *pdev)
- {
- 	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
-+	unsigned int v;
- 
- 	/* ULPI transceivers don't need usbpll */
- 	if (pdata->phy_mode == FSL_USB2_PHY_ULPI) {
-@@ -91,6 +96,13 @@ void fsl_udc_clk_finalize(struct platform_device *pdev)
- 		clk_put(mxc_usb_clk);
- 		mxc_usb_clk = NULL;
- 	}
-+	/* workaround ENGcm09152 for i.MX35 */
-+	if (pdata->workaround & FLS_USB2_WORKAROUND_ENGCM09152) {
-+		v = readl(MX35_IO_ADDRESS(MX35_OTG_BASE_ADDR +
-+				USBPHYCTRL_OTGBASE_OFFSET));
-+		writel(v | USBPHYCTRL_EVDO, MX35_IO_ADDRESS(MX35_OTG_BASE_ADDR +
-+				USBPHYCTRL_OTGBASE_OFFSET));
-+	}
- }
- 
- void fsl_udc_clk_release(void)
-diff --git a/include/linux/fsl_devices.h b/include/linux/fsl_devices.h
-index 28e33fe..01a23fa 100644
---- a/include/linux/fsl_devices.h
-+++ b/include/linux/fsl_devices.h
-@@ -63,12 +63,15 @@ struct fsl_usb2_platform_data {
- 	enum fsl_usb2_operating_modes	operating_mode;
- 	enum fsl_usb2_phy_modes		phy_mode;
- 	unsigned int			port_enables;
-+	unsigned int			workaround;
- };
- 
- /* Flags in fsl_usb2_mph_platform_data */
- #define FSL_USB2_PORT0_ENABLED	0x00000001
- #define FSL_USB2_PORT1_ENABLED	0x00000002
- 
-+#define FLS_USB2_WORKAROUND_ENGCM09152	(1 << 0)
-+
- struct spi_device;
- 
- struct fsl_spi_platform_data {
--- 
-1.6.3.3
+> 
+> > This driver exports two video device nodes per each FIMC device,
+> > one for for memory to memory (color conversion, image resizing,
+> > flipping and rotation) operations and one for direct
+> > V4L2 output interface to framebuffer.
+> >
+> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > Reviewed-by: Pawel Osciak <p.osciak@samsung.com>
+> > Reviewed-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > ---
+> >  drivers/media/video/Kconfig                  |   20 +
+> >  drivers/media/video/Makefile                 |    1 +
+> >  drivers/media/video/samsung/fimc/Makefile    |    3 +
+> >  drivers/media/video/samsung/fimc/fimc-core.c | 1664
+> > ++++++++++++++++++++++++++
+> >  drivers/media/video/samsung/fimc/fimc-core.h |  541 +++++++++
+> >  drivers/media/video/samsung/fimc/fimc-fifo.c |  814 +++++++++++++
+> >  drivers/media/video/samsung/fimc/fimc-reg.c  |  585 +++++++++
+> >  include/linux/videodev2.h                    |    1 +
+> >  8 files changed, 3629 insertions(+), 0 deletions(-)
+> >  create mode 100644 drivers/media/video/samsung/fimc/Makefile
+> >  create mode 100644 drivers/media/video/samsung/fimc/fimc-core.c
+> >  create mode 100644 drivers/media/video/samsung/fimc/fimc-core.h
+> >  create mode 100644 drivers/media/video/samsung/fimc/fimc-fifo.c
+> >  create mode 100644 drivers/media/video/samsung/fimc/fimc-reg.c
+> >
+> 
+> (snip)
+> 
+> Thanks.
+> 
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+Best regards,
+--
+Sylwester Nawrocki
+Samsung Poland R&D Center
