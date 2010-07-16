@@ -1,35 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Jul 2010 08:58:56 +0100
-Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
-	memory management
-In-Reply-To: <AANLkTinVZeaZxt_lWKhjKa0dqhu3_j3BRNySO-2LvMdw@mail.gmail.com>
-References: <4C3C0032.5020702@codeaurora.org>
-	<20100713150311B.fujita.tomonori@lab.ntt.co.jp>
-	<20100713121420.GB4263@codeaurora.org>
-	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
-	<20100714201149.GA14008@codeaurora.org>
-	<20100714220536.GE18138@n2100.arm.linux.org.uk>
-	<20100715012958.GB2239@codeaurora.org>
-	<20100715085535.GC26212@n2100.arm.linux.org.uk>
-	<AANLkTinVZeaZxt_lWKhjKa0dqhu3_j3BRNySO-2LvMdw@mail.gmail.com>
-Message-ID: <20100716075856.GC16124@n2100.arm.linux.org.uk>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Fri, 16 Jul 2010 17:01:12 +0900
+Subject: [PATCH v2 0/5] ARM: S5PV210: CPUFREQ Initial Support
+Message-ID: <1279267277-6804-1-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 15, 2010 at 08:48:36PM -0400, Tim HRM wrote:
-> Interesting, since I seem to remember the MSM devices mostly conduct
-> IO through regions of normal RAM, largely accomplished through
-> ioremap() calls.
-> 
-> Without more public domain documentation of the MSM chips and AMSS
-> interfaces I wouldn't know how to avoid this, but I can imagine it
-> creates a bit of urgency for Qualcomm developers as they attempt to
-> upstream support for this most interesting SoC.
+S5PV210 CPUFREQ Initial Support.
 
-As the patch has been out for RFC since early April on the linux-arm-kernel
-mailing list (Subject: [RFC] Prohibit ioremap() on kernel managed RAM),
-and no comments have come back from Qualcomm folk.
+This is a series of patches to enable CPUFREQ for S5PV210.
 
-The restriction on creation of multiple V:P mappings with differing
-attributes is also fairly hard to miss in the ARM architecture
-specification when reading the sections about caches.
+Although this works without PMIC's DVS support, it is not
+as effective without DVS support as supposed. AVS is not
+supported in this version.
+
+
+MyungJoo Ham (5):
+  ARM: Samsung SoC: added hclk/pclk info to s3c_freq for s5pv210
+    cpu-freq
+  ARM: S5P: Added default pll values for APLL 800/1000MHz
+  ARM: S5PV210: macros for clock registers at regs-clock.h
+  ARM: S5PV210: add DMCx access virtual address
+  ARM: S5PV210: Initial CPUFREQ Support
+
+ arch/arm/Kconfig                                |    1 +
+ arch/arm/mach-s5pv210/Makefile                  |    3 +
+ arch/arm/mach-s5pv210/cpu.c                     |   12 +-
+ arch/arm/mach-s5pv210/cpufreq-s5pv210.c         |  776 +++++++++++++++++++++++
+ arch/arm/mach-s5pv210/include/mach/cpu-freq.h   |   50 ++
+ arch/arm/mach-s5pv210/include/mach/map.h        |    8 +
+ arch/arm/mach-s5pv210/include/mach/regs-clock.h |   45 ++-
+ arch/arm/plat-s5p/include/plat/pll.h            |    8 +
+ arch/arm/plat-samsung/include/plat/cpu-freq.h   |    6 +
+ 9 files changed, 905 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/mach-s5pv210/cpufreq-s5pv210.c
+ create mode 100644 arch/arm/mach-s5pv210/include/mach/cpu-freq.h
