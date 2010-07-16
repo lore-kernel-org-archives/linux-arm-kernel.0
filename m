@@ -1,183 +1,196 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 16 Jul 2010 22:13:18 +0900
-Subject: [PATCH 2/3] ARM: S5PV210: Add support for I2C devices on SMDKV210 and
-	SMDKC110
+Date: Fri, 16 Jul 2010 22:13:17 +0900
+Subject: [PATCH 1/3] ARM: S5P6440: Add support for I2C channel 0 and 1 on
+	SMDK6440
 In-Reply-To: <1279285999-27555-1-git-send-email-kgene.kim@samsung.com>
 References: <1279285999-27555-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1279285999-27555-3-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1279285999-27555-2-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Naveen Krishna Ch <ch.naveen@samsung.com>
 
-This patch adds support I2C-0/1/2 devices to the SMDKV210/SMDKC110.
+This patch adds helper functions for I2C channel 0 and 1, GPIO
+configurations for I2C on S5P6440 and support I2C-0/1 devices
+on SMDK6440.
 
 Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5pv210/Kconfig         |    8 ++++++++
- arch/arm/mach-s5pv210/mach-smdkc110.c |   28 ++++++++++++++++++++++++++++
- arch/arm/mach-s5pv210/mach-smdkv210.c |   29 +++++++++++++++++++++++++++++
- 3 files changed, 65 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5p6440/Kconfig            |    7 +++++++
+ arch/arm/mach-s5p6440/Makefile           |    1 +
+ arch/arm/mach-s5p6440/include/mach/map.h |    2 ++
+ arch/arm/mach-s5p6440/mach-smdk6440.c    |   20 ++++++++++++++++++++
+ arch/arm/mach-s5p6440/setup-i2c0.c       |    7 ++++++-
+ arch/arm/mach-s5p6440/setup-i2c1.c       |   30 ++++++++++++++++++++++++++++++
+ 6 files changed, 66 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-s5p6440/setup-i2c1.c
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 0761eac..2a996d9 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -72,9 +72,13 @@ config MACH_SMDKV210
- 	select CPU_S5PV210
- 	select ARCH_SPARSEMEM_ENABLE
+diff --git a/arch/arm/mach-s5p6440/Kconfig b/arch/arm/mach-s5p6440/Kconfig
+index f066fae..ba3927b 100644
+--- a/arch/arm/mach-s5p6440/Kconfig
++++ b/arch/arm/mach-s5p6440/Kconfig
+@@ -13,13 +13,20 @@ config CPU_S5P6440
+ 	help
+ 	  Enable S5P6440 CPU support
+ 
++config S5P6440_SETUP_I2C1
++	bool
++	help
++	  Common setup code for i2c bus 1.
++
+ config MACH_SMDK6440
+ 	bool "SMDK6440"
+ 	select CPU_S5P6440
+ 	select SAMSUNG_DEV_TS
  	select SAMSUNG_DEV_ADC
 +	select S3C_DEV_I2C1
-+	select S3C_DEV_I2C2
- 	select SAMSUNG_DEV_TS
  	select S3C_DEV_WDT
  	select HAVE_S3C2410_WATCHDOG
-+	select S5PV210_SETUP_I2C1
-+	select S5PV210_SETUP_I2C2
++	select S5P6440_SETUP_I2C1
  	help
- 	  Machine support for Samsung SMDKV210
+ 	  Machine support for the Samsung SMDK6440
  
-@@ -82,8 +86,12 @@ config MACH_SMDKC110
- 	bool "SMDKC110"
- 	select CPU_S5PV210
- 	select ARCH_SPARSEMEM_ENABLE
-+	select S3C_DEV_I2C1
-+	select S3C_DEV_I2C2
- 	select S3C_DEV_WDT
- 	select HAVE_S3C2410_WATCHDOG
-+	select S5PV210_SETUP_I2C1
-+	select S5PV210_SETUP_I2C2
- 	help
- 	  Machine support for Samsung SMDKC110
- 	  S5PC110(MCP) is one of package option of S5PV210
-diff --git a/arch/arm/mach-s5pv210/mach-smdkc110.c b/arch/arm/mach-s5pv210/mach-smdkc110.c
-index 4c8903c..420f9a0 100644
---- a/arch/arm/mach-s5pv210/mach-smdkc110.c
-+++ b/arch/arm/mach-s5pv210/mach-smdkc110.c
-@@ -12,6 +12,7 @@
- #include <linux/types.h>
+diff --git a/arch/arm/mach-s5p6440/Makefile b/arch/arm/mach-s5p6440/Makefile
+index be3c53a..c3fe4d3 100644
+--- a/arch/arm/mach-s5p6440/Makefile
++++ b/arch/arm/mach-s5p6440/Makefile
+@@ -22,3 +22,4 @@ obj-$(CONFIG_MACH_SMDK6440)	+= mach-smdk6440.o
+ # device support
+ obj-y				+= dev-audio.o
+ obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
++obj-$(CONFIG_S5P6440_SETUP_I2C1)	+= setup-i2c1.o
+diff --git a/arch/arm/mach-s5p6440/include/mach/map.h b/arch/arm/mach-s5p6440/include/mach/map.h
+index 44011b9..d6a3a29 100644
+--- a/arch/arm/mach-s5p6440/include/mach/map.h
++++ b/arch/arm/mach-s5p6440/include/mach/map.h
+@@ -53,6 +53,7 @@
+ #define S5P_SZ_UART		SZ_256
+ 
+ #define S5P6440_PA_IIC0		(0xEC104000)
++#define S5P6440_PA_IIC1		(0xEC20F000)
+ 
+ #define S5P6440_PA_SPI0		0xEC400000
+ #define S5P6440_PA_SPI1		0xEC500000
+@@ -77,6 +78,7 @@
+ /* compatibiltiy defines. */
+ #define S3C_PA_UART		S5P6440_PA_UART
+ #define S3C_PA_IIC		S5P6440_PA_IIC0
++#define S3C_PA_IIC1		S5P6440_PA_IIC1
+ #define S3C_PA_WDT		S5P6440_PA_WDT
+ 
+ #define SAMSUNG_PA_ADC		S5P6440_PA_ADC
+diff --git a/arch/arm/mach-s5p6440/mach-smdk6440.c b/arch/arm/mach-s5p6440/mach-smdk6440.c
+index 8291fec..623354e 100644
+--- a/arch/arm/mach-s5p6440/mach-smdk6440.c
++++ b/arch/arm/mach-s5p6440/mach-smdk6440.c
+@@ -15,6 +15,7 @@
+ #include <linux/timer.h>
+ #include <linux/delay.h>
  #include <linux/init.h>
- #include <linux/serial_core.h>
 +#include <linux/i2c.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -25,6 +26,7 @@
- #include <plat/s5pv210.h>
+ #include <linux/serial_core.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+@@ -37,6 +38,7 @@
+ #include <mach/regs-clock.h>
  #include <plat/devs.h>
  #include <plat/cpu.h>
 +#include <plat/iic.h>
- 
- /* Following are default values for UCON, ULCON and UFCON UART registers */
- #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-@@ -74,9 +76,24 @@ static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
- static struct platform_device *smdkc110_devices[] __initdata = {
- 	&s5pv210_device_iis0,
- 	&s5pv210_device_ac97,
-+	&s3c_device_i2c0,
-+	&s3c_device_i2c1,
-+	&s3c_device_i2c2,
- 	&s3c_device_wdt,
- };
- 
-+static struct i2c_board_info smdkc100_i2c_devs0[] __initdata = {
-+	{ I2C_BOARD_INFO("24c08", 0x50), },     /* Samsung S524AD0XD1 */
-+};
-+
-+static struct i2c_board_info smdkc100_i2c_devs1[] __initdata = {
-+	/* To Be Updated */
-+};
-+
-+static struct i2c_board_info smdkc100_i2c_devs2[] __initdata = {
-+	/* To Be Updated */
-+};
-+
- static void __init smdkc110_map_io(void)
- {
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-@@ -86,6 +103,17 @@ static void __init smdkc110_map_io(void)
- 
- static void __init smdkc110_machine_init(void)
- {
-+	/* I2C */
-+	s3c_i2c0_set_platdata(NULL);
-+	s3c_i2c1_set_platdata(NULL);
-+	s3c_i2c2_set_platdata(NULL);
-+	i2c_register_board_info(0, smdkc100_i2c_devs0,
-+			ARRAY_SIZE(smdkc100_i2c_devs0));
-+	i2c_register_board_info(1, smdkc100_i2c_devs1,
-+			ARRAY_SIZE(smdkc100_i2c_devs1));
-+	i2c_register_board_info(2, smdkc100_i2c_devs2,
-+			ARRAY_SIZE(smdkc100_i2c_devs2));
-+
- 	platform_add_devices(smdkc110_devices, ARRAY_SIZE(smdkc110_devices));
- }
- 
-diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
-index 0d46279..765f47e 100644
---- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-+++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-@@ -10,6 +10,7 @@
- 
- #include <linux/kernel.h>
- #include <linux/types.h>
-+#include <linux/i2c.h>
- #include <linux/init.h>
- #include <linux/serial_core.h>
- 
-@@ -27,6 +28,7 @@
- #include <plat/cpu.h>
+ #include <plat/pll.h>
  #include <plat/adc.h>
  #include <plat/ts.h>
-+#include <plat/iic.h>
- 
- /* Following are default values for UCON, ULCON and UFCON UART registers */
- #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-@@ -77,10 +79,25 @@ static struct platform_device *smdkv210_devices[] __initdata = {
- 	&s5pv210_device_iis0,
- 	&s5pv210_device_ac97,
+@@ -88,10 +90,20 @@ static struct s3c2410_uartcfg smdk6440_uartcfgs[] __initdata = {
+ static struct platform_device *smdk6440_devices[] __initdata = {
+ 	&s5p6440_device_iis,
  	&s3c_device_adc,
 +	&s3c_device_i2c0,
 +	&s3c_device_i2c1,
-+	&s3c_device_i2c2,
  	&s3c_device_ts,
  	&s3c_device_wdt,
  };
  
-+static struct i2c_board_info smdkv210_i2c_devs0[] __initdata = {
-+	{ I2C_BOARD_INFO("24c08", 0x50), },     /* Samsung S524AD0XD1 */
++static struct i2c_board_info smdk6440_i2c_devs0[] __initdata = {
++	{ I2C_BOARD_INFO("24c08", 0x50), },
 +};
 +
-+static struct i2c_board_info smdkv210_i2c_devs1[] __initdata = {
-+	/* To Be Updated */
-+};
-+
-+static struct i2c_board_info smdkv210_i2c_devs2[] __initdata = {
-+	/* To Be Updated */
++static struct i2c_board_info smdk6440_i2c_devs1[] __initdata = {
++	/* To be populated */
 +};
 +
  static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
  	.delay			= 10000,
  	.presc			= 49,
-@@ -97,6 +114,18 @@ static void __init smdkv210_map_io(void)
- static void __init smdkv210_machine_init(void)
+@@ -109,6 +121,14 @@ static void __init smdk6440_machine_init(void)
  {
  	s3c24xx_ts_set_platdata(&s3c_ts_platform);
-+
+ 
 +	/* I2C */
 +	s3c_i2c0_set_platdata(NULL);
 +	s3c_i2c1_set_platdata(NULL);
-+	s3c_i2c2_set_platdata(NULL);
-+	i2c_register_board_info(0, smdkv210_i2c_devs0,
-+			ARRAY_SIZE(smdkv210_i2c_devs0));
-+	i2c_register_board_info(1, smdkv210_i2c_devs1,
-+			ARRAY_SIZE(smdkv210_i2c_devs1));
-+	i2c_register_board_info(2, smdkv210_i2c_devs2,
-+			ARRAY_SIZE(smdkv210_i2c_devs2));
++	i2c_register_board_info(0, smdk6440_i2c_devs0,
++			ARRAY_SIZE(smdk6440_i2c_devs0));
++	i2c_register_board_info(1, smdk6440_i2c_devs1,
++			ARRAY_SIZE(smdk6440_i2c_devs1));
 +
- 	platform_add_devices(smdkv210_devices, ARRAY_SIZE(smdkv210_devices));
+ 	platform_add_devices(smdk6440_devices, ARRAY_SIZE(smdk6440_devices));
  }
  
+diff --git a/arch/arm/mach-s5p6440/setup-i2c0.c b/arch/arm/mach-s5p6440/setup-i2c0.c
+index 69e8a66..2c99d14 100644
+--- a/arch/arm/mach-s5p6440/setup-i2c0.c
++++ b/arch/arm/mach-s5p6440/setup-i2c0.c
+@@ -17,9 +17,14 @@
+ 
+ struct platform_device; /* don't need the contents */
+ 
++#include <linux/gpio.h>
++#include <plat/gpio-cfg.h>
+ #include <plat/iic.h>
+ 
+ void s3c_i2c0_cfg_gpio(struct platform_device *dev)
+ {
+-	/* Will be populated later */
++	s3c_gpio_cfgpin(S5P6440_GPB(5), S3C_GPIO_SFN(2));
++	s3c_gpio_setpull(S5P6440_GPB(5), S3C_GPIO_PULL_UP);
++	s3c_gpio_cfgpin(S5P6440_GPB(6), S3C_GPIO_SFN(2));
++	s3c_gpio_setpull(S5P6440_GPB(6), S3C_GPIO_PULL_UP);
+ }
+diff --git a/arch/arm/mach-s5p6440/setup-i2c1.c b/arch/arm/mach-s5p6440/setup-i2c1.c
+new file mode 100644
+index 0000000..9a1537f
+--- /dev/null
++++ b/arch/arm/mach-s5p6440/setup-i2c1.c
+@@ -0,0 +1,30 @@
++/* linux/arch/arm/mach-s5p6440/setup-i2c1.c
++ *
++ * Copyright (c) 2009 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * I2C1 GPIO configuration.
++ *
++ * Based on plat-s3c64xx/setup-i2c0.c
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/gpio.h>
++
++struct platform_device; /* don't need the contents */
++
++#include <plat/gpio-cfg.h>
++#include <plat/iic.h>
++
++void s3c_i2c1_cfg_gpio(struct platform_device *dev)
++{
++	s3c_gpio_cfgpin(S5P6440_GPR(9), S3C_GPIO_SFN(6));
++	s3c_gpio_setpull(S5P6440_GPR(9), S3C_GPIO_PULL_UP);
++	s3c_gpio_cfgpin(S5P6440_GPR(10), S3C_GPIO_SFN(6));
++	s3c_gpio_setpull(S5P6440_GPR(10), S3C_GPIO_PULL_UP);
++}
 -- 
 1.6.2.5
