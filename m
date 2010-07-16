@@ -1,120 +1,32 @@
-From: philippe.langlais@stericsson.com (Philippe Langlais)
-Date: Fri, 16 Jul 2010 15:09:55 +0200
-Subject: [PATCH 3/6] U6715 gpio platform driver This driver is
-	U6XXX	platform generic
-In-Reply-To: <20100715111823.GB29322@n2100.arm.linux.org.uk>
-References: <1278688913-26417-1-git-send-email-philippe.langlais@stericsson.com>
-	<1278688913-26417-4-git-send-email-philippe.langlais@stericsson.com>
-	<20100715111823.GB29322@n2100.arm.linux.org.uk>
-Message-ID: <4C405A23.7000009@stericsson.com>
+From: rabin.vincent@stericsson.com (Rabin VINCENT)
+Date: Fri, 16 Jul 2010 18:49:09 +0530
+Subject: [PATCH 0/3] Cache maintenance on VIPT caches
+In-Reply-To: <20100625115826.30030.89790.stgit@e102109-lin.cambridge.arm.com>
+References: <20100625115826.30030.89790.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100716131908.GA15032@bnru02.bnr.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jun 25, 2010 at 14:01:27 +0200, Catalin Marinas wrote:
+> The first and third patches have already been posted in the same form.
+> The second patch have been modified to handle all the VIPT caches via
+> __sync_icache_dcache(). The initial use case for this patch was dealing
+> with an SMP race condition but following suggestions from Rabin, it was
+> extended to cover ARMv6 onwards, both UP and SMP.
+> 
+> Any Tested-by's are welcome.
 
-I take into account all comments and I'll send a new U6 GPIO patch
+This version also fixes the MMC rootfs init crashes, without the need
+for the flush_kernel_dcache_page() change:
 
-Regards,
-Philippe
+Tested-by: Rabin Vincent <rabin.vincent@stericsson.com>
 
-On 07/15/10 13:18, Russell King - ARM Linux wrote:
-> Thanks, this is much better.  Just a few remaining niggles.
->
-> On Fri, Jul 09, 2010 at 05:21:50PM +0200, Philippe Langlais wrote:
->    
->> diff --git a/arch/arm/mach-u67xx/board_u67xx_wavex.c b/arch/arm/mach-u67xx/board_u67xx_wavex.c
->> index 633989f..235e80d 100644
->> --- a/arch/arm/mach-u67xx/board_u67xx_wavex.c
->> +++ b/arch/arm/mach-u67xx/board_u67xx_wavex.c
->> @@ -23,6 +23,473 @@
->>   #include<mach/hardware.h>
->>   #include<mach/irqs.h>
->>   #include<mach/timer.h>
->> +#include<mach/gpio.h>
->>      
-> Should be linux/gpio.h
->
->    
->> diff --git a/arch/arm/mach-u67xx/devices.c b/arch/arm/mach-u67xx/devices.c
->> index 1d00b35..e88a106 100644
->> --- a/arch/arm/mach-u67xx/devices.c
->> +++ b/arch/arm/mach-u67xx/devices.c
->> @@ -11,10 +11,78 @@
->>   #include<linux/kernel.h>
->>   #include<linux/init.h>
->>   #include<linux/device.h>
->> +#include<linux/ioport.h>
->>   #include<linux/platform_device.h>
->> +#include<linux/fs.h>
->> +#include<linux/gpio.h>
->> +#include<mach/hardware.h>
->> +#include<mach/scon.h>
->> +#include<mach/gpio.h>
->>      
-> You're already including linux/gpio.h, so this shouldn't be required.
->
->    
->> diff --git a/arch/arm/plat-u6xxx/gpio.c b/arch/arm/plat-u6xxx/gpio.c
->> new file mode 100644
->> index 0000000..40205d2
->> --- /dev/null
->> +++ b/arch/arm/plat-u6xxx/gpio.c
->> @@ -0,0 +1,672 @@
->> +/*
->> + * linux/arch/arm/plat-u6xxx/gpio.c
->> + *
->> + * Copyright (C) ST-Ericsson SA 2010
->> + * Author: Loic Pallardy<loic.pallardy@stericsson.com>  for ST-Ericsson.
->> + * License terms:  GNU General Public License (GPL), version 2
->> + * Support functions for GPIO
->> + */
->> +
->> +#include<linux/init.h>
->> +#include<linux/kernel.h>
->> +#include<linux/module.h>
->> +#include<linux/platform_device.h>
->> +#include<linux/sched.h>
->> +#include<linux/interrupt.h>
->> +#include<linux/ptrace.h>
->> +#include<linux/sysdev.h>
->> +#include<linux/err.h>
->> +#include<linux/clk.h>
->> +#include<linux/io.h>
->> +
->> +#include<asm/irq.h>
->> +#include<asm/mach/irq.h>
->> +
->> +#include<mach/hardware.h>
->> +#include<mach/irqs.h>
->> +#include<mach/gpio.h>
->>      
-> linux/gpio.h again please.
->
->    
->> +static struct platform_driver u6_gpio_driver = {
->> +	.probe = u6_gpio_probe,
->> +	.remove = NULL,
->> +	.suspend = NULL,
->> +	.resume = NULL,
->>      
-> NULL initializers aren't required.
->
->    
->> +	.driver = {
->> +		   .name = "u6-gpio",
->> +		   },
->>      
-> } should be aligned with the '.' of '.driver'.
->
-> Lastly, I'm confused by this in a few places:
->
-> 	local_irq_save(flags);
-> 	writel(some value, register);
-> 	local_irq_restore(flags);
->
-> Is there a reason why this apparantly simple register write need IRQs to
-> be disabled?
->
-> I don't think this patch needs another review cycle, unless someone else
-> wants to comment on it.
->    
+Will you be submitting this patch for linux-next?  I ask because the
+mmci patches that I posted convert that driver to use the sg_miter API
+(which uses flush_kernel_dcache_page() internally), and not do any
+flushing inside the driver itself.  Or do you think it would be
+appropriate to have the driver call flush_dcache_page() explicitly?
+(Although this would be double flushing on systems with aliasing caches
+where flush_kernel_dcache_page() is not a no-op.)
+
+Rabin
