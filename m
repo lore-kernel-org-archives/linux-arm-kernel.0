@@ -1,41 +1,31 @@
-From: minchan.kim@gmail.com (Minchan Kim)
-Date: Fri, 16 Jul 2010 11:52:20 +0900
-Subject: Question of kmap_atomic
-In-Reply-To: <alpine.LFD.2.00.1007152241110.10598@xanadu.home>
-References: <AANLkTilFvE0eyQS7jNQ77OYkJovJugjKRO-fPHjX8CB9@mail.gmail.com>
-	<alpine.LFD.2.00.1007152200520.10598@xanadu.home>
-	<AANLkTimy4fLzkAmVpxB9sTBUMQsqwMXjFLRUmk1dNEvm@mail.gmail.com>
-	<alpine.LFD.2.00.1007152241110.10598@xanadu.home>
-Message-ID: <AANLkTinphjSG89dQLadFZbJ9eVh7rJtm2N5-KT505ZzT@mail.gmail.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Fri, 16 Jul 2010 11:03:27 +0800
+Subject: [PATCH] ARM/nuc900: fix nuc900 touchscreen clk definition bug
+Message-ID: <4C3FCBFF.50506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 16, 2010 at 11:46 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Fri, 16 Jul 2010, Minchan Kim wrote:
->
->> >> But the patch made it to not call kmap_high_get when VIPT-aliasing
->> >> model in CONFIG_DEBUG_HIGHMEM.
->> >> Doesn't it cause aliasing problem as 7929eb9cf64 says, again?
->> >
->> > No because with VIPT, the cache is tagged with physical addresses, and
->> > therefore the same cache data will be used for the same memory
->> > regardless of the virtual address used to reach it. ?On VIVT this is not
->> > the case and the comment in 7929eb9cf64 applies to VIVT only.
->>
->> Thanks for quick reply, Nicolas.
->>
->> My concern is following as.
->>
->> In VIPT alising model,
-> [...]
->
-> Highmem is not supported with VIPT alising and probably will never be.
-> See commit 3f973e22.
+This patch is to fix nuc900 touchscreen clk definition bug,the .dev_id's
+name should be 'nuc900-ts', it should be the same to pdev.name. or else,
+the touchscreen driver will be not working well due to clock engine disabled.
 
-It's clear.
-Thanks, Nicolas.
+Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+---
+ arch/arm/mach-w90x900/cpu.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-
+diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
+index 642207e..83c5632 100644
+--- a/arch/arm/mach-w90x900/cpu.c
++++ b/arch/arm/mach-w90x900/cpu.c
+@@ -93,7 +93,7 @@ static struct clk_lookup nuc900_clkregs[] = {
+ 	DEF_CLKLOOK(&clk_kpi, "nuc900-kpi", NULL),
+ 	DEF_CLKLOOK(&clk_wdt, "nuc900-wdt", NULL),
+ 	DEF_CLKLOOK(&clk_gdma, "nuc900-gdma", NULL),
+-	DEF_CLKLOOK(&clk_adc, "nuc900-adc", NULL),
++	DEF_CLKLOOK(&clk_adc, "nuc900-ts", NULL),
+ 	DEF_CLKLOOK(&clk_usi, "nuc900-spi", NULL),
+ 	DEF_CLKLOOK(&clk_ext, NULL, "ext"),
+ 	DEF_CLKLOOK(&clk_timer0, NULL, "timer0"),
 -- 
-Kind regards,
-Minchan Kim
+1.6.3.3
