@@ -1,71 +1,59 @@
-From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Fri, 16 Jul 2010 12:18:23 +0300 (EEST)
-Subject: [RFC][PATCH 1/1] ARM: Add initial hibernation support
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C6127BF3@dbde02.ent.ti.com>
-References: <20100715.120807.39160135.Hiroshi.DOYU@nokia.com>
-	<20100716075243.GB16124@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C6127BF3@dbde02.ent.ti.com>
-Message-ID: <20100716.121823.226797826.Hiroshi.DOYU@nokia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 16 Jul 2010 10:20:18 +0100
+Subject: [PATCH] Stop ARM boards crashing when CUPS is loaded - 2.6.35-rc5
+In-Reply-To: <4C40218A.4090806@canonical.com>
+References: <4C3C72C6.4000005@canonical.com>
+	<20100715130214.4c9303b2.akpm@linux-foundation.org>
+	<20100715200618.GA6773@n2100.arm.linux.org.uk>
+	<4C40218A.4090806@canonical.com>
+Message-ID: <20100716092018.GB16995@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "ext Shilimkar, Santosh" <santosh.shilimkar@ti.com>
-Subject: RE: [RFC][PATCH 1/1] ARM: Add initial hibernation support
-Date: Fri, 16 Jul 2010 10:48:00 +0200
+On Fri, Jul 16, 2010 at 10:08:26AM +0100, Lee Jones wrote:
+> On 15/07/10 21:06, Russell King - ARM Linux wrote:
+> > Note that we have machines which have ISA parallel ports, so it's not
+> > this simple.
+> 
+> Do they have ISA parallel ports, or do they just pretend to?
 
-> Hiroshi,
->> -----Original Message-----
->> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
->> owner at vger.kernel.org] On Behalf Of Russell King - ARM Linux
->> Sent: Friday, July 16, 2010 1:23 PM
->> To: Hiroshi DOYU
->> Cc: linux-arm-kernel at lists.infradead.org; pavel at ucw.cz;
->> khilman at deeprootsystems.com; Reddy, Teerth; linux-pm at lists.linux-
->> foundation.org; Yoshiya.Hirase at nokia.com; linux-omap at vger.kernel.org
->> Subject: Re: [RFC][PATCH 1/1] ARM: Add initial hibernation support
->> 
->> On Thu, Jul 15, 2010 at 12:08:07PM +0300, Hiroshi DOYU wrote:
->> > From: ext Russell King - ARM Linux <linux@arm.linux.org.uk>
->> > Subject: Re: [RFC][PATCH 1/1] ARM: Add initial hibernation support
->> > Date: Thu, 15 Jul 2010 10:41:18 +0200
->> >
->> > > On Thu, Jul 15, 2010 at 08:34:50AM +0300, Hiroshi DOYU wrote:
->> > >> Russell, would it be possible to put this into your next merge queue?
->> > >
->> > > I think it needs quite a bit of rework - I certainly don't like all
->> > > those CP15 register accesses there - that's asking for lots of ifdefs
->> > > to spring up as more CPUs are supported.
->> > >
->> > > Eg, what about ensuring that state such as iWMMXt on PXA CPUs is
->> > > properly restored?
->> >
->> > Right. This arch specific part can be something like
->> > "suspend-v[3-7].S" to accomodate those differences
->> 
->> It's not quite that simple - things like iWMMXt aren't part of the ARM
->> arch specs.
->> 
->> > > We already have code which knows what needs to be saved across a
->> > > power-off transition - its what we use for our normal suspend/resume
->> > > functionality, so we should look at re-using that code for hibernate
->> > > as well.  We really don't want to be maintaining two sets of code
->> > > doing the same thing.
->> >
->> > Could you explain which code you're refering for the existing one?
->> 
->> The code which handles saving state for the existing suspend/resume
->> support.  This code already saves the necessary state from CP15 and
->> any other state which needs to be saved prior to putting the system
->> into low power mode.
->> 
->> Every machine class which supports suspend today has their own chunk
->> of code which does this, normally called something like sleep.S
->> 
-> When this getting developed in TI, we had one more concern about handling
-> the trustzone part for the CP15 resgiters.
-> This patch will hang on restoration on some devices implementing trustzone.
+I have four machines here which have real ISA parallel ports - as in
+an ISA multi-IO chip with the serial/parallel/ide ports at the standard
+PC IO offsets.  Whether there are more or not, I couldn't say.
 
-Thanks for the info.
+When platforms implement the PCI/ISA IO macros correctly (as these four
+platforms do), then these drivers work with no modification.
 
-I think that this trustzone issue and PXA part can be revisited later
-once the basic stuff is accepted.
+The problem comes when determining what is a "correct" implementation
+for some machines - particularly machines which have no PCI/ISA busses
+but have PCMCIA support.  PCMCIA has its own ISA-like bus, which can
+appear to be quite different from PCs - eg, each socket has its own
+separate chunk of MMIO emulating the ISA IO accesses to the cards.
+
+In this case, most platforms prefer to have the PCI/ISA IO macros just
+dereference the address they're passed, and arrange for the PCMCIA
+support to provide a base address relevant to the IO mapping which has
+been established.
+
+This leads to drivers which try the standard ISA IO addresses
+dereferencing addresses within the first page, thereby causing a kernel
+oops.
+
+> > Why not just avoid selecting and building parport_pc on these machines?
+> 
+> > I mean, the Beagleboard doesn't have PCI nor ISA, so why is parport_pc
+> > being built for production use?
+> 
+> I am happy to make a Kconfig change to disallow OMAP builds from building
+> the parport_pc driver. Do you think this would be more sensible?
+
+Making Kconfig changes to disallow drivers which don't work on certain
+platforms will result in a massive expansion of dependencies.  I'm
+not certain that this is the right solution.
+
+The best solution is probably for the parport code to go through a
+modernisation cycle like the serial code did, essentially using
+platform devices to pass the base addresses.  This would make the
+driver more portable, and eliminates this problem entirely (because
+platforms which don't have parports won't register the platform device(s)
+necessary for parport to even probe illegal addresses.)
