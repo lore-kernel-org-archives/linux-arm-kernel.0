@@ -1,59 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Jul 2010 10:20:18 +0100
-Subject: [PATCH] Stop ARM boards crashing when CUPS is loaded - 2.6.35-rc5
-In-Reply-To: <4C40218A.4090806@canonical.com>
-References: <4C3C72C6.4000005@canonical.com>
-	<20100715130214.4c9303b2.akpm@linux-foundation.org>
-	<20100715200618.GA6773@n2100.arm.linux.org.uk>
-	<4C40218A.4090806@canonical.com>
-Message-ID: <20100716092018.GB16995@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Jul 2010 11:19:55 +0200
+Subject: [PATCH 1/3] ARM: driver for the character LCD found in ARM
+	refdesigns
+In-Reply-To: <AANLkTinxE6hbgVWqvxen6yDNM1VLgK2DFnMyN_o_zbsw@mail.gmail.com>
+References: <1278429668-4564-1-git-send-email-triad@df.lth.se>
+	<20100715102237.GI26212@n2100.arm.linux.org.uk>
+	<AANLkTinxE6hbgVWqvxen6yDNM1VLgK2DFnMyN_o_zbsw@mail.gmail.com>
+Message-ID: <201007161119.55769.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 16, 2010 at 10:08:26AM +0100, Lee Jones wrote:
-> On 15/07/10 21:06, Russell King - ARM Linux wrote:
-> > Note that we have machines which have ISA parallel ports, so it's not
-> > this simple.
+On Thursday 15 July 2010, Linus Walleij wrote:
+> > Or maybe drivers/platform/arm/ (to avoid Linus' complaint about
+> > drivers under arch/ ?)
 > 
-> Do they have ISA parallel ports, or do they just pretend to?
+> Creating that for a single driver seems weird, I could just as well
+> create drivers/lcd for all LCDs in that case. But there is another
+> LCD-like driver for a USB-connected LCD under drivers/misc
+> IIRC, maybe I can make a patch for that as well and let the misc
+> maintainer decide if he wants it.
 
-I have four machines here which have real ISA parallel ports - as in
-an ISA multi-IO chip with the serial/parallel/ide ports at the standard
-PC IO offsets.  Whether there are more or not, I couldn't say.
+Most drivers are in directories based on the software interface, but
+as you explained, the driver does not interface with anything so far.
 
-When platforms implement the PCI/ISA IO macros correctly (as these four
-platforms do), then these drivers work with no modification.
+Other display drivers are under drivers/video. If it makes sense
+to use the display as the console, you could put it in
+drivers/video/console/. Another option would be to make it
+a tty and move it to driver/char.
 
-The problem comes when determining what is a "correct" implementation
-for some machines - particularly machines which have no PCI/ISA busses
-but have PCMCIA support.  PCMCIA has its own ISA-like bus, which can
-appear to be quite different from PCs - eg, each socket has its own
-separate chunk of MMIO emulating the ISA IO accesses to the cards.
-
-In this case, most platforms prefer to have the PCI/ISA IO macros just
-dereference the address they're passed, and arrange for the PCMCIA
-support to provide a base address relevant to the IO mapping which has
-been established.
-
-This leads to drivers which try the standard ISA IO addresses
-dereferencing addresses within the first page, thereby causing a kernel
-oops.
-
-> > Why not just avoid selecting and building parport_pc on these machines?
-> 
-> > I mean, the Beagleboard doesn't have PCI nor ISA, so why is parport_pc
-> > being built for production use?
-> 
-> I am happy to make a Kconfig change to disallow OMAP builds from building
-> the parport_pc driver. Do you think this would be more sensible?
-
-Making Kconfig changes to disallow drivers which don't work on certain
-platforms will result in a massive expansion of dependencies.  I'm
-not certain that this is the right solution.
-
-The best solution is probably for the parport code to go through a
-modernisation cycle like the serial code did, essentially using
-platform devices to pass the base addresses.  This would make the
-driver more portable, and eliminates this problem entirely (because
-platforms which don't have parports won't register the platform device(s)
-necessary for parport to even probe illegal addresses.)
+	Arnd
