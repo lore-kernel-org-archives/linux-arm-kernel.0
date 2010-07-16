@@ -1,60 +1,24 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 16 Jul 2010 21:44:36 +0100
-Subject: [RFC PATCH] Kconfig: Enable Kconfig fragments to be used for
-	defconfig
-In-Reply-To: <AANLkTimKpmZaGRYfYs8HGDz-_VG8ePXN6bZvl2-YcNdR@mail.gmail.com>
-References: <20100713230352.6781.18644.stgit@angua>
-	<1279296221.17878.66.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTinyFBTKYaryFANYheTuP-biJUws2x01NRNZPb4M@mail.gmail.com>
-	<alpine.LFD.2.00.1007161406120.10598@xanadu.home>
-	<20100716183028.GB26854@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1007161439240.10598@xanadu.home>
-	<AANLkTikqHnyFVJF0Pzwy2xtKeNSXYAPFdPkAkLiXK8Ls@mail.gmail.com>
-	<1279310976.18579.8.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTimKpmZaGRYfYs8HGDz-_VG8ePXN6bZvl2-YcNdR@mail.gmail.com>
-Message-ID: <1279313076.20418.3.camel@e102109-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 16 Jul 2010 21:54:45 +0100
+Subject: [PATCH] Stop ARM boards crashing when CUPS is loaded - 2.6.35-rc5
+In-Reply-To: <miltonm-arm-parport-2@bga.com>
+References: <4C408BEF.1060302@canonical.com> <4C3C72C6.4000005@canonical.com>
+	<20100715130214.4c9303b2.akpm@linux-foundation.org>
+	<20100715200618.GA6773@n2100.arm.linux.org.uk>
+	<4C40218A.4090806@canonical.com>
+	<20100716092018.GB16995@n2100.arm.linux.org.uk>
+	<miltonm-arm-parport-1@bga.com> <miltonm-arm-parport-2@bga.com>
+Message-ID: <20100716205445.GA28064@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-07-16 at 21:17 +0100, Grant Likely wrote:
-> On Fri, Jul 16, 2010 at 2:09 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > On Fri, 2010-07-16 at 19:46 +0100, Linus Torvalds wrote:
-> >> On Fri, Jul 16, 2010 at 11:40 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> >> >
-> >> > DOH.
-> >>
-> >> Well, it's possible that the correct approach is a mixture.
-> >>
-> >> Automatically do the trivial cases (recursive selects, dependencies
-> >> that are simple or of the form "x && y" etc), and warn about the cases
-> >> that aren't trivial (where "not trivial" may not necessarily be about
-> >> fundamentally ambiguous ones, but just "complex enough that I won't
-> >> even try").
-> >
-> > There is still a risk with this approach when the Kconfig isn't entirely
-> > correct. For example, on ARM we have (I pushed a patch already):
-> >
-> > config CPU_32v6K
-> >        depends on CPU_V6
-> >
-> > config CPU_V7
-> >        select CPU_32v6K
-> >
-> > In this simple approach, we end up selecting CPU_V6 when we only need
-> > CPU_V7. There other places like this in the kernel.
-> >
-> > Of course, kbuild could still warn but if people rely on this feature to
-> > select options automatically I suspect they would ignore the warnings.
-> 
-> In my first patch, I made Kconfig problems errors instead of warnings.
->  That would prevent people from ignoring them.
+On Fri, Jul 16, 2010 at 02:38:38PM -0500, Milton Miller wrote:
+> I just looked at the 8250 code and it abuses the platform device model.
+> Instead of a platform device for each port, it has multiple port
+> descriptions set via platform_data in one or a a few device instances.
 
-My point was that if we allow kbuild to select dependencies
-automatically (as per Nico's initial suggestion, followed up by Linus),
-in the above situation CPU_V7 would trigger the selection of CPU_V6 and
-I don't want this. If we rely on such automatic selection of the
-"depends on" options, we can't make the warnings be errors.
+I don't agree with that assessment (but then I'm the one who created
+that.)  Having one platform device for each port would have been
+absurd given the number of ISA addresses that 8250 ports appear at.
 
--- 
-Catalin
+Who'd want 64+ platform devices for serial ports?
