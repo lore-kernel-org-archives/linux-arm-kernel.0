@@ -1,56 +1,37 @@
-From: lee.jones@canonical.com (Lee Jones)
-Date: Fri, 16 Jul 2010 17:42:23 +0100
-Subject: [PATCH] Stop ARM boards crashing when CUPS is loaded -	2.6.35-rc5
-In-Reply-To: <miltonm-arm-parport-1@bga.com>
-References: <4C3C72C6.4000005@canonical.com>	<20100715130214.4c9303b2.akpm@linux-foundation.org>	<20100715200618.GA6773@n2100.arm.linux.org.uk>	<4C40218A.4090806@canonical.com>	<20100716092018.GB16995@n2100.arm.linux.org.uk>
-	<miltonm-arm-parport-1@bga.com>
-Message-ID: <4C408BEF.1060302@canonical.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 16 Jul 2010 11:57:55 -0600
+Subject: [RFC PATCH] Kconfig: Enable Kconfig fragments to be used for
+	defconfig
+In-Reply-To: <1279296221.17878.66.camel@e102109-lin.cambridge.arm.com>
+References: <20100713230352.6781.18644.stgit@angua>
+	<1279296221.17878.66.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <AANLkTinyFBTKYaryFANYheTuP-biJUws2x01NRNZPb4M@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/07/10 17:23, Milton Miller wrote:
-> On Fri Jul 16 2010 about 05:33:06 EST,  Lee Jones wrote:
->>> The best solution is probably for the parport code to go through a
->>> modernisation cycle like the serial code did, essentially using
->>> platform devices to pass the base addresses. This would make the
->>> driver more portable, and eliminates this problem entirely (because
->>> platforms which don't have parports won't register the platform device(s)
->>> necessary for parport to even probe illegal addresses.)
->>
->> This sounds brilliant - when are you going to start? </kidding>
-> 
-> It has a long time ago ...
-> 
-> drivers/parport/parport_pc.c calls parport_pc_find_nonpci_ports,
-> which is in asm/parport.h
+On Fri, Jul 16, 2010 at 10:03 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Wed, 2010-07-14 at 00:04 +0100, Grant Likely wrote:
+>> - It still doesn't resolve dependencies. ?A solver would help with this.
+>> ? For the time being I work around the problem by running the generated
+>> ? config through 'oldconfig' and looking for differences. ?If the files
+>> ? differ (ignoring comments and generateconfig_* options) after oldconfig,
+>> ? then the <board>_defconfig target returns a failure. ?(but leaves the
+>> ? new .config intact so the user can resolve it with menuconfig). ?This
+>> ? way at least the user is told when a Kconfig fragment is invalid.
+>
+> It's not a solver but I'm pushing a patch to warn on selecting symbols
+> with unmet dependencies so that you can select further symbols (manual
+> solving). The patch is in linux-next but you also can grab it from:
+>
+> http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-2.6-cm.git;a=commitdiff_plain;h=5d87db2d2a332784bbf2b1ec3e141486f4d41d6f
 
-I'm not entirely sure what you're trying to say here?
+sfr and I were talking about your patch the other day.  Just warning
+on incomplete dependencies is enough to make it actually workable for
+me (without my ugly post-processing step).  I was very happy to hear
+that it is in linux-next.
 
-How does that help with the platformisation of the driver?
+Last missing piece is being able to do "select FOO = n", which Stephen
+is currently working on.
 
->> In all seriousness, do you think anyone is likely to undertake this
->> work anytime soon? I am seeing this problem in a distribution which
->> is due for release in October. I have no problem implementing a config
->> change in the meantime, but as you say, a more _correct_ and portable
->> solution should be sought.
-> 
-> Why not replace the arm asm/parport.h with asm-generic/parport.h which
-> already has a check for CONFIG_ISA, which appears to only be selected
-> on a few ARM platforms?
-
-static int __devinit parport_pc_find_isa_ports(int autoirq, int autodma);
-static int __devinit parport_pc_find_nonpci_ports(int autoirq, int autodma)
-{
-#ifdef CONFIG_ISA
-	return parport_pc_find_isa_ports(autoirq, autodma);
-#else
-	return 0;
-#endif
-}
-
-That's perfect! 
-
-This would work a treat.
-
-Surely this #ifdef should be in all the parport.h files which call
-parport_pc_find_isa_ports?
+g.
