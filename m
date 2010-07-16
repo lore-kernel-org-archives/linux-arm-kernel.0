@@ -1,38 +1,64 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Fri, 16 Jul 2010 17:01:13 +0900
-Subject: [PATCH v2 1/5] ARM: Samsung SoC: added hclk/pclk info to s3c_freq for
-	s5pv210 cpu-freq
-In-Reply-To: <1279267277-6804-1-git-send-email-myungjoo.ham@samsung.com>
+Date: Fri, 16 Jul 2010 17:01:16 +0900
+Subject: [PATCH v2 4/5] ARM: S5PV210: add DMCx access virtual address
+In-Reply-To: <1279267277-6804-4-git-send-email-myungjoo.ham@samsung.com>
 References: <1279267277-6804-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <1279267277-6804-2-git-send-email-myungjoo.ham@samsung.com>
+	<1279267277-6804-2-git-send-email-myungjoo.ham@samsung.com>
+	<1279267277-6804-3-git-send-email-myungjoo.ham@samsung.com>
+	<1279267277-6804-4-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <1279267277-6804-5-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-S5PV210 requires msys/dsys info as well; thus, we've included those at
-struct s3c_freq, which is used by CPUFREQ of S5PV210.
+This patch prepares CPUFREQ support for S5PV210 by adding definitions
+for S5P_VA_DMCx accessed by CPUFREQ, which were not defined previously.
 
 Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-samsung/include/plat/cpu-freq.h |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pv210/cpu.c              |   12 +++++++++++-
+ arch/arm/mach-s5pv210/include/mach/map.h |    8 ++++++++
+ 2 files changed, 19 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/cpu-freq.h b/arch/arm/plat-samsung/include/plat/cpu-freq.h
-index 80c4a80..9e97df7 100644
---- a/arch/arm/plat-samsung/include/plat/cpu-freq.h
-+++ b/arch/arm/plat-samsung/include/plat/cpu-freq.h
-@@ -38,6 +38,12 @@ struct s3c_freq {
- 	unsigned long	hclk_tns;	/* in 10ths of ns */
- 	unsigned long	hclk;
- 	unsigned long	pclk;
-+#ifdef CONFIG_ARCH_S5PV210
-+	unsigned long	hclk_msys;
-+	unsigned long	pclk_msys;
-+	unsigned long	hclk_dsys;
-+	unsigned long	pclk_dsys;
-+#endif
+diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
+index 94c632b..84a6708 100644
+--- a/arch/arm/mach-s5pv210/cpu.c
++++ b/arch/arm/mach-s5pv210/cpu.c
+@@ -59,7 +59,17 @@ static struct map_desc s5pv210_iodesc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(S5PV210_PA_SROMC),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE,
+-	}
++	}, {
++		.virtual    = (unsigned long)S5P_VA_DMC0,
++		.pfn        = __phys_to_pfn(S5P_PA_DMC0),
++		.length     = SZ_4K,
++		.type       = MT_DEVICE,
++	}, {
++		.virtual    = (unsigned long)S5P_VA_DMC1,
++		.pfn        = __phys_to_pfn(S5P_PA_DMC1),
++		.length     = SZ_4K,
++		.type       = MT_DEVICE,
++	},
  };
  
- /**
+ static void s5pv210_idle(void)
+diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
+index 17687f0..4945674 100644
+--- a/arch/arm/mach-s5pv210/include/mach/map.h
++++ b/arch/arm/mach-s5pv210/include/mach/map.h
+@@ -108,4 +108,12 @@
+ #define SAMSUNG_PA_ADC		S5PV210_PA_ADC
+ #define SAMSUNG_PA_KEYPAD	S5PV210_PA_KEYPAD
+ 
++/* DMC */
++#define S5P_PA_DMC0     (0xF0000000)
++#define S5P_VA_DMC0     S3C_ADDR(0x00a00000)
++
++#define S5P_PA_DMC1     (0xF1400000)
++#define S5P_VA_DMC1     S3C_ADDR(0x00b00000)
++
++
+ #endif /* __ASM_ARCH_MAP_H */
 -- 
 1.6.3.3
