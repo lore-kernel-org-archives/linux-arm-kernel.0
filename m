@@ -1,35 +1,70 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Sat, 17 Jul 2010 18:13:46 +0300
-Subject: [PATCH v2] mtd/mxc_nand: don't call mtd->{suspend,resume}
-	explicitly
-In-Reply-To: <4C41A6EA.8070501@eukrea.com>
-References: <1276801147-4103-1-git-send-email-eric@eukrea.com>
-	<1276801147-4103-2-git-send-email-eric@eukrea.com>
-	<1276801147-4103-3-git-send-email-eric@eukrea.com>
-	<1276801147-4103-4-git-send-email-eric@eukrea.com>
-	<4C415AB5.9070705@eukrea.com>
-	<1279351998.7515.0.camel@localhost.localdomain>
-	<4C41A6EA.8070501@eukrea.com>
-Message-ID: <1279379626.7515.5.camel@localhost.localdomain>
+From: segooon@gmail.com (Kulikov Vasiliy)
+Date: Sat, 17 Jul 2010 19:19:07 +0400
+Subject: [PATCH 1/5] arm: mach-davinci: check irq2ctlr() result
+Message-ID: <1279379947-15152-1-git-send-email-segooon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2010-07-17 at 14:49 +0200, Eric B?nard wrote:
-> Hi Artem,
-> 
-> Le 17/07/2010 09:33, Artem Bityutskiy a ?crit :
-> > On Sat, 2010-07-17 at 09:24 +0200, Eric B?nard wrote:
-> >> can you also pick this patch for mxc_nand ?
-> >
-> > It is in my tree already, and I sent a notification as well :-)
-> >
-> 
-> OK, sorry, I didn't see the notification mail and only checked your 
-> master branch, not the dunno branch where you applied this patch !
+If irq2ctlr() fails return IRQ_NONE.
+Also as it can fail make 'ctlr' signed.
 
-Yeah, I put to master only the stuff I understand and hence, can
-sight-off. The rest goes to dunno - David then processes it.
 
+The semantic patch that finds this problem (many false-positive results):
+(http://coccinelle.lip6.fr/)
+
+// <smpl>
+@ r1 @
+identifier f;
+@@
+int f(...) { ... }
+
+@@
+identifier r1.f;
+type T;
+unsigned T x;
+@@
+
+*x = f(...)
+ ...
+*x > 0
+
+
+Signed-off-by: Kulikov Vasiliy <segooon@gmail.com>
+---
+ arch/arm/mach-davinci/dma.c |    8 ++++++--
+ 1 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
+index d33827a..d1127e1 100644
+--- a/arch/arm/mach-davinci/dma.c
++++ b/arch/arm/mach-davinci/dma.c
+@@ -344,10 +344,12 @@ static int irq2ctlr(int irq)
+ static irqreturn_t dma_irq_handler(int irq, void *data)
+ {
+ 	int i;
+-	unsigned ctlr;
++	int ctlr;
+ 	unsigned int cnt = 0;
+ 
+ 	ctlr = irq2ctlr(irq);
++	if (ctlr < 0)
++		return IRQ_NONE;
+ 
+ 	dev_dbg(data, "dma_irq_handler\n");
+ 
+@@ -398,10 +400,12 @@ static irqreturn_t dma_irq_handler(int irq, void *data)
+ static irqreturn_t dma_ccerr_handler(int irq, void *data)
+ {
+ 	int i;
+-	unsigned ctlr;
++	int ctlr;
+ 	unsigned int cnt = 0;
+ 
+ 	ctlr = irq2ctlr(irq);
++	if (ctlr < 0)
++		return IRQ_NONE;
+ 
+ 	dev_dbg(data, "dma_ccerr_handler\n");
+ 
 -- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+1.7.0.4
