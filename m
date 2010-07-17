@@ -1,29 +1,40 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sat, 17 Jul 2010 13:57:00 +0300
-Subject: [PATCH v5 0/4] s3c24xx: iPAQ rx1950 series
-Message-ID: <1279364224-24525-1-git-send-email-anarsoul@gmail.com>
+Date: Sat, 17 Jul 2010 13:57:02 +0300
+Subject: [PATCH v5 2/4] rx1950: add LEDs device
+In-Reply-To: <1279364224-24525-1-git-send-email-anarsoul@gmail.com>
+References: <1279364224-24525-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <1279364224-24525-3-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds more support for iPAQ rx1950 PDA to linux:
-1. LEDs driver -- it controls blue, green and red LEDs on rx1950
-2. Battery driver -- adds ability to monitor and charge battery.
-This driver is suitable for H1940 PDA aswell (just need to write
-some machine specific callbacks and get voltage LUTs)
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+ arch/arm/mach-s3c2440/mach-rx1950.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-v2: removed ac registration from s3c_adc_battery driver, use
-pda_power instead for ac support
-
-v3: split LEDs patch to driver and machine parts,
-split battery patch into battery + LED trigger parts,
-now battery driver can skip gpio/callbacks usage
-(if there's no gpio pin to determine that battery is
-full or if charger is enabled automatically)
-
-v4: add .blink_set callback to LEDs driver instead of
-using LED_HALF value for blinking, remove LED triggers
-from battery driver completely (for now)
-
-v5: restore lut_acin usage in s3c_adc_battery driver,
-it was accidently removed during removing AC support
-from driver
+diff --git a/arch/arm/mach-s3c2440/mach-rx1950.c b/arch/arm/mach-s3c2440/mach-rx1950.c
+index 8603b57..55b806a 100644
+--- a/arch/arm/mach-s3c2440/mach-rx1950.c
++++ b/arch/arm/mach-s3c2440/mach-rx1950.c
+@@ -126,6 +126,11 @@ static struct s3c2410fb_display rx1950_display = {
+ 
+ };
+ 
++static struct platform_device rx1950_device_leds = {
++	.name             = "rx1950-leds",
++	.id               = -1,
++};
++
+ static struct s3c2410fb_mach_info rx1950_lcd_cfg = {
+ 	.displays = &rx1950_display,
+ 	.num_displays = 1,
+@@ -502,6 +507,7 @@ static struct platform_device *rx1950_devices[] __initdata = {
+ 	&s3c_device_timer[1],
+ 	&rx1950_backlight,
+ 	&rx1950_device_gpiokeys,
++	&rx1950_device_leds,
+ };
+ 
+ static struct clk *rx1950_clocks[] __initdata = {
+-- 
+1.7.1.1
