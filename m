@@ -1,42 +1,48 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Sat, 17 Jul 2010 00:49:18 +0100
-Subject: [RFC PATCH] Kconfig: Enable Kconfig fragments to be used for
-	defconfig
-In-Reply-To: <1279124563.21162.14.camel@c-dwalke-linux.qualcomm.com>
-References: <20100713230352.6781.18644.stgit@angua>
-	<1279062881.4609.34.camel@c-dwalke-linux.qualcomm.com>
-	<AANLkTin69tN3NQHD2wvkA0G-lj3f9tSZEnhzdyJdTh9m@mail.gmail.com>
-	<1279064008.4609.48.camel@c-dwalke-linux.qualcomm.com>
-	<alpine.LFD.2.00.1007131941140.10598@xanadu.home>
-	<1279124563.21162.14.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <20100716234918.GA31060@shareable.org>
+From: lbassel@codeaurora.org (Larry Bassel)
+Date: Fri, 16 Jul 2010 17:01:08 -0700
+Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
+	memory management
+In-Reply-To: <20100716075856.GC16124@n2100.arm.linux.org.uk>
+References: <4C3C0032.5020702@codeaurora.org>
+	<20100713150311B.fujita.tomonori@lab.ntt.co.jp>
+	<20100713121420.GB4263@codeaurora.org>
+	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
+	<20100714201149.GA14008@codeaurora.org>
+	<20100714220536.GE18138@n2100.arm.linux.org.uk>
+	<20100715012958.GB2239@codeaurora.org>
+	<20100715085535.GC26212@n2100.arm.linux.org.uk>
+	<AANLkTinVZeaZxt_lWKhjKa0dqhu3_j3BRNySO-2LvMdw@mail.gmail.com>
+	<20100716075856.GC16124@n2100.arm.linux.org.uk>
+Message-ID: <20100717000108.GB21293@labbmf-linux.quicinc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Walker wrote:
-> > But all the rest is arbitrary and could be part of common shared 
-> > profiles or the like in defconfig format.
+On 16 Jul 10 08:58, Russell King - ARM Linux wrote:
+> On Thu, Jul 15, 2010 at 08:48:36PM -0400, Tim HRM wrote:
+> > Interesting, since I seem to remember the MSM devices mostly conduct
+> > IO through regions of normal RAM, largely accomplished through
+> > ioremap() calls.
+> > 
+> > Without more public domain documentation of the MSM chips and AMSS
+> > interfaces I wouldn't know how to avoid this, but I can imagine it
+> > creates a bit of urgency for Qualcomm developers as they attempt to
+> > upstream support for this most interesting SoC.
 > 
-> I'm sure most people will want to have a config isolated to their
-> specific device. That to me seems reasonable because everyone wants the
-> smallest possible kernel they can get for their given device.
+> As the patch has been out for RFC since early April on the linux-arm-kernel
+> mailing list (Subject: [RFC] Prohibit ioremap() on kernel managed RAM),
+> and no comments have come back from Qualcomm folk.
 
-Indeed, but people who want the smallest possible kernel for their
-specific device _in a particular use context_ tend to want:
+We are investigating the impact of this change on us, and I
+will send out more detailed comments next week.
 
-  - To disable support for parts of the device they aren't using.
-    For example, an SoC with integrated ethernet that isn't actually
-    wired up on their board, or where they're using an external ethernet
-    chip instead for some reason.
+> 
+> The restriction on creation of multiple V:P mappings with differing
+> attributes is also fairly hard to miss in the ARM architecture
+> specification when reading the sections about caches.
+> 
 
-  - To choose what's modular and what isn't, even for integrated
-    parts.  For example to control the bootup sequence, they might
-    want to delay integrated USB and IDE initialisation, which is done by
-    making those modular and loading them after bringing up a splash
-    screen earlier in the boot scripts.
+Larry Bassel
 
-So there is still a need to be able to override the drivers and
-settings, but it's still incredibly useful to have defaults which
-describe the SoC or board accurately.
-
--- Jamie
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
