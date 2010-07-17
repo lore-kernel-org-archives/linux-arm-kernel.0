@@ -1,48 +1,57 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Sat, 17 Jul 2010 19:24:08 +0100
-Subject: [PATCH] regulator: MAX8998: set_voltage bugfix. ramp_up delay
-	and min/max voltage
-In-Reply-To: <1279267760-6971-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1279267760-6971-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <1279391048.3070.11.camel@odin>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 17 Jul 2010 21:17:45 +0200
+Subject: [FAILED] BLD phyCORE-i.MX31 + linux-next git kernel
+In-Reply-To: <E1OZs5K-0005Px-5r@himalia.hi.pengutronix.de>
+References: <E1OZs5K-0005Px-5r@himalia.hi.pengutronix.de>
+Message-ID: <20100717191745.GC30077@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-07-16 at 17:09 +0900, MyungJoo Ham wrote:
-> Two issues are addressed for max8998_set_voltage function.
-> 
-> 1. Min/Max Voltage.
-> 
-> 	max8998_set_voltage had been using the voltage value of
-> 
-> 	min ( voltage[i] >= max_vol , i )
-> 
-> 	This is corrected to use:
-> 
-> 	min ( voltage[i] >= min_vol , i )
-> 
-> 2. Ramp Up Delay.
-> 
-> 	max8998_set_voltage should provide delay for BUCK1/2
-> if ENRAMP is on. It reads RAMP value from ONOFF4 register to determine
-> RAMP delay length. However, when max8998_set_voltage's new voltage is
-> lower than the previous, we don't care because it does not deteriorate
-> the stability.
-> 
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> --
-> I've omitted some CC in the previous email, adding them here. Sorry for the duplicated submission.
+Hello Russell,
 
-This doesn't apply. Can you re-create against my regulator for-next
-branch.
+Our nightly built found a problem while working on linux-next.
+Commit v2.6.35-rc5-17-g6f7dd68 broke your devel branch
+by renaming lmb to memblock.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/lrg/voltage-2.6.git for-next
+Best regards
+Uwe
 
-Thanks
+On Fri, Jul 16, 2010 at 11:04:42PM +0200, Pengutronix Sisyphus Druid wrote:
+>                               Source URL .... git://git.kernel.org/pub/scm/linux/kernel/git/sfr/linux-next.git
+>                         Current git hash .... c221ef77c77c18dd981338cd6ec60e0a50967857
+>                     Kernel configuration .... use config: mx3_defconfig
+> [...]
+>   LD      arch/arm/common/built-in.o
+>   CC      arch/arm/kernel/return_address.o
+>   CC      arch/arm/mm/init.o
+> arch/arm/kernel/return_address.c:61:2: warning: #warning "TODO: return_address should use unwind tables"
+> arch/arm/kernel/return_address.c:61:2: warning: #warning "TODO: return_address should use unwind tables"
+>   CC      arch/arm/kernel/setup.o
+>   CC      arch/arm/mach-mx3/mm.o
+>   CC      arch/arm/plat-mxc/irq.o
+> arch/arm/mm/init.c:20:23: error: linux/lmb.h: No such file or directory
+> arch/arm/kernel/setup.c:30:23: error: linux/lmb.h: No such file or directory
+> arch/arm/mm/init.c: In function 'arm_bootmem_init':
+> arch/arm/mm/init.c:163: error: implicit declaration of function 'lmb_alloc_base'
+> arch/arm/mm/init.c:183: error: 'lmb' undeclared (first use in this function)
+> arch/arm/mm/init.c:183: error: (Each undeclared identifier is reported only once
+> arch/arm/mm/init.c:183: error: for each function it appears in.)
+> arch/arm/mm/init.c:184: error: implicit declaration of function 'lmb_start_pfn'
+> arch/arm/mm/init.c:186: error: implicit declaration of function 'lmb_end_pfn'
+> arch/arm/mm/init.c:188: error: implicit declaration of function 'lmb_size_bytes'
+> arch/arm/mm/init.c: In function 'pfn_valid':
+> arch/arm/mm/init.c:240: error: 'lmb' undeclared (first use in this function)
+> arch/arm/mm/init.c:241: error: dereferencing pointer to incomplete type
+> arch/arm/mm/init.c: In function 'arm_lmb_init':
+> arch/arm/mm/init.c:274: error: implicit declaration of function 'lmb_init'
+> arch/arm/mm/init.c:276: error: implicit declaration of function 'lmb_add'
+> arch/arm/mm/init.c:282: error: implicit declaration of function 'lmb_reserve'
+> arch/arm/mm/init.c:300: error: implicit declaration of function 'lmb_analyze'
+> arch/arm/mm/init.c:301: error: implicit declaration of function 'lmb_dump_all'
+> make[1]: *** [arch/arm/mm/init.o] Error 1
+> make: *** [arch/arm/mm] Error 2
+> make: *** Waiting for unfinished jobs....
 
-Liam
 -- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
