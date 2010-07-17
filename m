@@ -1,260 +1,68 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Sat, 17 Jul 2010 12:52:01 +0900
-Subject: [PATCH v2 2/8] ARM: S5PV310: Add new CPU initialization support
-In-Reply-To: <20100716115219.GD17952@n2100.arm.linux.org.uk>
-References: <1279270714-15146-1-git-send-email-kgene.kim@samsung.com>
-	<1279270714-15146-3-git-send-email-kgene.kim@samsung.com>
-	<20100716115219.GD17952@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinaYfk_FrMvwec61r-oUh2V91B9vXcxasyLhqcO@mail.gmail.com>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Sat, 17 Jul 2010 13:09:27 +0900
+Subject: [PATCH v2 2/5] ARM: S5P: Added default pll values for APLL
+	800/1000MHz
+In-Reply-To: <AANLkTil5v3ypu0hZdzVmFCG7MsjQzTKPNgMtJQ-M6MHj@mail.gmail.com>
+References: <1279267277-6804-1-git-send-email-myungjoo.ham@samsung.com>
+	<1279267277-6804-2-git-send-email-myungjoo.ham@samsung.com>
+	<1279267277-6804-3-git-send-email-myungjoo.ham@samsung.com>
+	<012f01cb24e1$85628920$90279b60$%kim@samsung.com>
+	<AANLkTil5v3ypu0hZdzVmFCG7MsjQzTKPNgMtJQ-M6MHj@mail.gmail.com>
+Message-ID: <AANLkTinyx2Abgda7L-Z0XDeuftNv4tOPQ5HMdSsp6yUd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To Ben,
+On Sat, Jul 17, 2010 at 12:43 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Fri, Jul 16, 2010 at 9:22 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> MyungJoo Ham wrote:
+>>>
+>>> CPUFREQ of S5PV210 uses different APLL settings and we provide
+>>> such values for CPUFREQ at pll.h. We have been using differently
+>>> between EVT0 and EVT1 machines. Although this version of kernel
+>>> assumes that the CPU is EVT1, users may use code for EVT0 later.
+>>>
+>>> Note that at 1GHz of ARMCLK, APLL should be 1GHz and for other lower
+>>> ARMCLK, APLL should be 800MHz.
+>>>
+>>> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>> ---
+>>> ?arch/arm/plat-s5p/include/plat/pll.h | ? ?8 ++++++++
+>>> ?1 files changed, 8 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/plat-s5p/include/plat/pll.h
+>> b/arch/arm/plat-s5p/include/plat/pll.h
+>>> index 7db3227..3112aba 100644
+>>> --- a/arch/arm/plat-s5p/include/plat/pll.h
+>>> +++ b/arch/arm/plat-s5p/include/plat/pll.h
+>>> @@ -21,6 +21,14 @@
+>>>
+>>> ?#include <asm/div64.h>
+>>>
+>>> +#ifdef CONFIG_CPU_S5PC110_EVT0_ERRATA
+>>
+>> Actually, EVT0 is not real chip and not for mass production.
+>> So don't use in here.
+>
+> That was my point in a thread few days ago when I suggested we
+> be careful while pushing code upstream.
+> Rather than flood mainline Samsung support with any hardware
+> we can get our hands on, we need to strategically select
+> SoCs (& their versions) and machines so that we have maximum
+> overlap of features and, equally important, _users_ of that code.
+> That will help us concentrate our efforts on support needed by most
+> of the users and devices.
 
-Now you are working on make a single kernel for s5p series at your git.
-The v310 or c210 chip also included in these works.
+That's point of view from chip vendor. but in my side we made a
+product using all chips from evt0, evt1, and fused evt1.
+Some product used the evt0 chip already.
 
-Previous time Marek sent the mail if you are busy with other works, he
-can help it.
-
-Give your opinions.
-
-TO Changhwan or Kukjin
-
-Did you see the ben's work? If yes, can you make it similar way?
+I don't say LSI need to support early chip. you focus on the your selected SoC.
+The remaining will be done by us.
 
 Thank you,
 Kyungmin Park
 
-
-On Fri, Jul 16, 2010 at 8:52 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jul 16, 2010 at 05:58:28PM +0900, Kukjin Kim wrote:
->> diff --git a/arch/arm/mach-s5pv310/platsmp.c b/arch/arm/mach-s5pv310/platsmp.c
->> new file mode 100644
->> index 0000000..9325ac2
->> --- /dev/null
->> +++ b/arch/arm/mach-s5pv310/platsmp.c
->> @@ -0,0 +1,212 @@
->> +/* linux/arch/arm/mach-s5pv310/platsmp.c
->> + *
->> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
->> + * ? ? ? ? ? http://www.samsung.com/
->> + *
->> + * Cloned from linux/arch/arm/mach-realview/platsmp.c
->> + *
->> + * ?Copyright (C) 2002 ARM Ltd.
->> + * ?All Rights Reserved
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +#include <linux/init.h>
->> +#include <linux/errno.h>
->> +#include <linux/delay.h>
->> +#include <linux/device.h>
->> +#include <linux/jiffies.h>
->> +#include <linux/smp.h>
->> +#include <linux/io.h>
->> +
->> +#include <asm/cacheflush.h>
->> +#include <mach/hardware.h>
->> +#include <asm/mach-types.h>
->> +#include <asm/localtimer.h>
->> +#include <asm/unified.h>
->> +
->> +#include <asm/smp_scu.h>
->> +#include <mach/regs-clock.h>
->> +
->> +extern void s5pv310_secondary_startup(void);
->> +
->> +/*
->> + * control for which core is the next to come out of the secondary
->> + * boot "holding pen"
->> + */
->> +volatile int __cpuinitdata pen_release = -1;
->> +
->> +static void __iomem *scu_base_addr(void)
->> +{
->> + ? ? return (void __iomem *)(S5P_VA_SCU);
->> +}
->> +
->> +static inline unsigned int get_core_count(void)
->> +{
->> + ? ? void __iomem *scu_base = scu_base_addr();
->> + ? ? if (scu_base)
->> + ? ? ? ? ? ? return scu_get_core_count(scu_base);
->> + ? ? return 1;
->> +}
->> +
->> +static DEFINE_SPINLOCK(boot_lock);
->> +
->> +void __cpuinit platform_secondary_init(unsigned int cpu)
->> +{
->> + ? ? trace_hardirqs_off();
->> +
->> + ? ? /*
->> + ? ? ?* if any interrupts are already enabled for the primary
->> + ? ? ?* core (e.g. timer irq), then they will not have been enabled
->> + ? ? ?* for us: do so
->> + ? ? ?*/
->> + ? ? gic_cpu_init(0, gic_cpu_base_addr);
->> +
->> + ? ? /*
->> + ? ? ?* let the primary processor know we're out of the
->> + ? ? ?* pen, then head off into the C entry point
->> + ? ? ?*/
->> + ? ? pen_release = -1;
->> + ? ? smp_wmb();
->> +
->> + ? ? /*
->> + ? ? ?* Synchronise with the boot thread.
->> + ? ? ?*/
->> + ? ? spin_lock(&boot_lock);
->> + ? ? spin_unlock(&boot_lock);
->> +}
->> +
->> +int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
->> +{
->> + ? ? unsigned long timeout;
->> +
->> + ? ? /*
->> + ? ? ?* set synchronisation state between this boot processor
->> + ? ? ?* and the secondary one
->> + ? ? ?*/
->> + ? ? spin_lock(&boot_lock);
->> +
->> + ? ? /*
->> + ? ? ?* The secondary processor is waiting to be released from
->> + ? ? ?* the holding pen - release it, then wait for it to flag
->> + ? ? ?* that it has been released by resetting pen_release.
->> + ? ? ?*
->> + ? ? ?* Note that "pen_release" is the hardware CPU ID, whereas
->> + ? ? ?* "cpu" is Linux's internal ID.
->> + ? ? ?*/
->> + ? ? pen_release = cpu;
->> + ? ? flush_cache_all();
->> +
->> + ? ? /*
->> + ? ? ?* XXX
->> + ? ? ?*
->> + ? ? ?* This is a later addition to the booting protocol: the
->> + ? ? ?* bootMonitor now puts secondary cores into WFI, so
->> + ? ? ?* poke_milo() no longer gets the cores moving; we need
->> + ? ? ?* to send a soft interrupt to wake the secondary core.
->> + ? ? ?* Use smp_cross_call() for this, since there's little
->> + ? ? ?* point duplicating the code here
->> + ? ? ?*/
->> + ? ? smp_cross_call(cpumask_of(cpu));
->> +
->> + ? ? timeout = jiffies + (1 * HZ);
->> + ? ? while (time_before(jiffies, timeout)) {
->> + ? ? ? ? ? ? smp_rmb();
->> + ? ? ? ? ? ? if (pen_release == -1)
->> + ? ? ? ? ? ? ? ? ? ? break;
->> +
->> + ? ? ? ? ? ? udelay(10);
->> + ? ? }
->> +
->> + ? ? /*
->> + ? ? ?* now the secondary core is starting up let it run its
->> + ? ? ?* calibrations, then wait for it to finish
->> + ? ? ?*/
->> + ? ? spin_unlock(&boot_lock);
->> +
->> + ? ? return pen_release != -1 ? -ENOSYS : 0;
->> +}
->> +
->> +static void __init poke_milo(void)
->> +{
->> + ? ? /* nobody is to be released from the pen yet */
->> + ? ? pen_release = -1;
->> +
->> + ? ? /*
->> + ? ? ?* Write the address of secondary startup into the system-wide flags
->> + ? ? ?* register. The BootMonitor waits for this register to become
->> + ? ? ?* non-zero.
->> + ? ? ?*/
->> + ? ? __raw_writel(BSYM(virt_to_phys(s5pv310_secondary_startup)), S5P_INFORM0);
->> +
->> + ? ? mb();
->> +}
->> +
->> +/*
->> + * Initialise the CPU possible map early - this describes the CPUs
->> + * which may be present or become present in the system.
->> + */
->> +void __init smp_init_cpus(void)
->> +{
->> + ? ? unsigned int i, ncores = get_core_count();
->> +
->> + ? ? for (i = 0; i < ncores; i++)
->> + ? ? ? ? ? ? set_cpu_possible(i, true);
->> +}
->> +
->> +void __init smp_prepare_cpus(unsigned int max_cpus)
->> +{
->> + ? ? unsigned int ncores = get_core_count();
->> + ? ? unsigned int cpu = smp_processor_id();
->> + ? ? int i;
->> +
->> + ? ? /* sanity check */
->> + ? ? if (ncores == 0) {
->> + ? ? ? ? ? ? printk(KERN_ERR
->> + ? ? ? ? ? ? ? ? ? ?"Realview: strange CM count of 0? Default to 1\n");
->> +
->> + ? ? ? ? ? ? ncores = 1;
->> + ? ? }
->> +
->> + ? ? if (ncores > NR_CPUS) {
->> + ? ? ? ? ? ? printk(KERN_WARNING
->> + ? ? ? ? ? ? ? ? ? ?"Realview: no. of cores (%d) greater than configured "
->> + ? ? ? ? ? ? ? ? ? ?"maximum of %d - clipping\n",
->> + ? ? ? ? ? ? ? ? ? ?ncores, NR_CPUS);
->> + ? ? ? ? ? ? ncores = NR_CPUS;
->> + ? ? }
->> +
->> + ? ? smp_store_cpu_info(cpu);
->> +
->> + ? ? /*
->> + ? ? ?* are we trying to boot more cores than exist?
->> + ? ? ?*/
->> + ? ? if (max_cpus > ncores)
->> + ? ? ? ? ? ? max_cpus = ncores;
->> +
->> + ? ? /*
->> + ? ? ?* Initialise the present map, which describes the set of CPUs
->> + ? ? ?* actually populated at the present time.
->> + ? ? ?*/
->> + ? ? for (i = 0; i < max_cpus; i++)
->> + ? ? ? ? ? ? set_cpu_present(i, true);
->> +
->> + ? ? /*
->> + ? ? ?* Initialise the SCU if there are more than one CPU and let
->> + ? ? ?* them know where to start. Note that, on modern versions of
->> + ? ? ?* MILO, the "poke" doesn't actually do anything until each
->> + ? ? ?* individual core is sent a soft interrupt to get it out of
->> + ? ? ?* WFI
->> + ? ? ?*/
->> + ? ? if (max_cpus > 1) {
->> + ? ? ? ? ? ? /*
->> + ? ? ? ? ? ? ?* Enable the local timer or broadcast device for the
->> + ? ? ? ? ? ? ?* boot CPU, but only if we have more than one CPU.
->> + ? ? ? ? ? ? ?*/
->> + ? ? ? ? ? ? percpu_timer_setup();
->> +
->> + ? ? ? ? ? ? scu_enable(scu_base_addr());
->> + ? ? ? ? ? ? poke_milo();
->> + ? ? }
->> +}
->
-> Please can you model this on the Versatile Express platsmp.c rather than
-> the Realview platsmp.c ?
->
-> The Realview platsmp.c implementation contains a lot of left-overs from
-> the initial Integrator-based SMP implementation which we really shouldn't
-> be carrying endlessly forward.
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
 > the body of a message to majordomo at vger.kernel.org
