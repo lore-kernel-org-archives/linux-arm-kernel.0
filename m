@@ -1,56 +1,48 @@
-From: segooon@gmail.com (Kulikov Vasiliy)
-Date: Sat, 17 Jul 2010 19:19:33 +0400
-Subject: [PATCH 2/5] arm: mach-pnx4008: fix sign bug
-Message-ID: <1279379974-15192-1-git-send-email-segooon@gmail.com>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Sat, 17 Jul 2010 19:24:08 +0100
+Subject: [PATCH] regulator: MAX8998: set_voltage bugfix. ramp_up delay
+	and min/max voltage
+In-Reply-To: <1279267760-6971-1-git-send-email-myungjoo.ham@samsung.com>
+References: <1279267760-6971-1-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <1279391048.3070.11.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'ret' is unsigned, so this code is wrong:
+On Fri, 2010-07-16 at 17:09 +0900, MyungJoo Ham wrote:
+> Two issues are addressed for max8998_set_voltage function.
+> 
+> 1. Min/Max Voltage.
+> 
+> 	max8998_set_voltage had been using the voltage value of
+> 
+> 	min ( voltage[i] >= max_vol , i )
+> 
+> 	This is corrected to use:
+> 
+> 	min ( voltage[i] >= min_vol , i )
+> 
+> 2. Ramp Up Delay.
+> 
+> 	max8998_set_voltage should provide delay for BUCK1/2
+> if ENRAMP is on. It reads RAMP value from ONOFF4 register to determine
+> RAMP delay length. However, when max8998_set_voltage's new voltage is
+> lower than the previous, we don't care because it does not deteriorate
+> the stability.
+> 
+> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> --
+> I've omitted some CC in the previous email, adding them here. Sorry for the duplicated submission.
 
-    ret = gpio_read_bit(...);
-    ...
-    if (ret > 0)
+This doesn't apply. Can you re-create against my regulator for-next
+branch.
 
-If gpio_read_bit() returns -EFAULT then (ret > 0) would be true.
-Make 'ret' signed.
+git://git.kernel.org/pub/scm/linux/kernel/git/lrg/voltage-2.6.git for-next
 
+Thanks
 
-The semantic patch that finds this problem (many false-positive results):
-(http://coccinelle.lip6.fr/)
-
-// <smpl>
-@ r1 @
-identifier f;
-@@
-int f(...) { ... }
-
-@@
-identifier r1.f;
-type T;
-unsigned T x;
-@@
-
-*x = f(...)
- ...
-*x > 0
-
-Signed-off-by: Kulikov Vasiliy <segooon@gmail.com>
----
- arch/arm/mach-pnx4008/gpio.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-pnx4008/gpio.c b/arch/arm/mach-pnx4008/gpio.c
-index f219914..4a0c0eb 100644
---- a/arch/arm/mach-pnx4008/gpio.c
-+++ b/arch/arm/mach-pnx4008/gpio.c
-@@ -199,7 +199,7 @@ EXPORT_SYMBOL(pnx4008_gpio_unregister_pin);
- 
- unsigned long pnx4008_gpio_read_pin(unsigned short pin)
- {
--	unsigned long ret = -EFAULT;
-+	int ret = -EFAULT;
- 	int gpio = GPIO_BIT_MASK(pin);
- 	gpio_lock();
- 	if (GPIO_ISOUT(pin)) {
+Liam
 -- 
-1.7.0.4
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
