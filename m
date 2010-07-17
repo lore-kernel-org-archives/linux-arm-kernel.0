@@ -1,50 +1,30 @@
-From: ivan.kuten@promwad.com (Ivan Kuten)
-Date: Sat, 17 Jul 2010 15:37:39 +0300
-Subject: [PATCH 1/2] MISC: driver for the character LCD found in ARM
-	refdesigns
-In-Reply-To: <1279365780-18462-1-git-send-email-triad@df.lth.se>
-References: <1279365780-18462-1-git-send-email-triad@df.lth.se>
-Message-ID: <4C41A413.50205@promwad.com>
+From: eric@eukrea.com (=?UTF-8?B?RXJpYyBCw6luYXJk?=)
+Date: Sat, 17 Jul 2010 14:49:46 +0200
+Subject: [PATCH v2] mtd/mxc_nand: don't call mtd->{suspend,
+	resume} explicitly
+In-Reply-To: <1279351998.7515.0.camel@localhost.localdomain>
+References: <1276801147-4103-1-git-send-email-eric@eukrea.com>	
+	<1276801147-4103-2-git-send-email-eric@eukrea.com>	
+	<1276801147-4103-3-git-send-email-eric@eukrea.com>	
+	<1276801147-4103-4-git-send-email-eric@eukrea.com>	
+	<4C415AB5.9070705@eukrea.com>
+	<1279351998.7515.0.camel@localhost.localdomain>
+Message-ID: <4C41A6EA.8070501@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Hello Linus,
+Hi Artem,
 
-> diff --git a/drivers/misc/arm-charlcd.c b/drivers/misc/arm-charlcd.c
-> new file mode 100644
-> index 0000000..9e3879e
-> --- /dev/null
-> +++ b/drivers/misc/arm-charlcd.c
-> @@ -0,0 +1,396 @@
-> +/*
-> + * Driver for the on-board character LCD found on some ARM reference boards
-> + * This is basically an Hitachi HD44780 LCD with a custom IP block to drive it
-> + * http://en.wikipedia.org/wiki/HD44780_Character_LCD
-> + * Currently it will just display the text "ARM Linux" and the linux version
-> + *
-> + * License terms: GNU General Public License (GPL) version 2
-> + * Author: Linus Walleij<triad@df.lth.se>
-> + */
+Le 17/07/2010 09:33, Artem Bityutskiy a ?crit :
+> On Sat, 2010-07-17 at 09:24 +0200, Eric B?nard wrote:
+>> can you also pick this patch for mxc_nand ?
+>
+> It is in my tree already, and I sent a notification as well :-)
+>
 
-Any chance to sync your efforts with lcd-linux project (http://lcd-linux.sourceforge.net/) ?
-They seems to have a support for HD44780 LCD controller. Mattia, project maintainer is on CC 
-copy.
+OK, sorry, I didn't see the notification mail and only checked your 
+master branch, not the dunno branch where you applied this patch !
 
-Best regards,
-Ivan Kuten
------------------------------------------------------------
-Head of Embedded Software Department
+Thanks,
 
-Promwad Innovation Company
-
-22, Olshevskogo St.,
-
-220073, Minsk,
-
-BELARUS
-
-Phone/Fax: +375 (17) 312-1246
-
-Skype: vanokuten
-
-Web: www.promwad.com
+Eric
