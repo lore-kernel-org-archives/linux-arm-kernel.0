@@ -1,30 +1,53 @@
-From: eric@eukrea.com (=?UTF-8?B?RXJpYyBCw6luYXJk?=)
-Date: Sat, 17 Jul 2010 14:49:46 +0200
-Subject: [PATCH v2] mtd/mxc_nand: don't call mtd->{suspend,
-	resume} explicitly
-In-Reply-To: <1279351998.7515.0.camel@localhost.localdomain>
-References: <1276801147-4103-1-git-send-email-eric@eukrea.com>	
-	<1276801147-4103-2-git-send-email-eric@eukrea.com>	
-	<1276801147-4103-3-git-send-email-eric@eukrea.com>	
-	<1276801147-4103-4-git-send-email-eric@eukrea.com>	
-	<4C415AB5.9070705@eukrea.com>
-	<1279351998.7515.0.camel@localhost.localdomain>
-Message-ID: <4C41A6EA.8070501@eukrea.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat, 17 Jul 2010 15:51:44 +0200
+Subject: [RFC][PATCH 1/1] ARM: Add initial hibernation support
+In-Reply-To: <201007150804.06217.marek.vasut@gmail.com>
+References: <201007150648.50521.marek.vasut@gmail.com>
+	<20100715.090028.189718162.Hiroshi.DOYU@nokia.com>
+	<201007150804.06217.marek.vasut@gmail.com>
+Message-ID: <201007171551.44438.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Artem,
+Dne ?t 15. ?ervence 2010 08:04:06 Marek Vasut napsal(a):
+> Dne ?t 15. ?ervence 2010 08:00:28 Hiroshi DOYU napsal(a):
+> > From: ext Marek Vasut <marek.vasut@gmail.com>
+> > Subject: Re: [RFC][PATCH 1/1] ARM: Add initial hibernation support
+> > Date: Thu, 15 Jul 2010 07:56:11 +0200
+> > 
+> > > Dne ?t 15. ?ervence 2010 07:39:31 Hiroshi DOYU napsal(a):
+> > >> From: ext Marek Vasut <marek.vasut@gmail.com>
+> > >> Subject: Re: [RFC][PATCH 1/1] ARM: Add initial hibernation support
+> > >> Date: Thu, 15 Jul 2010 06:48:50 +0200
+> > >> 
+> > >> > Dne St 30. ?ervna 2010 16:28:01 Hiroshi DOYU napsal(a):
+> > >> >> From: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+> > >> >> 
+> > >> >> Hibernation (a.k.a: Suspend-To-Disk) support for ARM
+> > >> >> 
+> > >> >> Based on the original work from Romit and Raghu at TI. The original
+> > >> >> patch(*1) was sent to LOML by Teerth Reddy <teerth@ti.com>
+> > >> >> 
+> > >> >> *1: https://patchwork.kernel.org/patch/96442/
+> > >> >> 
+> > >> >> Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+> > >> > 
+> > >> > Hey, can this also run on pre-v7 arms ? Or is there something I
+> > >> > missed that'd make that impossible?
+> > >> 
+> > >> What I verified is with OMAP3(Cortex A8) based board.
+> > >> 
+> > >> cp15 part has to be modified, but it might work without this part
+> > >> itself, I guess.
+> > > 
+> > > I see ... do I need any special support on the bootloader or userland
+> > > side ?
+> > 
+> > No, I don't think so. The resuming boot could set up most of states
+> > basically.
+> 
+> I'll test it on xscale/pxa270 ... if it works, I can test on various pxa3xx
+> too.
 
-Le 17/07/2010 09:33, Artem Bityutskiy a ?crit :
-> On Sat, 2010-07-17 at 09:24 +0200, Eric B?nard wrote:
->> can you also pick this patch for mxc_nand ?
->
-> It is in my tree already, and I sent a notification as well :-)
->
-
-OK, sorry, I didn't see the notification mail and only checked your 
-master branch, not the dunno branch where you applied this patch !
-
-Thanks,
-
-Eric
+Sorry I wasn't able to test this yet, I'm having trouble with my cross-
+toolchain.
