@@ -1,24 +1,25 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Sat, 17 Jul 2010 10:33:18 +0300
-Subject: [PATCH v2] mtd/mxc_nand: don't call mtd->{suspend,resume}
-	explicitly
-In-Reply-To: <4C415AB5.9070705@eukrea.com>
-References: <1276801147-4103-1-git-send-email-eric@eukrea.com>
-	<1276801147-4103-2-git-send-email-eric@eukrea.com>
-	<1276801147-4103-3-git-send-email-eric@eukrea.com>
-	<1276801147-4103-4-git-send-email-eric@eukrea.com>
-	<4C415AB5.9070705@eukrea.com>
-Message-ID: <1279351998.7515.0.camel@localhost.localdomain>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sat, 17 Jul 2010 11:18:32 +0300
+Subject: [PATCH v4 0/4] s3c24xx: iPAQ rx1950 series
+Message-ID: <1279354716-11869-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2010-07-17 at 09:24 +0200, Eric B?nard wrote:
-> Hi Artem,
-> 
-> can you also pick this patch for mxc_nand ?
+This patch series adds more support for iPAQ rx1950 PDA to linux:
+1. LEDs driver -- it controls blue, green and red LEDs on rx1950
+2. Battery driver -- adds ability to monitor and charge battery.
+This driver is suitable for H1940 PDA aswell (just need to write
+some machine specific callbacks and get voltage LUTs)
 
-It is in my tree already, and I sent a notification as well :-)
+v2: removed ac registration from s3c_adc_battery driver, use
+pda_power instead for ac support
 
--- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+v3: split LEDs patch to driver and machine parts,
+split battery patch into battery + LED trigger parts,
+now battery driver can skip gpio/callbacks usage
+(if there's no gpio pin to determine that battery is
+full or if charger is enabled automatically)
+
+v4: add .blink_set callback to LEDs driver instead of
+using LED_HALF value for blinking, remove LED triggers
+from battery driver completely (for now)
