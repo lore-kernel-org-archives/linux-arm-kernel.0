@@ -1,21 +1,29 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Sat, 17 Jul 2010 12:00:38 +0200
-Subject: [PATCH 02/15] arm/mach-u300: check kmalloc result
-In-Reply-To: <1279296767-24823-1-git-send-email-segooon@gmail.com>
-References: <1279296767-24823-1-git-send-email-segooon@gmail.com>
-Message-ID: <AANLkTinb-TcOBX69tjR1Z3OdYmNvDwHMl_-C-39eWyCu@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sat, 17 Jul 2010 13:57:00 +0300
+Subject: [PATCH v5 0/4] s3c24xx: iPAQ rx1950 series
+Message-ID: <1279364224-24525-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/16 Kulikov Vasiliy <segooon@gmail.com>:
+This patch series adds more support for iPAQ rx1950 PDA to linux:
+1. LEDs driver -- it controls blue, green and red LEDs on rx1950
+2. Battery driver -- adds ability to monitor and charge battery.
+This driver is suitable for H1940 PDA aswell (just need to write
+some machine specific callbacks and get voltage LUTs)
 
-> ?arch/arm/mach-u300/dummyspichip.c | ? ?5 +++++
-> ?1 files changed, 5 insertions(+), 0 deletions(-)
+v2: removed ac registration from s3c_adc_battery driver, use
+pda_power instead for ac support
 
-NACK I have recently submitted two patches to move this test chip to
-drivers/spi, please base your fixes work on top of those patches
-instead, and make sure to mail them to Grant Likely and the
-spi-devel-general list.
+v3: split LEDs patch to driver and machine parts,
+split battery patch into battery + LED trigger parts,
+now battery driver can skip gpio/callbacks usage
+(if there's no gpio pin to determine that battery is
+full or if charger is enabled automatically)
 
-Yours,
-Linus Walleij
+v4: add .blink_set callback to LEDs driver instead of
+using LED_HALF value for blinking, remove LED triggers
+from battery driver completely (for now)
+
+v5: restore lut_acin usage in s3c_adc_battery driver,
+it was accidently removed during removing AC support
+from driver
