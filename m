@@ -1,39 +1,98 @@
-From: david.yangshuai@gmail.com (David Yang)
-Date: Sat, 17 Jul 2010 15:05:25 +0800
-Subject: Problem with dma_alloc_coherent at linux-2.6.33-arm1 ,
-	withRealView platform,board PBX-A9 and armv7 instructions.
-In-Reply-To: <1279199872.6664.24.camel@e102109-lin.cambridge.arm.com>
-References: <AANLkTimq3E7uF4poJkqcDIomEHoS4y24D7sJWt0U44Hd@mail.gmail.com>
-	<1279198607.6664.20.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTikezqBLFd_ECJZ9RoCf2XCNdYyWps_JKfjyQ1se@mail.gmail.com>
-	<1279199872.6664.24.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <AANLkTikiHfOL0WMjiZnWY3RVmw89hZVFcNkqfDUYSDgG@mail.gmail.com>
+From: eric@eukrea.com (=?UTF-8?B?RXJpYyBCw6luYXJk?=)
+Date: Sat, 17 Jul 2010 09:24:37 +0200
+Subject: [PATCH v2] mtd/mxc_nand: don't call mtd->{suspend,
+	resume} explicitly
+In-Reply-To: <1276801147-4103-4-git-send-email-eric@eukrea.com>
+References: <1276801147-4103-1-git-send-email-eric@eukrea.com>	<1276801147-4103-2-git-send-email-eric@eukrea.com>	<1276801147-4103-3-git-send-email-eric@eukrea.com>
+	<1276801147-4103-4-git-send-email-eric@eukrea.com>
+Message-ID: <4C415AB5.9070705@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have a question: in linux-2.6.28, there is no barriers in the IO accessors.
+Hi Artem,
 
-So,how does it prevent the reorder of the io  instructions?
+can you also pick this patch for mxc_nand ?
 
-On Thu, Jul 15, 2010 at 9:17 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, 2010-07-15 at 14:10 +0100, David Yang wrote:
->> I have passed the test,when using wmb() and without PATCH 0/3;
+Thanks
+Eric
+
+Le 17/06/2010 20:59, Eric B?nard a ?crit :
+> The mtd layer is responsible to call mtd->{suspend,resume}.  Doing it
+> again in the driver is wrong and results in a warning:
 >
-> Great, so it's a memory ordering issue.
+> 	nand_resume called for a chip which is not in suspended state
 >
->> But,I have a ?doubt : if I use the wmb(), then the l2x0.c 's patch is
->> not needed?
+> at resume time.  Removing the calls from the resume and suspend
+> functions makes them empty allowing them to be deleted completely.
 >
-> Correct, if you add the wmb(), none of the three ordered accessors
-> patches are needed. But we'll probably push them anyway, in which case
-> the wmb() becomes superfluous.
+> Signed-off-by: Eric B?nard<eric@eukrea.com>
+> Acked-by: Uwe Kleine-K?nig<u.kleine-koenig@pengutronix.de>
+> Cc: Sascha Hauer<s.hauer@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-mtd at lists.infradead.org
+> ---
+> v2:
+> 	fix commit log (writen by Uwe Kleine-K?nig)
 >
->> I will test the PATCH v3 0/3 ?tomorrow, without using wmb();
+>   drivers/mtd/nand/mxc_nand.c |   44 +------------------------------------------
+>   1 files changed, 1 insertions(+), 43 deletions(-)
 >
-> Thanks.
+> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> index 0d76b16..ad19dc6 100644
+> --- a/drivers/mtd/nand/mxc_nand.c
+> +++ b/drivers/mtd/nand/mxc_nand.c
+> @@ -873,53 +873,11 @@ static int __devexit mxcnd_remove(struct platform_device *pdev)
+>   	return 0;
+>   }
 >
-> --
-> Catalin
+> -#ifdef CONFIG_PM
+> -static int mxcnd_suspend(struct platform_device *pdev, pm_message_t state)
+> -{
+> -	struct mtd_info *mtd = platform_get_drvdata(pdev);
+> -	struct nand_chip *nand_chip = mtd->priv;
+> -	struct mxc_nand_host *host = nand_chip->priv;
+> -	int ret = 0;
+> -
+> -	DEBUG(MTD_DEBUG_LEVEL0, "MXC_ND : NAND suspend\n");
+> -
+> -	ret = mtd->suspend(mtd);
+> -
+> -	/*
+> -	 * nand_suspend locks the device for exclusive access, so
+> -	 * the clock must already be off.
+> -	 */
+> -	BUG_ON(!ret&&  host->clk_act);
+> -
+> -	return ret;
+> -}
+> -
+> -static int mxcnd_resume(struct platform_device *pdev)
+> -{
+> -	struct mtd_info *mtd = platform_get_drvdata(pdev);
+> -	struct nand_chip *nand_chip = mtd->priv;
+> -	struct mxc_nand_host *host = nand_chip->priv;
+> -	int ret = 0;
+> -
+> -	DEBUG(MTD_DEBUG_LEVEL0, "MXC_ND : NAND resume\n");
+> -
+> -	mtd->resume(mtd);
+> -
+> -	return ret;
+> -}
+> -
+> -#else
+> -# define mxcnd_suspend   NULL
+> -# define mxcnd_resume    NULL
+> -#endif				/* CONFIG_PM */
+> -
+>   static struct platform_driver mxcnd_driver = {
+>   	.driver = {
+>   		   .name = DRIVER_NAME,
+> -		   },
+> +	},
+>   	.remove = __devexit_p(mxcnd_remove),
+> -	.suspend = mxcnd_suspend,
+> -	.resume = mxcnd_resume,
+>   };
 >
->
+>   static int __init mxc_nd_init(void)
