@@ -1,5 +1,5 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Sat, 17 Jul 2010 12:10:42 +0900
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Sat, 17 Jul 2010 12:43:42 +0900
 Subject: [PATCH v2 2/5] ARM: S5P: Added default pll values for APLL
 	800/1000MHz
 In-Reply-To: <012f01cb24e1$85628920$90279b60$%kim@samsung.com>
@@ -7,7 +7,7 @@ References: <1279267277-6804-1-git-send-email-myungjoo.ham@samsung.com>
 	<1279267277-6804-2-git-send-email-myungjoo.ham@samsung.com>
 	<1279267277-6804-3-git-send-email-myungjoo.ham@samsung.com>
 	<012f01cb24e1$85628920$90279b60$%kim@samsung.com>
-Message-ID: <AANLkTiliHDKDO_QIAW9xKGVaDtrzotYFH1lxAICnIXbo@mail.gmail.com>
+Message-ID: <AANLkTil5v3ypu0hZdzVmFCG7MsjQzTKPNgMtJQ-M6MHj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -42,67 +42,11 @@ On Fri, Jul 16, 2010 at 9:22 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
 > Actually, EVT0 is not real chip and not for mass production.
 > So don't use in here.
 
-But we got too many board and want to use it. ARM core is also has
-some workaround to fix internal bug. so you can regard it.
-
-config S5PC110_WORKAROUND
-    help
-        Early s5pc110 has some errata blah blah ... To fix it you can enable it.
-
-Thank you,
-Kyungmin Park
-
->
->> +#define PLL45XX_APLL_VAL_1000 ? ? ? ?(1 << 31) | (0xfa<<16) | (0x6<<8) |
-> (0x1)
->> +#define PLL45XX_APLL_VAL_800 (1 << 31) | (0xc8<<16) | (0x6<<8) | (0x1)
->> +#else
->> +#define PLL45XX_APLL_VAL_1000 ? ? ? ?(1 << 31) | (125<<16) | (3<<8) | (1)
->> +#define PLL45XX_APLL_VAL_800 (1 << 31) | (100<<16) | (3<<8) | (1)
->> +#endif
->> +
->> ?enum pll45xx_type_t {
->> ? ? ? pll_4500,
->> ? ? ? pll_4502,
->> --
->
-> And...I got the below result from scripts/checkpatch.pl.
->
-> --
->
-> ERROR: Macros with complex values should be enclosed in parenthesis
-> #27: FILE: arch/arm/plat-s5p/include/plat/pll.h:25:
-> +#define PLL45XX_APLL_VAL_1000 ?(1 << 31) | (0xfa<<16) | (0x6<<8) | (0x1)
->
-> ERROR: Macros with complex values should be enclosed in parenthesis
-> #28: FILE: arch/arm/plat-s5p/include/plat/pll.h:26:
-> +#define PLL45XX_APLL_VAL_800 ? (1 << 31) | (0xc8<<16) | (0x6<<8) | (0x1)
->
-> ERROR: Macros with complex values should be enclosed in parenthesis
-> #30: FILE: arch/arm/plat-s5p/include/plat/pll.h:28:
-> +#define PLL45XX_APLL_VAL_1000 ?(1 << 31) | (125<<16) | (3<<8) | (1)
->
-> ERROR: Macros with complex values should be enclosed in parenthesis
-> #31: FILE: arch/arm/plat-s5p/include/plat/pll.h:29:
-> +#define PLL45XX_APLL_VAL_800 ? (1 << 31) | (100<<16) | (3<<8) | (1)
->
-> total: 4 errors, 0 warnings, 14 lines checked
->
-> --
->
-> I already said to you about that :-(
-> See the Documentation/SubmittingPatches...
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+That was my point in a thread few days ago when I suggested we
+be careful while pushing code upstream.
+Rather than flood mainline Samsung support with any hardware
+we can get our hands on, we need to strategically select
+SoCs (& their versions) and machines so that we have maximum
+overlap of features and, equally important, _users_ of that code.
+That will help us concentrate our efforts on support needed by most
+of the users and devices.
