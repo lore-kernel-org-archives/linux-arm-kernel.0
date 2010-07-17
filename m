@@ -1,45 +1,39 @@
-From: infa@BioMedTalk.com (BioMedTalk.com)
-Date: Sat, 17 Jul 2010 08:45:14 +0300
-Subject: scientific articles h-index
-Message-ID: <mailman.77.1279347732.27306.linux-arm-kernel@lists.infradead.org>
+From: david.yangshuai@gmail.com (David Yang)
+Date: Sat, 17 Jul 2010 15:05:25 +0800
+Subject: Problem with dma_alloc_coherent at linux-2.6.33-arm1 ,
+	withRealView platform,board PBX-A9 and armv7 instructions.
+In-Reply-To: <1279199872.6664.24.camel@e102109-lin.cambridge.arm.com>
+References: <AANLkTimq3E7uF4poJkqcDIomEHoS4y24D7sJWt0U44Hd@mail.gmail.com>
+	<1279198607.6664.20.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTikezqBLFd_ECJZ9RoCf2XCNdYyWps_JKfjyQ1se@mail.gmail.com>
+	<1279199872.6664.24.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <AANLkTikiHfOL0WMjiZnWY3RVmw89hZVFcNkqfDUYSDgG@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Re:  scientific articles h-index
+I have a question: in linux-2.6.28, there is no barriers in the IO accessors.
 
+So,how does it prevent the reorder of the io  instructions?
 
-Hello,
-You are welcome to check the Articles Rank (AR) for your scientific articles 
-published in the peer-reviewed professional journals on Life Science and Biology, 
-Health and Medical, Nutrition and BioTechnology research. This articles ranking 
-is different from the article citation index calculated for each individual 
-article, because calculation of the Articles Rank done for all articles published 
-by certain Author. Please, following this link for details 
-http://www.biomedtalk.com/showthread.php?t=1432
-
-Scientific ranking is a nice way to identify the scientific impact for a person. 
-Such impact ranking tool also helpful for the science factor as well as background 
-evaluation of potential employee, new Contacts and perspective Partners as well. 
-You are welcome to check article impact by articles factor calculation at 
-www.BioMedTalk.com site or by following this link 
-http://www.biomedtalk.com/showthread.php?t=1432
-
-To participate in discussion and to post your replays, comments and questions, 
-please, register by following this link first
-http://www.biomedtalk.com/register.php 
-
-Sincerely,
-
-BioMedTalk.com Team 
-Contact Us: http://www.biomedtalk.com/showthread.php?t=2033
-Web site: http://www.BioMedTalk.com
-
-http://BioMedTalk.COM Forum - Life science, bioscience
-and medical online board for the Scientific-Research
-Community of scientists, physicians, publishers,
-journalists, manufacturers, vendors, employers, job-
-seekers and the general public from all over the World
-to exchange ideas, post commentary, disseminate results
-and information of Life Sciences, Medical Sciences,
-Biotechnology, Health research, online debate and
-establishing new contacts.
+On Thu, Jul 15, 2010 at 9:17 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Thu, 2010-07-15 at 14:10 +0100, David Yang wrote:
+>> I have passed the test,when using wmb() and without PATCH 0/3;
+>
+> Great, so it's a memory ordering issue.
+>
+>> But,I have a ?doubt : if I use the wmb(), then the l2x0.c 's patch is
+>> not needed?
+>
+> Correct, if you add the wmb(), none of the three ordered accessors
+> patches are needed. But we'll probably push them anyway, in which case
+> the wmb() becomes superfluous.
+>
+>> I will test the PATCH v3 0/3 ?tomorrow, without using wmb();
+>
+> Thanks.
+>
+> --
+> Catalin
+>
+>
