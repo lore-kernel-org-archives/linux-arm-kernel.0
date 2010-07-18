@@ -1,31 +1,31 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Sun, 18 Jul 2010 22:29:16 +0800
-Subject: [PATCH] ARM/nuc900: add nuc900 kpi platform device structure to
-	nuc910_dev
-Message-ID: <4C430FBC.6010603@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 18 Jul 2010 20:34:25 +0100
+Subject: [PATCH resend] Watchdog: Adding support for ARM Primecell
+	SP805 Watchdog
+In-Reply-To: <20100628162430.GN3788@infomag.iguana.be>
+References: <1275465783-14052-1-git-send-email-viresh.kumar@st.com>
+	<4C11B711.70907@st.com> <20100611053049.GM3788@infomag.iguana.be>
+	<4C285A72.7030303@st.com> <20100628162430.GN3788@infomag.iguana.be>
+Message-ID: <20100718193425.GD24707@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to add nuc900 kpi platform device structure to nuc910_dev[],
-which enables nuc910 keypad support.
+On Mon, Jun 28, 2010 at 06:24:30PM +0200, Wim Van Sebroeck wrote:
+> Hi Viresh,
+> 
+> > > Still need to look at it. First finishing up another project.
+> > > Probably for this weekend.
+> > > 
+> > > Kind regards,
+> > > Wim.
+> > > 
+> > 
+> > Wim,
+> > 
+> > Have you reviewed this patch or still need to look at it?
+> 
+> I'm chasing another bug and must admit I almost forgot about this one.
+> So, yes, I still need to look at this one.
 
-Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
-
----
- arch/arm/mach-w90x900/nuc910.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-w90x900/nuc910.c b/arch/arm/mach-w90x900/nuc910.c
-index cd49776..1523f41 100644
---- a/arch/arm/mach-w90x900/nuc910.c
-+++ b/arch/arm/mach-w90x900/nuc910.c
-@@ -27,6 +27,7 @@ static struct platform_device *nuc910_dev[] __initdata = {
- 	&nuc900_device_ts,
- 	&nuc900_device_rtc,
- 	&nuc900_device_lcd,
-+	&nuc900_device_kpi,
- };
-
- /* define specific CPU platform io map */
--- 
-1.6.3.3
+Any news on this - its still sitting in the patch system since May 31st...
+What do I do about it?
