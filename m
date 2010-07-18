@@ -1,31 +1,16 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 18 Jul 2010 20:34:25 +0100
-Subject: [PATCH resend] Watchdog: Adding support for ARM Primecell
-	SP805 Watchdog
-In-Reply-To: <20100628162430.GN3788@infomag.iguana.be>
-References: <1275465783-14052-1-git-send-email-viresh.kumar@st.com>
-	<4C11B711.70907@st.com> <20100611053049.GM3788@infomag.iguana.be>
-	<4C285A72.7030303@st.com> <20100628162430.GN3788@infomag.iguana.be>
-Message-ID: <20100718193425.GD24707@n2100.arm.linux.org.uk>
+Date: Sun, 18 Jul 2010 20:47:20 +0100
+Subject: [PATCH] ARM: expose PB1176 ROM in debugfs
+In-Reply-To: <1278504339-26992-1-git-send-email-triad@df.lth.se>
+References: <1278504339-26992-1-git-send-email-triad@df.lth.se>
+Message-ID: <20100718194720.GE24707@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 28, 2010 at 06:24:30PM +0200, Wim Van Sebroeck wrote:
-> Hi Viresh,
-> 
-> > > Still need to look at it. First finishing up another project.
-> > > Probably for this weekend.
-> > > 
-> > > Kind regards,
-> > > Wim.
-> > > 
-> > 
-> > Wim,
-> > 
-> > Have you reviewed this patch or still need to look at it?
-> 
-> I'm chasing another bug and must admit I almost forgot about this one.
-> So, yes, I still need to look at this one.
+On Wed, Jul 07, 2010 at 02:05:39PM +0200, Linus Walleij wrote:
+> This exposes the PB1176 ROM as a simple 16KiB file in debugfs so
+> that it can be copied out and disassembled with some
+> objcopy+objdump massage for example. I used this to find out how
+> the ROM handled the CharLCD.
 
-Any news on this - its still sitting in the patch system since May 31st...
-What do I do about it?
+Would it be better to expose this through a mtd ROM mapping (map_rom) ?
