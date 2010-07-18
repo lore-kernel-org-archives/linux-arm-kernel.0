@@ -1,34 +1,31 @@
-From: minchan.kim@gmail.com (Minchan Kim)
-Date: Sun, 18 Jul 2010 23:13:10 +0900
-Subject: [PATCH] Tight check of pfn_valid on sparsemem - v2
-In-Reply-To: <AANLkTilQf-43GMAIDa-MKmcB2afdVgkERMg0b5mhIbhE@mail.gmail.com>
-References: <1279448311-29788-1-git-send-email-minchan.kim@gmail.com>
-	<AANLkTilQf-43GMAIDa-MKmcB2afdVgkERMg0b5mhIbhE@mail.gmail.com>
-Message-ID: <20100718141240.GA30402@barrios-desktop>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Sun, 18 Jul 2010 22:29:16 +0800
+Subject: [PATCH] ARM/nuc900: add nuc900 kpi platform device structure to
+	nuc910_dev
+Message-ID: <4C430FBC.6010603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kyoungmin, 
+This patch is to add nuc900 kpi platform device structure to nuc910_dev[],
+which enables nuc910 keypad support.
 
-On Sun, Jul 18, 2010 at 08:53:25PM +0900, Kyungmin Park wrote:
-> Hi Minchan,
-> 
-> Please see the OneDRAM spec. it's OneDRAM memory usage.
-> Actually memory size is 80MiB + 16MiB at AP side and it's used 80MiB
-> for dedicated AP.
-> The shared 16MiB used between AP and CP. So we also use the 16MiB.
+Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
 
-It's not only s5pv210 but general problem of memmap hole 
-on ARM's sparsemem. 
+---
+ arch/arm/mach-w90x900/nuc910.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-It doesn't matter with 16M or 80M. 
-The thing is that section size is greater than physical memory's groups.
+diff --git a/arch/arm/mach-w90x900/nuc910.c b/arch/arm/mach-w90x900/nuc910.c
+index cd49776..1523f41 100644
+--- a/arch/arm/mach-w90x900/nuc910.c
++++ b/arch/arm/mach-w90x900/nuc910.c
+@@ -27,6 +27,7 @@ static struct platform_device *nuc910_dev[] __initdata = {
+ 	&nuc900_device_ts,
+ 	&nuc900_device_rtc,
+ 	&nuc900_device_lcd,
++	&nuc900_device_kpi,
+ };
 
-Current sparsemen aren't designed to have memmap hole but ARM makes holes
-to save memory space. So we should solve it by not SECTION_SIZE but more 
-fundamental solution.
-
-I think this patch suggests it.
+ /* define specific CPU platform io map */
 -- 
-Kind regards,
-Minchan Kim
+1.6.3.3
