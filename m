@@ -1,46 +1,61 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Mon, 19 Jul 2010 14:31:19 +0900
-Subject: [PATCH v3 3/7] ARM: S5P: Added default pll values for APLL 800/1000MHz
-In-Reply-To: <1279517483-22751-3-git-send-email-myungjoo.ham@samsung.com>
+Date: Mon, 19 Jul 2010 14:31:22 +0900
+Subject: [PATCH v3 6/7] ARM: S5PV210: Access for DMCx registers
+In-Reply-To: <1279517483-22751-6-git-send-email-myungjoo.ham@samsung.com>
 References: <1279517483-22751-1-git-send-email-myungjoo.ham@samsung.com>
 	<1279517483-22751-2-git-send-email-myungjoo.ham@samsung.com>
 	<1279517483-22751-3-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <1279517483-22751-4-git-send-email-myungjoo.ham@samsung.com>
+	<1279517483-22751-4-git-send-email-myungjoo.ham@samsung.com>
+	<1279517483-22751-5-git-send-email-myungjoo.ham@samsung.com>
+	<1279517483-22751-6-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <1279517483-22751-7-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPUFREQ of S5PV210 uses different APLL settings and we provide
-such values for CPUFREQ at pll.h. We have been using differently
-between EVT0 and EVT1 machines. Although this version of kernel
-assumes that the CPU is EVT1, users may use code for EVT0 later.
-
-Note that at 1GHz of ARMCLK, APLL should be 1GHz and for other lower
-ARMCLK, APLL should be 800MHz.
+	The CPUFREQ driver requires an access to DMCx registers.
 
 Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-s5p/include/plat/pll.h |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pv210/cpu.c              |   12 +++++++++++-
+ arch/arm/mach-s5pv210/include/mach/map.h |    4 ++++
+ 2 files changed, 15 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-s5p/include/plat/pll.h b/arch/arm/plat-s5p/include/plat/pll.h
-index 7db3227..679e0d3 100644
---- a/arch/arm/plat-s5p/include/plat/pll.h
-+++ b/arch/arm/plat-s5p/include/plat/pll.h
-@@ -21,6 +21,14 @@
+diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
+index 94c632b..28c101d 100644
+--- a/arch/arm/mach-s5pv210/cpu.c
++++ b/arch/arm/mach-s5pv210/cpu.c
+@@ -59,7 +59,17 @@ static struct map_desc s5pv210_iodesc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(S5PV210_PA_SROMC),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE,
+-	}
++	}, {
++		.virtual	= (unsigned long)S5P_VA_DMC0,
++		.pfn		= __phys_to_pfn(S5PV210_PA_DMC0),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S5P_VA_DMC1,
++		.pfn		= __phys_to_pfn(S5PV210_PA_DMC1),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	},
+ };
  
- #include <asm/div64.h>
+ static void s5pv210_idle(void)
+diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
+index 17687f0..daf6456 100644
+--- a/arch/arm/mach-s5pv210/include/mach/map.h
++++ b/arch/arm/mach-s5pv210/include/mach/map.h
+@@ -108,4 +108,8 @@
+ #define SAMSUNG_PA_ADC		S5PV210_PA_ADC
+ #define SAMSUNG_PA_KEYPAD	S5PV210_PA_KEYPAD
  
-+#ifdef CONFIG_S5PC110_EVT0_WORKAROUND
-+#define PLL45XX_APLL_VAL_1000	((1 << 31) | (0xfa<<16) | (0x6<<8) | (0x1))
-+#define PLL45XX_APLL_VAL_800	((1 << 31) | (0xc8<<16) | (0x6<<8) | (0x1))
-+#else
-+#define PLL45XX_APLL_VAL_1000	((1 << 31) | (125<<16) | (3<<8) | (1))
-+#define PLL45XX_APLL_VAL_800	((1 << 31) | (100<<16) | (3<<8) | (1))
-+#endif
++/* DMC */
++#define S5PV210_PA_DMC0		(0xF0000000)
++#define S5PV210_PA_DMC1		(0xF1400000)
 +
- enum pll45xx_type_t {
- 	pll_4500,
- 	pll_4502,
+ #endif /* __ASM_ARCH_MAP_H */
 -- 
 1.6.3.3
