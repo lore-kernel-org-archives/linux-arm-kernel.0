@@ -1,54 +1,63 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 19 Jul 2010 12:05:10 +0530
-Subject: [PATCH] davinci: Add MityDSP-L138/MityARM-1808 SOM support
-In-Reply-To: <AANLkTil1t-KHom4wWLufDM2hPB24u_iGxlTwNXqXTjhI@mail.gmail.com>
-References: <E1OZlTF-0006NW-1I@wanda>
-	<1279324167.4526.85.camel@Joe-Laptop.home>
-	<AANLkTil1t-KHom4wWLufDM2hPB24u_iGxlTwNXqXTjhI@mail.gmail.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59301E7BD3A06@dbde02.ent.ti.com>
+From: zpfeffer@codeaurora.org (Zach Pfeffer)
+Date: Sun, 18 Jul 2010 23:52:33 -0700
+Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
+	memory management
+In-Reply-To: <20100715085535.GC26212@n2100.arm.linux.org.uk>
+References: <4C3C0032.5020702@codeaurora.org>
+	<20100713150311B.fujita.tomonori@lab.ntt.co.jp>
+	<20100713121420.GB4263@codeaurora.org>
+	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
+	<20100714201149.GA14008@codeaurora.org>
+	<20100714220536.GE18138@n2100.arm.linux.org.uk>
+	<20100715012958.GB2239@codeaurora.org>
+	<20100715085535.GC26212@n2100.arm.linux.org.uk>
+Message-ID: <20100719065233.GD11054@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jul 15, 2010 at 09:55:35AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jul 14, 2010 at 06:29:58PM -0700, Zach Pfeffer wrote:
+> > The VCM ensures that all mappings that map a given physical buffer:
+> > IOMMU mappings, CPU mappings and one-to-one device mappings all map
+> > that buffer using the same (or compatible) attributes. At this point
+> > the only attribute that users can pass is CACHED. In the absence of
+> > CACHED all accesses go straight through to the physical memory.
+> 
+> So what you're saying is that if I have a buffer in kernel space
+> which I already have its virtual address, I can pass this to VCM and
+> tell it !CACHED, and it'll setup another mapping which is not cached
+> for me?
 
-Hi Mike,
+Not quite. The existing mapping will be represented by a reservation
+from the prebuilt VCM of the VM. This reservation has been marked
+non-cached. Another reservation on a IOMMU VCM, also marked non-cached
+will be backed with the same physical memory. This is legal in ARM,
+allowing the vcm_back call to succeed. If you instead passed cached on
+the second mapping, the first mapping would be non-cached and the
+second would be cached. If the underlying architecture supported this
+than the vcm_back would go through.
 
-On Sun, Jul 18, 2010 at 22:59:32, Mike Williamson wrote:
->
->
-> 2010/7/16 Joe Perches <joe@perches.com>
->
->
->       On Fri, 2010-07-16 at 10:00 -0400, Michael Williamson wrote:
->       > +static __init void mityomapl138_setup_lcd(void)
->       > +{
->
->       []
->
->       > +                     pr_warning("mityomapl138_init: unknown
-> LCD type : %s\n",
->       > +
-> peripheral_config.LCDConfig.PanelName);
->
->
->       I think you'd be better off actually using the actual
->       function name rather than the caller name
->
->                              pr_warning("%s: unknown LCD type: %s\n",
->                                         __func__,
-> peripheral_config.LCDConfig.PanelName);
->
->
->
->
-> Absolutely.   Didn't catch those when shuffling around during cleanup /
-> etc.
-> I will clean these up and resubmit.
->
-> Thank you for the feedback.
+> 
+> You are aware that multiple V:P mappings for the same physical page
+> with different attributes are being outlawed with ARMv6 and ARMv7
+> due to speculative prefetching.  The cache can be searched even for
+> a mapping specified as 'normal, uncached' and you can get cache hits
+> because the data has been speculatively loaded through a separate
+> cached mapping of the same physical page.
 
-Can you can you please configure your e-mail client to send
-plain text and not HTML? I don't think this response of yours
-reached subscribers of ARM linux kernel mailing list.
+I didn't know that. Thanks for the heads up.
 
-Thanks,
-Sekhar
+> FYI, during the next merge window, I will be pushing a patch which makes
+> ioremap() of system RAM fail, which should be the last core code creator
+> of mappings with different memory types.  This behaviour has been outlawed
+> (as unpredictable) in the architecture specification and does cause
+> problems on some CPUs.
+
+That's fair enough, but it seems like it should only be outlawed for
+those processors on which it breaks.
+
+> 
+> We've also the issue of multiple mappings with differing cache attributes
+> which needs addressing too...
+
+The VCM has been architected to handle these things.
