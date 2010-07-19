@@ -1,145 +1,256 @@
-From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Mon, 19 Jul 2010 08:31:50 +0900
-Subject: [PATCH 1/2] ARM: SAMSUNG: Add setname core function for S3C24XX NAND
-In-Reply-To: <1279495911-17346-1-git-send-email-sbkim73@samsung.com>
-References: <1279495911-17346-1-git-send-email-sbkim73@samsung.com>
-Message-ID: <1279495911-17346-2-git-send-email-sbkim73@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 19 Jul 2010 09:09:42 +0900
+Subject: [PATCH v2 2/8] ARM: S5PV310: Add new CPU initialization support
+In-Reply-To: <20100716115219.GD17952@n2100.arm.linux.org.uk>
+References: <1279270714-15146-1-git-send-email-kgene.kim@samsung.com>
+	<1279270714-15146-3-git-send-email-kgene.kim@samsung.com>
+	<20100716115219.GD17952@n2100.arm.linux.org.uk>
+Message-ID: <000001cb26d6$b2a3fee0$17ebfca0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Atul Dahiya <atul.dahiya@samsung.com>
+Russell King wrote:
+> 
+> On Fri, Jul 16, 2010 at 05:58:28PM +0900, Kukjin Kim wrote:
+> > diff --git a/arch/arm/mach-s5pv310/platsmp.c b/arch/arm/mach-
+> s5pv310/platsmp.c
+> > new file mode 100644
+> > index 0000000..9325ac2
+> > --- /dev/null
+> > +++ b/arch/arm/mach-s5pv310/platsmp.c
+> > @@ -0,0 +1,212 @@
+> > +/* linux/arch/arm/mach-s5pv310/platsmp.c
+> > + *
+> > + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+> > + *		http://www.samsung.com/
+> > + *
+> > + * Cloned from linux/arch/arm/mach-realview/platsmp.c
+> > + *
+> > + *  Copyright (C) 2002 ARM Ltd.
+> > + *  All Rights Reserved
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +#include <linux/init.h>
+> > +#include <linux/errno.h>
+> > +#include <linux/delay.h>
+> > +#include <linux/device.h>
+> > +#include <linux/jiffies.h>
+> > +#include <linux/smp.h>
+> > +#include <linux/io.h>
+> > +
+> > +#include <asm/cacheflush.h>
+> > +#include <mach/hardware.h>
+> > +#include <asm/mach-types.h>
+> > +#include <asm/localtimer.h>
+> > +#include <asm/unified.h>
+> > +
+> > +#include <asm/smp_scu.h>
+> > +#include <mach/regs-clock.h>
+> > +
+> > +extern void s5pv310_secondary_startup(void);
+> > +
+> > +/*
+> > + * control for which core is the next to come out of the secondary
+> > + * boot "holding pen"
+> > + */
+> > +volatile int __cpuinitdata pen_release = -1;
+> > +
+> > +static void __iomem *scu_base_addr(void)
+> > +{
+> > +	return (void __iomem *)(S5P_VA_SCU);
+> > +}
+> > +
+> > +static inline unsigned int get_core_count(void)
+> > +{
+> > +	void __iomem *scu_base = scu_base_addr();
+> > +	if (scu_base)
+> > +		return scu_get_core_count(scu_base);
+> > +	return 1;
+> > +}
+> > +
+> > +static DEFINE_SPINLOCK(boot_lock);
+> > +
+> > +void __cpuinit platform_secondary_init(unsigned int cpu)
+> > +{
+> > +	trace_hardirqs_off();
+> > +
+> > +	/*
+> > +	 * if any interrupts are already enabled for the primary
+> > +	 * core (e.g. timer irq), then they will not have been enabled
+> > +	 * for us: do so
+> > +	 */
+> > +	gic_cpu_init(0, gic_cpu_base_addr);
+> > +
+> > +	/*
+> > +	 * let the primary processor know we're out of the
+> > +	 * pen, then head off into the C entry point
+> > +	 */
+> > +	pen_release = -1;
+> > +	smp_wmb();
+> > +
+> > +	/*
+> > +	 * Synchronise with the boot thread.
+> > +	 */
+> > +	spin_lock(&boot_lock);
+> > +	spin_unlock(&boot_lock);
+> > +}
+> > +
+> > +int __cpuinit boot_secondary(unsigned int cpu, struct task_struct
+*idle)
+> > +{
+> > +	unsigned long timeout;
+> > +
+> > +	/*
+> > +	 * set synchronisation state between this boot processor
+> > +	 * and the secondary one
+> > +	 */
+> > +	spin_lock(&boot_lock);
+> > +
+> > +	/*
+> > +	 * The secondary processor is waiting to be released from
+> > +	 * the holding pen - release it, then wait for it to flag
+> > +	 * that it has been released by resetting pen_release.
+> > +	 *
+> > +	 * Note that "pen_release" is the hardware CPU ID, whereas
+> > +	 * "cpu" is Linux's internal ID.
+> > +	 */
+> > +	pen_release = cpu;
+> > +	flush_cache_all();
+> > +
+> > +	/*
+> > +	 * XXX
+> > +	 *
+> > +	 * This is a later addition to the booting protocol: the
+> > +	 * bootMonitor now puts secondary cores into WFI, so
+> > +	 * poke_milo() no longer gets the cores moving; we need
+> > +	 * to send a soft interrupt to wake the secondary core.
+> > +	 * Use smp_cross_call() for this, since there's little
+> > +	 * point duplicating the code here
+> > +	 */
+> > +	smp_cross_call(cpumask_of(cpu));
+> > +
+> > +	timeout = jiffies + (1 * HZ);
+> > +	while (time_before(jiffies, timeout)) {
+> > +		smp_rmb();
+> > +		if (pen_release == -1)
+> > +			break;
+> > +
+> > +		udelay(10);
+> > +	}
+> > +
+> > +	/*
+> > +	 * now the secondary core is starting up let it run its
+> > +	 * calibrations, then wait for it to finish
+> > +	 */
+> > +	spin_unlock(&boot_lock);
+> > +
+> > +	return pen_release != -1 ? -ENOSYS : 0;
+> > +}
+> > +
+> > +static void __init poke_milo(void)
+> > +{
+> > +	/* nobody is to be released from the pen yet */
+> > +	pen_release = -1;
+> > +
+> > +	/*
+> > +	 * Write the address of secondary startup into the system-wide flags
+> > +	 * register. The BootMonitor waits for this register to become
+> > +	 * non-zero.
+> > +	 */
+> > +	__raw_writel(BSYM(virt_to_phys(s5pv310_secondary_startup)),
+> S5P_INFORM0);
+> > +
+> > +	mb();
+> > +}
+> > +
+> > +/*
+> > + * Initialise the CPU possible map early - this describes the CPUs
+> > + * which may be present or become present in the system.
+> > + */
+> > +void __init smp_init_cpus(void)
+> > +{
+> > +	unsigned int i, ncores = get_core_count();
+> > +
+> > +	for (i = 0; i < ncores; i++)
+> > +		set_cpu_possible(i, true);
+> > +}
+> > +
+> > +void __init smp_prepare_cpus(unsigned int max_cpus)
+> > +{
+> > +	unsigned int ncores = get_core_count();
+> > +	unsigned int cpu = smp_processor_id();
+> > +	int i;
+> > +
+> > +	/* sanity check */
+> > +	if (ncores == 0) {
+> > +		printk(KERN_ERR
+> > +		       "Realview: strange CM count of 0? Default to 1\n");
+> > +
+> > +		ncores = 1;
+> > +	}
+> > +
+> > +	if (ncores > NR_CPUS) {
+> > +		printk(KERN_WARNING
+> > +		       "Realview: no. of cores (%d) greater than configured
+"
+> > +		       "maximum of %d - clipping\n",
+> > +		       ncores, NR_CPUS);
+> > +		ncores = NR_CPUS;
+> > +	}
+> > +
+> > +	smp_store_cpu_info(cpu);
+> > +
+> > +	/*
+> > +	 * are we trying to boot more cores than exist?
+> > +	 */
+> > +	if (max_cpus > ncores)
+> > +		max_cpus = ncores;
+> > +
+> > +	/*
+> > +	 * Initialise the present map, which describes the set of CPUs
+> > +	 * actually populated at the present time.
+> > +	 */
+> > +	for (i = 0; i < max_cpus; i++)
+> > +		set_cpu_present(i, true);
+> > +
+> > +	/*
+> > +	 * Initialise the SCU if there are more than one CPU and let
+> > +	 * them know where to start. Note that, on modern versions of
+> > +	 * MILO, the "poke" doesn't actually do anything until each
+> > +	 * individual core is sent a soft interrupt to get it out of
+> > +	 * WFI
+> > +	 */
+> > +	if (max_cpus > 1) {
+> > +		/*
+> > +		 * Enable the local timer or broadcast device for the
+> > +		 * boot CPU, but only if we have more than one CPU.
+> > +		 */
+> > +		percpu_timer_setup();
+> > +
+> > +		scu_enable(scu_base_addr());
+> > +		poke_milo();
+> > +	}
+> > +}
+> 
+> Please can you model this on the Versatile Express platsmp.c rather than
+> the Realview platsmp.c ?
+> 
+Sure, will do it.
 
-This patch replaces the device name assignment method from string assignment
-to set_name method for all s3c24xx machines and adds device core file.
+> The Realview platsmp.c implementation contains a lot of left-overs from
+> the initial Integrator-based SMP implementation which we really shouldn't
+> be carrying endlessly forward.
 
-Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
-Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
----
- arch/arm/mach-s3c2412/s3c2412.c                |    3 +-
- arch/arm/mach-s3c2416/s3c2416.c                |    3 +-
- arch/arm/mach-s3c2440/s3c244x.c                |    3 +-
- arch/arm/mach-s3c2443/s3c2443.c                |    3 +-
- arch/arm/plat-samsung/include/plat/nand-core.h |   28 ++++++++++++++++++++++++
- 5 files changed, 36 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/plat-samsung/include/plat/nand-core.h
+Oh, I didn't know/check about that.
+Thanks for your information and inputs.
 
-diff --git a/arch/arm/mach-s3c2412/s3c2412.c b/arch/arm/mach-s3c2412/s3c2412.c
-index bef39f7..4c6df51 100644
---- a/arch/arm/mach-s3c2412/s3c2412.c
-+++ b/arch/arm/mach-s3c2412/s3c2412.c
-@@ -51,6 +51,7 @@
- #include <plat/clock.h>
- #include <plat/pm.h>
- #include <plat/pll.h>
-+#include <plat/nand-core.h>
- 
- #ifndef CONFIG_CPU_S3C2412_ONLY
- void __iomem *s3c24xx_va_gpio2 = S3C24XX_VA_GPIO;
-@@ -92,7 +93,7 @@ void __init s3c2412_init_uarts(struct s3c2410_uartcfg *cfg, int no)
- 	/* rename devices that are s3c2412/s3c2413 specific */
- 	s3c_device_sdi.name  = "s3c2412-sdi";
- 	s3c_device_lcd.name  = "s3c2412-lcd";
--	s3c_device_nand.name = "s3c2412-nand";
-+	s3c_nand_setname("s3c2412-nand");
- 
- 	/* alter IRQ of SDI controller */
- 
-diff --git a/arch/arm/mach-s3c2416/s3c2416.c b/arch/arm/mach-s3c2416/s3c2416.c
-index 35dabcc..bfe674f 100644
---- a/arch/arm/mach-s3c2416/s3c2416.c
-+++ b/arch/arm/mach-s3c2416/s3c2416.c
-@@ -55,6 +55,7 @@
- #include <plat/cpu.h>
- 
- #include <plat/iic-core.h>
-+#include <plat/nand-core.h>
- 
- static struct map_desc s3c2416_iodesc[] __initdata = {
- 	IODESC_ENT(WATCHDOG),
-@@ -99,7 +100,7 @@ void __init s3c2416_init_uarts(struct s3c2410_uartcfg *cfg, int no)
- {
- 	s3c24xx_init_uartdevs("s3c2440-uart", s3c2410_uart_resources, cfg, no);
- 
--	s3c_device_nand.name = "s3c2416-nand";
-+	s3c_nand_setname("s3c2416-nand");
- }
- 
- /* s3c2416_map_io
-diff --git a/arch/arm/mach-s3c2440/s3c244x.c b/arch/arm/mach-s3c2440/s3c244x.c
-index 5e4a97e..90c1707 100644
---- a/arch/arm/mach-s3c2440/s3c244x.c
-+++ b/arch/arm/mach-s3c2440/s3c244x.c
-@@ -44,6 +44,7 @@
- #include <plat/cpu.h>
- #include <plat/pm.h>
- #include <plat/pll.h>
-+#include <plat/nand-core.h>
- 
- static struct map_desc s3c244x_iodesc[] __initdata = {
- 	IODESC_ENT(CLKPWR),
-@@ -68,7 +69,7 @@ void __init s3c244x_map_io(void)
- 
- 	s3c_device_sdi.name  = "s3c2440-sdi";
- 	s3c_device_i2c0.name  = "s3c2440-i2c";
--	s3c_device_nand.name = "s3c2440-nand";
-+	s3c_nand_setname("s3c2440-nand");
- 	s3c_device_ts.name = "s3c2440-ts";
- 	s3c_device_usbgadget.name = "s3c2440-usbgadget";
- }
-diff --git a/arch/arm/mach-s3c2443/s3c2443.c b/arch/arm/mach-s3c2443/s3c2443.c
-index ce2ec32..a64615e 100644
---- a/arch/arm/mach-s3c2443/s3c2443.c
-+++ b/arch/arm/mach-s3c2443/s3c2443.c
-@@ -35,6 +35,7 @@
- #include <plat/s3c2443.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-+#include <plat/nand-core.h>
- 
- static struct map_desc s3c2443_iodesc[] __initdata = {
- 	IODESC_ENT(WATCHDOG),
-@@ -61,7 +62,7 @@ int __init s3c2443_init(void)
- 
- 	s3c24xx_reset_hook = s3c2443_hard_reset;
- 
--	s3c_device_nand.name = "s3c2412-nand";
-+	s3c_nand_setname("s3c2412-nand");
- 
- 	/* change WDT IRQ number */
- 	s3c_device_wdt.resource[1].start = IRQ_S3C2443_WDT;
-diff --git a/arch/arm/plat-samsung/include/plat/nand-core.h b/arch/arm/plat-samsung/include/plat/nand-core.h
-new file mode 100644
-index 0000000..6de2078
---- /dev/null
-+++ b/arch/arm/plat-samsung/include/plat/nand-core.h
-@@ -0,0 +1,28 @@
-+/* arch/arm/plat-samsung/include/plat/nand-core.h
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * S3C -  Nand Controller core functions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __ASM_ARCH_NAND_CORE_H
-+#define __ASM_ARCH_NAND_CORE_H __FILE__
-+
-+/* These functions are only for use with the core support code, such as
-+ * the cpu specific initialisation code
-+ */
-+
-+/* re-define device name depending on support. */
-+static inline void s3c_nand_setname(char *name)
-+{
-+#ifdef CONFIG_S3C_DEV_NAND
-+	s3c_device_nand.name = name;
-+#endif
-+}
-+
-+#endif /* __ASM_ARCH_NAND_CORE_H */
--- 
-1.6.2.5
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
