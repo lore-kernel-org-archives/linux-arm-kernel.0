@@ -1,58 +1,122 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Mon, 19 Jul 2010 17:09:28 +0900
-Subject: [PATCH v3 1/7] ARM: S5PV210: Add a Kconfig entry
-	"S5PC110_EVT0_WORKAROUND"
-In-Reply-To: <002c01cb2718$46fcc4a0$d4f64de0$%kim@samsung.com>
-References: <1279517483-22751-1-git-send-email-myungjoo.ham@samsung.com>
-	<1279517483-22751-2-git-send-email-myungjoo.ham@samsung.com>
-	<002c01cb2718$46fcc4a0$d4f64de0$%kim@samsung.com>
-Message-ID: <AANLkTim9UtCiyqhLRRWw42WyzgwjTY1OGbsPTwGJKn7p@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Jul 2010 09:22:13 +0100
+Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
+	memory management
+In-Reply-To: <20100715014148.GC2239@codeaurora.org>
+References: <20100713121420.GB4263@codeaurora.org>
+	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
+	<20100714201149.GA14008@codeaurora.org>
+	<20100715080710T.fujita.tomonori@lab.ntt.co.jp>
+	<20100715014148.GC2239@codeaurora.org>
+Message-ID: <20100719082213.GA7421@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 19, 2010 at 4:59 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> MyungJoo Ham wrote:
->>
->> Early S5PC110 (EVT0) chip had some issues required workaround from a
->> kernel. We can add such workaround codes with this Kconfig entry.
->>
->> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->> ?arch/arm/mach-s5pv210/Kconfig | ? ?7 +++++++
->> ?1 files changed, 7 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
->> index 631019a..18802e7 100644
->> --- a/arch/arm/mach-s5pv210/Kconfig
->> +++ b/arch/arm/mach-s5pv210/Kconfig
->> @@ -101,4 +101,11 @@ config MACH_SMDKC110
->> ? ? ? ? Machine support for Samsung SMDKC110
->> ? ? ? ? S5PC110(MCP) is one of package option of S5PV210
->>
->> +config S5PC110_EVT0_WORKAROUND
->> + ? ? bool "S5PC110 Early Chip Workaround (EVT0)"
->> + ? ? help
->> + ? ? ? Early S5PC110 (so called EVT0) has errata items that should be
->> + ? ? ? addressed; otherwise the kernel may panic or be locked up. Enable
->> + ? ? ? this option to execute workaround instructions.
->> +
->> ?endif
->> --
->
-> As I said earlier, EVT0 is not real chip and not for mass production.
->
-> Why do you submit the EVT0 patch which can only available for you?
-> It is better to not add code into mainline that is not going to be used.
+On Wed, Jul 14, 2010 at 06:41:48PM -0700, Zach Pfeffer wrote:
+> On Thu, Jul 15, 2010 at 08:07:28AM +0900, FUJITA Tomonori wrote:
+> > Why we we need a new abstraction layer to solve the problem that the
+> > current API can handle?
+> 
+> The current API can't really handle it because the DMA API doesn't
+> separate buffer allocation from buffer mapping.
 
-Did you read the previous mail? I explain that.
-The LSI focus the latest SoCs. but we got the early chip and used it.
-You see the chip itself but I see the product which used the chips
-whether for mass production or not.
+That's not entirely correct.  The DMA API provides two things:
 
-Actually it's management and maintenance problem. you only show the
-latest codes and chips to outside.
-but I want to maintain our board at mainline.
+1. An API for allocating DMA coherent buffers
+2. An API for mapping streaming buffers
 
-Thank you,
-Kyungmin Park
+Some implementations of (2) end up using (1) to work around broken
+hardware - but that's a separate problem (and causes its own set of
+problems.)
+
+> For instance: I need 10, 1 MB physical buffers and a 64 KB physical
+> buffer. With the DMA API I need to allocate 10*1MB/PAGE_SIZE + 64
+> KB/PAGE_SIZE scatterlist elements, fix them all up to follow the
+> chaining specification and then go through all of them again to fix up
+> their virtual mappings for the mapper that's mapping the physical
+> buffer.
+
+You're making it sound like extremely hard work.
+
+	struct scatterlist *sg;
+	int i, nents = 11;
+
+	sg = kmalloc(sizeof(*sg) * nents, GFP_KERNEL);
+	if (!sg)
+		return -ENOMEM;
+
+	sg_init_table(sg, nents);
+	for (i = 0; i < nents; i++) {
+		if (i != nents - 1)
+			len = 1048576;
+		else
+			len = 64*1024;
+		buf = alloc_buffer(len);
+		sg_set_buf(&sg[i], buf, len);
+	}
+
+There's no need to split the scatterlist elements up into individual
+pages - the block layer doesn't do that when it passes scatterlists
+down to block device drivers.
+
+I'm not saying that it's reasonable to pass (or even allocate) a 1MB
+buffer via the DMA API.
+
+> If I want to share the buffer with another device I have to
+> make a copy of the entire thing then fix up the virtual mappings for
+> the other device I'm sharing with.
+
+This is something the DMA API doesn't do - probably because there hasn't
+been a requirement for it.
+
+One of the issues for drivers is that by separating the mapped scatterlist
+from the input buffer scatterlist, it creates something else for them to
+allocate, which causes an additional failure point - and as all users sit
+well with the current API, there's little reason to change especially
+given the number of drivers which would need to be updated.
+
+What you can do is:
+
+struct map {
+	dma_addr_t addr;
+	size_t len;
+};
+
+int map_sg(struct device *dev, struct scatterlist *list,
+	unsigned int nents, struct map *map, enum dma_data_direction dir)
+{
+	struct scatterlist *sg;
+	unsigned int i, j = 0;
+
+	for_each_sg(list, sg, nents, i) {
+		map[j]->addr = dma_map_page(dev, sg_page(sg), sg->offset,
+					sg->length, dir);
+		map[j]->len = length;
+		if (dma_mapping_error(map[j]->addr))
+			break;
+		j++;
+	}
+
+	return j;
+}
+
+void unmap(struct device *dev, struct map *map, unsigned int nents,
+	enum dma_data_direction dir)
+{
+	while (nents) {
+		dma_unmap_page(dev, map->addr, map->len, dir);
+		map++;
+		nents--;
+	}
+}
+
+Note: this may not be portable to all architectures.  It may also break
+if there's something like the dmabounce or swiotlb code remapping buffers
+which don't fit the DMA mask for the device - that's a different problem.
+
+You can then map the same scatterlist into multiple different 'map'
+arrays for several devices simultaneously.  What you can't do is access
+the buffers from the CPU while they're mapped to any device.
+
+I'm not saying that you should do the above - I'm just proving that it's
+not as hard as you seem to be making out.
