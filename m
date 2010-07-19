@@ -1,116 +1,66 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 19 Jul 2010 12:59:04 +0200
-Subject: [PATCH 9/9] [ARM] mmp: move declarations into SoC specific header
-	file from common.h
-In-Reply-To: <1279537144-25424-1-git-send-email-eric.y.miao@gmail.com>
-References: <1279537144-25424-1-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <1279537144-25424-9-git-send-email-eric.y.miao@gmail.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Mon, 19 Jul 2010 14:20:12 +0300
+Subject: [PATCH 4/5] ARMv6K and ARMv7 use fault statuses 3 and 6 as
+	Access Flag fault
+In-Reply-To: <4C4424D4.3000002@ru.mvista.com>
+References: <cover.1279529223.git.kirill@shutemov.name>
+	<bfd71c480c8d137cc4cc6261a42f514f9024ee53.1279529223.git.kirill@shutemov.name>
+	<4C4424D4.3000002@ru.mvista.com>
+Message-ID: <20100719112012.GA12602@shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
----
- arch/arm/mach-mmp/common.h              |    9 ---------
- arch/arm/mach-mmp/include/mach/mmp2.h   |    7 +++++++
- arch/arm/mach-mmp/include/mach/pxa168.h |    5 +++++
- arch/arm/mach-mmp/include/mach/pxa910.h |    5 +++++
- arch/arm/mach-mmp/irq-mmp2.c            |    1 +
- arch/arm/mach-mmp/mmp2.c                |    1 +
- 6 files changed, 19 insertions(+), 9 deletions(-)
+On Mon, Jul 19, 2010 at 02:11:32PM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+> Kirill A. Shutsemov wrote:
+> 
+> > Statuses 3 (0b00011) and 6 (0x00110) of DFSR are Access Flags faults on
+> > ARMv6K and ARMv7. Let's patch fsr_info[] at runtime if we are on ARMv7
+> > or later.
+> 
+> > Unfortunately, we don't have runtime check for 'K' extension, so we
+> > can't check for it.
+> 
+> > Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
+> [...]
+> > diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+> > index 77cfdbe..d073b64 100644
+> > --- a/arch/arm/mm/alignment.c
+> > +++ b/arch/arm/mm/alignment.c
+> > @@ -926,8 +926,18 @@ static int __init alignment_init(void)
+> >  
+> >  	hook_fault_code(1, do_alignment, SIGBUS, BUS_ADRALN,
+> >  			"alignment exception");
+> > -	hook_fault_code(3, do_alignment, SIGBUS, BUS_ADRALN,
+> > -			"alignment exception");
+> > +
+> > +	/*
+> > +	 * ARMv6K and ARMv7 use fault status 3 (0b00011) as Access Flag section
+> > +	 * fault, not as alignment error.
+> > +	 *
+> > +	 * TODO: handle ARMv6K properly. Runtime check for 'K' extension is
+> > +	 * needed.
+> > +	 */
+> > +	if (cpu_architecture() <= CPU_ARCH_ARMv6) {
+> > +		hook_fault_code(3, do_alignment, SIGBUS, BUS_ADRALN,
+> > +				"alignment exception");
+> > +	}
+> 
+>     Curly braces not neeed here. I assume you haven't run your patch thru 
+> scripts/checkpatch.pl?
 
-diff --git a/arch/arm/mach-mmp/common.h b/arch/arm/mach-mmp/common.h
-index 9696175..ec8d65d 100644
---- a/arch/arm/mach-mmp/common.h
-+++ b/arch/arm/mach-mmp/common.h
-@@ -3,15 +3,6 @@
- struct sys_timer;
- 
- extern void timer_init(int irq);
--extern void mmp2_clear_pmic_int(void);
--
--extern struct sys_timer pxa168_timer;
--extern struct sys_timer pxa910_timer;
--extern struct sys_timer mmp2_timer;
--extern void __init pxa168_init_irq(void);
--extern void __init pxa910_init_irq(void);
--extern void __init mmp2_init_icu(void);
--extern void __init mmp2_init_irq(void);
- 
- extern void __init icu_init_irq(void);
- extern void __init mmp_map_io(void);
-diff --git a/arch/arm/mach-mmp/include/mach/mmp2.h b/arch/arm/mach-mmp/include/mach/mmp2.h
-index fec220b..dbba6e8 100644
---- a/arch/arm/mach-mmp/include/mach/mmp2.h
-+++ b/arch/arm/mach-mmp/include/mach/mmp2.h
-@@ -1,6 +1,13 @@
- #ifndef __ASM_MACH_MMP2_H
- #define __ASM_MACH_MMP2_H
- 
-+struct sys_timer;
-+
-+extern struct sys_timer mmp2_timer;
-+extern void __init mmp2_init_icu(void);
-+extern void __init mmp2_init_irq(void);
-+extern void mmp2_clear_pmic_int(void);
-+
- #include <linux/i2c.h>
- #include <mach/devices.h>
- #include <plat/i2c.h>
-diff --git a/arch/arm/mach-mmp/include/mach/pxa168.h b/arch/arm/mach-mmp/include/mach/pxa168.h
-index 3b2bd5d..27e1bc7 100644
---- a/arch/arm/mach-mmp/include/mach/pxa168.h
-+++ b/arch/arm/mach-mmp/include/mach/pxa168.h
-@@ -1,6 +1,11 @@
- #ifndef __ASM_MACH_PXA168_H
- #define __ASM_MACH_PXA168_H
- 
-+struct sys_timer;
-+
-+extern struct sys_timer pxa168_timer;
-+extern void __init pxa168_init_irq(void);
-+
- #include <linux/i2c.h>
- #include <mach/devices.h>
- #include <plat/i2c.h>
-diff --git a/arch/arm/mach-mmp/include/mach/pxa910.h b/arch/arm/mach-mmp/include/mach/pxa910.h
-index 4f0b4ec..f13c49d 100644
---- a/arch/arm/mach-mmp/include/mach/pxa910.h
-+++ b/arch/arm/mach-mmp/include/mach/pxa910.h
-@@ -1,6 +1,11 @@
- #ifndef __ASM_MACH_PXA910_H
- #define __ASM_MACH_PXA910_H
- 
-+struct sys_timer;
-+
-+extern struct sys_timer pxa910_timer;
-+extern void __init pxa910_init_irq(void);
-+
- #include <linux/i2c.h>
- #include <mach/devices.h>
- #include <plat/i2c.h>
-diff --git a/arch/arm/mach-mmp/irq-mmp2.c b/arch/arm/mach-mmp/irq-mmp2.c
-index cb18221..01342be 100644
---- a/arch/arm/mach-mmp/irq-mmp2.c
-+++ b/arch/arm/mach-mmp/irq-mmp2.c
-@@ -16,6 +16,7 @@
- #include <linux/io.h>
- 
- #include <mach/regs-icu.h>
-+#include <mach/mmp2.h>
- 
- #include "common.h"
- 
-diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
-index b3fddac..daf3993 100644
---- a/arch/arm/mach-mmp/mmp2.c
-+++ b/arch/arm/mach-mmp/mmp2.c
-@@ -27,6 +27,7 @@
- #include <mach/mfp.h>
- #include <mach/gpio.h>
- #include <mach/devices.h>
-+#include <mach/mmp2.h>
- 
- #include "common.h"
- #include "clock.h"
+total: 0 errors, 0 warnings, 37 lines checked
+
+I'll remove it if you want. But I think it reasonable to leave braces in
+cases like:
+
+if (condition) {
+	do_this(a, very_long, list, of, parameters,
+		second, part, of, the, list);
+}
+
+What do you think?
+
 -- 
-1.7.1
+ Kirill A. Shutemov
