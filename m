@@ -1,26 +1,36 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Jul 2010 09:57:30 +0100
-Subject: [PATCH 3/4] ARM: SAMSUNG SoC: Clock Framework: Flag Support
-	for struct clk.
-In-Reply-To: <1279528236-6076-4-git-send-email-myungjoo.ham@samsung.com>
+Date: Mon, 19 Jul 2010 10:02:41 +0100
+Subject: [PATCH 2/4] ARM: S5PV210: Powerdomain/Clock-gating Support
+In-Reply-To: <1279528236-6076-3-git-send-email-myungjoo.ham@samsung.com>
 References: <1279528236-6076-1-git-send-email-myungjoo.ham@samsung.com>
 	<1279528236-6076-2-git-send-email-myungjoo.ham@samsung.com>
 	<1279528236-6076-3-git-send-email-myungjoo.ham@samsung.com>
-	<1279528236-6076-4-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <20100719085730.GA8641@n2100.arm.linux.org.uk>
+Message-ID: <20100719090241.GB8641@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 19, 2010 at 05:30:35PM +0900, MyungJoo Ham wrote:
-> +#ifdef CONFIG_SAMSUNG_POWERDOMAIN
-> +		if ((clk->flags | CLKFLAGS_BOOT_ON) &&
+On Mon, Jul 19, 2010 at 05:30:34PM +0900, MyungJoo Ham wrote:
+> +static int powerdomain_set(struct powerdomain *pd, int enable)
+> +{
+> +	unsigned long ctrlbit;
+> +	void __iomem *reg;
+> +	void __iomem *stable_reg;
+> +	unsigned long reg_dat;
+> +
+> +	if (pd == NULL)
+> +		return -EINVAL;
 
-This is always true if CLKFLAGS_BOOT_ON is non-zero.
+If someone calls this function with a NULL pd argument, is it better
+to ignore it, or better to use WARN_ON and get a backtrace so it can
+be fixed?  I don't see much reason for this function to ever be called
+with a NULL powerdomain argument.
 
-> +				!(clk->flags | CLKFLAGS_CANNOT_DISABLE)) {
+> +
+> +	ctrlbit = pd->pd_ctrlbit;
+> +	reg = (void __iomem *)pd->pd_reg;
+> +	stable_reg = (void __iomem *)pd->pd_stable_reg;
 
-This is always false if CLKFLAGS_CANNOT_DISABLE is non-zero.
+Why not ensure that the element in the structure is correctly typed to
+start with?
 
-> +		if (clk->enable && !(clk->flags | CLKFLAGS_CANNOT_DISABLE))
-
-Always false...
+It's good practice to avoid casts whenever-possible - they hide bugs.
