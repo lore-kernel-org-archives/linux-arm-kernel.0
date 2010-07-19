@@ -1,67 +1,12 @@
-From: zt.tmzt@gmail.com (Tim HRM)
-Date: Mon, 19 Jul 2010 05:21:35 -0400
-Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
-	memory management
-In-Reply-To: <20100717000108.GB21293@labbmf-linux.quicinc.com>
-References: <4C3C0032.5020702@codeaurora.org>
-	<20100713150311B.fujita.tomonori@lab.ntt.co.jp>
-	<20100713121420.GB4263@codeaurora.org>
-	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
-	<20100714201149.GA14008@codeaurora.org>
-	<20100714220536.GE18138@n2100.arm.linux.org.uk>
-	<20100715012958.GB2239@codeaurora.org>
-	<20100715085535.GC26212@n2100.arm.linux.org.uk>
-	<AANLkTinVZeaZxt_lWKhjKa0dqhu3_j3BRNySO-2LvMdw@mail.gmail.com>
-	<20100716075856.GC16124@n2100.arm.linux.org.uk>
-	<20100717000108.GB21293@labbmf-linux.quicinc.com>
-Message-ID: <AANLkTinTQXbsD91JDHiSFrvDoUeHbaGUGSWA-5aT5ZCr@mail.gmail.com>
+From: philippe.langlais@stericsson.com (Philippe Langlais)
+Date: Mon, 19 Jul 2010 11:24:52 +0200
+Subject: The three U6715 patches after third review
+Message-ID: <1279531495-16225-1-git-send-email-philippe.langlais@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 16, 2010 at 8:01 PM, Larry Bassel <lbassel@codeaurora.org> wrote:
-> On 16 Jul 10 08:58, Russell King - ARM Linux wrote:
->> On Thu, Jul 15, 2010 at 08:48:36PM -0400, Tim HRM wrote:
->> > Interesting, since I seem to remember the MSM devices mostly conduct
->> > IO through regions of normal RAM, largely accomplished through
->> > ioremap() calls.
->> >
->> > Without more public domain documentation of the MSM chips and AMSS
->> > interfaces I wouldn't know how to avoid this, but I can imagine it
->> > creates a bit of urgency for Qualcomm developers as they attempt to
->> > upstream support for this most interesting SoC.
->>
->> As the patch has been out for RFC since early April on the linux-arm-kernel
->> mailing list (Subject: [RFC] Prohibit ioremap() on kernel managed RAM),
->> and no comments have come back from Qualcomm folk.
->
-> We are investigating the impact of this change on us, and I
-> will send out more detailed comments next week.
->
->>
->> The restriction on creation of multiple V:P mappings with differing
->> attributes is also fairly hard to miss in the ARM architecture
->> specification when reading the sections about caches.
->>
->
-> Larry Bassel
->
-> --
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
->
 
-Hi Larry and Qualcomm people.
-I'm curious what your reason for introducing this new api (or adding
-to dma) is.  Specifically how this would be used to make the memory
-mapping of the MSM chip dynamic in contrast to the fixed _PHYS defines
-in the Android and Codeaurora trees.
+These patches fixes latest Russell King comments (date 07/15/2010).
 
-I'm also interested in how this ability to map memory regions as files
-for devices like KGSL/DRI or PMEM might work and why this is better
-suited to that purpose than existing methods, where this fits into
-camera preview and other issues that have been dealt with in these
-trees in novel ways (from my perspective).
-
-Thanks,
-Timothy Meade
-tmzt #htc-linux
+Regards,
+Philippe
