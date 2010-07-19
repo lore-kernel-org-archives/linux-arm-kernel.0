@@ -1,34 +1,51 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Mon, 19 Jul 2010 10:18:37 +1000
-Subject: [PATCH] Orion: DNS-323 C1 requires phylib
-In-Reply-To: <20100716153151.GA9307@jirafa.cyrius.com>
-References: <20100716153151.GA9307@jirafa.cyrius.com>
-Message-ID: <1279498717.10390.1778.camel@pasglop>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 19 Jul 2010 09:24:54 +0900
+Subject: [PATCH 3/3] i2c/busses: Select I2C bus support for S5PV210 and
+	S5P6440.
+In-Reply-To: <AANLkTikqjZVKDgCIuZ0QCvzrzdrNmGUOq2YZyqb0TKZn@mail.gmail.com>
+References: <1279285999-27555-1-git-send-email-kgene.kim@samsung.com>
+	<1279285999-27555-4-git-send-email-kgene.kim@samsung.com>
+	<AANLkTikqjZVKDgCIuZ0QCvzrzdrNmGUOq2YZyqb0TKZn@mail.gmail.com>
+Message-ID: <000101cb26d8$d2c74fe0$7855efa0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-07-16 at 16:31 +0100, Martin Michlmayr wrote:
-> The code to support the DNS-323 rev C1 added a call to
-> phy_register_fixup_for_uid() and therefore phylib has to
-> be built in.
+Kyungmin Park wrote:
 > 
-> Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
-
-Oops ;-) Ack.
-
-Cheers,
-Ben.
-
-> diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
-> index 905719a..c897e03 100644
-> --- a/arch/arm/mach-orion5x/Kconfig
-> +++ b/arch/arm/mach-orion5x/Kconfig
-> @@ -26,6 +26,7 @@ config MACH_KUROBOX_PRO
->  config MACH_DNS323
->  	bool "D-Link DNS-323"
->  	select I2C_BOARDINFO
-> +	select PHYLIB
->  	help
->  	  Say 'Y' here if you want your kernel to support the
->  	  D-Link DNS-323 platform.
+> On Fri, Jul 16, 2010 at 10:13 PM, Kukjin Kim <kgene.kim@samsung.com>
+wrote:
+> > From: Naveen Krishna Ch <ch.naveen@samsung.com>
+> >
+> > This patch is to select support I2C channels 0, 1 and 2 for S5PV210 and
+> S5P6440.
+> >
+> > Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> > ?drivers/i2c/busses/Kconfig | ? ?2 +-
+> > ?1 files changed, 1 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+> > index bceafbf..e553fe8 100644
+> > --- a/drivers/i2c/busses/Kconfig
+> > +++ b/drivers/i2c/busses/Kconfig
+> > @@ -523,7 +523,7 @@ config I2C_PXA_SLAVE
+> >
+> > ?config I2C_S3C2410
+> > ? ? ? ?tristate "S3C2410 I2C Driver"
+> > - ? ? ? depends on ARCH_S3C2410 || ARCH_S3C64XX
+> > + ? ? ? depends on ARCH_S3C2410 || ARCH_S3C64XX || ARCH_S5PV210 ||
+> ARCH_S5P6440
 > 
+> Are there any SoCs don't have i2c? If no, how about to just depends on
+> PLAT_SAMSUNG.
+> 
+Looks good..will change it.
+
+Thanks for your suggestion.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
