@@ -1,141 +1,67 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 19 Jul 2010 14:19:01 +0900
-Subject: [PATCH v2] ARM: SAMSUNG: Make WDT driver dependency SoC specific
-	instead of machine specific
-Message-ID: <1279516741-7643-1-git-send-email-kgene.kim@samsung.com>
+Date: Mon, 19 Jul 2010 14:18:47 +0900
+Subject: [PATCH] ARM: S5P6442: Add Watchdog support for S5P6442
+Message-ID: <1279516727-7609-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Banajit Goswami <banajit.g@samsung.com>
 
-This patch moves the dependency of watchdog timer driver from MACH_XXX(board)
-to ARCH_XXX(SoC). This will enable all machines using Samsung S3C64XX and S5P
-SoCs to use the WDT driver by default.
+This patch adds support for Watchdog timer for Samsung S5P6442.
 
 Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
-NOTE: now, re-submitted updated because of adding S5P6442.
+NOTE:
+Depends on 'ARM: S5P6442: Add Watchdog Timer map for S5P6442' which
+has submitted for other part.
 
- arch/arm/Kconfig              |    5 +++++
- arch/arm/mach-s3c64xx/Kconfig |    1 -
- arch/arm/mach-s5p6440/Kconfig |    1 -
- arch/arm/mach-s5p6442/Kconfig |    1 -
- arch/arm/mach-s5pc100/Kconfig |    1 -
- arch/arm/mach-s5pv210/Kconfig |    2 --
- 6 files changed, 5 insertions(+), 6 deletions(-)
+ arch/arm/mach-s5p6442/Kconfig         |    2 ++
+ arch/arm/mach-s5p6442/clock.c         |    6 ++++++
+ arch/arm/mach-s5p6442/mach-smdk6442.c |    1 +
+ 3 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 98922f7..fe54947 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -663,6 +663,7 @@ config ARCH_S3C64XX
- 	select S3C_DEV_NAND
- 	select USB_ARCH_HAS_OHCI
- 	select SAMSUNG_GPIOLIB_4BIT
-+	select HAVE_S3C2410_WATCHDOG
- 	help
- 	  Samsung S3C64XX series based systems
- 
-@@ -671,6 +672,7 @@ config ARCH_S5P6440
- 	select CPU_V6
- 	select GENERIC_GPIO
- 	select HAVE_CLK
-+	select HAVE_S3C2410_WATCHDOG
- 	select ARCH_USES_GETTIMEOFFSET
- 	help
- 	  Samsung S5P6440 CPU based systems
-@@ -681,6 +683,7 @@ config ARCH_S5P6442
- 	select GENERIC_GPIO
- 	select HAVE_CLK
- 	select ARCH_USES_GETTIMEOFFSET
-+	select HAVE_S3C2410_WATCHDOG
- 	help
- 	  Samsung S5P6442 CPU based systems
- 
-@@ -691,6 +694,7 @@ config ARCH_S5PC100
- 	select CPU_V7
- 	select ARM_L1_CACHE_SHIFT_6
- 	select ARCH_USES_GETTIMEOFFSET
-+	select HAVE_S3C2410_WATCHDOG
- 	help
- 	  Samsung S5PC100 series based systems
- 
-@@ -701,6 +705,7 @@ config ARCH_S5PV210
- 	select HAVE_CLK
- 	select ARM_L1_CACHE_SHIFT_6
- 	select ARCH_USES_GETTIMEOFFSET
-+	select HAVE_S3C2410_WATCHDOG
- 	help
- 	  Samsung S5PV210/S5PC110 series based systems
- 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index f5a5972..915cb47 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -100,7 +100,6 @@ config MACH_SMDK6410
- 	select S3C_DEV_USB_HOST
- 	select S3C_DEV_USB_HSOTG
- 	select S3C_DEV_WDT
--	select HAVE_S3C2410_WATCHDOG
- 	select S3C64XX_SETUP_SDHCI
- 	select S3C64XX_SETUP_I2C1
- 	select S3C64XX_SETUP_FB_24BPP
-diff --git a/arch/arm/mach-s5p6440/Kconfig b/arch/arm/mach-s5p6440/Kconfig
-index f066fae..084c0bc 100644
---- a/arch/arm/mach-s5p6440/Kconfig
-+++ b/arch/arm/mach-s5p6440/Kconfig
-@@ -19,7 +19,6 @@ config MACH_SMDK6440
- 	select SAMSUNG_DEV_TS
- 	select SAMSUNG_DEV_ADC
- 	select S3C_DEV_WDT
--	select HAVE_S3C2410_WATCHDOG
- 	help
- 	  Machine support for the Samsung SMDK6440
- 
 diff --git a/arch/arm/mach-s5p6442/Kconfig b/arch/arm/mach-s5p6442/Kconfig
-index 7cd2843..0fda0a5 100644
+index 0fd41b4..7cd2843 100644
 --- a/arch/arm/mach-s5p6442/Kconfig
 +++ b/arch/arm/mach-s5p6442/Kconfig
-@@ -20,7 +20,6 @@ config MACH_SMDK6442
+@@ -19,6 +19,8 @@ config CPU_S5P6442
+ config MACH_SMDK6442
  	bool "SMDK6442"
  	select CPU_S5P6442
- 	select S3C_DEV_WDT
--	select HAVE_S3C2410_WATCHDOG
++	select S3C_DEV_WDT
++	select HAVE_S3C2410_WATCHDOG
  	help
  	  Machine support for Samsung SMDK6442
  
-diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
-index b63b440..0593b3f 100644
---- a/arch/arm/mach-s5pc100/Kconfig
-+++ b/arch/arm/mach-s5pc100/Kconfig
-@@ -45,7 +45,6 @@ config MACH_SMDKC100
- 	select S3C_DEV_HSMMC1
- 	select S3C_DEV_HSMMC2
- 	select S3C_DEV_WDT
--	select HAVE_S3C2410_WATCHDOG
- 	select S5PC100_SETUP_FB_24BPP
- 	select S5PC100_SETUP_I2C1
- 	select S5PC100_SETUP_SDHCI
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 0761eac..2e3ed18 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -74,7 +74,6 @@ config MACH_SMDKV210
- 	select SAMSUNG_DEV_ADC
- 	select SAMSUNG_DEV_TS
- 	select S3C_DEV_WDT
--	select HAVE_S3C2410_WATCHDOG
- 	help
- 	  Machine support for Samsung SMDKV210
+diff --git a/arch/arm/mach-s5p6442/clock.c b/arch/arm/mach-s5p6442/clock.c
+index 087e57f..dcd20f1 100644
+--- a/arch/arm/mach-s5p6442/clock.c
++++ b/arch/arm/mach-s5p6442/clock.c
+@@ -361,6 +361,12 @@ static struct clk init_clocks[] = {
+ 		.enable		= s5p6442_clk_ip3_ctrl,
+ 		.ctrlbit	= (1<<19),
+ 	}, {
++		.name		= "watchdog",
++		.id		= -1,
++		.parent		= &clk_pclkd1,
++		.enable		= s5p6442_clk_ip3_ctrl,
++		.ctrlbit	= (1 << 22),
++	}, {
+ 		.name		= "timers",
+ 		.id		= -1,
+ 		.parent		= &clk_pclkd1,
+diff --git a/arch/arm/mach-s5p6442/mach-smdk6442.c b/arch/arm/mach-s5p6442/mach-smdk6442.c
+index ebcf997..6e061be 100644
+--- a/arch/arm/mach-s5p6442/mach-smdk6442.c
++++ b/arch/arm/mach-s5p6442/mach-smdk6442.c
+@@ -66,6 +66,7 @@ static struct s3c2410_uartcfg smdk6442_uartcfgs[] __initdata = {
  
-@@ -83,7 +82,6 @@ config MACH_SMDKC110
- 	select CPU_S5PV210
- 	select ARCH_SPARSEMEM_ENABLE
- 	select S3C_DEV_WDT
--	select HAVE_S3C2410_WATCHDOG
- 	help
- 	  Machine support for Samsung SMDKC110
- 	  S5PC110(MCP) is one of package option of S5PV210
+ static struct platform_device *smdk6442_devices[] __initdata = {
+ 	&s5p6442_device_iis0,
++	&s3c_device_wdt,
+ };
+ 
+ static void __init smdk6442_map_io(void)
 -- 
 1.6.2.5
