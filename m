@@ -1,884 +1,515 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Mon, 19 Jul 2010 11:50:28 +0900
-Subject: [PATCH v2 5/5] ARM: S5PV210: Initial CPUFREQ Support
-In-Reply-To: <4C403C53.4000204@gmail.com>
-References: <1279267277-6804-1-git-send-email-myungjoo.ham@samsung.com>
-	<1279267277-6804-2-git-send-email-myungjoo.ham@samsung.com>
-	<1279267277-6804-3-git-send-email-myungjoo.ham@samsung.com>
-	<1279267277-6804-4-git-send-email-myungjoo.ham@samsung.com>
-	<1279267277-6804-5-git-send-email-myungjoo.ham@samsung.com>
-	<1279267277-6804-6-git-send-email-myungjoo.ham@samsung.com>
-	<4C403C53.4000204@gmail.com>
-Message-ID: <AANLkTinj5LAerJPSqYtRg6oumV3o_DTXZaj6GC6mOVA7@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh KUMAR)
+Date: Mon, 19 Jul 2010 10:37:10 +0530
+Subject: [PATCH] Watchdog: Adding support for ARM Primecell SP805 Watchdog
+In-Reply-To: <AANLkTik1vSgASNLXSpYD2MVgmQGgvCx-5mFY_3YFsuHL@mail.gmail.com>
+References: <1274344428-28329-1-git-send-email-viresh.kumar@st.com>
+	<AANLkTik1vSgASNLXSpYD2MVgmQGgvCx-5mFY_3YFsuHL@mail.gmail.com>
+Message-ID: <4C43DD7E.5050800@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 16, 2010 at 8:02 PM, Maurus Cuelenaere
-<mcuelenaere@gmail.com> wrote:
-> ?Op 16-07-10 10:01, MyungJoo Ham schreef:
->> S5PV210 CPUFREQ Support.
+On 7/19/2010 1:59 AM, Linus Walleij wrote:
+> Sorry for late review.
+> 
+> I was bored so I compiled this driver in the latest -next
+> and tested on ARM PB1176JZF-S that I've brought for
+> entertainment this vacation...
+> 
+> First: add
+> #include <linux/slab.h>
+> or compilation fails on newer codebases.
+
+OK.
+
+> 
+> Then I get this:
+> sp805-wdt dev:wdog: Clock not found
+> sp805-wdt dev:wdog: Probe Failed!!!
+> sp805-wdt: probe of dev:wdog failed with error -2
+> 
+> So I added it to the realviews, even though the clocking
+> of the watchdog is not mentioned in the reference manual
+> it appears to be using the same 24MHz clock as the UARTs
+> and the RTC. (ARM people, can you confirm this?)
+
+Yes, it is using 24 Mhz on spear and is its functional clock.
+So this time we need clock support in driver.
+
+> 
+> After this it seems to work...
+> Tested-by: Linus Walleij <linus.walleij@stericsson.com>
+> 
+> 2010/5/20 Viresh KUMAR <viresh.kumar@st.com>:
+>> Technical Reference Manual can be found at:
+>> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0270b/DDI0270.pdf
 >>
->> This CPUFREQ may work without PMIC's DVS support. However, it is not
->> as effective without DVS support as supposed. AVS is not supported in
->> this version.
->>
->> Note that CLK_SRC of some clocks including ARMCLK, G3D, G2D, MFC,
->> and ONEDRAM are modified directly without updating clksrc_src
->> representations of the clocks. ?Because CPUFREQ reverts the CLK_SRC
->> to the supposed values, this does not affect the consistency as long as
->> there are no other modules that modifies clock sources of ARMCLK, G3D,
->> G2D, MFC, and ONEDRAM (and only CPUFREQ should have the control). As
->> soon as clock framework is settled, we may update source clocks
->> (.parent field) of those clocks accordingly later.
->>
->> --
->> v2:
->> ? ? ? - Ramp-up delay is removed. (let regulator framework do the job)
->> ? ? ? - Provide proper max values for regulator_set_voltage
->> ? ? ? - Removed unneccesary #ifdef's.
->> ? ? ? - Removed unnecessary initialiser for CLK_OUT
->>
->> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 >> ---
->> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?1 +
->> ?arch/arm/mach-s5pv210/Makefile ? ? ? ? ? ? ? ?| ? ?3 +
->> ?arch/arm/mach-s5pv210/cpufreq-s5pv210.c ? ? ? | ?776 +++++++++++++++++++++++++
->> ?arch/arm/mach-s5pv210/include/mach/cpu-freq.h | ? 50 ++
->> ?4 files changed, 830 insertions(+), 0 deletions(-)
->> ?create mode 100644 arch/arm/mach-s5pv210/cpufreq-s5pv210.c
->> ?create mode 100644 arch/arm/mach-s5pv210/include/mach/cpu-freq.h
+>>  drivers/watchdog/Kconfig     |    7 +
+>>  drivers/watchdog/Makefile    |    1 +
+>>  drivers/watchdog/sp805_wdt.c |  386 ++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 394 insertions(+), 0 deletions(-)
+>>  create mode 100644 drivers/watchdog/sp805_wdt.c
 >>
+>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+>> index b87ba23..2759a91 100644
+>> --- a/drivers/watchdog/Kconfig
+>> +++ b/drivers/watchdog/Kconfig
+>> @@ -73,6 +73,13 @@ config WM8350_WATCHDOG
+>>
+>>  # ARM Architecture
+>>
+>> +config ARM_SP805_WATCHDOG
+>> +       tristate "ARM SP805 Watchdog"
+> 
+> Why would you want this as a module... Can't it
+> be just bool?
 
-(snip)
+I think watchdog can be present as a module. It can be inserted at
+runtime. Other drivers in drivers/watchdog/Kconfig are also present
+in modules.
 
->> +
->> +struct s5pc11x_dvs_conf {
->> + ? ? const unsigned long lvl; ? ? ? ?/* DVFS level : L0,L1,L2,L3... */
->
-> Why add this when you don't use it? You could use the level as the lookup key instead.
->
-
-Thank you for pointing out. I'll correct them (including pr_* and
-duplicated info messages) in the next version of patches.
-
->> + ? ? unsigned long ? ? ? arm_volt; ? /* uV */
->> + ? ? unsigned long ? ? ? int_volt; ? /* uV */
->> +};
->> +
->> +#ifdef CONFIG_CPU_S5PC110_EVT0_ERRATA
->> +const unsigned long arm_volt_max = 1350000;
->> +const unsigned long int_volt_max = 1250000;
->> +#else
->> +const unsigned long arm_volt_max = 1300000;
->> +const unsigned long int_volt_max = 1200000;
->> +#endif
->> +
->> +static struct s5pc11x_dvs_conf s5pv210_dvs_conf[] = {
->> +#ifdef CONFIG_CPU_S5PC110_EVT0_ERRATA
->> + ? ? {
->> + ? ? ? ? ? ? .lvl ? ? ? ?= L0,
->> + ? ? ? ? ? ? .arm_volt ? = 1300000,
->> + ? ? ? ? ? ? .int_volt ? = 1200000,
->> + ? ? }, {
->> + ? ? ? ? ? ? .lvl ? ? ? ?= L1,
->> + ? ? ? ? ? ? .arm_volt ? = 1250000,
->> + ? ? ? ? ? ? .int_volt ? = 1200000,
->> +
->> + ? ? }, {
->> + ? ? ? ? ? ? .lvl ? ? ? ?= L2,
->> + ? ? ? ? ? ? .arm_volt ? = 1250000,
->> + ? ? ? ? ? ? .int_volt ? = 1200000,
->> +
->> + ? ? }, {
->> + ? ? ? ? ? ? .lvl ? ? ? ?= L3,
->> + ? ? ? ? ? ? .arm_volt ? = 1250000,
->> + ? ? ? ? ? ? .int_volt ? = 1200000,
->> + ? ? }, {
->> + ? ? ? ? ? ? .lvl ? ? ? ?= L4,
->> + ? ? ? ? ? ? .arm_volt ? = 1250000,
->> + ? ? ? ? ? ? .int_volt ? = 1200000,
->> + ? ? },
->> +#else
->> + ? ? {
->> + ? ? ? ? ? ? .lvl ? ? ? ?= L0,
->> + ? ? ? ? ? ? .arm_volt ? = 1250000,
->> + ? ? ? ? ? ? .int_volt ? = 1100000,
->> + ? ? }, {
->> + ? ? ? ? ? ? .lvl ? ? ? ?= L1,
->> + ? ? ? ? ? ? .arm_volt ? = 1200000,
->> + ? ? ? ? ? ? .int_volt ? = 1100000,
->> +
->> + ? ? }, {
->> + ? ? ? ? ? ? .lvl ? ? ? ?= L2,
->> + ? ? ? ? ? ? .arm_volt ? = 1050000,
->> + ? ? ? ? ? ? .int_volt ? = 1100000,
->> +
->> + ? ? }, {
->> + ? ? ? ? ? ? .lvl ? ? ? ?= L3,
->> + ? ? ? ? ? ? .arm_volt ? = 950000,
->> + ? ? ? ? ? ? .int_volt ? = 1100000,
->> + ? ? }, {
->> + ? ? ? ? ? ? .lvl ? ? ? ?= L4,
->> + ? ? ? ? ? ? .arm_volt ? = 950000,
->> + ? ? ? ? ? ? .int_volt ? = 1000000,
->> + ? ? },
->> +#endif
->> +};
->> +
->> +static u32 clkdiv_val[5][11] = {
->> + ? ? /*{ APLL, A2M, HCLK_MSYS, PCLK_MSYS,
->> + ? ? ?* HCLK_DSYS, PCLK_DSYS, HCLK_PSYS, PCLK_PSYS, ONEDRAM,
->> + ? ? ?* MFC, G3D }
->> + ? ? ?*/
->> + ? ? /* L0 : [1000/200/200/100][166/83][133/66][200/200] */
->> + ? ? {0, 4, 4, 1, 3, 1, 4, 1, 3, 0, 0},
->> + ? ? /* L1 : [800/200/200/100][166/83][133/66][200/200] */
->> + ? ? {0, 3, 3, 1, 3, 1, 4, 1, 3, 0, 0},
->> + ? ? /* L2 : [400/200/200/100][166/83][133/66][200/200] */
->> + ? ? {1, 3, 1, 1, 3, 1, 4, 1, 3, 0, 0},
->> + ? ? /* L3 : [200/200/200/100][166/83][133/66][200/200] */
->> + ? ? {3, 3, 0, 1, 3, 1, 4, 1, 3, 0, 0},
->> + ? ? /* L4 : [100/100/100/100][83/83][66/66][100/100] */
->> + ? ? {7, 7, 0, 0, 7, 0, 9, 0, 7, 0, 0},
->> +};
->> +
->> +static struct s3c_freq s5pv210_clk_info[] = {
->> + ? ? [L0] = { ? ? ? ?/* L0: 1GHz */
->> + ? ? ? ? ? ? .fclk ? ? ? = 1000000,
->> + ? ? ? ? ? ? .armclk ? ? = 1000000,
->> + ? ? ? ? ? ? .hclk_tns ? = 0,
->> + ? ? ? ? ? ? .hclk ? ? ? = 133000,
->> + ? ? ? ? ? ? .pclk ? ? ? = 66000,
->> + ? ? ? ? ? ? .hclk_msys ?= 200000,
->> + ? ? ? ? ? ? .pclk_msys ?= 100000,
->> + ? ? ? ? ? ? .hclk_dsys ?= 166750,
->> + ? ? ? ? ? ? .pclk_dsys ?= 83375,
->> + ? ? },
->> + ? ? [L1] = { ? ? ? ?/* L1: 800MHz */
->> + ? ? ? ? ? ? .fclk ? ? ? = 800000,
->> + ? ? ? ? ? ? .armclk ? ? = 800000,
->> + ? ? ? ? ? ? .hclk_tns ? = 0,
->> + ? ? ? ? ? ? .hclk ? ? ? = 133000,
->> + ? ? ? ? ? ? .pclk ? ? ? = 66000,
->> + ? ? ? ? ? ? .hclk_msys ?= 200000,
->> + ? ? ? ? ? ? .pclk_msys ?= 100000,
->> + ? ? ? ? ? ? .hclk_dsys ?= 166750,
->> + ? ? ? ? ? ? .pclk_dsys ?= 83375,
->> + ? ? },
->> + ? ? [L2] = { ? ? ? ?/* L2: 400MHz */
->> + ? ? ? ? ? ? .fclk ? ? ? = 800000,
->> + ? ? ? ? ? ? .armclk ? ? = 400000,
->> + ? ? ? ? ? ? .hclk_tns ? = 0,
->> + ? ? ? ? ? ? .hclk ? ? ? = 133000,
->> + ? ? ? ? ? ? .pclk ? ? ? = 66000,
->> + ? ? ? ? ? ? .hclk_msys ?= 200000,
->> + ? ? ? ? ? ? .pclk_msys ?= 100000,
->> + ? ? ? ? ? ? .hclk_dsys ?= 166750,
->> + ? ? ? ? ? ? .pclk_dsys ?= 83375,
->> + ? ? },
->> + ? ? [L3] = { ? ? ? ?/* L3: 200MHz */
->> + ? ? ? ? ? ? .fclk ? ? ? = 800000,
->> + ? ? ? ? ? ? .armclk ? ? = 200000,
->> + ? ? ? ? ? ? .hclk_tns ? = 0,
->> + ? ? ? ? ? ? .hclk ? ? ? = 133000,
->> + ? ? ? ? ? ? .pclk ? ? ? = 66000,
->> + ? ? ? ? ? ? .hclk_msys ?= 200000,
->> + ? ? ? ? ? ? .pclk_msys ?= 100000,
->> + ? ? ? ? ? ? .hclk_dsys ?= 166750,
->> + ? ? ? ? ? ? .pclk_dsys ?= 83375,
->> + ? ? },
->> + ? ? [L4] = { ? ? ? ?/* L4: 100MHz */
->> + ? ? ? ? ? ? .fclk ? ? ? = 800000,
->> + ? ? ? ? ? ? .armclk ? ? = 100000,
->> + ? ? ? ? ? ? .hclk_tns ? = 0,
->> + ? ? ? ? ? ? .hclk ? ? ? = 66000,
->> + ? ? ? ? ? ? .pclk ? ? ? = 66000,
->> + ? ? ? ? ? ? .hclk_msys ?= 100000,
->> + ? ? ? ? ? ? .pclk_msys ?= 100000,
->> + ? ? ? ? ? ? .hclk_dsys ?= 83375,
->> + ? ? ? ? ? ? .pclk_dsys ?= 83375,
->> + ? ? },
->> +};
->> +
->> +int s5pv210_verify_speed(struct cpufreq_policy *policy)
->> +{
->> +
->> + ? ? if (policy->cpu)
->> + ? ? ? ? ? ? return -EINVAL;
->> +
->> + ? ? return cpufreq_frequency_table_verify(policy, s5pv210_freq_table);
->> +}
->> +
->> +unsigned int s5pv210_getspeed(unsigned int cpu)
->> +{
->> + ? ? unsigned long rate;
->> +
->> + ? ? if (cpu)
->> + ? ? ? ? ? ? return 0;
->> +
->> + ? ? rate = clk_get_rate(mpu_clk) / KHZ_T;
->> +
->> + ? ? return rate;
->> +}
->> +
->> +static void s5pv210_target_APLL2MPLL(unsigned int index,
->> + ? ? ? ? ? ? unsigned int bus_speed_changing)
->> +{
->> + ? ? unsigned int reg;
->> +
->> + ? ? /* 1. Temporarily change divider for MFC and G3D
->> + ? ? ?* SCLKA2M(200/1=200)->(200/4=50)MHz
->> + ? ? ?**/
->> + ? ? reg = __raw_readl(S5P_CLK_DIV2);
->> + ? ? reg &= ~(S5P_CLKDIV2_G3D_MASK | S5P_CLKDIV2_MFC_MASK);
->> + ? ? reg |= (0x3 << S5P_CLKDIV2_G3D_SHIFT) |
->> + ? ? ? ? ? ? (0x3 << S5P_CLKDIV2_MFC_SHIFT);
->> +#ifndef CONFIG_CPU_S5PC110_EVT0_ERRATA
->> + ? ? reg &= ~S5P_CLKDIV2_G2D_MASK;
->> + ? ? reg |= (0x2 << S5P_CLKDIV2_G2D_SHIFT);
->> +#endif
->> + ? ? __raw_writel(reg, S5P_CLK_DIV2);
->> +
->> + ? ? /* For MFC, G3D dividing */
->> + ? ? do {
->> + ? ? ? ? ? ? reg = __raw_readl(S5P_CLK_DIV_STAT0);
->> + ? ? } while (reg & ((1 << 16) | (1 << 17)));
->> +
->> + ? ? /* 2. Change SCLKA2M(200MHz) to SCLKMPLL in MFC_MUX, G3D MUX
->> + ? ? ?* (100/4=50)->(667/4=166)MHz
->> + ? ? ?**/
->> + ? ? reg = __raw_readl(S5P_CLK_SRC2);
->> + ? ? reg &= ~(S5P_CLKSRC2_G3D_MASK | S5P_CLKSRC2_MFC_MASK);
->> + ? ? reg |= (0x1 << S5P_CLKSRC2_G3D_SHIFT) |
->> + ? ? ? ? ? ? (0x1 << S5P_CLKSRC2_MFC_SHIFT);
->> +#ifndef CONFIG_CPU_S5PC110_EVT0_ERRATA
->> + ? ? reg &= ~S5P_CLKSRC2_G2D_MASK;
->> + ? ? reg |= (0x1 << S5P_CLKSRC2_G2D_SHIFT);
->> +#endif
->> + ? ? __raw_writel(reg, S5P_CLK_SRC2);
->> +
->> + ? ? do {
->> + ? ? ? ? ? ? reg = __raw_readl(S5P_CLK_MUX_STAT1);
->> + ? ? } while (reg & ((1 << 7) | (1 << 3)));
->> +
->> + ? ? /* 3. DMC1 refresh count for 133MHz if (index == L4) is true
->> + ? ? ?* refresh counter is already programmed in the outer/upper
->> + ? ? ?* code. 0x287 at 83MHz
->> + ? ? ?**/
->> + ? ? if (!bus_speed_changing)
->> + ? ? ? ? ? ? __raw_writel(0x40d, S5P_VA_DMC1 + 0x30);
->> +
->> + ? ? /* 4. SCLKAPLL -> SCLKMPLL */
->> + ? ? reg = __raw_readl(S5P_CLK_SRC0);
->> + ? ? reg &= ~(S5P_CLKSRC0_MUX200_MASK);
->> + ? ? reg |= (0x1 << S5P_CLKSRC0_MUX200_SHIFT);
->> + ? ? __raw_writel(reg, S5P_CLK_SRC0);
->> +
->> + ? ? do {
->> + ? ? ? ? ? ? reg = __raw_readl(S5P_CLK_MUX_STAT0);
->> + ? ? } while (reg & (0x1 << 18));
->> +
->> +#if defined(CONFIG_S5PC110_H_TYPE)
->> + ? ? /* DMC0 source clock: SCLKA2M -> SCLKMPLL */
->> + ? ? __raw_writel(0x50e, S5P_VA_DMC0 + 0x30);
->> +
->> + ? ? reg = __raw_readl(S5P_CLK_DIV6);
->> + ? ? reg &= ~(S5P_CLKDIV6_ONEDRAM_MASK);
->> + ? ? reg |= (0x3 << S5P_CLKDIV6_ONEDRAM_SHIFT);
->> + ? ? __raw_writel(reg, S5P_CLK_DIV6);
->> +
->> + ? ? do {
->> + ? ? ? ? ? ? reg = __raw_readl(S5P_CLK_DIV_STAT1);
->> + ? ? } while (reg & (1 << 15));
->> +
->> + ? ? reg = __raw_readl(S5P_CLK_SRC6);
->> + ? ? reg &= ~(S5P_CLKSRC6_ONEDRAM_MASK);
->> + ? ? reg |= (0x1 << S5P_CLKSRC6_ONEDRAM_SHIFT);
->> + ? ? __raw_writel(reg, S5P_CLK_SRC6);
->> +
->> + ? ? do {
->> + ? ? ? ? ? ? reg = __raw_readl(S5P_CLK_MUX_STAT1);
->> + ? ? } while (reg & (1 << 11));
->> +#endif
->> +}
->> +
->> +static void s5pv210_target_MPLL2APLL(unsigned int index,
->> + ? ? ? ? ? ? unsigned int bus_speed_changing)
->> +{
->> + ? ? unsigned int reg;
->> +
->> + ? ? /* 7. Set Lock time = 30us*24MHz = 02cf (EVT1) */
->> +#ifdef CONFIG_CPU_S5PC110_EVT0_ERRATA
->> + ? ? /* Lock time = 300us*24Mhz = 7200(0x1c20)*/
->> + ? ? __raw_writel(0x1c20, S5P_APLL_LOCK);
->> +#else
->> + ? ? /* Lock time = 30us*24Mhz = 0x2cf*/
->> + ? ? __raw_writel(0x2cf, S5P_APLL_LOCK);
->> +#endif
->> +
->> + ? ? /* 8. Turn on APLL
->> + ? ? ?* 8-1. Set PMS values
->> + ? ? ?* 8-3. Wait until the PLL is locked
->> + ? ? ?**/
->> + ? ? if (index == L0)
->> + ? ? ? ? ? ? /* APLL FOUT becomes 1000 Mhz */
->> + ? ? ? ? ? ? __raw_writel(PLL45XX_APLL_VAL_1000, S5P_APLL_CON);
->> + ? ? else
->> + ? ? ? ? ? ? /* APLL FOUT becomes 800 Mhz */
->> + ? ? ? ? ? ? __raw_writel(PLL45XX_APLL_VAL_800, S5P_APLL_CON);
->> +
->> + ? ? do {
->> + ? ? ? ? ? ? reg = __raw_readl(S5P_APLL_CON);
->> + ? ? } while (!(reg & (0x1 << 29)));
->> +
->> + ? ? /* 9. Change source clock from SCLKMPLL(667MHz)
->> + ? ? ?* to SCLKA2M(200MHz) in MFC_MUX and G3D_MUX
->> + ? ? ?* (667/4=166)->(200/4=50)MHz
->> + ? ? ?**/
->> + ? ? reg = __raw_readl(S5P_CLK_SRC2);
->> + ? ? reg &= ~(S5P_CLKSRC2_G3D_MASK | S5P_CLKSRC2_MFC_MASK);
->> + ? ? reg |= (0 << S5P_CLKSRC2_G3D_SHIFT) | (0 << S5P_CLKSRC2_MFC_SHIFT);
->> +#ifndef CONFIG_CPU_S5PC110_EVT0_ERRATA
->> + ? ? reg &= ~S5P_CLKSRC2_G2D_MASK;
->> + ? ? reg |= 0x1 << S5P_CLKSRC2_G2D_SHIFT;
->> +#endif
->> + ? ? __raw_writel(reg, S5P_CLK_SRC2);
->> +
->> + ? ? do {
->> + ? ? ? ? ? ? reg = __raw_readl(S5P_CLK_MUX_STAT1);
->> + ? ? } while (reg & ((1 << 7) | (1 << 3)));
->> +
->> + ? ? /* 10. Change divider for MFC and G3D
->> + ? ? ?* (200/4=50)->(200/1=200)MHz
->> + ? ? ?**/
->> + ? ? reg = __raw_readl(S5P_CLK_DIV2);
->> + ? ? reg &= ~(S5P_CLKDIV2_G3D_MASK | S5P_CLKDIV2_MFC_MASK);
->> + ? ? reg |= (clkdiv_val[index][10] << S5P_CLKDIV2_G3D_SHIFT) |
->> + ? ? ? ? ? ? (clkdiv_val[index][9] << S5P_CLKDIV2_MFC_SHIFT);
->> +#ifndef CONFIG_CPU_S5PC110_EVT0_ERRATA
->> + ? ? reg &= ~S5P_CLKDIV2_G2D_MASK;
->> + ? ? reg |= 0x2 << S5P_CLKDIV2_G2D_SHIFT;
->> +#endif
->> + ? ? __raw_writel(reg, S5P_CLK_DIV2);
->> +
->> + ? ? do {
->> + ? ? ? ? ? ? reg = __raw_readl(S5P_CLK_DIV_STAT0);
->> + ? ? } while (reg & ((1 << 16) | (1 << 17)));
->> +
->> + ? ? /* 11. Change MPLL to APLL in MSYS_MUX */
->> + ? ? reg = __raw_readl(S5P_CLK_SRC0);
->> + ? ? reg &= ~(S5P_CLKSRC0_MUX200_MASK);
->> + ? ? reg |= (0x0 << S5P_CLKSRC0_MUX200_SHIFT); /* SCLKMPLL -> SCLKAPLL ? */
->> + ? ? __raw_writel(reg, S5P_CLK_SRC0);
->> +
->> + ? ? do {
->> + ? ? ? ? ? ? reg = __raw_readl(S5P_CLK_MUX_STAT0);
->> + ? ? } while (reg & (0x1 << 18));
->> +
->> + ? ? /* 12. DMC1 refresh counter
->> + ? ? ?* L4: DMC1 = 100MHz 7.8us/(1/100) = 0x30c
->> + ? ? ?* Others: DMC1 = 200MHz 7.8us/(1/200) = 0x618
->> + ? ? ?**/
->> + ? ? if (!bus_speed_changing)
->> + ? ? ? ? ? ? __raw_writel(0x618, S5P_VA_DMC1 + 0x30);
->> +
->> +#if defined(CONFIG_S5PC110_H_TYPE)
->> + ? ? /* DMC0 source clock: SCLKMPLL -> SCLKA2M */
->> + ? ? reg = __raw_readl(S5P_CLK_SRC6);
->> + ? ? reg &= ~(S5P_CLKSRC6_ONEDRAM_MASK);
->> + ? ? reg |= (0x0 << S5P_CLKSRC6_ONEDRAM_SHIFT);
->> + ? ? __raw_writel(reg, S5P_CLK_SRC6);
->> +
->> + ? ? do {
->> + ? ? ? ? ? ? reg = __raw_readl(S5P_CLK_MUX_STAT1);
->> + ? ? } while (reg & (1 << 11));
->> +
->> + ? ? reg = __raw_readl(S5P_CLK_DIC6);
->> + ? ? reg &= ~(S5P_CLKDIV6_ONEDRAM_MASK);
->> + ? ? reg |= (0x0 << S5P_CLKDIV6_ONEDRAM_SHIFT);
->> + ? ? __raw_writel(reg, S5P_CLK_DIV6);
->> +
->> + ? ? do {
->> + ? ? ? ? ? ? reg = __raw_readl(S5P_CLK_DIV_STAT1);
->> + ? ? } while (reg & (1 << 15));
->> + ? ? __raw_writel(0x618, S5P_VA_DMC0 + 0x30);
->> +#endif
->> +}
->> +
->> +#ifdef CONFIG_PM
->> +static int no_cpufreq_access;
->> +/* s5pv210_target: relation has an additional symantics other than
->> + * the standard
->> + * [0x30]:
->> + * ? 1: disable further access to target until being re-enabled.
->> + * ? 2: re-enable access to target */
->> +#endif
->> +static int s5pv210_target(struct cpufreq_policy *policy,
->> + ? ? ? ? ? ? unsigned int target_freq,
->> + ? ? ? ? ? ? unsigned int relation)
->> +{
->> + ? ? static int initialized;
->> + ? ? int ret = 0;
->> + ? ? unsigned long arm_clk;
->> + ? ? unsigned int index, reg, arm_volt, int_volt;
->> + ? ? unsigned int pll_changing = 0;
->> + ? ? unsigned int bus_speed_changing = 0;
->> +
->> +#ifdef CONFIG_CPU_FREQ_DEBUG
->> + ? ? printk(KERN_INFO "cpufreq: Entering for %dkHz\n", target_freq);
->> +#endif
->
-> cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, <prefix>, ...)
->
->> +#ifdef CONFIG_PM
->> + ? ? if ((relation & ENABLE_FURTHER_CPUFREQ) &&
->> + ? ? ? ? ? ? ? ? ? ? (relation & DISABLE_FURTHER_CPUFREQ)) {
->> + ? ? ? ? ? ? /* Invalidate both if both marked */
->> + ? ? ? ? ? ? relation &= ~ENABLE_FURTHER_CPUFREQ;
->> + ? ? ? ? ? ? relation &= ~DISABLE_FURTHER_CPUFREQ;
->> + ? ? ? ? ? ? printk(KERN_ERR "%s:%d denied marking \"FURTHER_CPUFREQ\""
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? " as both marked.\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? __FILE__, __LINE__);
->> + ? ? }
->> + ? ? if (relation & ENABLE_FURTHER_CPUFREQ)
->> + ? ? ? ? ? ? no_cpufreq_access = 0;
->> + ? ? if (no_cpufreq_access == 1) {
->> +#ifdef CONFIG_PM_VERBOSE
->> + ? ? ? ? ? ? printk(KERN_ERR "%s:%d denied access to %s as it is disabled"
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?" temporarily\n", __FILE__, __LINE__, __func__);
->
-> Use pr_err(...)
->
->> +#endif
->> + ? ? ? ? ? ? ret = -EINVAL;
->> + ? ? ? ? ? ? goto out;
->> + ? ? }
->> + ? ? if (relation & DISABLE_FURTHER_CPUFREQ)
->> + ? ? ? ? ? ? no_cpufreq_access = 1;
->> + ? ? relation &= ~MASK_FURTHER_CPUFREQ;
->> +#endif
->> +
->> + ? ? s3c_freqs.freqs.old = s5pv210_getspeed(0);
->> +
->> + ? ? if (cpufreq_frequency_table_target(policy, s5pv210_freq_table,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? target_freq, relation, &index)) {
->> + ? ? ? ? ? ? ret = -EINVAL;
->> + ? ? ? ? ? ? goto out;
->> + ? ? }
->> +#ifdef CPUFREQ_DISABLE_100MHZ
->> + ? ? if (index == L4)
->> + ? ? ? ? ? ? index = L3;
->> +#endif
->> +#ifdef CPUFREQ_DISABLE_1GHZ
->> + ? ? if (index == L0)
->> + ? ? ? ? ? ? index = L1;
->> +#endif
->> +
->> + ? ? arm_clk = s5pv210_freq_table[index].frequency;
->> +
->> + ? ? s3c_freqs.freqs.new = arm_clk;
->> + ? ? s3c_freqs.freqs.cpu = 0;
->> +
->> + ? ? if (s3c_freqs.freqs.new == s3c_freqs.freqs.old &&
->> + ? ? ? ? ? ? ? ? ? ? initialized >= 2)
->> + ? ? ? ? ? ? return 0;
->> + ? ? else if (initialized < 2)
->> + ? ? ? ? ? ? initialized++;
->> +
->> + ? ? arm_volt = s5pv210_dvs_conf[index].arm_volt;
->> + ? ? int_volt = s5pv210_dvs_conf[index].int_volt;
->> +
->> + ? ? /* iNew clock information update */
->> + ? ? memcpy(&s3c_freqs.new, &s5pv210_clk_info[index],
->> + ? ? ? ? ? ? ? ? ? ? sizeof(struct s3c_freq));
->> +
->> + ? ? if (s3c_freqs.freqs.new >= s3c_freqs.freqs.old) {
->> + ? ? ? ? ? ? /* Voltage up code: increase ARM first */
->> + ? ? ? ? ? ? if (!IS_ERR_OR_NULL(arm_regulator) &&
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? !IS_ERR_OR_NULL(internal_regulator)) {
->> + ? ? ? ? ? ? ? ? ? ? regulator_set_voltage(arm_regulator,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? arm_volt, arm_volt_max);
->> + ? ? ? ? ? ? ? ? ? ? regulator_set_voltage(internal_regulator,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int_volt, int_volt_max);
->> + ? ? ? ? ? ? }
->> + ? ? }
->> + ? ? cpufreq_notify_transition(&s3c_freqs.freqs, CPUFREQ_PRECHANGE);
->> +
->> + ? ? if (s3c_freqs.new.fclk != s3c_freqs.old.fclk || initialized < 2)
->> + ? ? ? ? ? ? pll_changing = 1;
->> +
->> + ? ? if (s3c_freqs.new.hclk_msys != s3c_freqs.old.hclk_msys ||
->> + ? ? ? ? ? ? ? ? ? ? initialized < 2)
->> + ? ? ? ? ? ? bus_speed_changing = 1;
->> +
->> + ? ? if (bus_speed_changing) {
->> + ? ? ? ? ? ? /* Reconfigure DRAM refresh counter value for minimum
->> + ? ? ? ? ? ? ?* temporary clock while changing divider.
->> + ? ? ? ? ? ? ?* expected clock is 83MHz: 7.8usec/(1/83MHz) = 0x287
->> + ? ? ? ? ? ? ?**/
->> + ? ? ? ? ? ? if (pll_changing)
->> + ? ? ? ? ? ? ? ? ? ? __raw_writel(0x287, S5P_VA_DMC1 + 0x30);
->> + ? ? ? ? ? ? else
->> + ? ? ? ? ? ? ? ? ? ? __raw_writel(0x30c, S5P_VA_DMC1 + 0x30);
->> +
->> + ? ? ? ? ? ? __raw_writel(0x287, S5P_VA_DMC0 + 0x30);
->> + ? ? }
->> +
->> + ? ? /* APLL should be changed in this level
->> + ? ? ?* APLL -> MPLL(for stable transition) -> APLL
->> + ? ? ?* Some clock source's clock API ?are not prepared. Do not use clock API
->> + ? ? ?* in below code.
->> + ? ? ?*/
->> + ? ? if (pll_changing)
->> + ? ? ? ? ? ? s5pv210_target_APLL2MPLL(index, bus_speed_changing);
->> +
->> + ? ? /* ARM MCS value changed */
->> + ? ? if (index != L4) {
->> + ? ? ? ? ? ? reg = __raw_readl(S5P_ARM_MCS_CON);
->> + ? ? ? ? ? ? reg &= ~0x3;
->> + ? ? ? ? ? ? reg |= 0x1;
->> + ? ? ? ? ? ? __raw_writel(reg, S5P_ARM_MCS_CON);
->> + ? ? }
->> +
->> + ? ? reg = __raw_readl(S5P_CLK_DIV0);
->> +
->> + ? ? reg &= ~(S5P_CLKDIV0_APLL_MASK | S5P_CLKDIV0_A2M_MASK
->> + ? ? ? ? ? ? ? ? ? ? | S5P_CLKDIV0_HCLK200_MASK | S5P_CLKDIV0_PCLK100_MASK
->> + ? ? ? ? ? ? ? ? ? ? | S5P_CLKDIV0_HCLK166_MASK | S5P_CLKDIV0_PCLK83_MASK
->> + ? ? ? ? ? ? ? ? ? ? | S5P_CLKDIV0_HCLK133_MASK | S5P_CLKDIV0_PCLK66_MASK);
->> +
->> + ? ? reg |= ((clkdiv_val[index][0]<<S5P_CLKDIV0_APLL_SHIFT)
->> + ? ? ? ? ? ? ? ? ? ? | (clkdiv_val[index][1] << S5P_CLKDIV0_A2M_SHIFT)
->> + ? ? ? ? ? ? ? ? ? ? | (clkdiv_val[index][2] << S5P_CLKDIV0_HCLK200_SHIFT)
->> + ? ? ? ? ? ? ? ? ? ? | (clkdiv_val[index][3] << S5P_CLKDIV0_PCLK100_SHIFT)
->> + ? ? ? ? ? ? ? ? ? ? | (clkdiv_val[index][4] << S5P_CLKDIV0_HCLK166_SHIFT)
->> + ? ? ? ? ? ? ? ? ? ? | (clkdiv_val[index][5] << S5P_CLKDIV0_PCLK83_SHIFT)
->> + ? ? ? ? ? ? ? ? ? ? | (clkdiv_val[index][6] << S5P_CLKDIV0_HCLK133_SHIFT)
->> + ? ? ? ? ? ? ? ? ? ? | (clkdiv_val[index][7] << S5P_CLKDIV0_PCLK66_SHIFT));
->> +
->> + ? ? __raw_writel(reg, S5P_CLK_DIV0);
->> +
->> + ? ? do {
->> + ? ? ? ? ? ? reg = __raw_readl(S5P_CLK_DIV_STAT0);
->> + ? ? } while (reg & 0xff);
->> +
->> + ? ? /* ARM MCS value changed */
->> + ? ? if (index == L4) {
->> + ? ? ? ? ? ? reg = __raw_readl(S5P_ARM_MCS_CON);
->> + ? ? ? ? ? ? reg &= ~0x3;
->> + ? ? ? ? ? ? reg |= 0x3;
->> + ? ? ? ? ? ? __raw_writel(reg, S5P_ARM_MCS_CON);
->> + ? ? }
->> +
->> + ? ? if (pll_changing)
->> + ? ? ? ? ? ? s5pv210_target_MPLL2APLL(index, bus_speed_changing);
->> +
->> + ? ? /* L4 level need to change memory bus speed,
->> + ? ? ?* hence onedram clock divier and
->> + ? ? ?* memory refresh parameter should be changed
->> + ? ? ?*/
->> + ? ? if (bus_speed_changing) {
->> + ? ? ? ? ? ? reg = __raw_readl(S5P_CLK_DIV6);
->> + ? ? ? ? ? ? reg &= ~S5P_CLKDIV6_ONEDRAM_MASK;
->> + ? ? ? ? ? ? reg |= (clkdiv_val[index][8] << S5P_CLKDIV6_ONEDRAM_SHIFT);
->> + ? ? ? ? ? ? /* ONEDRAM Clock Divider Ratio: 7 for L4, 3 for Others */
->> + ? ? ? ? ? ? __raw_writel(reg, S5P_CLK_DIV6);
->> +
->> + ? ? ? ? ? ? do {
->> + ? ? ? ? ? ? ? ? ? ? reg = __raw_readl(S5P_CLK_DIV_STAT1);
->> + ? ? ? ? ? ? } while (reg & (1 << 15));
->> +
->> + ? ? ? ? ? ? /* Reconfigure DRAM refresh counter value */
->> + ? ? ? ? ? ? if (index != L4) {
->> + ? ? ? ? ? ? ? ? ? ? /* DMC0: 166MHz
->> + ? ? ? ? ? ? ? ? ? ? ?* DMC1: 200MHz
->> + ? ? ? ? ? ? ? ? ? ? ?**/
->> + ? ? ? ? ? ? ? ? ? ? __raw_writel(0x618, S5P_VA_DMC1 + 0x30);
->> +#if !defined(CONFIG_S5PC110_H_TYPE)
->> + ? ? ? ? ? ? ? ? ? ? __raw_writel(0x50e, S5P_VA_DMC0 + 0x30);
->> +#else
->> + ? ? ? ? ? ? ? ? ? ? __raw_writel(0x618, S5P_VA_DMC0 + 0x30);
->> +#endif
->> + ? ? ? ? ? ? } else {
->> + ? ? ? ? ? ? ? ? ? ? /* DMC0: 83MHz
->> + ? ? ? ? ? ? ? ? ? ? ?* DMC1: 100MHz
->> + ? ? ? ? ? ? ? ? ? ? ?**/
->> + ? ? ? ? ? ? ? ? ? ? __raw_writel(0x30c, S5P_VA_DMC1 + 0x30);
->> + ? ? ? ? ? ? ? ? ? ? __raw_writel(0x287, S5P_VA_DMC0 + 0x30);
->> + ? ? ? ? ? ? }
->> + ? ? }
->> +
->> + ? ? if (s3c_freqs.freqs.new < s3c_freqs.freqs.old) {
->> + ? ? ? ? ? ? /* Voltage down: decrease INT first.*/
->> + ? ? ? ? ? ? if (!IS_ERR_OR_NULL(arm_regulator) &&
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? !IS_ERR_OR_NULL(internal_regulator)) {
->> + ? ? ? ? ? ? ? ? ? ? regulator_set_voltage(internal_regulator,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int_volt, int_volt_max);
->> + ? ? ? ? ? ? ? ? ? ? regulator_set_voltage(arm_regulator,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? arm_volt, arm_volt_max);
->> + ? ? ? ? ? ? }
->> + ? ? }
->> + ? ? cpufreq_notify_transition(&s3c_freqs.freqs, CPUFREQ_POSTCHANGE);
->> +
->> + ? ? memcpy(&s3c_freqs.old, &s3c_freqs.new, sizeof(struct s3c_freq));
->> +#ifdef CONFIG_CPU_FREQ_DEBUG
->> + ? ? printk(KERN_INFO "cpufreq: Performance changed[L%d]\n", index);
->
-> pr_info
->
->> +#endif
->> + ? ? previous_arm_volt = s5pv210_dvs_conf[index].arm_volt;
->> +out:
->> + ? ? return ret;
->> +}
->> +
->> +
->> +#ifdef CONFIG_PM
->> +static int previous_frequency;
->> +
->> +static int s5pv210_cpufreq_suspend(struct cpufreq_policy *policy,
->> + ? ? ? ? ? ? pm_message_t pmsg)
->> +{
->> + ? ? int ret = 0;
->> + ? ? printk(KERN_INFO "cpufreq: Entering suspend.\n");
->
-> pr_info
->
->> +
->> + ? ? previous_frequency = cpufreq_get(0);
->> + ? ? ret = __cpufreq_driver_target(cpufreq_cpu_get(0), SLEEP_FREQ,
->> + ? ? ? ? ? ? ? ? ? ? DISABLE_FURTHER_CPUFREQ);
->> + ? ? return ret;
->> +}
->> +
->> +static int s5pv210_cpufreq_resume(struct cpufreq_policy *policy)
->> +{
->> + ? ? int ret = 0;
->> + ? ? u32 rate;
->> + ? ? int level = CPUFREQ_TABLE_END;
->> + ? ? int i;
->> +
->> + ? ? printk(KERN_INFO "cpufreq: Waking up from a suspend.\n");
->
-> pr_info
->
->> +
->> + ? ? __cpufreq_driver_target(cpufreq_cpu_get(0), previous_frequency,
->> + ? ? ? ? ? ? ? ? ? ? ENABLE_FURTHER_CPUFREQ);
->> +
->> + ? ? /* Clock information update with wakeup value */
->> + ? ? rate = clk_get_rate(mpu_clk);
->> +
->> + ? ? i = 0;
->> + ? ? while (s5pv210_freq_table[i].frequency != CPUFREQ_TABLE_END) {
->> + ? ? ? ? ? ? if (s5pv210_freq_table[i].frequency * 1000 == rate) {
->> + ? ? ? ? ? ? ? ? ? ? level = s5pv210_freq_table[i].index;
->> + ? ? ? ? ? ? ? ? ? ? break;
->> + ? ? ? ? ? ? }
->> + ? ? ? ? ? ? i++;
->> + ? ? }
->> +
->> + ? ? if (level == CPUFREQ_TABLE_END) { /* Not found */
->> + ? ? ? ? ? ? printk(KERN_ERR "[%s:%d] clock speed does not match: "
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? "%d. Using L1 of 800MHz.\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? __FILE__, __LINE__, rate);
->
-> pr_err
->
->> + ? ? ? ? ? ? level = L1;
->> + ? ? }
->> +
->> + ? ? memcpy(&s3c_freqs.old, &s5pv210_clk_info[level],
->> + ? ? ? ? ? ? ? ? ? ? sizeof(struct s3c_freq));
->> + ? ? previous_arm_volt = s5pv210_dvs_conf[level].arm_volt;
->> + ? ? return ret;
->> +}
->> +#endif
->> +
->> +
->> +static int __init s5pv210_cpu_init(struct cpufreq_policy *policy)
->> +{
->> + ? ? u32 rate ;
->> + ? ? int i, level = CPUFREQ_TABLE_END;
->> +
->> + ? ? printk(KERN_INFO "S5PV210 CPUFREQ %s:%d\n", __FILE__, __LINE__);
->
-> pr_info
->
->> +#ifdef CONFIG_PM
->> + ? ? no_cpufreq_access = 0;
->> +#endif
->> +#ifdef CLK_OUT_PROBING
->> + ? ? reg = __raw_readl(S5P_CLK_OUT);
->> + ? ? reg &= ~(0x1f << 12 | 0xf << 20); /* CLKSEL and DIVVAL*/
->> + ? ? reg |= (0xf << 12 | 0x1 << 20); /* CLKSEL = ARMCLK/4, DIVVAL = 1 */
->> + ? ? /* Result = ARMCLK / 4 / ( 1 + 1 ) */
->> + ? ? __raw_writel(reg, S5P_CLK_OUT);
->> +#endif
->> + ? ? mpu_clk = clk_get(NULL, MPU_CLK);
->> + ? ? if (IS_ERR(mpu_clk)) {
->> + ? ? ? ? ? ? printk(KERN_ERR "S5PV210 CPUFREQ cannot get MPU_CLK(%s)\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? MPU_CLK);
->
-> pr_err
->
->> + ? ? ? ? ? ? return PTR_ERR(mpu_clk);
->> + ? ? }
->> +
->> + ? ? if (policy->cpu != 0) {
->> + ? ? ? ? ? ? printk(KERN_ERR "S5PV210 CPUFREQ cannot get proper cpu(%d)\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? policy->cpu);
->
-> pr_err
->
->> + ? ? ? ? ? ? return -EINVAL;
->> + ? ? }
->> + ? ? policy->cur = policy->min = policy->max = s5pv210_getspeed(0);
->> +
->> + ? ? cpufreq_frequency_table_get_attr(s5pv210_freq_table, policy->cpu);
->> +
->> + ? ? policy->cpuinfo.transition_latency = 40000; ? ? /*1us*/
->> +
->> + ? ? rate = clk_get_rate(mpu_clk);
->> + ? ? i = 0;
->> +
->> + ? ? while (s5pv210_freq_table[i].frequency != CPUFREQ_TABLE_END) {
->> + ? ? ? ? ? ? if (s5pv210_freq_table[i].frequency * 1000 == rate) {
->> + ? ? ? ? ? ? ? ? ? ? level = s5pv210_freq_table[i].index;
->> + ? ? ? ? ? ? ? ? ? ? break;
->> + ? ? ? ? ? ? }
->> + ? ? ? ? ? ? i++;
->> + ? ? }
->> +
->> + ? ? if (level == CPUFREQ_TABLE_END) { /* Not found */
->> + ? ? ? ? ? ? printk(KERN_ERR "[%s:%d] clock speed does not match: "
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? "%d. Using L1 of 800MHz.\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? __FILE__, __LINE__, rate);
->> + ? ? ? ? ? ? level = L1;
->> + ? ? }
->> +
->> + ? ? printk(KERN_INFO "S5PV210 CPUFREQ Initialized.\n");
->
-> pr_info
->
->> +
->> + ? ? memcpy(&s3c_freqs.old, &s5pv210_clk_info[level],
->> + ? ? ? ? ? ? ? ? ? ? sizeof(struct s3c_freq));
->> + ? ? previous_arm_volt = s5pv210_dvs_conf[level].arm_volt;
->> +
->> + ? ? return cpufreq_frequency_table_cpuinfo(policy, s5pv210_freq_table);
->> +}
->> +
->> +static struct cpufreq_driver s5pv210_driver = {
->> + ? ? .flags ? ? ? ? ?= CPUFREQ_STICKY,
->> + ? ? .verify ? ? ? ? = s5pv210_verify_speed,
->> + ? ? .target ? ? ? ? = s5pv210_target,
->> + ? ? .get ? ? ? ? ? ?= s5pv210_getspeed,
->> + ? ? .init ? ? ? ? ? = s5pv210_cpu_init,
->> + ? ? .name ? ? ? ? ? = "s5pv210",
->> +#ifdef CONFIG_PM
->> + ? ? .suspend ? ? ? ?= s5pv210_cpufreq_suspend,
->> + ? ? .resume ? ? ? ? = s5pv210_cpufreq_resume,
->> +#endif
->> +};
->> +
->> +static int __init s5pv210_cpufreq_init(void)
->> +{
->> + ? ? printk(KERN_INFO "S5PV210 CPUFREQ Init.\n");
->
-> pr_info
-> Also, I guess one banner is enough?
->
->> + ? ? arm_regulator = regulator_get_exclusive(NULL, "vddarm");
->> + ? ? if (IS_ERR(arm_regulator)) {
->> + ? ? ? ? ? ? printk(KERN_ERR "failed to get regulater resource vddarm\n");
->> + ? ? ? ? ? ? goto error;
->> + ? ? }
->> + ? ? internal_regulator = regulator_get_exclusive(NULL, "vddint");
->> + ? ? if (IS_ERR(internal_regulator)) {
->> + ? ? ? ? ? ? printk(KERN_ERR "failed to get regulater resource vddint\n");
->> + ? ? ? ? ? ? goto error;
->> + ? ? }
->> + ? ? goto finish;
->> +error:
->> + ? ? printk(KERN_WARNING "Cannot get vddarm or vddint. CPUFREQ Will not"
->> + ? ? ? ? ? ? ? ? ? ?" change the voltage.\n");
->
-> pr_warn
->
->> +finish:
->> + ? ? return cpufreq_register_driver(&s5pv210_driver);
->> +}
->> +
->> +late_initcall(s5pv210_cpufreq_init);
->> diff --git a/arch/arm/mach-s5pv210/include/mach/cpu-freq.h b/arch/arm/mach-s5pv210/include/mach/cpu-freq.h
+> 
+>> +       depends on ARM_AMBA
+>> +       help
+>> +         ARM Primecell SP805 Watchdog timer. This will reboot your system when
+>> +         the timeout is reached.
+>> +
+>>  config AT91RM9200_WATCHDOG
+>>        tristate "AT91RM9200 watchdog"
+>>        depends on ARCH_AT91RM9200
+>> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+>> index 5e3cb95..28af87a 100644
+>> --- a/drivers/watchdog/Makefile
+>> +++ b/drivers/watchdog/Makefile
+>> @@ -25,6 +25,7 @@ obj-$(CONFIG_USBPCWATCHDOG) += pcwd_usb.o
+>>  # ALPHA Architecture
+>>
+>>  # ARM Architecture
+>> +obj-$(CONFIG_ARM_SP805_WATCHDOG) += sp805_wdt.o
+>>  obj-$(CONFIG_AT91RM9200_WATCHDOG) += at91rm9200_wdt.o
+>>  obj-$(CONFIG_AT91SAM9X_WATCHDOG) += at91sam9_wdt.o
+>>  obj-$(CONFIG_OMAP_WATCHDOG) += omap_wdt.o
+>> diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
 >> new file mode 100644
->> index 0000000..d3c31b2
+>> index 0000000..85d86ac
 >> --- /dev/null
->> +++ b/arch/arm/mach-s5pv210/include/mach/cpu-freq.h
->> @@ -0,0 +1,50 @@
->> +/* arch/arm/mach-s5pv210/include/mach/cpu-freq.h
+>> +++ b/drivers/watchdog/sp805_wdt.c
+>> @@ -0,0 +1,386 @@
+>> +/*
+>> + * drivers/char/watchdog/sp805-wdt.c
 >> + *
->> + * Copyright (c) 2010 Samsung Electronics
+>> + * Watchdog driver for ARM SP805 watchdog module
 >> + *
->> + * ? MyungJoo Ham <myungjoo.ham@samsung.com>
+>> + * Copyright (C) 2010 ST Microelectronics
+>> + * Viresh Kumar<viresh.kumar@st.com>
 >> + *
->> + * S5PV210/S5PC110 CPU frequency scaling support
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2 or later. This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + */
+>> +
+>> +#include <linux/device.h>
+>> +#include <linux/resource.h>
+>> +#include <linux/amba/bus.h>
+>> +#include <linux/bitops.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/fs.h>
+>> +#include <linux/init.h>
+>> +#include <linux/io.h>
+>> +#include <linux/ioport.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/math64.h>
+>> +#include <linux/miscdevice.h>
+>> +#include <linux/module.h>
+>> +#include <linux/moduleparam.h>
+>> +#include <linux/spinlock.h>
+>> +#include <linux/types.h>
+>> +#include <linux/uaccess.h>
+>> +#include <linux/watchdog.h>
+> 
+> #include <linux/slab.h>
+
+OK.
+
+> 
+>> +
+>> +/* default timeout in seconds */
+>> +#define DEFAULT_TIMEOUT                60
+>> +
+>> +#define MODULE_NAME            "sp805-wdt"
+>> +
+>> +/* watchdog register offsets and masks */
+>> +#define WDTLOAD                        0x000
+>> +       #define LOAD_MIN        0x00000001
+>> +       #define LOAD_MAX        0xFFFFFFFF
+> 
+> I haven't seen this style of indenting the #defines for
+> stuff you can put into the registers before, but I sort of
+> like it. Is it common in the kernel?
+
+I am not sure if it is common, but i thought it would be much more readable
+now. so did it.
+
+> 
+>> +#define WDTVALUE               0x004
+>> +#define WDTCONTROL             0x008
+>> +       /* control register masks */
+>> +       #define INT_ENABLE      (1 << 0)
+>> +       #define RESET_ENABLE    (1 << 1)
+>> +#define WDTINTCLR              0x00C
+>> +#define WDTRIS                 0x010
+>> +#define WDTMIS                 0x014
+>> +       #define INT_MASK        (1 << 0)
+>> +#define WDTLOCK                        0xC00
+>> +       #define UNLOCK          0x1ACCE551
+>> +       #define LOCK            0x00000001
+>> +
+>> +/**
+>> + * struct sp805_wdt: sp805 wdt device structure
 >> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> +*/
->> +
->> +#ifndef _ARCH_ARM_MACH_S5PV210_INCLUDE_MACH_CPU_FREQ_H_
->> +#define _ARCH_ARM_MACH_S5PV210_INCLUDE_MACH_CPU_FREQ_H_
->> +
->> +#include <linux/cpufreq.h>
->> +
->> +#ifdef CONFIG_CPU_S5PV210
->> +
->> +#define USE_FREQ_TABLE
->> +
->> +#define KHZ_T ? ? ? ? ? 1000
->> +
->> +#define MPU_CLK ? ? ? ? "armclk"
->> +
->> +enum perf_level {
->> + ? ? L0 = 0,
->> + ? ? L1,
->> + ? ? L2,
->> + ? ? L3,
->> + ? ? L4,
+>> + * lock: spin lock protecting dev structure and io access
+>> + * base: base address of wdt
+>> + * clk: clock structure of wdt
+>> + * dev: amba device structure of wdt
+>> + * status: current status of wdt
+>> + * load_val: load value to be set for current timeout
+>> + * timeout: current programmed timeout
+>> + */
+>> +struct sp805_wdt {
+>> +       spinlock_t                      lock;
+>> +       void __iomem                    *base;
+>> +       struct clk                      *clk;
+>> +       struct amba_device              *adev;
+>> +       unsigned long                   status;
+>> +       #define WDT_BUSY                0
+>> +       #define WDT_CAN_BE_CLOSED       1
+>> +       unsigned int                    load_val;
+>> +       unsigned int                    timeout;
 >> +};
 >> +
->> +#define CLK_DIV0_MASK ? ((0x7<<0)|(0x7<<8)|(0x7<<12)) ? /* APLL,HCLK_MSYS,PCLK_MSYS mask value ?*/
+>> +/* local variables */
+>> +static struct sp805_wdt *wdt;
+>> +static int nowayout = WATCHDOG_NOWAYOUT;
 >> +
->> +#ifdef CONFIG_PM
->> +#define SLEEP_FREQ ? ? ?(800 * 1000) /* Use 800MHz when entering sleep */
+>> +/* This routine finds load value that will reset system in required timout */
+>> +static void wdt_setload(unsigned int timeout)
+>> +{
+>> +       u64 load, rate;
 >> +
->> +/* additional symantics for "relation" in cpufreq with pm */
->> +#define DISABLE_FURTHER_CPUFREQ ? ? ? ? 0x10
->> +#define ENABLE_FURTHER_CPUFREQ ? ? ? ? ?0x20
->> +#define MASK_FURTHER_CPUFREQ ? ? ? ? ? ?0x30
->> +/* With 0x00(NOCHANGE), it depends on the previous "further" status */
+>> +       rate = clk_get_rate(wdt->clk);
 >> +
->> +#endif
+>> +       /*
+>> +        * sp805 runs counter with given value twice, after the end of first
+>> +        * counter it gives an interrupt and then starts counter again. If
+>> +        * interrupt already occured then it resets the system. This is why
+>> +        * load is half of what should be required.
+>> +        */
+>> +       load = div_u64(rate, 2) * timeout - 1;
 >> +
+>> +       load = (load > LOAD_MAX) ? LOAD_MAX : load;
+>> +       load = (load < LOAD_MIN) ? LOAD_MIN : load;
 >> +
->> +#endif /* CONFIG_CPU_S5PV210 */
->> +#endif /* _ARCH_ARM_MACH_S5PV210_INCLUDE_MACH_CPU_FREQ_H_ */
->
->
-> --
-> Maurus Cuelenaere
->
+>> +       spin_lock(&wdt->lock);
+>> +       wdt->load_val = load;
+>> +       /* roundup timeout to closest positive integer value */
+>> +       wdt->timeout = div_u64((load + 1) * 2 + (rate / 2), rate);
+> 
+> Look in linux/kernel.h, use the
+> DIV_ROUND_CLOSEST() macro instead of this.
 
+OK.
 
+> 
+>> +       spin_unlock(&wdt->lock);
+>> +}
+>> +
+>> +/* returns number of seconds left for reset to occur */
+>> +static u32 wdt_timeleft(void)
+>> +{
+>> +       u64 load, rate;
+>> +
+>> +       rate = clk_get_rate(wdt->clk);
+>> +
+>> +       spin_lock(&wdt->lock);
+>> +       load = readl(wdt->base + WDTVALUE);
+>> +
+>> +       /*If the interrupt is inactive then time left is WDTValue + WDTLoad. */
+>> +       if (!(readl(wdt->base + WDTRIS) & INT_MASK))
+>> +               load += wdt->load_val + 1;
+>> +       spin_unlock(&wdt->lock);
+>> +
+>> +       return div_u64(load, rate);
+>> +}
+>> +
+>> +/* enables watchdog timers reset */
+>> +static void wdt_enable(void)
+>> +{
+>> +       spin_lock(&wdt->lock);
+>> +
+>> +       writel(UNLOCK, wdt->base + WDTLOCK);
+>> +       writel(wdt->load_val, wdt->base + WDTLOAD);
+>> +       writel(INT_MASK, wdt->base + WDTINTCLR);
+>> +       writel(INT_ENABLE | RESET_ENABLE, wdt->base + WDTCONTROL);
+>> +       writel(LOCK, wdt->base + WDTLOCK);
+>> +
+>> +       spin_unlock(&wdt->lock);
+>> +}
+>> +
+>> +/* disables watchdog timers reset */
+>> +static void wdt_disable(void)
+>> +{
+>> +       spin_lock(&wdt->lock);
+>> +
+>> +       writel(UNLOCK, wdt->base + WDTLOCK);
+>> +       writel(0, wdt->base + WDTCONTROL);
+>> +       writel(0, wdt->base + WDTLOAD);
+>> +       writel(LOCK, wdt->base + WDTLOCK);
+>> +
+>> +       spin_unlock(&wdt->lock);
+>> +}
+>> +
+>> +static ssize_t sp805_wdt_write(struct file *file, const char *data,
+>> +               size_t len, loff_t *ppos)
+>> +{
+>> +       if (len) {
+>> +               if (!nowayout) {
+>> +                       size_t i;
+>> +
+>> +                       clear_bit(WDT_CAN_BE_CLOSED, &wdt->status);
+>> +
+>> +                       for (i = 0; i != len; i++) {
+>> +                               char c;
+>> +
+>> +                               if (get_user(c, data + i))
+>> +                                       return -EFAULT;
+>> +                               /* Check for Magic Close character */
+>> +                               if (c == 'V') {
+>> +                                       set_bit(WDT_CAN_BE_CLOSED,
+>> +                                                       &wdt->status);
+>> +                                       break;
+>> +                               }
+>> +                       }
+>> +               }
+>> +               wdt_enable();
+>> +       }
+>> +       return len;
+>> +}
+>> +
+>> +static const struct watchdog_info ident = {
+>> +       .options = WDIOF_MAGICCLOSE | WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
+>> +       .identity = MODULE_NAME,
+>> +};
+>> +
+>> +static long sp805_wdt_ioctl(struct file *file, unsigned int cmd,
+>> +               unsigned long arg)
+>> +{
+>> +       int ret = -ENOTTY;
+>> +       unsigned int timeout;
+>> +
+>> +       switch (cmd) {
+>> +       case WDIOC_GETSUPPORT:
+>> +               ret = copy_to_user((struct watchdog_info *)arg, &ident,
+>> +                               sizeof(ident)) ? -EFAULT : 0;
+>> +               break;
+>> +
+>> +       case WDIOC_GETSTATUS:
+>> +               ret = put_user(0, (int *)arg);
+>> +               break;
+>> +
+>> +       case WDIOC_KEEPALIVE:
+>> +               wdt_enable();
+>> +               ret = 0;
+>> +               break;
+>> +
+>> +       case WDIOC_SETTIMEOUT:
+>> +               ret = get_user(timeout, (unsigned int *)arg);
+>> +               if (ret)
+>> +                       break;
+>> +
+>> +               wdt_setload(timeout);
+>> +
+>> +               wdt_enable();
+>> +               /* Fall through */
+>> +
+>> +       case WDIOC_GETTIMEOUT:
+>> +               ret = put_user(wdt->timeout, (unsigned int *)arg);
+>> +               break;
+>> +       case WDIOC_GETTIMELEFT:
+>> +               ret = put_user(wdt_timeleft(), (unsigned int *)arg);
+>> +               break;
+>> +       }
+>> +       return ret;
+>> +}
+>> +
+>> +static int sp805_wdt_open(struct inode *inode, struct file *file)
+>> +{
+>> +       int ret = 0;
+>> +
+>> +       if (test_and_set_bit(WDT_BUSY, &wdt->status))
+>> +               return -EBUSY;
+>> +
+>> +       ret = clk_enable(wdt->clk);
+>> +       if (ret) {
+>> +               dev_err(&wdt->adev->dev, "clock enable fail");
+>> +               goto err;
+>> +       }
+>> +
+>> +       wdt_enable();
+>> +
+>> +       /* can not be closed, once enabled */
+>> +       clear_bit(WDT_CAN_BE_CLOSED, &wdt->status);
+>> +       return nonseekable_open(inode, file);
+>> +
+>> +err:
+>> +       clear_bit(WDT_BUSY, &wdt->status);
+>> +       return ret;
+>> +}
+>> +
+>> +static int sp805_wdt_release(struct inode *inode, struct file *file)
+>> +{
+>> +       if (!test_bit(WDT_CAN_BE_CLOSED, &wdt->status)) {
+>> +               clear_bit(WDT_BUSY, &wdt->status);
+>> +               dev_warn(&wdt->adev->dev, "Device closed unexpectedly\n");
+>> +               return 0;
+>> +       }
+>> +
+>> +       wdt_disable();
+>> +       clk_disable(wdt->clk);
+>> +       clear_bit(WDT_BUSY, &wdt->status);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static const struct file_operations sp805_wdt_fops = {
+>> +       .owner = THIS_MODULE,
+>> +       .llseek = no_llseek,
+>> +       .write = sp805_wdt_write,
+>> +       .unlocked_ioctl = sp805_wdt_ioctl,
+>> +       .open = sp805_wdt_open,
+>> +       .release = sp805_wdt_release,
+>> +};
+>> +
+>> +static struct miscdevice sp805_wdt_miscdev = {
+>> +       .minor = WATCHDOG_MINOR,
+>> +       .name = "watchdog",
+>> +       .fops = &sp805_wdt_fops,
+>> +};
+>> +
+>> +static int __devinit
+>> +sp805_wdt_probe(struct amba_device *adev, struct amba_id *id)
+>> +{
+>> +       int ret = 0;
+>> +
+>> +       if (!request_mem_region(adev->res.start, resource_size(&adev->res),
+>> +                               "sp805_wdt")) {
+>> +               dev_warn(&adev->dev, "Failed to get memory region resource\n");
+>> +               ret = -ENOENT;
+>> +               goto err;
+>> +       }
+>> +
+>> +       wdt = kzalloc(sizeof(*wdt), GFP_KERNEL);
+>> +       if (!wdt) {
+>> +               dev_warn(&adev->dev, "Kzalloc failed\n");
+>> +               ret = -ENOMEM;
+>> +               goto err_kzalloc;
+>> +       }
+>> +
+>> +       wdt->clk = clk_get(&adev->dev, NULL);
+>> +       if (IS_ERR(wdt->clk)) {
+>> +               dev_warn(&adev->dev, "Clock not found\n");
+>> +               ret = PTR_ERR(wdt->clk);
+>> +               goto err_clk_get;
+>> +       }
+>> +
+>> +       wdt->base = ioremap(adev->res.start, resource_size(&adev->res));
+>> +       if (!wdt->base) {
+>> +               ret = -ENOMEM;
+>> +               dev_warn(&adev->dev, "ioremap fail\n");
+>> +               goto err_ioremap;
+>> +       }
+>> +
+>> +       wdt->adev = adev;
+>> +       spin_lock_init(&wdt->lock);
+>> +       wdt_setload(DEFAULT_TIMEOUT);
+>> +
+>> +       ret = misc_register(&sp805_wdt_miscdev);
+>> +       if (ret < 0) {
+>> +               dev_warn(&adev->dev, "cannot register misc device\n");
+>> +               goto err_misc_register;
+>> +       }
+>> +
+>> +       dev_info(&adev->dev, "registration successful\n");
+>> +       return 0;
+>> +
+>> +err_misc_register:
+>> +       iounmap(wdt->base);
+>> +err_ioremap:
+>> +       clk_put(wdt->clk);
+>> +err_clk_get:
+>> +       kfree(wdt);
+>> +       wdt = NULL;
+>> +err_kzalloc:
+>> +       release_mem_region(adev->res.start, resource_size(&adev->res));
+>> +err:
+>> +       dev_err(&adev->dev, "Probe Failed!!!\n");
+> 
+> Drop the exclamation marks, that it's dev_err() is serious enough.
+> 
 
--- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+OK.
+
+>> +       return ret;
+>> +}
+>> +
+>> +static int __devexit sp805_wdt_remove(struct amba_device *adev)
+>> +{
+>> +       misc_deregister(&sp805_wdt_miscdev);
+>> +       iounmap(wdt->base);
+>> +       clk_put(wdt->clk);
+>> +       kfree(wdt);
+>> +       release_mem_region(adev->res.start, resource_size(&adev->res));
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static struct amba_id sp805_wdt_ids[] __initdata = {
+>> +       {
+>> +               .id     = 0x00141805,
+>> +               .mask   = 0x00ffffff,
+>> +       },
+>> +       { 0, 0 },
+>> +};
+>> +
+>> +static struct amba_driver sp805_wdt_driver = {
+>> +       .drv = {
+>> +               .name   = MODULE_NAME,
+>> +       },
+>> +       .id_table       = sp805_wdt_ids,
+>> +       .probe          = sp805_wdt_probe,
+>> +       .remove = __devexit_p(sp805_wdt_remove),
+>> +};
+>> +
+>> +static int __init sp805_wdt_init(void)
+>> +{
+>> +       return amba_driver_register(&sp805_wdt_driver);
+>> +}
+>> +module_init(sp805_wdt_init);
+>> +
+>> +static void __exit sp805_wdt_exit(void)
+>> +{
+>> +       amba_driver_unregister(&sp805_wdt_driver);
+>> +}
+>> +module_exit(sp805_wdt_exit);
+>> +
+>> +module_param(nowayout, int, 0);
+>> +MODULE_PARM_DESC(nowayout,
+>> +               "Set to 1 to keep watchdog running after device release");
+>> +
+>> +MODULE_AUTHOR("Viresh Kumar <viresh.kumar@st.com>");
+>> +MODULE_DESCRIPTION("ARM SP805 Watchdog Driver");
+>> +MODULE_LICENSE("GPL");
+>> +MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
+> 
+
+I will send V2 after Wim's review comments.
