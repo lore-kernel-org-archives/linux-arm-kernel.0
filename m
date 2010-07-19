@@ -1,50 +1,69 @@
-From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
-Date: Mon, 19 Jul 2010 09:45:17 +0200
-Subject: [PATCH v2] eukrea_mbimx27-baseboard: fix compile when CONFIG_SPI_IMX
-	is disabled
-Message-ID: <1279525517-4093-1-git-send-email-eric@eukrea.com>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Mon, 19 Jul 2010 00:44:49 -0700
+Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU,
+	CPU and device memory management
+In-Reply-To: <20100719065233.GD11054@codeaurora.org> (Zach Pfeffer's message
+	of "Sun\, 18 Jul 2010 23\:52\:33 -0700")
+References: <4C3C0032.5020702@codeaurora.org>
+	<20100713150311B.fujita.tomonori@lab.ntt.co.jp>
+	<20100713121420.GB4263@codeaurora.org>
+	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
+	<20100714201149.GA14008@codeaurora.org>
+	<20100714220536.GE18138@n2100.arm.linux.org.uk>
+	<20100715012958.GB2239@codeaurora.org>
+	<20100715085535.GC26212@n2100.arm.linux.org.uk>
+	<20100719065233.GD11054@codeaurora.org>
+Message-ID: <m1mxtndifi.fsf@fess.ebiederm.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the i2c_board_info structure landed into the SPI #if/#endif
-which is wrong.
+Zach Pfeffer <zpfeffer@codeaurora.org> writes:
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
----
-v2 : rebased against today's imx-for-2.6.36 branch
+> On Thu, Jul 15, 2010 at 09:55:35AM +0100, Russell King - ARM Linux wrote:
+>> On Wed, Jul 14, 2010 at 06:29:58PM -0700, Zach Pfeffer wrote:
+>> > The VCM ensures that all mappings that map a given physical buffer:
+>> > IOMMU mappings, CPU mappings and one-to-one device mappings all map
+>> > that buffer using the same (or compatible) attributes. At this point
+>> > the only attribute that users can pass is CACHED. In the absence of
+>> > CACHED all accesses go straight through to the physical memory.
+>> 
+>> So what you're saying is that if I have a buffer in kernel space
+>> which I already have its virtual address, I can pass this to VCM and
+>> tell it !CACHED, and it'll setup another mapping which is not cached
+>> for me?
+>
+> Not quite. The existing mapping will be represented by a reservation
+> from the prebuilt VCM of the VM. This reservation has been marked
+> non-cached. Another reservation on a IOMMU VCM, also marked non-cached
+> will be backed with the same physical memory. This is legal in ARM,
+> allowing the vcm_back call to succeed. If you instead passed cached on
+> the second mapping, the first mapping would be non-cached and the
+> second would be cached. If the underlying architecture supported this
+> than the vcm_back would go through.
 
- arch/arm/mach-imx/eukrea_mbimx27-baseboard.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+How does this compare with the x86 pat code?
 
-diff --git a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-index 27e7226..4edc5f4 100644
---- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-+++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-@@ -289,12 +289,6 @@ static struct spi_board_info eukrea_mbimx27_spi_board_info[] __initdata = {
- 	},
- };
- 
--static struct i2c_board_info eukrea_mbimx27_i2c_devices[] = {
--	{
--		I2C_BOARD_INFO("tlv320aic23", 0x1a),
--	},
--};
--
- static int eukrea_mbimx27_spi_cs[] = {GPIO_PORTD | 28};
- 
- static const struct spi_imx_master eukrea_mbimx27_spi0_data __initconst = {
-@@ -303,6 +297,12 @@ static const struct spi_imx_master eukrea_mbimx27_spi0_data __initconst = {
- };
- #endif
- 
-+static struct i2c_board_info eukrea_mbimx27_i2c_devices[] = {
-+	{
-+		I2C_BOARD_INFO("tlv320aic23", 0x1a),
-+	},
-+};
-+
- static struct platform_device *platform_devices[] __initdata = {
- 	&leds_gpio,
- };
--- 
-1.6.3.3
+>> You are aware that multiple V:P mappings for the same physical page
+>> with different attributes are being outlawed with ARMv6 and ARMv7
+>> due to speculative prefetching.  The cache can be searched even for
+>> a mapping specified as 'normal, uncached' and you can get cache hits
+>> because the data has been speculatively loaded through a separate
+>> cached mapping of the same physical page.
+>
+> I didn't know that. Thanks for the heads up.
+>
+>> FYI, during the next merge window, I will be pushing a patch which makes
+>> ioremap() of system RAM fail, which should be the last core code creator
+>> of mappings with different memory types.  This behaviour has been outlawed
+>> (as unpredictable) in the architecture specification and does cause
+>> problems on some CPUs.
+>
+> That's fair enough, but it seems like it should only be outlawed for
+> those processors on which it breaks.
+
+To my knowledge mismatch of mapping attributes is a problem on most
+cpus on every architecture.  I don't see it making sense to encourage
+coding constructs that will fail in the strangest most difficult to
+debug ways.
+
+Eric
