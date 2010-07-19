@@ -1,151 +1,141 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 19 Jul 2010 14:24:24 +0900
-Subject: [PATCH v2] ARM: S5P: Add PMU device
-In-Reply-To: <1279157494-22329-1-git-send-email-jy0922.shim@samsung.com>
-References: <1279157494-22329-1-git-send-email-jy0922.shim@samsung.com>
-Message-ID: <002101cb2702$a9a12800$fce37800$%kim@samsung.com>
+Date: Mon, 19 Jul 2010 14:19:01 +0900
+Subject: [PATCH v2] ARM: SAMSUNG: Make WDT driver dependency SoC specific
+	instead of machine specific
+Message-ID: <1279516741-7643-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joonyoung Shim wrote:
-> 
-> This patch adds an initcall for the s5p platforms so that they register
-> their PMU IRQs with the PMU framework in the Kernel.
-> 
-> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5p6440/include/mach/irqs.h |    2 +-
->  arch/arm/mach-s5p6442/include/mach/irqs.h |    2 +-
->  arch/arm/mach-s5pc100/include/mach/irqs.h |    2 +-
->  arch/arm/mach-s5pv210/include/mach/irqs.h |    2 +-
->  arch/arm/plat-s5p/Makefile                |    1 +
->  arch/arm/plat-s5p/dev-pmu.c               |   36
-> +++++++++++++++++++++++++++++
->  6 files changed, 41 insertions(+), 4 deletions(-)
->  create mode 100644 arch/arm/plat-s5p/dev-pmu.c
-> 
-> diff --git a/arch/arm/mach-s5p6440/include/mach/irqs.h b/arch/arm/mach-
-> s5p6440/include/mach/irqs.h
-> index 911854d..16a7612 100644
-> --- a/arch/arm/mach-s5p6440/include/mach/irqs.h
-> +++ b/arch/arm/mach-s5p6440/include/mach/irqs.h
-> @@ -51,7 +51,7 @@
->  #define IRQ_DISPCON3		S5P_IRQ_VIC1(19)
->  #define IRQ_FIMGVG		S5P_IRQ_VIC1(20)
->  #define IRQ_EINT_GROUPS		S5P_IRQ_VIC1(21)
-> -#define IRQ_PMUIRQ		S5P_IRQ_VIC1(23)
-> +#define IRQ_PMU			S5P_IRQ_VIC1(23)
->  #define IRQ_HSMMC0		S5P_IRQ_VIC1(24)
->  #define IRQ_HSMMC1		S5P_IRQ_VIC1(25)
->  #define IRQ_HSMMC2		IRQ_SPI1	/* shared with SPI1 */
-> diff --git a/arch/arm/mach-s5p6442/include/mach/irqs.h b/arch/arm/mach-
-> s5p6442/include/mach/irqs.h
-> index 02c2374..3fbc6c3 100644
-> --- a/arch/arm/mach-s5p6442/include/mach/irqs.h
-> +++ b/arch/arm/mach-s5p6442/include/mach/irqs.h
-> @@ -32,7 +32,7 @@
->  #define IRQ_GPIOINT		S5P_IRQ_VIC0(30)
-> 
->  /* VIC1 */
-> -#define IRQ_nPMUIRQ 		S5P_IRQ_VIC1(0)
-> +#define IRQ_PMU			S5P_IRQ_VIC1(0)
->  #define IRQ_ONENAND 		S5P_IRQ_VIC1(7)
->  #define IRQ_UART0 		S5P_IRQ_VIC1(10)
->  #define IRQ_UART1 		S5P_IRQ_VIC1(11)
-> diff --git a/arch/arm/mach-s5pc100/include/mach/irqs.h b/arch/arm/mach-
-> s5pc100/include/mach/irqs.h
-> index 28aa551..59e90bf 100644
-> --- a/arch/arm/mach-s5pc100/include/mach/irqs.h
-> +++ b/arch/arm/mach-s5pc100/include/mach/irqs.h
-> @@ -29,7 +29,7 @@
->  #define IRQ_GPIOINT		S5P_IRQ_VIC0(30)
-> 
->  /* VIC1: ARM, power, memory, connectivity */
-> -#define IRQ_CORTEX0		S5P_IRQ_VIC1(0)
-> +#define IRQ_PMU			S5P_IRQ_VIC1(0)
->  #define IRQ_CORTEX1		S5P_IRQ_VIC1(1)
->  #define IRQ_CORTEX2		S5P_IRQ_VIC1(2)
->  #define IRQ_CORTEX3		S5P_IRQ_VIC1(3)
-> diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-
-> s5pv210/include/mach/irqs.h
-> index 9689537..b55f9e0 100644
-> --- a/arch/arm/mach-s5pv210/include/mach/irqs.h
-> +++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
-> @@ -36,7 +36,7 @@
-> 
->  /* VIC1: ARM, Power, Memory, Connectivity, Storage */
-> 
-> -#define IRQ_CORTEX0		S5P_IRQ_VIC1(0)
-> +#define IRQ_PMU			S5P_IRQ_VIC1(0)
->  #define IRQ_CORTEX1		S5P_IRQ_VIC1(1)
->  #define IRQ_CORTEX2		S5P_IRQ_VIC1(2)
->  #define IRQ_CORTEX3		S5P_IRQ_VIC1(3)
-> diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
-> index 39c242b..7e34194 100644
-> --- a/arch/arm/plat-s5p/Makefile
-> +++ b/arch/arm/plat-s5p/Makefile
-> @@ -12,6 +12,7 @@ obj-				:=
-> 
->  # Core files
-> 
-> +obj-y				+= dev-pmu.o
->  obj-y				+= dev-uart.o
->  obj-y				+= cpu.o
->  obj-y				+= clock.o
-> diff --git a/arch/arm/plat-s5p/dev-pmu.c b/arch/arm/plat-s5p/dev-pmu.c
-> new file mode 100644
-> index 0000000..a08576d
-> --- /dev/null
-> +++ b/arch/arm/plat-s5p/dev-pmu.c
-> @@ -0,0 +1,36 @@
-> +/*
-> + * linux/arch/arm/plat-s5p/dev-pmu.c
-> + *
-> + * Copyright (C) 2010 Samsung Electronics Co.Ltd
-> + * Author: Joonyoung Shim <jy0922.shim@samsung.com>
-> + *
-> + *  This program is free software; you can redistribute  it and/or modify
-it
-> + *  under  the terms of  the GNU General  Public License as published by
-the
-> + *  Free Software Foundation;  either version 2 of the  License, or (at
-your
-> + *  option) any later version.
-> + *
-> + */
-> +
-> +#include <linux/platform_device.h>
-> +#include <asm/pmu.h>
-> +#include <mach/irqs.h>
-> +
-> +static struct resource s5p_pmu_resource = {
-> +	.start	= IRQ_PMU,
-> +	.end	= IRQ_PMU,
-> +	.flags	= IORESOURCE_IRQ,
-> +};
-> +
-> +struct platform_device s5p_device_pmu = {
-> +	.name		= "arm-pmu",
-> +	.id		= ARM_PMU_DEVICE_CPU,
-> +	.num_resources	= 1,
-> +	.resource	= &s5p_pmu_resource,
-> +};
-> +
-> +static int __init s5p_pmu_init(void)
-> +{
-> +	platform_device_register(&s5p_device_pmu);
-> +	return 0;
-> +}
-> +arch_initcall(s5p_pmu_init);
-> --
+From: Banajit Goswami <banajit.g@samsung.com>
 
-Ok..will apply.
+This patch moves the dependency of watchdog timer driver from MACH_XXX(board)
+to ARCH_XXX(SoC). This will enable all machines using Samsung S3C64XX and S5P
+SoCs to use the WDT driver by default.
 
-Thanks.
+Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+NOTE: now, re-submitted updated because of adding S5P6442.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+ arch/arm/Kconfig              |    5 +++++
+ arch/arm/mach-s3c64xx/Kconfig |    1 -
+ arch/arm/mach-s5p6440/Kconfig |    1 -
+ arch/arm/mach-s5p6442/Kconfig |    1 -
+ arch/arm/mach-s5pc100/Kconfig |    1 -
+ arch/arm/mach-s5pv210/Kconfig |    2 --
+ 6 files changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 98922f7..fe54947 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -663,6 +663,7 @@ config ARCH_S3C64XX
+ 	select S3C_DEV_NAND
+ 	select USB_ARCH_HAS_OHCI
+ 	select SAMSUNG_GPIOLIB_4BIT
++	select HAVE_S3C2410_WATCHDOG
+ 	help
+ 	  Samsung S3C64XX series based systems
+ 
+@@ -671,6 +672,7 @@ config ARCH_S5P6440
+ 	select CPU_V6
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
++	select HAVE_S3C2410_WATCHDOG
+ 	select ARCH_USES_GETTIMEOFFSET
+ 	help
+ 	  Samsung S5P6440 CPU based systems
+@@ -681,6 +683,7 @@ config ARCH_S5P6442
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
+ 	select ARCH_USES_GETTIMEOFFSET
++	select HAVE_S3C2410_WATCHDOG
+ 	help
+ 	  Samsung S5P6442 CPU based systems
+ 
+@@ -691,6 +694,7 @@ config ARCH_S5PC100
+ 	select CPU_V7
+ 	select ARM_L1_CACHE_SHIFT_6
+ 	select ARCH_USES_GETTIMEOFFSET
++	select HAVE_S3C2410_WATCHDOG
+ 	help
+ 	  Samsung S5PC100 series based systems
+ 
+@@ -701,6 +705,7 @@ config ARCH_S5PV210
+ 	select HAVE_CLK
+ 	select ARM_L1_CACHE_SHIFT_6
+ 	select ARCH_USES_GETTIMEOFFSET
++	select HAVE_S3C2410_WATCHDOG
+ 	help
+ 	  Samsung S5PV210/S5PC110 series based systems
+ 
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index f5a5972..915cb47 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -100,7 +100,6 @@ config MACH_SMDK6410
+ 	select S3C_DEV_USB_HOST
+ 	select S3C_DEV_USB_HSOTG
+ 	select S3C_DEV_WDT
+-	select HAVE_S3C2410_WATCHDOG
+ 	select S3C64XX_SETUP_SDHCI
+ 	select S3C64XX_SETUP_I2C1
+ 	select S3C64XX_SETUP_FB_24BPP
+diff --git a/arch/arm/mach-s5p6440/Kconfig b/arch/arm/mach-s5p6440/Kconfig
+index f066fae..084c0bc 100644
+--- a/arch/arm/mach-s5p6440/Kconfig
++++ b/arch/arm/mach-s5p6440/Kconfig
+@@ -19,7 +19,6 @@ config MACH_SMDK6440
+ 	select SAMSUNG_DEV_TS
+ 	select SAMSUNG_DEV_ADC
+ 	select S3C_DEV_WDT
+-	select HAVE_S3C2410_WATCHDOG
+ 	help
+ 	  Machine support for the Samsung SMDK6440
+ 
+diff --git a/arch/arm/mach-s5p6442/Kconfig b/arch/arm/mach-s5p6442/Kconfig
+index 7cd2843..0fda0a5 100644
+--- a/arch/arm/mach-s5p6442/Kconfig
++++ b/arch/arm/mach-s5p6442/Kconfig
+@@ -20,7 +20,6 @@ config MACH_SMDK6442
+ 	bool "SMDK6442"
+ 	select CPU_S5P6442
+ 	select S3C_DEV_WDT
+-	select HAVE_S3C2410_WATCHDOG
+ 	help
+ 	  Machine support for Samsung SMDK6442
+ 
+diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+index b63b440..0593b3f 100644
+--- a/arch/arm/mach-s5pc100/Kconfig
++++ b/arch/arm/mach-s5pc100/Kconfig
+@@ -45,7 +45,6 @@ config MACH_SMDKC100
+ 	select S3C_DEV_HSMMC1
+ 	select S3C_DEV_HSMMC2
+ 	select S3C_DEV_WDT
+-	select HAVE_S3C2410_WATCHDOG
+ 	select S5PC100_SETUP_FB_24BPP
+ 	select S5PC100_SETUP_I2C1
+ 	select S5PC100_SETUP_SDHCI
+diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+index 0761eac..2e3ed18 100644
+--- a/arch/arm/mach-s5pv210/Kconfig
++++ b/arch/arm/mach-s5pv210/Kconfig
+@@ -74,7 +74,6 @@ config MACH_SMDKV210
+ 	select SAMSUNG_DEV_ADC
+ 	select SAMSUNG_DEV_TS
+ 	select S3C_DEV_WDT
+-	select HAVE_S3C2410_WATCHDOG
+ 	help
+ 	  Machine support for Samsung SMDKV210
+ 
+@@ -83,7 +82,6 @@ config MACH_SMDKC110
+ 	select CPU_S5PV210
+ 	select ARCH_SPARSEMEM_ENABLE
+ 	select S3C_DEV_WDT
+-	select HAVE_S3C2410_WATCHDOG
+ 	help
+ 	  Machine support for Samsung SMDKC110
+ 	  S5PC110(MCP) is one of package option of S5PV210
+-- 
+1.6.2.5
