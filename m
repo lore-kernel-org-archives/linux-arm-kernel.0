@@ -1,59 +1,45 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Mon, 19 Jul 2010 19:57:52 +0900
-Subject: [PATCH 5/5] ARM: S5PV210: Initial CPUFREQ Support
-In-Reply-To: <20100719090914.GC15693@rakim.wolfsonmicro.main>
-References: <1279184768-28971-5-git-send-email-myungjoo.ham@samsung.com>
-	<1279184768-28971-6-git-send-email-myungjoo.ham@samsung.com>
-	<20100715115942.GA15919@sirena.org.uk>
-	<AANLkTinrrXlh1GQ178_NzwWt5luO_1mdfIGy6G2ZNbPH@mail.gmail.com>
-	<20100716081707.GA9082@rakim.wolfsonmicro.main>
-	<AANLkTikYX6N7q3lT5ZzXh3RQnGss39eGhSrfC9blqoF_@mail.gmail.com>
-	<20100716084231.GF9082@rakim.wolfsonmicro.main>
-	<AANLkTikNCOjOSVlcBv99DuJEdPtQHmKpC8Cs60rQz1r3@mail.gmail.com>
-	<20100716093710.GH9082@rakim.wolfsonmicro.main>
-	<AANLkTine-RPFqd1zp-vu4xRaidhngU0t3hC3SP_bXfWw@mail.gmail.com>
-	<20100719090914.GC15693@rakim.wolfsonmicro.main>
-Message-ID: <AANLkTilG55F4mGjckrq3tVzLMI88SSBX-FetqZxSEdTR@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 19 Jul 2010 12:58:56 +0200
+Subject: [PATCH 1/9] [ARM] pxa/spitz: remove unused declarations
+Message-ID: <1279537144-25424-1-git-send-email-eric.y.miao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 19, 2010 at 6:09 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Jul 19, 2010 at 09:40:24AM +0900, MyungJoo Ham wrote:
->
->> Uh oh.. I didn't mean that the default ramp time is the "required" or
->> "suggested" by the PMIC, but I meant that it is required by the CPU to
->> execute instructions without possible CPU lockups due to lower voltage
->
-> You're still missing my point here. ?What I'm saying is that by using
-> the slower default ramp rate of the PMIC you're making the length of the
-> stall in execution introduced by waiting for the ramp to complete more
-> severe than it needs to be, thus increasing the impact on the system and
-> the need to do work in software to mitigate that. ?Reducing the ramp
-> time should result in improved system performance.
->
+Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+---
+ arch/arm/mach-pxa/include/mach/spitz.h |    8 --------
+ arch/arm/mach-pxa/spitz.c              |    3 ---
+ 2 files changed, 0 insertions(+), 11 deletions(-)
 
-
-Sure. reducing RAMP delay results in higher performance. I was only
-stating that we need RAMP delay anyway. I'd let PMIC driver to set the
-RAMP delay minimal or let the board file state the RAMP delay value
-for the driver to initialise.
-
-
-Thanks.
-
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
-
+diff --git a/arch/arm/mach-pxa/include/mach/spitz.h b/arch/arm/mach-pxa/include/mach/spitz.h
+index fa1998c..dc1ff25 100644
+--- a/arch/arm/mach-pxa/include/mach/spitz.h
++++ b/arch/arm/mach-pxa/include/mach/spitz.h
+@@ -181,11 +181,3 @@
+ #define SPITZ_IRQ_GPIO_CF2_IRQ        IRQ_GPIO(SPITZ_GPIO_CF2_IRQ)
+ #define SPITZ_IRQ_GPIO_nSD_INT        IRQ_GPIO(SPITZ_GPIO_nSD_INT)
+ #define SPITZ_IRQ_GPIO_nSD_DETECT     IRQ_GPIO(SPITZ_GPIO_nSD_DETECT)
+-
+-/*
+- * Shared data structures
+- */
+-extern struct platform_device spitzscoop_device;
+-extern struct platform_device spitzscoop2_device;
+-extern struct platform_device spitzssp_device;
+-extern struct sharpsl_charger_machinfo spitz_pm_machinfo;
+diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+index c1048a3..ddf7a11 100644
+--- a/arch/arm/mach-pxa/spitz.c
++++ b/arch/arm/mach-pxa/spitz.c
+@@ -242,9 +242,6 @@ static struct scoop_pcmcia_config spitz_pcmcia_config = {
+ 	.power_ctrl   = spitz_pcmcia_pwr,
+ };
+ 
+-EXPORT_SYMBOL(spitzscoop_device);
+-EXPORT_SYMBOL(spitzscoop2_device);
+-
+ /*
+  * Spitz Keyboard Device
+  */
 -- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+1.7.1
