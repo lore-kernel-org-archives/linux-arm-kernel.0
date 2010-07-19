@@ -1,54 +1,151 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 18 Jul 2010 23:20:57 -0600
-Subject: [RFC PATCH] Kconfig: Enable Kconfig fragments to be used for
-	defconfig
-In-Reply-To: <20100716234918.GA31060@shareable.org>
-References: <20100713230352.6781.18644.stgit@angua>
-	<1279062881.4609.34.camel@c-dwalke-linux.qualcomm.com>
-	<AANLkTin69tN3NQHD2wvkA0G-lj3f9tSZEnhzdyJdTh9m@mail.gmail.com>
-	<1279064008.4609.48.camel@c-dwalke-linux.qualcomm.com>
-	<alpine.LFD.2.00.1007131941140.10598@xanadu.home>
-	<1279124563.21162.14.camel@c-dwalke-linux.qualcomm.com>
-	<20100716234918.GA31060@shareable.org>
-Message-ID: <AANLkTilqZKk_tzGTLqhD7bNVGX_avXwy7_fXvoR96qNL@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 19 Jul 2010 14:24:24 +0900
+Subject: [PATCH v2] ARM: S5P: Add PMU device
+In-Reply-To: <1279157494-22329-1-git-send-email-jy0922.shim@samsung.com>
+References: <1279157494-22329-1-git-send-email-jy0922.shim@samsung.com>
+Message-ID: <002101cb2702$a9a12800$fce37800$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 16, 2010 at 5:49 PM, Jamie Lokier <jamie@shareable.org> wrote:
-> Daniel Walker wrote:
->> > But all the rest is arbitrary and could be part of common shared
->> > profiles or the like in defconfig format.
->>
->> I'm sure most people will want to have a config isolated to their
->> specific device. That to me seems reasonable because everyone wants the
->> smallest possible kernel they can get for their given device.
+Joonyoung Shim wrote:
+> 
+> This patch adds an initcall for the s5p platforms so that they register
+> their PMU IRQs with the PMU framework in the Kernel.
+> 
+> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5p6440/include/mach/irqs.h |    2 +-
+>  arch/arm/mach-s5p6442/include/mach/irqs.h |    2 +-
+>  arch/arm/mach-s5pc100/include/mach/irqs.h |    2 +-
+>  arch/arm/mach-s5pv210/include/mach/irqs.h |    2 +-
+>  arch/arm/plat-s5p/Makefile                |    1 +
+>  arch/arm/plat-s5p/dev-pmu.c               |   36
+> +++++++++++++++++++++++++++++
+>  6 files changed, 41 insertions(+), 4 deletions(-)
+>  create mode 100644 arch/arm/plat-s5p/dev-pmu.c
+> 
+> diff --git a/arch/arm/mach-s5p6440/include/mach/irqs.h b/arch/arm/mach-
+> s5p6440/include/mach/irqs.h
+> index 911854d..16a7612 100644
+> --- a/arch/arm/mach-s5p6440/include/mach/irqs.h
+> +++ b/arch/arm/mach-s5p6440/include/mach/irqs.h
+> @@ -51,7 +51,7 @@
+>  #define IRQ_DISPCON3		S5P_IRQ_VIC1(19)
+>  #define IRQ_FIMGVG		S5P_IRQ_VIC1(20)
+>  #define IRQ_EINT_GROUPS		S5P_IRQ_VIC1(21)
+> -#define IRQ_PMUIRQ		S5P_IRQ_VIC1(23)
+> +#define IRQ_PMU			S5P_IRQ_VIC1(23)
+>  #define IRQ_HSMMC0		S5P_IRQ_VIC1(24)
+>  #define IRQ_HSMMC1		S5P_IRQ_VIC1(25)
+>  #define IRQ_HSMMC2		IRQ_SPI1	/* shared with SPI1 */
+> diff --git a/arch/arm/mach-s5p6442/include/mach/irqs.h b/arch/arm/mach-
+> s5p6442/include/mach/irqs.h
+> index 02c2374..3fbc6c3 100644
+> --- a/arch/arm/mach-s5p6442/include/mach/irqs.h
+> +++ b/arch/arm/mach-s5p6442/include/mach/irqs.h
+> @@ -32,7 +32,7 @@
+>  #define IRQ_GPIOINT		S5P_IRQ_VIC0(30)
+> 
+>  /* VIC1 */
+> -#define IRQ_nPMUIRQ 		S5P_IRQ_VIC1(0)
+> +#define IRQ_PMU			S5P_IRQ_VIC1(0)
+>  #define IRQ_ONENAND 		S5P_IRQ_VIC1(7)
+>  #define IRQ_UART0 		S5P_IRQ_VIC1(10)
+>  #define IRQ_UART1 		S5P_IRQ_VIC1(11)
+> diff --git a/arch/arm/mach-s5pc100/include/mach/irqs.h b/arch/arm/mach-
+> s5pc100/include/mach/irqs.h
+> index 28aa551..59e90bf 100644
+> --- a/arch/arm/mach-s5pc100/include/mach/irqs.h
+> +++ b/arch/arm/mach-s5pc100/include/mach/irqs.h
+> @@ -29,7 +29,7 @@
+>  #define IRQ_GPIOINT		S5P_IRQ_VIC0(30)
+> 
+>  /* VIC1: ARM, power, memory, connectivity */
+> -#define IRQ_CORTEX0		S5P_IRQ_VIC1(0)
+> +#define IRQ_PMU			S5P_IRQ_VIC1(0)
+>  #define IRQ_CORTEX1		S5P_IRQ_VIC1(1)
+>  #define IRQ_CORTEX2		S5P_IRQ_VIC1(2)
+>  #define IRQ_CORTEX3		S5P_IRQ_VIC1(3)
+> diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-
+> s5pv210/include/mach/irqs.h
+> index 9689537..b55f9e0 100644
+> --- a/arch/arm/mach-s5pv210/include/mach/irqs.h
+> +++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
+> @@ -36,7 +36,7 @@
+> 
+>  /* VIC1: ARM, Power, Memory, Connectivity, Storage */
+> 
+> -#define IRQ_CORTEX0		S5P_IRQ_VIC1(0)
+> +#define IRQ_PMU			S5P_IRQ_VIC1(0)
+>  #define IRQ_CORTEX1		S5P_IRQ_VIC1(1)
+>  #define IRQ_CORTEX2		S5P_IRQ_VIC1(2)
+>  #define IRQ_CORTEX3		S5P_IRQ_VIC1(3)
+> diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
+> index 39c242b..7e34194 100644
+> --- a/arch/arm/plat-s5p/Makefile
+> +++ b/arch/arm/plat-s5p/Makefile
+> @@ -12,6 +12,7 @@ obj-				:=
+> 
+>  # Core files
+> 
+> +obj-y				+= dev-pmu.o
+>  obj-y				+= dev-uart.o
+>  obj-y				+= cpu.o
+>  obj-y				+= clock.o
+> diff --git a/arch/arm/plat-s5p/dev-pmu.c b/arch/arm/plat-s5p/dev-pmu.c
+> new file mode 100644
+> index 0000000..a08576d
+> --- /dev/null
+> +++ b/arch/arm/plat-s5p/dev-pmu.c
+> @@ -0,0 +1,36 @@
+> +/*
+> + * linux/arch/arm/plat-s5p/dev-pmu.c
+> + *
+> + * Copyright (C) 2010 Samsung Electronics Co.Ltd
+> + * Author: Joonyoung Shim <jy0922.shim@samsung.com>
+> + *
+> + *  This program is free software; you can redistribute  it and/or modify
+it
+> + *  under  the terms of  the GNU General  Public License as published by
+the
+> + *  Free Software Foundation;  either version 2 of the  License, or (at
+your
+> + *  option) any later version.
+> + *
+> + */
+> +
+> +#include <linux/platform_device.h>
+> +#include <asm/pmu.h>
+> +#include <mach/irqs.h>
+> +
+> +static struct resource s5p_pmu_resource = {
+> +	.start	= IRQ_PMU,
+> +	.end	= IRQ_PMU,
+> +	.flags	= IORESOURCE_IRQ,
+> +};
+> +
+> +struct platform_device s5p_device_pmu = {
+> +	.name		= "arm-pmu",
+> +	.id		= ARM_PMU_DEVICE_CPU,
+> +	.num_resources	= 1,
+> +	.resource	= &s5p_pmu_resource,
+> +};
+> +
+> +static int __init s5p_pmu_init(void)
+> +{
+> +	platform_device_register(&s5p_device_pmu);
+> +	return 0;
+> +}
+> +arch_initcall(s5p_pmu_init);
+> --
 
-Just to be clear (specifically for me as a maintainer) the purpose of
-defconfigs is not to provide the best optimized kernel configuration
-for each given board.  defconfigs are useful as a reasonable working
-starting point, and to provide build coverage testing.
+Ok..will apply.
 
-> Indeed, but people who want the smallest possible kernel for their
-> specific device _in a particular use context_ tend to want:
->
-> ?- To disable support for parts of the device they aren't using.
-> ? ?For example, an SoC with integrated ethernet that isn't actually
-> ? ?wired up on their board, or where they're using an external ethernet
-> ? ?chip instead for some reason.
->
-> ?- To choose what's modular and what isn't, even for integrated
-> ? ?parts. ?For example to control the bootup sequence, they might
-> ? ?want to delay integrated USB and IDE initialisation, which is done by
-> ? ?making those modular and loading them after bringing up a splash
-> ? ?screen earlier in the boot scripts.
->
-> So there is still a need to be able to override the drivers and
-> settings, but it's still incredibly useful to have defaults which
-> describe the SoC or board accurately.
+Thanks.
 
-Yes.  The defconfig is only a starting point.  Maintaining the actual
-config for the shipped kernel is the job of the distribution vendor
-and I have zero interest in maintaining those configurations in the
-kernel tree.
-
-g.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
