@@ -1,672 +1,433 @@
-From: singh.madhav@samsung.com (MADHAV SINGHCHAUHAN)
-Date: Mon, 19 Jul 2010 06:54:13 +0000 (GMT)
-Subject: [PATCH]HRT support in Samsung S5P Platform
-Message-ID: <13968563.679171279522453031.JavaMail.weblogic@epml17>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Mon, 19 Jul 2010 16:33:21 +0900
+Subject: [RFC PATCH] s5pv210: New samsung SoCs devices support
+Message-ID: <20100719073321.GA25399@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Madhav Singh <singh.madhav@samsung.com>
-Date: Mon, 19 Jul 2010 10:51:01 +0530
-Subject: [PATCH] HRT support in Samsung Tree
-This patch implements HRT support for Samsung plat-s5p.
-RTC has been used as CLOCKEVENT and SYSTIMER as CLOCKSOURCE.
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Signed-off-by: Madhav Chauhan <singh.madhav@samsung.com>
+Now only one samsung SoC and its devices are supported in mainline and
+can't support several SoCs simultaneously since each SoCs has different memory
+address and different number of IPs.
+e.g., some 64xx series has 2 I2Cs devices. C1xx series have three I2Cs and
+new SoC, S5PV310 has eight I2Cs.
+
+To address these issues. Each devices of SoC are registered at each devices tress (or list) and use it when probe time.
+
+Of course fundamentally we can't compile several SoCs simultaneously at current state. It's just preparation for supporting it
+
+Any comments are welcome.
+
+Thank you,
+Kyungmin Park
+
+Here's test codes and results.
+
+static struct samsung_device goni_samsung_devices[] = {
+        /* device, index */
+       S5PV210_DEVICE_ID(I2C, 0),
+       S5PV210_DEVICE_ID(I2C, 1),
+       S5PV210_DEVICE_ID(I2C, 2),
+};
+
+static void __init goni_machine_init(void)
+{
+       samsung_platform_add_devices(goni_samsung_devices,
+                                       ARRAY_SIZE(goni_samsung_devices));
+       platform_add_devices(goni_devices, ARRAY_SIZE(goni_devices));
+ }
+
+[    0.140000] samsung 0 device type 0, name s3c2440-i2c, id 2
+[    0.145000] samsung 0 device type 0, name s3c2440-i2c, id 1
+[    0.150000] samsung 0 device type 0, name s3c2440-i2c, id 0
+[    0.155000] S5PV210: Initializing architecture
+[    0.165000] bio: create slab <bio-0> at 0
+[    0.165000] s3c-i2c s3c2440-i2c.0: slave address 0x10
+[    0.170000] s3c-i2c s3c2440-i2c.0: bus frequency set to 378 KHz
+[    0.175000] s3c-i2c s3c2440-i2c.0: i2c-0: S3C I2C adapter
+[    0.185000] s3c-i2c s3c2440-i2c.1: slave address 0x10
+[    0.190000] s3c-i2c s3c2440-i2c.1: bus frequency set to 378 KHz
+[    0.195000] s3c-i2c s3c2440-i2c.1: i2c-1: S3C I2C adapter
+[    0.200000] s3c-i2c s3c2440-i2c.2: slave address 0x10
+[    0.205000] s3c-i2c s3c2440-i2c.2: bus frequency set to 378 KHz
+[    0.210000] s3c-i2c s3c2440-i2c.2: i2c-2: S3C I2C adapter
+
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s5pv210/Kconfig                   |    9 +
- arch/arm/mach-s5pv210/include/mach/map.h        |    4 +
- arch/arm/plat-s5p/clock.c                       |   15 +
- arch/arm/plat-s5p/cpu.c                         |    8 +
- arch/arm/plat-s5p/hr-time-rtc.c                 |  470 +++++++++++++++++++++++
- arch/arm/plat-s5p/include/plat/regs-sys-timer.h |   63 +++
- arch/arm/plat-samsung/include/plat/map-base.h   |    2 +
- 7 files changed, 571 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-s5p/hr-time-rtc.c
- create mode 100644 arch/arm/plat-s5p/include/plat/regs-sys-timer.h
+ mach-s5pv210/Makefile                      |    1
+ mach-s5pv210/devices.c                     |  144 +++++++++++++++++++++++++++++
+ mach-s5pv210/include/mach/irqs.h           |    5 -
+ plat-samsung/Makefile                      |    1
+ plat-samsung/devices.c                     |  102 ++++++++++++++++++++
+ plat-samsung/include/plat/samsung_device.h |   53 ++++++++++
+ 6 files changed, 305 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 631019a..9d8698e 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -101,4 +101,13 @@ config MACH_SMDKC110
- 	  Machine support for Samsung SMDKC110
- 	  S5PC110(MCP) is one of package option of S5PV210
+diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
+index 30be9a6..33ca7eb 100644
+--- a/arch/arm/mach-s5pv210/Makefile
++++ b/arch/arm/mach-s5pv210/Makefile
+@@ -24,6 +24,7 @@ obj-$(CONFIG_MACH_GONI)		+= mach-goni.o
  
-+config MACH_S5PV210_HRT
-+        bool "HRtimer and Dynamic Tick support"
-+        select GENERIC_TIME
-+        select GENERIC_CLOCKEVENTS
-+        select HIGH_RES_TIMERS
-+        default n
-+        help
-+          Support for HRtimer and Dynamic Tick system using RTC and SYSTEM timer
-+
- endif
-diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
-index 17687f0..fd8e504 100644
---- a/arch/arm/mach-s5pv210/include/mach/map.h
-+++ b/arch/arm/mach-s5pv210/include/mach/map.h
-@@ -42,6 +42,10 @@
- #define S5P_PA_TIMER		S5PV210_PA_TIMER
+ # device support
  
- #define S5PV210_PA_SYSTIMER	(0xE2600000)
-+/*For RTC*/
-+#define S5PC11X_PA_RTC		(0xE2800000)
-+#define S3C_PA_RTC		S5PC11X_PA_RTC
-+
- 
- #define S5PV210_PA_WATCHDOG	(0xE2700000)
- 
-diff --git a/arch/arm/plat-s5p/clock.c b/arch/arm/plat-s5p/clock.c
-index b5e2552..1e2a6f4 100644
---- a/arch/arm/plat-s5p/clock.c
-+++ b/arch/arm/plat-s5p/clock.c
-@@ -89,6 +89,19 @@ struct clk clk_arm = {
- 	.ctrlbit	= 0,
- };
- 
-+/*For HRT*/
-+struct clk clk_ext_xtal_rtc = {
-+	.name		= "XrtcXTI",
-+	.id		= -1,
-+	.rate           = 32768,
-+};
-+
-+struct clk clk_ext_xtal_usb = {
-+	.name		= "XusbXTI",
-+	.id		= -1,
-+	.rate		= 24000000,
-+};
-+
- /* Possible clock sources for APLL Mux */
- static struct clk *clk_src_apll_list[] = {
- 	[0] = &clk_fin_apll,
-@@ -149,6 +162,8 @@ static struct clk *s5p_clks[] __initdata = {
- 	&clk_arm,
- 	&clk_vpll,
- 	&clk_xusbxti,
-+	&clk_ext_xtal_usb,
-+	&clk_ext_xtal_rtc,
- };
- 
- void __init s5p_register_clocks(unsigned long xtal_freq)
-diff --git a/arch/arm/plat-s5p/cpu.c b/arch/arm/plat-s5p/cpu.c
-index 75cb8c3..83ae862 100644
---- a/arch/arm/plat-s5p/cpu.c
-+++ b/arch/arm/plat-s5p/cpu.c
-@@ -104,6 +104,14 @@ static struct map_desc s5p_iodesc[] __initdata = {
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE,
- 	},
-+#if defined(CONFIG_MACH_S5PV210_HRT)
-+	{
-+		.virtual        = (unsigned long)S3C_VA_RTC,
-+		.pfn            = __phys_to_pfn(S3C_PA_RTC),
-+		.length         = SZ_4K,
-+		.type           = MT_DEVICE,
-+	},
-+#endif
- };
- 
- /* read cpu identification code */
-diff --git a/arch/arm/plat-s5p/hr-time-rtc.c b/arch/arm/plat-s5p/hr-time-rtc.c
++obj-y				+= devices.o
+ obj-y				+= dev-audio.o
+ obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
+ obj-$(CONFIG_S5PC110_DEV_ONENAND) += dev-onenand.o
+diff --git a/arch/arm/mach-s5pv210/devices.c b/arch/arm/mach-s5pv210/devices.c
 new file mode 100644
-index 0000000..8decf4e
+index 0000000..baf6567
 --- /dev/null
-+++ b/arch/arm/plat-s5p/hr-time-rtc.c
-@@ -0,0 +1,470 @@
++++ b/arch/arm/mach-s5pv210/devices.c
+@@ -0,0 +1,144 @@
 +/*
-+ * linux/arch/arm/plat-s5p/hr-time-rtc.c
++ * arch/arm/mach-s5pv210/devices.c
 + *
-+ * S5PC11X Timers
++ *  Copyright 2010 Samsung Electronics
++ *  Kyungmin Park <kyungmin.park@samsung.com>
 + *
-+ * Copyright (c) 2006 Samsung Electronics
-+ * Copyright (c) 2010 Samsung Electronics Madhav Chauhan <singh.madhav@samsung.com>
-+ *
-+ *
-+ * S5PC11X (and compatible) HRT support using RTC and SYSTEM TIMER
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/delay.h>
-+#include <linux/interrupt.h>
-+#include <linux/sched.h>
-+#include <linux/spinlock.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/clocksource.h>
-+#include <linux/clockchips.h>
-+#include <linux/io.h>
-+#include <asm/system.h>
-+#include <mach/hardware.h>
-+#include <asm/irq.h>
-+#include <asm/mach/irq.h>
-+#include <asm/mach/time.h>
-+#include <asm/mach-types.h>
-+#include <mach/map.h>
-+#include <plat/regs-timer.h>
-+#include <plat/regs-rtc.h>
-+#include <plat/regs-sys-timer.h>
-+#include <mach/regs-irq.h>
-+#include <mach/tick.h>
-+#include <plat/clock.h>
-+#include <plat/cpu.h>
-+
-+/*For SCHED_CLOCK*/
-+static unsigned long long time_stamp;
-+static unsigned long long s5pc11x_sched_timer_overflows;
-+static unsigned long long old_overflows;
-+static cycle_t last_ticks;
-+
-+/* Sched timer interrupt is not processed right after
-+ * timer counter expired
-+ */
-+static unsigned int pending_irq;
-+
-+/* sched_timer_running
-+ * 0 : sched timer stopped or not initialized
-+ * 1 : sched timer started
-+ */
-+static unsigned int sched_timer_running;
-+
-+void __iomem *rtc_base =	S3C_VA_RTC;
-+static struct clk *clk_event;
-+static struct clk *clk_sched;
-+static int tick_timer_mode;	/* 0: oneshot, 1: autoreload */
-+
-+#define RTC_CLOCK		(32768)
-+#define RTC_DEFAULT_TICK	((RTC_CLOCK / HZ) - 1)
-+
-+/*
-+ * Helper functions
-+ * s5pc11x_systimer_read() : Read from System timer register
-+ * s5pc11x_systimer_write(): Write to System timer register
-+ *
-+ */
-+static unsigned int s5pc11x_systimer_read(unsigned int *reg_offset)
-+{
-+	return __raw_readl(reg_offset);
-+}
-+
-+static unsigned int s5pc11x_systimer_write(unsigned int *reg_offset,
-+					unsigned int value)
-+{
-+	unsigned int temp_regs;
-+
-+	__raw_writel(value, reg_offset);
-+
-+	if (reg_offset == S3C_SYSTIMER_TCON) {
-+		while (!(__raw_readl(S3C_SYSTIMER_INT_CSTAT) &
-+				S3C_SYSTIMER_INT_TCON));
-+		temp_regs = __raw_readl(S3C_SYSTIMER_INT_CSTAT);
-+		temp_regs |= S3C_SYSTIMER_INT_TCON;
-+		__raw_writel(temp_regs, S3C_SYSTIMER_INT_CSTAT);
-+
-+	} else if (reg_offset == S3C_SYSTIMER_ICNTB) {
-+		while (!(__raw_readl(S3C_SYSTIMER_INT_CSTAT) &
-+				S3C_SYSTIMER_INT_ICNTB));
-+		temp_regs = __raw_readl(S3C_SYSTIMER_INT_CSTAT);
-+		temp_regs |= S3C_SYSTIMER_INT_ICNTB;
-+		__raw_writel(temp_regs, S3C_SYSTIMER_INT_CSTAT);
-+
-+	} else if (reg_offset == S3C_SYSTIMER_TCNTB) {
-+		while (!(__raw_readl(S3C_SYSTIMER_INT_CSTAT) &
-+				S3C_SYSTIMER_INT_TCNTB));
-+		temp_regs = __raw_readl(S3C_SYSTIMER_INT_CSTAT);
-+		temp_regs |= S3C_SYSTIMER_INT_TCNTB;
-+		__raw_writel(temp_regs, S3C_SYSTIMER_INT_CSTAT);
-+	}
-+
-+	return 0;
-+}
-+
-+static void s5pc11x_rtc_set_tick(int enabled)
-+{
-+	unsigned int tmp;
-+
-+	tmp = __raw_readl(rtc_base + S3C2410_RTCCON) & ~S3C_RTCCON_TICEN;
-+	if (enabled)
-+		tmp |= S3C_RTCCON_TICEN;
-+	__raw_writel(tmp, rtc_base + S3C2410_RTCCON);
-+}
-+
-+static void s5pc11x_tick_timer_setup(void);
-+
-+static void s5pc11x_tick_timer_start(unsigned long load_val,
-+					int autoreset)
-+{
-+	unsigned int tmp;
-+
-+	tmp = __raw_readl(rtc_base + S3C2410_RTCCON) &
-+		~(S3C_RTCCON_TICEN | S3C2410_RTCCON_RTCEN);
-+	__raw_writel(tmp, rtc_base + S3C2410_RTCCON);
-+
-+	__raw_writel(load_val, rtc_base + S3C2410_TICNT);
-+
-+	tmp |= S3C_RTCCON_TICEN;
-+
-+	__raw_writel(tmp, rtc_base + S3C2410_RTCCON);
-+}
-+
-+static  void s5pc11x_tick_timer_stop(void)
-+{
-+	unsigned int tmp;
-+
-+	tmp = __raw_readl(rtc_base + S3C2410_RTCCON) &
-+		~(S3C_RTCCON_TICEN | S3C2410_RTCCON_RTCEN);
-+
-+	__raw_writel(tmp, rtc_base + S3C2410_RTCCON);
-+
-+}
-+
-+static void s5pc11x_sched_timer_start(unsigned long load_val,
-+					int autoreset)
-+{
-+	unsigned long tcon;
-+	unsigned long tcnt;
-+	unsigned long tcfg;
-+
-+	/* clock configuration setting and enable */
-+	struct clk *clk;
-+
-+	tcnt = TICK_MAX;  /* default value for tcnt */
-+
-+	/* initialize system timer clock */
-+	tcfg = s5pc11x_systimer_read(S3C_SYSTIMER_TCFG);
-+
-+	tcfg &= ~S3C_SYSTIMER_TCLK_MASK;
-+	tcfg |= S3C_SYSTIMER_TCLK_USB;
-+
-+	s5pc11x_systimer_write(S3C_SYSTIMER_TCFG, tcfg);
-+
-+	/* TCFG must not be changed at run-time.
-+	 * If you want to change TCFG, stop timer(TCON[0] = 0)
-+	 */
-+	s5pc11x_systimer_write(S3C_SYSTIMER_TCON, 0);
-+
-+	/* read the current timer configuration bits */
-+	tcon = s5pc11x_systimer_read(S3C_SYSTIMER_TCON);
-+	tcfg = s5pc11x_systimer_read(S3C_SYSTIMER_TCFG);
-+
-+	clk = clk_get(NULL, "systimer");
-+	if (IS_ERR(clk))
-+		panic("failed to get clock[%s] for system timer", "systimer");
-+
-+	clk_enable(clk);
-+
-+	clk_put(clk);
-+
-+	tcfg &= ~S3C_SYSTIMER_TCLK_MASK;
-+	tcfg |= S3C_SYSTIMER_TCLK_USB;
-+	tcfg &= ~S3C_SYSTIMER_PRESCALER_MASK;
-+
-+	/* check to see if timer is within 16bit range... */
-+	if (tcnt > TICK_MAX) {
-+		panic("setup_timer: cannot configure timer!");
-+		return;
-+	}
-+
-+	s5pc11x_systimer_write(S3C_SYSTIMER_TCFG, tcfg);
-+
-+	s5pc11x_systimer_write(S3C_SYSTIMER_TCNTB, tcnt);
-+
-+	/* set timer con */
-+	tcon =  S3C_SYSTIMER_INT_AUTO | S3C_SYSTIMER_START |
-+			S3C_SYSTIMER_AUTO_RELOAD;
-+	s5pc11x_systimer_write(S3C_SYSTIMER_TCON, tcon);
-+
-+	tcon |= S3C_SYSTIMER_INT_START;
-+	s5pc11x_systimer_write(S3C_SYSTIMER_TCON, tcon);
-+
-+	/* Interrupt Start and Enable */
-+	s5pc11x_systimer_write(S3C_SYSTIMER_INT_CSTAT,
-+				(S3C_SYSTIMER_INT_ICNTEIE |
-+					S3C_SYSTIMER_INT_EN));
-+	sched_timer_running = 1;
-+}
-+
-+/*
-+ * RTC tick : count down to zero, interrupt, reload
-+ */
-+static int s5pc11x_tick_set_next_event(unsigned long cycles,
-+				   struct clock_event_device *evt)
-+{
-+	if  (cycles == 0)	/* Should be larger than 0 */
-+		cycles = 1;
-+	s5pc11x_tick_timer_start(cycles, 0);
-+	return 0;
-+}
-+
-+static void s5pc11x_tick_set_mode(enum clock_event_mode mode,
-+			      struct clock_event_device *evt)
-+{
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		tick_timer_mode = 1;
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		s5pc11x_tick_timer_stop();
-+		tick_timer_mode = 0;
-+		break;
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+		/* Sched timer stopped */
-+		sched_timer_running = 0;
-+		/* Reset sched_clock variables after sleep/wakeup */
-+		last_ticks = 0;
-+		s5pc11x_sched_timer_overflows = 0;
-+		old_overflows = 0;
-+		pending_irq = 0;
-+		break;
-+	case CLOCK_EVT_MODE_RESUME:
-+		s5pc11x_tick_timer_setup();
-+		s5pc11x_sched_timer_start(~0, 1);
-+		break;
-+	}
-+}
-+
-+static struct clock_event_device clockevent_tick_timer = {
-+	.name		= "S5PC110 event timer",
-+	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.shift		= 32,
-+	.set_next_event	= s5pc11x_tick_set_next_event,
-+	.set_mode	= s5pc11x_tick_set_mode,
-+};
-+
-+irqreturn_t s5pc11x_tick_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = &clockevent_tick_timer;
-+
-+	__raw_writel(S3C_INTP_TIC, rtc_base + S3C_INTP);
-+	/* In case of oneshot mode */
-+	if (tick_timer_mode == 0)
-+		s5pc11x_tick_timer_stop();
-+
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction s5pc11x_tick_timer_irq = {
-+	.name		= "rtc-tick",
-+	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler	= s5pc11x_tick_timer_interrupt,
-+};
-+
-+static void  s5pc11x_init_dynamic_tick_timer(unsigned long rate)
-+{
-+	tick_timer_mode = 1;
-+
-+	s5pc11x_tick_timer_stop();
-+
-+	s5pc11x_tick_timer_start((rate / HZ) - 1, 1);
-+
-+	clockevent_tick_timer.mult = div_sc(rate, NSEC_PER_SEC,
-+					    clockevent_tick_timer.shift);
-+	clockevent_tick_timer.max_delta_ns =
-+		clockevent_delta2ns(-1, &clockevent_tick_timer);
-+	clockevent_tick_timer.min_delta_ns =
-+		clockevent_delta2ns(1, &clockevent_tick_timer);
-+
-+	clockevent_tick_timer.cpumask = cpumask_of(0);
-+	clockevents_register_device(&clockevent_tick_timer);
-+
-+	printk(KERN_INFO "mult[%u]\n", clockevent_tick_timer.mult);
-+	printk(KERN_INFO "max_delta_ns[%u]\n", clockevent_tick_timer.max_delta_ns);
-+	printk(KERN_INFO "min_delta_ns[%u]\n", clockevent_tick_timer.min_delta_ns);
-+	printk(KERN_INFO "rate[%lu]\n", rate);
-+	printk(KERN_INFO "HZ[%d]\n", HZ);
-+}
-+
-+
-+/*
-+ * ---------------------------------------------------------------------------
-+ * SYSTEM TIMER ... free running 32-bit clock source and scheduler clock
-+ * ---------------------------------------------------------------------------
-+ */
-+irqreturn_t s5pc11x_sched_timer_interrupt(int irq, void *dev_id)
-+{
-+	volatile unsigned int temp_cstat;
-+
-+	temp_cstat = s5pc11x_systimer_read(S3C_SYSTIMER_INT_CSTAT);
-+	temp_cstat |= S3C_SYSTIMER_INT_STATS;
-+
-+	s5pc11x_systimer_write(S3C_SYSTIMER_INT_CSTAT, temp_cstat);
-+
-+	if (unlikely(pending_irq))
-+		pending_irq = 0;
-+	else
-+		s5pc11x_sched_timer_overflows++;
-+
-+	return IRQ_HANDLED;
-+}
-+
-+struct irqaction s5pc11x_systimer_irq = {
-+	.name		= "System timer",
-+	.flags		= IRQF_DISABLED ,
-+	.handler	= s5pc11x_sched_timer_interrupt,
-+};
-+
-+
-+static cycle_t s5pc11x_sched_timer_read(void)
-+{
-+	return (cycle_t)~__raw_readl(S3C_SYSTIMER_TCNTO);
-+}
-+
-+struct clocksource clocksource_s5pc11x = {
-+	.name		= "clock_source_systimer",
-+	.rating		= 300,
-+	.read		= s5pc11x_sched_timer_read,
-+	.mask		= CLOCKSOURCE_MASK(32),
-+	.shift		= 20,
-+	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-+};
-+
-+static void s5pc11x_init_clocksource(unsigned long rate)
-+{
-+	static char err[] __initdata = KERN_ERR
-+			"%s: can't register clocksource!\n";
-+
-+	clocksource_s5pc11x.mult
-+		= clocksource_khz2mult(rate/1000, clocksource_s5pc11x.shift);
-+
-+
-+	s5pc11x_sched_timer_start(~0, 1);
-+
-+	if (clocksource_register(&clocksource_s5pc11x))
-+		printk(err, clocksource_s5pc11x.name);
-+}
-+
-+/*
-+ * Returns current time from boot in nsecs. It's OK for this to wrap
-+ * around for now, as it's just a relative time stamp.
-+ */
-+unsigned long long sched_clock(void)
-+{
-+	unsigned long irq_flags;
-+	cycle_t ticks, elapsed_ticks = 0;
-+	unsigned long long increment = 0;
-+	unsigned int overflow_cnt = 0;
-+
-+	local_irq_save(irq_flags);
-+
-+	if (likely(sched_timer_running)) {
-+		overflow_cnt = (s5pc11x_sched_timer_overflows - old_overflows);
-+
-+		ticks = s5pc11x_sched_timer_read();
-+
-+		if (overflow_cnt) {
-+			increment = (overflow_cnt - 1) *
-+					(clocksource_cyc2ns(clocksource_s5pc11x.mask,
-+					clocksource_s5pc11x.mult, clocksource_s5pc11x.shift));
-+			elapsed_ticks = (clocksource_s5pc11x.mask - last_ticks) + ticks;
-+		} else {
-+			if (unlikely(last_ticks > ticks)) {
-+				pending_irq = 1;
-+				elapsed_ticks = (clocksource_s5pc11x.mask - last_ticks) + ticks;
-+				s5pc11x_sched_timer_overflows++;
-+			} else {
-+				elapsed_ticks = (ticks - last_ticks);
-+			}
-+		}
-+
-+		time_stamp += (clocksource_cyc2ns(elapsed_ticks, clocksource_s5pc11x.mult, clocksource_s5pc11x.shift) + increment);
-+
-+		old_overflows = s5pc11x_sched_timer_overflows;
-+		last_ticks = ticks;
-+	}
-+	local_irq_restore(irq_flags);
-+
-+	return time_stamp;
-+}
-+
-+/*
-+ *  Event/Sched Timer initialization
-+ */
-+static void s5pc11x_timer_setup(void)
-+{
-+	unsigned long rate;
-+	/* Setup event timer using XrtcXTI */
-+	if (clk_event == NULL)
-+		clk_event = clk_get(NULL, "XrtcXTI");
-+	if (IS_ERR(clk_event))
-+		panic("failed to get clock for event timer");
-+	rate = clk_get_rate(clk_event);
-+	s5pc11x_init_dynamic_tick_timer(rate);
-+
-+	/* Setup sched-timer using XusbXTI */
-+	if (clk_sched == NULL)
-+		clk_sched = clk_get(NULL, "XusbXTI");
-+	if (IS_ERR(clk_sched))
-+		panic("failed to get clock for sched-timer");
-+	rate = clk_get_rate(clk_sched);
-+	s5pc11x_init_clocksource(rate);
-+}
-+
-+static void s5pc11x_tick_timer_setup(void)
-+{
-+	unsigned long rate;
-+
-+	rate = clk_get_rate(clk_event);
-+	s5pc11x_tick_timer_start((rate / HZ) - 1, 1);
-+}
-+
-+static void __init s5pc11x_timer_init(void)
-+{
-+	/* Initialize variables before starting each timers */
-+	last_ticks = 0;
-+	s5pc11x_sched_timer_overflows = 0;
-+	old_overflows = 0;
-+	time_stamp = 0;
-+	sched_timer_running = 0;
-+	pending_irq = 0;
-+	s5pc11x_timer_setup();
-+	setup_irq(IRQ_RTC_TIC, &s5pc11x_tick_timer_irq);
-+	setup_irq(IRQ_SYSTIMER, &s5pc11x_systimer_irq);
-+}
-+
-+
-+struct sys_timer s3c24xx_timer = {
-+	.init		= s5pc11x_timer_init,
-+};
-+
-diff --git a/arch/arm/plat-s5p/include/plat/regs-sys-timer.h b/arch/arm/plat-s5p/include/plat/regs-sys-timer.h
-new file mode 100644
-index 0000000..75e6267
---- /dev/null
-+++ b/arch/arm/plat-s5p/include/plat/regs-sys-timer.h
-@@ -0,0 +1,63 @@
-+/* arch/arm/plat-s5pc1xx/include/plat/regs-sys-timer.h
-+ *
-+ * Copyright (c) 2008 Samsung Electronics
++ * Sasmung S5PC110/S5PV210 devices definitions
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
-+ *
-+ * S5PC1XX System Timer configuration
-+*/
++ */
 +
-+#ifndef __ASM_ARCH_REGS_SYS_TIMER_H
-+#define __ASM_ARCH_REGS_SYS_TIMER_H
++#include <linux/platform_device.h>
++#include <linux/gpio.h>
++#include <linux/irq.h>
 +
-+#define S3C_SYSTIMERREG(x)		(S5P_VA_SYSTIMER + (x))
++#include <mach/map.h>
++#include <plat/gpio-cfg.h>
++#include <plat/samsung_device.h>
++#include <plat/iic.h>
 +
-+#define S3C_SYSTIMER_TCFG		S3C_SYSTIMERREG(0x00)
-+#define S3C_SYSTIMER_TCON		S3C_SYSTIMERREG(0x04)
-+#define S3C_SYSTIMER_TCNTB		S3C_SYSTIMERREG(0x08)
-+#define S3C_SYSTIMER_TCNTO		S3C_SYSTIMERREG(0x0c)
++static struct resource s5pv210_i2c0_resource[] = {
++	[0] = {
++		.start = S5PV210_PA_IIC0,
++		.end   = S5PV210_PA_IIC0 + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = S5PV210_IRQ_I2C0,
++		.end   = S5PV210_IRQ_I2C0,
++		.flags = IORESOURCE_IRQ,
++	},
++};
 +
-+#define S3C_SYSTIMER_TFCNTB		S3C_SYSTIMERREG(0x10)
-+#define S3C_SYSTIMER_ICNTB		S3C_SYSTIMERREG(0x18)
-+#define S3C_SYSTIMER_ICNTO		S3C_SYSTIMERREG(0x1c)
-+#define S3C_SYSTIMER_INT_CSTAT	S3C_SYSTIMERREG(0x20)
++static void s5pv210_i2c0_cfg_gpio(struct platform_device *dev)
++{
++	s3c_gpio_cfgpin(S5PV210_GPD1(0), S3C_GPIO_SFN(2));
++	s3c_gpio_setpull(S5PV210_GPD1(0), S3C_GPIO_PULL_UP);
++	s3c_gpio_cfgpin(S5PV210_GPD1(1), S3C_GPIO_SFN(2));
++	s3c_gpio_setpull(S5PV210_GPD1(1), S3C_GPIO_PULL_UP);
++}
 +
-+/* Value for TCFG */
-+#define S3C_SYSTIMER_TCLK_MASK		(3<<12)
-+#define S3C_SYSTIMER_TCLK_XXTI		(0<<12)
-+#define S3C_SYSTIMER_TCLK_RTC		(1<<12)
-+#define S3C_SYSTIMER_TCLK_USB		(2<<12)
-+#define S3C_SYSTIMER_TCLK_PCLK		(3<<12)
++static struct s3c2410_platform_i2c s5pv210_i2c0_data = {
++	.bus_num		= 0,
++	.slave_addr		= 0x10,
++	.frequency		= 400*1000,
++	.sda_delay		= 100,
++	.cfg_gpio		= s5pv210_i2c0_cfg_gpio,
++};
 +
-+#define S3C_SYSTIMER_DIV_MASK		(7<<8)
-+#define S3C_SYSTIMER_DIV_1		(0<<8)
-+#define S3C_SYSTIMER_DIV_2		(1<<8)
-+#define S3C_SYSTIMER_DIV_4		(2<<8)
-+#define S3C_SYSTIMER_DIV_8		(3<<8)
-+#define S3C_SYSTIMER_DIV_16		(4<<8)
++static struct platform_device s5pv210_i2c0_device = {
++	.name			= "s3c2440-i2c",
++	.id			= 0,
++	.dev			= {
++		.platform_data	= &s5pv210_i2c0_data,
++	},
++	.num_resources		= ARRAY_SIZE(s5pv210_i2c0_resource),
++	.resource		= s5pv210_i2c0_resource,
++};
 +
-+#define S3C_SYSTIMER_TARGET_HZ		200
-+#define S3C_SYSTIMER_PRESCALER		5
-+#define S3C_SYSTIMER_PRESCALER_MASK	(0x3f<<0)
++SAMSUNG_DEVICE_INIT(SAMSUNG_S5PV210, SAMSUNG_DEVICE_I2C, s5pv210_i2c0_device);
 +
-+/* value for TCON */
-+#define S3C_SYSTIMER_INT_AUTO		(1<<5)
-+#define S3C_SYSTIMER_INT_IMM		(1<<4)
-+#define S3C_SYSTIMER_INT_START		(1<<3)
-+#define S3C_SYSTIMER_AUTO_RELOAD	(1<<2)
-+#define S3C_SYSTIMER_IMM_UPDATE		(1<<1)
-+#define S3C_SYSTIMER_START		(1<<0)
++static struct resource s5pv210_i2c1_resource[] = {
++	[0] = {
++		.start = S5PV210_PA_IIC1,
++		.end   = S5PV210_PA_IIC1 + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = S5PV210_IRQ_I2C1,
++		.end   = S5PV210_IRQ_I2C1,
++		.flags = IORESOURCE_IRQ,
++	},
++};
 +
-+/* Value for INT_CSTAT */
-+#define S3C_SYSTIMER_INT_IWIE		(1<<9)
-+#define S3C_SYSTIMER_INT_TWIE		(1<<10)
-+#define S3C_SYSTIMER_INT_ICNTEIE	(1<<6)
-+#define S3C_SYSTIMER_INT_TCON		(1<<5)
-+#define S3C_SYSTIMER_INT_ICNTB		(1<<4)
-+#define S3C_SYSTIMER_INT_TCNTB		(1<<2)
-+#define S3C_SYSTIMER_INT_STATS		(1<<1)
-+#define S3C_SYSTIMER_INT_EN		(1<<0)
++static void s5pv210_i2c1_cfg_gpio(struct platform_device *dev)
++{
++	s3c_gpio_cfgpin(S5PV210_GPD1(2), S3C_GPIO_SFN(2));
++	s3c_gpio_setpull(S5PV210_GPD1(2), S3C_GPIO_PULL_UP);
++	s3c_gpio_cfgpin(S5PV210_GPD1(3), S3C_GPIO_SFN(2));
++	s3c_gpio_setpull(S5PV210_GPD1(3), S3C_GPIO_PULL_UP);
++}
 +
-+#endif /*  __ASM_ARCH_REGS_TIMER_H */
-diff --git a/arch/arm/plat-samsung/include/plat/map-base.h b/arch/arm/plat-samsung/include/plat/map-base.h
-index 250be31..ff766d9 100644
---- a/arch/arm/plat-samsung/include/plat/map-base.h
-+++ b/arch/arm/plat-samsung/include/plat/map-base.h
-@@ -36,6 +36,8 @@
- #define S3C_VA_TIMER	S3C_ADDR(0x00300000)	/* timer block */
- #define S3C_VA_WATCHDOG	S3C_ADDR(0x00400000)	/* watchdog */
- #define S3C_VA_UART	S3C_ADDR(0x01000000)	/* UART */
-+/*For RTC*/
-+#define S3C_VA_RTC	S3C_ADDR(0x00c00000)
++static struct s3c2410_platform_i2c s5pv210_i2c1_data = {
++	.bus_num		= 1,
++	.slave_addr		= 0x10,
++	.frequency		= 400*1000,
++	.sda_delay		= 100,
++	.cfg_gpio		= s5pv210_i2c1_cfg_gpio,
++};
++
++static struct platform_device s5pv210_i2c1_device = {
++	.name			= "s3c2440-i2c",
++	.id			= 1,
++	.dev			= {
++		.platform_data	= &s5pv210_i2c1_data,
++	},
++	.num_resources		= ARRAY_SIZE(s5pv210_i2c1_resource),
++	.resource		= s5pv210_i2c1_resource,
++};
++
++SAMSUNG_DEVICE_INIT(SAMSUNG_S5PV210, SAMSUNG_DEVICE_I2C, s5pv210_i2c1_device);
++
++static struct resource s5pv210_i2c2_resource[] = {
++	[0] = {
++		.start = S5PV210_PA_IIC2,
++		.end   = S5PV210_PA_IIC2 + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = S5PV210_IRQ_I2C2,
++		.end   = S5PV210_IRQ_I2C2,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static void s5pv210_i2c2_cfg_gpio(struct platform_device *dev)
++{
++	s3c_gpio_cfgpin(S5PV210_GPD1(4), S3C_GPIO_SFN(2));
++	s3c_gpio_setpull(S5PV210_GPD1(4), S3C_GPIO_PULL_UP);
++	s3c_gpio_cfgpin(S5PV210_GPD1(5), S3C_GPIO_SFN(2));
++	s3c_gpio_setpull(S5PV210_GPD1(5), S3C_GPIO_PULL_UP);
++}
++
++static struct s3c2410_platform_i2c s5pv210_i2c2_data = {
++	.bus_num		= 2,
++	.slave_addr		= 0x10,
++	.frequency		= 400*1000,
++	.sda_delay		= 100,
++	.cfg_gpio		= s5pv210_i2c2_cfg_gpio,
++};
++
++static struct platform_device s5pv210_i2c2_device = {
++	.name			= "s3c2440-i2c",
++	.id			= 2,
++	.dev			= {
++		.platform_data	= &s5pv210_i2c2_data,
++	},
++	.num_resources		= ARRAY_SIZE(s5pv210_i2c2_resource),
++	.resource		= s5pv210_i2c2_resource,
++};
++
++SAMSUNG_DEVICE_INIT(SAMSUNG_S5PV210, SAMSUNG_DEVICE_I2C, s5pv210_i2c2_device);
+diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-s5pv210/include/mach/irqs.h
+index 9689537..fe48c7f 100644
+--- a/arch/arm/mach-s5pv210/include/mach/irqs.h
++++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
+@@ -51,11 +51,13 @@
+ #define IRQ_UART2		S5P_IRQ_VIC1(12)
+ #define IRQ_UART3		S5P_IRQ_VIC1(13)
+ #define IRQ_IIC			S5P_IRQ_VIC1(14)
++#define S5PV210_IRQ_I2C0	S5P_IRQ_VIC1(14)
+ #define IRQ_SPI0		S5P_IRQ_VIC1(15)
+ #define IRQ_SPI1		S5P_IRQ_VIC1(16)
+ #define IRQ_SPI2		S5P_IRQ_VIC1(17)
+ #define IRQ_IRDA		S5P_IRQ_VIC1(18)
+-#define IRQ_CAN0		S5P_IRQ_VIC1(19)
++#define IRQ_IIC2		S5P_IRQ_VIC1(19)
++#define S5PV210_IRQ_I2C2	S5P_IRQ_VIC1(19)
+ #define IRQ_CAN1		S5P_IRQ_VIC1(20)
+ #define IRQ_HSIRX		S5P_IRQ_VIC1(21)
+ #define IRQ_HSITX		S5P_IRQ_VIC1(22)
+@@ -85,6 +87,7 @@
+ #define IRQ_MIXER		S5P_IRQ_VIC2(11)
+ #define IRQ_HDMI		S5P_IRQ_VIC2(12)
+ #define IRQ_IIC1		S5P_IRQ_VIC2(13)
++#define S5PV210_IRQ_I2C1	S5P_IRQ_VIC2(13)
+ #define IRQ_MFC			S5P_IRQ_VIC2(14)
+ #define IRQ_TVENC		S5P_IRQ_VIC2(15)
+ #define IRQ_I2S0		S5P_IRQ_VIC2(16)
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index b1d82cc..f2a91f3 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -30,6 +30,7 @@ obj-$(CONFIG_S3C_ADC)	+= adc.o
  
- /* This is used for the CPU specific mappings that may be needed, so that
-  * they do not need to directly used S3C_ADDR() and thus make it easier to
--- 
-1.6.0.4
+ # devices
+ 
++obj-y				+= devices.o
+ obj-$(CONFIG_S3C_DEV_HSMMC)	+= dev-hsmmc.o
+ obj-$(CONFIG_S3C_DEV_HSMMC1)	+= dev-hsmmc1.o
+ obj-$(CONFIG_S3C_DEV_HSMMC2)	+= dev-hsmmc2.o
+diff --git a/arch/arm/plat-samsung/devices.c b/arch/arm/plat-samsung/devices.c
+new file mode 100644
+index 0000000..0db6555
+--- /dev/null
++++ b/arch/arm/plat-samsung/devices.c
+@@ -0,0 +1,102 @@
++/*
++ * linux/arch/arm/plat-samsung/devices.c
++ *
++ *  Copyright 2010 Samsung Electronics
++ *
++ * Sasmung SoCs series device helper functions
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/kernel.h>
++#include <linux/slab.h>
++#include <linux/platform_device.h>
++#include <linux/list.h>
++
++#include <plat/samsung_device.h>
++
++static struct list_head samsung_devices_list[SAMSUNG_NUM_SOC];
++
++static struct samsung_device *samsung_find_device(struct samsung_device *sdev)
++{
++	struct samsung_device *sd;
++
++	list_for_each_entry(sd, &samsung_devices_list[sdev->soc], list) {
++		if (sd->type == sdev->type &&
++		    sd->pdev->id == sdev->id) {
++			return sd;
++		}
++	}
++
++	return NULL;
++}
++
++static void samsung_device_unregister(struct samsung_device *sdevs, int num)
++{
++	struct samsung_device *sd;
++	int i;
++
++	for (i = 0; i < num; i++) {
++		sd = samsung_find_device(&sdevs[i]);
++		if (!sd)
++			continue;
++
++		platform_device_unregister(sd->pdev);
++	}
++}
++
++int samsung_platform_add_devices(struct samsung_device *sdevs, int num)
++{
++	struct samsung_device *sd;
++	int i, ret = 0;
++
++	for (i = 0; i < num; i++) {
++		sd = samsung_find_device(&sdevs[i]);
++		if (!sd)
++			continue;
++
++		ret = platform_device_register(sd->pdev);
++		if (ret) {
++			samsung_device_unregister(sdevs, num);
++			break;
++		}
++	}
++
++	return ret;
++}
++EXPORT_SYMBOL(samsung_platform_add_devices);
++
++int samsung_device_register(enum samsung_soc soc,
++		enum samsung_device_type type, struct platform_device *pdev)
++{
++	struct samsung_device *sd;
++
++	sd = kzalloc(sizeof(struct samsung_device), GFP_KERNEL);
++	if (!sd)
++		return -ENOMEM;
++
++	printk(KERN_INFO "samsung %d device type %d, name %s, id %d\n",
++				soc, type, pdev->name, pdev->id);
++
++	INIT_LIST_HEAD(&sd->list);
++	sd->soc = soc;
++	sd->type = type;
++	sd->pdev = pdev;
++	list_add(&sd->list, &samsung_devices_list[soc]);
++
++	return 0;
++}
++EXPORT_SYMBOL(samsung_device_register);
++
++static int __init samsung_device_init(void)
++{
++	int i;
++
++	for (i = 0; i < SAMSUNG_NUM_SOC; i++)
++		INIT_LIST_HEAD(&samsung_devices_list[i]);
++	return 0;
++}
++
++pure_initcall(samsung_device_init);
+diff --git a/arch/arm/plat-samsung/include/plat/samsung_device.h b/arch/arm/plat-samsung/include/plat/samsung_device.h
+new file mode 100644
+index 0000000..8bb134a
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/plat/samsung_device.h
+@@ -0,0 +1,53 @@
++/*
++ * arch/arm/mach-s5pv210/devices.c
++ *
++ *  Copyright 2010 Samsung Electronics
++ *  Kyungmin Park <kyungmin.park@samsung.com>
++ *
++ * Sasmung SoCs series devices definitions
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __SAMSUNG_DEVICE_H
++#define __SAMSUNG_DEVICE_H
++
++#include <linux/init.h>
++
++enum samsung_soc {
++	SAMSUNG_S5PV210,
++	SAMSUNG_NUM_SOC,
++};
++
++enum samsung_device_type {
++	SAMSUNG_DEVICE_I2C,
++};
++
++struct samsung_device {
++	struct list_head		list;
++	enum samsung_soc		soc;
++	enum samsung_device_type	type;
++	int				id;
++	struct platform_device		*pdev;
++};
++
++extern int samsung_platform_add_devices(struct samsung_device *sdevs, int num);
++extern int samsung_device_register(enum samsung_soc soc,
++		enum samsung_device_type type, struct platform_device *pdev);
++
++#define SAMSUNG_DEVICE_ID(dev_soc, dev_type, dev_id)			\
++{	.soc = dev_soc, .type = SAMSUNG_DEVICE_##dev_type, .id = dev_id, }
++
++#define S5PV210_DEVICE_ID(dev_type, dev_id)				\
++	SAMSUNG_DEVICE_ID(SAMSUNG_S5PV210, dev_type, dev_id)
++
++#define SAMSUNG_DEVICE_INIT(soc, type, pdev)				\
++static int samsung_device_init_##pdev(void)				\
++{									\
++	return samsung_device_register(soc, type, &pdev);		\
++}									\
++core_initcall(samsung_device_init_##pdev)
++
++#endif
