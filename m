@@ -1,73 +1,70 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 19 Jul 2010 14:44:47 +0100
-Subject: [PATCH 9/9] ARM: Implement phys_mem_access_prot() to avoid
-	attributes aliasing
-In-Reply-To: <20100719133050.24290.70856.stgit@e102109-lin.cambridge.arm.com>
-References: <20100719133050.24290.70856.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100719134447.24290.48140.stgit@e102109-lin.cambridge.arm.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 19 Jul 2010 17:51:48 +0400
+Subject: [PATCH 4/5] ARMv6K and ARMv7 use fault statuses 3 and 6 as Access
+	Flag fault
+In-Reply-To: <20100719112012.GA12602@shutemov.name>
+References: <cover.1279529223.git.kirill@shutemov.name>
+	<bfd71c480c8d137cc4cc6261a42f514f9024ee53.1279529223.git.kirill@shutemov.name>
+	<4C4424D4.3000002@ru.mvista.com>
+	<20100719112012.GA12602@shutemov.name>
+Message-ID: <4C445874.40500@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv7 onwards requires that there are no aliases to the same physical
-location using different memory types (i.e. Normal vs Strongly Ordered).
-Access to SO mappings when the unaligned accesses are handled in
-hardware is also Unpredictable (pgprot_noncached() mappings in user
-space).
+Kirill A. Shutemov wrote:
 
-The /dev/mem driver requires uncached mappings with O_SYNC. The patch
-implements the phys_mem_access_prot() function which generates Strongly
-Ordered memory attributes if !pfn_valid() (independent of O_SYNC) and
-Normal Noncacheable (writecombine) if O_SYNC.
+>> Hello.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/include/asm/pgtable.h |    3 +++
- arch/arm/mm/mmu.c              |   14 ++++++++++++++
- 2 files changed, 17 insertions(+), 0 deletions(-)
+>> Kirill A. Shutsemov wrote:
 
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 42e694f..ea19775 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -337,6 +337,9 @@ static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
- #ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
- #define pgprot_dmacoherent(prot) \
- 	__pgprot_modify(prot, L_PTE_MT_MASK|L_PTE_EXEC, L_PTE_MT_BUFFERABLE)
-+#define __HAVE_PHYS_MEM_ACCESS_PROT
-+extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
-+				     unsigned long size, pgprot_t vma_prot);
- #else
- #define pgprot_dmacoherent(prot) \
- 	__pgprot_modify(prot, L_PTE_MT_MASK|L_PTE_EXEC, L_PTE_MT_UNCACHED)
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 499e22d..e107f1b 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -15,6 +15,7 @@
- #include <linux/mman.h>
- #include <linux/nodemask.h>
- #include <linux/sort.h>
-+#include <linux/fs.h>
- 
- #include <asm/cputype.h>
- #include <asm/mach-types.h>
-@@ -487,6 +488,19 @@ static void __init build_mem_type_table(void)
- 	}
- }
- 
-+#ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
-+pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
-+			      unsigned long size, pgprot_t vma_prot)
-+{
-+	if (!pfn_valid(pfn))
-+		return pgprot_noncached(vma_prot);
-+	else if (file->f_flags & O_SYNC)
-+		return pgprot_writecombine(vma_prot);
-+	return vma_prot;
-+}
-+EXPORT_SYMBOL(phys_mem_access_prot);
-+#endif
-+
- #define vectors_base()	(vectors_high() ? 0xffff0000 : 0)
- 
- static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>>> Statuses 3 (0b00011) and 6 (0x00110) of DFSR are Access Flags faults on
+>>> ARMv6K and ARMv7. Let's patch fsr_info[] at runtime if we are on ARMv7
+>>> or later.
+>>> Unfortunately, we don't have runtime check for 'K' extension, so we
+>>> can't check for it.
+>>> Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
+>> [...]
+>>> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+>>> index 77cfdbe..d073b64 100644
+>>> --- a/arch/arm/mm/alignment.c
+>>> +++ b/arch/arm/mm/alignment.c
+>>> @@ -926,8 +926,18 @@ static int __init alignment_init(void)
+>>>  
+>>>  	hook_fault_code(1, do_alignment, SIGBUS, BUS_ADRALN,
+>>>  			"alignment exception");
+>>> -	hook_fault_code(3, do_alignment, SIGBUS, BUS_ADRALN,
+>>> -			"alignment exception");
+>>> +
+>>> +	/*
+>>> +	 * ARMv6K and ARMv7 use fault status 3 (0b00011) as Access Flag section
+>>> +	 * fault, not as alignment error.
+>>> +	 *
+>>> +	 * TODO: handle ARMv6K properly. Runtime check for 'K' extension is
+>>> +	 * needed.
+>>> +	 */
+>>> +	if (cpu_architecture() <= CPU_ARCH_ARMv6) {
+>>> +		hook_fault_code(3, do_alignment, SIGBUS, BUS_ADRALN,
+>>> +				"alignment exception");
+>>> +	}
+
+>>     Curly braces not neeed here. I assume you haven't run your patch thru 
+>> scripts/checkpatch.pl?
+
+> total: 0 errors, 0 warnings, 37 lines checked
+
+    Strange, it used to warn about superfluous braces...
+
+> I'll remove it if you want. But I think it reasonable to leave braces in
+> cases like:
+
+> if (condition) {
+> 	do_this(a, very_long, list, of, parameters,
+> 		second, part, of, the, list);
+> }
+
+> What do you think?
+
+    I wouldn't use braces in this case. But it's up to you after all, if 
+checkpatch.pl is indifferent about them...
+
+WBR, Sergei
