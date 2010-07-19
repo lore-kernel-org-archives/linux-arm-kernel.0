@@ -1,1671 +1,1809 @@
 From: philippe.langlais@stericsson.com (Philippe Langlais)
-Date: Mon, 19 Jul 2010 11:24:53 +0200
-Subject: [PATCH 1/3] U6/U6715 ARM architecture files
+Date: Mon, 19 Jul 2010 11:24:55 +0200
+Subject: [PATCH 3/3] U6715 gpio platform driver This driver is U6XXX platform
+	generic
 In-Reply-To: <1279531495-16225-1-git-send-email-philippe.langlais@stericsson.com>
 References: <1279531495-16225-1-git-send-email-philippe.langlais@stericsson.com>
-Message-ID: <1279531495-16225-2-git-send-email-philippe.langlais@stericsson.com>
+Message-ID: <1279531495-16225-4-git-send-email-philippe.langlais@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Philippe Langlais <philippe.langlais@stericsson.com>
 ---
- arch/arm/Kconfig                               |   11 +
- arch/arm/Makefile                              |    2 +
- arch/arm/mach-u67xx/Kconfig                    |   12 +
- arch/arm/mach-u67xx/Makefile                   |   11 +
- arch/arm/mach-u67xx/Makefile.boot              |    4 +
- arch/arm/mach-u67xx/board_u67xx_wavex.c        |   47 +++
- arch/arm/mach-u67xx/devices.c                  |   28 ++
- arch/arm/plat-u6xxx/Kconfig                    |   22 ++
- arch/arm/plat-u6xxx/Makefile                   |    8 +
- arch/arm/plat-u6xxx/include/mach/cpu.h         |   36 ++
- arch/arm/plat-u6xxx/include/mach/debug-macro.S |   38 ++
- arch/arm/plat-u6xxx/include/mach/entry-macro.S |   32 ++
- arch/arm/plat-u6xxx/include/mach/hardware.h    |   41 +++
- arch/arm/plat-u6xxx/include/mach/io.h          |   30 ++
- arch/arm/plat-u6xxx/include/mach/irqs.h        |  102 ++++++
- arch/arm/plat-u6xxx/include/mach/memory.h      |   17 +
- arch/arm/plat-u6xxx/include/mach/regs-u6.h     |  121 +++++++
- arch/arm/plat-u6xxx/include/mach/system.h      |   42 +++
- arch/arm/plat-u6xxx/include/mach/timer.h       |   16 +
- arch/arm/plat-u6xxx/include/mach/timex.h       |   23 ++
- arch/arm/plat-u6xxx/include/mach/uncompress.h  |   47 +++
- arch/arm/plat-u6xxx/include/mach/vmalloc.h     |   10 +
- arch/arm/plat-u6xxx/io.c                       |   34 ++
- arch/arm/plat-u6xxx/irq.c                      |  254 ++++++++++++++
- arch/arm/plat-u6xxx/timer.c                    |  446 ++++++++++++++++++++++++
- 25 files changed, 1434 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-u67xx/Kconfig
- create mode 100644 arch/arm/mach-u67xx/Makefile
- create mode 100644 arch/arm/mach-u67xx/Makefile.boot
- create mode 100644 arch/arm/mach-u67xx/board_u67xx_wavex.c
- create mode 100644 arch/arm/mach-u67xx/devices.c
- create mode 100644 arch/arm/plat-u6xxx/Kconfig
- create mode 100644 arch/arm/plat-u6xxx/Makefile
- create mode 100644 arch/arm/plat-u6xxx/include/mach/cpu.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/debug-macro.S
- create mode 100644 arch/arm/plat-u6xxx/include/mach/entry-macro.S
- create mode 100644 arch/arm/plat-u6xxx/include/mach/hardware.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/io.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/irqs.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/memory.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/regs-u6.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/system.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/timer.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/timex.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/uncompress.h
- create mode 100644 arch/arm/plat-u6xxx/include/mach/vmalloc.h
- create mode 100644 arch/arm/plat-u6xxx/io.c
- create mode 100644 arch/arm/plat-u6xxx/irq.c
- create mode 100644 arch/arm/plat-u6xxx/timer.c
+ arch/arm/mach-u67xx/board_u67xx_wavex.c |  468 ++++++++++++++++++++++
+ arch/arm/mach-u67xx/devices.c           |   67 +++
+ arch/arm/plat-u6xxx/Makefile            |    2 +-
+ arch/arm/plat-u6xxx/gpio.c              |  665 +++++++++++++++++++++++++++++++
+ arch/arm/plat-u6xxx/include/mach/gpio.h |  391 ++++++++++++++++++
+ arch/arm/plat-u6xxx/include/mach/scon.h |  123 ++++++
+ 6 files changed, 1715 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/plat-u6xxx/gpio.c
+ create mode 100644 arch/arm/plat-u6xxx/include/mach/gpio.h
+ create mode 100644 arch/arm/plat-u6xxx/include/mach/scon.h
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index cf30fc9..1ae089c 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -739,6 +739,14 @@ config ARCH_U300
- 	help
- 	  Support for ST-Ericsson U300 series mobile platforms.
- 
-+config PLAT_U6XXX
-+	bool "ST-Ericsson U6XXX Series"
-+	select CPU_ARM926T
-+	select GENERIC_GPIO
-+	select ARCH_REQUIRE_GPIOLIB
-+	help
-+	  Support for ST-Ericsson's U6XXX architecture
-+
- config ARCH_U8500
- 	bool "ST-Ericsson U8500 Series"
- 	select CPU_V7
-@@ -910,6 +918,9 @@ source "arch/arm/mach-tegra/Kconfig"
- 
- source "arch/arm/mach-u300/Kconfig"
- 
-+source "arch/arm/plat-u6xxx/Kconfig"
-+source "arch/arm/mach-u67xx/Kconfig"
-+
- source "arch/arm/mach-ux500/Kconfig"
- 
- source "arch/arm/mach-versatile/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 2de67c9..c510a64 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -176,6 +176,7 @@ machine-$(CONFIG_ARCH_STMP378X)		:= stmp378x
- machine-$(CONFIG_ARCH_STMP37XX)		:= stmp37xx
- machine-$(CONFIG_ARCH_TEGRA)		:= tegra
- machine-$(CONFIG_ARCH_U300)		:= u300
-+machine-$(CONFIG_ARCH_U67XX)		:= u67xx
- machine-$(CONFIG_ARCH_U8500)		:= ux500
- machine-$(CONFIG_ARCH_VERSATILE)	:= versatile
- machine-$(CONFIG_ARCH_VEXPRESS)		:= vexpress
-@@ -200,6 +201,7 @@ plat-$(CONFIG_PLAT_PXA)		:= pxa
- plat-$(CONFIG_PLAT_S3C24XX)	:= s3c24xx samsung
- plat-$(CONFIG_PLAT_S5P)		:= s5p samsung
- plat-$(CONFIG_PLAT_SPEAR)	:= spear
-+plat-$(CONFIG_PLAT_U6XXX)	:= u6xxx
- plat-$(CONFIG_PLAT_VERSATILE)	:= versatile
- 
- ifeq ($(CONFIG_ARCH_EBSA110),y)
-diff --git a/arch/arm/mach-u67xx/Kconfig b/arch/arm/mach-u67xx/Kconfig
-new file mode 100644
-index 0000000..f02f6e2
---- /dev/null
-+++ b/arch/arm/mach-u67xx/Kconfig
-@@ -0,0 +1,12 @@
-+comment "U67XX Board Type"
-+	depends on ARCH_U67XX
-+
-+choice
-+	depends on ARCH_U67XX
-+	prompt "Choose the U67XX Board type"
-+	default MACH_U67XX_WAVEC_2GB
-+	help
-+		Choose the ST-Ericsson Reference Design Board
-+config MACH_U67XX_WAVEC_2GB
-+	bool "U67XX WaveC Board with 2Gb Micron combo"
-+endchoice
-diff --git a/arch/arm/mach-u67xx/Makefile b/arch/arm/mach-u67xx/Makefile
-new file mode 100644
-index 0000000..38cf624
---- /dev/null
-+++ b/arch/arm/mach-u67xx/Makefile
-@@ -0,0 +1,11 @@
-+#
-+## Makefile for the linux kernel, hardware dependent part of ST-Ericsson U67xx
-+#
-+#
-+## Object file lists.
-+
-+# Common support
-+obj-y			:= devices.o
-+
-+# Specific board support
-+obj-$(CONFIG_MACH_U67XX_WAVEC_2GB) += board_u67xx_wavex.o
-diff --git a/arch/arm/mach-u67xx/Makefile.boot b/arch/arm/mach-u67xx/Makefile.boot
-new file mode 100644
-index 0000000..c4e8c02
---- /dev/null
-+++ b/arch/arm/mach-u67xx/Makefile.boot
-@@ -0,0 +1,4 @@
-+   zreladdr-y		:= 0x20008000
-+params_phys-y		:= 0x20000100
-+initrd_phys-y		:= 0x26000000
-+
 diff --git a/arch/arm/mach-u67xx/board_u67xx_wavex.c b/arch/arm/mach-u67xx/board_u67xx_wavex.c
-new file mode 100644
-index 0000000..633989f
---- /dev/null
+index 633989f..c54a79b 100644
+--- a/arch/arm/mach-u67xx/board_u67xx_wavex.c
 +++ b/arch/arm/mach-u67xx/board_u67xx_wavex.c
-@@ -0,0 +1,47 @@
-+/*
-+ * linux/arch/arm/mach-u67xx/board_u67xx_wavex.c
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ *
-+ * Platform machine definition for U6XXX WAVEx Board.
+@@ -14,6 +14,7 @@
+ #include <linux/sched.h>
+ #include <linux/interrupt.h>
+ #include <linux/init.h>
++#include <linux/gpio.h>
+ #include <linux/platform_device.h>
+ 
+ #include <asm/setup.h>
+@@ -23,6 +24,472 @@
+ #include <mach/hardware.h>
+ #include <mach/irqs.h>
+ #include <mach/timer.h>
++#include <mach/scon.h>
++
++/**
++ * SCON initial settings
++ * Allows to define the PIN multiplexing for all the platform (Linux and Modem)
 + */
-+
-+#include <linux/kernel.h>
-+#include <linux/ioport.h>
-+#include <linux/types.h>
-+#include <linux/sched.h>
-+#include <linux/interrupt.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+
-+#include <asm/setup.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+
-+#include <mach/hardware.h>
-+#include <mach/irqs.h>
-+#include <mach/timer.h>
-+
-+/* List of board specific devices */
-+static struct platform_device *devices[] __initdata = {
-+};
-+
-+void __init u67xx_init(void)
-+{
-+	/* Add specific board devices */
-+	platform_add_devices(devices, ARRAY_SIZE(devices));
-+}
-+
-+MACHINE_START(U6715, "STE_U67xx_refd")
-+	/* Maintainer: Philippe Langlais <philippe.langlais@stericsson.com> */
-+	.phys_io	= UART1_BASE,
-+	.io_pg_offst	= (IO_ADDRESS(UART1_BASE) >> 18) & 0xfffc,
-+	.boot_params	= PHYS_OFFSET + 0x100,
-+	.map_io		= u6xxx_map_io,
-+	.init_irq	= u6_init_irq,
-+	.init_machine	= u67xx_init,
-+	.timer		= &u6_timer,
-+MACHINE_END
-+
-diff --git a/arch/arm/mach-u67xx/devices.c b/arch/arm/mach-u67xx/devices.c
-new file mode 100644
-index 0000000..1d00b35
---- /dev/null
-+++ b/arch/arm/mach-u67xx/devices.c
-@@ -0,0 +1,28 @@
-+/*
-+ * linux/arch/arm/mach-u67xx/devices.c
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ *
-+ * Device specification for the U67XX
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/device.h>
-+#include <linux/platform_device.h>
-+
-+/* list of devices */
-+static struct platform_device *platform_devs[] __initdata = {
-+};
-+
-+/* register generic devices */
-+
-+static int __init u67xx_devices_init(void)
-+{
-+	platform_add_devices(platform_devs, ARRAY_SIZE(platform_devs));
-+	return 0;
-+}
-+
-+arch_initcall(u67xx_devices_init);
-diff --git a/arch/arm/plat-u6xxx/Kconfig b/arch/arm/plat-u6xxx/Kconfig
-new file mode 100644
-index 0000000..10929ea
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/Kconfig
-@@ -0,0 +1,22 @@
-+if PLAT_U6XXX
-+
-+menu "STE U6XXX Implementations"
-+
-+choice
-+	prompt "U67XX System Type"
-+	default ARCH_U67XX
-+
-+config ARCH_U67XX
-+	bool "U67XX"
-+	select GENERIC_TIME
-+	select GENERIC_CLOCKEVENTS
-+	select U6_MTU_TIMER
-+endchoice
-+
-+endmenu
-+
-+config U6_MTU_TIMER
-+	bool
-+	default y
-+
-+endif
-diff --git a/arch/arm/plat-u6xxx/Makefile b/arch/arm/plat-u6xxx/Makefile
-new file mode 100644
-index 0000000..12c832c
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/Makefile
-@@ -0,0 +1,8 @@
-+#
-+# Makefile for the linux kernel hardware independant part of STE U6XXX.
-+#
-+
-+# Common support
-+obj-y := io.o irq.o
-+
-+obj-$(CONFIG_U6_MTU_TIMER) += timer.o
-diff --git a/arch/arm/plat-u6xxx/include/mach/cpu.h b/arch/arm/plat-u6xxx/include/mach/cpu.h
-new file mode 100644
-index 0000000..7512ce6
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/cpu.h
-@@ -0,0 +1,36 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/cpu.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ * U6 cpu type detection
-+ */
-+
-+#ifndef __ASM_PLAT_CPU_H
-+#define __ASM_PLAT_CPU_H
-+
-+/*
-+ * Macros to group U6xxx into cpu classes.
-+ * These can be used in most places.
-+ * cpu_is_u67xx():	True for U67XX
-+ */
-+
-+#define GET_U6XXX_CLASS		((inl(SCON_SYSVER_REG)&0x0F00)>>8)
-+#define GET_U6XXX_SUBCLASS	((inl(SCON_SYSVER_REG)&0x0FF0)>>4)
-+
-+#define cpu_is_u67xx()		0
-+#define cpu_is_u67xx_v2()	0
-+#define cpu_is_u67xx_v3()	0
-+
-+#if defined(CONFIG_ARCH_U67XX)
-+#  undef cpu_is_u67xx
-+#  undef cpu_is_u67xx_v2
-+#  undef cpu_is_u67xx_v3
-+#  define cpu_is_u67xx()	(GET_U6XXX_CLASS == 0x6)
-+#  define cpu_is_u67xx_v2()	(GET_U6XXX_SUBCLASS == 0x62)
-+#  define cpu_is_u67xx_v3()	(GET_U6XXX_SUBCLASS == 0x63)
-+#endif
-+
-+#endif /* __ASM_PLAT_CPU_H */
-+
-diff --git a/arch/arm/plat-u6xxx/include/mach/debug-macro.S b/arch/arm/plat-u6xxx/include/mach/debug-macro.S
-new file mode 100644
-index 0000000..039c810
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/debug-macro.S
-@@ -0,0 +1,38 @@
-+/* linux/arch/arm/plat-u6xxx/include/mach/debug-macro.S
-+ *
-+ * Debugging macro include header
-+ *
-+ *  Copyright (C) 2010 ST-Ericsson
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+*/
-+
-+#include <mach/hardware.h>
-+
-+		.macro	addruart,rx
-+		mrc	p15, 0, \rx, c1, c0
-+		tst	\rx, #1                       @ MMU enabled?
-+		ldreq	\rx, = UART1_BASE             @ physical base address
-+		ldrne	\rx, = IO_ADDRESS(UART1_BASE) @ virtual base
-+		.endm
-+
-+		.macro	senduart,rd,rx
-+		strb	\rd, [\rx]
-+		.endm
-+
-+		.macro	waituart,rd,rx
-+1001:
-+		ldr	\rd, [\rx, #20]
-+		tst	\rd, #1 << 5	@ LSR_THRE - 0 when full
-+		beq	1001b
-+		.endm
-+
-+		.macro	busyuart,rd,rx
-+1001:
-+		ldr	\rd, [\rx, #20]
-+		tst	\rd, #1 << 6	@ LSR_TEMT - 0 when busy
-+		beq	1001b
-+		.endm
-diff --git a/arch/arm/plat-u6xxx/include/mach/entry-macro.S b/arch/arm/plat-u6xxx/include/mach/entry-macro.S
-new file mode 100644
-index 0000000..cae8824
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/entry-macro.S
-@@ -0,0 +1,32 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/entry-macro.S
-+ *
-+ * Low-level IRQ helper macros for U6-based platforms
-+ * Copyright (C) ST-Ericsson SA 2010
-+ *
-+ * This file is licensed under  the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+#include <mach/hardware.h>
-+#include <mach/irqs.h>
-+
-+	.macro  arch_ret_to_user, tmp1, tmp2
-+	.endm
-+
-+	.macro	disable_fiq
-+	.endm
-+
-+	.macro  get_irqnr_preamble, base, tmp
-+	ldr	\base, =IO_ADDRESS(INTC_BASE)
-+	.endm
-+
-+	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
-+	ldr	\irqnr, [\base, #INTC_VECTOR_IRQ_OFFSET] @ load intc vector reg
-+	mov	\irqnr, \irqnr, lsr #3              @ Bits[0..2] are reserved
-+	ands	\irqnr, \irqnr, #0x00FF             @ mask Bits[11..31]
-+	.endm
-+
-+	.macro	irq_prio_table
-+	.endm
-+
-diff --git a/arch/arm/plat-u6xxx/include/mach/hardware.h b/arch/arm/plat-u6xxx/include/mach/hardware.h
-new file mode 100644
-index 0000000..79199ec
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/hardware.h
-@@ -0,0 +1,41 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/hardware.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#ifndef __ASM_ARCH_HARDWARE_H
-+#define __ASM_ARCH_HARDWARE_H
-+
-+#include <asm/sizes.h>
-+#ifndef __ASSEMBLER__
-+#include <mach/cpu.h>
-+#endif
-+
-+/*
-+ * Processor specific registers defines
-+ */
-+#include "regs-u6.h"
-+
-+/*
-+ * Where in virtual memory the IO devices (timers, system controllers
-+ * and so on)
-+ */
-+
-+#define IO_BASE_VIRT            0xE8000000        /* VA of IO */
-+
-+/* macro to get at IO space when running virtually */
-+/* this version gives more IO address range to map*/
-+#define IO_ADDRESS(x)   ((x) - IO_BASE_PHYS + IO_BASE_VIRT)
-+
-+/* typesafe io address */
-+#define __io_address(n)		__io(IO_ADDRESS(n))
-+
-+/*
-+ * Board specific defines
-+ */
-+
-+#endif
-+
-diff --git a/arch/arm/plat-u6xxx/include/mach/io.h b/arch/arm/plat-u6xxx/include/mach/io.h
-new file mode 100644
-index 0000000..e8a93b4
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/io.h
-@@ -0,0 +1,30 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/io.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ *
-+ * Dummy IO map & IO definitions
-+ */
-+#ifndef __ASM_ARM_ARCH_IO_H
-+#define __ASM_ARM_ARCH_IO_H
-+
-+#define IO_SPACE_LIMIT 0xffffffff
-+
-+#define __io(a)       __typesafe_io(a)
-+#define __mem_pci(a)  (a)
-+
-+/*
-+ * I/O mapping
-+ */
-+#ifdef __ASSEMBLER__
-+#define IOMEM(x)		(x)
++struct u6_scon_config u6_scon_init_config[SCON_REGISTER_NB] = {
++ {
++	SCON_SYSMUX0_REG,
++	0 |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A0  & 0xF))) | /* FM IRQ */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_A1  & 0xF))) | /* UART 2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_A2  & 0xF))) | /* UART 2 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A3  & 0xF))) |
++	(GPIO_MODE_MUX3 << (2 * (GPIO_A4  & 0xF))) | /* SIMOFF_copy for modem */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A5  & 0xF))) | /* for AGPS */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A6  & 0xF))) | /* LCD backlight
++							-> ressource backligth*/
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A7  & 0xF))) | /* Bluetooth */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A8  & 0xF))) | /* Reserved for mode DPWS*/
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A9  & 0xF))) | /* Reserved for mode DPWS*/
++	(GPIO_MODE_MUX1 << (2 * (GPIO_A10 & 0xF))) | /* UART2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_A11 & 0xF))) | /* UART2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_A12 & 0xF))) | /* UART 1, configured
++							by boot, don't touch */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A13 & 0xF))) | /* free */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A14 & 0xF))) | /* PMU irq */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A15 & 0xF)))
++ },
++ {
++	SCON_SYSMUX1_REG,
++	0 |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A16 & 0xF))) | /* FCI data 3 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A17 & 0xF))) | /* free */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A18 & 0xF))) | /* FCI data 2 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A19 & 0xF))) | /* FCI data 1 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A20 & 0xF))) | /* Cam Ligth copy */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A21 & 0xF))) | /* RF on -> GPIO */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_A22 & 0xF))) | /* RF RF_DPN */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A23 & 0xF))) | /* RF reset -> GPIO */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A24 & 0xF))) | /* AGPS reset */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A25 & 0xF))) | /* AGPS wake up */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A26 & 0xF))) | /* free */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A27 & 0xF))) | /* SPI1 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A28 & 0xF))) | /* SPI1 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_A29 & 0xF))) | /* Audio IIS */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A30 & 0xF))) | /* AGPS pwr on */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_A31 & 0xF)))  /* free */
++ },
++ {
++	SCON_SYSMUX2_REG,
++	0 |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B0  & 0xF))) | /* RF DD */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B1  & 0xF))) | /* RF DU */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B2  & 0xF))) | /* RF FSC */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B3  & 0xF))) | /* RF DCL */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B4  & 0xF))) | /* UART RTS1 -> console */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B5  & 0xF))) | /* UART TXD1 -> console */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B6  & 0xF))) | /* NFI ready -> for NFI */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B7  & 0xF))) | /* VDE_EOFI -> VDE already
++						configured by splashscreen */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B8  & 0xF))) | /* RFEN0 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_B9  & 0xF))) | /* FCICMD -> for FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_B10 & 0xF))) | /* FCICLK -> for FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_B11 & 0xF))) | /* FCIDATA0 -> for FCI */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B12 & 0xF))) | /* RFSIG6 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B13 & 0xF))) | /* RFSIG7 */
++	(GPIO_MODE_MUX3 << (2 * (GPIO_B14 & 0xF))) |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_B15 & 0xF)))  /* RFDATA */
++ },
++ {
++	SCON_SYSMUX3_REG,
++	0
++ },
++ {
++	SCON_SYSMUX4_REG,
++	0 |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C0  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C1  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C2  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C3  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C4  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C5  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C6  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C7  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C8  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C9  & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C10 & 0xF))) | /* VDE */
++#ifdef CONFIG_EBI_BUS
++	(GPIO_MODE_MUX2 << (2 * (GPIO_C11 & 0xF))) | /* EBI_CS0 */
 +#else
-+#define IOMEM(x)		((void __force __iomem *)(x))
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C11 & 0xF))) | /* VDE */
 +#endif
-+#define U6_IO_ADDRESS(pa)	IOMEM(IO_ADDRESS(pa))
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C12 & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C13 & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C14 & 0xF))) | /* KCOL0 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C15 & 0xF)))  /* KCOL1 -> keypad */
 +
-+void u6xxx_map_io(void);
-+
-+#endif /* __ASM_ARM_ARCH_IO_H */
-diff --git a/arch/arm/plat-u6xxx/include/mach/irqs.h b/arch/arm/plat-u6xxx/include/mach/irqs.h
-new file mode 100644
-index 0000000..2943882
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/irqs.h
-@@ -0,0 +1,102 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/irqs.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#ifndef __ASM_PLAT_U6_IRQS_H
-+#define __ASM_PLAT_U6_IRQS_H
-+
-+#define IRQ_COUNT             65
-+
-+/* external IRQ definition EXTINT */
-+#define IRQ_EXTINT(num)       (IRQ_COUNT+(num))
-+#define EXTINT_NUM(irq)       ((irq)-IRQ_COUNT)
-+
-+#define NR_EXTINT             24
-+#define NR_IRQS	              (IRQ_COUNT+NR_EXTINT)
-+
-+#ifndef __ASSEMBLY__
-+extern unsigned char extint_to_gpio[NR_EXTINT];
-+
-+#define EXTINT_TO_GPIO(gpio_irq)    extint_to_gpio[gpio_irq-IRQ_COUNT]
-+
-+void /*__init */ u6_init_irq(void);
-+void u6_monitor_irq_enter(unsigned int irq);
-+void u6_monitor_irq_exit(unsigned int irq);
-+#endif /* __ASSEMBLY__ */
-+
-+/*
-+ * Interrupt numbers
-+ */
-+#define IRQ_GHOST                       0
-+#define IRQ_EXTINT1                     1
-+#define IRQ_EXTINT2                     2
-+#define IRQ_EXTINT3                     3
-+#define IRQ_RFRD                        4
-+#define IRQ_MMTU                        5
-+#define IRQ_IIS                         6
-+#define IRQ_USB                         7
-+#define IRQ_I2C2                        8
-+#define IRQ_TVO                         9
-+#define IRQ_3G_WUP                      10
-+#define IRQ_3G_CALINT                   11
-+#define IRQ_3G_FRAME_IT                 12
-+#define IRQ_GPADCINT                    13
-+#define IRQ_ARM9_COMMTX                 14
-+#define IRQ_ARM9_COMMRX                 15
-+#define IRQ_KBS                         16
-+#define IRQ_SCTU2                       17
-+#define IRQ_SCTU1                       18
-+#define IRQ_PIO1                        19
-+#define IRQ_PIO2                        20
-+#define IRQ_FINT0                       21
-+#define IRQ_FINT1                       22
-+#define IRQ_UART2                       23
-+#define IRQ_UART1                       24
-+#define IRQ_SPI2                        25
-+#define IRQ_SPI1                        26
-+#define IRQ_FCI                         27
-+#define IRQ_I2C1                        28
-+#define IRQ_DMAU                        29
-+#define IRQ_USIM                        30
-+#define IRQ_HSDPA                       31    /* reserved */
-+#define IRQ_MSI                         32
-+#define IRQ_JDI                         33
-+#define IRQ_JDU                         34
-+#define IRQ_NFI                         35
-+#define IRQ_IPP                         36
-+#define IRQ_VDC                         37
-+#define IRQ_VEC                         38
-+#define IRQ_VDE                         39
-+#define IRQ_CAM                         40
-+#define IRQ_ETB_ACQ                     41
-+#define IRQ_ETB_FULL                    42
-+#define IRQ_RESERVED43                  43
-+#define IRQ_RESERVED44                  44
-+#define IRQ_RESERVED45                  45    /* reserved */
-+#define IRQ_RESERVED46                  46
-+#define IRQ_RESERVED47                  47
-+#define IRQ_PDCU                        48
-+#define IRQ_MC2SC0                      49
-+#define IRQ_MC2SC1                      50
-+#define IRQ_MC2SC2                      51
-+#define IRQ_MC2SC3                      52
-+#define IRQ_MC2SC4                      53
-+#define IRQ_MC2SC5                      54
-+#define IRQ_MC2SC6                      55
-+#define IRQ_MC2SC7                      56
-+
-+/* INTC VECTOR_IRQ Register (32 bits) */
-+#define INTC_VECTOR_IRQ_OFFSET   0x100
-+
-+/* INTC REQUEST 64 Registers (32 bits) */
-+#define INTC_REQUEST1_OFFSET     0x404
-+#define INTC_REQUEST64_OFFSET    0x500
-+
-+/* interrupt x [1..64] request configuration */
-+#define INTC_REQUESTx(x)  U6_IO_ADDRESS(INTC_BASE+INTC_REQUEST1_OFFSET+(x-1)*4)
-+
-+#endif /* __ASM_PLAT_U6_IRQS_H */
-diff --git a/arch/arm/plat-u6xxx/include/mach/memory.h b/arch/arm/plat-u6xxx/include/mach/memory.h
-new file mode 100644
-index 0000000..71a5c60
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/memory.h
-@@ -0,0 +1,17 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/memory.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#ifndef __ASM_ARCH_MEMORY_H
-+#define __ASM_ARCH_MEMORY_H
-+
-+/*
-+ * Physical DRAM offset.
-+ */
-+#define PHYS_OFFSET		UL(0x20000000)
-+
-+#endif
-diff --git a/arch/arm/plat-u6xxx/include/mach/regs-u6.h b/arch/arm/plat-u6xxx/include/mach/regs-u6.h
-new file mode 100644
-index 0000000..aa2fbb0
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/regs-u6.h
-@@ -0,0 +1,121 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/regs-u6.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ * Basic register address definitions in physical memory
-+ */
-+
-+#if !defined(__REGS_U6_H__)
-+#define __REGS_U6_H__
-+
-+#define IO_BASE_PHYS              0xC1000000  /* phys base address of reg */
-+#define IO_SIZE                   0x03400000  /* How much */
-+
-+/*
-+ * System Controller Core devices base address table
-+ */
-+
-+/* DMA Controller */
-+#define DMAU_BASE                 (IO_BASE_PHYS + 0x0000000)
-+
-+/* Interrupt Controller */
-+#define INTC_BASE                 (IO_BASE_PHYS + 0x0100000)
-+
-+/* SDRam controller */
-+#define SDI_BASE                  (IO_BASE_PHYS + 0x0200000)
-+
-+/* Nand Flash Inteface controller */
-+#define NFI_BASE                  (IO_BASE_PHYS + 0x0300000)
-+
-+/* USB controller */
-+#define USB_BASE                  (IO_BASE_PHYS + 0x0400000)
-+
-+/* Video Display Engine */
-+#define VDE_BASE                  (IO_BASE_PHYS + 0x0500000)
-+
-+/* Video Decoder */
-+#define VDC_BASE                  (IO_BASE_PHYS + 0x1000000)
-+
-+/* Viedo Encoder */
-+#define VEC_BASE                  (IO_BASE_PHYS + 0x1100000)
-+
-+/* Texture Codec, MPEG4 encoder sub module */
-+#define TC_BASE                   (IO_BASE_PHYS + 0x1102000)
-+
-+/* Image Post-Processor */
-+#define IPP2_BASE                 (IO_BASE_PHYS + 0x1200000)
-+
-+/* JPEG Decoder Unit */
-+#define JDU_BASE                  (IO_BASE_PHYS + 0x1300000)
-+
-+/* TV output controller */
-+#define TVO_BASE                  (IO_BASE_PHYS + 0x1400000)
-+
-+/* Camera controller */
-+#define CAM_BASE                  (IO_BASE_PHYS + 0x1800000)
-+
-+/* External Bus Interfaces */
-+#define EBI_BASE                  (IO_BASE_PHYS + 0x2001000)
-+
-+/* SPI controllers */
-+#define SPI1_BASE                 (IO_BASE_PHYS + 0x2002000)
-+#define SPI2_BASE                 (IO_BASE_PHYS + 0x2003000)
-+
-+/* SD/MMC controller */
-+#define FCI_BASE                  (IO_BASE_PHYS + 0x2008000)
-+
-+/* Crypto Acceleration Engine */
-+#define CAE_BASE                  (IO_BASE_PHYS + 0x2009000)
-+
-+/* Multimedia Timer Unit, aka MTU in Datasheet */
-+#define MMTU_BASE                 (IO_BASE_PHYS + 0x2101000)
-+
-+/* System controller timer units */
-+#define SCTU1_BASE                (IO_BASE_PHYS + 0x2102000)
-+#define SCTU2_BASE                (IO_BASE_PHYS + 0x2103000)
-+
-+/* General Purpose I/O units */
-+#define GPIOA_BASE                (IO_BASE_PHYS + 0x2104000)
-+#define GPIOB_BASE                (IO_BASE_PHYS + 0x2104200)
-+#define GPIOC_BASE                (IO_BASE_PHYS + 0x2104400)
-+#define GPIOD_BASE                (IO_BASE_PHYS + 0x2104600)
-+#define GPIOE_BASE                (IO_BASE_PHYS + 0x2104800)
-+#define GPIOF_BASE                (IO_BASE_PHYS + 0x2104A00)
-+
-+/* External Interrupt controller */
-+#define EXTINT_BASE               (IO_BASE_PHYS + 0x2105000)
-+
-+/* Keyboard Scanner */
-+#define KBS_BASE                  (IO_BASE_PHYS + 0x2106000)
-+
-+/* Pulse Width Modulators */
-+#define PWM1_BASE                 (IO_BASE_PHYS + 0x2108000)
-+#define PWM2_BASE                 (IO_BASE_PHYS + 0x2109000)
-+#define PWM3_BASE                 (IO_BASE_PHYS + 0x210A000)
-+
-+/* I2C controllers */
-+#define I2C1_BASE                 (IO_BASE_PHYS + 0x210C000)
-+#define I2C2_BASE                 (IO_BASE_PHYS + 0x210D000)
-+
-+/* UARTs */
-+#define UART1_BASE                (IO_BASE_PHYS + 0x210E000)
-+#define UART2_BASE                (IO_BASE_PHYS + 0x210F000)
-+
-+/* Clock Generation Unit */
-+#define CGU_BASE                  (IO_BASE_PHYS + 0x2200000)
-+
-+/* Time base Unit */
-+#define TBU_BASE                  (IO_BASE_PHYS + 0x2201000)
-+
-+/* Power Down Control Unit */
-+#define PDCU_BASE                 (IO_BASE_PHYS + 0x2202000)
-+
-+/* Watchdog & Reset Unit */
-+#define WDRU_BASE                 (IO_BASE_PHYS + 0x2203000)
-+
-+/* System Configuration */
-+#define SCON_BASE                 (IO_BASE_PHYS + 0x2204000)
-+
-+#endif /* __REGS_U6_H__ */
-diff --git a/arch/arm/plat-u6xxx/include/mach/system.h b/arch/arm/plat-u6xxx/include/mach/system.h
-new file mode 100644
-index 0000000..8799e57
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/system.h
-@@ -0,0 +1,42 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/system.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#ifndef __ASM_ARCH_SYSTEM_H
-+#define __ASM_ARCH_SYSTEM_H
-+
-+#include <mach/hardware.h>
-+
-+/* Watchdog & Reset Unit TIMER Register (16 bits) */
-+#define WDRU_TIM_OFFSET                0x4
-+
-+static inline void arch_idle(void)
++ },
++ {
++	SCON_SYSMUX5_REG,
++	0 |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C16 & 0xF))) | /* KCOL2 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C17 & 0xF))) | /* KCOL3 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C18 & 0xF))) | /* KCOL4 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C19 & 0xF))) | /* KROW0 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C20 & 0xF))) | /* KROW1 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C21 & 0xF))) | /* KROW2 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C22 & 0xF))) | /* KROW3 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C23 & 0xF))) | /* KROW4 -> keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C24 & 0xF))) | /* RF3GSPIEN0 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C25 & 0xF))) | /* RF3GSPIDATA */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C26 & 0xF))) | /* RF3GSPICLK */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C27 & 0xF))) | /* RFSM_OUT0 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C28 & 0xF))) | /* RFSM_OUT1 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_C29 & 0xF))) | /* RFSM_OUT2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_C30 & 0xF))) | /* I2C -> ressource */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_C31 & 0xF)))  /* I2C -> ressource */
++ },
++ {
++	SCON_SYSMUX6_REG,
++	0 |
++	(GPIO_MODE_MUX1 << (2 * (GPIO_D0  & 0xF))) | /* CAM PWRDN1 -> CAM */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D1  & 0xF))) | /* CAM DATA 0 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D2  & 0xF))) | /* CAM DATA 1 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D3  & 0xF))) | /* CAM DATA 2 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D4  & 0xF))) | /* CAM DATA 3 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D5  & 0xF))) | /* CAM DATA 4 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D6  & 0xF))) | /* CAM DATA 5 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D7  & 0xF))) | /* CAM DATA 6 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D8  & 0xF))) | /* CAM DATA 7 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D9  & 0xF))) | /* CAM DATA 8 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D10 & 0xF))) | /* CAM DATA 9 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D11 & 0xF))) | /* CAMVS */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D12 & 0xF))) | /* CAMHS */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D13 & 0xF))) | /* CAMCLKI */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D14 & 0xF))) | /* CAMCLKO */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_D15 & 0xF)))  /* VDDC2EN */
++ },
++ {
++	SCON_SYSMUX7_REG,
++	0 |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D16 & 0xF))) | /* RF3GGPO9 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D17 & 0xF))) | /* RF3GGPO8 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_D18 & 0xF))) | /* FCI card detect, FCI */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_D19 & 0xF))) | /* CAM_Prelight copy, CAM*/
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D20 & 0xF))) | /* UART1 RXD1 -> Console */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D21 & 0xF))) | /* DIISWS */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D22 & 0xF))) | /* DIISSDO */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D23 & 0xF))) | /* DIISCK */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_D24 & 0xF))) | /* GPIOD24 ->FM Reset */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_D25 & 0xF))) | /* RFSIG3 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D26 & 0xF))) | /* RF3GGPO6 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D27 & 0xF))) | /* RF3GGPO7 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D28 & 0xF))) | /* RF3GGPO5 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_D29 & 0xF))) | /* GPIOD29 USB suspend */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D30 & 0xF))) | /* RF3GGPO4 */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_D31 & 0xF)))  /* RFCLK */
++ },
++#ifdef CONFIG_MACH_U67XX_V2_WAVEB_2GB
 +{
-+	/*
-+	 * This should do all the clock switching
-+	 * and wait for interrupt tricks
-+	 */
-+	cpu_do_idle();
-+}
-+
-+static inline void arch_reset(char mode, const char *cmd)
++	SCON_SYSMUX8_REG,
++	0 |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E0  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E1  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E2  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E3  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E4  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E5  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E6  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E7  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E8  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E9  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E10 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E11 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E12 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E13 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E14 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E15 & 0xF)))  /* DEBUG */
++ },
++ {
++	SCON_SYSMUX9_REG,
++	0 |
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E16 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E17 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E18 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E19 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E20 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E21 & 0xF))) | /* SDATO2 -> SPI2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E22 & 0xF))) | /* SDATIN2 -> SPI2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E23 & 0xF))) | /* SCLK2 -> SPI2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E24 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E25 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E26 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E27 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E28 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E29 & 0xF))) | /* FCI_copy
++							-> FCI USB suspend */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E30 & 0xF))) | /* RFSM_OUT3 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E31 & 0xF)))  /* GPIO CAM */
++ },
++#else
 +{
-+	unsigned long flags;
-+	/*
-+	 * To reset, we hit the on-board reset register
-+	 * in the system FPGA
-+	 */
-+	/* diasble HW interruption */
-+	raw_local_irq_save(flags);
-+	/* load watchdog with reset value */
-+	writel(0x5, IO_ADDRESS(WDRU_BASE + WDRU_TIM_OFFSET));
-+	/* wait for wachdog expiration */
-+	while (1)
-+		;
-+}
++	SCON_SYSMUX8_REG,
++	0 |
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E0  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E1  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E2  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E3  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E4  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E5  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E6  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E7  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E8  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E9  & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E10 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E11 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E12 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E13 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E14 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E15 & 0xF)))  /* DEBUG */
++ },
++ {
++	SCON_SYSMUX9_REG,
++	0 |
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E16 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E17 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E18 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E19 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX2 << (2 * (GPIO_E20 & 0xF))) | /* DEBUG */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E21 & 0xF))) | /* SDATO2 -> SPI2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E22 & 0xF))) | /* SDATIN2 -> SPI2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E23 & 0xF))) | /* SCLK2 -> SPI2 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E24 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E25 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E26 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E27 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E28 & 0xF))) | /* FCI_copy -> FCI */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E29 & 0xF))) | /* FCI_copy
++							-> FCI USB suspend */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_E30 & 0xF))) | /* RFSM_OUT3 */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_E31 & 0xF)))  /* GPIO CAM */
++ },
 +
 +#endif
-diff --git a/arch/arm/plat-u6xxx/include/mach/timer.h b/arch/arm/plat-u6xxx/include/mach/timer.h
-new file mode 100644
-index 0000000..614d6cf
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/timer.h
-@@ -0,0 +1,16 @@
-+/*
-+ *  linux/arch/arm/plat-u6xxx/include/mach/timer.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#ifndef __PLAT_TIMER_H
-+#define __PLAT_TIMER_H
-+
-+struct sys_timer;
-+
-+extern struct sys_timer u6_timer;
-+
++ {
++	SCON_SYSMUX10_REG,
++	0 |
++#ifdef CONFIG_EBI_BUS
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F0  & 0xF))) | /* EBI_IO0_copy */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F1  & 0xF))) | /* EBI_OE_RW_copy */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F2  & 0xF))) | /* EBI_WE_E_copy */
++#else
++	(GPIO_MODE_MUX1 << (2 * (GPIO_F0  & 0xF))) | /* CAM_PWR_REG -> CAM */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_F1  & 0xF))) | /* AGPS FRAME_SYNC, AGPS */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F2  & 0xF))) | /* free */
 +#endif
-diff --git a/arch/arm/plat-u6xxx/include/mach/timex.h b/arch/arm/plat-u6xxx/include/mach/timex.h
-new file mode 100644
-index 0000000..1e71241
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/timex.h
-@@ -0,0 +1,23 @@
-+/*
-+ *  linux/arch/arm/plat-u6xxx/include/mach/timex.h
-+ *
-+ *  Integrator architecture timex specifications
-+ *
-+ *  Copyright (C) 1999 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F3  & 0xF))) | /* KCOL5 -> Keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F4  & 0xF))) | /* KCOL6 -> Keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F5  & 0xF))) | /* KCOL7 -> Keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F6  & 0xF))) | /* KROW5 -> Keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F7  & 0xF))) | /* KROW6 -> Keypad */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F8  & 0xF))) | /* KROW7 -> Keypad */
++	(GPIO_MODE_MUX1 << (2 * (GPIO_F9  & 0xF))) | /* eMMC_PDn -> FCI */
++#ifdef CONFIG_EBI_BUS
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F10 & 0xF))) | /* VDE_CS0_copy */
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F11 & 0xF))) | /* EBI_IO1_copy */
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F12 & 0xF))) | /* EBI_IO2_copy */
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F13 & 0xF))) | /* EBI_IO3_copy */
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F14 & 0xF))) | /* EBI_IO4_copy */
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F15 & 0xF)))  /* EBI_IO5_copy */
++#else
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F10 & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F11 & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F12 & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F13 & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F14 & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F15 & 0xF)))  /* VDE */
++#endif
++ },
++ {
++	SCON_SYSMUX11_REG,
++	0 |
++#ifdef CONFIG_EBI_BUS
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F16 & 0xF))) | /* EBI_IO6_copy */
++	(GPIO_MODE_MUX3 << (2 * (GPIO_F17 & 0xF))) | /* EBI_IO7_copy */
++#else
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F16 & 0xF))) | /* VDE */
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F17 & 0xF))) | /* VDE */
++#endif
++	(GPIO_MODE_MUX0 << (2 * (GPIO_F18 & 0xF)))  /* NFI_CE_n -> NFI */
++ },
++ /* Configure PAD Value */
++ {
++	SCON_SYSPAD0_REG,
++	0 |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A0   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A1   & 0xF))) |
++	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A2   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A3   & 0xF))) |
++	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A4   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A5   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A6   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A7   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A8   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A9   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A10  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A11  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A12  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A13  & 0xF))) |
++	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A14  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A15  & 0xF)))
++ },
++ {
++	SCON_SYSPAD1_REG,
++	0 |
++	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A16  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A17  & 0xF))) |
++	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A18  & 0xF))) |
++	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_A19  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A20  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A21  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A22  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A23  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A24  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A25  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A26  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A27  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A28  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A29  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A30  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_A31  & 0xF)))
++ },
++ {
++	SCON_SYSPAD2_REG,
++	0 |
++	(SCON_PAD_PULL_DOWN   << (2 * (GPIO_B0   & 0xF))) |
++	(SCON_PAD_PULL_DOWN   << (2 * (GPIO_B1   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B2   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B3   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B4   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B5   & 0xF))) |
++	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_B6   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B7   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B8   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B9   & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B10  & 0xF))) |
++	(SCON_PAD_PLAIN_INPUT << (2 * (GPIO_B11  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B12  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B13  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B14  & 0xF))) |
++	(SCON_PAD_REPEATER    << (2 * (GPIO_B15  & 0xF)))
++ },
++};
 +
-+#define CLOCK_TICK_RATE		(50000000 / 16)
-diff --git a/arch/arm/plat-u6xxx/include/mach/uncompress.h b/arch/arm/plat-u6xxx/include/mach/uncompress.h
-new file mode 100644
-index 0000000..e37f0b4
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/uncompress.h
-@@ -0,0 +1,47 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/uncompress.h
-+ *
-+ * Copyright (C) 2010 ST-Ericsson SA
-+ * Copyright (C) 2003 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#include <linux/io.h>
-+#include "mach/hardware.h"
-+
-+/* UART THR Register (8 bits) */
-+#define UART1_THR_OFFSET      0x0
-+#define UART1_THR_REG         IO_ADDRESS(UART1_BASE + UART1_THR_OFFSET)
-+
-+/* UART LSR Register (8 bits) */
-+#define UART1_LSR_OFFSET      0x14
-+#define UART1_LSR_REG         IO_ADDRESS(UART1_BASE + UART1_LSR_OFFSET)
-+
-+static void putc(int c)
-+{
-+	while (!(readb(UART1_LSR_REG) & (1<<5)))
-+		barrier();
-+	writeb(c, UART1_THR_REG);
-+}
-+
-+static inline void flush(void)
-+{
-+}
-+
-+/* nothing to do */
-+#define arch_decomp_setup()
-+
-+#define arch_decomp_wdog()
-diff --git a/arch/arm/plat-u6xxx/include/mach/vmalloc.h b/arch/arm/plat-u6xxx/include/mach/vmalloc.h
-new file mode 100644
-index 0000000..cb89107
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/vmalloc.h
-@@ -0,0 +1,10 @@
-+/*
-+ * linux/arch/arm/plat-u6/include/mach/vmalloc.h
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ *
-+ * Virtual memory allocations
-+ * End must be above the I/O registers and on an even 2MiB boundary.
-+ */
-+#define VMALLOC_END       0xe8000000UL
-diff --git a/arch/arm/plat-u6xxx/io.c b/arch/arm/plat-u6xxx/io.c
-new file mode 100644
-index 0000000..01d447c
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/io.c
-@@ -0,0 +1,34 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/io.c
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#include <linux/sched.h>
-+#include <linux/mm.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+
-+#include <mach/hardware.h>
-+#include <asm/pgtable.h>
-+#include <asm/page.h>
-+
-+#include <asm/mach/map.h>
-+
-+
-+static struct map_desc u6xxx_io_desc[] __initdata = {
++/* GPIO def settings to avoid HW issue */
++struct u6_gpio_config u6_gpio_init_config[] = {
++	/* GPIO A bank */
 +	{
-+		.virtual  = IO_BASE_VIRT,	/* only peripherals */
-+		.pfn      = __phys_to_pfn(IO_BASE_PHYS),
-+		.length   = IO_SIZE,
-+		.type     = MT_DEVICE,
++		.gpio = GPIO_A5,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 1,
++	},
++	{
++		.gpio = GPIO_A6,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 1,
++	},
++	{
++		.gpio = GPIO_A7,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_A8,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 1,
++	},
++	{
++		.gpio = GPIO_A9,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 1,
++	},
++	{
++		.gpio = GPIO_A13,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_A17,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_A21,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_A23,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_A24,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 1,
++	},
++	{
++		.gpio = GPIO_A25,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_A30,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 0,
++	},
++	/* GPIO B bank */
++	/* GPIO C bank */
++	/* GPIO D bank */
++	{
++		.gpio = GPIO_D0,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_D24,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_D29,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 0,
++	},
++	/* GPIO E bank */
++	{
++		.gpio = GPIO_E31,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 0,
++	},
++	/* GPIO F bank */
++	{
++		.gpio = GPIO_F0,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_F1,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_F2,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 0,
++	},
++	{
++		.gpio = GPIO_F9,
++		.dir = GPIO_DIR_OUTPUT,
++		.value = 0,
 +	}
 +};
 +
-+void __init u6xxx_map_io(void)
-+{
-+    iotable_init(u6xxx_io_desc, ARRAY_SIZE(u6xxx_io_desc));
-+}
++u32 gpio_to_configure = ARRAY_SIZE(u6_gpio_init_config);
+ 
+ /* List of board specific devices */
+ static struct platform_device *devices[] __initdata = {
+@@ -30,6 +497,7 @@ static struct platform_device *devices[] __initdata = {
+ 
+ void __init u67xx_init(void)
+ {
++	u6_gpio_init();
+ 	/* Add specific board devices */
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ }
+diff --git a/arch/arm/mach-u67xx/devices.c b/arch/arm/mach-u67xx/devices.c
+index 1d00b35..f558fca 100644
+--- a/arch/arm/mach-u67xx/devices.c
++++ b/arch/arm/mach-u67xx/devices.c
+@@ -11,10 +11,77 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/device.h>
++#include <linux/ioport.h>
+ #include <linux/platform_device.h>
++#include <linux/fs.h>
++#include <linux/gpio.h>
++#include <mach/hardware.h>
++#include <mach/scon.h>
 +
-diff --git a/arch/arm/plat-u6xxx/irq.c b/arch/arm/plat-u6xxx/irq.c
++/* EXTINT to GPIO mapping */
++unsigned char extint_to_gpio[NR_EXTINT] = {
++	GPIO_A0,  /*extint 0 */
++	GPIO_A1,  /*extint 1 */
++	GPIO_A2,  /*extint 2 */
++	GPIO_A3,  /*extint 3 */
++	GPIO_A4,  /*extint 4 */
++	GPIO_A5,  /*extint 5 */
++	GPIO_A12, /*extint 6 */
++	GPIO_A13, /*extint 7 */
++	GPIO_A14, /*extint 8 */
++	GPIO_A15, /*extint 9 */
++	GPIO_A16, /*extint 10 */
++	GPIO_A17, /*extint 11 */
++	GPIO_D19, /*extint 12 */
++	GPIO_A19, /*extint 13 */
++	GPIO_A20, /*extint 14 */
++	GPIO_B11, /*extint 15 */
++	GPIO_E30, /*extint 16 */
++	GPIO_D15, /*extint 17 */
++	GPIO_D20, /*extint 18 */
++	GPIO_B9,  /*extint 19 */
++	GPIO_B7,  /*extint 20 */
++	GPIO_A25, /*extint 21 */
++	GPIO_D18, /*extint 22 */
++	GPIO_A6   /*extint 23 */
++};
++EXPORT_SYMBOL(extint_to_gpio);
++
++struct gpio_bank u6_gpio_bank[6] = {
++	{GPIOA_PINS_REG, SCON_SYSMUX0_REG},
++	{GPIOB_PINS_REG, SCON_SYSMUX2_REG},
++	{GPIOC_PINS_REG, SCON_SYSMUX4_REG},
++	{GPIOD_PINS_REG, SCON_SYSMUX6_REG},
++	{GPIOE_PINS_REG, SCON_SYSMUX8_REG},
++	{GPIOF_PINS_REG, SCON_SYSMUX10_REG},
++};
++
++static struct gpio_data u6_gpio_data = {
++	ARRAY_SIZE(u6_gpio_bank),	/* nb bank */
++	u6_gpio_bank
++};
++
++static struct resource u6_wavex_gpio_resources[] = {
++	[0] = {
++	       .start = GPIOA_BASE,	/* Physical address */
++	       .end = GPIOA_BASE + SZ_4K - 1,
++	       .flags = IORESOURCE_MEM,
++	       },
++};
++
++static struct platform_device u6_wavex_gpio_device = {
++	.name = "u6-gpio",
++	.id = -1,
++	.dev = {
++		.platform_data = &u6_gpio_data,
++		},
++	.num_resources = ARRAY_SIZE(u6_wavex_gpio_resources),
++	.resource = u6_wavex_gpio_resources,
++};
+ 
+ /* list of devices */
+ static struct platform_device *platform_devs[] __initdata = {
++	&u6_wavex_gpio_device,
+ };
+ 
+ /* register generic devices */
+diff --git a/arch/arm/plat-u6xxx/Makefile b/arch/arm/plat-u6xxx/Makefile
+index afdf82b..3d6898e 100644
+--- a/arch/arm/plat-u6xxx/Makefile
++++ b/arch/arm/plat-u6xxx/Makefile
+@@ -3,6 +3,6 @@
+ #
+ 
+ # Common support
+-obj-y := io.o irq.o clock.o
++obj-y := io.o irq.o clock.o gpio.o
+ 
+ obj-$(CONFIG_U6_MTU_TIMER) += timer.o
+diff --git a/arch/arm/plat-u6xxx/gpio.c b/arch/arm/plat-u6xxx/gpio.c
 new file mode 100644
-index 0000000..2ede5f0
+index 0000000..b064ee2
 --- /dev/null
-+++ b/arch/arm/plat-u6xxx/irq.c
-@@ -0,0 +1,254 @@
++++ b/arch/arm/plat-u6xxx/gpio.c
+@@ -0,0 +1,665 @@
 +/*
-+ *  linux/arch/arm/plat-u6xxx/irq.c
++ * linux/arch/arm/plat-u6xxx/gpio.c
 + *
 + * Copyright (C) ST-Ericsson SA 2010
 + * Author: Loic Pallardy <loic.pallardy@stericsson.com> for ST-Ericsson.
 + * License terms:  GNU General Public License (GPL), version 2
++ * Support functions for GPIO
 + */
 +
-+#include <linux/types.h>
-+#include <linux/kernel.h>
 +#include <linux/init.h>
-+#include <linux/clk.h>
-+#include <linux/device.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <asm/irq.h>
-+#include <mach/hardware.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/irq.h>
-+#include <mach/irqs.h>		/* U6 specific constants, types */
-+
-+/* INTC PRIOMASK_IRQ Register (32 bits) */
-+#define INTC_PRIOMASK_IRQ_OFFSET 0x0
-+#define INTC_PRIOMASK_IRQ_REG  IO_ADDRESS(INTC_BASE + INTC_PRIOMASK_IRQ_OFFSET)
-+
-+/* INTC PRIOMASK_FIQ Register (32 bits) */
-+#define INTC_PRIOMASK_FIQ_OFFSET 0x4
-+#define INTC_PRIOMASK_FIQ_REG  IO_ADDRESS(INTC_BASE + INTC_PRIOMASK_FIQ_OFFSET)
-+
-+/* INTC VECTOR_IRQ Register (32 bits) */
-+#define INTC_VECTOR_IRQ_REG      IO_ADDRESS(INTC_BASE + INTC_VECTOR_IRQ_OFFSET)
-+
-+/* INTC VECTOR_FIQ Register (32 bits) */
-+#define INTC_VECTOR_FIQ_OFFSET   0x104
-+#define INTC_VECTOR_FIQ_REG      IO_ADDRESS(INTC_BASE + INTC_VECTOR_FIQ_OFFSET)
-+
-+/* INTC PENDING_* Registers (32 bits) */
-+#define INTC_PENDING_1_OFFSET    0x200
-+#define INTC_PENDING_2_OFFSET    0x204
-+#define INTC_PENDING_3_OFFSET    0x208
-+#define INTC_FEATURES_OFFSET     0x300
-+
-+#define INTC_REQUESTx_PENDING_MASK       (1 << 31)
-+#define INTC_REQUESTx_SET_SWINT_MASK     (1 << 30)
-+#define INTC_REQUESTx_CLR_SWINT_MASK     (1 << 29)
-+#define INTC_REQUESTx_WE_PRIORITY_MASK   (1 << 28)
-+#define INTC_REQUESTx_WE_TARGET_MASK     (1 << 27)
-+#define INTC_REQUESTx_WE_ENABLE_MASK     (1 << 26)
-+#define INTC_REQUESTx_WE_ACTIVE_LOW_MASK (1 << 25)
-+#define INTC_REQUESTx_ACTIVE_LOW_MASK    (1 << 17)
-+#define INTC_REQUESTx_ENABLE_MASK        (1 << 16)
-+#define INTC_REQUESTx_TARGET_MASK        (1 <<  8)
-+
-+#define INTC_IID_USB_LP_INT 13
-+
-+static void u6_irq_mask(uint32_t irqno)
-+{
-+	if (irqno > 0 || irqno < IRQ_COUNT) {
-+		unsigned long flags;
-+		void __iomem *a;
-+		uint32_t v;
-+
-+		raw_local_irq_save(flags);
-+
-+		a = INTC_REQUESTx(irqno);
-+		v = readl(a);
-+		v &= ~INTC_REQUESTx_ENABLE_MASK;
-+		v |= INTC_REQUESTx_WE_ENABLE_MASK;
-+		v |= INTC_REQUESTx_CLR_SWINT_MASK;
-+		writel(v, a);
-+
-+		raw_local_irq_restore(flags);
-+	}
-+}
-+
-+static void u6_irq_unmask(uint32_t irqno)
-+{
-+	if (irqno > 0 || irqno < IRQ_COUNT) {
-+		unsigned long flags;
-+		void __iomem *a;
-+		uint32_t v;
-+
-+		raw_local_irq_save(flags);
-+
-+		a = INTC_REQUESTx(irqno);
-+		v = readl(a);
-+		v |= INTC_REQUESTx_ENABLE_MASK;
-+		v |= INTC_REQUESTx_WE_ENABLE_MASK;
-+		v |= INTC_REQUESTx_CLR_SWINT_MASK;
-+		writel(v, a);
-+
-+		raw_local_irq_restore(flags);
-+	}
-+}
-+
-+static int u6_irq_type(unsigned irqno, unsigned type)
-+{
-+	int l;
-+	void __iomem *reg = INTC_REQUESTx(irqno);
-+
-+	if (irqno > 0 || irqno < IRQ_COUNT) {
-+		if (type == IRQF_TRIGGER_LOW) {
-+			l = (INTC_REQUESTx_ACTIVE_LOW_MASK
-+			     | INTC_REQUESTx_WE_ACTIVE_LOW_MASK);
-+		} else if (type == IRQF_TRIGGER_HIGH) {
-+			l = (INTC_REQUESTx_WE_ACTIVE_LOW_MASK);
-+		} else {
-+			goto bad;
-+		}
-+
-+		writel(l, reg);
-+		return 0;
-+
-+	}
-+
-+bad:
-+	return -EINVAL;
-+}
-+
-+int u6_irq_enabled(uint32_t irqno)
-+{
-+	if (irqno > 0 || irqno < IRQ_COUNT) {
-+		void __iomem *a = INTC_REQUESTx(irqno);
-+		uint32_t v = readl(a);
-+
-+		return v & INTC_REQUESTx_ENABLE_MASK;
-+	} else
-+		return 0;
-+}
-+
-+static struct irq_chip u6_irq_chip = {
-+	.ack = u6_irq_mask,
-+	.mask = u6_irq_mask,	/* disable irqs */
-+	.unmask = u6_irq_unmask,	/* enable irqs */
-+	.set_type = u6_irq_type,
-+};
-+
-+
-+#if defined(CONFIG_ARCH_U67XX)
-+
-+static const uint32_t u6_irq_config[] = {
-+	0,			/* GHOST      0 */
-+	INTC_REQUESTx_ACTIVE_LOW_MASK,	/* EXTINT1    1 */
-+	INTC_REQUESTx_ACTIVE_LOW_MASK,	/* EXTINT2    2 */
-+	INTC_REQUESTx_ACTIVE_LOW_MASK,	/* EXTINT3    3 */
-+	0,			/* RFRD       4 */
-+	0,			/* MTU        5 */
-+	0,			/* IIS        6 */
-+	0,			/* USB        7 */
-+	INTC_REQUESTx_ACTIVE_LOW_MASK,	/* I2C2       8 */
-+	0,			/* TVO        9 */
-+	0,			/* 3G_WUP     10 */
-+	0,			/* 3G_CALINT  11 */
-+	0,			/* 3G_FRAME_IT 12 */
-+	0,			/* GPADCINT    13 */
-+	0,			/* ARM9_COMMTX 14 */
-+	0,			/* ARM9_COMMRX 15 */
-+	0,			/* KBS        16 */
-+	0,			/* SCTU2      17 */
-+	0,			/* SCTU1      18 */
-+	0,			/* PIO1       19 */
-+	0,			/* PIO2       20 */
-+	0,			/* FINT0      21 */
-+	0,			/* FINT1      22 */
-+	0,			/* UART2      23 */
-+	0,			/* UART1      24 */
-+	0,			/* SPI2       25 */
-+	0,			/* SPI1       26 */
-+	0,			/* FCI        27 */
-+	INTC_REQUESTx_ACTIVE_LOW_MASK,	/* I2C1       28 */
-+	0,			/* DMAU       29 */
-+	0,			/* USIM       30 */
-+	0,			/* RESERVED31 31 */
-+	INTC_REQUESTx_ACTIVE_LOW_MASK,	/* MSI        32 */
-+	0,			/* JDI        33 */
-+	0,			/* JDU        34 */
-+	0,			/* NFI        35 */
-+	0,			/* IPP        36 */
-+	0,			/* VDC        37 */
-+	0,			/* VEC        38 */
-+	0,			/* VDE        39 */
-+	INTC_REQUESTx_ACTIVE_LOW_MASK,	/* CAM        40 */
-+	0,			/* ETB_ACQ    41 */
-+	0,			/* ETB_FULL   42 */
-+	0,			/* DIGRF_TX   43 */
-+	0,			/* DIGRF_RX   44 */
-+	0,			/* RESERVED45 45 */
-+	0,			/* FIR_FI     46 */
-+	0,			/* FIR        47 */
-+	0,			/* PDCU       48 */
-+	0,			/* MC2SC0     49 */
-+	0,			/* MC2SC1     50 */
-+	0,			/* MC2SC2     51 */
-+	0,			/* MC2SC3     52 */
-+	0,			/* MC2SC4     53 */
-+	0,			/* MC2SC5     54 */
-+	0,			/* MC2SC6     55 */
-+	0,			/* MC2SC7     56 */
-+	0,			/* Reserved   57 */
-+	0,			/* Reserved   58 */
-+	0,			/* Reserved   59 */
-+	0,			/* Reserved   60 */
-+	0,			/* Reserved   61 */
-+	0,			/* Reserved   62 */
-+	0,			/* Reserved   63 */
-+	0,			/* Reserved   64 */
-+};
-+
-+#endif
-+
-+static const uint32_t u6_irq_irq_priority;
-+static const uint32_t u6_irq_fiq_priority;
-+
-+void __init u6_init_irq(void)
-+{
-+	unsigned int irqno;
-+
-+	/* Clock interrupt controller.
-+	 */
-+	struct clk *clk = clk_get(NULL, "INTC");
-+	clk_enable(clk);
-+	clk_put(clk);
-+
-+	/* The address of the vector table INTCdata.asm is assumed to be aligned
-+	 * to a 2KB boundary. Thus the register access value will be padded with
-+	 * zeroes, which is conforming to the 'READ_ONLY' attributes of the LS
-+	 * 11 bits. We are using the same table for both IRQ and FIQ.
-+	 */
-+	writel(0, INTC_VECTOR_FIQ_REG);	/* no vector IRQ */
-+	writel(0, INTC_VECTOR_IRQ_REG);	/* no vector FIQ */
-+
-+	writel(u6_irq_irq_priority, INTC_PRIOMASK_IRQ_REG);
-+	writel(u6_irq_fiq_priority, INTC_PRIOMASK_FIQ_REG);
-+
-+	/* Initialize the individual interrupt sources.
-+	 */
-+	for (irqno = 1; irqno < IRQ_COUNT; irqno += 1) {
-+		void __iomem *a = INTC_REQUESTx(irqno);
-+		uint32_t v = u6_irq_config[irqno];
-+
-+		v |= 4;
-+		v |= INTC_REQUESTx_WE_ACTIVE_LOW_MASK;
-+		v |= INTC_REQUESTx_WE_TARGET_MASK;
-+		v |= INTC_REQUESTx_WE_PRIORITY_MASK;
-+		v |= INTC_REQUESTx_WE_ENABLE_MASK;
-+		v |= INTC_REQUESTx_CLR_SWINT_MASK;
-+
-+		writel(v, a);
-+
-+		set_irq_chip(irqno, &u6_irq_chip);
-+		set_irq_handler(irqno, handle_level_irq);
-+		set_irq_flags(irqno, IRQF_VALID | IRQF_PROBE);
-+	}
-+}
-diff --git a/arch/arm/plat-u6xxx/timer.c b/arch/arm/plat-u6xxx/timer.c
-new file mode 100644
-index 0000000..2baa0ee
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/timer.c
-@@ -0,0 +1,446 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/timer.c
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Vincent Guittot <vincent.guittot@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#include <linux/types.h>
 +#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/sched.h>
++#include <linux/interrupt.h>
++#include <linux/ptrace.h>
++#include <linux/sysdev.h>
 +#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/interrupt.h>
 +#include <linux/clk.h>
-+#include <linux/clocksource.h>
-+#include <linux/clockchips.h>
++#include <linux/io.h>
++#include <linux/gpio.h>
 +
-+#include <asm/mach/time.h>
++#include <asm/irq.h>
 +#include <asm/mach/irq.h>
 +
 +#include <mach/hardware.h>
 +#include <mach/irqs.h>
-+#include <mach/clock.h>
++#include <mach/scon.h>
 +
-+/*** System timer variable ***/
-+struct sys_timer u6_timer;
++#define DRV_NAME "u6-gpio"
 +
-+/*** Module definition ***/
-+/*************************/
++/*
++ * PN5220 GPIO/MUX registers
++ * defined in asm/arch/registers.h
++ */
 +
-+#define MODULE_NAME "U6_TIMER"
-+#define PKMOD MODULE_NAME ": "
++#define U6_GPIO_PINS_OFFSET	0
++#define U6_GPIO_OUTPUT_OFFSET	4
++#define U6_GPIO_DIR_OFFSET	8
 +
-+/*#define DEBUG*/
-+#define U6_MMTU_CLOCK_SOURCE
++#define U6_MUX2_OFFSET		4
 +
-+/*** MMTU clock devices ***/
-+/*************************/
++static struct gpio_bank *gpio_bank_desc;
++static int gpio_bank_count;
 +
-+/*** MMTU HW ip register index definition ***/
-+#define MMTU_CON_IDX 0
-+#define MMTU_TCVAL_IDX 0x4
-+#define MMTU_PRESCALER_IDX 0x8
-+#define MMTU_MATCH_CON_IDX 0xC
-+#define MMTU_MATCH0_IDX 0x14
-+#define MMTU_MATCH1_IDX 0x18
++static inline struct gpio_bank *get_gpio_bank(int gpio)
++{
++	/* 32 GPIOs per bank */
++	return &(gpio_bank_desc[gpio >> 5]);
++}
 +
-+#define MMTU_INT_OFFSET 0xFD0
-+#define MMTU_MOD_CONF_IDX 0x4
-+#define MMTU_INT_CLR_ENA_IDX 0x8
-+#define MMTU_INT_SET_ENA_IDX 0xC
-+#define MMTU_INT_STATUS_IDX 0x10
-+#define MMTU_INT_ENABLE_IDX 0x14
-+#define MMTU_INT_CLR_STAT_IDX 0x18
-+#define MMTU_INT_SET_STAT_IDX 0x1C
++static inline int get_gpio_index(int gpio)
++{
++	return gpio & 0x1f;
++}
 +
-+#define MMTU_IRQ_MASK		0x1
-+#define MMTU_USED_MATCH_IDX	MMTU_MATCH0_IDX
++static int check_gpio(int gpio)
++{
++	int retval = ((unsigned int)gpio) < U6_GPIO_COUNT;
++	WARN(!retval, DRV_NAME": invalid GPIO %d\n", gpio);
++	return retval;
++}
 +
-+/* MMTU sys clock definition */
-+#define MMTU_SYS_FRQ 13000000
++static inline int gpio_is_requested(struct gpio_bank *bank, unsigned long mask)
++{
++	return bank->reserved_map & mask;
++}
 +
-+/*** MMTU Clock event device ***/
-+#define MMTU_ROOT_FRQ 8000
-+static int u6_mmtu_set_next_event(unsigned long cycles,
-+				struct clock_event_device *evt);
-+static void u6_mmtu_set_mode(enum clock_event_mode mode,
-+				struct clock_event_device *evt);
++static int check_gpio_requested(struct gpio_bank *bank, int index)
++{
++	int retval = gpio_is_requested(bank, 1 << index);
++	if (unlikely(!retval)) {
++		char c = 'A' + (bank - get_gpio_bank(0));
++		printk(KERN_ERR DRV_NAME": GPIO %c%d is not requested yet\n",
++		       c, index);
++		dump_stack();
++	}
++	return retval;
++}
 +
-+static struct clock_event_device clockevent_mmtu = {
-+	.name = "mmtu_timer",
-+	.rating = 360,
-+	.shift = 30,
-+	.features = CLOCK_EVT_FEAT_ONESHOT,
-+	.set_next_event = u6_mmtu_set_next_event,
-+	.set_mode = u6_mmtu_set_mode,
-+};
++static int check_gpio_unrequested(struct gpio_bank *bank, int index)
++{
++	int retval = !gpio_is_requested(bank, 1 << index);
++	if (unlikely(!retval)) {
++		char c = 'A' + (bank - get_gpio_bank(0));
++		printk(KERN_ERR DRV_NAME": GPIO %c%d is already requested\n",
++		       c, index);
++		dump_stack();
++	}
++	return retval;
++}
 +
-+/*** MMTU Clock source device ***/
-+#ifdef U6_MMTU_CLOCK_SOURCE
-+static cycle_t u6_mmtu_read(struct clocksource *);
++static int check_gpio_irq(int gpio_irq)
++{
++	int retval = ((unsigned int)gpio_irq) < NR_EXTINT;
++	if (unlikely(!retval)) {
++		printk(KERN_ERR DRV_NAME": invalid GPIO-IRQ %d\n", gpio_irq);
++		dump_stack();
++	}
++	return retval;
++}
 +
-+static struct clocksource clocksource_mmtu = {
-+	.name = "mmtu_timer",
-+	.rating = 360,
-+	.read = u6_mmtu_read,
-+	.mask = CLOCKSOURCE_MASK(32),
-+	.shift = 8,
-+	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
-+};
++static void _set_gpio_direction(struct gpio_bank *bank, int gpio, int is_input)
++{
++	void __iomem *reg = bank->gpio_base;
++	u32 l;
++
++	/* select direction register */
++	reg += U6_GPIO_DIR_OFFSET;
++
++	/* in register 0 = input, 1 = output */
++	l = readl(reg);
++	if (is_input)
++		l &= ~(1 << gpio);
++	else
++		l |= (1 << gpio);
++	writel(l, reg);
++}
++
++int u6_gpio_set_direction(int gpio, int is_input)
++{
++	unsigned long flags, index;
++	struct gpio_bank *bank;
++
++	if (!check_gpio(gpio))
++		return -EINVAL;
++
++	bank = get_gpio_bank(gpio);
++	index = get_gpio_index(gpio);
++	if (!check_gpio_requested(bank, index))
++		return -EINVAL;
++
++	spin_lock_irqsave(&bank->lock, flags);
++	_set_gpio_direction(bank, index, is_input);
++	spin_unlock_irqrestore(&bank->lock, flags);
++
++	return 0;
++}
++EXPORT_SYMBOL(u6_gpio_set_direction);
++
++static void _set_gpio_mode(struct gpio_bank *bank, int gpio, int mode)
++{
++	void __iomem *reg = bank->mux_base;
++	unsigned long l;
++
++	/* select direction register */
++	if (gpio >= 16) {
++		reg += U6_MUX2_OFFSET;
++		gpio -= 16;
++	}
++
++	/* apply mux mode */
++	/* width 2 bit */
++	l = readl(reg);
++	l &= ~(3 << (gpio * 2));
++	l |= (mode << (gpio * 2));
++	writel(l, reg);
++}
++
++int u6_gpio_set_mode(int gpio, int mode)
++{
++	struct gpio_bank *bank;
++	int index;
++
++	if (!check_gpio(gpio))
++		return -EINVAL;
++
++	bank = get_gpio_bank(gpio);
++	index = get_gpio_index(gpio);
++	if (!check_gpio_requested(bank, index))
++		return -EINVAL;
++
++	spin_lock(&bank->lock);
++	_set_gpio_mode(bank, get_gpio_index(gpio), mode);
++	spin_unlock(&bank->lock);
++
++	return 0;
++}
++EXPORT_SYMBOL(u6_gpio_set_mode);
++
++int u6_gpio_set_mode_gpio(int gpio)
++{
++	int muxmode = gpio >= GPIO_B0 ? GPIO_MODE_MUX1 : GPIO_MODE_MUX0;
++	return u6_gpio_set_mode(gpio, muxmode);
++}
++EXPORT_SYMBOL(u6_gpio_set_mode_gpio);
++
++static void _write_gpio_pin(struct gpio_bank *bank, int gpio, int gpio_value)
++{
++	void __iomem *reg = bank->gpio_base;
++	unsigned long l = 0;
++
++	reg += U6_GPIO_OUTPUT_OFFSET;
++	l = readl(reg);
++	if (gpio_value)
++		l |= 1 << gpio;
++	else
++		l &= ~(1 << gpio);
++	writel(l, reg);
++}
++
++static int u6_gpio_to_extint(int gpio)
++{
++	int extint_idx;
++
++	for (extint_idx = 0; extint_idx < NR_EXTINT; extint_idx++)
++		if (extint_to_gpio[extint_idx] == gpio)
++			return extint_idx;
++
++	return -1;
++}
++
++int u6_gpio_write_pin(int gpio, int gpio_value)
++{
++	struct gpio_bank *bank;
++	unsigned long index;
++
++	if (!check_gpio(gpio))
++		return -EINVAL;
++
++	bank = get_gpio_bank(gpio);
++	index = get_gpio_index(gpio);
++	if (!check_gpio_requested(bank, index))
++		return -EINVAL;
++
++	spin_lock(&bank->lock);
++	_write_gpio_pin(bank, index, gpio_value);
++	spin_unlock(&bank->lock);
++
++	return 0;
++}
++EXPORT_SYMBOL(u6_gpio_write_pin);
++
++int u6_gpio_read_pin(int gpio)
++{
++	struct gpio_bank *bank;
++	void __iomem *reg;
++	u32 l = 0;
++	int irq, index;
++
++	if (!check_gpio(gpio))
++		return -EINVAL;
++
++	bank = get_gpio_bank(gpio);
++	index = get_gpio_index(gpio);
++	if (!check_gpio_requested(bank, index))
++		return -EINVAL;
++
++	/* check if the GPIO is used as extint */
++	irq = u6_gpio_to_extint(gpio);
++	if (irq >= 0) {
++		/* and if it's an alternate internal signal */
++		/* (cf U67xx datasheet table 444) */
++		reg = EXTINT_CFGx(irq);
++		l = readl(reg);
++		if (l & EXTINT_SEL_ALTERNATE) {
++			reg = EXTINT_SIGNAL_REG;
++			return (readl(reg) & (1 << irq)) != 0;
++		}
++	}
++
++	reg = bank->gpio_base;
++	reg += U6_GPIO_PINS_OFFSET;
++	return (readl(reg) & (1 << index)) != 0;
++}
++EXPORT_SYMBOL(u6_gpio_read_pin);
++
++static int _u6_gpio_request(struct gpio_bank *bank, int index)
++{
++	int retval = 0;
++	unsigned long mask = 1 << index;
++	unsigned long flags;
++
++	spin_lock_irqsave(&bank->lock, flags);
++	if (unlikely(!check_gpio_unrequested(bank, index)))
++		retval = -EINVAL;
++	else
++		bank->reserved_map |= mask;
++	spin_unlock_irqrestore(&bank->lock, flags);
++
++	return retval;
++}
++
++static int u6_gpio_acquire(struct gpio_chip *chip, unsigned offset)
++{
++	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
++
++	return _u6_gpio_request(bank, offset);
++}
++
++int u6_gpio_request(int gpio)
++{
++	int index;
++	struct gpio_bank *bank;
++
++	if (!check_gpio(gpio))
++		return -EINVAL;
++
++	index = get_gpio_index(gpio);
++	bank = get_gpio_bank(gpio);
++
++	return _u6_gpio_request(bank, index);
++}
++EXPORT_SYMBOL(u6_gpio_request);
++
++static void _u6_gpio_free(struct gpio_bank *bank, int index)
++{
++	unsigned long mask = 1 << index;
++	unsigned long flags;
++
++	spin_lock_irqsave(&bank->lock, flags);
++	if (likely(check_gpio_requested(bank, index)))
++		bank->reserved_map &= ~mask;
++	spin_unlock_irqrestore(&bank->lock, flags);
++}
++
++static void u6_gpio_release(struct gpio_chip *chip, unsigned offset)
++{
++	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
++
++	return _u6_gpio_free(bank, offset);
++}
++
++void u6_gpio_free(int gpio)
++{
++	int index;
++	struct gpio_bank *bank;
++
++	if (!check_gpio(gpio))
++		return;
++
++	index = get_gpio_index(gpio);
++	bank = get_gpio_bank(gpio);
++	_u6_gpio_free(bank, index);
++}
++EXPORT_SYMBOL(u6_gpio_free);
++
++/* New GPIO_GENERIC interface */
++
++static int gpio_input(struct gpio_chip *chip, unsigned offset)
++{
++	struct gpio_bank *bank;
++	unsigned long flags;
++
++	bank = container_of(chip, struct gpio_bank, chip);
++	spin_lock_irqsave(&bank->lock, flags);
++	_set_gpio_direction(bank, offset, 1);
++	spin_unlock_irqrestore(&bank->lock, flags);
++	return 0;
++}
++
++static int gpio_get(struct gpio_chip *chip, unsigned offset)
++{
++	return u6_gpio_read_pin(chip->base + offset);
++}
++
++static int gpio_output(struct gpio_chip *chip, unsigned offset, int value)
++{
++	struct gpio_bank *bank;
++	unsigned long flags;
++
++	bank = container_of(chip, struct gpio_bank, chip);
++	spin_lock_irqsave(&bank->lock, flags);
++	_write_gpio_pin(bank, offset, value);
++	_set_gpio_direction(bank, offset, 0);
++	spin_unlock_irqrestore(&bank->lock, flags);
++	return 0;
++}
++
++static void gpio_set(struct gpio_chip *chip, unsigned offset, int value)
++{
++	struct gpio_bank *bank;
++	unsigned long flags;
++
++	bank = container_of(chip, struct gpio_bank, chip);
++	spin_lock_irqsave(&bank->lock, flags);
++	_write_gpio_pin(bank, offset, value);
++	spin_unlock_irqrestore(&bank->lock, flags);
++}
++
++static int gpio_2irq(struct gpio_chip *chip, unsigned offset)
++{
++	return u6_gpio_to_extint(chip->base + offset);
++}
++
++/*
++ * U6 EXTINT : only EXTINT 3 is managed by Linux
++ * We need to unmask the GPIO bank interrupt as soon as possible to
++ * avoid missing GPIO interrupts for other lines in the bank.
++ * Then we need to mask-read-clear-unmask the triggered GPIO lines
++ * in the bank to avoid missing nested interrupts for a GPIO line.
++ * If we wait to unmask individual GPIO lines in the bank after the
++ * line's interrupt handler has been run, we may miss some nested
++ * interrupts.
++ */
++static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
++{
++	unsigned long isr;
++	unsigned long flags;
++	unsigned int gpio_irq;
++
++	/* LPA TBD */
++	desc->chip->ack(irq);
++
++	/* read status */
++	local_irq_save(flags);
++	isr = readl(EXTINT_STATUS_REG) & readl(EXTINT_ENABLE3_REG);
++	/* clear IRQ source(s) */
++	writel(~isr, EXTINT_STATUS_REG);
++	local_irq_restore(flags);
++
++	gpio_irq = IRQ_COUNT;
++	for (; isr != 0; isr >>= 1, gpio_irq++) {
++		struct irq_desc *d;
++		if (!(isr & 1))
++			continue;
++		d = irq_desc + gpio_irq;
++#ifdef CONFIG_DEBUG_EXTINT
++		printk(KERN_ERR "got something from EXTINT#%i line\n",
++		       gpio_irq - IRQ_COUNT);
 +#endif
++		desc_handle_irq(gpio_irq, d);
++	}
 +
-+/*** MMTU driver ***/
-+#define RELOAD_COUNTER_POWER_MMTU 32
-+#define RELOAD_COUNTER_MMTU (1 << RELOAD_COUNTER_POWER_MMTU)
++}
 +
-+struct mmtu_ctxt {
-+	void __iomem *base;
-+	uint32_t compvalue;
-+	uint32_t endvalue;
-+	struct clk *clk;
++static void gpio_ack_irq(unsigned int irq)
++{
++	unsigned int gpio_irq = irq - IRQ_COUNT;
++	writel(~(1 << gpio_irq), EXTINT_STATUS_REG);
++}
++
++static void gpio_mask_irq(unsigned int irq)
++{
++	unsigned int gpio_irq = irq - IRQ_COUNT;
++	writel(readl(EXTINT_ENABLE3_REG) & ~(1 << gpio_irq),
++		     EXTINT_ENABLE3_REG);
++}
++
++static void gpio_unmask_irq(unsigned int irq)
++{
++	unsigned int gpio_irq = irq - IRQ_COUNT;
++	writel(readl(EXTINT_ENABLE3_REG) | (1 << gpio_irq),
++		     EXTINT_ENABLE3_REG);
++}
++
++int u6_gpio_clear_irq(unsigned int irq)
++{
++	unsigned int gpio_irq;
++	gpio_irq = irq - IRQ_COUNT;
++	if (!check_gpio_irq(gpio_irq))
++		return -EINVAL;
++	writel(~(1 << gpio_irq), EXTINT_STATUS_REG);
++	return 0;
++}
++EXPORT_SYMBOL(u6_gpio_clear_irq);
++
++int u6_gpio_set_irq_debounce(int irq, int cycles)
++{
++	int gpio;
++	struct gpio_bank *bank;
++	void __iomem *reg;
 +	int mode;
++	u32 l = 0;
++
++	gpio = EXTINT_TO_GPIO(irq);
++	irq -= IRQ_COUNT;
++	if (!check_gpio_irq(irq))
++		goto err;
++
++	bank = get_gpio_bank(gpio);
++	if (!check_gpio_requested(bank, get_gpio_index(gpio)))
++		return -EINVAL;
++
++	reg = EXTINT_CFGx(irq);
++	l = readl(reg);
++
++	mode = l & (3 << EXTINT_MODE_SHIFT);
++	if (mode == EXTINT_MODE_BYPASS)
++		goto err;
++
++	/* clear mode and set streching to debounce */
++	if (mode == EXTINT_MODE_STRETCHING) {
++		l &= ~(3 << EXTINT_MODE_SHIFT);
++		l |= EXTINT_MODE_DEBOUNCE;
++	}
++	/* clear and set the debounce field */
++	l &= ~(7 << EXTINT_DEBOUNCE_SHIFT);
++	l |= ((cycles & 0x7) << EXTINT_DEBOUNCE_SHIFT);
++	writel(l, reg);
++
++	return 0;
++err:
++	return -EINVAL;
++}
++EXPORT_SYMBOL(u6_gpio_set_irq_debounce);
++
++int u6_gpio_set_irq_selection(int irq, int selection)
++{
++	int gpio, index;
++	struct gpio_bank *bank;
++	u32 l = 0;
++	void __iomem *reg;
++
++	gpio = EXTINT_TO_GPIO(irq);
++	irq -= IRQ_COUNT;
++	if (!check_gpio_irq(irq))
++		return -EINVAL;
++
++	bank = get_gpio_bank(gpio);
++	index = get_gpio_index(gpio);
++	if (!check_gpio_requested(bank, index))
++		return -EINVAL;
++
++	reg = EXTINT_CFGx(irq);
++	l = readl(reg);
++
++	if (selection == EXTINT_SEL_ALTERNATE)
++		l |= EXTINT_SEL_ALTERNATE;
++	else
++		l &= ~EXTINT_SEL_ALTERNATE;
++	writel(l, reg);
++
++	return 0;
++}
++EXPORT_SYMBOL(u6_gpio_set_irq_selection);
++
++/*
++ * -the level type set the bypass mode
++ * -and by default the edge type select the stretching mode.
++ * if you would a debounce you must defined your nb
++ * cycle with u6_set_gpio_debounce
++ */
++static int _set_gpio_triggering(int gpio_irq, int trigger)
++{
++	void __iomem *reg = EXTINT_CFGx(gpio_irq);
++	u32 l = 0;
++
++	l = readl(reg);
++	l &= ~(3 << 6 | 1 << 2);
++
++	if (trigger == IRQ_TYPE_LEVEL_LOW)
++		l |= EXTINT_POL_NEGATIVE;
++	else if (trigger == IRQ_TYPE_LEVEL_HIGH)
++		l |= EXTINT_POL_POSITIVE;
++	else if (trigger == IRQ_TYPE_EDGE_RISING)
++		l |= (EXTINT_MODE_STRETCHING | EXTINT_POL_POSITIVE);
++	else if (trigger == IRQ_TYPE_EDGE_FALLING)
++		l |= (EXTINT_MODE_STRETCHING | EXTINT_POL_NEGATIVE);
++	else if (trigger == IRQ_TYPE_EDGE_BOTH)
++		l |= EXTINT_MODE_DUAL_EDGE;
++	else
++		goto err;
++
++	writel(l, reg);
++
++	return 0;
++err:
++	return -EINVAL;
++}
++
++static int gpio_irq_type(unsigned irq, unsigned type)
++{
++	unsigned gpio_irq;
++	int retval;
++
++	gpio_irq = irq - IRQ_COUNT;
++
++	if (!check_gpio_irq(gpio_irq))
++		return -EINVAL;
++
++	if (type & (IRQF_TRIGGER_PROBE))
++		return -EINVAL;
++
++	retval = _set_gpio_triggering(gpio_irq, type);
++	return retval;
++}
++
++static struct irq_chip gpio_irq_chip = {
++	.ack = gpio_ack_irq,
++	.disable = gpio_mask_irq,
++	.enable = gpio_unmask_irq,
++	.mask = gpio_mask_irq,
++	.unmask = gpio_unmask_irq,
++	.set_type = gpio_irq_type,
++	/*.set_wake     = gpio_wake_enable, */
 +};
 +
-+struct mmtu_ctxt mmtu_table[1] = {
-+	{
-+		.base = U6_IO_ADDRESS(MMTU_BASE),
-+		.compvalue = 0,
-+		.endvalue = 0,
-+		.clk = NULL,
-+		.mode = 0,
++static int __devinit u6_gpio_probe(struct platform_device *pdev)
++{
++	int i, j;
++	int gpio = 0;
++	struct gpio_bank *bank;
++	struct gpio_data *data = pdev->dev.platform_data;
++	unsigned long flags;
++
++	printk(KERN_INFO "U6 GPIO\n");
++	gpio_bank_desc = data->gpio_bank_desc;
++	gpio_bank_count = data->nb_banks;
++
++	for (i = 0; i < gpio_bank_count; i++) {
++		int gpio_count = 32;	/* 32 GPIO per bank */
++		bank = &gpio_bank_desc[i];
++		bank->reserved_map = 0;
++		spin_lock_init(&bank->lock);
++
++		bank->chip.request = u6_gpio_acquire;
++		bank->chip.free = u6_gpio_release;
++		bank->chip.direction_input = gpio_input;
++		bank->chip.get = gpio_get;
++		bank->chip.direction_output = gpio_output;
++		bank->chip.set = gpio_set;
++		bank->chip.to_irq = gpio_2irq;
++		bank->chip.label = "gpio";
++		bank->chip.base = gpio;
++		gpio += gpio_count;
++
++		bank->chip.ngpio = gpio_count;
++
++		gpiochip_add(&bank->chip);
++
++	}
++
++	/* configure MUX and PAD settings */
++	for (i = 0; i < SCON_REGISTER_NB; i++)
++		writel(u6_scon_init_config[i].scon_reg_value,
++			     u6_scon_init_config[i].scon_reg_addr);
++
++	/* for extint */
++	for (j = IRQ_COUNT; j < IRQ_COUNT + NR_EXTINT; j++) {
++		set_irq_chip(j, &gpio_irq_chip);
++		set_irq_handler(j, handle_simple_irq);
++		set_irq_flags(j, IRQF_VALID);
++	}
++
++	local_irq_save(flags);
++	/* mask all EXT IRQ sources before registring handler */
++	/* read status */
++	j = readl(EXTINT_STATUS_REG) & readl(EXTINT_ENABLE3_REG);
++	/* clear IRQ source(s) */
++	writel(j, EXTINT_STATUS_REG);
++
++	writel(0, EXTINT_ENABLE3_REG);
++
++	/* set irq in low level */
++	set_irq_type(IRQ_EXTINT3, IRQF_TRIGGER_LOW);
++
++	/* chained GPIO-IRQ on EXTINT3 */
++	set_irq_chained_handler(IRQ_EXTINT3, gpio_irq_handler);
++	local_irq_restore(flags);
++
++	return 0;
++}
++
++static struct platform_driver u6_gpio_driver = {
++	.probe = u6_gpio_probe,
++	.driver = {
++		.name = DRV_NAME,
 +	},
 +};
 +
-+static inline struct mmtu_ctxt *u6_mmtu_get_context(int id)
++int __init u6_gpio_init(void)
 +{
-+	return &(mmtu_table[id]);
++	return platform_driver_register(&u6_gpio_driver);
 +}
-+
-+static inline int u6_mmtu_timer_start(unsigned long cycles, int id);
-+static inline void u6_mmtu_clk_enable(int id);
-+static inline void u6_mmtu_clk_disable(int id);
-+
-+static irqreturn_t
-+u6_mmtu_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
-+{
-+	uint8_t status, enable;
-+	struct mmtu_ctxt *mmtu;
-+
-+	mmtu = u6_mmtu_get_context(0);
-+
-+	status = readl((mmtu->base + MMTU_INT_OFFSET + MMTU_INT_STATUS_IDX));
-+	enable = readl((mmtu->base + MMTU_INT_OFFSET + MMTU_INT_ENABLE_IDX));
-+
-+	pr_debug(PKMOD "mmtu_timer_interrupt %d\n", status);
-+
-+	if (status & enable & MMTU_IRQ_MASK) {
-+		struct clock_event_device *evt = &clockevent_mmtu;
-+
-+		writel(MMTU_IRQ_MASK, (mmtu->base + MMTU_INT_OFFSET
-+					+ MMTU_INT_CLR_STAT_IDX));
-+		writel(MMTU_IRQ_MASK,
-+				(mmtu->base + MMTU_INT_OFFSET +
-+				 MMTU_INT_CLR_ENA_IDX));
-+
-+		if (evt->event_handler)
-+			evt->event_handler(evt);
-+	}
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction u6_mmtu_timer_irq = {
-+	.name = "U6 MMTU timer Tick",
-+	.flags = IRQF_DISABLED,
-+	.handler = (irq_handler_t) u6_mmtu_timer_interrupt,
-+};
-+
-+static inline void u6_mmtu_clk_enable(int id)
-+{
-+	struct mmtu_ctxt *mmtu = u6_mmtu_get_context(id);
-+
-+	/* Clock Multimedia Timer Unit.
-+	 */
-+	if ((mmtu->clk != NULL) && (mmtu->mode == 0)) {
-+		pr_debug(PKMOD "mmtu_clk_enable\n");
-+		mmtu->mode = 1;
-+		clk_enable(mmtu->clk);
-+	}
-+}
-+
-+static inline void u6_mmtu_clk_disable(int id)
-+{
-+	struct mmtu_ctxt *mmtu = u6_mmtu_get_context(id);
-+
-+	/* Clock Multimedia Timer Unit.
-+	 */
-+	if ((mmtu->clk != NULL) && (mmtu->mode == 1)) {
-+		pr_debug(PKMOD "mmtu_clk_disable\n");
-+		clk_disable(mmtu->clk);
-+		mmtu->mode = 0;
-+	}
-+}
-+
-+static inline int u6_mmtu_timer_start(unsigned long cycles, int id)
-+{
-+	struct mmtu_ctxt *mmtu = u6_mmtu_get_context(id);
-+
-+	pr_debug(PKMOD "mmtu_timer_start %ld\n", cycles);
-+	u6_mmtu_clk_enable(id);
-+
-+	/* MMTU limitation : can't set a value smaller or equal to tcval + 1 */
-+	cycles = cycles < 2 ? 2 : cycles;
-+
-+	mmtu->compvalue = cycles;
-+
-+	mmtu->endvalue = mmtu->compvalue
-+		+ readl((mmtu->base + MMTU_TCVAL_IDX));
-+
-+	writel(MMTU_IRQ_MASK,
-+	       (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_CLR_STAT_IDX));
-+
-+	writel(mmtu->endvalue, (mmtu->base + MMTU_USED_MATCH_IDX));
-+
-+	writel(MMTU_IRQ_MASK,
-+	       (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_SET_ENA_IDX));
-+
-+	/* the value has already expired */
-+	if ((mmtu->endvalue <= readl((mmtu->base + MMTU_TCVAL_IDX)))
-+	    && (mmtu->endvalue > mmtu->compvalue)
-+	    && !(readl((mmtu->base + MMTU_INT_OFFSET
-+				    + MMTU_INT_STATUS_IDX)) & MMTU_IRQ_MASK))
-+		writel(MMTU_IRQ_MASK, (mmtu->base + MMTU_INT_OFFSET
-+					+ MMTU_INT_SET_STAT_IDX));
-+
-+	return 0;
-+}
-+
-+static int u6_mmtu_timer_init(int id, unsigned long reload,
-+			     unsigned long prescale, int over_it)
-+{
-+
-+	struct mmtu_ctxt *mmtu = u6_mmtu_get_context(id);
-+
-+	pr_debug(PKMOD "mmtu_timer_init %d\n", id);
-+
-+	/* Enable clock */
+diff --git a/arch/arm/plat-u6xxx/include/mach/gpio.h b/arch/arm/plat-u6xxx/include/mach/gpio.h
+new file mode 100644
+index 0000000..72e8147
+--- /dev/null
++++ b/arch/arm/plat-u6xxx/include/mach/gpio.h
+@@ -0,0 +1,391 @@
 +/*
-+	u6_mmtu_clk_enable(id);
-+	clk mngt not available yet
-+	directly enable it
-+*/
-+	{
-+		unsigned long flags;
-+		unsigned long reg;
-+		local_irq_save(flags);
-+		reg = readl(CGU_GATESC2_REG);
-+		reg |= 0x1 << 2;
-+		writel(reg, CGU_GATESC2_REG);
-+		local_irq_restore(flags);
-+	}
++ * linux/arch/arm/plat-u6xxx/include/mach/gpio.h
++ *
++ * Copyright (C) ST-Ericsson SA 2010
++ * Author: Loic Pallardy <loic.pallardy@stericsson.com> for ST-Ericsson.
++ * License terms:  GNU General Public License (GPL), version 2
++ * GPIO handling defines and functions
++ */
 +
-+	/* Reset timer */
-+	/* reset control register */
-+	writel(0x0000, (mmtu->base + MMTU_CON_IDX));
-+	writel(0x0002, (mmtu->base + MMTU_CON_IDX));
-+	/* reset control register */
-+	writel(0x0000, (mmtu->base + MMTU_CON_IDX));
++#ifndef __ASM_PLAT_U6_GPIO_H
++#define __ASM_PLAT_U6_GPIO_H
 +
-+	/* clear whole enable irq register */
-+	writel(0xFF, (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_CLR_ENA_IDX));
-+	/* clear whole status register */
-+	writel(0xFF, (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_CLR_STAT_IDX));
++#include <linux/io.h>
++#include <linux/errno.h>
++#include <asm-generic/gpio.h>
 +
-+	/* reset pre-scaler reload register */
-+	writel(0x00000000, (mmtu->base + MMTU_PRESCALER_IDX));
++#include <mach/hardware.h>
++#include <mach/irqs.h>
 +
-+	/* reset match control register */
-+	writel(0x0000, (mmtu->base + MMTU_MATCH_CON_IDX));
-+	/* reset match 0 register */
-+	writel(0x00000000, (mmtu->base + MMTU_MATCH0_IDX));
-+	/* reset match 1 register */
-+	writel(0x00000000, (mmtu->base + MMTU_MATCH1_IDX));
-+
-+	/* Initialize timer */
-+	writel(prescale - 1, (mmtu->base + MMTU_PRESCALER_IDX));
-+	/* power of 2 system clock */
-+	writel(reload, (mmtu->base + MMTU_MATCH0_IDX));
-+
-+	/* enable counter register */
-+	writel(0x0001, (mmtu->base + MMTU_CON_IDX));
-+
-+	/* clear whole status register */
-+	writel(0xFF, (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_CLR_STAT_IDX));
-+
-+	if (id == 0)
-+		setup_irq(IRQ_MMTU, &u6_mmtu_timer_irq);
-+
-+	/* Disable clock */
-+#ifndef U6_MMTU_CLOCK_SOURCE
-+	u6_mmtu_clk_disable(id);
-+#endif
-+	return 0;
-+}
-+
-+/*** MMTU Clock event device ***/
-+
-+static int u6_mmtu_set_next_event(unsigned long cycles,
-+				 struct clock_event_device *evt)
-+{
-+	pr_debug(PKMOD "mmtu_set_next_event %ld\n", cycles);
-+	u6_mmtu_timer_start(cycles, 0);
-+
-+	return 0;
-+}
-+
-+static void u6_mmtu_set_mode(enum clock_event_mode mode,
-+			    struct clock_event_device *evt)
-+{
-+	struct mmtu_ctxt *mmtu = u6_mmtu_get_context(0);
-+	unsigned long reg;
-+
-+	pr_debug(PKMOD "mmtu_set_mode %d\n", mode);
-+
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_UNUSED:
-+		writel(MMTU_IRQ_MASK,
-+		       (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_CLR_ENA_IDX));
-+		writel(MMTU_IRQ_MASK,
-+		       (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_CLR_STAT_IDX));
-+
-+		reg = readl((mmtu->base + MMTU_TCVAL_IDX));
-+		writel(reg - 1, (mmtu->base + MMTU_USED_MATCH_IDX));
-+
-+#ifndef U6_MMTU_CLOCK_SOURCE
-+		u6_mmtu_clk_disable(0);
-+
-+		if (mmtu->clk != NULL)
-+			clk_put(mmtu->clk);
-+#endif
-+		break;
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+		if (mmtu->clk == NULL) {
-+			mmtu->clk = clk_get(NULL, "MMTU");
-+			if (IS_ERR(mmtu->clk))
-+				mmtu->clk = NULL;
-+		}
-+
-+		writel(MMTU_IRQ_MASK,
-+		       (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_CLR_STAT_IDX));
-+		writel(MMTU_IRQ_MASK,
-+		       (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_SET_ENA_IDX));
-+	case CLOCK_EVT_MODE_ONESHOT:
-+	case CLOCK_EVT_MODE_RESUME:
-+		break;
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		writel(MMTU_IRQ_MASK,
-+		       (mmtu->base + MMTU_INT_OFFSET + MMTU_INT_SET_ENA_IDX));
-+		break;
-+	}
-+}
-+
-+static void u6_clockevent_init_mmtu(void)
-+{
-+	printk(PKMOD "clockevent_init_mmtu\n");
-+
-+	/* prescale 13Mhz -> 1Mhz */
-+#ifndef U6_MMTU_CLOCK_SOURCE
-+	u6_mmtu_timer_init(0, 0, (MMTU_SYS_FRQ / MMTU_ROOT_FRQ), 0);
-+#endif
-+
-+/* issue it is shorter than reality and generates spurious irq */
-+/*      clockevent_mmtu.mult = div_sc(MMTU_ROOT_FRQ, NSEC_PER_SEC,
-+ *      clockevent_mmtu.shift) + 1;*/
-+	clockevent_mmtu.mult =
-+	    div_sc(MMTU_ROOT_FRQ, NSEC_PER_SEC, clockevent_mmtu.shift);
-+
-+/*      clockevent_mmtu.max_delta_ns = div_sc(RELOAD_COUNTER_MMTU,
-+ *      clockevent_mmtu.mult, clockevent_mmtu.shift);*/
-+/*  In fact it is wider than the 32bits variable !!! */
-+	clockevent_mmtu.max_delta_ns = 0xFFFFFFFF;
-+
-+/*  MMTU HW limitation: match register can't be set w/ tcval+1 */
-+/*      clockevent_mmtu.min_delta_ns = div_sc(1, clockevent_mmtu.mult,
-+ *      clockevent_mmtu.shift)+1;*/
-+	clockevent_mmtu.min_delta_ns =
-+	    div_sc(2, clockevent_mmtu.mult, clockevent_mmtu.shift) + 1;
-+	/* avoid to much timer interrupt with 10us min between 2 irq */
-+	if (clockevent_mmtu.min_delta_ns < 10000)
-+		clockevent_mmtu.min_delta_ns = 10000;
-+	else if (clockevent_mmtu.max_delta_ns < 10000)
-+		clockevent_mmtu.min_delta_ns = clockevent_mmtu.max_delta_ns>>1;
-+
-+	clockevent_mmtu.cpumask = get_cpu_mask(0);
-+	clockevents_register_device(&clockevent_mmtu);
-+
-+	u6_mmtu_set_next_event(MMTU_ROOT_FRQ / HZ, &clockevent_mmtu);
-+}
-+
-+/*** MMTU Clock source device ***/
-+#ifdef U6_MMTU_CLOCK_SOURCE
-+
-+static cycle_t u6_mmtu_read(struct clocksource *source)
-+{
-+	struct mmtu_ctxt *mmtu = u6_mmtu_get_context(0);
-+
-+	return readl(mmtu->base + MMTU_TCVAL_IDX);
-+}
-+
-+static void u6_clocksource_init_mmtu(void)
-+{
-+	printk(PKMOD "clocksource_init_mmtu\n");
-+
-+	if (MMTU_ROOT_FRQ >= 1000000)
-+		clocksource_mmtu.mult =
-+			clocksource_khz2mult((MMTU_ROOT_FRQ / 1000),
-+					clocksource_mmtu.shift);
-+	else
-+		clocksource_mmtu.mult = clocksource_hz2mult((MMTU_ROOT_FRQ),
-+				clocksource_mmtu.shift);
-+
-+	u6_mmtu_timer_init(0, 0, (MMTU_SYS_FRQ / MMTU_ROOT_FRQ), 0);
-+
-+	clocksource_register(&clocksource_mmtu);
-+}
-+
-+#endif
-+
-+/*** System timer init ***/
-+/*************************/
-+
-+void __init u6_timer_init(void)
-+{
-+	printk(PKMOD "mmtu_timer_init\n");
-+
-+#ifdef U6_MMTU_CLOCK_SOURCE
-+	u6_clocksource_init_mmtu();
-+#endif
-+
-+	u6_clockevent_init_mmtu();
-+}
-+
-+struct sys_timer u6_timer = {
-+	.init = u6_timer_init,
++/* GPIO bank description */
++struct gpio_bank {
++	void __iomem *gpio_base;
++	void __iomem *mux_base;
++	u16 irq;
++	u16 virtual_irq_start;
++	int method;
++	u32 reserved_map;
++	u32 suspend_wakeup;
++	u32 saved_wakeup;
++	spinlock_t lock;
++	struct gpio_chip chip;
 +};
 +
-+#ifdef CONFIG_U6_POWER_SYSFS
-+static int __init u6_mmtu_init_sysfs(void)
++
++struct gpio_data {
++	u32 nb_banks;
++	struct gpio_bank *gpio_bank_desc;
++};
++
++
++/* GPIO Init configuration */
++
++struct u6_gpio_config {
++	u32 gpio;
++	u32 dir;
++	u32 value;
++};
++
++
++/* list of GPIO */
++enum U6_GPIO_LIST {
++	GPIO_A0 = 0,
++	GPIO_A1,
++	GPIO_A2,
++	GPIO_A3,
++	GPIO_A4,
++	GPIO_A5,
++	GPIO_A6,
++	GPIO_A7,
++	GPIO_A8,
++	GPIO_A9,
++	GPIO_A10,
++	GPIO_A11,
++	GPIO_A12,
++	GPIO_A13,
++	GPIO_A14,
++	GPIO_A15,
++	GPIO_A16,
++	GPIO_A17,
++	GPIO_A18,
++	GPIO_A19,
++	GPIO_A20,
++	GPIO_A21,
++	GPIO_A22,
++	GPIO_A23,
++	GPIO_A24,
++	GPIO_A25,
++	GPIO_A26,
++	GPIO_A27,
++	GPIO_A28,
++	GPIO_A29,
++	GPIO_A30,
++	GPIO_A31,
++	GPIO_B0,
++	GPIO_B1,
++	GPIO_B2,
++	GPIO_B3,
++	GPIO_B4,
++	GPIO_B5,
++	GPIO_B6,
++	GPIO_B7,
++	GPIO_B8,
++	GPIO_B9,
++	GPIO_B10,
++	GPIO_B11,
++	GPIO_B12,
++	GPIO_B13,
++	GPIO_B14,
++	GPIO_B15,
++	GPIO_B16,
++	GPIO_B17,
++	GPIO_B18,
++	GPIO_B19,
++	GPIO_B20,
++	GPIO_B21,
++	GPIO_B22,
++	GPIO_B23,
++	GPIO_B24,
++	GPIO_B25,
++	GPIO_B26,
++	GPIO_B27,
++	GPIO_B28,
++	GPIO_B29,
++	GPIO_B30,
++	GPIO_B31,
++	GPIO_C0,
++	GPIO_C1,
++	GPIO_C2,
++	GPIO_C3,
++	GPIO_C4,
++	GPIO_C5,
++	GPIO_C6,
++	GPIO_C7,
++	GPIO_C8,
++	GPIO_C9,
++	GPIO_C10,
++	GPIO_C11,
++	GPIO_C12,
++	GPIO_C13,
++	GPIO_C14,
++	GPIO_C15,
++	GPIO_C16,
++	GPIO_C17,
++	GPIO_C18,
++	GPIO_C19,
++	GPIO_C20,
++	GPIO_C21,
++	GPIO_C22,
++	GPIO_C23,
++	GPIO_C24,
++	GPIO_C25,
++	GPIO_C26,
++	GPIO_C27,
++	GPIO_C28,
++	GPIO_C29,
++	GPIO_C30,
++	GPIO_C31,
++	GPIO_D0,
++	GPIO_D1,
++	GPIO_D2,
++	GPIO_D3,
++	GPIO_D4,
++	GPIO_D5,
++	GPIO_D6,
++	GPIO_D7,
++	GPIO_D8,
++	GPIO_D9,
++	GPIO_D10,
++	GPIO_D11,
++	GPIO_D12,
++	GPIO_D13,
++	GPIO_D14,
++	GPIO_D15,
++	GPIO_D16,
++	GPIO_D17,
++	GPIO_D18,
++	GPIO_D19,
++	GPIO_D20,
++	GPIO_D21,
++	GPIO_D22,
++	GPIO_D23,
++	GPIO_D24,
++	GPIO_D25,
++	GPIO_D26,
++	GPIO_D27,
++	GPIO_D28,
++	GPIO_D29,
++	GPIO_D30,
++	GPIO_D31,
++	GPIO_E0,
++	GPIO_E1,
++	GPIO_E2,
++	GPIO_E3,
++	GPIO_E4,
++	GPIO_E5,
++	GPIO_E6,
++	GPIO_E7,
++	GPIO_E8,
++	GPIO_E9,
++	GPIO_E10,
++	GPIO_E11,
++	GPIO_E12,
++	GPIO_E13,
++	GPIO_E14,
++	GPIO_E15,
++	GPIO_E16,
++	GPIO_E17,
++	GPIO_E18,
++	GPIO_E19,
++	GPIO_E20,
++	GPIO_E21,
++	GPIO_E22,
++	GPIO_E23,
++	GPIO_E24,
++	GPIO_E25,
++	GPIO_E26,
++	GPIO_E27,
++	GPIO_E28,
++	GPIO_E29,
++	GPIO_E30,
++	GPIO_E31,
++	GPIO_F0,
++	GPIO_F1,
++	GPIO_F2,
++	GPIO_F3,
++	GPIO_F4,
++	GPIO_F5,
++	GPIO_F6,
++	GPIO_F7,
++	GPIO_F8,
++	GPIO_F9,
++	GPIO_F10,
++	GPIO_F11,
++	GPIO_F12,
++	GPIO_F13,
++	GPIO_F14,
++	GPIO_F15,
++	GPIO_F16,
++	GPIO_F17,
++	GPIO_F18,
++	GPIO_F19,
++	GPIO_F20,
++	GPIO_F21,
++	GPIO_F22,
++	GPIO_F23,
++	GPIO_F24,
++	GPIO_F25,
++	GPIO_F26,
++	GPIO_F27,
++	GPIO_F28,
++	GPIO_F29,
++	GPIO_F30,
++	GPIO_F31,
++	U6_GPIO_COUNT,
++};
++
++enum U6_GPIO_MODE {
++	GPIO_MODE_MUX0 = 0,
++	GPIO_MODE_MUX1,
++	GPIO_MODE_MUX2,
++	GPIO_MODE_MUX3
++};
++
++
++#define GPIO_DIR_INPUT  1
++#define GPIO_DIR_OUTPUT 0
++
++
++extern int  u6_gpio_init(void);	/* Call from board init only */
++extern int  u6_gpio_request(int gpio);
++extern void u6_gpio_free(int gpio);
++extern int  u6_gpio_set_mode(int gpio, int mode);
++extern int  u6_gpio_set_mode_gpio(int gpio);
++extern int  u6_gpio_set_direction(int gpio, int is_input);
++extern int  u6_gpio_write_pin(int gpio, int gpio_value);
++extern int  u6_gpio_read_pin(int gpio);
++extern int  u6_gpio_set_irq_debounce(int irq, int cycles);
++extern int  u6_gpio_set_irq_selection(int irq, int selection);
++extern int  u6_gpio_clear_irq(unsigned int irq);
++
++
++/*
++ * Wrappers for "new style" GPIO calls, using the new infrastructure
++ * which lets us plug in FPGA, I2C, and other implementations.
++ */
++
++static inline int gpio_get_value(unsigned gpio)
 +{
-+	printk(PKMOD "mmtu_init_sysfs\n");
-+
-+#ifdef U6_MMTU_CLOCK_SOURCE
-+	if (sysfs_create_group(&u6_power_kobj, &dbs_attr_srce_group))
-+		printk(PKMOD "Unable to register %s in sysfs\n",
-+		       dbs_attr_srce_group.name);
-+#endif
-+
-+	if (sysfs_create_group(&u6_power_kobj, &dbs_attr_event_group))
-+		printk(PKMOD "Unable to register %s in sysfs\n",
-+		       dbs_attr_event_group.name);
-+
-+	return 0;
++	return __gpio_get_value(gpio);
 +}
 +
-+module_init(u6_mmtu_init_sysfs);
++static inline void gpio_set_value(unsigned gpio, int value)
++{
++	__gpio_set_value(gpio, value);
++}
++
++static inline int gpio_cansleep(unsigned gpio)
++{
++	return __gpio_cansleep(gpio);
++}
++
++static inline int gpio_to_irq(unsigned gpio)
++{
++	return __gpio_to_irq(gpio);
++}
++
++static inline int irq_to_gpio(unsigned irq)
++{
++	return EXTINT_TO_GPIO(irq);
++}
++
++/*
++* Hardware Register Definitions for EXTINT
++ */
++
++/* EXTINT ENABLE1 Register (32 bits) */
++#define EXTINT_ENABLE1_OFFSET  0x60
++#define EXTINT_ENABLE1_REG     U6_IO_ADDRESS(EXTINT_BASE + EXTINT_ENABLE1_OFFSET)
++
++/* EXTINT ENABLE2 Register (32 bits) */
++#define EXTINT_ENABLE2_OFFSET  0x64
++#define EXTINT_ENABLE2_REG     U6_IO_ADDRESS(EXTINT_BASE + EXTINT_ENABLE2_OFFSET)
++
++/* EXTINT ENABLE3 Register (32 bits) */
++#define EXTINT_ENABLE3_OFFSET  0x68
++#define EXTINT_ENABLE3_REG     U6_IO_ADDRESS(EXTINT_BASE + EXTINT_ENABLE3_OFFSET)
++
++/* EXTINT STATUS Register (32 bits) */
++#define EXTINT_STATUS_OFFSET   0x6C
++#define EXTINT_STATUS_REG      U6_IO_ADDRESS(EXTINT_BASE + EXTINT_STATUS_OFFSET)
++
++/* EXTINT SIGNAL Register (32 bits) */
++#define EXTINT_SIGNAL_OFFSET   0x70
++#define EXTINT_SIGNAL_REG      U6_IO_ADDRESS(EXTINT_BASE + EXTINT_SIGNAL_OFFSET)
++
++/* Bits definition for register EXTINT_CFG[23:0] */
++#define EXTINT_MODE_SHIFT      6
++#define EXTINT_MODE_FIELD      (0xFFFFFFFF - (0x3UL<<EXTINT_MODE_SHIFT))
++#define EXTINT_MODE_BYPASS     (0x0UL<<EXTINT_MODE_SHIFT)
++#define EXTINT_MODE_STRETCHING (0x1UL<<EXTINT_MODE_SHIFT)
++#define EXTINT_MODE_DEBOUNCE   (0x2UL<<EXTINT_MODE_SHIFT)
++#define EXTINT_MODE_DUAL_EDGE  (0x3UL<<EXTINT_MODE_SHIFT)
++#define EXTINT_DEBOUNCE_SHIFT  3
++#define EXTINT_DEBOUNCE_FIELD  (0xFFFFFFFF - (0x7UL<<EXTINT_DEBOUNCE_SHIFT))
++#define EXTINT_DEBOUNCE_0      (0x0UL<<EXTINT_DEBOUNCE_SHIFT)
++#define EXTINT_DEBOUNCE_1      (0x1UL<<EXTINT_DEBOUNCE_SHIFT)
++#define EXTINT_DEBOUNCE_2      (0x2UL<<EXTINT_DEBOUNCE_SHIFT)
++#define EXTINT_DEBOUNCE_3      (0x3UL<<EXTINT_DEBOUNCE_SHIFT)
++#define EXTINT_DEBOUNCE_7      (0x7UL<<EXTINT_DEBOUNCE_SHIFT)
++#define EXTINT_POL_SHIFT       2
++#define EXTINT_POL_FIELD       (0xFFFFFFFF - (0x1UL<<EXTINT_POL_SHIFT))
++#define EXTINT_POL_NEGATIVE    (0x0UL<<EXTINT_POL_SHIFT)
++#define EXTINT_POL_POSITIVE    (0x1UL<<EXTINT_POL_SHIFT)
++#define EXTINT_POL             (0x1UL<<EXTINT_POL_SHIFT)
++#define EXTINT_SEL_SHIFT       1
++#define EXTINT_SEL_FIELD       (0xFFFFFFFF - (0x1UL<<EXTINT_SEL_SHIFT))
++#define EXTINT_SEL_EXTINT      (0x0UL<<EXTINT_SEL_SHIFT)
++#define EXTINT_SEL_ALTERNATE   (0x1UL<<EXTINT_SEL_SHIFT)
++#define EXTINT_SEL             (0x1UL<<EXTINT_SEL_SHIFT)
++
++/*****************************************************************************/
++/* Register description for ENABLE[3:1] */
++
++/* Bits definition for register EXTINT_ENABLE[3:1] */
++#define EXTINT_ENABLE_SHIFT    0
++#define EXTINT_ENABLE_FIELD    (0xFFFFFFFF - (0xFFFFFFUL<<EXTINT_ENABLE_SHIFT))
++#define EXTINT_ENABLE_0        (0x0UL<<EXTINT_ENABLE_SHIFT)
++#define EXTINT_ENABLE_1        (0x1UL<<EXTINT_ENABLE_SHIFT)
++
++/*****************************************************************************/
++/* Register description for STATUS */
++
++/* Bits definition for register EXTINT_STATUS */
++#define EXTINT_STATUS_SHIFT    0
++#define EXTINT_STATUS_FIELD    (0xFFFFFFFF - (0xFFFFFFUL<<EXTINT_STATUS_SHIFT))
++#define EXTINT_STATUS_0        (0x0UL<<EXTINT_STATUS_SHIFT)
++#define EXTINT_STATUS_1        (0x1UL<<EXTINT_STATUS_SHIFT)
++
++/* EXTINTx [0..23] configuration register */
++#define EXTINT_CFGx(x)         U6_IO_ADDRESS(EXTINT_BASE+(x)*4)
++
++/*****************************************************************************
++* Hardware Register Definitions for GPIOx
++*****************************************************************************/
++/* Offsets */
++#define GPIO_PINS_OFFSET       0x0
++#define GPIO_OR_OFFSET         0x4
++#define GPIO_DR_OFFSET         0x8
++
++/* GPIOx PINS Registers (32 bits) */
++#define GPIOA_PINS_REG         U6_IO_ADDRESS(GPIOA_BASE + GPIO_PINS_OFFSET)
++#define GPIOB_PINS_REG         U6_IO_ADDRESS(GPIOB_BASE + GPIO_PINS_OFFSET)
++#define GPIOC_PINS_REG         U6_IO_ADDRESS(GPIOC_BASE + GPIO_PINS_OFFSET)
++#define GPIOD_PINS_REG         U6_IO_ADDRESS(GPIOD_BASE + GPIO_PINS_OFFSET)
++#define GPIOE_PINS_REG         U6_IO_ADDRESS(GPIOE_BASE + GPIO_PINS_OFFSET)
++#define GPIOF_PINS_REG         U6_IO_ADDRESS(GPIOF_BASE + GPIO_PINS_OFFSET)
++
++/* GPIOx OR Registers (32 bits) */
++#define GPIOA_OR_REG           U6_IO_ADDRESS(GPIOC_BASE + GPIO_OR_OFFSET)
++
++#endif
+diff --git a/arch/arm/plat-u6xxx/include/mach/scon.h b/arch/arm/plat-u6xxx/include/mach/scon.h
+new file mode 100644
+index 0000000..180aeeb
+--- /dev/null
++++ b/arch/arm/plat-u6xxx/include/mach/scon.h
+@@ -0,0 +1,123 @@
++/*
++ * linux/arch/arm/plat-u6xxx/include/mach/scon.h
++ *
++ * Copyright (C) ST-Ericsson SA 2010
++ * Author: Loic Pallardy <loic.pallardy@stericsson.com> for ST-Ericsson.
++ * License terms:  GNU General Public License (GPL), version 2
++ *
++ * System Configuration Block registers
++ */
++
++#ifndef __ARCH_SCON_H
++#define __ARCH_SCON_H
++
++/*
++ * this structure allows to store SCON register values to set
++ * during initialization step
++ */
++
++struct u6_scon_config {
++	void __iomem *scon_reg_addr;
++	u32 scon_reg_value;
++};
++
++#define SCON_REGISTER_NB         15
++
++extern struct u6_scon_config u6_scon_init_config[SCON_REGISTER_NB];
++
++/* SCON SYSVER Register (32 bits) */
++#define SCON_SYSVER_OFFSET       0x0
++#define SCON_SYSVER_REG          U6_IO_ADDRESS(SCON_BASE + SCON_SYSVER_OFFSET)
++
++/* SCON SYSCON0 Register (32 bits) */
++#define SCON_SYSCON0_OFFSET      0x4
++#define SCON_SYSCON0_REG         U6_IO_ADDRESS(SCON_BASE + SCON_SYSCON0_OFFSET)
++
++/* SCON SYSPROT Register (32 bits) */
++#define SCON_SYSPROT_OFFSET      0x8
++#define SCON_SYSPROT_REG         U6_IO_ADDRESS(SCON_BASE + SCON_SYSPROT_OFFSET)
++
++/* SCON SYSMUX0 Register (32 bits) */
++#define SCON_SYSMUX0_OFFSET      0xC
++#define SCON_SYSMUX0_REG         U6_IO_ADDRESS(SCON_BASE + SCON_SYSMUX0_OFFSET)
++
++/* SCON SYSMUX1 Register (32 bits) */
++#define SCON_SYSMUX1_OFFSET      0x10
++#define SCON_SYSMUX1_REG         U6_IO_ADDRESS(SCON_BASE + SCON_SYSMUX1_OFFSET)
++
++/* SCON SYSMUX2 Register (32 bits) */
++#define SCON_SYSMUX2_OFFSET      0x14
++#define SCON_SYSMUX2_REG         U6_IO_ADDRESS(SCON_BASE + SCON_SYSMUX2_OFFSET)
++
++/* SCON SYSMUX3 Register (32 bits) */
++#define SCON_SYSMUX3_OFFSET      0x18
++#define SCON_SYSMUX3_REG         U6_IO_ADDRESS(SCON_BASE + SCON_SYSMUX3_OFFSET)
++
++/* SCON SYSMUX4 Register (32 bits) */
++#define SCON_SYSMUX4_OFFSET      0x1C
++#define SCON_SYSMUX4_REG         U6_IO_ADDRESS(SCON_BASE + SCON_SYSMUX4_OFFSET)
++
++/* SCON SYSMUX5 Register (32 bits) */
++#define SCON_SYSMUX5_OFFSET      0x20
++#define SCON_SYSMUX5_REG         U6_IO_ADDRESS(SCON_BASE + SCON_SYSMUX5_OFFSET)
++
++/* SCON SYSMUX6 Register (32 bits) */
++#define SCON_SYSMUX6_OFFSET      0x24
++#define SCON_SYSMUX6_REG         U6_IO_ADDRESS(SCON_BASE + SCON_SYSMUX6_OFFSET)
++
++/* SCON SYSMUX7 Register (32 bits) */
++#define SCON_SYSMUX7_OFFSET      0x28
++#define SCON_SYSMUX7_REG         U6_IO_ADDRESS(SCON_BASE + SCON_SYSMUX7_OFFSET)
++
++/* SCON SYSMUX8 Register (32 bits) */
++#define SCON_SYSMUX8_OFFSET      0x2C
++#define SCON_SYSMUX8_REG         U6_IO_ADDRESS(SCON_BASE + SCON_SYSMUX8_OFFSET)
++
++/* SCON SYSMUX9 Register (32 bits) */
++#define SCON_SYSMUX9_OFFSET      0x30
++#define SCON_SYSMUX9_REG         U6_IO_ADDRESS(SCON_BASE + SCON_SYSMUX9_OFFSET)
++
++/* SCON SYSMUX10 Register (32 bits) */
++#define SCON_SYSMUX10_OFFSET     0x34
++#define SCON_SYSMUX10_REG        U6_IO_ADDRESS(SCON_BASE + SCON_SYSMUX10_OFFSET)
++
++/* SCON SYSMUX11 Register (32 bits) */
++#define SCON_SYSMUX11_OFFSET     0x38
++#define SCON_SYSMUX11_REG        U6_IO_ADDRESS(SCON_BASE + SCON_SYSMUX11_OFFSET)
++
++/* SCON SYSPAD0 Register (32 bits) */
++#define SCON_SYSPAD0_OFFSET      0x50
++#define SCON_SYSPAD0_REG         U6_IO_ADDRESS(SCON_BASE + SCON_SYSPAD0_OFFSET)
++
++/* SCON SYSPAD1 Register (32 bits) */
++#define SCON_SYSPAD1_OFFSET      0x54
++#define SCON_SYSPAD1_REG         U6_IO_ADDRESS(SCON_BASE + SCON_SYSPAD1_OFFSET)
++
++/* SCON SYSPAD2 Register (32 bits) */
++#define SCON_SYSPAD2_OFFSET      0x58
++#define SCON_SYSPAD2_REG         U6_IO_ADDRESS(SCON_BASE + SCON_SYSPAD2_OFFSET)
++
++/* SCON SYSCON1 Register (32 bits) */
++#define SCON_SYSCON1_OFFSET      0x70
++#define SCON_SYSCON1_REG         U6_IO_ADDRESS(SCON_BASE + SCON_SYSCON1_OFFSET)
++
++/* SCON SYSIISMUX Register (32 bits) */
++#define SCON_SYSIISMUX_OFFSET    0x74
++#define SCON_SYSIISMUX_REG       U6_IO_ADDRESS(SCON_BASE + SCON_SYSIISMUX_OFFSET)
++
++/* SCON SYSAHBPROT Register (32 bits) */
++#define SCON_SYSAHBPROT_OFFSET   0x78
++#define SCON_SYSAHBPROT_REG      U6_IO_ADDRESS(SCON_BASE + SCON_SYSAHBPROT_OFFSET)
++
++/* SCON SYSIVSBRIDGE Register (32 bits) */
++#define SCON_SYSIVSBRIDGE_OFFSET 0x7C
++#define SCON_SYSIVSBRIDGE_REG   U6_IO_ADDRESS(SCON_BASE + SCON_SYSIVSBRIDGE_OFFSET)
++
++/* Register description for SYSPADx */
++/* SYSPAD configuration defines */
++#define SCON_PAD_PULL_UP        0
++#define SCON_PAD_REPEATER       1
++#define SCON_PAD_PLAIN_INPUT    2
++#define SCON_PAD_PULL_DOWN      3
++
 +#endif
 -- 
 1.7.1
