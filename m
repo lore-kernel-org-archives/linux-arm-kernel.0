@@ -1,69 +1,52 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Mon, 19 Jul 2010 00:44:49 -0700
-Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU,
-	CPU and device memory management
-In-Reply-To: <20100719065233.GD11054@codeaurora.org> (Zach Pfeffer's message
-	of "Sun\, 18 Jul 2010 23\:52\:33 -0700")
-References: <4C3C0032.5020702@codeaurora.org>
-	<20100713150311B.fujita.tomonori@lab.ntt.co.jp>
-	<20100713121420.GB4263@codeaurora.org>
-	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
-	<20100714201149.GA14008@codeaurora.org>
-	<20100714220536.GE18138@n2100.arm.linux.org.uk>
-	<20100715012958.GB2239@codeaurora.org>
-	<20100715085535.GC26212@n2100.arm.linux.org.uk>
-	<20100719065233.GD11054@codeaurora.org>
-Message-ID: <m1mxtndifi.fsf@fess.ebiederm.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 19 Jul 2010 16:59:01 +0900
+Subject: [PATCH v3 1/7] ARM: S5PV210: Add a Kconfig entry
+	"S5PC110_EVT0_WORKAROUND"
+In-Reply-To: <1279517483-22751-2-git-send-email-myungjoo.ham@samsung.com>
+References: <1279517483-22751-1-git-send-email-myungjoo.ham@samsung.com>
+	<1279517483-22751-2-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <002c01cb2718$46fcc4a0$d4f64de0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zach Pfeffer <zpfeffer@codeaurora.org> writes:
+MyungJoo Ham wrote:
+> 
+> Early S5PC110 (EVT0) chip had some issues required workaround from a
+> kernel. We can add such workaround codes with this Kconfig entry.
+> 
+> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pv210/Kconfig |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+> index 631019a..18802e7 100644
+> --- a/arch/arm/mach-s5pv210/Kconfig
+> +++ b/arch/arm/mach-s5pv210/Kconfig
+> @@ -101,4 +101,11 @@ config MACH_SMDKC110
+>  	  Machine support for Samsung SMDKC110
+>  	  S5PC110(MCP) is one of package option of S5PV210
+> 
+> +config S5PC110_EVT0_WORKAROUND
+> +	bool "S5PC110 Early Chip Workaround (EVT0)"
+> +	help
+> +	  Early S5PC110 (so called EVT0) has errata items that should be
+> +	  addressed; otherwise the kernel may panic or be locked up. Enable
+> +	  this option to execute workaround instructions.
+> +
+>  endif
+> --
 
-> On Thu, Jul 15, 2010 at 09:55:35AM +0100, Russell King - ARM Linux wrote:
->> On Wed, Jul 14, 2010 at 06:29:58PM -0700, Zach Pfeffer wrote:
->> > The VCM ensures that all mappings that map a given physical buffer:
->> > IOMMU mappings, CPU mappings and one-to-one device mappings all map
->> > that buffer using the same (or compatible) attributes. At this point
->> > the only attribute that users can pass is CACHED. In the absence of
->> > CACHED all accesses go straight through to the physical memory.
->> 
->> So what you're saying is that if I have a buffer in kernel space
->> which I already have its virtual address, I can pass this to VCM and
->> tell it !CACHED, and it'll setup another mapping which is not cached
->> for me?
->
-> Not quite. The existing mapping will be represented by a reservation
-> from the prebuilt VCM of the VM. This reservation has been marked
-> non-cached. Another reservation on a IOMMU VCM, also marked non-cached
-> will be backed with the same physical memory. This is legal in ARM,
-> allowing the vcm_back call to succeed. If you instead passed cached on
-> the second mapping, the first mapping would be non-cached and the
-> second would be cached. If the underlying architecture supported this
-> than the vcm_back would go through.
+As I said earlier, EVT0 is not real chip and not for mass production.
 
-How does this compare with the x86 pat code?
+Why do you submit the EVT0 patch which can only available for you?
+It is better to not add code into mainline that is not going to be used.
 
->> You are aware that multiple V:P mappings for the same physical page
->> with different attributes are being outlawed with ARMv6 and ARMv7
->> due to speculative prefetching.  The cache can be searched even for
->> a mapping specified as 'normal, uncached' and you can get cache hits
->> because the data has been speculatively loaded through a separate
->> cached mapping of the same physical page.
->
-> I didn't know that. Thanks for the heads up.
->
->> FYI, during the next merge window, I will be pushing a patch which makes
->> ioremap() of system RAM fail, which should be the last core code creator
->> of mappings with different memory types.  This behaviour has been outlawed
->> (as unpredictable) in the architecture specification and does cause
->> problems on some CPUs.
->
-> That's fair enough, but it seems like it should only be outlawed for
-> those processors on which it breaks.
+Thanks.
 
-To my knowledge mismatch of mapping attributes is a problem on most
-cpus on every architecture.  I don't see it making sense to encourage
-coding constructs that will fail in the strangest most difficult to
-debug ways.
-
-Eric
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
