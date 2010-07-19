@@ -1,69 +1,79 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 19 Jul 2010 14:44:36 +0100
-Subject: [PATCH 7/9] ARM: Add barriers to the I/O accessors if
-	ARM_DMA_MEM_BUFFERABLE
+Date: Mon, 19 Jul 2010 14:44:42 +0100
+Subject: [PATCH 8/9] ARM: Improve the L2 cache performance when PL310 is used
 In-Reply-To: <20100719133050.24290.70856.stgit@e102109-lin.cambridge.arm.com>
 References: <20100719133050.24290.70856.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100719134436.24290.50175.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100719134442.24290.87957.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the coherent DMA buffers are mapped as Normal Non-cacheable
-(ARM_DMA_MEM_BUFFERABLE enabled), buffer accesses are no longer ordered
-with Device memory accesses causing failures in device drivers that do
-not use the mandatory memory barriers before starting a DMA transfer.
-LKML discussions led to the conclusion that such barriers have to be
-added to the I/O accessors:
+With this L2 cache controller, the cache maintenance by PA and sync
+operations are atomic and do not require a "wait" loop. This patch
+conditionally defines the cache_wait() function.
 
-http://thread.gmane.org/gmane.linux.kernel/683509/focus=686153
-http://thread.gmane.org/gmane.linux.ide/46414
-http://thread.gmane.org/gmane.linux.kernel.cross-arch/5250
-
-This patch introduces a wmb() barrier to the write*() I/O accessors to
-handle the situations where Normal Non-cacheable writes are still in the
-processor (or L2 cache controller) write buffer before a DMA transfer
-command is issued. For the read*() accessors, a rmb() is introduced
-after the I/O to avoid speculative loads where the driver polls for a
-DMA transfer ready bit.
+Since L2x0 cache controllers do not work with ARMv7 CPUs, the patch
+automatically enables CACHE_PL310 when only CPU_V7 is defined.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/io.h |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+ arch/arm/mm/Kconfig      |    8 ++++++++
+ arch/arm/mm/cache-l2x0.c |   15 ++++++++++++---
+ 2 files changed, 20 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 9db072d..3c91e7c 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -26,6 +26,7 @@
- #include <linux/types.h>
- #include <asm/byteorder.h>
- #include <asm/memory.h>
-+#include <asm/system.h>
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 294a57d..4e93c4a 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -797,6 +797,14 @@ config CACHE_L2X0
+ 	help
+ 	  This option enables the L2x0 PrimeCell.
  
- /*
-  * ISA I/O bus memory addresses are 1:1 with the physical address.
-@@ -191,6 +192,15 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
- #define writel_relaxed(v,c)	((void)__raw_writel((__force u32) \
- 					cpu_to_le32(v),__mem_pci(c)))
- 
-+#ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
-+#define readb(c)		({ u8  __v = readb_relaxed(c); rmb(); __v; })
-+#define readw(c)		({ u16 __v = readw_relaxed(c); rmb(); __v; })
-+#define readl(c)		({ u32 __v = readl_relaxed(c); rmb(); __v; })
++config CACHE_PL310
++	bool
++	depends on CACHE_L2X0
++	default y if CPU_V7 && !CPU_V6
++	help
++	  This option enables optimisations for the PL310 cache
++	  controller.
 +
-+#define writeb(v,c)		({ wmb(); writeb_relaxed(v,c); })
-+#define writew(v,c)		({ wmb(); writew_relaxed(v,c); })
-+#define writel(v,c)		({ wmb(); writel_relaxed(v,c); })
-+#else
- #define readb(c)		readb_relaxed(c)
- #define readw(c)		readw_relaxed(c)
- #define readl(c)		readl_relaxed(c)
-@@ -198,6 +208,7 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
- #define writeb(v,c)		writeb_relaxed(v,c)
- #define writew(v,c)		writew_relaxed(v,c)
- #define writel(v,c)		writel_relaxed(v,c)
-+#endif
+ config CACHE_TAUROS2
+ 	bool "Enable the Tauros2 L2 cache controller"
+ 	depends on (ARCH_DOVE || ARCH_MMP)
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 532c35c..b5c573e 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -29,13 +29,22 @@ static void __iomem *l2x0_base;
+ static DEFINE_SPINLOCK(l2x0_lock);
+ static uint32_t l2x0_way_mask;	/* Bitmask of active ways */
  
- #define readsb(p,d,l)		__raw_readsb(__mem_pci(p),d,l)
- #define readsw(p,d,l)		__raw_readsw(__mem_pci(p),d,l)
+-static inline void cache_wait(void __iomem *reg, unsigned long mask)
++static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
+ {
+-	/* wait for the operation to complete */
++	/* wait for cache operation by line or way to complete */
+ 	while (readl_relaxed(reg) & mask)
+ 		;
+ }
+ 
++#ifdef CONFIG_CACHE_PL310
++static inline void cache_wait(void __iomem *reg, unsigned long mask)
++{
++	/* cache operations by line are atomic on PL310 */
++}
++#else
++#define cache_wait	cache_wait_way
++#endif
++
+ static inline void cache_sync(void)
+ {
+ 	void __iomem *base = l2x0_base;
+@@ -110,7 +119,7 @@ static inline void l2x0_inv_all(void)
+ 	/* invalidate all ways */
+ 	spin_lock_irqsave(&l2x0_lock, flags);
+ 	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_INV_WAY);
+-	cache_wait(l2x0_base + L2X0_INV_WAY, l2x0_way_mask);
++	cache_wait_way(l2x0_base + L2X0_INV_WAY, l2x0_way_mask);
+ 	cache_sync();
+ 	spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
