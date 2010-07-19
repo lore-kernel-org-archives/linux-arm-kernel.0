@@ -1,36 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Jul 2010 10:02:41 +0100
-Subject: [PATCH 2/4] ARM: S5PV210: Powerdomain/Clock-gating Support
-In-Reply-To: <1279528236-6076-3-git-send-email-myungjoo.ham@samsung.com>
-References: <1279528236-6076-1-git-send-email-myungjoo.ham@samsung.com>
-	<1279528236-6076-2-git-send-email-myungjoo.ham@samsung.com>
-	<1279528236-6076-3-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <20100719090241.GB8641@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 19 Jul 2010 10:09:14 +0100
+Subject: [PATCH 5/5] ARM: S5PV210: Initial CPUFREQ Support
+In-Reply-To: <AANLkTine-RPFqd1zp-vu4xRaidhngU0t3hC3SP_bXfWw@mail.gmail.com>
+References: <1279184768-28971-5-git-send-email-myungjoo.ham@samsung.com>
+	<1279184768-28971-6-git-send-email-myungjoo.ham@samsung.com>
+	<20100715115942.GA15919@sirena.org.uk>
+	<AANLkTinrrXlh1GQ178_NzwWt5luO_1mdfIGy6G2ZNbPH@mail.gmail.com>
+	<20100716081707.GA9082@rakim.wolfsonmicro.main>
+	<AANLkTikYX6N7q3lT5ZzXh3RQnGss39eGhSrfC9blqoF_@mail.gmail.com>
+	<20100716084231.GF9082@rakim.wolfsonmicro.main>
+	<AANLkTikNCOjOSVlcBv99DuJEdPtQHmKpC8Cs60rQz1r3@mail.gmail.com>
+	<20100716093710.GH9082@rakim.wolfsonmicro.main>
+	<AANLkTine-RPFqd1zp-vu4xRaidhngU0t3hC3SP_bXfWw@mail.gmail.com>
+Message-ID: <20100719090914.GC15693@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 19, 2010 at 05:30:34PM +0900, MyungJoo Ham wrote:
-> +static int powerdomain_set(struct powerdomain *pd, int enable)
-> +{
-> +	unsigned long ctrlbit;
-> +	void __iomem *reg;
-> +	void __iomem *stable_reg;
-> +	unsigned long reg_dat;
-> +
-> +	if (pd == NULL)
-> +		return -EINVAL;
+On Mon, Jul 19, 2010 at 09:40:24AM +0900, MyungJoo Ham wrote:
 
-If someone calls this function with a NULL pd argument, is it better
-to ignore it, or better to use WARN_ON and get a backtrace so it can
-be fixed?  I don't see much reason for this function to ever be called
-with a NULL powerdomain argument.
+> Uh oh.. I didn't mean that the default ramp time is the "required" or
+> "suggested" by the PMIC, but I meant that it is required by the CPU to
+> execute instructions without possible CPU lockups due to lower voltage
 
-> +
-> +	ctrlbit = pd->pd_ctrlbit;
-> +	reg = (void __iomem *)pd->pd_reg;
-> +	stable_reg = (void __iomem *)pd->pd_stable_reg;
-
-Why not ensure that the element in the structure is correctly typed to
-start with?
-
-It's good practice to avoid casts whenever-possible - they hide bugs.
+You're still missing my point here.  What I'm saying is that by using
+the slower default ramp rate of the PMIC you're making the length of the
+stall in execution introduced by waiting for the ramp to complete more
+severe than it needs to be, thus increasing the impact on the system and
+the need to do work in software to mitigate that.  Reducing the ramp
+time should result in improved system performance.
