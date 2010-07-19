@@ -1,43 +1,20 @@
-From: michael.williamson@criticallink.com (Mike Williamson)
-Date: Sun, 18 Jul 2010 13:29:32 -0400
-Subject: [PATCH] davinci: Add MityDSP-L138/MityARM-1808 SOM support
-In-Reply-To: <1279324167.4526.85.camel@Joe-Laptop.home>
-References: <E1OZlTF-0006NW-1I@wanda>
-	<1279324167.4526.85.camel@Joe-Laptop.home>
-Message-ID: <AANLkTil1t-KHom4wWLufDM2hPB24u_iGxlTwNXqXTjhI@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 19 Jul 2010 13:29:17 +0100
+Subject: Problem with dma_alloc_coherent at linux-2.6.33-arm1 ,
+	withRealView platform,board PBX-A9 and armv7 instructions.
+In-Reply-To: <AANLkTikiHfOL0WMjiZnWY3RVmw89hZVFcNkqfDUYSDgG@mail.gmail.com>
+References: <AANLkTikiHfOL0WMjiZnWY3RVmw89hZVFcNkqfDUYSDgG@mail.gmail.com>
+Message-ID: <1279542557.10760.21.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/16 Joe Perches <joe@perches.com>
+On Sat, 2010-07-17 at 08:05 +0100, David Yang wrote:
+> I have a question: in linux-2.6.28, there is no barriers in the IO
+> accessors.
 
-> On Fri, 2010-07-16 at 10:00 -0400, Michael Williamson wrote:
-> > +static __init void mityomapl138_setup_lcd(void)
-> > +{
-> []
-> > +                     pr_warning("mityomapl138_init: unknown LCD type :
-> %s\n",
-> > +                             peripheral_config.LCDConfig.PanelName);
->
-> I think you'd be better off actually using the actual
-> function name rather than the caller name
->
->                        pr_warning("%s: unknown LCD type: %s\n",
->                                   __func__,
-> peripheral_config.LCDConfig.PanelName);
->
->
-Absolutely.   Didn't catch those when shuffling around during cleanup /
-etc.
-I will clean these up and resubmit.
-
-Thank you for the feedback.
-
--Mike
+Because in 2.6.28 we used Strongly Ordered memory for the coherent DMA
+buffers and on many CPUs SO accesses are ordered relatively to Device
+accesses. But that even this isn't guaranteed by the ARM ARM.
 
 -- 
-Michael Williamson
-315-425-4045x230
-www.criticallink.com
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100718/6b017c19/attachment.html>
+Catalin
