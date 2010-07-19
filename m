@@ -1,9 +1,9 @@
 From: c.aeschlimann@acn-group.ch (Christophe Aeschlimann)
-Date: Mon, 19 Jul 2010 16:22:43 +0200
+Date: Mon, 19 Jul 2010 16:20:08 +0200
 Subject: [PATCH v2] davinci: Add MityDSP-L138/MityARM-1808 SOM support
 In-Reply-To: <4C44515A.4030003@criticallink.com>
 References: <4C44515A.4030003@criticallink.com>
-Message-ID: <4C445FB3.5050901@acn-group.ch>
+Message-ID: <4C445F18.60506@acn-group.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,7 +24,7 @@ On 19.07.2010 15:21, Michael Williamson wrote:
 > +
 > +/* TPS65070 voltage regulator support */
 
-The comment doesn't match what _you are_ supporting.
+The comment doesn't match what your supporting.
 
 > +
 > +/* 1.2V Core */
