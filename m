@@ -1,79 +1,73 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 19 Jul 2010 14:44:42 +0100
-Subject: [PATCH 8/9] ARM: Improve the L2 cache performance when PL310 is used
+Date: Mon, 19 Jul 2010 14:44:47 +0100
+Subject: [PATCH 9/9] ARM: Implement phys_mem_access_prot() to avoid
+	attributes aliasing
 In-Reply-To: <20100719133050.24290.70856.stgit@e102109-lin.cambridge.arm.com>
 References: <20100719133050.24290.70856.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100719134442.24290.87957.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100719134447.24290.48140.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With this L2 cache controller, the cache maintenance by PA and sync
-operations are atomic and do not require a "wait" loop. This patch
-conditionally defines the cache_wait() function.
+ARMv7 onwards requires that there are no aliases to the same physical
+location using different memory types (i.e. Normal vs Strongly Ordered).
+Access to SO mappings when the unaligned accesses are handled in
+hardware is also Unpredictable (pgprot_noncached() mappings in user
+space).
 
-Since L2x0 cache controllers do not work with ARMv7 CPUs, the patch
-automatically enables CACHE_PL310 when only CPU_V7 is defined.
+The /dev/mem driver requires uncached mappings with O_SYNC. The patch
+implements the phys_mem_access_prot() function which generates Strongly
+Ordered memory attributes if !pfn_valid() (independent of O_SYNC) and
+Normal Noncacheable (writecombine) if O_SYNC.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/mm/Kconfig      |    8 ++++++++
- arch/arm/mm/cache-l2x0.c |   15 ++++++++++++---
- 2 files changed, 20 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/pgtable.h |    3 +++
+ arch/arm/mm/mmu.c              |   14 ++++++++++++++
+ 2 files changed, 17 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 294a57d..4e93c4a 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -797,6 +797,14 @@ config CACHE_L2X0
- 	help
- 	  This option enables the L2x0 PrimeCell.
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 42e694f..ea19775 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -337,6 +337,9 @@ static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
+ #ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
+ #define pgprot_dmacoherent(prot) \
+ 	__pgprot_modify(prot, L_PTE_MT_MASK|L_PTE_EXEC, L_PTE_MT_BUFFERABLE)
++#define __HAVE_PHYS_MEM_ACCESS_PROT
++extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
++				     unsigned long size, pgprot_t vma_prot);
+ #else
+ #define pgprot_dmacoherent(prot) \
+ 	__pgprot_modify(prot, L_PTE_MT_MASK|L_PTE_EXEC, L_PTE_MT_UNCACHED)
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 499e22d..e107f1b 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -15,6 +15,7 @@
+ #include <linux/mman.h>
+ #include <linux/nodemask.h>
+ #include <linux/sort.h>
++#include <linux/fs.h>
  
-+config CACHE_PL310
-+	bool
-+	depends on CACHE_L2X0
-+	default y if CPU_V7 && !CPU_V6
-+	help
-+	  This option enables optimisations for the PL310 cache
-+	  controller.
-+
- config CACHE_TAUROS2
- 	bool "Enable the Tauros2 L2 cache controller"
- 	depends on (ARCH_DOVE || ARCH_MMP)
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 532c35c..b5c573e 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -29,13 +29,22 @@ static void __iomem *l2x0_base;
- static DEFINE_SPINLOCK(l2x0_lock);
- static uint32_t l2x0_way_mask;	/* Bitmask of active ways */
- 
--static inline void cache_wait(void __iomem *reg, unsigned long mask)
-+static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
- {
--	/* wait for the operation to complete */
-+	/* wait for cache operation by line or way to complete */
- 	while (readl_relaxed(reg) & mask)
- 		;
+ #include <asm/cputype.h>
+ #include <asm/mach-types.h>
+@@ -487,6 +488,19 @@ static void __init build_mem_type_table(void)
+ 	}
  }
  
-+#ifdef CONFIG_CACHE_PL310
-+static inline void cache_wait(void __iomem *reg, unsigned long mask)
++#ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
++pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
++			      unsigned long size, pgprot_t vma_prot)
 +{
-+	/* cache operations by line are atomic on PL310 */
++	if (!pfn_valid(pfn))
++		return pgprot_noncached(vma_prot);
++	else if (file->f_flags & O_SYNC)
++		return pgprot_writecombine(vma_prot);
++	return vma_prot;
 +}
-+#else
-+#define cache_wait	cache_wait_way
++EXPORT_SYMBOL(phys_mem_access_prot);
 +#endif
 +
- static inline void cache_sync(void)
- {
- 	void __iomem *base = l2x0_base;
-@@ -110,7 +119,7 @@ static inline void l2x0_inv_all(void)
- 	/* invalidate all ways */
- 	spin_lock_irqsave(&l2x0_lock, flags);
- 	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_INV_WAY);
--	cache_wait(l2x0_base + L2X0_INV_WAY, l2x0_way_mask);
-+	cache_wait_way(l2x0_base + L2X0_INV_WAY, l2x0_way_mask);
- 	cache_sync();
- 	spin_unlock_irqrestore(&l2x0_lock, flags);
- }
+ #define vectors_base()	(vectors_high() ? 0xffff0000 : 0)
+ 
+ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
