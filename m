@@ -1,39 +1,53 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 19 Jul 2010 09:47:46 +0100
-Subject: [PATCH v3 7/7] ARM: S5PV210: Initial CPUFREQ Support
-In-Reply-To: <1279517483-22751-8-git-send-email-myungjoo.ham@samsung.com>
-References: <1279517483-22751-1-git-send-email-myungjoo.ham@samsung.com>
-	<1279517483-22751-2-git-send-email-myungjoo.ham@samsung.com>
-	<1279517483-22751-3-git-send-email-myungjoo.ham@samsung.com>
-	<1279517483-22751-4-git-send-email-myungjoo.ham@samsung.com>
-	<1279517483-22751-5-git-send-email-myungjoo.ham@samsung.com>
-	<1279517483-22751-6-git-send-email-myungjoo.ham@samsung.com>
-	<1279517483-22751-7-git-send-email-myungjoo.ham@samsung.com>
-	<1279517483-22751-8-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <20100719084745.GA7002@sirena.org.uk>
+From: kirill@shutemov.name (Kirill A. Shutsemov)
+Date: Mon, 19 Jul 2010 11:53:21 +0300
+Subject: [PATCH 1/5] Use SIGBUS for unalinged access instead of SIGILL
+In-Reply-To: <cover.1279529223.git.kirill@shutemov.name>
+References: <cover.1279529223.git.kirill@shutemov.name>
+Message-ID: <91bc8b97638b650c2af70b2e25814618f75cfee2.1279529223.git.kirill@shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 19, 2010 at 02:31:23PM +0900, MyungJoo Ham wrote:
-> S5PV210 CPUFREQ Support.
-> 
-> This CPUFREQ may work without PMIC's DVS support. However, it is not
-> as effective without DVS support as supposed. AVS is not supported in
-> this version.
-> 
-> Note that CLK_SRC of some clocks including ARMCLK, G3D, G2D, MFC,
-> and ONEDRAM are modified directly without updating clksrc_src
-> representations of the clocks.  Because CPUFREQ reverts the CLK_SRC
-> to the supposed values, this does not affect the consistency as long as
-> there are no other modules that modifies clock sources of ARMCLK, G3D,
-> G2D, MFC, and ONEDRAM (and only CPUFREQ should have the control). As
-> soon as clock framework is settled, we may update source clocks
-> (.parent field) of those clocks accordingly later.
-> 
-> 
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+From: Kirill A. Shutemov <kirill@shutemov.name>
 
-Still:
+POSIX specify to use signal SIGBUS with code BUS_ADRALN for invalid
+address alignment.
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
+---
+ arch/arm/mm/alignment.c |    4 ++--
+ arch/arm/mm/fault.c     |    4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index 6f98c35..53a6096 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -924,8 +924,8 @@ static int __init alignment_init(void)
+ 		ai_usermode = UM_FIXUP;
+ 	}
+ 
+-	hook_fault_code(1, do_alignment, SIGILL, "alignment exception");
+-	hook_fault_code(3, do_alignment, SIGILL, "alignment exception");
++	hook_fault_code(1, do_alignment, SIGBUS, "alignment exception");
++	hook_fault_code(3, do_alignment, SIGBUS, "alignment exception");
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index cbfb2ed..ce6f3a4 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -463,9 +463,9 @@ static struct fsr_info {
+ 	 * defines these to be "precise" aborts.
+ 	 */
+ 	{ do_bad,		SIGSEGV, 0,		"vector exception"		   },
+-	{ do_bad,		SIGILL,	 BUS_ADRALN,	"alignment exception"		   },
++	{ do_bad,		SIGBUS,	 BUS_ADRALN,	"alignment exception"		   },
+ 	{ do_bad,		SIGKILL, 0,		"terminal exception"		   },
+-	{ do_bad,		SIGILL,	 BUS_ADRALN,	"alignment exception"		   },
++	{ do_bad,		SIGBUS,	 BUS_ADRALN,	"alignment exception"		   },
+ /* Do we need runtime check ? */
+ #if __LINUX_ARM_ARCH__ < 6
+ 	{ do_bad,		SIGBUS,	 0,		"external abort on linefetch"	   },
+-- 
+1.7.1.1
