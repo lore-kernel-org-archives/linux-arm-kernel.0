@@ -1,29 +1,31 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 19 Jul 2010 20:19:03 +0200
-Subject: [PATCH 1/2] ARM: move SPEAr to use common mult/shift calculation
-	code
-In-Reply-To: <AANLkTinS5zMWdoxBczgpQmYWMgWI77Jwkyfz6LtMH8yK@mail.gmail.com>
-References: <1275067996-17233-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTinS5zMWdoxBczgpQmYWMgWI77Jwkyfz6LtMH8yK@mail.gmail.com>
-Message-ID: <AANLkTimSOKu_4K7b8H5rJIKUPfNi1ytpGF6ElTh9JeLu@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Jul 2010 19:40:02 +0100
+Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
+	memory management
+In-Reply-To: <4C449183.20000@codeaurora.org>
+References: <20100713150311B.fujita.tomonori@lab.ntt.co.jp>
+	<20100713121420.GB4263@codeaurora.org>
+	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
+	<20100714201149.GA14008@codeaurora.org>
+	<20100714220536.GE18138@n2100.arm.linux.org.uk>
+	<20100715012958.GB2239@codeaurora.org>
+	<20100715085535.GC26212@n2100.arm.linux.org.uk>
+	<AANLkTinVZeaZxt_lWKhjKa0dqhu3_j3BRNySO-2LvMdw@mail.gmail.com>
+	<20100716075856.GC16124@n2100.arm.linux.org.uk>
+	<4C449183.20000@codeaurora.org>
+Message-ID: <20100719184002.GA21608@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/19 shiraz hashim <shiraz.linux.kernel@gmail.com>:
+On Mon, Jul 19, 2010 at 10:55:15AM -0700, Michael Bohan wrote:
+>
+> On 7/16/2010 12:58 AM, Russell King - ARM Linux wrote:
+>
+>> As the patch has been out for RFC since early April on the linux-arm-kernel
+>> mailing list (Subject: [RFC] Prohibit ioremap() on kernel managed RAM),
+>> and no comments have come back from Qualcomm folk.
+>
+> Would it be unreasonable to allow a map request to succeed if the  
+> requested attributes matched that of the preexisting mapping?
 
-> The timer on spear platforms is 16 bit only (say with min. functional
-> freq as 187500 HZ.).
-> With these values the resolution of the timer is not much so what
-> should be the good value
-> of SPEAR_MIN_RANGE.
-
-I've set it to 4 seconds, it will scale properly to assure the system
-will get as much resolution as possible while still being able to
-sleep for 4 seconds. 187 kHz is quite slow anyway.
-
-> Tested-by: Shiraz Hashim <shiraz.hashim@st.com>
-
-Thanks!
-
-Yours,
-Linus Walleij
+What would be the point of creating such a mapping?
