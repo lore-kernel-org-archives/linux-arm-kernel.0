@@ -1,30 +1,67 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 19 Jul 2010 10:09:14 +0100
-Subject: [PATCH 5/5] ARM: S5PV210: Initial CPUFREQ Support
-In-Reply-To: <AANLkTine-RPFqd1zp-vu4xRaidhngU0t3hC3SP_bXfWw@mail.gmail.com>
-References: <1279184768-28971-5-git-send-email-myungjoo.ham@samsung.com>
-	<1279184768-28971-6-git-send-email-myungjoo.ham@samsung.com>
-	<20100715115942.GA15919@sirena.org.uk>
-	<AANLkTinrrXlh1GQ178_NzwWt5luO_1mdfIGy6G2ZNbPH@mail.gmail.com>
-	<20100716081707.GA9082@rakim.wolfsonmicro.main>
-	<AANLkTikYX6N7q3lT5ZzXh3RQnGss39eGhSrfC9blqoF_@mail.gmail.com>
-	<20100716084231.GF9082@rakim.wolfsonmicro.main>
-	<AANLkTikNCOjOSVlcBv99DuJEdPtQHmKpC8Cs60rQz1r3@mail.gmail.com>
-	<20100716093710.GH9082@rakim.wolfsonmicro.main>
-	<AANLkTine-RPFqd1zp-vu4xRaidhngU0t3hC3SP_bXfWw@mail.gmail.com>
-Message-ID: <20100719090914.GC15693@rakim.wolfsonmicro.main>
+From: zt.tmzt@gmail.com (Tim HRM)
+Date: Mon, 19 Jul 2010 05:21:35 -0400
+Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
+	memory management
+In-Reply-To: <20100717000108.GB21293@labbmf-linux.quicinc.com>
+References: <4C3C0032.5020702@codeaurora.org>
+	<20100713150311B.fujita.tomonori@lab.ntt.co.jp>
+	<20100713121420.GB4263@codeaurora.org>
+	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
+	<20100714201149.GA14008@codeaurora.org>
+	<20100714220536.GE18138@n2100.arm.linux.org.uk>
+	<20100715012958.GB2239@codeaurora.org>
+	<20100715085535.GC26212@n2100.arm.linux.org.uk>
+	<AANLkTinVZeaZxt_lWKhjKa0dqhu3_j3BRNySO-2LvMdw@mail.gmail.com>
+	<20100716075856.GC16124@n2100.arm.linux.org.uk>
+	<20100717000108.GB21293@labbmf-linux.quicinc.com>
+Message-ID: <AANLkTinTQXbsD91JDHiSFrvDoUeHbaGUGSWA-5aT5ZCr@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 19, 2010 at 09:40:24AM +0900, MyungJoo Ham wrote:
+On Fri, Jul 16, 2010 at 8:01 PM, Larry Bassel <lbassel@codeaurora.org> wrote:
+> On 16 Jul 10 08:58, Russell King - ARM Linux wrote:
+>> On Thu, Jul 15, 2010 at 08:48:36PM -0400, Tim HRM wrote:
+>> > Interesting, since I seem to remember the MSM devices mostly conduct
+>> > IO through regions of normal RAM, largely accomplished through
+>> > ioremap() calls.
+>> >
+>> > Without more public domain documentation of the MSM chips and AMSS
+>> > interfaces I wouldn't know how to avoid this, but I can imagine it
+>> > creates a bit of urgency for Qualcomm developers as they attempt to
+>> > upstream support for this most interesting SoC.
+>>
+>> As the patch has been out for RFC since early April on the linux-arm-kernel
+>> mailing list (Subject: [RFC] Prohibit ioremap() on kernel managed RAM),
+>> and no comments have come back from Qualcomm folk.
+>
+> We are investigating the impact of this change on us, and I
+> will send out more detailed comments next week.
+>
+>>
+>> The restriction on creation of multiple V:P mappings with differing
+>> attributes is also fairly hard to miss in the ARM architecture
+>> specification when reading the sections about caches.
+>>
+>
+> Larry Bassel
+>
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
 
-> Uh oh.. I didn't mean that the default ramp time is the "required" or
-> "suggested" by the PMIC, but I meant that it is required by the CPU to
-> execute instructions without possible CPU lockups due to lower voltage
+Hi Larry and Qualcomm people.
+I'm curious what your reason for introducing this new api (or adding
+to dma) is.  Specifically how this would be used to make the memory
+mapping of the MSM chip dynamic in contrast to the fixed _PHYS defines
+in the Android and Codeaurora trees.
 
-You're still missing my point here.  What I'm saying is that by using
-the slower default ramp rate of the PMIC you're making the length of the
-stall in execution introduced by waiting for the ramp to complete more
-severe than it needs to be, thus increasing the impact on the system and
-the need to do work in software to mitigate that.  Reducing the ramp
-time should result in improved system performance.
+I'm also interested in how this ability to map memory regions as files
+for devices like KGSL/DRI or PMEM might work and why this is better
+suited to that purpose than existing methods, where this fits into
+camera preview and other issues that have been dealt with in these
+trees in novel ways (from my perspective).
+
+Thanks,
+Timothy Meade
+tmzt #htc-linux
