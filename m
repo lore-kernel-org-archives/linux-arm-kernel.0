@@ -1,40 +1,37 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Mon, 19 Jul 2010 14:31:16 +0900
-Subject: [PATCH v3 0/7] ARM: S5PV210: CPUFREQ Initial Support
-Message-ID: <1279517483-22751-1-git-send-email-myungjoo.ham@samsung.com>
+Date: Mon, 19 Jul 2010 14:31:17 +0900
+Subject: [PATCH v3 1/7] ARM: S5PV210: Add a Kconfig entry
+	"S5PC110_EVT0_WORKAROUND"
+In-Reply-To: <1279517483-22751-1-git-send-email-myungjoo.ham@samsung.com>
+References: <1279517483-22751-1-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <1279517483-22751-2-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-S5PV210 CPUFREQ Initial Support.
+Early S5PC110 (EVT0) chip had some issues required workaround from a
+kernel. We can add such workaround codes with this Kconfig entry.
 
-This is a series of patches to enable CPUFREQ for S5PV210.
+Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv210/Kconfig |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-Although this works without PMIC's DVS support, it is not
-as effective without DVS support as supposed. AVS is not
-supported in this version.
-
-
-MyungJoo Ham (7):
-  ARM: S5PV210: Add a Kconfig entry "S5PC110_EVT0_WORKAROUND"
-  ARM: Samsung SoC: added hclk/pclk info to s3c_freq for s5pv210
-    cpu-freq
-  ARM: S5P: Added default pll values for APLL 800/1000MHz
-  ARM: S5P: Virtual Addresses for DMCx registers.
-  ARM: S5PV210: macros for clock registers at regs-clock.h
-  ARM: S5PV210: Access for DMCx registers
-  ARM: S5PV210: Initial CPUFREQ Support
-
- arch/arm/Kconfig                                |    1 +
- arch/arm/mach-s5pv210/Kconfig                   |    7 +
- arch/arm/mach-s5pv210/Makefile                  |    3 +
- arch/arm/mach-s5pv210/cpu.c                     |   12 +-
- arch/arm/mach-s5pv210/cpufreq-s5pv210.c         |  766 +++++++++++++++++++++++
- arch/arm/mach-s5pv210/include/mach/cpu-freq.h   |   51 ++
- arch/arm/mach-s5pv210/include/mach/map.h        |    4 +
- arch/arm/mach-s5pv210/include/mach/regs-clock.h |   45 ++-
- arch/arm/plat-s5p/include/plat/map-s5p.h        |    3 +
- arch/arm/plat-s5p/include/plat/pll.h            |    8 +
- arch/arm/plat-samsung/include/plat/cpu-freq.h   |    6 +
- 11 files changed, 902 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/cpufreq-s5pv210.c
- create mode 100644 arch/arm/mach-s5pv210/include/mach/cpu-freq.h
+diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+index 631019a..18802e7 100644
+--- a/arch/arm/mach-s5pv210/Kconfig
++++ b/arch/arm/mach-s5pv210/Kconfig
+@@ -101,4 +101,11 @@ config MACH_SMDKC110
+ 	  Machine support for Samsung SMDKC110
+ 	  S5PC110(MCP) is one of package option of S5PV210
+ 
++config S5PC110_EVT0_WORKAROUND
++	bool "S5PC110 Early Chip Workaround (EVT0)"
++	help
++	  Early S5PC110 (so called EVT0) has errata items that should be
++	  addressed; otherwise the kernel may panic or be locked up. Enable
++	  this option to execute workaround instructions.
++
+ endif
+-- 
+1.6.3.3
