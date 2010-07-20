@@ -1,100 +1,70 @@
-From: minchan.kim@gmail.com (Minchan Kim)
-Date: Wed, 21 Jul 2010 00:57:32 +0900
-Subject: [PATCH] Tight check of pfn_valid on sparsemem - v2
-In-Reply-To: <20100720101557.GD16031@cmpxchg.org>
-References: <1279448311-29788-1-git-send-email-minchan.kim@gmail.com>
-	<20100720101557.GD16031@cmpxchg.org>
-Message-ID: <20100720155732.GA1940@barrios-desktop>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 20 Jul 2010 17:01:27 +0100
+Subject: [RFC PATCH] ARM: Allow lazy cache flushing via PG_arch_1 for
+	highmem pages
+In-Reply-To: <alpine.LFD.2.00.1007201715470.25803@xanadu.home>
+References: <20100720124102.7163.46919.stgit@e102109-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1007201458430.24916@xanadu.home>
+	<alpine.LFD.2.00.1007201715470.25803@xanadu.home>
+Message-ID: <1279641687.10002.45.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 20, 2010 at 12:15:58PM +0200, Johannes Weiner wrote:
-> Hi,
+On Tue, 2010-07-20 at 16:17 +0100, Nicolas Pitre wrote:
+> On Tue, 20 Jul 2010, Nicolas Pitre wrote:
 > 
-> On Sun, Jul 18, 2010 at 07:18:31PM +0900, Minchan Kim wrote:
-> > Kukjin reported oops happen while he change min_free_kbytes
-> > http://www.spinics.net/lists/arm-kernel/msg92894.html
-> > It happen by memory map on sparsemem.
-> > 
-> > The system has a memory map following as. 
-> >      section 0             section 1              section 2
-> > 0x20000000-0x25000000, 0x40000000-0x50000000, 0x50000000-0x58000000
-> > SECTION_SIZE_BITS 28(256M)
-> > 
-> > It means section 0 is an incompletely filled section.
-> > Nontheless, current pfn_valid of sparsemem checks pfn loosely. 
-> > It checks only mem_section's validation but ARM can free mem_map on hole 
-> > to save memory space. So in above case, pfn on 0x25000000 can pass pfn_valid's 
-> > validation check. It's not what we want.
+> > On Tue, 20 Jul 2010, Catalin Marinas wrote:
 > >
-> > We can match section size to smallest valid size.(ex, above case, 16M)
-> > But Russell doesn't like it due to mem_section's memory overhead with different
-> > configuration(ex, 512K section).
+> > > Current flush_dcache_page() implementation does not allow lazy cache
+> > > flushing for highmem pages (introduced by commit d73cd42) on the
+> > > assumption that the temporary kmap mapping would disappear. A subsequent
+> > > commit (7e5a69e) allows __flush_dcache_page() to handle highmem pages so
+> > > we can allow lazy cache flushing even for highmem pages.
 > >
-> > I tried to add valid pfn range in mem_section but everyone doesn't like it 
-> > due to size overhead. This patch is suggested by KAMEZAWA-san. 
-> > I just fixed compile error and change some naming.
+> > Actually this has been in the back of my mind for a while.  The
+> > reasoning in d73cd42 is flawed, irrespective of the changes in 7e5a69e. 
+> > Even without the later, it should have been possible to lazily flush the
+> > himem pages because they get flushed anyway the moment their virtual
+> > mapping goes away through flush_cache_kmaps().  What the second commit
+> > is doing is making highmem usable on a VIPT system while it was totally
+> > unacounted for and broken before.
+> >
+> > Acked-by: Nicolas Pitre <nico@linaro.org>
 > 
-> I did not like it, because it messes up the whole concept of a
-> section.
+> BTW, while I agree with the patch, you might have guessed that I prefer
+> that the commit message be changed to more reflect reality.
 
-Yes. but ARM already have broken it.
-So we can't ignore it. 
+I didn't figure out what you meant exactly since without 7e5a69e,
+__flush_dcache_page() called from update_mmu_cache() may fault.
 
-> 
-> But most importantly, we already have a crutch for ARM in place,
-> namely memmap_valid_within().  Looking at Kukjin's bug report,
-> wouldn't it be enough to use that check in
-> setup_zone_migrate_reserve()?
+Anyway, does this sound ok? Thanks.
 
-I did it.
-But I think it's not a fundamental solution.
-It would make new bad rule which whole pfn walker should call 
-memmap_valid_within. 
 
-I just greped "grep -nRH 'start_pfn' mm/'.
-If we add it in setup_zone_migration_reserve, look at kmemleak(kmemleak_scan)
-compaction(isolate_migratepages) and so on. I am not sure how many there are.
-I doubt they have a same problem in setup_zone_migrate_pages.
-Should we add memmap_valid_within whenever whole pfn walker does?
+ARM: Allow lazy cache flushing via PG_arch_1 for highmem pages
 
-> 
-> Your approach makes every pfn_valid() more expensive, although the
-> extensive checks are not not needed everywhere (check the comment
-> above memmap_valid_within): vm_normal_page() for example can probably
-> assume that a PTE won't point to a hole within the memory map.
+From: Catalin Marinas <catalin.marinas@arm.com>
 
-I agree. But I think it's trade-off of architecture have memmap hole.
-They want to use such model which don't meet sparsemem's disign
-so that it's cost they have to pay.
-In fact, All we mm guys don't want to use such model, but ARM has been 
-used such model, so we can't ignore them. So I want to care them but doesn't
-affect non-hole architecure of memmap. 
-In terms of such point, this patch doesn't have a overhead 
-in non-hole architecture and it doesn't make new rule as I said above.
-Also, hole architecture developers don't need to override pfn_valid to detect
-hole pfn range. 
+Commit d73cd42 forced non-lazy cache flushing of highmem pages in
+flush_dcache_page(). This isn't needed since __flush_dcache_page()
+(called lazily from update_mmu_cache) can handle highmem pages (fixed by
+commit 7e5a69e).
 
-> 
-> OTOH, if the ARM people do not care, we could probably go with your
-> approach, encode it all into pfn_valid(), and also get rid of
-> memmap_valid_within() completely.  But I would prefer doing a bugfix
-> first and such a conceptual change in a different patch, would you
-> agree?
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+---
+ arch/arm/mm/flush.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Hmm, I am not sure. memmap_valid_within problem can happen in only sparemem?
-AFAIR, the problem can happen in punched hole(not either side hole) of FLATMEM?
-If it is right, maybe we should expand this patch 
-to CONFIG_ARCH_HAS_HOLES_MEMORYMODEL not CONFIG_SPARSEMEM.
-
-And I think this patch just checks validation of memmap not page's itself 
-validiation. If one page in memmap has mixed(valid or non-valid) struct page 
-descriptors,  it can't  identify it. So pfn walker need to check PageReserved 
-in addition to pfn_valid. But as I review above example, some cases
-doesn't check it. but it's a another story we have to fix. 
-
-Thanks for careful review, Hannes. :)
-
--- 
-Kind regards,
-Minchan Kim
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index c6844cb..87dd5ff 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -247,7 +247,7 @@ void flush_dcache_page(struct page *page)
+ 	mapping = page_mapping(page);
+ 
+ #ifndef CONFIG_SMP
+-	if (!PageHighMem(page) && mapping && !mapping_mapped(mapping))
++	if (mapping && !mapping_mapped(mapping))
+ 		set_bit(PG_dcache_dirty, &page->flags);
+ 	else
+ #endif
