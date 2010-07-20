@@ -1,32 +1,37 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 20 Jul 2010 10:58:52 +0300
-Subject: [PATCH] [ARM] pxa/cm-x300: fix ffuart registration
-Message-ID: <1279612732-5906-1-git-send-email-grinberg@compulab.co.il>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 20 Jul 2010 09:53:57 +0100
+Subject: Problem with dma_alloc_coherent at linux-2.6.33-arm1 ,
+	withRealView platform,board PBX-A9 and armv7 instructions.
+In-Reply-To: <AANLkTinPlxiyIV9rWAIc0CR_MTymXXqNLZAu-P8OvEHK@mail.gmail.com>
+References: <AANLkTikiHfOL0WMjiZnWY3RVmw89hZVFcNkqfDUYSDgG@mail.gmail.com>
+	<1279542557.10760.21.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTinPlxiyIV9rWAIc0CR_MTymXXqNLZAu-P8OvEHK@mail.gmail.com>
+Message-ID: <1279616037.27808.1.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ffuart is available on cm-x300 only with pxa300.
+On Tue, 2010-07-20 at 04:17 +0100, David Yang wrote:
+> On Mon, Jul 19, 2010 at 8:29 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Sat, 2010-07-17 at 08:05 +0100, David Yang wrote:
+> >> I have a question: in linux-2.6.28, there is no barriers in the IO
+> >> accessors.
+> >
+> > Because in 2.6.28 we used Strongly Ordered memory for the coherent DMA
+> > buffers and on many CPUs SO accesses are ordered relatively to Device
+> > accesses. But that even this isn't guaranteed by the ARM ARM.
+> >
+> 
+> Yes, I know that.
+> 
+> But I mean that ,in linux-2.6.28,whether the order between the IO
+> access will be re-ordered at the hardware level? And whether we should
+> use the wmb() to guarantee the order? Here we just talk about the IO
+> register access,without the normal memory or coherent DMA buffers.
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
----
- arch/arm/mach-pxa/cm-x300.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+IO accesses (via Device memory mapping) are guaranteed by the hardware
+to be ordered (i.e. they reach the device in the specified program
+order).
 
-diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
-index fdda6be..d717b49 100644
---- a/arch/arm/mach-pxa/cm-x300.c
-+++ b/arch/arm/mach-pxa/cm-x300.c
-@@ -745,9 +745,10 @@ static void __init cm_x300_init(void)
- {
- 	cm_x300_init_mfp();
- 
--	pxa_set_ffuart_info(NULL);
- 	pxa_set_btuart_info(NULL);
- 	pxa_set_stuart_info(NULL);
-+	if (cpu_is_pxa300())
-+		pxa_set_ffuart_info(NULL);
- 
- 	cm_x300_init_da9030();
- 	cm_x300_init_dm9000();
 -- 
-1.7.1
+Catalin
