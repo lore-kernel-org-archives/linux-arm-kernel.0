@@ -1,15 +1,211 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Jul 2010 22:19:22 +0100
-Subject: [RFC] arm: versatile: enable PCI I/O space
-In-Reply-To: <201007202312.18353.arnd@arndb.de>
-References: <AANLkTikiim-a8zM0PRDVVN078xBWeZt7ElwbC4oZsfXy@mail.gmail.com>
-	<201007202312.18353.arnd@arndb.de>
-Message-ID: <20100720211921.GC10553@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 20 Jul 2010 23:22:16 +0200
+Subject: [PATCH =?iso-8859-1?q?v2=5D=A0arm=3A_versatile=3A_enable_PCI_I/O?=
+	space
+In-Reply-To: <201007201309.36898.arnd@arndb.de>
+References: <201007201123.38709.arnd@arndb.de>
+	<20100720095940.GA32702@n2100.arm.linux.org.uk>
+	<201007201309.36898.arnd@arndb.de>
+Message-ID: <201007202322.16615.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 20, 2010 at 11:12:17PM +0200, Arnd Bergmann wrote:
-> We also have two platforms (integrator and shark) that use a
-> higher value of 0x6000 but do not document why they do so.
+I/O space handling on the versatile platform is currently
+broken in multiple ways. Most importantly, the ports do
+not get mapped into the virtual address space at all.
 
-On Integrator, it's fairly arbitary, and could be 0x1000 too.
+Also, there is some amount of confusion between PCI I/O
+space and other statically mapped MMIO registers in the
+platform code:
+
+* The __io_address() macro that is used to access the
+  platform register maps to the same __io macro that gets
+  used for I/O space.
+
+* The IO_SPACE_LIMIT is set to a value that is much larger
+  than the total available space.
+
+* The I/O resource of the PCI bus is set to the physical
+  address of the mapping, which is way outside of the
+  actual I/O space limit as well as the address range that
+  gets decoded by traditional PCI cards.
+
+* No attempt is made to stay outside of the ISA port range
+  that some device drivers try access.
+
+* No resource gets requested as a child of ioport_resource,
+  but an IORESOURCE_IO type mapping gets requested
+  as a child of iomem_resource.
+
+This patch attempts to correct all of the above. This makes
+it possible to use virtio-pci based virtual devices as well
+as actual PCI cards including those with legacy ISA port
+ranges like VGA.
+
+Some of the issues seem to be duplicated on other platforms.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+
+Version 2 of this patch adds improvements suggested by Russell.
+I chose to define PCIO_BASE directly and to derive the static
+mapping from that, because it will allow us to eventually move
+to a fixed PCIO_BASE in the virtual mapping of multiplatform kernels.
+
+Tested in qemu with a small patch to enable PCI I/O space for
+versatile. Catalin mentioned that I/O space mappings possibly
+never worked on the real versatile board, but applying this
+patch should still fix real problems, e.g. you no longer
+crash the kernel by writing to /dev/port and it makes it
+possible to use qemu virtio devices.
+
+	Arnd
+
+ arch/arm/mach-versatile/core.c                  |   19 +++----------------
+ arch/arm/mach-versatile/include/mach/hardware.h |   17 ++++-------------
+ arch/arm/mach-versatile/include/mach/io.h       |    6 ++++--
+ arch/arm/mach-versatile/pci.c                   |   18 ++++++++++++++++--
+ 4 files changed, 27 insertions(+), 33 deletions(-)
+
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+index 3dff864..4b9ad2c 100644
+--- a/arch/arm/mach-versatile/core.c
++++ b/arch/arm/mach-versatile/core.c
+@@ -200,26 +200,13 @@ static struct map_desc versatile_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(VERSATILE_PCI_CFG_BASE),
+ 		.length		= VERSATILE_PCI_CFG_BASE_SIZE,
+ 		.type		= MT_DEVICE
+-	},
+-#if 0
+- 	{
+-		.virtual	=  VERSATILE_PCI_VIRT_MEM_BASE0,
+-		.pfn		= __phys_to_pfn(VERSATILE_PCI_MEM_BASE0),
+-		.length		= SZ_16M,
+-		.type		= MT_DEVICE
+ 	}, {
+-		.virtual	=  VERSATILE_PCI_VIRT_MEM_BASE1,
+-		.pfn		= __phys_to_pfn(VERSATILE_PCI_MEM_BASE1),
+-		.length		= SZ_16M,
+-		.type		= MT_DEVICE
+-	}, {
+-		.virtual	=  VERSATILE_PCI_VIRT_MEM_BASE2,
+-		.pfn		= __phys_to_pfn(VERSATILE_PCI_MEM_BASE2),
+-		.length		= SZ_16M,
++		.virtual	=  (unsigned long)VERSATILE_PCI_VIRT_MEM_BASE0,
++		.pfn		= __phys_to_pfn(VERSATILE_PCI_MEM_BASE0),
++		.length		= IO_SPACE_LIMIT,
+ 		.type		= MT_DEVICE
+ 	},
+ #endif
+-#endif
+ };
+ 
+ void __init versatile_map_io(void)
+diff --git a/arch/arm/mach-versatile/include/mach/hardware.h b/arch/arm/mach-versatile/include/mach/hardware.h
+index 4f8f99a..b4ae7cf 100644
+--- a/arch/arm/mach-versatile/include/mach/hardware.h
++++ b/arch/arm/mach-versatile/include/mach/hardware.h
+@@ -29,25 +29,16 @@
+  */
+ #define VERSATILE_PCI_VIRT_BASE		(void __iomem *)0xe8000000ul
+ #define VERSATILE_PCI_CFG_VIRT_BASE	(void __iomem *)0xe9000000ul
++#define VERSATILE_PCI_VIRT_MEM_BASE0	(void __iomem *)PCIO_BASE
+ 
+-#if 0
+-#define VERSATILE_PCI_VIRT_MEM_BASE0	0xf4000000
+-#define VERSATILE_PCI_VIRT_MEM_BASE1	0xf5000000
+-#define VERSATILE_PCI_VIRT_MEM_BASE2	0xf6000000
+-
+-#define PCIO_BASE			VERSATILE_PCI_VIRT_MEM_BASE0
+-#define PCIMEM_BASE			VERSATILE_PCI_VIRT_MEM_BASE1
+-#endif
+-
+-/* CIK guesswork */
+-#define PCIBIOS_MIN_IO			0x44000000
++#define PCIBIOS_MIN_IO			0x00001000
+ #define PCIBIOS_MIN_MEM			0x50000000
+ 
+ #define pcibios_assign_all_busses()     1
+ 
+-/* macro to get at IO space when running virtually */
++/* macro to get at MMIO space when running virtually */
+ #define IO_ADDRESS(x)		(((x) & 0x0fffffff) + (((x) >> 4) & 0x0f000000) + 0xf0000000)
+ 
+-#define __io_address(n)		__io(IO_ADDRESS(n))
++#define __io_address(n)			((void __iomem *)IO_ADDRESS(n))
+ 
+ #endif
+diff --git a/arch/arm/mach-versatile/include/mach/io.h b/arch/arm/mach-versatile/include/mach/io.h
+index f067c14..83ef5b6 100644
+--- a/arch/arm/mach-versatile/include/mach/io.h
++++ b/arch/arm/mach-versatile/include/mach/io.h
+@@ -20,9 +20,11 @@
+ #ifndef __ASM_ARM_ARCH_IO_H
+ #define __ASM_ARM_ARCH_IO_H
+ 
+-#define IO_SPACE_LIMIT 0xffffffff
++#define PCIO_BASE	0xeb000000ul
++#define PCIO_SIZE	0x00100000ul
++#define IO_SPACE_LIMIT  (PCIO_SIZE - 1)
+ 
+-#define __io(a)		__typesafe_io(a)
++#define __io(a)		(a + PCIO_BASE)
+ #define __mem_pci(a)	(a)
+ 
+ #endif
+diff --git a/arch/arm/mach-versatile/pci.c b/arch/arm/mach-versatile/pci.c
+index 334f0df..4630ff1 100644
+--- a/arch/arm/mach-versatile/pci.c
++++ b/arch/arm/mach-versatile/pci.c
+@@ -170,11 +170,18 @@ static struct pci_ops pci_versatile_ops = {
+ 	.write	= versatile_write_config,
+ };
+ 
++static struct resource io_port = {
++	.name	= "PCI",
++	.start	= 0,
++	.end	= IO_SPACE_LIMIT,
++	.flags	= IORESOURCE_IO,
++};
++
+ static struct resource io_mem = {
+ 	.name	= "PCI I/O space",
+ 	.start	= VERSATILE_PCI_MEM_BASE0,
+ 	.end	= VERSATILE_PCI_MEM_BASE0+VERSATILE_PCI_MEM_BASE0_SIZE-1,
+-	.flags	= IORESOURCE_IO,
++	.flags	= IORESOURCE_MEM,
+ };
+ 
+ static struct resource non_mem = {
+@@ -201,6 +208,12 @@ static int __init pci_versatile_setup_resources(struct resource **resource)
+ 		       "memory region (%d)\n", ret);
+ 		goto out;
+ 	}
++	ret = request_resource(&ioport_resource, &io_port);
++	if (ret) {
++		printk(KERN_ERR "PCI: unable to allocate I/O "
++		       "port region (%d)\n", ret);
++		goto out;
++	}
+ 	ret = request_resource(&iomem_resource, &non_mem);
+ 	if (ret) {
+ 		printk(KERN_ERR "PCI: unable to allocate non-prefetchable "
+@@ -219,7 +232,7 @@ static int __init pci_versatile_setup_resources(struct resource **resource)
+ 	 * bus->resource[1] is the mem resource for this bus
+ 	 * bus->resource[2] is the prefetch mem resource for this bus
+ 	 */
+-	resource[0] = &io_mem;
++	resource[0] = &io_port;
+ 	resource[1] = &non_mem;
+ 	resource[2] = &pre_mem;
+ 
+@@ -250,6 +263,7 @@ int __init pci_versatile_setup(int nr, struct pci_sys_data *sys)
+ 
+ 	if (nr == 0) {
+ 		sys->mem_offset = 0;
++		sys->io_offset = 0;
+ 		ret = pci_versatile_setup_resources(sys->resource);
+ 		if (ret < 0) {
+ 			printk("pci_versatile_setup: resources... oops?\n");
+-- 
+1.7.1
