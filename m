@@ -1,29 +1,40 @@
-From: svenkatr@ti.com (Venkatraman S)
-Date: Tue, 20 Jul 2010 15:52:08 +0530
-Subject: configuration warnings with omap_3630sdp_defconfig in 2.6.35-rc5
-Message-ID: <AANLkTimh0MBzANu1rmLb7q1tYQMywznQd5DJ_mUKp_cZ@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 20 Jul 2010 12:54:49 +0200
+Subject: [PATCH] [ARM] pxa/cm-x300: fix ffuart registration
+In-Reply-To: <1279612732-5906-1-git-send-email-grinberg@compulab.co.il>
+References: <1279612732-5906-1-git-send-email-grinberg@compulab.co.il>
+Message-ID: <AANLkTikxIFryvGJeCRMPrGrdcPXaEDPjsgEozsHbndwR@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While trying to build omap_3630sdp_defconfig on Linus's 2.6.35-rc5, I
-get these warnings..
-I understand these could be related to the recent defconfig changes.
-I will try to investigate; posted here to know if anyone has found a
-fix already..
-------------------------------
-scripts/kconfig/conf -s arch/arm/Kconfig
-can't copy type 0
-warning: (USB_MUSB_HDRC_HCD && USB_SUPPORT && USB_MUSB_HDRC &&
-(USB_MUSB_HOST || USB_MUSB_OTG) && USB_GADGET_MUSB_HDRC ||
-USB_MUSB_OTG && <choice> && USB && USB_GADGET && PM && EXPERIMENTAL)
-selects USB_OTG which has unmet direct dependencies (USB_GADGET_OMAP
-&& ARCH_OMAP_OTG && USB_OHCI_HCD)
-warning: (USB_MUSB_HDRC_HCD && USB_SUPPORT && USB_MUSB_HDRC &&
-(USB_MUSB_HOST || USB_MUSB_OTG) && USB_GADGET_MUSB_HDRC ||
-USB_MUSB_OTG && <choice> && USB && USB_GADGET && PM && EXPERIMENTAL)
-selects USB_OTG which has unmet direct dependencies (USB_GADGET_OMAP
-&& ARCH_OMAP_OTG && USB_OHCI_HCD)
-------------------------------
+On Tue, Jul 20, 2010 at 9:58 AM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> ffuart is available on cm-x300 only with pxa300.
+>
+> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
 
-Regards,
-Venkat.
+Applied.
+
+> ---
+> ?arch/arm/mach-pxa/cm-x300.c | ? ?3 ++-
+> ?1 files changed, 2 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
+> index fdda6be..d717b49 100644
+> --- a/arch/arm/mach-pxa/cm-x300.c
+> +++ b/arch/arm/mach-pxa/cm-x300.c
+> @@ -745,9 +745,10 @@ static void __init cm_x300_init(void)
+> ?{
+> ? ? ? ?cm_x300_init_mfp();
+>
+> - ? ? ? pxa_set_ffuart_info(NULL);
+> ? ? ? ?pxa_set_btuart_info(NULL);
+> ? ? ? ?pxa_set_stuart_info(NULL);
+> + ? ? ? if (cpu_is_pxa300())
+> + ? ? ? ? ? ? ? pxa_set_ffuart_info(NULL);
+>
+> ? ? ? ?cm_x300_init_da9030();
+> ? ? ? ?cm_x300_init_dm9000();
+> --
+> 1.7.1
+>
+>
