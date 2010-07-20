@@ -1,48 +1,50 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Tue, 20 Jul 2010 01:53:41 +0200
-Subject: [spi-devel-general] [PATCH 2/2] SPI: make the moved loopback test
-	work
-In-Reply-To: <377310.49674.qm@web180311.mail.gq1.yahoo.com>
-References: <AANLkTikfwTxZ4iMaveddXLd1Z2phF0hVi_yG7A2wUNCo@mail.gmail.com>
-	<377310.49674.qm@web180311.mail.gq1.yahoo.com>
-Message-ID: <AANLkTinm_bvpcQogsTgVy5ZX1MFajVvDxBtVJ056sTyq@mail.gmail.com>
+From: kamezawa.hiroyu@jp.fujitsu.com (KAMEZAWA Hiroyuki)
+Date: Tue, 20 Jul 2010 09:04:40 +0900
+Subject: [PATCH] Tight check of pfn_valid on sparsemem - v2
+In-Reply-To: <1279448311-29788-1-git-send-email-minchan.kim@gmail.com>
+References: <1279448311-29788-1-git-send-email-minchan.kim@gmail.com>
+Message-ID: <20100720090440.b7f85b8a.kamezawa.hiroyu@jp.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/19 David Brownell <david-b@pacbell.net>:
+On Sun, 18 Jul 2010 19:18:31 +0900
+Minchan Kim <minchan.kim@gmail.com> wrote:
 
-> A dedicated loopback test is the wrong model,
-> given that SPI_LOOP exists. ?And is even used
-> in the sample userspace code ...
+> Kukjin reported oops happen while he change min_free_kbytes
+> http://www.spinics.net/lists/arm-kernel/msg92894.html
+> It happen by memory map on sparsemem.
+> 
+> The system has a memory map following as. 
+>      section 0             section 1              section 2
+> 0x20000000-0x25000000, 0x40000000-0x50000000, 0x50000000-0x58000000
+> SECTION_SIZE_BITS 28(256M)
+> 
+> It means section 0 is an incompletely filled section.
+> Nontheless, current pfn_valid of sparsemem checks pfn loosely. 
+> It checks only mem_section's validation but ARM can free mem_map on hole 
+> to save memory space. So in above case, pfn on 0x25000000 can pass pfn_valid's 
+> validation check. It's not what we want. 
+> 
+> We can match section size to smallest valid size.(ex, above case, 16M)
+> But Russell doesn't like it due to mem_section's memory overhead with different
+> configuration(ex, 512K section).
+> 
+> I tried to add valid pfn range in mem_section but everyone doesn't like it 
+> due to size overhead. This patch is suggested by KAMEZAWA-san. 
+> I just fixed compile error and change some naming. 
+> 
+> This patch registers address of mem_section to memmap itself's page struct's
+> pg->private field. This means the page is used for memmap of the section.
+> Otherwise, the page is used for other purpose and memmap has a hole.
+> 
+> This patch is based on mmotm-2010-07-01-12-19.
+> 
+> Signed-off-by: Minchan Kim <minchan.kim@gmail.com>
+> Signed-off-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+> Reported-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Hm looking over and grepping everywhere about this gives
-me no clues as to how an in-kernel SPI loopback test could
-use spi->mode |= SPI_LOOP. It can be set, and then it expects
-the hardware to set the corresponding bit.
+Thank you for working on this. I myself like this solution.
+I think ARM guys can make this default later (after rc period ?)
 
-No matter how much I look at it, it seems like all use of this
-require you to first register *some* device, whether real or
-not, then you may play with it from kernelspace or userspace
-alike.
-
-So for a generic loopback in-kernel test I would need
-something like:
-
-loop over all masters
-  for each master
-    if it supports SPI_LOOP
-      look for devices on master - make sure first device is a
-      loopback dummy
-      locate loopback dummy
-      perform loopback test on the dummy
-
-This means I still would have to register some dummychip
-on the devices that should be able to run the test.
-
-Anton, any hints on this, execept that you added it for
-spidev?
-
-I'll try to dream some use model up otherwise.
-
-Yours,
-Linus Walleij
+Thanks,
+-Kame
