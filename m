@@ -1,25 +1,29 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Tue, 20 Jul 2010 12:21:32 +0200
-Subject: [RFC,PATCH 3/3] arm: remove machine_desc.io_pg_offst and .phys_io
-In-Reply-To: <20100720100448.GB32702@n2100.arm.linux.org.uk>
-References: <1279073377.400469.233833413341.0.gpush@pororo>
-	<1279073377.404006.432977736300.3.gpush@pororo>
-	<AANLkTilsIR36GNlbpZHt3FB5Dp2msedtUMFRSlZ-N-w9@mail.gmail.com>
-	<20100720100448.GB32702@n2100.arm.linux.org.uk>
-Message-ID: <1279621292.27276.19.camel@pororo.lan>
+From: svenkatr@ti.com (Venkatraman S)
+Date: Tue, 20 Jul 2010 15:52:08 +0530
+Subject: configuration warnings with omap_3630sdp_defconfig in 2.6.35-rc5
+Message-ID: <AANLkTimh0MBzANu1rmLb7q1tYQMywznQd5DJ_mUKp_cZ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+While trying to build omap_3630sdp_defconfig on Linus's 2.6.35-rc5, I
+get these warnings..
+I understand these could be related to the recent defconfig changes.
+I will try to investigate; posted here to know if anyone has found a
+fix already..
+------------------------------
+scripts/kconfig/conf -s arch/arm/Kconfig
+can't copy type 0
+warning: (USB_MUSB_HDRC_HCD && USB_SUPPORT && USB_MUSB_HDRC &&
+(USB_MUSB_HOST || USB_MUSB_OTG) && USB_GADGET_MUSB_HDRC ||
+USB_MUSB_OTG && <choice> && USB && USB_GADGET && PM && EXPERIMENTAL)
+selects USB_OTG which has unmet direct dependencies (USB_GADGET_OMAP
+&& ARCH_OMAP_OTG && USB_OHCI_HCD)
+warning: (USB_MUSB_HDRC_HCD && USB_SUPPORT && USB_MUSB_HDRC &&
+(USB_MUSB_HOST || USB_MUSB_OTG) && USB_GADGET_MUSB_HDRC ||
+USB_MUSB_OTG && <choice> && USB && USB_GADGET && PM && EXPERIMENTAL)
+selects USB_OTG which has unmet direct dependencies (USB_GADGET_OMAP
+&& ARCH_OMAP_OTG && USB_OHCI_HCD)
+------------------------------
 
-> For these wide-ranging changes, what I've said in the past to people
-> is to get them in linux-next, and we'll sort out merging their code
-> into my tree towards the end of the cycle.
-
-OK, so I should request Stephen to add this branch to linux-next,
-including the fixups?
-
-Cheers,
-
-
-Jeremy
+Regards,
+Venkat.
