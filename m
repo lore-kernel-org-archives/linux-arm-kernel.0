@@ -1,58 +1,22 @@
-From: qy03fugy@stud.informatik.uni-erlangen.de (Christian Dietrich)
-Date: Tue, 20 Jul 2010 09:08:01 +0200
-Subject: [PATCH] usb/host: Remove dead CONFIG_ARCH_KARO
-In-Reply-To: <4C3E24DE.7050208@bluewatersys.com> (Ryan Mallon's message of
-	"Thu, 15 Jul 2010 08:58:06 +1200")
-References: <cover.1279104996.git.qy03fugy@stud.informatik.uni-erlangen.de>
-	<9df7166bb950e7fbc12d1be9f2b9f9cbb9961187.1279104996.git.qy03fugy@stud.informatik.uni-erlangen.de>
-	<4C3E24DE.7050208@bluewatersys.com>
-Message-ID: <86zkxmk4vi.fsf_-_@peer.zerties.org>
+From: ccross@android.com (Colin Cross)
+Date: Tue, 20 Jul 2010 00:14:08 -0700
+Subject: [PATCH 1/8] arm/mach-tegra: fix unsigned calcs
+In-Reply-To: <1279219395-12088-1-git-send-email-segooon@gmail.com>
+References: <1279219395-12088-1-git-send-email-segooon@gmail.com>
+Message-ID: <AANLkTinFKH4Ed3UW3kMKdT5RJwmmE5n5k7nO01mB9xpO@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jul 15, 2010 at 11:43 AM, Kulikov Vasiliy <segooon@gmail.com> wrote:
+> divider_u71 is unsigned, so this check is buggy:
+> if (divider_u71 - 2 > 255 || divider_u71 - 2 < 0)
+>
+> If divider_u71 is 0 or 1 both checks are lying.
+> So, it does not produce a buggy answer, but it is confusing.
 
-CONFIG_ARCH_KARO doesn't exist in Kconfig and is never defined anywhere
-else, therefore removing all references for it from the source code.
+Hi Kulikov,
+Thanks for the patch.  This problem has been fixed in another patch in
+the linux-tegra tree, I'll post it for review and update the
+linux-next tree soon.
 
-Signed-off-by: Christian Dietrich <qy03fugy@stud.informatik.uni-erlangen.de>
----
- drivers/usb/host/isp1362.h |   24 +-----------------------
- 1 files changed, 1 insertions(+), 23 deletions(-)
-
-diff --git a/drivers/usb/host/isp1362.h b/drivers/usb/host/isp1362.h
-index d995351..0f97820 100644
---- a/drivers/usb/host/isp1362.h
-+++ b/drivers/usb/host/isp1362.h
-@@ -8,29 +8,7 @@
- /*
-  * Platform specific compile time options
-  */
--#if defined(CONFIG_ARCH_KARO)
--#include <asm/arch/hardware.h>
--#include <asm/arch/pxa-regs.h>
--#include <asm/arch/karo.h>
--
--#define USE_32BIT              1
--
--
--/* These options are mutually eclusive */
--#define USE_PLATFORM_DELAY    1
--#define USE_NDELAY             0
--/*
-- * MAX_ROOT_PORTS: Number of downstream ports
-- *
-- * The chip has two USB ports, one of which can be configured as
-- * an USB device port, so the value of this constant is implementation
-- * specific.
-- */
--#define MAX_ROOT_PORTS         2
--#define DUMMY_DELAY_ACCESS do {} while (0)
--
--/* insert platform specific definitions for other machines here */
--#elif defined(CONFIG_BLACKFIN)
-+#if defined(CONFIG_BLACKFIN)
- 
- #include <linux/io.h>
- #define USE_32BIT              0
--- 
-1.7.0.4
+Colin Cross
