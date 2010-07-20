@@ -1,107 +1,25 @@
-From: hannes@cmpxchg.org (Johannes Weiner)
-Date: Tue, 20 Jul 2010 12:15:58 +0200
-Subject: [PATCH] Tight check of pfn_valid on sparsemem - v2
-In-Reply-To: <1279448311-29788-1-git-send-email-minchan.kim@gmail.com>
-References: <1279448311-29788-1-git-send-email-minchan.kim@gmail.com>
-Message-ID: <20100720101557.GD16031@cmpxchg.org>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Tue, 20 Jul 2010 12:21:32 +0200
+Subject: [RFC,PATCH 3/3] arm: remove machine_desc.io_pg_offst and .phys_io
+In-Reply-To: <20100720100448.GB32702@n2100.arm.linux.org.uk>
+References: <1279073377.400469.233833413341.0.gpush@pororo>
+	<1279073377.404006.432977736300.3.gpush@pororo>
+	<AANLkTilsIR36GNlbpZHt3FB5Dp2msedtUMFRSlZ-N-w9@mail.gmail.com>
+	<20100720100448.GB32702@n2100.arm.linux.org.uk>
+Message-ID: <1279621292.27276.19.camel@pororo.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Russell,
 
-On Sun, Jul 18, 2010 at 07:18:31PM +0900, Minchan Kim wrote:
-> Kukjin reported oops happen while he change min_free_kbytes
-> http://www.spinics.net/lists/arm-kernel/msg92894.html
-> It happen by memory map on sparsemem.
-> 
-> The system has a memory map following as. 
->      section 0             section 1              section 2
-> 0x20000000-0x25000000, 0x40000000-0x50000000, 0x50000000-0x58000000
-> SECTION_SIZE_BITS 28(256M)
-> 
-> It means section 0 is an incompletely filled section.
-> Nontheless, current pfn_valid of sparsemem checks pfn loosely. 
-> It checks only mem_section's validation but ARM can free mem_map on hole 
-> to save memory space. So in above case, pfn on 0x25000000 can pass pfn_valid's 
-> validation check. It's not what we want.
->
-> We can match section size to smallest valid size.(ex, above case, 16M)
-> But Russell doesn't like it due to mem_section's memory overhead with different
-> configuration(ex, 512K section).
->
-> I tried to add valid pfn range in mem_section but everyone doesn't like it 
-> due to size overhead. This patch is suggested by KAMEZAWA-san. 
-> I just fixed compile error and change some naming.
+> For these wide-ranging changes, what I've said in the past to people
+> is to get them in linux-next, and we'll sort out merging their code
+> into my tree towards the end of the cycle.
 
-I did not like it, because it messes up the whole concept of a
-section.
+OK, so I should request Stephen to add this branch to linux-next,
+including the fixups?
 
-But most importantly, we already have a crutch for ARM in place,
-namely memmap_valid_within().  Looking at Kukjin's bug report,
-wouldn't it be enough to use that check in
-setup_zone_migrate_reserve()?
+Cheers,
 
-Your approach makes every pfn_valid() more expensive, although the
-extensive checks are not not needed everywhere (check the comment
-above memmap_valid_within): vm_normal_page() for example can probably
-assume that a PTE won't point to a hole within the memory map.
 
-OTOH, if the ARM people do not care, we could probably go with your
-approach, encode it all into pfn_valid(), and also get rid of
-memmap_valid_within() completely.  But I would prefer doing a bugfix
-first and such a conceptual change in a different patch, would you
-agree?
-
-Kukjin, does the appended patch also fix your problem?
-
-	Hannes
-
----
-From: Johannes Weiner <hannes@cmpxchg.org>
-Subject: mm: check mem_map backing in setup_zone_migrate_reserve
-
-Kukjin encountered kernel oopsen when changing
-/proc/sys/vm/min_free_kbytes.  The problem is that his sparse memory
-layout on ARM is the following:
-
-     section 0             section 1              section 2
-0x20000000-0x25000000, 0x40000000-0x50000000, 0x50000000-0x58000000
-SECTION_SIZE_BITS 28(256M)
-
-where there is a memory hole at the end of section 0.
-
-Since section 0 has _some_ memory, pfn_valid() will return true for
-all PFNs in this section.  But ARM releases the mem_map pages of this
-hole and pfn_valid() alone is not enough anymore to ensure there is a
-valid page struct behind a PFN.
-
-We acknowledged that ARM does this already and have a function to
-double-check for mem_map in cases where we do PFN range walks (as
-opposed to coming from a page table entry, which should not point to a
-memory hole in the first place e.g.).
-
-setup_zone_migrate_reserve() contains one such range walk which does
-not have the extra check and was also the cause of the oopsen Kukjin
-encountered.
-
-This patch adds the needed memmap_valid_within() check.
-
-Reported-by: Kukjin Kim <kgene.kim@samsung.com>
-Signed-off-by: Johannes Weiner <hannes@cmpxchg.org>
----
-
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index 0b0b629..cb6d6d3 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -3168,6 +3168,10 @@ static void setup_zone_migrate_reserve(struct zone *zone)
- 			continue;
- 		page = pfn_to_page(pfn);
- 
-+		/* Watch out for holes in the memory map */
-+		if (!memmap_valid_within(pfn, page, zone))
-+			continue;
-+
- 		/* Watch out for overlapping nodes */
- 		if (page_to_nid(page) != zone_to_nid(zone))
- 			continue;
+Jeremy
