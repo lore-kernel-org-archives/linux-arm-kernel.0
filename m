@@ -1,38 +1,32 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 20 Jul 2010 17:22:10 +0200 (CEST)
-Subject: [PATCH 0/3] Cache maintenance on VIPT caches
-In-Reply-To: <1279633178.10002.28.camel@e102109-lin.cambridge.arm.com>
-References: <20100625115826.30030.89790.stgit@e102109-lin.cambridge.arm.com>
-	<20100716131908.GA15032@bnru02.bnr.st.com>
-	<1279291157.17878.49.camel@e102109-lin.cambridge.arm.com>
-	<20100720185611I.fujita.tomonori@lab.ntt.co.jp>
-	<1279633178.10002.28.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.00.1007201718570.25803@xanadu.home>
+From: janboe.ye@gmail.com (janboe)
+Date: Tue, 20 Jul 2010 23:24:31 +0800
+Subject: [PATCH] arm: show_regs dump stack when ARM_UNWIND enable
+Message-ID: <20100720152431.GA17092@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Jul 2010, Catalin Marinas wrote:
+__backtrace is empty when ARM_UNWIND enable, so instead dump_stack
 
-> On Tue, 2010-07-20 at 18:56 +0900, FUJITA Tomonori wrote:
-> > On Fri, 16 Jul 2010 15:39:17 +0100
-> > Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > > I'm not sure why sg_miter doesn't call flush_dcache_page() but
-> > > flush_kernel_dcache_page() (I cc'ed Fujita as he seems to have added
-> > > this code).
-> > 
-> > It is intended to handle D aliasing due to kmap. As cachetlb.txt says
-> > that it is assumed here that the user has no incoherent cached copies
-> > (it was already addressed elsewhere). So flush_dcache_page() does too
-> > much there.
-> 
-> A related question here - does flush_kernel_dcache_page() need to do
-> anything for non-highmem pages? For highmem pages, on ARM, we already
-> handle the cache flushing in kunmap().
+Signed-off-by: janboe <janboe.ye@gmail.com>
+---
+ arch/arm/kernel/process.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-Well, with your proposed patch we wouldn't anymore.  And semantically we 
-shouldn't have to.  Even the fact that kunmap_atomic() does flush the 
-cache on VIVT system is an implementation issue not a semantic 
-definition (incidentally on VIPT it is not flushed).
-
-
-Nicolas
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index acf5e6f..e7ad878 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -271,7 +271,11 @@ void show_regs(struct pt_regs * regs)
+ 	printk("\n");
+ 	printk("Pid: %d, comm: %20s\n", task_pid_nr(current), current->comm);
+ 	__show_regs(regs);
++#ifdef CONFIG_ARM_UNWIND
++	dump_stack();
++#else
+ 	__backtrace();
++#endif
+ }
+ 
+ ATOMIC_NOTIFIER_HEAD(thread_notify_head);
+-- 
+1.7.1
