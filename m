@@ -1,38 +1,20 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Jul 2010 23:12:17 +0200
-Subject: [RFC] arm: versatile: enable PCI I/O space
-In-Reply-To: <AANLkTikiim-a8zM0PRDVVN078xBWeZt7ElwbC4oZsfXy@mail.gmail.com>
-References: <AANLkTikiim-a8zM0PRDVVN078xBWeZt7ElwbC4oZsfXy@mail.gmail.com>
-Message-ID: <201007202312.18353.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 20 Jul 2010 22:16:29 +0100
+Subject: [PATCH] [ARM] Introduce patching of phys_to_virt and vice versa
+In-Reply-To: <1278083164.15298.55.camel@ra7055-laptop>
+References: <1277542025-19881-1-git-send-email-eric.miao@canonical.com>
+	<1278083164.15298.55.camel@ra7055-laptop>
+Message-ID: <20100720211629.GB10553@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 July 2010, Eric Miao wrote:
+On Fri, Jul 02, 2010 at 10:06:04AM -0500, Rob Herring wrote:
+> Should something more generic like the x86 alternative code be done for
+> ARM? It's very likely we will need patching in other places like for UP
+> and SMP in one kernel. 
 
-> > -
-> > -/* CIK guesswork */
-> > -#define PCIBIOS_MIN_IO                 0x44000000
-> > +#define PCIBIOS_MIN_IO                 0x00001000
-> 
-> I guess this is true for other sub-architectures. Currently no idea
-> why they are all using different values. But 0x1000 seems to be
-> good value and maybe we should default all of them to this and
-> move it into some common place instead of defining them every
-> where.
+I think yes, we need to - I can't see how we can sensibly combine
+kernels without this.
 
-Yes. The 0x1000 is really the only sensible way to avoid the
-legacy ISA ranges. Most platforms currently set this to zero,
-which only works as long as you never try to load things like
-an PC keyboard driver (including KDB) or an nvram driver that
-probes the well-known ISA ports. The only reason I can see for
-using less than 0x1000 is if you have a really small
-IO_SPACE_LIMIT, but most platforms seem to set that to
-0xffffffff, which is rather unrealistic if you use a memory
-mapped IO region.
-
-We also have two platforms (integrator and shark) that use a
-higher value of 0x6000 but do not document why they do so.
-iop13xx defines it as variable but never sets it to anything
-else than zero.
-
-	Arnd
+However, the effect of this is that XIP can't use this - as the
+kernel text is read-only.
