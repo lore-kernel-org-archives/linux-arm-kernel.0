@@ -1,29 +1,40 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 20 Jul 2010 11:22:06 +0200
-Subject: Fwd: [RFC,PATCH 3/3] arm: remove machine_desc.io_pg_offst and
-	.phys_io
-In-Reply-To: <AANLkTilsIR36GNlbpZHt3FB5Dp2msedtUMFRSlZ-N-w9@mail.gmail.com>
-References: <1279073377.400469.233833413341.0.gpush@pororo>
-	<1279073377.404006.432977736300.3.gpush@pororo>
-	<AANLkTilsIR36GNlbpZHt3FB5Dp2msedtUMFRSlZ-N-w9@mail.gmail.com>
-Message-ID: <AANLkTilpIedM36r2fUuImyIVAVpfJse-vV1c_8cgwalH@mail.gmail.com>
+From: david.yangshuai@gmail.com (David Yang)
+Date: Tue, 20 Jul 2010 17:22:42 +0800
+Subject: Problem with dma_alloc_coherent at linux-2.6.33-arm1 ,
+	withRealView platform,board PBX-A9 and armv7 instructions.
+In-Reply-To: <1279616037.27808.1.camel@e102109-lin.cambridge.arm.com>
+References: <AANLkTikiHfOL0WMjiZnWY3RVmw89hZVFcNkqfDUYSDgG@mail.gmail.com>
+	<1279542557.10760.21.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTinPlxiyIV9rWAIc0CR_MTymXXqNLZAu-P8OvEHK@mail.gmail.com>
+	<1279616037.27808.1.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <AANLkTik8QQPCOk_-zwrI4R2Kj_ROx3BAOOpFTMwXSjOD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 14, 2010 at 4:09 AM, Jeremy Kerr <jeremy.kerr@canonical.com> wrote:
-> Since we're now using addruart to establish the debug mapping, we can
-> remove the io_pg_offst and phys_io members of struct machine_desc.
+eh...is it right that I need not use  wmb()  between two writel()?
+
+On Tue, Jul 20, 2010 at 4:53 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Tue, 2010-07-20 at 04:17 +0100, David Yang wrote:
+>> On Mon, Jul 19, 2010 at 8:29 PM, Catalin Marinas
+>> <catalin.marinas@arm.com> wrote:
+>> > On Sat, 2010-07-17 at 08:05 +0100, David Yang wrote:
+>> >> I have a question: in linux-2.6.28, there is no barriers in the IO
+>> >> accessors.
+>> >
+>> > Because in 2.6.28 we used Strongly Ordered memory for the coherent DMA
+>> > buffers and on many CPUs SO accesses are ordered relatively to Device
+>> > accesses. But that even this isn't guaranteed by the ARM ARM.
+>> >
+>>
+>> Yes, I know that.
+>>
+>> But I mean that ,in linux-2.6.28,whether the order between the IO
+>> access will be re-ordered at the hardware level? And whether we should
+>> use the wmb() to guarantee the order? Here we just talk about the IO
+>> register access,without the normal memory or coherent DMA buffers.
 >
-> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-
-Like this very much,
-
-Acked-by: Eric Miao <eric.miao@canonical.com>
-
-Russell,
-
-I think it can be merged soon, need to rebase my 'machine_class' patches
-on top of your -devel branch then.
-
-(PS: forgot to remove the remaining content, which leaded the previous
-message to be too long to pass the moderation :-/ )
+> IO accesses (via Device memory mapping) are guaranteed by the hardware
+> to be ordered (i.e. they reach the device in the specified program
+> order).
+>
