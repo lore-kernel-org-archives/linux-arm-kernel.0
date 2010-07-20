@@ -1,54 +1,42 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Tue, 20 Jul 2010 18:56:37 +0900
-Subject: [PATCH 0/3] Cache maintenance on VIPT caches
-In-Reply-To: <1279291157.17878.49.camel@e102109-lin.cambridge.arm.com>
-References: <20100625115826.30030.89790.stgit@e102109-lin.cambridge.arm.com>
-	<20100716131908.GA15032@bnru02.bnr.st.com>
-	<1279291157.17878.49.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100720185611I.fujita.tomonori@lab.ntt.co.jp>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 20 Jul 2010 10:59:40 +0100
+Subject: =?iso-8859-1?B?W1JGQ12gYXJt?=
+	=?iso-8859-1?Q?=3A?= versatile: enable PCI I/O space
+In-Reply-To: <201007201123.38709.arnd@arndb.de>
+References: <201007201123.38709.arnd@arndb.de>
+Message-ID: <20100720095940.GA32702@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc'ed to linux-arch
+On Tue, Jul 20, 2010 at 11:23:38AM +0200, Arnd Bergmann wrote:
+> -/* macro to get at IO space when running virtually */
+> +/* macro to get at MMIO space when running virtually */
+>  #define IO_ADDRESS(x)		(((x) & 0x0fffffff) + (((x) >> 4) & 0x0f000000) + 0xf0000000)
+>  
+> -#define __io_address(n)		__io(IO_ADDRESS(n))
+> +#define __io_address(n)		__typesafe_io(IO_ADDRESS(n))
 
-On Fri, 16 Jul 2010 15:39:17 +0100
-Catalin Marinas <catalin.marinas@arm.com> wrote:
+Hmm, that's not a scenario that I forsaw __typesafe_io() being used -
+I'd prefer it to be restricted to only aliasing __io() to if it's
+appropriate.  Either add an IOMEM() definition or open-code the cast
+here.
 
-> On Fri, 2010-07-16 at 14:19 +0100, Rabin VINCENT wrote:
-> > On Fri, Jun 25, 2010 at 14:01:27 +0200, Catalin Marinas wrote:
-> > > The first and third patches have already been posted in the same form.
-> > > The second patch have been modified to handle all the VIPT caches via
-> > > __sync_icache_dcache(). The initial use case for this patch was dealing
-> > > with an SMP race condition but following suggestions from Rabin, it was
-> > > extended to cover ARMv6 onwards, both UP and SMP.
-> > >
-> > > Any Tested-by's are welcome.
-> > 
-> > This version also fixes the MMC rootfs init crashes, without the need
-> > for the flush_kernel_dcache_page() change:
-> > 
-> > Tested-by: Rabin Vincent <rabin.vincent@stericsson.com>
-> 
-> Thanks for testing.
+> diff --git a/arch/arm/mach-versatile/include/mach/io.h b/arch/arm/mach-versatile/include/mach/io.h
+> index f067c14..a276171 100644
+> --- a/arch/arm/mach-versatile/include/mach/io.h
+> +++ b/arch/arm/mach-versatile/include/mach/io.h
+> @@ -20,9 +20,12 @@
+>  #ifndef __ASM_ARM_ARCH_IO_H
+>  #define __ASM_ARM_ARCH_IO_H
+>  
+> -#define IO_SPACE_LIMIT 0xffffffff
+> +#include <mach/hardware.h>
+> +#include <mach/platform.h>
+>  
+> -#define __io(a)		__typesafe_io(a)
+> +#define IO_SPACE_LIMIT (VERSATILE_PCI_MEM_BASE0_SIZE - 1)
+> +
+> +#define __io(a)		(a + VERSATILE_PCI_VIRT_MEM_BASE0)
 
-This patchset for arm handles I/D coherency (and D aliasing) with
-PG_arch_1, right? If so, can you please send it to linux-arch? I guess
-that some non arm people might be interested in it.
-
-
-> > I ask because the
-> > mmci patches that I posted convert that driver to use the sg_miter API
-> > (which uses flush_kernel_dcache_page() internally), and not do any
-> > flushing inside the driver itself.  Or do you think it would be
-> > appropriate to have the driver call flush_dcache_page() explicitly?
-> > (Although this would be double flushing on systems with aliasing caches
-> > where flush_kernel_dcache_page() is not a no-op.)
-> 
-> I'm not sure why sg_miter doesn't call flush_dcache_page() but
-> flush_kernel_dcache_page() (I cc'ed Fujita as he seems to have added
-> this code).
-
-It is intended to handle D aliasing due to kmap. As cachetlb.txt says
-that it is assumed here that the user has no incoherent cached copies
-(it was already addressed elsewhere). So flush_dcache_page() does too
-much there.
+Not quite.  Have a look at arch/arm/mach-footbridge/include/mach/io.h to
+see how __io is defined there.
