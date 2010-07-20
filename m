@@ -1,673 +1,213 @@
-From: singh.madhav@samsung.com (MADHAV SINGHCHAUHAN)
-Date: Tue, 20 Jul 2010 06:03:20 +0000 (GMT)
-Subject: [PATCH RESEND] HRT support in Samsung Tree
-Message-ID: <6331225.721891279605800233.JavaMail.weblogic@epml17>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Tue, 20 Jul 2010 16:00:10 +0900
+Subject: [PATCH v3 7/7] ARM: S5PV210: Initial CPUFREQ Support
+In-Reply-To: <006301cb27a3$bd8d55e0$38a801a0$%kim@samsung.com>
+References: <1279517483-22751-1-git-send-email-myungjoo.ham@samsung.com>
+	<1279517483-22751-2-git-send-email-myungjoo.ham@samsung.com>
+	<1279517483-22751-3-git-send-email-myungjoo.ham@samsung.com>
+	<1279517483-22751-4-git-send-email-myungjoo.ham@samsung.com>
+	<1279517483-22751-5-git-send-email-myungjoo.ham@samsung.com>
+	<1279517483-22751-6-git-send-email-myungjoo.ham@samsung.com>
+	<1279517483-22751-7-git-send-email-myungjoo.ham@samsung.com>
+	<1279517483-22751-8-git-send-email-myungjoo.ham@samsung.com>
+	<006301cb27a3$bd8d55e0$38a801a0$%kim@samsung.com>
+Message-ID: <AANLkTincP954dBuRIN8KwiQPo1CDkykRKv1vIMFYcnyo@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch now uses ioremap for RTC  instead of iodesc so that more Samsung SOCs can be supported.
+On Tue, Jul 20, 2010 at 9:37 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> MyungJoo Ham wrote:
+>>
+>> S5PV210 CPUFREQ Support.
+>>
+>> This CPUFREQ may work without PMIC's DVS support. However, it is not
+>> as effective without DVS support as supposed. AVS is not supported in
+>> this version.
+>>
+>> Note that CLK_SRC of some clocks including ARMCLK, G3D, G2D, MFC,
+>> and ONEDRAM are modified directly without updating clksrc_src
+>> representations of the clocks. ?Because CPUFREQ reverts the CLK_SRC
+>> to the supposed values, this does not affect the consistency as long as
+>> there are no other modules that modifies clock sources of ARMCLK, G3D,
+>> G2D, MFC, and ONEDRAM (and only CPUFREQ should have the control). As
+>> soon as clock framework is settled, we may update source clocks
+>> (.parent field) of those clocks accordingly later.
+>>
+> As you know memory composition such as mDDR, (mDDR, OneDRAM), DDR2 and so on
+> differs in MCP type of each S5PC110, and single type of S5PV210.
+> So basically, this code can available only for some S5PC110 MCP types...only
+> some machines.
+> It means can occur problem on some boards...if you use ARCH dependency
+> configuration...
+> And need to add comment about tested boards.
 
->From 9dd03426a47e02ccb2220d1564a04b0288103b8c Mon Sep 17 00:00:00 2001
-From: Madhav Singh <singh.madhav@samsung.com>
-Date: Tue, 20 Jul 2010 11:11:39 +0530
-Subject: [PATCH] HRT support in Samsung Tree
- This patch implements HRT support for Samsung plat-s5p.
- RTC has been used as CLOCKEVENT and SYSTIMER as CLOCKSOURCE.
+Although selecting "ARCH_HAS_CPUFREQ" does not make choosing
+ARCH_S5PV210 depend on CPUFREQ as it does NOT turn on CPUFREQ
+automatically or forcibly, do you think we need to block being able to
+turn on CPUFREQ if it is not one of the test boards?
 
----
- arch/arm/mach-s5pv210/Kconfig                   |    9 +
- arch/arm/mach-s5pv210/include/mach/map.h        |    4 +
- arch/arm/plat-s5p/Makefile                      |    4 +-
- arch/arm/plat-s5p/clock.c                       |   18 +
- arch/arm/plat-s5p/hr-time-rtc.c                 |  472 +++++++++++++++++++++++
- arch/arm/plat-s5p/include/plat/regs-sys-timer.h |   63 +++
- arch/arm/plat-samsung/Makefile                  |    4 +-
- 7 files changed, 572 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/plat-s5p/hr-time-rtc.c
- create mode 100644 arch/arm/plat-s5p/include/plat/regs-sys-timer.h
+However, in the next patch version, I'm going to use the memory clock
+setting values set before initializing cpufreq so that we have no
+compatibility issues on memory configurations.
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 631019a..d4f7e55 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -101,4 +101,13 @@ config MACH_SMDKC110
- 	  Machine support for Samsung SMDKC110
- 	  S5PC110(MCP) is one of package option of S5PV210
- 
-+config SAMSUNG_HRT_RTC_SYSTIMER
-+        bool "HRtimer and Dynamic Tick support"
-+        select GENERIC_TIME
-+        select GENERIC_CLOCKEVENTS
-+        select HIGH_RES_TIMERS
-+        default n
-+        help
-+          Support for HRtimer and Dynamic Tick system using RTC and SYSTEM timer
-+
- endif
-diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
-index 17687f0..fd8e504 100644
---- a/arch/arm/mach-s5pv210/include/mach/map.h
-+++ b/arch/arm/mach-s5pv210/include/mach/map.h
-@@ -42,6 +42,10 @@
- #define S5P_PA_TIMER		S5PV210_PA_TIMER
- 
- #define S5PV210_PA_SYSTIMER	(0xE2600000)
-+/*For RTC*/
-+#define S5PC11X_PA_RTC		(0xE2800000)
-+#define S3C_PA_RTC		S5PC11X_PA_RTC
-+
- 
- #define S5PV210_PA_WATCHDOG	(0xE2700000)
- 
-diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
-index 18c9e34..9c61cf5 100644
---- a/arch/arm/plat-s5p/Makefile
-+++ b/arch/arm/plat-s5p/Makefile
-@@ -18,4 +18,6 @@ obj-y				+= cpu.o
- obj-y				+= clock.o
- obj-y				+= irq.o irq-gpioint.o
- obj-$(CONFIG_S5P_EXT_INT)	+= irq-eint.o
--
-+ifdef CONFIG_SAMSUNG_HRT_RTC_SYSTIMER
-+obj-y				+= hr-time-rtc.o
-+endif
-diff --git a/arch/arm/plat-s5p/clock.c b/arch/arm/plat-s5p/clock.c
-index b5e2552..cc2e50d 100644
---- a/arch/arm/plat-s5p/clock.c
-+++ b/arch/arm/plat-s5p/clock.c
-@@ -89,6 +89,20 @@ struct clk clk_arm = {
- 	.ctrlbit	= 0,
- };
- 
-+/*For HRT*/
-+#ifdef CONFIG_SAMSUNG_HRT_RTC_SYSTIMER
-+struct clk clk_ext_xtal_rtc = {
-+	.name		= "XrtcXTI",
-+	.id		= -1,
-+	.rate           = 32768,
-+};
-+
-+struct clk clk_ext_xtal_usb = {
-+	.name		= "XusbXTI",
-+	.id		= -1,
-+	.rate		= 24000000,
-+};
-+#endif
- /* Possible clock sources for APLL Mux */
- static struct clk *clk_src_apll_list[] = {
- 	[0] = &clk_fin_apll,
-@@ -149,6 +163,10 @@ static struct clk *s5p_clks[] __initdata = {
- 	&clk_arm,
- 	&clk_vpll,
- 	&clk_xusbxti,
-+	#ifdef CONFIG_SAMSUNG_HRT_RTC_SYSTIMER
-+	&clk_ext_xtal_usb,
-+	&clk_ext_xtal_rtc,
-+	#endif
- };
- 
- void __init s5p_register_clocks(unsigned long xtal_freq)
-diff --git a/arch/arm/plat-s5p/hr-time-rtc.c b/arch/arm/plat-s5p/hr-time-rtc.c
-new file mode 100644
-index 0000000..a5ffe69
---- /dev/null
-+++ b/arch/arm/plat-s5p/hr-time-rtc.c
-@@ -0,0 +1,472 @@
-+/*
-+ * linux/arch/arm/plat-s5p/hr-time-rtc.c
-+ *
-+ * S5PC11X Timers
-+ *
-+ * Copyright (c) 2006 Samsung Electronics
-+ * Copyright (c) 2010 Samsung Electronics Madhav Chauhan <singh.madhav@samsung.com>
-+ *
-+ *
-+ * S5PC11X (and compatible) HRT support using RTC and SYSTEM TIMER
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/delay.h>
-+#include <linux/interrupt.h>
-+#include <linux/sched.h>
-+#include <linux/spinlock.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/clocksource.h>
-+#include <linux/clockchips.h>
-+#include <linux/io.h>
-+#include <asm/system.h>
-+#include <mach/hardware.h>
-+#include <asm/irq.h>
-+#include <asm/mach/irq.h>
-+#include <asm/mach/time.h>
-+#include <asm/mach-types.h>
-+#include <mach/map.h>
-+#include <plat/regs-timer.h>
-+#include <plat/regs-rtc.h>
-+#include <plat/regs-sys-timer.h>
-+#include <mach/regs-irq.h>
-+#include <mach/tick.h>
-+#include <plat/clock.h>
-+#include <plat/cpu.h>
-+
-+/*For SCHED_CLOCK*/
-+static unsigned long long time_stamp;
-+static unsigned long long s5pc11x_sched_timer_overflows;
-+static unsigned long long old_overflows;
-+static cycle_t last_ticks;
-+
-+/* Sched timer interrupt is not processed right after
-+ * timer counter expired
-+ */
-+static unsigned int pending_irq;
-+
-+/* sched_timer_running
-+ * 0 : sched timer stopped or not initialized
-+ * 1 : sched timer started
-+ */
-+static unsigned int sched_timer_running;
-+
-+void __iomem *rtc_base;
-+static struct clk *clk_event;
-+static struct clk *clk_sched;
-+static int tick_timer_mode;	/* 0: oneshot, 1: autoreload */
-+
-+#define RTC_CLOCK		(32768)
-+#define RTC_DEFAULT_TICK	((RTC_CLOCK / HZ) - 1)
-+
-+/*
-+ * Helper functions
-+ * s5pc11x_systimer_read() : Read from System timer register
-+ * s5pc11x_systimer_write(): Write to System timer register
-+ *
-+ */
-+static unsigned int s5pc11x_systimer_read(unsigned int *reg_offset)
-+{
-+	return __raw_readl(reg_offset);
-+}
-+
-+static unsigned int s5pc11x_systimer_write(unsigned int *reg_offset,
-+					unsigned int value)
-+{
-+	unsigned int temp_regs;
-+
-+	__raw_writel(value, reg_offset);
-+
-+	if (reg_offset == S3C_SYSTIMER_TCON) {
-+		while (!(__raw_readl(S3C_SYSTIMER_INT_CSTAT) &
-+				S3C_SYSTIMER_INT_TCON));
-+		temp_regs = __raw_readl(S3C_SYSTIMER_INT_CSTAT);
-+		temp_regs |= S3C_SYSTIMER_INT_TCON;
-+		__raw_writel(temp_regs, S3C_SYSTIMER_INT_CSTAT);
-+
-+	} else if (reg_offset == S3C_SYSTIMER_ICNTB) {
-+		while (!(__raw_readl(S3C_SYSTIMER_INT_CSTAT) &
-+				S3C_SYSTIMER_INT_ICNTB));
-+		temp_regs = __raw_readl(S3C_SYSTIMER_INT_CSTAT);
-+		temp_regs |= S3C_SYSTIMER_INT_ICNTB;
-+		__raw_writel(temp_regs, S3C_SYSTIMER_INT_CSTAT);
-+
-+	} else if (reg_offset == S3C_SYSTIMER_TCNTB) {
-+		while (!(__raw_readl(S3C_SYSTIMER_INT_CSTAT) &
-+				S3C_SYSTIMER_INT_TCNTB));
-+		temp_regs = __raw_readl(S3C_SYSTIMER_INT_CSTAT);
-+		temp_regs |= S3C_SYSTIMER_INT_TCNTB;
-+		__raw_writel(temp_regs, S3C_SYSTIMER_INT_CSTAT);
-+	}
-+
-+	return 0;
-+}
-+
-+static void s5pc11x_rtc_set_tick(int enabled)
-+{
-+	unsigned int tmp;
-+
-+	tmp = __raw_readl(rtc_base + S3C2410_RTCCON) & ~S3C_RTCCON_TICEN;
-+	if (enabled)
-+		tmp |= S3C_RTCCON_TICEN;
-+	__raw_writel(tmp, rtc_base + S3C2410_RTCCON);
-+}
-+
-+static void s5pc11x_tick_timer_setup(void);
-+
-+static void s5pc11x_tick_timer_start(unsigned long load_val,
-+					int autoreset)
-+{
-+	unsigned int tmp;
-+
-+	tmp = __raw_readl(rtc_base + S3C2410_RTCCON) &
-+		~(S3C_RTCCON_TICEN | S3C2410_RTCCON_RTCEN);
-+	__raw_writel(tmp, rtc_base + S3C2410_RTCCON);
-+
-+	__raw_writel(load_val, rtc_base + S3C2410_TICNT);
-+
-+	tmp |= S3C_RTCCON_TICEN;
-+
-+	__raw_writel(tmp, rtc_base + S3C2410_RTCCON);
-+}
-+
-+static  void s5pc11x_tick_timer_stop(void)
-+{
-+	unsigned int tmp;
-+
-+	tmp = __raw_readl(rtc_base + S3C2410_RTCCON) &
-+		~(S3C_RTCCON_TICEN | S3C2410_RTCCON_RTCEN);
-+
-+	__raw_writel(tmp, rtc_base + S3C2410_RTCCON);
-+
-+}
-+
-+static void s5pc11x_sched_timer_start(unsigned long load_val,
-+					int autoreset)
-+{
-+	unsigned long tcon;
-+	unsigned long tcnt;
-+	unsigned long tcfg;
-+
-+	/* clock configuration setting and enable */
-+	struct clk *clk;
-+
-+	tcnt = TICK_MAX;  /* default value for tcnt */
-+
-+	/* initialize system timer clock */
-+	tcfg = s5pc11x_systimer_read(S3C_SYSTIMER_TCFG);
-+
-+	tcfg &= ~S3C_SYSTIMER_TCLK_MASK;
-+	tcfg |= S3C_SYSTIMER_TCLK_USB;
-+
-+	s5pc11x_systimer_write(S3C_SYSTIMER_TCFG, tcfg);
-+
-+	/* TCFG must not be changed at run-time.
-+	 * If you want to change TCFG, stop timer(TCON[0] = 0)
-+	 */
-+	s5pc11x_systimer_write(S3C_SYSTIMER_TCON, 0);
-+
-+	/* read the current timer configuration bits */
-+	tcon = s5pc11x_systimer_read(S3C_SYSTIMER_TCON);
-+	tcfg = s5pc11x_systimer_read(S3C_SYSTIMER_TCFG);
-+
-+	clk = clk_get(NULL, "systimer");
-+	if (IS_ERR(clk))
-+		panic("failed to get clock[%s] for system timer", "systimer");
-+
-+	clk_enable(clk);
-+
-+	clk_put(clk);
-+
-+	tcfg &= ~S3C_SYSTIMER_TCLK_MASK;
-+	tcfg |= S3C_SYSTIMER_TCLK_USB;
-+	tcfg &= ~S3C_SYSTIMER_PRESCALER_MASK;
-+
-+	/* check to see if timer is within 16bit range... */
-+	if (tcnt > TICK_MAX) {
-+		panic("setup_timer: cannot configure timer!");
-+		return;
-+	}
-+
-+	s5pc11x_systimer_write(S3C_SYSTIMER_TCFG, tcfg);
-+
-+	s5pc11x_systimer_write(S3C_SYSTIMER_TCNTB, tcnt);
-+
-+	/* set timer con */
-+	tcon =  S3C_SYSTIMER_INT_AUTO | S3C_SYSTIMER_START |
-+			S3C_SYSTIMER_AUTO_RELOAD;
-+	s5pc11x_systimer_write(S3C_SYSTIMER_TCON, tcon);
-+
-+	tcon |= S3C_SYSTIMER_INT_START;
-+	s5pc11x_systimer_write(S3C_SYSTIMER_TCON, tcon);
-+
-+	/* Interrupt Start and Enable */
-+	s5pc11x_systimer_write(S3C_SYSTIMER_INT_CSTAT,
-+				(S3C_SYSTIMER_INT_ICNTEIE |
-+					S3C_SYSTIMER_INT_EN));
-+	sched_timer_running = 1;
-+}
-+
-+/*
-+ * RTC tick : count down to zero, interrupt, reload
-+ */
-+static int s5pc11x_tick_set_next_event(unsigned long cycles,
-+				   struct clock_event_device *evt)
-+{
-+	if  (cycles == 0)	/* Should be larger than 0 */
-+		cycles = 1;
-+	s5pc11x_tick_timer_start(cycles, 0);
-+	return 0;
-+}
-+
-+static void s5pc11x_tick_set_mode(enum clock_event_mode mode,
-+			      struct clock_event_device *evt)
-+{
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		tick_timer_mode = 1;
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		s5pc11x_tick_timer_stop();
-+		tick_timer_mode = 0;
-+		break;
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+		/* Sched timer stopped */
-+		sched_timer_running = 0;
-+		/* Reset sched_clock variables after sleep/wakeup */
-+		last_ticks = 0;
-+		s5pc11x_sched_timer_overflows = 0;
-+		old_overflows = 0;
-+		pending_irq = 0;
-+		break;
-+	case CLOCK_EVT_MODE_RESUME:
-+		s5pc11x_tick_timer_setup();
-+		s5pc11x_sched_timer_start(~0, 1);
-+		break;
-+	}
-+}
-+
-+static struct clock_event_device clockevent_tick_timer = {
-+	.name		= "S5PC110 event timer",
-+	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.shift		= 32,
-+	.set_next_event	= s5pc11x_tick_set_next_event,
-+	.set_mode	= s5pc11x_tick_set_mode,
-+};
-+
-+irqreturn_t s5pc11x_tick_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = &clockevent_tick_timer;
-+
-+	__raw_writel(S3C_INTP_TIC, rtc_base + S3C_INTP);
-+	/* In case of oneshot mode */
-+	if (tick_timer_mode == 0)
-+		s5pc11x_tick_timer_stop();
-+
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction s5pc11x_tick_timer_irq = {
-+	.name		= "rtc-tick",
-+	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler	= s5pc11x_tick_timer_interrupt,
-+};
-+
-+static void  s5pc11x_init_dynamic_tick_timer(unsigned long rate)
-+{
-+	tick_timer_mode = 1;
-+
-+	rtc_base = ioremap(S3C_PA_RTC, SZ_4K);
-+
-+	s5pc11x_tick_timer_stop();
-+
-+	s5pc11x_tick_timer_start((rate / HZ) - 1, 1);
-+
-+	clockevent_tick_timer.mult = div_sc(rate, NSEC_PER_SEC,
-+					    clockevent_tick_timer.shift);
-+	clockevent_tick_timer.max_delta_ns =
-+		clockevent_delta2ns(-1, &clockevent_tick_timer);
-+	clockevent_tick_timer.min_delta_ns =
-+		clockevent_delta2ns(1, &clockevent_tick_timer);
-+
-+	clockevent_tick_timer.cpumask = cpumask_of(0);
-+	clockevents_register_device(&clockevent_tick_timer);
-+
-+	printk(KERN_INFO "mult[%u]\n", clockevent_tick_timer.mult);
-+	printk(KERN_INFO "max_delta_ns[%u]\n", clockevent_tick_timer.max_delta_ns);
-+	printk(KERN_INFO "min_delta_ns[%u]\n", clockevent_tick_timer.min_delta_ns);
-+	printk(KERN_INFO "rate[%lu]\n", rate);
-+	printk(KERN_INFO "HZ[%d]\n", HZ);
-+}
-+
-+
-+/*
-+ * ---------------------------------------------------------------------------
-+ * SYSTEM TIMER ... free running 32-bit clock source and scheduler clock
-+ * ---------------------------------------------------------------------------
-+ */
-+irqreturn_t s5pc11x_sched_timer_interrupt(int irq, void *dev_id)
-+{
-+	volatile unsigned int temp_cstat;
-+
-+	temp_cstat = s5pc11x_systimer_read(S3C_SYSTIMER_INT_CSTAT);
-+	temp_cstat |= S3C_SYSTIMER_INT_STATS;
-+
-+	s5pc11x_systimer_write(S3C_SYSTIMER_INT_CSTAT, temp_cstat);
-+
-+	if (unlikely(pending_irq))
-+		pending_irq = 0;
-+	else
-+		s5pc11x_sched_timer_overflows++;
-+
-+	return IRQ_HANDLED;
-+}
-+
-+struct irqaction s5pc11x_systimer_irq = {
-+	.name		= "System timer",
-+	.flags		= IRQF_DISABLED ,
-+	.handler	= s5pc11x_sched_timer_interrupt,
-+};
-+
-+
-+static cycle_t s5pc11x_sched_timer_read(void)
-+{
-+	return (cycle_t)~__raw_readl(S3C_SYSTIMER_TCNTO);
-+}
-+
-+struct clocksource clocksource_s5pc11x = {
-+	.name		= "clock_source_systimer",
-+	.rating		= 300,
-+	.read		= s5pc11x_sched_timer_read,
-+	.mask		= CLOCKSOURCE_MASK(32),
-+	.shift		= 20,
-+	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-+};
-+
-+static void s5pc11x_init_clocksource(unsigned long rate)
-+{
-+	static char err[] __initdata = KERN_ERR
-+			"%s: can't register clocksource!\n";
-+
-+	clocksource_s5pc11x.mult
-+		= clocksource_khz2mult(rate/1000, clocksource_s5pc11x.shift);
-+
-+
-+	s5pc11x_sched_timer_start(~0, 1);
-+
-+	if (clocksource_register(&clocksource_s5pc11x))
-+		printk(err, clocksource_s5pc11x.name);
-+}
-+
-+/*
-+ * Returns current time from boot in nsecs. It's OK for this to wrap
-+ * around for now, as it's just a relative time stamp.
-+ */
-+unsigned long long sched_clock(void)
-+{
-+	unsigned long irq_flags;
-+	cycle_t ticks, elapsed_ticks = 0;
-+	unsigned long long increment = 0;
-+	unsigned int overflow_cnt = 0;
-+
-+	local_irq_save(irq_flags);
-+
-+	if (likely(sched_timer_running)) {
-+		overflow_cnt = (s5pc11x_sched_timer_overflows - old_overflows);
-+
-+		ticks = s5pc11x_sched_timer_read();
-+
-+		if (overflow_cnt) {
-+			increment = (overflow_cnt - 1) *
-+					(clocksource_cyc2ns(clocksource_s5pc11x.mask,
-+					clocksource_s5pc11x.mult, clocksource_s5pc11x.shift));
-+			elapsed_ticks = (clocksource_s5pc11x.mask - last_ticks) + ticks;
-+		} else {
-+			if (unlikely(last_ticks > ticks)) {
-+				pending_irq = 1;
-+				elapsed_ticks = (clocksource_s5pc11x.mask - last_ticks) + ticks;
-+				s5pc11x_sched_timer_overflows++;
-+			} else {
-+				elapsed_ticks = (ticks - last_ticks);
-+			}
-+		}
-+
-+		time_stamp += (clocksource_cyc2ns(elapsed_ticks, clocksource_s5pc11x.mult, clocksource_s5pc11x.shift) + increment);
-+
-+		old_overflows = s5pc11x_sched_timer_overflows;
-+		last_ticks = ticks;
-+	}
-+	local_irq_restore(irq_flags);
-+
-+	return time_stamp;
-+}
-+
-+/*
-+ *  Event/Sched Timer initialization
-+ */
-+static void s5pc11x_timer_setup(void)
-+{
-+	unsigned long rate;
-+	/* Setup event timer using XrtcXTI */
-+	if (clk_event == NULL)
-+		clk_event = clk_get(NULL, "XrtcXTI");
-+	if (IS_ERR(clk_event))
-+		panic("failed to get clock for event timer");
-+	rate = clk_get_rate(clk_event);
-+	s5pc11x_init_dynamic_tick_timer(rate);
-+
-+	/* Setup sched-timer using XusbXTI */
-+	if (clk_sched == NULL)
-+		clk_sched = clk_get(NULL, "XusbXTI");
-+	if (IS_ERR(clk_sched))
-+		panic("failed to get clock for sched-timer");
-+	rate = clk_get_rate(clk_sched);
-+	s5pc11x_init_clocksource(rate);
-+}
-+
-+static void s5pc11x_tick_timer_setup(void)
-+{
-+	unsigned long rate;
-+
-+	rate = clk_get_rate(clk_event);
-+	s5pc11x_tick_timer_start((rate / HZ) - 1, 1);
-+}
-+
-+static void __init s5pc11x_timer_init(void)
-+{
-+	/* Initialize variables before starting each timers */
-+	last_ticks = 0;
-+	s5pc11x_sched_timer_overflows = 0;
-+	old_overflows = 0;
-+	time_stamp = 0;
-+	sched_timer_running = 0;
-+	pending_irq = 0;
-+	s5pc11x_timer_setup();
-+	setup_irq(IRQ_RTC_TIC, &s5pc11x_tick_timer_irq);
-+	setup_irq(IRQ_SYSTIMER, &s5pc11x_systimer_irq);
-+}
-+
-+
-+struct sys_timer s3c24xx_timer = {
-+	.init		= s5pc11x_timer_init,
-+};
-+
-diff --git a/arch/arm/plat-s5p/include/plat/regs-sys-timer.h b/arch/arm/plat-s5p/include/plat/regs-sys-timer.h
-new file mode 100644
-index 0000000..75e6267
---- /dev/null
-+++ b/arch/arm/plat-s5p/include/plat/regs-sys-timer.h
-@@ -0,0 +1,63 @@
-+/* arch/arm/plat-s5pc1xx/include/plat/regs-sys-timer.h
-+ *
-+ * Copyright (c) 2008 Samsung Electronics
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * S5PC1XX System Timer configuration
-+*/
-+
-+#ifndef __ASM_ARCH_REGS_SYS_TIMER_H
-+#define __ASM_ARCH_REGS_SYS_TIMER_H
-+
-+#define S3C_SYSTIMERREG(x)		(S5P_VA_SYSTIMER + (x))
-+
-+#define S3C_SYSTIMER_TCFG		S3C_SYSTIMERREG(0x00)
-+#define S3C_SYSTIMER_TCON		S3C_SYSTIMERREG(0x04)
-+#define S3C_SYSTIMER_TCNTB		S3C_SYSTIMERREG(0x08)
-+#define S3C_SYSTIMER_TCNTO		S3C_SYSTIMERREG(0x0c)
-+
-+#define S3C_SYSTIMER_TFCNTB		S3C_SYSTIMERREG(0x10)
-+#define S3C_SYSTIMER_ICNTB		S3C_SYSTIMERREG(0x18)
-+#define S3C_SYSTIMER_ICNTO		S3C_SYSTIMERREG(0x1c)
-+#define S3C_SYSTIMER_INT_CSTAT	S3C_SYSTIMERREG(0x20)
-+
-+/* Value for TCFG */
-+#define S3C_SYSTIMER_TCLK_MASK		(3<<12)
-+#define S3C_SYSTIMER_TCLK_XXTI		(0<<12)
-+#define S3C_SYSTIMER_TCLK_RTC		(1<<12)
-+#define S3C_SYSTIMER_TCLK_USB		(2<<12)
-+#define S3C_SYSTIMER_TCLK_PCLK		(3<<12)
-+
-+#define S3C_SYSTIMER_DIV_MASK		(7<<8)
-+#define S3C_SYSTIMER_DIV_1		(0<<8)
-+#define S3C_SYSTIMER_DIV_2		(1<<8)
-+#define S3C_SYSTIMER_DIV_4		(2<<8)
-+#define S3C_SYSTIMER_DIV_8		(3<<8)
-+#define S3C_SYSTIMER_DIV_16		(4<<8)
-+
-+#define S3C_SYSTIMER_TARGET_HZ		200
-+#define S3C_SYSTIMER_PRESCALER		5
-+#define S3C_SYSTIMER_PRESCALER_MASK	(0x3f<<0)
-+
-+/* value for TCON */
-+#define S3C_SYSTIMER_INT_AUTO		(1<<5)
-+#define S3C_SYSTIMER_INT_IMM		(1<<4)
-+#define S3C_SYSTIMER_INT_START		(1<<3)
-+#define S3C_SYSTIMER_AUTO_RELOAD	(1<<2)
-+#define S3C_SYSTIMER_IMM_UPDATE		(1<<1)
-+#define S3C_SYSTIMER_START		(1<<0)
-+
-+/* Value for INT_CSTAT */
-+#define S3C_SYSTIMER_INT_IWIE		(1<<9)
-+#define S3C_SYSTIMER_INT_TWIE		(1<<10)
-+#define S3C_SYSTIMER_INT_ICNTEIE	(1<<6)
-+#define S3C_SYSTIMER_INT_TCON		(1<<5)
-+#define S3C_SYSTIMER_INT_ICNTB		(1<<4)
-+#define S3C_SYSTIMER_INT_TCNTB		(1<<2)
-+#define S3C_SYSTIMER_INT_STATS		(1<<1)
-+#define S3C_SYSTIMER_INT_EN		(1<<0)
-+
-+#endif /*  __ASM_ARCH_REGS_TIMER_H */
-diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index 8269d80..e0b89aa 100644
---- a/arch/arm/plat-samsung/Makefile
-+++ b/arch/arm/plat-samsung/Makefile
-@@ -12,7 +12,9 @@ obj-				:=
- # Objects we always build independent of SoC choice
- 
- obj-y				+= init.o
--obj-y				+= time.o
-+ifndef CONFIG_SAMSUNG_HRT_RTC_SYSTIMER
-+obj-y				+= time.o
-+endif
- obj-y				+= clock.o
- obj-y				+= pwm-clock.o
- obj-y				+= gpio.o
+>
+>>
+
+(snip)
+
+>> +
+>> +# CPUFREQ (DVFS)
+>
+> No need above comment.
+
+should be fixed.
+
+>
+>> +obj-$(CONFIG_CPU_FREQ) ? ? ? ? ? ? ? += cpufreq-s5pv210.o
+>
+> As I said, should be having machine dependency configuration...
+
+going to remove memory-configuration dependency...
+
+>
+>> diff --git a/arch/arm/mach-s5pv210/cpufreq-s5pv210.c b/arch/arm/mach-
+>> s5pv210/cpufreq-s5pv210.c
+>> new file mode 100644
+>> index 0000000..38de3ac
+>> --- /dev/null
+>> +++ b/arch/arm/mach-s5pv210/cpufreq-s5pv210.c
+>
+> 'cpufreq.c' is enough.
+
+fine.
+
+>
+>> @@ -0,0 +1,766 @@
+>> +/* ?linux/arch/arm/plat-s5pc11x/s5pc11x-cpufreq.c
+>
+> Please correct above comment.
+
+sure.
+
+>
+>> + *
+
+(snip)
+
+>> +#ifdef CONFIG_S5PC110_EVT0_WORKAROUND
+>
+> As I said, please don't add EVT0 code in here.
+>
+
+Um.. then, what you want to do is to branch to the WORKAROUND codes in
+run-time (based on the board-specific setting), not in compile-time?
+
+(snip)
+
+>> +#if defined(CONFIG_S5PC110_H_TYPE)
+>
+> Where is S5PC110_H_TYPE?
+> Please don't add not available code in here.
+
+will remove every H_TYPE.
+
+>
+
+(snip)
+
+>> + ? ? mpu_clk = clk_get(NULL, MPU_CLK);
+>
+> Just use 'armclk' instead of MPU_CLK definition...
+>
+
+Yes.
+
+(snip)
+
+>> +
+>> +#ifndef _ARCH_ARM_MACH_S5PV210_INCLUDE_MACH_CPU_FREQ_H_
+>> +#define _ARCH_ARM_MACH_S5PV210_INCLUDE_MACH_CPU_FREQ_H_
+>
+> How about __ASM_ARCH_CPU_FREQ_H ?
+
+Fine.
+
+>
+>> +
+>> +#include <linux/cpufreq.h>
+>> +
+>> +#ifdef CONFIG_CPU_S5PV210
+>
+> Do we really need above #ifdef?
+
+Not really. I'll remove it.
+
+>
+>> +
+>> +#define USE_FREQ_TABLE
+>> +
+>> +#define KHZ_T ? ? ? ? ? 1000
+>
+> Already said about that.
+>
+>> +
+>> +#define MPU_CLK ? ? ? ? "armclk"
+>
+> Already said about that...
+>
+>> +
+>> +enum perf_level {
+>> + ? ? L0 = 0,
+>> + ? ? L1,
+>> + ? ? L2,
+>> + ? ? L3,
+>> + ? ? L4,
+>> +};
+>> +
+>> +/* APLL,HCLK_MSYS,PCLK_MSYS mask value */
+>> +#define CLK_DIV0_MASK ? ((0x7<<0)|(0x7<<8)|(0x7<<12))
+>
+> Here is right?
+
+Found that it's no more needed. I'll get rid of it.
+
+>
+>> +
+>> +#ifdef CONFIG_PM
+>> +#define SLEEP_FREQ ? ? ?(800 * 1000) /* Use 800MHz when entering sleep */
+>> +
+>> +/* additional symantics for "relation" in cpufreq with pm */
+>> +#define DISABLE_FURTHER_CPUFREQ ? ? ? ? 0x10
+>> +#define ENABLE_FURTHER_CPUFREQ ? ? ? ? ?0x20
+>> +#define MASK_FURTHER_CPUFREQ ? ? ? ? ? ?0x30
+>> +/* With 0x00(NOCHANGE), it depends on the previous "further" status */
+>> +
+>> +#endif
+>> +
+>> +
+>
+> 1 empty line is enough...
+>
+>> +#endif /* CONFIG_CPU_S5PV210 */
+>> +#endif /* _ARCH_ARM_MACH_S5PV210_INCLUDE_MACH_CPU_FREQ_H_ */
+>> --
+>
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
+
+
+
 -- 
-1.6.0.4
+MyungJoo Ham (???), Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
