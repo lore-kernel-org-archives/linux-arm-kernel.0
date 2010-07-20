@@ -1,61 +1,41 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 20 Jul 2010 21:34:03 +0900
-Subject: [PATCH v2 5/8] ARM: S5PV310: Add Timer support
-In-Reply-To: <AANLkTimirpioNZmzLoWeAD9hN0gAmWodddeMyxsdY7A6@mail.gmail.com>
-References: <1279270714-15146-1-git-send-email-kgene.kim@samsung.com>
-	<1279270714-15146-6-git-send-email-kgene.kim@samsung.com>
-	<AANLkTimirpioNZmzLoWeAD9hN0gAmWodddeMyxsdY7A6@mail.gmail.com>
-Message-ID: <003b01cb2807$df794560$9e6bd020$%kim@samsung.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Tue, 20 Jul 2010 15:35:14 +0300
+Subject: [PATCH v5 0/4] s3c24xx: iPAQ rx1950 series
+In-Reply-To: <1279364224-24525-1-git-send-email-anarsoul@gmail.com>
+References: <1279364224-24525-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <201007201535.26600.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
+? ????????? ?? 17 ???? 2010 13:57:00 ????? Vasily Khoruzhick ???????:
+> This patch series adds more support for iPAQ rx1950 PDA to linux:
+> 1. LEDs driver -- it controls blue, green and red LEDs on rx1950
+> 2. Battery driver -- adds ability to monitor and charge battery.
+> This driver is suitable for H1940 PDA aswell (just need to write
+> some machine specific callbacks and get voltage LUTs)
 > 
-> On Fri, Jul 16, 2010 at 5:58 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > From: Changhwan Youn <chaos.youn@samsung.com>
-> >
-> > This patch adds timer support for S5PV310.
-> > Until now, all S5P SoCs use CONFIG_ARCH_USES_GETTIMEOFFSET macro as
-> a default
-> > configuration. Instead, S5PV310 implements clocksource and
-> clock_event_device
-> > to support the high resolution timer and tickless system.
-> >
-> > Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-> > Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-
-(snip)
-
-> > diff --git a/arch/arm/mach-s5pv310/time.c b/arch/arm/mach-s5pv310/time.c
-> > new file mode 100644
-> > index 0000000..64accf8
-> > --- /dev/null
-> > +++ b/arch/arm/mach-s5pv310/time.c
-> > @@ -0,0 +1,287 @@
-> > +/* linux/arch/arm/mach-s5pv310/time.c
-> > + *
-> > + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> > + * ? ? ? ? ? ? http://www.samsung.com
-> > + *
-> > + * S5PV310 (and compatible) HRT support
-> > + * PWM 2/4 is used for this feature
+> v2: removed ac registration from s3c_adc_battery driver, use
+> pda_power instead for ac support
 > 
-> Please make it configurable, now PWM 2 is used for I2C pin in mobile
-hardware.
-> It seems to smdk specific file.
+> v3: split LEDs patch to driver and machine parts,
+> split battery patch into battery + LED trigger parts,
+> now battery driver can skip gpio/callbacks usage
+> (if there's no gpio pin to determine that battery is
+> full or if charger is enabled automatically)
 > 
-> Why don't use the systimer?
+> v4: add .blink_set callback to LEDs driver instead of
+> using LED_HALF value for blinking, remove LED triggers
+> from battery driver completely (for now)
 > 
-Your suggestion looks reasonable, so will support HRT with System Timer.
+> v5: restore lut_acin usage in s3c_adc_battery driver,
+> it was accidently removed during removing AC support
+> from driver
 
-(snip)
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Ping :)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100720/137d6a02/attachment.sig>
