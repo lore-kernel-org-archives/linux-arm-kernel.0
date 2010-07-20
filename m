@@ -1,72 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Jul 2010 13:09:35 +0200
-Subject: =?iso-8859-1?q?=5BRFC=5D=A0arm=3A_versatile=3A_enable_PCI_I/O?= space
-In-Reply-To: <20100720095940.GA32702@n2100.arm.linux.org.uk>
-References: <201007201123.38709.arnd@arndb.de>
-	<20100720095940.GA32702@n2100.arm.linux.org.uk>
-Message-ID: <201007201309.36898.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 20 Jul 2010 12:37:00 +0100
+Subject: [PATCH 0/3] Cache maintenance on VIPT caches
+In-Reply-To: <20100720185611I.fujita.tomonori@lab.ntt.co.jp>
+References: <20100625115826.30030.89790.stgit@e102109-lin.cambridge.arm.com>
+	<20100716131908.GA15032@bnru02.bnr.st.com>
+	<1279291157.17878.49.camel@e102109-lin.cambridge.arm.com>
+	<20100720185611I.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <1279625820.10002.16.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 July 2010, Russell King - ARM Linux wrote:
-> On Tue, Jul 20, 2010 at 11:23:38AM +0200, Arnd Bergmann wrote:
-> > -/* macro to get at IO space when running virtually */
-> > +/* macro to get at MMIO space when running virtually */
-> >  #define IO_ADDRESS(x)		(((x) & 0x0fffffff) + (((x) >> 4) & 0x0f000000) + 0xf0000000)
-> >  
-> > -#define __io_address(n)		__io(IO_ADDRESS(n))
-> > +#define __io_address(n)		__typesafe_io(IO_ADDRESS(n))
+On Tue, 2010-07-20 at 18:56 +0900, FUJITA Tomonori wrote:
+> On Fri, 16 Jul 2010 15:39:17 +0100
+> Catalin Marinas <catalin.marinas@arm.com> wrote:
 > 
-> Hmm, that's not a scenario that I forsaw __typesafe_io() being used -
-> I'd prefer it to be restricted to only aliasing __io() to if it's
-> appropriate.  Either add an IOMEM() definition or open-code the cast
-> here.
-
-Yes, that's what I thought, but I didn't want to change too much.
-Thanks for the confirmation. The same pattern is also present in
-other platforms, I'll follow up with a patch to fix them all.
-
-> > diff --git a/arch/arm/mach-versatile/include/mach/io.h b/arch/arm/mach-versatile/include/mach/io.h
-> > index f067c14..a276171 100644
-> > --- a/arch/arm/mach-versatile/include/mach/io.h
-> > +++ b/arch/arm/mach-versatile/include/mach/io.h
-> > @@ -20,9 +20,12 @@
-> >  #ifndef __ASM_ARM_ARCH_IO_H
-> >  #define __ASM_ARM_ARCH_IO_H
-> >  
-> > -#define IO_SPACE_LIMIT 0xffffffff
-> > +#include <mach/hardware.h>
-> > +#include <mach/platform.h>
-> >  
-> > -#define __io(a)		__typesafe_io(a)
-> > +#define IO_SPACE_LIMIT (VERSATILE_PCI_MEM_BASE0_SIZE - 1)
-> > +
-> > +#define __io(a)		(a + VERSATILE_PCI_VIRT_MEM_BASE0)
+> > On Fri, 2010-07-16 at 14:19 +0100, Rabin VINCENT wrote:
+> > > On Fri, Jun 25, 2010 at 14:01:27 +0200, Catalin Marinas wrote:
+> > > > The first and third patches have already been posted in the same form.
+> > > > The second patch have been modified to handle all the VIPT caches via
+> > > > __sync_icache_dcache(). The initial use case for this patch was dealing
+> > > > with an SMP race condition but following suggestions from Rabin, it was
+> > > > extended to cover ARMv6 onwards, both UP and SMP.
+> > > >
+> > > > Any Tested-by's are welcome.
+> > > 
+> > > This version also fixes the MMC rootfs init crashes, without the need
+> > > for the flush_kernel_dcache_page() change:
+> > > 
+> > > Tested-by: Rabin Vincent <rabin.vincent@stericsson.com>
+> > 
+> > Thanks for testing.
 > 
-> Not quite.  Have a look at arch/arm/mach-footbridge/include/mach/io.h to
-> see how __io is defined there.
+> This patchset for arm handles I/D coherency (and D aliasing) with
+> PG_arch_1, right? If so, can you please send it to linux-arch? I guess
+> that some non arm people might be interested in it.
 
-The result is basically the same. My idea was to only define
-VERSATILE_PCI_VIRT_MEM_BASE0 in one place and use it in both the place
-where it get mapped and in the place where it gets used.
+Yes, I will.
 
-If I use the same definition as footbridge (which looks sensible,
-#define __io(a)     ((void __iomem *)(PCIO_BASE + (a))) ),
-should I do 
+ARM uses lazy D-cache flushing as per cachetlb.txt. However, this file
+recommends that the meaning of PG_arch_1 is 'dirty' and the bit is set
+by flush_dcache_page(). It works fine if all PIO drivers would call
+flush_dcache_page() but there are many (the majority?) that don't and we
+end up with data corruption in user space. So rather than changing all
+the drivers or proposing a PIO API (tried this as well :)), we changed
+the meaning of PG_arch_1 to 'clean'. That's already done by PowerPC and
+IA-64.
 
-a)
-mach-versatile/include/mach/io.h:
-#define PCIO_BASE                ((unsigned long)VERSATILE_PCI_VIRT_MEM_BASE0)
-mach-versatile/include/mach/hardware.h:
-#define VERSATILE_PCI_VIRT_MEM_BASE0 ((void __iomem *)0xeb000000ul)
+This was discussed on linux-arch on several occasions and I also posted
+a patch to change the recommendations in cachetlb.txt
+(http://thread.gmane.org/gmane.linux.kernel.cross-arch/6187).
 
-or b)
-mach-versatile/include/mach/io.h:
-#define PCIO_BASE                0xeb000000ul
-mach-versatile/include/mach/hardware.h:
-#define VERSATILE_PCI_VIRT_MEM_BASE0 ((void __iomem *)PCIO_BASE)
+> > > I ask because the
+> > > mmci patches that I posted convert that driver to use the sg_miter API
+> > > (which uses flush_kernel_dcache_page() internally), and not do any
+> > > flushing inside the driver itself.  Or do you think it would be
+> > > appropriate to have the driver call flush_dcache_page() explicitly?
+> > > (Although this would be double flushing on systems with aliasing caches
+> > > where flush_kernel_dcache_page() is not a no-op.)
+> > 
+> > I'm not sure why sg_miter doesn't call flush_dcache_page() but
+> > flush_kernel_dcache_page() (I cc'ed Fujita as he seems to have added
+> > this code).
+> 
+> It is intended to handle D aliasing due to kmap. As cachetlb.txt says
+> that it is assumed here that the user has no incoherent cached copies
+> (it was already addressed elsewhere). So flush_dcache_page() does too
+> much there.
 
+OK. So in this case a PIO driver using sg_miter should still call
+flush_dcache_page() as usual (or not at all as we change the meaning
+PG_arch_1 for the architectures where this matters).
 
-Thanks for the review!
+Thanks.
 
-	Arnd
+-- 
+Catalin
