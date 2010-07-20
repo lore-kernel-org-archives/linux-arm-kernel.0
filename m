@@ -1,32 +1,27 @@
-From: janboe.ye@gmail.com (janboe)
-Date: Tue, 20 Jul 2010 23:24:31 +0800
-Subject: [PATCH] arm: show_regs dump stack when ARM_UNWIND enable
-Message-ID: <20100720152431.GA17092@localhost.localdomain>
+From: jkosina@suse.cz (Jiri Kosina)
+Date: Tue, 20 Jul 2010 17:27:34 +0200 (CEST)
+Subject: [PATCH 31/33] Removing dead MACH_U300_BS26
+In-Reply-To: <AANLkTikyk4fu72kWFfxQyEV_GHTc5flLYytF9cnHDBE_@mail.gmail.com>
+References: <cover.1277911345.git.siccegge@cs.fau.de>
+	<2a81bf5506ce15ac839ca4fa58dc8af4112ff531.1277911346.git.siccegge@cs.fau.de>
+	<AANLkTikyk4fu72kWFfxQyEV_GHTc5flLYytF9cnHDBE_@mail.gmail.com>
+Message-ID: <alpine.LNX.2.00.1007201727160.4741@pobox.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__backtrace is empty when ARM_UNWIND enable, so instead dump_stack
+On Thu, 1 Jul 2010, Linus Walleij wrote:
 
-Signed-off-by: janboe <janboe.ye@gmail.com>
----
- arch/arm/kernel/process.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+> > MACH_U300_BS26 doesn't exist in Kconfig, therefore removing all
+> > references for it from the source code.
+> >
+> > Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
+> 
+> OK then,
+> Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index acf5e6f..e7ad878 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -271,7 +271,11 @@ void show_regs(struct pt_regs * regs)
- 	printk("\n");
- 	printk("Pid: %d, comm: %20s\n", task_pid_nr(current), current->comm);
- 	__show_regs(regs);
-+#ifdef CONFIG_ARM_UNWIND
-+	dump_stack();
-+#else
- 	__backtrace();
-+#endif
- }
- 
- ATOMIC_NOTIFIER_HEAD(thread_notify_head);
+As this doesn't seem to be present in linux-next as of today, I have 
+applied it to trivial queue. Thanks,
+
 -- 
-1.7.1
+Jiri Kosina
+SUSE Labs, Novell Inc.
