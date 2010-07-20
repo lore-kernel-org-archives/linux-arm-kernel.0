@@ -1,42 +1,35 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Jul 2010 10:59:40 +0100
-Subject: =?iso-8859-1?B?W1JGQ12gYXJt?=
-	=?iso-8859-1?Q?=3A?= versatile: enable PCI I/O space
-In-Reply-To: <201007201123.38709.arnd@arndb.de>
-References: <201007201123.38709.arnd@arndb.de>
-Message-ID: <20100720095940.GA32702@n2100.arm.linux.org.uk>
+Date: Tue, 20 Jul 2010 11:04:48 +0100
+Subject: [RFC,PATCH 3/3] arm: remove machine_desc.io_pg_offst and .phys_io
+In-Reply-To: <AANLkTilsIR36GNlbpZHt3FB5Dp2msedtUMFRSlZ-N-w9@mail.gmail.com>
+References: <1279073377.400469.233833413341.0.gpush@pororo>
+	<1279073377.404006.432977736300.3.gpush@pororo>
+	<AANLkTilsIR36GNlbpZHt3FB5Dp2msedtUMFRSlZ-N-w9@mail.gmail.com>
+Message-ID: <20100720100448.GB32702@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 20, 2010 at 11:23:38AM +0200, Arnd Bergmann wrote:
-> -/* macro to get at IO space when running virtually */
-> +/* macro to get at MMIO space when running virtually */
->  #define IO_ADDRESS(x)		(((x) & 0x0fffffff) + (((x) >> 4) & 0x0f000000) + 0xf0000000)
->  
-> -#define __io_address(n)		__io(IO_ADDRESS(n))
-> +#define __io_address(n)		__typesafe_io(IO_ADDRESS(n))
+On Tue, Jul 20, 2010 at 11:14:22AM +0200, Eric Miao wrote:
+> On Wed, Jul 14, 2010 at 4:09 AM, Jeremy Kerr <jeremy.kerr@canonical.com> wrote:
+> > Since we're now using addruart to establish the debug mapping, we can
+> > remove the io_pg_offst and phys_io members of struct machine_desc.
+> >
+> > Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> 
+> Like this very much,
+> 
+> Acked-by: Eric Miao <eric.miao@canonical.com>
+> 
+> Russell,
+> 
+> I think it can be merged soon, need to rebase my 'machine_class' patches
+> on top of your -devel branch then.
 
-Hmm, that's not a scenario that I forsaw __typesafe_io() being used -
-I'd prefer it to be restricted to only aliasing __io() to if it's
-appropriate.  Either add an IOMEM() definition or open-code the cast
-here.
+My devel branch is still very much in a state of flux - there's a
+number of patches which are 'on-hold' for various reasons, and
+various other patches which need merging on the various sub-topic
+branches...
 
-> diff --git a/arch/arm/mach-versatile/include/mach/io.h b/arch/arm/mach-versatile/include/mach/io.h
-> index f067c14..a276171 100644
-> --- a/arch/arm/mach-versatile/include/mach/io.h
-> +++ b/arch/arm/mach-versatile/include/mach/io.h
-> @@ -20,9 +20,12 @@
->  #ifndef __ASM_ARM_ARCH_IO_H
->  #define __ASM_ARM_ARCH_IO_H
->  
-> -#define IO_SPACE_LIMIT 0xffffffff
-> +#include <mach/hardware.h>
-> +#include <mach/platform.h>
->  
-> -#define __io(a)		__typesafe_io(a)
-> +#define IO_SPACE_LIMIT (VERSATILE_PCI_MEM_BASE0_SIZE - 1)
-> +
-> +#define __io(a)		(a + VERSATILE_PCI_VIRT_MEM_BASE0)
-
-Not quite.  Have a look at arch/arm/mach-footbridge/include/mach/io.h to
-see how __io is defined there.
+For these wide-ranging changes, what I've said in the past to people
+is to get them in linux-next, and we'll sort out merging their code
+into my tree towards the end of the cycle.
