@@ -1,92 +1,97 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Jul 2010 18:00:14 +0900
-Subject: [PATCH 5/5] ARM: S5PV210: Add RTC support for S5PV210 and S5PC110
-In-Reply-To: <1279702814-14929-1-git-send-email-kgene.kim@samsung.com>
-References: <1279702814-14929-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1279702814-14929-6-git-send-email-kgene.kim@samsung.com>
+Date: Wed, 21 Jul 2010 18:00:31 +0900
+Subject: [PATCH] ARM: SAMSUNG: Make RTC driver dependency SoC specific instead
+	of machine specific
+Message-ID: <1279702831-14968-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Atul Dahiya <atul.dahiya@samsung.com>
 
-This patch adds support RTC driver for Samsung S5PV210/S5PC110.
+This patch moves the dependency of RTC driver from MACH_XXX(board) to
+ARCH_XXX(SoC). This will enable all machines using Samsung S5P6440, S5PC100
+and S5PV210 SoCs to use RTC driver by default.
 
 Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5pv210/Kconfig            |    4 ++++
- arch/arm/mach-s5pv210/include/mach/map.h |    2 ++
- arch/arm/mach-s5pv210/mach-smdkc110.c    |    1 +
- arch/arm/mach-s5pv210/mach-smdkv210.c    |    1 +
- 4 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/Kconfig              |    3 +++
+ arch/arm/mach-s5p6440/Kconfig |    1 -
+ arch/arm/mach-s5pc100/Kconfig |    1 -
+ arch/arm/mach-s5pv210/Kconfig |    2 --
+ 4 files changed, 3 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 98922f7..ea668a4 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -672,6 +672,7 @@ config ARCH_S5P6440
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
+ 	select ARCH_USES_GETTIMEOFFSET
++	select HAVE_S3C_RTC
+ 	help
+ 	  Samsung S5P6440 CPU based systems
+ 
+@@ -691,6 +692,7 @@ config ARCH_S5PC100
+ 	select CPU_V7
+ 	select ARM_L1_CACHE_SHIFT_6
+ 	select ARCH_USES_GETTIMEOFFSET
++	select HAVE_S3C_RTC
+ 	help
+ 	  Samsung S5PC100 series based systems
+ 
+@@ -701,6 +703,7 @@ config ARCH_S5PV210
+ 	select HAVE_CLK
+ 	select ARM_L1_CACHE_SHIFT_6
+ 	select ARCH_USES_GETTIMEOFFSET
++	select HAVE_S3C_RTC
+ 	help
+ 	  Samsung S5PV210/S5PC110 series based systems
+ 
+diff --git a/arch/arm/mach-s5p6440/Kconfig b/arch/arm/mach-s5p6440/Kconfig
+index b2d4716..de8f08d 100644
+--- a/arch/arm/mach-s5p6440/Kconfig
++++ b/arch/arm/mach-s5p6440/Kconfig
+@@ -20,7 +20,6 @@ config MACH_SMDK6440
+ 	select SAMSUNG_DEV_ADC
+ 	select S3C_DEV_RTC
+ 	select S3C_DEV_WDT
+-	select HAVE_S3C_RTC
+ 	select HAVE_S3C2410_WATCHDOG
+ 	help
+ 	  Machine support for the Samsung SMDK6440
+diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+index 2602895..e9c3d98 100644
+--- a/arch/arm/mach-s5pc100/Kconfig
++++ b/arch/arm/mach-s5pc100/Kconfig
+@@ -48,7 +48,6 @@ config MACH_SMDKC100
+ 	select S5PC100_SETUP_FB_24BPP
+ 	select S5PC100_SETUP_I2C1
+ 	select S5PC100_SETUP_SDHCI
+-	select HAVE_S3C_RTC
+ 	help
+ 	  Machine support for the Samsung SMDKC100
+ 
 diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 0761eac..04597cc 100644
+index 04597cc..7f029d1 100644
 --- a/arch/arm/mach-s5pv210/Kconfig
 +++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -73,7 +73,9 @@ config MACH_SMDKV210
- 	select ARCH_SPARSEMEM_ENABLE
- 	select SAMSUNG_DEV_ADC
+@@ -75,7 +75,6 @@ config MACH_SMDKV210
  	select SAMSUNG_DEV_TS
-+	select S3C_DEV_RTC
+ 	select S3C_DEV_RTC
  	select S3C_DEV_WDT
-+	select HAVE_S3C_RTC
+-	select HAVE_S3C_RTC
  	select HAVE_S3C2410_WATCHDOG
  	help
  	  Machine support for Samsung SMDKV210
-@@ -82,7 +84,9 @@ config MACH_SMDKC110
- 	bool "SMDKC110"
- 	select CPU_S5PV210
+@@ -86,7 +85,6 @@ config MACH_SMDKC110
  	select ARCH_SPARSEMEM_ENABLE
-+	select S3C_DEV_RTC
+ 	select S3C_DEV_RTC
  	select S3C_DEV_WDT
-+	select HAVE_S3C_RTC
+-	select HAVE_S3C_RTC
  	select HAVE_S3C2410_WATCHDOG
  	help
  	  Machine support for Samsung SMDKC110
-diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
-index 34eb168..743ae4a 100644
---- a/arch/arm/mach-s5pv210/include/mach/map.h
-+++ b/arch/arm/mach-s5pv210/include/mach/map.h
-@@ -43,6 +43,7 @@
- 
- #define S5PV210_PA_WATCHDOG	(0xE2700000)
- 
-+#define S5PV210_PA_RTC		(0xE2800000)
- #define S5PV210_PA_UART		(0xE2900000)
- 
- #define S5P_PA_UART0		(S5PV210_PA_UART + 0x0)
-@@ -101,6 +102,7 @@
- #define S3C_PA_IIC1		S5PV210_PA_IIC1
- #define S3C_PA_IIC2		S5PV210_PA_IIC2
- #define S3C_PA_FB		S5PV210_PA_FB
-+#define S3C_PA_RTC		S5PV210_PA_RTC
- #define S3C_PA_WDT		S5PV210_PA_WATCHDOG
- 
- #define SAMSUNG_PA_ADC		S5PV210_PA_ADC
-diff --git a/arch/arm/mach-s5pv210/mach-smdkc110.c b/arch/arm/mach-s5pv210/mach-smdkc110.c
-index 4c8903c..2b48d5a 100644
---- a/arch/arm/mach-s5pv210/mach-smdkc110.c
-+++ b/arch/arm/mach-s5pv210/mach-smdkc110.c
-@@ -74,6 +74,7 @@ static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
- static struct platform_device *smdkc110_devices[] __initdata = {
- 	&s5pv210_device_iis0,
- 	&s5pv210_device_ac97,
-+	&s3c_device_rtc,
- 	&s3c_device_wdt,
- };
- 
-diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
-index 0d46279..15e2b9b 100644
---- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-+++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-@@ -77,6 +77,7 @@ static struct platform_device *smdkv210_devices[] __initdata = {
- 	&s5pv210_device_iis0,
- 	&s5pv210_device_ac97,
- 	&s3c_device_adc,
-+	&s3c_device_rtc,
- 	&s3c_device_ts,
- 	&s3c_device_wdt,
- };
 -- 
 1.6.2.5
