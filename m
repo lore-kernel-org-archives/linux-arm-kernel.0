@@ -1,48 +1,35 @@
-From: david.jander@protonic.nl (David Jander)
-Date: Wed, 21 Jul 2010 10:29:29 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 21 Jul 2010 09:47:26 +0100
 Subject: ARM Machine SoC I/O setup and PAD initialization code
-Message-ID: <201007211029.29529.david.jander@protonic.nl>
+In-Reply-To: <201007211029.29529.david.jander@protonic.nl>
+References: <201007211029.29529.david.jander@protonic.nl>
+Message-ID: <20100721084726.GC6009@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jul 21, 2010 at 10:29:29AM +0200, David Jander wrote:
+> General machine initialization like I/O-multiplexing and I/O-pad setup seems 
+> to be done twice most of the time: Once in the bootloader (i.e. u-boot), and 
+> once in the machine support file in the linux kernel. This seems awfully 
+> redundant and error-prone to me. Why is it like this?
 
-Hi all,
+I answer your question only once - rather than the number of times you've
+asked it in this email.
 
-Having some experience with powerpc linux and being fairly new to ARM, I 
-wonder about the following I have observed on ARM-linux so far:
+We do IO mux setup in the kernel for two reasons:
 
-General machine initialization like I/O-multiplexing and I/O-pad setup seems 
-to be done twice most of the time: Once in the bootloader (i.e. u-boot), and 
-once in the machine support file in the linux kernel. This seems awfully 
-redundant and error-prone to me. Why is it like this?
+1. we don't trust boot loaders to do the right thing, especially when we
+   have a plethora of boot loaders - or even no boot loader - to deal with.
 
-Shouldn't I/O-pad setup and such stuff be duty of the bootloader alone? Why do 
-I see so much platform setup code in the linux kernel that repeats this?
+2. on some platforms and SoCs, it's necessary to change the IO mux setup
+   at runtime.
 
-For example:
-arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> What about fixing bootloaders then?
 
-#define MX51_UART1_PAD_CTRL     (PAD_CTL_HYS | PAD_CTL_PKE | PAD_CTL_PUE | \
-                                 PAD_CTL_DSE_HIGH)
-...
+Forget fixing boot loaders; that's a total and utter lost cause.  Boot
+loaders generally don't seem to even be capable of passing a block of
+information correctly to the kernel, or even getting one simple value
+in a register correct.
 
-IMHO this shouldn't be in the kernel, much less in this place. This define 
-assumes somehow that on every i.MX51 based board I should configure any UART1 
-pad as having high drive-strength and a pull-up. What drive strength the pad 
-should have is a decision that the board hardware-designer must make 
-individually for each board and pin of the UART. It cannot be something as 
-generic as to put it into such a header-file. The kernel definitely shouldn't 
-mess with those things.
-
-So, why is it done like this?
-Is it historically grown like this, and has noone yet had the time to fix 
-this?
-Or is it that boot-loaders on ARM in general don't do hardware setup correctly 
-so that it has to be re-done in the kernel? What about fixing bootloaders 
-then?
-
-Best regards,
-
--- 
-David Jander
-Protonic Holland.
+Boot loaders really can't be trusted, and the less we rely upon them,
+the better.
