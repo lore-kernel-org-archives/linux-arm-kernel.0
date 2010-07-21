@@ -1,35 +1,46 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Wed, 21 Jul 2010 11:09:15 +0200
-Subject: [RFC,PATCH 3/3] arm: remove machine_desc.io_pg_offst and .phys_io
-In-Reply-To: <20100721085024.GD6009@n2100.arm.linux.org.uk>
-References: <1279073377.400469.233833413341.0.gpush@pororo>
-	<1279073377.404006.432977736300.3.gpush@pororo>
-	<AANLkTilsIR36GNlbpZHt3FB5Dp2msedtUMFRSlZ-N-w9@mail.gmail.com>
-	<20100720100448.GB32702@n2100.arm.linux.org.uk>
-	<1279621292.27276.19.camel@pororo.lan>
-	<1279629158.27276.29.camel@pororo.lan>
-	<20100721085024.GD6009@n2100.arm.linux.org.uk>
-Message-ID: <1279703355.27276.100.camel@pororo.lan>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 21 Jul 2010 18:00:10 +0900
+Subject: [PATCH 1/5] ARM: S3C64XX: Add RTC support for S3C64XX
+In-Reply-To: <1279702814-14929-1-git-send-email-kgene.kim@samsung.com>
+References: <1279702814-14929-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1279702814-14929-2-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+From: Atul Dahiya <atul.dahiya@samsung.com>
 
-> It's extremely unlikely to have a UART at address 0 (because that's by
-> default where the CPU jumps to on reset.)  That's not to say it could
-> never happen - it's possible to hard-wire the CPU into 'hivec' mode
-> where it'll instead jump to 0xffff0000.  In that case, if you're sane
-> you'd put your SDRAM at 0x00000000.
+This patch adds support for RTC for SMDK6410.
 
-OK, the patch I have just posted is a bit of a hack that does the 0x0
-check; happy to do this a different way.
+Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-s3c64xx/Kconfig         |    1 +
+ arch/arm/mach-s3c64xx/mach-smdk6410.c |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-So, the simplest solution seems to be to make the uart mapping code
-dependent on !DEBUG_ICEDCC (but leave the code there to add the mappings
-for ARCH_NETWINDER, ARCH_CATS and ARCH_RPC). Would you like a new patch
-for this?
-
-Cheers,
-
-
-Jeremy
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index f5a5972..e206504 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -96,6 +96,7 @@ config MACH_SMDK6410
+ 	select S3C_DEV_HSMMC1
+ 	select S3C_DEV_I2C1
+ 	select S3C_DEV_FB
++	select S3C_DEV_RTC
+ 	select SAMSUNG_DEV_TS
+ 	select S3C_DEV_USB_HOST
+ 	select S3C_DEV_USB_HSOTG
+diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+index d9a0355..b3bfb68 100644
+--- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
++++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+@@ -265,6 +265,7 @@ static struct platform_device *smdk6410_devices[] __initdata = {
+ 
+ 	&smdk6410_smsc911x,
+ 	&s3c_device_adc,
++	&s3c_device_rtc,
+ 	&s3c_device_ts,
+ 	&s3c_device_wdt,
+ };
+-- 
+1.6.2.5
