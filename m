@@ -1,62 +1,66 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 21 Jul 2010 22:41:18 +0900
-Subject: [PATCH v2 3/3] i2c/busses: Select I2C bus support for S5PV210 and
-	S5P6440.
-In-Reply-To: <1279717167-24456-1-git-send-email-kgene.kim@samsung.com>
-References: <1279717167-24456-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <AANLkTilygLmO9n0oconz73C6Bjtsgbh0cbfnJ1zU9YMb@mail.gmail.com>
+Date: Wed, 21 Jul 2010 22:51:32 +0900
+Subject: [PATCH v3 1/7] ARM: S5PV210: Add a Kconfig entry
+	"S5PC110_EVT0_WORKAROUND"
+In-Reply-To: <4C46DE37.5060105@simtec.co.uk>
+References: <1279517483-22751-1-git-send-email-myungjoo.ham@samsung.com>
+	<1279517483-22751-2-git-send-email-myungjoo.ham@samsung.com>
+	<4C464127.5040405@simtec.co.uk>
+	<AANLkTikaUugKaDFCHW234eWLPn7KnV-wudeNY2-KwWR0@mail.gmail.com>
+	<4C46DE37.5060105@simtec.co.uk>
+Message-ID: <AANLkTikbou_klg7xeGTk42HsKQJIJa5sbFIwpNQzk5eJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I don't want to modify Kconfig anymore. it's simple to modify driver itself.
+On Wed, Jul 21, 2010 at 8:47 PM, Ben Dooks <ben@simtec.co.uk> wrote:
+> On 21/07/10 02:13, MyungJoo Ham wrote:
+>> On Wed, Jul 21, 2010 at 9:36 AM, Ben Dooks <ben@simtec.co.uk> wrote:
+>>> On 07/19/10 06:31, MyungJoo Ham wrote:
+>>>>
+>>>> Early S5PC110 (EVT0) chip had some issues required workaround from a
+>>>> kernel. We can add such workaround codes with this Kconfig entry.
+>>>>
+>>>> Signed-off-by: MyungJoo Ham<myungjoo.ham@samsung.com>
+>>>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
+>>>> ---
+>>>> ?arch/arm/mach-s5pv210/Kconfig | ? ?7 +++++++
+>>>> ?1 files changed, 7 insertions(+), 0 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+>>>> index 631019a..18802e7 100644
+>>>> --- a/arch/arm/mach-s5pv210/Kconfig
+>>>> +++ b/arch/arm/mach-s5pv210/Kconfig
+>>>> @@ -101,4 +101,11 @@ config MACH_SMDKC110
+>>>> ? ? ? ? ?Machine support for Samsung SMDKC110
+>>>> ? ? ? ? ?S5PC110(MCP) is one of package option of S5PV210
+>>>>
+>>>> +config S5PC110_EVT0_WORKAROUND
+>>>> + ? ? ? bool "S5PC110 Early Chip Workaround (EVT0)"
+>>>> + ? ? ? help
+>>>> + ? ? ? ? Early S5PC110 (so called EVT0) has errata items that should be
+>>>> + ? ? ? ? addressed; otherwise the kernel may panic or be locked up.
+>>>> Enable
+>>>> + ? ? ? ? this option to execute workaround instructions.
+>>>> +
+>>>> ?endif
+>>>
+>>> What happens for non EVT0, is the a performance issue or is it exclusive?
+>>>
+>>
+>> This S5PC110_EVT0_WORKAROUND addresses issues (erratic behaviors, not
+>> performance issues) of "EVT-0" revisions, which is exclusive for these
+>> EVT-0 only. They do not apply to the later (EVT-1 and so on) chips.
+>
+> Ok, so does the fix work for just EVT0? Does it exclude supporting other
+> EVT sillicon as well?
 
-Think the usage of I2c. I think there's no case don't use it.
+Mr. Ham will reply it.
 
-At this time modify Kconfig once, and just fix the driver if new SoCs
-are arrives.
-Of course we can modify Kconfig one more, If there's really new IPs of
-I2C are created. but I expect we also need to define new PLAT_SAMSUNG2
+As I know "yes", just FYI now Mr. Ham works on it. you can see it
+http://git.infradead.org/users/kmpark/linux-2.6-samsung clock and
+cpufreq branch.
+
+If you have a good idea, give your opinions.
 
 Thank you,
 Kyungmin Park
-
-On Wed, Jul 21, 2010 at 9:59 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> From: Naveen Krishna Ch <ch.naveen@samsung.com>
->
-> This patch is to select support I2C channels 0, 1 and 2 for S5PV210 and S5P6440.
->
-> Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-> Changes since v1:
-> - Modifed the Kconfig help comments.
->
-> ?drivers/i2c/busses/Kconfig | ? ?6 +++---
-> ?1 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> index bceafbf..27c96ec 100644
-> --- a/drivers/i2c/busses/Kconfig
-> +++ b/drivers/i2c/busses/Kconfig
-> @@ -523,10 +523,10 @@ config I2C_PXA_SLAVE
->
-> ?config I2C_S3C2410
-> ? ? ? ?tristate "S3C2410 I2C Driver"
-> - ? ? ? depends on ARCH_S3C2410 || ARCH_S3C64XX
-> + ? ? ? depends on ARCH_S3C2410 || ARCH_S3C64XX || ARCH_S5P6440 || ARCH_S5PV210
-> ? ? ? ?help
-> - ? ? ? ? Say Y here to include support for I2C controller in the
-> - ? ? ? ? Samsung S3C2410 based System-on-Chip devices.
-> + ? ? ? ? Say Y here to include support for I2C controller in the Samsung
-> + ? ? ? ? S3C2410, S3C64XX, S5P6440 and S5PV210 based System-on-Chip devices.
->
-> ?config I2C_S6000
-> ? ? ? ?tristate "S6000 I2C support"
-> --
-> 1.6.2.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
