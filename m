@@ -1,61 +1,50 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 21 Jul 2010 17:46:17 +0300
-Subject: [PATCH v2] otg/ulpi.c : fix register write
-In-Reply-To: <1279178419-3806-1-git-send-email-eric@eukrea.com>
-References: <20100714204740.GA29417@suse.de>
-	<1279178419-3806-1-git-send-email-eric@eukrea.com>
-Message-ID: <4C470839.2050500@compulab.co.il>
+Date: Wed, 21 Jul 2010 17:47:54 +0300
+Subject: [PATCH 0/3] Generic ULPI driver extention
+In-Reply-To: <1279198816-30367-1-git-send-email-grinberg@compulab.co.il>
+References: <1279198816-30367-1-git-send-email-grinberg@compulab.co.il>
+Message-ID: <4C47089A.6020502@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+Greg, Daniel, Sascha,
 
-This was a resend, you've asked...
-Can you please update us on its status?
+Any comments?
 
-Thanks
-
-> ulpi_set_vbus and ulpi_set_flags are using ULPI_SET(register) to write
-> to the PHY's registers, which means we can only set bits in the PHY's
-> register and not clear them.
-> By directly using the address of the register without any offset, we
-> now get the expected behaviour for these functions.
+> This patch series add support for SMSC USB3319 ulpi phy,
+> introduces the ulpi specific flags for control over the
+> ulpi phy and extends the generic ulpi driver with
+> support for Function and Interface control of upli phy.
 >
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> Cc: Daniel Mack <daniel@caiaq.de>
-> Cc: linux-usb at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> ---
-> v2 :
-> drop reg/val swap which is handled in a better way by Igor's patch here :
-> http://comments.gmane.org/gmane.linux.usb.general/32092 
->  
->  drivers/usb/otg/ulpi.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+> Depends on:
+> From: Ajay Kumar Gupta <ajay.gupta@ti.com>
+> Date: Thu,  8 Jul 2010 14:03:01 +0530
+> Subject: USB: ulpi: fix compilation warning
 >
-> diff --git a/drivers/usb/otg/ulpi.c b/drivers/usb/otg/ulpi.c
-> index b1b3469..086853b 100644
-> --- a/drivers/usb/otg/ulpi.c
-> +++ b/drivers/usb/otg/ulpi.c
-> @@ -54,7 +54,7 @@ static int ulpi_set_flags(struct otg_transceiver *otg)
->  	if (otg->flags & USB_OTG_EXT_VBUS_INDICATOR)
->  		flags |= ULPI_OTG_CTRL_EXTVBUSIND;
->  
-> -	return otg_io_write(otg, flags, ULPI_SET(ULPI_OTG_CTRL));
-> +	return otg_io_write(otg, flags, ULPI_OTG_CTRL);
->  }
->  
->  static int ulpi_init(struct otg_transceiver *otg)
-> @@ -90,7 +90,7 @@ static int ulpi_set_vbus(struct otg_transceiver *otg, bool on)
->  			flags |= ULPI_OTG_CTRL_DRVVBUS_EXT;
->  	}
->  
-> -	return otg_io_write(otg, flags, ULPI_SET(ULPI_OTG_CTRL));
-> +	return otg_io_write(otg, flags, ULPI_OTG_CTRL);
->  }
->  
->  struct otg_transceiver *
+> From: Eric B?nard <eric@eukrea.com>
+> Date: Thu, 15 Jul 2010 09:20:19 +0200
+> Subject: [PATCH v2] otg/ulpi.c : fix register write
+>
+> Igor Grinberg (3):
+>   usb/otg/ulpi: remove unused macro
+>   usb/otg/ulpi: add support for SMSC USB3319 ulpi phy
+>   usb/otg/ulpi: extend the generic ulpi driver.
+>
+>  arch/arm/mach-mx2/mach-pca100.c          |    4 +-
+>  arch/arm/mach-mx3/mach-armadillo5x0.c    |    4 +-
+>  arch/arm/mach-mx3/mach-mx31lilly.c       |    4 +-
+>  arch/arm/mach-mx3/mach-mx31lite.c        |    2 +-
+>  arch/arm/mach-mx3/mach-mx31moboard.c     |    2 +-
+>  arch/arm/mach-mx3/mach-pcm037.c          |    4 +-
+>  arch/arm/mach-mx3/mach-pcm043.c          |    2 +-
+>  arch/arm/mach-mx3/mx31moboard-smartbot.c |    2 +-
+>  drivers/usb/otg/Kconfig                  |    2 -
+>  drivers/usb/otg/ulpi.c                   |  130 +++++++++++++++++++++++++++---
+>  include/linux/usb/otg.h                  |    7 --
+>  include/linux/usb/ulpi.h                 |   39 +++++++++
+>  12 files changed, 169 insertions(+), 33 deletions(-)
+>
+>
 >   
 
 -- 
