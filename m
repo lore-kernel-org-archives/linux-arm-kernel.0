@@ -1,169 +1,75 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 21 Jul 2010 20:33:45 +0300
-Subject: [PATCH v2 11/20] omap: hsmmc: support mmc3 regulator power control
+Date: Wed, 21 Jul 2010 20:33:46 +0300
+Subject: [PATCH v2 12/20] omap: hsmmc: allow board-specific settings of
+	private mmc data
 In-Reply-To: <1279733634-21974-1-git-send-email-ohad@wizery.com>
 References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-Message-ID: <1279733634-21974-12-git-send-email-ohad@wizery.com>
+Message-ID: <1279733634-21974-13-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare for mmc3 regulator power control by splitting the power
-control functions of mmc2 and mmc3, and expecting mmc3 to have
-a single, dedicated, regulator support.
+Allow board-specific settings of private mmc data, in order to
+allow embedded SDIO devices to communicate board-specific parameters
+to the SDIO function driver (e.g., the external IRQ line of the wl1271).
 
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 ---
- arch/arm/mach-omap2/hsmmc.c   |   10 ++++--
- drivers/mmc/host/omap_hsmmc.c |   67 ++++++++++++++++++++++++++++++++++++----
- 2 files changed, 66 insertions(+), 11 deletions(-)
+ arch/arm/mach-omap2/hsmmc.c           |    2 ++
+ arch/arm/mach-omap2/hsmmc.h           |    1 +
+ arch/arm/plat-omap/include/plat/mmc.h |    2 ++
+ drivers/mmc/host/omap_hsmmc.c         |    2 ++
+ 4 files changed, 7 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-index 1ef54b0..5d3d789 100644
+index 5d3d789..f06ddd2 100644
 --- a/arch/arm/mach-omap2/hsmmc.c
 +++ b/arch/arm/mach-omap2/hsmmc.c
-@@ -174,7 +174,7 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
- 	}
- }
+@@ -284,6 +284,8 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
+ 		if (c->vcc_aux_disable_is_sleep)
+ 			mmc->slots[0].vcc_aux_disable_is_sleep = 1;
  
--static void hsmmc23_before_set_reg(struct device *dev, int slot,
-+static void hsmmc2_before_set_reg(struct device *dev, int slot,
- 				   int power_on, int vdd)
- {
- 	struct omap_mmc_platform_data *mmc = dev->platform_data;
-@@ -325,14 +325,16 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
- 				c->transceiver = 1;
- 			if (c->transceiver && c->wires > 4)
- 				c->wires = 4;
--			/* FALLTHROUGH */
--		case 3:
- 			if (mmc->slots[0].features & HSMMC_HAS_PBIAS) {
- 				/* off-chip level shifting, or none */
--				mmc->slots[0].before_set_reg = hsmmc23_before_set_reg;
-+				mmc->slots[0].before_set_reg = hsmmc2_before_set_reg;
- 				mmc->slots[0].after_set_reg = NULL;
- 			}
- 			break;
-+		case 3:
-+			mmc->slots[0].before_set_reg = NULL;
-+			mmc->slots[0].after_set_reg = NULL;
-+			break;
- 		default:
- 			pr_err("MMC%d configuration not supported!\n", c->mmc);
- 			kfree(mmc);
++		mmc->slots[0].priv_data = c->priv_data;
++
+ 		/* NOTE:  MMC slots should have a Vcc regulator set up.
+ 		 * This may be from a TWL4030-family chip, another
+ 		 * controllable regulator, or a fixed supply.
+diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
+index 36f0ba8..434a3ed 100644
+--- a/arch/arm/mach-omap2/hsmmc.h
++++ b/arch/arm/mach-omap2/hsmmc.h
+@@ -23,6 +23,7 @@ struct omap2_hsmmc_info {
+ 	int	ocr_mask;	/* temporary HACK */
+ 	/* Remux (pad configuation) when powering on/off */
+ 	void (*remux)(struct device *dev, int slot, int power_on);
++	void	*priv_data;	/* private data to SDIO function driver */
+ };
+ 
+ #if defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
+diff --git a/arch/arm/plat-omap/include/plat/mmc.h b/arch/arm/plat-omap/include/plat/mmc.h
+index c835f1e..9db1617 100644
+--- a/arch/arm/plat-omap/include/plat/mmc.h
++++ b/arch/arm/plat-omap/include/plat/mmc.h
+@@ -140,6 +140,8 @@ struct omap_mmc_platform_data {
+ 
+ 		unsigned int ban_openended:1;
+ 
++		/* card private data that should be used by function driver */
++		void *priv_data;
+ 	} slots[OMAP_MMC_MAX_SLOTS];
+ };
+ 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index b032828..4c5a669 100644
+index 4c5a669..4ac548e 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -258,7 +258,7 @@ static int omap_hsmmc_1_set_power(struct device *dev, int slot, int power_on,
- 	return ret;
- }
+@@ -2157,6 +2157,8 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
+ 	if (mmc_slot(host).nonremovable)
+ 		mmc->caps |= MMC_CAP_NONREMOVABLE;
  
--static int omap_hsmmc_23_set_power(struct device *dev, int slot, int power_on,
-+static int omap_hsmmc_2_set_power(struct device *dev, int slot, int power_on,
- 				   int vdd)
- {
- 	struct omap_hsmmc_host *host =
-@@ -309,6 +309,31 @@ static int omap_hsmmc_23_set_power(struct device *dev, int slot, int power_on,
- 	return ret;
- }
++	mmc_set_embedded_data(mmc, mmc_slot(host).priv_data);
++
+ 	omap_hsmmc_conf_bus_power(host);
  
-+static int omap_hsmmc_3_set_power(struct device *dev, int slot, int power_on,
-+				   int vdd)
-+{
-+	struct omap_hsmmc_host *host =
-+		platform_get_drvdata(to_platform_device(dev));
-+	int ret = 0;
-+
-+	if (power_on) {
-+		ret = mmc_regulator_set_ocr(host->vcc, vdd);
-+		/* Enable interface voltage rail, if needed */
-+		if (ret == 0 && host->vcc) {
-+			ret = regulator_enable(host->vcc);
-+			if (ret < 0)
-+				ret = mmc_regulator_set_ocr(host->vcc, 0);
-+		}
-+	} else {
-+		if (host->vcc)
-+			ret = regulator_disable(host->vcc);
-+		if (ret == 0)
-+			ret = mmc_regulator_set_ocr(host->vcc, 0);
-+	}
-+
-+	return ret;
-+}
-+
- static int omap_hsmmc_1_set_sleep(struct device *dev, int slot, int sleep,
- 				  int vdd, int cardsleep)
- {
-@@ -319,7 +344,7 @@ static int omap_hsmmc_1_set_sleep(struct device *dev, int slot, int sleep,
- 	return regulator_set_mode(host->vcc, mode);
- }
- 
--static int omap_hsmmc_23_set_sleep(struct device *dev, int slot, int sleep,
-+static int omap_hsmmc_2_set_sleep(struct device *dev, int slot, int sleep,
- 				   int vdd, int cardsleep)
- {
- 	struct omap_hsmmc_host *host =
-@@ -358,6 +383,31 @@ static int omap_hsmmc_23_set_sleep(struct device *dev, int slot, int sleep,
- 		return regulator_enable(host->vcc_aux);
- }
- 
-+static int omap_hsmmc_3_set_sleep(struct device *dev, int slot, int sleep,
-+				   int vdd, int cardsleep)
-+{
-+	struct omap_hsmmc_host *host =
-+		platform_get_drvdata(to_platform_device(dev));
-+	int err = 0;
-+
-+	/*
-+	 * If we don't see a Vcc regulator, assume it's a fixed
-+	 * voltage always-on regulator.
-+	 */
-+	if (!host->vcc)
-+		return 0;
-+
-+	if (cardsleep) {
-+		/* VCC can be turned off if card is asleep */
-+		if (sleep)
-+			err = mmc_regulator_set_ocr(host->vcc, 0);
-+		else
-+			err = mmc_regulator_set_ocr(host->vcc, vdd);
-+	}
-+
-+	return err;
-+}
-+
- static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
- {
- 	struct regulator *reg;
-@@ -370,10 +420,13 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
- 		mmc_slot(host).set_sleep = omap_hsmmc_1_set_sleep;
- 		break;
- 	case OMAP_MMC2_DEVID:
--	case OMAP_MMC3_DEVID:
- 		/* Off-chip level shifting, or none */
--		mmc_slot(host).set_power = omap_hsmmc_23_set_power;
--		mmc_slot(host).set_sleep = omap_hsmmc_23_set_sleep;
-+		mmc_slot(host).set_power = omap_hsmmc_2_set_power;
-+		mmc_slot(host).set_sleep = omap_hsmmc_2_set_sleep;
-+		break;
-+	case OMAP_MMC3_DEVID:
-+		mmc_slot(host).set_power = omap_hsmmc_3_set_power;
-+		mmc_slot(host).set_sleep = omap_hsmmc_3_set_sleep;
- 		break;
- 	default:
- 		pr_err("MMC%d configuration not supported!\n", host->id);
-@@ -386,9 +439,9 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
- 		/*
- 		* HACK: until fixed.c regulator is usable,
- 		* we don't require a main regulator
--		* for MMC2 or MMC3
-+		* for MMC2
- 		*/
--		if (host->id == OMAP_MMC1_DEVID) {
-+		if (host->id != OMAP_MMC2_DEVID) {
- 			ret = PTR_ERR(reg);
- 			goto err;
- 		}
+ 	/* Select DMA lines */
 -- 
 1.7.0.4
