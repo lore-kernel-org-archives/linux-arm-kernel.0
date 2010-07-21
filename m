@@ -1,63 +1,87 @@
-From: blp@cs.stanford.edu (Ben Pfaff)
-Date: Wed, 21 Jul 2010 09:38:54 -0700
-Subject: Introducing the LCD-Linux project
-References: <AANLkTikitTGpiE5Oe_P5a4f2OCOnlB9j_LVm5CQhQIno@mail.gmail.com>
-Message-ID: <874ofsdc2p.fsf@benpfaff.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 21 Jul 2010 20:33:34 +0300
+Subject: [PATCH v2 00/20] native support for wl1271 on ZOOM
+Message-ID: <1279733634-21974-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mattia Jona-Lasinio <mattia.jona@gmail.com> writes:
+This patch series adds native support for wl1271 on ZOOM.
 
-> The possibility to connect to the computer small alphanumeric
-> as well as graphic displays, has always attracted some
-> interest. These small devices are connected to the computer and
-> can be used to display system diagnostics like network usage,
-> RAM or disk usage or even to replace the usual
-> monitor. Possible applications can be found in embedded systems
-> or clusters. These displays are connected to the computer
-> through serial lines, parallel ports and more recently through
-> USB connections. Appropriate programs in userspace gather the
-> desired information and output it on the display. However for
-> this to work, the userspace program has to implement some sort
-> of display management, to determine what must be displayed
-> where. This has two major disadvantages. First. Every userspace
-> program willing to drive a display must solve the very same
-> problems (display scroll and refresh, for instance), resulting
-> in an overall duplication of code. Second. Display controllers
-> usually require quite strict timings for proper operation and
-> it is not trivial neither efficient to obtain this in
-> userspace, whereas it is straightforward in kernel space
-> through the usual delay functions. A solution is therefore to
-> provide a sort of minimal terminal emulation in kernel space,
-> that can be accessed through the standard character device
-> interface. In this way the problem of the display management is
-> reduced to some calls to the usual read/write/seek/ioctl
-> routines. At the same time one has the possibility to implement
-> handling of escape sequences, thus opening the way to standard
-> applications based on the ncurses library.
+Changes since v1:
 
-When I wanted to solve the same problem for a small
-serial-connected LCD panel (sold under the name EZIO), I wrote a
-program called "ezio-term" that has the same functionality but
-runs entirely in userspace.  It connects to the serial port and
-speaks the EZIO protocol on the serial port, and it creates a pty
-and acts like an ANSI terminal on that pty.  Thus, it translates
-back and forth between the two protocols.
+- introduce a fixed regulator device to control the power of wl1271
+- allow to propagate private board-specific data to SDIO function drivers
+- allow SDIO function driver to control the card's power via new API
+- make it possible to keep the card's power down (without depending
+  on an explicit SDIO function driver power-down request)
 
-ezio-term also comes with a terminfo description that lets
-programs take advantage of the special features of the LCD panel.
-ezio-term also has the "virtual screen larger than physical
-screen" feature that you mention elsewhere, although it currently
-only implements an extra-wide screen, not an extra-tall one.
+Thanks to these changes, we no longer need a separate platform
+device (carrying e.g. the external irq information of the device),
+and no longer need to emulate virtual card detect events.
 
-ezio-term solves the first problem you mention.  I'm not sure I
-understand how the second one would come about across a serial or
-parallel or USB connection.
+The two "board muxing" pathces were already taken by Tony, and
+are resent here just to make it easier for people to use/test these pathces.
 
-ezio-term is distributed as part of Open vSwitch, in the
-directory extras/ezio.  You can clone the Open vSwitch Git
-repository with:
-        git clone git://openvswitch.org/openvswitch
--- 
-"Premature optimization is the root of all evil."
---D. E. Knuth, "Structured Programming with go to Statements"
+The changes to the MMC core really needs careful review; there still
+might be some pitfalls that haven't been covered. E.g., one thing
+we plan to look at next is their bahvior together with SDIO Suspend/Resume.
+
+Special thanks to Roger Quadros and Nicolas Pitre for their extensive
+review and helpful suggestions.
+
+The patches are based on 2.6.35-rc5, and were tested on ZOOM3.
+
+Thanks,
+
+Ohad Ben-Cohen (20):
+  sdio: add TI + wl1271 ids
+  wireless: wl1271: remove SDIO IDs from driver
+  mmc: support embedded data field in mmc_host
+  omap zoom2: wlan board muxing
+  omap zoom3: wlan board muxing
+  wireless: wl1271: make wl12xx.h common to both spi and sdio
+  wireless: wl1271: support return value for the set power func
+  wireless: wl1271: take irq info from private board data
+  wireless: wl1271: make ref_clock configurable by board
+  omap: zoom: add fixed regulator device for wlan
+  omap: hsmmc: support mmc3 regulator power control
+  omap: hsmmc: allow board-specific settings of private mmc data
+  omap: zoom: add mmc3/wl1271 device support
+  mmc: sdio: fully reconfigure oldcard on resume
+  mmc: sdio: verify existence of resume handler
+  mmc: introduce API to control the card's power
+  mmc: sdio: relocate sdio_set_block_size call
+  mmc: sdio: enable a default power off mode of the card
+  omap: zoom: keep the MMC3 wl1271 device powered off
+  wireless: wl1271: call SDIO claim/release power API
+
+ arch/arm/mach-omap2/board-zoom-peripherals.c |   54 +++++++++++++++++++
+ arch/arm/mach-omap2/board-zoom2.c            |   13 +++++
+ arch/arm/mach-omap2/board-zoom3.c            |   13 +++++
+ arch/arm/mach-omap2/hsmmc.c                  |   15 ++++--
+ arch/arm/mach-omap2/hsmmc.h                  |    2 +
+ arch/arm/plat-omap/include/plat/mmc.h        |    5 ++
+ drivers/mmc/core/bus.c                       |    3 +
+ drivers/mmc/core/core.c                      |   50 ++++++++++++++++++
+ drivers/mmc/core/sdio.c                      |   36 +++++++++++--
+ drivers/mmc/core/sdio_bus.c                  |    9 ---
+ drivers/mmc/core/sdio_io.c                   |   50 ++++++++++++++++++
+ drivers/mmc/host/omap_hsmmc.c                |   72 +++++++++++++++++++++++---
+ drivers/net/wireless/wl12xx/wl1251_sdio.c    |    2 +-
+ drivers/net/wireless/wl12xx/wl1251_spi.c     |    2 +-
+ drivers/net/wireless/wl12xx/wl1271.h         |    3 +-
+ drivers/net/wireless/wl12xx/wl1271_boot.c    |    9 ++--
+ drivers/net/wireless/wl12xx/wl1271_boot.h    |    1 -
+ drivers/net/wireless/wl12xx/wl1271_io.h      |    8 ++-
+ drivers/net/wireless/wl12xx/wl1271_main.c    |    4 +-
+ drivers/net/wireless/wl12xx/wl1271_sdio.c    |   31 +++++------
+ drivers/net/wireless/wl12xx/wl1271_spi.c     |    8 ++-
+ include/linux/mmc/card.h                     |    2 +
+ include/linux/mmc/host.h                     |   15 +++++
+ include/linux/mmc/sdio_func.h                |    3 +
+ include/linux/mmc/sdio_ids.h                 |    3 +
+ include/linux/spi/wl12xx.h                   |   34 ------------
+ include/linux/wl12xx.h                       |   35 ++++++++++++
+ 27 files changed, 393 insertions(+), 89 deletions(-)
+ delete mode 100644 include/linux/spi/wl12xx.h
+ create mode 100644 include/linux/wl12xx.h
