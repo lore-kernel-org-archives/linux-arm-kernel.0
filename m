@@ -1,197 +1,145 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 21 Jul 2010 22:23:38 +0900
-Subject: [PATCH v2 2/3] ARM: S5PV210: Add support for I2C devices on
-	SMDKV210 and SMDKC110
-In-Reply-To: <1279717139-24422-1-git-send-email-kgene.kim@samsung.com>
-References: <1279717139-24422-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <AANLkTilTcum2H5zj2B21Ha8Ov0lfwJ29WavT89AoGQVL@mail.gmail.com>
+Date: Wed, 21 Jul 2010 22:29:37 +0900
+Subject: [PATCH v3 2/8] ARM: S5PV310: Add new CPU initialization support
+In-Reply-To: <009701cb28d4$0ead3040$2c0790c0$%kim@samsung.com>
+References: <1279627861-23047-1-git-send-email-kgene.kim@samsung.com>
+	<AANLkTikYjSIZzT-WHpAYbaHC1R9DU2T89qUVoAYASEZv@mail.gmail.com>
+	<009701cb28d4$0ead3040$2c0790c0$%kim@samsung.com>
+Message-ID: <AANLkTimQqAKUlCXgRFMWMvI_zVXlHJOFCx3c3lrU5kpP@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-which tree do you use? If not fix the s5pv210_IIC2_IRQ correcly, it
-can't compile it.
-but I'm not see related patch at mailing list.
+On Wed, Jul 21, 2010 at 9:55 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Kyungmin Park wrote:
+>>
+>> On Tue, Jul 20, 2010 at 9:11 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> > From: Changhwan Youn <chaos.youn@samsung.com>
+>> >
+>> > This patch adds Samsung S5PV310/S5PC210 CPU support.
+>> > The S5PV310/S5PC210 integrates a ARM Cortex A9 multi-core.
+>> >
+>> > Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+>> > Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
+>> > Signed-off-by: Jiseong Oh <jiseong.oh@samsung.com>
+>> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+>> > ---
+>> > Changes since v2:
+>> > - Re-model platsmp.c on the Versatile Express as per Russell King's
+> suggestion.
+>> > ?And tested on the board.
+>> >
+>> > - Compared Versatile Express SMP code with Realview SMP code and
+> modified
+>> as needed.
+>> >
+>
+> Hi,
+>
+> (snip)
+>
+>> > +static void arch_detect_cpu(void)
+>> > +{
+>> > + ? ? ? /* we do not need to do any cpu detection here at the moment. */
+>> > +
+>> > + ? ? ? fifo_mask = S5PV210_UFSTAT_TXMASK;
+>> > + ? ? ? fifo_max = 63 << S5PV210_UFSTAT_TXSHIFT;
+>>
+>> It's only valid when use the UART1. others 255 for UART0, 15 for others.
+>
+> Ok..will fix it.
+>
+> (snip)
+>
+>> > +#define VMALLOC_END ? ? ?(0xE0000000)
+>>
+>> Increase to 0xF000'0000. but it will be removed from Eric's patch.
+>>
+> Right now, the 0xE0000000 is no problem as default.
+> But I will check this is appropriate again.
+Since maybe you use the 2g/2g configuration. try to use the 3g/1g
+configuration with more the 512MiB.
 
-Thank you,
-Kyungmin Park
+>
+> And according to his '[PATCH 08/13] [ARM] Make VMALLOC_END into a global
+> variable if not defined',
+> it doesn't mean absolutely remove it. why did you say like that.
+>
+> +#ifndef VMALLOC_END
+> +extern unsigned long vmalloc_end;
+> +#define VMALLOC_END (vmalloc_end)
+> +#endif
+> +
+>
+> And if required modify it for some machine, you can do it later with
+> mach_desc after applying Eric's patch.
+> Or as Russell said, there is the way to do it is to specify a vmalloc=
+> parameter to the kernel.
 
-On Wed, Jul 21, 2010 at 9:58 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> From: Naveen Krishna Ch <ch.naveen@samsung.com>
+I don't have confidence with HIGHMEM with VIPT (it's same as PIPT).
+So I want to use lowmem if possible,
+
 >
-> This patch adds support I2C-0/1/2 devices to the SMDKV210/SMDKC110.
+> (snip)
 >
-> Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-> Changes since v1:
-> - Fixed the wrong name as per Kyungmin Park's comments
+>> > + ? ? ? ? ? ? ? /*
+>> > + ? ? ? ? ? ? ? ?* Write the address of secondary startup into the
+>> > + ? ? ? ? ? ? ? ?* system-wide flags register. The boot monitor waits
+>> > + ? ? ? ? ? ? ? ?* until it receives a soft interrupt, and then the
+>> > + ? ? ? ? ? ? ? ?* secondary CPU branches to this address.
+>> > + ? ? ? ? ? ? ? ?*/
+>> > + ? ? ? __raw_writel(BSYM(virt_to_phys(s5pv310_secondary_startup)),
+>> S5P_INFORM0);
+>>
+>> Do you really use the INFORM0? historically it's used for sleep &
+>> wakeup. new SoC has several INFORM register. So I recommend to use
+>> others.
+>>
 >
-> ?arch/arm/mach-s5pv210/Kconfig ? ? ? ? | ? ?8 ++++++++
-> ?arch/arm/mach-s5pv210/mach-smdkc110.c | ? 28 ++++++++++++++++++++++++++++
-> ?arch/arm/mach-s5pv210/mach-smdkv210.c | ? 29 +++++++++++++++++++++++++++++
-> ?3 files changed, 65 insertions(+), 0 deletions(-)
+> It doesn't mean we should use INFORM0 for sleep & wakeup even though
+> historically used.
+> ...I mean it doesn't matter and as you know, just need to sync with
+> boot-loader for it.
+that's reason I said, we got unused INFORM{3,4,5,...} so if we use it,
+no problem.
 >
-> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-> index 0761eac..2a996d9 100644
-> --- a/arch/arm/mach-s5pv210/Kconfig
-> +++ b/arch/arm/mach-s5pv210/Kconfig
-> @@ -72,9 +72,13 @@ config MACH_SMDKV210
-> ? ? ? ?select CPU_S5PV210
-> ? ? ? ?select ARCH_SPARSEMEM_ENABLE
-> ? ? ? ?select SAMSUNG_DEV_ADC
-> + ? ? ? select S3C_DEV_I2C1
-> + ? ? ? select S3C_DEV_I2C2
-> ? ? ? ?select SAMSUNG_DEV_TS
-> ? ? ? ?select S3C_DEV_WDT
-> ? ? ? ?select HAVE_S3C2410_WATCHDOG
-> + ? ? ? select S5PV210_SETUP_I2C1
-> + ? ? ? select S5PV210_SETUP_I2C2
-> ? ? ? ?help
-> ? ? ? ? ?Machine support for Samsung SMDKV210
+> (snip)
 >
-> @@ -82,8 +86,12 @@ config MACH_SMDKC110
-> ? ? ? ?bool "SMDKC110"
-> ? ? ? ?select CPU_S5PV210
-> ? ? ? ?select ARCH_SPARSEMEM_ENABLE
-> + ? ? ? select S3C_DEV_I2C1
-> + ? ? ? select S3C_DEV_I2C2
-> ? ? ? ?select S3C_DEV_WDT
-> ? ? ? ?select HAVE_S3C2410_WATCHDOG
-> + ? ? ? select S5PV210_SETUP_I2C1
-> + ? ? ? select S5PV210_SETUP_I2C2
-> ? ? ? ?help
-> ? ? ? ? ?Machine support for Samsung SMDKC110
-> ? ? ? ? ?S5PC110(MCP) is one of package option of S5PV210
-> diff --git a/arch/arm/mach-s5pv210/mach-smdkc110.c b/arch/arm/mach-s5pv210/mach-smdkc110.c
-> index 4c8903c..fcd475f 100644
-> --- a/arch/arm/mach-s5pv210/mach-smdkc110.c
-> +++ b/arch/arm/mach-s5pv210/mach-smdkc110.c
-> @@ -12,6 +12,7 @@
-> ?#include <linux/types.h>
-> ?#include <linux/init.h>
-> ?#include <linux/serial_core.h>
-> +#include <linux/i2c.h>
+>> > +void s3c_i2c0_cfg_gpio(struct platform_device *dev)
+>> > +{
+>> > +/* will be implemented later */
+>> > +}
+>>
+>> Remove it and send separate patch. e.g.,I2C support on s5pc210.
+>>
+> I think i2c0 is un-conditionally compiled. So need to add i2c0 support in
+> here.
+It mean all samsung SoC have i2c0. okay if you want it.
 >
-> ?#include <asm/mach/arch.h>
-> ?#include <asm/mach/map.h>
-> @@ -25,6 +26,7 @@
-> ?#include <plat/s5pv210.h>
-> ?#include <plat/devs.h>
-> ?#include <plat/cpu.h>
-> +#include <plat/iic.h>
+> (snip)
 >
-> ?/* Following are default values for UCON, ULCON and UFCON UART registers */
-> ?#define S5PV210_UCON_DEFAULT ? (S3C2410_UCON_TXILEVEL | ? ? ? ?\
-> @@ -74,9 +76,24 @@ static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
-> ?static struct platform_device *smdkc110_devices[] __initdata = {
-> ? ? ? ?&s5pv210_device_iis0,
-> ? ? ? ?&s5pv210_device_ac97,
-> + ? ? ? &s3c_device_i2c0,
-> + ? ? ? &s3c_device_i2c1,
-> + ? ? ? &s3c_device_i2c2,
-> ? ? ? ?&s3c_device_wdt,
-> ?};
+>> > +#define S5P_VA_COREPERI_BASE ? S3C_ADDR(0x00800000)
+>> > +#define S5P_VA_COREPERI(x) ? ? (S5P_VA_COREPERI_BASE + (x))
+>> > +#define S5P_VA_SCU ? ? ? ? ? ? S5P_VA_COREPERI(0x0)
+>> > +#define S5P_VA_GIC_CPU ? ? ? ? S5P_VA_COREPERI(0x100)
+>> > +#define S5P_VA_TWD ? ? ? ? ? ? S5P_VA_COREPERI(0x600)
+>> > +#define S5P_VA_GIC_DIST ? ? ? ? ? ? ? ?S5P_VA_COREPERI(0x1000)
+>> > +
+>> > +#define S5P_VA_L2CC ? ? ? ? ? ?S3C_ADDR(0x00900000)
+>>
+>> I'm not sure it's proper prefix.
+>>
+> It's no problem.
 >
-> +static struct i2c_board_info smdkc110_i2c_devs0[] __initdata = {
-> + ? ? ? { I2C_BOARD_INFO("24c08", 0x50), }, ? ? /* Samsung S524AD0XD1 */
-> +};
-> +
-> +static struct i2c_board_info smdkc110_i2c_devs1[] __initdata = {
-> + ? ? ? /* To Be Updated */
-> +};
-> +
-> +static struct i2c_board_info smdkc110_i2c_devs2[] __initdata = {
-> + ? ? ? /* To Be Updated */
-> +};
-> +
-> ?static void __init smdkc110_map_io(void)
-> ?{
-> ? ? ? ?s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-> @@ -86,6 +103,17 @@ static void __init smdkc110_map_io(void)
+> (snip)
 >
-> ?static void __init smdkc110_machine_init(void)
-> ?{
-> + ? ? ? /* I2C */
-> + ? ? ? s3c_i2c0_set_platdata(NULL);
-> + ? ? ? s3c_i2c1_set_platdata(NULL);
-> + ? ? ? s3c_i2c2_set_platdata(NULL);
-> + ? ? ? i2c_register_board_info(0, smdkc110_i2c_devs0,
-> + ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(smdkc110_i2c_devs0));
-> + ? ? ? i2c_register_board_info(1, smdkc110_i2c_devs1,
-> + ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(smdkc110_i2c_devs1));
-> + ? ? ? i2c_register_board_info(2, smdkc110_i2c_devs2,
-> + ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(smdkc110_i2c_devs2));
-> +
-> ? ? ? ?platform_add_devices(smdkc110_devices, ARRAY_SIZE(smdkc110_devices));
-> ?}
 >
-> diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
-> index 0d46279..765f47e 100644
-> --- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-> +++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-> @@ -10,6 +10,7 @@
+> Thanks.
 >
-> ?#include <linux/kernel.h>
-> ?#include <linux/types.h>
-> +#include <linux/i2c.h>
-> ?#include <linux/init.h>
-> ?#include <linux/serial_core.h>
->
-> @@ -27,6 +28,7 @@
-> ?#include <plat/cpu.h>
-> ?#include <plat/adc.h>
-> ?#include <plat/ts.h>
-> +#include <plat/iic.h>
->
-> ?/* Following are default values for UCON, ULCON and UFCON UART registers */
-> ?#define S5PV210_UCON_DEFAULT ? (S3C2410_UCON_TXILEVEL | ? ? ? ?\
-> @@ -77,10 +79,25 @@ static struct platform_device *smdkv210_devices[] __initdata = {
-> ? ? ? ?&s5pv210_device_iis0,
-> ? ? ? ?&s5pv210_device_ac97,
-> ? ? ? ?&s3c_device_adc,
-> + ? ? ? &s3c_device_i2c0,
-> + ? ? ? &s3c_device_i2c1,
-> + ? ? ? &s3c_device_i2c2,
-> ? ? ? ?&s3c_device_ts,
-> ? ? ? ?&s3c_device_wdt,
-> ?};
->
-> +static struct i2c_board_info smdkv210_i2c_devs0[] __initdata = {
-> + ? ? ? { I2C_BOARD_INFO("24c08", 0x50), }, ? ? /* Samsung S524AD0XD1 */
-> +};
-> +
-> +static struct i2c_board_info smdkv210_i2c_devs1[] __initdata = {
-> + ? ? ? /* To Be Updated */
-> +};
-> +
-> +static struct i2c_board_info smdkv210_i2c_devs2[] __initdata = {
-> + ? ? ? /* To Be Updated */
-> +};
-> +
-> ?static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
-> ? ? ? ?.delay ? ? ? ? ? ? ? ? ?= 10000,
-> ? ? ? ?.presc ? ? ? ? ? ? ? ? ?= 49,
-> @@ -97,6 +114,18 @@ static void __init smdkv210_map_io(void)
-> ?static void __init smdkv210_machine_init(void)
-> ?{
-> ? ? ? ?s3c24xx_ts_set_platdata(&s3c_ts_platform);
-> +
-> + ? ? ? /* I2C */
-> + ? ? ? s3c_i2c0_set_platdata(NULL);
-> + ? ? ? s3c_i2c1_set_platdata(NULL);
-> + ? ? ? s3c_i2c2_set_platdata(NULL);
-> + ? ? ? i2c_register_board_info(0, smdkv210_i2c_devs0,
-> + ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(smdkv210_i2c_devs0));
-> + ? ? ? i2c_register_board_info(1, smdkv210_i2c_devs1,
-> + ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(smdkv210_i2c_devs1));
-> + ? ? ? i2c_register_board_info(2, smdkv210_i2c_devs2,
-> + ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(smdkv210_i2c_devs2));
-> +
-> ? ? ? ?platform_add_devices(smdkv210_devices, ARRAY_SIZE(smdkv210_devices));
-> ?}
->
+> Best regards,
+> Kgene.
 > --
-> 1.6.2.5
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
 >
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
