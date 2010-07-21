@@ -1,73 +1,113 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 21 Jul 2010 13:15:14 +0530
-Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
-	memory management
-In-Reply-To: <20100721072837.GB6009@n2100.arm.linux.org.uk>
-References: <20100714220536.GE18138@n2100.arm.linux.org.uk>
-	<20100715012958.GB2239@codeaurora.org>
-	<20100715085535.GC26212@n2100.arm.linux.org.uk>
-	<AANLkTinVZeaZxt_lWKhjKa0dqhu3_j3BRNySO-2LvMdw@mail.gmail.com>
-	<20100716075856.GC16124@n2100.arm.linux.org.uk>
-	<4C449183.20000@codeaurora.org>
-	<20100719184002.GA21608@n2100.arm.linux.org.uk>
-	<bb667e285fd8be82ea8cc9cc25cf335b.squirrel@www.codeaurora.org>
-	<20100720222952.GD10553@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C61C5FCA@dbde02.ent.ti.com>
-	<20100721072837.GB6009@n2100.arm.linux.org.uk>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C61C60DD@dbde02.ent.ti.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 21 Jul 2010 01:07:26 -0700
+Subject: [PATCH v6 3/3] input: samsung-keypad - Add samsung keypad driver
+In-Reply-To: <4C4688BE.1080409@samsung.com>
+References: <1277724824-13308-1-git-send-email-jy0922.shim@samsung.com>
+	<1277724824-13308-3-git-send-email-jy0922.shim@samsung.com>
+	<4C32E21A.8080100@samsung.com>
+	<013401cb1d66$5fbf3fb0$1f3dbf10$%kim@samsung.com>
+	<4C33D859.9050708@samsung.com>
+	<026901cb1f35$64c63470$2e529d50$%kim@samsung.com>
+	<4C36D235.3040702@samsung.com> <4C4688BE.1080409@samsung.com>
+Message-ID: <20100721080725.GA21373@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Wednesday, July 21, 2010 12:59 PM
-> To: Shilimkar, Santosh
-> Cc: stepanm at codeaurora.org; linux-arch at vger.kernel.org;
-> dwalker at codeaurora.org; mel at csn.ul.ie; linux-arm-msm at vger.kernel.org;
-> linux-kernel at vger.kernel.org; FUJITA Tomonori; linux-mm at kvack.org;
-> andi at firstfloor.org; Zach Pfeffer; Michael Bohan; Tim HRM; linux-
-> omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> ebiederm at xmission.com
-> Subject: Re: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
-> memory management
+Hi Joonyoung,
+
+On Wed, Jul 21, 2010 at 02:42:22PM +0900, Joonyoung Shim wrote:
+> Hi, Dmitry.
 > 
-> On Wed, Jul 21, 2010 at 11:19:58AM +0530, Shilimkar, Santosh wrote:
-> > > -----Original Message-----
-> > > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> > > kernel-bounces at lists.infradead.org] On Behalf Of Russell King - ARM
-> Linux
-> > > Sent: Wednesday, July 21, 2010 4:00 AM
-> > > To: stepanm at codeaurora.org
-> > > Cc: linux-arch at vger.kernel.org; dwalker at codeaurora.org; mel at csn.ul.ie;
-> > > linux-arm-msm at vger.kernel.org; linux-kernel at vger.kernel.org; FUJITA
-> > > Tomonori; linux-mm at kvack.org; andi at firstfloor.org; Zach Pfeffer;
-> Michael
-> > > Bohan; Tim HRM; linux-omap at vger.kernel.org; linux-arm-
-> > > kernel at lists.infradead.org; ebiederm at xmission.com
-> > > Subject: Re: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and
-> device
-> > > memory management
+> On 7/9/2010 4:39 PM, Joonyoung Shim wrote:
+> > On 7/9/2010 4:07 PM, Kukjin Kim wrote:
+> >> Joonyoung Shim wrote:
+> >>> On 7/7/2010 8:52 AM, Kukjin Kim wrote:
+> >>>> Joonyoung Shim wrote:
+> >>>>> Hi, Naveen.
+> >>>>>
+> >>>>> On 6/28/2010 8:33 PM, Joonyoung Shim wrote:
+> >>>>>> This patch adds support for keypad driver running on Samsung cpus. This
+> >>>>>> driver is tested on GONI and Aquila board using S5PC110 cpu.
+> >>>>>>
+> >>>>>> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> >>>>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> >>>>>> ---
+> >>>>>>  drivers/input/keyboard/Kconfig          |    9 +
+> >>>>>>  drivers/input/keyboard/Makefile         |    1 +
+> >>>>>>  drivers/input/keyboard/samsung-keypad.c |  491
+> >>>>> +++++++++++++++++++++++++++++++
+> >>>>>>  3 files changed, 501 insertions(+), 0 deletions(-)
+> >>>>>>  create mode 100644 drivers/input/keyboard/samsung-keypad.c
+> >>>>>>
+> >>>>> Could you please test this v6 keypad driver on your various targets?
+> >>>> Hi,
+> >>>>
+> >>>> I received the test result from Naveen.
+> >>>> And now he is debugging about that.
+> >>>>
+> >>>> ..his e-mail client has some problem..so I replied...
+> >>>>
+> >>>> ---
+> >>>> From: Naveen Ch
+> >>>>
+> >>>> I've tested with v6 patches and they are working fine on SMDK6410, SMDKC100
+> >>> and SMDKV210, except for some header inclusion (linux/sched.h) in samsung-
+> >>> keypad.c.
+> >>>> The build breaking error is like following:
+> >>>> (make s5pc100_defconfig and select input->keypad->samsung keypad)
+> >>>>
+> >>>> drivers/input/keyboard/samsung-keypad.c: In function 'samsung_keypad_irq':
+> >>>> drivers/input/keyboard/samsung-keypad.c:170: error: 'TASK_UNINTERRUPTIBLE'
+> >>> undeclared (first use in this function)
+> >>>> drivers/input/keyboard/samsung-keypad.c:170: error: (Each undeclared identifier
+> >>> is reported only once
+> >>>> drivers/input/keyboard/samsung-keypad.c:170: error: for each function it appears
+> >>> in.)
+> >>>> drivers/input/keyboard/samsung-keypad.c:170: error: implicit declaration of
+> >>> function 'schedule_timeout'
+> >>>> drivers/input/keyboard/samsung-keypad.c: In function 'samsung_keypad_stop':
+> >>>> drivers/input/keyboard/samsung-keypad.c:202: error: 'TASK_NORMAL'
+> >>> undeclared (first use in this function)
+> >>>> make[3]: *** [drivers/input/keyboard/samsung-keypad.o] Error 1
+> >>>>
+> >>> This error occurs on s5pc100_defconfig having disabled CONFIG_PREEMPT
+> >>> option. I think sched.h should be included to remove like this
+> >>> dependency in driver, are there other ways?
+> >> I'm not sure root cause is that. But as you said, I think need inclusion it for prevent the problem.
+> >> Actually didn't happen it before..so maybe the some core functions have moved between rc-3 and earlier versions...
+> > 
+> > The sched.h is included by below path.
+> > 
+> > interrupt.h -> hardirq.h -> smp_lock.h -> sched.h
+> > 
+> > The smp_lock.h in hardirq.h is included if CONFIG_PREEMPT is defined. 
+> > The samsung keypad driver haven't needed including sched.h before
+> > Dmitry's patch is applied..
+> > 
+> >> Anyway, if no any issues, could you please re-submit updated it soon?
+> > 
+> > I haven't get yet Dmitry's review of v6 patch set, so i am waiting it.
+> > 
 > 
-> *************************************************************************
-> > > This is difficult to achieve without remapping kernel memory using L2
-> > > page tables, so we can unmap pages on 4K page granularity.  That's
-> > > going to increase TLB overhead and result in lower system performance
-> > > as there'll be a greater number of MMU misses.
-> *************************************************************************
+> Ping.
 > 
-> > > However, one obvious case would be to use highmem-only pages for
-> > > remapping - but you then have to ensure that those pages are never
-> > > kmapped in any way, because those mappings will fall into the same
-> > > unpredictable category that we're already trying to avoid.  This
-> > > may be possible, but you'll have to ensure that most of the system
-> > > RAM is in highmem - which poses other problems (eg, if lowmem gets
-> > > low.)
-> >
-> > Why can't we consider an option of removing the old mappings when
-> > we need to create new ones with different attributes as suggested
-> > by Catalin on similar thread previously. This will avoid the duplicate
-> > mapping with different attributes issue on newer ARMs.
-> 
-> See the first paragraph which I've highlighted above.
->
-Sorry about missing that para Russell.
+> Do you have any feedback? If ok, i want to go to input tree or samsung
+> tree these added sched.h including.
+
+I applied the patch adding samsung-keypad.c and the platform data
+arch/arm/plat-samsung/include/plat/keypad.h and I expect that
+patches to actually enable keypad will go through appropriate
+platform tree(s).
+
+The only caveat is that I removed declarations for copying platform data
+around and for gpio config function - if it is there there is no point
+of invoking it through the pointer in platform data.
+
+Overall I am confused why you set up keypad in platform code in the
+way you do. I'd put the device definitions and all supporting functions
+in the same module that registers platform device and be done with it.
+
+Thanks.
+
+-- 
+Dmitry
