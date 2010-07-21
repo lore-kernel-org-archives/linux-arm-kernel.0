@@ -1,72 +1,82 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Jul 2010 17:57:45 +0900
-Subject: [PATCH 2/3] rtc: rtc-s3c: Updates driver for S3C64XX and newer SoCs
-In-Reply-To: <1279702666-13021-1-git-send-email-kgene.kim@samsung.com>
-References: <1279702666-13021-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1279702666-13021-3-git-send-email-kgene.kim@samsung.com>
+Date: Wed, 21 Jul 2010 17:55:01 +0900
+Subject: [PATCH 2/2] rtc: rtc-s3c: Updates RTC driver for clock enabling
+	support
+In-Reply-To: <1279702501-6803-1-git-send-email-kgene.kim@samsung.com>
+References: <1279702501-6803-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1279702501-6803-3-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Atul Dahiya <atul.dahiya@samsung.com>
 
-This Patch does followings.
-1) Enables support for alarm and time tick pending register
-   for periodic interrupt generation.
-2) Changes writeb to writew beacuse the macro S3C64XX_RTCCON_TICEN
-   (Tick Timer Enable) is 9th bit of register.
-3) Changes writeb to writel as max_user_freq used in s3c64xx is 32768 and
-   requires 15 bits to update the Tick Count Register.
+This Patch updates existing Samsung RTC driver for clock enabling support.
 
 Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
-Signed-off-by: Taekgyun Ko <taeggyun.ko@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- drivers/rtc/rtc-s3c.c |   12 ++++++++++--
- 1 files changed, 10 insertions(+), 2 deletions(-)
+ drivers/rtc/rtc-s3c.c |   22 ++++++++++++++++++++++
+ 1 files changed, 22 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-index c032a15..2040017 100644
+index 70b68d3..c032a15 100644
 --- a/drivers/rtc/rtc-s3c.c
 +++ b/drivers/rtc/rtc-s3c.c
-@@ -57,6 +57,10 @@ static irqreturn_t s3c_rtc_alarmirq(int irq, void *id)
- 	struct rtc_device *rdev = id;
+@@ -1,5 +1,8 @@
+ /* drivers/rtc/rtc-s3c.c
+  *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
+  * Copyright (c) 2004,2006 Simtec Electronics
+  *	Ben Dooks, <ben@simtec.co.uk>
+  *	http://armlinux.simtec.co.uk/
+@@ -39,6 +42,7 @@ enum s3c_cpu_type {
  
- 	rtc_update_irq(rdev, 1, RTC_AF | RTC_IRQF);
+ static struct resource *s3c_rtc_mem;
+ 
++static struct clk *rtc_clk;
+ static void __iomem *s3c_rtc_base;
+ static int s3c_rtc_alarmno = NO_IRQ;
+ static int s3c_rtc_tickno  = NO_IRQ;
+@@ -431,6 +435,10 @@ static int __devexit s3c_rtc_remove(struct platform_device *dev)
+ 	s3c_rtc_setpie(&dev->dev, 0);
+ 	s3c_rtc_setaie(0);
+ 
++	clk_disable(rtc_clk);
++	clk_put(rtc_clk);
++	rtc_clk = NULL;
 +
-+	if (s3c_rtc_cpu_type == TYPE_S3C64XX)
-+		writeb(S3C2410_INTP_ALM, s3c_rtc_base + S3C2410_INTP);
+ 	iounmap(s3c_rtc_base);
+ 	release_resource(s3c_rtc_mem);
+ 	kfree(s3c_rtc_mem);
+@@ -488,6 +496,16 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+ 		goto err_nomap;
+ 	}
+ 
++	rtc_clk = clk_get(&pdev->dev, "rtc");
++	if (IS_ERR(rtc_clk)) {
++		dev_err(&pdev->dev, "failed to find rtc clock source\n");
++		ret = PTR_ERR(rtc_clk);
++		rtc_clk = NULL;
++		goto err_clk;
++	}
 +
- 	return IRQ_HANDLED;
- }
- 
-@@ -65,6 +69,10 @@ static irqreturn_t s3c_rtc_tickirq(int irq, void *id)
- 	struct rtc_device *rdev = id;
- 
- 	rtc_update_irq(rdev, 1, RTC_PF | RTC_IRQF);
++	clk_enable(rtc_clk);
 +
-+	if (s3c_rtc_cpu_type == TYPE_S3C64XX)
-+		writeb(S3C2410_INTP_TIC, s3c_rtc_base + S3C2410_INTP);
+ 	/* check to see if everything is setup correctly */
+ 
+ 	s3c_rtc_enable(pdev, 1);
+@@ -523,6 +541,10 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+ 
+  err_nortc:
+ 	s3c_rtc_enable(pdev, 0);
++	clk_disable(rtc_clk);
++	clk_put(rtc_clk);
 +
- 	return IRQ_HANDLED;
- }
++ err_clk:
+ 	iounmap(s3c_rtc_base);
  
-@@ -98,7 +106,7 @@ static int s3c_rtc_setpie(struct device *dev, int enabled)
- 		if (enabled)
- 			tmp |= S3C64XX_RTCCON_TICEN;
- 
--		writeb(tmp, s3c_rtc_base + S3C2410_RTCCON);
-+		writew(tmp, s3c_rtc_base + S3C2410_RTCCON);
- 	} else {
- 		tmp = readb(s3c_rtc_base + S3C2410_TICNT);
- 		tmp &= ~S3C2410_TICNT_ENABLE;
-@@ -132,7 +140,7 @@ static int s3c_rtc_setfreq(struct device *dev, int freq)
- 
- 	tmp |= (rtc_dev->max_user_freq / freq)-1;
- 
--	writeb(tmp, s3c_rtc_base + S3C2410_TICNT);
-+	writel(tmp, s3c_rtc_base + S3C2410_TICNT);
- 	spin_unlock_irq(&s3c_rtc_pie_lock);
- 
- 	return 0;
+  err_nomap:
 -- 
 1.6.2.5
