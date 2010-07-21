@@ -1,104 +1,78 @@
-From: benzyg@ti.com (Gabay, Benzy)
-Date: Wed, 21 Jul 2010 13:55:16 -0500
-Subject: [PATCH v2 19/20] omap: zoom: keep the MMC3 wl1271 device
-	powered off
-In-Reply-To: <1279733634-21974-20-git-send-email-ohad@wizery.com>
-References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-	<1279733634-21974-20-git-send-email-ohad@wizery.com>
-Message-ID: <676FD6AA0F002F49B89E70F0C5EFD22C1311192A47@dlee04.ent.ti.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 21 Jul 2010 23:59:54 +0200
+Subject: [PATCH 4/5] mx35: add flexcan devices
+In-Reply-To: <1279749595-21596-1-git-send-email-mkl@pengutronix.de>
+References: <1279749595-21596-1-git-send-email-mkl@pengutronix.de>
+Message-ID: <1279749595-21596-5-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ohad,
-
-
------Original Message-----
-From: Ohad Ben-Cohen [mailto:ohad at wizery.com] 
-Sent: Wednesday, July 21, 2010 12:34 PM
-To: linux-wireless at vger.kernel.org; linux-mmc at vger.kernel.org; linux-omap at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org; linux at arm.linux.org.uk; Chikkature Rajashekar, Madhusudhan; Luciano Coelho; akpm at linux-foundation.org; San Mehat; Roger Quadros; Tony Lindgren; Nicolas Pitre; Pandita, Vikram; Kalle Valo; Ohad Ben-Cohen
-Subject: [PATCH v2 19/20] omap: zoom: keep the MMC3 wl1271 device powered off
-
-Keep the MMC3 wl1271 WLAN device powered off until its
-SDIO function driver requests otherwise.
-
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 ---
- arch/arm/mach-omap2/board-zoom-peripherals.c |    1 +
- arch/arm/mach-omap2/hsmmc.c                  |    3 +++
- arch/arm/mach-omap2/hsmmc.h                  |    1 +
- arch/arm/plat-omap/include/plat/mmc.h        |    3 +++
- drivers/mmc/host/omap_hsmmc.c                |    3 +++
- 5 files changed, 11 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx3/devices.c |   40 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mx3/devices.h |    2 ++
+ 2 files changed, 42 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
-index 3230801..3ab9125 100644
---- a/arch/arm/mach-omap2/board-zoom-peripherals.c
-+++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
-@@ -217,6 +217,7 @@ static struct omap2_hsmmc_info mmc[] __initdata = {
- 		.gpio_wp	= -EINVAL,
- 		.gpio_cd	= -EINVAL,
- 		.ocr_mask	= MMC_VDD_165_195,
-+		.dont_power_card = true,
- 		.priv_data	= &omap_zoom_wlan_data,
- 	},
- 	{}      /* Terminator */
-diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-index f06ddd2..24c4144 100644
---- a/arch/arm/mach-omap2/hsmmc.c
-+++ b/arch/arm/mach-omap2/hsmmc.c
-@@ -284,6 +284,9 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
- 		if (c->vcc_aux_disable_is_sleep)
- 			mmc->slots[0].vcc_aux_disable_is_sleep = 1;
+diff --git a/arch/arm/mach-mx3/devices.c b/arch/arm/mach-mx3/devices.c
+index a4fd1a2..a8aa157 100644
+--- a/arch/arm/mach-mx3/devices.c
++++ b/arch/arm/mach-mx3/devices.c
+@@ -29,6 +29,46 @@
  
-+		if (c->dont_power_card)
-+			mmc->slots[0].dont_power_card = 1;
+ #include "devices.h"
+ 
++#ifdef CONFIG_ARCH_MX35
++static struct resource mxc_can_1_resources[] = {
++	{
++		.start	= 0x53fe4000,
++		.end	= 0x53fe7fff,
++		.flags	= IORESOURCE_MEM,
++	}, {
++		.start	= 43,
++		.end	= 43,
++		.flags	= IORESOURCE_IRQ,
++	}
++};
 +
- 		mmc->slots[0].priv_data = c->priv_data;
- 
- 		/* NOTE:  MMC slots should have a Vcc regulator set up.
-diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
-index 434a3ed..e200786 100644
---- a/arch/arm/mach-omap2/hsmmc.h
-+++ b/arch/arm/mach-omap2/hsmmc.h
-@@ -23,6 +23,7 @@ struct omap2_hsmmc_info {
- 	int	ocr_mask;	/* temporary HACK */
- 	/* Remux (pad configuation) when powering on/off */
- 	void (*remux)(struct device *dev, int slot, int power_on);
-+	bool	dont_power_card;/* keep card power off at boot (default is n)*/
- 	void	*priv_data;	/* private data to SDIO function driver */
- };
- 
-diff --git a/arch/arm/plat-omap/include/plat/mmc.h b/arch/arm/plat-omap/include/plat/mmc.h
-index 9db1617..d042494 100644
---- a/arch/arm/plat-omap/include/plat/mmc.h
-+++ b/arch/arm/plat-omap/include/plat/mmc.h
-@@ -140,6 +140,9 @@ struct omap_mmc_platform_data {
- 
- 		unsigned int ban_openended:1;
- 
-+		/* keep this card powered off at boot (default is n) */
-+		unsigned int dont_power_card:1;
++struct platform_device mxc_can_device0 = {
++	.name = "flexcan",
++	.id = 0,
++	.num_resources = ARRAY_SIZE(mxc_can_1_resources),
++	.resource = mxc_can_1_resources,
++};
 +
- 		/* card private data that should be used by function driver */
- 		void *priv_data;
- 	} slots[OMAP_MMC_MAX_SLOTS];
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 4ac548e..4fb6634 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -2157,6 +2157,9 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
- 	if (mmc_slot(host).nonremovable)
- 		mmc->caps |= MMC_CAP_NONREMOVABLE;
- 
-+	if (mmc_slot(host).dont_power_card)
-+		mmc->caps |= MMC_CAP_DONT_POWER_CARD;
++static struct resource mxc_can_2_resources[] = {
++	{
++		.start	= 0x53fe8000,
++		.end	= 0x53feffff,
++		.flags	= IORESOURCE_MEM,
++	}, {
++		.start	= 44,
++		.end	= 44,
++		.flags	= IORESOURCE_IRQ,
++	}
++};
 +
- 	mmc_set_embedded_data(mmc, mmc_slot(host).priv_data);
- 
- 	omap_hsmmc_conf_bus_power(host);
++struct platform_device mxc_can_device1 = {
++	.name = "flexcan",
++	.id = 1,
++	.num_resources = ARRAY_SIZE(mxc_can_2_resources),
++	.resource = mxc_can_2_resources,
++};
++#endif /* CONFIG_ARCH_MX35 */
++
+ /* GPIO port description */
+ static struct mxc_gpio_port imx_gpio_ports[] = {
+ 	{
+diff --git a/arch/arm/mach-mx3/devices.h b/arch/arm/mach-mx3/devices.h
+index e553523..c92bc91 100644
+--- a/arch/arm/mach-mx3/devices.h
++++ b/arch/arm/mach-mx3/devices.h
+@@ -16,3 +16,5 @@ extern struct platform_device imx_ssi_device1;
+ extern struct platform_device imx_wdt_device0;
+ extern struct platform_device imx_rtc_device0;
+ extern struct platform_device imx_kpp_device;
++extern struct platform_device mxc_can_device0;
++extern struct platform_device mxc_can_device1;
 -- 
-1.7.0.4
-
-[Benzy Gabay] small comment: Please make sure that all 127x related changes are not bounded only to MMC3. 
-On OMAP4 WLAN is used on MMC5.
+1.7.1
