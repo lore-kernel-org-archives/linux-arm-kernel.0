@@ -1,52 +1,39 @@
-From: bjoern.slotkowski@imc-berlin.de (Bjoern Slotkowski)
-Date: Wed, 21 Jul 2010 11:59:27 +0200
-Subject: Random crash using fork in a multithreaded application
-Message-ID: <FPEIIEKCABPOOBGGCOCHKEPCCGAA.bjoern.slotkowski@imc-berlin.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 21 Jul 2010 12:28:47 +0200 (CEST)
+Subject: [RFC, PATCH 3/3] arm: remove machine_desc.io_pg_offst and .phys_io
+In-Reply-To: <20100721085024.GD6009@n2100.arm.linux.org.uk>
+References: <1279073377.400469.233833413341.0.gpush@pororo>
+	<1279073377.404006.432977736300.3.gpush@pororo>
+	<AANLkTilsIR36GNlbpZHt3FB5Dp2msedtUMFRSlZ-N-w9@mail.gmail.com>
+	<20100720100448.GB32702@n2100.arm.linux.org.uk>
+	<1279621292.27276.19.camel@pororo.lan>
+	<1279629158.27276.29.camel@pororo.lan>
+	<20100721085024.GD6009@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1007211227450.31718@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, 21 Jul 2010, Russell King - ARM Linux wrote:
 
-we have a problem using fork in a multitheaded application.
-Our application crashes somewhere with a segfault.
-This happens randomly ( within 2 hours to 2 days)
-The fork is done every 10 s.
+> On Tue, Jul 20, 2010 at 02:32:38PM +0200, Jeremy Kerr wrote:
+> > Hi all,
+> > 
+> > > OK, so I should request Stephen to add this branch to linux-next,
+> > > including the fixups?
+> > > 
+> > 
+> > Hm, before I do that I should probably work out what to do in the
+> > CONFIG_DEBUG_ICEDCC case. How about returning 0x0 as the phys address in
+> > this case (ie, addruart -> mov \rp, #0), and skip setting up the mapping
+> > if addruart gives this zero address?
+> 
+> It's extremely unlikely to have a UART at address 0 (because that's by
+> default where the CPU jumps to on reset.)  That's not to say it could
+> never happen - it's possible to hard-wire the CPU into 'hivec' mode
+> where it'll instead jump to 0xffff0000.  In that case, if you're sane
+> you'd put your SDRAM at 0x00000000.
 
-The crash happens after do_fork and before execve.
-One thread which is not involved in the forking gets the segfault.
-
-This happens on an arm at91rm9200.
-
-Our kernelversion is 2.6.14, I know it is old,
-but we don't have a chance to update the kernel.
+Using the value -1 is probably a better choice in this case.
 
 
-When looking through the mailininglists
-I found a mail describing the same issue
-but no real reason for this behaviour.
-
-When comparing Kernel 2.6.14 and 2.6.15.4 I saw some differences,
-but in the Changelog it appeared as if these differences do not fix an
-error.
-
-Can someone point me into the right direction.
-(Where to get more information, is this a known and hopefully solved issue).
-
-Thanks a lot in advance,
-
-Bjoern Slotkowski
-
---
-imc Messsysteme GmbH
-Bereich Entwicklung / Dept. Development
-Voltastra?e 5
-D-13355 Berlin
-Germany
-Tel:   +49 30 46 70 90 23
-Fax:   +49 30 46 31 57 6
-mailto:Bjoern.Slotkowski at imc-berlin.de
-Homepage: http://www.imc-berlin.de
-
-Sitz der Gesellschaft : Berlin
-Handelsregister       : Berlin-Charlottenburg HRB 28778
-Gesch?ftsf?hrer       : Dr.-Ing. Dietmar Sprenger
+Nicolas
