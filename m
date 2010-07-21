@@ -1,107 +1,76 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Wed, 21 Jul 2010 10:12:33 +0100
-Subject: [PATCH v3] gpio: sx150x: Add Semtech I2C sx150x gpio expander
-	driver.
-In-Reply-To: <1279660063-29449-1-git-send-email-gbean@codeaurora.org>
-References: <1279660063-29449-1-git-send-email-gbean@codeaurora.org>
-Message-ID: <20100721101233.42b22faf@taxman.wild-wind.fr.eu.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 21 Jul 2010 18:20:47 +0900
+Subject: [PATCH] serial: samsung.c: Add FRACVAL support for newer UART
+In-Reply-To: <4C46B9D8.7020504@ru.mvista.com>
+References: <1277474119-6897-1-git-send-email-kgene.kim@samsung.com>
+	<4C46B9D8.7020504@ru.mvista.com>
+Message-ID: <008b01cb28b6$049fc6d0$0ddf5470$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Jul 2010 14:07:43 -0700
-Gregory Bean <gbean@codeaurora.org> wrote:
-
-Gregory,
-
-> Add support for Semtech SX150-series I2C GPIO expanders.
-> Compatible models include:
+Sergei Shtylyov wrote:
 > 
-> 8 bits:  sx1508q
-> 16 bits: sx1509q
+> Hello.
 > 
-> Signed-off-by: Gregory Bean <gbean@codeaurora.org>
+Hi ;-)
 
-> +static int sx150x_irq_set_type(unsigned int irq, unsigned int flow_type)
-> +{
-> +	struct irq_chip *ic = get_irq_chip(irq);
-> +	struct sx150x_chip *chip;
-> +	unsigned n, val = 0;
-> +
-> +	if (flow_type & (IRQ_TYPE_LEVEL_HIGH | IRQ_TYPE_LEVEL_LOW))
-> +		return -EINVAL;
-> +
-> +	chip = container_of(ic, struct sx150x_chip, irq_chip);
-> +	n = irq - chip->irq_base;
-> +
-> +	if (flow_type & IRQ_TYPE_EDGE_RISING)
-> +		val |= 0x1;
-> +	if (flow_type & IRQ_TYPE_EDGE_FALLING)
-> +		val |= 0x2;
-> +
-> +	mutex_lock(&chip->mutex);
-> +	chip->irq_sense &= ~(3UL << (n * 2));
-> +	chip->irq_sense |= val << (n * 2);
-> +	if (!(irq_to_desc(irq)->status & IRQ_MASKED))
-> +		sx150x_write_cfg(chip, n, 2, chip->dev_cfg->reg_sense, val);
-> +	mutex_unlock(&chip->mutex);
-> +
-> +	return 0;
-> +}
+> Kukjin Kim wrote:
+> 
+> > From: Changhwan Youn <chaos.youn@samsung.com>
+> 
+> > FRACVAL register provides the same function as UDIVSLOT register which
+is
+> > the 1/16ths adjustment to the baud rate but the implementaiton is
+easier.
+> > To support UDIVSLOT register, UDIVSLOT table search is necessary though
+> > supporting FRACVAL only needs the index value of UDIVSLOT table.
+> 
+> > This patch implements the FRACVAL supports for the newer Samsung SoC
+> UARTs.
+> 
+> > Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> [...]
+> > diff --git a/drivers/serial/samsung.c b/drivers/serial/samsung.c
+> > index a9d6c56..09805c7 100644
+> > --- a/drivers/serial/samsung.c
+> > +++ b/drivers/serial/samsung.c
+> > @@ -530,7 +530,7 @@ static int s3c24xx_serial_calcbaud(struct baud_calc
+*calc,
+> >
+> >  	calc->clksrc = clksrc;
+> >
+> > -	if (ourport->info->has_divslot) {
+> > +	if ((ourport->info->has_divslot) || (ourport->info->has_fracval)) {
+> 
+>     Parens around variables are not needed.
+> 
+Yeah.
 
-Several problems here:
-* This can be called from request_threaded irq(), which means the mutex
-  is already taken (via the bus_lock method).
-* On the same path, __setup_irq will disable local interrupts before
-  calling this function. Bad things will happen if your I2C controller
-  wants to sleep. pca953x had the same problem, see
-  a2cb9aeb3c9b2475955cec328487484034f414e4 for a potential solution.
+> 
+> > @@ -755,7 +758,7 @@ static void s3c24xx_serial_set_termios(struct
+uart_port
+> *port,
+> >  	wr_regl(port, S3C2410_UBRDIV, quot);
+> >  	wr_regl(port, S3C2410_UMCON, umcon);
+> >
+> > -	if (ourport->info->has_divslot)
+> > +	if ((ourport->info->has_divslot) || (ourport->info->has_fracval))
+> 
+>     Here as well...
+> 
+Yeah.
 
-> +static irqreturn_t sx150x_irq_thread_fn(int irq, void *dev_id)
-> +{
-> +	struct sx150x_chip *chip = (struct sx150x_chip *)dev_id;
-> +	unsigned nhandled = 0;
-> +	unsigned sub_irq;
-> +	unsigned n;
-> +	s32 err;
-> +	u8 val;
-> +	int i;
-> +
-> +	mutex_lock(&chip->mutex);
+You're right.
+But already re-submitted updated.
 
-This looks wrong... The whole purpose of the genirq framework is that it
-takes care of most of the locking for you if you provide the
-bus_lock/unlock methods. You should only use direct locking to protect
-against races from the gpiolib framework.
+Please kindly find following URL.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-July/020713.html
 
-> +	for (i = (chip->dev_cfg->ngpios / 8) - 1; i >= 0; --i) {
-> +		err = sx150x_i2c_read(chip->client,
-> +				      chip->dev_cfg->reg_irq_src - i,
-> +				      &val);
-> +		if (err < 0)
-> +			continue;
-> +
-> +		sx150x_i2c_write(chip->client,
-> +				chip->dev_cfg->reg_irq_src - i,
-> +				val);
-> +		for (n = 0; n < 8; ++n) {
-> +			if (val & (1 << n)) {
-> +				sub_irq = chip->irq_base + (i * 8) + n;
-> +				handle_nested_irq(sub_irq);
-> +				++nhandled;
-> +			}
-> +		}
-> +	}
-> +	mutex_unlock(&chip->mutex);
-> +
-> +	return (nhandled > 0 ? IRQ_HANDLED : IRQ_NONE);
-> +}
-> +
+Thanks.
 
-Cheers,
-
-	M.
--- 
-Enforcement officers may use a hand-held detection device to measure
-both the direction and the strength of a TV signal. This makes it easy
-for us to locate TV receiving equipment in even the hardest-to-reach
-places.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
