@@ -1,101 +1,130 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 21 Jul 2010 14:51:13 +0200
-Subject: [PATCH] fec: use interrupt for MDIO completion indication
-In-Reply-To: <20100715040956.GA7690@jasper.tkos.co.il>
-References: <006416d38a8e51ba8dd8631613a991528dc7976a.1278918594.git.baruch@tkos.co.il>
-	<4C3E812C.10303@canonical.com>
-	<20100715040956.GA7690@jasper.tkos.co.il>
-Message-ID: <20100721125113.GA2651@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 21 Jul 2010 21:55:51 +0900
+Subject: [PATCH v3 2/8] ARM: S5PV310: Add new CPU initialization support
+In-Reply-To: <AANLkTikYjSIZzT-WHpAYbaHC1R9DU2T89qUVoAYASEZv@mail.gmail.com>
+References: <1279627861-23047-1-git-send-email-kgene.kim@samsung.com>
+	<AANLkTikYjSIZzT-WHpAYbaHC1R9DU2T89qUVoAYASEZv@mail.gmail.com>
+Message-ID: <009701cb28d4$0ead3040$2c0790c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> > Thanks for this patch, we tested on our i.MX51 board with Ubuntu. It works 
-> > fine.
-> > 
-> > Wolfram, you can pick up this, too. -;)
+Kyungmin Park wrote:
 > 
-> Dave has already applied this patch to his net-next tree.
+> On Tue, Jul 20, 2010 at 9:11 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > From: Changhwan Youn <chaos.youn@samsung.com>
+> >
+> > This patch adds Samsung S5PV310/S5PC210 CPU support.
+> > The S5PV310/S5PC210 integrates a ARM Cortex A9 multi-core.
+> >
+> > Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+> > Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
+> > Signed-off-by: Jiseong Oh <jiseong.oh@samsung.com>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> > Changes since v2:
+> > - Re-model platsmp.c on the Versatile Express as per Russell King's
+suggestion.
+> > ?And tested on the board.
+> >
+> > - Compared Versatile Express SMP code with Realview SMP code and
+modified
+> as needed.
+> >
 
-Bryan, thanks for letting me know, I missed this one.
+Hi,
 
-However, have you guys ever tried pulling the cable off/on or restarting
-the interface with 'ifconfig down/up'? This always caused a stalled PHY
-for me. This patch helps:
+(snip)
 
-==========================
+> > +static void arch_detect_cpu(void)
+> > +{
+> > + ? ? ? /* we do not need to do any cpu detection here at the moment. */
+> > +
+> > + ? ? ? fifo_mask = S5PV210_UFSTAT_TXMASK;
+> > + ? ? ? fifo_max = 63 << S5PV210_UFSTAT_TXSHIFT;
+> 
+> It's only valid when use the UART1. others 255 for UART0, 15 for others.
 
-From: Wolfram Sang <w.sang@pengutronix.de>
-Subject: [PATCH] net/fec: restore interrupt mask after software-reset in fec_stop()
+Ok..will fix it.
 
-After the change from mdio polling to irq, it became necessary to
-restore the interrupt mask after resetting the chip in fec_stop().
-Otherwise, with all irqs disabled, no communication with the PHY will be
-possible after e.g. un-/replugging the cable and the device gets
-stalled.
+(snip)
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
----
- drivers/net/fec.c |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
+> > +#define VMALLOC_END ? ? ?(0xE0000000)
+> 
+> Increase to 0xF000'0000. but it will be removed from Eric's patch.
+> 
+Right now, the 0xE0000000 is no problem as default.
+But I will check this is appropriate again.
 
-diff --git a/drivers/net/fec.c b/drivers/net/fec.c
-index 391a553..768b840 100644
---- a/drivers/net/fec.c
-+++ b/drivers/net/fec.c
-@@ -118,6 +118,8 @@ static unsigned char	fec_mac_default[] = {
- #define FEC_ENET_MII	((uint)0x00800000)	/* MII interrupt */
- #define FEC_ENET_EBERR	((uint)0x00400000)	/* SDMA bus error */
- 
-+#define FEC_DEFAULT_IMASK (FEC_ENET_TXF | FEC_ENET_RXF | FEC_ENET_MII)
+And according to his '[PATCH 08/13] [ARM] Make VMALLOC_END into a global
+variable if not defined', 
+it doesn't mean absolutely remove it. why did you say like that.
+
++#ifndef VMALLOC_END
++extern unsigned long vmalloc_end;
++#define VMALLOC_END (vmalloc_end)
++#endif
 +
- /* The FEC stores dest/src/type, data, and checksum for receive packets.
-  */
- #define PKT_MAXBUF_SIZE		1518
-@@ -1213,8 +1215,7 @@ fec_restart(struct net_device *dev, int duplex)
- 	writel(0, fep->hwp + FEC_R_DES_ACTIVE);
- 
- 	/* Enable interrupts we wish to service */
--	writel(FEC_ENET_TXF | FEC_ENET_RXF | FEC_ENET_MII,
--			fep->hwp + FEC_IMASK);
-+	writel(FEC_DEFAULT_IMASK, fep->hwp + FEC_IMASK);
- }
- 
- static void
-@@ -1233,8 +1234,8 @@ fec_stop(struct net_device *dev)
- 	/* Whack a reset.  We should wait for this. */
- 	writel(1, fep->hwp + FEC_ECNTRL);
- 	udelay(10);
--
- 	writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
-+	writel(FEC_DEFAULT_IMASK, fep->hwp + FEC_IMASK);
- }
- 
- static int __devinit
--- 
-1.7.1
 
-==========================
+And if required modify it for some machine, you can do it later with
+mach_desc after applying Eric's patch.
+Or as Russell said, there is the way to do it is to specify a vmalloc=
+parameter to the kernel.
 
-BUT, while it helps and may possibly be a quick fix for 2.6.35,
-resetting the chip in fec_stop() looks like a wrong thing to do for me.
-In the long run, it probably is better to make sure the chip is set up
-correctly during initialization, so the reset in fec_stop() is not
-needed at all. I had a quick shot at this, but seem to have missed
-something as it didn't work. As I will be away from the computers for
-two weeks in about 24 hours, I at least wanted to bring up the issue.
+(snip)
 
-Regards,
+> > + ? ? ? ? ? ? ? /*
+> > + ? ? ? ? ? ? ? ?* Write the address of secondary startup into the
+> > + ? ? ? ? ? ? ? ?* system-wide flags register. The boot monitor waits
+> > + ? ? ? ? ? ? ? ?* until it receives a soft interrupt, and then the
+> > + ? ? ? ? ? ? ? ?* secondary CPU branches to this address.
+> > + ? ? ? ? ? ? ? ?*/
+> > + ? ? ? __raw_writel(BSYM(virt_to_phys(s5pv310_secondary_startup)),
+> S5P_INFORM0);
+> 
+> Do you really use the INFORM0? historically it's used for sleep &
+> wakeup. new SoC has several INFORM register. So I recommend to use
+> others.
+> 
 
-   Wolfram
+It doesn't mean we should use INFORM0 for sleep & wakeup even though
+historically used.
+...I mean it doesn't matter and as you know, just need to sync with
+boot-loader for it.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100721/852e18a4/attachment-0001.sig>
+(snip)
+
+> > +void s3c_i2c0_cfg_gpio(struct platform_device *dev)
+> > +{
+> > +/* will be implemented later */
+> > +}
+> 
+> Remove it and send separate patch. e.g.,I2C support on s5pc210.
+> 
+I think i2c0 is un-conditionally compiled. So need to add i2c0 support in
+here.
+
+(snip)
+
+> > +#define S5P_VA_COREPERI_BASE ? S3C_ADDR(0x00800000)
+> > +#define S5P_VA_COREPERI(x) ? ? (S5P_VA_COREPERI_BASE + (x))
+> > +#define S5P_VA_SCU ? ? ? ? ? ? S5P_VA_COREPERI(0x0)
+> > +#define S5P_VA_GIC_CPU ? ? ? ? S5P_VA_COREPERI(0x100)
+> > +#define S5P_VA_TWD ? ? ? ? ? ? S5P_VA_COREPERI(0x600)
+> > +#define S5P_VA_GIC_DIST ? ? ? ? ? ? ? ?S5P_VA_COREPERI(0x1000)
+> > +
+> > +#define S5P_VA_L2CC ? ? ? ? ? ?S3C_ADDR(0x00900000)
+> 
+> I'm not sure it's proper prefix.
+> 
+It's no problem.
+
+(snip)
+
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
