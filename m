@@ -1,66 +1,24 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 21 Jul 2010 22:51:32 +0900
-Subject: [PATCH v3 1/7] ARM: S5PV210: Add a Kconfig entry
-	"S5PC110_EVT0_WORKAROUND"
-In-Reply-To: <4C46DE37.5060105@simtec.co.uk>
-References: <1279517483-22751-1-git-send-email-myungjoo.ham@samsung.com>
-	<1279517483-22751-2-git-send-email-myungjoo.ham@samsung.com>
-	<4C464127.5040405@simtec.co.uk>
-	<AANLkTikaUugKaDFCHW234eWLPn7KnV-wudeNY2-KwWR0@mail.gmail.com>
-	<4C46DE37.5060105@simtec.co.uk>
-Message-ID: <AANLkTikbou_klg7xeGTk42HsKQJIJa5sbFIwpNQzk5eJ@mail.gmail.com>
+From: qy03fugy@stud.informatik.uni-erlangen.de (Christian Dietrich)
+Date: Wed, 21 Jul 2010 15:52:29 +0200
+Subject: drivers/scsi/arm/acornsci.c -- Dead CONFIG_* options
+Message-ID: <86d3uhhrhe.fsf@peer.zerties.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 21, 2010 at 8:47 PM, Ben Dooks <ben@simtec.co.uk> wrote:
-> On 21/07/10 02:13, MyungJoo Ham wrote:
->> On Wed, Jul 21, 2010 at 9:36 AM, Ben Dooks <ben@simtec.co.uk> wrote:
->>> On 07/19/10 06:31, MyungJoo Ham wrote:
->>>>
->>>> Early S5PC110 (EVT0) chip had some issues required workaround from a
->>>> kernel. We can add such workaround codes with this Kconfig entry.
->>>>
->>>> Signed-off-by: MyungJoo Ham<myungjoo.ham@samsung.com>
->>>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
->>>> ---
->>>> ?arch/arm/mach-s5pv210/Kconfig | ? ?7 +++++++
->>>> ?1 files changed, 7 insertions(+), 0 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
->>>> index 631019a..18802e7 100644
->>>> --- a/arch/arm/mach-s5pv210/Kconfig
->>>> +++ b/arch/arm/mach-s5pv210/Kconfig
->>>> @@ -101,4 +101,11 @@ config MACH_SMDKC110
->>>> ? ? ? ? ?Machine support for Samsung SMDKC110
->>>> ? ? ? ? ?S5PC110(MCP) is one of package option of S5PV210
->>>>
->>>> +config S5PC110_EVT0_WORKAROUND
->>>> + ? ? ? bool "S5PC110 Early Chip Workaround (EVT0)"
->>>> + ? ? ? help
->>>> + ? ? ? ? Early S5PC110 (so called EVT0) has errata items that should be
->>>> + ? ? ? ? addressed; otherwise the kernel may panic or be locked up.
->>>> Enable
->>>> + ? ? ? ? this option to execute workaround instructions.
->>>> +
->>>> ?endif
->>>
->>> What happens for non EVT0, is the a performance issue or is it exclusive?
->>>
->>
->> This S5PC110_EVT0_WORKAROUND addresses issues (erratic behaviors, not
->> performance issues) of "EVT-0" revisions, which is exclusive for these
->> EVT-0 only. They do not apply to the later (EVT-1 and so on) chips.
->
-> Ok, so does the fix work for just EVT0? Does it exclude supporting other
-> EVT sillicon as well?
+Hi all!
+       
+        As part of the VAMOS[0] research project at the University of
+Erlangen we are looking at multiple integrity errors in linux'
+configuration system.
 
-Mr. Ham will reply it.
+I also encountered some reference problems in
+drivers/scsi/arm/acornscsi.c. But they seem to be intentionally, in
+order to make integration into the linux kernel working. But the last
+changelog entry is from 1998. So perhaps some of this ifdefs can be
+removed. If this should be done i can make up a patch and send it.
 
-As I know "yes", just FYI now Mr. Ham works on it. you can see it
-http://git.infradead.org/users/kmpark/linux-2.6-samsung clock and
-cpufreq branch.
-
-If you have a good idea, give your opinions.
-
-Thank you,
-Kyungmin Park
+[0] http://vamos1.informatik.uni-erlangen.de
+-- 
+(? x . x x) (? x . x x) -- See how beatiful the lambda is
+No documentation is better than bad documentation
+-- Das Ausdrucken dieser Mail wird urheberrechtlich verfolgt.
