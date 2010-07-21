@@ -1,135 +1,62 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 21 Jul 2010 22:31:34 +0900
-Subject: [PATCH] ARM: SAMSUNG: Make RTC driver dependency SoC specific
-	instead of machine specific
-In-Reply-To: <009301cb28d0$6db6b470$49241d50$%kim@samsung.com>
-References: <1279702831-14968-1-git-send-email-kgene.kim@samsung.com>
-	<AANLkTikIAuRD1mRpPpeHd-WqvHSG9S_nPYyE279J76zb@mail.gmail.com>
-	<009301cb28d0$6db6b470$49241d50$%kim@samsung.com>
-Message-ID: <AANLkTilt7F6CYZfuAqPmZrksCojoScij105wicbRd8DN@mail.gmail.com>
+Date: Wed, 21 Jul 2010 22:41:18 +0900
+Subject: [PATCH v2 3/3] i2c/busses: Select I2C bus support for S5PV210 and
+	S5P6440.
+In-Reply-To: <1279717167-24456-1-git-send-email-kgene.kim@samsung.com>
+References: <1279717167-24456-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <AANLkTilygLmO9n0oconz73C6Bjtsgbh0cbfnJ1zU9YMb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 21, 2010 at 9:29 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Kyungmin Park wrote:
->>
->> I don't see the Samsung SoCs don't have RTC feature.
->>
-> Yes, you're right...
-> But it doesn't mean the RTC driver can support every Samsung SoCs now.
+I don't want to modify Kconfig anymore. it's simple to modify driver itself.
 
-Vice versa, if there's problem, we can fix it easily. No need to
-modify Kconfig anymore, just fix it driver itself.
+Think the usage of I2c. I think there's no case don't use it.
+
+At this time modify Kconfig once, and just fix the driver if new SoCs
+are arrives.
+Of course we can modify Kconfig one more, If there's really new IPs of
+I2C are created. but I expect we also need to define new PLAT_SAMSUNG2
+
+Thank you,
+Kyungmin Park
+
+On Wed, Jul 21, 2010 at 9:59 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> From: Naveen Krishna Ch <ch.naveen@samsung.com>
 >
->> I think S3C_RTC only depends on PLAT_SAMSUNG so PLAT_SAMSUNG select
->> HAVE_S3C_RTC is enough.
+> This patch is to select support I2C channels 0, 1 and 2 for S5PV210 and S5P6440.
 >
-> So I think, this is not bad.
+> Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+> Changes since v1:
+> - Modifed the Kconfig help comments.
 >
->>
->> Thank you,
->> Kyungmin Park
->>
->> On Wed, Jul 21, 2010 at 6:00 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> > From: Atul Dahiya <atul.dahiya@samsung.com>
->> >
->> > This patch moves the dependency of RTC driver from MACH_XXX(board) to
->> > ARCH_XXX(SoC). This will enable all machines using Samsung S5P6440,
->> S5PC100
->> > and S5PV210 SoCs to use RTC driver by default.
->> >
->> > Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
->> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
->> > ---
->> > ?arch/arm/Kconfig ? ? ? ? ? ? ?| ? ?3 +++
->> > ?arch/arm/mach-s5p6440/Kconfig | ? ?1 -
->> > ?arch/arm/mach-s5pc100/Kconfig | ? ?1 -
->> > ?arch/arm/mach-s5pv210/Kconfig | ? ?2 --
->> > ?4 files changed, 3 insertions(+), 4 deletions(-)
->> >
->> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> > index 98922f7..ea668a4 100644
->> > --- a/arch/arm/Kconfig
->> > +++ b/arch/arm/Kconfig
->> > @@ -672,6 +672,7 @@ config ARCH_S5P6440
->> > ? ? ? ?select GENERIC_GPIO
->> > ? ? ? ?select HAVE_CLK
->> > ? ? ? ?select ARCH_USES_GETTIMEOFFSET
->> > + ? ? ? select HAVE_S3C_RTC
->> > ? ? ? ?help
->> > ? ? ? ? ?Samsung S5P6440 CPU based systems
->> >
->> > @@ -691,6 +692,7 @@ config ARCH_S5PC100
->> > ? ? ? ?select CPU_V7
->> > ? ? ? ?select ARM_L1_CACHE_SHIFT_6
->> > ? ? ? ?select ARCH_USES_GETTIMEOFFSET
->> > + ? ? ? select HAVE_S3C_RTC
->> > ? ? ? ?help
->> > ? ? ? ? ?Samsung S5PC100 series based systems
->> >
->> > @@ -701,6 +703,7 @@ config ARCH_S5PV210
->> > ? ? ? ?select HAVE_CLK
->> > ? ? ? ?select ARM_L1_CACHE_SHIFT_6
->> > ? ? ? ?select ARCH_USES_GETTIMEOFFSET
->> > + ? ? ? select HAVE_S3C_RTC
->> > ? ? ? ?help
->> > ? ? ? ? ?Samsung S5PV210/S5PC110 series based systems
->> >
->> > diff --git a/arch/arm/mach-s5p6440/Kconfig
-> b/arch/arm/mach-s5p6440/Kconfig
->> > index b2d4716..de8f08d 100644
->> > --- a/arch/arm/mach-s5p6440/Kconfig
->> > +++ b/arch/arm/mach-s5p6440/Kconfig
->> > @@ -20,7 +20,6 @@ config MACH_SMDK6440
->> > ? ? ? ?select SAMSUNG_DEV_ADC
->> > ? ? ? ?select S3C_DEV_RTC
->> > ? ? ? ?select S3C_DEV_WDT
->> > - ? ? ? select HAVE_S3C_RTC
->> > ? ? ? ?select HAVE_S3C2410_WATCHDOG
->> > ? ? ? ?help
->> > ? ? ? ? ?Machine support for the Samsung SMDK6440
->> > diff --git a/arch/arm/mach-s5pc100/Kconfig
-> b/arch/arm/mach-s5pc100/Kconfig
->> > index 2602895..e9c3d98 100644
->> > --- a/arch/arm/mach-s5pc100/Kconfig
->> > +++ b/arch/arm/mach-s5pc100/Kconfig
->> > @@ -48,7 +48,6 @@ config MACH_SMDKC100
->> > ? ? ? ?select S5PC100_SETUP_FB_24BPP
->> > ? ? ? ?select S5PC100_SETUP_I2C1
->> > ? ? ? ?select S5PC100_SETUP_SDHCI
->> > - ? ? ? select HAVE_S3C_RTC
->> > ? ? ? ?help
->> > ? ? ? ? ?Machine support for the Samsung SMDKC100
->> >
->> > diff --git a/arch/arm/mach-s5pv210/Kconfig
-> b/arch/arm/mach-s5pv210/Kconfig
->> > index 04597cc..7f029d1 100644
->> > --- a/arch/arm/mach-s5pv210/Kconfig
->> > +++ b/arch/arm/mach-s5pv210/Kconfig
->> > @@ -75,7 +75,6 @@ config MACH_SMDKV210
->> > ? ? ? ?select SAMSUNG_DEV_TS
->> > ? ? ? ?select S3C_DEV_RTC
->> > ? ? ? ?select S3C_DEV_WDT
->> > - ? ? ? select HAVE_S3C_RTC
->> > ? ? ? ?select HAVE_S3C2410_WATCHDOG
->> > ? ? ? ?help
->> > ? ? ? ? ?Machine support for Samsung SMDKV210
->> > @@ -86,7 +85,6 @@ config MACH_SMDKC110
->> > ? ? ? ?select ARCH_SPARSEMEM_ENABLE
->> > ? ? ? ?select S3C_DEV_RTC
->> > ? ? ? ?select S3C_DEV_WDT
->> > - ? ? ? select HAVE_S3C_RTC
->> > ? ? ? ?select HAVE_S3C2410_WATCHDOG
->> > ? ? ? ?help
->> > ? ? ? ? ?Machine support for Samsung SMDKC110
->> > --
+> ?drivers/i2c/busses/Kconfig | ? ?6 +++---
+> ?1 files changed, 3 insertions(+), 3 deletions(-)
 >
-> Thanks.
+> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+> index bceafbf..27c96ec 100644
+> --- a/drivers/i2c/busses/Kconfig
+> +++ b/drivers/i2c/busses/Kconfig
+> @@ -523,10 +523,10 @@ config I2C_PXA_SLAVE
 >
-> Best regards,
-> Kgene.
+> ?config I2C_S3C2410
+> ? ? ? ?tristate "S3C2410 I2C Driver"
+> - ? ? ? depends on ARCH_S3C2410 || ARCH_S3C64XX
+> + ? ? ? depends on ARCH_S3C2410 || ARCH_S3C64XX || ARCH_S5P6440 || ARCH_S5PV210
+> ? ? ? ?help
+> - ? ? ? ? Say Y here to include support for I2C controller in the
+> - ? ? ? ? Samsung S3C2410 based System-on-Chip devices.
+> + ? ? ? ? Say Y here to include support for I2C controller in the Samsung
+> + ? ? ? ? S3C2410, S3C64XX, S5P6440 and S5PV210 based System-on-Chip devices.
+>
+> ?config I2C_S6000
+> ? ? ? ?tristate "S6000 I2C support"
 > --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
+> 1.6.2.5
 >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >
