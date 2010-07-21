@@ -1,48 +1,41 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 21 Jul 2010 17:47:54 +0300
-Subject: [PATCH 0/3] Generic ULPI driver extention
-In-Reply-To: <1279198816-30367-1-git-send-email-grinberg@compulab.co.il>
-References: <1279198816-30367-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <4C47089A.6020502@compulab.co.il>
+Date: Wed, 21 Jul 2010 17:49:22 +0300
+Subject: [PATCH 0/3] Enable pxa310 usb otg port host mode
+In-Reply-To: <1279199446-30526-1-git-send-email-grinberg@compulab.co.il>
+References: <1279199446-30526-1-git-send-email-grinberg@compulab.co.il>
+Message-ID: <4C4708F2.5050707@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg, Daniel, Sascha,
+Eric,
 
 Any comments?
 
-> This patch series add support for SMSC USB3319 ulpi phy,
-> introduces the ulpi specific flags for control over the
-> ulpi phy and extends the generic ulpi driver with
-> support for Function and Interface control of upli phy.
+> This patch series introduces the U2D Controller and
+> Host driver for PXA3xx and enables cm-x300 usb host port2.
 >
-> Depends on:
-> From: Ajay Kumar Gupta <ajay.gupta@ti.com>
-> Date: Thu,  8 Jul 2010 14:03:01 +0530
-> Subject: USB: ulpi: fix compilation warning
->
-> From: Eric B?nard <eric@eukrea.com>
-> Date: Thu, 15 Jul 2010 09:20:19 +0200
-> Subject: [PATCH v2] otg/ulpi.c : fix register write
+> This patch series depends on
+> "Generic ULPI driver extention" patch series,
+> which is currently sent for review to
+> linux-usb at vger.kernel.org mailing list
 >
 > Igor Grinberg (3):
->   usb/otg/ulpi: remove unused macro
->   usb/otg/ulpi: add support for SMSC USB3319 ulpi phy
->   usb/otg/ulpi: extend the generic ulpi driver.
+>   [ARM] pxa3xx: Add U2D controller and driver
+>   [ARM] usb/host/ohci-pxa27x: enable OHCI over U2DC
+>   [ARM] pxa/cm-x300: enable USB host port2
 >
->  arch/arm/mach-mx2/mach-pca100.c          |    4 +-
->  arch/arm/mach-mx3/mach-armadillo5x0.c    |    4 +-
->  arch/arm/mach-mx3/mach-mx31lilly.c       |    4 +-
->  arch/arm/mach-mx3/mach-mx31lite.c        |    2 +-
->  arch/arm/mach-mx3/mach-mx31moboard.c     |    2 +-
->  arch/arm/mach-mx3/mach-pcm037.c          |    4 +-
->  arch/arm/mach-mx3/mach-pcm043.c          |    2 +-
->  arch/arm/mach-mx3/mx31moboard-smartbot.c |    2 +-
->  drivers/usb/otg/Kconfig                  |    2 -
->  drivers/usb/otg/ulpi.c                   |  130 +++++++++++++++++++++++++++---
->  include/linux/usb/otg.h                  |    7 --
->  include/linux/usb/ulpi.h                 |   39 +++++++++
->  12 files changed, 169 insertions(+), 33 deletions(-)
+>  arch/arm/mach-pxa/Kconfig                   |    4 +
+>  arch/arm/mach-pxa/Makefile                  |    2 +-
+>  arch/arm/mach-pxa/cm-x300.c                 |   77 ++++++
+>  arch/arm/mach-pxa/devices.c                 |   28 ++
+>  arch/arm/mach-pxa/devices.h                 |    1 +
+>  arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h |   35 +++
+>  arch/arm/mach-pxa/pxa3xx-u2d.c              |  392 +++++++++++++++++++++++++++
+>  arch/arm/mach-pxa/pxa3xx.c                  |    2 +-
+>  drivers/usb/host/ohci-pxa27x.c              |    7 +
+>  9 files changed, 546 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h
+>  create mode 100644 arch/arm/mach-pxa/pxa3xx-u2d.c
 >
 >
 >   
