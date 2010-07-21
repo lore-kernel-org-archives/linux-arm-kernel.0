@@ -1,116 +1,34 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Jul 2010 15:21:23 +0900
-Subject: [PATCH v6 3/3] input: samsung-keypad - Add samsung keypad driver
-In-Reply-To: <4C4688BE.1080409@samsung.com>
-References: <1277724824-13308-1-git-send-email-jy0922.shim@samsung.com>
-	<1277724824-13308-3-git-send-email-jy0922.shim@samsung.com>
-	<4C32E21A.8080100@samsung.com>
-	<013401cb1d66$5fbf3fb0$1f3dbf10$%kim@samsung.com>
-	<4C33D859.9050708@samsung.com>
-	<026901cb1f35$64c63470$2e529d50$%kim@samsung.com>
-	<4C36D235.3040702@samsung.com> <4C4688BE.1080409@samsung.com>
-Message-ID: <007901cb289c$f4763d70$dd62b850$%kim@samsung.com>
+From: rabin.vincent@stericsson.com (Rabin VINCENT)
+Date: Wed, 21 Jul 2010 12:10:38 +0530
+Subject: Your patch: ARM: AMBA: Add pclk definition for platforms using
+	primecells
+In-Reply-To: <0D753D10438DA54287A00B02708426976374051D65@AUSP01VMBX24.collaborationhost.net>
+References: <0D753D10438DA54287A00B02708426976374051D65@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20100721064036.GA17884@bnru02.bnr.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joonyoung Shim wrote:
+On Wed, Jul 21, 2010 at 01:54:18 +0200, H Hartley Sweeten wrote:
+> Hello Russell,
 > 
-> Hi, Dmitry.
-> 
-> On 7/9/2010 4:39 PM, Joonyoung Shim wrote:
-> > On 7/9/2010 4:07 PM, Kukjin Kim wrote:
-> >> Joonyoung Shim wrote:
-> >>> On 7/7/2010 8:52 AM, Kukjin Kim wrote:
-> >>>> Joonyoung Shim wrote:
-> >>>>> Hi, Naveen.
-> >>>>>
-> >>>>> On 6/28/2010 8:33 PM, Joonyoung Shim wrote:
-> >>>>>> This patch adds support for keypad driver running on Samsung cpus. This
-> >>>>>> driver is tested on GONI and Aquila board using S5PC110 cpu.
-> >>>>>>
-> >>>>>> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-> >>>>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> >>>>>> ---
-> >>>>>>  drivers/input/keyboard/Kconfig          |    9 +
-> >>>>>>  drivers/input/keyboard/Makefile         |    1 +
-> >>>>>>  drivers/input/keyboard/samsung-keypad.c |  491
-> >>>>> +++++++++++++++++++++++++++++++
-> >>>>>>  3 files changed, 501 insertions(+), 0 deletions(-)
-> >>>>>>  create mode 100644 drivers/input/keyboard/samsung-keypad.c
-> >>>>>>
-> >>>>> Could you please test this v6 keypad driver on your various targets?
-> >>>> Hi,
-> >>>>
-> >>>> I received the test result from Naveen.
-> >>>> And now he is debugging about that.
-> >>>>
-> >>>> ..his e-mail client has some problem..so I replied...
-> >>>>
-> >>>> ---
-> >>>> From: Naveen Ch
-> >>>>
-> >>>> I've tested with v6 patches and they are working fine on SMDK6410,
-> SMDKC100
-> >>> and SMDKV210, except for some header inclusion (linux/sched.h) in
-> samsung-
-> >>> keypad.c.
-> >>>> The build breaking error is like following:
-> >>>> (make s5pc100_defconfig and select input->keypad->samsung keypad)
-> >>>>
-> >>>> drivers/input/keyboard/samsung-keypad.c: In function 'samsung_keypad_irq':
-> >>>> drivers/input/keyboard/samsung-keypad.c:170: error:
-> 'TASK_UNINTERRUPTIBLE'
-> >>> undeclared (first use in this function)
-> >>>> drivers/input/keyboard/samsung-keypad.c:170: error: (Each undeclared
-> identifier
-> >>> is reported only once
-> >>>> drivers/input/keyboard/samsung-keypad.c:170: error: for each function it
-> appears
-> >>> in.)
-> >>>> drivers/input/keyboard/samsung-keypad.c:170: error: implicit declaration of
-> >>> function 'schedule_timeout'
-> >>>> drivers/input/keyboard/samsung-keypad.c: In function
-> 'samsung_keypad_stop':
-> >>>> drivers/input/keyboard/samsung-keypad.c:202: error: 'TASK_NORMAL'
-> >>> undeclared (first use in this function)
-> >>>> make[3]: *** [drivers/input/keyboard/samsung-keypad.o] Error 1
-> >>>>
-> >>> This error occurs on s5pc100_defconfig having disabled CONFIG_PREEMPT
-> >>> option. I think sched.h should be included to remove like this
-> >>> dependency in driver, are there other ways?
-> >> I'm not sure root cause is that. But as you said, I think need inclusion it for
-> prevent the problem.
-> >> Actually didn't happen it before..so maybe the some core functions have
-> moved between rc-3 and earlier versions...
-> >
-> > The sched.h is included by below path.
-> >
-> > interrupt.h -> hardirq.h -> smp_lock.h -> sched.h
-> >
-> > The smp_lock.h in hardirq.h is included if CONFIG_PREEMPT is defined.
-> > The samsung keypad driver haven't needed including sched.h before
-> > Dmitry's patch is applied..
-> >
-> >> Anyway, if no any issues, could you please re-submit updated it soon?
-> >
-> > I haven't get yet Dmitry's review of v6 patch set, so i am waiting it.
-> >
-> 
-> Ping.
-> 
-> Do you have any feedback? If ok, i want to go to input tree or samsung
-> tree these added sched.h including.
+> Your patch added a new clock to the ep93xx platform called "apb_pclk".
 
-With including sched.h and Naveen's keypad support patches for SMDK6410, SMDKC100 and SMDKV210:
+Unrelated to ep93xx, but the same patch breaks the u8500 build:
 
-[ch.naveen at samsung.com: tested on SMDK6410, SMDKC100, and SMDKV210]
-Tested-by: Naveen Krishna Ch <ch.naveen@samsung.com>
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+arch/arm/mach-ux500/clock.c:459: error: 'clk_dummy_apb_pclk' undeclared here (not in a function)
 
-Thanks.
+The following can be folded in to fix it:
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/mach-ux500/clock.c b/arch/arm/mach-ux500/clock.c
+index e618ab1..d8ab7f1 100644
+--- a/arch/arm/mach-ux500/clock.c
++++ b/arch/arm/mach-ux500/clock.c
+@@ -453,7 +453,7 @@ static DEFINE_PRCC_CLK_CUSTOM(7, mtu0_ed, 2, -1, NULL, clk_mtu_get_rate, 0);
+ static DEFINE_PRCC_CLK(7, wdg_ed, 	1, -1, NULL);
+ static DEFINE_PRCC_CLK(7, cfgreg_ed, 	0, -1, NULL);
+ 
+-static struct clk dummy_apb_pclk;
++static struct clk clk_dummy_apb_pclk;
+ 
+ static struct clk_lookup u8500_common_clks[] = {
+ 	CLK(dummy_apb_pclk, NULL,	"apb_pclk"),
