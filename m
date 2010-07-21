@@ -1,80 +1,69 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 21 Jul 2010 20:33:51 +0300
-Subject: [PATCH v2 17/20] mmc: sdio: relocate sdio_set_block_size call
+Date: Wed, 21 Jul 2010 20:33:52 +0300
+Subject: [PATCH v2 18/20] mmc: sdio: enable a default power off mode of the
+	card
 In-Reply-To: <1279733634-21974-1-git-send-email-ohad@wizery.com>
 References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-Message-ID: <1279733634-21974-18-git-send-email-ohad@wizery.com>
+Message-ID: <1279733634-21974-19-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To support probing of SDIO function driver while the device
-is powered off, we need to relocate the sdio_set_block_size call
-from the bus probe to an earlier point where we know the device
-is still powered. In addition, we want the block size set also
-when cards are resumed.
+Add support for an SDIO device to stay powered off even without
+the presence of an SDIO function driver. A host should explicitly
+ask for it by means of MMC_CAP_DONT_POWER_CARD, and the SDIO
+function driver should know it needs to call sdio_claim_power
+before accessing the device.
 
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 ---
- drivers/mmc/core/sdio.c     |   14 +++++++++++++-
- drivers/mmc/core/sdio_bus.c |    9 ---------
- 2 files changed, 13 insertions(+), 10 deletions(-)
+ drivers/mmc/core/sdio.c  |   15 +++++++++++++--
+ include/linux/mmc/host.h |    1 +
+ 2 files changed, 14 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mmc/core/sdio.c b/drivers/mmc/core/sdio.c
-index 79e6fa1..5c0fbfa 100644
+index 5c0fbfa..164353f 100644
 --- a/drivers/mmc/core/sdio.c
 +++ b/drivers/mmc/core/sdio.c
-@@ -73,6 +73,12 @@ static int sdio_init_func(struct mmc_card *card, unsigned int fn)
+@@ -80,8 +80,9 @@ static int sdio_init_func(struct mmc_card *card, unsigned int fn)
+ 		return ret;
  
- 	card->sdio_func[fn - 1] = func;
- 
-+	/* Set the default block size so the driver is sure it's something
-+	 * sensible. */
-+	ret = sdio_set_block_size(func, 0);
-+	if (ret)
-+		return ret;
-+
  	/* For each SDIO function initialized, increase the power claim
- 	 * reference count of the card */
- 	atomic_inc(&card->power_claims);
-@@ -510,7 +516,13 @@ static int mmc_sdio_resume(struct mmc_host *host)
- 		if (func && sdio_func_present(func) && func->dev.driver) {
- 			const struct dev_pm_ops *pmops = func->dev.driver->pm;
+-	 * reference count of the card */
+-	atomic_inc(&card->power_claims);
++	 * reference count of the card, unless explicitly requested not to */
++	if (!(card->host->caps & MMC_CAP_DONT_POWER_CARD))
++		atomic_inc(&card->power_claims);
  
--			if (pmops && pmops->resume)
-+			/* Set the default block size so the driver is sure
-+			 * it's something sensible. */
-+			mmc_claim_host(host);
-+			err = sdio_set_block_size(func, 0);
-+			mmc_release_host(host);
+ 	return 0;
+ 
+@@ -607,6 +608,16 @@ int mmc_attach_sdio(struct mmc_host *host, u32 ocr)
+ 	mmc_release_host(host);
+ 
+ 	/*
++	 * If power is not required for this card, power it off.
++	 * The sdio function will need to call sdio_claim_power.
++	 */
++	if (!atomic_read(&card->power_claims)) {
++		pr_info("%s: power is not claimed, releasing\n",
++						mmc_hostname(host));
++		mmc_release_power(host);
++	}
 +
-+			if (!err && pmops && pmops->resume)
- 				err = pmops->resume(&func->dev);
- 		}
- 	}
-diff --git a/drivers/mmc/core/sdio_bus.c b/drivers/mmc/core/sdio_bus.c
-index 4a890dc..87269f6 100644
---- a/drivers/mmc/core/sdio_bus.c
-+++ b/drivers/mmc/core/sdio_bus.c
-@@ -119,20 +119,11 @@ static int sdio_bus_probe(struct device *dev)
- 	struct sdio_driver *drv = to_sdio_driver(dev->driver);
- 	struct sdio_func *func = dev_to_sdio_func(dev);
- 	const struct sdio_device_id *id;
--	int ret;
++	/*
+ 	 * First add the card to the driver model...
+ 	 */
+ 	err = mmc_add_card(host->card);
+diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+index 3675d58..756cf38 100644
+--- a/include/linux/mmc/host.h
++++ b/include/linux/mmc/host.h
+@@ -155,6 +155,7 @@ struct mmc_host {
+ #define MMC_CAP_DISABLE		(1 << 7)	/* Can the host be disabled */
+ #define MMC_CAP_NONREMOVABLE	(1 << 8)	/* Nonremovable e.g. eMMC */
+ #define MMC_CAP_WAIT_WHILE_BUSY	(1 << 9)	/* Waits while card is busy */
++#define MMC_CAP_DONT_POWER_CARD	(1 << 10)	/* Keep the card powered off */
  
- 	id = sdio_match_device(func, drv);
- 	if (!id)
- 		return -ENODEV;
- 
--	/* Set the default block size so the driver is sure it's something
--	 * sensible. */
--	sdio_claim_host(func);
--	ret = sdio_set_block_size(func, 0);
--	sdio_release_host(func);
--	if (ret)
--		return ret;
--
- 	return drv->probe(func, id);
- }
+ 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
  
 -- 
 1.7.0.4
