@@ -1,130 +1,95 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Jul 2010 21:55:51 +0900
-Subject: [PATCH v3 2/8] ARM: S5PV310: Add new CPU initialization support
-In-Reply-To: <AANLkTikYjSIZzT-WHpAYbaHC1R9DU2T89qUVoAYASEZv@mail.gmail.com>
-References: <1279627861-23047-1-git-send-email-kgene.kim@samsung.com>
-	<AANLkTikYjSIZzT-WHpAYbaHC1R9DU2T89qUVoAYASEZv@mail.gmail.com>
-Message-ID: <009701cb28d4$0ead3040$2c0790c0$%kim@samsung.com>
+From: mattia.jona@gmail.com (Mattia Jona-Lasinio)
+Date: Wed, 21 Jul 2010 14:57:54 +0200
+Subject: Introducing the LCD-Linux project
+Message-ID: <AANLkTikitTGpiE5Oe_P5a4f2OCOnlB9j_LVm5CQhQIno@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> On Tue, Jul 20, 2010 at 9:11 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > From: Changhwan Youn <chaos.youn@samsung.com>
-> >
-> > This patch adds Samsung S5PV310/S5PC210 CPU support.
-> > The S5PV310/S5PC210 integrates a ARM Cortex A9 multi-core.
-> >
-> > Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-> > Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
-> > Signed-off-by: Jiseong Oh <jiseong.oh@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> > Changes since v2:
-> > - Re-model platsmp.c on the Versatile Express as per Russell King's
-suggestion.
-> > ?And tested on the board.
-> >
-> > - Compared Versatile Express SMP code with Realview SMP code and
-modified
-> as needed.
-> >
-
 Hi,
 
-(snip)
+this is to introduce the LCD-Linux project (http://lcd-linux.sourceforge.net/),
+a kernel level implementation of a VT102 terminal emulator, optimized for small
+alphanumeric and graphic displays.
 
-> > +static void arch_detect_cpu(void)
-> > +{
-> > + ? ? ? /* we do not need to do any cpu detection here at the moment. */
-> > +
-> > + ? ? ? fifo_mask = S5PV210_UFSTAT_TXMASK;
-> > + ? ? ? fifo_max = 63 << S5PV210_UFSTAT_TXSHIFT;
-> 
-> It's only valid when use the UART1. others 255 for UART0, 15 for others.
+The possibility to connect to the computer small alphanumeric as well as graphic
+displays, has always attracted some interest. These small devices are connected
+to the computer and can be used to display system diagnostics like network
+usage, RAM or disk usage or even to replace the usual monitor. Possible
+applications can be found in embedded systems or clusters. These displays are
+connected to the computer through serial lines, parallel ports and more recently
+through USB connections. Appropriate programs in userspace gather the desired
+information and output it on the display. However for this to work, the
+userspace program has to implement some sort of display management, to determine
+what must be displayed where. This has two major disadvantages. First. Every
+userspace program willing to drive a display must solve the very same problems
+(display scroll and refresh, for instance), resulting in an overall duplication
+of code. Second. Display controllers usually require quite strict timings for
+proper operation and it is not trivial neither efficient to obtain this in
+userspace, whereas it is straightforward in kernel space through the usual delay
+functions. A solution is therefore to provide a sort of minimal terminal
+emulation in kernel space, that can be accessed through the standard character
+device interface. In this way the problem of the display management is reduced
+to some calls to the usual read/write/seek/ioctl routines. At the same time one
+has the possibility to implement handling of escape sequences, thus opening the
+way to standard applications based on the ncurses library.
 
-Ok..will fix it.
+LCD-Linux aims to be a complete VT102 terminal emulation in kernel space,
+optimized for small alphanumeric and graphic displays. It consists of two
+distinct pieces of software.
 
-(snip)
+The first piece is the lcd-linux module in itself, implementing a (hopefully)
+complete VT102 terminal with the addition of some custom escape sequences
+specific to the world of small LCD displays. Care has been taken to avoid any
+conflict between standard and custom escape sequences. A major feature of
+lcd-linux is the possibility to define a virtual display geometry larger than
+the physical one, so that one can use a small display as a normal 80x25 monitor
+in an effective way. The layer takes care about display refresh and keeps the
+cursor visible in a smart way. A second feature is the possibility to connect
+more than one display (up to 256 different displays). Each display is assigned a
+different minor number and is addressed individually. The lcd-linux module also
+registers the appropriate major number character device and implements all the
+relevant read/write/seek/ioctl functions allowed on the character device.
+Finally it creates some /proc files for internal inspection, information and
+diagnostics.
 
-> > +#define VMALLOC_END ? ? ?(0xE0000000)
-> 
-> Increase to 0xF000'0000. but it will be removed from Eric's patch.
-> 
-Right now, the 0xE0000000 is no problem as default.
-But I will check this is appropriate again.
+The second piece of software is the display driver, implementing all functions
+that are controller specific. Each driver registers itself with the lcd-linux
+layer and behaves like a 'slave' with respect to it. The interface between
+lcd-linux and the display driver is kept as simple as possible and no assumption
+is made by any of the two parts on the implementation of the other part. Ideally
+there will be one module for each controller. At the current stage, the driver
+for the Hitachi HD44780 (and compatibles) controller is fully implemented and
+optimized. Drivers for other controllers can be written in an easy way thanks to
+the standard interface provided by the lcd-linux layer.
 
-And according to his '[PATCH 08/13] [ARM] Make VMALLOC_END into a global
-variable if not defined', 
-it doesn't mean absolutely remove it. why did you say like that.
+The LCD-Linux project has been under development for several years and has now
+reached a stable state. It has been succesfully compiled, tested and used on
+different machines running Linux version 2.2, 2.4 and 2.6. The software can be
+compiled as a module or compiled statically into the kernel. In the latter case,
+the user can pass some parameters at boot time, to configure the display as soon
+as possible during the boot sequence. The project comes with Documentation and
+examples about how to use it.
 
-+#ifndef VMALLOC_END
-+extern unsigned long vmalloc_end;
-+#define VMALLOC_END (vmalloc_end)
-+#endif
-+
+LCD-Linux is released under the GNU General Public License version 2. The latest
+release is available at the Sourceforge website:
 
-And if required modify it for some machine, you can do it later with
-mach_desc after applying Eric's patch.
-Or as Russell said, there is the way to do it is to specify a vmalloc=
-parameter to the kernel.
+http://lcd-linux.sourceforge.net/
+http://prdownloads.sourceforge.net/lcd-linux/lcd-linux-0.13.9.tar.gz?download
 
-(snip)
+The CVS version still includes some partial support for Linux 2.0 but this
+support is considered obsolete and now abandoned in the official release.
 
-> > + ? ? ? ? ? ? ? /*
-> > + ? ? ? ? ? ? ? ?* Write the address of secondary startup into the
-> > + ? ? ? ? ? ? ? ?* system-wide flags register. The boot monitor waits
-> > + ? ? ? ? ? ? ? ?* until it receives a soft interrupt, and then the
-> > + ? ? ? ? ? ? ? ?* secondary CPU branches to this address.
-> > + ? ? ? ? ? ? ? ?*/
-> > + ? ? ? __raw_writel(BSYM(virt_to_phys(s5pv310_secondary_startup)),
-> S5P_INFORM0);
-> 
-> Do you really use the INFORM0? historically it's used for sleep &
-> wakeup. new SoC has several INFORM register. So I recommend to use
-> others.
-> 
+The LCD4Linux (http://ssl.bulix.org/projects/lcd4linux/) project is known to
+support LCD-Linux among the possible connection types.
 
-It doesn't mean we should use INFORM0 for sleep & wakeup even though
-historically used.
-...I mean it doesn't matter and as you know, just need to sync with
-boot-loader for it.
+I would appreciate some comments and feedback on the project. In view of the
+potential applications, future developments and improvements of LCD-Linux, I
+would also like to propose LCD-Linux for inclusion in the Linux kernel mainline.
 
-(snip)
+Thank you for your attention.
 
-> > +void s3c_i2c0_cfg_gpio(struct platform_device *dev)
-> > +{
-> > +/* will be implemented later */
-> > +}
-> 
-> Remove it and send separate patch. e.g.,I2C support on s5pc210.
-> 
-I think i2c0 is un-conditionally compiled. So need to add i2c0 support in
-here.
+With best regards,
 
-(snip)
+Mattia Jona-Lasinio
 
-> > +#define S5P_VA_COREPERI_BASE ? S3C_ADDR(0x00800000)
-> > +#define S5P_VA_COREPERI(x) ? ? (S5P_VA_COREPERI_BASE + (x))
-> > +#define S5P_VA_SCU ? ? ? ? ? ? S5P_VA_COREPERI(0x0)
-> > +#define S5P_VA_GIC_CPU ? ? ? ? S5P_VA_COREPERI(0x100)
-> > +#define S5P_VA_TWD ? ? ? ? ? ? S5P_VA_COREPERI(0x600)
-> > +#define S5P_VA_GIC_DIST ? ? ? ? ? ? ? ?S5P_VA_COREPERI(0x1000)
-> > +
-> > +#define S5P_VA_L2CC ? ? ? ? ? ?S3C_ADDR(0x00900000)
-> 
-> I'm not sure it's proper prefix.
-> 
-It's no problem.
-
-(snip)
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+(LCD-Linux project developer and maintainer)
