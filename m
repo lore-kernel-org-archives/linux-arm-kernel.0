@@ -1,41 +1,54 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 21 Jul 2010 23:59:51 +0200
-Subject: [PATCH 1/5] mx25: flexcan clock support
-In-Reply-To: <1279749595-21596-1-git-send-email-mkl@pengutronix.de>
-References: <1279749595-21596-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1279749595-21596-2-git-send-email-mkl@pengutronix.de>
+Date: Wed, 21 Jul 2010 23:59:50 +0200
+Subject: [PATCH 0/5] add flexcan support to i.mx
+Message-ID: <1279749595-21596-1-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+Hello,
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
----
- arch/arm/mach-mx25/clock.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+this series of patches prepares the i.mx tree for the flexcan driver.
+Clock support is added or adjusted. The last patch registers flexcan on
+the pcm043.
 
-diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
-index 02f8247..40c7cc4 100644
---- a/arch/arm/mach-mx25/clock.c
-+++ b/arch/arm/mach-mx25/clock.c
-@@ -240,6 +240,8 @@ DEFINE_CLOCK(ssi1_clk,  0, CCM_CGCR2, 11, get_rate_ssi1, NULL, &ssi1_per_clk);
- DEFINE_CLOCK(ssi2_clk,  1, CCM_CGCR2, 12, get_rate_ssi2, NULL, &ssi2_per_clk);
- DEFINE_CLOCK(audmux_clk, 0, CCM_CGCR1, 0, NULL, NULL, NULL);
- DEFINE_CLOCK(csi_clk,    0, CCM_CGCR1,  4, get_rate_csi, NULL,  &csi_per_clk);
-+DEFINE_CLOCK(can1_clk,	 0, CCM_CGCR1,  2, get_rate_ipg, NULL, NULL);
-+DEFINE_CLOCK(can2_clk,	 0, CCM_CGCR1,  3, get_rate_ipg, NULL, NULL);
- 
- #define _REGISTER_CLOCK(d, n, c)	\
- 	{				\
-@@ -279,6 +281,8 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
- 	_REGISTER_CLOCK("mx2-camera.0", NULL, csi_clk)
- 	_REGISTER_CLOCK(NULL, "audmux", audmux_clk)
-+	_REGISTER_CLOCK("flexcan.0", NULL, can1_clk)
-+	_REGISTER_CLOCK("flexcan.1", NULL, can2_clk)
- };
- 
- int __init mx25_clocks_init(void)
--- 
-1.7.1
+This series of patches applies to the sha's "imx/linux-2.6.git imx-for-2.6.36"
+tree and is available at:
+git://git.pengutronix.de/git/mkl/linux-2.6.git for-imx-for-2.6.36
+
+The actual flexcan driver is going over the net-next-2.6 tree and is currently
+in the (hopefully) final round of review, it is available at:
+git://git.pengutronix.de/git/mkl/linux-2.6.git for-net-next-2.6
+
+The combination (current mainline + for-net-next-2.6 + for-imx-for-2.6.36)
+has been successfully tested on the pcm043 (i.mx35).
+
+please consider to apply
+Cheers, Marc
+
+
+P.S.: this can be pulled:
+
+The following changes since commit 10fda3e745c337332a58ce1c43704d7af3eb79fd:
+
+  eukrea_mbimx27-baseboard: fix compile when CONFIG_SPI_IMX is disabled (2010-07-20 08:33:00 +0200)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/mkl/linux-2.6.git for-imx-for-2.6.36
+
+Marc Kleine-Budde (3):
+      mx35: adjust flexcan clock definition
+      mx35: add flexcan devices
+      pcm043: register flexcan device
+
+Sascha Hauer (2):
+      mx25: flexcan clock support
+      mx25: Add flexcan devices
+
+ arch/arm/mach-mx25/clock.c      |    4 ++
+ arch/arm/mach-mx25/devices.c    |   95 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mx25/devices.h    |    2 +
+ arch/arm/mach-mx3/clock-imx35.c |    4 +-
+ arch/arm/mach-mx3/devices.c     |   40 ++++++++++++++++
+ arch/arm/mach-mx3/devices.h     |    2 +
+ arch/arm/mach-mx3/mach-pcm043.c |    4 ++
+ 7 files changed, 149 insertions(+), 2 deletions(-)
