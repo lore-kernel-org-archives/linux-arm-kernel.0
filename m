@@ -1,57 +1,43 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 21 Jul 2010 20:33:37 +0300
-Subject: [PATCH v2 03/20] mmc: support embedded data field in mmc_host
+Date: Wed, 21 Jul 2010 20:33:38 +0300
+Subject: [PATCH v2 04/20] omap zoom2: wlan board muxing
 In-Reply-To: <1279733634-21974-1-git-send-email-ohad@wizery.com>
 References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-Message-ID: <1279733634-21974-4-git-send-email-ohad@wizery.com>
+Message-ID: <1279733634-21974-5-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to set/get mmc_host private embedded
-data.
-
-This is needed to allow software to dynamically
-create (and remove) SDIO functions which represents
-embedded SDIO devices.
-
-Typically, it will be used to set the context of
-a driver that is creating a new SDIO function
-(and would then expect to be able to get that context
-back upon creation of the new sdio func).
+Add board muxing to support the wlan wl1271 chip that is
+hardwired to mmc2 (third mmc controller) on the ZOOM2.
 
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 ---
- include/linux/mmc/host.h |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/board-zoom2.c |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
 
-diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-index f65913c..80db597 100644
---- a/include/linux/mmc/host.h
-+++ b/include/linux/mmc/host.h
-@@ -209,6 +209,8 @@ struct mmc_host {
- 	struct led_trigger	*led;		/* activity led */
- #endif
+diff --git a/arch/arm/mach-omap2/board-zoom2.c b/arch/arm/mach-omap2/board-zoom2.c
+index 803ef14..1520a2c 100644
+--- a/arch/arm/mach-omap2/board-zoom2.c
++++ b/arch/arm/mach-omap2/board-zoom2.c
+@@ -71,6 +71,19 @@ static struct twl4030_platform_data zoom2_twldata = {
  
-+	void			*embedded_data;
-+
- 	struct dentry		*debugfs_root;
- 
- 	unsigned long		private[0] ____cacheline_aligned;
-@@ -264,5 +266,15 @@ static inline void mmc_set_disable_delay(struct mmc_host *host,
- 	host->disable_delay = disable_delay;
- }
- 
-+static inline void *mmc_get_embedded_data(struct mmc_host *host)
-+{
-+	return host->embedded_data;
-+}
-+
-+static inline void mmc_set_embedded_data(struct mmc_host *host, void *data)
-+{
-+	host->embedded_data = data;
-+}
-+
- #endif
- 
+ #ifdef CONFIG_OMAP_MUX
+ static struct omap_board_mux board_mux[] __initdata = {
++	/* WLAN IRQ - GPIO 162 */
++	OMAP3_MUX(MCBSP1_CLKX, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
++	/* WLAN POWER ENABLE - GPIO 101 */
++	OMAP3_MUX(CAM_D2, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
++	/* WLAN SDIO: MMC3 CMD */
++	OMAP3_MUX(MCSPI1_CS1, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLUP),
++	/* WLAN SDIO: MMC3 CLK */
++	OMAP3_MUX(ETK_CLK, OMAP_MUX_MODE2 | OMAP_PIN_INPUT_PULLUP),
++	/* WLAN SDIO: MMC3 DAT[0-3] */
++	OMAP3_MUX(ETK_D3, OMAP_MUX_MODE2 | OMAP_PIN_INPUT_PULLUP),
++	OMAP3_MUX(ETK_D4, OMAP_MUX_MODE2 | OMAP_PIN_INPUT_PULLUP),
++	OMAP3_MUX(ETK_D5, OMAP_MUX_MODE2 | OMAP_PIN_INPUT_PULLUP),
++	OMAP3_MUX(ETK_D6, OMAP_MUX_MODE2 | OMAP_PIN_INPUT_PULLUP),
+ 	{ .reg_offset = OMAP_MUX_TERMINATOR },
+ };
+ #else
 -- 
 1.7.0.4
