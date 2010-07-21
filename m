@@ -1,114 +1,66 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 21 Jul 2010 20:33:41 +0300
-Subject: [PATCH v2 07/20] wireless: wl1271: support return value for the set
-	power func
+Date: Wed, 21 Jul 2010 20:33:42 +0300
+Subject: [PATCH v2 08/20] wireless: wl1271: take irq info from private board
+	data
 In-Reply-To: <1279733634-21974-1-git-send-email-ohad@wizery.com>
 References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-Message-ID: <1279733634-21974-8-git-send-email-ohad@wizery.com>
+Message-ID: <1279733634-21974-9-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make it possible for the set power method to indicate a
-success/failure return value. This is needed to support
-more complex power on/off operations such as bringing up
-(and down) sdio functions.
+Remove the hard coded irq information, and instead take
+the irq information from the board private data
+which is supplied by the sdio function.
 
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 ---
- drivers/net/wireless/wl12xx/wl1271.h      |    2 +-
- drivers/net/wireless/wl12xx/wl1271_io.h   |    8 +++++---
- drivers/net/wireless/wl12xx/wl1271_main.c |    4 +++-
- drivers/net/wireless/wl12xx/wl1271_sdio.c |    4 +++-
- drivers/net/wireless/wl12xx/wl1271_spi.c  |    4 +++-
- 5 files changed, 15 insertions(+), 7 deletions(-)
+ drivers/net/wireless/wl12xx/wl1271_sdio.c |   14 ++++++++------
+ 1 files changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/net/wireless/wl12xx/wl1271.h b/drivers/net/wireless/wl12xx/wl1271.h
-index 6f1b6b5..a21cdb2 100644
---- a/drivers/net/wireless/wl12xx/wl1271.h
-+++ b/drivers/net/wireless/wl12xx/wl1271.h
-@@ -340,7 +340,7 @@ struct wl1271_if_operations {
- 		     bool fixed);
- 	void (*reset)(struct wl1271 *wl);
- 	void (*init)(struct wl1271 *wl);
--	void (*power)(struct wl1271 *wl, bool enable);
-+	int (*power)(struct wl1271 *wl, bool enable);
- 	struct device* (*dev)(struct wl1271 *wl);
- 	void (*enable_irq)(struct wl1271 *wl);
- 	void (*disable_irq)(struct wl1271 *wl);
-diff --git a/drivers/net/wireless/wl12xx/wl1271_io.h b/drivers/net/wireless/wl12xx/wl1271_io.h
-index bc806c7..4a5b92c 100644
---- a/drivers/net/wireless/wl12xx/wl1271_io.h
-+++ b/drivers/net/wireless/wl12xx/wl1271_io.h
-@@ -144,10 +144,12 @@ static inline void wl1271_power_off(struct wl1271 *wl)
- 	clear_bit(WL1271_FLAG_GPIO_POWER, &wl->flags);
- }
- 
--static inline void wl1271_power_on(struct wl1271 *wl)
-+static inline int wl1271_power_on(struct wl1271 *wl)
- {
--	wl->if_ops->power(wl, true);
--	set_bit(WL1271_FLAG_GPIO_POWER, &wl->flags);
-+	int ret = wl->if_ops->power(wl, true);
-+	if (ret == 0)
-+		set_bit(WL1271_FLAG_GPIO_POWER, &wl->flags);
-+	return ret;
- }
- 
- 
-diff --git a/drivers/net/wireless/wl12xx/wl1271_main.c b/drivers/net/wireless/wl12xx/wl1271_main.c
-index b7d9137..6bd748e 100644
---- a/drivers/net/wireless/wl12xx/wl1271_main.c
-+++ b/drivers/net/wireless/wl12xx/wl1271_main.c
-@@ -620,7 +620,9 @@ static int wl1271_chip_wakeup(struct wl1271 *wl)
- 	int ret = 0;
- 
- 	msleep(WL1271_PRE_POWER_ON_SLEEP);
--	wl1271_power_on(wl);
-+	ret = wl1271_power_on(wl);
-+	if (ret < 0)
-+		goto out;
- 	msleep(WL1271_POWER_ON_SLEEP);
- 	wl1271_io_reset(wl);
- 	wl1271_io_init(wl);
 diff --git a/drivers/net/wireless/wl12xx/wl1271_sdio.c b/drivers/net/wireless/wl12xx/wl1271_sdio.c
-index 9903ae9..571c6b9 100644
+index 571c6b9..75901a6 100644
 --- a/drivers/net/wireless/wl12xx/wl1271_sdio.c
 +++ b/drivers/net/wireless/wl12xx/wl1271_sdio.c
-@@ -144,7 +144,7 @@ static void wl1271_sdio_raw_write(struct wl1271 *wl, int addr, void *buf,
+@@ -28,15 +28,14 @@
+ #include <linux/mmc/sdio_func.h>
+ #include <linux/mmc/sdio_ids.h>
+ #include <linux/mmc/card.h>
++#include <linux/mmc/host.h>
++#include <linux/wl12xx.h>
+ #include <plat/gpio.h>
  
- }
+ #include "wl1271.h"
+ #include "wl12xx_80211.h"
+ #include "wl1271_io.h"
  
--static void wl1271_sdio_set_power(struct wl1271 *wl, bool enable)
-+static int wl1271_sdio_set_power(struct wl1271 *wl, bool enable)
+-
+-#define RX71_WL1271_IRQ_GPIO		42
+-
+ static const struct sdio_device_id wl1271_devices[] = {
+ 	{ SDIO_DEVICE(SDIO_VENDOR_ID_TI, SDIO_DEVICE_ID_TI_WL1271) },
+ 	{}
+@@ -178,6 +177,7 @@ static int __devinit wl1271_probe(struct sdio_func *func,
+ 				  const struct sdio_device_id *id)
  {
- 	struct sdio_func *func = wl_to_func(wl);
+ 	struct ieee80211_hw *hw;
++	struct wl12xx_platform_data *wlan_data;
+ 	struct wl1271 *wl;
+ 	int ret;
  
-@@ -159,6 +159,8 @@ static void wl1271_sdio_set_power(struct wl1271 *wl, bool enable)
- 		sdio_disable_func(func);
- 		sdio_release_host(func);
+@@ -197,9 +197,11 @@ static int __devinit wl1271_probe(struct sdio_func *func,
+ 	/* Grab access to FN0 for ELP reg. */
+ 	func->card->quirks |= MMC_QUIRK_LENIENT_FN0;
+ 
+-	wl->irq = gpio_to_irq(RX71_WL1271_IRQ_GPIO);
+-	if (wl->irq < 0) {
+-		ret = wl->irq;
++	wlan_data = mmc_get_embedded_data(func->card->host);
++	if (wlan_data && wlan_data->irq)
++		wl->irq = wlan_data->irq;
++	else {
++		ret = -EINVAL;
+ 		wl1271_error("could not get irq!");
+ 		goto out_free;
  	}
-+
-+	return 0;
- }
- 
- static struct wl1271_if_operations sdio_ops = {
-diff --git a/drivers/net/wireless/wl12xx/wl1271_spi.c b/drivers/net/wireless/wl12xx/wl1271_spi.c
-index e866049..85a167f 100644
---- a/drivers/net/wireless/wl12xx/wl1271_spi.c
-+++ b/drivers/net/wireless/wl12xx/wl1271_spi.c
-@@ -313,10 +313,12 @@ static irqreturn_t wl1271_irq(int irq, void *cookie)
- 	return IRQ_HANDLED;
- }
- 
--static void wl1271_spi_set_power(struct wl1271 *wl, bool enable)
-+static int wl1271_spi_set_power(struct wl1271 *wl, bool enable)
- {
- 	if (wl->set_power)
- 		wl->set_power(enable);
-+
-+	return 0;
- }
- 
- static struct wl1271_if_operations spi_ops = {
 -- 
 1.7.0.4
