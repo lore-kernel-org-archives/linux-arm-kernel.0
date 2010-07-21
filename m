@@ -1,39 +1,66 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 21 Jul 2010 12:28:47 +0200 (CEST)
-Subject: [RFC, PATCH 3/3] arm: remove machine_desc.io_pg_offst and .phys_io
-In-Reply-To: <20100721085024.GD6009@n2100.arm.linux.org.uk>
-References: <1279073377.400469.233833413341.0.gpush@pororo>
-	<1279073377.404006.432977736300.3.gpush@pororo>
-	<AANLkTilsIR36GNlbpZHt3FB5Dp2msedtUMFRSlZ-N-w9@mail.gmail.com>
-	<20100720100448.GB32702@n2100.arm.linux.org.uk>
-	<1279621292.27276.19.camel@pororo.lan>
-	<1279629158.27276.29.camel@pororo.lan>
-	<20100721085024.GD6009@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1007211227450.31718@xanadu.home>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 21 Jul 2010 19:50:27 +0900
+Subject: [PATCH 3/3] i2c/busses: Select I2C bus support for S5PV210 and
+	S5P6440.
+In-Reply-To: <AANLkTikqjZVKDgCIuZ0QCvzrzdrNmGUOq2YZyqb0TKZn@mail.gmail.com>
+References: <1279285999-27555-1-git-send-email-kgene.kim@samsung.com>
+	<1279285999-27555-4-git-send-email-kgene.kim@samsung.com>
+	<AANLkTikqjZVKDgCIuZ0QCvzrzdrNmGUOq2YZyqb0TKZn@mail.gmail.com>
+Message-ID: <009001cb28c2$8a0d6050$9e2820f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Jul 2010, Russell King - ARM Linux wrote:
-
-> On Tue, Jul 20, 2010 at 02:32:38PM +0200, Jeremy Kerr wrote:
-> > Hi all,
-> > 
-> > > OK, so I should request Stephen to add this branch to linux-next,
-> > > including the fixups?
-> > > 
-> > 
-> > Hm, before I do that I should probably work out what to do in the
-> > CONFIG_DEBUG_ICEDCC case. How about returning 0x0 as the phys address in
-> > this case (ie, addruart -> mov \rp, #0), and skip setting up the mapping
-> > if addruart gives this zero address?
+Kyungmin Park wrote:
 > 
-> It's extremely unlikely to have a UART at address 0 (because that's by
-> default where the CPU jumps to on reset.)  That's not to say it could
-> never happen - it's possible to hard-wire the CPU into 'hivec' mode
-> where it'll instead jump to 0xffff0000.  In that case, if you're sane
-> you'd put your SDRAM at 0x00000000.
+> On Fri, Jul 16, 2010 at 10:13 PM, Kukjin Kim <kgene.kim@samsung.com>
+wrote:
+> > From: Naveen Krishna Ch <ch.naveen@samsung.com>
+> >
+> > This patch is to select support I2C channels 0, 1 and 2 for S5PV210 and
+> S5P6440.
+> >
+> > Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> > ?drivers/i2c/busses/Kconfig | ? ?2 +-
+> > ?1 files changed, 1 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+> > index bceafbf..e553fe8 100644
+> > --- a/drivers/i2c/busses/Kconfig
+> > +++ b/drivers/i2c/busses/Kconfig
+> > @@ -523,7 +523,7 @@ config I2C_PXA_SLAVE
+> >
+> > ?config I2C_S3C2410
+> > ? ? ? ?tristate "S3C2410 I2C Driver"
+> > - ? ? ? depends on ARCH_S3C2410 || ARCH_S3C64XX
+> > + ? ? ? depends on ARCH_S3C2410 || ARCH_S3C64XX || ARCH_S5PV210 ||
+> ARCH_S5P6440
+> 
+> Are there any SoCs don't have i2c? If no, how about to just depends on
+> PLAT_SAMSUNG.
+> 
+I thought about this again, but I'm not sure your suggestion is better.
+Because as you said, there is no Samsung SoC that does not have
+I2C...however it's true that this I2C driver cannot support/(is not tested
+on) every Samsung SoCs now.
 
-Using the value -1 is probably a better choice in this case.
+So, to add available SoC ARCH is better to us at the present.
+
+> Thank you,
+> Kyungmin Park
+> > ? ? ? ?help
+> > ? ? ? ? ?Say Y here to include support for I2C controller in the
+> > ? ? ? ? ?Samsung S3C2410 based System-on-Chip devices.
+
+Just need to modify help message...
 
 
-Nicolas
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
