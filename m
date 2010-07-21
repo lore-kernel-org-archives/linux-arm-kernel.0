@@ -1,113 +1,62 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 21 Jul 2010 01:07:26 -0700
-Subject: [PATCH v6 3/3] input: samsung-keypad - Add samsung keypad driver
-In-Reply-To: <4C4688BE.1080409@samsung.com>
-References: <1277724824-13308-1-git-send-email-jy0922.shim@samsung.com>
-	<1277724824-13308-3-git-send-email-jy0922.shim@samsung.com>
-	<4C32E21A.8080100@samsung.com>
-	<013401cb1d66$5fbf3fb0$1f3dbf10$%kim@samsung.com>
-	<4C33D859.9050708@samsung.com>
-	<026901cb1f35$64c63470$2e529d50$%kim@samsung.com>
-	<4C36D235.3040702@samsung.com> <4C4688BE.1080409@samsung.com>
-Message-ID: <20100721080725.GA21373@core.coreip.homeip.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 21 Jul 2010 10:20:43 +0200
+Subject: [PATCH 0/5] Makefile.boot cleanup
+In-Reply-To: <20100708070826.GB21565@pengutronix.de>
+References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
+	<20100705141344.GA25407@pengutronix.de>
+	<20100707144521.GB10470@pengutronix.de>
+	<alpine.LFD.2.00.1007071150390.6020@xanadu.home>
+	<20100708070826.GB21565@pengutronix.de>
+Message-ID: <20100721082043.GA23853@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joonyoung,
+Hello Russell,
 
-On Wed, Jul 21, 2010 at 02:42:22PM +0900, Joonyoung Shim wrote:
-> Hi, Dmitry.
+On Thu, Jul 08, 2010 at 09:08:26AM +0200, Uwe Kleine-K?nig wrote:
+> On Wed, Jul 07, 2010 at 11:54:14AM -0400, Nicolas Pitre wrote:
+> > On Wed, 7 Jul 2010, Uwe Kleine-K?nig wrote:
+> > > On Mon, Jul 05, 2010 at 04:13:44PM +0200, Uwe Kleine-K?nig wrote:
+> > > > this series is a merge between Eric's and my patches that we did to
+> > > > clean up the early boot code.  It doesn't contain runtime physoffset
+> > > > support for now, but I plan to pick that up later.
+> > > 
+> > > I added Nicolas' Acks to my tree and dropped the one patch he objected.
+> > > 
+> > > Are you willing to pull these now?
+> > 
+> > FWIW, I'm fine with Russell pulling this into his tree for the next 
+> > merge window.  Maybe you could just resend an official pull request with 
+> > the updated info.
+> OK, I thought it similar enough to the original request, but if it helps
+> I can do that:
 > 
-> On 7/9/2010 4:39 PM, Joonyoung Shim wrote:
-> > On 7/9/2010 4:07 PM, Kukjin Kim wrote:
-> >> Joonyoung Shim wrote:
-> >>> On 7/7/2010 8:52 AM, Kukjin Kim wrote:
-> >>>> Joonyoung Shim wrote:
-> >>>>> Hi, Naveen.
-> >>>>>
-> >>>>> On 6/28/2010 8:33 PM, Joonyoung Shim wrote:
-> >>>>>> This patch adds support for keypad driver running on Samsung cpus. This
-> >>>>>> driver is tested on GONI and Aquila board using S5PC110 cpu.
-> >>>>>>
-> >>>>>> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-> >>>>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> >>>>>> ---
-> >>>>>>  drivers/input/keyboard/Kconfig          |    9 +
-> >>>>>>  drivers/input/keyboard/Makefile         |    1 +
-> >>>>>>  drivers/input/keyboard/samsung-keypad.c |  491
-> >>>>> +++++++++++++++++++++++++++++++
-> >>>>>>  3 files changed, 501 insertions(+), 0 deletions(-)
-> >>>>>>  create mode 100644 drivers/input/keyboard/samsung-keypad.c
-> >>>>>>
-> >>>>> Could you please test this v6 keypad driver on your various targets?
-> >>>> Hi,
-> >>>>
-> >>>> I received the test result from Naveen.
-> >>>> And now he is debugging about that.
-> >>>>
-> >>>> ..his e-mail client has some problem..so I replied...
-> >>>>
-> >>>> ---
-> >>>> From: Naveen Ch
-> >>>>
-> >>>> I've tested with v6 patches and they are working fine on SMDK6410, SMDKC100
-> >>> and SMDKV210, except for some header inclusion (linux/sched.h) in samsung-
-> >>> keypad.c.
-> >>>> The build breaking error is like following:
-> >>>> (make s5pc100_defconfig and select input->keypad->samsung keypad)
-> >>>>
-> >>>> drivers/input/keyboard/samsung-keypad.c: In function 'samsung_keypad_irq':
-> >>>> drivers/input/keyboard/samsung-keypad.c:170: error: 'TASK_UNINTERRUPTIBLE'
-> >>> undeclared (first use in this function)
-> >>>> drivers/input/keyboard/samsung-keypad.c:170: error: (Each undeclared identifier
-> >>> is reported only once
-> >>>> drivers/input/keyboard/samsung-keypad.c:170: error: for each function it appears
-> >>> in.)
-> >>>> drivers/input/keyboard/samsung-keypad.c:170: error: implicit declaration of
-> >>> function 'schedule_timeout'
-> >>>> drivers/input/keyboard/samsung-keypad.c: In function 'samsung_keypad_stop':
-> >>>> drivers/input/keyboard/samsung-keypad.c:202: error: 'TASK_NORMAL'
-> >>> undeclared (first use in this function)
-> >>>> make[3]: *** [drivers/input/keyboard/samsung-keypad.o] Error 1
-> >>>>
-> >>> This error occurs on s5pc100_defconfig having disabled CONFIG_PREEMPT
-> >>> option. I think sched.h should be included to remove like this
-> >>> dependency in driver, are there other ways?
-> >> I'm not sure root cause is that. But as you said, I think need inclusion it for prevent the problem.
-> >> Actually didn't happen it before..so maybe the some core functions have moved between rc-3 and earlier versions...
-> > 
-> > The sched.h is included by below path.
-> > 
-> > interrupt.h -> hardirq.h -> smp_lock.h -> sched.h
-> > 
-> > The smp_lock.h in hardirq.h is included if CONFIG_PREEMPT is defined. 
-> > The samsung keypad driver haven't needed including sched.h before
-> > Dmitry's patch is applied..
-> > 
-> >> Anyway, if no any issues, could you please re-submit updated it soon?
-> > 
-> > I haven't get yet Dmitry's review of v6 patch set, so i am waiting it.
-> > 
+> The following changes since commit 7e27d6e778cd87b6f2415515d7127eba53fe5d02:
 > 
-> Ping.
+>   Linux 2.6.35-rc3 (2010-06-11 19:14:04 -0700)
 > 
-> Do you have any feedback? If ok, i want to go to input tree or samsung
-> tree these added sched.h including.
+> are available in the git repository at:
+>   git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
+> 
+> Eric Miao (2):
+>       ARM: Remove unused PARAMS_PHYS from arch/arm/boot/compressed
+>       Auto calculate ZRELADDR and provide option for exceptions
+> 
+> Uwe Kleine-K?nig (8):
+>       ARM: zImage: don't hard code the stack size twice
+>       ARM: zImage: some comments for __armv3_mpu_cache_on
+>       ARM: zImage: __armv3_mpu_cache_flush: respect should-be-zero specification
+>       ARM: zImage: fix comments for cache_on, cache_off and cache_clean_flush
+>       ARM: zImage: annotate debug functions about corrupted registers
+>       ARM: remove bit-rotten STANDALONE_DEBUG for decompressor
+>       ARM: zImage: don't define unused symbol initrd_phys
+>       ARM: deprecate support for old way to pass kernel parameters
+I added an ARM: prefix to Eric's second commit, other than that the
+branch is unchanged.  Do you pull for .36-rc1?
 
-I applied the patch adding samsung-keypad.c and the platform data
-arch/arm/plat-samsung/include/plat/keypad.h and I expect that
-patches to actually enable keypad will go through appropriate
-platform tree(s).
-
-The only caveat is that I removed declarations for copying platform data
-around and for gpio config function - if it is there there is no point
-of invoking it through the pointer in platform data.
-
-Overall I am confused why you set up keypad in platform code in the
-way you do. I'd put the device definitions and all supporting functions
-in the same module that registers platform device and be done with it.
-
-Thanks.
+Best regards
+Uwe
 
 -- 
-Dmitry
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
