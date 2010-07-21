@@ -1,78 +1,31 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 21 Jul 2010 23:59:54 +0200
-Subject: [PATCH 4/5] mx35: add flexcan devices
+Date: Wed, 21 Jul 2010 23:59:53 +0200
+Subject: [PATCH 3/5] mx35: adjust flexcan clock definition
 In-Reply-To: <1279749595-21596-1-git-send-email-mkl@pengutronix.de>
 References: <1279749595-21596-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1279749595-21596-5-git-send-email-mkl@pengutronix.de>
+Message-ID: <1279749595-21596-4-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 ---
- arch/arm/mach-mx3/devices.c |   40 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-mx3/devices.h |    2 ++
- 2 files changed, 42 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx3/clock-imx35.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/devices.c b/arch/arm/mach-mx3/devices.c
-index a4fd1a2..a8aa157 100644
---- a/arch/arm/mach-mx3/devices.c
-+++ b/arch/arm/mach-mx3/devices.c
-@@ -29,6 +29,46 @@
- 
- #include "devices.h"
- 
-+#ifdef CONFIG_ARCH_MX35
-+static struct resource mxc_can_1_resources[] = {
-+	{
-+		.start	= 0x53fe4000,
-+		.end	= 0x53fe7fff,
-+		.flags	= IORESOURCE_MEM,
-+	}, {
-+		.start	= 43,
-+		.end	= 43,
-+		.flags	= IORESOURCE_IRQ,
-+	}
-+};
-+
-+struct platform_device mxc_can_device0 = {
-+	.name = "flexcan",
-+	.id = 0,
-+	.num_resources = ARRAY_SIZE(mxc_can_1_resources),
-+	.resource = mxc_can_1_resources,
-+};
-+
-+static struct resource mxc_can_2_resources[] = {
-+	{
-+		.start	= 0x53fe8000,
-+		.end	= 0x53feffff,
-+		.flags	= IORESOURCE_MEM,
-+	}, {
-+		.start	= 44,
-+		.end	= 44,
-+		.flags	= IORESOURCE_IRQ,
-+	}
-+};
-+
-+struct platform_device mxc_can_device1 = {
-+	.name = "flexcan",
-+	.id = 1,
-+	.num_resources = ARRAY_SIZE(mxc_can_2_resources),
-+	.resource = mxc_can_2_resources,
-+};
-+#endif /* CONFIG_ARCH_MX35 */
-+
- /* GPIO port description */
- static struct mxc_gpio_port imx_gpio_ports[] = {
- 	{
-diff --git a/arch/arm/mach-mx3/devices.h b/arch/arm/mach-mx3/devices.h
-index e553523..c92bc91 100644
---- a/arch/arm/mach-mx3/devices.h
-+++ b/arch/arm/mach-mx3/devices.h
-@@ -16,3 +16,5 @@ extern struct platform_device imx_ssi_device1;
- extern struct platform_device imx_wdt_device0;
- extern struct platform_device imx_rtc_device0;
- extern struct platform_device imx_kpp_device;
-+extern struct platform_device mxc_can_device0;
-+extern struct platform_device mxc_can_device1;
+diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
+index 28be011..d3af0fd 100644
+--- a/arch/arm/mach-mx3/clock-imx35.c
++++ b/arch/arm/mach-mx3/clock-imx35.c
+@@ -428,8 +428,8 @@ static struct clk nfc_clk = {
+ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK(NULL, "asrc", asrc_clk)
+ 	_REGISTER_CLOCK(NULL, "ata", ata_clk)
+-	_REGISTER_CLOCK(NULL, "can", can1_clk)
+-	_REGISTER_CLOCK(NULL, "can", can2_clk)
++	_REGISTER_CLOCK("flexcan.0", NULL, can1_clk)
++	_REGISTER_CLOCK("flexcan.1", NULL, can2_clk)
+ 	_REGISTER_CLOCK("spi_imx.0", NULL, cspi1_clk)
+ 	_REGISTER_CLOCK("spi_imx.1", NULL, cspi2_clk)
+ 	_REGISTER_CLOCK(NULL, "ect", ect_clk)
 -- 
 1.7.1
