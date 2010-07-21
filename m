@@ -1,58 +1,94 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 21 Jul 2010 07:42:39 +0300
-Subject: [PATCH 3/3] i.MX51: add support for cpuimx51 module and its
-	baseboard
-In-Reply-To: <1279610174-6025-3-git-send-email-eric@eukrea.com>
-References: <1279610174-6025-1-git-send-email-eric@eukrea.com>
-	<1279610174-6025-2-git-send-email-eric@eukrea.com>
-	<1279610174-6025-3-git-send-email-eric@eukrea.com>
-Message-ID: <20100721044239.GC31367@jasper.tkos.co.il>
+Date: Wed, 21 Jul 2010 08:10:06 +0300
+Subject: [PATCH v2] arm/imx/gpio: add spinlock protection
+In-Reply-To: <a1d5b20ff1b6e39355fcad2e882489df55c7bf2a.1278413731.git.baruch@tkos.co.il>
+References: <20100706103748.GE28547@jasper.tkos.co.il>
+	<a1d5b20ff1b6e39355fcad2e882489df55c7bf2a.1278413731.git.baruch@tkos.co.il>
+Message-ID: <20100721051006.GD31367@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi Sascha,
 
-On Tue, Jul 20, 2010 at 09:16:14AM +0200, Eric B?nard wrote:
-> CPUIMX51 is build around Freescale's i.MX515 and has up to
-> 512MB of RAM, NAND Flash, Ethernet, USB Host with 4 ports
-> hub, USB OTG, ST16554 Quad UART on nCS1, I2C RTC ...
-> 
-> MBIMX51 adds LEDS, Keypad, TSC2007 touchscreen controler ...
-> 
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
+On Tue, Jul 06, 2010 at 02:03:22PM +0300, Baruch Siach wrote:
+> The GPIO registers need protection from concurrent access for operations that
+> are not atomic.
+
+Ping?
+This looks like an -rc and -stable issue to me.
+
+> Cc: stable at kernel.org
+> Cc: Juergen Beisert <j.beisert@pengutronix.de>
+> Cc: Daniel Mack <daniel@caiaq.de>
+> Reported-by: rpkamiak at rockwellcollins.com
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 > ---
->  arch/arm/mach-mx5/Kconfig                          |   21 ++
->  arch/arm/mach-mx5/Makefile                         |    2 +
->  arch/arm/mach-mx5/board-cpuimx51.c                 |  299 ++++++++++++++++++++
->  arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c       |  200 +++++++++++++
->  .../plat-mxc/include/mach/board-eukrea_cpuimx51.h  |   37 +++
->  5 files changed, 559 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mx5/board-cpuimx51.c
->  create mode 100644 arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
->  create mode 100644 arch/arm/plat-mxc/include/mach/board-eukrea_cpuimx51.h
+> Changes v1 -> v2
 > 
-> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-> index 6ef3428..5edd07e 100644
-> --- a/arch/arm/mach-mx5/Kconfig
-> +++ b/arch/arm/mach-mx5/Kconfig
-> @@ -21,4 +21,25 @@ config MACH_MX51_3DS
->  	help
->  	  Include support for MX51PDK (3DS) platform. This includes specific
->  	  configurations for the board and its peripherals.
+>     Remove redundant protection of GPIO/IRQ registers
+> 
+>  arch/arm/plat-mxc/gpio.c              |    8 ++++++++
+>  arch/arm/plat-mxc/include/mach/gpio.h |    1 +
+>  2 files changed, 9 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
+> index 71437c6..9ebbd31 100644
+> --- a/arch/arm/plat-mxc/gpio.c
+> +++ b/arch/arm/plat-mxc/gpio.c
+> @@ -214,13 +214,16 @@ static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
+>  	struct mxc_gpio_port *port =
+>  		container_of(chip, struct mxc_gpio_port, chip);
+>  	u32 l;
+> +	unsigned long flags;
+>  
+> +	spin_lock_irqsave(&port->lock, flags);
+>  	l = __raw_readl(port->base + GPIO_GDIR);
+>  	if (dir)
+>  		l |= 1 << offset;
+>  	else
+>  		l &= ~(1 << offset);
+>  	__raw_writel(l, port->base + GPIO_GDIR);
+> +	spin_unlock_irqrestore(&port->lock, flags);
+>  }
+>  
+>  static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+> @@ -229,9 +232,12 @@ static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+>  		container_of(chip, struct mxc_gpio_port, chip);
+>  	void __iomem *reg = port->base + GPIO_DR;
+>  	u32 l;
+> +	unsigned long flags;
+>  
+> +	spin_lock_irqsave(&port->lock, flags);
+>  	l = (__raw_readl(reg) & (~(1 << offset))) | (value << offset);
+>  	__raw_writel(l, reg);
+> +	spin_unlock_irqrestore(&port->lock, flags);
+>  }
+>  
+>  static int mxc_gpio_get(struct gpio_chip *chip, unsigned offset)
+> @@ -285,6 +291,8 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
+>  		port[i].chip.base = i * 32;
+>  		port[i].chip.ngpio = 32;
+>  
+> +		spin_lock_init(&port[i].lock);
 > +
-> +config MACH_EUKREA_CPUIMX51
-> +	bool "Support Eukrea CPUIMX51 module"
-> +	help
-> +	  Include support forEukrea CPUIMX27 platform. This includes
-
-s/CPUIMX27/CPUIMX51/
-
-> +	  specific configurations for the module and its peripherals.
-> +
-
-[snip]
-
-baruch
+>  		/* its a serious configuration bug when it fails */
+>  		BUG_ON( gpiochip_add(&port[i].chip) < 0 );
+>  
+> diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
+> index 894d2f8..6bd932c 100644
+> --- a/arch/arm/plat-mxc/include/mach/gpio.h
+> +++ b/arch/arm/plat-mxc/include/mach/gpio.h
+> @@ -36,6 +36,7 @@ struct mxc_gpio_port {
+>  	int virtual_irq_start;
+>  	struct gpio_chip chip;
+>  	u32 both_edges;
+> +	spinlock_t lock;
+>  };
+>  
+>  int mxc_gpio_init(struct mxc_gpio_port*, int);
+> -- 
+> 1.7.1
+> 
 
 -- 
                                                      ~. .~   Tk Open Systems
