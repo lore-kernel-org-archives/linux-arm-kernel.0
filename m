@@ -1,46 +1,71 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Jul 2010 18:00:10 +0900
-Subject: [PATCH 1/5] ARM: S3C64XX: Add RTC support for S3C64XX
+Date: Wed, 21 Jul 2010 18:00:13 +0900
+Subject: [PATCH 4/5] ARM: S5PC100: Add RTC support for S5PC100
 In-Reply-To: <1279702814-14929-1-git-send-email-kgene.kim@samsung.com>
 References: <1279702814-14929-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1279702814-14929-2-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1279702814-14929-5-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Atul Dahiya <atul.dahiya@samsung.com>
 
-This patch adds support for RTC for SMDK6410.
+This patch adds support RTC driver for Samsung S5PC100.
 
 Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s3c64xx/Kconfig         |    1 +
- arch/arm/mach-s3c64xx/mach-smdk6410.c |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pc100/Kconfig            |    2 ++
+ arch/arm/mach-s5pc100/include/mach/map.h |    3 +++
+ arch/arm/mach-s5pc100/mach-smdkc100.c    |    1 +
+ 3 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index f5a5972..e206504 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -96,6 +96,7 @@ config MACH_SMDK6410
+diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+index b2a11df..2602895 100644
+--- a/arch/arm/mach-s5pc100/Kconfig
++++ b/arch/arm/mach-s5pc100/Kconfig
+@@ -44,9 +44,11 @@ config MACH_SMDKC100
+ 	select S3C_DEV_HSMMC
  	select S3C_DEV_HSMMC1
- 	select S3C_DEV_I2C1
- 	select S3C_DEV_FB
+ 	select S3C_DEV_HSMMC2
 +	select S3C_DEV_RTC
- 	select SAMSUNG_DEV_TS
- 	select S3C_DEV_USB_HOST
- 	select S3C_DEV_USB_HSOTG
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-index d9a0355..b3bfb68 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-@@ -265,6 +265,7 @@ static struct platform_device *smdk6410_devices[] __initdata = {
+ 	select S5PC100_SETUP_FB_24BPP
+ 	select S5PC100_SETUP_I2C1
+ 	select S5PC100_SETUP_SDHCI
++	select HAVE_S3C_RTC
+ 	help
+ 	  Machine support for the Samsung SMDKC100
  
- 	&smdk6410_smsc911x,
- 	&s3c_device_adc,
+diff --git a/arch/arm/mach-s5pc100/include/mach/map.h b/arch/arm/mach-s5pc100/include/mach/map.h
+index cadae43..1834b2c 100644
+--- a/arch/arm/mach-s5pc100/include/mach/map.h
++++ b/arch/arm/mach-s5pc100/include/mach/map.h
+@@ -72,6 +72,8 @@
+ 
+ #define S5PC100_PA_SYSTIMER	(0xEA100000)
+ 
++#define S5PC100_PA_RTC		(0xEA300000)
++
+ #define S5PC100_PA_UART		(0xEC000000)
+ 
+ #define S5P_PA_UART0		(S5PC100_PA_UART + 0x0)
+@@ -134,5 +136,6 @@
+ #define S3C_PA_ONENAND		S5PC100_PA_ONENAND
+ #define S3C_PA_ONENAND_BUF	S5PC100_PA_ONENAND_BUF
+ #define S3C_SZ_ONENAND_BUF	S5PC100_SZ_ONENAND_BUF
++#define S3C_PA_RTC		S5PC100_PA_RTC
+ 
+ #endif /* __ASM_ARCH_C100_MAP_H */
+diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-s5pc100/mach-smdkc100.c
+index af22f82..09785e3 100644
+--- a/arch/arm/mach-s5pc100/mach-smdkc100.c
++++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
+@@ -159,6 +159,7 @@ static struct platform_device *smdkc100_devices[] __initdata = {
+ 	&smdkc100_lcd_powerdev,
+ 	&s5pc100_device_iis0,
+ 	&s5pc100_device_ac97,
 +	&s3c_device_rtc,
- 	&s3c_device_ts,
- 	&s3c_device_wdt,
  };
+ 
+ static void __init smdkc100_map_io(void)
 -- 
 1.6.2.5
