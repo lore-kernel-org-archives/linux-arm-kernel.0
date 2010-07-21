@@ -1,54 +1,136 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 21 Jul 2010 23:59:50 +0200
-Subject: [PATCH 0/5] add flexcan support to i.mx
-Message-ID: <1279749595-21596-1-git-send-email-mkl@pengutronix.de>
+Date: Wed, 21 Jul 2010 23:59:52 +0200
+Subject: [PATCH 2/5] mx25: Add flexcan devices
+In-Reply-To: <1279749595-21596-1-git-send-email-mkl@pengutronix.de>
+References: <1279749595-21596-1-git-send-email-mkl@pengutronix.de>
+Message-ID: <1279749595-21596-3-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
-this series of patches prepares the i.mx tree for the flexcan driver.
-Clock support is added or adjusted. The last patch registers flexcan on
-the pcm043.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+---
+ arch/arm/mach-mx25/devices.c |   95 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mx25/devices.h |    2 +
+ 2 files changed, 97 insertions(+), 0 deletions(-)
 
-This series of patches applies to the sha's "imx/linux-2.6.git imx-for-2.6.36"
-tree and is available at:
-git://git.pengutronix.de/git/mkl/linux-2.6.git for-imx-for-2.6.36
-
-The actual flexcan driver is going over the net-next-2.6 tree and is currently
-in the (hopefully) final round of review, it is available at:
-git://git.pengutronix.de/git/mkl/linux-2.6.git for-net-next-2.6
-
-The combination (current mainline + for-net-next-2.6 + for-imx-for-2.6.36)
-has been successfully tested on the pcm043 (i.mx35).
-
-please consider to apply
-Cheers, Marc
-
-
-P.S.: this can be pulled:
-
-The following changes since commit 10fda3e745c337332a58ce1c43704d7af3eb79fd:
-
-  eukrea_mbimx27-baseboard: fix compile when CONFIG_SPI_IMX is disabled (2010-07-20 08:33:00 +0200)
-
-are available in the git repository at:
-  git://git.pengutronix.de/git/mkl/linux-2.6.git for-imx-for-2.6.36
-
-Marc Kleine-Budde (3):
-      mx35: adjust flexcan clock definition
-      mx35: add flexcan devices
-      pcm043: register flexcan device
-
-Sascha Hauer (2):
-      mx25: flexcan clock support
-      mx25: Add flexcan devices
-
- arch/arm/mach-mx25/clock.c      |    4 ++
- arch/arm/mach-mx25/devices.c    |   95 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-mx25/devices.h    |    2 +
- arch/arm/mach-mx3/clock-imx35.c |    4 +-
- arch/arm/mach-mx3/devices.c     |   40 ++++++++++++++++
- arch/arm/mach-mx3/devices.h     |    2 +
- arch/arm/mach-mx3/mach-pcm043.c |    4 ++
- 7 files changed, 149 insertions(+), 2 deletions(-)
+diff --git a/arch/arm/mach-mx25/devices.c b/arch/arm/mach-mx25/devices.c
+index 3468eb1..ecff519 100644
+--- a/arch/arm/mach-mx25/devices.c
++++ b/arch/arm/mach-mx25/devices.c
+@@ -179,6 +179,101 @@ struct platform_device mxc_pwm_device3 = {
+ 	.resource = mxc_pwm_resources3,
+ };
+ 
++static struct resource mxc_i2c_1_resources[] = {
++	{
++		.start	= 0x43f80000,
++		.end	= 0x43f83fff,
++		.flags	= IORESOURCE_MEM,
++	}, {
++		.start	= 3,
++		.end	= 3,
++		.flags	= IORESOURCE_IRQ,
++	}
++};
++
++struct platform_device mxc_i2c_device0 = {
++	.name = "imx-i2c",
++	.id = 0,
++	.num_resources = ARRAY_SIZE(mxc_i2c_1_resources),
++	.resource = mxc_i2c_1_resources,
++};
++
++static struct resource mxc_i2c_2_resources[] = {
++	{
++		.start	= 0x43f98000,
++		.end	= 0x43f9bfff,
++		.flags	= IORESOURCE_MEM,
++	}, {
++		.start	= 4,
++		.end	= 4,
++		.flags	= IORESOURCE_IRQ,
++	}
++};
++
++struct platform_device mxc_i2c_device1 = {
++	.name = "imx-i2c",
++	.id = 1,
++	.num_resources = ARRAY_SIZE(mxc_i2c_2_resources),
++	.resource = mxc_i2c_2_resources,
++};
++
++static struct resource mxc_i2c_3_resources[] = {
++	{
++		.start	= 0x43f84000,
++		.end	= 0x43f87fff,
++		.flags	= IORESOURCE_MEM,
++	}, {
++		.start	= 10,
++		.end	= 10,
++		.flags	= IORESOURCE_IRQ,
++	}
++};
++
++struct platform_device mxc_i2c_device2 = {
++	.name = "imx-i2c",
++	.id = 2,
++	.num_resources = ARRAY_SIZE(mxc_i2c_3_resources),
++	.resource = mxc_i2c_3_resources,
++};
++
++static struct resource mxc_can_1_resources[] = {
++	{
++		.start	= 0x43f88000,
++		.end	= 0x43f8bfff,
++		.flags	= IORESOURCE_MEM,
++	}, {
++		.start	= 43,
++		.end	= 43,
++		.flags	= IORESOURCE_IRQ,
++	}
++};
++
++struct platform_device mxc_can_device0 = {
++	.name = "flexcan",
++	.id = 0,
++	.num_resources = ARRAY_SIZE(mxc_can_1_resources),
++	.resource = mxc_can_1_resources,
++};
++
++static struct resource mxc_can_2_resources[] = {
++	{
++		.start	= 0x43f8c000,
++		.end	= 0x43f8ffff,
++		.flags	= IORESOURCE_MEM,
++	}, {
++		.start	= 44,
++		.end	= 44,
++		.flags	= IORESOURCE_IRQ,
++	}
++};
++
++struct platform_device mxc_can_device1 = {
++	.name = "flexcan",
++	.id = 1,
++	.num_resources = ARRAY_SIZE(mxc_can_2_resources),
++	.resource = mxc_can_2_resources,
++};
++
+ static struct mxc_gpio_port imx_gpio_ports[] = {
+ 	{
+ 		.chip.label = "gpio-0",
+diff --git a/arch/arm/mach-mx25/devices.h b/arch/arm/mach-mx25/devices.h
+index 4aceb68..66b72b1 100644
+--- a/arch/arm/mach-mx25/devices.h
++++ b/arch/arm/mach-mx25/devices.h
+@@ -14,3 +14,5 @@ extern struct platform_device mx25_kpp_device;
+ extern struct platform_device imx_ssi_device0;
+ extern struct platform_device imx_ssi_device1;
+ extern struct platform_device mx25_csi_device;
++extern struct platform_device mxc_can_device0;
++extern struct platform_device mxc_can_device1;
+-- 
+1.7.1
