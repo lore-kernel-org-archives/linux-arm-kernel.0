@@ -1,89 +1,37 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 21 Jul 2010 20:33:53 +0300
-Subject: [PATCH v2 19/20] omap: zoom: keep the MMC3 wl1271 device powered off
+Date: Wed, 21 Jul 2010 20:33:54 +0300
+Subject: [PATCH v2 20/20] wireless: wl1271: call SDIO claim/release power API
 In-Reply-To: <1279733634-21974-1-git-send-email-ohad@wizery.com>
 References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-Message-ID: <1279733634-21974-20-git-send-email-ohad@wizery.com>
+Message-ID: <1279733634-21974-21-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keep the MMC3 wl1271 WLAN device powered off until its
-SDIO function driver requests otherwise.
+call SDIO claim/release power API to turn the wl1271
+power on and off
 
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 ---
- arch/arm/mach-omap2/board-zoom-peripherals.c |    1 +
- arch/arm/mach-omap2/hsmmc.c                  |    3 +++
- arch/arm/mach-omap2/hsmmc.h                  |    1 +
- arch/arm/plat-omap/include/plat/mmc.h        |    3 +++
- drivers/mmc/host/omap_hsmmc.c                |    3 +++
- 5 files changed, 11 insertions(+), 0 deletions(-)
+ drivers/net/wireless/wl12xx/wl1271_sdio.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
-index 3230801..3ab9125 100644
---- a/arch/arm/mach-omap2/board-zoom-peripherals.c
-+++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
-@@ -217,6 +217,7 @@ static struct omap2_hsmmc_info mmc[] __initdata = {
- 		.gpio_wp	= -EINVAL,
- 		.gpio_cd	= -EINVAL,
- 		.ocr_mask	= MMC_VDD_165_195,
-+		.dont_power_card = true,
- 		.priv_data	= &omap_zoom_wlan_data,
- 	},
- 	{}      /* Terminator */
-diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-index f06ddd2..24c4144 100644
---- a/arch/arm/mach-omap2/hsmmc.c
-+++ b/arch/arm/mach-omap2/hsmmc.c
-@@ -284,6 +284,9 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
- 		if (c->vcc_aux_disable_is_sleep)
- 			mmc->slots[0].vcc_aux_disable_is_sleep = 1;
+diff --git a/drivers/net/wireless/wl12xx/wl1271_sdio.c b/drivers/net/wireless/wl12xx/wl1271_sdio.c
+index 5967718..a7e9ace 100644
+--- a/drivers/net/wireless/wl12xx/wl1271_sdio.c
++++ b/drivers/net/wireless/wl12xx/wl1271_sdio.c
+@@ -152,11 +152,13 @@ static int wl1271_sdio_set_power(struct wl1271 *wl, bool enable)
+ 	 * alive.
+ 	 */
+ 	if (enable) {
++		sdio_claim_power(func);
+ 		sdio_claim_host(func);
+ 		sdio_enable_func(func);
+ 	} else {
+ 		sdio_disable_func(func);
+ 		sdio_release_host(func);
++		sdio_release_power(func);
+ 	}
  
-+		if (c->dont_power_card)
-+			mmc->slots[0].dont_power_card = 1;
-+
- 		mmc->slots[0].priv_data = c->priv_data;
- 
- 		/* NOTE:  MMC slots should have a Vcc regulator set up.
-diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
-index 434a3ed..e200786 100644
---- a/arch/arm/mach-omap2/hsmmc.h
-+++ b/arch/arm/mach-omap2/hsmmc.h
-@@ -23,6 +23,7 @@ struct omap2_hsmmc_info {
- 	int	ocr_mask;	/* temporary HACK */
- 	/* Remux (pad configuation) when powering on/off */
- 	void (*remux)(struct device *dev, int slot, int power_on);
-+	bool	dont_power_card;/* keep card power off at boot (default is n)*/
- 	void	*priv_data;	/* private data to SDIO function driver */
- };
- 
-diff --git a/arch/arm/plat-omap/include/plat/mmc.h b/arch/arm/plat-omap/include/plat/mmc.h
-index 9db1617..d042494 100644
---- a/arch/arm/plat-omap/include/plat/mmc.h
-+++ b/arch/arm/plat-omap/include/plat/mmc.h
-@@ -140,6 +140,9 @@ struct omap_mmc_platform_data {
- 
- 		unsigned int ban_openended:1;
- 
-+		/* keep this card powered off at boot (default is n) */
-+		unsigned int dont_power_card:1;
-+
- 		/* card private data that should be used by function driver */
- 		void *priv_data;
- 	} slots[OMAP_MMC_MAX_SLOTS];
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 4ac548e..4fb6634 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -2157,6 +2157,9 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
- 	if (mmc_slot(host).nonremovable)
- 		mmc->caps |= MMC_CAP_NONREMOVABLE;
- 
-+	if (mmc_slot(host).dont_power_card)
-+		mmc->caps |= MMC_CAP_DONT_POWER_CARD;
-+
- 	mmc_set_embedded_data(mmc, mmc_slot(host).priv_data);
- 
- 	omap_hsmmc_conf_bus_power(host);
+ 	return 0;
 -- 
 1.7.0.4
