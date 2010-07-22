@@ -1,160 +1,53 @@
-From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
-Date: Thu, 22 Jul 2010 18:38:54 +0200
-Subject: [PATCH 2/2] eukrea-baseboards: merge includes in one file
-In-Reply-To: <1279816734-26094-1-git-send-email-eric@eukrea.com>
-References: <1279816734-26094-1-git-send-email-eric@eukrea.com>
-Message-ID: <1279816734-26094-2-git-send-email-eric@eukrea.com>
+From: zpfeffer@codeaurora.org (Zach Pfeffer)
+Date: Thu, 22 Jul 2010 09:44:56 -0700
+Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
+	memory management
+In-Reply-To: <20100722134253B.fujita.tomonori@lab.ntt.co.jp>
+References: <20100720221959.GC12250@codeaurora.org>
+	<20100721104356S.fujita.tomonori@lab.ntt.co.jp>
+	<20100722043034.GC22559@codeaurora.org>
+	<20100722134253B.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <20100722164454.GF10255@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-as per suggested by Sascha
+On Thu, Jul 22, 2010 at 01:43:26PM +0900, FUJITA Tomonori wrote:
+> On Wed, 21 Jul 2010 21:30:34 -0700
+> Zach Pfeffer <zpfeffer@codeaurora.org> wrote:
+> 
+> > On Wed, Jul 21, 2010 at 10:44:37AM +0900, FUJITA Tomonori wrote:
+> > > On Tue, 20 Jul 2010 15:20:01 -0700
+> > > Zach Pfeffer <zpfeffer@codeaurora.org> wrote:
+> > > 
+> > > > > I'm not saying that it's reasonable to pass (or even allocate) a 1MB
+> > > > > buffer via the DMA API.
+> > > > 
+> > > > But given a bunch of large chunks of memory, is there any API that can
+> > > > manage them (asked this on the other thread as well)?
+> > > 
+> > > What is the problem about mapping a 1MB buffer with the DMA API?
+> > > 
+> > > Possibly, an IOMMU can't find space for 1MB but it's not the problem
+> > > of the DMA API.
+> > 
+> > This goes to the nub of the issue. We need a lot of 1 MB physically
+> > contiguous chunks. The system is going to fragment and we'll never get
+> > our 12 1 MB chunks that we'll need, since the DMA API allocator uses
+> > the system pool it will never succeed. For this reason we reserve a
+> > pool of 1 MB chunks (and 16 MB, 64 KB etc...) to satisfy our
+> > requests. This same use case is seen on most embedded "media" engines
+> > that are getting built today.
+> 
+> We don't need a new abstraction to reserve some memory.
+> 
+> If you want pre-allocated memory pool per device (and share them with
+> some), the DMA API can for coherent memory (see
+> dma_alloc_from_coherent). You can extend the DMA API if necessary.
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
----
- arch/arm/mach-imx/mach-cpuimx27.c                  |    2 +-
- arch/arm/mach-mx25/mach-cpuimx25.c                 |    2 +-
- arch/arm/mach-mx3/mach-cpuimx35.c                  |    2 +-
- arch/arm/plat-mxc/eukrea_mbimxsd-baseboard.c       |    1 -
- .../plat-mxc/include/mach/board-eukrea_cpuimx27.h  |   40 --------------------
- ...board-eukrea_cpuimxsd.h => eukrea-baseboards.h} |   13 ++++--
- 6 files changed, 11 insertions(+), 49 deletions(-)
- delete mode 100644 arch/arm/plat-mxc/include/mach/board-eukrea_cpuimx27.h
- rename arch/arm/plat-mxc/include/mach/{board-eukrea_cpuimxsd.h => eukrea-baseboards.h} (76%)
+That function won't work for us. We can't use
+bitmap_find_free_region(), we need to use our own allocator. If
+anything we need a dma_alloc_from_custom(my_allocator). Take a look
+at:
 
-diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
-index 2a13544..575ff1a 100644
---- a/arch/arm/mach-imx/mach-cpuimx27.c
-+++ b/arch/arm/mach-imx/mach-cpuimx27.c
-@@ -35,7 +35,7 @@
- #include <asm/mach/time.h>
- #include <asm/mach/map.h>
- 
--#include <mach/board-eukrea_cpuimx27.h>
-+#include <mach/eukrea-baseboards.h>
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <mach/iomux-mx27.h>
-diff --git a/arch/arm/mach-mx25/mach-cpuimx25.c b/arch/arm/mach-mx25/mach-cpuimx25.c
-index 526928f..56b2e26 100644
---- a/arch/arm/mach-mx25/mach-cpuimx25.c
-+++ b/arch/arm/mach-mx25/mach-cpuimx25.c
-@@ -29,7 +29,7 @@
- #include <linux/usb/ulpi.h>
- #include <linux/fsl_devices.h>
- 
--#include <mach/board-eukrea_cpuimxsd.h>
-+#include <mach/eukrea-baseboards.h>
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-mx3/mach-cpuimx35.c b/arch/arm/mach-mx3/mach-cpuimx35.c
-index a7ecd7b..63f970f 100644
---- a/arch/arm/mach-mx3/mach-cpuimx35.c
-+++ b/arch/arm/mach-mx3/mach-cpuimx35.c
-@@ -37,7 +37,7 @@
- #include <asm/mach/time.h>
- #include <asm/mach/map.h>
- 
--#include <mach/board-eukrea_cpuimxsd.h>
-+#include <mach/eukrea-baseboards.h>
- #include <mach/hardware.h>
- #include <mach/common.h>
- #include <mach/iomux-mx35.h>
-diff --git a/arch/arm/plat-mxc/eukrea_mbimxsd-baseboard.c b/arch/arm/plat-mxc/eukrea_mbimxsd-baseboard.c
-index 57e8e7b..bc4d48a 100644
---- a/arch/arm/plat-mxc/eukrea_mbimxsd-baseboard.c
-+++ b/arch/arm/plat-mxc/eukrea_mbimxsd-baseboard.c
-@@ -38,7 +38,6 @@
- 
- #include <mach/hardware.h>
- #include <mach/common.h>
--#include <mach/board-eukrea_cpuimxsd.h>
- 
- #if defined(CONFIG_MACH_EUKREA_CPUIMX25)
- #include <mach/iomux-mx25.h>
-diff --git a/arch/arm/plat-mxc/include/mach/board-eukrea_cpuimx27.h b/arch/arm/plat-mxc/include/mach/board-eukrea_cpuimx27.h
-deleted file mode 100644
-index 45b2fb8..0000000
---- a/arch/arm/plat-mxc/include/mach/board-eukrea_cpuimx27.h
-+++ /dev/null
-@@ -1,40 +0,0 @@
--/*
-- * Copyright (C) 2009 Eric Benard - eric at eukrea.com
-- *
-- * Based on board-pcm038.h which is :
-- * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version 2
-- * of the License, or (at your option) any later version.
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-- * MA 02110-1301, USA.
-- */
--
--#ifndef __ASM_ARCH_MXC_BOARD_EUKREA_CPUIMX27_H__
--#define __ASM_ARCH_MXC_BOARD_EUKREA_CPUIMX27_H__
--
--#ifndef __ASSEMBLY__
--/*
-- * This CPU module needs a baseboard to work. After basic initializing
-- * its own devices, it calls the baseboard's init function.
-- * TODO: Add your own baseboard init function and call it from
-- * inside eukrea_cpuimx27_init().
-- *
-- * This example here is for the development board. Refer
-- * eukrea_mbimx27-baseboard.c
-- */
--
--extern void eukrea_mbimx27_baseboard_init(void);
--
--#endif
--
--#endif /* __ASM_ARCH_MXC_BOARD_EUKREA_CPUIMX27_H__ */
-diff --git a/arch/arm/plat-mxc/include/mach/board-eukrea_cpuimxsd.h b/arch/arm/plat-mxc/include/mach/eukrea-baseboards.h
-similarity index 76%
-rename from arch/arm/plat-mxc/include/mach/board-eukrea_cpuimxsd.h
-rename to arch/arm/plat-mxc/include/mach/eukrea-baseboards.h
-index 35f9583..8864da4 100644
---- a/arch/arm/plat-mxc/include/mach/board-eukrea_cpuimxsd.h
-+++ b/arch/arm/plat-mxc/include/mach/eukrea-baseboards.h
-@@ -19,22 +19,25 @@
-  * MA 02110-1301, USA.
-  */
- 
--#ifndef __MACH_BOARD_EUKREA_CPUIMXSD_H__
--#define __MACH_BOARD_EUKREA_CPUIMXSD_H__
-+#ifndef __MACH_EUKREA_BASEBOARDS_H__
-+#define __MACH_EUKREA_BASEBOARDS_H__
- 
- #ifndef __ASSEMBLY__
- /*
-  * This CPU module needs a baseboard to work. After basic initializing
-  * its own devices, it calls baseboard's init function.
-  * TODO: Add your own baseboard init function and call it from
-- * inside eukrea_cpuimx25_init() or eukrea_cpuimx35_init().
-+ * inside eukrea_cpuimx25_init() eukrea_cpuimx27_init()
-+ * or eukrea_cpuimx35_init().
-  *
-  * This example here is for the development board. Refer
-- * eukrea_mbimxsd-baseboard.c
-+ * plat-mxc/eukrea_mbimxsd-baseboard.c for cpuimx25 & cpuimx35
-+ * mach-imx/eukrea_mbimx27-baseboard.c for cpuimx27
-  */
- 
- extern void eukrea_mbimxsd_baseboard_init(void);
-+extern void eukrea_mbimx27_baseboard_init(void);
- 
- #endif
- 
--#endif /* __MACH_BOARD_EUKREA_CPUIMXSD_H__ */
-+#endif /* __MACH_EUKREA_BASEBOARDS_H__ */
--- 
-1.6.3.3
+mm: iommu: A physical allocator for the VCMM
+vcm_alloc_max_munch() 
