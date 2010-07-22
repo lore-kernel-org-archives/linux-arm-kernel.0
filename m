@@ -1,27 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 22 Jul 2010 11:54:29 +0100
-Subject: [PATCH] ARM: Versatile Express: Add default memory layout
-In-Reply-To: <20100722103038.GE31293@n2100.arm.linux.org.uk>
-References: <20100721165509.26047.70564.stgit@e102109-lin.cambridge.arm.com>
-	<20100722103038.GE31293@n2100.arm.linux.org.uk>
-Message-ID: <1279796069.9564.2.camel@e102109-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Jul 2010 11:55:19 +0100
+Subject: [PATCH 5/6] arm/ns9xxx: fix debug macro compilation failure
+In-Reply-To: <AANLkTilzEDKnO5GdFMedF9kq3vZboT6dcywCuz6YEsdE@mail.gmail.com>
+References: <1279074759.517724.734812272398.0.gpush@pororo>
+	<1279074759.519643.866429356172.5.gpush@pororo>
+	<20100722103834.GH31293@n2100.arm.linux.org.uk>
+	<AANLkTilzEDKnO5GdFMedF9kq3vZboT6dcywCuz6YEsdE@mail.gmail.com>
+Message-ID: <20100722105519.GJ31293@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-07-22 at 11:30 +0100, Russell King - ARM Linux wrote:
-> On Wed, Jul 21, 2010 at 05:55:09PM +0100, Catalin Marinas wrote:
-> > Since this platform is known to have 1GB of RAM at 0x60000000, add a
-> > .fixup function to set the defaults in case no "mem=" option is passed
-> > on the kernel command line.
+On Thu, Jul 22, 2010 at 12:50:28PM +0200, Eric Miao wrote:
+> On Thu, Jul 22, 2010 at 12:38 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Wed, Jul 14, 2010 at 10:32:39AM +0800, Jeremy Kerr wrote:
+> >> We need mach/memory.h for NS9XXX_CSxSTAT_PHYS, and mach/memory.h needs
+> >> asm/memory.h for UL().
+> >
+> > NAK. ?Definitely NAK. ?You haven't checked what includes whatelse.
+> >
+> > asm/memory.h includes mach/memory.h to pick up the platform specific
+> > parts, and provides mach/memory.h with its pre-requisits. ?Use asm/memory.h
+> > _everywhere_ rather than mach/memory.h.
+> >
 > 
-> And the reason why uboot can't pass the RAM information to the kernel
-> is...
+> I think it would be just fine to encode PHYS_OFFSET as 0xNNNNNNNNUL
+> instead of using UL() if there is no specific reason. So we don't need
+> to include asm/memory.h any more in machine specific code.
 
-It needs implementing, or ask the user to pass it on the kernel command
-line. For the latter, I think it would be nicer if the kernel has some
-sane defaults.
-
-But anyway I'm proposing this patch for similarities to mach-realview.
-
--- 
-Catalin
+No it's not.  0xNNNNNNNNUL isn't able to be parsed by the assembler.
+That's the whole reason for UL() existing.
