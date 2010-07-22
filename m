@@ -1,28 +1,24 @@
-From: jeff.hane@maxim-ic.com (Jeff Hane)
-Date: Wed, 21 Jul 2010 15:44:21 -0700
-Subject: debugging kernel with gdb
-In-Reply-To: <AANLkTikfGIBaYnFskW4_TUzfWXBIy9fIqziNcedQwE8M@mail.gmail.com>
-References: <4BFD72AD.4010005@gmail.com>
-	<AANLkTikwrs3PUS2zNR8daxfVkSCKLUvRtDYkXicXcTXq@mail.gmail.com>
-	<4BFD7BBF.1090100@gmail.com>
-	<AANLkTikfGIBaYnFskW4_TUzfWXBIy9fIqziNcedQwE8M@mail.gmail.com>
-Message-ID: <1279752261.15547.9.camel@qu102.quarc.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Thu, 22 Jul 2010 08:47:31 +0200
+Subject: [PATCH] Add support for Vista Silicon Visstrim_m10 board[v2].
+In-Reply-To: <20100721184646.GA10982@pengutronix.de>
+References: <1279730000-4320-1-git-send-email-javier.martin@vista-silicon.com>
+	<20100721184646.GA10982@pengutronix.de>
+Message-ID: <AANLkTimNuyUNJjwQxf-CMtKC5RpMOzzWLKjH329rVU9X@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Thank you for your tips Uwe.
+I have just submitted a new v3 with those issues fixed.
 
- I'm bringing up a new chip with an ARM1136 and trying to step thru the
-code with gdb but because it's been optimized it's not working so well.
-The code was being compiled with -O2 and -g.  I thought the obvious
-thing to do is just change this to -O0 in the top level Makefile;
-however this results in the following message.   
-
-Error: selected processor does not support `ldrexb
-
-
- I'm trying to figure out if optimization can't be turned off or if I
-have some issue with my toolchain. 
-
-thanks,
-jeff
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100722/63f13e02/attachment-0001.html>
