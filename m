@@ -1,26 +1,27 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 22 Jul 2010 14:12:45 -0700 (PDT)
-Subject: [PATCH] fec: use interrupt for MDIO completion indication
-In-Reply-To: <20100721125113.GA2651@pengutronix.de>
-References: <4C3E812C.10303@canonical.com>
-	<20100715040956.GA7690@jasper.tkos.co.il>
-	<20100721125113.GA2651@pengutronix.de>
-Message-ID: <20100722.141245.165337920.davem@davemloft.net>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Thu, 22 Jul 2010 23:20:00 +0200
+Subject: ARM Machine SoC I/O setup and PAD initialization code
+In-Reply-To: <201007211029.29529.david.jander@protonic.nl>
+References: <201007211029.29529.david.jander@protonic.nl>
+Message-ID: <AANLkTik4xSSMalj5jVwA4SaHabRYd7c8bH7iTTIwUKQ0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <w.sang@pengutronix.de>
-Date: Wed, 21 Jul 2010 14:51:13 +0200
+2010/7/21 David Jander <david.jander@protonic.nl>:
 
-> From: Wolfram Sang <w.sang@pengutronix.de>
-> Subject: [PATCH] net/fec: restore interrupt mask after software-reset in fec_stop()
-> 
-> After the change from mdio polling to irq, it became necessary to
-> restore the interrupt mask after resetting the chip in fec_stop().
-> Otherwise, with all irqs disabled, no communication with the PHY will be
-> possible after e.g. un-/replugging the cable and the device gets
-> stalled.
-> 
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> General machine initialization like I/O-multiplexing and I/O-pad setup seems
+> to be done twice most of the time: Once in the bootloader (i.e. u-boot), and
+> once in the machine support file in the linux kernel. This seems awfully
+> redundant and error-prone to me. Why is it like this?
 
-Applied.
+I cannot talk for all platforms but on some systems I've worked with
+it's not touched by the boot loader but all done by the kernel.
+
+One reason is to keep the bootloader smallish.
+
+Another reason is the ability to slam a kernel into primary memory
+and just boot it, with *something else* than a boot loader, e.g.
+JTAG. Which proves to be extremely convenient at times.
+
+Yours,
+Linus Walleij
