@@ -1,64 +1,48 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 23 Jul 2010 02:38:01 +0300
-Subject: [PATCH v2 01/20] sdio: add TI + wl1271 ids
-In-Reply-To: <1279735134.3035.9.camel@localhost.localdomain>
+Date: Fri, 23 Jul 2010 02:56:07 +0300
+Subject: [PATCH v2 00/20] native support for wl1271 on ZOOM
+In-Reply-To: <alpine.LFD.2.00.1007230052320.12562@xanadu.home>
 References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-	<1279733634-21974-2-git-send-email-ohad@wizery.com>
-	<1279735134.3035.9.camel@localhost.localdomain>
-Message-ID: <AANLkTilNefqQ08SgI9i_ZzjNTAU2ggd813DU0Hh22JlX@mail.gmail.com>
+	<alpine.LFD.2.00.1007230052320.12562@xanadu.home>
+Message-ID: <AANLkTinQa8-SePaCmqmMMOcTtJOVfKHq0yH4YCRMuqPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcel,
-
-On Wed, Jul 21, 2010 at 8:58 PM, Marcel Holtmann <marcel@holtmann.org> wrote:
->> Add SDIO IDs for TI and for TI's wl1271 wlan device.
+On Fri, Jul 23, 2010 at 1:56 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Wed, 21 Jul 2010, Ohad Ben-Cohen wrote:
+>
+>> This patch series adds native support for wl1271 on ZOOM.
 >>
->> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
->> ---
->> ?include/linux/mmc/sdio_ids.h | ? ?3 +++
->> ?1 files changed, 3 insertions(+), 0 deletions(-)
+>> Changes since v1:
 >>
->> diff --git a/include/linux/mmc/sdio_ids.h b/include/linux/mmc/sdio_ids.h
->> index 33b2ea0..0d313c6 100644
->> --- a/include/linux/mmc/sdio_ids.h
->> +++ b/include/linux/mmc/sdio_ids.h
->> @@ -43,4 +43,7 @@
->> ?#define SDIO_DEVICE_ID_SIANO_NOVA_A0 ? ? ? ? 0x1100
->> ?#define SDIO_DEVICE_ID_SIANO_STELLAR ? ? ? ? ? ? ? ? 0x5347
+>> - introduce a fixed regulator device to control the power of wl1271
+>> - allow to propagate private board-specific data to SDIO function drivers
+>> - allow SDIO function driver to control the card's power via new API
+>> - make it possible to keep the card's power down (without depending
+>> ? on an explicit SDIO function driver power-down request)
 >>
->> +#define SDIO_VENDOR_ID_TI ? ? ? ? ? ? ? ? ? ?0x0097
->> +#define SDIO_DEVICE_ID_TI_WL1271 ? ? ? ? ? ? 0x4076
->> +
+>> Thanks to these changes, we no longer need a separate platform
+>> device (carrying e.g. the external irq information of the device),
+>> and no longer need to emulate virtual card detect events.
+>>
+>> The two "board muxing" pathces were already taken by Tony, and
+>> are resent here just to make it easier for people to use/test these pathces.
+>>
+>> The changes to the MMC core really needs careful review; there still
+>> might be some pitfalls that haven't been covered. E.g., one thing
+>> we plan to look at next is their bahvior together with SDIO Suspend/Resume.
+>>
+>> Special thanks to Roger Quadros and Nicolas Pitre for their extensive
+>> review and helpful suggestions.
 >
-> are we still doing this non-sense for no real reason.  What is so wrong
-> with keeping the IDs inside the driver code?
+> FYI, I do intend to review those patches, but I'll be flying home in a
+> couple hours, and once there I'll be gone on vacation for 2 weeks. ?So
+> this review won't happen right away.
 
-Either way we can't go so wrong here (having global VENDOR_IDs can
-potentially prevent redefinitions of the same ID in different drivers,
-but that's probably not that big of an
-issue too).
-
-But if we prefer people to stop adding IDs to this global pool, let's
-at least make it clear. We can probably seal it with some "please
-don't add new IDs if you don't have to" footnote (care to send such
-patch ? :)
-
-Thanks,
-Ohad.
+Thanks, Nicolas.
 
 
-> Personally I don't even see a point for these ID defines at all. Just
-> use the bare numbers in SDIO_DEVICE and put a comment above what kind of
-> device this is.
->
-> Regards
->
-> Marcel
 >
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Nicolas
 >
