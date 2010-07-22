@@ -1,38 +1,48 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 22 Jul 2010 14:07:42 +0300
-Subject: [PATCH] Add support for Vista Silicon Visstrim_m10 board [v4].
-In-Reply-To: <AANLkTimnAfDAmW8YO0PrAnTfgnTaMqqEad8JiBHfA0Vs@mail.gmail.com>
-References: <1279795652-6175-1-git-send-email-javier.martin@vista-silicon.com>
-	<AANLkTimnAfDAmW8YO0PrAnTfgnTaMqqEad8JiBHfA0Vs@mail.gmail.com>
-Message-ID: <20100722110742.GD12359@jasper.tkos.co.il>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 22 Jul 2010 12:11:29 +0100
+Subject: [PATCH] ARM: Versatile Express: Add default memory layout
+In-Reply-To: <20100722105729.GK31293@n2100.arm.linux.org.uk>
+References: <20100721165509.26047.70564.stgit@e102109-lin.cambridge.arm.com>
+	<20100722103038.GE31293@n2100.arm.linux.org.uk>
+	<1279796069.9564.2.camel@e102109-lin.cambridge.arm.com>
+	<20100722105729.GK31293@n2100.arm.linux.org.uk>
+Message-ID: <1279797089.9564.21.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-On Thu, Jul 22, 2010 at 12:52:30PM +0200, Eric Miao wrote:
-> On Thu, Jul 22, 2010 at 12:47 PM, Javier Martin
-> <javier.martin@vista-silicon.com> wrote:
-> > Vista Silicon Visstrim_m10 i.MX27 based board is used
-> > as multimedia streaming server, access control and other
-> > custom applications.
+On Thu, 2010-07-22 at 11:57 +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 22, 2010 at 11:54:29AM +0100, Catalin Marinas wrote:
+> > On Thu, 2010-07-22 at 11:30 +0100, Russell King - ARM Linux wrote:
+> > > On Wed, Jul 21, 2010 at 05:55:09PM +0100, Catalin Marinas wrote:
+> > > > Since this platform is known to have 1GB of RAM at 0x60000000, add a
+> > > > .fixup function to set the defaults in case no "mem=" option is passed
+> > > > on the kernel command line.
+> > >
+> > > And the reason why uboot can't pass the RAM information to the kernel
+> > > is...
 > >
-> > Fixed some style issues.
-> >
-> > Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> > ---
-> > ?arch/arm/mach-imx/Kconfig ? ? ? ? ? ? ? ? ? | ? ?9 +
-> > ?arch/arm/mach-imx/Makefile ? ? ? ? ? ? ? ? ?| ? ?1 +
-> > ?arch/arm/mach-imx/mach-imx27_visstrim_m10.c | ?265 +++++++++++++++++++++++++++
+> > It needs implementing, or ask the user to pass it on the kernel command
+> > line. For the latter, I think it would be nicer if the kernel has some
+> > sane defaults.
 > 
-> Mmm... I don't have this directory in my git tip.
+> The kernel does have some sane _safe_ defaults - it assumes that there's
+> at least 16M of RAM.
 
-It's in the imx-for-2.6.36 branch of Sascha 
-(git://git.pengutronix.de/git/imx/linux-2.6.git).
+That's only during the initial MMU setup. Afterwards it cannot allocate
+any memory without a proper mem= parameter or ATAG.
 
-baruch
+> > But anyway I'm proposing this patch for similarities to mach-realview.
+> 
+> I don't think that's a good enough justification.  We have the fixup for
+> realview because of the dual RAM mappings in physical space, and the
+> boot loader doesn't know which one we're using.  That problem is unique
+> to the Realview platforms, and doesn't exist on any of the other ARM
+> development platforms.
+
+I think this goes down to personal preference - pushing more
+configuration towards the bootloader or having some correct defaults in
+the kernel. If you prefer the former, that's fine as well. At some point
+I hope the device tree would solve all this anyway.
 
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Catalin
