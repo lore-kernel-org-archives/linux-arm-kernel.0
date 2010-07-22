@@ -1,54 +1,57 @@
-From: mattia.jona@gmail.com (Mattia Jona-Lasinio)
-Date: Thu, 22 Jul 2010 13:00:34 +0200
-Subject: Introducing the LCD-Linux project
-Message-ID: <AANLkTil5Gz4i6iGZcaAcU0hg_ynNP1UR7bLwv_VQU6Wm@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Jul 2010 12:16:31 +0100
+Subject: [PATCH] ARM: Versatile Express: Add default memory layout
+In-Reply-To: <1279797089.9564.21.camel@e102109-lin.cambridge.arm.com>
+References: <20100721165509.26047.70564.stgit@e102109-lin.cambridge.arm.com>
+	<20100722103038.GE31293@n2100.arm.linux.org.uk>
+	<1279796069.9564.2.camel@e102109-lin.cambridge.arm.com>
+	<20100722105729.GK31293@n2100.arm.linux.org.uk>
+	<1279797089.9564.21.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100722111631.GM31293@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Pfaff <blp@cs.stanford.edu> writes:
+On Thu, Jul 22, 2010 at 12:11:29PM +0100, Catalin Marinas wrote:
+> On Thu, 2010-07-22 at 11:57 +0100, Russell King - ARM Linux wrote:
+> > On Thu, Jul 22, 2010 at 11:54:29AM +0100, Catalin Marinas wrote:
+> > > On Thu, 2010-07-22 at 11:30 +0100, Russell King - ARM Linux wrote:
+> > > > On Wed, Jul 21, 2010 at 05:55:09PM +0100, Catalin Marinas wrote:
+> > > > > Since this platform is known to have 1GB of RAM at 0x60000000, add a
+> > > > > .fixup function to set the defaults in case no "mem=" option is passed
+> > > > > on the kernel command line.
+> > > >
+> > > > And the reason why uboot can't pass the RAM information to the kernel
+> > > > is...
+> > >
+> > > It needs implementing, or ask the user to pass it on the kernel command
+> > > line. For the latter, I think it would be nicer if the kernel has some
+> > > sane defaults.
+> > 
+> > The kernel does have some sane _safe_ defaults - it assumes that there's
+> > at least 16M of RAM.
+> 
+> That's only during the initial MMU setup. Afterwards it cannot allocate
+> any memory without a proper mem= parameter or ATAG.
 
-> When I wanted to solve the same problem for a small
-> serial-connected LCD panel (sold under the name EZIO), I wrote a
-> program called "ezio-term" that has the same functionality but
-> runs entirely in userspace.  It connects to the serial port and
-> speaks the EZIO protocol on the serial port, and it creates a pty
-> and acts like an ANSI terminal on that pty.  Thus, it translates
-> back and forth between the two protocols.
->
-> ezio-term also comes with a terminfo description that lets
-> programs take advantage of the special features of the LCD panel.
-> ezio-term also has the "virtual screen larger than physical
-> screen" feature that you mention elsewhere, although it currently
-> only implements an extra-wide screen, not an extra-tall one.
+That's because uboot passes a tagged list without any ATAG_MEM entries.
+If it passed no tagged list, then the defaults will be used.  If it
+passed the ATAG_MEM entry, it'd also work.
 
-This is indeed a possibility. However, in my opinion, it always suffers
-the same problems: if you change the display, you have to rewrite everything
-from scratch since the protocol for a different display will be different.
-The big problem is that there is no standard protocol or connection type for
-these small devices; nothing comparable with the VGA standard, for example.
-The idea is therefore to write a minimal terminal emulation for a general
-abstract display so that the general question about WHAT has to be done
-is solved once for all, pushing the question about HOW to do it in a very small
-piece of code.
+But as it does neither, it falls into the hole.
 
-> ezio-term solves the first problem you mention.  I'm not sure I
-> understand how the second one would come about across a serial or
-> parallel or USB connection.
+The kernel boot requirements document has for the last _8_ years said:
 
-Hmmmm, you are probably right about serial and USB (which is in any case serial)
-connections. But for parallel port connections the situation is
-different, since you
-speak directly with the display controller, so all timing issues are
-up to you. For
-instance the hd44780 needs timings in the microsecond range. How would you
-obtain this in userspace without doing something like real time scheduling?
-Of course you can also increase timing but the display refresh will be obviously
-worse. In embedded systems these devices can be connected to GPIO lines. The
-access is through memory mapped ports. In some sense this is similar to a
-parallel port connection but still you are concerned with timing issues.
+   The boot loader must pass at a minimum the size and location of the system
+   memory, and root filesystem location. Therefore, the minimum tagged list
+   should look:
 
-I downloaded your program and I'm going through it.
+           +-----------+
+   base -> | ATAG_CORE |  |
+           +-----------+  |
+           | ATAG_MEM  |  | increasing address
+           +-----------+  |
+           | ATAG_NONE |  |
+           +-----------+  v
 
-Regards,
-
-Mattia
+and still u-boot gets it wrong...  Now tell me why I hate boot loaders
+soo much.
