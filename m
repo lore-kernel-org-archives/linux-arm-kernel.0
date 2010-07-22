@@ -1,41 +1,69 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 23 Jul 2010 00:56:30 +0200 (CEST)
-Subject: [PATCH v2 00/20] native support for wl1271 on ZOOM
-In-Reply-To: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-Message-ID: <alpine.LFD.2.00.1007230052320.12562@xanadu.home>
+From: johlstei@codeaurora.org (Jeff Ohlstein)
+Date: Thu, 22 Jul 2010 15:57:30 -0700
+Subject: [PATCH] GIC: Dont disable INT in ack callback
+Message-ID: <1279839450-6477-1-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Jul 2010, Ohad Ben-Cohen wrote:
+From: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
 
-> This patch series adds native support for wl1271 on ZOOM.
-> 
-> Changes since v1:
-> 
-> - introduce a fixed regulator device to control the power of wl1271
-> - allow to propagate private board-specific data to SDIO function drivers
-> - allow SDIO function driver to control the card's power via new API
-> - make it possible to keep the card's power down (without depending
->   on an explicit SDIO function driver power-down request)
-> 
-> Thanks to these changes, we no longer need a separate platform
-> device (carrying e.g. the external irq information of the device),
-> and no longer need to emulate virtual card detect events.
-> 
-> The two "board muxing" pathces were already taken by Tony, and
-> are resent here just to make it easier for people to use/test these pathces.
-> 
-> The changes to the MMC core really needs careful review; there still
-> might be some pitfalls that haven't been covered. E.g., one thing
-> we plan to look at next is their bahvior together with SDIO Suspend/Resume.
-> 
-> Special thanks to Roger Quadros and Nicolas Pitre for their extensive
-> review and helpful suggestions.
+Unless gic_ack_irq is called from __do_IRQ, interrupt should not
+be disabled in the ack function. Disabling the interrupt causes
+handle_edge_irq to never enable it again.
 
-FYI, I do intend to review those patches, but I'll be flying home in a 
-couple hours, and once there I'll be gone on vacation for 2 weeks.  So 
-this review won't happen right away.
+Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
+---
+ arch/arm/common/gic.c |   31 ++++++++++++++++++-------------
+ 1 files changed, 18 insertions(+), 13 deletions(-)
 
-
-Nicolas
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 337741f..1ac2f31 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -67,25 +67,30 @@ static inline unsigned int gic_irq(unsigned int irq)
+ 
+ /*
+  * Routines to acknowledge, disable and enable interrupts
+- *
+- * Linux assumes that when we're done with an interrupt we need to
+- * unmask it, in the same way we need to unmask an interrupt when
+- * we first enable it.
+- *
+- * The GIC has a separate notion of "end of interrupt" to re-enable
+- * an interrupt after handling, in order to support hardware
+- * prioritisation.
+- *
+- * We can make the GIC behave in the way that Linux expects by making
+- * our "acknowledge" routine disable the interrupt, then mark it as
+- * complete.
+  */
+ static void gic_ack_irq(unsigned int irq)
+ {
+-	u32 mask = 1 << (irq % 32);
+ 
+ 	spin_lock(&irq_controller_lock);
++
++#ifndef CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ
++	u32 mask = 1 << (irq % 32);
++
++	 /*
++	  * Linux assumes that when we're done with an interrupt we need to
++	  * unmask it, in the same way we need to unmask an interrupt when
++	  * we first enable it.
++	  *
++	  * The GIC has a separate notion of "end of interrupt" to re-enable
++	  * an interrupt after handling, in order to support hardware
++	  * prioritisation.
++	  *
++	  * We can make the GIC behave in the way that Linux expects by making
++	  * our "acknowledge" routine disable the interrupt, then mark it as
++	  * complete.
++	  */
+ 	writel(mask, gic_dist_base(irq) + GIC_DIST_ENABLE_CLEAR + (gic_irq(irq) / 32) * 4);
++#endif
+ 	writel(gic_irq(irq), gic_cpu_base(irq) + GIC_CPU_EOI);
+ 	spin_unlock(&irq_controller_lock);
+ }
+-- 
+1.7.1
