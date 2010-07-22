@@ -1,121 +1,347 @@
-From: eric.miao@canonical.com (Eric Miao)
-Date: Thu, 22 Jul 2010 11:21:22 +0200
-Subject: [PATCH] Introduce 'struct machine_class' for SoC level abstraction
-Message-ID: <AANLkTikWs2j8mSmiAdOPIY2uOfO9Q08kbuihkak7GCG8@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 22 Jul 2010 11:29:40 +0200
+Subject: [PATCH v4] Samsung: add new card detection methods in s3c-sdhci driver
+	(platform part)
+In-Reply-To: <000501cb2977d6cf210846d630$%szyprowski@samsung.com>
+References: <000501cb2977d6cf210846d630$%szyprowski@samsung.com>
+Message-ID: <1279790980-29583-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-    [ARM] Introduce 'struct machine_class' for SoC level abstraction
+On some Samsung SoCs not all SDHCI controllers have card detect (CD)
+line. For some embedded designs it is not even needed, because ususally
+the device (like SDIO flash memory or wifi controller) is permanently
+wired to the controller. There are also systems which have a card detect
+line connected to some of the external interrupt lines or the presence
+of the card depends on some other actions (like enabling a power
+regulator).
 
-    Introduce 'struct machine_class' to group common elements shared by a
-    class of machines (i.e. normally SoC level). The elements in 'struct
-    machine_desc' will override if provided. (Note zero is considered
-    invalid for phys_io, io_pg_offst and boot_params, and if they are
-    zero, the version in 'class' will be used)
+This patch adds all required changes to platform support code, so
+another patch, which extends the driver with support for the new card
+detection methods can be applied.
 
-    Signed-off-by: Eric Miao <eric.miao@canonical.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
 
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index 8a0dd18..a8db47a 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -14,6 +14,21 @@ struct tag;
- struct meminfo;
- struct sys_timer;
+This a resend of the previous patch.
 
-+/*
-+ * 'struct machine_class' groups the common elements shared by a class of
-+ * machines. Elements in 'struct machine_desc' will override if provided.
-+ * (Note zero is considered invalid for fields like boot_params, and if
-+ * they are zero, the version in 'class' will be used)
-+ */
-+struct machine_class {
-+	const char		*name;		/* machine class name	*/
-+	unsigned long		boot_params;	/* tagged list		*/
-+
-+	void			(*map_io)(void);/* IO mapping function */
-+	void			(*init_irq)(void);
-+	struct sys_timer	*timer;
+I hope these changes to platform specific code gets merged soon, so the
+changes to the driver can be merged as well.
+
+The patch has been prepared against linux-next kernel tree from 20100722.
+
+Changes since V3:
+- renamed patch to avoid confusion with the patch for the s3c-sdhci driver
+  itself - added "(platform part)" in subject
+
+Changes since V2:
+- added support for HSMMC3 device
+
+Changes since V1:
+- added support for gpio external interrupt card based detect method
+  directly to sdhci-s3c driver
+- removed s3c64xx compilation fix patch from the series
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
+
+---
+
+ arch/arm/mach-s3c64xx/setup-sdhci-gpio.c   |   14 +++++++++---
+ arch/arm/mach-s5pc100/setup-sdhci-gpio.c   |   21 ++++++++++++++-----
+ arch/arm/mach-s5pv210/setup-sdhci-gpio.c   |   22 +++++++++++++++-----
+ arch/arm/plat-samsung/dev-hsmmc.c          |    5 ++++
+ arch/arm/plat-samsung/dev-hsmmc1.c         |    5 ++++
+ arch/arm/plat-samsung/dev-hsmmc2.c         |    5 ++++
+ arch/arm/plat-samsung/dev-hsmmc3.c         |    5 ++++
+ arch/arm/plat-samsung/include/plat/sdhci.h |   29 ++++++++++++++++++++++++++++
+ 8 files changed, 90 insertions(+), 16 deletions(-)
+
+diff --git a/arch/arm/mach-s3c64xx/setup-sdhci-gpio.c b/arch/arm/mach-s3c64xx/setup-sdhci-gpio.c
+index a58c0cc..54c311c 100644
+--- a/arch/arm/mach-s3c64xx/setup-sdhci-gpio.c
++++ b/arch/arm/mach-s3c64xx/setup-sdhci-gpio.c
+@@ -22,6 +22,7 @@
+ 
+ void s3c64xx_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
+ {
++	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+ 	unsigned int gpio;
+ 	unsigned int end;
+ 
+@@ -33,12 +34,15 @@ void s3c64xx_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
+ 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+ 	}
+ 
+-	s3c_gpio_setpull(S3C64XX_GPG(6), S3C_GPIO_PULL_UP);
+-	s3c_gpio_cfgpin(S3C64XX_GPG(6), S3C_GPIO_SFN(2));
++	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
++		s3c_gpio_setpull(S3C64XX_GPG(6), S3C_GPIO_PULL_UP);
++		s3c_gpio_cfgpin(S3C64XX_GPG(6), S3C_GPIO_SFN(2));
++	}
+ }
+ 
+ void s3c64xx_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
+ {
++	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+ 	unsigned int gpio;
+ 	unsigned int end;
+ 
+@@ -50,8 +54,10 @@ void s3c64xx_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
+ 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+ 	}
+ 
+-	s3c_gpio_setpull(S3C64XX_GPG(6), S3C_GPIO_PULL_UP);
+-	s3c_gpio_cfgpin(S3C64XX_GPG(6), S3C_GPIO_SFN(3));
++	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
++		s3c_gpio_setpull(S3C64XX_GPG(6), S3C_GPIO_PULL_UP);
++		s3c_gpio_cfgpin(S3C64XX_GPG(6), S3C_GPIO_SFN(3));
++	}
+ }
+ 
+ void s3c64xx_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
+diff --git a/arch/arm/mach-s5pc100/setup-sdhci-gpio.c b/arch/arm/mach-s5pc100/setup-sdhci-gpio.c
+index 7769c76..e4b6739 100644
+--- a/arch/arm/mach-s5pc100/setup-sdhci-gpio.c
++++ b/arch/arm/mach-s5pc100/setup-sdhci-gpio.c
+@@ -23,6 +23,7 @@
+ 
+ void s5pc100_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
+ {
++	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+ 	unsigned int gpio;
+ 	unsigned int end;
+ 	unsigned int num;
+@@ -47,12 +48,15 @@ void s5pc100_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
+ 		}
+ 	}
+ 
+-	s3c_gpio_setpull(S5PC100_GPG1(2), S3C_GPIO_PULL_UP);
+-	s3c_gpio_cfgpin(S5PC100_GPG1(2), S3C_GPIO_SFN(2));
++	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
++		s3c_gpio_setpull(S5PC100_GPG1(2), S3C_GPIO_PULL_UP);
++		s3c_gpio_cfgpin(S5PC100_GPG1(2), S3C_GPIO_SFN(2));
++	}
+ }
+ 
+ void s5pc100_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
+ {
++	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+ 	unsigned int gpio;
+ 	unsigned int end;
+ 
+@@ -64,12 +68,15 @@ void s5pc100_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
+ 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+ 	}
+ 
+-	s3c_gpio_setpull(S5PC100_GPG2(6), S3C_GPIO_PULL_UP);
+-	s3c_gpio_cfgpin(S5PC100_GPG2(6), S3C_GPIO_SFN(2));
++	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
++		s3c_gpio_setpull(S5PC100_GPG2(6), S3C_GPIO_PULL_UP);
++		s3c_gpio_cfgpin(S5PC100_GPG2(6), S3C_GPIO_SFN(2));
++	}
+ }
+ 
+ void s5pc100_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
+ {
++	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+ 	unsigned int gpio;
+ 	unsigned int end;
+ 
+@@ -81,6 +88,8 @@ void s5pc100_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
+ 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+ 	}
+ 
+-	s3c_gpio_setpull(S5PC100_GPG3(6), S3C_GPIO_PULL_UP);
+-	s3c_gpio_cfgpin(S5PC100_GPG3(6), S3C_GPIO_SFN(2));
++	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
++		s3c_gpio_setpull(S5PC100_GPG3(6), S3C_GPIO_PULL_UP);
++		s3c_gpio_cfgpin(S5PC100_GPG3(6), S3C_GPIO_SFN(2));
++	}
+ }
+diff --git a/arch/arm/mach-s5pv210/setup-sdhci-gpio.c b/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
+index fe7d86d..b3ad243 100644
+--- a/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
++++ b/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
+@@ -21,9 +21,11 @@
+ #include <mach/gpio.h>
+ #include <plat/gpio-cfg.h>
+ #include <plat/regs-sdhci.h>
++#include <plat/sdhci.h>
+ 
+ void s5pv210_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
+ {
++	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+ 	unsigned int gpio;
+ 
+ 	/* Set all the necessary GPG0/GPG1 pins to special-function 2 */
+@@ -48,12 +50,15 @@ void s5pv210_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
+ 		break;
+ 	}
+ 
+-	s3c_gpio_setpull(S5PV210_GPG0(2), S3C_GPIO_PULL_UP);
+-	s3c_gpio_cfgpin(S5PV210_GPG0(2), S3C_GPIO_SFN(2));
++	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
++		s3c_gpio_setpull(S5PV210_GPG0(2), S3C_GPIO_PULL_UP);
++		s3c_gpio_cfgpin(S5PV210_GPG0(2), S3C_GPIO_SFN(2));
++	}
+ }
+ 
+ void s5pv210_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
+ {
++	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+ 	unsigned int gpio;
+ 
+ 	/* Set all the necessary GPG1[0:1] pins to special-function 2 */
+@@ -68,12 +73,15 @@ void s5pv210_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
+ 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+ 	}
+ 
+-	s3c_gpio_setpull(S5PV210_GPG1(2), S3C_GPIO_PULL_UP);
+-	s3c_gpio_cfgpin(S5PV210_GPG1(2), S3C_GPIO_SFN(2));
++	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
++		s3c_gpio_setpull(S5PV210_GPG1(2), S3C_GPIO_PULL_UP);
++		s3c_gpio_cfgpin(S5PV210_GPG1(2), S3C_GPIO_SFN(2));
++	}
+ }
+ 
+ void s5pv210_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
+ {
++	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+ 	unsigned int gpio;
+ 
+ 	/* Set all the necessary GPG2[0:1] pins to special-function 2 */
+@@ -99,6 +107,8 @@ void s5pv210_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
+ 		break;
+ 	}
+ 
+-	s3c_gpio_setpull(S5PV210_GPG2(2), S3C_GPIO_PULL_UP);
+-	s3c_gpio_cfgpin(S5PV210_GPG2(2), S3C_GPIO_SFN(2));
++	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
++		s3c_gpio_setpull(S5PV210_GPG2(2), S3C_GPIO_PULL_UP);
++		s3c_gpio_cfgpin(S5PV210_GPG2(2), S3C_GPIO_SFN(2));
++	}
+ }
+diff --git a/arch/arm/plat-samsung/dev-hsmmc.c b/arch/arm/plat-samsung/dev-hsmmc.c
+index 4c05b39..b0f93f1 100644
+--- a/arch/arm/plat-samsung/dev-hsmmc.c
++++ b/arch/arm/plat-samsung/dev-hsmmc.c
+@@ -60,6 +60,11 @@ void s3c_sdhci0_set_platdata(struct s3c_sdhci_platdata *pd)
+ 	struct s3c_sdhci_platdata *set = &s3c_hsmmc0_def_platdata;
+ 
+ 	set->max_width = pd->max_width;
++	set->cd_type = pd->cd_type;
++	set->ext_cd_init = pd->ext_cd_init;
++	set->ext_cd_cleanup = pd->ext_cd_cleanup;
++	set->ext_cd_gpio = pd->ext_cd_gpio;
++	set->ext_cd_gpio_invert = pd->ext_cd_gpio_invert;
+ 
+ 	if (pd->cfg_gpio)
+ 		set->cfg_gpio = pd->cfg_gpio;
+diff --git a/arch/arm/plat-samsung/dev-hsmmc1.c b/arch/arm/plat-samsung/dev-hsmmc1.c
+index e49bc4c..1504fd8 100644
+--- a/arch/arm/plat-samsung/dev-hsmmc1.c
++++ b/arch/arm/plat-samsung/dev-hsmmc1.c
+@@ -60,6 +60,11 @@ void s3c_sdhci1_set_platdata(struct s3c_sdhci_platdata *pd)
+ 	struct s3c_sdhci_platdata *set = &s3c_hsmmc1_def_platdata;
+ 
+ 	set->max_width = pd->max_width;
++	set->cd_type = pd->cd_type;
++	set->ext_cd_init = pd->ext_cd_init;
++	set->ext_cd_cleanup = pd->ext_cd_cleanup;
++	set->ext_cd_gpio = pd->ext_cd_gpio;
++	set->ext_cd_gpio_invert = pd->ext_cd_gpio_invert;
+ 
+ 	if (pd->cfg_gpio)
+ 		set->cfg_gpio = pd->cfg_gpio;
+diff --git a/arch/arm/plat-samsung/dev-hsmmc2.c b/arch/arm/plat-samsung/dev-hsmmc2.c
+index 824580b..b28ef17 100644
+--- a/arch/arm/plat-samsung/dev-hsmmc2.c
++++ b/arch/arm/plat-samsung/dev-hsmmc2.c
+@@ -61,6 +61,11 @@ void s3c_sdhci2_set_platdata(struct s3c_sdhci_platdata *pd)
+ 	struct s3c_sdhci_platdata *set = &s3c_hsmmc2_def_platdata;
+ 
+ 	set->max_width = pd->max_width;
++	set->cd_type = pd->cd_type;
++	set->ext_cd_init = pd->ext_cd_init;
++	set->ext_cd_cleanup = pd->ext_cd_cleanup;
++	set->ext_cd_gpio = pd->ext_cd_gpio;
++	set->ext_cd_gpio_invert = pd->ext_cd_gpio_invert;
+ 
+ 	if (pd->cfg_gpio)
+ 		set->cfg_gpio = pd->cfg_gpio;
+diff --git a/arch/arm/plat-samsung/dev-hsmmc3.c b/arch/arm/plat-samsung/dev-hsmmc3.c
+index 57bd394..85aaf0f 100644
+--- a/arch/arm/plat-samsung/dev-hsmmc3.c
++++ b/arch/arm/plat-samsung/dev-hsmmc3.c
+@@ -64,6 +64,11 @@ void s3c_sdhci3_set_platdata(struct s3c_sdhci_platdata *pd)
+ 	struct s3c_sdhci_platdata *set = &s3c_hsmmc3_def_platdata;
+ 
+ 	set->max_width = pd->max_width;
++	set->cd_type = pd->cd_type;
++	set->ext_cd_init = pd->ext_cd_init;
++	set->ext_cd_cleanup = pd->ext_cd_cleanup;
++	set->ext_cd_gpio = pd->ext_cd_gpio;
++	set->ext_cd_gpio_invert = pd->ext_cd_gpio_invert;
+ 
+ 	if (pd->cfg_gpio)
+ 		set->cfg_gpio = pd->cfg_gpio;
+diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h b/arch/arm/plat-samsung/include/plat/sdhci.h
+index c52c6f0..2abb08a 100644
+--- a/arch/arm/plat-samsung/include/plat/sdhci.h
++++ b/arch/arm/plat-samsung/include/plat/sdhci.h
+@@ -20,10 +20,31 @@ struct mmc_host;
+ struct mmc_card;
+ struct mmc_ios;
+ 
++enum cd_types {
++	S3C_SDHCI_CD_INTERNAL,	/* use mmc internal CD line */
++	S3C_SDHCI_CD_EXTERNAL,	/* use external callback */
++	S3C_SDHCI_CD_GPIO,	/* use external gpio pin for CD line */
++	S3C_SDHCI_CD_NONE,	/* no CD line, use polling to detect card */
++	S3C_SDHCI_CD_PERMANENT,	/* no CD line, card permanently wired to host */
 +};
 +
- struct machine_desc {
- 	/*
- 	 * Note! The first four elements are used
-@@ -26,6 +41,7 @@ struct machine_desc {
- 						 * page tabe entry	*/
-
- 	const char		*name;		/* architecture name	*/
-+	struct machine_class	*class;		/* machine class */
- 	unsigned long		boot_params;	/* tagged list		*/
-
- 	unsigned int		video_start;	/* start of video RAM	*/
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 776ea1a..263a89a 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -759,12 +759,14 @@ void __init setup_arch(char **cmdline_p)
- {
- 	struct tag *tags = (struct tag *)&init_tags;
- 	struct machine_desc *mdesc;
-+	struct machine_class *class;
- 	char *from = default_command_line;
-
- 	unwind_init();
-
- 	setup_processor();
- 	mdesc = setup_machine(machine_arch_type);
-+	class = mdesc->class;
- 	machine_name = mdesc->name;
-
- 	if (mdesc->soft_reboot)
-@@ -772,8 +774,13 @@ void __init setup_arch(char **cmdline_p)
-
- 	if (__atags_pointer)
- 		tags = phys_to_virt(__atags_pointer);
--	else if (mdesc->boot_params)
--		tags = phys_to_virt(mdesc->boot_params);
-+	else {
-+		unsigned long boot_params = mdesc->boot_params ?
-+					    mdesc->boot_params :
-+					   (class ? class->boot_params: 0);
-+		if (boot_params)
-+			tags = phys_to_virt(boot_params);
-+	}
-
- 	/*
- 	 * If we have the old style parameters, convert them to
-@@ -825,8 +832,8 @@ void __init setup_arch(char **cmdline_p)
- 	 * Set up various architecture-specific pointers
- 	 */
- 	arch_nr_irqs = mdesc->nr_irqs;
--	init_arch_irq = mdesc->init_irq;
--	system_timer = mdesc->timer;
-+	init_arch_irq = mdesc->init_irq ? : (class ? class->init_irq : NULL);
-+	system_timer = mdesc->timer ? : (class ? class->timer : NULL);
- 	init_machine = mdesc->init_machine;
-
- #ifdef CONFIG_VT
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 9ee3c75..7bc25c7 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -881,6 +881,7 @@ void __init arm_mm_memblock_reserve(void)
-  */
- static void __init devicemaps_init(struct machine_desc *mdesc)
- {
-+	struct machine_class *class = mdesc->class;
- 	struct map_desc map;
- 	unsigned long addr;
- 	void *vectors;
-@@ -945,6 +946,10 @@ static void __init devicemaps_init(struct
-machine_desc *mdesc)
- 	 */
- 	if (mdesc->map_io)
- 		mdesc->map_io();
-+	else {
-+		if (class && class->map_io)
-+			class->map_io();
-+	}
-
- 	/*
- 	 * Finally flush the caches and tlb to ensure that we're in a
+ /**
+  * struct s3c_sdhci_platdata() - Platform device data for Samsung SDHCI
+  * @max_width: The maximum number of data bits supported.
+  * @host_caps: Standard MMC host capabilities bit field.
++ * @cd_type: Type of Card Detection method (see cd_types enum above)
++ * @ext_cd_init: Initialize external card detect subsystem. Called on
++ *		 sdhci-s3c driver probe when cd_type == S3C_SDHCI_CD_EXTERNAL.
++ *		 notify_func argument is a callback to the sdhci-s3c driver
++ *		 that triggers the card detection event. Callback arguments:
++ *		 dev is pointer to platform device of the host controller,
++ *		 state is new state of the card (0 - removed, 1 - inserted).
++ * @ext_cd_cleanup: Cleanup external card detect subsystem. Called on
++ *		 sdhci-s3c driver remove when cd_type == S3C_SDHCI_CD_EXTERNAL.
++ *		 notify_func argument is the same callback as for ext_cd_init.
++ * @ext_cd_gpio: gpio pin used for external CD line, valid only if
++ *		 cd_type == S3C_SDHCI_CD_GPIO
++ * @ext_cd_gpio_invert: invert values for external CD gpio line
+  * @cfg_gpio: Configure the GPIO for a specific card bit-width
+  * @cfg_card: Configure the interface for a specific card and speed. This
+  *            is necessary the controllers and/or GPIO blocks require the
+@@ -37,9 +58,17 @@ struct mmc_ios;
+ struct s3c_sdhci_platdata {
+ 	unsigned int	max_width;
+ 	unsigned int	host_caps;
++	enum cd_types	cd_type;
+ 
+ 	char		**clocks;	/* set of clock sources */
+ 
++	int		ext_cd_gpio;
++	bool		ext_cd_gpio_invert;
++	int 	(*ext_cd_init)(void (*notify_func)(struct platform_device *,
++						   int state));
++	int 	(*ext_cd_cleanup)(void (*notify_func)(struct platform_device *,
++						      int state));
++
+ 	void	(*cfg_gpio)(struct platform_device *dev, int width);
+ 	void	(*cfg_card)(struct platform_device *dev,
+ 			    void __iomem *regbase,
+-- 
+1.7.1.569.g6f426
