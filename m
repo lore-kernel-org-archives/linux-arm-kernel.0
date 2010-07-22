@@ -1,22 +1,30 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Jul 2010 12:42:58 +0100
-Subject: [RFC,PATCH 3/3] arm: remove machine_desc.io_pg_offst and .phys_io
-In-Reply-To: <1279073377.404006.432977736300.3.gpush@pororo>
-References: <1279073377.400469.233833413341.0.gpush@pororo>
-	<1279073377.404006.432977736300.3.gpush@pororo>
-Message-ID: <20100722114258.GO31293@n2100.arm.linux.org.uk>
+Date: Thu, 22 Jul 2010 12:44:27 +0100
+Subject: [PATCH] ARM: Versatile Express: Add default memory layout
+In-Reply-To: <1279798823.9564.47.camel@e102109-lin.cambridge.arm.com>
+References: <20100721165509.26047.70564.stgit@e102109-lin.cambridge.arm.com>
+	<20100722103038.GE31293@n2100.arm.linux.org.uk>
+	<1279796069.9564.2.camel@e102109-lin.cambridge.arm.com>
+	<20100722105729.GK31293@n2100.arm.linux.org.uk>
+	<1279797089.9564.21.camel@e102109-lin.cambridge.arm.com>
+	<20100722111631.GM31293@n2100.arm.linux.org.uk>
+	<1279797596.9564.25.camel@e102109-lin.cambridge.arm.com>
+	<20100722113003.GN31293@n2100.arm.linux.org.uk>
+	<1279798823.9564.47.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100722114427.GP31293@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 14, 2010 at 10:09:37AM +0800, Jeremy Kerr wrote:
-> Since we're now using addruart to establish the debug mapping, we can
-> remove the io_pg_offst and phys_io members of struct machine_desc.
+On Thu, Jul 22, 2010 at 12:40:23PM +0100, Catalin Marinas wrote:
+> On Thu, 2010-07-22 at 12:30 +0100, Russell King - ARM Linux wrote:
+> > It's also an argument for avoiding DT!  If boot loaders can't even get
+> > the most basic of information right...
+> 
+> With DT I see it as slightly different. The DT information is provided
+> by the board manufacturer and the boot loader doesn't need to do much
+> discovery. It can be a pretty dumb boot loader just passing the relevant
+> DT address to the kernel. But that's another thread of discussion (which
+> unfortunately I didn't have time to follow properly).
 
-BTW, it'd probably make more sense to do this as a script, something
-like this (untested):
-
-grep -rl MACHINE_START arch/arm | xargs --no-run-if-empty \
-  sed -i '/MACHINE_START/,/MACHINE_END/ { /\.(phys_io|io_pg_offst)/d }'
-
-as over time the number of boards, etc, will change, and there's already
-context changes with these patches caused by the memblock stuff.
+The boot loader is also provided by the board manufacturer...  I see it
+as being not much different.
