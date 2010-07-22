@@ -1,75 +1,43 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Thu, 22 Jul 2010 09:50:36 +0800
-Subject: [rtc-linux] [PATCH 3/3] rtc: rtc-s3c: Add BCD register
-	initialization codes
-In-Reply-To: <1279702666-13021-4-git-send-email-kgene.kim@samsung.com>
-References: <1279702666-13021-1-git-send-email-kgene.kim@samsung.com>
-	<1279702666-13021-4-git-send-email-kgene.kim@samsung.com>
-Message-ID: <AANLkTinHlD1fC_Es6P7mcX4-_STNoYxV4wmsKe6KAw_N@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 22 Jul 2010 11:32:53 +0900
+Subject: ARM Machine SoC I/O setup and PAD initialization code
+In-Reply-To: <20100721084726.GC6009@n2100.arm.linux.org.uk>
+References: <201007211029.29529.david.jander@protonic.nl>
+	<20100721084726.GC6009@n2100.arm.linux.org.uk>
+Message-ID: <20100722023250.GC27663@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/21 Kukjin Kim <kgene.kim@samsung.com>:
-> From: Taekgyun Ko <taeggyun.ko@samsung.com>
->
-> RTC needs to be initialized when BCD registers have invalid value.
+On Wed, Jul 21, 2010 at 09:47:26AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jul 21, 2010 at 10:29:29AM +0200, David Jander wrote:
+> > General machine initialization like I/O-multiplexing and I/O-pad setup seems 
+> > to be done twice most of the time: Once in the bootloader (i.e. u-boot), and 
+> > once in the machine support file in the linux kernel. This seems awfully 
+> > redundant and error-prone to me. Why is it like this?
+> 
+> I answer your question only once - rather than the number of times you've
+> asked it in this email.
+> 
+> We do IO mux setup in the kernel for two reasons:
+> 
+> 1. we don't trust boot loaders to do the right thing, especially when we
+>    have a plethora of boot loaders - or even no boot loader - to deal with.
+> 
+> 2. on some platforms and SoCs, it's necessary to change the IO mux setup
+>    at runtime.
+> 
+> > What about fixing bootloaders then?
+> 
+> Forget fixing boot loaders; that's a total and utter lost cause.  Boot
+> loaders generally don't seem to even be capable of passing a block of
+> information correctly to the kernel, or even getting one simple value
+> in a register correct.
+> 
+> Boot loaders really can't be trusted, and the less we rely upon them,
+> the better.
 
-Do you mean that the hardware register does not have default value?
-Any results if no initialized value here?
+Would it be feasible to  use Linux + kexec as the boot loader as
+a long term solution to fixing boot loaders by eliminating them?
 
->
-> Signed-off-by: Taekgyun Ko <taeggyun.ko@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-> ?drivers/rtc/rtc-s3c.c | ? 14 ++++++++++++--
-> ?1 files changed, 12 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-> index 2040017..e96e109 100644
-> --- a/drivers/rtc/rtc-s3c.c
-> +++ b/drivers/rtc/rtc-s3c.c
-> @@ -536,10 +536,20 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
->
-> ? ? ? ?s3c_rtc_cpu_type = platform_get_device_id(pdev)->driver_data;
->
-> - ? ? ? if (s3c_rtc_cpu_type == TYPE_S3C64XX)
-> + ? ? ? if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
-> ? ? ? ? ? ? ? ?rtc->max_user_freq = 32768;
-> - ? ? ? else
-> +
-> + ? ? ? ? ? ? ? /* Check RTC Time */
-> +
-> + ? ? ? ? ? ? ? for (i = S3C2410_RTCSEC; i <= S3C2410_RTCYEAR; i += 0x4) {
-> + ? ? ? ? ? ? ? ? ? ? ? tmp = readb(s3c_rtc_base + i);
-> +
-> + ? ? ? ? ? ? ? ? ? ? ? if (((tmp & 0xf) > 0x9) || (((tmp >> 4) & 0xf) > 0x9))
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? writeb(0, s3c_rtc_base + i);
-> + ? ? ? ? ? ? ? }
-> + ? ? ? } else {
-> ? ? ? ? ? ? ? ?rtc->max_user_freq = 128;
-> + ? ? ? }
->
-> ? ? ? ?platform_set_drvdata(pdev, rtc);
->
-> --
-> 1.6.2.5
->
-> --
-> You received this message because you are subscribed to "rtc-linux".
-> Membership options at http://groups.google.com/group/rtc-linux .
-> Please read http://groups.google.com/group/rtc-linux/web/checklist
-> before submitting a driver.
-
-
-
--- 
-*linux-arm-kernel mailing list
-mail addr:linux-arm-kernel at lists.infradead.org
-you can subscribe by:
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-* linux-arm-NUC900 mailing list
-mail addr:NUC900 at googlegroups.com
-main web: https://groups.google.com/group/NUC900
-you can subscribe it by sending me mail:
-mcuos.com at gmail.com
+I believe Magnus Damn (CCed) amongst others have done work
+in this area, though I'm not sure that it was on ARM.
