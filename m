@@ -1,37 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 22 Jul 2010 12:19:56 +0100
-Subject: [PATCH] ARM: Versatile Express: Add default memory layout
-In-Reply-To: <20100722111631.GM31293@n2100.arm.linux.org.uk>
-References: <20100721165509.26047.70564.stgit@e102109-lin.cambridge.arm.com>
-	<20100722103038.GE31293@n2100.arm.linux.org.uk>
-	<1279796069.9564.2.camel@e102109-lin.cambridge.arm.com>
-	<20100722105729.GK31293@n2100.arm.linux.org.uk>
-	<1279797089.9564.21.camel@e102109-lin.cambridge.arm.com>
-	<20100722111631.GM31293@n2100.arm.linux.org.uk>
-Message-ID: <1279797596.9564.25.camel@e102109-lin.cambridge.arm.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 22 Jul 2010 13:20:59 +0200
+Subject: [PATCH] Introduce 'struct machine_class' for SoC level
+	abstraction
+In-Reply-To: <20100722131145.q1mqlhg2888cks0w@v1539.ncsrv.de>
+References: <AANLkTikWs2j8mSmiAdOPIY2uOfO9Q08kbuihkak7GCG8@mail.gmail.com>
+	<20100722131145.q1mqlhg2888cks0w@v1539.ncsrv.de>
+Message-ID: <AANLkTinvLsDl3smP7C9LmHeKF9b0-dSNXhJMsy6Tp7JI@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-07-22 at 12:16 +0100, Russell King - ARM Linux wrote:
-> The kernel boot requirements document has for the last _8_ years said:
-> 
->    The boot loader must pass at a minimum the size and location of the system
->    memory, and root filesystem location. Therefore, the minimum tagged list
->    should look:
-> 
->            +-----------+
->    base -> | ATAG_CORE |  |
->            +-----------+  |
->            | ATAG_MEM  |  | increasing address
->            +-----------+  |
->            | ATAG_NONE |  |
->            +-----------+  v
-> 
-> and still u-boot gets it wrong...  Now tell me why I hate boot loaders
-> soo much.
+On Thu, Jul 22, 2010 at 1:11 PM, Hendrik Sattler
+<post@hendrik-sattler.de> wrote:
+> Zitat von Eric Miao <eric.miao@canonical.com>:
+>>
+>> @@ -772,8 +774,13 @@ void __init setup_arch(char **cmdline_p)
+>>
+>> ? ? ? ?if (__atags_pointer)
+>> ? ? ? ? ? ? ? ?tags = phys_to_virt(__atags_pointer);
+>> - ? ? ? else if (mdesc->boot_params)
+>> - ? ? ? ? ? ? ? tags = phys_to_virt(mdesc->boot_params);
+>> + ? ? ? else {
+>> + ? ? ? ? ? ? ? unsigned long boot_params = mdesc->boot_params ?
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? mdesc->boot_params :
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(class ? class->boot_params:
+>> 0);
+>> + ? ? ? ? ? ? ? if (boot_params)
+>> + ? ? ? ? ? ? ? ? ? ? ? tags = phys_to_virt(boot_params);
+>> + ? ? ? }
+>
+> Isn't
+> ? ? ? ?if (__atags_pointer)
+> ? ? ? ? ? ? ? ?tags = phys_to_virt(__atags_pointer);
+> ? ? ? ?else if (mdesc->boot_params)
+> ? ? ? ? ? ? ? ?tags = phys_to_virt(mdesc->boot_params);
+> + ? ? ? else if (class)
+> + ? ? ? ? ? ? ? tags = phys_to_virt(class->boot_params);
+>
+> equivalent and much simpler?
+>
 
-Maybe it's time to ignore all boot loaders and do everything in the
-kernel :)
+The idea is for mdesc->boot_params to override class->boot_params
+if it's non-zero. Eventually this can be removed as the old way of
+passing parameters from the bootloader at .boot_params will just
+go away.
 
--- 
-Catalin
+> HS
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
