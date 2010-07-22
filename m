@@ -1,25 +1,47 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 22 Jul 2010 16:29:48 +0900
-Subject: ARM Machine SoC I/O setup and PAD initialization code
-In-Reply-To: <20100722072034.GA6802@n2100.arm.linux.org.uk>
-References: <201007211029.29529.david.jander@protonic.nl>
-	<20100721084726.GC6009@n2100.arm.linux.org.uk>
-	<20100722023250.GC27663@verge.net.au>
-	<20100722072034.GA6802@n2100.arm.linux.org.uk>
-Message-ID: <20100722072948.GA7101@verge.net.au>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Jul 2010 08:34:55 +0100
+Subject: [RFC 1/3 v3] mm: iommu: An API to unify IOMMU, CPU and device
+	memory management
+In-Reply-To: <20100722042528.GB22559@codeaurora.org>
+References: <20100713150311B.fujita.tomonori@lab.ntt.co.jp>
+	<20100713121420.GB4263@codeaurora.org>
+	<20100714104353B.fujita.tomonori@lab.ntt.co.jp>
+	<20100714201149.GA14008@codeaurora.org>
+	<20100714220536.GE18138@n2100.arm.linux.org.uk>
+	<20100715012958.GB2239@codeaurora.org>
+	<20100715085535.GC26212@n2100.arm.linux.org.uk>
+	<20100719065233.GD11054@codeaurora.org>
+	<m1mxtndifi.fsf@fess.ebiederm.org>
+	<20100722042528.GB22559@codeaurora.org>
+Message-ID: <20100722073455.GB6802@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 22, 2010 at 08:20:34AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 22, 2010 at 11:32:53AM +0900, Simon Horman wrote:
-> > Would it be feasible to  use Linux + kexec as the boot loader as
-> > a long term solution to fixing boot loaders by eliminating them?
+On Wed, Jul 21, 2010 at 09:25:28PM -0700, Zach Pfeffer wrote:
+> Yes it is a problem, as Russell has brought up, but there's something
+> I probably haven't communicated well. I'll use the following example:
 > 
-> So what you're proposing is that a broken boot loader should boot a
-> version of Linux to fix the pin MUX, which then kexecs a kernel which
-> doesn't have that code?
-> 
-> What's the point of that - when the first kernel will be able to run
-> the system?
+> There are 3 devices: A CPU, a decoder and a video output device. All 3
+> devices need to map the same 12 MB buffer at the same time.
 
-Ok, point taken, its impossible to remove the boot loaders.
+Why do you need the same buffer mapped by the CPU?
+
+Let's take your example of a video decoder and video output device.
+Surely the CPU doesn't want to be writing to the same memory region
+used for the output picture as the decoder is writing to.  So what's
+the point of mapping that memory into the CPU's address space?
+
+Surely the video output device doesn't need to see the input data to
+the decoder either?
+
+Surely, all you need is:
+
+1. a mapping for the CPU for a chunk of memory to pass data to the
+   decoder.
+2. a mapping for the decoder to see the chunk of memory to receive data
+   from the CPU.
+3. a mapping for the decoder to see a chunk of memory used for the output
+   video buffer.
+4. a mapping for the output device to see the video buffer.
+
+So I don't see why everything needs to be mapped by everything else.
