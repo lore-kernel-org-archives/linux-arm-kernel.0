@@ -1,44 +1,65 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 23 Jul 2010 02:13:38 +0300
-Subject: [PATCH v2 10/20] omap: zoom: add fixed regulator device for wlan
-In-Reply-To: <4C48287D.1000603@nokia.com>
+Date: Fri, 23 Jul 2010 02:18:08 +0300
+Subject: [PATCH v2 19/20] omap: zoom: keep the MMC3 wl1271 device powered
+	off
+In-Reply-To: <676FD6AA0F002F49B89E70F0C5EFD22C1311192A47@dlee04.ent.ti.com>
 References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-	<1279733634-21974-11-git-send-email-ohad@wizery.com>
-	<20100721175930.GD10930@sirena.org.uk>
-	<4C48287D.1000603@nokia.com>
-Message-ID: <AANLkTin2dyLNo1RMQgLG-4DtN-CsXqNNLAfITXDbMIvl@mail.gmail.com>
+	<1279733634-21974-20-git-send-email-ohad@wizery.com>
+	<676FD6AA0F002F49B89E70F0C5EFD22C1311192A47@dlee04.ent.ti.com>
+Message-ID: <AANLkTim3RWv2-qi9UMg1imwKTJuh3GstdjMTxz64uOHf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 22, 2010 at 2:16 PM, Roger Quadros <roger.quadros@nokia.com> wrote:
-> On 07/21/2010 08:59 PM, ext Mark Brown wrote:
->>
->> On Wed, Jul 21, 2010 at 08:33:44PM +0300, Ohad Ben-Cohen wrote:
->>
->>> +static struct regulator_consumer_supply zoom_vmmc3_supply = {
->>> + ? ? ? .supply ? ? ? ? = "vmmc",
->>> +};
->>
->> This looks like a misconfiguration on the consumer - I'd strongly expect
->> the consumer to have a dev_name specified also with the name being in
->> terms of the consumer device.
+Hi Gever,
+
+On Wed, Jul 21, 2010 at 9:55 PM, Gabay, Benzy <benzyg@ti.com> wrote:
+> From: Ohad Ben-Cohen [mailto:ohad at wizery.com]
+> Sent: Wednesday, July 21, 2010 12:34 PM
+> To: linux-wireless at vger.kernel.org; linux-mmc at vger.kernel.org; linux-omap at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org; linux at arm.linux.org.uk; Chikkature Rajashekar, Madhusudhan; Luciano Coelho; akpm at linux-foundation.org; San Mehat; Roger Quadros; Tony Lindgren; Nicolas Pitre; Pandita, Vikram; Kalle Valo; Ohad Ben-Cohen
+> Subject: [PATCH v2 19/20] omap: zoom: keep the MMC3 wl1271 device powered off
 >
-> you need to add something like
+> Keep the MMC3 wl1271 WLAN device powered off until its
+> SDIO function driver requests otherwise.
 >
-> .dev_name ? ? ? = "mmci-omap-hs.2"
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+> ---
+> ?arch/arm/mach-omap2/board-zoom-peripherals.c | ? ?1 +
+> ?arch/arm/mach-omap2/hsmmc.c ? ? ? ? ? ? ? ? ?| ? ?3 +++
+> ?arch/arm/mach-omap2/hsmmc.h ? ? ? ? ? ? ? ? ?| ? ?1 +
+> ?arch/arm/plat-omap/include/plat/mmc.h ? ? ? ?| ? ?3 +++
+> ?drivers/mmc/host/omap_hsmmc.c ? ? ? ? ? ? ? ?| ? ?3 +++
+> ?5 files changed, 11 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
+> index 3230801..3ab9125 100644
+> --- a/arch/arm/mach-omap2/board-zoom-peripherals.c
+> +++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
+> @@ -217,6 +217,7 @@ static struct omap2_hsmmc_info mmc[] __initdata = {
+> ? ? ? ? ? ? ? ?.gpio_wp ? ? ? ?= -EINVAL,
+> ? ? ? ? ? ? ? ?.gpio_cd ? ? ? ?= -EINVAL,
+> ? ? ? ? ? ? ? ?.ocr_mask ? ? ? = MMC_VDD_165_195,
+> + ? ? ? ? ? ? ? .dont_power_card = true,
+> ? ? ? ? ? ? ? ?.priv_data ? ? ?= &omap_zoom_wlan_data,
+> ? ? ? ?},
+> ? ? ? ?{} ? ? ?/* Terminator */
+...
+> --
+> 1.7.0.4
+>
+> [Benzy Gabay] small comment: Please make sure that all 127x related changes are not bounded only to MMC3.
+> On OMAP4 WLAN is used on MMC5.
 
-I already set the .dev member of the consumer in a similar manner to
-how all other regulators are configured in this board - please check
-out patch 13:
 
-https://patchwork.kernel.org/patch/113418/
+The only place MMC3 is bound is in the board files (see code snippet
+above), so that should be ok.
 
-Does this look reasonable to you ?
+I can probably split this patch to make this more obvious just by
+reading the diffstat if you prefer.
+
 
 Thanks,
 Ohad.
 
->
-> regards,
-> -roger
+
 >
