@@ -1,20 +1,24 @@
-From: eric@eukrea.com (=?UTF-8?B?RXJpYyBCw6luYXJk?=)
-Date: Thu, 22 Jul 2010 16:28:23 +0200
-Subject: [PATCH] mxc_udc: add workaround for ENGcm09152 for i.MX35
-In-Reply-To: <1279297839-2155-1-git-send-email-eric@eukrea.com>
-References: <1279297839-2155-1-git-send-email-eric@eukrea.com>
-Message-ID: <4C485587.8000201@eukrea.com>
+From: lmctlx@gmail.com (Karol)
+Date: Thu, 22 Jul 2010 14:44:54 +0000 (UTC)
+Subject: GCOV on arm - no files but /debug/reset
+Message-ID: <i29lh6$bh5$1@dough.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Hello,
 
-Le 16/07/2010 18:30, Eric B?nard a ?crit :
-> this patch gives the possibility to workaround bug ENGcm09152
-> on i.MX35 when the hardware workaround is also implemented on
-> the board.
->
-any comment concerning this patch ?
+I'm trying to use GCOV profiling on ARM architecture without much
+success.
 
-Thanks
-Eric
+I've enabled CONFIG_GCOV=y in .config and added "GCOV_PROFILE := y" to
+bunch of Makefiles (in kernel/, fs/, etc.).   According to the docs
+(Documentation/gcov.txt) debugfs should be automatically populated
+with profile files along with symlinks to sources. However, my
+<debugfs>/gcov directory is empty.
+
+I've tested old LTP's gcov patches (to kernel 2.6.25, I think) and it
+worked as expected.
+
+Am I missing something obvious?  Hints?
+
+Thanks in advance.
