@@ -1,35 +1,67 @@
-From: post@hendrik-sattler.de (Hendrik Sattler)
-Date: Thu, 22 Jul 2010 13:11:45 +0200
-Subject: [PATCH] Introduce 'struct machine_class' for SoC level abstraction
-In-Reply-To: <AANLkTikWs2j8mSmiAdOPIY2uOfO9Q08kbuihkak7GCG8@mail.gmail.com>
-References: <AANLkTikWs2j8mSmiAdOPIY2uOfO9Q08kbuihkak7GCG8@mail.gmail.com>
-Message-ID: <20100722131145.q1mqlhg2888cks0w@v1539.ncsrv.de>
+From: vince@simtec.co.uk (Vincent Sanders)
+Date: Thu, 22 Jul 2010 12:14:12 +0100
+Subject: ARM Kernel autobuilder
+Message-ID: <20100722111412.GB10399@kyllikki.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zitat von Eric Miao <eric.miao@canonical.com>:
-> @@ -772,8 +774,13 @@ void __init setup_arch(char **cmdline_p)
->
->  	if (__atags_pointer)
->  		tags = phys_to_virt(__atags_pointer);
-> -	else if (mdesc->boot_params)
-> -		tags = phys_to_virt(mdesc->boot_params);
-> +	else {
-> +		unsigned long boot_params = mdesc->boot_params ?
-> +					    mdesc->boot_params :
-> +					   (class ? class->boot_params: 0);
-> +		if (boot_params)
-> +			tags = phys_to_virt(boot_params);
-> +	}
+A short note to apologize to the kirkwood people over the autobuilder
+producing junk results for their defconfig on the last few builds. The
+ccache got corrupted due to a disk glitch. All fixed now.
 
-Isn't
-	if (__atags_pointer)
-		tags = phys_to_virt(__atags_pointer);
-	else if (mdesc->boot_params)
-		tags = phys_to_virt(mdesc->boot_params);
-+	else if (class)
-+		tags = phys_to_virt(class->boot_params);
+The current level of 177 Configurations is (to put it mildly)
+insane. The 5 year report posted previously explained the
+specifics. suffice to say with Linus recent activities anything we can
+do to reduce this count is useful.
 
-equivalent and much simpler?
+Can I propose now the omap3_defconfig is working that the duplicate
+defconfigs are removed, these are:
 
-HS
+cm_t35_defconfig
+devkit8000_defconfig
+igep0020_defconfig
+rx51_defconfig
+omap3_beagle_defconfig
+omap3_evm_defconfig
+am3517_evm_defconfig
+omap_4430sdp_defconfig
+omap_ldp_defconfig
+omap3_pandora_defconfig
+omap3_stalker_lks_defconfig
+omap_apollon_2420_defconfig
+omap_h4_2420_defconfig
+omap_2430sdp_defconfig
+omap_3430sdp_defconfig
+omap_3630sdp_defconfig
+omap3_touchbook_defconfig
+omap_zoom2_defconfig
+omap_zoom3_defconfig
+overo_defconfig
+
+This would reduce the default configuration count to 156
+configurations. 
+
+There are still a huge number of configurations which support a single
+machine which I may look at creating additional combined targets for
+futher reducing the build count.
+
+Finally the n8x0 and ns9xxx configurations have failed to build for a
+while now.
+
+The n8x0 config supports machines maintained by Kai Svahn, Lauri
+Leukkunen and Timo O. Karjalainen can one of you please fix the build?
+
+The ns9xxx configuration has been failing for even longer and teh
+machines supported are maintainerd by Uwe Kleine-Konig
+
+
+-- 
+Regards Vincent
+http://www.kyllikki.org/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 189 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100722/6bdebb07/attachment.sig>
