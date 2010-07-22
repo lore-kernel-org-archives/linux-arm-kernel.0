@@ -1,55 +1,28 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 22 Jul 2010 13:20:59 +0200
-Subject: [PATCH] Introduce 'struct machine_class' for SoC level
-	abstraction
-In-Reply-To: <20100722131145.q1mqlhg2888cks0w@v1539.ncsrv.de>
-References: <AANLkTikWs2j8mSmiAdOPIY2uOfO9Q08kbuihkak7GCG8@mail.gmail.com>
-	<20100722131145.q1mqlhg2888cks0w@v1539.ncsrv.de>
-Message-ID: <AANLkTinvLsDl3smP7C9LmHeKF9b0-dSNXhJMsy6Tp7JI@mail.gmail.com>
+From: roger.quadros@nokia.com (Roger Quadros)
+Date: Thu, 22 Jul 2010 14:16:13 +0300
+Subject: [PATCH v2 10/20] omap: zoom: add fixed regulator device for	wlan
+In-Reply-To: <20100721175930.GD10930@sirena.org.uk>
+References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
+	<1279733634-21974-11-git-send-email-ohad@wizery.com>
+	<20100721175930.GD10930@sirena.org.uk>
+Message-ID: <4C48287D.1000603@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 22, 2010 at 1:11 PM, Hendrik Sattler
-<post@hendrik-sattler.de> wrote:
-> Zitat von Eric Miao <eric.miao@canonical.com>:
->>
->> @@ -772,8 +774,13 @@ void __init setup_arch(char **cmdline_p)
->>
->> ? ? ? ?if (__atags_pointer)
->> ? ? ? ? ? ? ? ?tags = phys_to_virt(__atags_pointer);
->> - ? ? ? else if (mdesc->boot_params)
->> - ? ? ? ? ? ? ? tags = phys_to_virt(mdesc->boot_params);
->> + ? ? ? else {
->> + ? ? ? ? ? ? ? unsigned long boot_params = mdesc->boot_params ?
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? mdesc->boot_params :
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(class ? class->boot_params:
->> 0);
->> + ? ? ? ? ? ? ? if (boot_params)
->> + ? ? ? ? ? ? ? ? ? ? ? tags = phys_to_virt(boot_params);
->> + ? ? ? }
+On 07/21/2010 08:59 PM, ext Mark Brown wrote:
+> On Wed, Jul 21, 2010 at 08:33:44PM +0300, Ohad Ben-Cohen wrote:
 >
-> Isn't
-> ? ? ? ?if (__atags_pointer)
-> ? ? ? ? ? ? ? ?tags = phys_to_virt(__atags_pointer);
-> ? ? ? ?else if (mdesc->boot_params)
-> ? ? ? ? ? ? ? ?tags = phys_to_virt(mdesc->boot_params);
-> + ? ? ? else if (class)
-> + ? ? ? ? ? ? ? tags = phys_to_virt(class->boot_params);
+>> +static struct regulator_consumer_supply zoom_vmmc3_supply = {
+>> +	.supply		= "vmmc",
+>> +};
 >
-> equivalent and much simpler?
->
+> This looks like a misconfiguration on the consumer - I'd strongly expect
+> the consumer to have a dev_name specified also with the name being in
+> terms of the consumer device.
 
-The idea is for mdesc->boot_params to override class->boot_params
-if it's non-zero. Eventually this can be removed as the old way of
-passing parameters from the bootloader at .boot_params will just
-go away.
+you need to add something like
 
-> HS
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+.dev_name       = "mmci-omap-hs.2"
+
+regards,
+-roger
