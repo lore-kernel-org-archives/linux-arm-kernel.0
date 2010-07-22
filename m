@@ -1,30 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Jul 2010 12:44:27 +0100
-Subject: [PATCH] ARM: Versatile Express: Add default memory layout
-In-Reply-To: <1279798823.9564.47.camel@e102109-lin.cambridge.arm.com>
-References: <20100721165509.26047.70564.stgit@e102109-lin.cambridge.arm.com>
-	<20100722103038.GE31293@n2100.arm.linux.org.uk>
-	<1279796069.9564.2.camel@e102109-lin.cambridge.arm.com>
-	<20100722105729.GK31293@n2100.arm.linux.org.uk>
-	<1279797089.9564.21.camel@e102109-lin.cambridge.arm.com>
-	<20100722111631.GM31293@n2100.arm.linux.org.uk>
-	<1279797596.9564.25.camel@e102109-lin.cambridge.arm.com>
-	<20100722113003.GN31293@n2100.arm.linux.org.uk>
-	<1279798823.9564.47.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100722114427.GP31293@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 22 Jul 2010 12:47:18 +0100
+Subject: [PATCH 0/9] CM's patches for the next merging window(s)
+In-Reply-To: <20100722100326.GC31293@n2100.arm.linux.org.uk>
+References: <20100719133050.24290.70856.stgit@e102109-lin.cambridge.arm.com>
+	<20100722100326.GC31293@n2100.arm.linux.org.uk>
+Message-ID: <1279799238.9564.55.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 22, 2010 at 12:40:23PM +0100, Catalin Marinas wrote:
-> On Thu, 2010-07-22 at 12:30 +0100, Russell King - ARM Linux wrote:
-> > It's also an argument for avoiding DT!  If boot loaders can't even get
-> > the most basic of information right...
+On Thu, 2010-07-22 at 11:03 +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 19, 2010 at 02:43:57PM +0100, Catalin Marinas wrote:
+> > This is a series of patches I maintain in my tree at (the 'rebased'
+> > branch for individual patches or 'master' for a merge-friendly branch):
 > 
-> With DT I see it as slightly different. The DT information is provided
-> by the board manufacturer and the boot loader doesn't need to do much
-> discovery. It can be a pretty dumb boot loader just passing the relevant
-> DT address to the kernel. But that's another thread of discussion (which
-> unfortunately I didn't have time to follow properly).
+> I think patches 2 through 9 are fine.
 
-The boot loader is also provided by the board manufacturer...  I see it
-as being not much different.
+Thanks. I'll push them to -next. Since some of these patches would be
+useful to merge in 2.6.36-rc1, please let me know which of them you'd
+like in the patch system.
+
+> I think you and Tony need to discuss patch 1 - you point out that there's
+> an issue writing the TLS value after this change, and Tony's patches
+> change the way that the TLS code works.  I'd like to hear that there's
+> no issue if both patches were to be merged.
+
+Is Tony's patch going into mainline for 2.6.36-rc1? I can rebase my
+domains patch on top of this. Apart from some merge conflicts I don't
+see an issue with the implementation. I'll repost once rebased.
+
+-- 
+Catalin
