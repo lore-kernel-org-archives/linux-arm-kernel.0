@@ -1,46 +1,121 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 22 Jul 2010 18:14:12 +0900
-Subject: ARM Machine SoC I/O setup and PAD initialization code
-In-Reply-To: <20100722084649.GK6802@n2100.arm.linux.org.uk>
-References: <201007211029.29529.david.jander@protonic.nl>
-	<20100721084726.GC6009@n2100.arm.linux.org.uk>
-	<20100722023250.GC27663@verge.net.au>
-	<20100722072034.GA6802@n2100.arm.linux.org.uk>
-	<20100722072948.GA7101@verge.net.au>
-	<20100722084649.GK6802@n2100.arm.linux.org.uk>
-Message-ID: <20100722091409.GA15757@verge.net.au>
+From: eric.miao@canonical.com (Eric Miao)
+Date: Thu, 22 Jul 2010 11:21:22 +0200
+Subject: [PATCH] Introduce 'struct machine_class' for SoC level abstraction
+Message-ID: <AANLkTikWs2j8mSmiAdOPIY2uOfO9Q08kbuihkak7GCG8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 22, 2010 at 09:46:49AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 22, 2010 at 04:29:48PM +0900, Simon Horman wrote:
-> > On Thu, Jul 22, 2010 at 08:20:34AM +0100, Russell King - ARM Linux wrote:
-> > > On Thu, Jul 22, 2010 at 11:32:53AM +0900, Simon Horman wrote:
-> > > > Would it be feasible to  use Linux + kexec as the boot loader as
-> > > > a long term solution to fixing boot loaders by eliminating them?
-> > > 
-> > > So what you're proposing is that a broken boot loader should boot a
-> > > version of Linux to fix the pin MUX, which then kexecs a kernel which
-> > > doesn't have that code?
-> > > 
-> > > What's the point of that - when the first kernel will be able to run
-> > > the system?
-> > 
-> > Ok, point taken, its impossible to remove the boot loaders.
+    [ARM] Introduce 'struct machine_class' for SoC level abstraction
 
-For the record, what I was proposing was removing the broken boot loader
-and replacing it with something that isn't broken. And I was wondering
-if that is feasible or not. But as you point out (elsewhere) that
-may not be relevant to the original question.
+    Introduce 'struct machine_class' to group common elements shared by a
+    class of machines (i.e. normally SoC level). The elements in 'struct
+    machine_desc' will override if provided. (Note zero is considered
+    invalid for phys_io, io_pg_offst and boot_params, and if they are
+    zero, the version in 'class' will be used)
 
-> No, my point was that if you're going to put pin mux code into the
-> kernel, there's no point building the pin mux code out of the kernel
-> which you're going to use to run your device.
-> 
-> So, what we tend to do as a general rule on ARM is to put the pin mux
-> code into the kernel so that we're less reliant on any boot loader to
-> get it right.  And as I've already said, we have some cases where we
-> need to change the pin muxing at runtime, and at least one case where
-> it needs to be changed by the device driver operating on the pins.
+    Signed-off-by: Eric Miao <eric.miao@canonical.com>
 
-Ok, so the boot-loader is irrelevant to the pin mux code in the kernel?
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index 8a0dd18..a8db47a 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -14,6 +14,21 @@ struct tag;
+ struct meminfo;
+ struct sys_timer;
+
++/*
++ * 'struct machine_class' groups the common elements shared by a class of
++ * machines. Elements in 'struct machine_desc' will override if provided.
++ * (Note zero is considered invalid for fields like boot_params, and if
++ * they are zero, the version in 'class' will be used)
++ */
++struct machine_class {
++	const char		*name;		/* machine class name	*/
++	unsigned long		boot_params;	/* tagged list		*/
++
++	void			(*map_io)(void);/* IO mapping function */
++	void			(*init_irq)(void);
++	struct sys_timer	*timer;
++};
++
+ struct machine_desc {
+ 	/*
+ 	 * Note! The first four elements are used
+@@ -26,6 +41,7 @@ struct machine_desc {
+ 						 * page tabe entry	*/
+
+ 	const char		*name;		/* architecture name	*/
++	struct machine_class	*class;		/* machine class */
+ 	unsigned long		boot_params;	/* tagged list		*/
+
+ 	unsigned int		video_start;	/* start of video RAM	*/
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 776ea1a..263a89a 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -759,12 +759,14 @@ void __init setup_arch(char **cmdline_p)
+ {
+ 	struct tag *tags = (struct tag *)&init_tags;
+ 	struct machine_desc *mdesc;
++	struct machine_class *class;
+ 	char *from = default_command_line;
+
+ 	unwind_init();
+
+ 	setup_processor();
+ 	mdesc = setup_machine(machine_arch_type);
++	class = mdesc->class;
+ 	machine_name = mdesc->name;
+
+ 	if (mdesc->soft_reboot)
+@@ -772,8 +774,13 @@ void __init setup_arch(char **cmdline_p)
+
+ 	if (__atags_pointer)
+ 		tags = phys_to_virt(__atags_pointer);
+-	else if (mdesc->boot_params)
+-		tags = phys_to_virt(mdesc->boot_params);
++	else {
++		unsigned long boot_params = mdesc->boot_params ?
++					    mdesc->boot_params :
++					   (class ? class->boot_params: 0);
++		if (boot_params)
++			tags = phys_to_virt(boot_params);
++	}
+
+ 	/*
+ 	 * If we have the old style parameters, convert them to
+@@ -825,8 +832,8 @@ void __init setup_arch(char **cmdline_p)
+ 	 * Set up various architecture-specific pointers
+ 	 */
+ 	arch_nr_irqs = mdesc->nr_irqs;
+-	init_arch_irq = mdesc->init_irq;
+-	system_timer = mdesc->timer;
++	init_arch_irq = mdesc->init_irq ? : (class ? class->init_irq : NULL);
++	system_timer = mdesc->timer ? : (class ? class->timer : NULL);
+ 	init_machine = mdesc->init_machine;
+
+ #ifdef CONFIG_VT
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 9ee3c75..7bc25c7 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -881,6 +881,7 @@ void __init arm_mm_memblock_reserve(void)
+  */
+ static void __init devicemaps_init(struct machine_desc *mdesc)
+ {
++	struct machine_class *class = mdesc->class;
+ 	struct map_desc map;
+ 	unsigned long addr;
+ 	void *vectors;
+@@ -945,6 +946,10 @@ static void __init devicemaps_init(struct
+machine_desc *mdesc)
+ 	 */
+ 	if (mdesc->map_io)
+ 		mdesc->map_io();
++	else {
++		if (class && class->map_io)
++			class->map_io();
++	}
+
+ 	/*
+ 	 * Finally flush the caches and tlb to ensure that we're in a
