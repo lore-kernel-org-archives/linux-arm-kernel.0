@@ -1,39 +1,35 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Thu, 22 Jul 2010 12:21:11 +0100
-Subject: Introducing the LCD-Linux project
-In-Reply-To: <AANLkTikitTGpiE5Oe_P5a4f2OCOnlB9j_LVm5CQhQIno@mail.gmail.com>
-References: <AANLkTikitTGpiE5Oe_P5a4f2OCOnlB9j_LVm5CQhQIno@mail.gmail.com>
-Message-ID: <20100722122111.4cf4ca2f@lxorguk.ukuu.org.uk>
+From: post@hendrik-sattler.de (Hendrik Sattler)
+Date: Thu, 22 Jul 2010 13:11:45 +0200
+Subject: [PATCH] Introduce 'struct machine_class' for SoC level abstraction
+In-Reply-To: <AANLkTikWs2j8mSmiAdOPIY2uOfO9Q08kbuihkak7GCG8@mail.gmail.com>
+References: <AANLkTikWs2j8mSmiAdOPIY2uOfO9Q08kbuihkak7GCG8@mail.gmail.com>
+Message-ID: <20100722131145.q1mqlhg2888cks0w@v1539.ncsrv.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Jul 2010 14:57:54 +0200
-Mattia Jona-Lasinio <mattia.jona@gmail.com> wrote:
+Zitat von Eric Miao <eric.miao@canonical.com>:
+> @@ -772,8 +774,13 @@ void __init setup_arch(char **cmdline_p)
+>
+>  	if (__atags_pointer)
+>  		tags = phys_to_virt(__atags_pointer);
+> -	else if (mdesc->boot_params)
+> -		tags = phys_to_virt(mdesc->boot_params);
+> +	else {
+> +		unsigned long boot_params = mdesc->boot_params ?
+> +					    mdesc->boot_params :
+> +					   (class ? class->boot_params: 0);
+> +		if (boot_params)
+> +			tags = phys_to_virt(boot_params);
+> +	}
 
-> Hi,
-> 
-> this is to introduce the LCD-Linux project (http://lcd-linux.sourceforge.net/),
-> a kernel level implementation of a VT102 terminal emulator, optimized for small
-> alphanumeric and graphic displays.
+Isn't
+	if (__atags_pointer)
+		tags = phys_to_virt(__atags_pointer);
+	else if (mdesc->boot_params)
+		tags = phys_to_virt(mdesc->boot_params);
++	else if (class)
++		tags = phys_to_virt(class->boot_params);
 
-The kernel already has a console and that provides an abstract
-implementation that is used for everything from text mode displays to vga
-to assorted accelerated hardware platforms.
+equivalent and much simpler?
 
-Why do we need a VT102 as well ?
-
-> functions. A solution is therefore to provide a sort of minimal terminal
-> emulation in kernel space, that can be accessed through the standard character
-> device interface. In this way the problem of the display management is reduced
-
-If you use the existing kernel console interfaces then you don't need to
-worry about vt102 v console or having two terminal emulations running.
-
-The basic idea seems sound enough other than that. Another reason for
-using the kernel console/vt driver is that you can then also support mini
-bitmap displays because a frame buffer driver backed by a driver for a
-suitable LCD panel can work nicely because the vt driver can sit on the
-fb layer quite happily and fb then implements low level handling for the
-pixels.
-
-Alan
+HS
