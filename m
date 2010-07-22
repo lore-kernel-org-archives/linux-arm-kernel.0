@@ -1,50 +1,25 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 22 Jul 2010 09:21:41 +0200
-Subject: [PATCH 0/3] Enable pxa310 usb otg port host mode
-In-Reply-To: <4C47DA25.3040202@compulab.co.il>
-References: <1279199446-30526-1-git-send-email-grinberg@compulab.co.il>
-	<AANLkTikJUNLl-Xd0D7zJlo-iJYxIlyLD_HBB77qZj-4T@mail.gmail.com>
-	<4C47DA25.3040202@compulab.co.il>
-Message-ID: <AANLkTim4CzwrTZyIvs951HwK2Pps6xaF3B1DTpo0iCuN@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 22 Jul 2010 16:29:48 +0900
+Subject: ARM Machine SoC I/O setup and PAD initialization code
+In-Reply-To: <20100722072034.GA6802@n2100.arm.linux.org.uk>
+References: <201007211029.29529.david.jander@protonic.nl>
+	<20100721084726.GC6009@n2100.arm.linux.org.uk>
+	<20100722023250.GC27663@verge.net.au>
+	<20100722072034.GA6802@n2100.arm.linux.org.uk>
+Message-ID: <20100722072948.GA7101@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 22, 2010 at 7:41 AM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->>
->> On Thu, Jul 15, 2010 at 3:10 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->>
->>> This patch series introduces the U2D Controller and
->>> Host driver for PXA3xx and enables cm-x300 usb host port2.
->>>
->>> This patch series depends on
->>> "Generic ULPI driver extention" patch series,
->>> which is currently sent for review to
->>> linux-usb at vger.kernel.org mailing list
->>>
->>> Igor Grinberg (3):
->>> ?[ARM] pxa3xx: Add U2D controller and driver
->>> ?[ARM] usb/host/ohci-pxa27x: enable OHCI over U2DC
->>> ?[ARM] pxa/cm-x300: enable USB host port2
->>>
->>> ?arch/arm/mach-pxa/Kconfig ? ? ? ? ? ? ? ? ? | ? ?4 +
->>> ?arch/arm/mach-pxa/Makefile ? ? ? ? ? ? ? ? ?| ? ?2 +-
->>> ?arch/arm/mach-pxa/cm-x300.c ? ? ? ? ? ? ? ? | ? 77 ++++++
->>> ?arch/arm/mach-pxa/devices.c ? ? ? ? ? ? ? ? | ? 28 ++
->>> ?arch/arm/mach-pxa/devices.h ? ? ? ? ? ? ? ? | ? ?1 +
->>> ?arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h | ? 35 +++
->>> ?arch/arm/mach-pxa/pxa3xx-u2d.c ? ? ? ? ? ? ?| ?392 +++++++++++++++++++++++++++
->>>
->> Will pxa3xx-ulpi.c be a better name here? I do like pxa3xx-u2d.c to be
->> the driver name for the U2D controller, and be placed in drivers/usb/
->>
->
-> Well, the intend was to make a start for the U2D driver,
-> so there will be facilities for comunicating with the controller.
->
-> I can separate the U2D stuff from the pxa310 specific ulpi,
-> is this what you mean?
->
+On Thu, Jul 22, 2010 at 08:20:34AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 22, 2010 at 11:32:53AM +0900, Simon Horman wrote:
+> > Would it be feasible to  use Linux + kexec as the boot loader as
+> > a long term solution to fixing boot loaders by eliminating them?
+> 
+> So what you're proposing is that a broken boot loader should boot a
+> version of Linux to fix the pin MUX, which then kexecs a kernel which
+> doesn't have that code?
+> 
+> What's the point of that - when the first kernel will be able to run
+> the system?
 
-Yes. At this stage, I guess it might be a good idea to just have
-a separate ULPI code that's common to live inside arch/arm/mach-pxa.
-But U2D driver, I'd expect it to be ended in drivers/usb/gadget/.
+Ok, point taken, its impossible to remove the boot loaders.
