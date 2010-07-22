@@ -1,22 +1,16 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Jul 2010 11:38:34 +0100
-Subject: [PATCH 5/6] arm/ns9xxx: fix debug macro compilation failure
-In-Reply-To: <1279074759.519643.866429356172.5.gpush@pororo>
+Date: Thu, 22 Jul 2010 11:39:41 +0100
+Subject: [PATCH 0/6] debug macro fixups
+In-Reply-To: <1279074759.517724.734812272398.0.gpush@pororo>
 References: <1279074759.517724.734812272398.0.gpush@pororo>
-	<1279074759.519643.866429356172.5.gpush@pororo>
-Message-ID: <20100722103834.GH31293@n2100.arm.linux.org.uk>
+Message-ID: <20100722103941.GI31293@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Jul 14, 2010 at 10:32:39AM +0800, Jeremy Kerr wrote:
-> We need mach/memory.h for NS9XXX_CSxSTAT_PHYS, and mach/memory.h needs
-> asm/memory.h for UL().
+> As part of the DEBUG_LL mapping changes, I ran all of the defconfigs
+> with DEBUG_LL=y. Some of the configs are broken, so I'm posting the
+> fixups.
 
-NAK.  Definitely NAK.  You haven't checked what includes whatelse.
-
-asm/memory.h includes mach/memory.h to pick up the platform specific
-parts, and provides mach/memory.h with its pre-requisits.  Use asm/memory.h
-_everywhere_ rather than mach/memory.h.
-
-Doing otherwise will create include loops, which leads to unreliability
-in defined symbols.
+Apart from the two comments, the rest is fine, and should be merged
+in -rc.  Please send the fixed patches to the patch system.
