@@ -1,27 +1,41 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Thu, 22 Jul 2010 23:20:00 +0200
-Subject: ARM Machine SoC I/O setup and PAD initialization code
-In-Reply-To: <201007211029.29529.david.jander@protonic.nl>
-References: <201007211029.29529.david.jander@protonic.nl>
-Message-ID: <AANLkTik4xSSMalj5jVwA4SaHabRYd7c8bH7iTTIwUKQ0@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 23 Jul 2010 00:56:30 +0200 (CEST)
+Subject: [PATCH v2 00/20] native support for wl1271 on ZOOM
+In-Reply-To: <1279733634-21974-1-git-send-email-ohad@wizery.com>
+References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
+Message-ID: <alpine.LFD.2.00.1007230052320.12562@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/21 David Jander <david.jander@protonic.nl>:
+On Wed, 21 Jul 2010, Ohad Ben-Cohen wrote:
 
-> General machine initialization like I/O-multiplexing and I/O-pad setup seems
-> to be done twice most of the time: Once in the bootloader (i.e. u-boot), and
-> once in the machine support file in the linux kernel. This seems awfully
-> redundant and error-prone to me. Why is it like this?
+> This patch series adds native support for wl1271 on ZOOM.
+> 
+> Changes since v1:
+> 
+> - introduce a fixed regulator device to control the power of wl1271
+> - allow to propagate private board-specific data to SDIO function drivers
+> - allow SDIO function driver to control the card's power via new API
+> - make it possible to keep the card's power down (without depending
+>   on an explicit SDIO function driver power-down request)
+> 
+> Thanks to these changes, we no longer need a separate platform
+> device (carrying e.g. the external irq information of the device),
+> and no longer need to emulate virtual card detect events.
+> 
+> The two "board muxing" pathces were already taken by Tony, and
+> are resent here just to make it easier for people to use/test these pathces.
+> 
+> The changes to the MMC core really needs careful review; there still
+> might be some pitfalls that haven't been covered. E.g., one thing
+> we plan to look at next is their bahvior together with SDIO Suspend/Resume.
+> 
+> Special thanks to Roger Quadros and Nicolas Pitre for their extensive
+> review and helpful suggestions.
 
-I cannot talk for all platforms but on some systems I've worked with
-it's not touched by the boot loader but all done by the kernel.
+FYI, I do intend to review those patches, but I'll be flying home in a 
+couple hours, and once there I'll be gone on vacation for 2 weeks.  So 
+this review won't happen right away.
 
-One reason is to keep the bootloader smallish.
 
-Another reason is the ability to slam a kernel into primary memory
-and just boot it, with *something else* than a boot loader, e.g.
-JTAG. Which proves to be extremely convenient at times.
-
-Yours,
-Linus Walleij
+Nicolas
