@@ -1,37 +1,37 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 22 Jul 2010 10:43:07 +0200
-Subject: [PATCH] Make SPARSE_IRQ a hidden option
-Message-ID: <AANLkTimmwLIubkxfagve_QBfD9KahO57Q_-vwhV3h4VU@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Jul 2010 09:46:49 +0100
+Subject: ARM Machine SoC I/O setup and PAD initialization code
+In-Reply-To: <20100722072948.GA7101@verge.net.au>
+References: <201007211029.29529.david.jander@protonic.nl>
+	<20100721084726.GC6009@n2100.arm.linux.org.uk>
+	<20100722023250.GC27663@verge.net.au>
+	<20100722072034.GA6802@n2100.arm.linux.org.uk>
+	<20100722072948.GA7101@verge.net.au>
+Message-ID: <20100722084649.GK6802@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-    [ARM] Make SPARSE_IRQ a hidden option
+On Thu, Jul 22, 2010 at 04:29:48PM +0900, Simon Horman wrote:
+> On Thu, Jul 22, 2010 at 08:20:34AM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Jul 22, 2010 at 11:32:53AM +0900, Simon Horman wrote:
+> > > Would it be feasible to  use Linux + kexec as the boot loader as
+> > > a long term solution to fixing boot loaders by eliminating them?
+> > 
+> > So what you're proposing is that a broken boot loader should boot a
+> > version of Linux to fix the pin MUX, which then kexecs a kernel which
+> > doesn't have that code?
+> > 
+> > What's the point of that - when the first kernel will be able to run
+> > the system?
+> 
+> Ok, point taken, its impossible to remove the boot loaders.
 
-    SPARSE_IRQ doesn't need to be a visible option, only those platforms
-    supporting that will select it.
+No, my point was that if you're going to put pin mux code into the
+kernel, there's no point building the pin mux code out of the kernel
+which you're going to use to run your device.
 
-    Signed-off-by: Eric Miao <eric.miao@canonical.com>
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c810765..2b3f84f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1263,8 +1263,7 @@ config HW_PERF_EVENTS
- 	  disabled, perf events will use software events only.
-
- config SPARSE_IRQ
--	bool "Support sparse irq numbering"
--	depends on EXPERIMENTAL
-+	def_bool n
- 	help
- 	  This enables support for sparse irqs. This is useful in general
- 	  as most CPUs have a fairly sparse array of IRQ vectors, which
-@@ -1272,8 +1271,6 @@ config SPARSE_IRQ
- 	  number of off-chip IRQs will want to treat this as
- 	  experimental until they have been independently verified.
-
--	  If you don't know what to do here, say N.
--
- source "mm/Kconfig"
-
- config FORCE_MAX_ZONEORDER
+So, what we tend to do as a general rule on ARM is to put the pin mux
+code into the kernel so that we're less reliant on any boot loader to
+get it right.  And as I've already said, we have some cases where we
+need to change the pin muxing at runtime, and at least one case where
+it needs to be changed by the device driver operating on the pins.
