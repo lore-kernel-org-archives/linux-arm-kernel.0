@@ -1,30 +1,22 @@
-From: roger.quadros@nokia.com (Roger Quadros)
-Date: Thu, 22 Jul 2010 14:35:29 +0300
-Subject: [PATCH v2 18/20] mmc: sdio: enable a default power off mode of
-	the card
-In-Reply-To: <1279733634-21974-19-git-send-email-ohad@wizery.com>
-References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-	<1279733634-21974-19-git-send-email-ohad@wizery.com>
-Message-ID: <4C482D01.1040109@nokia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Jul 2010 12:42:58 +0100
+Subject: [RFC,PATCH 3/3] arm: remove machine_desc.io_pg_offst and .phys_io
+In-Reply-To: <1279073377.404006.432977736300.3.gpush@pororo>
+References: <1279073377.400469.233833413341.0.gpush@pororo>
+	<1279073377.404006.432977736300.3.gpush@pororo>
+Message-ID: <20100722114258.GO31293@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/21/2010 08:33 PM, ext Ohad Ben-Cohen wrote:
-> Add support for an SDIO device to stay powered off even without
-> the presence of an SDIO function driver. A host should explicitly
-> ask for it by means of MMC_CAP_DONT_POWER_CARD, and the SDIO
-> function driver should know it needs to call sdio_claim_power
-> before accessing the device.
->
-> Signed-off-by: Ohad Ben-Cohen<ohad@wizery.com>
+On Wed, Jul 14, 2010 at 10:09:37AM +0800, Jeremy Kerr wrote:
+> Since we're now using addruart to establish the debug mapping, we can
+> remove the io_pg_offst and phys_io members of struct machine_desc.
 
-Shouldn't this be the default behaviour? If there is no function driver for any 
-of the functions of the card, then sdio core shold power off the card.
+BTW, it'd probably make more sense to do this as a script, something
+like this (untested):
 
-I don't see a need for a special capability flag for this.
+grep -rl MACHINE_START arch/arm | xargs --no-run-if-empty \
+  sed -i '/MACHINE_START/,/MACHINE_END/ { /\.(phys_io|io_pg_offst)/d }'
 
-in fact MMC_CAP_DONT_POWER_CARD does not seem like an mmc host's capability 
-flag, it seems more like a request from the board to keep the card powered off.
-
-regards,
--roger
+as over time the number of boards, etc, will change, and there's already
+context changes with these patches caused by the memblock stuff.
