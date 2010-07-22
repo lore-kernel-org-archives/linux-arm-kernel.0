@@ -1,24 +1,27 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 22 Jul 2010 12:52:30 +0200
-Subject: [PATCH] Add support for Vista Silicon Visstrim_m10 board [v4].
-In-Reply-To: <1279795652-6175-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1279795652-6175-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <AANLkTimnAfDAmW8YO0PrAnTfgnTaMqqEad8JiBHfA0Vs@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 22 Jul 2010 11:54:29 +0100
+Subject: [PATCH] ARM: Versatile Express: Add default memory layout
+In-Reply-To: <20100722103038.GE31293@n2100.arm.linux.org.uk>
+References: <20100721165509.26047.70564.stgit@e102109-lin.cambridge.arm.com>
+	<20100722103038.GE31293@n2100.arm.linux.org.uk>
+Message-ID: <1279796069.9564.2.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 22, 2010 at 12:47 PM, Javier Martin
-<javier.martin@vista-silicon.com> wrote:
-> Vista Silicon Visstrim_m10 i.MX27 based board is used
-> as multimedia streaming server, access control and other
-> custom applications.
->
-> Fixed some style issues.
->
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> ---
-> ?arch/arm/mach-imx/Kconfig ? ? ? ? ? ? ? ? ? | ? ?9 +
-> ?arch/arm/mach-imx/Makefile ? ? ? ? ? ? ? ? ?| ? ?1 +
-> ?arch/arm/mach-imx/mach-imx27_visstrim_m10.c | ?265 +++++++++++++++++++++++++++
+On Thu, 2010-07-22 at 11:30 +0100, Russell King - ARM Linux wrote:
+> On Wed, Jul 21, 2010 at 05:55:09PM +0100, Catalin Marinas wrote:
+> > Since this platform is known to have 1GB of RAM at 0x60000000, add a
+> > .fixup function to set the defaults in case no "mem=" option is passed
+> > on the kernel command line.
+> 
+> And the reason why uboot can't pass the RAM information to the kernel
+> is...
 
-Mmm... I don't have this directory in my git tip.
+It needs implementing, or ask the user to pass it on the kernel command
+line. For the latter, I think it would be nicer if the kernel has some
+sane defaults.
+
+But anyway I'm proposing this patch for similarities to mach-realview.
+
+-- 
+Catalin
