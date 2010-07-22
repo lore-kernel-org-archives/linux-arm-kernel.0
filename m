@@ -1,26 +1,14 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Jul 2010 09:02:30 +0100
-Subject: [PATCH] Add support for Vista Silicon Visstrim_m10 board [v4].
-In-Reply-To: <1279785529-9679-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1279785529-9679-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <20100722080230.GG6802@n2100.arm.linux.org.uk>
+Date: Thu, 22 Jul 2010 09:02:58 +0100
+Subject: [PATCH] ARM/nuc900: patch for modifying spi flash configuration
+In-Reply-To: <AANLkTikJruYLIo3By6Wq1evr7J6giz4-73XcPKOFFgKZ@mail.gmail.com>
+References: <AANLkTikJruYLIo3By6Wq1evr7J6giz4-73XcPKOFFgKZ@mail.gmail.com>
+Message-ID: <20100722080258.GH6802@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +#include <linux/platform_device.h>
-> +#include <linux/mtd/physmap.h>
-> +#include <mach/common.h>
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/time.h>
-> +#include <mach/gpio.h>
-> +#include <mach/mmc.h>
-> +#include <mach/iomux.h>
-> +#include <mach/mxc_ehci.h>
-> +#include <linux/i2c.h>
-> +#include <linux/i2c/pca953x.h>
-> +#include <linux/gpio_keys.h>
-> +#include <linux/input.h>
+On Thu, Jul 22, 2010 at 02:34:58PM +0800, Wan ZongShun wrote:
+> This patch is to modify spi flash configuration,
+> the previous one can make spi driver work failed.
 
-linux/ includes first, then asm/ includes, then mach/ includes.  Please
-use linux/gpio.h rather than mach/gpio.h
+Ok.
