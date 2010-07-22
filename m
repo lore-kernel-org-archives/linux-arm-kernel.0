@@ -1,41 +1,19 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Jul 2010 10:46:43 +0100
-Subject: [RFC,PATCH 3/3] arm: remove machine_desc.io_pg_offst and .phys_io
-In-Reply-To: <1279703355.27276.100.camel@pororo.lan>
-References: <1279073377.400469.233833413341.0.gpush@pororo>
-	<1279073377.404006.432977736300.3.gpush@pororo>
-	<AANLkTilsIR36GNlbpZHt3FB5Dp2msedtUMFRSlZ-N-w9@mail.gmail.com>
-	<20100720100448.GB32702@n2100.arm.linux.org.uk>
-	<1279621292.27276.19.camel@pororo.lan>
-	<1279629158.27276.29.camel@pororo.lan>
-	<20100721085024.GD6009@n2100.arm.linux.org.uk>
-	<1279703355.27276.100.camel@pororo.lan>
-Message-ID: <20100722094643.GB31293@n2100.arm.linux.org.uk>
+Date: Thu, 22 Jul 2010 10:44:18 +0100
+Subject: [PATCH v2] arm: use addruart macro to establish debug mappings
+In-Reply-To: <1279702980.221230.84864205444.1.gpush@pororo>
+References: <1279702980.221230.84864205444.1.gpush@pororo>
+Message-ID: <20100722094418.GA31293@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 21, 2010 at 11:09:15AM +0200, Jeremy Kerr wrote:
-> Russell,
-> 
-> > It's extremely unlikely to have a UART at address 0 (because that's by
-> > default where the CPU jumps to on reset.)  That's not to say it could
-> > never happen - it's possible to hard-wire the CPU into 'hivec' mode
-> > where it'll instead jump to 0xffff0000.  In that case, if you're sane
-> > you'd put your SDRAM at 0x00000000.
-> 
-> OK, the patch I have just posted is a bit of a hack that does the 0x0
-> check; happy to do this a different way.
-> 
-> So, the simplest solution seems to be to make the uart mapping code
-> dependent on !DEBUG_ICEDCC (but leave the code there to add the mappings
-> for ARCH_NETWINDER, ARCH_CATS and ARCH_RPC). Would you like a new patch
-> for this?
+On Wed, Jul 21, 2010 at 11:03:00AM +0200, Jeremy Kerr wrote:
+> Since we can call addruart with an argument to specify that we want a
+> physical or virtual address, use addruart in the debug mapping code to
+> find these addresses.
 
-I think the last patch you posted is fine as-is.  Compiling out the
-setup code for the DEBUG_ICEDCC would be an optimization which could
-be done though...  If you think it's appropriate, please do so.
+I think you need to update the changelog above.  We no longer call
+addruart with any arguments, other than what registers we'd like the
+virtual and physical addresses in.
 
-Meanwhile, I'm happy enough to merge this patch (or the optimized one)
-and the follow-on patch which kills off the initializers.
-
-Out of interest, have the OMAP platforms been compile tested with this?
+Apart from that, I'm happy with this patch.
