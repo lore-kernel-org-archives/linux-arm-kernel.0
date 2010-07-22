@@ -1,35 +1,99 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Jul 2010 11:57:29 +0100
-Subject: [PATCH] ARM: Versatile Express: Add default memory layout
-In-Reply-To: <1279796069.9564.2.camel@e102109-lin.cambridge.arm.com>
-References: <20100721165509.26047.70564.stgit@e102109-lin.cambridge.arm.com>
-	<20100722103038.GE31293@n2100.arm.linux.org.uk>
-	<1279796069.9564.2.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20100722105729.GK31293@n2100.arm.linux.org.uk>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 22 Jul 2010 14:05:37 +0300
+Subject: [PATCH] Add support for Vista Silicon Visstrim_m10 board [v5].
+In-Reply-To: <1279795695-6211-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1279795695-6211-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <20100722110537.GC12359@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 22, 2010 at 11:54:29AM +0100, Catalin Marinas wrote:
-> On Thu, 2010-07-22 at 11:30 +0100, Russell King - ARM Linux wrote:
-> > On Wed, Jul 21, 2010 at 05:55:09PM +0100, Catalin Marinas wrote:
-> > > Since this platform is known to have 1GB of RAM at 0x60000000, add a
-> > > .fixup function to set the defaults in case no "mem=" option is passed
-> > > on the kernel command line.
-> > 
-> > And the reason why uboot can't pass the RAM information to the kernel
-> > is...
+Hi Javier,
+
+On Thu, Jul 22, 2010 at 12:48:15PM +0200, Javier Martin wrote:
+> Vista Silicon Visstrim_m10 i.MX27 based board is used
+> as multimedia streaming server, access control and other
+> custom applications.
 > 
-> It needs implementing, or ask the user to pass it on the kernel command
-> line. For the latter, I think it would be nicer if the kernel has some
-> sane defaults.
+> Include files in correct order and use <linux/gpio.h>
+> instead of <mach/gpio.h>.
+> 
+> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+> ---
+>  arch/arm/mach-imx/Kconfig                   |    9 +
+>  arch/arm/mach-imx/Makefile                  |    1 +
+>  arch/arm/mach-imx/mach-imx27_visstrim_m10.c |  266 +++++++++++++++++++++++++++
+>  3 files changed, 276 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-imx/mach-imx27_visstrim_m10.c
 
-The kernel does have some sane _safe_ defaults - it assumes that there's
-at least 16M of RAM.
+[snip]
 
-> But anyway I'm proposing this patch for similarities to mach-realview.
+> new file mode 100644
+> index 0000000..f18b9ed
+> --- /dev/null
+> +++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> @@ -0,0 +1,266 @@
+> +/*
+> + * mach-imx27_visstrim_m10.c
+> + *
+> + * Copyright 2010  Javier Martin <javier.martin@vista-silicon.com>
+> + *
+> + * Based on mach-pcm038.c, mach-pca100.c, mach-mx27ads.c and others.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+> + * MA 02110-1301, USA.
+> + */
+> +
+> +#define pr_fmt(fmt) "visstrim_m10: " fmt
 
-I don't think that's a good enough justification.  We have the fixup for
-realview because of the dual RAM mappings in physical space, and the
-boot loader doesn't know which one we're using.  That problem is unique
-to the Realview platforms, and doesn't exist on any of the other ARM
-development platforms.
+This isn't used anywhere.
+
+> +#include <linux/platform_device.h>
+> +#include <linux/mtd/physmap.h>
+> +#include <linux/i2c.h>
+> +#include <linux/i2c/pca953x.h>
+> +#include <linux/gpio_keys.h>
+> +#include <linux/input.h>
+> +#include <linux/gpio.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/time.h>
+> +#include <mach/common.h>
+> +#include <mach/mmc.h>
+> +#include <mach/iomux.h>
+> +#include <mach/mxc_ehci.h>
+> +
+> +
+
+One empty line should be enough.
+
+> +#include "devices-imx27.h"
+> +#include "devices.h"
+> +
+> +#define OTG_PHY_CS_GPIO (GPIO_PORTF + 17)
+> +#define SDHC1_IRQ IRQ_GPIOB(25)
+> +
+> +
+> +
+
+Ditto.
+
+[snip]
+
+baruch
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
