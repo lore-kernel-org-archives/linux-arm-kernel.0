@@ -1,40 +1,55 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 22 Jul 2010 17:38:36 +0900
-Subject: ARM Machine SoC I/O setup and PAD initialization code
-In-Reply-To: <20100722072948.GA7101@verge.net.au>
-References: <201007211029.29529.david.jander@protonic.nl>
-	<20100721084726.GC6009@n2100.arm.linux.org.uk>
-	<20100722023250.GC27663@verge.net.au>
-	<20100722072034.GA6802@n2100.arm.linux.org.uk>
-	<20100722072948.GA7101@verge.net.au>
-Message-ID: <AANLkTilA-9ZjAVqiql1amjjrRlh724z_RHQz7VBdNSxA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Jul 2010 09:40:59 +0100
+Subject: [PATCH 1/3] U6/U6715 ARM architecture files
+In-Reply-To: <1279531495-16225-2-git-send-email-philippe.langlais@stericsson.com>
+References: <1279531495-16225-1-git-send-email-philippe.langlais@stericsson.com>
+	<1279531495-16225-2-git-send-email-philippe.langlais@stericsson.com>
+Message-ID: <20100722084059.GJ6802@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 22, 2010 at 4:29 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Jul 22, 2010 at 08:20:34AM +0100, Russell King - ARM Linux wrote:
->> On Thu, Jul 22, 2010 at 11:32:53AM +0900, Simon Horman wrote:
->> > Would it be feasible to ?use Linux + kexec as the boot loader as
->> > a long term solution to fixing boot loaders by eliminating them?
->>
->> So what you're proposing is that a broken boot loader should boot a
->> version of Linux to fix the pin MUX, which then kexecs a kernel which
->> doesn't have that code?
->>
->> What's the point of that - when the first kernel will be able to run
->> the system?
->
-> Ok, point taken, its impossible to remove the boot loaders.
+On Mon, Jul 19, 2010 at 11:24:53AM +0200, Philippe Langlais wrote:
+> +/*
+> + * Macros to group U6xxx into cpu classes.
+> + * These can be used in most places.
+> + * cpu_is_u67xx():	True for U67XX
+> + */
+> +
+> +#define GET_U6XXX_CLASS		((inl(SCON_SYSVER_REG)&0x0F00)>>8)
+> +#define GET_U6XXX_SUBCLASS	((inl(SCON_SYSVER_REG)&0x0FF0)>>4)
 
-I disagree. We already use upstream Linux as a boot loader on SuperH.
+Bah.  Still finding ISA/PCI IO macros in your source.  Can you review
+your own patches and eliminate all {in,out}s?[bwl] calls please?
+(that's inb, inw, inl, insb, insw, insl, and the out variants too...)
 
-For ARM and other architectures check out the ELC2010 presentation by
-Greg Ungerer here:
-http://elinux.org/images/7/7b/LinuxWithoutABootLoader.pdf
+> +static void u6_clockevent_init_mmtu(void)
+> +{
+> +	printk(PKMOD "clockevent_init_mmtu\n");
+> +
+> +	/* prescale 13Mhz -> 1Mhz */
+> +#ifndef U6_MMTU_CLOCK_SOURCE
+> +	u6_mmtu_timer_init(0, 0, (MMTU_SYS_FRQ / MMTU_ROOT_FRQ), 0);
+> +#endif
+> +
+> +/* issue it is shorter than reality and generates spurious irq */
+> +/*      clockevent_mmtu.mult = div_sc(MMTU_ROOT_FRQ, NSEC_PER_SEC,
+> + *      clockevent_mmtu.shift) + 1;*/
 
-For SH and a more zoomed our perspective have a look at my presentation:
-http://elinux.org/images/2/2f/ELC-2010-Damm-Kexec.pdf
+Shouldn't these comments be indented?
 
-Cheers,
+> +	clockevent_mmtu.mult =
+> +	    div_sc(MMTU_ROOT_FRQ, NSEC_PER_SEC, clockevent_mmtu.shift);
+> +
+> +/*      clockevent_mmtu.max_delta_ns = div_sc(RELOAD_COUNTER_MMTU,
+> + *      clockevent_mmtu.mult, clockevent_mmtu.shift);*/
+> +/*  In fact it is wider than the 32bits variable !!! */
 
-/ magnus
+Ditto.
+
+> +	clockevent_mmtu.max_delta_ns = 0xFFFFFFFF;
+> +
+> +/*  MMTU HW limitation: match register can't be set w/ tcval+1 */
+> +/*      clockevent_mmtu.min_delta_ns = div_sc(1, clockevent_mmtu.mult,
+> + *      clockevent_mmtu.shift)+1;*/
+
+Ditto.
