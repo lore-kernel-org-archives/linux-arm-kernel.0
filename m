@@ -1,26 +1,60 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Thu, 22 Jul 2010 13:47:36 +0900
-Subject: [RFC 3/3] mm: iommu: The Virtual Contiguous Memory Manager
-In-Reply-To: <20100722035026.GB14176@codeaurora.org>
-References: <20100713090223.GB20590@n2100.arm.linux.org.uk>
-	<20100714105922D.fujita.tomonori@lab.ntt.co.jp>
-	<20100722035026.GB14176@codeaurora.org>
-Message-ID: <20100722134708I.fujita.tomonori@lab.ntt.co.jp>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 22 Jul 2010 08:41:57 +0300
+Subject: [PATCH 0/3] Enable pxa310 usb otg port host mode
+In-Reply-To: <AANLkTikJUNLl-Xd0D7zJlo-iJYxIlyLD_HBB77qZj-4T@mail.gmail.com>
+References: <1279199446-30526-1-git-send-email-grinberg@compulab.co.il>
+	<AANLkTikJUNLl-Xd0D7zJlo-iJYxIlyLD_HBB77qZj-4T@mail.gmail.com>
+Message-ID: <4C47DA25.3040202@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Jul 2010 20:50:26 -0700
-Zach Pfeffer <zpfeffer@codeaurora.org> wrote:
+>
+> On Thu, Jul 15, 2010 at 3:10 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>   
+>> This patch series introduces the U2D Controller and
+>> Host driver for PXA3xx and enables cm-x300 usb host port2.
+>>
+>> This patch series depends on
+>> "Generic ULPI driver extention" patch series,
+>> which is currently sent for review to
+>> linux-usb at vger.kernel.org mailing list
+>>
+>> Igor Grinberg (3):
+>>  [ARM] pxa3xx: Add U2D controller and driver
+>>  [ARM] usb/host/ohci-pxa27x: enable OHCI over U2DC
+>>  [ARM] pxa/cm-x300: enable USB host port2
+>>
+>>  arch/arm/mach-pxa/Kconfig                   |    4 +
+>>  arch/arm/mach-pxa/Makefile                  |    2 +-
+>>  arch/arm/mach-pxa/cm-x300.c                 |   77 ++++++
+>>  arch/arm/mach-pxa/devices.c                 |   28 ++
+>>  arch/arm/mach-pxa/devices.h                 |    1 +
+>>  arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h |   35 +++
+>>  arch/arm/mach-pxa/pxa3xx-u2d.c              |  392 +++++++++++++++++++++++++++
+>>     
+> Will pxa3xx-ulpi.c be a better name here? I do like pxa3xx-u2d.c to be
+> the driver name for the U2D controller, and be placed in drivers/usb/
+>   
 
-> On Wed, Jul 14, 2010 at 10:59:43AM +0900, FUJITA Tomonori wrote:
-> > On Tue, 13 Jul 2010 10:02:23 +0100
-> > 
-> > Zach Pfeffer said this new VCM infrastructure can be useful for
-> > video4linux. However, I don't think we need 3,000-lines another
-> > abstraction layer to solve video4linux's issue nicely.
-> 
-> Its only 3000 lines because I haven't converted the code to use
-> function pointers.
+Well, the intend was to make a start for the U2D driver,
+so there will be facilities for comunicating with the controller.
 
-The main point is adding a new abstraction that don't provide the huge
-benefit.
+I can separate the U2D stuff from the pxa310 specific ulpi,
+is this what you mean?
+
+> Otherwise looks OK to me.
+>
+>   
+>>  arch/arm/mach-pxa/pxa3xx.c                  |    2 +-
+>>  drivers/usb/host/ohci-pxa27x.c              |    7 +
+>>  9 files changed, 546 insertions(+), 2 deletions(-)
+>>  create mode 100644 arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h
+>>  create mode 100644 arch/arm/mach-pxa/pxa3xx-u2d.c
+>>
+>>
+>>     
+>   
+
+-- 
+Regards,
+Igor.
