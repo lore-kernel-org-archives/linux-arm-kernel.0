@@ -1,30 +1,41 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 22 Jul 2010 13:56:52 +0100
-Subject: ARM Machine SoC I/O setup and PAD initialization code
-In-Reply-To: <201007221410.10087.david.jander@protonic.nl>
-References: <201007211029.29529.david.jander@protonic.nl>
-	<20100722072034.GA6802@n2100.arm.linux.org.uk>
-	<AANLkTinQS3vkua2dW0iPpXKDJizVIIKgqcBol2FhuRW_@mail.gmail.com>
-	<201007221410.10087.david.jander@protonic.nl>
-Message-ID: <20100722125652.GL10930@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Jul 2010 14:24:00 +0100
+Subject: ARM Kernel autobuilder
+In-Reply-To: <20100722111412.GB10399@kyllikki.org>
+References: <20100722111412.GB10399@kyllikki.org>
+Message-ID: <20100722132400.GR31293@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 22, 2010 at 02:10:09PM +0200, David Jander wrote:
+On Thu, Jul 22, 2010 at 12:14:12PM +0100, Vincent Sanders wrote:
+> Can I propose now the omap3_defconfig is working that the duplicate
+> defconfigs are removed, these are:
+> 
+> cm_t35_defconfig
+> devkit8000_defconfig
+> igep0020_defconfig
+> rx51_defconfig
+> omap3_beagle_defconfig
+> omap3_evm_defconfig
+> am3517_evm_defconfig
+> omap_4430sdp_defconfig
+> omap_ldp_defconfig
+> omap3_pandora_defconfig
+> omap3_stalker_lks_defconfig
+> omap_apollon_2420_defconfig
+> omap_h4_2420_defconfig
+> omap_2430sdp_defconfig
+> omap_3430sdp_defconfig
+> omap_3630sdp_defconfig
+> omap3_touchbook_defconfig
+> omap_zoom2_defconfig
+> omap_zoom3_defconfig
+> overo_defconfig
+> 
+> This would reduce the default configuration count to 156
+> configurations. 
 
-> IMO, if a bootloader is broken (in any way), it needs replacing. Be it with 
-> another bootloader or directly with the kernel.
-
-If you don't have JTAG access (either due to device limitations or due
-to lack of data from the vendor of a reference platform you're using)
-replacing a bootloader can be rather more stressful than it's worth.
-
-> That sounds a lot "saner" to me than having two asynchronous and different 
-> copies of setup-code, which could be a potential nightmare, besides not being 
-> really maintainable.
-
-Well, from the point of view of using systems like this all you need the
-bootloader to do is to set the system up enough to load the kernel and
-start it running.  You don't need it to understand anything else about
-the rest of the system, which means you're less reliant on the quality
-of the bootloader.
+Linus lately appears to be more relaxed about this, and is in the mood
+for improvements in the situation, so yes this would be an improvement.
+It certainly would make things a little smaller, and allow kautobuild
+to run faster.
