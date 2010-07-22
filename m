@@ -1,53 +1,35 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 22 Jul 2010 17:06:16 +0900
-Subject: [linux-pm] [PATCH/RFC] Runtime PM: ARM: subarch-specific
-	extensions of pdev_archdata
-In-Reply-To: <87k4yhagv4.fsf@deeprootsystems.com>
-References: <1253670648-28610-1-git-send-email-khilman@deeprootsystems.com>
-	<f17812d70909222153y4a0e4fc2n496ea2e6caaac847@mail.gmail.com>
-	<19129.63264.653666.70492@pilspetsen.it.uu.se>
-	<4ABAAF1D.6090907@deeprootsystems.com>
-	<f17812d70909231630i20f64328k8d604c3436094b85@mail.gmail.com>
-	<87k4yhagv4.fsf@deeprootsystems.com>
-Message-ID: <AANLkTinBqc11oE2SOmvXbFHmlgvZ21LngXNWkSHiJmRK@mail.gmail.com>
+Date: Thu, 22 Jul 2010 17:16:17 +0900
+Subject: ARM Machine SoC I/O setup and PAD initialization code
+In-Reply-To: <20100722072034.GA6802@n2100.arm.linux.org.uk>
+References: <201007211029.29529.david.jander@protonic.nl>
+	<20100721084726.GC6009@n2100.arm.linux.org.uk>
+	<20100722023250.GC27663@verge.net.au>
+	<20100722072034.GA6802@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinQS3vkua2dW0iPpXKDJizVIIKgqcBol2FhuRW_@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 27, 2009 at 8:13 AM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
-> Eric Miao <eric.y.miao@gmail.com> writes:
->> On Thu, Sep 24, 2009 at 7:28 AM, Kevin Hilman
->> <khilman@deeprootsystems.com> wrote:
->>> Mikael Pettersson wrote:
->>>> Eric Miao writes:
->>>> ?> On Wed, Sep 23, 2009 at 9:50 AM, Kevin Hilman
->>>> ?> <khilman@deeprootsystems.com> wrote:
->>>> ?> > On ARM platforms, power management can be very platform specific.
->>>> ?> > This patch allows ARM subarches to extend the platform_device
->>>> ?> > pdev_archdata for each subarch by creating a new struct pdev_machdata
->>>> ?> > and allowing each subarch to customize it as needed.
+On Thu, Jul 22, 2010 at 4:20 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Jul 22, 2010 at 11:32:53AM +0900, Simon Horman wrote:
+>> Would it be feasible to ?use Linux + kexec as the boot loader as
+>> a long term solution to fixing boot loaders by eliminating them?
+>
+> So what you're proposing is that a broken boot loader should boot a
+> version of Linux to fix the pin MUX, which then kexecs a kernel which
+> doesn't have that code?
 
-[snip]
+I think Simon was proposing to remove the broken boot loader.
 
-> OK, after no further comments, sending this patch to the patch system.
+> What's the point of that - when the first kernel will be able to run
+> the system?
 
-Hi Kevin,
+If you boot straight into a Linux kernel (CONFIG_ZBOOT_ROM on ARM ?)
+and use that to boot your real system, then at least you only need one
+copy of pinmux setup code. If it gets executed once or twice is a
+matter of system configuration IMO.
 
-Thanks for your work on this. I found this patch marked as superseeded
-in the tracker here:
-
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=5773/1
-
-I'd now like to use struct pdev_archdata myself on mach-shmobile, so
-almost a year later I wonder why this patch didn't make it.
-
-I realize that you use struct omap_device instead of struct
-pdev_archdata. I prefer not to wrap if possible. This because I'd like
-to reuse already existing drivers and PM code with the SuperH
-architecture.
-
-Do you remember what happened with this patch?
-
-Cheers,
+That aside, not trusting the boot loader is probably a good idea. =)
 
 / magnus
