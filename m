@@ -1,78 +1,46 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 22 Jul 2010 10:25:44 +0200
-Subject: [PATCH v3] Samsung: sdhci-s3c: add support for new card detection
-	methods
-In-Reply-To: <20100721161133.5c3285d3.akpm@linux-foundation.org>
-References: <1279181721-23333-1-git-send-email-m.szyprowski@samsung.com>
-	<20100715133954.7fcb797a.akpm@linux-foundation.org>
-	<011401cb24af$8eb2cb70$ac186250$%szyprowski@samsung.com>
-	<20100721161133.5c3285d3.akpm@linux-foundation.org>
-Message-ID: <000501cb2977$7d6cf210$7846d630$%szyprowski@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 22 Jul 2010 18:14:12 +0900
+Subject: ARM Machine SoC I/O setup and PAD initialization code
+In-Reply-To: <20100722084649.GK6802@n2100.arm.linux.org.uk>
+References: <201007211029.29529.david.jander@protonic.nl>
+	<20100721084726.GC6009@n2100.arm.linux.org.uk>
+	<20100722023250.GC27663@verge.net.au>
+	<20100722072034.GA6802@n2100.arm.linux.org.uk>
+	<20100722072948.GA7101@verge.net.au>
+	<20100722084649.GK6802@n2100.arm.linux.org.uk>
+Message-ID: <20100722091409.GA15757@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Jul 22, 2010 at 09:46:49AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 22, 2010 at 04:29:48PM +0900, Simon Horman wrote:
+> > On Thu, Jul 22, 2010 at 08:20:34AM +0100, Russell King - ARM Linux wrote:
+> > > On Thu, Jul 22, 2010 at 11:32:53AM +0900, Simon Horman wrote:
+> > > > Would it be feasible to  use Linux + kexec as the boot loader as
+> > > > a long term solution to fixing boot loaders by eliminating them?
+> > > 
+> > > So what you're proposing is that a broken boot loader should boot a
+> > > version of Linux to fix the pin MUX, which then kexecs a kernel which
+> > > doesn't have that code?
+> > > 
+> > > What's the point of that - when the first kernel will be able to run
+> > > the system?
+> > 
+> > Ok, point taken, its impossible to remove the boot loaders.
 
-On Thursday, July 22, 2010 1:12 AM 
+For the record, what I was proposing was removing the broken boot loader
+and replacing it with something that isn't broken. And I was wondering
+if that is feasible or not. But as you point out (elsewhere) that
+may not be relevant to the original question.
 
-> On Fri, 16 Jul 2010 08:24:26 +0200
-> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> No, my point was that if you're going to put pin mux code into the
+> kernel, there's no point building the pin mux code out of the kernel
+> which you're going to use to run your device.
 > 
-> > > >  arch/arm/mach-s3c64xx/setup-sdhci-gpio.c   |   14 +++++++++---
-> > > >  arch/arm/mach-s5pc100/setup-sdhci-gpio.c   |   21 ++++++++++++++----
-> -
-> > > >  arch/arm/mach-s5pv210/setup-sdhci-gpio.c   |   22 +++++++++++++++---
-> --
-> > > >  arch/arm/plat-samsung/dev-hsmmc.c          |    5 ++++
-> > > >  arch/arm/plat-samsung/dev-hsmmc1.c         |    5 ++++
-> > > >  arch/arm/plat-samsung/dev-hsmmc2.c         |    5 ++++
-> > > >  arch/arm/plat-samsung/dev-hsmmc3.c         |    5 ++++
-> > > >  arch/arm/plat-samsung/include/plat/sdhci.h |   29
-> > > ++++++++++++++++++++++++++++
-> > > >  8 files changed, 90 insertions(+), 16 deletions(-)
-> > >
-> > > This is quite confusing.  You've already sent a patch called
-> > > "sdhci-s3c: add support for new card detection methods".  It had the
-> > > same changelog as this patch and the same title, but the two patches
-> > > are utterly different!
-> >
-> > The real patch has been split into two for easier merging: 1. the driver
-> > part and 2. samsung platform related part. The part which patch belongs
-> > to is indicated in the last line of the change log.
-> >
-> > I'm really confused how to submit properly a patch that requires changes
-> > to both the driver (which is merged by the proper driver maintainer's
-> > sub-tree) and the platform (which should go through platform maintainer's
-> > tree).
-> 
-> Make the relationship very very clear in the changelog.  Send both
-> patches to both maintainers.  Ask that one of them merge both patches
-> and that the other ack both patches.
+> So, what we tend to do as a general rule on ARM is to put the pin mux
+> code into the kernel so that we're less reliant on any boot loader to
+> get it right.  And as I've already said, we have some cases where we
+> need to change the pin muxing at runtime, and at least one case where
+> it needs to be changed by the device driver operating on the pins.
 
-Ok. Thanks for the hint.
-
-> Anyway, I've forgotten what's happening here.  I appear to be sitting on
-> 
-> sdhci-s3c-add-support-for-the-non-standard-minimal-clock-value.patch
-
-This one is independent from the card-detection patches and can be applied
-directly onto linux-next kernel tree.
-
-> and
-> sdhci-s3c-add-support-for-new-card-detection-methods.patch
-> 
-> the latter of which is below.
-> 
-> Am I missing something?  Is
-> sdhci-s3c-add-support-for-new-card-detection-methods.patch up to date?
-> 
-
-Ok, I will repost these 2 patches under new names to avoid further
-confusion. Currently there exists two 
-"sdhci-s3c-add-support-for-new-card-detection-methods.patch", both of them 
-are required.
-
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+Ok, so the boot-loader is irrelevant to the pin mux code in the kernel?
