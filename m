@@ -1,22 +1,54 @@
-From: ibr@radix50.net (Baurzhan Ismagulov)
-Date: Thu, 22 Jul 2010 19:15:04 +0200
-Subject: debugging kernel with gdb
-In-Reply-To: <1279752261.15547.9.camel@qu102.quarc.com>
-References: <4BFD72AD.4010005@gmail.com>
-	<AANLkTikwrs3PUS2zNR8daxfVkSCKLUvRtDYkXicXcTXq@mail.gmail.com>
-	<4BFD7BBF.1090100@gmail.com>
-	<AANLkTikfGIBaYnFskW4_TUzfWXBIy9fIqziNcedQwE8M@mail.gmail.com>
-	<1279752261.15547.9.camel@qu102.quarc.com>
-Message-ID: <20100722171504.GA7869@radix50.net>
+From: randy.dunlap@oracle.com (Randy Dunlap)
+Date: Thu, 22 Jul 2010 10:17:53 -0700
+Subject: [PATCH v4] gpio: sx150x: Add Semtech I2C sx150x gpio expander
+	driver.
+In-Reply-To: <1279818771-9428-1-git-send-email-gbean@codeaurora.org>
+References: <1279818771-9428-1-git-send-email-gbean@codeaurora.org>
+Message-ID: <20100722101753.c73604eb.randy.dunlap@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 21, 2010 at 03:44:21PM -0700, Jeff Hane wrote:
-> The code was being compiled with -O2 and -g.  I thought the obvious
-> thing to do is just change this to -O0 in the top level Makefile;
-> however this results in the following message.   
+On Thu, 22 Jul 2010 10:12:51 -0700 Gregory Bean wrote:
 
-This doesn't work (I've never looked why) and is not supported.
+>  drivers/gpio/Kconfig       |   11 +
+>  drivers/gpio/Makefile      |    1 +
+>  drivers/gpio/sx150x.c      |  645 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/i2c/sx150x.h |   78 ++++++
+>  4 files changed, 735 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/gpio/sx150x.c
+>  create mode 100644 include/linux/i2c/sx150x.h
+> 
+> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> index 7face91..f623953 100644
+> --- a/drivers/gpio/Kconfig
+> +++ b/drivers/gpio/Kconfig
+> @@ -195,6 +195,17 @@ config GPIO_PCF857X
+>  	  This driver provides an in-kernel interface to those GPIOs using
+>  	  platform-neutral GPIO calls.
+>  
+> +config GPIO_SX150X
+> +	bool "Semtech SX150x I2C GPIO expander"
+> +	depends on I2C=y
+> +	default n
+> +	help
+> +	  Say yes here to provide support for Semtech SX150-series I2C
+> +	  GPIO expanders. Compatible models include:
 
-With kind regards,
-Baurzhan.
+Just curious, not complaining, but why does this driver (and some others)
+need to be built-in instead of having the option of being built as a
+loadable module?
+
+
+> +	  8 bits:  sx1508q
+> +	  16 bits: sx1509q
+> +
+>  config GPIO_TC35892
+>  	bool "TC35892 GPIOs"
+>  	depends on MFD_TC35892
+
+
+
+
+---
+~Randy
+*** Remember to use Documentation/SubmitChecklist when testing your code ***
