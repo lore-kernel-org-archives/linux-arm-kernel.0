@@ -1,7 +1,7 @@
 From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Thu, 22 Jul 2010 12:47:32 +0200
-Subject: [PATCH] Add support for Vista Silicon Visstrim_m10 board [v4].
-Message-ID: <1279795652-6175-1-git-send-email-javier.martin@vista-silicon.com>
+Date: Thu, 22 Jul 2010 12:48:15 +0200
+Subject: [PATCH] Add support for Vista Silicon Visstrim_m10 board [v5].
+Message-ID: <1279795695-6211-1-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,14 +9,15 @@ Vista Silicon Visstrim_m10 i.MX27 based board is used
 as multimedia streaming server, access control and other
 custom applications.
 
-Fixed some style issues.
+Include files in correct order and use <linux/gpio.h>
+instead of <mach/gpio.h>.
 
 Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 ---
  arch/arm/mach-imx/Kconfig                   |    9 +
  arch/arm/mach-imx/Makefile                  |    1 +
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c |  265 +++++++++++++++++++++++++++
- 3 files changed, 275 insertions(+), 0 deletions(-)
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |  266 +++++++++++++++++++++++++++
+ 3 files changed, 276 insertions(+), 0 deletions(-)
  create mode 100644 arch/arm/mach-imx/mach-imx27_visstrim_m10.c
 
 diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
@@ -53,10 +54,10 @@ index 46a9fdf..5582692 100644
  obj-$(CONFIG_MACH_PCA100) += mach-pca100.o
 diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
 new file mode 100644
-index 0000000..a719edc
+index 0000000..f18b9ed
 --- /dev/null
 +++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-@@ -0,0 +1,265 @@
+@@ -0,0 +1,266 @@
 +/*
 + * mach-imx27_visstrim_m10.c
 + *
@@ -84,18 +85,19 @@ index 0000000..a719edc
 +
 +#include <linux/platform_device.h>
 +#include <linux/mtd/physmap.h>
-+#include <mach/common.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
-+#include <mach/gpio.h>
-+#include <mach/mmc.h>
-+#include <mach/iomux.h>
-+#include <mach/mxc_ehci.h>
 +#include <linux/i2c.h>
 +#include <linux/i2c/pca953x.h>
 +#include <linux/gpio_keys.h>
 +#include <linux/input.h>
++#include <linux/gpio.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++#include <mach/common.h>
++#include <mach/mmc.h>
++#include <mach/iomux.h>
++#include <mach/mxc_ehci.h>
++
 +
 +#include "devices-imx27.h"
 +#include "devices.h"
