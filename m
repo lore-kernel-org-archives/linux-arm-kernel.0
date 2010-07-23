@@ -1,82 +1,125 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 23 Jul 2010 10:59:18 +0530
-Subject: ARM Kernel autobuilder
-In-Reply-To: <20100723040454.GA30291@verge.net.au>
-References: <20100722111412.GB10399@kyllikki.org>
-	<20100722132400.GR31293@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C6254BEF@dbde02.ent.ti.com>
-	<20100723040454.GA30291@verge.net.au>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C6254E6C@dbde02.ent.ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 23 Jul 2010 07:36:54 +0200
+Subject: [PATCH v4] Samsung: add new card detection methods in s3c-sdhci
+	driver (platform part)
+In-Reply-To: <004801cb29fe$7fb23ad0$7f16b070$%kim@samsung.com>
+References: <000501cb2977d6cf210846d630$%szyprowski@samsung.com>
+	<1279790980-29583-1-git-send-email-m.szyprowski@samsung.com>
+	<004801cb29fe$7fb23ad0$7f16b070$%kim@samsung.com>
+Message-ID: <003701cb2a29$12eed9a0$38cc8ce0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Simon Horman [mailto:horms at verge.net.au]
-> Sent: Friday, July 23, 2010 9:35 AM
-> To: Shilimkar, Santosh
-> Cc: Russell King - ARM Linux; Vincent Sanders; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: ARM Kernel autobuilder
+Hello,
+
+On Friday, July 23, 2010 2:32 AM Kukjin Kim wrote:
+
+> Marek Szyprowski wrote:
+> >
+> > On some Samsung SoCs not all SDHCI controllers have card detect (CD)
+> > line. For some embedded designs it is not even needed, because ususally
+> > the device (like SDIO flash memory or wifi controller) is permanently
+> > wired to the controller. There are also systems which have a card detect
+> > line connected to some of the external interrupt lines or the presence
+> > of the card depends on some other actions (like enabling a power
+> > regulator).
+> >
+> > This patch adds all required changes to platform support code, so
+> > another patch, which extends the driver with support for the new card
+> > detection methods can be applied.
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >
+> > This a resend of the previous patch.
+> >
+> > I hope these changes to platform specific code gets merged soon, so the
+> > changes to the driver can be merged as well.
+> >
+> > The patch has been prepared against linux-next kernel tree from 20100722.
+> >
+> > Changes since V3:
+> > - renamed patch to avoid confusion with the patch for the s3c-sdhci
+> driver
+> >   itself - added "(platform part)" in subject
+> >
+> > Changes since V2:
+> > - added support for HSMMC3 device
+> >
+> > Changes since V1:
+> > - added support for gpio external interrupt card based detect method
+> >   directly to sdhci-s3c driver
+> > - removed s3c64xx compilation fix patch from the series
+> >
+> > Best regards
+> > --
+> > Marek Szyprowski
+> > Samsung Poland R&D Center
+> >
+> > ---
+> >
+> >  arch/arm/mach-s3c64xx/setup-sdhci-gpio.c   |   14 +++++++++---
+> >  arch/arm/mach-s5pc100/setup-sdhci-gpio.c   |   21 ++++++++++++++-----
+> >  arch/arm/mach-s5pv210/setup-sdhci-gpio.c   |   22 +++++++++++++++-----
+> >  arch/arm/plat-samsung/dev-hsmmc.c          |    5 ++++
+> >  arch/arm/plat-samsung/dev-hsmmc1.c         |    5 ++++
+> >  arch/arm/plat-samsung/dev-hsmmc2.c         |    5 ++++
+> >  arch/arm/plat-samsung/dev-hsmmc3.c         |    5 ++++
+> >  arch/arm/plat-samsung/include/plat/sdhci.h |   29
+> > ++++++++++++++++++++++++++++
+> >  8 files changed, 90 insertions(+), 16 deletions(-)
+> >
 > 
-> On Thu, Jul 22, 2010 at 07:11:05PM +0530, Shilimkar, Santosh wrote:
-> > On Thu, Jul 22, 1010 at  6:54 PM, Russell King - ARM Linux wrote:
-> > > On Thu, Jul 22, 2010 at 12:14:12PM +0100, Vincent Sanders wrote:
-> > > > Can I propose now the omap3_defconfig is working that the duplicate
-> > > > defconfigs are removed, these are:
-> > > >
-> > > > cm_t35_defconfig
-> > > > devkit8000_defconfig
-> > > > igep0020_defconfig
-> > > > rx51_defconfig
-> > > > omap3_beagle_defconfig
-> > > > omap3_evm_defconfig
-> > > > am3517_evm_defconfig
-> > > > omap_4430sdp_defconfig
-> > > > omap_ldp_defconfig
-> > > > omap3_pandora_defconfig
-> > > > omap3_stalker_lks_defconfig
-> > > > omap_apollon_2420_defconfig
-> > > > omap_h4_2420_defconfig
-> > > > omap_2430sdp_defconfig
-> > > > omap_3430sdp_defconfig
-> > > > omap_3630sdp_defconfig
-> > > > omap3_touchbook_defconfig
-> > > > omap_zoom2_defconfig
-> > > > omap_zoom3_defconfig
-> > > > overo_defconfig
-> > > >
-> > > > This would reduce the default configuration count to 156
-> > > > configurations.
-> > >
-> > > Linus lately appears to be more relaxed about this, and is in the mood
-> > > for improvements in the situation, so yes this would be an
-> improvement.
-> > > It certainly would make things a little smaller, and allow kautobuild
-> > > to run faster.
-> > >
-> > omap_4430sdp_defconfig is not duplicate. Please keep
-> omap_4430sdp_defconfig because omap3_defconfig doen't includes SMP build.
+> Marek,
 > 
-> Are there any other reasons to keep omap_4430sdp_defconfig?
-> SMP seems to be a weak argument to me, after all if I peek in to
-> arch/x86/configs/ I don't see SMP and non-SMP variants.
-OMAP4 is way different from OMAP3.
+> Following is build error with this patch.
+> 
+> /home/kgene/linux/linux-2.6-mainline-dev/arch/arm/mach-s5pc100/setup-sdhci-
+> g
+> pio.c: In function 's5pc100_setup_sdhci0_cfg_gpio':
+> /home/kgene/linux/linux-2.6-mainline-dev/arch/arm/mach-s5pc100/setup-sdhci-
+> g
+> pio.c:51: error: dereferencing pointer to incomplete type
+> /home/kgene/linux/linux-2.6-mainline-dev/arch/arm/mach-s5pc100/setup-sdhci-
+> g
+> pio.c:51: error: 'S3C_SDHCI_CD_INTERNAL' undeclared (first use in
+> /home/kgene/linux/linux-2.6-mainline-dev/arch/arm/mach-s5pc100/setup-sdhci-
+> g
+> pio.c:51: error: (Each undeclared identifier is reported only once
+> /home/kgene/linux/linux-2.6-mainline-dev/arch/arm/mach-s5pc100/setup-sdhci-
+> g
+> pio.c:51: error: for each function it appears in.)
+> /home/kgene/linux/linux-2.6-mainline-dev/arch/arm/mach-s5pc100/setup-sdhci-
+> g
+> pio.c: In function 's5pc100_setup_sdhci1_cfg_gpio':
+> /home/kgene/linux/linux-2.6-mainline-dev/arch/arm/mach-s5pc100/setup-sdhci-
+> g
+> pio.c:71: error: dereferencing pointer to incomplete type
+> /home/kgene/linux/linux-2.6-mainline-dev/arch/arm/mach-s5pc100/setup-sdhci-
+> g
+> pio.c:71: error: 'S3C_SDHCI_CD_INTERNAL' undeclared (first use in
+> /home/kgene/linux/linux-2.6-mainline-dev/arch/arm/mach-s5pc100/setup-sdhci-
+> g
+> pio.c: In function 's5pc100_setup_sdhci2_cfg_gpio':
+> /home/kgene/linux/linux-2.6-mainline-dev/arch/arm/mach-s5pc100/setup-sdhci-
+> g
+> pio.c:91: error: dereferencing pointer to incomplete type
+> /home/kgene/linux/linux-2.6-mainline-dev/arch/arm/mach-s5pc100/setup-sdhci-
+> g
+> pio.c:91: error: 'S3C_SDHCI_CD_INTERNAL' undeclared (first use in
+> make[2]: *** [arch/arm/mach-s5pc100/setup-sdhci-gpio.o] Error 1
+> 
+> and s3c64xx also.
+> 
+> ...we need inclusion <plat/sdhci.h> into the ..s3c64xx/setup-sdhci-gpio.c
+> and ..s5pc100/setup-sdhci-gpio.c.
+> 
+> Will apply with build fix.
 
-OMAP3:
-	Coretex-A8 UP
-	Internal L2 cache
-	DSP System
-	IVHA 
-OMAP4 - 
-	Cortex-A9, Dual Core 
-	External L2 cache ( PL310)
-	New Interrupt controller(GIC)
-	New Memory subsystem (EMIF)
-	3 Additional co-procesors
-	New DSS
-	IVHA2
+Ok, thank you for merging the patch fixing this issue.
 
-Except ARMv7 architecture, there is not much common between these two SOCs
-
-Regards,
-Santosh
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
