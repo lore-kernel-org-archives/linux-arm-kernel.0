@@ -1,67 +1,57 @@
-From: mattia.jona@gmail.com (Mattia Jona-Lasinio)
-Date: Sat, 24 Jul 2010 12:31:53 +0200
-Subject: Introducing the LCD-Linux project
-In-Reply-To: <AANLkTilKJx18oyc815DhKfPv-Yjdv8UmfJ4WTDxZxaab@mail.gmail.com>
-References: <AANLkTikitTGpiE5Oe_P5a4f2OCOnlB9j_LVm5CQhQIno@mail.gmail.com>
-	<20100722122111.4cf4ca2f@lxorguk.ukuu.org.uk>
-	<AANLkTilKJx18oyc815DhKfPv-Yjdv8UmfJ4WTDxZxaab@mail.gmail.com>
-Message-ID: <AANLkTimnxkn5eLRHOAs6v_TJE0hM5=dQ3OWaiQP6tPJd@mail.gmail.com>
+From: jason.mcmullan@netronome.com (Jason McMullan)
+Date: Fri, 23 Jul 2010 15:59:29 -0400
+Subject: ARM Machine SoC I/O setup and PAD initialization code
+In-Reply-To: <61396.213.84.91.226.1279910330.squirrel@protonic.xs4all.nl>
+References: <201007211029.29529.david.jander@protonic.nl>
+	<201007221531.58744.david.jander@protonic.nl>
+	<20100722142043.GK4737@rakim.wolfsonmicro.main>
+	<201007231218.07379.david.jander@protonic.nl>
+	<20100723141712.GC12300@rakim.wolfsonmicro.main>
+	<61396.213.84.91.226.1279910330.squirrel@protonic.xs4all.nl>
+Message-ID: <AANLkTikpD9MTdJ0K3F43QS5eH450rw=eGE+5agubBNVi@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 22, 2010 at 1:38 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Thu, Jul 22, 2010 at 13:21, Alan Cox <alan@lxorguk.ukuu.org.uk> wrote:
->> Why do we need a VT102 as well ?
->>
->> If you use the existing kernel console interfaces then you don't need to
->> worry about vt102 v console or having two terminal emulations running.
+On Fri, Jul 23, 2010 at 2:38 PM, <david@protonic.nl> wrote:
 >
-> Indeed, the kernel already has the console abstraction.
+> This has been an interesting discussion, but I don't want to upset any
+> more people here. I just want to ask one more question, being new to
+> ARM-linux: What setup should I chose for our products then? What would be
+> more in tune with the most desireable long-term goal of ARM-linux booting?
+>
+> 1. u-boot doing all pad/IO setup and loading linux.
+> 2. u-boot just loading linux and doing only the minimum IO-setup necessary
+> for that job, and write a linux BSP that does ALL IO-init
+> 3. Don't use u-boot at all, and investigate Magnus's Kexec technique?
+> 4. Something else?
+>
+>
+Option (1) is the best bet for a *production* device (your scenario).
 
-I agree on that and at the beginning I was thinking about writing a
-framebuffer driver as well.
-But on the way I realized that the standard Linux console was not
-exactly what I needed.
-I wanted to implement some escape sequences typical of the world of
-small displays, like
-the generation of custom characters, backward writing or backlighting.
-This would have required
-a change in the standard console, and I personally wouldn't dare to do
-it. I thought it would have been
-better to have a separate console emulation dedicated to these small devices.
-Moreover I wanted something that COULD be used as a console but not
-necessarily, that is
-something that could run happily in the presence of a normal monitor
-as well. It seems to me, but I may be
-wrong, that through the standard console system only the current
-visible console is actually updated
-while other consoles are just "software" updated. An external LCD
-would therefore be updated
-only when you "switch" to it, so it would not be possible to use it to
-display diagnostics.
+For me (as a SoC company BSP engineer, trying to make a zillion
+disparate customers all happy) I use option (4):
 
-> I wrote a LCD console driver (for a HD44780 connected to the parallel
-> port) using
-> the standard console abstraction several years ago. As it used the standard
-> console abstraction, it supported multiple virtual consoles and co-operated with
-> the VGA text console out-of-the-box. Just use ALT-Fx to switch between different
-> VCs on the LCD or on VGA.
+  a) A minimial (<16k) boot block, that reads a config out of flash, and
+runs...
+  b) A small DDR (and other devices) init routine (<32k) out of flash, and
+then...
+  c) Linux
 
-I also wrote a very simple (and experimental) LCD console driver
-using the standard Linux console and LCD-Linux. More or less it works, though
-the "update" problem that I mentioned is still an issue.
+(a) Doesn't set up *anything* other than the serial UART. It is primarily
+    for reading the config, and performing the load order from flash as
+    requested by the config.
+(b) Contains all the 'real' chip/pad/board initialization, that would be
+    per-production board specific.
+(c) Doesn't need to set up pads/pins, assumes (b) took care of it.
 
-> Having a bigger virtual console where the LCD follows the region
-> surrounding the cursor
-> is indeed a nice extension to have.
+So, this is kinda like option (1), except that we use our own minimal loader
+and board setup instead of U-Boot.  The source code for (a) and (b) are
+provided
+as examples to our customers.
 
-That's another point which would have required a modification at the
-console level
-and, as I said, I didn't want to touch at the standard console. But we
-can think about
-it! ;)
-
-Regards,
-
-Mattia
+-- 
+Jason S. McMullan
+Netronome Systems, Inc.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100723/d8f81dc7/attachment-0001.html>
