@@ -1,66 +1,19 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Fri, 23 Jul 2010 21:38:27 +0800
-Subject: [PATCH] ARM/nuc900: patch for adding the global control registers
-	definition
-Message-ID: <4C499B53.5090400@gmail.com>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Fri, 23 Jul 2010 15:47:31 +0200
+Subject: [PATCH 1/3] mbimxsd baseboards : remove unecessary include
+In-Reply-To: <20100723131130.GC6690@pengutronix.de>
+References: <1279889800-12426-1-git-send-email-eric@eukrea.com>
+	<20100723131130.GC6690@pengutronix.de>
+Message-ID: <4C499D73.6050202@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to add the global control registers definition,
-many drivers need it, such as usb driver,I need it to control
-usb phy open or close, so I sent this patch.
+Hi Uwe,
 
-Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+Le 23/07/2010 15:11, Uwe Kleine-K?nig a ?crit :
+> Ack for all three patches.  I would suggest to include 2/3 before .35.
+>
+it's not necessary for .35 as the boards are only in the imx-for-2.6.36 
+branch.
 
----
- arch/arm/mach-w90x900/include/mach/regs-gcr.h |   39 +++++++++++++++++++++++++
- 1 files changed, 39 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-w90x900/include/mach/regs-gcr.h
-
-diff --git a/arch/arm/mach-w90x900/include/mach/regs-gcr.h b/arch/arm/mach-w90x900/include/mach/regs-gcr.h
-new file mode 100644
-index 0000000..6087abd
---- /dev/null
-+++ b/arch/arm/mach-w90x900/include/mach/regs-gcr.h
-@@ -0,0 +1,39 @@
-+/*
-+ * arch/arm/mach-w90x900/include/mach/regs-gcr.h
-+ *
-+ * Copyright (c) 2010 Nuvoton technology corporation
-+ * All rights reserved.
-+ *
-+ * Wan ZongShun <mcuos.com@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
-+
-+#ifndef __ASM_ARCH_REGS_GCR_H
-+#define __ASM_ARCH_REGS_GCR_H
-+
-+/* Global control registers */
-+
-+#define GCR_BA		W90X900_VA_GCR
-+#define REG_PDID	(GCR_BA+0x000)
-+#define REG_PWRON	(GCR_BA+0x004)
-+#define REG_ARBCON	(GCR_BA+0x008)
-+#define REG_MFSEL	(GCR_BA+0x00C)
-+#define REG_EBIDPE	(GCR_BA+0x010)
-+#define REG_LCDDPE	(GCR_BA+0x014)
-+#define REG_GPIOCPE	(GCR_BA+0x018)
-+#define REG_GPIODPE	(GCR_BA+0x01C)
-+#define REG_GPIOEPE	(GCR_BA+0x020)
-+#define REG_GPIOFPE	(GCR_BA+0x024)
-+#define REG_GPIOGPE	(GCR_BA+0x028)
-+#define REG_GPIOHPE	(GCR_BA+0x02C)
-+#define REG_GPIOIPE	(GCR_BA+0x030)
-+#define REG_GTMP1	(GCR_BA+0x034)
-+#define REG_GTMP2	(GCR_BA+0x038)
-+#define REG_GTMP3	(GCR_BA+0x03C)
-+
-+#endif /*  __ASM_ARCH_REGS_GCR_H */
--- 
-1.6.3.3
+Eric
