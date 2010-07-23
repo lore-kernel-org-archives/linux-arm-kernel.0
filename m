@@ -1,43 +1,31 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 23 Jul 2010 18:21:23 +0200
-Subject: [PATCH v3 8/8] ARM: s5pv210: Override FIMC driver name on Aquila board
-In-Reply-To: <1279902083-21250-1-git-send-email-s.nawrocki@samsung.com>
-References: <1279902083-21250-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1279902083-21250-9-git-send-email-s.nawrocki@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 23 Jul 2010 17:42:18 +0100
+Subject: [PATCH RFC] arm: msm: Add QSD8x60 System MMU support.
+In-Reply-To: <1279833694-1214-1-git-send-email-stepanm@codeaurora.org>
+References: <1279833694-1214-1-git-send-email-stepanm@codeaurora.org>
+Message-ID: <20100723164218.GC750@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change variant of the FIMC driver for compatibility with older
-SoC version (EVT0) used on Aquila board.
+On Thu, Jul 22, 2010 at 02:21:34PM -0700, Stepan Moskovchenko wrote:
+> Add support for the System MMUs found on the 8x60 and 8x72
+> families of Qualcomm MSMs. These SMMUs allow virtualization
+> of the address space used by most of the multimedia cores
+> on these chips.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-s5pv210/mach-aquila.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+There's lots of "return -1;" statements in this patch - it's obscene
+that this is used to indicate "some error occurred" in kernel space
+rather than a real errno value - even when an existing function
+(eg, request_irq) gave you an error code already.
 
-diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
-index 7528514..c6cc3f5 100644
---- a/arch/arm/mach-s5pv210/mach-aquila.c
-+++ b/arch/arm/mach-s5pv210/mach-aquila.c
-@@ -36,6 +36,7 @@
- #include <plat/cpu.h>
- #include <plat/fb.h>
- #include <plat/fimc.h>
-+#include <plat/fimc-core.h>
- 
- #include "common-aquila-goni.h"
- 
-@@ -467,6 +468,10 @@ static void __init aquila_machine_init(void)
- 	i2c_register_board_info(AP_I2C_GPIO_PMIC_BUS_4, i2c_gpio_pmic_devs,
- 			ARRAY_SIZE(i2c_gpio_pmic_devs));
- 
-+	s3c_fimc_setname(0, "s5p-fimc");
-+	s3c_fimc_setname(1, "s5p-fimc");
-+	s3c_fimc_setname(2, "s5p-fimc");
-+
- 	/* FB */
- 	s3c_fb_set_platdata(&aquila_lcd_pdata);
- 
--- 
-1.7.2
+The problem comes when someone - or you - uses your code, assuming that
+you do return errno values, just like the rest of the kernel.  I've seen
+cases where this happened all the way through to userspace.  When "-1"
+is interpreted as an errno value, it means "Operation not permitted"
+which almost is never what you meant - and as kernel functions return
+negative errno values, this is exactly how it gets interpreted.
+
+Please note this for the future - and please review patches on this
+point internally first.
+
+Thanks.
