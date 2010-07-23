@@ -1,24 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 23 Jul 2010 09:49:13 +0100
-Subject: ARM Kernel autobuilder
-In-Reply-To: <20100723083444.GA6690@pengutronix.de>
-References: <20100722111412.GB10399@kyllikki.org>
-	<20100723083444.GA6690@pengutronix.de>
-Message-ID: <20100723084913.GW31293@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 23 Jul 2010 10:15:04 +0100
+Subject: [PATCH v2 10/20] omap: zoom: add fixed regulator device for wlan
+In-Reply-To: <AANLkTin2dyLNo1RMQgLG-4DtN-CsXqNNLAfITXDbMIvl@mail.gmail.com>
+References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
+	<1279733634-21974-11-git-send-email-ohad@wizery.com>
+	<20100721175930.GD10930@sirena.org.uk> <4C48287D.1000603@nokia.com>
+	<AANLkTin2dyLNo1RMQgLG-4DtN-CsXqNNLAfITXDbMIvl@mail.gmail.com>
+Message-ID: <20100723091503.GA12300@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 23, 2010 at 10:34:44AM +0200, Uwe Kleine-K?nig wrote:
-> Hello Vincent,
-> 
-> On Thu, Jul 22, 2010 at 12:14:12PM +0100, Vincent Sanders wrote:
-> > The ns9xxx configuration has been failing for even longer and teh
-> > machines supported are maintainerd by Uwe Kleine-Konig
-> See patch that I just sent to this thread.  Russell: is it already to
-> late for .36?
+On Fri, Jul 23, 2010 at 02:13:38AM +0300, Ohad Ben-Cohen wrote:
+> On Thu, Jul 22, 2010 at 2:16 PM, Roger Quadros <roger.quadros@nokia.com> wrote:
+> > .dev_name ? ? ? = "mmci-omap-hs.2"
 
-No, I still have patches queued to go into the -rc series.
+> I already set the .dev member of the consumer in a similar manner to
+> how all other regulators are configured in this board - please check
+> out patch 13:
 
-> Should I send my patch to your patch system?
+> https://patchwork.kernel.org/patch/113418/
 
-Yes please.
+> Does this look reasonable to you ?
+
+You should really be using dev_name in preference to dev these days
+unless there's a *very* good reason.
