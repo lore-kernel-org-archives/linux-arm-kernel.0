@@ -1,31 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 23 Jul 2010 17:42:18 +0100
-Subject: [PATCH RFC] arm: msm: Add QSD8x60 System MMU support.
-In-Reply-To: <1279833694-1214-1-git-send-email-stepanm@codeaurora.org>
-References: <1279833694-1214-1-git-send-email-stepanm@codeaurora.org>
-Message-ID: <20100723164218.GC750@n2100.arm.linux.org.uk>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Fri, 23 Jul 2010 20:17:50 +0300
+Subject: [PATCH v6 0/2] s3c24xx: iPAQ rx1950 series
+Message-ID: <1279905472-5908-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 22, 2010 at 02:21:34PM -0700, Stepan Moskovchenko wrote:
-> Add support for the System MMUs found on the 8x60 and 8x72
-> families of Qualcomm MSMs. These SMMUs allow virtualization
-> of the address space used by most of the multimedia cores
-> on these chips.
+This patch series adds more support for iPAQ rx1950 PDA to linux:
+1. LEDs driver -- it controls blue, green and red LEDs on rx1950
+2. Battery driver -- adds ability to monitor and charge battery.
+This driver is suitable for H1940 PDA aswell (just need to write
+some machine specific callbacks and get voltage LUTs)
 
-There's lots of "return -1;" statements in this patch - it's obscene
-that this is used to indicate "some error occurred" in kernel space
-rather than a real errno value - even when an existing function
-(eg, request_irq) gave you an error code already.
+v2: removed ac registration from s3c_adc_battery driver, use
+pda_power instead for ac support
 
-The problem comes when someone - or you - uses your code, assuming that
-you do return errno values, just like the rest of the kernel.  I've seen
-cases where this happened all the way through to userspace.  When "-1"
-is interpreted as an errno value, it means "Operation not permitted"
-which almost is never what you meant - and as kernel functions return
-negative errno values, this is exactly how it gets interpreted.
+v3: split LEDs patch to driver and machine parts,
+split battery patch into battery + LED trigger parts,
+now battery driver can skip gpio/callbacks usage
+(if there's no gpio pin to determine that battery is
+full or if charger is enabled automatically)
 
-Please note this for the future - and please review patches on this
-point internally first.
+v4: add .blink_set callback to LEDs driver instead of
+using LED_HALF value for blinking, remove LED triggers
+from battery driver completely (for now)
 
-Thanks.
+v5: restore lut_acin usage in s3c_adc_battery driver,
+it was accidently removed during removing AC support
+from driver
+
+v6: drop rx1950-specific LEDs driver, use leds-gpio instead,
+skip s3c-adc-battery patch, as it's already merged into battery-2.6
+tree
