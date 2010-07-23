@@ -1,33 +1,47 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 23 Jul 2010 21:58:31 +0200
-Subject: [PATCH 08/11] ARM: omap: move get_fbmem_region() to .init.text
-In-Reply-To: <1279915120-4373-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1279915120-4373-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1279915120-4373-8-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Fri, 23 Jul 2010 21:58:24 +0200
+Subject: [PATCH 01/11] ARM: cam60: move cam60_spi_devices to .init.data
+Message-ID: <1279915120-4373-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-get_fbmem_region() is only called by omapfb_reserve_sdram() and
-omapfb_reserve_sram() that both live in .init.text.  So get_fbmem_region
-can go there, too.
+cam60_spi_devices is passed to at91_add_device_spi which calls
+spi_register_board_info.  The latter makes a copy of it, so living in
+.init.data is OK.
+
+This fixes the following warning in cam60_defconfig:
+	WARNING: vmlinux.o(.data+0x2a00): Section mismatch in reference from the variable cam60_spi_devices to the (unknown reference) .init.data:(unknown)
+	The variable cam60_spi_devices references
+	the (unknown reference) __initdata (unknown)
+	If the reference is valid then annotate the
+	variable with __init* or __refdata (see linux/init.h) or name the variable:
+	*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/plat-omap/fb.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-at91/board-cam60.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-omap/fb.c b/arch/arm/plat-omap/fb.c
-index 4c0ae4d..e05e320 100644
---- a/arch/arm/plat-omap/fb.c
-+++ b/arch/arm/plat-omap/fb.c
-@@ -94,7 +94,7 @@ static int fbmem_region_reserved(unsigned long start, size_t size)
-  * Get the region_idx`th region from board config/ATAG and convert it to
-  * our internal format.
-  */
--static int get_fbmem_region(int region_idx, struct omapfb_mem_region *rg)
-+static int __init get_fbmem_region(int region_idx, struct omapfb_mem_region *rg)
- {
- 	const struct omap_fbmem_config	*conf;
- 	u32				paddr;
+diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
+index 02138af..05c7072 100644
+--- a/arch/arm/mach-at91/board-cam60.c
++++ b/arch/arm/mach-at91/board-cam60.c
+@@ -98,14 +98,14 @@ static struct mtd_partition __initdata cam60_spi_partitions[] = {
+ 	},
+ };
+ 
+-static struct flash_platform_data __initdata cam60_spi_flash_platform_data = {
++static struct flash_platform_data cam60_spi_flash_platform_data __initdata = {
+ 	.name		= "spi_flash",
+ 	.parts		= cam60_spi_partitions,
+ 	.nr_parts	= ARRAY_SIZE(cam60_spi_partitions)
+ };
+ #endif
+ 
+-static struct spi_board_info cam60_spi_devices[] = {
++static struct spi_board_info cam60_spi_devices[] __initdata = {
+ #if defined(CONFIG_MTD_DATAFLASH)
+ 	{	/* DataFlash chip */
+ 		.modalias	= "mtd_dataflash",
 -- 
 1.7.1
