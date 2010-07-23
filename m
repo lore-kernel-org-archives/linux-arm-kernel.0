@@ -1,601 +1,140 @@
-From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
-Date: Fri, 23 Jul 2010 16:11:19 +0200
-Subject: [PATCH v3] i.MX51: add support for cpuimx51 module and its baseboard
-In-Reply-To: <20100722133141.GL14113@pengutronix.de>
-References: <20100722133141.GL14113@pengutronix.de>
-Message-ID: <1279894279-3214-1-git-send-email-eric@eukrea.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 23 Jul 2010 15:17:14 +0100
+Subject: ARM Machine SoC I/O setup and PAD initialization code
+In-Reply-To: <201007231218.07379.david.jander@protonic.nl>
+References: <201007211029.29529.david.jander@protonic.nl>
+	<201007221531.58744.david.jander@protonic.nl>
+	<20100722142043.GK4737@rakim.wolfsonmicro.main>
+	<201007231218.07379.david.jander@protonic.nl>
+Message-ID: <20100723141712.GC12300@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPUIMX51 is build around Freescale's i.MX515 and has up to
-512MB of RAM, NAND Flash, Ethernet, USB Host with 4 ports
-hub, USB OTG, ST16554 Quad UART on nCS1, I2C RTC ...
+On Fri, Jul 23, 2010 at 12:18:07PM +0200, David Jander wrote:
+> On Thursday 22 July 2010 04:20:43 pm Mark Brown wrote:
 
-MBIMX51 adds LEDS, Keypad, TSC2007 touchscreen controler ...
+> > I suspect it's more that there are vastly fewer PowerPC vendors out
+> > there so much less independant development - compared to ARM the PowerPC
+> > devices are *very* homogenous.
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
----
-v3 : fix forgotten babbage strings, use irqflags for quad uart's irq,
-	use eukrea-baseboards.h
-v2 : fix board name in Kconfig help
- arch/arm/mach-mx5/Kconfig                          |   21 ++
- arch/arm/mach-mx5/Makefile                         |    2 +
- arch/arm/mach-mx5/board-cpuimx51.c                 |  293 ++++++++++++++++++++
- arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c       |  200 +++++++++++++
- arch/arm/plat-mxc/include/mach/eukrea-baseboards.h |    4 +-
- 5 files changed, 519 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-mx5/board-cpuimx51.c
- create mode 100644 arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
+> That could indeed be part of the reason... but there are not _so_ few PowerPC 
+> vendors actually: Chips are made by Freescale, AMCC and IBM mainly (PASemi 
+> used to exist also), but boards and workstations are made by quite a lot of 
+> vendors (we are one ;-)
 
-diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index 6ef3428..0848db5 100644
---- a/arch/arm/mach-mx5/Kconfig
-+++ b/arch/arm/mach-mx5/Kconfig
-@@ -21,4 +21,25 @@ config MACH_MX51_3DS
- 	help
- 	  Include support for MX51PDK (3DS) platform. This includes specific
- 	  configurations for the board and its peripherals.
-+
-+config MACH_EUKREA_CPUIMX51
-+	bool "Support Eukrea CPUIMX51 module"
-+	help
-+	  Include support for Eukrea CPUIMX51 platform. This includes
-+	  specific configurations for the module and its peripherals.
-+
-+choice
-+	prompt "Baseboard"
-+	depends on MACH_EUKREA_CPUIMX51
-+	default MACH_EUKREA_MBIMX51_BASEBOARD
-+
-+config MACH_EUKREA_MBIMX51_BASEBOARD
-+	prompt "Eukrea MBIMX51 development board"
-+	bool
-+	help
-+	  This adds board specific devices that can be found on Eukrea's
-+	  MBIMX51 evaluation board.
-+
-+endchoice
-+
- endif
-diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-index c757c59..86c66e7 100644
---- a/arch/arm/mach-mx5/Makefile
-+++ b/arch/arm/mach-mx5/Makefile
-@@ -7,3 +7,5 @@ obj-y   := cpu.o mm.o clock-mx51.o devices.o
- 
- obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
- obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
-+obj-$(CONFIG_MACH_EUKREA_CPUIMX51) += board-cpuimx51.o
-+obj-$(CONFIG_MACH_EUKREA_MBIMX51_BASEBOARD) += eukrea_mbimx51-baseboard.o
-diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
-new file mode 100644
-index 0000000..623607a
---- /dev/null
-+++ b/arch/arm/mach-mx5/board-cpuimx51.c
-@@ -0,0 +1,293 @@
-+/*
-+ *
-+ * Copyright (C) 2010 Eric B?nard <eric@eukrea.com>
-+ *
-+ * based on board-mx51_babbage.c which is
-+ * Copyright 2009 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/serial_8250.h>
-+#include <linux/i2c.h>
-+#include <linux/gpio.h>
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/fsl_devices.h>
-+
-+#include <mach/eukrea-baseboards.h>
-+#include <mach/common.h>
-+#include <mach/hardware.h>
-+#include <mach/imx-uart.h>
-+#include <mach/iomux-mx51.h>
-+#include <mach/i2c.h>
-+#include <mach/mxc_ehci.h>
-+
-+#include <asm/irq.h>
-+#include <asm/setup.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
-+
-+#include "devices.h"
-+
-+#define CPUIMX51_USBH1_STP	(0*32 + 27)
-+#define CPUIMX51_QUARTA_GPIO	(2*32 + 28)
-+#define CPUIMX51_QUARTB_GPIO	(2*32 + 25)
-+#define CPUIMX51_QUARTC_GPIO	(2*32 + 26)
-+#define CPUIMX51_QUARTD_GPIO	(2*32 + 27)
-+#define CPUIMX51_QUARTA_IRQ	(MXC_INTERNAL_IRQS + CPUIMX51_QUARTA_GPIO)
-+#define CPUIMX51_QUARTB_IRQ	(MXC_INTERNAL_IRQS + CPUIMX51_QUARTB_GPIO)
-+#define CPUIMX51_QUARTC_IRQ	(MXC_INTERNAL_IRQS + CPUIMX51_QUARTC_GPIO)
-+#define CPUIMX51_QUARTD_IRQ	(MXC_INTERNAL_IRQS + CPUIMX51_QUARTD_GPIO)
-+#define CPUIMX51_QUART_XTAL	14745600
-+#define CPUIMX51_QUART_REGSHIFT	17
-+
-+/* USB_CTRL_1 */
-+#define MX51_USB_CTRL_1_OFFSET		0x10
-+#define MX51_USB_CTRL_UH1_EXT_CLK_EN	(1 << 25)
-+
-+#define	MX51_USB_PLLDIV_12_MHZ		0x00
-+#define	MX51_USB_PLL_DIV_19_2_MHZ	0x01
-+#define	MX51_USB_PLL_DIV_24_MHZ		0x02
-+
-+#if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
-+static struct plat_serial8250_port serial_platform_data[] = {
-+	{
-+		.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x400000),
-+		.irq = CPUIMX51_QUARTA_IRQ,
-+		.irqflags = IRQF_TRIGGER_HIGH,
-+		.uartclk = CPUIMX51_QUART_XTAL,
-+		.regshift = CPUIMX51_QUART_REGSHIFT,
-+		.iotype = UPIO_MEM,
-+		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
-+	}, {
-+		.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x800000),
-+		.irq = CPUIMX51_QUARTB_IRQ,
-+		.irqflags = IRQF_TRIGGER_HIGH,
-+		.uartclk = CPUIMX51_QUART_XTAL,
-+		.regshift = CPUIMX51_QUART_REGSHIFT,
-+		.iotype = UPIO_MEM,
-+		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
-+	}, {
-+		.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x1000000),
-+		.irq = CPUIMX51_QUARTC_IRQ,
-+		.irqflags = IRQF_TRIGGER_HIGH,
-+		.uartclk = CPUIMX51_QUART_XTAL,
-+		.regshift = CPUIMX51_QUART_REGSHIFT,
-+		.iotype = UPIO_MEM,
-+		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
-+	}, {
-+		.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x2000000),
-+		.irq = CPUIMX51_QUARTD_IRQ,
-+		.irqflags = IRQF_TRIGGER_HIGH,
-+		.uartclk = CPUIMX51_QUART_XTAL,
-+		.regshift = CPUIMX51_QUART_REGSHIFT,
-+		.iotype = UPIO_MEM,
-+		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
-+	}, {
-+	}
-+};
-+
-+static struct platform_device serial_device = {
-+	.name = "serial8250",
-+	.id = 0,
-+	.dev = {
-+		.platform_data = serial_platform_data,
-+	},
-+};
-+#endif
-+
-+static struct platform_device *devices[] __initdata = {
-+	&mxc_fec_device,
-+#if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
-+	&serial_device,
-+#endif
-+};
-+
-+static struct pad_desc eukrea_cpuimx51_pads[] = {
-+	/* UART1 */
-+	MX51_PAD_UART1_RXD__UART1_RXD,
-+	MX51_PAD_UART1_TXD__UART1_TXD,
-+	MX51_PAD_UART1_RTS__UART1_RTS,
-+	MX51_PAD_UART1_CTS__UART1_CTS,
-+
-+	/* I2C2 */
-+	MX51_PAD_GPIO_1_2__I2C2_SCL,
-+	MX51_PAD_GPIO_1_3__I2C2_SDA,
-+	MX51_PAD_NANDF_D10__GPIO_3_30,
-+
-+	/* QUART IRQ */
-+	MX51_PAD_NANDF_D15__GPIO_3_25,
-+	MX51_PAD_NANDF_D14__GPIO_3_26,
-+	MX51_PAD_NANDF_D13__GPIO_3_27,
-+	MX51_PAD_NANDF_D12__GPIO_3_28,
-+
-+	/* USB HOST1 */
-+	MX51_PAD_USBH1_CLK__USBH1_CLK,
-+	MX51_PAD_USBH1_DIR__USBH1_DIR,
-+	MX51_PAD_USBH1_NXT__USBH1_NXT,
-+	MX51_PAD_USBH1_DATA0__USBH1_DATA0,
-+	MX51_PAD_USBH1_DATA1__USBH1_DATA1,
-+	MX51_PAD_USBH1_DATA2__USBH1_DATA2,
-+	MX51_PAD_USBH1_DATA3__USBH1_DATA3,
-+	MX51_PAD_USBH1_DATA4__USBH1_DATA4,
-+	MX51_PAD_USBH1_DATA5__USBH1_DATA5,
-+	MX51_PAD_USBH1_DATA6__USBH1_DATA6,
-+	MX51_PAD_USBH1_DATA7__USBH1_DATA7,
-+	MX51_PAD_USBH1_STP__USBH1_STP,
-+};
-+
-+static struct imxuart_platform_data uart_pdata = {
-+	.flags = IMXUART_HAVE_RTSCTS,
-+};
-+
-+static struct imxi2c_platform_data eukrea_cpuimx51_i2c_data = {
-+	.bitrate = 100000,
-+};
-+
-+static struct i2c_board_info eukrea_cpuimx51_i2c_devices[] = {
-+	{
-+		I2C_BOARD_INFO("pcf8563", 0x51),
-+	},
-+};
-+
-+/* This function is board specific as the bit mask for the plldiv will also
-+be different for other Freescale SoCs, thus a common bitmask is not
-+possible and cannot get place in /plat-mxc/ehci.c.*/
-+static int initialize_otg_port(struct platform_device *pdev)
-+{
-+	u32 v;
-+	void __iomem *usb_base;
-+	void __iomem *usbother_base;
-+
-+	usb_base = ioremap(MX51_OTG_BASE_ADDR, SZ_4K);
-+	usbother_base = usb_base + MX5_USBOTHER_REGS_OFFSET;
-+
-+	/* Set the PHY clock to 19.2MHz */
-+	v = __raw_readl(usbother_base + MXC_USB_PHY_CTR_FUNC2_OFFSET);
-+	v &= ~MX5_USB_UTMI_PHYCTRL1_PLLDIV_MASK;
-+	v |= MX51_USB_PLL_DIV_19_2_MHZ;
-+	__raw_writel(v, usbother_base + MXC_USB_PHY_CTR_FUNC2_OFFSET);
-+	iounmap(usb_base);
-+	return 0;
-+}
-+
-+static int initialize_usbh1_port(struct platform_device *pdev)
-+{
-+	u32 v;
-+	void __iomem *usb_base;
-+	void __iomem *usbother_base;
-+
-+	usb_base = ioremap(MX51_OTG_BASE_ADDR, SZ_4K);
-+	usbother_base = usb_base + MX5_USBOTHER_REGS_OFFSET;
-+
-+	/* The clock for the USBH1 ULPI port will come externally from the PHY. */
-+	v = __raw_readl(usbother_base + MX51_USB_CTRL_1_OFFSET);
-+	__raw_writel(v | MX51_USB_CTRL_UH1_EXT_CLK_EN, usbother_base + MX51_USB_CTRL_1_OFFSET);
-+	iounmap(usb_base);
-+	return 0;
-+}
-+
-+static struct mxc_usbh_platform_data dr_utmi_config = {
-+	.init		= initialize_otg_port,
-+	.portsc	= MXC_EHCI_UTMI_16BIT,
-+	.flags	= MXC_EHCI_INTERNAL_PHY,
-+};
-+
-+static struct fsl_usb2_platform_data usb_pdata = {
-+	.operating_mode	= FSL_USB2_DR_DEVICE,
-+	.phy_mode	= FSL_USB2_PHY_UTMI_WIDE,
-+};
-+
-+static struct mxc_usbh_platform_data usbh1_config = {
-+	.init		= initialize_usbh1_port,
-+	.portsc	= MXC_EHCI_MODE_ULPI,
-+	.flags	= (MXC_EHCI_POWER_PINS_ENABLED | MXC_EHCI_ITC_NO_THRESHOLD),
-+};
-+
-+static int otg_mode_host;
-+
-+static int __init eukrea_cpuimx51_otg_mode(char *options)
-+{
-+	if (!strcmp(options, "host"))
-+		otg_mode_host = 1;
-+	else if (!strcmp(options, "device"))
-+		otg_mode_host = 0;
-+	else
-+		pr_info("otg_mode neither \"host\" nor \"device\". "
-+			"Defaulting to device\n");
-+	return 0;
-+}
-+__setup("otg_mode=", eukrea_cpuimx51_otg_mode);
-+
-+/*
-+ * Board specific initialization.
-+ */
-+static void __init eukrea_cpuimx51_init(void)
-+{
-+	mxc_iomux_v3_setup_multiple_pads(eukrea_cpuimx51_pads,
-+					ARRAY_SIZE(eukrea_cpuimx51_pads));
-+
-+	mxc_register_device(&mxc_uart_device0, &uart_pdata);
-+	gpio_request(CPUIMX51_QUARTA_GPIO, "quarta_irq");
-+	gpio_direction_input(CPUIMX51_QUARTA_GPIO);
-+	gpio_free(CPUIMX51_QUARTA_GPIO);
-+	gpio_request(CPUIMX51_QUARTB_GPIO, "quartb_irq");
-+	gpio_direction_input(CPUIMX51_QUARTB_GPIO);
-+	gpio_free(CPUIMX51_QUARTB_GPIO);
-+	gpio_request(CPUIMX51_QUARTC_GPIO, "quartc_irq");
-+	gpio_direction_input(CPUIMX51_QUARTC_GPIO);
-+	gpio_free(CPUIMX51_QUARTC_GPIO);
-+	gpio_request(CPUIMX51_QUARTD_GPIO, "quartd_irq");
-+	gpio_direction_input(CPUIMX51_QUARTD_GPIO);
-+	gpio_free(CPUIMX51_QUARTD_GPIO);
-+
-+	platform_add_devices(devices, ARRAY_SIZE(devices));
-+
-+	mxc_register_device(&mxc_i2c_device1, &eukrea_cpuimx51_i2c_data);
-+	i2c_register_board_info(1, eukrea_cpuimx51_i2c_devices,
-+				ARRAY_SIZE(eukrea_cpuimx51_i2c_devices));
-+
-+	if (otg_mode_host)
-+		mxc_register_device(&mxc_usbdr_host_device, &dr_utmi_config);
-+	else {
-+		initialize_otg_port(NULL);
-+		mxc_register_device(&mxc_usbdr_udc_device, &usb_pdata);
-+	}
-+	mxc_register_device(&mxc_usbh1_device, &usbh1_config);
-+
-+#ifdef CONFIG_MACH_EUKREA_MBIMX51_BASEBOARD
-+	eukrea_mbimx51_baseboard_init();
-+#endif
-+}
-+
-+static void __init eukrea_cpuimx51_timer_init(void)
-+{
-+	mx51_clocks_init(32768, 24000000, 22579200, 0);
-+}
-+
-+static struct sys_timer mxc_timer = {
-+	.init	= eukrea_cpuimx51_timer_init,
-+};
-+
-+MACHINE_START(EUKREA_CPUIMX51, "Eukrea CPUIMX51 Module")
-+	/* Maintainer: Eric B?nard <eric@eukrea.com> */
-+	.phys_io = MX51_AIPS1_BASE_ADDR,
-+	.io_pg_offst = ((MX51_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.boot_params = PHYS_OFFSET + 0x100,
-+	.map_io = mx51_map_io,
-+	.init_irq = mx51_init_irq,
-+	.init_machine = eukrea_cpuimx51_init,
-+	.timer = &mxc_timer,
-+MACHINE_END
-diff --git a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
-new file mode 100644
-index 0000000..ffa93d1
---- /dev/null
-+++ b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
-@@ -0,0 +1,200 @@
-+/*
-+ *
-+ * Copyright (C) 2010 Eric B?nard <eric@eukrea.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/serial_8250.h>
-+#include <linux/i2c.h>
-+#include <linux/gpio.h>
-+#include <linux/io.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/fsl_devices.h>
-+#include <linux/i2c/tsc2007.h>
-+#include <linux/leds.h>
-+#include <linux/input/matrix_keypad.h>
-+
-+#include <mach/common.h>
-+#include <mach/hardware.h>
-+#include <mach/imx-uart.h>
-+#include <mach/iomux-mx51.h>
-+
-+#include <asm/mach/arch.h>
-+
-+#include "devices.h"
-+
-+#define MBIMX51_TSC2007_GPIO	(2*32 + 30)
-+#define MBIMX51_TSC2007_IRQ	(MXC_INTERNAL_IRQS + MBIMX51_TSC2007_GPIO)
-+#define MBIMX51_LED0		(2*32 + 5)
-+#define MBIMX51_LED1		(2*32 + 6)
-+#define MBIMX51_LED2		(2*32 + 7)
-+#define MBIMX51_LED3		(2*32 + 8)
-+
-+static struct gpio_led mbimx51_leds[] = {
-+	{
-+		.name			= "led0",
-+		.default_trigger	= "heartbeat",
-+		.active_low		= 1,
-+		.gpio			= MBIMX51_LED0,
-+	},
-+	{
-+		.name			= "led1",
-+		.default_trigger	= "nand-disk",
-+		.active_low		= 1,
-+		.gpio			= MBIMX51_LED1,
-+	},
-+	{
-+		.name			= "led2",
-+		.default_trigger	= "mmc0",
-+		.active_low		= 1,
-+		.gpio			= MBIMX51_LED2,
-+	},
-+	{
-+		.name			= "led3",
-+		.default_trigger	= "default-on",
-+		.active_low		= 1,
-+		.gpio			= MBIMX51_LED3,
-+	},
-+};
-+
-+static struct gpio_led_platform_data mbimx51_leds_info = {
-+	.leds		= mbimx51_leds,
-+	.num_leds	= ARRAY_SIZE(mbimx51_leds),
-+};
-+
-+static struct platform_device mbimx51_leds_gpio = {
-+	.name	= "leds-gpio",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &mbimx51_leds_info,
-+	},
-+};
-+
-+static struct platform_device *devices[] __initdata = {
-+	&mbimx51_leds_gpio,
-+};
-+
-+static struct pad_desc mbimx51_pads[] = {
-+	/* UART2 */
-+	MX51_PAD_UART2_RXD__UART2_RXD,
-+	MX51_PAD_UART2_TXD__UART2_TXD,
-+
-+	/* UART3 */
-+	MX51_PAD_UART3_RXD__UART3_RXD,
-+	MX51_PAD_UART3_TXD__UART3_TXD,
-+	MX51_PAD_KEY_COL4__UART3_RTS,
-+	MX51_PAD_KEY_COL5__UART3_CTS,
-+
-+	/* TSC2007 IRQ */
-+	MX51_PAD_NANDF_D10__GPIO_3_30,
-+
-+	/* LEDS */
-+	MX51_PAD_DISPB2_SER_DIN__GPIO_3_5,
-+	MX51_PAD_DISPB2_SER_DIO__GPIO_3_6,
-+	MX51_PAD_DISPB2_SER_CLK__GPIO_3_7,
-+	MX51_PAD_DISPB2_SER_RS__GPIO_3_8,
-+
-+	/* KPP */
-+	MX51_PAD_KEY_ROW0__KEY_ROW0,
-+	MX51_PAD_KEY_ROW1__KEY_ROW1,
-+	MX51_PAD_KEY_ROW2__KEY_ROW2,
-+	MX51_PAD_KEY_ROW3__KEY_ROW3,
-+	MX51_PAD_KEY_COL0__KEY_COL0,
-+	MX51_PAD_KEY_COL1__KEY_COL1,
-+	MX51_PAD_KEY_COL2__KEY_COL2,
-+	MX51_PAD_KEY_COL3__KEY_COL3,
-+};
-+
-+static struct imxuart_platform_data uart_pdata = {
-+	.flags = IMXUART_HAVE_RTSCTS,
-+};
-+
-+static int mbimx51_keymap[] = {
-+	KEY(0, 0, KEY_1),
-+	KEY(0, 1, KEY_2),
-+	KEY(0, 2, KEY_3),
-+	KEY(0, 3, KEY_UP),
-+
-+	KEY(1, 0, KEY_4),
-+	KEY(1, 1, KEY_5),
-+	KEY(1, 2, KEY_6),
-+	KEY(1, 3, KEY_LEFT),
-+
-+	KEY(2, 0, KEY_7),
-+	KEY(2, 1, KEY_8),
-+	KEY(2, 2, KEY_9),
-+	KEY(2, 3, KEY_RIGHT),
-+
-+	KEY(3, 0, KEY_0),
-+	KEY(3, 1, KEY_DOWN),
-+	KEY(3, 2, KEY_ESC),
-+	KEY(3, 3, KEY_ENTER),
-+};
-+
-+static struct matrix_keymap_data mbimx51_map_data = {
-+	.keymap		= mbimx51_keymap,
-+	.keymap_size	= ARRAY_SIZE(mbimx51_keymap),
-+};
-+
-+static int tsc2007_get_pendown_state(void)
-+{
-+	return !gpio_get_value(MBIMX51_TSC2007_GPIO);
-+}
-+
-+struct tsc2007_platform_data tsc2007_data = {
-+	.model = 2007,
-+	.x_plate_ohms = 180,
-+	.get_pendown_state = tsc2007_get_pendown_state,
-+};
-+
-+static struct i2c_board_info mbimx51_i2c_devices[] = {
-+	{
-+		I2C_BOARD_INFO("tsc2007", 0x48),
-+		.irq  = MBIMX51_TSC2007_IRQ,
-+		.platform_data = &tsc2007_data,
-+	},
-+};
-+
-+/*
-+ * baseboard initialization.
-+ */
-+void __init eukrea_mbimx51_baseboard_init(void)
-+{
-+	mxc_iomux_v3_setup_multiple_pads(mbimx51_pads,
-+					ARRAY_SIZE(mbimx51_pads));
-+
-+	mxc_register_device(&mxc_uart_device1, NULL);
-+	mxc_register_device(&mxc_uart_device2, &uart_pdata);
-+
-+	gpio_request(MBIMX51_LED0, "LED0");
-+	gpio_direction_output(MBIMX51_LED0, 1);
-+	gpio_free(MBIMX51_LED0);
-+	gpio_request(MBIMX51_LED1, "LED1");
-+	gpio_direction_output(MBIMX51_LED1, 1);
-+	gpio_free(MBIMX51_LED1);
-+	gpio_request(MBIMX51_LED2, "LED2");
-+	gpio_direction_output(MBIMX51_LED2, 1);
-+	gpio_free(MBIMX51_LED2);
-+	gpio_request(MBIMX51_LED3, "LED3");
-+	gpio_direction_output(MBIMX51_LED3, 1);
-+	gpio_free(MBIMX51_LED3);
-+
-+	platform_add_devices(devices, ARRAY_SIZE(devices));
-+
-+	mxc_register_device(&mxc_keypad_device, &mbimx51_map_data);
-+
-+	gpio_request(MBIMX51_TSC2007_GPIO, "tsc2007_irq");
-+	gpio_direction_input(MBIMX51_TSC2007_GPIO);
-+	set_irq_type(MBIMX51_TSC2007_IRQ, IRQF_TRIGGER_FALLING);
-+	i2c_register_board_info(1, mbimx51_i2c_devices,
-+				ARRAY_SIZE(mbimx51_i2c_devices));
-+}
-diff --git a/arch/arm/plat-mxc/include/mach/eukrea-baseboards.h b/arch/arm/plat-mxc/include/mach/eukrea-baseboards.h
-index 4e7cbe7..634e3f4 100644
---- a/arch/arm/plat-mxc/include/mach/eukrea-baseboards.h
-+++ b/arch/arm/plat-mxc/include/mach/eukrea-baseboards.h
-@@ -28,17 +28,19 @@
-  * its own devices, it calls baseboard's init function.
-  * TODO: Add your own baseboard init function and call it from
-  * inside eukrea_cpuimx25_init() eukrea_cpuimx27_init()
-- * or eukrea_cpuimx35_init().
-+ * eukrea_cpuimx35_init() or eukrea_cpuimx51_init().
-  *
-  * This example here is for the development board. Refer
-  * mach-mx25/eukrea_mbimxsd-baseboard.c for cpuimx25
-  * mach-imx/eukrea_mbimx27-baseboard.c for cpuimx27
-  * mach-mx3/eukrea_mbimxsd-baseboard.c for cpuimx35
-+ * mach-mx5/eukrea_mbimx51-baseboard.c for cpuimx51
-  */
- 
- extern void eukrea_mbimx25_baseboard_init(void);
- extern void eukrea_mbimx27_baseboard_init(void);
- extern void eukrea_mbimx35_baseboard_init(void);
-+extern void eukrea_mbimx51_baseboard_init(void);
- 
- #endif
- 
--- 
-1.6.3.3
+This is a vanishingly small number of chip vendors (and hence original
+BSPs, which are the main issue here) in comparison with the ARM market.
+
+> > Usually the people doing the kernel bringup on an actual end system will
+> > be part of the same organisation that does the hardware design - if
+> > there's a problem the kernel developer can usually locate the orginal
+> > hardware designer.
+
+> Then why can't they get the boot-loader fixed?
+
+In extreme cases the bootloader may be provided as binary by the SoC
+vendor and not changable, but there can also be the other concerns I
+mentioned with things like deploying updates throughout the team.
+Sometimes the bootloader code supplied with the BSP is entertainingly
+baroque and discourages changes even if they are technically possible.
+
+Also remember that many of the people doing upstream work are doing it
+on various generic reference platforms rather than boards they
+themselves have manufactured and may therefore have problems getting the
+access that you get with commercial devices.
+
+> Well, of course it always is some sort of iterative process before the DTS is 
+> 100% correct, but it is faily simple. You can rely on all SoC drivers to be 
+> generic and independent of your specific board and that, provided the correct 
+> DT, drivers and hardware will find each other and work. I/O setup is the sole 
+> duty of u-boot.
+
+In process terms this is generally true of ARM also, it's just that
+everything tends to be included in the kernel.
+
+> There is a small chance that u-boot may need to get changed later on, but that 
+> chance always exists, even if I/O setup was done in the kernel. U-boot can 
+> easily be replaced by a running linux system, the only thing that has to be 
+> taken care of is not touching power while flashing, as well as verifying the 
+> flashed image before reboot. The boot-loader itself is supposed to be factory 
+> tested and shouldn't brick your device. Also, you usually don't need to change 
+> the boot-loader that often.
+
+Technically being able to replace the bootloader and being willing to
+take the risk of bricking the system are not the same thing. 
+
+> > As I said, even if the bootloader *can* be updated at least some users
+> > are likely to refuse point blank to do so if they don't have a recovery
+> > mechanism that they trust and prefer to fix the code up in a part of the
+> > system they can recover easily if it fails.  The determination of these
+> > paramters may come after the original bootloader is written (since they
+> > may depend in part on measurement, for example).
+
+> Measurement for design-characterization is done on prototypes, not on 
+> production devices.
+> If you do your homework in the bootloader during the product prototype phase, 
+> chances that you ever need to change I/O-setup later are very small, so this 
+> doesn't seem a valid argument to me.
+
+You need to at lest reverify all this stuff in form factor, and
+obviously if you're using a reference board from a manufacturer rather
+than an actual system the concept of production is somewhat vauge.
+
+> > Another issue can be
+> > that in development simultaneously deploying bootloader and kernel
+> > updates can be more difficult than deploying a single image so people
+> > prefer to keep everything in one place.
+
+> "In development" is when the product isn't finished yet, so what is the big 
+> deal of updating the bootloader then?
+> I would prefer a good architecture over a patched workaround any day.
+
+You need a mechanism to ensure all the engineers are applying bootloader
+updates to their systems when required.  It's not insurmountable, but
+it's one more thing that needs doing.
+
+> > The reliability concerns also apply to updates done in the field (eg,
+> > when rolling out new functionality) - anything that may require fallback
+> > to JTAG is fail.
+
+> New functionality that hasn't been thought of during development would need 
+> different hardware anyway, and if that functional upgrade has been thought of 
+> during initial design, that thought should have included the boot-loader IMHO.
+
+Not at all, people do ship systems with hardware physically present but
+no software support and then add software support later especially with
+reference designs.
+
+> Clarification: Amateuristish was meant as much or even more for 
+> hardware/bootloader development as for the kernel part. Don't just feel 
+> offended, but you can't tell me that delivering hardware with a half-baked 
+> bootloader to a kernel developer and letting him hack/guess the I/O 
+> initialization together that the boot-loader got wrong doesn't sound very 
+> professional to me.
+
+This is only a problem if you assume the bootloader is responsible for
+doing the pin setup - clearly if it was supposed to do that and it
+didn't there's an issue.  If instead you merely expect the bootloader to
+load and start the kernel then so long as the kernel is running the
+bootloader did what it was supposed to do.
+
+> > Clearly if you think that the kernel should have no involvement in
+> > configuring the system then there's a problem but that's not a given.
+
+> Well, let's try to make it a given. I think we mostly agree that it would be 
+> better tha way.
+
+I don't actually see a problem with the current situation.
+
+As others have said you're welcome to try, but it's not the most
+tractable problem ever and it's not immediately obvious that it's the
+best use of time.  Given the concerns that exist about bootloader
+quality it's not clear that there's much enthusiasm for increasing the
+level of reliance on the bootloader.
+
+> On PC platforms it is that way also: There is the BIOS that needs to do all 
+> low-level setup stuff. It is never done in the linux kernel nor in the NT-
+> kernel.
+
+This isn't entirely true, the BIOS is handing off a partially
+initialised system and init is completed by the kernel.
