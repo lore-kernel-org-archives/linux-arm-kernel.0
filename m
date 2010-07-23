@@ -1,107 +1,66 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 23 Jul 2010 15:17:09 +0200
-Subject: [PATCH v3 3/3] sdhci-s3c: Add SDHCI_QUIRK_NO_WP_BIT quirk for
-	Samsung SoC
-In-Reply-To: <1279886191-9197-4-git-send-email-kgene.kim@samsung.com>
-References: <1279886191-9197-1-git-send-email-kgene.kim@samsung.com>
-	<1279886191-9197-4-git-send-email-kgene.kim@samsung.com>
-Message-ID: <005d01cb2a69$5eeceff0$1cc6cfd0$%szyprowski@samsung.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Fri, 23 Jul 2010 21:38:27 +0800
+Subject: [PATCH] ARM/nuc900: patch for adding the global control registers
+	definition
+Message-ID: <4C499B53.5090400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch is to add the global control registers definition,
+many drivers need it, such as usb driver,I need it to control
+usb phy open or close, so I sent this patch.
 
-On Friday, July 23, 2010 1:57 PM Kukjin Kim wrote:
+Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
 
-> From: Hyuk Lee <hyuk1.lee@samsung.com>
-> 
-> If host controller doesn't have WP pin which should be connnected with
-> SDMMC
-> card WP pin, can implement get_ro function with using the allocated gpio.
-> In order to use this quirk wp_gpio in the platform data must be set.
-> 
-> Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  drivers/mmc/host/sdhci-s3c.c |   43
-> ++++++++++++++++++++++++++++++++++++++++++
->  drivers/mmc/host/sdhci.c     |    3 ++
->  drivers/mmc/host/sdhci.h     |    3 ++
->  3 files changed, 49 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> index 0d25285..0b75e57 100644
-> --- a/drivers/mmc/host/sdhci-s3c.c
-> +++ b/drivers/mmc/host/sdhci-s3c.c
-> @@ -22,6 +22,7 @@
-> 
->  #include <linux/mmc/host.h>
-> 
-> +#include <plat/gpio-cfg.h>
->  #include <plat/sdhci.h>
->  #include <plat/regs-sdhci.h>
-> 
-> @@ -213,6 +214,36 @@ static void sdhci_s3c_set_clock(struct sdhci_host
-> *host, unsigned int clock)
->  }
-> 
->  /**
-> + * sdhci_s3c_get_ro - callback for get_ro
-> + * @host: The SDHCI host being changed
-> + *
-> + * If the WP pin is connected with GPIO, can get the value which indicates
-> + * the card is locked or not.
-> +*/
-> +static int sdhci_s3c_get_ro(struct mmc_host *mmc)
-> +{
-> +	struct sdhci_s3c *sc;
-> +	struct sdhci_host *host;
-> +
-> +	host = mmc_priv(mmc);
-> +	sc = sdhci_priv(host);
-> +
-> +	return gpio_get_value(sc->pdata->wp_gpio);
-> +}
-> +
-> +/**
-> + * sdhci_s3c_cfg_wp - configure GPIO for WP pin
-> + * @gpio_num: GPIO number which connected with WP line from SD/MMC slot
-> + *
-> + * Configure GPIO for using WP line
-> +*/
-> +static void sdhci_s3c_cfg_wp(unsigned int gpio_num)
-> +{
-> +	s3c_gpio_cfgpin(gpio_num, S3C_GPIO_INPUT);
-> +	s3c_gpio_setpull(gpio_num, S3C_GPIO_PULL_UP);
-> +}
-> +
-> +/**
->   * sdhci_s3c_get_min_clock - callback to get minimal supported clock value
->   * @host: The SDHCI host being queried
->   *
-> @@ -375,6 +406,9 @@ static int __devinit sdhci_s3c_probe(struct
-> platform_device *pdev)
->  	if (pdata->cfg_gpio)
->  		pdata->cfg_gpio(pdev, pdata->max_width);
-> 
-> +	if (gpio_is_valid(pdata->wp_gpio))
-> +		sdhci_s3c_ops.get_ro = sdhci_s3c_get_ro;
-> +
+---
+ arch/arm/mach-w90x900/include/mach/regs-gcr.h |   39 +++++++++++++++++++++++++
+ 1 files changed, 39 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-w90x900/include/mach/regs-gcr.h
 
-There is still a problem here, but the opposite to the issue from V1 of this
-patch.
-If one apply the current version, he would need to set pdata->wp_gpio to -1 on
-all
-existing platforms to get old behavior of the driver. Leaving it as zero means
-that
-the driver will try to use GPA(0) for write protection.
-
-Adding one more field to pdata (like "bool has_gpio_wp") seems to be unavoidable
-in this case imho.
-
-> (snip)
-
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+diff --git a/arch/arm/mach-w90x900/include/mach/regs-gcr.h b/arch/arm/mach-w90x900/include/mach/regs-gcr.h
+new file mode 100644
+index 0000000..6087abd
+--- /dev/null
++++ b/arch/arm/mach-w90x900/include/mach/regs-gcr.h
+@@ -0,0 +1,39 @@
++/*
++ * arch/arm/mach-w90x900/include/mach/regs-gcr.h
++ *
++ * Copyright (c) 2010 Nuvoton technology corporation
++ * All rights reserved.
++ *
++ * Wan ZongShun <mcuos.com@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ */
++
++#ifndef __ASM_ARCH_REGS_GCR_H
++#define __ASM_ARCH_REGS_GCR_H
++
++/* Global control registers */
++
++#define GCR_BA		W90X900_VA_GCR
++#define REG_PDID	(GCR_BA+0x000)
++#define REG_PWRON	(GCR_BA+0x004)
++#define REG_ARBCON	(GCR_BA+0x008)
++#define REG_MFSEL	(GCR_BA+0x00C)
++#define REG_EBIDPE	(GCR_BA+0x010)
++#define REG_LCDDPE	(GCR_BA+0x014)
++#define REG_GPIOCPE	(GCR_BA+0x018)
++#define REG_GPIODPE	(GCR_BA+0x01C)
++#define REG_GPIOEPE	(GCR_BA+0x020)
++#define REG_GPIOFPE	(GCR_BA+0x024)
++#define REG_GPIOGPE	(GCR_BA+0x028)
++#define REG_GPIOHPE	(GCR_BA+0x02C)
++#define REG_GPIOIPE	(GCR_BA+0x030)
++#define REG_GTMP1	(GCR_BA+0x034)
++#define REG_GTMP2	(GCR_BA+0x038)
++#define REG_GTMP3	(GCR_BA+0x03C)
++
++#endif /*  __ASM_ARCH_REGS_GCR_H */
+-- 
+1.6.3.3
