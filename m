@@ -1,72 +1,158 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 23 Jul 2010 21:12:30 +0900
-Subject: [PATCH v2] sdhci-s3c: Add SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK quirk
-Message-ID: <1279887150-9373-1-git-send-email-kgene.kim@samsung.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 23 Jul 2010 21:50:25 +0900
+Subject: [PATCH v3 3/3] sdhci-s3c: Add SDHCI_QUIRK_NO_WP_BIT quirk for
+	Samsung SoC
+In-Reply-To: <1279886191-9197-4-git-send-email-kgene.kim@samsung.com>
+References: <1279886191-9197-1-git-send-email-kgene.kim@samsung.com>
+	<1279886191-9197-4-git-send-email-kgene.kim@samsung.com>
+Message-ID: <AANLkTiktYdBpgVtYUt69qfas4FHXvKvSEO4y9kf+DArE@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hyuk Lee <hyuk1.lee@samsung.com>
+On Fri, Jul 23, 2010 at 8:56 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> From: Hyuk Lee <hyuk1.lee@samsung.com>
+>
+> If host controller doesn't have WP pin which should be connnected with SDMMC
+> card WP pin, can implement get_ro function with using the allocated gpio.
+> In order to use this quirk wp_gpio in the platform data must be set.
+>
+> Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+> ?drivers/mmc/host/sdhci-s3c.c | ? 43 ++++++++++++++++++++++++++++++++++++++++++
+> ?drivers/mmc/host/sdhci.c ? ? | ? ?3 ++
+> ?drivers/mmc/host/sdhci.h ? ? | ? ?3 ++
+> ?3 files changed, 49 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index 0d25285..0b75e57 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -22,6 +22,7 @@
+>
+> ?#include <linux/mmc/host.h>
+>
+> +#include <plat/gpio-cfg.h>
+> ?#include <plat/sdhci.h>
+> ?#include <plat/regs-sdhci.h>
+>
+> @@ -213,6 +214,36 @@ static void sdhci_s3c_set_clock(struct sdhci_host *host, unsigned int clock)
+> ?}
+>
+> ?/**
+> + * sdhci_s3c_get_ro - callback for get_ro
+> + * @host: The SDHCI host being changed
+> + *
+> + * If the WP pin is connected with GPIO, can get the value which indicates
+> + * the card is locked or not.
+> +*/
+> +static int sdhci_s3c_get_ro(struct mmc_host *mmc)
+> +{
+> + ? ? ? struct sdhci_s3c *sc;
+> + ? ? ? struct sdhci_host *host;
+> +
+> + ? ? ? host = mmc_priv(mmc);
+> + ? ? ? sc = sdhci_priv(host);
+> +
+> + ? ? ? return gpio_get_value(sc->pdata->wp_gpio);
+> +}
+> +
+> +/**
+> + * sdhci_s3c_cfg_wp - configure GPIO for WP pin
+> + * @gpio_num: GPIO number which connected with WP line from SD/MMC slot
+> + *
+> + * Configure GPIO for using WP line
+> +*/
+> +static void sdhci_s3c_cfg_wp(unsigned int gpio_num)
+> +{
+> + ? ? ? s3c_gpio_cfgpin(gpio_num, S3C_GPIO_INPUT);
+> + ? ? ? s3c_gpio_setpull(gpio_num, S3C_GPIO_PULL_UP);
+> +}
+> +
+> +/**
+> ?* sdhci_s3c_get_min_clock - callback to get minimal supported clock value
+> ?* @host: The SDHCI host being queried
+> ?*
+> @@ -375,6 +406,9 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+> ? ? ? ?if (pdata->cfg_gpio)
+> ? ? ? ? ? ? ? ?pdata->cfg_gpio(pdev, pdata->max_width);
+>
+> + ? ? ? if (gpio_is_valid(pdata->wp_gpio))
+> + ? ? ? ? ? ? ? sdhci_s3c_ops.get_ro = sdhci_s3c_get_ro;
+> +
+> ? ? ? ?host->hw_name = "samsung-hsmmc";
+> ? ? ? ?host->ops = &sdhci_s3c_ops;
+> ? ? ? ?host->quirks = 0;
+> @@ -408,6 +442,15 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+> ? ? ? ?host->quirks |= (SDHCI_QUIRK_32BIT_DMA_ADDR |
+> ? ? ? ? ? ? ? ? ? ? ? ? SDHCI_QUIRK_32BIT_DMA_SIZE);
+>
+> + ? ? ? /* Controller's WP pin donsn't connected with SD card and there is an
+> + ? ? ? ?* allocated GPIO for getting WP data form SD card, use this quirk and
+> + ? ? ? ?* send the GPIO number in pdata->wp_gpio. */
+> + ? ? ? host->quirks |= SDHCI_QUIRK_NO_WP_BIT;
+> +
+> + ? ? ? /* to configure gpio pin as a card write protection signal */
+> + ? ? ? if (gpio_is_valid(pdata->wp_gpio))
+> + ? ? ? ? ? ? ? sdhci_s3c_cfg_wp(pdata->wp_gpio);
+> +
 
-On Samsung's SDMMC hosts the timeout clock is derivied from the SD Clock
-which is set dynamically. So checked SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
-quirk and removed 'sdhci_s3c_get_timeout_clk' callback which doesn't need
-any more.
+Put it just one place like this.
 
-Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
-The submitted v1 patch looks missed...so re-sending...
+if (gpio_is_valid(pdata->wp_gpio)) {
+   sdhci_s3c_cfg_wp(pdata->wp_gpio);
+sdhci_s3c_ops.get_ro = sdhci_s3c_get_ro;
+   host->quirks |= SDHCI_QUIRK_NO_WP_BIT;
+}
 
-Hi Andrew,
-If no problems, could you please apply this patch?
+It reduce the below quirks check by one. If you add the quriks as your
+patch, host->quirks are always true whether WP use or not.
 
-Changes since v1:
-- re-made this patch againt mmotm-20100720
-
- drivers/mmc/host/sdhci-s3c.c |   10 +++-------
- 1 files changed, 3 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-index 0d25285..48fd161 100644
---- a/drivers/mmc/host/sdhci-s3c.c
-+++ b/drivers/mmc/host/sdhci-s3c.c
-@@ -113,11 +113,6 @@ static unsigned int sdhci_s3c_get_max_clk(struct sdhci_host *host)
- 	return max;
- }
- 
--static unsigned int sdhci_s3c_get_timeout_clk(struct sdhci_host *host)
--{
--	return sdhci_s3c_get_max_clk(host) / 1000000;
--}
--
- /**
-  * sdhci_s3c_consider_clock - consider one the bus clocks for current setting
-  * @ourhost: Our SDHCI instance.
-@@ -191,7 +186,6 @@ static void sdhci_s3c_set_clock(struct sdhci_host *host, unsigned int clock)
- 
- 		ourhost->cur_clk = best_src;
- 		host->max_clk = clk_get_rate(clk);
--		host->timeout_clk = sdhci_s3c_get_timeout_clk(host);
- 
- 		ctrl = readl(host->ioaddr + S3C_SDHCI_CONTROL2);
- 		ctrl &= ~S3C_SDHCI_CTRL2_SELBASECLK_MASK;
-@@ -240,7 +234,6 @@ static unsigned int sdhci_s3c_get_min_clock(struct sdhci_host *host)
- 
- static struct sdhci_ops sdhci_s3c_ops = {
- 	.get_max_clock		= sdhci_s3c_get_max_clk,
--	.get_timeout_clock	= sdhci_s3c_get_timeout_clk,
- 	.set_clock		= sdhci_s3c_set_clock,
- 	.get_min_clock		= sdhci_s3c_get_min_clock,
- };
-@@ -408,6 +401,9 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
- 	host->quirks |= (SDHCI_QUIRK_32BIT_DMA_ADDR |
- 			 SDHCI_QUIRK_32BIT_DMA_SIZE);
- 
-+	/* HSMMC on Samsung SoCs uses SDCLK as timeout clock */
-+	host->quirks |= SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK;
-+
- 	ret = sdhci_add_host(host);
- 	if (ret) {
- 		dev_err(dev, "sdhci_add_host() failed\n");
--- 
-1.6.2.5
+Thank you,
+Kyungmin Park
+> ? ? ? ?ret = sdhci_add_host(host);
+> ? ? ? ?if (ret) {
+> ? ? ? ? ? ? ? ?dev_err(dev, "sdhci_add_host() failed\n");
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index f9ca4c6..7fba401 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -1198,6 +1198,9 @@ static int sdhci_get_ro(struct mmc_host *mmc)
+>
+> ? ? ? ?host = mmc_priv(mmc);
+>
+> + ? ? ? if ((host->quirks & SDHCI_QUIRK_NO_WP_BIT) && host->ops->get_ro)
+> + ? ? ? ? ? ? ? return host->ops->get_ro(mmc);
+> +
+> ? ? ? ?spin_lock_irqsave(&host->lock, flags);
+>
+> ? ? ? ?if (host->flags & SDHCI_DEVICE_DEAD)
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index 0de8b38..dd9a233 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -247,6 +247,8 @@ struct sdhci_host {
+> ?#define SDHCI_QUIRK_MISSING_CAPS ? ? ? ? ? ? ? ? ? ? ? (1<<28)
+> ?/* Controller has nonstandard clock management */
+> ?#define SDHCI_QUIRK_NONSTANDARD_MINCLOCK ? ? ? ? ? ? ? (1<<29)
+> +/* Controller has no write-protect pin connected with SD card */
+> +#define SDHCI_QUIRK_NO_WP_BIT ? ? ? ? ? ? ? ? ? ? ? ? ?(1<<30)
+>
+> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? irq; ? ? ? ? ? ?/* Device IRQ */
+> ? ? ? ?void __iomem * ? ? ? ? ?ioaddr; ? ? ? ? /* Mapped address */
+> @@ -321,6 +323,7 @@ struct sdhci_ops {
+> ? ? ? ?unsigned int ? ?(*get_max_clock)(struct sdhci_host *host);
+> ? ? ? ?unsigned int ? ?(*get_min_clock)(struct sdhci_host *host);
+> ? ? ? ?unsigned int ? ?(*get_timeout_clock)(struct sdhci_host *host);
+> + ? ? ? int ? ? ? ? ? ? (*get_ro)(struct mmc_host *mmc);
+> ?};
+>
+> ?#ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
+> --
+> 1.6.2.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
