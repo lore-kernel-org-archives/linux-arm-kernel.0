@@ -1,66 +1,41 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 23 Jul 2010 21:58:32 +0200
-Subject: [PATCH 09/11] ARM: omap: move omap_get_config et al. to .init.text
+Date: Fri, 23 Jul 2010 21:58:27 +0200
+Subject: [PATCH 04/11] ARM: omap: move omap_init_fb to .init.text
 In-Reply-To: <1279915120-4373-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1279915120-4373-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1279915120-4373-9-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1279915120-4373-4-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All callers of these functions live in .init.text, so these can go there,
-too.  There they must not be exported anymore, this is no problem though,
-as all callers are always built-in.
+omap_init_fb() is only called as arch_initcall and so can live in
+.init.text.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/plat-omap/common.c             |    6 ++----
- arch/arm/plat-omap/include/plat/board.h |    4 ++--
- 2 files changed, 4 insertions(+), 6 deletions(-)
+ arch/arm/plat-omap/fb.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
-index 219c01e..3737dae 100644
---- a/arch/arm/plat-omap/common.c
-+++ b/arch/arm/plat-omap/common.c
-@@ -69,17 +69,15 @@ static const void *get_config(u16 tag, size_t len, int skip, size_t *len_out)
- 	return kinfo->data;
+diff --git a/arch/arm/plat-omap/fb.c b/arch/arm/plat-omap/fb.c
+index d3eea4f..e8a390d 100644
+--- a/arch/arm/plat-omap/fb.c
++++ b/arch/arm/plat-omap/fb.c
+@@ -307,7 +307,7 @@ void omapfb_set_ctrl_platform_data(void *data)
+ 	omapfb_config.ctrl_platform_data = data;
  }
  
--const void *__omap_get_config(u16 tag, size_t len, int nr)
-+const void *__init __omap_get_config(u16 tag, size_t len, int nr)
+-static inline int omap_init_fb(void)
++static int __init omap_init_fb(void)
  {
-         return get_config(tag, len, nr, NULL);
- }
--EXPORT_SYMBOL(__omap_get_config);
+ 	const struct omap_lcd_config *conf;
  
--const void *omap_get_var_config(u16 tag, size_t *len)
-+const void *__init omap_get_var_config(u16 tag, size_t *len)
+@@ -352,7 +352,7 @@ void omapfb_set_platform_data(struct omapfb_platform_data *data)
+ 	omapfb_config = *data;
+ }
+ 
+-static inline int omap_init_fb(void)
++static int __init omap_init_fb(void)
  {
-         return get_config(tag, NO_LENGTH_CHECK, 0, len);
+ 	return platform_device_register(&omap_fb_device);
  }
--EXPORT_SYMBOL(omap_get_var_config);
- 
- /*
-  * 32KHz clocksource ... always available, on pretty most chips except
-diff --git a/arch/arm/plat-omap/include/plat/board.h b/arch/arm/plat-omap/include/plat/board.h
-index 5cd6220..7decf58 100644
---- a/arch/arm/plat-omap/include/plat/board.h
-+++ b/arch/arm/plat-omap/include/plat/board.h
-@@ -143,14 +143,14 @@ struct omap_board_config_kernel {
- 	const void *data;
- };
- 
--extern const void *__omap_get_config(u16 tag, size_t len, int nr);
-+extern const void *__init __omap_get_config(u16 tag, size_t len, int nr);
- 
- #define omap_get_config(tag, type) \
- 	((const type *) __omap_get_config((tag), sizeof(type), 0))
- #define omap_get_nr_config(tag, type, nr) \
- 	((const type *) __omap_get_config((tag), sizeof(type), (nr)))
- 
--extern const void *omap_get_var_config(u16 tag, size_t *len);
-+extern const void *__init omap_get_var_config(u16 tag, size_t *len);
- 
- extern struct omap_board_config_kernel *omap_board_config;
- extern int omap_board_config_size;
 -- 
 1.7.1
