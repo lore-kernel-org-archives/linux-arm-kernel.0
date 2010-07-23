@@ -1,36 +1,79 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 23 Jul 2010 20:56:28 +0900
-Subject: [PATCH v3 0/3] Add support WP on SMDKV210 and SDHCI_QUIRK_NO_WP_BIT
-	quirk
-Message-ID: <1279886191-9197-1-git-send-email-kgene.kim@samsung.com>
+Date: Fri, 23 Jul 2010 20:56:30 +0900
+Subject: [PATCH v3 2/3] ARM: S5PV210: Add support SDMMC WP through EXT_INT on
+	SMDKV210
+In-Reply-To: <1279886191-9197-1-git-send-email-kgene.kim@samsung.com>
+References: <1279886191-9197-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1279886191-9197-3-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support SDMMC write protection pin on SMDKV210.
+From: Hyuk Lee <hyuk1.lee@samsung.com>
 
-Changes since v2:
-Addressed comments from Marek Szyprowski
+S5PV210 HSMMC host controller doesn't have the Write Protection pin which
+should be connnected with SDMMC card WP pin. So send the allocated GPIO number
+which is connected with WP pin of SD slot in order to implement get_ro function
+in sdhci-s3c.
 
-- modified wp_gpio checking method for support gpio number 0.
-- removed unnecessary checking in dev-hsmmc.c
+Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-s5pv210/mach-smdkv210.c |   22 ++++++++++++++++++++++
+ 1 files changed, 22 insertions(+), 0 deletions(-)
 
-Changes since v1:
-Addressed comments from Ben Dooks, Maurus Cuelenaere and Kyungmin Park
-
-- just pass gpio numbers for support WP as Ben's suggestion
-- use the gpio layer for specific machine
-- use s3c_sdhcix_set_platdata() in machine_init()
-- removed unnecessary EXPORT_SYMBOL
-
-Note: Depends on following patch set
-
-[PATCH v2 1/2] ARM: SAMSUNG: Add device definition for HSMMC3
-[PATCH v2 2/2] ARM: S5PV210: Add support HSMMC on SMDKV210
-[PATCH v4] Samsung: add new card detection methods in s3c-sdhci driver (platform part) from Marek Szyprowski 
-[PATCH v4] sdhci-s3c: add support for new card detection methods (driver part) from Marek Szyprowski 
-
-And this patch set includes the following patches:
-
-[PATCH v3 1/2] ARM: SAMSUNG: Add the member of platdata to implement SDMMC Write Protection
-[PATCH v3 2/2] ARM: S5PV210: Add support SDMMC WP through EXT_INT on SMDKV210
-[PATCH v3 3/3] sdhci-s3c: Add SDHCI_QUIRK_NO_WP_BIT quirk for Samsung SoC
+diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
+index d20adf7..e573beb 100644
+--- a/arch/arm/mach-s5pv210/mach-smdkv210.c
++++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
+@@ -12,6 +12,7 @@
+ #include <linux/types.h>
+ #include <linux/init.h>
+ #include <linux/serial_core.h>
++#include <linux/gpio.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -29,6 +30,7 @@
+ #include <plat/ts.h>
+ #include <plat/ata.h>
+ #include <plat/keypad.h>
++#include <plat/sdhci.h>
+ 
+ /* Following are default values for UCON, ULCON and UFCON UART registers */
+ #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+@@ -118,6 +120,22 @@ static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
+ 	.oversampling_shift	= 2,
+ };
+ 
++static struct s3c_sdhci_platdata smdkv210_hsmmc0_pdata __initdata = {
++	.wp_gpio		= S5PV210_GPH0(7),
++};
++
++static struct s3c_sdhci_platdata smdkv210_hsmmc1_pdata __initdata = {
++	.wp_gpio		= S5PV210_GPH0(7),
++};
++
++static struct s3c_sdhci_platdata smdkv210_hsmmc2_pdata __initdata = {
++	.wp_gpio		= S5PV210_GPH3(1),
++};
++
++static struct s3c_sdhci_platdata smdkv210_hsmmc3_pdata __initdata = {
++	.wp_gpio		= S5PV210_GPH1(0),
++};
++
+ static void __init smdkv210_map_io(void)
+ {
+ 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+@@ -129,6 +147,10 @@ static void __init smdkv210_machine_init(void)
+ {
+ 	samsung_keypad_set_platdata(&smdkv210_keypad_data);
+ 	s3c24xx_ts_set_platdata(&s3c_ts_platform);
++	s3c_sdhci0_set_platdata(&smdkv210_hsmmc0_pdata);
++	s3c_sdhci1_set_platdata(&smdkv210_hsmmc1_pdata);
++	s3c_sdhci2_set_platdata(&smdkv210_hsmmc2_pdata);
++	s3c_sdhci3_set_platdata(&smdkv210_hsmmc3_pdata);
+ 	s3c_ide_set_platdata(&smdkv210_ide_pdata);
+ 
+ 	platform_add_devices(smdkv210_devices, ARRAY_SIZE(smdkv210_devices));
+-- 
+1.6.2.5
