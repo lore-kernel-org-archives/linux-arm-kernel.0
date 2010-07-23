@@ -1,19 +1,109 @@
 From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Fri, 23 Jul 2010 15:47:31 +0200
-Subject: [PATCH 1/3] mbimxsd baseboards : remove unecessary include
-In-Reply-To: <20100723131130.GC6690@pengutronix.de>
-References: <1279889800-12426-1-git-send-email-eric@eukrea.com>
-	<20100723131130.GC6690@pengutronix.de>
-Message-ID: <4C499D73.6050202@eukrea.com>
+Date: Fri, 23 Jul 2010 16:02:00 +0200
+Subject: [PATCH] imx: move gpio init after to irq init
+In-Reply-To: <1279026162-6634-5-git-send-email-jason77.wang@gmail.com>
+References: <1279026162-6634-1-git-send-email-jason77.wang@gmail.com>	<1279026162-6634-2-git-send-email-jason77.wang@gmail.com>	<1279026162-6634-3-git-send-email-jason77.wang@gmail.com>	<1279026162-6634-4-git-send-email-jason77.wang@gmail.com>
+	<1279026162-6634-5-git-send-email-jason77.wang@gmail.com>
+Message-ID: <4C49A0D8.307@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi,
 
-Le 23/07/2010 15:11, Uwe Kleine-K?nig a ?crit :
-> Ack for all three patches.  I would suggest to include 2/3 before .35.
+Le 13/07/2010 15:02, Jason Wang a ?crit :
+> The commit 9a763bf "get rid of mxc_gpio_init" changed gpio_init
+> and irq_init sequence. Usually we will call set_irq_chained_handler
+> in gpio_init functions, this should be called after the irq_init
+> called, otherwise the chained irq can't get propoer irq_chip and this
+> irq will remain masked even we called set_irq_chained_handler.
 >
-it's not necessary for .35 as the boards are only in the imx-for-2.6.36 
-branch.
+> Signed-off-by: Jason Wang<jason77.wang@gmail.com>
+> ---
+>   arch/arm/mach-imx/mm-imx1.c  |    2 +-
+>   arch/arm/mach-imx/mm-imx21.c |    2 +-
+>   arch/arm/mach-imx/mm-imx27.c |    2 +-
+>   arch/arm/mach-mx25/mm.c      |    2 +-
+>   arch/arm/mach-mx3/mm.c       |    2 +-
+>   arch/arm/mach-mx5/mm.c       |    2 +-
+>   6 files changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/mach-imx/mm-imx1.c b/arch/arm/mach-imx/mm-imx1.c
+> index 117ebf6..9be92b9 100644
+> --- a/arch/arm/mach-imx/mm-imx1.c
+> +++ b/arch/arm/mach-imx/mm-imx1.c
+> @@ -45,6 +45,6 @@ int imx1_register_gpios(void);
+>
+>   void __init mx1_init_irq(void)
+>   {
+> -	imx1_register_gpios();
+>   	mxc_init_irq(MX1_IO_ADDRESS(MX1_AVIC_BASE_ADDR));
+> +	imx1_register_gpios();
+>   }
+> diff --git a/arch/arm/mach-imx/mm-imx21.c b/arch/arm/mach-imx/mm-imx21.c
+> index 68aa5d2..12faeea 100644
+> --- a/arch/arm/mach-imx/mm-imx21.c
+> +++ b/arch/arm/mach-imx/mm-imx21.c
+> @@ -81,6 +81,6 @@ int imx21_register_gpios(void);
+>
+>   void __init mx21_init_irq(void)
+>   {
+> -	imx21_register_gpios();
+>   	mxc_init_irq(MX21_IO_ADDRESS(MX21_AVIC_BASE_ADDR));
+> +	imx21_register_gpios();
+>   }
+> diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
+> index bcedce9..a246229 100644
+> --- a/arch/arm/mach-imx/mm-imx27.c
+> +++ b/arch/arm/mach-imx/mm-imx27.c
+> @@ -81,6 +81,6 @@ int imx27_register_gpios(void);
+>
+>   void __init mx27_init_irq(void)
+>   {
+> -	imx27_register_gpios();
+>   	mxc_init_irq(MX27_IO_ADDRESS(MX27_AVIC_BASE_ADDR));
+> +	imx27_register_gpios();
+>   }
+> diff --git a/arch/arm/mach-mx25/mm.c b/arch/arm/mach-mx25/mm.c
+> index 593e145..bb67711 100644
+> --- a/arch/arm/mach-mx25/mm.c
+> +++ b/arch/arm/mach-mx25/mm.c
+> @@ -69,7 +69,7 @@ int imx25_register_gpios(void);
+>
+>   void __init mx25_init_irq(void)
+>   {
+> -	imx25_register_gpios();
+>   	mxc_init_irq((void __iomem *)MX25_AVIC_BASE_ADDR_VIRT);
+> +	imx25_register_gpios();
+>   }
+>
+> diff --git a/arch/arm/mach-mx3/mm.c b/arch/arm/mach-mx3/mm.c
+> index a378fba..20e48c0 100644
+> --- a/arch/arm/mach-mx3/mm.c
+> +++ b/arch/arm/mach-mx3/mm.c
+> @@ -97,8 +97,8 @@ int imx3x_register_gpios(void);
+>
+>   void __init mx31_init_irq(void)
+>   {
+> -	imx3x_register_gpios();
+>   	mxc_init_irq(IO_ADDRESS(AVIC_BASE_ADDR));
+> +	imx3x_register_gpios();
+>   }
+>
+>   void __init mx35_init_irq(void)
+> diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
+> index 2f79722..bc3f30d 100644
+> --- a/arch/arm/mach-mx5/mm.c
+> +++ b/arch/arm/mach-mx5/mm.c
+> @@ -81,6 +81,6 @@ void __init mx51_init_irq(void)
+>   	if (!tzic_virt)
+>   		panic("unable to map TZIC interrupt controller\n");
+>
+> -	imx51_register_gpios();
+>   	tzic_init_irq(tzic_virt);
+> +	imx51_register_gpios();
+>   }
+Tested-by: Eric B?nard <eric@eukrea.com>
+
+on i.MX51 : this patch seems necessary to get gpio IRQ working.
 
 Eric
