@@ -1,45 +1,49 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 23 Jul 2010 15:59:57 +0300
-Subject: [PATCH v5 0/4] s3c24xx: iPAQ rx1950 series
-In-Reply-To: <201007201535.26600.anarsoul@gmail.com>
-References: <1279364224-24525-1-git-send-email-anarsoul@gmail.com>
-	<201007201535.26600.anarsoul@gmail.com>
-Message-ID: <201007231600.03973.anarsoul@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 23 Jul 2010 14:02:43 +0100
+Subject: ARM Machine SoC I/O setup and PAD initialization code
+In-Reply-To: <201007231235.40625.david.jander@protonic.nl>
+References: <201007211029.29529.david.jander@protonic.nl>
+	<201007221531.58744.david.jander@protonic.nl>
+	<20100722135431.GS31293@n2100.arm.linux.org.uk>
+	<201007231235.40625.david.jander@protonic.nl>
+Message-ID: <20100723130243.GB750@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 20 ???? 2010 15:35:14 ????? Vasily Khoruzhick ???????:
-> ? ????????? ?? 17 ???? 2010 13:57:00 ????? Vasily Khoruzhick ???????:
-> > This patch series adds more support for iPAQ rx1950 PDA to linux:
-> > 1. LEDs driver -- it controls blue, green and red LEDs on rx1950
-> > 2. Battery driver -- adds ability to monitor and charge battery.
-> > This driver is suitable for H1940 PDA aswell (just need to write
-> > some machine specific callbacks and get voltage LUTs)
+On Fri, Jul 23, 2010 at 12:35:40PM +0200, David Jander wrote:
+> On Thursday 22 July 2010 03:54:31 pm Russell King - ARM Linux wrote:
+> > > There are important hardware-design decisions after each of those
+> > > settings! If we continue this amateuristic approach, ARM-linux
+> > > platforms will never get taken seriously in more demanding
+> > > environments. This really needs to change.
 > > 
-> > v2: removed ac registration from s3c_adc_battery driver, use
-> > pda_power instead for ac support
-> > 
-> > v3: split LEDs patch to driver and machine parts,
-> > split battery patch into battery + LED trigger parts,
-> > now battery driver can skip gpio/callbacks usage
-> > (if there's no gpio pin to determine that battery is
-> > full or if charger is enabled automatically)
-> > 
-> > v4: add .blink_set callback to LEDs driver instead of
-> > using LED_HALF value for blinking, remove LED triggers
-> > from battery driver completely (for now)
-> > 
-> > v5: restore lut_acin usage in s3c_adc_battery driver,
-> > it was accidently removed during removing AC support
-> > from driver
+> > "we continue this amateuristic approach" - you think we really have some
+> > choice in this?  We have very little influence on this point.
 > 
-> Ping :)
+> You do. I work for a hardware manufacturer and we are listening!
 
-Ping once again :)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100723/baed7e4a/attachment.sig>
+Well, do _something_ about it then rather than endlessly discussing it.
+Make sure that your boot loader is correct for all your platforms, and
+then we can rely on it to be right for your platforms and omit the
+setup on them.
+
+But you won't be able to influence all hardware manufacturers.
+
+> Also, Canonical might have some important weight here (Linaro).... and they 
+> may just as well listen also.
+
+I doubt Linaro can change the way hardware manufacturers behave either.
+
+ARM Ltd have been going around trying to teach silicon vendors about
+feeding their changes back to the kernel, and it's taken them about a
+decade for this stuff to happen.
+
+How long do you think it'll take for board-level manufacturers to get
+the big picture?  I wouldn't be surprised if it takes at least another
+decade.
+
+As you seem to have a problem with the current setup, then please pick
+up the campaign banner and start trying to teach the hardware vendors
+about the Right Way(tm) to do things - which means addressing your
+concerns _to_ the people who create them, not the people who end up
+having to live with the resulting mess.
