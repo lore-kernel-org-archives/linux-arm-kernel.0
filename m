@@ -1,34 +1,35 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 23 Jul 2010 06:58:07 +0200
-Subject: [PATCH] gpio: remove spurious gpio_unexport debug error.
-In-Reply-To: <1279832758-25442-1-git-send-email-gbean@codeaurora.org>
-References: <1279832758-25442-1-git-send-email-gbean@codeaurora.org>
-Message-ID: <20100723045807.GA14875@pengutronix.de>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 23 Jul 2010 10:50:47 +0530
+Subject: hotplug and init section
+In-Reply-To: <989bc3c9f8d8ce1d51c480a0dbdce07e.squirrel@www.codeaurora.org>
+References: <989bc3c9f8d8ce1d51c480a0dbdce07e.squirrel@www.codeaurora.org>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C6254E4A@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> kernel-bounces at lists.infradead.org] On Behalf Of smuckle at codeaurora.org
+> Sent: Friday, July 23, 2010 1:03 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: linux-arm-msm at vger.kernel.org
+> Subject: hotplug and init section
+> 
+> Hi,
+> 
+> I'm working on hotplug support. It looks like currently only mach-realview
+> supports this on ARM, and it does not fully power down the core.  The core
+> just goes into wfi. If we fully power down the core being hot-removed, we
+> need to rerun the processor init, enable mmu, turn on mmu, etc when it is
+> brought back up.
+> 
+> This code is currently all put in the .init section. Changing things so
+> that the code required for bringing up secondary cores is still present
+> after init looks to be a fairly big change. As such I wanted to see if
+> anyone had thoughts here before I start hacking up head.S, the linker
+> script, etc.
+> 
+Not sure whether you need to really start from scratch for hotplugged CPU. If you have proper context save /restore, you can avoid full restart of the CPU.
 
-On Thu, Jul 22, 2010 at 02:05:58PM -0700, Gregory Bean wrote:
-> Make gpio_unexport generate success instead of an -EINVAL
-> if asked to unexport a line which is not exported, because
-> the only result of that condition is a pr_debug
-> which complains of what is really a harmless no-op:
-> when an unexported gpio is unexported again, nothing happens.
-> That's not a failure, just a trivial border case.
-> Since gpio_free calls gpio_unexport unconditionally
-> and exported gpio lines are uncommon, most calls to
-> gpio_free with debug flags enabled generate -EINVAL
-> warnings in the log, causing unnecessary stress.
-I noticed that a few days ago, too.  Just didn't come around to fix it
-myself.
- 
-> Signed-off-by: Gregory Bean <gbean@codeaurora.org>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-
-Thanks
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+Santosh
