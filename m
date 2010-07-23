@@ -1,26 +1,32 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 23 Jul 2010 15:11:30 +0200
-Subject: [PATCH 1/3] mbimxsd baseboards : remove unecessary include
-In-Reply-To: <1279889800-12426-1-git-send-email-eric@eukrea.com>
-References: <1279889800-12426-1-git-send-email-eric@eukrea.com>
-Message-ID: <20100723131130.GC6690@pengutronix.de>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Fri, 23 Jul 2010 17:18:33 +0400
+Subject: [PATCH v5 3/4] Add s3c-adc-battery driver
+In-Reply-To: <1279364224-24525-4-git-send-email-anarsoul@gmail.com>
+References: <1279364224-24525-1-git-send-email-anarsoul@gmail.com>
+	<1279364224-24525-4-git-send-email-anarsoul@gmail.com>
+Message-ID: <20100723131833.GA14980@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, Jul 23, 2010 at 02:56:38PM +0200, Eric B?nard wrote:
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> ---
->  arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c |    1 -
->  arch/arm/mach-mx3/eukrea_mbimxsd-baseboard.c  |    1 -
->  2 files changed, 0 insertions(+), 2 deletions(-)
+On Sat, Jul 17, 2010 at 01:57:03PM +0300, Vasily Khoruzhick wrote:
+> s3c-adc-battery is driver for monitoring
+> and charging battery on iPAQ H1930/H1940/RX1950.
+> It depends on s3c-adc driver to get battery voltage and current.
 > 
-Ack for all three patches.  I would suggest to include 2/3 before .35.
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> ---
 
-Thanks
-Uwe
+Applied to battery-2.6.git (for -next) with a few cosmetic
+fixes.
+
+If/when Ben comment on this driver, feel free to send fixups
+on top of battery-2.6.git.
+
+Also, I can take patch 4/4 if Ben ack it.
+
+Thanks,
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Anton Vorontsov
+email: cbouatmailru at gmail.com
+irc://irc.freenode.net/bd2
