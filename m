@@ -1,33 +1,74 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 23 Jul 2010 20:17:50 +0300
-Subject: [PATCH v6 0/2] s3c24xx: iPAQ rx1950 series
-Message-ID: <1279905472-5908-1-git-send-email-anarsoul@gmail.com>
+Date: Fri, 23 Jul 2010 20:17:52 +0300
+Subject: [PATCH v6 2/2] rx1950: add LEDs support
+In-Reply-To: <1279905472-5908-1-git-send-email-anarsoul@gmail.com>
+References: <1279905472-5908-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <1279905472-5908-3-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds more support for iPAQ rx1950 PDA to linux:
-1. LEDs driver -- it controls blue, green and red LEDs on rx1950
-2. Battery driver -- adds ability to monitor and charge battery.
-This driver is suitable for H1940 PDA aswell (just need to write
-some machine specific callbacks and get voltage LUTs)
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+ arch/arm/mach-s3c2440/mach-rx1950.c |   33 +++++++++++++++++++++++++++++++++
+ 1 files changed, 33 insertions(+), 0 deletions(-)
 
-v2: removed ac registration from s3c_adc_battery driver, use
-pda_power instead for ac support
-
-v3: split LEDs patch to driver and machine parts,
-split battery patch into battery + LED trigger parts,
-now battery driver can skip gpio/callbacks usage
-(if there's no gpio pin to determine that battery is
-full or if charger is enabled automatically)
-
-v4: add .blink_set callback to LEDs driver instead of
-using LED_HALF value for blinking, remove LED triggers
-from battery driver completely (for now)
-
-v5: restore lut_acin usage in s3c_adc_battery driver,
-it was accidently removed during removing AC support
-from driver
-
-v6: drop rx1950-specific LEDs driver, use leds-gpio instead,
-skip s3c-adc-battery patch, as it's already merged into battery-2.6
-tree
+diff --git a/arch/arm/mach-s3c2440/mach-rx1950.c b/arch/arm/mach-s3c2440/mach-rx1950.c
+index 1ccb1ae..8c24869 100644
+--- a/arch/arm/mach-s3c2440/mach-rx1950.c
++++ b/arch/arm/mach-s3c2440/mach-rx1950.c
+@@ -28,6 +28,7 @@
+ #include <linux/pwm_backlight.h>
+ #include <linux/pwm.h>
+ #include <linux/s3c_adc_battery.h>
++#include <linux/leds.h>
+ 
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+@@ -258,6 +259,37 @@ void rx1950_disable_charger(void)
+ 	gpio_direction_output(S3C2410_GPJ(3), 0);
+ }
+ 
++static struct gpio_led rx1950_leds_desc[] = {
++	{
++		.name				= "Green",
++		.default_trigger	= "main-battery-charging-or-full",
++		.gpio				= S3C2410_GPA(6),
++	},
++	{
++		.name				= "Red",
++		.default_trigger	= "main-battery-full",
++		.gpio				= S3C2410_GPA(7),
++	},
++	{
++		.name				= "Blue",
++		.default_trigger	= "rx1950-acx-mem",
++		.gpio				= S3C2410_GPA(11),
++	},
++};
++
++static struct gpio_led_platform_data rx1950_leds_pdata = {
++	.num_leds	= ARRAY_SIZE(rx1950_leds_desc),
++	.leds		= rx1950_leds_desc,
++};
++
++static struct platform_device rx1950_leds = {
++	.name	= "leds-gpio",
++	.id		= -1,
++	.dev	= {
++				.platform_data = &rx1950_leds_pdata,
++	},
++};
++
+ static struct s3c_adc_bat_pdata rx1950_bat_cfg = {
+ 	.init = rx1950_bat_init,
+ 	.exit = rx1950_bat_exit,
+@@ -662,6 +694,7 @@ static struct platform_device *rx1950_devices[] __initdata = {
+ 	&rx1950_device_gpiokeys,
+ 	&power_supply,
+ 	&rx1950_battery,
++	&rx1950_leds,
+ };
+ 
+ static struct clk *rx1950_clocks[] __initdata = {
+-- 
+1.7.1.1
