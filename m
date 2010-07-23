@@ -1,30 +1,42 @@
-From: augulis.darius@gmail.com (Darius Augulis)
-Date: Fri, 23 Jul 2010 22:12:03 +0300
-Subject: real6410 support
-Message-ID: <4C49E983.1030001@gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri, 23 Jul 2010 21:58:29 +0200
+Subject: [PATCH 06/11] ARM: omap: move omapfb_reserve_sdram() to .init.text
+In-Reply-To: <1279915120-4373-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1279915120-4373-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1279915120-4373-6-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+omapfb_reserve_sdram() is only called by omap1_map_common_io() and
+_omap2_map_common_io() that both live in .init.text.  So this is save
+for omapfb_reserve_sdram(), too.
 
-there is a nice s3c6410 board named real6410.
-I would like to buy it and develop product on it.
-Because it's quite expensive, before I buy it, I would like to know 
-about kernel support for it. Is there any differences between smdk6410 
-and real6410? Board manufacturer doesn't provide any schematics of this 
-board. I found kernel and u-boot packages for real6410 on the net:
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/plat-omap/fb.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-http://code.google.com/p/real6410/source/browse/trunk/soft/s3c-linux-2.6.28-Real6410.tar.bz2
-
-http://code.google.com/p/real6410/source/browse/trunk/soft/s3c-u-boot-1.1.6-Real6410.tar.bz2
-
-Quick look into kernel .config showed:
-
-CONFIG_MACH_SMDK6410=y
-
-Does it mean that I can compile main line kernel for mach-smdk6410 and I 
-will have all real6410 devices working?
-
-Thanks for info!
-
-Darius.
+diff --git a/arch/arm/plat-omap/fb.c b/arch/arm/plat-omap/fb.c
+index e8a390d..4df210f 100644
+--- a/arch/arm/plat-omap/fb.c
++++ b/arch/arm/plat-omap/fb.c
+@@ -359,7 +359,7 @@ static int __init omap_init_fb(void)
+ 
+ arch_initcall(omap_init_fb);
+ 
+-void omapfb_reserve_sdram(void) {}
++void __init omapfb_reserve_sdram(void) {}
+ unsigned long omapfb_reserve_sram(unsigned long sram_pstart,
+ 				  unsigned long sram_vstart,
+ 				  unsigned long sram_size,
+@@ -375,7 +375,7 @@ void omapfb_set_platform_data(struct omapfb_platform_data *data)
+ {
+ }
+ 
+-void omapfb_reserve_sdram(void) {}
++void __init omapfb_reserve_sdram(void) {}
+ unsigned long omapfb_reserve_sram(unsigned long sram_pstart,
+ 				  unsigned long sram_vstart,
+ 				  unsigned long sram_size,
+-- 
+1.7.1
