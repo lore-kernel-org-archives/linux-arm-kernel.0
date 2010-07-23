@@ -1,42 +1,32 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 23 Jul 2010 21:58:29 +0200
-Subject: [PATCH 06/11] ARM: omap: move omapfb_reserve_sdram() to .init.text
+Date: Fri, 23 Jul 2010 21:58:26 +0200
+Subject: [PATCH 03/11] ARM: sa1111: move __sa1111_probe() to .devinit.text
 In-Reply-To: <1279915120-4373-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1279915120-4373-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1279915120-4373-6-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1279915120-4373-3-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omapfb_reserve_sdram() is only called by omap1_map_common_io() and
-_omap2_map_common_io() that both live in .init.text.  So this is save
-for omapfb_reserve_sdram(), too.
+__sa1111_probe is only called by sa1111_probe that lives in .devinit.text.
+So it's save to move the former to .devinit.text, too.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/plat-omap/fb.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/common/sa1111.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-omap/fb.c b/arch/arm/plat-omap/fb.c
-index e8a390d..4df210f 100644
---- a/arch/arm/plat-omap/fb.c
-+++ b/arch/arm/plat-omap/fb.c
-@@ -359,7 +359,7 @@ static int __init omap_init_fb(void)
- 
- arch_initcall(omap_init_fb);
- 
--void omapfb_reserve_sdram(void) {}
-+void __init omapfb_reserve_sdram(void) {}
- unsigned long omapfb_reserve_sram(unsigned long sram_pstart,
- 				  unsigned long sram_vstart,
- 				  unsigned long sram_size,
-@@ -375,7 +375,7 @@ void omapfb_set_platform_data(struct omapfb_platform_data *data)
+diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
+index 6f80665..97c5bc9 100644
+--- a/arch/arm/common/sa1111.c
++++ b/arch/arm/common/sa1111.c
+@@ -681,7 +681,7 @@ out:
+  *	%-EBUSY		physical address already marked in-use.
+  *	%0		successful.
+  */
+-static int
++static int __devinit
+ __sa1111_probe(struct device *me, struct resource *mem, int irq)
  {
- }
- 
--void omapfb_reserve_sdram(void) {}
-+void __init omapfb_reserve_sdram(void) {}
- unsigned long omapfb_reserve_sram(unsigned long sram_pstart,
- 				  unsigned long sram_vstart,
- 				  unsigned long sram_size,
+ 	struct sa1111 *sachip;
 -- 
 1.7.1
