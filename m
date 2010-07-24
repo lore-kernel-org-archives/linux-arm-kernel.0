@@ -1,32 +1,27 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 24 Jul 2010 10:57:22 +0200
-Subject: [PATCH] ARM: ns9xxx: fix FTBFS for zImage
-In-Reply-To: <20100724082044.GA15571@n2100.arm.linux.org.uk>
-References: <20100722111412.GB10399@kyllikki.org>
-	<1279867922-10626-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20100724082044.GA15571@n2100.arm.linux.org.uk>
-Message-ID: <20100724085722.GC694@pengutronix.de>
+From: mattia.jona@gmail.com (Mattia Jona-Lasinio)
+Date: Sat, 24 Jul 2010 11:52:47 +0200
+Subject: Introducing the LCD-Linux project
+In-Reply-To: <AANLkTinxNlCSBqBggTIlVqyyn4NLy4LbZU8SFAlqPLow@mail.gmail.com>
+References: <AANLkTikitTGpiE5Oe_P5a4f2OCOnlB9j_LVm5CQhQIno@mail.gmail.com>
+	<AANLkTinxNlCSBqBggTIlVqyyn4NLy4LbZU8SFAlqPLow@mail.gmail.com>
+Message-ID: <AANLkTi=PkFZTuEujN4X8hJR-5YZf1Kz=9DW-XUFrPY0m@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 24, 2010 at 09:20:44AM +0100, Russell King - ARM Linux wrote:
-> Subject: [PATCH] ARM: ns9xxx: fix FTBFS for zImage
-> 
-> btw, I don't think you mean FTBFS here.
-> 
-> 	"fix fails to build from source for zImage"
-> 
-> is wrong.
-> 
-> 	"fix build failure for zImage"
-> 
-> is better.
-I didn't thought much about it, but if F means "failure" it should be
-OK :-).
+On Thu, Jul 22, 2010 at 9:19 PM, Miguel Ojeda
+<miguel.ojeda.sandonis@gmail.com> wrote:
+> Someone told me once ago, when I submitted the cfag12864b/ks0108
+> drivers, to make them use a framebuffer, so we could get a console on
+> it using a program like con2fb program in an independent manner. It
+> worked flawlessly and the console was quite usable!
+>
+> I see that you want to implement something more complex, but maybe
+> someone/you can make a use of that idea. Check it out : )
 
-Best regards
-Uwe
+Hi,
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+thanks for pointing this out. I'll certainly check it! :)
+
+Regards,
+
+Mattia
