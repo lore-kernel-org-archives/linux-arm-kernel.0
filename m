@@ -1,665 +1,162 @@
-From: davidsin@ti.com (David Sin)
-Date: Fri, 23 Jul 2010 18:28:13 -0500
-Subject: [RFC 7/8] TILER-DMM: Main TILER driver implementation.
-In-Reply-To: <1279927694-26138-7-git-send-email-davidsin@ti.com>
-References: <1279927694-26138-1-git-send-email-davidsin@ti.com>
-	<1279927694-26138-2-git-send-email-davidsin@ti.com>
-	<1279927694-26138-3-git-send-email-davidsin@ti.com>
-	<1279927694-26138-4-git-send-email-davidsin@ti.com>
-	<1279927694-26138-5-git-send-email-davidsin@ti.com>
-	<1279927694-26138-6-git-send-email-davidsin@ti.com>
-	<1279927694-26138-7-git-send-email-davidsin@ti.com>
-Message-ID: <1279927694-26138-8-git-send-email-davidsin@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 24 Jul 2010 19:50:22 +0100
+Subject: ARM Machine SoC I/O setup and PAD initialization code
+In-Reply-To: <61396.213.84.91.226.1279910330.squirrel@protonic.xs4all.nl>
+References: <201007211029.29529.david.jander@protonic.nl>
+	<201007221531.58744.david.jander@protonic.nl>
+	<20100722142043.GK4737@rakim.wolfsonmicro.main>
+	<201007231218.07379.david.jander@protonic.nl>
+	<20100723141712.GC12300@rakim.wolfsonmicro.main>
+	<61396.213.84.91.226.1279910330.squirrel@protonic.xs4all.nl>
+Message-ID: <20100724185015.GA17738@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lajos Molnar <molnar@ti.com>
+On Fri, Jul 23, 2010 at 08:38:50PM +0200, david at protonic.nl wrote:
+> > On Fri, Jul 23, 2010 at 12:18:07PM +0200, David Jander wrote:
 
-This patch contains the TILER driver and implementation of the TILER
-block manipulation and mapping functions.
+> > In extreme cases the bootloader may be provided as binary by the SoC
+> > vendor and not changable, but there can also be the other concerns I
+> > mentioned with things like deploying updates throughout the team.
+> > Sometimes the bootloader code supplied with the BSP is entertainingly
+> > baroque and discourages changes even if they are technically possible.
 
-It also contains the makefile and config file for the TILER driver.
+> Well, I know one manufacturer delivering such a bootloader with their
+> evaluation kit, but I'd never expect anyone to actually use that one in
+> production!? Isn't it meant as a mere example?
 
-Signed-off-by: Lajos Molnar <molnar@ti.com>
-Signed-off-by: David Sin <davidsin@ti.com>
----
- drivers/media/video/tiler/Kconfig       |   65 +++++
- drivers/media/video/tiler/Makefile      |    7 +
- drivers/media/video/tiler/tiler-iface.c |  106 ++++++++
- drivers/media/video/tiler/tiler-main.c  |  426 +++++++++++++++++++++++++++++++
- 4 files changed, 604 insertions(+), 0 deletions(-)
- create mode 100644 drivers/media/video/tiler/Kconfig
- create mode 100644 drivers/media/video/tiler/Makefile
- create mode 100644 drivers/media/video/tiler/tiler-iface.c
- create mode 100644 drivers/media/video/tiler/tiler-main.c
+Well, if it already does the job why would you want to change it?  Given
+that a large proportion of systems boot in an identical fashion it's
+likely that an off the shelf bootloader is more than capable of doing
+the job.  It certainly seems crazy to write one from scratch given the
+rather large range of existing ones, at most a bit of customisation
+might be expected.
 
-diff --git a/drivers/media/video/tiler/Kconfig b/drivers/media/video/tiler/Kconfig
-new file mode 100644
-index 0000000..2c61471
---- /dev/null
-+++ b/drivers/media/video/tiler/Kconfig
-@@ -0,0 +1,65 @@
-+config HAVE_TI_TILER
-+        bool
-+        default y
-+        depends on ARCH_OMAP4
-+
-+menuconfig TI_TILER
-+        tristate "TI TILER support"
-+        default y
-+        depends on HAVE_TI_TILER
-+        help
-+           TILER and TILER-DMM driver for TI chips.  The TI TILER device
-+           enables video rotation on certain TI chips such as OMAP4 or
-+           Netra.  Video rotation will be limited without TILER support.
-+
-+config TILER_GRANULARITY
-+        int "Allocation granularity (2^n)"
-+        range 1 4096
-+        default 128
-+        depends on TI_TILER
-+        help
-+           This option sets the default TILER allocation granularity.  It can
-+           be overriden by the tiler.grain boot argument.
-+
-+           The allocation granularity is the smallest TILER block size (in
-+           bytes) managed distinctly by the TILER driver.  TILER blocks of any
-+           size are managed in chunks of at least this size.
-+
-+           Must be a 2^n in the range of 1 to 4096; however, the TILER driver
-+           may use a larger supported granularity.
-+
-+           Supported values are: 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024,
-+           2048, 4096.
-+
-+config TILER_ALIGNMENT
-+        int "Allocation alignment (2^n)"
-+        range 1 4096
-+        default 4096
-+        depends on TI_TILER
-+        help
-+           This option sets the default TILER allocation alignment.  It can
-+           be overriden by the tiler.align boot argument.
-+
-+           Must be a 2^n in the range of 1 to 4096; however, it is naturally
-+           aligned to the TILER granularity.
-+
-+           Supported values are: 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024,
-+           2048, 4096.
-+
-+config TILER_CACHE_LIMIT
-+        int "Memory limit to cache free pages in MBytes"
-+        range 0 128
-+        default 40
-+        depends on TI_TILER
-+        help
-+           This option sets the minimum memory that TILER retains even if
-+           there is less TILER allocated memory is use.  The unused memory is
-+           instead stored in a cache to speed up allocation and freeing of
-+           physical pages.
-+
-+           This option can be overriden by the tiler.cache boot argument.
-+
-+           While initially TILER will use less memory than this limit (0), it
-+           will not release any memory used until it reaches this limit.
-+           Thereafter, TILER will release any unused memory immediately as
-+           long as there it is above this threshold.
-diff --git a/drivers/media/video/tiler/Makefile b/drivers/media/video/tiler/Makefile
-new file mode 100644
-index 0000000..4a6495e
---- /dev/null
-+++ b/drivers/media/video/tiler/Makefile
-@@ -0,0 +1,7 @@
-+obj-$(CONFIG_TI_TILER) += tcm/
-+
-+obj-$(CONFIG_TI_TILER) += tiler.o
-+tiler-objs = tiler-geom.o tiler-main.o tiler-iface.o tmm-pat.o
-+
-+obj-$(CONFIG_TI_TILER) += tiler_dmm.o
-+tiler_dmm-objs = dmm.o
-diff --git a/drivers/media/video/tiler/tiler-iface.c b/drivers/media/video/tiler/tiler-iface.c
-new file mode 100644
-index 0000000..0b10fae
---- /dev/null
-+++ b/drivers/media/video/tiler/tiler-iface.c
-@@ -0,0 +1,106 @@
-+/*
-+ * tiler-iface.c
-+ *
-+ * TILER driver interace functions for TI TILER hardware block.
-+ *
-+ * Authors: Lajos Molnar <molnar@ti.com>
-+ *          David Sin <davidsin@ti.com>
-+ *
-+ * Copyright (C) 2009-2010 Texas Instruments, Inc.
-+ *
-+ * This package is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * THIS PACKAGE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
-+ * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
-+ * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/slab.h>		/* kmalloc */
-+#include <linux/mm.h>
-+#include <linux/mm_types.h>
-+#include <asm/mach/map.h>	/* for ioremap_page */
-+
-+#include "_tiler.h"
-+
-+/*
-+ *  Memory-Map Kernel APIs
-+ *  ==========================================================================
-+ */
-+
-+s32 tiler_mmap_blk(struct tiler_block_t *blk, u32 offs, u32 size,
-+				struct vm_area_struct *vma, u32 voffs)
-+{
-+	u32 v, p, len;
-+
-+	/* don't allow mremap */
-+	vma->vm_flags |= VM_DONTEXPAND | VM_RESERVED;
-+
-+	/* mapping must fit into vma */
-+	BUG_ON(vma->vm_start > vma->vm_start + voffs ||
-+		vma->vm_start + voffs > vma->vm_start + voffs + size ||
-+		vma->vm_start + voffs + size > vma->vm_end);
-+
-+	/* mapping must fit into block */
-+	BUG_ON(offs > offs + size || offs + size > tiler_size(blk));
-+
-+	v = tiler_vstride(blk);
-+	p = tiler_pstride(blk);
-+
-+	/* remap block portion */
-+	len = v - (offs % v);	/* initial area to map */
-+	while (size) {
-+		/* restrict to size still needs mapping */
-+		if (len > size)
-+			len = size;
-+
-+		vma->vm_pgoff = (blk->phys + offs) >> PAGE_SHIFT;
-+		if (remap_pfn_range(vma, vma->vm_start + voffs, vma->vm_pgoff,
-+				    len, vma->vm_page_prot))
-+			return -EAGAIN;
-+		voffs += len;
-+		offs += len + p - v;
-+		size -= len;
-+		len = v;	/* subsequent area to map */
-+	}
-+	return 0;
-+}
-+EXPORT_SYMBOL(tiler_mmap_blk);
-+
-+s32 tiler_ioremap_blk(struct tiler_block_t *blk, u32 offs, u32 size,
-+				u32 addr, u32 mtype)
-+{
-+	u32 v, p;
-+	u32 len;		/* area to map */
-+	const struct mem_type *type = get_mem_type(mtype);
-+
-+	/* mapping must fit into address space */
-+	BUG_ON(addr > addr + size);
-+
-+	/* mapping must fit into block */
-+	BUG_ON(offs > offs + size || offs + size > tiler_size(blk));
-+
-+	v = tiler_vstride(blk);
-+	p = tiler_pstride(blk);
-+
-+	/* move offset and address to end */
-+	offs += blk->phys + size;
-+	addr += size;
-+
-+	len = v - (offs % v);	/* initial area to map */
-+	while (size) {
-+		while (len && size) {
-+			if (ioremap_page(addr - size, offs - size, type))
-+				return -EAGAIN;
-+			len  -= PAGE_SIZE;
-+			size -= PAGE_SIZE;
-+		}
-+
-+		offs += p - v;
-+		len = v;	/* subsequent area to map */
-+	}
-+	return 0;
-+}
-+EXPORT_SYMBOL(tiler_ioremap_blk);
-diff --git a/drivers/media/video/tiler/tiler-main.c b/drivers/media/video/tiler/tiler-main.c
-new file mode 100644
-index 0000000..cbd84d1
---- /dev/null
-+++ b/drivers/media/video/tiler/tiler-main.c
-@@ -0,0 +1,426 @@
-+/*
-+ * tiler-main.c
-+ *
-+ * TILER driver main support functions for TI TILER hardware block.
-+ *
-+ * Authors: Lajos Molnar <molnar@ti.com>
-+ *          David Sin <davidsin@ti.com>
-+ *
-+ * Copyright (C) 2009-2010 Texas Instruments, Inc.
-+ *
-+ * This package is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * THIS PACKAGE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
-+ * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
-+ * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>	/* platform_device() */
-+#include <linux/errno.h>
-+#include <linux/mutex.h>
-+#include <linux/dma-mapping.h>		/* dma_alloc_coherent */
-+#include <linux/pagemap.h>		/* page_cache_release() */
-+#include <linux/slab.h>
-+
-+#include <mach/dmm.h>
-+#include "tmm.h"
-+#include "_tiler.h"
-+#include "tcm/tcm-sita.h"		/* TCM algorithm */
-+
-+static uint default_align = CONFIG_TILER_ALIGNMENT;
-+static uint granularity = CONFIG_TILER_GRANULARITY;
-+
-+module_param_named(align, default_align, uint, 0444);
-+MODULE_PARM_DESC(align, "Default block ssptr alignment");
-+module_param_named(grain, granularity, uint, 0444);
-+MODULE_PARM_DESC(grain, "Granularity (bytes)");
-+
-+struct platform_driver tiler_driver_ldm = {
-+	.driver = {
-+		.owner = THIS_MODULE,
-+		.name = "tiler",
-+	},
-+	.probe = NULL,
-+	.shutdown = NULL,
-+	.remove = NULL,
-+};
-+
-+static struct tiler_ops tiler;		/* shared methods and variables */
-+
-+static struct list_head blocks;		/* all tiler blocks */
-+
-+static struct mutex mtx;
-+static struct tcm *tcm[TILER_FORMATS];
-+static struct tmm *tmm[TILER_FORMATS];
-+static u32 *dmac_va;
-+static dma_addr_t dmac_pa;
-+
-+/* info for a block */
-+struct mem_info {
-+	struct list_head global;	/* global blocks */
-+	struct tiler_block_t blk;	/* block info */
-+	struct tcm_area area;
-+	u32 *mem;			/* list of alloced phys addresses */
-+};
-+
-+/*
-+ *  TMM connectors
-+ *  ==========================================================================
-+ */
-+/* wrapper around tmm_map */
-+static s32 refill_pat(struct tmm *tmm, struct tcm_area *area, u32 *ptr)
-+{
-+	s32 res = 0;
-+	struct pat_area p_area = {0};
-+
-+	p_area.x0 = area->p0.x;
-+	p_area.y0 = area->p0.y;
-+	p_area.x1 = area->p1.x;
-+	p_area.y1 = area->p1.y;
-+
-+	memcpy(dmac_va, ptr, sizeof(*ptr) * tcm_sizeof(*area));
-+
-+	if (tmm_map(tmm, p_area, dmac_pa))
-+		res = -EFAULT;
-+
-+	return res;
-+}
-+
-+/* wrapper around tmm_clear */
-+static void clear_pat(struct tmm *tmm, struct tcm_area *area)
-+{
-+	struct pat_area p_area = {0};
-+
-+	p_area.x0 = area->p0.x;
-+	p_area.y0 = area->p0.y;
-+	p_area.x1 = area->p1.x;
-+	p_area.y1 = area->p1.y;
-+
-+	tmm_clear(tmm, p_area);
-+}
-+
-+/*
-+ *  Area handling methods
-+ *  ==========================================================================
-+ */
-+
-+/* verify input params and calculate tiler container params for a block */
-+static s32 __analize_area(enum tiler_fmt fmt, u32 width, u32 height,
-+			  u16 *x_area, u16 *y_area, u16 *align, u16 *offs)
-+{
-+	/* input: width, height is in pixels, *align, *offs in bytes */
-+	/* output: x_area, y_area, *align in slots */
-+
-+	/* slot width, height, and row size */
-+	u32 slot_row, min_align;
-+	const struct tiler_geom *g;
-+
-+	/* width and height must be positive, format must be 2D */
-+	if (!width || !height || fmt == TILFMT_PAGE)
-+		return -EINVAL;
-+
-+	/* align must be 2 power */
-+	if (*align & (*align - 1))
-+		return -EINVAL;
-+
-+	/* format must be valid */
-+	g = tiler.geom(fmt);
-+	if (!g)
-+		return -EINVAL;
-+
-+	/* get the # of bytes per row in 1 slot */
-+	slot_row = g->slot_w * g->bpp;
-+
-+	/* minimum alignment is at least 1 slot.  Use default if needed */
-+	min_align = max(slot_row, granularity);
-+	*align = ALIGN(*align ? : default_align, min_align);
-+
-+	/* offset must be multiple of bpp */
-+	if (*offs & (g->bpp - 1) || *offs >= *align)
-+		return -EINVAL;
-+
-+	/* round down the offset to the nearest slot size, and increase width
-+	   to allow space for having the correct offset */
-+	width += (*offs & (min_align - 1)) / g->bpp;
-+
-+	/* expand width to block size */
-+	width = ALIGN(width, min_align / g->bpp);
-+
-+	/* adjust to slots */
-+	*x_area = DIV_ROUND_UP(width, g->slot_w);
-+	*y_area = DIV_ROUND_UP(height, g->slot_h);
-+	*align /= slot_row;
-+
-+	if (*x_area > tiler.width || *y_area > tiler.height)
-+		return -ENOMEM;
-+	return 0;
-+}
-+
-+/* allocate a mem_info structure and reserves a 2d container area */
-+static struct mem_info *get_2d_area(u16 w, u16 h, u16 align, struct tcm *tcm)
-+{
-+	struct mem_info *mi = NULL;
-+
-+	/* reserve a block struct */
-+	mi = kmalloc(sizeof(*mi), GFP_KERNEL);
-+	if (!mi)
-+		return mi;
-+	memset(mi, 0, sizeof(*mi));
-+
-+	/* reserve an area */
-+	if (tcm_reserve_2d(tcm, w, h, align, &mi->area)) {
-+		kfree(mi);
-+		return NULL;
-+	}
-+
-+	return mi;
-+}
-+
-+/*
-+ *  Block operations
-+ *  ==========================================================================
-+ */
-+
-+/* free a block */
-+static s32 free_block(struct mem_info *mi)
-+{
-+	/* release memory */
-+	if (mi->mem)
-+		tmm_free(tmm[tiler_fmt(mi->blk.phys)], mi->mem);
-+	clear_pat(tmm[tiler_fmt(mi->blk.phys)], &mi->area);
-+
-+	/* unreserve area */
-+	tcm_free(&mi->area);
-+
-+	/* have mutex */
-+
-+	/* safe deletion as list may not have been assigned */
-+	if (mi->global.next)
-+		list_del(&mi->global);
-+
-+	kfree(mi);
-+	return 0;
-+}
-+
-+/* create an empty block with just an area and add it to the global list */
-+static struct mem_info *get_area(enum tiler_fmt fmt, u32 width, u32 height,
-+							u16 align, u16 offs)
-+{
-+	u16 x, y;
-+	struct mem_info *mi = NULL;
-+	const struct tiler_geom *g = tiler.geom(fmt);
-+
-+	/* calculate dimensions and alignment in slots */
-+	if (__analize_area(fmt, width, height, &x, &y, &align, &offs))
-+		return NULL;
-+
-+	mi = get_2d_area(x, y, align, tcm[fmt]);
-+	if (!mi)
-+		return NULL;
-+
-+	/* have mutex */
-+	list_add(&mi->global, &blocks);
-+
-+	mi->blk.phys = tiler.addr(fmt,
-+		mi->area.p0.x * g->slot_w, mi->area.p0.y * g->slot_h)
-+		+ offs;
-+	return mi;
-+}
-+
-+/* allocate a new tiler block */
-+static s32 alloc_block(enum tiler_fmt fmt, u32 width, u32 height,
-+		u32 align, u32 offs, struct mem_info **info)
-+{
-+	struct mem_info *mi = NULL;
-+
-+	*info = NULL;
-+
-+	/* only support up to page alignment */
-+	if (align > PAGE_SIZE || offs >= (align ? : default_align))
-+		return -EINVAL;
-+
-+	mutex_lock(&mtx);
-+
-+	/* reserve area in tiler container */
-+	mi = get_area(fmt, width, height, align, offs);
-+	if (!mi)
-+		goto nomem;
-+
-+	mi->blk.width = width;
-+	mi->blk.height = height;
-+
-+	/* allocate and map if mapping is supported */
-+	if (tmm_can_map(tmm[fmt])) {
-+		mi->mem = tmm_get(tmm[fmt], tcm_sizeof(mi->area));
-+		if (!mi->mem)
-+			goto cleanup;
-+
-+		/* Ensure the data reaches to main memory before PAT refill */
-+		wmb();
-+
-+		/* program PAT */
-+		if (refill_pat(tmm[fmt], &mi->area, mi->mem))
-+			goto cleanup;
-+	}
-+	*info = mi;
-+	mutex_unlock(&mtx);
-+	return 0;
-+
-+cleanup:
-+	free_block(mi);
-+nomem:
-+	mutex_unlock(&mtx);
-+	return -ENOMEM;
-+}
-+
-+/*
-+ *  Driver code
-+ *  ==========================================================================
-+ */
-+
-+/* driver initialization */
-+static s32 __init tiler_init(void)
-+{
-+	s32 r = -1;
-+	struct tcm *sita = NULL;
-+	struct tmm *tmm_pat = NULL;
-+
-+	tiler_geom_init(&tiler);
-+
-+	/* check module parameters for correctness */
-+	if (default_align > PAGE_SIZE ||
-+	    default_align & (default_align - 1) ||
-+	    granularity < 1 || granularity > PAGE_SIZE ||
-+	    granularity & (granularity - 1))
-+		return -EINVAL;
-+
-+	/*
-+	 * Array of physical pages for PAT programming, which must be a 16-byte
-+	 * aligned physical address.
-+	 */
-+	dmac_va = dma_alloc_coherent(NULL, tiler.width * tiler.height *
-+					sizeof(*dmac_va), &dmac_pa, GFP_ATOMIC);
-+	if (!dmac_va)
-+		return -ENOMEM;
-+
-+	/* Allocate tiler container manager (we share 1 on OMAP4) */
-+	sita = sita_init(tiler.width, tiler.height, NULL);
-+
-+	tcm[TILFMT_8BIT]  = sita;
-+	tcm[TILFMT_16BIT] = sita;
-+	tcm[TILFMT_32BIT] = sita;
-+
-+	/* Allocate tiler memory manager (must have 1 unique TMM per TCM ) */
-+	tmm_pat = tmm_pat_init(0);
-+	tmm[TILFMT_8BIT]  = tmm_pat;
-+	tmm[TILFMT_16BIT] = tmm_pat;
-+	tmm[TILFMT_32BIT] = tmm_pat;
-+
-+	if (!sita || !tmm_pat) {
-+		r = -ENOMEM;
-+		goto error;
-+	}
-+
-+	r = platform_driver_register(&tiler_driver_ldm);
-+
-+	mutex_init(&mtx);
-+	INIT_LIST_HEAD(&blocks);
-+
-+error:
-+	if (r) {
-+		tcm_deinit(sita);
-+		tmm_deinit(tmm_pat);
-+		dma_free_coherent(NULL, tiler.width * tiler.height *
-+					sizeof(*dmac_va), dmac_va, dmac_pa);
-+	}
-+
-+	return r;
-+}
-+
-+/* driver cleanup */
-+static void __exit tiler_exit(void)
-+{
-+	int i, j;
-+	struct mem_info *mi, *mi_;
-+
-+	mutex_lock(&mtx);
-+
-+	/* free all blocks */
-+	list_for_each_entry_safe(mi, mi_, &blocks, global)
-+		free_block(mi);
-+
-+	/* all lists should have cleared */
-+	BUG_ON(!list_empty(&blocks));
-+
-+	mutex_unlock(&mtx);
-+
-+	dma_free_coherent(NULL, tiler.width * tiler.height * sizeof(*dmac_va),
-+							dmac_va, dmac_pa);
-+
-+	/* close containers only once */
-+	for (i = TILFMT_MIN; i <= TILFMT_MAX; i++) {
-+		/* remove identical containers (tmm is unique per tcm) */
-+		for (j = i + 1; j <= TILFMT_MAX; j++)
-+			if (tcm[i] == tcm[j]) {
-+				tcm[j] = NULL;
-+				tmm[j] = NULL;
-+			}
-+
-+		tcm_deinit(tcm[i]);
-+		tmm_deinit(tmm[i]);
-+	}
-+
-+	mutex_destroy(&mtx);
-+	platform_driver_unregister(&tiler_driver_ldm);
-+}
-+
-+/*
-+ *  Block Kernel APIs
-+ *  ==========================================================================
-+ */
-+
-+s32 tiler_alloc(struct tiler_block_t *blk, enum tiler_fmt fmt,
-+		u32 align, u32 offs)
-+{
-+	struct mem_info *mi;
-+	s32 res;
-+
-+	/* blk must be valid, and blk->phys must be 0 */
-+	BUG_ON(!blk || blk->phys);
-+
-+	res = alloc_block(fmt, blk->width, blk->height, align, offs, &mi);
-+	if (mi)
-+		blk->phys = mi->blk.phys;
-+	return res;
-+}
-+EXPORT_SYMBOL(tiler_alloc);
-+
-+void tiler_free(struct tiler_block_t *blk)
-+{
-+	struct mem_info *mi;
-+
-+	mutex_lock(&mtx);
-+
-+	/* find block */
-+	list_for_each_entry(mi, &blocks, global) {
-+		if (mi->blk.phys == blk->phys) {
-+			free_block(mi);
-+			break;
-+		}
-+	}
-+
-+	blk->phys = 0;
-+
-+	mutex_unlock(&mtx);
-+}
-+EXPORT_SYMBOL(tiler_free);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Lajos Molnar <molnar@ti.com>");
-+MODULE_AUTHOR("David Sin <davidsin@ti.com>");
-+module_init(tiler_init);
-+module_exit(tiler_exit);
--- 
-1.6.3.3
+> > Also remember that many of the people doing upstream work are doing it
+> > on various generic reference platforms rather than boards they
+> > themselves have manufactured and may therefore have problems getting the
+> > access that you get with commercial devices.
+
+> Wait a second... how can you do development of BSP stuff for a product on
+> an essentially different evaluation platform?
+> I am starting to finally understand why things are as they are now. My
+> excuses if it upset someone in the way.... :-(
+
+I'm talking about upstream work here - people working on the stuff that
+ends up in the mainline kernel.  A large part of that is done on widely
+available reference boards rather than custom systems since either
+people are trying to use the reference systems in various applications 
+or they wish to provide examples others can actually run here.
+
+People working on consumer or industrial systems are much less likely to
+contribute upstream, even if they are enthusiastic about that they may
+be using an old BSP from the vendor or carrying sufficient out of tree
+code to cause problems.  There may well be no interest at all in
+contributing upstream.
+
+> > In process terms this is generally true of ARM also, it's just that
+> > everything tends to be included in the kernel.
+
+> Well, if you want to include _everything_ in the kernel, that's fine, but
+> then don't use a bootloader, and set the rules accordingly. My primary
+> concern is about there not being a single place for this. It's in the BL
+> and in the kernel, and sometimes things are setup differently in both
+> places!
+
+The bootloader is still useful in that it allows you to replace the
+system images without JTAG and can provide a basic hardware diagnosis
+environment (without things like VM or multitasking to worry about).
+
+> > Technically being able to replace the bootloader and being willing to
+> > take the risk of bricking the system are not the same thing.
+
+> If a PC does not work correctly (especially with a new feature or OS),
+> manufacturers publish BIOS upgrades. People accept them as long as it's
+> not too often. Heck, even game-console manufacturers sometimes remotely
+> upgrade their bootloaders, and users don't even have the option to say no.
+> And yes, I mean the actual bootloader, not just the firmware of the
+> console.
+
+Mass production commercial hardware tends to get rather more testing and
+better support from their vendors than chip reference boards do for most
+users.  The support structure and expectations in the two environments
+are totally different and can't really be compared.
+
+> > You need a mechanism to ensure all the engineers are applying bootloader
+> > updates to their systems when required.  It's not insurmountable, but
+> > it's one more thing that needs doing.
+
+> Sorry, I am still baffled at how that can be a problem... I mean they are
+> engineers, developing a product together, right? I'll take your word, but
+> I am surprised.
+
+Think of teams of fifty or more developers, somtimes distributed
+geographically or organisationally, of varying degrees of skill.  The
+communication overheads alone aren't trivial.
+
+> > Not at all, people do ship systems with hardware physically present but
+> > no software support and then add software support later especially with
+> > reference designs.
+
+> Well, I was referring to actual products, not reference designs. When we
+> develop a product, we use the datasheet and reference manuals for the
+
+A very great proportion of upstream kernel work is done on reference
+designs of one form or another.  This means that the needs of reference 
+designs are important to kernel developers, and the fact that systems
+are often based on reference designs and intended to boot initially with
+the reference design BSP means that even users working off on their own
+care about them.
+
+> design, and the reference design schematics to get a better idea of what
+> the chip maker intended or omitted from the datasheet. Then we make a
+> prototype of our design, which is 95% identical to the actually shipped
+> product most of the time, and then we write a bootloader for it (mostly
+> just porting u-boot), after that we develop a linux BSP, if possible from
+> a git-tree as close to mainline as possible for that chip. And just after
+> that do application developers get a chance to try out the software on our
+> board.
+
+> I naively thought most manufacturers did something similar. I understand
+> now that I was wrong. Sorry. But it does hurt!
+
+That's *broadly* similar but much more waterfall than you'd see on a big
+project.  You'd also expect to see more spins of the system as it
+progresses from a probable development system to a form factor system
+with plastics, and there may be substantial integration effort if
+there's lots of vendor code to merge in.
+
+> > This is only a problem if you assume the bootloader is responsible for
+> > doing the pin setup - clearly if it was supposed to do that and it
+> > didn't there's an issue.
+
+> It seems the most logical place to do it. Has the linux kernel (on x86)
+> ever cared about DRAM timings, or PCI slew-rate settings, delay trimming,
+> etc...? I think not. And hopefully it shouldn't. But if it needs to (for
+> ARM), then let's find a sane way of specifying the settings, hopefully in
+
+Things like DRAM mostly need to be set up prior to boot since the
+bootloader tends to need them to do anything, never mind the kernel.
+It's mostly the pin mux stuff that the kernel deals with.
+
+> a way that is not related to re-useable code (drivers and such stuff). See
+> the example given in my original post.
+
+That's exactly what pretty much everyone is doing - there's a pin
+configuration API that's totally separate to the drivers except in cases
+where you need to change function at runtime.
+
+> This has been an interesting discussion, but I don't want to upset any
+> more people here. I just want to ask one more question, being new to
+> ARM-linux: What setup should I chose for our products then? What would be
+> more in tune with the most desireable long-term goal of ARM-linux booting?
+> 
+> 1. u-boot doing all pad/IO setup and loading linux.
+> 2. u-boot just loading linux and doing only the minimum IO-setup necessary
+> for that job, and write a linux BSP that does ALL IO-init
+> 3. Don't use u-boot at all, and investigate Magnus's Kexec technique?
+> 4. Something else?
+
+I'd go for option 2 as we currently are, though I do prefer a bootloader
+that doesn't require uImages (if only because mkimage seems to do such
+nasty things with I/O, must debug that sometime).
