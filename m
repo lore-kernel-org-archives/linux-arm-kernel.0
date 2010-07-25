@@ -1,34 +1,32 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Sun, 25 Jul 2010 01:48:01 +0200
-Subject: [RFC 0/8] TI TILER-DMM driver
-In-Reply-To: <1279927694-26138-1-git-send-email-davidsin@ti.com>
-References: <1279927694-26138-1-git-send-email-davidsin@ti.com>
-Message-ID: <AANLkTinyidvgpE26M=JXjpouoC+mPfehQWyr4L_bQHu_@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sun, 25 Jul 2010 01:48:37 -0600
+Subject: [spi-devel-general] [PATCH 2/2] SPI: make the moved loopback test
+	work
+In-Reply-To: <AANLkTilqKs4WcSXxrZPUuaTudLD-P8ZeA6ShGyLmAIhi@mail.gmail.com>
+References: <AANLkTinm_bvpcQogsTgVy5ZX1MFajVvDxBtVJ056sTyq@mail.gmail.com>
+	<812288.2599.qm@web180314.mail.gq1.yahoo.com>
+	<AANLkTilqKs4WcSXxrZPUuaTudLD-P8ZeA6ShGyLmAIhi@mail.gmail.com>
+Message-ID: <AANLkTinFqwexhf5g3JMeN2eedRHbo8eTgaD-eqfWkU=B@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/24 David Sin <davidsin@ti.com>:
+On Tue, Jul 20, 2010 at 3:10 PM, Linus Walleij
+<linus.ml.walleij@gmail.com> wrote:
+> 2010/7/20 David Brownell <david-b@pacbell.net>:
+>
+>>> No matter how much I look at it, it seems like
+>>> all use of this require you to first register
+>>> *some* device,
+>>
+>> OBVIOUSLY. ?You can't use SPI without a device;
+>> it's like any other driver framework in Linux.
+>> What else should you expect???
+>
+> I didn't expect anything else, it just makes it clear that
+> the part of my patch registering a dummy device is
+> not what is being disagreed upon, so this should be OK.
 
-> TILER is a hardware block made by Texas Instruments. ?Its purpose is to
-> organize video/image memory in a 2-dimensional fashion to limit memory
-> bandwidth and facilitate 0 effort rotation and mirroring. ?The TILER
-> driver facilitates allocating, freeing, as well as mapping 2D blocks (areas)
-> in the TILER container(s). ?It also facilitates rotating and mirroring
-> the allocated blocks or its rectangular subsections.
+What's disagreed with is the dummy device knowing the intimate working
+details of the SPI bus driver.
 
-Pretty cool hardware!
-
-(...)
-> * Add multiple search directions to TCM-SiTA
-> * Add 1D block support (including adding 1D search algo to TCM-SiTA)
-
-Spell out these acronyms. I've been writing some code for the ARM
-TCM (Tightly Coupled Memory) and often vendors pick up this terminology
-and call all on-chip memory "TCM", though it has a specific technical
-meaning in ARM context.
-
-What does TCM mean in your case?
-And what is SiTA?
-
-Yours,
-Linus Walleij
+g.
