@@ -1,27 +1,55 @@
-From: hari.kanigeri@gmail.com (Hari Kanigeri)
-Date: Sun, 25 Jul 2010 12:34:22 -0600
-Subject: [PATCH 6/7] save and restore etm state across core OFF modes
-In-Reply-To: <1280077520-7538-7-git-send-email-virtuoso@slind.org>
-References: <13B9B4C6EF24D648824FF11BE896716203BADA0745@dlee02.ent.ti.com>
-	<1280077520-7538-7-git-send-email-virtuoso@slind.org>
-Message-ID: <AANLkTinmSJ6dtgqmyuk9CArniPEvEp7TrXauvGxLxv7x@mail.gmail.com>
+From: minchan.kim@gmail.com (Minchan Kim)
+Date: Mon, 26 Jul 2010 07:22:45 +0900
+Subject: [PATCH] Tight check of pfn_valid on sparsemem - v3
+In-Reply-To: <AANLkTimtN9PuvwrB2PAUZMajWzg=TbEP1jeseVM3MST3@mail.gmail.com>
+References: <1280066561-8543-1-git-send-email-minchan.kim@gmail.com>
+	<AANLkTimtN9PuvwrB2PAUZMajWzg=TbEP1jeseVM3MST3@mail.gmail.com>
+Message-ID: <AANLkTi=Vy0dUSsLmqV8Hwd9TT_m+CAMaVUV+ATOVFJFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +config ENABLE_OFF_MODE_JTAG_ETM_DEBUG
-> + ? ? ? bool "Enable hardware emulation context save and restore"
-> + ? ? ? depends on ARCH_OMAP3
+On Mon, Jul 26, 2010 at 2:03 AM, Balbir Singh <balbir@linux.vnet.ibm.com> wrote:
+> On Sun, Jul 25, 2010 at 7:32 PM, Minchan Kim <minchan.kim@gmail.com> wrote:
+>> Changelog since v2
+>> ?o Change some function names
+>> ?o Remove mark_memmap_hole in memmap bring up
+>> ?o Change CONFIG_SPARSEMEM with CONFIG_ARCH_HAS_HOLES_MEMORYMODEL
+>>
+>> I have a plan following as after this patch is acked.
+>>
+>> TODO:
+>> 1) expand pfn_valid to FALTMEM in ARM
+>> I think we can enhance pfn_valid of FLATMEM in ARM.
+>> Now it is doing binary search and it's expesive.
+>> First of all, After we merge this patch, I expand it to FALTMEM of ARM.
+>>
+>> 2) remove memmap_valid_within
+>> We can remove memmap_valid_within by strict pfn_valid's tight check.
+>>
+>> 3) Optimize hole check in sparsemem
+>> In case of spasemem, we can optimize pfn_valid through defining new flag
+>> like SECTION_HAS_HOLE of hole mem_section.
+>>
+>
+> Is there an assumption somewhere that assumes that page->private will
+> always have MEMMAP_HOLE set when the pfn is invalid, independent of
+> the context in which it is invoked? BTW, I'd also recommend moving
 
--- Shouldn't this be depends on OMAP3_EMU instead ?
+zzzzz.... I needed sleep.
+Will fix and resend.
 
-> + ? ? ? default y
+> over to using set_page_private() and page_private() wrappers (makes
+> the code easier to search)
 
--- As this is debug option, can you keep this "n" by default ?
+Okay.
+Thanks for pointing me out, Balbir.
 
-> + ? ? ? help
-> + ? ? ? ? This option enables JTAG & ETM debugging across power states.
-> + ? ? ? ? With out this option emulation features are reset across OFF
-> + ? ? ? ? mode state changes.
-> +
+>
+> Balbir
+>
 
-Hari
+
+
+-- 
+Kind regards,
+Minchan Kim
