@@ -1,84 +1,41 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 26 Jul 2010 15:32:36 -0700
-Subject: [PATCH] gpio: remove spurious gpio_unexport debug error.
-In-Reply-To: <20100723045807.GA14875@pengutronix.de>
-References: <1279832758-25442-1-git-send-email-gbean@codeaurora.org>
-	<20100723045807.GA14875@pengutronix.de>
-Message-ID: <20100726153236.ead96c88.akpm@linux-foundation.org>
+From: minchan.kim@gmail.com (Minchan Kim)
+Date: Tue, 27 Jul 2010 07:47:26 +0900
+Subject: [PATCH] Tight check of pfn_valid on sparsemem - v4
+In-Reply-To: <alpine.DEB.2.00.1007261136160.5438@router.home>
+References: <1280159163-23386-1-git-send-email-minchan.kim@gmail.com>
+	<alpine.DEB.2.00.1007261136160.5438@router.home>
+Message-ID: <AANLkTikMMMWcT5Uvv5+80yeGP-uYbW7awQsHL7A7NXmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Jul 2010 06:58:07 +0200
-Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de> wrote:
+Hi Christoph,
 
-> Hello,
-> 
-> On Thu, Jul 22, 2010 at 02:05:58PM -0700, Gregory Bean wrote:
-> > Make gpio_unexport generate success instead of an -EINVAL
-> > if asked to unexport a line which is not exported, because
-> > the only result of that condition is a pr_debug
-> > which complains of what is really a harmless no-op:
-> > when an unexported gpio is unexported again, nothing happens.
-> > That's not a failure, just a trivial border case.
-> > Since gpio_free calls gpio_unexport unconditionally
-> > and exported gpio lines are uncommon, most calls to
-> > gpio_free with debug flags enabled generate -EINVAL
-> > warnings in the log, causing unnecessary stress.
-> I noticed that a few days ago, too.  Just didn't come around to fix it
-> myself.
->  
-> > Signed-off-by: Gregory Bean <gbean@codeaurora.org>
-> Acked-by: Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de>
-> 
+On Tue, Jul 27, 2010 at 1:40 AM, Christoph Lameter
+<cl@linux-foundation.org> wrote:
+> On Tue, 27 Jul 2010, Minchan Kim wrote:
+>
+>> This patch registers address of mem_section to memmap itself's page struct's
+>> pg->private field. This means the page is used for memmap of the section.
+>> Otherwise, the page is used for other purpose and memmap has a hole.
+>
+> What if page->private just happens to be the value of the page struct?
+> Even if that is not possible today, someday someone may add new
+> functionality to the kernel where page->pivage == page is used for some
+> reason.
 
-Jon got there first ;)
+I agree.
 
+>
+> Checking for PG_reserved wont work?
 
+Okay. It would be better to consider page point itself with PG_reserved.
+I will reflect your opinion next version. :)
 
-Subject: gpio: fix spurious printk when freeing a gpio
+Thanks, Christoph.
 
 
-From: Jon Povey <jon.povey@racelogic.co.uk>
 
-When freeing a gpio that has not been exported, gpio_unexport() prints a
-debug message when it should just fall through silently.
 
-Example spurious message:
-
-	gpio_unexport: gpio0 status -22
-
-Signed-off-by: Jon Povey <jon.povey@racelogic.co.uk>
-Cc: David Brownell <david-b@pacbell.net>
-Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
----
-
- drivers/gpio/gpiolib.c |    7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff -puN drivers/gpio/gpiolib.c~gpio-fix-spurious-printk-when-freeing-a-gpio drivers/gpio/gpiolib.c
---- a/drivers/gpio/gpiolib.c~gpio-fix-spurious-printk-when-freeing-a-gpio
-+++ a/drivers/gpio/gpiolib.c
-@@ -893,10 +893,12 @@ EXPORT_SYMBOL_GPL(gpio_sysfs_set_active_
- void gpio_unexport(unsigned gpio)
- {
- 	struct gpio_desc	*desc;
--	int			status = -EINVAL;
-+	int			status = 0;
- 
--	if (!gpio_is_valid(gpio))
-+	if (!gpio_is_valid(gpio)) {
-+		status = -EINVAL;
- 		goto done;
-+	}
- 
- 	mutex_lock(&sysfs_lock);
- 
-@@ -911,7 +913,6 @@ void gpio_unexport(unsigned gpio)
- 			clear_bit(FLAG_EXPORT, &desc->flags);
- 			put_device(dev);
- 			device_unregister(dev);
--			status = 0;
- 		} else
- 			status = -ENODEV;
- 	}
-_
+-- 
+Kind regards,
+Minchan Kim
