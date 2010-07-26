@@ -1,55 +1,46 @@
 From: davidsin@ti.com (Sin, David)
-Date: Mon, 26 Jul 2010 14:34:30 -0500
-Subject: [RFC 4/8] TILER-DMM: TILER Memory Manager interface and
-	implementation
-In-Reply-To: <20100724080118.GB15064@n2100.arm.linux.org.uk>
-References: <1279927348-21750-1-git-send-email-davidsin@ti.com>
-	<1279927348-21750-2-git-send-email-davidsin@ti.com>
-	<1279927348-21750-3-git-send-email-davidsin@ti.com>
-	<1279927348-21750-4-git-send-email-davidsin@ti.com>
-	<1279927348-21750-5-git-send-email-davidsin@ti.com>
-	<20100724080118.GB15064@n2100.arm.linux.org.uk>
-Message-ID: <513FF747EED39B4AADBB4D6C9D9F9F7903D63B9DD3@dlee02.ent.ti.com>
+Date: Mon, 26 Jul 2010 14:44:51 -0500
+Subject: [RFC 0/8] TI TILER-DMM driver
+In-Reply-To: <AANLkTinyidvgpE26M=JXjpouoC+mPfehQWyr4L_bQHu_@mail.gmail.com>
+References: <1279927694-26138-1-git-send-email-davidsin@ti.com>
+	<AANLkTinyidvgpE26M=JXjpouoC+mPfehQWyr4L_bQHu_@mail.gmail.com>
+Message-ID: <513FF747EED39B4AADBB4D6C9D9F9F7903D63B9DF7@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OK -- I will revisit this.  Thanks for the explanation.
+Thanks for your feedback, Linus.  I will incorporate an acronym list in the documentation.  TCM stands for TILER container manager, which pretty much represents the interface to the logic which determines the location for a given 2-D area request.  SiTA (Simple TILER algorithm) is the implementation behind that interface.  I will work on revising the acronym to avoid any conflicts.
 
--David
+-David     
 
 -----Original Message-----
-From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
-Sent: Saturday, July 24, 2010 3:01 AM
+From: Linus Walleij [mailto:linus.ml.walleij at gmail.com] 
+Sent: Saturday, July 24, 2010 6:48 PM
 To: Sin, David
-Cc: linux-arm-kernel at lists.arm.linux.org.uk; linux-omap at vger.kernel.org; Tony Lindgren; Kanigeri, Hari; Ohad Ben-Cohen; Hiremath, Vaibhav; Shilimkar, Santosh; Molnar, Lajos
-Subject: Re: [RFC 4/8] TILER-DMM: TILER Memory Manager interface and implementation
+Cc: linux-arm-kernel at lists.infradead.org
+Subject: Re: [RFC 0/8] TI TILER-DMM driver
 
-On Fri, Jul 23, 2010 at 06:22:24PM -0500, David Sin wrote:
-> +/* allocate and flush a page */
-> +static struct mem *alloc_mem(void)
-> +{
-> +	struct mem *m = kzalloc(sizeof(*m), GFP_KERNEL);
-> +	if (!m)
-> +		return NULL;
-> +
-> +	m->pg = alloc_page(GFP_KERNEL | GFP_DMA);
-> +	if (!m->pg) {
-> +		kfree(m);
-> +		return NULL;
-> +	}
-> +
-> +	m->pa = page_to_phys(m->pg);
-> +
-> +	/* flush the cache entry for each page we allocate. */
-> +	dmac_flush_range(page_address(m->pg),
-> +				page_address(m->pg) + PAGE_SIZE);
-> +	outer_flush_range(m->pa, m->pa + PAGE_SIZE);
+2010/7/24 David Sin <davidsin@ti.com>:
 
-NAK.  This is an abuse of these interfaces, and is buggy in any case.
+> TILER is a hardware block made by Texas Instruments. ?Its purpose is to
+> organize video/image memory in a 2-dimensional fashion to limit memory
+> bandwidth and facilitate 0 effort rotation and mirroring. ?The TILER
+> driver facilitates allocating, freeing, as well as mapping 2D blocks (areas)
+> in the TILER container(s). ?It also facilitates rotating and mirroring
+> the allocated blocks or its rectangular subsections.
 
-ARMv6 and ARMv7 CPUs speculatively prefetch memory, which means that
-there's no guarantee that if you flush the caches for a particular
-range of virtual space, that it will stay flushed until you decide
-to read it.  So flushing the caches in some memory allocator can't
-guarantee that when you eventually get around to using the page that
-there won't be cache lines associated with it.
+Pretty cool hardware!
+
+(...)
+> * Add multiple search directions to TCM-SiTA
+> * Add 1D block support (including adding 1D search algo to TCM-SiTA)
+
+Spell out these acronyms. I've been writing some code for the ARM
+TCM (Tightly Coupled Memory) and often vendors pick up this terminology
+and call all on-chip memory "TCM", though it has a specific technical
+meaning in ARM context.
+
+What does TCM mean in your case?
+And what is SiTA?
+
+Yours,
+Linus Walleij
