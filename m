@@ -1,97 +1,30 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 26 Jul 2010 15:41:23 +0900
-Subject: [PATCH v3 5/8] ARM: s5pv210: enable FIMC on Aquila
-In-Reply-To: <1279902083-21250-6-git-send-email-s.nawrocki@samsung.com>
-References: <1279902083-21250-1-git-send-email-s.nawrocki@samsung.com>
-	<1279902083-21250-6-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <00b801cb2c8d$98282610$c8787230$%kim@samsung.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 26 Jul 2010 10:46:17 +0300
+Subject: [PATCH v6 0/2] s3c24xx: iPAQ rx1950 series
+In-Reply-To: <1279905472-5908-1-git-send-email-anarsoul@gmail.com>
+References: <1279905472-5908-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <201007261046.22070.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
-> 
-> Add support for FIMC on Samsung Aquila board.
-> 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  arch/arm/mach-s5pv210/Kconfig       |    4 ++++
->  arch/arm/mach-s5pv210/mach-aquila.c |    7 +++++++
->  2 files changed, 11 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-> index 039ba8c..b81b91b 100644
-> --- a/arch/arm/mach-s5pv210/Kconfig
-> +++ b/arch/arm/mach-s5pv210/Kconfig
-> @@ -58,9 +58,13 @@ menu "S5PC110 Machines"
->  config MACH_AQUILA
->  	bool "Aquila"
->  	select CPU_S5PV210
-> +	select COMMON_AQUILA_GONI
+? ????????? ?? 23 ???? 2010 20:17:50 ????? Vasily Khoruzhick ???????:
+> This patch series adds more support for iPAQ rx1950 PDA to linux:
 
-...
+Hi, Ben
 
->  	select ARCH_SPARSEMEM_ENABLE
->  	select S5PV210_SETUP_FB_24BPP
->  	select S3C_DEV_FB
-> +	select S5P_DEV_FIMC0
-> +	select S5P_DEV_FIMC1
-> +	select S5P_DEV_FIMC2
->  	select S5PC110_DEV_ONENAND
->  	help
->  	  Machine support for the Samsung Aquila target based on S5PC110
-> SoC
-> diff --git a/arch/arm/mach-s5pv210/mach-aquila.c
-b/arch/arm/mach-s5pv210/mach-
-> aquila.c
-> index 0992618..7528514 100644
-> --- a/arch/arm/mach-s5pv210/mach-aquila.c
-> +++ b/arch/arm/mach-s5pv210/mach-aquila.c
-> @@ -35,6 +35,9 @@
->  #include <plat/devs.h>
->  #include <plat/cpu.h>
->  #include <plat/fb.h>
-> +#include <plat/fimc.h>
-> +
-> +#include "common-aquila-goni.h"
+Please, if it's possible, review this patch series this week. I want this 
+series to be ready for 2.6.36, but next week I'm going on vacation and will be 
+offline from 2 aug till 18 aug.
 
-Hmm...please refer to my another comment.
+s3c-adc-battery patch from v5 was merged into battery-2.6 tree and so it's 
+skipped in v6 series, so send comments for battery driver for v5 3/4 patch.
 
-> 
->  /* Following are default values for UCON, ULCON and UFCON UART registers
-*/
->  #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-> @@ -445,6 +448,9 @@ static struct platform_device *aquila_devices[]
-__initdata =
-> {
->  	&aquila_device_gpiokeys,
->  	&s3c_device_fb,
->  	&s5pc110_device_onenand,
-> +	&s5p_device_fimc0,
-> +	&s5p_device_fimc1,
-> +	&s5p_device_fimc2,
->  };
-> 
->  static void __init aquila_map_io(void)
-> @@ -465,6 +471,7 @@ static void __init aquila_machine_init(void)
->  	s3c_fb_set_platdata(&aquila_lcd_pdata);
-> 
->  	platform_add_devices(aquila_devices, ARRAY_SIZE(aquila_devices));
-> +	s5pv210_common_fimc_clk_init();
-
-Hmm...really need this fimc_clk_init here not driver?
-
->  }
-> 
->  MACHINE_START(AQUILA, "Aquila")
-> --
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100726/0b588fa9/attachment-0001.sig>
