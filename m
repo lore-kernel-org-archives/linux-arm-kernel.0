@@ -1,104 +1,73 @@
-From: p.osciak@samsung.com (Pawel Osciak)
-Date: Mon, 26 Jul 2010 08:51:36 +0200
-Subject: [PATCH v3 5/8] ARM: s5pv210: enable FIMC on Aquila
-In-Reply-To: <00b801cb2c8d$98282610$c8787230$%kim@samsung.com>
-References: <1279902083-21250-1-git-send-email-s.nawrocki@samsung.com>
-	<1279902083-21250-6-git-send-email-s.nawrocki@samsung.com>
-	<00b801cb2c8d$98282610$c8787230$%kim@samsung.com>
-Message-ID: <003201cb2c8e$fdf0dc70$f9d29550$%osciak@samsung.com>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Mon, 26 Jul 2010 08:56:11 +0200
+Subject: ARM Machine SoC I/O setup and PAD initialization code
+In-Reply-To: <AANLkTin=uThThNaUxCP4qEJjO2TYMzpHfmZ6jLokQxCD@mail.gmail.com>
+References: <201007211029.29529.david.jander@protonic.nl>
+	<201007221531.58744.david.jander@protonic.nl>
+	<20100722142043.GK4737@rakim.wolfsonmicro.main>
+	<201007231218.07379.david.jander@protonic.nl>
+	<20100723141712.GC12300@rakim.wolfsonmicro.main>
+	<61396.213.84.91.226.1279910330.squirrel@protonic.xs4all.nl>
+	<20100723210347.GO20855@pengutronix.de>
+	<AANLkTin=uThThNaUxCP4qEJjO2TYMzpHfmZ6jLokQxCD@mail.gmail.com>
+Message-ID: <20100726065611.GR20855@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
->Kukjin Kim <kgene.kim@samsung.com> wrote:
->Sylwester Nawrocki wrote:
->>
->> Add support for FIMC on Samsung Aquila board.
->>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>  arch/arm/mach-s5pv210/Kconfig       |    4 ++++
->>  arch/arm/mach-s5pv210/mach-aquila.c |    7 +++++++
->>  2 files changed, 11 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
->> index 039ba8c..b81b91b 100644
->> --- a/arch/arm/mach-s5pv210/Kconfig
->> +++ b/arch/arm/mach-s5pv210/Kconfig
->> @@ -58,9 +58,13 @@ menu "S5PC110 Machines"
->>  config MACH_AQUILA
->>  	bool "Aquila"
->>  	select CPU_S5PV210
->> +	select COMMON_AQUILA_GONI
+On Mon, Jul 26, 2010 at 10:37:20AM +0900, Magnus Damm wrote:
+> On Sat, Jul 24, 2010 at 6:03 AM, Robert Schwebel
+> <r.schwebel@pengutronix.de> wrote:
+> > kexec is a good idea only in theory. Last time we tried it, it
+> > needed something like 6 s additional boot time. Inacceptable - we
+> > bring Qt based GUI systems into the application in 6 s, and
+> > automotive systems into userspace in 336 ms. Not to mention that the
+> > first kernel needs to be brought up as well.
 >
->...
->
+> I disagree with your "in theory only" stamp on kexec. I've used kexec
+> for rebooting and crash dumping on i386, x86_64, ia64, ARM and SH.
 
-Please see my previous comments.
+That's a good usecase, I agree.
 
->>  	select ARCH_SPARSEMEM_ENABLE
->>  	select S5PV210_SETUP_FB_24BPP
->>  	select S3C_DEV_FB
->> +	select S5P_DEV_FIMC0
->> +	select S5P_DEV_FIMC1
->> +	select S5P_DEV_FIMC2
->>  	select S5PC110_DEV_ONENAND
->>  	help
->>  	  Machine support for the Samsung Aquila target based on S5PC110
->> SoC
->> diff --git a/arch/arm/mach-s5pv210/mach-aquila.c
->b/arch/arm/mach-s5pv210/mach-
->> aquila.c
->> index 0992618..7528514 100644
->> --- a/arch/arm/mach-s5pv210/mach-aquila.c
->> +++ b/arch/arm/mach-s5pv210/mach-aquila.c
->> @@ -35,6 +35,9 @@
->>  #include <plat/devs.h>
->>  #include <plat/cpu.h>
->>  #include <plat/fb.h>
->> +#include <plat/fimc.h>
->> +
->> +#include "common-aquila-goni.h"
->
->Hmm...please refer to my another comment.
->
+> The two presentations pointed out earlier in this thread clearly show
+> how to build kexec based boot loaders which boot in one second. The
+> overhead of kexec itself is almost nothing. I'm sure you can discuss
+> the details of the kexec implementation with Eric Biederman if you'd
+> like.
 
-Ditto.
+We'll re-do the tests, in order to measure some hard facts. It may turn
+out that we have learned more things since we made the last numbers :)
 
->>
->>  /* Following are default values for UCON, ULCON and UFCON UART registers
->*/
->>  #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
->> @@ -445,6 +448,9 @@ static struct platform_device *aquila_devices[]
->__initdata =
->> {
->>  	&aquila_device_gpiokeys,
->>  	&s3c_device_fb,
->>  	&s5pc110_device_onenand,
->> +	&s5p_device_fimc0,
->> +	&s5p_device_fimc1,
->> +	&s5p_device_fimc2,
->>  };
->>
->>  static void __init aquila_map_io(void)
->> @@ -465,6 +471,7 @@ static void __init aquila_machine_init(void)
->>  	s3c_fb_set_platdata(&aquila_lcd_pdata);
->>
->>  	platform_add_devices(aquila_devices, ARRAY_SIZE(aquila_devices));
->> +	s5pv210_common_fimc_clk_init();
->
->Hmm...really need this fimc_clk_init here not driver?
->
+> That aside, the 6 s number looks familiar from earlier Barebox
+> presentations that I've eyed through before. When did you test it? Do
+> you remember what platform and which kernel version? Are you using a
+> full Gnome desktop in your boot loader? =)
 
-I believe that the whole idea is that drivers should not be involved in
-clocks setup, especially in setting up source parameters...
+On MX35 we boot a naked kernel into a custom /sbin/init application in
+336 ms with barebox, starting the measurement at the first assembler
+instruction which can be influenced in software.
 
+I think it's a question of what you want to have. The 6 s boot is with:
 
-Best regards
---
-Pawel Osciak
-Linux Platform Group
-Samsung Poland R&D Center
+- Barebox from NAND
+- booting the kernel from NAND
+- kernel config with everything built in which is needed in the system
+- init based userspace
+- dbus + some related services
+- Qt
+- system based on ipkg packages
+
+and it is measured up to the point where the qt application is fully
+operational.
+
+> From my point of view it always makes sense to optimize the kernel
+> boot up time. This because it will improve the start up time of your
+> final kernel _and_ your boot loader as well if you use kexec.
+
+Seconded. What can be done in the kernel should be done in the kernel.
+
+rsc
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
