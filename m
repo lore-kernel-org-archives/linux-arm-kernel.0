@@ -1,97 +1,39 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 26 Jul 2010 13:57:08 -0700
-Subject: [PATCH v3] Samsung: sdhci-s3c: add support for new card
-	detection methods
-In-Reply-To: <000501cb2977$7d6cf210$7846d630$%szyprowski@samsung.com>
-References: <1279181721-23333-1-git-send-email-m.szyprowski@samsung.com>
-	<20100715133954.7fcb797a.akpm@linux-foundation.org>
-	<011401cb24af$8eb2cb70$ac186250$%szyprowski@samsung.com>
-	<20100721161133.5c3285d3.akpm@linux-foundation.org>
-	<000501cb2977$7d6cf210$7846d630$%szyprowski@samsung.com>
-Message-ID: <20100726135708.57048800.akpm@linux-foundation.org>
+From: gregkh@suse.de (Greg KH)
+Date: Mon, 26 Jul 2010 15:26:28 -0700
+Subject: [PATCH] Stop ARM boards crashing when CUPS is loaded - 2.6.35-rc5
+In-Reply-To: <4C403E87.4040503@canonical.com>
+References: <4C3C72C6.4000005@canonical.com>
+	<20100715130214.4c9303b2.akpm@linux-foundation.org>
+	<20100715200618.GA6773@n2100.arm.linux.org.uk>
+	<4C40218A.4090806@canonical.com>
+	<20100716092018.GB16995@n2100.arm.linux.org.uk>
+	<4C402746.6080309@canonical.com> <4C403E87.4040503@canonical.com>
+Message-ID: <20100726222628.GA31510@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Jul 2010 10:25:44 +0200
-Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+On Fri, Jul 16, 2010 at 12:12:07PM +0100, Lee Jones wrote:
+> On 16/07/10 10:32, Lee Jones wrote:
+> >> The best solution is probably for the parport code to go through a
+> >> modernisation cycle like the serial code did, essentially using
+> >> platform devices to pass the base addresses.  This would make the
+> >> driver more portable, and eliminates this problem entirely (because
+> >> platforms which don't have parports won't register the platform device(s)
+> >> necessary for parport to even probe illegal addresses.)
+> 
+> I have lobbied for one of our partners to conduct this work, but I don't
+> think this would be something that is in their interest to fix. 
+> Nevertheless, I am currently waiting on a reply from them.
+> 
+> FAO GregKH,
+> 
+> Do you think this would be something that may interest you and your Linux 
+> drivers project? Or perhaps a student who wants to get their feet wet and
+> play with some platform driver code.
 
-> Hello,
-> 
-> On Thursday, July 22, 2010 1:12 AM 
-> 
-> > On Fri, 16 Jul 2010 08:24:26 +0200
-> > Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > 
-> > > > >  arch/arm/mach-s3c64xx/setup-sdhci-gpio.c   |   14 +++++++++---
-> > > > >  arch/arm/mach-s5pc100/setup-sdhci-gpio.c   |   21 ++++++++++++++----
-> > -
-> > > > >  arch/arm/mach-s5pv210/setup-sdhci-gpio.c   |   22 +++++++++++++++---
-> > --
-> > > > >  arch/arm/plat-samsung/dev-hsmmc.c          |    5 ++++
-> > > > >  arch/arm/plat-samsung/dev-hsmmc1.c         |    5 ++++
-> > > > >  arch/arm/plat-samsung/dev-hsmmc2.c         |    5 ++++
-> > > > >  arch/arm/plat-samsung/dev-hsmmc3.c         |    5 ++++
-> > > > >  arch/arm/plat-samsung/include/plat/sdhci.h |   29
-> > > > ++++++++++++++++++++++++++++
-> > > > >  8 files changed, 90 insertions(+), 16 deletions(-)
-> > > >
-> > > > This is quite confusing.  You've already sent a patch called
-> > > > "sdhci-s3c: add support for new card detection methods".  It had the
-> > > > same changelog as this patch and the same title, but the two patches
-> > > > are utterly different!
-> > >
-> > > The real patch has been split into two for easier merging: 1. the driver
-> > > part and 2. samsung platform related part. The part which patch belongs
-> > > to is indicated in the last line of the change log.
-> > >
-> > > I'm really confused how to submit properly a patch that requires changes
-> > > to both the driver (which is merged by the proper driver maintainer's
-> > > sub-tree) and the platform (which should go through platform maintainer's
-> > > tree).
-> > 
-> > Make the relationship very very clear in the changelog.  Send both
-> > patches to both maintainers.  Ask that one of them merge both patches
-> > and that the other ack both patches.
-> 
-> Ok. Thanks for the hint.
-> 
-> > Anyway, I've forgotten what's happening here.  I appear to be sitting on
-> > 
-> > sdhci-s3c-add-support-for-the-non-standard-minimal-clock-value.patch
-> 
-> This one is independent from the card-detection patches and can be applied
-> directly onto linux-next kernel tree.
-> 
-> > and
-> > sdhci-s3c-add-support-for-new-card-detection-methods.patch
-> > 
-> > the latter of which is below.
-> > 
-> > Am I missing something?  Is
-> > sdhci-s3c-add-support-for-new-card-detection-methods.patch up to date?
-> > 
-> 
-> Ok, I will repost these 2 patches under new names to avoid further
-> confusion. Currently there exists two 
-> "sdhci-s3c-add-support-for-new-card-detection-methods.patch", both of them 
-> are required.
+Yes, sure, that would be good.  Post it on the driverdevel mailing list
+and see who responds.
 
-So the second(?) patch "[PATCH v4] Samsung: add new card detection
-methods in s3c-sdhci driver (platform part)" has already been applied
-to linux-next by Kukjin Kim, along with modifications which we have not
-been shown.  
+thanks,
 
-But the first patch
-(sdhci-s3c-add-support-for-the-non-standard-minimal-clock-value.patch)
-has not been applied to linux-next by anoyne and the third patch
-"[PATCH v4] sdhci-s3c: add support for new card detection methods
-(driver part)" has not been applied either.
-
-This is a complete mess.  What happens if I apply and merge
-sdhci-s3c-add-support-for-the-non-standard-minimal-clock-value.patch
-and
-sdhci-s3c-add-support-for-new-card-detection-methods-driver-part.patch?
-I have no idea.
-
-I think I'll just drop all of it.  Please sort all of this out then let
-me know what you want me to do.
+greg k-h
