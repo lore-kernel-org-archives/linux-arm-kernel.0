@@ -1,73 +1,174 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Mon, 26 Jul 2010 08:56:11 +0200
-Subject: ARM Machine SoC I/O setup and PAD initialization code
-In-Reply-To: <AANLkTin=uThThNaUxCP4qEJjO2TYMzpHfmZ6jLokQxCD@mail.gmail.com>
-References: <201007211029.29529.david.jander@protonic.nl>
-	<201007221531.58744.david.jander@protonic.nl>
-	<20100722142043.GK4737@rakim.wolfsonmicro.main>
-	<201007231218.07379.david.jander@protonic.nl>
-	<20100723141712.GC12300@rakim.wolfsonmicro.main>
-	<61396.213.84.91.226.1279910330.squirrel@protonic.xs4all.nl>
-	<20100723210347.GO20855@pengutronix.de>
-	<AANLkTin=uThThNaUxCP4qEJjO2TYMzpHfmZ6jLokQxCD@mail.gmail.com>
-Message-ID: <20100726065611.GR20855@pengutronix.de>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 26 Jul 2010 12:28:38 +0530
+Subject: [PATCH] omap3: make coresight register save across OFF modes a
+	sysfs option
+In-Reply-To: <1280091863-8891-1-git-send-email-virtuoso@slind.org>
+References: <AANLkTinmSJ6dtgqmyuk9CArniPEvEp7TrXauvGxLxv7x@mail.gmail.com>
+	<1280091863-8891-1-git-send-email-virtuoso@slind.org>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C625569B@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 26, 2010 at 10:37:20AM +0900, Magnus Damm wrote:
-> On Sat, Jul 24, 2010 at 6:03 AM, Robert Schwebel
-> <r.schwebel@pengutronix.de> wrote:
-> > kexec is a good idea only in theory. Last time we tried it, it
-> > needed something like 6 s additional boot time. Inacceptable - we
-> > bring Qt based GUI systems into the application in 6 s, and
-> > automotive systems into userspace in 336 ms. Not to mention that the
-> > first kernel needs to be brought up as well.
->
-> I disagree with your "in theory only" stamp on kexec. I've used kexec
-> for rebooting and crash dumping on i386, x86_64, ia64, ARM and SH.
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Alexander Shishkin
+> Sent: Monday, July 26, 2010 2:34 AM
+> To: Hari Kanigeri
+> Cc: Alexander Shishkin; linux-arm-kernel at lists.infradead.org; Tony
+> Lindgren; Russell King; Paul Walmsley; Kevin Hilman; linux-
+> omap at vger.kernel.org; linux-kernel at vger.kernel.org
+> Subject: [PATCH] omap3: make coresight register save across OFF modes a
+> sysfs option
+> 
+> This adds a sysfs file at /sys/power/coresight_save which is used to
+> control if the ETM and debug components' states should be saved and
+> restored across OFF modes.
+> 
+> Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/mach-omap2/Makefile    |    1 +
+>  arch/arm/mach-omap2/debug34xx.c |   66
+> +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/pm.h        |    6 +++
+>  arch/arm/mach-omap2/pm34xx.c    |    3 ++
+>  4 files changed, 76 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-omap2/debug34xx.c
+> 
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index f5b4ff4..3a64ce4 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -49,6 +49,7 @@ ifeq ($(CONFIG_PM),y)
+>  obj-$(CONFIG_ARCH_OMAP2)		+= pm24xx.o
+>  obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o
+>  obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o cpuidle34xx.o
+> +obj-$(CONFIG_ENABLE_OFF_MODE_JTAG_ETM_DEBUG) += debug34xx.o
+>  obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
+> 
+>  AFLAGS_sleep24xx.o			:=-Wa,-march=armv6
+> diff --git a/arch/arm/mach-omap2/debug34xx.c b/arch/arm/mach-
+> omap2/debug34xx.c
+> new file mode 100644
+> index 0000000..698e83a
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/debug34xx.c
 
-That's a good usecase, I agree.
+> @@ -0,0 +1,66 @@
+> +/*
+> + * Control saving and restoring of coresight components' state during
+> + * OFF mode.
+> + *
+> + * Copyright (C) 2010 Nokia Corporation
+> + * Alexander Shishkin
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/sysfs.h>
+> +#include <linux/kobject.h>
+> +
+> +#include "pm.h"
+> +
+> +/*
+> + * Pointer to a place in sram where the ETM/debug state save
+> + * flag is. It can be calculated after the omap_sram_idle is
+> + * pushed to sram.
+> + */
+> +static unsigned int *_etm_save;
+> +
+> +/*
+> + * sysfs file /sys/power/coresight_save controls whether the
+> + * state of coresight components should be saved and restored
+> + * across OFF modes.
+> + */
+> +static ssize_t coresight_save_show(struct kobject *kobj,
+> +				  struct kobj_attribute *attr,
+> +				  char *buf)
+> +{
+> +	return sprintf(buf, "%u\n", *_etm_save);
+> +}
+> +
+> +static ssize_t coresight_save_store(struct kobject *kobj,
+> +				   struct kobj_attribute *attr,
+> +				   const char *buf, size_t n)
+> +{
+> +	unsigned int value;
+> +
+> +	if (sscanf(buf, "%u", &value) != 1)
+> +		return -EINVAL;
+> +
+> +	*_etm_save = !!value;
+> +
+> +	return n;
+> +}
+> +
+> +static struct kobj_attribute coresight_save_attr =
+> +	__ATTR(coresight_save, 0644, coresight_save_show,
+> coresight_save_store);
+> +
+> +int omap3_coresight_pm_init(void *sram_addr)
+> +{
+> +	int ret;
+> +
+> +	/* the last word from the top of omap_sram_idle */
+> +	_etm_save = (unsigned *)((u8 *)sram_addr + omap34xx_cpu_suspend_sz -
+> 4);
+> +
+> +	ret = sysfs_create_file(power_kobj, &coresight_save_attr.attr);
+> +
+> +	return ret;
+> +}
 
-> The two presentations pointed out earlier in this thread clearly show
-> how to build kexec based boot loaders which boot in one second. The
-> overhead of kexec itself is almost nothing. I'm sure you can discuss
-> the details of the kexec implementation with Eric Biederman if you'd
-> like.
-
-We'll re-do the tests, in order to measure some hard facts. It may turn
-out that we have learned more things since we made the last numbers :)
-
-> That aside, the 6 s number looks familiar from earlier Barebox
-> presentations that I've eyed through before. When did you test it? Do
-> you remember what platform and which kernel version? Are you using a
-> full Gnome desktop in your boot loader? =)
-
-On MX35 we boot a naked kernel into a custom /sbin/init application in
-336 ms with barebox, starting the measurement at the first assembler
-instruction which can be influenced in software.
-
-I think it's a question of what you want to have. The 6 s boot is with:
-
-- Barebox from NAND
-- booting the kernel from NAND
-- kernel config with everything built in which is needed in the system
-- init based userspace
-- dbus + some related services
-- Qt
-- system based on ipkg packages
-
-and it is measured up to the point where the qt application is fully
-operational.
-
-> From my point of view it always makes sense to optimize the kernel
-> boot up time. This because it will improve the start up time of your
-> final kernel _and_ your boot loader as well if you use kexec.
-
-Seconded. What can be done in the kernel should be done in the kernel.
-
-rsc
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Looking at content of this file, I think you can keep this under common 
+pm-debug.c file. 
+Any problems with that ?
+> +
+> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+> index 3de6ece..0321834 100644
+> --- a/arch/arm/mach-omap2/pm.h
+> +++ b/arch/arm/mach-omap2/pm.h
+> @@ -76,6 +76,12 @@ extern void omap34xx_cpu_suspend(u32 *addr, int
+> save_state);
+>  extern void save_secure_ram_context(u32 *addr);
+>  extern void omap3_save_scratchpad_contents(void);
+> 
+> +#ifdef CONFIG_ENABLE_OFF_MODE_JTAG_ETM_DEBUG
+> +int omap3_coresight_pm_init(void *sram_addr);
+> +#else
+> +#define omap3_coresight_pm_init(x) do {} while (0)
+> +#endif
+> +
+>  extern unsigned int omap24xx_idle_loop_suspend_sz;
+>  extern unsigned int omap34xx_suspend_sz;
+>  extern unsigned int save_secure_ram_context_sz;
+> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> index fb4994a..c389e65 100644
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -1096,6 +1096,9 @@ static int __init omap3_pm_init(void)
+>  	core_clkdm = clkdm_lookup("core_clkdm");
+> 
+>  	omap_push_sram_idle();
+> +
+> +	omap3_coresight_pm_init(_omap_sram_idle);
+> +
+>  #ifdef CONFIG_SUSPEND
+>  	suspend_set_ops(&omap_pm_ops);
+>  #endif /* CONFIG_SUSPEND */
+> --
+> 1.7.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
