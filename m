@@ -1,67 +1,104 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 26 Jul 2010 14:00:08 +0200
-Subject: Pull request mxc
-In-Reply-To: <20100726103219.GB20737@n2100.arm.linux.org.uk>
-References: <20100726090014.GQ14113@pengutronix.de>
-	<20100726092855.GA20737@n2100.arm.linux.org.uk>
-	<20100726103219.GB20737@n2100.arm.linux.org.uk>
-Message-ID: <20100726120008.GR14113@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 26 Jul 2010 13:31:13 +0100
+Subject: [PATCH v2] ARM: Stop secondary cpus in machine_halt()
+In-Reply-To: <20100712164810.GB9897@n2100.arm.linux.org.uk>
+References: <20100701224706.GA26473@lixom.net>
+	<20100703184614.GA9693@lixom.net>
+	<20100712164810.GB9897@n2100.arm.linux.org.uk>
+Message-ID: <20100726123113.GC23399@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Added Guennadi, Baruch and linux-media to cc]
+On Mon, Jul 12, 2010 at 05:48:10PM +0100, Russell King - ARM Linux wrote:
+> Hmm... what about kexec on a SMP system, or we try to reboot a SMP
+> system?
+> 
+> The x86 code suggests that we put smp_send_stop() inside
+> machine_shutdown() (and move that function into arch/arm/kernel/process.c)
+> and call it from machine_halt() and machine_reboot().
+> 
+> This will cover the kexec and reboot cases too.
 
-On Mon, Jul 26, 2010 at 11:32:19AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 26, 2010 at 10:28:55AM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Jul 26, 2010 at 11:00:14AM +0200, Sascha Hauer wrote:
-> > >  160 files changed, 6547 insertions(+), 3276 deletions(-)
-> > 
-> > I get:
-> > 
-> > 160 files changed, 6530 insertions(+), 3265 deletions
-> > 
-> > which seems to be down to this difference between your diffstat and mine:
-> > 
-> > > arch/arm/mach-mx3/mach-mx31lilly.c                 |   48 +-
-> > 
-> >  arch/arm/mach-mx3/mach-mx31lilly.c                 |   20 +-
-> > 
-> > This seems to be down to 4d5d859 (ARM: mx3: mx31lilly: fix build error for
-> > !CONFIG_USB_ULPI).
-> 
-> Err...
-> 
-> commit 10ee61384e444133e4d2cf2a1f21fdd50c2be297
-> Author: Baruch Siach <baruch@tkos.co.il>
-> Date:   Sun Jul 4 07:55:10 2010 +0300
-> 
->     mx2_camera: Add soc_camera support for i.MX25/i.MX27
-> 
->     This is the soc_camera support developed by Sascha Hauer for the i.MX27.  Alan
->     Carvalho de Assis modified the original driver to get it working on more recent
->     kernels. I modified it further to add support for i.MX25. This driver has been
->     tested on i.MX25 and i.MX27 based platforms.
-> 
->     Signed-off-by: Baruch Siach <baruch@tkos.co.il>
->     Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
->     Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> Why has no one from the V4L community reviewed this patch?
+As no one's commented on this, I'm going to apply it later today for
+the next merge window - it seems to be the right way to solve this
+problem, and makes us reflect what x86 does.
 
-It was posted to linux-media and reviewed there. I put it in my tree to
-prevent problems due to missing platform_data declarations when board
-support for the camera gets added.
-
+> So, something like this:
 > 
-> Why are you using void __iomem * with the virtual address returned from
-> dma_alloc_coherent()?  It doesn't return IOMEM addresses!
-
-Baruch, can you fix this?
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+> index 598ca61..4acce99 100644
+> --- a/arch/arm/kernel/machine_kexec.c
+> +++ b/arch/arm/kernel/machine_kexec.c
+> @@ -37,10 +37,6 @@ void machine_kexec_cleanup(struct kimage *image)
+>  {
+>  }
+>  
+> -void machine_shutdown(void)
+> -{
+> -}
+> -
+>  void machine_crash_shutdown(struct pt_regs *regs)
+>  {
+>  }
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index a4a9cc8..ceb2aa4 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -189,19 +189,29 @@ int __init reboot_setup(char *str)
+>  
+>  __setup("reboot=", reboot_setup);
+>  
+> -void machine_halt(void)
+> +void machine_shutdown(void)
+>  {
+> +#ifdef CONFIG_SMP
+> +	smp_send_stop();
+> +#endif
+>  }
+>  
+> +void machine_halt(void)
+> +{
+> +	machine_shutdown();
+> +	while (1);
+> +}
+>  
+>  void machine_power_off(void)
+>  {
+> +	machine_shutdown();
+>  	if (pm_power_off)
+>  		pm_power_off();
+>  }
+>  
+>  void machine_restart(char *cmd)
+>  {
+> +	machine_shutdown();
+>  	arm_pm_restart(reboot_mode, cmd);
+>  }
+>  
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index b8c3d0f..11f631b 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -467,10 +467,13 @@ static DEFINE_SPINLOCK(stop_lock);
+>   */
+>  static void ipi_cpu_stop(unsigned int cpu)
+>  {
+> -	spin_lock(&stop_lock);
+> -	printk(KERN_CRIT "CPU%u: stopping\n", cpu);
+> -	dump_stack();
+> -	spin_unlock(&stop_lock);
+> +	if (system_state == SYSTEM_BOOTING ||
+> +	    system_state == SYSTEM_RUNNING) {
+> +		spin_lock(&stop_lock);
+> +		printk(KERN_CRIT "CPU%u: stopping\n", cpu);
+> +		dump_stack();
+> +		spin_unlock(&stop_lock);
+> +	}
+>  
+>  	set_cpu_online(cpu, false);
+>  
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
