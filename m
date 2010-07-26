@@ -1,50 +1,56 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 26 Jul 2010 10:37:20 +0900
-Subject: ARM Machine SoC I/O setup and PAD initialization code
-In-Reply-To: <20100723210347.GO20855@pengutronix.de>
-References: <201007211029.29529.david.jander@protonic.nl>
-	<201007221531.58744.david.jander@protonic.nl>
-	<20100722142043.GK4737@rakim.wolfsonmicro.main>
-	<201007231218.07379.david.jander@protonic.nl>
-	<20100723141712.GC12300@rakim.wolfsonmicro.main>
-	<61396.213.84.91.226.1279910330.squirrel@protonic.xs4all.nl>
-	<20100723210347.GO20855@pengutronix.de>
-Message-ID: <AANLkTin=uThThNaUxCP4qEJjO2TYMzpHfmZ6jLokQxCD@mail.gmail.com>
+Date: Mon, 26 Jul 2010 10:51:44 +0900
+Subject: [linux-pm] [PATCH/RFC] Runtime PM: ARM: subarch-specific
+	extensions of pdev_archdata
+In-Reply-To: <34dc79dc-0868-4401-9fa5-c7134f6d4485@email.android.com>
+References: <1253670648-28610-1-git-send-email-khilman@deeprootsystems.com>
+	<f17812d70909222153y4a0e4fc2n496ea2e6caaac847@mail.gmail.com>
+	<19129.63264.653666.70492@pilspetsen.it.uu.se>
+	<4ABAAF1D.6090907@deeprootsystems.com>
+	<f17812d70909231630i20f64328k8d604c3436094b85@mail.gmail.com>
+	<87k4yhagv4.fsf@deeprootsystems.com>
+	<AANLkTinBqc11oE2SOmvXbFHmlgvZ21LngXNWkSHiJmRK@mail.gmail.com>
+	<34dc79dc-0868-4401-9fa5-c7134f6d4485@email.android.com>
+Message-ID: <AANLkTikHUcgBcTmv+=NrYMwgn-UC_Q0Vv3ytfuJbkyRB@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 24, 2010 at 6:03 AM, Robert Schwebel
-<r.schwebel@pengutronix.de> wrote:
-> kexec is a good idea only in theory. Last time we tried it, it needed
-> something like 6 s additional boot time. Inacceptable - we bring Qt
-> based GUI systems into the application in 6 s, and automotive systems
-> into userspace in 336 ms. Not to mention that the first kernel needs to
-> be brought up as well.
+On Sun, Jul 25, 2010 at 5:24 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> "Magnus Damm" <magnus.damm@gmail.com> wrote:
+>>On Tue, Oct 27, 2009 at 8:13 AM, Kevin Hilman
+>><khilman@deeprootsystems.com> wrote:
+>>> Eric Miao <eric.y.miao@gmail.com> writes:
+>>>> On Thu, Sep 24, 2009 at 7:28 AM, Kevin Hilman
+>>>> <khilman@deeprootsystems.com> wrote:
+>>>>> Mikael Pettersson wrote:
+>>>>>> Eric Miao writes:
+>>>>>> ?> On Wed, Sep 23, 2009 at 9:50 AM, Kevin Hilman
+>>>>>> ?> <khilman@deeprootsystems.com> wrote:
+>>>>>> ?> > On ARM platforms, power management can be very platform specific.
+>>>>>> ?> > This patch allows ARM subarches to extend the platform_device
+>>>>>> ?> > pdev_archdata for each subarch by creating a new struct pdev_machdata
+>>>>>> ?> > and allowing each subarch to customize it as needed.
 
-I disagree with your "in theory only" stamp on kexec. I've used kexec
-for rebooting and crash dumping on i386, x86_64, ia64, ARM and SH. 10
-years ago before kexec I booted Linux from Linux on Powerpc using the
-"relf" kernel module. I know that closed-source RTOS has booted
-themselves for ages, look at vxWorks and/or pSOS if you happen to be
-interested in history.
+>>Do you remember what happened with this patch?
+>
+> I don't have all the details in front of me because I'm on my phone, but I advised against pdev_archdata because it is multiplatform-unfriendly.
 
-The two presentations pointed out earlier in this thread clearly show
-how to build kexec based boot loaders which boot in one second. The
-overhead of kexec itself is almost nothing. I'm sure you can discuss
-the details of the kexec implementation with Eric Biederman if you'd
-like.
+Ok, I did not expect that. =) But after thinking a bit it does make
+sense. I wonder what my options are. I'm not so fond of the idea to
+wrap the platform devices - that's not more multi-platform friendly,
+is it?
 
-That aside, the 6 s number looks familiar from earlier Barebox
-presentations that I've eyed through before. When did you test it? Do
-you remember what platform and which kernel version? Are you using a
-full Gnome desktop in your boot loader? =)
+How about using devres and platform bus notifiers?
 
-I'm sure there still are valid reasons why people chose to duplicate
-driver development though traditional boot loaders like Barebox or
-U-boot. One valid reason may be size of the boot loader, another may
-be speed.
+For a Runtime PM prototype using devres (instead of pdev_archdata or
+wrapping) look here:
+https://patchwork.kernel.org/patch/113605/
 
-The 6 s difference you point out is just strange IMO. I'm not sure
-what you are booting with your boot loader. Is it a Linux kernel? If
-so, are you trying to say that kexec itself is slow or that the kernel
-is slow?
+To make it work with modules I propose adding a driver bind event:
+https://patchwork.kernel.org/patch/113865/
+
+Looks pretty multi-platform friendly to me. Any suggestions?
+
+Thanks,
+
+/ magnus
