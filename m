@@ -1,45 +1,81 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 26 Jul 2010 22:04:38 +0200
-Subject: [PULL] Various xscale fixes
-Message-ID: <201007262204.39318.marek.vasut@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 26 Jul 2010 22:08:40 +0200
+Subject: Introducing the LCD-Linux project
+In-Reply-To: <AANLkTilKJx18oyc815DhKfPv-Yjdv8UmfJ4WTDxZxaab@mail.gmail.com>
+References: <AANLkTikitTGpiE5Oe_P5a4f2OCOnlB9j_LVm5CQhQIno@mail.gmail.com>
+	<20100722122111.4cf4ca2f@lxorguk.ukuu.org.uk>
+	<AANLkTilKJx18oyc815DhKfPv-Yjdv8UmfJ4WTDxZxaab@mail.gmail.com>
+Message-ID: <AANLkTimciy00nGiePXcMAcuiuoPLjB8AKb2jtHFPZ5rC@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric, can you please pull these changes into your -devel? Thanks!
+On Thu, Jul 22, 2010 at 13:38, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> On Thu, Jul 22, 2010 at 13:21, Alan Cox <alan@lxorguk.ukuu.org.uk> wrote:
+>> On Wed, 21 Jul 2010 14:57:54 +0200
+>> Mattia Jona-Lasinio <mattia.jona@gmail.com> wrote:
+>>> this is to introduce the LCD-Linux project (http://lcd-linux.sourceforge.net/),
+>>> a kernel level implementation of a VT102 terminal emulator, optimized for small
+>>> alphanumeric and graphic displays.
+>>
+>> The kernel already has a console and that provides an abstract
+>> implementation that is used for everything from text mode displays to vga
+>> to assorted accelerated hardware platforms.
+>>
+>> Why do we need a VT102 as well ?
+>>
+>>> functions. A solution is therefore to provide a sort of minimal terminal
+>>> emulation in kernel space, that can be accessed through the standard character
+>>> device interface. In this way the problem of the display management is reduced
+>>
+>> If you use the existing kernel console interfaces then you don't need to
+>> worry about vt102 v console or having two terminal emulations running.
+>
+> Indeed, the kernel already has the console abstraction.
+>
+> I wrote a LCD console driver (for a HD44780 connected to the parallel
+> port) using
+> the standard console abstraction several years ago. As it used the standard
+> console abstraction, it supported multiple virtual consoles and co-operated with
+> the VGA text console out-of-the-box. Just use ALT-Fx to switch between different
+> VCs on the LCD or on VGA.
+>
+> I never published the code, though. Will do so tonight when I get back
+> to the machine that holds the code ;-)
 
-The following changes since commit 9f5f3423ac0d786ff87ee80e7c5292b43fe0b4f9:
+And so I did, to prevent it from being lost for mankind:
 
-  Merge branch 'devel' of 
-git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6 into devel 
-(2010-07-22 17:14:02 +0200)
+    http://users.telenet.be/geertu/Download/hd44780.tar.gz
 
-are available in the git repository at:
+This is a Linux console driver for a HD44780 LCD connected to a PC-style
+parallel port. It supports both 4-bit and 8-bit interface mode.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/marex/pxa-linux-2.6.git for-
-eric-devel
+The code was developed and used with a 20x4 LCD connected to the parallel port
+of a standard PC and a CHRP LongTrail PowerPC box, with Linux kernel 2.2
+(early development) and 2.4, from 2000 until 2004. There's no guarantee it will
+work with more recent kernels.
 
-Marek Vasut (8):
-      pxa: Introduce Palm27x
-      pxa: Flip Palm LD, TX, T5, Z72 to Palm27x
-      pxa: Add core pmic support for Palm27x
-      pxa: Modularize remnants of code in Palms
-      pxa/spitz: Rework spitz
-      pxa/spitz: Formating and naming fixes
-      PXA: Fix ZipitZ2 flash layout typo
-      Merge branch 'palm' into for-eric-devel
+The console driver has a comment suggesting to use a 20x4 window on an 80x25
+virtual screen, but this has never been implemented.
 
- arch/arm/mach-pxa/Kconfig                |    7 +
- arch/arm/mach-pxa/Makefile               |    1 +
- arch/arm/mach-pxa/include/mach/palm27x.h |   48 ++
- arch/arm/mach-pxa/include/mach/spitz.h   |    6 +
- arch/arm/mach-pxa/palm27x.c              |  532 ++++++++++++++++++++++
- arch/arm/mach-pxa/palmld.c               |  301 +++----------
- arch/arm/mach-pxa/palmt5.c               |  289 ++-----------
- arch/arm/mach-pxa/palmtreo.c             |  371 +++-------------
- arch/arm/mach-pxa/palmtx.c               |  307 +++-----------
- arch/arm/mach-pxa/palmz72.c              |  269 ++----------
- arch/arm/mach-pxa/spitz.c                |  724 ++++++++++++++++++------------
- arch/arm/mach-pxa/z2.c                   |    2 +-
- 12 files changed, 1265 insertions(+), 1592 deletions(-)
- create mode 100644 arch/arm/mach-pxa/include/mach/palm27x.h
- create mode 100644 arch/arm/mach-pxa/palm27x.c
+It consists of 4 modules:
+  - hd44780: Mid-level HD44780 LCD driver, handling the HD44780 commands
+             [kernel, user]
+  - parlcd: Low-level HD44780 driver, defining how to talk to a HD44780 LCD
+            connected to a PC-style parallel port [kernel, user]
+  - lcdcon: Standard Linux console driver for a HD44780 LCD [kernel]
+  - play: Interactive test program to talk to the HD44780 or to the raw
+          parallel port [user]
+
+Modules marked [kernel] are used inside the Linux kernel only.
+Modules marked [user] are used with the userspace test program.
+
+Gr{oetje,eeting}s,
+
+? ? ? ? ? ? ? ? ? ? ? ? Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+? ? ? ? ? ? ? ? ? ? ? ? ? ?? ?? -- Linus Torvalds
