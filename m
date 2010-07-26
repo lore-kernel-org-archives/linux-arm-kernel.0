@@ -1,39 +1,84 @@
-From: gregkh@suse.de (Greg KH)
-Date: Mon, 26 Jul 2010 15:26:28 -0700
-Subject: [PATCH] Stop ARM boards crashing when CUPS is loaded - 2.6.35-rc5
-In-Reply-To: <4C403E87.4040503@canonical.com>
-References: <4C3C72C6.4000005@canonical.com>
-	<20100715130214.4c9303b2.akpm@linux-foundation.org>
-	<20100715200618.GA6773@n2100.arm.linux.org.uk>
-	<4C40218A.4090806@canonical.com>
-	<20100716092018.GB16995@n2100.arm.linux.org.uk>
-	<4C402746.6080309@canonical.com> <4C403E87.4040503@canonical.com>
-Message-ID: <20100726222628.GA31510@suse.de>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 26 Jul 2010 15:32:36 -0700
+Subject: [PATCH] gpio: remove spurious gpio_unexport debug error.
+In-Reply-To: <20100723045807.GA14875@pengutronix.de>
+References: <1279832758-25442-1-git-send-email-gbean@codeaurora.org>
+	<20100723045807.GA14875@pengutronix.de>
+Message-ID: <20100726153236.ead96c88.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 16, 2010 at 12:12:07PM +0100, Lee Jones wrote:
-> On 16/07/10 10:32, Lee Jones wrote:
-> >> The best solution is probably for the parport code to go through a
-> >> modernisation cycle like the serial code did, essentially using
-> >> platform devices to pass the base addresses.  This would make the
-> >> driver more portable, and eliminates this problem entirely (because
-> >> platforms which don't have parports won't register the platform device(s)
-> >> necessary for parport to even probe illegal addresses.)
-> 
-> I have lobbied for one of our partners to conduct this work, but I don't
-> think this would be something that is in their interest to fix. 
-> Nevertheless, I am currently waiting on a reply from them.
-> 
-> FAO GregKH,
-> 
-> Do you think this would be something that may interest you and your Linux 
-> drivers project? Or perhaps a student who wants to get their feet wet and
-> play with some platform driver code.
+On Fri, 23 Jul 2010 06:58:07 +0200
+Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de> wrote:
 
-Yes, sure, that would be good.  Post it on the driverdevel mailing list
-and see who responds.
+> Hello,
+> 
+> On Thu, Jul 22, 2010 at 02:05:58PM -0700, Gregory Bean wrote:
+> > Make gpio_unexport generate success instead of an -EINVAL
+> > if asked to unexport a line which is not exported, because
+> > the only result of that condition is a pr_debug
+> > which complains of what is really a harmless no-op:
+> > when an unexported gpio is unexported again, nothing happens.
+> > That's not a failure, just a trivial border case.
+> > Since gpio_free calls gpio_unexport unconditionally
+> > and exported gpio lines are uncommon, most calls to
+> > gpio_free with debug flags enabled generate -EINVAL
+> > warnings in the log, causing unnecessary stress.
+> I noticed that a few days ago, too.  Just didn't come around to fix it
+> myself.
+>  
+> > Signed-off-by: Gregory Bean <gbean@codeaurora.org>
+> Acked-by: Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de>
+> 
 
-thanks,
+Jon got there first ;)
 
-greg k-h
+
+
+Subject: gpio: fix spurious printk when freeing a gpio
+
+
+From: Jon Povey <jon.povey@racelogic.co.uk>
+
+When freeing a gpio that has not been exported, gpio_unexport() prints a
+debug message when it should just fall through silently.
+
+Example spurious message:
+
+	gpio_unexport: gpio0 status -22
+
+Signed-off-by: Jon Povey <jon.povey@racelogic.co.uk>
+Cc: David Brownell <david-b@pacbell.net>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+---
+
+ drivers/gpio/gpiolib.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff -puN drivers/gpio/gpiolib.c~gpio-fix-spurious-printk-when-freeing-a-gpio drivers/gpio/gpiolib.c
+--- a/drivers/gpio/gpiolib.c~gpio-fix-spurious-printk-when-freeing-a-gpio
++++ a/drivers/gpio/gpiolib.c
+@@ -893,10 +893,12 @@ EXPORT_SYMBOL_GPL(gpio_sysfs_set_active_
+ void gpio_unexport(unsigned gpio)
+ {
+ 	struct gpio_desc	*desc;
+-	int			status = -EINVAL;
++	int			status = 0;
+ 
+-	if (!gpio_is_valid(gpio))
++	if (!gpio_is_valid(gpio)) {
++		status = -EINVAL;
+ 		goto done;
++	}
+ 
+ 	mutex_lock(&sysfs_lock);
+ 
+@@ -911,7 +913,6 @@ void gpio_unexport(unsigned gpio)
+ 			clear_bit(FLAG_EXPORT, &desc->flags);
+ 			put_device(dev);
+ 			device_unregister(dev);
+-			status = 0;
+ 		} else
+ 			status = -ENODEV;
+ 	}
+_
