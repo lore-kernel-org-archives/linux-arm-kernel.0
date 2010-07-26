@@ -1,509 +1,1058 @@
-From: sbkim73@samsung.com (=?UTF-8?B?6rmA7IOB67KU?=)
-Date: Mon, 26 Jul 2010 13:07:25 +0900
-Subject: [PATCH v2 5/8] ARM: S5PV310: Add Timer support
-In-Reply-To: <AANLkTimirpioNZmzLoWeAD9hN0gAmWodddeMyxsdY7A6@mail.gmail.com>
-References: <1279270714-15146-1-git-send-email-kgene.kim@samsung.com>
-	<1279270714-15146-6-git-send-email-kgene.kim@samsung.com>
-	<AANLkTimirpioNZmzLoWeAD9hN0gAmWodddeMyxsdY7A6@mail.gmail.com>
-Message-ID: <009701cb2c78$112116f0$336344d0$@com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 26 Jul 2010 13:54:45 +0900
+Subject: [PATCH v4 7/7] ARM: S5PV210: Initial CPUFREQ Support
+In-Reply-To: <1279790573-24179-8-git-send-email-myungjoo.ham@samsung.com>
+References: <1279790573-24179-1-git-send-email-myungjoo.ham@samsung.com>
+	<1279790573-24179-2-git-send-email-myungjoo.ham@samsung.com>
+	<1279790573-24179-3-git-send-email-myungjoo.ham@samsung.com>
+	<1279790573-24179-4-git-send-email-myungjoo.ham@samsung.com>
+	<1279790573-24179-5-git-send-email-myungjoo.ham@samsung.com>
+	<1279790573-24179-6-git-send-email-myungjoo.ham@samsung.com>
+	<1279790573-24179-7-git-send-email-myungjoo.ham@samsung.com>
+	<1279790573-24179-8-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <008301cb2c7e$ad2ed4a0$078c7de0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+MyungJoo Ham wrote:
+> 
+> S5PV210 CPUFREQ Support.
+> 
+> This CPUFREQ may work without PMIC's DVS support. However, it is not
+> as effective without DVS support as supposed. AVS is not supported in
+> this version.
+> 
+> Note that CLK_SRC of some clocks including ARMCLK, G3D, G2D, MFC,
+> and ONEDRAM are modified directly without updating clksrc_src
+> representations of the clocks.  Because CPUFREQ reverts the CLK_SRC
+> to the supposed values, this does not affect the consistency as long as
+> there are no other modules that modifies clock sources of ARMCLK, G3D,
+> G2D, MFC, and ONEDRAM (and only CPUFREQ should have the control). As
+> soon as clock framework is settled, we may update source clocks
+> (.parent field) of those clocks accordingly later.
+> 
+> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-Hi Kyungmin,
+Hi MyungJoo,
 
->On Fri, Jul 16, 2010 at 5:58 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> From: Changhwan Youn <chaos.youn@samsung.com>
->>
->> This patch adds timer support for S5PV310.
->> Until now, all S5P SoCs use CONFIG_ARCH_USES_GETTIMEOFFSET macro as a
->default
->> configuration. Instead, S5PV310 implements clocksource and
->clock_event_device
->> to support the high resolution timer and tickless system.
->>
->> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
->> Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
->> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
->> ---
->>  arch/arm/mach-s5pv310/include/mach/pwm-clock.h |   70 ++++++
->>  arch/arm/mach-s5pv310/localtimer.c             |   25 ++
->>  arch/arm/mach-s5pv310/time.c                   |  287
->++++++++++++++++++++++++
->>  arch/arm/plat-s5p/include/plat/s5pv310.h       |    1 +
->>  arch/arm/plat-samsung/Makefile                 |    2 +-
->>  5 files changed, 384 insertions(+), 1 deletions(-)
->>  create mode 100644 arch/arm/mach-s5pv310/include/mach/pwm-clock.h
->>  create mode 100644 arch/arm/mach-s5pv310/localtimer.c
->>  create mode 100644 arch/arm/mach-s5pv310/time.c
->>
->> diff --git a/arch/arm/mach-s5pv310/include/mach/pwm-clock.h
->b/arch/arm/mach-s5pv310/include/mach/pwm-clock.h
->> new file mode 100644
->> index 0000000..7e6da27
->> --- /dev/null
->> +++ b/arch/arm/mach-s5pv310/include/mach/pwm-clock.h
->> @@ -0,0 +1,70 @@
->> +/* linux/arch/arm/mach-s5pv310/include/mach/pwm-clock.h
->> + *
->> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
->> + *             http://www.samsung.com/
->> + *
->> + * Copyright 2008 Openmoko, Inc.
->> + * Copyright 2008 Simtec Electronics
->> + *      Ben Dooks <ben@simtec.co.uk>
->> + *      http://armlinux.simtec.co.uk/
->> + *
->> + * Based on arch/arm/mach-s3c64xx/include/mach/pwm-clock.h
->> + *
->> + * S5PV310 - pwm clock and timer support
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> +*/
->> +
->> +#ifndef __ASM_ARCH_PWMCLK_H
->> +#define __ASM_ARCH_PWMCLK_H __FILE__
->> +
->> +/**
->> + * pwm_cfg_src_is_tclk() - return whether the given mux config is a tclk
->> + * @tcfg: The timer TCFG1 register bits shifted down to 0.
->> + *
->> + * Return true if the given configuration from TCFG1 is a TCLK instead
->> + * any of the TDIV clocks.
->> + */
->> +static inline int pwm_cfg_src_is_tclk(unsigned long tcfg)
->> +{
->> +       return tcfg == S3C64XX_TCFG1_MUX_TCLK;
->> +}
->> +
->> +/**
->> + * tcfg_to_divisor() - convert tcfg1 setting to a divisor
->> + * @tcfg1: The tcfg1 setting, shifted down.
->> + *
->> + * Get the divisor value for the given tcfg1 setting. We assume the
->> + * caller has already checked to see if this is not a TCLK source.
->> + */
->> +static inline unsigned long tcfg_to_divisor(unsigned long tcfg1)
->> +{
->> +       return 1 << tcfg1;
->> +}
->> +
->> +/**
->> + * pwm_tdiv_has_div1() - does the tdiv setting have a /1
->> + *
->> + * Return true if we have a /1 in the tdiv setting.
->> + */
->> +static inline unsigned int pwm_tdiv_has_div1(void)
->> +{
->> +       return 1;
->> +}
->> +
->> +/**
->> + * pwm_tdiv_div_bits() - calculate TCFG1 divisor value.
->> + * @div: The divisor to calculate the bit information for.
->> + *
->> + * Turn a divisor into the necessary bit field for TCFG1.
->> + */
->> +static inline unsigned long pwm_tdiv_div_bits(unsigned int div)
->> +{
->> +       return ilog2(div);
->> +}
->> +
->> +#define S3C_TCFG1_MUX_TCLK S3C64XX_TCFG1_MUX_TCLK
->> +
->> +#endif /* __ASM_ARCH_PWMCLK_H */
->> diff --git a/arch/arm/mach-s5pv310/localtimer.c b/arch/arm/mach-
->s5pv310/localtimer.c
->> new file mode 100644
->> index 0000000..2784036
->> --- /dev/null
->> +++ b/arch/arm/mach-s5pv310/localtimer.c
->> @@ -0,0 +1,25 @@
->> +/* linux/arch/arm/mach-s5pv310/localtimer.c
->> + *
->> + * Cloned from linux/arch/arm/mach-realview/localtimer.c
->> + *
->> + *  Copyright (C) 2002 ARM Ltd.
->> + *  All Rights Reserved
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> +*/
->> +
->> +#include <linux/clockchips.h>
->> +
->> +#include <asm/irq.h>
->> +#include <asm/localtimer.h>
->> +
->> +/*
->> + * Setup the local clock events for a CPU.
->> + */
->> +void __cpuinit local_timer_setup(struct clock_event_device *evt)
->> +{
->> +       evt->irq = IRQ_LOCALTIMER;
->> +       twd_timer_setup(evt);
->> +}
->> diff --git a/arch/arm/mach-s5pv310/time.c b/arch/arm/mach-s5pv310/time.c
->> new file mode 100644
->> index 0000000..64accf8
->> --- /dev/null
->> +++ b/arch/arm/mach-s5pv310/time.c
->> @@ -0,0 +1,287 @@
->> +/* linux/arch/arm/mach-s5pv310/time.c
->> + *
->> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
->> + *             http://www.samsung.com
->> + *
->> + * S5PV310 (and compatible) HRT support
->> + * PWM 2/4 is used for this feature
->
->Please make it configurable, now PWM 2 is used for I2C pin in mobile
->hardware.
->It seems to smdk specific file.
->
->Why don't use the systimer?
->
->Thank you,
->Kyungmin Park
->
+> --
+> v2:
+> 	- Ramp-up delay is removed. (let regulator framework do the job)
+> 	- Provide proper max values for regulator_set_voltage
+> 	- Removed unneccesary #ifdef's.
+> 	- Removed unnecessary initialiser for CLK_OUT
+> v3:
+> 	- Style corrections (pr_info/pr_err, ...)
+> 	- Revised dvs_conf struct
+> v4:
+> 	- Renamed cpufreq-s5pv210.c -> cpufreq.c
+> 	- Style corrections (less #ifdef's, comments)
+> 	- Removed unncessary codes
+> 	- Remove #ifdef for WORKAROUND, use s5pv210_workaround()
+> 	- Renamed some static variables (get rid of s5pv210 prefix)
+> 	- Added machine dependency to Kconfig/Makefile
+> 	- DMC0, DMC1 refresh counter is not updated by a hardcoded value,
+but
+> 	with the value given as the default and relative clock speeds.
+Besides,
+> 	the algorithm to update DMC0/1 refresh counter is reformed.
+> 
+> ---
+>  arch/arm/Kconfig                              |    1 +
+>  arch/arm/mach-s5pv210/Kconfig                 |    5 +
+>  arch/arm/mach-s5pv210/Makefile                |    2 +
+>  arch/arm/mach-s5pv210/cpufreq.c               |  783
+> +++++++++++++++++++++++++
+>  arch/arm/mach-s5pv210/include/mach/cpu-freq.h |   40 ++
+>  5 files changed, 831 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-s5pv210/cpufreq.c
+>  create mode 100644 arch/arm/mach-s5pv210/include/mach/cpu-freq.h
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 98922f7..d5a5916 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -701,6 +701,7 @@ config ARCH_S5PV210
+>  	select HAVE_CLK
+>  	select ARM_L1_CACHE_SHIFT_6
+>  	select ARCH_USES_GETTIMEOFFSET
+> +	select ARCH_HAS_CPUFREQ
+>  	help
+>  	  Samsung S5PV210/S5PC110 series based systems
+> 
+> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+> index 631019a..1c6d3bc 100644
+> --- a/arch/arm/mach-s5pv210/Kconfig
+> +++ b/arch/arm/mach-s5pv210/Kconfig
+> @@ -14,6 +14,7 @@ config CPU_S5PV210
+>  	select PLAT_S5P
+>  	select S3C_PL330_DMA
+>  	select S5P_EXT_INT
+> +	select S5PV210_CPU_FREQ if CPU_FREQ
+>  	help
+>  	  Enable S5PV210 CPU support
+> 
+> @@ -101,4 +102,8 @@ config MACH_SMDKC110
+>  	  Machine support for Samsung SMDKC110
+>  	  S5PC110(MCP) is one of package option of S5PV210
+> 
+> +config S5PV210_CPU_FREQ
+> +	bool "S5PV210 CPU-FREQ Support"
+> +	depends on CPU_S5PV210 && CPU_FREQ
+> +
+>  endif
+> diff --git a/arch/arm/mach-s5pv210/Makefile
+b/arch/arm/mach-s5pv210/Makefile
+> index aae592a..72ca5ec 100644
+> --- a/arch/arm/mach-s5pv210/Makefile
+> +++ b/arch/arm/mach-s5pv210/Makefile
+> @@ -34,3 +34,5 @@ obj-$(CONFIG_S5PV210_SETUP_I2C2) 	+= setup-i2c2.o
+>  obj-$(CONFIG_S5PV210_SETUP_KEYPAD)	+= setup-keypad.o
+>  obj-$(CONFIG_S5PV210_SETUP_SDHCI)       += setup-sdhci.o
+>  obj-$(CONFIG_S5PV210_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
+> +
+> +obj-$(CONFIG_S5PV210_CPU_FREQ)		+= cpufreq.o
+> diff --git a/arch/arm/mach-s5pv210/cpufreq.c
+b/arch/arm/mach-s5pv210/cpufreq.c
+> new file mode 100644
+> index 0000000..8ea1ce8
+> --- /dev/null
+> +++ b/arch/arm/mach-s5pv210/cpufreq.c
+> @@ -0,0 +1,783 @@
+> +/*  linux/arch/arm/mach-s5pv210/cpufreq.c
+> + *
+> + *  Copyright (C) 2010 Samsung Electronics Co., Ltd.
+> + *
+> + *  CPU frequency scaling for S5PV210/S5PC110
+> + *  Based on cpu-sa1110.c and s5pc11x-cpufreq.c
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/types.h>
+> +#include <linux/kernel.h>
+> +#include <linux/sched.h>
+> +#include <linux/delay.h>
+> +#include <linux/init.h>
+> +#include <linux/err.h>
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <linux/gpio.h>
+> +#include <asm/system.h>
+> +
+> +#include <mach/hardware.h>
+> +#include <mach/map.h>
+> +#include <mach/regs-clock.h>
+> +#include <mach/regs-gpio.h>
+> +#include <mach/cpu-freq.h>
+> +
+> +#include <plat/cpu-freq.h>
+> +#include <plat/pll.h>
+> +#include <plat/clock.h>
+> +#include <plat/gpio-cfg.h>
+> +#include <plat/regs-fb.h>
+> +#ifdef CONFIG_PM
+> +#include <plat/pm.h>
+> +#endif
+> +
+> +static struct clk *mpu_clk;
+> +static struct regulator *arm_regulator;
+> +static struct regulator *internal_regulator;
+> +
+> +struct s3c_cpufreq_freqs s3c_freqs;
+> +
+> +static unsigned long previous_arm_volt;
+> +
+> +static unsigned int backup_dmc0_reg;
+> +static unsigned int backup_dmc1_reg;
+> +static unsigned int backup_freq_level;
+> +static unsigned int mpll_freq; /* in MHz */
+> +static unsigned int apll_freq_max; /* in MHz */
+> +
+> +/* frequency */
+> +static struct cpufreq_frequency_table freq_table[] = {
+> +	{L0, 1000*1000},
+> +	{L1, 800*1000},
+> +	{L2, 400*1000},
+> +	{L3, 200*1000},
+> +	{L4, 100*1000},
+> +	{0, CPUFREQ_TABLE_END},
+> +};
+> +
+> +struct s5pv210_dvs_conf {
+> +	unsigned long       arm_volt;   /* uV */
+> +	unsigned long       int_volt;   /* uV */
+> +};
+> +
+> +const unsigned long arm_volt_max = 1350000;
+> +const unsigned long int_volt_max = 1250000;
+> +
+> +static struct s5pv210_dvs_conf dvs_conf_workaround[] = {
 
-In current implementation, pwm 2 is for clock source and 
-arm private timers are used for clock event device.
-Pwm 4 is used only for calibrating arm private timers.
-because arm private timers are calibrated using Jiffies and that means 
-we need other timer for clock event before the arm private timers are registered to the kernel.
+Is this really workaround?
 
-According to your comment, it seems that pwm 4 is more appropriate for clock source 
-because pwm 4 doesn't have external output function through GPIO port.
-With this modification, pwm 2 will be used for clock event device during early boot time 
-and can be used for other purpose after system boot time.
+This is just difference of voltage characteristic of CPU revision, not
+workaround.
 
-regards,
-Sangbeom Kim
+> +	[L0] = {
+> +		.arm_volt   = 1300000,
+> +		.int_volt   = 1200000,
+> +	},
+> +	[L1] = {
+> +		.arm_volt   = 1250000,
+> +		.int_volt   = 1200000,
+> +
+> +	},
+> +	[L2] = {
+> +		.arm_volt   = 1250000,
+> +		.int_volt   = 1200000,
+> +
+> +	},
+> +	[L3] = {
+> +		.arm_volt   = 1250000,
+> +		.int_volt   = 1200000,
+> +	},
+> +	[L4] = {
+> +		.arm_volt   = 1250000,
+> +		.int_volt   = 1200000,
+> +	},
+> +};
+> +static struct s5pv210_dvs_conf dvs_conf_default[] = {
+> +	[L0] = {
+> +		.arm_volt   = 1250000,
+> +		.int_volt   = 1100000,
+> +	},
+> +	[L1] = {
+> +		.arm_volt   = 1200000,
+> +		.int_volt   = 1100000,
+> +	},
+> +	[L2] = {
+> +		.arm_volt   = 1050000,
+> +		.int_volt   = 1100000,
+> +	},
+> +	[L3] = {
+> +		.arm_volt   = 950000,
+> +		.int_volt   = 1100000,
+> +	},
+> +	[L4] = {
+> +		.arm_volt   = 950000,
+> +		.int_volt   = 1000000,
+> +	},
+> +};
+> +static struct s5pv210_dvs_conf *dvs_conf = dvs_conf_default;
+> +
+> +static u32 clkdiv_val[5][11] = {
+> +	/*{ APLL, A2M, HCLK_MSYS, PCLK_MSYS,
+> +	 * HCLK_DSYS, PCLK_DSYS, HCLK_PSYS, PCLK_PSYS, ONEDRAM,
+> +	 * MFC, G3D }
+> +	 */
+> +	/* L0 : [1000/200/200/100][166/83][133/66][200/200] */
+> +	{0, 4, 4, 1, 3, 1, 4, 1, 3, 0, 0},
+> +	/* L1 : [800/200/200/100][166/83][133/66][200/200] */
+> +	{0, 3, 3, 1, 3, 1, 4, 1, 3, 0, 0},
+> +	/* L2 : [400/200/200/100][166/83][133/66][200/200] */
+> +	{1, 3, 1, 1, 3, 1, 4, 1, 3, 0, 0},
+> +	/* L3 : [200/200/200/100][166/83][133/66][200/200] */
+> +	{3, 3, 0, 1, 3, 1, 4, 1, 3, 0, 0},
+> +	/* L4 : [100/100/100/100][83/83][66/66][100/100] */
+> +	{7, 7, 0, 0, 7, 0, 9, 0, 7, 0, 0},
+> +};
+> +
+> +static struct s3c_freq clk_info[] = {
+> +	[L0] = {	/* L0: 1GHz */
+> +		.fclk       = 1000000,
+> +		.armclk     = 1000000,
+> +		.hclk_tns   = 0,
+> +		.hclk       = 133000,
+> +		.pclk       = 66000,
+> +		.hclk_msys  = 200000,
+> +		.pclk_msys  = 100000,
+> +		.hclk_dsys  = 166750,
+> +		.pclk_dsys  = 83375,
+> +	},
+> +	[L1] = {	/* L1: 800MHz */
+> +		.fclk       = 800000,
+> +		.armclk     = 800000,
+> +		.hclk_tns   = 0,
+> +		.hclk       = 133000,
+> +		.pclk       = 66000,
+> +		.hclk_msys  = 200000,
+> +		.pclk_msys  = 100000,
+> +		.hclk_dsys  = 166750,
+> +		.pclk_dsys  = 83375,
+> +	},
+> +	[L2] = {	/* L2: 400MHz */
+> +		.fclk       = 800000,
+> +		.armclk     = 400000,
+> +		.hclk_tns   = 0,
+> +		.hclk       = 133000,
+> +		.pclk       = 66000,
+> +		.hclk_msys  = 200000,
+> +		.pclk_msys  = 100000,
+> +		.hclk_dsys  = 166750,
+> +		.pclk_dsys  = 83375,
+> +	},
+> +	[L3] = {	/* L3: 200MHz */
+> +		.fclk       = 800000,
+> +		.armclk     = 200000,
+> +		.hclk_tns   = 0,
+> +		.hclk       = 133000,
+> +		.pclk       = 66000,
+> +		.hclk_msys  = 200000,
+> +		.pclk_msys  = 100000,
+> +		.hclk_dsys  = 166750,
+> +		.pclk_dsys  = 83375,
+> +	},
+> +	[L4] = {	/* L4: 100MHz */
+> +		.fclk       = 800000,
+> +		.armclk     = 100000,
+> +		.hclk_tns   = 0,
+> +		.hclk       = 66000,
+> +		.pclk       = 66000,
+> +		.hclk_msys  = 100000,
+> +		.pclk_msys  = 100000,
+> +		.hclk_dsys  = 83375,
+> +		.pclk_dsys  = 83375,
+> +	},
+> +};
+> +
+> +static int s5pv210_verify_speed(struct cpufreq_policy *policy)
+> +{
+> +
 
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> +*/
->> +
->> +#include <linux/sched.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/irq.h>
->> +#include <linux/err.h>
->> +#include <linux/clk.h>
->> +#include <linux/clockchips.h>
->> +#include <linux/platform_device.h>
->> +
->> +#include <asm/smp_twd.h>
->> +
->> +#include <mach/map.h>
->> +#include <plat/regs-timer.h>
->> +#include <asm/mach/time.h>
->> +
->> +static unsigned long clock_count_per_tick;
->> +
->> +static struct clk *tin2;
->> +static struct clk *tin4;
->> +static struct clk *tdiv2;
->> +static struct clk *tdiv4;
->> +static struct clk *timerclk;
->> +
->> +static void s5pv310_pwm_stop(unsigned int pwm_id)
->> +{
->> +       unsigned long tcon;
->> +
->> +       tcon = __raw_readl(S3C2410_TCON);
->> +
->> +       switch (pwm_id) {
->> +       case 2:
->> +               tcon &= ~S3C2410_TCON_T2START;
->> +               break;
->> +       case 4:
->> +               tcon &= ~S3C2410_TCON_T4START;
->> +               break;
->> +       default:
->> +               break;
->> +       }
->> +       __raw_writel(tcon, S3C2410_TCON);
->> +}
->> +
->> +static void s5pv310_pwm_init(unsigned int pwm_id, unsigned long tcnt)
->> +{
->> +       unsigned long tcon;
->> +
->> +       tcon = __raw_readl(S3C2410_TCON);
->> +
->> +       /* timers reload after counting zero, so reduce the count by 1 */
->> +       tcnt--;
->> +
->> +       /* ensure timer is stopped... */
->> +       switch (pwm_id) {
->> +       case 2:
->> +               tcon &= ~(0xf<<12);
->> +               tcon |= S3C2410_TCON_T2MANUALUPD;
->> +
->> +               __raw_writel(tcnt, S3C2410_TCNTB(2));
->> +               __raw_writel(tcnt, S3C2410_TCMPB(2));
->> +               __raw_writel(tcon, S3C2410_TCON);
->> +
->> +               break;
->> +       case 4:
->> +               tcon &= ~(7<<20);
->> +               tcon |= S3C2410_TCON_T4MANUALUPD;
->> +
->> +               __raw_writel(tcnt, S3C2410_TCNTB(4));
->> +               __raw_writel(tcnt, S3C2410_TCMPB(4));
->> +               __raw_writel(tcon, S3C2410_TCON);
->> +
->> +               break;
->> +       default:
->> +               break;
->> +       }
->> +}
->> +
->> +static inline void s5pv310_pwm_start(unsigned int pwm_id, bool periodic)
->> +{
->> +       unsigned long tcon;
->> +
->> +       tcon  = __raw_readl(S3C2410_TCON);
->> +
->> +       switch (pwm_id) {
->> +       case 2:
->> +               tcon |= S3C2410_TCON_T2START;
->> +               tcon &= ~S3C2410_TCON_T2MANUALUPD;
->> +
->> +               if (periodic)
->> +                       tcon |= S3C2410_TCON_T2RELOAD;
->> +               else
->> +                       tcon &= ~S3C2410_TCON_T2RELOAD;
->> +               break;
->> +       case 4:
->> +               tcon |= S3C2410_TCON_T4START;
->> +               tcon &= ~S3C2410_TCON_T4MANUALUPD;
->> +
->> +               if (periodic)
->> +                       tcon |= S3C2410_TCON_T4RELOAD;
->> +               else
->> +                       tcon &= ~S3C2410_TCON_T4RELOAD;
->> +               break;
->> +       default:
->> +               break;
->> +       }
->> +       __raw_writel(tcon, S3C2410_TCON);
->> +}
->> +
->> +static int s5pv310_pwm_set_next_event(unsigned long cycles,
->> +                                       struct clock_event_device *evt)
->> +{
->> +       s5pv310_pwm_init(4, cycles);
->> +       s5pv310_pwm_start(4, 0);
->> +       return 0;
->> +}
->> +
->> +static void s5pv310_pwm_set_mode(enum clock_event_mode mode,
->> +                               struct clock_event_device *evt)
->> +{
->> +       s5pv310_pwm_stop(4);
->> +
->> +       switch (mode) {
->> +       case CLOCK_EVT_MODE_PERIODIC:
->> +               s5pv310_pwm_init(4, clock_count_per_tick);
->> +               s5pv310_pwm_start(4, 1);
->> +               break;
->> +       case CLOCK_EVT_MODE_ONESHOT:
->> +               break;
->> +       case CLOCK_EVT_MODE_UNUSED:
->> +       case CLOCK_EVT_MODE_SHUTDOWN:
->> +       case CLOCK_EVT_MODE_RESUME:
->> +               break;
->> +       }
->> +}
->> +
->> +static struct clock_event_device pwm_event_device = {
->> +       .name           = "pwm_timer4",
->> +       .features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
->> +       .rating         = 200,
->> +       .shift          = 32,
->> +       .set_next_event = s5pv310_pwm_set_next_event,
->> +       .set_mode       = s5pv310_pwm_set_mode,
->> +};
->> +
->> +irqreturn_t s5pv310_clock_event_isr(int irq, void *dev_id)
->> +{
->> +       struct clock_event_device *evt = &pwm_event_device;
->> +
->> +       evt->event_handler(evt);
->> +
->> +       return IRQ_HANDLED;
->> +}
->> +
->> +static struct irqaction s5pv310_clock_event_irq = {
->> +       .name           = "pwm_timer4_irq",
->> +       .flags          = IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
->> +       .handler        = s5pv310_clock_event_isr,
->> +};
->> +
->> +static void __init s5pv310_clockevent_init(void)
->> +{
->> +       unsigned long pclk;
->> +       unsigned long clock_rate;
->> +       struct clk *tscaler;
->> +
->> +       pclk = clk_get_rate(timerclk);
->> +
->> +       /* configure clock tick */
->> +
->> +       tscaler = clk_get_parent(tdiv4);
->> +
->> +       clk_set_rate(tscaler, pclk / 2);
->> +       clk_set_rate(tdiv4, pclk / 2);
->> +       clk_set_parent(tin4, tdiv4);
->> +
->> +       clock_rate = clk_get_rate(tin4);
->> +
->> +       clock_count_per_tick = clock_rate / HZ;
->> +
->> +       pwm_event_device.mult =
->> +               div_sc(clock_rate, NSEC_PER_SEC, pwm_event_device.shift);
->> +       pwm_event_device.max_delta_ns =
->> +               clockevent_delta2ns(-1, &pwm_event_device);
->> +       pwm_event_device.min_delta_ns =
->> +               clockevent_delta2ns(1, &pwm_event_device);
->> +
->> +       pwm_event_device.cpumask = cpumask_of(0);
->> +       clockevents_register_device(&pwm_event_device);
->> +
->> +       setup_irq(IRQ_TIMER4, &s5pv310_clock_event_irq);
->> +}
->> +
->> +static cycle_t s5pv310_pwm2_read(struct clocksource *cs)
->> +{
->> +       return (cycle_t) ~__raw_readl(S3C_TIMERREG(0x2c));
->> +}
->> +
->> +struct clocksource pwm_clocksource = {
->> +       .name           = "pwm_timer2",
->> +       .rating         = 250,
->> +       .read           = s5pv310_pwm2_read,
->> +       .mask           = CLOCKSOURCE_MASK(32),
->> +       .shift          = 20,
->> +       .flags          = CLOCK_SOURCE_IS_CONTINUOUS ,
->> +};
->> +
->> +static void __init s5pv310_clocksource_init(void)
->> +{
->> +       unsigned long pclk;
->> +       unsigned long clock_rate;
->> +
->> +       pclk = clk_get_rate(timerclk);
->> +
->> +       clk_set_rate(tdiv2, pclk / 2);
->> +       clk_set_parent(tin2, tdiv2);
->> +
->> +       clock_rate = clk_get_rate(tin2);
->> +
->> +       s5pv310_pwm_init(2, ~0);
->> +       s5pv310_pwm_start(2, 1);
->> +
->> +       pwm_clocksource.mult =
->> +               clocksource_khz2mult(clock_rate/1000,
->pwm_clocksource.shift);
->> +
->> +       if (clocksource_register(&pwm_clocksource))
->> +               panic("%s: can't register clocksource\n",
->pwm_clocksource.name);
->> +}
->> +
->> +static void __init s5pv310_timer_resources(void)
->> +{
->> +       struct platform_device tmpdev;
->> +
->> +       tmpdev.dev.bus = &platform_bus_type;
->> +
->> +       timerclk = clk_get(NULL, "timers");
->> +       if (IS_ERR(timerclk))
->> +               panic("failed to get timers clock for system timer");
->> +
->> +       clk_enable(timerclk);
->> +
->> +       tmpdev.id = 2;
->> +       tin2 = clk_get(&tmpdev.dev, "pwm-tin");
->> +       if (IS_ERR(tin2))
->> +               panic("failed to get pwm-tin2 clock for system timer");
->> +
->> +       tdiv2 = clk_get(&tmpdev.dev, "pwm-tdiv");
->> +       if (IS_ERR(tdiv2))
->> +               panic("failed to get pwm-tdiv2 clock for system timer");
->> +       clk_enable(tin2);
->> +
->> +       tmpdev.id = 4;
->> +       tin4 = clk_get(&tmpdev.dev, "pwm-tin");
->> +       if (IS_ERR(tin4))
->> +               panic("failed to get pwm-tin4 clock for system timer");
->> +
->> +       tdiv4 = clk_get(&tmpdev.dev, "pwm-tdiv");
->> +       if (IS_ERR(tdiv4))
->> +               panic("failed to get pwm-tdiv4 clock for system timer");
->> +
->> +       clk_enable(tin4);
->> +}
->> +
->> +static void __init s5pv310_timer_init(void)
->> +{
->> +#ifdef CONFIG_LOCAL_TIMERS
->> +       twd_base = S5P_VA_TWD;
->> +#endif
->> +
->> +       s5pv310_timer_resources();
->> +       s5pv310_clockevent_init();
->> +       s5pv310_clocksource_init();
->> +}
->> +
->> +struct sys_timer s5pv310_timer = {
->> +       .init           = s5pv310_timer_init,
->> +};
->> diff --git a/arch/arm/plat-s5p/include/plat/s5pv310.h b/arch/arm/plat-
->s5p/include/plat/s5pv310.h
->> index d2f05e1..769c991 100644
->> --- a/arch/arm/plat-s5p/include/plat/s5pv310.h
->> +++ b/arch/arm/plat-s5p/include/plat/s5pv310.h
->> @@ -22,6 +22,7 @@ extern  int s5pv310_init(void);
->>  extern void s5pv310_init_irq(void);
->>  extern void s5pv310_map_io(void);
->>  extern void s5pv310_init_clocks(int xtal);
->> +extern struct sys_timer s5pv310_timer;
->>
->>  #define s5pv310_init_uarts s5pv310_common_init_uarts
->>
->> diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-
->samsung/Makefile
->> index b1d82cc..0d5bf8a 100644
->> --- a/arch/arm/plat-samsung/Makefile
->> +++ b/arch/arm/plat-samsung/Makefile
->> @@ -12,7 +12,7 @@ obj-                          :=
->>  # Objects we always build independent of SoC choice
->>
->>  obj-y                          += init.o
->> -obj-y                          += time.o
->> +obj-$(CONFIG_ARCH_USES_GETTIMEOFFSET)   += time.o
->>  obj-y                          += clock.o
->>  obj-y                          += pwm-clock.o
->>  obj-y                          += gpio.o
->> --
->> 1.6.2.5
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-samsung-
->soc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->--
->To unsubscribe from this list: send the line "unsubscribe linux-samsung-
->soc" in
->the body of a message to majordomo at vger.kernel.org
->More majordomo info at  http://vger.kernel.org/majordomo-info.html
+No need empty line.
+
+> +	if (policy->cpu)
+> +		return -EINVAL;
+> +
+> +	return cpufreq_frequency_table_verify(policy, freq_table);
+> +}
+> +
+> +static unsigned int s5pv210_getspeed(unsigned int cpu)
+> +{
+> +	unsigned long rate;
+> +
+> +	if (cpu)
+> +		return 0;
+> +
+> +	rate = clk_get_rate(mpu_clk) / 1000;
+> +
+> +	return rate;
+> +}
+> +
+> +static void s5pv210_target_APLL2MPLL(unsigned int index,
+> +		unsigned int bus_speed_changing)
+> +{
+> +	unsigned int reg;
+> +
+> +	/*
+> +	 * 1. Temporarily change divider for MFC and G3D
+> +	 * SCLKA2M(200/1=200)->(200/4=50)MHz
+> +	 */
+> +	reg = __raw_readl(S5P_CLK_DIV2);
+> +	reg &= ~(S5P_CLKDIV2_G3D_MASK | S5P_CLKDIV2_MFC_MASK);
+> +	reg |= (0x3 << S5P_CLKDIV2_G3D_SHIFT) |
+> +		(0x3 << S5P_CLKDIV2_MFC_SHIFT);
+
+How about following for reducing redundant definition?
+reg |= (0x3 << 0) | (0x3 << 4); /* G3D_SHIFT, MFC_SHIFT */
+
+Actually, you used same method in below...
++	} while (reg & ((1 << 16) | (1 << 17)));
+
+> +	if (s5pv210_workaround()) {
+
+This is just from CPU revision...not workaround.
+
+> +		/*
+> +		 * Early version does NOT have G2D
+> +		 * Do Nothing about G2D.
+> +		 */
+> +	} else {
+> +		reg &= ~S5P_CLKDIV2_G2D_MASK;
+> +		reg |= (0x2 << S5P_CLKDIV2_G2D_SHIFT);
+> +	}
+> +
+> +	__raw_writel(reg, S5P_CLK_DIV2);
+> +
+> +	/* For MFC, G3D dividing */
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_DIV_STAT0);
+> +	} while (reg & ((1 << 16) | (1 << 17)));
+
+> +
+> +	/*
+> +	 * 2. Change SCLKA2M(200MHz) to SCLKMPLL in MFC_MUX, G3D MUX
+> +	 * (100/4=50)->(667/4=166)MHz
+> +	 */
+> +	reg = __raw_readl(S5P_CLK_SRC2);
+> +	reg &= ~(S5P_CLKSRC2_G3D_MASK | S5P_CLKSRC2_MFC_MASK);
+> +	reg |= (0x1 << S5P_CLKSRC2_G3D_SHIFT) |
+> +		(0x1 << S5P_CLKSRC2_MFC_SHIFT);
+
+
+> +	if (s5pv210_workaround()) {
+
+This is not workaround...just CPU revision...
+
+> +		/*
+> +		 * Early version does NOT have G2D
+> +		 * Do Nothing about G2D.
+> +		 */
+> +	} else {
+> +		reg &= ~S5P_CLKSRC2_G2D_MASK;
+> +		reg |= (0x1 << S5P_CLKSRC2_G2D_SHIFT);
+> +	}
+> +	__raw_writel(reg, S5P_CLK_SRC2);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_MUX_STAT1);
+> +	} while (reg & ((1 << 7) | (1 << 3)));
+> +
+> +	/* 3. msys: SCLKAPLL -> SCLKMPLL */
+> +	reg = __raw_readl(S5P_CLK_SRC0);
+> +	reg &= ~(S5P_CLKSRC0_MUX200_MASK);
+> +	reg |= (0x1 << S5P_CLKSRC0_MUX200_SHIFT);
+> +	__raw_writel(reg, S5P_CLK_SRC0);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_MUX_STAT0);
+> +	} while (reg & (0x1 << 18));
+> +}
+> +
+> +static void s5pv210_target_MPLL2APLL(unsigned int index,
+> +		unsigned int bus_speed_changing)
+> +{
+> +	unsigned int reg;
+> +
+> +	/*
+> +	 * 7. Set Lock time = 30us*24MHz = 02cf (EVT1)
+> +	 * WORKAROUND: Lock time = 300us*24Mhz = 7200(0x1c20)
+> +	 * Normal:     Lock time = 30us*24Mhz = 0x2cf
+> +	 */
+> +	if (s5pv210_workaround())
+
+Same....just EVT0...not workaround.
+
+> +		__raw_writel(0x1c20, S5P_APLL_LOCK);
+> +	else
+> +		__raw_writel(0x2cf, S5P_APLL_LOCK);
+> +
+> +	/*
+> +	 * 8. Turn on APLL
+> +	 * 8-1. Set PMS values
+> +	 * 8-3. Wait until the PLL is locked
+> +	 */
+> +	if (index == L0)
+> +		/* APLL FOUT becomes 1000 Mhz */
+> +		__raw_writel(PLL45XX_APLL_VAL_1000, S5P_APLL_CON);
+> +	else
+> +		/* APLL FOUT becomes 800 Mhz */
+> +		__raw_writel(PLL45XX_APLL_VAL_800, S5P_APLL_CON);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_APLL_CON);
+> +	} while (!(reg & (0x1 << 29)));
+> +
+> +	/*
+> +	 * 9. Change source clock from SCLKMPLL(667MHz)
+> +	 * to SCLKA2M(200MHz) in MFC_MUX and G3D_MUX
+> +	 * (667/4=166)->(200/4=50)MHz
+> +	 */
+> +	reg = __raw_readl(S5P_CLK_SRC2);
+> +	reg &= ~(S5P_CLKSRC2_G3D_MASK | S5P_CLKSRC2_MFC_MASK);
+> +	reg |= (0 << S5P_CLKSRC2_G3D_SHIFT) | (0 <<
+> S5P_CLKSRC2_MFC_SHIFT);
+
+
+> +	if (s5pv210_workaround()) {
+
+Same.
+
+> +		/*
+> +		 * Early version does NOT have G2D
+> +		 * Do Nothing about G2D.
+> +		 */
+> +	} else {
+> +		reg &= ~S5P_CLKSRC2_G2D_MASK;
+> +		reg |= 0x1 << S5P_CLKSRC2_G2D_SHIFT;
+> +	}
+> +	__raw_writel(reg, S5P_CLK_SRC2);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_MUX_STAT1);
+> +	} while (reg & ((1 << 7) | (1 << 3)));
+> +
+> +	/*
+> +	 * 10. Change divider for MFC and G3D
+> +	 * (200/4=50)->(200/1=200)MHz
+> +	 */
+> +	reg = __raw_readl(S5P_CLK_DIV2);
+> +	reg &= ~(S5P_CLKDIV2_G3D_MASK | S5P_CLKDIV2_MFC_MASK);
+> +	reg |= (clkdiv_val[index][10] << S5P_CLKDIV2_G3D_SHIFT) |
+> +		(clkdiv_val[index][9] << S5P_CLKDIV2_MFC_SHIFT);
+
+
+> +	if (s5pv210_workaround()) {
+
+Same.
+
+> +		/*
+> +		 * Early version does NOT have G2D
+> +		 * Do Nothing about G2D.
+> +		 */
+> +	} else {
+> +		reg &= ~S5P_CLKDIV2_G2D_MASK;
+> +		reg |= 0x2 << S5P_CLKDIV2_G2D_SHIFT;
+> +	}
+> +	__raw_writel(reg, S5P_CLK_DIV2);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_DIV_STAT0);
+> +	} while (reg & ((1 << 16) | (1 << 17)));
+> +
+> +	/* 11. Change MPLL to APLL in MSYS_MUX */
+> +	reg = __raw_readl(S5P_CLK_SRC0);
+> +	reg &= ~(S5P_CLKSRC0_MUX200_MASK);
+> +	reg |= (0x0 << S5P_CLKSRC0_MUX200_SHIFT); /* SCLKMPLL ->
+> SCLKAPLL   */
+> +	__raw_writel(reg, S5P_CLK_SRC0);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_MUX_STAT0);
+> +	} while (reg & (0x1 << 18));
+> +}
+> +
+> +#ifdef CONFIG_PM
+> +static int no_cpufreq_access;
+> +/*
+> + * s5pv210_target: relation has an additional symantics other than
+> + * the standard
+> + * [0x30]:
+> + *	1: disable further access to target until being re-enabled.
+> + *	2: re-enable access to target */
+> +#endif
+> +static int s5pv210_target(struct cpufreq_policy *policy,
+
+s5pv210_target what?...
+
+> +		unsigned int target_freq,
+> +		unsigned int relation)
+> +{
+> +	static int initialized;
+> +	int ret = 0;
+> +	unsigned long arm_clk;
+> +	unsigned int index, reg, arm_volt, int_volt;
+> +	unsigned int pll_changing = 0;
+> +	unsigned int bus_speed_changing = 0;
+> +
+> +	cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, KERN_INFO,
+> +			"cpufreq: Entering for %dkHz\n", target_freq);
+> +#ifdef CONFIG_PM
+> +	if ((relation & ENABLE_FURTHER_CPUFREQ) &&
+> +			(relation & DISABLE_FURTHER_CPUFREQ)) {
+> +		/* Invalidate both if both marked */
+> +		relation &= ~ENABLE_FURTHER_CPUFREQ;
+> +		relation &= ~DISABLE_FURTHER_CPUFREQ;
+> +		pr_err("%s:%d denied marking \"FURTHER_CPUFREQ\""
+> +				" as both marked.\n",
+> +				__FILE__, __LINE__);
+> +	}
+> +	if (relation & ENABLE_FURTHER_CPUFREQ)
+> +		no_cpufreq_access = 0;
+> +	if (no_cpufreq_access == 1) {
+> +#ifdef CONFIG_PM_VERBOSE
+> +		pr_err("%s:%d denied access to %s as it is disabled"
+> +			       " temporarily\n", __FILE__, __LINE__,
+__func__);
+> +#endif
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +	if (relation & DISABLE_FURTHER_CPUFREQ)
+> +		no_cpufreq_access = 1;
+> +	relation &= ~MASK_FURTHER_CPUFREQ;
+> +#endif
+> +
+> +	s3c_freqs.freqs.old = s5pv210_getspeed(0);
+> +
+> +	if (cpufreq_frequency_table_target(policy, freq_table,
+> +				target_freq, relation, &index)) {
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +
+> +	arm_clk = freq_table[index].frequency;
+> +
+> +	s3c_freqs.freqs.new = arm_clk;
+> +	s3c_freqs.freqs.cpu = 0;
+> +
+> +	/*
+> +	 * Run this function unconditionally until s3c_freqs.freqs.new
+> +	 * and s3c_freqs.freqs.old are both set by this function.
+> +	 */
+> +	if (s3c_freqs.freqs.new == s3c_freqs.freqs.old &&
+> +			initialized >= 2)
+> +		return 0;
+> +	else if (initialized < 2)
+> +		initialized++;
+> +
+
+Where is initialization of 'initialized'?...
+
+> +	arm_volt = dvs_conf[index].arm_volt;
+> +	int_volt = dvs_conf[index].int_volt;
+> +
+> +	/* iNew clock information update */
+
+'iNew clock'?
+Hmm...I found this typo in the S.LSI's original code :-(
+
+> +	memcpy(&s3c_freqs.new, &clk_info[index],
+> +			sizeof(struct s3c_freq));
+> +
+> +	if (s3c_freqs.freqs.new >= s3c_freqs.freqs.old) {
+> +		/* Voltage up code: increase ARM first */
+> +		if (!IS_ERR_OR_NULL(arm_regulator) &&
+> +				!IS_ERR_OR_NULL(internal_regulator)) {
+> +			regulator_set_voltage(arm_regulator,
+> +					arm_volt, arm_volt_max);
+> +			regulator_set_voltage(internal_regulator,
+> +					int_volt, int_volt_max);
+> +		}
+> +	}
+> +	cpufreq_notify_transition(&s3c_freqs.freqs, CPUFREQ_PRECHANGE);
+> +
+> +	if (s3c_freqs.new.fclk != s3c_freqs.old.fclk || initialized < 2)
+> +		pll_changing = 1;
+> +
+> +	if (s3c_freqs.new.hclk_msys != s3c_freqs.old.hclk_msys ||
+> +			initialized < 2)
+
+Hmm...why need 'initialized' checking?
+
+> +		bus_speed_changing = 1;
+> +
+> +	/*
+> +	 * If ONEDRAM(DMC0)'s clock is getting slower, DMC0's
+> +	 * refresh counter should decrease before slowing down
+> +	 * DMC0 clock. We assume that DMC0's source clock never
+> +	 * changes. This is a temporary setting for the transition.
+> +	 * Stable setting is done at the end of this function.
+> +	 */
+
+Actually there are some S5PC110 MCP types which don't have ONEDRAM.
+...so how can distinguish it? No need check it?
+
+> +	reg = (__raw_readl(S5P_CLK_DIV6) & S5P_CLKDIV6_ONEDRAM_MASK)
+> +		>> S5P_CLKDIV6_ONEDRAM_SHIFT;
+> +	if (clkdiv_val[index][8] > reg) {
+> +		reg = backup_dmc0_reg * (reg + 1) / (clkdiv_val[index][8] +
+1);
+> +		WARN_ON(reg > 0xFFFF);
+> +		reg &= 0xFFFF;
+> +		__raw_writel(reg, S5P_VA_DMC0 + 0x30);
+> +	}
+> +
+> +	/*
+> +	 * If hclk_msys (for DMC1) is getting slower, DMC1's
+> +	 * refresh counter should decrease before slowing down
+> +	 * hclk_msys in order to get rid of glitches in the
+> +	 * transition. This is temporary setting for the transition.
+> +	 * Stable setting is done at the end of this function.
+> +	 *
+> +	 * Besides, we need to consider the case when PLL speed changes,
+> +	 * where the DMC1's source clock hclk_msys is changed from ARMCLK
+> +	 * to MPLL temporarily. DMC1 needs to be ready for this
+> +	 * transition as well.
+> +	 */
+> +	if (s3c_freqs.new.hclk_msys < s3c_freqs.old.hclk_msys) {
+> +		/*
+> +		 * hclk_msys is up to 12bit. (200000)
+> +		 * reg is 16bit. so no overflow, yet.
+> +		 *
+> +		 * May need to use div64.h later with larger hclk_msys or
+> +		 * DMCx refresh counter. But, we have bugs in do_div and
+> +		 * that should be fixed before.
+> +		 */
+> +		reg = backup_dmc1_reg * s3c_freqs.new.hclk_msys;
+> +		reg /= clk_info[backup_freq_level].hclk_msys;
+> +
+> +		/*
+> +		 * When ARM_CLK is absed on APLL->MPLL,
+> +		 * hclk_msys becomes hclk_msys *= MPLL/APLL;
+> +		 *
+> +		 * Based on the worst case scenario, we use MPLL/APLL_MAX
+> +		 * assuming that MPLL clock speed does not change.
+> +		 *
+> +		 * Multiplied first in order to reduce rounding error.
+> +		 * because reg has 15b length, using 64b should be enough to
+> +		 * prevent overflow.
+> +		 */
+> +		if (pll_changing) {
+> +			reg *= mpll_freq;
+> +			reg /= apll_freq_max;
+> +		}
+> +		WARN_ON(reg > 0xFFFF);
+> +		__raw_writel(reg & 0xFFFF, S5P_VA_DMC1 + 0x30);
+> +	}
+> +
+> +	/*
+> +	 * APLL should be changed in this level
+> +	 * APLL -> MPLL(for stable transition) -> APLL
+> +	 * Some clock source's clock API  are not prepared. Do not use clock
+> API
+> +	 * in below code.
+> +	 */
+> +	if (pll_changing)
+> +		s5pv210_target_APLL2MPLL(index, bus_speed_changing);
+> +
+> +	/* ARM MCS value changed */
+> +	if (index != L4) {
+> +		reg = __raw_readl(S5P_ARM_MCS_CON);
+> +		reg &= ~0x3;
+> +		reg |= 0x1;
+> +		__raw_writel(reg, S5P_ARM_MCS_CON);
+> +	}
+> +
+> +	reg = __raw_readl(S5P_CLK_DIV0);
+> +
+> +	reg &= ~(S5P_CLKDIV0_APLL_MASK | S5P_CLKDIV0_A2M_MASK
+> +			| S5P_CLKDIV0_HCLK200_MASK |
+> S5P_CLKDIV0_PCLK100_MASK
+> +			| S5P_CLKDIV0_HCLK166_MASK |
+> S5P_CLKDIV0_PCLK83_MASK
+> +			| S5P_CLKDIV0_HCLK133_MASK |
+> S5P_CLKDIV0_PCLK66_MASK);
+> +
+> +	reg |= ((clkdiv_val[index][0]<<S5P_CLKDIV0_APLL_SHIFT)
+> +			| (clkdiv_val[index][1] << S5P_CLKDIV0_A2M_SHIFT)
+> +			| (clkdiv_val[index][2] <<
+> S5P_CLKDIV0_HCLK200_SHIFT)
+> +			| (clkdiv_val[index][3] <<
+> S5P_CLKDIV0_PCLK100_SHIFT)
+> +			| (clkdiv_val[index][4] <<
+> S5P_CLKDIV0_HCLK166_SHIFT)
+> +			| (clkdiv_val[index][5] << S5P_CLKDIV0_PCLK83_SHIFT)
+> +			| (clkdiv_val[index][6] <<
+> S5P_CLKDIV0_HCLK133_SHIFT)
+> +			| (clkdiv_val[index][7] <<
+> S5P_CLKDIV0_PCLK66_SHIFT));
+> +
+> +	__raw_writel(reg, S5P_CLK_DIV0);
+> +
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_DIV_STAT0);
+> +	} while (reg & 0xff);
+> +
+> +	/* ARM MCS value changed */
+> +	if (index == L4) {
+> +		reg = __raw_readl(S5P_ARM_MCS_CON);
+> +		reg &= ~0x3;
+> +		reg |= 0x3;
+> +		__raw_writel(reg, S5P_ARM_MCS_CON);
+> +	}
+> +
+> +	if (pll_changing)
+> +		s5pv210_target_MPLL2APLL(index, bus_speed_changing);
+> +
+> +	/*
+> +	 * Adjust DMC0 refresh ratio according to the rate of DMC0
+> +	 * The DIV value of DMC0 clock changes and SRC value is not
+controlled.
+> +	 * We assume that no one changes SRC value of DMC0 clock, either.
+> +	 */
+> +	reg = __raw_readl(S5P_CLK_DIV6);
+> +	reg &= ~S5P_CLKDIV6_ONEDRAM_MASK;
+> +	reg |= (clkdiv_val[index][8] << S5P_CLKDIV6_ONEDRAM_SHIFT);
+> +	/* ONEDRAM(DMC0) Clock Divider Ratio: 7+1 for L4, 3+1 for Others */
+> +	__raw_writel(reg, S5P_CLK_DIV6);
+> +	do {
+> +		reg = __raw_readl(S5P_CLK_DIV_STAT1);
+> +	} while (reg & (1 << 15));
+> +
+> +	/*
+> +	 * If DMC0 clock gets slower (by orginal clock speed / n),
+> +	 * then, the refresh rate should decrease
+> +	 * (by original refresh count / n) (n: divider)
+> +	 */
+> +	reg = backup_dmc0_reg * (clkdiv_val[backup_freq_level][8] + 1)
+> +		/ (clkdiv_val[index][8] + 1);
+> +	__raw_writel(reg & 0xFFFF, S5P_VA_DMC0 + 0x30);
+> +
+> +	/*
+> +	 * Adjust DMC1 refresh ratio according to the rate of hclk_msys
+> +	 * (L0~L3: 200 <-> L4: 100)
+> +	 * If DMC1 clock gets slower (by original clock speed * n),
+> +	 * then, the refresh rate should decrease
+> +	 * (by original refresh count * n) (n : clock rate)
+> +	 */
+> +	reg = backup_dmc1_reg * clk_info[index].hclk_msys;
+> +	reg /= clk_info[backup_freq_level].hclk_msys;
+> +	__raw_writel(reg & 0xFFFF, S5P_VA_DMC1 + 0x30);
+> +
+> +	if (s3c_freqs.freqs.new < s3c_freqs.freqs.old) {
+> +		/* Voltage down: decrease INT first.*/
+> +		if (!IS_ERR_OR_NULL(arm_regulator) &&
+> +				!IS_ERR_OR_NULL(internal_regulator)) {
+> +			regulator_set_voltage(internal_regulator,
+> +					int_volt, int_volt_max);
+> +			regulator_set_voltage(arm_regulator,
+> +					arm_volt, arm_volt_max);
+> +		}
+> +	}
+> +	cpufreq_notify_transition(&s3c_freqs.freqs, CPUFREQ_POSTCHANGE);
+> +
+> +	memcpy(&s3c_freqs.old, &s3c_freqs.new, sizeof(struct s3c_freq));
+> +	cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, KERN_INFO,
+> +			"cpufreq: Performance changed[L%d]\n", index);
+> +	previous_arm_volt = dvs_conf[index].arm_volt;
+> +out:
+> +	return ret;
+> +}
+> +
+> +#ifdef CONFIG_PM
+> +static int previous_frequency;
+> +
+> +static int s5pv210_cpufreq_suspend(struct cpufreq_policy *policy,
+> +		pm_message_t pmsg)
+> +{
+> +	int ret = 0;
+> +	pr_info("cpufreq: Entering suspend.\n");
+> +
+> +	previous_frequency = cpufreq_get(0);
+> +	ret = __cpufreq_driver_target(cpufreq_cpu_get(0), SLEEP_FREQ,
+> +			DISABLE_FURTHER_CPUFREQ);
+> +	return ret;
+> +}
+> +
+> +static int s5pv210_cpufreq_resume(struct cpufreq_policy *policy)
+> +{
+> +	int ret = 0;
+> +	u32 rate;
+> +	int level = CPUFREQ_TABLE_END;
+> +	int i;
+
+Should be 'int i = 0;' for removing below 'i = 0;'
+
+> +
+> +	pr_info("cpufreq: Waking up from a suspend.\n");
+> +
+> +	__cpufreq_driver_target(cpufreq_cpu_get(0), previous_frequency,
+> +			ENABLE_FURTHER_CPUFREQ);
+> +
+> +	/* Clock information update with wakeup value */
+> +	rate = clk_get_rate(mpu_clk);
+> +
+> +	i = 0;
+
+...
+
+> +	while (freq_table[i].frequency != CPUFREQ_TABLE_END) {
+> +		if (freq_table[i].frequency * 1000 == rate) {
+> +			level = freq_table[i].index;
+> +			break;
+> +		}
+> +		i++;
+> +	}
+> +
+> +	if (level == CPUFREQ_TABLE_END) { /* Not found */
+> +		pr_err("[%s:%d] clock speed does not match: "
+> +				"%d. Using L1 of 800MHz.\n",
+> +				__FILE__, __LINE__, rate);
+> +		level = L1;
+> +	}
+> +
+> +	memcpy(&s3c_freqs.old, &clk_info[level],
+> +			sizeof(struct s3c_freq));
+> +	previous_arm_volt = dvs_conf[level].arm_volt;
+> +	return ret;
+> +}
+> +#endif
+> +
+> +static int __init s5pv210_cpu_init(struct cpufreq_policy *policy)
+
+s5pv210_cpu_init?...is this function cpu initialization?..No!
+hmm...s5pv210_cpufreq_init() is better...but used at below...
+
+...need another name for easily reading
+
+> +{
+> +	u32 rate ;
+> +	int i, level = CPUFREQ_TABLE_END;
+> +	struct clk *mpll_clk;
+> +
+> +	pr_info("S5PV210 CPUFREQ Initialising...\n");
+> +#ifdef CONFIG_PM
+> +	no_cpufreq_access = 0;
+> +#endif
+> +	mpu_clk = clk_get(NULL, "armclk");
+> +	if (IS_ERR(mpu_clk)) {
+> +		pr_err("S5PV210 CPUFREQ cannot get armclk\n");
+> +		return PTR_ERR(mpu_clk);
+> +	}
+> +
+> +	if (policy->cpu != 0) {
+> +		pr_err("S5PV210 CPUFREQ cannot get proper cpu(%d)\n",
+> +				policy->cpu);
+> +		return -EINVAL;
+> +	}
+> +	policy->cur = policy->min = policy->max = s5pv210_getspeed(0);
+> +
+> +	cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
+> +
+> +	policy->cpuinfo.transition_latency = 40000;	/* 1us */
+> +
+> +	rate = clk_get_rate(mpu_clk);
+> +	i = 0;
+> +
+i = 0?
+
+> +	while (freq_table[i].frequency != CPUFREQ_TABLE_END) {
+> +		if (freq_table[i].frequency * 1000 == rate) {
+> +			level = freq_table[i].index;
+> +			break;
+> +		}
+> +		i++;
+> +	}
+> +
+> +	if (level == CPUFREQ_TABLE_END) { /* Not found */
+> +		pr_err("[%s:%d] clock speed does not match: "
+> +				"%d. Using L1 of 800MHz.\n",
+> +				__FILE__, __LINE__, rate);
+> +		level = L1;
+> +	}
+> +
+> +	backup_dmc0_reg = __raw_readl(S5P_VA_DMC0 + 0x30) & 0xFFFF;
+> +	backup_dmc1_reg = __raw_readl(S5P_VA_DMC1 + 0x30) & 0xFFFF;
+> +	backup_freq_level = level;
+> +	mpll_clk = clk_get(NULL, "mout_mpll");
+> +	mpll_freq = clk_get_rate(mpll_clk) / 1000 / 1000; /* in MHz */
+> +	clk_put(mpll_clk);
+> +	i = 0;
+> +	do {
+> +		int index = freq_table[i].index;
+> +		if (apll_freq_max < clk_info[index].fclk)
+> +			apll_freq_max = clk_info[index].fclk;
+> +		i++;
+> +	} while (freq_table[i].frequency != CPUFREQ_TABLE_END);
+> +	apll_freq_max /= 1000; /* in MHz */
+> +
+> +	memcpy(&s3c_freqs.old, &clk_info[level],
+> +			sizeof(struct s3c_freq));
+> +	previous_arm_volt = dvs_conf[level].arm_volt;
+> +
+> +	return cpufreq_frequency_table_cpuinfo(policy, freq_table);
+> +}
+> +
+> +static struct cpufreq_driver s5pv210_driver = {
+
+s5pv210_cpufreq_driver...
+
+> +	.flags		= CPUFREQ_STICKY,
+> +	.verify		= s5pv210_verify_speed,
+> +	.target		= s5pv210_target,
+> +	.get		= s5pv210_getspeed,
+> +	.init		= s5pv210_cpu_init,
+> +	.name		= "s5pv210",
+> +#ifdef CONFIG_PM
+> +	.suspend	= s5pv210_cpufreq_suspend,
+> +	.resume		= s5pv210_cpufreq_resume,
+> +#endif
+> +};
+> +
+> +static int __init s5pv210_cpufreq_init(void)
+> +{
+> +	if (s5pv210_workaround())
+
+Same...just CPU revision...not workaround...
+
+> +		dvs_conf = dvs_conf_workaround;
+> +
+> +	arm_regulator = regulator_get_exclusive(NULL, "vddarm");
+> +	if (IS_ERR(arm_regulator)) {
+> +		pr_err("failed to get regulater resource vddarm\n");
+> +		goto error;
+> +	}
+> +	internal_regulator = regulator_get_exclusive(NULL, "vddint");
+> +	if (IS_ERR(internal_regulator)) {
+> +		pr_err("failed to get regulater resource vddint\n");
+> +		goto error;
+> +	}
+> +	goto finish;
+> +error:
+> +	pr_warn("Cannot get vddarm or vddint. CPUFREQ Will not"
+> +		       " change the voltage.\n");
+> +finish:
+> +	return cpufreq_register_driver(&s5pv210_driver);
+
+s5pv210_cpufreq_driver...
+
+> +}
+> +
+> +late_initcall(s5pv210_cpufreq_init);
+> diff --git a/arch/arm/mach-s5pv210/include/mach/cpu-freq.h
+b/arch/arm/mach-
+> s5pv210/include/mach/cpu-freq.h
+> new file mode 100644
+> index 0000000..e1a1c0c
+> --- /dev/null
+> +++ b/arch/arm/mach-s5pv210/include/mach/cpu-freq.h
+> @@ -0,0 +1,40 @@
+> +/* arch/arm/mach-s5pv210/include/mach/cpu-freq.h
+> + *
+> + * Copyright (c) 2010 Samsung Electronics
+> + *
+> + *       MyungJoo Ham <myungjoo.ham@samsung.com>
+> + *
+> + * S5PV210/S5PC110 CPU frequency scaling support
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#ifndef __ASM_ARCH_CPU_FREQ_H
+> +#define __ASM_ARCH_CPU_FREQ_H
+> +
+> +#include <linux/cpufreq.h>
+> +
+> +#define USE_FREQ_TABLE
+
+Where is this used?
+
+> +
+> +enum perf_level {
+> +	L0 = 0,
+> +	L1,
+> +	L2,
+> +	L3,
+> +	L4,
+> +};
+> +
+> +#ifdef CONFIG_PM
+> +#define SLEEP_FREQ      (800 * 1000) /* Use 800MHz when entering sleep */
+> +
+> +/* additional symantics for "relation" in cpufreq with pm */
+> +#define DISABLE_FURTHER_CPUFREQ         0x10
+> +#define ENABLE_FURTHER_CPUFREQ          0x20
+> +#define MASK_FURTHER_CPUFREQ            0x30
+> +/* With 0x00(NOCHANGE), it depends on the previous "further" status */
+> +
+> +#endif /* CONFIG_PM */
+> +
+> +#endif /* __ASM_ARCH_CPU_FREQ_H */
+> --
+
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
