@@ -1,8 +1,7 @@
 From: wjydlut@gmail.com (nonthing wu)
-Date: Tue, 27 Jul 2010 14:20:17 +0800
-Subject: Boot Filesystem form sd/mmc card, the sd/mmc driver can't probe
-	proper
-Message-ID: <AANLkTinpBh=dj2wGYXPxrogxNkp6=dpWOFLo5TQps0Ej@mail.gmail.com>
+Date: Tue, 27 Jul 2010 14:22:53 +0800
+Subject: Boot Filesystem form sd card, the sd driver can't probe proper
+Message-ID: <AANLkTinrEJAwhTc8t__buMtbhtBCc8J7FbgR2gV+qUkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -89,4 +88,4 @@ SD/MMC controller's regsiter and begin to transfer data
 I don't how to relove this problem , anybody can help me ? thanks!
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100727/49aae0be/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100727/d6b0c70e/attachment-0001.html>
