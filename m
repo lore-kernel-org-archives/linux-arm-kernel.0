@@ -1,107 +1,55 @@
-From: avorontsov@mvista.com (Anton Vorontsov)
-Date: Tue, 27 Jul 2010 21:57:10 +0400
-Subject: [PATCH resend] ARM: Small cleanup for 'config PCI'
-Message-ID: <20100727175710.GA25216@oksana.dev.rtsoft.ru>
+From: johlstei@codeaurora.org (Jeff Ohlstein)
+Date: Tue, 27 Jul 2010 11:46:38 -0700
+Subject: [PATCH v2] GIC: Dont disable INT in ack callback
+In-Reply-To: <20100724103027.GA3336@debian>
+References: <20100724103027.GA3336@debian>
+Message-ID: <1280256399-10752-1-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simply introduce ARCH_HAS_PCI to avoid the very long 'if' condition
-for PCI Kconfig symbol.
+From: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
 
-Suggested-by: Ben Dooks <ben@simtec.co.uk>
-Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
+Unless gic_ack_irq is called from __do_IRQ, interrupt should not
+be disabled in the ack function.
+
+Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
 ---
+ arch/arm/common/gic.c |   15 ---------------
+ 1 files changed, 0 insertions(+), 15 deletions(-)
 
-Just resending
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/016978.html
-
-Thanks,
-
- arch/arm/Kconfig                 |   11 ++++++++++-
- arch/arm/mach-integrator/Kconfig |    1 +
- arch/arm/mach-pxa/Kconfig        |    1 +
- arch/arm/mach-versatile/Kconfig  |    1 +
- 4 files changed, 13 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 7bc76de..5731caa 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -301,6 +301,7 @@ config ARCH_CNS3XXX
- 	select CPU_V6
- 	select GENERIC_CLOCKEVENTS
- 	select ARM_GIC
-+	select ARCH_HAS_PCI
- 	select PCI_DOMAINS if PCI
- 	help
- 	  Support for Cavium Networks CNS3XXX platform.
-@@ -436,6 +437,7 @@ config ARCH_IXP4XX
- 	select CPU_XSCALE
- 	select GENERIC_GPIO
- 	select GENERIC_CLOCKEVENTS
-+	select ARCH_HAS_PCI
- 	select DMABOUNCE if PCI
- 	help
- 	  Support for Intel's IXP4XX (XScale) family of processors.
-@@ -523,6 +525,7 @@ config ARCH_KS8695
- 	select CPU_ARM922T
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARCH_USES_GETTIMEOFFSET
-+	select ARCH_HAS_PCI
- 	help
- 	  Support for Micrel/Kendin KS8695 "Centaur" (ARM922T) based
- 	  System-on-Chip devices.
-@@ -1060,8 +1063,14 @@ config ISA_DMA
- config ISA_DMA_API
- 	bool
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 337741f..9bc6d88 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -67,25 +67,10 @@ static inline unsigned int gic_irq(unsigned int irq)
  
-+config ARCH_HAS_PCI
-+	bool
-+	help
-+	  Architectures should select this option if they want to give
-+	  user a choice to enable PCI support.
-+
- config PCI
--	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB || ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX
-+	bool "PCI support" if ARCH_HAS_PCI
- 	help
- 	  Find out whether you have a PCI motherboard. PCI is the name of a
- 	  bus system, i.e. the way the CPU talks to the other stuff inside
-diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
-index 27db275..6116308 100644
---- a/arch/arm/mach-integrator/Kconfig
-+++ b/arch/arm/mach-integrator/Kconfig
-@@ -4,6 +4,7 @@ menu "Integrator Options"
- 
- config ARCH_INTEGRATOR_AP
- 	bool "Support Integrator/AP and Integrator/PP2 platforms"
-+	select ARCH_HAS_PCI
- 	help
- 	  Include support for the ARM(R) Integrator/AP and
- 	  Integrator/PP2 platforms.
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index 3b51741..67907f0 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -96,6 +96,7 @@ config MACH_ARMCORE
- 	select PXA27x
- 	select IWMMXT
- 	select PXA25x
-+	select ARCH_HAS_PCI
- 
- config MACH_EM_X270
- 	bool "CompuLab EM-x270 platform"
-diff --git a/arch/arm/mach-versatile/Kconfig b/arch/arm/mach-versatile/Kconfig
-index c781f30..2dd4c12 100644
---- a/arch/arm/mach-versatile/Kconfig
-+++ b/arch/arm/mach-versatile/Kconfig
-@@ -4,6 +4,7 @@ menu "Versatile platform type"
- config ARCH_VERSATILE_PB
- 	bool "Support Versatile/PB platform"
- 	select CPU_ARM926T
-+	select ARCH_HAS_PCI
- 	default y
- 	help
- 	  Include support for the ARM(R) Versatile/PB platform.
+ /*
+  * Routines to acknowledge, disable and enable interrupts
+- *
+- * Linux assumes that when we're done with an interrupt we need to
+- * unmask it, in the same way we need to unmask an interrupt when
+- * we first enable it.
+- *
+- * The GIC has a separate notion of "end of interrupt" to re-enable
+- * an interrupt after handling, in order to support hardware
+- * prioritisation.
+- *
+- * We can make the GIC behave in the way that Linux expects by making
+- * our "acknowledge" routine disable the interrupt, then mark it as
+- * complete.
+  */
+ static void gic_ack_irq(unsigned int irq)
+ {
+-	u32 mask = 1 << (irq % 32);
+-
+ 	spin_lock(&irq_controller_lock);
+-	writel(mask, gic_dist_base(irq) + GIC_DIST_ENABLE_CLEAR + (gic_irq(irq) / 32) * 4);
+ 	writel(gic_irq(irq), gic_cpu_base(irq) + GIC_CPU_EOI);
+ 	spin_unlock(&irq_controller_lock);
+ }
 -- 
-1.7.0.5
+1.7.1.1
+
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
