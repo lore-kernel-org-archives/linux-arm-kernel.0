@@ -1,80 +1,94 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 27 Jul 2010 20:58:49 +0900
-Subject: [PATCH v3 3/3] sdhci-s3c: Add SDHCI_QUIRK_NO_WP_BIT quirk for
-	Samsung SoC
-In-Reply-To: <4C49871D.8030702@gmail.com>
-References: <1279886191-9197-1-git-send-email-kgene.kim@samsung.com>
-	<1279886191-9197-4-git-send-email-kgene.kim@samsung.com>
-	<4C49871D.8030702@gmail.com>
-Message-ID: <000d01cb2d83$16b7efb0$4427cf10$%kim@samsung.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 27 Jul 2010 17:30:59 +0530
+Subject: Issue with file transfers to a mass storage device on SMP	system
+In-Reply-To: <20100727104133.GA10665@n2100.arm.linux.org.uk>
+References: <00e601cb2d55$cb6253c0$808918ac@apr.dhcp.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF707@dbde02.ent.ti.com>
+	<20100727100121.GB7846@n2100.arm.linux.org.uk>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF75B@dbde02.ent.ti.com>
+	<20100727104133.GA10665@n2100.arm.linux.org.uk>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C62EF83C@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maurus Cuelenaere wrote:
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Tuesday, July 27, 2010 4:12 PM
+> To: Shilimkar, Santosh
+> Cc: Mankad, Maulik Ojas; linux-usb at vger.kernel.org; linux-
+> omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: Issue with file transfers to a mass storage device on SMP
+> system
 > 
->  Op 23-07-10 13:56, Kukjin Kim schreef:
-> > From: Hyuk Lee <hyuk1.lee@samsung.com>
-> >
-> > If host controller doesn't have WP pin which should be connnected with SDMMC
-> > card WP pin, can implement get_ro function with using the allocated gpio.
-> > In order to use this quirk wp_gpio in the platform data must be set.
-> >
-> > Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> >  drivers/mmc/host/sdhci-s3c.c |   43
-> ++++++++++++++++++++++++++++++++++++++++++
-> >  drivers/mmc/host/sdhci.c     |    3 ++
-> >  drivers/mmc/host/sdhci.h     |    3 ++
-> >  3 files changed, 49 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> > index 0d25285..0b75e57 100644
-> > --- a/drivers/mmc/host/sdhci-s3c.c
-> > +++ b/drivers/mmc/host/sdhci-s3c.c
-> > @@ -22,6 +22,7 @@
-> >
-> >  #include <linux/mmc/host.h>
-> >
-> > +#include <plat/gpio-cfg.h>
-> >  #include <plat/sdhci.h>
-> >  #include <plat/regs-sdhci.h>
-> >
-> > @@ -213,6 +214,36 @@ static void sdhci_s3c_set_clock(struct sdhci_host *host,
-> unsigned int clock)
-> >  }
-> >
-> >  /**
-> > + * sdhci_s3c_get_ro - callback for get_ro
-> > + * @host: The SDHCI host being changed
-> > + *
-> > + * If the WP pin is connected with GPIO, can get the value which indicates
-> > + * the card is locked or not.
-> > +*/
-> > +static int sdhci_s3c_get_ro(struct mmc_host *mmc)
-> > +{
-> > +	struct sdhci_s3c *sc;
-> > +	struct sdhci_host *host;
-> > +
-> > +	host = mmc_priv(mmc);
-> > +	sc = sdhci_priv(host);
+> On Tue, Jul 27, 2010 at 03:49:29PM +0530, Shilimkar, Santosh wrote:
+> > > On Tue, Jul 27, 2010 at 03:08:54PM +0530, Shilimkar, Santosh wrote:
+> > > > As discussed, the main reason is the cache maintenance isn't done on
+> > > >  "bcb->CDB"  buffers and hence the data remains in CPU write buffer
+> > > > instead of the physical memory on which DMA operates.
+> > >
+> > > struct bulk_cb_wrap {
+> > >         __le32  Signature;              /* contains 'USBC' */
+> > >         __u32   Tag;                    /* unique per command id */
+> > >         __le32  DataTransferLength;     /* size of data */
+> > >         __u8    Flags;                  /* direction in bit 0 */
+> > >         __u8    Lun;                    /* LUN normally 0 */
+> > >         __u8    Length;                 /* of of the CDB */
+> > >         __u8    CDB[16];                /* max command */
+> > > };
+> > >
+> > > So, CDB is contained within bcb...bcb+sizeof(*bcb).
+> > >
+> > > The bcb is passed to usb_stor_bulk_transfer_buf:
+> > >
+> > >         result = usb_stor_bulk_transfer_buf(us, us->send_bulk_pipe,
+> > >                                 bcb, cbwlen, NULL);
+> > >
+> > > which fills it into a URB:
+> > >
+> > >         usb_fill_bulk_urb(us->current_urb, us->pusb_dev, pipe, buf,
+> > > length,
+> > >                       usb_stor_blocking_completion, NULL);
+> > >
+> > > This sets the URB buffer pointers:
+> > >
+> > >         urb->transfer_buffer = transfer_buffer;
+> > >         urb->transfer_buffer_length = buffer_length;
+> > >
+> > > And this buffer should be dma-mapped and dma-unmapped as appropriate.
+> > >
+> > > Wasn't there an issue with the DMA mapping being used with a PIO USB
+> > > host recently?  Is that the problem here?
+> > That's correct.
+> > The last issue was otherway round where we were doing map/unmpap on PIO
+> buffer.
 > 
-> This can be done as static initializer if you reverse the order above.
+> That's exactly what I said.
 > 
-Could you please kindly explain about this?
-Sorry, I cannot get the exactly meaning...
-
-> > +
-> > +	return gpio_get_value(sc->pdata->wp_gpio);
-> > +}
+> > This issue is because "CDB[16]", is not cleaned up before merging it
+> into CBW.
 > 
-> --
+> The CDB array is part of the CBW (struct bulk_cb_wrap).  When the
+> struct bulk_cb_wrap is mapped for DMA, the CDB will also be as it
+> is contained entirely within the CBW structure.
+> 
+> As USB deals with the whole of the CBW as one block, it can't be that
+> half of it is being DMA-mapped and the other half isn't - something
+> else must be going on.  If the CDB was a separate chunk of memory, I
+> could believe what you're suggesting.
+> 
+> What we _do_ know is that 2.6.35-rc5 misses Catalin's barrier patches
+> for readl+writel, which means that there are ordering issues between
+> writing to memory and writing to devices.  This is what is going on
+> here, and it is confirmed by this:
+> 
+> | (3)Using wmb() (Write memory barrier) before starting DMA transfer in
+> MUSB
+> | driver fixes the issue.
+> 
+> from Maulik.  The fix is to have Catalin's ordered IO accessors which
+> add the wmb() internally to writel() to ensure that memory accesses
+> are visible.
+We have already those patches Russell and still see the issue. I think WMB 
+is helping because data is just 16 bytes which can reside in WB. Had it been a bigger buffer this wouldn't have worked.
 
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Will get back to you with more data on this.
