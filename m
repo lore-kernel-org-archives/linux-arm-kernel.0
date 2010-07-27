@@ -1,213 +1,796 @@
-From: thara@ti.com (Gopinath, Thara)
-Date: Tue, 27 Jul 2010 13:44:32 +0530
-Subject: [PATCH 12/20] OMAP: PM: create omap_devices for MPU, DSP, L3
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59301E7DA1E30@dbde02.ent.ti.com>
-References: <20100702152703.6221.33529.stgit@localhost.localdomain>
-	<20100702152930.6221.32877.stgit@localhost.localdomain>
-	<B85A65D85D7EB246BE421B3FB0FBB59301E7DA1E30@dbde02.ent.ti.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0323C3FADC@dbde02.ent.ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 27 Jul 2010 18:06:12 +0900
+Subject: [PATCH v2 3/8] ARM: S5PV310: Add Clock and PLL support
+In-Reply-To: <AANLkTimmkD=nrPSYmHMSDsx09ZdSZVAyz1XVBujRqf0u@mail.gmail.com>
+References: <1279270714-15146-1-git-send-email-kgene.kim@samsung.com>
+	<1279270714-15146-4-git-send-email-kgene.kim@samsung.com>
+	<AANLkTimmkD=nrPSYmHMSDsx09ZdSZVAyz1XVBujRqf0u@mail.gmail.com>
+Message-ID: <00aa01cb2d6a$fa66de60$ef349b20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+MyungJoo Ham wrote:
+> 
+> Hello,
 
+Hello,
 
->>-----Original Message-----
->>From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Basak,
->>Partha
->>Sent: Tuesday, July 27, 2010 1:07 PM
->>To: Paul Walmsley; linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->>Cc: Kevin Hilman
->>Subject: RE: [PATCH 12/20] OMAP: PM: create omap_devices for MPU, DSP, L3
->>
->>
->>
->>> -----Original Message-----
->>> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
->>> owner at vger.kernel.org] On Behalf Of Paul Walmsley
->>> Sent: Friday, July 02, 2010 9:00 PM
->>> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->>> Cc: Kevin Hilman
->>> Subject: [PATCH 12/20] OMAP: PM: create omap_devices for MPU, DSP, L3
->>>
->>> From: Kevin Hilman <khilman@deeprootsystems.com>
->>>
->>> Create simple omap_devices for the main processors and busses.
->>>
->>> This is required to support the forth-coming device-based OPP
->>> approach, where OPPs are managed and tracked at the device level.
->>>
->>> Also, move these common PM init functions into a common_pm_init call
->>> that is called as a device_initcall().  The PM init is done at this level
->>> to ensure that the driver core is initialized before initialized.
->>>
->>> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
->>> [paul at pwsan.com: sparse warnings cleaned up; newly-created functions moved
->>>  from mach-omap2/io.c to mach-omap2/pm.c; newly-created functions renamed
->>>  to start with "omap2" rather than "omap"]
->>> Signed-off-by: Paul Walmsley <paul@pwsan.com>
->>> ---
->>>  arch/arm/mach-omap2/Makefile             |    2 -
->>>  arch/arm/mach-omap2/io.c                 |    2 -
->>>  arch/arm/mach-omap2/pm.c                 |   84
->>> ++++++++++++++++++++++++++++++
->>>  arch/arm/plat-omap/include/plat/common.h |    4 +
->>>  4 files changed, 90 insertions(+), 2 deletions(-)
->>>  create mode 100644 arch/arm/mach-omap2/pm.c
->>>
->>> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
->>> index 2fa3418..213f1df 100644
->>> --- a/arch/arm/mach-omap2/Makefile
->>> +++ b/arch/arm/mach-omap2/Makefile
->>> @@ -3,7 +3,7 @@
->>>  #
->>>
->>>  # Common support
->>> -obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer-gp.o
->>> +obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer-gp.o
->>> pm.o
->>>
->>>  omap-2-3-common				= irq.o sdrc.o
->>>  hwmod-common				= omap_hwmod.o \
->>> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
->>> index 05c9cdb..2b983ac 100644
->>> --- a/arch/arm/mach-omap2/io.c
->>> +++ b/arch/arm/mach-omap2/io.c
->>> @@ -44,6 +44,7 @@
->>>
->>>  #include <plat/clockdomain.h>
->>>  #include "clockdomains.h"
->>> +
->>>  #include <plat/omap_hwmod.h>
->>>
->>>  /*
->>> @@ -346,7 +347,6 @@ void __init omap2_init_common_hw(struct
->>> omap_sdrc_params *sdrc_cs0,
->>>  	if (cpu_is_omap24xx() || cpu_is_omap34xx())   /* FIXME: OMAP4 */
->>>  		omap_hwmod_late_init(skip_setup_idle);
->>>
->>> -	omap_pm_if_init();
->>>  	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
->>>  		omap2_sdrc_init(sdrc_cs0, sdrc_cs1);
->>>  		_omap2_init_reprogram_sdrc();
->>> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
->>> new file mode 100644
->>> index 0000000..68f9f2e
->>> --- /dev/null
->>> +++ b/arch/arm/mach-omap2/pm.c
->>> @@ -0,0 +1,84 @@
->>> +/*
->>> + * pm.c - Common OMAP2+ power management-related code
->>> + *
->>> + * Copyright (C) 2010 Texas Instruments, Inc.
->>> + * Copyright (C) 2010 Nokia Corporation
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + */
->>> +
->>> +#include <linux/kernel.h>
->>> +#include <linux/init.h>
->>> +#include <linux/io.h>
->>> +#include <linux/err.h>
->>> +
->>> +#include <plat/omap-pm.h>
->>> +#include <plat/omap_device.h>
->>> +#include <plat/common.h>
->>> +
->>> +static struct omap_device_pm_latency *pm_lats;
->>> +
->>> +static struct device *mpu_dev;
->>> +static struct device *dsp_dev;
->>> +static struct device *l3_dev;
->>> +
->>> +struct device *omap2_get_mpuss_device(void)
->>> +{
->>> +	WARN_ON_ONCE(!mpu_dev);
->>> +	return mpu_dev;
->>> +}
->>> +
->>> +struct device *omap2_get_dsp_device(void)
->>> +{
->>> +	WARN_ON_ONCE(!dsp_dev);
->>> +	return dsp_dev;
->>> +}
->>> +
->>> +struct device *omap2_get_l3_device(void)
->>> +{
->>> +	WARN_ON_ONCE(!l3_dev);
->>> +	return l3_dev;
->>> +}
->>> +
->>> +/* static int _init_omap_device(struct omap_hwmod *oh, void *user) */
->>> +static int _init_omap_device(char *name, struct device **new_dev)
->>> +{
->>> +	struct omap_hwmod *oh;
->>> +	struct omap_device *od;
->>> +
->>> +	oh = omap_hwmod_lookup(name);
->>> +	if (WARN(!oh, "%s: could not find omap_hwmod for %s\n",
->>> +		 __func__, name))
->>> +		return -ENODEV;
->>> +
->>> +	od = omap_device_build(oh->name, 0, oh, NULL, 0, pm_lats, 0, false);
->>> +	if (WARN(IS_ERR(od), "%s: could not build omap_device for %s\n",
->>> +		 __func__, name))
->>> +		return -ENODEV;
->>> +
->>> +	*new_dev = &od->pdev.dev;
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +/*
->>> + * Build omap_devices for processors and bus.
->>> + */
->>> +static void omap2_init_processor_devices(void)
->>> +{
->>> +	_init_omap_device("mpu", &mpu_dev);
->>> +	_init_omap_device("iva", &dsp_dev);
->>> +	_init_omap_device("l3_main", &l3_dev);
->>
->>This breaks OMAP4 as l3_main is not applicable for OMAP4.
+> 
+> On Fri, Jul 16, 2010 at 5:58 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > From: Changhwan Youn <chaos.youn@samsung.com>
+> >
+> > This patch adds clock and pll support for S5PV310.
+> >
+> > Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> >  arch/arm/mach-s5pv310/clock.c                   |  544
+> +++++++++++++++++++++++
+> >  arch/arm/mach-s5pv310/include/mach/regs-clock.h |   60 +++
+> >  arch/arm/plat-s5p/include/plat/pll.h            |   41 ++
+> >  3 files changed, 645 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/mach-s5pv310/clock.c
+> >  create mode 100644 arch/arm/mach-s5pv310/include/mach/regs-clock.h
+> >
+> > diff --git a/arch/arm/mach-s5pv310/clock.c b/arch/arm/mach-s5pv310/clock.c
+> > new file mode 100644
+> > index 0000000..bb671d5
+> > --- /dev/null
+> > +++ b/arch/arm/mach-s5pv310/clock.c
+> > @@ -0,0 +1,544 @@
+> > +/* linux/arch/arm/mach-s5pv310/clock.c
+> > + *
+> > + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+> > + *             http://www.samsung.com/
+> > + *
+> > + * S5PV310 - Clock support
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > +*/
+> > +
+> > +#include <linux/kernel.h>
+> > +#include <linux/err.h>
+> > +#include <linux/io.h>
+> > +
+> > +#include <plat/cpu-freq.h>
+> > +#include <plat/clock.h>
+> > +#include <plat/cpu.h>
+> > +#include <plat/pll.h>
+> > +#include <plat/s5p-clock.h>
+> > +#include <plat/clock-clksrc.h>
+> > +
+> > +#include <mach/map.h>
+> > +#include <mach/regs-clock.h>
+> > +
+> > +static struct clk clk_sclk_hdmi27m = {
+> > +       .name           = "sclk_hdmi27m",
+> > +       .id             = -1,
+> > +       .rate           = 27000000,
+> > +};
+> > +
+> > +/* Core list of CMU_CPU side */
+> > +
+> > +static struct clksrc_clk clk_mout_apll = {
+> > +       .clk    = {
+> > +               .name           = "mout_apll",
+> > +               .id             = -1,
+> > +       },
+> > +       .sources        = &clk_src_apll,
+> > +       .reg_src        = { .reg = S5P_CLKSRC_CPU, .shift = 0, .size = 1 },
+> > +       .reg_div        = { .reg = S5P_CLKDIV_CPU, .shift = 24, .size = 3 },
+> > +};
+> > +
+> > +static struct clksrc_clk clk_mout_epll = {
+> > +       .clk    = {
+> > +               .name           = "mout_epll",
+> > +               .id             = -1,
+> > +       },
+> > +       .sources        = &clk_src_epll,
+> > +       .reg_src        = { .reg = S5P_CLKSRC_TOP0, .shift = 4, .size = 1 },
+> > +};
+> > +
+> > +static struct clksrc_clk clk_mout_mpll = {
+> > +       .clk = {
+> > +               .name           = "mout_mpll",
+> > +               .id             = -1,
+> > +       },
+> > +       .sources        = &clk_src_mpll,
+> > +       .reg_src        = { .reg = S5P_CLKSRC_CPU, .shift = 4, .size = 1 },
+> > +};
+> 
+> S5P_CLKSRC_CPU[4] is not described in the user manual (it's
+> "Reserved"). Is it "undocumented", "typographical error" in manual, or
+> "typographical error" in the source code? If the user manual is
+> correct, it appears to have the shift value of 8.
+> 
+Yeah, you're right....typo...will fix it.
 
-For OMAP4 we need to add a check and make it "l3_main_1". I have done this as part
-of DVFS support on OMAP4. Will be posting it out in sometime.
+> > +
+> > +static struct clk *clkset_moutcore_list[] = {
+> > +       [0] = &clk_mout_apll.clk,
+> > +       [1] = &clk_mout_mpll.clk,
+> > +};
+> > +
+> > +static struct clksrc_sources clkset_moutcore = {
+> > +       .sources        = clkset_moutcore_list,
+> > +       .nr_sources     = ARRAY_SIZE(clkset_moutcore_list),
+> > +};
+> > +
+> > +static struct clksrc_clk clk_moutcore = {
+> > +       .clk    = {
+> > +               .name           = "moutcore",
+> > +               .id             = -1,
+> > +       },
+> > +       .sources        = &clkset_moutcore,
+> > +       .reg_src        = { .reg = S5P_CLKSRC_CPU, .shift = 16, .size = 1 },
+> > +};
+> > +
+> > +static struct clksrc_clk clk_coreclk = {
+> > +       .clk    = {
+> > +               .name           = "core_clk",
+> > +               .id             = -1,
+> > +               .parent         = &clk_moutcore.clk,
+> > +       },
+> > +       .reg_div        = { .reg = S5P_CLKDIV_CPU, .shift = 0, .size = 3 },
+> > +};
+> > +
+> > +static struct clksrc_clk clk_armclk = {
+> > +       .clk    = {
+> > +               .name           = "armclk",
+> > +               .id             = -1,
+> > +               .parent         = &clk_coreclk.clk,
+> > +       },
+> > +};
+> > +
+> > +static struct clksrc_clk clk_aclk_corem0 = {
+> > +       .clk    = {
+> > +               .name           = "aclk_corem0",
+> > +               .id             = -1,
+> > +               .parent         = &clk_coreclk.clk,
+> > +       },
+> > +       .reg_div        = { .reg = S5P_CLKDIV_CPU, .shift = 4, .size = 3 },
+> > +};
+> > +
+> > +static struct clksrc_clk clk_aclk_cores = {
+> > +       .clk    = {
+> > +               .name           = "aclk_cores",
+> > +               .id             = -1,
+> > +               .parent         = &clk_coreclk.clk,
+> > +       },
+> > +       .reg_div        = { .reg = S5P_CLKDIV_CPU, .shift = 4, .size = 3 },
+> > +};
+> 
+> We have two clock definitions that are identical, "aclk_corem0" and
+> "aclk_cores". Is there any reason to define the same clock source
+> twice? Although this is not going to make lockup/deadlock issues due
+> to duplicated clocks as long as there are no enable/disable functions
+> attached, these two may still suffer from inconsistency due to the
+> updates (on DIV) from each other.
+> 
+> In the clock diagram, ACLK_COREM0 and ACLK_CORES are getting the same
+> clock from DIV_COREM0. In such a case, it'd be better let
+> clk_aclk_corem0 and clk_aclk_cores be children of a source clock of
+> DIV_corem0 or aclk_cores be a child of aclk_corem0 unless we can
+> guarantee that at least one of corem0 and cores will _never_ write to
+> S5P_CLKDIV_CPU.
+> 
+> Please note that with the common struct clk that provides one lock per
+> clock combined with SMP support of S5PV310, we can suffer from
+> inconsistency due to parallelism in clock related values. For example,
+> updating DIV value of corem0 may happen in the middle of
+> reading/updating cores's DIV value. We can prevent such actions by
+> locking more widely (the whole section of clk_get_rate and
+> clk_set_rate with a global lock); however, this may affect the
+> efficiency greatly especially in SMP machines.
+> 
+Actually, there are own purpose...so we need to separate them.
+But used same divider because there is no case that need to set up different each clock rate.
 
-Regards
-Thara
->>> +}
->>> +
->>> +static int __init omap2_common_pm_init(void)
->>> +{
->>> +	omap2_init_processor_devices();
->>> +	omap_pm_if_init();
->>> +
->>> +	return 0;
->>> +}
->>> +device_initcall(omap2_common_pm_init);
->>> +
->>> diff --git a/arch/arm/plat-omap/include/plat/common.h b/arch/arm/plat-
->>> omap/include/plat/common.h
->>> index 5e4afbe..5cf9509 100644
->>> --- a/arch/arm/plat-omap/include/plat/common.h
->>> +++ b/arch/arm/plat-omap/include/plat/common.h
->>> @@ -89,4 +89,8 @@ void omap2_set_globals_uart(struct omap_globals *);
->>>  	}							\
->>>  })
->>>
->>> +extern struct device *omap2_get_mpuss_device(void);
->>> +extern struct device *omap2_get_dsp_device(void);
->>> +extern struct device *omap2_get_l3_device(void);
->>> +
->>>  #endif /* __ARCH_ARM_MACH_OMAP_COMMON_H */
->>>
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>?{.n?+???????+%??lzwm??b????r??zX??&j??????}????z?&j:+v???
-????zZ+??+zf???h???~????i???z?
-?w??????
->>??&?)?f
+> > +
+> > +static struct clksrc_clk clk_aclk_corem1 = {
+> > +       .clk    = {
+> > +               .name           = "aclk_corem1",
+> > +               .id             = -1,
+> > +               .parent         = &clk_coreclk.clk,
+> > +       },
+> > +       .reg_div        = { .reg = S5P_CLKDIV_CPU, .shift = 8, .size = 3 },
+> > +};
+> > +
+> > +static struct clksrc_clk clk_periph = {
+> > +       .clk    = {
+> > +               .name           = "periph",
+> > +               .id             = -1,
+> > +               .parent         = &clk_coreclk.clk,
+> > +       },
+> > +       .reg_div        = { .reg = S5P_CLKDIV_CPU, .shift = 12, .size = 3 },
+> > +};
+> > +
+> > +static struct clksrc_clk clk_atbout = {
+> > +       .clk    = {
+> > +               .name           = "atbout",
+> > +               .id             = -1,
+> > +               .parent         = &clk_moutcore.clk,
+> > +       },
+> > +       .reg_div        = { .reg = S5P_CLKDIV_CPU, .shift = 16, .size = 3 },
+> > +};
+> > +
+> > +static struct clksrc_clk clk_pclk_dbg = {
+> > +       .clk    = {
+> > +               .name           = "pclk_dbg",
+> > +               .id             = -1,
+> > +               .parent         = &clk_atbout.clk,
+> > +       },
+> > +       .reg_div        = { .reg = S5P_CLKDIV_CPU, .shift = 20, .size = 3 },
+> > +};
+> > +
+> > +/* Core list of CMU_CORE side */
+> > +
+> > +static struct clk *clkset_corebus_list[] = {
+> > +       [0] = &clk_mout_mpll.clk,
+> > +       [1] = &clk_mout_apll.clk,
+> > +};
+> > +
+> > +static struct clksrc_sources clkset_mout_corebus = {
+> > +       .sources        = clkset_corebus_list,
+> > +       .nr_sources     = ARRAY_SIZE(clkset_corebus_list),
+> > +};
+> > +
+> > +static struct clksrc_clk clk_mout_corebus = {
+> > +       .clk    = {
+> > +               .name           = "mout_corebus",
+> > +               .id             = -1,
+> > +       },
+> > +       .sources        = &clkset_mout_corebus,
+> > +       .reg_src        = { .reg = S5P_CLKSRC_CPU, .shift = 4, .size = 1 },
+> > +};
+> 
+> The clock, "mout_corebus", appears to be either duplicated (another
+> instance of S5P_CLKSRC_CPU[4]) or mistyped. Besides, "moutcore" is
+> already defined with a shift value of 16 and sources with
+> clkset_moutcore. Did you intend to define
+> MUX_HPM_SEL(CLK_SRC_CPU[20]), which is the only bit that is not
+> defined yet with CLK_SRC_CPU.
+> 
+yeah, should be 16...will fix it.
+
+> > +
+> > +static struct clksrc_clk clk_sclk_dmc = {
+> > +       .clk    = {
+> > +               .name           = "sclk_dmc",
+> > +               .id             = -1,
+> > +               .parent         = &clk_mout_corebus.clk,
+> 
+> ==> clk_moutcore.clk?
+> 
+Please refer to below explain.
+
+> > +       },
+> > +       .reg_div        = { .reg = S5P_CLKDIV_CORE0, .shift = 12, .size = 3 },
+> > +};
+> > +
+> > +static struct clksrc_clk clk_aclk_cored = {
+> > +       .clk    = {
+> > +               .name           = "aclk_cored",
+> > +               .id             = -1,
+> > +               .parent         = &clk_sclk_dmc.clk,
+> > +       },
+> > +       .reg_div        = { .reg = S5P_CLKDIV_CORE0, .shift = 16, .size = 3 },
+> > +};
+> > +
+> > +static struct clksrc_clk clk_aclk_corep = {
+> > +       .clk    = {
+> > +               .name           = "aclk_corep",
+> > +               .id             = -1,
+> > +               .parent         = &clk_aclk_cored.clk,
+> > +       },
+> > +       .reg_div        = { .reg = S5P_CLKDIV_CORE0, .shift = 20, .size = 3 },
+> > +};
+> > +
+> > +static struct clksrc_clk clk_aclk_acp = {
+> > +       .clk    = {
+> > +               .name           = "aclk_acp",
+> > +               .id             = -1,
+> > +               .parent         = &clk_mout_corebus.clk,
+> 
+> ==> clk_moutcore.clk?
+
+The parent of clock 'clk_aclk_acp' is clk_mout_corebus.
+The clock 'clk_moutcore' is in ohter domain, CMU_CPU.
+
+> 
+> > +       },
+> > +       .reg_div        = { .reg = S5P_CLKDIV_CORE0, .shift = 0, .size = 3 },
+> > +};
+> > +
+> > +static struct clksrc_clk clk_pclk_acp = {
+> > +       .clk    = {
+> > +               .name           = "pclk_acp",
+> > +               .id             = -1,
+> > +               .parent         = &clk_aclk_acp.clk,
+> > +       },
+> > +       .reg_div        = { .reg = S5P_CLKDIV_CORE0, .shift = 4, .size = 3 },
+> > +};
+> > +
+> > +/* Core list of CMU_TOP side */
+> > +
+> > +static struct clk *clkset_aclk_top_list[] = {
+> > +       [0] = &clk_mout_mpll.clk,
+> > +       [1] = &clk_mout_apll.clk,
+> > +};
+> > +
+> > +static struct clksrc_sources clkset_aclk_200 = {
+> > +       .sources        = clkset_aclk_top_list,
+> > +       .nr_sources     = ARRAY_SIZE(clkset_aclk_top_list),
+> > +};
+> > +
+> > +static struct clksrc_clk clk_aclk_200 = {
+> > +       .clk    = {
+> > +               .name           = "aclk_200",
+> > +               .id             = -1,
+> > +       },
+> > +       .sources        = &clkset_aclk_200,
+> > +       .reg_src        = { .reg = S5P_CLKSRC_TOP0, .shift = 12, .size = 1 },
+> > +       .reg_div        = { .reg = S5P_CLKDIV_TOP, .shift = 0, .size = 3 },
+> > +};
+> > +
+> > +static struct clksrc_sources clkset_aclk_100 = {
+> > +       .sources        = clkset_aclk_top_list,
+> > +       .nr_sources     = ARRAY_SIZE(clkset_aclk_top_list),
+> > +};
+> 
+> clkset_aclk_200 and clkset_aclk_100 are the same.
+> 
+Each clock 'aclk_xxx' has own clock rate for supporting bus clock.
+So...it differs.
+
+> > +
+> > +static struct clksrc_clk clk_aclk_100 = {
+> > +       .clk    = {
+> > +               .name           = "aclk_100",
+> > +               .id             = -1,
+> > +       },
+> > +       .sources        = &clkset_aclk_100,
+> > +       .reg_src        = { .reg = S5P_CLKSRC_TOP0, .shift = 16, .size = 1 },
+> > +       .reg_div        = { .reg = S5P_CLKDIV_TOP, .shift = 4, .size = 4 },
+> > +};
+> > +
+> > +static struct clksrc_sources clkset_aclk_160 = {
+> > +       .sources        = clkset_aclk_top_list,
+> > +       .nr_sources     = ARRAY_SIZE(clkset_aclk_top_list),
+> > +};
+> 
+> clkset_aclk_160 is also same with _200 and _100.
+> 
+already explained.
+
+> > +
+> > +static struct clksrc_clk clk_aclk_160 = {
+> > +       .clk    = {
+> > +               .name           = "aclk_160",
+> > +               .id             = -1,
+> > +       },
+> > +       .sources        = &clkset_aclk_160,
+> > +       .reg_src        = { .reg = S5P_CLKSRC_TOP0, .shift = 20, .size = 1 },
+> > +       .reg_div        = { .reg = S5P_CLKDIV_TOP, .shift = 8, .size = 3 },
+> > +};
+> > +
+> > +static struct clksrc_sources clkset_aclk_133 = {
+> > +       .sources        = clkset_aclk_top_list,
+> > +       .nr_sources     = ARRAY_SIZE(clkset_aclk_top_list),
+> > +};
+> 
+> clkset_aclk_133 is also same with _200, _100, and _160.
+> 
+already explained.
+
+> > +
+> > +static struct clksrc_clk clk_aclk_133 = {
+> > +       .clk    = {
+> > +               .name           = "aclk_133",
+> > +               .id             = -1,
+> > +       },
+> > +       .sources        = &clkset_aclk_133,
+> > +       .reg_src        = { .reg = S5P_CLKSRC_TOP0, .shift = 24, .size = 1 },
+> > +       .reg_div        = { .reg = S5P_CLKDIV_TOP, .shift = 12, .size = 3 },
+> > +};
+> > +
+> > +static struct clk *clkset_vpllsrc_list[] = {
+> > +       [0] = &clk_fin_vpll,
+> > +       [1] = &clk_sclk_hdmi27m,
+> > +};
+> > +
+> > +static struct clksrc_sources clkset_vpllsrc = {
+> > +       .sources        = clkset_vpllsrc_list,
+> > +       .nr_sources     = ARRAY_SIZE(clkset_vpllsrc_list),
+> > +};
+> > +
+> > +static struct clksrc_clk clk_vpllsrc = {
+> > +       .clk    = {
+> > +               .name           = "vpll_src",
+> > +               .id             = -1,
+> > +       },
+> > +       .sources        = &clkset_vpllsrc,
+> > +       .reg_src        = { .reg = S5P_CLKSRC_TOP0, .shift = 0, .size = 1 },
+> > +};
+> 
+> In the user manual, CLKSRC_TOP0[0] is "Reserved". It appears that the
+> .reg field should be "S5P_CLKSRC_TOP1", not "TOP0".
+
+will fix it.
+
+> 
+> > +
+> > +static struct clk *clkset_sclk_vpll_list[] = {
+> > +       [0] = &clk_vpllsrc.clk,
+> > +       [1] = &clk_fout_vpll,
+> > +};
+> > +
+> > +static struct clksrc_sources clkset_sclk_vpll = {
+> > +       .sources        = clkset_sclk_vpll_list,
+> > +       .nr_sources     = ARRAY_SIZE(clkset_sclk_vpll_list),
+> > +};
+> > +
+> > +static struct clksrc_clk clk_sclk_vpll = {
+> > +       .clk    = {
+> > +               .name           = "sclk_vpll",
+> > +               .id             = -1,
+> > +       },
+> > +       .sources        = &clkset_sclk_vpll,
+> > +       .reg_src        = { .reg = S5P_CLKSRC_TOP0, .shift = 8, .size = 1 },
+> > +};
+> > +
+> > +static int s5pv310_clk_ip_peril_ctrl(struct clk *clk, int enable)
+> > +{
+> > +       return s5p_gatectrl(S5P_CLKGATE_IP_PERIL, clk, enable);
+> > +}
+> > +
+> > +static struct clk init_clocks_disable[] = {
+> > +       {
+> > +               .name           = "timers",
+> > +               .id             = -1,
+> > +               .parent         = &clk_aclk_100.clk,
+> > +               .enable         = s5pv310_clk_ip_peril_ctrl,
+> > +               .ctrlbit        = (1<<24),
+> > +       }
+> > +};
+> > +
+> > +static struct clk init_clocks[] = {
+> > +       /* Nothing here yet */
+> > +};
+> > +
+> > +static struct clk *clkset_group_list[] = {
+> > +       [0] = &clk_ext_xtal_mux,
+> > +       [1] = &clk_xusbxti,
+> > +       [2] = &clk_sclk_hdmi27m,
+> > +       [6] = &clk_mout_mpll.clk,
+> > +       [7] = &clk_mout_epll.clk,
+> > +       [8] = &clk_sclk_vpll.clk,
+> > +};
+> > +
+> > +static struct clksrc_sources clkset_group = {
+> > +       .sources        = clkset_group_list,
+> > +       .nr_sources     = ARRAY_SIZE(clkset_group_list),
+> > +};
+> > +
+> > +static struct clksrc_clk clksrcs[] = {
+> > +       {
+> > +               .clk    = {
+> > +                       .name           = "uclk1",
+> > +                       .id             = 0,
+> > +                       .ctrlbit        = (1 << 0),
+> > +                       .enable         = s5pv310_clk_ip_peril_ctrl,
+> > +               },
+> > +               .sources = &clkset_group,
+> > +               .reg_src = { .reg = S5P_CLKSRC_PERIL0, .shift = 0, .size = 4 },
+> > +               .reg_div = { .reg = S5P_CLKDIV_PERIL0, .shift = 0, .size = 4 },
+> > +       }, {
+> > +               .clk            = {
+> > +                       .name           = "uclk1",
+> > +                       .id             = 1,
+> > +                       .enable         = s5pv310_clk_ip_peril_ctrl,
+> > +                       .ctrlbit        = (1 << 1),
+> > +               },
+> > +               .sources = &clkset_group,
+> > +               .reg_src = { .reg = S5P_CLKSRC_PERIL0, .shift = 4, .size = 4 },
+> > +               .reg_div = { .reg = S5P_CLKDIV_PERIL0, .shift = 4, .size = 4 },
+> > +       }, {
+> > +               .clk            = {
+> > +                       .name           = "uclk1",
+> > +                       .id             = 2,
+> > +                       .enable         = s5pv310_clk_ip_peril_ctrl,
+> > +                       .ctrlbit        = (1 << 2),
+> > +               },
+> > +               .sources = &clkset_group,
+> > +               .reg_src = { .reg = S5P_CLKSRC_PERIL0, .shift = 8, .size = 4 },
+> > +               .reg_div = { .reg = S5P_CLKDIV_PERIL0, .shift = 8, .size = 4 },
+> > +       }, {
+> > +               .clk            = {
+> > +                       .name           = "uclk1",
+> > +                       .id             = 3,
+> > +                       .enable         = s5pv310_clk_ip_peril_ctrl,
+> > +                       .ctrlbit        = (1 << 3),
+> > +               },
+> > +               .sources = &clkset_group,
+> > +               .reg_src = { .reg = S5P_CLKSRC_PERIL0, .shift = 12, .size = 4 },
+> > +               .reg_div = { .reg = S5P_CLKDIV_PERIL0, .shift = 12, .size = 4 },
+> > +       }, {
+> > +               .clk            = {
+> > +                       .name           = "sclk_pwm",
+> > +                       .id             = -1,
+> > +                       .enable         = s5pv310_clk_ip_peril_ctrl,
+> > +                       .ctrlbit        = (1 << 24),
+> > +               },
+> > +               .sources = &clkset_group,
+> > +               .reg_src = { .reg = S5P_CLKSRC_PERIL0, .shift = 24, .size = 4 },
+> > +               .reg_div = { .reg = S5P_CLKDIV_PERIL3, .shift = 0, .size = 4 },
+> > +       },
+> > +};
+> > +
+> > +/* Clock initialization code */
+> > +static struct clksrc_clk *sysclks[] = {
+> > +       &clk_mout_apll,
+> > +       &clk_mout_epll,
+> > +       &clk_mout_mpll,
+> > +       &clk_moutcore,
+> > +       &clk_coreclk,
+> > +       &clk_armclk,
+> > +       &clk_aclk_corem0,
+> > +       &clk_aclk_cores,
+> > +       &clk_aclk_corem1,
+> > +       &clk_periph,
+> > +       &clk_atbout,
+> > +       &clk_pclk_dbg,
+> > +       &clk_mout_corebus,
+> > +       &clk_sclk_dmc,
+> > +       &clk_aclk_cored,
+> > +       &clk_aclk_corep,
+> > +       &clk_aclk_acp,
+> > +       &clk_pclk_acp,
+> > +       &clk_vpllsrc,
+> > +       &clk_sclk_vpll,
+> > +       &clk_aclk_200,
+> > +       &clk_aclk_100,
+> > +       &clk_aclk_160,
+> > +       &clk_aclk_133,
+> > +};
+> > +
+> > +void __init_or_cpufreq s5pv310_setup_clocks(void)
+> > +{
+> > +       struct clk *xtal_clk;
+> > +       unsigned long apll;
+> > +       unsigned long mpll;
+> > +       unsigned long epll;
+> > +       unsigned long vpll;
+> > +       unsigned long vpllsrc;
+> > +       unsigned long xtal;
+> > +       unsigned long armclk;
+> > +       unsigned long aclk_corem0;
+> > +       unsigned long aclk_cores;
+> > +       unsigned long aclk_corem1;
+> > +       unsigned long periclk;
+> > +       unsigned long sclk_dmc;
+> > +       unsigned long aclk_cored;
+> > +       unsigned long aclk_corep;
+> > +       unsigned long aclk_acp;
+> > +       unsigned long pclk_acp;
+> > +       unsigned int ptr;
+> > +
+> > +       printk(KERN_DEBUG "%s: registering clocks\n", __func__);
+> > +
+> > +       xtal_clk = clk_get(NULL, "xtal");
+> > +       BUG_ON(IS_ERR(xtal_clk));
+> > +
+> > +       xtal = clk_get_rate(xtal_clk);
+> > +       clk_put(xtal_clk);
+> > +
+> > +       printk(KERN_DEBUG "%s: xtal is %ld\n", __func__, xtal);
+> > +
+> > +       apll = s5p_get_pll45xx(xtal, __raw_readl(S5P_APLL_CON0), pll_4508);
+> > +       mpll = s5p_get_pll45xx(xtal, __raw_readl(S5P_MPLL_CON0), pll_4508);
+> > +       epll = s5p_get_pll46xx(xtal, __raw_readl(S5P_EPLL_CON0),
+> > +                               __raw_readl(S5P_EPLL_CON1), pll_4500);
+> > +
+> > +       vpllsrc = clk_get_rate(&clk_vpllsrc.clk);
+> > +       vpll = s5p_get_pll46xx(vpllsrc, __raw_readl(S5P_VPLL_CON0),
+> > +                               __raw_readl(S5P_VPLL_CON1), pll_4502);
+> > +
+> > +       clk_fout_apll.rate = apll;
+> > +       clk_fout_mpll.rate = mpll;
+> > +       clk_fout_epll.rate = epll;
+> > +       clk_fout_vpll.rate = vpll;
+> > +
+> > +       printk(KERN_INFO "S5PV310: PLL settings, A=%ld, M=%ld, E=%ld
+> V=%ld",
+> > +                       apll, mpll, epll, vpll);
+> > +
+> > +       armclk = clk_get_rate(&clk_armclk.clk);
+> > +       aclk_corem0 = clk_get_rate(&clk_aclk_corem0.clk);
+> > +       aclk_cores = clk_get_rate(&clk_aclk_cores.clk);
+> > +       aclk_corem1 = clk_get_rate(&clk_aclk_corem1.clk);
+> > +       periclk = clk_get_rate(&clk_periph.clk);
+> > +       sclk_dmc = clk_get_rate(&clk_sclk_dmc.clk);
+> > +       aclk_cored = clk_get_rate(&clk_aclk_cored.clk);
+> > +       aclk_corep = clk_get_rate(&clk_aclk_corep.clk);
+> > +       aclk_acp = clk_get_rate(&clk_aclk_acp.clk);
+> > +       pclk_acp = clk_get_rate(&clk_pclk_acp.clk);
+> > +
+> > +       printk(KERN_INFO "S5PV310: ARMCLK=%ld, COREM0=%ld,
+> CORES=%ld\n"
+> > +                        "COREM1=%ld, PERI=%ld, DMC=%ld, CORED=%ld\n"
+> > +                        "COREP=%ld, ACLK_ACP=%ld, PCLK_ACP=%ld",
+> > +                       armclk, aclk_corem0, aclk_cores, aclk_corem1,
+> > +                       periclk, sclk_dmc, aclk_cored, aclk_corep,
+> > +                       aclk_acp, pclk_acp);
+> > +
+> > +       clk_f.rate = armclk;
+> > +       clk_h.rate = sclk_dmc;
+> > +       clk_p.rate = periclk;
+> > +
+> > +       for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
+> > +               s3c_set_clksrc(&clksrcs[ptr], true);
+> > +}
+> > +
+> > +static struct clk *clks[] __initdata = {
+> > +       /* Nothing here yet */
+> > +};
+> > +
+> > +void __init s5pv310_register_clocks(void)
+> > +{
+> > +       struct clk *clkp;
+> > +       int ret;
+> > +       int ptr;
+> > +
+> > +       ret = s3c24xx_register_clocks(clks, ARRAY_SIZE(clks));
+> > +       if (ret > 0)
+> > +               printk(KERN_ERR "Failed to register %u clocks\n", ret);
+> > +
+> > +       for (ptr = 0; ptr < ARRAY_SIZE(sysclks); ptr++)
+> > +               s3c_register_clksrc(sysclks[ptr], 1);
+> > +
+> > +       s3c_register_clksrc(clksrcs, ARRAY_SIZE(clksrcs));
+> > +       s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
+> > +
+> > +       clkp = init_clocks_disable;
+> > +       for (ptr = 0; ptr < ARRAY_SIZE(init_clocks_disable); ptr++, clkp++) {
+> > +               ret = s3c24xx_register_clock(clkp);
+> > +               if (ret < 0) {
+> > +                       printk(KERN_ERR "Failed to register clock %s (%d)\n",
+> > +                              clkp->name, ret);
+> > +               }
+> > +               (clkp->enable)(clkp, 0);
+> > +       }
+> > +
+> > +       s3c_pwmclk_init();
+> > +}
+> > diff --git a/arch/arm/mach-s5pv310/include/mach/regs-clock.h b/arch/arm/mach-
+> s5pv310/include/mach/regs-clock.h
+> > new file mode 100644
+> > index 0000000..77f637f
+> > --- /dev/null
+> > +++ b/arch/arm/mach-s5pv310/include/mach/regs-clock.h
+> > @@ -0,0 +1,60 @@
+> > +/* linux/arch/arm/mach-s5pv310/include/mach/regs-clock.h
+> > + *
+> > + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+> > + *             http://www.samsung.com/
+> > + *
+> > + * S5PV310 - Clock register definitions
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > +*/
+> > +
+> > +#ifndef __ASM_ARCH_REGS_CLOCK_H
+> > +#define __ASM_ARCH_REGS_CLOCK_H __FILE__
+> > +
+> > +#include <mach/map.h>
+> > +
+> > +#define S5P_CLKREG(x)                  (S3C_VA_SYS + (x))
+> > +
+> > +#define S5P_INFORM0                    S5P_CLKREG(0x800)
+> > +
+> > +#define S5P_EPLL_CON0                  S5P_CLKREG(0x1C110)
+> > +#define S5P_EPLL_CON1                  S5P_CLKREG(0x1C114)
+> > +#define S5P_VPLL_CON0                  S5P_CLKREG(0x1C120)
+> > +#define S5P_VPLL_CON1                  S5P_CLKREG(0x1C124)
+> > +
+> > +#define S5P_CLKSRC_TOP0                        S5P_CLKREG(0x1C210)
+> > +#define S5P_CLKSRC_TOP1                        S5P_CLKREG(0x1C214)
+> > +
+> > +#define S5P_CLKSRC_PERIL0              S5P_CLKREG(0x1C250)
+> > +
+> > +#define S5P_CLKDIV_TOP                 S5P_CLKREG(0x1C510)
+> > +
+> > +#define S5P_CLKDIV_PERIL0              S5P_CLKREG(0x1C550)
+> > +#define S5P_CLKDIV_PERIL1              S5P_CLKREG(0x1C554)
+> > +#define S5P_CLKDIV_PERIL2              S5P_CLKREG(0x1C558)
+> > +#define S5P_CLKDIV_PERIL3              S5P_CLKREG(0x1C55C)
+> > +#define S5P_CLKDIV_PERIL4              S5P_CLKREG(0x1C560)
+> > +#define S5P_CLKDIV_PERIL5              S5P_CLKREG(0x1C564)
+> > +
+> > +#define S5P_CLKGATE_IP_PERIL           S5P_CLKREG(0x1C950)
+> > +
+> > +#define S5P_CLKDIV_CORE0               S5P_CLKREG(0x20500)
+> > +
+> > +#define S5P_APLL_LOCK                  S5P_CLKREG(0x24000)
+> > +#define S5P_MPLL_LOCK                  S5P_CLKREG(0x24004)
+> > +#define S5P_APLL_CON0                  S5P_CLKREG(0x24100)
+> > +#define S5P_APLL_CON1                  S5P_CLKREG(0x24104)
+> > +#define S5P_MPLL_CON0                  S5P_CLKREG(0x24108)
+> > +#define S5P_MPLL_CON1                  S5P_CLKREG(0x2410C)
+> > +
+> > +#define S5P_CLKSRC_CPU                 S5P_CLKREG(0x24200)
+> > +#define S5P_CLKMUX_STATCPU             S5P_CLKREG(0x24400)
+> > +
+> > +#define S5P_CLKDIV_CPU                 S5P_CLKREG(0x24500)
+> > +#define S5P_CLKDIV_STATCPU             S5P_CLKREG(0x24600)
+> > +
+> > +#define S5P_CLKGATE_SCLKCPU            S5P_CLKREG(0x24800)
+> > +
+> > +#endif /* __ASM_ARCH_REGS_CLOCK_H */
+> > diff --git a/arch/arm/plat-s5p/include/plat/pll.h b/arch/arm/plat-
+> s5p/include/plat/pll.h
+> > index 7db3227..4e8fe08 100644
+> > --- a/arch/arm/plat-s5p/include/plat/pll.h
+> > +++ b/arch/arm/plat-s5p/include/plat/pll.h
+> > @@ -46,6 +46,47 @@ static inline unsigned long s5p_get_pll45xx(unsigned long
+> baseclk, u32 pll_con,
+> >        return (unsigned long)fvco;
+> >  }
+> >
+> > +#define PLL46XX_KDIV_MASK      (0xFFFF)
+> > +#define PLL46XX_MDIV_MASK      (0x1FF)
+> > +#define PLL46XX_PDIV_MASK      (0x3F)
+> > +#define PLL46XX_SDIV_MASK      (0x7)
+> > +#define PLL46XX_MDIV_SHIFT     (16)
+> > +#define PLL46XX_PDIV_SHIFT     (8)
+> > +#define PLL46XX_SDIV_SHIFT     (0)
+> > +
+> > +enum pll46xx_type_t {
+> > +       pll_4600,
+> > +       pll_4650,
+> > +};
+> > +
+> > +static inline unsigned long s5p_get_pll46xx(unsigned long baseclk,
+> > +                                           u32 pll_con0, u32 pll_con1,
+> > +                                           enum pll46xx_type_t pll_type)
+> > +{
+> > +       unsigned long result;
+> > +       u32 mdiv, pdiv, sdiv, kdiv;
+> > +       u64 tmp;
+> > +
+> > +       mdiv = (pll_con0 >> PLL46XX_MDIV_SHIFT) & PLL46XX_MDIV_MASK;
+> > +       pdiv = (pll_con0 >> PLL46XX_PDIV_SHIFT) & PLL46XX_PDIV_MASK;
+> > +       sdiv = (pll_con0 >> PLL46XX_SDIV_SHIFT) & PLL46XX_SDIV_MASK;
+> > +       kdiv = pll_con1 & PLL46XX_KDIV_MASK;
+> > +
+> > +       tmp = baseclk;
+> > +
+> > +       if (pll_type == pll_4600) {
+> > +               tmp *= (mdiv << 16) + kdiv;
+> > +               do_div(tmp, (pdiv << sdiv));
+> > +               result = tmp >> 16;
+> > +       } else {
+> > +               tmp *= (mdiv << 10) + kdiv;
+> > +               do_div(tmp, (pdiv << sdiv));
+> > +               result = tmp >> 10;
+> > +       }
+> > +
+> > +       return result;
+> > +}
+> > +
+> >  #define PLL90XX_MDIV_MASK      (0xFF)
+> >  #define PLL90XX_PDIV_MASK      (0x3F)
+> >  #define PLL90XX_SDIV_MASK      (0x7)
+> > --
+
+Thanks for pointing it out.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
