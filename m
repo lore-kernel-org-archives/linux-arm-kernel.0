@@ -1,45 +1,65 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 27 Jul 2010 15:46:26 +0200
-Subject: [PATCHv2 2/4] mm: cma: Contiguous Memory Allocator added
-In-Reply-To: <20100727065842.40ae76c8@bike.lwn.net>
-References: <cover.1280151963.git.m.nazarewicz@samsung.com>
-	<743102607e2c5fb20e3c0676fadbcb93d501a78e.1280151963.git.m.nazarewicz@samsung.com>
-	<dc4bdf3e0b02c0ac4770927f72b6cbc3f0b486a2.1280151963.git.m.nazarewicz@samsung.com>
-	<20100727120841.GC11468@n2100.arm.linux.org.uk>
-	<003701cb2d89$adae4580$090ad080$%szyprowski@samsung.com>
-	<20100727065842.40ae76c8@bike.lwn.net>
-Message-ID: <003f01cb2d92$20819730$6184c590$%szyprowski@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Jul 2010 14:59:40 +0100
+Subject: Issue with file transfers to a mass storage device on SMP system
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C62EF8F3@dbde02.ent.ti.com>
+References: <00e601cb2d55$cb6253c0$808918ac@apr.dhcp.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF707@dbde02.ent.ti.com>
+	<20100727100121.GB7846@n2100.arm.linux.org.uk>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF75B@dbde02.ent.ti.com>
+	<20100727104133.GA10665@n2100.arm.linux.org.uk>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF83C@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF8F3@dbde02.ent.ti.com>
+Message-ID: <20100727135939.GD11468@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tuesday, July 27, 2010 2:59 PM Jonathan Corbet wrote:
-
-> On Tue, 27 Jul 2010 14:45:58 +0200
-> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+On Tue, Jul 27, 2010 at 07:15:25PM +0530, Shilimkar, Santosh wrote:
+> > -----Original Message-----
+> > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> > owner at vger.kernel.org] On Behalf Of Shilimkar, Santosh
+> > Sent: Tuesday, July 27, 2010 5:31 PM
+> > To: Russell King - ARM Linux
+> > Cc: Mankad, Maulik Ojas; linux-usb at vger.kernel.org; linux-
+> > omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> > Subject: RE: Issue with file transfers to a mass storage device on SMP
+> > system
+> > 
+> > We have already those patches Russell and still see the issue. I think WMB
+> > is helping because data is just 16 bytes which can reside in WB. Had it
+> > been a bigger buffer this wouldn't have worked.
+> > 
+> > Will get back to you with more data on this.
 > 
-> > > How does one obtain the CPU address of this memory in order for the CPU
-> > > to access it?
-> >
-> > Right, we did not cover such case. In CMA approach we tried to separate
-> > memory allocation from the memory mapping into user/kernel space. Mapping
-> > a buffer is much more complicated process that cannot be handled in a
-> > generic way, so we decided to leave this for the device drivers. Usually
-> > video processing devices also don't need in-kernel mapping for such
-> > buffers at all.
+> Maulik and I looked at the code and below is what seems to be an issue.
+> The mass storage USB layer is not respecting the DMA/CPU buffer ownership.
 > 
-> Still...that *is* why I suggested an interface which would return both
-> the DMA address and a kernel-space virtual address, just like the DMA
-> API does...  Either that, or just return the void * kernel address and
-> let drivers do the DMA mapping themselves.  Returning only the
-> dma_addr_t address will make the interface difficult to use in many
-> situations.
+> "usb_stor_Bulk_transport" gets "us-iobuf" which is already mapped for DMA.
+> But inside this function the buffers is updated by the CPU which should not
+> be done as per rule. Same buffer passed down for DMA to transfer where the 
+> data might remain in CPU cache/WB. The dma map is not done on this buffer
+> because it's being done already before passing it to 'usb_stor_Bulk_transport'
 
-As I said, drivers usually don't need in-kernel mapping for video buffers.
-Is there really a need for creating such mapping?
+Hang on.
 
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+us->iobuf is a DMA coherent buffer, allocated by usb_alloc_coherent(),
+in turn hcd_buffer_alloc().  This comes from either a DMA pool, or
+dma_alloc_coherent().  These buffers are simultaneously owned by both
+the CPU and the DMA agent.
+
+So to talk about the buffer "already being mapped" and "buffer ownership"
+is wrong.  It's supposed to be a DMA coherent buffer, and trying to use
+dma_map_*() on it definitely won't work.
+
+This memory will be mapped in as 'normal memory, uncached', and with
+Catalins IO ordering patches, we rely upon wmb() ensuring that data
+written to it becomes visible to the DMA agents.  (wmb() by default
+aliases to mb(), which is a dsb() followed by outer_sync().)
+
+I think OMAP overrides the definitions of the mandatory barriers -
+the question is whether the OMAP implementation is sufficient to ensure
+that data written to a 'normal memory, uncached' mapping makes it out
+RAM so that the DMA agents can see it.
+
+As the OMAP mandatory barrier implementation isn't in mainline, I can't
+comment on that.  However, I feel certain that this is where the problem
+is.
