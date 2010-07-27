@@ -1,22 +1,25 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 27 Jul 2010 21:21:47 +0900
+Date: Tue, 27 Jul 2010 21:21:58 +0900
 Subject: [PATCH v3 3/3] sdhci-s3c: Add SDHCI_QUIRK_NO_WP_BIT quirk for
 	Samsung SoC
-In-Reply-To: <AANLkTiktYdBpgVtYUt69qfas4FHXvKvSEO4y9kf+DArE@mail.gmail.com>
+In-Reply-To: <005d01cb2a69$5eeceff0$1cc6cfd0$%szyprowski@samsung.com>
 References: <1279886191-9197-1-git-send-email-kgene.kim@samsung.com>
 	<1279886191-9197-4-git-send-email-kgene.kim@samsung.com>
-	<AANLkTiktYdBpgVtYUt69qfas4FHXvKvSEO4y9kf+DArE@mail.gmail.com>
-Message-ID: <001101cb2d86$4afddd90$e0f998b0$%kim@samsung.com>
+	<005d01cb2a69$5eeceff0$1cc6cfd0$%szyprowski@samsung.com>
+Message-ID: <001201cb2d86$524d8230$f6e88690$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
+Marek Szyprowski wrote:
 > 
-> On Fri, Jul 23, 2010 at 8:56 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Hello,
+> 
+> On Friday, July 23, 2010 1:57 PM Kukjin Kim wrote:
+> 
 > > From: Hyuk Lee <hyuk1.lee@samsung.com>
 > >
 > > If host controller doesn't have WP pin which should be connnected with
-SDMMC
+> > SDMMC
 > > card WP pin, can implement get_ro function with using the allocated
 gpio.
 > > In order to use this quirk wp_gpio in the platform data must be set.
@@ -24,11 +27,11 @@ gpio.
 > > Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
 > > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 > > ---
-> > ?drivers/mmc/host/sdhci-s3c.c | ? 43
-> ++++++++++++++++++++++++++++++++++++++++++
-> > ?drivers/mmc/host/sdhci.c ? ? | ? ?3 ++
-> > ?drivers/mmc/host/sdhci.h ? ? | ? ?3 ++
-> > ?3 files changed, 49 insertions(+), 0 deletions(-)
+> >  drivers/mmc/host/sdhci-s3c.c |   43
+> > ++++++++++++++++++++++++++++++++++++++++++
+> >  drivers/mmc/host/sdhci.c     |    3 ++
+> >  drivers/mmc/host/sdhci.h     |    3 ++
+> >  3 files changed, 49 insertions(+), 0 deletions(-)
 > >
 > > diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
 > > index 0d25285..0b75e57 100644
@@ -36,18 +39,17 @@ gpio.
 > > +++ b/drivers/mmc/host/sdhci-s3c.c
 > > @@ -22,6 +22,7 @@
 > >
-> > ?#include <linux/mmc/host.h>
+> >  #include <linux/mmc/host.h>
 > >
 > > +#include <plat/gpio-cfg.h>
-> > ?#include <plat/sdhci.h>
-> > ?#include <plat/regs-sdhci.h>
+> >  #include <plat/sdhci.h>
+> >  #include <plat/regs-sdhci.h>
 > >
 > > @@ -213,6 +214,36 @@ static void sdhci_s3c_set_clock(struct sdhci_host
-*host,
-> unsigned int clock)
-> > ?}
+> > *host, unsigned int clock)
+> >  }
 > >
-> > ?/**
+> >  /**
 > > + * sdhci_s3c_get_ro - callback for get_ro
 > > + * @host: The SDHCI host being changed
 > > + *
@@ -57,13 +59,13 @@ indicates
 > > +*/
 > > +static int sdhci_s3c_get_ro(struct mmc_host *mmc)
 > > +{
-> > + ? ? ? struct sdhci_s3c *sc;
-> > + ? ? ? struct sdhci_host *host;
+> > +	struct sdhci_s3c *sc;
+> > +	struct sdhci_host *host;
 > > +
-> > + ? ? ? host = mmc_priv(mmc);
-> > + ? ? ? sc = sdhci_priv(host);
+> > +	host = mmc_priv(mmc);
+> > +	sc = sdhci_priv(host);
 > > +
-> > + ? ? ? return gpio_get_value(sc->pdata->wp_gpio);
+> > +	return gpio_get_value(sc->pdata->wp_gpio);
 > > +}
 > > +
 > > +/**
@@ -74,102 +76,42 @@ indicates
 > > +*/
 > > +static void sdhci_s3c_cfg_wp(unsigned int gpio_num)
 > > +{
-> > + ? ? ? s3c_gpio_cfgpin(gpio_num, S3C_GPIO_INPUT);
-> > + ? ? ? s3c_gpio_setpull(gpio_num, S3C_GPIO_PULL_UP);
+> > +	s3c_gpio_cfgpin(gpio_num, S3C_GPIO_INPUT);
+> > +	s3c_gpio_setpull(gpio_num, S3C_GPIO_PULL_UP);
 > > +}
 > > +
 > > +/**
-> > ?* sdhci_s3c_get_min_clock - callback to get minimal supported clock
+> >   * sdhci_s3c_get_min_clock - callback to get minimal supported clock
 value
-> > ?* @host: The SDHCI host being queried
-> > ?*
+> >   * @host: The SDHCI host being queried
+> >   *
 > > @@ -375,6 +406,9 @@ static int __devinit sdhci_s3c_probe(struct
-> platform_device *pdev)
-> > ? ? ? ?if (pdata->cfg_gpio)
-> > ? ? ? ? ? ? ? ?pdata->cfg_gpio(pdev, pdata->max_width);
+> > platform_device *pdev)
+> >  	if (pdata->cfg_gpio)
+> >  		pdata->cfg_gpio(pdev, pdata->max_width);
 > >
-> > + ? ? ? if (gpio_is_valid(pdata->wp_gpio))
-> > + ? ? ? ? ? ? ? sdhci_s3c_ops.get_ro = sdhci_s3c_get_ro;
-> > +
-> > ? ? ? ?host->hw_name = "samsung-hsmmc";
-> > ? ? ? ?host->ops = &sdhci_s3c_ops;
-> > ? ? ? ?host->quirks = 0;
-> > @@ -408,6 +442,15 @@ static int __devinit sdhci_s3c_probe(struct
-> platform_device *pdev)
-> > ? ? ? ?host->quirks |= (SDHCI_QUIRK_32BIT_DMA_ADDR |
-> > ? ? ? ? ? ? ? ? ? ? ? ? SDHCI_QUIRK_32BIT_DMA_SIZE);
-> >
-> > + ? ? ? /* Controller's WP pin donsn't connected with SD card and there
-is an
-> > + ? ? ? ?* allocated GPIO for getting WP data form SD card, use this
-quirk and
-> > + ? ? ? ?* send the GPIO number in pdata->wp_gpio. */
-> > + ? ? ? host->quirks |= SDHCI_QUIRK_NO_WP_BIT;
-> > +
-> > + ? ? ? /* to configure gpio pin as a card write protection signal */
-> > + ? ? ? if (gpio_is_valid(pdata->wp_gpio))
-> > + ? ? ? ? ? ? ? sdhci_s3c_cfg_wp(pdata->wp_gpio);
+> > +	if (gpio_is_valid(pdata->wp_gpio))
+> > +		sdhci_s3c_ops.get_ro = sdhci_s3c_get_ro;
 > > +
 > 
-> Put it just one place like this.
+> There is still a problem here, but the opposite to the issue from V1 of
+this
+> patch.
+> If one apply the current version, he would need to set pdata->wp_gpio to
+-1 on
+> all
+> existing platforms to get old behavior of the driver. Leaving it as zero
+means
+> that
+> the driver will try to use GPA(0) for write protection.
 > 
-> if (gpio_is_valid(pdata->wp_gpio)) {
->    sdhci_s3c_cfg_wp(pdata->wp_gpio);
-> sdhci_s3c_ops.get_ro = sdhci_s3c_get_ro;
->    host->quirks |= SDHCI_QUIRK_NO_WP_BIT;
-> }
+> Adding one more field to pdata (like "bool has_gpio_wp") seems to be
+> unavoidable
+> in this case imho.
 > 
-> It reduce the below quirks check by one. If you add the quriks as your
-> patch, host->quirks are always true whether WP use or not.
-> 
-Ok..thanks for your suggestion.
+Ok..thanks for your review.
 
-Will re-submit as per your comments.
-
-> Thank you,
-> Kyungmin Park
-> > ? ? ? ?ret = sdhci_add_host(host);
-> > ? ? ? ?if (ret) {
-> > ? ? ? ? ? ? ? ?dev_err(dev, "sdhci_add_host() failed\n");
-> > diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> > index f9ca4c6..7fba401 100644
-> > --- a/drivers/mmc/host/sdhci.c
-> > +++ b/drivers/mmc/host/sdhci.c
-> > @@ -1198,6 +1198,9 @@ static int sdhci_get_ro(struct mmc_host *mmc)
-> >
-> > ? ? ? ?host = mmc_priv(mmc);
-> >
-> > + ? ? ? if ((host->quirks & SDHCI_QUIRK_NO_WP_BIT) && host->ops->get_ro)
-> > + ? ? ? ? ? ? ? return host->ops->get_ro(mmc);
-> > +
-> > ? ? ? ?spin_lock_irqsave(&host->lock, flags);
-> >
-> > ? ? ? ?if (host->flags & SDHCI_DEVICE_DEAD)
-> > diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> > index 0de8b38..dd9a233 100644
-> > --- a/drivers/mmc/host/sdhci.h
-> > +++ b/drivers/mmc/host/sdhci.h
-> > @@ -247,6 +247,8 @@ struct sdhci_host {
-> > ?#define SDHCI_QUIRK_MISSING_CAPS ? ? ? ? ? ? ? ? ? ? ? (1<<28)
-> > ?/* Controller has nonstandard clock management */
-> > ?#define SDHCI_QUIRK_NONSTANDARD_MINCLOCK ? ? ? ? ? ? ? (1<<29)
-> > +/* Controller has no write-protect pin connected with SD card */
-> > +#define SDHCI_QUIRK_NO_WP_BIT ? ? ? ? ? ? ? ? ? ? ? ? ?(1<<30)
-> >
-> > ? ? ? ?int ? ? ? ? ? ? ? ? ? ? irq; ? ? ? ? ? ?/* Device IRQ */
-> > ? ? ? ?void __iomem * ? ? ? ? ?ioaddr; ? ? ? ? /* Mapped address */
-> > @@ -321,6 +323,7 @@ struct sdhci_ops {
-> > ? ? ? ?unsigned int ? ?(*get_max_clock)(struct sdhci_host *host);
-> > ? ? ? ?unsigned int ? ?(*get_min_clock)(struct sdhci_host *host);
-> > ? ? ? ?unsigned int ? ?(*get_timeout_clock)(struct sdhci_host *host);
-> > + ? ? ? int ? ? ? ? ? ? (*get_ro)(struct mmc_host *mmc);
-> > ?};
-> >
-> > ?#ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
-> > --
-> > 1.6.2.5
-> >
-> > --
+Will fix it like your card detection method soon.
 
 Thanks.
 
