@@ -1,34 +1,49 @@
-From: corbet@lwn.net (Jonathan Corbet)
-Date: Tue, 27 Jul 2010 06:58:42 -0600
-Subject: [PATCHv2 2/4] mm: cma: Contiguous Memory Allocator added
-In-Reply-To: <003701cb2d89$adae4580$090ad080$%szyprowski@samsung.com>
-References: <cover.1280151963.git.m.nazarewicz@samsung.com>
-	<743102607e2c5fb20e3c0676fadbcb93d501a78e.1280151963.git.m.nazarewicz@samsung.com>
-	<dc4bdf3e0b02c0ac4770927f72b6cbc3f0b486a2.1280151963.git.m.nazarewicz@samsung.com>
-	<20100727120841.GC11468@n2100.arm.linux.org.uk>
-	<003701cb2d89$adae4580$090ad080$%szyprowski@samsung.com>
-Message-ID: <20100727065842.40ae76c8@bike.lwn.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 27 Jul 2010 21:59:13 +0900
+Subject: [PATCH v2 3/3] rtc: rtc-s3c: Add BCD register initialization codes
+Message-ID: <1280235553-27369-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Jul 2010 14:45:58 +0200
-Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+From: Taekgyun Ko <taeggyun.ko@samsung.com>
 
-> > How does one obtain the CPU address of this memory in order for the CPU
-> > to access it?  
-> 
-> Right, we did not cover such case. In CMA approach we tried to separate
-> memory allocation from the memory mapping into user/kernel space. Mapping
-> a buffer is much more complicated process that cannot be handled in a
-> generic way, so we decided to leave this for the device drivers. Usually
-> video processing devices also don't need in-kernel mapping for such
-> buffers at all.
+RTC needs to be initialized when BCD registers have invalid value.
 
-Still...that *is* why I suggested an interface which would return both
-the DMA address and a kernel-space virtual address, just like the DMA
-API does...  Either that, or just return the void * kernel address and
-let drivers do the DMA mapping themselves.  Returning only the
-dma_addr_t address will make the interface difficult to use in many
-situations.
+Signed-off-by: Taekgyun Ko <taeggyun.ko@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+Changes since v1:
+- Removed unnecessary parens around > operations as per Sergei Shtylyov
 
-jon
+ drivers/rtc/rtc-s3c.c |   14 ++++++++++++--
+ 1 files changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+index 2040017..e96e109 100644
+--- a/drivers/rtc/rtc-s3c.c
++++ b/drivers/rtc/rtc-s3c.c
+@@ -536,10 +536,20 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+ 
+ 	s3c_rtc_cpu_type = platform_get_device_id(pdev)->driver_data;
+ 
+-	if (s3c_rtc_cpu_type == TYPE_S3C64XX)
++	if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
+ 		rtc->max_user_freq = 32768;
+-	else
++
++		/* Check RTC Time */
++
++		for (i = S3C2410_RTCSEC; i <= S3C2410_RTCYEAR; i += 0x4) {
++			tmp = readb(s3c_rtc_base + i);
++
++			if ((tmp & 0xf) > 0x9 || ((tmp >> 4) & 0xf) > 0x9)
++				writeb(0, s3c_rtc_base + i);
++		}
++	} else {
+ 		rtc->max_user_freq = 128;
++	}
+ 
+ 	platform_set_drvdata(pdev, rtc);
+ 
+-- 
+1.6.2.5
