@@ -1,46 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 27 Jul 2010 15:21:13 +0100
-Subject: Issue with file transfers to a mass storage device on SMP system
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C62EF90B@dbde02.ent.ti.com>
-References: <00e601cb2d55$cb6253c0$808918ac@apr.dhcp.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF707@dbde02.ent.ti.com>
-	<20100727100121.GB7846@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF75B@dbde02.ent.ti.com>
-	<20100727104133.GA10665@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF83C@dbde02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF8F3@dbde02.ent.ti.com>
-	<20100727135939.GD11468@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF90B@dbde02.ent.ti.com>
-Message-ID: <20100727142113.GE11468@n2100.arm.linux.org.uk>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Tue, 27 Jul 2010 23:21:37 +0900
+Subject: [PATCHv2 2/4] mm: cma: Contiguous Memory Allocator added
+In-Reply-To: <20100727065842.40ae76c8@bike.lwn.net>
+References: <20100727120841.GC11468@n2100.arm.linux.org.uk>
+	<003701cb2d89$adae4580$090ad080$%szyprowski@samsung.com>
+	<20100727065842.40ae76c8@bike.lwn.net>
+Message-ID: <20100727232106Z.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 27, 2010 at 07:44:20PM +0530, Shilimkar, Santosh wrote:
-> OMAP doesn't override because the default definition is good enough now.
+On Tue, 27 Jul 2010 06:58:42 -0600
+Jonathan Corbet <corbet@lwn.net> wrote:
 
-Ah, good to know.
-
-> Shouldn't below work ?
-> #elif __LINUX_ARM_ARCH__ >= 7 || defined(CONFIG_SMP)
-> #define mb()            do { dsb(); outer_sync(); } while (0)
-> #define rmb()           dmb()
-> #define wmb()           mb()
-
-Yes, that should get it out of the CPU and caches, and onto the bus.
-However, I need to check up exactly what a write to the L2x0 SYNC
-register gives us...
-
-> > As the OMAP mandatory barrier implementation isn't in mainline, I can't
-> > comment on that.  However, I feel certain that this is where the problem
-> > is.
+> On Tue, 27 Jul 2010 14:45:58 +0200
+> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 > 
-> Do you think with above setting it should be still a problem ? I mean
-> with " CONFIG_ARCH_HAS_BARRIERS" not enabled
+> > > How does one obtain the CPU address of this memory in order for the CPU
+> > > to access it?  
+> > 
+> > Right, we did not cover such case. In CMA approach we tried to separate
+> > memory allocation from the memory mapping into user/kernel space. Mapping
+> > a buffer is much more complicated process that cannot be handled in a
+> > generic way, so we decided to leave this for the device drivers. Usually
+> > video processing devices also don't need in-kernel mapping for such
+> > buffers at all.
+> 
+> Still...that *is* why I suggested an interface which would return both
+> the DMA address and a kernel-space virtual address, just like the DMA
+> API does...  Either that, or just return the void * kernel address and
 
-Well, the question is whether getting it out of the outer cache (and
-performing an effective memory barrier to the outer cache) is sufficient
-for the DMA agent to see the data.
+The DMA API for coherent memory (dma_alloc_coherent) returns both an
+DMA address and a kernel-space virtual address because it does both
+allocation and mapping.
 
-Could the data be sitting somewhere in the interconnect between the
-CPU pushing it out of the outer cache and the DMA agent trying to read
-from memory?
+However, other DMA API (dma_map_*) returns only an DMA address because
+it does only mapping.
+
+I think that if we need new API for coherent memory, we could
+unify it with the DMA API for coherent memory.
+
+IMO, it's cleaner to having two separate APIs for allocation and
+mapping (except for coherent memory). The drivers have been working
+in that way.
