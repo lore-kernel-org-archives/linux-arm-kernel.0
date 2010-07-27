@@ -1,171 +1,261 @@
 From: avorontsov@mvista.com (Anton Vorontsov)
-Date: Tue, 27 Jul 2010 21:11:42 +0400
-Subject: [PATCH 2/4] ARM: cns3xxx: Add support for SMP
+Date: Tue, 27 Jul 2010 21:11:40 +0400
+Subject: [PATCH 1/4] ARM: SCU: Add generic routines for secondary CPU bootup
 In-Reply-To: <20100727171109.GA7929@oksana.dev.rtsoft.ru>
 References: <20100727171109.GA7929@oksana.dev.rtsoft.ru>
-Message-ID: <20100727171142.GB10375@oksana.dev.rtsoft.ru>
+Message-ID: <20100727171140.GA10375@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks to the previous refactorings, nothing fancy needs to be
-done, just use generic SCU routines.
+For CNS3xxx we want to reuse the original ARM approach of booting
+secondary CPUs. This patch turns VExpress' code into "SCU library",
+so that now platform code can call the generic routines.
+
+Note that this patch doesn't convert VExpress platform to the
+generic routines. Plus, there are also mach-{omap2,ux500,realview}
+platforms that might benefit from this change, but we'll convert
+them via separate patches.
 
 Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
 ---
- arch/arm/Kconfig                         |    2 +-
- arch/arm/mach-cns3xxx/Kconfig            |    1 +
- arch/arm/mach-cns3xxx/Makefile           |    1 +
- arch/arm/mach-cns3xxx/include/mach/smp.h |   31 +++++++++++++
- arch/arm/mach-cns3xxx/platsmp.c          |   69 ++++++++++++++++++++++++++++++
- 5 files changed, 103 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-cns3xxx/include/mach/smp.h
- create mode 100644 arch/arm/mach-cns3xxx/platsmp.c
+ arch/arm/include/asm/smp_scu.h |    9 +++
+ arch/arm/kernel/Makefile       |    2 +-
+ arch/arm/kernel/smp_scu.c      |  136 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/smp_scu_head.S |   37 +++++++++++
+ 4 files changed, 183 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/kernel/smp_scu_head.S
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4b54156..7bc76de 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1101,7 +1101,7 @@ config SMP
- 	bool "Symmetric Multi-Processing (EXPERIMENTAL)"
- 	depends on EXPERIMENTAL && (REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP ||\
- 		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 ||\
--		 ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
-+		 ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_CNS3XXX)
- 	depends on GENERIC_CLOCKEVENTS
- 	select USE_GENERIC_SMP_HELPERS
- 	select HAVE_ARM_SCU if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
-diff --git a/arch/arm/mach-cns3xxx/Kconfig b/arch/arm/mach-cns3xxx/Kconfig
-index 9ebfcc4..0ba82aa 100644
---- a/arch/arm/mach-cns3xxx/Kconfig
-+++ b/arch/arm/mach-cns3xxx/Kconfig
-@@ -3,6 +3,7 @@ menu "CNS3XXX platform type"
+diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
+index 2376835..271b252 100644
+--- a/arch/arm/include/asm/smp_scu.h
++++ b/arch/arm/include/asm/smp_scu.h
+@@ -1,7 +1,16 @@
+ #ifndef __ASMARM_ARCH_SCU_H
+ #define __ASMARM_ARCH_SCU_H
  
- config MACH_CNS3420VB
- 	bool "Support for CNS3420 Validation Board"
-+	select HAVE_ARM_SCU if SMP
- 	help
- 	  Include support for the Cavium Networks CNS3420 MPCore Platform
- 	  Baseboard.
-diff --git a/arch/arm/mach-cns3xxx/Makefile b/arch/arm/mach-cns3xxx/Makefile
-index 11033f1..ba4ee7b 100644
---- a/arch/arm/mach-cns3xxx/Makefile
-+++ b/arch/arm/mach-cns3xxx/Makefile
-@@ -1,3 +1,4 @@
- obj-$(CONFIG_ARCH_CNS3XXX)		+= core.o pm.o devices.o
-+obj-$(CONFIG_SMP)			+= platsmp.o
- obj-$(CONFIG_PCI)			+= pcie.o
- obj-$(CONFIG_MACH_CNS3420VB)		+= cns3420vb.o
-diff --git a/arch/arm/mach-cns3xxx/include/mach/smp.h b/arch/arm/mach-cns3xxx/include/mach/smp.h
-new file mode 100644
-index 0000000..afb2fef
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/include/mach/smp.h
-@@ -0,0 +1,31 @@
-+/*
-+ * Copyright 2002 ARM Ltd.
-+ * Copyright 2008 Cavium Networks
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
++#include <linux/init.h>
 +
-+#ifndef __MACH_SMP_H
-+#define __MACH_SMP_H
+ unsigned int scu_get_core_count(void __iomem *);
+ void scu_enable(void __iomem *);
+ 
++extern volatile int __cpuinitdata scu_pen_release;
++void scu_secondary_startup(void);
++void __cpuinit scu_secondary_init(unsigned int cpu);
++int __cpuinit scu_boot_secondary(unsigned int cpu, struct task_struct *idle);
++void __init scu_init_cpus(void __iomem *scu_base);
++void __init scu_prepare_cpus(void __iomem *scu_base, unsigned int max_cpus);
 +
-+#include <asm/hardware/gic.h>
-+
-+#define hard_smp_processor_id()				\
-+	({						\
-+		unsigned int cpunum;			\
-+		__asm__("mrc p15, 0, %0, c0, c0, 5"	\
-+			: "=r" (cpunum));		\
-+		cpunum &= 0x0F;				\
-+	})
-+
-+/*
-+ * We use IRQ1 as the IPI
-+ */
-+static inline void smp_cross_call(const struct cpumask *mask)
-+{
-+	gic_raise_softirq(mask, 1);
-+}
-+
-+#endif /* __MACH_SMP_H */
-diff --git a/arch/arm/mach-cns3xxx/platsmp.c b/arch/arm/mach-cns3xxx/platsmp.c
-new file mode 100644
-index 0000000..fc1595c
---- /dev/null
-+++ b/arch/arm/mach-cns3xxx/platsmp.c
-@@ -0,0 +1,69 @@
-+/*
-+ * Copyright 2002 ARM Ltd
-+ * Copyright 2008 Cavium Networks
-+ * Copyright 2010 MontaVista Software, LLC.
-+ *
-+ * This file is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, Version 2, as
-+ * published by the Free Software Foundation.
-+ */
-+
+ #endif
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 26d302c..2fc7cb1 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -28,7 +28,7 @@ obj-$(CONFIG_ARTHUR)		+= arthur.o
+ obj-$(CONFIG_ISA_DMA)		+= dma-isa.o
+ obj-$(CONFIG_PCI)		+= bios32.o isa.o
+ obj-$(CONFIG_SMP)		+= smp.o
+-obj-$(CONFIG_HAVE_ARM_SCU)	+= smp_scu.o
++obj-$(CONFIG_HAVE_ARM_SCU)	+= smp_scu.o smp_scu_head.o
+ obj-$(CONFIG_HAVE_ARM_TWD)	+= smp_twd.o
+ obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o
+ obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 9ab4149..b18414c 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -8,10 +8,15 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
 +#include <linux/compiler.h>
 +#include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
++#include <linux/jiffies.h>
++#include <linux/delay.h>
+ 
+ #include <asm/smp_scu.h>
++#include <asm/localtimer.h>
+ #include <asm/cacheflush.h>
+ 
+ #define SCU_CTRL		0x00
+@@ -50,3 +55,134 @@ void __init scu_enable(void __iomem *scu_base)
+ 	 */
+ 	flush_cache_all();
+ }
++
++/*
++ * control for which core is the next to come out of the secondary
++ * boot "holding pen"
++ */
++volatile int __cpuinitdata scu_pen_release = -1;
++
++static DEFINE_SPINLOCK(boot_lock);
++
++void __cpuinit scu_secondary_init(unsigned int cpu)
++{
++	/*
++	 * let the primary processor know we're out of the
++	 * pen, then head off into the C entry point
++	 */
++	scu_pen_release = -1;
++	smp_wmb();
++
++	/*
++	 * Synchronise with the boot thread.
++	 */
++	spin_lock(&boot_lock);
++	spin_unlock(&boot_lock);
++}
++
++int __cpuinit scu_boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	unsigned long timeout;
++
++	/*
++	 * Set synchronisation state between this boot processor
++	 * and the secondary one
++	 */
++	spin_lock(&boot_lock);
++
++	/*
++	 * This is really belt and braces; we hold unintended secondary
++	 * CPUs in the holding pen until we're ready for them.  However,
++	 * since we haven't sent them a soft interrupt, they shouldn't
++	 * be there.
++	 */
++	scu_pen_release = cpu;
++	__cpuc_flush_dcache_area((void *)&scu_pen_release,
++				 sizeof(scu_pen_release));
++	outer_clean_range(__pa(&scu_pen_release), __pa(&scu_pen_release + 1));
++
++	/*
++	 * Send the secondary CPU a soft interrupt, thereby causing
++	 * the boot monitor to read the system wide flags register,
++	 * and branch to the address found there.
++	 */
++	smp_cross_call(cpumask_of(cpu));
++
++	timeout = jiffies + (1 * HZ);
++	while (time_before(jiffies, timeout)) {
++		smp_rmb();
++		if (scu_pen_release == -1)
++			break;
++
++		udelay(10);
++	}
++
++	/*
++	 * now the secondary core is starting up let it run its
++	 * calibrations, then wait for it to finish
++	 */
++	spin_unlock(&boot_lock);
++
++	return scu_pen_release != -1 ? -ENOSYS : 0;
++}
++
++/*
++ * Initialise the CPU possible map early - this describes the CPUs
++ * which may be present or become present in the system.
++ */
++void __init scu_init_cpus(void __iomem *scu_base)
++{
++	unsigned int ncores = scu_base ? scu_get_core_count(scu_base) : 1;
++	unsigned int i;
++
++	/* sanity check */
++	if (ncores == 0) {
++		pr_err("%s: strange CM count of 0? Default to 1\n", __func__);
++		ncores = 1;
++	}
++
++	if (ncores > NR_CPUS) {
++		pr_warn("%s: no. of cores (%d) greater than configured "
++		       "maximum of %d - clipping\n", __func__, ncores, NR_CPUS);
++		ncores = NR_CPUS;
++	}
++
++	for (i = 0; i < ncores; i++)
++		set_cpu_possible(i, true);
++}
++
++void __init scu_prepare_cpus(void __iomem *scu_base, unsigned int max_cpus)
++{
++	unsigned int ncores = num_possible_cpus();
++	unsigned int cpu = smp_processor_id();
++	int i;
++
++	smp_store_cpu_info(cpu);
++
++	/*
++	 * are we trying to boot more cores than exist?
++	 */
++	if (max_cpus > ncores)
++		max_cpus = ncores;
++
++	/*
++	 * Initialise the present map, which describes the set of CPUs
++	 * actually populated at the present time.
++	 */
++	for (i = 0; i < max_cpus; i++)
++		set_cpu_present(i, true);
++
++	/*
++	 * Initialise the SCU if there are more than one CPU and let
++	 * them know where to start.
++	 */
++	if (max_cpus > 1) {
++		/*
++		 * Enable the local timer or broadcast device for the
++		 * boot CPU, but only if we have more than one CPU.
++		 */
++		percpu_timer_setup();
++
++		scu_enable(scu_base);
++	}
++}
+diff --git a/arch/arm/kernel/smp_scu_head.S b/arch/arm/kernel/smp_scu_head.S
+new file mode 100644
+index 0000000..200010b
+--- /dev/null
++++ b/arch/arm/kernel/smp_scu_head.S
+@@ -0,0 +1,37 @@
++/*
++ *  Copyright (c) 2003 ARM Limited
++ *  All Rights Reserved
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/linkage.h>
 +#include <linux/init.h>
-+#include <linux/smp.h>
-+#include <linux/io.h>
-+#include <asm/unified.h>
-+#include <asm/smp_scu.h>
-+#include <mach/cns3xxx.h>
-+#include "core.h"
 +
-+static void __iomem *scu_base_addr(void)
-+{
-+	return (void __iomem *)CNS3XXX_TC11MP_SCU_BASE_VIRT;
-+}
++	__INIT
 +
-+void __cpuinit platform_secondary_init(unsigned int cpu)
-+{
-+	trace_hardirqs_off();
++/*
++ * SCU specific entry point for secondary CPUs.  This provides
++ * a "holding pen" into which all secondary cores are held until we're
++ * ready for them to initialise.
++ */
++ENTRY(scu_secondary_startup)
++	mrc	p15, 0, r0, c0, c0, 5
++	and	r0, r0, #15
++	adr	r4, 1f
++	ldmia	r4, {r5, r6}
++	sub	r4, r4, r5
++	add	r6, r6, r4
++pen:	ldr	r7, [r6]
++	cmp	r7, r0
++	bne	pen
 +
 +	/*
-+	 * if any interrupts are already enabled for the primary
-+	 * core (e.g. timer irq), then they will not have been enabled
-+	 * for us: do so
++	 * we've been released from the holding pen: secondary_stack
++	 * should now contain the SVC stack for this core
 +	 */
-+	gic_cpu_init(0, gic_cpu_base_addr);
++	b	secondary_startup
 +
-+	scu_secondary_init(cpu);
-+}
-+
-+int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	return scu_boot_secondary(cpu, idle);
-+}
-+
-+void __init smp_init_cpus(void)
-+{
-+	scu_init_cpus(scu_base_addr());
-+}
-+
-+static void __init poke_milo(void)
-+{
-+	if (num_present_cpus() <= 1)
-+		return;
-+	/*
-+	 * Write the address of secondary startup into the system-wide flags
-+	 * register. The BootMonitor waits for this register to become
-+	 * non-zero.
-+	 */
-+	__raw_writel(BSYM(virt_to_phys(scu_secondary_startup)),
-+		     (void __iomem *)(0xFFF07000 + 0x0600));
-+
-+	mb();
-+}
-+
-+void __init smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	scu_prepare_cpus(scu_base_addr(), max_cpus);
-+	poke_milo();
-+}
++1:	.long	.
++	.long	scu_pen_release
 -- 
 1.7.0.5
