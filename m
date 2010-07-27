@@ -1,193 +1,213 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 27 Jul 2010 09:41:40 +0200
-Subject: [PATCHv2 2/4] mm: cma: Contiguous Memory Allocator added
-In-Reply-To: <201007262228.42358.hverkuil@xs4all.nl>
-References: <cover.1280151963.git.m.nazarewicz@samsung.com>
-	<743102607e2c5fb20e3c0676fadbcb93d501a78e.1280151963.git.m.nazarewicz@samsung.com>
-	<dc4bdf3e0b02c0ac4770927f72b6cbc3f0b486a2.1280151963.git.m.nazarewicz@samsung.com>
-	<201007262228.42358.hverkuil@xs4all.nl>
-Message-ID: <002801cb2d5f$2b288550$81798ff0$%szyprowski@samsung.com>
+From: thara@ti.com (Gopinath, Thara)
+Date: Tue, 27 Jul 2010 13:44:32 +0530
+Subject: [PATCH 12/20] OMAP: PM: create omap_devices for MPU, DSP, L3
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59301E7DA1E30@dbde02.ent.ti.com>
+References: <20100702152703.6221.33529.stgit@localhost.localdomain>
+	<20100702152930.6221.32877.stgit@localhost.localdomain>
+	<B85A65D85D7EB246BE421B3FB0FBB59301E7DA1E30@dbde02.ent.ti.com>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0323C3FADC@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On Monday, July 26, 2010 10:29 PM Hans Verkuil wrote:
 
-> Hi Michal,
-> 
-> Thanks for working on this, we definitely need something along these lines.
-> 
-> On Monday 26 July 2010 16:40:30 Michal Nazarewicz wrote:
-> > The Contiguous Memory Allocator framework is a set of APIs for
-> > allocating physically contiguous chunks of memory.
-> >
-> > Various chips require contiguous blocks of memory to operate.  Those
-> > chips include devices such as cameras, hardware video decoders and
-> > encoders, etc.
-> >
-> > The code is highly modular and customisable to suit the needs of
-> > various users.  Set of regions reserved for CMA can be configured on
-> > run-time and it is easy to add custom allocator algorithms if one
-> > has such need.
-> >
-> > For more details see Documentation/contiguous-memory.txt.
-> >
-> > Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > Reviewed-by: Pawel Osciak <p.osciak@samsung.com>
-> > ---
-> >  Documentation/00-INDEX                             |    2 +
-> >  .../ABI/testing/sysfs-kernel-mm-contiguous         |    9 +
-> >  Documentation/contiguous-memory.txt                |  646 +++++++++++
-> >  Documentation/kernel-parameters.txt                |    4 +
-> >  include/linux/cma.h                                |  445 ++++++++
-> >  mm/Kconfig                                         |   34 +
-> >  mm/Makefile                                        |    3 +
-> >  mm/cma-best-fit.c                                  |  407 +++++++
-> >  mm/cma.c                                           | 1170
-> ++++++++++++++++++++
-> >  9 files changed, 2720 insertions(+), 0 deletions(-)
-> >  create mode 100644 Documentation/ABI/testing/sysfs-kernel-mm-contiguous
-> >  create mode 100644 Documentation/contiguous-memory.txt
-> >  create mode 100644 include/linux/cma.h
-> >  create mode 100644 mm/cma-best-fit.c
-> >  create mode 100644 mm/cma.c
-> >
-> > diff --git a/Documentation/00-INDEX b/Documentation/00-INDEX
-> > index 5405f7a..bb50209 100644
-> > --- a/Documentation/00-INDEX
-> > +++ b/Documentation/00-INDEX
-> > @@ -94,6 +94,8 @@ connector/
-> >  	- docs on the netlink based userspace<->kernel space communication
-> mod.
-> >  console/
-> >  	- documentation on Linux console drivers.
-> > +contiguous-memory.txt
-> > +	- documentation on physically-contiguous memory allocation framework.
-> >  cpu-freq/
-> >  	- info on CPU frequency and voltage scaling.
-> >  cpu-hotplug.txt
-> > diff --git a/Documentation/ABI/testing/sysfs-kernel-mm-contiguous
-> b/Documentation/ABI/testing/sysfs-kernel-mm-contiguous
-> > new file mode 100644
-> > index 0000000..05e2f6a
-> > --- /dev/null
-> > +++ b/Documentation/ABI/testing/sysfs-kernel-mm-contiguous
-> > @@ -0,0 +1,9 @@
-> > +What:		/sys/kernel/mm/contiguous/
-> > +Date:		July 2008
-> > +Contact:	Michal Nazarewicz <m.nazarewicz@samsung.com>
-> > +Description:
-> > +		/sys/kernel/mm/contiguous/ contains two files: asterisk and
-> > +		map.  They are used to configure the Contiguous Memory
-> > +		Allocator framework.
-> > +
-> > +		For details see Documentation/contiguous-memory.txt.
-> > diff --git a/Documentation/contiguous-memory.txt
-> b/Documentation/contiguous-memory.txt
-> > new file mode 100644
-> > index 0000000..6eb1295
-> > --- /dev/null
-> > +++ b/Documentation/contiguous-memory.txt
-> > @@ -0,0 +1,646 @@
-> > +                                                             -*- org -*-
-> > +
-> > +* Contiguous Memory Allocator
-> > +
-> > +   The Contiguous Memory Allocator (CMA) is a framework, which allows
-> > +   setting up a machine-specific configuration for physically-contiguous
-> > +   memory management. Memory for devices is then allocated according
-> > +   to that configuration.
-> > +
-> > +   The main role of the framework is not to allocate memory, but to
-> > +   parse and manage memory configurations, as well as to act as an
-> > +   in-between between device drivers and pluggable allocators. It is
-> > +   thus not tied to any memory allocation method or strategy.
-> > +
-> > +** Why is it needed?
-> > +
-> > +    Various devices on embedded systems have no scatter-getter and/or
-> > +    IO map support and as such require contiguous blocks of memory to
-> > +    operate.  They include devices such as cameras, hardware video
-> > +    decoders and encoders, etc.
-> > +
-> > +    Such devices often require big memory buffers (a full HD frame is,
-> > +    for instance, more then 2 mega pixels large, i.e. more than 6 MB
-> > +    of memory), which makes mechanisms such as kmalloc() ineffective.
-> > +
-> > +    Some embedded devices impose additional requirements on the
-> > +    buffers, e.g. they can operate only on buffers allocated in
-> > +    particular location/memory bank (if system has more than one
-> > +    memory bank) or buffers aligned to a particular memory boundary.
-> > +
-> > +    Development of embedded devices have seen a big rise recently
-> > +    (especially in the V4L area) and many such drivers include their
-> > +    own memory allocation code. Most of them use bootmem-based methods.
-> > +    CMA framework is an attempt to unify contiguous memory allocation
-> > +    mechanisms and provide a simple API for device drivers, while
-> > +    staying as customisable and modular as possible.
-> > +
-> > +** Design
-> > +
-> > +    The main design goal for the CMA was to provide a customisable and
-> > +    modular framework, which could be configured to suit the needs of
-> > +    individual systems.  Configuration specifies a list of memory
-> > +    regions, which then are assigned to devices.  Memory regions can
-> > +    be shared among many device drivers or assigned exclusively to
-> > +    one.  This has been achieved in the following ways:
-> 
-> OK, I like the idea of regions, i.e. defining memory areas with specific
-> properties or uses.
-> 
-> But why should it be possible to define regions through kernel parameters?
-> Regions are typically fixed for a particular platform and can be setup in
-> the
-> platform specific code. Actually, one region could be setup by default:
-> DMA-able memory. That would be very handy in fact for many PCI-based TV
-> capture drivers.
+>>-----Original Message-----
+>>From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Basak,
+>>Partha
+>>Sent: Tuesday, July 27, 2010 1:07 PM
+>>To: Paul Walmsley; linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+>>Cc: Kevin Hilman
+>>Subject: RE: [PATCH 12/20] OMAP: PM: create omap_devices for MPU, DSP, L3
+>>
+>>
+>>
+>>> -----Original Message-----
+>>> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+>>> owner at vger.kernel.org] On Behalf Of Paul Walmsley
+>>> Sent: Friday, July 02, 2010 9:00 PM
+>>> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+>>> Cc: Kevin Hilman
+>>> Subject: [PATCH 12/20] OMAP: PM: create omap_devices for MPU, DSP, L3
+>>>
+>>> From: Kevin Hilman <khilman@deeprootsystems.com>
+>>>
+>>> Create simple omap_devices for the main processors and busses.
+>>>
+>>> This is required to support the forth-coming device-based OPP
+>>> approach, where OPPs are managed and tracked at the device level.
+>>>
+>>> Also, move these common PM init functions into a common_pm_init call
+>>> that is called as a device_initcall().  The PM init is done at this level
+>>> to ensure that the driver core is initialized before initialized.
+>>>
+>>> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+>>> [paul at pwsan.com: sparse warnings cleaned up; newly-created functions moved
+>>>  from mach-omap2/io.c to mach-omap2/pm.c; newly-created functions renamed
+>>>  to start with "omap2" rather than "omap"]
+>>> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+>>> ---
+>>>  arch/arm/mach-omap2/Makefile             |    2 -
+>>>  arch/arm/mach-omap2/io.c                 |    2 -
+>>>  arch/arm/mach-omap2/pm.c                 |   84
+>>> ++++++++++++++++++++++++++++++
+>>>  arch/arm/plat-omap/include/plat/common.h |    4 +
+>>>  4 files changed, 90 insertions(+), 2 deletions(-)
+>>>  create mode 100644 arch/arm/mach-omap2/pm.c
+>>>
+>>> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+>>> index 2fa3418..213f1df 100644
+>>> --- a/arch/arm/mach-omap2/Makefile
+>>> +++ b/arch/arm/mach-omap2/Makefile
+>>> @@ -3,7 +3,7 @@
+>>>  #
+>>>
+>>>  # Common support
+>>> -obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer-gp.o
+>>> +obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer-gp.o
+>>> pm.o
+>>>
+>>>  omap-2-3-common				= irq.o sdrc.o
+>>>  hwmod-common				= omap_hwmod.o \
+>>> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+>>> index 05c9cdb..2b983ac 100644
+>>> --- a/arch/arm/mach-omap2/io.c
+>>> +++ b/arch/arm/mach-omap2/io.c
+>>> @@ -44,6 +44,7 @@
+>>>
+>>>  #include <plat/clockdomain.h>
+>>>  #include "clockdomains.h"
+>>> +
+>>>  #include <plat/omap_hwmod.h>
+>>>
+>>>  /*
+>>> @@ -346,7 +347,6 @@ void __init omap2_init_common_hw(struct
+>>> omap_sdrc_params *sdrc_cs0,
+>>>  	if (cpu_is_omap24xx() || cpu_is_omap34xx())   /* FIXME: OMAP4 */
+>>>  		omap_hwmod_late_init(skip_setup_idle);
+>>>
+>>> -	omap_pm_if_init();
+>>>  	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+>>>  		omap2_sdrc_init(sdrc_cs0, sdrc_cs1);
+>>>  		_omap2_init_reprogram_sdrc();
+>>> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+>>> new file mode 100644
+>>> index 0000000..68f9f2e
+>>> --- /dev/null
+>>> +++ b/arch/arm/mach-omap2/pm.c
+>>> @@ -0,0 +1,84 @@
+>>> +/*
+>>> + * pm.c - Common OMAP2+ power management-related code
+>>> + *
+>>> + * Copyright (C) 2010 Texas Instruments, Inc.
+>>> + * Copyright (C) 2010 Nokia Corporation
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + */
+>>> +
+>>> +#include <linux/kernel.h>
+>>> +#include <linux/init.h>
+>>> +#include <linux/io.h>
+>>> +#include <linux/err.h>
+>>> +
+>>> +#include <plat/omap-pm.h>
+>>> +#include <plat/omap_device.h>
+>>> +#include <plat/common.h>
+>>> +
+>>> +static struct omap_device_pm_latency *pm_lats;
+>>> +
+>>> +static struct device *mpu_dev;
+>>> +static struct device *dsp_dev;
+>>> +static struct device *l3_dev;
+>>> +
+>>> +struct device *omap2_get_mpuss_device(void)
+>>> +{
+>>> +	WARN_ON_ONCE(!mpu_dev);
+>>> +	return mpu_dev;
+>>> +}
+>>> +
+>>> +struct device *omap2_get_dsp_device(void)
+>>> +{
+>>> +	WARN_ON_ONCE(!dsp_dev);
+>>> +	return dsp_dev;
+>>> +}
+>>> +
+>>> +struct device *omap2_get_l3_device(void)
+>>> +{
+>>> +	WARN_ON_ONCE(!l3_dev);
+>>> +	return l3_dev;
+>>> +}
+>>> +
+>>> +/* static int _init_omap_device(struct omap_hwmod *oh, void *user) */
+>>> +static int _init_omap_device(char *name, struct device **new_dev)
+>>> +{
+>>> +	struct omap_hwmod *oh;
+>>> +	struct omap_device *od;
+>>> +
+>>> +	oh = omap_hwmod_lookup(name);
+>>> +	if (WARN(!oh, "%s: could not find omap_hwmod for %s\n",
+>>> +		 __func__, name))
+>>> +		return -ENODEV;
+>>> +
+>>> +	od = omap_device_build(oh->name, 0, oh, NULL, 0, pm_lats, 0, false);
+>>> +	if (WARN(IS_ERR(od), "%s: could not build omap_device for %s\n",
+>>> +		 __func__, name))
+>>> +		return -ENODEV;
+>>> +
+>>> +	*new_dev = &od->pdev.dev;
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +/*
+>>> + * Build omap_devices for processors and bus.
+>>> + */
+>>> +static void omap2_init_processor_devices(void)
+>>> +{
+>>> +	_init_omap_device("mpu", &mpu_dev);
+>>> +	_init_omap_device("iva", &dsp_dev);
+>>> +	_init_omap_device("l3_main", &l3_dev);
+>>
+>>This breaks OMAP4 as l3_main is not applicable for OMAP4.
 
-IMHO this is a just desktop-point-of-view. In embedded world things are
-a bit different. Most SoCs have a some kind of common system memory and
-usually all build-in peripherals are able to DMA to any part of it (there is
-no DMA specific hardware zone).
+For OMAP4 we need to add a check and make it "l3_main_1". I have done this as part
+of DVFS support on OMAP4. Will be posting it out in sometime.
 
-> I think that the only thing that you want to set in the kernel params is
-> the size of each region.
-
-Keeping it as a kernel parameter is very handy for development. But I agree
-that we might make it dependent on some Kconfig entry. This way a platform
-setup code would provide default region description just as an array of the
-region structures and we will get rid of the parsing code in the release
-versions.
- 
-> The same with assigning regions to drivers: why would you want to do that?
-> The driver should know which regions it can use (with possible fallbacks).
-
-I'm sorry, but this is again a little 'desktop-centric point-of-view'. On
-desktop it is perfectly acceptable to have a separate memory region for each
-device. In embedded world memory is a precious resource. Of course we can go
-the 'separate memory region for each device' way, but we observed that at
-least some memory can be recovered if we decide to share memory regions for
-some of the devices.
-
-Assigning regions to the drivers is a way to describe how memory can be
-shared. This is something that is independent from the actual drivers. 
-Device drivers cannot and mustn't have such knowledge. 
-
-> And it can know that provided regions are setup by the platform code and
-> not created dynamically. This will simplify things enormously.
-> 
-> > +    1. The core of the CMA does not handle allocation of memory and
-> > +       management of free space.  Dedicated allocators are used for
-> > +       that purpose.
-> > +
-> > +       This way, if the provided solution does not match demands
-> > +       imposed on a given system, one can develop a new algorithm and
-> > +       easily plug it into the CMA framework.
-> > +
-> > +       The presented solution includes an implementation of a best-fit
-> > +       algorithm.
-> 
-> Again, do we really need user-settable per-region allocators? Just provide
-> one with the option to later choose others through the kernel Kconfig files.
+Regards
+Thara
+>>> +}
+>>> +
+>>> +static int __init omap2_common_pm_init(void)
+>>> +{
+>>> +	omap2_init_processor_devices();
+>>> +	omap_pm_if_init();
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +device_initcall(omap2_common_pm_init);
+>>> +
+>>> diff --git a/arch/arm/plat-omap/include/plat/common.h b/arch/arm/plat-
+>>> omap/include/plat/common.h
+>>> index 5e4afbe..5cf9509 100644
+>>> --- a/arch/arm/plat-omap/include/plat/common.h
+>>> +++ b/arch/arm/plat-omap/include/plat/common.h
+>>> @@ -89,4 +89,8 @@ void omap2_set_globals_uart(struct omap_globals *);
+>>>  	}							\
+>>>  })
+>>>
+>>> +extern struct device *omap2_get_mpuss_device(void);
+>>> +extern struct device *omap2_get_dsp_device(void);
+>>> +extern struct device *omap2_get_l3_device(void);
+>>> +
+>>>  #endif /* __ARCH_ARM_MACH_OMAP_COMMON_H */
+>>>
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>?{.n?+???????+%??lzwm??b????r??zX??&j??????}????z?&j:+v???
+????zZ+??+zf???h???~????i???z?
+?w??????
+>>??&?)?f
