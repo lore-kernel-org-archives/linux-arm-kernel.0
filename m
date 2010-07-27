@@ -1,74 +1,88 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Tue, 27 Jul 2010 18:18:52 +0200
-Subject: [PATCH v3 3/3] sdhci-s3c: Add SDHCI_QUIRK_NO_WP_BIT quirk for
-	Samsung SoC
-In-Reply-To: <000d01cb2d83$16b7efb0$4427cf10$%kim@samsung.com>
-References: <1279886191-9197-1-git-send-email-kgene.kim@samsung.com>
-	<1279886191-9197-4-git-send-email-kgene.kim@samsung.com>
-	<4C49871D.8030702@gmail.com>
-	<000d01cb2d83$16b7efb0$4427cf10$%kim@samsung.com>
-Message-ID: <4C4F06EC.2020902@gmail.com>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Tue, 27 Jul 2010 18:19:36 +0200
+Subject: Git pull request: ARM LPC32XX architecture
+In-Reply-To: <083DF309106F364B939360100EC290F80AC2FF21ED@eu1rdcrdc1wx030.exi.nxp.com>
+References: <a08234131003121244t6f914926s3ea75e98c017686a@mail.gmail.com>
+	<20100312210353.GB1146@n2100.arm.linux.org.uk>
+	<083DF309106F364B939360100EC290F80AC2FF1AE8@eu1rdcrdc1wx030.exi.nxp.com>
+	<20100525172106.GA16204@n2100.arm.linux.org.uk>
+	<083DF309106F364B939360100EC290F80AC2FF21ED@eu1rdcrdc1wx030.exi.nxp.com>
+Message-ID: <083DF309106F364B939360100EC290F80AC392A1F8@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Op 27-07-10 13:58, Kukjin Kim schreef:
-> Maurus Cuelenaere wrote:
->>  Op 23-07-10 13:56, Kukjin Kim schreef:
->>> From: Hyuk Lee <hyuk1.lee@samsung.com>
->>>
->>> If host controller doesn't have WP pin which should be connnected with SDMMC
->>> card WP pin, can implement get_ro function with using the allocated gpio.
->>> In order to use this quirk wp_gpio in the platform data must be set.
->>>
->>> Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
->>> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
->>> ---
->>>  drivers/mmc/host/sdhci-s3c.c |   43
->> ++++++++++++++++++++++++++++++++++++++++++
->>>  drivers/mmc/host/sdhci.c     |    3 ++
->>>  drivers/mmc/host/sdhci.h     |    3 ++
->>>  3 files changed, 49 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
->>> index 0d25285..0b75e57 100644
->>> --- a/drivers/mmc/host/sdhci-s3c.c
->>> +++ b/drivers/mmc/host/sdhci-s3c.c
->>> @@ -22,6 +22,7 @@
->>>
->>>  #include <linux/mmc/host.h>
->>>
->>> +#include <plat/gpio-cfg.h>
->>>  #include <plat/sdhci.h>
->>>  #include <plat/regs-sdhci.h>
->>>
->>> @@ -213,6 +214,36 @@ static void sdhci_s3c_set_clock(struct sdhci_host *host,
->> unsigned int clock)
->>>  }
->>>
->>>  /**
->>> + * sdhci_s3c_get_ro - callback for get_ro
->>> + * @host: The SDHCI host being changed
->>> + *
->>> + * If the WP pin is connected with GPIO, can get the value which indicates
->>> + * the card is locked or not.
->>> +*/
->>> +static int sdhci_s3c_get_ro(struct mmc_host *mmc)
->>> +{
->>> +	struct sdhci_s3c *sc;
->>> +	struct sdhci_host *host;
->>> +
->>> +	host = mmc_priv(mmc);
->>> +	sc = sdhci_priv(host);
->> This can be done as static initializer if you reverse the order above.
-> Could you please kindly explain about this?
-> Sorry, I cannot get the exactly meaning...
 
-+static int sdhci_s3c_get_ro(struct mmc_host *mmc)
-+{
-+	struct sdhci_host *host = mmc_priv(mmc);
-+	struct sdhci_s3c *sc = sdhci_priv(host);
+Hi Russell,
 
+I just wanted to drop a friendly reminder on this pull request. As
+of yesterday, everything still built fine with the latest tree, but
+it's in need of some updates. Can you still pull this and I'll apply
+the updates in another patch series in the next week?
 
+git://git.lpclinux.com/linux-2.6-lpc wells/lpc32xx-arch
 
--- 
-Maurus Cuelenaere
+Or if you think you'll pull it in the next few weeks, I'll start
+posting those updates now...
+
+thanks,
+Kevin
+
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: RE: Git pull request: ARM LPC32XX architecture
+> 
+> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> > Sent: Tuesday, May 25, 2010 10:21 AM
+> > To: Kevin Wells
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Subject: Re: Git pull request: ARM LPC32XX architecture
+> >
+> > On Tue, May 25, 2010 at 05:27:12PM +0200, Kevin Wells wrote:
+> > > It's been a few months since I've posted this patch set and I'd
+> still
+> > > like to get it pulled.
+> >
+> > Sorry, it got buried beneath _lots_ of email.
+> >
+> > However, I've sent my second and final pull request to Linus
+> yesterday
+> > evening.  So far Linus hasn't pulled my tree, so I can't touch it at
+> > the moment.
+> >
+> > I think this stuff has missed this window as well. ;(
+> >
+> 
+> Thanks, I figured you probably had your hands full.
+> 
+> > > Can you pull the original series plus the slab.h patch? (breaks
+> > bisect)?
+> > > Or do you want the slab.h fix included in the correct order in the
+> > > Series to be bisect friendly?
+> >
+> > Well, there's two ways to get around that - both of which you need to
+> > ensure that no one's pulled your tree yet.
+> >
+> > 1. Re-do the patches such that the missing include(s) are added.
+> >
+> > 2. rebase the series on something more recent and fix the slab.h
+> thing
+> >    along the way.
+> >
+> > Either way means that the series remains bisect-able after merging.
+> >
+> > This is not something that should be done lightly however - these
+> kinds
+> > of changes mean that anyone who has pulled your tree is in for some
+> > grief.
+> 
+> The updated full series is available from:
+> git://git.lpclinux.com/linux-2.6-lpc wells/lpc32xx-arch
+> 
+> This has been rebased on 2.6.34.
+> A pull of this series should play nice with the previous series if
+> someone has already pulled it..
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
