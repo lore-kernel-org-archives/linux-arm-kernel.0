@@ -1,122 +1,84 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 27 Jul 2010 21:21:58 +0900
-Subject: [PATCH v3 3/3] sdhci-s3c: Add SDHCI_QUIRK_NO_WP_BIT quirk for
-	Samsung SoC
-In-Reply-To: <005d01cb2a69$5eeceff0$1cc6cfd0$%szyprowski@samsung.com>
-References: <1279886191-9197-1-git-send-email-kgene.kim@samsung.com>
-	<1279886191-9197-4-git-send-email-kgene.kim@samsung.com>
-	<005d01cb2a69$5eeceff0$1cc6cfd0$%szyprowski@samsung.com>
-Message-ID: <001201cb2d86$524d8230$f6e88690$%kim@samsung.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 27 Jul 2010 14:45:58 +0200
+Subject: [PATCHv2 2/4] mm: cma: Contiguous Memory Allocator added
+In-Reply-To: <20100727120841.GC11468@n2100.arm.linux.org.uk>
+References: <cover.1280151963.git.m.nazarewicz@samsung.com>
+	<743102607e2c5fb20e3c0676fadbcb93d501a78e.1280151963.git.m.nazarewicz@samsung.com>
+	<dc4bdf3e0b02c0ac4770927f72b6cbc3f0b486a2.1280151963.git.m.nazarewicz@samsung.com>
+	<20100727120841.GC11468@n2100.arm.linux.org.uk>
+Message-ID: <003701cb2d89$adae4580$090ad080$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> 
-> Hello,
-> 
-> On Friday, July 23, 2010 1:57 PM Kukjin Kim wrote:
-> 
-> > From: Hyuk Lee <hyuk1.lee@samsung.com>
-> >
-> > If host controller doesn't have WP pin which should be connnected with
-> > SDMMC
-> > card WP pin, can implement get_ro function with using the allocated
-gpio.
-> > In order to use this quirk wp_gpio in the platform data must be set.
-> >
-> > Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> >  drivers/mmc/host/sdhci-s3c.c |   43
-> > ++++++++++++++++++++++++++++++++++++++++++
-> >  drivers/mmc/host/sdhci.c     |    3 ++
-> >  drivers/mmc/host/sdhci.h     |    3 ++
-> >  3 files changed, 49 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> > index 0d25285..0b75e57 100644
-> > --- a/drivers/mmc/host/sdhci-s3c.c
-> > +++ b/drivers/mmc/host/sdhci-s3c.c
-> > @@ -22,6 +22,7 @@
-> >
-> >  #include <linux/mmc/host.h>
-> >
-> > +#include <plat/gpio-cfg.h>
-> >  #include <plat/sdhci.h>
-> >  #include <plat/regs-sdhci.h>
-> >
-> > @@ -213,6 +214,36 @@ static void sdhci_s3c_set_clock(struct sdhci_host
-> > *host, unsigned int clock)
-> >  }
-> >
-> >  /**
-> > + * sdhci_s3c_get_ro - callback for get_ro
-> > + * @host: The SDHCI host being changed
-> > + *
-> > + * If the WP pin is connected with GPIO, can get the value which
-indicates
-> > + * the card is locked or not.
-> > +*/
-> > +static int sdhci_s3c_get_ro(struct mmc_host *mmc)
-> > +{
-> > +	struct sdhci_s3c *sc;
-> > +	struct sdhci_host *host;
-> > +
-> > +	host = mmc_priv(mmc);
-> > +	sc = sdhci_priv(host);
-> > +
-> > +	return gpio_get_value(sc->pdata->wp_gpio);
-> > +}
-> > +
-> > +/**
-> > + * sdhci_s3c_cfg_wp - configure GPIO for WP pin
-> > + * @gpio_num: GPIO number which connected with WP line from SD/MMC slot
-> > + *
-> > + * Configure GPIO for using WP line
-> > +*/
-> > +static void sdhci_s3c_cfg_wp(unsigned int gpio_num)
-> > +{
-> > +	s3c_gpio_cfgpin(gpio_num, S3C_GPIO_INPUT);
-> > +	s3c_gpio_setpull(gpio_num, S3C_GPIO_PULL_UP);
-> > +}
-> > +
-> > +/**
-> >   * sdhci_s3c_get_min_clock - callback to get minimal supported clock
-value
-> >   * @host: The SDHCI host being queried
-> >   *
-> > @@ -375,6 +406,9 @@ static int __devinit sdhci_s3c_probe(struct
-> > platform_device *pdev)
-> >  	if (pdata->cfg_gpio)
-> >  		pdata->cfg_gpio(pdev, pdata->max_width);
-> >
-> > +	if (gpio_is_valid(pdata->wp_gpio))
-> > +		sdhci_s3c_ops.get_ro = sdhci_s3c_get_ro;
-> > +
-> 
-> There is still a problem here, but the opposite to the issue from V1 of
-this
-> patch.
-> If one apply the current version, he would need to set pdata->wp_gpio to
--1 on
-> all
-> existing platforms to get old behavior of the driver. Leaving it as zero
-means
-> that
-> the driver will try to use GPA(0) for write protection.
-> 
-> Adding one more field to pdata (like "bool has_gpio_wp") seems to be
-> unavoidable
-> in this case imho.
-> 
-Ok..thanks for your review.
+Hello,
 
-Will fix it like your card detection method soon.
+On Tuesday, July 27, 2010 2:09 PM Russell King - ARM Linux wrote:
 
-Thanks.
+> On Mon, Jul 26, 2010 at 04:40:30PM +0200, Michal Nazarewicz wrote:
+> > +** Why is it needed?
+> > +
+> > +    Various devices on embedded systems have no scatter-getter and/or
+> > +    IO map support and as such require contiguous blocks of memory to
+> > +    operate.  They include devices such as cameras, hardware video
+> > +    decoders and encoders, etc.
+> 
+> Yes, this is becoming quite a big problem - and many ARM SoCs suffer
+> from the existing memory allocators being extremely inadequate for
+> their use.
+> 
+> One of the areas I've been working on is sorting out the DMA coherent
+> allocator so we don't violate the architecture requirements for ARMv6
+> and ARMv7 CPUs (which basically prohibits multiple mappings of memory
+> with different attributes.)
+> 
+> One of the ideas that I've thought about for this is to reserve an
+> amount of contiguous memory at boot time to fill the entire DMA coherent
+> mapping, marking the memory in the main kernel memory map as 'no access',
+> and allocate directly from the DMA coherent region.
+> 
+> However, discussing this with people who have the problem you're trying
+> to solve indicates that they do not want to set aside an amount of
+> memory as they perceive this to be a waste of resources.
 
-Best regards,
-Kgene.
+Assuming your board have only 128MB of physical memory (quite common case
+for some embedded boards), leaving 16MB unused just for DMA coherent
+area is a huge waste imho.
+
+> This concern also applies to 'cma'.
+
+Yes, we know. We plan to recover some of that 'wasted' memory by providing
+a way to allocate some kind of virtual swap device on it. This is just an
+idea, no related works has been started yet.
+
+> 
+> > +/*
+> > + * Don't call it directly, use cma_alloc(), cma_alloc_from() or
+> > + * cma_alloc_from_region().
+> > + */
+> > +dma_addr_t __must_check
+> > +__cma_alloc(const struct device *dev, const char *kind,
+> > +	    size_t size, dma_addr_t alignment);
+> 
+> Does this really always return DMA-able memory (memory which can be
+> DMA'd to/from without DMA-mapping etc?)
+> 
+> As it returns a dma_addr_t, it's returning a cookie for the memory which
+> will be suitable for writing directly to the device 'dev' doing the DMA.
+> (NB: DMA addresses may not be the same as physical addresses, especially
+> if the device is on a downstream bus.  We have ARM platforms which have
+> different bus offsets.)
+> 
+> How does one obtain the CPU address of this memory in order for the CPU
+> to access it?
+
+Right, we did not cover such case. In CMA approach we tried to separate
+memory allocation from the memory mapping into user/kernel space. Mapping
+a buffer is much more complicated process that cannot be handled in a
+generic way, so we decided to leave this for the device drivers. Usually
+video processing devices also don't need in-kernel mapping for such
+buffers at all.
+
+Best regards
 --
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Marek Szyprowski
+Samsung Poland R&D Center
