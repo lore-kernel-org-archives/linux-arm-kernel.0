@@ -1,40 +1,40 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 27 Jul 2010 15:06:07 +0300
-Subject: [PATCH 1/4] mx2_camera: fix a race causing NULL dereference
+Date: Tue, 27 Jul 2010 15:06:08 +0300
+Subject: [PATCH 2/4] mx2_camera: return IRQ_NONE when doing nothing
 In-Reply-To: <cover.1280229966.git.baruch@tkos.co.il>
 References: <cover.1280229966.git.baruch@tkos.co.il>
-Message-ID: <9f12919acb3673ff10249ea3d151eccaa2818859.1280229966.git.baruch@tkos.co.il>
+Message-ID: <49da2476310a921b19226d572503b7c04175204d.1280229966.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mx25_camera_irq irq handler may get called after the camera has been
-deactivated (from mx2_camera_deactivate). Detect this situation, and bail out.
-
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- drivers/media/video/mx2_camera.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ drivers/media/video/mx2_camera.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/media/video/mx2_camera.c b/drivers/media/video/mx2_camera.c
-index 881d5d8..1536bd4 100644
+index 1536bd4..b42ad8d 100644
 --- a/drivers/media/video/mx2_camera.c
 +++ b/drivers/media/video/mx2_camera.c
-@@ -384,6 +384,9 @@ static void mx25_camera_frame_done(struct mx2_camera_dev *pcdev, int fb,
+@@ -420,15 +420,17 @@ static irqreturn_t mx25_camera_irq(int irq_csi, void *data)
+ 	struct mx2_camera_dev *pcdev = data;
+ 	u32 status = readl(pcdev->base_csi + CSISR);
  
- 	spin_lock_irqsave(&pcdev->lock, flags);
- 
-+	if (*fb_active == NULL)
-+		goto out;
+-	if (status & CSISR_DMA_TSF_FB1_INT)
++	writel(status, pcdev->base_csi + CSISR);
 +
- 	vb = &(*fb_active)->vb;
- 	dev_dbg(pcdev->dev, "%s (vb=0x%p) 0x%08lx %d\n", __func__,
- 		vb, vb->baddr, vb->bsize);
-@@ -408,6 +411,7 @@ static void mx25_camera_frame_done(struct mx2_camera_dev *pcdev, int fb,
++	if (!(status & (CSISR_DMA_TSF_FB1_INT | CSISR_DMA_TSF_FB2_INT)))
++		return IRQ_NONE;
++	else if (status & CSISR_DMA_TSF_FB1_INT)
+ 		mx25_camera_frame_done(pcdev, 1, VIDEOBUF_DONE);
+ 	else if (status & CSISR_DMA_TSF_FB2_INT)
+ 		mx25_camera_frame_done(pcdev, 2, VIDEOBUF_DONE);
  
- 	*fb_active = buf;
+ 	/* FIXME: handle CSISR_RFF_OR_INT */
  
-+out:
- 	spin_unlock_irqrestore(&pcdev->lock, flags);
+-	writel(status, pcdev->base_csi + CSISR);
+-
+ 	return IRQ_HANDLED;
  }
  
 -- 
