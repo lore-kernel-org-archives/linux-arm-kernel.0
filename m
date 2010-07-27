@@ -1,70 +1,35 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Tue, 27 Jul 2010 15:05:58 +0800
-Subject: Issue with file transfers to a mass storage device on SMP system
-In-Reply-To: <00e601cb2d55$cb6253c0$808918ac@apr.dhcp.ti.com>
-References: <00e601cb2d55$cb6253c0$808918ac@apr.dhcp.ti.com>
-Message-ID: <AANLkTinmwh3ZetA78xk9B27tq4fgnxN8Qu5pt0TBpuLX@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 27 Jul 2010 01:22:36 -0600 (MDT)
+Subject: [PATCH 12/20] OMAP: PM: create omap_devices for MPU, DSP, L3
+In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB0323C3F32F@dbde02.ent.ti.com>
+References: <20100702152703.6221.33529.stgit@localhost.localdomain>
+	<20100702152930.6221.32877.stgit@localhost.localdomain>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0323A2C2A5@dbde02.ent.ti.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0323C3F32F@dbde02.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1007270121350.1906@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/27 Maulik <x0082077@ti.com>:
-> Hello,
->
-> I am working on OMAP4 which has two ARM Cortex A9 microprocessors (SMP
-> system) with 2.6.35-rc5 kernel.
->
-> I have an issue whereby transferring a large file (>20MB) over USB (OMAP
-> Mentor USB controller acts as USB host) to an attached USB thumb drive
-> fails.
->
-> The USB analyzer trace shows that the 31 bytes CBW packet is corrupted and
-> device responds with a STALL when this issue occurs.
->
-> Further it was found that the CBWCB field (the last 16 bytes which contains
-> the command to be executed by the device) of the CBW packet was Zero in the
-> failure case. Also the first 15 bytes of the CBW packet contained valid
-> data.
->
-> The code snippet below from usb_stor_Bulk_transport () in
-> drivers/usb/storage/transport.c looks to be a problem area.
->
-> /* copy the command payload */
->
-> ?memset(bcb->CDB, 0, sizeof(bcb->CDB));
-> ?memcpy(bcb->CDB, srb->cmnd, bcb->Length);
->
-> Looks like when the issue occurs the memory (bcb->CDB) is not yet updated
-> due to likely out of order execution due to SMP.
->
-> I have tried below workarounds that fixes the issue.
->
-> (1)Enabling debug prints / adding delays fixes the issue.
-> (2)Using nosmp in bootargs i.e. disabling SMP fixes the issue.
-> (3)Using wmb() (Write memory barrier) before starting DMA transfer in MUSB
-> driver fixes the issue.
+Hi Thara,
 
-Seems it is one solution.
+On Sat, 24 Jul 2010, Gopinath, Thara wrote:
 
-It should be caused by dma_alloc_coherent, which allocated uncached but
-buffered coherent buffer, see discussions below:
+> >>>>+struct device *omap2_get_dsp_device(void)
+> >>>>+{
+> >>>>+	WARN_ON_ONCE(!dsp_dev);
+> >>>>+	return dsp_dev;
+> >>>>+}
+> >>First of all, apologies for so late posting of the comment. IMHO it would be good to rename this API
+> >>as omap2_get_iva_device. This is because OMAP4 has separate IVA and DSP devices and we will need to
+> >>build the omap_device for both. If we could rename this as omap2_get_iva_device, we could introduce
+> >>another API omap4_get_iva_device until bridge starts doing a omap_device_build for all these devices.
+> 
+> Hello Paul,
+> 
+> Any thoughts on this one?
 
-          http://marc.info/?t=127918539100004&r=1&w=2
-
-> (4)Using wmb() for only 31 bytes CBW packets after the memcpy(in storage
-> stack (transport.c)) fixes the issue.
-> (5)Checking if last 16 bytes (of the 31 bytes CBW packet) are Zero or not
-> after the memcpy() also fixes the issue. i.e if you read back the memory,
-> the memory seems to be updated.
->
-> Has anyone seen such issue on a SMP system?
->
-> Please comment on the need and the usage of a memory barrier in this case.
->
-> Thanks,
-> Maulik
->
+Makes sense to me.  Probably we should queue a patch up to fix that for 
+2.6.37...
 
 
-
--- 
-Lei Ming
+- Paul
