@@ -1,58 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 27 Jul 2010 17:07:10 +0100
-Subject: Issue with file transfers to a mass storage device on SMP system
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C62EF91F@dbde02.ent.ti.com>
-References: <EAF47CD23C76F840A9E7FCE10091EFAB02C62EF707@dbde02.ent.ti.com>
-	<20100727100121.GB7846@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF75B@dbde02.ent.ti.com>
-	<20100727104133.GA10665@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF83C@dbde02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF8F3@dbde02.ent.ti.com>
-	<20100727135939.GD11468@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF90B@dbde02.ent.ti.com>
-	<20100727142113.GE11468@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF91F@dbde02.ent.ti.com>
-Message-ID: <20100727160710.GF11468@n2100.arm.linux.org.uk>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Tue, 27 Jul 2010 18:18:52 +0200
+Subject: [PATCH v3 3/3] sdhci-s3c: Add SDHCI_QUIRK_NO_WP_BIT quirk for
+	Samsung SoC
+In-Reply-To: <000d01cb2d83$16b7efb0$4427cf10$%kim@samsung.com>
+References: <1279886191-9197-1-git-send-email-kgene.kim@samsung.com>
+	<1279886191-9197-4-git-send-email-kgene.kim@samsung.com>
+	<4C49871D.8030702@gmail.com>
+	<000d01cb2d83$16b7efb0$4427cf10$%kim@samsung.com>
+Message-ID: <4C4F06EC.2020902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 27, 2010 at 07:59:17PM +0530, Shilimkar, Santosh wrote:
-> Once it's pushed out of L2X WB, it will hit the memory. Just to give an additional data point, with CATC analyzer what we see that only those 
-> 16 bytes CDB are 0x0. This buffer was memset to 0x0 just before the
-> memcpy.
-> 
-> I am just wondering who will issue a barrier(wmb) on this buffer before DMA
-> start if we don't use dma-mapping APIs? May be for dma_alloc_coherent
-> buffers, we need to explicitly issue the barrier.
+ Op 27-07-10 13:58, Kukjin Kim schreef:
+> Maurus Cuelenaere wrote:
+>>  Op 23-07-10 13:56, Kukjin Kim schreef:
+>>> From: Hyuk Lee <hyuk1.lee@samsung.com>
+>>>
+>>> If host controller doesn't have WP pin which should be connnected with SDMMC
+>>> card WP pin, can implement get_ro function with using the allocated gpio.
+>>> In order to use this quirk wp_gpio in the platform data must be set.
+>>>
+>>> Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
+>>> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+>>> ---
+>>>  drivers/mmc/host/sdhci-s3c.c |   43
+>> ++++++++++++++++++++++++++++++++++++++++++
+>>>  drivers/mmc/host/sdhci.c     |    3 ++
+>>>  drivers/mmc/host/sdhci.h     |    3 ++
+>>>  3 files changed, 49 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+>>> index 0d25285..0b75e57 100644
+>>> --- a/drivers/mmc/host/sdhci-s3c.c
+>>> +++ b/drivers/mmc/host/sdhci-s3c.c
+>>> @@ -22,6 +22,7 @@
+>>>
+>>>  #include <linux/mmc/host.h>
+>>>
+>>> +#include <plat/gpio-cfg.h>
+>>>  #include <plat/sdhci.h>
+>>>  #include <plat/regs-sdhci.h>
+>>>
+>>> @@ -213,6 +214,36 @@ static void sdhci_s3c_set_clock(struct sdhci_host *host,
+>> unsigned int clock)
+>>>  }
+>>>
+>>>  /**
+>>> + * sdhci_s3c_get_ro - callback for get_ro
+>>> + * @host: The SDHCI host being changed
+>>> + *
+>>> + * If the WP pin is connected with GPIO, can get the value which indicates
+>>> + * the card is locked or not.
+>>> +*/
+>>> +static int sdhci_s3c_get_ro(struct mmc_host *mmc)
+>>> +{
+>>> +	struct sdhci_s3c *sc;
+>>> +	struct sdhci_host *host;
+>>> +
+>>> +	host = mmc_priv(mmc);
+>>> +	sc = sdhci_priv(host);
+>> This can be done as static initializer if you reverse the order above.
+> Could you please kindly explain about this?
+> Sorry, I cannot get the exactly meaning...
 
-wmb's don't take addresses - they're a global thing.  All stores before
-the wmb() take effect before stores after the wmb().
++static int sdhci_s3c_get_ro(struct mmc_host *mmc)
++{
++	struct sdhci_host *host = mmc_priv(mmc);
++	struct sdhci_s3c *sc = sdhci_priv(host);
 
-The wmb() is issued by Catalin's IO ordering patches:
 
-+#define writeb(v,c)            ({ wmb(); writeb_relaxed(v,c); })
-+#define writew(v,c)            ({ wmb(); writew_relaxed(v,c); })
-+#define writel(v,c)            ({ wmb(); writel_relaxed(v,c); })
 
-So, the wmb() is issued to ensure that all stores to (eg) buffers
-allocated by dma_alloc_coherent() hit memory prior to the store to
-the device.
-
-Now, if you're writing to registers using something other than write[bwl](),
-you'll miss the wmb(), and therefore your DMA buffer won't be up to date.
-
-And this _is_ the problem:
-
-drivers/usb/musb/musb_io.h:static inline void musb_writew(void __iomem *addr, unsigned offset, u16 data)
-drivers/usb/musb/musb_io.h:     { __raw_writew(data, addr + offset); }
-drivers/usb/musb/musb_io.h:static inline void musb_writel(void __iomem *addr, unsigned offset, u32 data)
-drivers/usb/musb/musb_io.h:     { __raw_writel(data, addr + offset); }
-drivers/usb/musb/musb_io.h:static inline void musb_writeb(void __iomem *addr, unsigned offset, u8 data)
-drivers/usb/musb/musb_io.h:     __raw_writew(tmp, addr + (offset & ~1));
-drivers/usb/musb/musb_io.h:static inline void musb_writeb(void __iomem *addr, unsigned offset, u8 data)
-drivers/usb/musb/musb_io.h:     { __raw_writeb(data, addr + offset); }
-
-All IO performed by musb misses out on the barriers - so what you
-need to do is either add wmb()s to these, or you need to ensure
-that the driver has the various necessary memory barriers in place.
-The latter solution will be more efficient.
+-- 
+Maurus Cuelenaere
