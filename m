@@ -1,31 +1,77 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 27 Jul 2010 19:39:37 +0900
-Subject: [PATCH] S5PC110: Add OneNAND interrupt number
-Message-ID: <20100727103937.GA1247@july>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Jul 2010 11:41:33 +0100
+Subject: Issue with file transfers to a mass storage device on SMP system
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C62EF75B@dbde02.ent.ti.com>
+References: <00e601cb2d55$cb6253c0$808918ac@apr.dhcp.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF707@dbde02.ent.ti.com>
+	<20100727100121.GB7846@n2100.arm.linux.org.uk>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF75B@dbde02.ent.ti.com>
+Message-ID: <20100727104133.GA10665@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To use OneNAND interrupt at drivers, also extend DMA address to cover fully.
+On Tue, Jul 27, 2010 at 03:49:29PM +0530, Shilimkar, Santosh wrote:
+> > On Tue, Jul 27, 2010 at 03:08:54PM +0530, Shilimkar, Santosh wrote:
+> > > As discussed, the main reason is the cache maintenance isn't done on
+> > >  "bcb->CDB"  buffers and hence the data remains in CPU write buffer
+> > > instead of the physical memory on which DMA operates.
+> > 
+> > struct bulk_cb_wrap {
+> >         __le32  Signature;              /* contains 'USBC' */
+> >         __u32   Tag;                    /* unique per command id */
+> >         __le32  DataTransferLength;     /* size of data */
+> >         __u8    Flags;                  /* direction in bit 0 */
+> >         __u8    Lun;                    /* LUN normally 0 */
+> >         __u8    Length;                 /* of of the CDB */
+> >         __u8    CDB[16];                /* max command */
+> > };
+> > 
+> > So, CDB is contained within bcb...bcb+sizeof(*bcb).
+> > 
+> > The bcb is passed to usb_stor_bulk_transfer_buf:
+> > 
+> >         result = usb_stor_bulk_transfer_buf(us, us->send_bulk_pipe,
+> >                                 bcb, cbwlen, NULL);
+> > 
+> > which fills it into a URB:
+> > 
+> >         usb_fill_bulk_urb(us->current_urb, us->pusb_dev, pipe, buf,
+> > length,
+> >                       usb_stor_blocking_completion, NULL);
+> > 
+> > This sets the URB buffer pointers:
+> > 
+> >         urb->transfer_buffer = transfer_buffer;
+> >         urb->transfer_buffer_length = buffer_length;
+> > 
+> > And this buffer should be dma-mapped and dma-unmapped as appropriate.
+> > 
+> > Wasn't there an issue with the DMA mapping being used with a PIO USB
+> > host recently?  Is that the problem here?
+> That's correct.
+> The last issue was otherway round where we were doing map/unmpap on PIO buffer.
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
-diff --git a/arch/arm/mach-s5pv210/dev-onenand.c b/arch/arm/mach-s5pv210/dev-onenand.c
-index 34997b7..f8ede33 100644
---- a/arch/arm/mach-s5pv210/dev-onenand.c
-+++ b/arch/arm/mach-s5pv210/dev-onenand.c
-@@ -27,9 +27,14 @@ static struct resource s5pc110_onenand_resources[] = {
- 	},
- 	[1] = {
- 		.start	= S5PC110_PA_ONENAND_DMA,
--		.end	= S5PC110_PA_ONENAND_DMA + SZ_2K - 1,
-+		.end	= S5PC110_PA_ONENAND_DMA + SZ_8K - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
-+	[2] = {
-+		.start	= IRQ_ONENAND_AUDI,
-+		.end	= IRQ_ONENAND_AUDI,
-+		.flags	= IORESOURCE_IRQ,
-+	},
- };
- 
- struct platform_device s5pc110_device_onenand = {
+That's exactly what I said.
+
+> This issue is because "CDB[16]", is not cleaned up before merging it into CBW.
+
+The CDB array is part of the CBW (struct bulk_cb_wrap).  When the
+struct bulk_cb_wrap is mapped for DMA, the CDB will also be as it
+is contained entirely within the CBW structure.
+
+As USB deals with the whole of the CBW as one block, it can't be that
+half of it is being DMA-mapped and the other half isn't - something
+else must be going on.  If the CDB was a separate chunk of memory, I
+could believe what you're suggesting.
+
+What we _do_ know is that 2.6.35-rc5 misses Catalin's barrier patches
+for readl+writel, which means that there are ordering issues between
+writing to memory and writing to devices.  This is what is going on
+here, and it is confirmed by this:
+
+| (3)Using wmb() (Write memory barrier) before starting DMA transfer in MUSB
+| driver fixes the issue.
+
+from Maulik.  The fix is to have Catalin's ordered IO accessors which
+add the wmb() internally to writel() to ensure that memory accesses
+are visible.
