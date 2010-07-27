@@ -1,22 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 27 Jul 2010 22:44:39 +0100
-Subject: Git pull request: ARM LPC32XX architecture
-In-Reply-To: <083DF309106F364B939360100EC290F80AC392A25D@eu1rdcrdc1wx030.exi.nxp.com>
-References: <a08234131003121244t6f914926s3ea75e98c017686a@mail.gmail.com>
-	<20100312210353.GB1146@n2100.arm.linux.org.uk>
-	<083DF309106F364B939360100EC290F80AC2FF1AE8@eu1rdcrdc1wx030.exi.nxp.com>
-	<20100525172106.GA16204@n2100.arm.linux.org.uk>
-	<083DF309106F364B939360100EC290F80AC2FF21ED@eu1rdcrdc1wx030.exi.nxp.com>
-	<083DF309106F364B939360100EC290F80AC392A1F8@eu1rdcrdc1wx030.exi.nxp.com>
-	<20100727164540.GC17099@n2100.arm.linux.org.uk>
-	<20100727164945.GD17099@n2100.arm.linux.org.uk>
-	<083DF309106F364B939360100EC290F80AC392A25D@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <20100727214439.GA22475@n2100.arm.linux.org.uk>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Wed, 28 Jul 2010 00:25:20 +0200
+Subject: [PATCH] Watchdog: Adding support for ARM Primecell SP805 Watchdog
+In-Reply-To: <4C4E65A4.7030005@st.com>
+References: <1274344428-28329-1-git-send-email-viresh.kumar@st.com>
+	<AANLkTik1vSgASNLXSpYD2MVgmQGgvCx-5mFY_3YFsuHL@mail.gmail.com>
+	<4C43DD7E.5050800@st.com> <4C4E65A4.7030005@st.com>
+Message-ID: <AANLkTiktDfvRUjA-Scu643=GniuNzqKjNFBZY2foh_fa@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 27, 2010 at 10:00:16PM +0200, Kevin Wells wrote:
-> Can you pull the series if I completely remove the defconfig file (for
-> now at least)?
+2010/7/27 Viresh KUMAR <viresh.kumar@st.com>:
 
-Yes.
+>>>> >> + ? ? ? /* roundup timeout to closest positive integer value */
+>>>> >> + ? ? ? wdt->timeout = div_u64((load + 1) * 2 + (rate / 2), rate);
+>>> >
+>>> > Look in linux/kernel.h, use the
+>>> > DIV_ROUND_CLOSEST() macro instead of this.
+>
+> Now i remember why i didn't choose DIV_ROUND_CLOSEST in V1 of this patch.
+> As it is a u64 division, i get following compilation error if i use
+> DIV_ROUND_CLOSEST. I wasn't sure if inclusion of some header file can remove
+> this error, and so i used div_u64.
+
+Aha, I have no solution to that, but I'd recommend adding the comment
+/* Cannot use DIV_ROUND_CLOSEST() due to the 64bit size */
+
+Yours,
+Linus Walleij
