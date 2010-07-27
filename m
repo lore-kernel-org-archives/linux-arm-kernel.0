@@ -1,54 +1,31 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 27 Jul 2010 15:08:54 +0530
-Subject: Issue with file transfers to a mass storage device on SMP system
-In-Reply-To: <00e601cb2d55$cb6253c0$808918ac@apr.dhcp.ti.com>
-References: <00e601cb2d55$cb6253c0$808918ac@apr.dhcp.ti.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C62EF707@dbde02.ent.ti.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Tue, 27 Jul 2010 12:42:04 +0300
+Subject: [PATCH 2/5] Add 'code' parameter for hook_fault_code()
+In-Reply-To: <20100727093537.GA7846@n2100.arm.linux.org.uk>
+References: <cover.1279529223.git.kirill@shutemov.name>
+	<182e37fa369c926c23f21f6a06426afb8a5b6f81.1279529223.git.kirill@shutemov.name>
+	<20100727093537.GA7846@n2100.arm.linux.org.uk>
+Message-ID: <20100727094204.GA3177@shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Mankad, Maulik Ojas
-> Sent: Tuesday, July 27, 2010 12:05 PM
-> To: linux-usb at vger.kernel.org
-> Cc: Shilimkar, Santosh; linux-arm-kernel at lists.infradead.org; linux-
-> omap at vger.kernel.org
-> Subject: Issue with file transfers to a mass storage device on SMP system
+On Tue, Jul 27, 2010 at 10:35:37AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 19, 2010 at 11:53:22AM +0300, Kirill A. Shutsemov wrote:
+> > diff --git a/arch/arm/mach-ixp2000/pci.c b/arch/arm/mach-ixp2000/pci.c
+> > index 90771ca..853fd90 100644
+> > --- a/arch/arm/mach-ixp2000/pci.c
+> > +++ b/arch/arm/mach-ixp2000/pci.c
+> > @@ -209,7 +209,7 @@ ixp2000_pci_preinit(void)
+> >  			"the needed workaround has not been configured in");
+> >  #endif
+> >  
+> > -	hook_fault_code(16+6, ixp2000_pci_abort_handler, SIGBUS,
+> > +	hook_fault_code(16+6, ixp2000_pci_abort_handler, SIGBUS, 0
+> >  				"PCI config cycle to non-existent device");
 > 
-> Hello,
-> 
-> I am working on OMAP4 which has two ARM Cortex A9 microprocessors (SMP
-> system) with 2.6.35-rc5 kernel.
-> 
-> I have an issue whereby transferring a large file (>20MB) over USB (OMAP
-> Mentor USB controller acts as USB host) to an attached USB thumb drive
-> fails.
-> 
-> The USB analyzer trace shows that the 31 bytes CBW packet is corrupted and
-> device responds with a STALL when this issue occurs.
-> 
-> Further it was found that the CBWCB field (the last 16 bytes which
-> contains
-> the command to be executed by the device) of the CBW packet was Zero in
-> the
-> failure case. Also the first 15 bytes of the CBW packet contained valid
-> data.
-> 
-> The code snippet below from usb_stor_Bulk_transport () in
-> drivers/usb/storage/transport.c looks to be a problem area.
-> 
-> /* copy the command payload */
-> 
->  memset(bcb->CDB, 0, sizeof(bcb->CDB));
->  memcpy(bcb->CDB, srb->cmnd, bcb->Length);
-> 
-> Looks like when the issue occurs the memory (bcb->CDB) is not yet updated
-> due to likely out of order execution due to SMP.
-> 
-As discussed, the main reason is the cache maintenance isn't done on
- "bcb->CDB"  buffers and hence the data remains in CPU write buffer instead of the physical memory on which DMA operates. 
-In working scenario's, there might be a barrier in the path which is helping
-you.
+> This is broken - can you submit a fixed version please?
 
-Regards,
-Santosh
+Done.
+
+-- 
+ Kirill A. Shutemov
