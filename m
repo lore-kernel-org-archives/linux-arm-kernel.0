@@ -1,56 +1,31 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 27 Jul 2010 15:06:10 +0300
-Subject: [PATCH 4/4] mx2_camera: implement forced termination of active buffer
-	for mx25
-In-Reply-To: <cover.1280229966.git.baruch@tkos.co.il>
-References: <cover.1280229966.git.baruch@tkos.co.il>
-Message-ID: <967af81dac1c4c7627b18b5eec23a258ac7d9cd2.1280229966.git.baruch@tkos.co.il>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 27 Jul 2010 15:06:57 +0300
+Subject: [PATCH 0/3 v2] Enable pxa310 usb otg port host mode
+Message-ID: <1280232420-28691-1-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows userspace to terminate a capture without waiting for the current
-frame to complete.
+This patch series introduces the U2D Controller and
+U2D ULPI Host driver for PXA310 and enables cm-x300 usb host port2.
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- drivers/media/video/mx2_camera.c |   20 ++++++++++++++++----
- 1 files changed, 16 insertions(+), 4 deletions(-)
+This patch series depends on
+"Generic ULPI driver extention" patch series,
+which have been reviewed at linux-usb mailing list
 
-diff --git a/drivers/media/video/mx2_camera.c b/drivers/media/video/mx2_camera.c
-index d327d11..396542b 100644
---- a/drivers/media/video/mx2_camera.c
-+++ b/drivers/media/video/mx2_camera.c
-@@ -648,15 +648,27 @@ static void mx2_videobuf_release(struct videobuf_queue *vq,
- 	 * Terminate only queued but inactive buffers. Active buffers are
- 	 * released when they become inactive after videobuf_waiton().
- 	 *
--	 * FIXME: implement forced termination of active buffers, so that the
--	 * user won't get stuck in an uninterruptible state. This requires a
--	 * specific handling for each of the three DMA types that this driver
--	 * supports.
-+	 * FIXME: implement forced termination of active buffers for mx27 and 
-+	 * mx27 eMMA, so that the user won't get stuck in an uninterruptible
-+	 * state. This requires a specific handling for each of the these DMA
-+	 * types.
- 	 */
- 	spin_lock_irqsave(&pcdev->lock, flags);
- 	if (vb->state == VIDEOBUF_QUEUED) {
- 		list_del(&vb->queue);
- 		vb->state = VIDEOBUF_ERROR;
-+	} else if (cpu_is_mx25() && vb->state == VIDEOBUF_ACTIVE) {
-+		if (pcdev->fb1_active == buf) {
-+			pcdev->csicr1 &= ~CSICR1_FB1_DMA_INTEN;
-+			writel(0, pcdev->base_csi + CSIDMASA_FB1);
-+			pcdev->fb1_active = NULL;
-+		} else if (pcdev->fb2_active == buf) {
-+			pcdev->csicr1 &= ~CSICR1_FB2_DMA_INTEN;
-+			writel(0, pcdev->base_csi + CSIDMASA_FB2);
-+			pcdev->fb2_active = NULL;
-+		}
-+		writel(pcdev->csicr1, pcdev->base_csi + CSICR1);
-+		vb->state = VIDEOBUF_ERROR;
- 	}
- 	spin_unlock_irqrestore(&pcdev->lock, flags);
- 
--- 
-1.7.1
+Igor Grinberg (3):
+  [ARM] pxa3xx: Add U2D controller and ULPI driver
+  [ARM] usb/host/ohci-pxa27x: enable OHCI over U2DC
+  [ARM] pxa/cm-x300: enable USB host port2
+
+ arch/arm/mach-pxa/Kconfig                   |    4 +
+ arch/arm/mach-pxa/Makefile                  |    2 +-
+ arch/arm/mach-pxa/cm-x300.c                 |   77 ++++++
+ arch/arm/mach-pxa/devices.c                 |   28 ++
+ arch/arm/mach-pxa/devices.h                 |    1 +
+ arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h |   35 +++
+ arch/arm/mach-pxa/pxa3xx-ulpi.c             |  392 +++++++++++++++++++++++++++
+ arch/arm/mach-pxa/pxa3xx.c                  |    2 +-
+ drivers/usb/host/ohci-pxa27x.c              |    7 +
+ 9 files changed, 546 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h
+ create mode 100644 arch/arm/mach-pxa/pxa3xx-ulpi.c
