@@ -1,32 +1,26 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 27 Jul 2010 18:29:21 +0900
-Subject: [PATCH] ARM: clean files in arch/arm/boot/compressed/
-Message-ID: <20100727092921.3620.51711.sendpatchset@t400s>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 27 Jul 2010 12:32:11 +0300
+Subject: [PATCH v2 00/20] native support for wl1271 on ZOOM
+In-Reply-To: <20100726193028.GG3903@tuxdriver.com>
+References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
+	<20100726193028.GG3903@tuxdriver.com>
+Message-ID: <AANLkTi=L2ha_wcP3nBJ2txxH6iJkmEaqitbOALaouG6V@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Mon, Jul 26, 2010 at 10:30 PM, John W. Linville
+<linville@tuxdriver.com> wrote:
+> On Wed, Jul 21, 2010 at 08:33:34PM +0300, Ohad Ben-Cohen wrote:
+>> This patch series adds native support for wl1271 on ZOOM.
+>
+> Just for the record, I'm fine with the wl1271 bits here going through
+> the omap tree with the rest of the series.
 
-Update the compressed boot Makefile for ARM to
-remove files during clean.
+Thanks, John.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- Perhaps there is a better way to do this?
-
- arch/arm/boot/compressed/Makefile |    3 +++
- 1 file changed, 3 insertions(+)
-
---- 0001/arch/arm/boot/compressed/Makefile
-+++ work/arch/arm/boot/compressed/Makefile	2010-07-27 18:18:19.000000000 +0900
-@@ -67,6 +67,9 @@ targets       := vmlinux vmlinux.lds \
- 		 piggy.$(suffix_y) piggy.$(suffix_y).o \
- 		 font.o font.c head.o misc.o $(OBJS)
- 
-+# Make sure files are removed during clean
-+extra-y       += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
-+
- ifeq ($(CONFIG_FUNCTION_TRACER),y)
- ORIG_CFLAGS := $(KBUILD_CFLAGS)
- KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
+>
+> John
+> --
+> John W. Linville ? ? ? ? ? ? ? ?Someday the world will need a hero, and you
+> linville at tuxdriver.com ? ? ? ? ? ? ? ? ?might be all we have. ?Be ready.
+>
