@@ -1,33 +1,31 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Tue, 27 Jul 2010 15:43:37 -0700
-Subject: [PATCH 1/2] arm: msm: Add System MMU support.
-In-Reply-To: <1280270466-13503-1-git-send-email-stepanm@codeaurora.org>
-References: <1280270466-13503-1-git-send-email-stepanm@codeaurora.org>
-Message-ID: <1280270617.16382.5.camel@c-dwalke-linux.qualcomm.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 28 Jul 2010 01:16:07 +0200
+Subject: [PATCH] [ARM] VIC: Remove resume_sources
+In-Reply-To: <1276144595-17411-1-git-send-email-jy0922.shim@samsung.com>
+References: <1276144595-17411-1-git-send-email-jy0922.shim@samsung.com>
+Message-ID: <AANLkTiniACNQvLYGMiD43zUaRykMEjsFEigOSseUm33D@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-07-27 at 15:41 -0700, Stepan Moskovchenko wrote:
-> +/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-> + *
-> + * Redistribution and use in source and binary forms, with or without
-> + * modification, are permitted provided that the following conditions are
-> + * met:
-> + *     * Redistributions of source code must retain the above copyright
-> + *       notice, this list of conditions and the following disclaimer.
-> + *     * Redistributions in binary form must reproduce the above
-> + *       copyright notice, this list of conditions and the following
-> + *       disclaimer in the documentation and/or other materials provided
-> + *       with the distribution.
-> + *     * Neither the name of Code Aurora Forum, Inc. nor the names of its
-> + *       contributors may be used to endorse or promote products derived
-> + *       from this software without specific prior written permission. 
+2010/6/10 Joonyoung Shim <jy0922.shim@samsung.com>:
 
+> The resume_sources is the bitmask of interrupts allowed for resume
+> sources, but it's value is zero in the all machine using VIC then
+> vic_set_wake returns always error.
 
-This should be GPLv2 ..
+In the U300 I actually set it to 1, not 0, for all available interrupt
+lines. The idea is that any IRQ shall wake the system. I don't
+think it matters much tho.
 
-Daniel
+> The interrupt sources to allow can use to resume sources too and
+> vic_set_wake called by set_irq_wake desides whether enable or disable
+> interrupt sources to resume sources, so we don't have any reason to
+> control resume sources by resume_sources.
+>
+> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
 
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+That makes sense so:
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+
+Yours,
+Linus Walleij
