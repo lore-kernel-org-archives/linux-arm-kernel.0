@@ -1,30 +1,22 @@
-From: s-ghorai@ti.com (Sukumar Ghorai)
-Date: Tue, 27 Jul 2010 16:57:46 +0530
-Subject: [PATCH] mmc: failure of block read wait for long time
-Message-ID: <1280230066-27612-1-git-send-email-s-ghorai@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Jul 2010 12:37:06 +0100
+Subject: [PATCH] ARM: clean files in arch/arm/boot/compressed/
+In-Reply-To: <20100727092921.3620.51711.sendpatchset@t400s>
+References: <20100727092921.3620.51711.sendpatchset@t400s>
+Message-ID: <20100727113706.GB11468@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- multi-block read failure retries in single block read one by one. It continues
- retry of subsequent blocks, even after failure. Application will not be able
- to decode the interleave data (even if few single block read success).
- This patch fixes this problem by returning at the first failure instead of
- waiting for long duration.
+On Tue, Jul 27, 2010 at 06:29:21PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> Update the compressed boot Makefile for ARM to
+> remove files during clean.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+>  Perhaps there is a better way to do this?
 
-Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
----
- drivers/mmc/card/block.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
-index cb9fbc8..cfb0827 100644
---- a/drivers/mmc/card/block.c
-+++ b/drivers/mmc/card/block.c
-@@ -419,7 +419,6 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
- 				spin_lock_irq(&md->lock);
- 				ret = __blk_end_request(req, -EIO, brq.data.blksz);
- 				spin_unlock_irq(&md->lock);
--				continue;
- 			}
- 			goto cmd_err;
- 		}
+That'll do - can you stick it in the patch system please, and I'll try
+to get it in before 2.6.35 is released.
