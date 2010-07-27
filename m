@@ -1,46 +1,58 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 27 Jul 2010 17:32:31 +0200
-Subject: [PATCH] gpio: remove spurious gpio_unexport debug error.
-In-Reply-To: <20100726153236.ead96c88.akpm@linux-foundation.org>
-References: <1279832758-25442-1-git-send-email-gbean@codeaurora.org>
-	<20100723045807.GA14875@pengutronix.de>
-	<20100726153236.ead96c88.akpm@linux-foundation.org>
-Message-ID: <20100727153231.GA7072@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Jul 2010 17:07:10 +0100
+Subject: Issue with file transfers to a mass storage device on SMP system
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C62EF91F@dbde02.ent.ti.com>
+References: <EAF47CD23C76F840A9E7FCE10091EFAB02C62EF707@dbde02.ent.ti.com>
+	<20100727100121.GB7846@n2100.arm.linux.org.uk>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF75B@dbde02.ent.ti.com>
+	<20100727104133.GA10665@n2100.arm.linux.org.uk>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF83C@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF8F3@dbde02.ent.ti.com>
+	<20100727135939.GD11468@n2100.arm.linux.org.uk>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF90B@dbde02.ent.ti.com>
+	<20100727142113.GE11468@n2100.arm.linux.org.uk>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF91F@dbde02.ent.ti.com>
+Message-ID: <20100727160710.GF11468@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andrew,
-
-On Mon, Jul 26, 2010 at 03:32:36PM -0700, Andrew Morton wrote:
-> On Fri, 23 Jul 2010 06:58:07 +0200
-> Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de> wrote:
+On Tue, Jul 27, 2010 at 07:59:17PM +0530, Shilimkar, Santosh wrote:
+> Once it's pushed out of L2X WB, it will hit the memory. Just to give an additional data point, with CATC analyzer what we see that only those 
+> 16 bytes CDB are 0x0. This buffer was memset to 0x0 just before the
+> memcpy.
 > 
-> > Hello,
-> > 
-> > On Thu, Jul 22, 2010 at 02:05:58PM -0700, Gregory Bean wrote:
-> > > Make gpio_unexport generate success instead of an -EINVAL
-> > > if asked to unexport a line which is not exported, because
-> > > the only result of that condition is a pr_debug
-> > > which complains of what is really a harmless no-op:
-> > > when an unexported gpio is unexported again, nothing happens.
-> > > That's not a failure, just a trivial border case.
-> > > Since gpio_free calls gpio_unexport unconditionally
-> > > and exported gpio lines are uncommon, most calls to
-> > > gpio_free with debug flags enabled generate -EINVAL
-> > > warnings in the log, causing unnecessary stress.
-> > I noticed that a few days ago, too.  Just didn't come around to fix it
-> > myself.
-> >  
-> > > Signed-off-by: Gregory Bean <gbean@codeaurora.org>
-> > Acked-by: Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de>
-> > 
-> 
-> Jon got there first ;)
-OK, then he can get my ack, too.
+> I am just wondering who will issue a barrier(wmb) on this buffer before DMA
+> start if we don't use dma-mapping APIs? May be for dma_alloc_coherent
+> buffers, we need to explicitly issue the barrier.
 
-Thanks
-Uwe
+wmb's don't take addresses - they're a global thing.  All stores before
+the wmb() take effect before stores after the wmb().
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+The wmb() is issued by Catalin's IO ordering patches:
+
++#define writeb(v,c)            ({ wmb(); writeb_relaxed(v,c); })
++#define writew(v,c)            ({ wmb(); writew_relaxed(v,c); })
++#define writel(v,c)            ({ wmb(); writel_relaxed(v,c); })
+
+So, the wmb() is issued to ensure that all stores to (eg) buffers
+allocated by dma_alloc_coherent() hit memory prior to the store to
+the device.
+
+Now, if you're writing to registers using something other than write[bwl](),
+you'll miss the wmb(), and therefore your DMA buffer won't be up to date.
+
+And this _is_ the problem:
+
+drivers/usb/musb/musb_io.h:static inline void musb_writew(void __iomem *addr, unsigned offset, u16 data)
+drivers/usb/musb/musb_io.h:     { __raw_writew(data, addr + offset); }
+drivers/usb/musb/musb_io.h:static inline void musb_writel(void __iomem *addr, unsigned offset, u32 data)
+drivers/usb/musb/musb_io.h:     { __raw_writel(data, addr + offset); }
+drivers/usb/musb/musb_io.h:static inline void musb_writeb(void __iomem *addr, unsigned offset, u8 data)
+drivers/usb/musb/musb_io.h:     __raw_writew(tmp, addr + (offset & ~1));
+drivers/usb/musb/musb_io.h:static inline void musb_writeb(void __iomem *addr, unsigned offset, u8 data)
+drivers/usb/musb/musb_io.h:     { __raw_writeb(data, addr + offset); }
+
+All IO performed by musb misses out on the barriers - so what you
+need to do is either add wmb()s to these, or you need to ensure
+that the driver has the various necessary memory barriers in place.
+The latter solution will be more efficient.
