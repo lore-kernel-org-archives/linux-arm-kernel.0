@@ -1,66 +1,123 @@
-From: s-ghorai@ti.com (Ghorai, Sukumar)
-Date: Tue, 27 Jul 2010 19:02:14 +0530
-Subject: [PATCH] mmc: failure of block read wait for long time
-In-Reply-To: <4C4EDD85.5060606@nokia.com>
-References: <1280230066-27612-1-git-send-email-s-ghorai@ti.com>
-	<4C4EDD85.5060606@nokia.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B030E417D80@dbde02.ent.ti.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 27 Jul 2010 19:15:25 +0530
+Subject: Issue with file transfers to a mass storage device on SMP	system
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C62EF83C@dbde02.ent.ti.com>
+References: <00e601cb2d55$cb6253c0$808918ac@apr.dhcp.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF707@dbde02.ent.ti.com>
+	<20100727100121.GB7846@n2100.arm.linux.org.uk>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF75B@dbde02.ent.ti.com>
+	<20100727104133.GA10665@n2100.arm.linux.org.uk>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF83C@dbde02.ent.ti.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C62EF8F3@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
 > -----Original Message-----
-> From: Adrian Hunter [mailto:adrian.hunter at nokia.com]
-> Sent: Tuesday, July 27, 2010 6:52 PM
-> To: Ghorai, Sukumar
-> Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] mmc: failure of block read wait for long time
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Shilimkar, Santosh
+> Sent: Tuesday, July 27, 2010 5:31 PM
+> To: Russell King - ARM Linux
+> Cc: Mankad, Maulik Ojas; linux-usb at vger.kernel.org; linux-
+> omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: RE: Issue with file transfers to a mass storage device on SMP
+> system
 > 
-> Sukumar Ghorai wrote:
-> >  multi-block read failure retries in single block read one by one. It
-> continues
-> >  retry of subsequent blocks, even after failure. Application will not be
-> able
-> >  to decode the interleave data (even if few single block read success).
-> >  This patch fixes this problem by returning at the first failure instead
-> of
-> >  waiting for long duration.
+> > -----Original Message-----
+> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> > Sent: Tuesday, July 27, 2010 4:12 PM
+> > To: Shilimkar, Santosh
+> > Cc: Mankad, Maulik Ojas; linux-usb at vger.kernel.org; linux-
+> > omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> > Subject: Re: Issue with file transfers to a mass storage device on SMP
+> > system
+> >
+> > On Tue, Jul 27, 2010 at 03:49:29PM +0530, Shilimkar, Santosh wrote:
+> > > > On Tue, Jul 27, 2010 at 03:08:54PM +0530, Shilimkar, Santosh wrote:
+> > > > > As discussed, the main reason is the cache maintenance isn't done
+> on
+> > > > >  "bcb->CDB"  buffers and hence the data remains in CPU write
+> buffer
+> > > > > instead of the physical memory on which DMA operates.
+> > > >
+> > > > struct bulk_cb_wrap {
+> > > >         __le32  Signature;              /* contains 'USBC' */
+> > > >         __u32   Tag;                    /* unique per command id */
+> > > >         __le32  DataTransferLength;     /* size of data */
+> > > >         __u8    Flags;                  /* direction in bit 0 */
+> > > >         __u8    Lun;                    /* LUN normally 0 */
+> > > >         __u8    Length;                 /* of of the CDB */
+> > > >         __u8    CDB[16];                /* max command */
+> > > > };
+> > > >
+> > > > So, CDB is contained within bcb...bcb+sizeof(*bcb).
+> > > >
+> > > > The bcb is passed to usb_stor_bulk_transfer_buf:
+> > > >
+> > > >         result = usb_stor_bulk_transfer_buf(us, us->send_bulk_pipe,
+> > > >                                 bcb, cbwlen, NULL);
+> > > >
+> > > > which fills it into a URB:
+> > > >
+> > > >         usb_fill_bulk_urb(us->current_urb, us->pusb_dev, pipe, buf,
+> > > > length,
+> > > >                       usb_stor_blocking_completion, NULL);
+> > > >
+> > > > This sets the URB buffer pointers:
+> > > >
+> > > >         urb->transfer_buffer = transfer_buffer;
+> > > >         urb->transfer_buffer_length = buffer_length;
+> > > >
+> > > > And this buffer should be dma-mapped and dma-unmapped as
+> appropriate.
+> > > >
+> > > > Wasn't there an issue with the DMA mapping being used with a PIO USB
+> > > > host recently?  Is that the problem here?
+> > > That's correct.
+> > > The last issue was otherway round where we were doing map/unmpap on
+> PIO
+> > buffer.
+> >
+> > That's exactly what I said.
+> >
+> > > This issue is because "CDB[16]", is not cleaned up before merging it
+> > into CBW.
+> >
+> > The CDB array is part of the CBW (struct bulk_cb_wrap).  When the
+> > struct bulk_cb_wrap is mapped for DMA, the CDB will also be as it
+> > is contained entirely within the CBW structure.
+> >
+> > As USB deals with the whole of the CBW as one block, it can't be that
+> > half of it is being DMA-mapped and the other half isn't - something
+> > else must be going on.  If the CDB was a separate chunk of memory, I
+> > could believe what you're suggesting.
+> >
+> > What we _do_ know is that 2.6.35-rc5 misses Catalin's barrier patches
+> > for readl+writel, which means that there are ordering issues between
+> > writing to memory and writing to devices.  This is what is going on
+> > here, and it is confirmed by this:
+> >
+> > | (3)Using wmb() (Write memory barrier) before starting DMA transfer in
+> > MUSB
+> > | driver fixes the issue.
+> >
+> > from Maulik.  The fix is to have Catalin's ordered IO accessors which
+> > add the wmb() internally to writel() to ensure that memory accesses
+> > are visible.
+> We have already those patches Russell and still see the issue. I think WMB
+> is helping because data is just 16 bytes which can reside in WB. Had it
+> been a bigger buffer this wouldn't have worked.
 > 
-> How can you know what sectors are important to the upper layers?
-[Ghorai] 
-1. This is obvious either give the complete data to above layer or not. And every protocol follows that.
+> Will get back to you with more data on this.
 
-2. And other scenario, say apps request for to read the 128MB data and it will take quite long time before returning in failure case.
+Maulik and I looked at the code and below is what seems to be an issue.
+The mass storage USB layer is not respecting the DMA/CPU buffer ownership.
 
-3. it is quite obvious if the read fail for sector(x) it will fail for sector(x+1)
+"usb_stor_Bulk_transport" gets "us-iobuf" which is already mapped for DMA.
+But inside this function the buffers is updated by the CPU which should not
+be done as per rule. Same buffer passed down for DMA to transfer where the 
+data might remain in CPU cache/WB. The dma map is not done on this buffer because it's being done already before passing it to 'usb_stor_Bulk_transport'
 
-> 
-> >
-> > Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
-> > ---
-> >  drivers/mmc/card/block.c |    1 -
-> >  1 files changed, 0 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
-> > index cb9fbc8..cfb0827 100644
-> > --- a/drivers/mmc/card/block.c
-> > +++ b/drivers/mmc/card/block.c
-> > @@ -419,7 +419,6 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq,
-> struct request *req)
-> >  				spin_lock_irq(&md->lock);
-> >  				ret = __blk_end_request(req, -EIO,
-> brq.data.blksz);
-> >  				spin_unlock_irq(&md->lock);
-> > -				continue;
-> >  			}
-> >  			goto cmd_err;
-> >  		}
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >
+Some USB expert can comment if this is indeed the case !!
 
 Regards,
-Ghorai
+Santosh
