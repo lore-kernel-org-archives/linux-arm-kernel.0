@@ -1,94 +1,19 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 27 Jul 2010 17:30:59 +0530
-Subject: Issue with file transfers to a mass storage device on SMP	system
-In-Reply-To: <20100727104133.GA10665@n2100.arm.linux.org.uk>
-References: <00e601cb2d55$cb6253c0$808918ac@apr.dhcp.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF707@dbde02.ent.ti.com>
-	<20100727100121.GB7846@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF75B@dbde02.ent.ti.com>
-	<20100727104133.GA10665@n2100.arm.linux.org.uk>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C62EF83C@dbde02.ent.ti.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 27 Jul 2010 15:06:06 +0300
+Subject: [PATCH 0/4] mx2_camera: mx25 fixes and enhancements
+Message-ID: <cover.1280229966.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Tuesday, July 27, 2010 4:12 PM
-> To: Shilimkar, Santosh
-> Cc: Mankad, Maulik Ojas; linux-usb at vger.kernel.org; linux-
-> omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: Issue with file transfers to a mass storage device on SMP
-> system
-> 
-> On Tue, Jul 27, 2010 at 03:49:29PM +0530, Shilimkar, Santosh wrote:
-> > > On Tue, Jul 27, 2010 at 03:08:54PM +0530, Shilimkar, Santosh wrote:
-> > > > As discussed, the main reason is the cache maintenance isn't done on
-> > > >  "bcb->CDB"  buffers and hence the data remains in CPU write buffer
-> > > > instead of the physical memory on which DMA operates.
-> > >
-> > > struct bulk_cb_wrap {
-> > >         __le32  Signature;              /* contains 'USBC' */
-> > >         __u32   Tag;                    /* unique per command id */
-> > >         __le32  DataTransferLength;     /* size of data */
-> > >         __u8    Flags;                  /* direction in bit 0 */
-> > >         __u8    Lun;                    /* LUN normally 0 */
-> > >         __u8    Length;                 /* of of the CDB */
-> > >         __u8    CDB[16];                /* max command */
-> > > };
-> > >
-> > > So, CDB is contained within bcb...bcb+sizeof(*bcb).
-> > >
-> > > The bcb is passed to usb_stor_bulk_transfer_buf:
-> > >
-> > >         result = usb_stor_bulk_transfer_buf(us, us->send_bulk_pipe,
-> > >                                 bcb, cbwlen, NULL);
-> > >
-> > > which fills it into a URB:
-> > >
-> > >         usb_fill_bulk_urb(us->current_urb, us->pusb_dev, pipe, buf,
-> > > length,
-> > >                       usb_stor_blocking_completion, NULL);
-> > >
-> > > This sets the URB buffer pointers:
-> > >
-> > >         urb->transfer_buffer = transfer_buffer;
-> > >         urb->transfer_buffer_length = buffer_length;
-> > >
-> > > And this buffer should be dma-mapped and dma-unmapped as appropriate.
-> > >
-> > > Wasn't there an issue with the DMA mapping being used with a PIO USB
-> > > host recently?  Is that the problem here?
-> > That's correct.
-> > The last issue was otherway round where we were doing map/unmpap on PIO
-> buffer.
-> 
-> That's exactly what I said.
-> 
-> > This issue is because "CDB[16]", is not cleaned up before merging it
-> into CBW.
-> 
-> The CDB array is part of the CBW (struct bulk_cb_wrap).  When the
-> struct bulk_cb_wrap is mapped for DMA, the CDB will also be as it
-> is contained entirely within the CBW structure.
-> 
-> As USB deals with the whole of the CBW as one block, it can't be that
-> half of it is being DMA-mapped and the other half isn't - something
-> else must be going on.  If the CDB was a separate chunk of memory, I
-> could believe what you're suggesting.
-> 
-> What we _do_ know is that 2.6.35-rc5 misses Catalin's barrier patches
-> for readl+writel, which means that there are ordering issues between
-> writing to memory and writing to devices.  This is what is going on
-> here, and it is confirmed by this:
-> 
-> | (3)Using wmb() (Write memory barrier) before starting DMA transfer in
-> MUSB
-> | driver fixes the issue.
-> 
-> from Maulik.  The fix is to have Catalin's ordered IO accessors which
-> add the wmb() internally to writel() to ensure that memory accesses
-> are visible.
-We have already those patches Russell and still see the issue. I think WMB 
-is helping because data is just 16 bytes which can reside in WB. Had it been a bigger buffer this wouldn't have worked.
+The first 3 pathces in this series are fixes for the mx2_camera driver which is 
+going upstream via the imx git tree. The last patch implements forced active 
+buffer termination on mx25.
 
-Will get back to you with more data on this.
+Baruch Siach (4):
+  mx2_camera: fix a race causing NULL dereference
+  mx2_camera: return IRQ_NONE when doing nothing
+  mx2_camera: fix comment typo
+  mx2_camera: implement forced termination of active buffer for mx25
+
+ drivers/media/video/mx2_camera.c |   34 ++++++++++++++++++++++++++--------
+ 1 files changed, 26 insertions(+), 8 deletions(-)
