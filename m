@@ -1,31 +1,107 @@
-From: a.zummo@towertech.it (Alessandro Zummo)
-Date: Tue, 27 Jul 2010 19:46:11 +0200
-Subject: [rtc-linux] [PATCH v2 3/3] rtc: rtc-s3c: Add BCD register
-	initialization codes
-In-Reply-To: <1280235553-27369-1-git-send-email-kgene.kim@samsung.com>
-References: <1280235553-27369-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20100727194611.04486f92@linux.lan.towertech.it>
+From: avorontsov@mvista.com (Anton Vorontsov)
+Date: Tue, 27 Jul 2010 21:57:10 +0400
+Subject: [PATCH resend] ARM: Small cleanup for 'config PCI'
+Message-ID: <20100727175710.GA25216@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Jul 2010 21:59:13 +0900
-Kukjin Kim <kgene.kim@samsung.com> wrote:
+Simply introduce ARCH_HAS_PCI to avoid the very long 'if' condition
+for PCI Kconfig symbol.
 
-> From: Taekgyun Ko <taeggyun.ko@samsung.com>
-> 
-> RTC needs to be initialized when BCD registers have invalid value.
-> 
-> Signed-off-by: Taekgyun Ko <taeggyun.ko@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Suggested-by: Ben Dooks <ben@simtec.co.uk>
+Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
+---
 
+Just resending
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/016978.html
 
- Acked-by: Alessandro Zummo <a.zummo@towertech.it>
+Thanks,
 
+ arch/arm/Kconfig                 |   11 ++++++++++-
+ arch/arm/mach-integrator/Kconfig |    1 +
+ arch/arm/mach-pxa/Kconfig        |    1 +
+ arch/arm/mach-versatile/Kconfig  |    1 +
+ 4 files changed, 13 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7bc76de..5731caa 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -301,6 +301,7 @@ config ARCH_CNS3XXX
+ 	select CPU_V6
+ 	select GENERIC_CLOCKEVENTS
+ 	select ARM_GIC
++	select ARCH_HAS_PCI
+ 	select PCI_DOMAINS if PCI
+ 	help
+ 	  Support for Cavium Networks CNS3XXX platform.
+@@ -436,6 +437,7 @@ config ARCH_IXP4XX
+ 	select CPU_XSCALE
+ 	select GENERIC_GPIO
+ 	select GENERIC_CLOCKEVENTS
++	select ARCH_HAS_PCI
+ 	select DMABOUNCE if PCI
+ 	help
+ 	  Support for Intel's IXP4XX (XScale) family of processors.
+@@ -523,6 +525,7 @@ config ARCH_KS8695
+ 	select CPU_ARM922T
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_USES_GETTIMEOFFSET
++	select ARCH_HAS_PCI
+ 	help
+ 	  Support for Micrel/Kendin KS8695 "Centaur" (ARM922T) based
+ 	  System-on-Chip devices.
+@@ -1060,8 +1063,14 @@ config ISA_DMA
+ config ISA_DMA_API
+ 	bool
+ 
++config ARCH_HAS_PCI
++	bool
++	help
++	  Architectures should select this option if they want to give
++	  user a choice to enable PCI support.
++
+ config PCI
+-	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB || ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX
++	bool "PCI support" if ARCH_HAS_PCI
+ 	help
+ 	  Find out whether you have a PCI motherboard. PCI is the name of a
+ 	  bus system, i.e. the way the CPU talks to the other stuff inside
+diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
+index 27db275..6116308 100644
+--- a/arch/arm/mach-integrator/Kconfig
++++ b/arch/arm/mach-integrator/Kconfig
+@@ -4,6 +4,7 @@ menu "Integrator Options"
+ 
+ config ARCH_INTEGRATOR_AP
+ 	bool "Support Integrator/AP and Integrator/PP2 platforms"
++	select ARCH_HAS_PCI
+ 	help
+ 	  Include support for the ARM(R) Integrator/AP and
+ 	  Integrator/PP2 platforms.
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index 3b51741..67907f0 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -96,6 +96,7 @@ config MACH_ARMCORE
+ 	select PXA27x
+ 	select IWMMXT
+ 	select PXA25x
++	select ARCH_HAS_PCI
+ 
+ config MACH_EM_X270
+ 	bool "CompuLab EM-x270 platform"
+diff --git a/arch/arm/mach-versatile/Kconfig b/arch/arm/mach-versatile/Kconfig
+index c781f30..2dd4c12 100644
+--- a/arch/arm/mach-versatile/Kconfig
++++ b/arch/arm/mach-versatile/Kconfig
+@@ -4,6 +4,7 @@ menu "Versatile platform type"
+ config ARCH_VERSATILE_PB
+ 	bool "Support Versatile/PB platform"
+ 	select CPU_ARM926T
++	select ARCH_HAS_PCI
+ 	default y
+ 	help
+ 	  Include support for the ARM(R) Versatile/PB platform.
 -- 
-
- Best regards,
-
- Alessandro Zummo,
-  Tower Technologies - Torino, Italy
-
-  http://www.towertech.it
+1.7.0.5
