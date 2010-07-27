@@ -1,29 +1,33 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 28 Jul 2010 00:25:20 +0200
-Subject: [PATCH] Watchdog: Adding support for ARM Primecell SP805 Watchdog
-In-Reply-To: <4C4E65A4.7030005@st.com>
-References: <1274344428-28329-1-git-send-email-viresh.kumar@st.com>
-	<AANLkTik1vSgASNLXSpYD2MVgmQGgvCx-5mFY_3YFsuHL@mail.gmail.com>
-	<4C43DD7E.5050800@st.com> <4C4E65A4.7030005@st.com>
-Message-ID: <AANLkTiktDfvRUjA-Scu643=GniuNzqKjNFBZY2foh_fa@mail.gmail.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 27 Jul 2010 15:43:37 -0700
+Subject: [PATCH 1/2] arm: msm: Add System MMU support.
+In-Reply-To: <1280270466-13503-1-git-send-email-stepanm@codeaurora.org>
+References: <1280270466-13503-1-git-send-email-stepanm@codeaurora.org>
+Message-ID: <1280270617.16382.5.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/27 Viresh KUMAR <viresh.kumar@st.com>:
+On Tue, 2010-07-27 at 15:41 -0700, Stepan Moskovchenko wrote:
+> +/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+> + *
+> + * Redistribution and use in source and binary forms, with or without
+> + * modification, are permitted provided that the following conditions are
+> + * met:
+> + *     * Redistributions of source code must retain the above copyright
+> + *       notice, this list of conditions and the following disclaimer.
+> + *     * Redistributions in binary form must reproduce the above
+> + *       copyright notice, this list of conditions and the following
+> + *       disclaimer in the documentation and/or other materials provided
+> + *       with the distribution.
+> + *     * Neither the name of Code Aurora Forum, Inc. nor the names of its
+> + *       contributors may be used to endorse or promote products derived
+> + *       from this software without specific prior written permission. 
 
->>>> >> + ? ? ? /* roundup timeout to closest positive integer value */
->>>> >> + ? ? ? wdt->timeout = div_u64((load + 1) * 2 + (rate / 2), rate);
->>> >
->>> > Look in linux/kernel.h, use the
->>> > DIV_ROUND_CLOSEST() macro instead of this.
->
-> Now i remember why i didn't choose DIV_ROUND_CLOSEST in V1 of this patch.
-> As it is a u64 division, i get following compilation error if i use
-> DIV_ROUND_CLOSEST. I wasn't sure if inclusion of some header file can remove
-> this error, and so i used div_u64.
 
-Aha, I have no solution to that, but I'd recommend adding the comment
-/* Cannot use DIV_ROUND_CLOSEST() due to the 64bit size */
+This should be GPLv2 ..
 
-Yours,
-Linus Walleij
+Daniel
+
+-- 
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
