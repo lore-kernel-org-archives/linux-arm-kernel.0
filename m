@@ -1,7 +1,7 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 28 Jul 2010 13:57:44 +0800
-Subject: [PATCH 17/29] mmp: correct nand clock setting for pxa168 and pxa910
-Message-ID: <AANLkTin4vm2oxiRv=Zuoujdk9G8ojmsDgmiJKNWkv1Cg@mail.gmail.com>
+Date: Wed, 28 Jul 2010 13:58:01 +0800
+Subject: [PATCH 19/29] pxa3xx_nand: update ns2cycle calculation method
+Message-ID: <AANLkTimopoTQVJusuKkVz6=sFF+yeRWkOGQBOP-zNpL0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
