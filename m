@@ -1,152 +1,66 @@
-From: davidsin@ti.com (Sin, David)
-Date: Wed, 28 Jul 2010 10:23:06 -0500
-Subject: [RFC 0/8] TI TILER-DMM driver
-In-Reply-To: <201007241312.53551.hverkuil@xs4all.nl>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 28 Jul 2010 21:16:22 +0530
+Subject: [RFC 1/8] TILER-DMM: DMM-PAT driver for TI TILER
+In-Reply-To: <513FF747EED39B4AADBB4D6C9D9F9F7903D64D75EB@dlee02.ent.ti.com>
 References: <1279927348-21750-1-git-send-email-davidsin@ti.com>
-	<201007241312.53551.hverkuil@xs4all.nl>
-Message-ID: <513FF747EED39B4AADBB4D6C9D9F9F7903D64D76D5@dlee02.ent.ti.com>
+	<513FF747EED39B4AADBB4D6C9D9F9F7903D644D974@dlee02.ent.ti.com>
+	<19F8576C6E063C45BE387C64729E7394044ED6385D@dbde02.ent.ti.com>
+	<201007281200.23458.laurent.pinchart@ideasonboard.com>
+	<513FF747EED39B4AADBB4D6C9D9F9F7903D64D75EB@dlee02.ent.ti.com>
+Message-ID: <19F8576C6E063C45BE387C64729E7394044EE51DAD@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
-> From: Hans Verkuil [mailto:hverkuil at xs4all.nl] 
-> Sent: Saturday, July 24, 2010 6:13 AM
-> To: Sin, David
-> Cc: linux-arm-kernel at lists.arm.linux.org.uk; 
-> linux-omap at vger.kernel.org; Tony Lindgren; Russell King; 
-> Kanigeri, Hari; Ohad Ben-Cohen; Hiremath, Vaibhav; Shilimkar, Santosh
-> Subject: Re: [RFC 0/8] TI TILER-DMM driver
+> From: Sin, David
+> Sent: Wednesday, July 28, 2010 8:09 PM
+> To: Laurent Pinchart; linux-arm-kernel at lists.infradead.org
+> Cc: Hiremath, Vaibhav; linux-omap at vger.kernel.org; Tony Lindgren; Russell
+> King; Ohad Ben-Cohen; Kanigeri, Hari; Shilimkar, Santosh; Molnar, Lajos
+> Subject: RE: [RFC 1/8] TILER-DMM: DMM-PAT driver for TI TILER
 > 
-> Hi David,
-> 
-> On Saturday 24 July 2010 01:22:20 David Sin wrote:
-> > TILER is a hardware block made by Texas Instruments.  Its 
-> purpose is to 
-> > organize video/image memory in a 2-dimensional fashion to 
-> limit memory 
-> > bandwidth and facilitate 0 effort rotation and mirroring.  
-> The TILER 
-> > driver facilitates allocating, freeing, as well as mapping 
-> 2D blocks (areas) 
-> > in the TILER container(s).  It also facilitates rotating 
-> and mirroring 
-> > the allocated blocks or its rectangular subsections.
-> 
-> Since this driver is part of the media/video subsystem you 
-> should cross-post
-> it to the linux-media mailinglist as well.
-> 
-> The main question that I have is how this driver is to be 
-> used in practice.
-> How does it fit into the bigger video4linux picture? Is this 
-> something that
-> is mainly used from other v4l or fb drivers? Or is it 
-> controlled by userspace?
+> > -----Original Message-----
+> > From: Laurent Pinchart [mailto:laurent.pinchart at ideasonboard.com]
+> > Sent: Wednesday, July 28, 2010 5:00 AM
+> > To: linux-arm-kernel at lists.infradead.org
+> > Cc: Hiremath, Vaibhav; Sin, David;
+> > linux-omap at vger.kernel.org; Tony Lindgren; Russell King; Ohad
+> > Ben-Cohen; Kanigeri, Hari; Shilimkar, Santosh; Molnar, Lajos
+> > Subject: Re: [RFC 1/8] TILER-DMM: DMM-PAT driver for TI TILER
+<snip>
 
-[dhs] I missed this one -- my apologies.  As I stated to Vaibhav, any device can use TILER memory, but there is a big advantage, performance-wise, for 2-Dimensional macro block based buffers.  This HW is intended for image/video hardware accelerators (e.g. OMAP4 IVA-HD).  Plus there's the added advantage of doing zero-copy flips and rotations for the OMAP display and image sub-systems.
-
-In this RFC, there are only kernel APIs to allocate TILER memory.  Eventually, we would like to provide a way to obtain TILER memory to the user space.
-
-> 
-> Regards,
-> 
-> 	Hans
-> 
-> > 
-> > List of pending items in proposed order:
-> > 
-> > * Add area packing support (multiple blocks can reside in 
-> the same band/area)
-> >   to optimize area use
-> > * Add group-ID support (to specify which blocks can reside 
-> together in the
-> >   same area)
-> > * Add multiple search directions to TCM-SiTA
-> > * Add 1D block support (including adding 1D search algo to TCM-SiTA)
-> > * Optimize mutex handling (don.t hold mutex during memory
-> >   allocation/mapping/cache flushing)
-> > * Add block reference counting, support for sharing blocks
-> > * Move all kernel-API-s to tiler-iface.c
-> > * Support orphaned block support (in preparation for 
-> process cleanup support)
-> > * Change block identification from physical address to key-ID pair
-> >   (in preparation for user space support, and process security)
-> > * Add support for process security (blocks from separate 
-> processes never
-> >   reside in the same band)
-> > * Support file interface (ioctl and mmap)
-> > * Support for buffers (ordered list of blocks that are 
-> mapped to userspace
-> >   together, such as YUV420sp)
-> > * Support 1D user buffer mapping into TILER container
-> > * Support for block pre-reservation (to further optimize area use)
-> > 
-> > David Sin (1):
-> >   TILER-DMM: DMM-PAT driver for TI TILER
-> > 
-> > Lajos Molnar (6):
-> >   TILER-DMM: Container manager interface and utility definitons
-> >   TILER-DMM: TILER Memory Manager interface and implementation
-> >   TILER-DMM: TILER interface file and documentation
-> >   TILER-DMM: Geometry and view manipulation functions.
-> >   TILER-DMM: Main TILER driver implementation.
-> >   TILER-DMM: Linking TILER driver into the Linux kernel build
-> > 
-> > Ravi Ramachandra (1):
-> >   TILER-DMM: Sample TCM implementation: Simple TILER Allocator
-> > 
-> >  Documentation/arm/TILER                   |  144 +++++++++
-> >  arch/arm/mach-omap2/include/mach/dmm.h    |  128 ++++++++
-> >  arch/arm/mach-omap2/include/mach/tiler.h  |  201 +++++++++++++
-> >  drivers/media/Kconfig                     |    6 +
-> >  drivers/media/Makefile                    |    2 +
-> >  drivers/media/video/tiler/Kconfig         |   65 ++++
-> >  drivers/media/video/tiler/Makefile        |    7 +
-> >  drivers/media/video/tiler/_tiler.h        |   51 ++++
-> >  drivers/media/video/tiler/dmm.c           |  200 +++++++++++++
-> >  drivers/media/video/tiler/tcm.h           |  209 +++++++++++++
-> >  drivers/media/video/tiler/tcm/Makefile    |    1 +
-> >  drivers/media/video/tiler/tcm/_tcm-sita.h |   64 ++++
-> >  drivers/media/video/tiler/tcm/tcm-sita.c  |  459 
-> +++++++++++++++++++++++++++++
-> >  drivers/media/video/tiler/tcm/tcm-sita.h  |   37 +++
-> >  drivers/media/video/tiler/tcm/tcm-utils.h |   54 ++++
-> >  drivers/media/video/tiler/tiler-geom.c    |  360 
-> ++++++++++++++++++++++
-> >  drivers/media/video/tiler/tiler-iface.c   |  106 +++++++
-> >  drivers/media/video/tiler/tiler-main.c    |  426 
-> ++++++++++++++++++++++++++
-> >  drivers/media/video/tiler/tmm-pat.c       |  274 +++++++++++++++++
-> >  drivers/media/video/tiler/tmm.h           |  109 +++++++
-> >  20 files changed, 2903 insertions(+), 0 deletions(-)
-> >  create mode 100644 Documentation/arm/TILER
-> >  create mode 100644 arch/arm/mach-omap2/include/mach/dmm.h
-> >  create mode 100644 arch/arm/mach-omap2/include/mach/tiler.h
-> >  create mode 100644 drivers/media/video/tiler/Kconfig
-> >  create mode 100644 drivers/media/video/tiler/Makefile
-> >  create mode 100644 drivers/media/video/tiler/_tiler.h
-> >  create mode 100644 drivers/media/video/tiler/dmm.c
-> >  create mode 100644 drivers/media/video/tiler/tcm.h
-> >  create mode 100644 drivers/media/video/tiler/tcm/Makefile
-> >  create mode 100644 drivers/media/video/tiler/tcm/_tcm-sita.h
-> >  create mode 100644 drivers/media/video/tiler/tcm/tcm-sita.c
-> >  create mode 100644 drivers/media/video/tiler/tcm/tcm-sita.h
-> >  create mode 100644 drivers/media/video/tiler/tcm/tcm-utils.h
-> >  create mode 100644 drivers/media/video/tiler/tiler-geom.c
-> >  create mode 100644 drivers/media/video/tiler/tiler-iface.c
-> >  create mode 100644 drivers/media/video/tiler/tiler-main.c
-> >  create mode 100644 drivers/media/video/tiler/tmm-pat.c
-> >  create mode 100644 drivers/media/video/tiler/tmm.h
-> > 
+> > I think I agree with it. The tiler provides dynamic views on
+> > arbitrary
+> > physical memory. Ideally it shouldn't be tied to the
+> > media/video subsystem
+> > (obviously it should still provide an interface for V4L drivers).
+> >
+> > It's getting a bit hard to comment on the proposal, as
+> > there's no public
+> > documentation I'm aware of beside the Documentation/arm/TILER
+> > file in the
+> > patch set, and that information is far too concise and vague.
+> >
 > > --
-> > To unsubscribe from this list: send the line "unsubscribe 
-> linux-omap" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > 
-> > 
+> > Regards,
+> >
+> > Laurent Pinchart
+> >
 > 
-> -- 
-> Hans Verkuil - video4linux developer - sponsored by TANDBERG, 
-> part of Cisco
+> [dhs] I understand what you're stating here, conceptually, but I'm missing
+> some details.  Do you mean that there needs to be a generic layer between a
+> given video memory allocator and V4L? 
+> and that set of APIs should point to
+> specific functions based on availability (e.g. VRFB, TILER, future TILER,
+> other IP, etc)?
 > 
+[Hiremath, Vaibhav] David,
+As far as Memory allocator is concerned I think it is more generic term and should not really tie to underneath hardware/feature (Tiler, VRFB or could be anything). This is long time issue with every Embedded devices dealing with Video, due to their dynamic requirement of memory/buffers.
+
+Have you looked at Samsung (CMA) and Qualcomm (IOMMU) patches for memory allocation/management? I think it is worth to look at their approach. 
+
+Thanks,
+Vaibhav
+
+> Laurent:  The TRM for DMM-TILER should be publicly available already, but
+> for some reason, I'm not able to see the link.  I will work on this...
