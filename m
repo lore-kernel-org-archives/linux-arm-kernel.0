@@ -1,39 +1,36 @@
-From: PeterHuewe@gmx.de (Peter Huewe)
-Date: Wed, 28 Jul 2010 20:43:13 +0200
-Subject: [PATCH] arm/mach-ixp2000: Add missing comma - fix build failure
-Message-ID: <201007282043.13561.PeterHuewe@gmx.de>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Wed, 28 Jul 2010 20:47:49 +0200
+Subject: Git pull request: ARM LPC32XX architecture
+In-Reply-To: <20100727214439.GA22475@n2100.arm.linux.org.uk>
+References: <a08234131003121244t6f914926s3ea75e98c017686a@mail.gmail.com>
+	<20100312210353.GB1146@n2100.arm.linux.org.uk>
+	<083DF309106F364B939360100EC290F80AC2FF1AE8@eu1rdcrdc1wx030.exi.nxp.com>
+	<20100525172106.GA16204@n2100.arm.linux.org.uk>
+	<083DF309106F364B939360100EC290F80AC2FF21ED@eu1rdcrdc1wx030.exi.nxp.com>
+	<083DF309106F364B939360100EC290F80AC392A1F8@eu1rdcrdc1wx030.exi.nxp.com>
+	<20100727164540.GC17099@n2100.arm.linux.org.uk>
+	<20100727164945.GD17099@n2100.arm.linux.org.uk>
+	<083DF309106F364B939360100EC290F80AC392A25D@eu1rdcrdc1wx030.exi.nxp.com>
+	<20100727214439.GA22475@n2100.arm.linux.org.uk>
+Message-ID: <083DF309106F364B939360100EC290F80AC392A795@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Huewe <peterhuewe@gmx.de>
 
-This trivial patch fixes a build failure [1] by adding a missing comma.
+Hi Russell,
 
-Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
----
-KernelVersion: linux-next-20100728
+> On Tue, Jul 27, 2010 at 10:00:16PM +0200, Kevin Wells wrote:
+> > Can you pull the series if I completely remove the defconfig file
+> (for
+> > now at least)?
+> 
+> Yes.
 
-References:
-[1] http://kisskb.ellerman.id.au/kisskb/buildresult/2980895/
+Please pull the updated LPC32xx tree from:
+git://git.lpclinux.com/linux-2.6-lpc wells/lpc32xx-arch_v2
 
-BF introduced by 3cad685d - ARM: 6253/1: Add 'code' parameter for
-hook_fault_code()
+There is no defconfig in this, but I'll post that as a separate
+patch and it can be pulled later if needed.
 
- arch/arm/mach-ixp2000/pci.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-ixp2000/pci.c b/arch/arm/mach-ixp2000/pci.c
-index 853fd90..f797c5f 100644
---- a/arch/arm/mach-ixp2000/pci.c
-+++ b/arch/arm/mach-ixp2000/pci.c
-@@ -209,7 +209,7 @@ ixp2000_pci_preinit(void)
- 			"the needed workaround has not been configured in");
- #endif
- 
--	hook_fault_code(16+6, ixp2000_pci_abort_handler, SIGBUS, 0
-+	hook_fault_code(16+6, ixp2000_pci_abort_handler, SIGBUS, 0,
- 				"PCI config cycle to non-existent device");
- }
- 
--- 
-1.7.1
+thanks!
+Kevin
