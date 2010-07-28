@@ -1,57 +1,27 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 28 Jul 2010 08:53:37 +0200
-Subject: [PATCH 2/4] mx2_camera: return IRQ_NONE when doing nothing
-In-Reply-To: <49da2476310a921b19226d572503b7c04175204d.1280229966.git.baruch@tkos.co.il>
-References: <cover.1280229966.git.baruch@tkos.co.il>
-	<49da2476310a921b19226d572503b7c04175204d.1280229966.git.baruch@tkos.co.il>
-Message-ID: <20100728065337.GC14113@pengutronix.de>
+Date: Wed, 28 Jul 2010 09:12:40 +0200
+Subject: Pull request mxc
+In-Reply-To: <20100727050911.GA22765@jasper.tkos.co.il>
+References: <20100726090014.GQ14113@pengutronix.de>
+	<20100727050911.GA22765@jasper.tkos.co.il>
+Message-ID: <20100728071240.GF14113@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 27, 2010 at 03:06:08PM +0300, Baruch Siach wrote:
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> ---
->  drivers/media/video/mx2_camera.c |    8 +++++---
->  1 files changed, 5 insertions(+), 3 deletions(-)
+On Tue, Jul 27, 2010 at 08:09:12AM +0300, Baruch Siach wrote:
+> Hi Sascha,
 > 
-> diff --git a/drivers/media/video/mx2_camera.c b/drivers/media/video/mx2_camera.c
-> index 1536bd4..b42ad8d 100644
-> --- a/drivers/media/video/mx2_camera.c
-> +++ b/drivers/media/video/mx2_camera.c
-> @@ -420,15 +420,17 @@ static irqreturn_t mx25_camera_irq(int irq_csi, void *data)
->  	struct mx2_camera_dev *pcdev = data;
->  	u32 status = readl(pcdev->base_csi + CSISR);
->  
-> -	if (status & CSISR_DMA_TSF_FB1_INT)
-> +	writel(status, pcdev->base_csi + CSISR);
-> +
-> +	if (!(status & (CSISR_DMA_TSF_FB1_INT | CSISR_DMA_TSF_FB2_INT)))
-> +		return IRQ_NONE;
+> On Mon, Jul 26, 2010 at 11:00:14AM +0200, Sascha Hauer wrote:
+> > Please pull the following patches for 2.6.36.
+> 
+> I'm using this opportunity to ask about the verdict of the "arm/imx/gpio: add 
+> spinlock protection" patch that I posted on July, 6. As I mentioned since this 
+> fixes a potential GPIO register corruption, this is should go in before .36.
 
-I'm not sure this is correct. When we get here, the interrupt definitely
-is from the camera, it's not a shared interrupt. So this only provokes a
-'nobody cared' message from the kernel (if it's still present, I don't
-know).
+Indeed, added this one.
 
 Sascha
 
-
-> +	else if (status & CSISR_DMA_TSF_FB1_INT)
->  		mx25_camera_frame_done(pcdev, 1, VIDEOBUF_DONE);
->  	else if (status & CSISR_DMA_TSF_FB2_INT)
->  		mx25_camera_frame_done(pcdev, 2, VIDEOBUF_DONE);
->  
->  	/* FIXME: handle CSISR_RFF_OR_INT */
->  
-> -	writel(status, pcdev->base_csi + CSISR);
-> -
->  	return IRQ_HANDLED;
->  }
->  
-> -- 
-> 1.7.1
-> 
-> 
 
 -- 
 Pengutronix e.K.                           |                             |
