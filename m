@@ -1,108 +1,152 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Wed, 28 Jul 2010 16:48:06 +0200
-Subject: [PATCH 4/4] sdhci-s3c: add regulator support
-In-Reply-To: <1280326797-15792-5-git-send-email-m.szyprowski@samsung.com>
-References: <1280326797-15792-1-git-send-email-m.szyprowski@samsung.com>
-	<1280326797-15792-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <4C504326.30708@gmail.com>
+From: davidsin@ti.com (Sin, David)
+Date: Wed, 28 Jul 2010 10:23:06 -0500
+Subject: [RFC 0/8] TI TILER-DMM driver
+In-Reply-To: <201007241312.53551.hverkuil@xs4all.nl>
+References: <1279927348-21750-1-git-send-email-davidsin@ti.com>
+	<201007241312.53551.hverkuil@xs4all.nl>
+Message-ID: <513FF747EED39B4AADBB4D6C9D9F9F7903D64D76D5@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Op 28-07-10 16:19, Marek Szyprowski schreef:
-> This patch adds support for regulator API to sdhci-s3c driver. Regulators
-> can be used to disable power in suspended state to reduce dissipated
-> energy.
+> -----Original Message-----
+> From: Hans Verkuil [mailto:hverkuil at xs4all.nl] 
+> Sent: Saturday, July 24, 2010 6:13 AM
+> To: Sin, David
+> Cc: linux-arm-kernel at lists.arm.linux.org.uk; 
+> linux-omap at vger.kernel.org; Tony Lindgren; Russell King; 
+> Kanigeri, Hari; Ohad Ben-Cohen; Hiremath, Vaibhav; Shilimkar, Santosh
+> Subject: Re: [RFC 0/8] TI TILER-DMM driver
+> 
+> Hi David,
+> 
+> On Saturday 24 July 2010 01:22:20 David Sin wrote:
+> > TILER is a hardware block made by Texas Instruments.  Its 
+> purpose is to 
+> > organize video/image memory in a 2-dimensional fashion to 
+> limit memory 
+> > bandwidth and facilitate 0 effort rotation and mirroring.  
+> The TILER 
+> > driver facilitates allocating, freeing, as well as mapping 
+> 2D blocks (areas) 
+> > in the TILER container(s).  It also facilitates rotating 
+> and mirroring 
+> > the allocated blocks or its rectangular subsections.
+> 
+> Since this driver is part of the media/video subsystem you 
+> should cross-post
+> it to the linux-media mailinglist as well.
+> 
+> The main question that I have is how this driver is to be 
+> used in practice.
+> How does it fit into the bigger video4linux picture? Is this 
+> something that
+> is mainly used from other v4l or fb drivers? Or is it 
+> controlled by userspace?
 
-I'm not sure about this, when I would try to do this I'd look at implementing
-this in the sdhci driver itself instead of a subdriver of it.
+[dhs] I missed this one -- my apologies.  As I stated to Vaibhav, any device can use TILER memory, but there is a big advantage, performance-wise, for 2-Dimensional macro block based buffers.  This HW is intended for image/video hardware accelerators (e.g. OMAP4 IVA-HD).  Plus there's the added advantage of doing zero-copy flips and rotations for the OMAP display and image sub-systems.
 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/mmc/host/sdhci-s3c.c |   30 +++++++++++++++++++++++++++++-
->  1 files changed, 29 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> index 606e695..b9d46a5 100644
-> --- a/drivers/mmc/host/sdhci-s3c.c
-> +++ b/drivers/mmc/host/sdhci-s3c.c
-> @@ -19,6 +19,7 @@
->  #include <linux/clk.h>
->  #include <linux/io.h>
->  #include <linux/gpio.h>
-> +#include <linux/regulator/consumer.h>
->  
->  #include <linux/mmc/host.h>
->  
-> @@ -50,6 +51,7 @@ struct sdhci_s3c {
->  
->  	struct clk		*clk_io;
->  	struct clk		*clk_bus[MAX_BUS_CLK];
-> +	struct regulator	*vmmc;
->  };
->  
->  static inline struct sdhci_s3c *to_s3c(struct sdhci_host *host)
-> @@ -309,6 +311,13 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, host);
->  
-> +	sc->vmmc = regulator_get(dev, "vmmc");
-> +	if (IS_ERR(sc->vmmc)) {
-> +		dev_warn(dev, "no vmmc regulator found\n");
-> +		sc->vmmc = NULL;
-> +	} else
-> +		regulator_enable(sc->vmmc);
-> +
->  	sc->clk_io = clk_get(dev, "hsmmc");
->  	if (IS_ERR(sc->clk_io)) {
->  		dev_err(dev, "failed to get io clock\n");
-> @@ -482,6 +491,11 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
->  	clk_disable(sc->clk_io);
->  	clk_put(sc->clk_io);
->  
-> +	if (sc->vmmc) {
-> +		regulator_disable(sc->vmmc);
-> +		regulator_put(sc->vmmc);
-> +	}
-> +
->  	iounmap(host->ioaddr);
->  	release_resource(sc->ioarea);
->  	kfree(sc->ioarea);
-> @@ -496,15 +510,29 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
->  
->  static int sdhci_s3c_suspend(struct platform_device *dev, pm_message_t pm)
->  {
-> +	int ret = 0;
->  	struct sdhci_host *host = platform_get_drvdata(dev);
-> +	struct sdhci_s3c *sc = sdhci_priv(host);
->  
->  	sdhci_suspend_host(host, pm);
-> -	return 0;
-> +
-> +	if (sc->vmmc)
-> +		ret = regulator_disable(sc->vmmc);
-> +
-> +	return ret;
->  }
->  
->  static int sdhci_s3c_resume(struct platform_device *dev)
->  {
->  	struct sdhci_host *host = platform_get_drvdata(dev);
-> +	struct sdhci_s3c *sc = sdhci_priv(host);
-> +
-> +	if (sc->vmmc) {
-> +		int ret = regulator_disable(sc->vmmc);
-> +		if (ret)
-> +			return ret;
-> +		mdelay(2);
+In this RFC, there are only kernel APIs to allocate TILER memory.  Eventually, we would like to provide a way to obtain TILER memory to the user space.
 
-Shouldn't these delays be handled in the regulator framework itself?
-
-> +	}
->  
->  	sdhci_resume_host(host);
->  	return 0;
-
-
--- 
-Maurus Cuelenaere
+> 
+> Regards,
+> 
+> 	Hans
+> 
+> > 
+> > List of pending items in proposed order:
+> > 
+> > * Add area packing support (multiple blocks can reside in 
+> the same band/area)
+> >   to optimize area use
+> > * Add group-ID support (to specify which blocks can reside 
+> together in the
+> >   same area)
+> > * Add multiple search directions to TCM-SiTA
+> > * Add 1D block support (including adding 1D search algo to TCM-SiTA)
+> > * Optimize mutex handling (don.t hold mutex during memory
+> >   allocation/mapping/cache flushing)
+> > * Add block reference counting, support for sharing blocks
+> > * Move all kernel-API-s to tiler-iface.c
+> > * Support orphaned block support (in preparation for 
+> process cleanup support)
+> > * Change block identification from physical address to key-ID pair
+> >   (in preparation for user space support, and process security)
+> > * Add support for process security (blocks from separate 
+> processes never
+> >   reside in the same band)
+> > * Support file interface (ioctl and mmap)
+> > * Support for buffers (ordered list of blocks that are 
+> mapped to userspace
+> >   together, such as YUV420sp)
+> > * Support 1D user buffer mapping into TILER container
+> > * Support for block pre-reservation (to further optimize area use)
+> > 
+> > David Sin (1):
+> >   TILER-DMM: DMM-PAT driver for TI TILER
+> > 
+> > Lajos Molnar (6):
+> >   TILER-DMM: Container manager interface and utility definitons
+> >   TILER-DMM: TILER Memory Manager interface and implementation
+> >   TILER-DMM: TILER interface file and documentation
+> >   TILER-DMM: Geometry and view manipulation functions.
+> >   TILER-DMM: Main TILER driver implementation.
+> >   TILER-DMM: Linking TILER driver into the Linux kernel build
+> > 
+> > Ravi Ramachandra (1):
+> >   TILER-DMM: Sample TCM implementation: Simple TILER Allocator
+> > 
+> >  Documentation/arm/TILER                   |  144 +++++++++
+> >  arch/arm/mach-omap2/include/mach/dmm.h    |  128 ++++++++
+> >  arch/arm/mach-omap2/include/mach/tiler.h  |  201 +++++++++++++
+> >  drivers/media/Kconfig                     |    6 +
+> >  drivers/media/Makefile                    |    2 +
+> >  drivers/media/video/tiler/Kconfig         |   65 ++++
+> >  drivers/media/video/tiler/Makefile        |    7 +
+> >  drivers/media/video/tiler/_tiler.h        |   51 ++++
+> >  drivers/media/video/tiler/dmm.c           |  200 +++++++++++++
+> >  drivers/media/video/tiler/tcm.h           |  209 +++++++++++++
+> >  drivers/media/video/tiler/tcm/Makefile    |    1 +
+> >  drivers/media/video/tiler/tcm/_tcm-sita.h |   64 ++++
+> >  drivers/media/video/tiler/tcm/tcm-sita.c  |  459 
+> +++++++++++++++++++++++++++++
+> >  drivers/media/video/tiler/tcm/tcm-sita.h  |   37 +++
+> >  drivers/media/video/tiler/tcm/tcm-utils.h |   54 ++++
+> >  drivers/media/video/tiler/tiler-geom.c    |  360 
+> ++++++++++++++++++++++
+> >  drivers/media/video/tiler/tiler-iface.c   |  106 +++++++
+> >  drivers/media/video/tiler/tiler-main.c    |  426 
+> ++++++++++++++++++++++++++
+> >  drivers/media/video/tiler/tmm-pat.c       |  274 +++++++++++++++++
+> >  drivers/media/video/tiler/tmm.h           |  109 +++++++
+> >  20 files changed, 2903 insertions(+), 0 deletions(-)
+> >  create mode 100644 Documentation/arm/TILER
+> >  create mode 100644 arch/arm/mach-omap2/include/mach/dmm.h
+> >  create mode 100644 arch/arm/mach-omap2/include/mach/tiler.h
+> >  create mode 100644 drivers/media/video/tiler/Kconfig
+> >  create mode 100644 drivers/media/video/tiler/Makefile
+> >  create mode 100644 drivers/media/video/tiler/_tiler.h
+> >  create mode 100644 drivers/media/video/tiler/dmm.c
+> >  create mode 100644 drivers/media/video/tiler/tcm.h
+> >  create mode 100644 drivers/media/video/tiler/tcm/Makefile
+> >  create mode 100644 drivers/media/video/tiler/tcm/_tcm-sita.h
+> >  create mode 100644 drivers/media/video/tiler/tcm/tcm-sita.c
+> >  create mode 100644 drivers/media/video/tiler/tcm/tcm-sita.h
+> >  create mode 100644 drivers/media/video/tiler/tcm/tcm-utils.h
+> >  create mode 100644 drivers/media/video/tiler/tiler-geom.c
+> >  create mode 100644 drivers/media/video/tiler/tiler-iface.c
+> >  create mode 100644 drivers/media/video/tiler/tiler-main.c
+> >  create mode 100644 drivers/media/video/tiler/tmm-pat.c
+> >  create mode 100644 drivers/media/video/tiler/tmm.h
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe 
+> linux-omap" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > 
+> > 
+> 
+> -- 
+> Hans Verkuil - video4linux developer - sponsored by TANDBERG, 
+> part of Cisco
+> 
