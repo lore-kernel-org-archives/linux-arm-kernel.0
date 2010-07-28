@@ -1,190 +1,53 @@
-From: davidsin@ti.com (Sin, David)
-Date: Wed, 28 Jul 2010 14:15:11 -0500
-Subject: [RFC 0/8] TI TILER-DMM driver
-In-Reply-To: <19F8576C6E063C45BE387C64729E7394044EE51DF1@dbde02.ent.ti.com>
-References: <1279927348-21750-1-git-send-email-davidsin@ti.com>
-	<201007241312.53551.hverkuil@xs4all.nl>
-	<513FF747EED39B4AADBB4D6C9D9F9F7903D64D76D5@dlee02.ent.ti.com>
-	<19F8576C6E063C45BE387C64729E7394044EE51DF1@dbde02.ent.ti.com>
-Message-ID: <513FF747EED39B4AADBB4D6C9D9F9F7903D64D7A92@dlee02.ent.ti.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Wed, 28 Jul 2010 22:15:31 +0300
+Subject: [PATCH] arm/mach-ixp2000: Add missing comma - fix build failure
+In-Reply-To: <201007282043.13561.PeterHuewe@gmx.de>
+References: <201007282043.13561.PeterHuewe@gmx.de>
+Message-ID: <20100728191531.GA10719@shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Hiremath, Vaibhav 
-> Sent: Wednesday, July 28, 2010 12:31 PM
-> To: Sin, David; Hans Verkuil
-> Cc: linux-omap at vger.kernel.org; Tony Lindgren; Russell King; 
-> Kanigeri, Hari; Ohad Ben-Cohen; Shilimkar, Santosh; 
-> linux-arm-kernel at lists.infradead.org
-> Subject: RE: [RFC 0/8] TI TILER-DMM driver
+On Wed, Jul 28, 2010 at 08:43:13PM +0200, Peter Huewe wrote:
+> From: Peter Huewe <peterhuewe@gmx.de>
 > 
-> > -----Original Message-----
-> > From: Sin, David
-> > Sent: Wednesday, July 28, 2010 8:53 PM
-> > To: Hans Verkuil
-> > Cc: linux-omap at vger.kernel.org; Tony Lindgren; Russell 
-> King; Kanigeri, Hari;
-> > Ohad Ben-Cohen; Hiremath, Vaibhav; Shilimkar, Santosh; linux-arm-
-> > kernel at lists.infradead.org
-> > Subject: RE: [RFC 0/8] TI TILER-DMM driver
-> > 
-> > > -----Original Message-----
-> > > From: Hans Verkuil [mailto:hverkuil at xs4all.nl]
-> > > Sent: Saturday, July 24, 2010 6:13 AM
-> > > To: Sin, David
-> > > Cc: linux-arm-kernel at lists.arm.linux.org.uk;
-> > > linux-omap at vger.kernel.org; Tony Lindgren; Russell King;
-> > > Kanigeri, Hari; Ohad Ben-Cohen; Hiremath, Vaibhav; 
-> Shilimkar, Santosh
-> > > Subject: Re: [RFC 0/8] TI TILER-DMM driver
-> > >
-> > > Hi David,
-> > >
-> <snip>
+> This trivial patch fixes a build failure [1] by adding a missing comma.
+
+It has been fixed by updated patch:
+
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6269/1
+
+Thank you.
+
 > 
-> > > The main question that I have is how this driver is to be
-> > > used in practice.
-> > > How does it fit into the bigger video4linux picture? Is this
-> > > something that
-> > > is mainly used from other v4l or fb drivers? Or is it
-> > > controlled by userspace?
-> > 
-> > [dhs] I missed this one -- my apologies.  As I stated to 
-> Vaibhav, any device
-> > can use TILER memory, but there is a big advantage, 
-> performance-wise, for 2-
-> > Dimensional macro block based buffers.  This HW is intended 
-> for image/video
-> > hardware accelerators (e.g. OMAP4 IVA-HD).  Plus there's 
-> the added advantage
-> > of doing zero-copy flips and rotations for the OMAP display 
-> and image sub-
-> > systems.
-> > 
-> > In this RFC, there are only kernel APIs to allocate TILER memory.
-> > Eventually, we would like to provide a way to obtain TILER 
-> memory to the
-> > user space.
-> > 
-> [Hiremath, Vaibhav] Don't you think, user has to mmap memory 
-> (irrespective of whether it is tiles view or not) to userland 
-> in both the cases, Fbdev and V4L2 (MMAP mode)?
+> Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
+> ---
+> KernelVersion: linux-next-20100728
 > 
-> Am I missing something here?
+> References:
+> [1] http://kisskb.ellerman.id.au/kisskb/buildresult/2980895/
 > 
-> Thanks,
-> Vaibhav
+> BF introduced by 3cad685d - ARM: 6253/1: Add 'code' parameter for
+> hook_fault_code()
+> 
+>  arch/arm/mach-ixp2000/pci.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-ixp2000/pci.c b/arch/arm/mach-ixp2000/pci.c
+> index 853fd90..f797c5f 100644
+> --- a/arch/arm/mach-ixp2000/pci.c
+> +++ b/arch/arm/mach-ixp2000/pci.c
+> @@ -209,7 +209,7 @@ ixp2000_pci_preinit(void)
+>  			"the needed workaround has not been configured in");
+>  #endif
+>  
+> -	hook_fault_code(16+6, ixp2000_pci_abort_handler, SIGBUS, 0
+> +	hook_fault_code(16+6, ixp2000_pci_abort_handler, SIGBUS, 0,
+>  				"PCI config cycle to non-existent device");
+>  }
+>  
+> -- 
+> 1.7.1
 > 
 
-[dhs] You're right; this is needed.  However, I first wanted to get some feedback for allocating 2-D memory just from kernel space.  
-
-> > >
-> > > Regards,
-> > >
-> > > 	Hans
-> > >
-> > > >
-> > > > List of pending items in proposed order:
-> > > >
-> > > > * Add area packing support (multiple blocks can reside in
-> > > the same band/area)
-> > > >   to optimize area use
-> > > > * Add group-ID support (to specify which blocks can reside
-> > > together in the
-> > > >   same area)
-> > > > * Add multiple search directions to TCM-SiTA
-> > > > * Add 1D block support (including adding 1D search algo 
-> to TCM-SiTA)
-> > > > * Optimize mutex handling (don.t hold mutex during memory
-> > > >   allocation/mapping/cache flushing)
-> > > > * Add block reference counting, support for sharing blocks
-> > > > * Move all kernel-API-s to tiler-iface.c
-> > > > * Support orphaned block support (in preparation for
-> > > process cleanup support)
-> > > > * Change block identification from physical address to 
-> key-ID pair
-> > > >   (in preparation for user space support, and process security)
-> > > > * Add support for process security (blocks from separate
-> > > processes never
-> > > >   reside in the same band)
-> > > > * Support file interface (ioctl and mmap)
-> > > > * Support for buffers (ordered list of blocks that are
-> > > mapped to userspace
-> > > >   together, such as YUV420sp)
-> > > > * Support 1D user buffer mapping into TILER container
-> > > > * Support for block pre-reservation (to further 
-> optimize area use)
-> > > >
-> > > > David Sin (1):
-> > > >   TILER-DMM: DMM-PAT driver for TI TILER
-> > > >
-> > > > Lajos Molnar (6):
-> > > >   TILER-DMM: Container manager interface and utility definitons
-> > > >   TILER-DMM: TILER Memory Manager interface and implementation
-> > > >   TILER-DMM: TILER interface file and documentation
-> > > >   TILER-DMM: Geometry and view manipulation functions.
-> > > >   TILER-DMM: Main TILER driver implementation.
-> > > >   TILER-DMM: Linking TILER driver into the Linux kernel build
-> > > >
-> > > > Ravi Ramachandra (1):
-> > > >   TILER-DMM: Sample TCM implementation: Simple TILER Allocator
-> > > >
-> > > >  Documentation/arm/TILER                   |  144 +++++++++
-> > > >  arch/arm/mach-omap2/include/mach/dmm.h    |  128 ++++++++
-> > > >  arch/arm/mach-omap2/include/mach/tiler.h  |  201 +++++++++++++
-> > > >  drivers/media/Kconfig                     |    6 +
-> > > >  drivers/media/Makefile                    |    2 +
-> > > >  drivers/media/video/tiler/Kconfig         |   65 ++++
-> > > >  drivers/media/video/tiler/Makefile        |    7 +
-> > > >  drivers/media/video/tiler/_tiler.h        |   51 ++++
-> > > >  drivers/media/video/tiler/dmm.c           |  200 +++++++++++++
-> > > >  drivers/media/video/tiler/tcm.h           |  209 +++++++++++++
-> > > >  drivers/media/video/tiler/tcm/Makefile    |    1 +
-> > > >  drivers/media/video/tiler/tcm/_tcm-sita.h |   64 ++++
-> > > >  drivers/media/video/tiler/tcm/tcm-sita.c  |  459
-> > > +++++++++++++++++++++++++++++
-> > > >  drivers/media/video/tiler/tcm/tcm-sita.h  |   37 +++
-> > > >  drivers/media/video/tiler/tcm/tcm-utils.h |   54 ++++
-> > > >  drivers/media/video/tiler/tiler-geom.c    |  360
-> > > ++++++++++++++++++++++
-> > > >  drivers/media/video/tiler/tiler-iface.c   |  106 +++++++
-> > > >  drivers/media/video/tiler/tiler-main.c    |  426
-> > > ++++++++++++++++++++++++++
-> > > >  drivers/media/video/tiler/tmm-pat.c       |  274 
-> +++++++++++++++++
-> > > >  drivers/media/video/tiler/tmm.h           |  109 +++++++
-> > > >  20 files changed, 2903 insertions(+), 0 deletions(-)
-> > > >  create mode 100644 Documentation/arm/TILER
-> > > >  create mode 100644 arch/arm/mach-omap2/include/mach/dmm.h
-> > > >  create mode 100644 arch/arm/mach-omap2/include/mach/tiler.h
-> > > >  create mode 100644 drivers/media/video/tiler/Kconfig
-> > > >  create mode 100644 drivers/media/video/tiler/Makefile
-> > > >  create mode 100644 drivers/media/video/tiler/_tiler.h
-> > > >  create mode 100644 drivers/media/video/tiler/dmm.c
-> > > >  create mode 100644 drivers/media/video/tiler/tcm.h
-> > > >  create mode 100644 drivers/media/video/tiler/tcm/Makefile
-> > > >  create mode 100644 drivers/media/video/tiler/tcm/_tcm-sita.h
-> > > >  create mode 100644 drivers/media/video/tiler/tcm/tcm-sita.c
-> > > >  create mode 100644 drivers/media/video/tiler/tcm/tcm-sita.h
-> > > >  create mode 100644 drivers/media/video/tiler/tcm/tcm-utils.h
-> > > >  create mode 100644 drivers/media/video/tiler/tiler-geom.c
-> > > >  create mode 100644 drivers/media/video/tiler/tiler-iface.c
-> > > >  create mode 100644 drivers/media/video/tiler/tiler-main.c
-> > > >  create mode 100644 drivers/media/video/tiler/tmm-pat.c
-> > > >  create mode 100644 drivers/media/video/tiler/tmm.h
-> > > >
-> > > > --
-> > > > To unsubscribe from this list: send the line "unsubscribe
-> > > linux-omap" in
-> > > > the body of a message to majordomo at vger.kernel.org
-> > > > More majordomo info at  
-> http://vger.kernel.org/majordomo-info.html
-> > > >
-> > > >
-> > >
-> > > --
-> > > Hans Verkuil - video4linux developer - sponsored by TANDBERG,
-> > > part of Cisco
-> > >
-> 
+-- 
+ Kirill A. Shutemov
