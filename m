@@ -1,53 +1,39 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Wed, 28 Jul 2010 22:15:31 +0300
-Subject: [PATCH] arm/mach-ixp2000: Add missing comma - fix build failure
-In-Reply-To: <201007282043.13561.PeterHuewe@gmx.de>
-References: <201007282043.13561.PeterHuewe@gmx.de>
-Message-ID: <20100728191531.GA10719@shutemov.name>
+From: vitalywool@gmail.com (Vitaly Wool)
+Date: Wed, 28 Jul 2010 21:47:41 +0200
+Subject: [PATCH v2 03/20] mmc: support embedded data field in mmc_host
+In-Reply-To: <1279733634-21974-4-git-send-email-ohad@wizery.com>
+References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
+	<1279733634-21974-4-git-send-email-ohad@wizery.com>
+Message-ID: <AANLkTimzA_JJ-byTDWznbL3YzeJ8LAP4M50onf2_3fBF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 28, 2010 at 08:43:13PM +0200, Peter Huewe wrote:
-> From: Peter Huewe <peterhuewe@gmx.de>
-> 
-> This trivial patch fixes a build failure [1] by adding a missing comma.
+Hi Ohad,
 
-It has been fixed by updated patch:
+On Wed, Jul 21, 2010 at 7:33 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> Add support to set/get mmc_host private embedded
+> data.
+>
+> This is needed to allow software to dynamically
+> create (and remove) SDIO functions which represents
+> embedded SDIO devices.
+>
+<snip>
+> @@ -209,6 +209,8 @@ struct mmc_host {
+> ? ? ? ?struct led_trigger ? ? ?*led; ? ? ? ? ? /* activity led */
+> ?#endif
+>
+> + ? ? ? void ? ? ? ? ? ? ? ? ? ?*embedded_data;
+> +
 
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6269/1
+To my understanding, this data doesn't belong to mmc_host. It's not a
+host data at all. E. g. imagine a GPIO IRQ for some SDIO chip -- it's
+totally unrelated to host.
 
-Thank you.
+I think a cleaner way would be to introduce something similar to what
+we have for SPI, e. g. struct sdio_board_info. This board info will
+contain platform-specific stuff and vendor id/chip id for each onboard
+SDIO device. Then the SDIO core will pick up the appropriate data
+basing on vendor id/chip id.
 
-> 
-> Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
-> ---
-> KernelVersion: linux-next-20100728
-> 
-> References:
-> [1] http://kisskb.ellerman.id.au/kisskb/buildresult/2980895/
-> 
-> BF introduced by 3cad685d - ARM: 6253/1: Add 'code' parameter for
-> hook_fault_code()
-> 
->  arch/arm/mach-ixp2000/pci.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ixp2000/pci.c b/arch/arm/mach-ixp2000/pci.c
-> index 853fd90..f797c5f 100644
-> --- a/arch/arm/mach-ixp2000/pci.c
-> +++ b/arch/arm/mach-ixp2000/pci.c
-> @@ -209,7 +209,7 @@ ixp2000_pci_preinit(void)
->  			"the needed workaround has not been configured in");
->  #endif
->  
-> -	hook_fault_code(16+6, ixp2000_pci_abort_handler, SIGBUS, 0
-> +	hook_fault_code(16+6, ixp2000_pci_abort_handler, SIGBUS, 0,
->  				"PCI config cycle to non-existent device");
->  }
->  
-> -- 
-> 1.7.1
-> 
-
--- 
- Kirill A. Shutemov
+~Vitaly
