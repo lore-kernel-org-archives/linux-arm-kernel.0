@@ -1,43 +1,51 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 28 Jul 2010 16:32:42 +0900
-Subject: S5PC110 should be used the correct VIC number
-In-Reply-To: <20100728072753.GC29277@n2100.arm.linux.org.uk>
-References: <AANLkTikh7mt30gEQU0_Wr7n-jZrG0iUmd1Hw17Ni7UNQ@mail.gmail.com>
-	<009d01cb2e1a$29605e80$7c211b80$%kim@samsung.com>
-	<AANLkTinC_68244EXf2jcEQN8zur8Dff5AcVjA+UTiNPX@mail.gmail.com>
-	<20100728072753.GC29277@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimbyuy3_iKzyDANaWM=Lbx9JRvGAm9CDHqkbZRn@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 28 Jul 2010 15:38:10 +0800
+Subject: [PATCH 02/29] pxa3xx_nand: fix compile warning
+In-Reply-To: <20100728072338.GA29277@n2100.arm.linux.org.uk>
+References: <AANLkTimJbfRUwzRUT0Z6_eMOm-SpYeti-FjY-eE5a7cV@mail.gmail.com>
+	<AANLkTikHFbaUjocnH9Fm8EHV75rCFEZ03EkMqbWPzHc+@mail.gmail.com>
+	<20100728072338.GA29277@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinsKD-xdmmvSc8XBVLCAT-1wRZ4jxphy29Vn4Ma@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 28, 2010 at 4:27 PM, Russell King - ARM Linux
+On Wed, Jul 28, 2010 at 3:23 PM, Russell King - ARM Linux
 <linux@arm.linux.org.uk> wrote:
-> On Wed, Jul 28, 2010 at 04:25:16PM +0900, Kyungmin Park wrote:
->> On Wed, Jul 28, 2010 at 3:00 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> > Kyungmin Park wrote:
->> >>
->> >> Hi Ben,
->> >>
->> >> Can you post the VIC patch from correct VIC number from vic code at
->> >> suspend & resume?
->> >> If not, it has to modify it after release. or can you fix it as below.
->> >>
->> > Yeah, you're right.
+> On Wed, Jul 28, 2010 at 02:17:23PM +0800, Eric Miao wrote:
+>> On Wed, Jul 28, 2010 at 1:56 PM, Haojian Zhuang
+>> <haojian.zhuang@gmail.com> wrote:
+>> > From c374a3f27c56f9112b97960eaa3194a08db6f4a4 Mon Sep 17 00:00:00 2001
+>> > From: Lei Wen <leiwen@marvell.com>
+>> > Date: Tue, 22 Jun 2010 20:19:35 +0800
+>> > Subject: [PATCH 02/29] pxa3xx_nand: fix compile warning
 >> >
->> > Already reported by Ben Dooks...but missed that.
->> > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/016872.html
+>> > The compile output as below:
+>> > WARNING: modpost: Found 1 section mismatch(es).
+>> >
+>> > Signed-off-by: Lei Wen <leiwen@marvell.com>
+>> > ---
+>> > ?drivers/mtd/nand/pxa3xx_nand.c | ? ?2 +-
+>> > ?1 files changed, 1 insertions(+), 1 deletions(-)
+>> >
+>> > diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+>> > index 3ffcbcd..52cec28 100644
+>> > --- a/drivers/mtd/nand/pxa3xx_nand.c
+>> > +++ b/drivers/mtd/nand/pxa3xx_nand.c
+>> > @@ -1069,7 +1069,7 @@ static void pxa3xx_nand_init_mtd(struct mtd_info *mtd,
+>> > ? ? ? ?this->chip_delay = 25;
+>> > ?}
+>> >
+>> > -static int pxa3xx_nand_probe(struct platform_device *pdev)
+>> > +static int __devinit pxa3xx_nand_probe(struct platform_device *pdev)
 >>
->> I think ben's patch solves all of problems.
->>
->> Russell, can you pull it from ben's tree?
+>> Ack
 >
-> When and only when Ben sends me a pull request.
+> __devinit is not always the right thing for this. ?Not having any
+> attribute is the safest thing. ?Having any kind of init tag means
+> that there's a circumstance when the function will be freed, and
+> if the function pointer is called...
 >
-In my memory, you mentioned it. there's some missing related it during
-merge windows when I sent the above patches. So above patch doesn't
-accepted.
 
-Then If Ben don't request it. can you accept the each SoCs fixed patches?
-
-Thank you,
-Kyungmin Park
+Should be quite safe if all the NAND devices are registered during
+the initcall phase, which is normally true. Yet indeed will create
+problems if they are registered later, e.g. in modules.
