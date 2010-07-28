@@ -1,38 +1,108 @@
-From: davidsin@ti.com (Sin, David)
-Date: Wed, 28 Jul 2010 09:44:06 -0500
-Subject: [RFC 5/8] TILER-DMM: TILER interface file and documentation
-In-Reply-To: <201007281158.31050.laurent.pinchart@ideasonboard.com>
-References: <1279927694-26138-1-git-send-email-davidsin@ti.com>
-	<1279927694-26138-5-git-send-email-davidsin@ti.com>
-	<1279927694-26138-6-git-send-email-davidsin@ti.com>
-	<201007281158.31050.laurent.pinchart@ideasonboard.com>
-Message-ID: <513FF747EED39B4AADBB4D6C9D9F9F7903D64D7603@dlee02.ent.ti.com>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Wed, 28 Jul 2010 16:48:06 +0200
+Subject: [PATCH 4/4] sdhci-s3c: add regulator support
+In-Reply-To: <1280326797-15792-5-git-send-email-m.szyprowski@samsung.com>
+References: <1280326797-15792-1-git-send-email-m.szyprowski@samsung.com>
+	<1280326797-15792-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <4C504326.30708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Laurent Pinchart [mailto:laurent.pinchart at ideasonboard.com] 
-> Sent: Wednesday, July 28, 2010 4:59 AM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Sin, David; Molnar, Lajos
-> Subject: Re: [RFC 5/8] TILER-DMM: TILER interface file and 
-> documentation
-> 
-> Hi,
-> 
-> On Saturday 24 July 2010 01:28:11 David Sin wrote:
-> > From: Lajos Molnar <molnar@ti.com>
-> > 
-> > This patch contains the TILER interface file and the documentation.
-> 
-> I got a problem with the documentation. After reading it I'm 
-> still not sure 
-> how the tiler works and what it's supposed to do exactly.
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
->
+ Op 28-07-10 16:19, Marek Szyprowski schreef:
+> This patch adds support for regulator API to sdhci-s3c driver. Regulators
+> can be used to disable power in suspended state to reduce dissipated
+> energy.
 
-[dhs] Thanks for this feedback.  I'm working on getting the public TRM link fixed, which should explain more.  I will also work on improving the document.  
+I'm not sure about this, when I would try to do this I'd look at implementing
+this in the sdhci driver itself instead of a subdriver of it.
+
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  drivers/mmc/host/sdhci-s3c.c |   30 +++++++++++++++++++++++++++++-
+>  1 files changed, 29 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index 606e695..b9d46a5 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/io.h>
+>  #include <linux/gpio.h>
+> +#include <linux/regulator/consumer.h>
+>  
+>  #include <linux/mmc/host.h>
+>  
+> @@ -50,6 +51,7 @@ struct sdhci_s3c {
+>  
+>  	struct clk		*clk_io;
+>  	struct clk		*clk_bus[MAX_BUS_CLK];
+> +	struct regulator	*vmmc;
+>  };
+>  
+>  static inline struct sdhci_s3c *to_s3c(struct sdhci_host *host)
+> @@ -309,6 +311,13 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>  
+>  	platform_set_drvdata(pdev, host);
+>  
+> +	sc->vmmc = regulator_get(dev, "vmmc");
+> +	if (IS_ERR(sc->vmmc)) {
+> +		dev_warn(dev, "no vmmc regulator found\n");
+> +		sc->vmmc = NULL;
+> +	} else
+> +		regulator_enable(sc->vmmc);
+> +
+>  	sc->clk_io = clk_get(dev, "hsmmc");
+>  	if (IS_ERR(sc->clk_io)) {
+>  		dev_err(dev, "failed to get io clock\n");
+> @@ -482,6 +491,11 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
+>  	clk_disable(sc->clk_io);
+>  	clk_put(sc->clk_io);
+>  
+> +	if (sc->vmmc) {
+> +		regulator_disable(sc->vmmc);
+> +		regulator_put(sc->vmmc);
+> +	}
+> +
+>  	iounmap(host->ioaddr);
+>  	release_resource(sc->ioarea);
+>  	kfree(sc->ioarea);
+> @@ -496,15 +510,29 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
+>  
+>  static int sdhci_s3c_suspend(struct platform_device *dev, pm_message_t pm)
+>  {
+> +	int ret = 0;
+>  	struct sdhci_host *host = platform_get_drvdata(dev);
+> +	struct sdhci_s3c *sc = sdhci_priv(host);
+>  
+>  	sdhci_suspend_host(host, pm);
+> -	return 0;
+> +
+> +	if (sc->vmmc)
+> +		ret = regulator_disable(sc->vmmc);
+> +
+> +	return ret;
+>  }
+>  
+>  static int sdhci_s3c_resume(struct platform_device *dev)
+>  {
+>  	struct sdhci_host *host = platform_get_drvdata(dev);
+> +	struct sdhci_s3c *sc = sdhci_priv(host);
+> +
+> +	if (sc->vmmc) {
+> +		int ret = regulator_disable(sc->vmmc);
+> +		if (ret)
+> +			return ret;
+> +		mdelay(2);
+
+Shouldn't these delays be handled in the regulator framework itself?
+
+> +	}
+>  
+>  	sdhci_resume_host(host);
+>  	return 0;
+
+
+-- 
+Maurus Cuelenaere
