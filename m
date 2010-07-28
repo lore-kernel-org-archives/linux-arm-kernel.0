@@ -1,25 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jul 2010 12:46:02 +0200
-Subject: Questions about FPU and NEON on Cortex-A9 with armv7 instructions!
-In-Reply-To: <AANLkTinoZ0GT5FFUFPmU5gQK1zVcZKYtSWpHDQ1Y4OXO@mail.gmail.com>
-References: <AANLkTinA_ZNdNwx2R-6C9LBQ=4i8uMVpmVFCRaKkS=Xs@mail.gmail.com>
-	<4C4FF8FF.304@xenomai.org>
-	<AANLkTinoZ0GT5FFUFPmU5gQK1zVcZKYtSWpHDQ1Y4OXO@mail.gmail.com>
-Message-ID: <201007281246.03033.arnd@arndb.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 28 Jul 2010 13:25:27 +0200 (CEST)
+Subject: [PATCH 2/4] mx2_camera: return IRQ_NONE when doing nothing
+In-Reply-To: <49da2476310a921b19226d572503b7c04175204d.1280229966.git.baruch@tkos.co.il>
+References: <cover.1280229966.git.baruch@tkos.co.il>
+	<49da2476310a921b19226d572503b7c04175204d.1280229966.git.baruch@tkos.co.il>
+Message-ID: <Pine.LNX.4.64.1007281317400.23907@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 July 2010, David Yang wrote:
-> If the other kernel code doesn't save and restore the FPU context,then
-> it's risky.
+A general comment to your patches: the actual driver is going to be merged 
+via the ARM tree, all other your incremental patches should rather go via 
+the v4l tree. So, we'll have to synchronise with ARM, let's hope ARM 
+patches go in early enough.
+
+On Tue, 27 Jul 2010, Baruch Siach wrote:
+
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  drivers/media/video/mx2_camera.c |    8 +++++---
+>  1 files changed, 5 insertions(+), 3 deletions(-)
 > 
-> Can I use FPU just in one C file ?
+> diff --git a/drivers/media/video/mx2_camera.c b/drivers/media/video/mx2_camera.c
+> index 1536bd4..b42ad8d 100644
+> --- a/drivers/media/video/mx2_camera.c
+> +++ b/drivers/media/video/mx2_camera.c
+> @@ -420,15 +420,17 @@ static irqreturn_t mx25_camera_irq(int irq_csi, void *data)
+>  	struct mx2_camera_dev *pcdev = data;
+>  	u32 status = readl(pcdev->base_csi + CSISR);
+>  
+> -	if (status & CSISR_DMA_TSF_FB1_INT)
+> +	writel(status, pcdev->base_csi + CSISR);
+> +
+> +	if (!(status & (CSISR_DMA_TSF_FB1_INT | CSISR_DMA_TSF_FB2_INT)))
+> +		return IRQ_NONE;
+> +	else if (status & CSISR_DMA_TSF_FB1_INT)
+>  		mx25_camera_frame_done(pcdev, 1, VIDEOBUF_DONE);
+>  	else if (status & CSISR_DMA_TSF_FB2_INT)
+>  		mx25_camera_frame_done(pcdev, 2, VIDEOBUF_DONE);
+>  
+>  	/* FIXME: handle CSISR_RFF_OR_INT */
+>  
+> -	writel(status, pcdev->base_csi + CSISR);
+> -
+>  	return IRQ_HANDLED;
+>  }
 
-Usually if you need something like this, you're doing something wrong.
-Code that does a lot of computation should go generally live in user
-space, not a kernel module, though there are a few exceptions.
+I don't think this is correct. You should return IRQ_NONE if this is not 
+an interrupt from your device at all. In this case you don't have to ack 
+your interrupts, which, I presume, is what the write to CSISR is doing. 
+OTOH, if this is an interrupt from your device, but you're just not 
+interested in it, you should ack it and return IRQ_HANDLED. So, the 
+original behaviour was more correct, than what this your patch is doing. 
+The only improvement I can think of is, that you can return IRQ_NONE if 
+status is 0, but then you don't have to ack it.
 
-Take a look at how drivers/md/raid6sse2.c uses kernel_fpu_begin() to
-do this on x86.
-
-	Arnd
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
