@@ -1,40 +1,31 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 28 Jul 2010 17:04:21 +0800
+From: mail@pawelmoll.com (Pawel Moll)
+Date: Wed, 28 Jul 2010 10:06:12 +0100
 Subject: JPEG hw decoder
-In-Reply-To: <4C4FE70A.70101@st.com>
+In-Reply-To: <AANLkTin4r_NrQbzXoTWoJJRCUXX9mjfgtrJ9yTPLW5_W@mail.gmail.com>
 References: <AANLkTin4r_NrQbzXoTWoJJRCUXX9mjfgtrJ9yTPLW5_W@mail.gmail.com>
-	<4C4FE70A.70101@st.com>
-Message-ID: <AANLkTikV9PAbKY+CQpcgXX01MOFx36G3LMg+nZ5pEy1q@mail.gmail.com>
+Message-ID: <1280307972.28571.12.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 28, 2010 at 4:15 PM, viresh kumar <viresh.kumar@st.com> wrote:
-> On 7/28/2010 10:42 AM, rd bairva wrote:
->> Hi ,
->> ? ? ? My board has a hardware JPEG decoder. I want to write a driver
->> for this in Linux kernel, But it seems there that no Framework exists
->> in kernel. Can somebody provide me some pointers?
->
-> Hello Rbairva,
->
-> Which JPEG decoder are you working on??
->
-> I have Synopsys JPEG Decoder/Encoder on ST SPEAr platform
-> and i am currently working on its driver for LKML.
->
-> I already have a driver for it which is not aligned to LKML guidelines,
-> and so doing modifications there.
-> In my driver i have used char device framework and none other suits it well.
->
+Hi,
 
-Normally the JPEG decoder/encoder comes with the video camera
-module, which falls in v4l2 framework. Though not sure how well
-the v4l2 API is gonna support this.
+>       My board has a hardware JPEG decoder. I want to write a driver
+> for this in Linux kernel, But it seems there that no Framework exists
+> in kernel. Can somebody provide me some pointers?
 
-> viresh.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+If I was to do the same, I'd look around V4L2 API. If covers things like
+video encoders/decoders etc. The only problem is that the particular
+area you are interested in is not well defined yet:
+
+http://linuxtv.org/downloads/v4l-dvb-apis/ch04s05.html
+
+This means that people usually extend the API in their own way, staying
+within the framework itself, obviously.
+
+Maybe you could ask about this on the linux-media mailing list?
+
+http://vger.kernel.org/vger-lists.html#linux-media
+
+Good luck!
+
+Pawe?
