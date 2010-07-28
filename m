@@ -1,120 +1,225 @@
-From: davidsin@ti.com (Sin, David)
-Date: Wed, 28 Jul 2010 09:39:21 -0500
-Subject: [RFC 1/8] TILER-DMM: DMM-PAT driver for TI TILER
-In-Reply-To: <201007281200.23458.laurent.pinchart@ideasonboard.com>
-References: <1279927348-21750-1-git-send-email-davidsin@ti.com>
-	<513FF747EED39B4AADBB4D6C9D9F9F7903D644D974@dlee02.ent.ti.com>
-	<19F8576C6E063C45BE387C64729E7394044ED6385D@dbde02.ent.ti.com>
-	<201007281200.23458.laurent.pinchart@ideasonboard.com>
-Message-ID: <513FF747EED39B4AADBB4D6C9D9F9F7903D64D75EB@dlee02.ent.ti.com>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Wed, 28 Jul 2010 16:39:40 +0200
+Subject: [PATCHv5 3/4] sdhci-s3c: add support for new card detection
+	methods (driver part)
+In-Reply-To: <1280326797-15792-4-git-send-email-m.szyprowski@samsung.com>
+References: <1280326797-15792-1-git-send-email-m.szyprowski@samsung.com>
+	<1280326797-15792-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <4C50412C.3080703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Laurent Pinchart [mailto:laurent.pinchart at ideasonboard.com] 
-> Sent: Wednesday, July 28, 2010 5:00 AM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Hiremath, Vaibhav; Sin, David; 
-> linux-omap at vger.kernel.org; Tony Lindgren; Russell King; Ohad 
-> Ben-Cohen; Kanigeri, Hari; Shilimkar, Santosh; Molnar, Lajos
-> Subject: Re: [RFC 1/8] TILER-DMM: DMM-PAT driver for TI TILER
-> 
-> 
-> On Tuesday 27 July 2010 21:53:28 Hiremath, Vaibhav wrote:
-> > On Wednesday 28 July 2010 00:35:00 Sin, David wrote:
-> > > On Tuesday 27 July 2010 01:38:00 Hiremath, Vaibhav wrote:
-> > > > On Saturday 24 July 2010 04:52:00 Sin, David wrote:
-> 
-> [snip]
-> 
-> > > > [Hiremath, Vaibhav] If I understand correctly, DMM stands for
-> > > > dynamic memory manager. Is it something which can only be
-> > > > used with Video devices? Any specific reason why this is part
-> > > > of drivers/media/video/ directory,
-> > >
-> > > [dhs] Any device can use TILER memory, but there is a big 
-> advantage,
-> > > performance-wise, for 2-Dimensional macro block based 
-> buffers.  This HW
-> > > is intended for image/video hardware accelerators (e.g. 
-> OMAP4 IVA-HD). 
-> > > Plus there's the added advantage of doing zero-copy flips 
-> and rotations
-> > > for the OMAP display and image sub-systems.
-> > 
-> > [Hiremath, Vaibhav] When you mention Tiler memory, you 
-> meant Tiler Virtual
-> > memory which is independent of physical memory. Driver 
-> requesting/using
-> > Tiler is responsible for allocating physical memory. Is 
-> that understanding
-> > correct?
+ Op 28-07-10 16:19, Marek Szyprowski schreef:
+> On some Samsung SoCs not all SDHCI controllers have card detect (CD)
+> line. For some embedded designs it is not even needed, because ususally
+> the device (like SDIO flash memory or wifi controller) is permanently
+> wired to the controller. There are also systems which have a card detect
+> line connected to some of the external interrupt lines or the presence
+> of the card depends on some other actions (like enabling a power
+> regulator).
+>
+> This patch adds support for all these cases. The following card
+> detection methods are possible:
+>
+> 1. internal sdhci host card detect line
+> 2. external event
+> 3. external gpio interrupt
+> 4. no card detect line, controller will poll for the card
+> 5. no card detect line, card is permanently wired to the controller
+> (once detected host won't poll it any more)
+>
+> By default, all existing code would use method #1, what is compatible
+> with the previous version of the driver.
+>
+> In case of external event, two callbacks must be provided in platdata:
+> ext_cd_init and ext_cd_cleanup. Both of them get a callback to a
+> function that notifies the s3c-sdhci host contoller as their argument.
+> That callback function should be called from the even dispatcher to let
+> host notice the card insertion/removal.
+>
+> In case of external gpio interrupt, a gpio pin number must be provided
+> in platdata (ext_cd_gpio parameter), as well as the information about
+> the polarity of that gpio pin (ext_cd_gpio_invert). By default
+> (ext_cd_gpio_invert == 0) gpio value 0 means 'card has been removed',
+> but this can be changed to 'card has been removed' when
+> ext_cd_gpio_invert == 1.
+>
+> This patch adds all required changes to sdhci-s3c driver.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>
+> Changes since V4:
+> - adapted to threaded irq approach in sdhci driver
+> - rebased onto latest -mm kernel tree
+> - fixed problem when gpio-base card detection was not called on driver
+> init
+>
+> Changes since V3:
+> - renamed patch to avoid confusion with the patch for the s3c-sdhci
+> platform changes - added "(driver part)" in subject
+>
+> Changes since V2:
+> According to Andrew Morton's suggestion local_irq_save() call in the
+> sdhci_s3c_notify_change function has been replaced by spin_lock_irqsave
+> (host driver already has a spinlock that is used for protecting internal
+> state of the driver).
+>
+> Changes since V1:
+> - added support for gpio external interrupt card based detect method
+>   directly to sdhci-s3c driver
+>
+> ---
+>  drivers/mmc/host/sdhci-s3c.c |   78 ++++++++++++++++++++++++++++++++++++++++++
+>  drivers/mmc/host/sdhci.c     |   47 ++++++++++++++-----------
+>  drivers/mmc/host/sdhci.h     |    1 +
+>  3 files changed, 106 insertions(+), 20 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index 9938ded..606e695 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/slab.h>
+>  #include <linux/clk.h>
+>  #include <linux/io.h>
+> +#include <linux/gpio.h>
+>  
+>  #include <linux/mmc/host.h>
+>  
+> @@ -44,6 +45,8 @@ struct sdhci_s3c {
+>  	struct resource		*ioarea;
+>  	struct s3c_sdhci_platdata *pdata;
+>  	unsigned int		cur_clk;
+> +	int			ext_cd_irq;
+> +	int			ext_cd_gpio;
+>  
+>  	struct clk		*clk_io;
+>  	struct clk		*clk_bus[MAX_BUS_CLK];
+> @@ -235,6 +238,36 @@ static struct sdhci_ops sdhci_s3c_ops = {
+>  	.get_min_clock		= sdhci_s3c_get_min_clock,
+>  };
+>  
+> +static void sdhci_s3c_notify_change(struct platform_device *dev, int state)
+> +{
+> +	struct sdhci_host *host = platform_get_drvdata(dev);
+> +	if (host) {
+> +		mutex_lock(&host->lock);
+> +		if (state) {
+> +			dev_dbg(&dev->dev, "card inserted.\n");
+> +			host->flags &= ~SDHCI_DEVICE_DEAD;
+> +			host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
+> +			sdhci_card_detect(host);
+> +		} else {
+> +			dev_dbg(&dev->dev, "card removed.\n");
+> +			host->flags |= SDHCI_DEVICE_DEAD;
+> +			host->quirks &= ~SDHCI_QUIRK_BROKEN_CARD_DETECTION;
+> +			sdhci_card_detect(host);
+> +		}
 
-[dhs] Yes this is correct.  I'm referring to the 33 bit 4 GB TILER virtual memory.
+You could move the sdhci_card_detect outside the if.
 
-> > 
-> > If yes, then feature wise it is same as VRFB in OMAP3, 
-> where it provides
-> > virtual address space and driver requesting VRFB is responsible for
-> > physical memory allocation. There could be additional features,
-> > enhancement and stuff but zero-copy rotation for DSS, then 
-> its same as
-> > VRFB.
-> > 
-> > Don't you think is would be very difficult to use for 
-> drivers with such
-> > proposals, I can comment from DSS point of view,
-> > 
-> > In case of OMAP4 80% of code is being re-used from OMAP3 
-> (located under
-> > drivers/video/omap2/), which is currently supported hardware
-> > rotation/mirroring and hardly tied to VRFB API's.
-> > 
-> > Now with this driver we have to do something,
-> > 
-> > cpu_is_omap34xx()
-> >         VRFB
-> > else if cpu_is_omap44xx()
-> >         Tiler
-> > 
-> > I am not sure about further OMAP series of devices, where 
-> we might have
-> > something else with DSS IP reuse (along with software). And 
-> I believe
-> > Tiler is not part of DSS at all. Again if some other 
-> devices are using
-> > Tiler API's it would become more difficult to re-use the 
-> code when same IP
-> > is being used in multiple SoC's.
-> > 
-> > Does it make sense to you to have registration based 
-> mechanism (function
-> > pointer) where you register your hardware 
-> capabilities/API's, driver don't
-> > have to dependent on underneath hardware block. Ofcource if 
-> driver intend
-> > to use some specific/custom feature supported by some 
-> hardware block then
-> > he has to call that API under cpu_is_xxxx
-> 
-> I think I agree with it. The tiler provides dynamic views on 
-> arbitrary 
-> physical memory. Ideally it shouldn't be tied to the 
-> media/video subsystem 
-> (obviously it should still provide an interface for V4L drivers).
-> 
-> It's getting a bit hard to comment on the proposal, as 
-> there's no public 
-> documentation I'm aware of beside the Documentation/arm/TILER 
-> file in the 
-> patch set, and that information is far too concise and vague.
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
+> +		mutex_unlock(&host->lock);
+> +	}
+> +}
+> +
+> +static irqreturn_t sdhci_s3c_gpio_card_detect_thread(int irq, void *dev_id)
+> +{
+> +	struct sdhci_s3c *sc = dev_id;
+> +	int status = gpio_get_value(sc->ext_cd_gpio);
+> +	if (sc->pdata->ext_cd_gpio_invert)
+> +		status = !status;
+> +	sdhci_s3c_notify_change(sc->pdev, status);
+> +	return IRQ_HANDLED;
+> +}
+> +
+>  static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>  {
+>  	struct s3c_sdhci_platdata *pdata = pdev->dev.platform_data;
+> @@ -272,6 +305,7 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>  	sc->host = host;
+>  	sc->pdev = pdev;
+>  	sc->pdata = pdata;
+> +	sc->ext_cd_gpio = -1;
+>  
+>  	platform_set_drvdata(pdev, host);
+>  
+> @@ -355,6 +389,13 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>  	 * SDHCI block, or a missing configuration that needs to be set. */
+>  	host->quirks |= SDHCI_QUIRK_NO_BUSY_IRQ;
+>  
+> +	if (pdata->cd_type == S3C_SDHCI_CD_NONE ||
+> +	    pdata->cd_type == S3C_SDHCI_CD_PERMANENT)
+> +		host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
+> +
+> +	if (pdata->cd_type == S3C_SDHCI_CD_PERMANENT)
+> +		host->mmc->caps = MMC_CAP_NONREMOVABLE;
+> +
+>  	host->quirks |= (SDHCI_QUIRK_32BIT_DMA_ADDR |
+>  			 SDHCI_QUIRK_32BIT_DMA_SIZE);
+>  
+> @@ -367,6 +408,33 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>  		goto err_add_host;
+>  	}
+>  
+> +	/* pdata->ext_cd_init might call sdhci_s3c_notify_change immediately,
+> +	   so it can be called only after sdhci_add_host() */
+> +	if (pdata->cd_type == S3C_SDHCI_CD_EXTERNAL && pdata->ext_cd_init)
+> +		pdata->ext_cd_init(&sdhci_s3c_notify_change);
+> +
+> +	if (pdata->cd_type == S3C_SDHCI_CD_GPIO &&
+> +	    gpio_is_valid(pdata->ext_cd_gpio)) {
+> +		int status;
+> +
+> +		gpio_request(pdata->ext_cd_gpio, "SDHCI EXT CD");
 
-[dhs] I understand what you're stating here, conceptually, but I'm missing some details.  Do you mean that there needs to be a generic layer between a given video memory allocator and V4L? and that set of APIs should point to specific functions based on availability (e.g. VRFB, TILER, future TILER, other IP, etc)?
+Shouldn't you check the return value of gpio_request()?
 
-Laurent:  The TRM for DMM-TILER should be publicly available already, but for some reason, I'm not able to see the link.  I will work on this...  
+> +		sc->ext_cd_gpio = pdata->ext_cd_gpio;
+> +
+> +		sc->ext_cd_irq = gpio_to_irq(pdata->ext_cd_gpio);
+> +		if (sc->ext_cd_irq &&
+> +		    request_threaded_irq(sc->ext_cd_irq, NULL, sdhci_s3c_gpio_card_detect_thread,
+> +				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+> +				dev_name(&pdev->dev), sc)) {
+> +			dev_err(&pdev->dev, "cannot request irq for card detect\n");
+> +			sc->ext_cd_irq = 0;
+> +		}
+> +
+> +		status = gpio_get_value(sc->ext_cd_gpio);
+> +		if (sc->pdata->ext_cd_gpio_invert)
+> +			status = !status;
+> +		sdhci_s3c_notify_change(sc->pdev, status);
+> +	}
+> +
+>  	return 0;
+>  
+>   err_add_host:
+> @@ -391,10 +459,20 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>  
+>  static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
+>  {
+> +	struct s3c_sdhci_platdata *pdata = pdev->dev.platform_data;
+>  	struct sdhci_host *host =  platform_get_drvdata(pdev);
+>  	struct sdhci_s3c *sc = sdhci_priv(host);
+>  	int ptr;
+>  
+> +	if (pdata->cd_type == S3C_SDHCI_CD_EXTERNAL && pdata->ext_cd_cleanup)
+> +		pdata->ext_cd_cleanup(&sdhci_s3c_notify_change);
+> +
+> +	if (sc->ext_cd_irq)
+> +		free_irq(sc->ext_cd_irq, sc);
+> +
+> +	if (sc->ext_cd_gpio != -1)
+
+Perhaps if (gpio_is_valid(...)) ?
+
+> +		gpio_free(sc->ext_cd_gpio);
+> +
+>  	sdhci_remove_host(host, 1);
+>  
+>  	for (ptr = 0; ptr < 3; ptr++) {
+
+-- 
+Maurus Cuelenaere
