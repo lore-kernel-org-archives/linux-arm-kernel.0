@@ -1,79 +1,53 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 28 Jul 2010 12:00:22 +0200
-Subject: [RFC 1/8] TILER-DMM: DMM-PAT driver for TI TILER
-In-Reply-To: <19F8576C6E063C45BE387C64729E7394044ED6385D@dbde02.ent.ti.com>
-References: <1279927348-21750-1-git-send-email-davidsin@ti.com>
-	<513FF747EED39B4AADBB4D6C9D9F9F7903D644D974@dlee02.ent.ti.com>
-	<19F8576C6E063C45BE387C64729E7394044ED6385D@dbde02.ent.ti.com>
-Message-ID: <201007281200.23458.laurent.pinchart@ideasonboard.com>
+From: david.yangshuai@gmail.com (David Yang)
+Date: Wed, 28 Jul 2010 18:06:46 +0800
+Subject: Questions about FPU and NEON on Cortex-A9 with armv7
+	instructions!
+In-Reply-To: <4C4FF8FF.304@xenomai.org>
+References: <AANLkTinA_ZNdNwx2R-6C9LBQ=4i8uMVpmVFCRaKkS=Xs@mail.gmail.com>
+	<AANLkTi=EBvumJfRJmBwHVtHAW081ewBzjAR2d=2O2-Zd@mail.gmail.com>
+	<AANLkTikHns6tdbVK-CDoiv10V-pHaYFf0AvB5s=ti9k5@mail.gmail.com>
+	<4C4FF8FF.304@xenomai.org>
+Message-ID: <AANLkTinoZ0GT5FFUFPmU5gQK1zVcZKYtSWpHDQ1Y4OXO@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+My God...
 
-On Tuesday 27 July 2010 21:53:28 Hiremath, Vaibhav wrote:
-> On Wednesday 28 July 2010 00:35:00 Sin, David wrote:
-> > On Tuesday 27 July 2010 01:38:00 Hiremath, Vaibhav wrote:
-> > > On Saturday 24 July 2010 04:52:00 Sin, David wrote:
+The job for the FPU is big enough.
 
-[snip]
+But I am not sure the kernel itself won't use the FPU . And I just
+want to use FPU in my driver other than the whole kernel.
 
-> > > [Hiremath, Vaibhav] If I understand correctly, DMM stands for
-> > > dynamic memory manager. Is it something which can only be
-> > > used with Video devices? Any specific reason why this is part
-> > > of drivers/media/video/ directory,
-> >
-> > [dhs] Any device can use TILER memory, but there is a big advantage,
-> > performance-wise, for 2-Dimensional macro block based buffers.  This HW
-> > is intended for image/video hardware accelerators (e.g. OMAP4 IVA-HD). 
-> > Plus there's the added advantage of doing zero-copy flips and rotations
-> > for the OMAP display and image sub-systems.
-> 
-> [Hiremath, Vaibhav] When you mention Tiler memory, you meant Tiler Virtual
-> memory which is independent of physical memory. Driver requesting/using
-> Tiler is responsible for allocating physical memory. Is that understanding
-> correct?
-> 
-> If yes, then feature wise it is same as VRFB in OMAP3, where it provides
-> virtual address space and driver requesting VRFB is responsible for
-> physical memory allocation. There could be additional features,
-> enhancement and stuff but zero-copy rotation for DSS, then its same as
-> VRFB.
-> 
-> Don't you think is would be very difficult to use for drivers with such
-> proposals, I can comment from DSS point of view,
-> 
-> In case of OMAP4 80% of code is being re-used from OMAP3 (located under
-> drivers/video/omap2/), which is currently supported hardware
-> rotation/mirroring and hardly tied to VRFB API's.
-> 
-> Now with this driver we have to do something,
-> 
-> cpu_is_omap34xx()
->         VRFB
-> else if cpu_is_omap44xx()
->         Tiler
-> 
-> I am not sure about further OMAP series of devices, where we might have
-> something else with DSS IP reuse (along with software). And I believe
-> Tiler is not part of DSS at all. Again if some other devices are using
-> Tiler API's it would become more difficult to re-use the code when same IP
-> is being used in multiple SoC's.
-> 
-> Does it make sense to you to have registration based mechanism (function
-> pointer) where you register your hardware capabilities/API's, driver don't
-> have to dependent on underneath hardware block. Ofcource if driver intend
-> to use some specific/custom feature supported by some hardware block then
-> he has to call that API under cpu_is_xxxx
+If the other kernel code doesn't save and restore the FPU context,then
+it's risky.
 
-I think I agree with it. The tiler provides dynamic views on arbitrary 
-physical memory. Ideally it shouldn't be tied to the media/video subsystem 
-(obviously it should still provide an interface for V4L drivers).
+Can I use FPU just in one C file ?
 
-It's getting a bit hard to comment on the proposal, as there's no public 
-documentation I'm aware of beside the Documentation/arm/TILER file in the 
-patch set, and that information is far too concise and vague.
-
--- 
-Regards,
-
-Laurent Pinchart
+On Wed, Jul 28, 2010 at 5:31 PM, Gilles Chanteperdrix
+<gilles.chanteperdrix@xenomai.org> wrote:
+> David Yang wrote:
+>> Hi,Martin
+>>
+>> ? ? I see.
+>>
+>> ? ? But I will ?try to use FPU in kernel for testing. I hope kernel won't crash.
+>
+> You will not get FPU working in kernel-space without any effort. The
+> kernel handles lazy switching of FPU context for user-space tasks, but
+> not for the kernel itself. If you start using the FPU at any place in
+> the kernel, the changes you made would clobber the FPU context of the
+> user-space task currently running, which is probably not what you want.
+>
+> What you will have to do is what the x86 kernel does in the RAID code
+> for instance (file drivers/md/raid6mmx.c), disable preemption, save the
+> fpu context, do your computations, then restore the fpu context and
+> re-enable preemption. For the operation to be worth it, the gain you
+> obtain by using the FPU has to be greater than the time for an fpu
+> context save and restore, and saving/restoring the fpu context is a
+> pretty heavy operation. This means that if you want the FPU for a
+> multiplication or a division, forget it, you will actually be loosing
+> time, and soft-float will be more efficient.
+>
+> --
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?Gilles.
+>
