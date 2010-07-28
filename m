@@ -1,33 +1,52 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Wed, 28 Jul 2010 09:32:22 +0530
-Subject: [PATCH] Watchdog: Adding support for ARM Primecell SP805 Watchdog
-In-Reply-To: <AANLkTiktDfvRUjA-Scu643=GniuNzqKjNFBZY2foh_fa@mail.gmail.com>
-References: <1274344428-28329-1-git-send-email-viresh.kumar@st.com>	<AANLkTik1vSgASNLXSpYD2MVgmQGgvCx-5mFY_3YFsuHL@mail.gmail.com>	<4C43DD7E.5050800@st.com>	<4C4E65A4.7030005@st.com>
-	<AANLkTiktDfvRUjA-Scu643=GniuNzqKjNFBZY2foh_fa@mail.gmail.com>
-Message-ID: <4C4FABCE.70907@st.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 28 Jul 2010 13:24:31 +0900
+Subject: [PATCH] Fix build error for mach-s3c64xx
+In-Reply-To: <20100727195505.786.25117.stgit@darius-desktop>
+References: <20100727195505.786.25117.stgit@darius-desktop>
+Message-ID: <007801cb2e0c$ca3a8870$5eaf9950$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/28/2010 3:55 AM, Linus Walleij wrote:
-> 2010/7/27 Viresh KUMAR <viresh.kumar@st.com>:
+Darius Augulis wrote:
 > 
->>>>>>> +       /* roundup timeout to closest positive integer value */
->>>>>>> +       wdt->timeout = div_u64((load + 1) * 2 + (rate / 2), rate);
->>>>>
->>>>> Look in linux/kernel.h, use the
->>>>> DIV_ROUND_CLOSEST() macro instead of this.
->>
->> Now i remember why i didn't choose DIV_ROUND_CLOSEST in V1 of this patch.
->> As it is a u64 division, i get following compilation error if i use
->> DIV_ROUND_CLOSEST. I wasn't sure if inclusion of some header file can remove
->> this error, and so i used div_u64.
+> If SAMSUNG_DEV_ADC is not set, s3c6410_map_io()
+> tries to init undefined device s3c_device_adc.
+> ---
+>  arch/arm/mach-s3c64xx/s3c6410.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
 > 
-> Aha, I have no solution to that, but I'd recommend adding the comment
-> /* Cannot use DIV_ROUND_CLOSEST() due to the 64bit size */
+> diff --git a/arch/arm/mach-s3c64xx/s3c6410.c
+b/arch/arm/mach-s3c64xx/s3c6410.c
+> index 014401c..29338bd 100644
+> --- a/arch/arm/mach-s3c64xx/s3c6410.c
+> +++ b/arch/arm/mach-s3c64xx/s3c6410.c
+> @@ -54,7 +54,10 @@ void __init s3c6410_map_io(void)
+>  	s3c_i2c0_setname("s3c2440-i2c");
+>  	s3c_i2c1_setname("s3c2440-i2c");
+> 
+> +#ifdef CONFIG_SAMSUNG_DEV_ADC
+>  	s3c_device_adc.name	= "s3c64xx-adc";
+> +#endif
+> +
+>  	s3c_device_nand.name = "s3c6400-nand";
+>  	s3c_onenand_setname("s3c6410-onenand");
+>  	s3c64xx_onenand1_setname("s3c6410-onenand");
+> 
 > 
 
-I thought that also, but i didn't like that. There is nothing wrong or
-special in code. It is fine to do divisions the way it is done. So i didn't
-give any comment here. You still want me to give a comment there?
+Hi,
 
-viresh.
+Already submitted and applied about this.
+
+Please refer to below URL.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/019225.html
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-July/019436.html
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
