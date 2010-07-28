@@ -1,81 +1,61 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 28 Jul 2010 15:51:35 -0700
-Subject: [PATCH 2/3] arm: mm: do not set missing flags on ScorpionMP
-In-Reply-To: <20100728223603.GB6729@n2100.arm.linux.org.uk>
-References: <1279911483-7039-1-git-send-email-johlstei@codeaurora.org>
-	<1279911483-7039-3-git-send-email-johlstei@codeaurora.org>
-	<20100724082334.GB15571@n2100.arm.linux.org.uk>
-	<1280354280.21185.10.camel@c-dwalke-linux.qualcomm.com>
-	<20100728223603.GB6729@n2100.arm.linux.org.uk>
-Message-ID: <1280357495.21185.26.camel@c-dwalke-linux.qualcomm.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Thu, 29 Jul 2010 01:12:48 +0200
+Subject: [PATCH 2/2] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
+In-Reply-To: <AANLkTi=jStVGbJC7jUyhOG3og14F58rw+LEN2UqnP-X0@mail.gmail.com>
+References: <1277811391-17966-1-git-send-email-linus.walleij@stericsson.com>
+	<AANLkTi=jStVGbJC7jUyhOG3og14F58rw+LEN2UqnP-X0@mail.gmail.com>
+Message-ID: <AANLkTi=bkp+JJYQ7dF36Up3gcjJR8LypgfKBWZHLfPH-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-07-28 at 23:36 +0100, Russell King - ARM Linux wrote:
-> On Wed, Jul 28, 2010 at 02:58:00PM -0700, Daniel Walker wrote:
-> > On Sat, 2010-07-24 at 09:23 +0100, Russell King - ARM Linux wrote:
-> > > On Fri, Jul 23, 2010 at 11:58:02AM -0700, Jeff Ohlstein wrote:
-> > > > From: Steve Muckle <smuckle@codeaurora.org>
-> > > > 
-> > > > ScorpionMP does not have the SMP/nAMP mode and TLB ops
-> > > > broadcasting bits in the ACTLR.
-> > > 
-> > > Please provide a separate instance of __v7_proc_info for your processor
-> > > and direct it to jump into the __v7_setup code after this setup instead.
-> > 
-> > 
-> > You mean add another label into __v7_setup along with a proc-msm.S to
-> > jump over this code?
-> 
-> Yes to the first, no to the second.
-> 
+2010/7/28 Dan Williams <dan.j.williams@intel.com>:
+> On Tue, Jun 29, 2010 at 4:36 AM, Linus Walleij
+> <linus.walleij@stericsson.com> wrote:
+>> This creates a DMAengine driver for the ARM PL080/PL081 PrimeCells
+>> based on the implementation earlier submitted by Peter Pearse.
+>> This is working like a charm for memcpy and slave DMA to the PL011
+>> PrimeCell on the PB11MPCore.
+>
+> Russell I am assuming this implementation and testing is sufficient to
+> allay your prior nak [1]? ?Linus is oversubscribing virtual channels
+> to physical channels to handle muxing.
 
-Like so? I haven't tested this.
+I don't think Russell has ever NAK:ed the PL08x driver(s). The NAK
+was about the PrimeCell DMA extenstions to amba-pl011.c etc.
+(Still I'm happy if Russell looks at this thing of course.)
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 6bddf5d..167bedb 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -196,6 +196,7 @@ __v7_setup:
- 	orreq	r0, r0, #(1 << 6) | (1 << 0)	@ Enable SMP/nAMP mode and
- 	mcreq	p15, 0, r0, c1, c0, 1		@ TLB ops broadcasting
- #endif
-+__v7_msm_setup:
- 	adr	r12, __v7_setup_stack		@ the local stack
- 	stmia	r12, {r0-r5, r7, r9, r11, lr}
- 	bl	v7_flush_dcache_all
-@@ -326,6 +327,29 @@ cpu_elf_name:
- 
- 	.section ".proc.info.init", #alloc, #execinstr
- 
-+	.type   __v7_msm_proc_info, #object
-+__v7_msm_proc_info:
-+	.long	0x000f0000		@ Required ID value
-+	.long	0x000f0000		@ Mask for ID
-+	.long   PMD_TYPE_SECT | \
-+		PMD_SECT_AP_WRITE | \
-+		PMD_SECT_AP_READ | \
-+		PMD_FLAGS
-+	.long   PMD_TYPE_SECT | \
-+		PMD_SECT_XN | \
-+		PMD_SECT_AP_WRITE | \
-+		PMD_SECT_AP_READ
-+	b	__v7_msm_setup
-+	.long	cpu_arch_name
-+	.long	cpu_elf_name
-+	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
-+	.long	cpu_v7_name
-+	.long	v7_processor_functions
-+	.long	v7wbi_tlb_fns
-+	.long	v6_user_fns
-+	.long	v7_cache_fns
-+	.size	__v7_msm_proc_info, . - __v7_msm_proc_info
-+
- 	/*
- 	 * Match any ARMv7 processor core.
- 	 */
+This patch along with the generic channel control removed the
+cross-dependency between the PrimeCell DMA patchset and the
+drivers/dma DMA engine framework (yay!) so there is no arch/arm
+or AMBA stuff involved anymore, other than the fact that this driver
+sits on the AMBA/PrimeCell bus.
 
+>> +#ifdef MODULE
+>> +
+>> +# error "AMBA PL08X DMA CANNOT BE COMPILED AS A LOADABLE MODULE AT PRESENT"
+>> +
+>> +/*
+>> + ? ? ? a) Some devices might make use of DMA during boot
+>> + ? ? ? ? ?(esp true for DMAENGINE implementation)
+>> + ? ? ? b) Memory allocation will need much more attention
+>> + ? ? ? ? ?before load/unload can be supported
+>> + */
+>> +#endif
+>
+> This is taken care of by being "config bool", but I assume you want
+> this for documentation purposes?
 
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Peter had that in and I didn't remove it. If you don't like it you
+can remove it or I can send a new patch.
+
+>> + ? ? ? txd = kzalloc(sizeof(struct pl08x_txd), GFP_KERNEL);
+>
+> ...appears in the prep routines. ?Will this driver be used by any
+> storage controllers on the platfom? ?Might we deadlock waiting on i/o
+> that needs to allocate a descriptor to complete?
+
+I haven't noticed anything but a descriptor pool is on my
+list of things to look into and fix.
+
+Yours,
+Linus Walleij
