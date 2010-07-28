@@ -1,62 +1,63 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 28 Jul 2010 13:25:27 +0200 (CEST)
-Subject: [PATCH 2/4] mx2_camera: return IRQ_NONE when doing nothing
-In-Reply-To: <49da2476310a921b19226d572503b7c04175204d.1280229966.git.baruch@tkos.co.il>
-References: <cover.1280229966.git.baruch@tkos.co.il>
-	<49da2476310a921b19226d572503b7c04175204d.1280229966.git.baruch@tkos.co.il>
-Message-ID: <Pine.LNX.4.64.1007281317400.23907@axis700.grange>
+From: rabin.vincent@stericsson.com (Rabin VINCENT)
+Date: Wed, 28 Jul 2010 18:18:47 +0530
+Subject: [PATCH v3 0/3] Ordered I/O accessors
+In-Reply-To: <20100727110310.GA11468@n2100.arm.linux.org.uk>
+References: <20100714145802.16555.48563.stgit@e102109-lin.cambridge.arm.com>
+	<20100727110310.GA11468@n2100.arm.linux.org.uk>
+Message-ID: <20100728124846.GA24466@bnru02.bnr.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A general comment to your patches: the actual driver is going to be merged 
-via the ARM tree, all other your incremental patches should rather go via 
-the v4l tree. So, we'll have to synchronise with ARM, let's hope ARM 
-patches go in early enough.
-
-On Tue, 27 Jul 2010, Baruch Siach wrote:
-
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> ---
->  drivers/media/video/mx2_camera.c |    8 +++++---
->  1 files changed, 5 insertions(+), 3 deletions(-)
+On Tue, Jul 27, 2010 at 13:03:10 +0200, Russell King - ARM Linux wrote:
+> On Wed, Jul 14, 2010 at 04:01:12PM +0100, Catalin Marinas wrote:
+> > This version replaces the do { ... } while (0) constructs in the final
+> > patch with ({ ... }) to avoid errors in drivers putting brackets around
+> > the write*() accessors. To avoid the write*() macro having a non-void
+> > type (and possibly the compiler generating code to read a register), the
+> > first patch explicitly casts the __raw_write*() accessors to (void).
 > 
-> diff --git a/drivers/media/video/mx2_camera.c b/drivers/media/video/mx2_camera.c
-> index 1536bd4..b42ad8d 100644
-> --- a/drivers/media/video/mx2_camera.c
-> +++ b/drivers/media/video/mx2_camera.c
-> @@ -420,15 +420,17 @@ static irqreturn_t mx25_camera_irq(int irq_csi, void *data)
->  	struct mx2_camera_dev *pcdev = data;
->  	u32 status = readl(pcdev->base_csi + CSISR);
->  
-> -	if (status & CSISR_DMA_TSF_FB1_INT)
-> +	writel(status, pcdev->base_csi + CSISR);
-> +
-> +	if (!(status & (CSISR_DMA_TSF_FB1_INT | CSISR_DMA_TSF_FB2_INT)))
-> +		return IRQ_NONE;
-> +	else if (status & CSISR_DMA_TSF_FB1_INT)
->  		mx25_camera_frame_done(pcdev, 1, VIDEOBUF_DONE);
->  	else if (status & CSISR_DMA_TSF_FB2_INT)
->  		mx25_camera_frame_done(pcdev, 2, VIDEOBUF_DONE);
->  
->  	/* FIXME: handle CSISR_RFF_OR_INT */
->  
-> -	writel(status, pcdev->base_csi + CSISR);
-> -
->  	return IRQ_HANDLED;
->  }
+> Ok.  Can you please put this in the patch system?  I think we need to
+> get this in prior to 2.6.35 being released.
 
-I don't think this is correct. You should return IRQ_NONE if this is not 
-an interrupt from your device at all. In this case you don't have to ack 
-your interrupts, which, I presume, is what the write to CSISR is doing. 
-OTOH, if this is an interrupt from your device, but you're just not 
-interested in it, you should ack it and return IRQ_HANDLED. So, the 
-original behaviour was more correct, than what this your patch is doing. 
-The only improvement I can think of is, that you can return IRQ_NONE if 
-status is 0, but then you don't have to ack it.
+ux500 is using writel() inside uncompress.h, so this series triggers a
+build failure there:
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+  arch/arm/boot/compressed/misc.o: In function `putc':
+  arch/arm/mach-ux500/include/mach/uncompress.h:41:
+  undefined reference to `outer_cache'
+
+Something like the following needs to be applied to fix it.  I'll submit
+this as a separate patch if it can't be folded in.
+
+diff --git a/arch/arm/mach-ux500/include/mach/uncompress.h b/arch/arm/mach-ux500/include/mach/uncompress.h
+index 8552eb1..0271ca0 100644
+--- a/arch/arm/mach-ux500/include/mach/uncompress.h
++++ b/arch/arm/mach-ux500/include/mach/uncompress.h
+@@ -30,22 +30,22 @@
+ static void putc(const char c)
+ {
+ 	/* Do nothing if the UART is not enabled. */
+-	if (!(readb(U8500_UART_CR) & 0x1))
++	if (!(__raw_readb(U8500_UART_CR) & 0x1))
+ 		return;
+ 
+ 	if (c == '\n')
+ 		putc('\r');
+ 
+-	while (readb(U8500_UART_FR) & (1 << 5))
++	while (__raw_readb(U8500_UART_FR) & (1 << 5))
+ 		barrier();
+-	writeb(c, U8500_UART_DR);
++	__raw_writeb(c, U8500_UART_DR);
+ }
+ 
+ static void flush(void)
+ {
+-	if (!(readb(U8500_UART_CR) & 0x1))
++	if (!(__raw_readb(U8500_UART_CR) & 0x1))
+ 		return;
+-	while (readb(U8500_UART_FR) & (1 << 3))
++	while (__raw_readb(U8500_UART_FR) & (1 << 3))
+ 		barrier();
+ }
+ 
