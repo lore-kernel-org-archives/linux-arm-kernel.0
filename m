@@ -1,166 +1,458 @@
-From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Wed, 28 Jul 2010 11:41:26 +0300
-Subject: [PATCH] mmc: failure of block read wait for long time
-In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B030E417D80@dbde02.ent.ti.com>
-References: <1280230066-27612-1-git-send-email-s-ghorai@ti.com>
-	<4C4EDD85.5060606@nokia.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B030E417D80@dbde02.ent.ti.com>
-Message-ID: <4C4FED36.3010607@nokia.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 28 Jul 2010 17:49:57 +0900
+Subject: [PATCH] ARM: S5PV210: Add audio support to Goni and Aquila board
+Message-ID: <4C4FEF35.7020002@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ext Ghorai, Sukumar wrote:
-> 
->> -----Original Message-----
->> From: Adrian Hunter [mailto:adrian.hunter at nokia.com]
->> Sent: Tuesday, July 27, 2010 6:52 PM
->> To: Ghorai, Sukumar
->> Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH] mmc: failure of block read wait for long time
->>
->> Sukumar Ghorai wrote:
->>>  multi-block read failure retries in single block read one by one. It
->> continues
->>>  retry of subsequent blocks, even after failure. Application will not be
->> able
->>>  to decode the interleave data (even if few single block read success).
->>>  This patch fixes this problem by returning at the first failure instead
->> of
->>>  waiting for long duration.
->> How can you know what sectors are important to the upper layers?
-> [Ghorai] 
-> 1. This is obvious either give the complete data to above layer or not. And every protocol follows that.
-> 
-> 2. And other scenario, say apps request for to read the 128MB data and it will take quite long time before returning in failure case.
-> 
-> 3. it is quite obvious if the read fail for sector(x) it will fail for sector(x+1)
-> 
+This patch the I2C board information for the WM8994 used in the Goni/Aquila
+as audio codec and adds the I2C/I2S platform drivers. Additionlly, to
+control power consumption have registerd the voltage consumer of WM8994
+to the regulator framework. I initialize gpio settting relevant to
+operation of audio codec. I explain following comment concering gpio
+setting:
+ - CODEC_XTAL_EN : This gpio enables that the main clock is provided
+   to operate audio codec. (Only used on Aquila board)
+ - ADC_EN : This gpio enable the ADC device which is used to detect
+   the kind of jack. (SND_JACK_HEADPHONE/HEADSET/MECHANICAL/AVOUT)
+   According to the kind of jack, an electric current is changed.
+   (Only used on Aquila board)
+ - MICBIAS_EN : This gpio enable the microphone to support capture.
 
-None of that is exactly true.  However you could change the retry
-from sectors to segments e.g.
+Signed-off-by : Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by : Joonyoung Shim <jy0922.shim@samsung.com>
+Signed-off-by : Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv210/mach-aquila.c |  177 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-s5pv210/mach-goni.c   |  165 ++++++++++++++++++++++++++++++++
+ 2 files changed, 342 insertions(+), 0 deletions(-)
 
-
-diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
-index d545f79..5ed15f6 100644
---- a/drivers/mmc/card/block.c
-+++ b/drivers/mmc/card/block.c
-@@ -321,13 +321,14 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
- 	struct mmc_blk_data *md = mq->data;
- 	struct mmc_card *card = md->queue.card;
- 	struct mmc_blk_request brq;
--	int ret = 1, disable_multi = 0;
-+	int ret = 1, retrying = 0;
+diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
+index f0f960f..312ff76 100644
+--- a/arch/arm/mach-s5pv210/mach-aquila.c
++++ b/arch/arm/mach-s5pv210/mach-aquila.c
+@@ -17,9 +17,11 @@
+ #include <linux/i2c-gpio.h>
+ #include <linux/i2c/mcs.h>
+ #include <linux/mfd/max8998.h>
++#include <linux/mfd/wm8994/pdata.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
+ #include <linux/gpio.h>
++#include <linux/regulator/fixed.h>
  
- 	mmc_claim_host(card->host);
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -397,6 +399,120 @@ static struct max8998_platform_data aquila_max8998_pdata = {
+ };
+ #endif
  
- 	do {
- 		struct mmc_command cmd;
- 		u32 readcmd, writecmd, status = 0;
-+		unsigned int blocks;
- 
- 		memset(&brq, 0, sizeof(struct mmc_blk_request));
- 		brq.mrq.cmd = &brq.cmd;
-@@ -341,23 +342,26 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
- 		brq.stop.opcode = MMC_STOP_TRANSMISSION;
- 		brq.stop.arg = 0;
- 		brq.stop.flags = MMC_RSP_SPI_R1B | MMC_RSP_R1B | MMC_CMD_AC;
--		brq.data.blocks = blk_rq_sectors(req);
++static struct regulator_consumer_supply wm8994_fixed_voltage0_supplies[] = {
++	{
++		.dev_name	= "5-001a",
++		.supply		= "DBVDD",
++	}, {
++		.dev_name	= "5-001a",
++		.supply		= "AVDD2",
++	}, {
++		.dev_name	= "5-001a",
++		.supply		= "CPVDD",
++	},
 +
-+		/*
-+		 * After a read error, we redo the request one segment at a time
-+		 * in order to accurately determine which segments can be read
-+		 * successfully.
-+		 */
-+		if (retrying)
-+			blocks = blk_rq_cur_sectors(req);
-+		else
-+			blocks = blk_rq_sectors(req);
++};
++
++static struct regulator_consumer_supply wm8994_fixed_voltage1_supplies[] = {
++	{
++		.dev_name	= "5-001a",
++		.supply		= "SPKVDD1",
++	}, {
++		.dev_name	= "5-001a",
++		.supply		= "SPKVDD2",
++	},
++};
++
++static struct regulator_init_data wm8994_fixed_voltage0_init_data = {
++	.constraints = {
++		.always_on = 1,
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(wm8994_fixed_voltage0_supplies),
++	.consumer_supplies	= wm8994_fixed_voltage0_supplies,
++};
++
++static struct regulator_init_data wm8994_fixed_voltage1_init_data = {
++	.constraints = {
++		.always_on = 1,
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(wm8994_fixed_voltage1_supplies),
++	.consumer_supplies	= wm8994_fixed_voltage1_supplies,
++};
++
++static struct fixed_voltage_config wm8994_fixed_voltage0_config = {
++	.supply_name	= "VCC_1.8V_PDA",
++	.microvolts	= 1800000,
++	.gpio		= -EINVAL,
++	.init_data	= &wm8994_fixed_voltage0_init_data,
++};
++
++static struct fixed_voltage_config wm8994_fixed_voltage1_config = {
++	.supply_name	= "V_BAT",
++	.microvolts	= 3700000,
++	.gpio		= -EINVAL,
++	.init_data	= &wm8994_fixed_voltage1_init_data,
++};
++
++static struct platform_device wm8994_fixed_voltage0 = {
++	.name		= "reg-fixed-voltage",
++	.id		= 0,
++	.dev		= {
++		.platform_data	= &wm8994_fixed_voltage0_config,
++	},
++};
++
++static struct platform_device wm8994_fixed_voltage1 = {
++	.name		= "reg-fixed-voltage",
++	.id		= 1,
++	.dev		= {
++		.platform_data	= &wm8994_fixed_voltage1_config,
++	},
++};
++
++static struct regulator_consumer_supply wm8994_avdd1_supply = {
++	.dev_name	= "5-001a",
++	.supply		= "AVDD1",
++};
++
++static struct regulator_consumer_supply wm8994_dcvdd_supply = {
++	.dev_name	= "5-001a",
++	.supply		= "DCVDD",
++};
++
++static struct regulator_init_data wm8994_ldo1_data = {
++	.constraints	= {
++		.name		= "AVDD1_3.0V",
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies	= 1,
++	.consumer_supplies	= &wm8994_avdd1_supply,
++};
++
++static struct regulator_init_data wm8994_ldo2_data = {
++	.constraints	= {
++		.name		= "DCVDD_1.0V",
++	},
++	.num_consumer_supplies	= 1,
++	.consumer_supplies	= &wm8994_dcvdd_supply,
++};
++
++static struct wm8994_pdata wm8994_platform_data = {
++	/* configure gpio1 function: 0x0001(Logic level input/output) */
++	.gpio_defaults[0] = 0x0001,
++	/* configure gpio3/4/5/7 function for AIF2 voice */
++	.gpio_defaults[2] = 0x8100,
++	.gpio_defaults[3] = 0x8100,
++	.gpio_defaults[4] = 0x8100,
++	.gpio_defaults[6] = 0x0100,
++	/* configure gpio8/9/10/11 function for AIF3 BT */
++	.gpio_defaults[7] = 0x8100,
++	.gpio_defaults[8] = 0x0100,
++	.gpio_defaults[9] = 0x0100,
++	.gpio_defaults[10] = 0x0100,
++	.ldo[0]	= { S5PV210_MP03(6), NULL, &wm8994_ldo1_data },	/* XM0FRNB_2 */
++	.ldo[1]	= { 0, NULL, &wm8994_ldo2_data },
++};
++
+ /* GPIO I2C PMIC */
+ #define AP_I2C_GPIO_PMIC_BUS_4	4
+ static struct i2c_gpio_platform_data aquila_i2c_gpio_pmic_data = {
+@@ -422,6 +538,58 @@ static struct i2c_board_info i2c_gpio_pmic_devs[] __initdata = {
+ #endif
+ };
  
- 		/*
- 		 * The block layer doesn't support all sector count
- 		 * restrictions, so we need to be prepared for too big
- 		 * requests.
- 		 */
--		if (brq.data.blocks > card->host->max_blk_count)
--			brq.data.blocks = card->host->max_blk_count;
-+		if (blocks > card->host->max_blk_count)
-+			blocks = card->host->max_blk_count;
++/* GPIO I2C AP 1.8V */
++#define AP_I2C_GPIO_BUS_5	5
++static struct i2c_gpio_platform_data i2c_gpio5_data = {
++	.sda_pin	= S5PV210_MP05(3),	/* XM0ADDR_11 */
++	.scl_pin	= S5PV210_MP05(2),	/* XM0ADDR_10 */
++};
++
++static struct platform_device i2c_gpio5 = {
++	.name		= "i2c-gpio",
++	.id		= AP_I2C_GPIO_BUS_5,
++	.dev		= {
++		.platform_data	= &i2c_gpio5_data,
++	},
++};
++
++static struct i2c_board_info i2c_gpio5_devs[] __initdata = {
++	{
++		/* CS/ADDR = low 0x34 (FYI: high = 0x36) */
++		I2C_BOARD_INFO("wm8994", 0x34 >> 1),
++		.platform_data	= &wm8994_platform_data,
++	},
++};
++
++static void __init aquila_sound_init(void)
++{
++	unsigned int gpio;
++
++	/* CODEC_XTAL_EN */
++	gpio = S5PV210_GPH3(2);		/* XEINT_26 */
++	gpio_request(gpio, "CODEC_XTAL_EN");
++	s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
++	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++	gpio_direction_output(gpio, 1);
++
++	/* CLKOUT[9:8] set to 0x3(XUSBXTI) of 0xE010E000(OTHERS)
++	 * for 24MHZ
++	 */
++	writel(readl(S5P_OTHERS) | (0x3 << 8), S5P_OTHERS);
++
++	/* MICBIAS_EN */
++	gpio = S5PV210_GPJ4(2);			/* XMSMRN */
++	gpio_request(gpio, "MICBIAS_EN");
++	s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
++	gpio_direction_output(gpio, 1);
++
++	/* ADC_EN */
++	gpio = S5PV210_GPJ3(2);
++	gpio_request(gpio, "ADC_EN");
++	s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
++	gpio_direction_output(gpio, 1);
++}
++
+ /* PMIC Power button */
+ static struct gpio_keys_button aquila_gpio_keys_table[] = {
+ 	{
+@@ -523,6 +691,10 @@ static struct platform_device *aquila_devices[] __initdata = {
+ 	&s5pc110_device_onenand,
+ 	&samsung_device_keypad,
+ 	&i2c_gpio10,
++	&i2c_gpio5,
++	&wm8994_fixed_voltage0,
++	&wm8994_fixed_voltage1,
++	&s5pv210_device_iis0,
+ };
  
--		/*
--		 * After a read error, we redo the request one sector at a time
--		 * in order to accurately determine which sectors can be read
--		 * successfully.
--		 */
--		if (disable_multi && brq.data.blocks > 1)
--			brq.data.blocks = 1;
-+		brq.data.blocks = blocks;
+ static void __init aquila_map_io(void)
+@@ -539,6 +711,11 @@ static void __init aquila_machine_init(void)
+ 	i2c_register_board_info(AP_I2C_GPIO_PMIC_BUS_4, i2c_gpio_pmic_devs,
+ 			ARRAY_SIZE(i2c_gpio_pmic_devs));
  
- 		if (brq.data.blocks > 1) {
- 			/* SPI multiblock writes terminate using a special
-@@ -418,11 +422,14 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
- 		 * programming mode even when things go wrong.
- 		 */
- 		if (brq.cmd.error || brq.data.error || brq.stop.error) {
--			if (brq.data.blocks > 1 && rq_data_dir(req) == READ) {
--				/* Redo read one sector at a time */
--				printk(KERN_WARNING "%s: retrying using single "
--				       "block read\n", req->rq_disk->disk_name);
--				disable_multi = 1;
-+			if (!retrying && rq_data_dir(req) == READ &&
-+			    blk_rq_cur_sectors(req) &&
-+			    blk_rq_cur_sectors(req) < blocks) {
-+				/* Redo read one segment at a time */
-+				printk(KERN_WARNING "%s: retrying read one "
-+						    "segment@a time\n",
-+						    req->rq_disk->disk_name);
-+				retrying = 1;
- 				continue;
- 			}
- 			status = get_card_status(card, req);
-@@ -486,12 +493,13 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
- 		if (brq.cmd.error || brq.stop.error || brq.data.error) {
- 			if (rq_data_dir(req) == READ) {
- 				/*
--				 * After an error, we redo I/O one sector at a
-+				 * After an error, we redo I/O one segment at a
- 				 * time, so we only reach here after trying to
--				 * read a single sector.
-+				 * read a single segment.  Error out the whole
-+				 * segment and continue to the next.
- 				 */
- 				spin_lock_irq(&md->lock);
--				ret = __blk_end_request(req, -EIO, brq.data.blksz);
-+				ret = __blk_end_request(req, -EIO, blk_rq_cur_sectors(req) << 9);
- 				spin_unlock_irq(&md->lock);
- 				continue;
- 			}
-
-
->>> Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
->>> ---
->>>  drivers/mmc/card/block.c |    1 -
->>>  1 files changed, 0 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
->>> index cb9fbc8..cfb0827 100644
->>> --- a/drivers/mmc/card/block.c
->>> +++ b/drivers/mmc/card/block.c
->>> @@ -419,7 +419,6 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq,
->> struct request *req)
->>>  				spin_lock_irq(&md->lock);
->>>  				ret = __blk_end_request(req, -EIO,
->> brq.data.blksz);
->>>  				spin_unlock_irq(&md->lock);
->>> -				continue;
->>>  			}
->>>  			goto cmd_err;
->>>  		}
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>
-> 
-> Regards,
-> Ghorai
-> 
++	/* SOUND */
++	aquila_sound_init();
++	i2c_register_board_info(AP_I2C_GPIO_BUS_5, i2c_gpio5_devs,
++			ARRAY_SIZE(i2c_gpio5_devs));
++
+ 	/* FB */
+ 	s3c_fb_set_platdata(&aquila_lcd_pdata);
+ 
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index 5fec4a0..944e600 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -17,9 +17,11 @@
+ #include <linux/i2c-gpio.h>
+ #include <linux/i2c/mcs.h>
+ #include <linux/mfd/max8998.h>
++#include <linux/mfd/wm8994/pdata.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
+ #include <linux/gpio.h>
++#include <linux/regulator/fixed.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -373,6 +375,120 @@ static struct max8998_regulator_data goni_regulators[] = {
+ 	{ MAX8998_BUCK4, &goni_buck4_data },
+ };
+ 
++static struct regulator_consumer_supply wm8994_fixed_voltage0_supplies[] = {
++	{
++		.dev_name	= "5-001a",
++		.supply		= "DBVDD",
++	}, {
++		.dev_name	= "5-001a",
++		.supply		= "AVDD2",
++	}, {
++		.dev_name	= "5-001a",
++		.supply		= "CPVDD",
++	},
++
++};
++
++static struct regulator_consumer_supply wm8994_fixed_voltage1_supplies[] = {
++	{
++		.dev_name	= "5-001a",
++		.supply		= "SPKVDD1",
++	}, {
++		.dev_name	= "5-001a",
++		.supply		= "SPKVDD2",
++	},
++};
++
++static struct regulator_init_data wm8994_fixed_voltage0_init_data = {
++	.constraints = {
++		.always_on = 1,
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(wm8994_fixed_voltage0_supplies),
++	.consumer_supplies	= wm8994_fixed_voltage0_supplies,
++};
++
++static struct regulator_init_data wm8994_fixed_voltage1_init_data = {
++	.constraints = {
++		.always_on = 1,
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(wm8994_fixed_voltage1_supplies),
++	.consumer_supplies	= wm8994_fixed_voltage1_supplies,
++};
++
++static struct fixed_voltage_config wm8994_fixed_voltage0_config = {
++	.supply_name	= "VCC_1.8V_PDA",
++	.microvolts	= 1800000,
++	.gpio		= -EINVAL,
++	.init_data	= &wm8994_fixed_voltage0_init_data,
++};
++
++static struct fixed_voltage_config wm8994_fixed_voltage1_config = {
++	.supply_name	= "V_BAT",
++	.microvolts	= 3700000,
++	.gpio		= -EINVAL,
++	.init_data	= &wm8994_fixed_voltage1_init_data,
++};
++
++static struct platform_device wm8994_fixed_voltage0 = {
++	.name		= "reg-fixed-voltage",
++	.id		= 0,
++	.dev		= {
++		.platform_data	= &wm8994_fixed_voltage0_config,
++	},
++};
++
++static struct platform_device wm8994_fixed_voltage1 = {
++	.name		= "reg-fixed-voltage",
++	.id		= 1,
++	.dev		= {
++		.platform_data	= &wm8994_fixed_voltage1_config,
++	},
++};
++
++static struct regulator_consumer_supply wm8994_avdd1_supply = {
++	.dev_name	= "5-001a",
++	.supply		= "AVDD1",
++};
++
++static struct regulator_consumer_supply wm8994_dcvdd_supply = {
++	.dev_name	= "5-001a",
++	.supply		= "DCVDD",
++};
++
++static struct regulator_init_data wm8994_ldo1_data = {
++	.constraints	= {
++		.name		= "AVDD1_3.0V",
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies	= 1,
++	.consumer_supplies	= &wm8994_avdd1_supply,
++};
++
++static struct regulator_init_data wm8994_ldo2_data = {
++	.constraints	= {
++		.name		= "DCVDD_1.0V",
++	},
++	.num_consumer_supplies	= 1,
++	.consumer_supplies	= &wm8994_dcvdd_supply,
++};
++
++static struct wm8994_pdata wm8994_platform_data = {
++	/* configure gpio1 function: 0x0001(Logic level input/output) */
++	.gpio_defaults[0] = 0x0001,
++	/* configure gpio3/4/5/7 function for AIF2 voice */
++	.gpio_defaults[2] = 0x8100,
++	.gpio_defaults[3] = 0x8100,
++	.gpio_defaults[4] = 0x8100,
++	.gpio_defaults[6] = 0x0100,
++	/* configure gpio8/9/10/11 function for AIF3 BT */
++	.gpio_defaults[7] = 0x8100,
++	.gpio_defaults[8] = 0x0100,
++	.gpio_defaults[9] = 0x0100,
++	.gpio_defaults[10] = 0x0100,
++	.ldo[0]	= { S5PV210_GPF3(4), NULL, &wm8994_ldo1_data },	/* XVVSYNC_LDI */
++	.ldo[1]	= { 0, NULL, &wm8994_ldo2_data },
++};
++
+ static struct max8998_platform_data goni_max8998_pdata = {
+ 	.num_regulators	= ARRAY_SIZE(goni_regulators),
+ 	.regulators	= goni_regulators,
+@@ -404,6 +520,45 @@ static struct i2c_board_info i2c_gpio_pmic_devs[] __initdata = {
+ #endif
+ };
+ 
++/* GPIO I2C AP 1.8V */
++#define AP_I2C_GPIO_BUS_5	5
++static struct i2c_gpio_platform_data i2c_gpio5_data = {
++	.sda_pin	= S5PV210_MP05(3),	/* XM0ADDR_11 */
++	.scl_pin	= S5PV210_MP05(2),	/* XM0ADDR_10 */
++};
++
++static struct platform_device i2c_gpio5 = {
++	.name		= "i2c-gpio",
++	.id		= AP_I2C_GPIO_BUS_5,
++	.dev		= {
++		.platform_data	= &i2c_gpio5_data,
++	},
++};
++
++static struct i2c_board_info i2c_gpio5_devs[] __initdata = {
++	{
++		/* CS/ADDR = low 0x34 (FYI: high = 0x36) */
++		I2C_BOARD_INFO("wm8994", 0x34 >> 1),
++		.platform_data	= &wm8994_platform_data,
++	},
++};
++
++static void __init goni_sound_init(void)
++{
++	unsigned int gpio;
++
++	/* CLKOUT[9:8] set to 0x3(XUSBXTI) of 0xE010E000(OTHERS)
++	 * for 24MHZ
++	 */
++	writel(readl(S5P_OTHERS) | (0x3 << 8), S5P_OTHERS);
++
++	/* MICBIAS_EN */
++	gpio = S5PV210_GPJ4(2);			/* XMSMRN */
++	gpio_request(gpio, "MICBIAS_EN");
++	s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
++	gpio_direction_output(gpio, 1);
++}
++
+ /* PMIC Power button */
+ static struct gpio_keys_button goni_gpio_keys_table[] = {
+ 	{
+@@ -504,7 +659,11 @@ static struct platform_device *goni_devices[] __initdata = {
+ 	&samsung_device_keypad,
+ 	&goni_i2c_gpio_pmic,
+ 	&goni_device_gpiokeys,
++	&i2c_gpio5,
+ 	&i2c_gpio10,
++	&wm8994_fixed_voltage0,
++	&wm8994_fixed_voltage1,
++	&s5pv210_device_iis0,
+ };
+ 
+ static void __init goni_map_io(void)
+@@ -520,6 +679,12 @@ static void __init goni_machine_init(void)
+ 	goni_pmic_init();
+ 	i2c_register_board_info(AP_I2C_GPIO_PMIC_BUS_4, i2c_gpio_pmic_devs,
+ 			ARRAY_SIZE(i2c_gpio_pmic_devs));
++
++	/* SOUND */
++	goni_sound_init();
++	i2c_register_board_info(AP_I2C_GPIO_BUS_5, i2c_gpio5_devs,
++			ARRAY_SIZE(i2c_gpio5_devs));
++
+ 	/* FB */
+ 	s3c_fb_set_platdata(&goni_lcd_pdata);
+ 
+-- 
+1.6.3.3
