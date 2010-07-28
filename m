@@ -1,140 +1,136 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 28 Jul 2010 10:31:41 +0900
-Subject: [PATCH] S5PV310: Add Samsung Mobile Reference Board support
-Message-ID: <20100728013141.GA2071@july>
+Date: Wed, 28 Jul 2010 10:17:14 +0900
+Subject: [PATCH] S5PV210: Move OneNAND platform data to plat-s5p
+Message-ID: <20100728011714.GA1882@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Initial samsung mobile reference board support
+S5PV310 has the same OneNAND controller and can use it commonly.
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s5pv310/Kconfig          |    9 +++
- arch/arm/mach-s5pv310/Makefile         |    1 +
- arch/arm/mach-s5pv310/mach-universal.c |   86 ++++++++++++++++++++++++++++++++
- 3 files changed, 96 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pv310/mach-universal.c
+ arch/arm/mach-s5pv210/Kconfig            |    5 ---
+ arch/arm/mach-s5pv210/Makefile           |    1 -
+ arch/arm/mach-s5pv210/include/mach/map.h |    3 --
+ arch/arm/plat-s5p/Makefile               |    2 +-
+ arch/arm/plat-s5p/dev-onenand.c          |   52 ++++++++++++++++++++++++++++++
+ 5 files changed, 53 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/plat-s5p/dev-onenand.c
 
-diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
-index 24ef3cd..2fe8149 100644
---- a/arch/arm/mach-s5pv310/Kconfig
-+++ b/arch/arm/mach-s5pv310/Kconfig
-@@ -23,4 +23,13 @@ config MACH_SMDKV310
- 	select ARCH_SPARSEMEM_ENABLE
- 	help
- 	  Machine support for Samsung SMDKV310
-+
-+config MACH_UNIVERSAL
-+	bool "Mobile Universal Board"
-+	select CPU_S5PV310
-+	select ARCH_SPARSEMEM_ENABLE
-+	help
-+	  Machine support for Samsung Mobile Universal Reference Board.
-+	  S5PC210(MCP) is one of package option of S5PV310
-+
- endif
-diff --git a/arch/arm/mach-s5pv310/Makefile b/arch/arm/mach-s5pv310/Makefile
-index 56e7693..5b52132 100644
---- a/arch/arm/mach-s5pv310/Makefile
-+++ b/arch/arm/mach-s5pv310/Makefile
-@@ -22,3 +22,4 @@ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
- # machine support
+diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+index 0761eac..96f4d9b 100644
+--- a/arch/arm/mach-s5pv210/Kconfig
++++ b/arch/arm/mach-s5pv210/Kconfig
+@@ -62,11 +62,6 @@ config MACH_GONI
+ 	  Machine support for Samsung GONI board
+ 	  S5PC110(MCP) is one of package option of S5PV210
  
- obj-$(CONFIG_MACH_SMDKV310)	+= mach-smdkv310.o
-+obj-$(CONFIG_MACH_UNIVERSAL)	+= mach-universal.o
-diff --git a/arch/arm/mach-s5pv310/mach-universal.c b/arch/arm/mach-s5pv310/mach-universal.c
+-config S5PC110_DEV_ONENAND
+-	bool
+-	help
+-	  Compile in platform device definition for OneNAND1 controller
+-
+ config MACH_SMDKV210
+ 	bool "SMDKV210"
+ 	select CPU_S5PV210
+diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
+index 30be9a6..6a6dea1 100644
+--- a/arch/arm/mach-s5pv210/Makefile
++++ b/arch/arm/mach-s5pv210/Makefile
+@@ -26,7 +26,6 @@ obj-$(CONFIG_MACH_GONI)		+= mach-goni.o
+ 
+ obj-y				+= dev-audio.o
+ obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
+-obj-$(CONFIG_S5PC110_DEV_ONENAND) += dev-onenand.o
+ 
+ obj-$(CONFIG_S5PV210_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
+ obj-$(CONFIG_S5PV210_SETUP_I2C1) 	+= setup-i2c1.o
+diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
+index 34eb168..3a44e1e 100644
+--- a/arch/arm/mach-s5pv210/include/mach/map.h
++++ b/arch/arm/mach-s5pv210/include/mach/map.h
+@@ -16,9 +16,6 @@
+ #include <plat/map-base.h>
+ #include <plat/map-s5p.h>
+ 
+-#define S5PC110_PA_ONENAND	(0xB0000000)
+-#define S5PC110_PA_ONENAND_DMA	(0xB0600000)
+-
+ #define S5PV210_PA_CHIPID	(0xE0000000)
+ #define S5P_PA_CHIPID		S5PV210_PA_CHIPID
+ 
+diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
+index 39c242b..d9f6890 100644
+--- a/arch/arm/plat-s5p/Makefile
++++ b/arch/arm/plat-s5p/Makefile
+@@ -12,7 +12,7 @@ obj-				:=
+ 
+ # Core files
+ 
+-obj-y				+= dev-uart.o
++obj-y				+= dev-uart.o dev-onenand.o
+ obj-y				+= cpu.o
+ obj-y				+= clock.o
+ obj-y				+= irq.o
+diff --git a/arch/arm/plat-s5p/dev-onenand.c b/arch/arm/plat-s5p/dev-onenand.c
 new file mode 100644
-index 0000000..d22727f
+index 0000000..00facbe
 --- /dev/null
-+++ b/arch/arm/mach-s5pv310/mach-universal.c
-@@ -0,0 +1,86 @@
-+/* linux/arch/arm/mach-s5pv310/mach-universal.c
++++ b/arch/arm/plat-s5p/dev-onenand.c
+@@ -0,0 +1,52 @@
++/*
++ * linux/arch/arm/plat-s5p/dev-onenand.c
 + *
-+ * Copyright (C) 2010 Samsung Electronics Co., Ltd.
++ *  Copyright (c) 2008-2010 Samsung Electronics
++ *  Kyungmin Park <kyungmin.park@samsung.com>
++ *
++ * S5PC110 series device definition for OneNAND devices
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
-+*/
++ */
 +
-+#include <linux/serial_core.h>
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++#include <linux/mtd/mtd.h>
++#include <linux/mtd/onenand.h>
 +
-+#include <asm/mach/arch.h>
-+#include <asm/mach-types.h>
-+#include <asm/hardware/cache-l2x0.h>
++#include <mach/irqs.h>
 +
-+#include <plat/regs-serial.h>
-+#include <plat/s5pv310.h>
-+#include <plat/cpu.h>
++#define S5PC110_PA_ONENAND		(0xB0000000)
++#define S5PC110_PA_ONENAND_DMA		(0xB0600000)
 +
-+#include <mach/map.h>
-+
-+/* Following are default values for UCON, ULCON and UFCON UART registers */
-+#define UNIVERSAL_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-+				 S3C2410_UCON_RXILEVEL |	\
-+				 S3C2410_UCON_TXIRQMODE |	\
-+				 S3C2410_UCON_RXIRQMODE |	\
-+				 S3C2410_UCON_RXFIFO_TOI |	\
-+				 S3C2443_UCON_RXERR_IRQEN)
-+
-+#define UNIVERSAL_ULCON_DEFAULT	S3C2410_LCON_CS8
-+
-+#define UNIVERSAL_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
-+				S5PV210_UFCON_TXTRIGMAX |	\
-+				S5PV210_UFCON_RXTRIGMAX)
-+
-+static struct s3c2410_uartcfg universal_uartcfgs[] __initdata = {
++static struct resource s5pc110_onenand_resources[] = {
 +	[0] = {
-+		.hwport		= 0,
-+		.ucon		= UNIVERSAL_UCON_DEFAULT,
-+		.ulcon		= UNIVERSAL_ULCON_DEFAULT,
-+		.ufcon		= UNIVERSAL_UFCON_DEFAULT,
++		.start	= S5PC110_PA_ONENAND,
++		.end	= S5PC110_PA_ONENAND + SZ_128K - 1,
++		.flags	= IORESOURCE_MEM,
 +	},
 +	[1] = {
-+		.hwport		= 1,
-+		.ucon		= UNIVERSAL_UCON_DEFAULT,
-+		.ulcon		= UNIVERSAL_ULCON_DEFAULT,
-+		.ufcon		= UNIVERSAL_UFCON_DEFAULT,
-+	},
-+	[2] = {
-+		.hwport		= 2,
-+		.ucon		= UNIVERSAL_UCON_DEFAULT,
-+		.ulcon		= UNIVERSAL_ULCON_DEFAULT,
-+		.ufcon		= UNIVERSAL_UFCON_DEFAULT,
-+	},
-+	[3] = {
-+		.hwport		= 3,
-+		.ucon		= UNIVERSAL_UCON_DEFAULT,
-+		.ulcon		= UNIVERSAL_ULCON_DEFAULT,
-+		.ufcon		= UNIVERSAL_UFCON_DEFAULT,
++		.start	= S5PC110_PA_ONENAND_DMA,
++		.end	= S5PC110_PA_ONENAND_DMA + SZ_2K - 1,
++		.flags	= IORESOURCE_MEM,
 +	},
 +};
 +
-+static void __init universal_map_io(void)
-+{
-+	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-+	s3c24xx_init_clocks(24000000);
-+	s3c24xx_init_uarts(universal_uartcfgs, ARRAY_SIZE(universal_uartcfgs));
-+}
++struct platform_device s5pc110_device_onenand = {
++	.name		= "s5pc110-onenand",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(s5pc110_onenand_resources),
++	.resource	= s5pc110_onenand_resources,
++};
 +
-+static void __init universal_machine_init(void)
++void s5pc110_onenand_set_platdata(struct onenand_platform_data *pdata)
 +{
-+#ifdef CONFIG_CACHE_L2X0
-+	l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
-+#endif
-+}
++	struct onenand_platform_data *pd;
 +
-+MACHINE_START(UNIVERSAL, "UNIVERSAL")
-+	/* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
-+	.phys_io	= S3C_PA_UART & 0xfff00000,
-+	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
-+	.boot_params	= S5P_PA_SDRAM + 0x100,
-+	.init_irq	= s5pv310_init_irq,
-+	.map_io		= universal_map_io,
-+	.init_machine	= universal_machine_init,
-+	.timer		= &s5pv310_timer,
-+MACHINE_END
++	pd = kmemdup(pdata, sizeof(struct onenand_platform_data), GFP_KERNEL);
++	if (!pd)
++		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
++	s5pc110_device_onenand.dev.platform_data = pd;
++}
 -- 
 1.5.3.3
