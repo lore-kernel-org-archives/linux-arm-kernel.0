@@ -1,39 +1,30 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Wed, 28 Jul 2010 12:02:26 -0400
-Subject: [PATCH v3] davinci: Add MityDSP-L138/MityARM-1808 SOM support
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59301E7D0AF64@dbde02.ent.ti.com>
-References: <4C45AE5E.7070905@criticallink.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59301E7D0AF64@dbde02.ent.ti.com>
-Message-ID: <4C505492.3060404@criticallink.com>
+From: segooon@gmail.com (Kulikov Vasiliy)
+Date: Wed, 28 Jul 2010 20:38:47 +0400
+Subject: [PATCH 01/10] arm: leds: check return value of request_region()
+Message-ID: <1280335127-23145-1-git-send-email-segooon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- On 7/26/2010 5:29 AM, Nori, Sekhar wrote:
->
->
->> +
->> +static struct davinci_i2c_platform_data mityomap_i2c_0_pdata = {
->> +    .bus_freq    = 100,    /* kHz */
->> +    .bus_delay    = 0,    /* usec */
->> +};
-> This is exactly the pdata that davinci I2C driver uses by default,
-> so you can save a few bytes and a few lines of code by passing NULL
-> pdata.
->
-> [...]
->
+request_region() may fail, if so return -ENOMEM.
 
-So I tried your suggestion and passed NULL as the pdata argument, e.g.,
+Signed-off-by: Kulikov Vasiliy <segooon@gmail.com>
+---
+ arch/arm/mach-shark/leds.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-...
-ret = da8xx_register_i2c(0, NULL);
-...
-
-and the kernel locks up during initialization.  Did I not understand
-what you were suggesting?  I will back this suggestion out until I get a chance
-to hunt down the problem.  I see no other boards initialize the i2c this
-way (they explicitly provide a structure).
-
-Thanks.
-
--Mike
+diff --git a/arch/arm/mach-shark/leds.c b/arch/arm/mach-shark/leds.c
+index c9e32de..cb1a8f2 100644
+--- a/arch/arm/mach-shark/leds.c
++++ b/arch/arm/mach-shark/leds.c
+@@ -155,7 +155,8 @@ static int __init leds_init(void)
+ 	leds_event = sequoia_leds_event;
+ 
+ 	/* Make LEDs independent of power-state */
+-	request_region(0x24,4,"sequoia");
++	if (request_region(0x24, 4, "sequoia") == NULL)
++		return -ENOMEM;
+ 	temp = sequoia_read(0x09);
+ 	temp |= 1<<10;
+ 	sequoia_write(temp,0x09);
+-- 
+1.7.0.4
