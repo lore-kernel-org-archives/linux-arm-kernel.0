@@ -1,116 +1,60 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 28 Jul 2010 14:51:23 +0800
-Subject: [PATCH 05/29] pxa3xx_nand: set oob length in the runtime
-In-Reply-To: <AANLkTimDpM_RZ77OPwE8zet9ekwcSD7oF9Qxb3AXEVjo@mail.gmail.com>
-References: <AANLkTimDpM_RZ77OPwE8zet9ekwcSD7oF9Qxb3AXEVjo@mail.gmail.com>
-Message-ID: <AANLkTimiGFzQSCb7Kq+Vf3Q42pJeMjsv+TckisV=U8PP@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 28 Jul 2010 08:53:37 +0200
+Subject: [PATCH 2/4] mx2_camera: return IRQ_NONE when doing nothing
+In-Reply-To: <49da2476310a921b19226d572503b7c04175204d.1280229966.git.baruch@tkos.co.il>
+References: <cover.1280229966.git.baruch@tkos.co.il>
+	<49da2476310a921b19226d572503b7c04175204d.1280229966.git.baruch@tkos.co.il>
+Message-ID: <20100728065337.GC14113@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 28, 2010 at 1:56 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> From 66073b51eb2431545c581556e42ec1358cf72a70 Mon Sep 17 00:00:00 2001
-> From: Lei Wen <leiwen@marvell.com>
-> Date: Tue, 22 Jun 2010 21:01:04 +0800
-> Subject: [PATCH 05/29] pxa3xx_nand: set oob length in the runtime
->
-> For different command need different oob requirement, set the proper
-> oob length by different cmd.
->
-
-Looks good.
-
-> Signed-off-by: Lei Wen <leiwen@marvell.com>
+On Tue, Jul 27, 2010 at 03:06:08PM +0300, Baruch Siach wrote:
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 > ---
-> ?drivers/mtd/nand/pxa3xx_nand.c | ? 25 ++++++++++++++++++-------
-> ?1 files changed, 18 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> index 50e08db..26c0286 100644
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -274,13 +274,20 @@ static int wait_for_event(struct
-> pxa3xx_nand_info *info, uint32_t event)
->
-> ?static void pxa3xx_set_datasize(struct pxa3xx_nand_info *info)
-> ?{
-> - ? ? ? /* calculate data size */
-> + ? ? ? int oob_enable = info->reg_ndcr & NDCR_SPARE_EN;
+>  drivers/media/video/mx2_camera.c |    8 +++++---
+>  1 files changed, 5 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/media/video/mx2_camera.c b/drivers/media/video/mx2_camera.c
+> index 1536bd4..b42ad8d 100644
+> --- a/drivers/media/video/mx2_camera.c
+> +++ b/drivers/media/video/mx2_camera.c
+> @@ -420,15 +420,17 @@ static irqreturn_t mx25_camera_irq(int irq_csi, void *data)
+>  	struct mx2_camera_dev *pcdev = data;
+>  	u32 status = readl(pcdev->base_csi + CSISR);
+>  
+> -	if (status & CSISR_DMA_TSF_FB1_INT)
+> +	writel(status, pcdev->base_csi + CSISR);
 > +
-> + ? ? ? info->data_size = info->page_size;
-> + ? ? ? if (!oob_enable) {
-> + ? ? ? ? ? ? ? info->oob_size = 0;
-> + ? ? ? ? ? ? ? return;
-> + ? ? ? }
-> +
-> ? ? ? ?switch (info->page_size) {
-> ? ? ? ?case 2048:
-> - ? ? ? ? ? ? ? info->data_size = (info->use_ecc) ? 2088 : 2112;
-> + ? ? ? ? ? ? ? info->oob_size = (info->use_ecc) ? 40 : 64;
-> ? ? ? ? ? ? ? ?break;
-> ? ? ? ?case 512:
-> - ? ? ? ? ? ? ? info->data_size = (info->use_ecc) ? 520 : 528;
-> + ? ? ? ? ? ? ? info->oob_size = (info->use_ecc) ? 8 : 16;
-> ? ? ? ? ? ? ? ?break;
-> ? ? ? ?}
-> ?}
-> @@ -334,6 +341,7 @@ static int prepare_other_cmd(struct
-> pxa3xx_nand_info *info, uint16_t cmd)
-> ? ? ? ?info->ndcb1 = 0;
-> ? ? ? ?info->ndcb2 = 0;
->
-> + ? ? ? info->oob_size = 0;
-> ? ? ? ?if (cmd == cmdset->read_id) {
-> ? ? ? ? ? ? ? ?info->ndcb0 |= NDCB0_CMD_TYPE(3);
-> ? ? ? ? ? ? ? ?info->data_size = 8;
-> @@ -402,6 +410,9 @@ static int handle_data_pio(struct pxa3xx_nand_info *info)
-> ? ? ? ?case STATE_PIO_WRITING:
-> ? ? ? ? ? ? ? ?__raw_writesl(info->mmio_base + NDDB, info->data_buff,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?DIV_ROUND_UP(info->data_size, 4));
-> + ? ? ? ? ? ? ? if (info->oob_size > 0)
-> + ? ? ? ? ? ? ? ? ? ? ? __raw_writesl(info->mmio_base + NDDB, info->oob_buff,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? DIV_ROUND_UP(info->oob_size, 4));
->
-> ? ? ? ? ? ? ? ?enable_int(info, NDSR_CS0_BBD | NDSR_CS0_CMDD);
->
-> @@ -414,6 +425,9 @@ static int handle_data_pio(struct pxa3xx_nand_info *info)
-> ? ? ? ?case STATE_PIO_READING:
-> ? ? ? ? ? ? ? ?__raw_readsl(info->mmio_base + NDDB, info->data_buff,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?DIV_ROUND_UP(info->data_size, 4));
-> + ? ? ? ? ? ? ? if (info->oob_size > 0)
-> + ? ? ? ? ? ? ? ? ? ? ? __raw_readsl(info->mmio_base + NDDB, info->oob_buff,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? DIV_ROUND_UP(info->oob_size, 4));
->
-> ? ? ? ? ? ? ? ?break;
-> ? ? ? ?default:
-> @@ -429,7 +443,7 @@ static int handle_data_pio(struct pxa3xx_nand_info *info)
-> ?static void start_data_dma(struct pxa3xx_nand_info *info, int dir_out)
-> ?{
-> ? ? ? ?struct pxa_dma_desc *desc = info->data_desc;
-> - ? ? ? int dma_len = ALIGN(info->data_size, 32);
-> + ? ? ? int dma_len = ALIGN(info->data_size + info->oob_size, 32);
->
-> ? ? ? ?desc->ddadr = DDADR_STOP;
-> ? ? ? ?desc->dcmd = DCMD_ENDIRQEN | DCMD_WIDTH4 | DCMD_BURST32 | dma_len;
-> @@ -835,7 +849,6 @@ static int pxa3xx_nand_config_flash(struct
-> pxa3xx_nand_info *info,
-> ? ? ? ?info->cmdset = f->cmdset;
-> ? ? ? ?info->page_size = f->page_size;
-> ? ? ? ?info->oob_buff = info->data_buff + f->page_size;
-> - ? ? ? info->oob_size = (f->page_size == 2048) ? 64 : 16;
-> ? ? ? ?info->read_id_bytes = (f->page_size == 2048) ? 4 : 2;
->
-> ? ? ? ?/* calculate addressing information */
-> @@ -894,8 +907,6 @@ static int pxa3xx_nand_detect_config(struct
-> pxa3xx_nand_info *info)
-> ? ? ? ?i = __ffs(page_per_block * info->page_size);
-> ? ? ? ?num_blocks = type->chipsize << (20 - i);
->
-> - ? ? ? info->oob_size = (info->page_size == 2048) ? 64 : 16;
+> +	if (!(status & (CSISR_DMA_TSF_FB1_INT | CSISR_DMA_TSF_FB2_INT)))
+> +		return IRQ_NONE;
+
+I'm not sure this is correct. When we get here, the interrupt definitely
+is from the camera, it's not a shared interrupt. So this only provokes a
+'nobody cared' message from the kernel (if it's still present, I don't
+know).
+
+Sascha
+
+
+> +	else if (status & CSISR_DMA_TSF_FB1_INT)
+>  		mx25_camera_frame_done(pcdev, 1, VIDEOBUF_DONE);
+>  	else if (status & CSISR_DMA_TSF_FB2_INT)
+>  		mx25_camera_frame_done(pcdev, 2, VIDEOBUF_DONE);
+>  
+>  	/* FIXME: handle CSISR_RFF_OR_INT */
+>  
+> -	writel(status, pcdev->base_csi + CSISR);
 > -
-> ? ? ? ?/* calculate addressing information */
-> ? ? ? ?info->col_addr_cycles = (info->page_size == 2048) ? 2 : 1;
->
-> --
-> 1.7.0.4
->
+>  	return IRQ_HANDLED;
+>  }
+>  
+> -- 
+> 1.7.1
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
