@@ -1,47 +1,32 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 28 Jul 2010 13:24:31 +0900
-Subject: [PATCH] Fix build error for mach-s3c64xx
-In-Reply-To: <20100727195505.786.25117.stgit@darius-desktop>
-References: <20100727195505.786.25117.stgit@darius-desktop>
-Message-ID: <007801cb2e0c$ca3a8870$5eaf9950$%kim@samsung.com>
+Date: Wed, 28 Jul 2010 13:30:49 +0900
+Subject: [rtc-linux] [PATCH v2 3/3] rtc: rtc-s3c: Add BCD register
+	initialization codes
+In-Reply-To: <20100727194611.04486f92@linux.lan.towertech.it>
+References: <1280235553-27369-1-git-send-email-kgene.kim@samsung.com>
+	<20100727194611.04486f92@linux.lan.towertech.it>
+Message-ID: <007901cb2e0d$ac1faa40$045efec0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Darius Augulis wrote:
+Alessandro Zummo wrote:
 > 
-> If SAMSUNG_DEV_ADC is not set, s3c6410_map_io()
-> tries to init undefined device s3c_device_adc.
-> ---
->  arch/arm/mach-s3c64xx/s3c6410.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
+> On Tue, 27 Jul 2010 21:59:13 +0900
+> Kukjin Kim <kgene.kim@samsung.com> wrote:
 > 
-> diff --git a/arch/arm/mach-s3c64xx/s3c6410.c
-b/arch/arm/mach-s3c64xx/s3c6410.c
-> index 014401c..29338bd 100644
-> --- a/arch/arm/mach-s3c64xx/s3c6410.c
-> +++ b/arch/arm/mach-s3c64xx/s3c6410.c
-> @@ -54,7 +54,10 @@ void __init s3c6410_map_io(void)
->  	s3c_i2c0_setname("s3c2440-i2c");
->  	s3c_i2c1_setname("s3c2440-i2c");
-> 
-> +#ifdef CONFIG_SAMSUNG_DEV_ADC
->  	s3c_device_adc.name	= "s3c64xx-adc";
-> +#endif
-> +
->  	s3c_device_nand.name = "s3c6400-nand";
->  	s3c_onenand_setname("s3c6410-onenand");
->  	s3c64xx_onenand1_setname("s3c6410-onenand");
+> > From: Taekgyun Ko <taeggyun.ko@samsung.com>
+> >
+> > RTC needs to be initialized when BCD registers have invalid value.
+> >
+> > Signed-off-by: Taekgyun Ko <taeggyun.ko@samsung.com>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 > 
 > 
+>  Acked-by: Alessandro Zummo <a.zummo@towertech.it>
+> 
+Thanks for your ack.
 
-Hi,
-
-Already submitted and applied about this.
-
-Please refer to below URL.
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/019225.html
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-July/019436.html
+So...which subsystem tree is appropriate for this?
 
 Thanks.
 
