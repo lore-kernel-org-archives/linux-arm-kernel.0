@@ -1,13 +1,7 @@
 From: nitvishnoi@gmail.com (nitin vishnoi)
-Date: Wed, 28 Jul 2010 08:47:54 +0530
-Subject: [PATCH v3 3/3] sdhci-s3c: Add SDHCI_QUIRK_NO_WP_BIT quirk for
-	Samsung SoC
-In-Reply-To: <001101cb2d86$4afddd90$e0f998b0$%kim@samsung.com>
-References: <1279886191-9197-1-git-send-email-kgene.kim@samsung.com>
-	<1279886191-9197-4-git-send-email-kgene.kim@samsung.com>
-	<AANLkTiktYdBpgVtYUt69qfas4FHXvKvSEO4y9kf+DArE@mail.gmail.com>
-	<001101cb2d86$4afddd90$e0f998b0$%kim@samsung.com>
-Message-ID: <AANLkTim1RtuRzdoCs4ozCjnA-f1wmZxwJE6T4BvnFVLL@mail.gmail.com>
+Date: Wed, 28 Jul 2010 08:51:06 +0530
+Subject: not coming prompt in 2.6.33.6 kernel
+Message-ID: <AANLkTikgB9OF6mRqZ2KgQYuCQ4JcF7N6oTJyUbrYq0t7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -121,4 +115,4 @@ Regards
 Nitin
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100728/aaf0936f/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100728/d6b01274/attachment-0001.html>
