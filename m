@@ -1,25 +1,40 @@
-From: martinwguy@gmail.com (Martin Guy)
-Date: Wed, 28 Jul 2010 09:57:43 +0100
-Subject: Questions about FPU and NEON on Cortex-A9 with armv7
-	instructions!
-In-Reply-To: <AANLkTinA_ZNdNwx2R-6C9LBQ=4i8uMVpmVFCRaKkS=Xs@mail.gmail.com>
-References: <AANLkTinA_ZNdNwx2R-6C9LBQ=4i8uMVpmVFCRaKkS=Xs@mail.gmail.com>
-Message-ID: <AANLkTi=EBvumJfRJmBwHVtHAW081ewBzjAR2d=2O2-Zd@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 28 Jul 2010 17:04:21 +0800
+Subject: JPEG hw decoder
+In-Reply-To: <4C4FE70A.70101@st.com>
+References: <AANLkTin4r_NrQbzXoTWoJJRCUXX9mjfgtrJ9yTPLW5_W@mail.gmail.com>
+	<4C4FE70A.70101@st.com>
+Message-ID: <AANLkTikV9PAbKY+CQpcgXX01MOFx36G3LMg+nZ5pEy1q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/28/10, David Yang <david.yangshuai@gmail.com> wrote:
->        Because I need use the NEON on Cortex-A9, so I want to add the
->  parameter : -mfpu=neon -mfloat-abi=softfp to the KBUILD_CFLAGS and
->  KBUILD_AFLAGS in the Makefile of the top dir like below:
+On Wed, Jul 28, 2010 at 4:15 PM, viresh kumar <viresh.kumar@st.com> wrote:
+> On 7/28/2010 10:42 AM, rd bairva wrote:
+>> Hi ,
+>> ? ? ? My board has a hardware JPEG decoder. I want to write a driver
+>> for this in Linux kernel, But it seems there that no Framework exists
+>> in kernel. Can somebody provide me some pointers?
+>
+> Hello Rbairva,
+>
+> Which JPEG decoder are you working on??
+>
+> I have Synopsys JPEG Decoder/Encoder on ST SPEAr platform
+> and i am currently working on its driver for LKML.
+>
+> I already have a driver for it which is not aligned to LKML guidelines,
+> and so doing modifications there.
+> In my driver i have used char device framework and none other suits it well.
+>
 
-Hi David
-   Linux never uses the FPU internally, in fact it doesn't use
-floating point at all. Linux's task with the FPU is only to initialize
-it so that user-space applications can use it, and to save/restore FP
-register contents when two processes are both using it.
-   In the kernel itself only integer math is used.
+Normally the JPEG decoder/encoder comes with the video camera
+module, which falls in v4l2 framework. Though not sure how well
+the v4l2 API is gonna support this.
 
-Cheers
-
-    M
+> viresh.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
