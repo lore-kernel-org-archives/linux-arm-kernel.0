@@ -1,44 +1,24 @@
-From: leiwen@marvell.com (Lei Wen)
-Date: Tue, 13 Jul 2010 21:10:32 +0800
-Subject: [PATCH 29/29] pxa3xx_nand: new read oob logic only works with
-Message-ID: <mailman.150.1280297160.27306.linux-arm-kernel@lists.infradead.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 28 Jul 2010 08:06:49 +0200
+Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v6)
+In-Reply-To: <AANLkTik3CSSQLqajFimJxbq8TFBQ6iVx3RtdC9ObVj2-@mail.gmail.com>
+References: <20100719180136.20305.7333.stgit@e200687-lin>
+	<20100719194940.GA14766@shutemov.name>
+	<AANLkTik3CSSQLqajFimJxbq8TFBQ6iVx3RtdC9ObVj2-@mail.gmail.com>
+Message-ID: <20100728060649.GB1656@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-new silicon
+On Mon 2010-07-19 22:02:12, Linus Walleij wrote:
+> 2010/7/19 Kirill A. Shutemov <kirill@shutemov.name>:
+> 
+> > Why do we need this? Why do not just fix broken programs?
+> 
+> People tend to use some third-party precompiled binaries, some of
+> them compiled with a compiler using SWP.
 
+Why not just let the cpu emulate it? It surely will be faster...?
 
-Signed-off-by: Lei Wen <leiwen@marvell.com>
----
- drivers/mtd/nand/pxa3xx_nand.c |    7 ++++++-
- 1 files changed, 6 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index bc2f56d..068232c 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -360,6 +360,8 @@ static void pxa3xx_nand_set_timing(struct
-pxa3xx_nand_info *info,
- static void pxa3xx_set_datasize(struct pxa3xx_nand_info *info)
- {
- 	struct pxa3xx_nand *nand = info->nand_data;
-+	struct platform_device *pdev = nand->pdev;
-+	struct pxa3xx_nand_platform_data *pdata = pdev->dev.platform_data;
- 	int oob_enable = info->reg_ndcr & NDCR_SPARE_EN;
-
- 	if (info->page_size < PAGE_CHUNK_SIZE) {
-@@ -388,7 +390,10 @@ static void pxa3xx_set_datasize(struct
-pxa3xx_nand_info *info)
- 		return;
- 	}
-
--	if (nand->command == NAND_CMD_READOOB) {
-+	if (nand->command == NAND_CMD_READOOB
-+		&& pdata->controller_attrs & PXA3XX_NAKED_CMD_EN) {
-+		/* This special handle read oob method can only be used
-+		 * with silicon support naked command*/
- 		switch (info->ecc_strength) {
- 		case HAMMING_STRENGTH:
- 			nand->ndcb1[3] = 2 * PAGE_CHUNK_SIZE + OOB_CHUNK_SIZE;
 -- 
-1.7.0.4
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
