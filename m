@@ -1,35 +1,24 @@
-From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
-Date: Wed, 28 Jul 2010 10:53:17 +0200
-Subject: [PATCHv2 2/4] mm: cma: Contiguous Memory Allocator added
-In-Reply-To: <20100727120841.GC11468@n2100.arm.linux.org.uk>
-References: <cover.1280151963.git.m.nazarewicz@samsung.com>
-	<743102607e2c5fb20e3c0676fadbcb93d501a78e.1280151963.git.m.nazarewicz@samsung.com>
-	<dc4bdf3e0b02c0ac4770927f72b6cbc3f0b486a2.1280151963.git.m.nazarewicz@samsung.com>
-	<20100727120841.GC11468@n2100.arm.linux.org.uk>
-Message-ID: <op.vgjpm3it7p4s8u@pikus>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 28 Jul 2010 17:54:38 +0900
+Subject: [PATCH 2/2] ARM: S5PV210: Add the GPIO lib
+In-Reply-To: <005501cb2e2c$304d4480$90e7cd80$%szyprowski@samsung.com>
+References: <4C4F9E4D.4090608@samsung.com>
+	<005501cb2e2c$304d4480$90e7cd80$%szyprowski@samsung.com>
+Message-ID: <4C4FF04E.6010101@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +static inline dma_addr_t __must_check
->> +cma_alloc(const struct device *dev, const char *kind,
->> +	  size_t size, dma_addr_t alignment)
->> +{
->> +	return dev ? -EINVAL : __cma_alloc(dev, kind, size, alignment);
-
-On Tue, 27 Jul 2010 14:08:41 +0200, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> So I can't use this to allocate memory for anything but a NULL device?
-
->> +static inline int
->> +cma_info(struct cma_info *info, const struct device *dev, const char *kind)
->> +{
->> +	return dev ? -EINVAL : __cma_info(info, dev, kind);
-
-> This won't return information for anything but a NULL device?
-
-Obviously a bug.  Thanks for spotting that.
-
--- 
-Best regards,                                        _     _
-| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
-| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
-+----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
+Marek Szyprowski wrote:
+> Hello,
+> 
+> On Wednesday, July 28, 2010 5:05 AM Chanwoo Choi wrote:
+> 
+>> This patch add the definition of GPIO to support WM8994 audio codec on
+>> I2C bus.
+> 
+> I've already submitted similar patch that does this job correctly. See:
+> http://git.kernel.org/?p=linux/kernel/git/kgene/linux-samsung.git;a=commit;h=d67
+> d303c159aca6db11fb9a03068f52cbf7c145d
+> 
+Ah~, I haven't checked your patch.
+I will only send the patch which support audio on Goni/Aquila board.
