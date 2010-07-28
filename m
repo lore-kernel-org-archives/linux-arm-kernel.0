@@ -1,27 +1,29 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 28 Jul 2010 08:41:49 -0700
-Subject: [PATCH 4/4] sdhci-s3c: add regulator support
-In-Reply-To: <4C504326.30708@gmail.com> (sfid-20100728_154813_432417_3ADF200E)
-References: <1280326797-15792-1-git-send-email-m.szyprowski@samsung.com>
-	<1280326797-15792-5-git-send-email-m.szyprowski@samsung.com>
-	<4C504326.30708@gmail.com> (sfid-20100728_154813_432417_3ADF200E)
-Message-ID: <3482ADFC-0FFB-47AE-B809-C88AC8B92C7F@opensource.wolfsonmicro.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Wed, 28 Jul 2010 14:58:00 -0700
+Subject: [PATCH 2/3] arm: mm: do not set missing flags on ScorpionMP
+In-Reply-To: <20100724082334.GB15571@n2100.arm.linux.org.uk>
+References: <1279911483-7039-1-git-send-email-johlstei@codeaurora.org>
+	<1279911483-7039-3-git-send-email-johlstei@codeaurora.org>
+	<20100724082334.GB15571@n2100.arm.linux.org.uk>
+Message-ID: <1280354280.21185.10.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 Jul 2010, at 07:48, Maurus Cuelenaere <mcuelenaere@gmail.com> wrote:
->> 
->> +	struct sdhci_s3c *sc = sdhci_priv(host);
->> +
->> +	if (sc->vmmc) {
->> +		int ret = regulator_disable(sc->vmmc);
->> +		if (ret)
->> +			return ret;
->> +		mdelay(2);
+On Sat, 2010-07-24 at 09:23 +0100, Russell King - ARM Linux wrote:
+> On Fri, Jul 23, 2010 at 11:58:02AM -0700, Jeff Ohlstein wrote:
+> > From: Steve Muckle <smuckle@codeaurora.org>
+> > 
+> > ScorpionMP does not have the SMP/nAMP mode and TLB ops
+> > broadcasting bits in the ACTLR.
 > 
-> Shouldn't these delays be handled in the regulator framework itself?
+> Please provide a separate instance of __v7_proc_info for your processor
+> and direct it to jump into the __v7_setup code after this setup instead.
 
-A 2ms delay on power down seems suspicious for a regulator. I'm not sure why this is required but if it is I suspect it's due to a large cap on the regulator output and light load rather than something that's always true for whatever regulator is providing the supply.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100728/cb7a4997/attachment-0001.html>
+
+You mean add another label into __v7_setup along with a proc-msm.S to
+jump over this code?
+
+Daniel
+-- 
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
