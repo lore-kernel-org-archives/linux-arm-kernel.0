@@ -1,36 +1,42 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Wed, 28 Jul 2010 20:47:49 +0200
-Subject: Git pull request: ARM LPC32XX architecture
-In-Reply-To: <20100727214439.GA22475@n2100.arm.linux.org.uk>
-References: <a08234131003121244t6f914926s3ea75e98c017686a@mail.gmail.com>
-	<20100312210353.GB1146@n2100.arm.linux.org.uk>
-	<083DF309106F364B939360100EC290F80AC2FF1AE8@eu1rdcrdc1wx030.exi.nxp.com>
-	<20100525172106.GA16204@n2100.arm.linux.org.uk>
-	<083DF309106F364B939360100EC290F80AC2FF21ED@eu1rdcrdc1wx030.exi.nxp.com>
-	<083DF309106F364B939360100EC290F80AC392A1F8@eu1rdcrdc1wx030.exi.nxp.com>
-	<20100727164540.GC17099@n2100.arm.linux.org.uk>
-	<20100727164945.GD17099@n2100.arm.linux.org.uk>
-	<083DF309106F364B939360100EC290F80AC392A25D@eu1rdcrdc1wx030.exi.nxp.com>
-	<20100727214439.GA22475@n2100.arm.linux.org.uk>
-Message-ID: <083DF309106F364B939360100EC290F80AC392A795@eu1rdcrdc1wx030.exi.nxp.com>
+From: henne@nachtwindheim.de (Henrik Kretzschmar)
+Date: Wed, 28 Jul 2010 21:02:08 +0200
+Subject: [PATCH] video/w100fb: ignore void return value / fix build failure
+In-Reply-To: <201007282029.52989.PeterHuewe@gmx.de>
+References: <201007282029.52989.PeterHuewe@gmx.de>
+Message-ID: <4C507EB0.8050208@nachtwindheim.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Russell,
-
-> On Tue, Jul 27, 2010 at 10:00:16PM +0200, Kevin Wells wrote:
-> > Can you pull the series if I completely remove the defconfig file
-> (for
-> > now at least)?
+Am 28.07.2010 20:29, schrieb Peter H?we:
+> From: Peter Huewe <peterhuewe@gmx.de>
 > 
-> Yes.
-
-Please pull the updated LPC32xx tree from:
-git://git.lpclinux.com/linux-2.6-lpc wells/lpc32xx-arch_v2
-
-There is no defconfig in this, but I'll post that as a separate
-patch and it can be pulled later if needed.
-
-thanks!
-Kevin
+> This patch fixes a build failure [1] (error: void value not ignored as
+> it ought to be) by removing an assignment of a void return value.
+> The functionality of the code is not changed.
+> 
+> Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
+Ached-by: Henrik Kretzschmar <henne@nachtwindheim.de>
+> ---
+> KernelVersion: linux-next-20100728
+> References:
+> [1] http://kisskb.ellerman.id.au/kisskb/buildresult/2980912/
+> 
+>  drivers/video/w100fb.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/video/w100fb.c b/drivers/video/w100fb.c
+> index e66b8b1..d8b12c3 100644
+> --- a/drivers/video/w100fb.c
+> +++ b/drivers/video/w100fb.c
+> @@ -858,9 +858,9 @@ unsigned long w100fb_gpio_read(int port)
+>  void w100fb_gpio_write(int port, unsigned long value)
+>  {
+>  	if (port==W100_GPIO_PORT_A)
+> -		value = writel(value, remapped_regs + mmGPIO_DATA);
+> +		writel(value, remapped_regs + mmGPIO_DATA);
+>  	else
+> -		value = writel(value, remapped_regs + mmGPIO_DATA2);
+> +		writel(value, remapped_regs + mmGPIO_DATA2);
+>  }
+>  EXPORT_SYMBOL(w100fb_gpio_read);
+>  EXPORT_SYMBOL(w100fb_gpio_write);
