@@ -1,29 +1,27 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 28 Jul 2010 22:09:16 +0100
-Subject: [PATCH v3 0/3] Ordered I/O accessors
-In-Reply-To: <20100727110310.GA11468@n2100.arm.linux.org.uk>
-References: <20100714145802.16555.48563.stgit@e102109-lin.cambridge.arm.com>
-	<20100727110310.GA11468@n2100.arm.linux.org.uk>
-Message-ID: <1280351356.16413.1.camel@e102109-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 28 Jul 2010 22:21:56 +0100
+Subject: [PATCH 1/2] arm: msm: Add System MMU support.
+In-Reply-To: <201007281950.20847.arnd@arndb.de>
+References: <1280270466-13503-1-git-send-email-stepanm@codeaurora.org>
+	<201007281039.44883.arnd@arndb.de>
+	<ea4bbdecc271f7fa5749d09645f38c0d.squirrel@www.codeaurora.org>
+	<201007281950.20847.arnd@arndb.de>
+Message-ID: <20100728212156.GA6729@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-07-27 at 12:03 +0100, Russell King - ARM Linux wrote:
-> On Wed, Jul 14, 2010 at 04:01:12PM +0100, Catalin Marinas wrote:
-> > This version replaces the do { ... } while (0) constructs in the final
-> > patch with ({ ... }) to avoid errors in drivers putting brackets around
-> > the write*() accessors. To avoid the write*() macro having a non-void
-> > type (and possibly the compiler generating code to read a register), the
-> > first patch explicitly casts the __raw_write*() accessors to (void).
-> 
-> Ok.  Can you please put this in the patch system?  I think we need to
-> get this in prior to 2.6.35 being released.
+On Wed, Jul 28, 2010 at 07:50:20PM +0200, Arnd Bergmann wrote:
+> The DMA API is extremely flexible, it works just fine with all the
+> IOMMUs that I've seen so far. Please take a look at
+> include/asm-generic/dma-mapping-common.h and its users to see how
+> to use multiple IOMMUs depending on the device.
 
-I pushed the three patches to the patch system (I'm still around
-tomorrow and then off-line for a week, so please let me know if there
-are any issues).
+We don't yet use those DMA API interface extensions because we haven't
+had the need.  If someone who has the need wants to put the effort in
+though...
 
-Thanks.
-
--- 
-Catalin
+One of the problems with it though is the abstraction of the sync*
+operations is the wrong way around for stuff like dmabounce - we want
+to be passed the base address of the buffer (so we can look this up),
+plus offset and length.  We don't want to know just the region which
+is affected.
