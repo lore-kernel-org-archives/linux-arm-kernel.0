@@ -1,100 +1,156 @@
 From: ben@simtec.co.uk (Ben Dooks)
-Date: Wed, 28 Jul 2010 18:25:47 +0100
-Subject: [PATCH] ARM: Samsung SoC: clksrc-clk: wait for the stable SRC/DIV
-	status.
-In-Reply-To: <1280287044-6645-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1280287044-6645-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <4C50681B.8040306@simtec.co.uk>
+Date: Wed, 28 Jul 2010 18:28:34 +0100
+Subject: [PATCH] Support for Real6410
+In-Reply-To: <20100727195944.910.69956.stgit@darius-desktop>
+References: <20100727195944.910.69956.stgit@darius-desktop>
+Message-ID: <4C5068C2.9030904@simtec.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/07/10 04:17, MyungJoo Ham wrote:
-> Many MUX and clock dividers have a status bit so that users can wait
-> until the status is stable. When corresponding registers are accessed
-> while a clock is not stable, we may suffer from unexpected errors.
+On 27/07/10 20:59, Darius Augulis wrote:
+> Add support for CoreWind Real6410 board,
+> based on Samsung s3c6410 processor.
 > 
-> Therefore, we introduce a mechanism to let the operations related with
-> updating SRC/DIV registers of clksrc-clk wait for the stabilization:
-> clk_set_parent, clk_set_rate.
-> 
-> In order to use this feature, the definition of clksrc_clk should
-> include reg_src_stable or reg_div_stable. With effective rec_src_stable
-> values, clk_set_parent returns with a stabilized SRC register and
-> with effective rec_div_stable values, clk_set_rate returns with a
-> stabilized DIV register. If .reg field is null, its (either SRC or DIV)
-> register's status is not checked and returned without waiting; i.e.,
-> some MUX/DIV may not need this feature.
-> 
-> When setting reg_*_stable, .size is used to tell the value of "stable".
-> If .size = 0, the stable status is 0 and if .size = 1, the stable status
-> is 1.
-> 
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
 > ---
->  arch/arm/plat-samsung/clock-clksrc.c              |   13 +++++++++++++
->  arch/arm/plat-samsung/include/plat/clock-clksrc.h |   10 ++++++++++
->  2 files changed, 23 insertions(+), 0 deletions(-)
+>  arch/arm/mach-s3c64xx/Kconfig         |    6 ++
+>  arch/arm/mach-s3c64xx/Makefile        |    1 
+>  arch/arm/mach-s3c64xx/mach-real6410.c |   88 +++++++++++++++++++++++++++++++++
+>  3 files changed, 95 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-s3c64xx/mach-real6410.c
 > 
-> diff --git a/arch/arm/plat-samsung/clock-clksrc.c b/arch/arm/plat-samsung/clock-clksrc.c
-> index 46d204a..5ff17ad 100644
-> --- a/arch/arm/plat-samsung/clock-clksrc.c
-> +++ b/arch/arm/plat-samsung/clock-clksrc.c
-> @@ -68,6 +68,12 @@ static int s3c_setrate_clksrc(struct clk *clk, unsigned long rate)
->  	val |= (div - 1) << sclk->reg_div.shift;
->  	__raw_writel(val, reg);
+> diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+> index f5a5972..0f9f2dd 100644
+> --- a/arch/arm/mach-s3c64xx/Kconfig
+> +++ b/arch/arm/mach-s3c64xx/Kconfig
+> @@ -88,6 +88,12 @@ config MACH_ANW6410
+>  	help
+>  	  Machine support for the A&W6410
 >  
-> +	if (sclk->reg_div_stable.reg) {
-> +		do { } while (((__raw_readl(sclk->reg_div_stable.reg) >>
-> +						sclk->reg_div_stable.shift) & 1)
-> +				!= sclk->reg_div_stable.size);
-> +	}
+> +config MACH_REAL6410
+> +	bool "REAL6410"
+> +	select CPU_S3C6410
+> +	help
+> +	  Machine support for the CoreWind REAL6410
 > +
->  	return 0;
->  }
+>  config MACH_SMDK6410
+>  	bool "SMDK6410"
+>  	select CPU_S3C6410
+> diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
+> index 9d10069..6be3e5b 100644
+> --- a/arch/arm/mach-s3c64xx/Makefile
+> +++ b/arch/arm/mach-s3c64xx/Makefile
+> @@ -50,6 +50,7 @@ obj-$(CONFIG_PM)		+= irq-pm.o
+>  obj-$(CONFIG_MACH_ANW6410)	+= mach-anw6410.o
+>  obj-$(CONFIG_MACH_SMDK6400)	+= mach-smdk6400.o
+>  obj-$(CONFIG_MACH_SMDK6410)	+= mach-smdk6410.o
+> +obj-$(CONFIG_MACH_REAL6410)     += mach-real6410.o
+>  obj-$(CONFIG_MACH_NCP)		+= mach-ncp.o
+>  obj-$(CONFIG_MACH_HMT)		+= mach-hmt.o
+>  obj-$(CONFIG_MACH_SMARTQ)	+= mach-smartq.o
+> diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
+> new file mode 100644
+> index 0000000..bbd9bf8
+> --- /dev/null
+> +++ b/arch/arm/mach-s3c64xx/mach-real6410.c
+> @@ -0,0 +1,88 @@
+> +/* linux/arch/arm/mach-s3c64xx/mach-real6410.c
+> + *
+> + * Copyright 2010 Darius Augulis <augulis.darius@gmail.com>
+> + * Copyright 2008 Openmoko, Inc.
+> + * Copyright 2008 Simtec Electronics
+> + *	Ben Dooks <ben@simtec.co.uk>
+> + *	http://armlinux.simtec.co.uk/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> +*/
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/types.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/list.h>
+> +#include <linux/init.h>
+> +#include <linux/serial_core.h>
+> +#include <linux/platform_device.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/map.h>
+> +#include <mach/map.h>
+> +#include <mach/s3c6410.h>
+> +#include <plat/cpu.h>
+> +#include <plat/regs-serial.h>
+> +
+> +#define UCON S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK
+> +#define ULCON S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB
+> +#define UFCON S3C2410_UFCON_RXTRIG8 | S3C2410_UFCON_FIFOMODE
+> +
+> +static struct s3c2410_uartcfg real6410_uartcfgs[] __initdata = {
+> +	[0] = {
+> +		.hwport	     = 0,
+> +		.flags	     = 0,
+> +		.ucon	     = UCON,
+> +		.ulcon	     = ULCON,
+> +		.ufcon	     = UFCON,
+> +	},
+> +	[1] = {
+> +		.hwport	     = 1,
+> +		.flags	     = 0,
+> +		.ucon	     = UCON,
+> +		.ulcon	     = ULCON,
+> +		.ufcon	     = UFCON,
+> +	},
+> +	[2] = {
+> +		.hwport	     = 2,
+> +		.flags	     = 0,
+> +		.ucon	     = UCON,
+> +		.ulcon	     = ULCON,
+> +		.ufcon	     = UFCON,
+> +	},
+> +	[3] = {
+> +		.hwport	     = 3,
+> +		.flags	     = 0,
+> +		.ucon	     = UCON,
+> +		.ulcon	     = ULCON,
+> +		.ufcon	     = UFCON,
+> +	},
+> +};
 
-you could move the code for this out to a separate inlined function to
-avoid it being here twice, and possibly make it flow better.
+I'll look into a default table for the next release.
 
-> @@ -93,6 +99,13 @@ static int s3c_setparent_clksrc(struct clk *clk, struct clk *parent)
->  		clksrc |= src_nr << sclk->reg_src.shift;
->  
->  		__raw_writel(clksrc, sclk->reg_src.reg);
 > +
-> +		if (sclk->reg_src_stable.reg) {
-> +			do { } while (((__raw_readl(sclk->reg_src_stable.reg) >>
-> +						sclk->reg_src_stable.shift) & 1)
-> +					!= sclk->reg_src_stable.size);
-> +		}
+> +static struct map_desc real6410_iodesc[] = {};
 > +
->  		return 0;
->  	}
->  
-> diff --git a/arch/arm/plat-samsung/include/plat/clock-clksrc.h b/arch/arm/plat-samsung/include/plat/clock-clksrc.h
-> index 50a8ca7..282821d 100644
-> --- a/arch/arm/plat-samsung/include/plat/clock-clksrc.h
-> +++ b/arch/arm/plat-samsung/include/plat/clock-clksrc.h
-> @@ -45,6 +45,13 @@ struct clksrc_reg {
->   * @sources: the sources for this clock
->   * @reg_src: the register definition for selecting the clock's source
->   * @reg_div: the register definition for the clock's output divisor
-> + * @reg_src_stable: the register definition to probe if reg_src is
-> + *    stabilized after the update of reg_src. It is "stabilized" if
-> + *    reg[shift] == size. If reg == NULL, this stable reg is not looked
-> + *    up. Thus, in S5PV210, size is usually 0.
-> + * @reg_div_stable: the register definition to probe if reg_div is
-> + *    stabilized after the update of reg_div. Same mechanism with
-> + *    reg_src_stable.
->   *
->   * This clock implements the features required by the newer SoCs where
->   * the standard clock block provides an input mux and a post-mux divisor
-> @@ -61,6 +68,9 @@ struct clksrc_clk {
->  
->  	struct clksrc_reg	reg_src;
->  	struct clksrc_reg	reg_div;
+> +static void __init real6410_map_io(void)
+> +{
+> +	s3c64xx_init_io(real6410_iodesc, ARRAY_SIZE(real6410_iodesc));
+
+I _think_ you can pass (NULL, 0) here, and remove the map_desc
+
+> +	s3c24xx_init_clocks(12000000);
+> +	s3c24xx_init_uarts(real6410_uartcfgs, ARRAY_SIZE(real6410_uartcfgs));
+> +}
 > +
-> +	struct clksrc_reg	reg_src_stable;
-> +	struct clksrc_reg	reg_div_stable;
->  };
->  
->  /**
+> +static void __init real6410_machine_init(void)
+> +{
+> +}
+> +
+> +MACHINE_START(REAL6410, "REAL6410")
+> +	/* Maintainer: Darius Augulis <augulis.darius@gmail.com> */
+> +	.phys_io	= S3C_PA_UART & 0xfff00000,
+> +	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
+> +	.boot_params	= S3C64XX_PA_SDRAM + 0x100,
+> +
+> +	.init_irq	= s3c6410_init_irq,
+> +	.map_io		= real6410_map_io,
+> +	.init_machine	= real6410_machine_init,
+> +	.timer		= &s3c24xx_timer,
+> +MACHINE_END
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
