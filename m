@@ -1,36 +1,98 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 28 Jul 2010 14:06:52 +0100
-Subject: [PATCH v3 0/3] Ordered I/O accessors
-In-Reply-To: <20100728124846.GA24466@bnru02.bnr.st.com>
-References: <20100714145802.16555.48563.stgit@e102109-lin.cambridge.arm.com>	<20100727110310.GA11468@n2100.arm.linux.org.uk>
-	<20100728124846.GA24466@bnru02.bnr.st.com>
-Message-ID: <002d01cb2e55$bf328c90$3d97a5b0$@deacon@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 28 Jul 2010 16:19:57 +0200
+Subject: [PATCH 4/4] sdhci-s3c: add regulator support
+In-Reply-To: <1280326797-15792-1-git-send-email-m.szyprowski@samsung.com>
+References: <1280326797-15792-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1280326797-15792-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell, Rabin,
+This patch adds support for regulator API to sdhci-s3c driver. Regulators
+can be used to disable power in suspended state to reduce dissipated
+energy.
 
-> On Tue, Jul 27, 2010 at 13:03:10 +0200, Russell King - ARM Linux wrote:
-> > On Wed, Jul 14, 2010 at 04:01:12PM +0100, Catalin Marinas wrote:
-> > > This version replaces the do { ... } while (0) constructs in the final
-> > > patch with ({ ... }) to avoid errors in drivers putting brackets around
-> > > the write*() accessors. To avoid the write*() macro having a non-void
-> > > type (and possibly the compiler generating code to read a register), the
-> > > first patch explicitly casts the __raw_write*() accessors to (void).
-> >
-> > Ok.  Can you please put this in the patch system?  I think we need to
-> > get this in prior to 2.6.35 being released.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/mmc/host/sdhci-s3c.c |   30 +++++++++++++++++++++++++++++-
+ 1 files changed, 29 insertions(+), 1 deletions(-)
 
-Catalin's away at the moment and I'm not sure if he's picking up mail.
-
-> ux500 is using writel() inside uncompress.h, so this series triggers a
-> build failure there:
-> 
->   arch/arm/boot/compressed/misc.o: In function `putc':
->   arch/arm/mach-ux500/include/mach/uncompress.h:41:
->   undefined reference to `outer_cache'
-
-There's also an issue with the iowrite* macros, which need a (void)
-cast in the same way as the write* guys.
-
-Will
+diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+index 606e695..b9d46a5 100644
+--- a/drivers/mmc/host/sdhci-s3c.c
++++ b/drivers/mmc/host/sdhci-s3c.c
+@@ -19,6 +19,7 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/gpio.h>
++#include <linux/regulator/consumer.h>
+ 
+ #include <linux/mmc/host.h>
+ 
+@@ -50,6 +51,7 @@ struct sdhci_s3c {
+ 
+ 	struct clk		*clk_io;
+ 	struct clk		*clk_bus[MAX_BUS_CLK];
++	struct regulator	*vmmc;
+ };
+ 
+ static inline struct sdhci_s3c *to_s3c(struct sdhci_host *host)
+@@ -309,6 +311,13 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, host);
+ 
++	sc->vmmc = regulator_get(dev, "vmmc");
++	if (IS_ERR(sc->vmmc)) {
++		dev_warn(dev, "no vmmc regulator found\n");
++		sc->vmmc = NULL;
++	} else
++		regulator_enable(sc->vmmc);
++
+ 	sc->clk_io = clk_get(dev, "hsmmc");
+ 	if (IS_ERR(sc->clk_io)) {
+ 		dev_err(dev, "failed to get io clock\n");
+@@ -482,6 +491,11 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
+ 	clk_disable(sc->clk_io);
+ 	clk_put(sc->clk_io);
+ 
++	if (sc->vmmc) {
++		regulator_disable(sc->vmmc);
++		regulator_put(sc->vmmc);
++	}
++
+ 	iounmap(host->ioaddr);
+ 	release_resource(sc->ioarea);
+ 	kfree(sc->ioarea);
+@@ -496,15 +510,29 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
+ 
+ static int sdhci_s3c_suspend(struct platform_device *dev, pm_message_t pm)
+ {
++	int ret = 0;
+ 	struct sdhci_host *host = platform_get_drvdata(dev);
++	struct sdhci_s3c *sc = sdhci_priv(host);
+ 
+ 	sdhci_suspend_host(host, pm);
+-	return 0;
++
++	if (sc->vmmc)
++		ret = regulator_disable(sc->vmmc);
++
++	return ret;
+ }
+ 
+ static int sdhci_s3c_resume(struct platform_device *dev)
+ {
+ 	struct sdhci_host *host = platform_get_drvdata(dev);
++	struct sdhci_s3c *sc = sdhci_priv(host);
++
++	if (sc->vmmc) {
++		int ret = regulator_disable(sc->vmmc);
++		if (ret)
++			return ret;
++		mdelay(2);
++	}
+ 
+ 	sdhci_resume_host(host);
+ 	return 0;
+-- 
+1.7.1.569.g6f426
