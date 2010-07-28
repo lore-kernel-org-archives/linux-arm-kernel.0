@@ -1,24 +1,25 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 28 Jul 2010 17:54:38 +0900
-Subject: [PATCH 2/2] ARM: S5PV210: Add the GPIO lib
-In-Reply-To: <005501cb2e2c$304d4480$90e7cd80$%szyprowski@samsung.com>
-References: <4C4F9E4D.4090608@samsung.com>
-	<005501cb2e2c$304d4480$90e7cd80$%szyprowski@samsung.com>
-Message-ID: <4C4FF04E.6010101@samsung.com>
+From: martinwguy@gmail.com (Martin Guy)
+Date: Wed, 28 Jul 2010 09:57:43 +0100
+Subject: Questions about FPU and NEON on Cortex-A9 with armv7
+	instructions!
+In-Reply-To: <AANLkTinA_ZNdNwx2R-6C9LBQ=4i8uMVpmVFCRaKkS=Xs@mail.gmail.com>
+References: <AANLkTinA_ZNdNwx2R-6C9LBQ=4i8uMVpmVFCRaKkS=Xs@mail.gmail.com>
+Message-ID: <AANLkTi=EBvumJfRJmBwHVtHAW081ewBzjAR2d=2O2-Zd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> Hello,
-> 
-> On Wednesday, July 28, 2010 5:05 AM Chanwoo Choi wrote:
-> 
->> This patch add the definition of GPIO to support WM8994 audio codec on
->> I2C bus.
-> 
-> I've already submitted similar patch that does this job correctly. See:
-> http://git.kernel.org/?p=linux/kernel/git/kgene/linux-samsung.git;a=commit;h=d67
-> d303c159aca6db11fb9a03068f52cbf7c145d
-> 
-Ah~, I haven't checked your patch.
-I will only send the patch which support audio on Goni/Aquila board.
+On 7/28/10, David Yang <david.yangshuai@gmail.com> wrote:
+>        Because I need use the NEON on Cortex-A9, so I want to add the
+>  parameter : -mfpu=neon -mfloat-abi=softfp to the KBUILD_CFLAGS and
+>  KBUILD_AFLAGS in the Makefile of the top dir like below:
+
+Hi David
+   Linux never uses the FPU internally, in fact it doesn't use
+floating point at all. Linux's task with the FPU is only to initialize
+it so that user-space applications can use it, and to save/restore FP
+register contents when two processes are both using it.
+   In the kernel itself only integer math is used.
+
+Cheers
+
+    M
