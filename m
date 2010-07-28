@@ -1,43 +1,31 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 28 Jul 2010 08:27:18 +0100
-Subject: [PATCH 2/4] mx2_camera: return IRQ_NONE when doing nothing
-In-Reply-To: <20100728065337.GC14113@pengutronix.de>
-References: <cover.1280229966.git.baruch@tkos.co.il>
-	<49da2476310a921b19226d572503b7c04175204d.1280229966.git.baruch@tkos.co.il>
-	<20100728065337.GC14113@pengutronix.de>
-Message-ID: <20100728072718.GB29277@n2100.arm.linux.org.uk>
+Date: Wed, 28 Jul 2010 08:27:53 +0100
+Subject: S5PC110 should be used the correct VIC number
+In-Reply-To: <AANLkTinC_68244EXf2jcEQN8zur8Dff5AcVjA+UTiNPX@mail.gmail.com>
+References: <AANLkTikh7mt30gEQU0_Wr7n-jZrG0iUmd1Hw17Ni7UNQ@mail.gmail.com>
+	<009d01cb2e1a$29605e80$7c211b80$%kim@samsung.com>
+	<AANLkTinC_68244EXf2jcEQN8zur8Dff5AcVjA+UTiNPX@mail.gmail.com>
+Message-ID: <20100728072753.GC29277@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 28, 2010 at 08:53:37AM +0200, Sascha Hauer wrote:
-> On Tue, Jul 27, 2010 at 03:06:08PM +0300, Baruch Siach wrote:
-> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > ---
-> >  drivers/media/video/mx2_camera.c |    8 +++++---
-> >  1 files changed, 5 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/media/video/mx2_camera.c b/drivers/media/video/mx2_camera.c
-> > index 1536bd4..b42ad8d 100644
-> > --- a/drivers/media/video/mx2_camera.c
-> > +++ b/drivers/media/video/mx2_camera.c
-> > @@ -420,15 +420,17 @@ static irqreturn_t mx25_camera_irq(int irq_csi, void *data)
-> >  	struct mx2_camera_dev *pcdev = data;
-> >  	u32 status = readl(pcdev->base_csi + CSISR);
-> >  
-> > -	if (status & CSISR_DMA_TSF_FB1_INT)
-> > +	writel(status, pcdev->base_csi + CSISR);
-> > +
-> > +	if (!(status & (CSISR_DMA_TSF_FB1_INT | CSISR_DMA_TSF_FB2_INT)))
-> > +		return IRQ_NONE;
+On Wed, Jul 28, 2010 at 04:25:16PM +0900, Kyungmin Park wrote:
+> On Wed, Jul 28, 2010 at 3:00 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Kyungmin Park wrote:
+> >>
+> >> Hi Ben,
+> >>
+> >> Can you post the VIC patch from correct VIC number from vic code at
+> >> suspend & resume?
+> >> If not, it has to modify it after release. or can you fix it as below.
+> >>
+> > Yeah, you're right.
+> >
+> > Already reported by Ben Dooks...but missed that.
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/016872.html
 > 
-> I'm not sure this is correct. When we get here, the interrupt definitely
-> is from the camera, it's not a shared interrupt. So this only provokes a
-> 'nobody cared' message from the kernel (if it's still present, I don't
-> know).
+> I think ben's patch solves all of problems.
+> 
+> Russell, can you pull it from ben's tree?
 
-You'll only get the 'nobody cared' message if it's happened many times
-in a short space of time.  The odd spurious IRQ_NONE has little effect.
-
-It is good practice to return IRQ_NONE if there's nothing pending - it
-allows stuck IRQs to be detected and disabled without taking the system
-down.  In other words, it should make the system more robust.
+When and only when Ben sends me a pull request.
