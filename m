@@ -1,136 +1,142 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 28 Jul 2010 10:17:14 +0900
-Subject: [PATCH] S5PV210: Move OneNAND platform data to plat-s5p
-Message-ID: <20100728011714.GA1882@july>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Wed, 28 Jul 2010 09:45:31 +0800
+Subject: [rtc-linux] [PATCH 2/2] rtc: rtc-s3c: Updates RTC driver for
+	clock enabling support
+In-Reply-To: <AANLkTikEanSQBeFoqpMxR3tWxWTci_ytNsEhe9VS9ygg@mail.gmail.com>
+References: <1279702501-6803-1-git-send-email-kgene.kim@samsung.com>
+	<1279702501-6803-3-git-send-email-kgene.kim@samsung.com>
+	<AANLkTikGjzmHxCX6_s5Z-ZXkoyPbtF28uCyE1VqdGPvb@mail.gmail.com>
+	<AANLkTikEanSQBeFoqpMxR3tWxWTci_ytNsEhe9VS9ygg@mail.gmail.com>
+Message-ID: <AANLkTin=bqMRLYgAd4NvVnKZi1PWAGPqQSsZDPxvitfh@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+2010/7/22 Atul Dahiya <atuldahiya84@gmail.com>:
+> On Thu, Jul 22, 2010 at 11:39 AM, Wan ZongShun <mcuos.com@gmail.com> wrote:
+>>
+>> 2010/7/21 Kukjin Kim <kgene.kim@samsung.com>:
+>> > From: Atul Dahiya <atul.dahiya@samsung.com>
+>> >
+>> > This Patch updates existing Samsung RTC driver for clock enabling support.
+>> >
+>> > Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
+>> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+>> > ---
+>> > ?drivers/rtc/rtc-s3c.c | ? 22 ++++++++++++++++++++++
+>> > ?1 files changed, 22 insertions(+), 0 deletions(-)
+>> >
+>> > diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+>> > index 70b68d3..c032a15 100644
+>> > --- a/drivers/rtc/rtc-s3c.c
+>> > +++ b/drivers/rtc/rtc-s3c.c
+>> > @@ -1,5 +1,8 @@
+>> > ?/* drivers/rtc/rtc-s3c.c
+>> > ?*
+>> > + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+>> > + * ? ? ? ? ? ? http://www.samsung.com/
+>> > + *
+>> > ?* Copyright (c) 2004,2006 Simtec Electronics
+>> > ?* ? ? Ben Dooks, <ben@simtec.co.uk>
+>> > ?* ? ? http://armlinux.simtec.co.uk/
+>> > @@ -39,6 +42,7 @@ enum s3c_cpu_type {
+>> >
+>> > ?static struct resource *s3c_rtc_mem;
+>> >
+>> > +static struct clk *rtc_clk;
+>> > ?static void __iomem *s3c_rtc_base;
+>> > ?static int s3c_rtc_alarmno = NO_IRQ;
+>> > ?static int s3c_rtc_tickno ?= NO_IRQ;
+>> > @@ -431,6 +435,10 @@ static int __devexit s3c_rtc_remove(struct platform_device *dev)
+>> > ? ? ? ?s3c_rtc_setpie(&dev->dev, 0);
+>> > ? ? ? ?s3c_rtc_setaie(0);
+>> >
+>> > + ? ? ? clk_disable(rtc_clk);
+>> > + ? ? ? clk_put(rtc_clk);
+>> > + ? ? ? rtc_clk = NULL;
+>> > +
+>> > ? ? ? ?iounmap(s3c_rtc_base);
+>> > ? ? ? ?release_resource(s3c_rtc_mem);
+>> > ? ? ? ?kfree(s3c_rtc_mem);
+>> > @@ -488,6 +496,16 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+>> > ? ? ? ? ? ? ? ?goto err_nomap;
+>> > ? ? ? ?}
+>> >
+>> > + ? ? ? rtc_clk = clk_get(&pdev->dev, "rtc");
+>>
+>> Do you really need the second argument? I think the bus clock for
+>> a device should be findable with NULL for s3c platform..
+>
+> No, actually ?clk_get() function for s3c platform searches on the
+> basis of second parameter passed
+> so need to pass the second argument here.
 
-S5PV310 has the same OneNAND controller and can use it commonly.
+Okay, good patch!
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-s5pv210/Kconfig            |    5 ---
- arch/arm/mach-s5pv210/Makefile           |    1 -
- arch/arm/mach-s5pv210/include/mach/map.h |    3 --
- arch/arm/plat-s5p/Makefile               |    2 +-
- arch/arm/plat-s5p/dev-onenand.c          |   52 ++++++++++++++++++++++++++++++
- 5 files changed, 53 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm/plat-s5p/dev-onenand.c
+Acked-by: Wan ZongShun <mcuos.com@gmail.com>
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 0761eac..96f4d9b 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -62,11 +62,6 @@ config MACH_GONI
- 	  Machine support for Samsung GONI board
- 	  S5PC110(MCP) is one of package option of S5PV210
- 
--config S5PC110_DEV_ONENAND
--	bool
--	help
--	  Compile in platform device definition for OneNAND1 controller
--
- config MACH_SMDKV210
- 	bool "SMDKV210"
- 	select CPU_S5PV210
-diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-index 30be9a6..6a6dea1 100644
---- a/arch/arm/mach-s5pv210/Makefile
-+++ b/arch/arm/mach-s5pv210/Makefile
-@@ -26,7 +26,6 @@ obj-$(CONFIG_MACH_GONI)		+= mach-goni.o
- 
- obj-y				+= dev-audio.o
- obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
--obj-$(CONFIG_S5PC110_DEV_ONENAND) += dev-onenand.o
- 
- obj-$(CONFIG_S5PV210_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
- obj-$(CONFIG_S5PV210_SETUP_I2C1) 	+= setup-i2c1.o
-diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
-index 34eb168..3a44e1e 100644
---- a/arch/arm/mach-s5pv210/include/mach/map.h
-+++ b/arch/arm/mach-s5pv210/include/mach/map.h
-@@ -16,9 +16,6 @@
- #include <plat/map-base.h>
- #include <plat/map-s5p.h>
- 
--#define S5PC110_PA_ONENAND	(0xB0000000)
--#define S5PC110_PA_ONENAND_DMA	(0xB0600000)
--
- #define S5PV210_PA_CHIPID	(0xE0000000)
- #define S5P_PA_CHIPID		S5PV210_PA_CHIPID
- 
-diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
-index 39c242b..d9f6890 100644
---- a/arch/arm/plat-s5p/Makefile
-+++ b/arch/arm/plat-s5p/Makefile
-@@ -12,7 +12,7 @@ obj-				:=
- 
- # Core files
- 
--obj-y				+= dev-uart.o
-+obj-y				+= dev-uart.o dev-onenand.o
- obj-y				+= cpu.o
- obj-y				+= clock.o
- obj-y				+= irq.o
-diff --git a/arch/arm/plat-s5p/dev-onenand.c b/arch/arm/plat-s5p/dev-onenand.c
-new file mode 100644
-index 0000000..00facbe
---- /dev/null
-+++ b/arch/arm/plat-s5p/dev-onenand.c
-@@ -0,0 +1,52 @@
-+/*
-+ * linux/arch/arm/plat-s5p/dev-onenand.c
-+ *
-+ *  Copyright (c) 2008-2010 Samsung Electronics
-+ *  Kyungmin Park <kyungmin.park@samsung.com>
-+ *
-+ * S5PC110 series device definition for OneNAND devices
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/mtd/onenand.h>
-+
-+#include <mach/irqs.h>
-+
-+#define S5PC110_PA_ONENAND		(0xB0000000)
-+#define S5PC110_PA_ONENAND_DMA		(0xB0600000)
-+
-+static struct resource s5pc110_onenand_resources[] = {
-+	[0] = {
-+		.start	= S5PC110_PA_ONENAND,
-+		.end	= S5PC110_PA_ONENAND + SZ_128K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= S5PC110_PA_ONENAND_DMA,
-+		.end	= S5PC110_PA_ONENAND_DMA + SZ_2K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+struct platform_device s5pc110_device_onenand = {
-+	.name		= "s5pc110-onenand",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(s5pc110_onenand_resources),
-+	.resource	= s5pc110_onenand_resources,
-+};
-+
-+void s5pc110_onenand_set_platdata(struct onenand_platform_data *pdata)
-+{
-+	struct onenand_platform_data *pd;
-+
-+	pd = kmemdup(pdata, sizeof(struct onenand_platform_data), GFP_KERNEL);
-+	if (!pd)
-+		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
-+	s5pc110_device_onenand.dev.platform_data = pd;
-+}
+>
+>>
+>> > + ? ? ? if (IS_ERR(rtc_clk)) {
+>> > + ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to find rtc clock source\n");
+>> > + ? ? ? ? ? ? ? ret = PTR_ERR(rtc_clk);
+>> > + ? ? ? ? ? ? ? rtc_clk = NULL;
+>> > + ? ? ? ? ? ? ? goto err_clk;
+>> > + ? ? ? }
+>> > +
+>> > + ? ? ? clk_enable(rtc_clk);
+>> > +
+>> > ? ? ? ?/* check to see if everything is setup correctly */
+>> >
+>> > ? ? ? ?s3c_rtc_enable(pdev, 1);
+>> > @@ -523,6 +541,10 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+>> >
+>> > ?err_nortc:
+>> > ? ? ? ?s3c_rtc_enable(pdev, 0);
+>> > + ? ? ? clk_disable(rtc_clk);
+>> > + ? ? ? clk_put(rtc_clk);
+>> > +
+>> > + err_clk:
+>> > ? ? ? ?iounmap(s3c_rtc_base);
+>> >
+>> > ?err_nomap:
+>> > --
+>> > 1.6.2.5
+>> >
+>> > --
+>> > You received this message because you are subscribed to "rtc-linux".
+>> > Membership options at http://groups.google.com/group/rtc-linux .
+>> > Please read http://groups.google.com/group/rtc-linux/web/checklist
+>> > before submitting a driver.
+>>
+>>
+>>
+>> --
+>> *linux-arm-kernel mailing list
+>> mail addr:linux-arm-kernel at lists.infradead.org
+>> you can subscribe by:
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>> * linux-arm-NUC900 mailing list
+>> mail addr:NUC900 at googlegroups.com
+>> main web: https://groups.google.com/group/NUC900
+>> you can subscribe it by sending me mail:
+>> mcuos.com at gmail.com
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
+
+
+
 -- 
-1.5.3.3
+*linux-arm-kernel mailing list
+mail addr:linux-arm-kernel at lists.infradead.org
+you can subscribe by:
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+* linux-arm-NUC900 mailing list
+mail addr:NUC900 at googlegroups.com
+main web: https://groups.google.com/group/NUC900
+you can subscribe it by sending me mail:
+mcuos.com at gmail.com
