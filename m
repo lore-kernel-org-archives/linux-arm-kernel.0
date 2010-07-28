@@ -1,134 +1,172 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 28 Jul 2010 14:21:49 +0800
-Subject: [PATCH 03/29] pxa3xx_nand: introduce default timing to reduce
-	read id times
-In-Reply-To: <AANLkTim9fYeDqUBXXuuwiczNdtMobYStRWutLF6qyp6C@mail.gmail.com>
-References: <AANLkTim9fYeDqUBXXuuwiczNdtMobYStRWutLF6qyp6C@mail.gmail.com>
-Message-ID: <AANLkTikjC3DgcUEGx7ceRN6ytHCqAeL8R3SAXRGiorM=@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 28 Jul 2010 15:23:57 +0900
+Subject: [PATCH] S5PV210: Move OneNAND platform data to plat-s5p
+In-Reply-To: <20100728011714.GA1882@july>
+References: <20100728011714.GA1882@july>
+Message-ID: <00af01cb2e1d$79c8e790$6d5ab6b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 28, 2010 at 1:56 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> From 3450c0a0a881b4b37776a3d22917aa7752bfd980 Mon Sep 17 00:00:00 2001
-> From: Lei Wen <leiwen@marvell.com>
-> Date: Tue, 22 Jun 2010 20:20:16 +0800
-> Subject: [PATCH 03/29] pxa3xx_nand: introduce default timing to reduce
-> read id times
->
-> We certainly don't need to send read id command times by times, since
-> we already know what the id is after the first read id...
->
-> So create a default timing which could ensure it would successfully read
-> id out all supported chip. Then follow the build-in table to reconfigure
-> the timing.
->
-> Signed-off-by: Lei Wen <leiwen@marvell.com>
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+Kyungmin Park wrote:
+> 
+> From: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> S5PV310 has the same OneNAND controller and can use it commonly.
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
-> ?drivers/mtd/nand/pxa3xx_nand.c | ? 56 ++++++++++++++++++---------------------
-> ?1 files changed, 26 insertions(+), 30 deletions(-)
->
-> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> index 52cec28..b605147 100644
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -190,15 +190,18 @@ static struct pxa3xx_nand_cmdset default_cmdset = {
-> ?};
->
-> ?static struct pxa3xx_nand_timing __devinitdata timing[] = {
-> - ? ? ? { 10, ?0, 20, 40, 30, 40, 11123, 110, 10, },
-> - ? ? ? { 10, 25, 15, 25, 15, 30, 25000, ?60, 10, },
-> - ? ? ? { 10, 35, 15, 25, 15, 25, 25000, ?60, 10, },
-> + ? ? ? { 40, 80, 60, 100, 80, 100, 90000, 400, 40, },
-> + ? ? ? { 10, ?0, 20, ?40, 30, ?40, 11123, 110, 10, },
-> + ? ? ? { 10, 25, 15, ?25, 15, ?30, 25000, ?60, 10, },
-> + ? ? ? { 10, 35, 15, ?25, 15, ?25, 25000, ?60, 10, },
-> ?};
->
-> -#define NAND_SETTING_SAMSUNG ? ? &default_cmdset, &timing[0]
-> -#define NAND_SETTING_MICRON ? ? ?&default_cmdset, &timing[1]
-> -#define NAND_SETTING_ST ? ? ? ? ?&default_cmdset, &timing[2]
-> +#define NAND_SETTING_DEFAULT ? ? &default_cmdset, &timing[0]
-> +#define NAND_SETTING_SAMSUNG ? ? &default_cmdset, &timing[1]
-> +#define NAND_SETTING_MICRON ? ? ?&default_cmdset, &timing[2]
-> +#define NAND_SETTING_ST ? ? ? ? ?&default_cmdset, &timing[3]
-> ?static struct pxa3xx_nand_flash __devinitdata builtin_flash_types[] = {
-> + ? ? ? { ? ? ?0, ? 0, 2048, ?8, ?8, ? ?0, NAND_SETTING_DEFAULT, },
-> ? ? ? ?{ 0x46ec, ?32, ?512, 16, 16, 4096, NAND_SETTING_SAMSUNG, },
-> ? ? ? ?{ 0xdaec, ?64, 2048, ?8, ?8, 2048, NAND_SETTING_SAMSUNG, },
-> ? ? ? ?{ 0xd7ec, 128, 4096, ?8, ?8, 8192, NAND_SETTING_SAMSUNG, },
-> @@ -948,36 +951,29 @@ static int pxa3xx_nand_detect_flash(struct
-> pxa3xx_nand_info *info,
-> ? ? ? ? ? ? ? ?if (pxa3xx_nand_detect_config(info) == 0)
-> ? ? ? ? ? ? ? ? ? ? ? ?return 0;
->
-> - ? ? ? for (i = 0; i<pdata->num_flash; ++i) {
-> - ? ? ? ? ? ? ? f = pdata->flash + i;
-> -
-> - ? ? ? ? ? ? ? if (pxa3xx_nand_config_flash(info, f))
-> - ? ? ? ? ? ? ? ? ? ? ? continue;
-> -
-> - ? ? ? ? ? ? ? if (__readid(info, &id))
-> - ? ? ? ? ? ? ? ? ? ? ? continue;
-> -
-> - ? ? ? ? ? ? ? if (id == f->chip_id)
-> - ? ? ? ? ? ? ? ? ? ? ? return 0;
-> - ? ? ? }
-> -
-> - ? ? ? for (i = 0; i < ARRAY_SIZE(builtin_flash_types); i++) {
-> -
-> - ? ? ? ? ? ? ? f = &builtin_flash_types[i];
-> -
-> - ? ? ? ? ? ? ? if (pxa3xx_nand_config_flash(info, f))
-> - ? ? ? ? ? ? ? ? ? ? ? continue;
-> -
-> - ? ? ? ? ? ? ? if (__readid(info, &id))
-> - ? ? ? ? ? ? ? ? ? ? ? continue;
-> -
-> - ? ? ? ? ? ? ? if (id == f->chip_id)
-> + ? ? ? /* we use default timing to detect id */
-> + ? ? ? f = &builtin_flash_types[0];
+>  arch/arm/mach-s5pv210/Kconfig            |    5 ---
+>  arch/arm/mach-s5pv210/Makefile           |    1 -
+>  arch/arm/mach-s5pv210/include/mach/map.h |    3 --
+>  arch/arm/plat-s5p/Makefile               |    2 +-
+>  arch/arm/plat-s5p/dev-onenand.c          |   52
+> ++++++++++++++++++++++++++++++
 
-This is not intuitive when referencing an array item, probably define a
-macro for this:
+Is this just moving dev-onenand.c from mach-s5pv210 to plat-s5p to support
+further SoC?
+So...where is removing 'mach-s5pv210/dev-onenand.c'...I found just adding
+dev-onenand.c to plat-s5p.
 
-#define DEFAULT_FLASH_TYPE (&builtin_flash_types[0])
+>  5 files changed, 53 insertions(+), 10 deletions(-)
+>  create mode 100644 arch/arm/plat-s5p/dev-onenand.c
+> 
+> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+> index 0761eac..96f4d9b 100644
+> --- a/arch/arm/mach-s5pv210/Kconfig
+> +++ b/arch/arm/mach-s5pv210/Kconfig
+> @@ -62,11 +62,6 @@ config MACH_GONI
+>  	  Machine support for Samsung GONI board
+>  	  S5PC110(MCP) is one of package option of S5PV210
+> 
+> -config S5PC110_DEV_ONENAND
+> -	bool
+> -	help
+> -	  Compile in platform device definition for OneNAND1 controller
+> -
+>  config MACH_SMDKV210
+>  	bool "SMDKV210"
+>  	select CPU_S5PV210
+> diff --git a/arch/arm/mach-s5pv210/Makefile
+b/arch/arm/mach-s5pv210/Makefile
+> index 30be9a6..6a6dea1 100644
+> --- a/arch/arm/mach-s5pv210/Makefile
+> +++ b/arch/arm/mach-s5pv210/Makefile
+> @@ -26,7 +26,6 @@ obj-$(CONFIG_MACH_GONI)		+= mach-goni.o
+> 
+>  obj-y				+= dev-audio.o
+>  obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
+> -obj-$(CONFIG_S5PC110_DEV_ONENAND) += dev-onenand.o
+> 
+>  obj-$(CONFIG_S5PV210_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
+>  obj-$(CONFIG_S5PV210_SETUP_I2C1) 	+= setup-i2c1.o
+> diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-
+> s5pv210/include/mach/map.h
+> index 34eb168..3a44e1e 100644
+> --- a/arch/arm/mach-s5pv210/include/mach/map.h
+> +++ b/arch/arm/mach-s5pv210/include/mach/map.h
+> @@ -16,9 +16,6 @@
+>  #include <plat/map-base.h>
+>  #include <plat/map-s5p.h>
+> 
+> -#define S5PC110_PA_ONENAND	(0xB0000000)
+> -#define S5PC110_PA_ONENAND_DMA	(0xB0600000)
+> -
+>  #define S5PV210_PA_CHIPID	(0xE0000000)
+>  #define S5P_PA_CHIPID		S5PV210_PA_CHIPID
+> 
+> diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
+> index 39c242b..d9f6890 100644
+> --- a/arch/arm/plat-s5p/Makefile
+> +++ b/arch/arm/plat-s5p/Makefile
+> @@ -12,7 +12,7 @@ obj-				:=
+> 
+>  # Core files
+> 
+> -obj-y				+= dev-uart.o
+> +obj-y				+= dev-uart.o dev-onenand.o
 
-right after the builtin_flash_types array, with comment to explain
-that this only works when probing/detecting.
+Really, always need building dev-onenand for all S5P SoCs?
 
-> + ? ? ? pxa3xx_nand_config_flash(info, f);
-> + ? ? ? if (__readid(info, &id))
-> + ? ? ? ? ? ? ? goto fail_detect;
+>  obj-y				+= cpu.o
+>  obj-y				+= clock.o
+>  obj-y				+= irq.o
+> diff --git a/arch/arm/plat-s5p/dev-onenand.c
+b/arch/arm/plat-s5p/dev-onenand.c
+> new file mode 100644
+> index 0000000..00facbe
+> --- /dev/null
+> +++ b/arch/arm/plat-s5p/dev-onenand.c
+> @@ -0,0 +1,52 @@
+> +/*
+> + * linux/arch/arm/plat-s5p/dev-onenand.c
+> + *
+> + *  Copyright (c) 2008-2010 Samsung Electronics
+> + *  Kyungmin Park <kyungmin.park@samsung.com>
+> + *
+> + * S5PC110 series device definition for OneNAND devices
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
 > +
-> + ? ? ? for (i=0; i<ARRAY_SIZE(builtin_flash_types) + pdata->num_flash - 1; i++) {
-> + ? ? ? ? ? ? ? /* we first choose the flash definition from platfrom */
-> + ? ? ? ? ? ? ? if (i < pdata->num_flash)
-> + ? ? ? ? ? ? ? ? ? ? ? f = pdata->flash + i;
-> + ? ? ? ? ? ? ? else
-> + ? ? ? ? ? ? ? ? ? ? ? f = &builtin_flash_types[i - pdata->num_flash + 1];
+> +#include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/mtd/mtd.h>
+> +#include <linux/mtd/onenand.h>
+> +
+> +#include <mach/irqs.h>
+> +
+> +#define S5PC110_PA_ONENAND		(0xB0000000)
+> +#define S5PC110_PA_ONENAND_DMA		(0xB0600000)
 
-Or
+Should be in relevant map.h not here.
 
-f = (i < pdata->num_flash) ? ...
+> +
+> +static struct resource s5pc110_onenand_resources[] = {
 
-> + ? ? ? ? ? ? ? if (f->chip_id == id) {
-> + ? ? ? ? ? ? ? ? ? ? ? dev_info(&info->pdev->dev, "detect chip id: 0x%x\n", id);
-> + ? ? ? ? ? ? ? ? ? ? ? pxa3xx_nand_config_flash(info, f);
-> ? ? ? ? ? ? ? ? ? ? ? ?return 0;
-> + ? ? ? ? ? ? ? }
-> ? ? ? ?}
->
-> ? ? ? ?dev_warn(&info->pdev->dev,
-> ? ? ? ? ? ? ? ? "failed to detect configured nand flash; found %04x instead of\n",
-> ? ? ? ? ? ? ? ? id);
-> +fail_detect:
-> ? ? ? ?return -ENODEV;
-> ?}
->
+It would be nice if could use s5p_ prefix in here.
+
+> +	[0] = {
+> +		.start	= S5PC110_PA_ONENAND,
+> +		.end	= S5PC110_PA_ONENAND + SZ_128K - 1,
+
+Same.
+
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start	= S5PC110_PA_ONENAND_DMA,
+> +		.end	= S5PC110_PA_ONENAND_DMA + SZ_2K - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +};
+> +
+> +struct platform_device s5pc110_device_onenand = {
+> +	.name		= "s5pc110-onenand",
+> +	.id		= -1,
+> +	.num_resources	= ARRAY_SIZE(s5pc110_onenand_resources),
+> +	.resource	= s5pc110_onenand_resources,
+> +};
+> +
+> +void s5pc110_onenand_set_platdata(struct onenand_platform_data *pdata)
+> +{
+> +	struct onenand_platform_data *pd;
+> +
+> +	pd = kmemdup(pdata, sizeof(struct onenand_platform_data),
+> GFP_KERNEL);
+> +	if (!pd)
+> +		printk(KERN_ERR "%s: no memory for platform data\n",
+> __func__);
+> +	s5pc110_device_onenand.dev.platform_data = pd;
+> +}
 > --
-> 1.7.0.4
->
 
-Otherwise looks good to me.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
