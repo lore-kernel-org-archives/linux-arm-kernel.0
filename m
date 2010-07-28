@@ -1,27 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 28 Jul 2010 22:21:56 +0100
-Subject: [PATCH 1/2] arm: msm: Add System MMU support.
-In-Reply-To: <201007281950.20847.arnd@arndb.de>
-References: <1280270466-13503-1-git-send-email-stepanm@codeaurora.org>
-	<201007281039.44883.arnd@arndb.de>
-	<ea4bbdecc271f7fa5749d09645f38c0d.squirrel@www.codeaurora.org>
-	<201007281950.20847.arnd@arndb.de>
-Message-ID: <20100728212156.GA6729@n2100.arm.linux.org.uk>
+From: davidsin@ti.com (Sin, David)
+Date: Wed, 28 Jul 2010 16:22:47 -0500
+Subject: [RFC 5/8] TILER-DMM: TILER interface file and documentation
+References: <1279927694-26138-1-git-send-email-davidsin@ti.com>
+	<1279927694-26138-5-git-send-email-davidsin@ti.com>
+	<1279927694-26138-6-git-send-email-davidsin@ti.com>
+	<201007281158.31050.laurent.pinchart@ideasonboard.com>
+Message-ID: <513FF747EED39B4AADBB4D6C9D9F9F7903D64D7C68@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 28, 2010 at 07:50:20PM +0200, Arnd Bergmann wrote:
-> The DMA API is extremely flexible, it works just fine with all the
-> IOMMUs that I've seen so far. Please take a look at
-> include/asm-generic/dma-mapping-common.h and its users to see how
-> to use multiple IOMMUs depending on the device.
+> -----Original Message-----
+> From: Sin, David 
+> Sent: Wednesday, July 28, 2010 9:44 AM
+> To: 'Laurent Pinchart'; linux-arm-kernel at lists.infradead.org
+> Cc: Molnar, Lajos
+> Subject: RE: [RFC 5/8] TILER-DMM: TILER interface file and 
+> documentation
+> 
+> > -----Original Message-----
+> > From: Laurent Pinchart [mailto:laurent.pinchart at ideasonboard.com] 
+> > Sent: Wednesday, July 28, 2010 4:59 AM
+> > To: linux-arm-kernel at lists.infradead.org
+> > Cc: Sin, David; Molnar, Lajos
+> > Subject: Re: [RFC 5/8] TILER-DMM: TILER interface file and 
+> > documentation
+> > 
+> > Hi,
+> > 
+> > On Saturday 24 July 2010 01:28:11 David Sin wrote:
+> > > From: Lajos Molnar <molnar@ti.com>
+> > > 
+> > > This patch contains the TILER interface file and the 
+> documentation.
+> > 
+> > I got a problem with the documentation. After reading it I'm 
+> > still not sure 
+> > how the tiler works and what it's supposed to do exactly.
+> > 
+> > -- 
+> > Regards,
+> > 
+> > Laurent Pinchart
+> >
+> 
+> [dhs] Thanks for this feedback.  I'm working on getting the 
+> public TRM link fixed, which should explain more.  I will 
+> also work on improving the document.
 
-We don't yet use those DMA API interface extensions because we haven't
-had the need.  If someone who has the need wants to put the effort in
-though...
+Laurent, 
+I have uploaded the DMM-TILER TRM section for omap4 es 2.0 here:
+https://gforge.ti.com/gf/download/docmanfileversion/208/3739/OMAP4430_ES2.0_PUBLIC_TRM_MEMSS_DMM_v3.0.pdf
 
-One of the problems with it though is the abstraction of the sync*
-operations is the wrong way around for stuff like dmabounce - we want
-to be passed the base address of the buffer (so we can look this up),
-plus offset and length.  We don't want to know just the region which
-is affected.
+I'm not able to provide you a link to the complete TRM, at this time.  It will not be available until the end of September.
+
+BR,
+--
+David Sin 
