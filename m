@@ -1,156 +1,161 @@
-From: ben@simtec.co.uk (Ben Dooks)
-Date: Wed, 28 Jul 2010 18:28:34 +0100
-Subject: [PATCH] Support for Real6410
-In-Reply-To: <20100727195944.910.69956.stgit@darius-desktop>
-References: <20100727195944.910.69956.stgit@darius-desktop>
-Message-ID: <4C5068C2.9030904@simtec.co.uk>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 28 Jul 2010 23:00:32 +0530
+Subject: [RFC 0/8] TI TILER-DMM driver
+In-Reply-To: <513FF747EED39B4AADBB4D6C9D9F9F7903D64D76D5@dlee02.ent.ti.com>
+References: <1279927348-21750-1-git-send-email-davidsin@ti.com>
+	<201007241312.53551.hverkuil@xs4all.nl>
+	<513FF747EED39B4AADBB4D6C9D9F9F7903D64D76D5@dlee02.ent.ti.com>
+Message-ID: <19F8576C6E063C45BE387C64729E7394044EE51DF1@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/07/10 20:59, Darius Augulis wrote:
-> Add support for CoreWind Real6410 board,
-> based on Samsung s3c6410 processor.
+> -----Original Message-----
+> From: Sin, David
+> Sent: Wednesday, July 28, 2010 8:53 PM
+> To: Hans Verkuil
+> Cc: linux-omap at vger.kernel.org; Tony Lindgren; Russell King; Kanigeri, Hari;
+> Ohad Ben-Cohen; Hiremath, Vaibhav; Shilimkar, Santosh; linux-arm-
+> kernel at lists.infradead.org
+> Subject: RE: [RFC 0/8] TI TILER-DMM driver
 > 
-> Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
-> ---
->  arch/arm/mach-s3c64xx/Kconfig         |    6 ++
->  arch/arm/mach-s3c64xx/Makefile        |    1 
->  arch/arm/mach-s3c64xx/mach-real6410.c |   88 +++++++++++++++++++++++++++++++++
->  3 files changed, 95 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-s3c64xx/mach-real6410.c
+> > -----Original Message-----
+> > From: Hans Verkuil [mailto:hverkuil at xs4all.nl]
+> > Sent: Saturday, July 24, 2010 6:13 AM
+> > To: Sin, David
+> > Cc: linux-arm-kernel at lists.arm.linux.org.uk;
+> > linux-omap at vger.kernel.org; Tony Lindgren; Russell King;
+> > Kanigeri, Hari; Ohad Ben-Cohen; Hiremath, Vaibhav; Shilimkar, Santosh
+> > Subject: Re: [RFC 0/8] TI TILER-DMM driver
+> >
+> > Hi David,
+> >
+<snip>
+
+> > The main question that I have is how this driver is to be
+> > used in practice.
+> > How does it fit into the bigger video4linux picture? Is this
+> > something that
+> > is mainly used from other v4l or fb drivers? Or is it
+> > controlled by userspace?
 > 
-> diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-> index f5a5972..0f9f2dd 100644
-> --- a/arch/arm/mach-s3c64xx/Kconfig
-> +++ b/arch/arm/mach-s3c64xx/Kconfig
-> @@ -88,6 +88,12 @@ config MACH_ANW6410
->  	help
->  	  Machine support for the A&W6410
->  
-> +config MACH_REAL6410
-> +	bool "REAL6410"
-> +	select CPU_S3C6410
-> +	help
-> +	  Machine support for the CoreWind REAL6410
-> +
->  config MACH_SMDK6410
->  	bool "SMDK6410"
->  	select CPU_S3C6410
-> diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
-> index 9d10069..6be3e5b 100644
-> --- a/arch/arm/mach-s3c64xx/Makefile
-> +++ b/arch/arm/mach-s3c64xx/Makefile
-> @@ -50,6 +50,7 @@ obj-$(CONFIG_PM)		+= irq-pm.o
->  obj-$(CONFIG_MACH_ANW6410)	+= mach-anw6410.o
->  obj-$(CONFIG_MACH_SMDK6400)	+= mach-smdk6400.o
->  obj-$(CONFIG_MACH_SMDK6410)	+= mach-smdk6410.o
-> +obj-$(CONFIG_MACH_REAL6410)     += mach-real6410.o
->  obj-$(CONFIG_MACH_NCP)		+= mach-ncp.o
->  obj-$(CONFIG_MACH_HMT)		+= mach-hmt.o
->  obj-$(CONFIG_MACH_SMARTQ)	+= mach-smartq.o
-> diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
-> new file mode 100644
-> index 0000000..bbd9bf8
-> --- /dev/null
-> +++ b/arch/arm/mach-s3c64xx/mach-real6410.c
-> @@ -0,0 +1,88 @@
-> +/* linux/arch/arm/mach-s3c64xx/mach-real6410.c
-> + *
-> + * Copyright 2010 Darius Augulis <augulis.darius@gmail.com>
-> + * Copyright 2008 Openmoko, Inc.
-> + * Copyright 2008 Simtec Electronics
-> + *	Ben Dooks <ben@simtec.co.uk>
-> + *	http://armlinux.simtec.co.uk/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> +*/
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/types.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/list.h>
-> +#include <linux/init.h>
-> +#include <linux/serial_core.h>
-> +#include <linux/platform_device.h>
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/map.h>
-> +#include <mach/map.h>
-> +#include <mach/s3c6410.h>
-> +#include <plat/cpu.h>
-> +#include <plat/regs-serial.h>
-> +
-> +#define UCON S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK
-> +#define ULCON S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB
-> +#define UFCON S3C2410_UFCON_RXTRIG8 | S3C2410_UFCON_FIFOMODE
-> +
-> +static struct s3c2410_uartcfg real6410_uartcfgs[] __initdata = {
-> +	[0] = {
-> +		.hwport	     = 0,
-> +		.flags	     = 0,
-> +		.ucon	     = UCON,
-> +		.ulcon	     = ULCON,
-> +		.ufcon	     = UFCON,
-> +	},
-> +	[1] = {
-> +		.hwport	     = 1,
-> +		.flags	     = 0,
-> +		.ucon	     = UCON,
-> +		.ulcon	     = ULCON,
-> +		.ufcon	     = UFCON,
-> +	},
-> +	[2] = {
-> +		.hwport	     = 2,
-> +		.flags	     = 0,
-> +		.ucon	     = UCON,
-> +		.ulcon	     = ULCON,
-> +		.ufcon	     = UFCON,
-> +	},
-> +	[3] = {
-> +		.hwport	     = 3,
-> +		.flags	     = 0,
-> +		.ucon	     = UCON,
-> +		.ulcon	     = ULCON,
-> +		.ufcon	     = UFCON,
-> +	},
-> +};
-
-I'll look into a default table for the next release.
-
-> +
-> +static struct map_desc real6410_iodesc[] = {};
-> +
-> +static void __init real6410_map_io(void)
-> +{
-> +	s3c64xx_init_io(real6410_iodesc, ARRAY_SIZE(real6410_iodesc));
-
-I _think_ you can pass (NULL, 0) here, and remove the map_desc
-
-> +	s3c24xx_init_clocks(12000000);
-> +	s3c24xx_init_uarts(real6410_uartcfgs, ARRAY_SIZE(real6410_uartcfgs));
-> +}
-> +
-> +static void __init real6410_machine_init(void)
-> +{
-> +}
-> +
-> +MACHINE_START(REAL6410, "REAL6410")
-> +	/* Maintainer: Darius Augulis <augulis.darius@gmail.com> */
-> +	.phys_io	= S3C_PA_UART & 0xfff00000,
-> +	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
-> +	.boot_params	= S3C64XX_PA_SDRAM + 0x100,
-> +
-> +	.init_irq	= s3c6410_init_irq,
-> +	.map_io		= real6410_map_io,
-> +	.init_machine	= real6410_machine_init,
-> +	.timer		= &s3c24xx_timer,
-> +MACHINE_END
+> [dhs] I missed this one -- my apologies.  As I stated to Vaibhav, any device
+> can use TILER memory, but there is a big advantage, performance-wise, for 2-
+> Dimensional macro block based buffers.  This HW is intended for image/video
+> hardware accelerators (e.g. OMAP4 IVA-HD).  Plus there's the added advantage
+> of doing zero-copy flips and rotations for the OMAP display and image sub-
+> systems.
 > 
+> In this RFC, there are only kernel APIs to allocate TILER memory.
+> Eventually, we would like to provide a way to obtain TILER memory to the
+> user space.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+[Hiremath, Vaibhav] Don't you think, user has to mmap memory (irrespective of whether it is tiles view or not) to userland in both the cases, Fbdev and V4L2 (MMAP mode)?
+
+Am I missing something here?
+
+Thanks,
+Vaibhav
+
+> >
+> > Regards,
+> >
+> > 	Hans
+> >
+> > >
+> > > List of pending items in proposed order:
+> > >
+> > > * Add area packing support (multiple blocks can reside in
+> > the same band/area)
+> > >   to optimize area use
+> > > * Add group-ID support (to specify which blocks can reside
+> > together in the
+> > >   same area)
+> > > * Add multiple search directions to TCM-SiTA
+> > > * Add 1D block support (including adding 1D search algo to TCM-SiTA)
+> > > * Optimize mutex handling (don.t hold mutex during memory
+> > >   allocation/mapping/cache flushing)
+> > > * Add block reference counting, support for sharing blocks
+> > > * Move all kernel-API-s to tiler-iface.c
+> > > * Support orphaned block support (in preparation for
+> > process cleanup support)
+> > > * Change block identification from physical address to key-ID pair
+> > >   (in preparation for user space support, and process security)
+> > > * Add support for process security (blocks from separate
+> > processes never
+> > >   reside in the same band)
+> > > * Support file interface (ioctl and mmap)
+> > > * Support for buffers (ordered list of blocks that are
+> > mapped to userspace
+> > >   together, such as YUV420sp)
+> > > * Support 1D user buffer mapping into TILER container
+> > > * Support for block pre-reservation (to further optimize area use)
+> > >
+> > > David Sin (1):
+> > >   TILER-DMM: DMM-PAT driver for TI TILER
+> > >
+> > > Lajos Molnar (6):
+> > >   TILER-DMM: Container manager interface and utility definitons
+> > >   TILER-DMM: TILER Memory Manager interface and implementation
+> > >   TILER-DMM: TILER interface file and documentation
+> > >   TILER-DMM: Geometry and view manipulation functions.
+> > >   TILER-DMM: Main TILER driver implementation.
+> > >   TILER-DMM: Linking TILER driver into the Linux kernel build
+> > >
+> > > Ravi Ramachandra (1):
+> > >   TILER-DMM: Sample TCM implementation: Simple TILER Allocator
+> > >
+> > >  Documentation/arm/TILER                   |  144 +++++++++
+> > >  arch/arm/mach-omap2/include/mach/dmm.h    |  128 ++++++++
+> > >  arch/arm/mach-omap2/include/mach/tiler.h  |  201 +++++++++++++
+> > >  drivers/media/Kconfig                     |    6 +
+> > >  drivers/media/Makefile                    |    2 +
+> > >  drivers/media/video/tiler/Kconfig         |   65 ++++
+> > >  drivers/media/video/tiler/Makefile        |    7 +
+> > >  drivers/media/video/tiler/_tiler.h        |   51 ++++
+> > >  drivers/media/video/tiler/dmm.c           |  200 +++++++++++++
+> > >  drivers/media/video/tiler/tcm.h           |  209 +++++++++++++
+> > >  drivers/media/video/tiler/tcm/Makefile    |    1 +
+> > >  drivers/media/video/tiler/tcm/_tcm-sita.h |   64 ++++
+> > >  drivers/media/video/tiler/tcm/tcm-sita.c  |  459
+> > +++++++++++++++++++++++++++++
+> > >  drivers/media/video/tiler/tcm/tcm-sita.h  |   37 +++
+> > >  drivers/media/video/tiler/tcm/tcm-utils.h |   54 ++++
+> > >  drivers/media/video/tiler/tiler-geom.c    |  360
+> > ++++++++++++++++++++++
+> > >  drivers/media/video/tiler/tiler-iface.c   |  106 +++++++
+> > >  drivers/media/video/tiler/tiler-main.c    |  426
+> > ++++++++++++++++++++++++++
+> > >  drivers/media/video/tiler/tmm-pat.c       |  274 +++++++++++++++++
+> > >  drivers/media/video/tiler/tmm.h           |  109 +++++++
+> > >  20 files changed, 2903 insertions(+), 0 deletions(-)
+> > >  create mode 100644 Documentation/arm/TILER
+> > >  create mode 100644 arch/arm/mach-omap2/include/mach/dmm.h
+> > >  create mode 100644 arch/arm/mach-omap2/include/mach/tiler.h
+> > >  create mode 100644 drivers/media/video/tiler/Kconfig
+> > >  create mode 100644 drivers/media/video/tiler/Makefile
+> > >  create mode 100644 drivers/media/video/tiler/_tiler.h
+> > >  create mode 100644 drivers/media/video/tiler/dmm.c
+> > >  create mode 100644 drivers/media/video/tiler/tcm.h
+> > >  create mode 100644 drivers/media/video/tiler/tcm/Makefile
+> > >  create mode 100644 drivers/media/video/tiler/tcm/_tcm-sita.h
+> > >  create mode 100644 drivers/media/video/tiler/tcm/tcm-sita.c
+> > >  create mode 100644 drivers/media/video/tiler/tcm/tcm-sita.h
+> > >  create mode 100644 drivers/media/video/tiler/tcm/tcm-utils.h
+> > >  create mode 100644 drivers/media/video/tiler/tiler-geom.c
+> > >  create mode 100644 drivers/media/video/tiler/tiler-iface.c
+> > >  create mode 100644 drivers/media/video/tiler/tiler-main.c
+> > >  create mode 100644 drivers/media/video/tiler/tmm-pat.c
+> > >  create mode 100644 drivers/media/video/tiler/tmm.h
+> > >
+> > > --
+> > > To unsubscribe from this list: send the line "unsubscribe
+> > linux-omap" in
+> > > the body of a message to majordomo at vger.kernel.org
+> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > >
+> > >
+> >
+> > --
+> > Hans Verkuil - video4linux developer - sponsored by TANDBERG,
+> > part of Cisco
+> >
