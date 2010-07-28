@@ -1,37 +1,46 @@
-From: stepanm@codeaurora.org (stepanm at codeaurora.org)
-Date: Wed, 28 Jul 2010 10:39:24 -0700 (PDT)
-Subject: [PATCH 1/2] arm: msm: Add System MMU support.
-In-Reply-To: <201007281039.44883.arnd@arndb.de>
-References: <1280270466-13503-1-git-send-email-stepanm@codeaurora.org>
-	<201007281039.44883.arnd@arndb.de>
-Message-ID: <ea4bbdecc271f7fa5749d09645f38c0d.squirrel@www.codeaurora.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 28 Jul 2010 10:39:55 -0700
+Subject: [PATCH 4/4] sdhci-s3c: add regulator support
+In-Reply-To: <1280326797-15792-5-git-send-email-m.szyprowski@samsung.com>
+References: <1280326797-15792-1-git-send-email-m.szyprowski@samsung.com>
+	<1280326797-15792-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20100728173954.GD22544@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wednesday 28 July 2010 00:41:06 Stepan Moskovchenko wrote:
->> Add support for the System MMUs found on the 8x60 and 8x72
->> families of Qualcomm chips. These SMMUs allow virtualization
->> of the address space used by most of the multimedia cores
->> on these chips.
->
-> How is this different from an IOMMU?
->
-> From a very brief look, it seems that you should be using the
-> existing dma-mapping APIs here instead of making up your own.
->
-> 	Arnd
+On Wed, Jul 28, 2010 at 04:19:57PM +0200, Marek Szyprowski wrote:
 
+>  static int sdhci_s3c_suspend(struct platform_device *dev, pm_message_t pm)
+>  {
+> +	int ret = 0;
+>  	struct sdhci_host *host = platform_get_drvdata(dev);
+> +	struct sdhci_s3c *sc = sdhci_priv(host);
+>  
+>  	sdhci_suspend_host(host, pm);
+> -	return 0;
+> +
+> +	if (sc->vmmc)
+> +		ret = regulator_disable(sc->vmmc);
+> +
 
-These are just SMMU APIs, and the DMA-mapping API is one layer above this.
+So, on suspend you disable the regulator...
 
-We have our own SMMU API for the MSM SoCs because we have muliple IOMMUs,
-each one having multiple contexts, or even having multiple instances of
-the same context. Our usage model is also quite a bit different from how
-the DMA APIs are set up. I believe only two IOMMU drivers actually make
-use of the DMA API (Intel and AMD) and the other ones (OMAP and other
-SoCs) have their own APIs for their specific use cases.
+> +	struct sdhci_s3c *sc = sdhci_priv(host);
+> +
+> +	if (sc->vmmc) {
+> +		int ret = regulator_disable(sc->vmmc);
+> +		if (ret)
+> +			return ret;
 
-Steve
+...and on resume you disable it again.  I'm surprised this works
+properly after resume, at the very least the core is going to get
+confused about the reference counts I'd expect.
 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+I suspect this is for something we need to do better in the regulator
+API - restoring the state of the regulators after a resume if the
+hardware changes them.  A lot of regulators just do this in hardware so
+we didn't need to worry about it previously.
+
+> +		mdelay(2);
+
+This could do with some sort of comment.
