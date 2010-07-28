@@ -1,83 +1,155 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 28 Jul 2010 10:45:41 +0530
-Subject: Issue with file transfers to a mass storage device on SMP	system
-In-Reply-To: <20100727160710.GF11468@n2100.arm.linux.org.uk>
-References: <EAF47CD23C76F840A9E7FCE10091EFAB02C62EF707@dbde02.ent.ti.com>
-	<20100727100121.GB7846@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF75B@dbde02.ent.ti.com>
-	<20100727104133.GA10665@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF83C@dbde02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF8F3@dbde02.ent.ti.com>
-	<20100727135939.GD11468@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF90B@dbde02.ent.ti.com>
-	<20100727142113.GE11468@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C62EF91F@dbde02.ent.ti.com>
-	<20100727160710.GF11468@n2100.arm.linux.org.uk>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C62EFAD5@dbde02.ent.ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 28 Jul 2010 14:21:45 +0900
+Subject: [PATCH v4 3/3] sdhci-s3c: Add SDHCI_QUIRK_NO_WP_BIT quirk for
+	Samsung	SoC
+In-Reply-To: <003e01cb2d92$054871a0$0fd954e0$%szyprowski@samsung.com>
+References: <1280234628-27303-1-git-send-email-kgene.kim@samsung.com>
+	<1280234628-27303-4-git-send-email-kgene.kim@samsung.com>
+	<003e01cb2d92$054871a0$0fd954e0$%szyprowski@samsung.com>
+Message-ID: <009701cb2e14$c8232080$58696180$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Tuesday, July 27, 2010 9:37 PM
-> To: Shilimkar, Santosh
-> Cc: Mankad, Maulik Ojas; linux-usb at vger.kernel.org; linux-
-> omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: Issue with file transfers to a mass storage device on SMP
-> system
+Marek Szyprowski wrote:
 > 
-> On Tue, Jul 27, 2010 at 07:59:17PM +0530, Shilimkar, Santosh wrote:
-> > Once it's pushed out of L2X WB, it will hit the memory. Just to give an
-> additional data point, with CATC analyzer what we see that only those
-> > 16 bytes CDB are 0x0. This buffer was memset to 0x0 just before the
-> > memcpy.
+> Hello,
+
+Hi :-)
+> 
+> On Tuesday, July 27, 2010 2:44 PM Kukjin Kim wrote:
+> 
+> > From: Hyuk Lee <hyuk1.lee@samsung.com>
 > >
-> > I am just wondering who will issue a barrier(wmb) on this buffer before
-> DMA
-> > start if we don't use dma-mapping APIs? May be for dma_alloc_coherent
-> > buffers, we need to explicitly issue the barrier.
+> > If host controller doesn't have WP pin which should be connnected with
+> > SDMMC
+> > card WP pin, can implement get_ro function with using the allocated
+gpio.
+> > In order to use this quirk wp_gpio in the platform data must be set.
+> >
+> > Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> >  drivers/mmc/host/sdhci-s3c.c |   36
+> ++++++++++++++++++++++++++++++++++++
+> >  drivers/mmc/host/sdhci.c     |    3 +++
+> >  drivers/mmc/host/sdhci.h     |    3 +++
+> >  3 files changed, 42 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> > index 0d25285..98a8ec8 100644
+> > --- a/drivers/mmc/host/sdhci-s3c.c
+> > +++ b/drivers/mmc/host/sdhci-s3c.c
+> > @@ -22,6 +22,7 @@
+> >
+> >  #include <linux/mmc/host.h>
+> >
+> > +#include <plat/gpio-cfg.h>
+> >  #include <plat/sdhci.h>
+> >  #include <plat/regs-sdhci.h>
+> >
+> > @@ -213,6 +214,32 @@ static void sdhci_s3c_set_clock(struct sdhci_host
+> > *host, unsigned int clock)
+> >  }
+> >
+> >  /**
+> > + * sdhci_s3c_get_ro - callback for get_ro
+> > + * @host: The SDHCI host being changed
+> > + *
+> > + * If the WP pin is connected with GPIO, can get the value which
+indicates
+> > + * the card is locked or not.
+> > +*/
+> > +static int sdhci_s3c_get_ro(struct mmc_host *mmc)
+> > +{
+> > +	struct sdhci_s3c *ourhost = to_s3c(mmc_priv(mmc));
+> > +
+> > +	return gpio_get_value(ourhost->pdata->wp_gpio);
+> > +}
+> > +
+> > +/**
+> > + * sdhci_s3c_cfg_wp - configure GPIO for WP pin
+> > + * @gpio_num: GPIO number which connected with WP line from SD/MMC slot
+> > + *
+> > + * Configure GPIO for using WP line
+> > +*/
+> > +static void sdhci_s3c_cfg_wp(unsigned int gpio_num)
+> > +{
+> > +	s3c_gpio_cfgpin(gpio_num, S3C_GPIO_INPUT);
+> > +	s3c_gpio_setpull(gpio_num, S3C_GPIO_PULL_UP);
+> > +}
+> > +
+> > +/**
+> >   * sdhci_s3c_get_min_clock - callback to get minimal supported clock
+value
+> >   * @host: The SDHCI host being queried
+> >   *
+> > @@ -408,6 +435,15 @@ static int __devinit sdhci_s3c_probe(struct
+> > platform_device *pdev)
+> >  	host->quirks |= (SDHCI_QUIRK_32BIT_DMA_ADDR |
+> >  			 SDHCI_QUIRK_32BIT_DMA_SIZE);
+> >
+> > +	/* Controller's WP pin doesn't connected with SD card and there is
+an
+> > +	 * allocated GPIO for getting WP data form SD card, use this quirk
+> > and
+> > +	 * send the GPIO number in pdata->wp_gpio. */
+> > +	if (gpio_is_valid(pdata->wp_gpio) && pdata->has_wp_gpio) {
 > 
-> wmb's don't take addresses - they're a global thing.  All stores before
-> the wmb() take effect before stores after the wmb().
+> IMHO the opposite order would make much more sense:
+> if (pdata->has_wp_gpio && gpio_is_valid(pdata->wp_gpio))
 > 
-> The wmb() is issued by Catalin's IO ordering patches:
-> 
-> +#define writeb(v,c)            ({ wmb(); writeb_relaxed(v,c); })
-> +#define writew(v,c)            ({ wmb(); writew_relaxed(v,c); })
-> +#define writel(v,c)            ({ wmb(); writel_relaxed(v,c); })
-> 
-> So, the wmb() is issued to ensure that all stores to (eg) buffers
-> allocated by dma_alloc_coherent() hit memory prior to the store to
-> the device.
-> 
-> Now, if you're writing to registers using something other than
-> write[bwl](),
-> you'll miss the wmb(), and therefore your DMA buffer won't be up to date.
-> 
-Yep. 
-> And this _is_ the problem:
-> 
-> drivers/usb/musb/musb_io.h:static inline void musb_writew(void __iomem
-> *addr, unsigned offset, u16 data)
-> drivers/usb/musb/musb_io.h:     { __raw_writew(data, addr + offset); }
-> drivers/usb/musb/musb_io.h:static inline void musb_writel(void __iomem
-> *addr, unsigned offset, u32 data)
-> drivers/usb/musb/musb_io.h:     { __raw_writel(data, addr + offset); }
-> drivers/usb/musb/musb_io.h:static inline void musb_writeb(void __iomem
-> *addr, unsigned offset, u8 data)
-> drivers/usb/musb/musb_io.h:     __raw_writew(tmp, addr + (offset & ~1));
-> drivers/usb/musb/musb_io.h:static inline void musb_writeb(void __iomem
-> *addr, unsigned offset, u8 data)
-> drivers/usb/musb/musb_io.h:     { __raw_writeb(data, addr + offset); }
-> 
-> All IO performed by musb misses out on the barriers - so what you
-> need to do is either add wmb()s to these, or you need to ensure
-> that the driver has the various necessary memory barriers in place.
-> The latter solution will be more efficient.
+Ok..will modify.
 
-I also agree that patching driver is less impacting and non-intrusive. We will go ahead with the original work-around which adds barrier in the driver.
+> > +		sdhci_s3c_ops.get_ro = sdhci_s3c_get_ro;
+> > +		host->quirks |= SDHCI_QUIRK_NO_WP_BIT;
+> > +		sdhci_s3c_cfg_wp(pdata->wp_gpio);
+> > +	}
+> > +
+> >  	ret = sdhci_add_host(host);
+> >  	if (ret) {
+> >  		dev_err(dev, "sdhci_add_host() failed\n");
+> > diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> > index f9ca4c6..7fba401 100644
+> > --- a/drivers/mmc/host/sdhci.c
+> > +++ b/drivers/mmc/host/sdhci.c
+> > @@ -1198,6 +1198,9 @@ static int sdhci_get_ro(struct mmc_host *mmc)
+> >
+> >  	host = mmc_priv(mmc);
+> >
+> > +	if ((host->quirks & SDHCI_QUIRK_NO_WP_BIT) && host->ops->get_ro)
+> > +		return host->ops->get_ro(mmc);
+> > +
+> >  	spin_lock_irqsave(&host->lock, flags);
+> >
+> >  	if (host->flags & SDHCI_DEVICE_DEAD)
+> > diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> > index 0de8b38..dd9a233 100644
+> > --- a/drivers/mmc/host/sdhci.h
+> > +++ b/drivers/mmc/host/sdhci.h
+> > @@ -247,6 +247,8 @@ struct sdhci_host {
+> >  #define SDHCI_QUIRK_MISSING_CAPS			(1<<28)
+> >  /* Controller has nonstandard clock management */
+> >  #define SDHCI_QUIRK_NONSTANDARD_MINCLOCK		(1<<29)
+> > +/* Controller has no write-protect pin connected with SD card */
+> > +#define SDHCI_QUIRK_NO_WP_BIT				(1<<30)
+> >
+> >  	int			irq;		/* Device IRQ */
+> >  	void __iomem *		ioaddr;		/* Mapped address */
+> > @@ -321,6 +323,7 @@ struct sdhci_ops {
+> >  	unsigned int	(*get_max_clock)(struct sdhci_host *host);
+> >  	unsigned int	(*get_min_clock)(struct sdhci_host *host);
+> >  	unsigned int	(*get_timeout_clock)(struct sdhci_host *host);
+> > +	int		(*get_ro)(struct mmc_host *mmc);
+> >  };
+> >
+> >  #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
+> 
+> Otherwise looks fine.
+> 
+Thanks for your comment.
 
-Thanks for the good discussion on this.
-
-Regards,
-Santosh
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
