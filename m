@@ -1,38 +1,45 @@
-From: david.yangshuai@gmail.com (David Yang)
-Date: Wed, 28 Jul 2010 17:16:18 +0800
-Subject: Questions about FPU and NEON on Cortex-A9 with armv7
-	instructions!
-In-Reply-To: <AANLkTi=EBvumJfRJmBwHVtHAW081ewBzjAR2d=2O2-Zd@mail.gmail.com>
-References: <AANLkTinA_ZNdNwx2R-6C9LBQ=4i8uMVpmVFCRaKkS=Xs@mail.gmail.com>
-	<AANLkTi=EBvumJfRJmBwHVtHAW081ewBzjAR2d=2O2-Zd@mail.gmail.com>
-Message-ID: <AANLkTikHns6tdbVK-CDoiv10V-pHaYFf0AvB5s=ti9k5@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 28 Jul 2010 12:17:21 +0300
+Subject: [PATCH v6 0/2] s3c24xx: iPAQ rx1950 series
+In-Reply-To: <1279905472-5908-1-git-send-email-anarsoul@gmail.com>
+References: <1279905472-5908-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <201007281217.27719.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,Martin
+? ????????? ?? 23 ???? 2010 20:17:50 ????? Vasily Khoruzhick ???????:
+> This patch series adds more support for iPAQ rx1950 PDA to linux:
+> 1. LEDs driver -- it controls blue, green and red LEDs on rx1950
+> 2. Battery driver -- adds ability to monitor and charge battery.
+> This driver is suitable for H1940 PDA aswell (just need to write
+> some machine specific callbacks and get voltage LUTs)
+> 
+> v2: removed ac registration from s3c_adc_battery driver, use
+> pda_power instead for ac support
+> 
+> v3: split LEDs patch to driver and machine parts,
+> split battery patch into battery + LED trigger parts,
+> now battery driver can skip gpio/callbacks usage
+> (if there's no gpio pin to determine that battery is
+> full or if charger is enabled automatically)
+> 
+> v4: add .blink_set callback to LEDs driver instead of
+> using LED_HALF value for blinking, remove LED triggers
+> from battery driver completely (for now)
+> 
+> v5: restore lut_acin usage in s3c_adc_battery driver,
+> it was accidently removed during removing AC support
+> from driver
+> 
+> v6: drop rx1950-specific LEDs driver, use leds-gpio instead,
+> skip s3c-adc-battery patch, as it's already merged into battery-2.6
+> tree
 
-    I see.
-
-    But I will  try to use FPU in kernel for testing. I hope kernel won't crash.
-
-
-Thank you?
-
-
-On Wed, Jul 28, 2010 at 4:57 PM, Martin Guy <martinwguy@gmail.com> wrote:
-> On 7/28/10, David Yang <david.yangshuai@gmail.com> wrote:
->> ? ? ? ?Because I need use the NEON on Cortex-A9, so I want to add the
->> ?parameter : -mfpu=neon -mfloat-abi=softfp to the KBUILD_CFLAGS and
->> ?KBUILD_AFLAGS in the Makefile of the top dir like below:
->
-> Hi David
-> ? Linux never uses the FPU internally, in fact it doesn't use
-> floating point at all. Linux's task with the FPU is only to initialize
-> it so that user-space applications can use it, and to save/restore FP
-> register contents when two processes are both using it.
-> ? In the kernel itself only integer math is used.
->
-> Cheers
->
-> ? ?M
->
+Ping
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100728/4c75bf60/attachment.sig>
