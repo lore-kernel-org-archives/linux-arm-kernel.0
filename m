@@ -1,35 +1,141 @@
-From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Wed, 28 Jul 2010 11:31:43 +0200
-Subject: Questions about FPU and NEON on Cortex-A9 with armv7 instructions!
-In-Reply-To: <AANLkTikHns6tdbVK-CDoiv10V-pHaYFf0AvB5s=ti9k5@mail.gmail.com>
-References: <AANLkTinA_ZNdNwx2R-6C9LBQ=4i8uMVpmVFCRaKkS=Xs@mail.gmail.com>	<AANLkTi=EBvumJfRJmBwHVtHAW081ewBzjAR2d=2O2-Zd@mail.gmail.com>
-	<AANLkTikHns6tdbVK-CDoiv10V-pHaYFf0AvB5s=ti9k5@mail.gmail.com>
-Message-ID: <4C4FF8FF.304@xenomai.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 28 Jul 2010 18:40:31 +0900
+Subject: [PATCH] s5pv210/s5pv310: Fix wrong UFCON Tx/Rx definitions
+In-Reply-To: <20100728002631.GA25238@july>
+References: <20100728002631.GA25238@july>
+Message-ID: <000801cb2e38$f08845e0$d198d1a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Yang wrote:
-> Hi,Martin
+Kyungmin Park wrote:
 > 
->     I see.
+Hi,
+
+Cc'ed Ben Dooks.
+
+> S5PV210/V310 have different Tx/Rx trigger level on each UARTs
+> But now use the wrong definitions so we can't set the exact trigger level.
+>
+Ok...
+
+> I think it should go rc window and also fix it at each the board.
 > 
->     But I will  try to use FPU in kernel for testing. I hope kernel won't crash.
+But just I prefer don't mind adding unnecessary definitions.
+There is no use adding all the #defines now.
 
-You will not get FPU working in kernel-space without any effort. The
-kernel handles lazy switching of FPU context for user-space tasks, but
-not for the kernel itself. If you start using the FPU at any place in
-the kernel, the changes you made would clobber the FPU context of the
-user-space task currently running, which is probably not what you want.
+Anyway, default trigger level defines are used in arch/arm code only. So
+when new #define is required, it can be added.
 
-What you will have to do is what the x86 kernel does in the RAID code
-for instance (file drivers/md/raid6mmx.c), disable preemption, save the
-fpu context, do your computations, then restore the fpu context and
-re-enable preemption. For the operation to be worth it, the gain you
-obtain by using the FPU has to be greater than the time for an fpu
-context save and restore, and saving/restoring the fpu context is a
-pretty heavy operation. This means that if you want the FPU for a
-multiplication or a division, forget it, you will actually be loosing
-time, and soft-float will be more efficient.
+And "fix" patch should only fix the issue. But this patch is adding new
+#defines.
 
--- 
-					    Gilles.
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> diff --git a/arch/arm/plat-samsung/include/plat/regs-serial.h
+b/arch/arm/plat-
+> samsung/include/plat/regs-serial.h
+> index 788837e..8839733 100644
+> --- a/arch/arm/plat-samsung/include/plat/regs-serial.h
+> +++ b/arch/arm/plat-samsung/include/plat/regs-serial.h
+> @@ -199,15 +199,52 @@
+>  #define S5PV210_UCON_PCLK	(0<<10)
+>  #define S5PV210_UCON_UCLK	(1<<10)
+> 
+> +/*
+> + * S5PV210/S5PV310 UART TX trigger level is different at each UARTs
+> + * The below wrong values will be removed. Now some boards use it. so
+remain it.
+> + */
+>  #define S5PV210_UFCON_TXTRIG0	(0<<8)
+>  #define S5PV210_UFCON_TXTRIG4	(1<<8)
+>  #define S5PV210_UFCON_TXTRIG8	(2<<8)
+>  #define S5PV210_UFCON_TXTRIG16	(3<<8)
+>  #define S5PV210_UFCON_TXTRIG32	(4<<8)
+>  #define S5PV210_UFCON_TXTRIG64	(5<<8)
+> -#define S5PV210_UFCON_TXTRIG128 (6<<8)
+> -#define S5PV210_UFCON_TXTRIG256 (7<<8)
+> -
+> +#define S5PV210_UFCON_TXTRIG128	(6<<8)
+> +#define S5PV210_UFCON_TXTRIG256	(7<<8)
+> +
+> +#define S5PV210_UFCON_UART0_TXTRIG0	(0<<8)
+> +#define S5PV210_UFCON_UART0_TXTRIG32	(1<<8)
+> +#define S5PV210_UFCON_UART0_TXTRIG64	(2<<8)
+> +#define S5PV210_UFCON_UART0_TXTRIG96	(3<<8)
+> +#define S5PV210_UFCON_UART0_TXTRIG128	(4<<8)
+> +#define S5PV210_UFCON_UART0_TXTRIG160	(5<<8)
+> +#define S5PV210_UFCON_UART0_TXTRIG192	(6<<8)
+> +#define S5PV210_UFCON_UART0_TXTRIG224	(7<<8)
+> +
+> +#define S5PV210_UFCON_UART1_TXTRIG0	(0<<8)
+> +#define S5PV210_UFCON_UART1_TXTRIG8	(1<<8)
+> +#define S5PV210_UFCON_UART1_TXTRIG16	(2<<8)
+> +#define S5PV210_UFCON_UART1_TXTRIG24	(3<<8)
+> +#define S5PV210_UFCON_UART1_TXTRIG32	(4<<8)
+> +#define S5PV210_UFCON_UART1_TXTRIG40	(5<<8)
+> +#define S5PV210_UFCON_UART1_TXTRIG48	(6<<8)
+> +#define S5PV210_UFCON_UART1_TXTRIG56	(7<<8)
+> +
+> +#define S5PV210_UFCON_UART23_TXTRIG0	(0<<8)
+> +#define S5PV210_UFCON_UART23_TXTRIG2	(1<<8)
+> +#define S5PV210_UFCON_UART23_TXTRIG4	(2<<8)
+> +#define S5PV210_UFCON_UART23_TXTRIG6	(3<<8)
+> +#define S5PV210_UFCON_UART23_TXTRIG8	(4<<8)
+> +#define S5PV210_UFCON_UART23_TXTRIG10	(5<<8)
+> +#define S5PV210_UFCON_UART23_TXTRIG12	(6<<8)
+> +#define S5PV210_UFCON_UART23_TXTRIG14	(7<<8)
+> +
+> +#define S5PV210_UFCON_TXTRIGMAX		(7<<8)
+> +
+> +/*
+> + * S5PV210/S5PV310 UART RX trigger level is different at each UARTs
+> + * The below wrong values will be removed. Now some boards use it. so
+remain it.
+> + */
+>  #define S5PV210_UFCON_RXTRIG1	(0<<4)
+>  #define S5PV210_UFCON_RXTRIG4	(1<<4)
+>  #define S5PV210_UFCON_RXTRIG8	(2<<4)
+> @@ -217,6 +254,35 @@
+>  #define S5PV210_UFCON_RXTRIG128	(6<<4)
+>  #define S5PV210_UFCON_RXTRIG256	(7<<4)
+> 
+> +#define S5PV210_UFCON_UART0_RXTRIG32	(0<<4)
+> +#define S5PV210_UFCON_UART0_RXTRIG64	(1<<4)
+> +#define S5PV210_UFCON_UART0_RXTRIG96	(2<<4)
+> +#define S5PV210_UFCON_UART0_RXTRIG128	(3<<4)
+> +#define S5PV210_UFCON_UART0_RXTRIG160	(4<<4)
+> +#define S5PV210_UFCON_UART0_RXTRIG192	(5<<4)
+> +#define S5PV210_UFCON_UART0_RXTRIG224	(6<<4)
+> +#define S5PV210_UFCON_UART0_RXTRIG256	(7<<4)
+> +
+> +#define S5PV210_UFCON_UART1_RXTRIG8	(0<<4)
+> +#define S5PV210_UFCON_UART1_RXTRIG16	(1<<4)
+> +#define S5PV210_UFCON_UART1_RXTRIG24	(2<<4)
+> +#define S5PV210_UFCON_UART1_RXTRIG32	(3<<4)
+> +#define S5PV210_UFCON_UART1_RXTRIG40	(4<<4)
+> +#define S5PV210_UFCON_UART1_RXTRIG48	(5<<4)
+> +#define S5PV210_UFCON_UART1_RXTRIG56	(6<<4)
+> +#define S5PV210_UFCON_UART1_RXTRIG64	(7<<4)
+> +
+> +#define S5PV210_UFCON_UART23_RXTRIG2	(0<<4)
+> +#define S5PV210_UFCON_UART23_RXTRIG4	(1<<4)
+> +#define S5PV210_UFCON_UART23_RXTRIG6	(2<<4)
+> +#define S5PV210_UFCON_UART23_RXTRIG8	(3<<4)
+> +#define S5PV210_UFCON_UART23_RXTRIG10	(4<<4)
+> +#define S5PV210_UFCON_UART23_RXTRIG12	(5<<4)
+> +#define S5PV210_UFCON_UART23_RXTRIG14	(6<<4)
+> +#define S5PV210_UFCON_UART23_RXTRIG16	(7<<4)
+> +
+> +#define S5PV210_UFCON_RXTRIGMAX		(7<<4)
+> +
+>  #define S5PV210_UFSTAT_TXFULL	(1<<24)
+>  #define S5PV210_UFSTAT_RXFULL	(1<<8)
+>  #define S5PV210_UFSTAT_TXMASK	(255<<16)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
