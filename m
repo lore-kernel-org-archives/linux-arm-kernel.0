@@ -1,90 +1,124 @@
-From: wjydlut@gmail.com (nonthing wu)
-Date: Tue, 27 Jul 2010 14:24:54 +0800
-Subject: Boot Filesystem form sd card, the sd driver can't probe proper
-In-Reply-To: <AANLkTinrEJAwhTc8t__buMtbhtBCc8J7FbgR2gV+qUkw@mail.gmail.com>
-References: <AANLkTinrEJAwhTc8t__buMtbhtBCc8J7FbgR2gV+qUkw@mail.gmail.com>
-Message-ID: <AANLkTi=cHLonUd7mc1n35c_2ODcitSaJ35VKQ3KMzasT@mail.gmail.com>
+From: nitvishnoi@gmail.com (nitin vishnoi)
+Date: Wed, 28 Jul 2010 08:47:54 +0530
+Subject: [PATCH v3 3/3] sdhci-s3c: Add SDHCI_QUIRK_NO_WP_BIT quirk for
+	Samsung SoC
+In-Reply-To: <001101cb2d86$4afddd90$e0f998b0$%kim@samsung.com>
+References: <1279886191-9197-1-git-send-email-kgene.kim@samsung.com>
+	<1279886191-9197-4-git-send-email-kgene.kim@samsung.com>
+	<AANLkTiktYdBpgVtYUt69qfas4FHXvKvSEO4y9kf+DArE@mail.gmail.com>
+	<001101cb2d86$4afddd90$e0f998b0$%kim@samsung.com>
+Message-ID: <AANLkTim1RtuRzdoCs4ozCjnA-f1wmZxwJE6T4BvnFVLL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kernel version is linux-2.6.33 , and apply with android patch,
-hardware is arm realview pbxA9
+Hi
 
-I configured the sd/mmc driver into the kernel, when I boot filesystem
-from nfs, after the kernel boot up, the sd/mmc driver is probe ok, and
-I can mount the sd card. but when I copy the filesytem to sd/mmc card
-, and boot with it, it can't works ok. error as follows:
+I am porting the 2.6.33.6 kernel,which i took from kernel.org.I am trying to
+port it on samsung-s3c2451 board.
+But i am not getting the shell prompt,due to getting the following error.Any
+body can tell due to what this error i am getting?
 
-<7>mmc0: starting CMD51 arg 00000000 flags 000000b5
-<7>mmc0:???? blksz 8 blocks 1 flags 00000200 tsac 100 ms nsac 0
-Desc_No: 0 , desc0: 0x8000001c, desc1: 0x8,???????????????????? desc2:
-0x7f3fe4e0, desc3: 0x0
-[?? 55.324953] Desc_No: 0 , desc0: 0x8000001c, desc1: 0x8,
-???????? desc2: 0x7f3fe4e0, desc3: 0x0
-<3>ns2416-sdmmc ns2416-sdmmc.0: MMC IRQ 00000004 (CMD 51): [
-55.365066] ns2416-sdmmc ns2416-sdmmc.0: MMC IRQ 00000004 (CMD 51): CMD
-doneCMD done
-
-<6>scsi0 : pata_platform
-.......................................................................................
-.......................................................................................
-<4>atkbd.c: keyboard reset failed on fpga:kmi1
-[?? 53.382712] atkbd.c: keyboard reset failed on fpga:kmi1
-<6>Waiting for root device /dev/mmcblk0p4...
-[?? 53.861013] Waiting for root device /dev/mmcblk0p4...
-<3>INFO: task kmmcd:165 blocked for more than 120 seconds.
-[? 288.385908] INFO: task kmmcd:165 blocked for more than 120 seconds.
-<3>"echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
-[? 288.425467] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs"
-disables this message.
-<6>kmmcd?????????? D[? 288.454402] kmmcd?????????? D<c> c02c69b4
-c02c69b4 <c>??? 0?? 165????? 2 0x00000000
-??? 0?? 165????? 2 0x00000000
-[<c02c69b4>] (schedule+0x280/0x2c4) from [<c02c6b5c>]
-(schedule_timeout+0x18/0x188)
-[? 288.508780] [<c02c69b4>] (schedule+0x280/0x2c4) from [<c02c6b5c>]
-(schedule_timeout+0x18/0x188)
-[<c02c6b5c>] (schedule_timeout+0x18/0x188) from [<c02c6628>]
-(wait_for_common+0xc0/0x14c)
-[? 288.559151] [<c02c6b5c>] (schedule_timeout+0x18/0x188) from
-[<c02c6628>] (wait_for_common+0xc0/0x14c)
-[<c02c6628>] (wait_for_common+0xc0/0x14c) from [<c017b95c>]
-(mmc_wait_for_req+0x114/0x120)
-[? 288.611389] [<c02c6628>] (wait_for_common+0xc0/0x14c) from
-[<c017b95c>] (mmc_wait_for_req+0x114/0x120)
-[<c017b95c>] (mmc_wait_for_req+0x114/0x120) from [<c017e1a4>]
-(mmc_app_send_scr+0xec/0x134)
-[? 288.664140] [<c017b95c>] (mmc_wait_for_req+0x114/0x120) from
-[<c017e1a4>] (mmc_app_send_scr+0xec/0x134)
-[<c017e1a4>] (mmc_app_send_scr+0xec/0x134) from [<c017d8f0>]
-(mmc_sd_init_card+0x38c/0x69c)
-[? 288.717131] [<c017e1a4>] (mmc_app_send_scr+0xec/0x134) from
-[<c017d8f0>] (mmc_sd_init_card+0x38c/0x69c)
-[<c017d8f0>] (mmc_sd_init_card+0x38c/0x69c) from [<c017dd04>]
-(mmc_attach_sd+0x104/0x180)
-[? 288.769587] [<c017d8f0>] (mmc_sd_init_card+0x38c/0x69c) from
-[<c017dd04>] (mmc_attach_sd+0x104/0x180)
-[<c017dd04>] (mmc_attach_sd+0x104/0x180) from [<c017b7bc>]
-(mmc_rescan+0x1b0/0x23c)
-[? 288.819924] [<c017dd04>] (mmc_attach_sd+0x104/0x180) from
-[<c017b7bc>] (mmc_rescan+0x1b0/0x23c)
-[<c017b7bc>] (mmc_rescan+0x1b0/0x23c) from [<c00500ac>]
-(worker_thread+0x14c/0x1c4)
-[? 288.868745] [<c017b7bc>] (mmc_rescan+0x1b0/0x23c) from [<c00500ac>]
-(worker_thread+0x14c/0x1c4)
-[<c00500ac>] (worker_thread+0x14c/0x1c4) from [<c0052e94>] (kthread+0x7c/0x84)
-[? 288.916254] [<c00500ac>] (worker_thread+0x14c/0x1c4) from
-[<c0052e94>] (kthread+0x7c/0x84)
-[<c0052e94>] (kthread+0x7c/0x84) from [<c002a970>] (kernel_thread_exit+0x0/0x8)
+Starting kernel ...
 
 
-CMD51 is the first command which need transfer data from SD to memory.
-At normal working condition when I write DMA Descriptors address to
-register it's begin transfer data, but now it's blocked and it can't
-get the data tranfer over, timeout or any others interrupt. my
-programm flow as follows;
+Uncompressing Linux... done, booting the kernel.
+Linux version 2.6.33.6 (root at ubntu-desktop) (gcc version 4.2.2) #12 Mon Jul
+26 18:39:19 IST 2010
+CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
+CPU: VIVT data cache, VIVT instruction cache
+Machine: SMDK2450
+Ignoring unrecognised tag 0x00000000
+Memory policy: ECC disabled, Data cache writeback
+CPU S3C2450 EVT3 (id 0x32450003)
+SPA   epll  80200102  Mpll  80640061   clkdiv0 557
+S3C24XX Clocks, (c) 2004 Simtec Electronics
+S3C2450: mpll on 800.000 MHz, cpu 400.000 MHz, mem 133.333 MHz, pclk 66.666
+MHz
+S3C2450: epll on 96.000 MHz, usb-bus 48.000 MHz
+Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 16256
+Kernel command line: root=/dev/ram0 initrd=0x30800000,16M ramdisk=32768
+init=/bin/sh console=ttySAC3,115200 mem=64M
+PID hash table entries: 256 (order: -2, 1024 bytes)
+Dentry cache hash table entries: 8192 (order: 3, 32768 bytes)
+Inode-cache hash table entries: 4096 (order: 2, 16384 bytes)
+Memory: 64MB = 64MB total
+Memory: 45432KB available (2588K code, 271K data, 116K init, 0K highmem)
+Hierarchical RCU implementation.
+NR_IRQS:109
+irq: clearing subpending status 02000006
+irq: clearing subpending status 02000002
+timer tcon=00000000, tcnt 28af, tcfg 00000f00,00000000, usec 00007ae2
+Console: colour dummy device 80x30
+console [ttySAC3] enabled
+Calibrating delay loop... 398.95 BogoMIPS (lpj=997376)
+Mount-cache hash table entries: 512
+CPU: Testing write buffer coherency: ok
+NET: Registered protocol family 16
+whats up blady
+hello
+entered machine init
+S3C Power Management, Copyright 2004 Simtec Electronics
+S3C2450: Initialising architecture
+SPA s3c2450_init
+S3C2450: IRQ Support
+bio: create slab <bio-0> at 0
+SCSI subsystem initialized
+NET: Registered protocol family 2
+IP route cache hash table entries: 1024 (order: 0, 4096 bytes)
+TCP established hash table entries: 2048 (order: 2, 16384 bytes)
+TCP bind hash table entries: 2048 (order: 1, 8192 bytes)
+TCP: Hash tables configured (established 2048 bind 2048)
+TCP reno registered
+UDP hash table entries: 256 (order: 0, 4096 bytes)
+UDP-Lite hash table entries: 256 (order: 0, 4096 bytes)
+NET: Registered protocol family 1
+Trying to unpack rootfs image as initramfs...
+rootfs image is not initramfs (no cpio magic); looks like an initrd
+Freeing initrd memory: 16384K
+NetWinder Floating Point Emulator V0.97 (double precision)
+JFFS2 version 2.2. (NAND) ?? 2001-2006 Red Hat, Inc.
+ROMFS MTD (C) 2007 Red Hat, Inc.
+msgmni has been set to 120
+alg: No test for stdrng (krng)
+Block layer SCSI generic (bsg) driver version 0.4 loaded (major 254)
+io scheduler noop registered
+io scheduler deadline registered
+io scheduler cfq registered (default)
+brd: module loaded
+loop: module loaded
+Uniform Multi-Platform E-IDE driver
+ide-gd driver 1.18
+ide-cd driver 5.00
+PPP generic driver version 2.4.2
+PPP Deflate Compression module registered
+PPP BSD Compression module registered
+PPP MPPE Compression module registered
+NET: Registered protocol family 24
+SLIP: version 0.8.4-NET3.019-NEWTTY (dynamic channels, max=256).
+CSLIP: code copyright 1989 Regents of the University of California.
+mice: PS/2 mouse device common for all mice
+TCP cubic registered
+RAMDISK: gzip image found at block 0
+EXT2-fs (ram0): warning: maximal mount count reached, running e2fsck is
+recommended
+VFS: Mounted root (ext2 filesystem) on device 1:0.
+Freeing init memory: 116K
+Warning: unable to open an initial console.
+Kernel panic - not syncing: Attempted to kill init!
+[<c002b900>] (unwind_backtrace+0x0/0xe0) from [<c003fe9c>]
+(panic+0x40/0x12c)
+[<c003fe9c>] (panic+0x40/0x12c) from [<c0042cac>] (do_exit+0x58/0x57c)
+[<c0042cac>] (do_exit+0x58/0x57c) from [<c0043254>]
+(do_group_exit+0x84/0xb8)
+[<c0043254>] (do_group_exit+0x84/0xb8) from [<c004329c>]
+(sys_exit_group+0x14/0x20)
+[<c004329c>] (sys_exit_group+0x14/0x20) from [<c0025e80>]
+(ret_fast_syscall+0x0/0x28)
 
-??? setup DMA descriptors---> wmb() ----> write DMA descriptors
-address to SD/MMC controller's regsiter and begin to transfer data
 
-I don't how to relove this problem , anybody can help me ? thanks!
+Regards
+
+Nitin
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100728/aaf0936f/attachment-0001.html>
