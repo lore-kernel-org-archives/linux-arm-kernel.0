@@ -1,340 +1,48 @@
-From: philippe.langlais@stericsson.com (Philippe Langlais)
-Date: Thu, 29 Jul 2010 17:26:32 +0200
-Subject: [PATCH] U6715 platform serial driver It's a generic driver for all
-	U6XXX platform
-Message-ID: <1280417192-25710-1-git-send-email-philippe.langlais@stericsson.com>
+From: eric.miao@canonical.com (Eric Miao)
+Date: Thu, 29 Jul 2010 23:34:32 +0800
+Subject: [RFC] dove: fix __io() definition to use bus based offset
+In-Reply-To: <201007291726.39145.arnd@arndb.de>
+References: <AANLkTinuXRH0XeD=3b0Wmq32SEEBxdevfj58EmSybcWu@mail.gmail.com>
+	<201007291726.39145.arnd@arndb.de>
+Message-ID: <AANLkTikeoQf=WC8M9daA=O+tgPdMbDeQdMTWoT8U=CpK@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clock specificity:
-  It's parent clock depend on baud rate.
-  The UART port can be used before u6xxx clock framework initialization
+On Thu, Jul 29, 2010 at 11:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 29 July 2010, Eric Miao wrote:
+>> diff --git a/arch/arm/mach-dove/include/mach/io.h
+>> b/arch/arm/mach-dove/include/mach/io.h
+>> index 3b3e472..067435e 100644
+>> --- a/arch/arm/mach-dove/include/mach/io.h
+>> +++ b/arch/arm/mach-dove/include/mach/io.h
+>> @@ -11,10 +11,9 @@
+>>
+>> ?#include "dove.h"
+>>
+>> -#define IO_SPACE_LIMIT ? ? ? ? 0xffffffff
+>> -
+>> -#define __io(a) ?((void __iomem *)(((a) - DOVE_PCIE0_IO_PHYS_BASE) +\
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?DOVE_PCIE0_IO_VIRT_BASE))
+>> -#define __mem_pci(a) ? ? ? ? ? (a)
+>> +#define IO_SPACE_LIMIT 0xffffffff
+>> +#define __io(a) ? ? ? ? ? ? ? ?__typesafe_io((a) - DOVE_PCIE0_IO_BUS_BASE + \
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? DOVE_PCIE0_IO_VIRT_BASE)
+>> +#define __mem_pci(a) ? (a)
+>>
+>> ?#endif
+>>
+>
+> The IO_SPACE_LIMIT still looks wrong, AFAICT it should be
+>
+> #define IO_SPACE_LIMIT (DOVE_PCIE0_IO_SIZE + DOVE_PCIE1_IO_SIZE - 1)
+>
 
-Signed-off-by: Philippe Langlais <philippe.langlais@stericsson.com>
----
- arch/arm/plat-u6xxx/Makefile              |    2 +-
- arch/arm/plat-u6xxx/include/mach/serial.h |   23 +++
- arch/arm/plat-u6xxx/serial.c              |  270 +++++++++++++++++++++++++++++
- 3 files changed, 294 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/plat-u6xxx/include/mach/serial.h
- create mode 100644 arch/arm/plat-u6xxx/serial.c
+And it looks like PCIE1_IO space is not used as indicated in its __io() macro.
 
-diff --git a/arch/arm/plat-u6xxx/Makefile b/arch/arm/plat-u6xxx/Makefile
-index 3d6898e..f12068c 100644
---- a/arch/arm/plat-u6xxx/Makefile
-+++ b/arch/arm/plat-u6xxx/Makefile
-@@ -3,6 +3,6 @@
- #
- 
- # Common support
--obj-y := io.o irq.o clock.o gpio.o
-+obj-y := io.o irq.o clock.o gpio.o serial.o
- 
- obj-$(CONFIG_U6_MTU_TIMER) += timer.o
-diff --git a/arch/arm/plat-u6xxx/include/mach/serial.h b/arch/arm/plat-u6xxx/include/mach/serial.h
-new file mode 100644
-index 0000000..321e406
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/include/mach/serial.h
-@@ -0,0 +1,23 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/include/mach/serial.h
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Author: Ludovic Barre <ludovic.barre@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+
-+#ifndef __SERIAL_H
-+#define __SERIAL_H
-+
-+#include <linux/clk.h>
-+
-+struct u6_uart {
-+	struct clk *uartClk;
-+	char   uart_name[7];
-+};
-+
-+extern unsigned int u6_serial8250_enable_clock(struct uart_port *port);
-+extern unsigned int u6_serial8250_disable_clock(struct uart_port *port);
-+
-+#endif   /* __SERIAL_H */
-diff --git a/arch/arm/plat-u6xxx/serial.c b/arch/arm/plat-u6xxx/serial.c
-new file mode 100644
-index 0000000..14b5230
---- /dev/null
-+++ b/arch/arm/plat-u6xxx/serial.c
-@@ -0,0 +1,270 @@
-+/*
-+ * linux/arch/arm/plat-u6xxx/serial.c
-+ *
-+ * Copyright (C) ST-Ericsson SA 2010
-+ * Authors: Ludovic Barre <ludovic.barre@stericsson.com> for ST-Ericsson.
-+ *         Philippe Langlais <philippe.langlais@stericsson.com> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ * U6 cpu type detection
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/serial_8250.h>
-+#include <linux/slab.h>
-+
-+#include <mach/hardware.h>
-+#include <mach/serial.h>
-+#include <mach/clock.h>
-+
-+#define U6_MAX_BAUDRATE 3250000  /* 3.25MBds is the maximum baudrate supported */
-+#define BASE_BAUD	7372800
-+
-+/* Register description for FDIV_CTRL */
-+/* UART FDIV_CTRL Register (8 bits) */
-+#define UARTX_FDIV_CTRL_OFFSET         0xC00
-+/* UART FDIV_M Register (16 bits) */
-+#define UARTX_FDIV_M_OFFSET            0xC04
-+/* UART FDIV_N Register (16 bits) */
-+#define UARTX_FDIV_N_OFFSET            0xC08
-+
-+/* Bits definition for register UARTX_FDIV_CTRL */
-+#define UARTX_FDIV_ENABLE_SHIFT  7
-+#define UARTX_FDIV_ENABLE_FIELD  (0xFFFFFFFF - (0x1UL<<UARTX_FDIV_ENABLE_SHIFT))
-+#define UARTX_FDIV_ENABLE_OFF    (0x0UL<<UARTX_FDIV_ENABLE_SHIFT)
-+#define UARTX_FDIV_ENABLE_ON     (0x1UL<<UARTX_FDIV_ENABLE_SHIFT)
-+#define UARTX_FDIV_ENABLE        (0x1UL<<UARTX_FDIV_ENABLE_SHIFT)
-+#define UARTX_CLKSEL_SHIFT       0
-+#define UARTX_CLKSEL_FIELD       (0xFFFFFFFF - (0x3UL<<UARTX_CLKSEL_SHIFT))
-+#define UARTX_CLKSEL_PCLK        (0x0UL<<UARTX_CLKSEL_SHIFT)
-+#define UARTX_CLKSEL_13M         (0x1UL<<UARTX_CLKSEL_SHIFT)
-+#define UARTX_CLKSEL_26M         (0x2UL<<UARTX_CLKSEL_SHIFT)
-+#define UARTX_CLKSEL_3           (0x3UL<<UARTX_CLKSEL_SHIFT)
-+
-+/*
-+ * console and pctools has needed to start before serial_init
-+ * (without cgu interface)
-+ */
-+static int uart_enable_clock(struct uart_port *port)
-+{
-+	u32 v;
-+	v = readl(CGU_GATESC1_REG);
-+
-+	if (port->irq == IRQ_UART1)
-+		v |= CGU_UART1EN_1;
-+	else if (port->irq == IRQ_UART2)
-+		v |= CGU_UART2EN_1;
-+
-+	writel(v, CGU_GATESC1_REG);
-+
-+	return 0;
-+}
-+
-+static int uart_disable_clock(struct uart_port *port)
-+{
-+	u32 v;
-+	v = readl(CGU_GATESC1_REG);
-+
-+	if (port->irq == IRQ_UART1)
-+		v &= ~CGU_UART1EN_0;
-+	else if (port->irq == IRQ_UART2)
-+		v &= ~CGU_UART2EN_0;
-+
-+	writel(v, CGU_GATESC1_REG);
-+
-+	return 0;
-+}
-+
-+unsigned int u6_serial8250_enable_clock(struct uart_port *port)
-+{
-+	struct u6_uart *uart_u6 = port->private_data;
-+
-+	if (!uart_u6)
-+		return uart_enable_clock(port);
-+
-+	if (IS_ERR(uart_u6->uartClk)) {
-+		pr_warning("%s - uart clock failed error:%ld\n",
-+		       __func__, PTR_ERR(uart_u6->uartClk));
-+		return PTR_ERR(uart_u6->uartClk);
-+	}
-+
-+	if (clk_get_usecount(uart_u6->uartClk) == 0)
-+		clk_enable(uart_u6->uartClk);
-+	return 0;
-+}
-+
-+unsigned int u6_serial8250_disable_clock(struct uart_port *port)
-+{
-+	struct u6_uart *uart_u6 = port->private_data;
-+
-+	if (!uart_u6)
-+		return uart_disable_clock(port);
-+
-+	if (IS_ERR(uart_u6->uartClk)) {
-+		pr_warning("%s - uart clk error :%ld\n", __func__,
-+		       PTR_ERR(uart_u6->uartClk));
-+		return PTR_ERR(uart_u6->uartClk);
-+	}
-+	if (clk_get_usecount(uart_u6->uartClk) >= 1)
-+		clk_disable(uart_u6->uartClk);
-+
-+	return 0;
-+}
-+
-+static unsigned int u6_get_setdiv_clock(struct uart_port *port,
-+					 unsigned int baud)
-+{
-+	unsigned int uartclk;
-+	u32 fdiv_m = 0x5F37;
-+	u32 fdiv_n = 0x3600;
-+	u32 fdiv_ctrl = UARTX_FDIV_ENABLE_ON;
-+	struct u6_uart *uart_u6 = port->private_data;
-+
-+	/*  Compute uart clock from baudrate */
-+	if (baud > 2000000)
-+		uartclk = 52000000;
-+	else if (baud > 1843200)
-+		uartclk = 32000000;
-+	else if (baud > 921600)
-+		uartclk = 29491200;
-+	else if (baud > 460800)
-+		uartclk = 14745600;
-+	else
-+		uartclk = 7372800;
-+
-+	/* Set divisors & parent clock accordingly */
-+	switch (uartclk) {
-+	case 7372800: /* clk=13MHz */
-+		fdiv_ctrl |= UARTX_CLKSEL_13M;
-+		break;
-+	case 14745600: /* clk=26MHz */
-+		fdiv_ctrl |= UARTX_CLKSEL_26M;
-+		break;
-+	case 29491200: /* clk=pclk */
-+		fdiv_ctrl |= UARTX_CLKSEL_PCLK;
-+		break;
-+	case 32000000: /* clk=pclk */
-+		fdiv_n = 0x3A98;
-+		fdiv_ctrl |= UARTX_CLKSEL_PCLK;
-+		break;
-+	case 52000000: /* clk=pclk */
-+		fdiv_n = 0x5F37;
-+		fdiv_ctrl |= UARTX_CLKSEL_PCLK;
-+		break;
-+	}
-+
-+	if (uart_u6 != NULL && !IS_ERR(uart_u6->uartClk)) {
-+		/* if clock interface is ready and u6_serial_init */
-+		struct clk *parentClk;
-+
-+		if (fdiv_ctrl & UARTX_CLKSEL_26M)
-+			parentClk = clk_get(NULL, "clk26m_ck");
-+		else if (fdiv_ctrl & UARTX_CLKSEL_PCLK)
-+			parentClk = clk_get(NULL, "pclk2_ck");
-+		else
-+			parentClk = clk_get(NULL, "clk13m_ck");
-+
-+		if (!IS_ERR(parentClk)) {
-+			u6_serial8250_disable_clock(port);
-+
-+			if (clk_set_parent(uart_u6->uartClk, parentClk) != 0)
-+				pr_warning("%s: set parent failed\n", __func__);
-+
-+			u6_serial8250_enable_clock(port);
-+			clk_put(parentClk);
-+		}
-+	}
-+
-+	writel(fdiv_m, port->membase + UARTX_FDIV_M_OFFSET);
-+	writel(fdiv_n, port->membase + UARTX_FDIV_N_OFFSET);
-+	writel(fdiv_ctrl, port->membase + UARTX_FDIV_CTRL_OFFSET);
-+	return uartclk;
-+}
-+
-+static void u6_set_termios(struct uart_port *port,
-+		struct ktermios *termios, struct ktermios *old)
-+{
-+	unsigned int baud;
-+
-+	baud = uart_get_baud_rate(port, termios, old, 0, U6_MAX_BAUDRATE);
-+	/* Calculate the new uart clock frequency & set divisors */
-+	port->uartclk = u6_get_setdiv_clock(port, baud);
-+	/* Call standard 8250 set_termios() */
-+	serial8250_do_set_termios(port, termios, old);
-+}
-+
-+/*
-+ * Internal UARTs need to be initialized for the 8250 autoconfig to work
-+ * properly.
-+ */
-+static struct plat_serial8250_port serial_platform_data[] = {
-+	{
-+		.membase	= U6_IO_ADDRESS(UART1_BASE),
-+		.mapbase	= UART1_BASE,
-+		.irq		= IRQ_UART1,
-+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
-+		.iotype		= UPIO_MEM,
-+		.regshift	= 2,
-+		.uartclk	= BASE_BAUD,
-+		.set_termios	= u6_set_termios,
-+	},
-+	{
-+		.membase	= U6_IO_ADDRESS(UART2_BASE),
-+		.mapbase	= UART2_BASE,
-+		.irq		= IRQ_UART2,
-+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
-+		.iotype		= UPIO_MEM,
-+		.regshift	= 2,
-+		.uartclk	= BASE_BAUD,
-+		.set_termios	= u6_set_termios,
-+	},
-+	/* void declaration needed by serial core */
-+	{
-+		.flags		= 0
-+	},
-+};
-+
-+static struct platform_device serial_device = {
-+	.name = "serial8250",
-+	.id = 0,
-+	.dev = {.platform_data = serial_platform_data,},
-+};
-+
-+static int __init u6_serial_init(void)
-+{
-+	int i;
-+	struct u6_uart *uart_u6;
-+
-+	/* supress void element from loop */
-+	for (i = 0; i < (ARRAY_SIZE(serial_platform_data) - 1); i++) {
-+		struct clk *uartClk = NULL;
-+
-+		/* Allocation of u6 struct on uart X */
-+		uart_u6 = kzalloc(sizeof(*uart_u6), GFP_KERNEL);
-+		if (!uart_u6)
-+			continue;
-+
-+		if (serial_platform_data[i].irq == IRQ_UART1) {
-+			uartClk = clk_get(NULL, "UART1");
-+			strcpy(uart_u6->uart_name, "UART1");
-+		} else if (serial_platform_data[i].irq == IRQ_UART2) {
-+			uartClk = clk_get(NULL, "UART2");
-+			strcpy(uart_u6->uart_name, "UART2");
-+		}
-+		if (!IS_ERR(uartClk) && uartClk != NULL) {
-+			uart_u6->uartClk = uartClk;
-+			serial_platform_data[i].private_data = uart_u6;
-+			/*  Clock Uart for autoconfigure detection */
-+			clk_enable(uartClk);
-+		} else {
-+			printk(KERN_WARNING
-+			       "%s - get uart clock failed error:%ld\n",
-+			       __func__, PTR_ERR(uartClk));
-+			kfree(uart_u6);
-+			continue;
-+		}
-+	}
-+	return platform_device_register(&serial_device);
-+}
-+
-+arch_initcall(u6_serial_init);
--- 
-1.7.1
+> ? ? ? ?Arnd
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
