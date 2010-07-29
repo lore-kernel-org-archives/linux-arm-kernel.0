@@ -1,96 +1,50 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 29 Jul 2010 05:16:29 +0200
-Subject: [PATCH 13/13] [ARM] pxa/balloon3: Add MAX1586 PMIC support
-In-Reply-To: <1280373389-32475-1-git-send-email-marek.vasut@gmail.com>
-References: <1280373389-32475-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1280373389-32475-13-git-send-email-marek.vasut@gmail.com>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Thu, 29 Jul 2010 12:35:48 +0900
+Subject: [PATCH 1/2] arm: msm: Add System MMU support.
+In-Reply-To: <bad58db98c165a61860827d4e720acf8.squirrel@www.codeaurora.org>
+References: <ea4bbdecc271f7fa5749d09645f38c0d.squirrel@www.codeaurora.org>
+	<201007281950.20847.arnd@arndb.de>
+	<bad58db98c165a61860827d4e720acf8.squirrel@www.codeaurora.org>
+Message-ID: <20100729123512Y.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- arch/arm/mach-pxa/balloon3.c |   55 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 55 insertions(+), 0 deletions(-)
+On Wed, 28 Jul 2010 17:58:50 -0700 (PDT)
+stepanm at codeaurora.org wrote:
 
-diff --git a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
-index 781dab7..5069478 100644
---- a/arch/arm/mach-pxa/balloon3.c
-+++ b/arch/arm/mach-pxa/balloon3.c
-@@ -29,6 +29,7 @@
- #include <linux/i2c/pcf857x.h>
- #include <linux/mtd/nand.h>
- #include <linux/mtd/physmap.h>
-+#include <linux/regulator/max1586.h>
- 
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -727,6 +728,59 @@ static inline void balloon3_nand_init(void) {}
- #endif
- 
- /******************************************************************************
-+ * Core power regulator
-+ ******************************************************************************/
-+#if defined(CONFIG_REGULATOR_MAX1586) || \
-+    defined(CONFIG_REGULATOR_MAX1586_MODULE)
-+static struct regulator_consumer_supply balloon3_max1587a_consumers[] = {
-+	{
-+		.supply	= "vcc_core",
-+	}
-+};
-+
-+static struct regulator_init_data balloon3_max1587a_v3_info = {
-+	.constraints = {
-+		.name		= "vcc_core range",
-+		.min_uV		= 900000,
-+		.max_uV		= 1705000,
-+		.always_on	= 1,
-+		.valid_ops_mask	= REGULATOR_CHANGE_VOLTAGE,
-+	},
-+	.consumer_supplies	= balloon3_max1587a_consumers,
-+	.num_consumer_supplies	= ARRAY_SIZE(balloon3_max1587a_consumers),
-+};
-+
-+static struct max1586_subdev_data balloon3_max1587a_subdevs[] = {
-+	{
-+		.name		= "vcc_core",
-+		.id		= MAX1586_V3,
-+		.platform_data	= &balloon3_max1587a_v3_info,
-+	}
-+};
-+
-+static struct max1586_platform_data balloon3_max1587a_info = {
-+	.subdevs     = balloon3_max1587a_subdevs,
-+	.num_subdevs = ARRAY_SIZE(balloon3_max1587a_subdevs),
-+	.v3_gain     = MAX1586_GAIN_R24_3k32, /* 730..1550 mV */
-+};
-+
-+static struct i2c_board_info __initdata balloon3_pi2c_board_info[] = {
-+	{
-+		I2C_BOARD_INFO("max1586", 0x14),
-+		.platform_data	= &balloon3_max1587a_info,
-+	},
-+};
-+
-+static void __init balloon3_pmic_init(void)
-+{
-+	pxa27x_set_i2c_power_info(NULL);
-+	i2c_register_board_info(1, ARRAY_AND_SIZE(balloon3_pi2c_board_info));
-+}
-+#else
-+static inline void balloon3_pmic_init(void) {}
-+#endif
-+
-+/******************************************************************************
-  * Machine init
-  ******************************************************************************/
- static void __init balloon3_init(void)
-@@ -746,6 +800,7 @@ static void __init balloon3_init(void)
- 	balloon3_mmc_init();
- 	balloon3_nand_init();
- 	balloon3_nor_init();
-+	balloon3_pmic_init();
- 	balloon3_ts_init();
- 	balloon3_udc_init();
- 	balloon3_uhc_init();
--- 
-1.7.1
+> >> These are just SMMU APIs, and the DMA-mapping API is one layer above
+> >> this.
+> >>
+> >> We have our own SMMU API for the MSM SoCs because we have muliple
+> >> IOMMUs,
+> >> each one having multiple contexts, or even having multiple instances of
+> >> the same context. Our usage model is also quite a bit different from how
+> >> the DMA APIs are set up. I believe only two IOMMU drivers actually make
+> >> use of the DMA API (Intel and AMD) and the other ones (OMAP and other
+> >> SoCs) have their own APIs for their specific use cases.
+> >
+> > The DMA API is extremely flexible, it works just fine with all the
+> > IOMMUs that I've seen so far. Please take a look at
+> > include/asm-generic/dma-mapping-common.h and its users to see how
+> > to use multiple IOMMUs depending on the device.
+> >
+> > If the OMAP developers got this wrong, that's not your problem :-)
+> >
+> > 	Arnd
+> 
+> Hi Arnd,
+> 
+> From what I have been able to tell, the IOMMU interface was written by
+> AMD/Intel to allow the kvm code to work with a common IOMMU interface. To
+
+Don't confuse the IOMMU interface with the DMA API that Arnd
+mentioned.
+
+They are not related at all.
+
+The DMA API is defined in Documentation/DMA-API.txt.
+
+Arnd told you that include/asm-generic/dma-mapping-common.h is the
+library to support the DMA API with multiple IOMMUs. Lots of
+architectures (x86, powerpc, sh, alpha, ia64, microblaze, sparc)
+use it.
