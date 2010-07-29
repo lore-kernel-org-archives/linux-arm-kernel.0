@@ -1,42 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Jul 2010 14:36:47 +0100
-Subject: [PATCH 02/12] mmci: fix multi block transfers
-In-Reply-To: <000001cb2f22$65576150$300623f0$@tuckley@arm.com>
-References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
-	<1277198267-10860-2-git-send-email-rabin.vincent@stericsson.com>
-	<20100729131858.GB18923@n2100.arm.linux.org.uk>
-	<000001cb2f22$65576150$300623f0$@tuckley@arm.com>
-Message-ID: <20100729133646.GC18923@n2100.arm.linux.org.uk>
+From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
+Date: Thu, 29 Jul 2010 15:37:16 +0200
+Subject: [PATCH v3] video/imxfb.c: allow usage without
+	BACKLIGHT_CLASS_DEVICE
+In-Reply-To: <1280408618-21364-1-git-send-email-eric@eukrea.com>
+References: <20100729124534.GB6268@pengutronix.de>
+	<1280408618-21364-1-git-send-email-eric@eukrea.com>
+Message-ID: <19537.33804.34059.293152@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 29, 2010 at 02:31:48PM +0100, Colin Tuckley wrote:
-> > -----Original Message-----
-> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> > kernel-bounces at lists.infradead.org] On Behalf Of Russell King - ARM
+Eric B?nard writes:
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
+> ---
+> v3:	handle CONFIG_BACKLIGHT_CLASS_DEVICE=m & CONFIG_FB_IMX=y case as per
+> 	suggested by Uwe
+> v2:	handle CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE
 > 
-> > So this is good news.  I've applied the first three patches in this
-> > series, but we do need to sort out the card detect situation properly
-> > before continuing.
+>  drivers/video/imxfb.c |   19 +++++++++++++++++--
+>  1 files changed, 17 insertions(+), 2 deletions(-)
 > 
-> On the subject of card detection. I recently noticed that although it works
-> on the PB926 it doesn't on the AB926 despite it being the same kernel
-> binary.
+> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+> index 43f0639..2f9b7e3 100644
+> --- a/drivers/video/imxfb.c
+> +++ b/drivers/video/imxfb.c
+> @@ -40,6 +40,12 @@
+>   */
+>  #define DEBUG_VAR 1
+>  
+> +#if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) || \
+> +	(defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE) && \
+> +		defined(CONFIG_FB_IMX__MODULE))
+                                     ^^
+should be just one '_'.
 
-No, it doesn't work on Versatile PB926 in mainline (I tried it this morning)
-because the card detection (via the ->status callback) is inverted - just
-like it was for realview.  What happens is you get commands issued to the
-card on card removal, and nothing on card insertion.
 
-What I'm proposing is that we get rid of these multiple levels of negation
-that we're gaining.  The negations only add additional complexity and
-confusion over what's the right thing to return at any given point.  Lets
-stick to one positive logic method throughout the code - 0 means no card,
-!0 means card inserted.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-That means your original patch needs to be reverted, and we need to change
-the 'return !status;' to just 'return status;' in mmci.c's get_cd function
-as per my patch.
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-However, I think this will make GPIO on Realview wrong - iirc, the card
-detection bits from PL061 are inverted.
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
