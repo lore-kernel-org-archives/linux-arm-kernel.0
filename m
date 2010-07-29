@@ -1,41 +1,96 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Jul 2010 15:14:07 +0100
-Subject: [PATCH 02/12] mmci: fix multi block transfers
-In-Reply-To: <20100729135511.GD18923@n2100.arm.linux.org.uk>
-References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
-	<1277198267-10860-2-git-send-email-rabin.vincent@stericsson.com>
-	<20100729131858.GB18923@n2100.arm.linux.org.uk>
-	<000001cb2f22$65576150$300623f0$@tuckley@arm.com>
-	<20100729133646.GC18923@n2100.arm.linux.org.uk>
-	<000101cb2f23$e97d1280$bc773780$@tuckley@arm.com>
-	<20100729135511.GD18923@n2100.arm.linux.org.uk>
-Message-ID: <20100729141407.GF18923@n2100.arm.linux.org.uk>
+From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
+Date: Thu, 29 Jul 2010 16:17:34 +0200
+Subject: [PATCH v4] video/imxfb.c: allow usage without BACKLIGHT_CLASS_DEVICE
+In-Reply-To: <4C5180E9.8070203@ru.mvista.com>
+References: <4C5180E9.8070203@ru.mvista.com>
+Message-ID: <1280413054-3046-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 29, 2010 at 02:55:11PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 29, 2010 at 02:42:39PM +0100, Colin Tuckley wrote:
-> > > However, I think this will make GPIO on Realview wrong - iirc, the card
-> > > detection bits from PL061 are inverted.
-> > 
-> > See above.
-> 
-> I've no idea what the right thing on Realview is because the documentation
-> is too poor in this area.  Although the Realview EB user manual gives you
-> the GPIO block signals, it doesn't say what sense they are.
-> 
-> It looks to me from the hardware description diagrams, that the GPIO block
-> is fed with an inverted signal from the socket card detect pin - which
-> itself is active low.  That means the GPIO signal is in a positive logic
-> state.
-> 
-> So I don't think that the "return !status;" is right even for the GPIO
-> case.
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+---
+v4:	fix typo in CONFIG_FB_IMX_MODULE
+v3:	handle CONFIG_BACKLIGHT_CLASS_DEVICE=m & CONFIG_FB_IMX=y case as per
+	suggested by Uwe
+v2:	handle CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE
 
-Hmm.  Firstly, Versatile doesn't support reading the card detect via GPIO.
+ drivers/video/imxfb.c |   19 +++++++++++++++++--
+ 1 files changed, 17 insertions(+), 2 deletions(-)
 
-Secondly, my Realview hardware appears to have the GPIO card detect status
-inverted - zero means card inserted, non-zero means card removed.  That's
-contary to what the documentation suggests.
-
-Confused.
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index 43f0639..5c363d0 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -40,6 +40,12 @@
+  */
+ #define DEBUG_VAR 1
+ 
++#if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) || \
++	(defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE) && \
++		defined(CONFIG_FB_IMX_MODULE))
++#define PWMR_BACKLIGHT_AVAILABLE
++#endif
++
+ #define DRIVER_NAME "imx-fb"
+ 
+ #define LCDC_SSA	0x00
+@@ -175,7 +181,9 @@ struct imxfb_info {
+ 
+ 	struct imx_fb_videomode *mode;
+ 	int			num_modes;
++#ifdef PWMR_BACKLIGHT_AVAILABLE
+ 	struct backlight_device *bl;
++#endif
+ 
+ 	void (*lcd_power)(int);
+ 	void (*backlight_power)(int);
+@@ -450,8 +458,7 @@ static int imxfb_set_par(struct fb_info *info)
+ 	return 0;
+ }
+ 
+-
+-
++#ifdef PWMR_BACKLIGHT_AVAILABLE
+ static int imxfb_bl_get_brightness(struct backlight_device *bl)
+ {
+ 	struct imxfb_info *fbi = bl_get_data(bl);
+@@ -516,6 +523,7 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
+ 	if (fbi->bl)
+ 		backlight_device_unregister(fbi->bl);
+ }
++#endif
+ 
+ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ {
+@@ -647,6 +655,9 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
+ 			fbi->regs + LCDC_SIZE);
+ 
+ 	writel(fbi->pcr, fbi->regs + LCDC_PCR);
++#ifndef PWMR_BACKLIGHT_AVAILABLE
++	writel(fbi->pwmr, fbi->regs + LCDC_PWMR);
++#endif
+ 	writel(fbi->lscr1, fbi->regs + LCDC_LSCR1);
+ 	writel(fbi->dmacr, fbi->regs + LCDC_DMACR);
+ 
+@@ -847,7 +858,9 @@ static int __init imxfb_probe(struct platform_device *pdev)
+ 
+ 	imxfb_enable_controller(fbi);
+ 	fbi->pdev = pdev;
++#ifdef PWMR_BACKLIGHT_AVAILABLE
+ 	imxfb_init_backlight(fbi);
++#endif
+ 
+ 	return 0;
+ 
+@@ -885,7 +898,9 @@ static int __devexit imxfb_remove(struct platform_device *pdev)
+ 
+ 	imxfb_disable_controller(fbi);
+ 
++#ifdef PWMR_BACKLIGHT_AVAILABLE
+ 	imxfb_exit_backlight(fbi);
++#endif
+ 	unregister_framebuffer(info);
+ 
+ 	pdata = pdev->dev.platform_data;
+-- 
+1.6.3.3
