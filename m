@@ -1,598 +1,581 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 29 Jul 2010 05:16:20 +0200
-Subject: [PATCH 04/13] [ARM] pxa/palm: Modularize rest of code in Palms
+Date: Thu, 29 Jul 2010 05:16:22 +0200
+Subject: [PATCH 06/13] [ARM] pxa/spitz: Formating and naming fixes
 In-Reply-To: <1280373389-32475-1-git-send-email-marek.vasut@gmail.com>
 References: <1280373389-32475-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1280373389-32475-4-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1280373389-32475-6-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Improve formating so checkpatch passes. Also, change some function and variable
+names to make the naming consistent.
+
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- arch/arm/mach-pxa/palmld.c   |   63 +++++++++++++++----
- arch/arm/mach-pxa/palmt5.c   |   22 ++++++-
- arch/arm/mach-pxa/palmtreo.c |  141 ++++++++++++++++++++----------------------
- arch/arm/mach-pxa/palmtx.c   |   49 ++++++++++++---
- arch/arm/mach-pxa/palmz72.c  |   22 ++++++-
- 5 files changed, 196 insertions(+), 101 deletions(-)
+ arch/arm/mach-pxa/spitz.c |  282 ++++++++++++++++++++++-----------------------
+ 1 files changed, 138 insertions(+), 144 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/palmld.c b/arch/arm/mach-pxa/palmld.c
-index cac66ca..d59db0b 100644
---- a/arch/arm/mach-pxa/palmld.c
-+++ b/arch/arm/mach-pxa/palmld.c
-@@ -128,6 +128,7 @@ static unsigned long palmld_pin_config[] __initdata = {
- /******************************************************************************
-  * NOR Flash
+diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+index 24c4d27..a8d4e3a 100644
+--- a/arch/arm/mach-pxa/spitz.c
++++ b/arch/arm/mach-pxa/spitz.c
+@@ -133,10 +133,8 @@ static unsigned long spitz_pin_config[] __initdata = {
+  * Scoop GPIO expander
   ******************************************************************************/
-+#if defined(CONFIG_MTD_PHYSMAP) || defined(CONFIG_MTD_PHYSMAP_MODULE)
- static struct mtd_partition palmld_partitions[] = {
- 	{
- 		.name		= "Flash",
-@@ -161,9 +162,18 @@ static struct platform_device palmld_flash = {
+ #if defined(CONFIG_SHARP_SCOOP) || defined(CONFIG_SHARP_SCOOP_MODULE)
+-/*
+- * Spitz SCOOP Device #1
+- */
+-static struct resource spitz_scoop_resources[] = {
++/* SCOOP Device #1 */
++static struct resource spitz_scoop_1_resources[] = {
+ 	[0] = {
+ 		.start		= 0x10800000,
+ 		.end		= 0x10800fff,
+@@ -144,7 +142,7 @@ static struct resource spitz_scoop_resources[] = {
  	},
  };
  
-+static void __init palmld_nor_init(void)
-+{
-+	platform_device_register(&palmld_flash);
-+}
-+#else
-+static inline void palmld_nor_init(void) {}
-+#endif
-+
- /******************************************************************************
-  * GPIO keyboard
-  ******************************************************************************/
-+#if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULE)
- static unsigned int palmld_matrix_keys[] = {
- 	KEY(0, 1, KEY_F2),
- 	KEY(0, 2, KEY_UP),
-@@ -190,9 +200,18 @@ static struct pxa27x_keypad_platform_data palmld_keypad_platform_data = {
- 	.debounce_interval	= 30,
+-static struct scoop_config spitz_scoop_setup = {
++static struct scoop_config spitz_scoop_1_setup = {
+ 	.io_dir		= SPITZ_SCP_IO_DIR,
+ 	.io_out		= SPITZ_SCP_IO_OUT,
+ 	.suspend_clr	= SPITZ_SCP_SUS_CLR,
+@@ -152,20 +150,18 @@ static struct scoop_config spitz_scoop_setup = {
+ 	.gpio_base	= SPITZ_SCP_GPIO_BASE,
  };
  
-+static void __init palmld_kpc_init(void)
-+{
-+	pxa_set_keypad_info(&palmld_keypad_platform_data);
-+}
-+#else
-+static inline void palmld_kpc_init(void) {}
-+#endif
-+
- /******************************************************************************
-  * GPIO keys
-  ******************************************************************************/
-+#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
- static struct gpio_keys_button palmld_pxa_buttons[] = {
- 	{KEY_F8, GPIO_NR_PALMLD_HOTSYNC_BUTTON_N, 1, "HotSync Button" },
- 	{KEY_F9, GPIO_NR_PALMLD_LOCK_SWITCH, 0, "Lock Switch" },
-@@ -212,9 +231,18 @@ static struct platform_device palmld_pxa_keys = {
+-struct platform_device spitzscoop_device = {
++struct platform_device spitz_scoop_1_device = {
+ 	.name		= "sharp-scoop",
+ 	.id		= 0,
+ 	.dev		= {
+- 		.platform_data	= &spitz_scoop_setup,
++		.platform_data	= &spitz_scoop_1_setup,
+ 	},
+-	.num_resources	= ARRAY_SIZE(spitz_scoop_resources),
+-	.resource	= spitz_scoop_resources,
++	.num_resources	= ARRAY_SIZE(spitz_scoop_1_resources),
++	.resource	= spitz_scoop_1_resources,
+ };
+ 
+-/*
+- * Spitz SCOOP Device #2
+- */
+-static struct resource spitz_scoop2_resources[] = {
++/* SCOOP Device #2 */
++static struct resource spitz_scoop_2_resources[] = {
+ 	[0] = {
+ 		.start		= 0x08800040,
+ 		.end		= 0x08800fff,
+@@ -173,7 +169,7 @@ static struct resource spitz_scoop2_resources[] = {
  	},
  };
  
-+static void __init palmld_keys_init(void)
-+{
-+	platform_device_register(&palmld_pxa_keys);
-+}
-+#else
-+static inline void palmld_keys_init(void) {}
-+#endif
-+
- /******************************************************************************
-  * LEDs
-  ******************************************************************************/
-+#if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
- struct gpio_led gpio_leds[] = {
- {
- 	.name			= "palmld:green:led",
-@@ -240,26 +268,34 @@ static struct platform_device palmld_leds = {
- 	}
+-static struct scoop_config spitz_scoop2_setup = {
++static struct scoop_config spitz_scoop_2_setup = {
+ 	.io_dir		= SPITZ_SCP2_IO_DIR,
+ 	.io_out		= SPITZ_SCP2_IO_OUT,
+ 	.suspend_clr	= SPITZ_SCP2_SUS_CLR,
+@@ -181,23 +177,23 @@ static struct scoop_config spitz_scoop2_setup = {
+ 	.gpio_base	= SPITZ_SCP2_GPIO_BASE,
  };
  
-+static void __init palmld_leds_init(void)
-+{
-+	platform_device_register(&palmld_leds);
-+}
-+#else
-+static inline void palmld_leds_init(void) {}
-+#endif
-+
- /******************************************************************************
-  * HDD
-  ******************************************************************************/
--static struct platform_device palmld_hdd = {
-+#if defined(CONFIG_PATA_PALMLD) || defined(CONFIG_PATA_PALMLD_MODULE)
-+static struct platform_device palmld_ide_device = {
- 	.name	= "pata_palmld",
- 	.id	= -1,
+-struct platform_device spitzscoop2_device = {
++struct platform_device spitz_scoop_2_device = {
+ 	.name		= "sharp-scoop",
+ 	.id		= 1,
+ 	.dev		= {
+- 		.platform_data	= &spitz_scoop2_setup,
++		.platform_data	= &spitz_scoop_2_setup,
+ 	},
+-	.num_resources	= ARRAY_SIZE(spitz_scoop2_resources),
+-	.resource	= spitz_scoop2_resources,
++	.num_resources	= ARRAY_SIZE(spitz_scoop_2_resources),
++	.resource	= spitz_scoop_2_resources,
  };
  
-+static void __init palmld_ide_init(void)
-+{
-+	platform_device_register(&palmld_ide_device);
-+}
-+#else
-+static inline void palmld_ide_init(void) {}
-+#endif
-+
- /******************************************************************************
-  * Machine init
-  ******************************************************************************/
--static struct platform_device *devices[] __initdata = {
--#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
--	&palmld_pxa_keys,
--#endif
--	&palmld_leds,
--	&palmld_hdd,
--	&palmld_flash,
--};
--
- static struct map_desc palmld_io_desc[] __initdata = {
+ static void __init spitz_scoop_init(void)
  {
- 	.virtual	= PALMLD_IDE_VIRT,
-@@ -301,8 +337,11 @@ static void __init palmld_init(void)
- {
- 	pxa2xx_mfp_config(ARRAY_AND_SIZE(palmld_pin_config));
- 	palm27x_common_init(&palmld);
--	pxa_set_keypad_info(&palmld_keypad_platform_data);
--	platform_add_devices(devices, ARRAY_SIZE(devices));
-+	palmld_kpc_init();
-+	palmld_keys_init();
-+	palmld_nor_init();
-+	palmld_leds_init();
-+	palmld_ide_init();
+-	platform_device_register(&spitz_scoop1_device);
++	platform_device_register(&spitz_scoop_1_device);
+ 
+ 	/* Akita doesn't have the second SCOOP chip */
+ 	if (!machine_is_akita())
+-		platform_device_register(&spitzscoop2_device);
++		platform_device_register(&spitz_scoop_2_device);
  }
  
- MACHINE_START(PALMLD, "Palm LifeDrive")
-diff --git a/arch/arm/mach-pxa/palmt5.c b/arch/arm/mach-pxa/palmt5.c
-index 593f57c..45daf1b 100644
---- a/arch/arm/mach-pxa/palmt5.c
-+++ b/arch/arm/mach-pxa/palmt5.c
-@@ -106,6 +106,7 @@ static unsigned long palmt5_pin_config[] __initdata = {
- /******************************************************************************
-  * GPIO keyboard
-  ******************************************************************************/
-+#if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULE)
- static unsigned int palmt5_matrix_keys[] = {
- 	KEY(0, 0, KEY_POWER),
- 	KEY(0, 1, KEY_F1),
-@@ -131,9 +132,18 @@ static struct pxa27x_keypad_platform_data palmt5_keypad_platform_data = {
- 	.debounce_interval	= 30,
- };
- 
-+static void __init palmt5_kpc_init(void)
-+{
-+	pxa_set_keypad_info(&palmt5_keypad_platform_data);
-+}
-+#else
-+static inline void palmt5_kpc_init(void) {}
-+#endif
-+
- /******************************************************************************
-  * GPIO keys
-  ******************************************************************************/
-+#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
- static struct gpio_keys_button palmt5_pxa_buttons[] = {
- 	{KEY_F8, GPIO_NR_PALMT5_HOTSYNC_BUTTON_N, 1, "HotSync Button" },
- };
-@@ -151,6 +161,14 @@ static struct platform_device palmt5_pxa_keys = {
- 	},
- };
- 
-+static void __init palmt5_keys_init(void)
-+{
-+	platform_device_register(&palmt5_pxa_keys);
-+}
-+#else
-+static inline void palmt5_keys_init(void) {}
-+#endif
-+
- /******************************************************************************
-  * Machine init
-  ******************************************************************************/
-@@ -176,8 +194,8 @@ static void __init palmt5_init(void)
- {
- 	pxa2xx_mfp_config(ARRAY_AND_SIZE(palmt5_pin_config));
- 	palm27x_common_init(&palmt5);
--	pxa_set_keypad_info(&palmt5_keypad_platform_data);
--	platform_device_register(&palmt5_pxa_keys);
-+	palmt5_kpc_init();
-+	palmt5_keys_init();
+ /* Power control is shared with between one of the CF slots and SD */
+@@ -250,22 +246,22 @@ static void spitz_pcmcia_pwr(struct device *scoop, uint16_t cpr, int nr)
  }
  
- MACHINE_START(PALMT5, "Palm Tungsten|T5")
-diff --git a/arch/arm/mach-pxa/palmtreo.c b/arch/arm/mach-pxa/palmtreo.c
-index dcb5f93..93c83d4 100644
---- a/arch/arm/mach-pxa/palmtreo.c
-+++ b/arch/arm/mach-pxa/palmtreo.c
-@@ -161,7 +161,7 @@ static unsigned long centro685_pin_config[] __initdata = {
- /******************************************************************************
-  * GPIO keyboard
-  ******************************************************************************/
--#ifdef CONFIG_MACH_TREO680
-+#if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULE)
- static unsigned int treo680_matrix_keys[] = {
- 	KEY(0, 0, KEY_F8),		/* Red/Off/Power */
- 	KEY(0, 1, KEY_LEFT),
-@@ -221,19 +221,6 @@ static unsigned int treo680_matrix_keys[] = {
- 	KEY(7, 5, KEY_I),
- };
- 
--static struct pxa27x_keypad_platform_data treo680_keypad_platform_data = {
--	.matrix_key_rows	= 8,
--	.matrix_key_cols	= 7,
--	.matrix_key_map		= treo680_matrix_keys,
--	.matrix_key_map_size	= ARRAY_SIZE(treo680_matrix_keys),
--	.direct_key_map		= { KEY_CONNECT },
--	.direct_key_num		= 1,
--
--	.debounce_interval	= 30,
--};
--#endif /* CONFIG_MACH_TREO680 */
--
--#ifdef CONFIG_MACH_CENTRO
- static unsigned int centro_matrix_keys[] = {
- 	KEY(0, 0, KEY_F9),		/* Home */
- 	KEY(0, 1, KEY_LEFT),
-@@ -293,28 +280,50 @@ static unsigned int centro_matrix_keys[] = {
- 	KEY(7, 5, KEY_I),
- };
- 
--static struct pxa27x_keypad_platform_data centro_keypad_platform_data = {
-+static struct pxa27x_keypad_platform_data treo680_keypad_pdata = {
- 	.matrix_key_rows	= 8,
- 	.matrix_key_cols	= 7,
--	.matrix_key_map		= centro_matrix_keys,
--	.matrix_key_map_size	= ARRAY_SIZE(centro_matrix_keys),
-+	.matrix_key_map		= treo680_matrix_keys,
-+	.matrix_key_map_size	= ARRAY_SIZE(treo680_matrix_keys),
- 	.direct_key_map		= { KEY_CONNECT },
- 	.direct_key_num		= 1,
- 
- 	.debounce_interval	= 30,
- };
--#endif /* CONFIG_MACH_CENTRO */
-+
-+static void __init palmtreo_kpc_init(void)
-+{
-+	static struct pxa27x_keypad_platform_data *data = &treo680_keypad_pdata;
-+
-+	if (machine_is_centro()) {
-+		data->matrix_key_map = centro_matrix_keys;
-+		data->matrix_key_map_size = ARRAY_SIZE(centro_matrix_keys);
-+	}
-+
-+	pxa_set_keypad_info(&treo680_keypad_pdata);
-+}
-+#else
-+static inline void palmtreo_kpc_init(void) {}
-+#endif
- 
- /******************************************************************************
-  * USB host
-  ******************************************************************************/
--#ifdef CONFIG_MACH_TREO680
-+#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
- static struct pxaohci_platform_data treo680_ohci_info = {
- 	.port_mode    = PMM_PERPORT_MODE,
- 	.flags        = ENABLE_PORT1 | ENABLE_PORT3,
- 	.power_budget = 0,
- };
--#endif /* CONFIG_MACH_TREO680 */
-+
-+static void __init palmtreo_uhc_init(void)
-+{
-+	if (machine_is_treo680())
-+		pxa_set_ohci_info(&treo680_ohci_info);
-+}
-+#else
-+static inline void palmtreo_uhc_init(void) {}
-+#endif
- 
- /******************************************************************************
-  * Vibra and LEDs
-@@ -343,16 +352,6 @@ static struct gpio_led_platform_data treo680_gpio_led_info = {
- 	.num_leds	= ARRAY_SIZE(treo680_gpio_leds),
- };
- 
--static struct platform_device treo680_leds = {
--	.name   = "leds-gpio",
--	.id     = -1,
--	.dev    = {
--		.platform_data  = &treo680_gpio_led_info,
--	}
--};
--#endif /* CONFIG_MACH_TREO680 */
--
--#ifdef CONFIG_MACH_CENTRO
- static struct gpio_led centro_gpio_leds[] = {
- 	{
- 		.name			= "centro:vibra:vibra",
-@@ -377,31 +376,28 @@ static struct gpio_led_platform_data centro_gpio_led_info = {
- 	.num_leds	= ARRAY_SIZE(centro_gpio_leds),
- };
- 
--static struct platform_device centro_leds = {
-+static struct platform_device palmtreo_leds = {
- 	.name   = "leds-gpio",
- 	.id     = -1,
- 	.dev    = {
--		.platform_data  = &centro_gpio_led_info,
-+		.platform_data  = &treo680_gpio_led_info,
- 	}
- };
--#endif /* CONFIG_MACH_CENTRO */
-+
-+static void __init palmtreo_leds_init(void)
-+{
-+	if (machine_is_centro())
-+		palmtreo_leds.dev.platform_data = &centro_gpio_led_info;
-+
-+	platform_device_register(&palmtreo_leds);
-+}
-+#else
-+static inline void palmtreo_leds_init(void) {}
-+#endif
- 
- /******************************************************************************
-  * Machine init
-  ******************************************************************************/
--#ifdef CONFIG_MACH_TREO680
--static struct platform_device *treo680_devices[] __initdata = {
--	&treo680_leds,
--};
--#endif /* CONFIG_MACH_TREO680 */
--
--#ifdef CONFIG_MACH_CENTRO
--static struct platform_device *centro_devices[] __initdata = {
--	&centro_leds,
--};
--#endif /* CONFIG_MACH_CENTRO */
--
--#ifdef CONFIG_MACH_TREO680
- struct palm27x_handheld palmtreo680 = {
- 	.mmc_detect	= GPIO_NR_TREO_SD_DETECT_N,
- 	.mmc_ro		= GPIO_NR_TREO680_SD_READONLY,
-@@ -417,28 +413,6 @@ struct palm27x_handheld palmtreo680 = {
- 	.lcd_power	= GPIO_NR_TREO_BL_POWER,
- };
- 
--static void __init treo680_init(void)
+ static struct scoop_pcmcia_dev spitz_pcmcia_scoop[] = {
 -{
--	pxa2xx_mfp_config(ARRAY_AND_SIZE(treo_pin_config));
--	pxa2xx_mfp_config(ARRAY_AND_SIZE(treo680_pin_config));
--	palm27x_common_init(&palmtreo680);
--	pxa_set_keypad_info(&treo680_keypad_platform_data);
--	pxa_set_ohci_info(&treo680_ohci_info);
--	platform_add_devices(ARRAY_AND_SIZE(treo680_devices));
--}
--
--MACHINE_START(TREO680, "Palm Treo 680")
--	.phys_io        = TREO_PHYS_IO_START,
--	.io_pg_offst    = io_p2v(0x40000000),
--	.boot_params    = 0xa0000100,
--	.map_io         = pxa_map_io,
--	.init_irq       = pxa27x_init_irq,
--	.timer          = &pxa_timer,
--	.init_machine   = treo680_init,
--MACHINE_END
--#endif /* CONFIG_MACH_TREO680 */
--
--#ifdef CONFIG_MACH_CENTRO
- struct palm27x_handheld palmcentro = {
- 	.mmc_detect	= GPIO_NR_TREO_SD_DETECT_N,
- 	.mmc_ro		= -1,
-@@ -454,15 +428,33 @@ struct palm27x_handheld palmcentro = {
- 	.lcd_power	= GPIO_NR_TREO_BL_POWER,
+-	.dev        = &spitzscoop_device.dev,
+-	.irq        = SPITZ_IRQ_GPIO_CF_IRQ,
+-	.cd_irq     = SPITZ_IRQ_GPIO_CF_CD,
+-	.cd_irq_str = "PCMCIA0 CD",
+-},{
+-	.dev        = &spitzscoop2_device.dev,
+-	.irq        = SPITZ_IRQ_GPIO_CF2_IRQ,
+-	.cd_irq     = -1,
+-},
++	{
++		.dev		= &spitz_scoop_1_device.dev,
++		.irq		= SPITZ_IRQ_GPIO_CF_IRQ,
++		.cd_irq		= SPITZ_IRQ_GPIO_CF_CD,
++		.cd_irq_str	= "PCMCIA0 CD",
++	}, {
++		.dev		= &spitz_scoop_2_device.dev,
++		.irq		= SPITZ_IRQ_GPIO_CF2_IRQ,
++		.cd_irq		= -1,
++	},
  };
  
--static void __init centro_init(void)
-+static void __init palmtreo_init(void)
- {
- 	pxa2xx_mfp_config(ARRAY_AND_SIZE(treo_pin_config));
--	pxa2xx_mfp_config(ARRAY_AND_SIZE(centro685_pin_config));
--	palm27x_common_init(&palmcentro);
--	pxa_set_keypad_info(&centro_keypad_platform_data);
--	platform_add_devices(ARRAY_AND_SIZE(centro_devices));
-+
-+	if (machine_is_centro()) {
-+		pxa2xx_mfp_config(ARRAY_AND_SIZE(centro685_pin_config));
-+		palm27x_common_init(&palmcentro);
-+	} else {
-+		pxa2xx_mfp_config(ARRAY_AND_SIZE(treo680_pin_config));
-+		palm27x_common_init(&palmtreo680);
-+	}
-+
-+	palmtreo_kpc_init();
-+	palmtreo_uhc_init();
-+	palmtreo_leds_init();
- }
+ static struct scoop_pcmcia_config spitz_pcmcia_config = {
+-	.devs         = &spitz_pcmcia_scoop[0],
+-	.num_devs     = 2,
+-	.power_ctrl   = spitz_pcmcia_pwr,
++	.devs		= &spitz_pcmcia_scoop[0],
++	.num_devs	= 2,
++	.power_ctrl	= spitz_pcmcia_pwr,
+ };
  
-+MACHINE_START(TREO680, "Palm Treo 680")
-+	.phys_io        = TREO_PHYS_IO_START,
-+	.io_pg_offst    = io_p2v(0x40000000),
-+	.boot_params    = 0xa0000100,
-+	.map_io         = pxa_map_io,
-+	.init_irq       = pxa27x_init_irq,
-+	.timer          = &pxa_timer,
-+	.init_machine   = palmtreo_init,
-+MACHINE_END
-+
- MACHINE_START(CENTRO, "Palm Centro 685")
- 	.phys_io        = TREO_PHYS_IO_START,
- 	.io_pg_offst    = io_p2v(0x40000000),
-@@ -470,6 +462,5 @@ MACHINE_START(CENTRO, "Palm Centro 685")
- 	.map_io         = pxa_map_io,
- 	.init_irq       = pxa27x_init_irq,
- 	.timer          = &pxa_timer,
--       .init_machine   = centro_init,
-+       .init_machine	= palmtreo_init,
- MACHINE_END
--#endif /* CONFIG_MACH_CENTRO */
-diff --git a/arch/arm/mach-pxa/palmtx.c b/arch/arm/mach-pxa/palmtx.c
-index f8ddffe..ad39d50 100644
---- a/arch/arm/mach-pxa/palmtx.c
-+++ b/arch/arm/mach-pxa/palmtx.c
-@@ -130,6 +130,7 @@ static unsigned long palmtx_pin_config[] __initdata = {
+ static void __init spitz_pcmcia_init(void)
+@@ -300,7 +296,7 @@ static inline void spitz_pcmcia_init(void) {}
+ #define SPITZ_KEY_OK		KEY_F11
+ #define SPITZ_KEY_MENU		KEY_F12
+ 
+-static const uint32_t spitzkbd_keymap[] = {
++static const uint32_t spitz_keymap[] = {
+ 	KEY(0, 0, KEY_LEFTCTRL),
+ 	KEY(0, 1, KEY_1),
+ 	KEY(0, 2, KEY_3),
+@@ -367,38 +363,38 @@ static const uint32_t spitzkbd_keymap[] = {
+ 	KEY(6, 8, KEY_RIGHT),
+ };
+ 
+-static const struct matrix_keymap_data spitzkbd_keymap_data = {
+-	.keymap		= spitzkbd_keymap,
+-	.keymap_size	= ARRAY_SIZE(spitzkbd_keymap),
++static const struct matrix_keymap_data spitz_keymap_data = {
++	.keymap		= spitz_keymap,
++	.keymap_size	= ARRAY_SIZE(spitz_keymap),
+ };
+ 
+-static const uint32_t spitzkbd_row_gpios[] =
++static const uint32_t spitz_row_gpios[] =
+ 		{ 12, 17, 91, 34, 36, 38, 39 };
+-static const uint32_t spitzkbd_col_gpios[] =
++static const uint32_t spitz_col_gpios[] =
+ 		{ 88, 23, 24, 25, 26, 27, 52, 103, 107, 108, 114 };
+ 
+-static struct matrix_keypad_platform_data spitzkbd_pdata = {
+-	.keymap_data		= &spitzkbd_keymap_data,
+-	.row_gpios		= spitzkbd_row_gpios,
+-	.col_gpios		= spitzkbd_col_gpios,
+-	.num_row_gpios		= ARRAY_SIZE(spitzkbd_row_gpios),
+-	.num_col_gpios		= ARRAY_SIZE(spitzkbd_col_gpios),
++static struct matrix_keypad_platform_data spitz_mkp_pdata = {
++	.keymap_data		= &spitz_keymap_data,
++	.row_gpios		= spitz_row_gpios,
++	.col_gpios		= spitz_col_gpios,
++	.num_row_gpios		= ARRAY_SIZE(spitz_row_gpios),
++	.num_col_gpios		= ARRAY_SIZE(spitz_col_gpios),
+ 	.col_scan_delay_us	= 10,
+ 	.debounce_ms		= 10,
+ 	.wakeup			= 1,
+ };
+ 
+-static struct platform_device spitzkbd_device = {
++static struct platform_device spitz_mkp_device = {
+ 	.name		= "matrix-keypad",
+ 	.id		= -1,
+ 	.dev		= {
+-		.platform_data = &spitzkbd_pdata,
++		.platform_data	= &spitz_mkp_pdata,
+ 	},
+ };
+ 
+ static void __init spitz_mkp_init(void)
+ {
+-	platform_device_register(&spitzkbd_device);
++	platform_device_register(&spitz_mkp_device);
+ }
+ #else
+ static inline void spitz_mkp_init(void) {}
+@@ -474,17 +470,17 @@ static struct gpio_led_platform_data spitz_gpio_leds_info = {
+ 	.num_leds	= ARRAY_SIZE(spitz_gpio_leds),
+ };
+ 
+-static struct platform_device spitzled_device = {
++static struct platform_device spitz_led_device = {
+ 	.name		= "leds-gpio",
+ 	.id		= -1,
+ 	.dev		= {
+-		.platform_data = &spitz_gpio_leds_info,
++		.platform_data	= &spitz_gpio_leds_info,
+ 	},
+ };
+ 
+ static void __init spitz_leds_init(void)
+ {
+-	platform_device_register(&spitzled_device);
++	platform_device_register(&spitz_led_device);
+ }
+ #else
+ static inline void spitz_leds_init(void) {}
+@@ -494,7 +490,7 @@ static inline void spitz_leds_init(void) {}
+  * SSP Devices
+  ******************************************************************************/
+ #if defined(CONFIG_SPI_PXA2XX) || defined(CONFIG_SPI_PXA2XX_MODULE)
+-static void spitz_wait_for_hsync(void)
++static void spitz_ads7846_wait_for_hsync(void)
+ {
+ 	while (gpio_get_value(SPITZ_GPIO_HSYNC))
+ 		cpu_relax();
+@@ -510,7 +506,7 @@ static struct ads7846_platform_data spitz_ads7846_info = {
+ 	.y_plate_ohms		= 486,
+ 	.pressure_max		= 1024,
+ 	.gpio_pendown		= SPITZ_GPIO_TP_INT,
+-	.wait_for_sync		= spitz_wait_for_hsync,
++	.wait_for_sync		= spitz_ads7846_wait_for_hsync,
+ };
+ 
+ static struct pxa2xx_spi_chip spitz_ads7846_chip = {
+@@ -548,26 +544,26 @@ static struct pxa2xx_spi_chip spitz_max1111_chip = {
+ 
+ static struct spi_board_info spitz_spi_devices[] = {
+ 	{
+-		.modalias	= "ads7846",
+-		.max_speed_hz	= 1200000,
+-		.bus_num	= 2,
+-		.chip_select	= 0,
+-		.platform_data	= &spitz_ads7846_info,
+-		.controller_data= &spitz_ads7846_chip,
+-		.irq		= gpio_to_irq(SPITZ_GPIO_TP_INT),
++		.modalias		= "ads7846",
++		.max_speed_hz		= 1200000,
++		.bus_num		= 2,
++		.chip_select		= 0,
++		.platform_data		= &spitz_ads7846_info,
++		.controller_data	= &spitz_ads7846_chip,
++		.irq			= gpio_to_irq(SPITZ_GPIO_TP_INT),
+ 	}, {
+-		.modalias	= "corgi-lcd",
+-		.max_speed_hz	= 50000,
+-		.bus_num	= 2,
+-		.chip_select	= 1,
+-		.platform_data	= &spitz_lcdcon_info,
+-		.controller_data= &spitz_lcdcon_chip,
++		.modalias		= "corgi-lcd",
++		.max_speed_hz		= 50000,
++		.bus_num		= 2,
++		.chip_select		= 1,
++		.platform_data		= &spitz_lcdcon_info,
++		.controller_data	= &spitz_lcdcon_chip,
+ 	}, {
+-		.modalias	= "max1111",
+-		.max_speed_hz	= 450000,
+-		.bus_num	= 2,
+-		.chip_select	= 2,
+-		.controller_data= &spitz_max1111_chip,
++		.modalias		= "max1111",
++		.max_speed_hz		= 450000,
++		.bus_num		= 2,
++		.chip_select		= 2,
++		.controller_data	= &spitz_max1111_chip,
+ 	},
+ };
+ 
+@@ -575,7 +571,7 @@ static struct pxa2xx_spi_master spitz_spi_info = {
+ 	.num_chipselect	= 3,
+ };
+ 
+-static void __init spitz_init_spi(void)
++static void __init spitz_spi_init(void)
+ {
+ 	struct corgi_lcd_platform_data *lcd_data = &spitz_lcdcon_info;
+ 
+@@ -588,7 +584,7 @@ static void __init spitz_init_spi(void)
+ 	spi_register_board_info(ARRAY_AND_SIZE(spitz_spi_devices));
+ }
+ #else
+-static inline void spitz_init_spi(void) {}
++static inline void spitz_spi_init(void) {}
+ #endif
+ 
  /******************************************************************************
+@@ -612,7 +608,7 @@ static void spitz_mci_setpower(struct device *dev, unsigned int vdd)
+ static struct pxamci_platform_data spitz_mci_platform_data = {
+ 	.detect_delay_ms	= 250,
+ 	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
+-	.setpower 		= spitz_mci_setpower,
++	.setpower		= spitz_mci_setpower,
+ 	.gpio_card_detect	= SPITZ_GPIO_nSD_DETECT,
+ 	.gpio_card_ro		= SPITZ_GPIO_nSD_WP,
+ 	.gpio_power		= -1,
+@@ -691,31 +687,31 @@ static inline void spitz_irda_init(void) {}
+  ******************************************************************************/
+ #if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
+ static struct pxafb_mode_info spitz_pxafb_modes[] = {
+-{
+-	.pixclock       = 19231,
+-	.xres           = 480,
+-	.yres           = 640,
+-	.bpp            = 16,
+-	.hsync_len      = 40,
+-	.left_margin    = 46,
+-	.right_margin   = 125,
+-	.vsync_len      = 3,
+-	.upper_margin   = 1,
+-	.lower_margin   = 0,
+-	.sync           = 0,
+-},{
+-	.pixclock       = 134617,
+-	.xres           = 240,
+-	.yres           = 320,
+-	.bpp            = 16,
+-	.hsync_len      = 20,
+-	.left_margin    = 20,
+-	.right_margin   = 46,
+-	.vsync_len      = 2,
+-	.upper_margin   = 1,
+-	.lower_margin   = 0,
+-	.sync           = 0,
+-},
++	{
++		.pixclock       = 19231,
++		.xres           = 480,
++		.yres           = 640,
++		.bpp            = 16,
++		.hsync_len      = 40,
++		.left_margin    = 46,
++		.right_margin   = 125,
++		.vsync_len      = 3,
++		.upper_margin   = 1,
++		.lower_margin   = 0,
++		.sync           = 0,
++	}, {
++		.pixclock       = 134617,
++		.xres           = 240,
++		.yres           = 320,
++		.bpp            = 16,
++		.hsync_len      = 20,
++		.left_margin    = 20,
++		.right_margin   = 46,
++		.vsync_len      = 2,
++		.upper_margin   = 1,
++		.lower_margin   = 0,
++		.sync           = 0,
++	},
+ };
+ 
+ static struct pxafb_mach_info spitz_pxafb_info = {
+@@ -737,17 +733,15 @@ static inline void spitz_lcd_init(void) {}
+  * Framebuffer
+  ******************************************************************************/
+ #if defined(CONFIG_MTD_NAND_SHARPSL) || defined(CONFIG_MTD_NAND_SHARPSL_MODULE)
+-static struct mtd_partition sharpsl_nand_partitions[] = {
++static struct mtd_partition spitz_nand_partitions[] = {
+ 	{
+ 		.name = "System Area",
+ 		.offset = 0,
+ 		.size = 7 * 1024 * 1024,
+-	},
+-	{
++	}, {
+ 		.name = "Root Filesystem",
+ 		.offset = 7 * 1024 * 1024,
+-	},
+-	{
++	}, {
+ 		.name = "Home Filesystem",
+ 		.offset = MTDPART_OFS_APPEND,
+ 		.size = MTDPART_SIZ_FULL,
+@@ -756,14 +750,14 @@ static struct mtd_partition sharpsl_nand_partitions[] = {
+ 
+ static uint8_t scan_ff_pattern[] = { 0xff, 0xff };
+ 
+-static struct nand_bbt_descr sharpsl_bbt = {
+-	.options = 0,
+-	.offs = 4,
+-	.len = 2,
+-	.pattern = scan_ff_pattern
++static struct nand_bbt_descr spitz_nand_bbt = {
++	.options	= 0,
++	.offs		= 4,
++	.len		= 2,
++	.pattern	= scan_ff_pattern
+ };
+ 
+-static struct nand_ecclayout spitz_akita_oobinfo = {
++static struct nand_ecclayout akita_oobinfo = {
+ 	.oobfree	= { {0x08, 0x09} },
+ 	.eccbytes	= 24,
+ 	.eccpos		= {
+@@ -773,13 +767,13 @@ static struct nand_ecclayout spitz_akita_oobinfo = {
+ 	},
+ };
+ 
+-static struct sharpsl_nand_platform_data sharpsl_nand_platform_data = {
+-	.badblock_pattern	= &sharpsl_bbt,
+-	.partitions		= sharpsl_nand_partitions,
+-	.nr_partitions		= ARRAY_SIZE(sharpsl_nand_partitions),
++static struct sharpsl_nand_platform_data spitz_nand_pdata = {
++	.badblock_pattern	= &spitz_nand_bbt,
++	.partitions		= spitz_nand_partitions,
++	.nr_partitions		= ARRAY_SIZE(spitz_nand_partitions),
+ };
+ 
+-static struct resource sharpsl_nand_resources[] = {
++static struct resource spitz_nand_resources[] = {
+ 	{
+ 		.start	= PXA_CS3_PHYS,
+ 		.end	= PXA_CS3_PHYS + SZ_4K - 1,
+@@ -787,31 +781,31 @@ static struct resource sharpsl_nand_resources[] = {
+ 	},
+ };
+ 
+-static struct platform_device sharpsl_nand_device = {
++static struct platform_device spitz_nand_device = {
+ 	.name		= "sharpsl-nand",
+ 	.id		= -1,
+-	.resource	= sharpsl_nand_resources,
+-	.num_resources	= ARRAY_SIZE(sharpsl_nand_resources),
++	.resource	= spitz_nand_resources,
++	.num_resources	= ARRAY_SIZE(spitz_nand_resources),
+ 	.dev		= {
+-		.platform_data	= &sharpsl_nand_platform_data,
++		.platform_data	= &spitz_nand_pdata,
+ 	}
+ };
+ 
+ static void __init spitz_nand_init(void)
+ {
+ 	if (machine_is_spitz()) {
+-		sharpsl_nand_partitions[1].size = 5 * 1024 * 1024;
++		spitz_nand_partitions[1].size = 5 * 1024 * 1024;
+ 	} else if (machine_is_akita()) {
+-		sharpsl_nand_partitions[1].size = 58 * 1024 * 1024;
+-		sharpsl_nand_bbt.len = 1;
+-		sharpsl_nand_pdata.ecc_layout = &spitz_akita_oobinfo;
++		spitz_nand_partitions[1].size = 58 * 1024 * 1024;
++		spitz_nand_bbt.len = 1;
++		spitz_nand_pdata.ecc_layout = &akita_oobinfo;
+ 	} else if (machine_is_borzoi()) {
+-		sharpsl_nand_partitions[1].size = 32 * 1024 * 1024;
+-		sharpsl_nand_bbt.len = 1;
+-		sharpsl_nand_pdata.ecc_layout = &spitz_akita_oobinfo;
++		spitz_nand_partitions[1].size = 32 * 1024 * 1024;
++		spitz_nand_bbt.len = 1;
++		spitz_nand_pdata.ecc_layout = &akita_oobinfo;
+ 	}
+ 
+-	platform_device_register(&sharpsl_nand_device);
++	platform_device_register(&spitz_nand_device);
+ }
+ #else
+ static inline void spitz_nand_init(void) {}
+@@ -821,7 +815,7 @@ static inline void spitz_nand_init(void) {}
   * NOR Flash
   ******************************************************************************/
-+#if defined(CONFIG_MTD_PHYSMAP) || defined(CONFIG_MTD_PHYSMAP_MODULE)
- static struct mtd_partition palmtx_partitions[] = {
+ #if defined(CONFIG_MTD_PHYSMAP) || defined(CONFIG_MTD_PHYSMAP_MODULE)
+-static struct mtd_partition sharpsl_rom_parts[] = {
++static struct mtd_partition spitz_rom_parts[] = {
  	{
- 		.name		= "Flash",
-@@ -163,9 +164,18 @@ static struct platform_device palmtx_flash = {
+ 		.name	="Boot PROM Filesystem",
+ 		.offset	= 0x00140000,
+@@ -829,13 +823,13 @@ static struct mtd_partition sharpsl_rom_parts[] = {
  	},
  };
  
-+static void __init palmtx_nor_init(void)
-+{
-+	platform_device_register(&palmtx_flash);
-+}
-+#else
-+static inline void palmtx_nor_init(void) {}
-+#endif
-+
- /******************************************************************************
-  * GPIO keyboard
-  ******************************************************************************/
-+#if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULE)
- static unsigned int palmtx_matrix_keys[] = {
- 	KEY(0, 0, KEY_POWER),
- 	KEY(0, 1, KEY_F1),
-@@ -191,9 +201,18 @@ static struct pxa27x_keypad_platform_data palmtx_keypad_platform_data = {
- 	.debounce_interval	= 30,
+-static struct physmap_flash_data sharpsl_rom_data = {
++static struct physmap_flash_data spitz_rom_data = {
+ 	.width		= 2,
+-	.nr_parts	= ARRAY_SIZE(sharpsl_rom_parts),
+-	.parts		= sharpsl_rom_parts,
++	.nr_parts	= ARRAY_SIZE(spitz_rom_parts),
++	.parts		= spitz_rom_parts,
  };
  
-+static void __init palmtx_kpc_init(void)
-+{
-+	pxa_set_keypad_info(&palmtx_keypad_platform_data);
-+}
-+#else
-+static inline void palmtx_kpc_init(void) {}
-+#endif
-+
- /******************************************************************************
-  * GPIO keys
-  ******************************************************************************/
-+#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
- static struct gpio_keys_button palmtx_pxa_buttons[] = {
- 	{KEY_F8, GPIO_NR_PALMTX_HOTSYNC_BUTTON_N, 1, "HotSync Button" },
- };
-@@ -211,9 +230,18 @@ static struct platform_device palmtx_pxa_keys = {
+-static struct resource sharpsl_rom_resources[] = {
++static struct resource spitz_rom_resources[] = {
+ 	{
+ 		.start	= PXA_CS0_PHYS,
+ 		.end	= PXA_CS0_PHYS + SZ_8M - 1,
+@@ -843,19 +837,19 @@ static struct resource sharpsl_rom_resources[] = {
  	},
  };
  
-+static void __init palmtx_keys_init(void)
-+{
-+	platform_device_register(&palmtx_pxa_keys);
-+}
-+#else
-+static inline void palmtx_keys_init(void) {}
-+#endif
-+
- /******************************************************************************
-  * NAND Flash
-  ******************************************************************************/
-+#if defined(CONFIG_MTD_NAND_GPIO) || defined(CONFIG_MTD_NAND_GPIO_MODULE)
- static void palmtx_nand_cmd_ctl(struct mtd_info *mtd, int cmd,
- 				 unsigned int ctrl)
- {
-@@ -273,18 +301,17 @@ static struct platform_device palmtx_nand = {
- 	}
+-static struct platform_device sharpsl_rom_device = {
+-	.name	= "physmap-flash",
+-	.id	= -1,
+-	.resource = sharpsl_rom_resources,
+-	.num_resources = ARRAY_SIZE(sharpsl_rom_resources),
++static struct platform_device spitz_rom_device = {
++	.name		= "physmap-flash",
++	.id		= -1,
++	.resource	= spitz_rom_resources,
++	.num_resources	= ARRAY_SIZE(spitz_rom_resources),
+ 	.dev		= {
+-		.platform_data	= &sharpsl_rom_data,
++		.platform_data	= &spitz_rom_data,
+ 	},
  };
  
-+static void __init palmtx_nand_init(void)
-+{
-+	platform_device_register(&palmtx_nand);
-+}
-+#else
-+static inline void palmtx_nand_init(void) {}
-+#endif
+ static void __init spitz_nor_init(void)
+ {
+-	platform_device_register(&sharpsl_rom_device);
++	platform_device_register(&spitz_rom_device);
+ }
+ #else
+ static inline void spitz_nor_init(void) {}
+@@ -959,7 +953,7 @@ static void __init spitz_init(void)
+ 	pxa_set_btuart_info(NULL);
+ 	pxa_set_stuart_info(NULL);
  
- /******************************************************************************
-  * Machine init
-  ******************************************************************************/
--static struct platform_device *devices[] __initdata = {
--#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
--	&palmtx_pxa_keys,
--#endif
--	&palmtx_flash,
--	&palmtx_nand,
--};
--
- static struct map_desc palmtx_io_desc[] __initdata = {
- {
- 	.virtual	= PALMTX_PCMCIA_VIRT,
-@@ -332,8 +359,10 @@ static void __init palmtx_init(void)
- {
- 	pxa2xx_mfp_config(ARRAY_AND_SIZE(palmtx_pin_config));
- 	palm27x_common_init(&palmtx);
--	pxa_set_keypad_info(&palmtx_keypad_platform_data);
--	platform_add_devices(devices, ARRAY_SIZE(devices));
-+	palmtx_kpc_init();
-+	palmtx_keys_init();
-+	palmtx_nor_init();
-+	palmtx_nand_init();
+-	spitz_init_spi();
++	spitz_spi_init();
+ 	spitz_scoop_init();
+ 	spitz_mkp_init();
+ 	spitz_keys_init();
+@@ -974,7 +968,7 @@ static void __init spitz_init(void)
+ 	spitz_i2c_init();
  }
  
- MACHINE_START(PALMTX, "Palm T|X")
-diff --git a/arch/arm/mach-pxa/palmz72.c b/arch/arm/mach-pxa/palmz72.c
-index 10b06ad..fe8a6aa 100644
---- a/arch/arm/mach-pxa/palmz72.c
-+++ b/arch/arm/mach-pxa/palmz72.c
-@@ -112,6 +112,7 @@ static unsigned long palmz72_pin_config[] __initdata = {
- /******************************************************************************
-  * GPIO keyboard
-  ******************************************************************************/
-+#if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULE)
- static unsigned int palmz72_matrix_keys[] = {
- 	KEY(0, 0, KEY_POWER),
- 	KEY(0, 1, KEY_F1),
-@@ -137,9 +138,18 @@ static struct pxa27x_keypad_platform_data palmz72_keypad_platform_data = {
- 	.debounce_interval	= 30,
- };
- 
-+static void __init palmz72_kpc_init(void)
-+{
-+	pxa_set_keypad_info(&palmz72_keypad_platform_data);
-+}
-+#else
-+static inline void palmz72_kpc_init(void) {}
-+#endif
-+
- /******************************************************************************
-  * LEDs
-  ******************************************************************************/
-+#if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
- static struct gpio_led gpio_leds[] = {
- 	{
- 		.name			= "palmz72:green:led",
-@@ -161,6 +171,14 @@ static struct platform_device palmz72_leds = {
- 	}
- };
- 
-+static void __init palmz72_leds_init(void)
-+{
-+	platform_device_register(&palmz72_leds);
-+}
-+#else
-+static inline void palmz72_leds_init(void) {}
-+#endif
-+
- #ifdef CONFIG_PM
- 
- /* We have some black magic here
-@@ -255,8 +273,8 @@ static void __init palmz72_init(void)
+-static void __init fixup_spitz(struct machine_desc *desc,
++static void __init spitz_fixup(struct machine_desc *desc,
+ 		struct tag *tags, char **cmdline, struct meminfo *mi)
  {
- 	pxa2xx_mfp_config(ARRAY_AND_SIZE(palmz72_pin_config));
- 	palm27x_common_init(&palmz72);
--	pxa_set_keypad_info(&palmz72_keypad_platform_data);
--	platform_device_register(&palmz72_leds);
-+	palmz72_kpc_init();
-+	palmz72_leds_init();
- }
- 
- MACHINE_START(PALMZ72, "Palm Zire72")
+ 	sharpsl_save_param();
+@@ -988,7 +982,7 @@ static void __init fixup_spitz(struct machine_desc *desc,
+ MACHINE_START(SPITZ, "SHARP Spitz")
+ 	.phys_io	= 0x40000000,
+ 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
+-	.fixup		= fixup_spitz,
++	.fixup		= spitz_fixup,
+ 	.map_io		= pxa_map_io,
+ 	.init_irq	= pxa27x_init_irq,
+ 	.init_machine	= spitz_init,
+@@ -1000,7 +994,7 @@ MACHINE_END
+ MACHINE_START(BORZOI, "SHARP Borzoi")
+ 	.phys_io	= 0x40000000,
+ 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
+-	.fixup		= fixup_spitz,
++	.fixup		= spitz_fixup,
+ 	.map_io		= pxa_map_io,
+ 	.init_irq	= pxa27x_init_irq,
+ 	.init_machine	= spitz_init,
+@@ -1012,7 +1006,7 @@ MACHINE_END
+ MACHINE_START(AKITA, "SHARP Akita")
+ 	.phys_io	= 0x40000000,
+ 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
+-	.fixup		= fixup_spitz,
++	.fixup		= spitz_fixup,
+ 	.map_io		= pxa_map_io,
+ 	.init_irq	= pxa27x_init_irq,
+ 	.init_machine	= spitz_init,
 -- 
 1.7.1
