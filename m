@@ -1,39 +1,41 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 29 Jul 2010 21:28:56 +0200
-Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v6)
-In-Reply-To: <201007291313.29923.siarhei.siamashka@nokia.com>
-References: <20100719180136.20305.7333.stgit@e200687-lin>
-	<AANLkTik3CSSQLqajFimJxbq8TFBQ6iVx3RtdC9ObVj2-@mail.gmail.com>
-	<20100728060649.GB1656@ucw.cz>
-	<201007291313.29923.siarhei.siamashka@nokia.com>
-Message-ID: <20100729192855.GA4298@elf.ucw.cz>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Jul 2010 22:21:17 +0100
+Subject: [PATCH] [ARM] highmem: fix SMP preemption bug in kmap_high_l1_vipt
+In-Reply-To: <alpine.LFD.2.00.1007291058140.20337@xanadu.home>
+References: <1280366705-21334-1-git-send-email-gking@nvidia.com>
+	<alpine.LFD.2.00.1007291058140.20337@xanadu.home>
+Message-ID: <20100729212117.GB28330@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2010-07-29 13:13:29, Siarhei Siamashka wrote:
-> On Wednesday 28 July 2010 09:06:49 ext Pavel Machek wrote:
-> > On Mon 2010-07-19 22:02:12, Linus Walleij wrote:
-> > > 2010/7/19 Kirill A. Shutemov <kirill@shutemov.name>:
-> > > > Why do we need this? Why do not just fix broken programs?
-> > >
-> > > People tend to use some third-party precompiled binaries, some of
-> > > them compiled with a compiler using SWP.
-> >
-> > Why not just let the cpu emulate it? It surely will be faster...?
+On Thu, Jul 29, 2010 at 10:59:52AM -0400, Nicolas Pitre wrote:
+> On Wed, 28 Jul 2010, gking at nvidia.com wrote:
 > 
-> IMHO, being able to identify the usage of SWP instructions and fix bad
-> programs eventually (by spamming the said third-party programs bugtrackers) is
-> a good enough reason.
+> > From: Andrew Howe <ahowe@nvidia.com>
+> > 
+> > smp_processor_id() must not be called from a preemptible context (this
+> > is checked by CONFIG_DEBUG_PREEMPT).  kmap_high_l1_vipt() was doing so.
+> > This lead to a problem where the wrong per_cpu kmap_high_l1_vipt_depth
+> > could be incremented, causing a BUG_ON(*depth <= 0); in
+> > kunmap_high_l1_vipt().
+> > 
+> > The solution is to move the call to smp_processor_id() after the call
+> > to preempt_disable().
+> > 
+> > Signed-off-by: Gary King <gking@nvidia.com>
+> 
+> Acked-by: Nicolas Pitre <nico.as.pitre@linaro.org>
+> 
+> Please forward to RMK's patch system.
 
-Why do we need _emulation_ for that? 
+Unfortunately, I suspect that none of the remaining stuff in my master
+branch will make 2.6.35 (which is due this evening) especially as I've
+put the fixes for the Versatile/Realview/Versatile Express MMC card
+detection in there today, and we still don't know what's right for its
+GPIO-based card detection.  (The change to fix the status method may
+have broken the GPIO-based method.)
 
-Either you care about compatibility, then you let the CPU emulate SWP,
-or you want to fix your userspace, so you turn off SWP emulation and
-see what breaks.
-
-I believe emulation just to annoy users into submitting bugreports is
-serious overengineering.
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+So I'm not sending a pull request this evening.  Hopefully people can
+work out what's right for the GPIO based card detection while I'm out
+tomorrow, and report back so it can be fixed in the evening if
+necessary.
