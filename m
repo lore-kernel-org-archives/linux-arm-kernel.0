@@ -1,7 +1,9 @@
 From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
-Date: Thu, 29 Jul 2010 10:42:43 +0200
+Date: Thu, 29 Jul 2010 10:42:58 +0200
 Subject: [PATCH] video/imxfb.c: allow usage without BACKLIGHT_CLASS_DEVICE
-Message-ID: <1280392963-25374-1-git-send-email-eric@eukrea.com>
+In-Reply-To: <20100729051647.GA11268@pengutronix.de>
+References: <20100729051647.GA11268@pengutronix.de>
+Message-ID: <1280392978-25405-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
