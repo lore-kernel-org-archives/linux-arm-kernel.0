@@ -1,40 +1,107 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Thu, 29 Jul 2010 13:15:37 +0900
-Subject: [PATCH 1/2] arm: msm: Add System MMU support.
-In-Reply-To: <20100728212156.GA6729@n2100.arm.linux.org.uk>
-References: <ea4bbdecc271f7fa5749d09645f38c0d.squirrel@www.codeaurora.org>
-	<201007281950.20847.arnd@arndb.de>
-	<20100728212156.GA6729@n2100.arm.linux.org.uk>
-Message-ID: <20100729131500Q.fujita.tomonori@lab.ntt.co.jp>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Thu, 29 Jul 2010 14:05:47 +0900
+Subject: [PATCH v2] ARM: Samsung SoC: clksrc-clk: wait for the stable SRC/DIV
+	status.
+Message-ID: <1280379947-7362-1-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Jul 2010 22:21:56 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Many MUX and clock dividers have a status bit so that users can wait
+until the status is stable. When corresponding registers are accessed
+while a clock is not stable, we may suffer from unexpected errors.
 
-> On Wed, Jul 28, 2010 at 07:50:20PM +0200, Arnd Bergmann wrote:
-> > The DMA API is extremely flexible, it works just fine with all the
-> > IOMMUs that I've seen so far. Please take a look at
-> > include/asm-generic/dma-mapping-common.h and its users to see how
-> > to use multiple IOMMUs depending on the device.
-> 
-> We don't yet use those DMA API interface extensions because we haven't
-> had the need.  If someone who has the need wants to put the effort in
-> though...
-> 
-> One of the problems with it though is the abstraction of the sync*
-> operations is the wrong way around for stuff like dmabounce - we want
-> to be passed the base address of the buffer (so we can look this up),
-> plus offset and length.  We don't want to know just the region which
-> is affected.
+Therefore, we introduce a mechanism to let the operations related with
+updating SRC/DIV registers of clksrc-clk wait for the stabilization:
+clk_set_parent, clk_set_rate.
 
-We can't pass the base address because the DMA API callers don't pass
-the base address for dma_sync_single_for_{device|cpu}.
+In order to use this feature, the definition of clksrc_clk should
+include reg_src_stable or reg_div_stable. With effective rec_src_stable
+values, clk_set_parent returns with a stabilized SRC register and
+with effective rec_div_stable values, clk_set_rate returns with a
+stabilized DIV register. If .reg field is null, its (either SRC or DIV)
+register's status is not checked and returned without waiting; i.e.,
+some MUX/DIV may not need this feature.
 
-dma_sync_single_range_for_* requires the base address but they are
-obsolete.
+When setting reg_*_stable, .size is used to tell the value of "stable".
+If .size = 0, the stable status is 0 and if .size = 1, the stable status
+is 1.
 
-So you need to fix dmabounce. Actually, I send you a patch to fix
-dmabounce long ago (looks like not applied yet):
+Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+--
+v2 changes:
+	- Wait-for-stable loop is described at an inline function.
 
-http://kerneltrap.org/mailarchive/linux-netdev/2010/4/5/6274046
+---
+ arch/arm/plat-samsung/clock-clksrc.c              |   13 +++++++++++++
+ arch/arm/plat-samsung/include/plat/clock-clksrc.h |   10 ++++++++++
+ 2 files changed, 23 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-samsung/clock-clksrc.c b/arch/arm/plat-samsung/clock-clksrc.c
+index 46d204a..eeaf8f4 100644
+--- a/arch/arm/plat-samsung/clock-clksrc.c
++++ b/arch/arm/plat-samsung/clock-clksrc.c
+@@ -50,6 +50,14 @@ static unsigned long s3c_getrate_clksrc(struct clk *clk)
+ 	return rate;
+ }
+ 
++static inline void s3c_wait_for_stable(struct clksrc_reg *stable)
++{
++	if (stable->reg) {
++		do { } while (((__raw_readl(stable->reg) >> stable->shift) & 1)
++				!= stable->size);
++	}
++}
++
+ static int s3c_setrate_clksrc(struct clk *clk, unsigned long rate)
+ {
+ 	struct clksrc_clk *sclk = to_clksrc(clk);
+@@ -68,6 +76,8 @@ static int s3c_setrate_clksrc(struct clk *clk, unsigned long rate)
+ 	val |= (div - 1) << sclk->reg_div.shift;
+ 	__raw_writel(val, reg);
+ 
++	s3c_wait_for_stable(&sclk->reg_div_stable);
++
+ 	return 0;
+ }
+ 
+@@ -93,6 +103,9 @@ static int s3c_setparent_clksrc(struct clk *clk, struct clk *parent)
+ 		clksrc |= src_nr << sclk->reg_src.shift;
+ 
+ 		__raw_writel(clksrc, sclk->reg_src.reg);
++
++		s3c_wait_for_stable(&sclk->reg_src_stable);
++
+ 		return 0;
+ 	}
+ 
+diff --git a/arch/arm/plat-samsung/include/plat/clock-clksrc.h b/arch/arm/plat-samsung/include/plat/clock-clksrc.h
+index 50a8ca7..282821d 100644
+--- a/arch/arm/plat-samsung/include/plat/clock-clksrc.h
++++ b/arch/arm/plat-samsung/include/plat/clock-clksrc.h
+@@ -45,6 +45,13 @@ struct clksrc_reg {
+  * @sources: the sources for this clock
+  * @reg_src: the register definition for selecting the clock's source
+  * @reg_div: the register definition for the clock's output divisor
++ * @reg_src_stable: the register definition to probe if reg_src is
++ *    stabilized after the update of reg_src. It is "stabilized" if
++ *    reg[shift] == size. If reg == NULL, this stable reg is not looked
++ *    up. Thus, in S5PV210, size is usually 0.
++ * @reg_div_stable: the register definition to probe if reg_div is
++ *    stabilized after the update of reg_div. Same mechanism with
++ *    reg_src_stable.
+  *
+  * This clock implements the features required by the newer SoCs where
+  * the standard clock block provides an input mux and a post-mux divisor
+@@ -61,6 +68,9 @@ struct clksrc_clk {
+ 
+ 	struct clksrc_reg	reg_src;
+ 	struct clksrc_reg	reg_div;
++
++	struct clksrc_reg	reg_src_stable;
++	struct clksrc_reg	reg_div_stable;
+ };
+ 
+ /**
+-- 
+1.6.3.3
