@@ -1,610 +1,134 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Thu, 29 Jul 2010 13:04:55 +0300
-Subject: [PATCH 01/13] [ARM] pxa/palm: Introduce Palm27x
-In-Reply-To: <1280373389-32475-1-git-send-email-marek.vasut@gmail.com>
+From: wookey@wookware.org (Wookey)
+Date: Thu, 29 Jul 2010 11:10:55 +0100
+Subject: [PATCH 10/13] [ARM] pxa/balloon3: PCMCIA Support
+In-Reply-To: <1280373389-32475-10-git-send-email-marek.vasut@gmail.com>
 References: <1280373389-32475-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <4C515247.4030104@compulab.co.il>
+	<1280373389-32475-10-git-send-email-marek.vasut@gmail.com>
+Message-ID: <20100729101054.GB4981@dream.aleph1.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Vasut wrote:
-> This contains common code for Palm LD, TX, T5, Z72, Treo680, Centro
++++ Marek Vasut [2010-07-29 05:16 +0200]:
+> This driver adds support for the on-board CF socket.
 > 
 > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 > ---
->  arch/arm/mach-pxa/Kconfig                |    3 +
->  arch/arm/mach-pxa/Makefile               |    1 +
->  arch/arm/mach-pxa/include/mach/palm27x.h |   48 +++
->  arch/arm/mach-pxa/palm27x.c              |  475 ++++++++++++++++++++++++++++++
->  4 files changed, 527 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-pxa/include/mach/palm27x.h
->  create mode 100644 arch/arm/mach-pxa/palm27x.c
+>  arch/arm/mach-pxa/balloon3.c              |   13 ++-
+>  arch/arm/mach-pxa/include/mach/balloon3.h |   17 ---
+>  drivers/pcmcia/Kconfig                    |    2 +-
+>  drivers/pcmcia/Makefile                   |    1 +
+>  drivers/pcmcia/pxa2xx_balloon3.c          |  199 +++++++++++++++++++++++++++++
+>  5 files changed, 213 insertions(+), 19 deletions(-)
+>  create mode 100644 drivers/pcmcia/pxa2xx_balloon3.c
 > 
-> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-> index 21d1224..6f04f21 100644
-> --- a/arch/arm/mach-pxa/Kconfig
-> +++ b/arch/arm/mach-pxa/Kconfig
-> @@ -347,6 +347,9 @@ config ARCH_PXA_PALM
->  	bool "PXA based Palm PDAs"
->  	select HAVE_PWM
+> diff --git a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
+> index 572525c..91ad56d 100644
+> --- a/arch/arm/mach-pxa/balloon3.c
+> +++ b/arch/arm/mach-pxa/balloon3.c
+> @@ -88,6 +88,18 @@ static unsigned long balloon3_pin_config[] __initdata = {
+>  	/* USB Host */
+>  	GPIO88_USBH1_PWR,
+>  	GPIO89_USBH1_PEN,
+> +
+> +	/* PC Card */
+> +	GPIO48_nPOE,
+> +	GPIO49_nPWE,
+> +	GPIO50_nPIOR,
+> +	GPIO51_nPIOW,
+> +	GPIO85_nPCE_1,
+> +	GPIO54_nPCE_2,
+> +	GPIO79_PSKTSEL,
+> +	GPIO55_nPREG,
+> +	GPIO56_nPWAIT,
+> +	GPIO57_nIOIS16,
+>  };
 >  
-> +config MACH_PALM27X
-> +	bool
-> +
->  config MACH_PALMTE2
->  	bool "Palm Tungsten|E2"
->  	default y
-> diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
-> index cb408ef..85c7fb3 100644
-> --- a/arch/arm/mach-pxa/Makefile
-> +++ b/arch/arm/mach-pxa/Makefile
-> @@ -75,6 +75,7 @@ obj-$(CONFIG_PXA_EZX)           += ezx.o
->  obj-$(CONFIG_MACH_MP900C)	+= mp900.o
->  obj-$(CONFIG_MACH_PALMTE2)	+= palmte2.o
->  obj-$(CONFIG_MACH_PALMTC)	+= palmtc.o
-> +obj-$(CONFIG_MACH_PALM27X)	+= palm27x.o
->  obj-$(CONFIG_MACH_PALMT5)	+= palmt5.o
->  obj-$(CONFIG_MACH_PALMTX)	+= palmtx.o
->  obj-$(CONFIG_MACH_PALMZ72)	+= palmz72.o
-> diff --git a/arch/arm/mach-pxa/include/mach/palm27x.h b/arch/arm/mach-pxa/include/mach/palm27x.h
+>  /******************************************************************************
+> @@ -405,7 +417,6 @@ static void balloon3_irq_handler(unsigned int irq, struct irq_desc *desc)
+>  {
+>  	unsigned long pending = __raw_readl(BALLOON3_INT_CONTROL_REG) &
+>  					balloon3_irq_enabled;
+> -
+>  	do {
+>  		/* clear useless edge notification */
+>  		if (desc->chip->ack)
+> diff --git a/arch/arm/mach-pxa/include/mach/balloon3.h b/arch/arm/mach-pxa/include/mach/balloon3.h
+> index 1a74106..14f4bd5 100644
+> --- a/arch/arm/mach-pxa/include/mach/balloon3.h
+> +++ b/arch/arm/mach-pxa/include/mach/balloon3.h
+> @@ -26,10 +26,6 @@ enum balloon3_features {
+>  #define BALLOON3_FPGA_VIRT	(0xf1000000)	/* as per balloon2 */
+>  #define BALLOON3_FPGA_LENGTH	0x01000000
+>  
+> -/* FPGA/CPLD registers */
+> -#define BALLOON3_PCMCIA0_REG		(BALLOON3_FPGA_VIRT + 0x00e00008)
+> -/* fixme - same for now */
+> -#define BALLOON3_PCMCIA1_REG		(BALLOON3_FPGA_VIRT + 0x00e00008)
+>  #define BALLOON3_NANDIO_IO_REG		(BALLOON3_FPGA_VIRT + 0x00e00000)
+>  /* fpga/cpld interrupt control register */
+>  #define BALLOON3_INT_CONTROL_REG	(BALLOON3_FPGA_VIRT + 0x00e0000C)
+> @@ -58,16 +54,6 @@ enum balloon3_features {
+>  #define BALLOON3_INT_S0_IRQ		(1 << 0)  /* PCMCIA 0 IRQ */
+>  #define BALLOON3_INT_S0_STSCHG		(1 << 1)  /* PCMCIA 0 status changed */
+>  
+> -/* CF Status Register */
+> -#define BALLOON3_PCMCIA_nIRQ		(1 << 0)  /* IRQ / ready signal */
+> -#define BALLOON3_PCMCIA_nSTSCHG_BVD1	(1 << 1)
+> -					/* VDD sense / card status changed */
+> -
+> -/* CF control register (write) */
+> -#define BALLOON3_PCMCIA_RESET		(1 << 0)   /* Card reset signal */
+> -#define BALLOON3_PCMCIA_ENABLE		(1 << 1)
+> -#define BALLOON3_PCMCIA_ADD_ENABLE	(1 << 2)
+> -
+> -#define BALLOON3_BP_CF_NRDY_IRQ	BALLOON3_IRQ(0)
+> -#define BALLOON3_BP_NSTSCHG_IRQ	BALLOON3_IRQ(1)
+> -
+
+
+> diff --git a/drivers/pcmcia/pxa2xx_balloon3.c b/drivers/pcmcia/pxa2xx_balloon3.c
 > new file mode 100644
-> index 0000000..94ae6d9
+> index 0000000..1f71f0d
 > --- /dev/null
-> +++ b/arch/arm/mach-pxa/include/mach/palm27x.h
-
-Does it have to be in arch/arm/mach-pxa/include/mach/? I'd move it to
-arch/arm/mach-pxa/ to reduce the header visibility
-
-> @@ -0,0 +1,48 @@
+> +++ b/drivers/pcmcia/pxa2xx_balloon3.c
+> @@ -0,0 +1,199 @@
 > +/*
-> + * Common functions for Palm LD, T5, TX, Z72
-> + *
-> + * Copyright (C) 2010
-> + * Marek Vasut <marek.vasut@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
+> + * FPGA / CPLD register offsets for CF socket
 > + */
+> +#define	BALLOON3_CF_STATUS_REG		(0x10e00008)
+> +#define	BALLOON3_CF_CONTROL_REG		(0x10e00008)
+> +#define BALLOON3_FPGA_VER		(0x10e0001c)
 > +
-> +struct palm27x_handheld {
-> +	/* SD/MMC */
-> +	int		mmc_detect;
-> +	int		mmc_ro;
-> +	int		mmc_power;
+> +/* CF Status Register bits (read-only) bits */
+> +#define BALLOON3_CF_nIRQ		(1 << 0)
+> +#define BALLOON3_CF_nSTSCHG_BVD1	(1 << 1)
 > +
-> +	/* PM */
-> +	unsigned long	pm_str_base;
+> +/* CF Control Set Register bits / CF Control Clear Register bits (write-only) */
+> +#define BALLOON3_CF_RESET		(1 << 0)
+> +#define BALLOON3_CF_ENABLE		(1 << 1)
+> +#define BALLOON3_CF_ADD_ENABLE		(1 << 2)
 > +
-> +	/* UDC */
-> +	int		udc_detect;
-> +	int		udc_pullup;
-> +
-> +	/* IrDA */
-> +	int		irda_pwdn;
-> +
-> +	/* Battery */
-> +	int		batt_minv;
-> +	int		batt_maxv;
-> +
-> +	/* Audio */
-> +	int		jack_gpio;
-> +
-> +	/* Backlight */
-> +	int		bl_bl;
-> +	int		bl_lcd;
-> +
-> +	/* Power supply */
-> +	int		power_ac;
-> +	int		power_usb;
-> +
-> +	/* LCD */
-> +	int		lcd_power;
-> +};
-> +
-> +extern void __init palm27x_common_init(struct palm27x_handheld *);
-> diff --git a/arch/arm/mach-pxa/palm27x.c b/arch/arm/mach-pxa/palm27x.c
-> new file mode 100644
-> index 0000000..ff5ee8c
-> --- /dev/null
-> +++ b/arch/arm/mach-pxa/palm27x.c
-> @@ -0,0 +1,475 @@
-> +/*
-> + * Common code for Palm LD, T5, TX, Z72
-> + *
-> + * Copyright (C) 2010
-> + * Marek Vasut <marek.vasut@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#include <linux/platform_device.h>
-> +#include <linux/delay.h>
-> +#include <linux/irq.h>
-> +#include <linux/gpio_keys.h>
-> +#include <linux/input.h>
-> +#include <linux/pda_power.h>
-> +#include <linux/pwm_backlight.h>
-> +#include <linux/gpio.h>
-> +#include <linux/wm97xx.h>
-> +#include <linux/power_supply.h>
-> +#include <linux/usb/gpio_vbus.h>
-> +
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/map.h>
-> +
-> +#include <mach/pxa27x.h>
-> +#include <mach/audio.h>
-> +#include <mach/mmc.h>
-> +#include <mach/pxafb.h>
-> +#include <mach/irda.h>
-> +#include <mach/udc.h>
-> +#include <mach/palmasoc.h>
-> +#include <mach/palm27x.h>
-> +
-> +#include "generic.h"
-> +#include "devices.h"
-> +
-> +/******************************************************************************
-> + * SD/MMC card controller
-> + ******************************************************************************/
-> +#if defined(CONFIG_MMC_PXA) || defined(CONFIG_MMC_PXA_MODULE)
-> +static struct pxamci_platform_data palm27x_mci_platform_data = {
-> +	.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34,
-> +	.detect_delay_ms	= 200,
-> +};
-> +
-> +static void __init palm27x_mmc_init(int detect, int ro, int power)
-> +{
-> +	palm27x_mci_platform_data.gpio_card_detect	= detect;
-> +	palm27x_mci_platform_data.gpio_card_ro		= ro;
-> +	palm27x_mci_platform_data.gpio_power		= power;
-> +
-> +	if (machine_is_palmz72() || machine_is_centro())
-> +		palm27x_mci_platform_data.gpio_power_invert = 1;
-> +
-> +	pxa_set_mci_info(&palm27x_mci_platform_data);
-> +}
-> +#else
-> +static inline void palm27x_mmc_init(int detect, int ro, int power) {}
-> +#endif
-> +
-> +/******************************************************************************
-> + * Power management - standby
-> + ******************************************************************************/
-> +#if defined(CONFIG_SUSPEND)
-> +static void __init palm27x_pm_init(unsigned long str_base)
-> +{
-> +	static const unsigned long resume[] = {
-> +		0xe3a00101,	/* mov	r0,	#0x40000000 */
-> +		0xe380060f,	/* orr	r0, r0, #0x00f00000 */
-> +		0xe590f008,	/* ldr	pc, [r0, #0x08] */
-> +	};
-> +
-> +	/*
-> +	 * Copy the bootloader.
-> +	 * NOTE: PalmZ72 uses a different wakeup method!
-> +	 */
-> +	if (!machine_is_palmz72())
-> +		memcpy(phys_to_virt(str_base), resume, sizeof(resume));
-> +}
-> +#else
-> +static inline void palm27x_pm_init(unsigned long str_base) {}
-> +#endif
-> +
-> +/******************************************************************************
-> + * Framebuffer
-> + ******************************************************************************/
-> +/*
-> + * NOTE: PalmZ72 has so called HiRes screen -- 320x320
-> + *       The rest of devices has HiRes+ screen -- 320x480
-> + */
-> +#if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
-> +static struct pxafb_mode_info palm27x_modes[] = {
-> +	{
-> +		.pixclock	= 57692,
-> +		.xres		= 320,
-> +		.yres		= 480,
-> +		.bpp		= 16,
-> +
-> +		.left_margin	= 32,
-> +		.right_margin	= 1,
-> +		.upper_margin	= 7,
-> +		.lower_margin	= 1,
-> +
-> +		.hsync_len	= 4,
-> +		.vsync_len	= 1,
-> +	}, {
-> +		.pixclock	= 115384,
-> +		.xres		= 320,
-> +		.yres		= 320,
-> +		.bpp		= 16,
-> +
-> +		.left_margin	= 27,
-> +		.right_margin	= 7,
-> +		.upper_margin	= 7,
-> +		.lower_margin	= 8,
-> +
-> +		.hsync_len	= 6,
-> +		.vsync_len	= 1,
-> +	}, {
-> +		.pixclock	= 86538,
-> +		.xres		= 320,
-> +		.yres		= 320,
-> +		.bpp		= 16,
-> +
-> +		.left_margin	= 20,
-> +		.right_margin	= 8,
-> +		.upper_margin	= 8,
-> +		.lower_margin	= 5,
-> +
-> +		.hsync_len	= 4,
-> +		.vsync_len	= 1,
-> +	}
-> +};
+> +/* CF Interrupt sources */
+> +#define BALLOON3_BP_CF_NRDY_IRQ		BALLOON3_IRQ(0)
+> +#define BALLOON3_BP_NSTSCHG_IRQ		BALLOON3_IRQ(1)
 
-I think that keeping three structures is more readable than the array, i.e
-static struct pxafb_mode_info palmz72_mode = {
-...
-};
+erm. Why move the FPGA/CPLD register definitions out of balloon3.h
+(along with the others) and put them in balloon3.c?
+Is that really good kernel form?
 
-static struct pxafb_mode_info palmz72_mode = {
-...
-};
-
-static struct pxafb_mode_info treo_centro_mode = {
-...
-};
-
-static struct pxafb_mode_info palmz72x_mode = {
-...
-};
+And surely keeping the FPGA_VIRT offset makes it clearer where the
+magic addresses come from?
 
 
-> +static struct pxafb_mach_info palm27x_lcd_screen = {
-> +	.num_modes	= 1,
-> +	.lcd_conn	= LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
-> +};
-> +
-> +static int palm27x_lcd_power;
-> +static void palm27x_lcd_ctl(int on, struct fb_var_screeninfo *info)
-> +{
-> +	gpio_set_value(palm27x_lcd_power, on);
-> +}
-> +
-> +static void __init palm27x_lcd_init(int power)
-> +{
-> +	if (machine_is_palmz72())
-> +		palm27x_lcd_screen.modes = &palm27x_modes[1];
-> +	else if (machine_is_treo680() || machine_is_centro())
-> +		palm27x_lcd_screen.modes = &palm27x_modes[2];
-> +	else
-> +		palm27x_lcd_screen.modes = &palm27x_modes[0];
-> +
-> +	if (gpio_is_valid(power)) {
-> +		if (!gpio_request(power, "LCD power")) {
-> +			pr_err("Palm27x: failed to claim lcd power gpio!\n");
-> +			return;
-> +		}
-> +		if (!gpio_direction_output(power, 1)) {
-> +			pr_err("Palm27x: lcd power configuration failed!\n");
-> +			return;
-> +		}
-> +		palm27x_lcd_power = power;
-> +		palm27x_lcd_screen.pxafb_lcd_power = palm27x_lcd_ctl;
-> +	}
-> +
-> +	set_pxa_fb_info(&palm27x_lcd_screen);
-> +}
-> +
-> +#else
-> +static inline void palm27x_lcd_init(int power) {}
-> +#endif
-> +
-> +/******************************************************************************
-> + * USB Gadget
-> + ******************************************************************************/
-> +#if	defined(CONFIG_USB_GADGET_PXA27X) || \
-> +	defined(CONFIG_USB_GADGET_PXA27X_MODULE)
-> +static struct gpio_vbus_mach_info palm27x_udc_info = {
-> +	.gpio_vbus_inverted	= 1,
-> +};
-> +
-> +static struct platform_device palm27x_gpio_vbus = {
-> +	.name	= "gpio-vbus",
-> +	.id	= -1,
-> +	.dev	= {
-> +		.platform_data	= &palm27x_udc_info,
-> +	},
-> +};
-> +
-> +static void __init palm27x_udc_init(int vbus, int pullup)
-> +{
-> +	if (machine_is_palmld())
-> +		return;
-> +
-> +	palm27x_udc_info.gpio_vbus	= vbus;
-> +	palm27x_udc_info.gpio_pullup	= pullup;
-> +
-> +	if (machine_is_palmz72())
-> +		palm27x_udc_info.gpio_vbus_inverted = 0;
-> +
-> +	if (!gpio_request(pullup, "USB Pullup")) {
-> +		gpio_direction_output(pullup,
-> +			palm27x_udc_info.gpio_vbus_inverted);
-> +		gpio_free(pullup);
-> +	} else
-> +		return;
-> +
-> +	platform_device_register(&palm27x_gpio_vbus);
-> +}
-> +#else
-> +static inline void palm27x_udc_init(int vbus, int pullup) {}
-> +#endif
-> +
-> +/******************************************************************************
-> + * IrDA
-> + ******************************************************************************/
-> +#if defined(CONFIG_IRDA) || defined(CONFIG_IRDA_MODULE)
-> +static struct pxaficp_platform_data palm27x_ficp_platform_data = {
-> +	.transceiver_cap	= IR_SIRMODE | IR_OFF,
-> +};
-> +
-> +static void __init palm27x_irda_init(int pwdn)
-> +{
-> +	palm27x_ficp_platform_data.gpio_pwdown = pwdn;
-> +	pxa_set_ficp_info(&palm27x_ficp_platform_data);
-> +}
-> +#else
-> +static inline void palm27x_irda_init(int pwdn) {}
-> +#endif
-> +
-> +/******************************************************************************
-> + * WM97xx audio, battery
-> + ******************************************************************************/
-> +#if	defined(CONFIG_TOUCHSCREEN_WM97XX) || \
-> +	defined(CONFIG_TOUCHSCREEN_WM97XX_MODULE)
-> +static struct wm97xx_batt_pdata palm27x_batt_pdata = {
-> +	.batt_aux	= WM97XX_AUX_ID3,
-> +	.temp_aux	= WM97XX_AUX_ID2,
-> +	.charge_gpio	= -1,
-> +	.batt_mult	= 1000,
-> +	.batt_div	= 414,
-> +	.temp_mult	= 1,
-> +	.temp_div	= 1,
-> +	.batt_tech	= POWER_SUPPLY_TECHNOLOGY_LIPO,
-> +	.batt_name	= "main-batt",
-> +};
-> +
-> +static struct wm97xx_pdata palm27x_wm97xx_pdata = {
-> +	.batt_pdata	= &palm27x_batt_pdata,
-> +};
-> +
-> +static pxa2xx_audio_ops_t palm27x_ac97_pdata = {
-> +	.codec_pdata	= { &palm27x_wm97xx_pdata, },
-> +};
-> +
-> +static struct palm27x_asoc_info palm27x_asoc_pdata = {
-> +	.jack_gpio	= -1,
-> +};
-> +
-> +static struct platform_device palm27x_asoc = {
-> +	.name = "palm27x-asoc",
-> +	.id   = -1,
-> +	.dev  = {
-> +		.platform_data = &palm27x_asoc_pdata,
-> +	},
-> +};
-> +
-> +static void __init palm27x_ac97_init(int minv, int maxv, int jack)
-> +{
-> +	if (!machine_is_palmz72())
-> +		palm27x_ac97_pdata.reset_gpio = 95;
-> +	else
-> +		palm27x_asoc_pdata.jack_gpio = jack;
-> +
-> +	if (machine_is_treo680() || machine_is_centro()) {
-> +		palm27x_ac97_pdata.codec_pdata[0] = NULL;
-> +		pxa_set_ac97_info(&palm27x_ac97_pdata);
-> +	} else {
-> +		palm27x_batt_pdata.min_voltage	= minv,
-> +		palm27x_batt_pdata.max_voltage	= maxv,
-> +
-> +		pxa_set_ac97_info(&palm27x_ac97_pdata);
-> +		platform_device_register(&palm27x_asoc);
-> +	}
-> +}
-> +#else
-> +static inline void palm27x_ac97_init(int minv, int maxv, int jack) {}
-> +#endif
-> +
-> +/******************************************************************************
-> + * Backlight
-> + ******************************************************************************/
-> +#if defined(CONFIG_BACKLIGHT_PWM) || defined(CONFIG_BACKLIGHT_PWM_MODULE)
-> +struct {
-> +	int	bl_power;
-> +	int	lcd_power;
-> +} palm27x_bl_info;
-> +
-> +static int palm27x_backlight_init(struct device *dev)
-> +{
-> +	int ret;
-> +
-> +	ret = gpio_request(palm27x_bl_info.bl_power, "BL POWER");
-> +	if (ret)
-> +		goto err;
-> +	ret = gpio_direction_output(palm27x_bl_info.bl_power, 0);
-> +	if (ret)
-> +		goto err2;
-> +
-> +	if (gpio_is_valid(palm27x_bl_info.lcd_power)) {
-> +		ret = gpio_request(palm27x_bl_info.lcd_power, "LCD POWER");
-> +		if (ret)
-> +			goto err2;
-> +		ret = gpio_direction_output(palm27x_bl_info.lcd_power, 0);
-> +		if (ret)
-> +			goto err3;
-> +	}
-> +
-> +	return 0;
-> +err3:
-> +	gpio_free(palm27x_bl_info.lcd_power);
-> +err2:
-> +	gpio_free(palm27x_bl_info.bl_power);
-> +err:
-> +	return ret;
-> +}
-> +
-> +static int palm27x_backlight_notify(struct device *dev, int brightness)
-> +{
-> +	gpio_set_value(palm27x_bl_info.bl_power, brightness);
-> +	if (gpio_is_valid(palm27x_bl_info.lcd_power))
-> +		gpio_set_value(palm27x_bl_info.lcd_power, brightness);
-> +	return brightness;
-> +}
-> +
-> +static void palm27x_backlight_exit(struct device *dev)
-> +{
-> +	gpio_free(palm27x_bl_info.bl_power);
-> +	if (gpio_is_valid(palm27x_bl_info.lcd_power))
-> +		gpio_free(palm27x_bl_info.lcd_power);
-> +}
-> +
-> +static struct platform_pwm_backlight_data palm27x_backlight_data = {
-> +	.pwm_id		= 0,
-> +	.max_brightness	= 0xfe,
-> +	.dft_brightness	= 0x7e,
-> +	.pwm_period_ns	= 3500,
-> +	.init		= palm27x_backlight_init,
-> +	.notify		= palm27x_backlight_notify,
-> +	.exit		= palm27x_backlight_exit,
-> +};
-> +
-> +static struct platform_device palm27x_backlight = {
-> +	.name	= "pwm-backlight",
-> +	.dev	= {
-> +		.parent		= &pxa27x_device_pwm0.dev,
-> +		.platform_data	= &palm27x_backlight_data,
-> +	},
-> +};
-> +
-> +static void __init palm27x_pwm_init(int bl, int lcd)
-> +{
-> +	palm27x_bl_info.bl_power	= bl;
-> +	palm27x_bl_info.lcd_power	= lcd;
-> +	platform_device_register(&palm27x_backlight);
-> +}
-> +#else
-> +static inline void palm27x_pwm_init(int bl, int lcd) {}
-> +#endif
-> +
-> +/******************************************************************************
-> + * Power supply
-> + ******************************************************************************/
-> +#if defined(CONFIG_PDA_POWER) || defined(CONFIG_PDA_POWER_MODULE)
-> +struct {
-> +	int	ac_state;
-> +	int	usb_state;
-> +} palm27x_power_info;
-> +
-> +static int palm27x_power_supply_init(struct device *dev)
-> +{
-> +	int ret;
-> +
-> +	ret = gpio_request(palm27x_power_info.ac_state, "AC state");
-> +	if (ret)
-> +		goto err1;
-> +	ret = gpio_direction_input(palm27x_power_info.ac_state);
-> +	if (ret)
-> +		goto err2;
-> +
-> +	if (gpio_is_valid(palm27x_power_info.usb_state)) {
-> +		ret = gpio_request(palm27x_power_info.usb_state, "USB state");
-> +		if (ret)
-> +			goto err2;
-> +		ret = gpio_direction_input(palm27x_power_info.usb_state);
-> +		if (ret)
-> +			goto err3;
-> +	}
-> +
-> +	return 0;
-> +err3:
-> +	gpio_free(palm27x_power_info.usb_state);
-> +err2:
-> +	gpio_free(palm27x_power_info.ac_state);
-> +err1:
-> +	return ret;
-> +}
-> +
-> +static void palm27x_power_supply_exit(struct device *dev)
-> +{
-> +	gpio_free(palm27x_power_info.usb_state);
-> +	gpio_free(palm27x_power_info.ac_state);
-> +}
-> +
-> +static int palm27x_is_ac_online(void)
-> +{
-> +	return gpio_get_value(palm27x_power_info.ac_state);
-> +}
-> +
-> +static int palm27x_is_usb_online(void)
-> +{
-> +	return !gpio_get_value(palm27x_power_info.usb_state);
-> +}
-> +static char *palm27x_supplicants[] = {
-> +	"main-battery",
-> +};
-> +
-> +static struct pda_power_pdata palm27x_ps_info = {
-> +	.init			= palm27x_power_supply_init,
-> +	.exit			= palm27x_power_supply_exit,
-> +	.is_ac_online		= palm27x_is_ac_online,
-> +	.is_usb_online		= palm27x_is_usb_online,
-> +	.supplied_to		= palm27x_supplicants,
-> +	.num_supplicants	= ARRAY_SIZE(palm27x_supplicants),
-> +};
-> +
-> +static struct platform_device palm27x_power_supply = {
-> +	.name = "pda-power",
-> +	.id   = -1,
-> +	.dev  = {
-> +		.platform_data = &palm27x_ps_info,
-> +	},
-> +};
-> +
-> +static void __init palm27x_power_init(int ac, int usb)
-> +{
-> +	palm27x_power_info.ac_state	= ac;
-> +	palm27x_power_info.usb_state	= usb;
-> +	platform_device_register(&palm27x_power_supply);
-> +}
-> +#else
-> +static inline void palm27x_power_init(int ac, int usb) {}
-> +#endif
-> +
-> +void __init palm27x_common_init(struct palm27x_handheld *palm)
-> +{
-> +	pxa_set_ffuart_info(NULL);
-> +	pxa_set_btuart_info(NULL);
-> +	pxa_set_stuart_info(NULL);
-> +
-> +	palm27x_mmc_init(palm->mmc_detect, palm->mmc_ro, palm->mmc_power);
-> +	palm27x_pm_init(palm->pm_str_base);
-> +	palm27x_lcd_init(palm->lcd_power);
-> +	palm27x_udc_init(palm->udc_detect, palm->udc_pullup);
-> +	palm27x_irda_init(palm->irda_pwdn);
-> +	palm27x_ac97_init(palm->batt_minv, palm->batt_maxv, palm->jack_gpio);
-> +	palm27x_pwm_init(palm->bl_bl, palm->bl_lcd);
-> +	palm27x_power_init(palm->power_ac, palm->power_usb);
-> +}
+And finally as this code is quite dependent on VHDL version numbers
+and we know we have a number of incompatible versions around
+should we add a version check to ensure that we have the same VHDL
+version as the driver is expecting? I guess it should be of the 'at
+least n' form, otherwise later VHDL updates would break the driver,
+probbaly for no good reason.
 
 
+Wookey
 -- 
-Sincerely yours,
-Mike.
+Principal hats:  Linaro, Emdebian, Wookware, Balloonboard, ARM
+http://wookware.org/
