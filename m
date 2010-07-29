@@ -1,37 +1,40 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 29 Jul 2010 11:11:38 +0200
-Subject: [PATCH] video/imxfb.c: allow usage without BACKLIGHT_CLASS_DEVICE
-In-Reply-To: <1280392978-25405-1-git-send-email-eric@eukrea.com>
-References: <20100729051647.GA11268@pengutronix.de>
-	<1280392978-25405-1-git-send-email-eric@eukrea.com>
-Message-ID: <20100729091138.GA6268@pengutronix.de>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Thu, 29 Jul 2010 18:14:49 +0900
+Subject: [PATCH 1/2] arm: msm: Add System MMU support.
+In-Reply-To: <20100729090607.GN26098@amd.com>
+References: <20100729084018.GM26098@amd.com>
+	<20100729174621W.fujita.tomonori@lab.ntt.co.jp>
+	<20100729090607.GN26098@amd.com>
+Message-ID: <20100729181412H.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 29, 2010 at 10:42:58AM +0200, Eric B?nard wrote:
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> ---
->  drivers/video/imxfb.c |   13 +++++++++++--
->  1 files changed, 11 insertions(+), 2 deletions(-)
+On Thu, 29 Jul 2010 11:06:08 +0200
+"Roedel, Joerg" <Joerg.Roedel@amd.com> wrote:
+
+> On Thu, Jul 29, 2010 at 04:46:59AM -0400, FUJITA Tomonori wrote:
+> > On Thu, 29 Jul 2010 10:40:19 +0200
+> > "Roedel, Joerg" <Joerg.Roedel@amd.com> wrote:
+> > 
+> > > The IOMMU-API is not about SR-IOV.
+> > 
+> > That's true. However, the point is that include/iommu.h is far from
+> > the IOMMU-API.
+> > 
+> > You could still insist that include/iommu.h is designed for the
+> > generic IOMMU-API. But the fact is that it's designed for very
+> > specific purposes. No intention to make it for generic purposes.
 > 
-> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-> index 43f0639..0c2fb4d 100644
-> --- a/drivers/video/imxfb.c
-> +++ b/drivers/video/imxfb.c
-> @@ -175,7 +175,9 @@ struct imxfb_info {
->  
->  	struct imx_fb_videomode *mode;
->  	int			num_modes;
-> +#ifdef CONFIG_BACKLIGHT_CLASS_DEVICE
->  	struct backlight_device *bl;
-> +#endif
-I'm always unsure about these .._MODULE symbols.  If imxfb and backlight
-support both are compiled modular, is backlight support picked up if
-#ifdef CONFIG_BACKLIGHT_CLASS_DEVICE is used to guard it?
+> I have no clue about the ARM iommus on the omap-platform. From a quick
+> look into the header file I see some similarities to the IOMMU-API. I am
 
-Best regards
-Uwe
+ARM's iommu stuff might be more appropriate as the IOMMU-API than
+include/linux/iommu.h
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+
+> also very open for discussions about how the IOMMU-API could be extended
+> to fit the needs of other platforms. Only because nobody has tried to
+> discuss about such an effort is no reason to push the IOMMU-API back.
+
+Well, the reason (nobody has tried) might be that linux/iommu.h
+doesn't look something intended for the generic IOMMU-API.
