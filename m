@@ -1,76 +1,45 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 29 Jul 2010 10:59:52 -0400 (EDT)
-Subject: [PATCH] [ARM] highmem: fix SMP preemption bug in kmap_high_l1_vipt
-In-Reply-To: <1280366705-21334-1-git-send-email-gking@nvidia.com>
-References: <1280366705-21334-1-git-send-email-gking@nvidia.com>
-Message-ID: <alpine.LFD.2.00.1007291058140.20337@xanadu.home>
+From: vitalywool@gmail.com (Vitaly Wool)
+Date: Thu, 29 Jul 2010 18:16:19 +0200
+Subject: [PATCH v2 03/20] mmc: support embedded data field in mmc_host
+In-Reply-To: <AANLkTi=Oy8X1xMOwWL_cKBB1LWULT6=p+adUgB+AuSJS@mail.gmail.com>
+References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
+	<1279733634-21974-4-git-send-email-ohad@wizery.com>
+	<AANLkTimzA_JJ-byTDWznbL3YzeJ8LAP4M50onf2_3fBF@mail.gmail.com>
+	<AANLkTi=Oy8X1xMOwWL_cKBB1LWULT6=p+adUgB+AuSJS@mail.gmail.com>
+Message-ID: <AANLkTi=BUX59heXAW2Uf4wZo2dSS19Je54dkQ5u2YGAW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Jul 2010, gking at nvidia.com wrote:
+Hi Ohad,
 
-> From: Andrew Howe <ahowe@nvidia.com>
-> 
-> smp_processor_id() must not be called from a preemptible context (this
-> is checked by CONFIG_DEBUG_PREEMPT).  kmap_high_l1_vipt() was doing so.
-> This lead to a problem where the wrong per_cpu kmap_high_l1_vipt_depth
-> could be incremented, causing a BUG_ON(*depth <= 0); in
-> kunmap_high_l1_vipt().
-> 
-> The solution is to move the call to smp_processor_id() after the call
-> to preempt_disable().
-> 
-> Signed-off-by: Gary King <gking@nvidia.com>
+On Thu, Jul 29, 2010 at 8:00 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+>> To my understanding, this data doesn't belong to mmc_host. It's not a
+>> host data at all. E. g. imagine a GPIO IRQ for some SDIO chip -- it's
+>> totally unrelated to host.
+>>
+>> I think a cleaner way would be to introduce something similar to what
+>> we have for SPI, e. g. struct sdio_board_info. This board info will
+>> contain platform-specific stuff and vendor id/chip id for each onboard
+>> SDIO device. Then the SDIO core will pick up the appropriate data
+>> basing on vendor id/chip id.
+>
+> Can you please elaborate some more about your proposal (specifically
+> where does this sdio_board_info get set and how do function drivers
+> access it) ?
+>
+> If I understand you correctly, you suggest to have a global,
+> board-specific table of sdio_board_info structures, which would be
+> accessible to the SDIO core (through the host driver ?). When a new
+> SDIO device is found the core would search this table for the
+> appropriate sdio_board_info struct and make it accessible to the SDIO
+> function driver ?
 
-Acked-by: Nicolas Pitre <nico.as.pitre@linaro.org>
+Well, let's look at how it's implemented for SPI. There is the
+function spi_register_board_info in the SPI core which copies the
+board info into the local data structure (a linked list, actually).
+Whenever needed, the core walks through the list to find the
+appropriate board_info basing on some search key.
 
-Please forward to RMK's patch system.
+I think this may be the way to go for SDIO as well.
 
-
-> ---
->  arch/arm/mm/highmem.c |   13 ++++++++-----
->  1 files changed, 8 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-> index 086816b..6ab2440 100644
-> --- a/arch/arm/mm/highmem.c
-> +++ b/arch/arm/mm/highmem.c
-> @@ -163,19 +163,22 @@ static DEFINE_PER_CPU(int, kmap_high_l1_vipt_depth);
->  
->  void *kmap_high_l1_vipt(struct page *page, pte_t *saved_pte)
->  {
-> -	unsigned int idx, cpu = smp_processor_id();
-> -	int *depth = &per_cpu(kmap_high_l1_vipt_depth, cpu);
-> +	unsigned int idx, cpu;
-> +	int *depth;
->  	unsigned long vaddr, flags;
->  	pte_t pte, *ptep;
->  
-> +	if (!in_interrupt())
-> +		preempt_disable();
-> +
-> +	cpu = smp_processor_id();
-> +	depth = &per_cpu(kmap_high_l1_vipt_depth, cpu);
-> +
->  	idx = KM_L1_CACHE + KM_TYPE_NR * cpu;
->  	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
->  	ptep = TOP_PTE(vaddr);
->  	pte = mk_pte(page, kmap_prot);
->  
-> -	if (!in_interrupt())
-> -		preempt_disable();
-> -
->  	raw_local_irq_save(flags);
->  	(*depth)++;
->  	if (pte_val(*ptep) == pte_val(pte)) {
-> -- 
-> 1.7.0.4
-> 
-> 
-> -----------------------------------------------------------------------------------
-> This email message is for the sole use of the intended recipient(s) and may contain
-> confidential information.  Any unauthorized review, use, disclosure or distribution
-> is prohibited.  If you are not the intended recipient, please contact the sender by
-> reply email and destroy all copies of the original message.
-> -----------------------------------------------------------------------------------
-> 
+~Vitaly
