@@ -1,40 +1,22 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Thu, 29 Jul 2010 10:49:58 +0200
-Subject: [PATCH 3/3] imxfb: add pwmr controlled backlight support
-In-Reply-To: <20100729051647.GA11268@pengutronix.de>
-References: <1279285747-7860-1-git-send-email-eric@eukrea.com>
-	<1279285747-7860-2-git-send-email-eric@eukrea.com>
-	<1279285747-7860-3-git-send-email-eric@eukrea.com>
-	<20100729051647.GA11268@pengutronix.de>
-Message-ID: <4C5140B6.6030703@eukrea.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Jul 2010 09:50:56 +0100
+Subject: [PATCH 1/2] [ARM] dmabounce: add support for low bitmasks in
+	dmabounce
+In-Reply-To: <1280365067-21102-2-git-send-email-gking@nvidia.com>
+References: <1280365067-21102-1-git-send-email-gking@nvidia.com>
+	<1280365067-21102-2-git-send-email-gking@nvidia.com>
+Message-ID: <20100729085056.GA14880@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Wed, Jul 28, 2010 at 05:57:46PM -0700, gking at nvidia.com wrote:
+> some systems have devices which require DMA bounce buffers due to
+> alignment restrictions rather than address window restrictions.
+> 
+> detect when a device's DMA mask has low bits set to zero and treat
+> this as an alignment for DMA pool allocations, but ignore the low
+> bits for DMA valid window comparisons.
 
-Le 29/07/2010 07:16, Uwe Kleine-K?nig a ?crit :
->> Signed-off-by: Eric B?nard<eric@eukrea.com>
->> ---
->> v2 : updated to use backlight infrastructure
-> this should have a dependency on CONFIG_BACKLIGHT_CLASS_DEVICE.  As
-> Sascha already took your patch you can just try to build mx27_defconfig
-> on his for-rmk branch :-|
->
-> Instead of a dependency I would prefer to have imxfb usable without
-> CONFIG_BACKLIGHT_CLASS_DEVICE.  From a quick look there are drivers that
-> have that.  (I checked drivers/video/sa1100fb.c +
-> drivers/video/backlight/locomolcd.c.)
->
-I've just sent a patch which fixes this build failure with mx27_defconfig.
-When CONFIG_BACKLIGHT_CLASS_DEVICE is not selected, the driver is now as 
-it was before my patch.
-
-I'll try to put the backligh things in a driver into backlight directory 
-when I find time, which will remove the #ifdef
-
-Also, I confirm the patch you sent for 
-arch/arm/plat-mxc/include/mach/gpio.h is necessary to compile a kernel 
-using mx27_defconfig .
-
-Thanks,
-Eric
+Why can't you arrange for the originally allocated buffer to have the
+necessary alignment?  What kind of devices have this problem?  Are
+there cases where the alignment is greater than the L1 cache line size?
