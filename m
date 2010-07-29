@@ -1,49 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Jul 2010 11:44:28 +0100
-Subject: [PATCH v3 0/3] Ordered I/O accessors
-In-Reply-To: <20100728124846.GA24466@bnru02.bnr.st.com>
-References: <20100714145802.16555.48563.stgit@e102109-lin.cambridge.arm.com>
-	<20100727110310.GA11468@n2100.arm.linux.org.uk>
-	<20100728124846.GA24466@bnru02.bnr.st.com>
-Message-ID: <20100729104428.GB15621@n2100.arm.linux.org.uk>
+From: segooon@gmail.com (Kulikov Vasiliy)
+Date: Thu, 29 Jul 2010 14:44:26 +0400
+Subject: [PATCH 01/10 v2] arm: leds: check return value of request_region()
+Message-ID: <1280400267-4659-1-git-send-email-segooon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 28, 2010 at 06:18:47PM +0530, Rabin VINCENT wrote:
-> Something like the following needs to be applied to fix it.  I'll submit
-> this as a separate patch if it can't be folded in.
+request_region() may fail, if so return -EBUSY.
 
-Please submit it as a separate patch to the patch system.  Thanks.
+Signed-off-by: Kulikov Vasiliy <segooon@gmail.com>
+---
+ arch/arm/mach-shark/leds.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-> diff --git a/arch/arm/mach-ux500/include/mach/uncompress.h b/arch/arm/mach-ux500/include/mach/uncompress.h
-> index 8552eb1..0271ca0 100644
-> --- a/arch/arm/mach-ux500/include/mach/uncompress.h
-> +++ b/arch/arm/mach-ux500/include/mach/uncompress.h
-> @@ -30,22 +30,22 @@
->  static void putc(const char c)
->  {
->  	/* Do nothing if the UART is not enabled. */
-> -	if (!(readb(U8500_UART_CR) & 0x1))
-> +	if (!(__raw_readb(U8500_UART_CR) & 0x1))
->  		return;
->  
->  	if (c == '\n')
->  		putc('\r');
->  
-> -	while (readb(U8500_UART_FR) & (1 << 5))
-> +	while (__raw_readb(U8500_UART_FR) & (1 << 5))
->  		barrier();
-> -	writeb(c, U8500_UART_DR);
-> +	__raw_writeb(c, U8500_UART_DR);
->  }
->  
->  static void flush(void)
->  {
-> -	if (!(readb(U8500_UART_CR) & 0x1))
-> +	if (!(__raw_readb(U8500_UART_CR) & 0x1))
->  		return;
-> -	while (readb(U8500_UART_FR) & (1 << 3))
-> +	while (__raw_readb(U8500_UART_FR) & (1 << 3))
->  		barrier();
->  }
->  
+diff --git a/arch/arm/mach-shark/leds.c b/arch/arm/mach-shark/leds.c
+index c9e32de..cb1a8f2 100644
+--- a/arch/arm/mach-shark/leds.c
++++ b/arch/arm/mach-shark/leds.c
+@@ -155,7 +155,8 @@ static int __init leds_init(void)
+ 	leds_event = sequoia_leds_event;
+ 
+ 	/* Make LEDs independent of power-state */
+-	request_region(0x24,4,"sequoia");
++	if (request_region(0x24, 4, "sequoia") == NULL)
++		return -EBUSY;
+ 	temp = sequoia_read(0x09);
+ 	temp |= 1<<10;
+ 	sequoia_write(temp,0x09);
+-- 
+1.7.0.4
