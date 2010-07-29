@@ -1,63 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Jul 2010 12:47:26 +0100
+From: Joerg.Roedel@amd.com (Roedel, Joerg)
+Date: Thu, 29 Jul 2010 14:12:02 +0200
 Subject: [PATCH 1/2] arm: msm: Add System MMU support.
-In-Reply-To: <201007291012.05986.arnd@arndb.de>
-References: <1280270466-13503-1-git-send-email-stepanm@codeaurora.org>
-	<201007281950.20847.arnd@arndb.de>
-	<20100728212156.GA6729@n2100.arm.linux.org.uk>
-	<201007291012.05986.arnd@arndb.de>
-Message-ID: <20100729114726.GA17991@n2100.arm.linux.org.uk>
+In-Reply-To: <201007291325.48129.arnd@arndb.de>
+References: <20100729090607.GN26098@amd.com>
+	<20100729184336N.fujita.tomonori@lab.ntt.co.jp>
+	<20100729100108.GQ26098@amd.com> <201007291325.48129.arnd@arndb.de>
+Message-ID: <20100729121202.GR26098@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 29, 2010 at 10:12:05AM +0200, Arnd Bergmann wrote:
-> On Wednesday 28 July 2010 23:21:56 Russell King - ARM Linux wrote:
-> > On Wed, Jul 28, 2010 at 07:50:20PM +0200, Arnd Bergmann wrote:
-> > > The DMA API is extremely flexible, it works just fine with all the
-> > > IOMMUs that I've seen so far. Please take a look at
-> > > include/asm-generic/dma-mapping-common.h and its users to see how
-> > > to use multiple IOMMUs depending on the device.
+On Thu, Jul 29, 2010 at 07:25:47AM -0400, Arnd Bergmann wrote:
+> On Thursday 29 July 2010, Roedel, Joerg wrote:
+> 
+> > > You designed it for what you need at the time. It should have been
+> > > named appropriately to avoid confusion. Later, when we actually
+> > > understand what other IOMMUs need, we can evolve the specific API for
+> > > generic purposes. Then we can rename the API to more generic.
 > > 
-> > We don't yet use those DMA API interface extensions because we haven't
-> > had the need.  If someone who has the need wants to put the effort in
-> > though...
+> > At the time the iommu-api was written is was generic enough for what we
+> > had. So it was designed as an generic API. At this point in time nobody
+> > knew what the future requirements would we. So today it turns out that
+> > it is not generic enough anymore for latest hardware. The logical
+> > consequence is to fix this in the iommu-api.
 > 
-> Right, it shouldn't be hard now that the groundwork for that is done.
-> Also, it's only really needed if you have IOMMUs of different types in the
-> same system. If msm doesn't have any swiotlb or dmabounce devices,
-> it could always use the same implementation for all devices.
-> 
-> > One of the problems with it though is the abstraction of the sync*
-> > operations is the wrong way around for stuff like dmabounce - we want
-> > to be passed the base address of the buffer (so we can look this up),
-> > plus offset and length.  We don't want to know just the region which
-> > is affected.
-> 
-> Yes, but that is an unrelated (dmabounce specific) problem that seems to
-> be fixed by an existing patch.
+> Well, I think the real question is why we have two APIs that both claim
+> to work with IOMMUs in a generic way and how we could unify the two.
 
-It's not unrelated because it stands in the way of using that interface.
-The patch also seems to be buggy in that it doesn't fix the for_device
-case - it leaves 'off' as zero.
+The DMA-API itself does not claim to be an iommu-frontend. The purpose
+of the DMA-API is to convert physical memory addresses into dma handles
+and do all the management of these handles. Backend implementations can
+use hardware iommus for this task. But depending on the hardware in the
+system the DMA-API can very well be implemented without any hardware
+support. This is an important difference to the IOMMU-API which needs
+hardware because it exposes hardware iommu features to software.
 
-I'm also not sold on this idea that the sync_range API is being obsoleted.
-It seems to me to be a step in the wrong direction.  The range API is a
-natural subset of the 'normal' sync API, yet people are trying to shoehorn
-the range API into the 'norma' API.  If anything it's the 'normal' API
-which should be obsoleted as it provides reduced information to
-implementations, which then have to start fuzzy-matching the passed
-address.
+> The Intel and AMD IOMMU drivers currently register at both the DMA
+> API and the IOMMU API. The first one is used by everything except
+> KVM and the second is only used by KVM.
 
-If we're going to start fuzzy-matching the passed address, then I think
-we also need to add detection of overlapping mappings and BUG() on such
-cases - otherwise we risk the possibility of having multiple overlapping
-mappings and hitting the wrong mapping with this reduced-information sync
-API.
+Right. But there is also a mode where the AMD IOMMU driver only
+registers for the IOMMU-API.
 
-> The driver posted by Stepan doesn't even support the dma_sync_single_*
-> style operations, and I don't think it can run into that specific problem.
-> Are there even (hardware) IOMMUs that are connected to noncoherent
-> buses?
+> I really think we should not extend the (KVM) IOMMU API further but
+> just use the generic DMA mapping api for KVM and extend it as necessary.
+> It already has the concept of cache coherency and mapping/unmapping
+> that are in the IOMMU API and could be extended to support domains
+> as well, through the use of dma_attrs.
 
-Yes.  Virtually all ARM systems have non-cache coherent DMA.  Doesn't
-matter if there's an IOMMU or not.
+If we find a nice and clean way to expose lower-level iommu
+functionality through the DMA-API, thats fine. We could certainly
+discuss ideas in this direction.  I think this is going to be hard
+because the DMA-API today does not provide enough flexibility to let the
+user choose both sides of a io-virtual<->cpu-physical address mapping.
+Thats fine for most drivers because it makes sense for them to use the
+generic io-address-allocator the DMA-API provides but not for KVM which
+needs this flexibility.
+
+	Joerg
+
+-- 
+Joerg Roedel - AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
