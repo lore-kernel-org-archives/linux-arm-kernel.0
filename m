@@ -1,50 +1,123 @@
-From: colin.tuckley@arm.com (Colin Tuckley)
-Date: Thu, 29 Jul 2010 14:42:39 +0100
-Subject: [PATCH 02/12] mmci: fix multi block transfers
-In-Reply-To: <20100729133646.GC18923@n2100.arm.linux.org.uk>
-References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
-	<1277198267-10860-2-git-send-email-rabin.vincent@stericsson.com>
-	<20100729131858.GB18923@n2100.arm.linux.org.uk>
-	<000001cb2f22$65576150$300623f0$@tuckley@arm.com>
-	<20100729133646.GC18923@n2100.arm.linux.org.uk>
-Message-ID: <000101cb2f23$e97d1280$bc773780$@tuckley@arm.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 29 Jul 2010 15:05:22 +0200
+Subject: [PATCH] ARM: fix regression in RealView after the introduction of pclk
+Message-ID: <1280408722-31995-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+The patch to add the apb_pclk to the AMBA/PrimeCell bus broke
+RealView, since the clockdevice is not registered at probe() time.
+This moves clock initialization to interrupt initialization on
+par with e.g ux500.
 
-> No, it doesn't work on Versatile PB926 in mainline (I tried it this
-> morning)
-> because the card detection (via the ->status callback) is inverted -
-> just
-> like it was for realview.  What happens is you get commands issued to
-> the
-> card on card removal, and nothing on card insertion.
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/mach-realview/core.c            |    3 +--
+ arch/arm/mach-realview/core.h            |    1 +
+ arch/arm/mach-realview/realview_eb.c     |    2 ++
+ arch/arm/mach-realview/realview_pb1176.c |    2 ++
+ arch/arm/mach-realview/realview_pb11mp.c |    2 ++
+ arch/arm/mach-realview/realview_pba8.c   |    2 ++
+ arch/arm/mach-realview/realview_pbx.c    |    2 ++
+ 7 files changed, 12 insertions(+), 2 deletions(-)
 
-Sorry, I wasn't clear - I was talking about the current ARM tree 2.6.33-arm1
-where Catalin and I fixed Realview and Versatile so that it worked with
-GPIOLIB where the detection was done with GPIO and to revert to the old
-method on boards where the detect pins are not available as gpio.
-
-> What I'm proposing is that we get rid of these multiple levels of
-> negation
-> that we're gaining.  The negations only add additional complexity and
-> confusion over what's the right thing to return at any given point.
-
-Ack.
-
-> That means your original patch needs to be reverted, and we need to
-> change
-> the 'return !status;' to just 'return status;' in mmci.c's get_cd
-> function
-> as per my patch.
-
-More massaged than reverted I think, but Ack.
-
-> However, I think this will make GPIO on Realview wrong - iirc, the card
-> detection bits from PL061 are inverted.
-
-See above.
-
-Colin
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index d8179ea..154d10b 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -359,7 +359,7 @@ static struct clk_lookup lookups[] = {
+ 	}
+ };
+ 
+-static int __init clk_init(void)
++int __init realview_clk_init(void)
+ {
+ 	if (machine_is_realview_pb1176())
+ 		oscvco_clk.vcoreg = __io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_OSC0_OFFSET;
+@@ -370,7 +370,6 @@ static int __init clk_init(void)
+ 
+ 	return 0;
+ }
+-arch_initcall(clk_init);
+ 
+ /*
+  * CLCD support.
+diff --git a/arch/arm/mach-realview/core.h b/arch/arm/mach-realview/core.h
+index 781bca6..5536068 100644
+--- a/arch/arm/mach-realview/core.h
++++ b/arch/arm/mach-realview/core.h
+@@ -59,6 +59,7 @@ extern void __iomem *timer1_va_base;
+ extern void __iomem *timer2_va_base;
+ extern void __iomem *timer3_va_base;
+ 
++extern int realview_clk_init(void);
+ extern void realview_leds_event(led_event_t ledevt);
+ extern void realview_timer_init(unsigned int timer_irq);
+ extern int realview_flash_register(struct resource *res, u32 num);
+diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
+index 991c1f8..200bec0 100644
+--- a/arch/arm/mach-realview/realview_eb.c
++++ b/arch/arm/mach-realview/realview_eb.c
+@@ -353,6 +353,8 @@ static struct platform_device char_lcd_device = {
+ 
+ static void __init gic_init_irq(void)
+ {
++	/* Initialize clocks early so they are available */
++	realview_clk_init();
+ 	if (core_tile_eb11mp() || core_tile_a9mp()) {
+ 		unsigned int pldctrl;
+ 
+diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
+index d2be12e..0ffc872 100644
+--- a/arch/arm/mach-realview/realview_pb1176.c
++++ b/arch/arm/mach-realview/realview_pb1176.c
+@@ -303,6 +303,8 @@ static struct platform_device char_lcd_device = {
+ 
+ static void __init gic_init_irq(void)
+ {
++	/* Initialize clocks early so they are available */
++	realview_clk_init();
+ 	/* ARM1176 DevChip GIC, primary */
+ 	gic_cpu_base_addr = __io_address(REALVIEW_DC1176_GIC_CPU_BASE);
+ 	gic_dist_init(0, __io_address(REALVIEW_DC1176_GIC_DIST_BASE), IRQ_DC1176_GIC_START);
+diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
+index d591bc0..a6d02e6 100644
+--- a/arch/arm/mach-realview/realview_pb11mp.c
++++ b/arch/arm/mach-realview/realview_pb11mp.c
+@@ -301,6 +301,8 @@ static void __init gic_init_irq(void)
+ {
+ 	unsigned int pldctrl;
+ 
++	/* Initialize clocks early so they are available */
++	realview_clk_init();
+ 	/* new irq mode with no DCC */
+ 	writel(0x0000a05f, __io_address(REALVIEW_SYS_LOCK));
+ 	pldctrl = readl(__io_address(REALVIEW_SYS_BASE)	+ REALVIEW_PB11MP_SYS_PLD_CTRL1);
+diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
+index 6c37621..c226006 100644
+--- a/arch/arm/mach-realview/realview_pba8.c
++++ b/arch/arm/mach-realview/realview_pba8.c
+@@ -272,6 +272,8 @@ static struct platform_device pmu_device = {
+ 
+ static void __init gic_init_irq(void)
+ {
++	/* Initialize clocks early so they are available */
++	realview_clk_init();
+ 	/* ARM PB-A8 on-board GIC */
+ 	gic_cpu_base_addr = __io_address(REALVIEW_PBA8_GIC_CPU_BASE);
+ 	gic_dist_init(0, __io_address(REALVIEW_PBA8_GIC_DIST_BASE), IRQ_PBA8_GIC_START);
+diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
+index 9428eff..96bac42 100644
+--- a/arch/arm/mach-realview/realview_pbx.c
++++ b/arch/arm/mach-realview/realview_pbx.c
+@@ -311,6 +311,8 @@ static struct platform_device pmu_device = {
+ 
+ static void __init gic_init_irq(void)
+ {
++	/* Initialize clocks early so they are available */
++	realview_clk_init();
+ 	/* ARM PBX on-board GIC */
+ 	if (core_tile_pbx11mp() || core_tile_pbxa9mp()) {
+ 		gic_cpu_base_addr = __io_address(REALVIEW_PBX_TILE_GIC_CPU_BASE);
+-- 
+1.7.2
