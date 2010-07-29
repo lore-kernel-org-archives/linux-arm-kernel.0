@@ -1,58 +1,71 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 29 Jul 2010 10:55:25 +0900
-Subject: [PATCH 3/3] rtc: rtc-s3c: Add BCD register initialization codes
-In-Reply-To: <4C50744C.6010501@simtec.co.uk>
-References: <1279702666-13021-1-git-send-email-kgene.kim@samsung.com>
-	<1279702666-13021-4-git-send-email-kgene.kim@samsung.com>
-	<4C50744C.6010501@simtec.co.uk>
-Message-ID: <007701cb2ec1$1fe5a2a0$5fb0e7e0$%kim@samsung.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 29 Jul 2010 04:51:52 +0200
+Subject: [PULL] Various xscale fixes
+In-Reply-To: <AANLkTimPuGN-gmpr6MORScejOQJ90tLFJQ1ALtau2pYK@mail.gmail.com>
+References: <201007262204.39318.marek.vasut@gmail.com>
+	<AANLkTimPuGN-gmpr6MORScejOQJ90tLFJQ1ALtau2pYK@mail.gmail.com>
+Message-ID: <201007290451.52535.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks wrote:
+Dne St 28. ?ervence 2010 03:24:03 Eric Miao napsal(a):
+> On Tue, Jul 27, 2010 at 4:04 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> > Eric, can you please pull these changes into your -devel? Thanks!
+> > 
+> > The following changes since commit
+> > 9f5f3423ac0d786ff87ee80e7c5292b43fe0b4f9:
+> > 
+> >  Merge branch 'devel' of
+> > git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6 into
+> > devel (2010-07-22 17:14:02 +0200)
 > 
-> On 21/07/10 09:57, Kukjin Kim wrote:
-> > From: Taekgyun Ko <taeggyun.ko@samsung.com>
-> >
-> > RTC needs to be initialized when BCD registers have invalid value.
-> >
-> > Signed-off-by: Taekgyun Ko <taeggyun.ko@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> >  drivers/rtc/rtc-s3c.c |   14 ++++++++++++--
-> >  1 files changed, 12 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-> > index 2040017..e96e109 100644
-> > --- a/drivers/rtc/rtc-s3c.c
-> > +++ b/drivers/rtc/rtc-s3c.c
-> > @@ -536,10 +536,20 @@ static int __devinit s3c_rtc_probe(struct
-> platform_device *pdev)
-> >
-> >  	s3c_rtc_cpu_type = platform_get_device_id(pdev)->driver_data;
-> >
-> > -	if (s3c_rtc_cpu_type == TYPE_S3C64XX)
-> > +	if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
-> >  		rtc->max_user_freq = 32768;
-> > -	else
-> > +
-> > +		/* Check RTC Time */
-> > +
-> > +		for (i = S3C2410_RTCSEC; i <= S3C2410_RTCYEAR; i += 0x4) {
-> > +			tmp = readb(s3c_rtc_base + i);
-> > +
-> > +			if (((tmp & 0xf) > 0x9) || (((tmp >> 4) & 0xf) >
-0x9))
-> > +				writeb(0, s3c_rtc_base + i);
-> 
-> This is something we should probably do for all SoCs.
+> For a simpler history, could you please either rebase on my -devel tip
+> or rebase on a certain -rcN tagline?
 
-Yeah...ok...will move it.
+Ok, this should be it:
 
-Thanks.
+The following changes since commit 9d89308d8166a5588e49a3e3303995ccf101e9c0:
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+  [ARM] pxa: removed mostly unused and confusing two sharpsl.h (2010-07-05 
+00:06:25 +0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/marex/pxa-linux-2.6.git for-
+eric-devel
+
+Marek Vasut (13):
+      [ARM] pxa/palm: Introduce Palm27x
+      [ARM] pxa/palm: Flip Palm LD,TX,T5,Z72 to Palm27x
+      [ARM] pxa/palm: Add core pmic support for Palm27x
+      [ARM] pxa/palm: Modularize rest of code in Palms
+      [ARM] pxa/spitz: Rework spitz
+      [ARM] pxa/spitz: Formating and naming fixes
+      [ARM] pxa/z2: Fix flash layout typo
+      [ARM] pxa/balloon3: Machine file cleanup
+      [ARM] pxa/balloon3: Machine file cleanup
+      [ARM] pxa/balloon3: PCMCIA Support
+      [ARM] pxa/balloon3: PCF857x GPIO expander and LEDs
+      [ARM] pxa/balloon3: Add NAND driver
+      [ARM] pxa/balloon3: Add MAX1586 PMIC support
+
+ arch/arm/mach-pxa/Kconfig                 |    7 +
+ arch/arm/mach-pxa/Makefile                |    1 +
+ arch/arm/mach-pxa/balloon3.c              |  777 +++++++++++++++++++++++------
+ arch/arm/mach-pxa/include/mach/balloon3.h |   31 +-
+ arch/arm/mach-pxa/include/mach/palm27x.h  |   48 ++
+ arch/arm/mach-pxa/include/mach/spitz.h    |    6 +
+ arch/arm/mach-pxa/palm27x.c               |  532 ++++++++++++++++++++
+ arch/arm/mach-pxa/palmld.c                |  301 +++---------
+ arch/arm/mach-pxa/palmt5.c                |  289 ++----------
+ arch/arm/mach-pxa/palmtreo.c              |  371 +++-----------
+ arch/arm/mach-pxa/palmtx.c                |  307 ++----------
+ arch/arm/mach-pxa/palmz72.c               |  269 +---------
+ arch/arm/mach-pxa/spitz.c                 |  724 ++++++++++++++++-----------
+ arch/arm/mach-pxa/z2.c                    |    2 +-
+ drivers/pcmcia/Kconfig                    |    2 +-
+ drivers/pcmcia/Makefile                   |    1 +
+ drivers/pcmcia/pxa2xx_balloon3.c          |  199 ++++++++
+ 17 files changed, 2107 insertions(+), 1760 deletions(-)
+ create mode 100644 arch/arm/mach-pxa/include/mach/palm27x.h
+ create mode 100644 arch/arm/mach-pxa/palm27x.c
+ create mode 100644 drivers/pcmcia/pxa2xx_balloon3.c
