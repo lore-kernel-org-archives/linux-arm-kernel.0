@@ -1,30 +1,85 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Thu, 29 Jul 2010 18:44:13 +0900
-Subject: [PATCH 1/2] arm: msm: Add System MMU support.
-In-Reply-To: <20100729092821.GP26098@amd.com>
-References: <20100729090607.GN26098@amd.com>
-	<20100729181412H.fujita.tomonori@lab.ntt.co.jp>
-	<20100729092821.GP26098@amd.com>
-Message-ID: <20100729184336N.fujita.tomonori@lab.ntt.co.jp>
+From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
+Date: Thu, 29 Jul 2010 11:47:36 +0200
+Subject: [PATCH v2] video/imxfb.c: allow usage without BACKLIGHT_CLASS_DEVICE
+In-Reply-To: <20100729091138.GA6268@pengutronix.de>
+References: <20100729091138.GA6268@pengutronix.de>
+Message-ID: <1280396856-4884-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Jul 2010 11:28:21 +0200
-"Roedel, Joerg" <Joerg.Roedel@amd.com> wrote:
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+---
+v2:	handle CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE
 
-> On Thu, Jul 29, 2010 at 05:14:49AM -0400, FUJITA Tomonori wrote:
-> > Well, the reason (nobody has tried) might be that linux/iommu.h
-> > doesn't look something intended for the generic IOMMU-API.
-> 
-> Oh, and as an additional note, the reason might also be that people were
-> not aware of its existence :-)
+ drivers/video/imxfb.c |   18 ++++++++++++++++--
+ 1 files changed, 16 insertions(+), 2 deletions(-)
 
-No. People actually read it and think that it's not intended for
-generic purposes, i.e., it was designed for VT-d/AMD-IOMMU with KVM:
-
-http://lkml.org/lkml/2010/7/28/470
-
-You designed it for what you need at the time. It should have been
-named appropriately to avoid confusion. Later, when we actually
-understand what other IOMMUs need, we can evolve the specific API for
-generic purposes. Then we can rename the API to more generic.
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index 43f0639..a6f0d3f 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -175,7 +175,10 @@ struct imxfb_info {
+ 
+ 	struct imx_fb_videomode *mode;
+ 	int			num_modes;
++#if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) || \
++	defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE)
+ 	struct backlight_device *bl;
++#endif
+ 
+ 	void (*lcd_power)(int);
+ 	void (*backlight_power)(int);
+@@ -450,8 +453,8 @@ static int imxfb_set_par(struct fb_info *info)
+ 	return 0;
+ }
+ 
+-
+-
++#if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) || \
++	defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE)
+ static int imxfb_bl_get_brightness(struct backlight_device *bl)
+ {
+ 	struct imxfb_info *fbi = bl_get_data(bl);
+@@ -516,6 +519,7 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
+ 	if (fbi->bl)
+ 		backlight_device_unregister(fbi->bl);
+ }
++#endif
+ 
+ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ {
+@@ -647,6 +651,10 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
+ 			fbi->regs + LCDC_SIZE);
+ 
+ 	writel(fbi->pcr, fbi->regs + LCDC_PCR);
++#if ! defined(CONFIG_BACKLIGHT_CLASS_DEVICE) && \
++	! defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE)
++	writel(fbi->pwmr, fbi->regs + LCDC_PWMR);
++#endif
+ 	writel(fbi->lscr1, fbi->regs + LCDC_LSCR1);
+ 	writel(fbi->dmacr, fbi->regs + LCDC_DMACR);
+ 
+@@ -847,7 +855,10 @@ static int __init imxfb_probe(struct platform_device *pdev)
+ 
+ 	imxfb_enable_controller(fbi);
+ 	fbi->pdev = pdev;
++#if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) || \
++	defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE)
+ 	imxfb_init_backlight(fbi);
++#endif
+ 
+ 	return 0;
+ 
+@@ -885,7 +896,10 @@ static int __devexit imxfb_remove(struct platform_device *pdev)
+ 
+ 	imxfb_disable_controller(fbi);
+ 
++#if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) || \
++	defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE)
+ 	imxfb_exit_backlight(fbi);
++#endif
+ 	unregister_framebuffer(info);
+ 
+ 	pdata = pdev->dev.platform_data;
+-- 
+1.6.3.3
