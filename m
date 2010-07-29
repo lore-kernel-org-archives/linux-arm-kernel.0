@@ -1,50 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 29 Jul 2010 09:51:55 +0900
-Subject: [PATCH 4/6] S5PV310: Define OneNAND interrupt number
-In-Reply-To: <20100728101206.GA21345@july>
-References: <20100728101206.GA21345@july>
-Message-ID: <007301cb2eb8$4173f650$c45be2f0$%kim@samsung.com>
+From: stepanm@codeaurora.org (stepanm at codeaurora.org)
+Date: Wed, 28 Jul 2010 17:58:50 -0700 (PDT)
+Subject: [PATCH 1/2] arm: msm: Add System MMU support.
+In-Reply-To: <201007281950.20847.arnd@arndb.de>
+References: <1280270466-13503-1-git-send-email-stepanm@codeaurora.org>
+	<201007281039.44883.arnd@arndb.de>
+	<ea4bbdecc271f7fa5749d09645f38c0d.squirrel@www.codeaurora.org>
+	<201007281950.20847.arnd@arndb.de>
+Message-ID: <bad58db98c165a61860827d4e720acf8.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Define OneNAND interrupt for s5pv310
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pv310/include/mach/irqs.h |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv310/include/mach/irqs.h b/arch/arm/mach-
-> s5pv310/include/mach/irqs.h
-> index 56885ca..f7fb2b8 100644
-> --- a/arch/arm/mach-s5pv310/include/mach/irqs.h
-> +++ b/arch/arm/mach-s5pv310/include/mach/irqs.h
-> @@ -66,6 +66,8 @@
-> 
->  #define IRQ_IIC			COMBINER_IRQ(27, 0)
-> 
-> +#define IRQ_ONENAND_AUDI	COMBINER_IRQ(34, 0)
-> +
+> On Wednesday 28 July 2010, stepanm at codeaurora.org wrote:
+>> > On Wednesday 28 July 2010 00:41:06 Stepan Moskovchenko wrote:
+>> >> Add support for the System MMUs found on the 8x60 and 8x72
+>> >> families of Qualcomm chips. These SMMUs allow virtualization
+>> >> of the address space used by most of the multimedia cores
+>> >> on these chips.
+>> >
+>> > How is this different from an IOMMU?
+>> >
+>> > From a very brief look, it seems that you should be using the
+>> > existing dma-mapping APIs here instead of making up your own.
+>> >
+>> > 	Arnd
+>>
+>>
+>> These are just SMMU APIs, and the DMA-mapping API is one layer above
+>> this.
+>>
+>> We have our own SMMU API for the MSM SoCs because we have muliple
+>> IOMMUs,
+>> each one having multiple contexts, or even having multiple instances of
+>> the same context. Our usage model is also quite a bit different from how
+>> the DMA APIs are set up. I believe only two IOMMU drivers actually make
+>> use of the DMA API (Intel and AMD) and the other ones (OMAP and other
+>> SoCs) have their own APIs for their specific use cases.
+>
+> The DMA API is extremely flexible, it works just fine with all the
+> IOMMUs that I've seen so far. Please take a look at
+> include/asm-generic/dma-mapping-common.h and its users to see how
+> to use multiple IOMMUs depending on the device.
+>
+> If the OMAP developers got this wrong, that's not your problem :-)
+>
+> 	Arnd
 
-Hmm...your previous #3 patch needs this :-(
-
-Please reverse the order(sequence) of 3rd and 4th...or make into one
-
->  /* Set the default NR_IRQS */
->  #define NR_IRQS
-> 	COMBINER_IRQ(MAX_COMBINER_NR, 0)
-> 
-> --
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Hi Arnd,
