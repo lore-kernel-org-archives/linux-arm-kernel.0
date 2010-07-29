@@ -1,226 +1,168 @@
-From: gking@nvidia.com (gking at nvidia.com)
-Date: Wed, 28 Jul 2010 17:57:47 -0700
-Subject: [PATCH 2/2] [ARM] dma-mapping: add highmem support to dma bounce
-In-Reply-To: <1280365067-21102-1-git-send-email-gking@nvidia.com>
-References: <1280365067-21102-1-git-send-email-gking@nvidia.com>
-Message-ID: <1280365067-21102-3-git-send-email-gking@nvidia.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 29 Jul 2010 10:12:55 +0900
+Subject: [PATCH 5/6] S5PV310: Add Samsung Mobile Reference Board support
+In-Reply-To: <20100728101217.GA21349@july>
+References: <20100728101217.GA21349@july>
+Message-ID: <007401cb2ebb$31c02870$95407950$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gary King <gking@nvidia.com>
+Kyungmin Park wrote:
+> 
+> From: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> Initial samsung mobile reference board support
 
-extend map_single and safe_buffer to support mapping pages or kernel
-buffers; call kmap_atomic and kunmap_atomic if the safe_buffer is
-bouncing a page, so that it may be copied into the safe DMA buffer
+This patch should be apart from OneNAND support.
 
-Signed-off-by: Gary King <gking@nvidia.com>
----
- arch/arm/common/dmabounce.c |   91 +++++++++++++++++++++++++++++++++---------
- 1 files changed, 71 insertions(+), 20 deletions(-)
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pv310/Kconfig          |    9 +++
+>  arch/arm/mach-s5pv310/Makefile         |    1 +
+>  arch/arm/mach-s5pv310/mach-universal.c |   86
+> ++++++++++++++++++++++++++++++++
+>  3 files changed, 96 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-s5pv310/mach-universal.c
+> 
+> diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
+> index 24ef3cd..2fe8149 100644
+> --- a/arch/arm/mach-s5pv310/Kconfig
+> +++ b/arch/arm/mach-s5pv310/Kconfig
+> @@ -23,4 +23,13 @@ config MACH_SMDKV310
+>  	select ARCH_SPARSEMEM_ENABLE
+>  	help
+>  	  Machine support for Samsung SMDKV310
+> +
+> +config MACH_UNIVERSAL
 
-diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
-index e31a333..0712f7f 100644
---- a/arch/arm/common/dmabounce.c
-+++ b/arch/arm/common/dmabounce.c
-@@ -31,6 +31,7 @@
- #include <linux/dmapool.h>
- #include <linux/list.h>
- #include <linux/scatterlist.h>
-+#include <linux/highmem.h>
- 
- #include <asm/cacheflush.h>
- 
-@@ -49,6 +50,8 @@ struct safe_buffer {
- 
- 	/* original request */
- 	void		*ptr;
-+	struct page	*page;
-+	unsigned long	offset;
- 	size_t		size;
- 	int		direction;
- 
-@@ -103,7 +106,8 @@ static DEVICE_ATTR(dmabounce_stats, 0400, dmabounce_show, NULL);
- /* allocate a 'safe' buffer and keep track of it */
- static inline struct safe_buffer *
- alloc_safe_buffer(struct dmabounce_device_info *device_info, void *ptr,
--		  size_t size, enum dma_data_direction dir)
-+		  struct page *page, unsigned long offset, size_t size,
-+		  enum dma_data_direction dir)
- {
- 	struct safe_buffer *buf;
- 	struct dmabounce_pool *pool;
-@@ -128,6 +132,8 @@ alloc_safe_buffer(struct dmabounce_device_info *device_info, void *ptr,
- 	}
- 
- 	buf->ptr = ptr;
-+	buf->page = page;
-+	buf->offset = offset;
- 	buf->size = size;
- 	buf->direction = dir;
- 	buf->pool = pool;
-@@ -219,7 +225,8 @@ static struct safe_buffer *find_safe_buffer_dev(struct device *dev,
- 	return find_safe_buffer(dev->archdata.dmabounce, dma_addr);
- }
- 
--static inline dma_addr_t map_single(struct device *dev, void *ptr, size_t size,
-+static inline dma_addr_t map_single_or_page(struct device *dev, void *ptr,
-+		struct page *page, unsigned long offset,  size_t size,
- 		enum dma_data_direction dir)
- {
- 	struct dmabounce_device_info *device_info = dev->archdata.dmabounce;
-@@ -229,7 +236,10 @@ static inline dma_addr_t map_single(struct device *dev, void *ptr, size_t size,
- 	if (device_info)
- 		DO_STATS ( device_info->map_op_count++ );
- 
--	dma_addr = virt_to_dma(dev, ptr);
-+	if (page)
-+		dma_addr = page_to_dma(dev, page) + offset;
-+	else
-+		dma_addr = virt_to_dma(dev, ptr);
- 
- 	if (dev->dma_mask) {
- 		unsigned long mask = *dev->dma_mask;
-@@ -253,38 +263,83 @@ static inline dma_addr_t map_single(struct device *dev, void *ptr, size_t size,
- 	if (device_info && (needs_bounce || dma_needs_bounce(dev, dma_addr, size))) {
- 		struct safe_buffer *buf;
- 
--		buf = alloc_safe_buffer(device_info, ptr, size, dir);
-+		buf = alloc_safe_buffer(device_info, ptr, page, offset, size, dir);
- 		if (buf == 0) {
- 			dev_err(dev, "%s: unable to map unsafe buffer %p!\n",
- 			       __func__, ptr);
- 			return 0;
- 		}
- 
--		dev_dbg(dev,
--			"%s: unsafe buffer %p (dma=%#x) mapped to %p (dma=%#x)\n",
--			__func__, buf->ptr, virt_to_dma(dev, buf->ptr),
--			buf->safe, buf->safe_dma_addr);
-+                if (buf->page)
-+			dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x) mapped "
-+				"to %p (dma=%#x)\n", __func__,
-+				page_address(buf->page),
-+				page_to_dma(dev, buf->page),
-+				buf->safe, buf->safe_dma_addr);
-+		else
-+			dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x) mapped "
-+				"to %p (dma=%#x)\n", __func__,
-+				buf->ptr, virt_to_dma(dev, buf->ptr),
-+				buf->safe, buf->safe_dma_addr);
- 
- 		if ((dir == DMA_TO_DEVICE) ||
- 		    (dir == DMA_BIDIRECTIONAL)) {
-+			if (page)
-+				ptr = kmap_atomic(page, KM_BOUNCE_READ) + offset;
- 			dev_dbg(dev, "%s: copy unsafe %p to safe %p, size %d\n",
- 				__func__, ptr, buf->safe, size);
- 			memcpy(buf->safe, ptr, size);
-+			wmb();
-+			if (page)
-+				kunmap_atomic(ptr - offset, KM_BOUNCE_READ);
- 		}
--		ptr = buf->safe;
--
- 		dma_addr = buf->safe_dma_addr;
- 	} else {
- 		/*
- 		 * We don't need to sync the DMA buffer since
- 		 * it was allocated via the coherent allocators.
- 		 */
--		__dma_single_cpu_to_dev(ptr, size, dir);
-+		if (page)
-+			__dma_page_cpu_to_dev(page, offset, size, dir);
-+		else
-+			__dma_single_cpu_to_dev(ptr, size, dir);
- 	}
- 
- 	return dma_addr;
- }
- 
-+static inline void unmap_page(struct device *dev, dma_addr_t dma_addr,
-+		size_t size, enum dma_data_direction dir)
-+{
-+	struct safe_buffer *buf = find_safe_buffer_dev(dev, dma_addr, "unmap");
-+
-+	if (buf) {
-+		BUG_ON(buf->size != size);
-+		BUG_ON(buf->direction != dir);
-+		BUG_ON(!buf->page);
-+		BUG_ON(buf->ptr);
-+
-+		dev_dbg(dev,
-+			"%s: unsafe buffer %p (dma=%#x) mapped to %p (dma=%#x)\n",
-+			__func__, page_address(buf->page),
-+			page_to_dma(dev, buf->page),
-+			buf->safe, buf->safe_dma_addr);
-+
-+		DO_STATS(dev->archdata.dmabounce->bounce_count++);
-+		if (dir == DMA_FROM_DEVICE || dir == DMA_BIDIRECTIONAL) {
-+			void *ptr;
-+			ptr = kmap_atomic(buf->page, KM_BOUNCE_READ) + buf->offset;
-+			memcpy(ptr, buf->safe, size);
-+			__cpuc_flush_dcache_area(ptr, size);
-+			kunmap_atomic(ptr - buf->offset, KM_BOUNCE_READ);
-+		}
-+		free_safe_buffer(dev->archdata.dmabounce, buf);
-+	} else {
-+		__dma_page_dev_to_cpu(dma_to_page(dev, dma_addr),
-+			      dma_addr & ~PAGE_MASK, size, dir);
-+	}
-+}
-+
- static inline void unmap_single(struct device *dev, dma_addr_t dma_addr,
- 		size_t size, enum dma_data_direction dir)
- {
-@@ -293,6 +348,8 @@ static inline void unmap_single(struct device *dev, dma_addr_t dma_addr,
- 	if (buf) {
- 		BUG_ON(buf->size != size);
- 		BUG_ON(buf->direction != dir);
-+		BUG_ON(buf->page);
-+		BUG_ON(!buf->ptr);
- 
- 		dev_dbg(dev,
- 			"%s: unsafe buffer %p (dma=%#x) mapped to %p (dma=%#x)\n",
-@@ -338,7 +395,7 @@ dma_addr_t dma_map_single(struct device *dev, void *ptr, size_t size,
- 
- 	BUG_ON(!valid_dma_direction(dir));
- 
--	return map_single(dev, ptr, size, dir);
-+	return map_single_or_page(dev, ptr, NULL, 0, size, dir);
- }
- EXPORT_SYMBOL(dma_map_single);
- 
-@@ -366,13 +423,7 @@ dma_addr_t dma_map_page(struct device *dev, struct page *page,
- 
- 	BUG_ON(!valid_dma_direction(dir));
- 
--	if (PageHighMem(page)) {
--		dev_err(dev, "DMA buffer bouncing of HIGHMEM pages "
--			     "is not supported\n");
--		return ~0;
--	}
--
--	return map_single(dev, page_address(page) + offset, size, dir);
-+	return map_single_or_page(dev, NULL, page, offset, size, dir);
- }
- EXPORT_SYMBOL(dma_map_page);
- 
-@@ -388,7 +439,7 @@ void dma_unmap_page(struct device *dev, dma_addr_t dma_addr, size_t size,
- 	dev_dbg(dev, "%s(ptr=%p,size=%d,dir=%x)\n",
- 		__func__, (void *) dma_addr, size, dir);
- 
--	unmap_single(dev, dma_addr, size, dir);
-+	unmap_page(dev, dma_addr, size, dir);
- }
- EXPORT_SYMBOL(dma_unmap_page);
- 
--- 
-1.7.0.4
+Hmm...do you _really_ want to use 'UNIVERSAL' as the board(machine) name?
+IMHO...it's so 'universal'...even though already registered to Russell's
+machine registry
+
+> +	bool "Mobile Universal Board"
+
+...
+
+> +	select CPU_S5PV310
+> +	select ARCH_SPARSEMEM_ENABLE
+> +	help
+> +	  Machine support for Samsung Mobile Universal Reference Board.
+> +	  S5PC210(MCP) is one of package option of S5PV310
+> +
+>  endif
+> diff --git a/arch/arm/mach-s5pv310/Makefile
+b/arch/arm/mach-s5pv310/Makefile
+> index 56e7693..5b52132 100644
+> --- a/arch/arm/mach-s5pv310/Makefile
+> +++ b/arch/arm/mach-s5pv310/Makefile
+> @@ -22,3 +22,4 @@ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+>  # machine support
+> 
+>  obj-$(CONFIG_MACH_SMDKV310)	+= mach-smdkv310.o
+> +obj-$(CONFIG_MACH_UNIVERSAL)	+= mach-universal.o
+> diff --git a/arch/arm/mach-s5pv310/mach-universal.c b/arch/arm/mach-
+> s5pv310/mach-universal.c
+> new file mode 100644
+> index 0000000..d22727f
+> --- /dev/null
+> +++ b/arch/arm/mach-s5pv310/mach-universal.c
+> @@ -0,0 +1,86 @@
+> +/* linux/arch/arm/mach-s5pv310/mach-universal.c
+> + *
+> + * Copyright (C) 2010 Samsung Electronics Co., Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#include <linux/serial_core.h>
+> +
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/hardware/cache-l2x0.h>
+> +
+> +#include <plat/regs-serial.h>
+> +#include <plat/s5pv310.h>
+> +#include <plat/cpu.h>
+> +
+> +#include <mach/map.h>
+> +
+> +/* Following are default values for UCON, ULCON and UFCON UART registers
+*/
+> +#define UNIVERSAL_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+> +				 S3C2410_UCON_RXILEVEL |	\
+> +				 S3C2410_UCON_TXIRQMODE |	\
+> +				 S3C2410_UCON_RXIRQMODE |	\
+> +				 S3C2410_UCON_RXFIFO_TOI |	\
+> +				 S3C2443_UCON_RXERR_IRQEN)
+> +
+> +#define UNIVERSAL_ULCON_DEFAULT	S3C2410_LCON_CS8
+> +
+> +#define UNIVERSAL_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
+> +				S5PV210_UFCON_TXTRIGMAX |	\
+> +				S5PV210_UFCON_RXTRIGMAX)
+> +
+> +static struct s3c2410_uartcfg universal_uartcfgs[] __initdata = {
+> +	[0] = {
+> +		.hwport		= 0,
+> +		.ucon		= UNIVERSAL_UCON_DEFAULT,
+> +		.ulcon		= UNIVERSAL_ULCON_DEFAULT,
+> +		.ufcon		= UNIVERSAL_UFCON_DEFAULT,
+> +	},
+> +	[1] = {
+> +		.hwport		= 1,
+> +		.ucon		= UNIVERSAL_UCON_DEFAULT,
+> +		.ulcon		= UNIVERSAL_ULCON_DEFAULT,
+> +		.ufcon		= UNIVERSAL_UFCON_DEFAULT,
+> +	},
+> +	[2] = {
+> +		.hwport		= 2,
+> +		.ucon		= UNIVERSAL_UCON_DEFAULT,
+> +		.ulcon		= UNIVERSAL_ULCON_DEFAULT,
+> +		.ufcon		= UNIVERSAL_UFCON_DEFAULT,
+> +	},
+> +	[3] = {
+> +		.hwport		= 3,
+> +		.ucon		= UNIVERSAL_UCON_DEFAULT,
+> +		.ulcon		= UNIVERSAL_ULCON_DEFAULT,
+> +		.ufcon		= UNIVERSAL_UFCON_DEFAULT,
+> +	},
+> +};
+> +
+> +static void __init universal_map_io(void)
+> +{
+> +	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+> +	s3c24xx_init_clocks(24000000);
+> +	s3c24xx_init_uarts(universal_uartcfgs,
+ARRAY_SIZE(universal_uartcfgs));
+> +}
+> +
+> +static void __init universal_machine_init(void)
+> +{
+> +#ifdef CONFIG_CACHE_L2X0
+> +	l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
+> +#endif
+> +}
+> +
+> +MACHINE_START(UNIVERSAL, "UNIVERSAL")
+> +	/* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
+> +	.phys_io	= S3C_PA_UART & 0xfff00000,
+> +	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
+> +	.boot_params	= S5P_PA_SDRAM + 0x100,
+> +	.init_irq	= s5pv310_init_irq,
+> +	.map_io		= universal_map_io,
+> +	.init_machine	= universal_machine_init,
+> +	.timer		= &s5pv310_timer,
+> +MACHINE_END
+> --
 
 
------------------------------------------------------------------------------------
-This email message is for the sole use of the intended recipient(s) and may contain
-confidential information.  Any unauthorized review, use, disclosure or distribution
-is prohibited.  If you are not the intended recipient, please contact the sender by
-reply email and destroy all copies of the original message.
------------------------------------------------------------------------------------
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
