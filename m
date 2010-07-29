@@ -1,40 +1,73 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Thu, 29 Jul 2010 19:16:03 +0300
-Subject: [PATCH 01/13] [ARM] pxa/palm: Introduce Palm27x
-In-Reply-To: <201007291754.02846.marek.vasut@gmail.com>
-References: <1280373389-32475-1-git-send-email-marek.vasut@gmail.com>
-	<4C515247.4030104@compulab.co.il>
-	<201007291754.02846.marek.vasut@gmail.com>
-Message-ID: <4C51A943.2010602@compulab.co.il>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 29 Jul 2010 12:17:40 -0400 (EDT)
+Subject: Git pull request, was Re: [PATCH 0/5] Makefile.boot cleanup
+In-Reply-To: <20100721082043.GA23853@pengutronix.de>
+References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
+	<20100705141344.GA25407@pengutronix.de>
+	<20100707144521.GB10470@pengutronix.de>
+	<alpine.LFD.2.00.1007071150390.6020@xanadu.home>
+	<20100708070826.GB21565@pengutronix.de>
+	<20100721082043.GA23853@pengutronix.de>
+Message-ID: <alpine.LFD.2.00.1007291211300.21215@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Vasut wrote:
-> Dne ?t 29. ?ervence 2010 12:04:55 Mike Rapoport napsal(a):
->> Marek Vasut wrote:
->>> This contains common code for Palm LD, TX, T5, Z72, Treo680, Centro
->>>
->>> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
->>> ---
->>>
+Russell,
 
-[ snip ]
+Could you pull the above for the upcoming merge window please?
+We've got a couple patches depending on this and that would simplify 
+things if this was merged into mainline.
 
-> Hey Mike,
+
+On Wed, 21 Jul 2010, Uwe Kleine-K?nig wrote:
+
+> Hello Russell,
 > 
-> I'll push the changes you suggested in a separate patch to avoid breaking the 
-> already existing code (I can't currently test this on all affected platforms, 
-> but I should be able to do it once I get another palmld). Especially I'll have 
-> to analyze the PMIC change.
-
-Using PIO mode on power I2C interface allows communications with PMIC late in 
-suspend and early during resume. If it's not required for Palms, just skip the 
-comment.
-
-> Thanks for the review !
-> Cheers
-
-
--- 
-Sincerely yours,
-Mike.
+> On Thu, Jul 08, 2010 at 09:08:26AM +0200, Uwe Kleine-K?nig wrote:
+> > On Wed, Jul 07, 2010 at 11:54:14AM -0400, Nicolas Pitre wrote:
+> > > On Wed, 7 Jul 2010, Uwe Kleine-K?nig wrote:
+> > > > On Mon, Jul 05, 2010 at 04:13:44PM +0200, Uwe Kleine-K?nig wrote:
+> > > > > this series is a merge between Eric's and my patches that we did to
+> > > > > clean up the early boot code.  It doesn't contain runtime physoffset
+> > > > > support for now, but I plan to pick that up later.
+> > > > 
+> > > > I added Nicolas' Acks to my tree and dropped the one patch he objected.
+> > > > 
+> > > > Are you willing to pull these now?
+> > > 
+> > > FWIW, I'm fine with Russell pulling this into his tree for the next 
+> > > merge window.  Maybe you could just resend an official pull request with 
+> > > the updated info.
+> > OK, I thought it similar enough to the original request, but if it helps
+> > I can do that:
+> > 
+> > The following changes since commit 7e27d6e778cd87b6f2415515d7127eba53fe5d02:
+> > 
+> >   Linux 2.6.35-rc3 (2010-06-11 19:14:04 -0700)
+> > 
+> > are available in the git repository at:
+> >   git://git.pengutronix.de/git/ukl/linux-2.6.git arm/booting
+> > 
+> > Eric Miao (2):
+> >       ARM: Remove unused PARAMS_PHYS from arch/arm/boot/compressed
+> >       Auto calculate ZRELADDR and provide option for exceptions
+> > 
+> > Uwe Kleine-K?nig (8):
+> >       ARM: zImage: don't hard code the stack size twice
+> >       ARM: zImage: some comments for __armv3_mpu_cache_on
+> >       ARM: zImage: __armv3_mpu_cache_flush: respect should-be-zero specification
+> >       ARM: zImage: fix comments for cache_on, cache_off and cache_clean_flush
+> >       ARM: zImage: annotate debug functions about corrupted registers
+> >       ARM: remove bit-rotten STANDALONE_DEBUG for decompressor
+> >       ARM: zImage: don't define unused symbol initrd_phys
+> >       ARM: deprecate support for old way to pass kernel parameters
+> I added an ARM: prefix to Eric's second commit, other than that the
+> branch is unchanged.  Do you pull for .36-rc1?
+> 
+> Best regards
+> Uwe
+> 
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> 
