@@ -1,33 +1,34 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 29 Jul 2010 14:34:31 +0200
-Subject: [PATCH v2] SDHCI-S3C updates
-Message-ID: <1280406875-31830-1-git-send-email-m.szyprowski@samsung.com>
+Date: Thu, 29 Jul 2010 14:34:33 +0200
+Subject: [PATCH 2/4] sdhci-s3c: enable SDHCI_QUIRK_NO_HISPD_BIT quirk
+In-Reply-To: <1280406875-31830-1-git-send-email-m.szyprowski@samsung.com>
+References: <1280406875-31830-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1280406875-31830-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch enables SDHCI_QUIRK_NO_HISPD_BIT on Samsung SDHCI driver.
+This solves detection problems with some external SD cards. This change
+has been tested on S5PC100 and S5PC110. It has no inpact on driver
+speed.
 
-This is an updated version of the patches I've sent yesterday. I've
-fixed issues reported by Maurus Cuelenaere and Ben Dooks.
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ drivers/mmc/host/sdhci-s3c.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-This patch series includes various updates to sdhci-s3c driver. The
-patches has been rebased onto latest -mm kernel tree from
-git://zen-kernel.org/kernel/mmotm.git (2010-07-27-14-56 snapshot).
-
-All required platform changes has been already merged by Kukjin Kim and
-are available in linux-next kernel tree - see commit:
-848a3aeee01c8c805f8dad4ae2963473975410d1 from
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-for-next branch.
-
-A complete list of patches:
-
-[PATCHv3 1/4] sdhci-s3c: add support for the non standard minimal clock value
-[PATCH 2/4] sdhci-s3c: enable SDHCI_QUIRK_NO_HISPD_BIT quirk
-[PATCHv6 3/4] sdhci-s3c: add support for new card detection methods
-[PATCHv2 4/4] sdhci: add regulator support
-
-Best regards
+diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+index 47138af..f0b819d 100644
+--- a/drivers/mmc/host/sdhci-s3c.c
++++ b/drivers/mmc/host/sdhci-s3c.c
+@@ -338,6 +338,7 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+ 
+ 	/* Setup quirks for the controller */
+ 	host->quirks |= SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC;
++	host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
+ 
+ #ifndef CONFIG_MMC_SDHCI_S3C_DMA
+ 
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.7.1.569.g6f426
