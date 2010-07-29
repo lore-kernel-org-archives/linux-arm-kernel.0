@@ -1,79 +1,58 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 29 Jul 2010 15:42:46 -0700
-Subject: [PATCH 2/3] arm: mm: do not set missing flags on ScorpionMP
-In-Reply-To: <20100729071818.GC6729@n2100.arm.linux.org.uk>
-References: <1279911483-7039-1-git-send-email-johlstei@codeaurora.org>
-	<1279911483-7039-3-git-send-email-johlstei@codeaurora.org>
-	<20100724082334.GB15571@n2100.arm.linux.org.uk>
-	<1280354280.21185.10.camel@c-dwalke-linux.qualcomm.com>
-	<20100728223603.GB6729@n2100.arm.linux.org.uk>
-	<1280357495.21185.26.camel@c-dwalke-linux.qualcomm.com>
-	<20100729071818.GC6729@n2100.arm.linux.org.uk>
-Message-ID: <1280443366.27035.14.camel@c-dwalke-linux.qualcomm.com>
+From: ben@simtec.co.uk (Ben Dooks)
+Date: Thu, 29 Jul 2010 23:48:26 +0100
+Subject: [PATCH 1/2] ARM: S5PV210: Add audio support to Aquila
+In-Reply-To: <4C4F9E4C.7000001@samsung.com>
+References: <4C4F9E4C.7000001@samsung.com>
+Message-ID: <4C52053A.8090400@simtec.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-07-29 at 08:18 +0100, Russell King - ARM Linux wrote:
-> On Wed, Jul 28, 2010 at 03:51:35PM -0700, Daniel Walker wrote:
-> > @@ -326,6 +327,29 @@ cpu_elf_name:
-> >  
-> >  	.section ".proc.info.init", #alloc, #execinstr
-> >  
-> > +	.type   __v7_msm_proc_info, #object
-> > +__v7_msm_proc_info:
-> > +	.long	0x000f0000		@ Required ID value
-> > +	.long	0x000f0000		@ Mask for ID
-> 
-> Almost - is there no more specific ID value for your CPU?
+On 28/07/10 04:04, Chanwoo Choi wrote:
 
-Here's one with a more specific cpu id. Would you be willing to take
-this for 2.6.36 or are you pretty much done taking pull requests?
+[snip]
 
-Daniel
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 6bddf5d..a5b613d 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -196,6 +196,7 @@ __v7_setup:
- 	orreq	r0, r0, #(1 << 6) | (1 << 0)	@ Enable SMP/nAMP mode and
- 	mcreq	p15, 0, r0, c1, c0, 1		@ TLB ops broadcasting
- #endif
-+__v7_msm_setup:
- 	adr	r12, __v7_setup_stack		@ the local stack
- 	stmia	r12, {r0-r5, r7, r9, r11, lr}
- 	bl	v7_flush_dcache_all
-@@ -326,6 +327,29 @@ cpu_elf_name:
- 
- 	.section ".proc.info.init", #alloc, #execinstr
- 
-+	.type   __v7_msm_proc_info, #object
-+__v7_msm_proc_info:
-+	.long	0x510f0000		@ Required ID value
-+	.long	0xff0f0000		@ Mask for ID
-+	.long   PMD_TYPE_SECT | \
-+		PMD_SECT_AP_WRITE | \
-+		PMD_SECT_AP_READ | \
-+		PMD_FLAGS
-+	.long   PMD_TYPE_SECT | \
-+		PMD_SECT_XN | \
-+		PMD_SECT_AP_WRITE | \
-+		PMD_SECT_AP_READ
-+	b	__v7_msm_setup
-+	.long	cpu_arch_name
-+	.long	cpu_elf_name
-+	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
-+	.long	cpu_v7_name
-+	.long	v7_processor_functions
-+	.long	v7wbi_tlb_fns
-+	.long	v6_user_fns
-+	.long	v7_cache_fns
-+	.size	__v7_msm_proc_info, . - __v7_msm_proc_info
-+
- 	/*
- 	 * Match any ARMv7 processor core.
- 	 */
+> +/* GPIO I2C AP 1.8V */
+> +#define AP_I2C_GPIO_BUS_5	5
+> +static struct i2c_gpio_platform_data i2c_gpio5_data = {
+> +	.sda_pin	= S5PV210_MP05(3),	/* XM0ADDR_11 */
+> +	.scl_pin	= S5PV210_MP05(2),	/* XM0ADDR_10 */
+> +};
+> +
+> +static struct platform_device i2c_gpio5 = {
+> +	.name		= "i2c-gpio",
+> +	.id		= AP_I2C_GPIO_BUS_5,
+> +	.dev		= {
+> +		.platform_data	= &i2c_gpio5_data,
+> +	},
+> +};
+> +
+> +static struct i2c_board_info i2c_gpio5_devs[] __initdata = {
+> +	{
+> +		/* CS/ADDR = low 0x34 (FYI: high = 0x36) */
+> +		I2C_BOARD_INFO("wm8994", 0x34 >> 1),
+> +		.platform_data	= &wm8994_platform_data,
+> +	},
+> +};
+> +
+> +static void __init aquila_sound_init(void)
+> +{
+> +	unsigned int gpio;
+> +
+> +	/* CODEC_XTAL_EN */
+> +	gpio = S5PV210_GPH3(2);		/* XEINT_26 */
+> +	gpio_request(gpio, "CODEC_XTAL_EN");
+> +	s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
+> +	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+> +	gpio_direction_output(gpio, 1);
 
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+gpio_direction_output() should have done the cfgpin()
+call.
+
+> +	/* CLKOUT[9:8] set to 0x3(XUSBXTI) of 0xE010E000(OTHERS)
+> +	 * for 24MHZ
+> +	 */
+> +	writel(readl(S5P_OTHERS) | (0x3 << 8), S5P_OTHERS);
+
+Not sure if this should be being done directly? will it affect
+the current clock tree?
