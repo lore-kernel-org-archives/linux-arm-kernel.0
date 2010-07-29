@@ -1,30 +1,25 @@
-From: colin.tuckley@arm.com (Colin Tuckley)
-Date: Thu, 29 Jul 2010 14:31:48 +0100
-Subject: [PATCH 02/12] mmci: fix multi block transfers
-In-Reply-To: <20100729131858.GB18923@n2100.arm.linux.org.uk>
-References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>	<1277198267-10860-2-git-send-email-rabin.vincent@stericsson.com>
-	<20100729131858.GB18923@n2100.arm.linux.org.uk>
-Message-ID: <000001cb2f22$65576150$300623f0$@tuckley@arm.com>
+From: eric@eukrea.com (=?UTF-8?B?RXJpYyBCw6luYXJk?=)
+Date: Thu, 29 Jul 2010 15:33:12 +0200
+Subject: [PATCH v3] video/imxfb.c: allow usage without
+	BACKLIGHT_CLASS_DEVICE
+In-Reply-To: <4C5180E9.8070203@ru.mvista.com>
+References: <20100729124534.GB6268@pengutronix.de>
+	<1280408618-21364-1-git-send-email-eric@eukrea.com>
+	<4C5180E9.8070203@ru.mvista.com>
+Message-ID: <4C518318.70909@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-bounces at lists.infradead.org] On Behalf Of Russell King - ARM
+Hi,
 
-> So this is good news.  I've applied the first three patches in this
-> series, but we do need to sort out the card detect situation properly
-> before continuing.
+Le 29/07/2010 15:23, Sergei Shtylyov a ?crit :
+>> +#if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) || \
+>> + (defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE) && \
+>> + defined(CONFIG_FB_IMX__MODULE))
+>
+> Are you sure there should be two underscores before MODULE?
+>
+no ... that was only compile tested as you can see :-(
+Thanks and sorry for the noise for such a stupid patch !
 
-On the subject of card detection. I recently noticed that although it works
-on the PB926 it doesn't on the AB926 despite it being the same kernel
-binary. On the AB926 the detection is doing something when a card is
-inserted but the device never appears.
-
-Colin
-
---
-Colin Tuckley - ARM Ltd.
-110 Fulbourn Rd
-Cambridge, CB1 9NJ
-Tel: +44 1223 400536
+Eric
