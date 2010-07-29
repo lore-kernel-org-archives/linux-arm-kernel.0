@@ -1,34 +1,41 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Jul 2010 14:56:39 +0100
-Subject: [PATCH] ARM: fix regression in RealView after the introduction
-	of pclk
-In-Reply-To: <1280408722-31995-1-git-send-email-linus.walleij@stericsson.com>
-References: <1280408722-31995-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20100729135639.GE18923@n2100.arm.linux.org.uk>
+Date: Thu, 29 Jul 2010 15:14:07 +0100
+Subject: [PATCH 02/12] mmci: fix multi block transfers
+In-Reply-To: <20100729135511.GD18923@n2100.arm.linux.org.uk>
+References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
+	<1277198267-10860-2-git-send-email-rabin.vincent@stericsson.com>
+	<20100729131858.GB18923@n2100.arm.linux.org.uk>
+	<000001cb2f22$65576150$300623f0$@tuckley@arm.com>
+	<20100729133646.GC18923@n2100.arm.linux.org.uk>
+	<000101cb2f23$e97d1280$bc773780$@tuckley@arm.com>
+	<20100729135511.GD18923@n2100.arm.linux.org.uk>
+Message-ID: <20100729141407.GF18923@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 29, 2010 at 03:05:22PM +0200, Linus Walleij wrote:
-> diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-> index d8179ea..154d10b 100644
-> --- a/arch/arm/mach-realview/core.c
-> +++ b/arch/arm/mach-realview/core.c
-> @@ -359,7 +359,7 @@ static struct clk_lookup lookups[] = {
->  	}
->  };
->  
-> -static int __init clk_init(void)
-> +int __init realview_clk_init(void)
->  {
->  	if (machine_is_realview_pb1176())
->  		oscvco_clk.vcoreg = __io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_OSC0_OFFSET;
-> @@ -370,7 +370,6 @@ static int __init clk_init(void)
->  
->  	return 0;
->  }
-> -arch_initcall(clk_init);
+On Thu, Jul 29, 2010 at 02:55:11PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 29, 2010 at 02:42:39PM +0100, Colin Tuckley wrote:
+> > > However, I think this will make GPIO on Realview wrong - iirc, the card
+> > > detection bits from PL061 are inverted.
+> > 
+> > See above.
+> 
+> I've no idea what the right thing on Realview is because the documentation
+> is too poor in this area.  Although the Realview EB user manual gives you
+> the GPIO block signals, it doesn't say what sense they are.
+> 
+> It looks to me from the hardware description diagrams, that the GPIO block
+> is fed with an inverted signal from the socket card detect pin - which
+> itself is active low.  That means the GPIO signal is in a positive logic
+> state.
+> 
+> So I don't think that the "return !status;" is right even for the GPIO
+> case.
 
-I think this can just be made core_initcall() rather than going to the
-lengths that this patch does - all we need to do is ensure that the
-clocks are registered before the machine init code is called, and
-core_initcall() will do that for us.
+Hmm.  Firstly, Versatile doesn't support reading the card detect via GPIO.
+
+Secondly, my Realview hardware appears to have the GPIO card detect status
+inverted - zero means card inserted, non-zero means card removed.  That's
+contary to what the documentation suggests.
+
+Confused.
