@@ -1,86 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Jul 2010 15:20:11 +0100
-Subject: [PATCH 04/12] mmci: allow the card detect status not to be
-	inverted
-In-Reply-To: <AANLkTikQi+SPpx8Wpvb0siSSsw0ZhusWaaKmqRnfHrnz@mail.gmail.com>
-References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
-	<1277198267-10860-4-git-send-email-rabin.vincent@stericsson.com>
-	<20100729123443.GA18923@n2100.arm.linux.org.uk>
-	<AANLkTikQi+SPpx8Wpvb0siSSsw0ZhusWaaKmqRnfHrnz@mail.gmail.com>
-Message-ID: <20100729142011.GG18923@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 29 Jul 2010 17:01:47 +0200
+Subject: [PATCH v4] video/imxfb.c: allow usage without
+	BACKLIGHT_CLASS_DEVICE
+In-Reply-To: <1280413054-3046-1-git-send-email-eric@eukrea.com>
+References: <4C5180E9.8070203@ru.mvista.com>
+	<1280413054-3046-1-git-send-email-eric@eukrea.com>
+Message-ID: <20100729150147.GA6331@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 29, 2010 at 03:53:19PM +0200, Linus Walleij wrote:
-> 2010/7/29 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> 
-> > What now needs to happen is the sense of the GPIOLIB support on platforms
-> > needs to be checked - eg, I suspect the card detect via the GPIO primecell
-> > is inverted on Realview - in which case we need a 'cd_invert' rather
-> > than the negative 'cd_noinvert'.
-> 
-> Doesn't seem so. I applied this patch and it works like a charm just
-> like before on PB1176. (PL061 is compiled in, so it's not that other
-> weird stuff being used.)
+Hello,
 
-Well, as I said in the other thread which seems to be dealing with this,
-I'm completely confused (as seems to be the case with this) as to what
-sense the various card detect signals are on ARMs various hardware
-platforms.
 
-It seems to be a totally undocumented - and I've no idea whether the
-behaviour I see on my platforms is what other people see (from some
-suggestions in these threads, my platforms behave differently.)
+On Thu, Jul 29, 2010 at 04:17:34PM +0200, Eric B?nard wrote:
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
+> ---
+> v4:	fix typo in CONFIG_FB_IMX_MODULE
+> v3:	handle CONFIG_BACKLIGHT_CLASS_DEVICE=m & CONFIG_FB_IMX=y case as per
+> 	suggested by Uwe
+> v2:	handle CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE
+looks ok to me now (though I didn't compile test).
+(i.e. something like:
+Reported-and-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+)
 
-So, for now I'm going to go with this patch, which fixes it across the
-board for the non-GPIO cases.
+Sascha, can you please take this.
 
-When the right sense for the GPIO case can be _properly_ determined,
-we can see about fixing that.  What I don't want to get into is a "it
-works this way on my realview revision X platform, but not revision Y."
-If that's the case, we might as well stick with reading the status from
-the reliable MCI register which always uses positive logic.
+Best regards
+Uwe
 
-diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-index 595be19..02e9fde 100644
---- a/arch/arm/mach-realview/core.c
-+++ b/arch/arm/mach-realview/core.c
-@@ -237,7 +237,7 @@ static unsigned int realview_mmc_status(struct device *dev)
- 	else
- 		mask = 2;
- 
--	return !(readl(REALVIEW_SYSMCI) & mask);
-+	return readl(REALVIEW_SYSMCI) & mask;
- }
- 
- struct mmci_platform_data realview_mmc0_plat_data = {
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index d250711..c842397 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -241,7 +241,7 @@ static struct platform_device v2m_flash_device = {
- 
- static unsigned int v2m_mmci_status(struct device *dev)
- {
--	return !(readl(MMIO_P2V(V2M_SYS_MCI)) & (1 << 0));
-+	return readl(MMIO_P2V(V2M_SYS_MCI)) & (1 << 0);
- }
- 
- static struct mmci_platform_data v2m_mmci_data = {
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 4917af9..8ca38d9 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -541,7 +541,11 @@ static int mmci_get_cd(struct mmc_host *mmc)
- 	else
- 		status = gpio_get_value(host->gpio_cd);
- 
--	return !status;
-+	/*
-+	 * Use positive logic throughout - status is zero for no card,
-+	 * non-zero for card inserted.
-+	 */
-+	return status;
- }
- 
- static const struct mmc_host_ops mmci_ops = {
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
