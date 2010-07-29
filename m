@@ -1,49 +1,76 @@
-From: Joerg.Roedel@amd.com (Roedel, Joerg)
-Date: Thu, 29 Jul 2010 10:40:19 +0200
-Subject: [PATCH 1/2] arm: msm: Add System MMU support.
-In-Reply-To: <201007291026.55928.arnd@arndb.de>
-References: <ea4bbdecc271f7fa5749d09645f38c0d.squirrel@www.codeaurora.org>
-	<bad58db98c165a61860827d4e720acf8.squirrel@www.codeaurora.org>
-	<20100729123512Y.fujita.tomonori@lab.ntt.co.jp>
-	<201007291026.55928.arnd@arndb.de>
-Message-ID: <20100729084018.GM26098@amd.com>
+From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
+Date: Thu, 29 Jul 2010 10:42:43 +0200
+Subject: [PATCH] video/imxfb.c: allow usage without BACKLIGHT_CLASS_DEVICE
+Message-ID: <1280392963-25374-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 29, 2010 at 04:26:55AM -0400, Arnd Bergmann wrote:
-> On Thursday 29 July 2010 05:35:48 FUJITA Tomonori wrote:
-> > > 
-> > > From what I have been able to tell, the IOMMU interface was written by
-> > > AMD/Intel to allow the kvm code to work with a common IOMMU interface. To
-> > 
-> > Don't confuse the IOMMU interface with the DMA API that Arnd
-> > mentioned.
-> > 
-> > They are not related at all.
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+---
+ drivers/video/imxfb.c |   13 +++++++++++--
+ 1 files changed, 11 insertions(+), 2 deletions(-)
 
-Thats not 100% true. They are not strictly related, but they are related
-as they may use the same backend kernel drivers to provide their
-functionality. Both APIs exist for different purposes, of course.
-
-> Exactly, thanks for the clarification. I also didn't realize that there
-> is now an include/linux/iommu.h file that only describes the PCI SR-IOV
-> interfaces, unlike the generic IOMMU support that we have in your
-> include/linux/dma-mapping.h file.
-
-The IOMMU-API is not about SR-IOV. It is about the capabilities of
-modern IOMMU hardware that we can not provide to the kernel with the
-DMA-API such as the ability to choose ourself at which io-virtual
-address a given cpu physical address should be mapped.
-Also I wouldn't call the DMA-API an IOMMU interface. The API does not
-depend on an IOMMU which is an important difference to the IOMMU-API.
-The IOMMU-API is probably not generic enough to handle all kinds of
-IOMMUs but its closer to a generic IOMMU-API than the DMA-API.
-
-		Joerg
-
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index 43f0639..0c2fb4d 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -175,7 +175,9 @@ struct imxfb_info {
+ 
+ 	struct imx_fb_videomode *mode;
+ 	int			num_modes;
++#ifdef CONFIG_BACKLIGHT_CLASS_DEVICE
+ 	struct backlight_device *bl;
++#endif
+ 
+ 	void (*lcd_power)(int);
+ 	void (*backlight_power)(int);
+@@ -450,8 +452,7 @@ static int imxfb_set_par(struct fb_info *info)
+ 	return 0;
+ }
+ 
+-
+-
++#ifdef CONFIG_BACKLIGHT_CLASS_DEVICE
+ static int imxfb_bl_get_brightness(struct backlight_device *bl)
+ {
+ 	struct imxfb_info *fbi = bl_get_data(bl);
+@@ -516,6 +517,7 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
+ 	if (fbi->bl)
+ 		backlight_device_unregister(fbi->bl);
+ }
++#endif
+ 
+ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ {
+@@ -647,6 +649,9 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
+ 			fbi->regs + LCDC_SIZE);
+ 
+ 	writel(fbi->pcr, fbi->regs + LCDC_PCR);
++#ifndef CONFIG_BACKLIGHT_CLASS_DEVICE
++	writel(fbi->pwmr, fbi->regs + LCDC_PWMR);
++#endif
+ 	writel(fbi->lscr1, fbi->regs + LCDC_LSCR1);
+ 	writel(fbi->dmacr, fbi->regs + LCDC_DMACR);
+ 
+@@ -847,7 +852,9 @@ static int __init imxfb_probe(struct platform_device *pdev)
+ 
+ 	imxfb_enable_controller(fbi);
+ 	fbi->pdev = pdev;
++#ifdef CONFIG_BACKLIGHT_CLASS_DEVICE
+ 	imxfb_init_backlight(fbi);
++#endif
+ 
+ 	return 0;
+ 
+@@ -885,7 +892,9 @@ static int __devexit imxfb_remove(struct platform_device *pdev)
+ 
+ 	imxfb_disable_controller(fbi);
+ 
++#ifdef CONFIG_BACKLIGHT_CLASS_DEVICE
+ 	imxfb_exit_backlight(fbi);
++#endif
+ 	unregister_framebuffer(info);
+ 
+ 	pdata = pdev->dev.platform_data;
 -- 
-Joerg Roedel - AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+1.6.3.3
