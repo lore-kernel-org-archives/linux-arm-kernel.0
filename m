@@ -1,34 +1,21 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Thu, 29 Jul 2010 18:54:13 +0200
-Subject: Some benchmarks on ARM
-In-Reply-To: <20100702180257.GA8767@pengutronix.de>
-References: <20100702180257.GA8767@pengutronix.de>
-Message-ID: <20100729165413.GU20855@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 29 Jul 2010 10:21:29 -0700
+Subject: [PATCHv2 4/4] sdhci: add regulator support
+In-Reply-To: <1280406875-31830-5-git-send-email-m.szyprowski@samsung.com>
+References: <1280406875-31830-1-git-send-email-m.szyprowski@samsung.com>
+	<1280406875-31830-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20100729172128.GB24781@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 02, 2010 at 08:02:57PM +0200, Robert Schwebel wrote:
-> We have recently made some benchmarks, in order to get a little bit
-> better fealing about where ARM cpus are today, especially when it
-> comes to the "recent" ones, and in comparism to the Atom.
+On Thu, Jul 29, 2010 at 02:34:35PM +0200, Marek Szyprowski wrote:
+> This patch adds support for regulator API to sdhci core driver. Regulators
+> can be used to disable power in suspended state to reduce dissipated
+> energy.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-Thanks to everyone who posted feedback!
+Looks good from a regulator point of view.
 
-An updated version of the article is now here:
-http://www.pengutronix.de/development/kernel/arm-benchmarks-20100729_en.html
-
-Changes:
-
-- all kernels ported to 2.6.34
-- Atom without -rt
-- all kernel configs available
-- all benchmark commandlines added
-- more info about compilers and generated code
-- info about memory types and bus widths
-
-rsc
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
