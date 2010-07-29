@@ -1,96 +1,86 @@
-From: eric@eukrea.com (=?utf-8?q?Eric=20B=C3=A9nard?=)
-Date: Thu, 29 Jul 2010 16:17:34 +0200
-Subject: [PATCH v4] video/imxfb.c: allow usage without BACKLIGHT_CLASS_DEVICE
-In-Reply-To: <4C5180E9.8070203@ru.mvista.com>
-References: <4C5180E9.8070203@ru.mvista.com>
-Message-ID: <1280413054-3046-1-git-send-email-eric@eukrea.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Jul 2010 15:20:11 +0100
+Subject: [PATCH 04/12] mmci: allow the card detect status not to be
+	inverted
+In-Reply-To: <AANLkTikQi+SPpx8Wpvb0siSSsw0ZhusWaaKmqRnfHrnz@mail.gmail.com>
+References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
+	<1277198267-10860-4-git-send-email-rabin.vincent@stericsson.com>
+	<20100729123443.GA18923@n2100.arm.linux.org.uk>
+	<AANLkTikQi+SPpx8Wpvb0siSSsw0ZhusWaaKmqRnfHrnz@mail.gmail.com>
+Message-ID: <20100729142011.GG18923@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
----
-v4:	fix typo in CONFIG_FB_IMX_MODULE
-v3:	handle CONFIG_BACKLIGHT_CLASS_DEVICE=m & CONFIG_FB_IMX=y case as per
-	suggested by Uwe
-v2:	handle CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE
+On Thu, Jul 29, 2010 at 03:53:19PM +0200, Linus Walleij wrote:
+> 2010/7/29 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> 
+> > What now needs to happen is the sense of the GPIOLIB support on platforms
+> > needs to be checked - eg, I suspect the card detect via the GPIO primecell
+> > is inverted on Realview - in which case we need a 'cd_invert' rather
+> > than the negative 'cd_noinvert'.
+> 
+> Doesn't seem so. I applied this patch and it works like a charm just
+> like before on PB1176. (PL061 is compiled in, so it's not that other
+> weird stuff being used.)
 
- drivers/video/imxfb.c |   19 +++++++++++++++++--
- 1 files changed, 17 insertions(+), 2 deletions(-)
+Well, as I said in the other thread which seems to be dealing with this,
+I'm completely confused (as seems to be the case with this) as to what
+sense the various card detect signals are on ARMs various hardware
+platforms.
 
-diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-index 43f0639..5c363d0 100644
---- a/drivers/video/imxfb.c
-+++ b/drivers/video/imxfb.c
-@@ -40,6 +40,12 @@
-  */
- #define DEBUG_VAR 1
+It seems to be a totally undocumented - and I've no idea whether the
+behaviour I see on my platforms is what other people see (from some
+suggestions in these threads, my platforms behave differently.)
+
+So, for now I'm going to go with this patch, which fixes it across the
+board for the non-GPIO cases.
+
+When the right sense for the GPIO case can be _properly_ determined,
+we can see about fixing that.  What I don't want to get into is a "it
+works this way on my realview revision X platform, but not revision Y."
+If that's the case, we might as well stick with reading the status from
+the reliable MCI register which always uses positive logic.
+
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index 595be19..02e9fde 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -237,7 +237,7 @@ static unsigned int realview_mmc_status(struct device *dev)
+ 	else
+ 		mask = 2;
  
-+#if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) || \
-+	(defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE) && \
-+		defined(CONFIG_FB_IMX_MODULE))
-+#define PWMR_BACKLIGHT_AVAILABLE
-+#endif
-+
- #define DRIVER_NAME "imx-fb"
- 
- #define LCDC_SSA	0x00
-@@ -175,7 +181,9 @@ struct imxfb_info {
- 
- 	struct imx_fb_videomode *mode;
- 	int			num_modes;
-+#ifdef PWMR_BACKLIGHT_AVAILABLE
- 	struct backlight_device *bl;
-+#endif
- 
- 	void (*lcd_power)(int);
- 	void (*backlight_power)(int);
-@@ -450,8 +458,7 @@ static int imxfb_set_par(struct fb_info *info)
- 	return 0;
+-	return !(readl(REALVIEW_SYSMCI) & mask);
++	return readl(REALVIEW_SYSMCI) & mask;
  }
  
--
--
-+#ifdef PWMR_BACKLIGHT_AVAILABLE
- static int imxfb_bl_get_brightness(struct backlight_device *bl)
+ struct mmci_platform_data realview_mmc0_plat_data = {
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index d250711..c842397 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -241,7 +241,7 @@ static struct platform_device v2m_flash_device = {
+ 
+ static unsigned int v2m_mmci_status(struct device *dev)
  {
- 	struct imxfb_info *fbi = bl_get_data(bl);
-@@ -516,6 +523,7 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
- 	if (fbi->bl)
- 		backlight_device_unregister(fbi->bl);
+-	return !(readl(MMIO_P2V(V2M_SYS_MCI)) & (1 << 0));
++	return readl(MMIO_P2V(V2M_SYS_MCI)) & (1 << 0);
  }
-+#endif
  
- static void imxfb_enable_controller(struct imxfb_info *fbi)
- {
-@@ -647,6 +655,9 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
- 			fbi->regs + LCDC_SIZE);
+ static struct mmci_platform_data v2m_mmci_data = {
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 4917af9..8ca38d9 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -541,7 +541,11 @@ static int mmci_get_cd(struct mmc_host *mmc)
+ 	else
+ 		status = gpio_get_value(host->gpio_cd);
  
- 	writel(fbi->pcr, fbi->regs + LCDC_PCR);
-+#ifndef PWMR_BACKLIGHT_AVAILABLE
-+	writel(fbi->pwmr, fbi->regs + LCDC_PWMR);
-+#endif
- 	writel(fbi->lscr1, fbi->regs + LCDC_LSCR1);
- 	writel(fbi->dmacr, fbi->regs + LCDC_DMACR);
+-	return !status;
++	/*
++	 * Use positive logic throughout - status is zero for no card,
++	 * non-zero for card inserted.
++	 */
++	return status;
+ }
  
-@@ -847,7 +858,9 @@ static int __init imxfb_probe(struct platform_device *pdev)
- 
- 	imxfb_enable_controller(fbi);
- 	fbi->pdev = pdev;
-+#ifdef PWMR_BACKLIGHT_AVAILABLE
- 	imxfb_init_backlight(fbi);
-+#endif
- 
- 	return 0;
- 
-@@ -885,7 +898,9 @@ static int __devexit imxfb_remove(struct platform_device *pdev)
- 
- 	imxfb_disable_controller(fbi);
- 
-+#ifdef PWMR_BACKLIGHT_AVAILABLE
- 	imxfb_exit_backlight(fbi);
-+#endif
- 	unregister_framebuffer(info);
- 
- 	pdata = pdev->dev.platform_data;
--- 
-1.6.3.3
+ static const struct mmc_host_ops mmci_ops = {
