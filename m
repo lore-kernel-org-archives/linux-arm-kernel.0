@@ -1,34 +1,48 @@
-From: wellsk40@gmail.com (wellsk40 at gmail.com)
-Date: Thu, 29 Jul 2010 09:04:14 -0700
-Subject: [PATCH 7/7] ARM: LPC32xx: Replace 'tbd's from audio clock names with
-	NULL
-In-Reply-To: <1280419454-1089-1-git-send-email-wellsk40@gmail.com>
-References: <1280419454-1089-1-git-send-email-wellsk40@gmail.com>
-Message-ID: <1280419454-1089-8-git-send-email-wellsk40@gmail.com>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Fri, 30 Jul 2010 01:22:58 +0200
+Subject: [PATCH v4] GPIO PL061: Adding Clk framework support
+In-Reply-To: <20100715095637.GF26212@n2100.arm.linux.org.uk>
+References: <20100709124050.GF22845@n2100.arm.linux.org.uk>
+	<AANLkTikm-wupuQA1_zsmqf3jrpavkMaw8Bt-GWb04TSo@mail.gmail.com>
+	<20100710071913.GM22845@n2100.arm.linux.org.uk>
+	<AANLkTimskXW4Nnxhc5bxwKiNrfJkMb-9NeWKhVOGaA1k@mail.gmail.com>
+	<20100713074449.GA20118@n2100.arm.linux.org.uk>
+	<AANLkTilZJTHh_iFS37UL7XoUs_DhAB50A3tHfcfEr5JM@mail.gmail.com>
+	<20100713182644.GC30142@n2100.arm.linux.org.uk>	<4C3EA46B.1000709@st.com>
+	<20100715083032.GA26212@n2100.arm.linux.org.uk>	<4C3ED678.7010308@st.com>
+	<20100715095637.GF26212@n2100.arm.linux.org.uk>
+Message-ID: <083DF309106F364B939360100EC290F80AC392ACFC@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Wells <wellsk40@gmail.com>
+>  /*
+>   * These are the device model conversion veneers; they convert the
+>   * device model structures to our more specific structures.
+> @@ -130,17 +155,33 @@ static int amba_probe(struct device *dev)
+>  {
+>  	struct amba_device *pcdev = to_amba_device(dev);
+>  	struct amba_driver *pcdrv = to_amba_driver(dev->driver);
+> -	struct amba_id *id;
+> +	struct amba_id *id = amba_lookup(pcdrv->id_table, pcdev);
+> +	int ret;
+> 
+> -	id = amba_lookup(pcdrv->id_table, pcdev);
+> +	do {
+> +		ret = amba_get_enable_pclk(pcdev);
+> +		if (ret)
+> +			break;
+> +
+> +		ret = pcdrv->probe(pcdev, id);
+> +		if (ret == 0)
+> +			break;
+> 
+> -	return pcdrv->probe(pcdev, id);
+> +		amba_put_disable_pclk(pcdev);
 
-Signed-off-by: Kevin Wells <wellsk40@gmail.com>
----
- arch/arm/mach-lpc32xx/clock.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Should the AMBA clock be disabled if the probe() fails?
 
-diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
-index e562d1b..043a5de 100644
---- a/arch/arm/mach-lpc32xx/clock.c
-+++ b/arch/arm/mach-lpc32xx/clock.c
-@@ -1091,8 +1091,8 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("dev:ssp1", NULL, clk_ssp1)
- 	_REGISTER_CLOCK("lpc32xx_keys.0", NULL, clk_kscan)
- 	_REGISTER_CLOCK("lpc32xx-nand.0", "nand_ck", clk_nand)
--	_REGISTER_CLOCK("tbd", "i2s0_ck", clk_i2s0)
--	_REGISTER_CLOCK("tbd", "i2s1_ck", clk_i2s1)
-+	_REGISTER_CLOCK(NULL, "i2s0_ck", clk_i2s0)
-+	_REGISTER_CLOCK(NULL, "i2s1_ck", clk_i2s1)
- 	_REGISTER_CLOCK("lpc32xx-ts", NULL, clk_tsc)
- 	_REGISTER_CLOCK("dev:mmc0", "MCLK", clk_mmc)
- 	_REGISTER_CLOCK("lpc-net.0", NULL, clk_net)
--- 
-1.7.1.1
+> +	} while (0);
+> +
+> +	return ret;
+>  }
+> 
