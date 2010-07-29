@@ -1,85 +1,256 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Thu, 29 Jul 2010 13:19:27 +0800
-Subject: [rtc-linux] [PATCH v3 3/3] rtc: rtc-s3c: Add BCD register
-	initialization codes
-In-Reply-To: <1280379570-6147-1-git-send-email-kgene.kim@samsung.com>
-References: <1280379570-6147-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <AANLkTimoyYGXc-bwQCOWFSBP+nWTVVri6ZMsNuwwYtC7@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 29 Jul 2010 07:22:45 +0200
+Subject: [PATCHv5 3/4] sdhci-s3c: add support for new card detection
+	methods (driver part)
+In-Reply-To: <4C50412C.3080703@gmail.com>
+References: <1280326797-15792-1-git-send-email-m.szyprowski@samsung.com>
+	<1280326797-15792-4-git-send-email-m.szyprowski@samsung.com>
+	<4C50412C.3080703@gmail.com>
+Message-ID: <00ae01cb2ede$17021160$45063420$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/29 Kukjin Kim <kgene.kim@samsung.com>:
-> From: Taekgyun Ko <taeggyun.ko@samsung.com>
->
-> RTC needs to be initialized when BCD registers have invalid value.
->
-> Signed-off-by: Taekgyun Ko <taeggyun.ko@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> ---
-> Hi, Alessandro Zummo
-> Just moved the routine to support all Samsung SoCs' RTC.
-> Is still your ack valid?
+Hello,
 
-Alessandro is busy, not every patch he can reviewed and acked,
-if nobody have any other suggestions about your patch, you can
-merge it. if you donot have specific git tree to merge it, you can get
-Andrew's help.
+On Wednesday, July 28, 2010 4:40 PM Maurus Cuelenaere wrote:
 
->
-> Changes since v2:
-> Moved chekcing BCD registers to support all Samsung SoCs as per Ben's comments.
->
-> ?drivers/rtc/rtc-s3c.c | ? 10 ++++++++++
-> ?1 files changed, 10 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-> index 2040017..a0d3ec8 100644
-> --- a/drivers/rtc/rtc-s3c.c
-> +++ b/drivers/rtc/rtc-s3c.c
-> @@ -458,6 +458,7 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
-> ?{
-> ? ? ? ?struct rtc_device *rtc;
-> ? ? ? ?struct resource *res;
-> + ? ? ? unsigned int tmp, i;
-> ? ? ? ?int ret;
->
-> ? ? ? ?pr_debug("%s: probe=%p\n", __func__, pdev);
-> @@ -536,6 +537,15 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
->
-> ? ? ? ?s3c_rtc_cpu_type = platform_get_device_id(pdev)->driver_data;
->
-> + ? ? ? /* Check RTC Time */
-> +
-> + ? ? ? for (i = S3C2410_RTCSEC; i <= S3C2410_RTCYEAR; i += 0x4) {
-> + ? ? ? ? ? ? ? tmp = readb(s3c_rtc_base + i);
-> +
-> + ? ? ? ? ? ? ? if ((tmp & 0xf) > 0x9 || ((tmp >> 4) & 0xf) > 0x9)
-> + ? ? ? ? ? ? ? ? ? ? ? writeb(0, s3c_rtc_base + i);
-> + ? ? ? }
-> +
-> ? ? ? ?if (s3c_rtc_cpu_type == TYPE_S3C64XX)
-> ? ? ? ? ? ? ? ?rtc->max_user_freq = 32768;
-> ? ? ? ?else
+>  Op 28-07-10 16:19, Marek Szyprowski schreef:
+> > On some Samsung SoCs not all SDHCI controllers have card detect (CD)
+> > line. For some embedded designs it is not even needed, because ususally
+> > the device (like SDIO flash memory or wifi controller) is permanently
+> > wired to the controller. There are also systems which have a card detect
+> > line connected to some of the external interrupt lines or the presence
+> > of the card depends on some other actions (like enabling a power
+> > regulator).
+> >
+> > This patch adds support for all these cases. The following card
+> > detection methods are possible:
+> >
+> > 1. internal sdhci host card detect line
+> > 2. external event
+> > 3. external gpio interrupt
+> > 4. no card detect line, controller will poll for the card
+> > 5. no card detect line, card is permanently wired to the controller
+> > (once detected host won't poll it any more)
+> >
+> > By default, all existing code would use method #1, what is compatible
+> > with the previous version of the driver.
+> >
+> > In case of external event, two callbacks must be provided in platdata:
+> > ext_cd_init and ext_cd_cleanup. Both of them get a callback to a
+> > function that notifies the s3c-sdhci host contoller as their argument.
+> > That callback function should be called from the even dispatcher to let
+> > host notice the card insertion/removal.
+> >
+> > In case of external gpio interrupt, a gpio pin number must be provided
+> > in platdata (ext_cd_gpio parameter), as well as the information about
+> > the polarity of that gpio pin (ext_cd_gpio_invert). By default
+> > (ext_cd_gpio_invert == 0) gpio value 0 means 'card has been removed',
+> > but this can be changed to 'card has been removed' when
+> > ext_cd_gpio_invert == 1.
+> >
+> > This patch adds all required changes to sdhci-s3c driver.
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >
+> > Changes since V4:
+> > - adapted to threaded irq approach in sdhci driver
+> > - rebased onto latest -mm kernel tree
+> > - fixed problem when gpio-base card detection was not called on driver
+> > init
+> >
+> > Changes since V3:
+> > - renamed patch to avoid confusion with the patch for the s3c-sdhci
+> > platform changes - added "(driver part)" in subject
+> >
+> > Changes since V2:
+> > According to Andrew Morton's suggestion local_irq_save() call in the
+> > sdhci_s3c_notify_change function has been replaced by spin_lock_irqsave
+> > (host driver already has a spinlock that is used for protecting internal
+> > state of the driver).
+> >
+> > Changes since V1:
+> > - added support for gpio external interrupt card based detect method
+> >   directly to sdhci-s3c driver
+> >
+> > ---
+> >  drivers/mmc/host/sdhci-s3c.c |   78
+> ++++++++++++++++++++++++++++++++++++++++++
+> >  drivers/mmc/host/sdhci.c     |   47 ++++++++++++++-----------
+> >  drivers/mmc/host/sdhci.h     |    1 +
+> >  3 files changed, 106 insertions(+), 20 deletions(-)
+> >
+> > diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> > index 9938ded..606e695 100644
+> > --- a/drivers/mmc/host/sdhci-s3c.c
+> > +++ b/drivers/mmc/host/sdhci-s3c.c
+> > @@ -18,6 +18,7 @@
+> >  #include <linux/slab.h>
+> >  #include <linux/clk.h>
+> >  #include <linux/io.h>
+> > +#include <linux/gpio.h>
+> >
+> >  #include <linux/mmc/host.h>
+> >
+> > @@ -44,6 +45,8 @@ struct sdhci_s3c {
+> >  	struct resource		*ioarea;
+> >  	struct s3c_sdhci_platdata *pdata;
+> >  	unsigned int		cur_clk;
+> > +	int			ext_cd_irq;
+> > +	int			ext_cd_gpio;
+> >
+> >  	struct clk		*clk_io;
+> >  	struct clk		*clk_bus[MAX_BUS_CLK];
+> > @@ -235,6 +238,36 @@ static struct sdhci_ops sdhci_s3c_ops = {
+> >  	.get_min_clock		= sdhci_s3c_get_min_clock,
+> >  };
+> >
+> > +static void sdhci_s3c_notify_change(struct platform_device *dev, int
+> state)
+> > +{
+> > +	struct sdhci_host *host = platform_get_drvdata(dev);
+> > +	if (host) {
+> > +		mutex_lock(&host->lock);
+> > +		if (state) {
+> > +			dev_dbg(&dev->dev, "card inserted.\n");
+> > +			host->flags &= ~SDHCI_DEVICE_DEAD;
+> > +			host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
+> > +			sdhci_card_detect(host);
+> > +		} else {
+> > +			dev_dbg(&dev->dev, "card removed.\n");
+> > +			host->flags |= SDHCI_DEVICE_DEAD;
+> > +			host->quirks &= ~SDHCI_QUIRK_BROKEN_CARD_DETECTION;
+> > +			sdhci_card_detect(host);
+> > +		}
+> 
+> You could move the sdhci_card_detect outside the if.
+
+Rigth, I will fix this.
+
+> > +		mutex_unlock(&host->lock);
+> > +	}
+> > +}
+> > +
+> > +static irqreturn_t sdhci_s3c_gpio_card_detect_thread(int irq, void
+> *dev_id)
+> > +{
+> > +	struct sdhci_s3c *sc = dev_id;
+> > +	int status = gpio_get_value(sc->ext_cd_gpio);
+> > +	if (sc->pdata->ext_cd_gpio_invert)
+> > +		status = !status;
+> > +	sdhci_s3c_notify_change(sc->pdev, status);
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> >  static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+> >  {
+> >  	struct s3c_sdhci_platdata *pdata = pdev->dev.platform_data;
+> > @@ -272,6 +305,7 @@ static int __devinit sdhci_s3c_probe(struct
+> platform_device *pdev)
+> >  	sc->host = host;
+> >  	sc->pdev = pdev;
+> >  	sc->pdata = pdata;
+> > +	sc->ext_cd_gpio = -1;
+> >
+> >  	platform_set_drvdata(pdev, host);
+> >
+> > @@ -355,6 +389,13 @@ static int __devinit sdhci_s3c_probe(struct
+> platform_device *pdev)
+> >  	 * SDHCI block, or a missing configuration that needs to be set. */
+> >  	host->quirks |= SDHCI_QUIRK_NO_BUSY_IRQ;
+> >
+> > +	if (pdata->cd_type == S3C_SDHCI_CD_NONE ||
+> > +	    pdata->cd_type == S3C_SDHCI_CD_PERMANENT)
+> > +		host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
+> > +
+> > +	if (pdata->cd_type == S3C_SDHCI_CD_PERMANENT)
+> > +		host->mmc->caps = MMC_CAP_NONREMOVABLE;
+> > +
+> >  	host->quirks |= (SDHCI_QUIRK_32BIT_DMA_ADDR |
+> >  			 SDHCI_QUIRK_32BIT_DMA_SIZE);
+> >
+> > @@ -367,6 +408,33 @@ static int __devinit sdhci_s3c_probe(struct
+> platform_device *pdev)
+> >  		goto err_add_host;
+> >  	}
+> >
+> > +	/* pdata->ext_cd_init might call sdhci_s3c_notify_change immediately,
+> > +	   so it can be called only after sdhci_add_host() */
+> > +	if (pdata->cd_type == S3C_SDHCI_CD_EXTERNAL && pdata->ext_cd_init)
+> > +		pdata->ext_cd_init(&sdhci_s3c_notify_change);
+> > +
+> > +	if (pdata->cd_type == S3C_SDHCI_CD_GPIO &&
+> > +	    gpio_is_valid(pdata->ext_cd_gpio)) {
+> > +		int status;
+> > +
+> > +		gpio_request(pdata->ext_cd_gpio, "SDHCI EXT CD");
+> 
+> Shouldn't you check the return value of gpio_request()?
+
+Yes, I it should. I will fix this.
+
+> 
+> > +		sc->ext_cd_gpio = pdata->ext_cd_gpio;
+> > +
+> > +		sc->ext_cd_irq = gpio_to_irq(pdata->ext_cd_gpio);
+> > +		if (sc->ext_cd_irq &&
+> > +		    request_threaded_irq(sc->ext_cd_irq, NULL,
+> sdhci_s3c_gpio_card_detect_thread,
+> > +				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+> > +				dev_name(&pdev->dev), sc)) {
+> > +			dev_err(&pdev->dev, "cannot request irq for card
+> detect\n");
+> > +			sc->ext_cd_irq = 0;
+> > +		}
+> > +
+> > +		status = gpio_get_value(sc->ext_cd_gpio);
+> > +		if (sc->pdata->ext_cd_gpio_invert)
+> > +			status = !status;
+> > +		sdhci_s3c_notify_change(sc->pdev, status);
+> > +	}
+> > +
+> >  	return 0;
+> >
+> >   err_add_host:
+> > @@ -391,10 +459,20 @@ static int __devinit sdhci_s3c_probe(struct
+> platform_device *pdev)
+> >
+> >  static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
+> >  {
+> > +	struct s3c_sdhci_platdata *pdata = pdev->dev.platform_data;
+> >  	struct sdhci_host *host =  platform_get_drvdata(pdev);
+> >  	struct sdhci_s3c *sc = sdhci_priv(host);
+> >  	int ptr;
+> >
+> > +	if (pdata->cd_type == S3C_SDHCI_CD_EXTERNAL && pdata->ext_cd_cleanup)
+> > +		pdata->ext_cd_cleanup(&sdhci_s3c_notify_change);
+> > +
+> > +	if (sc->ext_cd_irq)
+> > +		free_irq(sc->ext_cd_irq, sc);
+> > +
+> > +	if (sc->ext_cd_gpio != -1)
+> 
+> Perhaps if (gpio_is_valid(...)) ?
+
+-1 is intentionally assigned in s3c_sdhci_probe() when no gpio pin is used
+for card detection. I can change this to gpio_is_valid() if this increases
+the code readability.
+
+> 
+> > +		gpio_free(sc->ext_cd_gpio);
+> > +
+> >  	sdhci_remove_host(host, 1);
+> >
+> >  	for (ptr = 0; ptr < 3; ptr++) {
+> 
 > --
-> 1.6.2.5
->
-> --
-> You received this message because you are subscribed to "rtc-linux".
-> Membership options at http://groups.google.com/group/rtc-linux .
-> Please read http://groups.google.com/group/rtc-linux/web/checklist
-> before submitting a driver.
+> Maurus Cuelenaere
 
+Thanks for your comments!
 
-
--- 
-*linux-arm-kernel mailing list
-mail addr:linux-arm-kernel at lists.infradead.org
-you can subscribe by:
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-* linux-arm-NUC900 mailing list
-mail addr:NUC900 at googlegroups.com
-main web: https://groups.google.com/group/NUC900
-you can subscribe it by sending me mail:
-mcuos.com at gmail.com
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
