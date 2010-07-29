@@ -1,66 +1,93 @@
-From: Joerg.Roedel@amd.com (Roedel, Joerg)
-Date: Thu, 29 Jul 2010 14:12:02 +0200
-Subject: [PATCH 1/2] arm: msm: Add System MMU support.
-In-Reply-To: <201007291325.48129.arnd@arndb.de>
-References: <20100729090607.GN26098@amd.com>
-	<20100729184336N.fujita.tomonori@lab.ntt.co.jp>
-	<20100729100108.GQ26098@amd.com> <201007291325.48129.arnd@arndb.de>
-Message-ID: <20100729121202.GR26098@amd.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 29 Jul 2010 14:34:32 +0200
+Subject: [PATCHv3 1/4] sdhci-s3c: add support for the non standard minimal
+	clock value
+In-Reply-To: <1280406875-31830-1-git-send-email-m.szyprowski@samsung.com>
+References: <1280406875-31830-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1280406875-31830-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 29, 2010 at 07:25:47AM -0400, Arnd Bergmann wrote:
-> On Thursday 29 July 2010, Roedel, Joerg wrote:
-> 
-> > > You designed it for what you need at the time. It should have been
-> > > named appropriately to avoid confusion. Later, when we actually
-> > > understand what other IOMMUs need, we can evolve the specific API for
-> > > generic purposes. Then we can rename the API to more generic.
-> > 
-> > At the time the iommu-api was written is was generic enough for what we
-> > had. So it was designed as an generic API. At this point in time nobody
-> > knew what the future requirements would we. So today it turns out that
-> > it is not generic enough anymore for latest hardware. The logical
-> > consequence is to fix this in the iommu-api.
-> 
-> Well, I think the real question is why we have two APIs that both claim
-> to work with IOMMUs in a generic way and how we could unify the two.
+S3C SDHCI host controller can change the source for generating mmc
+clock. By default host bus clock is used, what causes some problems on
+machines with 133MHz bus, because the SDHCI divider cannot be as high
+get proper clock value for identification mode. This is not a problem
+for the controller, because it can generate lower frequencies from other
+clock sources. This patch changes sdhci driver to use get_min_clock()
+call if it has been provided.
 
-The DMA-API itself does not claim to be an iommu-frontend. The purpose
-of the DMA-API is to convert physical memory addresses into dma handles
-and do all the management of these handles. Backend implementations can
-use hardware iommus for this task. But depending on the hardware in the
-system the DMA-API can very well be implemented without any hardware
-support. This is an important difference to the IOMMU-API which needs
-hardware because it exposes hardware iommu features to software.
+This fixes the flood of the following warnings on Samsung S5PV210 SoCs:
+mmc0: Minimum clock frequency too high for identification mode
 
-> The Intel and AMD IOMMU drivers currently register at both the DMA
-> API and the IOMMU API. The first one is used by everything except
-> KVM and the second is only used by KVM.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
 
-Right. But there is also a mode where the AMD IOMMU driver only
-registers for the IOMMU-API.
+Changes since V2: 
+- removed the need for additional quirk, just use get_min_clock() method
+if provided
 
-> I really think we should not extend the (KVM) IOMMU API further but
-> just use the generic DMA mapping api for KVM and extend it as necessary.
-> It already has the concept of cache coherency and mapping/unmapping
-> that are in the IOMMU API and could be extended to support domains
-> as well, through the use of dma_attrs.
+Changes since V1:
+- rebased onto latest -mm kernel tree
+---
+ drivers/mmc/host/sdhci-s3c.c |   27 +++++++++++++++++++++++++++
+ drivers/mmc/host/sdhci.c     |    3 +--
+ 2 files changed, 28 insertions(+), 2 deletions(-)
 
-If we find a nice and clean way to expose lower-level iommu
-functionality through the DMA-API, thats fine. We could certainly
-discuss ideas in this direction.  I think this is going to be hard
-because the DMA-API today does not provide enough flexibility to let the
-user choose both sides of a io-virtual<->cpu-physical address mapping.
-Thats fine for most drivers because it makes sense for them to use the
-generic io-address-allocator the DMA-API provides but not for KVM which
-needs this flexibility.
-
-	Joerg
-
+diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+index d7058ee..47138af 100644
+--- a/drivers/mmc/host/sdhci-s3c.c
++++ b/drivers/mmc/host/sdhci-s3c.c
+@@ -203,9 +203,36 @@ static void sdhci_s3c_set_clock(struct sdhci_host *host, unsigned int clock)
+ 	}
+ }
+ 
++/**
++ * sdhci_s3c_get_min_clock - callback to get minimal supported clock value
++ * @host: The SDHCI host being queried
++ *
++ * To init mmc host properly a minimal clock value is needed. For high system
++ * bus clock's values the standard formula gives values out of allowed range.
++ * The clock still can be set to lower values, if clock source other then
++ * system bus is selected.
++*/
++static unsigned int sdhci_s3c_get_min_clock(struct sdhci_host *host)
++{
++	struct sdhci_s3c *ourhost = to_s3c(host);
++	unsigned int delta, min = UINT_MAX;
++	int src;
++
++	for (src = 0; src < MAX_BUS_CLK; src++) {
++		delta = sdhci_s3c_consider_clock(ourhost, src, 0);
++		if (delta == UINT_MAX)
++			continue;
++		/* delta is a negative value in this case */
++		if (-delta < min)
++			min = -delta;
++	}
++	return min;
++}
++
+ static struct sdhci_ops sdhci_s3c_ops = {
+ 	.get_max_clock		= sdhci_s3c_get_max_clk,
+ 	.set_clock		= sdhci_s3c_set_clock,
++	.get_min_clock		= sdhci_s3c_get_min_clock,
+ };
+ 
+ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 07b2695..1c67f91 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1776,8 +1776,7 @@ int sdhci_add_host(struct sdhci_host *host)
+ 	 * Set host parameters.
+ 	 */
+ 	mmc->ops = &sdhci_ops;
+-	if (host->quirks & SDHCI_QUIRK_NONSTANDARD_CLOCK &&
+-			host->ops->get_min_clock)
++	if (host->ops->get_min_clock)
+ 		mmc->f_min = host->ops->get_min_clock(host);
+ 	else
+ 		mmc->f_min = host->max_clk / 256;
 -- 
-Joerg Roedel - AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+1.7.1.569.g6f426
