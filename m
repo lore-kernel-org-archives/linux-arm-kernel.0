@@ -1,34 +1,37 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 29 Jul 2010 17:01:47 +0200
-Subject: [PATCH v4] video/imxfb.c: allow usage without
-	BACKLIGHT_CLASS_DEVICE
-In-Reply-To: <1280413054-3046-1-git-send-email-eric@eukrea.com>
-References: <4C5180E9.8070203@ru.mvista.com>
-	<1280413054-3046-1-git-send-email-eric@eukrea.com>
-Message-ID: <20100729150147.GA6331@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 29 Jul 2010 17:26:38 +0200
+Subject: [RFC] dove: fix __io() definition to use bus based offset
+In-Reply-To: <AANLkTinuXRH0XeD=3b0Wmq32SEEBxdevfj58EmSybcWu@mail.gmail.com>
+References: <AANLkTinuXRH0XeD=3b0Wmq32SEEBxdevfj58EmSybcWu@mail.gmail.com>
+Message-ID: <201007291726.39145.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thursday 29 July 2010, Eric Miao wrote:
+> diff --git a/arch/arm/mach-dove/include/mach/io.h
+> b/arch/arm/mach-dove/include/mach/io.h
+> index 3b3e472..067435e 100644
+> --- a/arch/arm/mach-dove/include/mach/io.h
+> +++ b/arch/arm/mach-dove/include/mach/io.h
+> @@ -11,10 +11,9 @@
+> 
+>  #include "dove.h"
+> 
+> -#define IO_SPACE_LIMIT         0xffffffff
+> -
+> -#define __io(a)  ((void __iomem *)(((a) - DOVE_PCIE0_IO_PHYS_BASE) +\
+> -                                  DOVE_PCIE0_IO_VIRT_BASE))
+> -#define __mem_pci(a)           (a)
+> +#define IO_SPACE_LIMIT 0xffffffff
+> +#define __io(a)                __typesafe_io((a) - DOVE_PCIE0_IO_BUS_BASE + \
+> +                                           DOVE_PCIE0_IO_VIRT_BASE)
+> +#define __mem_pci(a)   (a)
+> 
+>  #endif
+> 
 
+The IO_SPACE_LIMIT still looks wrong, AFAICT it should be 
 
-On Thu, Jul 29, 2010 at 04:17:34PM +0200, Eric B?nard wrote:
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> ---
-> v4:	fix typo in CONFIG_FB_IMX_MODULE
-> v3:	handle CONFIG_BACKLIGHT_CLASS_DEVICE=m & CONFIG_FB_IMX=y case as per
-> 	suggested by Uwe
-> v2:	handle CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE
-looks ok to me now (though I didn't compile test).
-(i.e. something like:
-Reported-and-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-)
+#define IO_SPACE_LIMIT (DOVE_PCIE0_IO_SIZE + DOVE_PCIE1_IO_SIZE - 1)
 
-Sascha, can you please take this.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+	Arnd
