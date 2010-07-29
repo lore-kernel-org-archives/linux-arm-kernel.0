@@ -1,106 +1,64 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 29 Jul 2010 14:34:35 +0200
-Subject: [PATCHv2 4/4] sdhci: add regulator support
-In-Reply-To: <1280406875-31830-1-git-send-email-m.szyprowski@samsung.com>
-References: <1280406875-31830-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1280406875-31830-5-git-send-email-m.szyprowski@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Jul 2010 13:34:43 +0100
+Subject: [PATCH 04/12] mmci: allow the card detect status not to be
+	inverted
+In-Reply-To: <1277198267-10860-4-git-send-email-rabin.vincent@stericsson.com>
+References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
+	<1277198267-10860-4-git-send-email-rabin.vincent@stericsson.com>
+Message-ID: <20100729123443.GA18923@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for regulator API to sdhci core driver. Regulators
-can be used to disable power in suspended state to reduce dissipated
-energy.
+On Tue, Jun 22, 2010 at 02:47:39PM +0530, Rabin Vincent wrote:
+> On some platforms, the GPIO value from the gpio_cd pin doesn't need to
+> be inverted to get it active high.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
+Argh.
 
-Changes since V1:
-- moved regulator support from sdhci-s3c sub-driver to the main sdhci
-driver
+Actually, I think the inversion of the card status is a bug - certainly
+for Versatile it is.  It was on Realview as well before b56ba8a changed
+the sense for Realview - so it seems b56ba8a was the wrong fix.
 
----
- drivers/mmc/host/sdhci.c |   26 +++++++++++++++++++++++++-
- drivers/mmc/host/sdhci.h |    2 ++
- 2 files changed, 27 insertions(+), 1 deletions(-)
+So, this patch restores the card detect functionality across the ARM
+devel platforms to what it was prior to the addition of GPIOLIB support.
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 95f44ac..cdd974e 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -23,6 +23,7 @@
- #include <linux/mutex.h>
- #include <linux/scatterlist.h>
- #include <linux/jiffies.h>
-+#include <linux/regulator/consumer.h>
+What now needs to happen is the sense of the GPIOLIB support on platforms
+needs to be checked - eg, I suspect the card detect via the GPIO primecell
+is inverted on Realview - in which case we need a 'cd_invert' rather
+than the negative 'cd_noinvert'.
+
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index d8179ea..f9dc99c 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -243,7 +243,7 @@ static unsigned int realview_mmc_status(struct device *dev)
+ 		 * way to do this on the PB1176.
+ 		 */
+ 		inserted = !inserted;
+-		return inserted ? 0 : 1;
++		return inserted ? 1 : 0;
+ 	}
  
- #include <linux/leds.h>
+ 	if (adev->res.start == REALVIEW_MMCI0_BASE)
+@@ -251,7 +251,7 @@ static unsigned int realview_mmc_status(struct device *dev)
+ 	else
+ 		mask = 2;
  
-@@ -1573,7 +1574,10 @@ int sdhci_suspend_host(struct sdhci_host *host, pm_message_t state)
- 
- 	free_irq(host->irq, host);
- 
--	return 0;
-+	if (host->vmmc)
-+		ret = regulator_disable(host->vmmc);
-+
-+	return ret;
+-	return !(readl(REALVIEW_SYSMCI) & mask);
++	return readl(REALVIEW_SYSMCI) & mask;
  }
  
- EXPORT_SYMBOL_GPL(sdhci_suspend_host);
-@@ -1582,6 +1586,13 @@ int sdhci_resume_host(struct sdhci_host *host)
- {
- 	int ret;
+ struct mmci_platform_data realview_mmc0_plat_data = {
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 9bf9194..02bf365 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -557,7 +557,7 @@ static int mmci_get_cd(struct mmc_host *mmc)
+ 	else
+ 		status = gpio_get_value(host->gpio_cd);
  
-+	if (host->vmmc) {
-+		int ret = regulator_enable(host->vmmc);
-+		if (ret)
-+			return ret;
-+	}
-+
-+
- 	if (host->flags & (SDHCI_USE_SDMA | SDHCI_USE_ADMA)) {
- 		if (host->ops->enable_dma)
- 			host->ops->enable_dma(host);
-@@ -1878,6 +1889,14 @@ int sdhci_add_host(struct sdhci_host *host)
- 	if (ret)
- 		return ret;
+-	return !status;
++	return status;
+ }
  
-+	host->vmmc = regulator_get(mmc_dev(mmc), "vmmc");
-+	if (IS_ERR(host->vmmc)) {
-+		printk(KERN_INFO "%s: no vmmc regulator found\n", mmc_hostname(mmc));
-+		host->vmmc = NULL;
-+	} else {
-+		regulator_enable(host->vmmc);
-+	}
-+
- 	sdhci_init(host, 0);
- 
- #ifdef CONFIG_MMC_DEBUG
-@@ -1955,6 +1974,11 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
- 
- 	flush_work(&host->finish_work);
- 
-+	if (host->vmmc) {
-+		regulator_disable(host->vmmc);
-+		regulator_put(host->vmmc);
-+	}
-+
- 	kfree(host->adma_desc);
- 	kfree(host->align_buffer);
- 
-diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index 253773e..4d03e24 100644
---- a/drivers/mmc/host/sdhci.h
-+++ b/drivers/mmc/host/sdhci.h
-@@ -253,6 +253,8 @@ struct sdhci_host {
- 
- 	const struct sdhci_ops	*ops;		/* Low level hw interface */
- 
-+	struct regulator	*vmmc;		/* Power regulator */
-+
- 	/* Internal data */
- 	struct mmc_host		*mmc;		/* MMC structure */
- 	u64			dma_mask;	/* custom DMA mask */
--- 
-1.7.1.569.g6f426
+ static const struct mmc_host_ops mmci_ops = {
