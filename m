@@ -1,109 +1,25 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 29 Jul 2010 08:42:41 +0200
-Subject: [PATCH v2] arm/imx/gpio: add spinlock protection
-In-Reply-To: <a1d5b20ff1b6e39355fcad2e882489df55c7bf2a.1278413731.git.baruch@tkos.co.il>
-References: <20100706103748.GE28547@jasper.tkos.co.il>
-	<a1d5b20ff1b6e39355fcad2e882489df55c7bf2a.1278413731.git.baruch@tkos.co.il>
-Message-ID: <20100729064241.GB11268@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Jul 2010 08:18:18 +0100
+Subject: [PATCH 2/3] arm: mm: do not set missing flags on ScorpionMP
+In-Reply-To: <1280357495.21185.26.camel@c-dwalke-linux.qualcomm.com>
+References: <1279911483-7039-1-git-send-email-johlstei@codeaurora.org>
+	<1279911483-7039-3-git-send-email-johlstei@codeaurora.org>
+	<20100724082334.GB15571@n2100.arm.linux.org.uk>
+	<1280354280.21185.10.camel@c-dwalke-linux.qualcomm.com>
+	<20100728223603.GB6729@n2100.arm.linux.org.uk>
+	<1280357495.21185.26.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <20100729071818.GC6729@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Sascha,
+On Wed, Jul 28, 2010 at 03:51:35PM -0700, Daniel Walker wrote:
+> @@ -326,6 +327,29 @@ cpu_elf_name:
+>  
+>  	.section ".proc.info.init", #alloc, #execinstr
+>  
+> +	.type   __v7_msm_proc_info, #object
+> +__v7_msm_proc_info:
+> +	.long	0x000f0000		@ Required ID value
+> +	.long	0x000f0000		@ Mask for ID
 
-On Tue, Jul 06, 2010 at 02:03:22PM +0300, Baruch Siach wrote:
-> The GPIO registers need protection from concurrent access for operations that
-> are not atomic.
-> 
-> Cc: stable at kernel.org
-> Cc: Juergen Beisert <j.beisert@pengutronix.de>
-> Cc: Daniel Mack <daniel@caiaq.de>
-> Reported-by: rpkamiak at rockwellcollins.com
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> ---
-> Changes v1 -> v2
-> 
->     Remove redundant protection of GPIO/IRQ registers
-
-> 
->  arch/arm/plat-mxc/gpio.c              |    8 ++++++++
->  arch/arm/plat-mxc/include/mach/gpio.h |    1 +
->  2 files changed, 9 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-> index 71437c6..9ebbd31 100644
-> --- a/arch/arm/plat-mxc/gpio.c
-> +++ b/arch/arm/plat-mxc/gpio.c
-> @@ -214,13 +214,16 @@ static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
->  	struct mxc_gpio_port *port =
->  		container_of(chip, struct mxc_gpio_port, chip);
->  	u32 l;
-> +	unsigned long flags;
->  
-> +	spin_lock_irqsave(&port->lock, flags);
->  	l = __raw_readl(port->base + GPIO_GDIR);
->  	if (dir)
->  		l |= 1 << offset;
->  	else
->  		l &= ~(1 << offset);
->  	__raw_writel(l, port->base + GPIO_GDIR);
-> +	spin_unlock_irqrestore(&port->lock, flags);
->  }
->  
->  static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
-> @@ -229,9 +232,12 @@ static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
->  		container_of(chip, struct mxc_gpio_port, chip);
->  	void __iomem *reg = port->base + GPIO_DR;
->  	u32 l;
-> +	unsigned long flags;
->  
-> +	spin_lock_irqsave(&port->lock, flags);
->  	l = (__raw_readl(reg) & (~(1 << offset))) | (value << offset);
->  	__raw_writel(l, reg);
-> +	spin_unlock_irqrestore(&port->lock, flags);
->  }
->  
->  static int mxc_gpio_get(struct gpio_chip *chip, unsigned offset)
-> @@ -285,6 +291,8 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
->  		port[i].chip.base = i * 32;
->  		port[i].chip.ngpio = 32;
->  
-> +		spin_lock_init(&port[i].lock);
-> +
->  		/* its a serious configuration bug when it fails */
->  		BUG_ON( gpiochip_add(&port[i].chip) < 0 );
->  
-> diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
-> index 894d2f8..6bd932c 100644
-> --- a/arch/arm/plat-mxc/include/mach/gpio.h
-> +++ b/arch/arm/plat-mxc/include/mach/gpio.h
-> @@ -36,6 +36,7 @@ struct mxc_gpio_port {
->  	int virtual_irq_start;
->  	struct gpio_chip chip;
->  	u32 both_edges;
-> +	spinlock_t lock;
->  };
->  
->  int mxc_gpio_init(struct mxc_gpio_port*, int);
-
-can you please fold this into Baruch's patch:
-
-diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
-index 661fbc6..af33b74 100644
---- a/arch/arm/plat-mxc/include/mach/gpio.h
-+++ b/arch/arm/plat-mxc/include/mach/gpio.h
-@@ -19,6 +19,7 @@
- #ifndef __ASM_ARCH_MXC_GPIO_H__
- #define __ASM_ARCH_MXC_GPIO_H__
- 
-+#include <linux/spinlock.h>
- #include <mach/hardware.h>
- #include <asm-generic/gpio.h>
- 
-This fixes a build failure with mx27_defconfig.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Almost - is there no more specific ID value for your CPU?
