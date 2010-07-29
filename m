@@ -1,25 +1,23 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Jul 2010 08:18:18 +0100
-Subject: [PATCH 2/3] arm: mm: do not set missing flags on ScorpionMP
-In-Reply-To: <1280357495.21185.26.camel@c-dwalke-linux.qualcomm.com>
-References: <1279911483-7039-1-git-send-email-johlstei@codeaurora.org>
-	<1279911483-7039-3-git-send-email-johlstei@codeaurora.org>
-	<20100724082334.GB15571@n2100.arm.linux.org.uk>
-	<1280354280.21185.10.camel@c-dwalke-linux.qualcomm.com>
-	<20100728223603.GB6729@n2100.arm.linux.org.uk>
-	<1280357495.21185.26.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <20100729071818.GC6729@n2100.arm.linux.org.uk>
+Date: Thu, 29 Jul 2010 08:42:40 +0100
+Subject: issue: insert kernel module failed with CONFIG_HIGHMEM enabled
+In-Reply-To: <AANLkTi=SZVbAnBSZn_khGE4hZM9gsGr7H0whkBBU4TED@mail.gmail.com>
+References: <AANLkTi=SZVbAnBSZn_khGE4hZM9gsGr7H0whkBBU4TED@mail.gmail.com>
+Message-ID: <20100729074239.GA13756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 28, 2010 at 03:51:35PM -0700, Daniel Walker wrote:
-> @@ -326,6 +327,29 @@ cpu_elf_name:
->  
->  	.section ".proc.info.init", #alloc, #execinstr
->  
-> +	.type   __v7_msm_proc_info, #object
-> +__v7_msm_proc_info:
-> +	.long	0x000f0000		@ Required ID value
-> +	.long	0x000f0000		@ Mask for ID
+On Wed, Jul 28, 2010 at 03:17:53PM +0800, Chao Xie wrote:
+> > I have compiled a module which will make use of graphics accelarate
+> > function in PXA9XX. The module works fine when CONFIG_HIGHMEM is not
+> > enabled. I can successfully insert the module. But when CONFIG_HIGHMEM is
+> > enabled, i fail to insert this module, and it reports the error likes:
+> >
+> > graphics: relocation out of range, section 2 reloc 315 sym '__kmalloc'
+> > Module len 32542 truncated
 
-Almost - is there no more specific ID value for your CPU?
+Please don't prefix your email body with '> ' - that's used to identify
+quoted parts of emails.
+
+Are you building the kernel and module using THUMB2?  Unfortunately,
+these error messages don't tell me what type the failing relocation is.
