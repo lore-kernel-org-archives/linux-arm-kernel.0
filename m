@@ -1,57 +1,109 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 29 Jul 2010 09:00:24 +0300
-Subject: [PATCH v2 03/20] mmc: support embedded data field in mmc_host
-In-Reply-To: <AANLkTimzA_JJ-byTDWznbL3YzeJ8LAP4M50onf2_3fBF@mail.gmail.com>
-References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-	<1279733634-21974-4-git-send-email-ohad@wizery.com>
-	<AANLkTimzA_JJ-byTDWznbL3YzeJ8LAP4M50onf2_3fBF@mail.gmail.com>
-Message-ID: <AANLkTi=Oy8X1xMOwWL_cKBB1LWULT6=p+adUgB+AuSJS@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 29 Jul 2010 08:42:41 +0200
+Subject: [PATCH v2] arm/imx/gpio: add spinlock protection
+In-Reply-To: <a1d5b20ff1b6e39355fcad2e882489df55c7bf2a.1278413731.git.baruch@tkos.co.il>
+References: <20100706103748.GE28547@jasper.tkos.co.il>
+	<a1d5b20ff1b6e39355fcad2e882489df55c7bf2a.1278413731.git.baruch@tkos.co.il>
+Message-ID: <20100729064241.GB11268@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vitaly,
+Hey Sascha,
 
-On Wed, Jul 28, 2010 at 10:47 PM, Vitaly Wool <vitalywool@gmail.com> wrote:
-> On Wed, Jul 21, 2010 at 7:33 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
->> Add support to set/get mmc_host private embedded
->> data.
->>
->> This is needed to allow software to dynamically
->> create (and remove) SDIO functions which represents
->> embedded SDIO devices.
->>
-> <snip>
->> @@ -209,6 +209,8 @@ struct mmc_host {
->> ? ? ? ?struct led_trigger ? ? ?*led; ? ? ? ? ? /* activity led */
->> ?#endif
->>
->> + ? ? ? void ? ? ? ? ? ? ? ? ? ?*embedded_data;
->> +
->
-> To my understanding, this data doesn't belong to mmc_host. It's not a
-> host data at all. E. g. imagine a GPIO IRQ for some SDIO chip -- it's
-> totally unrelated to host.
->
-> I think a cleaner way would be to introduce something similar to what
-> we have for SPI, e. g. struct sdio_board_info. This board info will
-> contain platform-specific stuff and vendor id/chip id for each onboard
-> SDIO device. Then the SDIO core will pick up the appropriate data
-> basing on vendor id/chip id.
+On Tue, Jul 06, 2010 at 02:03:22PM +0300, Baruch Siach wrote:
+> The GPIO registers need protection from concurrent access for operations that
+> are not atomic.
+> 
+> Cc: stable at kernel.org
+> Cc: Juergen Beisert <j.beisert@pengutronix.de>
+> Cc: Daniel Mack <daniel@caiaq.de>
+> Reported-by: rpkamiak at rockwellcollins.com
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+> Changes v1 -> v2
+> 
+>     Remove redundant protection of GPIO/IRQ registers
 
-Can you please elaborate some more about your proposal (specifically
-where does this sdio_board_info get set and how do function drivers
-access it) ?
+> 
+>  arch/arm/plat-mxc/gpio.c              |    8 ++++++++
+>  arch/arm/plat-mxc/include/mach/gpio.h |    1 +
+>  2 files changed, 9 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
+> index 71437c6..9ebbd31 100644
+> --- a/arch/arm/plat-mxc/gpio.c
+> +++ b/arch/arm/plat-mxc/gpio.c
+> @@ -214,13 +214,16 @@ static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
+>  	struct mxc_gpio_port *port =
+>  		container_of(chip, struct mxc_gpio_port, chip);
+>  	u32 l;
+> +	unsigned long flags;
+>  
+> +	spin_lock_irqsave(&port->lock, flags);
+>  	l = __raw_readl(port->base + GPIO_GDIR);
+>  	if (dir)
+>  		l |= 1 << offset;
+>  	else
+>  		l &= ~(1 << offset);
+>  	__raw_writel(l, port->base + GPIO_GDIR);
+> +	spin_unlock_irqrestore(&port->lock, flags);
+>  }
+>  
+>  static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+> @@ -229,9 +232,12 @@ static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+>  		container_of(chip, struct mxc_gpio_port, chip);
+>  	void __iomem *reg = port->base + GPIO_DR;
+>  	u32 l;
+> +	unsigned long flags;
+>  
+> +	spin_lock_irqsave(&port->lock, flags);
+>  	l = (__raw_readl(reg) & (~(1 << offset))) | (value << offset);
+>  	__raw_writel(l, reg);
+> +	spin_unlock_irqrestore(&port->lock, flags);
+>  }
+>  
+>  static int mxc_gpio_get(struct gpio_chip *chip, unsigned offset)
+> @@ -285,6 +291,8 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
+>  		port[i].chip.base = i * 32;
+>  		port[i].chip.ngpio = 32;
+>  
+> +		spin_lock_init(&port[i].lock);
+> +
+>  		/* its a serious configuration bug when it fails */
+>  		BUG_ON( gpiochip_add(&port[i].chip) < 0 );
+>  
+> diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
+> index 894d2f8..6bd932c 100644
+> --- a/arch/arm/plat-mxc/include/mach/gpio.h
+> +++ b/arch/arm/plat-mxc/include/mach/gpio.h
+> @@ -36,6 +36,7 @@ struct mxc_gpio_port {
+>  	int virtual_irq_start;
+>  	struct gpio_chip chip;
+>  	u32 both_edges;
+> +	spinlock_t lock;
+>  };
+>  
+>  int mxc_gpio_init(struct mxc_gpio_port*, int);
 
-If I understand you correctly, you suggest to have a global,
-board-specific table of sdio_board_info structures, which would be
-accessible to the SDIO core (through the host driver ?). When a new
-SDIO device is found the core would search this table for the
-appropriate sdio_board_info struct and make it accessible to the SDIO
-function driver ?
+can you please fold this into Baruch's patch:
 
-Thanks,
-Ohad.
+diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
+index 661fbc6..af33b74 100644
+--- a/arch/arm/plat-mxc/include/mach/gpio.h
++++ b/arch/arm/plat-mxc/include/mach/gpio.h
+@@ -19,6 +19,7 @@
+ #ifndef __ASM_ARCH_MXC_GPIO_H__
+ #define __ASM_ARCH_MXC_GPIO_H__
+ 
++#include <linux/spinlock.h>
+ #include <mach/hardware.h>
+ #include <asm-generic/gpio.h>
+ 
+This fixes a build failure with mx27_defconfig.
 
->
-> ~Vitaly
->
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
