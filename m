@@ -1,65 +1,39 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 30 Jul 2010 20:45:18 +0200
-Subject: [PATCH] VIDEO: sa1100fb: register driver using platform_driver_probe
-Message-ID: <1280515518-19209-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 30 Jul 2010 20:51:06 +0200
+Subject: [PATCH] MTD: pxa2xx: move pxa2xx_flash_probe to .devinit.text
+In-Reply-To: <4C52F6C1.5090207@mvista.com>
+References: <1280504530-31737-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<4C52F6C1.5090207@mvista.com>
+Message-ID: <20100730185106.GA25446@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes
+On Fri, Jul 30, 2010 at 07:58:57PM +0400, Sergei Shtylyov wrote:
+> Uwe Kleine-K?nig wrote:
+>
+>> This fixes the following warning by modpost:
+>
+>> 	WARNING: vmlinux.o(.data+0x15018): Section mismatch in reference from the variable pxa2xx_flash_driver to the function .init.text:pxa2xx_flash_probe()
+>> 	The variable pxa2xx_flash_driver references
+>> 	the function __init pxa2xx_flash_probe()
+>> 	If the reference is valid then annotate the
+>> 	variable with __init* or __refdata (see linux/init.h) or name the variable:
+>> 	*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
+>
+>> I choosed to do this instead of using platform_driver_probe as the remove
+>
+>    s/choosed/chose/
+oh right, thanks.
 
-	WARNING: vmlinux.o(.devinit.text+0x364): Section mismatch in reference from the function sa1100fb_probe() to the function .init.text:sa1100fb_init_fbinfo()
-	The function __devinit sa1100fb_probe() references
-	a function __init sa1100fb_init_fbinfo().
-	If sa1100fb_init_fbinfo is only used by sa1100fb_probe then
-	annotate sa1100fb_init_fbinfo with a matching annotation.
+>> function uses __devexit.
+>
+>    Perhaps remove() method should have been fixed instead -- I doubt that 
+> this is a hotplug device.
+Actually I don't care much.
 
-Commit c2e13037e6794bd0d9de3f9ecabf5615f15c160b addressed a section
-mismatch in this driver but introduced new ones as sa1100fb_probe
-references many more .init variables and functions (some of them
-indirectly) so using platform_driver_probe is less intrusive.
+Best regards
+Uwe
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/video/sa1100fb.c |    6 ++----
- 1 files changed, 2 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/video/sa1100fb.c b/drivers/video/sa1100fb.c
-index e8b76d6..35fc741 100644
---- a/drivers/video/sa1100fb.c
-+++ b/drivers/video/sa1100fb.c
-@@ -1351,7 +1351,6 @@ static struct fb_monspecs monspecs __initdata = {
- 	.vfmax	= 65,
- };
- 
--
- static struct sa1100fb_info * __init sa1100fb_init_fbinfo(struct device *dev)
- {
- 	struct sa1100fb_mach_info *inf;
-@@ -1435,7 +1434,7 @@ static struct sa1100fb_info * __init sa1100fb_init_fbinfo(struct device *dev)
- 	return fbi;
- }
- 
--static int __devinit sa1100fb_probe(struct platform_device *pdev)
-+static int __init sa1100fb_probe(struct platform_device *pdev)
- {
- 	struct sa1100fb_info *fbi;
- 	int ret, irq;
-@@ -1501,7 +1500,6 @@ static int __devinit sa1100fb_probe(struct platform_device *pdev)
- }
- 
- static struct platform_driver sa1100fb_driver = {
--	.probe		= sa1100fb_probe,
- 	.suspend	= sa1100fb_suspend,
- 	.resume		= sa1100fb_resume,
- 	.driver		= {
-@@ -1514,7 +1512,7 @@ int __init sa1100fb_init(void)
- 	if (fb_get_options("sa1100fb", NULL))
- 		return -ENODEV;
- 
--	return platform_driver_register(&sa1100fb_driver);
-+	return platform_driver_probe(&sa1100fb_driver, sa1100fb_probe);
- }
- 
- int __init sa1100fb_setup(char *options)
 -- 
-1.7.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
