@@ -1,71 +1,44 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 30 Jul 2010 15:16:07 +0200
-Subject: [PATCH 11/13] [ARM] pxa/balloon3: PCF857x GPIO expander and LEDs
-In-Reply-To: <20100730130755.GL6845@dream.aleph1.co.uk>
-References: <1280373389-32475-1-git-send-email-marek.vasut@gmail.com>
-	<201007301436.40920.marek.vasut@gmail.com>
-	<20100730130755.GL6845@dream.aleph1.co.uk>
-Message-ID: <201007301516.07235.marek.vasut@gmail.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Fri, 30 Jul 2010 17:19:03 +0200
+Subject: [PATCH v4] GPIO PL061: Adding Clk framework support
+In-Reply-To: <083DF309106F364B939360100EC290F80AC392ACFC@eu1rdcrdc1wx030.exi.nxp.com>
+References: <20100709124050.GF22845@n2100.arm.linux.org.uk>
+	<AANLkTikm-wupuQA1_zsmqf3jrpavkMaw8Bt-GWb04TSo@mail.gmail.com>
+	<20100710071913.GM22845@n2100.arm.linux.org.uk>
+	<AANLkTimskXW4Nnxhc5bxwKiNrfJkMb-9NeWKhVOGaA1k@mail.gmail.com>
+	<20100713074449.GA20118@n2100.arm.linux.org.uk>
+	<AANLkTilZJTHh_iFS37UL7XoUs_DhAB50A3tHfcfEr5JM@mail.gmail.com>
+	<20100713182644.GC30142@n2100.arm.linux.org.uk>
+	<4C3EA46B.1000709@st.com>
+	<20100715083032.GA26212@n2100.arm.linux.org.uk>
+	<4C3ED678.7010308@st.com>
+	<20100715095637.GF26212@n2100.arm.linux.org.uk>
+	<083DF309106F364B939360100EC290F80AC392ACFC@eu1rdcrdc1wx030.exi.nxp.com>
+Message-ID: <AANLkTikzGpqPHs4pBZKc118LvywJ09GuzLkXPp2kMBdW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 30. ?ervence 2010 15:07:55 Wookey napsal(a):
-> +++ Marek Vasut [2010-07-30 14:36 +0200]:
-> > Dne P? 30. ?ervence 2010 14:36:09 Marek Vasut napsal(a):
-> > > > > > support when the loon is used in this configuration. We have the
-> > > > > > balloon_has() macro which is used for dealing with the different
-> > > > > > builds of the board itself.
-> > > > > > 
-> > > > > > More obvious is using the CONFIG system to just enable this if
-> > > > > > CUED_IO_BOARD is configured.
-> > > > > 
-> > > > > You can just disable the PCF driver if you want to save space. In
-> > > > > case you won't have the CUED board connected, the driver will just
-> > > > > fail to probe so it's ok I believe.
-> > > > > 
-> > > > > The macro could be extended, but do we want such a weird stuff in
-> > > > > kernel?
-> > > > 
-> > > > That was how this list suggested we deal with the unprobe-able build
-> > > > variation, I beleive.
-> > > 
-> > > We have loadable kernel modules ever since ... long time ago. Maybe
-> > > that's more like the way to go.
-> 
-> But that makes it impossible to have a 'balloon' kernel that works on
-> different hardware builds. So far we have been able to have one kernel
-> build that works on all the different build variants by using that
-> macro to avoid doing things which will hang forever when hardware is
-> missing. Having to have a pile of different defconfigs for different
-> build options helps no-one (and we don't like defconfigs anymore
-> anyway :-)
-> 
-> More generic kernels is good, and ther has been much work on that sort
-> of thing recently.
+2010/7/30 Kevin Wells <kevin.wells@nxp.com>:
 
-Maybe we should figure out a more generic way of doing this so it can be 
-reusable on other machines too. Eric ? Maybe the Device tree would help here?
-> 
-> > > > > (especially if the driver can simply fail to probe).
-> > > > 
-> > > > No. Clearly anything that is probe-able should be probed. I thought
-> > > > thtat this wouldn't be as I2C devices are pretty dumb, but I guess we
-> > > > know its address here so we can try it and if no response then it's
-> > > > not there.
-> > > 
-> > > Yes, this one is probeable.
-> > 
-> > Re-adding Eric as he was dropped. Cheers
-> 
-> OK. Just to be clear I am not objecting to any of the stuff Marek is
-> posting here. It's great to have some of it upstream at last.
-> 
-> Once we have most of the basic support in we can consider the best
-> ways of dealing with the odd configuration issues of balloon variants
-> and add-on boards. (I'm not sure what you lot are going to think of
-> our Samosa bus - hopefuly it's not too ugly these days as we did make
-> it into a proper bus)
-> 
-> So, I am acking these patches.
-> 
-> Wookey
+>> - ? ? id = amba_lookup(pcdrv->id_table, pcdev);
+>> + ? ? do {
+>> + ? ? ? ? ? ? ret = amba_get_enable_pclk(pcdev);
+>> + ? ? ? ? ? ? if (ret)
+>> + ? ? ? ? ? ? ? ? ? ? break;
+>> +
+>> + ? ? ? ? ? ? ret = pcdrv->probe(pcdev, id);
+>> + ? ? ? ? ? ? if (ret == 0)
+>> + ? ? ? ? ? ? ? ? ? ? break;
+>>
+>> - ? ? return pcdrv->probe(pcdev, id);
+>> + ? ? ? ? ? ? amba_put_disable_pclk(pcdev);
+>
+> Should the AMBA clock be disabled if the probe() fails?
+
+Yes. This is the pclk for this one PrimeCell. It is first turned on,
+then the driver attempts to probe and in case that fails there
+obviously is no driver for this piece of silicon so why should it
+be clocked?
+
+Yours,
+Linus Walleij
