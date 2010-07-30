@@ -1,155 +1,63 @@
-From: jason.wessel@windriver.com (Jason Wessel)
-Date: Fri, 30 Jul 2010 14:17:27 -0500
-Subject: [PATCH 06/15] arm,kgdb: Individual register get/set for arm
-In-Reply-To: <1280517456-1167-1-git-send-email-jason.wessel@windriver.com>
-References: <1280517456-1167-1-git-send-email-jason.wessel@windriver.com>
-Message-ID: <1280517456-1167-7-git-send-email-jason.wessel@windriver.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 30 Jul 2010 21:34:29 +0200
+Subject: [Balloon] [PATCH 11/13] [ARM] pxa/balloon3: PCF857x
+	=?utf-8?q?GPIO=09expander?= =?utf-8?q?_and=09LEDs?=
+In-Reply-To: <Prayer.1.3.3.1007301954290.28463@hermes-2.csi.cam.ac.uk>
+References: <1280373389-32475-1-git-send-email-marek.vasut@gmail.com>
+	<20100730093939.GJ6845@dream.aleph1.co.uk>
+	<Prayer.1.3.3.1007301954290.28463@hermes-2.csi.cam.ac.uk>
+Message-ID: <201007302134.29333.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the ability to individually get and set registers for kdb
-and kgdb for arm.
+Dne P? 30. ?ervence 2010 20:54:29 Paul Fidler napsal(a):
+> On Jul 30 2010, Wookey wrote:
+> >+++ Marek Vasut [2010-07-30 06:44 +0200]:
+> >> Dne ?t 29. ?ervence 2010 12:00:41 Wookey napsal(a):
+> >> > +++ Marek Vasut [2010-07-29 05:16 +0200]:
+> >> > > Add supported for PCF8574A GPIO expander and LEDs attached to it.
+> >> > 
+> >> > This IO board is an add-on used in some ballon configurations, not
+> >> > part of the core board. There needs to be some way of selecting this
+> >> > support when the loon is used in this configuration. We have the
+> >> > balloon_has() macro which is used for dealing with the different
+> >> > builds of the board itself. Perhaps it should be extended to deal with
+> >> > add-on board functionality too?
+> >> > 
+> >> > More obvious is using the CONFIG system to just enable this if
+> >> > CUED_IO_BOARD is configured.
+> >> 
+> >> You can just disable the PCF driver if you want to save space. In case
+> >> you won't have the CUED board connected, the driver will just fail to
+> >> probe so it's ok I believe.
+> >> 
+> >> The macro could be extended, but do we want such a weird stuff in
+> >> kernel?
+> > 
+> > That was how this list suggested we deal with the unprobe-able build
+> > variation, I beleive.
+> > 
+> >> (especially if the driver can simply fail to probe).
+> 
+> I'd strongly recommend not adding anything at all in the kernel
+> to specifically support the CUED IO Board. The LEDs attached to
+> the PCF8574 on the board can be driven from user space quite easily
+> using programs such as as i2cset from the i2ctools package.
+> 
+> We've been using these boards at CUED for a number of years now
+> without any kernel support beyond i2c-pxa.ko and i2c-dev.ko.
+> 
+> If support is added for these LEDs in the kernel, it would be nice
+> if we could still write their PCF8574 device using the i2c-dev ioctls.
+> It would be inconvenient (for us) if the only way to set these LEDs
+> was by writing a 1 or 0 to /sys/devices/system/leds-gpio/balloon3:gpio:ledN
+> (or similar).
 
-Signed-off-by: Jason Wessel <jason.wessel@windriver.com>
-CC: Russell King <linux@arm.linux.org.uk>
-CC: linux-arm-kernel at lists.infradead.org
----
- arch/arm/include/asm/kgdb.h |    6 +-
- arch/arm/kernel/kgdb.c      |   88 ++++++++++++++++++++++--------------------
- 2 files changed, 49 insertions(+), 45 deletions(-)
-
-diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
-index 67af4b8..0826599 100644
---- a/arch/arm/include/asm/kgdb.h
-+++ b/arch/arm/include/asm/kgdb.h
-@@ -70,11 +70,11 @@ extern int kgdb_fault_expected;
- #define _GP_REGS		16
- #define _FP_REGS		8
- #define _EXTRA_REGS		2
--#define GDB_MAX_REGS		(_GP_REGS + (_FP_REGS * 3) + _EXTRA_REGS)
-+#define DBG_MAX_REG_NUM		(_GP_REGS + (_FP_REGS * 3) + _EXTRA_REGS)
- 
- #define KGDB_MAX_NO_CPUS	1
- #define BUFMAX			400
--#define NUMREGBYTES		(GDB_MAX_REGS << 2)
-+#define NUMREGBYTES		(DBG_MAX_REG_NUM << 2)
- #define NUMCRITREGBYTES		(32 << 2)
- 
- #define _R0			0
-@@ -93,7 +93,7 @@ extern int kgdb_fault_expected;
- #define _SPT			13
- #define _LR			14
- #define _PC			15
--#define _CPSR			(GDB_MAX_REGS - 1)
-+#define _CPSR			(DBG_MAX_REG_NUM - 1)
- 
- /*
-  * So that we can denote the end of a frame for tracing,
-diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
-index c868a88..cf846ca 100644
---- a/arch/arm/kernel/kgdb.c
-+++ b/arch/arm/kernel/kgdb.c
-@@ -13,54 +13,58 @@
- #include <linux/kgdb.h>
- #include <asm/traps.h>
- 
--/* Make a local copy of the registers passed into the handler (bletch) */
--void pt_regs_to_gdb_regs(unsigned long *gdb_regs, struct pt_regs *kernel_regs)
-+struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] =
- {
--	int regno;
--
--	/* Initialize all to zero. */
--	for (regno = 0; regno < GDB_MAX_REGS; regno++)
--		gdb_regs[regno] = 0;
-+	{ "r0", 4, offsetof(struct pt_regs, ARM_r0)},
-+	{ "r1", 4, offsetof(struct pt_regs, ARM_r1)},
-+	{ "r2", 4, offsetof(struct pt_regs, ARM_r2)},
-+	{ "r3", 4, offsetof(struct pt_regs, ARM_r3)},
-+	{ "r4", 4, offsetof(struct pt_regs, ARM_r4)},
-+	{ "r5", 4, offsetof(struct pt_regs, ARM_r5)},
-+	{ "r6", 4, offsetof(struct pt_regs, ARM_r6)},
-+	{ "r7", 4, offsetof(struct pt_regs, ARM_r7)},
-+	{ "r8", 4, offsetof(struct pt_regs, ARM_r8)},
-+	{ "r9", 4, offsetof(struct pt_regs, ARM_r9)},
-+	{ "r10", 4, offsetof(struct pt_regs, ARM_r10)},
-+	{ "fp", 4, offsetof(struct pt_regs, ARM_fp)},
-+	{ "ip", 4, offsetof(struct pt_regs, ARM_ip)},
-+	{ "sp", 4, offsetof(struct pt_regs, ARM_sp)},
-+	{ "lr", 4, offsetof(struct pt_regs, ARM_lr)},
-+	{ "pc", 4, offsetof(struct pt_regs, ARM_pc)},
-+	{ "f0", 12, -1 },
-+	{ "f1", 12, -1 },
-+	{ "f2", 12, -1 },
-+	{ "f3", 12, -1 },
-+	{ "f4", 12, -1 },
-+	{ "f5", 12, -1 },
-+	{ "f6", 12, -1 },
-+	{ "f7", 12, -1 },
-+	{ "fps", 4, -1 },
-+	{ "cpsr", 4, offsetof(struct pt_regs, ARM_cpsr)},
-+};
- 
--	gdb_regs[_R0]		= kernel_regs->ARM_r0;
--	gdb_regs[_R1]		= kernel_regs->ARM_r1;
--	gdb_regs[_R2]		= kernel_regs->ARM_r2;
--	gdb_regs[_R3]		= kernel_regs->ARM_r3;
--	gdb_regs[_R4]		= kernel_regs->ARM_r4;
--	gdb_regs[_R5]		= kernel_regs->ARM_r5;
--	gdb_regs[_R6]		= kernel_regs->ARM_r6;
--	gdb_regs[_R7]		= kernel_regs->ARM_r7;
--	gdb_regs[_R8]		= kernel_regs->ARM_r8;
--	gdb_regs[_R9]		= kernel_regs->ARM_r9;
--	gdb_regs[_R10]		= kernel_regs->ARM_r10;
--	gdb_regs[_FP]		= kernel_regs->ARM_fp;
--	gdb_regs[_IP]		= kernel_regs->ARM_ip;
--	gdb_regs[_SPT]		= kernel_regs->ARM_sp;
--	gdb_regs[_LR]		= kernel_regs->ARM_lr;
--	gdb_regs[_PC]		= kernel_regs->ARM_pc;
--	gdb_regs[_CPSR]		= kernel_regs->ARM_cpsr;
-+char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
-+{
-+	if (regno >= DBG_MAX_REG_NUM || regno < 0)
-+		return NULL;
-+
-+	if (dbg_reg_def[regno].offset != -1)
-+		memcpy(mem, (void *)regs + dbg_reg_def[regno].offset,
-+		       dbg_reg_def[regno].size);
-+	else
-+		memset(mem, 0, dbg_reg_def[regno].size);
-+	return dbg_reg_def[regno].name;
- }
- 
--/* Copy local gdb registers back to kgdb regs, for later copy to kernel */
--void gdb_regs_to_pt_regs(unsigned long *gdb_regs, struct pt_regs *kernel_regs)
-+int dbg_set_reg(int regno, void *mem, struct pt_regs *regs)
- {
--	kernel_regs->ARM_r0	= gdb_regs[_R0];
--	kernel_regs->ARM_r1	= gdb_regs[_R1];
--	kernel_regs->ARM_r2	= gdb_regs[_R2];
--	kernel_regs->ARM_r3	= gdb_regs[_R3];
--	kernel_regs->ARM_r4	= gdb_regs[_R4];
--	kernel_regs->ARM_r5	= gdb_regs[_R5];
--	kernel_regs->ARM_r6	= gdb_regs[_R6];
--	kernel_regs->ARM_r7	= gdb_regs[_R7];
--	kernel_regs->ARM_r8	= gdb_regs[_R8];
--	kernel_regs->ARM_r9	= gdb_regs[_R9];
--	kernel_regs->ARM_r10	= gdb_regs[_R10];
--	kernel_regs->ARM_fp	= gdb_regs[_FP];
--	kernel_regs->ARM_ip	= gdb_regs[_IP];
--	kernel_regs->ARM_sp	= gdb_regs[_SPT];
--	kernel_regs->ARM_lr	= gdb_regs[_LR];
--	kernel_regs->ARM_pc	= gdb_regs[_PC];
--	kernel_regs->ARM_cpsr	= gdb_regs[_CPSR];
-+	if (regno >= DBG_MAX_REG_NUM || regno < 0)
-+		return -EINVAL;
-+
-+	if (dbg_reg_def[regno].offset != -1)
-+		memcpy((void *)regs + dbg_reg_def[regno].offset, mem,
-+		       dbg_reg_def[regno].size);
-+	return 0;
- }
- 
- void
--- 
-1.6.4.rc1
+And also _please_ keep the CC correct. Cheers
+> 
+> Best wishes,
+> 
+>   Paul.
+> 
+> 
+> Paul Fidler
