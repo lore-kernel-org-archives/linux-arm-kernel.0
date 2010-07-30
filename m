@@ -1,44 +1,51 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Fri, 30 Jul 2010 17:19:03 +0200
-Subject: [PATCH v4] GPIO PL061: Adding Clk framework support
-In-Reply-To: <083DF309106F364B939360100EC290F80AC392ACFC@eu1rdcrdc1wx030.exi.nxp.com>
-References: <20100709124050.GF22845@n2100.arm.linux.org.uk>
-	<AANLkTikm-wupuQA1_zsmqf3jrpavkMaw8Bt-GWb04TSo@mail.gmail.com>
-	<20100710071913.GM22845@n2100.arm.linux.org.uk>
-	<AANLkTimskXW4Nnxhc5bxwKiNrfJkMb-9NeWKhVOGaA1k@mail.gmail.com>
-	<20100713074449.GA20118@n2100.arm.linux.org.uk>
-	<AANLkTilZJTHh_iFS37UL7XoUs_DhAB50A3tHfcfEr5JM@mail.gmail.com>
-	<20100713182644.GC30142@n2100.arm.linux.org.uk>
-	<4C3EA46B.1000709@st.com>
-	<20100715083032.GA26212@n2100.arm.linux.org.uk>
-	<4C3ED678.7010308@st.com>
-	<20100715095637.GF26212@n2100.arm.linux.org.uk>
-	<083DF309106F364B939360100EC290F80AC392ACFC@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <AANLkTikzGpqPHs4pBZKc118LvywJ09GuzLkXPp2kMBdW@mail.gmail.com>
+From: mfuzzey@gmail.com (Martin Fuzzey)
+Date: Fri, 30 Jul 2010 17:25:07 +0200
+Subject: not coming prompt in 2.6.33.6 kernel
+In-Reply-To: <AANLkTin8STiQqvjZo-atA9jhz1OLWuk2k61-VYnZrcD8@mail.gmail.com>
+References: <AANLkTikgB9OF6mRqZ2KgQYuCQ4JcF7N6oTJyUbrYq0t7@mail.gmail.com>
+	<20100728094344.GA9142@trinity.fluff.org>
+	<AANLkTikgq_Fb0ZfT-b+9zOA5w2pDpNgwnUqe919hAsnd@mail.gmail.com>
+	<AANLkTin8STiQqvjZo-atA9jhz1OLWuk2k61-VYnZrcD8@mail.gmail.com>
+Message-ID: <AANLkTim8KEn7-dFpHdbYs0Wvi_hxjrbmUmhEQ2nMOtHj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/30 Kevin Wells <kevin.wells@nxp.com>:
-
->> - ? ? id = amba_lookup(pcdrv->id_table, pcdev);
->> + ? ? do {
->> + ? ? ? ? ? ? ret = amba_get_enable_pclk(pcdev);
->> + ? ? ? ? ? ? if (ret)
->> + ? ? ? ? ? ? ? ? ? ? break;
->> +
->> + ? ? ? ? ? ? ret = pcdrv->probe(pcdev, id);
->> + ? ? ? ? ? ? if (ret == 0)
->> + ? ? ? ? ? ? ? ? ? ? break;
->>
->> - ? ? return pcdrv->probe(pcdev, id);
->> + ? ? ? ? ? ? amba_put_disable_pclk(pcdev);
+Hi,
+On Fri, Jul 30, 2010 at 12:40 PM, nitin vishnoi <nitvishnoi@gmail.com> wrote:
+> Hi now i am able the uart info also.Bu stil not getting the prompt.
+> and getting the following log.
 >
-> Should the AMBA clock be disabled if the probe() fails?
+> Starting kernel ...
+>
+>
+> Uncompressing
+> Linux......................................................................
+> done, booting the kernel.
+> Linux version 2.6.31.14 (root at ubntu-desktop) (gcc version 4.1.2) #34 Fri Jul
+> 30 15:33:38 IST 2010
+> CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
+> CPU: VIVT data cache, VIVT instruction cache
+> Kernel command line: root=/dev/ram initrd=0x30800000,8M ramdisk=24576
+> init=/sbin/init console=ttySAC3,115200 mem=64M
+> RAMDISK: gzip image found at block 0
+> EXT2-fs warning: maximal mount count reached, running e2fsck is recommended
+> VFS: Mounted root (ext2 filesystem) on device 1:0.
+> Freeing init memory: 88K
+> Kernel panic - not syncing: Attempted to kill init!
+>
 
-Yes. This is the pclk for this one PrimeCell. It is first turned on,
-then the driver attempts to probe and in case that fails there
-obviously is no driver for this piece of silicon so why should it
-be clocked?
+Looks like the init process is terminating unexpectedly.
+What's /sbin/init for you?
+How is it compiled? (could it be a OABI / EABI issue?)
 
-Yours,
-Linus Walleij
+What happens if you try booting with  init=/bin/sh   ?
+or try using a script like this as init
+
+#! /bin/sh
+echo "Test stdout"
+echo "Test console" > /dev/console
+echo "Test tty1" > /dev/tty1
+/bin/ls -l /dev > /dev/tty1
+
+Cheers,
+Martin
