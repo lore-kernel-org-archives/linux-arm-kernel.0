@@ -1,83 +1,55 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 30 Jul 2010 20:57:04 +0200
-Subject: [PATCH RFC] usb gadget: introduce usb_gadget_probe_driver
-In-Reply-To: <op.vgny39097p4s8u@pikus>
-References: <1280501361-13410-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<op.vgnwp8107p4s8u@pikus> <20100730152602.GA28042@pengutronix.de>
-	<op.vgny39097p4s8u@pikus>
-Message-ID: <20100730185704.GB25446@pengutronix.de>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Fri, 30 Jul 2010 17:22:11 +0800
+Subject: [PATCH 0/3] Allow late mdesc detection, v3
+Message-ID: <1280481731.769003.588934833065.0.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 30, 2010 at 06:08:23PM +0200, Micha? Nazarewicz wrote:
-> On Fri, 30 Jul 2010 17:26:02 +0200, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
->> On Fri, Jul 30, 2010 at 05:16:46PM +0200, Micha? Nazarewicz wrote:
->>> On Fri, 30 Jul 2010 16:49:14 +0200, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
->>>
->>>> This is like usb_gadget_register_driver with the only difference that it
->>>> gets the bind function as parameter instead of using driver->bind.  This
->>>> allows fixing section mismatches like
->>>>
->>>> 	WARNING: drivers/usb/gadget/g_printer.o(.data+0xc): Section mismatch in
->>>> 	reference from the variable printer_driver to the function
->>>> 	.init.text:printer_bind()
->>>> 	The variable printer_driver references
->>>> 	the function __init printer_bind()
->>>>
->>>> by using usb_gadget_probe_driver with driver->bind = NULL.  When all
->>>> drivers are fixed to use the new function the bind member of struct
->>>> usb_gadget_driver can go away.
->>>>
->>>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->>>> Cc: Michal Nazarewicz <m.nazarewicz@samsung.com>
->>>> Cc: Greg Kroah-Hartman <gregkh@suse.de>
->
-> BTW. Dunno if there is a reason to put me on Cc and Greg will be in
-> Signed-off-by anyway.
->
->>>> ---
->>>> Hello,
->>>>
->>>> there is an alternative patch in Greg's tree [1], but IMHO mine is
->>>> better as it doesn't need __ref.
->>>>
->>>> Thoughts?
->>>
->>> Personally I don't see advantage of this over changing the __init to __ref.
->>> Or am I missing something?  I see your patch as an unnecessary API change.
->>> The way I understand it, __ref was introduced exactly for cases like this
->>> one where function is referenced from "normal" data but used only during
->>> init.  Could you try to clarify for me why you think your solution is
->>> better then mine?
->
->> - Using __ref instead of __init moves all bind functions from .init.text
->>   to .text and so the code isn't freed after booting or module loading.
->>   (OK, you could fix this by marking the driver structs as __ref and
->>   keep __init for the bind functions.)
->
-> I believe this to be untrue.  __ref puts code in .ref.text which AFAIK is
-> freed.
-I'm pretty sure it's not freed.  .ref.text is of course correct.
+Hi all,
 
->> - Using __ref might hide section mismatches.  (Your patch hasn't this
->>   problem as the bind functions used to live in .init.text, so any
->>   reference to .init should be OK assuming that it was OK to live in
->>   .init.text in the first place.  But when marking the driver structs
->>   this is an issue.)  That's why I don't like __ref and said my patch
->>   were better as it doesn't make use of it.
->>
->> - The bind functions are only called at init time, so there is no need
->>   to save a pointer to it.
->
-> OK, I see some merit in this approach.  However, the same issue is with
-> usb_configuration and ?usb_composite_driver -- those should be changed
-> in the same way or it would defeat the purpose of the patch.
-I didn't skip these on purpose.  I just stumbled over the gadget drivers
-first.
+Currently, we probe for a mdesc early in boot. At this early stage, the
+only thing we use the mdesc for is to determine the debug page mapping.
 
-Best regards
-Uwe
+However, the debug addresses (phys and virt) need to be coded into the
+addruart macro anyway; the dynamic probing is only going to tell us what
+we already know.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+These changes allow us to use the addruart macros to find the debug
+mapping addresses, rather than pulling them out of the mdesc. This means
+that the addresses are only kept in the one place, and that we don't
+need the mdesc nearly as early.
+
+The first change updates all of the addruart macros to return both
+physical and virtual addresses. I've used 'rp' and 'rv' as the macro
+arguments to indicate which address goes where
+
+The second change updates the debug setup routine to use the addruart
+macro to establish the debug mapping, now that we can invoke the macro
+to find the phyical and virtual addresses.
+
+This allows us to delay the requirement to have a mdesc available until
+much later. For example, we can parse one from the device tree once
+we've reached C code.
+
+May break OMAP1/2, as the addruart macros are more complex on these
+platforms. I'd appreciate input from OMAP folks who may well tell me
+that this isn't possible.
+
+Cheers,
+
+
+Jeremy
+
+v3:
+ * only establish page mapping if !DEBUG_ICEDCC
+
+v2:
+ * return both phys and virt addresses from addruart
+ * mask unneeded bits from uart physical address in mapping setup
+ * remove io_pg_offst and phys_io, in a separate patch
+
+---
+Jeremy Kerr (3):
+      arm/debug: consolidate addruart macros for CONFIG_DEBUG_ICEDCC
+      arm: return both physical and virtual addresses from addruart
+      arm: use addruart macro to establish debug mappings
