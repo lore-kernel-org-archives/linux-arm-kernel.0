@@ -1,48 +1,80 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Fri, 30 Jul 2010 01:22:58 +0200
-Subject: [PATCH v4] GPIO PL061: Adding Clk framework support
-In-Reply-To: <20100715095637.GF26212@n2100.arm.linux.org.uk>
-References: <20100709124050.GF22845@n2100.arm.linux.org.uk>
-	<AANLkTikm-wupuQA1_zsmqf3jrpavkMaw8Bt-GWb04TSo@mail.gmail.com>
-	<20100710071913.GM22845@n2100.arm.linux.org.uk>
-	<AANLkTimskXW4Nnxhc5bxwKiNrfJkMb-9NeWKhVOGaA1k@mail.gmail.com>
-	<20100713074449.GA20118@n2100.arm.linux.org.uk>
-	<AANLkTilZJTHh_iFS37UL7XoUs_DhAB50A3tHfcfEr5JM@mail.gmail.com>
-	<20100713182644.GC30142@n2100.arm.linux.org.uk>	<4C3EA46B.1000709@st.com>
-	<20100715083032.GA26212@n2100.arm.linux.org.uk>	<4C3ED678.7010308@st.com>
-	<20100715095637.GF26212@n2100.arm.linux.org.uk>
-Message-ID: <083DF309106F364B939360100EC290F80AC392ACFC@eu1rdcrdc1wx030.exi.nxp.com>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Fri, 30 Jul 2010 09:14:30 +0900
+Subject: [PATCH 1/2] ARM: S5PV210: Add audio support to Aquila
+In-Reply-To: <4C52053A.8090400@simtec.co.uk>
+References: <4C4F9E4C.7000001@samsung.com>
+	<4C52053A.8090400@simtec.co.uk>
+Message-ID: <AANLkTimiLMqJ1qewOGr6jy=MhAgQpM0Z1yxYYz4xeraL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->  /*
->   * These are the device model conversion veneers; they convert the
->   * device model structures to our more specific structures.
-> @@ -130,17 +155,33 @@ static int amba_probe(struct device *dev)
->  {
->  	struct amba_device *pcdev = to_amba_device(dev);
->  	struct amba_driver *pcdrv = to_amba_driver(dev->driver);
-> -	struct amba_id *id;
-> +	struct amba_id *id = amba_lookup(pcdrv->id_table, pcdev);
-> +	int ret;
-> 
-> -	id = amba_lookup(pcdrv->id_table, pcdev);
-> +	do {
-> +		ret = amba_get_enable_pclk(pcdev);
-> +		if (ret)
-> +			break;
-> +
-> +		ret = pcdrv->probe(pcdev, id);
-> +		if (ret == 0)
-> +			break;
-> 
-> -	return pcdrv->probe(pcdev, id);
-> +		amba_put_disable_pclk(pcdev);
+On Fri, Jul 30, 2010 at 7:48 AM, Ben Dooks <ben@simtec.co.uk> wrote:
+> On 28/07/10 04:04, Chanwoo Choi wrote:
+>
+> [snip]
+>
+>
+>> +/* GPIO I2C AP 1.8V */
+>> +#define AP_I2C_GPIO_BUS_5 ? ?5
+>> +static struct i2c_gpio_platform_data i2c_gpio5_data = {
+>> + ? ? .sda_pin ? ? ? ?= S5PV210_MP05(3), ? ? ?/* XM0ADDR_11 */
+>> + ? ? .scl_pin ? ? ? ?= S5PV210_MP05(2), ? ? ?/* XM0ADDR_10 */
+>> +};
+>> +
+>> +static struct platform_device i2c_gpio5 = {
+>> + ? ? .name ? ? ? ? ? = "i2c-gpio",
+>> + ? ? .id ? ? ? ? ? ? = AP_I2C_GPIO_BUS_5,
+>> + ? ? .dev ? ? ? ? ? ?= {
+>> + ? ? ? ? ? ? .platform_data ?= &i2c_gpio5_data,
+>> + ? ? },
+>> +};
+>> +
+>> +static struct i2c_board_info i2c_gpio5_devs[] __initdata = {
+>> + ? ? {
+>> + ? ? ? ? ? ? /* CS/ADDR = low 0x34 (FYI: high = 0x36) */
+>> + ? ? ? ? ? ? I2C_BOARD_INFO("wm8994", 0x34 >> 1),
+>> + ? ? ? ? ? ? .platform_data ?= &wm8994_platform_data,
+>> + ? ? },
+>> +};
+>> +
+>> +static void __init aquila_sound_init(void)
+>> +{
+>> + ? ? unsigned int gpio;
+>> +
+>> + ? ? /* CODEC_XTAL_EN */
+>> + ? ? gpio = S5PV210_GPH3(2); ? ? ? ? /* XEINT_26 */
+>> + ? ? gpio_request(gpio, "CODEC_XTAL_EN");
+>> + ? ? s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
+>> + ? ? s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+>> + ? ? gpio_direction_output(gpio, 1);
+>
+> gpio_direction_output() should have done the cfgpin()
+> call.
 
-Should the AMBA clock be disabled if the probe() fails?
+Good catch. Thanks.
 
-> +	} while (0);
-> +
-> +	return ret;
->  }
-> 
+I think we required that extend the current gpiolib to support the
+setpull like functions. also sleep gpio pin configuration.
+Marek or shim? do you have any ideas?
+
+>
+>> + ? ? /* CLKOUT[9:8] set to 0x3(XUSBXTI) of 0xE010E000(OTHERS)
+>> + ? ? ?* for 24MHZ
+>> + ? ? ?*/
+>> + ? ? writel(readl(S5P_OTHERS) | (0x3 << 8), S5P_OTHERS);
+>
+> Not sure if this should be being done directly? will it affect
+> the current clock tree?
+
+It's almost done by bootloader. but we make sure it's really routed
+the CLKOUT to XUSBXTI.
+
+Thank you,
+Kyungmin Park
+
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
