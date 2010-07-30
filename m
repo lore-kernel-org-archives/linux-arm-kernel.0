@@ -1,214 +1,308 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Fri, 30 Jul 2010 15:14:27 +0900
-Subject: [PATCH 1/2] arm: msm: Add System MMU support.
-In-Reply-To: <20100729114726.GA17991@n2100.arm.linux.org.uk>
-References: <20100728212156.GA6729@n2100.arm.linux.org.uk>
-	<201007291012.05986.arnd@arndb.de>
-	<20100729114726.GA17991@n2100.arm.linux.org.uk>
-Message-ID: <20100730151345W.fujita.tomonori@lab.ntt.co.jp>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 30 Jul 2010 08:34:23 +0200
+Subject: [PATCH 1/6] [ARM] pxa/balloon3: Machine file cleanup
+Message-ID: <1280471668-30955-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Jul 2010 12:47:26 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Logically separate parts of the file that are handled by one particular driver.
 
-> On Thu, Jul 29, 2010 at 10:12:05AM +0200, Arnd Bergmann wrote:
-> > On Wednesday 28 July 2010 23:21:56 Russell King - ARM Linux wrote:
-> > > On Wed, Jul 28, 2010 at 07:50:20PM +0200, Arnd Bergmann wrote:
-> > > > The DMA API is extremely flexible, it works just fine with all the
-> > > > IOMMUs that I've seen so far. Please take a look at
-> > > > include/asm-generic/dma-mapping-common.h and its users to see how
-> > > > to use multiple IOMMUs depending on the device.
-> > > 
-> > > We don't yet use those DMA API interface extensions because we haven't
-> > > had the need.  If someone who has the need wants to put the effort in
-> > > though...
-> > 
-> > Right, it shouldn't be hard now that the groundwork for that is done.
-> > Also, it's only really needed if you have IOMMUs of different types in the
-> > same system. If msm doesn't have any swiotlb or dmabounce devices,
-> > it could always use the same implementation for all devices.
-> > 
-> > > One of the problems with it though is the abstraction of the sync*
-> > > operations is the wrong way around for stuff like dmabounce - we want
-> > > to be passed the base address of the buffer (so we can look this up),
-> > > plus offset and length.  We don't want to know just the region which
-> > > is affected.
-> > 
-> > Yes, but that is an unrelated (dmabounce specific) problem that seems to
-> > be fixed by an existing patch.
-> 
-> It's not unrelated because it stands in the way of using that interface.
-> The patch also seems to be buggy in that it doesn't fix the for_device
-> case - it leaves 'off' as zero.
-
-Ah, sorry about the bug. Surely, the for_device needs to do the same
-as the for_cpu. I've attached the updated patch.
-
-We need to fix dmabounce.c anyway (even if we keep the sync_range API)
-because drivers use the sync API to do a partial sync.
-
-
-> I'm also not sold on this idea that the sync_range API is being obsoleted.
-> It seems to me to be a step in the wrong direction.  The range API is a
-> natural subset of the 'normal' sync API, yet people are trying to shoehorn
-> the range API into the 'norma' API.  If anything it's the 'normal' API
-> which should be obsoleted as it provides reduced information to
-> implementations, which then have to start fuzzy-matching the passed
-> address.
-
-It would have been nice if you had opposed when this issue was
-discussed...
-
-commit 8127bfc5645db0e050468e0ff971b4081f73ddcf
-Author: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
-Date:   Wed Mar 10 15:23:18 2010 -0800
-
-    DMA-API.txt: remove dma_sync_single_range description
-
-
-As you said, the range API might be safer (since it requires more
-information). However, there were already drivers using the
-dma_sync_single_for API to do a partial sync (i.e. do a sync on
-range).
-
-Inspecting all the usage of the dma_sync_single_for API to see which
-drivers to do a partial sync looks unrealistic. So keeping the
-dma_sync_single_range_for API is pointless since drivers keep using 
-dma_sync_single_for API.
-
-And the majority of implementations doesn't use 'range' information,
-i.e., the implementation of dma_sync_single_for and
-dma_sync_single_range_for API is identical.
-
-
-> If we're going to start fuzzy-matching the passed address, then I think
-> we also need to add detection of overlapping mappings and BUG() on such
-> cases - otherwise we risk the possibility of having multiple overlapping
-> mappings and hitting the wrong mapping with this reduced-information sync
-> API.
-
-Strict checking would be nice. If architectures can do such easily, we
-had better to do so.
-
-However, I'm not sure we need to take special care for the
-dma_sync_single_for API. In general, misuse of the majority of the DMA
-functions is deadly.
-
-=
-From: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
-Subject: [PATCH] ARM: dmabounce: fix partial sync in dma_sync_single_* API
-
-Some network drivers do a partial sync with
-dma_sync_single_for_{device|cpu}. The dma_addr argument might not be
-the same as one as passed into the mapping API.
-
-This adds some tricks to find_safe_buffer() for
-dma_sync_single_for_{device|cpu}.
-
-Signed-off-by: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- arch/arm/common/dmabounce.c |   32 +++++++++++++++++++++++---------
- 1 files changed, 23 insertions(+), 9 deletions(-)
+ arch/arm/mach-pxa/balloon3.c |  225 +++++++++++++++++++++++------------------
+ 1 files changed, 126 insertions(+), 99 deletions(-)
 
-diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
-index cc0a932..dbd30dc 100644
---- a/arch/arm/common/dmabounce.c
-+++ b/arch/arm/common/dmabounce.c
-@@ -163,7 +163,8 @@ alloc_safe_buffer(struct dmabounce_device_info *device_info, void *ptr,
+diff --git a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
+index f3b5ace..8adb87a 100644
+--- a/arch/arm/mach-pxa/balloon3.c
++++ b/arch/arm/mach-pxa/balloon3.c
+@@ -51,87 +51,27 @@
+ #include "generic.h"
+ #include "devices.h"
  
- /* determine if a buffer is from our "safe" pool */
- static inline struct safe_buffer *
--find_safe_buffer(struct dmabounce_device_info *device_info, dma_addr_t safe_dma_addr)
-+find_safe_buffer(struct dmabounce_device_info *device_info, dma_addr_t safe_dma_addr,
-+		 int for_sync)
+-static unsigned long balloon3_irq_enabled;
+-
+-static unsigned long balloon3_features_present =
+-		(1 << BALLOON3_FEATURE_OHCI) | (1 << BALLOON3_FEATURE_CF) |
+-		(1 << BALLOON3_FEATURE_AUDIO) |
+-		(1 << BALLOON3_FEATURE_TOPPOLY);
+-
+-int balloon3_has(enum balloon3_features feature)
+-{
+-	return (balloon3_features_present & (1 << feature)) ? 1 : 0;
+-}
+-EXPORT_SYMBOL_GPL(balloon3_has);
+-
+-int __init parse_balloon3_features(char *arg)
+-{
+-	if (!arg)
+-		return 0;
+-
+-	return strict_strtoul(arg, 0, &balloon3_features_present);
+-}
+-early_param("balloon3_features", parse_balloon3_features);
+-
+-static void balloon3_mask_irq(unsigned int irq)
+-{
+-	int balloon3_irq = (irq - BALLOON3_IRQ(0));
+-	balloon3_irq_enabled &= ~(1 << balloon3_irq);
+-	__raw_writel(~balloon3_irq_enabled, BALLOON3_INT_CONTROL_REG);
+-}
++/******************************************************************************
++ * Pin configuration
++ ******************************************************************************/
++static unsigned long balloon3_pin_config[] __initdata = {
++	/* Select BTUART 'COM1/ttyS0' as IO option for pins 42/43/44/45 */
++	GPIO42_BTUART_RXD,
++	GPIO43_BTUART_TXD,
++	GPIO44_BTUART_CTS,
++	GPIO45_BTUART_RTS,
+ 
+-static void balloon3_unmask_irq(unsigned int irq)
+-{
+-	int balloon3_irq = (irq - BALLOON3_IRQ(0));
+-	balloon3_irq_enabled |= (1 << balloon3_irq);
+-	__raw_writel(~balloon3_irq_enabled, BALLOON3_INT_CONTROL_REG);
+-}
++	/* Wakeup GPIO */
++	GPIO1_GPIO | WAKEUP_ON_EDGE_BOTH,
+ 
+-static struct irq_chip balloon3_irq_chip = {
+-	.name		= "FPGA",
+-	.ack		= balloon3_mask_irq,
+-	.mask		= balloon3_mask_irq,
+-	.unmask		= balloon3_unmask_irq,
++	/* NAND & IDLE LED GPIOs */
++	GPIO9_GPIO,
++	GPIO10_GPIO,
+ };
+ 
+-static void balloon3_irq_handler(unsigned int irq, struct irq_desc *desc)
+-{
+-	unsigned long pending = __raw_readl(BALLOON3_INT_CONTROL_REG) &
+-					balloon3_irq_enabled;
+-
+-	do {
+-		/* clear useless edge notification */
+-		if (desc->chip->ack)
+-			desc->chip->ack(BALLOON3_AUX_NIRQ);
+-		while (pending) {
+-			irq = BALLOON3_IRQ(0) + __ffs(pending);
+-			generic_handle_irq(irq);
+-			pending &= pending - 1;
+-		}
+-		pending = __raw_readl(BALLOON3_INT_CONTROL_REG) &
+-				balloon3_irq_enabled;
+-	} while (pending);
+-}
+-
+-static void __init balloon3_init_irq(void)
+-{
+-	int irq;
+-
+-	pxa27x_init_irq();
+-	/* setup extra Balloon3 irqs */
+-	for (irq = BALLOON3_IRQ(0); irq <= BALLOON3_IRQ(7); irq++) {
+-		set_irq_chip(irq, &balloon3_irq_chip);
+-		set_irq_handler(irq, handle_level_irq);
+-		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+-	}
+-
+-	set_irq_chained_handler(BALLOON3_AUX_NIRQ, balloon3_irq_handler);
+-	set_irq_type(BALLOON3_AUX_NIRQ, IRQ_TYPE_EDGE_FALLING);
+-
+-	pr_debug("%s: chained handler installed - irq %d automatically "
+-		"enabled\n", __func__, BALLOON3_AUX_NIRQ);
+-}
+-
++/******************************************************************************
++ * Audio and Touchscreen
++ ******************************************************************************/
+ static unsigned long balloon3_ac97_pin_config[] = {
+ 	GPIO28_AC97_BITCLK,
+ 	GPIO29_AC97_SDATA_IN_0,
+@@ -140,19 +80,16 @@ static unsigned long balloon3_ac97_pin_config[] = {
+ 	GPIO113_AC97_nRESET,
+ };
+ 
++/******************************************************************************
++ * Framebuffer
++ ******************************************************************************/
++
+ static void balloon3_backlight_power(int on)
  {
- 	struct safe_buffer *b, *rb = NULL;
- 	unsigned long flags;
-@@ -171,9 +172,17 @@ find_safe_buffer(struct dmabounce_device_info *device_info, dma_addr_t safe_dma_
- 	read_lock_irqsave(&device_info->lock, flags);
- 
- 	list_for_each_entry(b, &device_info->safe_buffers, node)
--		if (b->safe_dma_addr == safe_dma_addr) {
--			rb = b;
--			break;
-+		if (for_sync) {
-+			if (b->safe_dma_addr <= safe_dma_addr &&
-+			    safe_dma_addr < b->safe_dma_addr + b->size) {
-+				rb = b;
-+				break;
-+			}
-+		} else {
-+			if (b->safe_dma_addr == safe_dma_addr) {
-+				rb = b;
-+				break;
-+			}
- 		}
- 
- 	read_unlock_irqrestore(&device_info->lock, flags);
-@@ -205,7 +214,8 @@ free_safe_buffer(struct dmabounce_device_info *device_info, struct safe_buffer *
- /* ************************************************** */
- 
- static struct safe_buffer *find_safe_buffer_dev(struct device *dev,
--		dma_addr_t dma_addr, const char *where)
-+						dma_addr_t dma_addr, const char *where,
-+						int for_sync)
- {
- 	if (!dev || !dev->archdata.dmabounce)
- 		return NULL;
-@@ -216,7 +226,7 @@ static struct safe_buffer *find_safe_buffer_dev(struct device *dev,
- 			pr_err("unknown device: Trying to %s invalid mapping\n", where);
- 		return NULL;
- 	}
--	return find_safe_buffer(dev->archdata.dmabounce, dma_addr);
-+	return find_safe_buffer(dev->archdata.dmabounce, dma_addr, for_sync);
+ 	pr_debug("%s: power is %s\n", __func__, on ? "on" : "off");
+ 	gpio_set_value(BALLOON3_GPIO_RUN_BACKLIGHT, on);
  }
  
- static inline dma_addr_t map_single(struct device *dev, void *ptr, size_t size,
-@@ -286,7 +296,7 @@ static inline dma_addr_t map_single(struct device *dev, void *ptr, size_t size,
- static inline void unmap_single(struct device *dev, dma_addr_t dma_addr,
- 		size_t size, enum dma_data_direction dir)
+-static unsigned long balloon3_lcd_pin_config[] = {
+-	/* LCD - 16bpp Active TFT */
+-	GPIOxx_LCD_TFT_16BPP,
+-
+-	GPIO99_GPIO,		/* Backlight */
+-};
+-
+ static struct pxafb_mode_info balloon3_lcd_modes[] = {
+ 	{
+ 		.pixclock		= 38000,
+@@ -176,6 +113,9 @@ static struct pxafb_mach_info balloon3_pxafb_info = {
+ 	.pxafb_backlight_power	= balloon3_backlight_power,
+ };
+ 
++/******************************************************************************
++ * SD/MMC card controller
++ ******************************************************************************/
+ static unsigned long balloon3_mmc_pin_config[] = {
+ 	GPIO32_MMC_CLK,
+ 	GPIO92_MMC_DAT_0,
+@@ -203,6 +143,9 @@ static struct pxamci_platform_data balloon3_mci_platform_data = {
+ 	.setpower 	= balloon3_mci_setpower,
+ };
+ 
++/******************************************************************************
++ * USB Gadget
++ ******************************************************************************/
+ static int balloon3_udc_is_connected(void)
  {
--	struct safe_buffer *buf = find_safe_buffer_dev(dev, dma_addr, "unmap");
-+	struct safe_buffer *buf = find_safe_buffer_dev(dev, dma_addr, "unmap", 0);
+ 	pr_debug("%s: udc connected\n", __func__);
+@@ -228,10 +171,16 @@ static struct pxa2xx_udc_mach_info balloon3_udc_info = {
+ 	.udc_command      = balloon3_udc_command,
+ };
  
- 	if (buf) {
- 		BUG_ON(buf->size != size);
-@@ -398,7 +408,7 @@ int dmabounce_sync_for_cpu(struct device *dev, dma_addr_t addr,
- 	dev_dbg(dev, "%s(dma=%#x,off=%#lx,sz=%zx,dir=%x)\n",
- 		__func__, addr, off, sz, dir);
++/******************************************************************************
++ * IrDA
++ ******************************************************************************/
+ static struct pxaficp_platform_data balloon3_ficp_platform_data = {
+ 	.transceiver_cap  = IR_SIRMODE | IR_FIRMODE | IR_OFF,
+ };
  
--	buf = find_safe_buffer_dev(dev, addr, __func__);
-+	buf = find_safe_buffer_dev(dev, addr, __func__, 1);
- 	if (!buf)
- 		return 1;
++/******************************************************************************
++ * USB Host
++ ******************************************************************************/
+ static unsigned long balloon3_ohci_pin_config[] = {
+ 	GPIO88_USBH1_PWR,
+ 	GPIO89_USBH1_PEN,
+@@ -242,21 +191,9 @@ static struct pxaohci_platform_data balloon3_ohci_platform_data = {
+ 	.flags		= ENABLE_PORT_ALL | POWER_CONTROL_LOW | POWER_SENSE_LOW,
+ };
  
-@@ -411,6 +421,8 @@ int dmabounce_sync_for_cpu(struct device *dev, dma_addr_t addr,
- 	DO_STATS(dev->archdata.dmabounce->bounce_count++);
+-static unsigned long balloon3_pin_config[] __initdata = {
+-	/* Select BTUART 'COM1/ttyS0' as IO option for pins 42/43/44/45 */
+-	GPIO42_BTUART_RXD,
+-	GPIO43_BTUART_TXD,
+-	GPIO44_BTUART_CTS,
+-	GPIO45_BTUART_RTS,
+-
+-	/* Wakeup GPIO */
+-	GPIO1_GPIO | WAKEUP_ON_EDGE_BOTH,
+-
+-	/* NAND & IDLE LED GPIOs */
+-	GPIO9_GPIO,
+-	GPIO10_GPIO,
+-};
+-
++/******************************************************************************
++ * LED
++ ******************************************************************************/
+ static struct gpio_led balloon3_gpio_leds[] = {
+ 	{
+ 		.name			= "balloon3:green:idle",
+@@ -285,6 +222,96 @@ static struct platform_device balloon3led_device = {
+ 	},
+ };
  
- 	if (dir == DMA_FROM_DEVICE || dir == DMA_BIDIRECTIONAL) {
-+		if (addr != buf->safe_dma_addr)
-+			off = addr - buf->safe_dma_addr;
- 		dev_dbg(dev, "%s: copy back safe %p to unsafe %p size %d\n",
- 			__func__, buf->safe + off, buf->ptr + off, sz);
- 		memcpy(buf->ptr + off, buf->safe + off, sz);
-@@ -427,7 +439,7 @@ int dmabounce_sync_for_device(struct device *dev, dma_addr_t addr,
- 	dev_dbg(dev, "%s(dma=%#x,off=%#lx,sz=%zx,dir=%x)\n",
- 		__func__, addr, off, sz, dir);
- 
--	buf = find_safe_buffer_dev(dev, addr, __func__);
-+	buf = find_safe_buffer_dev(dev, addr, __func__, 1);
- 	if (!buf)
- 		return 1;
- 
-@@ -440,6 +452,8 @@ int dmabounce_sync_for_device(struct device *dev, dma_addr_t addr,
- 	DO_STATS(dev->archdata.dmabounce->bounce_count++);
- 
- 	if (dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL) {
-+		if (addr != buf->safe_dma_addr)
-+			off = addr - buf->safe_dma_addr;
- 		dev_dbg(dev, "%s: copy out unsafe %p to safe %p, size %d\n",
- 			__func__,buf->ptr + off, buf->safe + off, sz);
- 		memcpy(buf->safe + off, buf->ptr + off, sz);
++/******************************************************************************
++ * Compatibility: Parameter parsing
++ ******************************************************************************/
++static unsigned long balloon3_irq_enabled;
++
++static unsigned long balloon3_features_present =
++		(1 << BALLOON3_FEATURE_OHCI) | (1 << BALLOON3_FEATURE_CF) |
++		(1 << BALLOON3_FEATURE_AUDIO) |
++		(1 << BALLOON3_FEATURE_TOPPOLY);
++
++int balloon3_has(enum balloon3_features feature)
++{
++	return (balloon3_features_present & (1 << feature)) ? 1 : 0;
++}
++EXPORT_SYMBOL_GPL(balloon3_has);
++
++int __init parse_balloon3_features(char *arg)
++{
++	if (!arg)
++		return 0;
++
++	return strict_strtoul(arg, 0, &balloon3_features_present);
++}
++early_param("balloon3_features", parse_balloon3_features);
++
++/******************************************************************************
++ * FPGA IRQ
++ ******************************************************************************/
++static void balloon3_mask_irq(unsigned int irq)
++{
++	int balloon3_irq = (irq - BALLOON3_IRQ(0));
++	balloon3_irq_enabled &= ~(1 << balloon3_irq);
++	__raw_writel(~balloon3_irq_enabled, BALLOON3_INT_CONTROL_REG);
++}
++
++static void balloon3_unmask_irq(unsigned int irq)
++{
++	int balloon3_irq = (irq - BALLOON3_IRQ(0));
++	balloon3_irq_enabled |= (1 << balloon3_irq);
++	__raw_writel(~balloon3_irq_enabled, BALLOON3_INT_CONTROL_REG);
++}
++
++static struct irq_chip balloon3_irq_chip = {
++	.name		= "FPGA",
++	.ack		= balloon3_mask_irq,
++	.mask		= balloon3_mask_irq,
++	.unmask		= balloon3_unmask_irq,
++};
++
++static void balloon3_irq_handler(unsigned int irq, struct irq_desc *desc)
++{
++	unsigned long pending = __raw_readl(BALLOON3_INT_CONTROL_REG) &
++					balloon3_irq_enabled;
++
++	do {
++		/* clear useless edge notification */
++		if (desc->chip->ack)
++			desc->chip->ack(BALLOON3_AUX_NIRQ);
++		while (pending) {
++			irq = BALLOON3_IRQ(0) + __ffs(pending);
++			generic_handle_irq(irq);
++			pending &= pending - 1;
++		}
++		pending = __raw_readl(BALLOON3_INT_CONTROL_REG) &
++				balloon3_irq_enabled;
++	} while (pending);
++}
++
++static void __init balloon3_init_irq(void)
++{
++	int irq;
++
++	pxa27x_init_irq();
++	/* setup extra Balloon3 irqs */
++	for (irq = BALLOON3_IRQ(0); irq <= BALLOON3_IRQ(7); irq++) {
++		set_irq_chip(irq, &balloon3_irq_chip);
++		set_irq_handler(irq, handle_level_irq);
++		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++	}
++
++	set_irq_chained_handler(BALLOON3_AUX_NIRQ, balloon3_irq_handler);
++	set_irq_type(BALLOON3_AUX_NIRQ, IRQ_TYPE_EDGE_FALLING);
++
++	pr_debug("%s: chained handler installed - irq %d automatically "
++		"enabled\n", __func__, BALLOON3_AUX_NIRQ);
++}
++
++/******************************************************************************
++ * Machine init
++ ******************************************************************************/
+ static void __init balloon3_init(void)
+ {
+ 	pr_info("Initialising Balloon3\n");
 -- 
-1.6.5
+1.7.1
