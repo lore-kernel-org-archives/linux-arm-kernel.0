@@ -1,135 +1,202 @@
 From: ccross@google.com (Colin Cross)
-Date: Thu, 29 Jul 2010 17:29:22 -0700
-Subject: [PATCH 1/9] [ARM] tegra: update iomap
+Date: Thu, 29 Jul 2010 17:29:24 -0700
+Subject: [PATCH 3/9] [ARM] tegra: add suspend and mirror irqs to legacy
+	controller
 In-Reply-To: <1280449771-24043-1-git-send-email-ccross@google.com>
 References: <1280449771-24043-1-git-send-email-ccross@google.com>
-Message-ID: <1280449771-24043-2-git-send-email-ccross@google.com>
+Message-ID: <1280449771-24043-4-git-send-email-ccross@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Cross <ccross@android.com>
+From: Gary King <gking@nvidia.com>
 
-Add missing io address map entries from datasheet.
-Add the IRAM area to the statically mapped io regions.
-Correct the onewire, USB, and statmon addresses
+mirror IRQ enable and disable operations on the legacy PPI system
+interrupt controller, since the legacy controller is responsible
+for responding to wakeup interrupts when the CPU is in LP2 idle mode
 
-Signed-off-by: Colin Cross <ccross@android.com>
+save the irq controller state on suspend and restore on resume
+
+Signed-off-by: Gary King <gking@nvidia.com>
 ---
- arch/arm/mach-tegra/include/mach/io.h    |    6 +++++
- arch/arm/mach-tegra/include/mach/iomap.h |   33 ++++++++++++++++++++++++-----
- arch/arm/mach-tegra/io.c                 |    6 +++++
- 3 files changed, 39 insertions(+), 6 deletions(-)
+ arch/arm/mach-tegra/include/mach/irqs.h |    2 +
+ arch/arm/mach-tegra/irq.c               |  137 +++++++++++++++++++++++++++++++
+ 2 files changed, 139 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/include/mach/io.h b/arch/arm/mach-tegra/include/mach/io.h
-index 35edfc3..16f1618 100644
---- a/arch/arm/mach-tegra/include/mach/io.h
-+++ b/arch/arm/mach-tegra/include/mach/io.h
-@@ -33,6 +33,10 @@
+diff --git a/arch/arm/mach-tegra/include/mach/irqs.h b/arch/arm/mach-tegra/include/mach/irqs.h
+index 20f640e..71bbf34 100644
+--- a/arch/arm/mach-tegra/include/mach/irqs.h
++++ b/arch/arm/mach-tegra/include/mach/irqs.h
+@@ -25,6 +25,7 @@
+ 
+ #define IRQ_LOCALTIMER                  29
+ 
++#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+ /* Primary Interrupt Controller */
+ #define INT_PRI_BASE			(INT_GIC_BASE + 32)
+ #define INT_TMR1			(INT_PRI_BASE + 0)
+@@ -169,5 +170,6 @@
+ #define INT_GPIO_NR			(28 * 8)
+ 
+ #define NR_IRQS				(INT_GPIO_BASE + INT_GPIO_NR)
++#endif
+ 
+ #endif
+diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+index 1fdbe70..50a8dfb 100644
+--- a/arch/arm/mach-tegra/irq.c
++++ b/arch/arm/mach-tegra/irq.c
+@@ -4,6 +4,8 @@
+  * Author:
+  *	Colin Cross <ccross@google.com>
   *
-  */
++ * Copyright (C) 2010, NVIDIA Corporation
++ *
+  * This software is licensed under the terms of the GNU General Public
+  * License version 2, as published by the Free Software Foundation, and
+  * may be copied, distributed, and modified under those terms.
+@@ -27,8 +29,143 @@
  
-+#define IO_IRAM_PHYS	0x40000000
-+#define IO_IRAM_VIRT	0xFE400000
-+#define IO_IRAM_SIZE	SZ_256K
+ #include "board.h"
+ 
++#define INT_SYS_NR	(INT_GPIO_BASE - INT_PRI_BASE)
++#define INT_SYS_SZ	(INT_SEC_BASE - INT_PRI_BASE)
++#define PPI_NR		((INT_SYS_NR+INT_SYS_SZ-1)/INT_SYS_SZ)
 +
- #define IO_CPU_PHYS     0x50040000
- #define IO_CPU_VIRT     0xFE000000
- #define IO_CPU_SIZE	SZ_16K
-@@ -55,6 +59,8 @@
- 		IO_TO_VIRT_XLATE((n), IO_APB_PHYS, IO_APB_VIRT) :	\
- 	IO_TO_VIRT_BETWEEN((n), IO_CPU_PHYS, IO_CPU_SIZE) ?		\
- 		IO_TO_VIRT_XLATE((n), IO_CPU_PHYS, IO_CPU_VIRT) :	\
-+	IO_TO_VIRT_BETWEEN((n), IO_IRAM_PHYS, IO_IRAM_SIZE) ?		\
-+		IO_TO_VIRT_XLATE((n), IO_IRAM_PHYS, IO_IRAM_VIRT) :	\
- 	0)
- 
- #ifndef __ASSEMBLER__
-diff --git a/arch/arm/mach-tegra/include/mach/iomap.h b/arch/arm/mach-tegra/include/mach/iomap.h
-index 1741f7d..44a4f4b 100644
---- a/arch/arm/mach-tegra/include/mach/iomap.h
-+++ b/arch/arm/mach-tegra/include/mach/iomap.h
-@@ -23,9 +23,15 @@
- 
- #include <asm/sizes.h>
- 
-+#define TEGRA_IRAM_BASE			0x40000000
-+#define TEGRA_IRAM_SIZE			SZ_256K
++#define APBDMA_IRQ_STA_CPU  0x14
++#define APBDMA_IRQ_MASK_SET 0x20
++#define APBDMA_IRQ_MASK_CLR 0x24
 +
- #define TEGRA_ARM_PERIF_BASE		0x50040000
- #define TEGRA_ARM_PERIF_SIZE		SZ_8K
- 
-+#define TEGRA_ARM_PL310_BASE		0x50043000
-+#define TEGRA_ARM_PL310_SIZE		SZ_4K
++#define ICTLR_CPU_IER		0x20
++#define ICTLR_CPU_IER_SET	0x24
++#define ICTLR_CPU_IER_CLR	0x28
++#define ICTLR_CPU_IEP_CLASS	0x2c
++#define ICTLR_COP_IER		0x30
++#define ICTLR_COP_IER_SET	0x34
++#define ICTLR_COP_IER_CLR	0x38
++#define ICTLR_COP_IEP_CLASS	0x3c
 +
- #define TEGRA_ARM_INT_DIST_BASE		0x50041000
- #define TEGRA_ARM_INT_DIST_SIZE		SZ_4K
- 
-@@ -68,7 +74,22 @@
- #define TEGRA_FLOW_CTRL_BASE		0x60007000
- #define TEGRA_FLOW_CTRL_SIZE		20
- 
--#define TEGRA_STATMON_BASE		0x6000C4000
-+#define TEGRA_AHB_DMA_BASE		0x60008000
-+#define TEGRA_AHB_DMA_SIZE		SZ_4K
++static void (*gic_mask_irq)(unsigned int irq);
++static void (*gic_unmask_irq)(unsigned int irq);
 +
-+#define TEGRA_AHB_DMA_CH0_BASE		0x60009000
-+#define TEGRA_AHB_DMA_CH0_SIZE		32
++#define irq_to_ictlr(irq) (((irq)-32) >> 5)
++static void __iomem *tegra_ictlr_base = IO_ADDRESS(TEGRA_PRIMARY_ICTLR_BASE);
++#define ictlr_to_virt(ictlr) (tegra_ictlr_base + (ictlr)*0x100)
 +
-+#define TEGRA_APB_DMA_BASE		0x6000A000
-+#define TEGRA_APB_DMA_SIZE		SZ_4K
++static void tegra_mask(unsigned int irq)
++{
++	void __iomem *addr = ictlr_to_virt(irq_to_ictlr(irq));
++	gic_mask_irq(irq);
++	writel(1<<(irq&31), addr+ICTLR_CPU_IER_CLR);
++}
 +
-+#define TEGRA_APB_DMA_CH0_BASE		0x6000B000
-+#define TEGRA_APB_DMA_CH0_SIZE		32
++static void tegra_unmask(unsigned int irq)
++{
++	void __iomem *addr = ictlr_to_virt(irq_to_ictlr(irq));
++	gic_unmask_irq(irq);
++	writel(1<<(irq&31), addr+ICTLR_CPU_IER_SET);
++}
 +
-+#define TEGRA_AHB_GIZMO_BASE		0x6000C004
-+#define TEGRA_AHB_GIZMO_SIZE		0x10C
++#ifdef CONFIG_PM
 +
-+#define TEGRA_STATMON_BASE		0x6000C400
- #define TEGRA_STATMON_SIZE		SZ_1K
- 
- #define TEGRA_GPIO_BASE			0x6000D000
-@@ -137,7 +158,7 @@
- #define TEGRA_I2C3_BASE			0x7000C500
- #define TEGRA_I2C3_SIZE			SZ_256
- 
--#define TEGRA_OWR_BASE			0x7000D000
-+#define TEGRA_OWR_BASE			0x7000C600
- #define TEGRA_OWR_SIZE			80
- 
- #define TEGRA_DVC_BASE			0x7000D000
-@@ -182,12 +203,12 @@
- #define TEGRA_USB_BASE			0xC5000000
- #define TEGRA_USB_SIZE			SZ_16K
- 
--#define TEGRA_USB1_BASE			0xC5004000
--#define TEGRA_USB1_SIZE			SZ_16K
--
--#define TEGRA_USB2_BASE			0xC5008000
-+#define TEGRA_USB2_BASE			0xC5004000
- #define TEGRA_USB2_SIZE			SZ_16K
- 
-+#define TEGRA_USB3_BASE			0xC5008000
-+#define TEGRA_USB3_SIZE			SZ_16K
++static int tegra_set_wake(unsigned int irq, unsigned int on)
++{
++	return 0;
++}
++#endif
 +
- #define TEGRA_SDMMC1_BASE		0xC8000000
- #define TEGRA_SDMMC1_SIZE		SZ_512
- 
-diff --git a/arch/arm/mach-tegra/io.c b/arch/arm/mach-tegra/io.c
-index 9fe2c5c..31848a9 100644
---- a/arch/arm/mach-tegra/io.c
-+++ b/arch/arm/mach-tegra/io.c
-@@ -49,6 +49,12 @@ static struct map_desc tegra_io_desc[] __initdata = {
- 		.length = IO_CPU_SIZE,
- 		.type = MT_DEVICE,
- 	},
-+	{
-+		.virtual = IO_IRAM_VIRT,
-+		.pfn = __phys_to_pfn(IO_IRAM_PHYS),
-+		.length = IO_IRAM_SIZE,
-+		.type = MT_DEVICE,
-+	},
- };
- 
- void __init tegra_map_common_io(void)
++static struct irq_chip tegra_irq = {
++	.name		= "PPI",
++	.mask		= tegra_mask,
++	.unmask		= tegra_unmask,
++#ifdef CONFIG_PM
++	.set_wake	= tegra_set_wake,
++#endif
++};
++
+ void __init tegra_init_irq(void)
+ {
++	struct irq_chip *gic;
++	unsigned int i;
++
++	for (i = 0; i < PPI_NR; i++) {
++		writel(~0, ictlr_to_virt(i) + ICTLR_CPU_IER_CLR);
++		writel(0, ictlr_to_virt(i) + ICTLR_CPU_IEP_CLASS);
++	}
++
+ 	gic_dist_init(0, IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE), 29);
+ 	gic_cpu_init(0, IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
++
++	gic = get_irq_chip(29);
++	gic_unmask_irq = gic->unmask;
++	gic_mask_irq = gic->mask;
++	tegra_irq.ack = gic->ack;
++#ifdef CONFIG_SMP
++	tegra_irq.set_affinity = gic->set_affinity;
++#endif
++
++	for (i = INT_PRI_BASE; i < INT_GPIO_BASE; i++) {
++		set_irq_chip(i, &tegra_irq);
++		set_irq_handler(i, handle_level_irq);
++		set_irq_flags(i, IRQF_VALID);
++	}
++}
++
++#ifdef CONFIG_PM
++static u32 cop_ier[PPI_NR];
++static u32 cpu_ier[PPI_NR];
++static u32 cpu_iep[PPI_NR];
++
++void tegra_irq_suspend(void)
++{
++	unsigned long flags;
++	int i;
++
++	for (i = INT_PRI_BASE; i < INT_GPIO_BASE; i++) {
++		struct irq_desc *desc = irq_to_desc(i);
++		if (!desc)
++			continue;
++		if (desc->status & IRQ_WAKEUP) {
++			pr_debug("irq %d is wakeup\n", i);
++			continue;
++		}
++		disable_irq(i);
++	}
++
++	local_irq_save(flags);
++	for (i = 0; i < PPI_NR; i++) {
++		void __iomem *ictlr = ictlr_to_virt(i);
++		cpu_ier[i] = readl(ictlr + ICTLR_CPU_IER);
++		cpu_iep[i] = readl(ictlr + ICTLR_CPU_IEP_CLASS);
++		cop_ier[i] = readl(ictlr + ICTLR_COP_IER);
++		writel(~0, ictlr + ICTLR_COP_IER_CLR);
++	}
++	local_irq_restore(flags);
++}
++
++void tegra_irq_resume(void)
++{
++	unsigned long flags;
++	int i;
++
++	local_irq_save(flags);
++	for (i = 0; i < PPI_NR; i++) {
++		void __iomem *ictlr = ictlr_to_virt(i);
++		writel(cpu_iep[i], ictlr + ICTLR_CPU_IEP_CLASS);
++		writel(~0ul, ictlr + ICTLR_CPU_IER_CLR);
++		writel(cpu_ier[i], ictlr + ICTLR_CPU_IER_SET);
++		writel(0, ictlr + ICTLR_COP_IEP_CLASS);
++		writel(~0ul, ictlr + ICTLR_COP_IER_CLR);
++		writel(cop_ier[i], ictlr + ICTLR_COP_IER_SET);
++	}
++	local_irq_restore(flags);
++
++	for (i = INT_PRI_BASE; i < INT_GPIO_BASE; i++) {
++		struct irq_desc *desc = irq_to_desc(i);
++		if (!desc || (desc->status & IRQ_WAKEUP))
++			continue;
++		enable_irq(i);
++	}
+ }
++#endif
 -- 
 1.7.1
