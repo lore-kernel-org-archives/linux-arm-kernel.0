@@ -1,56 +1,39 @@
-From: julia@diku.dk (Julia Lawall)
-Date: Fri, 30 Jul 2010 17:17:28 +0200 (CEST)
-Subject: [PATCH 2/2] arch/arm/common: Eliminate use after free
-Message-ID: <Pine.LNX.4.64.1007301717040.17618@ask.diku.dk>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri, 30 Jul 2010 17:42:09 +0200
+Subject: [PATCH] MTD: pxa2xx: move pxa2xx_flash_probe to .devinit.text
+Message-ID: <1280504530-31737-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <julia@diku.dk>
+This fixes the following warning by modpost:
 
-__sa1111_remove always frees its argument, so the subsequent reference to
-sachip->saved_state represents a use after free.  __sa1111_remove does not
-appear to use the saved_state field, so the patch simply frees it first.
+	WARNING: vmlinux.o(.data+0x15018): Section mismatch in reference from the variable pxa2xx_flash_driver to the function .init.text:pxa2xx_flash_probe()
+	The variable pxa2xx_flash_driver references
+	the function __init pxa2xx_flash_probe()
+	If the reference is valid then annotate the
+	variable with __init* or __refdata (see linux/init.h) or name the variable:
+	*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
 
-A simplified version of the semantic patch that finds this problem is as
-follows: (http://coccinelle.lip6.fr/)
+I choosed to do this instead of using platform_driver_probe as the remove
+function uses __devexit.
 
-// <smpl>
-@@
-expression E,E2;
-@@
-
-__sa1111_remove(E)
-...
-(
-  E = E2
-|
-* E
-)
-// </smpl>
-
-Signed-off-by: Julia Lawall <julia@diku.dk>
-
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
-arch/arm/common/sa1111.c            |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
+ drivers/mtd/maps/pxa2xx-flash.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-index ac2fd44..517d50d 100644
---- a/arch/arm/common/sa1111.c
-+++ b/arch/arm/common/sa1111.c
-@@ -1025,13 +1025,12 @@ static int sa1111_remove(struct platform_device *pdev)
- 	struct sa1111 *sachip = platform_get_drvdata(pdev);
+diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
+index dd90880..d8ae634 100644
+--- a/drivers/mtd/maps/pxa2xx-flash.c
++++ b/drivers/mtd/maps/pxa2xx-flash.c
+@@ -51,7 +51,7 @@ struct pxa2xx_flash_info {
+ static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
  
- 	if (sachip) {
--		__sa1111_remove(sachip);
--		platform_set_drvdata(pdev, NULL);
--
- #ifdef CONFIG_PM
- 		kfree(sachip->saved_state);
- 		sachip->saved_state = NULL;
- #endif
-+		__sa1111_remove(sachip);
-+		platform_set_drvdata(pdev, NULL);
- 	}
  
- 	return 0;
+-static int __init pxa2xx_flash_probe(struct platform_device *pdev)
++static int __devinit pxa2xx_flash_probe(struct platform_device *pdev)
+ {
+ 	struct flash_platform_data *flash = pdev->dev.platform_data;
+ 	struct pxa2xx_flash_info *info;
+-- 
+1.7.1
