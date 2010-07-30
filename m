@@ -1,51 +1,52 @@
-From: mfuzzey@gmail.com (Martin Fuzzey)
-Date: Fri, 30 Jul 2010 17:25:07 +0200
-Subject: not coming prompt in 2.6.33.6 kernel
-In-Reply-To: <AANLkTin8STiQqvjZo-atA9jhz1OLWuk2k61-VYnZrcD8@mail.gmail.com>
-References: <AANLkTikgB9OF6mRqZ2KgQYuCQ4JcF7N6oTJyUbrYq0t7@mail.gmail.com>
-	<20100728094344.GA9142@trinity.fluff.org>
-	<AANLkTikgq_Fb0ZfT-b+9zOA5w2pDpNgwnUqe919hAsnd@mail.gmail.com>
-	<AANLkTin8STiQqvjZo-atA9jhz1OLWuk2k61-VYnZrcD8@mail.gmail.com>
-Message-ID: <AANLkTim8KEn7-dFpHdbYs0Wvi_hxjrbmUmhEQ2nMOtHj@mail.gmail.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Fri, 30 Jul 2010 17:27:28 +0200
+Subject: [PATCH] ARM: fix regression in RealView after the introduction of
+	pclk
+In-Reply-To: <20100729222114.GC28330@n2100.arm.linux.org.uk>
+References: <1280408722-31995-1-git-send-email-linus.walleij@stericsson.com>
+	<20100729135639.GE18923@n2100.arm.linux.org.uk>
+	<AANLkTi=xcFsL7vCtG31v0yWfkBV+vYqQZ4z=_p-=wZnH@mail.gmail.com>
+	<20100729222114.GC28330@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTin2+hwoRmBxaxUi5Rt-9qpJO2N61YQA=0UgVPtm@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Fri, Jul 30, 2010 at 12:40 PM, nitin vishnoi <nitvishnoi@gmail.com> wrote:
-> Hi now i am able the uart info also.Bu stil not getting the prompt.
-> and getting the following log.
->
-> Starting kernel ...
->
->
-> Uncompressing
-> Linux......................................................................
-> done, booting the kernel.
-> Linux version 2.6.31.14 (root at ubntu-desktop) (gcc version 4.1.2) #34 Fri Jul
-> 30 15:33:38 IST 2010
-> CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
-> CPU: VIVT data cache, VIVT instruction cache
-> Kernel command line: root=/dev/ram initrd=0x30800000,8M ramdisk=24576
-> init=/sbin/init console=ttySAC3,115200 mem=64M
-> RAMDISK: gzip image found at block 0
-> EXT2-fs warning: maximal mount count reached, running e2fsck is recommended
-> VFS: Mounted root (ext2 filesystem) on device 1:0.
-> Freeing init memory: 88K
-> Kernel panic - not syncing: Attempted to kill init!
->
+2010/7/30 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-Looks like the init process is terminating unexpectedly.
-What's /sbin/init for you?
-How is it compiled? (could it be a OABI / EABI issue?)
+> On Thu, Jul 29, 2010 at 11:41:44PM +0200, Linus Walleij wrote:
+>> Yep that is true, currently. More like this then:
+>
+> Yup - and the patch is a lot smaller.
 
-What happens if you try booting with  init=/bin/sh   ?
-or try using a script like this as init
+OK putting it in the tracker.
 
-#! /bin/sh
-echo "Test stdout"
-echo "Test console" > /dev/console
-echo "Test tty1" > /dev/tty1
-/bin/ls -l /dev > /dev/tty1
+>> There is a reason why we have it on the interrupt init in ux500
+>> though, and that is that we want to use the clock framework to
+>> get the clock for the timer. If we want to fix up the hardcoded
+>> way it is currently done in plat-versatile/timer-sp.c we would need
+>> a change like this across the versatiles.
+>
+> I don't think it makes sense to use the clk API for those timers -
+> it's rather unclear from the manuals where they get their clocks
+> from - or even what the magic bits in the system controller do in
+> terms of switching their clock source.
 
-Cheers,
-Martin
+In the PB1176 manual there is a drawing of the clock tree, it
+shows that the fixed 24MHz reference clock is divided by a binary
+divider down to 1 MHz. So this one is likewise set in stone. I would
+be surprised if some other scheme was used for the other boards.
+
+I have a partial patch actually bringing these clocks into the
+clkdev framwork but if it makes things complicated for no good
+let's just skip it.
+
+Thinking about it I however see that since some platforms are
+initializing their clocks in .init_irq and some in core_initcall(), some
+in arch_initcall() etc, and since most platforms have some clock
+implementation these dats, it might be worth it to add an
+optional .init_clocks() call to the struct machine_desc and
+MACHINE_START() macro to get this in uniform and call
+that even before .init_irq(). Do you think it's worth it?
+
+Yours,
+Linus Walleij
