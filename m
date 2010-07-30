@@ -1,376 +1,127 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 30 Jul 2010 12:14:32 +0900
-Subject: [PATCH 1/6] S5PC110: Move OneNAND platform device to plat-s5p
-In-Reply-To: <016301cb2f8e$46856580$d3903080$%kim@samsung.com>
-References: <20100728101138.GA21329@july>
-	<006f01cb2eb5$3a53cd80$aefb6880$%kim@samsung.com>
-	<AANLkTik4TXxjQZ3xKmOvxh=DGkzABQRL0SmfhqUnLSi9@mail.gmail.com>
-	<016301cb2f8e$46856580$d3903080$%kim@samsung.com>
-Message-ID: <AANLkTikW6TvToPWTXitJQYrdQRKX-7kR7_ohOqrXYeLh@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 30 Jul 2010 13:25:37 +0900
+Subject: [PATCH v3 3/3] ARM: SAMSUNG: i2c/busses: Add HAVE_S3C2410_I2C
+	option to include I2C for Samsung SoCs
+In-Reply-To: <AANLkTimcZeZXoQ=i1rsbXiaU_FfSZSRi5NxMd7oYekj9@mail.gmail.com>
+References: <1280396565-21014-1-git-send-email-kgene.kim@samsung.com>
+	<AANLkTikyOUyz+sNPgBvWU8FvYa8HvgRY4P2udhMY=eOw@mail.gmail.com>
+	<015601cb2f83$0225bd00$06713700$%kim@samsung.com>
+	<AANLkTimcZeZXoQ=i1rsbXiaU_FfSZSRi5NxMd7oYekj9@mail.gmail.com>
+Message-ID: <018801cb2f9f$457badf0$d07309d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 30, 2010 at 11:23 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Kyungmin Park wrote:
->>
->> On Thu, Jul 29, 2010 at 9:30 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> > Kyungmin Park wrote:
->> >>
->> > Hi,
->> >
->> > Cc'ed Ben Dooks.
->> >
->> >> From: Kyungmin Park <kyungmin.park@samsung.com>
->> >>
->> >> To share the same platform device for s5pc210
->> >>
->> >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> >> ---
->> >> ?arch/arm/mach-s5pv210/Kconfig ? ? ? ? ? ?| ? ?5 ---
->> >> ?arch/arm/mach-s5pv210/Makefile ? ? ? ? ? | ? ?1 -
->> >> ?arch/arm/mach-s5pv210/dev-onenand.c ? ? ?| ? 50
->> > ----------------------------
->> >> ?arch/arm/mach-s5pv210/include/mach/map.h | ? ?3 --
->> >> ?arch/arm/plat-s5p/Kconfig ? ? ? ? ? ? ? ?| ? ?5 +++
->> >> ?arch/arm/plat-s5p/Makefile ? ? ? ? ? ? ? | ? ?5 ++-
->> >> ?arch/arm/plat-s5p/dev-onenand.c ? ? ? ? ?| ? 53
->> >> ++++++++++++++++++++++++++++++
->> >> ?7 files changed, 62 insertions(+), 60 deletions(-)
->> >> ?delete mode 100644 arch/arm/mach-s5pv210/dev-onenand.c
->> >> ?create mode 100644 arch/arm/plat-s5p/dev-onenand.c
->> >
->> > In future, please check your git configuration so that can come out as
->> > follows.
->> > It's just 'rename(move)' not 'delete and create'...It can help to us
-> that it
->> > can see more easily whether something changed.
->>
->> It used the lower version of git. I will update it.
->> >
->> > arch/arm/{mach-s5pv210 => plat-s5p}/dev-onenand.c | ? ?5 ++++-
->> > ?1 files changed, 4 insertions(+), 1 deletions(-)
->> > ?rename arch/arm/{mach-s5pv210 => plat-s5p}/dev-onenand.c (91%)
->> >
->> > diff --git a/arch/arm/mach-s5pv210/dev-onenand.c
->> > b/arch/arm/plat-s5p/dev-onenand.c
->> > similarity index 91%
->> > rename from arch/arm/mach-s5pv210/dev-onenand.c
->> > rename to arch/arm/plat-s5p/dev-onenand.c
->> > index 34997b7..08b3a3f 100644
->> > --- a/arch/arm/mach-s5pv210/dev-onenand.c
->> > +++ b/arch/arm/plat-s5p/dev-onenand.c
->> >
->> >
->> >>
->> >> diff --git a/arch/arm/mach-s5pv210/Kconfig
-> b/arch/arm/mach-s5pv210/Kconfig
->> >> index 0761eac..96f4d9b 100644
->> >> --- a/arch/arm/mach-s5pv210/Kconfig
->> >> +++ b/arch/arm/mach-s5pv210/Kconfig
->> >> @@ -62,11 +62,6 @@ config MACH_GONI
->> >> ? ? ? ? Machine support for Samsung GONI board
->> >> ? ? ? ? S5PC110(MCP) is one of package option of S5PV210
->> >>
->> >> -config S5PC110_DEV_ONENAND
->> >> - ? ? bool
->> >> - ? ? help
->> >> - ? ? ? Compile in platform device definition for OneNAND1 controller
->> >> -
->> >> ?config MACH_SMDKV210
->> >> ? ? ? bool "SMDKV210"
->> >> ? ? ? select CPU_S5PV210
->> >> diff --git a/arch/arm/mach-s5pv210/Makefile
->> > b/arch/arm/mach-s5pv210/Makefile
->> >> index 30be9a6..6a6dea1 100644
->> >> --- a/arch/arm/mach-s5pv210/Makefile
->> >> +++ b/arch/arm/mach-s5pv210/Makefile
->> >> @@ -26,7 +26,6 @@ obj-$(CONFIG_MACH_GONI) ? ? ? ? ? ? += mach-goni.o
->> >>
->> >> ?obj-y ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?+= dev-audio.o
->> >> ?obj-$(CONFIG_S3C64XX_DEV_SPI) ? ? ? ?+= dev-spi.o
->> >> -obj-$(CONFIG_S5PC110_DEV_ONENAND) += dev-onenand.o
->> >>
->> >> ?obj-$(CONFIG_S5PV210_SETUP_FB_24BPP) += setup-fb-24bpp.o
->> >> ?obj-$(CONFIG_S5PV210_SETUP_I2C1) ? ? += setup-i2c1.o
->> >> diff --git a/arch/arm/mach-s5pv210/dev-onenand.c
->> > b/arch/arm/mach-s5pv210/dev-
->> >> onenand.c
->> >> deleted file mode 100644
->> >> index 34997b7..0000000
->> >> --- a/arch/arm/mach-s5pv210/dev-onenand.c
->> >> +++ /dev/null
->> >> @@ -1,50 +0,0 @@
->> >> -/*
->> >> - * linux/arch/arm/mach-s5pv210/dev-onenand.c
->> >> - *
->> >> - * ?Copyright (c) 2008-2010 Samsung Electronics
->> >> - * ?Kyungmin Park <kyungmin.park@samsung.com>
->> >> - *
->> >> - * S5PC110 series device definition for OneNAND devices
->> >> - *
->> >> - * This program is free software; you can redistribute it and/or
-> modify
->> >> - * it under the terms of the GNU General Public License version 2 as
->> >> - * published by the Free Software Foundation.
->> >> - */
->> >> -
->> >> -#include <linux/kernel.h>
->> >> -#include <linux/platform_device.h>
->> >> -#include <linux/mtd/mtd.h>
->> >> -#include <linux/mtd/onenand.h>
->> >> -
->> >> -#include <mach/irqs.h>
->> >> -#include <mach/map.h>
->> >> -
->> >> -static struct resource s5pc110_onenand_resources[] = {
->> >> - ? ? [0] = {
->> >> - ? ? ? ? ? ? .start ?= S5PC110_PA_ONENAND,
->> >> - ? ? ? ? ? ? .end ? ?= S5PC110_PA_ONENAND + SZ_128K - 1,
->> >> - ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
->> >> - ? ? },
->> >> - ? ? [1] = {
->> >> - ? ? ? ? ? ? .start ?= S5PC110_PA_ONENAND_DMA,
->> >> - ? ? ? ? ? ? .end ? ?= S5PC110_PA_ONENAND_DMA + SZ_2K - 1,
->> >> - ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
->> >> - ? ? },
->> >> -};
->> >> -
->> >> -struct platform_device s5pc110_device_onenand = {
->> >> - ? ? .name ? ? ? ? ? = "s5pc110-onenand",
->> >> - ? ? .id ? ? ? ? ? ? = -1,
->> >> - ? ? .num_resources ?= ARRAY_SIZE(s5pc110_onenand_resources),
->> >> - ? ? .resource ? ? ? = s5pc110_onenand_resources,
->> >> -};
->> >> -
->> >> -void s5pc110_onenand_set_platdata(struct onenand_platform_data *pdata)
->> >> -{
->> >> - ? ? struct onenand_platform_data *pd;
->> >> -
->> >> - ? ? pd = kmemdup(pdata, sizeof(struct onenand_platform_data),
->> >> GFP_KERNEL);
->> >> - ? ? if (!pd)
->> >> - ? ? ? ? ? ? printk(KERN_ERR "%s: no memory for platform data\n",
->> >> __func__);
->> >> - ? ? s5pc110_device_onenand.dev.platform_data = pd;
->> >> -}
->> >> diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-
->> >> s5pv210/include/mach/map.h
->> >> index 34eb168..3a44e1e 100644
->> >> --- a/arch/arm/mach-s5pv210/include/mach/map.h
->> >> +++ b/arch/arm/mach-s5pv210/include/mach/map.h
->> >> @@ -16,9 +16,6 @@
->> >> ?#include <plat/map-base.h>
->> >> ?#include <plat/map-s5p.h>
->> >>
->> >> -#define S5PC110_PA_ONENAND ? (0xB0000000)
->> >> -#define S5PC110_PA_ONENAND_DMA ? ? ? (0xB0600000)
->> >> -
->> >> ?#define S5PV210_PA_CHIPID ? ?(0xE0000000)
->> >> ?#define S5P_PA_CHIPID ? ? ? ? ? ? ? ?S5PV210_PA_CHIPID
->> >>
->> >> diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
->> >> index 907ac63..314f7d1 100644
->> >> --- a/arch/arm/plat-s5p/Kconfig
->> >> +++ b/arch/arm/plat-s5p/Kconfig
->> >> @@ -31,3 +31,8 @@ config S5P_EXT_INT
->> >> ? ? ? help
->> >> ? ? ? ? Use the external interrupts (other than GPIO interrupts.)
->> >> ? ? ? ? Note: Do not choose this for S5P6440.
->> >> +
->> >> +config S5PC110_DEV_ONENAND
->> >
->> > As I said, S5P_DEV_ONENAND is better in here.
->> No, I don't want to break the current board use the S5PC110_DEV_ONENAND.
->
-> Hmm...you can use S5PC110_xxx even though change the prefix in there.
->
->>
->> Before request the S5P_* prefix. first make rules. In your
->
-> Please use s5p_xxx for easily reading and avoiding confusing in plat-s5p.
->
->> explanation. it can move to the plat-samsung.
->
-> No.
->
->> What's the definition of s5p. just two s5p series have the same IP.
->> then can be used the plat-s5p?
->
-> Yes, it's simple...it can help to avoid duplicate code.
->>
->> So I suggest that (the number means the priority and naming rules.)
->> 1. use the first SoC chip name.
->> 2. two s5p series or more have the same IP. then use the plat-s5p
->> 3. If driver support s3c and s5p series then use the plat-samsung. e.g.,
-> RTC.
->
-> In this case, I don't agree with you...
->>
->> So it's reasonable to use S5PC110_DEV_ONENAND name.
->>
->> >
->> >> + ? ? bool
->> >> + ? ? help
->> >> + ? ? ? Compile in platform device definition for OneNAND controller
->> >> diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
->> >> index 39c242b..c49617e 100644
->> >> --- a/arch/arm/plat-s5p/Makefile
->> >> +++ b/arch/arm/plat-s5p/Makefile
->> >> @@ -12,9 +12,12 @@ obj- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? :=
->> >>
->> >> ?# Core files
->> >>
->> >> -obj-y ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?+= dev-uart.o
->> >> ?obj-y ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?+= cpu.o
->> >> ?obj-y ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?+= clock.o
->> >> ?obj-y ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?+= irq.o
->> >> ?obj-$(CONFIG_S5P_EXT_INT) ? ?+= irq-eint.o
->> >>
->> >> +# Device files
->> >> +
->> >> +obj-y ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?+= dev-uart.o
->> >> +obj-$(CONFIG_S5PC110_DEV_ONENAND) ? ?+= dev-onenand.o
->> >> diff --git a/arch/arm/plat-s5p/dev-onenand.c
->> > b/arch/arm/plat-s5p/dev-onenand.c
->> >> new file mode 100644
->> >> index 0000000..08b3a3f
->> >> --- /dev/null
->> >> +++ b/arch/arm/plat-s5p/dev-onenand.c
->> >> @@ -0,0 +1,53 @@
->> >> +/*
->> >> + * linux/arch/arm/plat-s5p/dev-onenand.c
->> >> + *
->> >> + * ?Copyright (c) 2008-2010 Samsung Electronics
->> >> + * ?Kyungmin Park <kyungmin.park@samsung.com>
->> >> + *
->> >> + * S5PC110 series device definition for OneNAND devices
->> >
->> > I thinks...this is for S5P SoCs such as S5PC210 and S5PC110
->> > ...even though S5P6440 does not have OneNAND device...
->> >
->> >> + *
->> >> + * This program is free software; you can redistribute it and/or
-> modify
->> >> + * it under the terms of the GNU General Public License version 2 as
->> >> + * published by the Free Software Foundation.
->> >> + */
->> >> +
->> >> +#include <linux/kernel.h>
->> >> +#include <linux/platform_device.h>
->> >> +#include <linux/mtd/mtd.h>
->> >> +#include <linux/mtd/onenand.h>
->> >> +
->> >> +#include <mach/irqs.h>
->> >> +#include <mach/map.h>
->> >> +
->> >> +#define S5PC110_PA_ONENAND ? ? ? ? ? (0xB0000000)
->> >> +#define S5PC110_PA_ONENAND_DMA ? ? ? ? ? ? ? (0xB0600000)
->> >
->> > Please move to mach/map.h for compatibilities with other SoCs.
->>
->> Can you explain the why use the hard-coded value in clock framework?
->
-> It's different case...because the address can be changed in other APs.
->
->> it's only used that at there. it's same rule. it's only used here.
->>
-> Hmm...you misunderstood :-(
-> I didn't say like that...please see below.
->
-> --- mach/map.h
->
-> #define S5PC110_PA_ONENAND ? ? ? ? ? ? ?(0xB0000000)
-> #define S5PC110_PA_ONENAND_DMA ?(0xB0600000)
->
-> ...
->
-> #define S5P_PA_ONENAND ? ? ? ? ?S5PC110_PA_ONENAND
-> #define S5P_PA_ONENAND_DMA ? ? ? ? ? ? ?S5PC110_PA_ONENAND_DMA
->
-> ---
->
-> Used above method on other cases.
-> And it can be used even if the address differs on each AP.
 
-No. it doesn't consider the single kernel way. Basically it's valid
-only when use the single chip.
+> -----Original Message-----
+> From: kyungmin78 at gmail.com [mailto:kyungmin78 at gmail.com] On Behalf Of
+> Kyungmin Park
+> Sent: Friday, July 30, 2010 11:43 AM
+> To: Kukjin Kim
+> Cc: linux-arm-kernel at lists.infradead.org;
+linux-samsung-soc at vger.kernel.org;
+> linux-i2c at vger.kernel.org; ben-linux at fluff.org; Naveen Krishna Ch
+> Subject: Re: [PATCH v3 3/3] ARM: SAMSUNG: i2c/busses: Add
+> HAVE_S3C2410_I2C option to include I2C for Samsung SoCs
+> 
+> On Fri, Jul 30, 2010 at 10:03 AM, Kukjin Kim <kgene.kim@samsung.com>
+wrote:
+> > Kyungmin Park wrote:
+> >>
+> >> On Thu, Jul 29, 2010 at 6:42 PM, Kukjin Kim <kgene.kim@samsung.com>
+wrote:
+> >> > From: Naveen Krishna Ch <ch.naveen@samsung.com>
+> >> >
+> >> > This patch adds HAVE_S3C2410_I2C to control inclusion of I2C bus
+driver
+> >> > on Samsung SoCs and makes I2C bus driver dependency SoC specific
+> instead
+> >> > of machine specific. This will enalbe all machines using Samsung
+> >> ARCH_S3C2410,
+> >> > _S3C64XX, _S5P6440, _S5PC100, and _S5PV210 to select the I2C driver
+by
+> >> default
+> >>
+> >> What's the different from use PLAT_SAMSUNG?
+> >>
+> > Hi,
+> >
+> > Hmm..the difference?
+> >
+> > I remember, already said to you...
+> > Anyway actually, there was a stuff in here about that.
+> > Please refer to following...it may answer on your question.
+> >
+> > --- From Ben Dooks
+> >
+> >> ?config RTC_DRV_S3C
+> >> ? ? ? tristate "Samsung S3C series SoC RTC"
+> >> - ? ? depends on ARCH_S3C2410
+> >> + ? ? depends on ARCH_S3C2410 || ARCH_S3C64XX
+> >
+> > I wonder whether just making this depend on either S3C_DEV_RTC, or
+simply
+> > PLAT_SAMSUNG would just be a better choice.
+> >
+> > The S3C_DEV_RTC would mean that the drivers the core of the kernel
+> > would be built, but means that we can't speculatively build drivers
+> > if the kernel hasn't any machines using them.
+> >
+> > Making it depend on PLAT_SAMSUNG would mean it is available to all,
+> > but would be selectable even if there isn't a machine supporting it
+> > being built.
+> >
+> > The current situation would mean that we have to update driver Kconfig
+> > entries each time a new SoC turns up...
+> 
+> In other word, It can make it workable when new SoCs arrives, even
+> though depends on PLAT_SAMSUNG.
+> 
+> If new chip has improved i2C IP then define new I2C drivers and modify
+> it as 'depends on PLAT_SAMUSNG if !NEW_IP_I2C'
+> and use another i2c drivers. of course it's depends on PLAT_SAMSUNG or
+> PLAT_S5P if NEW_IP_I2C.
+> 
+Hmm...if there is new IP driver for Samsung SoCs, why should I add extra
+option for new one like your suggestion?
+As I said, just 'depends on HAVE_SAMSUNGNEWIPV2_I2C' is enough for it...
 
->
->> Do you want to hard-coded the value at resource directly?
->>
-> No...
-> I wonder...if the address differs on each AP, how can you support it...maybe
-> adding ifdef in there?
+I'm still thinking, this way is better to me...anything else?
 
-I don't worry we will change the current device implementation to
-support multiple SoCs. then this issue will be solved.
+> >
+> > We could also have a HAVE_RTC_DRV_S3C so that all SoCs supporting this
+> > coudl select it independant of whether there is machine support.
+> >
+> > ---
+> >
+> > It doesn't mean that we should use HAVE_XXX in this case...
+> > But this way is better _now_ and they used same method in several
+drivers.
+> > And if driver IP changes, we can use with HAVE_XXXV2...
+> >
+> >> config I2C_S3C2410
+> >> ? ? ? ? tristate "S3C2410 I2C Driver"
+> >> ? ? ? ? depends on PLAT_SAMSUNG
+> >>
+> >> Please don't populate the Kconfigs.
+> >>
+> >
+> > I hope you stop talking same issue without alternative...
+> >
+> >> Thank you,
+> >> Kyungmin Park
+> >>
+> >> >
+> >> > Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
+> >> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> >> > Cc: Ben Dooks <ben-linux@fluff.org>
+> >> > ---
 
->
->> As I suggested, make rules first and discuss it.
->>
-> Please use above method in there...of course if there is more reasonable
-> reason, the rule can be changed.
->
->> >
->> > #define S5PC110_PA_ONENAND ? ? ? ? ? ? ?(0xB0000000)
->> > ...
->> > #define S5P_PA_ONENAD ? ? ? ? ? S5PC110_PA_ONENAND
->> > ...
->> >
->> >> +
->> >> +static struct resource s5pc110_onenand_resources[] = {
->> >
->> > s5p_onenand_resources...
->> >
->> >> + ? ? [0] = {
->> >> + ? ? ? ? ? ? .start ?= S5PC110_PA_ONENAND,
->> >> + ? ? ? ? ? ? .end ? ?= S5PC110_PA_ONENAND + SZ_128K - 1,
->> >
->> > Here, S5P_PA_xxx is better...
->> >
->> >> + ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
->> >> + ? ? },
->> >> + ? ? [1] = {
->> >> + ? ? ? ? ? ? .start ?= S5PC110_PA_ONENAND_DMA,
->> >> + ? ? ? ? ? ? .end ? ?= S5PC110_PA_ONENAND_DMA + SZ_2K - 1,
->> >> + ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
->> >> + ? ? },
->> >> +};
->> >> +
->> >> +struct platform_device s5pc110_device_onenand = {
->> >> + ? ? .name ? ? ? ? ? = "s5pc110-onenand",
->> >> + ? ? .id ? ? ? ? ? ? = -1,
->> >> + ? ? .num_resources ?= ARRAY_SIZE(s5pc110_onenand_resources),
->> >> + ? ? .resource ? ? ? = s5pc110_onenand_resources,
->> >> +};
->> >> +
->> >> +void s5pc110_onenand_set_platdata(struct onenand_platform_data *pdata)
->> >> +{
->> >> + ? ? struct onenand_platform_data *pd;
->> >> +
->> >> + ? ? pd = kmemdup(pdata, sizeof(struct onenand_platform_data),
->> >> GFP_KERNEL);
->> >> + ? ? if (!pd)
->> >> + ? ? ? ? ? ? printk(KERN_ERR "%s: no memory for platform data\n",
->> >> __func__);
->> >> + ? ? s5pc110_device_onenand.dev.platform_data = pd;
->> >
->> > s3c_set_platdata(pdata, sizeof(struct onenand_platform_data),
->> > &s5p_device_onenand);
->>
->> I just remove it. there's no user. and no need to setup for platform.
->>
->> Thank you,
->> Kyungmin Park
->> >
->
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
+(snip)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
