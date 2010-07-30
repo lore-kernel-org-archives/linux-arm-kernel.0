@@ -1,63 +1,38 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 30 Jul 2010 21:34:29 +0200
-Subject: [Balloon] [PATCH 11/13] [ARM] pxa/balloon3: PCF857x
-	=?utf-8?q?GPIO=09expander?= =?utf-8?q?_and=09LEDs?=
-In-Reply-To: <Prayer.1.3.3.1007301954290.28463@hermes-2.csi.cam.ac.uk>
-References: <1280373389-32475-1-git-send-email-marek.vasut@gmail.com>
-	<20100730093939.GJ6845@dream.aleph1.co.uk>
-	<Prayer.1.3.3.1007301954290.28463@hermes-2.csi.cam.ac.uk>
-Message-ID: <201007302134.29333.marek.vasut@gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Sat, 31 Jul 2010 01:05:23 +0530
+Subject: [PATCH] fix Thumb-2 decompressor broken by "Auto calculate ZRELADDR"
+Message-ID: <1280518523-5526-1-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 30. ?ervence 2010 20:54:29 Paul Fidler napsal(a):
-> On Jul 30 2010, Wookey wrote:
-> >+++ Marek Vasut [2010-07-30 06:44 +0200]:
-> >> Dne ?t 29. ?ervence 2010 12:00:41 Wookey napsal(a):
-> >> > +++ Marek Vasut [2010-07-29 05:16 +0200]:
-> >> > > Add supported for PCF8574A GPIO expander and LEDs attached to it.
-> >> > 
-> >> > This IO board is an add-on used in some ballon configurations, not
-> >> > part of the core board. There needs to be some way of selecting this
-> >> > support when the loon is used in this configuration. We have the
-> >> > balloon_has() macro which is used for dealing with the different
-> >> > builds of the board itself. Perhaps it should be extended to deal with
-> >> > add-on board functionality too?
-> >> > 
-> >> > More obvious is using the CONFIG system to just enable this if
-> >> > CUED_IO_BOARD is configured.
-> >> 
-> >> You can just disable the PCF driver if you want to save space. In case
-> >> you won't have the CUED board connected, the driver will just fail to
-> >> probe so it's ok I believe.
-> >> 
-> >> The macro could be extended, but do we want such a weird stuff in
-> >> kernel?
-> > 
-> > That was how this list suggested we deal with the unprobe-able build
-> > variation, I beleive.
-> > 
-> >> (especially if the driver can simply fail to probe).
-> 
-> I'd strongly recommend not adding anything at all in the kernel
-> to specifically support the CUED IO Board. The LEDs attached to
-> the PCF8574 on the board can be driven from user space quite easily
-> using programs such as as i2cset from the i2ctools package.
-> 
-> We've been using these boards at CUED for a number of years now
-> without any kernel support beyond i2c-pxa.ko and i2c-dev.ko.
-> 
-> If support is added for these LEDs in the kernel, it would be nice
-> if we could still write their PCF8574 device using the i2c-dev ioctls.
-> It would be inconvenient (for us) if the only way to set these LEDs
-> was by writing a 1 or 0 to /sys/devices/system/leds-gpio/balloon3:gpio:ledN
-> (or similar).
+"ARM: Auto calculate ZRELADDR and provide option for exceptions" broke the
+Thumb-2 decompressor because it removed an entry in the LC0 table but didn't
+adjust the offset the Thumb-2 code uses to load the SP from that table.
 
-And also _please_ keep the CC correct. Cheers
-> 
-> Best wishes,
-> 
->   Paul.
-> 
-> 
-> Paul Fidler
+Fix it, and also change the ARM code to use the separate SP-load since
+ARM instructions that include the SP in the LDM register list are
+deprecated.
+
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+---
+ arch/arm/boot/compressed/head.S |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index abf4d65..47924fc 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -170,9 +170,9 @@ not_angel:
+ 
+ 		.text
+ 		adr	r0, LC0
+- ARM(		ldmia	r0, {r1, r2, r3, r5, r6, r11, ip, sp})
++ ARM(		ldmia	r0, {r1, r2, r3, r5, r6, r11, ip})
+  THUMB(		ldmia	r0, {r1, r2, r3, r5, r6, r11, ip}	)
+- THUMB(		ldr	sp, [r0, #32]				)
++		ldr	sp, [r0, #28]
+ #ifdef CONFIG_AUTO_ZRELADDR
+ 		@ determine final kernel image address
+ 		and	r4, pc, #0xf8000000
+-- 
+1.7.1
