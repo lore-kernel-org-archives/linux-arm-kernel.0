@@ -1,202 +1,195 @@
 From: ccross@google.com (Colin Cross)
-Date: Thu, 29 Jul 2010 17:29:24 -0700
-Subject: [PATCH 3/9] [ARM] tegra: add suspend and mirror irqs to legacy
-	controller
+Date: Thu, 29 Jul 2010 17:29:23 -0700
+Subject: [PATCH 2/9] [ARM] tegra: Add legacy irq support
 In-Reply-To: <1280449771-24043-1-git-send-email-ccross@google.com>
 References: <1280449771-24043-1-git-send-email-ccross@google.com>
-Message-ID: <1280449771-24043-4-git-send-email-ccross@google.com>
+Message-ID: <1280449771-24043-3-git-send-email-ccross@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gary King <gking@nvidia.com>
+From: Colin Cross <ccross@android.com>
 
-mirror IRQ enable and disable operations on the legacy PPI system
-interrupt controller, since the legacy controller is responsible
-for responding to wakeup interrupts when the CPU is in LP2 idle mode
+The "legacy irq controller" duplicates the functionality of the GIC,
+but remains powered during the cpu suspend and idle modes that power
+down the CPU and the GIC.
 
-save the irq controller state on suspend and restore on resume
-
-Signed-off-by: Gary King <gking@nvidia.com>
+Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/include/mach/irqs.h |    2 +
- arch/arm/mach-tegra/irq.c               |  137 +++++++++++++++++++++++++++++++
- 2 files changed, 139 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/Makefile                  |    2 +-
+ arch/arm/mach-tegra/include/mach/legacy_irq.h |   31 +++++++
+ arch/arm/mach-tegra/legacy_irq.c              |  114 +++++++++++++++++++++++++
+ 3 files changed, 146 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/include/mach/legacy_irq.h
+ create mode 100644 arch/arm/mach-tegra/legacy_irq.c
 
-diff --git a/arch/arm/mach-tegra/include/mach/irqs.h b/arch/arm/mach-tegra/include/mach/irqs.h
-index 20f640e..71bbf34 100644
---- a/arch/arm/mach-tegra/include/mach/irqs.h
-+++ b/arch/arm/mach-tegra/include/mach/irqs.h
-@@ -25,6 +25,7 @@
- 
- #define IRQ_LOCALTIMER                  29
- 
-+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
- /* Primary Interrupt Controller */
- #define INT_PRI_BASE			(INT_GIC_BASE + 32)
- #define INT_TMR1			(INT_PRI_BASE + 0)
-@@ -169,5 +170,6 @@
- #define INT_GPIO_NR			(28 * 8)
- 
- #define NR_IRQS				(INT_GPIO_BASE + INT_GPIO_NR)
-+#endif
- 
- #endif
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-index 1fdbe70..50a8dfb 100644
---- a/arch/arm/mach-tegra/irq.c
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -4,6 +4,8 @@
-  * Author:
-  *	Colin Cross <ccross@google.com>
-  *
-+ * Copyright (C) 2010, NVIDIA Corporation
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index 51e9370..0a975b5 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -1,6 +1,6 @@
+ obj-y                                   += common.o
+ obj-y                                   += io.o
+-obj-y                                   += irq.o
++obj-y                                   += irq.o legacy_irq.o
+ obj-y                                   += clock.o
+ obj-y                                   += timer.o
+ obj-y                                   += gpio.o
+diff --git a/arch/arm/mach-tegra/include/mach/legacy_irq.h b/arch/arm/mach-tegra/include/mach/legacy_irq.h
+new file mode 100644
+index 0000000..db1eb3d
+--- /dev/null
++++ b/arch/arm/mach-tegra/include/mach/legacy_irq.h
+@@ -0,0 +1,31 @@
++/*
++ * arch/arm/mach-tegra/include/mach/legacy_irq.h
 + *
-  * This software is licensed under the terms of the GNU General Public
-  * License version 2, as published by the Free Software Foundation, and
-  * may be copied, distributed, and modified under those terms.
-@@ -27,8 +29,143 @@
- 
- #include "board.h"
- 
-+#define INT_SYS_NR	(INT_GPIO_BASE - INT_PRI_BASE)
-+#define INT_SYS_SZ	(INT_SEC_BASE - INT_PRI_BASE)
-+#define PPI_NR		((INT_SYS_NR+INT_SYS_SZ-1)/INT_SYS_SZ)
++ * Copyright (C) 2010 Google, Inc.
++ * Author: Colin Cross <ccross@android.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
 +
-+#define APBDMA_IRQ_STA_CPU  0x14
-+#define APBDMA_IRQ_MASK_SET 0x20
-+#define APBDMA_IRQ_MASK_CLR 0x24
++#ifndef _ARCH_ARM_MACH_TEGRA_LEGARY_IRQ_H
++#define _ARCH_ARM_MACH_TEGRA_LEGARY_IRQ_H
++
++void tegra_legacy_mask_irq(unsigned int irq);
++void tegra_legacy_unmask_irq(unsigned int irq);
++void tegra_legacy_select_fiq(unsigned int irq, bool fiq);
++void tegra_legacy_force_irq_set(unsigned int irq);
++void tegra_legacy_force_irq_clr(unsigned int irq);
++int tegra_legacy_force_irq_status(unsigned int irq);
++void tegra_legacy_select_fiq(unsigned int irq, bool fiq);
++unsigned long tegra_legacy_vfiq(int nr);
++unsigned long tegra_legacy_class(int nr);
++
++#endif
+diff --git a/arch/arm/mach-tegra/legacy_irq.c b/arch/arm/mach-tegra/legacy_irq.c
+new file mode 100644
+index 0000000..7cc8601
+--- /dev/null
++++ b/arch/arm/mach-tegra/legacy_irq.c
+@@ -0,0 +1,114 @@
++/*
++ * arch/arm/mach-tegra/legacy_irq.c
++ *
++ * Copyright (C) 2010 Google, Inc.
++ * Author: Colin Cross <ccross@android.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <mach/iomap.h>
++#include <mach/legacy_irq.h>
 +
 +#define ICTLR_CPU_IER		0x20
 +#define ICTLR_CPU_IER_SET	0x24
 +#define ICTLR_CPU_IER_CLR	0x28
-+#define ICTLR_CPU_IEP_CLASS	0x2c
-+#define ICTLR_COP_IER		0x30
-+#define ICTLR_COP_IER_SET	0x34
-+#define ICTLR_COP_IER_CLR	0x38
-+#define ICTLR_COP_IEP_CLASS	0x3c
++#define ICTLR_CPU_IEP_CLASS	0x2C
++#define ICTLR_CPU_IEP_VFIQ	0x08
++#define ICTLR_CPU_IEP_FIR	0x14
++#define ICTLR_CPU_IEP_FIR_SET	0x18
++#define ICTLR_CPU_IEP_FIR_CLR	0x1c
 +
-+static void (*gic_mask_irq)(unsigned int irq);
-+static void (*gic_unmask_irq)(unsigned int irq);
-+
-+#define irq_to_ictlr(irq) (((irq)-32) >> 5)
-+static void __iomem *tegra_ictlr_base = IO_ADDRESS(TEGRA_PRIMARY_ICTLR_BASE);
-+#define ictlr_to_virt(ictlr) (tegra_ictlr_base + (ictlr)*0x100)
-+
-+static void tegra_mask(unsigned int irq)
-+{
-+	void __iomem *addr = ictlr_to_virt(irq_to_ictlr(irq));
-+	gic_mask_irq(irq);
-+	writel(1<<(irq&31), addr+ICTLR_CPU_IER_CLR);
-+}
-+
-+static void tegra_unmask(unsigned int irq)
-+{
-+	void __iomem *addr = ictlr_to_virt(irq_to_ictlr(irq));
-+	gic_unmask_irq(irq);
-+	writel(1<<(irq&31), addr+ICTLR_CPU_IER_SET);
-+}
-+
-+#ifdef CONFIG_PM
-+
-+static int tegra_set_wake(unsigned int irq, unsigned int on)
-+{
-+	return 0;
-+}
-+#endif
-+
-+static struct irq_chip tegra_irq = {
-+	.name		= "PPI",
-+	.mask		= tegra_mask,
-+	.unmask		= tegra_unmask,
-+#ifdef CONFIG_PM
-+	.set_wake	= tegra_set_wake,
-+#endif
++static void __iomem *ictlr_reg_base[] = {
++	IO_ADDRESS(TEGRA_PRIMARY_ICTLR_BASE),
++	IO_ADDRESS(TEGRA_SECONDARY_ICTLR_BASE),
++	IO_ADDRESS(TEGRA_TERTIARY_ICTLR_BASE),
++	IO_ADDRESS(TEGRA_QUATERNARY_ICTLR_BASE),
 +};
 +
- void __init tegra_init_irq(void)
- {
-+	struct irq_chip *gic;
-+	unsigned int i;
++/* When going into deep sleep, the CPU is powered down, taking the GIC with it
++   In order to wake, the wake interrupts need to be enabled in the legacy
++   interrupt controller. */
++void tegra_legacy_unmask_irq(unsigned int irq)
++{
++	void __iomem *base;
++	pr_debug("%s: %d\n", __func__, irq);
 +
-+	for (i = 0; i < PPI_NR; i++) {
-+		writel(~0, ictlr_to_virt(i) + ICTLR_CPU_IER_CLR);
-+		writel(0, ictlr_to_virt(i) + ICTLR_CPU_IEP_CLASS);
-+	}
-+
- 	gic_dist_init(0, IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE), 29);
- 	gic_cpu_init(0, IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
-+
-+	gic = get_irq_chip(29);
-+	gic_unmask_irq = gic->unmask;
-+	gic_mask_irq = gic->mask;
-+	tegra_irq.ack = gic->ack;
-+#ifdef CONFIG_SMP
-+	tegra_irq.set_affinity = gic->set_affinity;
-+#endif
-+
-+	for (i = INT_PRI_BASE; i < INT_GPIO_BASE; i++) {
-+		set_irq_chip(i, &tegra_irq);
-+		set_irq_handler(i, handle_level_irq);
-+		set_irq_flags(i, IRQF_VALID);
-+	}
++	irq -= 32;
++	base = ictlr_reg_base[irq>>5];
++	writel(1 << (irq & 31), base + ICTLR_CPU_IER_SET);
 +}
 +
-+#ifdef CONFIG_PM
-+static u32 cop_ier[PPI_NR];
-+static u32 cpu_ier[PPI_NR];
-+static u32 cpu_iep[PPI_NR];
-+
-+void tegra_irq_suspend(void)
++void tegra_legacy_mask_irq(unsigned int irq)
 +{
-+	unsigned long flags;
-+	int i;
++	void __iomem *base;
++	pr_debug("%s: %d\n", __func__, irq);
 +
-+	for (i = INT_PRI_BASE; i < INT_GPIO_BASE; i++) {
-+		struct irq_desc *desc = irq_to_desc(i);
-+		if (!desc)
-+			continue;
-+		if (desc->status & IRQ_WAKEUP) {
-+			pr_debug("irq %d is wakeup\n", i);
-+			continue;
-+		}
-+		disable_irq(i);
-+	}
-+
-+	local_irq_save(flags);
-+	for (i = 0; i < PPI_NR; i++) {
-+		void __iomem *ictlr = ictlr_to_virt(i);
-+		cpu_ier[i] = readl(ictlr + ICTLR_CPU_IER);
-+		cpu_iep[i] = readl(ictlr + ICTLR_CPU_IEP_CLASS);
-+		cop_ier[i] = readl(ictlr + ICTLR_COP_IER);
-+		writel(~0, ictlr + ICTLR_COP_IER_CLR);
-+	}
-+	local_irq_restore(flags);
++	irq -= 32;
++	base = ictlr_reg_base[irq>>5];
++	writel(1 << (irq & 31), base + ICTLR_CPU_IER_CLR);
 +}
 +
-+void tegra_irq_resume(void)
++void tegra_legacy_force_irq_set(unsigned int irq)
 +{
-+	unsigned long flags;
-+	int i;
++	void __iomem *base;
++	pr_debug("%s: %d\n", __func__, irq);
 +
-+	local_irq_save(flags);
-+	for (i = 0; i < PPI_NR; i++) {
-+		void __iomem *ictlr = ictlr_to_virt(i);
-+		writel(cpu_iep[i], ictlr + ICTLR_CPU_IEP_CLASS);
-+		writel(~0ul, ictlr + ICTLR_CPU_IER_CLR);
-+		writel(cpu_ier[i], ictlr + ICTLR_CPU_IER_SET);
-+		writel(0, ictlr + ICTLR_COP_IEP_CLASS);
-+		writel(~0ul, ictlr + ICTLR_COP_IER_CLR);
-+		writel(cop_ier[i], ictlr + ICTLR_COP_IER_SET);
-+	}
-+	local_irq_restore(flags);
++	irq -= 32;
++	base = ictlr_reg_base[irq>>5];
++	writel(1 << (irq & 31), base + ICTLR_CPU_IEP_FIR_SET);
++}
 +
-+	for (i = INT_PRI_BASE; i < INT_GPIO_BASE; i++) {
-+		struct irq_desc *desc = irq_to_desc(i);
-+		if (!desc || (desc->status & IRQ_WAKEUP))
-+			continue;
-+		enable_irq(i);
-+	}
- }
-+#endif
++void tegra_legacy_force_irq_clr(unsigned int irq)
++{
++	void __iomem *base;
++	pr_debug("%s: %d\n", __func__, irq);
++
++	irq -= 32;
++	base = ictlr_reg_base[irq>>5];
++	writel(1 << (irq & 31), base + ICTLR_CPU_IEP_FIR_CLR);
++}
++
++int tegra_legacy_force_irq_status(unsigned int irq)
++{
++	void __iomem *base;
++	pr_debug("%s: %d\n", __func__, irq);
++
++	irq -= 32;
++	base = ictlr_reg_base[irq>>5];
++	return !!(readl(base + ICTLR_CPU_IEP_FIR) & (1 << (irq & 31)));
++}
++
++void tegra_legacy_select_fiq(unsigned int irq, bool fiq)
++{
++	void __iomem *base;
++	pr_debug("%s: %d\n", __func__, irq);
++
++	irq -= 32;
++	base = ictlr_reg_base[irq>>5];
++	writel(fiq << (irq & 31), base + ICTLR_CPU_IEP_CLASS);
++}
++
++unsigned long tegra_legacy_vfiq(int nr)
++{
++	void __iomem *base;
++	base = ictlr_reg_base[nr];
++	return readl(base + ICTLR_CPU_IEP_VFIQ);
++}
++
++unsigned long tegra_legacy_class(int nr)
++{
++	void __iomem *base;
++	base = ictlr_reg_base[nr];
++	return readl(base + ICTLR_CPU_IEP_CLASS);
++}
 -- 
 1.7.1
