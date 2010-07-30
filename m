@@ -1,39 +1,88 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 30 Jul 2010 20:51:06 +0200
-Subject: [PATCH] MTD: pxa2xx: move pxa2xx_flash_probe to .devinit.text
-In-Reply-To: <4C52F6C1.5090207@mvista.com>
-References: <1280504530-31737-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<4C52F6C1.5090207@mvista.com>
-Message-ID: <20100730185106.GA25446@pengutronix.de>
+From: jason.wessel@windriver.com (Jason Wessel)
+Date: Fri, 30 Jul 2010 14:17:30 -0500
+Subject: [PATCH 09/15] arm,
+	kgdb: Add ability to trap into debugger on notify_die
+In-Reply-To: <1280517456-1167-1-git-send-email-jason.wessel@windriver.com>
+References: <1280517456-1167-1-git-send-email-jason.wessel@windriver.com>
+Message-ID: <1280517456-1167-10-git-send-email-jason.wessel@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 30, 2010 at 07:58:57PM +0400, Sergei Shtylyov wrote:
-> Uwe Kleine-K?nig wrote:
->
->> This fixes the following warning by modpost:
->
->> 	WARNING: vmlinux.o(.data+0x15018): Section mismatch in reference from the variable pxa2xx_flash_driver to the function .init.text:pxa2xx_flash_probe()
->> 	The variable pxa2xx_flash_driver references
->> 	the function __init pxa2xx_flash_probe()
->> 	If the reference is valid then annotate the
->> 	variable with __init* or __refdata (see linux/init.h) or name the variable:
->> 	*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
->
->> I choosed to do this instead of using platform_driver_probe as the remove
->
->    s/choosed/chose/
-oh right, thanks.
+Now that ARM implements the notify die handlers, add the ability for
+the kernel debugger to receive the notifications.
 
->> function uses __devexit.
->
->    Perhaps remove() method should have been fixed instead -- I doubt that 
-> this is a hotplug device.
-Actually I don't care much.
+Signed-off-by: Jason Wessel <jason.wessel@windriver.com>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/kernel/kgdb.c |   34 ++++++++++++++++++++++++++++++++++
+ 1 files changed, 34 insertions(+), 0 deletions(-)
 
-Best regards
-Uwe
-
+diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
+index cf846ca..778c2f7 100644
+--- a/arch/arm/kernel/kgdb.c
++++ b/arch/arm/kernel/kgdb.c
+@@ -10,6 +10,7 @@
+  *           Deepak Saxena <dsaxena@plexity.net>
+  */
+ #include <linux/irq.h>
++#include <linux/kdebug.h>
+ #include <linux/kgdb.h>
+ #include <asm/traps.h>
+ 
+@@ -180,6 +181,33 @@ void kgdb_roundup_cpus(unsigned long flags)
+        local_irq_disable();
+ }
+ 
++static int __kgdb_notify(struct die_args *args, unsigned long cmd)
++{
++	struct pt_regs *regs = args->regs;
++
++	if (kgdb_handle_exception(1, args->signr, cmd, regs))
++		return NOTIFY_DONE;
++	return NOTIFY_STOP;
++}
++static int
++kgdb_notify(struct notifier_block *self, unsigned long cmd, void *ptr)
++{
++	unsigned long flags;
++	int ret;
++
++	local_irq_save(flags);
++	ret = __kgdb_notify(ptr, cmd);
++	local_irq_restore(flags);
++
++	return ret;
++}
++
++static struct notifier_block kgdb_notifier = {
++	.notifier_call	= kgdb_notify,
++	.priority	= -INT_MAX,
++};
++
++
+ /**
+  *	kgdb_arch_init - Perform any architecture specific initalization.
+  *
+@@ -188,6 +216,11 @@ void kgdb_roundup_cpus(unsigned long flags)
+  */
+ int kgdb_arch_init(void)
+ {
++	int ret = register_die_notifier(&kgdb_notifier);
++
++	if (ret != 0)
++		return ret;
++
+ 	register_undef_hook(&kgdb_brkpt_hook);
+ 	register_undef_hook(&kgdb_compiled_brkpt_hook);
+ 
+@@ -204,6 +237,7 @@ void kgdb_arch_exit(void)
+ {
+ 	unregister_undef_hook(&kgdb_brkpt_hook);
+ 	unregister_undef_hook(&kgdb_compiled_brkpt_hook);
++	unregister_die_notifier(&kgdb_notifier);
+ }
+ 
+ /*
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.6.4.rc1
