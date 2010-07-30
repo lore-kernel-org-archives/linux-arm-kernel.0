@@ -1,92 +1,47 @@
-From: stepanm@codeaurora.org (stepanm at codeaurora.org)
-Date: Thu, 29 Jul 2010 22:19:06 -0700 (PDT)
-Subject: [PATCH 1/2] arm: msm: Add System MMU support.
-In-Reply-To: <20100729090607.GN26098@amd.com>
-References: <20100729123512Y.fujita.tomonori@lab.ntt.co.jp>
-	<201007291026.55928.arnd@arndb.de> <20100729084018.GM26098@amd.com>
-	<20100729174621W.fujita.tomonori@lab.ntt.co.jp>
-	<20100729090607.GN26098@amd.com>
-Message-ID: <d493494df33aaf65e526181b1dbafce3.squirrel@www.codeaurora.org>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 30 Jul 2010 07:19:09 +0200
+Subject: [PATCH 11/13] [ARM] pxa/balloon3: PCF857x GPIO expander and LEDs
+In-Reply-To: <AANLkTik4kH9a46pXN0BFcL=04PAU0Ut71nuPQR5H8Lqy@mail.gmail.com>
+References: <1280373389-32475-1-git-send-email-marek.vasut@gmail.com>
+	<201007300644.04710.marek.vasut@gmail.com>
+	<AANLkTik4kH9a46pXN0BFcL=04PAU0Ut71nuPQR5H8Lqy@mail.gmail.com>
+Message-ID: <201007300719.09789.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joerg,
+Dne P? 30. ?ervence 2010 07:09:00 Eric Miao napsal(a):
+> On Fri, Jul 30, 2010 at 12:44 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> > Dne ?t 29. ?ervence 2010 12:00:41 Wookey napsal(a):
+> >> +++ Marek Vasut [2010-07-29 05:16 +0200]:
+> >> > Add supported for PCF8574A GPIO expander and LEDs attached to it.
+> >> 
+> >> This IO board is an add-on used in some ballon configurations, not
+> >> part of the core board. There needs to be some way of selecting this
+> >> support when the loon is used in this configuration. We have the
+> >> balloon_has() macro which is used for dealing with the different
+> >> builds of the board itself. Perhaps it should be extended to deal with
+> >> add-on board functionality too?
+> >> 
+> >> More obvious is using the CONFIG system to just enable this if
+> >> CUED_IO_BOARD is configured.
+> > 
+> > You can just disable the PCF driver if you want to save space. In case
+> > you won't have the CUED board connected, the driver will just fail to
+> > probe so it's ok I believe.
+> > 
+> > The macro could be extended, but do we want such a weird stuff in kernel?
+> > (especially if the driver can simply fail to probe).
+> 
+> Are we able to detect this expansion board at run-time and registers
+> i2c/led-gpio if present. The thing I'm worried more on space is the
+> gpio_leds will be registered there even without the expansion board,
+> but what if someone tries to read/write to those LED controls?
 
-Thanks for the information. I have been trying to adapt the MSM IOMMU
-driver to use your IOMMU interface, and it looks like it might work, with
-one minor modification.
-
-Unlike a more traditional system with one IOMMU between the bus and
-memory, MSM has multiple IOMMUs, with each one hard-wired to a dedicated
-device. Furthermore, each IOMMU can have more than one translation
-context. One of the use cases is being able to create mappings within
-multiple instances of one context, and arbitrarily context-switch the
-IOMMU on the fly.
-
-It sounds like the domain abstraction and attach_device/detach_device can
-encapsulate this rather nicely and I am in the process of updating my
-driver to fit this framework.
-
-My problem, however, is with iommu_domain_alloc(). This will set up a
-domain and call the ops function to initialize it, but I want to be able
-to pass it an ?IOMMU id" that will tell the underlying driver which IOMMU
-(and which "stream id") is to be associated with that domain instance.
-This can be a void* parameter that gets passed through to domain_init. I
-feel like this change will make it easy to deal with multiple
-IOMMUs/translation contexts, and implementations that have only a singular
-IOMMU/translation context are free to ignore that parameter.
-
-The alternative for me is to have a separate msm_iommu_domain_alloc(void
-*context_id) function, to which I can specify which IOMMU I want to use,
-but I would like to fully use your API if possible.
-
-What are your thoughts? I can prepare a patch if you like - the
-domain_alloc change looks like it will be very innocuous.
-
-Thanks
-Steve
-
-
-> On Thu, Jul 29, 2010 at 04:46:59AM -0400, FUJITA Tomonori wrote:
->> On Thu, 29 Jul 2010 10:40:19 +0200
->> "Roedel, Joerg" <Joerg.Roedel@amd.com> wrote:
->>
->> > The IOMMU-API is not about SR-IOV.
->>
->> That's true. However, the point is that include/iommu.h is far from
->> the IOMMU-API.
->>
->> You could still insist that include/iommu.h is designed for the
->> generic IOMMU-API. But the fact is that it's designed for very
->> specific purposes. No intention to make it for generic purposes.
->
-> I have no clue about the ARM iommus on the omap-platform. From a quick
-> look into the header file I see some similarities to the IOMMU-API. I am
-> also very open for discussions about how the IOMMU-API could be extended
-> to fit the needs of other platforms. Only because nobody has tried to
-> discuss about such an effort is no reason to push the IOMMU-API back.
->
->>
->> Since you added it two years ago, nobody has tried to extend
->> it. Instead, we have something like
->> arch/arm/plat-omap/include/plat/iommu.h.
->
-> And I think we should try to merge this platform-specific functionality
-> into the IOMMU-API.
->
-> 	Joerg
->
-> --
-> Joerg Roedel - AMD Operating System Research Center
->
-> Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-> General Managers: Alberto Bozzo, Andrew Bowd
-> Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr.
-> 43632
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+They won't register because the GPIOs won't be there.
+> 
+> >> Wookey
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
