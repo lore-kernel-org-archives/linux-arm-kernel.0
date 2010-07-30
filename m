@@ -1,53 +1,52 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 30 Jul 2010 09:54:43 +0200
-Subject: [PATCH] spi: add spi_tegra driver
-In-Reply-To: <1280450224-25118-1-git-send-email-ccross@google.com>
-References: <1280450224-25118-1-git-send-email-ccross@google.com>
-Message-ID: <20100730075443.GA17814@avionic-design.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 30 Jul 2010 10:01:02 +0200
+Subject: [PATCH 1/2] arm: msm: Add System MMU support.
+In-Reply-To: <d493494df33aaf65e526181b1dbafce3.squirrel@www.codeaurora.org>
+References: <20100729123512Y.fujita.tomonori@lab.ntt.co.jp>
+	<20100729090607.GN26098@amd.com>
+	<d493494df33aaf65e526181b1dbafce3.squirrel@www.codeaurora.org>
+Message-ID: <201007301001.02509.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Colin Cross wrote:
-> From: Erik Gilling <konkers@android.com>
+On Friday 30 July 2010 07:19:06 stepanm at codeaurora.org wrote:
+> Unlike a more traditional system with one IOMMU between the bus and
+> memory, MSM has multiple IOMMUs, with each one hard-wired to a dedicated
+> device. Furthermore, each IOMMU can have more than one translation
+> context. One of the use cases is being able to create mappings within
+> multiple instances of one context, and arbitrarily context-switch the
+> IOMMU on the fly.
 > 
-> CC: spi-devel-general at lists.sourceforge.net
-> Signed-off-by: Erik Gilling <konkers@android.com>
-> ---
-> This patch depends on the Tegra APB DMA driver:
-> [PATCH] [ARM] tegra: Add APB DMA support
-> ---
->  drivers/spi/Kconfig     |    6 +
->  drivers/spi/Makefile    |    1 +
->  drivers/spi/spi_tegra.c |  651 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 658 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/spi/spi_tegra.c
+> It sounds like the domain abstraction and attach_device/detach_device can
+> encapsulate this rather nicely and I am in the process of updating my
+> driver to fit this framework.
 > 
-> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-> index 91c2f4f..c07e0de 100644
-> --- a/drivers/spi/Kconfig
-> +++ b/drivers/spi/Kconfig
-> @@ -298,6 +298,12 @@ config SPI_STMP3XXX
->  	help
->  	  SPI driver for Freescale STMP37xx/378x SoC SSP interface
->  
-> +config SPI_TEGRA
-> +	tristate "Nvidia Tegra SPI controller"
-> +	depends on ARCH_TEGRA
-> +	help
-> +	  SPI driver for NVidia Tegra SoCs
-> +
-[...]
+> My problem, however, is with iommu_domain_alloc(). This will set up a
+> domain and call the ops function to initialize it, but I want to be able
+> to pass it an ?IOMMU id" that will tell the underlying driver which IOMMU
+> (and which "stream id") is to be associated with that domain instance.
 
-Since you say this driver depends on the APB DMA driver, should this not be
-expressed as a Kconfig dependency? Something like:
+This probably best fits into the device itself, so you can assign the
+iommu data when probing the bus, e.g. (I don't know what bus you use)
 
-	select TEGRA_SYSTEM_DMA
+struct msm_device {
+	struct msm_iommu *iommu;
+	struct device dev;
+};
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100730/2c9c6a2d/attachment-0001.sig>
+This will work both for device drivers using the DMA API and for KVM
+with the IOMMU API.
+
+> This can be a void* parameter that gets passed through to domain_init. I
+> feel like this change will make it easy to deal with multiple
+> IOMMUs/translation contexts, and implementations that have only a singular
+> IOMMU/translation context are free to ignore that parameter.
+> 
+> The alternative for me is to have a separate msm_iommu_domain_alloc(void
+> *context_id) function, to which I can specify which IOMMU I want to use,
+> but I would like to fully use your API if possible.
+
+No, that would require adding msm specific code to KVM and potential
+other users.
+
+	Arnd
