@@ -1,47 +1,38 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 30 Jul 2010 07:19:09 +0200
-Subject: [PATCH 11/13] [ARM] pxa/balloon3: PCF857x GPIO expander and LEDs
-In-Reply-To: <AANLkTik4kH9a46pXN0BFcL=04PAU0Ut71nuPQR5H8Lqy@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 30 Jul 2010 13:19:40 +0800
+Subject: [PATCH 10/13] [ARM] pxa/balloon3: PCMCIA Support
+In-Reply-To: <201007300712.54027.marek.vasut@gmail.com>
 References: <1280373389-32475-1-git-send-email-marek.vasut@gmail.com>
-	<201007300644.04710.marek.vasut@gmail.com>
-	<AANLkTik4kH9a46pXN0BFcL=04PAU0Ut71nuPQR5H8Lqy@mail.gmail.com>
-Message-ID: <201007300719.09789.marek.vasut@gmail.com>
+	<201007300641.51952.marek.vasut@gmail.com>
+	<AANLkTinHT8sB4VO26DJLDjhpu8WQA0_PcO8C77rpj3XS@mail.gmail.com>
+	<201007300712.54027.marek.vasut@gmail.com>
+Message-ID: <AANLkTin=TgNd4tn-ZQgcYhyf0qsXDT5Au+bA0jgHdw6u@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 30. ?ervence 2010 07:09:00 Eric Miao napsal(a):
-> On Fri, Jul 30, 2010 at 12:44 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> > Dne ?t 29. ?ervence 2010 12:00:41 Wookey napsal(a):
-> >> +++ Marek Vasut [2010-07-29 05:16 +0200]:
-> >> > Add supported for PCF8574A GPIO expander and LEDs attached to it.
-> >> 
-> >> This IO board is an add-on used in some ballon configurations, not
-> >> part of the core board. There needs to be some way of selecting this
-> >> support when the loon is used in this configuration. We have the
-> >> balloon_has() macro which is used for dealing with the different
-> >> builds of the board itself. Perhaps it should be extended to deal with
-> >> add-on board functionality too?
-> >> 
-> >> More obvious is using the CONFIG system to just enable this if
-> >> CUED_IO_BOARD is configured.
-> > 
-> > You can just disable the PCF driver if you want to save space. In case
-> > you won't have the CUED board connected, the driver will just fail to
-> > probe so it's ok I believe.
-> > 
-> > The macro could be extended, but do we want such a weird stuff in kernel?
-> > (especially if the driver can simply fail to probe).
-> 
-> Are we able to detect this expansion board at run-time and registers
-> i2c/led-gpio if present. The thing I'm worried more on space is the
-> gpio_leds will be registered there even without the expansion board,
-> but what if someone tries to read/write to those LED controls?
+On Fri, Jul 30, 2010 at 1:12 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Dne P? 30. ?ervence 2010 07:02:46 Eric Miao napsal(a):
+>> >> erm. Why move the FPGA/CPLD register definitions out of balloon3.h
+>> >> (along with the others) and put them in balloon3.c?
+>> >> Is that really good kernel form?
+>> >
+>> > They are not used anywhere else so they don't need to be in that file
+>> > publically available.
+>>
+>> If the FPGA/CPLD is _not_ solely for the purpose of CF/PCMCIA,
+>> nor it is like an MFD device where the functionality can be clearly
+>> separated from different ranges of registers, I'd agree with Wookey
+>> better to keep them in balloon3.h.
+>
+> Well the registers used are solely for PCMCIA (or rather CF socket on the board,
+> which clears your question below).
 
-They won't register because the GPIOs won't be there.
-> 
-> >> Wookey
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I see something like:
+
+#define BALLOON3_NANDIO_IO_REG         (BALLOON3_FPGA_VIRT + 0x00e00000)
+ /* fpga/cpld interrupt control register */
+ #define BALLOON3_INT_CONTROL_REG       (BALLOON3_FPGA_VIRT + 0x00e0000C)
+
+But yeah, I don't know balloon3 board much, so it would be good
+to have Wookey's Ack on this. Otherwise the patch looks OK to
+me.
