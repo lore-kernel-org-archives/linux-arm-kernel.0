@@ -1,1012 +1,709 @@
 From: ccross@google.com (Colin Cross)
-Date: Thu, 29 Jul 2010 17:36:39 -0700
-Subject: [PATCH] [ARM] tegra: Add APB DMA support
-Message-ID: <1280450199-25058-1-git-send-email-ccross@google.com>
+Date: Thu, 29 Jul 2010 17:37:04 -0700
+Subject: [PATCH] spi: add spi_tegra driver
+Message-ID: <1280450224-25118-1-git-send-email-ccross@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Cross <ccross@android.com>
+From: Erik Gilling <konkers@android.com>
 
-The APB DMA block handles DMA transfers to and from some peripherals
-in the Tegra SOC.  It reads from sequential addresses on the memory
-bus, and writes repeatedly to the same address on the APB bus.
-
-Two transfer modes are supported, oneshot for transferring a known
-size to or from a peripheral, and continuous for streaming data.
-In continuous mode, a callback occurs when the buffer is half full
-to allow the existing data to be handled and a new request queued.x
-
-Signed-off-by: Colin Cross <ccross@android.com>
+CC: spi-devel-general at lists.sourceforge.net
+Signed-off-by: Erik Gilling <konkers@android.com>
 ---
- arch/arm/mach-tegra/Kconfig            |    7 +
- arch/arm/mach-tegra/Makefile           |    1 +
- arch/arm/mach-tegra/common.c           |    7 +
- arch/arm/mach-tegra/dma.c              |  752 ++++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/include/mach/dma.h |  155 +++++++
- 5 files changed, 922 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-tegra/dma.c
- create mode 100644 arch/arm/mach-tegra/include/mach/dma.h
+This patch depends on the Tegra APB DMA driver:
+[PATCH] [ARM] tegra: Add APB DMA support
+---
+ drivers/spi/Kconfig     |    6 +
+ drivers/spi/Makefile    |    1 +
+ drivers/spi/spi_tegra.c |  651 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 658 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/spi/spi_tegra.c
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index a57713c..8e32d9d 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -47,4 +47,11 @@ config TEGRA_DEBUG_UARTE
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 91c2f4f..c07e0de 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -298,6 +298,12 @@ config SPI_STMP3XXX
+ 	help
+ 	  SPI driver for Freescale STMP37xx/378x SoC SSP interface
  
- endchoice
- 
-+config TEGRA_SYSTEM_DMA
-+	bool "Enable system DMA driver for NVIDIA Tegra SoCs"
-+	default y
++config SPI_TEGRA
++	tristate "Nvidia Tegra SPI controller"
++	depends on ARCH_TEGRA
 +	help
-+	  Adds system DMA functionality for NVIDIA Tegra SoCs, used by
-+	  several Tegra device drivers
++	  SPI driver for NVidia Tegra SoCs
 +
- endif
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 2a37621..fc069a9 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -12,6 +12,7 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_dvfs.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= pinmux-t2-tables.o
- obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
-+obj-$(CONFIG_TEGRA_SYSTEM_DMA)		+= dma.o
- obj-$(CONFIG_CPU_FREQ)                  += cpu-tegra.o
- 
- obj-${CONFIG_MACH_HARMONY}              += board-harmony.o
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index 445104a..7c91e2b 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -19,10 +19,13 @@
- 
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <linux/clk.h>
-+#include <linux/delay.h>
- 
- #include <asm/hardware/cache-l2x0.h>
- 
- #include <mach/iomap.h>
-+#include <mach/dma.h>
- 
- #include "board.h"
- #include "clock.h"
-@@ -52,6 +55,7 @@ void __init tegra_init_cache(void)
- 
- 	l2x0_init(p, 0x6C080001, 0x8200c3fe);
- #endif
-+
- }
- 
- void __init tegra_common_init(void)
-@@ -60,4 +64,7 @@ void __init tegra_common_init(void)
- 	tegra_init_clock();
- 	tegra_clk_init_from_table(common_clk_init_table);
- 	tegra_init_cache();
-+#ifdef CONFIG_TEGRA_SYSTEM_DMA
-+	tegra_dma_init();
-+#endif
- }
-diff --git a/arch/arm/mach-tegra/dma.c b/arch/arm/mach-tegra/dma.c
+ config SPI_TXX9
+ 	tristate "Toshiba TXx9 SPI controller"
+ 	depends on GENERIC_GPIO && CPU_TX49XX
+diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
+index e9cbd18..b6573d8 100644
+--- a/drivers/spi/Makefile
++++ b/drivers/spi/Makefile
+@@ -39,6 +39,7 @@ obj-$(CONFIG_SPI_PPC4xx)		+= spi_ppc4xx.o
+ obj-$(CONFIG_SPI_S3C24XX_GPIO)		+= spi_s3c24xx_gpio.o
+ obj-$(CONFIG_SPI_S3C24XX)		+= spi_s3c24xx_hw.o
+ obj-$(CONFIG_SPI_S3C64XX)		+= spi_s3c64xx.o
++obj-$(CONFIG_SPI_TEGRA)			+= spi_tegra.o
+ obj-$(CONFIG_SPI_TXX9)			+= spi_txx9.o
+ obj-$(CONFIG_SPI_XILINX)		+= xilinx_spi.o
+ obj-$(CONFIG_SPI_XILINX_OF)		+= xilinx_spi_of.o
+diff --git a/drivers/spi/spi_tegra.c b/drivers/spi/spi_tegra.c
 new file mode 100644
-index 0000000..acae0b1
+index 0000000..72fc4d4
 --- /dev/null
-+++ b/arch/arm/mach-tegra/dma.c
-@@ -0,0 +1,752 @@
++++ b/drivers/spi/spi_tegra.c
+@@ -0,0 +1,651 @@
 +/*
-+ * arch/arm/mach-tegra/dma.c
++ * drivers/spi/spi_tegra.c
 + *
-+ * System DMA driver for NVIDIA Tegra SoCs
++ * Copyright (C) 2010 Google, Inc.
 + *
-+ * Copyright (c) 2008-2009, NVIDIA Corporation.
++ * Author:
++ *     Erik Gilling <konkers@android.com>
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
 + *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 + */
 +
-+#include <linux/io.h>
-+#include <linux/interrupt.h>
-+#include <linux/module.h>
-+#include <linux/spinlock.h>
++#undef DEBUG
++
++#include <linux/kernel.h>
++#include <linux/init.h>
 +#include <linux/err.h>
-+#include <linux/irq.h>
++#include <linux/platform_device.h>
++#include <linux/io.h>
++#include <linux/dma-mapping.h>
++#include <linux/dmapool.h>
++#include <linux/clk.h>
++#include <linux/interrupt.h>
 +#include <linux/delay.h>
++
++#include <linux/spi/spi.h>
++
 +#include <mach/dma.h>
-+#include <mach/irqs.h>
-+#include <mach/iomap.h>
 +
-+#define APB_DMA_GEN				0x000
-+#define GEN_ENABLE				(1<<31)
++#define DRIVER_NAME		"spi_tegra"
 +
-+#define APB_DMA_CNTRL				0x010
++#define BUSY_TIMEOUT		1000
 +
-+#define APB_DMA_IRQ_MASK			0x01c
++#define SLINK_COMMAND		0x000
++#define   BIT_LENGTH(x)			(((x) & 0x1f) << 0)
++#define   WORD_SIZE(x)			(((x) & 0x1f) << 5)
++#define   BOTH_EN			(1 << 10)
++#define   CS_SW				(1 << 11)
++#define   CS_VALUE			(1 << 12)
++#define   CS_POLARITY			(1 << 13)
++#define   IDLE_SDA_DRIVE_LOW		(0 << 16)
++#define   IDLE_SDA_DRIVE_HIGH		(1 << 16)
++#define   IDLE_SDA_PULL_LOW		(2 << 16)
++#define   IDLE_SDA_PULL_HIGH		(3 << 16)
++#define   IDLE_SDA_MASK			(3 << 16)
++#define   CS_POLARITY1			(1 << 20)
++#define   CK_SDA			(1 << 21)
++#define   CS_POLARITY2			(1 << 22)
++#define   CS_POLARITY3			(1 << 23)
++#define   IDLE_SCLK_DRIVE_LOW		(0 << 24)
++#define   IDLE_SCLK_DRIVE_HIGH		(1 << 24)
++#define   IDLE_SCLK_PULL_LOW		(2 << 24)
++#define   IDLE_SCLK_PULL_HIGH		(3 << 24)
++#define   IDLE_SCLK_MASK		(3 << 24)
++#define   M_S				(1 << 28)
++#define   WAIT				(1 << 29)
++#define   GO				(1 << 30)
++#define   ENB				(1 << 31)
 +
-+#define APB_DMA_IRQ_MASK_SET			0x020
++#define SLINK_COMMAND2		0x004
++#define   LSBFE				(1 << 0)
++#define   SSOE				(1 << 1)
++#define   SPIE				(1 << 4)
++#define   BIDIROE			(1 << 6)
++#define   MODFEN			(1 << 7)
++#define   INT_SIZE(x)			(((x) & 0x1f) << 8)
++#define   CS_ACTIVE_BETWEEN		(1 << 17)
++#define   SS_EN_CS(x)			(((x) & 0x3) << 18)
++#define   SS_SETUP(x)			(((x) & 0x3) << 20)
++#define   FIFO_REFILLS_0		(0 << 22)
++#define   FIFO_REFILLS_1		(1 << 22)
++#define   FIFO_REFILLS_2		(2 << 22)
++#define   FIFO_REFILLS_3		(3 << 22)
++#define   FIFO_REFILLS_MASK		(3 << 22)
++#define   WAIT_PACK_INT(x)		(((x) & 0x7) << 26)
++#define   SPC0				(1 << 29)
++#define   TXEN				(1 << 30)
++#define   RXEN				(1 << 31)
 +
-+#define APB_DMA_CHAN_CSR			0x000
-+#define CSR_ENB					(1<<31)
-+#define CSR_IE_EOC				(1<<30)
-+#define CSR_HOLD				(1<<29)
-+#define CSR_DIR					(1<<28)
-+#define CSR_ONCE				(1<<27)
-+#define CSR_FLOW				(1<<21)
-+#define CSR_REQ_SEL_SHIFT			16
-+#define CSR_REQ_SEL_MASK			(0x1F<<CSR_REQ_SEL_SHIFT)
-+#define CSR_REQ_SEL_INVALID			(31<<CSR_REQ_SEL_SHIFT)
-+#define CSR_WCOUNT_SHIFT			2
-+#define CSR_WCOUNT_MASK				0xFFFC
++#define SLINK_STATUS		0x008
++#define   COUNT(val)			(((val) >> 0) & 0x1f)
++#define   WORD(val)			(((val) >> 5) & 0x1f)
++#define   BLK_CNT(val)			(((val) >> 0) & 0xffff)
++#define   MODF				(1 << 16)
++#define   RX_UNF			(1 << 18)
++#define   TX_OVF			(1 << 19)
++#define   TX_FULL			(1 << 20)
++#define   TX_EMPTY			(1 << 21)
++#define   RX_FULL			(1 << 22)
++#define   RX_EMPTY			(1 << 23)
++#define   TX_UNF			(1 << 24)
++#define   RX_OVF			(1 << 25)
++#define   TX_FLUSH			(1 << 26)
++#define   RX_FLUSH			(1 << 27)
++#define   SCLK				(1 << 28)
++#define   ERR				(1 << 29)
++#define   RDY				(1 << 30)
++#define   BSY				(1 << 31)
 +
-+#define APB_DMA_CHAN_STA				0x004
-+#define STA_BUSY				(1<<31)
-+#define STA_ISE_EOC				(1<<30)
-+#define STA_HALT				(1<<29)
-+#define STA_PING_PONG				(1<<28)
-+#define STA_COUNT_SHIFT				2
-+#define STA_COUNT_MASK				0xFFFC
++#define SLINK_MAS_DATA		0x010
++#define SLINK_SLAVE_DATA	0x014
 +
-+#define APB_DMA_CHAN_AHB_PTR				0x010
++#define SLINK_DMA_CTL		0x018
++#define   DMA_BLOCK_SIZE(x)		(((x) & 0xffff) << 0)
++#define   TX_TRIG_1			(0 << 16)
++#define   TX_TRIG_4			(1 << 16)
++#define   TX_TRIG_8			(2 << 16)
++#define   TX_TRIG_16			(3 << 16)
++#define   TX_TRIG_MASK			(3 << 16)
++#define   RX_TRIG_1			(0 << 18)
++#define   RX_TRIG_4			(1 << 18)
++#define   RX_TRIG_8			(2 << 18)
++#define   RX_TRIG_16			(3 << 18)
++#define   RX_TRIG_MASK			(3 << 18)
++#define   PACKED			(1 << 20)
++#define   PACK_SIZE_4			(0 << 21)
++#define   PACK_SIZE_8			(1 << 21)
++#define   PACK_SIZE_16			(2 << 21)
++#define   PACK_SIZE_32			(3 << 21)
++#define   PACK_SIZE_MASK		(3 << 21)
++#define   IE_TXC			(1 << 26)
++#define   IE_RXC			(1 << 27)
++#define   DMA_EN			(1 << 31)
 +
-+#define APB_DMA_CHAN_AHB_SEQ				0x014
-+#define AHB_SEQ_INTR_ENB			(1<<31)
-+#define AHB_SEQ_BUS_WIDTH_SHIFT			28
-+#define AHB_SEQ_BUS_WIDTH_MASK			(0x7<<AHB_SEQ_BUS_WIDTH_SHIFT)
-+#define AHB_SEQ_BUS_WIDTH_8			(0<<AHB_SEQ_BUS_WIDTH_SHIFT)
-+#define AHB_SEQ_BUS_WIDTH_16			(1<<AHB_SEQ_BUS_WIDTH_SHIFT)
-+#define AHB_SEQ_BUS_WIDTH_32			(2<<AHB_SEQ_BUS_WIDTH_SHIFT)
-+#define AHB_SEQ_BUS_WIDTH_64			(3<<AHB_SEQ_BUS_WIDTH_SHIFT)
-+#define AHB_SEQ_BUS_WIDTH_128			(4<<AHB_SEQ_BUS_WIDTH_SHIFT)
-+#define AHB_SEQ_DATA_SWAP			(1<<27)
-+#define AHB_SEQ_BURST_MASK			(0x7<<24)
-+#define AHB_SEQ_BURST_1				(4<<24)
-+#define AHB_SEQ_BURST_4				(5<<24)
-+#define AHB_SEQ_BURST_8				(6<<24)
-+#define AHB_SEQ_DBL_BUF				(1<<19)
-+#define AHB_SEQ_WRAP_SHIFT			16
-+#define AHB_SEQ_WRAP_MASK			(0x7<<AHB_SEQ_WRAP_SHIFT)
++#define SLINK_STATUS2		0x01c
++#define   TX_FIFO_EMPTY_COUNT(val)	(((val) & 0x3f) >> 0)
++#define   RX_FIFO_FULL_COUNT(val)	(((val) & 0x3f) >> 16)
 +
-+#define APB_DMA_CHAN_APB_PTR				0x018
++#define SLINK_TX_FIFO		0x100
++#define SLINK_RX_FIFO		0x180
 +
-+#define APB_DMA_CHAN_APB_SEQ				0x01c
-+#define APB_SEQ_BUS_WIDTH_SHIFT			28
-+#define APB_SEQ_BUS_WIDTH_MASK			(0x7<<APB_SEQ_BUS_WIDTH_SHIFT)
-+#define APB_SEQ_BUS_WIDTH_8			(0<<APB_SEQ_BUS_WIDTH_SHIFT)
-+#define APB_SEQ_BUS_WIDTH_16			(1<<APB_SEQ_BUS_WIDTH_SHIFT)
-+#define APB_SEQ_BUS_WIDTH_32			(2<<APB_SEQ_BUS_WIDTH_SHIFT)
-+#define APB_SEQ_BUS_WIDTH_64			(3<<APB_SEQ_BUS_WIDTH_SHIFT)
-+#define APB_SEQ_BUS_WIDTH_128			(4<<APB_SEQ_BUS_WIDTH_SHIFT)
-+#define APB_SEQ_DATA_SWAP			(1<<27)
-+#define APB_SEQ_WRAP_SHIFT			16
-+#define APB_SEQ_WRAP_MASK			(0x7<<APB_SEQ_WRAP_SHIFT)
-+
-+#define TEGRA_SYSTEM_DMA_CH_NR			16
-+#define TEGRA_SYSTEM_DMA_AVP_CH_NUM		4
-+#define TEGRA_SYSTEM_DMA_CH_MIN			0
-+#define TEGRA_SYSTEM_DMA_CH_MAX	\
-+	(TEGRA_SYSTEM_DMA_CH_NR - TEGRA_SYSTEM_DMA_AVP_CH_NUM - 1)
-+
-+#define NV_DMA_MAX_TRASFER_SIZE 0x10000
-+
-+const unsigned int ahb_addr_wrap_table[8] = {
-+	0, 32, 64, 128, 256, 512, 1024, 2048
++static const unsigned long spi_tegra_req_sels[] = {
++	TEGRA_DMA_REQ_SEL_SL2B1,
++	TEGRA_DMA_REQ_SEL_SL2B2,
++	TEGRA_DMA_REQ_SEL_SL2B3,
++	TEGRA_DMA_REQ_SEL_SL2B4,
 +};
 +
-+const unsigned int apb_addr_wrap_table[8] = {0, 1, 2, 4, 8, 16, 32, 64};
-+
-+const unsigned int bus_width_table[5] = {8, 16, 32, 64, 128};
-+
-+#define TEGRA_DMA_NAME_SIZE 16
-+struct tegra_dma_channel {
-+	struct list_head	list;
-+	int			id;
-+	spinlock_t		lock;
-+	char			name[TEGRA_DMA_NAME_SIZE];
-+	void  __iomem		*addr;
-+	int			mode;
-+	int			irq;
-+
-+	/* Register shadow */
-+	u32			csr;
-+	u32			ahb_seq;
-+	u32			ahb_ptr;
-+	u32			apb_seq;
-+	u32			apb_ptr;
-+};
-+
-+#define  NV_DMA_MAX_CHANNELS  32
-+
-+static DECLARE_BITMAP(channel_usage, NV_DMA_MAX_CHANNELS);
-+static struct tegra_dma_channel dma_channels[NV_DMA_MAX_CHANNELS];
-+
-+static void tegra_dma_update_hw(struct tegra_dma_channel *ch,
-+	struct tegra_dma_req *req);
-+static void tegra_dma_update_hw_partial(struct tegra_dma_channel *ch,
-+	struct tegra_dma_req *req);
-+static void tegra_dma_init_hw(struct tegra_dma_channel *ch);
-+static void tegra_dma_stop(struct tegra_dma_channel *ch);
-+
-+void tegra_dma_flush(struct tegra_dma_channel *ch)
++static inline unsigned bytes_per_word(u8 bits)
 +{
-+}
-+EXPORT_SYMBOL(tegra_dma_flush);
-+
-+void tegra_dma_dequeue(struct tegra_dma_channel *ch)
-+{
-+	struct tegra_dma_req *req;
-+
-+	req = list_entry(ch->list.next, typeof(*req), node);
-+
-+	tegra_dma_dequeue_req(ch, req);
-+	return;
-+}
-+
-+void tegra_dma_stop(struct tegra_dma_channel *ch)
-+{
-+	unsigned int csr;
-+	unsigned int status;
-+
-+	csr = ch->csr;
-+	csr &= ~CSR_IE_EOC;
-+	writel(csr, ch->addr + APB_DMA_CHAN_CSR);
-+
-+	csr &= ~CSR_ENB;
-+	writel(csr, ch->addr + APB_DMA_CHAN_CSR);
-+
-+	status = readl(ch->addr + APB_DMA_CHAN_STA);
-+	if (status & STA_ISE_EOC)
-+		writel(status, ch->addr + APB_DMA_CHAN_STA);
-+}
-+
-+int tegra_dma_cancel(struct tegra_dma_channel *ch)
-+{
-+	unsigned int csr;
-+	unsigned long irq_flags;
-+
-+	spin_lock_irqsave(&ch->lock, irq_flags);
-+	while (!list_empty(&ch->list))
-+		list_del(ch->list.next);
-+
-+	csr = ch->csr;
-+	csr &= ~CSR_REQ_SEL_MASK;
-+	csr |= CSR_REQ_SEL_INVALID;
-+
-+	/* Set the enable as that is not shadowed */
-+	csr |= CSR_ENB;
-+	writel(csr, ch->addr + APB_DMA_CHAN_CSR);
-+
-+	tegra_dma_stop(ch);
-+
-+	spin_unlock_irqrestore(&ch->lock, irq_flags);
-+	return 0;
-+}
-+
-+int tegra_dma_dequeue_req(struct tegra_dma_channel *ch,
-+	struct tegra_dma_req *_req)
-+{
-+	unsigned int csr;
-+	unsigned int status;
-+	struct tegra_dma_req *req = NULL;
-+	int found = 0;
-+	unsigned long irq_flags;
-+	int to_transfer;
-+	int req_transfer_count;
-+
-+	spin_lock_irqsave(&ch->lock, irq_flags);
-+	list_for_each_entry(req, &ch->list, node) {
-+		if (req == _req) {
-+			list_del(&req->node);
-+			found = 1;
-+			break;
-+		}
-+	}
-+	if (!found) {
-+		spin_unlock_irqrestore(&ch->lock, irq_flags);
-+		return 0;
-+	}
-+
-+	/* STOP the DMA and get the transfer count.
-+	 * Getting the transfer count is tricky.
-+	 *  - Change the source selector to invalid to stop the DMA from
-+	 *    FIFO to memory.
-+	 *  - Read the status register to know the number of pending
-+	 *    bytes to be transfered.
-+	 *  - Finally stop or program the DMA to the next buffer in the
-+	 *    list.
-+	 */
-+	csr = ch->csr;
-+	csr &= ~CSR_REQ_SEL_MASK;
-+	csr |= CSR_REQ_SEL_INVALID;
-+
-+	/* Set the enable as that is not shadowed */
-+	csr |= CSR_ENB;
-+	writel(csr, ch->addr + APB_DMA_CHAN_CSR);
-+
-+	/* Get the transfer count */
-+	status = readl(ch->addr + APB_DMA_CHAN_STA);
-+	to_transfer = (status & STA_COUNT_MASK) >> STA_COUNT_SHIFT;
-+	req_transfer_count = (ch->csr & CSR_WCOUNT_MASK) >> CSR_WCOUNT_SHIFT;
-+	req_transfer_count += 1;
-+	to_transfer += 1;
-+
-+	req->bytes_transferred = req_transfer_count;
-+
-+	if (status & STA_BUSY)
-+		req->bytes_transferred -= to_transfer;
-+
-+	/* In continous transfer mode, DMA only tracks the count of the
-+	 * half DMA buffer. So, if the DMA already finished half the DMA
-+	 * then add the half buffer to the completed count.
-+	 *
-+	 *	FIXME: There can be a race here. What if the req to
-+	 *	dequue happens at the same time as the DMA just moved to
-+	 *	the new buffer and SW didn't yet received the interrupt?
-+	 */
-+	if (ch->mode & TEGRA_DMA_MODE_CONTINOUS)
-+		if (req->buffer_status == TEGRA_DMA_REQ_BUF_STATUS_HALF_FULL)
-+			req->bytes_transferred += req_transfer_count;
-+
-+	req->bytes_transferred *= 4;
-+
-+	tegra_dma_stop(ch);
-+	if (!list_empty(&ch->list)) {
-+		/* if the list is not empty, queue the next request */
-+		struct tegra_dma_req *next_req;
-+		next_req = list_entry(ch->list.next,
-+			typeof(*next_req), node);
-+		tegra_dma_update_hw(ch, next_req);
-+	}
-+	req->status = -TEGRA_DMA_REQ_ERROR_ABORTED;
-+
-+	spin_unlock_irqrestore(&ch->lock, irq_flags);
-+
-+	/* Callback should be called without any lock */
-+	req->complete(req);
-+	return 0;
-+}
-+EXPORT_SYMBOL(tegra_dma_dequeue_req);
-+
-+bool tegra_dma_is_empty(struct tegra_dma_channel *ch)
-+{
-+	unsigned long irq_flags;
-+	bool is_empty;
-+
-+	spin_lock_irqsave(&ch->lock, irq_flags);
-+	if (list_empty(&ch->list))
-+		is_empty = true;
++	WARN_ON((bits < 1) || bits > 32);
++	if (bits <= 8)
++		return 1;
++	else if (bits <= 16)
++		return 2;
++	else if (bits <= 24)
++		return 3;
 +	else
-+		is_empty = false;
-+	spin_unlock_irqrestore(&ch->lock, irq_flags);
-+	return is_empty;
++		return 4;
 +}
-+EXPORT_SYMBOL(tegra_dma_is_empty);
 +
-+bool tegra_dma_is_req_inflight(struct tegra_dma_channel *ch,
-+	struct tegra_dma_req *_req)
++#define BB_LEN			32
++
++struct spi_tegra_data {
++	struct spi_master	*master;
++	struct platform_device	*pdev;
++	spinlock_t		lock;
++
++	struct clk		*clk;
++	void __iomem		*base;
++	unsigned long		phys;
++
++	u32			cur_speed;
++
++	struct list_head	queue;
++	struct spi_transfer	*cur;
++	unsigned		cur_pos;
++	unsigned		cur_len;
++	unsigned		cur_bytes_per_word;
++
++	/* The tegra spi controller has a bug which causes the first word
++	 * in PIO transactions to be garbage.  Since packed DMA transactions
++	 * require transfers to be 4 byte aligned we need a bounce buffer
++	 * for the generic case.
++	 */
++	struct tegra_dma_req	rx_dma_req;
++	struct tegra_dma_channel *rx_dma;
++	u32			*rx_bb;
++	dma_addr_t		rx_bb_phys;
++};
++
++
++static unsigned long spi_readl(struct spi_tegra_data *tspi, unsigned long reg)
 +{
-+	unsigned long irq_flags;
-+	struct tegra_dma_req *req;
++	return readl(tspi->base + reg);
++}
 +
-+	spin_lock_irqsave(&ch->lock, irq_flags);
-+	list_for_each_entry(req, &ch->list, node) {
-+		if (req == _req) {
-+			spin_unlock_irqrestore(&ch->lock, irq_flags);
-+			return true;
++static void spi_writel(struct spi_tegra_data *tspi, unsigned long val,
++		       unsigned long reg)
++{
++	writel(val, tspi->base + reg);
++}
++
++static void spi_tegra_go(struct spi_tegra_data *tspi)
++{
++	unsigned long val;
++
++	wmb();
++
++	val = spi_readl(tspi, SLINK_DMA_CTL);
++	val &= ~DMA_BLOCK_SIZE(~0) & ~DMA_EN;
++	val |= DMA_BLOCK_SIZE(tspi->rx_dma_req.size / 4 - 1);
++	spi_writel(tspi, val, SLINK_DMA_CTL);
++
++	tegra_dma_enqueue_req(tspi->rx_dma, &tspi->rx_dma_req);
++
++	val |= DMA_EN;
++	spi_writel(tspi, val, SLINK_DMA_CTL);
++}
++
++static unsigned spi_tegra_fill_tx_fifo(struct spi_tegra_data *tspi,
++				  struct spi_transfer *t)
++{
++	unsigned len = min(t->len - tspi->cur_pos, BB_LEN *
++			   tspi->cur_bytes_per_word);
++	u8 *tx_buf = (u8 *)t->tx_buf + tspi->cur_pos;
++	int i, j;
++	unsigned long val;
++
++	val = spi_readl(tspi, SLINK_COMMAND);
++	val &= ~WORD_SIZE(~0);
++	val |= WORD_SIZE(len / tspi->cur_bytes_per_word - 1);
++	spi_writel(tspi, val, SLINK_COMMAND);
++
++	for (i = 0; i < len; i += tspi->cur_bytes_per_word) {
++		val = 0;
++		for (j = 0; j < tspi->cur_bytes_per_word; j++)
++			val |= tx_buf[i + j] << j * 8;
++
++		spi_writel(tspi, val, SLINK_TX_FIFO);
++	}
++
++	tspi->rx_dma_req.size = len / tspi->cur_bytes_per_word * 4;
++
++	return len;
++}
++
++static unsigned spi_tegra_drain_rx_fifo(struct spi_tegra_data *tspi,
++				  struct spi_transfer *t)
++{
++	unsigned len = tspi->cur_len;
++	u8 *rx_buf = (u8 *)t->rx_buf + tspi->cur_pos;
++	int i, j;
++	unsigned long val;
++
++	for (i = 0; i < len; i += tspi->cur_bytes_per_word) {
++		val = tspi->rx_bb[i / tspi->cur_bytes_per_word];
++		for (j = 0; j < tspi->cur_bytes_per_word; j++)
++			rx_buf[i + j] = (val >> (j * 8)) & 0xff;
++	}
++
++	return len;
++}
++
++static int spi_tegra_start_transfer(struct spi_device *spi,
++				    struct spi_transfer *t)
++{
++	struct spi_tegra_data *tspi = spi_master_get_devdata(spi->master);
++	u32 speed;
++	u8 bits_per_word;
++	unsigned long val;
++
++	speed = t->speed_hz ? t->speed_hz : spi->max_speed_hz;
++	bits_per_word = t->bits_per_word ? t->bits_per_word  :
++		spi->bits_per_word;
++
++	if (bits_per_word < 1 || bits_per_word > 32)
++		return -EINVAL;
++
++	if (t->len == 0)
++		return -EINVAL;
++
++	if (!t->rx_buf && !t->tx_buf)
++		return -EINVAL;
++
++	tspi->cur_bytes_per_word = bytes_per_word(bits_per_word);
++
++	if (speed != tspi->cur_speed)
++		clk_set_rate(tspi->clk, speed);
++
++	if (tspi->cur_speed == 0)
++		clk_enable(tspi->clk);
++
++	tspi->cur_speed = speed;
++
++	val = spi_readl(tspi, SLINK_COMMAND2);
++	if (t->rx_buf)
++		val |= RXEN;
++	else
++		val &= ~RXEN;
++
++	if (t->tx_buf)
++		val |= TXEN;
++	else
++		val &= ~TXEN;
++
++	val &= ~SS_EN_CS(~0);
++	val |= SS_EN_CS(spi->chip_select);
++	val |= SPIE;
++
++	spi_writel(tspi, val, SLINK_COMMAND2);
++
++	val = spi_readl(tspi, SLINK_COMMAND);
++	val &= ~BIT_LENGTH(~0);
++	val |= BIT_LENGTH(bits_per_word - 1);
++
++	/* FIXME: should probably control CS manually so that we can be sure
++	 * it does not go low between transfer and to support delay_usecs
++	 * correctly.
++	 */
++	val &= ~IDLE_SCLK_MASK & ~CK_SDA & ~CS_SW;
++
++	if (spi->mode & SPI_CPHA)
++		val |= CK_SDA;
++
++	if (spi->mode & SPI_CPOL)
++		val |= IDLE_SCLK_DRIVE_HIGH;
++	else
++		val |= IDLE_SCLK_DRIVE_LOW;
++
++	val |= M_S;
++
++	spi_writel(tspi, val, SLINK_COMMAND);
++
++	spi_writel(tspi, RX_FLUSH | TX_FLUSH, SLINK_STATUS);
++
++	tspi->cur = t;
++	tspi->cur_pos = 0;
++	tspi->cur_len = spi_tegra_fill_tx_fifo(tspi, t);
++
++	spi_tegra_go(tspi);
++
++	return 0;
++}
++
++static void spi_tegra_start_message(struct spi_device *spi,
++				    struct spi_message *m)
++{
++	struct spi_transfer *t;
++
++	m->actual_length = 0;
++
++	t = list_first_entry(&m->transfers, struct spi_transfer, transfer_list);
++	spi_tegra_start_transfer(spi, t);
++}
++
++static void tegra_spi_rx_dma_complete(struct tegra_dma_req *req)
++{
++	struct spi_tegra_data *tspi = req->dev;
++	unsigned long flags;
++	struct spi_message *m;
++	struct spi_device *spi;
++	int complete = 0;
++	int timeout = 0;
++	unsigned long val;
++
++	/* the SPI controller may come back with both the BSY and RDY bits
++	 * set.  In this case we need to wait for the BSY bit to clear so
++	 * that we are sure the DMA is finished.
++	 */
++	while (timeout++ < BUSY_TIMEOUT) {
++		if (!(spi_readl(tspi, SLINK_STATUS) & BSY))
++			break;
++	}
++
++	val = spi_readl(tspi, SLINK_STATUS);
++	val |= RDY;
++	spi_writel(tspi, val, SLINK_STATUS);
++
++	spin_lock_irqsave(&tspi->lock, flags);
++
++	m = list_first_entry(&tspi->queue, struct spi_message, queue);
++	spi = m->state;
++
++	tspi->cur_pos += spi_tegra_drain_rx_fifo(tspi, tspi->cur);
++	m->actual_length += tspi->cur_pos;
++
++	if (tspi->cur_pos < tspi->cur->len) {
++		tspi->cur_len = spi_tegra_fill_tx_fifo(tspi, tspi->cur);
++		spi_tegra_go(tspi);
++	} else if (!list_is_last(&tspi->cur->transfer_list,
++				 &m->transfers)) {
++		tspi->cur =  list_first_entry(&tspi->cur->transfer_list,
++					      struct spi_transfer,
++					      transfer_list);
++		spi_tegra_start_transfer(spi, tspi->cur);
++	} else {
++		complete = 1;
++	}
++
++	if (complete) {
++		list_del(&m->queue);
++
++		m->status = 0;
++		m->complete(m->context);
++
++		if (!list_empty(&tspi->queue)) {
++			m = list_first_entry(&tspi->queue, struct spi_message,
++					     queue);
++			spi = m->state;
++			spi_tegra_start_message(spi, m);
++		} else {
++			clk_disable(tspi->clk);
++			tspi->cur_speed = 0;
 +		}
 +	}
-+	spin_unlock_irqrestore(&ch->lock, irq_flags);
-+	return false;
++
++	spin_unlock_irqrestore(&tspi->lock, flags);
 +}
-+EXPORT_SYMBOL(tegra_dma_is_req_inflight);
 +
-+int tegra_dma_enqueue_req(struct tegra_dma_channel *ch,
-+	struct tegra_dma_req *req)
++static int spi_tegra_setup(struct spi_device *spi)
 +{
-+	unsigned long irq_flags;
-+	int start_dma = 0;
++	struct spi_tegra_data *tspi = spi_master_get_devdata(spi->master);
++	unsigned long cs_bit;
++	unsigned long val;
++	unsigned long flags;
 +
-+	if (req->size > NV_DMA_MAX_TRASFER_SIZE ||
-+		req->source_addr & 0x3 || req->dest_addr & 0x3) {
-+		pr_err("Invalid DMA request for channel %d\n", ch->id);
++	dev_dbg(&spi->dev, "setup %d bpw, %scpol, %scpha, %dHz\n",
++		spi->bits_per_word,
++		spi->mode & SPI_CPOL ? "" : "~",
++		spi->mode & SPI_CPHA ? "" : "~",
++		spi->max_speed_hz);
++
++
++	switch (spi->chip_select) {
++	case 0:
++		cs_bit = CS_POLARITY;
++		break;
++
++	case 1:
++		cs_bit = CS_POLARITY1;
++		break;
++
++	case 2:
++		cs_bit = CS_POLARITY2;
++		break;
++
++	case 4:
++		cs_bit = CS_POLARITY3;
++		break;
++
++	default:
 +		return -EINVAL;
 +	}
 +
-+	spin_lock_irqsave(&ch->lock, irq_flags);
++	spin_lock_irqsave(&tspi->lock, flags);
 +
-+	req->bytes_transferred = 0;
-+	req->status = 0;
-+	req->buffer_status = 0;
-+	if (list_empty(&ch->list))
-+		start_dma = 1;
++	val = spi_readl(tspi, SLINK_COMMAND);
++	if (spi->mode & SPI_CS_HIGH)
++		val |= cs_bit;
++	else
++		val &= ~cs_bit;
++	spi_writel(tspi, val, SLINK_COMMAND);
 +
-+	list_add_tail(&req->node, &ch->list);
-+
-+	if (start_dma)
-+		tegra_dma_update_hw(ch, req);
-+
-+	spin_unlock_irqrestore(&ch->lock, irq_flags);
++	spin_unlock_irqrestore(&tspi->lock, flags);
 +
 +	return 0;
 +}
-+EXPORT_SYMBOL(tegra_dma_enqueue_req);
 +
-+struct tegra_dma_channel *tegra_dma_allocate_channel(int mode)
++static int spi_tegra_transfer(struct spi_device *spi, struct spi_message *m)
 +{
-+	int channel;
-+	struct tegra_dma_channel *ch;
++	struct spi_tegra_data *tspi = spi_master_get_devdata(spi->master);
++	unsigned long flags;
++	int was_empty;
 +
-+	/* first channel is the shared channel */
-+	if (mode & TEGRA_DMA_SHARED) {
-+		channel = TEGRA_SYSTEM_DMA_CH_MIN;
-+	} else {
-+		channel = find_first_zero_bit(channel_usage,
-+			ARRAY_SIZE(dma_channels));
-+		if (channel >= ARRAY_SIZE(dma_channels))
-+			return ERR_PTR(ENODEV);
-+	}
-+	__set_bit(channel, channel_usage);
-+	ch = &dma_channels[channel];
-+	ch->mode = mode;
-+	return ch;
-+}
-+EXPORT_SYMBOL(tegra_dma_allocate_channel);
++	if (list_empty(&m->transfers) || !m->complete)
++		return -EINVAL;
 +
-+void tegra_dma_free_channel(struct tegra_dma_channel *ch)
-+{
-+	if (ch->mode & TEGRA_DMA_SHARED)
-+		return;
-+	tegra_dma_cancel(ch);
-+	__clear_bit(ch->id, channel_usage);
-+}
-+EXPORT_SYMBOL(tegra_dma_free_channel);
++	m->state = spi;
 +
-+static void tegra_dma_update_hw_partial(struct tegra_dma_channel *ch,
-+	struct tegra_dma_req *req)
-+{
-+	if (req->to_memory) {
-+		ch->apb_ptr = req->source_addr;
-+		ch->ahb_ptr = req->dest_addr;
-+	} else {
-+		ch->apb_ptr = req->dest_addr;
-+		ch->ahb_ptr = req->source_addr;
-+	}
-+	writel(ch->apb_ptr, ch->addr + APB_DMA_CHAN_APB_PTR);
-+	writel(ch->ahb_ptr, ch->addr + APB_DMA_CHAN_AHB_PTR);
++	spin_lock_irqsave(&tspi->lock, flags);
++	was_empty = list_empty(&tspi->queue);
++	list_add_tail(&m->queue, &tspi->queue);
 +
-+	req->status = TEGRA_DMA_REQ_INFLIGHT;
-+	return;
++	if (was_empty)
++		spi_tegra_start_message(spi, m);
++
++	spin_unlock_irqrestore(&tspi->lock, flags);
++
++	return 0;
 +}
 +
-+static void tegra_dma_update_hw(struct tegra_dma_channel *ch,
-+	struct tegra_dma_req *req)
++static void spi_tegra_cleanup(struct spi_device *spi)
 +{
-+	int ahb_addr_wrap;
-+	int apb_addr_wrap;
-+	int ahb_bus_width;
-+	int apb_bus_width;
-+	int index;
-+	unsigned long csr;
-+
-+
-+	ch->csr |= CSR_FLOW;
-+	ch->csr &= ~CSR_REQ_SEL_MASK;
-+	ch->csr |= req->req_sel << CSR_REQ_SEL_SHIFT;
-+	ch->ahb_seq &= ~AHB_SEQ_BURST_MASK;
-+	ch->ahb_seq |= AHB_SEQ_BURST_1;
-+
-+	/* One shot mode is always single buffered,
-+	 * continuous mode is always double buffered
-+	 * */
-+	if (ch->mode & TEGRA_DMA_MODE_ONESHOT) {
-+		ch->csr |= CSR_ONCE;
-+		ch->ahb_seq &= ~AHB_SEQ_DBL_BUF;
-+		ch->csr &= ~CSR_WCOUNT_MASK;
-+		ch->csr |= ((req->size>>2) - 1) << CSR_WCOUNT_SHIFT;
-+	} else {
-+		ch->csr &= ~CSR_ONCE;
-+		ch->ahb_seq |= AHB_SEQ_DBL_BUF;
-+
-+		/* In double buffered mode, we set the size to half the
-+		 * requested size and interrupt when half the buffer
-+		 * is full */
-+		ch->csr &= ~CSR_WCOUNT_MASK;
-+		ch->csr |= ((req->size>>3) - 1) << CSR_WCOUNT_SHIFT;
-+	}
-+
-+	if (req->to_memory) {
-+		ch->csr &= ~CSR_DIR;
-+		ch->apb_ptr = req->source_addr;
-+		ch->ahb_ptr = req->dest_addr;
-+
-+		apb_addr_wrap = req->source_wrap;
-+		ahb_addr_wrap = req->dest_wrap;
-+		apb_bus_width = req->source_bus_width;
-+		ahb_bus_width = req->dest_bus_width;
-+
-+	} else {
-+		ch->csr |= CSR_DIR;
-+		ch->apb_ptr = req->dest_addr;
-+		ch->ahb_ptr = req->source_addr;
-+
-+		apb_addr_wrap = req->dest_wrap;
-+		ahb_addr_wrap = req->source_wrap;
-+		apb_bus_width = req->dest_bus_width;
-+		ahb_bus_width = req->source_bus_width;
-+	}
-+
-+	apb_addr_wrap >>= 2;
-+	ahb_addr_wrap >>= 2;
-+
-+	/* set address wrap for APB size */
-+	index = 0;
-+	do  {
-+		if (apb_addr_wrap_table[index] == apb_addr_wrap)
-+			break;
-+		index++;
-+	} while (index < ARRAY_SIZE(apb_addr_wrap_table));
-+	BUG_ON(index == ARRAY_SIZE(apb_addr_wrap_table));
-+	ch->apb_seq &= ~APB_SEQ_WRAP_MASK;
-+	ch->apb_seq |= index << APB_SEQ_WRAP_SHIFT;
-+
-+	/* set address wrap for AHB size */
-+	index = 0;
-+	do  {
-+		if (ahb_addr_wrap_table[index] == ahb_addr_wrap)
-+			break;
-+		index++;
-+	} while (index < ARRAY_SIZE(ahb_addr_wrap_table));
-+	BUG_ON(index == ARRAY_SIZE(ahb_addr_wrap_table));
-+	ch->ahb_seq &= ~AHB_SEQ_WRAP_MASK;
-+	ch->ahb_seq |= index << AHB_SEQ_WRAP_SHIFT;
-+
-+	for (index = 0; index < ARRAY_SIZE(bus_width_table); index++) {
-+		if (bus_width_table[index] == ahb_bus_width)
-+			break;
-+	}
-+	BUG_ON(index == ARRAY_SIZE(bus_width_table));
-+	ch->ahb_seq &= ~AHB_SEQ_BUS_WIDTH_MASK;
-+	ch->ahb_seq |= index << AHB_SEQ_BUS_WIDTH_SHIFT;
-+
-+	for (index = 0; index < ARRAY_SIZE(bus_width_table); index++) {
-+		if (bus_width_table[index] == apb_bus_width)
-+			break;
-+	}
-+	BUG_ON(index == ARRAY_SIZE(bus_width_table));
-+	ch->apb_seq &= ~APB_SEQ_BUS_WIDTH_MASK;
-+	ch->apb_seq |= index << APB_SEQ_BUS_WIDTH_SHIFT;
-+
-+	ch->csr |= CSR_IE_EOC;
-+
-+	/* update hw registers with the shadow */
-+	writel(ch->csr, ch->addr + APB_DMA_CHAN_CSR);
-+	writel(ch->apb_seq, ch->addr + APB_DMA_CHAN_APB_SEQ);
-+	writel(ch->apb_ptr, ch->addr + APB_DMA_CHAN_APB_PTR);
-+	writel(ch->ahb_seq, ch->addr + APB_DMA_CHAN_AHB_SEQ);
-+	writel(ch->ahb_ptr, ch->addr + APB_DMA_CHAN_AHB_PTR);
-+
-+	csr = ch->csr | CSR_ENB;
-+	writel(csr, ch->addr + APB_DMA_CHAN_CSR);
-+
-+	req->status = TEGRA_DMA_REQ_INFLIGHT;
++	dev_dbg(&spi->dev, "cleanup\n");
 +}
 +
-+static void tegra_dma_init_hw(struct tegra_dma_channel *ch)
++static int __init spi_tegra_probe(struct platform_device *pdev)
 +{
-+	/* One shot with an interrupt to CPU after transfer */
-+	ch->csr = CSR_ONCE | CSR_IE_EOC;
-+	ch->ahb_seq = AHB_SEQ_BUS_WIDTH_32 | AHB_SEQ_INTR_ENB;
-+	ch->apb_seq = APB_SEQ_BUS_WIDTH_32 | 1 << APB_SEQ_WRAP_SHIFT;
-+}
++	struct spi_master	*master;
++	struct spi_tegra_data	*tspi;
++	struct resource		*r;
++	int ret;
 +
-+static void handle_oneshot_dma(struct tegra_dma_channel *ch)
-+{
-+	struct tegra_dma_req *req;
-+
-+	spin_lock(&ch->lock);
-+	if (list_empty(&ch->list)) {
-+		spin_unlock(&ch->lock);
-+		return;
++	master = spi_alloc_master(&pdev->dev, sizeof *tspi);
++	if (master == NULL) {
++		dev_err(&pdev->dev, "master allocation failed\n");
++		return -ENOMEM;
 +	}
 +
-+	req = list_entry(ch->list.next, typeof(*req), node);
-+	if (req) {
-+		int bytes_transferred;
++	/* the spi->mode bits understood by this driver: */
++	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
 +
-+		bytes_transferred =
-+			(ch->csr & CSR_WCOUNT_MASK) >> CSR_WCOUNT_SHIFT;
-+		bytes_transferred += 1;
-+		bytes_transferred <<= 2;
++	if (pdev->id != -1)
++		master->bus_num = pdev->id;
 +
-+		list_del(&req->node);
-+		req->bytes_transferred = bytes_transferred;
-+		req->status = TEGRA_DMA_REQ_SUCCESS;
++	master->setup = spi_tegra_setup;
++	master->transfer = spi_tegra_transfer;
++	master->cleanup = spi_tegra_cleanup;
++	master->num_chipselect = 4;
 +
-+		spin_unlock(&ch->lock);
-+		/* Callback should be called without any lock */
-+		pr_debug("%s: transferred %d bytes\n", __func__,
-+			req->bytes_transferred);
-+		req->complete(req);
-+		spin_lock(&ch->lock);
++	dev_set_drvdata(&pdev->dev, master);
++	tspi = spi_master_get_devdata(master);
++	tspi->master = master;
++	tspi->pdev = pdev;
++	spin_lock_init(&tspi->lock);
++
++	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (r == NULL) {
++		ret = -ENODEV;
++		goto err0;
 +	}
 +
-+	if (!list_empty(&ch->list)) {
-+		req = list_entry(ch->list.next, typeof(*req), node);
-+		/* the complete function we just called may have enqueued
-+		   another req, in which case dma has already started */
-+		if (req->status != TEGRA_DMA_REQ_INFLIGHT)
-+			tegra_dma_update_hw(ch, req);
-+	}
-+	spin_unlock(&ch->lock);
-+}
-+
-+static void handle_continuous_dma(struct tegra_dma_channel *ch)
-+{
-+	struct tegra_dma_req *req;
-+
-+	spin_lock(&ch->lock);
-+	if (list_empty(&ch->list)) {
-+		spin_unlock(&ch->lock);
-+		return;
++	if (!request_mem_region(r->start, (r->end - r->start) + 1,
++			dev_name(&pdev->dev))) {
++		ret = -EBUSY;
++		goto err0;
 +	}
 +
-+	req = list_entry(ch->list.next, typeof(*req), node);
-+	if (req) {
-+		if (req->buffer_status == TEGRA_DMA_REQ_BUF_STATUS_EMPTY) {
-+			/* Load the next request into the hardware, if available
-+			 * */
-+			if (!list_is_last(&req->node, &ch->list)) {
-+				struct tegra_dma_req *next_req;
-+
-+				next_req = list_entry(req->node.next,
-+					typeof(*next_req), node);
-+				tegra_dma_update_hw_partial(ch, next_req);
-+			}
-+			req->buffer_status = TEGRA_DMA_REQ_BUF_STATUS_HALF_FULL;
-+			req->status = TEGRA_DMA_REQ_SUCCESS;
-+			/* DMA lock is NOT held when callback is called */
-+			spin_unlock(&ch->lock);
-+			if (likely(req->threshold))
-+				req->threshold(req);
-+			return;
-+
-+		} else if (req->buffer_status ==
-+			TEGRA_DMA_REQ_BUF_STATUS_HALF_FULL) {
-+			/* Callback when the buffer is completely full (i.e on
-+			 * the second  interrupt */
-+			int bytes_transferred;
-+
-+			bytes_transferred =
-+				(ch->csr & CSR_WCOUNT_MASK) >> CSR_WCOUNT_SHIFT;
-+			bytes_transferred += 1;
-+			bytes_transferred <<= 3;
-+
-+			req->buffer_status = TEGRA_DMA_REQ_BUF_STATUS_FULL;
-+			req->bytes_transferred = bytes_transferred;
-+			req->status = TEGRA_DMA_REQ_SUCCESS;
-+			list_del(&req->node);
-+
-+			/* DMA lock is NOT held when callbak is called */
-+			spin_unlock(&ch->lock);
-+			req->complete(req);
-+			return;
-+
-+		} else {
-+			BUG();
-+		}
++	tspi->phys = r->start;
++	tspi->base = ioremap(r->start, r->end - r->start + 1);
++	if (!tspi->base) {
++		dev_err(&pdev->dev, "can't ioremap iomem\n");
++		ret = -ENOMEM;
++		goto err1;
 +	}
-+	spin_unlock(&ch->lock);
-+}
 +
-+static irqreturn_t dma_isr(int irq, void *data)
-+{
-+	struct tegra_dma_channel *ch = data;
-+	unsigned long status;
-+
-+	status = readl(ch->addr + APB_DMA_CHAN_STA);
-+	if (status & STA_ISE_EOC)
-+		writel(status, ch->addr + APB_DMA_CHAN_STA);
-+	else {
-+		pr_warning("Got a spurious ISR for DMA channel %d\n", ch->id);
-+		return IRQ_HANDLED;
++	tspi->clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR_OR_NULL(tspi->clk)) {
++		dev_err(&pdev->dev, "can not get clock\n");
++		ret = PTR_ERR(tspi->clk);
++		goto err2;
 +	}
-+	return IRQ_WAKE_THREAD;
-+}
 +
-+static irqreturn_t dma_thread_fn(int irq, void *data)
-+{
-+	struct tegra_dma_channel *ch = data;
++	INIT_LIST_HEAD(&tspi->queue);
 +
-+	if (ch->mode & TEGRA_DMA_MODE_ONESHOT)
-+		handle_oneshot_dma(ch);
-+	else
-+		handle_continuous_dma(ch);
-+
-+
-+	return IRQ_HANDLED;
-+}
-+
-+int __init tegra_dma_init(void)
-+{
-+	int ret = 0;
-+	int i;
-+	unsigned int irq;
-+	void __iomem *addr;
-+
-+	addr = IO_ADDRESS(TEGRA_APB_DMA_BASE);
-+	writel(GEN_ENABLE, addr + APB_DMA_GEN);
-+	writel(0, addr + APB_DMA_CNTRL);
-+	writel(0xFFFFFFFFul >> (31 - TEGRA_SYSTEM_DMA_CH_MAX),
-+	       addr + APB_DMA_IRQ_MASK_SET);
-+
-+	memset(channel_usage, 0, sizeof(channel_usage));
-+	memset(dma_channels, 0, sizeof(dma_channels));
-+
-+	/* Reserve all the channels we are not supposed to touch */
-+	for (i = 0; i < TEGRA_SYSTEM_DMA_CH_MIN; i++)
-+		__set_bit(i, channel_usage);
-+
-+	for (i = TEGRA_SYSTEM_DMA_CH_MIN; i <= TEGRA_SYSTEM_DMA_CH_MAX; i++) {
-+		struct tegra_dma_channel *ch = &dma_channels[i];
-+
-+		__clear_bit(i, channel_usage);
-+
-+		ch->id = i;
-+		snprintf(ch->name, TEGRA_DMA_NAME_SIZE, "dma_channel_%d", i);
-+
-+		ch->addr = IO_ADDRESS(TEGRA_APB_DMA_CH0_BASE +
-+			TEGRA_APB_DMA_CH0_SIZE * i);
-+
-+		spin_lock_init(&ch->lock);
-+		INIT_LIST_HEAD(&ch->list);
-+		tegra_dma_init_hw(ch);
-+
-+		irq = INT_APB_DMA_CH0 + i;
-+		ret = request_threaded_irq(irq, dma_isr, dma_thread_fn, 0,
-+			dma_channels[i].name, ch);
-+		if (ret) {
-+			pr_err("Failed to register IRQ %d for DMA %d\n",
-+				irq, i);
-+			goto fail;
-+		}
-+		ch->irq = irq;
++	tspi->rx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT);
++	if (IS_ERR(tspi->rx_dma)) {
++		dev_err(&pdev->dev, "can not allocate rx dma channel\n");
++		ret = PTR_ERR(tspi->rx_dma);
++		goto err3;
 +	}
-+	/* mark the shared channel allocated */
-+	__set_bit(TEGRA_SYSTEM_DMA_CH_MIN, channel_usage);
 +
-+	for (i = TEGRA_SYSTEM_DMA_CH_MAX+1; i < NV_DMA_MAX_CHANNELS; i++)
-+		__set_bit(i, channel_usage);
++	tspi->rx_bb = dma_alloc_coherent(&pdev->dev, sizeof(u32) * BB_LEN,
++					 &tspi->rx_bb_phys, GFP_KERNEL);
++	if (!tspi->rx_bb) {
++		dev_err(&pdev->dev, "can not allocate rx bounce buffer\n");
++		ret = -ENOMEM;
++		goto err4;
++	}
++
++	tspi->rx_dma_req.complete = tegra_spi_rx_dma_complete;
++	tspi->rx_dma_req.to_memory = 1;
++	tspi->rx_dma_req.dest_addr = tspi->rx_bb_phys;
++	tspi->rx_dma_req.dest_bus_width = 32;
++	tspi->rx_dma_req.source_addr = tspi->phys + SLINK_RX_FIFO;
++	tspi->rx_dma_req.source_bus_width = 32;
++	tspi->rx_dma_req.source_wrap = 4;
++	tspi->rx_dma_req.req_sel = spi_tegra_req_sels[pdev->id];
++	tspi->rx_dma_req.dev = tspi;
++
++	ret = spi_register_master(master);
++
++	if (ret < 0)
++		goto err5;
 +
 +	return ret;
-+fail:
-+	writel(0, addr + APB_DMA_GEN);
-+	for (i = TEGRA_SYSTEM_DMA_CH_MIN; i <= TEGRA_SYSTEM_DMA_CH_MAX; i++) {
-+		struct tegra_dma_channel *ch = &dma_channels[i];
-+		if (ch->irq)
-+			free_irq(ch->irq, ch);
-+	}
++
++err5:
++	dma_free_coherent(&pdev->dev, sizeof(u32) * BB_LEN,
++			  tspi->rx_bb, tspi->rx_bb_phys);
++err4:
++	tegra_dma_free_channel(tspi->rx_dma);
++err3:
++	clk_put(tspi->clk);
++err2:
++	iounmap(tspi->base);
++err1:
++	release_mem_region(r->start, (r->end - r->start) + 1);
++err0:
++	spi_master_put(master);
 +	return ret;
 +}
 +
-+#ifdef CONFIG_PM
-+static u32 apb_dma[5*TEGRA_SYSTEM_DMA_CH_NR + 3];
-+
-+void tegra_dma_suspend(void)
++static int __exit spi_tegra_remove(struct platform_device *pdev)
 +{
-+	void __iomem *addr = IO_ADDRESS(TEGRA_APB_DMA_BASE);
-+	u32 *ctx = apb_dma;
-+	int i;
++	struct spi_master	*master;
++	struct spi_tegra_data	*tspi;
++	struct resource		*r;
 +
-+	*ctx++ = readl(addr + APB_DMA_GEN);
-+	*ctx++ = readl(addr + APB_DMA_CNTRL);
-+	*ctx++ = readl(addr + APB_DMA_IRQ_MASK);
++	master = dev_get_drvdata(&pdev->dev);
++	tspi = spi_master_get_devdata(master);
 +
-+	for (i = 0; i < TEGRA_SYSTEM_DMA_CH_NR; i++) {
-+		addr = IO_ADDRESS(TEGRA_APB_DMA_CH0_BASE +
-+				  TEGRA_APB_DMA_CH0_SIZE * i);
++	tegra_dma_free_channel(tspi->rx_dma);
 +
-+		*ctx++ = readl(addr + APB_DMA_CHAN_CSR);
-+		*ctx++ = readl(addr + APB_DMA_CHAN_AHB_PTR);
-+		*ctx++ = readl(addr + APB_DMA_CHAN_AHB_SEQ);
-+		*ctx++ = readl(addr + APB_DMA_CHAN_APB_PTR);
-+		*ctx++ = readl(addr + APB_DMA_CHAN_APB_SEQ);
-+	}
++	dma_free_coherent(&pdev->dev, sizeof(u32) * BB_LEN,
++			  tspi->rx_bb, tspi->rx_bb_phys);
++
++	clk_put(tspi->clk);
++	iounmap(tspi->base);
++
++	spi_master_put(master);
++
++	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	release_mem_region(r->start, (r->end - r->start) + 1);
++
++	return 0;
 +}
 +
-+void tegra_dma_resume(void)
++
++MODULE_ALIAS("platform:" DRIVER_NAME);
++
++static struct platform_driver spi_tegra_driver = {
++	.driver = {
++		.name =		DRIVER_NAME,
++		.owner =	THIS_MODULE,
++	},
++	.remove =	__exit_p(spi_tegra_remove),
++};
++
++
++static int __init spi_tegra_init(void)
 +{
-+	void __iomem *addr = IO_ADDRESS(TEGRA_APB_DMA_BASE);
-+	u32 *ctx = apb_dma;
-+	int i;
-+
-+	writel(*ctx++, addr + APB_DMA_GEN);
-+	writel(*ctx++, addr + APB_DMA_CNTRL);
-+	writel(*ctx++, addr + APB_DMA_IRQ_MASK);
-+
-+	for (i = 0; i < TEGRA_SYSTEM_DMA_CH_NR; i++) {
-+		addr = IO_ADDRESS(TEGRA_APB_DMA_CH0_BASE +
-+				  TEGRA_APB_DMA_CH0_SIZE * i);
-+
-+		writel(*ctx++, addr + APB_DMA_CHAN_CSR);
-+		writel(*ctx++, addr + APB_DMA_CHAN_AHB_PTR);
-+		writel(*ctx++, addr + APB_DMA_CHAN_AHB_SEQ);
-+		writel(*ctx++, addr + APB_DMA_CHAN_APB_PTR);
-+		writel(*ctx++, addr + APB_DMA_CHAN_APB_SEQ);
-+	}
++	return platform_driver_probe(&spi_tegra_driver, spi_tegra_probe);
 +}
++subsys_initcall(spi_tegra_init);
 +
-+#endif
-diff --git a/arch/arm/mach-tegra/include/mach/dma.h b/arch/arm/mach-tegra/include/mach/dma.h
-new file mode 100644
-index 0000000..39011bd
---- /dev/null
-+++ b/arch/arm/mach-tegra/include/mach/dma.h
-@@ -0,0 +1,155 @@
-+/*
-+ * arch/arm/mach-tegra/include/mach/dma.h
-+ *
-+ * Copyright (c) 2008-2009, NVIDIA Corporation.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-+ */
++static void __exit spi_tegra_exit(void)
++{
++	platform_driver_unregister(&spi_tegra_driver);
++}
++module_exit(spi_tegra_exit);
 +
-+#ifndef __MACH_TEGRA_DMA_H
-+#define __MACH_TEGRA_DMA_H
-+
-+#include <linux/list.h>
-+
-+#if defined(CONFIG_TEGRA_SYSTEM_DMA)
-+
-+struct tegra_dma_req;
-+struct tegra_dma_channel;
-+
-+#define TEGRA_DMA_REQ_SEL_CNTR			0
-+#define TEGRA_DMA_REQ_SEL_I2S_2			1
-+#define TEGRA_DMA_REQ_SEL_I2S_1			2
-+#define TEGRA_DMA_REQ_SEL_SPD_I			3
-+#define TEGRA_DMA_REQ_SEL_UI_I			4
-+#define TEGRA_DMA_REQ_SEL_MIPI			5
-+#define TEGRA_DMA_REQ_SEL_I2S2_2		6
-+#define TEGRA_DMA_REQ_SEL_I2S2_1		7
-+#define TEGRA_DMA_REQ_SEL_UARTA			8
-+#define TEGRA_DMA_REQ_SEL_UARTB			9
-+#define TEGRA_DMA_REQ_SEL_UARTC			10
-+#define TEGRA_DMA_REQ_SEL_SPI			11
-+#define TEGRA_DMA_REQ_SEL_AC97			12
-+#define TEGRA_DMA_REQ_SEL_ACMODEM		13
-+#define TEGRA_DMA_REQ_SEL_SL4B			14
-+#define TEGRA_DMA_REQ_SEL_SL2B1			15
-+#define TEGRA_DMA_REQ_SEL_SL2B2			16
-+#define TEGRA_DMA_REQ_SEL_SL2B3			17
-+#define TEGRA_DMA_REQ_SEL_SL2B4			18
-+#define TEGRA_DMA_REQ_SEL_UARTD			19
-+#define TEGRA_DMA_REQ_SEL_UARTE			20
-+#define TEGRA_DMA_REQ_SEL_I2C			21
-+#define TEGRA_DMA_REQ_SEL_I2C2			22
-+#define TEGRA_DMA_REQ_SEL_I2C3			23
-+#define TEGRA_DMA_REQ_SEL_DVC_I2C		24
-+#define TEGRA_DMA_REQ_SEL_OWR			25
-+#define TEGRA_DMA_REQ_SEL_INVALID		31
-+
-+enum tegra_dma_mode {
-+	TEGRA_DMA_SHARED = 1,
-+	TEGRA_DMA_MODE_CONTINOUS = 2,
-+	TEGRA_DMA_MODE_ONESHOT = 4,
-+};
-+
-+enum tegra_dma_req_error {
-+	TEGRA_DMA_REQ_SUCCESS = 0,
-+	TEGRA_DMA_REQ_ERROR_ABORTED,
-+	TEGRA_DMA_REQ_INFLIGHT,
-+};
-+
-+enum tegra_dma_req_buff_status {
-+	TEGRA_DMA_REQ_BUF_STATUS_EMPTY = 0,
-+	TEGRA_DMA_REQ_BUF_STATUS_HALF_FULL,
-+	TEGRA_DMA_REQ_BUF_STATUS_FULL,
-+};
-+
-+struct tegra_dma_req {
-+	struct list_head node;
-+	unsigned int modid;
-+	int instance;
-+
-+	/* Called when the req is complete and from the DMA ISR context.
-+	 * When this is called the req structure is no longer queued by
-+	 * the DMA channel.
-+	 *
-+	 * State of the DMA depends on the number of req it has. If there are
-+	 * no DMA requests queued up, then it will STOP the DMA. It there are
-+	 * more requests in the DMA, then it will queue the next request.
-+	 */
-+	void (*complete)(struct tegra_dma_req *req);
-+
-+	/*  This is a called from the DMA ISR context when the DMA is still in
-+	 *  progress and is actively filling same buffer.
-+	 *
-+	 *  In case of continous mode receive, this threshold is 1/2 the buffer
-+	 *  size. In other cases, this will not even be called as there is no
-+	 *  hardware support for it.
-+	 *
-+	 * In the case of continous mode receive, if there is next req already
-+	 * queued, DMA programs the HW to use that req when this req is
-+	 * completed. If there is no "next req" queued, then DMA ISR doesn't do
-+	 * anything before calling this callback.
-+	 *
-+	 *	This is mainly used by the cases, where the clients has queued
-+	 *	only one req and want to get some sort of DMA threshold
-+	 *	callback to program the next buffer.
-+	 *
-+	 */
-+	void (*threshold)(struct tegra_dma_req *req);
-+
-+	/* 1 to copy to memory.
-+	 * 0 to copy from the memory to device FIFO */
-+	int to_memory;
-+
-+	void *virt_addr;
-+
-+	unsigned long source_addr;
-+	unsigned long dest_addr;
-+	unsigned long dest_wrap;
-+	unsigned long source_wrap;
-+	unsigned long source_bus_width;
-+	unsigned long dest_bus_width;
-+	unsigned long req_sel;
-+	unsigned int size;
-+
-+	/* Updated by the DMA driver on the conpletion of the request. */
-+	int bytes_transferred;
-+	int status;
-+
-+	/* DMA completion tracking information */
-+	int buffer_status;
-+
-+	/* Client specific data */
-+	void *dev;
-+};
-+
-+int tegra_dma_enqueue_req(struct tegra_dma_channel *ch,
-+	struct tegra_dma_req *req);
-+int tegra_dma_dequeue_req(struct tegra_dma_channel *ch,
-+	struct tegra_dma_req *req);
-+void tegra_dma_dequeue(struct tegra_dma_channel *ch);
-+void tegra_dma_flush(struct tegra_dma_channel *ch);
-+
-+bool tegra_dma_is_req_inflight(struct tegra_dma_channel *ch,
-+	struct tegra_dma_req *req);
-+bool tegra_dma_is_empty(struct tegra_dma_channel *ch);
-+
-+struct tegra_dma_channel *tegra_dma_allocate_channel(int mode);
-+void tegra_dma_free_channel(struct tegra_dma_channel *ch);
-+
-+int __init tegra_dma_init(void);
-+
-+#endif
-+
-+#endif
++MODULE_LICENSE("GPL");
 -- 
 1.7.1
