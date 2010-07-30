@@ -1,179 +1,201 @@
 From: ccross@google.com (Colin Cross)
-Date: Thu, 29 Jul 2010 17:29:27 -0700
-Subject: [PATCH 6/9] [ARM] tegra: Add support for reading fuses
+Date: Thu, 29 Jul 2010 17:29:26 -0700
+Subject: [PATCH 5/9] [ARM] tegra: gpio: Add suspend and wake support
 In-Reply-To: <1280449771-24043-1-git-send-email-ccross@google.com>
 References: <1280449771-24043-1-git-send-email-ccross@google.com>
-Message-ID: <1280449771-24043-7-git-send-email-ccross@google.com>
+Message-ID: <1280449771-24043-6-git-send-email-ccross@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Colin Cross <ccross@android.com>
 
-The Tegra SOC contains fuses to identify the CPU type and
-bin, and a unique id.  The CPU info is required to determine
-the correct voltages for each cpu and core frequency.
+Includes checkpatch fixes and TEGRA_NR_GPIOS changes from
+Mike Rapoport <mike@compulab.co.il>
 
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/Makefile |    1 +
- arch/arm/mach-tegra/common.c |    2 +
- arch/arm/mach-tegra/fuse.c   |   84 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/fuse.h   |   24 ++++++++++++
- 4 files changed, 111 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-tegra/fuse.c
- create mode 100644 arch/arm/mach-tegra/fuse.h
+ arch/arm/mach-tegra/gpio.c              |  104 +++++++++++++++++++++++++++---
+ arch/arm/mach-tegra/include/mach/gpio.h |    4 +-
+ 2 files changed, 95 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 87d065e..6203475 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -5,6 +5,7 @@ obj-y                                   += clock.o
- obj-y                                   += timer.o
- obj-y                                   += gpio.o
- obj-y                                   += pinmux.o
-+obj-y					+= fuse.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clock.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= pinmux-t2-tables.o
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index 039a514..9aedaf7 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -26,6 +26,7 @@
+diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
+index fe78fba..0775265 100644
+--- a/arch/arm/mach-tegra/gpio.c
++++ b/arch/arm/mach-tegra/gpio.c
+@@ -19,6 +19,7 @@
  
- #include "board.h"
- #include "clock.h"
-+#include "fuse.h"
+ #include <linux/init.h>
+ #include <linux/irq.h>
++#include <linux/interrupt.h>
  
- static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
- 	/* name		parent		rate		enabled */
-@@ -55,6 +56,7 @@ void __init tegra_init_cache(void)
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+@@ -60,6 +61,13 @@ struct tegra_gpio_bank {
+ 	int bank;
+ 	int irq;
+ 	spinlock_t lvl_lock[4];
++#ifdef CONFIG_PM
++	u32 cnf[4];
++	u32 out[4];
++	u32 oe[4];
++	u32 int_enb[4];
++	u32 int_lvl[4];
++#endif
+ };
  
- void __init tegra_common_init(void)
+ 
+@@ -131,7 +139,7 @@ static struct gpio_chip tegra_gpio_chip = {
+ 	.direction_output	= tegra_gpio_direction_output,
+ 	.set			= tegra_gpio_set,
+ 	.base			= 0,
+-	.ngpio			= ARCH_NR_GPIOS,
++	.ngpio			= TEGRA_NR_GPIOS,
+ };
+ 
+ static void tegra_gpio_irq_ack(unsigned int irq)
+@@ -244,6 +252,76 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 
+ }
+ 
++#ifdef CONFIG_PM
++void tegra_gpio_resume(void)
++{
++	unsigned long flags;
++	int b, p, i;
++
++	local_irq_save(flags);
++
++	for (b = 0; b < ARRAY_SIZE(tegra_gpio_banks); b++) {
++		struct tegra_gpio_bank *bank = &tegra_gpio_banks[b];
++
++		for (p = 0; p < ARRAY_SIZE(bank->oe); p++) {
++			unsigned int gpio = (b<<5) | (p<<3);
++			__raw_writel(bank->cnf[p], GPIO_CNF(gpio));
++			__raw_writel(bank->out[p], GPIO_OUT(gpio));
++			__raw_writel(bank->oe[p], GPIO_OE(gpio));
++			__raw_writel(bank->int_lvl[p], GPIO_INT_LVL(gpio));
++			__raw_writel(bank->int_enb[p], GPIO_INT_ENB(gpio));
++		}
++	}
++
++	local_irq_restore(flags);
++
++	for (i = INT_GPIO_BASE; i < (INT_GPIO_BASE + TEGRA_NR_GPIOS); i++) {
++		struct irq_desc *desc = irq_to_desc(i);
++		if (!desc || (desc->status & IRQ_WAKEUP))
++			continue;
++		enable_irq(i);
++	}
++}
++
++void tegra_gpio_suspend(void)
++{
++	unsigned long flags;
++	int b, p, i;
++
++	for (i = INT_GPIO_BASE; i < (INT_GPIO_BASE + TEGRA_NR_GPIOS); i++) {
++		struct irq_desc *desc = irq_to_desc(i);
++		if (!desc)
++			continue;
++		if (desc->status & IRQ_WAKEUP) {
++			int gpio = i - INT_GPIO_BASE;
++			pr_debug("gpio %d.%d is wakeup\n", gpio/8, gpio&7);
++			continue;
++		}
++		disable_irq(i);
++	}
++
++	local_irq_save(flags);
++	for (b = 0; b < ARRAY_SIZE(tegra_gpio_banks); b++) {
++		struct tegra_gpio_bank *bank = &tegra_gpio_banks[b];
++
++		for (p = 0; p < ARRAY_SIZE(bank->oe); p++) {
++			unsigned int gpio = (b<<5) | (p<<3);
++			bank->cnf[p] = __raw_readl(GPIO_CNF(gpio));
++			bank->out[p] = __raw_readl(GPIO_OUT(gpio));
++			bank->oe[p] = __raw_readl(GPIO_OE(gpio));
++			bank->int_enb[p] = __raw_readl(GPIO_INT_ENB(gpio));
++			bank->int_lvl[p] = __raw_readl(GPIO_INT_LVL(gpio));
++		}
++	}
++	local_irq_restore(flags);
++}
++
++static int tegra_gpio_wake_enable(unsigned int irq, unsigned int enable)
++{
++	struct tegra_gpio_bank *bank = get_irq_chip_data(irq);
++	return set_irq_wake(bank->irq, enable);
++}
++#endif
+ 
+ static struct irq_chip tegra_gpio_irq_chip = {
+ 	.name		= "GPIO",
+@@ -251,6 +329,9 @@ static struct irq_chip tegra_gpio_irq_chip = {
+ 	.mask		= tegra_gpio_irq_mask,
+ 	.unmask		= tegra_gpio_irq_unmask,
+ 	.set_type	= tegra_gpio_irq_set_type,
++#ifdef CONFIG_PM
++	.set_wake	= tegra_gpio_wake_enable,
++#endif
+ };
+ 
+ 
+@@ -274,7 +355,7 @@ static int __init tegra_gpio_init(void)
+ 
+ 	gpiochip_add(&tegra_gpio_chip);
+ 
+-	for (i = INT_GPIO_BASE; i < (INT_GPIO_BASE + ARCH_NR_GPIOS); i++) {
++	for (i = INT_GPIO_BASE; i < (INT_GPIO_BASE + TEGRA_NR_GPIOS); i++) {
+ 		bank = &tegra_gpio_banks[GPIO_BANK(irq_to_gpio(i))];
+ 
+ 		lockdep_set_class(&irq_desc[i].lock, &gpio_lock_class);
+@@ -312,15 +393,16 @@ static int dbg_gpio_show(struct seq_file *s, void *unused)
+ 	for (i = 0; i < 7; i++) {
+ 		for (j = 0; j < 4; j++) {
+ 			int gpio = tegra_gpio_compose(i, j, 0);
+-			seq_printf(s, "%d:%d %02x %02x %02x %02x %02x %02x %06x\n",
+-			       i, j,
+-			       __raw_readl(GPIO_CNF(gpio)),
+-			       __raw_readl(GPIO_OE(gpio)),
+-			       __raw_readl(GPIO_OUT(gpio)),
+-			       __raw_readl(GPIO_IN(gpio)),
+-			       __raw_readl(GPIO_INT_STA(gpio)),
+-			       __raw_readl(GPIO_INT_ENB(gpio)),
+-			       __raw_readl(GPIO_INT_LVL(gpio)));
++			seq_printf(s,
++				"%d:%d %02x %02x %02x %02x %02x %02x %06x\n",
++				i, j,
++				__raw_readl(GPIO_CNF(gpio)),
++				__raw_readl(GPIO_OE(gpio)),
++				__raw_readl(GPIO_OUT(gpio)),
++				__raw_readl(GPIO_IN(gpio)),
++				__raw_readl(GPIO_INT_STA(gpio)),
++				__raw_readl(GPIO_INT_ENB(gpio)),
++				__raw_readl(GPIO_INT_LVL(gpio)));
+ 		}
+ 	}
+ 	return 0;
+diff --git a/arch/arm/mach-tegra/include/mach/gpio.h b/arch/arm/mach-tegra/include/mach/gpio.h
+index 540e822..e31f486 100644
+--- a/arch/arm/mach-tegra/include/mach/gpio.h
++++ b/arch/arm/mach-tegra/include/mach/gpio.h
+@@ -22,7 +22,7 @@
+ 
+ #include <mach/irqs.h>
+ 
+-#define ARCH_NR_GPIOS		INT_GPIO_NR
++#define TEGRA_NR_GPIOS		INT_GPIO_NR
+ 
+ #include <asm-generic/gpio.h>
+ 
+@@ -35,7 +35,7 @@
+ 
+ static inline int gpio_to_irq(unsigned int gpio)
  {
-+	tegra_init_fuse();
- 	tegra_init_clock();
- 	tegra_clk_init_from_table(common_clk_init_table);
- 	tegra_init_cache();
-diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
-new file mode 100644
-index 0000000..1fa26d9
---- /dev/null
-+++ b/arch/arm/mach-tegra/fuse.c
-@@ -0,0 +1,84 @@
-+/*
-+ * arch/arm/mach-tegra/fuse.c
-+ *
-+ * Copyright (C) 2010 Google, Inc.
-+ *
-+ * Author:
-+ *	Colin Cross <ccross@android.com>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/io.h>
-+
-+#include <mach/iomap.h>
-+
-+#include "fuse.h"
-+
-+#define FUSE_UID_LOW		0x108
-+#define FUSE_UID_HIGH		0x10c
-+#define FUSE_SKU_INFO		0x110
-+#define FUSE_SPARE_BIT		0x200
-+
-+static inline u32 fuse_readl(unsigned long offset)
-+{
-+	return readl(IO_TO_VIRT(TEGRA_FUSE_BASE + offset));
-+}
-+
-+static inline void fuse_writel(u32 value, unsigned long offset)
-+{
-+	writel(value, IO_TO_VIRT(TEGRA_FUSE_BASE + offset));
-+}
-+
-+void tegra_init_fuse(void)
-+{
-+	u32 reg = readl(IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
-+	reg |= 1 << 28;
-+	writel(reg, IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
-+
-+	pr_info("Tegra SKU: %d CPU Process: %d Core Process: %d\n",
-+		tegra_sku_id(), tegra_cpu_process_id(),
-+		tegra_core_process_id());
-+}
-+
-+unsigned long long tegra_chip_uid(void)
-+{
-+	unsigned long long lo, hi;
-+
-+	lo = fuse_readl(FUSE_UID_LOW);
-+	hi = fuse_readl(FUSE_UID_HIGH);
-+	return (hi << 32ull) | lo;
-+}
-+
-+int tegra_sku_id(void)
-+{
-+	int sku_id;
-+	u32 reg = fuse_readl(FUSE_SKU_INFO);
-+	sku_id = reg & 0xFF;
-+	return sku_id;
-+}
-+
-+int tegra_cpu_process_id(void)
-+{
-+	int cpu_process_id;
-+	u32 reg = fuse_readl(FUSE_SPARE_BIT);
-+	cpu_process_id = (reg >> 6) & 3;
-+	return cpu_process_id;
-+}
-+
-+int tegra_core_process_id(void)
-+{
-+	int core_process_id;
-+	u32 reg = fuse_readl(FUSE_SPARE_BIT);
-+	core_process_id = (reg >> 12) & 3;
-+	return core_process_id;
-+}
-diff --git a/arch/arm/mach-tegra/fuse.h b/arch/arm/mach-tegra/fuse.h
-new file mode 100644
-index 0000000..584b2e2
---- /dev/null
-+++ b/arch/arm/mach-tegra/fuse.h
-@@ -0,0 +1,24 @@
-+/*
-+ * arch/arm/mach-tegra/fuse.c
-+ *
-+ * Copyright (C) 2010 Google, Inc.
-+ *
-+ * Author:
-+ *	Colin Cross <ccross@android.com>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+unsigned long long tegra_chip_uid(void);
-+int tegra_sku_id(void);
-+int tegra_cpu_process_id(void);
-+int tegra_core_process_id(void);
-+void tegra_init_fuse(void);
+-	if (gpio < ARCH_NR_GPIOS)
++	if (gpio < TEGRA_NR_GPIOS)
+ 		return INT_GPIO_BASE + gpio;
+ 	return -EINVAL;
+ }
 -- 
 1.7.1
