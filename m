@@ -1,204 +1,111 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 31 Jul 2010 13:46:35 +0900
-Subject: [PATCH] S5PV310: Add Samsung Mobile Reference Board support
-In-Reply-To: <AANLkTimyrTACtPDgiFpc-BhrqExuwWWxOGtu3B7yGtUD@mail.gmail.com>
-References: <20100730101037.GA18677@july>
-	<003601cb305d$b2f36b20$18da4160$%kim@samsung.com>
-	<AANLkTimyrTACtPDgiFpc-BhrqExuwWWxOGtu3B7yGtUD@mail.gmail.com>
-Message-ID: <000001cb306b$5db359a0$191a0ce0$%kim@samsung.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat, 31 Jul 2010 07:45:08 +0200
+Subject: [PATCH] Input: Make ADS7846 independent on regulator
+Message-ID: <1280555108-27994-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> On Sat, Jul 31, 2010 at 12:08 PM, Kukjin Kim <kgene.kim@samsung.com>
-wrote:
-> > Kyungmin Park wrote:
-> >>
-> >> From: Kyungmin Park <kyungmin.park@samsung.com>
-> >>
-> >> Initial samsung mobile reference board support
-> >>
-> >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> >
-> > Cc'ed Ben Dooks...again, please include Ben Dooks in Cc.
-> >
-> > And it would be helpful to me for review if you could add patch version
-and
-> > changes.
-> > It can help to avoid omission your new patch which has same name with
-> > previous one.
-> As I can't see the patch at your for-next I resend it.
+In case regulator was not found, ADS7846 failed to probe.
 
-Hmm...I mean, if this is just 'resend', should being the comment,
-'RESEND'...
-How can I know that without any comments?
+This fixes a problem on some Sharp Zaurus devices, where there is no regulator
+present and yet the touchscreen is used.
 
-However, your this patch changed UFCON_DEFAULT value.
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ drivers/input/touchscreen/ads7846.c |   50 +++++++++++++++++++++++------------
+ 1 files changed, 33 insertions(+), 17 deletions(-)
 
-> >
-> >> ---
-> >> ?arch/arm/mach-s5pv310/Kconfig ? ? ? ? ?| ? ?9 +++
-> >> ?arch/arm/mach-s5pv310/Makefile ? ? ? ? | ? ?1 +
-> >> ?arch/arm/mach-s5pv310/mach-universal.c | ? 86
-> >> ++++++++++++++++++++++++++++++++
-> >> ?3 files changed, 96 insertions(+), 0 deletions(-)
-> >> ?create mode 100644 arch/arm/mach-s5pv310/mach-universal.c
-> >>
-> >> diff --git a/arch/arm/mach-s5pv310/Kconfig
-b/arch/arm/mach-s5pv310/Kconfig
-> >> index 24ef3cd..2fe8149 100644
-> >> --- a/arch/arm/mach-s5pv310/Kconfig
-> >> +++ b/arch/arm/mach-s5pv310/Kconfig
-> >> @@ -23,4 +23,13 @@ config MACH_SMDKV310
-> >> ? ? ? select ARCH_SPARSEMEM_ENABLE
-> >> ? ? ? help
-> >> ? ? ? ? Machine support for Samsung SMDKV310
-> >> +
-> >> +config MACH_UNIVERSAL
-> >
-> > As I still asking, do you _really_ want to use 'UNIVERSAL' as the
-> > board(machine) name?
-> 
-> Yes, it's called 'universal' and it's really universal board at here.
-> I don't confuse the engineer who develop this board.
-> Maybe your engineers saw and hear the brief description about universal
-board.
-> 
-Actually, I know that. But there are S5PC100, S5PC110 universal board
-also...
-So I asked to you that you _really_ want to use 'universal' here...and I'm
-still concerning.
-
-> >
-> >> + ? ? bool "Mobile Universal Board"
-> >> + ? ? select CPU_S5PV310
-> >> + ? ? select ARCH_SPARSEMEM_ENABLE
-> >> + ? ? help
-> >> + ? ? ? Machine support for Samsung Mobile Universal Reference Board.
-> >> + ? ? ? S5PC210(MCP) is one of package option of S5PV310
-> >> +
-> >> ?endif
-> >> diff --git a/arch/arm/mach-s5pv310/Makefile
-> > b/arch/arm/mach-s5pv310/Makefile
-> >> index 56e7693..5b52132 100644
-> >> --- a/arch/arm/mach-s5pv310/Makefile
-> >> +++ b/arch/arm/mach-s5pv310/Makefile
-> >> @@ -22,3 +22,4 @@ obj-$(CONFIG_HOTPLUG_CPU) ? += hotplug.o
-> >> ?# machine support
-> >>
-> >> ?obj-$(CONFIG_MACH_SMDKV310) ?+= mach-smdkv310.o
-> >> +obj-$(CONFIG_MACH_UNIVERSAL) += mach-universal.o
-> >> diff --git a/arch/arm/mach-s5pv310/mach-universal.c b/arch/arm/mach-
-> >> s5pv310/mach-universal.c
-> >> new file mode 100644
-> >> index 0000000..d22727f
-> >> --- /dev/null
-> >> +++ b/arch/arm/mach-s5pv310/mach-universal.c
-> >> @@ -0,0 +1,86 @@
-> >> +/* linux/arch/arm/mach-s5pv310/mach-universal.c
-> >> + *
-> >> + * Copyright (C) 2010 Samsung Electronics Co., Ltd.
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or
-modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> >> +*/
-> >> +
-> >> +#include <linux/serial_core.h>
-> >> +
-> >> +#include <asm/mach/arch.h>
-> >> +#include <asm/mach-types.h>
-> >> +#include <asm/hardware/cache-l2x0.h>
-> >> +
-> >> +#include <plat/regs-serial.h>
-> >> +#include <plat/s5pv310.h>
-> >> +#include <plat/cpu.h>
-> >> +
-> >> +#include <mach/map.h>
-> >> +
-> >> +/* Following are default values for UCON, ULCON and UFCON UART
-registers
-> > */
-> >> +#define UNIVERSAL_UCON_DEFAULT ? ? ? (S3C2410_UCON_TXILEVEL
-> | ? ? ? ?\
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?S3C2410_UCON_RXILEVEL | ? ? ? ?\
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?S3C2410_UCON_TXIRQMODE | ? ? ? \
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?S3C2410_UCON_RXIRQMODE | ? ? ? \
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?S3C2410_UCON_RXFIFO_TOI | ? ? ?\
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?S3C2443_UCON_RXERR_IRQEN)
-> >> +
-> >> +#define UNIVERSAL_ULCON_DEFAULT ? ? ?S3C2410_LCON_CS8
-> >> +
-> >> +#define UNIVERSAL_UFCON_DEFAULT ? ? ?(S3C2410_UFCON_FIFOMODE
-> | ? ? ? \
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? S5PV210_UFCON_TXTRIG256 | ? ? ? \
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? S5PV210_UFCON_RXTRIG256)
-> >> +
-> >> +static struct s3c2410_uartcfg universal_uartcfgs[] __initdata = {
-> >> + ? ? [0] = {
-> >> + ? ? ? ? ? ? .hwport ? ? ? ? = 0,
-> >
-> >
-> >> + ? ? ? ? ? ? .ucon ? ? ? ? ? = UNIVERSAL_UCON_DEFAULT,
-> >> + ? ? ? ? ? ? .ulcon ? ? ? ? ?= UNIVERSAL_ULCON_DEFAULT,
-> >> + ? ? ? ? ? ? .ufcon ? ? ? ? ?= UNIVERSAL_UFCON_DEFAULT,
-> >> + ? ? },
-> >> + ? ? [1] = {
-> >> + ? ? ? ? ? ? .hwport ? ? ? ? = 1,
-> >> + ? ? ? ? ? ? .ucon ? ? ? ? ? = UNIVERSAL_UCON_DEFAULT,
-> >> + ? ? ? ? ? ? .ulcon ? ? ? ? ?= UNIVERSAL_ULCON_DEFAULT,
-> >> + ? ? ? ? ? ? .ufcon ? ? ? ? ?= UNIVERSAL_UFCON_DEFAULT,
-> >> + ? ? },
-> >> + ? ? [2] = {
-> >> + ? ? ? ? ? ? .hwport ? ? ? ? = 2,
-> >> + ? ? ? ? ? ? .ucon ? ? ? ? ? = UNIVERSAL_UCON_DEFAULT,
-> >> + ? ? ? ? ? ? .ulcon ? ? ? ? ?= UNIVERSAL_ULCON_DEFAULT,
-> >> + ? ? ? ? ? ? .ufcon ? ? ? ? ?= UNIVERSAL_UFCON_DEFAULT,
-> >> + ? ? },
-> >> + ? ? [3] = {
-> >> + ? ? ? ? ? ? .hwport ? ? ? ? = 3,
-> >> + ? ? ? ? ? ? .ucon ? ? ? ? ? = UNIVERSAL_UCON_DEFAULT,
-> >> + ? ? ? ? ? ? .ulcon ? ? ? ? ?= UNIVERSAL_ULCON_DEFAULT,
-> >> + ? ? ? ? ? ? .ufcon ? ? ? ? ?= UNIVERSAL_UFCON_DEFAULT,
-> >> + ? ? },
-> >> +};
-> >> +
-> >> +static void __init universal_map_io(void)
-> >> +{
-> >> + ? ? s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-> >> + ? ? s3c24xx_init_clocks(24000000);
-> >> + ? ? s3c24xx_init_uarts(universal_uartcfgs,
-> > ARRAY_SIZE(universal_uartcfgs));
-> >> +}
-> >> +
-> >> +static void __init universal_machine_init(void)
-> >> +{
-> >> +#ifdef CONFIG_CACHE_L2X0
-> >> + ? ? l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
-> >> +#endif
-> >> +}
-> >> +
-> >> +MACHINE_START(UNIVERSAL, "UNIVERSAL")
-> >> + ? ? /* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
-> >> + ? ? .phys_io ? ? ? ?= S3C_PA_UART & 0xfff00000,
-> >> + ? ? .io_pg_offst ? ?= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
-> >> + ? ? .boot_params ? ?= S5P_PA_SDRAM + 0x100,
-> >> + ? ? .init_irq ? ? ? = s5pv310_init_irq,
-> >> + ? ? .map_io ? ? ? ? = universal_map_io,
-> >> + ? ? .init_machine ? = universal_machine_init,
-> >> + ? ? .timer ? ? ? ? ?= &s5pv310_timer,
-> >> +MACHINE_END
-> >> --
-> >
-> >
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
+index a9fdf55..dafaef6 100644
+--- a/drivers/input/touchscreen/ads7846.c
++++ b/drivers/input/touchscreen/ads7846.c
+@@ -791,7 +791,10 @@ static void ads7846_disable(struct ads7846 *ts)
+ 		}
+ 	}
+ 
+-	regulator_disable(ts->reg);
++#ifdef	CONFIG_REGULATOR
++	if (ts->reg)
++		regulator_disable(ts->reg);
++#endif
+ 
+ 	/* we know the chip's in lowpower mode since we always
+ 	 * leave it that way after every request
+@@ -804,7 +807,10 @@ static void ads7846_enable(struct ads7846 *ts)
+ 	if (!ts->disabled)
+ 		return;
+ 
+-	regulator_enable(ts->reg);
++#ifdef	CONFIG_REGULATOR
++	if (ts->reg)
++		regulator_enable(ts->reg);
++#endif
+ 
+ 	ts->disabled = 0;
+ 	ts->irq_disabled = 0;
+@@ -1161,18 +1167,21 @@ static int __devinit ads7846_probe(struct spi_device *spi)
+ 
+ 	ts->last_msg = m;
+ 
++#ifdef	CONFIG_REGULATOR
+ 	ts->reg = regulator_get(&spi->dev, "vcc");
+-	if (IS_ERR(ts->reg)) {
+-		err = PTR_ERR(ts->reg);
+-		dev_err(&spi->dev, "unable to get regulator: %d\n", err);
+-		goto err_free_gpio;
+-	}
+-
+-	err = regulator_enable(ts->reg);
+-	if (err) {
+-		dev_err(&spi->dev, "unable to enable regulator: %d\n", err);
+-		goto err_put_regulator;
++	if (IS_ERR(ts->reg))
++		ts->reg = NULL;
++	else {
++		err = regulator_enable(ts->reg);
++		if (err) {
++			dev_err(&spi->dev, "unable to enable regulator: %d\n",
++				err);
++			goto err_put_regulator;
++		}
+ 	}
++#else
++	ts->reg = NULL;
++#endif
+ 
+ 	if (request_irq(spi->irq, ads7846_irq, IRQF_TRIGGER_FALLING,
+ 			spi->dev.driver->name, ts)) {
+@@ -1218,10 +1227,13 @@ static int __devinit ads7846_probe(struct spi_device *spi)
+  err_free_irq:
+ 	free_irq(spi->irq, ts);
+  err_disable_regulator:
+-	regulator_disable(ts->reg);
++#ifdef	CONFIG_REGULATOR
++	if (ts->reg)
++		regulator_disable(ts->reg);
+  err_put_regulator:
+-	regulator_put(ts->reg);
+- err_free_gpio:
++	if (ts->reg)
++		regulator_put(ts->reg);
++#endif
+ 	if (ts->gpio_pendown != -1)
+ 		gpio_free(ts->gpio_pendown);
+  err_cleanup_filter:
+@@ -1251,8 +1263,12 @@ static int __devexit ads7846_remove(struct spi_device *spi)
+ 	/* suspend left the IRQ disabled */
+ 	enable_irq(ts->spi->irq);
+ 
+-	regulator_disable(ts->reg);
+-	regulator_put(ts->reg);
++#ifdef	CONFIG_REGULATOR
++	if (ts->reg) {
++		regulator_disable(ts->reg);
++		regulator_put(ts->reg);
++	}
++#endif
+ 
+ 	if (ts->gpio_pendown != -1)
+ 		gpio_free(ts->gpio_pendown);
+-- 
+1.7.1
