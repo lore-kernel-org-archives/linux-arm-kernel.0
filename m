@@ -1,28 +1,74 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 31 Jul 2010 10:22:06 +0100
-Subject: [PATCH] PXA: Colibri320: Add M41T00 RTC support
-In-Reply-To: <20100731090554.GX17833@buzzloop.caiaq.de>
-References: <1280543453-28237-1-git-send-email-marek.vasut@gmail.com>
-	<201007310926.03292.pieterg@gmx.com>
-	<201007310933.05611.marek.vasut@gmail.com>
-	<20100731090554.GX17833@buzzloop.caiaq.de>
-Message-ID: <20100731092206.GC23886@n2100.arm.linux.org.uk>
+Date: Sat, 31 Jul 2010 10:25:22 +0100
+Subject: Fwd: [PATCH 0/3] Allow late mdesc detection, v3
+Message-ID: <20100731092522.GD23886@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 31, 2010 at 11:05:54AM +0200, Daniel Mack wrote:
-> Hmm, GPIOs for peripherals that are assembled on the module itself can
-> safely be configured unconditionally as it is impossible to use them for
-> anything else. For GPIOs that are allocted by a specific base board,
-> things are different though, especially for the the Colibri eval board
-> with it hundreds of jumpers on it. It's a convenience feature to have
-> them free for general purpose use just by disabling a certain config
-> directive.
+Forwarding for OMAP people - as there's outstanding questions about this
+change for their platforms.
 
-It would probably make sense for their to be a primary table which at
-least ensures that all pins are setup to safe default values.  You
-really don't want the unconnected pins left floating, especially if
-they come out to some vulnerable connector or unconnected jumper pin.
+----- Forwarded message from Jeremy Kerr <jeremy.kerr@canonical.com> -----
 
-I'd suggest they're configured as inputs but with a pull-up or pull-down,
-not forgetting to consider the low power mode pull setting as well.
+Date: Fri, 30 Jul 2010 17:22:11 +0800
+From: Jeremy Kerr <jeremy.kerr@canonical.com>
+To: linux-arm-kernel at lists.infradead.org
+Subject: [PATCH 0/3] Allow late mdesc detection, v3
+Delivery-date: Sat, 31 Jul 2010 01:25:58 +0100
+
+Hi all,
+
+Currently, we probe for a mdesc early in boot. At this early stage, the
+only thing we use the mdesc for is to determine the debug page mapping.
+
+However, the debug addresses (phys and virt) need to be coded into the
+addruart macro anyway; the dynamic probing is only going to tell us what
+we already know.
+
+These changes allow us to use the addruart macros to find the debug
+mapping addresses, rather than pulling them out of the mdesc. This means
+that the addresses are only kept in the one place, and that we don't
+need the mdesc nearly as early.
+
+The first change updates all of the addruart macros to return both
+physical and virtual addresses. I've used 'rp' and 'rv' as the macro
+arguments to indicate which address goes where
+
+The second change updates the debug setup routine to use the addruart
+macro to establish the debug mapping, now that we can invoke the macro
+to find the phyical and virtual addresses.
+
+This allows us to delay the requirement to have a mdesc available until
+much later. For example, we can parse one from the device tree once
+we've reached C code.
+
+May break OMAP1/2, as the addruart macros are more complex on these
+platforms. I'd appreciate input from OMAP folks who may well tell me
+that this isn't possible.
+
+Cheers,
+
+
+Jeremy
+
+v3:
+ * only establish page mapping if !DEBUG_ICEDCC
+
+v2:
+ * return both phys and virt addresses from addruart
+ * mask unneeded bits from uart physical address in mapping setup
+ * remove io_pg_offst and phys_io, in a separate patch
+
+---
+Jeremy Kerr (3):
+      arm/debug: consolidate addruart macros for CONFIG_DEBUG_ICEDCC
+      arm: return both physical and virtual addresses from addruart
+      arm: use addruart macro to establish debug mappings
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+----- End forwarded message -----
