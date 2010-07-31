@@ -1,143 +1,47 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 31 Jul 2010 23:16:12 +0530
-Subject: [PATCH 4/4] ARM: l2x0: Optmise the range based operations
-Message-ID: <1280598372-4830-1-git-send-email-santosh.shilimkar@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 31 Jul 2010 21:21:40 +0200
+Subject: [RFC] dove: fix __io() definition to use bus based offset
+In-Reply-To: <20100731110802.GL23886@n2100.arm.linux.org.uk>
+References: <AANLkTinuXRH0XeD=3b0Wmq32SEEBxdevfj58EmSybcWu@mail.gmail.com>
+	<20100731110802.GL23886@n2100.arm.linux.org.uk>
+Message-ID: <201007312121.40995.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the big buffers which are in excess of cache size, the maintaince
-operations by PA are very slow. For such buffers the maintainace
-operations can be speeded up by using the WAY based method.
+On Saturday 31 July 2010 13:08:02 Russell King - ARM Linux wrote:
+> On Thu, Jul 29, 2010 at 01:45:35PM +0800, Eric Miao wrote:
+> > diff --git a/arch/arm/mach-dove/include/mach/io.h
+> > b/arch/arm/mach-dove/include/mach/io.h
+> > index 3b3e472..067435e 100644
+> > --- a/arch/arm/mach-dove/include/mach/io.h
+> > +++ b/arch/arm/mach-dove/include/mach/io.h
+> > @@ -11,10 +11,9 @@
+> > 
+> >  #include "dove.h"
+> > 
+> > -#define IO_SPACE_LIMIT               0xffffffff
+> > -
+> > -#define __io(a)  ((void __iomem *)(((a) - DOVE_PCIE0_IO_PHYS_BASE) +\
+> > -                                DOVE_PCIE0_IO_VIRT_BASE))
+> > -#define __mem_pci(a)         (a)
+> > +#define IO_SPACE_LIMIT       0xffffffff
+> > +#define __io(a)              __typesafe_io((a) - DOVE_PCIE0_IO_BUS_BASE + \
+> > +                                         DOVE_PCIE0_IO_VIRT_BASE)
+> 
+> I recommend against this use of __typesafe_io():
+> 
+> http://lists.arm.linux.org.uk/lurker/message/20090214.154245.6325bc9d.en.html
+> 
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/mm/cache-l2x0.c |   95 ++++++++++++++++++++++++++++------------------
- 1 files changed, 58 insertions(+), 37 deletions(-)
+On a related note, is there a particular reason why most of the
+*_*_VIRT_BASE macros are just numbers instead of void __iomem
+pointers?
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index b2938d4..c0d6108 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -116,6 +116,18 @@ static void l2x0_flush_all(void)
- 	spin_unlock_irqrestore(&l2x0_lock, flags);
- }
- 
-+static void l2x0_clean_all(void)
-+{
-+	unsigned long flags;
-+
-+	/* clean all ways */
-+	spin_lock_irqsave(&l2x0_lock, flags);
-+	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_CLEAN_WAY);
-+	cache_wait(l2x0_base + L2X0_CLEAN_WAY, l2x0_way_mask);
-+	cache_sync();
-+	spin_unlock_irqrestore(&l2x0_lock, flags);
-+}
-+
- static void l2x0_inv_all(void)
- {
- 	unsigned long flags;
-@@ -171,54 +183,63 @@ static void l2x0_inv_range(unsigned long start, unsigned long end)
- 
- static void l2x0_clean_range(unsigned long start, unsigned long end)
- {
--	void __iomem *base = l2x0_base;
--	unsigned long flags;
- 
--	spin_lock_irqsave(&l2x0_lock, flags);
--	start &= ~(CACHE_LINE_SIZE - 1);
--	while (start < end) {
--		unsigned long blk_end = start + min(end - start, 4096UL);
-+	if ((end - start) >= l2x0_size) {
-+		l2x0_clean_all();
-+	} else {
-+		void __iomem *base = l2x0_base;
-+		unsigned long flags, blk_end;
- 
--		while (start < blk_end) {
--			l2x0_clean_line(start);
--			start += CACHE_LINE_SIZE;
--		}
--
--		if (blk_end < end) {
--			spin_unlock_irqrestore(&l2x0_lock, flags);
--			spin_lock_irqsave(&l2x0_lock, flags);
-+		spin_lock_irqsave(&l2x0_lock, flags);
-+		start &= ~(CACHE_LINE_SIZE - 1);
-+		while (start < end) {
-+			blk_end = start + min(end - start, 4096UL);
-+
-+			while (start < blk_end) {
-+				l2x0_clean_line(start);
-+				start += CACHE_LINE_SIZE;
-+			}
-+
-+			if (blk_end < end) {
-+				spin_unlock_irqrestore(&l2x0_lock, flags);
-+				spin_lock_irqsave(&l2x0_lock, flags);
-+			}
- 		}
-+		cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
-+		cache_sync();
-+		spin_unlock_irqrestore(&l2x0_lock, flags);
- 	}
--	cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
--	cache_sync();
--	spin_unlock_irqrestore(&l2x0_lock, flags);
- }
- 
- static void l2x0_flush_range(unsigned long start, unsigned long end)
- {
--	void __iomem *base = l2x0_base;
--	unsigned long flags;
--
--	spin_lock_irqsave(&l2x0_lock, flags);
--	start &= ~(CACHE_LINE_SIZE - 1);
--	while (start < end) {
--		unsigned long blk_end = start + min(end - start, 4096UL);
--
--		debug_writel(0x03);
--		while (start < blk_end) {
--			l2x0_flush_line(start);
--			start += CACHE_LINE_SIZE;
--		}
--		debug_writel(0x00);
-+	if ((end - start) >= l2x0_size) {
-+		l2x0_flush_all();
-+	} else {
-+		void __iomem *base = l2x0_base;
-+		unsigned long flags, blk_end;
- 
--		if (blk_end < end) {
--			spin_unlock_irqrestore(&l2x0_lock, flags);
--			spin_lock_irqsave(&l2x0_lock, flags);
-+		spin_lock_irqsave(&l2x0_lock, flags);
-+		start &= ~(CACHE_LINE_SIZE - 1);
-+		while (start < end) {
-+			blk_end = start + min(end - start, 4096UL);
-+
-+			debug_writel(0x03);
-+			while (start < blk_end) {
-+				l2x0_flush_line(start);
-+				start += CACHE_LINE_SIZE;
-+			}
-+			debug_writel(0x00);
-+
-+			if (blk_end < end) {
-+				spin_unlock_irqrestore(&l2x0_lock, flags);
-+				spin_lock_irqsave(&l2x0_lock, flags);
-+			}
- 		}
-+		cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
-+		cache_sync();
-+		spin_unlock_irqrestore(&l2x0_lock, flags);
- 	}
--	cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
--	cache_sync();
--	spin_unlock_irqrestore(&l2x0_lock, flags);
- }
- 
- static void l2x0_disable(void)
--- 
-1.6.0.4
+My feeling is that we could save a lot of these typecasts and conversion
+macros if the base addresses were already pointers in the right address
+space.
+
+I could do some cleanup and try to get the pointers right in the arm
+architecture tree if you think that's a good idea.
+
+	Arnd
