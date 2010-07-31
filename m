@@ -1,97 +1,32 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 31 Jul 2010 09:09:42 +0200
-Subject: [PATCH v2] Input: Make ADS7846 independent on regulator
-Message-ID: <1280560182-7071-1-git-send-email-marek.vasut@gmail.com>
+From: pieterg@gmx.com (pieterg)
+Date: Sat, 31 Jul 2010 09:26:03 +0200
+Subject: [PATCH] PXA: Colibri320: Add M41T00 RTC support
+In-Reply-To: <1280543453-28237-1-git-send-email-marek.vasut@gmail.com>
+References: <1280543453-28237-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <201007310926.03292.pieterg@gmx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case regulator was not found, ADS7846 failed to probe.
+On Saturday 31 July 2010 04:30:53 Marek Vasut wrote:
+> +#if defined(CONFIG_RTC_DRV_DS1307) ||
+> defined(CONFIG_RTC_DRV_DS1307_MODULE) 
+> +static mfp_cfg_t colibri_pxa320_i2c_pin_config[] __initdata = { 
+> +	GPIO32_I2C_SCL, 
+> +	GPIO33_I2C_SDA,
+> +};
 
-This fixes a problem on some Sharp Zaurus devices, where there is no regulator
-present and the touchscreen is used.
+Should the i2c pins really depend on the DS1307 config?
+On my board, I use a different rtc. So I do need the I2C pins to be 
+configured, but I don't need the DS1307.
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- drivers/input/touchscreen/ads7846.c |   38 +++++++++++++++++++---------------
- 1 files changed, 21 insertions(+), 17 deletions(-)
+A few weeks ago I submitted
 
-diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
-index a9fdf55..53b318b 100644
---- a/drivers/input/touchscreen/ads7846.c
-+++ b/drivers/input/touchscreen/ads7846.c
-@@ -791,7 +791,8 @@ static void ads7846_disable(struct ads7846 *ts)
- 		}
- 	}
- 
--	regulator_disable(ts->reg);
-+	if (ts->reg)
-+		regulator_disable(ts->reg);
- 
- 	/* we know the chip's in lowpower mode since we always
- 	 * leave it that way after every request
-@@ -804,7 +805,8 @@ static void ads7846_enable(struct ads7846 *ts)
- 	if (!ts->disabled)
- 		return;
- 
--	regulator_enable(ts->reg);
-+	if (ts->reg)
-+		regulator_enable(ts->reg);
- 
- 	ts->disabled = 0;
- 	ts->irq_disabled = 0;
-@@ -1162,16 +1164,15 @@ static int __devinit ads7846_probe(struct spi_device *spi)
- 	ts->last_msg = m;
- 
- 	ts->reg = regulator_get(&spi->dev, "vcc");
--	if (IS_ERR(ts->reg)) {
--		err = PTR_ERR(ts->reg);
--		dev_err(&spi->dev, "unable to get regulator: %d\n", err);
--		goto err_free_gpio;
--	}
--
--	err = regulator_enable(ts->reg);
--	if (err) {
--		dev_err(&spi->dev, "unable to enable regulator: %d\n", err);
--		goto err_put_regulator;
-+	if (IS_ERR(ts->reg))
-+		ts->reg = NULL;
-+	else {
-+		err = regulator_enable(ts->reg);
-+		if (err) {
-+			dev_err(&spi->dev, "unable to enable regulator: %d\n",
-+				err);
-+			goto err_put_regulator;
-+		}
- 	}
- 
- 	if (request_irq(spi->irq, ads7846_irq, IRQF_TRIGGER_FALLING,
-@@ -1218,10 +1219,11 @@ static int __devinit ads7846_probe(struct spi_device *spi)
-  err_free_irq:
- 	free_irq(spi->irq, ts);
-  err_disable_regulator:
--	regulator_disable(ts->reg);
-+	if (ts->reg)
-+		regulator_disable(ts->reg);
-  err_put_regulator:
--	regulator_put(ts->reg);
-- err_free_gpio:
-+	if (ts->reg)
-+		regulator_put(ts->reg);
- 	if (ts->gpio_pendown != -1)
- 		gpio_free(ts->gpio_pendown);
-  err_cleanup_filter:
-@@ -1251,8 +1253,10 @@ static int __devexit ads7846_remove(struct spi_device *spi)
- 	/* suspend left the IRQ disabled */
- 	enable_irq(ts->spi->irq);
- 
--	regulator_disable(ts->reg);
--	regulator_put(ts->reg);
-+	if (ts->reg) {
-+		regulator_disable(ts->reg);
-+		regulator_put(ts->reg);
-+	}
- 
- 	if (ts->gpio_pendown != -1)
- 		gpio_free(ts->gpio_pendown);
--- 
-1.7.1
+[PATCH 4/5] colibri-pxa3xx: add i2c support
+
+which initializes the i2c gpio's, depending on CONFIG_I2C || 
+CONFIG_I2C_MODULE
+
+(but the patch was rejected, argueing that people might want to use 
+different gpio's for i2c)
+
+Rgds, Pieter
