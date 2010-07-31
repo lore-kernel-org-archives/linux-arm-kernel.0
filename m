@@ -1,7 +1,7 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun,  1 Aug 2010 00:39:46 +0200
-Subject: [PATCH] PXA: Reworked spitz-battery
-Message-ID: <1280615986-9493-1-git-send-email-marek.vasut@gmail.com>
+Date: Sun,  1 Aug 2010 00:51:11 +0200
+Subject: [PATCH v3] PXA: Reworked spitz-battery
+Message-ID: <1280616671-11396-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,8 +11,8 @@ Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
  arch/arm/mach-pxa/spitz.c     |   23 ++
  drivers/power/Kconfig         |    7 +
  drivers/power/Makefile        |    1 +
- drivers/power/spitz_battery.c |  541 +++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 573 insertions(+), 1 deletions(-)
+ drivers/power/spitz_battery.c |  547 +++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 579 insertions(+), 1 deletions(-)
  create mode 100644 drivers/power/spitz_battery.c
 
 diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
@@ -99,10 +99,10 @@ index 0005080..3d282be 100644
  obj-$(CONFIG_CHARGER_PCF50633)	+= pcf50633-charger.o
 diff --git a/drivers/power/spitz_battery.c b/drivers/power/spitz_battery.c
 new file mode 100644
-index 0000000..840b23a
+index 0000000..7617700
 --- /dev/null
 +++ b/drivers/power/spitz_battery.c
-@@ -0,0 +1,541 @@
+@@ -0,0 +1,547 @@
 +/*
 + * Battery and Power Management code for the Sharp SL-Cxxxx
 + *
@@ -159,6 +159,7 @@ index 0000000..840b23a
 +static DECLARE_WAIT_QUEUE_HEAD(bat_wait);
 +static struct task_struct *bat_thread;
 +static int bat_restart;
++static int bat_update;
 +
 +extern int max1111_read_channel(int);
 +
@@ -333,7 +334,7 @@ index 0000000..840b23a
 +			break;
 +
 +	}
-+	if (update) {
++	if (update && bat_update) {
 +		power_supply_changed(&spitz_ac);
 +		power_supply_changed(&spitz_bat_main);
 +	}
@@ -542,6 +543,11 @@ index 0000000..840b23a
 +
 +	mutex_init(&bat_lock);
 +
++	bat_restart = 0;
++	bat_update = 0;
++	init_waitqueue_head(&bat_wait);
++	bat_thread = kthread_run(spitz_bat_thread, NULL, "spitz-bat");
++
 +	ret = power_supply_register(&pdev->dev, &spitz_bat_main);
 +	if (ret)
 +		goto err11;
@@ -550,9 +556,9 @@ index 0000000..840b23a
 +	if (ret)
 +		goto err12;
 +
-+	bat_restart = 0;
-+	init_waitqueue_head(&bat_wait);
-+	bat_thread = kthread_run(spitz_bat_thread, NULL, "spitz-bat");
++	mutex_lock(&bat_lock);
++	bat_update = 1;
++	mutex_unlock(&bat_lock);
 +
 +	return 0;
 +
