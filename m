@@ -1,9 +1,17 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun,  1 Aug 2010 00:51:11 +0200
-Subject: [PATCH v3] PXA: Reworked spitz-battery
-Message-ID: <1280616671-11396-1-git-send-email-marek.vasut@gmail.com>
+Date: Sun,  1 Aug 2010 01:28:53 +0200
+Subject: [PATCH v4] PXA: Reworked spitz-battery
+Message-ID: <1280618933-24515-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+This version seems to work a bit, but:
+1) The device is charging only when turned on (it doesn't wake up with charger
+plugged in, probably some further magic needed)
+2) The online charging is fast, but be warned, there is no temperature check (no
+overcharge protection but the GPIO)
+
+Still I think this is a good starting point
 
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
@@ -11,8 +19,8 @@ Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
  arch/arm/mach-pxa/spitz.c     |   23 ++
  drivers/power/Kconfig         |    7 +
  drivers/power/Makefile        |    1 +
- drivers/power/spitz_battery.c |  547 +++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 579 insertions(+), 1 deletions(-)
+ drivers/power/spitz_battery.c |  549 +++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 581 insertions(+), 1 deletions(-)
  create mode 100644 drivers/power/spitz_battery.c
 
 diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
@@ -99,10 +107,10 @@ index 0005080..3d282be 100644
  obj-$(CONFIG_CHARGER_PCF50633)	+= pcf50633-charger.o
 diff --git a/drivers/power/spitz_battery.c b/drivers/power/spitz_battery.c
 new file mode 100644
-index 0000000..7617700
+index 0000000..2008681
 --- /dev/null
 +++ b/drivers/power/spitz_battery.c
-@@ -0,0 +1,547 @@
+@@ -0,0 +1,549 @@
 +/*
 + * Battery and Power Management code for the Sharp SL-Cxxxx
 + *
@@ -606,6 +614,8 @@ index 0000000..7617700
 +#ifdef CONFIG_PM
 +static int spitz_bat_suspend(struct device *dev)
 +{
++	/* Charging OFF before suspend XXX why ? */
++	spitz_bat_set_chrg(POWER_SUPPLY_CHARGE_TYPE_NONE, 0);
 +	return 0;
 +}
 +
