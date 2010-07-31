@@ -1,25 +1,26 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 31 Jul 2010 17:38:06 +0200
-Subject: [PATCH] PXA: Fix wakealarm capability for pxa-rtc
-In-Reply-To: <1280550147-12380-1-git-send-email-marek.vasut@gmail.com> (Marek
-	Vasut's message of "Sat\, 31 Jul 2010 06\:22\:27 +0200")
-References: <1280550147-12380-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <87k4ob1x29.fsf@free.fr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 31 Jul 2010 16:41:34 +0100
+Subject: [PATCH 1/4] ARM: SCU: Add generic routines for secondary CPU
+	bootup
+In-Reply-To: <20100727171140.GA10375@oksana.dev.rtsoft.ru>
+References: <20100727171109.GA7929@oksana.dev.rtsoft.ru>
+	<20100727171140.GA10375@oksana.dev.rtsoft.ru>
+Message-ID: <20100731154134.GF27064@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Vasut <marek.vasut@gmail.com> writes:
+On Tue, Jul 27, 2010 at 09:11:40PM +0400, Anton Vorontsov wrote:
+> For CNS3xxx we want to reuse the original ARM approach of booting
+> secondary CPUs. This patch turns VExpress' code into "SCU library",
+> so that now platform code can call the generic routines.
 
-> The wakealarm capability was incorrectly set after the RTC was registered, which
-> resulted into the sysfs node not being created.
+I'm not sure this should become a "SCU library" - the name seems wrong.
+When you consider that the SCU is the 'snoop control unit', which has
+no relation to how secondary CPUs are booted, it makes little sense.
 
-On my platform, without this patch:
-> cat /sys/devices/platform/pxa-rtc/power/wakeup
-> enabled
+The secondary CPU boot protocol has much more to do with the boot
+loader than with the hardware.
 
-The sysfs node is created. What's the issue you're having ?
-
-Cheers.
-
---
-Robert
+I also suspect that we can get rid of the 'holding pen' stuff and just
+rely on the IPI being sent to the intended target CPU.  I don't think
+anyone has really updated this since the initial ARM SMP implementation.
