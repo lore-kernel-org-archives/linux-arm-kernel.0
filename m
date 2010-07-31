@@ -1,26 +1,44 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 31 Jul 2010 13:44:13 -0400 (EDT)
-Subject: [PATCH 11/11] Auto calculate ZRELADDR and provide option for
-	exceptions
-In-Reply-To: <20100731155430.GG27064@n2100.arm.linux.org.uk>
-References: <20100705141344.GA25407@pengutronix.de>
-	<1278339329-23739-11-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20100731155430.GG27064@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1007311342380.2117@xanadu.home>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 31 Jul 2010 23:14:37 +0530
+Subject: [PATCH 1/4] ARM: l2x0: Fix coding-style in the cache-l2x0.h
+Message-ID: <1280598277-4521-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 31 Jul 2010, Russell King - ARM Linux wrote:
+Replace tab with space after #define to be consisten with other
+define in the file. Also move the bit mask below the register offsets.
 
-> On Mon, Jul 05, 2010 at 04:15:29PM +0200, Uwe Kleine-K?nig wrote:
-> > +config ZRELADDR
-> > +	hex "Physical address of the decompressed kernel image"
-> 
-> Does it really make sense for users to be able to edit this?  I don't
-> think so as some platforms depend on its value being set appropriately,
-> plus the requirements for it aren't documented in the help text.
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/include/asm/hardware/cache-l2x0.h |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
-No, I don't think we should expose this to the user.
-
-
-Nicolas
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index 6bcba48..d833355 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -21,9 +21,6 @@
+ #define __ASM_ARM_HARDWARE_L2X0_H
+ 
+ #define L2X0_CACHE_ID			0x000
+-#define   L2X0_CACHE_ID_PART_MASK	(0xf << 6)
+-#define   L2X0_CACHE_ID_PART_L210	(1 << 6)
+-#define   L2X0_CACHE_ID_PART_L310	(3 << 6)
+ #define L2X0_CACHE_TYPE			0x004
+ #define L2X0_CTRL			0x100
+ #define L2X0_AUX_CTRL			0x104
+@@ -54,6 +51,11 @@
+ #define L2X0_LINE_TAG			0xF30
+ #define L2X0_DEBUG_CTRL			0xF40
+ 
++/* Registers shifts and masks */
++#define L2X0_CACHE_ID_PART_MASK		(0xf << 6)
++#define L2X0_CACHE_ID_PART_L210		(1 << 6)
++#define L2X0_CACHE_ID_PART_L310		(3 << 6)
++
+ #ifndef __ASSEMBLY__
+ extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
+ #endif
+-- 
+1.6.0.4
