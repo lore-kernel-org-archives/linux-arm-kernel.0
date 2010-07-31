@@ -1,41 +1,39 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 30 Jul 2010 21:46:16 -0400 (EDT)
-Subject: [GIT PULL] debug macro changes for 2.6.36
-In-Reply-To: <20100730081419.GA3208@n2100.arm.linux.org.uk>
-References: <1280465905.11181.41.camel@pororo.lan>
-	<20100730071805.GB29746@n2100.arm.linux.org.uk>
-	<1280474636.27902.1.camel@pororo.lan>
-	<20100730081419.GA3208@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1007302138380.30558@xanadu.home>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 31 Jul 2010 11:05:16 +0900
+Subject: [PATCH] S5V310: I2C0/I2C1/I2C2 support
+In-Reply-To: <20100730105535.GA15067@july>
+References: <20100730105535.GA15067@july>
+Message-ID: <002f01cb3054$d4ea6bb0$7ebf4310$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Jul 2010, Russell King - ARM Linux wrote:
-
-> This is what I said eight days ago:
-> | BTW, this may cause lots of conflicts from SFR when the follow-on patch
-> | which deletes the initializers is merged.  So rather than keeping this
-> | separate, it probably makes more sense for this patch to be merged into
-> | my tree now.
-> | 
-> | ...
-> | 
-> | BTW, it'd probably make more sense to do this as a script, something
-> | like this (untested):
-> | 
-> | grep -rl MACHINE_START arch/arm | xargs --no-run-if-empty \
-> |   sed -i '/MACHINE_START/,/MACHINE_END/ { /\.(phys_io|io_pg_offst)/d }'
-> | 
-> | as over time the number of boards, etc, will change, and there's already
-> | context changes with these patches caused by the memblock stuff.
+Kyungmin Park wrote:
 > 
-> My intention was to have your patch merged - as patches - into an
-> appropriate place in my tree, and then just before the merge window
-> run that script to remove all the references to phys_io/io_pg_offst,
-> and finally, some time later, the members from the structure.
+> From: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> Configure proper mux pins and define i2c0/i2c1/i2c2.
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pv310/Kconfig      |   10 ++++++++++
+>  arch/arm/mach-s5pv310/Makefile     |    5 +++++
+>  arch/arm/mach-s5pv310/setup-i2c0.c |   12 ++++++++++--
+>  arch/arm/mach-s5pv310/setup-i2c1.c |   25 +++++++++++++++++++++++++
+>  arch/arm/mach-s5pv310/setup-i2c2.c |   26 ++++++++++++++++++++++++++
+>  5 files changed, 76 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/mach-s5pv310/setup-i2c1.c
+>  create mode 100644 arch/arm/mach-s5pv310/setup-i2c2.c
+> 
 
-Just to be clear, would you prefer for Jeremy to send you those initial 
-patches through your patch system or via a Git pull request?
+(snip)
 
+> +#include <mach/gpio.h>
+Should be <linux/gpio.h>
 
-Nicolas
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
