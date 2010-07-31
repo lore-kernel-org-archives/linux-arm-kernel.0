@@ -1,44 +1,51 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 31 Jul 2010 23:14:37 +0530
-Subject: [PATCH 1/4] ARM: l2x0: Fix coding-style in the cache-l2x0.h
-Message-ID: <1280598277-4521-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Sat, 31 Jul 2010 23:15:48 +0530
+Subject: [PATCH 2/4] omap4: l2x0: Override the default l2x0_disable
+Message-ID: <1280598348-4721-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace tab with space after #define to be consisten with other
-define in the file. Also move the bit mask below the register offsets.
+The machine_kexec() calls outer_disable which can crash on OMAP4
+becasue of trustzone restrictions.
+
+This patch overrides the default l2x0_disable with a OMAP4
+specific implementation taking care of trustzone
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/hardware/cache-l2x0.h |    8 +++++---
- 1 files changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/omap4-common.c |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-index 6bcba48..d833355 100644
---- a/arch/arm/include/asm/hardware/cache-l2x0.h
-+++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-@@ -21,9 +21,6 @@
- #define __ASM_ARM_HARDWARE_L2X0_H
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 13dc979..b557cc2 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -44,6 +44,13 @@ void __init gic_init_irq(void)
+ }
  
- #define L2X0_CACHE_ID			0x000
--#define   L2X0_CACHE_ID_PART_MASK	(0xf << 6)
--#define   L2X0_CACHE_ID_PART_L210	(1 << 6)
--#define   L2X0_CACHE_ID_PART_L310	(3 << 6)
- #define L2X0_CACHE_TYPE			0x004
- #define L2X0_CTRL			0x100
- #define L2X0_AUX_CTRL			0x104
-@@ -54,6 +51,11 @@
- #define L2X0_LINE_TAG			0xF30
- #define L2X0_DEBUG_CTRL			0xF40
- 
-+/* Registers shifts and masks */
-+#define L2X0_CACHE_ID_PART_MASK		(0xf << 6)
-+#define L2X0_CACHE_ID_PART_L210		(1 << 6)
-+#define L2X0_CACHE_ID_PART_L310		(3 << 6)
+ #ifdef CONFIG_CACHE_L2X0
 +
- #ifndef __ASSEMBLY__
- extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
- #endif
++static void omap4_l2x0_disable(void)
++{
++	/* Disable PL310 L2 Cache controller */
++	omap_smc1(0x102, 0x0);
++}
++
+ static int __init omap_l2_cache_init(void)
+ {
+ 	/*
+@@ -66,6 +73,12 @@ static int __init omap_l2_cache_init(void)
+ 	 */
+ 	l2x0_init(l2cache_base, 0x0e050000, 0xc0000fff);
+ 
++	/*
++	 * Override default outer_cache.disable with a OMAP4
++	 * specific one
++	*/
++	outer_cache.disable = omap4_l2x0_disable;
++
+ 	return 0;
+ }
+ early_initcall(omap_l2_cache_init);
 -- 
 1.6.0.4
