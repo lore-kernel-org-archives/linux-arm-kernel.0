@@ -1,33 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 31 Jul 2010 10:28:38 +0100
-Subject: [GIT PULL] debug macro changes for 2.6.36
-In-Reply-To: <alpine.LFD.2.00.1007302138380.30558@xanadu.home>
-References: <1280465905.11181.41.camel@pororo.lan>
-	<20100730071805.GB29746@n2100.arm.linux.org.uk>
-	<1280474636.27902.1.camel@pororo.lan>
-	<20100730081419.GA3208@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1007302138380.30558@xanadu.home>
-Message-ID: <20100731092838.GE23886@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 31 Jul 2010 11:37:55 +0200
+Subject: [PATCH 1/2] arm: msm: Add System MMU support.
+In-Reply-To: <2d92bd7e819dd81e2f64d358918711d3.squirrel@www.codeaurora.org>
+References: <20100729123512Y.fujita.tomonori@lab.ntt.co.jp>
+	<201007302359.08188.arnd@arndb.de>
+	<2d92bd7e819dd81e2f64d358918711d3.squirrel@www.codeaurora.org>
+Message-ID: <201007311137.55826.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 30, 2010 at 09:46:16PM -0400, Nicolas Pitre wrote:
-> On Fri, 30 Jul 2010, Russell King - ARM Linux wrote:
-> > My intention was to have your patch merged - as patches - into an
-> > appropriate place in my tree, and then just before the merge window
-> > run that script to remove all the references to phys_io/io_pg_offst,
-> > and finally, some time later, the members from the structure.
+On Saturday 31 July 2010 00:58:00 stepanm at codeaurora.org wrote:
+> > If you really need multiple domains across multiple IOMMUs, I'd suggest that
+> > we first merge the APIs and then port your code to that, but as a first step
+> > you could implement the standard dma-mapping.h API, which allows you to use
+> > the IOMMUs in kernel space.
 > 
-> Just to be clear, would you prefer for Jeremy to send you those initial 
-> patches through your patch system or via a Git pull request?
+> One of our uses cases actually does involve using domains pretty much as
+> you had described them, though only on one of the IOMMUs. That is, the
+> domain for that IOMMU basically abstracts its page table, and it is a
+> legitimate thing to switch out page tables for the IOMMU on the fly. I
+> guess the difference is that you described the domain as the set of
+> mappings made on ALL the IOMMUs, whereas I had envisioned there being one
+> (or more) domains for each IOMMU.
 
-I think patches would be better, so there's no dependencies on stuff I
-have in my tree already - and I'll be free to add them at the most
-appropriate point.
+Can you be more specific on what kind of device would use multiple domains
+in your case and how you intend to use them? Is this for some kind of DSP
+interacting with user processes?
 
-However, it seems one of the patches still contains questions over OMAP
-which haven't been addressed (or maybe they have and the commit comment
-hasn't been updated.)  That needs resolving before they can be merged.
-I've forwarded the email to linux-omap and Tony, but I'm not expecting
-a reply before Monday or so as OMAP folk seem to keep to sane working
-hours.
+This seems to be a scenario that we haven't dealt with before (or perhaps
+avoided intentionally), so if we need to make API changes, we should all
+understand what we need them for. It's no problem to extend the API if you
+have good reasons for using multiple domains, but I also want to make sure
+that there isn't also a way to achieve the same or better result with the
+current APIs.
+
+	Arnd
