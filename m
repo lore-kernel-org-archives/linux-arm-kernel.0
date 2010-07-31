@@ -1,45 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 31 Jul 2010 10:04:45 +0100
-Subject: [PATCH] fix Thumb-2 decompressor broken by "Auto calculate
-	ZRELADDR"
-In-Reply-To: <20100730205756.GA28316@pengutronix.de>
-References: <1280518523-5526-1-git-send-email-rabin@rab.in>
-	<20100730205756.GA28316@pengutronix.de>
-Message-ID: <20100731090445.GA23886@n2100.arm.linux.org.uk>
+Date: Sat, 31 Jul 2010 10:16:50 +0100
+Subject: [PATCH] PXA: Colibri320: Add M41T00 RTC support
+In-Reply-To: <201007310933.05611.marek.vasut@gmail.com>
+References: <1280543453-28237-1-git-send-email-marek.vasut@gmail.com>
+	<201007310926.03292.pieterg@gmx.com>
+	<201007310933.05611.marek.vasut@gmail.com>
+Message-ID: <20100731091650.GB23886@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 30, 2010 at 10:57:56PM +0200, Uwe Kleine-K?nig wrote:
-> On Sat, Jul 31, 2010 at 01:05:23AM +0530, Rabin Vincent wrote:
-> > "ARM: Auto calculate ZRELADDR and provide option for exceptions" broke the
-> > Thumb-2 decompressor because it removed an entry in the LC0 table but didn't
-> > adjust the offset the Thumb-2 code uses to load the SP from that table.
-> > 
-> > Fix it, and also change the ARM code to use the separate SP-load since
-> > ARM instructions that include the SP in the LDM register list are
-> > deprecated.
-> I only found:
-> 
-> 	LDM{<cond>}<addressing_mode> <Rn>{!}, <registers>
-> 	...
-> 	If the base register <Rn> is specified in <registers>, and base
-> 	register write-back is specified,
-> 	the final value of <Rn> is UNPREDICTABLE.
-> 
-> Are you really sure about this?  Where do you know it from?
+On Sat, Jul 31, 2010 at 09:33:05AM +0200, Marek Vasut wrote:
+> Actually, there is one thing that puzzles me. Eric/Dan, shall I stick all the 
+> MFP configs into one (or two, one for board and once for cpu card) array or keep 
+> it split in multiple smaller arrays for each device? I think putting it all in 
+> one place would be more readable.
 
-It doesn't matter.  The point is that you deleted an entry from the
-table which the ldmia/ldmia+ldr loads from and didn't adjust the
-resulting code properly.
+I've always been of the opinion that the pin configuration should be setup
+independently of what drivers are built into the kernel or not.
 
-- ARM(          ldmia   r0, {r1, r2, r3, r5, r6, r11, ip, sp})
-+ ARM(          ldmia   r0, {r1, r2, r3, r5, r6, r11, ip})
-  THUMB(                ldmia   r0, {r1, r2, r3, r5, r6, r11, ip}       )
-- THUMB(                ldr     sp, [r0, #32]                           )
-+               ldr     sp, [r0, #28]
+Consider a pin which is used as an output to drive some high impedance
+signal (eg, an input on another device) and it doesn't have any pull-up
+or pull down.  If on reset, this signal is also configured as a high
+impedance input, it will float.
 
-In case you're wondering, it's this part, found in the "Instruction
-details" section of "A8.6.53 LDM / LDMIA / LDMFD":
+Inputs which float cause increased current drain (that's a fact of the
+high impedance FET input configurations - a floating signal ends up
+partially turning on both N and P FETs at both ends, which allows
+current to flow between supply and ground.  This is also why the current
+consumption of devices is related to their clock frequency and disabling
+clocks saves power.)
 
-"The SP can be in the list in ARM code, but not in Thumb code. However,
-ARM instructions that include the SP in the list are deprecated."
+So, it is desirable to have the pin configuration correct for the entire
+board, irrespective of the driver configuration.
