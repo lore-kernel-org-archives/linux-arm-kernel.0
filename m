@@ -1,71 +1,43 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sat, 31 Jul 2010 18:15:32 +0530
-Subject: [PATCH 0/3] Allow late mdesc detection, v3
-In-Reply-To: <20100731092522.GD23886@n2100.arm.linux.org.uk>
-References: <20100731092522.GD23886@n2100.arm.linux.org.uk>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C6381053@dbde02.ent.ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 31 Jul 2010 14:50:09 +0200
+Subject: [PATCH] fix Thumb-2 decompressor broken by "Auto calculate
+	ZRELADDR"
+In-Reply-To: <20100731123142.GA27064@n2100.arm.linux.org.uk>
+References: <1280518523-5526-1-git-send-email-rabin@rab.in>
+	<20100730205756.GA28316@pengutronix.de>
+	<20100731090445.GA23886@n2100.arm.linux.org.uk>
+	<20100731120827.GA12662@pengutronix.de>
+	<20100731123142.GA27064@n2100.arm.linux.org.uk>
+Message-ID: <20100731125009.GA15412@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jeremy,
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Russell King - ARM Linux
-> Sent: Saturday, July 31, 2010 2:55 PM
-> To: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org; Tony
-> Lindgren
-> Subject: Fwd: [PATCH 0/3] Allow late mdesc detection, v3
+On Sat, Jul 31, 2010 at 01:31:42PM +0100, Russell King - ARM Linux wrote:
+> On Sat, Jul 31, 2010 at 02:08:27PM +0200, Uwe Kleine-K?nig wrote:
+> > On Sat, Jul 31, 2010 at 10:04:45AM +0100, Russell King - ARM Linux wrote:
+> > > It doesn't matter.  The point is that you deleted an entry from the
+> > > table which the ldmia/ldmia+ldr loads from and didn't adjust the
+> > > resulting code properly.
+> > Yes, got that.
+> > > 
+> > > - ARM(          ldmia   r0, {r1, r2, r3, r5, r6, r11, ip, sp})
+> > > + ARM(          ldmia   r0, {r1, r2, r3, r5, r6, r11, ip})
+> > >   THUMB(                ldmia   r0, {r1, r2, r3, r5, r6, r11, ip}       )
+> > > - THUMB(                ldr     sp, [r0, #32]                           )
+> > > +               ldr     sp, [r0, #28]
+> > We can simpify this further to just
+> > 
+> > 	@ Thumb code doesn't allow sp to be in the list, for ARM it's
+> > 	@ deprecated, so use a seperate ldr for it.
+> > 	ldmia   r0, {r1, r2, r3, r5, r6, r11, ip}
+> > 	ldr     sp, [r0, #32]
 > 
-> Forwarding for OMAP people - as there's outstanding questions about this
-> change for their platforms.
-> 
-> ----- Forwarded message from Jeremy Kerr <jeremy.kerr@canonical.com> -----
-> 
-> Date: Fri, 30 Jul 2010 17:22:11 +0800
-> From: Jeremy Kerr <jeremy.kerr@canonical.com>
-> To: linux-arm-kernel at lists.infradead.org
-> Subject: [PATCH 0/3] Allow late mdesc detection, v3
-> Delivery-date: Sat, 31 Jul 2010 01:25:58 +0100
-> 
-> Hi all,
-> 
-> Currently, we probe for a mdesc early in boot. At this early stage, the
-> only thing we use the mdesc for is to determine the debug page mapping.
-> 
-> However, the debug addresses (phys and virt) need to be coded into the
-> addruart macro anyway; the dynamic probing is only going to tell us what
-> we already know.
-> 
-> These changes allow us to use the addruart macros to find the debug
-> mapping addresses, rather than pulling them out of the mdesc. This means
-> that the addresses are only kept in the one place, and that we don't
-> need the mdesc nearly as early.
-> 
-> The first change updates all of the addruart macros to return both
-> physical and virtual addresses. I've used 'rp' and 'rv' as the macro
-> arguments to indicate which address goes where
-> 
-> The second change updates the debug setup routine to use the addruart
-> macro to establish the debug mapping, now that we can invoke the macro
-> to find the phyical and virtual addresses.
-> 
-> This allows us to delay the requirement to have a mdesc available until
-> much later. For example, we can parse one from the device tree once
-> we've reached C code.
-> 
-> May break OMAP1/2, as the addruart macros are more complex on these
-> platforms. I'd appreciate input from OMAP folks who may well tell me
-> that this isn't possible.
-> 
-Just tried this on OMAP4, and indeed it breaks OMAP2PLUS low level debug
-support.
+> No, you mean #28.
+oops, yes of course.
 
-Tony recently revamped the complete debug code, so that we can dynamically
-set correct debug port based on machine ID passed by boot-loaders. Based
-on this , the debug code determines the the correct debug port based on
-this using a scratch pad register.
+Best regards
+Uwe
 
-Tony can comment better on this issue.
-
-Regards,
-Santosh
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
