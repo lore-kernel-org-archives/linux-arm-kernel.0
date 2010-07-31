@@ -1,34 +1,28 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 31 Jul 2010 10:16:50 +0100
+Date: Sat, 31 Jul 2010 10:22:06 +0100
 Subject: [PATCH] PXA: Colibri320: Add M41T00 RTC support
-In-Reply-To: <201007310933.05611.marek.vasut@gmail.com>
+In-Reply-To: <20100731090554.GX17833@buzzloop.caiaq.de>
 References: <1280543453-28237-1-git-send-email-marek.vasut@gmail.com>
 	<201007310926.03292.pieterg@gmx.com>
 	<201007310933.05611.marek.vasut@gmail.com>
-Message-ID: <20100731091650.GB23886@n2100.arm.linux.org.uk>
+	<20100731090554.GX17833@buzzloop.caiaq.de>
+Message-ID: <20100731092206.GC23886@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 31, 2010 at 09:33:05AM +0200, Marek Vasut wrote:
-> Actually, there is one thing that puzzles me. Eric/Dan, shall I stick all the 
-> MFP configs into one (or two, one for board and once for cpu card) array or keep 
-> it split in multiple smaller arrays for each device? I think putting it all in 
-> one place would be more readable.
+On Sat, Jul 31, 2010 at 11:05:54AM +0200, Daniel Mack wrote:
+> Hmm, GPIOs for peripherals that are assembled on the module itself can
+> safely be configured unconditionally as it is impossible to use them for
+> anything else. For GPIOs that are allocted by a specific base board,
+> things are different though, especially for the the Colibri eval board
+> with it hundreds of jumpers on it. It's a convenience feature to have
+> them free for general purpose use just by disabling a certain config
+> directive.
 
-I've always been of the opinion that the pin configuration should be setup
-independently of what drivers are built into the kernel or not.
+It would probably make sense for their to be a primary table which at
+least ensures that all pins are setup to safe default values.  You
+really don't want the unconnected pins left floating, especially if
+they come out to some vulnerable connector or unconnected jumper pin.
 
-Consider a pin which is used as an output to drive some high impedance
-signal (eg, an input on another device) and it doesn't have any pull-up
-or pull down.  If on reset, this signal is also configured as a high
-impedance input, it will float.
-
-Inputs which float cause increased current drain (that's a fact of the
-high impedance FET input configurations - a floating signal ends up
-partially turning on both N and P FETs at both ends, which allows
-current to flow between supply and ground.  This is also why the current
-consumption of devices is related to their clock frequency and disabling
-clocks saves power.)
-
-So, it is desirable to have the pin configuration correct for the entire
-board, irrespective of the driver configuration.
+I'd suggest they're configured as inputs but with a pull-up or pull-down,
+not forgetting to consider the low power mode pull setting as well.
