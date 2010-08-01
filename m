@@ -1,59 +1,68 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 01 Aug 2010 13:15:13 +0200
-Subject: [PATCH] PXA: Fix wakealarm capability for pxa-rtc
-In-Reply-To: <201008010253.28319.marek.vasut@gmail.com> (Marek Vasut's message
-	of "Sun\, 1 Aug 2010 02\:53\:28 +0200")
-References: <1280550147-12380-1-git-send-email-marek.vasut@gmail.com>
-	<201008010213.24191.marek.vasut@gmail.com> <87iq3vyx7d.fsf@free.fr>
-	<201008010253.28319.marek.vasut@gmail.com>
-Message-ID: <87eieiziri.fsf@free.fr>
+From: saeed@marvell.com (Saeed Bishara)
+Date: Sun, 1 Aug 2010 14:39:24 +0300
+Subject: [RFC] dove: fix __io() definition to use bus based offset
+In-Reply-To: <201007291749.04181.arnd@arndb.de>
+References: <AANLkTinuXRH0XeD=3b0Wmq32SEEBxdevfj58EmSybcWu@mail.gmail.com>
+	<201007291726.39145.arnd@arndb.de>
+	<AANLkTikeoQf=WC8M9daA=O+tgPdMbDeQdMTWoT8U=CpK@mail.gmail.com>
+	<201007291749.04181.arnd@arndb.de>
+Message-ID: <FCBE654890C0334289D0AD3AF4EF009FCA51277579@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Vasut <marek.vasut@gmail.com> writes:
-
-> Dne Ne 1. srpna 2010 02:48:38 Robert Jarzmik napsal(a):
->> Marek Vasut <marek.vasut@gmail.com> writes:
->> > Dne So 31. ?ervence 2010 23:07:06 Robert Jarzmik napsal(a):
->> >> Marek Vasut <marek.vasut@gmail.com> writes:
->> >> > Dne So 31. ?ervence 2010 17:38:06 Robert Jarzmik napsal(a):
->> >> >> Marek Vasut <marek.vasut@gmail.com> writes:
->> >> >> > The wakealarm capability was incorrectly set after the RTC was
->> >> >> > registered, which resulted into the sysfs node not being created.
->> >> >> 
->> >> >> On my platform, without this patch:
->> >> >> > cat /sys/devices/platform/pxa-rtc/power/wakeup
->> >> >> > enabled
->> >> >> 
->> >> >> The sysfs node is created. What's the issue you're having ?
->> >> > 
->> >> > It's not created for me without this patch (and if you read the code,
->> >> > it is impossible to be created without this patch).
+ 
+>> >> -
+>> >> -#define __io(a)  ((void __iomem *)(((a) - 
+>DOVE_PCIE0_IO_PHYS_BASE) +\
+>> >> -                                  DOVE_PCIE0_IO_VIRT_BASE))
+>> >> -#define __mem_pci(a)           (a)
+>> >> +#define IO_SPACE_LIMIT 0xffffffff
+>> >> +#define __io(a)                __typesafe_io((a) - 
+>DOVE_PCIE0_IO_BUS_BASE + \
+>> >> +                                           
+>DOVE_PCIE0_IO_VIRT_BASE)
+>> >> +#define __mem_pci(a)   (a)
+Using DOVE_PCIE0_IO_BUS_BASE instead of DOVE_PCIE0_IO_PHYS_BASE approved by me
+>> >>
+>> >>  #endif
+>> >>
+>> >
+>> > The IO_SPACE_LIMIT still looks wrong, AFAICT it should be
+>> >
+>> > #define IO_SPACE_LIMIT (DOVE_PCIE0_IO_SIZE + 
+>DOVE_PCIE1_IO_SIZE - 1)
+>> >
 >> 
->> Are we talking about the same /sys/devices/platform/pxa-rtc/power/wakeup ?
->> Aren't you looking for /sys/class/rtc/rtc0/power/wakeup ?
+>> And it looks like PCIE1_IO space is not used as indicated in 
+>its __io() macro.
 >
-> I'm looking for /sys/class/rtc/rtc0/wakealarm
-
-Okay, I understand better, you're looking for the class driver wakup sysfs
-entry, and not the driver sysfs wakeup entry.
-
-So when you said "It's not created for me without this patch", you meant the
-class driver's sysfs entry, not the one I mentioned I presume ?
-
-Anyway, to straighten things up :
- - for an rtc driver, device_init_wakeup() has to be called before
- rtc_driver_register()
- - if that's not the case, /sys/class/rtc/rtc0/wakealarm won't be created
- - if that's the case, if the driver called device_init_wakeup(x, 1), the rtc
- registering will override the value with device_init_wakeup(x, 0)
-
-I don't think changing the current behaviour, ie. having by default the rtc
-driver *not* wake up from suspend is a good thing. As I see now your real
-problem, I would request you leave the existing "device_init_wakeup(x, 1)" *and*
-you add yours to make the class driver happy.
-
-Cheers.
-
---
-Robert
+>DOVE_PCIE1_IO_VIRT_BASE directly follows (DOVE_PCIE0_IO_VIRT_BASE +
+>DOVE_PCIE0_IO_SIZE), so the macro is the same, isn't it?
+That's right, the same macro should work for PCIE1 and PCIE0.
+>
+>However, I believe you also need the patch below to make thinks like
+>PCI-ISA bridges and VGA adapters as well as /dev/port access work.
+>
+>Not-at-all-tested-by: Arnd Bergmann <arnd@arndb.de>
+>Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+>--- a/arch/arm/mach-dove/pcie.c
+>+++ b/arch/arm/mach-dove/pcie.c
+>@@ -59,10 +59,10 @@ static int __init dove_pcie_setup(int nr, 
+>struct pci_sys_data *sys)
+> 	pp->io_space_name[sizeof(pp->io_space_name) - 1] = 0;
+> 	pp->res[0].name = pp->io_space_name;
+> 	if (pp->index == 0) {
+>-		pp->res[0].start = DOVE_PCIE0_IO_PHYS_BASE;
+>+		pp->res[0].start = DOVE_PCIE0_IO_BUS_BASE;
+> 		pp->res[0].end = pp->res[0].start + 
+>DOVE_PCIE0_IO_SIZE - 1;
+> 	} else {
+>-		pp->res[0].start = DOVE_PCIE1_IO_PHYS_BASE;
+>+		pp->res[0].start = DOVE_PCIE1_IO_BUS_BASE;
+> 		pp->res[0].end = pp->res[0].start + 
+>DOVE_PCIE1_IO_SIZE - 1;
+> 	}
+> 	pp->res[0].flags = IORESOURCE_IO;
+I agree also on this part.
+>
