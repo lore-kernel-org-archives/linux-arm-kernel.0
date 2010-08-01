@@ -1,434 +1,805 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 31 Aug 2010 23:31:59 -0700
-Subject: [PATCH 21/74] ST SPEAr : Added keyboard support
-In-Reply-To: <4C7DE35F.9080103@st.com>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<b62c01f06f5090775271a5f779db8508638eff15.1283161023.git.viresh.kumar@st.com>
-	<20100830164825.GA28186@core.coreip.homeip.net>
-	<4C7DE35F.9080103@st.com>
-Message-ID: <20100901063158.GF23585@core.coreip.homeip.net>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sun, 1 Aug 2010 00:21:04 -0600
+Subject: [PATCH] spi: add spi_tegra driver
+In-Reply-To: <1280450224-25118-1-git-send-email-ccross@google.com>
+References: <1280450224-25118-1-git-send-email-ccross@google.com>
+Message-ID: <AANLkTimUm_wj+gyxTa=X+845kLj1sZ9GF+jsmsBwxnLN@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 01, 2010 at 10:53:43AM +0530, rajeev wrote:
-> Hi Dmitry 
-> 
-> Please find my answers embedded below.
-> 
-> On 8/30/2010 10:18 PM, Dmitry Torokhov wrote:
-> > Hi Rajeev,
-> > 
-> 
-> [snip...]
-> 
-> > 
-> > First of all, please split platform modifications from the driver itself
-> > (as I care about the latter but less about the former).
-> >
-> 
-> Will be done.
->  
-> >> diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
-> >> index 9252940..c48b779 100644
-> 
-> [snip...]
-> 
-> >> +++ b/arch/arm/plat-spear/include/plat/keyboard.h
-> >> @@ -0,0 +1,154 @@
-> >> +/*
-> >> + * arch/arm/plat-spear/include/plat/keyboard.h
-> >> + *
-> >> + * Copyright (C) 2010 ST Microelectronics
-> >> + * Rajeev Kumar<rajeev-dlh.kumar@st.com>
-> >> + *
-> >> + * This file is licensed under the terms of the GNU General Public
-> >> + * License version 2. This program is licensed "as is" without any
-> >> + * warranty of any kind, whether express or implied.
-> >> + */
-> >> +
-> >> +#ifndef __PLAT_KEYBOARD_H
-> >> +#define __PLAT_KEYBOARD_H
-> >> +
-> >> +#include <linux/bitops.h>
-> >> +#include <linux/input.h>
-> >> +#include <mach/misc_regs.h>
-> >> +
-> >> +#define KEY(row, col, val) (((row) << 28 | ((col) << 24) | (val)))
-> >> +
-> > 
-> > Please use definitions from include/linux/input/matrix_keypad.h
-> > 
-> 
-> Ok. I will check it and modify.
-> 
-> >> +#define DECLARE_KEYMAP(name) \
-> >> +int name[] = {\
-> >> +     KEY(0, 0, KEY_ESC), \
-> >> +     KEY(0, 1, KEY_1), \
-> >> +     KEY(0, 2, KEY_2), \
-> >> +     KEY(0, 3, KEY_3), \
-> >> +     KEY(0, 4, KEY_4), \
-> >> +     KEY(0, 5, KEY_5), \
-> >> +     KEY(0, 6, KEY_6), \
-> >> +     KEY(0, 7, KEY_7), \
-> >> +     KEY(0, 8, KEY_8), \
-> >> +     KEY(1, 0, KEY_9), \
-> >> +     KEY(1, 1, KEY_MINUS), \
-> >> +     KEY(1, 2, KEY_EQUAL), \
-> >> +     KEY(1, 3, KEY_BACKSPACE), \
-> >> +     KEY(1, 4, KEY_TAB), \
-> >> +     KEY(1, 5, KEY_Q), \
-> >> +     KEY(1, 6, KEY_W), \
-> >> +     KEY(1, 7, KEY_E), \
-> >> +     KEY(1, 8, KEY_R), \
-> >> +     KEY(2, 0, KEY_T), \
-> >> +     KEY(2, 1, KEY_Y), \
-> >> +     KEY(2, 2, KEY_U), \
-> >> +     KEY(2, 3, KEY_I), \
-> >> +     KEY(2, 4, KEY_O), \
-> >> +     KEY(2, 5, KEY_P), \
-> >> +     KEY(2, 6, KEY_LEFTBRACE), \
-> >> +     KEY(2, 7, KEY_RIGHTBRACE), \
-> >> +     KEY(2, 8, KEY_ENTER), \
-> >> +     KEY(3, 0, KEY_LEFTCTRL), \
-> >> +     KEY(3, 1, KEY_A), \
-> >> +     KEY(3, 2, KEY_S), \
-> >> +     KEY(3, 3, KEY_D), \
-> >> +     KEY(3, 4, KEY_F), \
-> >> +     KEY(3, 5, KEY_G), \
-> >> +     KEY(3, 6, KEY_H), \
-> >> +     KEY(3, 7, KEY_J), \
-> >> +     KEY(3, 8, KEY_K), \
-> >> +     KEY(4, 0, KEY_L), \
-> >> +     KEY(4, 1, KEY_SEMICOLON), \
-> >> +     KEY(4, 2, KEY_APOSTROPHE), \
-> >> +     KEY(4, 3, KEY_GRAVE), \
-> >> +     KEY(4, 4, KEY_LEFTSHIFT), \
-> >> +     KEY(4, 5, KEY_BACKSLASH), \
-> >> +     KEY(4, 6, KEY_Z), \
-> >> +     KEY(4, 7, KEY_X), \
-> >> +     KEY(4, 8, KEY_C), \
-> >> +     KEY(4, 0, KEY_L), \
-> >> +     KEY(4, 1, KEY_SEMICOLON), \
-> >> +     KEY(4, 2, KEY_APOSTROPHE), \
-> >> +     KEY(4, 3, KEY_GRAVE), \
-> >> +     KEY(4, 4, KEY_LEFTSHIFT), \
-> >> +     KEY(4, 5, KEY_BACKSLASH), \
-> >> +     KEY(4, 6, KEY_Z), \
-> >> +     KEY(4, 7, KEY_X), \
-> >> +     KEY(4, 8, KEY_C), \
-> >> +     KEY(4, 0, KEY_L), \
-> >> +     KEY(4, 1, KEY_SEMICOLON), \
-> >> +     KEY(4, 2, KEY_APOSTROPHE), \
-> >> +     KEY(4, 3, KEY_GRAVE), \
-> >> +     KEY(4, 4, KEY_LEFTSHIFT), \
-> >> +     KEY(4, 5, KEY_BACKSLASH), \
-> >> +     KEY(4, 6, KEY_Z), \
-> >> +     KEY(4, 7, KEY_X), \
-> >> +     KEY(4, 8, KEY_C), \
-> >> +     KEY(5, 0, KEY_V), \
-> >> +     KEY(5, 1, KEY_B), \
-> >> +     KEY(5, 2, KEY_N), \
-> >> +     KEY(5, 3, KEY_M), \
-> >> +     KEY(5, 4, KEY_COMMA), \
-> >> +     KEY(5, 5, KEY_DOT), \
-> >> +     KEY(5, 6, KEY_SLASH), \
-> >> +     KEY(5, 7, KEY_RIGHTSHIFT), \
-> >> +     KEY(5, 8, KEY_KPASTERISK), \
-> >> +     KEY(6, 0, KEY_LEFTALT), \
-> >> +     KEY(6, 1, KEY_SPACE), \
-> >> +     KEY(6, 2, KEY_CAPSLOCK), \
-> >> +     KEY(6, 3, KEY_F1), \
-> >> +     KEY(6, 4, KEY_F2), \
-> >> +     KEY(6, 5, KEY_F3), \
-> >> +     KEY(6, 6, KEY_F4), \
-> >> +     KEY(6, 7, KEY_F5), \
-> >> +     KEY(6, 8, KEY_F6), \
-> >> +     KEY(7, 0, KEY_F7), \
-> >> +     KEY(7, 1, KEY_F8), \
-> >> +     KEY(7, 2, KEY_F9), \
-> >> +     KEY(7, 3, KEY_F10), \
-> >> +     KEY(7, 4, KEY_NUMLOCK), \
-> >> +     KEY(7, 5, KEY_SCROLLLOCK), \
-> >> +     KEY(7, 6, KEY_KP7), \
-> >> +     KEY(7, 7, KEY_KP8), \
-> >> +     KEY(7, 8, KEY_KP9), \
-> >> +     KEY(8, 0, KEY_KPMINUS), \
-> >> +     KEY(8, 1, KEY_KP4), \
-> >> +     KEY(8, 2, KEY_KP5), \
-> >> +     KEY(8, 3, KEY_KP6), \
-> >> +     KEY(8, 4, KEY_KPPLUS), \
-> >> +     KEY(8, 5, KEY_KP1), \
-> >> +     KEY(8, 6, KEY_KP2), \
-> >> +     KEY(8, 7, KEY_KP3), \
-> >> +     KEY(8, 8, KEY_KP0), \
-> >> +};
-> > 
-> > Hm, I'd expect this to be in particular board code, not in the header
-> > file.
-> > 
-> 
-> Currently we have support for evaluation boards only and all of them will have
-> this structure in their board source files. In order to remove redundant code we
-> kept it in plat/keyboard.h.
-> 
+Hi Colin,
 
-So call it "spear_default_keymap" and put it right into the driver? And
-then allow platform code override it.
+Looks like a pretty nice driver.  Some comments/questions below.
 
-> >> +/**
-> >> + * struct kbd_platform_data - keymap for spear keyboards
-> >> + * keymap: pointer to array of values encoded with KEY() macro representing
-> >> + * keymap
-> >> + * keymapsize: number of entries (initialized) in this keymap
-> >> + * rep: current values for autorepeat parameters
-> >> + *
-> >> + * This structure is supposed to be used by platform code to supply
-> >> + * keymaps to drivers that implement keyboards.
-> >> + */
-> >> +struct kbd_platform_data {
-> >> +     int *keymap;
-> >> +     unsigned int keymapsize;
-> >> +     unsigned int rep:1;
-> > 
-> > Bool please.
-> > 
-> 
-> OK
-> 
-> >> +};
-> >> +
-> >> +/* This function is used to set platform data field of pdev->dev */
-> >> +static inline void
-> >> +kbd_set_plat_data(struct platform_device *pdev, struct kbd_platform_data *data)
-> >> +{
-> >> +#ifdef CONFIG_ARCH_SPEAR13XX
-> >> +#define KBD_PAD_SEL  (BIT(18) | BIT(20) | BIT(22) | BIT(24) | BIT(26))
-> >> +
-> >> +     u32 val;
-> >> +     /* Workaround:Setting bit for routing it to the IP */
-> >> +     val = readl(PAD_FUNCTION_EN_2);
-> >> +     val &= ~KBD_PAD_SEL;
-> >> +     writel(val, PAD_FUNCTION_EN_2);
-> > 
-> > Why does it belong here?
-> > 
-> 
-> Sorry. It will be handled in padmux framework.
-> 
-> >> +#endif
-> >> +     pdev->dev.platform_data = data;
-> >> +}
-> >> +#endif /* __PLAT_KEYBOARD_H */
-> >> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
-> >> index 9cc488d..2d7e3a8 100644
-> >> --- a/drivers/input/keyboard/Kconfig
-> >> +++ b/drivers/input/keyboard/Kconfig
-> >> @@ -424,6 +424,14 @@ config KEYBOARD_OMAP
-> >>         To compile this driver as a module, choose M here: the
-> >>         module will be called omap-keypad.
-> >>
-> >> +config KEYBOARD_SPEAR
-> >> +     tristate "ST SPEAR keyboard support"
-> > 
-> > No arch/platform dependencies?
-> > 
-> 
-> Will add them.
-> 
-> >> +     help
-> 
-> [snip...]
-> 
-> >> +struct spear_kbd {
-> >> +     struct input_dev *input;
-> >> +     void __iomem *io_base;          /* Keyboard Base Address */
-> >> +     struct clk *clk;
-> >> +     int *keymap;
-> > 
-> > You need a copy of keymap here so that userspace can modify it safely
-> > via EVIOCSKEYCODE.
-> > 
-> 
-> We have one copy of struct spear_kbd per device structure. I think it
-> will be fine if we change this structure only. And so don't need to copy
-> another structure in driver.
+Cheers,
+g.
 
-Normally such platform data should be declared as 'const' and drivers
-should not modify such data. Also unbinding device from driver and
-rebinding later should restore the device into pristine state. Having a
-copy of keymap in spear_kbd allows to achieve such behavior.
+On Thu, Jul 29, 2010 at 6:37 PM, Colin Cross <ccross@google.com> wrote:
+> From: Erik Gilling <konkers@android.com>
+>
+> CC: spi-devel-general at lists.sourceforge.net
+> Signed-off-by: Erik Gilling <konkers@android.com>
 
-> 
-> >> +};
-> >> +/* TODO: Need to optimize this function */
-> >> +static inline int get_key_value(struct spear_kbd *dev, int row, int col)
-> >> +{
-> >> +     int i, key;
-> >> +     int *keymap = dev->keymap;
-> >> +
-> >> +     key = KEY(row, col, 0);
-> >> +     for (i = 0; keymap[i] != 0; i++)
-> >> +             if ((keymap[i] & KEY_MASK) == key)
-> >> +                     return keymap[i] & KEY_VALUE;
-> >> +     return -ENOKEY;
-> >> +}
-> >> +
-> >> +static irqreturn_t spear_kbd_interrupt(int irq, void *dev_id)
-> >> +{
-> >> +     struct spear_kbd *dev = dev_id;
-> >> +     static u8 last_key ;
-> >> +     static u8 last_event;
-> > 
-> > No statics please, pull it into spear_kbd structure.
-> >
-> 
-> Ok
->  
-> >> +     int key;
-> >> +     u8 sts, val = 0;
-> >> +
-> >> +     if (dev == NULL) {
-> > 
-> > How can it be?
-> > 
-> 
-> Not needed, will be fixed.
-> 
-> >> +             pr_err("Keyboard: Invalid dev_id in irq handler\n");
-> >> +             return IRQ_NONE;
-> >> +     }
-> >> +
-> >> +     sts = readb(dev->io_base + STATUS_REG);
-> >> +     if (sts & DATA_AVAIL) {
-> >> +             /* following reads active (row, col) pair */
-> >> +             val = readb(dev->io_base + DATA_REG);
-> >> +             key = get_key_value(dev, (val & ROW_MASK)>>ROW_SHIFT, (val
-> >> +                                     & COLUMN_MASK));
-> >> +
-> >> +             /* valid key press event */
-> >> +             if (key >= 0) {
-> >> +                     if (last_event == 1) {
-> >> +                             /* check if we missed a release event */
-> >> +                             input_report_key(dev->input, last_key,
-> >> +                                             !last_event);
-> >> +                     }
-> >> +                     /* notify key press */
-> >> +                     last_event = 1;
-> >> +                     last_key = key;
-> >> +                     input_report_key(dev->input, key, last_event);
-> >> +             } else {
-> >> +                     /* notify key release */
-> >> +                     last_event = 0;
-> >> +                     input_report_key(dev->input, last_key, last_event);
-> >> +             }
-> >> +     } else
-> > 
-> > Don't you need to clear interrupt here? You got it somehow...
-> >
-> 
-> I can think of only one way in which this handler is called for some other
-> device interrupt, that is when this irq line is shared between peripherals.
-> In that case if interrupt is not meant for kbd then kbd shouldn't clear it.
+You should also add your s-o-b line when passing on patches.
 
-You would be clearing IRQ condition _in your device_ so that sould not
-affect the other device in any way.
+> ---
+> This patch depends on the Tegra APB DMA driver:
+> [PATCH] [ARM] tegra: Add APB DMA support
 
-> Isn't it fine???
 
-I guess it should be OK.
+What is the status of the APB DMA driver?  Is it going to be merged in 2.6.36?
 
-> 
-> >> +             return IRQ_NONE;
-> >> +
-> >> +     /* clear interrupt */
-> >> +     writeb(0, dev->io_base + STATUS_REG);
-> >> +
-> >> +     return IRQ_HANDLED;
-> >> +}
-> >> +
-> >> +static int __init spear_kbd_probe(struct platform_device *pdev)
-> >> +{
-> 
-> [snip...]
-> 
-> >> +     ret = request_irq(irq, spear_kbd_interrupt, 0, "keyboard",
-> >> +                     kbd);
-> >> +     if (ret) {
-> >> +             dev_err(&pdev->dev, "request_irq fail\n");
-> >> +             goto err_iounmap;
-> >> +     }
-> >> +
-> > 
-> > Are you 100% sure the device is shut off at this point? Because if it
-> > isn't you risk to get interrupt before you allocated your input device.
-> >
-> 
-> I will check and place it at correct place.
-> 
-> >> +
-> >> +     /* start key scan */
-> >> +     val |= START_SCAN;
-> >> +     writew(val, kbd->io_base + MODE_REG);
-> > 
-> > This should go into open() method.
-> > 
-> 
-> OK.
-> 
-> >> +static int spear_kbd_remove(struct platform_device *pdev)
-> >> +{
-> >> +     struct spear_kbd *kbd = platform_get_drvdata(pdev);
-> >> +     struct resource *res;
-> >> +     u16 val;
-> >> +     int irq;
-> >> +
-> >> +     val = readw(kbd->io_base + MODE_REG);
-> >> +     val &= ~START_SCAN;
-> >> +     writew(val, kbd->io_base + MODE_REG);
-> > 
-> > Need to go into close() method.
-> >
-> 
-> OK.
->  
-> >> +
-> >> +     /* unregister input device */
-> >> +     input_unregister_device(kbd->input);
-> >> +     input_free_device(kbd->input);
-> > 
-> > No free after unregister.
-> > 
-> 
-> OK.
-> 
-> >> +
-> >> +     irq = platform_get_irq(pdev, 0);
-> >> +     if (irq)
-> >> +             free_irq(irq, pdev);
-> > 
-> > Can it ever be 0 here?
-> > 
-> 
-> No. Will correct.
-> 
-> 
-> >> +
-> >> +static struct platform_driver spear_kbd_driver = {
-> >> +     .probe          = spear_kbd_probe,
-> >> +     .remove         = spear_kbd_remove,
-> >> +     .suspend        = spear_kbd_suspend,
-> >> +     .resume         = spear_kbd_resume,
-> > 
-> > Switch to dev_pm_ops please.
-> > 
-> 
-> Ok.
-> 
-> 
-> Thanks,
-> rajeev.
-> 
+> ---
+> ?drivers/spi/Kconfig ? ? | ? ?6 +
+> ?drivers/spi/Makefile ? ?| ? ?1 +
+> ?drivers/spi/spi_tegra.c | ?651 +++++++++++++++++++++++++++++++++++++++++++++++
+> ?3 files changed, 658 insertions(+), 0 deletions(-)
+> ?create mode 100644 drivers/spi/spi_tegra.c
+>
+> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+> index 91c2f4f..c07e0de 100644
+> --- a/drivers/spi/Kconfig
+> +++ b/drivers/spi/Kconfig
+> @@ -298,6 +298,12 @@ config SPI_STMP3XXX
+> ? ? ? ?help
+> ? ? ? ? ?SPI driver for Freescale STMP37xx/378x SoC SSP interface
+>
+> +config SPI_TEGRA
+> + ? ? ? tristate "Nvidia Tegra SPI controller"
+> + ? ? ? depends on ARCH_TEGRA
+> + ? ? ? help
+> + ? ? ? ? SPI driver for NVidia Tegra SoCs
+> +
+> ?config SPI_TXX9
+> ? ? ? ?tristate "Toshiba TXx9 SPI controller"
+> ? ? ? ?depends on GENERIC_GPIO && CPU_TX49XX
+> diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
+> index e9cbd18..b6573d8 100644
+> --- a/drivers/spi/Makefile
+> +++ b/drivers/spi/Makefile
+> @@ -39,6 +39,7 @@ obj-$(CONFIG_SPI_PPC4xx) ? ? ? ? ? ? ?+= spi_ppc4xx.o
+> ?obj-$(CONFIG_SPI_S3C24XX_GPIO) ? ? ? ? += spi_s3c24xx_gpio.o
+> ?obj-$(CONFIG_SPI_S3C24XX) ? ? ? ? ? ? ?+= spi_s3c24xx_hw.o
+> ?obj-$(CONFIG_SPI_S3C64XX) ? ? ? ? ? ? ?+= spi_s3c64xx.o
+> +obj-$(CONFIG_SPI_TEGRA) ? ? ? ? ? ? ? ? ? ? ? ?+= spi_tegra.o
+> ?obj-$(CONFIG_SPI_TXX9) ? ? ? ? ? ? ? ? += spi_txx9.o
+> ?obj-$(CONFIG_SPI_XILINX) ? ? ? ? ? ? ? += xilinx_spi.o
+> ?obj-$(CONFIG_SPI_XILINX_OF) ? ? ? ? ? ?+= xilinx_spi_of.o
+> diff --git a/drivers/spi/spi_tegra.c b/drivers/spi/spi_tegra.c
+> new file mode 100644
+> index 0000000..72fc4d4
+> --- /dev/null
+> +++ b/drivers/spi/spi_tegra.c
+> @@ -0,0 +1,651 @@
+> +/*
+> + * drivers/spi/spi_tegra.c
+
+I find it is more useful, and it is my preference, to have a one-line
+description of what the file actually is here.  Showing the filename
+is just redundant and doesn't tell a reader anything new.
+
+> + *
+> + * Copyright (C) 2010 Google, Inc.
+> + *
+> + * Author:
+> + * ? ? Erik Gilling <konkers@android.com>
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#undef DEBUG
+
+trim
+
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/err.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/io.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/dmapool.h>
+> +#include <linux/clk.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/delay.h>
+> +
+> +#include <linux/spi/spi.h>
+> +
+> +#include <mach/dma.h>
+> +
+> +#define DRIVER_NAME ? ? ? ? ? ?"spi_tegra"
+
+Used only twice in 2 side-by-side locations.  I'd trim, or at least
+move to where it is actually used.
+
+> +
+> +#define BUSY_TIMEOUT ? ? ? ? ? 1000
+
+Used exactly once.  May be better defined and documented at the usage site
+
+> +
+> +#define SLINK_COMMAND ? ? ? ? ?0x000
+> +#define ? BIT_LENGTH(x) ? ? ? ? ? ? ? ? ? ? ? ?(((x) & 0x1f) << 0)
+> +#define ? WORD_SIZE(x) ? ? ? ? ? ? ? ? (((x) & 0x1f) << 5)
+> +#define ? BOTH_EN ? ? ? ? ? ? ? ? ? ? ?(1 << 10)
+> +#define ? CS_SW ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(1 << 11)
+> +#define ? CS_VALUE ? ? ? ? ? ? ? ? ? ? (1 << 12)
+> +#define ? CS_POLARITY ? ? ? ? ? ? ? ? ?(1 << 13)
+> +#define ? IDLE_SDA_DRIVE_LOW ? ? ? ? ? (0 << 16)
+> +#define ? IDLE_SDA_DRIVE_HIGH ? ? ? ? ?(1 << 16)
+> +#define ? IDLE_SDA_PULL_LOW ? ? ? ? ? ?(2 << 16)
+> +#define ? IDLE_SDA_PULL_HIGH ? ? ? ? ? (3 << 16)
+> +#define ? IDLE_SDA_MASK ? ? ? ? ? ? ? ? ? ? ? ?(3 << 16)
+> +#define ? CS_POLARITY1 ? ? ? ? ? ? ? ? (1 << 20)
+> +#define ? CK_SDA ? ? ? ? ? ? ? ? ? ? ? (1 << 21)
+> +#define ? CS_POLARITY2 ? ? ? ? ? ? ? ? (1 << 22)
+> +#define ? CS_POLARITY3 ? ? ? ? ? ? ? ? (1 << 23)
+> +#define ? IDLE_SCLK_DRIVE_LOW ? ? ? ? ?(0 << 24)
+> +#define ? IDLE_SCLK_DRIVE_HIGH ? ? ? ? (1 << 24)
+> +#define ? IDLE_SCLK_PULL_LOW ? ? ? ? ? (2 << 24)
+> +#define ? IDLE_SCLK_PULL_HIGH ? ? ? ? ?(3 << 24)
+> +#define ? IDLE_SCLK_MASK ? ? ? ? ? ? ? (3 << 24)
+> +#define ? M_S ? ? ? ? ? ? ? ? ? ? ? ? ?(1 << 28)
+> +#define ? WAIT ? ? ? ? ? ? ? ? ? ? ? ? (1 << 29)
+> +#define ? GO ? ? ? ? ? ? ? ? ? ? ? ? ? (1 << 30)
+> +#define ? ENB ? ? ? ? ? ? ? ? ? ? ? ? ?(1 << 31)
+> +
+> +#define SLINK_COMMAND2 ? ? ? ? 0x004
+> +#define ? LSBFE ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(1 << 0)
+> +#define ? SSOE ? ? ? ? ? ? ? ? ? ? ? ? (1 << 1)
+> +#define ? SPIE ? ? ? ? ? ? ? ? ? ? ? ? (1 << 4)
+> +#define ? BIDIROE ? ? ? ? ? ? ? ? ? ? ?(1 << 6)
+> +#define ? MODFEN ? ? ? ? ? ? ? ? ? ? ? (1 << 7)
+> +#define ? INT_SIZE(x) ? ? ? ? ? ? ? ? ?(((x) & 0x1f) << 8)
+> +#define ? CS_ACTIVE_BETWEEN ? ? ? ? ? ?(1 << 17)
+> +#define ? SS_EN_CS(x) ? ? ? ? ? ? ? ? ?(((x) & 0x3) << 18)
+> +#define ? SS_SETUP(x) ? ? ? ? ? ? ? ? ?(((x) & 0x3) << 20)
+> +#define ? FIFO_REFILLS_0 ? ? ? ? ? ? ? (0 << 22)
+> +#define ? FIFO_REFILLS_1 ? ? ? ? ? ? ? (1 << 22)
+> +#define ? FIFO_REFILLS_2 ? ? ? ? ? ? ? (2 << 22)
+> +#define ? FIFO_REFILLS_3 ? ? ? ? ? ? ? (3 << 22)
+> +#define ? FIFO_REFILLS_MASK ? ? ? ? ? ?(3 << 22)
+> +#define ? WAIT_PACK_INT(x) ? ? ? ? ? ? (((x) & 0x7) << 26)
+> +#define ? SPC0 ? ? ? ? ? ? ? ? ? ? ? ? (1 << 29)
+> +#define ? TXEN ? ? ? ? ? ? ? ? ? ? ? ? (1 << 30)
+> +#define ? RXEN ? ? ? ? ? ? ? ? ? ? ? ? (1 << 31)
+> +
+> +#define SLINK_STATUS ? ? ? ? ? 0x008
+> +#define ? COUNT(val) ? ? ? ? ? ? ? ? ? (((val) >> 0) & 0x1f)
+> +#define ? WORD(val) ? ? ? ? ? ? ? ? ? ?(((val) >> 5) & 0x1f)
+> +#define ? BLK_CNT(val) ? ? ? ? ? ? ? ? (((val) >> 0) & 0xffff)
+> +#define ? MODF ? ? ? ? ? ? ? ? ? ? ? ? (1 << 16)
+> +#define ? RX_UNF ? ? ? ? ? ? ? ? ? ? ? (1 << 18)
+> +#define ? TX_OVF ? ? ? ? ? ? ? ? ? ? ? (1 << 19)
+> +#define ? TX_FULL ? ? ? ? ? ? ? ? ? ? ?(1 << 20)
+> +#define ? TX_EMPTY ? ? ? ? ? ? ? ? ? ? (1 << 21)
+> +#define ? RX_FULL ? ? ? ? ? ? ? ? ? ? ?(1 << 22)
+> +#define ? RX_EMPTY ? ? ? ? ? ? ? ? ? ? (1 << 23)
+> +#define ? TX_UNF ? ? ? ? ? ? ? ? ? ? ? (1 << 24)
+> +#define ? RX_OVF ? ? ? ? ? ? ? ? ? ? ? (1 << 25)
+> +#define ? TX_FLUSH ? ? ? ? ? ? ? ? ? ? (1 << 26)
+> +#define ? RX_FLUSH ? ? ? ? ? ? ? ? ? ? (1 << 27)
+> +#define ? SCLK ? ? ? ? ? ? ? ? ? ? ? ? (1 << 28)
+> +#define ? ERR ? ? ? ? ? ? ? ? ? ? ? ? ?(1 << 29)
+> +#define ? RDY ? ? ? ? ? ? ? ? ? ? ? ? ?(1 << 30)
+> +#define ? BSY ? ? ? ? ? ? ? ? ? ? ? ? ?(1 << 31)
+> +
+> +#define SLINK_MAS_DATA ? ? ? ? 0x010
+> +#define SLINK_SLAVE_DATA ? ? ? 0x014
+> +
+> +#define SLINK_DMA_CTL ? ? ? ? ?0x018
+> +#define ? DMA_BLOCK_SIZE(x) ? ? ? ? ? ?(((x) & 0xffff) << 0)
+> +#define ? TX_TRIG_1 ? ? ? ? ? ? ? ? ? ?(0 << 16)
+> +#define ? TX_TRIG_4 ? ? ? ? ? ? ? ? ? ?(1 << 16)
+> +#define ? TX_TRIG_8 ? ? ? ? ? ? ? ? ? ?(2 << 16)
+> +#define ? TX_TRIG_16 ? ? ? ? ? ? ? ? ? (3 << 16)
+> +#define ? TX_TRIG_MASK ? ? ? ? ? ? ? ? (3 << 16)
+> +#define ? RX_TRIG_1 ? ? ? ? ? ? ? ? ? ?(0 << 18)
+> +#define ? RX_TRIG_4 ? ? ? ? ? ? ? ? ? ?(1 << 18)
+> +#define ? RX_TRIG_8 ? ? ? ? ? ? ? ? ? ?(2 << 18)
+> +#define ? RX_TRIG_16 ? ? ? ? ? ? ? ? ? (3 << 18)
+> +#define ? RX_TRIG_MASK ? ? ? ? ? ? ? ? (3 << 18)
+> +#define ? PACKED ? ? ? ? ? ? ? ? ? ? ? (1 << 20)
+> +#define ? PACK_SIZE_4 ? ? ? ? ? ? ? ? ?(0 << 21)
+> +#define ? PACK_SIZE_8 ? ? ? ? ? ? ? ? ?(1 << 21)
+> +#define ? PACK_SIZE_16 ? ? ? ? ? ? ? ? (2 << 21)
+> +#define ? PACK_SIZE_32 ? ? ? ? ? ? ? ? (3 << 21)
+> +#define ? PACK_SIZE_MASK ? ? ? ? ? ? ? (3 << 21)
+> +#define ? IE_TXC ? ? ? ? ? ? ? ? ? ? ? (1 << 26)
+> +#define ? IE_RXC ? ? ? ? ? ? ? ? ? ? ? (1 << 27)
+> +#define ? DMA_EN ? ? ? ? ? ? ? ? ? ? ? (1 << 31)
+> +
+> +#define SLINK_STATUS2 ? ? ? ? ?0x01c
+> +#define ? TX_FIFO_EMPTY_COUNT(val) ? ? (((val) & 0x3f) >> 0)
+> +#define ? RX_FIFO_FULL_COUNT(val) ? ? ?(((val) & 0x3f) >> 16)
+> +
+> +#define SLINK_TX_FIFO ? ? ? ? ?0x100
+> +#define SLINK_RX_FIFO ? ? ? ? ?0x180
+> +
+> +static const unsigned long spi_tegra_req_sels[] = {
+> + ? ? ? TEGRA_DMA_REQ_SEL_SL2B1,
+> + ? ? ? TEGRA_DMA_REQ_SEL_SL2B2,
+> + ? ? ? TEGRA_DMA_REQ_SEL_SL2B3,
+> + ? ? ? TEGRA_DMA_REQ_SEL_SL2B4,
+> +};
+> +
+> +static inline unsigned bytes_per_word(u8 bits)
+> +{
+> + ? ? ? WARN_ON((bits < 1) || bits > 32);
+
+This condition has already been tested for in spi_tegra_start_transfer()
+
+> + ? ? ? if (bits <= 8)
+> + ? ? ? ? ? ? ? return 1;
+> + ? ? ? else if (bits <= 16)
+> + ? ? ? ? ? ? ? return 2;
+> + ? ? ? else if (bits <= 24)
+> + ? ? ? ? ? ? ? return 3;
+> + ? ? ? else
+> + ? ? ? ? ? ? ? return 4;
+
+return ((bits - 1) / 8) + 1
+
+Also, this function is used in exactly 1 place.  Consider moving it
+down to nearer where it is called, or open coding it instead.
+
+> +}
+> +
+> +#define BB_LEN ? ? ? ? ? ? ? ? 32
+> +
+> +struct spi_tegra_data {
+> + ? ? ? struct spi_master ? ? ? *master;
+> + ? ? ? struct platform_device ?*pdev;
+> + ? ? ? spinlock_t ? ? ? ? ? ? ?lock;
+> +
+> + ? ? ? struct clk ? ? ? ? ? ? ?*clk;
+> + ? ? ? void __iomem ? ? ? ? ? ?*base;
+> + ? ? ? unsigned long ? ? ? ? ? phys;
+> +
+> + ? ? ? u32 ? ? ? ? ? ? ? ? ? ? cur_speed;
+> +
+> + ? ? ? struct list_head ? ? ? ?queue;
+> + ? ? ? struct spi_transfer ? ? *cur;
+> + ? ? ? unsigned ? ? ? ? ? ? ? ?cur_pos;
+> + ? ? ? unsigned ? ? ? ? ? ? ? ?cur_len;
+> + ? ? ? unsigned ? ? ? ? ? ? ? ?cur_bytes_per_word;
+> +
+> + ? ? ? /* The tegra spi controller has a bug which causes the first word
+> + ? ? ? ?* in PIO transactions to be garbage. ?Since packed DMA transactions
+> + ? ? ? ?* require transfers to be 4 byte aligned we need a bounce buffer
+> + ? ? ? ?* for the generic case.
+> + ? ? ? ?*/
+> + ? ? ? struct tegra_dma_req ? ?rx_dma_req;
+> + ? ? ? struct tegra_dma_channel *rx_dma;
+> + ? ? ? u32 ? ? ? ? ? ? ? ? ? ? *rx_bb;
+> + ? ? ? dma_addr_t ? ? ? ? ? ? ?rx_bb_phys;
+> +};
+> +
+> +
+> +static unsigned long spi_readl(struct spi_tegra_data *tspi, unsigned long reg)
+
+To avoid global namespace collisions, please prefix all static symbols
+with something like tegra_spi_.
+
+> +{
+> + ? ? ? return readl(tspi->base + reg);
+> +}
+> +
+> +static void spi_writel(struct spi_tegra_data *tspi, unsigned long val,
+> + ? ? ? ? ? ? ? ? ? ? ?unsigned long reg)
+> +{
+> + ? ? ? writel(val, tspi->base + reg);
+> +}
+
+Are the accessor redirects really necessary?  Is there any likelyhood
+that anything other than readl/writel will ever be used to access the
+device regs?
+
+> +
+> +static void spi_tegra_go(struct spi_tegra_data *tspi)
+> +{
+> + ? ? ? unsigned long val;
+> +
+> + ? ? ? wmb();
+> +
+> + ? ? ? val = spi_readl(tspi, SLINK_DMA_CTL);
+> + ? ? ? val &= ~DMA_BLOCK_SIZE(~0) & ~DMA_EN;
+> + ? ? ? val |= DMA_BLOCK_SIZE(tspi->rx_dma_req.size / 4 - 1);
+> + ? ? ? spi_writel(tspi, val, SLINK_DMA_CTL);
+> +
+> + ? ? ? tegra_dma_enqueue_req(tspi->rx_dma, &tspi->rx_dma_req);
+> +
+> + ? ? ? val |= DMA_EN;
+> + ? ? ? spi_writel(tspi, val, SLINK_DMA_CTL);
+> +}
+> +
+> +static unsigned spi_tegra_fill_tx_fifo(struct spi_tegra_data *tspi,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct spi_transfer *t)
+> +{
+> + ? ? ? unsigned len = min(t->len - tspi->cur_pos, BB_LEN *
+> + ? ? ? ? ? ? ? ? ? ? ? ? ?tspi->cur_bytes_per_word);
+> + ? ? ? u8 *tx_buf = (u8 *)t->tx_buf + tspi->cur_pos;
+> + ? ? ? int i, j;
+> + ? ? ? unsigned long val;
+> +
+> + ? ? ? val = spi_readl(tspi, SLINK_COMMAND);
+> + ? ? ? val &= ~WORD_SIZE(~0);
+> + ? ? ? val |= WORD_SIZE(len / tspi->cur_bytes_per_word - 1);
+> + ? ? ? spi_writel(tspi, val, SLINK_COMMAND);
+> +
+> + ? ? ? for (i = 0; i < len; i += tspi->cur_bytes_per_word) {
+> + ? ? ? ? ? ? ? val = 0;
+> + ? ? ? ? ? ? ? for (j = 0; j < tspi->cur_bytes_per_word; j++)
+> + ? ? ? ? ? ? ? ? ? ? ? val |= tx_buf[i + j] << j * 8;
+> +
+> + ? ? ? ? ? ? ? spi_writel(tspi, val, SLINK_TX_FIFO);
+> + ? ? ? }
+> +
+> + ? ? ? tspi->rx_dma_req.size = len / tspi->cur_bytes_per_word * 4;
+> +
+> + ? ? ? return len;
+> +}
+> +
+> +static unsigned spi_tegra_drain_rx_fifo(struct spi_tegra_data *tspi,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct spi_transfer *t)
+> +{
+> + ? ? ? unsigned len = tspi->cur_len;
+> + ? ? ? u8 *rx_buf = (u8 *)t->rx_buf + tspi->cur_pos;
+> + ? ? ? int i, j;
+> + ? ? ? unsigned long val;
+> +
+> + ? ? ? for (i = 0; i < len; i += tspi->cur_bytes_per_word) {
+> + ? ? ? ? ? ? ? val = tspi->rx_bb[i / tspi->cur_bytes_per_word];
+> + ? ? ? ? ? ? ? for (j = 0; j < tspi->cur_bytes_per_word; j++)
+> + ? ? ? ? ? ? ? ? ? ? ? rx_buf[i + j] = (val >> (j * 8)) & 0xff;
+> + ? ? ? }
+> +
+> + ? ? ? return len;
+> +}
+> +
+> +static int spi_tegra_start_transfer(struct spi_device *spi,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct spi_transfer *t)
+> +{
+> + ? ? ? struct spi_tegra_data *tspi = spi_master_get_devdata(spi->master);
+> + ? ? ? u32 speed;
+> + ? ? ? u8 bits_per_word;
+> + ? ? ? unsigned long val;
+> +
+> + ? ? ? speed = t->speed_hz ? t->speed_hz : spi->max_speed_hz;
+> + ? ? ? bits_per_word = t->bits_per_word ? t->bits_per_word ?:
+> + ? ? ? ? ? ? ? spi->bits_per_word;
+> +
+> + ? ? ? if (bits_per_word < 1 || bits_per_word > 32)
+> + ? ? ? ? ? ? ? return -EINVAL;
+> +
+> + ? ? ? if (t->len == 0)
+> + ? ? ? ? ? ? ? return -EINVAL;
+> +
+> + ? ? ? if (!t->rx_buf && !t->tx_buf)
+> + ? ? ? ? ? ? ? return -EINVAL;
+
+Looks to me like this validation should be performed before accepting
+the transfer (see comments below)
+
+> +
+> + ? ? ? tspi->cur_bytes_per_word = bytes_per_word(bits_per_word);
+> +
+> + ? ? ? if (speed != tspi->cur_speed)
+> + ? ? ? ? ? ? ? clk_set_rate(tspi->clk, speed);
+> +
+> + ? ? ? if (tspi->cur_speed == 0)
+> + ? ? ? ? ? ? ? clk_enable(tspi->clk);
+> +
+> + ? ? ? tspi->cur_speed = speed;
+> +
+> + ? ? ? val = spi_readl(tspi, SLINK_COMMAND2);
+> + ? ? ? if (t->rx_buf)
+> + ? ? ? ? ? ? ? val |= RXEN;
+> + ? ? ? else
+> + ? ? ? ? ? ? ? val &= ~RXEN;
+> +
+> + ? ? ? if (t->tx_buf)
+> + ? ? ? ? ? ? ? val |= TXEN;
+> + ? ? ? else
+> + ? ? ? ? ? ? ? val &= ~TXEN;
+> +
+> + ? ? ? val &= ~SS_EN_CS(~0);
+> + ? ? ? val |= SS_EN_CS(spi->chip_select);
+> + ? ? ? val |= SPIE;
+> +
+> + ? ? ? spi_writel(tspi, val, SLINK_COMMAND2);
+> +
+> + ? ? ? val = spi_readl(tspi, SLINK_COMMAND);
+> + ? ? ? val &= ~BIT_LENGTH(~0);
+> + ? ? ? val |= BIT_LENGTH(bits_per_word - 1);
+> +
+> + ? ? ? /* FIXME: should probably control CS manually so that we can be sure
+> + ? ? ? ?* it does not go low between transfer and to support delay_usecs
+> + ? ? ? ?* correctly.
+> + ? ? ? ?*/
+> + ? ? ? val &= ~IDLE_SCLK_MASK & ~CK_SDA & ~CS_SW;
+> +
+> + ? ? ? if (spi->mode & SPI_CPHA)
+> + ? ? ? ? ? ? ? val |= CK_SDA;
+> +
+> + ? ? ? if (spi->mode & SPI_CPOL)
+> + ? ? ? ? ? ? ? val |= IDLE_SCLK_DRIVE_HIGH;
+> + ? ? ? else
+> + ? ? ? ? ? ? ? val |= IDLE_SCLK_DRIVE_LOW;
+> +
+> + ? ? ? val |= M_S;
+> +
+> + ? ? ? spi_writel(tspi, val, SLINK_COMMAND);
+> +
+> + ? ? ? spi_writel(tspi, RX_FLUSH | TX_FLUSH, SLINK_STATUS);
+> +
+> + ? ? ? tspi->cur = t;
+> + ? ? ? tspi->cur_pos = 0;
+> + ? ? ? tspi->cur_len = spi_tegra_fill_tx_fifo(tspi, t);
+> +
+> + ? ? ? spi_tegra_go(tspi);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static void spi_tegra_start_message(struct spi_device *spi,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct spi_message *m)
+> +{
+> + ? ? ? struct spi_transfer *t;
+> +
+> + ? ? ? m->actual_length = 0;
+> +
+> + ? ? ? t = list_first_entry(&m->transfers, struct spi_transfer, transfer_list);
+> + ? ? ? spi_tegra_start_transfer(spi, t);
+> +}
+> +
+> +static void tegra_spi_rx_dma_complete(struct tegra_dma_req *req)
+> +{
+> + ? ? ? struct spi_tegra_data *tspi = req->dev;
+> + ? ? ? unsigned long flags;
+> + ? ? ? struct spi_message *m;
+> + ? ? ? struct spi_device *spi;
+> + ? ? ? int complete = 0;
+> + ? ? ? int timeout = 0;
+> + ? ? ? unsigned long val;
+> +
+> + ? ? ? /* the SPI controller may come back with both the BSY and RDY bits
+> + ? ? ? ?* set. ?In this case we need to wait for the BSY bit to clear so
+> + ? ? ? ?* that we are sure the DMA is finished.
+> + ? ? ? ?*/
+> + ? ? ? while (timeout++ < BUSY_TIMEOUT) {
+> + ? ? ? ? ? ? ? if (!(spi_readl(tspi, SLINK_STATUS) & BSY))
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? }
+> +
+> + ? ? ? val = spi_readl(tspi, SLINK_STATUS);
+> + ? ? ? val |= RDY;
+> + ? ? ? spi_writel(tspi, val, SLINK_STATUS);
+> +
+> + ? ? ? spin_lock_irqsave(&tspi->lock, flags);
+> +
+> + ? ? ? m = list_first_entry(&tspi->queue, struct spi_message, queue);
+> + ? ? ? spi = m->state;
+> +
+> + ? ? ? tspi->cur_pos += spi_tegra_drain_rx_fifo(tspi, tspi->cur);
+> + ? ? ? m->actual_length += tspi->cur_pos;
+> +
+> + ? ? ? if (tspi->cur_pos < tspi->cur->len) {
+> + ? ? ? ? ? ? ? tspi->cur_len = spi_tegra_fill_tx_fifo(tspi, tspi->cur);
+> + ? ? ? ? ? ? ? spi_tegra_go(tspi);
+> + ? ? ? } else if (!list_is_last(&tspi->cur->transfer_list,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&m->transfers)) {
+> + ? ? ? ? ? ? ? tspi->cur = ?list_first_entry(&tspi->cur->transfer_list,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct spi_transfer,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? transfer_list);
+> + ? ? ? ? ? ? ? spi_tegra_start_transfer(spi, tspi->cur);
+
+Not checking the returned error code.  If an error occurs, then the
+callback needs to be called to notify that the message did not
+complete.  However, this comment may be moot if the validation is
+moved out of spi_tegra_start_transfer().
+
+> + ? ? ? } else {
+> + ? ? ? ? ? ? ? complete = 1;
+> + ? ? ? }
+> +
+> + ? ? ? if (complete) {
+> + ? ? ? ? ? ? ? list_del(&m->queue);
+> +
+> + ? ? ? ? ? ? ? m->status = 0;
+> + ? ? ? ? ? ? ? m->complete(m->context);
+> +
+> + ? ? ? ? ? ? ? if (!list_empty(&tspi->queue)) {
+> + ? ? ? ? ? ? ? ? ? ? ? m = list_first_entry(&tspi->queue, struct spi_message,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?queue);
+> + ? ? ? ? ? ? ? ? ? ? ? spi = m->state;
+> + ? ? ? ? ? ? ? ? ? ? ? spi_tegra_start_message(spi, m);
+> + ? ? ? ? ? ? ? } else {
+> + ? ? ? ? ? ? ? ? ? ? ? clk_disable(tspi->clk);
+> + ? ? ? ? ? ? ? ? ? ? ? tspi->cur_speed = 0;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? }
+> +
+> + ? ? ? spin_unlock_irqrestore(&tspi->lock, flags);
+> +}
+> +
+> +static int spi_tegra_setup(struct spi_device *spi)
+> +{
+> + ? ? ? struct spi_tegra_data *tspi = spi_master_get_devdata(spi->master);
+> + ? ? ? unsigned long cs_bit;
+> + ? ? ? unsigned long val;
+> + ? ? ? unsigned long flags;
+> +
+> + ? ? ? dev_dbg(&spi->dev, "setup %d bpw, %scpol, %scpha, %dHz\n",
+> + ? ? ? ? ? ? ? spi->bits_per_word,
+> + ? ? ? ? ? ? ? spi->mode & SPI_CPOL ? "" : "~",
+> + ? ? ? ? ? ? ? spi->mode & SPI_CPHA ? "" : "~",
+> + ? ? ? ? ? ? ? spi->max_speed_hz);
+> +
+> +
+> + ? ? ? switch (spi->chip_select) {
+> + ? ? ? case 0:
+> + ? ? ? ? ? ? ? cs_bit = CS_POLARITY;
+> + ? ? ? ? ? ? ? break;
+> +
+> + ? ? ? case 1:
+> + ? ? ? ? ? ? ? cs_bit = CS_POLARITY1;
+> + ? ? ? ? ? ? ? break;
+> +
+> + ? ? ? case 2:
+> + ? ? ? ? ? ? ? cs_bit = CS_POLARITY2;
+> + ? ? ? ? ? ? ? break;
+> +
+> + ? ? ? case 4:
+> + ? ? ? ? ? ? ? cs_bit = CS_POLARITY3;
+> + ? ? ? ? ? ? ? break;
+> +
+> + ? ? ? default:
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
+> +
+> + ? ? ? spin_lock_irqsave(&tspi->lock, flags);
+> +
+> + ? ? ? val = spi_readl(tspi, SLINK_COMMAND);
+> + ? ? ? if (spi->mode & SPI_CS_HIGH)
+> + ? ? ? ? ? ? ? val |= cs_bit;
+> + ? ? ? else
+> + ? ? ? ? ? ? ? val &= ~cs_bit;
+> + ? ? ? spi_writel(tspi, val, SLINK_COMMAND);
+> +
+> + ? ? ? spin_unlock_irqrestore(&tspi->lock, flags);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static int spi_tegra_transfer(struct spi_device *spi, struct spi_message *m)
+> +{
+> + ? ? ? struct spi_tegra_data *tspi = spi_master_get_devdata(spi->master);
+> + ? ? ? unsigned long flags;
+> + ? ? ? int was_empty;
+> +
+> + ? ? ? if (list_empty(&m->transfers) || !m->complete)
+> + ? ? ? ? ? ? ? return -EINVAL;
+
+It's a good idea to move most of the validation of the message from
+spi_tegra_start_message() and spi_tegra_start_transfer() to here so
+that the validation occurs outside of the spinlock.  It also means the
+driver doesn't discover badly formed messages part way through the
+transfer.
+
+> +
+> + ? ? ? m->state = spi;
+> +
+> + ? ? ? spin_lock_irqsave(&tspi->lock, flags);
+> + ? ? ? was_empty = list_empty(&tspi->queue);
+> + ? ? ? list_add_tail(&m->queue, &tspi->queue);
+> +
+> + ? ? ? if (was_empty)
+> + ? ? ? ? ? ? ? spi_tegra_start_message(spi, m);
+> +
+> + ? ? ? spin_unlock_irqrestore(&tspi->lock, flags);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static void spi_tegra_cleanup(struct spi_device *spi)
+> +{
+> + ? ? ? dev_dbg(&spi->dev, "cleanup\n");
+> +}
+> +
+> +static int __init spi_tegra_probe(struct platform_device *pdev)
+> +{
+> + ? ? ? struct spi_master ? ? ? *master;
+> + ? ? ? struct spi_tegra_data ? *tspi;
+> + ? ? ? struct resource ? ? ? ? *r;
+> + ? ? ? int ret;
+> +
+> + ? ? ? master = spi_alloc_master(&pdev->dev, sizeof *tspi);
+> + ? ? ? if (master == NULL) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "master allocation failed\n");
+> + ? ? ? ? ? ? ? return -ENOMEM;
+> + ? ? ? }
+> +
+> + ? ? ? /* the spi->mode bits understood by this driver: */
+> + ? ? ? master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
+> +
+> + ? ? ? if (pdev->id != -1)
+> + ? ? ? ? ? ? ? master->bus_num = pdev->id;
+> +
+> + ? ? ? master->setup = spi_tegra_setup;
+> + ? ? ? master->transfer = spi_tegra_transfer;
+> + ? ? ? master->cleanup = spi_tegra_cleanup;
+> + ? ? ? master->num_chipselect = 4;
+> +
+> + ? ? ? dev_set_drvdata(&pdev->dev, master);
+> + ? ? ? tspi = spi_master_get_devdata(master);
+> + ? ? ? tspi->master = master;
+> + ? ? ? tspi->pdev = pdev;
+> + ? ? ? spin_lock_init(&tspi->lock);
+> +
+> + ? ? ? r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> + ? ? ? if (r == NULL) {
+> + ? ? ? ? ? ? ? ret = -ENODEV;
+> + ? ? ? ? ? ? ? goto err0;
+> + ? ? ? }
+> +
+> + ? ? ? if (!request_mem_region(r->start, (r->end - r->start) + 1,
+> + ? ? ? ? ? ? ? ? ? ? ? dev_name(&pdev->dev))) {
+> + ? ? ? ? ? ? ? ret = -EBUSY;
+> + ? ? ? ? ? ? ? goto err0;
+> + ? ? ? }
+
+I believe the platform bus does this for you already by calling
+insert_resource() on all the platform bus ranges.  See if /proc/iomem
+is any different with or without this call to verify.
+
+> +
+> + ? ? ? tspi->phys = r->start;
+> + ? ? ? tspi->base = ioremap(r->start, r->end - r->start + 1);
+> + ? ? ? if (!tspi->base) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "can't ioremap iomem\n");
+> + ? ? ? ? ? ? ? ret = -ENOMEM;
+> + ? ? ? ? ? ? ? goto err1;
+> + ? ? ? }
+> +
+> + ? ? ? tspi->clk = clk_get(&pdev->dev, NULL);
+> + ? ? ? if (IS_ERR_OR_NULL(tspi->clk)) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "can not get clock\n");
+> + ? ? ? ? ? ? ? ret = PTR_ERR(tspi->clk);
+> + ? ? ? ? ? ? ? goto err2;
+> + ? ? ? }
+> +
+> + ? ? ? INIT_LIST_HEAD(&tspi->queue);
+> +
+> + ? ? ? tspi->rx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT);
+> + ? ? ? if (IS_ERR(tspi->rx_dma)) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "can not allocate rx dma channel\n");
+> + ? ? ? ? ? ? ? ret = PTR_ERR(tspi->rx_dma);
+> + ? ? ? ? ? ? ? goto err3;
+> + ? ? ? }
+> +
+> + ? ? ? tspi->rx_bb = dma_alloc_coherent(&pdev->dev, sizeof(u32) * BB_LEN,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&tspi->rx_bb_phys, GFP_KERNEL);
+> + ? ? ? if (!tspi->rx_bb) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "can not allocate rx bounce buffer\n");
+> + ? ? ? ? ? ? ? ret = -ENOMEM;
+> + ? ? ? ? ? ? ? goto err4;
+> + ? ? ? }
+> +
+> + ? ? ? tspi->rx_dma_req.complete = tegra_spi_rx_dma_complete;
+> + ? ? ? tspi->rx_dma_req.to_memory = 1;
+> + ? ? ? tspi->rx_dma_req.dest_addr = tspi->rx_bb_phys;
+> + ? ? ? tspi->rx_dma_req.dest_bus_width = 32;
+> + ? ? ? tspi->rx_dma_req.source_addr = tspi->phys + SLINK_RX_FIFO;
+> + ? ? ? tspi->rx_dma_req.source_bus_width = 32;
+> + ? ? ? tspi->rx_dma_req.source_wrap = 4;
+> + ? ? ? tspi->rx_dma_req.req_sel = spi_tegra_req_sels[pdev->id];
+> + ? ? ? tspi->rx_dma_req.dev = tspi;
+> +
+> + ? ? ? ret = spi_register_master(master);
+> +
+> + ? ? ? if (ret < 0)
+> + ? ? ? ? ? ? ? goto err5;
+> +
+> + ? ? ? return ret;
+> +
+> +err5:
+> + ? ? ? dma_free_coherent(&pdev->dev, sizeof(u32) * BB_LEN,
+> + ? ? ? ? ? ? ? ? ? ? ? ? tspi->rx_bb, tspi->rx_bb_phys);
+> +err4:
+> + ? ? ? tegra_dma_free_channel(tspi->rx_dma);
+> +err3:
+> + ? ? ? clk_put(tspi->clk);
+> +err2:
+> + ? ? ? iounmap(tspi->base);
+> +err1:
+> + ? ? ? release_mem_region(r->start, (r->end - r->start) + 1);
+> +err0:
+> + ? ? ? spi_master_put(master);
+> + ? ? ? return ret;
+> +}
+> +
+> +static int __exit spi_tegra_remove(struct platform_device *pdev)
+
+__devexit
+
+> +{
+> + ? ? ? struct spi_master ? ? ? *master;
+> + ? ? ? struct spi_tegra_data ? *tspi;
+> + ? ? ? struct resource ? ? ? ? *r;
+> +
+> + ? ? ? master = dev_get_drvdata(&pdev->dev);
+> + ? ? ? tspi = spi_master_get_devdata(master);
+> +
+> + ? ? ? tegra_dma_free_channel(tspi->rx_dma);
+> +
+> + ? ? ? dma_free_coherent(&pdev->dev, sizeof(u32) * BB_LEN,
+> + ? ? ? ? ? ? ? ? ? ? ? ? tspi->rx_bb, tspi->rx_bb_phys);
+> +
+> + ? ? ? clk_put(tspi->clk);
+> + ? ? ? iounmap(tspi->base);
+> +
+> + ? ? ? spi_master_put(master);
+> +
+> + ? ? ? r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> + ? ? ? release_mem_region(r->start, (r->end - r->start) + 1);
+
+Ditto to comment earlier.
+
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +
+> +MODULE_ALIAS("platform:" DRIVER_NAME);
+> +
+> +static struct platform_driver spi_tegra_driver = {
+> + ? ? ? .driver = {
+> + ? ? ? ? ? ? ? .name = ? ? ? ? DRIVER_NAME,
+> + ? ? ? ? ? ? ? .owner = ? ? ? ?THIS_MODULE,
+> + ? ? ? },
+> + ? ? ? .remove = ? ? ? __exit_p(spi_tegra_remove),
+
+__devexit_p
+
+> +};
+> +
+> +
+> +static int __init spi_tegra_init(void)
+> +{
+> + ? ? ? return platform_driver_probe(&spi_tegra_driver, spi_tegra_probe);
+> +}
+> +subsys_initcall(spi_tegra_init);
+
+Is module_init() not sufficient?
+
+> +
+> +static void __exit spi_tegra_exit(void)
+> +{
+> + ? ? ? platform_driver_unregister(&spi_tegra_driver);
+> +}
+> +module_exit(spi_tegra_exit);
+> +
+> +MODULE_LICENSE("GPL");
+> --
+> 1.7.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+
+
 
 -- 
-Dmitry
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
