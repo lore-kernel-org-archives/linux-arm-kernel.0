@@ -1,57 +1,30 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 01 Aug 2010 11:42:20 +0300
-Subject: [PATCH] PXA: Fix wakealarm capability for pxa-rtc
-In-Reply-To: <1280550147-12380-1-git-send-email-marek.vasut@gmail.com>
-References: <1280550147-12380-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <4C55336C.7070300@compulab.co.il>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Sun, 1 Aug 2010 14:35:41 +0400
+Subject: [PATCH 1/2] ARM: make a common low level IRQ helper macros for
+	GIC based platforms
+In-Reply-To: <1280408164.14531.13.camel@bnru03>
+References: <1280408164.14531.13.camel@bnru03>
+Message-ID: <20100801103541.GA27950@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/10 07:22, Marek Vasut wrote:
-> The wakealarm capability was incorrectly set after the RTC was registered, which
-> resulted into the sysfs node not being created.
->
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
->   
-
-Same problem exists on on pxa3xx/cm-x300 and I suppose
-on many other pxa based systems which use rtc-pxa and not
-rtc-sa1100 (in which device_init_wakeup() indeed called before
-the rtc_device_register()).
-
-This patch makes /sys/class/rtc/rtc0/wakealarm visible and thus
-solves the problem for cm-x300
-
-Tested-by: Igor Grinberg <grinberg@compulab.co.il>
-
+On Thu, Jul 29, 2010 at 06:26:04PM +0530, srinidhi wrote:
+> The IRQ helper macros for GIC based platforms are similar.
+> 
+> Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 > ---
->  drivers/rtc/rtc-pxa.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/rtc/rtc-pxa.c b/drivers/rtc/rtc-pxa.c
-> index e9c6fa0..d76f187 100644
-> --- a/drivers/rtc/rtc-pxa.c
-> +++ b/drivers/rtc/rtc-pxa.c
-> @@ -403,6 +403,8 @@ static int __init pxa_rtc_probe(struct platform_device *pdev)
->  
->  	rtsr_clear_bits(pxa_rtc, RTSR_PIALE | RTSR_RDALE1 | RTSR_HZE);
->  
-> +	device_init_wakeup(dev, 1);
-> +
->  	pxa_rtc->rtc = rtc_device_register("pxa-rtc", &pdev->dev, &pxa_rtc_ops,
->  					   THIS_MODULE);
->  	ret = PTR_ERR(pxa_rtc->rtc);
-> @@ -411,8 +413,6 @@ static int __init pxa_rtc_probe(struct platform_device *pdev)
->  		goto err_rtc_reg;
->  	}
->  
-> -	device_init_wakeup(dev, 1);
-> -
->  	return 0;
->  
->  err_rtc_reg:
->   
+>  arch/arm/include/asm/entry-macro-gic.S            |   74 ++++++++++++++++++++
+>  arch/arm/mach-cns3xxx/include/mach/entry-macro.S  |   73 +-------------------
+>  arch/arm/mach-omap2/include/mach/entry-macro.S    |   67 +-----------------
+>  arch/arm/mach-realview/include/mach/entry-macro.S |   72 +-------------------
+>  arch/arm/mach-ux500/include/mach/entry-macro.S    |   77 +--------------------
+>  arch/arm/mach-vexpress/include/mach/entry-macro.S |   68 +------------------
+>  6 files changed, 81 insertions(+), 350 deletions(-)
+>  create mode 100644 arch/arm/include/asm/entry-macro-gic.S
 
--- 
-Regards,
-Igor.
+This works on CNS3xxx.
+
+Acked-by: Anton Vorontsov <cbouatmailru@gmail.com>
+
+Thanks!
