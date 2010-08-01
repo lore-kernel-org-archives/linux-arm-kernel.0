@@ -1,44 +1,109 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 01 Aug 2010 21:32:47 +0200
-Subject: [PATCH] PXA: Fix wakealarm capability for pxa-rtc
-In-Reply-To: <201008011738.16225.marek.vasut@gmail.com> (Marek Vasut's message
-	of "Sun\, 1 Aug 2010 17\:38\:16 +0200")
-References: <1280550147-12380-1-git-send-email-marek.vasut@gmail.com>
-	<201008010253.28319.marek.vasut@gmail.com> <87eieiziri.fsf@free.fr>
-	<201008011738.16225.marek.vasut@gmail.com>
-Message-ID: <87vd7uxh5s.fsf@free.fr>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Sun, 01 Aug 2010 23:38:43 +0300
+Subject: [PATCH] s3c: add dm9000 ethernet support for mach-real6410
+Message-ID: <20100801203830.21120.91241.stgit@darius-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Vasut <marek.vasut@gmail.com> writes:
+This patch is based on "[PATCH v2] Support for Real6410"
 
->> Okay, I understand better, you're looking for the class driver wakup sysfs
->> entry, and not the driver sysfs wakeup entry.
->> 
->> So when you said "It's not created for me without this patch", you meant
->> the class driver's sysfs entry, not the one I mentioned I presume ?
->
-> You're still talking about some "wakeup", I'm talking about 
-> /sys/devices/platform/pxa-rtc/power/wakealarm .
-...
+Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
+---
+ arch/arm/mach-s3c64xx/mach-real6410.c |   63 +++++++++++++++++++++++++++++++++
+ 1 files changed, 63 insertions(+), 0 deletions(-)
 
->> 
->> Anyway, to straighten things up :
->>  - for an rtc driver, device_init_wakeup() has to be called before
->>  rtc_driver_register()
->>  - if that's not the case, /sys/class/rtc/rtc0/wakealarm won't be created
->>  - if that's the case, if the driver called device_init_wakeup(x, 1), the
->> rtc registering will override the value with device_init_wakeup(x, 0)
->
-> Are we talking about the same kernel? I just can't find this 
-> "device_init_wakeup(x, 0);" which would override anything anywhere.
-I already provided the call tree.
-
-Anyway, I won't be available for the next days, and as I don't want to argue
-anymore, and I expect you have tested your patch against a suspended device to
-see it wake up, have my:
-
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
-
---
-Robert
+diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
+index 04a472a..1a0485a 100644
+--- a/arch/arm/mach-s3c64xx/mach-real6410.c
++++ b/arch/arm/mach-s3c64xx/mach-real6410.c
+@@ -17,6 +17,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/list.h>
+ #include <linux/init.h>
++#include <linux/dm9000.h>
+ #include <linux/serial_core.h>
+ #include <linux/platform_device.h>
+ #include <asm/mach-types.h>
+@@ -24,6 +25,7 @@
+ #include <asm/mach/map.h>
+ #include <mach/map.h>
+ #include <mach/s3c6410.h>
++#include <mach/regs-srom.h>
+ #include <plat/cpu.h>
+ #include <plat/regs-serial.h>
+ 
+@@ -62,6 +64,44 @@ static struct s3c2410_uartcfg real6410_uartcfgs[] __initdata = {
+ 	},
+ };
+ 
++/* DM9000AEP 10/100 ethernet controller */
++
++static struct resource real6410_dm9k_resource[] = {
++        [0] = {
++                .start = S3C64XX_PA_XM0CSN1,
++                .end   = S3C64XX_PA_XM0CSN1 + 1,
++                .flags = IORESOURCE_MEM
++        },
++        [1] = {
++                .start = S3C64XX_PA_XM0CSN1 + 4,
++                .end   = S3C64XX_PA_XM0CSN1 + 5,
++                .flags = IORESOURCE_MEM
++        },
++        [2] = {
++                .start = S3C_EINT(7),
++                .end   = S3C_EINT(7),
++                .flags = IORESOURCE_IRQ,
++        }
++};
++
++static struct dm9000_plat_data real6410_dm9k_pdata = {
++        .flags          = (DM9000_PLATF_16BITONLY | DM9000_PLATF_NO_EEPROM),
++};
++
++static struct platform_device real6410_device_eth = {
++        .name           = "dm9000",
++        .id             = -1,
++        .num_resources  = ARRAY_SIZE(real6410_dm9k_resource),
++        .resource       = real6410_dm9k_resource,
++        .dev            = {
++                .platform_data  = &real6410_dm9k_pdata,
++        },
++};
++
++static struct platform_device *real6410_devices[] __initdata = {
++	&real6410_device_eth,
++};
++
+ static void __init real6410_map_io(void)
+ {
+ 	s3c64xx_init_io(NULL, 0);
+@@ -71,6 +111,29 @@ static void __init real6410_map_io(void)
+ 
+ static void __init real6410_machine_init(void)
+ {
++	u32 cs1;
++
++	/* configure nCS1 width to 16 bits */
++
++	cs1 = __raw_readl(S3C64XX_SROM_BW) &
++		~(S3C64XX_SROM_BW__CS_MASK << S3C64XX_SROM_BW__NCS1__SHIFT);
++	cs1 |= ((1 << S3C64XX_SROM_BW__DATAWIDTH__SHIFT) |
++		(1 << S3C64XX_SROM_BW__WAITENABLE__SHIFT) |
++		(1 << S3C64XX_SROM_BW__BYTEENABLE__SHIFT)) <<
++			S3C64XX_SROM_BW__NCS1__SHIFT;
++	__raw_writel(cs1, S3C64XX_SROM_BW);
++
++	/* set timing for nCS1 suitable for ethernet chip */
++
++	__raw_writel((0 << S3C64XX_SROM_BCX__PMC__SHIFT) |
++			(6 << S3C64XX_SROM_BCX__TACP__SHIFT) |
++			(4 << S3C64XX_SROM_BCX__TCAH__SHIFT) |
++			(1 << S3C64XX_SROM_BCX__TCOH__SHIFT) |
++			(13 << S3C64XX_SROM_BCX__TACC__SHIFT) |
++			(4 << S3C64XX_SROM_BCX__TCOS__SHIFT) |
++			(0 << S3C64XX_SROM_BCX__TACS__SHIFT), S3C64XX_SROM_BC1);
++
++	platform_add_devices(real6410_devices, ARRAY_SIZE(real6410_devices));
+ }
+ 
+ MACHINE_START(REAL6410, "REAL6410")
