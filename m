@@ -1,68 +1,56 @@
-From: saeed@marvell.com (Saeed Bishara)
-Date: Sun, 1 Aug 2010 14:39:24 +0300
-Subject: [RFC] dove: fix __io() definition to use bus based offset
-In-Reply-To: <201007291749.04181.arnd@arndb.de>
-References: <AANLkTinuXRH0XeD=3b0Wmq32SEEBxdevfj58EmSybcWu@mail.gmail.com>
-	<201007291726.39145.arnd@arndb.de>
-	<AANLkTikeoQf=WC8M9daA=O+tgPdMbDeQdMTWoT8U=CpK@mail.gmail.com>
-	<201007291749.04181.arnd@arndb.de>
-Message-ID: <FCBE654890C0334289D0AD3AF4EF009FCA51277579@IL-MB01.marvell.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Sun, 01 Aug 2010 15:10:10 +0300
+Subject: [PATCH] [ARM] pxa/cm-x300: fix ffuart registration
+In-Reply-To: <AANLkTikxIFryvGJeCRMPrGrdcPXaEDPjsgEozsHbndwR@mail.gmail.com>
+References: <1279612732-5906-1-git-send-email-grinberg@compulab.co.il>
+	<AANLkTikxIFryvGJeCRMPrGrdcPXaEDPjsgEozsHbndwR@mail.gmail.com>
+Message-ID: <4C556422.3060901@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
->> >> -
->> >> -#define __io(a)  ((void __iomem *)(((a) - 
->DOVE_PCIE0_IO_PHYS_BASE) +\
->> >> -                                  DOVE_PCIE0_IO_VIRT_BASE))
->> >> -#define __mem_pci(a)           (a)
->> >> +#define IO_SPACE_LIMIT 0xffffffff
->> >> +#define __io(a)                __typesafe_io((a) - 
->DOVE_PCIE0_IO_BUS_BASE + \
->> >> +                                           
->DOVE_PCIE0_IO_VIRT_BASE)
->> >> +#define __mem_pci(a)   (a)
-Using DOVE_PCIE0_IO_BUS_BASE instead of DOVE_PCIE0_IO_PHYS_BASE approved by me
->> >>
->> >>  #endif
->> >>
->> >
->> > The IO_SPACE_LIMIT still looks wrong, AFAICT it should be
->> >
->> > #define IO_SPACE_LIMIT (DOVE_PCIE0_IO_SIZE + 
->DOVE_PCIE1_IO_SIZE - 1)
->> >
->> 
->> And it looks like PCIE1_IO space is not used as indicated in 
->its __io() macro.
->
->DOVE_PCIE1_IO_VIRT_BASE directly follows (DOVE_PCIE0_IO_VIRT_BASE +
->DOVE_PCIE0_IO_SIZE), so the macro is the same, isn't it?
-That's right, the same macro should work for PCIE1 and PCIE0.
->
->However, I believe you also need the patch below to make thinks like
->PCI-ISA bridges and VGA adapters as well as /dev/port access work.
->
->Not-at-all-tested-by: Arnd Bergmann <arnd@arndb.de>
->Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
->--- a/arch/arm/mach-dove/pcie.c
->+++ b/arch/arm/mach-dove/pcie.c
->@@ -59,10 +59,10 @@ static int __init dove_pcie_setup(int nr, 
->struct pci_sys_data *sys)
-> 	pp->io_space_name[sizeof(pp->io_space_name) - 1] = 0;
-> 	pp->res[0].name = pp->io_space_name;
-> 	if (pp->index == 0) {
->-		pp->res[0].start = DOVE_PCIE0_IO_PHYS_BASE;
->+		pp->res[0].start = DOVE_PCIE0_IO_BUS_BASE;
-> 		pp->res[0].end = pp->res[0].start + 
->DOVE_PCIE0_IO_SIZE - 1;
-> 	} else {
->-		pp->res[0].start = DOVE_PCIE1_IO_PHYS_BASE;
->+		pp->res[0].start = DOVE_PCIE1_IO_BUS_BASE;
-> 		pp->res[0].end = pp->res[0].start + 
->DOVE_PCIE1_IO_SIZE - 1;
-> 	}
-> 	pp->res[0].flags = IORESOURCE_IO;
-I agree also on this part.
->
+On 07/20/10 13:54, Eric Miao wrote:
+> On Tue, Jul 20, 2010 at 9:58 AM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>   
+>> ffuart is available on cm-x300 only with pxa300.
+>>
+>> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+>>     
+> Applied.
+>   
+
+I can see it neither in fix, nor in devel branches on your git.kernel.org.
+Do you keep it locally?
+
+Thanks
+
+>   
+>> ---
+>>  arch/arm/mach-pxa/cm-x300.c |    3 ++-
+>>  1 files changed, 2 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
+>> index fdda6be..d717b49 100644
+>> --- a/arch/arm/mach-pxa/cm-x300.c
+>> +++ b/arch/arm/mach-pxa/cm-x300.c
+>> @@ -745,9 +745,10 @@ static void __init cm_x300_init(void)
+>>  {
+>>        cm_x300_init_mfp();
+>>
+>> -       pxa_set_ffuart_info(NULL);
+>>        pxa_set_btuart_info(NULL);
+>>        pxa_set_stuart_info(NULL);
+>> +       if (cpu_is_pxa300())
+>> +               pxa_set_ffuart_info(NULL);
+>>
+>>        cm_x300_init_da9030();
+>>        cm_x300_init_dm9000();
+>> --
+>> 1.7.1
+>>
+>>
+>>     
+>   
+
+-- 
+Regards,
+Igor.
