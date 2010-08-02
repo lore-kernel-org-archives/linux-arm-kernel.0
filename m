@@ -1,71 +1,68 @@
-From: nitvishnoi@gmail.com (nitin vishnoi)
-Date: Mon, 2 Aug 2010 11:42:07 +0530
-Subject: not coming prompt in 2.6.33.6 kernel
-In-Reply-To: <AANLkTim8KEn7-dFpHdbYs0Wvi_hxjrbmUmhEQ2nMOtHj@mail.gmail.com>
-References: <AANLkTikgB9OF6mRqZ2KgQYuCQ4JcF7N6oTJyUbrYq0t7@mail.gmail.com>
-	<20100728094344.GA9142@trinity.fluff.org>
-	<AANLkTikgq_Fb0ZfT-b+9zOA5w2pDpNgwnUqe919hAsnd@mail.gmail.com>
-	<AANLkTin8STiQqvjZo-atA9jhz1OLWuk2k61-VYnZrcD8@mail.gmail.com>
-	<AANLkTim8KEn7-dFpHdbYs0Wvi_hxjrbmUmhEQ2nMOtHj@mail.gmail.com>
-Message-ID: <AANLkTikZwzfY4kJ-9i5Y87vA7HMutRJUM5-5Y_HnQeb=@mail.gmail.com>
+From: Joerg.Roedel@amd.com (Roedel, Joerg)
+Date: Mon, 2 Aug 2010 11:45:04 +0200
+Subject: [PATCH 1/2] arm: msm: Add System MMU support.
+In-Reply-To: <20100802172941C.fujita.tomonori@lab.ntt.co.jp>
+References: <1280546124.1902.30.camel@pasglop> <20100802074812.GM24084@amd.com>
+	<1280736182.1902.55.camel@pasglop>
+	<20100802172941C.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <20100802094504.GF29744@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-Finally i got the prompt,
-the problem was in toolchain.I compiled the busybox and kernel with other
-new toolchain and made the ramdisk filesystem.Than i got the prompt.
+On Mon, Aug 02, 2010 at 04:30:26AM -0400, FUJITA Tomonori wrote:
+> On Mon, 02 Aug 2010 18:03:02 +1000
+> Benjamin Herrenschmidt <benh@kernel.crashing.org> wrote:
+> 
+> > On Mon, 2010-08-02 at 09:48 +0200, Roedel, Joerg wrote:
+> > > > Hrm, indeed I just noticed that. Pretty gross... it should definitly
+> > > be
+> > > > renamed, is will caused endless confusion with unrelated iommu.h and
+> > > > iommu_* interfaces which represent something different.
+> > > 
+> > > The first direction to go should be trying to unify all the different
+> > > iommu* interfaces into the iommu-api. The generic api will definitly
+> > > need to be extended for that, but since it is an in-kernel interface
+> > > thats no problem. 
+> > 
+> > Well, I suppose I'm the de-facto candidate to take care of the powerpc
+> > side then :-)
+> 
+> We already agreed that what the iommu-api looks like?
 
-Regards
+Well, we currently trying to figure out how to extend the IOMMU-API
+concepts to fit the omap-hardware in. Thats what I currently discuss
+with Stephan. It looks to me that we need to add the concept
+of device contexts to the IOMMU-API. We should also add IO-TLB
+management functions. The TLB management is currently handled completly
+in the backend driver. This needs to be changed and makes sense for
+AMD IOMMUs and Intel IOMMUs with QPI too.
 
-Nitin
+> ARM's iommu code (arch/plat-omap/include/plat/iommu.h) is a library to
+> simplify the IOMMU implementations. It could be useful for all the
+> iommu implementations.
 
-On Fri, Jul 30, 2010 at 8:55 PM, Martin Fuzzey <mfuzzey@gmail.com> wrote:
+To me it looks like a very hardware specific library. But it should fit
+well in the domain/device concept the IOMMU-API provides (when we also
+add device-contexts to it)
 
-> Hi,
-> On Fri, Jul 30, 2010 at 12:40 PM, nitin vishnoi <nitvishnoi@gmail.com>
-> wrote:
-> > Hi now i am able the uart info also.Bu stil not getting the prompt.
-> > and getting the following log.
-> >
-> > Starting kernel ...
-> >
-> >
-> > Uncompressing
-> >
-> Linux......................................................................
-> > done, booting the kernel.
-> > Linux version 2.6.31.14 (root at ubntu-desktop) (gcc version 4.1.2) #34 Fri
-> Jul
-> > 30 15:33:38 IST 2010
-> > CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
-> > CPU: VIVT data cache, VIVT instruction cache
-> > Kernel command line: root=/dev/ram initrd=0x30800000,8M ramdisk=24576
-> > init=/sbin/init console=ttySAC3,115200 mem=64M
-> > RAMDISK: gzip image found at block 0
-> > EXT2-fs warning: maximal mount count reached, running e2fsck is
-> recommended
-> > VFS: Mounted root (ext2 filesystem) on device 1:0.
-> > Freeing init memory: 88K
-> > Kernel panic - not syncing: Attempted to kill init!
-> >
->
-> Looks like the init process is terminating unexpectedly.
-> What's /sbin/init for you?
-> How is it compiled? (could it be a OABI / EABI issue?)
->
-> What happens if you try booting with  init=/bin/sh   ?
-> or try using a script like this as init
->
-> #! /bin/sh
-> echo "Test stdout"
-> echo "Test console" > /dev/console
-> echo "Test tty1" > /dev/tty1
-> /bin/ls -l /dev > /dev/tty1
->
-> Cheers,
-> Martin
->
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100802/7342104e/attachment.html>
+> The current iommu-api (include/linux/iommu.h) provides the common
+> interface for specific purposes (for KVM).
+
+The IOMMU-API is not limited to the purposes of KVM. There is
+currently development effort to use the IOMMU-API for UIO stuff. So the
+IOMMU-API is by no means KVM specific.
+
+> Another question is how the above can work with the DMA-API.
+
+This would work if we handle every device-context the platform provides
+as 'struct device'. But does that really need to work with the DMA-API?
+What is the driver use-case for that?
+
+		Joerg
+
+-- 
+Joerg Roedel - AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
