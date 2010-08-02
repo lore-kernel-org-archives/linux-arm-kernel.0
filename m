@@ -1,47 +1,32 @@
-From: philippe.langlais@stericsson.com (Philippe Langlais)
-Date: Mon, 2 Aug 2010 10:01:09 +0200
-Subject: [PATCH] U6715 platform serial driver It's a generic driver for
-	all U6XXX platform
-In-Reply-To: <20100731105946.GK23886@n2100.arm.linux.org.uk>
-References: <1280417192-25710-1-git-send-email-philippe.langlais@stericsson.com>
-	<20100731105946.GK23886@n2100.arm.linux.org.uk>
-Message-ID: <4C567B45.7050507@stericsson.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Mon, 02 Aug 2010 18:03:02 +1000
+Subject: [PATCH 1/2] arm: msm: Add System MMU support.
+In-Reply-To: <20100802074812.GM24084@amd.com>
+References: <ea4bbdecc271f7fa5749d09645f38c0d.squirrel@www.codeaurora.org>
+	<bad58db98c165a61860827d4e720acf8.squirrel@www.codeaurora.org>
+	<20100729123512Y.fujita.tomonori@lab.ntt.co.jp>
+	<201007291026.55928.arnd@arndb.de> <1280546124.1902.30.camel@pasglop>
+	<20100802074812.GM24084@amd.com>
+Message-ID: <1280736182.1902.55.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 2010-08-02 at 09:48 +0200, Roedel, Joerg wrote:
+> > Hrm, indeed I just noticed that. Pretty gross... it should definitly
+> be
+> > renamed, is will caused endless confusion with unrelated iommu.h and
+> > iommu_* interfaces which represent something different.
+> 
+> The first direction to go should be trying to unify all the different
+> iommu* interfaces into the iommu-api. The generic api will definitly
+> need to be extended for that, but since it is an in-kernel interface
+> thats no problem. 
 
+Well, I suppose I'm the de-facto candidate to take care of the powerpc
+side then :-)
 
-On 07/31/10 12:59, Russell King - ARM Linux wrote:
-> On Thu, Jul 29, 2010 at 05:26:32PM +0200, Philippe Langlais wrote:
->    
->> +unsigned int u6_serial8250_enable_clock(struct uart_port *port)
->> +{
->> +	struct u6_uart *uart_u6 = port->private_data;
->> +
->> +	if (!uart_u6)
->> +		return uart_enable_clock(port);
->> +
->> +	if (IS_ERR(uart_u6->uartClk)) {
->> +		pr_warning("%s - uart clock failed error:%ld\n",
->> +		       __func__, PTR_ERR(uart_u6->uartClk));
->> +		return PTR_ERR(uart_u6->uartClk);
->> +	}
->> +
->> +	if (clk_get_usecount(uart_u6->uartClk) == 0)
->> +		clk_enable(uart_u6->uartClk);
->>      
-> This breaks the atomic update nature of the use count of clocks, and breaks
-> the model that the driver should only ever enable the clock if it needs it.
-> I think instead you need to track whether the driver enabled or disabled
-> its own clock.
->    
-Hi,
-You are right.
-I forgot to withdraw these tests needed for our specific power managment.
-The new patch will follow.
-If you have no more remark, I'm ready to send all U6715 patches in your 
-patch system.
+I don't have the bandwidth right now, but I'll try to have a look when
+time permits.
 
-Thanks
-
-Philippe
+Cheers,
+Ben.
