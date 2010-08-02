@@ -1,99 +1,46 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 3 Aug 2010 00:35:56 +0300
-Subject: [PATCH v2 03/20] mmc: support embedded data field in mmc_host
-In-Reply-To: <AANLkTikfRja-h9mz7uyRXCZNZjKdU_yB8e58XQucUzrn@mail.gmail.com>
-References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-	<1279733634-21974-4-git-send-email-ohad@wizery.com>
-	<AANLkTimzA_JJ-byTDWznbL3YzeJ8LAP4M50onf2_3fBF@mail.gmail.com>
-	<AANLkTi=Oy8X1xMOwWL_cKBB1LWULT6=p+adUgB+AuSJS@mail.gmail.com>
-	<AANLkTi=BUX59heXAW2Uf4wZo2dSS19Je54dkQ5u2YGAW@mail.gmail.com>
-	<AANLkTimZQKj7H_GeE=+O9cwxEMTR+LhfFbt=AyXGzN3d@mail.gmail.com>
-	<AANLkTikfRja-h9mz7uyRXCZNZjKdU_yB8e58XQucUzrn@mail.gmail.com>
-Message-ID: <AANLkTi=vhWV1RNyemtfppfjvLYAbzd3aRjFOVgLLpG3Z@mail.gmail.com>
+From: gregkh@suse.de (Greg KH)
+Date: Mon, 2 Aug 2010 15:47:18 -0700
+Subject: [PATCH] USB-serial dummy cable driver
+In-Reply-To: <1280728807-20296-1-git-send-email-marek.vasut@gmail.com>
+References: <1280728807-20296-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <20100802224718.GC28821@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vitaly,
+On Mon, Aug 02, 2010 at 08:00:07AM +0200, Marek Vasut wrote:
+> This driver is used to implement USB-serial like behaviour over dummy
+> USB cables. These are used in the following devices:
+> 	Funsoft Serial USB driver
+> 	Genesys Logic GL620USB USB Laplink cable
+> 	HP4x (48/49) Serial cable
+> 	Motorola phones
+> 	Siemens USB-MPI Serial USB driver
+> 	ViVOpay USB Serial Driver
+> 	ZIO Motherboard USB driver
 
-On Mon, Aug 2, 2010 at 7:25 PM, Vitaly Wool <vitalywool@gmail.com> wrote:
-> On Mon, Aug 2, 2010 at 5:54 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
->> SPI is using these spi_board_info tables to populate the SPI device
->> trees. These tables are registered early at the board-specific init
->> code, and are later used by SPI core to populate the devices when the
->> SPI master controller is registered.
->>
->> SDIO doesn't normally needs any kind of hard coded data: most devices
->> are dynamically probed and populated.
->>
->> On rare cases like the wl1271, we have some platform-specific data we
->> need to deliver the SDIO function driver (i.e. the irq info in this
->> case). Since the device is hardwired to a specific controller, it does
->> make some sense to pass this private data from the controller's info
->> in the board files, through the host driver, and make it accessible
->> through the specific host instance that drives this controller.
->>
->> Btw, if our problem was be broader (e.g., needs to supply private data
->> for non-hardwired devices), then I agree that a more complex
->> mechanism, such as the one you suggest, would be needed. But currently
->> the problem is very simple and the solution is even simpler: just add
->> 1 private pointer to the host.
->>
->> Hope you find this reasonable,
->
-> no, actually I don't. I think this is a hack that intrudes into the
-> area it completely doesn't belong to.
->
-> In fact, one can have 2 views on this problem: either this is a fairly
-> generic problem we need to address, or this is a very specific corner
-> case.
-> Your solution will be treated as a hack in both cases.
->
-> If we consider it a generic problem, then we need to find a generic
-> solution, which is the board_info solution, for instance. FWIW, I2C
-> also uses this approach now.
->
-> If we consider it to be a corner case, let's just add a dummy
-> platform_device like it's done in WL1251 implementation and keep the
-> MMC subsystem clean.
+I like the idea, but not the name :)
 
-Let's start by defining the problem exactly:
+Ideally, all of these would be able to be handled by the usb-serial
+generic driver directly.
 
-SDIO devices that are hardwired to a specific controller and have some
-platform data that needs to be available to the SDIO function driver.
+But really, having these multiple drivers is a good thing, they properly
+convey to the user what the device is, and it gives these developers and
+companies a sense of ownership over the code, and that matters at times.
 
-It doesn't get more generic than that - it's not needed with common
-fully-enumerable SDIO devices (at least I'm not aware of such need),
-hence a generic mechanism of maintaining a global pile of platform
-data pointers, which can be queried with the device and vendor ID,
-really sounds like an overkill.
+So you lost the names of the devices with this patch, which isn't good.
 
-But it's not specific to the wl1271 device - I prefer to support this
-at the MMC level, so we wouldn't have to add an extra platform device
-for every SDIO function driver that needs to cope with such issue (we
-already have two drivers - wl1271_sdio.c and wl1251_sdio.c); Adding an
-extra platform device for every driver is just too much dummy code
-(that btw adds a well-hidden race condition between the two probe
-calls), which can be nicely eliminated if we just introduce this new
-per-host private data pointer.
+It's my end-goal to move the usb-serial layer to be more like libata,
+where it is dirt-simple to make a new disk driver, only a few fields to
+fill in, what you want to override.  So, any work toward simplification
+of the generic layer would be appreciated to make these individual
+drivers even smaller in the end.
 
-So we have a SDIO device hardwired to a specific controller, that is
-driven by a specific host controller driver instance. This patch
-allows this specific host instance to carry platform data for the
-device that is hardwired to it. The platform data would be available
-only to SDIO function driver instances of that specific host
-controller. The solution is generic enough to support all SDIO
-function drivers with similar needs, and it's extremely simple.
+So don't delete them, but try to consolidate the code, or just make it
+so that it can be deleted, and you only need a simple module init/exit
+function that registeres a single structure, like libata.
 
-I'm honestly trying to understand your concerns, but I'm afraid that
-just saying "it's a hack" is not too informative. Can you please
-explain what do you think is technically wrong with the proposed
-solution ? is it not general enough for other use cases ? will it
-break something ?
+Sound reasonable?
 
-Thanks,
-Ohad.
+thanks,
 
->
-> Thanks,
-> ? Vitaly
->
+greg k-h
