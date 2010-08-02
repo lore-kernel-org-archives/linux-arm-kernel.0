@@ -1,150 +1,176 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 02 Aug 2010 09:25:45 +0900
-Subject: [PATCH v2 3/3] ARM: S5PC210: Add I2C0/I2C1/I2C2 support
-Message-ID: <20100802002545.GA32265@july>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Mon, 2 Aug 2010 11:10:11 +0900
+Subject: [PATCH v2] ARM: Samsung SoC: clksrc-clk: wait for the stable
+	SRC/DIV status.
+In-Reply-To: <000101cb3077$0272a3a0$0757eae0$%kim@samsung.com>
+References: <1280379947-7362-1-git-send-email-myungjoo.ham@samsung.com>
+	<000101cb3077$0272a3a0$0757eae0$%kim@samsung.com>
+Message-ID: <AANLkTikM-mDn_PXCK1B=c531ZuxLSEeyfqTgJVkv2fWm@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+On Sat, Jul 31, 2010 at 3:09 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> MyungJoo Ham wrote:
+>>
+>> Many MUX and clock dividers have a status bit so that users can wait
+>> until the status is stable. When corresponding registers are accessed
+>> while a clock is not stable, we may suffer from unexpected errors.
+>>
+>> Therefore, we introduce a mechanism to let the operations related with
+>> updating SRC/DIV registers of clksrc-clk wait for the stabilization:
+>> clk_set_parent, clk_set_rate.
+>>
+>> In order to use this feature, the definition of clksrc_clk should
+>> include reg_src_stable or reg_div_stable. With effective rec_src_stable
+>> values, clk_set_parent returns with a stabilized SRC register and
+>> with effective rec_div_stable values, clk_set_rate returns with a
+>> stabilized DIV register. If .reg field is null, its (either SRC or DIV)
+>> register's status is not checked and returned without waiting; i.e.,
+>> some MUX/DIV may not need this feature.
+>>
+>> When setting reg_*_stable, .size is used to tell the value of "stable".
+>> If .size = 0, the stable status is 0 and if .size = 1, the stable status
+>> is 1.
+>>
+>> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> --
+>> v2 changes:
+>> ? ? ? - Wait-for-stable loop is described at an inline function.
+>>
+>> ---
+>> ?arch/arm/plat-samsung/clock-clksrc.c ? ? ? ? ? ? ?| ? 13 +++++++++++++
+>> ?arch/arm/plat-samsung/include/plat/clock-clksrc.h | ? 10 ++++++++++
+>> ?2 files changed, 23 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-samsung/clock-clksrc.c
+> b/arch/arm/plat-samsung/clock-
+>> clksrc.c
+>> index 46d204a..eeaf8f4 100644
+>> --- a/arch/arm/plat-samsung/clock-clksrc.c
+>> +++ b/arch/arm/plat-samsung/clock-clksrc.c
+>> @@ -50,6 +50,14 @@ static unsigned long s3c_getrate_clksrc(struct clk
+> *clk)
+>> ? ? ? return rate;
+>> ?}
+>>
+>> +static inline void s3c_wait_for_stable(struct clksrc_reg *stable)
+>> +{
+>> + ? ? if (stable->reg) {
+>
+> if (stable == NULL )
+> return;
 
-Configure proper mux pins and define i2c0/i2c1/i2c2.
+Fine. I'll rewrite it as "if (stable && stable->reg)" or add
+WARN_ON(stable == NULL).
 
-v1:
-	Use the linux/gpio.h
+>
+>> + ? ? ? ? ? ? do { } while (((__raw_readl(stable->reg) >> stable->shift) &
+> 1)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? != stable->size);
+>
+>> When setting reg_*_stable, .size is used to tell the value of "stable".
+>> If .size = 0, the stable status is 0 and if .size = 1, the stable status
+>> is 1.
+>
+> Really need stable->size and checking in while loop?
+> Because the meaning of 'size' used number of bit...
+> It can be confusing to us...later.
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-s5pv310/Kconfig      |   10 ++++++++++
- arch/arm/mach-s5pv310/Makefile     |    5 +++++
- arch/arm/mach-s5pv310/setup-i2c0.c |   12 ++++++++++--
- arch/arm/mach-s5pv310/setup-i2c1.c |   25 +++++++++++++++++++++++++
- arch/arm/mach-s5pv310/setup-i2c2.c |   25 +++++++++++++++++++++++++
- 5 files changed, 75 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-s5pv310/setup-i2c1.c
- create mode 100644 arch/arm/mach-s5pv310/setup-i2c2.c
+S5PV210's stat bits are "0 at stable". However, as I don't know
+whether it's also true for other CPUs, I wanted to make it more
+general. I'll add the following struct to make it more readable:
 
-diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
-index 2fe8149..faa3436 100644
---- a/arch/arm/mach-s5pv310/Kconfig
-+++ b/arch/arm/mach-s5pv310/Kconfig
-@@ -15,6 +15,16 @@ config CPU_S5PV310
- 	help
- 	  Enable S5PV310 CPU support
- 
-+config S5PV310_SETUP_I2C1
-+	bool
-+	help
-+	  Common setup code for i2c bus 1.
-+
-+config S5PV310_SETUP_I2C2
-+	bool
-+	help
-+	  Common setup code for i2c bus 2.
-+
- # machine support
- 
- config MACH_SMDKV310
-diff --git a/arch/arm/mach-s5pv310/Makefile b/arch/arm/mach-s5pv310/Makefile
-index 5b52132..82dbbaa 100644
---- a/arch/arm/mach-s5pv310/Makefile
-+++ b/arch/arm/mach-s5pv310/Makefile
-@@ -23,3 +23,8 @@ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
- 
- obj-$(CONFIG_MACH_SMDKV310)	+= mach-smdkv310.o
- obj-$(CONFIG_MACH_UNIVERSAL)	+= mach-universal.o
-+
-+# device support
-+
-+obj-$(CONFIG_S5PV310_SETUP_I2C1)	+= setup-i2c1.o
-+obj-$(CONFIG_S5PV310_SETUP_I2C2)	+= setup-i2c2.o
-diff --git a/arch/arm/mach-s5pv310/setup-i2c0.c b/arch/arm/mach-s5pv310/setup-i2c0.c
-index d4f5a81..a29f5e6 100644
---- a/arch/arm/mach-s5pv310/setup-i2c0.c
-+++ b/arch/arm/mach-s5pv310/setup-i2c0.c
-@@ -1,4 +1,5 @@
--/* linux/arch/arm/mach-s5pv210/setup-i2c0.c
-+/*
-+ * linux/arch/arm/mach-s5pv310/setup-i2c0.c
-  *
-  * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com/
-@@ -14,7 +15,14 @@
- 
- struct platform_device; /* don't need the contents */
- 
-+#include <linux/gpio.h>
-+#include <plat/iic.h>
-+#include <plat/gpio-cfg.h>
-+
- void s3c_i2c0_cfg_gpio(struct platform_device *dev)
- {
--/* will be implemented later */
-+        s3c_gpio_cfgpin(S5PV310_GPD1(0), S3C_GPIO_SFN(2));
-+        s3c_gpio_setpull(S5PV310_GPD1(0), S3C_GPIO_PULL_UP);
-+        s3c_gpio_cfgpin(S5PV310_GPD1(1), S3C_GPIO_SFN(2));
-+        s3c_gpio_setpull(S5PV310_GPD1(1), S3C_GPIO_PULL_UP);
- }
-diff --git a/arch/arm/mach-s5pv310/setup-i2c1.c b/arch/arm/mach-s5pv310/setup-i2c1.c
-new file mode 100644
-index 0000000..8ce6ebd
---- /dev/null
-+++ b/arch/arm/mach-s5pv310/setup-i2c1.c
-@@ -0,0 +1,25 @@
-+/*
-+ * linux/arch/arm/mach-s5pv310/setup-i2c1.c
-+ *
-+ * Copyright (C) 2010 Samsung Electronics Co., Ltd.
-+ *
-+ * I2C1 GPIO configuration.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+struct platform_device; /* don't need the contents */
-+
-+#include <linux/gpio.h>
-+#include <plat/iic.h>
-+#include <plat/gpio-cfg.h>
-+
-+void s3c_i2c1_cfg_gpio(struct platform_device *dev)
-+{
-+        s3c_gpio_cfgpin(S5PV310_GPD1(2), S3C_GPIO_SFN(2));
-+        s3c_gpio_setpull(S5PV310_GPD1(2), S3C_GPIO_PULL_UP);
-+        s3c_gpio_cfgpin(S5PV310_GPD1(3), S3C_GPIO_SFN(2));
-+        s3c_gpio_setpull(S5PV310_GPD1(3), S3C_GPIO_PULL_UP);
-+}
-diff --git a/arch/arm/mach-s5pv310/setup-i2c2.c b/arch/arm/mach-s5pv310/setup-i2c2.c
-new file mode 100644
-index 0000000..dcae14f
---- /dev/null
-+++ b/arch/arm/mach-s5pv310/setup-i2c2.c
-@@ -0,0 +1,25 @@
-+/*
-+ * linux/arch/arm/mach-s5pv310/setup-i2c2.c
-+ *
-+ * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
-+ *
-+ * I2C2 GPIO configuration.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+struct platform_device; /* don't need the contents */
-+
-+#include <linux/gpio.h>
-+#include <plat/iic.h>
-+#include <plat/gpio-cfg.h>
-+
-+void s3c_i2c2_cfg_gpio(struct platform_device *dev)
-+{
-+        s3c_gpio_cfgpin(S5PV310_GPA0(6), S3C_GPIO_SFN(3));
-+        s3c_gpio_setpull(S5PV310_GPA0(6), S3C_GPIO_PULL_UP);
-+        s3c_gpio_cfgpin(S5PV310_GPA0(7), S3C_GPIO_SFN(3));
-+        s3c_gpio_setpull(S5PV310_GPA0(7), S3C_GPIO_PULL_UP);
-+}
+/**
+ * struct clkstat_reg - register definition for clock stat bits
+ * @reg: pointer to the register in virtual memory.
+ * @shift: the shift in bits to where the bitfield is.
+ * @stable: the bit value of stable status.
+ */
+struct clksstat_reg {
+       void __iomem            *reg;
+       unsigned short          shift;
+       unsigned short          stable;
+};
+
+
+>
+>> + ? ? }
+>> +}
+>> +
+>> ?static int s3c_setrate_clksrc(struct clk *clk, unsigned long rate)
+>> ?{
+>> ? ? ? struct clksrc_clk *sclk = to_clksrc(clk);
+>> @@ -68,6 +76,8 @@ static int s3c_setrate_clksrc(struct clk *clk, unsigned
+> long rate)
+>> ? ? ? val |= (div - 1) << sclk->reg_div.shift;
+>> ? ? ? __raw_writel(val, reg);
+>>
+>> + ? ? s3c_wait_for_stable(&sclk->reg_div_stable);
+>> +
+>> ? ? ? return 0;
+>> ?}
+>>
+>> @@ -93,6 +103,9 @@ static int s3c_setparent_clksrc(struct clk *clk, struct
+> clk
+>> *parent)
+>> ? ? ? ? ? ? ? clksrc |= src_nr << sclk->reg_src.shift;
+>>
+>> ? ? ? ? ? ? ? __raw_writel(clksrc, sclk->reg_src.reg);
+>> +
+>> + ? ? ? ? ? ? s3c_wait_for_stable(&sclk->reg_src_stable);
+>> +
+>> ? ? ? ? ? ? ? return 0;
+>> ? ? ? }
+>>
+>> diff --git a/arch/arm/plat-samsung/include/plat/clock-clksrc.h
+> b/arch/arm/plat-
+>> samsung/include/plat/clock-clksrc.h
+>> index 50a8ca7..282821d 100644
+>> --- a/arch/arm/plat-samsung/include/plat/clock-clksrc.h
+>> +++ b/arch/arm/plat-samsung/include/plat/clock-clksrc.h
+>> @@ -45,6 +45,13 @@ struct clksrc_reg {
+>> ? * @sources: the sources for this clock
+>> ? * @reg_src: the register definition for selecting the clock's source
+>> ? * @reg_div: the register definition for the clock's output divisor
+>> + * @reg_src_stable: the register definition to probe if reg_src is
+>> + * ? ?stabilized after the update of reg_src. It is "stabilized" if
+>> + * ? ?reg[shift] == size. If reg == NULL, this stable reg is not looked
+>> + * ? ?up. Thus, in S5PV210, size is usually 0.
+>> + * @reg_div_stable: the register definition to probe if reg_div is
+>> + * ? ?stabilized after the update of reg_div. Same mechanism with
+>> + * ? ?reg_src_stable.
+>> ? *
+>> ? * This clock implements the features required by the newer SoCs where
+>> ? * the standard clock block provides an input mux and a post-mux divisor
+>> @@ -61,6 +68,9 @@ struct clksrc_clk {
+>>
+>> ? ? ? struct clksrc_reg ? ? ? reg_src;
+>> ? ? ? struct clksrc_reg ? ? ? reg_div;
+>> +
+>> + ? ? struct clksrc_reg ? ? ? reg_src_stable;
+>> + ? ? struct clksrc_reg ? ? ? reg_div_stable;
+>> ?};
+>>
+>> ?/**
+>> --
+>
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
+
+
+
 -- 
-1.5.3.3
+MyungJoo Ham (???), Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
