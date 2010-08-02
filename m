@@ -1,59 +1,55 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Mon, 02 Aug 2010 20:35:21 +0900
-Subject: [PATCH] ARM: S5PC210: Define more GPIOs to use the MP pins
-Message-ID: <20100802113521.GA1107@july>
+From: mchehab@redhat.com (Mauro Carvalho Chehab)
+Date: Mon, 02 Aug 2010 08:51:06 -0300
+Subject: [PATCH v3 1/8] ARM: Samsung: Add register definitions for	Samsung
+	S5P SoC camera interface
+In-Reply-To: <20100802105216.GD30670@n2100.arm.linux.org.uk>
+References: <1279902083-21250-1-git-send-email-s.nawrocki@samsung.com>
+	<1279902083-21250-2-git-send-email-s.nawrocki@samsung.com>
+	<00ba01cb2c8f$02fc8480$08f58d80$%kim@samsung.com>
+	<003001cb322d$fc976b10$f5c64130$%osciak@samsung.com>
+	<20100802105216.GD30670@n2100.arm.linux.org.uk>
+Message-ID: <4C56B12A.3080808@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+Em 02-08-2010 07:52, Russell King - ARM Linux escreveu:
+> On Mon, Aug 02, 2010 at 12:32:20PM +0200, Pawel Osciak wrote:
+>> Well, some of them are indeed unused, but it's not an uncommon practice in
+>> kernel and might help future developers.
+> 
+> On the other hand, arch/arm is getting soo big that we need to do
+> something about this - and one solution is to avoid unnecessary
+> definitions that we're not using.
+> 
+> Another good idea is to put definitions along side the drivers which
+> they're relevant to - maybe in a local driver-name.h file which
+> driver-name.c includes, or maybe even within driver-name.c if they're
+> not excessive.  This has the advantage of distributing the "bloat" to
+> where its actually used, and means that the driver isn't dependent so
+> much on arch/arm or even the SoC itself.
 
-Note that these pins can't support the interrupt. Only use to input/output.
+Very much appreciated from my side. It is very hard to sync changes that
+happen via arm trees when merging from my tree. There were several cases
+in the past were I needed to coordinate with an ARM maintainer about when
+he would merge from his tree, as the patches I had on media tree were
+highly dependent on the patches at arch.
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-s5pv310/include/mach/gpio.h |   14 +++++++++++++-
- 1 files changed, 13 insertions(+), 1 deletions(-)
+On several cases, I suspect that we had git bisect breakages (compilation
+or driver miss-functioning) due to those sync issues between two trees.
 
-diff --git a/arch/arm/mach-s5pv310/include/mach/gpio.h b/arch/arm/mach-s5pv310/include/mach/gpio.h
-index 3f751f2..a840d83 100644
---- a/arch/arm/mach-s5pv310/include/mach/gpio.h
-+++ b/arch/arm/mach-s5pv310/include/mach/gpio.h
-@@ -55,6 +55,10 @@
- #define S5PV310_GPIO_X2_NR	(8)
- #define S5PV310_GPIO_X3_NR	(8)
- #define S5PV310_GPIO_Z_NR	(7)
-+#define S5PV310_GPIO_MP01_NR	(8)
-+#define S5PV310_GPIO_MP02_NR	(4)
-+#define S5PV310_GPIO_MP03_NR	(8)
-+#define S5PV310_GPIO_MP04_NR	(8)
- 
- /* GPIO bank numbers */
- 
-@@ -92,6 +96,10 @@ enum s5p_gpio_number {
- 	S5PV310_GPIO_X2_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_X1),
- 	S5PV310_GPIO_X3_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_X2),
- 	S5PV310_GPIO_Z_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_X3),
-+	S5PV310_GPIO_MP01_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_Z),
-+	S5PV310_GPIO_MP02_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_MP01),
-+	S5PV310_GPIO_MP03_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_MP02),
-+	S5PV310_GPIO_MP04_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_MP03),
- };
- 
- /* S5PV310 GPIO number definitions */
-@@ -125,9 +133,13 @@ enum s5p_gpio_number {
- #define S5PV310_GPX2(_nr)	(S5PV310_GPIO_X2_START + (_nr))
- #define S5PV310_GPX3(_nr)	(S5PV310_GPIO_X3_START + (_nr))
- #define S5PV310_GPZ(_nr)	(S5PV310_GPIO_Z_START + (_nr))
-+#define S5PV310_MP01(_nr)	(S5PV310_GPIO_MP01_START + (_nr))
-+#define S5PV310_MP02(_nr)	(S5PV310_GPIO_MP02_START + (_nr))
-+#define S5PV310_MP03(_nr)	(S5PV310_GPIO_MP03_START + (_nr))
-+#define S5PV310_MP04(_nr)	(S5PV310_GPIO_MP04_START + (_nr))
- 
- /* the end of the S5PV310 specific gpios */
--#define S5PV310_GPIO_END	(S5PV310_GPZ(S5PV310_GPIO_Z_NR) + 1)
-+#define S5PV310_GPIO_END	(S5PV310_MP04(S5PV310_GPIO_MP04_NR) + 1)
- #define S3C_GPIO_END		S5PV310_GPIO_END
- 
- /* define the number of gpios we need to the one after the GPZ() range */
--- 
-1.5.3.3
+A per-driver *.h file makes things easier, as such header file can be
+merged/maintained together with the subsystem tree where the driver belongs.
+
+> Take a look at arch/arm/mach-vexpress/include/mach/ct-ca9x4.h and
+> arch/arm/mach-vexpress/include/mach/motherboard.h - these are the only
+> two files which contain platform definitions which are actually used
+> for Versatile Express.  Compare that with
+> arch/arm/mach-realview/include/mach/platform.h which contains lots
+> more...
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Cheers,
+Mauro
