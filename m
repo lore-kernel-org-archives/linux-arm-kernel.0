@@ -1,105 +1,66 @@
-From: darkstar6262@gmail.com (Cory Maccarrone)
-Date: Mon,  2 Aug 2010 08:29:36 -0700
-Subject: [PATCH 5/5] [htcherald] Add board support for UARTs, bluetooth
-In-Reply-To: <1280762976-17284-1-git-send-email-darkstar6262@gmail.com>
-References: <1280762976-17284-1-git-send-email-darkstar6262@gmail.com>
-Message-ID: <1280762976-17284-6-git-send-email-darkstar6262@gmail.com>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Tue, 3 Aug 2010 00:26:36 +0900
+Subject: [PATCH 1/2] arm: msm: Add System MMU support.
+In-Reply-To: <20100802100419.GC30670@n2100.arm.linux.org.uk>
+References: <20100802090326.GA30670@n2100.arm.linux.org.uk>
+	<20100802181919J.fujita.tomonori@lab.ntt.co.jp>
+	<20100802100419.GC30670@n2100.arm.linux.org.uk>
+Message-ID: <20100803002542M.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change adds bluetooth and UART initialization support to the
-HTC Herald board driver.  This allows use of the serial bluetooth
-adapter attached to UART1 using hciattach.
+On Mon, 2 Aug 2010 11:04:19 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-Signed-off-by: Cory Maccarrone <darkstar6262@gmail.com>
----
- arch/arm/mach-omap1/Makefile          |    2 +-
- arch/arm/mach-omap1/board-htcherald.c |   23 +++++++++++++++++++++++
- 2 files changed, 24 insertions(+), 1 deletions(-)
+> On Mon, Aug 02, 2010 at 06:20:01PM +0900, FUJITA Tomonori wrote:
+> > On Mon, 2 Aug 2010 10:03:26 +0100
+> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > 
+> > > On Mon, Aug 02, 2010 at 05:30:26PM +0900, FUJITA Tomonori wrote:
+> > > > ARM's iommu code (arch/plat-omap/include/plat/iommu.h) is a library to
+> > > > simplify the IOMMU implementations. It could be useful for all the
+> > > > iommu implementations.
+> > > 
+> > > ITYM OMAP's iommu code.
+> > 
+> > Yeah, I meant that we could extend it to make it useful for other
+> > iommu implementations. At least, we could make something generic like
+> > struct iommu_functions, I think. Then we can embed a generic iommu
+> > structure into an iommu specific struct (like we do with inode).
+> > 
+> > The current iommu-api (include/linux/iommu.h) is just about domain and
+> > mapping concept. We can implement it on the top of the above
+> > infrastructure.
+> > 
+> > I'm still trying to figure out how the DMA-API can work well with
+> > them.
+> 
+> I'm not sure it can in totality.  The DMA-API solves the host CPU <->
+> device aspect of DMA support only.
+> 
+> However, there is another use case for IOMMUs, which is to allow two
+> separate peripheral devices to communicate with each other via system
+> memory.  As the streaming DMA-API involves the idea of buffer ownership
+> (of a singular agent), it is unsuitable for this use case.
+> 
+> The coherent allocation part of the DMA-API also only deals with the
+> idea of there being a singular DMA agent accessing the allocated buffer
+> (in conjunction with the host CPU).
 
-diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
-index facfaeb..0b8cb18 100644
---- a/arch/arm/mach-omap1/Makefile
-+++ b/arch/arm/mach-omap1/Makefile
-@@ -42,7 +42,7 @@ obj-$(CONFIG_MACH_NOKIA770)		+= board-nokia770.o
- obj-$(CONFIG_MACH_AMS_DELTA)		+= board-ams-delta.o
- obj-$(CONFIG_AMS_DELTA_FIQ)		+= ams-delta-fiq.o ams-delta-fiq-handler.o
- obj-$(CONFIG_MACH_SX1)			+= board-sx1.o board-sx1-mmc.o
--obj-$(CONFIG_MACH_HERALD)		+= board-htcherald.o
-+obj-$(CONFIG_MACH_HERALD)		+= board-htcherald.o htc-bt.o
- 
- ifeq ($(CONFIG_ARCH_OMAP15XX),y)
- # Innovator-1510 FPGA
-diff --git a/arch/arm/mach-omap1/board-htcherald.c b/arch/arm/mach-omap1/board-htcherald.c
-index 1b12b75..cf4b908 100644
---- a/arch/arm/mach-omap1/board-htcherald.c
-+++ b/arch/arm/mach-omap1/board-htcherald.c
-@@ -47,8 +47,10 @@
- #include <plat/keypad.h>
- #include <plat/usb.h>
- #include <plat/mmc.h>
-+#include <plat/mux.h>
- 
- #include <mach/irqs.h>
-+#include <mach/htc-bt.h>
- 
- #include <linux/delay.h>
- 
-@@ -138,6 +140,7 @@ Happy Times         0 1 0 x  x x 0 x
- 
- #define HTCPLD_GPIO_LED_DPAD		HTCPLD_BASE(0, 0)
- #define HTCPLD_GPIO_LED_KBD		HTCPLD_BASE(1, 0)
-+#define HTCPLD_GPIO_BT_POWER		HTCPLD_BASE(1, 4)
- #define HTCPLD_GPIO_LED_CAPS		HTCPLD_BASE(1, 5)
- #define HTCPLD_GPIO_LED_RED_FLASH	HTCPLD_BASE(2, 1)
- #define HTCPLD_GPIO_LED_RED_SOLID	HTCPLD_BASE(2, 2)
-@@ -423,6 +426,22 @@ static struct omap_mmc_platform_data htc_mmc1_data = {
- static struct omap_mmc_platform_data *htc_mmc_data[1];
- #endif
- 
-+/* Bluetooth */
-+#define HTCHERALD_GPIO_BT_ENABLE 125
-+
-+static struct htc_bt_data htcherald_bt_data = {
-+	.uart_clock	= "uart1_ck",
-+	.gpio_pwr	= HTCPLD_GPIO_BT_POWER,
-+	.gpio_enable	= HTCHERALD_GPIO_BT_ENABLE,
-+};
-+
-+static struct platform_device bt_device = {
-+	.name		= "htc-bt",
-+	.id		= -1,
-+	.dev = {
-+		.platform_data = &htcherald_bt_data,
-+	},
-+};
- 
- /* Platform devices for the Herald */
- static struct platform_device *devices[] __initdata = {
-@@ -431,6 +450,7 @@ static struct platform_device *devices[] __initdata = {
- 	&htcpld_device,
- 	&gpio_leds_device,
- 	&herald_gpiokeys_device,
-+	&bt_device,
- };
- 
- /*
-@@ -574,6 +594,7 @@ done:
- 	printk(KERN_INFO "USB setup complete.\n");
- }
- 
-+
- static void __init htcherald_init(void)
- {
- 	printk(KERN_INFO "HTC Herald init.\n");
-@@ -595,6 +616,8 @@ static void __init htcherald_init(void)
- 
- 	omap_register_i2c_bus(1, 100, NULL, 0);
- 
-+	omap_serial_init();
-+
- #if defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE)
- 	htc_mmc_data[0] = &htc_mmc1_data;
- 	omap1_init_mmc(htc_mmc_data, 1);
--- 
-1.6.0.4
+I don't have a clear idea what kinda API works well in the above case
+yet.
+
+But we have been talking about more bigger things? Not just about the
+interface, how things work together.
+
+- OMAP's iommu code is a library to simplify OMAP implementations.
+
+- include/linux/iommu.h is an interface to IOMMUs for specific
+  interfaces.
+
+- the DMA API could access to IOMMUs internally.
+
+IOMMU library provides generic iommu interfaces (a structure including
+IOMMU implementation specific function pointers). KVM uses some of
+them. Architectures could implement the DMA API on the top of some the
+interfaces too.
