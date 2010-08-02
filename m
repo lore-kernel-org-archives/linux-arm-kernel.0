@@ -1,27 +1,52 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 2 Aug 2010 15:08:44 +0300
-Subject: [PATCH v2 00/20] native support for wl1271 on ZOOM
-In-Reply-To: <20100802114256.GE12293@atomide.com>
-References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-	<20100726193028.GG3903@tuxdriver.com>
-	<1280736987.17809.18.camel@chilepepper>
-	<20100802114256.GE12293@atomide.com>
-Message-ID: <AANLkTi=GmrCR8=NPLDE=e4nS7yM0Un95MDo25QdEt-XX@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Aug 2010 13:09:14 +0100
+Subject: [PATCH v3 1/8] ARM: Samsung: Add register definitions for
+	Samsung S5P SoC camera interface
+In-Reply-To: <4C56B12A.3080808@redhat.com>
+References: <1279902083-21250-1-git-send-email-s.nawrocki@samsung.com>
+	<1279902083-21250-2-git-send-email-s.nawrocki@samsung.com>
+	<00ba01cb2c8f$02fc8480$08f58d80$%kim@samsung.com>
+	<003001cb322d$fc976b10$f5c64130$%osciak@samsung.com>
+	<20100802105216.GD30670@n2100.arm.linux.org.uk>
+	<4C56B12A.3080808@redhat.com>
+Message-ID: <20100802120914.GF30670@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 2, 2010 at 2:42 PM, Tony Lindgren <tony@atomide.com> wrote:
-> Nicolas Pitre made a comment saying he wants to look at these patches
-> more, are there other pending comments?
+On Mon, Aug 02, 2010 at 08:51:06AM -0300, Mauro Carvalho Chehab wrote:
+> Em 02-08-2010 07:52, Russell King - ARM Linux escreveu:
+> > On Mon, Aug 02, 2010 at 12:32:20PM +0200, Pawel Osciak wrote:
+> >> Well, some of them are indeed unused, but it's not an uncommon practice in
+> >> kernel and might help future developers.
+> > 
+> > On the other hand, arch/arm is getting soo big that we need to do
+> > something about this - and one solution is to avoid unnecessary
+> > definitions that we're not using.
+> > 
+> > Another good idea is to put definitions along side the drivers which
+> > they're relevant to - maybe in a local driver-name.h file which
+> > driver-name.c includes, or maybe even within driver-name.c if they're
+> > not excessive.  This has the advantage of distributing the "bloat" to
+> > where its actually used, and means that the driver isn't dependent so
+> > much on arch/arm or even the SoC itself.
+> 
+> Very much appreciated from my side. It is very hard to sync changes that
+> happen via arm trees when merging from my tree. There were several cases
+> in the past were I needed to coordinate with an ARM maintainer about when
+> he would merge from his tree, as the patches I had on media tree were
+> highly dependent on the patches at arch.
 
-I plan to post a v3 series this week with some of the comments that
-were already discussed after v2.
+That's a separate problem - one which occurs when there's platform
+code in arch/arm/ which shares a common data structure with driver
+code under drivers/.
 
-Thanks everyone for the attention,
-Ohad.
+I don't think there's an easy resolution to that one, because if
+you split the arch/arm/ change (which may depend on other arch/arm/
+changes) from the drivers/ change, someone ends up losing no matter
+where the header file with the common data structure is placed.
 
->
-> Regards,
->
-> Tony
->
+One answer to that is to kill the idea that every ARM architecture
+needs to define their own watchdog platform data - and instead
+replace it with a shared watchdog_platform_data structure, much like
+the flash_platform_data structure in arch/arm/include/asm/mach/flash.h
+(which'd would be nice to be under include/linux ...)
