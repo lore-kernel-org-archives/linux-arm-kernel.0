@@ -1,40 +1,63 @@
-From: Joerg.Roedel@amd.com (Roedel, Joerg)
-Date: Mon, 2 Aug 2010 09:48:12 +0200
-Subject: [PATCH 1/2] arm: msm: Add System MMU support.
-In-Reply-To: <1280546124.1902.30.camel@pasglop>
-References: <ea4bbdecc271f7fa5749d09645f38c0d.squirrel@www.codeaurora.org>
-	<bad58db98c165a61860827d4e720acf8.squirrel@www.codeaurora.org>
-	<20100729123512Y.fujita.tomonori@lab.ntt.co.jp>
-	<201007291026.55928.arnd@arndb.de>
-	<1280546124.1902.30.camel@pasglop>
-Message-ID: <20100802074812.GM24084@amd.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 2 Aug 2010 10:46:43 +0300
+Subject: [PATCH] ARM: imx: Fix build failure when including
+	<mach/gpio.h> without <linux/spinlock.h>
+In-Reply-To: <1280734183-4315-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20100729064241.GB11268@pengutronix.de>
+	<1280734183-4315-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20100802074643.GB25825@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 30, 2010 at 11:15:24PM -0400, Benjamin Herrenschmidt wrote:
-> On Thu, 2010-07-29 at 10:26 +0200, Arnd Bergmann wrote:
-> > Exactly, thanks for the clarification. I also didn't realize that
-> > there
-> > is now an include/linux/iommu.h file that only describes the PCI
-> > SR-IOV
-> > interfaces, unlike the generic IOMMU support that we have in your
-> > include/linux/dma-mapping.h file.
-> > 
-> > Maybe we should rename linux/iommu.h to something more specific so we
-> > can reduce this confusion in the future.
-> 
-> Hrm, indeed I just noticed that. Pretty gross... it should definitly be
-> renamed, is will caused endless confusion with unrelated iommu.h and
-> iommu_* interfaces which represent something different.
+Hi Uwe,
 
-The first direction to go should be trying to unify all the different
-iommu* interfaces into the iommu-api. The generic api will definitly
-need to be extended for that, but since it is an in-kernel interface
-thats no problem.
+On Mon, Aug 02, 2010 at 09:29:43AM +0200, Uwe Kleine-K?nig wrote:
+> This is a follow up to
+> 
+> 	14cb0de (arm/imx/gpio: add spinlock protection)
+> 
+> and fixes the following build failure:
+> 
+> 	  CC      arch/arm/mach-imx/pcm970-baseboard.o
+> 	In file included from arch/arm/include/asm/gpio.h:6,
+> 			 from include/linux/gpio.h:8,
+> 			 from arch/arm/mach-imx/pcm970-baseboard.c:20:
+> 	arch/arm/plat-mxc/include/mach/gpio.h:40: error: expected specifier-qualifier-list before 'spinlock_t'
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Acked-by: Baruch Siach <baruch@tkos.co.il>
+
+Thanks,
+baruch
+
+> Cc: stable at kernel.org
+> ---
+> Kernel-Version: v2.6.35-rc1-133-g14cb0de
+> 
+> Hello,
+> 
+> as 14cb0de has a Cc: for stable, I added it here, too.
+> 
+> Thanks
+> Uwe
+> 
+>  arch/arm/plat-mxc/include/mach/gpio.h |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
+> index 661fbc6..af33b74 100644
+> --- a/arch/arm/plat-mxc/include/mach/gpio.h
+> +++ b/arch/arm/plat-mxc/include/mach/gpio.h
+> @@ -19,6 +19,7 @@
+>  #ifndef __ASM_ARCH_MXC_GPIO_H__
+>  #define __ASM_ARCH_MXC_GPIO_H__
+>  
+> +#include <linux/spinlock.h>
+>  #include <mach/hardware.h>
+>  #include <asm-generic/gpio.h>
 
 -- 
-Joerg Roedel - AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
