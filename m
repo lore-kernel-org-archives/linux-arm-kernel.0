@@ -1,26 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Aug 2010 10:22:33 +0100
-Subject: Please remind 'WARNING: about Samsung merge window over'
-In-Reply-To: <AANLkTim1qtiYzvGKKRDcgt-Wds30qVX27GDMcnquOvBP@mail.gmail.com>
-References: <003401cb3206$d68a1fc0$839e5f40$%kim@samsung.com>
-	<AANLkTimJvS0djVprEgCJ8k3_SYeaKc72NMNZNrRpqXHi@mail.gmail.com>
-	<20100802073138.GB10608@n2100.arm.linux.org.uk>
-	<AANLkTim1qtiYzvGKKRDcgt-Wds30qVX27GDMcnquOvBP@mail.gmail.com>
-Message-ID: <20100802092233.GB30670@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 2 Aug 2010 11:32:30 +0200
+Subject: [PATCH 1/2] mxc_nand: fix Unbalanced enable for IRQ
+In-Reply-To: <1276178584-10074-1-git-send-email-eric@eukrea.com>
+References: <1276178584-10074-1-git-send-email-eric@eukrea.com>
+Message-ID: <20100802093230.GA29811@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 02, 2010 at 05:35:37PM +0900, Kyungmin Park wrote:
-> As the maintainer, he merged his features freely but others can't get
-> the chance if the implementation is not fit his taste or company
-> policy.
+Hi David,
+
+can we please have this patch soon in mainline.  This bugs our
+autobuilder since long.
+
+Best regards
+Uwe
+
+On Thu, Jun 10, 2010 at 04:03:04PM +0200, Eric B?nard wrote:
+> * preset should be done before sending the reset command
 > 
-> Look at the example.
-> [PATCH v2 0/4] ARM: S5P: Support gpio interrupts
-> http://marc.info/?l=linux-arm-kernel&m=127840208508625&w=2
+> * without this, I get the following error on an i.MX35 :
+> [    0.900000] ------------[ cut here ]------------
+> [    0.900000] WARNING: at kernel/irq/manage.c:290 __enable_irq+0x4c/0x88()
+> [    0.900000] Unbalanced enable for IRQ 33
+> [    0.900000] Modules linked in:
+> [    0.900000] [<c002ffb8>] (unwind_backtrace+0x0/0xf0) from [<c02f7d0c>] (dump_stack+0x18/0x1c)
+> [    0.900000] [<c02f7d0c>] (dump_stack+0x18/0x1c) from [<c0049a44>] (warn_slowpath_common+0x54/0x6c)
+> [    0.900000] [<c0049a44>] (warn_slowpath_common+0x54/0x6c) from [<c0049b00>] (warn_slowpath_fmt+0x38/0x40)
+> [    0.900000] [<c0049b00>] (warn_slowpath_fmt+0x38/0x40) from [<c008f65c>] (__enable_irq+0x4c/0x88)
+> [    0.900000] [<c008f65c>] (__enable_irq+0x4c/0x88) from [<c008fca0>] (enable_irq+0x54/0x98)
+> [    0.900000] [<c008fca0>] (enable_irq+0x54/0x98) from [<c021e618>] (wait_op_done+0x40/0x134)
+> [    0.900000] [<c021e618>] (wait_op_done+0x40/0x134) from [<c021e808>] (send_cmd+0x30/0x38)
+> [    0.900000] [<c021e808>] (send_cmd+0x30/0x38) from [<c021eb8c>] (mxc_nand_command+0x26c/0x328)
+> [    0.900000] [<c021eb8c>] (mxc_nand_command+0x26c/0x328) from [<c021aa60>] (nand_scan_ident+0x188/0x6c0)
+> [    0.900000] [<c021aa60>] (nand_scan_ident+0x188/0x6c0) from [<c001a9cc>] (mxcnd_probe+0x2b8/0x3d0)
+> [    0.900000] [<c001a9cc>] (mxcnd_probe+0x2b8/0x3d0) from [<c01f9e88>] (platform_drv_probe+0x20/0x24)
+> [    0.900000] [<c01f9e88>] (platform_drv_probe+0x20/0x24) from [<c01f8c38>] (driver_probe_device+0xb0/0x164)
+> [    0.900000] [<c01f8c38>] (driver_probe_device+0xb0/0x164) from [<c01f8d54>] (__driver_attach+0x68/0x8c)
+> [    0.900000] [<c01f8d54>] (__driver_attach+0x68/0x8c) from [<c01f8348>] (bus_for_each_dev+0x50/0x84)
+> [    0.900000] [<c01f8348>] (bus_for_each_dev+0x50/0x84) from [<c01f8a9c>] (driver_attach+0x20/0x28)
+> [    0.900000] [<c01f8a9c>] (driver_attach+0x20/0x28) from [<c01f7c00>] (bus_add_driver+0x144/0x2dc)
+> [    0.900000] [<c01f7c00>] (bus_add_driver+0x144/0x2dc) from [<c01f906c>] (driver_register+0xb0/0x13c)
+> [    0.900000] [<c01f906c>] (driver_register+0xb0/0x13c) from [<c01fa13c>] (platform_driver_register+0x4c/0x60)
+> [    0.900000] [<c01fa13c>] (platform_driver_register+0x4c/0x60) from [<c01fa170>] (platform_driver_probe+0x20/0xa0)
+> [    0.900000] [<c01fa170>] (platform_driver_probe+0x20/0xa0) from [<c001a708>] (mxc_nd_init+0x18/0x24)
+> [    0.900000] [<c001a708>] (mxc_nd_init+0x18/0x24) from [<c002938c>] (do_one_initcall+0x64/0x1bc)
+> [    0.900000] [<c002938c>] (do_one_initcall+0x64/0x1bc) from [<c00084c4>] (kernel_init+0xe8/0x1ac)
+> [    0.900000] [<c00084c4>] (kernel_init+0xe8/0x1ac) from [<c002aee8>] (kernel_thread_exit+0x0/0x8)
+> [    0.900000] ---[ end trace 8bf72ac6ba089a19 ]---
+> [    1.140000] NAND device: Manufacturer ID: 0x2c, Chip ID: 0xda (Micron NAND 256MiB 3,3V 8-bit)
 > 
-> We need the gpio interrupt support but he refused it since it used too
-> many irq. Actually his board don't use this features.
-> "It is because there are too many gpio interrupts and having support
-> of all of them is unnecessary as realistically only few of them maybe
-> used."
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
+> ---
+>  drivers/mtd/nand/mxc_nand.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> index 82e9438..8878503 100644
+> --- a/drivers/mtd/nand/mxc_nand.c
+> +++ b/drivers/mtd/nand/mxc_nand.c
+> @@ -604,8 +604,8 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
+>  	/* Command pre-processing step */
+>  	switch (command) {
+>  	case NAND_CMD_RESET:
+> -		send_cmd(host, command, false);
+>  		preset(mtd);
+> +		send_cmd(host, command, false);
+>  		break;
+>  
+>  	case NAND_CMD_STATUS:
+> -- 
+> 1.6.3.3
+> 
+> 
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
