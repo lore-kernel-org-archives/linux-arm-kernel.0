@@ -1,78 +1,71 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 2 Aug 2010 11:32:30 +0200
-Subject: [PATCH 1/2] mxc_nand: fix Unbalanced enable for IRQ
-In-Reply-To: <1276178584-10074-1-git-send-email-eric@eukrea.com>
-References: <1276178584-10074-1-git-send-email-eric@eukrea.com>
-Message-ID: <20100802093230.GA29811@pengutronix.de>
+From: nitvishnoi@gmail.com (nitin vishnoi)
+Date: Mon, 2 Aug 2010 11:42:07 +0530
+Subject: not coming prompt in 2.6.33.6 kernel
+In-Reply-To: <AANLkTim8KEn7-dFpHdbYs0Wvi_hxjrbmUmhEQ2nMOtHj@mail.gmail.com>
+References: <AANLkTikgB9OF6mRqZ2KgQYuCQ4JcF7N6oTJyUbrYq0t7@mail.gmail.com>
+	<20100728094344.GA9142@trinity.fluff.org>
+	<AANLkTikgq_Fb0ZfT-b+9zOA5w2pDpNgwnUqe919hAsnd@mail.gmail.com>
+	<AANLkTin8STiQqvjZo-atA9jhz1OLWuk2k61-VYnZrcD8@mail.gmail.com>
+	<AANLkTim8KEn7-dFpHdbYs0Wvi_hxjrbmUmhEQ2nMOtHj@mail.gmail.com>
+Message-ID: <AANLkTikZwzfY4kJ-9i5Y87vA7HMutRJUM5-5Y_HnQeb=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi
+Finally i got the prompt,
+the problem was in toolchain.I compiled the busybox and kernel with other
+new toolchain and made the ramdisk filesystem.Than i got the prompt.
 
-can we please have this patch soon in mainline.  This bugs our
-autobuilder since long.
+Regards
 
-Best regards
-Uwe
+Nitin
 
-On Thu, Jun 10, 2010 at 04:03:04PM +0200, Eric B?nard wrote:
-> * preset should be done before sending the reset command
-> 
-> * without this, I get the following error on an i.MX35 :
-> [    0.900000] ------------[ cut here ]------------
-> [    0.900000] WARNING: at kernel/irq/manage.c:290 __enable_irq+0x4c/0x88()
-> [    0.900000] Unbalanced enable for IRQ 33
-> [    0.900000] Modules linked in:
-> [    0.900000] [<c002ffb8>] (unwind_backtrace+0x0/0xf0) from [<c02f7d0c>] (dump_stack+0x18/0x1c)
-> [    0.900000] [<c02f7d0c>] (dump_stack+0x18/0x1c) from [<c0049a44>] (warn_slowpath_common+0x54/0x6c)
-> [    0.900000] [<c0049a44>] (warn_slowpath_common+0x54/0x6c) from [<c0049b00>] (warn_slowpath_fmt+0x38/0x40)
-> [    0.900000] [<c0049b00>] (warn_slowpath_fmt+0x38/0x40) from [<c008f65c>] (__enable_irq+0x4c/0x88)
-> [    0.900000] [<c008f65c>] (__enable_irq+0x4c/0x88) from [<c008fca0>] (enable_irq+0x54/0x98)
-> [    0.900000] [<c008fca0>] (enable_irq+0x54/0x98) from [<c021e618>] (wait_op_done+0x40/0x134)
-> [    0.900000] [<c021e618>] (wait_op_done+0x40/0x134) from [<c021e808>] (send_cmd+0x30/0x38)
-> [    0.900000] [<c021e808>] (send_cmd+0x30/0x38) from [<c021eb8c>] (mxc_nand_command+0x26c/0x328)
-> [    0.900000] [<c021eb8c>] (mxc_nand_command+0x26c/0x328) from [<c021aa60>] (nand_scan_ident+0x188/0x6c0)
-> [    0.900000] [<c021aa60>] (nand_scan_ident+0x188/0x6c0) from [<c001a9cc>] (mxcnd_probe+0x2b8/0x3d0)
-> [    0.900000] [<c001a9cc>] (mxcnd_probe+0x2b8/0x3d0) from [<c01f9e88>] (platform_drv_probe+0x20/0x24)
-> [    0.900000] [<c01f9e88>] (platform_drv_probe+0x20/0x24) from [<c01f8c38>] (driver_probe_device+0xb0/0x164)
-> [    0.900000] [<c01f8c38>] (driver_probe_device+0xb0/0x164) from [<c01f8d54>] (__driver_attach+0x68/0x8c)
-> [    0.900000] [<c01f8d54>] (__driver_attach+0x68/0x8c) from [<c01f8348>] (bus_for_each_dev+0x50/0x84)
-> [    0.900000] [<c01f8348>] (bus_for_each_dev+0x50/0x84) from [<c01f8a9c>] (driver_attach+0x20/0x28)
-> [    0.900000] [<c01f8a9c>] (driver_attach+0x20/0x28) from [<c01f7c00>] (bus_add_driver+0x144/0x2dc)
-> [    0.900000] [<c01f7c00>] (bus_add_driver+0x144/0x2dc) from [<c01f906c>] (driver_register+0xb0/0x13c)
-> [    0.900000] [<c01f906c>] (driver_register+0xb0/0x13c) from [<c01fa13c>] (platform_driver_register+0x4c/0x60)
-> [    0.900000] [<c01fa13c>] (platform_driver_register+0x4c/0x60) from [<c01fa170>] (platform_driver_probe+0x20/0xa0)
-> [    0.900000] [<c01fa170>] (platform_driver_probe+0x20/0xa0) from [<c001a708>] (mxc_nd_init+0x18/0x24)
-> [    0.900000] [<c001a708>] (mxc_nd_init+0x18/0x24) from [<c002938c>] (do_one_initcall+0x64/0x1bc)
-> [    0.900000] [<c002938c>] (do_one_initcall+0x64/0x1bc) from [<c00084c4>] (kernel_init+0xe8/0x1ac)
-> [    0.900000] [<c00084c4>] (kernel_init+0xe8/0x1ac) from [<c002aee8>] (kernel_thread_exit+0x0/0x8)
-> [    0.900000] ---[ end trace 8bf72ac6ba089a19 ]---
-> [    1.140000] NAND device: Manufacturer ID: 0x2c, Chip ID: 0xda (Micron NAND 256MiB 3,3V 8-bit)
-> 
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> ---
->  drivers/mtd/nand/mxc_nand.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-> index 82e9438..8878503 100644
-> --- a/drivers/mtd/nand/mxc_nand.c
-> +++ b/drivers/mtd/nand/mxc_nand.c
-> @@ -604,8 +604,8 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
->  	/* Command pre-processing step */
->  	switch (command) {
->  	case NAND_CMD_RESET:
-> -		send_cmd(host, command, false);
->  		preset(mtd);
-> +		send_cmd(host, command, false);
->  		break;
->  
->  	case NAND_CMD_STATUS:
-> -- 
-> 1.6.3.3
-> 
-> 
+On Fri, Jul 30, 2010 at 8:55 PM, Martin Fuzzey <mfuzzey@gmail.com> wrote:
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Hi,
+> On Fri, Jul 30, 2010 at 12:40 PM, nitin vishnoi <nitvishnoi@gmail.com>
+> wrote:
+> > Hi now i am able the uart info also.Bu stil not getting the prompt.
+> > and getting the following log.
+> >
+> > Starting kernel ...
+> >
+> >
+> > Uncompressing
+> >
+> Linux......................................................................
+> > done, booting the kernel.
+> > Linux version 2.6.31.14 (root at ubntu-desktop) (gcc version 4.1.2) #34 Fri
+> Jul
+> > 30 15:33:38 IST 2010
+> > CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
+> > CPU: VIVT data cache, VIVT instruction cache
+> > Kernel command line: root=/dev/ram initrd=0x30800000,8M ramdisk=24576
+> > init=/sbin/init console=ttySAC3,115200 mem=64M
+> > RAMDISK: gzip image found at block 0
+> > EXT2-fs warning: maximal mount count reached, running e2fsck is
+> recommended
+> > VFS: Mounted root (ext2 filesystem) on device 1:0.
+> > Freeing init memory: 88K
+> > Kernel panic - not syncing: Attempted to kill init!
+> >
+>
+> Looks like the init process is terminating unexpectedly.
+> What's /sbin/init for you?
+> How is it compiled? (could it be a OABI / EABI issue?)
+>
+> What happens if you try booting with  init=/bin/sh   ?
+> or try using a script like this as init
+>
+> #! /bin/sh
+> echo "Test stdout"
+> echo "Test console" > /dev/console
+> echo "Test tty1" > /dev/tty1
+> /bin/ls -l /dev > /dev/tty1
+>
+> Cheers,
+> Martin
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100802/7342104e/attachment.html>
