@@ -1,94 +1,51 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 2 Aug 2010 01:07:30 -0600
-Subject: Please remind 'WARNING: about Samsung merge window over'
-In-Reply-To: <AANLkTimJvS0djVprEgCJ8k3_SYeaKc72NMNZNrRpqXHi@mail.gmail.com>
-References: <003401cb3206$d68a1fc0$839e5f40$%kim@samsung.com>
-	<AANLkTimJvS0djVprEgCJ8k3_SYeaKc72NMNZNrRpqXHi@mail.gmail.com>
-Message-ID: <AANLkTinbjcLp30VsWsy5tA4Q2md3VwDtzveoghhVh4Lv@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon,  2 Aug 2010 09:29:43 +0200
+Subject: [PATCH] ARM: imx: Fix build failure when including <mach/gpio.h>
+	without <linux/spinlock.h>
+In-Reply-To: <20100729064241.GB11268@pengutronix.de>
+References: <20100729064241.GB11268@pengutronix.de>
+Message-ID: <1280734183-4315-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 2, 2010 at 12:24 AM, Kyungmin Park <kmpark@infradead.org> wrote:
-> Absurd !!!
->
-> Did you mentioned that samsung merge window over before?
-> why it's reminder mail? it's unilateral notification at this time.
+This is a follow up to
 
-Kgene doesn't have to.  As has been widely discussed, Linus is getting
-stricter about the merge window process.  The window is for merging
-what has already been collected and tested by maintainers.  It is not
-for picking up new stuff.  Maintainers picking up new stuff late risk
-Linus not merging their tree *at all*.
+	14cb0de (arm/imx/gpio: add spinlock protection)
 
-g.
+and fixes the following build failure:
 
->
-> In my feelings. only include the your side (LSI) patches and don't
-> include others (mobile). since it's not fit your taste.
-> Can you explain the difference between "S5PV310 CPU support" and
-> "S5PV210 cpufreq support"?
-> Did you get any ACKs for V310 support? Why do you exclude the v210
-> cpufreq support even though it's acked from others?
->
-> On Mon, Aug 2, 2010 at 2:52 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> Please remind following which is from discussion about Samsung merge stuff
->> with Russell.
->>
->> ---
->>
->>> > So, please send the majority of patches *before* the merge window and
->>> > try to avoid sending anything but fixes during the merge window itself.
->>> > The merge window is for code which has _already_ been merged and has
->>> > been in linux-next to be merged into Linus' tree. ?It's not for new
->>> > code to be reviewed.
->>>
->>> Next merge window, which will probably be the last I will handle for the
->>> S5P range, will have an earlier cut-off point. It was a big rush to get
->>> this lot reviewed and merged.
->>
->> It also means that *NONE* of the stuff in your second pull request was
->> in linux-next for *any* time. ?It also conflicted with my tree. ?The
->> result of that is I'm expecting mainline to be dead for all ARM with:
->>
->> arch/arm/Kconfig:883: can't open file "arch/arm/plat-s5pc1xx/Kconfig"
->>
->> because of a mis-merge - and since that conflict was not picked up by
->> linux-next, it could not have been previously published.
->>
->> For the next merge window, I will avoid reading email for the duration
->> of the window - which means those who are late for the merge window will
->> simply not have their patches and trees pulled. ?This means we _will_
->> have time to resolve conflicts and find problems _before_ the merge
->> window
->>
->> ---
->>
->> I have no more plan to merge s5p stuff for this merge window, but reviewed
->> here until now.
->>
->> Thanks.
->>
->> Best regards,
->> Kgene.
->> --
->> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
->> SW Solution Development Team, Samsung Electronics Co., Ltd.
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+	  CC      arch/arm/mach-imx/pcm970-baseboard.o
+	In file included from arch/arm/include/asm/gpio.h:6,
+			 from include/linux/gpio.h:8,
+			 from arch/arm/mach-imx/pcm970-baseboard.c:20:
+	arch/arm/plat-mxc/include/mach/gpio.h:40: error: expected specifier-qualifier-list before 'spinlock_t'
 
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: stable at kernel.org
+---
+Kernel-Version: v2.6.35-rc1-133-g14cb0de
 
+Hello,
 
+as 14cb0de has a Cc: for stable, I added it here, too.
+
+Thanks
+Uwe
+
+ arch/arm/plat-mxc/include/mach/gpio.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
+index 661fbc6..af33b74 100644
+--- a/arch/arm/plat-mxc/include/mach/gpio.h
++++ b/arch/arm/plat-mxc/include/mach/gpio.h
+@@ -19,6 +19,7 @@
+ #ifndef __ASM_ARCH_MXC_GPIO_H__
+ #define __ASM_ARCH_MXC_GPIO_H__
+ 
++#include <linux/spinlock.h>
+ #include <mach/hardware.h>
+ #include <asm-generic/gpio.h>
+ 
 -- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+1.7.1
