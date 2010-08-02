@@ -1,46 +1,80 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 2 Aug 2010 15:12:48 +0200
-Subject: [PATCH] usb gadget: don't save bind callback in struct
-	usb_gadget_driver
-In-Reply-To: <Pine.LNX.4.64.1008021446470.10662@ask.diku.dk>
-References: <op.vgs04dub7p4s8u@pikus>
-	<1280752803-11441-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<Pine.LNX.4.64.1008021446470.10662@ask.diku.dk>
-Message-ID: <20100802131248.GD13900@pengutronix.de>
+From: s-ghorai@ti.com (Ghorai, Sukumar)
+Date: Mon, 2 Aug 2010 19:09:58 +0530
+Subject: [PATCH v3 1/4] omap3: nand: prefetch in irq mode support
+In-Reply-To: <20100802130306.GL12293@atomide.com>
+References: <1278996337-25172-1-git-send-email-s-ghorai@ti.com>
+	<1278996337-25172-2-git-send-email-s-ghorai@ti.com>
+	<20100802130306.GL12293@atomide.com>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B030E54E6BD@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 02, 2010 at 02:51:36PM +0200, Julia Lawall wrote:
-> > diff --git a/drivers/usb/gadget/amd5536udc.c b/drivers/usb/gadget/amd5536udc.c
-> > index 731150d..c266c1e 100644
-> > --- a/drivers/usb/gadget/amd5536udc.c
-> > +++ b/drivers/usb/gadget/amd5536udc.c
-> > @@ -1954,13 +1954,14 @@ static int setup_ep0(struct udc *dev)
-> >  }
-> >  
-> >  /* Called by gadget driver to register itself */
-> > -int usb_gadget_register_driver(struct usb_gadget_driver *driver)
-> > +int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
-> > +		int (*bind)(struct usb_gadget *))
-> >  {
-> >  	struct udc		*dev = udc;
-> >  	int			retval;
-> >  	u32 tmp;
-> >  
-> > -	if (!driver || !driver->bind || !driver->setup
-> > +	if (!driver || bind || !driver->setup
+
+
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com]
+> Sent: Monday, August 02, 2010 6:33 PM
+> To: Ghorai, Sukumar
+> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
+> kernel at lists.infradead.org; Vimal Singh
+> Subject: Re: [PATCH v3 1/4] omap3: nand: prefetch in irq mode support
 > 
-> I have the impression that this should be !bind rather than bind.  
-ah, now I see what you meant.  Obviously you're right.  I fixed it up
-locally here for now.  Greg, just tell me when/if you need a fixed
-patch.
+> * Sukumar Ghorai <s-ghorai@ti.com> [100713 07:39]:
+> > This patch enable prefetch-irq mode for NAND.
+> 
+> <snip>
+> 
+> > --- a/arch/arm/mach-omap2/board-flash.c
+> > +++ b/arch/arm/mach-omap2/board-flash.c
+> > @@ -133,6 +133,7 @@ static struct omap_nand_platform_data
+> board_nand_data = {
+> >  	.nand_setup	= NULL,
+> >  	.gpmc_t		= &nand_timings,
+> >  	.dma_channel	= -1,		/* disable DMA in OMAP NAND driver */
+> > +	.gpmc_irq	= GPMC_IRQ_NUMBER,
+> >  	.dev_ready	= NULL,
+> >  	.devsize	= 0,	/* '0' for 8-bit, '1' for 16-bit device */
+> >  };
+> > --- a/arch/arm/mach-omap2/include/mach/board-flash.h
+> > +++ b/arch/arm/mach-omap2/include/mach/board-flash.h
+> > @@ -19,6 +19,9 @@
+> >  #define PDC_ONENAND	3
+> >  #define DBG_MPDB	4
+> >
+> > +/* Interrupt number to the MPU Subsystem for GPMC */
+> > +#define GPMC_IRQ_NUMBER	20
+> > +
+> 
+> This does not look right for the IRQ. Please add it to the irqs.h and 34xx,
+> then set it dynamically during the init just like we handle the other
+> interrupt numbers.
+> 
+> This is because the irq numbers can change between omaps, like irqs-44xx.h
+> already has
+> 
+> #define OMAP44XX_IRQ_GPMC                       (20 +
+> OMAP44XX_IRQ_GIC_START)
+> 
+> > @@ -130,6 +141,13 @@ struct omap_nand_info {
+> >  	unsigned long			phys_base;
+> >  	struct completion		comp;
+> >  	int				dma_ch;
+> > +	int				gpmc_irq;
+> > +	enum {
+> > +		NAND_IO_READ = 0,	/* read */
+> > +		NAND_IO_WRITE,		/* write */
+> > +	} iomode;
+> > +	u_char				*buf;
+> > +	int					buf_len;
+> >  };
+> 
+> These should probably be OMAP_NAND_IO_READ and OMAP_NAND_IO_WRITE?
+[Ghorai] Thanks. I understand all your comments. I will rework and submit again. 
 
-> That would be like what is done in the patch for 
-> drivers/usb/gadget/fsl_udc_core.c below
+Regards,
+Ghorai
 
-Thanks
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> 
+> Regards,
+> 
+> Tony
