@@ -1,19 +1,78 @@
-From: konkers@android.com (Erik Gilling)
-Date: Mon, 2 Aug 2010 11:48:40 -0700
-Subject: [PATCH] spi: add spi_tegra driver
-In-Reply-To: <20100730075443.GA17814@avionic-design.de>
-References: <1280450224-25118-1-git-send-email-ccross@google.com>
-	<20100730075443.GA17814@avionic-design.de>
-Message-ID: <AANLkTikUjPaWs5h18pknvhSSCtvs+=pskNgNGrRmsvLD@mail.gmail.com>
+From: zpfeffer@codeaurora.org (Zach Pfeffer)
+Date: Mon, 2 Aug 2010 13:29:38 -0700
+Subject: [PATCH 1/2] arm: msm: Add System MMU support.
+In-Reply-To: <20100802075802.GN24084@amd.com>
+References: <20100729123512Y.fujita.tomonori@lab.ntt.co.jp>
+	<201007291026.55928.arnd@arndb.de> <20100729084018.GM26098@amd.com>
+	<20100729174621W.fujita.tomonori@lab.ntt.co.jp>
+	<20100729090607.GN26098@amd.com>
+	<d493494df33aaf65e526181b1dbafce3.squirrel@www.codeaurora.org>
+	<20100802075802.GN24084@amd.com>
+Message-ID: <20100802202935.GA26214@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 30, 2010 at 12:54 AM, Thierry Reding
-<thierry.reding@avionic-design.de> wrote:
->
-> Since you say this driver depends on the APB DMA driver, should this not be
-> expressed as a Kconfig dependency? Something like:
->
-> ? ? ? ?select TEGRA_SYSTEM_DMA
+On Mon, Aug 02, 2010 at 09:58:02AM +0200, Roedel, Joerg wrote:
+> Hi Stephan,
+> 
+> On Fri, Jul 30, 2010 at 01:19:06AM -0400, stepanm at codeaurora.org wrote:
+> > Unlike a more traditional system with one IOMMU between the bus and
+> > memory, MSM has multiple IOMMUs, with each one hard-wired to a dedicated
+> > device. Furthermore, each IOMMU can have more than one translation
+> > context. One of the use cases is being able to create mappings within
+> > multiple instances of one context, and arbitrarily context-switch the
+> > IOMMU on the fly.
+> 
+> The IOMMU-API supports multiple IOMMUs (at least multiple AMD/Intel
+> IOMMUs). But the face that there are more than one IOMMU is hidden in
+> the backend driver implementation. The API itself only works with
+> domains and devices. The IOMMU driver needs to know which IOMMU it needs
+> to program for a given device. If I understand the concept of your
+> hardware correctly you also have this information.
+> 
+> > It sounds like the domain abstraction and attach_device/detach_device can
+> > encapsulate this rather nicely and I am in the process of updating my
+> > driver to fit this framework.
+> > 
+> > My problem, however, is with iommu_domain_alloc(). This will set up a
+> > domain and call the ops function to initialize it, but I want to be able
+> > to pass it an ???IOMMU id" that will tell the underlying driver which IOMMU
+> > (and which "stream id") is to be associated with that domain instance.
+> > This can be a void* parameter that gets passed through to domain_init. I
+> > feel like this change will make it easy to deal with multiple
+> > IOMMUs/translation contexts, and implementations that have only a singular
+> > IOMMU/translation context are free to ignore that parameter.
+> 
+> In the means of the IOMMU-API the domain is the abstraction of an
+> address space (in other words a page table). The IOMMU(s) which this domain
+> is later assigned to are determined by the iommu_attach_device calls.
+> I think the right way to go here is to create the concept of a
+> device-context in the IOMMU-API and add functions like
+> 
+> 	iommu_attach_context(struct iommu_domain *domain,
+> 			     struct iommu_context *ctxt);
+> 	iommu_detach_context(struct iommu_context *ctxt);
+> 
+> This would work if you can determine in your iommu-driver which iommu
+> you need to program for which device. What do you think?
+> 
 
-yep, will do.
+Joerg, I'd like to make sure I understand this. A domain is an address
+space separate from the actual page-tables that may be part of an
+iommu_context, correct? After I iommu_attach_context the ctxt will
+reflect the address space of the domain, correct?
+
+> 
+> 	Joerg
+> 
+> -- 
+> Joerg Roedel - AMD Operating System Research Center
+> 
+> Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+> General Managers: Alberto Bozzo, Andrew Bowd
+> Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
