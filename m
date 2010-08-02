@@ -1,30 +1,59 @@
 From: vitalywool@gmail.com (Vitaly Wool)
-Date: Mon, 2 Aug 2010 18:19:04 +0200
-Subject: [PATCH v2 00/20] native support for wl1271 on ZOOM
-In-Reply-To: <AANLkTimaSeLqowRHSCivGXTiSE7NatNTR=jLWQYsSo-6@mail.gmail.com>
+Date: Mon, 2 Aug 2010 18:25:23 +0200
+Subject: [PATCH v2 03/20] mmc: support embedded data field in mmc_host
+In-Reply-To: <AANLkTimZQKj7H_GeE=+O9cwxEMTR+LhfFbt=AyXGzN3d@mail.gmail.com>
 References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-	<20100726193028.GG3903@tuxdriver.com>
-	<1280736987.17809.18.camel@chilepepper>
-	<20100802114256.GE12293@atomide.com>
-	<AANLkTikvtMbqUdwHtCtdL2xXbQh64pxjApo6ZH6hAXnP@mail.gmail.com>
-	<AANLkTimaSeLqowRHSCivGXTiSE7NatNTR=jLWQYsSo-6@mail.gmail.com>
-Message-ID: <AANLkTikPSp0_S8kSFmeZJ0qLR3DHKBN=iW_As5891a6v@mail.gmail.com>
+	<1279733634-21974-4-git-send-email-ohad@wizery.com>
+	<AANLkTimzA_JJ-byTDWznbL3YzeJ8LAP4M50onf2_3fBF@mail.gmail.com>
+	<AANLkTi=Oy8X1xMOwWL_cKBB1LWULT6=p+adUgB+AuSJS@mail.gmail.com>
+	<AANLkTi=BUX59heXAW2Uf4wZo2dSS19Je54dkQ5u2YGAW@mail.gmail.com>
+	<AANLkTimZQKj7H_GeE=+O9cwxEMTR+LhfFbt=AyXGzN3d@mail.gmail.com>
+Message-ID: <AANLkTikfRja-h9mz7uyRXCZNZjKdU_yB8e58XQucUzrn@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Ohad,
 
-On Mon, Aug 2, 2010 at 5:59 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+On Mon, Aug 2, 2010 at 5:54 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+
+> SPI is using these spi_board_info tables to populate the SPI device
+> trees. These tables are registered early at the board-specific init
+> code, and are later used by SPI core to populate the devices when the
+> SPI master controller is registered.
 >
-> Check out patch no. 9:
+> SDIO doesn't normally needs any kind of hard coded data: most devices
+> are dynamically probed and populated.
+>
+> On rare cases like the wl1271, we have some platform-specific data we
+> need to deliver the SDIO function driver (i.e. the irq info in this
+> case). Since the device is hardwired to a specific controller, it does
+> make some sense to pass this private data from the controller's info
+> in the board files, through the host driver, and make it accessible
+> through the specific host instance that drives this controller.
+>
+> Btw, if our problem was be broader (e.g., needs to supply private data
+> for non-hardwired devices), then I agree that a more complex
+> mechanism, such as the one you suggest, would be needed. But currently
+> the problem is very simple and the solution is even simpler: just add
+> 1 private pointer to the host.
+>
+> Hope you find this reasonable,
 
-sorry for the confusion. However, I guess if the platform doesn't
-supply this value, we'll just consider it 0? Without any warning,
-right?
+no, actually I don't. I think this is a hack that intrudes into the
+area it completely doesn't belong to.
 
-The problem is, we can't really distinguish between this field not set
-and value zero, and that means something is wrong with the design. The
-easiest way is probably changing the clock ids to start with 1.
+In fact, one can have 2 views on this problem: either this is a fairly
+generic problem we need to address, or this is a very specific corner
+case.
+Your solution will be treated as a hack in both cases.
+
+If we consider it a generic problem, then we need to find a generic
+solution, which is the board_info solution, for instance. FWIW, I2C
+also uses this approach now.
+
+If we consider it to be a corner case, let's just add a dummy
+platform_device like it's done in WL1251 implementation and keep the
+MMC subsystem clean.
 
 Thanks,
    Vitaly
