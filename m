@@ -1,29 +1,104 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 2 Aug 2010 07:26:54 +0200
-Subject: [PATCH 01/11] ARM: cam60: move cam60_spi_devices to .init.data
-In-Reply-To: <AANLkTi=hPg-12w9ihz-RsvD0d6Zawus14qF9hamA6nES@mail.gmail.com>
-References: <1279915120-4373-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<AANLkTi=hPg-12w9ihz-RsvD0d6Zawus14qF9hamA6nES@mail.gmail.com>
-Message-ID: <20100802052653.GA8538@pengutronix.de>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Mon, 02 Aug 2010 14:28:46 +0900
+Subject: [PATCH] ARM: S5PC210: Add gpio keys at Universal board
+Message-ID: <20100802052846.GA11979@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Universal board has 5 gpio keys.
 
-On Sun, Aug 01, 2010 at 11:23:35PM +0200, avictor.za at gmail.com wrote:
-> > cam60_spi_devices is passed to at91_add_device_spi which calls
-> > spi_register_board_info. ?The latter makes a copy of it, so living in
-> > .init.data is OK.
-> 
-> The  copy still maintains a pointers to
-> "cam60_spi_flash_platform_data", so I'm wondering if that and
-> "cam60_spi_partitions" should maybe not be marked as __initdata.
-I think that's right, these need to be fixed up.  Thanks for noticing, I
-will prepare a patch later today.
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv310/mach-universal.c |   62 ++++++++++++++++++++++++++++++++
+ 1 files changed, 62 insertions(+), 0 deletions(-)
 
-Best regards
-Uwe
-
+diff --git a/arch/arm/mach-s5pv310/mach-universal.c b/arch/arm/mach-s5pv310/mach-universal.c
+index b5908d9..d584028 100644
+--- a/arch/arm/mach-s5pv310/mach-universal.c
++++ b/arch/arm/mach-s5pv310/mach-universal.c
+@@ -7,7 +7,11 @@
+  * published by the Free Software Foundation.
+ */
+ 
++#include <linux/platform_device.h>
+ #include <linux/serial_core.h>
++#include <linux/input.h>
++#include <linux/gpio_keys.h>
++#include <linux/gpio.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+@@ -60,6 +64,61 @@ static struct s3c2410_uartcfg universal_uartcfgs[] __initdata = {
+ 	},
+ };
+ 
++static struct gpio_keys_button universal_gpio_keys_tables[] = {
++	{
++		.code			= KEY_VOLUMEUP,
++		.gpio			= S5PV310_GPX2(0),	/* XEINT16 */
++		.desc			= "gpio-keys: KEY_VOLUMEUP",
++		.type			= EV_KEY,
++		.active_low		= 1,
++		.debounce_interval	= 1,
++	}, {
++		.code			= KEY_VOLUMEDOWN,
++		.gpio			= S5PV310_GPX2(1),	/* XEINT17 */
++		.desc			= "gpio-keys: KEY_VOLUMEDOWN",
++		.type			= EV_KEY,
++		.active_low		= 1,
++		.debounce_interval	= 1,
++	}, {
++		.code			= KEY_CONFIG,
++		.gpio			= S5PV310_GPX2(2),	/* XEINT18 */
++		.desc			= "gpio-keys: KEY_CONFIG",
++		.type			= EV_KEY,
++		.active_low		= 1,
++		.debounce_interval	= 1,
++	}, {
++		.code			= KEY_CAMERA,
++		.gpio			= S5PV310_GPX2(3),	/* XEINT19 */
++		.desc			= "gpio-keys: KEY_CAMERA",
++		.type			= EV_KEY,
++		.active_low		= 1,
++		.debounce_interval	= 1,
++	}, {
++		.code			= KEY_OK,
++		.gpio			= S5PV310_GPX3(5),	/* XEINT29 */
++		.desc			= "gpio-keys: KEY_OK",
++		.type			= EV_KEY,
++		.active_low		= 1,
++		.debounce_interval	= 1,
++	},
++};
++
++static struct gpio_keys_platform_data universal_gpio_keys_data = {
++	.buttons	= universal_gpio_keys_tables,
++	.nbuttons	= ARRAY_SIZE(universal_gpio_keys_tables),
++};
++
++static struct platform_device universal_gpio_keys = {
++	.name			= "gpio-keys",
++	.dev			= {
++		.platform_data	= &universal_gpio_keys_data,
++	},
++};
++
++static struct platform_device *universal_devices[] __initdata = {
++	&universal_gpio_keys,
++};
++
+ static void __init universal_map_io(void)
+ {
+ 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+@@ -72,6 +131,9 @@ static void __init universal_machine_init(void)
+ #ifdef CONFIG_CACHE_L2X0
+ 	l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
+ #endif
++
++	/* Last */
++	platform_add_devices(universal_devices, ARRAY_SIZE(universal_devices));
+ }
+ 
+ MACHINE_START(UNIVERSAL, "UNIVERSAL")
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.5.3.3
