@@ -1,63 +1,65 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 2 Aug 2010 10:46:43 +0300
-Subject: [PATCH] ARM: imx: Fix build failure when including
-	<mach/gpio.h> without <linux/spinlock.h>
-In-Reply-To: <1280734183-4315-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20100729064241.GB11268@pengutronix.de>
-	<1280734183-4315-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20100802074643.GB25825@jasper.tkos.co.il>
+From: Joerg.Roedel@amd.com (Roedel, Joerg)
+Date: Mon, 2 Aug 2010 09:58:02 +0200
+Subject: [PATCH 1/2] arm: msm: Add System MMU support.
+In-Reply-To: <d493494df33aaf65e526181b1dbafce3.squirrel@www.codeaurora.org>
+References: <20100729123512Y.fujita.tomonori@lab.ntt.co.jp>
+	<201007291026.55928.arnd@arndb.de> <20100729084018.GM26098@amd.com>
+	<20100729174621W.fujita.tomonori@lab.ntt.co.jp>
+	<20100729090607.GN26098@amd.com>
+	<d493494df33aaf65e526181b1dbafce3.squirrel@www.codeaurora.org>
+Message-ID: <20100802075802.GN24084@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi Stephan,
 
-On Mon, Aug 02, 2010 at 09:29:43AM +0200, Uwe Kleine-K?nig wrote:
-> This is a follow up to
-> 
-> 	14cb0de (arm/imx/gpio: add spinlock protection)
-> 
-> and fixes the following build failure:
-> 
-> 	  CC      arch/arm/mach-imx/pcm970-baseboard.o
-> 	In file included from arch/arm/include/asm/gpio.h:6,
-> 			 from include/linux/gpio.h:8,
-> 			 from arch/arm/mach-imx/pcm970-baseboard.c:20:
-> 	arch/arm/plat-mxc/include/mach/gpio.h:40: error: expected specifier-qualifier-list before 'spinlock_t'
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On Fri, Jul 30, 2010 at 01:19:06AM -0400, stepanm at codeaurora.org wrote:
+> Unlike a more traditional system with one IOMMU between the bus and
+> memory, MSM has multiple IOMMUs, with each one hard-wired to a dedicated
+> device. Furthermore, each IOMMU can have more than one translation
+> context. One of the use cases is being able to create mappings within
+> multiple instances of one context, and arbitrarily context-switch the
+> IOMMU on the fly.
 
-Acked-by: Baruch Siach <baruch@tkos.co.il>
+The IOMMU-API supports multiple IOMMUs (at least multiple AMD/Intel
+IOMMUs). But the face that there are more than one IOMMU is hidden in
+the backend driver implementation. The API itself only works with
+domains and devices. The IOMMU driver needs to know which IOMMU it needs
+to program for a given device. If I understand the concept of your
+hardware correctly you also have this information.
 
-Thanks,
-baruch
+> It sounds like the domain abstraction and attach_device/detach_device can
+> encapsulate this rather nicely and I am in the process of updating my
+> driver to fit this framework.
+> 
+> My problem, however, is with iommu_domain_alloc(). This will set up a
+> domain and call the ops function to initialize it, but I want to be able
+> to pass it an ?IOMMU id" that will tell the underlying driver which IOMMU
+> (and which "stream id") is to be associated with that domain instance.
+> This can be a void* parameter that gets passed through to domain_init. I
+> feel like this change will make it easy to deal with multiple
+> IOMMUs/translation contexts, and implementations that have only a singular
+> IOMMU/translation context are free to ignore that parameter.
 
-> Cc: stable at kernel.org
-> ---
-> Kernel-Version: v2.6.35-rc1-133-g14cb0de
-> 
-> Hello,
-> 
-> as 14cb0de has a Cc: for stable, I added it here, too.
-> 
-> Thanks
-> Uwe
-> 
->  arch/arm/plat-mxc/include/mach/gpio.h |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
-> index 661fbc6..af33b74 100644
-> --- a/arch/arm/plat-mxc/include/mach/gpio.h
-> +++ b/arch/arm/plat-mxc/include/mach/gpio.h
-> @@ -19,6 +19,7 @@
->  #ifndef __ASM_ARCH_MXC_GPIO_H__
->  #define __ASM_ARCH_MXC_GPIO_H__
->  
-> +#include <linux/spinlock.h>
->  #include <mach/hardware.h>
->  #include <asm-generic/gpio.h>
+In the means of the IOMMU-API the domain is the abstraction of an
+address space (in other words a page table). The IOMMU(s) which this domain
+is later assigned to are determined by the iommu_attach_device calls.
+I think the right way to go here is to create the concept of a
+device-context in the IOMMU-API and add functions like
+
+	iommu_attach_context(struct iommu_domain *domain,
+			     struct iommu_context *ctxt);
+	iommu_detach_context(struct iommu_context *ctxt);
+
+This would work if you can determine in your iommu-driver which iommu
+you need to program for which device. What do you think?
+
+
+	Joerg
 
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Joerg Roedel - AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
