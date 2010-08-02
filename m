@@ -1,32 +1,29 @@
-From: gadiyar@ti.com (Gadiyar, Anand)
-Date: Mon, 2 Aug 2010 17:48:11 +0530
-Subject: [PATCH 2/4] omap4: l2x0: Override the default l2x0_disable
-In-Reply-To: <1280598348-4721-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1280598348-4721-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0323E686D4@dbde02.ent.ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 2 Aug 2010 14:42:58 +0300
+Subject: [PATCH v2 00/20] native support for wl1271 on ZOOM
+In-Reply-To: <1280736987.17809.18.camel@chilepepper>
+References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
+	<20100726193028.GG3903@tuxdriver.com>
+	<1280736987.17809.18.camel@chilepepper>
+Message-ID: <20100802114256.GE12293@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-> index 13dc979..b557cc2 100644
-> --- a/arch/arm/mach-omap2/omap4-common.c
-> +++ b/arch/arm/mach-omap2/omap4-common.c
+* Luciano Coelho <luciano.coelho@nokia.com> [100802 11:10]:
+> On Mon, 2010-07-26 at 21:30 +0200, ext John W. Linville wrote:
+> > On Wed, Jul 21, 2010 at 08:33:34PM +0300, Ohad Ben-Cohen wrote:
+> > > This patch series adds native support for wl1271 on ZOOM.
+> > 
+> > Just for the record, I'm fine with the wl1271 bits here going through
+> > the omap tree with the rest of the series.
+> 
+> Yeah, I agree.  This is probably the best way to keep things in sync.
 
-<snip>
+OK, let's do that then. 
 
-> @@ -66,6 +73,12 @@ static int __init omap_l2_cache_init(void)
->  	 */
->  	l2x0_init(l2cache_base, 0x0e050000, 0xc0000fff);
->  
-> +	/*
-> +	 * Override default outer_cache.disable with a OMAP4
-> +	 * specific one
-> +	*/
+Nicolas Pitre made a comment saying he wants to look at these patches
+more, are there other pending comments?
 
-Minor comment - you need a space before the '*'
+Regards,
 
-> +	outer_cache.disable = omap4_l2x0_disable;
-> +
->  	return 0;
->  }
->  early_initcall(omap_l2_cache_init);
+Tony
