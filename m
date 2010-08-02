@@ -1,26 +1,105 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Aug 2010 08:31:38 +0100
-Subject: Please remind 'WARNING: about Samsung merge window over'
-In-Reply-To: <AANLkTimJvS0djVprEgCJ8k3_SYeaKc72NMNZNrRpqXHi@mail.gmail.com>
-References: <003401cb3206$d68a1fc0$839e5f40$%kim@samsung.com>
-	<AANLkTimJvS0djVprEgCJ8k3_SYeaKc72NMNZNrRpqXHi@mail.gmail.com>
-Message-ID: <20100802073138.GB10608@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon,  2 Aug 2010 09:39:55 +0200
+Subject: [PATCH] video/imxfb.c: allow usage without BACKLIGHT_CLASS_DEVICE
+In-Reply-To: <20100729150147.GA6331@pengutronix.de>
+References: <20100729150147.GA6331@pengutronix.de>
+Message-ID: <1280734795-25452-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 02, 2010 at 03:24:13PM +0900, Kyungmin Park wrote:
-> Absurd !!!
-> 
-> Did you mentioned that samsung merge window over before?
-> why it's reminder mail? it's unilateral notification at this time.
+From: Eric B?nard <eric@eukrea.com>
 
-It's standard Linux kernel development procedure.
+This fixes the following build failure:
 
-The merge window is not for new code - the merge window is for code which
-has already been merged by maintainers to submit it to Linus in an orderly
-manner and fixup any conflicts which may occur.
+	drivers/built-in.o: In function `imxfb_probe': mxcmmc.c:(.init.text+0xd04): undefined reference to `backlight_device_register'
+	drivers/built-in.o: In function `imxfb_remove': mxcmmc.c:(.devexit.text+0x44): undefined reference to `backlight_device_unregister'
 
-New code which hasn't been reviewed by the beginning of the merge window
-and which hasn't been in linux-next for a _reasonable_ amount of time
-should wait until the following merge window unless there's a _very_ good
-reason to make an exception.
+that was introduced by
+
+	7a2bb23 (imxfb: add pwmr controlled backlight support)
+
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+KernelVersion: v2.6.35-rc1-118-g7a2bb23
+
+ drivers/video/imxfb.c |   19 +++++++++++++++++--
+ 1 files changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index 43f0639..5c363d0 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -40,6 +40,12 @@
+  */
+ #define DEBUG_VAR 1
+ 
++#if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) || \
++	(defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE) && \
++		defined(CONFIG_FB_IMX_MODULE))
++#define PWMR_BACKLIGHT_AVAILABLE
++#endif
++
+ #define DRIVER_NAME "imx-fb"
+ 
+ #define LCDC_SSA	0x00
+@@ -175,7 +181,9 @@ struct imxfb_info {
+ 
+ 	struct imx_fb_videomode *mode;
+ 	int			num_modes;
++#ifdef PWMR_BACKLIGHT_AVAILABLE
+ 	struct backlight_device *bl;
++#endif
+ 
+ 	void (*lcd_power)(int);
+ 	void (*backlight_power)(int);
+@@ -450,8 +458,7 @@ static int imxfb_set_par(struct fb_info *info)
+ 	return 0;
+ }
+ 
+-
+-
++#ifdef PWMR_BACKLIGHT_AVAILABLE
+ static int imxfb_bl_get_brightness(struct backlight_device *bl)
+ {
+ 	struct imxfb_info *fbi = bl_get_data(bl);
+@@ -516,6 +523,7 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
+ 	if (fbi->bl)
+ 		backlight_device_unregister(fbi->bl);
+ }
++#endif
+ 
+ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ {
+@@ -647,6 +655,9 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
+ 			fbi->regs + LCDC_SIZE);
+ 
+ 	writel(fbi->pcr, fbi->regs + LCDC_PCR);
++#ifndef PWMR_BACKLIGHT_AVAILABLE
++	writel(fbi->pwmr, fbi->regs + LCDC_PWMR);
++#endif
+ 	writel(fbi->lscr1, fbi->regs + LCDC_LSCR1);
+ 	writel(fbi->dmacr, fbi->regs + LCDC_DMACR);
+ 
+@@ -847,7 +858,9 @@ static int __init imxfb_probe(struct platform_device *pdev)
+ 
+ 	imxfb_enable_controller(fbi);
+ 	fbi->pdev = pdev;
++#ifdef PWMR_BACKLIGHT_AVAILABLE
+ 	imxfb_init_backlight(fbi);
++#endif
+ 
+ 	return 0;
+ 
+@@ -885,7 +898,9 @@ static int __devexit imxfb_remove(struct platform_device *pdev)
+ 
+ 	imxfb_disable_controller(fbi);
+ 
++#ifdef PWMR_BACKLIGHT_AVAILABLE
+ 	imxfb_exit_backlight(fbi);
++#endif
+ 	unregister_framebuffer(info);
+ 
+ 	pdata = pdev->dev.platform_data;
+-- 
+1.7.1
