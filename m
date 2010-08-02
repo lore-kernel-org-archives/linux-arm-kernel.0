@@ -1,31 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 2 Aug 2010 16:16:56 +0300
-Subject: OK to base some patches on lmb branch?
-In-Reply-To: <20100709144901.GK22845@n2100.arm.linux.org.uk>
-References: <20100707105213.GJ1920@atomide.com>
-	<20100709144901.GK22845@n2100.arm.linux.org.uk>
-Message-ID: <20100802131653.GN12293@atomide.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 2 Aug 2010 18:51:50 +0530
+Subject: [PATCH 2/4] omap4: l2x0: Override the default l2x0_disable
+In-Reply-To: <20100802131246.GM12293@atomide.com>
+References: <1280598348-4721-1-git-send-email-santosh.shilimkar@ti.com>
+	<20100802131246.GM12293@atomide.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C641D502@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [100709 17:42]:
-> On Wed, Jul 07, 2010 at 01:52:14PM +0300, Tony Lindgren wrote:
-> > Hi Russell,
-> > 
-> > Is your lmb branch going to stay static?
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com]
+> Sent: Monday, August 02, 2010 6:43 PM
+> To: Shilimkar, Santosh
+> Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
+> Subject: Re: [PATCH 2/4] omap4: l2x0: Override the default l2x0_disable
 > 
-> Not at the moment, I'm still tweaking things in there, and the main
-> lmb conversion commit needs a better description...  I think there's
-> also a few bits missing from the discontigmem removal patch.
-
-Back online now from a vacation.
-
-I have separated the omap common map_io patches into a branch based
-on your lmb branch and merged into omap for-next.
-
-Will not merge into omap-for-linus until I have a confirmation
-from you it will stay static.
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [100731 20:38]:
+> > The machine_kexec() calls outer_disable which can crash on OMAP4
+> > becasue of trustzone restrictions.
+> >
+> > This patch overrides the default l2x0_disable with a OMAP4
+> > specific implementation taking care of trustzone
+> 
+> Do you need different handling on GP omaps compared to HS omaps?
+> 
+No. Same API works for both
 
 Regards,
-
-Tony
+Santosh
