@@ -1,52 +1,50 @@
-From: augulis.darius@gmail.com (Darius Augulis)
-Date: Mon, 02 Aug 2010 01:39:25 +0300
-Subject: [PATCH] s3c: mach-real6410: add sdhc device support
-Message-ID: <20100801223901.27767.86550.stgit@darius-desktop>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Mon, 02 Aug 2010 09:24:57 +0900
+Subject: [PATCH 1/3] ARM: S5PC110/S5PC210: Add the C Preprocessor	directives
+	for gpio.h
+Message-ID: <20100802002457.GA32257@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is based on:
- * "[PATCH v2] Support for Real6410"
- * "[PATCH] s3c: add dm9000 ethernet support for mach-real6410"
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
+Make a buile error when include the mach/gpio.h directly.
+
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s3c64xx/Kconfig         |    3 +++
- arch/arm/mach-s3c64xx/mach-real6410.c |    3 +++
- 2 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pv210/include/mach/gpio.h |    4 ++++
+ arch/arm/mach-s5pv310/include/mach/gpio.h |    4 ++++
+ 2 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index 0f9f2dd..f5c77e5 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -91,6 +91,9 @@ config MACH_ANW6410
- config MACH_REAL6410
- 	bool "REAL6410"
- 	select CPU_S3C6410
-+	select S3C_DEV_HSMMC
-+	select S3C_DEV_HSMMC1
-+	select S3C64XX_SETUP_SDHCI
- 	help
- 	  Machine support for the CoreWind REAL6410
+diff --git a/arch/arm/mach-s5pv210/include/mach/gpio.h b/arch/arm/mach-s5pv210/include/mach/gpio.h
+index 1f4b595..7798693 100644
+--- a/arch/arm/mach-s5pv210/include/mach/gpio.h
++++ b/arch/arm/mach-s5pv210/include/mach/gpio.h
+@@ -13,6 +13,10 @@
+ #ifndef __ASM_ARCH_GPIO_H
+ #define __ASM_ARCH_GPIO_H __FILE__
  
-diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
-index 1a0485a..5c07d01 100644
---- a/arch/arm/mach-s3c64xx/mach-real6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-real6410.c
-@@ -27,6 +27,7 @@
- #include <mach/s3c6410.h>
- #include <mach/regs-srom.h>
- #include <plat/cpu.h>
-+#include <plat/devs.h>
- #include <plat/regs-serial.h>
++#ifndef __LINUX_GPIO_H
++#error "Don't include the mach/gpio.h directly. use the linux/gpio.h"
++#endif
++
+ #define gpio_get_value	__gpio_get_value
+ #define gpio_set_value	__gpio_set_value
+ #define gpio_cansleep	__gpio_cansleep
+diff --git a/arch/arm/mach-s5pv310/include/mach/gpio.h b/arch/arm/mach-s5pv310/include/mach/gpio.h
+index 20cb80c..3f751f2 100644
+--- a/arch/arm/mach-s5pv310/include/mach/gpio.h
++++ b/arch/arm/mach-s5pv310/include/mach/gpio.h
+@@ -13,6 +13,10 @@
+ #ifndef __ASM_ARCH_GPIO_H
+ #define __ASM_ARCH_GPIO_H __FILE__
  
- #define UCON S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK
-@@ -100,6 +101,8 @@ static struct platform_device real6410_device_eth = {
- 
- static struct platform_device *real6410_devices[] __initdata = {
- 	&real6410_device_eth,
-+	&s3c_device_hsmmc0,
-+	&s3c_device_hsmmc1,
- };
- 
- static void __init real6410_map_io(void)
++#ifndef __LINUX_GPIO_H
++#error "Don't include the mach/gpio.h directly. use the linux/gpio.h"
++#endif
++
+ #define gpio_get_value	__gpio_get_value
+ #define gpio_set_value	__gpio_set_value
+ #define gpio_cansleep	__gpio_cansleep
+-- 
+1.5.3.3
