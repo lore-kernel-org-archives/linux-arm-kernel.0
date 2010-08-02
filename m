@@ -1,216 +1,78 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Mon, 2 Aug 2010 21:51:11 +0900
-Subject: [PATCH v3] ARM: Samsung SoC: clksrc-clk: wait for the stable
-	SRC/DIV status.
-In-Reply-To: <003001cb3203$ce869bd0$6b93d370$%kim@samsung.com>
-References: <1280717476-32327-1-git-send-email-myungjoo.ham@samsung.com>
-	<003001cb3203$ce869bd0$6b93d370$%kim@samsung.com>
-Message-ID: <AANLkTikCRMaRVj4tvBSS0RTTwYF_GKuGSqZBG3+_j-kd@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 2 Aug 2010 15:52:24 +0300
+Subject: [PATCH v7 0/3] omap3 nand: cleanup exiting platform related code
+In-Reply-To: <1278666886-30293-1-git-send-email-s-ghorai@ti.com>
+References: <1278666886-30293-1-git-send-email-s-ghorai@ti.com>
+Message-ID: <20100802125224.GJ12293@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 2, 2010 at 2:30 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> MyungJoo Ham wrote:
->>
->> Many MUX and clock dividers have a status bit so that users can wait
->> until the status is stable. When corresponding registers are accessed
->> while a clock is not stable, we may suffer from unexpected errors.
->>
->> Therefore, we introduce a mechanism to let the operations related with
->> updating SRC/DIV registers of clksrc-clk wait for the stabilization:
->> clk_set_parent, clk_set_rate.
->>
->> In order to use this feature, the definition of clksrc_clk should
->> include reg_src_stable or reg_div_stable. With effective rec_src_stable
->> values, clk_set_parent returns with a stabilized SRC register and
->> with effective rec_div_stable values, clk_set_rate returns with a
->> stabilized DIV register. If .reg field is null, its (either SRC or DIV)
->> register's status is not checked and returned without waiting; i.e.,
->> some MUX/DIV may not need this feature.
->>
->> When setting reg_*_stable, .size is used to tell the value of "stable".
->> If .size = 0, the stable status is 0 and if .size = 1, the stable status
->> is 1.
->>
->> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> --
->> v2:
->> ? ? ? - Wait-for-stable loop is described at an inline function.
->> v3:
->> ? ? ? - Stop using clksrc_reg for stable bits. Use "clkstat_reg" for
->> ? ? ? ? them.
->>
->> ---
->> ?arch/arm/plat-samsung/clock-clksrc.c ? ? ? ? ? ? ?| ? 14 +++++++++++++
->> ?arch/arm/plat-samsung/include/plat/clock-clksrc.h | ? 22
->> +++++++++++++++++++++
->> ?2 files changed, 36 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/plat-samsung/clock-clksrc.c
-> b/arch/arm/plat-samsung/clock-
->> clksrc.c
->> index 46d204a..79ae92e 100644
->> --- a/arch/arm/plat-samsung/clock-clksrc.c
->> +++ b/arch/arm/plat-samsung/clock-clksrc.c
->> @@ -50,6 +50,15 @@ static unsigned long s3c_getrate_clksrc(struct clk
-> *clk)
->> ? ? ? return rate;
->> ?}
->>
->> +static inline void s3c_wait_for_stable(struct clkstat_reg *stat)
->> +{
->> + ? ? WARN_ON(stat == NULL);
->
-> if (stat == NULL)
-> ? ? ? ?return;
+* Sukumar Ghorai <s-ghorai@ti.com> [100709 12:09]:
+>    The following set of patches applies on top of for-next branch.
+> 	http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap-2.6.git
+>    Patches verified on: omap3430-SDP, omap3630-sdp, zoom3 and beagle board
+> 
+>    And these are the patches required to address the following input -
+>      1. The NAND driver needs to stop tinkering with the GPMC registers
+> 	The omap General Purpose Memory Controller (GPMC) registers are omap
+>         specific, and not driver specific. Tinkering with these registers can
+>         cause issues with the other devices on the GPMC.
+> 
+>      2. Passing hardcoded GPMC_CS0_BASE needs to go from the board files
+> 	Passing hardcoded GPMC virtual addressess is sure way to mess up things.
+>         This should all become unnecessary once the NAND drivers stops messing
+>         with the GPMC registers directly.
 
-Because .reg_*_stable is included in struct clksrc_clk and
-s3c_wait_for_stable is called by clk_set_parent and clk_set_rate,
-which have struct clksrc_clk, stat is unlikely to be NULL and if it's
-NULL, s3c_wait_for_stable is called from a wrong function and wrong
-context; thus, I'd use WARN for it rather than silently doing return.
+Thanks, I'll add this series into omap-for-linus.
 
->
-> If don't need to check status, have not become define relevant status
-> register.
->
->> + ? ? if (stat->reg) {
->
-> No need?...or need to check stat->reg and stat->shift?
+Regards,
 
-If stat->reg is NULL (it can be intentionally NULL), it means that the
-corresponding struct clksrc_clk does not have stable-stat bit; thus,
-pass this checking routine. And, stat->shift may be both 0 and
-positive effectively.
+Tony
 
-stat->reg = 0 : NO STAT REGISTER
-stat->reg != 0 : STAT Register Exists. Use stat->shift to specify the
-bit (stat->shift can be 0 or larger)
-
->
->> + ? ? ? ? ? ? do { } while (((__raw_readl(stat->reg) >> stat->shift) & 1)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? != stat->stable);
->
-> I'm still wondering we _really_ need 'stable'...just comments is enough,
-> right now.
-
-S5PV210 is fine without stable because stat->stable is always 0 for S5PV210.
-
-However, this is for "Samsung-SoC" not for "S5PV210" although only
-S5PV210 uses this feature for now.
-
-I've added stat->stable for the generality. Would it be better discard
-such generality and assume that other Samsung-SoC systems will also
-use the same stat bit scheme for every register (0 for stable, 1 for
-changing for every STAT register) with S5PV210? If we can guarantee
-such homogeneousity, getting rid of stable property would be perfectly
-fine. It is added just because I couldn't sure about Samsung-SoC chips
-other than S5PV210. (and I thought some chips may use different scheme
-for each register; e.g., some registers use 0 for stable, some others
-use 1 for stable)
-
->
->> + ? ? ? ? ? ? do { } while (((__raw_readl(stat->reg) >> stat->shift) & 1)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? != stat->stable);
->
->> + ? ? }
->> +}
->> +
->> ?static int s3c_setrate_clksrc(struct clk *clk, unsigned long rate)
->> ?{
->> ? ? ? struct clksrc_clk *sclk = to_clksrc(clk);
->> @@ -68,6 +77,8 @@ static int s3c_setrate_clksrc(struct clk *clk, unsigned
-> long rate)
->> ? ? ? val |= (div - 1) << sclk->reg_div.shift;
->> ? ? ? __raw_writel(val, reg);
->>
->> + ? ? s3c_wait_for_stable(&sclk->reg_div_stable);
->> +
->> ? ? ? return 0;
->> ?}
->>
->> @@ -93,6 +104,9 @@ static int s3c_setparent_clksrc(struct clk *clk, struct
-> clk
->> *parent)
->> ? ? ? ? ? ? ? clksrc |= src_nr << sclk->reg_src.shift;
->>
->> ? ? ? ? ? ? ? __raw_writel(clksrc, sclk->reg_src.reg);
->> +
->> + ? ? ? ? ? ? s3c_wait_for_stable(&sclk->reg_src_stable);
->> +
->> ? ? ? ? ? ? ? return 0;
->> ? ? ? }
->>
->> diff --git a/arch/arm/plat-samsung/include/plat/clock-clksrc.h
-> b/arch/arm/plat-
->> samsung/include/plat/clock-clksrc.h
->> index 50a8ca7..f1d54da 100644
->> --- a/arch/arm/plat-samsung/include/plat/clock-clksrc.h
->> +++ b/arch/arm/plat-samsung/include/plat/clock-clksrc.h
->> @@ -40,11 +40,30 @@ struct clksrc_reg {
->> ?};
->>
->> ?/**
->> + * struct clkstat_reg - register definition for clock stat bits
->> + * @reg: pointer to the register in virtual memory.
->> + * @shift: the shift in bits to where the bitfield is.
->> + * @stable: the bit value of stable status.
->> + */
->> +struct clkstat_reg {
->> + ? ? void __iomem ? ? ? ? ? ?*reg;
->> + ? ? unsigned short ? ? ? ? ?shift;
->> + ? ? unsigned short ? ? ? ? ?stable;
->
-> If you want to use this, just 'value' is better.
-> But...I think...we don't need this field now.
->
->> +};
->> +
->> +/**
->> ? * struct clksrc_clk - class of clock for newer style samsung devices.
->> ? * @clk: the standard clock representation
->> ? * @sources: the sources for this clock
->> ? * @reg_src: the register definition for selecting the clock's source
->> ? * @reg_div: the register definition for the clock's output divisor
->> + * @reg_src_stable: the register definition to probe if reg_src is
->> + * ? ?stabilized after the update of reg_src. It is "stabilized" if
->> + * ? ?reg[shift] == size. If reg == NULL, this stable reg is not looked
->> + * ? ?up. Thus, in S5PV210, size is usually 0.
->> + * @reg_div_stable: the register definition to probe if reg_div is
->> + * ? ?stabilized after the update of reg_div. Same mechanism with
->> + * ? ?reg_src_stable.
->> ? *
->> ? * This clock implements the features required by the newer SoCs where
->> ? * the standard clock block provides an input mux and a post-mux divisor
->> @@ -61,6 +80,9 @@ struct clksrc_clk {
->>
->> ? ? ? struct clksrc_reg ? ? ? reg_src;
->> ? ? ? struct clksrc_reg ? ? ? reg_div;
->> +
->> + ? ? struct clkstat_reg ? ? ?reg_src_stable;
->> + ? ? struct clkstat_reg ? ? ?reg_div_stable;
->> ?};
->>
->> ?/**
->> --
->
->
-> Thanks.
->
-> Best regards,
-> Kgene.
+>      Discussion: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg27630.html
+> 
+>    No code change from previous version.
+>    Looping linux-arm-kernel mailing list with new version.
+> 
+>    Changes in this series -
+> 	gpmc_hwcontrol() function in gpmc.c, break into various small function.
+>    v6: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg31936.html
+> 
+>   Unused function removed.
+>   v5: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg30305.html
+> 		
+>   Functions related to ecc and prefetch engine are optimized.
+>   v4: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg29458.html
+> 
+>   Few functionality was missing  like - There should be some locking as only
+>    one chipselect can use the ECC or prefetch engine at a time. If you have
+>    NAND in two chipselects, bad things would happen.
+>   v3: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg28715.html
+> 
+>   Additionally, it was needed to implement more functions for the platform
+>   init code to use.
+>   v2: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg28467.html
+> 	
+>   v1: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg28164.html
+> 
+> 
+> Sukumar Ghorai (3):
+> 	omap3 gpmc: functionality enhancement
+> 	omap3 nand: cleanup virtual address usages
+> 	omap3 nand: fix issue in board file to detect nand
+>  arch/arm/mach-omap2/board-cm-t35.c         |   20 +--
+>  arch/arm/mach-omap2/board-devkit8000.c     |   25 +---
+>  arch/arm/mach-omap2/board-omap3beagle.c    |   24 +---
+>  arch/arm/mach-omap2/board-omap3touchbook.c |   25 +---
+>  arch/arm/mach-omap2/board-overo.c          |   24 +---
+>  arch/arm/mach-omap2/board-sdp-flash.c      |    5 -
+>  arch/arm/mach-omap2/gpmc-nand.c            |   38 +---
+>  arch/arm/mach-omap2/gpmc.c                 |  285 ++++++++++++++++++++++++++--
+>  arch/arm/plat-omap/include/plat/gpmc.h     |   42 ++++-
+>  arch/arm/plat-omap/include/plat/nand.h     |    6 +-
+>  drivers/mtd/nand/omap2.c                   |  218 ++++++----------------
+>  11 files changed, 371 insertions(+), 341 deletions(-)
 > --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
-
-
-
--- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
