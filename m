@@ -1,26 +1,43 @@
-From: vitalywool@gmail.com (Vitaly Wool)
-Date: Mon, 2 Aug 2010 17:12:08 +0200
-Subject: [PATCH v2 00/20] native support for wl1271 on ZOOM
-In-Reply-To: <20100802114256.GE12293@atomide.com>
-References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-	<20100726193028.GG3903@tuxdriver.com>
-	<1280736987.17809.18.camel@chilepepper>
-	<20100802114256.GE12293@atomide.com>
-Message-ID: <AANLkTikvtMbqUdwHtCtdL2xXbQh64pxjApo6ZH6hAXnP@mail.gmail.com>
+From: darkstar6262@gmail.com (Cory Maccarrone)
+Date: Mon,  2 Aug 2010 08:29:31 -0700
+Subject: [PATCH 0/5] HTC Herald various device support
+Message-ID: <1280762976-17284-1-git-send-email-darkstar6262@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 2, 2010 at 1:42 PM, Tony Lindgren <tony@atomide.com> wrote:
+This patch set is an updated version of a series of patches I submitted
+a while ago.  It's built against the latest linux-omap master branch, and
+removes all defconfig updates.  Other comments were put in place as well.
 
-> Nicolas Pitre made a comment saying he wants to look at these patches
-> more, are there other pending comments?
+This patch set implements the following drivers and support for them into
+the HTC Herald:
 
-Yep, I'm feeling quite uncomfortable with the way platform data is
-being passed over to sdio device now.
+ * MMC card support
+ * I2C and HTCPLD drivers
+ * TSC2046 touchscreen support
+ * Serial port fixes for omap7xx
+ * Bluetooth common code for HTC omap7xx smartphones
 
-Also, specifically to 12xx, I'd like to see REF_CLOCK moved on and
-have this set by platform too (I haven't found anything like that in
-the patches but maybe I've overlooked that).
+The bluetooth drivers are implemented with the expectation that they will
+be used by other devices once the board files are submitted (Elf/Elfin,
+Opal, etc).
 
-Thanks,
-   Vitaly
+Cory Maccarrone (5):
+  [OMAP] HTCHERALD: MMC, I2C, HTCPLD and related devices
+  [OMAP] htcherald: SPI register config, TSC2046 touchscreen
+  [omap1] omap7xx clocks, mux, serial fixes
+  [omap1] Bluetooth device code common to HTC smartphones
+  [htcherald] Add board support for UARTs, bluetooth
+
+ arch/arm/mach-omap1/Kconfig               |    2 +
+ arch/arm/mach-omap1/Makefile              |    2 +-
+ arch/arm/mach-omap1/board-htcherald.c     |  346 ++++++++++++++++++++++++++++-
+ arch/arm/mach-omap1/clock_data.c          |   20 ++
+ arch/arm/mach-omap1/htc-bt.c              |  183 +++++++++++++++
+ arch/arm/mach-omap1/include/mach/htc-bt.h |   22 ++
+ arch/arm/mach-omap1/mux.c                 |    4 +
+ arch/arm/mach-omap1/serial.c              |    7 +
+ arch/arm/plat-omap/include/plat/mux.h     |    4 +
+ 9 files changed, 583 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/mach-omap1/htc-bt.c
+ create mode 100644 arch/arm/mach-omap1/include/mach/htc-bt.h
