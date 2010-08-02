@@ -1,139 +1,39 @@
-From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
-Date: Mon, 02 Aug 2010 16:25:34 +0200
-Subject: [PATCH] usb gadget: don't save bind callback in struct
-	usb_gadget_driver
-In-Reply-To: <1280752803-11441-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <op.vgs04dub7p4s8u@pikus>
-	<1280752803-11441-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <op.vgtecwcq7p4s8u@pikus>
+From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1_=27Sleep=5FWalker=27?=
+	=?utf-8?q?_=C4=8Cech?=)
+Date: Mon, 2 Aug 2010 11:21:23 +0200
+Subject: several section mismatches
+Message-ID: <201008021121.23860.sleep_walker@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some random thoughts, one bug and mostly just minor comments:
+Hi,
 
-> @@ -1954,13 +1954,14 @@ static int setup_ep0(struct udc *dev)
->  }
-> /* Called by gadget driver to register itself */
-> -int usb_gadget_register_driver(struct usb_gadget_driver *driver)
-> +int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
-> +		int (*bind)(struct usb_gadget *))
->  {
->  	struct udc		*dev = udc;
->  	int			retval;
->  	u32 tmp;
->-	if (!driver || !driver->bind || !driver->setup
-> +	if (!driver || bind || !driver->setup
+It seems that we have some problems with g_ether and pxa cpufreq. This is problematic output of `make CONFIG_DEBUG_SECTION_MISMATCH=y':
 
+WARNING: vmlinux.o(.data+0x2e18): Section mismatch in reference from the variable pxa_cpufreq_driver to the function .init.text:pxa_cpufreq_init()
+The variable pxa_cpufreq_driver references
+the function __init pxa_cpufreq_init()
+If the reference is valid then annotate the
+variable with __init* or __refdata (see linux/init.h) or name the variable:
+*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console, 
 
-** BUG: Should read "!bind".
+WARNING: vmlinux.o(.data+0x1e514): Section mismatch in reference from the variable eth_config_driver to the function .init.text:eth_do_config()
+The variable eth_config_driver references
+the function __init eth_do_config()
+If the reference is valid then annotate the
+variable with __init* or __refdata (see linux/init.h) or name the variable:
+*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console, 
 
+WARNING: vmlinux.o(.data+0x1e6f0): Section mismatch in reference from the variable eth_driver to the function .init.text:eth_bind()
+The variable eth_driver references
+the function __init eth_bind()
+If the reference is valid then annotate the
+variable with __init* or __refdata (see linux/init.h) or name the variable:
+*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
 
-> diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-> @@ -1612,7 +1613,7 @@ int usb_gadget_register_driver (struct usb_gadget_driver *driver)
->  	DBG("bound to %s\n", driver->driver.name);
->  	return 0;
->  }
-> -EXPORT_SYMBOL (usb_gadget_register_driver);
-> +EXPORT_SYMBOL (usb_gadget_probe_driver);
+Best regards,
 
-How about also correcting space before "("?
-
-> diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-> @@ -1789,7 +1789,8 @@ out:
->  	return IRQ_HANDLED;
->  }
->-int usb_gadget_register_driver(struct usb_gadget_driver *driver)
-> +int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
-> +		int (*bind)(struct usb_gadget *))
->  {
->  	struct usba_udc *udc = &the_udc;
->  	unsigned long flags;
-
-There was no checking here?  How about adding?
-
-> diff --git a/drivers/usb/gadget/ci13xxx_udc.c b/drivers/usb/gadget/ci13xxx_udc.c
-> @@ -2340,12 +2340,13 @@ static const struct usb_ep_ops usb_ep_ops = {
->  static const struct usb_gadget_ops usb_gadget_ops;
-> /**
-> - * usb_gadget_register_driver: register a gadget driver
-> + * usb_gadget_probe_driver: register a gadget driver
->   *
-> - * Check usb_gadget_register_driver() at "usb_gadget.h" for details
-> - * Interrupts are enabled here
-> + * Check usb_gadget_probe_driver() at "usb_gadget.h" for details.
-> + * Interrupts are enabled here.
->   */
-
-usb_gadget.h is the old name.  How about correcting it as well?
-
-> diff --git a/drivers/usb/gadget/file_storage.c b/drivers/usb/gadget/file_storage.c
-> @@ -3583,7 +3582,7 @@ static int __init fsg_init(void)
->  	if ((rc = fsg_alloc()) != 0)
->  		return rc;
->  	fsg = the_fsg;
-> -	if ((rc = usb_gadget_register_driver(&fsg_driver)) != 0)
-> +	if ((rc = usb_gadget_probe_driver(&fsg_driver, fsg_bind)) != 0)
-
-I'm tempted to propose:
-
-+ rc = usb_gadget_probe_driver(&fsg_driver, fsg_bind);
-+ if (rc != 0)
-
-which is more compatible with coding style but it probably would be inconsistent
-with the rest of the code.
-
-> diff --git a/drivers/usb/gadget/langwell_udc.c b/drivers/usb/gadget/langwell_udc.c
-> @@ -1807,7 +1807,8 @@ static DEVICE_ATTR(langwell_udc, S_IRUGO, show_langwell_udc, NULL);
->   * the driver might get unbound.
->   */
->-int usb_gadget_register_driver(struct usb_gadget_driver *driver)
-> +int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
-> +		int (*bind)(struct usb_gadget *))
->  {
->  	struct langwell_udc	*dev = the_controller;
->  	unsigned long		flags;
-
-Again, function has no checking, how about adding?
-
-> diff --git a/drivers/usb/musb/musb_gadget.c b/drivers/usb/musb/musb_gadget.c
-> @@ -1698,7 +1698,8 @@ void musb_gadget_cleanup(struct musb *musb)
->   * @param driver the gadget driver
->   * @return <0 if error, 0 if everything is fine
->   */
-
-I've just noticed that it misses @param bind in the comment.  Would be great to update it
-and all other occurrences.
-
-> diff --git a/include/linux/usb/gadget.h b/include/linux/usb/gadget.h
-> @@ -798,17 +797,18 @@ struct usb_gadget_driver {
->   */
-> /**
-> - * usb_gadget_register_driver - register a gadget driver
-> - * @driver:the driver being registered
-> + * usb_gadget_probe_driver - probe a gadget driver
-> + * @driver: the driver being registered
-
-+ * @bind: the driver's bind callback.
-
->   * Context: can sleep
->   *
->   * Call this in your gadget driver's module initialization function,
->   * to tell the underlying usb controller driver about your driver.
-> - * The driver's bind() function will be called to bind it to a
-> - * gadget before this registration call returns.  It's expected that
-> - * the bind() functions will be in init sections.
-> + * The bind() function will be called to bind it to a gadget before this
-> + * registration call returns.  It's expected that the bind() function will
-
-Maybe "the @bind function" in those two places?
-
-So for what it's worth, I haven't noticed any other obvious problems.
-
-I think it still does not fix all the section mismatch warnings -- would have to look
-closer at composite gadgets -- so I think still parts of my patch is legit.
-
--- 
-Best regards,                                        _     _
-| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
-| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
-+----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
+Tomas Cech
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100802/6c19f562/attachment.html>
