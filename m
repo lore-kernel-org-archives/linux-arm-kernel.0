@@ -1,49 +1,96 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 02 Aug 2010 14:52:01 +0900
-Subject: Please remind 'WARNING: about Samsung merge window over'
-Message-ID: <003401cb3206$d68a1fc0$839e5f40$%kim@samsung.com>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Mon, 02 Aug 2010 14:52:33 +0900
+Subject: [PATCH v6 3/3] input: samsung-keypad - Add samsung keypad driver
+In-Reply-To: <002f01cb3201$5da32480$18e96d80$%kim@samsung.com>
+References: <1277724824-13308-1-git-send-email-jy0922.shim@samsung.com>
+	<1277724824-13308-3-git-send-email-jy0922.shim@samsung.com>
+	<4C32E21A.8080100@samsung.com>
+	<013401cb1d66$5fbf3fb0$1f3dbf10$%kim@samsung.com>
+	<4C33D859.9050708@samsung.com>
+	<026901cb1f35$64c63470$2e529d50$%kim@samsung.com>
+	<4C36D235.3040702@samsung.com> <4C4688BE.1080409@samsung.com>
+	<20100721080725.GA21373@core.coreip.homeip.net>
+	<4C46B777.9010808@samsung.com>
+	<009501cb28d1$c54c9f00$4fe5dd00$%kim@samsung.com>
+	<4C5636DC.5070703@samsung.com>
+	<019a01cb31f4$226a8aa0$673f9fe0$%kim@samsung.com>
+	<4C564C6A.9040204@samsung.com>
+	<002f01cb3201$5da32480$18e96d80$%kim@samsung.com>
+Message-ID: <4C565D21.8050506@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please remind following which is from discussion about Samsung merge stuff
-with Russell.
-
----
-
-> > So, please send the majority of patches *before* the merge window and
-> > try to avoid sending anything but fixes during the merge window itself.
-> > The merge window is for code which has _already_ been merged and has
-> > been in linux-next to be merged into Linus' tree.  It's not for new
-> > code to be reviewed.
+On 8/2/2010 2:12 PM, Kukjin Kim wrote:
+> Joonyoung Shim wrote:
+>> On 8/2/2010 12:38 PM, Kukjin Kim wrote:
+>>> Joonyoung Shim wrote:
+>>>> Hi, I came back from vacation.
+>>>>
+>>>>>>>> Do you have any feedback? If ok, i want to go to input tree or samsung
+>>>>>>>> tree these added sched.h including.
+>>>>>>> I applied the patch adding samsung-keypad.c and the platform data
+>>>>>>> arch/arm/plat-samsung/include/plat/keypad.h and I expect that
+>>>>>>> patches to actually enable keypad will go through appropriate
+>>>>>>> platform tree(s).
+>>>>>>>
+>>>>>> OK, the rest will go through samsung platform tree
+>>>>>>
+>>>>> Ok..will apply.
+>>>>>
+>>>> Kukjin, could you remove keypad.h on the commit "ARM: SAMSUNG: Add
+>>>> keypad device support" of the samsung platform tree. The keypad.h file
+>>>> was included on input tree.
+>>>>
+>> (http://git.kernel.org/?p=linux/kernel/git/dtor/input.git;a=commit;h=0fffed27f92d9d7
+>>>> a34de9fe017b7082b5958bb93)
+>>> You mean in plat-samsung/dev-keypad.c?
+>>> If remove inclusion plat/keypad.h in there, following build error happens.
+>>>
+>> No. I mean to remove arch/arm/plat-samsung/include/plat/keypad.h file on
+>> samsung platform tree, it was applied on input tree already. If needs, i
+>> can repost.
+>>
+> If it is not small change like to remove a file in a patch, I think should be re-submitted.
+> Will drop your previous patch in my tree.
 > 
-> Next merge window, which will probably be the last I will handle for the
-> S5P range, will have an earlier cut-off point. It was a big rush to get
-> this lot reviewed and merged.
+>>> arch/arm/plat-samsung/dev-keypad.c:41: warning: 'struct
+>> samsung_keypad_platdata' declared inside parameter list
+>>> arch/arm/plat-samsung/dev-keypad.c:41: warning: its scope is only this definition
+>> or declaration, which is probably not what you want
+>>> arch/arm/plat-samsung/dev-keypad.c: In function
+>> 'samsung_keypad_set_platdata':
+>>> arch/arm/plat-samsung/dev-keypad.c:50: error: invalid application of 'sizeof' to
+>> incomplete type 'struct samsung_keypad_platdata'
+>>> arch/arm/plat-samsung/dev-keypad.c:54: error: dereferencing pointer to
+>> incomplete type
+>>> arch/arm/plat-samsung/dev-keypad.c:55: error: dereferencing pointer to
+>> incomplete type
+>>> arch/arm/plat-samsung/dev-keypad.c:55: error: 'samsung_keypad_cfg_gpio'
+>> undeclared (first use in this function)
+>>> arch/arm/plat-samsung/dev-keypad.c:55: error: (Each undeclared identifier is
+>> reported only once
+>>> arch/arm/plat-samsung/dev-keypad.c:55: error: for each function it appears in.)
+>>> make[1]: *** [arch/arm/plat-samsung/dev-keypad.o] Error 1
+>>>
+>>> As you know, released 35 today. So we have no much time for this merge
+>> window.
+>> I'm not sure about merge rule, but I think the compile problem can be
+>> solved by merge to 36 of input tree and samsung platform tree.
+> 
+> Hmm...actually, already informed about that on linux-next.
+> If it's just build problem, I or Dmitry can fix it. However, this is not just that.
+> I cannot understand how your 'plat/keypad.h' was included to both of patch.
 
-It also means that *NONE* of the stuff in your second pull request was
-in linux-next for *any* time.  It also conflicted with my tree.  The
-result of that is I'm expecting mainline to be dead for all ARM with:
+Please see the prior mail history. The keypad.h file is included only at 
+the 1/3 patch in the original patch set, but Dmitry applied the 3/3
+patch modified with keypad.h.
 
-arch/arm/Kconfig:883: can't open file "arch/arm/plat-s5pc1xx/Kconfig"
+The basic problem is that each patches be applied on two tree. It makes
+compile errors at the one tree lacking keypad.h file because both tree 
+share keypad.h file.
 
-because of a mis-merge - and since that conflict was not picked up by
-linux-next, it could not have been previously published.
+There are two solutions, First, all patches go to one tree. Second, we 
+wait for merging to 36 of both tree then apply platform patches.
 
-For the next merge window, I will avoid reading email for the duration
-of the window - which means those who are late for the merge window will
-simply not have their patches and trees pulled.  This means we _will_
-have time to resolve conflicts and find problems _before_ the merge
-window
-
----
-
-I have no more plan to merge s5p stuff for this merge window, but reviewed
-here until now.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> And I'm not sure, should be 'plat/keypad.h' in which tree...
+> 
