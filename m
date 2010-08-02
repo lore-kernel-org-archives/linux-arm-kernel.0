@@ -1,31 +1,30 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 2 Aug 2010 18:59:07 +0300
+From: vitalywool@gmail.com (Vitaly Wool)
+Date: Mon, 2 Aug 2010 18:19:04 +0200
 Subject: [PATCH v2 00/20] native support for wl1271 on ZOOM
-In-Reply-To: <AANLkTikvtMbqUdwHtCtdL2xXbQh64pxjApo6ZH6hAXnP@mail.gmail.com>
+In-Reply-To: <AANLkTimaSeLqowRHSCivGXTiSE7NatNTR=jLWQYsSo-6@mail.gmail.com>
 References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
 	<20100726193028.GG3903@tuxdriver.com>
 	<1280736987.17809.18.camel@chilepepper>
 	<20100802114256.GE12293@atomide.com>
 	<AANLkTikvtMbqUdwHtCtdL2xXbQh64pxjApo6ZH6hAXnP@mail.gmail.com>
-Message-ID: <AANLkTimaSeLqowRHSCivGXTiSE7NatNTR=jLWQYsSo-6@mail.gmail.com>
+	<AANLkTimaSeLqowRHSCivGXTiSE7NatNTR=jLWQYsSo-6@mail.gmail.com>
+Message-ID: <AANLkTikPSp0_S8kSFmeZJ0qLR3DHKBN=iW_As5891a6v@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 2, 2010 at 6:12 PM, Vitaly Wool <vitalywool@gmail.com> wrote:
-> Also, specifically to 12xx, I'd like to see REF_CLOCK moved on and
-> have this set by platform too (I haven't found anything like that in
-> the patches but maybe I've overlooked that).
+Hi Ohad,
 
-Check out patch no. 9:
-
-http://www.spinics.net/lists/arm-kernel/msg93836.html
-
-
+On Mon, Aug 2, 2010 at 5:59 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
 >
-> Thanks,
-> ? Vitaly
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-wireless" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+> Check out patch no. 9:
+
+sorry for the confusion. However, I guess if the platform doesn't
+supply this value, we'll just consider it 0? Without any warning,
+right?
+
+The problem is, we can't really distinguish between this field not set
+and value zero, and that means something is wrong with the design. The
+easiest way is probably changing the clock ids to start with 1.
+
+Thanks,
+   Vitaly
