@@ -1,46 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Aug 2010 11:04:19 +0100
-Subject: [PATCH 1/2] arm: msm: Add System MMU support.
-In-Reply-To: <20100802181919J.fujita.tomonori@lab.ntt.co.jp>
-References: <1280736182.1902.55.camel@pasglop>
-	<20100802172941C.fujita.tomonori@lab.ntt.co.jp>
-	<20100802090326.GA30670@n2100.arm.linux.org.uk>
-	<20100802181919J.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <20100802100419.GC30670@n2100.arm.linux.org.uk>
+From: p.osciak@samsung.com (Pawel Osciak)
+Date: Mon, 02 Aug 2010 12:32:20 +0200
+Subject: [PATCH v3 1/8] ARM: Samsung: Add register definitions for Samsung
+	S5P SoC camera interface
+In-Reply-To: <00ba01cb2c8f$02fc8480$08f58d80$%kim@samsung.com>
+References: <1279902083-21250-1-git-send-email-s.nawrocki@samsung.com>
+	<1279902083-21250-2-git-send-email-s.nawrocki@samsung.com>
+	<00ba01cb2c8f$02fc8480$08f58d80$%kim@samsung.com>
+Message-ID: <003001cb322d$fc976b10$f5c64130$%osciak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 02, 2010 at 06:20:01PM +0900, FUJITA Tomonori wrote:
-> On Mon, 2 Aug 2010 10:03:26 +0100
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > On Mon, Aug 02, 2010 at 05:30:26PM +0900, FUJITA Tomonori wrote:
-> > > ARM's iommu code (arch/plat-omap/include/plat/iommu.h) is a library to
-> > > simplify the IOMMU implementations. It could be useful for all the
-> > > iommu implementations.
-> > 
-> > ITYM OMAP's iommu code.
-> 
-> Yeah, I meant that we could extend it to make it useful for other
-> iommu implementations. At least, we could make something generic like
-> struct iommu_functions, I think. Then we can embed a generic iommu
-> structure into an iommu specific struct (like we do with inode).
-> 
-> The current iommu-api (include/linux/iommu.h) is just about domain and
-> mapping concept. We can implement it on the top of the above
-> infrastructure.
-> 
-> I'm still trying to figure out how the DMA-API can work well with
-> them.
+Hello,
 
-I'm not sure it can in totality.  The DMA-API solves the host CPU <->
-device aspect of DMA support only.
+>Kukjin Kim <kgene.kim@samsung.com> wrote:
+>Sylwester Nawrocki wrote:
+>>
+>> Add register definitions for the camera interface/video postprocessor
+>> contained in Samsung's S5P SoC series.
+>>
+>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> Reviewed-by: Pawel Osciak <p.osciak@samsung.com>
+>> Reviewed-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>>  arch/arm/plat-samsung/include/plat/regs-fimc.h |  294
+>> ++++++++++++++++++++++++
+>>  1 files changed, 294 insertions(+), 0 deletions(-)
+>>  create mode 100644 arch/arm/plat-samsung/include/plat/regs-fimc.h
+>>
+>> diff --git a/arch/arm/plat-samsung/include/plat/regs-fimc.h
+>b/arch/arm/plat-
+>> samsung/include/plat/regs-fimc.h
+>> new file mode 100644
+>> index 0000000..7f3141c
+>> --- /dev/null
+>> +++ b/arch/arm/plat-samsung/include/plat/regs-fimc.h
+>> @@ -0,0 +1,294 @@
+>> +/* arch/arm/plat-s5p/include/plat/regs-fimc.h
+>> + *
+>> + * Register definition file for Samsung Camera Interface (FIMC) driver
 
-However, there is another use case for IOMMUs, which is to allow two
-separate peripheral devices to communicate with each other via system
-memory.  As the streaming DMA-API involves the idea of buffer ownership
-(of a singular agent), it is unsuitable for this use case.
+<snip>
 
-The coherent allocation part of the DMA-API also only deals with the
-idea of there being a singular DMA agent accessing the allocated buffer
-(in conjunction with the host CPU).
+>
+>Looks ok...however, I'm still thinking whether really need all these
+>definitions.
+>
+>Hmm...
+>
+
+Well, some of them are indeed unused, but it's not an uncommon practice in
+kernel and might help future developers.
+
+
+Best regards
+--
+Pawel Osciak
+Linux Platform Group
+Samsung Poland R&D Center
