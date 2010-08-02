@@ -1,78 +1,99 @@
-From: zpfeffer@codeaurora.org (Zach Pfeffer)
-Date: Mon, 2 Aug 2010 13:29:38 -0700
-Subject: [PATCH 1/2] arm: msm: Add System MMU support.
-In-Reply-To: <20100802075802.GN24084@amd.com>
-References: <20100729123512Y.fujita.tomonori@lab.ntt.co.jp>
-	<201007291026.55928.arnd@arndb.de> <20100729084018.GM26098@amd.com>
-	<20100729174621W.fujita.tomonori@lab.ntt.co.jp>
-	<20100729090607.GN26098@amd.com>
-	<d493494df33aaf65e526181b1dbafce3.squirrel@www.codeaurora.org>
-	<20100802075802.GN24084@amd.com>
-Message-ID: <20100802202935.GA26214@codeaurora.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 3 Aug 2010 00:35:56 +0300
+Subject: [PATCH v2 03/20] mmc: support embedded data field in mmc_host
+In-Reply-To: <AANLkTikfRja-h9mz7uyRXCZNZjKdU_yB8e58XQucUzrn@mail.gmail.com>
+References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
+	<1279733634-21974-4-git-send-email-ohad@wizery.com>
+	<AANLkTimzA_JJ-byTDWznbL3YzeJ8LAP4M50onf2_3fBF@mail.gmail.com>
+	<AANLkTi=Oy8X1xMOwWL_cKBB1LWULT6=p+adUgB+AuSJS@mail.gmail.com>
+	<AANLkTi=BUX59heXAW2Uf4wZo2dSS19Je54dkQ5u2YGAW@mail.gmail.com>
+	<AANLkTimZQKj7H_GeE=+O9cwxEMTR+LhfFbt=AyXGzN3d@mail.gmail.com>
+	<AANLkTikfRja-h9mz7uyRXCZNZjKdU_yB8e58XQucUzrn@mail.gmail.com>
+Message-ID: <AANLkTi=vhWV1RNyemtfppfjvLYAbzd3aRjFOVgLLpG3Z@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 02, 2010 at 09:58:02AM +0200, Roedel, Joerg wrote:
-> Hi Stephan,
-> 
-> On Fri, Jul 30, 2010 at 01:19:06AM -0400, stepanm at codeaurora.org wrote:
-> > Unlike a more traditional system with one IOMMU between the bus and
-> > memory, MSM has multiple IOMMUs, with each one hard-wired to a dedicated
-> > device. Furthermore, each IOMMU can have more than one translation
-> > context. One of the use cases is being able to create mappings within
-> > multiple instances of one context, and arbitrarily context-switch the
-> > IOMMU on the fly.
-> 
-> The IOMMU-API supports multiple IOMMUs (at least multiple AMD/Intel
-> IOMMUs). But the face that there are more than one IOMMU is hidden in
-> the backend driver implementation. The API itself only works with
-> domains and devices. The IOMMU driver needs to know which IOMMU it needs
-> to program for a given device. If I understand the concept of your
-> hardware correctly you also have this information.
-> 
-> > It sounds like the domain abstraction and attach_device/detach_device can
-> > encapsulate this rather nicely and I am in the process of updating my
-> > driver to fit this framework.
-> > 
-> > My problem, however, is with iommu_domain_alloc(). This will set up a
-> > domain and call the ops function to initialize it, but I want to be able
-> > to pass it an ???IOMMU id" that will tell the underlying driver which IOMMU
-> > (and which "stream id") is to be associated with that domain instance.
-> > This can be a void* parameter that gets passed through to domain_init. I
-> > feel like this change will make it easy to deal with multiple
-> > IOMMUs/translation contexts, and implementations that have only a singular
-> > IOMMU/translation context are free to ignore that parameter.
-> 
-> In the means of the IOMMU-API the domain is the abstraction of an
-> address space (in other words a page table). The IOMMU(s) which this domain
-> is later assigned to are determined by the iommu_attach_device calls.
-> I think the right way to go here is to create the concept of a
-> device-context in the IOMMU-API and add functions like
-> 
-> 	iommu_attach_context(struct iommu_domain *domain,
-> 			     struct iommu_context *ctxt);
-> 	iommu_detach_context(struct iommu_context *ctxt);
-> 
-> This would work if you can determine in your iommu-driver which iommu
-> you need to program for which device. What do you think?
-> 
+Hi Vitaly,
 
-Joerg, I'd like to make sure I understand this. A domain is an address
-space separate from the actual page-tables that may be part of an
-iommu_context, correct? After I iommu_attach_context the ctxt will
-reflect the address space of the domain, correct?
+On Mon, Aug 2, 2010 at 7:25 PM, Vitaly Wool <vitalywool@gmail.com> wrote:
+> On Mon, Aug 2, 2010 at 5:54 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+>> SPI is using these spi_board_info tables to populate the SPI device
+>> trees. These tables are registered early at the board-specific init
+>> code, and are later used by SPI core to populate the devices when the
+>> SPI master controller is registered.
+>>
+>> SDIO doesn't normally needs any kind of hard coded data: most devices
+>> are dynamically probed and populated.
+>>
+>> On rare cases like the wl1271, we have some platform-specific data we
+>> need to deliver the SDIO function driver (i.e. the irq info in this
+>> case). Since the device is hardwired to a specific controller, it does
+>> make some sense to pass this private data from the controller's info
+>> in the board files, through the host driver, and make it accessible
+>> through the specific host instance that drives this controller.
+>>
+>> Btw, if our problem was be broader (e.g., needs to supply private data
+>> for non-hardwired devices), then I agree that a more complex
+>> mechanism, such as the one you suggest, would be needed. But currently
+>> the problem is very simple and the solution is even simpler: just add
+>> 1 private pointer to the host.
+>>
+>> Hope you find this reasonable,
+>
+> no, actually I don't. I think this is a hack that intrudes into the
+> area it completely doesn't belong to.
+>
+> In fact, one can have 2 views on this problem: either this is a fairly
+> generic problem we need to address, or this is a very specific corner
+> case.
+> Your solution will be treated as a hack in both cases.
+>
+> If we consider it a generic problem, then we need to find a generic
+> solution, which is the board_info solution, for instance. FWIW, I2C
+> also uses this approach now.
+>
+> If we consider it to be a corner case, let's just add a dummy
+> platform_device like it's done in WL1251 implementation and keep the
+> MMC subsystem clean.
 
-> 
-> 	Joerg
-> 
-> -- 
-> Joerg Roedel - AMD Operating System Research Center
-> 
-> Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-> General Managers: Alberto Bozzo, Andrew Bowd
-> Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Let's start by defining the problem exactly:
+
+SDIO devices that are hardwired to a specific controller and have some
+platform data that needs to be available to the SDIO function driver.
+
+It doesn't get more generic than that - it's not needed with common
+fully-enumerable SDIO devices (at least I'm not aware of such need),
+hence a generic mechanism of maintaining a global pile of platform
+data pointers, which can be queried with the device and vendor ID,
+really sounds like an overkill.
+
+But it's not specific to the wl1271 device - I prefer to support this
+at the MMC level, so we wouldn't have to add an extra platform device
+for every SDIO function driver that needs to cope with such issue (we
+already have two drivers - wl1271_sdio.c and wl1251_sdio.c); Adding an
+extra platform device for every driver is just too much dummy code
+(that btw adds a well-hidden race condition between the two probe
+calls), which can be nicely eliminated if we just introduce this new
+per-host private data pointer.
+
+So we have a SDIO device hardwired to a specific controller, that is
+driven by a specific host controller driver instance. This patch
+allows this specific host instance to carry platform data for the
+device that is hardwired to it. The platform data would be available
+only to SDIO function driver instances of that specific host
+controller. The solution is generic enough to support all SDIO
+function drivers with similar needs, and it's extremely simple.
+
+I'm honestly trying to understand your concerns, but I'm afraid that
+just saying "it's a hack" is not too informative. Can you please
+explain what do you think is technically wrong with the proposed
+solution ? is it not general enough for other use cases ? will it
+break something ?
+
+Thanks,
+Ohad.
+
+>
+> Thanks,
+> ? Vitaly
+>
