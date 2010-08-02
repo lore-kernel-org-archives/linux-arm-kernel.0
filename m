@@ -1,42 +1,46 @@
-From: tiffang@gmail.com (ikjn)
-Date: Mon, 2 Aug 2010 18:55:31 +0900
-Subject: Question about armv7(cortex-a9) dcache initialization.
-In-Reply-To: <AANLkTilpM7DcP26kvAmtukre16alx72Rh9CcnTvWVMD5@mail.gmail.com>
-References: <AANLkTilpM7DcP26kvAmtukre16alx72Rh9CcnTvWVMD5@mail.gmail.com>
-Message-ID: <AANLkTinuU5mJA7jHpODeQFik3JFUp0u+0B-5QA24tsmh@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Aug 2010 11:04:19 +0100
+Subject: [PATCH 1/2] arm: msm: Add System MMU support.
+In-Reply-To: <20100802181919J.fujita.tomonori@lab.ntt.co.jp>
+References: <1280736182.1902.55.camel@pasglop>
+	<20100802172941C.fujita.tomonori@lab.ntt.co.jp>
+	<20100802090326.GA30670@n2100.arm.linux.org.uk>
+	<20100802181919J.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <20100802100419.GC30670@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now I think that it is a bootloader requirement.
+On Mon, Aug 02, 2010 at 06:20:01PM +0900, FUJITA Tomonori wrote:
+> On Mon, 2 Aug 2010 10:03:26 +0100
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+> > On Mon, Aug 02, 2010 at 05:30:26PM +0900, FUJITA Tomonori wrote:
+> > > ARM's iommu code (arch/plat-omap/include/plat/iommu.h) is a library to
+> > > simplify the IOMMU implementations. It could be useful for all the
+> > > iommu implementations.
+> > 
+> > ITYM OMAP's iommu code.
+> 
+> Yeah, I meant that we could extend it to make it useful for other
+> iommu implementations. At least, we could make something generic like
+> struct iommu_functions, I think. Then we can embed a generic iommu
+> structure into an iommu specific struct (like we do with inode).
+> 
+> The current iommu-api (include/linux/iommu.h) is just about domain and
+> mapping concept. We can implement it on the top of the above
+> infrastructure.
+> 
+> I'm still trying to figure out how the DMA-API can work well with
+> them.
 
-And in the arm linux kernel's booting requirement,
-"Data cache must be off and must not contain any stale data."
-And today I found a code for invalidating dcache in omap4 bootloader
-source code.
+I'm not sure it can in totality.  The DMA-API solves the host CPU <->
+device aspect of DMA support only.
 
-So it's okay to clean & invalidate in kernel init procedure.
-Boot loader should initialize all caches before use.
+However, there is another use case for IOMMUs, which is to allow two
+separate peripheral devices to communicate with each other via system
+memory.  As the streaming DMA-API involves the idea of buffer ownership
+(of a singular agent), it is unsuitable for this use case.
 
-On Thu, Jul 22, 2010 at 10:12 AM, ikjn <tiffang@gmail.com> wrote:
-> In the ARM Cortex-A9 TRM, I found a note in chapter 6.1
->
-> Note:
-> You must invalidate the instruction cache, the data cache, and BTAC
-> before using them.
-> You are not required to invalidate the main TLB, even though it is
-> recommended for
-> safety reasons. This ensures compatibility with future revisions of
-> the processor.
->
-> But the kernel does.. ( __v7_setup in proc-v7.S )
-> clean & invalidate before turning on the MMU, not just 'invalidate'.
->
-> If dcache tag&data ram has garbage data when power up,
-> I think some dirty data lines can be flushed into to L2 or L3 memory
-> because kernel does clean.
-> And It can pollute the memory.
->
-> Is it possible in cortex-A9?
->
-> Thanks..
->
+The coherent allocation part of the DMA-API also only deals with the
+idea of there being a singular DMA agent accessing the allocated buffer
+(in conjunction with the host CPU).
