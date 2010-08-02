@@ -1,46 +1,47 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon,  2 Aug 2010 09:59:29 +0200
-Subject: [PATCH] ARM: cam60: don't use __init for
-	cam60_spi_{flash_platform_data, partitions}
-In-Reply-To: <20100802052653.GA8538@pengutronix.de>
-References: <20100802052653.GA8538@pengutronix.de>
-Message-ID: <1280735969-17063-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: philippe.langlais@stericsson.com (Philippe Langlais)
+Date: Mon, 2 Aug 2010 10:01:09 +0200
+Subject: [PATCH] U6715 platform serial driver It's a generic driver for
+	all U6XXX platform
+In-Reply-To: <20100731105946.GK23886@n2100.arm.linux.org.uk>
+References: <1280417192-25710-1-git-send-email-philippe.langlais@stericsson.com>
+	<20100731105946.GK23886@n2100.arm.linux.org.uk>
+Message-ID: <4C567B45.7050507@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These two structs are referenced by cam60_spi_devices.  The latter is
-copied at init time to kmalloced memory and so the copy isn't freed after
-booting.  So it must not contain references to .init memory.
 
-This isn't noticed by modpost as cam60_spi_devices is in .init.data, too.
 
-Noticed-by: Andrew Victor <avictor.za@gmail.com>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-at91/board-cam60.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+On 07/31/10 12:59, Russell King - ARM Linux wrote:
+> On Thu, Jul 29, 2010 at 05:26:32PM +0200, Philippe Langlais wrote:
+>    
+>> +unsigned int u6_serial8250_enable_clock(struct uart_port *port)
+>> +{
+>> +	struct u6_uart *uart_u6 = port->private_data;
+>> +
+>> +	if (!uart_u6)
+>> +		return uart_enable_clock(port);
+>> +
+>> +	if (IS_ERR(uart_u6->uartClk)) {
+>> +		pr_warning("%s - uart clock failed error:%ld\n",
+>> +		       __func__, PTR_ERR(uart_u6->uartClk));
+>> +		return PTR_ERR(uart_u6->uartClk);
+>> +	}
+>> +
+>> +	if (clk_get_usecount(uart_u6->uartClk) == 0)
+>> +		clk_enable(uart_u6->uartClk);
+>>      
+> This breaks the atomic update nature of the use count of clocks, and breaks
+> the model that the driver should only ever enable the clock if it needs it.
+> I think instead you need to track whether the driver enabled or disabled
+> its own clock.
+>    
+Hi,
+You are right.
+I forgot to withdraw these tests needed for our specific power managment.
+The new patch will follow.
+If you have no more remark, I'm ready to send all U6715 patches in your 
+patch system.
 
-diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
-index 05c7072..44eb9f7 100644
---- a/arch/arm/mach-at91/board-cam60.c
-+++ b/arch/arm/mach-at91/board-cam60.c
-@@ -75,7 +75,7 @@ static struct at91_usbh_data __initdata cam60_usbh_data = {
-  * SPI devices.
-  */
- #if defined(CONFIG_MTD_DATAFLASH)
--static struct mtd_partition __initdata cam60_spi_partitions[] = {
-+static struct mtd_partition cam60_spi_partitions[] = {
- 	{
- 		.name	= "BOOT1",
- 		.offset	= 0,
-@@ -98,7 +98,7 @@ static struct mtd_partition __initdata cam60_spi_partitions[] = {
- 	},
- };
- 
--static struct flash_platform_data cam60_spi_flash_platform_data __initdata = {
-+static struct flash_platform_data cam60_spi_flash_platform_data = {
- 	.name		= "spi_flash",
- 	.parts		= cam60_spi_partitions,
- 	.nr_parts	= ARRAY_SIZE(cam60_spi_partitions)
--- 
-1.7.1
+Thanks
+
+Philippe
