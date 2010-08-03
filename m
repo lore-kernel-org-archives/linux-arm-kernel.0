@@ -1,85 +1,43 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 3 Aug 2010 19:21:43 +0800
-Subject: [PATCH 2/3] [ARM] pxa: MFU pin configuration to support Fast
-	ethernet.
-In-Reply-To: <1280849830-5350-3-git-send-email-ssanap@marvell.com>
-References: <1280849830-5350-1-git-send-email-ssanap@marvell.com>
-	<1280849830-5350-2-git-send-email-ssanap@marvell.com>
-	<1280849830-5350-3-git-send-email-ssanap@marvell.com>
-Message-ID: <AANLkTim-sSUwaYdbsU7mA9pcVbHKMb6N4B1A0j0Ls6GE@mail.gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 03 Aug 2010 14:41:28 +0300
+Subject: [PATCH 0/3 v2] Enable pxa310 usb otg port host mode
+In-Reply-To: <1280232420-28691-1-git-send-email-grinberg@compulab.co.il>
+References: <1280232420-28691-1-git-send-email-grinberg@compulab.co.il>
+Message-ID: <4C580068.6080108@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 3, 2010 at 11:37 PM, Sachin Sanap <ssanap@marvell.com> wrote:
-> Signed-off-by: Sachin Sanap <ssanap@marvell.com>
+ping!
 
-This one looks good.
+On 07/27/10 15:06, Igor Grinberg wrote:
+> This patch series introduces the U2D Controller and
+> U2D ULPI Host driver for PXA310 and enables cm-x300 usb host port2.
+>
+> This patch series depends on
+> "Generic ULPI driver extention" patch series,
+> which have been reviewed at linux-usb mailing list
+>
+> Igor Grinberg (3):
+>   [ARM] pxa3xx: Add U2D controller and ULPI driver
+>   [ARM] usb/host/ohci-pxa27x: enable OHCI over U2DC
+>   [ARM] pxa/cm-x300: enable USB host port2
+>
+>  arch/arm/mach-pxa/Kconfig                   |    4 +
+>  arch/arm/mach-pxa/Makefile                  |    2 +-
+>  arch/arm/mach-pxa/cm-x300.c                 |   77 ++++++
+>  arch/arm/mach-pxa/devices.c                 |   28 ++
+>  arch/arm/mach-pxa/devices.h                 |    1 +
+>  arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h |   35 +++
+>  arch/arm/mach-pxa/pxa3xx-ulpi.c             |  392 +++++++++++++++++++++++++++
+>  arch/arm/mach-pxa/pxa3xx.c                  |    2 +-
+>  drivers/usb/host/ohci-pxa27x.c              |    7 +
+>  9 files changed, 546 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h
+>  create mode 100644 arch/arm/mach-pxa/pxa3xx-ulpi.c
+>
+>
+>   
 
-> ---
-> ?arch/arm/mach-mmp/aspenite.c ? ? ? ? ? ? ? ?| ? 18 ++++++++++++++++++
-> ?arch/arm/mach-mmp/include/mach/mfp-pxa168.h | ? 19 +++++++++++++++++++
-> ?2 files changed, 37 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
-> index d19c26c..a235551 100644
-> --- a/arch/arm/mach-mmp/aspenite.c
-> +++ b/arch/arm/mach-mmp/aspenite.c
-> @@ -74,6 +74,24 @@ static unsigned long common_pin_config[] __initdata = {
-> ? ? ? ?GPIO105_CI2C_SDA,
-> ? ? ? ?GPIO106_CI2C_SCL,
->
-> + ? ? ? /* MFU */
-> + ? ? ? GPIO86_TX_CLK,
-> + ? ? ? GPIO87_TX_EN,
-> + ? ? ? GPIO88_TX_DQ3,
-> + ? ? ? GPIO89_TX_DQ2,
-> + ? ? ? GPIO90_TX_DQ1,
-> + ? ? ? GPIO91_TX_DQ0,
-> + ? ? ? GPIO92_MII_CRS,
-> + ? ? ? GPIO93_MII_COL,
-> + ? ? ? GPIO94_RX_CLK,
-> + ? ? ? GPIO95_RX_ER,
-> + ? ? ? GPIO96_RX_DQ3,
-> + ? ? ? GPIO97_RX_DQ2,
-> + ? ? ? GPIO98_RX_DQ1,
-> + ? ? ? GPIO99_RX_DQ0,
-> + ? ? ? GPIO100_MII_MDC,
-> + ? ? ? GPIO101_MII_MDIO,
-> + ? ? ? GPIO103_RX_DV,
-> ?};
->
-> ?static struct smc91x_platdata smc91x_info = {
-> diff --git a/arch/arm/mach-mmp/include/mach/mfp-pxa168.h b/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
-> index ded43c4..afea9dc 100644
-> --- a/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
-> +++ b/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
-> @@ -266,6 +266,25 @@
-> ?#define GPIO116_I2S_RXD ? ? ? ? ? ? ? ?MFP_CFG(GPIO116,AF2)
-> ?#define GPIO117_I2S_TXD ? ? ? ? ? ? ? ?MFP_CFG(GPIO117,AF2)
->
-> +/* MFU */
-> +#define GPIO86_TX_CLK ? ? ? ? ?MFP_CFG(GPIO86, AF5)
-> +#define GPIO87_TX_EN ? ? ? ? ? MFP_CFG(GPIO87, AF5)
-> +#define GPIO88_TX_DQ3 ? ? ? ? ?MFP_CFG(GPIO88, AF5)
-> +#define GPIO89_TX_DQ2 ? ? ? ? ?MFP_CFG(GPIO89, AF5)
-> +#define GPIO90_TX_DQ1 ? ? ? ? ?MFP_CFG(GPIO90, AF5)
-> +#define GPIO91_TX_DQ0 ? ? ? ? ?MFP_CFG(GPIO91, AF5)
-> +#define GPIO92_MII_CRS ? ? ? ? MFP_CFG(GPIO92, AF5)
-> +#define GPIO93_MII_COL ? ? ? ? MFP_CFG(GPIO93, AF5)
-> +#define GPIO94_RX_CLK ? ? ? ? ?MFP_CFG(GPIO94, AF5)
-> +#define GPIO95_RX_ER ? ? ? ? ? MFP_CFG(GPIO95, AF5)
-> +#define GPIO96_RX_DQ3 ? ? ? ? ?MFP_CFG(GPIO96, AF5)
-> +#define GPIO97_RX_DQ2 ? ? ? ? ?MFP_CFG(GPIO97, AF5)
-> +#define GPIO98_RX_DQ1 ? ? ? ? ?MFP_CFG(GPIO98, AF5)
-> +#define GPIO99_RX_DQ0 ? ? ? ? ?MFP_CFG(GPIO99, AF5)
-> +#define GPIO100_MII_MDC ? ? ? ? ? ? ? ?MFP_CFG(GPIO100, AF5)
-> +#define GPIO101_MII_MDIO ? ? ? MFP_CFG(GPIO101, AF5)
-> +#define GPIO103_RX_DV ? ? ? ? ?MFP_CFG(GPIO103, AF5)
-> +
-> ?/* PWM */
-> ?#define GPIO96_PWM3_OUT ? ? ? ? ? ? ? ?MFP_CFG(GPIO96, AF1)
-> ?#define GPIO97_PWM2_OUT ? ? ? ? ? ? ? ?MFP_CFG(GPIO97, AF1)
-> --
-> 1.6.2.5
->
->
+-- 
+Regards,
+Igor.
