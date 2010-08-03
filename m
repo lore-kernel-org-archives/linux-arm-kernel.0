@@ -1,44 +1,74 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Tue,  3 Aug 2010 06:10:06 +0530
-Subject: [PATCHv2] fix Thumb-2 decompressor broken by "Auto calculate ZRELADDR"
-In-Reply-To: <20100731125009.GA15412@pengutronix.de>
-References: <20100731125009.GA15412@pengutronix.de>
-Message-ID: <1280796006-32028-1-git-send-email-rabin@rab.in>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Tue, 3 Aug 2010 02:40:39 +0200
+Subject: [PATCH v4] GPIO PL061: Adding Clk framework support
+In-Reply-To: <20100730070943.GA29746@n2100.arm.linux.org.uk>
+References: <20100710071913.GM22845@n2100.arm.linux.org.uk>
+	<AANLkTimskXW4Nnxhc5bxwKiNrfJkMb-9NeWKhVOGaA1k@mail.gmail.com>
+	<20100713074449.GA20118@n2100.arm.linux.org.uk>
+	<AANLkTilZJTHh_iFS37UL7XoUs_DhAB50A3tHfcfEr5JM@mail.gmail.com>
+	<20100713182644.GC30142@n2100.arm.linux.org.uk>
+	<4C3EA46B.1000709@st.com>
+	<20100715083032.GA26212@n2100.arm.linux.org.uk>
+	<4C3ED678.7010308@st.com>
+	<20100715095637.GF26212@n2100.arm.linux.org.uk>
+	<083DF309106F364B939360100EC290F80AC392ACFC@eu1rdcrdc1wx030.exi.nxp.com>
+	<20100730070943.GA29746@n2100.arm.linux.org.uk>
+Message-ID: <083DF309106F364B939360100EC290F80AC39A091A@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"ARM: Auto calculate ZRELADDR and provide option for exceptions" broke
-the Thumb-2 decompressor because it removed an entry in the LC0 table
-but didn't adjust the offset the Thumb-2 code uses to load the SP from
-that table.
+> Cc: Viresh KUMAR; rabin at rab.in; Linus Walleij; baruch at tkos.co.il;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v4] GPIO PL061: Adding Clk framework support
+> 
+> On Fri, Jul 30, 2010 at 01:22:58AM +0200, Kevin Wells wrote:
+> > >  /*
+> > >   * These are the device model conversion veneers; they convert the
+> > >   * device model structures to our more specific structures.
+> > > @@ -130,17 +155,33 @@ static int amba_probe(struct device *dev)
+> > >  {
+> > >  	struct amba_device *pcdev = to_amba_device(dev);
+> > >  	struct amba_driver *pcdrv = to_amba_driver(dev->driver);
+> > > -	struct amba_id *id;
+> > > +	struct amba_id *id = amba_lookup(pcdrv->id_table, pcdev);
+> > > +	int ret;
+> > >
+> > > -	id = amba_lookup(pcdrv->id_table, pcdev);
+> > > +	do {
+> > > +		ret = amba_get_enable_pclk(pcdev);
+> > > +		if (ret)
+> > > +			break;
+> > > +
+> > > +		ret = pcdrv->probe(pcdev, id);
+> > > +		if (ret == 0)
+> > > +			break;
+> > >
+> > > -	return pcdrv->probe(pcdev, id);
+> > > +		amba_put_disable_pclk(pcdev);
+> >
+> > Should the AMBA clock be disabled if the probe() fails?
+> 
+> This is exactly what happens here.
 
-Fix it, and also change the ARM code to use the separate SP-load since
-ARM instructions that include the SP in the LDM register list are
-deprecated.
+I think I got my logic reversed..
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
-v2: don't need separate code for ARM and THUMB since they're now
-    the same.
+One more item I noted. These changes want to keep the clock enabled
+after the probe - only disabling the clock on amba_remove. Both the
+AMBA peripheral driver (ie, the LCD or MMCI driver) and the amba_remove
+function now disable the clocks.
 
- arch/arm/boot/compressed/head.S |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
+Wouldn't drivers that use clk_disable in their xxx_suspend functions
+have some problems with this as multiple clk_enables have been called?
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index abf4d65..6af9907 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -170,9 +170,8 @@ not_angel:
- 
- 		.text
- 		adr	r0, LC0
-- ARM(		ldmia	r0, {r1, r2, r3, r5, r6, r11, ip, sp})
-- THUMB(		ldmia	r0, {r1, r2, r3, r5, r6, r11, ip}	)
-- THUMB(		ldr	sp, [r0, #32]				)
-+		ldmia	r0, {r1, r2, r3, r5, r6, r11, ip}
-+		ldr	sp, [r0, #28]
- #ifdef CONFIG_AUTO_ZRELADDR
- 		@ determine final kernel image address
- 		and	r4, pc, #0xf8000000
--- 
-1.7.1
+ie,
+AMBA enables clock in amba_probe() <<< clock use count = 1
+pl022 driver enables clock in mmci_probe <<< clock use count = 2
+...SPI stuff happens...
+...Linux enters suspend mode...
+pl022 driver enters suspend mode, disables clock <<< clock use count = 1
+
+Because the AMBA driver enabled the clock, the clock driver would still
+see a use count > 1 on suspend and keep the clock enabled. Should the
+suspend and resume functions in bus.c also disable/enable clocks? Or
+maybe the peripheral drivers should just handle clocking and the clock
+enable in amba_probe should be removed?
