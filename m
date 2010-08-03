@@ -1,33 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Aug 2010 08:41:37 +0100
-Subject: [PATCH 3/4] [ARM] mm: add memory type for inner-writeback
-In-Reply-To: <1280803369-13362-4-git-send-email-gking@nvidia.com>
-References: <1280803369-13362-1-git-send-email-gking@nvidia.com>
-	<1280803369-13362-4-git-send-email-gking@nvidia.com>
-Message-ID: <20100803074137.GC11987@n2100.arm.linux.org.uk>
+From: eric.miao@canonical.com (Eric Miao)
+Date: Tue, 3 Aug 2010 15:47:31 +0800
+Subject: [PATCHv2] fix Thumb-2 decompressor broken by "Auto calculate
+	ZRELADDR"
+In-Reply-To: <20100803073627.GA17297@pengutronix.de>
+References: <20100731125009.GA15412@pengutronix.de>
+	<1280796006-32028-1-git-send-email-rabin@rab.in>
+	<20100803073627.GA17297@pengutronix.de>
+Message-ID: <AANLkTin4+OD8mLG1sqrDUSdct5ss8EHsSj_CR7gx8V06@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 02, 2010 at 07:42:48PM -0700, Gary King wrote:
-> This change uses the currently-unused mapping 5 (TEX[0]=1, C=0, B=1)
-> in the tex remapping tables as an inner-writeback-write-allocate, outer
-> non-cacheable memory type, so that this mapping will be available to
-> clients which will benefit from the reduced L2 maintenance.
+2010/8/3 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello Rabin,
+>
+> On Tue, Aug 03, 2010 at 06:10:06AM +0530, Rabin Vincent wrote:
+>> "ARM: Auto calculate ZRELADDR and provide option for exceptions" broke
+>> the Thumb-2 decompressor because it removed an entry in the LC0 table
+>> but didn't adjust the offset the Thumb-2 code uses to load the SP from
+>> that table.
+>>
+>> Fix it, and also change the ARM code to use the separate SP-load since
+>> ARM instructions that include the SP in the LDM register list are
+>> deprecated.
+>>
+>> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> Acked-and-regretted-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-No.  This is not "free for use".  Mapping 5 is unused because it's not
-architecturally defined - CPU implementations may not implement it.
-This is what the ARM ARM says:
-
-  For seven of the eight possible combinations of the TEX[0], C and B bits,
-  a field in the PRRR defines the corresponding memory region as being
-  Normal, Device or Strongly-ordered memory a field in the NMRR defines
-  the Inner cache attributes that apply if the PRRR field identifies the
-  region as Normal memory a second field in the NMRR defines the Outer
-  cache attributes that apply if the PRRR field identifies the region as
-  Normal memory.
-
-  The meaning of the eighth combination for the TEX[0], C and B bits is
-  IMPLEMENTATION DEFINED
-
-So we can't be sure that the PRRR and NMRR bits which correspond with
-mapping 5 even exist.
+Nah, I seemed to introduce that so you don't have to feel regret :-)
