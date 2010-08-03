@@ -1,33 +1,121 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Aug 2010 20:47:18 +0100
-Subject: [PATCH] omap: Fix DEBUG_LL uart to access phys addr when MMU
-	isn't enable
-In-Reply-To: <20100803123828.GZ12293@atomide.com>
-References: <1280807058-8394-1-git-send-email-jason77.wang@gmail.com>
-	<AANLkTi=ocZPDi5eU_F8VdAzJzYRCEp+B7MZ2q3DAesa3@mail.gmail.com>
-	<20100803065709.GP12293@atomide.com>
-	<AANLkTinNr7=8cO_E4zaXF4wCcKo3=WUnAek-Dh9-kgjs@mail.gmail.com>
-	<20100803072526.GA11987@n2100.arm.linux.org.uk>
-	<20100803123828.GZ12293@atomide.com>
-Message-ID: <20100803194717.GA28048@n2100.arm.linux.org.uk>
+From: davidsin@ti.com (Sin, David)
+Date: Tue, 3 Aug 2010 14:49:45 -0500
+Subject: [RFC 4/8] TILER-DMM: TILER Memory Manager interface and
+	implementation
+In-Reply-To: <9DCA1E44C5805D4EB7C1626D5FD1739E048EDA223B@dlee02.ent.ti.com>
+References: <1279927348-21750-1-git-send-email-davidsin@ti.com>
+	<1279927348-21750-2-git-send-email-davidsin@ti.com>
+	<1279927348-21750-3-git-send-email-davidsin@ti.com>
+	<1279927348-21750-4-git-send-email-davidsin@ti.com>
+	<1279927348-21750-5-git-send-email-davidsin@ti.com>
+	<20100724080118.GB15064@n2100.arm.linux.org.uk>
+	<513FF747EED39B4AADBB4D6C9D9F9F7903D654A3FE@dlee02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C641D580@dbde02.ent.ti.com>
+	<513FF747EED39B4AADBB4D6C9D9F9F7903D654A430@dlee02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C641D58B@dbde02.ent.ti.com>
+	<9DCA1E44C5805D4EB7C1626D5FD1739E048EDA223B@dlee02.ent.ti.com>
+Message-ID: <513FF747EED39B4AADBB4D6C9D9F9F7903D65FEEDE@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 03, 2010 at 03:38:29PM +0300, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [100803 10:18]:
-> > On Tue, Aug 03, 2010 at 03:11:41PM +0800, Eric Miao wrote:
-> > > We also need to take care of Jeremy's recent patchset to remove
-> > > .io_pg_offst and .phys_io, which modifies all the addruart macros.
-> > 
-> > I don't think Jeremy's patches will be going in for this merge window as
-> > we can't intentionally break OMAP's support because we don't understand
-> > OMAP.  I think Jeremy's patches will have to wait for the next merge
-> > window now.
-> 
-> Well now we understand there's a bug.. Here's what's needed to make
-> Jason's fix to work on Jeremy's mdesc series.
+Russell, 
 
-That's not quite the point - Jeremy's patches with working OMAP support
-haven't been tested in linux-next, and so hasn't had visibility to the
-wider community, and so it shouldn't be going into the current merge
-window.
+> -----Original Message-----
+> From: Sin, David 
+> Sent: Monday, August 02, 2010 9:55 AM
+> To: Shilimkar, Santosh; Russell King - ARM Linux; Woodruff, Richard
+> Cc: linux-omap at vger.kernel.org; Tony Lindgren; Kanigeri, 
+> Hari; Ohad Ben-Cohen; Hiremath, Vaibhav; Molnar, Lajos; 
+> Voultoury, Pierre; linux-arm-kernel at lists.infradead.org
+> Subject: RE: [RFC 4/8] TILER-DMM: TILER Memory Manager 
+> interface and implementation
+> 
+> -----Original Message-----
+> From: Shilimkar, Santosh 
+> Sent: Monday, August 02, 2010 9:53 AM
+> To: Sin, David; Russell King - ARM Linux; Woodruff, Richard
+> Cc: linux-omap at vger.kernel.org; Tony Lindgren; Kanigeri, 
+> Hari; Ohad Ben-Cohen; Hiremath, Vaibhav; Molnar, Lajos; 
+> Voultoury, Pierre; linux-arm-kernel at lists.infradead.org
+> Subject: RE: [RFC 4/8] TILER-DMM: TILER Memory Manager 
+> interface and implementation
+> 
+> 
+> 
+> > -----Original Message-----
+> > From: Sin, David
+> > Sent: Monday, August 02, 2010 8:20 PM
+> > To: Shilimkar, Santosh; Russell King - ARM Linux; Woodruff, Richard
+> > Cc: linux-omap at vger.kernel.org; Tony Lindgren; Kanigeri, 
+> Hari; Ohad Ben-
+> > Cohen; Hiremath, Vaibhav; Molnar, Lajos; Voultoury, Pierre; 
+> linux-arm-
+> > kernel at lists.infradead.org
+> > Subject: RE: [RFC 4/8] TILER-DMM: TILER Memory Manager interface and
+> > implementation
+> > 
+> > -----Original Message-----
+> > From: Shilimkar, Santosh
+> > Sent: Monday, August 02, 2010 9:45 AM
+> > To: Sin, David; Russell King - ARM Linux; Woodruff, Richard
+> > Cc: linux-omap at vger.kernel.org; Tony Lindgren; Kanigeri, 
+> Hari; Ohad Ben-
+> > Cohen; Hiremath, Vaibhav; Molnar, Lajos; Voultoury, Pierre; 
+> linux-arm-
+> > kernel at lists.infradead.org
+> > Subject: RE: [RFC 4/8] TILER-DMM: TILER Memory Manager interface and
+> > implementation
+> > 
+> < snip>
+> 
+> > > > +	m->pa = page_to_phys(m->pg);
+> > > > +
+> > > > +	/* flush the cache entry for each page we allocate. */
+> > > > +	dmac_flush_range(page_address(m->pg),
+> > > > +				page_address(m->pg) + 
+> PAGE_SIZE);
+> > > > +	outer_flush_range(m->pa, m->pa + PAGE_SIZE);
+> > >
+> > > NAK.  This is an abuse of these interfaces, and is buggy 
+> in any case.
+> > >
+> > > ARMv6 and ARMv7 CPUs speculatively prefetch memory, which 
+> means that
+> > > there's no guarantee that if you flush the caches for a particular
+> > > range of virtual space, that it will stay flushed until you decide
+> > > to read it.  So flushing the caches in some memory allocator can't
+> > > guarantee that when you eventually get around to using 
+> the page that
+> > > there won't be cache lines associated with it.
+> > >
+> > > [dhs] Russell, thanks for reviewing this code.  Do you have any
+> > interface
+> > > suggestions that you can share that would make this 
+> proper?  Ideally, I
+> > > would like to get physical pages without associated 
+> virtual address, or
+> > > ones that are non-cached/non-bufferable.
+> > 
+> > There is nothing called 'non-bufferable' any more David on ARMv6 and
+> > ARMv7.
+> > You can get non-cached memory using "dma_alloc_coherent"
+> > 
+> > [dhs] Thanks, Santosh, for the clarification.  I believe
+> > dma_alloc_coherent is quite limited, right?  We need to be 
+> able to cover
+> > potentially 128MB of physical memory for the TILER.  BTW, 
+> does GFP_DMA
+> > indicate that I don't want cached memory?
+> > 
+> It's configurable. By default it's 2 MB pool. GFP_DMA doesn't give you
+> un-cacheable memory.
+> 
+> [dhs] OK -- I will increase this and try to allocate this 
+> way.  Thank you.
+> 
+> 
+
+As Santosh suggests, I will increase the dma_alloc_coherent pool size to something that will accomdate TILER requirements.  I believe this will work, as I'm only making 4k allocations per call, as opposed to one large contiguous allocation.  However, I'd like to be able to use an API similar to alloc_page() that gives back device or strongly ordered memory so that we don't have to pre-allocate such a large amount at boot-up.  Is this something that you're considering on your end for the near future?  Thanks for working through this with us.
+
+Regards,
+-David
