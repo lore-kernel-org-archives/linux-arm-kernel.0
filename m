@@ -1,23 +1,33 @@
-From: seth.forshee@gmail.com (Seth Forshee)
-Date: Tue, 3 Aug 2010 15:04:57 -0500
-Subject: READ_IMPLIES_EXEC set when no GNU_STACK header present
-In-Reply-To: <20100803200234.GB28048@n2100.arm.linux.org.uk>
-References: <20100803195816.GB31111@ubuntu-workstation>
-	<20100803200234.GB28048@n2100.arm.linux.org.uk>
-Message-ID: <20100803200457.GC31111@ubuntu-workstation>
+From: fabioestevam@yahoo.com (Fabio Estevam)
+Date: Tue, 3 Aug 2010 13:19:00 -0700 (PDT)
+Subject: concurrent access to gpiolib on mxc.
+In-Reply-To: <4C58643E.2040105@xenomai.org>
+Message-ID: <602293.37535.qm@web51008.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 03, 2010 at 09:02:34PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Aug 03, 2010 at 02:58:16PM -0500, Seth Forshee wrote:
-> > We recently noticed that all of our applications had the execute
-> > permission set for any mappings with read permission on an ARMv6
-> > platform. This is happening because the ELF images do not have a
-> > GNU_STACK program header, causing executable_stack=EXSTACK_DEFAULT to be
-> > passed to arm_elf_read_implies_exec(), and it immediately returns 1.
-> 
-> That's correct behaviour.  Historically, ARM ELF binaries don't have
-> the GNU_STACK program header, but expect read+exec behaviour from the
-> stack.
+Gilles,
 
-Okay, thanks for the explanation.
+--- On Tue, 8/3/10, Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org> wrote:
+
+> From: Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org>
+> Subject: concurrent access to gpiolib on mxc.
+> To: "Sascha Hauer" <s.hauer@pengutronix.de>
+> Cc: "ARM Linux Mailing List" <linux-arm-kernel@lists.infradead.org>
+> Date: Tuesday, August 3, 2010, 3:47 PM
+> 
+> Hi Sascha,
+> 
+> the gpiolib support on mxc seems to lack protection against
+> concurrent
+> access. Is it OK for this SOC family?
+
+See this patch that is now on Sascha's tree: http://git.pengutronix.de/?p=imx/linux-2.6.git;a=commit;h=8de841dc03c0bd0841f99923dc1b6cc55c33361d
+
+Regards,
+
+Fabio Estevam
+
+
+
+      
