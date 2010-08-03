@@ -1,43 +1,65 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 03 Aug 2010 14:41:28 +0300
-Subject: [PATCH 0/3 v2] Enable pxa310 usb otg port host mode
-In-Reply-To: <1280232420-28691-1-git-send-email-grinberg@compulab.co.il>
-References: <1280232420-28691-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <4C580068.6080108@compulab.co.il>
+From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
+Date: Tue, 03 Aug 2010 15:12:22 +0300
+Subject: [PATCH 21/33] Removing dead OMAP2_VENC_OUT_TYPE_SVIDEO,
+	OMAP2_VENC_OUT_TYPE_COMPOSITE
+In-Reply-To: <20100705085654.GL15951@atomide.com>
+References: <cover.1277911345.git.siccegge@cs.fau.de>
+	<2709d1406900af2436f6f8af00555507baf8dac9.1277911346.git.siccegge@cs.fau.de>
+	<20100705085654.GL15951@atomide.com>
+Message-ID: <1280837542.3436.142.camel@tubuntu.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping!
+On Mon, 2010-07-05 at 10:56 +0200, ext Tony Lindgren wrote:
+> * Christoph Egger <siccegge@cs.fau.de> [100630 18:58]:
+> > OMAP2_VENC_OUT_TYPE_SVIDEO, OMAP2_VENC_OUT_TYPE_COMPOSITE doesn't
+> > exist in Kconfig, therefore removing all references for it from the
+> > source code.
+> 
+> Let's let Tomi figure out this one, added him to Cc.
 
-On 07/27/10 15:06, Igor Grinberg wrote:
-> This patch series introduces the U2D Controller and
-> U2D ULPI Host driver for PXA310 and enables cm-x300 usb host port2.
->
-> This patch series depends on
-> "Generic ULPI driver extention" patch series,
-> which have been reviewed at linux-usb mailing list
->
-> Igor Grinberg (3):
->   [ARM] pxa3xx: Add U2D controller and ULPI driver
->   [ARM] usb/host/ohci-pxa27x: enable OHCI over U2DC
->   [ARM] pxa/cm-x300: enable USB host port2
->
->  arch/arm/mach-pxa/Kconfig                   |    4 +
->  arch/arm/mach-pxa/Makefile                  |    2 +-
->  arch/arm/mach-pxa/cm-x300.c                 |   77 ++++++
->  arch/arm/mach-pxa/devices.c                 |   28 ++
->  arch/arm/mach-pxa/devices.h                 |    1 +
->  arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h |   35 +++
->  arch/arm/mach-pxa/pxa3xx-ulpi.c             |  392 +++++++++++++++++++++++++++
->  arch/arm/mach-pxa/pxa3xx.c                  |    2 +-
->  drivers/usb/host/ohci-pxa27x.c              |    7 +
->  9 files changed, 546 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h
->  create mode 100644 arch/arm/mach-pxa/pxa3xx-ulpi.c
->
->
->   
+The patch doesn't look valid, because either SVIDEO or COMPOSITE should
+be set into .phy.venc.type. But then again, the code that's removed
+doesn't look valid either, as by default it doesn't do either, and the
+COMPOSITE block wouldn't even comile...
 
--- 
-Regards,
-Igor.
+Those defines look like some custom defines that have never been in
+mainstream linux, so I think the patch can be applied, and the board
+file maintainer can fix it with proper code later.
+
+ Tomi
+
+> 
+> Regards,
+> 
+> Tony
+>  
+> > Signed-off-by: Christoph Egger <siccegge@cs.fau.de>
+> > ---
+> >  arch/arm/mach-omap2/board-omap3stalker.c |    5 -----
+> >  1 files changed, 0 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
+> > index f848ba8..b38afd5 100644
+> > --- a/arch/arm/mach-omap2/board-omap3stalker.c
+> > +++ b/arch/arm/mach-omap2/board-omap3stalker.c
+> > @@ -181,11 +181,6 @@ static struct omap_dss_device omap3_stalker_tv_device = {
+> >  	.name			= "tv",
+> >  	.driver_name		= "venc",
+> >  	.type			= OMAP_DISPLAY_TYPE_VENC,
+> > -#if defined(CONFIG_OMAP2_VENC_OUT_TYPE_SVIDEO)
+> > -	.phy.venc.type		= OMAP_DSS_VENC_TYPE_SVIDEO,
+> > -#elif defined(CONFIG_OMAP2_VENC_OUT_TYPE_COMPOSITE)
+> > -	.u.venc.type		= OMAP_DSS_VENC_TYPE_COMPOSITE,
+> > -#endif
+> >  	.platform_enable	= omap3_stalker_enable_tv,
+> >  	.platform_disable	= omap3_stalker_disable_tv,
+> >  };
+> > -- 
+> > 1.7.0.4
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
