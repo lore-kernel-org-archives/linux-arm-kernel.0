@@ -1,54 +1,65 @@
-From: vitalywool@gmail.com (Vitaly Wool)
-Date: Tue, 3 Aug 2010 16:17:37 +0200
-Subject: [PATCH v2 03/20] mmc: support embedded data field in mmc_host
-In-Reply-To: <AANLkTi=vhWV1RNyemtfppfjvLYAbzd3aRjFOVgLLpG3Z@mail.gmail.com>
-References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-	<1279733634-21974-4-git-send-email-ohad@wizery.com>
-	<AANLkTimzA_JJ-byTDWznbL3YzeJ8LAP4M50onf2_3fBF@mail.gmail.com>
-	<AANLkTi=Oy8X1xMOwWL_cKBB1LWULT6=p+adUgB+AuSJS@mail.gmail.com>
-	<AANLkTi=BUX59heXAW2Uf4wZo2dSS19Je54dkQ5u2YGAW@mail.gmail.com>
-	<AANLkTimZQKj7H_GeE=+O9cwxEMTR+LhfFbt=AyXGzN3d@mail.gmail.com>
-	<AANLkTikfRja-h9mz7uyRXCZNZjKdU_yB8e58XQucUzrn@mail.gmail.com>
-	<AANLkTi=vhWV1RNyemtfppfjvLYAbzd3aRjFOVgLLpG3Z@mail.gmail.com>
-Message-ID: <AANLkTin4m8gJR50zwMB2b0jRMHdNA6CQToKBTAhOL9wF@mail.gmail.com>
+From: a.paterniani@swapp-eng.it (Andrea Paterniani)
+Date: Tue, 03 Aug 2010 16:20:10 +0200
+Subject: [patch 0/2] ARM: Disable outer cache before kexec call -V3
+In-Reply-To: <20100705113029.082013074@linutronix.de>
+References: <20100705113029.082013074@linutronix.de>
+Message-ID: <4C58259A.3080404@swapp-eng.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+Hi,
+     I have applied your patches to kernel 2.6.35-rc4 running on my 
+beagleboard.
+I'm using kexec-tools-2.0.1.
 
-On Mon, Aug 2, 2010 at 11:35 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+My u-boot bootargs is:
+     console=ttyS2,115200n8 root=/dev/mmcblk0p2 rw rootfstype=ext3 
+rootwait ip=192.168.2.13::255.255.255.0
 
-> I'm honestly trying to understand your concerns, but I'm afraid that
-> just saying "it's a hack" is not too informative. Can you please
-> explain what do you think is technically wrong with the proposed
-> solution ? is it not general enough for other use cases ? will it
-> break something ?
+To restart the system I type:
+ > sync
+ > kexec -l /boot/zImage --append="console=ttyS2,115200n8 
+root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait 
+ip=192.168.2.13::255.255.255.0"
+ > kexec -e
 
-let's summarize the solution you're proposing.
+Not every time the system restart.
+In some cases no output on the console after the following:
+     Bye!
+     Uncompressing Linux... done, booting the kernel.
 
-You're trying to add embedded_data which will be scattered all over
-the place. The patches you introduce do the following:
-- add the pointer to the mmc core header;
-- add the primitive to set it from the controller driver;
-- add the pointer to the board-specific header;
-- add the structure to the board-specific C file and propagate its
-pointer to the controller driver;
-- add setting the pointer in the core structure into the controller driver.
+Any idea?
 
-So if I'd like to set the *same* structure for the *same* WL1271
-driver, provided that I'm working with the other platform, I'll need
-to do the following:
-- add the pointer to the board-specific header;
-- add the structure to the board-specific C file and propagate its
-pointer to the controller driver;
-- add setting the pointer in the core structure into the controller driver.
+Regards,
+Andrea
 
-This is far from being intuitive. This means we need to hack,
-generally speaking, all the MMC controller drivers to get it working
-on all platforms. This is error prone.
 
-And I'm not even speaking about the fact that MMC controller driver
-should not deal with such things at all.
 
-Thanks,
-   Vitaly
+Il 05/07/2010 13.52, Thomas Gleixner ha scritto:
+> The following patch series addresses the problem that the kexec code
+> does not disable the outer cache before disabling the inner cache and
+> jumping into the new kernel. This results in random crashes of the new
+> kernel.
+>
+> Changes since version 2:
+>
+>   - Use CLEAN_INV_WAY in l2x0_flush_all according to Catalin
+>
+>   - Rename outer_cache_disable() to outer_disable()
+>
+>   - Added a  BUG_ON() when l2x0_inv_all() is called with L2 enabled.
+>
+> Thanks,
+>
+> 	tglx
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>    
+
+-- 
