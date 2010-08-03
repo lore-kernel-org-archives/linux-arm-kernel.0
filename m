@@ -1,47 +1,55 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Tue, 3 Aug 2010 16:41:26 +0200
-Subject: [PATCH] wire up sys_accept4() on ARM
-Message-ID: <19544.10902.127940.970133@pilspetsen.it.uu.se>
+From: GKing@nvidia.com (Gary King)
+Date: Tue, 3 Aug 2010 08:24:46 -0700
+Subject: [PATCH 3/4] [ARM] mm: add memory type for inner-writeback
+In-Reply-To: <20100803074137.GC11987@n2100.arm.linux.org.uk>
+References: <1280803369-13362-1-git-send-email-gking@nvidia.com>
+	<1280803369-13362-4-git-send-email-gking@nvidia.com>
+	<20100803074137.GC11987@n2100.arm.linux.org.uk>
+Message-ID: <4C5834BE.1070609@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sys_accept4() was added in kernel 2.6.28, but ARM was not updated
-to include it.  The number and types of parameters is such that
-no ARM-specific processing is needed, so wiring up sys_accept4()
-just requires defining __NR_accept4 and adding a direct call in
-the syscall entry table.
+Russell,
 
-Tested with an EABI 2.6.35 kernel and Ulrich Drepper's original
-accept4() test program, modified to define __NR_accept4 for ARM.
+ > No.  This is not "free for use".  Mapping 5 is unused because it's not
+ > architecturally defined - CPU implementations may not implement it.
+ > This is what the ARM ARM says:
 
-Using the updated unistd.h also eliminates a warning then building
-glibc (2.10.2 and newer) about accept4() being unimplemented.
+According to the ARMv7-A ARM, n = 6 is implementation defined; n = 5 is
+available:
 
-Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
----
- arch/arm/include/asm/unistd.h |    1 +
- arch/arm/kernel/calls.S       |    1 +
+"The meaning of the field with n = 6 is IMPLEMENTATION DEFINED and might
+   differ from the meaning given here. This is because the meaning of the
+   attribute combination {TEX[0] = 1, C = 1, B = 0} is IMPLEMENTATION
+   DEFINED."
 
- 2 files changed, 2 insertions(+)
-diff -rupN linux-2.6.35/arch/arm/include/asm/unistd.h linux-2.6.35.arm-sys_accept4/arch/arm/include/asm/unistd.h
---- linux-2.6.35/arch/arm/include/asm/unistd.h	2010-05-17 19:51:29.000000000 +0200
-+++ linux-2.6.35.arm-sys_accept4/arch/arm/include/asm/unistd.h	2010-08-03 14:34:35.000000000 +0200
-@@ -392,6 +392,7 @@
- #define __NR_rt_tgsigqueueinfo		(__NR_SYSCALL_BASE+363)
- #define __NR_perf_event_open		(__NR_SYSCALL_BASE+364)
- #define __NR_recvmmsg			(__NR_SYSCALL_BASE+365)
-+#define __NR_accept4			(__NR_SYSCALL_BASE+366)
- 
- /*
-  * The following SWIs are ARM private.
-diff -rupN linux-2.6.35/arch/arm/kernel/calls.S linux-2.6.35.arm-sys_accept4/arch/arm/kernel/calls.S
---- linux-2.6.35/arch/arm/kernel/calls.S	2010-05-17 19:51:29.000000000 +0200
-+++ linux-2.6.35.arm-sys_accept4/arch/arm/kernel/calls.S	2010-08-03 14:34:35.000000000 +0200
-@@ -375,6 +375,7 @@
- 		CALL(sys_rt_tgsigqueueinfo)
- 		CALL(sys_perf_event_open)
- /* 365 */	CALL(sys_recvmmsg)
-+		CALL(sys_accept4)
- #ifndef syscalls_counted
- .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
- #define syscalls_counted
+- Gary
+
+
+On 08/03/2010 12:41 AM, Russell King - ARM Linux wrote:
+>
+> On Mon, Aug 02, 2010 at 07:42:48PM -0700, Gary King wrote:
+> > This change uses the currently-unused mapping 5 (TEX[0]=1, C=0, B=1)
+> > in the tex remapping tables as an inner-writeback-write-allocate, outer
+> > non-cacheable memory type, so that this mapping will be available to
+> > clients which will benefit from the reduced L2 maintenance.
+>
+> No.  This is not "free for use".  Mapping 5 is unused because it's not
+> architecturally defined - CPU implementations may not implement it.
+> This is what the ARM ARM says:
+>
+>   For seven of the eight possible combinations of the TEX[0], C and B 
+> bits,
+>   a field in the PRRR defines the corresponding memory region as being
+>   Normal, Device or Strongly-ordered memory a field in the NMRR defines
+>   the Inner cache attributes that apply if the PRRR field identifies the
+>   region as Normal memory a second field in the NMRR defines the Outer
+>   cache attributes that apply if the PRRR field identifies the region as
+>   Normal memory.
+>
+>   The meaning of the eighth combination for the TEX[0], C and B bits is
+>   IMPLEMENTATION DEFINED
+>
+> So we can't be sure that the PRRR and NMRR bits which correspond with
+> mapping 5 even exist.
+>
