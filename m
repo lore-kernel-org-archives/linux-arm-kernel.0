@@ -1,29 +1,28 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 3 Aug 2010 16:31:36 +0300
+Date: Tue, 3 Aug 2010 16:34:50 +0300
 Subject: ARM Kernel autobuilder
-In-Reply-To: <87iq47k8mf.fsf@lechat.rtp-net.org>
+In-Reply-To: <20100723073051.GV31293@n2100.arm.linux.org.uk>
 References: <20100722111412.GB10399@kyllikki.org>
-	<87iq47k8mf.fsf@lechat.rtp-net.org>
-Message-ID: <20100803133136.GC5450@atomide.com>
+	<20100722132400.GR31293@n2100.arm.linux.org.uk>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C6254BEF@dbde02.ent.ti.com>
+	<20100723040454.GA30291@verge.net.au>
+	<20100723073051.GV31293@n2100.arm.linux.org.uk>
+Message-ID: <20100803133449.GD5450@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnaud Patard <arnaud.patard@rtp-net.org> [100722 15:14]:
-> Vincent Sanders <vince@simtec.co.uk> writes:
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [100723 10:29]:
+> On Fri, Jul 23, 2010 at 01:04:54PM +0900, Simon Horman wrote:
+> > Are there any other reasons to keep omap_4430sdp_defconfig?
+> > SMP seems to be a weak argument to me, after all if I peek in to
+> > arch/x86/configs/ I don't see SMP and non-SMP variants.
 > 
-> > Finally the n8x0 and ns9xxx configurations have failed to build for a
-> > while now.
-> >
-> > The n8x0 config supports machines maintained by Kai Svahn, Lauri
-> > Leukkunen and Timo O. Karjalainen can one of you please fix the build?
-> 
-> It has been discussed on the linux-omap mailing list :
-> http://marc.info/?l=linux-omap&m=127832134917694&w=2
-> 
-> Don't know the status of the patch though.
+> SMP is a strong argument on ARM - a SMP kernel can't be booted on
+> UP machines, whereas on x86, a SMP kernel can be booted on UP machines.
 
-That's merged as 2b795ea00c2bbb077a1199a4d729c8ac03a6bded.
+Late ack from me to stop building other omap defconfigs than
+omap3_defconfig and omap_4430sdp_defconfig.
 
-Regards,
+Cheers,
 
 Tony
