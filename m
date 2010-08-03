@@ -1,53 +1,70 @@
 From: wellsk40@gmail.com (Kevin Wells)
-Date: Tue, 3 Aug 2010 13:36:25 -0700
-Subject: [PATCH v4] GPIO PL061: Adding Clk framework support
-In-Reply-To: <AANLkTi=mtdcsr+KBUuK2rA1zrbcRRdCj1PvuSDrUjke-@mail.gmail.com>
-References: <20100710071913.GM22845@n2100.arm.linux.org.uk>
-	<AANLkTimskXW4Nnxhc5bxwKiNrfJkMb-9NeWKhVOGaA1k@mail.gmail.com>
-	<20100713074449.GA20118@n2100.arm.linux.org.uk>
-	<AANLkTilZJTHh_iFS37UL7XoUs_DhAB50A3tHfcfEr5JM@mail.gmail.com>
-	<20100713182644.GC30142@n2100.arm.linux.org.uk>
-	<4C3EA46B.1000709@st.com>
-	<20100715083032.GA26212@n2100.arm.linux.org.uk>
-	<4C3ED678.7010308@st.com>
-	<20100715095637.GF26212@n2100.arm.linux.org.uk>
-	<083DF309106F364B939360100EC290F80AC392ACFC@eu1rdcrdc1wx030.exi.nxp.com>
-	<20100730070943.GA29746@n2100.arm.linux.org.uk>
-	<083DF309106F364B939360100EC290F80AC39A091A@eu1rdcrdc1wx030.exi.nxp.com>
-	<AANLkTi=mtdcsr+KBUuK2rA1zrbcRRdCj1PvuSDrUjke-@mail.gmail.com>
-Message-ID: <AANLkTimcunSmSiV2+N19RPbZ_AwfzEnAMyO74Zh+N6h7@mail.gmail.com>
+Date: Tue, 3 Aug 2010 13:40:51 -0700
+Subject: RFC ARM LPC32xx AMBA apb_pclk changes
+In-Reply-To: <20100731132630.GB27064@n2100.arm.linux.org.uk>
+References: <AANLkTi=eqwRMYLAUoXkuBgTrPWHsj_XbfQF4FgNOxiXd@mail.gmail.com>
+	<20100731094442.GF23886@n2100.arm.linux.org.uk>
+	<20100731132630.GB27064@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTin52uhgb18FXX+H2E1jKmrzXGLch7Rv2_X1AAu8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 2010/8/3 Kevin Wells <kevin.wells@nxp.com>:
+>> > This is a first cut at adding apb_pclk support for the AMBA bus driver.
+>> >
+>> > The temporary clock enable/disable wrappers around the amba_register
+>> > function will no longer be needed. A "apb_pclk" con_id wasn't added,
+>> > using only the matching device IDs used by the AMBA drivers. Because
+>> > the AMBA driver attempts to turn off the LCD clock prior to exist, the
+>> > workaround for the LCD clock enable needs to be handled with
+>> > clk_enable so it will stay on after the AMBA driver disables it's clock.
+>>
+>> I think the clcd driver should be fixed not to do the first disable,
+>> rather than work-around the problem like this.
 >
->> Wouldn't drivers that use clk_disable in their xxx_suspend functions
->> have some problems with this as multiple clk_enables have been called?
+> Something like this:
 >
-> Russell already answered that, all drivers have to be augmented
-> in the following way (this is for PL011, the same will be valid for
-> any other PrimeCell with aggressive clocking):
+> diff --git a/drivers/video/amba-clcd.c b/drivers/video/amba-clcd.c
+> index afe21e6..1c2c683 100644
+> --- a/drivers/video/amba-clcd.c
+> +++ b/drivers/video/amba-clcd.c
+> @@ -80,7 +80,10 @@ static void clcdfb_disable(struct clcd_fb *fb)
+> ? ? ? ?/*
+> ? ? ? ? * Disable CLCD clock source.
+> ? ? ? ? */
+> - ? ? ? clk_disable(fb->clk);
+> + ? ? ? if (fb->clk_enabled) {
+> + ? ? ? ? ? ? ? fb->clk_enabled = false;
+> + ? ? ? ? ? ? ? clk_disable(fb->clk);
+> + ? ? ? }
+> ?}
 >
-> [Russell King]
->> 1. add an amba_bus_clk_disable() at the end of the successful probe
->> ?function
->> 2. add amba_bus_clk_enable() at the beginning of the remove function.
->> 3. add amba_bus_clk_enable()/amba_bus_clk_disable() around each of the
->> suspend(), resume(), pl011_console_write(), and
->> ?pl011_console_get_options() functions.
->> 4. amba_bus_clk_enable() at the start of the startup method.
->> 5. amba_bus_clk_disable() at the end of the shutdown method.
+> ?static void clcdfb_enable(struct clcd_fb *fb, u32 cntl)
+> @@ -88,7 +91,10 @@ static void clcdfb_enable(struct clcd_fb *fb, u32 cntl)
+> ? ? ? ?/*
+> ? ? ? ? * Enable the CLCD clock source.
+> ? ? ? ? */
+> - ? ? ? clk_enable(fb->clk);
+> + ? ? ? if (!fb->clk_enabled) {
+> + ? ? ? ? ? ? ? fb->clk_enabled = true;
+> + ? ? ? ? ? ? ? clk_enable(fb->clk);
+> + ? ? ? }
 >
->> AMBA enables clock in amba_probe() <<< clock use count = 1
->> pl022 driver enables clock in mmci_probe <<< clock use count = 2
->> ...SPI stuff happens...
->> ...Linux enters suspend mode...
->> pl022 driver enters suspend mode, disables clock <<< clock use count = 1
+> ? ? ? ?/*
+> ? ? ? ? * Bring up by first enabling..
+> diff --git a/include/linux/amba/clcd.h b/include/linux/amba/clcd.h
+> index ca16c38..be33b3a 100644
+> --- a/include/linux/amba/clcd.h
+> +++ b/include/linux/amba/clcd.h
+> @@ -150,6 +150,7 @@ struct clcd_fb {
+> ? ? ? ?u16 ? ? ? ? ? ? ? ? ? ? off_cntl;
+> ? ? ? ?u32 ? ? ? ? ? ? ? ? ? ? clcd_cntl;
+> ? ? ? ?u32 ? ? ? ? ? ? ? ? ? ? cmap[16];
+> + ? ? ? bool ? ? ? ? ? ? ? ? ? ?clk_enabled;
+> ?};
 >
-> OK I feel some responsibility for that driver so I will try to fix it,
-> maybe I can take a round at PL011 and perhaps MMCI as well.
+> ?static inline void clcdfb_decode(struct clcd_fb *fb, struct clcd_regs *regs)
+>
 >
 
-Thanks for the info Linus. I'll take an initial try at the pl11x driver..
-
-Kevin
+I'll get a patch for this change and the amba pclk changes for the
+pl11x up a little later..thanks!
