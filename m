@@ -1,30 +1,28 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 3 Aug 2010 21:36:11 +0200
-Subject: concurrent access to gpiolib on mxc.
-In-Reply-To: <4C58643E.2040105@xenomai.org>
-References: <4C58643E.2040105@xenomai.org>
-Message-ID: <20100803193611.GA18431@pengutronix.de>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Tue, 3 Aug 2010 20:42:32 +0100
+Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v6)
+In-Reply-To: <AANLkTik3CSSQLqajFimJxbq8TFBQ6iVx3RtdC9ObVj2-@mail.gmail.com>
+References: <20100719180136.20305.7333.stgit@e200687-lin>
+	<20100719194940.GA14766@shutemov.name>
+	<AANLkTik3CSSQLqajFimJxbq8TFBQ6iVx3RtdC9ObVj2-@mail.gmail.com>
+Message-ID: <20100803194232.GK27827@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gilles,
+Linus Walleij wrote:
+> 2010/7/19 Kirill A. Shutemov <kirill@shutemov.name>:
+> 
+> > Why do we need this? Why do not just fix broken programs?
+> 
+> People tend to use some third-party precompiled binaries, some of
+> them compiled with a compiler using SWP.
+> 
+> A typical example is the CDC Java runtime, JRE.
 
-On Tue, Aug 03, 2010 at 08:47:26PM +0200, Gilles Chanteperdrix wrote:
-> the gpiolib support on mxc seems to lack protection against concurrent
-> access. Is it OK for this SOC family?
-	http://git.pengutronix.de/?p=imx/linux-2.6.git;a=commitdiff;h=14cb0de
+Also people like to run the same binaries on different ARMs.
+E.g. Debian, Ubuntu.
 
-is on it's way into mainline.  Note that you need
+System pthread libraries can have multiple implementations, but
+not every user of SWP or LDREX/STREX is in the pthread libraries.
 
-	http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6280/1
-
-on top of it.
-
-Does this answer your question?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-- Jamie
