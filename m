@@ -1,21 +1,27 @@
 From: a.zummo@towertech.it (Alessandro Zummo)
-Date: Tue, 3 Aug 2010 01:58:47 +0200
-Subject: [rtc-linux] [PATCH v3 3/3] rtc: rtc-s3c: Add BCD register
-	initialization codes
-In-Reply-To: <1280379570-6147-1-git-send-email-kgene.kim@samsung.com>
-References: <1280379570-6147-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20100803015847.64b1e2c8@linux.lan.towertech.it>
+Date: Tue, 3 Aug 2010 02:03:28 +0200
+Subject: [PATCH] PXA: Fix wakealarm capability for pxa-rtc
+In-Reply-To: <201008011738.16225.marek.vasut@gmail.com>
+References: <1280550147-12380-1-git-send-email-marek.vasut@gmail.com>
+	<201008010253.28319.marek.vasut@gmail.com> <87eieiziri.fsf@free.fr>
+	<201008011738.16225.marek.vasut@gmail.com>
+Message-ID: <20100803020328.1046308a@linux.lan.towertech.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Jul 2010 13:59:30 +0900
-Kukjin Kim <kgene.kim@samsung.com> wrote:
+On Sun, 1 Aug 2010 17:38:16 +0200
+Marek Vasut <marek.vasut@gmail.com> wrote:
 
-> Hi, Alessandro Zummo
-> Just moved the routine to support all Samsung SoCs' RTC.
-> Is still your ack valid?
+> > As I see now your real
+> > problem, I would request you leave the existing "device_init_wakeup(x, 1)"
+> > *and* you add yours to make the class driver happy.  
+> 
+> Why wouldn't the driver wake up from suspend?
+> > 
 
- yes, it is.
+ may I see the latest version of your patch, Marek?
+
+ ty
 
 -- 
 
