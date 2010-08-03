@@ -1,100 +1,57 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 03 Aug 2010 09:16:00 -0700
-Subject: [linux-pm] [PATCH/RFC] Runtime PM: ARM: subarch-specific
-	extensions of pdev_archdata
-In-Reply-To: <AANLkTikHUcgBcTmv+=NrYMwgn-UC_Q0Vv3ytfuJbkyRB@mail.gmail.com>
-	(Magnus Damm's message of "Mon, 26 Jul 2010 10:51:44 +0900")
-References: <1253670648-28610-1-git-send-email-khilman@deeprootsystems.com>
-	<f17812d70909222153y4a0e4fc2n496ea2e6caaac847@mail.gmail.com>
-	<19129.63264.653666.70492@pilspetsen.it.uu.se>
-	<4ABAAF1D.6090907@deeprootsystems.com>
-	<f17812d70909231630i20f64328k8d604c3436094b85@mail.gmail.com>
-	<87k4yhagv4.fsf@deeprootsystems.com>
-	<AANLkTinBqc11oE2SOmvXbFHmlgvZ21LngXNWkSHiJmRK@mail.gmail.com>
-	<34dc79dc-0868-4401-9fa5-c7134f6d4485@email.android.com>
-	<AANLkTikHUcgBcTmv+=NrYMwgn-UC_Q0Vv3ytfuJbkyRB@mail.gmail.com>
-Message-ID: <87k4o7r7sv.fsf@deeprootsystems.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Tue, 3 Aug 2010 22:12:47 +0530
+Subject: [PATCH 07/10] ftrace: pass KBUILD_CFLAGS to record_mcount.pl
+In-Reply-To: <1268462987-8271-8-git-send-email-rabin@rab.in>
+References: <1268462987-8271-1-git-send-email-rabin@rab.in>
+	<1268462987-8271-8-git-send-email-rabin@rab.in>
+Message-ID: <20100803164247.GA6133@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Magnus Damm <magnus.damm@gmail.com> writes:
+Steven, Frederic,
 
-> On Sun, Jul 25, 2010 at 5:24 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> "Magnus Damm" <magnus.damm@gmail.com> wrote:
->>>On Tue, Oct 27, 2009 at 8:13 AM, Kevin Hilman
->>><khilman@deeprootsystems.com> wrote:
->>>> Eric Miao <eric.y.miao@gmail.com> writes:
->>>>> On Thu, Sep 24, 2009 at 7:28 AM, Kevin Hilman
->>>>> <khilman@deeprootsystems.com> wrote:
->>>>>> Mikael Pettersson wrote:
->>>>>>> Eric Miao writes:
->>>>>>> ?> On Wed, Sep 23, 2009 at 9:50 AM, Kevin Hilman
->>>>>>> ?> <khilman@deeprootsystems.com> wrote:
->>>>>>> ?> > On ARM platforms, power management can be very platform specific.
->>>>>>> ?> > This patch allows ARM subarches to extend the platform_device
->>>>>>> ?> > pdev_archdata for each subarch by creating a new struct pdev_machdata
->>>>>>> ?> > and allowing each subarch to customize it as needed.
->
->>>Do you remember what happened with this patch?
->>
->> I don't have all the details in front of me because I'm on my phone,
->> but I advised against pdev_archdata because it is
->> multiplatform-unfriendly.
->
-> Ok, I did not expect that. =) But after thinking a bit it does make
-> sense. I wonder what my options are. I'm not so fond of the idea to
-> wrap the platform devices - that's not more multi-platform friendly,
-> is it?
+I'd like to resurrect this old ARM dynamic ftrace patchset.  It still
+applies on next except for a small merge conflict in one of the
+ARM-specific patches.
 
-[sorry for the lag, been on vacation]
+On Sat, Mar 13, 2010 at 12:19:44PM +0530, Rabin Vincent wrote:
+> On ARM, we have two ABIs, and the ABI used is controlled via a config
+> option.  Object files built with one ABI can't be merged with object
+> files built with the other ABI.  So, record_mcount.pl needs to use the
+> same compiler flags as the kernel when generating the object file with
+> the mcount locations.  Ensure this by passing CFLAGS to the script.
+> 
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
 
-Wrapping is more multi-platform friendly because only platform-specific
-code accesses the wrapped code.  It's also logically consistent as 
-a struct device is contained by a platform_device which is then
-contained by an omap_device (in our case.)   Only OMAP-specific code
-ever knows about or touches that layer.
+This is the only non-arch/arm/ patch in the series which doesn't have
+either of your Acked-bys, so if you'd be willing to ack it, I'll send in
+the lot via rmk's ARM patch system for .37.
 
-> How about using devres and platform bus notifiers?
+Alternatively, this one and "[PATCH 03/10] ftrace: allow building
+without frame pointers" could go in via the tracing tree for .36?  Then
+I'll send in the ARM specific stuff for .37 via the ARM tree.
 
-That seems fine too, and probably better if the amount of data/code you need
-is small.  In the OMAP case, it's rather complicated so it's cleaner
-IMHO to keep it in a separate omap_device layer and struct.
+Thanks,
+Rabin
 
-> For a Runtime PM prototype using devres (instead of pdev_archdata or
-> wrapping) look here:
-> https://patchwork.kernel.org/patch/113605/
->
-> To make it work with modules I propose adding a driver bind event:
-> https://patchwork.kernel.org/patch/113865/
->
-> Looks pretty multi-platform friendly to me. Any suggestions?
-
-Your patches look multi-platform friendly, but there are still some
-outstanding issues with making runtime PM support multi-platform
-friendly that are not direclty related to the above patches.
-
-1) weak symbols
-
-We need to change the overriding of weak symbols into some form of
-register/unregister so multiple platforms in the same kernel could work.
-That's the easy one.   
-
-2) custom vs. platform bus.
-
-The other issue under discussion between Grant & myself[1] has been the
-use of a custom bus instead of the platform bus.  Following your lead,
-(and preferring that option) I continued to use the platform_bus since
-I only need to override a few of the dev_pm_ops functions.
-
-However, Grant is not happy about overriding the platform_bus.  He would
-rather see each platform create a custom bus with it's own PM methods.
-
-In this thread[1], I did a quick and dirty proof of concept to show that
-it is possible, but quite frankly, I still much prefer continuing to use
-the platform_bus since it is mostly identical.  
-
-After I catch up on the rest of my mail, I will get back to this topic.
-
-Kevin
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/018925.html
+> ---
+>  scripts/Makefile.build |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+> 
+> diff --git a/scripts/Makefile.build b/scripts/Makefile.build
+> index 0b94d2f..2535c11 100644
+> --- a/scripts/Makefile.build
+> +++ b/scripts/Makefile.build
+> @@ -209,7 +209,8 @@ ifdef CONFIG_FTRACE_MCOUNT_RECORD
+>  cmd_record_mcount = set -e ; perl $(srctree)/scripts/recordmcount.pl "$(ARCH)" \
+>  	"$(if $(CONFIG_CPU_BIG_ENDIAN),big,little)" \
+>  	"$(if $(CONFIG_64BIT),64,32)" \
+> -	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC)" "$(LD)" "$(NM)" "$(RM)" "$(MV)" \
+> +	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC) $(KBUILD_CFLAGS)" \
+> +	"$(LD)" "$(NM)" "$(RM)" "$(MV)" \
+>  	"$(if $(part-of-module),1,0)" "$(@)";
+>  endif
+>  
+> -- 
+> 1.7.0
+> 
