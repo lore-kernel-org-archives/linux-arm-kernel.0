@@ -1,121 +1,47 @@
-From: davidsin@ti.com (Sin, David)
-Date: Tue, 3 Aug 2010 14:49:45 -0500
-Subject: [RFC 4/8] TILER-DMM: TILER Memory Manager interface and
-	implementation
-In-Reply-To: <9DCA1E44C5805D4EB7C1626D5FD1739E048EDA223B@dlee02.ent.ti.com>
-References: <1279927348-21750-1-git-send-email-davidsin@ti.com>
-	<1279927348-21750-2-git-send-email-davidsin@ti.com>
-	<1279927348-21750-3-git-send-email-davidsin@ti.com>
-	<1279927348-21750-4-git-send-email-davidsin@ti.com>
-	<1279927348-21750-5-git-send-email-davidsin@ti.com>
-	<20100724080118.GB15064@n2100.arm.linux.org.uk>
-	<513FF747EED39B4AADBB4D6C9D9F9F7903D654A3FE@dlee02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C641D580@dbde02.ent.ti.com>
-	<513FF747EED39B4AADBB4D6C9D9F9F7903D654A430@dlee02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C641D58B@dbde02.ent.ti.com>
-	<9DCA1E44C5805D4EB7C1626D5FD1739E048EDA223B@dlee02.ent.ti.com>
-Message-ID: <513FF747EED39B4AADBB4D6C9D9F9F7903D65FEEDE@dlee02.ent.ti.com>
+From: seth.forshee@gmail.com (Seth Forshee)
+Date: Tue, 3 Aug 2010 14:58:16 -0500
+Subject: READ_IMPLIES_EXEC set when no GNU_STACK header present
+Message-ID: <20100803195816.GB31111@ubuntu-workstation>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, 
+We recently noticed that all of our applications had the execute
+permission set for any mappings with read permission on an ARMv6
+platform. This is happening because the ELF images do not have a
+GNU_STACK program header, causing executable_stack=EXSTACK_DEFAULT to be
+passed to arm_elf_read_implies_exec(), and it immediately returns 1.
 
-> -----Original Message-----
-> From: Sin, David 
-> Sent: Monday, August 02, 2010 9:55 AM
-> To: Shilimkar, Santosh; Russell King - ARM Linux; Woodruff, Richard
-> Cc: linux-omap at vger.kernel.org; Tony Lindgren; Kanigeri, 
-> Hari; Ohad Ben-Cohen; Hiremath, Vaibhav; Molnar, Lajos; 
-> Voultoury, Pierre; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [RFC 4/8] TILER-DMM: TILER Memory Manager 
-> interface and implementation
-> 
-> -----Original Message-----
-> From: Shilimkar, Santosh 
-> Sent: Monday, August 02, 2010 9:53 AM
-> To: Sin, David; Russell King - ARM Linux; Woodruff, Richard
-> Cc: linux-omap at vger.kernel.org; Tony Lindgren; Kanigeri, 
-> Hari; Ohad Ben-Cohen; Hiremath, Vaibhav; Molnar, Lajos; 
-> Voultoury, Pierre; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [RFC 4/8] TILER-DMM: TILER Memory Manager 
-> interface and implementation
-> 
-> 
-> 
-> > -----Original Message-----
-> > From: Sin, David
-> > Sent: Monday, August 02, 2010 8:20 PM
-> > To: Shilimkar, Santosh; Russell King - ARM Linux; Woodruff, Richard
-> > Cc: linux-omap at vger.kernel.org; Tony Lindgren; Kanigeri, 
-> Hari; Ohad Ben-
-> > Cohen; Hiremath, Vaibhav; Molnar, Lajos; Voultoury, Pierre; 
-> linux-arm-
-> > kernel at lists.infradead.org
-> > Subject: RE: [RFC 4/8] TILER-DMM: TILER Memory Manager interface and
-> > implementation
-> > 
-> > -----Original Message-----
-> > From: Shilimkar, Santosh
-> > Sent: Monday, August 02, 2010 9:45 AM
-> > To: Sin, David; Russell King - ARM Linux; Woodruff, Richard
-> > Cc: linux-omap at vger.kernel.org; Tony Lindgren; Kanigeri, 
-> Hari; Ohad Ben-
-> > Cohen; Hiremath, Vaibhav; Molnar, Lajos; Voultoury, Pierre; 
-> linux-arm-
-> > kernel at lists.infradead.org
-> > Subject: RE: [RFC 4/8] TILER-DMM: TILER Memory Manager interface and
-> > implementation
-> > 
-> < snip>
-> 
-> > > > +	m->pa = page_to_phys(m->pg);
-> > > > +
-> > > > +	/* flush the cache entry for each page we allocate. */
-> > > > +	dmac_flush_range(page_address(m->pg),
-> > > > +				page_address(m->pg) + 
-> PAGE_SIZE);
-> > > > +	outer_flush_range(m->pa, m->pa + PAGE_SIZE);
-> > >
-> > > NAK.  This is an abuse of these interfaces, and is buggy 
-> in any case.
-> > >
-> > > ARMv6 and ARMv7 CPUs speculatively prefetch memory, which 
-> means that
-> > > there's no guarantee that if you flush the caches for a particular
-> > > range of virtual space, that it will stay flushed until you decide
-> > > to read it.  So flushing the caches in some memory allocator can't
-> > > guarantee that when you eventually get around to using 
-> the page that
-> > > there won't be cache lines associated with it.
-> > >
-> > > [dhs] Russell, thanks for reviewing this code.  Do you have any
-> > interface
-> > > suggestions that you can share that would make this 
-> proper?  Ideally, I
-> > > would like to get physical pages without associated 
-> virtual address, or
-> > > ones that are non-cached/non-bufferable.
-> > 
-> > There is nothing called 'non-bufferable' any more David on ARMv6 and
-> > ARMv7.
-> > You can get non-cached memory using "dma_alloc_coherent"
-> > 
-> > [dhs] Thanks, Santosh, for the clarification.  I believe
-> > dma_alloc_coherent is quite limited, right?  We need to be 
-> able to cover
-> > potentially 128MB of physical memory for the TILER.  BTW, 
-> does GFP_DMA
-> > indicate that I don't want cached memory?
-> > 
-> It's configurable. By default it's 2 MB pool. GFP_DMA doesn't give you
-> un-cacheable memory.
-> 
-> [dhs] OK -- I will increase this and try to allocate this 
-> way.  Thank you.
-> 
-> 
+Is this intentional or just an oversight? The patch below removes
+READ_IMPLIES_EXEC when GNU_STACK is not present; if this is the desired
+behavior I can submit it to the patch system.
 
-As Santosh suggests, I will increase the dma_alloc_coherent pool size to something that will accomdate TILER requirements.  I believe this will work, as I'm only making 4k allocations per call, as opposed to one large contiguous allocation.  However, I'd like to be able to use an API similar to alloc_page() that gives back device or strongly ordered memory so that we don't have to pre-allocate such a large amount at boot-up.  Is this something that you're considering on your end for the near future?  Thanks for working through this with us.
 
-Regards,
--David
+
+commit 6e6d10ae2b5967ce9e9ebe9ebcc6df26a6b57854
+Author: Seth Forshee <seth.forshee@gmail.com>
+Date:   Tue Aug 3 13:50:41 2010 -0500
+
+    [ARM] enable NX support by default
+    
+    arm_elf_read_implies_exec() currently returns 1 unless non-
+    executable stacks are explicitly requested. This results in
+    READ_IMPLIES_EXEC being set for elf images without a GNU_STACK
+    program header, even though executable stacks aren't actually
+    being requested. This function should default to enabling NX when
+    the architecture supports it for better security.
+    
+    Signed-off-by: Seth Forshee <seth.forshee@gmail.com>
+
+diff --git a/arch/arm/kernel/elf.c b/arch/arm/kernel/elf.c
+index d4a0da1..a2eaa6d 100644
+--- a/arch/arm/kernel/elf.c
++++ b/arch/arm/kernel/elf.c
+@@ -74,7 +74,7 @@ EXPORT_SYMBOL(elf_set_personality);
+  */
+ int arm_elf_read_implies_exec(const struct elf32_hdr *x, int executable_stack)
+ {
+-	if (executable_stack != EXSTACK_DISABLE_X)
++	if (executable_stack == EXSTACK_ENABLE_X)
+ 		return 1;
+ 	if (cpu_architecture() < CPU_ARCH_ARMv6)
+ 		return 1;
