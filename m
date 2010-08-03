@@ -1,28 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 3 Aug 2010 16:34:50 +0300
-Subject: ARM Kernel autobuilder
-In-Reply-To: <20100723073051.GV31293@n2100.arm.linux.org.uk>
-References: <20100722111412.GB10399@kyllikki.org>
-	<20100722132400.GR31293@n2100.arm.linux.org.uk>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C6254BEF@dbde02.ent.ti.com>
-	<20100723040454.GA30291@verge.net.au>
-	<20100723073051.GV31293@n2100.arm.linux.org.uk>
-Message-ID: <20100803133449.GD5450@atomide.com>
+From: vitalywool@gmail.com (Vitaly Wool)
+Date: Tue, 3 Aug 2010 16:17:37 +0200
+Subject: [PATCH v2 03/20] mmc: support embedded data field in mmc_host
+In-Reply-To: <AANLkTi=vhWV1RNyemtfppfjvLYAbzd3aRjFOVgLLpG3Z@mail.gmail.com>
+References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
+	<1279733634-21974-4-git-send-email-ohad@wizery.com>
+	<AANLkTimzA_JJ-byTDWznbL3YzeJ8LAP4M50onf2_3fBF@mail.gmail.com>
+	<AANLkTi=Oy8X1xMOwWL_cKBB1LWULT6=p+adUgB+AuSJS@mail.gmail.com>
+	<AANLkTi=BUX59heXAW2Uf4wZo2dSS19Je54dkQ5u2YGAW@mail.gmail.com>
+	<AANLkTimZQKj7H_GeE=+O9cwxEMTR+LhfFbt=AyXGzN3d@mail.gmail.com>
+	<AANLkTikfRja-h9mz7uyRXCZNZjKdU_yB8e58XQucUzrn@mail.gmail.com>
+	<AANLkTi=vhWV1RNyemtfppfjvLYAbzd3aRjFOVgLLpG3Z@mail.gmail.com>
+Message-ID: <AANLkTin4m8gJR50zwMB2b0jRMHdNA6CQToKBTAhOL9wF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [100723 10:29]:
-> On Fri, Jul 23, 2010 at 01:04:54PM +0900, Simon Horman wrote:
-> > Are there any other reasons to keep omap_4430sdp_defconfig?
-> > SMP seems to be a weak argument to me, after all if I peek in to
-> > arch/x86/configs/ I don't see SMP and non-SMP variants.
-> 
-> SMP is a strong argument on ARM - a SMP kernel can't be booted on
-> UP machines, whereas on x86, a SMP kernel can be booted on UP machines.
+Hi Ohad,
 
-Late ack from me to stop building other omap defconfigs than
-omap3_defconfig and omap_4430sdp_defconfig.
+On Mon, Aug 2, 2010 at 11:35 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
 
-Cheers,
+> I'm honestly trying to understand your concerns, but I'm afraid that
+> just saying "it's a hack" is not too informative. Can you please
+> explain what do you think is technically wrong with the proposed
+> solution ? is it not general enough for other use cases ? will it
+> break something ?
 
-Tony
+let's summarize the solution you're proposing.
+
+You're trying to add embedded_data which will be scattered all over
+the place. The patches you introduce do the following:
+- add the pointer to the mmc core header;
+- add the primitive to set it from the controller driver;
+- add the pointer to the board-specific header;
+- add the structure to the board-specific C file and propagate its
+pointer to the controller driver;
+- add setting the pointer in the core structure into the controller driver.
+
+So if I'd like to set the *same* structure for the *same* WL1271
+driver, provided that I'm working with the other platform, I'll need
+to do the following:
+- add the pointer to the board-specific header;
+- add the structure to the board-specific C file and propagate its
+pointer to the controller driver;
+- add setting the pointer in the core structure into the controller driver.
+
+This is far from being intuitive. This means we need to hack,
+generally speaking, all the MMC controller drivers to get it working
+on all platforms. This is error prone.
+
+And I'm not even speaking about the fact that MMC controller driver
+should not deal with such things at all.
+
+Thanks,
+   Vitaly
