@@ -1,39 +1,84 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Tue, 3 Aug 2010 14:44:30 +0200
-Subject: [patch 2/2] arm: Implement l2x0 cache disable functions
-In-Reply-To: <20100705113227.750612927@linutronix.de>
-References: <20100705113029.082013074@linutronix.de>
-	<20100705113227.750612927@linutronix.de>
-Message-ID: <AANLkTikHNFS9j-RuGd41qbFekMsTK5U-G+JZw+UedFdN@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 3 Aug 2010 15:56:52 +0300
+Subject: [PATCH 0/3] Allow late mdesc detection, v3
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C6381053@dbde02.ent.ti.com>
+References: <20100731092522.GD23886@n2100.arm.linux.org.uk>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C6381053@dbde02.ent.ti.com>
+Message-ID: <20100803125652.GA5450@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/7/5 Thomas Gleixner <tglx@linutronix.de>:
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [100731 15:38]:
+> Jeremy,
+> > -----Original Message-----
+> > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> > owner at vger.kernel.org] On Behalf Of Russell King - ARM Linux
+> > Sent: Saturday, July 31, 2010 2:55 PM
+> > To: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org; Tony
+> > Lindgren
+> > Subject: Fwd: [PATCH 0/3] Allow late mdesc detection, v3
+> > 
+> > Forwarding for OMAP people - as there's outstanding questions about this
+> > change for their platforms.
+> > 
+> > ----- Forwarded message from Jeremy Kerr <jeremy.kerr@canonical.com> -----
+> > 
+> > Date: Fri, 30 Jul 2010 17:22:11 +0800
+> > From: Jeremy Kerr <jeremy.kerr@canonical.com>
+> > To: linux-arm-kernel at lists.infradead.org
+> > Subject: [PATCH 0/3] Allow late mdesc detection, v3
+> > Delivery-date: Sat, 31 Jul 2010 01:25:58 +0100
+> > 
+> > Hi all,
+> > 
+> > Currently, we probe for a mdesc early in boot. At this early stage, the
+> > only thing we use the mdesc for is to determine the debug page mapping.
+> > 
+> > However, the debug addresses (phys and virt) need to be coded into the
+> > addruart macro anyway; the dynamic probing is only going to tell us what
+> > we already know.
+> > 
+> > These changes allow us to use the addruart macros to find the debug
+> > mapping addresses, rather than pulling them out of the mdesc. This means
+> > that the addresses are only kept in the one place, and that we don't
+> > need the mdesc nearly as early.
+> > 
+> > The first change updates all of the addruart macros to return both
+> > physical and virtual addresses. I've used 'rp' and 'rv' as the macro
+> > arguments to indicate which address goes where
+> > 
+> > The second change updates the debug setup routine to use the addruart
+> > macro to establish the debug mapping, now that we can invoke the macro
+> > to find the phyical and virtual addresses.
+> > 
+> > This allows us to delay the requirement to have a mdesc available until
+> > much later. For example, we can parse one from the device tree once
+> > we've reached C code.
+> > 
+> > May break OMAP1/2, as the addruart macros are more complex on these
+> > platforms. I'd appreciate input from OMAP folks who may well tell me
+> > that this isn't possible.
+> > 
+> Just tried this on OMAP4, and indeed it breaks OMAP2PLUS low level debug
+> support.
+> 
+> Tony recently revamped the complete debug code, so that we can dynamically
+> set correct debug port based on machine ID passed by boot-loaders. Based
+> on this , the debug code determines the the correct debug port based on
+> this using a scratch pad register.
+> 
+> Tony can comment better on this issue.
 
-> Add flush_all, inv_all and disable functions to the l2x0 code. These
-> functions are called from kexec code to prevent random crashes in the
-> new kernel.
-> (...)
-> +static void l2x0_disable(void)
-> +{
-> + ? ? ? unsigned long flags;
-> +
-> + ? ? ? spin_lock_irqsave(&l2x0_lock, flags);
-> + ? ? ? writel(0, l2x0_base + L2X0_CTRL);
-> + ? ? ? spin_unlock_irqrestore(&l2x0_lock, flags);
-> +}
-> +
+Looks like the fix suggested by Jason Wang <jason77.wang@gmail.com>
+is needed to make the mdesc series to work on omaps. An updated
+version for the mdesc series is here:
 
-Does this take into account this comment from Srinidhi:
+http://marc.info/?l=linux-arm-kernel&m=128083927030188&w=2
 
-[Srinidhi KASAGAR wrote]
-> I think it's a problem for PL310 controller where the access to
-> L2X0_CTRL is secure, accessing this in non-secure mode will fault.
+So with the patch at the link above, the mdesc series
 
-I'm worried that a writel() into the CTRL register like that will cause
-a bus error on platforms that have L2x0 in Trusted World (TrustZone)?
-Or that it may be ignored simply on such platforms causing
-trouble that way?
+Tested-by: Tony Lindgren <tony@atomide.com>
 
-Yours,
-Linus Walleij
+Regards,
+
+Tony
