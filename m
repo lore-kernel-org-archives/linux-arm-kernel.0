@@ -1,70 +1,52 @@
-From: wellsk40@gmail.com (Kevin Wells)
-Date: Tue, 3 Aug 2010 13:40:51 -0700
-Subject: RFC ARM LPC32xx AMBA apb_pclk changes
-In-Reply-To: <20100731132630.GB27064@n2100.arm.linux.org.uk>
-References: <AANLkTi=eqwRMYLAUoXkuBgTrPWHsj_XbfQF4FgNOxiXd@mail.gmail.com>
-	<20100731094442.GF23886@n2100.arm.linux.org.uk>
-	<20100731132630.GB27064@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTin52uhgb18FXX+H2E1jKmrzXGLch7Rv2_X1AAu8@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Aug 2010 22:23:34 +0100
+Subject: [PATCH v4] GPIO PL061: Adding Clk framework support
+In-Reply-To: <083DF309106F364B939360100EC290F80AC39A091A@eu1rdcrdc1wx030.exi.nxp.com>
+References: <20100713074449.GA20118@n2100.arm.linux.org.uk>
+	<AANLkTilZJTHh_iFS37UL7XoUs_DhAB50A3tHfcfEr5JM@mail.gmail.com>
+	<20100713182644.GC30142@n2100.arm.linux.org.uk>
+	<4C3EA46B.1000709@st.com>
+	<20100715083032.GA26212@n2100.arm.linux.org.uk>
+	<4C3ED678.7010308@st.com>
+	<20100715095637.GF26212@n2100.arm.linux.org.uk>
+	<083DF309106F364B939360100EC290F80AC392ACFC@eu1rdcrdc1wx030.exi.nxp.com>
+	<20100730070943.GA29746@n2100.arm.linux.org.uk>
+	<083DF309106F364B939360100EC290F80AC39A091A@eu1rdcrdc1wx030.exi.nxp.com>
+Message-ID: <20100803212334.GC28048@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> > This is a first cut at adding apb_pclk support for the AMBA bus driver.
->> >
->> > The temporary clock enable/disable wrappers around the amba_register
->> > function will no longer be needed. A "apb_pclk" con_id wasn't added,
->> > using only the matching device IDs used by the AMBA drivers. Because
->> > the AMBA driver attempts to turn off the LCD clock prior to exist, the
->> > workaround for the LCD clock enable needs to be handled with
->> > clk_enable so it will stay on after the AMBA driver disables it's clock.
->>
->> I think the clcd driver should be fixed not to do the first disable,
->> rather than work-around the problem like this.
->
-> Something like this:
->
-> diff --git a/drivers/video/amba-clcd.c b/drivers/video/amba-clcd.c
-> index afe21e6..1c2c683 100644
-> --- a/drivers/video/amba-clcd.c
-> +++ b/drivers/video/amba-clcd.c
-> @@ -80,7 +80,10 @@ static void clcdfb_disable(struct clcd_fb *fb)
-> ? ? ? ?/*
-> ? ? ? ? * Disable CLCD clock source.
-> ? ? ? ? */
-> - ? ? ? clk_disable(fb->clk);
-> + ? ? ? if (fb->clk_enabled) {
-> + ? ? ? ? ? ? ? fb->clk_enabled = false;
-> + ? ? ? ? ? ? ? clk_disable(fb->clk);
-> + ? ? ? }
-> ?}
->
-> ?static void clcdfb_enable(struct clcd_fb *fb, u32 cntl)
-> @@ -88,7 +91,10 @@ static void clcdfb_enable(struct clcd_fb *fb, u32 cntl)
-> ? ? ? ?/*
-> ? ? ? ? * Enable the CLCD clock source.
-> ? ? ? ? */
-> - ? ? ? clk_enable(fb->clk);
-> + ? ? ? if (!fb->clk_enabled) {
-> + ? ? ? ? ? ? ? fb->clk_enabled = true;
-> + ? ? ? ? ? ? ? clk_enable(fb->clk);
-> + ? ? ? }
->
-> ? ? ? ?/*
-> ? ? ? ? * Bring up by first enabling..
-> diff --git a/include/linux/amba/clcd.h b/include/linux/amba/clcd.h
-> index ca16c38..be33b3a 100644
-> --- a/include/linux/amba/clcd.h
-> +++ b/include/linux/amba/clcd.h
-> @@ -150,6 +150,7 @@ struct clcd_fb {
-> ? ? ? ?u16 ? ? ? ? ? ? ? ? ? ? off_cntl;
-> ? ? ? ?u32 ? ? ? ? ? ? ? ? ? ? clcd_cntl;
-> ? ? ? ?u32 ? ? ? ? ? ? ? ? ? ? cmap[16];
-> + ? ? ? bool ? ? ? ? ? ? ? ? ? ?clk_enabled;
-> ?};
->
-> ?static inline void clcdfb_decode(struct clcd_fb *fb, struct clcd_regs *regs)
->
->
+On Tue, Aug 03, 2010 at 02:40:39AM +0200, Kevin Wells wrote:
+> One more item I noted. These changes want to keep the clock enabled
+> after the probe - only disabling the clock on amba_remove. Both the
+> AMBA peripheral driver (ie, the LCD or MMCI driver) and the amba_remove
+> function now disable the clocks.
 
-I'll get a patch for this change and the amba pclk changes for the
-pl11x up a little later..thanks!
+Absolutely correct.  If we enable the clock for the probe call, and then
+disable it afterwards, then what do AMBA bus drivers which have registered
+interrupt routines in their probe function do when they receive an
+interrupt and want to access their statuc register?
+
+Do we just let them go ahead and fault?  That's just stupid.
+
+No, what we do is create a setup where existing drivers continue to work
+without modification - and that means ensuring that the bus clock is
+enabled for the duration that the driver is active.
+
+As I've already said, if drivers then want to achieve greater power savings,
+they need to use the supplied functions to manage the bus clock - with the
+assumption that they will be called with the bus clock already enabled.
+If a driver doesn't participate in managing the APB clock, then they don't
+need to be modified.
+
+> Wouldn't drivers that use clk_disable in their xxx_suspend functions
+> have some problems with this as multiple clk_enables have been called?
+
+Probably, and I left this intentionally open for the time being because
+it wasn't clear whether the right action was to disable the bus clock
+across a suspend.
+
+However, thinking about it some more, it's probably safe to disable the
+bus clock _after_ the driver specific suspend call has successfully
+completed, and re-enable it before calling the resume method.  So let's
+do this...
