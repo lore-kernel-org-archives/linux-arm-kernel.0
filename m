@@ -1,54 +1,60 @@
-From: gregkh@suse.de (Greg KH)
-Date: Tue, 3 Aug 2010 09:38:26 -0700
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 3 Aug 2010 19:36:39 +0200
 Subject: [PATCH] USB-serial dummy cable driver
-In-Reply-To: <201008031814.15859.marek.vasut@gmail.com>
+In-Reply-To: <20100803163826.GA757@suse.de>
 References: <1280728807-20296-1-git-send-email-marek.vasut@gmail.com>
-	<20100802224718.GC28821@suse.de>
 	<201008031814.15859.marek.vasut@gmail.com>
-Message-ID: <20100803163826.GA757@suse.de>
+	<20100803163826.GA757@suse.de>
+Message-ID: <201008031936.39556.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 03, 2010 at 06:14:15PM +0200, Marek Vasut wrote:
-> Dne ?t 3. srpna 2010 00:47:18 Greg KH napsal(a):
-> > On Mon, Aug 02, 2010 at 08:00:07AM +0200, Marek Vasut wrote:
-> > > This driver is used to implement USB-serial like behaviour over dummy
+Dne ?t 3. srpna 2010 18:38:26 Greg KH napsal(a):
+> On Tue, Aug 03, 2010 at 06:14:15PM +0200, Marek Vasut wrote:
+> > Dne ?t 3. srpna 2010 00:47:18 Greg KH napsal(a):
+> > > On Mon, Aug 02, 2010 at 08:00:07AM +0200, Marek Vasut wrote:
+> > > > This driver is used to implement USB-serial like behaviour over dummy
+> > > > 
+> > > > USB cables. These are used in the following devices:
+> > > > 	Funsoft Serial USB driver
+> > > > 	Genesys Logic GL620USB USB Laplink cable
+> > > > 	HP4x (48/49) Serial cable
+> > > > 	Motorola phones
+> > > > 	Siemens USB-MPI Serial USB driver
+> > > > 	ViVOpay USB Serial Driver
+> > > > 	ZIO Motherboard USB driver
 > > > 
-> > > USB cables. These are used in the following devices:
-> > > 	Funsoft Serial USB driver
-> > > 	Genesys Logic GL620USB USB Laplink cable
-> > > 	HP4x (48/49) Serial cable
-> > > 	Motorola phones
-> > > 	Siemens USB-MPI Serial USB driver
-> > > 	ViVOpay USB Serial Driver
-> > > 	ZIO Motherboard USB driver
+> > > I like the idea, but not the name :)
 > > 
-> > I like the idea, but not the name :)
+> > Please don't expect miracles from me after 26 hours without sleep ;-)
+> > 
+> > > Ideally, all of these would be able to be handled by the usb-serial
+> > > generic driver directly.
+> > 
+> > I just noticed that one. Stupid me.
+> > 
+> > > But really, having these multiple drivers is a good thing, they
+> > > properly convey to the user what the device is, and it gives these
+> > > developers and companies a sense of ownership over the code, and that
+> > > matters at times.
+> > > 
+> > > So you lost the names of the devices with this patch, which isn't good.
+> > 
+> > Sheesh ... that's true, but having pile of copies of the same code is not
+> > good either.
 > 
-> Please don't expect miracles from me after 26 hours without sleep ;-)
-> > 
-> > Ideally, all of these would be able to be handled by the usb-serial
-> > generic driver directly.
+> I agree, that's why I said it should be reduced.
 > 
-> I just noticed that one. Stupid me.
-> > 
-> > But really, having these multiple drivers is a good thing, they properly
-> > convey to the user what the device is, and it gives these developers and
-> > companies a sense of ownership over the code, and that matters at times.
-> > 
-> > So you lost the names of the devices with this patch, which isn't good.
+> > Can't we then just deprecate all these drivers and set correct udev
+> > rules?
 > 
-> Sheesh ... that's true, but having pile of copies of the same code is not good 
-> either.
+> udev can not change the name of the device in sysfs, or the name in the
+> kernel of the device.
 
-I agree, that's why I said it should be reduced.
-
-> Can't we then just deprecate all these drivers and set correct udev
-> rules?
-
-udev can not change the name of the device in sysfs, or the name in the
-kernel of the device.
-
-thanks,
-
-greg k-h
+That's right, but it can bind the generic driver with the hardware. And who 
+would care about the driver name, really ? The interface just appears and that's 
+what matters (to me and probably to users) ...
+> 
+> thanks,
+> 
+> greg k-h
