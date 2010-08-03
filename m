@@ -1,57 +1,54 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Tue, 3 Aug 2010 22:12:47 +0530
-Subject: [PATCH 07/10] ftrace: pass KBUILD_CFLAGS to record_mcount.pl
-In-Reply-To: <1268462987-8271-8-git-send-email-rabin@rab.in>
-References: <1268462987-8271-1-git-send-email-rabin@rab.in>
-	<1268462987-8271-8-git-send-email-rabin@rab.in>
-Message-ID: <20100803164247.GA6133@debian>
+From: gregkh@suse.de (Greg KH)
+Date: Tue, 3 Aug 2010 09:38:26 -0700
+Subject: [PATCH] USB-serial dummy cable driver
+In-Reply-To: <201008031814.15859.marek.vasut@gmail.com>
+References: <1280728807-20296-1-git-send-email-marek.vasut@gmail.com>
+	<20100802224718.GC28821@suse.de>
+	<201008031814.15859.marek.vasut@gmail.com>
+Message-ID: <20100803163826.GA757@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Steven, Frederic,
-
-I'd like to resurrect this old ARM dynamic ftrace patchset.  It still
-applies on next except for a small merge conflict in one of the
-ARM-specific patches.
-
-On Sat, Mar 13, 2010 at 12:19:44PM +0530, Rabin Vincent wrote:
-> On ARM, we have two ABIs, and the ABI used is controlled via a config
-> option.  Object files built with one ABI can't be merged with object
-> files built with the other ABI.  So, record_mcount.pl needs to use the
-> same compiler flags as the kernel when generating the object file with
-> the mcount locations.  Ensure this by passing CFLAGS to the script.
+On Tue, Aug 03, 2010 at 06:14:15PM +0200, Marek Vasut wrote:
+> Dne ?t 3. srpna 2010 00:47:18 Greg KH napsal(a):
+> > On Mon, Aug 02, 2010 at 08:00:07AM +0200, Marek Vasut wrote:
+> > > This driver is used to implement USB-serial like behaviour over dummy
+> > > 
+> > > USB cables. These are used in the following devices:
+> > > 	Funsoft Serial USB driver
+> > > 	Genesys Logic GL620USB USB Laplink cable
+> > > 	HP4x (48/49) Serial cable
+> > > 	Motorola phones
+> > > 	Siemens USB-MPI Serial USB driver
+> > > 	ViVOpay USB Serial Driver
+> > > 	ZIO Motherboard USB driver
+> > 
+> > I like the idea, but not the name :)
 > 
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
-
-This is the only non-arch/arm/ patch in the series which doesn't have
-either of your Acked-bys, so if you'd be willing to ack it, I'll send in
-the lot via rmk's ARM patch system for .37.
-
-Alternatively, this one and "[PATCH 03/10] ftrace: allow building
-without frame pointers" could go in via the tracing tree for .36?  Then
-I'll send in the ARM specific stuff for .37 via the ARM tree.
-
-Thanks,
-Rabin
-
-> ---
->  scripts/Makefile.build |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
+> Please don't expect miracles from me after 26 hours without sleep ;-)
+> > 
+> > Ideally, all of these would be able to be handled by the usb-serial
+> > generic driver directly.
 > 
-> diff --git a/scripts/Makefile.build b/scripts/Makefile.build
-> index 0b94d2f..2535c11 100644
-> --- a/scripts/Makefile.build
-> +++ b/scripts/Makefile.build
-> @@ -209,7 +209,8 @@ ifdef CONFIG_FTRACE_MCOUNT_RECORD
->  cmd_record_mcount = set -e ; perl $(srctree)/scripts/recordmcount.pl "$(ARCH)" \
->  	"$(if $(CONFIG_CPU_BIG_ENDIAN),big,little)" \
->  	"$(if $(CONFIG_64BIT),64,32)" \
-> -	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC)" "$(LD)" "$(NM)" "$(RM)" "$(MV)" \
-> +	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC) $(KBUILD_CFLAGS)" \
-> +	"$(LD)" "$(NM)" "$(RM)" "$(MV)" \
->  	"$(if $(part-of-module),1,0)" "$(@)";
->  endif
->  
-> -- 
-> 1.7.0
+> I just noticed that one. Stupid me.
+> > 
+> > But really, having these multiple drivers is a good thing, they properly
+> > convey to the user what the device is, and it gives these developers and
+> > companies a sense of ownership over the code, and that matters at times.
+> > 
+> > So you lost the names of the devices with this patch, which isn't good.
 > 
+> Sheesh ... that's true, but having pile of copies of the same code is not good 
+> either.
+
+I agree, that's why I said it should be reduced.
+
+> Can't we then just deprecate all these drivers and set correct udev
+> rules?
+
+udev can not change the name of the device in sysfs, or the name in the
+kernel of the device.
+
+thanks,
+
+greg k-h
