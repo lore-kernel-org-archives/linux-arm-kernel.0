@@ -1,63 +1,100 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 3 Aug 2010 18:14:15 +0200
-Subject: [PATCH] USB-serial dummy cable driver
-In-Reply-To: <20100802224718.GC28821@suse.de>
-References: <1280728807-20296-1-git-send-email-marek.vasut@gmail.com>
-	<20100802224718.GC28821@suse.de>
-Message-ID: <201008031814.15859.marek.vasut@gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 03 Aug 2010 09:16:00 -0700
+Subject: [linux-pm] [PATCH/RFC] Runtime PM: ARM: subarch-specific
+	extensions of pdev_archdata
+In-Reply-To: <AANLkTikHUcgBcTmv+=NrYMwgn-UC_Q0Vv3ytfuJbkyRB@mail.gmail.com>
+	(Magnus Damm's message of "Mon, 26 Jul 2010 10:51:44 +0900")
+References: <1253670648-28610-1-git-send-email-khilman@deeprootsystems.com>
+	<f17812d70909222153y4a0e4fc2n496ea2e6caaac847@mail.gmail.com>
+	<19129.63264.653666.70492@pilspetsen.it.uu.se>
+	<4ABAAF1D.6090907@deeprootsystems.com>
+	<f17812d70909231630i20f64328k8d604c3436094b85@mail.gmail.com>
+	<87k4yhagv4.fsf@deeprootsystems.com>
+	<AANLkTinBqc11oE2SOmvXbFHmlgvZ21LngXNWkSHiJmRK@mail.gmail.com>
+	<34dc79dc-0868-4401-9fa5-c7134f6d4485@email.android.com>
+	<AANLkTikHUcgBcTmv+=NrYMwgn-UC_Q0Vv3ytfuJbkyRB@mail.gmail.com>
+Message-ID: <87k4o7r7sv.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 3. srpna 2010 00:47:18 Greg KH napsal(a):
-> On Mon, Aug 02, 2010 at 08:00:07AM +0200, Marek Vasut wrote:
-> > This driver is used to implement USB-serial like behaviour over dummy
-> > 
-> > USB cables. These are used in the following devices:
-> > 	Funsoft Serial USB driver
-> > 	Genesys Logic GL620USB USB Laplink cable
-> > 	HP4x (48/49) Serial cable
-> > 	Motorola phones
-> > 	Siemens USB-MPI Serial USB driver
-> > 	ViVOpay USB Serial Driver
-> > 	ZIO Motherboard USB driver
-> 
-> I like the idea, but not the name :)
+Magnus Damm <magnus.damm@gmail.com> writes:
 
-Please don't expect miracles from me after 26 hours without sleep ;-)
-> 
-> Ideally, all of these would be able to be handled by the usb-serial
-> generic driver directly.
+> On Sun, Jul 25, 2010 at 5:24 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>> "Magnus Damm" <magnus.damm@gmail.com> wrote:
+>>>On Tue, Oct 27, 2009 at 8:13 AM, Kevin Hilman
+>>><khilman@deeprootsystems.com> wrote:
+>>>> Eric Miao <eric.y.miao@gmail.com> writes:
+>>>>> On Thu, Sep 24, 2009 at 7:28 AM, Kevin Hilman
+>>>>> <khilman@deeprootsystems.com> wrote:
+>>>>>> Mikael Pettersson wrote:
+>>>>>>> Eric Miao writes:
+>>>>>>> ?> On Wed, Sep 23, 2009 at 9:50 AM, Kevin Hilman
+>>>>>>> ?> <khilman@deeprootsystems.com> wrote:
+>>>>>>> ?> > On ARM platforms, power management can be very platform specific.
+>>>>>>> ?> > This patch allows ARM subarches to extend the platform_device
+>>>>>>> ?> > pdev_archdata for each subarch by creating a new struct pdev_machdata
+>>>>>>> ?> > and allowing each subarch to customize it as needed.
+>
+>>>Do you remember what happened with this patch?
+>>
+>> I don't have all the details in front of me because I'm on my phone,
+>> but I advised against pdev_archdata because it is
+>> multiplatform-unfriendly.
+>
+> Ok, I did not expect that. =) But after thinking a bit it does make
+> sense. I wonder what my options are. I'm not so fond of the idea to
+> wrap the platform devices - that's not more multi-platform friendly,
+> is it?
 
-I just noticed that one. Stupid me.
-> 
-> But really, having these multiple drivers is a good thing, they properly
-> convey to the user what the device is, and it gives these developers and
-> companies a sense of ownership over the code, and that matters at times.
-> 
-> So you lost the names of the devices with this patch, which isn't good.
+[sorry for the lag, been on vacation]
 
-Sheesh ... that's true, but having pile of copies of the same code is not good 
-either. Can't we then just deprecate all these drivers and set correct udev 
-rules?
-> 
-> It's my end-goal to move the usb-serial layer to be more like libata,
-> where it is dirt-simple to make a new disk driver, only a few fields to
-> fill in, what you want to override.  So, any work toward simplification
-> of the generic layer would be appreciated to make these individual
-> drivers even smaller in the end.
-> 
-> So don't delete them, but try to consolidate the code, or just make it
-> so that it can be deleted, and you only need a simple module init/exit
-> function that registeres a single structure, like libata.
-> 
-> Sound reasonable?
+Wrapping is more multi-platform friendly because only platform-specific
+code accesses the wrapped code.  It's also logically consistent as 
+a struct device is contained by a platform_device which is then
+contained by an omap_device (in our case.)   Only OMAP-specific code
+ever knows about or touches that layer.
 
-Sounds ok, I'd like to help you but I'm dead busy with a pile of ARM machines 
-here. This hack was really just a side-job. I'll try looking into it if I wont 
-get insane ;-)
+> How about using devres and platform bus notifiers?
 
-Cheers
-> 
-> thanks,
-> 
-> greg k-h
+That seems fine too, and probably better if the amount of data/code you need
+is small.  In the OMAP case, it's rather complicated so it's cleaner
+IMHO to keep it in a separate omap_device layer and struct.
+
+> For a Runtime PM prototype using devres (instead of pdev_archdata or
+> wrapping) look here:
+> https://patchwork.kernel.org/patch/113605/
+>
+> To make it work with modules I propose adding a driver bind event:
+> https://patchwork.kernel.org/patch/113865/
+>
+> Looks pretty multi-platform friendly to me. Any suggestions?
+
+Your patches look multi-platform friendly, but there are still some
+outstanding issues with making runtime PM support multi-platform
+friendly that are not direclty related to the above patches.
+
+1) weak symbols
+
+We need to change the overriding of weak symbols into some form of
+register/unregister so multiple platforms in the same kernel could work.
+That's the easy one.   
+
+2) custom vs. platform bus.
+
+The other issue under discussion between Grant & myself[1] has been the
+use of a custom bus instead of the platform bus.  Following your lead,
+(and preferring that option) I continued to use the platform_bus since
+I only need to override a few of the dev_pm_ops functions.
+
+However, Grant is not happy about overriding the platform_bus.  He would
+rather see each platform create a custom bus with it's own PM methods.
+
+In this thread[1], I did a quick and dirty proof of concept to show that
+it is possible, but quite frankly, I still much prefer continuing to use
+the platform_bus since it is mostly identical.  
+
+After I catch up on the rest of my mail, I will get back to this topic.
+
+Kevin
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/018925.html
