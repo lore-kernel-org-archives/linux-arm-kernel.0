@@ -1,34 +1,47 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 3 Aug 2010 16:31:26 +0200
-Subject: Is anyone working on SD/MMC driver for i.MX35 ?
-In-Reply-To: <20100428131519.GA1992@bluebox.local>
-References: <20100401125739.GE2045@bluebox.local>
-	<20100401132017.GA30804@buzzloop.caiaq.de>
-	<20100401132234.GG2045@bluebox.local>
-	<20100402012932.GE13989@pengutronix.de>
-	<20100405182103.GB3316@oksana.dev.rtsoft.ru>
-	<20100406091220.GA2036@bluebox.local>
-	<20100427110439.GB1775@pengutronix.de>
-	<20100428131519.GA1992@bluebox.local>
-Message-ID: <20100803143126.GB9384@pengutronix.de>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Tue, 3 Aug 2010 16:41:26 +0200
+Subject: [PATCH] wire up sys_accept4() on ARM
+Message-ID: <19544.10902.127940.970133@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > Thanks a lot for all your hints! Will have a deeper look at that.
-> > 
-> > Any success?
-> 
-> I was delayed by some other project, don't know when I'll have something.
+sys_accept4() was added in kernel 2.6.28, but ARM was not updated
+to include it.  The number and types of parameters is such that
+no ARM-specific processing is needed, so wiring up sys_accept4()
+just requires defining __NR_accept4 and adding a direct call in
+the syscall entry table.
 
-Meanwhile? I might need to touch it in the future again...
+Tested with an EABI 2.6.35 kernel and Ulrich Drepper's original
+accept4() test program, modified to define __NR_accept4 for ARM.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100803/23e49afd/attachment.sig>
+Using the updated unistd.h also eliminates a warning then building
+glibc (2.10.2 and newer) about accept4() being unimplemented.
+
+Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
+---
+ arch/arm/include/asm/unistd.h |    1 +
+ arch/arm/kernel/calls.S       |    1 +
+
+ 2 files changed, 2 insertions(+)
+diff -rupN linux-2.6.35/arch/arm/include/asm/unistd.h linux-2.6.35.arm-sys_accept4/arch/arm/include/asm/unistd.h
+--- linux-2.6.35/arch/arm/include/asm/unistd.h	2010-05-17 19:51:29.000000000 +0200
++++ linux-2.6.35.arm-sys_accept4/arch/arm/include/asm/unistd.h	2010-08-03 14:34:35.000000000 +0200
+@@ -392,6 +392,7 @@
+ #define __NR_rt_tgsigqueueinfo		(__NR_SYSCALL_BASE+363)
+ #define __NR_perf_event_open		(__NR_SYSCALL_BASE+364)
+ #define __NR_recvmmsg			(__NR_SYSCALL_BASE+365)
++#define __NR_accept4			(__NR_SYSCALL_BASE+366)
+ 
+ /*
+  * The following SWIs are ARM private.
+diff -rupN linux-2.6.35/arch/arm/kernel/calls.S linux-2.6.35.arm-sys_accept4/arch/arm/kernel/calls.S
+--- linux-2.6.35/arch/arm/kernel/calls.S	2010-05-17 19:51:29.000000000 +0200
++++ linux-2.6.35.arm-sys_accept4/arch/arm/kernel/calls.S	2010-08-03 14:34:35.000000000 +0200
+@@ -375,6 +375,7 @@
+ 		CALL(sys_rt_tgsigqueueinfo)
+ 		CALL(sys_perf_event_open)
+ /* 365 */	CALL(sys_recvmmsg)
++		CALL(sys_accept4)
+ #ifndef syscalls_counted
+ .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
+ #define syscalls_counted
