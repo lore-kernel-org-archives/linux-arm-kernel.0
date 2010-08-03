@@ -1,55 +1,63 @@
-From: GKing@nvidia.com (Gary King)
-Date: Tue, 3 Aug 2010 08:24:46 -0700
-Subject: [PATCH 3/4] [ARM] mm: add memory type for inner-writeback
-In-Reply-To: <20100803074137.GC11987@n2100.arm.linux.org.uk>
-References: <1280803369-13362-1-git-send-email-gking@nvidia.com>
-	<1280803369-13362-4-git-send-email-gking@nvidia.com>
-	<20100803074137.GC11987@n2100.arm.linux.org.uk>
-Message-ID: <4C5834BE.1070609@nvidia.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 3 Aug 2010 18:14:15 +0200
+Subject: [PATCH] USB-serial dummy cable driver
+In-Reply-To: <20100802224718.GC28821@suse.de>
+References: <1280728807-20296-1-git-send-email-marek.vasut@gmail.com>
+	<20100802224718.GC28821@suse.de>
+Message-ID: <201008031814.15859.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Dne ?t 3. srpna 2010 00:47:18 Greg KH napsal(a):
+> On Mon, Aug 02, 2010 at 08:00:07AM +0200, Marek Vasut wrote:
+> > This driver is used to implement USB-serial like behaviour over dummy
+> > 
+> > USB cables. These are used in the following devices:
+> > 	Funsoft Serial USB driver
+> > 	Genesys Logic GL620USB USB Laplink cable
+> > 	HP4x (48/49) Serial cable
+> > 	Motorola phones
+> > 	Siemens USB-MPI Serial USB driver
+> > 	ViVOpay USB Serial Driver
+> > 	ZIO Motherboard USB driver
+> 
+> I like the idea, but not the name :)
 
- > No.  This is not "free for use".  Mapping 5 is unused because it's not
- > architecturally defined - CPU implementations may not implement it.
- > This is what the ARM ARM says:
+Please don't expect miracles from me after 26 hours without sleep ;-)
+> 
+> Ideally, all of these would be able to be handled by the usb-serial
+> generic driver directly.
 
-According to the ARMv7-A ARM, n = 6 is implementation defined; n = 5 is
-available:
+I just noticed that one. Stupid me.
+> 
+> But really, having these multiple drivers is a good thing, they properly
+> convey to the user what the device is, and it gives these developers and
+> companies a sense of ownership over the code, and that matters at times.
+> 
+> So you lost the names of the devices with this patch, which isn't good.
 
-"The meaning of the field with n = 6 is IMPLEMENTATION DEFINED and might
-   differ from the meaning given here. This is because the meaning of the
-   attribute combination {TEX[0] = 1, C = 1, B = 0} is IMPLEMENTATION
-   DEFINED."
+Sheesh ... that's true, but having pile of copies of the same code is not good 
+either. Can't we then just deprecate all these drivers and set correct udev 
+rules?
+> 
+> It's my end-goal to move the usb-serial layer to be more like libata,
+> where it is dirt-simple to make a new disk driver, only a few fields to
+> fill in, what you want to override.  So, any work toward simplification
+> of the generic layer would be appreciated to make these individual
+> drivers even smaller in the end.
+> 
+> So don't delete them, but try to consolidate the code, or just make it
+> so that it can be deleted, and you only need a simple module init/exit
+> function that registeres a single structure, like libata.
+> 
+> Sound reasonable?
 
-- Gary
+Sounds ok, I'd like to help you but I'm dead busy with a pile of ARM machines 
+here. This hack was really just a side-job. I'll try looking into it if I wont 
+get insane ;-)
 
-
-On 08/03/2010 12:41 AM, Russell King - ARM Linux wrote:
->
-> On Mon, Aug 02, 2010 at 07:42:48PM -0700, Gary King wrote:
-> > This change uses the currently-unused mapping 5 (TEX[0]=1, C=0, B=1)
-> > in the tex remapping tables as an inner-writeback-write-allocate, outer
-> > non-cacheable memory type, so that this mapping will be available to
-> > clients which will benefit from the reduced L2 maintenance.
->
-> No.  This is not "free for use".  Mapping 5 is unused because it's not
-> architecturally defined - CPU implementations may not implement it.
-> This is what the ARM ARM says:
->
->   For seven of the eight possible combinations of the TEX[0], C and B 
-> bits,
->   a field in the PRRR defines the corresponding memory region as being
->   Normal, Device or Strongly-ordered memory a field in the NMRR defines
->   the Inner cache attributes that apply if the PRRR field identifies the
->   region as Normal memory a second field in the NMRR defines the Outer
->   cache attributes that apply if the PRRR field identifies the region as
->   Normal memory.
->
->   The meaning of the eighth combination for the TEX[0], C and B bits is
->   IMPLEMENTATION DEFINED
->
-> So we can't be sure that the PRRR and NMRR bits which correspond with
-> mapping 5 even exist.
->
+Cheers
+> 
+> thanks,
+> 
+> greg k-h
