@@ -1,175 +1,104 @@
-From: ecc@cmu.edu (Eric Cooper)
-Date: Tue,  3 Aug 2010 18:13:24 -0400
-Subject: [PATCH] support for Seagate DockStar
-In-Reply-To: <1280873604-3065-1-git-send-email-ecc@cmu.edu>
-References: <1280873604-3065-1-git-send-email-ecc@cmu.edu>
-Message-ID: <1280873604-3065-2-git-send-email-ecc@cmu.edu>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 03 Aug 2010 15:28:02 -0700
+Subject: [GIT PULL] OMAP: clock, hwmod, omap_device,
+	PM constraints: patches for 2.6.36
+In-Reply-To: <20100706110918.GJ3192@atomide.com> (Tony Lindgren's message of
+	"Tue, 6 Jul 2010 14:09:20 +0300")
+References: <alpine.DEB.2.00.1007031548010.16344@utopia.booyaka.com>
+	<20100706110918.GJ3192@atomide.com>
+Message-ID: <877hk7nxfx.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----
- arch/arm/mach-kirkwood/Kconfig          |    6 ++
- arch/arm/mach-kirkwood/Makefile         |    1 +
- arch/arm/mach-kirkwood/dockstar-setup.c |  112 +++++++++++++++++++++++++++++++
- arch/arm/tools/mach-types               |    1 +
- 4 files changed, 120 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-kirkwood/dockstar-setup.c
+Tony Lindgren <tony@atomide.com> writes:
 
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index 29b2163..74d832f 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -58,6 +58,12 @@ config MACH_TS41X
- 	  QNAP TS-410, TS-410U, TS-419P and TS-419U Turbo NAS
- 	  devices.
- 
-+config MACH_DOCKSTAR
-+	bool "Seagate FreeAgent DockStar"
-+	help
-+	  Say 'Y' here if you want your kernel to support the
-+	  Seagate FreeAgent DockStar.
-+
- config MACH_OPENRD
-         bool
- 
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index c0cd5d3..025b256 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -9,6 +9,7 @@ obj-$(CONFIG_MACH_ESATA_SHEEVAPLUG)	+= sheevaplug-setup.o
- obj-$(CONFIG_MACH_GURUPLUG)		+= guruplug-setup.o
- obj-$(CONFIG_MACH_TS219)		+= ts219-setup.o tsx1x-common.o
- obj-$(CONFIG_MACH_TS41X)		+= ts41x-setup.o tsx1x-common.o
-+obj-$(CONFIG_MACH_DOCKSTAR)		+= dockstar-setup.o
- obj-$(CONFIG_MACH_OPENRD)		+= openrd-setup.o
- obj-$(CONFIG_MACH_NETSPACE_V2)		+= netspace_v2-setup.o
- obj-$(CONFIG_MACH_INETSPACE_V2)		+= netspace_v2-setup.o
-diff --git a/arch/arm/mach-kirkwood/dockstar-setup.c b/arch/arm/mach-kirkwood/dockstar-setup.c
-new file mode 100644
-index 0000000..a90475d
---- /dev/null
-+++ b/arch/arm/mach-kirkwood/dockstar-setup.c
-@@ -0,0 +1,112 @@
-+/*
-+ * arch/arm/mach-kirkwood/dockstar-setup.c
-+ *
-+ * Seagate FreeAgent DockStar Setup
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/ata_platform.h>
-+#include <linux/mtd/partitions.h>
-+#include <linux/mv643xx_eth.h>
-+#include <linux/gpio.h>
-+#include <linux/leds.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <mach/kirkwood.h>
-+#include <plat/mvsdio.h>
-+#include "common.h"
-+#include "mpp.h"
-+
-+static struct mtd_partition dockstar_nand_parts[] = {
-+	{
-+		.name = "u-boot",
-+		.offset = 0,
-+		.size = SZ_1M
-+	}, {
-+		.name = "uImage",
-+		.offset = MTDPART_OFS_NXTBLK,
-+		.size = SZ_4M
-+	}, {
-+		.name = "root",
-+		.offset = MTDPART_OFS_NXTBLK,
-+		.size = MTDPART_SIZ_FULL
-+	},
-+};
-+
-+static struct mv643xx_eth_platform_data dockstar_ge00_data = {
-+	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
-+};
-+
-+static struct gpio_led dockstar_led_pins[] = {
-+	{
-+		.name			= "dockstar:green:health",
-+		.default_trigger	= "default-on",
-+		.gpio			= 46,
-+		.active_low		= 1,
-+	},
-+	{
-+		.name			= "dockstar:orange:misc",
-+		.default_trigger	= "none",
-+		.gpio			= 47,
-+		.active_low		= 1,
-+	},
-+};
-+
-+static struct gpio_led_platform_data dockstar_led_data = {
-+	.leds		= dockstar_led_pins,
-+	.num_leds	= ARRAY_SIZE(dockstar_led_pins),
-+};
-+
-+static struct platform_device dockstar_leds = {
-+	.name	= "leds-gpio",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &dockstar_led_data,
-+	}
-+};
-+
-+static unsigned int dockstar_mpp_config[] __initdata = {
-+	MPP29_GPIO,	/* USB Power Enable */
-+	MPP46_GPIO,	/* LED green */
-+	MPP47_GPIO,	/* LED orange */
-+	0
-+};
-+
-+static void __init dockstar_init(void)
-+{
-+	/*
-+	 * Basic setup. Needs to be called early.
-+	 */
-+	kirkwood_init();
-+
-+	/* setup gpio pin select */
-+	kirkwood_mpp_conf(dockstar_mpp_config);
-+
-+	kirkwood_uart0_init();
-+	kirkwood_nand_init(ARRAY_AND_SIZE(dockstar_nand_parts), 25);
-+
-+	if (gpio_request(29, "USB Power Enable") != 0 ||
-+	    gpio_direction_output(29, 1) != 0)
-+		printk(KERN_ERR "can't set up GPIO 29 (USB Power Enable)\n");
-+	kirkwood_ehci_init();
-+
-+	kirkwood_ge00_init(&dockstar_ge00_data);
-+
-+	platform_device_register(&dockstar_leds);
-+}
-+
-+MACHINE_START(DOCKSTAR, "Seagate FreeAgent DockStar")
-+	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
-+	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
-+	.boot_params	= 0x00000100,
-+	.init_machine	= dockstar_init,
-+	.map_io		= kirkwood_map_io,
-+	.init_irq	= kirkwood_init_irq,
-+	.timer		= &kirkwood_timer,
-+MACHINE_END
-diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
-index 48cbdcb..8d56837 100644
---- a/arch/arm/tools/mach-types
-+++ b/arch/arm/tools/mach-types
-@@ -2950,3 +2950,4 @@ davinci_dm365_dvr	MACH_DAVINCI_DM365_DVR	DAVINCI_DM365_DVR	2963
- netviz			MACH_NETVIZ		NETVIZ			2964
- flexibity		MACH_FLEXIBITY		FLEXIBITY		2965
- wlan_computer		MACH_WLAN_COMPUTER	WLAN_COMPUTER		2966
-+dockstar		MACH_DOCKSTAR		DOCKSTAR		2998
--- 
-1.7.1
+> * Paul Walmsley <paul@pwsan.com> [100704 00:43]:
+>> 
+>> Hi Tony,
+>> 
+>> here's the pull request for some clock, hwmod, omap_device, PM constraints 
+>> patches for 2.6.36.
+>
+> Thanks, pulled into omap-for-linus.
+>
+
+Hmm, I don't see this in current omap-for-linus.  Is it still planned
+for 2.6.36?  
+
+Once this is merged, the all the hwmod/omap_device conversions will only
+have a dependency on the OMAP runtime PM core.
+
+Kevin
+
+>
+>  
+>> 
+>> - Paul
+>> 
+>> The following changes since commit 7e27d6e778cd87b6f2415515d7127eba53fe5d02:
+>> 
+>>   Linux 2.6.35-rc3 (2010-06-11 19:14:04 -0700)
+>> 
+>> are available in the git repository at:
+>>   git://git.pwsan.com/linux-2.6 for_2.6.36
+>> 
+>> Anand Gadiyar (1):
+>>       OMAP3: wait on IDLEST after enabling USBTLL fclk
+>> 
+>> Benoit Cousson (1):
+>>       OMAP2&3: hwmod: Remove _hwmod prefix in name string
+>> 
+>> Kevin Hilman (8):
+>>       OMAP24xx: CM: fix mask used for checking IDLEST status
+>>       OMAP2/3: hwmod: L3 and L4 CORE/PER/WKUP hwmods don't have IDLEST
+>>       OMAP: hwmod: add non-locking versions of enable and idle functions
+>>       OMAP: omap_device: ensure hwmod tracks attached omap_device pointer
+>>       OMAP: PM: create omap_devices for MPU, DSP, L3
+>>       OMAP: hwmod data: add class for IVA hwmods
+>>       OMAP2&3: hwmod: Replace l3 -> l3_main
+>>       OMAP3: hwmod data: add data for OMAP3 IVA2
+>> 
+>> Paul Walmsley (9):
+>>       OMAP: clock: add kerneldoc for structures; move flags closer to structs
+>>       OMAP1: OPP: add KConfig entry for 96MHz ARM rate (using a 12MHz oscillator)
+>>       OMAP1: clock: some cleanup
+>>       OMAP: hwmod: allow omap_hwmod_late_init() caller to skip module idle in _setup()
+>>       OMAP2: hwmod data: add IVA1 (2420), IVA2 (2430) hwmods
+>>       OMAP: hwmod/device: add omap_{device,hwmod}_get_mpu_rt_va
+>>       OMAP2+: hwmod/device: update documentation and copyright
+>>       OMAP: PM constraints: add return values; add requesting device param to omap_pm_set_max_dev_wakeup_lat()
+>>       OMAP: PM constraints: add omap_pm_set_min_clk_rate()
+>> 
+>> Rajendra Nayak (1):
+>>       OMAP4: hwmod: Enable omap_device build for OMAP4
+>> 
+>>  arch/arm/mach-omap1/Kconfig                   |    6 +
+>>  arch/arm/mach-omap1/clock.c                   |   22 +++--
+>>  arch/arm/mach-omap1/clock.h                   |    2 +-
+>>  arch/arm/mach-omap1/clock_data.c              |  129 +++++++++++++++++++-----
+>>  arch/arm/mach-omap2/Makefile                  |    4 +-
+>>  arch/arm/mach-omap2/clock3xxx_data.c          |    2 +-
+>>  arch/arm/mach-omap2/cm.c                      |    6 +-
+>>  arch/arm/mach-omap2/io.c                      |   11 ++-
+>>  arch/arm/mach-omap2/omap_hwmod.c              |  106 +++++++++++++++-----
+>>  arch/arm/mach-omap2/omap_hwmod_2420_data.c    |   79 +++++++++++-----
+>>  arch/arm/mach-omap2/omap_hwmod_2430_data.c    |   81 +++++++++++-----
+>>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c    |   92 ++++++++++++------
+>>  arch/arm/mach-omap2/omap_hwmod_common_data.c  |    3 +
+>>  arch/arm/mach-omap2/omap_hwmod_common_data.h  |    1 +
+>>  arch/arm/mach-omap2/pm.c                      |   84 ++++++++++++++++
+>>  arch/arm/plat-omap/Makefile                   |    1 +
+>>  arch/arm/plat-omap/i2c.c                      |   12 ++-
+>>  arch/arm/plat-omap/include/plat/clock.h       |  130 ++++++++++++++++++++-----
+>>  arch/arm/plat-omap/include/plat/common.h      |    4 +
+>>  arch/arm/plat-omap/include/plat/omap-pm.h     |  130 +++++++++++++++++++------
+>>  arch/arm/plat-omap/include/plat/omap_device.h |    2 +
+>>  arch/arm/plat-omap/include/plat/omap_hwmod.h  |   14 ++-
+>>  arch/arm/plat-omap/omap-pm-noop.c             |   61 +++++++++---
+>>  arch/arm/plat-omap/omap_device.c              |   33 ++++++-
+>>  24 files changed, 790 insertions(+), 225 deletions(-)
+>>  create mode 100644 arch/arm/mach-omap2/pm.c
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
