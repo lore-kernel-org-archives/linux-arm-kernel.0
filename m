@@ -1,41 +1,33 @@
-From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Tue, 03 Aug 2010 15:31:09 -0700
-Subject: hotplug and init section
-In-Reply-To: <20100722205753.GU31293@n2100.arm.linux.org.uk>
-References: <989bc3c9f8d8ce1d51c480a0dbdce07e.squirrel@www.codeaurora.org>
-	<20100722205753.GU31293@n2100.arm.linux.org.uk>
-Message-ID: <4C5898AD.9020300@codeaurora.org>
+From: wellsk40@gmail.com (wellsk40 at gmail.com)
+Date: Tue,  3 Aug 2010 09:03:57 -0700
+Subject: rfc: amba_pl022: LCD and AMBA PCLK clock updates
+Message-ID: <1280851439-25468-1-git-send-email-wellsk40@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Thu, Jul 22, 2010 at 12:33:08PM -0700, smuckle at codeaurora.org wrote:
->> Changing things so
->> that the code required for bringing up secondary cores is still present
->> after init looks to be a fairly big change. As such I wanted to see if
->> anyone had thoughts here before I start hacking up head.S, the linker
->> script, etc.
->>     
->
-> No need to hack the linker script - all you need to do is to ensure that
-> the required parts of code are placed in the cpuinit sections - and there's
-> a macro to do that called "__CPUINIT" (which equates to a .section
-> directive.)
->
-> You'll need to ensure that stuff which shouldn't be in the cpuinit
-> section remains as-is, so you'll have to also add __INIT or
-> .section .text as appropriate.
->   
-So I've been looking into this, and it does look like I need to change 
-the linker script. I need the secondary_startup function to be around at 
-hotplug time, and it appears that the whole head section gets freed with 
-the init section. Does it seem sane to make it so the head section isn't 
-freed when hotplug is configured? Or should I move the secondary startup 
-function out of the head section?
+This patch series fixes unbalanced clock enables and disables for the
+pl11x driver and adds support for the AMBA PCLK via the AMBA bus driver.
 
-Thanks,
-Jeff
+This patch series depends on the AMBA PCLK patch..
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+The LPC32xx will thrown an ARM exception if an attempt is made to access a
+peripheral register set without the clocks enabled. The LCD clock was not
+enabled until a number of register accesses already occured. Because this
+clock wasn't enabled, the driver wouldn't work correctly. This is fixed
+with the AMBA PCLK patch.
+
+The clock inbalance occurred during when no clocks were yet enabled and
+the clcdfb_set_par() function was called during probe. It would attempt to
+disable the inactive clock in clcdfb_disable(). You can also force the
+inbalance by writing to /sys/class/graphics/blank. This is fixed by
+preventing calls to the clk_* functions if the clock is already in the
+desired state.
+
+The LCD peripheral and AMBA PCLK are treated as 2 different clocks in the
+patch. Prior to any register access, the AMBA PCLK is enabled. It's also
+disabled after the access. During probe, the AMBA PCLK clock is assumed to
+be initially active. Prior the leaving probe, the AMBA PLCK is disabled.
+Prior to leaving the disable funciton, the AMBA clock is enabled (to be
+disabled in the AMBA bus driver). Some functions will enable and disable
+the AMBA PCLK if it's already enabled. These nested clock enables/disable
+operations are balanced.
