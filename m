@@ -1,74 +1,132 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Tue, 3 Aug 2010 02:40:39 +0200
-Subject: [PATCH v4] GPIO PL061: Adding Clk framework support
-In-Reply-To: <20100730070943.GA29746@n2100.arm.linux.org.uk>
-References: <20100710071913.GM22845@n2100.arm.linux.org.uk>
-	<AANLkTimskXW4Nnxhc5bxwKiNrfJkMb-9NeWKhVOGaA1k@mail.gmail.com>
-	<20100713074449.GA20118@n2100.arm.linux.org.uk>
-	<AANLkTilZJTHh_iFS37UL7XoUs_DhAB50A3tHfcfEr5JM@mail.gmail.com>
-	<20100713182644.GC30142@n2100.arm.linux.org.uk>
-	<4C3EA46B.1000709@st.com>
-	<20100715083032.GA26212@n2100.arm.linux.org.uk>
-	<4C3ED678.7010308@st.com>
-	<20100715095637.GF26212@n2100.arm.linux.org.uk>
-	<083DF309106F364B939360100EC290F80AC392ACFC@eu1rdcrdc1wx030.exi.nxp.com>
-	<20100730070943.GA29746@n2100.arm.linux.org.uk>
-Message-ID: <083DF309106F364B939360100EC290F80AC39A091A@eu1rdcrdc1wx030.exi.nxp.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 03 Aug 2010 09:44:03 +0900
+Subject: [PATCH] ARM: S5PC210: GPIO I2C devices support on universal board
+Message-ID: <20100803004403.GA5300@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Cc: Viresh KUMAR; rabin at rab.in; Linus Walleij; baruch at tkos.co.il;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v4] GPIO PL061: Adding Clk framework support
-> 
-> On Fri, Jul 30, 2010 at 01:22:58AM +0200, Kevin Wells wrote:
-> > >  /*
-> > >   * These are the device model conversion veneers; they convert the
-> > >   * device model structures to our more specific structures.
-> > > @@ -130,17 +155,33 @@ static int amba_probe(struct device *dev)
-> > >  {
-> > >  	struct amba_device *pcdev = to_amba_device(dev);
-> > >  	struct amba_driver *pcdrv = to_amba_driver(dev->driver);
-> > > -	struct amba_id *id;
-> > > +	struct amba_id *id = amba_lookup(pcdrv->id_table, pcdev);
-> > > +	int ret;
-> > >
-> > > -	id = amba_lookup(pcdrv->id_table, pcdev);
-> > > +	do {
-> > > +		ret = amba_get_enable_pclk(pcdev);
-> > > +		if (ret)
-> > > +			break;
-> > > +
-> > > +		ret = pcdrv->probe(pcdev, id);
-> > > +		if (ret == 0)
-> > > +			break;
-> > >
-> > > -	return pcdrv->probe(pcdev, id);
-> > > +		amba_put_disable_pclk(pcdev);
-> >
-> > Should the AMBA clock be disabled if the probe() fails?
-> 
-> This is exactly what happens here.
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-I think I got my logic reversed..
+Universal board has several GPIO i2c devices.
 
-One more item I noted. These changes want to keep the clock enabled
-after the probe - only disabling the clock on amba_remove. Both the
-AMBA peripheral driver (ie, the LCD or MMCI driver) and the amba_remove
-function now disable the clocks.
+Note that this patch depends on previous patch "ARM: S5PC210: Define more GPIOs to use the MP pins".
 
-Wouldn't drivers that use clk_disable in their xxx_suspend functions
-have some problems with this as multiple clk_enables have been called?
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv310/mach-universal.c |   92 ++++++++++++++++++++++++++++++++
+ 1 files changed, 92 insertions(+), 0 deletions(-)
 
-ie,
-AMBA enables clock in amba_probe() <<< clock use count = 1
-pl022 driver enables clock in mmci_probe <<< clock use count = 2
-...SPI stuff happens...
-...Linux enters suspend mode...
-pl022 driver enters suspend mode, disables clock <<< clock use count = 1
-
-Because the AMBA driver enabled the clock, the clock driver would still
-see a use count > 1 on suspend and keep the clock enabled. Should the
-suspend and resume functions in bus.c also disable/enable clocks? Or
-maybe the peripheral drivers should just handle clocking and the clock
-enable in amba_probe should be removed?
+diff --git a/arch/arm/mach-s5pv310/mach-universal.c b/arch/arm/mach-s5pv310/mach-universal.c
+index d584028..29a2516 100644
+--- a/arch/arm/mach-s5pv310/mach-universal.c
++++ b/arch/arm/mach-s5pv310/mach-universal.c
+@@ -12,6 +12,7 @@
+ #include <linux/input.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/gpio.h>
++#include <linux/i2c-gpio.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+@@ -115,8 +116,99 @@ static struct platform_device universal_gpio_keys = {
+ 	},
+ };
+ 
++/* GPIO I2C devices */
++#define I2C_GPIO_BUS_9		9
++static struct i2c_gpio_platform_data universal_i2c_gpio_fuelgauge_data = {
++	.sda_pin		= S5PV310_MP04(0),	/* XM0ADDR_8 */
++	.scl_pin		= S5PV310_MP04(1),	/* XM0ADDR_9 */
++};
++
++static struct platform_device universal_i2c_gpio_fuelgauge = {
++	.name			= "i2c-gpio",
++	.id			= I2C_GPIO_BUS_9,
++	.dev			= {
++		.platform_data	= &universal_i2c_gpio_fuelgauge_data,
++	},
++};
++
++#define I2C_GPIO_BUS_10		10
++static struct i2c_gpio_platform_data universal_i2c_gpio_microusb_data = {
++	.sda_pin		= S5PV310_GPE1(0),	/* XMDMADDR_0 */
++	.scl_pin		= S5PV310_GPE1(1),	/* XMDMADDR_1 */
++};
++
++static struct platform_device universal_i2c_gpio_microusb = {
++	.name			= "i2c-gpio",
++	.id			= I2C_GPIO_BUS_10,
++	.dev			= {
++		.platform_data	= &universal_i2c_gpio_microusb_data,
++	},
++};
++
++#define I2C_GPIO_BUS_11		11
++static struct i2c_gpio_platform_data universal_i2c_gpio_fm_data = {
++	.sda_pin		= S5PV310_GPE1(2),	/* XMDMADDR_2 */
++	.scl_pin		= S5PV310_GPE1(3),	/* XMDMADDR_3 */
++};
++
++static struct platform_device universal_i2c_gpio_fm = {
++	.name			= "i2c-gpio",
++	.id			= I2C_GPIO_BUS_11,
++	.dev			= {
++		.platform_data	= &universal_i2c_gpio_fm_data,
++	},
++};
++
++#define I2C_GPIO_BUS_12		12
++static struct i2c_gpio_platform_data universal_i2c_gpio_3touch_data = {
++	.sda_pin		= S5PV310_GPE4(0),	/* XMDMDATA_8 */
++	.scl_pin		= S5PV310_GPE4(1),	/* XMDMDATA_9 */
++};
++
++static struct platform_device universal_i2c_gpio_3touch = {
++	.name			= "i2c-gpio",
++	.id			= I2C_GPIO_BUS_12,
++	.dev			= {
++		.platform_data	= &universal_i2c_gpio_3touch_data,
++	},
++};
++
++#define I2C_GPIO_BUS_13		13
++static struct i2c_gpio_platform_data universal_i2c_gpio_hdmiddc_data = {
++	.sda_pin		= S5PV310_GPE4(2),	/* XMDMDATA_10 */
++	.scl_pin		= S5PV310_GPE4(3),	/* XMDMDATA_11 */
++};
++
++static struct platform_device universal_i2c_gpio_hdmiddc = {
++	.name			= "i2c-gpio",
++	.id			= I2C_GPIO_BUS_13,
++	.dev			= {
++		.platform_data	= &universal_i2c_gpio_hdmiddc_data,
++	},
++};
++
++#define I2C_GPIO_BUS_14		14
++static struct i2c_gpio_platform_data universal_i2c_gpio_light_data = {
++	.sda_pin		= S5PV310_GPK2(2),	/* XMMC2CDN */
++	.scl_pin		= S5PV310_GPK0(2),	/* XMMC0CDN */
++};
++
++static struct platform_device universal_i2c_gpio_light = {
++	.name			= "i2c-gpio",
++	.id			= I2C_GPIO_BUS_14,
++	.dev			= {
++		.platform_data	= &universal_i2c_gpio_light_data,
++	},
++};
++
+ static struct platform_device *universal_devices[] __initdata = {
+ 	&universal_gpio_keys,
++	&universal_i2c_gpio_fuelgauge,
++	&universal_i2c_gpio_microusb,
++	&universal_i2c_gpio_fm,
++	&universal_i2c_gpio_3touch,
++	&universal_i2c_gpio_hdmiddc,
++	&universal_i2c_gpio_light,
+ };
+ 
+ static void __init universal_map_io(void)
+-- 
+1.5.3.3
