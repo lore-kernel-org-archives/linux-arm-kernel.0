@@ -1,43 +1,38 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 04 Aug 2010 15:16:51 +0900
-Subject: [alsa-devel] [PATCH 1/2] ARM: S5PV210: Add audio support to	Aquila
-In-Reply-To: <20100803085929.GC25306@rakim.wolfsonmicro.main>
-References: <4C4F9E4C.7000001@samsung.com>
-	<20100729173825.GE24781@opensource.wolfsonmicro.com>
-	<4C527C11.5090409@samsung.com>
-	<20100803085929.GC25306@rakim.wolfsonmicro.main>
-Message-ID: <4C5905D3.8090703@samsung.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 4 Aug 2010 14:25:42 +0800
+Subject: [PATCH] PXA: Colibri320: Add M41T00 RTC support
+In-Reply-To: <20100731092206.GC23886@n2100.arm.linux.org.uk>
+References: <1280543453-28237-1-git-send-email-marek.vasut@gmail.com>
+	<201007310926.03292.pieterg@gmx.com>
+	<201007310933.05611.marek.vasut@gmail.com>
+	<20100731090554.GX17833@buzzloop.caiaq.de>
+	<20100731092206.GC23886@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikvuwyfWwTu3vjvUM2zML4paqtY3+g3OhReL9KL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> On Fri, Jul 30, 2010 at 04:15:29PM +0900, Chanwoo Choi wrote:
-> 
->>> All these fixed voltage regulators seem a bit suspicous for a mobile
->>> phone - I'd have expected that the supplies would all be being provided
->>> by your PMIC except for things taken directly from the battery supply
->>> (like the speakers tend to be, for example)?  There's no problem with
->>> the code itself, it just looks a bit odd.
-> 
->> All these consumer supply of WM8994 codec connected the below regulator(VCC_1.8V) on
->> a circuit diagram. "VCC_1.8V" regualtor is always enabled, because it is used to many devices.
->> Then I haven't connected all these consumer supply of WM8994 codec to "VCC_1.8V" regulator.
->> I will modify that the consumer supply would be provided by PMIC.
-> 
-> OK, good - the fact that the connection wasn't being made with the PMIC
-> was my main point here.
+On Sat, Jul 31, 2010 at 5:22 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Jul 31, 2010 at 11:05:54AM +0200, Daniel Mack wrote:
+>> Hmm, GPIOs for peripherals that are assembled on the module itself can
+>> safely be configured unconditionally as it is impossible to use them for
+>> anything else. For GPIOs that are allocted by a specific base board,
+>> things are different though, especially for the the Colibri eval board
+>> with it hundreds of jumpers on it. It's a convenience feature to have
+>> them free for general purpose use just by disabling a certain config
+>> directive.
+>
+> It would probably make sense for their to be a primary table which at
+> least ensures that all pins are setup to safe default values. ?You
+> really don't want the unconnected pins left floating, especially if
+> they come out to some vulnerable connector or unconnected jumper pin.
+>
+> I'd suggest they're configured as inputs but with a pull-up or pull-down,
+> not forgetting to consider the low power mode pull setting as well.
+>
 
-Did you read writed mail about consumer supply of WM8994 by MyungJoo Ham?
-He is in charge of PMIC and Power Management on Aquila board.
-
-MyungJoo Ham is wrote : 
-This aquila_buck3_data.constraints would be better have ".always_on =
-1" entry as this buck3 is required to be turned on at all times in
-Aquila boards (even when the system is in suspend-to-mem state). This
-is required especially when there are many devices physically attached
-to Buck3 and some of they did not "register" as consumers to Buck3.
-Buck3 might be turned off by those who are registered while
-"unregistered" are still active.
-
-Can you tell me your opinion about the review by MyungJoo Ham?
-I will respect your response.
+Yeah, that's also my opinion. So for those pins which can be connected
+to different usages (e.g. to two or more different expansion boards), I'd
+like to have the baseboard code to configure them safely (e.g. inputs with
+pull as Russell suggested), and perform another mfp config in the
+expansion board code.
