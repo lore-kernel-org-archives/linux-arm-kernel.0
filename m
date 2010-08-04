@@ -1,42 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Aug 2010 09:54:47 +0100
-Subject: memblock glitch
-In-Reply-To: <1280885890.1902.134.camel@pasglop>
-References: <1280882307.1902.124.camel@pasglop>
-	<1280885890.1902.134.camel@pasglop>
-Message-ID: <20100804085447.GB4927@n2100.arm.linux.org.uk>
+From: a.paterniani@swapp-eng.it (Andrea Paterniani)
+Date: Wed, 04 Aug 2010 11:19:41 +0200
+Subject: [patch 0/2] ARM: Disable outer cache before kexec call -V3
+In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB0321623966@dbde02.ent.ti.com>
+References: <20100705113029.082013074@linutronix.de>,
+	<4C58259A.3080404@swapp-eng.it>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0321623966@dbde02.ent.ti.com>
+Message-ID: <4C5930AD.3030701@swapp-eng.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 04, 2010 at 11:38:10AM +1000, Benjamin Herrenschmidt wrote:
-> In arch/arm/plat-omap/fb.c:
-> 
-> static int valid_sdram(unsigned long addr, unsigned long size)
-> {
-> 	struct memblock_region res;
-> 
-> 	res.base = addr;
-> 	res.size = size;
-> 	return !memblock_find(&res) && res.base == addr && res.size == size;
-> }
-> 
-> So if I understand things correctly, you are working around the weird
-> behaviour of memblock_find(), which returns the intersection of the
-> region passed and the first memblock that partially overlaps it.
+Il 03/08/2010 19.36, Gadiyar, Anand ha scritto:
+> Andrea Paterniani wrote:
+>    
+>> Hi,
+>>       I have applied your patches to kernel 2.6.35-rc4 running on my beagleboard.
+>> I'm using kexec-tools-2.0.1.
+>>
+>> My u-boot bootargs is:
+>>       console=ttyS2,115200n8 root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait ip=192.168.2.13::255.255.255.0
+>>
+>> To restart the system I type:
+>>   >  sync
+>>   >  kexec -l /boot/zImage --append="console=ttyS2,115200n8 root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait ip=192.168.2.13::255.255.255.0"
+>>   >  kexec -e
+>>
+>> Not every time the system restart.
+>> In some cases no output on the console after the following:
+>>       Bye!
+>>       Uncompressing Linux... done, booting the kernel.
+>>
+>> Any idea?
+>>
+>>      
+> Can you try building your kernel with CONFIG_EARLY_PRINTK,
+> and add the word "earlyprintk" to your bootargs?
+>
+>    
+I built the kernel with (also verified via zcat /proc/config.gz | grep 
+... after succesfull kexec):
 
-Correct - what it's trying to ascertain is whether the address range
-is entirely contained within a valid region.
+CONFIG_EARLY_PRINTK=y
+CONFIG_DEBUG_LL=y
 
-> Since you are now the only user of that function (I was about to remove it),
-> would you be happy if I replaced the above and the !SPARSEMEM pfn_valid()
-> with a single function: memblock_is_mem(addr, size) ?
-> 
-> It can do a fast search (binary search or whatever) on addr, and then
-> dbl check size (which would be PAGE_SIZE for pfn_valid).
+I load new kernel zImage via:
+kexec -l /boot/zImage --append="earlyprintk console=ttyS2,115200n8 root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait ip=192.168.2.13::255.255.255.0"
 
-You could do, but do we want to introduce size checks for pfn_valid?
-I'm slightly concerned because it can be a hot path.
+but when kexec fails I got only the following:
+	Bye!
+	Uncompressing Linux... done, booting the kernel.
 
-If all entries in memblock are already page aligned, if addr falls
-within a memblock, it must cover the entire page so checking the size
-seems redundant for this case.
+What do I miss whith earlyprintk?
+
+Perhaps I did not enough tests, but at the moment it seems that system boot with nfs rootfs followed by kexec with mmc rootfs works.
+Problems arise with system boot and kexec both with mmc rootfs.
+
+Regards,
+- Andrea
+
+>
+>    
+>> Il 05/07/2010 13.52, Thomas Gleixner ha scritto:
+>>      
+>>> The following patch series addresses the problem that the kexec code
+>>> does not disable the outer cache before disabling the inner cache and
+>>> jumping into the new kernel. This results in random crashes of the new
+>>> kernel.
+>>>
+>>> Changes since version 2:
+>>>
+>>>    - Use CLEAN_INV_WAY in l2x0_flush_all according to Catalin
+>>>
+>>>    - Rename outer_cache_disable() to outer_disable()
+>>>
+>>>    - Added a  BUG_ON() when l2x0_inv_all() is called with L2 enabled.
+>>>
+>>> Thanks,
+>>>
+>>>        tglx
+>>>
+>>>
+>>>
+>>>        
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>    
+
+-- 
