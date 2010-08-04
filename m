@@ -1,42 +1,186 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 4 Aug 2010 16:55:27 -0600
-Subject: [PATCH v2 1/3] OMAP: PM: initial runtime PM core support
-In-Reply-To: <1277422991-25350-2-git-send-email-khilman@deeprootsystems.com>
-References: <1277422991-25350-1-git-send-email-khilman@deeprootsystems.com>
-	<1277422991-25350-2-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <AANLkTi=CRCKO3Vjsm3K+OZO1Ea=oGcZovEzfw71r=gtM@mail.gmail.com>
+Date: Wed, 4 Aug 2010 17:10:40 -0600
+Subject: [linux-pm] [PATCH/RFC] Runtime PM: ARM: subarch-specific
+	extensions of pdev_archdata
+In-Reply-To: <AANLkTi=RTigcf-p=GFncAQ2ZjP=4qjDPXjnMmTO_u6tL@mail.gmail.com>
+References: <1253670648-28610-1-git-send-email-khilman@deeprootsystems.com>
+	<f17812d70909222153y4a0e4fc2n496ea2e6caaac847@mail.gmail.com>
+	<19129.63264.653666.70492@pilspetsen.it.uu.se>
+	<4ABAAF1D.6090907@deeprootsystems.com>
+	<f17812d70909231630i20f64328k8d604c3436094b85@mail.gmail.com>
+	<87k4yhagv4.fsf@deeprootsystems.com>
+	<AANLkTinBqc11oE2SOmvXbFHmlgvZ21LngXNWkSHiJmRK@mail.gmail.com>
+	<34dc79dc-0868-4401-9fa5-c7134f6d4485@email.android.com>
+	<AANLkTikHUcgBcTmv+=NrYMwgn-UC_Q0Vv3ytfuJbkyRB@mail.gmail.com>
+	<87k4o7r7sv.fsf@deeprootsystems.com>
+	<AANLkTi=RTigcf-p=GFncAQ2ZjP=4qjDPXjnMmTO_u6tL@mail.gmail.com>
+Message-ID: <AANLkTintoVDFHxmbuj_YHj5e4PzK7j6-SzdWqFKDLjkE@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 24, 2010 at 5:43 PM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
-> Implement the new runtime PM framework as a thin layer on top of the
-> omap_device API. ?Since we don't have an OMAP-specific bus, override
-> the runtime PM hooks for the platform_bus for the OMAP specific
-> implementation.
-[...]
-> +int platform_pm_runtime_suspend(struct device *dev)
-> +{
-> + ? ? ? struct platform_device *pdev = to_platform_device(dev);
-> + ? ? ? struct omap_device *odev = to_omap_device(pdev);
-> + ? ? ? int r, ret = 0;
-> +
-> + ? ? ? dev_dbg(dev, "%s\n", __func__);
-> +
-> + ? ? ? if (dev->driver->pm && dev->driver->pm->runtime_suspend)
-> + ? ? ? ? ? ? ? ret = dev->driver->pm->runtime_suspend(dev);
-> + ? ? ? if (!ret && omap_device_is_valid(odev)) {
-> + ? ? ? ? ? ? ? r = omap_device_idle(pdev);
-> + ? ? ? ? ? ? ? WARN_ON(r);
+On Tue, Aug 3, 2010 at 9:56 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> On Wed, Aug 4, 2010 at 1:16 AM, Kevin Hilman
+> <khilman@deeprootsystems.com> wrote:
+>> Magnus Damm <magnus.damm@gmail.com> writes:
+>>> On Sun, Jul 25, 2010 at 5:24 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>>>> "Magnus Damm" <magnus.damm@gmail.com> wrote:
+>>>>>On Tue, Oct 27, 2009 at 8:13 AM, Kevin Hilman
+>>>>><khilman@deeprootsystems.com> wrote:
+>>>>>> Eric Miao <eric.y.miao@gmail.com> writes:
+>>>>>>> On Thu, Sep 24, 2009 at 7:28 AM, Kevin Hilman
+>>>>>>> <khilman@deeprootsystems.com> wrote:
+>>>>>>>> Mikael Pettersson wrote:
+>>>>>>>>> Eric Miao writes:
+>>>>>>>>> ?> On Wed, Sep 23, 2009 at 9:50 AM, Kevin Hilman
+>>>>>>>>> ?> <khilman@deeprootsystems.com> wrote:
+>>>>>>>>> ?> > On ARM platforms, power management can be very platform specific.
+>>>>>>>>> ?> > This patch allows ARM subarches to extend the platform_device
+>>>>>>>>> ?> > pdev_archdata for each subarch by creating a new struct pdev_machdata
+>>>>>>>>> ?> > and allowing each subarch to customize it as needed.
+>>>
+>>>>>Do you remember what happened with this patch?
+>>>>
+>>>> I don't have all the details in front of me because I'm on my phone,
+>>>> but I advised against pdev_archdata because it is
+>>>> multiplatform-unfriendly.
+>>>
+>>> Ok, I did not expect that. =) But after thinking a bit it does make
+>>> sense. I wonder what my options are. I'm not so fond of the idea to
+>>> wrap the platform devices - that's not more multi-platform friendly,
+>>> is it?
+>>
+>> [sorry for the lag, been on vacation]
+>>
+>> Wrapping is more multi-platform friendly because only platform-specific
+>> code accesses the wrapped code. ?It's also logically consistent as
+>> a struct device is contained by a platform_device which is then
+>> contained by an omap_device (in our case.) ? Only OMAP-specific code
+>> ever knows about or touches that layer.
+>
+> Sure, as long as all platform devices are wrapped into omap_device
+> then I see no problem. I guess my worries are about mixing platform
+> devices and omap_device on the same system. The answer to that may
+> simply be "don't". =)
 
-For the record, I should note here that this is *really* dangerous.
-When handed a random platform_device pointer, it is not safe to use
-to_omap_device() and dereference it with omap_device_is_valid().
-There are no guarantees that the dereference is actually valid,
-particularly so when the platform_device has been dynamically
-allocated.
+yes
 
-It is only okay to use to_omap_device() when the code is already
-absolutely sure that the platform_device is in fact contained by a
-struct omap_device.  There needs to be a different method to test if
-it is contained by an omap_device before doing the dereference.
+> For the mixed case my main concern is the use of to_omap_device() on a
+> struct platform device which may or may not be an omap_device. You
+> have your magic check in omap_device_is_valid() so i guess that's ok,
+> but compared to the rest of the driver model this extended level of
+> wrapping does not come with any pointer for class/type/bus. Platform
+> devices all use the platform_bus_type symbol for device->bus, so in
+> theory it's possible to check the bus type before going from struct
+> device to struct platform_device using to_platform_device().
+
+Yes, this is guaranteed safe.
+
+> In the
+> wrapped platform device case you first have to speculate using
+> container_of() and then check for magic. Seems a bit hackish to me. I
+> prefer the other way around, check wrapping type first then use
+> container_of().
+
+Not just hackish.  Dangerous.
+
+> I guess the question is if it's really needed to differentiate between
+> platform devices and omap devices, and I guess the only place where it
+> may be a problem is the runtime pm code. Perhaps thanks to the weak
+> symbols, sorry about that...
+>
+>>> How about using devres and platform bus notifiers?
+> [snip]
+>
+>> Your patches look multi-platform friendly, but there are still some
+>> outstanding issues with making runtime PM support multi-platform
+>> friendly that are not direclty related to the above patches.
+>
+> I agree!
+>
+>> 1) weak symbols
+>>
+>> We need to change the overriding of weak symbols into some form of
+>> register/unregister so multiple platforms in the same kernel could work.
+>> That's the easy one.
+>
+> Yeah. Perhaps it's possible to reuse part of the pm_generic_... functions.
+>
+>> 2) custom vs. platform bus.
+>>
+>> The other issue under discussion between Grant & myself[1] has been the
+>> use of a custom bus instead of the platform bus. ?Following your lead,
+>> (and preferring that option) I continued to use the platform_bus since
+>> I only need to override a few of the dev_pm_ops functions.
+>>
+>> However, Grant is not happy about overriding the platform_bus. ?He would
+>> rather see each platform create a custom bus with it's own PM methods.
+>>
+>> In this thread[1], I did a quick and dirty proof of concept to show that
+>> it is possible, but quite frankly, I still much prefer continuing to use
+>> the platform_bus since it is mostly identical.
+>>
+>> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/018925.html
+>
+> Thanks for the pointer. I've been thinking of using a custom bus as
+> well, but from my point of view it's always looked like a lot of
+> coding without any clear benefit. I understand the idea of wanting to
+> use a single binary on a wide range of systems, and solving that seems
+> like a good plan.
+>
+> I'm not sure if a custom bus is the best idea. I wouldn't mind being
+> able to create platform bus instances though.
+
+The only problem with multiple platform_bus instances would be that
+drivers intended to work on both would need to be registered twice;
+once on the regular platform bus, and once on the custom bus.  All the
+rest of the code would be shared, but it probably still doesn't
+reflect the model that you're shooting for.
+
+However, on the flipside the question must be asked; are you trying to
+describe inherent bus-type behaviour that the plaform bus does not
+address?  ie. is the OMAP bus fundamentally different from a normal
+'dumb' bus?  What is the real count of device drivers that will need
+to be registered on the platform bus and the omap bus (or sh, etc)?  A
+modified platform bus type instance may require duplicate driver
+registrations, but it is also potentially a lot less complex for a
+reader to understand what is going on (ie. the runtime-pm calls are
+explicit instead of being indirect through a bus notifier).
+
+> Or custom buses using
+> some kind of platform bus library. A lot of drivers use the platform
+> bus, so there has to be a very good reason to move away from that IMO.
+> A new bus type seems a bit overkill to me though, what we need from my
+> point of view is:
+
+bus types are cheep, especially when the code is shared.
+
+> 1) Mach/Plat hardware configuration data for platform devices
+> -> Can be kept in struct pdev_archdata (clock and power domain configuration)
+
+Careful.  putting mach/plat specific stuff into pdev_archdata is
+multiplatform unfriendly.  I think pdev_archdata should be restricted
+to arch-specific stuff.
+
+> -> Can be kept in a wrapped structure (clock and power domain configuration)
+> -> Use clkdev tables to handle the device name to clock translation
+> -> Power domain configuration without wrapping/pdev_archdata, not sure
+>
+> 2) Mach/Plat runtime data for each platform device
+> -> Data can be kept in the wrapped data structure or struct pdev_archdata
+> -> Could be solved by bus notifiers and dynamic allocation using devres
+>
+> 3) Mach/Plat specific runtime PM
+> -> Need to move away from weak symbols to register/unregister interface
+> -> Struct pdev_archdata could perhaps point out a per-mach/plat dev_pm_ops?
+
+registerable per-mach/plat ops structures sound sane.  However, I
+think we can do better since this is not an arch-specific problem.
+Already ARM and SH needs a solution, and I can see it being applicable
+to the other embedded archs too.  I'd like to see a non-arch-specific
+solution.
+
+g.
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
