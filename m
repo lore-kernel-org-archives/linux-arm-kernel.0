@@ -1,102 +1,84 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Wed, 4 Aug 2010 22:36:21 +0900
-Subject: [PATCH v6 5/7] ARM: S5PV210: Access for DMCx registers
-In-Reply-To: <001901cb33c6$b05542f0$10ffc8d0$%kim@samsung.com>
-References: <1280829866-26001-1-git-send-email-myungjoo.ham@samsung.com>
-	<1280829866-26001-2-git-send-email-myungjoo.ham@samsung.com>
-	<1280829866-26001-3-git-send-email-myungjoo.ham@samsung.com>
-	<1280829866-26001-4-git-send-email-myungjoo.ham@samsung.com>
-	<1280829866-26001-5-git-send-email-myungjoo.ham@samsung.com>
-	<1280829866-26001-6-git-send-email-myungjoo.ham@samsung.com>
-	<001901cb33c6$b05542f0$10ffc8d0$%kim@samsung.com>
-Message-ID: <AANLkTinrOPuQUn63gh1owfEgYBRZ8J=COVkPBp_VtBm4@mail.gmail.com>
+From: vitalywool@gmail.com (Vitaly Wool)
+Date: Wed, 4 Aug 2010 16:01:19 +0200
+Subject: [PATCH v2 03/20] mmc: support embedded data field in mmc_host
+In-Reply-To: <AANLkTi=Dqs_qg=BsoNBTjvJbG+ub+zMv8ctbrJSGPJJJ@mail.gmail.com>
+References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
+	<1279733634-21974-4-git-send-email-ohad@wizery.com>
+	<AANLkTimzA_JJ-byTDWznbL3YzeJ8LAP4M50onf2_3fBF@mail.gmail.com>
+	<AANLkTi=Oy8X1xMOwWL_cKBB1LWULT6=p+adUgB+AuSJS@mail.gmail.com>
+	<AANLkTi=BUX59heXAW2Uf4wZo2dSS19Je54dkQ5u2YGAW@mail.gmail.com>
+	<AANLkTimZQKj7H_GeE=+O9cwxEMTR+LhfFbt=AyXGzN3d@mail.gmail.com>
+	<AANLkTikfRja-h9mz7uyRXCZNZjKdU_yB8e58XQucUzrn@mail.gmail.com>
+	<AANLkTi=vhWV1RNyemtfppfjvLYAbzd3aRjFOVgLLpG3Z@mail.gmail.com>
+	<AANLkTin4m8gJR50zwMB2b0jRMHdNA6CQToKBTAhOL9wF@mail.gmail.com>
+	<AANLkTinu2S19r8fueM-jVkc35XL2G0Z16BddE92Ci9KB@mail.gmail.com>
+	<20100804114147.GB6852@n2100.arm.linux.org.uk>
+	<AANLkTi=Dqs_qg=BsoNBTjvJbG+ub+zMv8ctbrJSGPJJJ@mail.gmail.com>
+Message-ID: <AANLkTikvKCJiwbbGz+W+h8ixorCy5=MuV9WQ+vyjUL=Z@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 4, 2010 at 8:17 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> MyungJoo Ham wrote:
+On Wed, Aug 4, 2010 at 2:42 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> On Wed, Aug 4, 2010 at 2:41 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Wed, Aug 04, 2010 at 02:24:39PM +0300, Ohad Ben-Cohen wrote:
+>>> On Tue, Aug 3, 2010 at 5:17 PM, Vitaly Wool <vitalywool@gmail.com> wrote:
+>>> > On Mon, Aug 2, 2010 at 11:35 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+>>> >> I'm honestly trying to understand your concerns, but I'm afraid that
+>>> >> just saying "it's a hack" is not too informative. Can you please
+>>> >> explain what do you think is technically wrong with the proposed
+>>> >> solution ? is it not general enough for other use cases ? will it
+>>> >> break something ?
+>>>
+>>> > So if I'd like to set the *same* structure for the *same* WL1271
+>>> > driver, provided that I'm working with the other platform, I'll need
+>>> > to do the following:
+>>> > - add the pointer to the board-specific header;
+>>> > - add the structure to the board-specific C file and propagate its
+>>> > pointer to the controller driver;
+>>> > - add setting the pointer in the core structure into the controller driver.
+>>> >
+>>> > This is far from being intuitive. This means we need to hack,
+>>> > generally speaking, all the MMC controller drivers to get it working
+>>> > on all platforms. This is error prone.
+>>>
+>>> You make it sound really complex.
+>>>
+>>> Let's see what it means to add it to a totally different platform.
+>>>
+>>> As an example, let's take Google's ADP1 which is based on a different
+>>> host controller (msm-sdcc), and add the required support (untested of
+>>> course, just a quick sketch, patch is based on android's msm git):
 >>
->> ? ? ? The CPUFREQ driver requires an access to DMCx registers. We
->> define physical addresses and mapping between physical and virtual
->> addresses of DMCx registers.
+>> What if some other driver gets attached and tries to use this
+>> platform data? ?This whole idea sounds extremely silly, cumbersome,
+>> error prone, and is inviting misuse by normal MMC sockets.
 >>
->> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->> ?arch/arm/mach-s5pv210/cpu.c ? ? ? ? ? ? ?| ? 12 +++++++++++-
->> ?arch/arm/mach-s5pv210/include/mach/map.h | ? ?4 ++++
->> ?2 files changed, 15 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
->> index 74d4c08..2066695 100644
->> --- a/arch/arm/mach-s5pv210/cpu.c
->> +++ b/arch/arm/mach-s5pv210/cpu.c
->> @@ -60,7 +60,17 @@ static struct map_desc s5pv210_iodesc[] __initdata = {
->> ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(S5PV210_PA_SROMC),
->> ? ? ? ? ? ? ? .length ? ? ? ? = SZ_4K,
->> ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
->> - ? ? }
->> + ? ? }, {
->> + ? ? ? ? ? ? .virtual ? ? ? ?= (unsigned long)S5P_VA_DMC0,
->> + ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(S5PV210_PA_DMC0),
->> + ? ? ? ? ? ? .length ? ? ? ? = SZ_4K,
->> + ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
->> + ? ? }, {
->> + ? ? ? ? ? ? .virtual ? ? ? ?= (unsigned long)S5P_VA_DMC1,
->> + ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(S5PV210_PA_DMC1),
->> + ? ? ? ? ? ? .length ? ? ? ? = SZ_4K,
->> + ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
->> + ? ? },
->> ?};
->>
->> ?static void s5pv210_idle(void)
->> diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-
->> s5pv210/include/mach/map.h
->> index 17687f0..daf6456 100644
->> --- a/arch/arm/mach-s5pv210/include/mach/map.h
->> +++ b/arch/arm/mach-s5pv210/include/mach/map.h
->> @@ -108,4 +108,8 @@
->> ?#define SAMSUNG_PA_ADC ? ? ? ? ? ? ? S5PV210_PA_ADC
->> ?#define SAMSUNG_PA_KEYPAD ? ?S5PV210_PA_KEYPAD
->>
->> +/* DMC */
+>> Why not arrange for a small piece of code to be built into the kernel
+>> when this driver is selected as a module or built-in, which handles
+>> the passing of platform data to the driver?
 >
-> No need an obvious comment like above...
+> It's interesting.
 >
->> +#define S5PV210_PA_DMC0 ? ? ? ? ? ? ?(0xF0000000)
->> +#define S5PV210_PA_DMC1 ? ? ? ? ? ? ?(0xF1400000)
+> The only drawback I can see is that it has an inherent limitation of
+> having only a single wl1271 device on board, but there are no such
+> boards outside development/testing labs.
 >
-> As I said, if you need adding new definition into the mach/map.h, please
-> keep the address order like others.
-> It can help to us for easily reading...
+> Vitaly would that work for you too ?
 
-Good, good, good,
+Works for me, but I've got a remark.
+If we try to generalize that idea to handle multiple devices it will
+be similar to the following:
 
-I'm really appreciate it if the same rules apply to LSI internal trees.
-I hope you check it LSI codes also.
+static struct wl12xx_platform_data platform_data[MAX_WL12XX_DEVICES];
 
-Thank you,
-Kyungmin Park
+int __init wl12xx_set_platform_data(const struct wl12xx_platform_data
+*data, int id);
+int wl12xx_get_platform_data(struct wl12xx_platform_data *data, int id);
 
->
->> +
->> ?#endif /* __ASM_ARCH_MAP_H */
->> --
->
-> And as I commented, to merge your 4th(previous, just adding VA) and 5th
-> patch to one is better...just for adding DMC map IO.
->
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+which will look pretty much like... yes, a simplified/customized
+version board_info applied to a single driver.
+
+But anyway I'm fine with that.
+
+~Vitaly
