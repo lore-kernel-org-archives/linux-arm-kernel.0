@@ -1,53 +1,86 @@
-From: s-ghorai@ti.com (Ghorai, Sukumar)
-Date: Wed, 4 Aug 2010 09:28:57 +0530
-Subject: [PATCH v4 0/4] nand prefetch-irq support and ecc layout chanage
-In-Reply-To: <1280764192-15053-1-git-send-email-s-ghorai@ti.com>
-References: <1280764192-15053-1-git-send-email-s-ghorai@ti.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B030E5E4374@dbde02.ent.ti.com>
+From: sajithpv@gmail.com (Sajith P V)
+Date: Wed, 4 Aug 2010 09:47:14 +0530
+Subject: Enabling/disabling MMU in kernel power management suspend handler
+Message-ID: <AANLkTimuys1GCBtm=oewUKp6ftDHjA0eNvT5Lfwac71A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Ghorai, Sukumar
-> Sent: Monday, August 02, 2010 9:20 PM
-> To: linux-omap at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; linux-mtd at lists.infradead.org;
-> Ghorai, Sukumar
-> Subject: [PATCH v4 0/4] nand prefetch-irq support and ecc layout chanage
-> 
->    The following set of patches applies on top of omap-for-linus.
-> 
->    v4: Comments incorporated
-> 
->    v3: http://www.mail-archive.com/linux-
-> omap at vger.kernel.org/msg32071.html
->    	Rebase on latest codebase and previous patch(posted).
-> 	http://www.mail-archive.com/linux-omap at vger.kernel.org/msg31963.html
-> 
->    v2: Rebase on latest codebase and previous patch(posted).
-> 	http://www.mail-archive.com/linux-omap at vger.kernel.org/msg31471.html
-> 
->    v1: http://www.mail-archive.com/linux-
-> omap at vger.kernel.org/msg26666.html
-> 
-> Sukumar Ghorai (4):
-> 	omap3: nand: prefetch in irq mode support
-> 	omap: nand: configurable fifo threshold to gain the throughput
-> 	omap: nand: ecc layout select from board file
-> 	omap: nand: making ecc layout as compatible with romcode ecc
-> 
->  arch/arm/mach-omap2/board-flash.c      |    5 +-
->  arch/arm/mach-omap2/gpmc.c             |   15 ++-
->  arch/arm/plat-omap/include/plat/gpmc.h |    9 +-
->  arch/arm/plat-omap/include/plat/irqs.h |    1 +
->  arch/arm/plat-omap/include/plat/nand.h |    7 +
->  drivers/mtd/nand/Kconfig               |   14 ++-
->  drivers/mtd/nand/omap2.c               |  277
-> ++++++++++++++++++++++++++++---
->  7 files changed, 294 insertions(+), 34 deletions(-)
-[Ghorai] 
-Tony,
-Would you please check if you have any input further?
+Hi,
+
+I need to disable and re-enable MMU and caches in the power management
+suspend handler in order to save and restore complete ARM state information in
+DDR memory (this is to take the ARM1136JF-S through the dormant sleep state).
+I'm working on 2.6.29 kernel (Eclair). To achieve this, I'm testing
+the following code sequence that will first disable mmu, then branch
+to a function which re enables MMU (attached text file).
+
+This sequence is not working. I've pored through ARM1136JF-S rev r1p5
+data sheets and could not figure out what is wrong here. The
+observations are as follows:
+
+1. When the above code sequence is executed and when I attach a
+debugger I see that the PC is at some address starting with 0xCxxxxxxx
+and not looping at 'restore'.
+
+2. When I step through the code and then forcefully change the PC
+value to equivalent physical address at the instruction 'mov pc,r3' in
+the routine dormant_sleep, then the control is successfully
+transferred to dormant_restore. The same behavior holds good when I
+forcefully set the PC to equivalent virtual address at the instruction
+'mov    r1,r1' in the routine dormant_restore.
+
+What could be incorrect in the above sequence?
 
 Regards,
-Ghorai
+Sajith
+-------------- next part --------------
+
+ENTRY(dormant_sleep)
+	@ initialize restore_func_phys_addr to physical address
+	@ of dormant_restore routine
+	...
+
+	@ Take a backup of the cp15 control reg into the location
+	@ cp15_control_reg
+	...
+
+	@ Load phys addr of restore func
+	ldr     r3,restore_func_phys_addr
+
+	@ Turn off MMU, I cache and D cache
+	bl      cache_mmu_off
+	mov     pc,r3
+
+ENTRY(cache_mmu_off)
+	mov     r0,#0
+	mcr     p15,0,r0,c13,c0,0          @ Clear FCSE PID
+	mrc     p15,0,r2,c1,c0,0           @ Read ctrl reg
+	bic     r2,r2,#DISABLE_DCACHE_MMU
+	bic     r2,r2,#DISABLE_ICACHE
+	mcr     p15,0,r2,c1,c0,0           @ Disable Dcache
+	mov     r0,#0
+	mcr     p15,0,r0,c7,c7,0           @ Invalidate whole cache
+	mcr     p15,0,r0,c8,c7,0           @ Invalidate whole TLB
+	mov     pc,r14
+
+
+ENTRY(dormant_restore)
+restore:
+	@ This loop is to enable a debugger to be attached
+	b       restore
+
+	@ Read cp15 control reg
+	ldr     r1,cp15_control_reg
+	mcr     p15,0,r1,c1,c0,0
+	mov	r1,r1
+	mov	r1,r1
+	
+	@ At this point virtual memory should be kicked in
+	...
+
+cp15_control_reg:
+	.word	0
+restore_func_phys_addr:
+	.word	0
+
+	
