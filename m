@@ -1,17 +1,40 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 4 Aug 2010 13:27:49 +0800
-Subject: [PATCH 06/13] [ARM] pxa/spitz: Formating and naming fixes
-In-Reply-To: <1280373389-32475-6-git-send-email-marek.vasut@gmail.com>
-References: <1280373389-32475-1-git-send-email-marek.vasut@gmail.com>
-	<1280373389-32475-6-git-send-email-marek.vasut@gmail.com>
-Message-ID: <AANLkTin0UyD0euCz44eh6rc-CZ9z2Hgm-f0+0mEV5=dy@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 4 Aug 2010 08:28:38 +0300
+Subject: [PATCH] omap: Fix DEBUG_LL uart to access phys addr when MMU
+	isn't enable
+In-Reply-To: <20100803194717.GA28048@n2100.arm.linux.org.uk>
+References: <1280807058-8394-1-git-send-email-jason77.wang@gmail.com>
+	<AANLkTi=ocZPDi5eU_F8VdAzJzYRCEp+B7MZ2q3DAesa3@mail.gmail.com>
+	<20100803065709.GP12293@atomide.com>
+	<AANLkTinNr7=8cO_E4zaXF4wCcKo3=WUnAek-Dh9-kgjs@mail.gmail.com>
+	<20100803072526.GA11987@n2100.arm.linux.org.uk>
+	<20100803123828.GZ12293@atomide.com>
+	<20100803194717.GA28048@n2100.arm.linux.org.uk>
+Message-ID: <20100804052834.GA6840@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 29, 2010 at 11:16 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Improve formating so checkpatch passes. Also, change some function and variable
-> names to make the naming consistent.
->
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [100803 22:40]:
+> On Tue, Aug 03, 2010 at 03:38:29PM +0300, Tony Lindgren wrote:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [100803 10:18]:
+> > > On Tue, Aug 03, 2010 at 03:11:41PM +0800, Eric Miao wrote:
+> > > > We also need to take care of Jeremy's recent patchset to remove
+> > > > .io_pg_offst and .phys_io, which modifies all the addruart macros.
+> > > 
+> > > I don't think Jeremy's patches will be going in for this merge window as
+> > > we can't intentionally break OMAP's support because we don't understand
+> > > OMAP.  I think Jeremy's patches will have to wait for the next merge
+> > > window now.
+> > 
+> > Well now we understand there's a bug.. Here's what's needed to make
+> > Jason's fix to work on Jeremy's mdesc series.
+> 
+> That's not quite the point - Jeremy's patches with working OMAP support
+> haven't been tested in linux-next, and so hasn't had visibility to the
+> wider community, and so it shouldn't be going into the current merge
+> window.
 
-Applied.
+OK. It's best to test them properly. I'll add Jason's original fix
+into omap-for-linus then for this merge window.
+
+Tony
