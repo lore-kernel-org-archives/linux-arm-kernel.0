@@ -1,697 +1,1697 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 4 Aug 2010 11:07:55 +0800
-Subject: [PATCH 01/13] [ARM] pxa/palm: Introduce Palm27x
-In-Reply-To: <201007291754.02846.marek.vasut@gmail.com>
+Date: Wed, 4 Aug 2010 11:14:09 +0800
+Subject: [PATCH 02/13] [ARM] pxa/palm: Flip Palm LD,TX,T5,Z72 to Palm27x
+In-Reply-To: <1280373389-32475-2-git-send-email-marek.vasut@gmail.com>
 References: <1280373389-32475-1-git-send-email-marek.vasut@gmail.com>
-	<4C515247.4030104@compulab.co.il>
-	<201007291754.02846.marek.vasut@gmail.com>
-Message-ID: <AANLkTimF9W6=2ZtUxrggzvHxEea30EkKiz=bMqnmsM_T@mail.gmail.com>
+	<1280373389-32475-2-git-send-email-marek.vasut@gmail.com>
+Message-ID: <AANLkTinF2VTwjbY5RQe7g=FSNdHTmT+XwX+8gAkrAiCv@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 29, 2010 at 11:54 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Dne ?t 29. ?ervence 2010 12:04:55 Mike Rapoport napsal(a):
->> Marek Vasut wrote:
->> > This contains common code for Palm LD, TX, T5, Z72, Treo680, Centro
->> >
->> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
->> > ---
->> >
->> > ?arch/arm/mach-pxa/Kconfig ? ? ? ? ? ? ? ?| ? ?3 +
->> > ?arch/arm/mach-pxa/Makefile ? ? ? ? ? ? ? | ? ?1 +
->> > ?arch/arm/mach-pxa/include/mach/palm27x.h | ? 48 +++
->> > ?arch/arm/mach-pxa/palm27x.c ? ? ? ? ? ? ?| ?475
->> > ?++++++++++++++++++++++++++++++ 4 files changed, 527 insertions(+), 0
->> > ?deletions(-)
->> > ?create mode 100644 arch/arm/mach-pxa/include/mach/palm27x.h
->> > ?create mode 100644 arch/arm/mach-pxa/palm27x.c
->> >
->> > diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
->> > index 21d1224..6f04f21 100644
->> > --- a/arch/arm/mach-pxa/Kconfig
->> > +++ b/arch/arm/mach-pxa/Kconfig
->> > @@ -347,6 +347,9 @@ config ARCH_PXA_PALM
->> >
->> > ? ? bool "PXA based Palm PDAs"
->> > ? ? select HAVE_PWM
->> >
->> > +config MACH_PALM27X
->> > + ? bool
->> > +
->> >
->> > ?config MACH_PALMTE2
->> >
->> > ? ? bool "Palm Tungsten|E2"
->> > ? ? default y
->> >
->> > diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
->> > index cb408ef..85c7fb3 100644
->> > --- a/arch/arm/mach-pxa/Makefile
->> > +++ b/arch/arm/mach-pxa/Makefile
->> > @@ -75,6 +75,7 @@ obj-$(CONFIG_PXA_EZX) ? ? ? ? ? += ezx.o
->> >
->> > ?obj-$(CONFIG_MACH_MP900C) ?+= mp900.o
->> > ?obj-$(CONFIG_MACH_PALMTE2) += palmte2.o
->> > ?obj-$(CONFIG_MACH_PALMTC) ?+= palmtc.o
->> >
->> > +obj-$(CONFIG_MACH_PALM27X) += palm27x.o
->> >
->> > ?obj-$(CONFIG_MACH_PALMT5) ?+= palmt5.o
->> > ?obj-$(CONFIG_MACH_PALMTX) ?+= palmtx.o
->> > ?obj-$(CONFIG_MACH_PALMZ72) += palmz72.o
->> >
->> > diff --git a/arch/arm/mach-pxa/include/mach/palm27x.h
->> > b/arch/arm/mach-pxa/include/mach/palm27x.h new file mode 100644
->> > index 0000000..94ae6d9
->> > --- /dev/null
->> > +++ b/arch/arm/mach-pxa/include/mach/palm27x.h
->>
->> Does it have to be in arch/arm/mach-pxa/include/mach/? I'd move it to
->> arch/arm/mach-pxa/ to reduce the header visibility
->>
->> > @@ -0,0 +1,48 @@
->> > +/*
->> > + * Common functions for Palm LD, T5, TX, Z72
->> > + *
->> > + * Copyright (C) 2010
->> > + * Marek Vasut <marek.vasut@gmail.com>
->> > + *
->> > + * This program is free software; you can redistribute it and/or modify
->> > + * it under the terms of the GNU General Public License version 2 as
->> > + * published by the Free Software Foundation.
->> > + *
->> > + */
->> > +
->> > +struct palm27x_handheld {
->> > + ? /* SD/MMC */
->> > + ? int ? ? ? ? ? ? mmc_detect;
->> > + ? int ? ? ? ? ? ? mmc_ro;
->> > + ? int ? ? ? ? ? ? mmc_power;
->> > +
->> > + ? /* PM */
->> > + ? unsigned long ? pm_str_base;
->> > +
->> > + ? /* UDC */
->> > + ? int ? ? ? ? ? ? udc_detect;
->> > + ? int ? ? ? ? ? ? udc_pullup;
->> > +
->> > + ? /* IrDA */
->> > + ? int ? ? ? ? ? ? irda_pwdn;
->> > +
->> > + ? /* Battery */
->> > + ? int ? ? ? ? ? ? batt_minv;
->> > + ? int ? ? ? ? ? ? batt_maxv;
->> > +
->> > + ? /* Audio */
->> > + ? int ? ? ? ? ? ? jack_gpio;
->> > +
->> > + ? /* Backlight */
->> > + ? int ? ? ? ? ? ? bl_bl;
->> > + ? int ? ? ? ? ? ? bl_lcd;
->> > +
->> > + ? /* Power supply */
->> > + ? int ? ? ? ? ? ? power_ac;
->> > + ? int ? ? ? ? ? ? power_usb;
->> > +
->> > + ? /* LCD */
->> > + ? int ? ? ? ? ? ? lcd_power;
->> > +};
->> > +
->> > +extern void __init palm27x_common_init(struct palm27x_handheld *);
->> > diff --git a/arch/arm/mach-pxa/palm27x.c b/arch/arm/mach-pxa/palm27x.c
->> > new file mode 100644
->> > index 0000000..ff5ee8c
->> > --- /dev/null
->> > +++ b/arch/arm/mach-pxa/palm27x.c
->> > @@ -0,0 +1,475 @@
->> > +/*
->> > + * Common code for Palm LD, T5, TX, Z72
->> > + *
->> > + * Copyright (C) 2010
->> > + * Marek Vasut <marek.vasut@gmail.com>
->> > + *
->> > + * This program is free software; you can redistribute it and/or modify
->> > + * it under the terms of the GNU General Public License version 2 as
->> > + * published by the Free Software Foundation.
->> > + *
->> > + */
->> > +
->> > +#include <linux/platform_device.h>
->> > +#include <linux/delay.h>
->> > +#include <linux/irq.h>
->> > +#include <linux/gpio_keys.h>
->> > +#include <linux/input.h>
->> > +#include <linux/pda_power.h>
->> > +#include <linux/pwm_backlight.h>
->> > +#include <linux/gpio.h>
->> > +#include <linux/wm97xx.h>
->> > +#include <linux/power_supply.h>
->> > +#include <linux/usb/gpio_vbus.h>
->> > +
->> > +#include <asm/mach-types.h>
->> > +#include <asm/mach/arch.h>
->> > +#include <asm/mach/map.h>
->> > +
->> > +#include <mach/pxa27x.h>
->> > +#include <mach/audio.h>
->> > +#include <mach/mmc.h>
->> > +#include <mach/pxafb.h>
->> > +#include <mach/irda.h>
->> > +#include <mach/udc.h>
->> > +#include <mach/palmasoc.h>
->> > +#include <mach/palm27x.h>
->> > +
->> > +#include "generic.h"
->> > +#include "devices.h"
->> > +
->> > +/***********************************************************************
->> > ******* + * SD/MMC card controller
->> > +
->> > ************************************************************************
->> > ******/ +#if defined(CONFIG_MMC_PXA) || defined(CONFIG_MMC_PXA_MODULE)
->> > +static struct pxamci_platform_data palm27x_mci_platform_data = {
+On Thu, Jul 29, 2010 at 11:16 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> ---
+> ?arch/arm/mach-pxa/Kconfig ? ?| ? ?4 +
+> ?arch/arm/mach-pxa/palmld.c ? | ?258 +++----------------------------------
+> ?arch/arm/mach-pxa/palmt5.c ? | ?275 +++------------------------------------
+> ?arch/arm/mach-pxa/palmtreo.c | ?292 +++++-------------------------------------
+> ?arch/arm/mach-pxa/palmtx.c ? | ?270 +++------------------------------------
+> ?arch/arm/mach-pxa/palmz72.c ?| ?261 ++-----------------------------------
+> ?6 files changed, 109 insertions(+), 1251 deletions(-)
 
-0 is a valid number for GPIO, so you may want to initialize this as:
+I like the number of line deletions :-)
 
-	.gpio_card_detect	= -1,
-	.gpio_card_ro		= -1,
-	.gpio_power		= -1,
+>
+> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+> index 6f04f21..7aefb90 100644
+> --- a/arch/arm/mach-pxa/Kconfig
+> +++ b/arch/arm/mach-pxa/Kconfig
+> @@ -374,6 +374,7 @@ config MACH_PALMT5
+> ? ? ? ?depends on ARCH_PXA_PALM
+> ? ? ? ?select PXA27x
+> ? ? ? ?select IWMMXT
+> + ? ? ? select MACH_PALM27X
 
->> > + ? .ocr_mask ? ? ? ? ? ? ? = MMC_VDD_32_33 | MMC_VDD_33_34,
->> > + ? .detect_delay_ms ? ? ? ?= 200,
->> > +};
->> > +
->> > +static void __init palm27x_mmc_init(int detect, int ro, int power)
->> > +{
->> > + ? palm27x_mci_platform_data.gpio_card_detect ? ? ?= detect;
->> > + ? palm27x_mci_platform_data.gpio_card_ro ? ? ? ? ?= ro;
->> > + ? palm27x_mci_platform_data.gpio_power ? ? ? ? ? ?= power;
->> > +
->> > + ? if (machine_is_palmz72() || machine_is_centro())
->> > + ? ? ? ? ? palm27x_mci_platform_data.gpio_power_invert = 1;
+Instead of introducing MACH_PALM27X, it might be better to change the Makefile
+as:
 
-Moving 'gpio_power_invert' to the parameter list of the function could help
-saving this if (machine_is_*()...), so when adding a new palm27x board or
-fixing an error, you don't have to list the machine types here.
+obj-$(CONFIG_MACH_PALMT5)	+= palmt5.o palm27x.o
+obj-$(CONFIG_MACH_PALMTX)	+= palmtx.o palm27x.o
 
->> > +
->> > + ? pxa_set_mci_info(&palm27x_mci_platform_data);
->> > +}
->> > +#else
->> > +static inline void palm27x_mmc_init(int detect, int ro, int power) {}
->> > +#endif
->> > +
->> > +/***********************************************************************
->> > ******* + * Power management - standby
->> > +
->> > ************************************************************************
->> > ******/ +#if defined(CONFIG_SUSPEND)
->> > +static void __init palm27x_pm_init(unsigned long str_base)
->> > +{
->> > + ? static const unsigned long resume[] = {
->> > + ? ? ? ? ? 0xe3a00101, ? ? /* mov ?r0, ? ? #0x40000000 */
->> > + ? ? ? ? ? 0xe380060f, ? ? /* orr ?r0, r0, #0x00f00000 */
->> > + ? ? ? ? ? 0xe590f008, ? ? /* ldr ?pc, [r0, #0x08] */
->> > + ? };
->> > +
->> > + ? /*
->> > + ? ?* Copy the bootloader.
->> > + ? ?* NOTE: PalmZ72 uses a different wakeup method!
->> > + ? ?*/
->> > + ? if (!machine_is_palmz72())
->> > + ? ? ? ? ? memcpy(phys_to_virt(str_base), resume, sizeof(resume));
->> > +}
->> > +#else
->> > +static inline void palm27x_pm_init(unsigned long str_base) {}
->> > +#endif
->> > +
->> > +/***********************************************************************
->> > ******* + * Framebuffer
->> > +
->> > ************************************************************************
->> > ******/ +/*
->> > + * NOTE: PalmZ72 has so called HiRes screen -- 320x320
->> > + * ? ? ? The rest of devices has HiRes+ screen -- 320x480
->> > + */
->> > +#if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
->> > +static struct pxafb_mode_info palm27x_modes[] = {
->> > + ? {
->> > + ? ? ? ? ? .pixclock ? ? ? = 57692,
->> > + ? ? ? ? ? .xres ? ? ? ? ? = 320,
->> > + ? ? ? ? ? .yres ? ? ? ? ? = 480,
->> > + ? ? ? ? ? .bpp ? ? ? ? ? ?= 16,
->> > +
->> > + ? ? ? ? ? .left_margin ? ?= 32,
->> > + ? ? ? ? ? .right_margin ? = 1,
->> > + ? ? ? ? ? .upper_margin ? = 7,
->> > + ? ? ? ? ? .lower_margin ? = 1,
->> > +
->> > + ? ? ? ? ? .hsync_len ? ? ?= 4,
->> > + ? ? ? ? ? .vsync_len ? ? ?= 1,
->> > + ? }, {
->> > + ? ? ? ? ? .pixclock ? ? ? = 115384,
->> > + ? ? ? ? ? .xres ? ? ? ? ? = 320,
->> > + ? ? ? ? ? .yres ? ? ? ? ? = 320,
->> > + ? ? ? ? ? .bpp ? ? ? ? ? ?= 16,
->> > +
->> > + ? ? ? ? ? .left_margin ? ?= 27,
->> > + ? ? ? ? ? .right_margin ? = 7,
->> > + ? ? ? ? ? .upper_margin ? = 7,
->> > + ? ? ? ? ? .lower_margin ? = 8,
->> > +
->> > + ? ? ? ? ? .hsync_len ? ? ?= 6,
->> > + ? ? ? ? ? .vsync_len ? ? ?= 1,
->> > + ? }, {
->> > + ? ? ? ? ? .pixclock ? ? ? = 86538,
->> > + ? ? ? ? ? .xres ? ? ? ? ? = 320,
->> > + ? ? ? ? ? .yres ? ? ? ? ? = 320,
->> > + ? ? ? ? ? .bpp ? ? ? ? ? ?= 16,
->> > +
->> > + ? ? ? ? ? .left_margin ? ?= 20,
->> > + ? ? ? ? ? .right_margin ? = 8,
->> > + ? ? ? ? ? .upper_margin ? = 8,
->> > + ? ? ? ? ? .lower_margin ? = 5,
->> > +
->> > + ? ? ? ? ? .hsync_len ? ? ?= 4,
->> > + ? ? ? ? ? .vsync_len ? ? ?= 1,
->> > + ? }
->> > +};
->>
->> I think that keeping three structures is more readable than the array, i.e
->> static struct pxafb_mode_info palmz72_mode = {
->> ...
->> };
->>
->> static struct pxafb_mode_info palmz72_mode = {
->> ...
->> };
->>
->> static struct pxafb_mode_info treo_centro_mode = {
->> ...
->> };
->>
->> static struct pxafb_mode_info palmz72x_mode = {
->> ...
->> };
->>
->> > +static struct pxafb_mach_info palm27x_lcd_screen = {
->> > + ? .num_modes ? ? ?= 1,
->> > + ? .lcd_conn ? ? ? = LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
->> > +};
->> > +
->> > +static int palm27x_lcd_power;
->> > +static void palm27x_lcd_ctl(int on, struct fb_var_screeninfo *info)
->> > +{
->> > + ? gpio_set_value(palm27x_lcd_power, on);
->> > +}
->> > +
->> > +static void __init palm27x_lcd_init(int power)
->> > +{
->> > + ? if (machine_is_palmz72())
->> > + ? ? ? ? ? palm27x_lcd_screen.modes = &palm27x_modes[1];
->> > + ? else if (machine_is_treo680() || machine_is_centro())
->> > + ? ? ? ? ? palm27x_lcd_screen.modes = &palm27x_modes[2];
->> > + ? else
->> > + ? ? ? ? ? palm27x_lcd_screen.modes = &palm27x_modes[0];
+The linker is smart enough to avoid linking palm27x.o twice.
 
-Mike's suggestion would be better in my POV.
+And in the end I'd like to see
 
->> > +
->> > + ? if (gpio_is_valid(power)) {
->> > + ? ? ? ? ? if (!gpio_request(power, "LCD power")) {
->> > + ? ? ? ? ? ? ? ? ? pr_err("Palm27x: failed to claim lcd power gpio!\n");
->> > + ? ? ? ? ? ? ? ? ? return;
->> > + ? ? ? ? ? }
->> > + ? ? ? ? ? if (!gpio_direction_output(power, 1)) {
->> > + ? ? ? ? ? ? ? ? ? pr_err("Palm27x: lcd power configuration failed!\n");
->> > + ? ? ? ? ? ? ? ? ? return;
->> > + ? ? ? ? ? }
->> > + ? ? ? ? ? palm27x_lcd_power = power;
->> > + ? ? ? ? ? palm27x_lcd_screen.pxafb_lcd_power = palm27x_lcd_ctl;
->> > + ? }
->> > +
->> > + ? set_pxa_fb_info(&palm27x_lcd_screen);
->> > +}
->> > +
->> > +#else
->> > +static inline void palm27x_lcd_init(int power) {}
->> > +#endif
->> > +
->> > +/***********************************************************************
->> > ******* + * USB Gadget
->> > +
->> > ************************************************************************
->> > ******/ +#if ? ? ? ?defined(CONFIG_USB_GADGET_PXA27X) || \
->> > + ? defined(CONFIG_USB_GADGET_PXA27X_MODULE)
->> > +static struct gpio_vbus_mach_info palm27x_udc_info = {
->> > + ? .gpio_vbus_inverted ? ? = 1,
->> > +};
->> > +
->> > +static struct platform_device palm27x_gpio_vbus = {
->> > + ? .name ? = "gpio-vbus",
->> > + ? .id ? ? = -1,
->> > + ? .dev ? ?= {
->> > + ? ? ? ? ? .platform_data ?= &palm27x_udc_info,
->> > + ? },
->> > +};
->> > +
->> > +static void __init palm27x_udc_init(int vbus, int pullup)
->> > +{
->> > + ? if (machine_is_palmld())
->> > + ? ? ? ? ? return;
->> > +
->> > + ? palm27x_udc_info.gpio_vbus ? ? ?= vbus;
->> > + ? palm27x_udc_info.gpio_pullup ? ?= pullup;
->> > +
->> > + ? if (machine_is_palmz72())
->> > + ? ? ? ? ? palm27x_udc_info.gpio_vbus_inverted = 0;
->> > +
->> > + ? if (!gpio_request(pullup, "USB Pullup")) {
->> > + ? ? ? ? ? gpio_direction_output(pullup,
->> > + ? ? ? ? ? ? ? ? ? palm27x_udc_info.gpio_vbus_inverted);
->> > + ? ? ? ? ? gpio_free(pullup);
->> > + ? } else
->> > + ? ? ? ? ? return;
->> > +
->> > + ? platform_device_register(&palm27x_gpio_vbus);
->> > +}
->> > +#else
->> > +static inline void palm27x_udc_init(int vbus, int pullup) {}
->> > +#endif
->> > +
->> > +/***********************************************************************
->> > ******* + * IrDA
->> > +
->> > ************************************************************************
->> > ******/ +#if defined(CONFIG_IRDA) || defined(CONFIG_IRDA_MODULE)
->> > +static struct pxaficp_platform_data palm27x_ficp_platform_data = {
->> > + ? .transceiver_cap ? ? ? ?= IR_SIRMODE | IR_OFF,
->> > +};
->> > +
->> > +static void __init palm27x_irda_init(int pwdn)
->> > +{
->> > + ? palm27x_ficp_platform_data.gpio_pwdown = pwdn;
->> > + ? pxa_set_ficp_info(&palm27x_ficp_platform_data);
->> > +}
->> > +#else
->> > +static inline void palm27x_irda_init(int pwdn) {}
->> > +#endif
->> > +
->> > +/***********************************************************************
->> > ******* + * WM97xx audio, battery
->> > +
->> > ************************************************************************
->> > ******/ +#if ? ? ? ?defined(CONFIG_TOUCHSCREEN_WM97XX) || \
->> > + ? defined(CONFIG_TOUCHSCREEN_WM97XX_MODULE)
->> > +static struct wm97xx_batt_pdata palm27x_batt_pdata = {
->> > + ? .batt_aux ? ? ? = WM97XX_AUX_ID3,
->> > + ? .temp_aux ? ? ? = WM97XX_AUX_ID2,
->> > + ? .charge_gpio ? ?= -1,
->> > + ? .batt_mult ? ? ?= 1000,
->> > + ? .batt_div ? ? ? = 414,
->> > + ? .temp_mult ? ? ?= 1,
->> > + ? .temp_div ? ? ? = 1,
->> > + ? .batt_tech ? ? ?= POWER_SUPPLY_TECHNOLOGY_LIPO,
->> > + ? .batt_name ? ? ?= "main-batt",
->> > +};
->> > +
->> > +static struct wm97xx_pdata palm27x_wm97xx_pdata = {
->> > + ? .batt_pdata ? ? = &palm27x_batt_pdata,
->> > +};
->> > +
->> > +static pxa2xx_audio_ops_t palm27x_ac97_pdata = {
->> > + ? .codec_pdata ? ?= { &palm27x_wm97xx_pdata, },
->> > +};
->> > +
->> > +static struct palm27x_asoc_info palm27x_asoc_pdata = {
->> > + ? .jack_gpio ? ? ?= -1,
->> > +};
->> > +
->> > +static struct platform_device palm27x_asoc = {
->> > + ? .name = "palm27x-asoc",
->> > + ? .id ? = -1,
->> > + ? .dev ?= {
->> > + ? ? ? ? ? .platform_data = &palm27x_asoc_pdata,
->> > + ? },
->> > +};
->> > +
->> > +static void __init palm27x_ac97_init(int minv, int maxv, int jack)
->> > +{
->> > + ? if (!machine_is_palmz72())
->> > + ? ? ? ? ? palm27x_ac97_pdata.reset_gpio = 95;
->> > + ? else
->> > + ? ? ? ? ? palm27x_asoc_pdata.jack_gpio = jack;
->> > +
->> > + ? if (machine_is_treo680() || machine_is_centro()) {
->> > + ? ? ? ? ? palm27x_ac97_pdata.codec_pdata[0] = NULL;
->> > + ? ? ? ? ? pxa_set_ac97_info(&palm27x_ac97_pdata);
->> > + ? } else {
->> > + ? ? ? ? ? palm27x_batt_pdata.min_voltage ?= minv,
->> > + ? ? ? ? ? palm27x_batt_pdata.max_voltage ?= maxv,
->> > +
->> > + ? ? ? ? ? pxa_set_ac97_info(&palm27x_ac97_pdata);
->> > + ? ? ? ? ? platform_device_register(&palm27x_asoc);
->> > + ? }
-
-The handling of treo680&centro seems to be quite different from the others,
-no platform_device_register(&palm27x_asoc) for treo680/centro?
-
-And since we really wanna common functions here, can we reduce if we cannot
-avoid completely the use of machine_is_*() here, since the invoker apparently
-knows which machine it is running on?
-
-I don't actually mind adding a bit redundancy to the data in this case,
-finally it will be easier to modify data only instead of modifying the
-code. e.g. let's say now we add a new palm27x board, which is partly like
-the treo series and partly like the others, so we will have to add more
-tricky if (machine_is_*()) code here.
-
->> > +}
->> > +#else
->> > +static inline void palm27x_ac97_init(int minv, int maxv, int jack) {}
->> > +#endif
->> > +
->> > +/***********************************************************************
->> > ******* + * Backlight
->> > +
->> > ************************************************************************
->> > ******/ +#if defined(CONFIG_BACKLIGHT_PWM) ||
->> > defined(CONFIG_BACKLIGHT_PWM_MODULE) +struct {
->> > + ? int ? ? bl_power;
->> > + ? int ? ? lcd_power;
->> > +} palm27x_bl_info;
-
-Or simply two static variables:
-
-static int gpio_bl_power;
-static int gpio_lcd_power;
-
->> > +
->> > +static int palm27x_backlight_init(struct device *dev)
->> > +{
->> > + ? int ret;
->> > +
->> > + ? ret = gpio_request(palm27x_bl_info.bl_power, "BL POWER");
->> > + ? if (ret)
->> > + ? ? ? ? ? goto err;
->> > + ? ret = gpio_direction_output(palm27x_bl_info.bl_power, 0);
->> > + ? if (ret)
->> > + ? ? ? ? ? goto err2;
->> > +
->> > + ? if (gpio_is_valid(palm27x_bl_info.lcd_power)) {
->> > + ? ? ? ? ? ret = gpio_request(palm27x_bl_info.lcd_power, "LCD POWER");
->> > + ? ? ? ? ? if (ret)
->> > + ? ? ? ? ? ? ? ? ? goto err2;
->> > + ? ? ? ? ? ret = gpio_direction_output(palm27x_bl_info.lcd_power, 0);
->> > + ? ? ? ? ? if (ret)
->> > + ? ? ? ? ? ? ? ? ? goto err3;
->> > + ? }
->> > +
->> > + ? return 0;
->> > +err3:
->> > + ? gpio_free(palm27x_bl_info.lcd_power);
->> > +err2:
->> > + ? gpio_free(palm27x_bl_info.bl_power);
->> > +err:
->> > + ? return ret;
->> > +}
->> > +
->> > +static int palm27x_backlight_notify(struct device *dev, int brightness)
->> > +{
->> > + ? gpio_set_value(palm27x_bl_info.bl_power, brightness);
->> > + ? if (gpio_is_valid(palm27x_bl_info.lcd_power))
->> > + ? ? ? ? ? gpio_set_value(palm27x_bl_info.lcd_power, brightness);
->> > + ? return brightness;
->> > +}
->> > +
->> > +static void palm27x_backlight_exit(struct device *dev)
->> > +{
->> > + ? gpio_free(palm27x_bl_info.bl_power);
->> > + ? if (gpio_is_valid(palm27x_bl_info.lcd_power))
->> > + ? ? ? ? ? gpio_free(palm27x_bl_info.lcd_power);
->> > +}
->> > +
->> > +static struct platform_pwm_backlight_data palm27x_backlight_data = {
->> > + ? .pwm_id ? ? ? ? = 0,
->> > + ? .max_brightness = 0xfe,
->> > + ? .dft_brightness = 0x7e,
->> > + ? .pwm_period_ns ?= 3500,
->> > + ? .init ? ? ? ? ? = palm27x_backlight_init,
->> > + ? .notify ? ? ? ? = palm27x_backlight_notify,
->> > + ? .exit ? ? ? ? ? = palm27x_backlight_exit,
->> > +};
->> > +
->> > +static struct platform_device palm27x_backlight = {
->> > + ? .name ? = "pwm-backlight",
->> > + ? .dev ? ?= {
->> > + ? ? ? ? ? .parent ? ? ? ? = &pxa27x_device_pwm0.dev,
->> > + ? ? ? ? ? .platform_data ?= &palm27x_backlight_data,
->> > + ? },
->> > +};
->> > +
->> > +static void __init palm27x_pwm_init(int bl, int lcd)
->> > +{
->> > + ? palm27x_bl_info.bl_power ? ? ? ?= bl;
->> > + ? palm27x_bl_info.lcd_power ? ? ? = lcd;
->> > + ? platform_device_register(&palm27x_backlight);
->> > +}
->> > +#else
->> > +static inline void palm27x_pwm_init(int bl, int lcd) {}
->> > +#endif
->> > +
->> > +/***********************************************************************
->> > ******* + * Power supply
->> > +
->> > ************************************************************************
->> > ******/ +#if defined(CONFIG_PDA_POWER) ||
->> > defined(CONFIG_PDA_POWER_MODULE) +struct {
->> > + ? int ? ? ac_state;
->> > + ? int ? ? usb_state;
->> > +} palm27x_power_info;
-
-Mmm.... won't bother to introduce a struct, two static variables should be
-enough?
-
-static int gpio_ac_state;
-static int gpio_usb_state;
-
->> > +
->> > +static int palm27x_power_supply_init(struct device *dev)
->> > +{
->> > + ? int ret;
->> > +
->> > + ? ret = gpio_request(palm27x_power_info.ac_state, "AC state");
->> > + ? if (ret)
->> > + ? ? ? ? ? goto err1;
->> > + ? ret = gpio_direction_input(palm27x_power_info.ac_state);
->> > + ? if (ret)
->> > + ? ? ? ? ? goto err2;
->> > +
->> > + ? if (gpio_is_valid(palm27x_power_info.usb_state)) {
->> > + ? ? ? ? ? ret = gpio_request(palm27x_power_info.usb_state, "USB state");
->> > + ? ? ? ? ? if (ret)
->> > + ? ? ? ? ? ? ? ? ? goto err2;
->> > + ? ? ? ? ? ret = gpio_direction_input(palm27x_power_info.usb_state);
->> > + ? ? ? ? ? if (ret)
->> > + ? ? ? ? ? ? ? ? ? goto err3;
->> > + ? }
->> > +
->> > + ? return 0;
->> > +err3:
->> > + ? gpio_free(palm27x_power_info.usb_state);
->> > +err2:
->> > + ? gpio_free(palm27x_power_info.ac_state);
->> > +err1:
->> > + ? return ret;
->> > +}
->> > +
->> > +static void palm27x_power_supply_exit(struct device *dev)
->> > +{
->> > + ? gpio_free(palm27x_power_info.usb_state);
->> > + ? gpio_free(palm27x_power_info.ac_state);
->> > +}
->> > +
->> > +static int palm27x_is_ac_online(void)
->> > +{
->> > + ? return gpio_get_value(palm27x_power_info.ac_state);
->> > +}
->> > +
->> > +static int palm27x_is_usb_online(void)
->> > +{
->> > + ? return !gpio_get_value(palm27x_power_info.usb_state);
->> > +}
->> > +static char *palm27x_supplicants[] = {
->> > + ? "main-battery",
->> > +};
->> > +
->> > +static struct pda_power_pdata palm27x_ps_info = {
->> > + ? .init ? ? ? ? ? ? ? ? ? = palm27x_power_supply_init,
->> > + ? .exit ? ? ? ? ? ? ? ? ? = palm27x_power_supply_exit,
->> > + ? .is_ac_online ? ? ? ? ? = palm27x_is_ac_online,
->> > + ? .is_usb_online ? ? ? ? ?= palm27x_is_usb_online,
->> > + ? .supplied_to ? ? ? ? ? ?= palm27x_supplicants,
->> > + ? .num_supplicants ? ? ? ?= ARRAY_SIZE(palm27x_supplicants),
->> > +};
->> > +
->> > +static struct platform_device palm27x_power_supply = {
->> > + ? .name = "pda-power",
->> > + ? .id ? = -1,
->> > + ? .dev ?= {
->> > + ? ? ? ? ? .platform_data = &palm27x_ps_info,
->> > + ? },
->> > +};
->> > +
->> > +static void __init palm27x_power_init(int ac, int usb)
->> > +{
->> > + ? palm27x_power_info.ac_state ? ? = ac;
->> > + ? palm27x_power_info.usb_state ? ?= usb;
->> > + ? platform_device_register(&palm27x_power_supply);
->> > +}
->> > +#else
->> > +static inline void palm27x_power_init(int ac, int usb) {}
->> > +#endif
->> > +
->> > +void __init palm27x_common_init(struct palm27x_handheld *palm)
->> > +{
->> > + ? pxa_set_ffuart_info(NULL);
->> > + ? pxa_set_btuart_info(NULL);
->> > + ? pxa_set_stuart_info(NULL);
-
-Can we only choose those UARTs actually used?
-
->> > +
->> > + ? palm27x_mmc_init(palm->mmc_detect, palm->mmc_ro, palm->mmc_power);
->> > + ? palm27x_pm_init(palm->pm_str_base);
->> > + ? palm27x_lcd_init(palm->lcd_power);
->> > + ? palm27x_udc_init(palm->udc_detect, palm->udc_pullup);
->> > + ? palm27x_irda_init(palm->irda_pwdn);
->> > + ? palm27x_ac97_init(palm->batt_minv, palm->batt_maxv, palm->jack_gpio);
->> > + ? palm27x_pwm_init(palm->bl_bl, palm->bl_lcd);
->> > + ? palm27x_power_init(palm->power_ac, palm->power_usb);
->> > +}
-
-This might be abstracted too much. Instead I'd like to avoid introducing
-'struct palm27x_handheld' (and a better name could be 'palm27x_params'?),
-and having machines to call these common init functions directly:
-
-static void __init palmld_init(void)
-{
+config MACH_PALMT5
+	depends on PXA_PALM27X
+	select PXA27x
+	select IWMMXT
 	...
-	palm27x_mmc_init(GPIO_PALMLD_MMC_DETECT,
-			 GPIO_PALMLD_MMC_RO,
-			 GPIO_PALMLD_MMC_POWER);
-	palm27x_lcd_init(GPIO_PALMLD_LCD_POWER);
-	...
-}
 
+So in Makefile:
+
+obj-$(CONFIG_PXA_PALM27X)	+= palm27x.o
+
+And all those #ifdef CONFIG_MACH_PALMT5 .. #endif in palm27x.c, like
+what ezx is doing.
+
+The rest of the patch looks good.
+
+> ? ? ? ?help
+> ? ? ? ? ?Say Y here if you intend to run this kernel on a Palm Tungsten|T5
+> ? ? ? ? ?handheld computer.
+> @@ -384,6 +385,7 @@ config MACH_PALMTX
+> ? ? ? ?depends on ARCH_PXA_PALM
+> ? ? ? ?select PXA27x
+> ? ? ? ?select IWMMXT
+> + ? ? ? select MACH_PALM27X
+> ? ? ? ?help
+> ? ? ? ? ?Say Y here if you intend to run this kernel on a Palm T|X
+> ? ? ? ? ?handheld computer.
+> @@ -394,6 +396,7 @@ config MACH_PALMZ72
+> ? ? ? ?depends on ARCH_PXA_PALM
+> ? ? ? ?select PXA27x
+> ? ? ? ?select IWMMXT
+> + ? ? ? select MACH_PALM27X
+> ? ? ? ?help
+> ? ? ? ? ?Say Y here if you intend to run this kernel on Palm Zire 72
+> ? ? ? ? ?handheld computer.
+> @@ -404,6 +407,7 @@ config MACH_PALMLD
+> ? ? ? ?depends on ARCH_PXA_PALM
+> ? ? ? ?select PXA27x
+> ? ? ? ?select IWMMXT
+> + ? ? ? select MACH_PALM27X
+> ? ? ? ?help
+> ? ? ? ? ?Say Y here if you intend to run this kernel on a Palm LifeDrive
+> ? ? ? ? ?handheld computer.
+> diff --git a/arch/arm/mach-pxa/palmld.c b/arch/arm/mach-pxa/palmld.c
+> index 83a1a55..cac66ca 100644
+> --- a/arch/arm/mach-pxa/palmld.c
+> +++ b/arch/arm/mach-pxa/palmld.c
+> @@ -41,6 +41,7 @@
+> ?#include <mach/irda.h>
+> ?#include <mach/pxa27x_keypad.h>
+> ?#include <mach/palmasoc.h>
+> +#include <mach/palm27x.h>
 >
-> Hey Mike,
+> ?#include "generic.h"
+> ?#include "devices.h"
+> @@ -161,17 +162,6 @@ static struct platform_device palmld_flash = {
+> ?};
 >
-> I'll push the changes you suggested in a separate patch to avoid breaking the
-> already existing code (I can't currently test this on all affected platforms,
-> but I should be able to do it once I get another palmld). Especially I'll have
-> to analyze the PMIC change.
+> ?/******************************************************************************
+> - * SD/MMC card controller
+> - ******************************************************************************/
+> -static struct pxamci_platform_data palmld_mci_platform_data = {
+> - ? ? ? .ocr_mask ? ? ? ? ? ? ? = MMC_VDD_32_33 | MMC_VDD_33_34,
+> - ? ? ? .gpio_card_detect ? ? ? = GPIO_NR_PALMLD_SD_DETECT_N,
+> - ? ? ? .gpio_card_ro ? ? ? ? ? = GPIO_NR_PALMLD_SD_READONLY,
+> - ? ? ? .gpio_power ? ? ? ? ? ? = GPIO_NR_PALMLD_SD_POWER,
+> - ? ? ? .detect_delay_ms ? ? ? ?= 200,
+> -};
+> -
+> -/******************************************************************************
+> ?* GPIO keyboard
+> ?******************************************************************************/
+> ?static unsigned int palmld_matrix_keys[] = {
+> @@ -223,74 +213,6 @@ static struct platform_device palmld_pxa_keys = {
+> ?};
 >
-> Thanks for the review !
-> Cheers
+> ?/******************************************************************************
+> - * Backlight
+> - ******************************************************************************/
+> -static int palmld_backlight_init(struct device *dev)
+> -{
+> - ? ? ? int ret;
+> -
+> - ? ? ? ret = gpio_request(GPIO_NR_PALMLD_BL_POWER, "BL POWER");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err;
+> - ? ? ? ret = gpio_direction_output(GPIO_NR_PALMLD_BL_POWER, 0);
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err2;
+> - ? ? ? ret = gpio_request(GPIO_NR_PALMLD_LCD_POWER, "LCD POWER");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err2;
+> - ? ? ? ret = gpio_direction_output(GPIO_NR_PALMLD_LCD_POWER, 0);
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err3;
+> -
+> - ? ? ? return 0;
+> -err3:
+> - ? ? ? gpio_free(GPIO_NR_PALMLD_LCD_POWER);
+> -err2:
+> - ? ? ? gpio_free(GPIO_NR_PALMLD_BL_POWER);
+> -err:
+> - ? ? ? return ret;
+> -}
+> -
+> -static int palmld_backlight_notify(struct device *dev, int brightness)
+> -{
+> - ? ? ? gpio_set_value(GPIO_NR_PALMLD_BL_POWER, brightness);
+> - ? ? ? gpio_set_value(GPIO_NR_PALMLD_LCD_POWER, brightness);
+> - ? ? ? return brightness;
+> -}
+> -
+> -static void palmld_backlight_exit(struct device *dev)
+> -{
+> - ? ? ? gpio_free(GPIO_NR_PALMLD_BL_POWER);
+> - ? ? ? gpio_free(GPIO_NR_PALMLD_LCD_POWER);
+> -}
+> -
+> -static struct platform_pwm_backlight_data palmld_backlight_data = {
+> - ? ? ? .pwm_id ? ? ? ? = 0,
+> - ? ? ? .max_brightness = PALMLD_MAX_INTENSITY,
+> - ? ? ? .dft_brightness = PALMLD_MAX_INTENSITY,
+> - ? ? ? .pwm_period_ns ?= PALMLD_PERIOD_NS,
+> - ? ? ? .init ? ? ? ? ? = palmld_backlight_init,
+> - ? ? ? .notify ? ? ? ? = palmld_backlight_notify,
+> - ? ? ? .exit ? ? ? ? ? = palmld_backlight_exit,
+> -};
+> -
+> -static struct platform_device palmld_backlight = {
+> - ? ? ? .name ? = "pwm-backlight",
+> - ? ? ? .dev ? ?= {
+> - ? ? ? ? ? ? ? .parent ? ? ? ? = &pxa27x_device_pwm0.dev,
+> - ? ? ? ? ? ? ? .platform_data ?= &palmld_backlight_data,
+> - ? ? ? },
+> -};
+> -
+> -/******************************************************************************
+> - * IrDA
+> - ******************************************************************************/
+> -static struct pxaficp_platform_data palmld_ficp_platform_data = {
+> - ? ? ? .gpio_pwdown ? ? ? ? ? ?= GPIO_NR_PALMLD_IR_DISABLE,
+> - ? ? ? .transceiver_cap ? ? ? ?= IR_SIRMODE | IR_OFF,
+> -};
+> -
+> -/******************************************************************************
+> ?* LEDs
+> ?******************************************************************************/
+> ?struct gpio_led gpio_leds[] = {
+> @@ -319,112 +241,6 @@ static struct platform_device palmld_leds = {
+> ?};
+>
+> ?/******************************************************************************
+> - * Power supply
+> - ******************************************************************************/
+> -static int power_supply_init(struct device *dev)
+> -{
+> - ? ? ? int ret;
+> -
+> - ? ? ? ret = gpio_request(GPIO_NR_PALMLD_POWER_DETECT, "CABLE_STATE_AC");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err1;
+> - ? ? ? ret = gpio_direction_input(GPIO_NR_PALMLD_POWER_DETECT);
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err2;
+> -
+> - ? ? ? ret = gpio_request(GPIO_NR_PALMLD_USB_DETECT_N, "CABLE_STATE_USB");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err2;
+> - ? ? ? ret = gpio_direction_input(GPIO_NR_PALMLD_USB_DETECT_N);
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err3;
+> -
+> - ? ? ? return 0;
+> -
+> -err3:
+> - ? ? ? gpio_free(GPIO_NR_PALMLD_USB_DETECT_N);
+> -err2:
+> - ? ? ? gpio_free(GPIO_NR_PALMLD_POWER_DETECT);
+> -err1:
+> - ? ? ? return ret;
+> -}
+> -
+> -static int palmld_is_ac_online(void)
+> -{
+> - ? ? ? return gpio_get_value(GPIO_NR_PALMLD_POWER_DETECT);
+> -}
+> -
+> -static int palmld_is_usb_online(void)
+> -{
+> - ? ? ? return !gpio_get_value(GPIO_NR_PALMLD_USB_DETECT_N);
+> -}
+> -
+> -static void power_supply_exit(struct device *dev)
+> -{
+> - ? ? ? gpio_free(GPIO_NR_PALMLD_USB_DETECT_N);
+> - ? ? ? gpio_free(GPIO_NR_PALMLD_POWER_DETECT);
+> -}
+> -
+> -static char *palmld_supplicants[] = {
+> - ? ? ? "main-battery",
+> -};
+> -
+> -static struct pda_power_pdata power_supply_info = {
+> - ? ? ? .init ? ? ? ? ? ?= power_supply_init,
+> - ? ? ? .is_ac_online ? ?= palmld_is_ac_online,
+> - ? ? ? .is_usb_online ? = palmld_is_usb_online,
+> - ? ? ? .exit ? ? ? ? ? ?= power_supply_exit,
+> - ? ? ? .supplied_to ? ? = palmld_supplicants,
+> - ? ? ? .num_supplicants = ARRAY_SIZE(palmld_supplicants),
+> -};
+> -
+> -static struct platform_device power_supply = {
+> - ? ? ? .name = "pda-power",
+> - ? ? ? .id ? = -1,
+> - ? ? ? .dev ?= {
+> - ? ? ? ? ? ? ? .platform_data = &power_supply_info,
+> - ? ? ? },
+> -};
+> -
+> -/******************************************************************************
+> - * WM97xx audio, battery
+> - ******************************************************************************/
+> -static struct wm97xx_batt_pdata palmld_batt_pdata = {
+> - ? ? ? .batt_aux ? ? ? = WM97XX_AUX_ID3,
+> - ? ? ? .temp_aux ? ? ? = WM97XX_AUX_ID2,
+> - ? ? ? .charge_gpio ? ?= -1,
+> - ? ? ? .max_voltage ? ?= PALMLD_BAT_MAX_VOLTAGE,
+> - ? ? ? .min_voltage ? ?= PALMLD_BAT_MIN_VOLTAGE,
+> - ? ? ? .batt_mult ? ? ?= 1000,
+> - ? ? ? .batt_div ? ? ? = 414,
+> - ? ? ? .temp_mult ? ? ?= 1,
+> - ? ? ? .temp_div ? ? ? = 1,
+> - ? ? ? .batt_tech ? ? ?= POWER_SUPPLY_TECHNOLOGY_LIPO,
+> - ? ? ? .batt_name ? ? ?= "main-batt",
+> -};
+> -
+> -static struct wm97xx_pdata palmld_wm97xx_pdata = {
+> - ? ? ? .batt_pdata ? ? = &palmld_batt_pdata,
+> -};
+> -
+> -static pxa2xx_audio_ops_t palmld_ac97_pdata = {
+> - ? ? ? .reset_gpio ? ? = 95,
+> - ? ? ? .codec_pdata ? ?= { &palmld_wm97xx_pdata, },
+> -};
+> -
+> -static struct palm27x_asoc_info palmld_asoc_pdata = {
+> - ? ? ? .jack_gpio ? ? ?= GPIO_NR_PALMLD_EARPHONE_DETECT,
+> -};
+> -
+> -static struct platform_device palmld_asoc = {
+> - ? ? ? .name = "palm27x-asoc",
+> - ? ? ? .id ? = -1,
+> - ? ? ? .dev ?= {
+> - ? ? ? ? ? ? ? .platform_data = &palmld_asoc_pdata,
+> - ? ? ? },
+> -};
+> -
+> -/******************************************************************************
+> ?* HDD
+> ?******************************************************************************/
+> ?static struct platform_device palmld_hdd = {
+> @@ -433,57 +249,13 @@ static struct platform_device palmld_hdd = {
+> ?};
+>
+> ?/******************************************************************************
+> - * Framebuffer
+> - ******************************************************************************/
+> -static struct pxafb_mode_info palmld_lcd_modes[] = {
+> -{
+> - ? ? ? .pixclock ? ? ? = 57692,
+> - ? ? ? .xres ? ? ? ? ? = 320,
+> - ? ? ? .yres ? ? ? ? ? = 480,
+> - ? ? ? .bpp ? ? ? ? ? ?= 16,
+> -
+> - ? ? ? .left_margin ? ?= 32,
+> - ? ? ? .right_margin ? = 1,
+> - ? ? ? .upper_margin ? = 7,
+> - ? ? ? .lower_margin ? = 1,
+> -
+> - ? ? ? .hsync_len ? ? ?= 4,
+> - ? ? ? .vsync_len ? ? ?= 1,
+> -},
+> -};
+> -
+> -static struct pxafb_mach_info palmld_lcd_screen = {
+> - ? ? ? .modes ? ? ? ? ?= palmld_lcd_modes,
+> - ? ? ? .num_modes ? ? ?= ARRAY_SIZE(palmld_lcd_modes),
+> - ? ? ? .lcd_conn ? ? ? = LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
+> -};
+> -
+> -/******************************************************************************
+> - * Power management - standby
+> - ******************************************************************************/
+> -static void __init palmld_pm_init(void)
+> -{
+> - ? ? ? static u32 resume[] = {
+> - ? ? ? ? ? ? ? 0xe3a00101, ? ? /* mov ?r0, ? ? #0x40000000 */
+> - ? ? ? ? ? ? ? 0xe380060f, ? ? /* orr ?r0, r0, #0x00f00000 */
+> - ? ? ? ? ? ? ? 0xe590f008, ? ? /* ldr ?pc, [r0, #0x08] */
+> - ? ? ? };
+> -
+> - ? ? ? /* copy the bootloader */
+> - ? ? ? memcpy(phys_to_virt(PALMLD_STR_BASE), resume, sizeof(resume));
+> -}
+> -
+> -/******************************************************************************
+> ?* Machine init
+> ?******************************************************************************/
+> ?static struct platform_device *devices[] __initdata = {
+> ?#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
+> ? ? ? ?&palmld_pxa_keys,
+> ?#endif
+> - ? ? ? &palmld_backlight,
+> ? ? ? ?&palmld_leds,
+> - ? ? ? &power_supply,
+> - ? ? ? &palmld_asoc,
+> ? ? ? ?&palmld_hdd,
+> ? ? ? ?&palmld_flash,
+> ?};
+> @@ -509,21 +281,27 @@ static void __init palmld_map_io(void)
+> ? ? ? ?iotable_init(palmld_io_desc, ARRAY_SIZE(palmld_io_desc));
+> ?}
+>
+> +struct palm27x_handheld palmld = {
+> + ? ? ? .mmc_detect ? ? = GPIO_NR_PALMLD_SD_DETECT_N,
+> + ? ? ? .mmc_ro ? ? ? ? = GPIO_NR_PALMLD_SD_READONLY,
+> + ? ? ? .mmc_power ? ? ?= GPIO_NR_PALMLD_SD_POWER,
+> + ? ? ? .pm_str_base ? ?= PALMLD_STR_BASE,
+> + ? ? ? .irda_pwdn ? ? ?= GPIO_NR_PALMLD_IR_DISABLE,
+> + ? ? ? .batt_minv ? ? ?= PALMLD_BAT_MIN_VOLTAGE,
+> + ? ? ? .batt_maxv ? ? ?= PALMLD_BAT_MAX_VOLTAGE,
+> + ? ? ? .jack_gpio ? ? ?= GPIO_NR_PALMLD_EARPHONE_DETECT,
+> + ? ? ? .bl_bl ? ? ? ? ?= GPIO_NR_PALMLD_BL_POWER,
+> + ? ? ? .bl_lcd ? ? ? ? = GPIO_NR_PALMLD_LCD_POWER,
+> + ? ? ? .power_ac ? ? ? = GPIO_NR_PALMLD_POWER_DETECT,
+> + ? ? ? .power_usb ? ? ?= GPIO_NR_PALMLD_USB_DETECT_N,
+> + ? ? ? .lcd_power ? ? ?= -1,
+> +};
+> +
+> ?static void __init palmld_init(void)
+> ?{
+> ? ? ? ?pxa2xx_mfp_config(ARRAY_AND_SIZE(palmld_pin_config));
+> -
+> - ? ? ? pxa_set_ffuart_info(NULL);
+> - ? ? ? pxa_set_btuart_info(NULL);
+> - ? ? ? pxa_set_stuart_info(NULL);
+> -
+> - ? ? ? palmld_pm_init();
+> - ? ? ? set_pxa_fb_info(&palmld_lcd_screen);
+> - ? ? ? pxa_set_mci_info(&palmld_mci_platform_data);
+> - ? ? ? pxa_set_ac97_info(&palmld_ac97_pdata);
+> - ? ? ? pxa_set_ficp_info(&palmld_ficp_platform_data);
+> + ? ? ? palm27x_common_init(&palmld);
+> ? ? ? ?pxa_set_keypad_info(&palmld_keypad_platform_data);
+> -
+> ? ? ? ?platform_add_devices(devices, ARRAY_SIZE(devices));
+> ?}
+>
+> diff --git a/arch/arm/mach-pxa/palmt5.c b/arch/arm/mach-pxa/palmt5.c
+> index 0b36d7d..593f57c 100644
+> --- a/arch/arm/mach-pxa/palmt5.c
+> +++ b/arch/arm/mach-pxa/palmt5.c
+> @@ -41,6 +41,7 @@
+> ?#include <mach/pxa27x_keypad.h>
+> ?#include <mach/udc.h>
+> ?#include <mach/palmasoc.h>
+> +#include <mach/palm27x.h>
+>
+> ?#include "generic.h"
+> ?#include "devices.h"
+> @@ -103,17 +104,6 @@ static unsigned long palmt5_pin_config[] __initdata = {
+> ?};
+>
+> ?/******************************************************************************
+> - * SD/MMC card controller
+> - ******************************************************************************/
+> -static struct pxamci_platform_data palmt5_mci_platform_data = {
+> - ? ? ? .ocr_mask ? ? ? ? ? ? ? = MMC_VDD_32_33 | MMC_VDD_33_34,
+> - ? ? ? .gpio_card_detect ? ? ? = GPIO_NR_PALMT5_SD_DETECT_N,
+> - ? ? ? .gpio_card_ro ? ? ? ? ? = GPIO_NR_PALMT5_SD_READONLY,
+> - ? ? ? .gpio_power ? ? ? ? ? ? = GPIO_NR_PALMT5_SD_POWER,
+> - ? ? ? .detect_delay_ms ? ? ? ?= 200,
+> -};
+> -
+> -/******************************************************************************
+> ?* GPIO keyboard
+> ?******************************************************************************/
+> ?static unsigned int palmt5_matrix_keys[] = {
+> @@ -162,259 +152,32 @@ static struct platform_device palmt5_pxa_keys = {
+> ?};
+>
+> ?/******************************************************************************
+> - * Backlight
+> - ******************************************************************************/
+> -static int palmt5_backlight_init(struct device *dev)
+> -{
+> - ? ? ? int ret;
+> -
+> - ? ? ? ret = gpio_request(GPIO_NR_PALMT5_BL_POWER, "BL POWER");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err;
+> - ? ? ? ret = gpio_direction_output(GPIO_NR_PALMT5_BL_POWER, 0);
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err2;
+> - ? ? ? ret = gpio_request(GPIO_NR_PALMT5_LCD_POWER, "LCD POWER");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err2;
+> - ? ? ? ret = gpio_direction_output(GPIO_NR_PALMT5_LCD_POWER, 0);
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err3;
+> -
+> - ? ? ? return 0;
+> -err3:
+> - ? ? ? gpio_free(GPIO_NR_PALMT5_LCD_POWER);
+> -err2:
+> - ? ? ? gpio_free(GPIO_NR_PALMT5_BL_POWER);
+> -err:
+> - ? ? ? return ret;
+> -}
+> -
+> -static int palmt5_backlight_notify(struct device *dev, int brightness)
+> -{
+> - ? ? ? gpio_set_value(GPIO_NR_PALMT5_BL_POWER, brightness);
+> - ? ? ? gpio_set_value(GPIO_NR_PALMT5_LCD_POWER, brightness);
+> - ? ? ? return brightness;
+> -}
+> -
+> -static void palmt5_backlight_exit(struct device *dev)
+> -{
+> - ? ? ? gpio_free(GPIO_NR_PALMT5_BL_POWER);
+> - ? ? ? gpio_free(GPIO_NR_PALMT5_LCD_POWER);
+> -}
+> -
+> -static struct platform_pwm_backlight_data palmt5_backlight_data = {
+> - ? ? ? .pwm_id ? ? ? ? = 0,
+> - ? ? ? .max_brightness = PALMT5_MAX_INTENSITY,
+> - ? ? ? .dft_brightness = PALMT5_MAX_INTENSITY,
+> - ? ? ? .pwm_period_ns ?= PALMT5_PERIOD_NS,
+> - ? ? ? .init ? ? ? ? ? = palmt5_backlight_init,
+> - ? ? ? .notify ? ? ? ? = palmt5_backlight_notify,
+> - ? ? ? .exit ? ? ? ? ? = palmt5_backlight_exit,
+> -};
+> -
+> -static struct platform_device palmt5_backlight = {
+> - ? ? ? .name ? = "pwm-backlight",
+> - ? ? ? .dev ? ?= {
+> - ? ? ? ? ? ? ? .parent ? ? ? ? = &pxa27x_device_pwm0.dev,
+> - ? ? ? ? ? ? ? .platform_data ?= &palmt5_backlight_data,
+> - ? ? ? },
+> -};
+> -
+> -/******************************************************************************
+> - * IrDA
+> - ******************************************************************************/
+> -static struct pxaficp_platform_data palmt5_ficp_platform_data = {
+> - ? ? ? .gpio_pwdown ? ? ? ? ? ?= GPIO_NR_PALMT5_IR_DISABLE,
+> - ? ? ? .transceiver_cap ? ? ? ?= IR_SIRMODE | IR_OFF,
+> -};
+> -
+> -/******************************************************************************
+> - * UDC
+> - ******************************************************************************/
+> -static struct gpio_vbus_mach_info palmt5_udc_info = {
+> - ? ? ? .gpio_vbus ? ? ? ? ? ? ?= GPIO_NR_PALMT5_USB_DETECT_N,
+> - ? ? ? .gpio_vbus_inverted ? ? = 1,
+> - ? ? ? .gpio_pullup ? ? ? ? ? ?= GPIO_NR_PALMT5_USB_PULLUP,
+> -};
+> -
+> -static struct platform_device palmt5_gpio_vbus = {
+> - ? ? ? .name ? = "gpio-vbus",
+> - ? ? ? .id ? ? = -1,
+> - ? ? ? .dev ? ?= {
+> - ? ? ? ? ? ? ? .platform_data ?= &palmt5_udc_info,
+> - ? ? ? },
+> -};
+> -
+> -/******************************************************************************
+> - * Power supply
+> - ******************************************************************************/
+> -static int power_supply_init(struct device *dev)
+> -{
+> - ? ? ? int ret;
+> -
+> - ? ? ? ret = gpio_request(GPIO_NR_PALMT5_POWER_DETECT, "CABLE_STATE_AC");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err1;
+> - ? ? ? ret = gpio_direction_input(GPIO_NR_PALMT5_POWER_DETECT);
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err2;
+> -
+> - ? ? ? return 0;
+> -err2:
+> - ? ? ? gpio_free(GPIO_NR_PALMT5_POWER_DETECT);
+> -err1:
+> - ? ? ? return ret;
+> -}
+> -
+> -static int palmt5_is_ac_online(void)
+> -{
+> - ? ? ? return gpio_get_value(GPIO_NR_PALMT5_POWER_DETECT);
+> -}
+> -
+> -static void power_supply_exit(struct device *dev)
+> -{
+> - ? ? ? gpio_free(GPIO_NR_PALMT5_POWER_DETECT);
+> -}
+> -
+> -static char *palmt5_supplicants[] = {
+> - ? ? ? "main-battery",
+> -};
+> -
+> -static struct pda_power_pdata power_supply_info = {
+> - ? ? ? .init ? ? ? ? ? ?= power_supply_init,
+> - ? ? ? .is_ac_online ? ?= palmt5_is_ac_online,
+> - ? ? ? .exit ? ? ? ? ? ?= power_supply_exit,
+> - ? ? ? .supplied_to ? ? = palmt5_supplicants,
+> - ? ? ? .num_supplicants = ARRAY_SIZE(palmt5_supplicants),
+> -};
+> -
+> -static struct platform_device power_supply = {
+> - ? ? ? .name = "pda-power",
+> - ? ? ? .id ? = -1,
+> - ? ? ? .dev ?= {
+> - ? ? ? ? ? ? ? .platform_data = &power_supply_info,
+> - ? ? ? },
+> -};
+> -
+> -/******************************************************************************
+> - * WM97xx audio, battery
+> - ******************************************************************************/
+> -static struct wm97xx_batt_pdata palmt5_batt_pdata = {
+> - ? ? ? .batt_aux ? ? ? = WM97XX_AUX_ID3,
+> - ? ? ? .temp_aux ? ? ? = WM97XX_AUX_ID2,
+> - ? ? ? .charge_gpio ? ?= -1,
+> - ? ? ? .max_voltage ? ?= PALMT5_BAT_MAX_VOLTAGE,
+> - ? ? ? .min_voltage ? ?= PALMT5_BAT_MIN_VOLTAGE,
+> - ? ? ? .batt_mult ? ? ?= 1000,
+> - ? ? ? .batt_div ? ? ? = 414,
+> - ? ? ? .temp_mult ? ? ?= 1,
+> - ? ? ? .temp_div ? ? ? = 1,
+> - ? ? ? .batt_tech ? ? ?= POWER_SUPPLY_TECHNOLOGY_LIPO,
+> - ? ? ? .batt_name ? ? ?= "main-batt",
+> -};
+> -
+> -static struct wm97xx_pdata palmt5_wm97xx_pdata = {
+> - ? ? ? .batt_pdata ? ? = &palmt5_batt_pdata,
+> -};
+> -
+> -static pxa2xx_audio_ops_t palmt5_ac97_pdata = {
+> - ? ? ? .reset_gpio ? ? = 95,
+> - ? ? ? .codec_pdata ? ?= { &palmt5_wm97xx_pdata, },
+> -};
+> -
+> -static struct palm27x_asoc_info palmt5_asoc_pdata = {
+> - ? ? ? .jack_gpio ? ? ?= GPIO_NR_PALMT5_EARPHONE_DETECT,
+> -};
+> -
+> -static struct platform_device palmt5_asoc = {
+> - ? ? ? .name = "palm27x-asoc",
+> - ? ? ? .id ? = -1,
+> - ? ? ? .dev ?= {
+> - ? ? ? ? ? ? ? .platform_data = &palmt5_asoc_pdata,
+> - ? ? ? },
+> -};
+> -
+> -/******************************************************************************
+> - * Framebuffer
+> - ******************************************************************************/
+> -static struct pxafb_mode_info palmt5_lcd_modes[] = {
+> -{
+> - ? ? ? .pixclock ? ? ? = 57692,
+> - ? ? ? .xres ? ? ? ? ? = 320,
+> - ? ? ? .yres ? ? ? ? ? = 480,
+> - ? ? ? .bpp ? ? ? ? ? ?= 16,
+> -
+> - ? ? ? .left_margin ? ?= 32,
+> - ? ? ? .right_margin ? = 1,
+> - ? ? ? .upper_margin ? = 7,
+> - ? ? ? .lower_margin ? = 1,
+> -
+> - ? ? ? .hsync_len ? ? ?= 4,
+> - ? ? ? .vsync_len ? ? ?= 1,
+> -},
+> -};
+> -
+> -static struct pxafb_mach_info palmt5_lcd_screen = {
+> - ? ? ? .modes ? ? ? ? ?= palmt5_lcd_modes,
+> - ? ? ? .num_modes ? ? ?= ARRAY_SIZE(palmt5_lcd_modes),
+> - ? ? ? .lcd_conn ? ? ? = LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
+> -};
+> -
+> -/******************************************************************************
+> - * Power management - standby
+> - ******************************************************************************/
+> -static void __init palmt5_pm_init(void)
+> -{
+> - ? ? ? static u32 resume[] = {
+> - ? ? ? ? ? ? ? 0xe3a00101, ? ? /* mov ?r0, ? ? #0x40000000 */
+> - ? ? ? ? ? ? ? 0xe380060f, ? ? /* orr ?r0, r0, #0x00f00000 */
+> - ? ? ? ? ? ? ? 0xe590f008, ? ? /* ldr ?pc, [r0, #0x08] */
+> - ? ? ? };
+> -
+> - ? ? ? /* copy the bootloader */
+> - ? ? ? memcpy(phys_to_virt(PALMT5_STR_BASE), resume, sizeof(resume));
+> -}
+> -
+> -/******************************************************************************
+> ?* Machine init
+> ?******************************************************************************/
+> -static struct platform_device *devices[] __initdata = {
+> -#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
+> - ? ? ? &palmt5_pxa_keys,
+> -#endif
+> - ? ? ? &palmt5_backlight,
+> - ? ? ? &power_supply,
+> - ? ? ? &palmt5_asoc,
+> - ? ? ? &palmt5_gpio_vbus,
+> +struct palm27x_handheld palmt5 = {
+> + ? ? ? .mmc_detect ? ? = GPIO_NR_PALMT5_SD_DETECT_N,
+> + ? ? ? .mmc_ro ? ? ? ? = GPIO_NR_PALMT5_SD_READONLY,
+> + ? ? ? .mmc_power ? ? ?= GPIO_NR_PALMT5_SD_POWER,
+> + ? ? ? .pm_str_base ? ?= PALMT5_STR_BASE,
+> + ? ? ? .udc_detect ? ? = GPIO_NR_PALMT5_USB_DETECT_N,
+> + ? ? ? .udc_pullup ? ? = GPIO_NR_PALMT5_USB_PULLUP,
+> + ? ? ? .irda_pwdn ? ? ?= GPIO_NR_PALMT5_IR_DISABLE,
+> + ? ? ? .batt_minv ? ? ?= PALMT5_BAT_MIN_VOLTAGE,
+> + ? ? ? .batt_maxv ? ? ?= PALMT5_BAT_MAX_VOLTAGE,
+> + ? ? ? .jack_gpio ? ? ?= GPIO_NR_PALMT5_EARPHONE_DETECT,
+> + ? ? ? .bl_bl ? ? ? ? ?= GPIO_NR_PALMT5_BL_POWER,
+> + ? ? ? .bl_lcd ? ? ? ? = GPIO_NR_PALMT5_LCD_POWER,
+> + ? ? ? .power_ac ? ? ? = GPIO_NR_PALMT5_POWER_DETECT,
+> + ? ? ? .power_usb ? ? ?= -1,
+> + ? ? ? .lcd_power ? ? ?= -1,
+> ?};
+>
+> -/* setup udc GPIOs initial state */
+> -static void __init palmt5_udc_init(void)
+> -{
+> - ? ? ? if (!gpio_request(GPIO_NR_PALMT5_USB_PULLUP, "UDC Vbus")) {
+> - ? ? ? ? ? ? ? gpio_direction_output(GPIO_NR_PALMT5_USB_PULLUP, 1);
+> - ? ? ? ? ? ? ? gpio_free(GPIO_NR_PALMT5_USB_PULLUP);
+> - ? ? ? }
+> -}
+> -
+> ?static void __init palmt5_init(void)
+> ?{
+> ? ? ? ?pxa2xx_mfp_config(ARRAY_AND_SIZE(palmt5_pin_config));
+> -
+> - ? ? ? pxa_set_ffuart_info(NULL);
+> - ? ? ? pxa_set_btuart_info(NULL);
+> - ? ? ? pxa_set_stuart_info(NULL);
+> -
+> - ? ? ? palmt5_pm_init();
+> - ? ? ? set_pxa_fb_info(&palmt5_lcd_screen);
+> - ? ? ? pxa_set_mci_info(&palmt5_mci_platform_data);
+> - ? ? ? palmt5_udc_init();
+> - ? ? ? pxa_set_ac97_info(&palmt5_ac97_pdata);
+> - ? ? ? pxa_set_ficp_info(&palmt5_ficp_platform_data);
+> + ? ? ? palm27x_common_init(&palmt5);
+> ? ? ? ?pxa_set_keypad_info(&palmt5_keypad_platform_data);
+> -
+> - ? ? ? platform_add_devices(devices, ARRAY_SIZE(devices));
+> + ? ? ? platform_device_register(&palmt5_pxa_keys);
+> ?}
+>
+> ?MACHINE_START(PALMT5, "Palm Tungsten|T5")
+> diff --git a/arch/arm/mach-pxa/palmtreo.c b/arch/arm/mach-pxa/palmtreo.c
+> index 4eb0258..dcb5f93 100644
+> --- a/arch/arm/mach-pxa/palmtreo.c
+> +++ b/arch/arm/mach-pxa/palmtreo.c
+> @@ -44,6 +44,7 @@
+> ?#include <mach/pxa2xx-regs.h>
+> ?#include <mach/palmasoc.h>
+> ?#include <mach/camera.h>
+> +#include <mach/palm27x.h>
+>
+> ?#include <sound/pxa2xx-lib.h>
+>
+> @@ -158,28 +159,6 @@ static unsigned long centro685_pin_config[] __initdata = {
+> ?#endif /* CONFIG_MACH_CENTRO */
+>
+> ?/******************************************************************************
+> - * SD/MMC card controller
+> - ******************************************************************************/
+> -#ifdef CONFIG_MACH_TREO680
+> -static struct pxamci_platform_data treo680_mci_platform_data = {
+> - ? ? ? .ocr_mask ? ? ? ? ? ? ? = MMC_VDD_32_33 | MMC_VDD_33_34,
+> - ? ? ? .gpio_card_detect ? ? ? = GPIO_NR_TREO_SD_DETECT_N,
+> - ? ? ? .gpio_card_ro ? ? ? ? ? = GPIO_NR_TREO680_SD_READONLY,
+> - ? ? ? .gpio_power ? ? ? ? ? ? = GPIO_NR_TREO680_SD_POWER,
+> -};
+> -#endif /* CONFIG_MACH_TREO680 */
+> -
+> -#ifdef CONFIG_MACH_CENTRO
+> -static struct pxamci_platform_data centro_mci_platform_data = {
+> - ? ? ? .ocr_mask ? ? ? ? ? ? ? = MMC_VDD_32_33 | MMC_VDD_33_34,
+> - ? ? ? .gpio_card_detect ? ? ? = GPIO_NR_TREO_SD_DETECT_N,
+> - ? ? ? .gpio_card_ro ? ? ? ? ? = -1,
+> - ? ? ? .gpio_power ? ? ? ? ? ? = GPIO_NR_CENTRO_SD_POWER,
+> - ? ? ? .gpio_power_invert ? ? ?= 1,
+> -};
+> -#endif /* CONFIG_MACH_CENTRO */
+> -
+> -/******************************************************************************
+> ?* GPIO keyboard
+> ?******************************************************************************/
+> ?#ifdef CONFIG_MACH_TREO680
+> @@ -327,83 +306,6 @@ static struct pxa27x_keypad_platform_data centro_keypad_platform_data = {
+> ?#endif /* CONFIG_MACH_CENTRO */
+>
+> ?/******************************************************************************
+> - * aSoC audio
+> - ******************************************************************************/
+> -
+> -static pxa2xx_audio_ops_t treo_ac97_pdata = {
+> - ? ? ? .reset_gpio ? ? = 95,
+> -};
+> -
+> -/******************************************************************************
+> - * Backlight
+> - ******************************************************************************/
+> -static int treo_backlight_init(struct device *dev)
+> -{
+> - ? ? ? int ret;
+> -
+> - ? ? ? ret = gpio_request(GPIO_NR_TREO_BL_POWER, "BL POWER");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err;
+> - ? ? ? ret = gpio_direction_output(GPIO_NR_TREO_BL_POWER, 0);
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err2;
+> -
+> - ? ? ? return 0;
+> -
+> -err2:
+> - ? ? ? gpio_free(GPIO_NR_TREO_BL_POWER);
+> -err:
+> - ? ? ? return ret;
+> -}
+> -
+> -static int treo_backlight_notify(struct device *dev, int brightness)
+> -{
+> - ? ? ? gpio_set_value(GPIO_NR_TREO_BL_POWER, brightness);
+> - ? ? ? return TREO_MAX_INTENSITY - brightness;
+> -};
+> -
+> -static void treo_backlight_exit(struct device *dev)
+> -{
+> - ? ? ? gpio_free(GPIO_NR_TREO_BL_POWER);
+> -}
+> -
+> -static struct platform_pwm_backlight_data treo_backlight_data = {
+> - ? ? ? .pwm_id ? ? ? ? = 0,
+> - ? ? ? .max_brightness = TREO_MAX_INTENSITY,
+> - ? ? ? .dft_brightness = TREO_DEFAULT_INTENSITY,
+> - ? ? ? .pwm_period_ns ?= TREO_PERIOD_NS,
+> - ? ? ? .init ? ? ? ? ? = treo_backlight_init,
+> - ? ? ? .notify ? ? ? ? = treo_backlight_notify,
+> - ? ? ? .exit ? ? ? ? ? = treo_backlight_exit,
+> -};
+> -
+> -static struct platform_device treo_backlight = {
+> - ? ? ? .name ? = "pwm-backlight",
+> - ? ? ? .dev ? ?= {
+> - ? ? ? ? ? ? ? .parent ? ? ? ? = &pxa27x_device_pwm0.dev,
+> - ? ? ? ? ? ? ? .platform_data ?= &treo_backlight_data,
+> - ? ? ? },
+> -};
+> -
+> -/******************************************************************************
+> - * IrDA
+> - ******************************************************************************/
+> -static struct pxaficp_platform_data treo_ficp_info = {
+> - ? ? ? .gpio_pwdown ? ? ? ? ? ?= GPIO_NR_TREO_IR_EN,
+> - ? ? ? .transceiver_cap ? ? ? ?= IR_SIRMODE | IR_OFF,
+> -};
+> -
+> -/******************************************************************************
+> - * UDC
+> - ******************************************************************************/
+> -static struct pxa2xx_udc_mach_info treo_udc_info __initdata = {
+> - ? ? ? .gpio_vbus ? ? ? ? ? ? ?= GPIO_NR_TREO_USB_DETECT,
+> - ? ? ? .gpio_vbus_inverted ? ? = 1,
+> - ? ? ? .gpio_pullup ? ? ? ? ? ?= GPIO_NR_TREO_USB_PULLUP,
+> -};
+> -
+> -
+> -/******************************************************************************
+> ?* USB host
+> ?******************************************************************************/
+> ?#ifdef CONFIG_MACH_TREO680
+> @@ -415,58 +317,6 @@ static struct pxaohci_platform_data treo680_ohci_info = {
+> ?#endif /* CONFIG_MACH_TREO680 */
+>
+> ?/******************************************************************************
+> - * Power supply
+> - ******************************************************************************/
+> -static int power_supply_init(struct device *dev)
+> -{
+> - ? ? ? int ret;
+> -
+> - ? ? ? ret = gpio_request(GPIO_NR_TREO_POWER_DETECT, "CABLE_STATE_AC");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err1;
+> - ? ? ? ret = gpio_direction_input(GPIO_NR_TREO_POWER_DETECT);
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err2;
+> -
+> - ? ? ? return 0;
+> -
+> -err2:
+> - ? ? ? gpio_free(GPIO_NR_TREO_POWER_DETECT);
+> -err1:
+> - ? ? ? return ret;
+> -}
+> -
+> -static int treo_is_ac_online(void)
+> -{
+> - ? ? ? return gpio_get_value(GPIO_NR_TREO_POWER_DETECT);
+> -}
+> -
+> -static void power_supply_exit(struct device *dev)
+> -{
+> - ? ? ? gpio_free(GPIO_NR_TREO_POWER_DETECT);
+> -}
+> -
+> -static char *treo_supplicants[] = {
+> - ? ? ? "main-battery",
+> -};
+> -
+> -static struct pda_power_pdata power_supply_info = {
+> - ? ? ? .init ? ? ? ? ? ?= power_supply_init,
+> - ? ? ? .is_ac_online ? ?= treo_is_ac_online,
+> - ? ? ? .exit ? ? ? ? ? ?= power_supply_exit,
+> - ? ? ? .supplied_to ? ? = treo_supplicants,
+> - ? ? ? .num_supplicants = ARRAY_SIZE(treo_supplicants),
+> -};
+> -
+> -static struct platform_device power_supply = {
+> - ? ? ? .name = "pda-power",
+> - ? ? ? .id ? = -1,
+> - ? ? ? .dev ?= {
+> - ? ? ? ? ? ? ? .platform_data = &power_supply_info,
+> - ? ? ? },
+> -};
+> -
+> -/******************************************************************************
+> ?* Vibra and LEDs
+> ?******************************************************************************/
+> ?#ifdef CONFIG_MACH_TREO680
+> @@ -537,60 +387,8 @@ static struct platform_device centro_leds = {
+> ?#endif /* CONFIG_MACH_CENTRO */
+>
+> ?/******************************************************************************
+> - * Framebuffer
+> - ******************************************************************************/
+> -/* TODO: add support for 324x324 */
+> -static struct pxafb_mode_info treo_lcd_modes[] = {
+> -{
+> - ? ? ? .pixclock ? ? ? ? ? ? ? = 86538,
+> - ? ? ? .xres ? ? ? ? ? ? ? ? ? = 320,
+> - ? ? ? .yres ? ? ? ? ? ? ? ? ? = 320,
+> - ? ? ? .bpp ? ? ? ? ? ? ? ? ? ?= 16,
+> -
+> - ? ? ? .left_margin ? ? ? ? ? ?= 20,
+> - ? ? ? .right_margin ? ? ? ? ? = 8,
+> - ? ? ? .upper_margin ? ? ? ? ? = 8,
+> - ? ? ? .lower_margin ? ? ? ? ? = 5,
+> -
+> - ? ? ? .hsync_len ? ? ? ? ? ? ?= 4,
+> - ? ? ? .vsync_len ? ? ? ? ? ? ?= 1,
+> -},
+> -};
+> -
+> -static void treo_lcd_power(int on, struct fb_var_screeninfo *info)
+> -{
+> - ? ? ? gpio_set_value(GPIO_NR_TREO_BL_POWER, on);
+> -}
+> -
+> -static struct pxafb_mach_info treo_lcd_screen = {
+> - ? ? ? .modes ? ? ? ? ?= treo_lcd_modes,
+> - ? ? ? .num_modes ? ? ?= ARRAY_SIZE(treo_lcd_modes),
+> - ? ? ? .lcd_conn ? ? ? = LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
+> -};
+> -
+> -/******************************************************************************
+> - * Power management - standby
+> - ******************************************************************************/
+> -static void __init treo_pm_init(void)
+> -{
+> - ? ? ? static u32 resume[] = {
+> - ? ? ? ? ? ? ? 0xe3a00101, ? ? /* mov ?r0, ? ? #0x40000000 */
+> - ? ? ? ? ? ? ? 0xe380060f, ? ? /* orr ?r0, r0, #0x00f00000 */
+> - ? ? ? ? ? ? ? 0xe590f008, ? ? /* ldr ?pc, [r0, #0x08] */
+> - ? ? ? };
+> -
+> - ? ? ? /* this is where the bootloader jumps */
+> - ? ? ? memcpy(phys_to_virt(TREO_STR_BASE), resume, sizeof(resume));
+> -}
+> -
+> -/******************************************************************************
+> ?* Machine init
+> ?******************************************************************************/
+> -static struct platform_device *treo_devices[] __initdata = {
+> - ? ? ? &treo_backlight,
+> - ? ? ? &power_supply,
+> -};
+> -
+> ?#ifdef CONFIG_MACH_TREO680
+> ?static struct platform_device *treo680_devices[] __initdata = {
+> ? ? ? ?&treo680_leds,
+> @@ -603,62 +401,29 @@ static struct platform_device *centro_devices[] __initdata = {
+> ?};
+> ?#endif /* CONFIG_MACH_CENTRO */
+>
+> -/* setup udc GPIOs initial state */
+> -static void __init treo_udc_init(void)
+> -{
+> - ? ? ? if (!gpio_request(GPIO_NR_TREO_USB_PULLUP, "UDC Vbus")) {
+> - ? ? ? ? ? ? ? gpio_direction_output(GPIO_NR_TREO_USB_PULLUP, 1);
+> - ? ? ? ? ? ? ? gpio_free(GPIO_NR_TREO_USB_PULLUP);
+> - ? ? ? }
+> -}
+> -
+> -static void __init treo_lcd_power_init(void)
+> -{
+> - ? ? ? int ret;
+> -
+> - ? ? ? ret = gpio_request(GPIO_NR_TREO_LCD_POWER, "LCD POWER");
+> - ? ? ? if (ret) {
+> - ? ? ? ? ? ? ? pr_err("Treo680: LCD power GPIO request failed!\n");
+> - ? ? ? ? ? ? ? return;
+> - ? ? ? }
+> -
+> - ? ? ? ret = gpio_direction_output(GPIO_NR_TREO_LCD_POWER, 0);
+> - ? ? ? if (ret) {
+> - ? ? ? ? ? ? ? pr_err("Treo680: setting LCD power GPIO direction failed!\n");
+> - ? ? ? ? ? ? ? gpio_free(GPIO_NR_TREO_LCD_POWER);
+> - ? ? ? ? ? ? ? return;
+> - ? ? ? }
+> -
+> - ? ? ? treo_lcd_screen.pxafb_lcd_power = treo_lcd_power;
+> -}
+> -
+> -static void __init treo_init(void)
+> -{
+> - ? ? ? pxa_set_ffuart_info(NULL);
+> - ? ? ? pxa_set_btuart_info(NULL);
+> - ? ? ? pxa_set_stuart_info(NULL);
+> -
+> - ? ? ? treo_pm_init();
+> - ? ? ? pxa2xx_mfp_config(ARRAY_AND_SIZE(treo_pin_config));
+> - ? ? ? treo_lcd_power_init();
+> - ? ? ? set_pxa_fb_info(&treo_lcd_screen);
+> - ? ? ? treo_udc_init();
+> - ? ? ? pxa_set_udc_info(&treo_udc_info);
+> - ? ? ? pxa_set_ac97_info(&treo_ac97_pdata);
+> - ? ? ? pxa_set_ficp_info(&treo_ficp_info);
+> -
+> - ? ? ? platform_add_devices(ARRAY_AND_SIZE(treo_devices));
+> -}
+> -
+> ?#ifdef CONFIG_MACH_TREO680
+> +struct palm27x_handheld palmtreo680 = {
+> + ? ? ? .mmc_detect ? ? = GPIO_NR_TREO_SD_DETECT_N,
+> + ? ? ? .mmc_ro ? ? ? ? = GPIO_NR_TREO680_SD_READONLY,
+> + ? ? ? .mmc_power ? ? ?= GPIO_NR_TREO680_SD_POWER,
+> + ? ? ? .pm_str_base ? ?= TREO_STR_BASE,
+> + ? ? ? .udc_detect ? ? = GPIO_NR_TREO_USB_DETECT,
+> + ? ? ? .udc_pullup ? ? = GPIO_NR_TREO_USB_PULLUP,
+> + ? ? ? .irda_pwdn ? ? ?= GPIO_NR_TREO_IR_EN,
+> + ? ? ? .bl_bl ? ? ? ? ?= GPIO_NR_TREO_BL_POWER,
+> + ? ? ? .bl_lcd ? ? ? ? = -1,
+> + ? ? ? .power_ac ? ? ? = GPIO_NR_TREO_POWER_DETECT,
+> + ? ? ? .power_usb ? ? ?= -1,
+> + ? ? ? .lcd_power ? ? ?= GPIO_NR_TREO_BL_POWER,
+> +};
+> +
+> ?static void __init treo680_init(void)
+> ?{
+> - ? ? ? treo_init();
+> + ? ? ? pxa2xx_mfp_config(ARRAY_AND_SIZE(treo_pin_config));
+> ? ? ? ?pxa2xx_mfp_config(ARRAY_AND_SIZE(treo680_pin_config));
+> - ? ? ? pxa_set_mci_info(&treo680_mci_platform_data);
+> + ? ? ? palm27x_common_init(&palmtreo680);
+> ? ? ? ?pxa_set_keypad_info(&treo680_keypad_platform_data);
+> ? ? ? ?pxa_set_ohci_info(&treo680_ohci_info);
+> -
+> ? ? ? ?platform_add_devices(ARRAY_AND_SIZE(treo680_devices));
+> ?}
+>
+> @@ -674,14 +439,27 @@ MACHINE_END
+> ?#endif /* CONFIG_MACH_TREO680 */
+>
+> ?#ifdef CONFIG_MACH_CENTRO
+> +struct palm27x_handheld palmcentro = {
+> + ? ? ? .mmc_detect ? ? = GPIO_NR_TREO_SD_DETECT_N,
+> + ? ? ? .mmc_ro ? ? ? ? = -1,
+> + ? ? ? .mmc_power ? ? ?= GPIO_NR_CENTRO_SD_POWER,
+> + ? ? ? .pm_str_base ? ?= TREO_STR_BASE,
+> + ? ? ? .udc_detect ? ? = GPIO_NR_TREO_USB_DETECT,
+> + ? ? ? .udc_pullup ? ? = GPIO_NR_TREO_USB_PULLUP,
+> + ? ? ? .irda_pwdn ? ? ?= GPIO_NR_TREO_IR_EN,
+> + ? ? ? .bl_bl ? ? ? ? ?= GPIO_NR_TREO_BL_POWER,
+> + ? ? ? .bl_lcd ? ? ? ? = -1,
+> + ? ? ? .power_ac ? ? ? = GPIO_NR_TREO_POWER_DETECT,
+> + ? ? ? .power_usb ? ? ?= -1,
+> + ? ? ? .lcd_power ? ? ?= GPIO_NR_TREO_BL_POWER,
+> +};
+> +
+> ?static void __init centro_init(void)
+> ?{
+> - ? ? ? treo_init();
+> + ? ? ? pxa2xx_mfp_config(ARRAY_AND_SIZE(treo_pin_config));
+> ? ? ? ?pxa2xx_mfp_config(ARRAY_AND_SIZE(centro685_pin_config));
+> - ? ? ? pxa_set_mci_info(&centro_mci_platform_data);
+> -
+> + ? ? ? palm27x_common_init(&palmcentro);
+> ? ? ? ?pxa_set_keypad_info(&centro_keypad_platform_data);
+> -
+> ? ? ? ?platform_add_devices(ARRAY_AND_SIZE(centro_devices));
+> ?}
+>
+> diff --git a/arch/arm/mach-pxa/palmtx.c b/arch/arm/mach-pxa/palmtx.c
+> index a5429cd..f8ddffe 100644
+> --- a/arch/arm/mach-pxa/palmtx.c
+> +++ b/arch/arm/mach-pxa/palmtx.c
+> @@ -46,6 +46,7 @@
+> ?#include <mach/pxa27x_keypad.h>
+> ?#include <mach/udc.h>
+> ?#include <mach/palmasoc.h>
+> +#include <mach/palm27x.h>
+>
+> ?#include "generic.h"
+> ?#include "devices.h"
+> @@ -163,17 +164,6 @@ static struct platform_device palmtx_flash = {
+> ?};
+>
+> ?/******************************************************************************
+> - * SD/MMC card controller
+> - ******************************************************************************/
+> -static struct pxamci_platform_data palmtx_mci_platform_data = {
+> - ? ? ? .ocr_mask ? ? ? ? ? ? ? = MMC_VDD_32_33 | MMC_VDD_33_34,
+> - ? ? ? .gpio_card_detect ? ? ? = GPIO_NR_PALMTX_SD_DETECT_N,
+> - ? ? ? .gpio_card_ro ? ? ? ? ? = GPIO_NR_PALMTX_SD_READONLY,
+> - ? ? ? .gpio_power ? ? ? ? ? ? = GPIO_NR_PALMTX_SD_POWER,
+> - ? ? ? .detect_delay_ms ? ? ? ?= 200,
+> -};
+> -
+> -/******************************************************************************
+> ?* GPIO keyboard
+> ?******************************************************************************/
+> ?static unsigned int palmtx_matrix_keys[] = {
+> @@ -222,207 +212,6 @@ static struct platform_device palmtx_pxa_keys = {
+> ?};
+>
+> ?/******************************************************************************
+> - * Backlight
+> - ******************************************************************************/
+> -static int palmtx_backlight_init(struct device *dev)
+> -{
+> - ? ? ? int ret;
+> -
+> - ? ? ? ret = gpio_request(GPIO_NR_PALMTX_BL_POWER, "BL POWER");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err;
+> - ? ? ? ret = gpio_direction_output(GPIO_NR_PALMTX_BL_POWER, 0);
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err2;
+> - ? ? ? ret = gpio_request(GPIO_NR_PALMTX_LCD_POWER, "LCD POWER");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err2;
+> - ? ? ? ret = gpio_direction_output(GPIO_NR_PALMTX_LCD_POWER, 0);
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err3;
+> -
+> - ? ? ? return 0;
+> -err3:
+> - ? ? ? gpio_free(GPIO_NR_PALMTX_LCD_POWER);
+> -err2:
+> - ? ? ? gpio_free(GPIO_NR_PALMTX_BL_POWER);
+> -err:
+> - ? ? ? return ret;
+> -}
+> -
+> -static int palmtx_backlight_notify(struct device *dev, int brightness)
+> -{
+> - ? ? ? gpio_set_value(GPIO_NR_PALMTX_BL_POWER, brightness);
+> - ? ? ? gpio_set_value(GPIO_NR_PALMTX_LCD_POWER, brightness);
+> - ? ? ? return brightness;
+> -}
+> -
+> -static void palmtx_backlight_exit(struct device *dev)
+> -{
+> - ? ? ? gpio_free(GPIO_NR_PALMTX_BL_POWER);
+> - ? ? ? gpio_free(GPIO_NR_PALMTX_LCD_POWER);
+> -}
+> -
+> -static struct platform_pwm_backlight_data palmtx_backlight_data = {
+> - ? ? ? .pwm_id ? ? ? ? = 0,
+> - ? ? ? .max_brightness = PALMTX_MAX_INTENSITY,
+> - ? ? ? .dft_brightness = PALMTX_MAX_INTENSITY,
+> - ? ? ? .pwm_period_ns ?= PALMTX_PERIOD_NS,
+> - ? ? ? .init ? ? ? ? ? = palmtx_backlight_init,
+> - ? ? ? .notify ? ? ? ? = palmtx_backlight_notify,
+> - ? ? ? .exit ? ? ? ? ? = palmtx_backlight_exit,
+> -};
+> -
+> -static struct platform_device palmtx_backlight = {
+> - ? ? ? .name ? = "pwm-backlight",
+> - ? ? ? .dev ? ?= {
+> - ? ? ? ? ? ? ? .parent ? ? ? ? = &pxa27x_device_pwm0.dev,
+> - ? ? ? ? ? ? ? .platform_data ?= &palmtx_backlight_data,
+> - ? ? ? },
+> -};
+> -
+> -/******************************************************************************
+> - * IrDA
+> - ******************************************************************************/
+> -static struct pxaficp_platform_data palmtx_ficp_platform_data = {
+> - ? ? ? .gpio_pwdown ? ? ? ? ? ?= GPIO_NR_PALMTX_IR_DISABLE,
+> - ? ? ? .transceiver_cap ? ? ? ?= IR_SIRMODE | IR_OFF,
+> -};
+> -
+> -/******************************************************************************
+> - * UDC
+> - ******************************************************************************/
+> -static struct gpio_vbus_mach_info palmtx_udc_info = {
+> - ? ? ? .gpio_vbus ? ? ? ? ? ? ?= GPIO_NR_PALMTX_USB_DETECT_N,
+> - ? ? ? .gpio_vbus_inverted ? ? = 1,
+> - ? ? ? .gpio_pullup ? ? ? ? ? ?= GPIO_NR_PALMTX_USB_PULLUP,
+> -};
+> -
+> -static struct platform_device palmtx_gpio_vbus = {
+> - ? ? ? .name ? = "gpio-vbus",
+> - ? ? ? .id ? ? = -1,
+> - ? ? ? .dev ? ?= {
+> - ? ? ? ? ? ? ? .platform_data ?= &palmtx_udc_info,
+> - ? ? ? },
+> -};
+> -
+> -/******************************************************************************
+> - * Power supply
+> - ******************************************************************************/
+> -static int power_supply_init(struct device *dev)
+> -{
+> - ? ? ? int ret;
+> -
+> - ? ? ? ret = gpio_request(GPIO_NR_PALMTX_POWER_DETECT, "CABLE_STATE_AC");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err1;
+> - ? ? ? ret = gpio_direction_input(GPIO_NR_PALMTX_POWER_DETECT);
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err2;
+> -
+> - ? ? ? return 0;
+> -
+> -err2:
+> - ? ? ? gpio_free(GPIO_NR_PALMTX_POWER_DETECT);
+> -err1:
+> - ? ? ? return ret;
+> -}
+> -
+> -static int palmtx_is_ac_online(void)
+> -{
+> - ? ? ? return gpio_get_value(GPIO_NR_PALMTX_POWER_DETECT);
+> -}
+> -
+> -static void power_supply_exit(struct device *dev)
+> -{
+> - ? ? ? gpio_free(GPIO_NR_PALMTX_POWER_DETECT);
+> -}
+> -
+> -static char *palmtx_supplicants[] = {
+> - ? ? ? "main-battery",
+> -};
+> -
+> -static struct pda_power_pdata power_supply_info = {
+> - ? ? ? .init ? ? ? ? ? ?= power_supply_init,
+> - ? ? ? .is_ac_online ? ?= palmtx_is_ac_online,
+> - ? ? ? .exit ? ? ? ? ? ?= power_supply_exit,
+> - ? ? ? .supplied_to ? ? = palmtx_supplicants,
+> - ? ? ? .num_supplicants = ARRAY_SIZE(palmtx_supplicants),
+> -};
+> -
+> -static struct platform_device power_supply = {
+> - ? ? ? .name = "pda-power",
+> - ? ? ? .id ? = -1,
+> - ? ? ? .dev ?= {
+> - ? ? ? ? ? ? ? .platform_data = &power_supply_info,
+> - ? ? ? },
+> -};
+> -
+> -/******************************************************************************
+> - * WM97xx audio, battery
+> - ******************************************************************************/
+> -static struct wm97xx_batt_pdata palmtx_batt_pdata = {
+> - ? ? ? .batt_aux ? ? ? = WM97XX_AUX_ID3,
+> - ? ? ? .temp_aux ? ? ? = WM97XX_AUX_ID2,
+> - ? ? ? .charge_gpio ? ?= -1,
+> - ? ? ? .max_voltage ? ?= PALMTX_BAT_MAX_VOLTAGE,
+> - ? ? ? .min_voltage ? ?= PALMTX_BAT_MIN_VOLTAGE,
+> - ? ? ? .batt_mult ? ? ?= 1000,
+> - ? ? ? .batt_div ? ? ? = 414,
+> - ? ? ? .temp_mult ? ? ?= 1,
+> - ? ? ? .temp_div ? ? ? = 1,
+> - ? ? ? .batt_tech ? ? ?= POWER_SUPPLY_TECHNOLOGY_LIPO,
+> - ? ? ? .batt_name ? ? ?= "main-batt",
+> -};
+> -
+> -static struct wm97xx_pdata palmtx_wm97xx_pdata = {
+> - ? ? ? .batt_pdata ? ? = &palmtx_batt_pdata,
+> -};
+> -
+> -static pxa2xx_audio_ops_t palmtx_ac97_pdata = {
+> - ? ? ? .reset_gpio ? ? = 95,
+> - ? ? ? .codec_pdata ? ?= { &palmtx_wm97xx_pdata, },
+> -};
+> -
+> -static struct palm27x_asoc_info palmtx_asoc_pdata = {
+> - ? ? ? .jack_gpio ? ? ?= GPIO_NR_PALMTX_EARPHONE_DETECT,
+> -};
+> -
+> -static struct platform_device palmtx_asoc = {
+> - ? ? ? .name = "palm27x-asoc",
+> - ? ? ? .id ? = -1,
+> - ? ? ? .dev ?= {
+> - ? ? ? ? ? ? ? .platform_data = &palmtx_asoc_pdata,
+> - ? ? ? },
+> -};
+> -
+> -/******************************************************************************
+> - * Framebuffer
+> - ******************************************************************************/
+> -static struct pxafb_mode_info palmtx_lcd_modes[] = {
+> -{
+> - ? ? ? .pixclock ? ? ? = 57692,
+> - ? ? ? .xres ? ? ? ? ? = 320,
+> - ? ? ? .yres ? ? ? ? ? = 480,
+> - ? ? ? .bpp ? ? ? ? ? ?= 16,
+> -
+> - ? ? ? .left_margin ? ?= 32,
+> - ? ? ? .right_margin ? = 1,
+> - ? ? ? .upper_margin ? = 7,
+> - ? ? ? .lower_margin ? = 1,
+> -
+> - ? ? ? .hsync_len ? ? ?= 4,
+> - ? ? ? .vsync_len ? ? ?= 1,
+> -},
+> -};
+> -
+> -static struct pxafb_mach_info palmtx_lcd_screen = {
+> - ? ? ? .modes ? ? ? ? ?= palmtx_lcd_modes,
+> - ? ? ? .num_modes ? ? ?= ARRAY_SIZE(palmtx_lcd_modes),
+> - ? ? ? .lcd_conn ? ? ? = LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
+> -};
+> -
+> -/******************************************************************************
+> ?* NAND Flash
+> ?******************************************************************************/
+> ?static void palmtx_nand_cmd_ctl(struct mtd_info *mtd, int cmd,
+> @@ -484,20 +273,6 @@ static struct platform_device palmtx_nand = {
+> ? ? ? ?}
+> ?};
+>
+> -/******************************************************************************
+> - * Power management - standby
+> - ******************************************************************************/
+> -static void __init palmtx_pm_init(void)
+> -{
+> - ? ? ? static u32 resume[] = {
+> - ? ? ? ? ? ? ? 0xe3a00101, ? ? /* mov ?r0, ? ? #0x40000000 */
+> - ? ? ? ? ? ? ? 0xe380060f, ? ? /* orr ?r0, r0, #0x00f00000 */
+> - ? ? ? ? ? ? ? 0xe590f008, ? ? /* ldr ?pc, [r0, #0x08] */
+> - ? ? ? };
+> -
+> - ? ? ? /* copy the bootloader */
+> - ? ? ? memcpy(phys_to_virt(PALMTX_STR_BASE), resume, sizeof(resume));
+> -}
+>
+> ?/******************************************************************************
+> ?* Machine init
+> @@ -506,10 +281,6 @@ static struct platform_device *devices[] __initdata = {
+> ?#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
+> ? ? ? ?&palmtx_pxa_keys,
+> ?#endif
+> - ? ? ? &palmtx_backlight,
+> - ? ? ? &power_supply,
+> - ? ? ? &palmtx_asoc,
+> - ? ? ? &palmtx_gpio_vbus,
+> ? ? ? ?&palmtx_flash,
+> ? ? ? ?&palmtx_nand,
+> ?};
+> @@ -539,32 +310,29 @@ static void __init palmtx_map_io(void)
+> ? ? ? ?iotable_init(palmtx_io_desc, ARRAY_SIZE(palmtx_io_desc));
+> ?}
+>
+> -/* setup udc GPIOs initial state */
+> -static void __init palmtx_udc_init(void)
+> -{
+> - ? ? ? if (!gpio_request(GPIO_NR_PALMTX_USB_PULLUP, "UDC Vbus")) {
+> - ? ? ? ? ? ? ? gpio_direction_output(GPIO_NR_PALMTX_USB_PULLUP, 1);
+> - ? ? ? ? ? ? ? gpio_free(GPIO_NR_PALMTX_USB_PULLUP);
+> - ? ? ? }
+> -}
+> -
+> +struct palm27x_handheld palmtx = {
+> + ? ? ? .mmc_detect ? ? = GPIO_NR_PALMTX_SD_DETECT_N,
+> + ? ? ? .mmc_ro ? ? ? ? = GPIO_NR_PALMTX_SD_READONLY,
+> + ? ? ? .mmc_power ? ? ?= GPIO_NR_PALMTX_SD_POWER,
+> + ? ? ? .pm_str_base ? ?= PALMTX_STR_BASE,
+> + ? ? ? .udc_detect ? ? = GPIO_NR_PALMTX_USB_DETECT_N,
+> + ? ? ? .udc_pullup ? ? = GPIO_NR_PALMTX_USB_PULLUP,
+> + ? ? ? .irda_pwdn ? ? ?= GPIO_NR_PALMTX_IR_DISABLE,
+> + ? ? ? .batt_minv ? ? ?= PALMTX_BAT_MIN_VOLTAGE,
+> + ? ? ? .batt_maxv ? ? ?= PALMTX_BAT_MAX_VOLTAGE,
+> + ? ? ? .jack_gpio ? ? ?= GPIO_NR_PALMTX_EARPHONE_DETECT,
+> + ? ? ? .bl_bl ? ? ? ? ?= GPIO_NR_PALMTX_BL_POWER,
+> + ? ? ? .bl_lcd ? ? ? ? = GPIO_NR_PALMTX_LCD_POWER,
+> + ? ? ? .power_ac ? ? ? = GPIO_NR_PALMTX_POWER_DETECT,
+> + ? ? ? .power_usb ? ? ?= -1,
+> + ? ? ? .lcd_power ? ? ?= -1,
+> +};
+>
+> ?static void __init palmtx_init(void)
+> ?{
+> ? ? ? ?pxa2xx_mfp_config(ARRAY_AND_SIZE(palmtx_pin_config));
+> -
+> - ? ? ? pxa_set_ffuart_info(NULL);
+> - ? ? ? pxa_set_btuart_info(NULL);
+> - ? ? ? pxa_set_stuart_info(NULL);
+> -
+> - ? ? ? palmtx_pm_init();
+> - ? ? ? set_pxa_fb_info(&palmtx_lcd_screen);
+> - ? ? ? pxa_set_mci_info(&palmtx_mci_platform_data);
+> - ? ? ? palmtx_udc_init();
+> - ? ? ? pxa_set_ac97_info(&palmtx_ac97_pdata);
+> - ? ? ? pxa_set_ficp_info(&palmtx_ficp_platform_data);
+> + ? ? ? palm27x_common_init(&palmtx);
+> ? ? ? ?pxa_set_keypad_info(&palmtx_keypad_platform_data);
+> -
+> ? ? ? ?platform_add_devices(devices, ARRAY_SIZE(devices));
+> ?}
+>
+> diff --git a/arch/arm/mach-pxa/palmz72.c b/arch/arm/mach-pxa/palmz72.c
+> index b78c6b4..10b06ad 100644
+> --- a/arch/arm/mach-pxa/palmz72.c
+> +++ b/arch/arm/mach-pxa/palmz72.c
+> @@ -44,6 +44,7 @@
+> ?#include <mach/pxa27x_keypad.h>
+> ?#include <mach/udc.h>
+> ?#include <mach/palmasoc.h>
+> +#include <mach/palm27x.h>
+>
+> ?#include <mach/pm.h>
+>
+> @@ -109,19 +110,6 @@ static unsigned long palmz72_pin_config[] __initdata = {
+> ?};
+>
+> ?/******************************************************************************
+> - * SD/MMC card controller
+> - ******************************************************************************/
+> -/* SD_POWER is not actually power, but it is more like chip
+> - * select, i.e. it is inverted */
+> -static struct pxamci_platform_data palmz72_mci_platform_data = {
+> - ? ? ? .ocr_mask ? ? ? ? ? ? ? = MMC_VDD_32_33 | MMC_VDD_33_34,
+> - ? ? ? .gpio_card_detect ? ? ? = GPIO_NR_PALMZ72_SD_DETECT_N,
+> - ? ? ? .gpio_card_ro ? ? ? ? ? = GPIO_NR_PALMZ72_SD_RO,
+> - ? ? ? .gpio_power ? ? ? ? ? ? = GPIO_NR_PALMZ72_SD_POWER_N,
+> - ? ? ? .gpio_power_invert ? ? ?= 1,
+> -};
+> -
+> -/******************************************************************************
+> ?* GPIO keyboard
+> ?******************************************************************************/
+> ?static unsigned int palmz72_matrix_keys[] = {
+> @@ -150,74 +138,6 @@ static struct pxa27x_keypad_platform_data palmz72_keypad_platform_data = {
+> ?};
+>
+> ?/******************************************************************************
+> - * Backlight
+> - ******************************************************************************/
+> -static int palmz72_backlight_init(struct device *dev)
+> -{
+> - ? ? ? int ret;
+> -
+> - ? ? ? ret = gpio_request(GPIO_NR_PALMZ72_BL_POWER, "BL POWER");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err;
+> - ? ? ? ret = gpio_direction_output(GPIO_NR_PALMZ72_BL_POWER, 0);
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err2;
+> - ? ? ? ret = gpio_request(GPIO_NR_PALMZ72_LCD_POWER, "LCD POWER");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err2;
+> - ? ? ? ret = gpio_direction_output(GPIO_NR_PALMZ72_LCD_POWER, 0);
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err3;
+> -
+> - ? ? ? return 0;
+> -err3:
+> - ? ? ? gpio_free(GPIO_NR_PALMZ72_LCD_POWER);
+> -err2:
+> - ? ? ? gpio_free(GPIO_NR_PALMZ72_BL_POWER);
+> -err:
+> - ? ? ? return ret;
+> -}
+> -
+> -static int palmz72_backlight_notify(struct device *dev, int brightness)
+> -{
+> - ? ? ? gpio_set_value(GPIO_NR_PALMZ72_BL_POWER, brightness);
+> - ? ? ? gpio_set_value(GPIO_NR_PALMZ72_LCD_POWER, brightness);
+> - ? ? ? return brightness;
+> -}
+> -
+> -static void palmz72_backlight_exit(struct device *dev)
+> -{
+> - ? ? ? gpio_free(GPIO_NR_PALMZ72_BL_POWER);
+> - ? ? ? gpio_free(GPIO_NR_PALMZ72_LCD_POWER);
+> -}
+> -
+> -static struct platform_pwm_backlight_data palmz72_backlight_data = {
+> - ? ? ? .pwm_id ? ? ? ? = 0,
+> - ? ? ? .max_brightness = PALMZ72_MAX_INTENSITY,
+> - ? ? ? .dft_brightness = PALMZ72_MAX_INTENSITY,
+> - ? ? ? .pwm_period_ns ?= PALMZ72_PERIOD_NS,
+> - ? ? ? .init ? ? ? ? ? = palmz72_backlight_init,
+> - ? ? ? .notify ? ? ? ? = palmz72_backlight_notify,
+> - ? ? ? .exit ? ? ? ? ? = palmz72_backlight_exit,
+> -};
+> -
+> -static struct platform_device palmz72_backlight = {
+> - ? ? ? .name ? = "pwm-backlight",
+> - ? ? ? .dev ? ?= {
+> - ? ? ? ? ? ? ? .parent ? ? ? ? = &pxa27x_device_pwm0.dev,
+> - ? ? ? ? ? ? ? .platform_data ?= &palmz72_backlight_data,
+> - ? ? ? },
+> -};
+> -
+> -/******************************************************************************
+> - * IrDA
+> - ******************************************************************************/
+> -static struct pxaficp_platform_data palmz72_ficp_platform_data = {
+> - ? ? ? .gpio_pwdown ? ? ? ? ? ?= GPIO_NR_PALMZ72_IR_DISABLE,
+> - ? ? ? .transceiver_cap ? ? ? ?= IR_SIRMODE | IR_OFF,
+> -};
+> -
+> -/******************************************************************************
+> ?* LEDs
+> ?******************************************************************************/
+> ?static struct gpio_led gpio_leds[] = {
+> @@ -241,145 +161,6 @@ static struct platform_device palmz72_leds = {
+> ? ? ? ?}
+> ?};
+>
+> -/******************************************************************************
+> - * UDC
+> - ******************************************************************************/
+> -static struct gpio_vbus_mach_info palmz72_udc_info = {
+> - ? ? ? .gpio_vbus ? ? ? ? ? ? ?= GPIO_NR_PALMZ72_USB_DETECT_N,
+> - ? ? ? .gpio_pullup ? ? ? ? ? ?= GPIO_NR_PALMZ72_USB_PULLUP,
+> -};
+> -
+> -static struct platform_device palmz72_gpio_vbus = {
+> - ? ? ? .name ? = "gpio-vbus",
+> - ? ? ? .id ? ? = -1,
+> - ? ? ? .dev ? ?= {
+> - ? ? ? ? ? ? ? .platform_data ?= &palmz72_udc_info,
+> - ? ? ? },
+> -};
+> -
+> -/******************************************************************************
+> - * Power supply
+> - ******************************************************************************/
+> -static int power_supply_init(struct device *dev)
+> -{
+> - ? ? ? int ret;
+> -
+> - ? ? ? ret = gpio_request(GPIO_NR_PALMZ72_POWER_DETECT, "CABLE_STATE_AC");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err1;
+> - ? ? ? ret = gpio_direction_input(GPIO_NR_PALMZ72_POWER_DETECT);
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err2;
+> -
+> - ? ? ? ret = gpio_request(GPIO_NR_PALMZ72_USB_DETECT_N, "CABLE_STATE_USB");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err2;
+> - ? ? ? ret = gpio_direction_input(GPIO_NR_PALMZ72_USB_DETECT_N);
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err3;
+> -
+> - ? ? ? return 0;
+> -err3:
+> - ? ? ? gpio_free(GPIO_NR_PALMZ72_USB_DETECT_N);
+> -err2:
+> - ? ? ? gpio_free(GPIO_NR_PALMZ72_POWER_DETECT);
+> -err1:
+> - ? ? ? return ret;
+> -}
+> -
+> -static int palmz72_is_ac_online(void)
+> -{
+> - ? ? ? return gpio_get_value(GPIO_NR_PALMZ72_POWER_DETECT);
+> -}
+> -
+> -static int palmz72_is_usb_online(void)
+> -{
+> - ? ? ? return !gpio_get_value(GPIO_NR_PALMZ72_USB_DETECT_N);
+> -}
+> -
+> -static void power_supply_exit(struct device *dev)
+> -{
+> - ? ? ? gpio_free(GPIO_NR_PALMZ72_USB_DETECT_N);
+> - ? ? ? gpio_free(GPIO_NR_PALMZ72_POWER_DETECT);
+> -}
+> -
+> -static char *palmz72_supplicants[] = {
+> - ? ? ? "main-battery",
+> -};
+> -
+> -static struct pda_power_pdata power_supply_info = {
+> - ? ? ? .init ? ? ? ? ? ?= power_supply_init,
+> - ? ? ? .is_ac_online ? ?= palmz72_is_ac_online,
+> - ? ? ? .is_usb_online ? = palmz72_is_usb_online,
+> - ? ? ? .exit ? ? ? ? ? ?= power_supply_exit,
+> - ? ? ? .supplied_to ? ? = palmz72_supplicants,
+> - ? ? ? .num_supplicants = ARRAY_SIZE(palmz72_supplicants),
+> -};
+> -
+> -static struct platform_device power_supply = {
+> - ? ? ? .name = "pda-power",
+> - ? ? ? .id ? = -1,
+> - ? ? ? .dev ?= {
+> - ? ? ? ? ? ? ? .platform_data = &power_supply_info,
+> - ? ? ? },
+> -};
+> -
+> -/******************************************************************************
+> - * WM97xx audio, battery
+> - ******************************************************************************/
+> -static struct wm97xx_batt_pdata palmz72_batt_pdata = {
+> - ? ? ? .batt_aux ? ? ? = WM97XX_AUX_ID3,
+> - ? ? ? .temp_aux ? ? ? = WM97XX_AUX_ID2,
+> - ? ? ? .charge_gpio ? ?= -1,
+> - ? ? ? .max_voltage ? ?= PALMZ72_BAT_MAX_VOLTAGE,
+> - ? ? ? .min_voltage ? ?= PALMZ72_BAT_MIN_VOLTAGE,
+> - ? ? ? .batt_mult ? ? ?= 1000,
+> - ? ? ? .batt_div ? ? ? = 414,
+> - ? ? ? .temp_mult ? ? ?= 1,
+> - ? ? ? .temp_div ? ? ? = 1,
+> - ? ? ? .batt_tech ? ? ?= POWER_SUPPLY_TECHNOLOGY_LIPO,
+> - ? ? ? .batt_name ? ? ?= "main-batt",
+> -};
+> -
+> -static struct wm97xx_pdata palmz72_wm97xx_pdata = {
+> - ? ? ? .batt_pdata ? ? = &palmz72_batt_pdata,
+> -};
+> -
+> -static pxa2xx_audio_ops_t palmz72_ac97_pdata = {
+> - ? ? ? .codec_pdata ? ?= { &palmz72_wm97xx_pdata, },
+> -};
+> -
+> -static struct platform_device palmz72_asoc = {
+> - ? ? ? .name = "palm27x-asoc",
+> - ? ? ? .id ? = -1,
+> -};
+> -
+> -/******************************************************************************
+> - * Framebuffer
+> - ******************************************************************************/
+> -static struct pxafb_mode_info palmz72_lcd_modes[] = {
+> -{
+> - ? ? ? .pixclock ? ? ? = 115384,
+> - ? ? ? .xres ? ? ? ? ? = 320,
+> - ? ? ? .yres ? ? ? ? ? = 320,
+> - ? ? ? .bpp ? ? ? ? ? ?= 16,
+> -
+> - ? ? ? .left_margin ? ?= 27,
+> - ? ? ? .right_margin ? = 7,
+> - ? ? ? .upper_margin ? = 7,
+> - ? ? ? .lower_margin ? = 8,
+> -
+> - ? ? ? .hsync_len ? ? ?= 6,
+> - ? ? ? .vsync_len ? ? ?= 1,
+> -},
+> -};
+> -
+> -static struct pxafb_mach_info palmz72_lcd_screen = {
+> - ? ? ? .modes ? ? ? ? ?= palmz72_lcd_modes,
+> - ? ? ? .num_modes ? ? ?= ARRAY_SIZE(palmz72_lcd_modes),
+> - ? ? ? .lcd_conn ? ? ? = LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
+> -};
+> -
+> ?#ifdef CONFIG_PM
+>
+> ?/* We have some black magic here
+> @@ -457,39 +238,25 @@ device_initcall(palmz72_pm_init);
+> ?/******************************************************************************
+> ?* Machine init
+> ?******************************************************************************/
+> -static struct platform_device *devices[] __initdata = {
+> - ? ? ? &palmz72_backlight,
+> - ? ? ? &palmz72_leds,
+> - ? ? ? &palmz72_asoc,
+> - ? ? ? &power_supply,
+> - ? ? ? &palmz72_gpio_vbus,
+> +struct palm27x_handheld palmz72 = {
+> + ? ? ? .mmc_detect ? ? = GPIO_NR_PALMZ72_SD_DETECT_N,
+> + ? ? ? .mmc_ro ? ? ? ? = GPIO_NR_PALMZ72_SD_RO,
+> + ? ? ? .mmc_power ? ? ?= GPIO_NR_PALMZ72_SD_POWER_N,
+> + ? ? ? .pm_str_base ? ?= 0,
+> + ? ? ? .udc_detect ? ? = GPIO_NR_PALMZ72_USB_DETECT_N,
+> + ? ? ? .udc_pullup ? ? = GPIO_NR_PALMZ72_USB_PULLUP,
+> + ? ? ? .irda_pwdn ? ? ?= GPIO_NR_PALMZ72_IR_DISABLE,
+> + ? ? ? .batt_minv ? ? ?= PALMZ72_BAT_MIN_VOLTAGE,
+> + ? ? ? .batt_maxv ? ? ?= PALMZ72_BAT_MAX_VOLTAGE,
+> + ? ? ? .lcd_power ? ? ?= -1,
+> ?};
+>
+> -/* setup udc GPIOs initial state */
+> -static void __init palmz72_udc_init(void)
+> -{
+> - ? ? ? if (!gpio_request(GPIO_NR_PALMZ72_USB_PULLUP, "USB Pullup")) {
+> - ? ? ? ? ? ? ? gpio_direction_output(GPIO_NR_PALMZ72_USB_PULLUP, 0);
+> - ? ? ? ? ? ? ? gpio_free(GPIO_NR_PALMZ72_USB_PULLUP);
+> - ? ? ? }
+> -}
+> -
+> ?static void __init palmz72_init(void)
+> ?{
+> ? ? ? ?pxa2xx_mfp_config(ARRAY_AND_SIZE(palmz72_pin_config));
+> -
+> - ? ? ? pxa_set_ffuart_info(NULL);
+> - ? ? ? pxa_set_btuart_info(NULL);
+> - ? ? ? pxa_set_stuart_info(NULL);
+> -
+> - ? ? ? set_pxa_fb_info(&palmz72_lcd_screen);
+> - ? ? ? pxa_set_mci_info(&palmz72_mci_platform_data);
+> - ? ? ? palmz72_udc_init();
+> - ? ? ? pxa_set_ac97_info(&palmz72_ac97_pdata);
+> - ? ? ? pxa_set_ficp_info(&palmz72_ficp_platform_data);
+> + ? ? ? palm27x_common_init(&palmz72);
+> ? ? ? ?pxa_set_keypad_info(&palmz72_keypad_platform_data);
+> -
+> - ? ? ? platform_add_devices(devices, ARRAY_SIZE(devices));
+> + ? ? ? platform_device_register(&palmz72_leds);
+> ?}
+>
+> ?MACHINE_START(PALMZ72, "Palm Zire72")
+> --
+> 1.7.1
+>
 >
