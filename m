@@ -1,36 +1,37 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 4 Aug 2010 13:36:16 +0800
-Subject: [PATCH 07/13] [ARM] pxa/z2: Fix flash layout typo
-In-Reply-To: <1280373389-32475-7-git-send-email-marek.vasut@gmail.com>
-References: <1280373389-32475-1-git-send-email-marek.vasut@gmail.com>
-	<1280373389-32475-7-git-send-email-marek.vasut@gmail.com>
-Message-ID: <AANLkTinph4V9xq7HXgajdSYOeJVLZ2TUoOiFT+SyoLr2@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 4 Aug 2010 08:51:24 +0300
+Subject: [GIT PULL] OMAP: clock, hwmod, omap_device, PM constraints:
+	patches for 2.6.36
+In-Reply-To: <877hk7nxfx.fsf@deeprootsystems.com>
+References: <alpine.DEB.2.00.1007031548010.16344@utopia.booyaka.com>
+	<20100706110918.GJ3192@atomide.com>
+	<877hk7nxfx.fsf@deeprootsystems.com>
+Message-ID: <20100804055123.GD6840@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 29, 2010 at 11:16 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+* Kevin Hilman <khilman@deeprootsystems.com> [100804 01:21]:
+> Tony Lindgren <tony@atomide.com> writes:
+> 
+> > * Paul Walmsley <paul@pwsan.com> [100704 00:43]:
+> >> 
+> >> Hi Tony,
+> >> 
+> >> here's the pull request for some clock, hwmod, omap_device, PM constraints 
+> >> patches for 2.6.36.
+> >
+> > Thanks, pulled into omap-for-linus.
+> >
+> 
+> Hmm, I don't see this in current omap-for-linus.  Is it still planned
+> for 2.6.36?  
 
-Applied.
+Thanks for checking. Paul asked me to redo the pull after fixing some
+credits, and looks like then I forgot to pull.
+ 
+> Once this is merged, the all the hwmod/omap_device conversions will only
+> have a dependency on the OMAP runtime PM core.
 
-> ---
-> ?arch/arm/mach-pxa/z2.c | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
-> index 07d8bd8..f0d0228 100644
-> --- a/arch/arm/mach-pxa/z2.c
-> +++ b/arch/arm/mach-pxa/z2.c
-> @@ -164,7 +164,7 @@ static struct mtd_partition z2_flash_parts[] = {
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.name ? = "U-Boot Environment",
-> ? ? ? ? ? ? ? ?.offset = 0x40000,
-> - ? ? ? ? ? ? ? .size ? = 0x60000,
-> + ? ? ? ? ? ? ? .size ? = 0x20000,
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.name ? = "Flash",
-> ? ? ? ? ? ? ? ?.offset = 0x60000,
-> --
-> 1.7.1
->
->
+Yeah that's good!
+
+Tony
