@@ -1,97 +1,70 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 4 Aug 2010 14:24:39 +0300
-Subject: [PATCH v2 03/20] mmc: support embedded data field in mmc_host
-In-Reply-To: <AANLkTin4m8gJR50zwMB2b0jRMHdNA6CQToKBTAhOL9wF@mail.gmail.com>
-References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
-	<1279733634-21974-4-git-send-email-ohad@wizery.com>
-	<AANLkTimzA_JJ-byTDWznbL3YzeJ8LAP4M50onf2_3fBF@mail.gmail.com>
-	<AANLkTi=Oy8X1xMOwWL_cKBB1LWULT6=p+adUgB+AuSJS@mail.gmail.com>
-	<AANLkTi=BUX59heXAW2Uf4wZo2dSS19Je54dkQ5u2YGAW@mail.gmail.com>
-	<AANLkTimZQKj7H_GeE=+O9cwxEMTR+LhfFbt=AyXGzN3d@mail.gmail.com>
-	<AANLkTikfRja-h9mz7uyRXCZNZjKdU_yB8e58XQucUzrn@mail.gmail.com>
-	<AANLkTi=vhWV1RNyemtfppfjvLYAbzd3aRjFOVgLLpG3Z@mail.gmail.com>
-	<AANLkTin4m8gJR50zwMB2b0jRMHdNA6CQToKBTAhOL9wF@mail.gmail.com>
-Message-ID: <AANLkTinu2S19r8fueM-jVkc35XL2G0Z16BddE92Ci9KB@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 4 Aug 2010 14:25:46 +0300
+Subject: [PATCH] Remove ARM default configurations which duplicate
+	omap3_defconfig
+In-Reply-To: <20100804110130.GA30181@kyllikki.org>
+References: <20100803201921.GA18698@kyllikki.org>
+	<20100804053533.GB6840@atomide.com>
+	<20100804110130.GA30181@kyllikki.org>
+Message-ID: <20100804112546.GM9881@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vitaly,
+* Vincent Sanders <vince@kyllikki.org> [100804 13:59]:
+> On Wed, Aug 04, 2010 at 08:35:36AM +0300, Tony Lindgren wrote:
+> > * Vincent Sanders <vince@simtec.co.uk> [100803 23:23]:
+> > > These configurations are no longer useful as the systems they support
+> > > are covered by the generic omap3_defconfig
+> > 
+> > Since the defconfigs will stay around at least for a while
+> > in the compacted form..
+> 
+> The default configuration situation is simply insane there are over
+> 170 of them for crying out loud. We *need* to reduce the number to
+> sane levels or Linus will simply rm the lot.
 
-On Tue, Aug 3, 2010 at 5:17 PM, Vitaly Wool <vitalywool@gmail.com> wrote:
-> On Mon, Aug 2, 2010 at 11:35 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
->> I'm honestly trying to understand your concerns, but I'm afraid that
->> just saying "it's a hack" is not too informative. Can you please
->> explain what do you think is technically wrong with the proposed
->> solution ? is it not general enough for other use cases ? will it
->> break something ?
+I agree it's out of control. 
+ 
+> > .. And until we have sorted out how to deal with which drivers
+> > need to be compiled in or as modules for each board, I'd
+> > rather keep these defconfigs around for now.
+> > 
+> 
+> > Can we just disable building these with some blacklist
+> > in Kautobuild?
+> > 
+> 
+> There is no such thing, the point was to reduce the number of configurations.
 
-> So if I'd like to set the *same* structure for the *same* WL1271
-> driver, provided that I'm working with the other platform, I'll need
-> to do the following:
-> - add the pointer to the board-specific header;
-> - add the structure to the board-specific C file and propagate its
-> pointer to the controller driver;
-> - add setting the pointer in the core structure into the controller driver.
->
-> This is far from being intuitive. This means we need to hack,
-> generally speaking, all the MMC controller drivers to get it working
-> on all platforms. This is error prone.
+I would like to reduce the configs too, but the issue of knowing
+which drivers and modules to build is still unhandled unfortunately.
+ 
+> > > Signed-off-by:Vincent Sanders <vince@simtec.co.uk>
+> > > Acked-by:Tony Lindgren <tony@atomide.com>
+> > 
+> > So Not-yet-acked-by until some Kconfig issues are sorted out :)
+> > 
+> 
+> I obviously misinterpreted your ack in your previous mail. 
 
-You make it sound really complex.
+Yes sorry about that.
+ 
+> I give up, really, its completely pointless to carry on even trying to
+> make this situation better, noone else really cares so...  
 
-Let's see what it means to add it to a totally different platform.
+I do, I'm having the same problem just building the omap configs
+on my box!
+ 
+> I am on holiday for a few weeks so will not be moderating the lists or
+> running the autobuilder for that time. If on my return I feel like it
+> I may turn kautobuild back on but probably not.
 
-As an example, let's take Google's ADP1 which is based on a different
-host controller (msm-sdcc), and add the required support (untested of
-course, just a quick sketch, patch is based on android's msm git):
+Happy vacation & thanks for all the hard work. Hopefully we can still
+have kautobuild.. If you really insist on removing these defconfigs
+to keep kautobuild going, I'm cool with that. That still does not
+solve the remaining issue though on how to know the drivers and modules
+needed for each board.
 
-diff --git a/arch/arm/mach-msm/board-trout-mmc.c b/arch/arm/mach-msm/board-trout
-index 13755f5..df32b2f 100644
---- a/arch/arm/mach-msm/board-trout-mmc.c
-+++ b/arch/arm/mach-msm/board-trout-mmc.c
-@@ -10,6 +10,7 @@
- #include <linux/mmc/sdio_ids.h>
- #include <linux/err.h>
- #include <linux/debugfs.h>
-+#include <linux/wl12xx.h>
+Regards,
 
- #include <asm/gpio.h>
- #include <asm/io.h>
-@@ -297,11 +298,16 @@ int trout_wifi_reset(int on)
- EXPORT_SYMBOL(trout_wifi_reset);
- #endif
-
-+struct wl12xx_platform_data trout_wlan_data = {
-+       .irq = 62, /* put here your irq number */
-+       .board_ref_clock = 1, /* put here your ref clock */
-+};
-+
- static struct mmc_platform_data trout_wifi_data = {
-        .ocr_mask               = MMC_VDD_28_29,
-        .status                 = trout_wifi_status,
-        .register_status_notify = trout_wifi_status_register,
--       .embedded_sdio          = &trout_wifi_emb_data,
-+       .embedded_sdio          = &trout_wlan_data,
- };
-
- int __init trout_init_mmc(unsigned int sys_rev)
-diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
-index 1697d42..c40f0d1 100755
---- a/drivers/mmc/host/msm_sdcc.c
-+++ b/drivers/mmc/host/msm_sdcc.c
-@@ -1261,6 +1261,7 @@ msmsdcc_probe(struct platform_device *pdev)
-        mmc->f_min = msmsdcc_fmin;
-        mmc->f_max = msmsdcc_fmax;
-        mmc->ocr_avail = plat->ocr_mask;
-+        mmc_set_embedded_data(mmc, plat->embedded_sdio);
-
-        if (msmsdcc_4bit)
-                mmc->caps |= MMC_CAP_4_BIT_DATA;
-
-
-
-
-Is it really that complex ?
-
-Thanks,
-Ohad.
+Tony
