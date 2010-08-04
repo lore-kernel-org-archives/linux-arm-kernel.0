@@ -1,29 +1,47 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Wed, 4 Aug 2010 14:52:46 -0700
-Subject: [PATCH 2/2] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
-In-Reply-To: <AANLkTi=bkp+JJYQ7dF36Up3gcjJR8LypgfKBWZHLfPH-@mail.gmail.com>
-References: <1277811391-17966-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTi=jStVGbJC7jUyhOG3og14F58rw+LEN2UqnP-X0@mail.gmail.com>
-	<AANLkTi=bkp+JJYQ7dF36Up3gcjJR8LypgfKBWZHLfPH-@mail.gmail.com>
-Message-ID: <AANLkTimPAeupEKwksBKOyWX8K+wHgmgc5vEJ8cXBsQtD@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 05 Aug 2010 07:33:49 +0900
+Subject: [PATCH 2/3] ARM: Samsung: Don't use the mach/gpio.h directly
+In-Reply-To: <4C597503.3030809@simtec.co.uk>
+References: <20100802002511.GA32261@july> <4C597503.3030809@simtec.co.uk>
+Message-ID: <003b01cb3425$1f0ef7a0$5d2ce6e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 28, 2010 at 4:12 PM, Linus Walleij
-<linus.ml.walleij@gmail.com> wrote:
-> 2010/7/28 Dan Williams <dan.j.williams@intel.com>:
->>> + ? ? ? txd = kzalloc(sizeof(struct pl08x_txd), GFP_KERNEL);
->>
->> ...appears in the prep routines. ?Will this driver be used by any
->> storage controllers on the platfom? ?Might we deadlock waiting on i/o
->> that needs to allocate a descriptor to complete?
->
-> I haven't noticed anything but a descriptor pool is on my
-> list of things to look into and fix.
+Ben Dooks wrote:
+> 
+> On 02/08/10 01:25, Kyungmin Park wrote:
+> > Use the linux/gpio.h. also fix the build error since new C preprocessor
+directives.
+> >
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Acked-by: Ben Dooks <ben-linux@fluff.org>
 
-If there is a list of things to fix and no acked-by's from anyone on
-the cc list I assume you want to wait for 2.6.37??  I'm sending the
-dmaengine/async_tx pull request this Friday.
+Ok...will apply this into my tree.
 
+> > ---
+> >  arch/arm/plat-samsung/gpiolib.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/arch/arm/plat-samsung/gpiolib.c
+b/arch/arm/plat-samsung/gpiolib.c
+> > index 8a8ba8b..c354089 100644
+> > --- a/arch/arm/plat-samsung/gpiolib.c
+> > +++ b/arch/arm/plat-samsung/gpiolib.c
+> > @@ -18,7 +18,7 @@
+> >  #include <linux/kernel.h>
+> >  #include <linux/irq.h>
+> >  #include <linux/io.h>
+> > -#include <mach/gpio.h>
+> > +#include <linux/gpio.h>
+> >  #include <plat/gpio-core.h>
+> >  #include <plat/gpio-cfg.h>
+> >  #include <plat/gpio-cfg-helpers.h>
+
+
+Thanks.
+
+Best regards,
+Kgene.
 --
-Dan
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
