@@ -1,45 +1,69 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 4 Aug 2010 17:35:09 +0530
-Subject: Memory type used for ioremap
-In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B030E5E47F6@dbde02.ent.ti.com>
-References: <2A3DCF3DA181AD40BDE86A3150B27B6B030E181724@dbde02.ent.ti.com>
-	<1278677464.11895.41.camel@e102109-lin.cambridge.arm.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B030E181CAD@dbde02.ent.ti.com>
-	<20100709141416.GI22845@n2100.arm.linux.org.uk>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B030E5E42A7@dbde02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C641DE6B@dbde02.ent.ti.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B030E5E47F6@dbde02.ent.ti.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C641E31D@dbde02.ent.ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 4 Aug 2010 15:35:34 +0300
+Subject: [PATCH] Remove ARM default configurations which duplicate
+	omap3_defconfig
+In-Reply-To: <20100804113047.GA6852@n2100.arm.linux.org.uk>
+References: <20100803201921.GA18698@kyllikki.org>
+	<20100804053533.GB6840@atomide.com>
+	<20100804113047.GA6852@n2100.arm.linux.org.uk>
+Message-ID: <20100804123533.GN9881@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Pedanekar, Hemant
-> Sent: Wednesday, August 04, 2010 5:31 PM
-> To: Shilimkar, Santosh; Russell King - ARM Linux
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: RE: Memory type used for ioremap
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [100804 14:24]:
+> On Wed, Aug 04, 2010 at 08:35:36AM +0300, Tony Lindgren wrote:
+> > * Vincent Sanders <vince@simtec.co.uk> [100803 23:23]:
+> > > These configurations are no longer useful as the systems they support
+> > > are covered by the generic omap3_defconfig
+> > 
+> > Since the defconfigs will stay around at least for a while
+> > in the compacted form..
+> > 
+> > .. And until we have sorted out how to deal with which drivers
+> > need to be compiled in or as modules for each board, I'd
+> > rather keep these defconfigs around for now.
 > 
-> Shilimkar, Santosh wrote:
-> >> Pedanekar, Hemant wrote:
-> >>> Russell King - ARM Linux wrote:
-> >>>> On Fri, Jul 09, 2010 at 07:32:46PM +0530, Pedanekar,
-> > Hemant wrote:
-> >>>>> Catalin,
-> >>>>
+> That's a user optimization more than anything else.
+> 
+> > Can we just disable building these with some blacklist
+> > in Kautobuild?
+> 
+> That's no the point.  The point is that there's too many of these things.
+> Most other SoCs get away with far fewer defconfigs than OMAP does, and I
+> don't see why OMAP should get any kind of special treatment on this.
+> 
+> > So Not-yet-acked-by until some Kconfig issues are sorted out :)
+> 
+> We've known that the defconfig situation is a hot potato since just
+> after the last merge window, and we should consider ourselves lucky
+> that through Uwe's work, Linus has stepped back from removing all
+> the defconfigs.  Had that not happened, we would now be looking at
+> all the defconfigs being removed.
+> 
+> I've also been on at people throughout the last three months over this
+> issue, and it's gained very little traction.  What's waiting another
+> three months going to achieve?  All that I can see is it'll just be a
+> delay of execution.
+> 
+> So, I'm going to give it a week, and then I'm applying this patch.  As
+> Linus said when he was talking about removing all the defconfigs, if
+> people want to keep them around, put them on a website or similar.  We've
+> already had enough time to sort something out.
 
-> Santosh,
-> 
-> Can you please point me to the patch series you mentioned? I will give it
-> a
-> try.
-http://www.spinics.net/lists/arm-kernel/msg93218.html
+OK, fine. I'll add it to omap-for-linus and merge it. No need to
+wait a week on this.
 
-> 
-> Regarding read-back, the writes themselves are not successful as the
-> peripheral
-> has specific requirement for non-posted writes. So reading back after
-> write
-> Always returns old value.
-> 
-Are you sure about this behaviour? 
+With the recent changes all known mach-omap2 boards should
+be now bootable with just:
+
+$ rm .config
+$ echo CONFIG_ARCH_OMAP=y > .config
+$ yes "" | ARCH=arm make oldconfig
+
+Of course the drivers still need to be selected and CMDLINE needs
+to be set for some boards not suporting bootloader cmdline options.
+And CONFIG_SMP can't be selected on uncore boards.
+
+Cheers,
+
+Tony
