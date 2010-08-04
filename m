@@ -1,39 +1,51 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 4 Aug 2010 09:19:38 +0100
-Subject: [alsa-devel] [PATCH 1/2] ARM: S5PV210: Add audio support to Aquila
-In-Reply-To: <4C5905D3.8090703@samsung.com>
-References: <4C4F9E4C.7000001@samsung.com>
-	<20100729173825.GE24781@opensource.wolfsonmicro.com>
-	<4C527C11.5090409@samsung.com>
-	<20100803085929.GC25306@rakim.wolfsonmicro.main>
-	<4C5905D3.8090703@samsung.com>
-Message-ID: <20100804081938.GD22446@rakim.wolfsonmicro.main>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Aug 2010 09:49:30 +0100
+Subject: memblock glitch
+In-Reply-To: <1280882307.1902.124.camel@pasglop>
+References: <1280882307.1902.124.camel@pasglop>
+Message-ID: <20100804084930.GA4927@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 04, 2010 at 03:16:51PM +0900, Chanwoo Choi wrote:
-> Mark Brown wrote:
+On Wed, Aug 04, 2010 at 10:38:27AM +1000, Benjamin Herrenschmidt wrote:
+> Hi Russell !
+> 
+> While looking at updating ARM memblock to some of my changes, I found
+> this bit in arch/arm/mm/init.c:
+> 
+> int pfn_valid(unsigned long pfn)
+> {
+> 	struct memblock_region *mem = &memblock.memory;
+> 	unsigned int left = 0, right = mem->cnt;
+> 
+> 	do {
+> 		unsigned int mid = (right + left) / 2;
+> 
+> 		if (pfn < memblock_start_pfn(mem, mid))
+> 			right = mid;
+> 		else if (pfn >= memblock_end_pfn(mem, mid))
+> 			left = mid + 1;
+> 		else
+> 			return 1;
+> 	} while (left < right);
+> 	return 0;
+> }
+> EXPORT_SYMBOL(pfn_valid);
+> 
+> So you're trying to do a dichotomy to be faster.
 
-> > OK, good - the fact that the connection wasn't being made with the PMIC
-> > was my main point here.
+Correct.  The normal size of this thing tends to typically be one or
+maybe two entries, although we normally support up to 8 ranges, or 16
+in one case.  It works well because of the tight cache locality of the
+data, which occupies maybe up to three cache lines.
 
-> Did you read writed mail about consumer supply of WM8994 by MyungJoo Ham?
+> However, that doesn't
+> quite work with my new code as I'm trying to take away access to
+> the internals of memblock from arch code so we can re-implement the core
+> in a slightly saner way if we wish to.
+> 
+> Since I understand why you don't want a linear search there, any
+> objection if I move the logic to the core memblock and expose it via a
+> memblock_search() kind of facility ?
 
-I saw it, yes.
-
-> He is in charge of PMIC and Power Management on Aquila board.
-
-> MyungJoo Ham is wrote : 
-> This aquila_buck3_data.constraints would be better have ".always_on =
-> 1" entry as this buck3 is required to be turned on at all times in
-> Aquila boards (even when the system is in suspend-to-mem state). This
-> is required especially when there are many devices physically attached
-> to Buck3 and some of they did not "register" as consumers to Buck3.
-> Buck3 might be turned off by those who are registered while
-> "unregistered" are still active.
-
-> Can you tell me your opinion about the review by MyungJoo Ham?
-> I will respect your response.
-
-I think his comments are sensible.  The constraints should always try to
-reflect the actual constraints of the system as closely as possible.
+No objection.
