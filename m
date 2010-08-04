@@ -1,102 +1,97 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Aug 2010 12:24:48 +0100
-Subject: [PATCH 2/2] ARM: flush_ptrace_access: invalidate all I-caches
-In-Reply-To: <20100715163216.GI29322@n2100.arm.linux.org.uk>
-References: <1279209238-16234-1-git-send-email-will.deacon@arm.com>
-	<1279209238-16234-2-git-send-email-will.deacon@arm.com>
-	<1279209238-16234-3-git-send-email-will.deacon@arm.com>
-	<20100715163216.GI29322@n2100.arm.linux.org.uk>
-Message-ID: <001701cb33c7$a6535a20$f2fa0e60$@deacon@arm.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 4 Aug 2010 14:24:39 +0300
+Subject: [PATCH v2 03/20] mmc: support embedded data field in mmc_host
+In-Reply-To: <AANLkTin4m8gJR50zwMB2b0jRMHdNA6CQToKBTAhOL9wF@mail.gmail.com>
+References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
+	<1279733634-21974-4-git-send-email-ohad@wizery.com>
+	<AANLkTimzA_JJ-byTDWznbL3YzeJ8LAP4M50onf2_3fBF@mail.gmail.com>
+	<AANLkTi=Oy8X1xMOwWL_cKBB1LWULT6=p+adUgB+AuSJS@mail.gmail.com>
+	<AANLkTi=BUX59heXAW2Uf4wZo2dSS19Je54dkQ5u2YGAW@mail.gmail.com>
+	<AANLkTimZQKj7H_GeE=+O9cwxEMTR+LhfFbt=AyXGzN3d@mail.gmail.com>
+	<AANLkTikfRja-h9mz7uyRXCZNZjKdU_yB8e58XQucUzrn@mail.gmail.com>
+	<AANLkTi=vhWV1RNyemtfppfjvLYAbzd3aRjFOVgLLpG3Z@mail.gmail.com>
+	<AANLkTin4m8gJR50zwMB2b0jRMHdNA6CQToKBTAhOL9wF@mail.gmail.com>
+Message-ID: <AANLkTinu2S19r8fueM-jVkc35XL2G0Z16BddE92Ci9KB@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Vitaly,
 
-> Subject: Re: [PATCH 2/2] ARM: flush_ptrace_access: invalidate all I-caches
-> 
-> On Thu, Jul 15, 2010 at 04:53:58PM +0100, Will Deacon wrote:
-> > copy_to_user_page can be used by access_process_vm to write to an
-> > executable page of a process using a mapping acquired by kmap.
-> > For systems with I-cache aliasing, flushing the I-cache using the
-> > Kernel mapping may leave stale data in the I-cache if the user
-> > mapping is of a different colour.
-> >
-> > This patch replaces the coherent_kern_range call in flush_ptrace_access
-> > with a D-cache flush followed by a system-wide I-cache invalidation.
-> > This is required on all systems where the size of a way in the I-cache
-> > is larger than PAGE_SIZE.
-> >
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/mm/flush.c |    4 ++--
-> >  1 files changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-> > index c6844cb..45896a9 100644
-> > --- a/arch/arm/mm/flush.c
-> > +++ b/arch/arm/mm/flush.c
-> > @@ -120,8 +120,8 @@ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
-> >
-> >  	/* VIPT non-aliasing cache */
-> >  	if (vma->vm_flags & VM_EXEC) {
-> > -		unsigned long addr = (unsigned long)kaddr;
-> > -		__cpuc_coherent_kern_range(addr, addr + len);
-> > +		__cpuc_flush_dcache_area(kaddr, len);
-> > +		__flush_icache_all();
-> 
-> NAK.
-> 
+On Tue, Aug 3, 2010 at 5:17 PM, Vitaly Wool <vitalywool@gmail.com> wrote:
+> On Mon, Aug 2, 2010 at 11:35 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+>> I'm honestly trying to understand your concerns, but I'm afraid that
+>> just saying "it's a hack" is not too informative. Can you please
+>> explain what do you think is technically wrong with the proposed
+>> solution ? is it not general enough for other use cases ? will it
+>> break something ?
 
-How about something like this instead?:
+> So if I'd like to set the *same* structure for the *same* WL1271
+> driver, provided that I'm working with the other platform, I'll need
+> to do the following:
+> - add the pointer to the board-specific header;
+> - add the structure to the board-specific C file and propagate its
+> pointer to the controller driver;
+> - add setting the pointer in the core structure into the controller driver.
+>
+> This is far from being intuitive. This means we need to hack,
+> generally speaking, all the MMC controller drivers to get it working
+> on all platforms. This is error prone.
 
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index c6844cb..6b03043 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -20,10 +20,9 @@
- 
- #include "mm.h"
- 
--#ifdef CONFIG_CPU_CACHE_VIPT
--
- #define ALIAS_FLUSH_START      0xffff4000
- 
-+#ifdef CONFIG_CPU_CACHE_VIPT
- static void flush_pfn_alias(unsigned long pfn, unsigned long vaddr)
- {
-        unsigned long to = ALIAS_FLUSH_START + (CACHE_COLOUR(vaddr) << PAGE_SHIFT);
-@@ -93,6 +92,18 @@ void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsig
- #define flush_pfn_alias(pfn,vaddr)     do { } while (0)
+You make it sound really complex.
+
+Let's see what it means to add it to a totally different platform.
+
+As an example, let's take Google's ADP1 which is based on a different
+host controller (msm-sdcc), and add the required support (untested of
+course, just a quick sketch, patch is based on android's msm git):
+
+diff --git a/arch/arm/mach-msm/board-trout-mmc.c b/arch/arm/mach-msm/board-trout
+index 13755f5..df32b2f 100644
+--- a/arch/arm/mach-msm/board-trout-mmc.c
++++ b/arch/arm/mach-msm/board-trout-mmc.c
+@@ -10,6 +10,7 @@
+ #include <linux/mmc/sdio_ids.h>
+ #include <linux/err.h>
+ #include <linux/debugfs.h>
++#include <linux/wl12xx.h>
+
+ #include <asm/gpio.h>
+ #include <asm/io.h>
+@@ -297,11 +298,16 @@ int trout_wifi_reset(int on)
+ EXPORT_SYMBOL(trout_wifi_reset);
  #endif
- 
-+static void flush_icache_alias(unsigned long pfn, unsigned long vaddr, unsigned long len)
-+{
-+       unsigned long colour = CACHE_COLOUR(vaddr);
-+       unsigned long offset = vaddr & (PAGE_SIZE - 1);
-+       unsigned long to;
-+
-+       set_pte_ext(TOP_PTE(ALIAS_FLUSH_START) + colour, pfn_pte(pfn, PAGE_KERNEL), 0);
-+       to = ALIAS_FLUSH_START + (colour << PAGE_SHIFT) + offset;
-+       flush_tlb_kernel_page(to);
-+       flush_icache_range(to, to + len);
-+}
-+
- #ifdef CONFIG_SMP
- static void flush_ptrace_access_other(void *args)
- {
-@@ -120,8 +131,7 @@ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
- 
-        /* VIPT non-aliasing cache */
-        if (vma->vm_flags & VM_EXEC) {
--               unsigned long addr = (unsigned long)kaddr;
--               __cpuc_coherent_kern_range(addr, addr + len);
-+               flush_icache_alias(page_to_pfn(page), uaddr, len);
- #ifdef CONFIG_SMP
-                if (cache_ops_need_broadcast())
-                        smp_call_function(flush_ptrace_access_other,
 
-That way we only use __flush_icache_all for non-aliasing D-caches in
-the case that we have to broadcast the flushing using IPI.
++struct wl12xx_platform_data trout_wlan_data = {
++       .irq = 62, /* put here your irq number */
++       .board_ref_clock = 1, /* put here your ref clock */
++};
++
+ static struct mmc_platform_data trout_wifi_data = {
+        .ocr_mask               = MMC_VDD_28_29,
+        .status                 = trout_wifi_status,
+        .register_status_notify = trout_wifi_status_register,
+-       .embedded_sdio          = &trout_wifi_emb_data,
++       .embedded_sdio          = &trout_wlan_data,
+ };
 
-Will
+ int __init trout_init_mmc(unsigned int sys_rev)
+diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
+index 1697d42..c40f0d1 100755
+--- a/drivers/mmc/host/msm_sdcc.c
++++ b/drivers/mmc/host/msm_sdcc.c
+@@ -1261,6 +1261,7 @@ msmsdcc_probe(struct platform_device *pdev)
+        mmc->f_min = msmsdcc_fmin;
+        mmc->f_max = msmsdcc_fmax;
+        mmc->ocr_avail = plat->ocr_mask;
++        mmc_set_embedded_data(mmc, plat->embedded_sdio);
+
+        if (msmsdcc_4bit)
+                mmc->caps |= MMC_CAP_4_BIT_DATA;
+
+
+
+
+Is it really that complex ?
+
+Thanks,
+Ohad.
