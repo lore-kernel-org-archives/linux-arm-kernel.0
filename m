@@ -1,55 +1,115 @@
-From: Joerg.Roedel@amd.com (Roedel, Joerg)
-Date: Wed, 4 Aug 2010 11:52:37 +0200
-Subject: [PATCH 1/2] arm: msm: Add System MMU support.
-In-Reply-To: <4C586348.2050209@codeaurora.org>
-References: <20100729123512Y.fujita.tomonori@lab.ntt.co.jp>
-	<201007291026.55928.arnd@arndb.de> <20100729084018.GM26098@amd.com>
-	<20100729174621W.fujita.tomonori@lab.ntt.co.jp>
-	<20100729090607.GN26098@amd.com> <4C586348.2050209@codeaurora.org>
-Message-ID: <20100804095237.GH18307@amd.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 4 Aug 2010 13:10:09 +0300
+Subject: [PATCH 1/5] [OMAP] HTCHERALD: MMC, I2C, HTCPLD and related devices
+In-Reply-To: <1280762976-17284-2-git-send-email-darkstar6262@gmail.com>
+References: <1280762976-17284-1-git-send-email-darkstar6262@gmail.com>
+	<1280762976-17284-2-git-send-email-darkstar6262@gmail.com>
+Message-ID: <20100804101008.GD9881@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 03, 2010 at 02:43:20PM -0400, Stepan Moskovchenko wrote:
->   On 8/3/2010 2:23 AM, Roedel, Joerg wrote:
-> > A domain is defined by a single page-table which can be modified using
-> > the iommu_map/iommu_unmap function calls. I am not completly sure what
-> > you mean by an iommu_context. Can you describe what it means in your
-> > context?
+* Cory Maccarrone <darkstar6262@gmail.com> [100802 18:23]:
+> This change adds in MMC and I2C support to the HTC Herald board, as well
+> as adding the HTCPLD driver for the PLD used on this phone.  It also
+> adds in the gpio-keys entries for the front directional keys and
+> selector and the cursor keys on the slide-out keyboard, and gpio-leds
+> support for the LEDs attached to the htcpld.
 > 
-> Joerg,
-> I think with some rework, all my use cases can be handled by your 
-> existing iommu API. If the domain is treated basically a page table, 
-> there will be some changes, but I think it can be done. I will push a 
-> new version of my driver in a few days.
+> The Kconfig was also modified to add 64 GPIOs and IRQs to the default
+> maximum number of each for the HTC herald.  This is needed because the
+> HTCPLD chip on this board exposes an additional 32 gpios and 16 irqs
+> that would not fit in the default limits.
 > 
-> One thing that may be helpful for the future, however, is maybe 
-> something like adding iommu_tlb_flush to the ops. I suppose this would 
-> either have to take a device, or the domain would need to keep a list of 
-> devices it had been attached to (so that their TLBs can be invalidated). 
-> But I suppose on the other hand, iommu_map/unmap may be able to just 
-> implicitly invalidate the TLB also, since TLB invalidation often follows 
-> map/unmap. What are your thoughts?
+> Signed-off-by: Cory Maccarrone <darkstar6262@gmail.com>
+> ---
+>  arch/arm/mach-omap1/Kconfig           |    2 +
+>  arch/arm/mach-omap1/board-htcherald.c |  288 ++++++++++++++++++++++++++++++++-
+>  2 files changed, 284 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap1/Kconfig b/arch/arm/mach-omap1/Kconfig
+> index 3b02d3b..94d5b52 100644
+> --- a/arch/arm/mach-omap1/Kconfig
+> +++ b/arch/arm/mach-omap1/Kconfig
+> @@ -64,6 +64,8 @@ config MACH_OMAP_HTCWIZARD
+>  config MACH_HERALD
+>  	bool "HTC Herald"
+>  	depends on ARCH_OMAP850
+> +	select OMAP_GPIO_EXTRA64
+> +	select OMAP_IRQ_EXTRA64
+>  	help
+>  	  HTC Herald smartphone support (AKA T-Mobile Wing, ...)
+>  
 
-Sounds good. I am curious for your patches :-)
+Looking at this patches again.. These above does not exist in
+the mainline kernel.
 
-For the TLB-flush question, I think it would make sense to add iommu
-tlb flushing functions to the IOMMU-API. We currently flush the TLB
-implicitly in the map/unmap calls but thats very inefficient. It would
-be better to have a seperate function for it in the API. The right
-parameter for such a function is a domain. The IOMMU driver knows which
-devices are attached to a domain an could easily flush all TLBs.
+> +/* HTCPLD definitions */
+> +
+> +/*
+> + * CPLD Logic
+> + *
+> +
+> +Chip 3 - 0x03
+> +
+> +Function            7 6 5 4  3 2 1 0
+> +------------------------------------
+> +DPAD light          x x x x  x x x 1
+> +SoundDev            x x x x  1 x x x
+> +Screen white        1 x x x  x x x x
+> +MMC power on        x x x x  x 1 x x
+> +Happy times (n)     0 x x x  x 1 x x
+> +
+> +Chip 4 - 0x04
+> +
+> +Function            7 6 5 4  3 2 1 0
+> +------------------------------------
+> +Keyboard light      x x x x  x x x 1
+> +LCD Bright (4)      x x x x  x 1 1 x
+> +LCD Bright (3)      x x x x  x 0 1 x
+> +LCD Bright (2)      x x x x  x 1 0 x
+> +LCD Bright (1)      x x x x  x 0 0 x
+> +LCD Off             x x x x  0 x x x
+> +LCD image (fb)      1 x x x  x x x x
+> +LCD image (white)   0 x x x  x x x x
+> +Caps lock LED       x x 1 x  x x x x
+> +
+> +Chip 5 - 0x05
+> +
+> +Function            7 6 5 4  3 2 1 0
+> +------------------------------------
+> +Red (solid)         x x x x  x 1 x x
+> +Red (flash)         x x x x  x x 1 x
+> +Green (GSM flash)   x x x x  1 x x x
+> +Green (GSM solid)   x x x 1  x x x x
+> +Green (wifi flash)  x x 1 x  x x x x
+> +Blue (bt flash)     x 1 x x  x x x x
+> +DPAD Int Enable     1 x x x  x x x 0
+> +
+> +(Combinations of the above can be made for different colors.)
+> +The direction pad interrupt enable must be set each time the
+> +interrupt is handled.
+> +
+> +Chip 6 - 0x06
+> +
+> +Function            7 6 5 4  3 2 1 0
+> +------------------------------------
+> +Vibrator            x x x x  1 x x x
+> +Alt LED             x x x 1  x x x x
+> +Screen white        1 x x x  x x x x
+> +Screen white        x x 1 x  x x x x
+> +Screen white        x 0 x x  x x x x
+> +Enable kbd dpad     x x x x  x x 0 x
+> +Happy Times         0 1 0 x  x x 0 x
+> +*/
 
-One alternative I can think of: An iommu_domain_commit() function which
-syncs software changes of a domain to the hardware. The map/unmap calls
-have to save which parts of the tlb need to be flushed and commit does
-flush those parts then (or flush everything).
+/*
+ * Please put the above into standard comments like
+ * this thanks
+ */
 
-	Joerg
+Other than that, looks good to me. Have to leave this to the next
+merge window though.
 
--- 
-AMD Operating System Research Center
+Regards,
 
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+Tony
