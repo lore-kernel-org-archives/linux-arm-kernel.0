@@ -1,137 +1,95 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 04 Aug 2010 20:34:43 +0900
-Subject: [PATCH v6 6/7] ARM: S5PV210: clock registers (CLK_DIV/SRC/STAT)
-In-Reply-To: <1280829866-26001-7-git-send-email-myungjoo.ham@samsung.com>
-References: <1280829866-26001-1-git-send-email-myungjoo.ham@samsung.com>
-	<1280829866-26001-2-git-send-email-myungjoo.ham@samsung.com>
-	<1280829866-26001-3-git-send-email-myungjoo.ham@samsung.com>
-	<1280829866-26001-4-git-send-email-myungjoo.ham@samsung.com>
-	<1280829866-26001-5-git-send-email-myungjoo.ham@samsung.com>
-	<1280829866-26001-6-git-send-email-myungjoo.ham@samsung.com>
-	<1280829866-26001-7-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <001b01cb33c9$0fa33b70$2ee9b250$%kim@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Aug 2010 12:41:48 +0100
+Subject: [PATCH v2 03/20] mmc: support embedded data field in mmc_host
+In-Reply-To: <AANLkTinu2S19r8fueM-jVkc35XL2G0Z16BddE92Ci9KB@mail.gmail.com>
+References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
+	<1279733634-21974-4-git-send-email-ohad@wizery.com>
+	<AANLkTimzA_JJ-byTDWznbL3YzeJ8LAP4M50onf2_3fBF@mail.gmail.com>
+	<AANLkTi=Oy8X1xMOwWL_cKBB1LWULT6=p+adUgB+AuSJS@mail.gmail.com>
+	<AANLkTi=BUX59heXAW2Uf4wZo2dSS19Je54dkQ5u2YGAW@mail.gmail.com>
+	<AANLkTimZQKj7H_GeE=+O9cwxEMTR+LhfFbt=AyXGzN3d@mail.gmail.com>
+	<AANLkTikfRja-h9mz7uyRXCZNZjKdU_yB8e58XQucUzrn@mail.gmail.com>
+	<AANLkTi=vhWV1RNyemtfppfjvLYAbzd3aRjFOVgLLpG3Z@mail.gmail.com>
+	<AANLkTin4m8gJR50zwMB2b0jRMHdNA6CQToKBTAhOL9wF@mail.gmail.com>
+	<AANLkTinu2S19r8fueM-jVkc35XL2G0Z16BddE92Ci9KB@mail.gmail.com>
+Message-ID: <20100804114147.GB6852@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
+On Wed, Aug 04, 2010 at 02:24:39PM +0300, Ohad Ben-Cohen wrote:
+> Hi Vitaly,
 > 
-> Previously, most of CLK_DIV/SRC register accessing mask and shift
-> values were used at arch/arm/mach-s5pv210/clock.c only; thus we
-> had not been using macros for these. However, as CPUFREQ uses
-> those shift and mask values as well, we'd better define them at a single
-> location, whose proper location would be regs-clock.h.
+> On Tue, Aug 3, 2010 at 5:17 PM, Vitaly Wool <vitalywool@gmail.com> wrote:
+> > On Mon, Aug 2, 2010 at 11:35 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> >> I'm honestly trying to understand your concerns, but I'm afraid that
+> >> just saying "it's a hack" is not too informative. Can you please
+> >> explain what do you think is technically wrong with the proposed
+> >> solution ? is it not general enough for other use cases ? will it
+> >> break something ?
 > 
-> Note that only the information about registers used by CPUFREQ are
-> defined. However, we may need to define other registers later if we add
-> other parts. Besides, later, we will probably need to use these macros
-> at arch/arm/mach-s5pv210/clock.c as well especially for entries that are
-> used out of clock.c as well.
+> > So if I'd like to set the *same* structure for the *same* WL1271
+> > driver, provided that I'm working with the other platform, I'll need
+> > to do the following:
+> > - add the pointer to the board-specific header;
+> > - add the structure to the board-specific C file and propagate its
+> > pointer to the controller driver;
+> > - add setting the pointer in the core structure into the controller driver.
+> >
+> > This is far from being intuitive. This means we need to hack,
+> > generally speaking, all the MMC controller drivers to get it working
+> > on all platforms. This is error prone.
 > 
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pv210/include/mach/regs-clock.h |   60
-> +++++++++++++++++++++-
->  1 files changed, 57 insertions(+), 3 deletions(-)
+> You make it sound really complex.
 > 
-> diff --git a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-b/arch/arm/mach-
-> s5pv210/include/mach/regs-clock.h
-> index 2a25ab4..f370ae8 100644
-> --- a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-> +++ b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-> @@ -66,11 +66,30 @@
->  #define S5P_CLKGATE_BUS0	S5P_CLKREG(0x484)
->  #define S5P_CLKGATE_BUS1	S5P_CLKREG(0x488)
->  #define S5P_CLK_OUT		S5P_CLKREG(0x500)
-> +#define S5P_CLK_DIV_STAT0   S5P_CLKREG(0x1000)
-> +#define S5P_CLK_DIV_STAT1   S5P_CLKREG(0x1004)
-> +#define S5P_CLK_MUX_STAT0   S5P_CLKREG(0x1100)
-> +#define S5P_CLK_MUX_STAT1   S5P_CLKREG(0x1104)
-> +
-> +#define S5P_ARM_MCS_CON		S5P_CLKREG(0x6100)
+> Let's see what it means to add it to a totally different platform.
 > 
->  /* CLKSRC0 */
-> -#define S5P_CLKSRC0_MUX200_MASK		(0x1<<16)
-> -#define S5P_CLKSRC0_MUX166_MASK		(0x1<<20)
-> -#define S5P_CLKSRC0_MUX133_MASK		(0x1<<24)
-> +#define S5P_CLKSRC0_APLL_MASK		(0x1 << 0)
-> +#define S5P_CLKSRC0_APLL_SHIFT		(0)
-> +#define S5P_CLKSRC0_MPLL_MASK		(0x1 << 4)
-> +#define S5P_CLKSRC0_MPLL_SHIFT		(4)
-> +#define S5P_CLKSRC0_EPLL_MASK		(0x1 << 8)
-> +#define S5P_CLKSRC0_EPLL_SHIFT		(8)
-> +#define S5P_CLKSRC0_VPLL_MASK		(0x1 << 12)
-> +#define S5P_CLKSRC0_VPLL_SHIFT		(12)
+> As an example, let's take Google's ADP1 which is based on a different
+> host controller (msm-sdcc), and add the required support (untested of
+> course, just a quick sketch, patch is based on android's msm git):
 
-I didn't find anywhere above definitions are used....
-As I said, please don't add unnecessary definitions.
+What if some other driver gets attached and tries to use this
+platform data?  This whole idea sounds extremely silly, cumbersome,
+error prone, and is inviting misuse by normal MMC sockets.
 
-> +#define S5P_CLKSRC0_MUX200_MASK		(0x1 << 16)
-> +#define S5P_CLKSRC0_MUX200_SHIFT	(16)
-> +#define S5P_CLKSRC0_MUX166_MASK		(0x1 << 20)
-> +#define S5P_CLKSRC0_MUX166_SHIFT	(20)
-> +#define S5P_CLKSRC0_MUX133_MASK		(0x1 << 24)
-> +#define S5P_CLKSRC0_MUX133_SHIFT	(24)
+Why not arrange for a small piece of code to be built into the kernel
+when this driver is selected as a module or built-in, which handles
+the passing of platform data to the driver?
 
-> +#define S5P_CLKSRC0_ONENAND_MASK	(0x1 << 28)
-> +#define S5P_CLKSRC0_ONENAND_SHIFT	(28)
+Something like:
 
-Same...unnecessary.
+wl12xx_platform_data.c:
+#include <linux/module.h>
+#include <whatever/required/for/wl12xx.h>
 
-> 
->  /* CLKDIV0 */
->  #define S5P_CLKDIV0_APLL_SHIFT		(0)
-> @@ -90,6 +109,41 @@
->  #define S5P_CLKDIV0_PCLK66_SHIFT	(28)
->  #define S5P_CLKDIV0_PCLK66_MASK		(0x7 <<
-> S5P_CLKDIV0_PCLK66_SHIFT)
-> 
-> +/* CLKSRC2 */
-> +#define S5P_CLKSRC2_G3D_MASK		(0x3 << 0)
-> +#define S5P_CLKSRC2_G3D_SHIFT		(0)
-> +#define S5P_CLKSRC2_MFC_MASK		(0x3 << 4)
-> +#define S5P_CLKSRC2_MFC_SHIFT		(4)
-> +#define S5P_CLKSRC2_G2D_MASK		(0x3 << 8)
-> +#define S5P_CLKSRC2_G2D_SHIFT		(8)
-> +
-> +/* CLKDIV2 */
-> +#define S5P_CLKDIV2_G3D_MASK		(0xF << 0)
-> +#define S5P_CLKDIV2_G3D_SHIFT		(0)
-> +#define S5P_CLKDIV2_MFC_MASK		(0xF << 4)
-> +#define S5P_CLKDIV2_MFC_SHIFT		(4)
-> +#define S5P_CLKDIV2_G2D_MASK		(0xF << 8)
-> +#define S5P_CLKDIV2_G2D_SHIFT		(8)
-> +
-> +/* CLKDIV6 */
-> +#define S5P_CLKDIV6_ONEDRAM_MASK	(0xf<<28)
-> +#define S5P_CLKDIV6_ONEDRAM_SHIFT	(28)
-> +
-> +/* CLK_DIV_STAT0 */
-> +#define S5P_CLKDIV_STAT0_G3D		(1 << 16)
-> +#define S5P_CLKDIV_STAT0_MFC		(1 << 17)
-> +
-> +/* CLK_DIV_STAT1 */
-> +#define S5P_CLKDIV_STAT1_G2D		(1 << 20)
-> +
-> +/* CLK_MUX_STAT0 */
-> +#define S5P_CLKMUX_STAT0_MUX200		(1 << 18)
-> +
-> +/* CLK_MUX_STAT1 */
-> +#define S5P_CLKMUX_STAT1_G3D		(1 << 3)
-> +#define S5P_CLKMUX_STAT1_MFC		(1 << 7)
-> +#define S5P_CLKMUX_STAT1_G2D		(1 << 27)
-> +
->  /* Registers related to power management */
->  #define S5P_PWR_CFG		S5P_CLKREG(0xC000)
->  #define S5P_EINT_WAKEUP_MASK	S5P_CLKREG(0xC004)
-> --
+static struct wl12xx_platform_data *platform_data;
 
+int __init wl12xx_set_platform_data(const struct wl12xx_platform_data *data)
+{
+	if (platform_data)
+		return -EBUSY;
+	platform_data = kmemdup(data, sizeof(*data), GFP_KERNEL);
+	if (!platform_data)
+		return -ENOMEM;
+	return 0;
+}
 
-Thanks.
+int wl12xx_get_platform_data(struct wl12xx_platform_data *data)
+{
+	if (platform_data) {
+		memcpy(data, platform_data, sizeof(*data));
+		return 0;
+	}
+	return -ENODEV;
+}
+EXPORT_SYMBOL(wl12xx_get_platform_data);
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+And in the Kconfig, something like:
+
+config WL12XX_PLATFORM_DATA
+	bool
+	depends on WL12XX != n
+	default y
+
+This means there'll be no confusion over who owns the 'embedded data',
+typechecking is preserved, and no possibility for the wrong driver to
+pick up the data.
