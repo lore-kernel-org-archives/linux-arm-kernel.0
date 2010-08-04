@@ -1,121 +1,150 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 4 Aug 2010 11:16:14 +0800
-Subject: [PATCH 03/13] [ARM] pxa/palm: Add core pmic support for Palm27x
-In-Reply-To: <4C51520D.3000202@compulab.co.il>
+Date: Wed, 4 Aug 2010 11:26:36 +0800
+Subject: [PATCH 04/13] [ARM] pxa/palm: Modularize rest of code in Palms
+In-Reply-To: <1280373389-32475-4-git-send-email-marek.vasut@gmail.com>
 References: <1280373389-32475-1-git-send-email-marek.vasut@gmail.com>
-	<1280373389-32475-3-git-send-email-marek.vasut@gmail.com>
-	<4C51520D.3000202@compulab.co.il>
-Message-ID: <AANLkTi=tg_y49z8NxYSXx1+QPsuDtCdFhSOJMCMuTi=j@mail.gmail.com>
+	<1280373389-32475-4-git-send-email-marek.vasut@gmail.com>
+Message-ID: <AANLkTins4gL93uTgCT0fErbLVUzWtiJheNzpi7mrRuZW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 29, 2010 at 6:03 PM, Mike Rapoport <mike@compulab.co.il> wrote:
-> Marek Vasut wrote:
->>
->> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
->> ---
->> ?arch/arm/mach-pxa/palm27x.c | ? 57
->> +++++++++++++++++++++++++++++++++++++++++++
->> ?1 files changed, 57 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-pxa/palm27x.c b/arch/arm/mach-pxa/palm27x.c
->> index ff5ee8c..a1009ec 100644
->> --- a/arch/arm/mach-pxa/palm27x.c
->> +++ b/arch/arm/mach-pxa/palm27x.c
->> @@ -21,6 +21,7 @@
->> ?#include <linux/wm97xx.h>
->> ?#include <linux/power_supply.h>
->> ?#include <linux/usb/gpio_vbus.h>
->> +#include <linux/regulator/max1586.h>
->> ?#include <asm/mach-types.h>
->> ?#include <asm/mach/arch.h>
->> @@ -35,6 +36,8 @@
->> ?#include <mach/palmasoc.h>
->> ?#include <mach/palm27x.h>
->> ?+#include <plat/i2c.h>
->> +
->> ?#include "generic.h"
->> ?#include "devices.h"
->> ?@@ -458,6 +461,59 @@ static void __init palm27x_power_init(int ac, int
->> usb)
->> ?static inline void palm27x_power_init(int ac, int usb) {}
->> ?#endif
->>
->> ?+/******************************************************************************
->> + * Core power regulator
->> +
->> ******************************************************************************/
->> +#if defined(CONFIG_REGULATOR_MAX1586) || \
->> + ? ?defined(CONFIG_REGULATOR_MAX1586_MODULE)
->> +static struct regulator_consumer_supply palm27x_max1587a_consumers[] = {
->> + ? ? ? {
->> + ? ? ? ? ? ? ? .supply = "vcc_core",
->> + ? ? ? }
->> +};
->> +
->> +static struct regulator_init_data palm27x_max1587a_v3_info = {
->> + ? ? ? .constraints = {
->> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "vcc_core range",
->> + ? ? ? ? ? ? ? .min_uV ? ? ? ? = 900000,
->> + ? ? ? ? ? ? ? .max_uV ? ? ? ? = 1705000,
->> + ? ? ? ? ? ? ? .always_on ? ? ?= 1,
->> + ? ? ? ? ? ? ? .valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
->> + ? ? ? },
->> + ? ? ? .consumer_supplies ? ? ?= palm27x_max1587a_consumers,
->> + ? ? ? .num_consumer_supplies ?= ARRAY_SIZE(palm27x_max1587a_consumers),
->> +};
->> +
->> +static struct max1586_subdev_data palm27x_max1587a_subdevs[] = {
->> + ? ? ? {
->> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "vcc_core",
->> + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = MAX1586_V3,
->> + ? ? ? ? ? ? ? .platform_data ?= &palm27x_max1587a_v3_info,
->> + ? ? ? }
->> +};
->> +
->> +static struct max1586_platform_data palm27x_max1587a_info = {
->> + ? ? ? .subdevs ? ? = palm27x_max1587a_subdevs,
->> + ? ? ? .num_subdevs = ARRAY_SIZE(palm27x_max1587a_subdevs),
->> + ? ? ? .v3_gain ? ? = MAX1586_GAIN_R24_3k32, /* 730..1550 mV */
->> +};
->> +
->> +static struct i2c_board_info __initdata palm27x_pi2c_board_info[] = {
->> + ? ? ? {
->> + ? ? ? ? ? ? ? I2C_BOARD_INFO("max1586", 0x14),
->> + ? ? ? ? ? ? ? .platform_data ?= &palm27x_max1587a_info,
->> + ? ? ? },
->> +};
->> +
->> +static void __init palm27x_pmic_init(void)
->> +{
->> + ? ? ? i2c_register_board_info(1,
->> ARRAY_AND_SIZE(palm27x_pi2c_board_info));
->> + ? ? ? pxa27x_set_i2c_power_info(NULL);
+On Thu, Jul 29, 2010 at 11:16 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> ---
+> ?arch/arm/mach-pxa/palmld.c ? | ? 63 +++++++++++++++----
+> ?arch/arm/mach-pxa/palmt5.c ? | ? 22 ++++++-
+> ?arch/arm/mach-pxa/palmtreo.c | ?141 ++++++++++++++++++++----------------------
+> ?arch/arm/mach-pxa/palmtx.c ? | ? 49 ++++++++++++---
+> ?arch/arm/mach-pxa/palmz72.c ?| ? 22 ++++++-
+> ?5 files changed, 196 insertions(+), 101 deletions(-)
 >
-> Consider using PIO mode for PMIC communications
+> diff --git a/arch/arm/mach-pxa/palmld.c b/arch/arm/mach-pxa/palmld.c
+> index cac66ca..d59db0b 100644
+> --- a/arch/arm/mach-pxa/palmld.c
+> +++ b/arch/arm/mach-pxa/palmld.c
+> @@ -128,6 +128,7 @@ static unsigned long palmld_pin_config[] __initdata = {
+> ?/******************************************************************************
+> ?* NOR Flash
+> ?******************************************************************************/
+> +#if defined(CONFIG_MTD_PHYSMAP) || defined(CONFIG_MTD_PHYSMAP_MODULE)
+> ?static struct mtd_partition palmld_partitions[] = {
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "Flash",
+> @@ -161,9 +162,18 @@ static struct platform_device palmld_flash = {
+> ? ? ? ?},
+> ?};
 >
+> +static void __init palmld_nor_init(void)
+> +{
+> + ? ? ? platform_device_register(&palmld_flash);
+> +}
+> +#else
+> +static inline void palmld_nor_init(void) {}
+> +#endif
+> +
+> ?/******************************************************************************
+> ?* GPIO keyboard
+> ?******************************************************************************/
+> +#if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULE)
+> ?static unsigned int palmld_matrix_keys[] = {
+> ? ? ? ?KEY(0, 1, KEY_F2),
+> ? ? ? ?KEY(0, 2, KEY_UP),
+> @@ -190,9 +200,18 @@ static struct pxa27x_keypad_platform_data palmld_keypad_platform_data = {
+> ? ? ? ?.debounce_interval ? ? ?= 30,
+> ?};
+>
+> +static void __init palmld_kpc_init(void)
+> +{
+> + ? ? ? pxa_set_keypad_info(&palmld_keypad_platform_data);
+> +}
+> +#else
+> +static inline void palmld_kpc_init(void) {}
+> +#endif
+> +
+> ?/******************************************************************************
+> ?* GPIO keys
+> ?******************************************************************************/
+> +#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
+> ?static struct gpio_keys_button palmld_pxa_buttons[] = {
+> ? ? ? ?{KEY_F8, GPIO_NR_PALMLD_HOTSYNC_BUTTON_N, 1, "HotSync Button" },
+> ? ? ? ?{KEY_F9, GPIO_NR_PALMLD_LOCK_SWITCH, 0, "Lock Switch" },
+> @@ -212,9 +231,18 @@ static struct platform_device palmld_pxa_keys = {
+> ? ? ? ?},
+> ?};
+>
+> +static void __init palmld_keys_init(void)
+> +{
+> + ? ? ? platform_device_register(&palmld_pxa_keys);
+> +}
+> +#else
+> +static inline void palmld_keys_init(void) {}
+> +#endif
+> +
+> ?/******************************************************************************
+> ?* LEDs
+> ?******************************************************************************/
+> +#if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
+> ?struct gpio_led gpio_leds[] = {
+> ?{
+> ? ? ? ?.name ? ? ? ? ? ? ? ? ? = "palmld:green:led",
+> @@ -240,26 +268,34 @@ static struct platform_device palmld_leds = {
+> ? ? ? ?}
+> ?};
+>
+> +static void __init palmld_leds_init(void)
+> +{
+> + ? ? ? platform_device_register(&palmld_leds);
+> +}
+> +#else
+> +static inline void palmld_leds_init(void) {}
+> +#endif
+> +
+> ?/******************************************************************************
+> ?* HDD
+> ?******************************************************************************/
+> -static struct platform_device palmld_hdd = {
+> +#if defined(CONFIG_PATA_PALMLD) || defined(CONFIG_PATA_PALMLD_MODULE)
+> +static struct platform_device palmld_ide_device = {
+> ? ? ? ?.name ? = "pata_palmld",
+> ? ? ? ?.id ? ? = -1,
+> ?};
+>
+> +static void __init palmld_ide_init(void)
+> +{
+> + ? ? ? platform_device_register(&palmld_ide_device);
+> +}
+> +#else
+> +static inline void palmld_ide_init(void) {}
+> +#endif
+> +
+> ?/******************************************************************************
+> ?* Machine init
+> ?******************************************************************************/
+> -static struct platform_device *devices[] __initdata = {
+> -#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
+> - ? ? ? &palmld_pxa_keys,
+> -#endif
+> - ? ? ? &palmld_leds,
+> - ? ? ? &palmld_hdd,
+> - ? ? ? &palmld_flash,
+> -};
+> -
+> ?static struct map_desc palmld_io_desc[] __initdata = {
+> ?{
+> ? ? ? ?.virtual ? ? ? ?= PALMLD_IDE_VIRT,
+> @@ -301,8 +337,11 @@ static void __init palmld_init(void)
+> ?{
+> ? ? ? ?pxa2xx_mfp_config(ARRAY_AND_SIZE(palmld_pin_config));
+> ? ? ? ?palm27x_common_init(&palmld);
+> - ? ? ? pxa_set_keypad_info(&palmld_keypad_platform_data);
+> - ? ? ? platform_add_devices(devices, ARRAY_SIZE(devices));
+> + ? ? ? palmld_kpc_init();
+> + ? ? ? palmld_keys_init();
 
-Yep, otherwise looks good to me.
+The original code is already well modularized, I doubt we need to go this
+far. And I guess the following function names will be a bit readable?
 
->> +}
->> +#else
->> +static inline void palm27x_pmic_init(void) {}
->> +#endif
->> +
->> ?void __init palm27x_common_init(struct palm27x_handheld *palm)
->> ?{
->> ? ? ? ?pxa_set_ffuart_info(NULL);
->> @@ -472,4 +528,5 @@ void __init palm27x_common_init(struct
->> palm27x_handheld *palm)
->> ? ? ? ?palm27x_ac97_init(palm->batt_minv, palm->batt_maxv,
->> palm->jack_gpio);
->> ? ? ? ?palm27x_pwm_init(palm->bl_bl, palm->bl_lcd);
->> ? ? ? ?palm27x_power_init(palm->power_ac, palm->power_usb);
->> + ? ? ? palm27x_pmic_init();
->> ?}
->
->
-> --
-> Sincerely yours,
-> Mike.
->
+	palmld_keypad_init();
+	palmld_gpio_keys_init();
+
+'kpc' - Grrr.... will take a bit time to figure out it's KeyPad Controller...
