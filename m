@@ -1,127 +1,54 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 04 Aug 2010 19:56:48 +0900
-Subject: [PATCH] ARM: S5PV210: Add SDHCI devices for Aquila board
-In-Reply-To: <1279896407-29571-1-git-send-email-m.szyprowski@samsung.com>
-References: <1279896407-29571-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <001701cb33c3$c0a72590$41f570b0$%kim@samsung.com>
+From: vince@kyllikki.org (Vincent Sanders)
+Date: Wed, 4 Aug 2010 12:01:30 +0100
+Subject: [PATCH] Remove ARM default configurations which duplicate
+	omap3_defconfig
+In-Reply-To: <20100804053533.GB6840@atomide.com>
+References: <20100803201921.GA18698@kyllikki.org>
+	<20100804053533.GB6840@atomide.com>
+Message-ID: <20100804110130.GA30181@kyllikki.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
+On Wed, Aug 04, 2010 at 08:35:36AM +0300, Tony Lindgren wrote:
+> * Vincent Sanders <vince@simtec.co.uk> [100803 23:23]:
+> > These configurations are no longer useful as the systems they support
+> > are covered by the generic omap3_defconfig
 > 
-> This patch add support for SDHCI blocks on Samsung Aquila board. The
-> following host controllers are defined:
-> 1. Internal MoviNAND device (permanently wired to the controller)
-> 2. Internal WiFI SDIO device (card is activated by power regualor)
-> 3. External MMC/SD socket (card detection is provided by external
-> gpio interrupt)
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pv210/Kconfig       |    4 +++
->  arch/arm/mach-s5pv210/mach-aquila.c |   39
-> +++++++++++++++++++++++++++++++++++
->  2 files changed, 43 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-> index 12a2c6b..c64dff1 100644
-> --- a/arch/arm/mach-s5pv210/Kconfig
-> +++ b/arch/arm/mach-s5pv210/Kconfig
-> @@ -60,8 +60,12 @@ config MACH_AQUILA
->  	select CPU_S5PV210
->  	select ARCH_SPARSEMEM_ENABLE
->  	select S5PV210_SETUP_FB_24BPP
-> +	select S5PV210_SETUP_SDHCI
->  	select S3C_DEV_FB
->  	select S5PC110_DEV_ONENAND
-> +	select S3C_DEV_HSMMC
-> +	select S3C_DEV_HSMMC1
-> +	select S3C_DEV_HSMMC2
->  	help
->  	  Machine support for the Samsung Aquila target based on S5PC110
-> SoC
-> 
-> diff --git a/arch/arm/mach-s5pv210/mach-aquila.c
-b/arch/arm/mach-s5pv210/mach-
-> aquila.c
-> index 0992618..a1f8d07 100644
-> --- a/arch/arm/mach-s5pv210/mach-aquila.c
-> +++ b/arch/arm/mach-s5pv210/mach-aquila.c
-> @@ -35,6 +35,7 @@
->  #include <plat/devs.h>
->  #include <plat/cpu.h>
->  #include <plat/fb.h>
-> +#include <plat/sdhci.h>
-> 
->  /* Following are default values for UCON, ULCON and UFCON UART registers
-*/
->  #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-> @@ -440,11 +441,47 @@ static void __init aquila_pmic_init(void)
->  	s3c_gpio_setpull(S5PV210_GPH2(6), S3C_GPIO_PULL_UP);
->  }
-> 
-> +/* MoviNAND */
-> +static struct s3c_sdhci_platdata aquila_hsmmc0_data __initdata = {
-> +	.max_width		= 4,
-> +	.cd_type		= S3C_SDHCI_CD_PERMANENT,
-> +};
-> +
-> +/* Wireless LAN */
-> +static struct s3c_sdhci_platdata aquila_hsmmc1_data __initdata = {
-> +	.max_width		= 4,
-> +	.cd_type		= S3C_SDHCI_CD_EXTERNAL,
-> +	/* ext_cd_{init,cleanup} callbacks will be added later */
-> +};
-> +
-> +/* External Flash */
-> +#define AQUILA_EXT_FLASH_EN	S5PV210_MP05(4)
-> +#define AQUILA_EXT_FLASH_CD	S5PV210_GPH3(4)
-> +static struct s3c_sdhci_platdata aquila_hsmmc2_data __initdata = {
-> +	.max_width		= 4,
-> +	.cd_type		= S3C_SDHCI_CD_GPIO,
-> +	.ext_cd_gpio		= AQUILA_EXT_FLASH_CD,
-> +	.ext_cd_gpio_invert	= 1,
-> +};
-> +
-> +static void aquila_setup_sdhci(void)
-> +{
-> +	gpio_request(AQUILA_EXT_FLASH_EN, "FLASH_EN");
-> +	gpio_direction_output(AQUILA_EXT_FLASH_EN, 1);
-> +
-> +	s3c_sdhci0_set_platdata(&aquila_hsmmc0_data);
-> +	s3c_sdhci1_set_platdata(&aquila_hsmmc1_data);
-> +	s3c_sdhci2_set_platdata(&aquila_hsmmc2_data);
-> +};
-> +
->  static struct platform_device *aquila_devices[] __initdata = {
->  	&aquila_i2c_gpio_pmic,
->  	&aquila_device_gpiokeys,
->  	&s3c_device_fb,
->  	&s5pc110_device_onenand,
-> +	&s3c_device_hsmmc0,
-> +	&s3c_device_hsmmc1,
-> +	&s3c_device_hsmmc2,
->  };
-> 
->  static void __init aquila_map_io(void)
-> @@ -460,6 +497,8 @@ static void __init aquila_machine_init(void)
->  	aquila_pmic_init();
->  	i2c_register_board_info(AP_I2C_GPIO_PMIC_BUS_4,
-> i2c_gpio_pmic_devs,
->  			ARRAY_SIZE(i2c_gpio_pmic_devs));
-> +	/* SDHCI */
-> +	aquila_setup_sdhci();
-> 
->  	/* FB */
->  	s3c_fb_set_platdata(&aquila_lcd_pdata);
-> --
-Looks ok..will apply.
+> Since the defconfigs will stay around at least for a while
+> in the compacted form..
 
-Thanks.
+The default configuration situation is simply insane there are over
+170 of them for crying out loud. We *need* to reduce the number to
+sane levels or Linus will simply rm the lot.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> 
+> .. And until we have sorted out how to deal with which drivers
+> need to be compiled in or as modules for each board, I'd
+> rather keep these defconfigs around for now.
+> 
+
+> Can we just disable building these with some blacklist
+> in Kautobuild?
+> 
+
+There is no such thing, the point was to reduce the number of configurations.
+
+> > Signed-off-by:Vincent Sanders <vince@simtec.co.uk>
+> > Acked-by:Tony Lindgren <tony@atomide.com>
+> 
+> So Not-yet-acked-by until some Kconfig issues are sorted out :)
+> 
+
+I obviously misinterpreted your ack in your previous mail. 
+
+I give up, really, its completely pointless to carry on even trying to
+make this situation better, noone else really cares so...  
+
+I am on holiday for a few weeks so will not be moderating the lists or
+running the autobuilder for that time. If on my return I feel like it
+I may turn kautobuild back on but probably not.
+
+-- 
+So long and thanks for all the fish!
+Vincent Sanders
+http://www.kyllikki.org/
