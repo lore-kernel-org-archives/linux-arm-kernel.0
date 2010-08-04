@@ -1,40 +1,32 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 4 Aug 2010 08:28:38 +0300
-Subject: [PATCH] omap: Fix DEBUG_LL uart to access phys addr when MMU
-	isn't enable
-In-Reply-To: <20100803194717.GA28048@n2100.arm.linux.org.uk>
-References: <1280807058-8394-1-git-send-email-jason77.wang@gmail.com>
-	<AANLkTi=ocZPDi5eU_F8VdAzJzYRCEp+B7MZ2q3DAesa3@mail.gmail.com>
-	<20100803065709.GP12293@atomide.com>
-	<AANLkTinNr7=8cO_E4zaXF4wCcKo3=WUnAek-Dh9-kgjs@mail.gmail.com>
-	<20100803072526.GA11987@n2100.arm.linux.org.uk>
-	<20100803123828.GZ12293@atomide.com>
-	<20100803194717.GA28048@n2100.arm.linux.org.uk>
-Message-ID: <20100804052834.GA6840@atomide.com>
+Date: Wed, 4 Aug 2010 08:35:36 +0300
+Subject: [PATCH] Remove ARM default configurations which duplicate
+	omap3_defconfig
+In-Reply-To: <20100803201921.GA18698@kyllikki.org>
+References: <20100803201921.GA18698@kyllikki.org>
+Message-ID: <20100804053533.GB6840@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [100803 22:40]:
-> On Tue, Aug 03, 2010 at 03:38:29PM +0300, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [100803 10:18]:
-> > > On Tue, Aug 03, 2010 at 03:11:41PM +0800, Eric Miao wrote:
-> > > > We also need to take care of Jeremy's recent patchset to remove
-> > > > .io_pg_offst and .phys_io, which modifies all the addruart macros.
-> > > 
-> > > I don't think Jeremy's patches will be going in for this merge window as
-> > > we can't intentionally break OMAP's support because we don't understand
-> > > OMAP.  I think Jeremy's patches will have to wait for the next merge
-> > > window now.
-> > 
-> > Well now we understand there's a bug.. Here's what's needed to make
-> > Jason's fix to work on Jeremy's mdesc series.
-> 
-> That's not quite the point - Jeremy's patches with working OMAP support
-> haven't been tested in linux-next, and so hasn't had visibility to the
-> wider community, and so it shouldn't be going into the current merge
-> window.
+* Vincent Sanders <vince@simtec.co.uk> [100803 23:23]:
+> These configurations are no longer useful as the systems they support
+> are covered by the generic omap3_defconfig
 
-OK. It's best to test them properly. I'll add Jason's original fix
-into omap-for-linus then for this merge window.
+Since the defconfigs will stay around at least for a while
+in the compacted form..
+
+.. And until we have sorted out how to deal with which drivers
+need to be compiled in or as modules for each board, I'd
+rather keep these defconfigs around for now.
+
+Can we just disable building these with some blacklist
+in Kautobuild?
+
+> Signed-off-by:Vincent Sanders <vince@simtec.co.uk>
+> Acked-by:Tony Lindgren <tony@atomide.com>
+
+So Not-yet-acked-by until some Kconfig issues are sorted out :)
+
+Thanks,
 
 Tony
