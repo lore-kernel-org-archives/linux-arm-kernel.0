@@ -1,91 +1,55 @@
-From: a.paterniani@swapp-eng.it (Andrea Paterniani)
-Date: Wed, 04 Aug 2010 11:19:41 +0200
-Subject: [patch 0/2] ARM: Disable outer cache before kexec call -V3
-In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB0321623966@dbde02.ent.ti.com>
-References: <20100705113029.082013074@linutronix.de>,
-	<4C58259A.3080404@swapp-eng.it>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0321623966@dbde02.ent.ti.com>
-Message-ID: <4C5930AD.3030701@swapp-eng.it>
+From: Joerg.Roedel@amd.com (Roedel, Joerg)
+Date: Wed, 4 Aug 2010 11:52:37 +0200
+Subject: [PATCH 1/2] arm: msm: Add System MMU support.
+In-Reply-To: <4C586348.2050209@codeaurora.org>
+References: <20100729123512Y.fujita.tomonori@lab.ntt.co.jp>
+	<201007291026.55928.arnd@arndb.de> <20100729084018.GM26098@amd.com>
+	<20100729174621W.fujita.tomonori@lab.ntt.co.jp>
+	<20100729090607.GN26098@amd.com> <4C586348.2050209@codeaurora.org>
+Message-ID: <20100804095237.GH18307@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 03/08/2010 19.36, Gadiyar, Anand ha scritto:
-> Andrea Paterniani wrote:
->    
->> Hi,
->>       I have applied your patches to kernel 2.6.35-rc4 running on my beagleboard.
->> I'm using kexec-tools-2.0.1.
->>
->> My u-boot bootargs is:
->>       console=ttyS2,115200n8 root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait ip=192.168.2.13::255.255.255.0
->>
->> To restart the system I type:
->>   >  sync
->>   >  kexec -l /boot/zImage --append="console=ttyS2,115200n8 root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait ip=192.168.2.13::255.255.255.0"
->>   >  kexec -e
->>
->> Not every time the system restart.
->> In some cases no output on the console after the following:
->>       Bye!
->>       Uncompressing Linux... done, booting the kernel.
->>
->> Any idea?
->>
->>      
-> Can you try building your kernel with CONFIG_EARLY_PRINTK,
-> and add the word "earlyprintk" to your bootargs?
->
->    
-I built the kernel with (also verified via zcat /proc/config.gz | grep 
-... after succesfull kexec):
+On Tue, Aug 03, 2010 at 02:43:20PM -0400, Stepan Moskovchenko wrote:
+>   On 8/3/2010 2:23 AM, Roedel, Joerg wrote:
+> > A domain is defined by a single page-table which can be modified using
+> > the iommu_map/iommu_unmap function calls. I am not completly sure what
+> > you mean by an iommu_context. Can you describe what it means in your
+> > context?
+> 
+> Joerg,
+> I think with some rework, all my use cases can be handled by your 
+> existing iommu API. If the domain is treated basically a page table, 
+> there will be some changes, but I think it can be done. I will push a 
+> new version of my driver in a few days.
+> 
+> One thing that may be helpful for the future, however, is maybe 
+> something like adding iommu_tlb_flush to the ops. I suppose this would 
+> either have to take a device, or the domain would need to keep a list of 
+> devices it had been attached to (so that their TLBs can be invalidated). 
+> But I suppose on the other hand, iommu_map/unmap may be able to just 
+> implicitly invalidate the TLB also, since TLB invalidation often follows 
+> map/unmap. What are your thoughts?
 
-CONFIG_EARLY_PRINTK=y
-CONFIG_DEBUG_LL=y
+Sounds good. I am curious for your patches :-)
 
-I load new kernel zImage via:
-kexec -l /boot/zImage --append="earlyprintk console=ttyS2,115200n8 root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait ip=192.168.2.13::255.255.255.0"
+For the TLB-flush question, I think it would make sense to add iommu
+tlb flushing functions to the IOMMU-API. We currently flush the TLB
+implicitly in the map/unmap calls but thats very inefficient. It would
+be better to have a seperate function for it in the API. The right
+parameter for such a function is a domain. The IOMMU driver knows which
+devices are attached to a domain an could easily flush all TLBs.
 
-but when kexec fails I got only the following:
-	Bye!
-	Uncompressing Linux... done, booting the kernel.
+One alternative I can think of: An iommu_domain_commit() function which
+syncs software changes of a domain to the hardware. The map/unmap calls
+have to save which parts of the tlb need to be flushed and commit does
+flush those parts then (or flush everything).
 
-What do I miss whith earlyprintk?
-
-Perhaps I did not enough tests, but at the moment it seems that system boot with nfs rootfs followed by kexec with mmc rootfs works.
-Problems arise with system boot and kexec both with mmc rootfs.
-
-Regards,
-- Andrea
-
->
->    
->> Il 05/07/2010 13.52, Thomas Gleixner ha scritto:
->>      
->>> The following patch series addresses the problem that the kexec code
->>> does not disable the outer cache before disabling the inner cache and
->>> jumping into the new kernel. This results in random crashes of the new
->>> kernel.
->>>
->>> Changes since version 2:
->>>
->>>    - Use CLEAN_INV_WAY in l2x0_flush_all according to Catalin
->>>
->>>    - Rename outer_cache_disable() to outer_disable()
->>>
->>>    - Added a  BUG_ON() when l2x0_inv_all() is called with L2 enabled.
->>>
->>> Thanks,
->>>
->>>        tglx
->>>
->>>
->>>
->>>        
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->    
+	Joerg
 
 -- 
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
