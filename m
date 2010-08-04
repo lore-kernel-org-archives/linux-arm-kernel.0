@@ -1,21 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 4 Aug 2010 13:16:15 +0300
-Subject: [PATCH 5/5] [htcherald] Add board support for UARTs, bluetooth
-In-Reply-To: <1280762976-17284-6-git-send-email-darkstar6262@gmail.com>
-References: <1280762976-17284-1-git-send-email-darkstar6262@gmail.com>
-	<1280762976-17284-6-git-send-email-darkstar6262@gmail.com>
-Message-ID: <20100804101614.GH9881@atomide.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 04 Aug 2010 20:41:04 +1000
+Subject: memblock glitch
+In-Reply-To: <20100804085447.GB4927@n2100.arm.linux.org.uk>
+References: <1280882307.1902.124.camel@pasglop>
+	<1280885890.1902.134.camel@pasglop>
+	<20100804085447.GB4927@n2100.arm.linux.org.uk>
+Message-ID: <1280918464.1902.148.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Cory Maccarrone <darkstar6262@gmail.com> [100802 18:23]:
-> This change adds bluetooth and UART initialization support to the
-> HTC Herald board driver.  This allows use of the serial bluetooth
-> adapter attached to UART1 using hciattach.
+On Wed, 2010-08-04 at 09:54 +0100, Russell King - ARM Linux wrote:
+> 
+> You could do, but do we want to introduce size checks for pfn_valid?
+> I'm slightly concerned because it can be a hot path.
+> 
+> If all entries in memblock are already page aligned, if addr falls
+> within a memblock, it must cover the entire page so checking the size
+> seems redundant for this case. 
 
-Ah and here you already have the gpio pins in platform_data, nice.
-Still, the driver part should be under drivers in the previous patch.
+Ok, I've done a separate function for single address and range for now.
+Feel free to look at my memblock branch in powerpc.git.
 
-Regards,
+I'm still thinking however whether I should just expose a
+memblock_pfn_valid() that can be directly hooked up to arch that wants
+it to limit the overhead to a minimum..
 
-Tony
+Cheers,
+Ben.
