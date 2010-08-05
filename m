@@ -1,46 +1,50 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 05 Aug 2010 16:25:38 +0900
-Subject: [PATCH 2/5] ARM: Samsung: Introduce group field for GPIOs
-Message-ID: <20100805072538.GA22266@july>
+Date: Thu, 05 Aug 2010 16:25:44 +0900
+Subject: [PATCH 3/5] ARM: S5PC110: gpio_to_irq support on external interrupt
+Message-ID: <20100805072544.GA22271@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kyungmin Park <kyungmin.park@samsung.com>
 
-The GPIOs are consisted of several groups at Samsung SoCs.
-Basically GPIOs support interrupt feature but some GPISs don't support.
-In case of external interrupt it's alive at any case and support wakeup feature.
-
-Using group field it can assign the group number.
-e.g., GPA0 has group 0. GPA1 has group 1, and so on.
-On the other hand, GPH0 will start with group 0 in case of external interrupt.
-
-With this group field, it can calculate the gpio offset and interrupt number easily.
+Using group field, it can calculate the related irq number easily.
+Also if don't support gpio_to_irq, it can't use the gpio functionaliy fully.
+e.g., can't use the gpio-keys and so on
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-samsung/include/plat/gpio-core.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pv210/gpiolib.c |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/gpio-core.h b/arch/arm/plat-samsung/include/plat/gpio-core.h
-index e358c7d..56aa136 100644
---- a/arch/arm/plat-samsung/include/plat/gpio-core.h
-+++ b/arch/arm/plat-samsung/include/plat/gpio-core.h
-@@ -45,6 +45,7 @@ struct s3c_gpio_cfg;
-  * @base: The base pointer to the gpio configuration registers.
-  * @config: special function and pull-resistor control information.
-  * @lock: Lock for exclusive access to this gpio bank.
-+ * @group: The interrupt group number either GPIO or external
-  * @pm_save: Save information for suspend/resume support.
-  *
-  * This wrapper provides the necessary information for the Samsung
-@@ -64,6 +65,7 @@ struct s3c_gpio_chip {
- 	struct s3c_gpio_pm	*pm;
- 	void __iomem		*base;
- 	spinlock_t		 lock;
-+	int			group;
- #ifdef CONFIG_PM
- 	u32			pm_save[4];
- #endif
+diff --git a/arch/arm/mach-s5pv210/gpiolib.c b/arch/arm/mach-s5pv210/gpiolib.c
+index f6a32c4..bd24c81 100644
+--- a/arch/arm/mach-s5pv210/gpiolib.c
++++ b/arch/arm/mach-s5pv210/gpiolib.c
+@@ -246,6 +246,15 @@ static struct s3c_gpio_chip s5pv210_gpio_4bit[] = {
+ 	},
+ };
+ 
++static int s5pv210_extint_to_irq(struct gpio_chip *gpio, unsigned int offset)
++{
++	struct s3c_gpio_chip *chip = to_s3c_gpio(gpio);
++	int irq;
++
++	irq = (chip->group * 8) + offset;
++	return IRQ_EINT(irq);
++}
++
+ static __init int s5pv210_gpiolib_init(void)
+ {
+ 	struct s3c_gpio_chip *chip = s5pv210_gpio_4bit;
+@@ -257,6 +266,9 @@ static __init int s5pv210_gpiolib_init(void)
+ 			chip->config = &gpio_cfg;
+ 		if (chip->config == &gpio_cfg_extint) {
+ 			chip->base = S5PV210_BANK_BASE(extint) + EXTINT_OFFSET;
++			/* Assign the external GPIO interrupt group number */
++			chip->group = extint;
++			chip->chip.to_irq = s5pv210_extint_to_irq;
+ 			extint++;
+ 		}
+ 		if (chip->base == NULL)
 -- 
 1.5.3.3
