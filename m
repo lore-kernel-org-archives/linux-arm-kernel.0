@@ -1,32 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Aug 2010 15:47:59 +0100
-Subject: cpu_get_pgd()
-In-Reply-To: <4C5AC972.4010109@l4dev.org>
-References: <4C5AC972.4010109@l4dev.org>
-Message-ID: <20100805144759.GD23473@n2100.arm.linux.org.uk>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 5 Aug 2010 11:03:33 -0400 (EDT)
+Subject: [PATCH] usb: musb: host: Issue a memory barrier before staring
+	the DMA
+In-Reply-To: <1281001990-29755-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <Pine.LNX.4.44L0.1008051102210.1944-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 05, 2010 at 05:23:46PM +0300, Bahadir Balban wrote:
-> There's a call to cpu_get_pgd() from do_translation_fault()
-> that reads the TTBR to reach the pgd pointer.
+On Thu, 5 Aug 2010, Santosh Shilimkar wrote:
+
+> This patch fixes the issue which was observed while transfering
+> a large file ( > 20MB) over USB (OMAP MUSB controller acts as USB host)
+> to an attached USB thumb drive.
 > 
-> Why not use pgd_offset(current->mm, addr)?
+> It was found that CDB field of CBW packet was set to 0x0. This was
+> due to missing a barrier before DMA engine starts transfer.
+> This  buffer is  allocated using dma_alloc_coherent which gives
+> non-cacheble but bufferable memory and hence needed a write
+> memory barrier to flush the write buffer.
 
-Because current->mm might not refer to the page table which is currently
-being used by the hardware.  Think about this sequence:
+If you see this problem when the controller uses DMA acting as a host,
+does this mean the same problem might occur when it uses DMA acting as
+a peripheral?
 
-task = current
-schedule()
-next = some_other_task
-switch_mm(next)
-IRQ occurs, handler is in a module which is unmapped in next's mm but
-exists in task's mm
-prefetch fault occurs
-
-Now at this point, if we look at current->mm, we find that the entry exists.
-If we used this, and just returned, we'd repeat the prefetch fault, and
-make no progress.
-
-So we have to read the page tables which the hardware is currently using
-to ensure that we update the right set of page tables.
+Alan Stern
