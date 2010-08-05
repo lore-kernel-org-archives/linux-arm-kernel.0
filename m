@@ -1,32 +1,32 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 05 Aug 2010 15:14:23 -0700
-Subject: [GIT PULL] Initial Tegra ARM support
-In-Reply-To: <AANLkTimZYveOZLoDS82z0nosAHa21ChHCK1GpophEQ1P@mail.gmail.com>
-References: <AANLkTi=dcQrik=+5xfwbNo_w7WkTOKZiKAFYFhwzbS=_@mail.gmail.com>
-	<1281044755.30969.8.camel@c-dwalke-linux.qualcomm.com>
-	<AANLkTimZYveOZLoDS82z0nosAHa21ChHCK1GpophEQ1P@mail.gmail.com>
-Message-ID: <1281046463.30969.14.camel@c-dwalke-linux.qualcomm.com>
+From: wellsk40@gmail.com (Kevin Wells)
+Date: Thu, 5 Aug 2010 15:40:17 -0700
+Subject: [PATCH] i2c: Enable NXP LPC support in Kconfig
+Message-ID: <AANLkTimD2Odr2zTF5fammq9i+yeCTjOMqG+NXjiLnB-i@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-08-05 at 15:01 -0700, Erik Gilling wrote:
-> If these changes went through Russell's tree there would be
-> dependancies on arch/arm/mach-tegra/(Makefile|Kconfig) in
-> arch/arm/(Makefile|Kconfig) breaking Russell's tree until it was
-> merged with the tegra tree.  That sounds wrong to me.  Additionally
-> these patches have received review on LAKML including some by Russell
-> and nothing was mentioned about this being a problem.
+NXP LPC series processors use the IP3204 I2C block shared with the
+Philips PNX4008 processor.
 
-It's wrong to do it the way your suggesting .. You don't need to create
-conflicts when you send stuff to Russell.. It takes some skill to break
-things up by maintainer, but you need to learn how to do that in order
-to play nice with the other ARM sub-architecture maintainers ..
+Signed-off-by: Kevin Wells <wellsk40@gmail.com>
+---
+ drivers/i2c/busses/Kconfig |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-If you have some questions on how to break stuff up feel free to ask me,
-or send questions to the linux-arm-kernel list ..
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index bceafbf..77eabae 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -496,8 +496,8 @@ config I2C_PMCMSP
+ 	  will be called i2c-pmcmsp.
 
-Daniel
-
+ config I2C_PNX
+-	tristate "I2C bus support for Philips PNX targets"
+-	depends on ARCH_PNX4008
++	tristate "I2C bus support for Philips PNX and NXP LPC targets"
++	depends on ARCH_PNX4008 || ARCH_LPC32XX
+ 	help
+ 	  This driver supports the Philips IP3204 I2C IP block master and/or
+ 	  slave controller
 -- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.1.1
