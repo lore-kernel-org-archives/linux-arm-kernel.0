@@ -1,42 +1,44 @@
-From: eric.miao@canonical.com (Eric Miao)
-Date: Thu, 5 Aug 2010 21:01:53 +0800
-Subject: [PATCH] [ARM] Introduce patching of phys_to_virt and vice versa
-In-Reply-To: <20100805094521.GB23473@n2100.arm.linux.org.uk>
-References: <1277542025-19881-1-git-send-email-eric.miao@canonical.com>
-	<1278083164.15298.55.camel@ra7055-laptop>
-	<20100720211629.GB10553@n2100.arm.linux.org.uk>
-	<AANLkTimyif7CCoNwdKMCA=P+y=0e9uhwfhRchbMuB7eY@mail.gmail.com>
-	<20100805094521.GB23473@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimw6hbzRRy7gHsvZ_QeJA4MR2Kf4Fvz2roHUX=N@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Aug 2010 14:12:12 +0100
+Subject: [PATCH] usb: musb: host: Issue a memory barrier before staring
+	the DMA
+In-Reply-To: <001201cb349d$5bb96e60$808918ac@apr.dhcp.ti.com>
+References: <1281001990-29755-1-git-send-email-santosh.shilimkar@ti.com>
+	<4C5AB13F.8060706@ru.mvista.com>
+	<001201cb349d$5bb96e60$808918ac@apr.dhcp.ti.com>
+Message-ID: <20100805131212.GC23473@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 5, 2010 at 5:45 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Aug 05, 2010 at 04:45:25PM +0800, Eric Miao wrote:
->> On Wed, Jul 21, 2010 at 5:16 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Fri, Jul 02, 2010 at 10:06:04AM -0500, Rob Herring wrote:
->> >> Should something more generic like the x86 alternative code be done for
->> >> ARM? It's very likely we will need patching in other places like for UP
->> >> and SMP in one kernel.
->> >
->> > I think yes, we need to - I can't see how we can sensibly combine
->> > kernels without this.
->> >
->> > However, the effect of this is that XIP can't use this - as the
->> > kernel text is read-only.
->> >
->>
->> Hi Russell,
->>
->> Sorry for late update on this. I've addressed your comments as below,
->> and really hope this can get into this merge window, so I'm also sending
->> this to your patch system right now ;-)
->
-> How does this affect the compiler's instruction scheduling w.r.t. previous
-> load instructions?
->
+On Thu, Aug 05, 2010 at 06:24:31PM +0530, Maulik wrote:
+> > > Index: omap4_integration/drivers/usb/musb/musb_host.c
+> > > ===================================================================
+> > > --- omap4_integration.orig/drivers/usb/musb/musb_host.c
+> > > +++ omap4_integration/drivers/usb/musb/musb_host.c
+> > > @@ -628,6 +628,11 @@ static bool musb_tx_dma_program(struct d
+> > >  	u8			mode;
+> > >
+> > >  #ifdef	CONFIG_USB_INVENTRA_DMA
+> > > +	/*
+> > > +	 * Ensure the data reaches to main memory before starting
+> > > +	 * DMA transfer
+> > > +	 */
+> > > +	wmb();
+> > 
+> >     Are you sure this is only needed for Inventra DMA?
+> 
+> Yes. This is seen only on SMP system such as OMAP4 which uses Inventra DMA.
+> We did not see the issue when SMP is disabled. 
 
-I'm not really sure, so is there some testing benchmarking program
-this can be measured?
+It'll be far safer to actually consider what's going on here, and realise
+that it's NOT a SMP issue but a write ordering issue.
+
+What that means is that as OMAP systems progress, and the ordering becomes
+weaker, you will see the problem appearing on non-SMP.  So why not fix it
+properly now and avoid having to revisit this with yet more patches.
+
+Think about what happens if writes to memory (DMA or otherwise) in the
+program become mis-ordered with writes to the device registers - and fix
+anything where that ordering matters by adding the necessary barriers.
+This will save you having to constantly revisit the driver time and time
+again to move the barriers around.
