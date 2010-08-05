@@ -1,96 +1,56 @@
-From: jason.wessel@windriver.com (Jason Wessel)
-Date: Thu,  5 Aug 2010 09:37:50 -0500
-Subject: [PATCH 09/17] arm,
-	kgdb: Add ability to trap into debugger on notify_die
-In-Reply-To: <1281019078-6636-9-git-send-email-jason.wessel@windriver.com>
-References: <1281019078-6636-1-git-send-email-jason.wessel@windriver.com>
-	<1281019078-6636-2-git-send-email-jason.wessel@windriver.com>
-	<1281019078-6636-3-git-send-email-jason.wessel@windriver.com>
-	<1281019078-6636-4-git-send-email-jason.wessel@windriver.com>
-	<1281019078-6636-5-git-send-email-jason.wessel@windriver.com>
-	<1281019078-6636-6-git-send-email-jason.wessel@windriver.com>
-	<1281019078-6636-7-git-send-email-jason.wessel@windriver.com>
-	<1281019078-6636-8-git-send-email-jason.wessel@windriver.com>
-	<1281019078-6636-9-git-send-email-jason.wessel@windriver.com>
-Message-ID: <1281019078-6636-10-git-send-email-jason.wessel@windriver.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 5 Aug 2010 16:42:04 +0200
+Subject: thumb2 user binaries with v6/v7 combined kernel
+Message-ID: <201008051642.04950.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that ARM implements the notify die handlers, add the ability for
-the kernel debugger to receive the notifications.
+I've been trying to run a multi-CPU kernel for armv6 and armv7
+and noticed that thumb2 binaries sometimes crash with SIGILL.
 
-Signed-off-by: Jason Wessel <jason.wessel@windriver.com>
-CC: Russell King <linux@arm.linux.org.uk>
-CC: linux-arm-kernel at lists.infradead.org
----
- arch/arm/kernel/kgdb.c |   34 ++++++++++++++++++++++++++++++++++
- 1 files changed, 34 insertions(+), 0 deletions(-)
+The only problem appears to be that when __LINUX_ARM_ARCH__
+is set to 6, the kernel does not correctly decode some instructions.
+The patch below illustrates the problem, if I apply that, I'm
+able to run all my thumb2 user space code. Unfortunately,
+I can't use the ldrht instruction there, because the kernel
+is built with -march=armv6. The patch breaks the exception
+handling, and I couldn't figure out how to fix that.
 
-diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
-index cf846ca..778c2f7 100644
---- a/arch/arm/kernel/kgdb.c
-+++ b/arch/arm/kernel/kgdb.c
-@@ -10,6 +10,7 @@
-  *           Deepak Saxena <dsaxena@plexity.net>
-  */
- #include <linux/irq.h>
-+#include <linux/kdebug.h>
- #include <linux/kgdb.h>
- #include <asm/traps.h>
- 
-@@ -180,6 +181,33 @@ void kgdb_roundup_cpus(unsigned long flags)
-        local_irq_disable();
- }
- 
-+static int __kgdb_notify(struct die_args *args, unsigned long cmd)
-+{
-+	struct pt_regs *regs = args->regs;
-+
-+	if (kgdb_handle_exception(1, args->signr, cmd, regs))
-+		return NOTIFY_DONE;
-+	return NOTIFY_STOP;
-+}
-+static int
-+kgdb_notify(struct notifier_block *self, unsigned long cmd, void *ptr)
-+{
-+	unsigned long flags;
-+	int ret;
-+
-+	local_irq_save(flags);
-+	ret = __kgdb_notify(ptr, cmd);
-+	local_irq_restore(flags);
-+
-+	return ret;
-+}
-+
-+static struct notifier_block kgdb_notifier = {
-+	.notifier_call	= kgdb_notify,
-+	.priority	= -INT_MAX,
-+};
-+
-+
- /**
-  *	kgdb_arch_init - Perform any architecture specific initalization.
-  *
-@@ -188,6 +216,11 @@ void kgdb_roundup_cpus(unsigned long flags)
-  */
- int kgdb_arch_init(void)
- {
-+	int ret = register_die_notifier(&kgdb_notifier);
-+
-+	if (ret != 0)
-+		return ret;
-+
- 	register_undef_hook(&kgdb_brkpt_hook);
- 	register_undef_hook(&kgdb_compiled_brkpt_hook);
- 
-@@ -204,6 +237,7 @@ void kgdb_arch_exit(void)
- {
- 	unregister_undef_hook(&kgdb_brkpt_hook);
- 	unregister_undef_hook(&kgdb_compiled_brkpt_hook);
-+	unregister_die_notifier(&kgdb_notifier);
- }
- 
- /*
--- 
-1.6.3.3
+The code in question was originally introduced by Paul Brook,
+in order to support thumb2 user space on armv7-only kernels.
+
+Any suggestions?
+
+	Arnd
+
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -499,15 +499,15 @@ __und_usr:
+ #endif
+ 	beq	call_fpe
+ 	@ Thumb instruction
+-#if __LINUX_ARM_ARCH__ >= 7
++#ifdef CONFIG_CPU_V7
+ 2:
+- ARM(	ldrht	r5, [r4], #2	)
+- THUMB(	ldrht	r5, [r4]	)
++ ARM(	ldrh	r5, [r4], #2	)
++ THUMB(	ldrh	r5, [r4]	)
+  THUMB(	add	r4, r4, #2	)
+ 	and	r0, r5, #0xf800			@ mask bits 111x x... .... ....
+ 	cmp	r0, #0xe800			@ 32bit instruction if xx != 0
+ 	blo	__und_usr_unknown
+-3:	ldrht	r0, [r4]
++3:	ldrh	r0, [r4]
+ 	add	r2, r2, #2			@ r2 is PC + 2, make it PC + 4
+ 	orr	r0, r0, r5, lsl #16
+ #else
+@@ -528,7 +528,7 @@ ENDPROC(__und_usr)
+ 	.popsection
+ 	.pushsection __ex_table,"a"
+ 	.long	1b, 4b
+-#if __LINUX_ARM_ARCH__ >= 7
++#ifdef CONFIG_CPU_V7
+ 	.long	2b, 4b
+ 	.long	3b, 4b
+ #endif
