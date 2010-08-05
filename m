@@ -1,52 +1,115 @@
-From: ppisa4lists@pikron.com (Pavel Pisa)
-Date: Thu, 5 Aug 2010 22:57:53 +0200
-Subject: [PATCH 10/42] drivers/mmc/host: Adjust confusing if indentation
-In-Reply-To: <Pine.LNX.4.64.1008052219360.31692@ask.diku.dk>
-References: <Pine.LNX.4.64.1008052219360.31692@ask.diku.dk>
-Message-ID: <201008052257.54039.ppisa4lists@pikron.com>
+From: konkers@google.com (Erik Gilling)
+Date: Thu, 5 Aug 2010 14:10:20 -0700
+Subject: [GIT PULL] Initial Tegra ARM support
+Message-ID: <AANLkTi=dcQrik=+5xfwbNo_w7WkTOKZiKAFYFhwzbS=_@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 August 2010 22:19:52 Julia Lawall wrote:
-> From: Julia Lawall <julia@diku.dk>
-...
-> Signed-off-by: Julia Lawall <julia@diku.dk>
-Acked-by: Pavel Pisa <pisa@cmp.felk.cvut.cz>
+Hi Linus,
 
-Good catch.
+The following changes since commit 9fe6206f400646a2322096b56c59891d530e8d51:
+  Linus Torvalds (1):
+        Linux 2.6.35
 
-> ---
->  drivers/mmc/host/imxmmc.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/imxmmc.c b/drivers/mmc/host/imxmmc.c
-> index 9a68ff4..5a950b1 100644
-> --- a/drivers/mmc/host/imxmmc.c
-> +++ b/drivers/mmc/host/imxmmc.c
-> @@ -148,11 +148,12 @@ static int imxmci_start_clock(struct imxmci_host
-> *host)
->
->  		while (delay--) {
->  			reg = readw(host->base + MMC_REG_STATUS);
-> -			if (reg & STATUS_CARD_BUS_CLK_RUN)
-> +			if (reg & STATUS_CARD_BUS_CLK_RUN) {
->  				/* Check twice before cut */
->  				reg = readw(host->base + MMC_REG_STATUS);
->  				if (reg & STATUS_CARD_BUS_CLK_RUN)
->  					return 0;
-> +			}
->
->  			if (test_bit(IMXMCI_PEND_STARTED_b, &host->pending_events))
->  				return 0;
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+are available in the git repository at:
 
---
-                Pavel Pisa
-    e-mail:     pisa at cmp.felk.cvut.cz
-    www:        http://cmp.felk.cvut.cz/~pisa
-    university: http://dce.fel.cvut.cz/
-    company:    http://www.pikron.com/
+  git://android.kernel.org/kernel/tegra.git for-linus
+
+This code has received review on linux-arm-kernel and has been in
+for-next since June 18th.  No subsystems were harmed out side of
+mach-tegra.
+
+Colin Cross (4):
+      [ARM] tegra: Add clock support
+      [ARM] tegra: SMP support
+      [ARM] tegra: Add timer support
+      [ARM] tegra: harmony: Add harmony board file
+
+Erik Gilling (5):
+      [ARM] tegra: initial tegra support
+      [ARM] tegra: Add IRQ support
+      [ARM] tegra: add GPIO support
+      [ARM] tegra: add pinmux support
+      [ARM] tegra: add MAINTAINERS entry
+
+ MAINTAINERS                                    |    9 +
+ arch/arm/Kconfig                               |   25 +-
+ arch/arm/Makefile                              |    1 +
+ arch/arm/mach-tegra/Kconfig                    |   50 +
+ arch/arm/mach-tegra/Makefile                   |   14 +
+ arch/arm/mach-tegra/Makefile.boot              |    3 +
+ arch/arm/mach-tegra/board-harmony-pinmux.c     |  144 +++
+ arch/arm/mach-tegra/board-harmony.c            |  127 +++
+ arch/arm/mach-tegra/board-harmony.h            |   22 +
+ arch/arm/mach-tegra/board.h                    |   32 +
+ arch/arm/mach-tegra/clock.c                    |  488 +++++++++
+ arch/arm/mach-tegra/clock.h                    |  147 +++
+ arch/arm/mach-tegra/common.c                   |   61 ++
+ arch/arm/mach-tegra/gpio-names.h               |  247 +++++
+ arch/arm/mach-tegra/gpio.c                     |  348 ++++++
+ arch/arm/mach-tegra/headsmp.S                  |   61 ++
+ arch/arm/mach-tegra/hotplug.c                  |  140 +++
+ arch/arm/mach-tegra/include/mach/barriers.h    |   30 +
+ arch/arm/mach-tegra/include/mach/clk.h         |   26 +
+ arch/arm/mach-tegra/include/mach/clkdev.h      |   32 +
+ arch/arm/mach-tegra/include/mach/debug-macro.S |   46 +
+ arch/arm/mach-tegra/include/mach/entry-macro.S |  118 ++
+ arch/arm/mach-tegra/include/mach/gpio.h        |   53 +
+ arch/arm/mach-tegra/include/mach/hardware.h    |   24 +
+ arch/arm/mach-tegra/include/mach/io.h          |   79 ++
+ arch/arm/mach-tegra/include/mach/iomap.h       |  203 ++++
+ arch/arm/mach-tegra/include/mach/irqs.h        |  173 +++
+ arch/arm/mach-tegra/include/mach/memory.h      |   28 +
+ arch/arm/mach-tegra/include/mach/pinmux.h      |  348 ++++++
+ arch/arm/mach-tegra/include/mach/smp.h         |   30 +
+ arch/arm/mach-tegra/include/mach/system.h      |   39 +
+ arch/arm/mach-tegra/include/mach/timex.h       |   26 +
+ arch/arm/mach-tegra/include/mach/uncompress.h  |   78 ++
+ arch/arm/mach-tegra/include/mach/vmalloc.h     |   28 +
+ arch/arm/mach-tegra/io.c                       |   78 ++
+ arch/arm/mach-tegra/irq.c                      |   34 +
+ arch/arm/mach-tegra/localtimer.c               |   25 +
+ arch/arm/mach-tegra/pinmux.c                   |  945 ++++++++++++++++
+ arch/arm/mach-tegra/platsmp.c                  |  156 +++
+ arch/arm/mach-tegra/tegra2_clocks.c            | 1359 ++++++++++++++++++++++++
+ arch/arm/mach-tegra/timer.c                    |  187 ++++
+ arch/arm/mm/Kconfig                            |    3 +-
+ 42 files changed, 6062 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/Kconfig
+ create mode 100644 arch/arm/mach-tegra/Makefile
+ create mode 100644 arch/arm/mach-tegra/Makefile.boot
+ create mode 100644 arch/arm/mach-tegra/board-harmony-pinmux.c
+ create mode 100644 arch/arm/mach-tegra/board-harmony.c
+ create mode 100644 arch/arm/mach-tegra/board-harmony.h
+ create mode 100644 arch/arm/mach-tegra/board.h
+ create mode 100644 arch/arm/mach-tegra/clock.c
+ create mode 100644 arch/arm/mach-tegra/clock.h
+ create mode 100644 arch/arm/mach-tegra/common.c
+ create mode 100644 arch/arm/mach-tegra/gpio-names.h
+ create mode 100644 arch/arm/mach-tegra/gpio.c
+ create mode 100644 arch/arm/mach-tegra/headsmp.S
+ create mode 100644 arch/arm/mach-tegra/hotplug.c
+ create mode 100644 arch/arm/mach-tegra/include/mach/barriers.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/clk.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/clkdev.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-tegra/include/mach/entry-macro.S
+ create mode 100644 arch/arm/mach-tegra/include/mach/gpio.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/hardware.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/io.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/iomap.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/irqs.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/memory.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/pinmux.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/smp.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/system.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/timex.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/uncompress.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/vmalloc.h
+ create mode 100644 arch/arm/mach-tegra/io.c
+ create mode 100644 arch/arm/mach-tegra/irq.c
+ create mode 100644 arch/arm/mach-tegra/localtimer.c
+ create mode 100644 arch/arm/mach-tegra/pinmux.c
+ create mode 100644 arch/arm/mach-tegra/platsmp.c
+ create mode 100644 arch/arm/mach-tegra/tegra2_clocks.c
+ create mode 100644 arch/arm/mach-tegra/timer.c
