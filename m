@@ -1,44 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Aug 2010 10:25:31 +0100
-Subject: [PATCH 04/12] mmci: allow the card detect status not to be
-	inverted
-In-Reply-To: <20100805061453.GA7524@bnru02.bnr.st.com>
-References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
-	<1277198267-10860-4-git-send-email-rabin.vincent@stericsson.com>
-	<20100729123443.GA18923@n2100.arm.linux.org.uk>
-	<AANLkTikQi+SPpx8Wpvb0siSSsw0ZhusWaaKmqRnfHrnz@mail.gmail.com>
-	<20100729142011.GG18923@n2100.arm.linux.org.uk>
-	<20100805061453.GA7524@bnru02.bnr.st.com>
-Message-ID: <20100805092531.GA23473@n2100.arm.linux.org.uk>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Thu, 5 Aug 2010 14:58:12 +0530
+Subject: [PATCH 2/2] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
+In-Reply-To: <1277811391-17966-1-git-send-email-linus.walleij@stericsson.com>
+References: <1277811391-17966-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <AANLkTikFULpLdqOF9q2vpxiQKb__zzDRGGoYR1qE=zwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 05, 2010 at 11:44:54AM +0530, Rabin VINCENT wrote:
-> On Thu, Jul 29, 2010 at 16:20:11 +0200, Russell King - ARM Linux wrote:
-> > diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> > index 4917af9..8ca38d9 100644
-> > --- a/drivers/mmc/host/mmci.c
-> > +++ b/drivers/mmc/host/mmci.c
-> > @@ -541,7 +541,11 @@ static int mmci_get_cd(struct mmc_host *mmc)
-> >  	else
-> >  		status = gpio_get_value(host->gpio_cd);
-> >  
-> > -	return !status;
-> > +	/*
-> > +	 * Use positive logic throughout - status is zero for no card,
-> > +	 * non-zero for card inserted.
-> > +	 */
-> > +	return status;
-> >  }
-> 
-> Your patch in -next has a !gpio_get_value,
+On Tue, Jun 29, 2010 at 5:06 PM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
+> This creates a DMAengine driver for the ARM PL080/PL081 PrimeCells
+> based on the implementation earlier submitted by Peter Pearse.
+> This is working like a charm for memcpy and slave DMA to the PL011
+> PrimeCell on the PB11MPCore.
+>
+> This DMA controller is used in mostly unmodified form in the ARM
+> RealView and Versatile platforms, in the ST-Ericsson Nomadik, and
+> in the ST SPEAr platform.
+>
+> It has been converted to use the header from the Samsung PL080
+> derivate instead of its own defintions. The Samsungs have a custom
+> driver in their mach-* folders though, atleast we can share the
+> register definitions.
+>
+> Cc: Peter Pearse <peter.pearse@arm.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Cc: Viresh Kumar <viresh.kumar@st.com>
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+> Changes since last revision: this has now been successfully tested
+> with PL011 UART on the PB11MPCore.
+>
+> It now uses the generic runtime slave control and not the PrimeCell
+> extensions, and thus depends only on that patch set. With the previous
+> patch to the header file this is cleanly separated from the ARM tree
+> and any PrimeCell drivers and can go into the async_tx tree as it is
+> without further dependencies.
+> ---
+> ?drivers/dma/Kconfig ? ? ? ?| ? ?8 +
+> ?drivers/dma/Makefile ? ? ? | ? ?1 +
+> ?drivers/dma/amba-pl08x.c ? | 2027 ++++++++++++++++++++++++++++++++++++++++++++
+> ?include/linux/amba/pl08x.h | ?183 ++++
+> ?4 files changed, 2219 insertions(+), 0 deletions(-)
+> ?create mode 100644 drivers/dma/amba-pl08x.c
+> ?create mode 100644 include/linux/amba/pl08x.h
+>
 
-Yes, because I at least need it for it to work on my Realview platform.
-As no one else seemed interested in replying to my questions about it,
-I decided that I'd fix it so at least what I had continued to work.
+Acked-by: Viresh Kumar <viresh.kumar@st.com>
 
-> so are you OK with the cd_noinvert addition (for the GPIO case)?
-> Or a cd_invert and a patch to existing platforms?
-
-I'd much prefer positive logic.  Double negatives (eg, not noinverted)
-are always bad news.
+regards,
+viresh.
