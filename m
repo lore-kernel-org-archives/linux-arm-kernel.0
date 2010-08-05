@@ -1,27 +1,22 @@
 From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Thu, 5 Aug 2010 09:19:06 +0200
-Subject: rfc: amba_pl022: LCD and AMBA PCLK clock updates
-In-Reply-To: <1280851439-25468-1-git-send-email-wellsk40@gmail.com>
+Date: Thu, 5 Aug 2010 09:20:30 +0200
+Subject: [PATCH 1/2] amba_pl022: Fix driver clock enable/disable balance
+	issues
+In-Reply-To: <1280851439-25468-2-git-send-email-wellsk40@gmail.com>
 References: <1280851439-25468-1-git-send-email-wellsk40@gmail.com>
-Message-ID: <AANLkTindQJLfTcw5oOY6EFjK=k29vGzAAYokO+_AJO7j@mail.gmail.com>
+	<1280851439-25468-2-git-send-email-wellsk40@gmail.com>
+Message-ID: <AANLkTikvMLRfd175-1YUbsgDRm68N65YZH3DborqHcLY@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2010/8/3  <wellsk40@gmail.com>:
 
-> This patch series fixes unbalanced clock enables and disables for the
-> pl11x driver and adds support for the AMBA PCLK via the AMBA bus driver.
+> The pl022 clock enable and disable calls can become unbalanced. This
+> code prevents clk_disable() from being called until clk_enable()
+> has been called first.
 
-I don't understand one thing of this, the subject says it's about PL022 (SPI),
-this comment says it's for PL011 (serial) and then the patch is for CLCD...
-
-I guess it's for the CLCD!
-
-:-)
-
-> This patch series depends on the AMBA PCLK patch..
-
-That thing is already merged to the mainline kernel so no problem.
+This is not for the PL022. It's for the CLCD (Is that PL220?)
+Same with the other patch...
 
 Yours,
 Linus Walleij
