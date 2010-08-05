@@ -1,66 +1,55 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu,  5 Aug 2010 16:08:40 +0200
-Subject: [PATCH 06/19] ARM: omap: move omap_get_config et al. to .init.text
+Date: Thu,  5 Aug 2010 16:08:49 +0200
+Subject: [PATCH 15/19] SPI: amba-pl022: move probe and remove to .devinit and
+	.devexit resp.
 In-Reply-To: <20100805140813.GA13859@pengutronix.de>
 References: <20100805140813.GA13859@pengutronix.de>
-Message-ID: <1281017333-5563-6-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1281017333-5563-15-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All callers of these functions live in .init.text, so these can go there,
-too.  There they must not be exported anymore, this is no problem though,
-as all callers are always built-in.
+The driver can be bound via sysfs after the .init sections are already
+discarded, so pl022_probe must not be in .init.text.  If there is no remove
+function the driver can still be unbound without any callback being run.
+So pl022_remove must not be in .exit.text.
+
+This fixes a section mismatch reported by modpost.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/plat-omap/common.c             |    6 ++----
- arch/arm/plat-omap/include/plat/board.h |    4 ++--
- 2 files changed, 4 insertions(+), 6 deletions(-)
+ drivers/spi/amba-pl022.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
-index ebed826..9cd4d91 100644
---- a/arch/arm/plat-omap/common.c
-+++ b/arch/arm/plat-omap/common.c
-@@ -71,17 +71,15 @@ static const void *get_config(u16 tag, size_t len, int skip, size_t *len_out)
- 	return kinfo->data;
+diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
+index f0a1418..acd35d1 100644
+--- a/drivers/spi/amba-pl022.c
++++ b/drivers/spi/amba-pl022.c
+@@ -1723,7 +1723,7 @@ static void pl022_cleanup(struct spi_device *spi)
  }
  
--const void *__omap_get_config(u16 tag, size_t len, int nr)
-+const void *__init __omap_get_config(u16 tag, size_t len, int nr)
- {
-         return get_config(tag, len, nr, NULL);
- }
--EXPORT_SYMBOL(__omap_get_config);
  
--const void *omap_get_var_config(u16 tag, size_t *len)
-+const void *__init omap_get_var_config(u16 tag, size_t *len)
+-static int __init
++static int __devinit
+ pl022_probe(struct amba_device *adev, struct amba_id *id)
  {
-         return get_config(tag, NO_LENGTH_CHECK, 0, len);
+ 	struct device *dev = &adev->dev;
+@@ -1838,7 +1838,7 @@ pl022_probe(struct amba_device *adev, struct amba_id *id)
+ 	return status;
  }
--EXPORT_SYMBOL(omap_get_var_config);
  
- void __init omap_reserve(void)
+-static int __exit
++static int __devexit
+ pl022_remove(struct amba_device *adev)
  {
-diff --git a/arch/arm/plat-omap/include/plat/board.h b/arch/arm/plat-omap/include/plat/board.h
-index 5cd6220..7decf58 100644
---- a/arch/arm/plat-omap/include/plat/board.h
-+++ b/arch/arm/plat-omap/include/plat/board.h
-@@ -143,14 +143,14 @@ struct omap_board_config_kernel {
- 	const void *data;
+ 	struct pl022 *pl022 = amba_get_drvdata(adev);
+@@ -1970,7 +1970,7 @@ static struct amba_driver pl022_driver = {
+ 	},
+ 	.id_table	= pl022_ids,
+ 	.probe		= pl022_probe,
+-	.remove		= __exit_p(pl022_remove),
++	.remove		= __devexit_p(pl022_remove),
+ 	.suspend        = pl022_suspend,
+ 	.resume         = pl022_resume,
  };
- 
--extern const void *__omap_get_config(u16 tag, size_t len, int nr);
-+extern const void *__init __omap_get_config(u16 tag, size_t len, int nr);
- 
- #define omap_get_config(tag, type) \
- 	((const type *) __omap_get_config((tag), sizeof(type), 0))
- #define omap_get_nr_config(tag, type, nr) \
- 	((const type *) __omap_get_config((tag), sizeof(type), (nr)))
- 
--extern const void *omap_get_var_config(u16 tag, size_t *len);
-+extern const void *__init omap_get_var_config(u16 tag, size_t *len);
- 
- extern struct omap_board_config_kernel *omap_board_config;
- extern int omap_board_config_size;
 -- 
 1.7.1
