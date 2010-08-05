@@ -1,68 +1,49 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu,  5 Aug 2010 16:08:44 +0200
-Subject: [PATCH 10/19] VIDEO: sa1100fb: register driver using
-	platform_driver_probe
+Date: Thu,  5 Aug 2010 16:08:45 +0200
+Subject: [PATCH 11/19] ARM: cam60: move cam60_spi_devices to .init.data
 In-Reply-To: <20100805140813.GA13859@pengutronix.de>
 References: <20100805140813.GA13859@pengutronix.de>
-Message-ID: <1281017333-5563-10-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1281017333-5563-11-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes
+cam60_spi_devices is passed to at91_add_device_spi which calls
+spi_register_board_info.  The latter makes a copy of it, so living in
+.init.data is OK.
 
-	WARNING: vmlinux.o(.devinit.text+0x364): Section mismatch in reference from the function sa1100fb_probe() to the function .init.text:sa1100fb_init_fbinfo()
-	The function __devinit sa1100fb_probe() references
-	a function __init sa1100fb_init_fbinfo().
-	If sa1100fb_init_fbinfo is only used by sa1100fb_probe then
-	annotate sa1100fb_init_fbinfo with a matching annotation.
-
-Commit c2e13037e6794bd0d9de3f9ecabf5615f15c160b addressed a section
-mismatch in this driver but introduced new ones as sa1100fb_probe
-references many more .init variables and functions (some of them
-indirectly) so using platform_driver_probe is less intrusive.
+This fixes the following warning in cam60_defconfig:
+	WARNING: vmlinux.o(.data+0x2a00): Section mismatch in reference from the variable cam60_spi_devices to the (unknown reference) .init.data:(unknown)
+	The variable cam60_spi_devices references
+	the (unknown reference) __initdata (unknown)
+	If the reference is valid then annotate the
+	variable with __init* or __refdata (see linux/init.h) or name the variable:
+	*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- drivers/video/sa1100fb.c |    6 ++----
- 1 files changed, 2 insertions(+), 4 deletions(-)
+ arch/arm/mach-at91/board-cam60.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/video/sa1100fb.c b/drivers/video/sa1100fb.c
-index e8b76d6..35fc741 100644
---- a/drivers/video/sa1100fb.c
-+++ b/drivers/video/sa1100fb.c
-@@ -1351,7 +1351,6 @@ static struct fb_monspecs monspecs __initdata = {
- 	.vfmax	= 65,
+diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
+index 02138af..05c7072 100644
+--- a/arch/arm/mach-at91/board-cam60.c
++++ b/arch/arm/mach-at91/board-cam60.c
+@@ -98,14 +98,14 @@ static struct mtd_partition __initdata cam60_spi_partitions[] = {
+ 	},
  };
  
--
- static struct sa1100fb_info * __init sa1100fb_init_fbinfo(struct device *dev)
- {
- 	struct sa1100fb_mach_info *inf;
-@@ -1435,7 +1434,7 @@ static struct sa1100fb_info * __init sa1100fb_init_fbinfo(struct device *dev)
- 	return fbi;
- }
+-static struct flash_platform_data __initdata cam60_spi_flash_platform_data = {
++static struct flash_platform_data cam60_spi_flash_platform_data __initdata = {
+ 	.name		= "spi_flash",
+ 	.parts		= cam60_spi_partitions,
+ 	.nr_parts	= ARRAY_SIZE(cam60_spi_partitions)
+ };
+ #endif
  
--static int __devinit sa1100fb_probe(struct platform_device *pdev)
-+static int __init sa1100fb_probe(struct platform_device *pdev)
- {
- 	struct sa1100fb_info *fbi;
- 	int ret, irq;
-@@ -1501,7 +1500,6 @@ static int __devinit sa1100fb_probe(struct platform_device *pdev)
- }
- 
- static struct platform_driver sa1100fb_driver = {
--	.probe		= sa1100fb_probe,
- 	.suspend	= sa1100fb_suspend,
- 	.resume		= sa1100fb_resume,
- 	.driver		= {
-@@ -1514,7 +1512,7 @@ int __init sa1100fb_init(void)
- 	if (fb_get_options("sa1100fb", NULL))
- 		return -ENODEV;
- 
--	return platform_driver_register(&sa1100fb_driver);
-+	return platform_driver_probe(&sa1100fb_driver, sa1100fb_probe);
- }
- 
- int __init sa1100fb_setup(char *options)
+-static struct spi_board_info cam60_spi_devices[] = {
++static struct spi_board_info cam60_spi_devices[] __initdata = {
+ #if defined(CONFIG_MTD_DATAFLASH)
+ 	{	/* DataFlash chip */
+ 		.modalias	= "mtd_dataflash",
 -- 
 1.7.1
