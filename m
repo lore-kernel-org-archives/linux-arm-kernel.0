@@ -1,65 +1,27 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 05 Aug 2010 15:15:04 +0900
-Subject: [PATCH] S5PC110: Add OneNAND interrupt number
-In-Reply-To: <AANLkTikV8ypbpainB7toPPeq7n6Q1P7ZDwL4Uf89q9dP@mail.gmail.com>
-References: <20100727103937.GA1247@july>
-	<1280982776.4363.18.camel@localhost.localdomain>
-	<AANLkTikV8ypbpainB7toPPeq7n6Q1P7ZDwL4Uf89q9dP@mail.gmail.com>
-Message-ID: <009301cb3465$8df1b3c0$a9d51b40$%kim@samsung.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Thu, 5 Aug 2010 08:55:27 +0200
+Subject: [PATCH 2/2] DMAENGINE: driver for the ARM PL080/PL081 PrimeCells
+In-Reply-To: <AANLkTimPAeupEKwksBKOyWX8K+wHgmgc5vEJ8cXBsQtD@mail.gmail.com>
+References: <1277811391-17966-1-git-send-email-linus.walleij@stericsson.com>
+	<AANLkTi=jStVGbJC7jUyhOG3og14F58rw+LEN2UqnP-X0@mail.gmail.com>
+	<AANLkTi=bkp+JJYQ7dF36Up3gcjJR8LypgfKBWZHLfPH-@mail.gmail.com>
+	<AANLkTimPAeupEKwksBKOyWX8K+wHgmgc5vEJ8cXBsQtD@mail.gmail.com>
+Message-ID: <AANLkTi=yJjHDh08muCg7Z97xRGDcTQrv=VimHSNCqn2U@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> On Thu, Aug 5, 2010 at 1:32 PM, Artem Bityutskiy <dedekind1@gmail.com>
-wrote:
-> > On Tue, 2010-07-27 at 19:39 +0900, Kyungmin Park wrote:
-> >> To use OneNAND interrupt at drivers, also extend DMA address to cover
-fully.
-> >>
-> >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> >> ---
-> >> diff --git a/arch/arm/mach-s5pv210/dev-onenand.c b/arch/arm/mach-
-> s5pv210/dev-onenand.c
-> >> index 34997b7..f8ede33 100644
-> >> --- a/arch/arm/mach-s5pv210/dev-onenand.c
-> >> +++ b/arch/arm/mach-s5pv210/dev-onenand.c
-> >> @@ -27,9 +27,14 @@ static struct resource s5pc110_onenand_resources[] =
-{
-> >> ? ? ? },
-> >> ? ? ? [1] = {
-> >> ? ? ? ? ? ? ? .start ?= S5PC110_PA_ONENAND_DMA,
-> >> - ? ? ? ? ? ? .end ? ?= S5PC110_PA_ONENAND_DMA + SZ_2K - 1,
-> >> + ? ? ? ? ? ? .end ? ?= S5PC110_PA_ONENAND_DMA + SZ_8K - 1,
-> >> ? ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
-> >> ? ? ? },
-> >> + ? ? [2] = {
-> >> + ? ? ? ? ? ? .start ?= IRQ_ONENAND_AUDI,
-> >> + ? ? ? ? ? ? .end ? ?= IRQ_ONENAND_AUDI,
-> >> + ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ,
-> >> + ? ? },
-> >> ?};
-> >
-> > You do not expect this to go through the MTD tree, right?
-> 
-> After this patch, I did a lot of works but failed to persuade the Kukjin.
+2010/8/4 Dan Williams <dan.j.williams@intel.com>:
 
-Maybe I missed this single patch...looks ok itself.
+> If there is a list of things to fix and no acked-by's from anyone on
+> the cc list I assume you want to wait for 2.6.37?? ?I'm sending the
+> dmaengine/async_tx pull request this Friday.
 
-> At this time. it's okay only this patch to mtd tree.
-> 
-I think, it's better this patch is going to upstream through ARM tree.
+There are no blockers for merging this AFAICT, but some ACK:s would
+be nice of course.
 
-Artem, I will apply in my tree. Thanks.
+Peter, Alessandro and Viresh especially: you will hopefully use this
+driver for ARM refboards, Nomadik and SPEAr, can you provide
+an Acked-by:?
 
-> Kukjin, are you okay?
-> Since It's only affect the c110.
-> 
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Yours,
+Linus Walleij
