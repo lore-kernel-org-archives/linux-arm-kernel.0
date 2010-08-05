@@ -1,31 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Aug 2010 12:36:22 +0300
-Subject: [PATCH 2/3] OMAP3630: Add ES1.1 and ES1.2 detection
-In-Reply-To: <4C59B92C.5060300@ti.com>
-References: <20100804112916.25027.94640.stgit@baageli.muru.com>
-	<20100804113307.25027.8630.stgit@baageli.muru.com>
-	<4C59B92C.5060300@ti.com>
-Message-ID: <20100805093621.GW9881@atomide.com>
+From: hjk@linutronix.de (Hans J. Koch)
+Date: Thu, 5 Aug 2010 11:44:43 +0200
+Subject: Is anyone working on SD/MMC driver for i.MX35 ?
+In-Reply-To: <20100803143126.GB9384@pengutronix.de>
+References: <20100401125739.GE2045@bluebox.local>
+	<20100401132017.GA30804@buzzloop.caiaq.de>
+	<20100401132234.GG2045@bluebox.local>
+	<20100402012932.GE13989@pengutronix.de>
+	<20100405182103.GB3316@oksana.dev.rtsoft.ru>
+	<20100406091220.GA2036@bluebox.local>
+	<20100427110439.GB1775@pengutronix.de>
+	<20100428131519.GA1992@bluebox.local>
+	<20100803143126.GB9384@pengutronix.de>
+Message-ID: <20100805094443.GA2197@silverbox.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [100804 21:55]:
-> Tony Lindgren had written, on 08/04/2010 06:33 AM, the following:
-> >From: Anand Gadiyar <gadiyar@ti.com>
-> >+		default:
-> >+			omap_revision =  OMAP3630_REV_ES1_2;
-> >+			omap_chip.oc |= CHIP_IS_OMAP3630ES1_2;
-> >+			break;
-> >+		}
+On Tue, Aug 03, 2010 at 04:31:26PM +0200, Wolfram Sang wrote:
+> > > > Thanks a lot for all your hints! Will have a deeper look at that.
+> > > 
+> > > Any success?
+> > 
+> > I was delayed by some other project, don't know when I'll have something.
 > 
-> we need to add a break here. to jump out of the main switch statement.
-> currently with ES1.0 3630, it reports as 3630 ES1.2
+> Meanwhile? I might need to touch it in the future again...
 
-Argh.. It's merged already, care to do another patch
-to fix this?
- 
-> Tested and verified on SDP3630 with OMAP3630 ES1.0
+No, sorry. I probably won't work on that anymore.
 
-OK, thanks.
-
-Tony
+Thanks,
+Hans
