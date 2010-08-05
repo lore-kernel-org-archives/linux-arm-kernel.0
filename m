@@ -1,21 +1,134 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Thu, 5 Aug 2010 19:14:19 +0200
-Subject: [PATCH 15/19] SPI: amba-pl022: move probe and remove to
-	.devinit and	.devexit resp.
-In-Reply-To: <1281017333-5563-15-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20100805140813.GA13859@pengutronix.de>
-	<1281017333-5563-15-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <083DF309106F364B939360100EC290F80AC3A54D15@eu1rdcrdc1wx030.exi.nxp.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 05 Aug 2010 12:01:12 -0700
+Subject: [PATCH v3] davinci: Add MityDSP-L138/MityARM-1808 SOM support
+In-Reply-To: <4C4D8449.9040706@criticallink.com> (Michael Williamson's message
+	of "Mon, 26 Jul 2010 08:49:13 -0400")
+References: <4C45AE5E.7070905@criticallink.com>
+	<B85A65D85D7EB246BE421B3FB0FBB59301E7D0AF64@dbde02.ent.ti.com>
+	<4C4D8449.9040706@criticallink.com>
+Message-ID: <87mxt0ubnr.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The driver can be bound via sysfs after the .init sections are already
-> discarded, so pl022_probe must not be in .init.text.  If there is no
-> remove
-> function the driver can still be unbound without any callback being run.
-> So pl022_remove must not be in .exit.text.
-> 
-> This fixes a section mismatch reported by modpost.
-> 
+Michael Williamson <michael.williamson@criticallink.com> writes:
 
-This fix was in Grant Likely's spi tree earlier this week.
+>  On 7/26/2010 5:29 AM, Nori, Sekhar wrote:
+>
+>>
+>> Hi Michael,
+>>
+>> On Tue, Jul 20, 2010 at 19:40:38, Michael Williamson wrote:
+>>>  This patch adds support for the MityDSP-L138 and MityARM-1808 system on
+>>> module (SOM) under the registered machine "mityomapl138".  These SOMs
+>>> are based on the da850 davinci CPU architecture.  Information on these
+>>> SOMs may be found at http://www.mitydsp.com.
+>>>
+>>> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+>>> ---
+>>
+>> [...]
+>>
+>>>
+>>>  arch/arm/configs/da8xx_omapl_defconfig             |  291 ++++++--
+>>>  arch/arm/include/asm/setup.h                       |    5 +
+>>>  arch/arm/mach-davinci/Kconfig                      |    7 +
+>>>  arch/arm/mach-davinci/Makefile                     |    1 +
+>>>  arch/arm/mach-davinci/board-mityomapl138.c         |  793 ++++++++++++++++++++
+>>>  .../mach-davinci/include/mach/cb-mityomapl138.h    |  125 +++
+>>>  arch/arm/mach-davinci/include/mach/da8xx.h         |    1 +
+>>>  arch/arm/mach-davinci/include/mach/uncompress.h    |    1 +
+>>>  8 files changed, 1181 insertions(+), 43 deletions(-)
+>>>
+>>
+>> [...]
+>>
+>>> diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
+>>> index f392fb4..d6b1a47 100644
+>>> --- a/arch/arm/include/asm/setup.h
+>>> +++ b/arch/arm/include/asm/setup.h
+>>> @@ -143,6 +143,11 @@ struct tag_memclk {
+>>>      __u32 fmemclk;
+>>>  };
+>>>
+>>> +/** MityDSP-L138 peripheral configuration info,
+>>> +  *  see arch/arm/mach-davinci/include/mach/cb-mityomapl138.h
+>>> +  */
+>>> +#define ATAG_PERIPHERALS 0x42000101
+>>
+>> Instead of naming this so generic, can you call this ATAG_MITYDSPL138 or
+>> something like that?
+>
+>
+>
+> Yes.  I would be glad to rename it, assuming some other approach is not
+> used instead.
+>
+>>
+>> Since passing peripheral configuration from bootloader is a first for
+>> DaVinci, can you please explain why this is the best suited method for this
+>> board and why methods used on other boards wont work?
+>>
+>
+>
+>
+> Well, the problem we are struggling with is that we'd like to avoid
+> generating a pile of separate machine types for the different boards
+> that are needed to support for this common SOM part with regards
+> to the peripheral selection.  There are already have 4 different
+> boards with slightly different peripherals already being used with this SOM,
+> and it's a challenge enough just to try to get one configuration through
+> this cycle (which I am new to).  We are expecting many more (10's per
+> year). 
+>
+> In general, the only real difference on any of these boards will be in regards
+> to peripheral selection/configuration.  E.G., using RMII vs. MII, or using
+> different McASP pins or different numbers of channels, or adding a couple
+> of SPI devices on different chip selects, LCD settings, etc. 
+> Seems like we shouldn't need to make a whole new machine up to support
+> these kinds of things. 
+>
+> This came up in a thread on this mailing list, see
+>
+> http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg17042.html
+>
+> The approach here was pretty much what Kevin suggested as an alternate
+> to trying to port a flat device tree implementation like the powerpc
+> folks use.  The only difference was that I didn't think I could jam
+> everything I wanted onto the kernel command line without it getting out
+> of hand, so I am proposing a separate ATAG to provide the peripheral
+> configuration.  It's not perfect, but I wanted to get something out
+> there as if it's rejected then we only have a few boards to rewrite code
+> for.
+>
+> Other than device trees, the only other approaches I've seen so far to
+> sort out altering peripheral configuration is:
+>
+> a) Make a new board (a new board file, etc., KConfig option, etc.)
+>
+> b) Start in with a pile of #ifdefs, etc., and add a lot of peripheral
+> on/off options to the KConfig/Make system.  That means supporting
+> many variants of kernels for the different host boards, not
+> just an EVM.  I'd like to avoid that if I could, as the regression
+> testing for new options might get out of hand.  And it didn't seem
+> consistent with making a flexible kernel.
+>
+> c) Allow peripheral drivers to probe and initialize pins, etc. in the
+> modules, then load the right drivers up for your board.  There are a lot
+> of threads about why letting drivers mess with the pins is bad.  So this
+> is a non-starter.
+
+d) use ATAG_REVISION and a single board file
+
+There is currently a tag called ATAG_REVISION which sets a global
+variable 'system_rev' based on this tagq.  This tag was intended for
+exactly this purpose.
+
+You can then have a single machine type, a single board file and the
+boot loader can change ATAG_REVISION based on the board specifics.  The
+board file can then check 'system_rev' and handle specifics that way.
+
+This is also much clearer as all the things that are unique to that
+board will be contained in the board file and not hidden away in the
+bootloader.
+
+Kevin
