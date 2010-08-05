@@ -1,31 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 5 Aug 2010 10:06:40 -0500
-Subject: [PATCH] arm: R_ARM_REL32 relocation support
-In-Reply-To: <19546.31437.994840.466509@pilspetsen.it.uu.se>
-References: <1280993763-15254-1-git-send-email-olof@lixom.net>
-	<19546.31437.994840.466509@pilspetsen.it.uu.se>
-Message-ID: <20100805150640.GA25061@lixom.net>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 5 Aug 2010 20:40:52 +0530
+Subject: [PATCH] usb: musb: host: Issue a memory barrier before staring
+	the DMA
+In-Reply-To: <Pine.LNX.4.44L0.1008051102210.1944-100000@iolanthe.rowland.org>
+References: <1281001990-29755-1-git-send-email-santosh.shilimkar@ti.com>
+	<Pine.LNX.4.44L0.1008051102210.1944-100000@iolanthe.rowland.org>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C64A1BD6@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 05, 2010 at 10:48:13AM +0200, Mikael Pettersson wrote:
-> Olof Johansson writes:
->  > commit d0679c730395d0bde9a46939e7ba255b4ba7dd7c moved -fno-dwarf2-cfi-asm to be
->  > powerpc-only, causing R_ARM_REL32 to be used with some toolchains on ARM.
->  > 
->  > Implement support for it to make modules work with more toolchains.
->  > 
->  > Signed-off-by: Olof Johansson <olof@lixom.net>
+> -----Original Message-----
+> From: Alan Stern [mailto:stern at rowland.harvard.edu]
+> Sent: Thursday, August 05, 2010 8:34 PM
+> To: Shilimkar, Santosh
+> Cc: linux-usb at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> Mankad, Maulik Ojas; Russell King; Felipe Balbi
+> Subject: Re: [PATCH] usb: musb: host: Issue a memory barrier before
+> staring the DMA
 > 
-> Michal Marek's patch(*) to use -fno-dwarf2-cfi-asm already exists
-> and is IMO the correct solution in that it addresses the cause
-> of the problem rather than its symptoms.
+> On Thu, 5 Aug 2010, Santosh Shilimkar wrote:
 > 
-> NAK from me for now.
+> > This patch fixes the issue which was observed while transfering
+> > a large file ( > 20MB) over USB (OMAP MUSB controller acts as USB host)
+> > to an attached USB thumb drive.
+> >
+> > It was found that CDB field of CBW packet was set to 0x0. This was
+> > due to missing a barrier before DMA engine starts transfer.
+> > This  buffer is  allocated using dma_alloc_coherent which gives
+> > non-cacheble but bufferable memory and hence needed a write
+> > memory barrier to flush the write buffer.
 > 
-> (*) http://lkml.org/lkml/2010/7/26/154
+> If you see this problem when the controller uses DMA acting as a host,
+> does this mean the same problem might occur when it uses DMA acting as
+> a peripheral?
+> 
+The peripheral USB drivers seems to have using standard kernel dma-mapping
+framework which internally takes care of the ordering issues.
 
-Sigh. I searched the list for related patches and didn't see any. Sorry for the duplicate.
+This is one of the cases where buffer is allocated using "dma_alloc_coherent" for which except ordering issue , there is no
+maintainace is necessary.
 
-
--Olof
+Regards,
+Santosh
