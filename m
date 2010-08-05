@@ -1,44 +1,34 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu,  5 Aug 2010 15:23:10 +0530
-Subject: [PATCH] usb: musb: host: Issue a memory barrier before staring the DMA
-Message-ID: <1281001990-29755-1-git-send-email-santosh.shilimkar@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu,  5 Aug 2010 11:36:47 +0100
+Subject: [PATCH 0/2] Detect and handle I-cache aliases when D-cache is
+	non-aliasing
+Message-ID: <1281004609-7563-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the issue which was observed while transfering
-a large file ( > 20MB) over USB (OMAP MUSB controller acts as USB host)
-to an attached USB thumb drive.
+Last month, I posted some patches to fix ptrace software breakpoints:
 
-It was found that CDB field of CBW packet was set to 0x0. This was
-due to missing a barrier before DMA engine starts transfer.
-This  buffer is  allocated using dma_alloc_coherent which gives
-non-cacheble but bufferable memory and hence needed a write
-memory barrier to flush the write buffer.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-July/020649.html
 
-More info on this thread is here:
-	http://www.spinics.net/lists/linux-omap/msg33987.html
+One of these patches added a workaround for a hardware erratum, so I
+have submitted that to the patch system. The other patch simply called
+__flush_icache_all() in flush_ptrace_access to avoid having to worry
+about I-cache aliases when cache_is_vipt_nonaliasing() is true. This
+isn't ideal if the debugger decides to insert lots of software breakpoints
+sequentially (for example, when single-stepping a number of times).
 
-Signed-off-by: Maulik Mankad <x0082077@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Felipe Balbi <felipebalbi@users.sourceforge.net>
----
- drivers/usb/musb/musb_host.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+These two patches add proper identification of aliasing I-caches
+when the D-cache is nonaliasing. flush_ptrace_access can then
+flush only the relevant I-cache lines instead of the entire cache.
 
-Index: omap4_integration/drivers/usb/musb/musb_host.c
-===================================================================
---- omap4_integration.orig/drivers/usb/musb/musb_host.c
-+++ omap4_integration/drivers/usb/musb/musb_host.c
-@@ -628,6 +628,11 @@ static bool musb_tx_dma_program(struct d
- 	u8			mode;
- 
- #ifdef	CONFIG_USB_INVENTRA_DMA
-+	/*
-+	 * Ensure the data reaches to main memory before starting
-+	 * DMA transfer
-+	 */
-+	wmb();
- 	if (length > channel->max_len)
- 		length = channel->max_len;
- 
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+
+Will Deacon (2):
+  ARM: setup: detect aliasing I-cache when D-cache is non-aliasing
+  ARM: flush_ptrace_access: invalidate correct I-cache alias
+
+ arch/arm/include/asm/cachetype.h |    8 ++++++--
+ arch/arm/kernel/setup.c          |   38 +++++++++++++++++++++++++++++++++++---
+ arch/arm/mm/flush.c              |   23 ++++++++++++++++++++---
+ 3 files changed, 61 insertions(+), 8 deletions(-)
