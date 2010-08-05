@@ -1,32 +1,66 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu,  5 Aug 2010 16:08:42 +0200
-Subject: [PATCH 08/19] ARM: omap: ams-delta: move config to .init.data
+Date: Thu,  5 Aug 2010 16:08:40 +0200
+Subject: [PATCH 06/19] ARM: omap: move omap_get_config et al. to .init.text
 In-Reply-To: <20100805140813.GA13859@pengutronix.de>
 References: <20100805140813.GA13859@pengutronix.de>
-Message-ID: <1281017333-5563-8-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1281017333-5563-6-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most other boards have their config in .init.data, too, so this should
-be OK.
+All callers of these functions live in .init.text, so these can go there,
+too.  There they must not be exported anymore, this is no problem though,
+as all callers are always built-in.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-omap1/board-ams-delta.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/plat-omap/common.c             |    6 ++----
+ arch/arm/plat-omap/include/plat/board.h |    4 ++--
+ 2 files changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index 0a9d61d..71353f9 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -173,7 +173,7 @@ static struct omap_usb_config ams_delta_usb_config __initdata = {
- 	.pins[0]	= 2,
+diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
+index ebed826..9cd4d91 100644
+--- a/arch/arm/plat-omap/common.c
++++ b/arch/arm/plat-omap/common.c
+@@ -71,17 +71,15 @@ static const void *get_config(u16 tag, size_t len, int skip, size_t *len_out)
+ 	return kinfo->data;
+ }
+ 
+-const void *__omap_get_config(u16 tag, size_t len, int nr)
++const void *__init __omap_get_config(u16 tag, size_t len, int nr)
+ {
+         return get_config(tag, len, nr, NULL);
+ }
+-EXPORT_SYMBOL(__omap_get_config);
+ 
+-const void *omap_get_var_config(u16 tag, size_t *len)
++const void *__init omap_get_var_config(u16 tag, size_t *len)
+ {
+         return get_config(tag, NO_LENGTH_CHECK, 0, len);
+ }
+-EXPORT_SYMBOL(omap_get_var_config);
+ 
+ void __init omap_reserve(void)
+ {
+diff --git a/arch/arm/plat-omap/include/plat/board.h b/arch/arm/plat-omap/include/plat/board.h
+index 5cd6220..7decf58 100644
+--- a/arch/arm/plat-omap/include/plat/board.h
++++ b/arch/arm/plat-omap/include/plat/board.h
+@@ -143,14 +143,14 @@ struct omap_board_config_kernel {
+ 	const void *data;
  };
  
--static struct omap_board_config_kernel ams_delta_config[] = {
-+static struct omap_board_config_kernel ams_delta_config[] __initdata = {
- 	{ OMAP_TAG_LCD,		&ams_delta_lcd_config },
- };
+-extern const void *__omap_get_config(u16 tag, size_t len, int nr);
++extern const void *__init __omap_get_config(u16 tag, size_t len, int nr);
  
+ #define omap_get_config(tag, type) \
+ 	((const type *) __omap_get_config((tag), sizeof(type), 0))
+ #define omap_get_nr_config(tag, type, nr) \
+ 	((const type *) __omap_get_config((tag), sizeof(type), (nr)))
+ 
+-extern const void *omap_get_var_config(u16 tag, size_t *len);
++extern const void *__init omap_get_var_config(u16 tag, size_t *len);
+ 
+ extern struct omap_board_config_kernel *omap_board_config;
+ extern int omap_board_config_size;
 -- 
 1.7.1
