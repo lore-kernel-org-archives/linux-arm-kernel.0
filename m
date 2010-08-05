@@ -1,68 +1,42 @@
-From: x0082077@ti.com (Maulik)
-Date: Thu, 5 Aug 2010 18:24:31 +0530
-Subject: [PATCH] usb: musb: host: Issue a memory barrier before staring
-	the DMA
-In-Reply-To: <4C5AB13F.8060706@ru.mvista.com>
-References: <1281001990-29755-1-git-send-email-santosh.shilimkar@ti.com>
-	<4C5AB13F.8060706@ru.mvista.com>
-Message-ID: <001201cb349d$5bb96e60$808918ac@apr.dhcp.ti.com>
+From: eric.miao@canonical.com (Eric Miao)
+Date: Thu, 5 Aug 2010 21:01:53 +0800
+Subject: [PATCH] [ARM] Introduce patching of phys_to_virt and vice versa
+In-Reply-To: <20100805094521.GB23473@n2100.arm.linux.org.uk>
+References: <1277542025-19881-1-git-send-email-eric.miao@canonical.com>
+	<1278083164.15298.55.camel@ra7055-laptop>
+	<20100720211629.GB10553@n2100.arm.linux.org.uk>
+	<AANLkTimyif7CCoNwdKMCA=P+y=0e9uhwfhRchbMuB7eY@mail.gmail.com>
+	<20100805094521.GB23473@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimw6hbzRRy7gHsvZ_QeJA4MR2Kf4Fvz2roHUX=N@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Aug 5, 2010 at 5:45 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Aug 05, 2010 at 04:45:25PM +0800, Eric Miao wrote:
+>> On Wed, Jul 21, 2010 at 5:16 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Fri, Jul 02, 2010 at 10:06:04AM -0500, Rob Herring wrote:
+>> >> Should something more generic like the x86 alternative code be done for
+>> >> ARM? It's very likely we will need patching in other places like for UP
+>> >> and SMP in one kernel.
+>> >
+>> > I think yes, we need to - I can't see how we can sensibly combine
+>> > kernels without this.
+>> >
+>> > However, the effect of this is that XIP can't use this - as the
+>> > kernel text is read-only.
+>> >
+>>
+>> Hi Russell,
+>>
+>> Sorry for late update on this. I've addressed your comments as below,
+>> and really hope this can get into this merge window, so I'm also sending
+>> this to your patch system right now ;-)
+>
+> How does this affect the compiler's instruction scheduling w.r.t. previous
+> load instructions?
+>
 
-
-> -----Original Message-----
-> From: Sergei Shtylyov [mailto:sshtylyov at mvista.com]
-> Sent: Thursday, August 05, 2010 6:11 PM
-> To: Santosh Shilimkar
-> Cc: linux-usb at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> Maulik Mankad; Russell King; Felipe Balbi
-> Subject: Re: [PATCH] usb: musb: host: Issue a memory barrier before
-> staring the DMA
-> 
-> Hello.
-> 
-> Santosh Shilimkar wrote:
-> 
-> > This patch fixes the issue which was observed while transfering
-> > a large file ( > 20MB) over USB (OMAP MUSB controller acts as USB host)
-> > to an attached USB thumb drive.
-> 
-> > It was found that CDB field of CBW packet was set to 0x0. This was
-> > due to missing a barrier before DMA engine starts transfer.
-> > This  buffer is  allocated using dma_alloc_coherent which gives
-> > non-cacheble but bufferable memory and hence needed a write
-> > memory barrier to flush the write buffer.
-> 
-> > More info on this thread is here:
-> > 	http://www.spinics.net/lists/linux-omap/msg33987.html
-> 
-> > Signed-off-by: Maulik Mankad <x0082077@ti.com>
-> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Cc: Felipe Balbi <felipebalbi@users.sourceforge.net>
-> > ---
-> >  drivers/usb/musb/musb_host.c |    6 ++++++
-> >  1 files changed, 6 insertions(+), 0 deletions(-)
-> 
-> > Index: omap4_integration/drivers/usb/musb/musb_host.c
-> > ===================================================================
-> > --- omap4_integration.orig/drivers/usb/musb/musb_host.c
-> > +++ omap4_integration/drivers/usb/musb/musb_host.c
-> > @@ -628,6 +628,11 @@ static bool musb_tx_dma_program(struct d
-> >  	u8			mode;
-> >
-> >  #ifdef	CONFIG_USB_INVENTRA_DMA
-> > +	/*
-> > +	 * Ensure the data reaches to main memory before starting
-> > +	 * DMA transfer
-> > +	 */
-> > +	wmb();
-> 
->     Are you sure this is only needed for Inventra DMA?
-
-Yes. This is seen only on SMP system such as OMAP4 which uses Inventra DMA.
-We did not see the issue when SMP is disabled. 
-
-Regards,
-Maulik
+I'm not really sure, so is there some testing benchmarking program
+this can be measured?
