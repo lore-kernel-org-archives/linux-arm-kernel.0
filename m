@@ -1,69 +1,20 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Thu, 5 Aug 2010 10:48:13 +0200
-Subject: [PATCH] arm: R_ARM_REL32 relocation support
-In-Reply-To: <1280993763-15254-1-git-send-email-olof@lixom.net>
-References: <34780qy39a4uj093a4y>
-	<1280993763-15254-1-git-send-email-olof@lixom.net>
-Message-ID: <19546.31437.994840.466509@pilspetsen.it.uu.se>
+From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
+Date: Thu, 05 Aug 2010 11:20:18 +0200
+Subject: several section mismatches
+In-Reply-To: <201008021121.23860.sleep_walker@suse.cz>
+References: <201008021121.23860.sleep_walker@suse.cz>
+Message-ID: <op.vgyj74zp7p4s8u@pikus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson writes:
- > commit d0679c730395d0bde9a46939e7ba255b4ba7dd7c moved -fno-dwarf2-cfi-asm to be
- > powerpc-only, causing R_ARM_REL32 to be used with some toolchains on ARM.
- > 
- > Implement support for it to make modules work with more toolchains.
- > 
- > Signed-off-by: Olof Johansson <olof@lixom.net>
+On Mon, 02 Aug 2010 11:21:23 +0200, Tom?? 'Sleep_Walker'  ?ech <sleep_walker@suse.cz> wrote:
+> It seems that we have some problems with g_ether and pxa cpufreq.
+> This is problematic output of `make CONFIG_DEBUG_SECTION_MISMATCH=y':
 
-Michal Marek's patch(*) to use -fno-dwarf2-cfi-asm already exists
-and is IMO the correct solution in that it addresses the cause
-of the problem rather than its symptoms.
+Problems with g_ether should be fixed in -next.
 
-NAK from me for now.
-
-(*) http://lkml.org/lkml/2010/7/26/154
-
-/Mikael
-
- > ---
- >  arch/arm/include/asm/elf.h |    1 +
- >  arch/arm/kernel/module.c   |    4 ++++
- >  2 files changed, 5 insertions(+), 0 deletions(-)
- > 
- > diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
- > index 51662fe..b1f1991 100644
- > --- a/arch/arm/include/asm/elf.h
- > +++ b/arch/arm/include/asm/elf.h
- > @@ -50,6 +50,7 @@ typedef struct user_fp elf_fpregset_t;
- >  #define R_ARM_NONE		0
- >  #define R_ARM_PC24		1
- >  #define R_ARM_ABS32		2
- > +#define R_ARM_REL32		3
- >  #define R_ARM_CALL		28
- >  #define R_ARM_JUMP24		29
- >  #define R_ARM_V4BX		40
- > diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
- > index c628bdf..ec9526d 100644
- > --- a/arch/arm/kernel/module.c
- > +++ b/arch/arm/kernel/module.c
- > @@ -132,6 +132,10 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- >  			*(u32 *)loc += sym->st_value;
- >  			break;
- >  
- > +		case R_ARM_REL32:
- > +			*(u32 *)loc += sym->st_value - loc;
- > +			break;
- > +
- >  		case R_ARM_PC24:
- >  		case R_ARM_CALL:
- >  		case R_ARM_JUMP24:
- > -- 
- > 1.5.6.5
- > 
- > 
- > _______________________________________________
- > linux-arm-kernel mailing list
- > linux-arm-kernel at lists.infradead.org
- > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
- > 
+-- 
+Best regards,                                        _     _
+| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
+| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
++----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
