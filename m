@@ -1,41 +1,32 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu,  5 Aug 2010 16:08:43 +0200
-Subject: [PATCH 09/19] MTD: pxa2xx: move pxa2xx_flash_probe to .devinit.text
+Date: Thu,  5 Aug 2010 16:08:42 +0200
+Subject: [PATCH 08/19] ARM: omap: ams-delta: move config to .init.data
 In-Reply-To: <20100805140813.GA13859@pengutronix.de>
 References: <20100805140813.GA13859@pengutronix.de>
-Message-ID: <1281017333-5563-9-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1281017333-5563-8-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the following warning by modpost:
-
-	WARNING: vmlinux.o(.data+0x15018): Section mismatch in reference from the variable pxa2xx_flash_driver to the function .init.text:pxa2xx_flash_probe()
-	The variable pxa2xx_flash_driver references
-	the function __init pxa2xx_flash_probe()
-	If the reference is valid then annotate the
-	variable with __init* or __refdata (see linux/init.h) or name the variable:
-	*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
-
-I choosed to do this instead of using platform_driver_probe as the remove
-function uses __devexit.
+Most other boards have their config in .init.data, too, so this should
+be OK.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- drivers/mtd/maps/pxa2xx-flash.c |    2 +-
+ arch/arm/mach-omap1/board-ams-delta.c |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
-index dd90880..d8ae634 100644
---- a/drivers/mtd/maps/pxa2xx-flash.c
-+++ b/drivers/mtd/maps/pxa2xx-flash.c
-@@ -51,7 +51,7 @@ struct pxa2xx_flash_info {
- static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
+diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+index 0a9d61d..71353f9 100644
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@ -173,7 +173,7 @@ static struct omap_usb_config ams_delta_usb_config __initdata = {
+ 	.pins[0]	= 2,
+ };
  
+-static struct omap_board_config_kernel ams_delta_config[] = {
++static struct omap_board_config_kernel ams_delta_config[] __initdata = {
+ 	{ OMAP_TAG_LCD,		&ams_delta_lcd_config },
+ };
  
--static int __init pxa2xx_flash_probe(struct platform_device *pdev)
-+static int __devinit pxa2xx_flash_probe(struct platform_device *pdev)
- {
- 	struct flash_platform_data *flash = pdev->dev.platform_data;
- 	struct pxa2xx_flash_info *info;
 -- 
 1.7.1
