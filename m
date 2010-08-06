@@ -1,42 +1,50 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Fri, 6 Aug 2010 17:31:19 +0200
-Subject: [PATCH 07/10] ftrace: pass KBUILD_CFLAGS to record_mcount.pl
-In-Reply-To: <20100803164247.GA6133@debian>
-References: <1268462987-8271-1-git-send-email-rabin@rab.in>
-	<1268462987-8271-8-git-send-email-rabin@rab.in>
-	<20100803164247.GA6133@debian>
-Message-ID: <20100806153114.GA5345@nowhere>
+From: gregkh@suse.de (Greg KH)
+Date: Fri, 6 Aug 2010 08:39:03 -0700
+Subject: [PATCH 5/5] U6715 16550A serial driver support
+In-Reply-To: <1281011335-25761-6-git-send-email-philippe.langlais@stericsson.com>
+References: <1281011335-25761-1-git-send-email-philippe.langlais@stericsson.com>
+	<1281011335-25761-6-git-send-email-philippe.langlais@stericsson.com>
+Message-ID: <20100806153903.GA6255@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 03, 2010 at 10:12:47PM +0530, Rabin Vincent wrote:
-> Steven, Frederic,
+On Thu, Aug 05, 2010 at 02:28:55PM +0200, Philippe Langlais wrote:
+> UART Features extract from STEricsson U6715 data-sheet (arm926 SoC for mobile phone):
+> * Fully compatible with industry standard 16C550 and 16C450 from various
+> manufacturers
+> * RX and TX 64 byte FIFO reduces CPU interrupts
+> * Full double buffering
+> * Modem control signals include CTS, RTS, (and DSR, DTR on UART1 only)
+> * Automatic baud rate selection
+> * Manual or automatic RTS/CTS smart hardware flow control
+> * Programmable serial characteristics:
+> ? Baud rate generation (50 to 3.25M baud)
+> ? 5, 6, 7 or 8-bit characters
+> ? Even, odd or no-parity bit generation and detection
+> ? 1, 1.5 or 2 stop bit generation
+> * Independent control of transmit, receive, line status, data set interrupts and FIFOs
+> * Full status-reporting capabilities
+> * Separate DMA signaling for RX and TX
+> * Timed interrupt to spread receive interrupt on known duration
+> * DMA time-out interrupt to allow detection of end of reception
+> * Carkit pulse coding and decoding compliant with USB carkit control interface [40]
 > 
-> I'd like to resurrect this old ARM dynamic ftrace patchset.  It still
-> applies on next except for a small merge conflict in one of the
-> ARM-specific patches.
+> In 16550A auto-configuration, if the fifo size is 64 then it's an U6 16550A port.
+> Add set_termios hook & export serial8250_do_set_termios,
+> this feature is used in our U6715 8250 platform serial driver, to avoid
+> hack in 8250.c set_termios.
+> In this driver the input uart clock frequency depends on baud rate and
+> is computed in our set_termios override function.
 > 
-> On Sat, Mar 13, 2010 at 12:19:44PM +0530, Rabin Vincent wrote:
-> > On ARM, we have two ABIs, and the ABI used is controlled via a config
-> > option.  Object files built with one ABI can't be merged with object
-> > files built with the other ABI.  So, record_mcount.pl needs to use the
-> > same compiler flags as the kernel when generating the object file with
-> > the mcount locations.  Ensure this by passing CFLAGS to the script.
-> > 
-> > Signed-off-by: Rabin Vincent <rabin@rab.in>
-> 
-> This is the only non-arch/arm/ patch in the series which doesn't have
-> either of your Acked-bys, so if you'd be willing to ack it, I'll send in
-> the lot via rmk's ARM patch system for .37.
-> 
-> Alternatively, this one and "[PATCH 03/10] ftrace: allow building
-> without frame pointers" could go in via the tracing tree for .36?  Then
-> I'll send in the ARM specific stuff for .37 via the ARM tree.
-> 
-> Thanks,
-> Rabin
+> Signed-off-by: Philippe Langlais <philippe.langlais@stericsson.com>
 
+Acked-by: Greg Kroah-Hartman <gregkh@suse.de>
 
+But isn't this patch needed before the last one in this series in order
+to keep everything building properly?
 
-I'll let Steve handling this one as I have few skills with things that touch
-scripts/recordmcount.pl :)
+You might want to move it up to the first one.
+
+thanks,
+
+greg k-h
