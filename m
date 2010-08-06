@@ -1,42 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Aug 2010 15:46:05 +0100
-Subject: [PATCH v2 03/20] mmc: support embedded data field in mmc_host
-In-Reply-To: <AANLkTim6Yuor4CAEmQPs3zPVz1svEbckzO0HHeFWGmjy@mail.gmail.com>
-References: <AANLkTi=BUX59heXAW2Uf4wZo2dSS19Je54dkQ5u2YGAW@mail.gmail.com>
-	<AANLkTimZQKj7H_GeE=+O9cwxEMTR+LhfFbt=AyXGzN3d@mail.gmail.com>
-	<AANLkTikfRja-h9mz7uyRXCZNZjKdU_yB8e58XQucUzrn@mail.gmail.com>
-	<AANLkTi=vhWV1RNyemtfppfjvLYAbzd3aRjFOVgLLpG3Z@mail.gmail.com>
-	<AANLkTin4m8gJR50zwMB2b0jRMHdNA6CQToKBTAhOL9wF@mail.gmail.com>
-	<AANLkTinu2S19r8fueM-jVkc35XL2G0Z16BddE92Ci9KB@mail.gmail.com>
-	<20100804114147.GB6852@n2100.arm.linux.org.uk>
-	<AANLkTi=Dqs_qg=BsoNBTjvJbG+ub+zMv8ctbrJSGPJJJ@mail.gmail.com>
-	<AANLkTimrb5P9cVo30y_udoi4+vu3cM4YzfpDaYCfwGEA@mail.gmail.com>
-	<AANLkTim6Yuor4CAEmQPs3zPVz1svEbckzO0HHeFWGmjy@mail.gmail.com>
-Message-ID: <20100806144605.GA21015@n2100.arm.linux.org.uk>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Fri, 06 Aug 2010 08:00:40 -0700
+Subject: [PATCH V2] HRT support in Samsung S5P Platform
+In-Reply-To: <AANLkTimiM3hbcA1_--rKKwqcOY-K=yef-VfgV2sSnqBG@mail.gmail.com>
+References: <9852485.1007371280726519429.JavaMail.weblogic@epml04>
+	<1281051440.30969.21.camel@c-dwalke-linux.qualcomm.com>
+	<AANLkTimiM3hbcA1_--rKKwqcOY-K=yef-VfgV2sSnqBG@mail.gmail.com>
+Message-ID: <1281106840.4236.1.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 06, 2010 at 01:02:24PM +0300, Ohad Ben-Cohen wrote:
-> We have Russell's suggestion which is nice and simple, but it has the
-> 1 device limitation.
+On Fri, 2010-08-06 at 09:19 +0900, Kyungmin Park wrote:
+> On Fri, Aug 6, 2010 at 8:37 AM, Daniel Walker <dwalker@codeaurora.org> wrote:
+> > On Mon, 2010-08-02 at 05:21 +0000, MADHAV SINGHCHAUHAN wrote:
+> >> +config SAMSUNG_HRT_RTC_SYSTIMER
+> >> +       bool "HRtimer and Dynamic Tick support"
+> >> +       select GENERIC_TIME
+> >> +       select GENERIC_CLOCKEVENTS
+> >> +       select HIGH_RES_TIMERS
+> >> +       help
+> >> +          Support for HRtimer and Dynamic Tick system using RTC and
+> >> SYSTEM timer
+> >> +
+> >
+> > Do you really need a config option for this? I mean HRT has a config
+> > option already ..
+> 
+> It mean which timer use for HRT. there are several combination to
+> implement the HRT.
+> Do you mean add the depends on HRT?
 
-You could make it generic by doing something like this:
+No .. You shouldn't need this config option at all. HRT should select
+the right clock event device based on the rating. You just need to set
+the rating correctly.
 
-#define set_device_data(name, type, index, data)			\
- ({									\
-    extern void __set_device_data(const char *, int, void *, size_t);	\
-    BUILD_BUG_ON(!__same_type(type, *data));				\
-    __set_device_data(name ":" #type, index, data, sizeof(type));	\
- })
+Daniel
 
-#define get_device_data(name, type, index) ({				\
-  extern void *__get_device_data(const char *, int);			\
-  type *__ptr = __get_device_data(name ":" #type, index);		\
-  __ptr; })
-
-And now we have something that takes a string and index to use as a lookup
-key in some kind of list - and it's typesafe (because the lookup key is
-dependent on the stringified type.)
-
-But... at this point I feel that we're getting too complicated, and will
-get shouted at to use something like DT which already solves this problem.
+-- 
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum.
