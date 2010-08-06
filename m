@@ -1,43 +1,51 @@
-From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Fri, 6 Aug 2010 10:32:40 -0700 (PDT)
-Subject: Impossible constraint in 'asm' in 2.6.35 build
-Message-ID: <346052.84371.qm@web51008.mail.re2.yahoo.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 06 Aug 2010 12:53:47 -0400 (EDT)
+Subject: [PATCH v2 03/20] mmc: support embedded data field in mmc_host
+In-Reply-To: <20100806144605.GA21015@n2100.arm.linux.org.uk>
+References: <AANLkTi=BUX59heXAW2Uf4wZo2dSS19Je54dkQ5u2YGAW@mail.gmail.com>
+	<AANLkTimZQKj7H_GeE=+O9cwxEMTR+LhfFbt=AyXGzN3d@mail.gmail.com>
+	<AANLkTikfRja-h9mz7uyRXCZNZjKdU_yB8e58XQucUzrn@mail.gmail.com>
+	<AANLkTi=vhWV1RNyemtfppfjvLYAbzd3aRjFOVgLLpG3Z@mail.gmail.com>
+	<AANLkTin4m8gJR50zwMB2b0jRMHdNA6CQToKBTAhOL9wF@mail.gmail.com>
+	<AANLkTinu2S19r8fueM-jVkc35XL2G0Z16BddE92Ci9KB@mail.gmail.com>
+	<20100804114147.GB6852@n2100.arm.linux.org.uk>
+	<AANLkTi=Dqs_qg=BsoNBTjvJbG+ub+zMv8ctbrJSGPJJJ@mail.gmail.com>
+	<AANLkTimrb5P9cVo30y_udoi4+vu3cM4YzfpDaYCfwGEA@mail.gmail.com>
+	<AANLkTim6Yuor4CAEmQPs3zPVz1svEbckzO0HHeFWGmjy@mail.gmail.com>
+	<20100806144605.GA21015@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1008061251040.28809@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 6 Aug 2010, Russell King - ARM Linux wrote:
 
-I am trying to build a 2.6.35 kernel for i.MX31 and I am getting the following error:
+> On Fri, Aug 06, 2010 at 01:02:24PM +0300, Ohad Ben-Cohen wrote:
+> > We have Russell's suggestion which is nice and simple, but it has the
+> > 1 device limitation.
+> 
+> You could make it generic by doing something like this:
+> 
+> #define set_device_data(name, type, index, data)			\
+>  ({									\
+>     extern void __set_device_data(const char *, int, void *, size_t);	\
+>     BUILD_BUG_ON(!__same_type(type, *data));				\
+>     __set_device_data(name ":" #type, index, data, sizeof(type));	\
+>  })
+> 
+> #define get_device_data(name, type, index) ({				\
+>   extern void *__get_device_data(const char *, int);			\
+>   type *__ptr = __get_device_data(name ":" #type, index);		\
+>   __ptr; })
+> 
+> And now we have something that takes a string and index to use as a lookup
+> key in some kind of list - and it's typesafe (because the lookup key is
+> dependent on the stringified type.)
+> 
+> But... at this point I feel that we're getting too complicated, and will
+> get shouted at to use something like DT which already solves this problem.
 
-  CC      arch/arm/plat-mxc/audmux-v2.o
-  CC      arch/arm/plat-mxc/3ds_debugboard.o
-  CC      arch/arm/plat-mxc/devices/platform-imx-i2c.o
-  CC      arch/arm/plat-mxc/devices/platform-imx-uart.o
-  CC      arch/arm/plat-mxc/devices/platform-mxc_nand.o
-  CC      arch/arm/plat-mxc/devices/platform-spi_imx.o
-  LD      arch/arm/plat-mxc/devices/built-in.o
-  LD      arch/arm/plat-mxc/built-in.o
-  CC      arch/arm/vfp/vfpmodule.o
-  AS      arch/arm/vfp/entry.o
-  AS      arch/arm/vfp/vfphw.o
-  LD      arch/arm/vfp/vfp.o
-  LD      arch/arm/vfp/built-in.o
-  CC      kernel/sched.o
-kernel/sched_idletask.c: In function 'pick_next_task_idle':
-/home/fabio/pengutronix/linux-2.6/arch/arm/include/asm/atomic.h:42: error: impossible constraint in 'asm'
-make[1]: *** [kernel/sched.o] Error 1
-make: *** [kernel] Error 2
-
-I tried GCC4.3 and 4.4 and the result is the same. I haven't faced this issue when building 2.6.34.
-
-Does anyone have any suggestion?
-
-Thanks,
-
-Fabio Estevam
-
+DT is not generally available yet.  A simple interim solution would 
+still be worth it.
 
 
-
-
-      
+Nicolas
