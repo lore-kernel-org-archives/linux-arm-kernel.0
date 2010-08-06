@@ -1,160 +1,42 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  6 Aug 2010 16:02:17 +0200
-Subject: [PATCH 1/2] ARM i.MX51: Add Nand clock support
-In-Reply-To: <1281103338-19423-1-git-send-email-s.hauer@pengutronix.de>
-References: <1281103338-19423-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1281103338-19423-2-git-send-email-s.hauer@pengutronix.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 6 Aug 2010 16:45:03 +0200
+Subject: [PATCH] ARM: fix inverted MMC card detect in U300
+Message-ID: <1281105903-14557-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-mx5/clock-mx51.c |   98 ++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 98 insertions(+), 0 deletions(-)
+This converts the U300 to uninverted logic for MMCI card detect,
+fixing a regression in the current tree.
 
-diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
-index 6af69de..9a05f0d 100644
---- a/arch/arm/mach-mx5/clock-mx51.c
-+++ b/arch/arm/mach-mx5/clock-mx51.c
-@@ -571,6 +571,64 @@ static int _clk_uart_set_parent(struct clk *clk, struct clk *parent)
- 	return 0;
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/mach-u300/mmc.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-u300/mmc.c b/arch/arm/mach-u300/mmc.c
+index 3acb710..2382175 100644
+--- a/arch/arm/mach-u300/mmc.c
++++ b/arch/arm/mach-u300/mmc.c
+@@ -77,16 +77,16 @@ static void _mmci_callback(struct work_struct *ws)
+ 
+ 	mdelay(20);
+ 
+-	mmci_card->mmc_inserted = !!gpio_get_value(U300_GPIO_PIN_MMC_CD);
++	mmci_card->mmc_inserted = !gpio_get_value(U300_GPIO_PIN_MMC_CD);
+ 
+ 	input_report_switch(mmci_card->mmc_input, KEY_INSERT,
+-			    !mmci_card->mmc_inserted);
++			    mmci_card->mmc_inserted);
+ 	input_sync(mmci_card->mmc_input);
+ 
+ 	pr_debug("MMC/SD card was %s\n",
+-		 mmci_card->mmc_inserted ? "removed" : "inserted");
++		 mmci_card->mmc_inserted ? "inserted" : "removed");
+ 
+-	enable_irq_on_gpio_pin(U300_GPIO_PIN_MMC_CD, !mmci_card->mmc_inserted);
++	enable_irq_on_gpio_pin(U300_GPIO_PIN_MMC_CD, mmci_card->mmc_inserted);
  }
  
-+#define clk_nfc_set_parent	NULL
-+
-+static unsigned long clk_nfc_get_rate(struct clk *clk)
-+{
-+	unsigned long rate;
-+	u32 reg, div;
-+
-+	reg = __raw_readl(MXC_CCM_CBCDR);
-+	div = ((reg & MXC_CCM_CBCDR_NFC_PODF_MASK) >>
-+	       MXC_CCM_CBCDR_NFC_PODF_OFFSET) + 1;
-+	rate = clk_get_rate(clk->parent) / div;
-+	WARN_ON(rate == 0);
-+	return rate;
-+}
-+
-+static unsigned long clk_nfc_round_rate(struct clk *clk,
-+						unsigned long rate)
-+{
-+	u32 div;
-+	unsigned long parent_rate = clk_get_rate(clk->parent);
-+
-+	if (!rate)
-+		return -EINVAL;
-+
-+	div = parent_rate / rate;
-+
-+	if (parent_rate % rate)
-+		div++;
-+
-+	if (div > 8)
-+		return -EINVAL;
-+
-+	return parent_rate / div;
-+
-+}
-+
-+static int clk_nfc_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	u32 reg, div;
-+
-+	div = clk_get_rate(clk->parent) / rate;
-+	if (div == 0)
-+		div++;
-+	if (((clk_get_rate(clk->parent) / div) != rate) || (div > 8))
-+		return -EINVAL;
-+
-+	reg = __raw_readl(MXC_CCM_CBCDR);
-+	reg &= ~MXC_CCM_CBCDR_NFC_PODF_MASK;
-+	reg |= (div - 1) << MXC_CCM_CBCDR_NFC_PODF_OFFSET;
-+	__raw_writel(reg, MXC_CCM_CBCDR);
-+
-+	while (__raw_readl(MXC_CCM_CDHIPR) &
-+			MXC_CCM_CDHIPR_NFC_IPG_INT_MEM_PODF_BUSY){
-+	}
-+
-+	return 0;
-+}
-+
- static unsigned long clk_usboh3_get_rate(struct clk *clk)
- {
- 	u32 reg, prediv, podf;
-@@ -620,6 +678,17 @@ static unsigned long get_ckih2_reference_clock_rate(struct clk *clk)
- 	return ckih2_reference;
- }
- 
-+static unsigned long clk_emi_slow_get_rate(struct clk *clk)
-+{
-+	u32 reg, div;
-+
-+	reg = __raw_readl(MXC_CCM_CBCDR);
-+	div = ((reg & MXC_CCM_CBCDR_EMI_PODF_MASK) >>
-+	       MXC_CCM_CBCDR_EMI_PODF_OFFSET) + 1;
-+
-+	return clk_get_rate(clk->parent) / div;
-+}
-+
- /* External high frequency clock */
- static struct clk ckih_clk = {
- 	.get_rate = get_high_reference_clock_rate,
-@@ -762,6 +831,15 @@ static struct clk kpp_clk = {
- 	.id = 0,
- };
- 
-+static struct clk emi_slow_clk = {
-+	.parent = &pll2_sw_clk,
-+	.enable_reg = MXC_CCM_CCGR5,
-+	.enable_shift = MXC_CCM_CCGRx_CG8_OFFSET,
-+	.enable = _clk_ccgr_enable,
-+	.disable = _clk_ccgr_disable_inwait,
-+	.get_rate = clk_emi_slow_get_rate,
-+};
-+
- #define DEFINE_CLOCK(name, i, er, es, gr, sr, p, s)	\
- 	static struct clk name = {			\
- 		.id		= i,			\
-@@ -775,6 +853,21 @@ static struct clk kpp_clk = {
- 		.secondary	= s,			\
- 	}
- 
-+#define DEFINE_CLOCK1(name, i, er, es, pfx, p, s)	\
-+	static struct clk name = {			\
-+		.id		= i,			\
-+		.enable_reg	= er,			\
-+		.enable_shift	= es,			\
-+		.get_rate	= pfx##_get_rate,	\
-+		.set_rate	= pfx##_set_rate,	\
-+		.round_rate	= pfx##_round_rate,	\
-+		.set_parent	= pfx##_set_parent,	\
-+		.enable		= _clk_ccgr_enable,	\
-+		.disable	= _clk_ccgr_disable,	\
-+		.parent		= p,			\
-+		.secondary	= s,			\
-+	}
-+
- /* DEFINE_CLOCK(name, id, enable_reg, enable_shift,
-    get_rate, set_rate, parent, secondary); */
- 
-@@ -814,6 +907,10 @@ DEFINE_CLOCK(hsi2c_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG11_OFFSET,
- DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
- 	NULL,  NULL, &ipg_clk, NULL);
- 
-+/* NFC */
-+DEFINE_CLOCK1(nfc_clk, 0, MXC_CCM_CCGR5, MXC_CCM_CCGRx_CG10_OFFSET,
-+	clk_nfc, &emi_slow_clk, NULL);
-+
- #define _REGISTER_CLOCK(d, n, c) \
-        { \
- 		.dev_id = d, \
-@@ -837,6 +934,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
- 	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
- 	_REGISTER_CLOCK("imx-keypad.0", NULL, kpp_clk)
-+	_REGISTER_CLOCK("mxc_nand", NULL, nfc_clk)
- };
- 
- static void clk_tree_init(void)
+ int __devinit mmc_init(struct amba_device *adev)
 -- 
-1.7.1
+1.6.3.3
