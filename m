@@ -1,77 +1,46 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Fri, 06 Aug 2010 16:06:10 +0900
-Subject: [PATCH] serial: samsung: fix device name
-In-Reply-To: <4C5BAFF6.10606@gmail.com>
-References: <20100805201000.14030.34703.stgit@darius-desktop>
-	<AANLkTikp2ThBqF2jkU4CXS9-iYRoy3AWpeqWXjmLF6Gd@mail.gmail.com>
-	<4C5BAFF6.10606@gmail.com>
-Message-ID: <4C5BB462.6010409@samsung.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Fri, 6 Aug 2010 09:07:47 +0200
+Subject: [PATCH v2 03/20] mmc: support embedded data field in mmc_host
+In-Reply-To: <AANLkTi=Dqs_qg=BsoNBTjvJbG+ub+zMv8ctbrJSGPJJJ@mail.gmail.com>
+References: <1279733634-21974-1-git-send-email-ohad@wizery.com>
+	<1279733634-21974-4-git-send-email-ohad@wizery.com>
+	<AANLkTimzA_JJ-byTDWznbL3YzeJ8LAP4M50onf2_3fBF@mail.gmail.com>
+	<AANLkTi=Oy8X1xMOwWL_cKBB1LWULT6=p+adUgB+AuSJS@mail.gmail.com>
+	<AANLkTi=BUX59heXAW2Uf4wZo2dSS19Je54dkQ5u2YGAW@mail.gmail.com>
+	<AANLkTimZQKj7H_GeE=+O9cwxEMTR+LhfFbt=AyXGzN3d@mail.gmail.com>
+	<AANLkTikfRja-h9mz7uyRXCZNZjKdU_yB8e58XQucUzrn@mail.gmail.com>
+	<AANLkTi=vhWV1RNyemtfppfjvLYAbzd3aRjFOVgLLpG3Z@mail.gmail.com>
+	<AANLkTin4m8gJR50zwMB2b0jRMHdNA6CQToKBTAhOL9wF@mail.gmail.com>
+	<AANLkTinu2S19r8fueM-jVkc35XL2G0Z16BddE92Ci9KB@mail.gmail.com>
+	<20100804114147.GB6852@n2100.arm.linux.org.uk>
+	<AANLkTi=Dqs_qg=BsoNBTjvJbG+ub+zMv8ctbrJSGPJJJ@mail.gmail.com>
+Message-ID: <AANLkTimrb5P9cVo30y_udoi4+vu3cM4YzfpDaYCfwGEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/6/2010 3:47 PM, Paulius Zaleckas wrote:
-> On 08/06/2010 03:04 AM, Kyungmin Park wrote:
->> Hi,
+2010/8/4 Ohad Ben-Cohen <ohad@wizery.com>:
+> On Wed, Aug 4, 2010 at 2:41 PM, Russell King - ARM Linux
 >>
->> It's already posted by Mr. Shim
->> http://marc.info/?l=linux-arm-kernel&m=127410047306149&w=2
-> 
-> Darius patch is a little bit cleaner.
-> 
+>> Why not arrange for a small piece of code to be built into the kernel
+>> when this driver is selected as a module or built-in, which handles
+>> the passing of platform data to the driver?
+>
+> It's interesting.
+>
+> The only drawback I can see is that it has an inherent limitation of
+> having only a single wl1271 device on board,
 
-OK, it's better.
+...which is exactly what the *_board_info scheme in the spi
+and i2c subsystems is designed to solve.
 
-Acked-by: Joonyoung Shim <jy0922.shim@samsung.com>
+This is an established design pattern in the kernel with two
+precedents, what makes it so hard to implement this idea?
+There are plenty of examples all over the place.
 
->> As discussed with Ben. even though it's right patch, there's some
->> users to use previous interface.
->> I also think it will be fixed. but need to coordinate with existing
->> users.
-> 
-> IMO this is obvious bug fix.
-> 
-> Acked-by: Paulius Zaleckas <paulius.zaleckas@gmail.com>
-> 
->> Ben, how to you think?
->>
->> On Fri, Aug 6, 2010 at 5:10 AM, Darius
->> Augulis<augulis.darius@gmail.com>  wrote:
->>> Swap device and driver names in serial/samsung.c
->>>
->>> Signed-off-by: Darius Augulis<augulis.darius@gmail.com>
->>> ---
->>>   drivers/serial/samsung.c |    4 ++--
->>>   1 files changed, 2 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/serial/samsung.c b/drivers/serial/samsung.c
->>> index a9d6c56..9d63f24 100644
->>> --- a/drivers/serial/samsung.c
->>> +++ b/drivers/serial/samsung.c
->>> @@ -878,10 +878,10 @@ static struct uart_ops s3c24xx_serial_ops = {
->>>
->>>   static struct uart_driver s3c24xx_uart_drv = {
->>>         .owner          = THIS_MODULE,
->>> -       .dev_name       = "s3c2410_serial",
->>> +       .driver_name    = "s3c2410_serial",
->>>         .nr             = CONFIG_SERIAL_SAMSUNG_UARTS,
->>>         .cons           = S3C24XX_SERIAL_CONSOLE,
->>> -       .driver_name    = S3C24XX_SERIAL_NAME,
->>> +       .dev_name       = S3C24XX_SERIAL_NAME,
->>>         .major          = S3C24XX_SERIAL_MAJOR,
->>>         .minor          = S3C24XX_SERIAL_MINOR,
->>>   };
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->> -- 
->> To unsubscribe from this list: send the line "unsubscribe
->> linux-serial" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-> 
-> 
+What mainly matters to me is that the stuff can be separated
+cleanly and in a nicely structured manner into board-xxx.c files
+in the mach-xxx dirs, which is possible also with the simpler
+approach so whatever...
+
+Yours,
+Linus Walleij
