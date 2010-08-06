@@ -1,58 +1,23 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 06 Aug 2010 22:41:20 +0900
-Subject: [PATCH 1/3] ARM: S5PC210: Use the correct GPIO base addresses
-In-Reply-To: <20100806042343.GA19431@july>
-References: <20100806042343.GA19431@july>
-Message-ID: <00b401cb356d$13071610$39154230$%kim@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri,  6 Aug 2010 15:53:03 +0200
+Subject: Add i.MX51 support to mxc_nand
+Message-ID: <1281102791-8089-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> The S5PC210 has three GPIO base addresses.
-> 
-> Part1 Base Address=0x11400000
-> Part2 Base Address=0x11000000
-> Part3 Base Address=0x03860000
-> 
-Yes, maybe missed.
+Hi all,
 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pv310/include/mach/map.h |    4 +++-
->  1 files changed, 3 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv310/include/mach/map.h b/arch/arm/mach-
-> s5pv310/include/mach/map.h
-> index 87697c9..7eb2a7a 100644
-> --- a/arch/arm/mach-s5pv310/include/mach/map.h
-> +++ b/arch/arm/mach-s5pv310/include/mach/map.h
-> @@ -39,8 +39,10 @@
->  #define S5PV310_PA_GIC_DIST		(0x10501000)
->  #define S5PV310_PA_L2CC			(0x10502000)
-> 
-> -#define S5PV310_PA_GPIO			(0x11000000)
-> +#define S5PV310_PA_GPIO			(0x11400000)
+The following series adds v3 (found on i.MX51) support to the i.MX nand
+controller. auto mode is not supported, but if I understand correctly
+the auto mode is only of use when more than one nand chip is connected.
+Without the auto mode the v3 controller behaves very similar to the v2
+controller, but unfortunately it has a completely different register
+layout. For this reason this series has some preparation patches before
+the v3 support is added as the last patch.
 
-S5PV310_PA_GPIO1 is better...
+This series conflicts with the series John Ogness recently posted, so
+it has probably to be reworked a bit.
 
->  #define S5P_PA_GPIO			S5PV310_PA_GPIO
+I'll post the nand platform support for i.MX51 in a seperate series.
 
-> +#define S5PV310_PA_GPIO2		(0x11000000)
-> +#define S5PV310_PA_GPIO3		(0x03860000)
-
-> 
->  #define S5PV310_PA_UART			(0x13800000)
-> 
-> --
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Sascha
