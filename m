@@ -1,68 +1,98 @@
-From: augulis.darius@gmail.com (Darius Augulis)
-Date: Fri, 06 Aug 2010 09:13:36 +0300
-Subject: [PATCH] serial: samsung: fix device name
-In-Reply-To: <AANLkTikp2ThBqF2jkU4CXS9-iYRoy3AWpeqWXjmLF6Gd@mail.gmail.com>
-References: <20100805201000.14030.34703.stgit@darius-desktop>
-	<AANLkTikp2ThBqF2jkU4CXS9-iYRoy3AWpeqWXjmLF6Gd@mail.gmail.com>
-Message-ID: <4C5BA810.3030205@gmail.com>
+From: a.paterniani@swapp-eng.it (Andrea Paterniani)
+Date: Fri, 06 Aug 2010 08:16:30 +0200
+Subject: [patch 0/2] ARM: Disable outer cache before kexec call -V3
+In-Reply-To: <4C5930AD.3030701@swapp-eng.it>
+References: <20100705113029.082013074@linutronix.de>,
+	<4C58259A.3080404@swapp-eng.it>	<5A47E75E594F054BAF48C5E4FC4B92AB0321623966@dbde02.ent.ti.com>
+	<4C5930AD.3030701@swapp-eng.it>
+Message-ID: <4C5BA8BE.9010408@swapp-eng.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/2010 03:04 AM, Kyungmin Park wrote:
-> Hi,
->
-> It's already posted by Mr. Shim
-> http://marc.info/?l=linux-arm-kernel&m=127410047306149&w=2
->
-> As discussed with Ben. even though it's right patch, there's some
-> users to use previous interface.
-> I also think it will be fixed. but need to coordinate with existing users.
->
+Any other suggestion?
 
-IMHO, it must be fixed. It's very annoying bug and I spend few hours 
-trying to understand why kernel with devtmpfs auto-mount option doesn't 
-provide ttySAC0, because when grep'ing 'grep -R ttySAC0 drivers/serial/*
-it's found in samsung driver and I thought everything should be o.k. Who 
-could imagine that it's driver name, not device?...
-Regarding old users, they should not use such strange device name in 
-their configs, they have to sync with main line.
+Thanks
+- Andrea
 
-> Ben, how to you think?
+Il 04/08/2010 11.19, Andrea Paterniani ha scritto:
+> Il 03/08/2010 19.36, Gadiyar, Anand ha scritto:
+>> Andrea Paterniani wrote:
+>>> Hi,
+>>>       I have applied your patches to kernel 2.6.35-rc4 running on my 
+>>> beagleboard.
+>>> I'm using kexec-tools-2.0.1.
+>>>
+>>> My u-boot bootargs is:
+>>>       console=ttyS2,115200n8 root=/dev/mmcblk0p2 rw rootfstype=ext3 
+>>> rootwait ip=192.168.2.13::255.255.255.0
+>>>
+>>> To restart the system I type:
+>>> >  sync
+>>> >  kexec -l /boot/zImage --append="console=ttyS2,115200n8 
+>>> root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait 
+>>> ip=192.168.2.13::255.255.255.0"
+>>> >  kexec -e
+>>>
+>>> Not every time the system restart.
+>>> In some cases no output on the console after the following:
+>>>       Bye!
+>>>       Uncompressing Linux... done, booting the kernel.
+>>>
+>>> Any idea?
+>>>
+>> Can you try building your kernel with CONFIG_EARLY_PRINTK,
+>> and add the word "earlyprintk" to your bootargs?
+>>
+> I built the kernel with (also verified via zcat /proc/config.gz | grep 
+> ... after succesfull kexec):
 >
-> On Fri, Aug 6, 2010 at 5:10 AM, Darius Augulis<augulis.darius@gmail.com>  wrote:
->> Swap device and driver names in serial/samsung.c
+> CONFIG_EARLY_PRINTK=y
+> CONFIG_DEBUG_LL=y
+>
+> I load new kernel zImage via:
+> kexec -l /boot/zImage --append="earlyprintk console=ttyS2,115200n8 
+> root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait 
+> ip=192.168.2.13::255.255.255.0"
+>
+> but when kexec fails I got only the following:
+>     Bye!
+>     Uncompressing Linux... done, booting the kernel.
+>
+> What do I miss whith earlyprintk?
+>
+> Perhaps I did not enough tests, but at the moment it seems that system 
+> boot with nfs rootfs followed by kexec with mmc rootfs works.
+> Problems arise with system boot and kexec both with mmc rootfs.
+>
+> Regards,
+> - Andrea
+>
 >>
->> Signed-off-by: Darius Augulis<augulis.darius@gmail.com>
->> ---
->>   drivers/serial/samsung.c |    4 ++--
->>   1 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/serial/samsung.c b/drivers/serial/samsung.c
->> index a9d6c56..9d63f24 100644
->> --- a/drivers/serial/samsung.c
->> +++ b/drivers/serial/samsung.c
->> @@ -878,10 +878,10 @@ static struct uart_ops s3c24xx_serial_ops = {
->>
->>   static struct uart_driver s3c24xx_uart_drv = {
->>         .owner          = THIS_MODULE,
->> -       .dev_name       = "s3c2410_serial",
->> +       .driver_name    = "s3c2410_serial",
->>         .nr             = CONFIG_SERIAL_SAMSUNG_UARTS,
->>         .cons           = S3C24XX_SERIAL_CONSOLE,
->> -       .driver_name    = S3C24XX_SERIAL_NAME,
->> +       .dev_name       = S3C24XX_SERIAL_NAME,
->>         .major          = S3C24XX_SERIAL_MAJOR,
->>         .minor          = S3C24XX_SERIAL_MINOR,
->>   };
->>
->>
+>>> Il 05/07/2010 13.52, Thomas Gleixner ha scritto:
+>>>> The following patch series addresses the problem that the kexec code
+>>>> does not disable the outer cache before disabling the inner cache and
+>>>> jumping into the new kernel. This results in random crashes of the new
+>>>> kernel.
+>>>>
+>>>> Changes since version 2:
+>>>>
+>>>>    - Use CLEAN_INV_WAY in l2x0_flush_all according to Catalin
+>>>>
+>>>>    - Rename outer_cache_disable() to outer_disable()
+>>>>
+>>>>    - Added a  BUG_ON() when l2x0_inv_all() is called with L2 enabled.
+>>>>
+>>>> Thanks,
+>>>>
+>>>>        tglx
+>>>>
+>>>>
+>>>>
 >> _______________________________________________
 >> linux-arm-kernel mailing list
 >> linux-arm-kernel at lists.infradead.org
 >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >
+
+-- 
