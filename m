@@ -1,98 +1,78 @@
-From: a.paterniani@swapp-eng.it (Andrea Paterniani)
-Date: Fri, 06 Aug 2010 08:16:30 +0200
-Subject: [patch 0/2] ARM: Disable outer cache before kexec call -V3
-In-Reply-To: <4C5930AD.3030701@swapp-eng.it>
-References: <20100705113029.082013074@linutronix.de>,
-	<4C58259A.3080404@swapp-eng.it>	<5A47E75E594F054BAF48C5E4FC4B92AB0321623966@dbde02.ent.ti.com>
-	<4C5930AD.3030701@swapp-eng.it>
-Message-ID: <4C5BA8BE.9010408@swapp-eng.it>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 6 Aug 2010 15:24:09 +0900
+Subject: Merge request of s5pc210 universal board.
+In-Reply-To: <AANLkTinQ1mP2e5DA0J_GyWn32EAckgT3b=Ar6gHzDijX@mail.gmail.com>
+References: <AANLkTik1bxh8zfCuKV5UOcYyJW-QbGhT5PYen4MzE1R+@mail.gmail.com>
+	<006d01cb3521$e4e559e0$aeb00da0$%kim@samsung.com>
+	<AANLkTinQ1mP2e5DA0J_GyWn32EAckgT3b=Ar6gHzDijX@mail.gmail.com>
+Message-ID: <AANLkTi=oKyiVtMoZH7czYr5LQoLOMtZtG63RwXay8c2k@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any other suggestion?
-
-Thanks
-- Andrea
-
-Il 04/08/2010 11.19, Andrea Paterniani ha scritto:
-> Il 03/08/2010 19.36, Gadiyar, Anand ha scritto:
->> Andrea Paterniani wrote:
->>> Hi,
->>>       I have applied your patches to kernel 2.6.35-rc4 running on my 
->>> beagleboard.
->>> I'm using kexec-tools-2.0.1.
+On Fri, Aug 6, 2010 at 1:47 PM, Kyungmin Park <kmpark@infradead.org> wrote:
+> On Fri, Aug 6, 2010 at 1:43 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> Kyungmin Park wrote:
 >>>
->>> My u-boot bootargs is:
->>>       console=ttyS2,115200n8 root=/dev/mmcblk0p2 rw rootfstype=ext3 
->>> rootwait ip=192.168.2.13::255.255.255.0
+>>> Dear all,
 >>>
->>> To restart the system I type:
->>> >  sync
->>> >  kexec -l /boot/zImage --append="console=ttyS2,115200n8 
->>> root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait 
->>> ip=192.168.2.13::255.255.255.0"
->>> >  kexec -e
->>>
->>> Not every time the system restart.
->>> In some cases no output on the console after the following:
->>>       Bye!
->>>       Uncompressing Linux... done, booting the kernel.
->>>
->>> Any idea?
->>>
->> Can you try building your kernel with CONFIG_EARLY_PRINTK,
->> and add the word "earlyprintk" to your bootargs?
+>> Hi,
 >>
-> I built the kernel with (also verified via zcat /proc/config.gz | grep 
-> ... after succesfull kexec):
->
-> CONFIG_EARLY_PRINTK=y
-> CONFIG_DEBUG_LL=y
->
-> I load new kernel zImage via:
-> kexec -l /boot/zImage --append="earlyprintk console=ttyS2,115200n8 
-> root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait 
-> ip=192.168.2.13::255.255.255.0"
->
-> but when kexec fails I got only the following:
->     Bye!
->     Uncompressing Linux... done, booting the kernel.
->
-> What do I miss whith earlyprintk?
->
-> Perhaps I did not enough tests, but at the moment it seems that system 
-> boot with nfs rootfs followed by kexec with mmc rootfs works.
-> Problems arise with system boot and kexec both with mmc rootfs.
->
-> Regards,
-> - Andrea
->
+>>> Now I checked the next-v310 tree and know that only LSI required codes
+>>> are merged.
+>>> http://git.kernel.org/?p=linux/kernel/git/kgene/linux-
+>>> samsung.git;a=shortlog;h=refs/heads/next-s5pv310
+>>>
+>>> I can't find any reason to omit the universal board file. It's posted
+>>> before merge window and no difference with LSI SMDK board at current
+>>> status.
 >>
->>> Il 05/07/2010 13.52, Thomas Gleixner ha scritto:
->>>> The following patch series addresses the problem that the kexec code
->>>> does not disable the outer cache before disabling the inner cache and
->>>> jumping into the new kernel. This results in random crashes of the new
->>>> kernel.
->>>>
->>>> Changes since version 2:
->>>>
->>>>    - Use CLEAN_INV_WAY in l2x0_flush_all according to Catalin
->>>>
->>>>    - Rename outer_cache_disable() to outer_disable()
->>>>
->>>>    - Added a  BUG_ON() when l2x0_inv_all() is called with L2 enabled.
->>>>
->>>> Thanks,
->>>>
->>>>        tglx
->>>>
->>>>
->>>>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> Please answer my concern..I already replied to you about this.
+>>
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-July/022087.html
+>> ---
+>>> >> +config MACH_UNIVERSAL
+>>> >
+>>> > As I still asking, do you _really_ want to use 'UNIVERSAL' as the
+>>> > board(machine) name?
+>>>
+>>> Yes, it's called 'universal' and it's really universal board at here.
+>>> I don't confuse the engineer who develop this board.
+>>> Maybe your engineers saw and hear the brief description about universal
+>> board.
+>>>
+>> Actually, I know that. But there are S5PC100, S5PC110 universal board
+>> also...
+>> So I asked to you that you _really_ want to use 'universal' here...and I'm
+>> still concerning.
+>
+> No comment means "Of course want to merge it". thank you for your
+> concerning. but I can handle it.
+
+After discuss with Mr. Kim. I changed to use non-generic name to universal_c210.
+
+Then do you resend the patch? or can you handle it by yourself?
+
+To Russell.
+Sorry for bothering you.
+Can you change the registered universal to universal_c210?
+universal_c210          MACH_UNIVERSAL_C210     UNIVERSAL_C210
+
+Thank you,
+Kyungmin Park
+>
+>> ---
+>>
+>>> I try to support our board at mainline kernel but it seems to make a
+>>> difficult with unknown commit criteria of LSI.
+>>>
+>>
+>> Thanks.
+>>
+>> Best regards,
+>> Kgene.
+>> --
+>> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+>> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>>
 >>
 >
-
--- 
