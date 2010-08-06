@@ -1,432 +1,195 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 06 Aug 2010 22:38:56 +0900
-Subject: [PATCH 3/3] ARM: S5PC210: GPIO library support
-In-Reply-To: <20100806042356.GA19441@july>
-References: <20100806042356.GA19441@july>
-Message-ID: <00b301cb356c$baf130a0$30d391e0$%kim@samsung.com>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Fri, 06 Aug 2010 16:38:46 +0300
+Subject: [PATCH 1/4] s3c: add support for mach-real6410
+In-Reply-To: <00b001cb356a$ba158890$2e4099b0$%kim@samsung.com>
+References: <20100806101914.2481.67766.stgit@darius-desktop>	<20100806102041.2481.18980.stgit@darius-desktop>
+	<00b001cb356a$ba158890$2e4099b0$%kim@samsung.com>
+Message-ID: <4C5C1066.4090407@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> S5PC210 has three GPIOs. Part 1 uses the same as previous framework.
-> Part2 & Part 3 uses the own ioremap address.
+On 08/06/2010 04:24 PM, Kukjin Kim wrote:
+> Darius Augulis wrote:
+>>
+>> Add support for CoreWind Real6410 board,
+>> based on Samsung s3c6410 processor.
+>>
+> Hi,
+>
+> Please make sure that your patch has no problem with scripts/checkpatch.pl before submitting.
+> I got the following result on this patch :-(
 
-I don't think so, GPIO2 and GPIO3 parts should use same framework not
-ioremap.
-As my team member replied to you, can support 3 GPIO parts with same way....
+thanks for review and remind about checkpatch script.
+Will send updated patches today evening.
 
-And same method can help to handle this more easily.
-
-> 
-> Known issues: external interrupt codes depend on VA_GPIO which is used at
-Part
-> 1
-> . But actual external interrupt GPIOs are located at Part 2 of GPIO.
-> It needs to fixed by passsing the base address to irq-ext routine.
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pv310/Makefile  |    2 +-
->  arch/arm/mach-s5pv310/gpiolib.c |  360
-> +++++++++++++++++++++++++++++++++++++++
->  2 files changed, 361 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/mach-s5pv310/gpiolib.c
-> 
-> diff --git a/arch/arm/mach-s5pv310/Makefile
-b/arch/arm/mach-s5pv310/Makefile
-> index 82dbbaa..de49e98 100644
-> --- a/arch/arm/mach-s5pv310/Makefile
-> +++ b/arch/arm/mach-s5pv310/Makefile
-> @@ -12,7 +12,7 @@ obj-				:=
-> 
->  # Core support for S5PV310 system
-> 
-> -obj-$(CONFIG_CPU_S5PV310)	+= cpu.o init.o clock.o irq-combiner.o
-> +obj-$(CONFIG_CPU_S5PV310)	+= cpu.o init.o clock.o irq-combiner.o
-gpiolib.o
->  obj-$(CONFIG_CPU_S5PV310)	+= setup-i2c0.o time.o
-> 
->  obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
-> diff --git a/arch/arm/mach-s5pv310/gpiolib.c
-b/arch/arm/mach-s5pv310/gpiolib.c
-> new file mode 100644
-> index 0000000..c19fcf3
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/gpiolib.c
-> @@ -0,0 +1,360 @@
-> +/*
-> + * linux/arch/arm/mach-s5pv310/gpiolib.c
-> + *
-> + * Copyright (C) 2010 Samsung Electronics Co., Ltd.
-> + *
-> + * S5PC210 - GPIOlib support
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/irq.h>
-> +#include <linux/io.h>
-> +#include <linux/gpio.h>
-> +#include <plat/gpio-core.h>
-> +#include <plat/gpio-cfg.h>
-> +#include <plat/gpio-cfg-helpers.h>
-> +#include <mach/map.h>
-> +
-> +static struct s3c_gpio_cfg gpio_cfg = {
-> +	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
-> +	.set_pull	= s3c_gpio_setpull_updown,
-> +	.get_pull	= s3c_gpio_getpull_updown,
-> +};
-> +
-> +static struct s3c_gpio_cfg gpio_cfg_noint = {
-> +	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
-> +	.set_pull	= s3c_gpio_setpull_updown,
-> +	.get_pull	= s3c_gpio_getpull_updown,
-> +};
-> +
-> +static struct s3c_gpio_cfg gpio_cfg_extint = {
-> +	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
-> +	.set_pull	= s3c_gpio_setpull_updown,
-> +	.get_pull	= s3c_gpio_getpull_updown,
-> +};
-> +
-> +/*
-> + * GPIO bank's base address given the index of the bank in the
-> + * list of all gpio banks.
-> + */
-> +#define S5PC210_BANK_BASE(bank_nr)	(S5P_VA_GPIO + ((bank_nr) * 0x20))
-> +#define S5PC210_BANK2_BASE(base, bank)	((base) + ((bank) * 0x20))
-> +
-> +#define EXTINT_OFFSET			(0xC00)
-> +
-> +/*
-> + * Following are the gpio banks in c210.
-> + *
-> + * The 'config' member when left to NULL, is initialized to the default
-> + * structure gpio_cfg in the init function below.
-> + *
-> + * The 'base' member is also initialized in the init function below.
-> + * Note: The initialization of 'base' member of s3c_gpio_chip structure
-> + * uses the above macro and depends on the banks being listed in order
-here.
-> + */
-> +
-> +static struct s3c_gpio_chip s5pc210_gpio_part1_4bit[] = {
-> +	{
-> +		.chip	= {
-> +			.base	= S5PV310_GPA0(0),
-> +			.ngpio	= S5PV310_GPIO_A0_NR,
-> +			.label	= "GPA0",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPA1(0),
-> +			.ngpio	= S5PV310_GPIO_A1_NR,
-> +			.label	= "GPA1",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPB(0),
-> +			.ngpio	= S5PV310_GPIO_B_NR,
-> +			.label	= "GPB",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPC0(0),
-> +			.ngpio	= S5PV310_GPIO_C0_NR,
-> +			.label	= "GPC0",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPC1(0),
-> +			.ngpio	= S5PV310_GPIO_C1_NR,
-> +			.label	= "GPC1",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPD0(0),
-> +			.ngpio	= S5PV310_GPIO_D0_NR,
-> +			.label	= "GPD0",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPD1(0),
-> +			.ngpio	= S5PV310_GPIO_D1_NR,
-> +			.label	= "GPD1",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPE0(0),
-> +			.ngpio	= S5PV310_GPIO_E0_NR,
-> +			.label	= "GPE0",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPE1(0),
-> +			.ngpio	= S5PV310_GPIO_E1_NR,
-> +			.label	= "GPE1",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPE2(0),
-> +			.ngpio	= S5PV310_GPIO_E2_NR,
-> +			.label	= "GPE2",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPE3(0),
-> +			.ngpio	= S5PV310_GPIO_E3_NR,
-> +			.label	= "GPE3",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPE4(0),
-> +			.ngpio	= S5PV310_GPIO_E4_NR,
-> +			.label	= "GPE4",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPF0(0),
-> +			.ngpio	= S5PV310_GPIO_F0_NR,
-> +			.label	= "GPF0",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPF1(0),
-> +			.ngpio	= S5PV310_GPIO_F1_NR,
-> +			.label	= "GPF1",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPF2(0),
-> +			.ngpio	= S5PV310_GPIO_F2_NR,
-> +			.label	= "GPF2",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPF3(0),
-> +			.ngpio	= S5PV310_GPIO_F3_NR,
-> +			.label	= "GPF3",
-> +		},
-> +	},
-> +};
-> +
-> +static struct s3c_gpio_chip s5pc210_gpio_part2_4bit[] = {
-> +	{
-> +		.chip	= {
-> +			.base	= S5PV310_GPJ0(0),
-> +			.ngpio	= S5PV310_GPIO_J0_NR,
-> +			.label	= "GPJ0",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPJ1(0),
-> +			.ngpio	= S5PV310_GPIO_J1_NR,
-> +			.label	= "GPJ1",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPK0(0),
-> +			.ngpio	= S5PV310_GPIO_K0_NR,
-> +			.label	= "GPK0",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPK1(0),
-> +			.ngpio	= S5PV310_GPIO_K1_NR,
-> +			.label	= "GPK1",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPK2(0),
-> +			.ngpio	= S5PV310_GPIO_K2_NR,
-> +			.label	= "GPK2",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPK3(0),
-> +			.ngpio	= S5PV310_GPIO_K3_NR,
-> +			.label	= "GPK3",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPL0(0),
-> +			.ngpio	= S5PV310_GPIO_L0_NR,
-> +			.label	= "GPL0",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPL1(0),
-> +			.ngpio	= S5PV310_GPIO_L0_NR,
-> +			.label	= "GPL0",
-> +		},
-> +	}, {
-> +		.chip	= {
-> +			.base	= S5PV310_GPL2(0),
-> +			.ngpio	= S5PV310_GPIO_L2_NR,
-> +			.label	= "GPL2",
-> +		},
-> +	}, {
-> +		.config	= &gpio_cfg_noint,
-> +		.chip	= {
-> +			.base	= S5PV310_MP00(0),
-> +			.ngpio	= S5PV310_GPIO_MP00_NR,
-> +			.label	= "MP00",
-> +		},
-> +	}, {
-> +		.config	= &gpio_cfg_noint,
-> +		.chip	= {
-> +			.base	= S5PV310_MP01(0),
-> +			.ngpio	= S5PV310_GPIO_MP01_NR,
-> +			.label	= "MP01",
-> +		},
-> +	}, {
-> +		.config	= &gpio_cfg_noint,
-> +		.chip	= {
-> +			.base	= S5PV310_MP02(0),
-> +			.ngpio	= S5PV310_GPIO_MP02_NR,
-> +			.label	= "MP02",
-> +		},
-> +	}, {
-> +		.config	= &gpio_cfg_noint,
-> +		.chip	= {
-> +			.base	= S5PV310_MP03(0),
-> +			.ngpio	= S5PV310_GPIO_MP03_NR,
-> +			.label	= "MP03",
-> +		},
-> +	}, {
-> +		.config	= &gpio_cfg_noint,
-> +		.chip	= {
-> +			.base	= S5PV310_MP04(0),
-> +			.ngpio	= S5PV310_GPIO_MP04_NR,
-> +			.label	= "MP04",
-> +		},
-> +	}, {
-> +		.config	= &gpio_cfg_extint,
-> +		.chip	= {
-> +			.base	= S5PV310_GPX0(0),
-> +			.ngpio	= S5PV310_GPIO_X0_NR,
-> +			.label	= "GPX0",
-> +		},
-> +	}, {
-> +		.config	= &gpio_cfg_extint,
-> +		.chip	= {
-> +			.base	= S5PV310_GPX1(0),
-> +			.ngpio	= S5PV310_GPIO_X1_NR,
-> +			.label	= "GPX1",
-> +		},
-> +	}, {
-> +		.config	= &gpio_cfg_extint,
-> +		.chip	= {
-> +			.base	= S5PV310_GPX2(0),
-> +			.ngpio	= S5PV310_GPIO_X2_NR,
-> +			.label	= "GPX2",
-> +		},
-> +	}, {
-> +		.config	= &gpio_cfg_extint,
-> +		.chip	= {
-> +			.base	= S5PV310_GPX3(0),
-> +			.ngpio	= S5PV310_GPIO_X3_NR,
-> +			.label	= "GPX3",
-> +		},
-> +	},
-> +};
-> +
-> +static struct s3c_gpio_chip s5pc210_gpio_part3_4bit[] = {
-> +	{
-> +		.config	= &gpio_cfg_noint,
-> +		.chip	= {
-> +			.base	= S5PV310_GPZ(0),
-> +			.ngpio	= S5PV310_GPIO_Z_NR,
-> +			.label	= "GPZ",
-> +		},
-> +	},
-> +};
-> +
-> +static __init int s5pc210_gpiolib_init(void)
-> +{
-> +	struct s3c_gpio_chip *chip;
-> +	int nr_chips;
-> +	int i, extint = 0;
-> +	void __iomem *base;
-> +
-> +	/* Part 1 */
-> +	chip = s5pc210_gpio_part1_4bit;
-> +	nr_chips = ARRAY_SIZE(s5pc210_gpio_part1_4bit);
-> +
-> +	for (i = 0; i < nr_chips; i++, chip++) {
-> +		if (chip->config == NULL)
-> +			chip->config = &gpio_cfg;
-> +
-> +		if (chip->config == &gpio_cfg_extint)
-> +			chip->base = S5PC210_BANK_BASE(extint) +
-> EXTINT_OFFSET;
-> +
-> +		if (chip->base == NULL)
-> +			chip->base = S5PC210_BANK_BASE(i);
-> +	}
-> +
-> +	samsung_gpiolib_add_4bit_chips(s5pc210_gpio_part1_4bit, nr_chips);
-> +
-> +	/* It's permanent mapping. no iounmap */
-> +	base = ioremap(S5PV310_PA_GPIO2, SZ_4K);
-> +	if (!base)
-> +		panic("Can't ioremapthe GPIO Part 2 address\n");
-> +
-> +	/* Part 2 */
-> +	chip = s5pc210_gpio_part2_4bit;
-> +	nr_chips = ARRAY_SIZE(s5pc210_gpio_part2_4bit);
-> +
-> +	for (i = 0; i < nr_chips; i++, chip++) {
-> +		if (chip->config == NULL)
-> +			chip->config = &gpio_cfg;
-> +
-> +		if (chip->config == &gpio_cfg_extint)
-> +			chip->base = S5PC210_BANK2_BASE(base, extint) +
-> EXTINT_OFFSET;
-> +
-> +		if (chip->base == NULL)
-> +			chip->base = S5PC210_BANK2_BASE(base, i);
-> +	}
-> +
-> +	samsung_gpiolib_add_4bit_chips(s5pc210_gpio_part2_4bit, nr_chips);
-> +
-> +	/* It's permanent mapping. no iounmap */
-> +	base = ioremap(S5PV310_PA_GPIO3, SZ_4K);
-> +	if (!base)
-> +		panic("Can't ioremapthe GPIO Part 3 address\n");
-> +
-> +	/* Part 3 */
-> +	chip = s5pc210_gpio_part3_4bit;
-> +	nr_chips = ARRAY_SIZE(s5pc210_gpio_part3_4bit);
-> +
-> +	for (i = 0; i < nr_chips; i++, chip++) {
-> +		if (chip->config == NULL)
-> +			chip->config = &gpio_cfg;
-> +
-> +		if (chip->base == NULL)
-> +			chip->base = S5PC210_BANK2_BASE(base, i);
-> +	}
-> +
-> +	samsung_gpiolib_add_4bit_chips(s5pc210_gpio_part3_4bit, nr_chips);
-> +
-> +	return 0;
-> +}
-> +
-> +core_initcall(s5pc210_gpiolib_init);
+> ===
+> ERROR: Macros with complex values should be enclosed in parenthesis
+> #82: FILE: arch/arm/mach-s3c64xx/mach-real6410.c:30:
+> +#define UCON S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK
+>
+> ERROR: Macros with complex values should be enclosed in parenthesis
+> #83: FILE: arch/arm/mach-s3c64xx/mach-real6410.c:31:
+> +#define ULCON S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB
+>
+> ERROR: Macros with complex values should be enclosed in parenthesis
+> #84: FILE: arch/arm/mach-s3c64xx/mach-real6410.c:32:
+> +#define UFCON S3C2410_UFCON_RXTRIG8 | S3C2410_UFCON_FIFOMODE
+>
+> total: 3 errors, 1 warnings, 105 lines checked
+> ===
+>
+>
+>> Changelog:
+>>   * It's renamed patch '[PATCH v2] Support for Real6410'
+>>
+> This 'Changelog' should being next of "---", because if this is being here, merged into the commit when maintainer apply this in his tree.
+>
+>> Signed-off-by: Darius Augulis<augulis.darius@gmail.com>
+>> ---
+>
+> If you want to add any comments or notes, please adding here.
+>
+>>   arch/arm/mach-s3c64xx/Kconfig         |    6 ++
+>>   arch/arm/mach-s3c64xx/Makefile        |    1
+>>   arch/arm/mach-s3c64xx/mach-real6410.c |   86
+>> +++++++++++++++++++++++++++++++++
+>>   3 files changed, 93 insertions(+), 0 deletions(-)
+>>   create mode 100644 arch/arm/mach-s3c64xx/mach-real6410.c
+>>
+>> diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+>> index f5a5972..0f9f2dd 100644
+>> --- a/arch/arm/mach-s3c64xx/Kconfig
+>> +++ b/arch/arm/mach-s3c64xx/Kconfig
+>> @@ -88,6 +88,12 @@ config MACH_ANW6410
+>>   	help
+>>   	  Machine support for the A&W6410
+>>
+>> +config MACH_REAL6410
+>> +	bool "REAL6410"
+>> +	select CPU_S3C6410
+>> +	help
+>> +	  Machine support for the CoreWind REAL6410
+>> +
+>>   config MACH_SMDK6410
+>>   	bool "SMDK6410"
+>>   	select CPU_S3C6410
+>> diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
+>> index 9d10069..6be3e5b 100644
+>> --- a/arch/arm/mach-s3c64xx/Makefile
+>> +++ b/arch/arm/mach-s3c64xx/Makefile
+>> @@ -50,6 +50,7 @@ obj-$(CONFIG_PM)		+= irq-pm.o
+>>   obj-$(CONFIG_MACH_ANW6410)	+= mach-anw6410.o
+>>   obj-$(CONFIG_MACH_SMDK6400)	+= mach-smdk6400.o
+>>   obj-$(CONFIG_MACH_SMDK6410)	+= mach-smdk6410.o
+>> +obj-$(CONFIG_MACH_REAL6410)     += mach-real6410.o
+>>   obj-$(CONFIG_MACH_NCP)		+= mach-ncp.o
+>>   obj-$(CONFIG_MACH_HMT)		+= mach-hmt.o
+>>   obj-$(CONFIG_MACH_SMARTQ)	+= mach-smartq.o
+>> diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-
+>> s3c64xx/mach-real6410.c
+>> new file mode 100644
+>> index 0000000..04a472a
+>> --- /dev/null
+>> +++ b/arch/arm/mach-s3c64xx/mach-real6410.c
+>> @@ -0,0 +1,86 @@
+>> +/* linux/arch/arm/mach-s3c64xx/mach-real6410.c
+>> + *
+>> + * Copyright 2010 Darius Augulis<augulis.darius@gmail.com>
+>> + * Copyright 2008 Openmoko, Inc.
+>> + * Copyright 2008 Simtec Electronics
+>> + *	Ben Dooks<ben@simtec.co.uk>
+>> + *	http://armlinux.simtec.co.uk/
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> +*/
+>> +
+>> +#include<linux/kernel.h>
+>> +#include<linux/types.h>
+>> +#include<linux/interrupt.h>
+>> +#include<linux/list.h>
+>> +#include<linux/init.h>
+>> +#include<linux/serial_core.h>
+>> +#include<linux/platform_device.h>
+>> +#include<asm/mach-types.h>
+>> +#include<asm/mach/arch.h>
+>> +#include<asm/mach/map.h>
+>> +#include<mach/map.h>
+>> +#include<mach/s3c6410.h>
+>> +#include<plat/cpu.h>
+>> +#include<plat/regs-serial.h>
+>> +
+>> +#define UCON S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK
+>> +#define ULCON S3C2410_LCON_CS8 | S3C2410_LCON_PNONE |
+>> S3C2410_LCON_STOPB
+>> +#define UFCON S3C2410_UFCON_RXTRIG8 | S3C2410_UFCON_FIFOMODE
+>> +
+>> +static struct s3c2410_uartcfg real6410_uartcfgs[] __initdata = {
+>> +	[0] = {
+>> +		.hwport	     = 0,
+>                          ^^^^^
+> Please use tab here
+>
+>> +		.flags	     = 0,
+>> +		.ucon	     = UCON,
+>> +		.ulcon	     = ULCON,
+>> +		.ufcon	     = UFCON,
+>> +	},
+>> +	[1] = {
+>> +		.hwport	     = 1,
+>> +		.flags	     = 0,
+>> +		.ucon	     = UCON,
+>> +		.ulcon	     = ULCON,
+>> +		.ufcon	     = UFCON,
+>> +	},
+>> +	[2] = {
+>> +		.hwport	     = 2,
+>> +		.flags	     = 0,
+>> +		.ucon	     = UCON,
+>> +		.ulcon	     = ULCON,
+>> +		.ufcon	     = UFCON,
+>> +	},
+>> +	[3] = {
+>> +		.hwport	     = 3,
+>> +		.flags	     = 0,
+>> +		.ucon	     = UCON,
+>> +		.ulcon	     = ULCON,
+>> +		.ufcon	     = UFCON,
+>
+> Same...please use tab above between hwport, flags, ucon, ulcon, ufcon and '='.
+>
+>> +	},
+>> +};
+>> +
+>> +static void __init real6410_map_io(void)
+>> +{
+>> +	s3c64xx_init_io(NULL, 0);
+>> +	s3c24xx_init_clocks(12000000);
+>> +	s3c24xx_init_uarts(real6410_uartcfgs, ARRAY_SIZE(real6410_uartcfgs));
+>> +}
+>> +
+>> +static void __init real6410_machine_init(void)
+>> +{
+>> +}
+>> +
+>> +MACHINE_START(REAL6410, "REAL6410")
+>> +	/* Maintainer: Darius Augulis<augulis.darius@gmail.com>  */
+>> +	.phys_io	= S3C_PA_UART&  0xfff00000,
+>> +	.io_pg_offst	= (((u32)S3C_VA_UART)>>  18)&  0xfffc,
+>> +	.boot_params	= S3C64XX_PA_SDRAM + 0x100,
+>> +
+>> +	.init_irq	= s3c6410_init_irq,
+>> +	.map_io		= real6410_map_io,
+>> +	.init_machine	= real6410_machine_init,
+>> +	.timer		=&s3c24xx_timer,
+>> +MACHINE_END
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
 > --
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> Kukjin Kim<kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
