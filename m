@@ -1,27 +1,52 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 05 Aug 2010 16:37:20 -0700
-Subject: [PATCH V2] HRT support in Samsung S5P Platform
-In-Reply-To: <9852485.1007371280726519429.JavaMail.weblogic@epml04>
-References: <9852485.1007371280726519429.JavaMail.weblogic@epml04>
-Message-ID: <1281051440.30969.21.camel@c-dwalke-linux.qualcomm.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 6 Aug 2010 09:04:00 +0900
+Subject: [PATCH] serial: samsung: fix device name
+In-Reply-To: <20100805201000.14030.34703.stgit@darius-desktop>
+References: <20100805201000.14030.34703.stgit@darius-desktop>
+Message-ID: <AANLkTikp2ThBqF2jkU4CXS9-iYRoy3AWpeqWXjmLF6Gd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-08-02 at 05:21 +0000, MADHAV SINGHCHAUHAN wrote:
-> +config SAMSUNG_HRT_RTC_SYSTIMER
-> +       bool "HRtimer and Dynamic Tick support"
-> +       select GENERIC_TIME
-> +       select GENERIC_CLOCKEVENTS
-> +       select HIGH_RES_TIMERS
-> +       help
-> +          Support for HRtimer and Dynamic Tick system using RTC and
-> SYSTEM timer
-> + 
+Hi,
 
-Do you really need a config option for this? I mean HRT has a config
-option already ..
+It's already posted by Mr. Shim
+http://marc.info/?l=linux-arm-kernel&m=127410047306149&w=2
 
-Daniel
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+As discussed with Ben. even though it's right patch, there's some
+users to use previous interface.
+I also think it will be fixed. but need to coordinate with existing users.
+
+Ben, how to you think?
+
+On Fri, Aug 6, 2010 at 5:10 AM, Darius Augulis <augulis.darius@gmail.com> wrote:
+> Swap device and driver names in serial/samsung.c
+>
+> Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
+> ---
+> ?drivers/serial/samsung.c | ? ?4 ++--
+> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/serial/samsung.c b/drivers/serial/samsung.c
+> index a9d6c56..9d63f24 100644
+> --- a/drivers/serial/samsung.c
+> +++ b/drivers/serial/samsung.c
+> @@ -878,10 +878,10 @@ static struct uart_ops s3c24xx_serial_ops = {
+>
+> ?static struct uart_driver s3c24xx_uart_drv = {
+> ? ? ? ?.owner ? ? ? ? ?= THIS_MODULE,
+> - ? ? ? .dev_name ? ? ? = "s3c2410_serial",
+> + ? ? ? .driver_name ? ?= "s3c2410_serial",
+> ? ? ? ?.nr ? ? ? ? ? ? = CONFIG_SERIAL_SAMSUNG_UARTS,
+> ? ? ? ?.cons ? ? ? ? ? = S3C24XX_SERIAL_CONSOLE,
+> - ? ? ? .driver_name ? ?= S3C24XX_SERIAL_NAME,
+> + ? ? ? .dev_name ? ? ? = S3C24XX_SERIAL_NAME,
+> ? ? ? ?.major ? ? ? ? ?= S3C24XX_SERIAL_MAJOR,
+> ? ? ? ?.minor ? ? ? ? ?= S3C24XX_SERIAL_MINOR,
+> ?};
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
