@@ -1,17 +1,21 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 06 Aug 2010 13:23:37 +0900
-Subject: [PATCH 0/3] ARM: S5PC210: GPIO library support
-Message-ID: <20100806042337.GA19427@july>
+Date: Fri, 6 Aug 2010 13:35:03 +0900
+Subject: Merge request of s5pc210 universal board.
+Message-ID: <AANLkTik1bxh8zfCuKV5UOcYyJW-QbGhT5PYen4MzE1R+@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The S5PC210 has three GPIO base addresses.
+Dear all,
 
-Part1 Base Address=0x11400000
-Part2 Base Address=0x11000000
-Part3 Base Address=0x03860000
+Now I checked the next-v310 tree and know that only LSI required codes
+are merged.
+http://git.kernel.org/?p=linux/kernel/git/kgene/linux-samsung.git;a=shortlog;h=refs/heads/next-s5pv310
 
-Arrange the GPIO address as part number. and implement GPIO library
+I can't find any reason to omit the universal board file. It's posted
+before merge window and no difference with LSI SMDK board at current
+status.
+I try to support our board at mainline kernel but it seems to make a
+difficult with unknown commit criteria of LSI.
 
-To handle GPIO library at S5PC210 properly. It needs to modify existing
-frameworks which is only designed for One GPIO.
+Thank you,
+Kyungmin Park
