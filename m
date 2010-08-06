@@ -1,144 +1,113 @@
 From: augulis.darius@gmail.com (Darius Augulis)
-Date: Fri, 06 Aug 2010 13:21:11 +0300
-Subject: [PATCH 1/4] s3c: add support for mach-real6410
+Date: Fri, 06 Aug 2010 13:21:40 +0300
+Subject: [PATCH 2/4] s3c: mach-real6410: add support for dm9000 ethernet
 In-Reply-To: <20100806101914.2481.67766.stgit@darius-desktop>
 References: <20100806101914.2481.67766.stgit@darius-desktop>
-Message-ID: <20100806102041.2481.18980.stgit@darius-desktop>
+Message-ID: <20100806102118.2481.58456.stgit@darius-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for CoreWind Real6410 board,
-based on Samsung s3c6410 processor.
-
 Changelog:
- * It's renamed patch '[PATCH v2] Support for Real6410'
+ * Renamed from 's3c: add dm9000 ethernet support for mach-real6410'
+ * Added IORESOURCE_IRQ_HIGHLEVEL to irq resource flags
 
 Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
 ---
- arch/arm/mach-s3c64xx/Kconfig         |    6 ++
- arch/arm/mach-s3c64xx/Makefile        |    1 
- arch/arm/mach-s3c64xx/mach-real6410.c |   86 +++++++++++++++++++++++++++++++++
- 3 files changed, 93 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s3c64xx/mach-real6410.c
+ arch/arm/mach-s3c64xx/mach-real6410.c |   63 +++++++++++++++++++++++++++++++++
+ 1 files changed, 63 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index f5a5972..0f9f2dd 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -88,6 +88,12 @@ config MACH_ANW6410
- 	help
- 	  Machine support for the A&W6410
- 
-+config MACH_REAL6410
-+	bool "REAL6410"
-+	select CPU_S3C6410
-+	help
-+	  Machine support for the CoreWind REAL6410
-+
- config MACH_SMDK6410
- 	bool "SMDK6410"
- 	select CPU_S3C6410
-diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
-index 9d10069..6be3e5b 100644
---- a/arch/arm/mach-s3c64xx/Makefile
-+++ b/arch/arm/mach-s3c64xx/Makefile
-@@ -50,6 +50,7 @@ obj-$(CONFIG_PM)		+= irq-pm.o
- obj-$(CONFIG_MACH_ANW6410)	+= mach-anw6410.o
- obj-$(CONFIG_MACH_SMDK6400)	+= mach-smdk6400.o
- obj-$(CONFIG_MACH_SMDK6410)	+= mach-smdk6410.o
-+obj-$(CONFIG_MACH_REAL6410)     += mach-real6410.o
- obj-$(CONFIG_MACH_NCP)		+= mach-ncp.o
- obj-$(CONFIG_MACH_HMT)		+= mach-hmt.o
- obj-$(CONFIG_MACH_SMARTQ)	+= mach-smartq.o
 diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
-new file mode 100644
-index 0000000..04a472a
---- /dev/null
+index 04a472a..4aaee3f 100644
+--- a/arch/arm/mach-s3c64xx/mach-real6410.c
 +++ b/arch/arm/mach-s3c64xx/mach-real6410.c
-@@ -0,0 +1,86 @@
-+/* linux/arch/arm/mach-s3c64xx/mach-real6410.c
-+ *
-+ * Copyright 2010 Darius Augulis <augulis.darius@gmail.com>
-+ * Copyright 2008 Openmoko, Inc.
-+ * Copyright 2008 Simtec Electronics
-+ *	Ben Dooks <ben@simtec.co.uk>
-+ *	http://armlinux.simtec.co.uk/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+*/
+@@ -17,6 +17,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/list.h>
+ #include <linux/init.h>
++#include <linux/dm9000.h>
+ #include <linux/serial_core.h>
+ #include <linux/platform_device.h>
+ #include <asm/mach-types.h>
+@@ -24,6 +25,7 @@
+ #include <asm/mach/map.h>
+ #include <mach/map.h>
+ #include <mach/s3c6410.h>
++#include <mach/regs-srom.h>
+ #include <plat/cpu.h>
+ #include <plat/regs-serial.h>
+ 
+@@ -62,6 +64,44 @@ static struct s3c2410_uartcfg real6410_uartcfgs[] __initdata = {
+ 	},
+ };
+ 
++/* DM9000AEP 10/100 ethernet controller */
 +
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/interrupt.h>
-+#include <linux/list.h>
-+#include <linux/init.h>
-+#include <linux/serial_core.h>
-+#include <linux/platform_device.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <mach/map.h>
-+#include <mach/s3c6410.h>
-+#include <plat/cpu.h>
-+#include <plat/regs-serial.h>
-+
-+#define UCON S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK
-+#define ULCON S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB
-+#define UFCON S3C2410_UFCON_RXTRIG8 | S3C2410_UFCON_FIFOMODE
-+
-+static struct s3c2410_uartcfg real6410_uartcfgs[] __initdata = {
-+	[0] = {
-+		.hwport	     = 0,
-+		.flags	     = 0,
-+		.ucon	     = UCON,
-+		.ulcon	     = ULCON,
-+		.ufcon	     = UFCON,
-+	},
-+	[1] = {
-+		.hwport	     = 1,
-+		.flags	     = 0,
-+		.ucon	     = UCON,
-+		.ulcon	     = ULCON,
-+		.ufcon	     = UFCON,
-+	},
-+	[2] = {
-+		.hwport	     = 2,
-+		.flags	     = 0,
-+		.ucon	     = UCON,
-+		.ulcon	     = ULCON,
-+		.ufcon	     = UFCON,
-+	},
-+	[3] = {
-+		.hwport	     = 3,
-+		.flags	     = 0,
-+		.ucon	     = UCON,
-+		.ulcon	     = ULCON,
-+		.ufcon	     = UFCON,
-+	},
++static struct resource real6410_dm9k_resource[] = {
++        [0] = {
++                .start = S3C64XX_PA_XM0CSN1,
++                .end   = S3C64XX_PA_XM0CSN1 + 1,
++                .flags = IORESOURCE_MEM
++        },
++        [1] = {
++                .start = S3C64XX_PA_XM0CSN1 + 4,
++                .end   = S3C64XX_PA_XM0CSN1 + 5,
++                .flags = IORESOURCE_MEM
++        },
++        [2] = {
++                .start = S3C_EINT(7),
++                .end   = S3C_EINT(7),
++                .flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL,
++        }
 +};
 +
-+static void __init real6410_map_io(void)
-+{
-+	s3c64xx_init_io(NULL, 0);
-+	s3c24xx_init_clocks(12000000);
-+	s3c24xx_init_uarts(real6410_uartcfgs, ARRAY_SIZE(real6410_uartcfgs));
-+}
++static struct dm9000_plat_data real6410_dm9k_pdata = {
++        .flags          = (DM9000_PLATF_16BITONLY | DM9000_PLATF_NO_EEPROM),
++};
 +
-+static void __init real6410_machine_init(void)
-+{
-+}
++static struct platform_device real6410_device_eth = {
++        .name           = "dm9000",
++        .id             = -1,
++        .num_resources  = ARRAY_SIZE(real6410_dm9k_resource),
++        .resource       = real6410_dm9k_resource,
++        .dev            = {
++                .platform_data  = &real6410_dm9k_pdata,
++        },
++};
 +
-+MACHINE_START(REAL6410, "REAL6410")
-+	/* Maintainer: Darius Augulis <augulis.darius@gmail.com> */
-+	.phys_io	= S3C_PA_UART & 0xfff00000,
-+	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
-+	.boot_params	= S3C64XX_PA_SDRAM + 0x100,
++static struct platform_device *real6410_devices[] __initdata = {
++	&real6410_device_eth,
++};
 +
-+	.init_irq	= s3c6410_init_irq,
-+	.map_io		= real6410_map_io,
-+	.init_machine	= real6410_machine_init,
-+	.timer		= &s3c24xx_timer,
-+MACHINE_END
+ static void __init real6410_map_io(void)
+ {
+ 	s3c64xx_init_io(NULL, 0);
+@@ -71,6 +111,29 @@ static void __init real6410_map_io(void)
+ 
+ static void __init real6410_machine_init(void)
+ {
++	u32 cs1;
++
++	/* configure nCS1 width to 16 bits */
++
++	cs1 = __raw_readl(S3C64XX_SROM_BW) &
++		~(S3C64XX_SROM_BW__CS_MASK << S3C64XX_SROM_BW__NCS1__SHIFT);
++	cs1 |= ((1 << S3C64XX_SROM_BW__DATAWIDTH__SHIFT) |
++		(1 << S3C64XX_SROM_BW__WAITENABLE__SHIFT) |
++		(1 << S3C64XX_SROM_BW__BYTEENABLE__SHIFT)) <<
++			S3C64XX_SROM_BW__NCS1__SHIFT;
++	__raw_writel(cs1, S3C64XX_SROM_BW);
++
++	/* set timing for nCS1 suitable for ethernet chip */
++
++	__raw_writel((0 << S3C64XX_SROM_BCX__PMC__SHIFT) |
++			(6 << S3C64XX_SROM_BCX__TACP__SHIFT) |
++			(4 << S3C64XX_SROM_BCX__TCAH__SHIFT) |
++			(1 << S3C64XX_SROM_BCX__TCOH__SHIFT) |
++			(13 << S3C64XX_SROM_BCX__TACC__SHIFT) |
++			(4 << S3C64XX_SROM_BCX__TCOS__SHIFT) |
++			(0 << S3C64XX_SROM_BCX__TACS__SHIFT), S3C64XX_SROM_BC1);
++
++	platform_add_devices(real6410_devices, ARRAY_SIZE(real6410_devices));
+ }
+ 
+ MACHINE_START(REAL6410, "REAL6410")
