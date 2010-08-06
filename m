@@ -1,102 +1,120 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 6 Aug 2010 16:22:53 +0900
-Subject: Merge request of s5pc210 universal board.
-In-Reply-To: <008601cb3536$8b42ad60$a1c80820$%kim@samsung.com>
-References: <AANLkTik1bxh8zfCuKV5UOcYyJW-QbGhT5PYen4MzE1R+@mail.gmail.com>
-	<006d01cb3521$e4e559e0$aeb00da0$%kim@samsung.com>
-	<AANLkTinQ1mP2e5DA0J_GyWn32EAckgT3b=Ar6gHzDijX@mail.gmail.com>
-	<AANLkTi=oKyiVtMoZH7czYr5LQoLOMtZtG63RwXay8c2k@mail.gmail.com>
-	<008601cb3536$8b42ad60$a1c80820$%kim@samsung.com>
-Message-ID: <AANLkTinCtr5oajgafNbwNidAX0dP0DhcKGft98kvLbmq@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 06 Aug 2010 16:23:51 +0900
+Subject: [PATCH] serial: samsung: fix device name
+In-Reply-To: <4C5BB462.6010409@samsung.com>
+References: <20100805201000.14030.34703.stgit@darius-desktop>
+	<AANLkTikp2ThBqF2jkU4CXS9-iYRoy3AWpeqWXjmLF6Gd@mail.gmail.com>
+	<4C5BAFF6.10606@gmail.com> <4C5BB462.6010409@samsung.com>
+Message-ID: <008701cb3538$54a12a00$fde37e00$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 6, 2010 at 4:11 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Kyungmin Park wrote:
->>
->> On Fri, Aug 6, 2010 at 1:47 PM, Kyungmin Park <kmpark@infradead.org>
-> wrote:
->> > On Fri, Aug 6, 2010 at 1:43 PM, Kukjin Kim <kgene.kim@samsung.com>
-> wrote:
->> >> Kyungmin Park wrote:
->> >>>
->> >>> Dear all,
->> >>>
->> >> Hi,
->> >>
->> >>> Now I checked the next-v310 tree and know that only LSI required codes
->> >>> are merged.
->> >>> http://git.kernel.org/?p=linux/kernel/git/kgene/linux-
->> >>> samsung.git;a=shortlog;h=refs/heads/next-s5pv310
->> >>>
->> >>> I can't find any reason to omit the universal board file. It's posted
->> >>> before merge window and no difference with LSI SMDK board at current
->> >>> status.
->> >>
->> >> Please answer my concern..I already replied to you about this.
->> >>
->> >>
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-July/022087.html
->> >> ---
->> >>> >> +config MACH_UNIVERSAL
->> >>> >
->> >>> > As I still asking, do you _really_ want to use 'UNIVERSAL' as the
->> >>> > board(machine) name?
->> >>>
->> >>> Yes, it's called 'universal' and it's really universal board at here.
->> >>> I don't confuse the engineer who develop this board.
->> >>> Maybe your engineers saw and hear the brief description about
-> universal
->> >> board.
->> >>>
->> >> Actually, I know that. But there are S5PC100, S5PC110 universal board
->> >> also...
->> >> So I asked to you that you _really_ want to use 'universal' here...and
-> I'm
->> >> still concerning.
->> >
->> > No comment means "Of course want to merge it". thank you for your
->> > concerning. but I can handle it.
->>
-> Hi,
->
->> After discuss with Mr. Kim. I changed to use non-generic name to
-> universal_c210.
->>
-> Thanks for your understanding...IMHO, 'MACH_UNIVERSAL_C210' is quite long...
-> If you don't mind, how about 'MACH_UNI_C210' or 'MACH_UNIC210'...but it
-> depends on your decision.
+Joonyoung Shim wrote:
+> 
+> On 8/6/2010 3:47 PM, Paulius Zaleckas wrote:
+> > On 08/06/2010 03:04 AM, Kyungmin Park wrote:
+> >> Hi,
+> >>
+> >> It's already posted by Mr. Shim
+> >> http://marc.info/?l=linux-arm-kernel&m=127410047306149&w=2
+> >
+> > Darius patch is a little bit cleaner.
+> >
+> 
+> OK, it's better.
+> 
+> Acked-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> 
 
-FYI: These are also candidates but my team voted and decide to use it.
+Hi all,
 
->
->> Then do you resend the patch? or can you handle it by yourself?
->>
-> I will apply this with changing it.
-Thanks
->
->> To Russell.
->> Sorry for bothering you.
->> Can you change the registered universal to universal_c210?
->> universal_c210 ? ? ? ? ?MACH_UNIVERSAL_C210 ? ? UNIVERSAL_C210
->>
->> Thank you,
->> Kyungmin Park
->> >
->> >> ---
->> >>
->> >>> I try to support our board at mainline kernel but it seems to make a
->> >>> difficult with unknown commit criteria of LSI.
->> >>>
->> >>
->
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
+I think, this should be handled by Ben Dooks....
+As Kyungmin Park said, there was his comment about this.
+
+This is just for your information....
+
+===
+
+On Tue, May 18, 2010 at 12:52:13PM +0900, Joonyoung Shim wrote:
+> On 5/18/2010 11:48 AM, Ben Dooks wrote:
+> > On Mon, May 17, 2010 at 09:46:50PM +0900, Joonyoung Shim wrote:
+> >> Thd dev_name and driver_name should be switched each other.
+> > 
+> > Hmm, this doesn't seem to have appeard on the linux-arm-kernel list yet.
+> >  
+> > Please provide some information about what problem that this is fixing
+> > and the impact on any existing systems.
+> > 
+> 
+> The serial device nodes are created to s3c2410_serial* on android 
+> platform instead of ttySAC*.
+
+This has been how they've been for ages, surely the android device node
+creation sytstem supports symlinking /dev/SACx -> /dev/s3c2410_serialx,
+like many other operating sysyerms that can already do this.
+
+Changing this just because android (something as-yet unmerged into mainline)
+does not like it. I'm not even happy with an #ifdef around this.
+
+If you really feel this is a problem that you absolutely must fix in kernel
+then please provide a kernel commandline option to change the serial driver
+name and use that on any platform that needs it. Another way would be to
+update the serial platform data to have a field for which name to choose.
+
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
+
+===
+
+
+> >> As discussed with Ben. even though it's right patch, there's some
+> >> users to use previous interface.
+> >> I also think it will be fixed. but need to coordinate with existing
+> >> users.
+> >
+> > IMO this is obvious bug fix.
+> >
+> > Acked-by: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+> >
+> >> Ben, how to you think?
+> >>
+> >> On Fri, Aug 6, 2010 at 5:10 AM, Darius
+> >> Augulis<augulis.darius@gmail.com>  wrote:
+> >>> Swap device and driver names in serial/samsung.c
+> >>>
+> >>> Signed-off-by: Darius Augulis<augulis.darius@gmail.com>
+> >>> ---
+> >>>   drivers/serial/samsung.c |    4 ++--
+> >>>   1 files changed, 2 insertions(+), 2 deletions(-)
+> >>>
+> >>> diff --git a/drivers/serial/samsung.c b/drivers/serial/samsung.c
+> >>> index a9d6c56..9d63f24 100644
+> >>> --- a/drivers/serial/samsung.c
+> >>> +++ b/drivers/serial/samsung.c
+> >>> @@ -878,10 +878,10 @@ static struct uart_ops s3c24xx_serial_ops = {
+> >>>
+> >>>   static struct uart_driver s3c24xx_uart_drv = {
+> >>>         .owner          = THIS_MODULE,
+> >>> -       .dev_name       = "s3c2410_serial",
+> >>> +       .driver_name    = "s3c2410_serial",
+> >>>         .nr             = CONFIG_SERIAL_SAMSUNG_UARTS,
+> >>>         .cons           = S3C24XX_SERIAL_CONSOLE,
+> >>> -       .driver_name    = S3C24XX_SERIAL_NAME,
+> >>> +       .dev_name       = S3C24XX_SERIAL_NAME,
+> >>>         .major          = S3C24XX_SERIAL_MAJOR,
+> >>>         .minor          = S3C24XX_SERIAL_MINOR,
+> >>>   };
+> >>>
+> >>>
+
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
