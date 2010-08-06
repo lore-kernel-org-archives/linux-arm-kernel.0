@@ -1,53 +1,66 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 06 Aug 2010 13:07:46 -0400 (EDT)
-Subject: [PATCH] [ARM] Introduce patching of phys_to_virt and vice versa
-In-Reply-To: <20100805094521.GB23473@n2100.arm.linux.org.uk>
-References: <1277542025-19881-1-git-send-email-eric.miao@canonical.com>
-	<1278083164.15298.55.camel@ra7055-laptop>
-	<20100720211629.GB10553@n2100.arm.linux.org.uk>
-	<AANLkTimyif7CCoNwdKMCA=P+y=0e9uhwfhRchbMuB7eY@mail.gmail.com>
-	<20100805094521.GB23473@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1008061256170.28809@xanadu.home>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 6 Aug 2010 13:14:53 -0500
+Subject: Impossible constraint in 'asm' in 2.6.35 build
+In-Reply-To: <346052.84371.qm@web51008.mail.re2.yahoo.com>
+References: <346052.84371.qm@web51008.mail.re2.yahoo.com>
+Message-ID: <AANLkTi=tGh7GhVQyy-Wno-uindo-5i1kK8py2L9Jxant@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Aug 2010, Russell King - ARM Linux wrote:
+Fabio,
 
-> On Thu, Aug 05, 2010 at 04:45:25PM +0800, Eric Miao wrote:
-> > On Wed, Jul 21, 2010 at 5:16 AM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > > On Fri, Jul 02, 2010 at 10:06:04AM -0500, Rob Herring wrote:
-> > >> Should something more generic like the x86 alternative code be done for
-> > >> ARM? It's very likely we will need patching in other places like for UP
-> > >> and SMP in one kernel.
-> > >
-> > > I think yes, we need to - I can't see how we can sensibly combine
-> > > kernels without this.
-> > >
-> > > However, the effect of this is that XIP can't use this - as the
-> > > kernel text is read-only.
-> > >
-> > 
-> > Hi Russell,
-> > 
-> > Sorry for late update on this. I've addressed your comments as below,
-> > and really hope this can get into this merge window, so I'm also sending
-> > this to your patch system right now ;-)
-> 
-> How does this affect the compiler's instruction scheduling w.r.t. previous
-> load instructions?
+It is due to this commit and using gcc 4.1.2:
 
-No idea.  That depends how gcc is considering inline asm.  Given there 
-is one input operand, I suppose gcc would account for the delay slot 
-before that operand is actually available.  The inline asm itself is an 
-ALU instruction but there is no way to indicate that fact to gcc, and 
-whether or not it uses the output operand right away won't matter in 
-this case.  So all that could be missing is for gcc to schedule this ALU 
-instruction into a possible delay slot for another ldr instruction or 
-the like.
+commit 398aa66827155ef52bab58bebd24597d90968929
+Author: Will Deacon <will.deacon@arm.com>
+Date:   Thu Jul 8 10:59:16 2010 +0100
 
-In any case, this can only be an improvement over the alternative which 
-is to have PHYS_OFFSET in a global variable.
+    ARM: 6212/1: atomic ops: add memory constraints to inline asm
 
+It works fine for me with CS 4.3.3 toolchain.
 
-Nicolas
+Rob
+
+On Fri, Aug 6, 2010 at 12:32 PM, Fabio Estevam <fabioestevam@yahoo.com> wrote:
+> Hi,
+>
+> I am trying to build a 2.6.35 kernel for i.MX31 and I am getting the following error:
+>
+> ?CC ? ? ?arch/arm/plat-mxc/audmux-v2.o
+> ?CC ? ? ?arch/arm/plat-mxc/3ds_debugboard.o
+> ?CC ? ? ?arch/arm/plat-mxc/devices/platform-imx-i2c.o
+> ?CC ? ? ?arch/arm/plat-mxc/devices/platform-imx-uart.o
+> ?CC ? ? ?arch/arm/plat-mxc/devices/platform-mxc_nand.o
+> ?CC ? ? ?arch/arm/plat-mxc/devices/platform-spi_imx.o
+> ?LD ? ? ?arch/arm/plat-mxc/devices/built-in.o
+> ?LD ? ? ?arch/arm/plat-mxc/built-in.o
+> ?CC ? ? ?arch/arm/vfp/vfpmodule.o
+> ?AS ? ? ?arch/arm/vfp/entry.o
+> ?AS ? ? ?arch/arm/vfp/vfphw.o
+> ?LD ? ? ?arch/arm/vfp/vfp.o
+> ?LD ? ? ?arch/arm/vfp/built-in.o
+> ?CC ? ? ?kernel/sched.o
+> kernel/sched_idletask.c: In function 'pick_next_task_idle':
+> /home/fabio/pengutronix/linux-2.6/arch/arm/include/asm/atomic.h:42: error: impossible constraint in 'asm'
+> make[1]: *** [kernel/sched.o] Error 1
+> make: *** [kernel] Error 2
+>
+> I tried GCC4.3 and 4.4 and the result is the same. I haven't faced this issue when building 2.6.34.
+>
+> Does anyone have any suggestion?
+>
+> Thanks,
+>
+> Fabio Estevam
+>
+>
+>
+>
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
