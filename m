@@ -1,107 +1,204 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 6 Aug 2010 09:49:29 +0200
-Subject: [PATCH 07/11] [ARM] pxa/balloon3: Machine file cleanup
-In-Reply-To: <20100805232506.GQ9577@earth.li>
-References: <1280920933-3820-1-git-send-email-marek.vasut@gmail.com>
-	<1280920933-3820-7-git-send-email-marek.vasut@gmail.com>
-	<20100805232506.GQ9577@earth.li>
-Message-ID: <201008060949.29366.marek.vasut@gmail.com>
+From: stepanm@codeaurora.org (stepanm at codeaurora.org)
+Date: Fri, 6 Aug 2010 01:17:46 -0700 (PDT)
+Subject: [PATCH] arm: msm: Add MSM IOMMU support.
+In-Reply-To: <20100806073333.GA14965@n2100.arm.linux.org.uk>
+References: <1281062204-21880-1-git-send-email-stepanm@codeaurora.org>
+	<20100806073333.GA14965@n2100.arm.linux.org.uk>
+Message-ID: <93bd044b61aed19a3571bc019af0252a.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 6. srpna 2010 01:25:06 Jonathan McDowell napsal(a):
-> On Wed, Aug 04, 2010 at 01:22:09PM +0200, Marek Vasut wrote:
-> > Modularize components of the Balloon3 board.
-> 
-> NAK.
-> 
-> That's not what a large portion of this patch does.
+> On Thu, Aug 05, 2010 at 07:36:44PM -0700, Stepan Moskovchenko wrote:
+>> +/**
+>> + * struct msm_iommu_dev - a single IOMMU hardware instance
+>> + * name		Human-readable name given to this IOMMU HW instance
+>> + * clk		Name of the AXI clock used for the config space of this IOMMU
+>> + * clk_rate	Rate to set for the AXI clock. 0 means don't set a rate
+>> + * num_ctx	Number of context banks on this IOMMU device
+>> + *
+>> + */
+>> +struct msm_iommu_dev {
+>> +	char *name;
+>
+> const?
+>
+>> +	char *clk;
+>
+> const?  Any reason you can't have some kind of struct device instead?
+>
+>> +	unsigned long clk_rate;
+>> +	unsigned int num_ctx;
+>> +};
+>> +
+>> +/**
+>> + * struct msm_iommu_ctx_dev - an IOMMU context bank instance
+>> + * name		Human-readable name given to this context bank
+>> + * num		Index of this context bank within the hardware
+>> + * mids		List of Machine IDs that are to be mapped into this context
+>> + *		bank, terminated by -1. The MID is a set of signals on the
+>> + *		AXI bus that identifies the function associated with a specific
+>> + *		memory request. (See ARM spec).
+>> + */
+>> +struct msm_iommu_ctx_dev {
+>> +	char *name;
+>
+> const?
+>
+>> +	int num;
+>> +	int mids[MAX_NUM_MIDS];
+>> +};
+>> +
+> ...
+>> +int v7_flush_kern_cache_all(void);
+>
+> No - don't use internal functions directly.  Use flush_cache_all()
+> instead.
+>
+>> +#ifndef __ARCH_ARM_MACH_MSM_IOMMU_HW_8XXX_H
+>> +#define __ARCH_ARM_MACH_MSM_IOMMU_HW_8XXX_H
+>> +
+>> +#define CTX_SHIFT 12
+>> +
+>> +#define GET_GLOBAL_REG(reg, base) (readl((base)|(reg)))
+>> +#define GET_CTX_REG(reg, base,
+>> ctx)	(readl((base)|(reg)|((ctx)<<CTX_SHIFT)))
+>
+> This doesn't work if 'base' is correctly typed.  Use addition please.
+> Spacces around operators please.
+>
+>> +
+>> +#define SET_GLOBAL_REG(reg, base, val)	(writel((val), (base) | (reg)))
+>> +
+>> +#define SET_CTX_REG(reg, base, ctx, val) \
+>> +			(writel((val), (base) | (reg) | ((ctx)<<CTX_SHIFT)))
+>
+> Addition.
+>
+>> +
+>> +/* Wrappers for numbered registers */
+>> +#define SET_GLOBAL_REG_N(b, n, r, v) SET_GLOBAL_REG(b, ((r)|(n<<2)),
+>> (v))
+>> +#define GET_GLOBAL_REG_N(b, n, r)    GET_GLOBAL_REG(b, ((r)|(n<<2)))
+>> +
+>> +/* Field wrappers */
+>> +#define GET_GLOBAL_FIELD(b, r, F)    GET_FIELD(((b)|(r)), F##_MASK,
+>> F##_SHIFT)
+>> +#define GET_CONTEXT_FIELD(b, c, r, F)	\
+>> +	GET_FIELD(((b)|(r)|((c)<<CTX_SHIFT)), F##_MASK, F##_SHIFT)
+>> +
+>> +#define SET_GLOBAL_FIELD(b, r, F, v) \
+>> +	SET_FIELD(((b)|(r)), F##_MASK, F##_SHIFT, (v))
+>> +#define SET_CONTEXT_FIELD(b, c, r, F, v)	\
+>> +	SET_FIELD(((b)|(r)|((c)<<CTX_SHIFT)), F##_MASK, F##_SHIFT, (v))
+>> +
+>> +#define GET_FIELD(addr, mask, shift)  ((readl(addr) >> (shift) &
+>> (mask)))
+>> +
+>> +#define SET_FIELD(addr, mask, shift, v) \
+>> +do { \
+>> +	int t = readl(addr); mb(); \
+>> +	writel((t & ~((mask)<<(shift))) | (((v) & (mask)) << (shift)), addr);\
+>> +	mb();\
+>
+> readl/writel have barriers now, so these probably aren't required.  Please
+> check.
+>
+> ...
+>> +	if (len == SZ_16M) {
+>> +		int i = 0;
+>> +		for (i = 0; i < 16; i++)
+>> +			*(fl_pte+i) = (pa & 0xFF000000) | PMD_SECT_SUPER |
+>> +				PMD_SECT_AP_READ | PMD_SECT_AP_WRITE |
+>> +				PMD_TYPE_SECT | PMD_SECT_S;
+>
+> Don't reuse the kernel's definitions for its own page tables for IOMMU
+> page tables.
+>
+>> +	}
+>> +
+>> +	if (len == SZ_1M)
+>> +		*fl_pte = (pa & 0xFFF00000) | PMD_SECT_AP_READ |
+>> +			PMD_SECT_AP_WRITE | PMD_TYPE_SECT |
+>> +			PMD_SECT_S;
+>
+> Ditto.
+>
+>> +
+>> +	/* Need a 2nd level table */
+>> +	if ((len == SZ_4K || len == SZ_64K) && (*fl_pte) == 0) {
+>> +		unsigned long *sl;
+>> +		sl = (unsigned long *) __get_free_pages(GFP_KERNEL, 0);
+>> +
+>> +		if (!sl) {
+>> +			pr_err("could not allocate second level table\n");
+>> +			goto fail_nomem;
+>> +		}
+>> +
+>> +		memset(sl, 0, SZ_4K);
+>> +		*fl_pte = ((((int)__pa(sl)) & 0xFFFFFC00) | PMD_TYPE_TABLE);
+>
+> Ditto.
+>
+>> +	}
+>> +
+>> +	sl_table = (unsigned long *) __va(((*fl_pte) & 0xFFFFFC00));
+>> +	sl_offset = SL_OFFSET(va);
+>> +	sl_pte = sl_table + sl_offset;
+>> +
+>> +
+>> +	if (len == SZ_4K)
+>> +		*sl_pte = (pa & 0xFFFFF000) | PTE_EXT_AP0 | PTE_EXT_AP1 |
+>> +			PTE_EXT_SHARED | PTE_TYPE_SMALL;
+>
+> Ditto.
+>
+>> +
+>> +	if (len == SZ_64K) {
+>> +		int i;
+>> +
+>> +		for (i = 0; i < 16; i++)
+>> +			*(sl_pte+i) = (pa & 0xFFFF0000) | PTE_EXT_AP0 |
+>> +				PTE_EXT_AP1 | PTE_EXT_SHARED | PTE_TYPE_LARGE;
+>
+> Ditto.
+>
+>> +	}
+>> +
+>> +#ifndef CONFIG_IOMMU_PGTABLES_L2
+>> +	v7_flush_kern_cache_all();
+>> +#endif
+>
+> What has L2 got to do with whether you flush the L1 cache?
 
-Oh, really ?
+Hello
 
-> You have put all of
-> the pin definitions into balloon3_pin_config and negated the work that
-> was done to ensure that a single kernel could run on different variants
-> of the balloon3.
+Thank you for your comments. I will apply the fixes you have mentioned. I
+am flushing the cache when I update the page table because the page table
+lives in regular RAM that is mapped as cacheable on the CPU side, and in
+the default configuration the IOMMU reads the page table from RAM. So, I
+have put in the flush call to give the IOMMU a coherent view of the page
+tables. I realize it is more efficient to just flush that specific part of
+L2, but this is just the basic version of the driver and that optimization
+will be eventually put in. The hardware is actually capable of reading the
+IOMMU page table straight out of the L2 cache, but I haven't figured out
+how much control the API should give over this feature... initially I was
+thinking of a Kconfig "sub-option" for it but maybe more fine-grained
+control is in order, depending on the access pattern of each IOMMU. I can
+add this functionality in a subsequent patch, once the basic driver is in.
+If flushing the cache in this manner is not the right way to handle IOMMU
+page tables, can you please suggest what would be more appropriate?
 
-I have only this one, but read on.
+What did you mean by:
+> Any reason you can't have some kind of struct device instead?
 
-> If a feature isn't configured on the board you
-> shouldn't configure the MFPs for that feature.
+Are you referring to the clock line? As far as I understand it, the kernel
+tracks the clocks by a string name, but I can look into it further. Only a
+few of the IOMMUs even have clocks that I need to control in this manner,
+and these are only accessed at init time. From what I remember, it is
+possible to "get" a clock device, but I am not sure these can be
+statically added to the struct like that.
 
-That's not true. You should configure them as inputs. The big plan (in another 
-patch) is to do this the same way colibri270 is done (balloon3 baseboard + 
-expansion boards).
-> 
-> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> > ---
-> > 
-> >  arch/arm/mach-pxa/balloon3.c |  354
-> >  +++++++++++++++++++++++++++--------------- 1 files changed, 231
-> >  insertions(+), 123 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
-> > index 8adb87a..572525c 100644
-> > --- a/arch/arm/mach-pxa/balloon3.c
-> > +++ b/arch/arm/mach-pxa/balloon3.c
-> > @@ -22,6 +22,7 @@
-> > 
-> >  #include <linux/fb.h>
-> >  #include <linux/gpio.h>
-> >  #include <linux/ioport.h>
-> > 
-> > +#include <linux/ucb1400.h>
-> > 
-> >  #include <linux/mtd/mtd.h>
-> >  #include <linux/mtd/partitions.h>
-> >  #include <linux/types.h>
-> > 
-> > @@ -61,35 +62,136 @@ static unsigned long balloon3_pin_config[]
-> > __initdata = {
-> > 
-> >  	GPIO44_BTUART_CTS,
-> >  	GPIO45_BTUART_RTS,
-> > 
-> > -	/* Wakeup GPIO */
-> > +	/* Reset, configured as GPIO wakeup source */
-> > 
-> >  	GPIO1_GPIO | WAKEUP_ON_EDGE_BOTH,
-> > 
-> > -	/* NAND & IDLE LED GPIOs */
-> > -	GPIO9_GPIO,
-> > -	GPIO10_GPIO,
-> > -};
-> > +	/* LEDs */
-> > +	GPIO9_GPIO,	/* NAND activity LED */
-> > +	GPIO10_GPIO,	/* Heartbeat LED */
-> > 
-> > -/***********************************************************************
-> > ******* - * Audio and Touchscreen
-> > -
-> > ************************************************************************
-> > ******/ -static unsigned long balloon3_ac97_pin_config[] = {
-> > +	/* AC97 */
-> > 
-> >  	GPIO28_AC97_BITCLK,
-> >  	GPIO29_AC97_SDATA_IN_0,
-> >  	GPIO30_AC97_SDATA_OUT,
-> >  	GPIO31_AC97_SYNC,
-> >  	GPIO113_AC97_nRESET,
-> > 
-> > +	GPIO95_GPIO,
-> > +
-> > +	/* MMC */
-> > +	GPIO32_MMC_CLK,
-> > +	GPIO92_MMC_DAT_0,
-> > +	GPIO109_MMC_DAT_1,
-> > +	GPIO110_MMC_DAT_2,
-> > +	GPIO111_MMC_DAT_3,
-> > +	GPIO112_MMC_CMD,
-> > +
-> > +	/* USB Host */
-> > +	GPIO88_USBH1_PWR,
-> > +	GPIO89_USBH1_PEN,
-> > 
-> >  };
-> 
-> J.
+I will make the changes you suggested and post another version soon.
+
+Thanks
+Steve
