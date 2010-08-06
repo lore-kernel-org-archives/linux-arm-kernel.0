@@ -1,41 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 Aug 2010 15:47:26 +0300
-Subject: [PATCH 7/7] omap3: make coresight register save across OFF
-	modes a sysfs option
-In-Reply-To: <20100806123711.GI28519@shisha.kicks-ass.net>
-References: <13B9B4C6EF24D648824FF11BE896716203BADA0745@dlee02.ent.ti.com>
-	<1280077520-7538-8-git-send-email-virtuoso@slind.org>
-	<20100806123711.GI28519@shisha.kicks-ass.net>
-Message-ID: <20100806124726.GN23778@atomide.com>
+From: m.nazarewicz@samsung.com (Michal Nazarewicz)
+Date: Fri, 06 Aug 2010 15:22:07 +0200
+Subject: [PATCH/RFCv3 1/6] lib: rbtree: rb_root_init() function added
+In-Reply-To: <cover.1281100495.git.m.nazarewicz@samsung.com>
+References: <cover.1281100495.git.m.nazarewicz@samsung.com>
+Message-ID: <743102607e2c5fb20e3c0676fadbcb93d501a78e.1281100495.git.m.nazarewicz@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alexander Shishkin <virtuoso@slind.org> [100806 15:30]:
-> On Sun, Jul 25, 2010 at 08:05:20 +0300, Alexander Shishkin wrote:
-> > This adds a sysfs file at /sys/power/coresight_save which is used to
-> > control if the ETM and debug components' states should be saved and
-> > restored across OFF modes.
-> 
-> The non-omap patches are merged to Russell's tree, so these three are
-> the only remaining.
-> 
-> This one won't apply to linux-omap master any more because of the pm44xx
-> in the makefile, but should be ok otherwise. It would still apply to
-> linus' tree.
-> 
-> So, should I rediff it, resend it or just drop it, because it's not needed?
+Added a rb_root_init() function which initialises a rb_root
+structure as a red-black tree with at most one element.  The
+rationale is that using rb_root_init(root, node) is more
+straightforward and cleaner then first initialising and
+empty tree followed by an insert operation.
 
-Patches look OK to me.
+Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ include/linux/rbtree.h |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-Care to refresh and repost the remaining ones one more time to avoid
-confusion about which ones remain?
-
-Are you OK if we merge these in the next merge window after this?
-
-I'd rather have these sitting in linux-omap tree for a while first
-before we merge them so we can be sure they won't break the idle
-code..
-
-Regards,
-
-Tony
+diff --git a/include/linux/rbtree.h b/include/linux/rbtree.h
+index 7066acb..5b6dc66 100644
+--- a/include/linux/rbtree.h
++++ b/include/linux/rbtree.h
+@@ -130,6 +130,17 @@ static inline void rb_set_color(struct rb_node *rb, int color)
+ }
+ 
+ #define RB_ROOT	(struct rb_root) { NULL, }
++
++static inline void rb_root_init(struct rb_root *root, struct rb_node *node)
++{
++	root->rb_node = node;
++	if (node) {
++		node->rb_parent_color = RB_BLACK; /* black, no parent */
++		node->rb_left  = NULL;
++		node->rb_right = NULL;
++	}
++}
++
+ #define	rb_entry(ptr, type, member) container_of(ptr, type, member)
+ 
+ #define RB_EMPTY_ROOT(root)	((root)->rb_node == NULL)
+-- 
+1.7.1
