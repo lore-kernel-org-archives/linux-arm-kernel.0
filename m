@@ -1,42 +1,44 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 6 Aug 2010 16:45:03 +0200
-Subject: [PATCH] ARM: fix inverted MMC card detect in U300
-Message-ID: <1281105903-14557-1-git-send-email-linus.walleij@stericsson.com>
+From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
+Date: Fri, 6 Aug 2010 10:48:01 -0400
+Subject: [patch 01/20] Create generic alignment API (v8)
+In-Reply-To: <20100806114114.GH28519@shisha.kicks-ass.net>
+References: <20100709225727.312232266@efficios.com>
+	<20100709225814.855827624@efficios.com>
+	<20100806114114.GH28519@shisha.kicks-ass.net>
+Message-ID: <20100806144801.GA5523@Krystal>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This converts the U300 to uninverted logic for MMCI card detect,
-fixing a regression in the current tree.
+* Alexander Shishkin (virtuoso at slind.org) wrote:
+> On Fri, Jul 09, 2010 at 06:57:28 -0400, Mathieu Desnoyers wrote:
+> > Rather than re-doing the "alignment on a type size" trick all over again at
+> > different levels, import the "ltt_align" from LTTng into kernel.h and make this
+> > available to everyone. Renaming to:
+> > 
+> > - object_align()
+> > - object_align_floor()
+> > - offset_align()
+> > - offset_align_floor()
+> 
+> I was just wondering if this patch makes any progress anywhere?
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- arch/arm/mach-u300/mmc.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+I'm using it in my generic ring buffer code (I'm posting it as part of the
+patchset). This ring buffer has only been posted in RFC-stages so far.
 
-diff --git a/arch/arm/mach-u300/mmc.c b/arch/arm/mach-u300/mmc.c
-index 3acb710..2382175 100644
---- a/arch/arm/mach-u300/mmc.c
-+++ b/arch/arm/mach-u300/mmc.c
-@@ -77,16 +77,16 @@ static void _mmci_callback(struct work_struct *ws)
- 
- 	mdelay(20);
- 
--	mmci_card->mmc_inserted = !!gpio_get_value(U300_GPIO_PIN_MMC_CD);
-+	mmci_card->mmc_inserted = !gpio_get_value(U300_GPIO_PIN_MMC_CD);
- 
- 	input_report_switch(mmci_card->mmc_input, KEY_INSERT,
--			    !mmci_card->mmc_inserted);
-+			    mmci_card->mmc_inserted);
- 	input_sync(mmci_card->mmc_input);
- 
- 	pr_debug("MMC/SD card was %s\n",
--		 mmci_card->mmc_inserted ? "removed" : "inserted");
-+		 mmci_card->mmc_inserted ? "inserted" : "removed");
- 
--	enable_irq_on_gpio_pin(U300_GPIO_PIN_MMC_CD, !mmci_card->mmc_inserted);
-+	enable_irq_on_gpio_pin(U300_GPIO_PIN_MMC_CD, mmci_card->mmc_inserted);
- }
- 
- int __devinit mmc_init(struct amba_device *adev)
+Other than that, there has been no objection. So the first user of this patch
+that gets merged will probably bring the patch alongside with it.
+
+Thanks,
+
+Mathieu
+
+> 
+> Regards,
+> --
+> Alex
+
 -- 
-1.6.3.3
+Mathieu Desnoyers
+Operating System Efficiency R&D Consultant
+EfficiOS Inc.
+http://www.efficios.com
