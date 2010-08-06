@@ -1,41 +1,42 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Fri, 06 Aug 2010 08:00:40 -0700
-Subject: [PATCH V2] HRT support in Samsung S5P Platform
-In-Reply-To: <AANLkTimiM3hbcA1_--rKKwqcOY-K=yef-VfgV2sSnqBG@mail.gmail.com>
-References: <9852485.1007371280726519429.JavaMail.weblogic@epml04>
-	<1281051440.30969.21.camel@c-dwalke-linux.qualcomm.com>
-	<AANLkTimiM3hbcA1_--rKKwqcOY-K=yef-VfgV2sSnqBG@mail.gmail.com>
-Message-ID: <1281106840.4236.1.camel@m0nster>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Fri, 6 Aug 2010 17:31:19 +0200
+Subject: [PATCH 07/10] ftrace: pass KBUILD_CFLAGS to record_mcount.pl
+In-Reply-To: <20100803164247.GA6133@debian>
+References: <1268462987-8271-1-git-send-email-rabin@rab.in>
+	<1268462987-8271-8-git-send-email-rabin@rab.in>
+	<20100803164247.GA6133@debian>
+Message-ID: <20100806153114.GA5345@nowhere>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-08-06 at 09:19 +0900, Kyungmin Park wrote:
-> On Fri, Aug 6, 2010 at 8:37 AM, Daniel Walker <dwalker@codeaurora.org> wrote:
-> > On Mon, 2010-08-02 at 05:21 +0000, MADHAV SINGHCHAUHAN wrote:
-> >> +config SAMSUNG_HRT_RTC_SYSTIMER
-> >> +       bool "HRtimer and Dynamic Tick support"
-> >> +       select GENERIC_TIME
-> >> +       select GENERIC_CLOCKEVENTS
-> >> +       select HIGH_RES_TIMERS
-> >> +       help
-> >> +          Support for HRtimer and Dynamic Tick system using RTC and
-> >> SYSTEM timer
-> >> +
-> >
-> > Do you really need a config option for this? I mean HRT has a config
-> > option already ..
+On Tue, Aug 03, 2010 at 10:12:47PM +0530, Rabin Vincent wrote:
+> Steven, Frederic,
 > 
-> It mean which timer use for HRT. there are several combination to
-> implement the HRT.
-> Do you mean add the depends on HRT?
+> I'd like to resurrect this old ARM dynamic ftrace patchset.  It still
+> applies on next except for a small merge conflict in one of the
+> ARM-specific patches.
+> 
+> On Sat, Mar 13, 2010 at 12:19:44PM +0530, Rabin Vincent wrote:
+> > On ARM, we have two ABIs, and the ABI used is controlled via a config
+> > option.  Object files built with one ABI can't be merged with object
+> > files built with the other ABI.  So, record_mcount.pl needs to use the
+> > same compiler flags as the kernel when generating the object file with
+> > the mcount locations.  Ensure this by passing CFLAGS to the script.
+> > 
+> > Signed-off-by: Rabin Vincent <rabin@rab.in>
+> 
+> This is the only non-arch/arm/ patch in the series which doesn't have
+> either of your Acked-bys, so if you'd be willing to ack it, I'll send in
+> the lot via rmk's ARM patch system for .37.
+> 
+> Alternatively, this one and "[PATCH 03/10] ftrace: allow building
+> without frame pointers" could go in via the tracing tree for .36?  Then
+> I'll send in the ARM specific stuff for .37 via the ARM tree.
+> 
+> Thanks,
+> Rabin
 
-No .. You shouldn't need this config option at all. HRT should select
-the right clock event device based on the rating. You just need to set
-the rating correctly.
 
-Daniel
 
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+I'll let Steve handling this one as I have few skills with things that touch
+scripts/recordmcount.pl :)
