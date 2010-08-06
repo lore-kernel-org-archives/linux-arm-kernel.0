@@ -1,88 +1,82 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  6 Aug 2010 15:53:07 +0200
-Subject: [PATCH 4/8] mxc_nand: factor out a check_int function
+Date: Fri,  6 Aug 2010 15:53:10 +0200
+Subject: [PATCH 7/8] mxc_nand: support 8bit ecc
 In-Reply-To: <1281102791-8089-1-git-send-email-s.hauer@pengutronix.de>
 References: <1281102791-8089-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1281102791-8089-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1281102791-8089-8-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Nand devices with at least 26 bytes of oob data per 512 byte block
+can have 8bit ecc on v2 type controllers. This is currently not tested,
+but at least this patch puts the ECC_MODE bit into a well defined state.
+
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/mtd/nand/mxc_nand.c |   32 +++++++++++++++++++-------------
- 1 files changed, 19 insertions(+), 13 deletions(-)
+ drivers/mtd/nand/mxc_nand.c |   30 ++++++++++++++++++++++++++++++
+ 1 files changed, 30 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 2d2e2e7..70f64dc 100644
+index a6dc5a5..030da08 100644
 --- a/drivers/mtd/nand/mxc_nand.c
 +++ b/drivers/mtd/nand/mxc_nand.c
-@@ -122,6 +122,7 @@ struct mxc_nand_host {
- 	void			(*send_page)(struct mtd_info *, unsigned int);
- 	void			(*send_read_id)(struct mxc_nand_host *);
- 	uint16_t		(*get_dev_status)(struct mxc_nand_host *);
-+	int			(*check_int)(struct mxc_nand_host *);
- };
+@@ -58,6 +58,7 @@
+ #define NFC_V1_V2_CONFIG1		(host->regs + 0x1a)
+ #define NFC_V1_V2_CONFIG2		(host->regs + 0x1c)
  
- /* OOB placement block for use with hardware ecc generation */
-@@ -181,34 +182,38 @@ static irqreturn_t mxc_nfc_irq(int irq, void *dev_id)
- 	return IRQ_HANDLED;
++#define NFC_V2_CONFIG1_ECC_MODE_4	(1 << 0)
+ #define NFC_V1_V2_CONFIG1_SP_EN		(1 << 2)
+ #define NFC_V1_V2_CONFIG1_ECC_EN	(1 << 3)
+ #define NFC_V1_V2_CONFIG1_INT_MSK	(1 << 4)
+@@ -581,6 +582,23 @@ static void mxc_do_addr_cycle(struct mtd_info *mtd, int column, int page_addr)
+ 	}
  }
  
-+static int check_int_v1_v2(struct mxc_nand_host *host)
++/*
++ * v2 and v3 type controllers can do 4bit or 8bit ecc depending
++ * on how much oob the nand chip has. For 8bit ecc we need@least
++ * 26 bytes of oob data per 512 byte block.
++ */
++static int get_eccsize(struct mtd_info *mtd)
 +{
-+	uint32_t tmp;
++	int oobbytes_per_512 = 0;
 +
-+	tmp = readw(host->regs + NFC_CONFIG2);
-+	if (!(tmp & NFC_INT))
-+		return 0;
++	oobbytes_per_512 = mtd->oobsize * 512 / mtd->writesize;
 +
-+	writew(tmp & ~NFC_INT, NFC_CONFIG2);
-+
-+	return 1;
++	if (oobbytes_per_512 < 26)
++		return 4;
++	else
++		return 8;
 +}
 +
- /* This function polls the NANDFC to wait for the basic operation to
-  * complete by checking the INT bit of config2 register.
-  */
- static void wait_op_done(struct mxc_nand_host *host, int useirq)
+ static void preset_v1_v2(struct mtd_info *mtd)
  {
--	uint16_t tmp;
- 	int max_retries = 8000;
- 
- 	if (useirq) {
--		if ((readw(host->regs + NFC_CONFIG2) & NFC_INT) == 0) {
-+		if (!host->check_int(host)) {
- 
- 			enable_irq(host->irq);
- 
--			wait_event(host->irq_waitq,
--				readw(host->regs + NFC_CONFIG2) & NFC_INT);
--
--			tmp = readw(host->regs + NFC_CONFIG2);
--			tmp  &= ~NFC_INT;
--			writew(tmp, host->regs + NFC_CONFIG2);
-+			wait_event(host->irq_waitq, host->check_int(host));
- 		}
+ 	struct nand_chip *nand_chip = mtd->priv;
+@@ -596,6 +614,15 @@ static void preset_v1_v2(struct mtd_info *mtd)
  	} else {
- 		while (max_retries-- > 0) {
--			if (readw(host->regs + NFC_CONFIG2) & NFC_INT) {
--				tmp = readw(host->regs + NFC_CONFIG2);
--				tmp  &= ~NFC_INT;
--				writew(tmp, host->regs + NFC_CONFIG2);
-+			if (host->check_int(host))
- 				break;
--			}
+ 		tmp &= ~NFC_V1_V2_CONFIG1_ECC_EN;
+ 	}
 +
- 			udelay(1);
- 		}
- 		if (max_retries < 0)
-@@ -774,6 +779,7 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 		host->send_page = send_page_v1_v2;
- 		host->send_read_id = send_read_id_v1_v2;
- 		host->get_dev_status = get_dev_status_v1_v2;
-+		host->check_int = check_int_v1_v2;
++	if (nfc_is_v21() && mtd->writesize) {
++		host->eccsize = get_eccsize(mtd);
++		if (host->eccsize == 4)
++			tmp |= NFC_V2_CONFIG1_ECC_MODE_4;
++	} else {
++		host->eccsize = 1;
++	}
++
+ 	writew(tmp, NFC_V1_V2_CONFIG1);
+ 	/* preset operation */
+ 
+@@ -859,6 +886,9 @@ static int __init mxcnd_probe(struct platform_device *pdev)
+ 		goto escan;
  	}
  
- 	if (nfc_is_v21()) {
++	/* Call preset again, with correct writesize this time */
++	host->preset(mtd);
++
+ 	if (mtd->writesize == 2048)
+ 		this->ecc.layout = oob_largepage;
+ 
 -- 
 1.7.1
