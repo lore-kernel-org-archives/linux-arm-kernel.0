@@ -1,204 +1,172 @@
-From: stepanm@codeaurora.org (stepanm at codeaurora.org)
-Date: Fri, 6 Aug 2010 01:17:46 -0700 (PDT)
-Subject: [PATCH] arm: msm: Add MSM IOMMU support.
-In-Reply-To: <20100806073333.GA14965@n2100.arm.linux.org.uk>
-References: <1281062204-21880-1-git-send-email-stepanm@codeaurora.org>
-	<20100806073333.GA14965@n2100.arm.linux.org.uk>
-Message-ID: <93bd044b61aed19a3571bc019af0252a.squirrel@www.codeaurora.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 06 Aug 2010 17:21:33 +0900
+Subject: [PATCH] ARM: SAMSUNG: Add keypad device support
+In-Reply-To: <1281072625-21079-1-git-send-email-jy0922.shim@samsung.com>
+References: <1281072625-21079-1-git-send-email-jy0922.shim@samsung.com>
+Message-ID: <008c01cb3540$645a7520$2d0f5f60$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thu, Aug 05, 2010 at 07:36:44PM -0700, Stepan Moskovchenko wrote:
->> +/**
->> + * struct msm_iommu_dev - a single IOMMU hardware instance
->> + * name		Human-readable name given to this IOMMU HW instance
->> + * clk		Name of the AXI clock used for the config space of this IOMMU
->> + * clk_rate	Rate to set for the AXI clock. 0 means don't set a rate
->> + * num_ctx	Number of context banks on this IOMMU device
->> + *
->> + */
->> +struct msm_iommu_dev {
->> +	char *name;
->
-> const?
->
->> +	char *clk;
->
-> const?  Any reason you can't have some kind of struct device instead?
->
->> +	unsigned long clk_rate;
->> +	unsigned int num_ctx;
->> +};
->> +
->> +/**
->> + * struct msm_iommu_ctx_dev - an IOMMU context bank instance
->> + * name		Human-readable name given to this context bank
->> + * num		Index of this context bank within the hardware
->> + * mids		List of Machine IDs that are to be mapped into this context
->> + *		bank, terminated by -1. The MID is a set of signals on the
->> + *		AXI bus that identifies the function associated with a specific
->> + *		memory request. (See ARM spec).
->> + */
->> +struct msm_iommu_ctx_dev {
->> +	char *name;
->
-> const?
->
->> +	int num;
->> +	int mids[MAX_NUM_MIDS];
->> +};
->> +
-> ...
->> +int v7_flush_kern_cache_all(void);
->
-> No - don't use internal functions directly.  Use flush_cache_all()
-> instead.
->
->> +#ifndef __ARCH_ARM_MACH_MSM_IOMMU_HW_8XXX_H
->> +#define __ARCH_ARM_MACH_MSM_IOMMU_HW_8XXX_H
->> +
->> +#define CTX_SHIFT 12
->> +
->> +#define GET_GLOBAL_REG(reg, base) (readl((base)|(reg)))
->> +#define GET_CTX_REG(reg, base,
->> ctx)	(readl((base)|(reg)|((ctx)<<CTX_SHIFT)))
->
-> This doesn't work if 'base' is correctly typed.  Use addition please.
-> Spacces around operators please.
->
->> +
->> +#define SET_GLOBAL_REG(reg, base, val)	(writel((val), (base) | (reg)))
->> +
->> +#define SET_CTX_REG(reg, base, ctx, val) \
->> +			(writel((val), (base) | (reg) | ((ctx)<<CTX_SHIFT)))
->
-> Addition.
->
->> +
->> +/* Wrappers for numbered registers */
->> +#define SET_GLOBAL_REG_N(b, n, r, v) SET_GLOBAL_REG(b, ((r)|(n<<2)),
->> (v))
->> +#define GET_GLOBAL_REG_N(b, n, r)    GET_GLOBAL_REG(b, ((r)|(n<<2)))
->> +
->> +/* Field wrappers */
->> +#define GET_GLOBAL_FIELD(b, r, F)    GET_FIELD(((b)|(r)), F##_MASK,
->> F##_SHIFT)
->> +#define GET_CONTEXT_FIELD(b, c, r, F)	\
->> +	GET_FIELD(((b)|(r)|((c)<<CTX_SHIFT)), F##_MASK, F##_SHIFT)
->> +
->> +#define SET_GLOBAL_FIELD(b, r, F, v) \
->> +	SET_FIELD(((b)|(r)), F##_MASK, F##_SHIFT, (v))
->> +#define SET_CONTEXT_FIELD(b, c, r, F, v)	\
->> +	SET_FIELD(((b)|(r)|((c)<<CTX_SHIFT)), F##_MASK, F##_SHIFT, (v))
->> +
->> +#define GET_FIELD(addr, mask, shift)  ((readl(addr) >> (shift) &
->> (mask)))
->> +
->> +#define SET_FIELD(addr, mask, shift, v) \
->> +do { \
->> +	int t = readl(addr); mb(); \
->> +	writel((t & ~((mask)<<(shift))) | (((v) & (mask)) << (shift)), addr);\
->> +	mb();\
->
-> readl/writel have barriers now, so these probably aren't required.  Please
-> check.
->
-> ...
->> +	if (len == SZ_16M) {
->> +		int i = 0;
->> +		for (i = 0; i < 16; i++)
->> +			*(fl_pte+i) = (pa & 0xFF000000) | PMD_SECT_SUPER |
->> +				PMD_SECT_AP_READ | PMD_SECT_AP_WRITE |
->> +				PMD_TYPE_SECT | PMD_SECT_S;
->
-> Don't reuse the kernel's definitions for its own page tables for IOMMU
-> page tables.
->
->> +	}
->> +
->> +	if (len == SZ_1M)
->> +		*fl_pte = (pa & 0xFFF00000) | PMD_SECT_AP_READ |
->> +			PMD_SECT_AP_WRITE | PMD_TYPE_SECT |
->> +			PMD_SECT_S;
->
-> Ditto.
->
->> +
->> +	/* Need a 2nd level table */
->> +	if ((len == SZ_4K || len == SZ_64K) && (*fl_pte) == 0) {
->> +		unsigned long *sl;
->> +		sl = (unsigned long *) __get_free_pages(GFP_KERNEL, 0);
->> +
->> +		if (!sl) {
->> +			pr_err("could not allocate second level table\n");
->> +			goto fail_nomem;
->> +		}
->> +
->> +		memset(sl, 0, SZ_4K);
->> +		*fl_pte = ((((int)__pa(sl)) & 0xFFFFFC00) | PMD_TYPE_TABLE);
->
-> Ditto.
->
->> +	}
->> +
->> +	sl_table = (unsigned long *) __va(((*fl_pte) & 0xFFFFFC00));
->> +	sl_offset = SL_OFFSET(va);
->> +	sl_pte = sl_table + sl_offset;
->> +
->> +
->> +	if (len == SZ_4K)
->> +		*sl_pte = (pa & 0xFFFFF000) | PTE_EXT_AP0 | PTE_EXT_AP1 |
->> +			PTE_EXT_SHARED | PTE_TYPE_SMALL;
->
-> Ditto.
->
->> +
->> +	if (len == SZ_64K) {
->> +		int i;
->> +
->> +		for (i = 0; i < 16; i++)
->> +			*(sl_pte+i) = (pa & 0xFFFF0000) | PTE_EXT_AP0 |
->> +				PTE_EXT_AP1 | PTE_EXT_SHARED | PTE_TYPE_LARGE;
->
-> Ditto.
->
->> +	}
->> +
->> +#ifndef CONFIG_IOMMU_PGTABLES_L2
->> +	v7_flush_kern_cache_all();
->> +#endif
->
-> What has L2 got to do with whether you flush the L1 cache?
+Joonyoung Shim wrote:
+> 
+> This patch adds samsung keypad device definition for samsung cpus.
+> 
+> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> This patch is to add samsung keypad device. It is updated single version
+> of previous patch "[PATCH v6 1/3] ARM: SAMSUNG: Add keypad device
+> support".
 
-Hello
+Ok, this is better...will replace an old one with this.
 
-Thank you for your comments. I will apply the fixes you have mentioned. I
-am flushing the cache when I update the page table because the page table
-lives in regular RAM that is mapped as cacheable on the CPU side, and in
-the default configuration the IOMMU reads the page table from RAM. So, I
-have put in the flush call to give the IOMMU a coherent view of the page
-tables. I realize it is more efficient to just flush that specific part of
-L2, but this is just the basic version of the driver and that optimization
-will be eventually put in. The hardware is actually capable of reading the
-IOMMU page table straight out of the L2 cache, but I haven't figured out
-how much control the API should give over this feature... initially I was
-thinking of a Kconfig "sub-option" for it but maybe more fine-grained
-control is in order, depending on the access pattern of each IOMMU. I can
-add this functionality in a subsequent patch, once the basic driver is in.
-If flushing the cache in this manner is not the right way to handle IOMMU
-page tables, can you please suggest what would be more appropriate?
+Thanks.
 
-What did you mean by:
-> Any reason you can't have some kind of struct device instead?
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-Are you referring to the clock line? As far as I understand it, the kernel
-tracks the clocks by a string name, but I can look into it further. Only a
-few of the IOMMUs even have clocks that I need to control in this manner,
-and these are only accessed at init time. From what I remember, it is
-possible to "get" a clock device, but I am not sure these can be
-statically added to the struct like that.
-
-I will make the changes you suggested and post another version soon.
-
-Thanks
-Steve
+> 
+>  arch/arm/plat-samsung/Kconfig               |    5 +++
+>  arch/arm/plat-samsung/Makefile              |    1 +
+>  arch/arm/plat-samsung/dev-keypad.c          |   50
+> +++++++++++++++++++++++++++
+>  arch/arm/plat-samsung/include/plat/devs.h   |    2 +
+>  arch/arm/plat-samsung/include/plat/keypad.h |   13 +++++++
+>  5 files changed, 71 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/plat-samsung/dev-keypad.c
+> 
+> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+> index 2753fb3..bd007e3 100644
+> --- a/arch/arm/plat-samsung/Kconfig
+> +++ b/arch/arm/plat-samsung/Kconfig
+> @@ -227,6 +227,11 @@ config SAMSUNG_DEV_TS
+>  	help
+>  	    Common in platform device definitions for touchscreen device
+> 
+> +config SAMSUNG_DEV_KEYPAD
+> +	bool
+> +	help
+> +	  Compile in platform device definitions for keypad
+> +
+>  # DMA
+> 
+>  config S3C_DMA
+> diff --git a/arch/arm/plat-samsung/Makefile
+b/arch/arm/plat-samsung/Makefile
+> index 228c2ad..ef00c47 100644
+> --- a/arch/arm/plat-samsung/Makefile
+> +++ b/arch/arm/plat-samsung/Makefile
+> @@ -50,6 +50,7 @@ obj-$(CONFIG_S3C_DEV_RTC)	+= dev-rtc.o
+> 
+>  obj-$(CONFIG_SAMSUNG_DEV_ADC)	+= dev-adc.o
+>  obj-$(CONFIG_SAMSUNG_DEV_TS)	+= dev-ts.o
+> +obj-$(CONFIG_SAMSUNG_DEV_KEYPAD)	+= dev-keypad.o
+> 
+>  # DMA support
+> 
+> diff --git a/arch/arm/plat-samsung/dev-keypad.c
+b/arch/arm/plat-samsung/dev-
+> keypad.c
+> new file mode 100644
+> index 0000000..677c2d7
+> --- /dev/null
+> +++ b/arch/arm/plat-samsung/dev-keypad.c
+> @@ -0,0 +1,50 @@
+> +/*
+> + * linux/arch/arm/plat-samsung/dev-keypad.c
+> + *
+> + * Copyright (C) 2010 Samsung Electronics Co.Ltd
+> + * Author: Joonyoung Shim <jy0922.shim@samsung.com>
+> + *
+> + *  This program is free software; you can redistribute  it and/or modify
+it
+> + *  under  the terms of  the GNU General  Public License as published by
+the
+> + *  Free Software Foundation;  either version 2 of the  License, or (at
+your
+> + *  option) any later version.
+> + *
+> + */
+> +
+> +#include <linux/platform_device.h>
+> +#include <mach/irqs.h>
+> +#include <mach/map.h>
+> +#include <plat/cpu.h>
+> +#include <plat/devs.h>
+> +#include <plat/keypad.h>
+> +
+> +static struct resource samsung_keypad_resources[] = {
+> +	[0] = {
+> +		.start	= SAMSUNG_PA_KEYPAD,
+> +		.end	= SAMSUNG_PA_KEYPAD + 0x20 - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start	= IRQ_KEYPAD,
+> +		.end	= IRQ_KEYPAD,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +struct platform_device samsung_device_keypad = {
+> +	.name		= "samsung-keypad",
+> +	.id		= -1,
+> +	.num_resources	= ARRAY_SIZE(samsung_keypad_resources),
+> +	.resource	= samsung_keypad_resources,
+> +};
+> +
+> +void __init samsung_keypad_set_platdata(struct samsung_keypad_platdata
+*pd)
+> +{
+> +	struct samsung_keypad_platdata *npd;
+> +
+> +	npd = s3c_set_platdata(pd, sizeof(struct samsung_keypad_platdata),
+> +			&samsung_device_keypad);
+> +
+> +	if (!npd->cfg_gpio)
+> +		npd->cfg_gpio = samsung_keypad_cfg_gpio;
+> +}
+> diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-
+> samsung/include/plat/devs.h
+> index 6760999..c06386b 100644
+> --- a/arch/arm/plat-samsung/include/plat/devs.h
+> +++ b/arch/arm/plat-samsung/include/plat/devs.h
+> @@ -100,6 +100,8 @@ extern struct platform_device s5pc100_device_iis0;
+>  extern struct platform_device s5pc100_device_iis1;
+>  extern struct platform_device s5pc100_device_iis2;
+> 
+> +extern struct platform_device samsung_device_keypad;
+> +
+>  /* s3c2440 specific devices */
+> 
+>  #ifdef CONFIG_CPU_S3C2440
+> diff --git a/arch/arm/plat-samsung/include/plat/keypad.h b/arch/arm/plat-
+> samsung/include/plat/keypad.h
+> index 3a70c12..b59a648 100644
+> --- a/arch/arm/plat-samsung/include/plat/keypad.h
+> +++ b/arch/arm/plat-samsung/include/plat/keypad.h
+> @@ -40,4 +40,17 @@ struct samsung_keypad_platdata {
+>  	void (*cfg_gpio)(unsigned int rows, unsigned int cols);
+>  };
+> 
+> +/**
+> + * samsung_keypad_set_platdata - Set platform data for Samsung Keypad
+> device.
+> + * @pd: Platform data to register to device.
+> + *
+> + * Register the given platform data for use with Samsung Keypad device.
+> + * The call will copy the platform data, so the board definitions can
+> + * make the structure itself __initdata.
+> + */
+> +extern void samsung_keypad_set_platdata(struct samsung_keypad_platdata
+*pd);
+> +
+> +/* defined by architecture to configure gpio. */
+> +extern void samsung_keypad_cfg_gpio(unsigned int rows, unsigned int
+cols);
+> +
+>  #endif /* __PLAT_SAMSUNG_KEYPAD_H */
+> --
