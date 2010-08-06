@@ -1,9 +1,9 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 06 Aug 2010 22:33:28 +0900
-Subject: [PATCH 2/3] ARM: S5PC210: Add missing GPIO MP0_0 definition
-In-Reply-To: <20100806042351.GA19437@july>
-References: <20100806042351.GA19437@july>
-Message-ID: <00b201cb356b$f75310a0$e5f931e0$%kim@samsung.com>
+Date: Fri, 06 Aug 2010 22:38:56 +0900
+Subject: [PATCH 3/3] ARM: S5PC210: GPIO library support
+In-Reply-To: <20100806042356.GA19441@july>
+References: <20100806042356.GA19441@july>
+Message-ID: <00b301cb356c$baf130a0$30d391e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,56 +11,417 @@ Kyungmin Park wrote:
 > 
 > From: Kyungmin Park <kyungmin.park@samsung.com>
 > 
-> Some board uses the MP0_0 for GPIO.
+> S5PC210 has three GPIOs. Part 1 uses the same as previous framework.
+> Part2 & Part 3 uses the own ioremap address.
+
+I don't think so, GPIO2 and GPIO3 parts should use same framework not
+ioremap.
+As my team member replied to you, can support 3 GPIO parts with same way....
+
+And same method can help to handle this more easily.
+
+> 
+> Known issues: external interrupt codes depend on VA_GPIO which is used at
+Part
+> 1
+> . But actual external interrupt GPIOs are located at Part 2 of GPIO.
+> It needs to fixed by passsing the base address to irq-ext routine.
 > 
 > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/mach-s5pv310/include/mach/gpio.h |    5 ++++-
->  1 files changed, 4 insertions(+), 1 deletions(-)
+>  arch/arm/mach-s5pv310/Makefile  |    2 +-
+>  arch/arm/mach-s5pv310/gpiolib.c |  360
+> +++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 361 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/mach-s5pv310/gpiolib.c
 > 
-> diff --git a/arch/arm/mach-s5pv310/include/mach/gpio.h b/arch/arm/mach-
-> s5pv310/include/mach/gpio.h
-> index a840d83..4ab4e23 100644
-> --- a/arch/arm/mach-s5pv310/include/mach/gpio.h
-> +++ b/arch/arm/mach-s5pv310/include/mach/gpio.h
-> @@ -55,6 +55,7 @@
->  #define S5PV310_GPIO_X2_NR	(8)
->  #define S5PV310_GPIO_X3_NR	(8)
->  #define S5PV310_GPIO_Z_NR	(7)
-> +#define S5PV310_GPIO_MP00_NR	(8)
->  #define S5PV310_GPIO_MP01_NR	(8)
->  #define S5PV310_GPIO_MP02_NR	(4)
->  #define S5PV310_GPIO_MP03_NR	(8)
-> @@ -96,7 +97,8 @@ enum s5p_gpio_number {
->  	S5PV310_GPIO_X2_START	=
-> S5PV310_GPIO_NEXT(S5PV310_GPIO_X1),
->  	S5PV310_GPIO_X3_START	=
-> S5PV310_GPIO_NEXT(S5PV310_GPIO_X2),
->  	S5PV310_GPIO_Z_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_X3),
-> -	S5PV310_GPIO_MP01_START	=
-> S5PV310_GPIO_NEXT(S5PV310_GPIO_Z),
-> +	S5PV310_GPIO_MP00_START	=
-> S5PV310_GPIO_NEXT(S5PV310_GPIO_Z),
-> +	S5PV310_GPIO_MP01_START	=
-> S5PV310_GPIO_NEXT(S5PV310_GPIO_MP00),
->  	S5PV310_GPIO_MP02_START	=
-> S5PV310_GPIO_NEXT(S5PV310_GPIO_MP01),
->  	S5PV310_GPIO_MP03_START	=
-> S5PV310_GPIO_NEXT(S5PV310_GPIO_MP02),
->  	S5PV310_GPIO_MP04_START	=
-> S5PV310_GPIO_NEXT(S5PV310_GPIO_MP03),
-> @@ -133,6 +135,7 @@ enum s5p_gpio_number {
->  #define S5PV310_GPX2(_nr)	(S5PV310_GPIO_X2_START + (_nr))
->  #define S5PV310_GPX3(_nr)	(S5PV310_GPIO_X3_START + (_nr))
->  #define S5PV310_GPZ(_nr)	(S5PV310_GPIO_Z_START + (_nr))
-> +#define S5PV310_MP00(_nr)	(S5PV310_GPIO_MP00_START + (_nr))
->  #define S5PV310_MP01(_nr)	(S5PV310_GPIO_MP01_START + (_nr))
->  #define S5PV310_MP02(_nr)	(S5PV310_GPIO_MP02_START + (_nr))
->  #define S5PV310_MP03(_nr)	(S5PV310_GPIO_MP03_START + (_nr))
+> diff --git a/arch/arm/mach-s5pv310/Makefile
+b/arch/arm/mach-s5pv310/Makefile
+> index 82dbbaa..de49e98 100644
+> --- a/arch/arm/mach-s5pv310/Makefile
+> +++ b/arch/arm/mach-s5pv310/Makefile
+> @@ -12,7 +12,7 @@ obj-				:=
+> 
+>  # Core support for S5PV310 system
+> 
+> -obj-$(CONFIG_CPU_S5PV310)	+= cpu.o init.o clock.o irq-combiner.o
+> +obj-$(CONFIG_CPU_S5PV310)	+= cpu.o init.o clock.o irq-combiner.o
+gpiolib.o
+>  obj-$(CONFIG_CPU_S5PV310)	+= setup-i2c0.o time.o
+> 
+>  obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+> diff --git a/arch/arm/mach-s5pv310/gpiolib.c
+b/arch/arm/mach-s5pv310/gpiolib.c
+> new file mode 100644
+> index 0000000..c19fcf3
+> --- /dev/null
+> +++ b/arch/arm/mach-s5pv310/gpiolib.c
+> @@ -0,0 +1,360 @@
+> +/*
+> + * linux/arch/arm/mach-s5pv310/gpiolib.c
+> + *
+> + * Copyright (C) 2010 Samsung Electronics Co., Ltd.
+> + *
+> + * S5PC210 - GPIOlib support
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/irq.h>
+> +#include <linux/io.h>
+> +#include <linux/gpio.h>
+> +#include <plat/gpio-core.h>
+> +#include <plat/gpio-cfg.h>
+> +#include <plat/gpio-cfg-helpers.h>
+> +#include <mach/map.h>
+> +
+> +static struct s3c_gpio_cfg gpio_cfg = {
+> +	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
+> +	.set_pull	= s3c_gpio_setpull_updown,
+> +	.get_pull	= s3c_gpio_getpull_updown,
+> +};
+> +
+> +static struct s3c_gpio_cfg gpio_cfg_noint = {
+> +	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
+> +	.set_pull	= s3c_gpio_setpull_updown,
+> +	.get_pull	= s3c_gpio_getpull_updown,
+> +};
+> +
+> +static struct s3c_gpio_cfg gpio_cfg_extint = {
+> +	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
+> +	.set_pull	= s3c_gpio_setpull_updown,
+> +	.get_pull	= s3c_gpio_getpull_updown,
+> +};
+> +
+> +/*
+> + * GPIO bank's base address given the index of the bank in the
+> + * list of all gpio banks.
+> + */
+> +#define S5PC210_BANK_BASE(bank_nr)	(S5P_VA_GPIO + ((bank_nr) * 0x20))
+> +#define S5PC210_BANK2_BASE(base, bank)	((base) + ((bank) * 0x20))
+> +
+> +#define EXTINT_OFFSET			(0xC00)
+> +
+> +/*
+> + * Following are the gpio banks in c210.
+> + *
+> + * The 'config' member when left to NULL, is initialized to the default
+> + * structure gpio_cfg in the init function below.
+> + *
+> + * The 'base' member is also initialized in the init function below.
+> + * Note: The initialization of 'base' member of s3c_gpio_chip structure
+> + * uses the above macro and depends on the banks being listed in order
+here.
+> + */
+> +
+> +static struct s3c_gpio_chip s5pc210_gpio_part1_4bit[] = {
+> +	{
+> +		.chip	= {
+> +			.base	= S5PV310_GPA0(0),
+> +			.ngpio	= S5PV310_GPIO_A0_NR,
+> +			.label	= "GPA0",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPA1(0),
+> +			.ngpio	= S5PV310_GPIO_A1_NR,
+> +			.label	= "GPA1",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPB(0),
+> +			.ngpio	= S5PV310_GPIO_B_NR,
+> +			.label	= "GPB",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPC0(0),
+> +			.ngpio	= S5PV310_GPIO_C0_NR,
+> +			.label	= "GPC0",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPC1(0),
+> +			.ngpio	= S5PV310_GPIO_C1_NR,
+> +			.label	= "GPC1",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPD0(0),
+> +			.ngpio	= S5PV310_GPIO_D0_NR,
+> +			.label	= "GPD0",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPD1(0),
+> +			.ngpio	= S5PV310_GPIO_D1_NR,
+> +			.label	= "GPD1",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPE0(0),
+> +			.ngpio	= S5PV310_GPIO_E0_NR,
+> +			.label	= "GPE0",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPE1(0),
+> +			.ngpio	= S5PV310_GPIO_E1_NR,
+> +			.label	= "GPE1",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPE2(0),
+> +			.ngpio	= S5PV310_GPIO_E2_NR,
+> +			.label	= "GPE2",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPE3(0),
+> +			.ngpio	= S5PV310_GPIO_E3_NR,
+> +			.label	= "GPE3",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPE4(0),
+> +			.ngpio	= S5PV310_GPIO_E4_NR,
+> +			.label	= "GPE4",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPF0(0),
+> +			.ngpio	= S5PV310_GPIO_F0_NR,
+> +			.label	= "GPF0",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPF1(0),
+> +			.ngpio	= S5PV310_GPIO_F1_NR,
+> +			.label	= "GPF1",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPF2(0),
+> +			.ngpio	= S5PV310_GPIO_F2_NR,
+> +			.label	= "GPF2",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPF3(0),
+> +			.ngpio	= S5PV310_GPIO_F3_NR,
+> +			.label	= "GPF3",
+> +		},
+> +	},
+> +};
+> +
+> +static struct s3c_gpio_chip s5pc210_gpio_part2_4bit[] = {
+> +	{
+> +		.chip	= {
+> +			.base	= S5PV310_GPJ0(0),
+> +			.ngpio	= S5PV310_GPIO_J0_NR,
+> +			.label	= "GPJ0",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPJ1(0),
+> +			.ngpio	= S5PV310_GPIO_J1_NR,
+> +			.label	= "GPJ1",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPK0(0),
+> +			.ngpio	= S5PV310_GPIO_K0_NR,
+> +			.label	= "GPK0",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPK1(0),
+> +			.ngpio	= S5PV310_GPIO_K1_NR,
+> +			.label	= "GPK1",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPK2(0),
+> +			.ngpio	= S5PV310_GPIO_K2_NR,
+> +			.label	= "GPK2",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPK3(0),
+> +			.ngpio	= S5PV310_GPIO_K3_NR,
+> +			.label	= "GPK3",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPL0(0),
+> +			.ngpio	= S5PV310_GPIO_L0_NR,
+> +			.label	= "GPL0",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPL1(0),
+> +			.ngpio	= S5PV310_GPIO_L0_NR,
+> +			.label	= "GPL0",
+> +		},
+> +	}, {
+> +		.chip	= {
+> +			.base	= S5PV310_GPL2(0),
+> +			.ngpio	= S5PV310_GPIO_L2_NR,
+> +			.label	= "GPL2",
+> +		},
+> +	}, {
+> +		.config	= &gpio_cfg_noint,
+> +		.chip	= {
+> +			.base	= S5PV310_MP00(0),
+> +			.ngpio	= S5PV310_GPIO_MP00_NR,
+> +			.label	= "MP00",
+> +		},
+> +	}, {
+> +		.config	= &gpio_cfg_noint,
+> +		.chip	= {
+> +			.base	= S5PV310_MP01(0),
+> +			.ngpio	= S5PV310_GPIO_MP01_NR,
+> +			.label	= "MP01",
+> +		},
+> +	}, {
+> +		.config	= &gpio_cfg_noint,
+> +		.chip	= {
+> +			.base	= S5PV310_MP02(0),
+> +			.ngpio	= S5PV310_GPIO_MP02_NR,
+> +			.label	= "MP02",
+> +		},
+> +	}, {
+> +		.config	= &gpio_cfg_noint,
+> +		.chip	= {
+> +			.base	= S5PV310_MP03(0),
+> +			.ngpio	= S5PV310_GPIO_MP03_NR,
+> +			.label	= "MP03",
+> +		},
+> +	}, {
+> +		.config	= &gpio_cfg_noint,
+> +		.chip	= {
+> +			.base	= S5PV310_MP04(0),
+> +			.ngpio	= S5PV310_GPIO_MP04_NR,
+> +			.label	= "MP04",
+> +		},
+> +	}, {
+> +		.config	= &gpio_cfg_extint,
+> +		.chip	= {
+> +			.base	= S5PV310_GPX0(0),
+> +			.ngpio	= S5PV310_GPIO_X0_NR,
+> +			.label	= "GPX0",
+> +		},
+> +	}, {
+> +		.config	= &gpio_cfg_extint,
+> +		.chip	= {
+> +			.base	= S5PV310_GPX1(0),
+> +			.ngpio	= S5PV310_GPIO_X1_NR,
+> +			.label	= "GPX1",
+> +		},
+> +	}, {
+> +		.config	= &gpio_cfg_extint,
+> +		.chip	= {
+> +			.base	= S5PV310_GPX2(0),
+> +			.ngpio	= S5PV310_GPIO_X2_NR,
+> +			.label	= "GPX2",
+> +		},
+> +	}, {
+> +		.config	= &gpio_cfg_extint,
+> +		.chip	= {
+> +			.base	= S5PV310_GPX3(0),
+> +			.ngpio	= S5PV310_GPIO_X3_NR,
+> +			.label	= "GPX3",
+> +		},
+> +	},
+> +};
+> +
+> +static struct s3c_gpio_chip s5pc210_gpio_part3_4bit[] = {
+> +	{
+> +		.config	= &gpio_cfg_noint,
+> +		.chip	= {
+> +			.base	= S5PV310_GPZ(0),
+> +			.ngpio	= S5PV310_GPIO_Z_NR,
+> +			.label	= "GPZ",
+> +		},
+> +	},
+> +};
+> +
+> +static __init int s5pc210_gpiolib_init(void)
+> +{
+> +	struct s3c_gpio_chip *chip;
+> +	int nr_chips;
+> +	int i, extint = 0;
+> +	void __iomem *base;
+> +
+> +	/* Part 1 */
+> +	chip = s5pc210_gpio_part1_4bit;
+> +	nr_chips = ARRAY_SIZE(s5pc210_gpio_part1_4bit);
+> +
+> +	for (i = 0; i < nr_chips; i++, chip++) {
+> +		if (chip->config == NULL)
+> +			chip->config = &gpio_cfg;
+> +
+> +		if (chip->config == &gpio_cfg_extint)
+> +			chip->base = S5PC210_BANK_BASE(extint) +
+> EXTINT_OFFSET;
+> +
+> +		if (chip->base == NULL)
+> +			chip->base = S5PC210_BANK_BASE(i);
+> +	}
+> +
+> +	samsung_gpiolib_add_4bit_chips(s5pc210_gpio_part1_4bit, nr_chips);
+> +
+> +	/* It's permanent mapping. no iounmap */
+> +	base = ioremap(S5PV310_PA_GPIO2, SZ_4K);
+> +	if (!base)
+> +		panic("Can't ioremapthe GPIO Part 2 address\n");
+> +
+> +	/* Part 2 */
+> +	chip = s5pc210_gpio_part2_4bit;
+> +	nr_chips = ARRAY_SIZE(s5pc210_gpio_part2_4bit);
+> +
+> +	for (i = 0; i < nr_chips; i++, chip++) {
+> +		if (chip->config == NULL)
+> +			chip->config = &gpio_cfg;
+> +
+> +		if (chip->config == &gpio_cfg_extint)
+> +			chip->base = S5PC210_BANK2_BASE(base, extint) +
+> EXTINT_OFFSET;
+> +
+> +		if (chip->base == NULL)
+> +			chip->base = S5PC210_BANK2_BASE(base, i);
+> +	}
+> +
+> +	samsung_gpiolib_add_4bit_chips(s5pc210_gpio_part2_4bit, nr_chips);
+> +
+> +	/* It's permanent mapping. no iounmap */
+> +	base = ioremap(S5PV310_PA_GPIO3, SZ_4K);
+> +	if (!base)
+> +		panic("Can't ioremapthe GPIO Part 3 address\n");
+> +
+> +	/* Part 3 */
+> +	chip = s5pc210_gpio_part3_4bit;
+> +	nr_chips = ARRAY_SIZE(s5pc210_gpio_part3_4bit);
+> +
+> +	for (i = 0; i < nr_chips; i++, chip++) {
+> +		if (chip->config == NULL)
+> +			chip->config = &gpio_cfg;
+> +
+> +		if (chip->base == NULL)
+> +			chip->base = S5PC210_BANK2_BASE(base, i);
+> +	}
+> +
+> +	samsung_gpiolib_add_4bit_chips(s5pc210_gpio_part3_4bit, nr_chips);
+> +
+> +	return 0;
+> +}
+> +
+> +core_initcall(s5pc210_gpiolib_init);
 > --
 
-Should be merged previous '[PATCH] ARM: S5PC210: Define more GPIOs to use
-the MP pins' and this.
 
 Thanks.
 
