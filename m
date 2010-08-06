@@ -1,31 +1,155 @@
-From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
-Date: Fri, 06 Aug 2010 15:31:00 +0200
-Subject: [PATCHv2 2/4] mm: cma: Contiguous Memory Allocator added
-In-Reply-To: <201008030919.36575.hverkuil@xs4all.nl>
-References: <cover.1280151963.git.m.nazarewicz@samsung.com>
-	<201008011526.13566.hverkuil@xs4all.nl> <op.vgticdzj7p4s8u@pikus>
-	<201008030919.36575.hverkuil@xs4all.nl>
-Message-ID: <op.vg0qhyki7p4s8u@pikus>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 06 Aug 2010 22:30:05 +0900
+Subject: [PATCH 2/4] s3c: mach-real6410: add support for dm9000 ethernet
+In-Reply-To: <20100806102118.2481.58456.stgit@darius-desktop>
+References: <20100806101914.2481.67766.stgit@darius-desktop>
+	<20100806102118.2481.58456.stgit@darius-desktop>
+Message-ID: <00b101cb356b$7ffe0dc0$7ffa2940$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Hans,
+Darius Augulis wrote:
+> 
+Hi,
 
-I've just posted updated patchset.  It changes the way regions are
-reserved somehow so our discussion is not entirely applicable to a
-new version I think.
+Where is your description/commit message?
 
-I preserved the original "map" there.  I came to a conclusion that
-your approach is not that different from what I had in mind but I
-noticed that with your syntax it's impossible to specify the order
-of regions to try. For instance that driver should first try region
-"foo" and then region "bar" and not the other way around.
+> Changelog:
+>  * Renamed from 's3c: add dm9000 ethernet support for mach-real6410'
+>  * Added IORESOURCE_IRQ_HIGHLEVEL to irq resource flags
 
-I'm looking forward to hearing your comments on the newest version
-of CMA.
+As I said, should be moved next of "---" line.
 
--- 
-Best regards,                                        _     _
-| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
-| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
-+----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
+> 
+
+
+Same...please checking with script/checkpatch.pl...
+Following is result...
+==
+ERROR: code indent should use tabs where possible
+#40: FILE: arch/arm/mach-s3c64xx/mach-real6410.c:70:
++        [0] = {$
+
+(snip)
+
+ERROR: code indent should use tabs where possible
+#68: FILE: arch/arm/mach-s3c64xx/mach-real6410.c:98:
++        },$
+
+total: 23 errors, 0 warnings, 87 lines checked
+==
+
+> Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
+> ---
+>  arch/arm/mach-s3c64xx/mach-real6410.c |   63
+> +++++++++++++++++++++++++++++++++
+>  1 files changed, 63 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-
+> s3c64xx/mach-real6410.c
+> index 04a472a..4aaee3f 100644
+> --- a/arch/arm/mach-s3c64xx/mach-real6410.c
+> +++ b/arch/arm/mach-s3c64xx/mach-real6410.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/list.h>
+>  #include <linux/init.h>
+> +#include <linux/dm9000.h>
+>  #include <linux/serial_core.h>
+>  #include <linux/platform_device.h>
+>  #include <asm/mach-types.h>
+> @@ -24,6 +25,7 @@
+>  #include <asm/mach/map.h>
+>  #include <mach/map.h>
+>  #include <mach/s3c6410.h>
+> +#include <mach/regs-srom.h>
+>  #include <plat/cpu.h>
+>  #include <plat/regs-serial.h>
+> 
+> @@ -62,6 +64,44 @@ static struct s3c2410_uartcfg real6410_uartcfgs[] __initdata
+> = {
+>  	},
+>  };
+> 
+> +/* DM9000AEP 10/100 ethernet controller */
+> +
+> +static struct resource real6410_dm9k_resource[] = {
+> +        [0] = {
+> +                .start = S3C64XX_PA_XM0CSN1,
+> +                .end   = S3C64XX_PA_XM0CSN1 + 1,
+> +                .flags = IORESOURCE_MEM
+> +        },
+> +        [1] = {
+> +                .start = S3C64XX_PA_XM0CSN1 + 4,
+> +                .end   = S3C64XX_PA_XM0CSN1 + 5,
+> +                .flags = IORESOURCE_MEM
+> +        },
+> +        [2] = {
+> +                .start = S3C_EINT(7),
+> +                .end   = S3C_EINT(7),
+> +                .flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL,
+> +        }
+> +};
+> +
+> +static struct dm9000_plat_data real6410_dm9k_pdata = {
+> +        .flags          = (DM9000_PLATF_16BITONLY |
+> DM9000_PLATF_NO_EEPROM),
+> +};
+> +
+> +static struct platform_device real6410_device_eth = {
+> +        .name           = "dm9000",
+> +        .id             = -1,
+> +        .num_resources  = ARRAY_SIZE(real6410_dm9k_resource),
+> +        .resource       = real6410_dm9k_resource,
+> +        .dev            = {
+> +                .platform_data  = &real6410_dm9k_pdata,
+> +        },
+> +};
+> +
+> +static struct platform_device *real6410_devices[] __initdata = {
+> +	&real6410_device_eth,
+> +};
+> +
+>  static void __init real6410_map_io(void)
+>  {
+>  	s3c64xx_init_io(NULL, 0);
+> @@ -71,6 +111,29 @@ static void __init real6410_map_io(void)
+> 
+>  static void __init real6410_machine_init(void)
+>  {
+> +	u32 cs1;
+> +
+> +	/* configure nCS1 width to 16 bits */
+> +
+> +	cs1 = __raw_readl(S3C64XX_SROM_BW) &
+> +		~(S3C64XX_SROM_BW__CS_MASK <<
+> S3C64XX_SROM_BW__NCS1__SHIFT);
+> +	cs1 |= ((1 << S3C64XX_SROM_BW__DATAWIDTH__SHIFT) |
+> +		(1 << S3C64XX_SROM_BW__WAITENABLE__SHIFT) |
+> +		(1 << S3C64XX_SROM_BW__BYTEENABLE__SHIFT)) <<
+> +			S3C64XX_SROM_BW__NCS1__SHIFT;
+> +	__raw_writel(cs1, S3C64XX_SROM_BW);
+> +
+> +	/* set timing for nCS1 suitable for ethernet chip */
+> +
+> +	__raw_writel((0 << S3C64XX_SROM_BCX__PMC__SHIFT) |
+> +			(6 << S3C64XX_SROM_BCX__TACP__SHIFT) |
+> +			(4 << S3C64XX_SROM_BCX__TCAH__SHIFT) |
+> +			(1 << S3C64XX_SROM_BCX__TCOH__SHIFT) |
+> +			(13 << S3C64XX_SROM_BCX__TACC__SHIFT) |
+> +			(4 << S3C64XX_SROM_BCX__TCOS__SHIFT) |
+> +			(0 << S3C64XX_SROM_BCX__TACS__SHIFT),
+> S3C64XX_SROM_BC1);
+> +
+> +	platform_add_devices(real6410_devices, ARRAY_SIZE(real6410_devices));
+>  }
+> 
+>  MACHINE_START(REAL6410, "REAL6410")
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
