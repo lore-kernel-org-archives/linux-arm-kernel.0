@@ -1,44 +1,42 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Fri, 6 Aug 2010 10:48:01 -0400
-Subject: [patch 01/20] Create generic alignment API (v8)
-In-Reply-To: <20100806114114.GH28519@shisha.kicks-ass.net>
-References: <20100709225727.312232266@efficios.com>
-	<20100709225814.855827624@efficios.com>
-	<20100806114114.GH28519@shisha.kicks-ass.net>
-Message-ID: <20100806144801.GA5523@Krystal>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Aug 2010 15:46:05 +0100
+Subject: [PATCH v2 03/20] mmc: support embedded data field in mmc_host
+In-Reply-To: <AANLkTim6Yuor4CAEmQPs3zPVz1svEbckzO0HHeFWGmjy@mail.gmail.com>
+References: <AANLkTi=BUX59heXAW2Uf4wZo2dSS19Je54dkQ5u2YGAW@mail.gmail.com>
+	<AANLkTimZQKj7H_GeE=+O9cwxEMTR+LhfFbt=AyXGzN3d@mail.gmail.com>
+	<AANLkTikfRja-h9mz7uyRXCZNZjKdU_yB8e58XQucUzrn@mail.gmail.com>
+	<AANLkTi=vhWV1RNyemtfppfjvLYAbzd3aRjFOVgLLpG3Z@mail.gmail.com>
+	<AANLkTin4m8gJR50zwMB2b0jRMHdNA6CQToKBTAhOL9wF@mail.gmail.com>
+	<AANLkTinu2S19r8fueM-jVkc35XL2G0Z16BddE92Ci9KB@mail.gmail.com>
+	<20100804114147.GB6852@n2100.arm.linux.org.uk>
+	<AANLkTi=Dqs_qg=BsoNBTjvJbG+ub+zMv8ctbrJSGPJJJ@mail.gmail.com>
+	<AANLkTimrb5P9cVo30y_udoi4+vu3cM4YzfpDaYCfwGEA@mail.gmail.com>
+	<AANLkTim6Yuor4CAEmQPs3zPVz1svEbckzO0HHeFWGmjy@mail.gmail.com>
+Message-ID: <20100806144605.GA21015@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alexander Shishkin (virtuoso at slind.org) wrote:
-> On Fri, Jul 09, 2010 at 06:57:28 -0400, Mathieu Desnoyers wrote:
-> > Rather than re-doing the "alignment on a type size" trick all over again at
-> > different levels, import the "ltt_align" from LTTng into kernel.h and make this
-> > available to everyone. Renaming to:
-> > 
-> > - object_align()
-> > - object_align_floor()
-> > - offset_align()
-> > - offset_align_floor()
-> 
-> I was just wondering if this patch makes any progress anywhere?
+On Fri, Aug 06, 2010 at 01:02:24PM +0300, Ohad Ben-Cohen wrote:
+> We have Russell's suggestion which is nice and simple, but it has the
+> 1 device limitation.
 
-I'm using it in my generic ring buffer code (I'm posting it as part of the
-patchset). This ring buffer has only been posted in RFC-stages so far.
+You could make it generic by doing something like this:
 
-Other than that, there has been no objection. So the first user of this patch
-that gets merged will probably bring the patch alongside with it.
+#define set_device_data(name, type, index, data)			\
+ ({									\
+    extern void __set_device_data(const char *, int, void *, size_t);	\
+    BUILD_BUG_ON(!__same_type(type, *data));				\
+    __set_device_data(name ":" #type, index, data, sizeof(type));	\
+ })
 
-Thanks,
+#define get_device_data(name, type, index) ({				\
+  extern void *__get_device_data(const char *, int);			\
+  type *__ptr = __get_device_data(name ":" #type, index);		\
+  __ptr; })
 
-Mathieu
+And now we have something that takes a string and index to use as a lookup
+key in some kind of list - and it's typesafe (because the lookup key is
+dependent on the stringified type.)
 
-> 
-> Regards,
-> --
-> Alex
-
--- 
-Mathieu Desnoyers
-Operating System Efficiency R&D Consultant
-EfficiOS Inc.
-http://www.efficios.com
+But... at this point I feel that we're getting too complicated, and will
+get shouted at to use something like DT which already solves this problem.
