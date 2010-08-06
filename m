@@ -1,82 +1,79 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  6 Aug 2010 15:53:10 +0200
-Subject: [PATCH 7/8] mxc_nand: support 8bit ecc
+Date: Fri,  6 Aug 2010 15:53:04 +0200
+Subject: [PATCH 1/8] mxc_nand: remove 0xe00 offset from registers
 In-Reply-To: <1281102791-8089-1-git-send-email-s.hauer@pengutronix.de>
 References: <1281102791-8089-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1281102791-8089-8-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1281102791-8089-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nand devices with at least 26 bytes of oob data per 512 byte block
-can have 8bit ecc on v2 type controllers. This is currently not tested,
-but at least this patch puts the ECC_MODE bit into a well defined state.
+Add the offset to the register base instead. This is done
+in preparation for v3 controller support.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/mtd/nand/mxc_nand.c |   30 ++++++++++++++++++++++++++++++
- 1 files changed, 30 insertions(+), 0 deletions(-)
+ drivers/mtd/nand/mxc_nand.c |   36 ++++++++++++++++++------------------
+ 1 files changed, 18 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index a6dc5a5..030da08 100644
+index 0d76b16..abec73a 100644
 --- a/drivers/mtd/nand/mxc_nand.c
 +++ b/drivers/mtd/nand/mxc_nand.c
-@@ -58,6 +58,7 @@
- #define NFC_V1_V2_CONFIG1		(host->regs + 0x1a)
- #define NFC_V1_V2_CONFIG2		(host->regs + 0x1c)
+@@ -41,22 +41,22 @@
+ #define nfc_is_v1()		(cpu_is_mx31() || cpu_is_mx27() || cpu_is_mx21())
  
-+#define NFC_V2_CONFIG1_ECC_MODE_4	(1 << 0)
- #define NFC_V1_V2_CONFIG1_SP_EN		(1 << 2)
- #define NFC_V1_V2_CONFIG1_ECC_EN	(1 << 3)
- #define NFC_V1_V2_CONFIG1_INT_MSK	(1 << 4)
-@@ -581,6 +582,23 @@ static void mxc_do_addr_cycle(struct mtd_info *mtd, int column, int page_addr)
- 	}
- }
+ /* Addresses for NFC registers */
+-#define NFC_BUF_SIZE		0xE00
+-#define NFC_BUF_ADDR		0xE04
+-#define NFC_FLASH_ADDR		0xE06
+-#define NFC_FLASH_CMD		0xE08
+-#define NFC_CONFIG		0xE0A
+-#define NFC_ECC_STATUS_RESULT	0xE0C
+-#define NFC_RSLTMAIN_AREA	0xE0E
+-#define NFC_RSLTSPARE_AREA	0xE10
+-#define NFC_WRPROT		0xE12
+-#define NFC_V1_UNLOCKSTART_BLKADDR	0xe14
+-#define NFC_V1_UNLOCKEND_BLKADDR	0xe16
+-#define NFC_V21_UNLOCKSTART_BLKADDR	0xe20
+-#define NFC_V21_UNLOCKEND_BLKADDR	0xe22
+-#define NFC_NF_WRPRST		0xE18
+-#define NFC_CONFIG1		0xE1A
+-#define NFC_CONFIG2		0xE1C
++#define NFC_BUF_SIZE			0x00
++#define NFC_BUF_ADDR			0x04
++#define NFC_FLASH_ADDR			0x06
++#define NFC_FLASH_CMD			0x08
++#define NFC_CONFIG			0x0a
++#define NFC_ECC_STATUS_RESULT		0x0c
++#define NFC_RSLTMAIN_AREA		0x0e
++#define NFC_RSLTSPARE_AREA		0x10
++#define NFC_WRPROT			0x12
++#define NFC_V1_UNLOCKSTART_BLKADDR	0x14
++#define NFC_V1_UNLOCKEND_BLKADDR	0x16
++#define NFC_V21_UNLOCKSTART_BLKADDR	0x20
++#define NFC_V21_UNLOCKEND_BLKADDR	0x22
++#define NFC_NF_WRPRST			0x18
++#define NFC_CONFIG1			0x1a
++#define NFC_CONFIG2			0x1c
  
-+/*
-+ * v2 and v3 type controllers can do 4bit or 8bit ecc depending
-+ * on how much oob the nand chip has. For 8bit ecc we need@least
-+ * 26 bytes of oob data per 512 byte block.
-+ */
-+static int get_eccsize(struct mtd_info *mtd)
-+{
-+	int oobbytes_per_512 = 0;
-+
-+	oobbytes_per_512 = mtd->oobsize * 512 / mtd->writesize;
-+
-+	if (oobbytes_per_512 < 26)
-+		return 4;
-+	else
-+		return 8;
-+}
-+
- static void preset_v1_v2(struct mtd_info *mtd)
- {
- 	struct nand_chip *nand_chip = mtd->priv;
-@@ -596,6 +614,15 @@ static void preset_v1_v2(struct mtd_info *mtd)
- 	} else {
- 		tmp &= ~NFC_V1_V2_CONFIG1_ECC_EN;
- 	}
-+
-+	if (nfc_is_v21() && mtd->writesize) {
-+		host->eccsize = get_eccsize(mtd);
-+		if (host->eccsize == 4)
-+			tmp |= NFC_V2_CONFIG1_ECC_MODE_4;
-+	} else {
-+		host->eccsize = 1;
-+	}
-+
- 	writew(tmp, NFC_V1_V2_CONFIG1);
- 	/* preset operation */
+ /* Set INT to 0, FCMD to 1, rest to 0 in NFC_CONFIG2 Register
+  * for Command operation */
+@@ -764,14 +764,14 @@ static int __init mxcnd_probe(struct platform_device *pdev)
+ 	host->main_area1 = host->base + 0x200;
  
-@@ -859,6 +886,9 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 		goto escan;
- 	}
- 
-+	/* Call preset again, with correct writesize this time */
-+	host->preset(mtd);
-+
- 	if (mtd->writesize == 2048)
- 		this->ecc.layout = oob_largepage;
- 
+ 	if (nfc_is_v21()) {
+-		host->regs = host->base + 0x1000;
++		host->regs = host->base + 0x1e00;
+ 		host->spare0 = host->base + 0x1000;
+ 		host->spare_len = 64;
+ 		oob_smallpage = &nandv2_hw_eccoob_smallpage;
+ 		oob_largepage = &nandv2_hw_eccoob_largepage;
+ 		this->ecc.bytes = 9;
+ 	} else if (nfc_is_v1()) {
+-		host->regs = host->base;
++		host->regs = host->base + 0xe00;
+ 		host->spare0 = host->base + 0x800;
+ 		host->spare_len = 16;
+ 		oob_smallpage = &nandv1_hw_eccoob_smallpage;
 -- 
 1.7.1
