@@ -1,253 +1,354 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  6 Aug 2010 15:53:08 +0200
-Subject: [PATCH 5/8] mxc_nand: add V1_V2 namespace to registers
+Date: Fri,  6 Aug 2010 15:53:11 +0200
+Subject: [PATCH 8/8] mxc_nand: Add v3 (i.MX51) Support
 In-Reply-To: <1281102791-8089-1-git-send-email-s.hauer@pengutronix.de>
 References: <1281102791-8089-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1281102791-8089-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1281102791-8089-9-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This prepares the driver for v3 support. The v3 controller
-has a completely different register layout, so add a V1_V2_
-namespace to the register defines to avoid confusion with
-the v3 regs.
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/mtd/nand/mxc_nand.c |  141 +++++++++++++++++++------------------------
- 1 files changed, 63 insertions(+), 78 deletions(-)
+ drivers/mtd/nand/Kconfig    |    2 +-
+ drivers/mtd/nand/mxc_nand.c |  222 ++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 222 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 362d177..b8a03bd 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -482,7 +482,7 @@ config MTD_NAND_MPC5121_NFC
+ 
+ config MTD_NAND_MXC
+ 	tristate "MXC NAND support"
+-	depends on ARCH_MX2 || ARCH_MX25 || ARCH_MX3
++	depends on ARCH_MX2 || ARCH_MX25 || ARCH_MX3 || ARCH_MX51
+ 	help
+ 	  This enables the driver for the NAND flash controller on the
+ 	  MXC processors.
 diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 70f64dc..48b6dca 100644
+index 030da08..d88f0fa 100644
 --- a/drivers/mtd/nand/mxc_nand.c
 +++ b/drivers/mtd/nand/mxc_nand.c
-@@ -41,58 +41,43 @@
+@@ -39,6 +39,8 @@
+ 
+ #define nfc_is_v21()		(cpu_is_mx25() || cpu_is_mx35())
  #define nfc_is_v1()		(cpu_is_mx31() || cpu_is_mx27() || cpu_is_mx21())
++#define nfc_is_v3_2()		cpu_is_mx51()
++#define nfc_is_v3()		nfc_is_v3_2()
  
  /* Addresses for NFC registers */
--#define NFC_BUF_SIZE			0x00
--#define NFC_BUF_ADDR			0x04
--#define NFC_FLASH_ADDR			0x06
--#define NFC_FLASH_CMD			0x08
--#define NFC_CONFIG			0x0a
--#define NFC_ECC_STATUS_RESULT		0x0c
--#define NFC_RSLTMAIN_AREA		0x0e
--#define NFC_RSLTSPARE_AREA		0x10
--#define NFC_WRPROT			0x12
--#define NFC_V1_UNLOCKSTART_BLKADDR	0x14
--#define NFC_V1_UNLOCKEND_BLKADDR	0x16
--#define NFC_V21_UNLOCKSTART_BLKADDR	0x20
--#define NFC_V21_UNLOCKEND_BLKADDR	0x22
--#define NFC_NF_WRPRST			0x18
--#define NFC_CONFIG1			0x1a
--#define NFC_CONFIG2			0x1c
--
--/* Set INT to 0, FCMD to 1, rest to 0 in NFC_CONFIG2 Register
-- * for Command operation */
--#define NFC_CMD            0x1
--
--/* Set INT to 0, FADD to 1, rest to 0 in NFC_CONFIG2 Register
-- * for Address operation */
--#define NFC_ADDR           0x2
--
--/* Set INT to 0, FDI to 1, rest to 0 in NFC_CONFIG2 Register
-- * for Input operation */
--#define NFC_INPUT          0x4
--
--/* Set INT to 0, FDO to 001, rest to 0 in NFC_CONFIG2 Register
-- * for Data Output operation */
--#define NFC_OUTPUT         0x8
--
--/* Set INT to 0, FD0 to 010, rest to 0 in NFC_CONFIG2 Register
-- * for Read ID operation */
--#define NFC_ID             0x10
--
--/* Set INT to 0, FDO to 100, rest to 0 in NFC_CONFIG2 Register
-- * for Read Status operation */
--#define NFC_STATUS         0x20
--
--/* Set INT to 1, rest to 0 in NFC_CONFIG2 Register for Read
-- * Status operation */
--#define NFC_INT            0x8000
--
--#define NFC_SP_EN           (1 << 2)
--#define NFC_ECC_EN          (1 << 3)
--#define NFC_INT_MSK         (1 << 4)
--#define NFC_BIG             (1 << 5)
--#define NFC_RST             (1 << 6)
--#define NFC_CE              (1 << 7)
--#define NFC_ONE_CYCLE       (1 << 8)
-+#define NFC_V1_V2_BUF_SIZE		(host->regs + 0x00)
-+#define NFC_V1_V2_BUF_ADDR		(host->regs + 0x04)
-+#define NFC_V1_V2_FLASH_ADDR		(host->regs + 0x06)
-+#define NFC_V1_V2_FLASH_CMD		(host->regs + 0x08)
-+#define NFC_V1_V2_CONFIG		(host->regs + 0x0a)
-+#define NFC_V1_V2_ECC_STATUS_RESULT	(host->regs + 0x0c)
-+#define NFC_V1_V2_RSLTMAIN_AREA		(host->regs + 0x0e)
-+#define NFC_V1_V2_RSLTSPARE_AREA	(host->regs + 0x10)
-+#define NFC_V1_V2_WRPROT		(host->regs + 0x12)
-+#define NFC_V1_UNLOCKSTART_BLKADDR	(host->regs + 0x14)
-+#define NFC_V1_UNLOCKEND_BLKADDR	(host->regs + 0x16)
-+#define NFC_V21_UNLOCKSTART_BLKADDR	(host->regs + 0x20)
-+#define NFC_V21_UNLOCKEND_BLKADDR	(host->regs + 0x22)
-+#define NFC_V1_V2_NF_WRPRST		(host->regs + 0x18)
-+#define NFC_V1_V2_CONFIG1		(host->regs + 0x1a)
-+#define NFC_V1_V2_CONFIG2		(host->regs + 0x1c)
-+
-+#define NFC_V1_V2_CONFIG1_SP_EN		(1 << 2)
-+#define NFC_V1_V2_CONFIG1_ECC_EN	(1 << 3)
-+#define NFC_V1_V2_CONFIG1_INT_MSK	(1 << 4)
-+#define NFC_V1_V2_CONFIG1_BIG		(1 << 5)
-+#define NFC_V1_V2_CONFIG1_RST		(1 << 6)
-+#define NFC_V1_V2_CONFIG1_CE		(1 << 7)
-+#define NFC_V1_V2_CONFIG1_ONE_CYCLE	(1 << 8)
-+
-+#define NFC_V1_V2_CONFIG2_INT		(1 << 15)
-+
-+/*
-+ * Operation modes for the NFC. Valid for v1, v2 and v3
-+ * type controllers.
-+ */
-+#define NFC_CMD				(1 << 0)
-+#define NFC_ADDR			(1 << 1)
-+#define NFC_INPUT			(1 << 2)
-+#define NFC_OUTPUT			(1 << 3)
-+#define NFC_ID				(1 << 4)
-+#define NFC_STATUS			(1 << 5)
+ #define NFC_V1_V2_BUF_SIZE		(host->regs + 0x00)
+@@ -80,6 +82,54 @@
+ #define NFC_ID				(1 << 4)
+ #define NFC_STATUS			(1 << 5)
  
++#define NFC_V3_FLASH_CMD		(host->regs_axi + 0x00)
++#define NFC_V3_FLASH_ADDR0		(host->regs_axi + 0x04)
++
++#define NFC_V3_CONFIG1			(host->regs_axi + 0x34)
++#define NFC_V3_CONFIG1_SP_EN		(1 << 0)
++#define NFC_V3_CONFIG1_RBA(x)		(((x) & 0x7 ) << 4)
++
++#define NFC_V3_ECC_STATUS_RESULT	(host->regs_axi + 0x38)
++
++#define NFC_V3_LAUNCH			(host->regs_axi + 0x40)
++
++#define NFC_V3_WRPROT			(host->regs_ip + 0x0)
++#define NFC_V3_WRPROT_LOCK_TIGHT	(1 << 0)
++#define NFC_V3_WRPROT_LOCK		(1 << 1)
++#define NFC_V3_WRPROT_UNLOCK		(1 << 2)
++#define NFC_V3_WRPROT_BLS_UNLOCK	(2 << 6)
++
++#define NFC_V3_WRPROT_UNLOCK_BLK_ADD0   (host->regs_ip + 0x04)
++
++#define NFC_V3_CONFIG2			(host->regs_ip + 0x24)
++#define NFC_V3_CONFIG2_PS_512			(0 << 0)
++#define NFC_V3_CONFIG2_PS_2048			(1 << 0)
++#define NFC_V3_CONFIG2_PS_4096			(2 << 0)
++#define NFC_V3_CONFIG2_ONE_CYCLE		(1 << 2)
++#define NFC_V3_CONFIG2_ECC_EN			(1 << 3)
++#define NFC_V3_CONFIG2_2CMD_PHASES		(1 << 4)
++#define NFC_V3_CONFIG2_NUM_ADDR_PHASE0		(1 << 5)
++#define NFC_V3_CONFIG2_ECC_MODE_8		(1 << 6)
++#define NFC_V3_CONFIG2_PPB(x)			(((x) & 0x3) << 7)
++#define NFC_V3_CONFIG2_NUM_ADDR_PHASE1(x)	(((x) & 0x3) << 12)
++#define NFC_V3_CONFIG2_INT_MSK			(1 << 15)
++#define NFC_V3_CONFIG2_ST_CMD(x)		(((x) & 0xff) << 24)
++#define NFC_V3_CONFIG2_SPAS(x)			(((x) & 0xff) << 16)
++
++#define NFC_V3_CONFIG3				(host->regs_ip + 0x28)
++#define NFC_V3_CONFIG3_ADD_OP(x)		(((x) & 0x3) << 0)
++#define NFC_V3_CONFIG3_FW8			(1 << 3)
++#define NFC_V3_CONFIG3_SBB(x)			(((x) & 0x7) << 8)
++#define NFC_V3_CONFIG3_NUM_OF_DEVICES(x)	(((x) & 0x7) << 12)
++#define NFC_V3_CONFIG3_RBB_MODE			(1 << 15)
++#define NFC_V3_CONFIG3_NO_SDMA			(1 << 20)
++
++#define NFC_V3_IPC			(host->regs_ip + 0x2C)
++#define NFC_V3_IPC_CREQ			(1 << 0)
++#define NFC_V3_IPC_INT			(1 << 31)
++
++#define NFC_V3_DELAY_LINE		(host->regs_ip + 0x34)
++
  struct mxc_nand_host {
  	struct mtd_info		mtd;
-@@ -186,11 +171,11 @@ static int check_int_v1_v2(struct mxc_nand_host *host)
+ 	struct nand_chip	nand;
+@@ -91,6 +141,8 @@ struct mxc_nand_host {
+ 
+ 	void __iomem		*base;
+ 	void __iomem		*regs;
++	void __iomem		*regs_axi;
++	void __iomem		*regs_ip;
+ 	int			status_request;
+ 	struct clk		*clk;
+ 	int			clk_act;
+@@ -169,6 +221,20 @@ static irqreturn_t mxc_nfc_irq(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
++static int check_int_v3(struct mxc_nand_host *host)
++{
++	uint32_t tmp;
++
++	tmp = readl(NFC_V3_IPC);
++	if (!(tmp & NFC_V3_IPC_INT))
++		return 0;
++
++	tmp &= ~NFC_V3_IPC_INT;
++	writel(tmp, NFC_V3_IPC);
++
++	return 1;
++}
++
+ static int check_int_v1_v2(struct mxc_nand_host *host)
  {
  	uint32_t tmp;
- 
--	tmp = readw(host->regs + NFC_CONFIG2);
--	if (!(tmp & NFC_INT))
-+	tmp = readw(NFC_V1_V2_CONFIG2);
-+	if (!(tmp & NFC_V1_V2_CONFIG2_INT))
- 		return 0;
- 
--	writew(tmp & ~NFC_INT, NFC_CONFIG2);
-+	writew(tmp & ~NFC_V1_V2_CONFIG2_INT, NFC_V1_V2_CONFIG2);
- 
- 	return 1;
- }
-@@ -228,15 +213,15 @@ static void send_cmd_v1_v2(struct mxc_nand_host *host, uint16_t cmd, int useirq)
- {
- 	DEBUG(MTD_DEBUG_LEVEL3, "send_cmd(host, 0x%x, %d)\n", cmd, useirq);
- 
--	writew(cmd, host->regs + NFC_FLASH_CMD);
--	writew(NFC_CMD, host->regs + NFC_CONFIG2);
-+	writew(cmd, NFC_V1_V2_FLASH_CMD);
-+	writew(NFC_CMD, NFC_V1_V2_CONFIG2);
- 
- 	if (cpu_is_mx21() && (cmd == NAND_CMD_RESET)) {
- 		int max_retries = 100;
- 		/* Reset completion is indicated by NFC_CONFIG2 */
- 		/* being set to 0 */
- 		while (max_retries-- > 0) {
--			if (readw(host->regs + NFC_CONFIG2) == 0) {
-+			if (readw(NFC_V1_V2_CONFIG2) == 0) {
- 				break;
- 			}
- 			udelay(1);
-@@ -257,8 +242,8 @@ static void send_addr_v1_v2(struct mxc_nand_host *host, uint16_t addr, int islas
- {
- 	DEBUG(MTD_DEBUG_LEVEL3, "send_addr(host, 0x%x %d)\n", addr, islast);
- 
--	writew(addr, host->regs + NFC_FLASH_ADDR);
--	writew(NFC_ADDR, host->regs + NFC_CONFIG2);
-+	writew(addr, NFC_V1_V2_FLASH_ADDR);
-+	writew(NFC_ADDR, NFC_V1_V2_CONFIG2);
- 
- 	/* Wait for operation to complete */
- 	wait_op_done(host, islast);
-@@ -278,9 +263,9 @@ static void send_page_v1_v2(struct mtd_info *mtd, unsigned int ops)
- 	for (i = 0; i < bufs; i++) {
- 
- 		/* NANDFC buffer 0 is used for page read/write */
--		writew(i, host->regs + NFC_BUF_ADDR);
-+		writew(i, NFC_V1_V2_BUF_ADDR);
- 
--		writew(ops, host->regs + NFC_CONFIG2);
-+		writew(ops, NFC_V1_V2_CONFIG2);
- 
- 		/* Wait for operation to complete */
- 		wait_op_done(host, true);
-@@ -293,9 +278,9 @@ static void send_read_id_v1_v2(struct mxc_nand_host *host)
- 	struct nand_chip *this = &host->nand;
- 
- 	/* NANDFC buffer 0 is used for device ID output */
--	writew(0x0, host->regs + NFC_BUF_ADDR);
-+	writew(0x0, NFC_V1_V2_BUF_ADDR);
- 
--	writew(NFC_ID, host->regs + NFC_CONFIG2);
-+	writew(NFC_ID, NFC_V1_V2_CONFIG2);
- 
- 	/* Wait for operation to complete */
- 	wait_op_done(host, true);
-@@ -329,7 +314,7 @@ static uint16_t get_dev_status_v1_v2(struct mxc_nand_host *host)
- 	 */
- 	store = readl(main_buf);
- 
--	writew(NFC_STATUS, host->regs + NFC_CONFIG2);
-+	writew(NFC_STATUS, NFC_V1_V2_CONFIG2);
- 	wait_op_done(host, true);
- 
- 	ret = readw(main_buf);
-@@ -368,7 +353,7 @@ static int mxc_nand_correct_data(struct mtd_info *mtd, u_char *dat,
- 	 * additional correction.  2-Bit errors cannot be corrected by
- 	 * HW ECC, so we need to return failure
- 	 */
--	uint16_t ecc_status = readw(host->regs + NFC_ECC_STATUS_RESULT);
-+	uint16_t ecc_status = readw(NFC_V1_V2_ECC_STATUS_RESULT);
- 
- 	if (((ecc_status & 0x3) == 2) || ((ecc_status >> 2) == 2)) {
- 		DEBUG(MTD_DEBUG_LEVEL0,
-@@ -568,32 +553,32 @@ static void preset_v1_v2(struct mtd_info *mtd)
- 	uint16_t tmp;
- 
- 	/* enable interrupt, disable spare enable */
--	tmp = readw(host->regs + NFC_CONFIG1);
--	tmp &= ~NFC_INT_MSK;
--	tmp &= ~NFC_SP_EN;
-+	tmp = readw(NFC_V1_V2_CONFIG1);
-+	tmp &= ~NFC_V1_V2_CONFIG1_INT_MSK;
-+	tmp &= ~NFC_V1_V2_CONFIG1_SP_EN;
- 	if (nand_chip->ecc.mode == NAND_ECC_HW) {
--		tmp |= NFC_ECC_EN;
-+		tmp |= NFC_V1_V2_CONFIG1_ECC_EN;
- 	} else {
--		tmp &= ~NFC_ECC_EN;
-+		tmp &= ~NFC_V1_V2_CONFIG1_ECC_EN;
+@@ -209,6 +275,18 @@ static void wait_op_done(struct mxc_nand_host *host, int useirq)
  	}
--	writew(tmp, host->regs + NFC_CONFIG1);
-+	writew(tmp, NFC_V1_V2_CONFIG1);
- 	/* preset operation */
+ }
  
- 	/* Unlock the internal RAM Buffer */
--	writew(0x2, host->regs + NFC_CONFIG);
-+	writew(0x2, NFC_V1_V2_CONFIG);
++static void send_cmd_v3(struct mxc_nand_host *host, uint16_t cmd, int useirq)
++{
++	/* fill command */
++	writel(cmd, NFC_V3_FLASH_CMD);
++
++	/* send out command */
++	writel(NFC_CMD, NFC_V3_LAUNCH);
++
++	/* Wait for operation to complete */
++	wait_op_done(host, useirq);
++}
++
+ /* This function issues the specified command to the NAND device and
+  * waits for completion. */
+ static void send_cmd_v1_v2(struct mxc_nand_host *host, uint16_t cmd, int useirq)
+@@ -237,6 +315,17 @@ static void send_cmd_v1_v2(struct mxc_nand_host *host, uint16_t cmd, int useirq)
+ 	}
+ }
  
- 	/* Blocks to be unlocked */
- 	if (nfc_is_v21()) {
--		writew(0x0, host->regs + NFC_V21_UNLOCKSTART_BLKADDR);
--		writew(0xffff, host->regs + NFC_V21_UNLOCKEND_BLKADDR);
-+		writew(0x0, NFC_V21_UNLOCKSTART_BLKADDR);
-+		writew(0xffff, NFC_V21_UNLOCKEND_BLKADDR);
- 	} else if (nfc_is_v1()) {
--		writew(0x0, host->regs + NFC_V1_UNLOCKSTART_BLKADDR);
--		writew(0x4000, host->regs + NFC_V1_UNLOCKEND_BLKADDR);
-+		writew(0x0, NFC_V1_UNLOCKSTART_BLKADDR);
-+		writew(0x4000, NFC_V1_UNLOCKEND_BLKADDR);
++static void send_addr_v3(struct mxc_nand_host *host, uint16_t addr, int islast)
++{
++	/* fill address */
++	writel(addr, NFC_V3_FLASH_ADDR0);
++
++	/* send out address */
++	writel(NFC_ADDR, NFC_V3_LAUNCH);
++
++	wait_op_done(host, 0);
++}
++
+ /* This function sends an address (or partial address) to the
+  * NAND device. The address is used to select the source/destination for
+  * a NAND command. */
+@@ -251,6 +340,22 @@ static void send_addr_v1_v2(struct mxc_nand_host *host, uint16_t addr, int islas
+ 	wait_op_done(host, islast);
+ }
+ 
++static void send_page_v3(struct mtd_info *mtd, unsigned int ops)
++{
++	struct nand_chip *nand_chip = mtd->priv;
++	struct mxc_nand_host *host = nand_chip->priv;
++	uint32_t tmp;
++
++	tmp = readl(NFC_V3_CONFIG1);
++	tmp &= ~(7 << 4);
++	writel(tmp, NFC_V3_CONFIG1);
++
++	/* transfer data from NFC ram to nand */
++	writel(ops, NFC_V3_LAUNCH);
++
++	wait_op_done(host, false);
++}
++
+ static void send_page_v1_v2(struct mtd_info *mtd, unsigned int ops)
+ {
+ 	struct nand_chip *nand_chip = mtd->priv;
+@@ -274,6 +379,16 @@ static void send_page_v1_v2(struct mtd_info *mtd, unsigned int ops)
+ 	}
+ }
+ 
++static void send_read_id_v3(struct mxc_nand_host *host)
++{
++	/* Read ID into main buffer */
++	writel(NFC_ID, NFC_V3_LAUNCH);
++
++	wait_op_done(host, true);
++
++	memcpy(host->data_buf, host->main_area0, 16);
++}
++
+ /* Request the NANDFC to perform a read of the NAND device ID. */
+ static void send_read_id_v1_v2(struct mxc_nand_host *host)
+ {
+@@ -299,6 +414,14 @@ static void send_read_id_v1_v2(struct mxc_nand_host *host)
+ 	memcpy(host->data_buf, host->main_area0, 16);
+ }
+ 
++static uint16_t get_dev_status_v3(struct mxc_nand_host *host)
++{
++	writew(NFC_STATUS, NFC_V3_LAUNCH);
++	wait_op_done(host, true);
++
++	return readl(NFC_V3_CONFIG1) >> 16;
++}
++
+ /* This function requests the NANDFC to perform a read of the
+  * NAND device status and returns the current status. */
+ static uint16_t get_dev_status_v1_v2(struct mxc_nand_host *host)
+@@ -381,7 +504,10 @@ static int mxc_nand_correct_data_v2_v3(struct mtd_info *mtd, u_char *dat,
+ 
+ 	no_subpages = mtd->writesize >> 9;
+ 
+-	ecc_stat = readl(NFC_V1_V2_ECC_STATUS_RESULT);
++	if (nfc_is_v21())
++		ecc_stat = readl(NFC_V1_V2_ECC_STATUS_RESULT);
++	else
++		ecc_stat = readl(NFC_V3_ECC_STATUS_RESULT);
+ 
+ 	do {
+ 		err = ecc_stat & ecc_bit_mask;
+@@ -643,6 +769,72 @@ static void preset_v1_v2(struct mtd_info *mtd)
+ 	writew(0x4, NFC_V1_V2_WRPROT);
+ }
+ 
++static void preset_v3(struct mtd_info *mtd)
++{
++	struct nand_chip *chip = mtd->priv;
++	struct mxc_nand_host *host = chip->priv;
++	uint32_t config2, config3;
++	int i, addr_phases;
++
++	writel(NFC_V3_CONFIG1_RBA(0), NFC_V3_CONFIG1);
++	writel(NFC_V3_IPC_CREQ, NFC_V3_IPC);
++
++	/* Unlock the internal RAM Buffer */
++	writel(NFC_V3_WRPROT_BLS_UNLOCK | NFC_V3_WRPROT_UNLOCK,
++			NFC_V3_WRPROT);
++
++	/* Blocks to be unlocked */
++	for (i = 0; i < NAND_MAX_CHIPS; i++)
++		writel(0x0 |	(0xffff << 16),
++				NFC_V3_WRPROT_UNLOCK_BLK_ADD0 + (i << 2));
++
++	writel(0, NFC_V3_IPC);
++
++	config2 = NFC_V3_CONFIG2_ONE_CYCLE |
++		NFC_V3_CONFIG2_2CMD_PHASES |
++		NFC_V3_CONFIG2_SPAS(mtd->oobsize >> 1) |
++		NFC_V3_CONFIG2_ST_CMD(0x70) |
++		NFC_V3_CONFIG2_NUM_ADDR_PHASE0;
++
++	if (chip->ecc.mode == NAND_ECC_HW)
++		config2 |= NFC_V3_CONFIG2_ECC_EN;
++
++	addr_phases = fls(chip->pagemask) >> 3;
++
++	if (mtd->writesize == 2048) {
++		config2 |= NFC_V3_CONFIG2_PS_2048;
++		config2 |= NFC_V3_CONFIG2_NUM_ADDR_PHASE1(addr_phases);
++	} else if (mtd->writesize == 4096) {
++		config2 |= NFC_V3_CONFIG2_PS_4096;
++		config2 |= NFC_V3_CONFIG2_NUM_ADDR_PHASE1(addr_phases);
++	} else {
++		config2 |= NFC_V3_CONFIG2_PS_512;
++		config2 |= NFC_V3_CONFIG2_NUM_ADDR_PHASE1(addr_phases - 1);
++	}
++
++	if (mtd->writesize) {
++		config2 |= NFC_V3_CONFIG2_PPB(ffs(mtd->erasesize / mtd->writesize) - 6);
++		host->eccsize = get_eccsize(mtd);
++		if (host->eccsize == 8)
++			config2 |= NFC_V3_CONFIG2_ECC_MODE_8;
++	}
++
++	writel(config2, NFC_V3_CONFIG2);
++
++	config3 = NFC_V3_CONFIG3_NUM_OF_DEVICES(0) |
++			NFC_V3_CONFIG3_NO_SDMA |
++			NFC_V3_CONFIG3_RBB_MODE |
++			NFC_V3_CONFIG3_SBB(6) | /* Reset default */
++			NFC_V3_CONFIG3_ADD_OP(0);
++
++	if (!(chip->options & NAND_BUSWIDTH_16))
++		config3 |= NFC_V3_CONFIG3_FW8;
++
++	writel(config3, NFC_V3_CONFIG3);
++
++	writel(0, NFC_V3_DELAY_LINE);
++}
++
+ /* Used by the upper layer to write command to NAND Flash for
+  * different operations to be carried out on NAND Flash */
+ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
+@@ -843,6 +1035,30 @@ static int __init mxcnd_probe(struct platform_device *pdev)
+ 		oob_smallpage = &nandv1_hw_eccoob_smallpage;
+ 		oob_largepage = &nandv1_hw_eccoob_largepage;
+ 		this->ecc.bytes = 3;
++		host->eccsize = 1;
++	} else if (nfc_is_v3_2()) {
++		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++		if (!res) {
++			err = -ENODEV;
++			goto eirq;
++		}
++		host->regs_ip = ioremap(res->start, resource_size(res));
++		if (!host->regs_ip) {
++			err = -ENOMEM;
++			goto eirq;
++		}
++		host->regs_axi = host->base + 0x1e00;
++		host->spare0 = host->base + 0x1000;
++		host->spare_len = 64;
++		host->preset = preset_v3;
++		host->send_cmd = send_cmd_v3;
++		host->send_addr = send_addr_v3;
++		host->send_page = send_page_v3;
++		host->send_read_id = send_read_id_v3;
++		host->check_int = check_int_v3;
++		host->get_dev_status = get_dev_status_v3;
++		oob_smallpage = &nandv2_hw_eccoob_smallpage;
++		oob_largepage = &nandv2_hw_eccoob_largepage;
  	} else
  		BUG();
  
- 	/* Unlock Block Command for given address range */
--	writew(0x4, host->regs + NFC_WRPROT);
-+	writew(0x4, NFC_V1_V2_WRPROT);
- }
+@@ -920,6 +1136,8 @@ static int __init mxcnd_probe(struct platform_device *pdev)
+ escan:
+ 	free_irq(host->irq, host);
+ eirq:
++	if (host->regs_ip)
++		iounmap(host->regs_ip);
+ 	iounmap(host->base);
+ eres:
+ 	clk_put(host->clk);
+@@ -939,6 +1157,8 @@ static int __devexit mxcnd_remove(struct platform_device *pdev)
  
- /* Used by the upper layer to write command to NAND Flash for
+ 	nand_release(&host->mtd);
+ 	free_irq(host->irq, host);
++	if (host->regs_ip)
++		iounmap(host->regs_ip);
+ 	iounmap(host->base);
+ 	kfree(host);
+ 
 -- 
 1.7.1
