@@ -1,78 +1,78 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 6 Aug 2010 15:24:09 +0900
-Subject: Merge request of s5pc210 universal board.
-In-Reply-To: <AANLkTinQ1mP2e5DA0J_GyWn32EAckgT3b=Ar6gHzDijX@mail.gmail.com>
-References: <AANLkTik1bxh8zfCuKV5UOcYyJW-QbGhT5PYen4MzE1R+@mail.gmail.com>
-	<006d01cb3521$e4e559e0$aeb00da0$%kim@samsung.com>
-	<AANLkTinQ1mP2e5DA0J_GyWn32EAckgT3b=Ar6gHzDijX@mail.gmail.com>
-Message-ID: <AANLkTi=oKyiVtMoZH7czYr5LQoLOMtZtG63RwXay8c2k@mail.gmail.com>
+Date: Fri, 6 Aug 2010 15:26:04 +0900
+Subject: [PATCH] serial: samsung: fix device name
+In-Reply-To: <4C5BA810.3030205@gmail.com>
+References: <20100805201000.14030.34703.stgit@darius-desktop>
+	<AANLkTikp2ThBqF2jkU4CXS9-iYRoy3AWpeqWXjmLF6Gd@mail.gmail.com>
+	<4C5BA810.3030205@gmail.com>
+Message-ID: <AANLkTikrhuey00vC3aUmNEViuEvMNMdhZfGQ4--vnsuj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 6, 2010 at 1:47 PM, Kyungmin Park <kmpark@infradead.org> wrote:
-> On Fri, Aug 6, 2010 at 1:43 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> Kyungmin Park wrote:
->>>
->>> Dear all,
->>>
+On Fri, Aug 6, 2010 at 3:13 PM, Darius Augulis <augulis.darius@gmail.com> wrote:
+> On 08/06/2010 03:04 AM, Kyungmin Park wrote:
+>>
 >> Hi,
 >>
->>> Now I checked the next-v310 tree and know that only LSI required codes
->>> are merged.
->>> http://git.kernel.org/?p=linux/kernel/git/kgene/linux-
->>> samsung.git;a=shortlog;h=refs/heads/next-s5pv310
->>>
->>> I can't find any reason to omit the universal board file. It's posted
->>> before merge window and no difference with LSI SMDK board at current
->>> status.
+>> It's already posted by Mr. Shim
+>> http://marc.info/?l=linux-arm-kernel&m=127410047306149&w=2
 >>
->> Please answer my concern..I already replied to you about this.
+>> As discussed with Ben. even though it's right patch, there's some
+>> users to use previous interface.
+>> I also think it will be fixed. but need to coordinate with existing users.
 >>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-July/022087.html
->> ---
->>> >> +config MACH_UNIVERSAL
->>> >
->>> > As I still asking, do you _really_ want to use 'UNIVERSAL' as the
->>> > board(machine) name?
->>>
->>> Yes, it's called 'universal' and it's really universal board at here.
->>> I don't confuse the engineer who develop this board.
->>> Maybe your engineers saw and hear the brief description about universal
->> board.
->>>
->> Actually, I know that. But there are S5PC100, S5PC110 universal board
->> also...
->> So I asked to you that you _really_ want to use 'universal' here...and I'm
->> still concerning.
 >
-> No comment means "Of course want to merge it". thank you for your
-> concerning. but I can handle it.
+> IMHO, it must be fixed. It's very annoying bug and I spend few hours trying
+> to understand why kernel with devtmpfs auto-mount option doesn't provide
+> ttySAC0, because when grep'ing 'grep -R ttySAC0 drivers/serial/*
+> it's found in samsung driver and I thought everything should be o.k. Who
+> could imagine that it's driver name, not device?...
+> Regarding old users, they should not use such strange device name in their
+> configs, they have to sync with main line.
 
-After discuss with Mr. Kim. I changed to use non-generic name to universal_c210.
+Absolutely agree.
 
-Then do you resend the patch? or can you handle it by yourself?
-
-To Russell.
-Sorry for bothering you.
-Can you change the registered universal to universal_c210?
-universal_c210          MACH_UNIVERSAL_C210     UNIVERSAL_C210
-
-Thank you,
-Kyungmin Park
 >
->> ---
+>> Ben, how to you think?
 >>
->>> I try to support our board at mainline kernel but it seems to make a
->>> difficult with unknown commit criteria of LSI.
+>> On Fri, Aug 6, 2010 at 5:10 AM, Darius Augulis<augulis.darius@gmail.com>
+>> ?wrote:
 >>>
->>
->> Thanks.
->>
->> Best regards,
->> Kgene.
+>>> Swap device and driver names in serial/samsung.c
+>>>
+>>> Signed-off-by: Darius Augulis<augulis.darius@gmail.com>
+>>> ---
+>>> ?drivers/serial/samsung.c | ? ?4 ++--
+>>> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/serial/samsung.c b/drivers/serial/samsung.c
+>>> index a9d6c56..9d63f24 100644
+>>> --- a/drivers/serial/samsung.c
+>>> +++ b/drivers/serial/samsung.c
+>>> @@ -878,10 +878,10 @@ static struct uart_ops s3c24xx_serial_ops = {
+>>>
+>>> ?static struct uart_driver s3c24xx_uart_drv = {
+>>> ? ? ? ?.owner ? ? ? ? ?= THIS_MODULE,
+>>> - ? ? ? .dev_name ? ? ? = "s3c2410_serial",
+>>> + ? ? ? .driver_name ? ?= "s3c2410_serial",
+>>> ? ? ? ?.nr ? ? ? ? ? ? = CONFIG_SERIAL_SAMSUNG_UARTS,
+>>> ? ? ? ?.cons ? ? ? ? ? = S3C24XX_SERIAL_CONSOLE,
+>>> - ? ? ? .driver_name ? ?= S3C24XX_SERIAL_NAME,
+>>> + ? ? ? .dev_name ? ? ? = S3C24XX_SERIAL_NAME,
+>>> ? ? ? ?.major ? ? ? ? ?= S3C24XX_SERIAL_MAJOR,
+>>> ? ? ? ?.minor ? ? ? ? ?= S3C24XX_SERIAL_MINOR,
+>>> ?};
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
 >> --
->> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
->> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >>
->>
+>
 >
