@@ -1,96 +1,70 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat,  7 Aug 2010 09:51:51 +0200
-Subject: [PATCH] atmel_macb Kconfig: remove long dependency line
-Message-ID: <1281167511-3038-1-git-send-email-plagnioj@jcrosoft.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sat, 7 Aug 2010 17:06:17 +0800
+Subject: [PATCH 07/11] [ARM] pxa/balloon3: Machine file cleanup
+In-Reply-To: <201008062347.30423.marek.vasut@gmail.com>
+References: <1280920933-3820-1-git-send-email-marek.vasut@gmail.com>
+	<201008060949.29366.marek.vasut@gmail.com>
+	<20100806195218.GU9577@earth.li>
+	<201008062347.30423.marek.vasut@gmail.com>
+Message-ID: <AANLkTikpPEKkow_4HwAtc4P+6vzXYUMA6BEw6q5LjnuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many Atmel SOC are embedding a MACB controller. This patch removes the long
-dependency line for this Atmel MACB ethernet driver configuration entry.
-The HAVE_NET_MACB configuration option is located in the net Kconfig file
-as it may be setup by ARM/AT91 and AVR32 chips.
+On Sat, Aug 7, 2010 at 5:47 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Dne P? 6. srpna 2010 21:52:18 Jonathan McDowell napsal(a):
+>> On Fri, Aug 06, 2010 at 09:49:29AM +0200, Marek Vasut wrote:
+>> > Dne P? 6. srpna 2010 01:25:06 Jonathan McDowell napsal(a):
+>> > > On Wed, Aug 04, 2010 at 01:22:09PM +0200, Marek Vasut wrote:
+>> > > > Modularize components of the Balloon3 board.
+>> > >
+>> > > NAK.
+>> > >
+>> > > That's not what a large portion of this patch does.
+>> >
+>> > Oh, really ?
+>>
+>> A large portion of it removes setting the MFPs based on the board
+>> capabilities. That's a different piece of work to making the various
+>> components modular.
+>>
+>> > > You have put all of the pin definitions into balloon3_pin_config and
+>> > > negated the work that was done to ensure that a single kernel could
+>> > > run on different variants of the balloon3.
+>> >
+>> > I have only this one, but read on.
+>>
+>> I suspect you have a similar board to me; a double sided board fairly
+>> well populated (sound, CF, USB host + slave, LCD). The Lightwriter, for
+>> example, is a single sided board using fewer peripherals. The CUED
+>> variant I believe is different again for their needs.
+>
+> That's just great.
+>>
+>> > > If a feature isn't configured on the board you shouldn't configure
+>> > > the MFPs for that feature.
+>> >
+>> > That's not true. You should configure them as inputs. The big plan (in
+>> > another patch) is to do this the same way colibri270 is done (balloon3
+>> > baseboard + expansion boards).
+>>
+>> I don't have a copy of the PXA reference to hand, so I'm happy to accept
+>> best practise is to set unused pins to be inputs. However the changes in
+>> this patch don't do this and may end up setting some pins that are used
+>> for something else to an unexpected output.
+>
+> The changes in this patch should not screw up anything. If they do break
+> something, it'll be eventually found out. Do you have any trouble with this
+> patch on your board?
+>>
+>> I'm failing to understand the motivation for these changes, especially
+>> if you have a plan to later do more appropriate cleanup.
+>
+> Because you can't do everything at once. I prepared the ground for further
+> changes.
+>
+> I wonder why noone actually sent a better patch ever since balloon3 was pushed
+> mainline ... that's like 15 kernel versions already, isn't it? I also believe
+> this patch will make it very hard to forward-port the out-of-the-tree patches on
+> balloon3 website, which are often in terrible shape ... well that's sad.
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: David Miller <davem@davemloft.net>
-Cc: Haavard Skinnemoen <hskinnemoen@atmel.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Andrew Victor <linux@maxim.org.za>
----
- arch/arm/mach-at91/Kconfig |    4 ++++
- arch/avr32/Kconfig         |    1 +
- drivers/net/Kconfig        |    5 ++++-
- 3 files changed, 9 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 841eaf8..72a9edf 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -33,6 +33,7 @@ config ARCH_AT91SAM9260
- 	select HAVE_AT91_USART3
- 	select HAVE_AT91_USART4
- 	select HAVE_AT91_USART5
-+	select HAVE_NET_MACB
- 
- config ARCH_AT91SAM9261
- 	bool "AT91SAM9261"
-@@ -51,6 +52,7 @@ config ARCH_AT91SAM9263
- 	select CPU_ARM926T
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_FB_ATMEL
-+	select HAVE_NET_MACB
- 
- config ARCH_AT91SAM9RL
- 	bool "AT91SAM9RL"
-@@ -66,6 +68,7 @@ config ARCH_AT91SAM9G20
- 	select HAVE_AT91_USART3
- 	select HAVE_AT91_USART4
- 	select HAVE_AT91_USART5
-+	select HAVE_NET_MACB
- 
- config ARCH_AT91SAM9G45
- 	bool "AT91SAM9G45"
-@@ -73,6 +76,7 @@ config ARCH_AT91SAM9G45
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_AT91_USART3
- 	select HAVE_FB_ATMEL
-+	select HAVE_NET_MACB
- 
- config ARCH_AT91CAP9
- 	bool "AT91CAP9"
-diff --git a/arch/avr32/Kconfig b/arch/avr32/Kconfig
-index f2b3193..3dcd321 100644
---- a/arch/avr32/Kconfig
-+++ b/arch/avr32/Kconfig
-@@ -93,6 +93,7 @@ config PLATFORM_AT32AP
- 	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_ALLOCATOR
- 	select HAVE_FB_ATMEL
-+	select HAVE_NET_MACB
- 
- #
- # CPU types
-diff --git a/drivers/net/Kconfig b/drivers/net/Kconfig
-index ce2fcdd..19e1be8 100644
---- a/drivers/net/Kconfig
-+++ b/drivers/net/Kconfig
-@@ -2,6 +2,9 @@
- # Network device configuration
- #
- 
-+config HAVE_NET_MACB
-+	bool
-+
- menuconfig NETDEVICES
- 	default y if UML
- 	depends on NET
-@@ -221,7 +224,7 @@ config MII
- 
- config MACB
- 	tristate "Atmel MACB support"
--	depends on AVR32 || ARCH_AT91SAM9260 || ARCH_AT91SAM9263 || ARCH_AT91SAM9G20 || ARCH_AT91SAM9G45 || ARCH_AT91CAP9
-+	depend on HAVE_NET_MACB
- 	select PHYLIB
- 	help
- 	  The Atmel MACB ethernet interface is found on many AT32 and AT91
--- 
-1.7.1
+Well, possibly you can now sleep even less ;-)
