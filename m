@@ -1,74 +1,42 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 7 Aug 2010 13:15:56 +0200
-Subject: [PATCH 07/11] [ARM] pxa/balloon3: Machine file cleanup
-In-Reply-To: <AANLkTikpPEKkow_4HwAtc4P+6vzXYUMA6BEw6q5LjnuQ@mail.gmail.com>
-References: <1280920933-3820-1-git-send-email-marek.vasut@gmail.com>
-	<201008062347.30423.marek.vasut@gmail.com>
-	<AANLkTikpPEKkow_4HwAtc4P+6vzXYUMA6BEw6q5LjnuQ@mail.gmail.com>
-Message-ID: <201008071315.57153.marek.vasut@gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Sat, 07 Aug 2010 08:57:42 -0400
+Subject: [PATCH 07/10] ftrace: pass KBUILD_CFLAGS to record_mcount.pl
+In-Reply-To: <AANLkTi=Y7WsfrKy2db9j2v8b6PsEhOF2o953R-CvhmhQ@mail.gmail.com>
+References: <1268462987-8271-1-git-send-email-rabin@rab.in>
+	<1268462987-8271-8-git-send-email-rabin@rab.in>
+	<20100803164247.GA6133@debian>
+	<1281126198.3352.6.camel@gandalf.stny.rr.com>
+	<AANLkTi=Y7WsfrKy2db9j2v8b6PsEhOF2o953R-CvhmhQ@mail.gmail.com>
+Message-ID: <d8f8776d-ddbd-4429-982e-347be439dc02@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne So 7. srpna 2010 11:06:17 Eric Miao napsal(a):
-> On Sat, Aug 7, 2010 at 5:47 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> > Dne P? 6. srpna 2010 21:52:18 Jonathan McDowell napsal(a):
-> >> On Fri, Aug 06, 2010 at 09:49:29AM +0200, Marek Vasut wrote:
-> >> > Dne P? 6. srpna 2010 01:25:06 Jonathan McDowell napsal(a):
-> >> > > On Wed, Aug 04, 2010 at 01:22:09PM +0200, Marek Vasut wrote:
-> >> > > > Modularize components of the Balloon3 board.
-> >> > > 
-> >> > > NAK.
-> >> > > 
-> >> > > That's not what a large portion of this patch does.
-> >> > 
-> >> > Oh, really ?
-> >> 
-> >> A large portion of it removes setting the MFPs based on the board
-> >> capabilities. That's a different piece of work to making the various
-> >> components modular.
-> >> 
-> >> > > You have put all of the pin definitions into balloon3_pin_config and
-> >> > > negated the work that was done to ensure that a single kernel could
-> >> > > run on different variants of the balloon3.
-> >> > 
-> >> > I have only this one, but read on.
-> >> 
-> >> I suspect you have a similar board to me; a double sided board fairly
-> >> well populated (sound, CF, USB host + slave, LCD). The Lightwriter, for
-> >> example, is a single sided board using fewer peripherals. The CUED
-> >> variant I believe is different again for their needs.
-> > 
-> > That's just great.
-> > 
-> >> > > If a feature isn't configured on the board you shouldn't configure
-> >> > > the MFPs for that feature.
-> >> > 
-> >> > That's not true. You should configure them as inputs. The big plan (in
-> >> > another patch) is to do this the same way colibri270 is done (balloon3
-> >> > baseboard + expansion boards).
-> >> 
-> >> I don't have a copy of the PXA reference to hand, so I'm happy to accept
-> >> best practise is to set unused pins to be inputs. However the changes in
-> >> this patch don't do this and may end up setting some pins that are used
-> >> for something else to an unexpected output.
-> > 
-> > The changes in this patch should not screw up anything. If they do break
-> > something, it'll be eventually found out. Do you have any trouble with
-> > this patch on your board?
-> > 
-> >> I'm failing to understand the motivation for these changes, especially
-> >> if you have a plan to later do more appropriate cleanup.
-> > 
-> > Because you can't do everything at once. I prepared the ground for
-> > further changes.
-> > 
-> > I wonder why noone actually sent a better patch ever since balloon3 was
-> > pushed mainline ... that's like 15 kernel versions already, isn't it? I
-> > also believe this patch will make it very hard to forward-port the
-> > out-of-the-tree patches on balloon3 website, which are often in terrible
-> > shape ... well that's sad.
-> 
-> Well, possibly you can now sleep even less ;-)
+Sorry for top post. Sent from phone.
 
-I'm trying to get the sane ones mainline, but otherwise I'm NOT INSANE to care 
-for out-of-the-tree patches :)
+Argh! We had this discussion before. I must be getting old.
+
+Acked-by: Steven Rostedt <rostedt@goodmis.org>
+
+-- Steve
+
+
+"Rabin Vincent" <rabin@rab.in> wrote:
+
+>On Sat, Aug 7, 2010 at 1:53 AM, Steven Rostedt <rostedt@goodmis.org> wrote:
+>>> > ? ? "$(if $(CONFIG_CPU_BIG_ENDIAN),big,little)" \
+>>> > ? ? "$(if $(CONFIG_64BIT),64,32)" \
+>>> > - ? "$(OBJDUMP)" "$(OBJCOPY)" "$(CC)" "$(LD)" "$(NM)" "$(RM)" "$(MV)" \
+>>> > + ? "$(OBJDUMP)" "$(OBJCOPY)" "$(CC) $(KBUILD_CFLAGS)" \
+>>> > + ? "$(LD)" "$(NM)" "$(RM)" "$(MV)" \
+>>
+>> Hmm, this changes the number of parameters passed to the
+>> recordmcount.pl. shouldn't this be part of the change to
+>> recordmcount.pl? Otherwise, we can break a bisect.
+>
+>No, this doesn't change the number of parameters.  KBUILD_CFLAGS
+>is included inside the CC argument.
+>
+>Rabin
+
+-- 
+Sent from my Android phone with K-9 Mail. Please excuse my brevity.
