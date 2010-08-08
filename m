@@ -1,60 +1,38 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 8 Aug 2010 23:10:42 +0100
-Subject: [PATCH 6/8] mxc_nand: fix correct_data function
-In-Reply-To: <20100808204341.GA20065@pengutronix.de>
-References: <1281102791-8089-1-git-send-email-s.hauer@pengutronix.de>
-	<1281102791-8089-7-git-send-email-s.hauer@pengutronix.de>
-	<20100808081955.GB8687@n2100.arm.linux.org.uk>
-	<20100808083244.GC21128@jasper.tkos.co.il>
-	<20100808204341.GA20065@pengutronix.de>
-Message-ID: <20100808221042.GE23623@n2100.arm.linux.org.uk>
+Date: Sun, 8 Aug 2010 23:24:02 +0100
+Subject: [PATCH] [ARM] Introduce patching of phys_to_virt and vice versa
+In-Reply-To: <alpine.LFD.2.00.1008061256170.28809@xanadu.home>
+References: <1277542025-19881-1-git-send-email-eric.miao@canonical.com>
+	<1278083164.15298.55.camel@ra7055-laptop>
+	<20100720211629.GB10553@n2100.arm.linux.org.uk>
+	<AANLkTimyif7CCoNwdKMCA=P+y=0e9uhwfhRchbMuB7eY@mail.gmail.com>
+	<20100805094521.GB23473@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1008061256170.28809@xanadu.home>
+Message-ID: <20100808222402.GF23623@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 08, 2010 at 10:43:41PM +0200, Sascha Hauer wrote:
-> On Sun, Aug 08, 2010 at 11:32:44AM +0300, Baruch Siach wrote:
-> > Hi Russell,
-> > 
-> > On Sun, Aug 08, 2010 at 09:19:56AM +0100, Russell King - ARM Linux wrote:
-> > > On Fri, Aug 06, 2010 at 03:53:09PM +0200, Sascha Hauer wrote:
-> > > > +		err = ecc_stat & ecc_bit_mask;
-> > > > +		if (err > err_limit) {
-> > > > +			printk(KERN_WARNING "UnCorrectable RS-ECC Error\n");
-> > > > +			return -1;
-> > > 
-> > > Someone's being lazy.
-> > 
-> > The code at nand_read_subpage() (drivers/mtd/nand/nand_base.c) expects the 
-> > .correct callback to return -1 on an uncorrectable error:
-> > 
-> >                 stat = chip->ecc.correct(mtd, p, &chip->buffers->ecccode[i], &chip->buffers->ecccalc[i]);
-> >                 if (stat == -1)
-> >                         mtd->ecc_stats.failed++;
-> >                 else
-> >                         mtd->ecc_stats.corrected += stat;
-> 
-> Then this should be changed to check for stat < 0. I found some drivers
-> in the tree returning an errno value in their .correct function instead
-> of -1.
+On Fri, Aug 06, 2010 at 01:07:46PM -0400, Nicolas Pitre wrote:
+> No idea.  That depends how gcc is considering inline asm.  Given there 
+> is one input operand, I suppose gcc would account for the delay slot 
+> before that operand is actually available.
 
-That's the whole danger of the whole 'return -1' evilness in the kernel.
-The long established convention in the kernel is that negative numbers
-returned from functions are negative errno codes.
+For something which could very well become by default enabled across
+the board - due to the push to have a single kernel binary for lots
+of significantly different platforms - it seems little research has
+been carried out on this point.
 
-As soon as you decide that you want a function to return -1 to indicate
-an error rather than a real errno code, you lose clarity on which
-functions need '-1' and which are proper negative errno codes, and then
-you end up with people returning negative errno codes for functions
-which should be -1, and people returning -1 for functions which should
-be negative errno codes.
+While I agree that other obvious solutions would be more expensive, I
+think it makes sense to have the commit which is introducing this
+method include a proper evaluation, not least so that people who need
+to make the decision to enable this aren't repeating the same research
+that someone else has done (or, worse, just decide to enable it 'just
+because' without any understanding of what the effect may be.)
 
-If you want a function to return -1 for error, then it probably makes
-sense to create a ECC_CORRECT_FAILED definition which happens to be -1.
-Or some other number.  But don't use plain '-1' - it looks far too much
-like "I was lazy, I couldn't be bothered to look up a proper errno."
+So, I'd be interested in hearing whether we do see any preceding ldr
+delay slot scheduling for these asm instructions.
 
-We know full well that _lots_ of people submit stuff with 'return -1'
-statements where they should be proper negative errno codes, so it's
-something people are having a great deal of trouble with already.  Let's
-not further confuse everyone by having functions expecting called methods
-to do a plain "return -1;" on error.
+I think we also need to consider whether the volatile is really required.
+This asm() doesn't have any side effects other than its output operand,
+so I suspect that the volatile may get in the way of some optimisations
+(such as deleting the operation if the output is not actually used.)
