@@ -1,8 +1,8 @@
-From: ccc.cwj@gmail.com (=?utf-8?B?6ZmI6Ze75p2w?=)
-Date: Sat, 07 Aug 2010 18:24:24 -0000
-Subject: =?utf-8?B?UmU6IFJlOiB1c2IgaG9zdCBwb3J0MyBvbiBweGEzMTA/?=
+From: ccc.cwj@gmail.com (Chen Wenjie)
+Date: Sun, 08 Aug 2010 01:22:07 -0000
+Subject: usb host port3 on pxa310?
 References: <loom.20100806T201947-76@post.gmane.org>
-Message-ID: <201008080224060156867@gmail.com>
+Message-ID: <201008080921466561614@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,7 +17,7 @@ I think no real IC installed on my board, I just configure it on menuconfig by c
 seems related to USB (--blindly)
 
 
-Actually, my board use a ISP1105 as the PHY interface?the schematic is :
+Actually, my board use a ISP1105 as the PHY interface???the schematic is :
 
 http://picasaweb.google.com/114830881710721561783/Public#5502732460750351090 
 
@@ -51,12 +51,11 @@ Chen Wenjie
 
 
 
-???? Igor Grinberg 
-????? 2010-08-07  21:42:57 
-???? Chen Wenjie 
-??? linux-arm-kernel 
-??? Re: usb host port3 on pxa310? 
- 
+???????????? Igor Grinberg 
+??????????????? 2010-08-07  21:42:57 
+???????????? Chen Wenjie 
+????????? linux-arm-kernel 
+????????? Re: usb host port3 on pxa310? 
 On 08/06/10 21:43, Chen Wenjie wrote:
 > I want to use PXA310 to realize a USB HOST.
 >
@@ -79,18 +78,18 @@ around 2.6.28-rc1. May be you should consider upgrading...
 > Function
 > Port UP3OCR[CFG]
 >  0x0     0x2  
-> USB_P3_1 UHC Rx Data (RCV - in) ? UHC Rx Data (RCV - 
-> out) ?
-> USB_P3_2 UHC OE (OE_n - out) ? UHC OE (OE_n - in)
->  ?
-> USB_P3_3 UHC Rx D? (VM - in) ? UHC Rx D- (VM - 
-> out) ?
-> USB_P3_4 UHC Tx D? (VMO - out) ? UHC Tx D- (VMO - 
-> in) ?
-> USB_P3_5 UHC Rx D+ (VP - in) ? UHC Rx D+ (VP - 
-> out) ?
-> USB_P3_6 UHC Tx D+ (VPO - out) ? UHC Tx D+ (VPO - 
-> in) ?
+> USB_P3_1 UHC Rx Data (RCV - in) ??? UHC Rx Data (RCV - 
+> out) ???
+> USB_P3_2 UHC OE (OE_n - out) ??? UHC OE (OE_n - in)
+>  ???
+> USB_P3_3 UHC Rx D??? (VM - in) ??? UHC Rx D- (VM - 
+> out) ???
+> USB_P3_4 UHC Tx D??? (VMO - out) ??? UHC Tx D- (VMO - 
+> in) ???
+> USB_P3_5 UHC Rx D+ (VP - in) ??? UHC Rx D+ (VP - 
+> out) ???
+> USB_P3_6 UHC Tx D+ (VPO - out) ??? UHC Tx D+ (VPO - 
+> in) ???
 >
 > In the schematic, I have connected GPIO77~82 to USB_P3_1 ~ USB_P3_6.
 >   
@@ -165,11 +164,11 @@ Regards,
 Igor.
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100807/fa4be103/attachment.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100808/1449bdf4/attachment-0001.html>
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: not available
 Type: image/gif
 Size: 1237 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100807/fa4be103/attachment.gif>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100808/1449bdf4/attachment-0001.gif>
