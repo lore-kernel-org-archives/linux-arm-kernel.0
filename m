@@ -1,103 +1,169 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun,  8 Aug 2010 06:21:33 +0200
-Subject: [PATCH v2] atmel_macb Kconfig: remove long dependency line
-In-Reply-To: <1281167511-3038-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1281167511-3038-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1281241293-19571-1-git-send-email-plagnioj@jcrosoft.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Sun, 08 Aug 2010 09:02:54 +0300
+Subject: usb host port3 on pxa310?
+In-Reply-To: <201008080921466561614@gmail.com>
+References: <loom.20100806T201947-76@post.gmane.org>
+	<201008080921466561614@gmail.com>
+Message-ID: <4C5E488E.80300@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many Atmel SOC are embedding a MACB controller. This patch removes the long
-dependency line for this Atmel MACB ethernet driver configuration entry.
-The HAVE_NET_MACB configuration option is located in the net Kconfig file
-as it may be setup by ARM/AT91 and AVR32 chips.
+On 08/08/10 04:21, Chen Wenjie wrote:
+> Hi, Igor,
+> Thank you very much for your warm and professional help!
+> I will try to upgrade the codes for ohci-pxa27x first.
+> > Do you really have sl811 and r8a66597 usb host controllers on your
+> board?
+> I think no real IC installed on my board, I just configure it on
+> menuconfig by choose something
+> seems related to USB (--blindly)
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: David Miller <davem@davemloft.net>
-Cc: Haavard Skinnemoen <hskinnemoen@atmel.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Andrew Victor <linux@maxim.org.za>
----
-V2:
-fix typo introduce when editing the patch
+I'd rather remove the unused drivers from the configuration,
+then have them built-in and do something with the missing hardware...
 
-Best Regards,
-J.
- arch/arm/mach-at91/Kconfig |    4 ++++
- arch/avr32/Kconfig         |    1 +
- drivers/net/Kconfig        |    5 ++++-
- 3 files changed, 9 insertions(+), 1 deletions(-)
+> Actually, my board use a ISP1105 as the PHY interface???the schematic is :
+> http://picasaweb.google.com/114830881710721561783/Public#5502732460750351090
+>
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 939bccd..7068649 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -33,6 +33,7 @@ config ARCH_AT91SAM9260
- 	select HAVE_AT91_USART3
- 	select HAVE_AT91_USART4
- 	select HAVE_AT91_USART5
-+	select HAVE_NET_MACB
- 
- config ARCH_AT91SAM9261
- 	bool "AT91SAM9261"
-@@ -51,6 +52,7 @@ config ARCH_AT91SAM9263
- 	select CPU_ARM926T
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_FB_ATMEL
-+	select HAVE_NET_MACB
- 
- config ARCH_AT91SAM9RL
- 	bool "AT91SAM9RL"
-@@ -66,6 +68,7 @@ config ARCH_AT91SAM9G20
- 	select HAVE_AT91_USART3
- 	select HAVE_AT91_USART4
- 	select HAVE_AT91_USART5
-+	select HAVE_NET_MACB
- 
- config ARCH_AT91SAM9G45
- 	bool "AT91SAM9G45"
-@@ -73,6 +76,7 @@ config ARCH_AT91SAM9G45
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_AT91_USART3
- 	select HAVE_FB_ATMEL
-+	select HAVE_NET_MACB
- 
- config ARCH_AT91CAP9
- 	bool "AT91CAP9"
-diff --git a/arch/avr32/Kconfig b/arch/avr32/Kconfig
-index f515727..9ac8725 100644
---- a/arch/avr32/Kconfig
-+++ b/arch/avr32/Kconfig
-@@ -90,6 +90,7 @@ config PLATFORM_AT32AP
- 	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_ALLOCATOR
- 	select HAVE_FB_ATMEL
-+	select HAVE_NET_MACB
- 
- #
- # CPU types
-diff --git a/drivers/net/Kconfig b/drivers/net/Kconfig
-index 5a68953..2393030 100644
---- a/drivers/net/Kconfig
-+++ b/drivers/net/Kconfig
-@@ -2,6 +2,9 @@
- # Network device configuration
- #
- 
-+config HAVE_NET_MACB
-+	bool
-+
- menuconfig NETDEVICES
- 	default y if UML
- 	depends on NET
-@@ -221,7 +224,7 @@ config MII
- 
- config MACB
- 	tristate "Atmel MACB support"
--	depends on AVR32 || ARCH_AT91SAM9260 || ARCH_AT91SAM9263 || ARCH_AT91SAM9G20 || ARCH_AT91SAM9G45 || ARCH_AT91CAP9
-+	depends on HAVE_NET_MACB
- 	select PHYLIB
- 	help
- 	  The Atmel MACB ethernet interface is found on many AT32 and AT91
+As far as I know DNP, stands for "Do Not Populate".
+It states: "ISP1105BS(DNP)" - is it assembled at all?
+
+> Do you think there is anything wrong?
+> GPIO setting is :
+> //file: mfp-pxa300.h
+> /* USB P3 */
+> #define GPIO77_USB_P3_1 MFP_CFG(GPIO77, AF2)
+> #define GPIO78_USB_P3_2 MFP_CFG(GPIO78, AF2)
+> #define GPIO79_USB_P3_3 MFP_CFG(GPIO79, AF2)
+> #define GPIO80_USB_P3_4 MFP_CFG(GPIO80, AF2)
+> #define GPIO81_USB_P3_5 MFP_CFG(GPIO81, AF2)
+> #define GPIO82_USB_P3_6 MFP_CFG(GPIO82, AF2)
+> #define GPIO126_USB_SPEED MFP_CFG_LPM(GPIO126, AF5, PULL_HIGH)
+
+Indeed, those are the defines, but you need to do the actual configuration
+for them, by calling pxa3xx_mfp_config() with appropriate parameters.
+
+> I will upgrade the driver and test it again.
+> Thank you very very much!
+> 2010-08-08
+> ------------------------------------------------------------------------
+> Chen Wenjie
+> ------------------------------------------------------------------------
+> *????????????* Igor Grinberg
+> *???????????????* 2010-08-07 21:42:57
+> *????????????* Chen Wenjie
+> *?????????* linux-arm-kernel
+> *?????????* Re: usb host port3 on pxa310?
+> On 08/06/10 21:43, Chen Wenjie wrote:
+> > I want to use PXA310 to realize a USB HOST.
+> >
+> > (My kernel version: 2.6.27)
+> >
+> There was a relatively big change in ohci-pxa27x driver, I think
+> around 2.6.28-rc1. May be you should consider upgrading...
+> > Zylonite have implemented a USB host through USBH_N(USBH1_N)
+> USBH_P(USBH1_P).
+> > Unfortunatly, In PXA310, the pins of USBH1_N and USBH1_P does not exist.
+> >
+> > So I have to use "usb host port3 " described in the manual "Vol. IV:
+> Monahans
+> > L Processor and
+> > Monahans LV Processor Developers Manual"
+> >
+> >
+> >
+> > GPIO
+> > Alternate
+> > Function
+> > Port UP3OCR[CFG]
+> > 0x0 0x2
+> > USB_P3_1 UHC Rx Data (RCV - in) ??? UHC Rx Data (RCV -
+> > out) ???
+> > USB_P3_2 UHC OE (OE_n - out) ??? UHC OE (OE_n - in)
+> > ???
+> > USB_P3_3 UHC Rx D??? (VM - in) ??? UHC Rx D- (VM -
+> > out) ???
+> > USB_P3_4 UHC Tx D??? (VMO - out) ??? UHC Tx D- (VMO -
+> > in) ???
+> > USB_P3_5 UHC Rx D+ (VP - in) ??? UHC Rx D+ (VP -
+> > out) ???
+> > USB_P3_6 UHC Tx D+ (VPO - out) ??? UHC Tx D+ (VPO -
+> > in) ???
+> >
+> > In the schematic, I have connected GPIO77~82 to USB_P3_1 ~ USB_P3_6.
+> >
+> You need also to configure those gpios to alternate function 2 in the
+> MFPRs.
+> If you use a transceiver mode, then may be you need USBHPEN signal
+> connected to your PHY and configured accordingly in MFPR.
+> Also, in pxa310 there is a U2DP3CR register, which controls output
+> and serial mode selection of the usb port3.
+> >
+> >
+> > However, The USB port 3 does not work.
+> > Here is the log:
+> >
+> > ======================================
+> > pxa27x-ohci pxa27x-ohci: PXA27x OHCI
+> > pxa27x-ohci pxa27x-ohci: new USB bus registered, assigned bus number 1
+> > pxa27x-ohci pxa27x-ohci: irq 3, io mem 0x4c000000
+> > usb usb1: configuration #1 chosen from 1 choice
+> > hub 1-0:1.0: USB hub found
+> > hub 1-0:1.0: 3 ports detected
+> > usb usb1: New USB device found, idVendor=1d6b, idProduct=0001
+> > usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+> > usb usb1: Product: PXA27x OHCI
+> > usb usb1: Manufacturer: Linux 2.6.27-dirty ohci_hcd
+> > usb usb1: SerialNumber: pxa27x
+> > sl811: driver sl811-hcd, 19 May 2005
+> > r8a66597_hcd: driver r8a66597_hcd, 10 Apr 2008
+> >
+> Do you really have sl811 and r8a66597 usb host controllers on your board?
+> > usb 1-3: new full speed USB device using pxa27x-ohci and address 2
+> > usb 1-3: device descriptor read/64, error -62
+> > usb 1-3: device descriptor read/64, error -62
+> > usb 1-3: new full speed USB device using pxa27x-ohci and address 3
+> > usb 1-3: device descriptor read/64, error -62
+> > usb 1-3: device descriptor read/64, error -62
+> > usb 1-3: new full speed USB device using pxa27x-ohci and address 4
+> > usb 1-3: device not accepting address 4, error -62
+> > usb 1-3: new full speed USB device using pxa27x-ohci and address 5
+> > usb 1-3: device not accepting address 5, error -62
+> > hub 1-0:1.0: unable to enumerate USB device on port 3
+> > ======================================
+> >
+> >
+> > Then I found a bit in UP2OCR -- (VPMBlockEnbN).
+> > It is quite strange (if not ugly:( ) the this bit is to control port 3
+> > (In UP2OCR--a register for port 2, while there is too many unused
+> bits in
+> > UP3OCR)
+> >
+> > But I am not very sure how to use this bit.
+> > I grep the source tree, but found nothing about VPMBlockEnbN.
+> >
+> >
+> > Can anyone tell me that how to write a driver for USB-host-port-3?
+> >
+> As far as I know pxa310 usb port3 does not need any special driver
+> to work in host mode, ohci-pxa27x is enough.
+> Currently, the setup of registers, which are not related to UHC
+> (UP2OCR, UP3OCR, etc.), is done in the board code, in the ohci
+> callback.
+> > High appreciation for your kind help!
+> >
+> >
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+> -- 
+> Regards,
+> Igor.
+
 -- 
-1.7.1
+Regards,
+Igor.
