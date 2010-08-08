@@ -1,33 +1,103 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 7 Aug 2010 15:14:43 +0100
-Subject: [PATCH 1/1] arm: kernel: idle loop pm constraints
-In-Reply-To: <1281086261-23908-2-git-send-email-samu.p.onkalo@nokia.com>
-References: <1281086261-23908-1-git-send-email-samu.p.onkalo@nokia.com>
-	<1281086261-23908-2-git-send-email-samu.p.onkalo@nokia.com>
-Message-ID: <20100807141443.GA8687@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun,  8 Aug 2010 06:21:33 +0200
+Subject: [PATCH v2] atmel_macb Kconfig: remove long dependency line
+In-Reply-To: <1281167511-3038-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1281167511-3038-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1281241293-19571-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 06, 2010 at 12:17:41PM +0300, Samu Onkalo wrote:
-> Check pm qos cpu latency requirements before preparing for pm-idle activities.
-> Scheduling is prevented during those operations and interrupt thread serving
-> latency in increased. Driver can set pm qos latency requirement to zero to
-> indicate extreme tight latency needs.
+Many Atmel SOC are embedding a MACB controller. This patch removes the long
+dependency line for this Atmel MACB ethernet driver configuration entry.
+The HAVE_NET_MACB configuration option is located in the net Kconfig file
+as it may be setup by ARM/AT91 and AVR32 chips.
 
-NAK.  This breaks hotplug CPU support.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: David Miller <davem@davemloft.net>
+Cc: Haavard Skinnemoen <hskinnemoen@atmel.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Andrew Victor <linux@maxim.org.za>
+---
+V2:
+fix typo introduce when editing the patch
 
->  	while (1) {
-> +		if (pm_qos_requirement(PM_QOS_CPU_DMA_LATENCY) == 0) {
-> +			preempt_enable_no_resched();
-> +			schedule();
-> +			preempt_disable();
-> +			continue;
-> +		}
+Best Regards,
+J.
+ arch/arm/mach-at91/Kconfig |    4 ++++
+ arch/avr32/Kconfig         |    1 +
+ drivers/net/Kconfig        |    5 ++++-
+ 3 files changed, 9 insertions(+), 1 deletions(-)
 
-It's pointless to repeatedly call schedule() if need_resched() is not set -
-and the need_resched() check is extremely cheap.
-
-In any case, the parts that you're cutting out are the calls to
-leds_event() down to tick_nohz_restart_sched_tick().  Do you know
-where the additional latency comes from?  Is it the code in the
-pm_idle() hook?
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 939bccd..7068649 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -33,6 +33,7 @@ config ARCH_AT91SAM9260
+ 	select HAVE_AT91_USART3
+ 	select HAVE_AT91_USART4
+ 	select HAVE_AT91_USART5
++	select HAVE_NET_MACB
+ 
+ config ARCH_AT91SAM9261
+ 	bool "AT91SAM9261"
+@@ -51,6 +52,7 @@ config ARCH_AT91SAM9263
+ 	select CPU_ARM926T
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_FB_ATMEL
++	select HAVE_NET_MACB
+ 
+ config ARCH_AT91SAM9RL
+ 	bool "AT91SAM9RL"
+@@ -66,6 +68,7 @@ config ARCH_AT91SAM9G20
+ 	select HAVE_AT91_USART3
+ 	select HAVE_AT91_USART4
+ 	select HAVE_AT91_USART5
++	select HAVE_NET_MACB
+ 
+ config ARCH_AT91SAM9G45
+ 	bool "AT91SAM9G45"
+@@ -73,6 +76,7 @@ config ARCH_AT91SAM9G45
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_AT91_USART3
+ 	select HAVE_FB_ATMEL
++	select HAVE_NET_MACB
+ 
+ config ARCH_AT91CAP9
+ 	bool "AT91CAP9"
+diff --git a/arch/avr32/Kconfig b/arch/avr32/Kconfig
+index f515727..9ac8725 100644
+--- a/arch/avr32/Kconfig
++++ b/arch/avr32/Kconfig
+@@ -90,6 +90,7 @@ config PLATFORM_AT32AP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select GENERIC_ALLOCATOR
+ 	select HAVE_FB_ATMEL
++	select HAVE_NET_MACB
+ 
+ #
+ # CPU types
+diff --git a/drivers/net/Kconfig b/drivers/net/Kconfig
+index 5a68953..2393030 100644
+--- a/drivers/net/Kconfig
++++ b/drivers/net/Kconfig
+@@ -2,6 +2,9 @@
+ # Network device configuration
+ #
+ 
++config HAVE_NET_MACB
++	bool
++
+ menuconfig NETDEVICES
+ 	default y if UML
+ 	depends on NET
+@@ -221,7 +224,7 @@ config MII
+ 
+ config MACB
+ 	tristate "Atmel MACB support"
+-	depends on AVR32 || ARCH_AT91SAM9260 || ARCH_AT91SAM9263 || ARCH_AT91SAM9G20 || ARCH_AT91SAM9G45 || ARCH_AT91CAP9
++	depends on HAVE_NET_MACB
+ 	select PHYLIB
+ 	help
+ 	  The Atmel MACB ethernet interface is found on many AT32 and AT91
+-- 
+1.7.1
