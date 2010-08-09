@@ -1,22 +1,29 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 9 Aug 2010 16:19:06 +0200
-Subject: Query: Patches break with Microsoft exchange server.
-In-Reply-To: <4C5F9B25.8080401@st.com>
-References: <4C5F9B25.8080401@st.com>
-Message-ID: <20100809141906.GA31487@riccoc20.at.omicron.at>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 9 Aug 2010 16:33:35 +0200
+Subject: [PATCH] i2c: Enable NXP LPC support in Kconfig
+In-Reply-To: <AANLkTimD2Odr2zTF5fammq9i+yeCTjOMqG+NXjiLnB-i@mail.gmail.com>
+References: <AANLkTimD2Odr2zTF5fammq9i+yeCTjOMqG+NXjiLnB-i@mail.gmail.com>
+Message-ID: <20100809143335.GC4682@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 09, 2010 at 11:37:33AM +0530, viresh kumar wrote:
+On Thu, Aug 05, 2010 at 03:40:17PM -0700, Kevin Wells wrote:
+> NXP LPC series processors use the IP3204 I2C block shared with the
+> Philips PNX4008 processor.
 > 
-> Has anybody found a solution to this kind of issues? Are there any
-> workarounds possible?
+> Signed-off-by: Kevin Wells <wellsk40@gmail.com>
 
-I have this same problem. The exchange server rewrites incoming and
-outgoing plain text emails as it sees fit, and our IT department seems
-unable to turn this "feature" off.
+FWIW
 
-One work around is to get an gmail account and use IMAP.
+Tested-by: Wolfram Sang <w.sang@pengutronix.de>
 
-Good luck,
-Richard
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100809/07d9db12/attachment.sig>
