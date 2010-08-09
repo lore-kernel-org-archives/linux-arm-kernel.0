@@ -1,282 +1,268 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon,  9 Aug 2010 11:05:36 +0200
-Subject: [PATCH 1/8] ARM i.MX dma: implement wrapper for dma functions
+Date: Mon,  9 Aug 2010 11:05:37 +0200
+Subject: [PATCH 2/8] ARM i.MX dma-mx1-mx2: use wrapper
 In-Reply-To: <1281344743-2029-1-git-send-email-s.hauer@pengutronix.de>
 References: <1281344743-2029-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1281344743-2029-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1281344743-2029-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently there is only one i.MX DMA implementation in the tree,
-the one for i.MX1/21/27. The SDMA support for i.MX25/31/35/51 can
-be implemented similarly. This wrapper for the DMA is implemented
-so that drivers do not have to care about the implementation
-present and don't have to #ifdef DMA support
+This patch implements the new DMA API for i.MX1/21/27. The
+old APIP is kept in the tree until all users have switched
+to the new API.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-imx/include/mach/dma-v1.h |    8 +--
- arch/arm/plat-mxc/Makefile              |    2 +-
- arch/arm/plat-mxc/dma.c                 |  112 +++++++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/dma.h    |   92 +++++++++++++++++++++++++
- 4 files changed, 207 insertions(+), 7 deletions(-)
- create mode 100644 arch/arm/plat-mxc/dma.c
- create mode 100644 arch/arm/plat-mxc/include/mach/dma.h
+ arch/arm/mach-imx/dma-v1.c                   |  142 +++++++++++++++++++++++---
+ arch/arm/mach-imx/include/mach/dma-mx1-mx2.h |    2 +-
+ 2 files changed, 128 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-imx/include/mach/dma-v1.h b/arch/arm/mach-imx/include/mach/dma-v1.h
-index 287431c..ac6fd71 100644
---- a/arch/arm/mach-imx/include/mach/dma-v1.h
-+++ b/arch/arm/mach-imx/include/mach/dma-v1.h
-@@ -27,6 +27,8 @@
- 
- #define imx_has_dma_v1()	(cpu_is_mx1() || cpu_is_mx21() || cpu_is_mx27())
- 
+diff --git a/arch/arm/mach-imx/dma-v1.c b/arch/arm/mach-imx/dma-v1.c
+index 3e8c47c..d141458 100644
+--- a/arch/arm/mach-imx/dma-v1.c
++++ b/arch/arm/mach-imx/dma-v1.c
+@@ -35,6 +35,7 @@
+ #include <asm/irq.h>
+ #include <mach/hardware.h>
+ #include <mach/dma-v1.h>
 +#include <mach/dma.h>
+ 
+ #define DMA_DCR     0x00		/* Control Register */
+ #define DMA_DISR    0x04		/* Interrupt status Register */
+@@ -112,6 +113,7 @@ struct imx_dma_channel {
+ 	void (*irq_handler) (int, void *);
+ 	void (*err_handler) (int, void *, int errcode);
+ 	void (*prog_handler) (int, void *, struct scatterlist *);
++	void (*completion_handler) (int channel, void *data, int error);
+ 	void *data;
+ 	unsigned int dma_mode;
+ 	struct scatterlist *sg;
+@@ -126,6 +128,11 @@ struct imx_dma_channel {
+ 	struct timer_list watchdog;
+ 
+ 	int hw_chaining;
 +
- #define IMX_DMA_CHANNELS  16
++	dma_addr_t dev_addr;
++
++	int sgcount;
++	int sgcur;
+ };
  
- #define DMA_MODE_READ		0
-@@ -96,12 +98,6 @@ int imx_dma_request(int channel, const char *name);
+ static void __iomem *imx_dmav1_baseaddr;
+@@ -308,6 +315,8 @@ imx_dma_setup_sg(int channel,
+ 	imxdma->sg = sg;
+ 	imxdma->dma_mode = dmamode;
+ 	imxdma->resbytes = dma_length;
++	imxdma->sgcount = sgcount;
++	imxdma->sgcur = 0;
  
- void imx_dma_free(int channel);
+ 	if (!sg || !sgcount) {
+ 		printk(KERN_ERR "imxdma%d: imx_dma_setup_sg empty sg list\n",
+@@ -341,8 +350,6 @@ imx_dma_setup_sg(int channel,
+ 		return -EINVAL;
+ 	}
  
--enum imx_dma_prio {
--	DMA_PRIO_HIGH = 0,
--	DMA_PRIO_MEDIUM = 1,
--	DMA_PRIO_LOW = 2
--};
+-	imx_dma_sg_next(channel, sg);
 -
- int imx_dma_request_by_prio(const char *name, enum imx_dma_prio prio);
+ 	return 0;
+ }
+ EXPORT_SYMBOL(imx_dma_setup_sg);
+@@ -470,6 +477,9 @@ void imx_dma_enable(int channel)
  
- #endif	/* __MACH_DMA_V1_H__ */
-diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-index 78d405e..ff9880c 100644
---- a/arch/arm/plat-mxc/Makefile
-+++ b/arch/arm/plat-mxc/Makefile
-@@ -3,7 +3,7 @@
- #
+ 	local_irq_save(flags);
  
- # Common support
--obj-y := irq.o clock.o gpio.o time.o devices.o cpu.o system.o
-+obj-y := irq.o clock.o gpio.o time.o devices.o cpu.o system.o dma.o
++	if (imxdma->sg)
++		imx_dma_sg_next(channel, imxdma->sg + imxdma->sgcur);
++
+ 	imx_dmav1_writel(1 << channel, DMA_DISR);
+ 	imx_dmav1_writel(imx_dmav1_readl(DMA_DIMR) & ~(1 << channel), DMA_DIMR);
+ 	imx_dmav1_writel(imx_dmav1_readl(DMA_CCR(channel)) | CCR_CEN |
+@@ -478,10 +488,14 @@ void imx_dma_enable(int channel)
+ #ifdef CONFIG_ARCH_MX2
+ 	if ((cpu_is_mx21() || cpu_is_mx27()) &&
+ 			imxdma->sg && imx_dma_hw_chain(imxdma)) {
+-		imxdma->sg = sg_next(imxdma->sg);
+-		if (imxdma->sg) {
++		imxdma->sgcur++;
++
++		if (imxdma->resbytes == IMX_DMA_LENGTH_LOOP)
++			imxdma->sgcur %= imxdma->sgcount;
++
++		if (imxdma->sgcur < imxdma->sgcount) {
+ 			u32 tmp;
+-			imx_dma_sg_next(channel, imxdma->sg);
++			imx_dma_sg_next(channel, imxdma->sg + imxdma->sgcur);
+ 			tmp = imx_dmav1_readl(DMA_CCR(channel));
+ 			imx_dmav1_writel(tmp | CCR_RPT | CCR_ACRPT,
+ 				DMA_CCR(channel));
+@@ -503,7 +517,7 @@ void imx_dma_disable(int channel)
+ 	struct imx_dma_channel *imxdma = &imx_dma_channels[channel];
+ 	unsigned long flags;
  
- # MX51 uses the TZIC interrupt controller, older platforms use AVIC (irq.o)
- obj-$(CONFIG_MXC_TZIC) += tzic.o
-diff --git a/arch/arm/plat-mxc/dma.c b/arch/arm/plat-mxc/dma.c
-new file mode 100644
-index 0000000..1a241ab
---- /dev/null
-+++ b/arch/arm/plat-mxc/dma.c
-@@ -0,0 +1,112 @@
+-	pr_debug("imxdma%d: imx_dma_disable\n", channel);
++	pr_info("imxdma%d: imx_dma_disable\n", channel);
+ 
+ 	if (imx_dma_hw_chain(imxdma))
+ 		del_timer(&imxdma->watchdog);
+@@ -522,13 +536,13 @@ EXPORT_SYMBOL(imx_dma_disable);
+ static void imx_dma_watchdog(unsigned long chno)
+ {
+ 	struct imx_dma_channel *imxdma = &imx_dma_channels[chno];
++	u32 tmp;
+ 
+-	imx_dmav1_writel(0, DMA_CCR(chno));
+-	imxdma->in_use = 0;
+-	imxdma->sg = NULL;
++	mod_timer(&imxdma->watchdog, jiffies + msecs_to_jiffies(500));
+ 
+-	if (imxdma->err_handler)
+-		imxdma->err_handler(chno, imxdma->data, IMX_DMA_ERR_TIMEOUT);
++	tmp = imx_dmav1_readl(DMA_CCR(chno));
++	imx_dmav1_writel(0, DMA_CCR(chno));
++	imx_dmav1_writel(tmp, DMA_CCR(chno));
+ }
+ #endif
+ 
+@@ -607,11 +621,14 @@ static void dma_irq_handle_channel(int chno)
+ 
+ 	if (imxdma->sg) {
+ 		u32 tmp;
+-		struct scatterlist *current_sg = imxdma->sg;
+-		imxdma->sg = sg_next(imxdma->sg);
++		struct scatterlist *current_sg = imxdma->sg + imxdma->sgcur;
+ 
+-		if (imxdma->sg) {
+-			imx_dma_sg_next(chno, imxdma->sg);
++		imxdma->sgcur++;
++		if (imxdma->resbytes == IMX_DMA_LENGTH_LOOP)
++			imxdma->sgcur %= imxdma->sgcount;
 +
-+#include <mach/dma.h>
-+
-+static struct imx_dma_operations *imx_dma_ops;
-+
-+static DEFINE_MUTEX(dma_mutex);
-+
-+static int imxdma_check(int channel)
++		if (imxdma->sgcur < imxdma->sgcount) {
++			imx_dma_sg_next(chno, imxdma->sg + imxdma->sgcur);
+ 
+ 			tmp = imx_dmav1_readl(DMA_CCR(chno));
+ 
+@@ -798,6 +815,99 @@ int imx_dma_request_by_prio(const char *name, enum imx_dma_prio prio)
+ }
+ EXPORT_SYMBOL(imx_dma_request_by_prio);
+ 
++static void __irq_handler(int channel, void *data)
 +{
-+	if (!imx_dma_ops)
-+		return -ENOSYS;
-+	if (channel < 0 || channel >= imx_dma_ops->num_channels)
++	struct imx_dma_channel *imxdma = &imx_dma_channels[channel];
++
++	imxdma->completion_handler(channel, data, 0);
++}
++
++static void __prog_handler(int channel, void *data, struct scatterlist *unused)
++{
++	struct imx_dma_channel *imxdma = &imx_dma_channels[channel];
++
++	imxdma->completion_handler(channel, data, 0);
++}
++
++static int config_channel(int channel, struct imx_dma_config *cfg)
++{
++	struct imx_dma_channel *imxdma = &imx_dma_channels[channel];
++	unsigned int config_port;
++
++	imxdma->completion_handler = cfg->completion_handler;
++
++	imx_dma_config_burstlen(channel, cfg->burstlen * cfg->word_size);
++	imx_dma_setup_handlers(channel, __irq_handler,
++			NULL,
++			cfg->driver_data);
++
++	imxdma->dev_addr = cfg->dma_address;
++
++	switch (cfg->word_size) {
++	case 1:
++		config_port = IMX_DMA_MEMSIZE_8;
++		break;
++	case 2:
++		config_port = IMX_DMA_MEMSIZE_16;
++		break;
++	case 4:
++		config_port = IMX_DMA_MEMSIZE_32;
++		break;
++	default:
 +		return -EINVAL;
++	}
++
++	config_port |= IMX_DMA_TYPE_FIFO;
++
++	imx_dma_config_channel(channel, config_port,
++			IMX_DMA_MEMSIZE_32, cfg->dma_request, 1);
++
++	if (cfg->flags & IMX_DMA_SG_LOOP) {
++		imxdma->resbytes = IMX_DMA_LENGTH_LOOP;
++		imx_dma_setup_progression_handler(channel, __prog_handler);
++	}
++
 +	return 0;
 +}
 +
-+int imxdma_setup_single(int channel, dma_addr_t mem, int dma_length,
++static int setup_single(int channel, dma_addr_t mem, int dma_length,
 +		unsigned int dmamode)
 +{
-+	int ret;
++	struct imx_dma_channel *imxdma = &imx_dma_channels[channel];
 +
-+	ret = imxdma_check(channel);
-+	if (ret)
-+		return ret;
-+
-+	return imx_dma_ops->setup_single(channel, mem, dma_length, dmamode);
++	return imx_dma_setup_single(channel, mem,
++		     dma_length, imxdma->dev_addr,
++		     dmamode);
 +}
 +
-+int imxdma_setup_sg(int channel, struct scatterlist *sg, unsigned int sgcount,
++static int setup_sg(int channel, struct scatterlist *sg, unsigned int sgcount,
 +			unsigned int dma_length, unsigned int dmamode)
 +{
-+	int ret;
++	struct imx_dma_channel *imxdma = &imx_dma_channels[channel];
 +
-+	ret = imxdma_check(channel);
-+	if (ret)
-+		return ret;
++	if (imxdma->resbytes == IMX_DMA_LENGTH_LOOP)
++		dma_length = IMX_DMA_LENGTH_LOOP;
 +
-+	return imx_dma_ops->setup_sg(channel, sg, sgcount, dma_length, dmamode);
++	return imx_dma_setup_sg(channel, sg, sgcount, dma_length,
++			imxdma->dev_addr,
++			dmamode);
 +}
 +
-+void imxdma_enable(int channel)
++static int request_channel(enum imx_dma_prio prio)
 +{
-+	int ret;
-+
-+	ret = imxdma_check(channel);
-+	if (ret)
-+		return;
-+
-+	imx_dma_ops->enable(channel);
++	return imx_dma_request_by_prio("imxdma", prio);
 +}
 +
-+void imxdma_disable(int channel)
-+{
-+	int ret;
-+
-+	ret = imxdma_check(channel);
-+	if (ret)
-+		return;
-+
-+	imx_dma_ops->disable(channel);
-+}
-+
-+int imxdma_config(int channel, struct imx_dma_config *cfg)
-+{
-+	int ret;
-+
-+	ret = imxdma_check(channel);
-+	if (ret)
-+		return ret;
-+
-+	return imx_dma_ops->config_channel(channel, cfg);
-+}
-+
-+int imxdma_request(enum imx_dma_prio prio)
-+{
-+	int ret;
-+
-+	if (!imx_dma_ops)
-+		return -ENOSYS;
-+
-+	mutex_lock(&dma_mutex);
-+
-+	ret = imx_dma_ops->request(prio);
-+
-+	mutex_unlock(&dma_mutex);
-+
-+	return ret;
-+}
-+
-+void imxdma_free(int channel)
-+{
-+	int ret;
-+
-+	ret = imxdma_check(channel);
-+	if (ret)
-+		return;
-+
-+	mutex_lock(&dma_mutex);
-+
-+	imx_dma_ops->free(channel);
-+
-+	mutex_unlock(&dma_mutex);
-+}
-+
-+int imx_dma_ops_register(struct imx_dma_operations *ops)
-+{
-+	BUG_ON(imx_dma_ops);
-+
-+	imx_dma_ops = ops;
-+
-+	return 0;
-+}
-diff --git a/arch/arm/plat-mxc/include/mach/dma.h b/arch/arm/plat-mxc/include/mach/dma.h
-new file mode 100644
-index 0000000..3ee9541
---- /dev/null
-+++ b/arch/arm/plat-mxc/include/mach/dma.h
-@@ -0,0 +1,92 @@
-+/*
-+ * Copyright 2004-2009 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_ARCH_MXC_DMA_H__
-+#define __ASM_ARCH_MXC_DMA_H__
-+
-+#include <linux/scatterlist.h>
-+
-+#define DMA_MODE_READ	0
-+#define DMA_MODE_WRITE	1
-+
-+/*
-+ * This enumerates peripheral types. Used for SDMA.
-+ */
-+typedef enum {
-+	IMX_DMATYPE_SSI,	/* MCU domain SSI */
-+	IMX_DMATYPE_SSI_SP,	/* Shared SSI */
-+	IMX_DMATYPE_MMC,	/* MMC */
-+	IMX_DMATYPE_SDHC,	/* SDHC */
-+	IMX_DMATYPE_UART,	/* MCU domain UART */
-+	IMX_DMATYPE_UART_SP,	/* Shared UART */
-+	IMX_DMATYPE_FIRI,	/* FIRI */
-+	IMX_DMATYPE_CSPI,	/* MCU domain CSPI */
-+	IMX_DMATYPE_CSPI_SP,	/* Shared CSPI */
-+	IMX_DMATYPE_SIM,	/* SIM */
-+	IMX_DMATYPE_ATA,	/* ATA */
-+	IMX_DMATYPE_CCM,	/* CCM */
-+	IMX_DMATYPE_EXT,	/* External peripheral */
-+	IMX_DMATYPE_MSHC,	/* Memory Stick Host Controller */
-+	IMX_DMATYPE_MSHC_SP,	/* Shared Memory Stick Host Controller */
-+	IMX_DMATYPE_DSP,	/* DSP */
-+	IMX_DMATYPE_MEMORY,	/* Memory */
-+	IMX_DMATYPE_FIFO_MEMORY,/* FIFO type Memory */
-+	IMX_DMATYPE_SPDIF,	/* SPDIF */
-+	IMX_DMATYPE_IPU_MEMORY,	/* IPU Memory */
-+	IMX_DMATYPE_ASRC,	/* ASRC */
-+	IMX_DMATYPE_ESAI,	/* ESAI */
-+} sdma_peripheral_type;
-+
-+struct imx_dma_config {
-+	int burstlen; /* number of words (*not* bytes) to transfer during
-+		       * a single burst
-+		       */
-+	dma_addr_t dma_address; /* the physical address of the peripheral */
-+	int word_size; /* FIFO width of the peripheral in bytes */
-+	int peripheral_type; /* Needed for SDMA */
-+	int dma_request; /* DMA request line */
-+	/* completion callback */
-+	void (*completion_handler) (int channel, void *data, int error);
-+	void *driver_data; /* passed to handler above */
-+#define IMX_DMA_SG_LOOP		(1 << 0)
-+	unsigned long flags;
++static struct imx_dma_operations imxdma_ops = {
++	.config_channel = config_channel,
++	.setup_single = setup_single,
++	.setup_sg = setup_sg,
++	.enable = imx_dma_enable,
++	.disable = imx_dma_disable,
++	.request = request_channel,
++	.free = imx_dma_free,
 +};
 +
-+enum imx_dma_prio {
-+	DMA_PRIO_HIGH = 0,
-+	DMA_PRIO_MEDIUM = 1,
-+	DMA_PRIO_LOW = 2
-+};
+ static int __init imx_dma_init(void)
+ {
+ 	int ret = 0;
+@@ -856,6 +966,8 @@ static int __init imx_dma_init(void)
+ 		imx_dma_channels[i].dma_num = i;
+ 	}
+ 
++	imx_dma_ops_register(&imxdma_ops);
 +
-+int imxdma_request(enum imx_dma_prio);
-+void imxdma_free(int channel);
-+int imxdma_setup_single(int channel, dma_addr_t mem, int dma_length,
-+		unsigned int dmamode);
-+int imxdma_setup_sg(int channel, struct scatterlist *sg, unsigned int sgcount,
-+			unsigned int dma_length, unsigned int dmamode);
-+void imxdma_enable(int channel);
-+void imxdma_disable(int channel);
-+int imxdma_config(int channel, struct imx_dma_config *cfg);
-+
-+struct imx_dma_operations {
-+	int (*config_channel)(int channel, struct imx_dma_config *cfg);
-+	int (*setup_single)(int channel, dma_addr_t mem, int dma_length,
-+		unsigned int dmamode);
-+	int (*setup_sg)(int channel, struct scatterlist *sg,
-+			unsigned int sgcount, unsigned int dma_length,
-+			unsigned int dmamode);
-+	void (*enable)(int channel);
-+	void (*disable)(int channel);
-+	int (*request)(enum imx_dma_prio);
-+	void (*free)(int channel);
-+	int num_channels;
-+};
-+
-+int imx_dma_ops_register(struct imx_dma_operations *ops);
-+
-+#endif
+ 	return ret;
+ }
+ 
+diff --git a/arch/arm/mach-imx/include/mach/dma-mx1-mx2.h b/arch/arm/mach-imx/include/mach/dma-mx1-mx2.h
+index df5f522..90b7971 100644
+--- a/arch/arm/mach-imx/include/mach/dma-mx1-mx2.h
++++ b/arch/arm/mach-imx/include/mach/dma-mx1-mx2.h
+@@ -2,7 +2,7 @@
+ #define __MACH_DMA_MX1_MX2_H__
+ /*
+  * Don't use this header in new code, it will go away when all users are
+- * converted to mach/dma-v1.h
++ * converted to mach/dma.h
+  */
+ 
+ #include <mach/dma-v1.h>
 -- 
 1.7.1
