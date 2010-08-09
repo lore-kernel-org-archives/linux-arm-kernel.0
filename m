@@ -1,87 +1,52 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon,  9 Aug 2010 15:20:51 +0200
-Subject: [PATCH 07/12] mxc_nand: fix correct_data function
+Date: Mon,  9 Aug 2010 15:20:53 +0200
+Subject: [PATCH 09/12] mxc_nand: Do not do byte accesses to the NFC buffer.
 In-Reply-To: <1281360053-8386-1-git-send-email-s.hauer@pengutronix.de>
 References: <1281360053-8386-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1281360053-8386-8-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1281360053-8386-10-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The v2 controller has a totally different mechanism to check
-whether the data we read had ecc errors or not. Implement this.
-The mechanism in the v2 controller happens to be identical to
-the v3 controller.
+From: John Ogness <john.ogness@linutronix.de>
 
+This patch avoids byte access to the NFC buffer. Byte access to the
+NFC is not allowed.
+
+The patch is against linux-next 20100618.
+
+Signed-off-by: John Ogness <john.ogness@linutronix.de>
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/mtd/nand/mxc_nand.c |   41 +++++++++++++++++++++++++++++++++++++++--
- 1 files changed, 39 insertions(+), 2 deletions(-)
+ drivers/mtd/nand/mxc_nand.c |   14 +++++++-------
+ 1 files changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index c616c19..030da08 100644
+index d88f0fa..a85b60a 100644
 --- a/drivers/mtd/nand/mxc_nand.c
 +++ b/drivers/mtd/nand/mxc_nand.c
-@@ -344,7 +344,7 @@ static void mxc_nand_enable_hwecc(struct mtd_info *mtd, int mode)
- 	 */
+@@ -402,16 +402,16 @@ static void send_read_id_v1_v2(struct mxc_nand_host *host)
+ 	/* Wait for operation to complete */
+ 	wait_op_done(host, true);
+ 
++	memcpy(host->data_buf, host->main_area0, 16);
++
+ 	if (this->options & NAND_BUSWIDTH_16) {
+-		void __iomem *main_buf = host->main_area0;
+ 		/* compress the ID info */
+-		writeb(readb(main_buf + 2), main_buf + 1);
+-		writeb(readb(main_buf + 4), main_buf + 2);
+-		writeb(readb(main_buf + 6), main_buf + 3);
+-		writeb(readb(main_buf + 8), main_buf + 4);
+-		writeb(readb(main_buf + 10), main_buf + 5);
++		host->data_buf[1] = host->data_buf[2];
++		host->data_buf[2] = host->data_buf[4];
++		host->data_buf[3] = host->data_buf[6];
++		host->data_buf[4] = host->data_buf[8];
++		host->data_buf[5] = host->data_buf[10];
+ 	}
+-	memcpy(host->data_buf, host->main_area0, 16);
  }
  
--static int mxc_nand_correct_data(struct mtd_info *mtd, u_char *dat,
-+static int mxc_nand_correct_data_v1(struct mtd_info *mtd, u_char *dat,
- 				 u_char *read_ecc, u_char *calc_ecc)
- {
- 	struct nand_chip *nand_chip = mtd->priv;
-@@ -366,6 +366,40 @@ static int mxc_nand_correct_data(struct mtd_info *mtd, u_char *dat,
- 	return 0;
- }
- 
-+static int mxc_nand_correct_data_v2_v3(struct mtd_info *mtd, u_char *dat,
-+				 u_char *read_ecc, u_char *calc_ecc)
-+{
-+	struct nand_chip *nand_chip = mtd->priv;
-+	struct mxc_nand_host *host = nand_chip->priv;
-+	u32 ecc_stat, err;
-+	int no_subpages = 1;
-+	int ret = 0;
-+	u8 ecc_bit_mask, err_limit;
-+
-+	ecc_bit_mask = (host->eccsize == 4) ? 0x7 : 0xf;
-+	err_limit = (host->eccsize == 4) ? 0x4 : 0x8;
-+
-+	no_subpages = mtd->writesize >> 9;
-+
-+	ecc_stat = readl(NFC_V1_V2_ECC_STATUS_RESULT);
-+
-+	do {
-+		err = ecc_stat & ecc_bit_mask;
-+		if (err > err_limit) {
-+			printk(KERN_WARNING "UnCorrectable RS-ECC Error\n");
-+			return -1;
-+		} else {
-+			ret += err;
-+		}
-+		ecc_stat >>= 4;
-+	} while (--no_subpages);
-+
-+	mtd->ecc_stats.corrected += ret;
-+	pr_debug("%d Symbol Correctable RS-ECC Error\n", ret);
-+
-+	return ret;
-+}
-+
- static int mxc_nand_calculate_ecc(struct mtd_info *mtd, const u_char *dat,
- 				  u_char *ecc_code)
- {
-@@ -818,7 +852,10 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 	if (pdata->hw_ecc) {
- 		this->ecc.calculate = mxc_nand_calculate_ecc;
- 		this->ecc.hwctl = mxc_nand_enable_hwecc;
--		this->ecc.correct = mxc_nand_correct_data;
-+		if (nfc_is_v1())
-+			this->ecc.correct = mxc_nand_correct_data_v1;
-+		else
-+			this->ecc.correct = mxc_nand_correct_data_v2_v3;
- 		this->ecc.mode = NAND_ECC_HW;
- 	} else {
- 		this->ecc.mode = NAND_ECC_SOFT;
+ static uint16_t get_dev_status_v3(struct mxc_nand_host *host)
 -- 
 1.7.1
