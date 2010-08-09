@@ -1,56 +1,51 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 9 Aug 2010 14:28:33 +0200
-Subject: [PATCH 1/2] mxc_nand: fix build error
-In-Reply-To: <4db426cd74bc8aae80ddcbf666681c3cd439dfc7.1281353601.git.baruch@tkos.co.il>
+From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
+Date: Mon, 9 Aug 2010 14:34:08 +0200
+Subject: [PATCH 2/2] mxc_nand: remove unused variables
+In-Reply-To: <d4b734ef5662b65466fbe959bd1fc993a7f08398.1281353601.git.baruch@tkos.co.il>
 References: <1281102791-8089-1-git-send-email-s.hauer@pengutronix.de>
 	<cover.1281353601.git.baruch@tkos.co.il>
-	<4db426cd74bc8aae80ddcbf666681c3cd439dfc7.1281353601.git.baruch@tkos.co.il>
-Message-ID: <20100809122833.GB27749@pengutronix.de>
+	<d4b734ef5662b65466fbe959bd1fc993a7f08398.1281353601.git.baruch@tkos.co.il>
+Message-ID: <19551.62912.570721.778442@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 09, 2010 at 02:38:13PM +0300, Baruch Siach wrote:
-> drivers/mtd/nand/mxc_nand.c: In function 'mxc_nand_command':
-> drivers/mtd/nand/mxc_nand.c:908: error: implicit declaration of function 'send_cmd'
+Hi,
 
-This is because you based my series on 2.6.35. With current master this
-patch is not necessary.
-
-Sascha
-
-> 
+Baruch Siach writes:
 > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 > ---
->  drivers/mtd/nand/mxc_nand.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+>  drivers/mtd/nand/mxc_nand.c |    5 +----
+>  1 files changed, 1 insertions(+), 4 deletions(-)
 > 
 > diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-> index 4032e0b..3092240 100644
+> index 3092240..dfa8311 100644
 > --- a/drivers/mtd/nand/mxc_nand.c
 > +++ b/drivers/mtd/nand/mxc_nand.c
-> @@ -905,13 +905,13 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
+> @@ -1210,15 +1210,12 @@ static int mxcnd_suspend(struct platform_device *pdev, pm_message_t state)
+>  static int mxcnd_resume(struct platform_device *pdev)
+>  {
+>  	struct mtd_info *mtd = platform_get_drvdata(pdev);
+> -	struct nand_chip *nand_chip = mtd->priv;
+> -	struct mxc_nand_host *host = nand_chip->priv;
+> -	int ret = 0;
 >  
->  			/* Set program pointer to spare region */
->  			if (mtd->writesize == 512)
-> -				send_cmd(host, NAND_CMD_READOOB, false);
-> +				host->send_cmd(host, NAND_CMD_READOOB, false);
->  		} else {
->  			host->buf_start = column;
+>  	DEBUG(MTD_DEBUG_LEVEL0, "MXC_ND : NAND resume\n");
 >  
->  			/* Set program pointer to page start */
->  			if (mtd->writesize == 512)
-> -				send_cmd(host, NAND_CMD_READ0, false);
-> +				host->send_cmd(host, NAND_CMD_READ0, false);
->  		}
+>  	mtd->resume(mtd);
 >  
->  		host->send_cmd(host, command, false);
-> -- 
-> 1.7.1
-> 
-> 
+There was a patch to remove the whole function mxcnd_resume() because
+the call to mtd->resume() is done elsewhere in the MTD layer:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/018243.html
 
+
+Lothar Wa?mann
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
