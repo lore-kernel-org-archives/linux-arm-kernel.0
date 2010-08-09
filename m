@@ -1,25 +1,32 @@
-From: eric.y.miao@gmail.com (eric.y.miao at gmail.com)
-Date: Mon, 9 Aug 2010 10:03:25 +0800
-Subject: [PATCH] fix GDB_MAX_REGS not defined in arch/arm/kernel/kgdb.c
-Message-ID: <AANLkTik=1qGsDFfMfkP4G3S5mH3NhxycJvNL-q2RGraO@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon,  9 Aug 2010 07:20:23 +0300
+Subject: [PATCH] nand: fix .correct callback return value check
+In-Reply-To: <20100808204341.GA20065@pengutronix.de>
+References: <20100808204341.GA20065@pengutronix.de>
+Message-ID: <ca767a0d6cafbea862c307e944c2b800dafb6660.1281327492.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-How about this?
+Drivers may (and do) return negative errno values other than -1 from the
+.correct callback.
 
-Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ drivers/mtd/nand/nand_base.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
-index 778c2f7..d6e8b4d 100644
---- a/arch/arm/kernel/kgdb.c
-+++ b/arch/arm/kernel/kgdb.c
-@@ -79,7 +79,7 @@ sleeping_thread_to_gdb_regs(unsigned long *gdb_regs,
-struct task_struct *task)
- 		return;
-
- 	/* Initialize to zero */
--	for (regno = 0; regno < GDB_MAX_REGS; regno++)
-+	for (regno = 0; regno < DBG_MAX_REG_NUM; regno++)
- 		gdb_regs[regno] = 0;
-
- 	/* Otherwise, we have only some registers from switch_to() */
+diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+index 4a7b864..080f551 100644
+--- a/drivers/mtd/nand/nand_base.c
++++ b/drivers/mtd/nand/nand_base.c
+@@ -1210,7 +1210,7 @@ static int nand_read_subpage(struct mtd_info *mtd, struct nand_chip *chip, uint3
+ 		int stat;
+ 
+ 		stat = chip->ecc.correct(mtd, p, &chip->buffers->ecccode[i], &chip->buffers->ecccalc[i]);
+-		if (stat == -1)
++		if (stat < 0)
+ 			mtd->ecc_stats.failed++;
+ 		else
+ 			mtd->ecc_stats.corrected += stat;
+-- 
+1.7.1
