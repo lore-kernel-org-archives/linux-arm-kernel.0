@@ -1,55 +1,35 @@
-From: mihai.dontu@gmail.com (Mihai =?utf-8?q?Don=C8=9Bu?=)
-Date: Mon, 9 Aug 2010 21:15:25 +0300
-Subject: Query: Patches break with Microsoft exchange server.
-In-Reply-To: <4C6040FC.2020702@gmail.com>
-References: <4C5F9B25.8080401@st.com>
-	<201008091735.11105.mihai.dontu@gmail.com>
-	<4C6040FC.2020702@gmail.com>
-Message-ID: <201008092115.25992.mihai.dontu@gmail.com>
+From: lilja.magnus@gmail.com (Magnus Lilja)
+Date: Mon, 09 Aug 2010 20:38:14 +0200
+Subject: [RFC] SDMA support for i.MX
+In-Reply-To: <1281344743-2029-1-git-send-email-s.hauer@pengutronix.de>
+References: <1281344743-2029-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <4C604B16.7000309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 August 2010 20:55:08 Justin P. Mattock wrote:
-> On 08/09/2010 07:35 AM, Mihai Don?u wrote:
-> > On Monday 09 August 2010 12:43:16 Justin P. Mattock wrote:
-> >> On 08/09/2010 02:35 AM, viresh kumar wrote:
-> >>> On 8/9/2010 2:31 PM, Matti Aarnio wrote:
-> >>>> On Mon, Aug 09, 2010 at 12:26:24PM +0530, viresh kumar wrote:
-> >>>>>> I missed this information in my last mail. We are using git
-> >>>>>> send-email for sending patches. As patches will go through
-> >>>>>> Microsoft exchange server only, so they are broken.
-> >>>> 
-> >>>> Let your boss complain to your IT keepers.
-> >>>> "These are Machine-to-Machine messages, they must not be modified!"
-> >>>> 
-> >>>> 
-> >>>> It would probably be "against corporate policy" to use gmail for these
-> >>>> emails...
-> >>> 
-> >>> We got one solution: Upgrade Exchange server to SP2.
-> >>> Lets see if our IT department does this upgradation.
-> >> 
-> >> that or just blast them with some cryptology..i.e. pretty sure if your
-> >> message was encapsulated(AH/ESP) they couldn't tweak it.. but then
-> >> sending such encryption to a public list would require a _key_ on the
-> >> other side.. wishful thinking...
-> >> (just a thought)...
-> > 
-> > Shouldn't just signing the message be enough? The server (normally) would
-> > not alter it, otherwise it will break the signature (which is a too
-> > obvious bug even for Microsoft). Or am I missing something here?
-> > 
-> > PS: A local SMTP with DKIM signing capabilities could be another
-> > possibility, assuming Exchange does not break such signatures.
+Hi Sascha,
+
+On 2010-08-09 11:05, Sascha Hauer wrote:
+> Hi all,
 > 
-> yeah that would probably be just enough to get through without Microsoft
-> mucking around with the font etc.., but the biggest problem(I see) with
-> the encryption is having the key on the other end of the line.
+> Ever wondered what's hidden behind the tons of SDMA/iapi stuff in the
+> Freescale kernel? It's a nice and convenient to use DMA engine. The
+> following patches add support for it.
 
-Wait. I don't think we're on the same page here. I'm talking about message 
-signing (which does not require the receiving end to have any key - it's the 
-same plain text e-mail with a blob after it) while you refer to actually 
-encrypting the message. Mm? Or am I being extremely slow today? :-)
 
--- 
-Mihai Don?u
+Nice!
+
+> git://git.pengutronix.de/git/imx/sdma-firmware.git
+> 
+> As the layout of the firmware is not given by fsl but by me it should
+> be part of the review.
+
+I don't have any comments on the layout but some general comments on files in sdma-firmware.git:
+
+Some files are missing copyright and license information.
+
+Shouldn't the gen_one() function do a free(name) also when everything is successfull? I.e. before return 0.
+Also, in case of errors after line 67, fclose(f) should be called.
+
+
+Regards, Magnus
