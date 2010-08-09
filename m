@@ -1,38 +1,40 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon,  9 Aug 2010 14:38:14 +0300
-Subject: [PATCH 2/2] mxc_nand: remove unused variables
+Date: Mon,  9 Aug 2010 14:38:13 +0300
+Subject: [PATCH 1/2] mxc_nand: fix build error
 In-Reply-To: <cover.1281353601.git.baruch@tkos.co.il>
 References: <1281102791-8089-1-git-send-email-s.hauer@pengutronix.de>
 	<cover.1281353601.git.baruch@tkos.co.il>
-Message-ID: <d4b734ef5662b65466fbe959bd1fc993a7f08398.1281353601.git.baruch@tkos.co.il>
+Message-ID: <4db426cd74bc8aae80ddcbf666681c3cd439dfc7.1281353601.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+drivers/mtd/nand/mxc_nand.c: In function 'mxc_nand_command':
+drivers/mtd/nand/mxc_nand.c:908: error: implicit declaration of function 'send_cmd'
+
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- drivers/mtd/nand/mxc_nand.c |    5 +----
- 1 files changed, 1 insertions(+), 4 deletions(-)
+ drivers/mtd/nand/mxc_nand.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 3092240..dfa8311 100644
+index 4032e0b..3092240 100644
 --- a/drivers/mtd/nand/mxc_nand.c
 +++ b/drivers/mtd/nand/mxc_nand.c
-@@ -1210,15 +1210,12 @@ static int mxcnd_suspend(struct platform_device *pdev, pm_message_t state)
- static int mxcnd_resume(struct platform_device *pdev)
- {
- 	struct mtd_info *mtd = platform_get_drvdata(pdev);
--	struct nand_chip *nand_chip = mtd->priv;
--	struct mxc_nand_host *host = nand_chip->priv;
--	int ret = 0;
+@@ -905,13 +905,13 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
  
- 	DEBUG(MTD_DEBUG_LEVEL0, "MXC_ND : NAND resume\n");
+ 			/* Set program pointer to spare region */
+ 			if (mtd->writesize == 512)
+-				send_cmd(host, NAND_CMD_READOOB, false);
++				host->send_cmd(host, NAND_CMD_READOOB, false);
+ 		} else {
+ 			host->buf_start = column;
  
- 	mtd->resume(mtd);
+ 			/* Set program pointer to page start */
+ 			if (mtd->writesize == 512)
+-				send_cmd(host, NAND_CMD_READ0, false);
++				host->send_cmd(host, NAND_CMD_READ0, false);
+ 		}
  
--	return ret;
-+	return 0;
- }
- 
- #else
+ 		host->send_cmd(host, command, false);
 -- 
 1.7.1
