@@ -1,46 +1,60 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 09 Aug 2010 12:55:17 -0400 (EDT)
-Subject: [PATCH] [ARM] Introduce patching of phys_to_virt and vice versa
-In-Reply-To: <20100808222402.GF23623@n2100.arm.linux.org.uk>
-References: <1277542025-19881-1-git-send-email-eric.miao@canonical.com>
-	<1278083164.15298.55.camel@ra7055-laptop>
-	<20100720211629.GB10553@n2100.arm.linux.org.uk>
-	<AANLkTimyif7CCoNwdKMCA=P+y=0e9uhwfhRchbMuB7eY@mail.gmail.com>
-	<20100805094521.GB23473@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1008061256170.28809@xanadu.home>
-	<20100808222402.GF23623@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1008091251460.10330@xanadu.home>
+From: darkstar6262@gmail.com (Cory Maccarrone)
+Date: Mon, 9 Aug 2010 10:28:10 -0700
+Subject: [PATCH 4/5] [omap1] Bluetooth device code common to HTC
+	smartphones
+In-Reply-To: <20100809074300.GB32480@atomide.com>
+References: <1280762976-17284-1-git-send-email-darkstar6262@gmail.com>
+	<1280762976-17284-5-git-send-email-darkstar6262@gmail.com>
+	<20100804101507.GG9881@atomide.com>
+	<AANLkTikGA9-TCM7v+_yivBYtxiX3ByJ7_ub1FOP0LgBO@mail.gmail.com>
+	<20100809074300.GB32480@atomide.com>
+Message-ID: <AANLkTinQ+50aFPj6M0yEnE_nemamnBb8=emD--VZ_hsG@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 8 Aug 2010, Russell King - ARM Linux wrote:
+On Mon, Aug 9, 2010 at 12:43 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Cory Maccarrone <darkstar6262@gmail.com> [100808 20:22]:
+>> On Wed, Aug 4, 2010 at 3:15 AM, Tony Lindgren <tony@atomide.com> wrote:
+>> > * Cory Maccarrone <darkstar6262@gmail.com> [100802 18:23]:
+>> >> This change adds in a bluetooth controld driver/rfkill
+>> >> interface to the serial bluetooth controller found on many
+>> >> HTC smartphones such as the HTC Herald and HTC Wizard.
+>> >
+>> > To me it looks like most of this should be in drivers/bluetooth/omap7xx.c
+>> > or something like that. Then you can just pass it the gpio numbers in
+>> > the platform_data.
+>> >
+>>
+>> Not sure I agree that it fits there. ?The driver isn't really a
+>> bluetooth driver -- it's really just an RFKILL interface, and some
+>> code to toggle UART clocks on and off, plus GPIO work on a
+>> board-specific level. ?In principle, the gpios could be set and the
+>> clocks enabled in the board files, and this driver wouldn't be
+>> necessary to get working bluetooth (as we'd use hciattach on
+>> /dev/ttyS*). ?But then, we can't toggle it off for power saving.
+>> Maybe a better place would be plat-omap/? ?But it really is more
+>> specific to these HTC boards, not the architecture itself.
+>
+> Hmm well what we've used earlier is to set something like set_power
+> function pointer in the platform data, then call that in the driver
+> if set. But in this case the driver is 8250.c, so let's not mess
+> with that..
+>
+> This issue should get properly solved with the omap specific serial
+> driver once we get that merged as then we can have hooks for set_power
+> in addition to cutting serial clocks when idle.
+>
+>> So really, the only point of this driver is to be able to power on and
+>> off the external bluetooth chip, which is why I submitted it as helper
+>> code to the board files.
+>
+> Yeah. Can you take a look at the omap specific serial driver to get
+> it working on omap1?
+>
+> Then you can have your GPIO functions set in the board-*.c file
+> as set_power or similar, and the UART driver can idle properly.
+>
 
-> On Fri, Aug 06, 2010 at 01:07:46PM -0400, Nicolas Pitre wrote:
-> > No idea.  That depends how gcc is considering inline asm.  Given there 
-> > is one input operand, I suppose gcc would account for the delay slot 
-> > before that operand is actually available.
-> 
-> For something which could very well become by default enabled across
-> the board - due to the push to have a single kernel binary for lots
-> of significantly different platforms - it seems little research has
-> been carried out on this point.
-> 
-> While I agree that other obvious solutions would be more expensive, I
-> think it makes sense to have the commit which is introducing this
-> method include a proper evaluation, not least so that people who need
-> to make the decision to enable this aren't repeating the same research
-> that someone else has done (or, worse, just decide to enable it 'just
-> because' without any understanding of what the effect may be.)
+I can look at it.  Where is the code for that, arch/arm/mach-omap2/serial.c?
 
-Sure, I agree.  I'll contact gcc people for a definitive answer.
-
-> I think we also need to consider whether the volatile is really required.
-> This asm() doesn't have any side effects other than its output operand,
-> so I suspect that the volatile may get in the way of some optimisations
-> (such as deleting the operation if the output is not actually used.)
-
-Indeed, the volatile should go.  This is even getting in the way of 
-better scheduling.
-
-
-Nicolas
+- Cory
