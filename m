@@ -1,18 +1,25 @@
 From: eric.y.miao@gmail.com (eric.y.miao at gmail.com)
-Date: Mon, 9 Aug 2010 09:57:40 +0800
-Subject: [ERROR] kgdb: GDB_MAX_REGS not defined
-Message-ID: <AANLkTimaSFG7ad6=NC9VB_S7hx+Y7SZ8ktxjJDo-NeEF@mail.gmail.com>
+Date: Mon, 9 Aug 2010 10:03:25 +0800
+Subject: [PATCH] fix GDB_MAX_REGS not defined in arch/arm/kernel/kgdb.c
+Message-ID: <AANLkTik=1qGsDFfMfkP4G3S5mH3NhxycJvNL-q2RGraO@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-/home/ycmiao/linux-2.6/arch/arm/kernel/kgdb.c: In function
-'sleeping_thread_to_gdb_regs':
-/home/ycmiao/linux-2.6/arch/arm/kernel/kgdb.c:82: error:
-'GDB_MAX_REGS' undeclared (first use in this function)
-/home/ycmiao/linux-2.6/arch/arm/kernel/kgdb.c:82: error: (Each
-undeclared identifier is reported only once
-/home/ycmiao/linux-2.6/arch/arm/kernel/kgdb.c:82: error: for each
-function it appears in.)
-make[2]: *** [arch/arm/kernel/kgdb.o] Error 1
-make[1]: *** [arch/arm/kernel] Error 2
-make: *** [sub-make] Error 2
+How about this?
+
+Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+
+diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
+index 778c2f7..d6e8b4d 100644
+--- a/arch/arm/kernel/kgdb.c
++++ b/arch/arm/kernel/kgdb.c
+@@ -79,7 +79,7 @@ sleeping_thread_to_gdb_regs(unsigned long *gdb_regs,
+struct task_struct *task)
+ 		return;
+
+ 	/* Initialize to zero */
+-	for (regno = 0; regno < GDB_MAX_REGS; regno++)
++	for (regno = 0; regno < DBG_MAX_REG_NUM; regno++)
+ 		gdb_regs[regno] = 0;
+
+ 	/* Otherwise, we have only some registers from switch_to() */
