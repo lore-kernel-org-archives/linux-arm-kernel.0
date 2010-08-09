@@ -1,23 +1,41 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Mon, 09 Aug 2010 22:28:58 +0100
-Subject: Query: Patches break with Microsoft exchange server.
-In-Reply-To: <201008092115.25992.mihai.dontu@gmail.com>
-References: <4C5F9B25.8080401@st.com>
-	<201008091735.11105.mihai.dontu@gmail.com> <4C6040FC.2020702@gmail.com>
-	<201008092115.25992.mihai.dontu@gmail.com>
-Message-ID: <1281389338.7143.32.camel@localhost>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 9 Aug 2010 23:42:30 +0200
+Subject: [PATCH 2/8] ARM i.MX dma-mx1-mx2: use wrapper
+In-Reply-To: <4C604E15.3010808@gmail.com>
+References: <1281344743-2029-1-git-send-email-s.hauer@pengutronix.de>
+	<1281344743-2029-3-git-send-email-s.hauer@pengutronix.de>
+	<4C604E15.3010808@gmail.com>
+Message-ID: <20100809214230.GD27749@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-08-09 at 21:15 +0300, Mihai Don?u wrote:
+On Mon, Aug 09, 2010 at 08:51:01PM +0200, Magnus Lilja wrote:
+> Hi Sascha,
 > 
-> Wait. I don't think we're on the same page here. I'm talking about message 
-> signing (which does not require the receiving end to have any key - it's the 
-> same plain text e-mail with a blob after it) while you refer to actually 
-> encrypting the message. Mm? Or am I being extremely slow today? :-) 
+> > diff --git a/arch/arm/mach-imx/dma-v1.c b/arch/arm/mach-imx/dma-v1.c
+> > index 3e8c47c..d141458 100644
+> > --- a/arch/arm/mach-imx/dma-v1.c
+> > +++ b/arch/arm/mach-imx/dma-v1.c
+> > @@ -35,6 +35,7 @@
+> ...
+> > @@ -503,7 +517,7 @@ void imx_dma_disable(int channel)
+> >  	struct imx_dma_channel *imxdma = &imx_dma_channels[channel];
+> >  	unsigned long flags;
+> >  
+> > -	pr_debug("imxdma%d: imx_dma_disable\n", channel);
+> > +	pr_info("imxdma%d: imx_dma_disable\n", channel);
+> 
+> With this change imx_dma_enable() uses pr_debug() while
+> imx_dma_disable uses pr_info(). Shouldn't both use the same pr_*()
+> since the functions are paired?
 
-Only when you assume that Exchange would pass signed messages without
-corrupting them. It really is that broken.
+They should both use pr_debug. Will fix.
+
+Sascha
+
 
 -- 
-dwmw2
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
