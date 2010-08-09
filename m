@@ -1,41 +1,23 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Mon, 09 Aug 2010 20:43:58 +0200
-Subject: [PATCH 1/8] ARM i.MX dma: implement wrapper for dma functions
-In-Reply-To: <1281344743-2029-2-git-send-email-s.hauer@pengutronix.de>
-References: <1281344743-2029-1-git-send-email-s.hauer@pengutronix.de>
-	<1281344743-2029-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <4C604C6E.3060706@gmail.com>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Mon, 09 Aug 2010 22:28:58 +0100
+Subject: Query: Patches break with Microsoft exchange server.
+In-Reply-To: <201008092115.25992.mihai.dontu@gmail.com>
+References: <4C5F9B25.8080401@st.com>
+	<201008091735.11105.mihai.dontu@gmail.com> <4C6040FC.2020702@gmail.com>
+	<201008092115.25992.mihai.dontu@gmail.com>
+Message-ID: <1281389338.7143.32.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-
-On 2010-08-09 11:05, Sascha Hauer wrote:
-> Currently there is only one i.MX DMA implementation in the tree,
-> the one for i.MX1/21/27. The SDMA support for i.MX25/31/35/51 can
-> be implemented similarly. This wrapper for the DMA is implemented
-> so that drivers do not have to care about the implementation
-> present and don't have to #ifdef DMA support
+On Mon, 2010-08-09 at 21:15 +0300, Mihai Don?u wrote:
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Wait. I don't think we're on the same page here. I'm talking about message 
+> signing (which does not require the receiving end to have any key - it's the 
+> same plain text e-mail with a blob after it) while you refer to actually 
+> encrypting the message. Mm? Or am I being extremely slow today? :-) 
 
-> diff --git a/arch/arm/plat-mxc/dma.c b/arch/arm/plat-mxc/dma.c
-> new file mode 100644
-> index 0000000..1a241ab
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/dma.c
-> @@ -0,0 +1,112 @@
-> +
+Only when you assume that Exchange would pass signed messages without
+corrupting them. It really is that broken.
 
-
-Remember to add Copyright+License information here!
-
-> +#include <mach/dma.h>
-> +
-> +static struct imx_dma_operations *imx_dma_ops;
-> +
-> +static DEFINE_MUTEX(dma_mutex);
-> +
-
-
-Regards, Magnus
+-- 
+dwmw2
