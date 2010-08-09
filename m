@@ -1,66 +1,104 @@
-From: justinmattock@gmail.com (Justin P. Mattock)
-Date: Mon, 09 Aug 2010 11:53:17 -0700
-Subject: Query: Patches break with Microsoft exchange server.
-In-Reply-To: <201008092115.25992.mihai.dontu@gmail.com>
-References: <4C5F9B25.8080401@st.com>
-	<201008091735.11105.mihai.dontu@gmail.com>
-	<4C6040FC.2020702@gmail.com>
-	<201008092115.25992.mihai.dontu@gmail.com>
-Message-ID: <4C604E9D.6060500@gmail.com>
+From: lilja.magnus@gmail.com (Magnus Lilja)
+Date: Mon, 09 Aug 2010 21:04:48 +0200
+Subject: [PATCH 4/8] ARM i.MX: add SDMA driver
+In-Reply-To: <1281344743-2029-5-git-send-email-s.hauer@pengutronix.de>
+References: <1281344743-2029-1-git-send-email-s.hauer@pengutronix.de>
+	<1281344743-2029-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <4C605150.7030403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/2010 11:15 AM, Mihai Don?u wrote:
-> On Monday 09 August 2010 20:55:08 Justin P. Mattock wrote:
->> On 08/09/2010 07:35 AM, Mihai Don?u wrote:
->>> On Monday 09 August 2010 12:43:16 Justin P. Mattock wrote:
->>>> On 08/09/2010 02:35 AM, viresh kumar wrote:
->>>>> On 8/9/2010 2:31 PM, Matti Aarnio wrote:
->>>>>> On Mon, Aug 09, 2010 at 12:26:24PM +0530, viresh kumar wrote:
->>>>>>>> I missed this information in my last mail. We are using git
->>>>>>>> send-email for sending patches. As patches will go through
->>>>>>>> Microsoft exchange server only, so they are broken.
->>>>>>
->>>>>> Let your boss complain to your IT keepers.
->>>>>> "These are Machine-to-Machine messages, they must not be modified!"
->>>>>>
->>>>>>
->>>>>> It would probably be "against corporate policy" to use gmail for these
->>>>>> emails...
->>>>>
->>>>> We got one solution: Upgrade Exchange server to SP2.
->>>>> Lets see if our IT department does this upgradation.
->>>>
->>>> that or just blast them with some cryptology..i.e. pretty sure if your
->>>> message was encapsulated(AH/ESP) they couldn't tweak it.. but then
->>>> sending such encryption to a public list would require a _key_ on the
->>>> other side.. wishful thinking...
->>>> (just a thought)...
->>>
->>> Shouldn't just signing the message be enough? The server (normally) would
->>> not alter it, otherwise it will break the signature (which is a too
->>> obvious bug even for Microsoft). Or am I missing something here?
->>>
->>> PS: A local SMTP with DKIM signing capabilities could be another
->>> possibility, assuming Exchange does not break such signatures.
->>
->> yeah that would probably be just enough to get through without Microsoft
->> mucking around with the font etc.., but the biggest problem(I see) with
->> the encryption is having the key on the other end of the line.
->
-> Wait. I don't think we're on the same page here. I'm talking about message
-> signing (which does not require the receiving end to have any key - it's the
-> same plain text e-mail with a blob after it) while you refer to actually
-> encrypting the message. Mm? Or am I being extremely slow today? :-)
->
+Hi Sascha,
 
-no were on the same page.. keep in mind though I'm not sure how the 
-message signing thing really works, if it's just a signature verifying 
-that it's from you without the other end(recipient) accepting anything, 
-then the question is will microsoft still scan the email and garble it up?
-Now if it's a signature where the other end needs to accept the sender 
-then im guessing there's a little bit of encryption there to keep 
-microsoft database scanner from doing anything(but keep in mind I never 
-really setup the signature thing on e-mails so I could totally be wrong)
+Just some typos that I spotted.
 
-Justin P. Mattock
+> diff --git a/arch/arm/plat-mxc/include/mach/sdma.h b/arch/arm/plat-mxc/include/mach/sdma.h
+> new file mode 100644
+> index 0000000..5d542b8
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/include/mach/sdma.h
+> @@ -0,0 +1,8 @@
+> +#ifndef __MACH_MXC_SDMA_H__
+> +#define __MACH_MXC_SDMA_H__
+> +
+> +struct sdma_platform_data {
+> +	int sdma_version;
+> +};
+> +
+> +#endif /* __MACH_MXC_SDMA_H__ */
+> diff --git a/arch/arm/plat-mxc/sdma.c b/arch/arm/plat-mxc/sdma.c
+> new file mode 100644
+> index 0000000..3fbc8d8
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/sdma.c
+...
+
+> +#ifdef __BIG_ENDIAN
+> +struct sdma_mode_count {
+> +	u32 command :  8; /* command mostlky used for channel 0 */
+                                        ^^^ typo
+
+> +	u32 status  :  8; /* E,R,I,C,W,D status bits stored here */
+> +	u32 count   : 16; /* size of the buffer pointed by this BD */
+> +};
+> +#else
+> +struct sdma_mode_count {
+> +	u32 count   : 16; /* size of the buffer pointed by this BD */
+> +	u32 status  :  8; /* E,R,I,C,W,D status bits stored here */
+> +	u32 command :  8; /* command mostlky used for channel 0 */
+                                        ^^^ typo
+
+> +};
+> +#endif
+> +
+> +/*
+> + * Buffer descriptor
+> + */
+> +struct sdma_buffer_descriptor {
+> +	struct sdma_mode_count  mode;
+> +	void *buffer_addr;    /* address of the buffer described */
+> +	void *ext_buffer_addr; /* extended buffer address */
+> +};
+> +
+> +/*
+> + * Channel control Block
+> + */
+> +struct sdma_channel_control {
+> +	struct sdma_buffer_descriptor *currentBDptr; /* current buffer descriptor processed */
+> +	struct sdma_buffer_descriptor *baseBDptr;    /* first element of buffer descriptor array */
+> +	void *unused;
+> +	void *unused1;
+> +};
+> +
+> +/**
+> + * Context structure.
+> + */
+> +#ifdef __BIG_ENDIAN
+> +struct sdma_state_registers {
+> +	u32 sf     : 1; /* source falut while loading data */
+                                  ^^^^^ typo?
+
+> +	u32 unused0: 1;
+> +	u32 rpc    :14; /* return program counter */
+> +	u32 t      : 1; /* test bit:status of arithmetic & test instruction*/
+> +	u32 unused1: 1;
+> +	u32 pc     :14; /* program counter */
+> +	u32 lm     : 2; /* loop mode */
+> +	u32 epc    :14; /* loop end program counter */
+> +	u32 df     : 1; /* destiantion falut while storing data */
+                           ^^^^^^^^^^^^^^^^^ typos
+
+> +	u32 unused2: 1;
+> +	u32 spc    :14; /* loop start program counter */
+> +};
+> +#else
+> +struct sdma_state_registers {
+> +	u32 pc     :14; /* program counter */
+> +	u32 unused1: 1;
+> +	u32 t      : 1; /* test bit: status of arithmetic & test instruction*/
+> +	u32 rpc    :14; /* return program counter */
+> +	u32 unused0: 1;
+> +	u32 sf     : 1; /* source falut while loading data */
+                                    ^^^ typo?
+
+Regards, Magnus Lilja
