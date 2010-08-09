@@ -1,26 +1,33 @@
-From: rabin.vincent@stericsson.com (Rabin VINCENT)
-Date: Mon, 9 Aug 2010 16:07:05 +0530
-Subject: [PATCH 04/12] mmci: allow the card detect status not to be
-	inverted
-In-Reply-To: <20100805092531.GA23473@n2100.arm.linux.org.uk>
-References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
-	<1277198267-10860-4-git-send-email-rabin.vincent@stericsson.com>
-	<20100729123443.GA18923@n2100.arm.linux.org.uk>
-	<AANLkTikQi+SPpx8Wpvb0siSSsw0ZhusWaaKmqRnfHrnz@mail.gmail.com>
-	<20100729142011.GG18923@n2100.arm.linux.org.uk>
-	<20100805061453.GA7524@bnru02.bnr.st.com>
-	<20100805092531.GA23473@n2100.arm.linux.org.uk>
-Message-ID: <20100809103704.GB5826@bnru01.bnr.st.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 09 Aug 2010 19:43:10 +0900
+Subject: [GIT PULL] Samsung S5P updates for 2.6.36 merge window
+In-Reply-To: <20100809103337.GA12833@n2100.arm.linux.org.uk>
+References: <017201cb37ac$9979a5a0$cc6cf0e0$%kim@samsung.com>
+	<20100809103337.GA12833@n2100.arm.linux.org.uk>
+Message-ID: <017501cb37af$abf7f670$03e7e350$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 05, 2010 at 11:25:31 +0200, Russell King - ARM Linux wrote:
-> On Thu, Aug 05, 2010 at 11:44:54AM +0530, Rabin VINCENT wrote:
-> > so are you OK with the cd_noinvert addition (for the GPIO case)?
-> > Or a cd_invert and a patch to existing platforms?
+Russell King - ARM Linux wrote:
 > 
-> I'd much prefer positive logic.  Double negatives (eg, not noinverted)
-> are always bad news.
+> On Mon, Aug 09, 2010 at 07:21:11PM +0900, Kukjin Kim wrote:
+> >  arch/arm/configs/s5pc110_defconfig               |   66 -
+> >  arch/arm/configs/s5pv210_defconfig               |    5 +
+> 
+> What are these changes?
 
-Here's the new patch.  I'll rebase the rest of the unapplied patches in
-the series on top of this.
+Hi,
+
+Removed s5pc110_defconfig...because updated s5pv210_defconfig can cover it.
+
+I think this is reasonable even though there is some issue about ARM
+defconfig ;-)
+Because this can remove redundant defconfig...
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
