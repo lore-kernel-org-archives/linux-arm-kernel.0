@@ -1,35 +1,56 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 9 Aug 2010 15:19:33 +0300
-Subject: [PATCH 0/2] mxc_nand: fixes for purposed updates
-In-Reply-To: <1281354805.26440.4.camel@localhost>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 9 Aug 2010 14:28:33 +0200
+Subject: [PATCH 1/2] mxc_nand: fix build error
+In-Reply-To: <4db426cd74bc8aae80ddcbf666681c3cd439dfc7.1281353601.git.baruch@tkos.co.il>
 References: <1281102791-8089-1-git-send-email-s.hauer@pengutronix.de>
 	<cover.1281353601.git.baruch@tkos.co.il>
-	<1281354805.26440.4.camel@localhost>
-Message-ID: <20100809121933.GE2894@jasper.tkos.co.il>
+	<4db426cd74bc8aae80ddcbf666681c3cd439dfc7.1281353601.git.baruch@tkos.co.il>
+Message-ID: <20100809122833.GB27749@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Mon, Aug 09, 2010 at 02:38:13PM +0300, Baruch Siach wrote:
+> drivers/mtd/nand/mxc_nand.c: In function 'mxc_nand_command':
+> drivers/mtd/nand/mxc_nand.c:908: error: implicit declaration of function 'send_cmd'
 
-On Mon, Aug 09, 2010 at 12:53:25PM +0100, David Woodhouse wrote:
-> On Mon, 2010-08-09 at 14:38 +0300, Baruch Siach wrote:
-> > With these patches applied I've tested mxc-nand-pu on a i.MX25 based system.
-> > 
-> > Baruch Siach (2):
-> >   mxc_nand: fix build error
-> >   mxc_nand: remove unused variables
-> > 
-> >  drivers/mtd/nand/mxc_nand.c |    9 +++------
-> >  1 files changed, 3 insertions(+), 6 deletions(-)
+This is because you based my series on 2.6.35. With current master this
+patch is not necessary.
+
+Sascha
+
 > 
-> These patches don't apply to the mtd-2.6.git tree.
-
-These patches apply on top of the mxc-nand-pu branch of Sascha Hauer at 
-git://git.pengutronix.de/git/imx/linux-2.6.git. Sorry for not mentioning this.
-
-baruch
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  drivers/mtd/nand/mxc_nand.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> index 4032e0b..3092240 100644
+> --- a/drivers/mtd/nand/mxc_nand.c
+> +++ b/drivers/mtd/nand/mxc_nand.c
+> @@ -905,13 +905,13 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
+>  
+>  			/* Set program pointer to spare region */
+>  			if (mtd->writesize == 512)
+> -				send_cmd(host, NAND_CMD_READOOB, false);
+> +				host->send_cmd(host, NAND_CMD_READOOB, false);
+>  		} else {
+>  			host->buf_start = column;
+>  
+>  			/* Set program pointer to page start */
+>  			if (mtd->writesize == 512)
+> -				send_cmd(host, NAND_CMD_READ0, false);
+> +				host->send_cmd(host, NAND_CMD_READ0, false);
+>  		}
+>  
+>  		host->send_cmd(host, command, false);
+> -- 
+> 1.7.1
+> 
+> 
 
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
