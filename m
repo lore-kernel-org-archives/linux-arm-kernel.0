@@ -1,253 +1,359 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon,  9 Aug 2010 15:20:49 +0200
-Subject: [PATCH 05/12] mxc_nand: add V1_V2 namespace to registers
-In-Reply-To: <1281360053-8386-1-git-send-email-s.hauer@pengutronix.de>
-References: <1281360053-8386-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1281360053-8386-6-git-send-email-s.hauer@pengutronix.de>
+From: rabin.vincent@stericsson.com (Rabin Vincent)
+Date: Mon, 9 Aug 2010 19:18:15 +0530
+Subject: [PATCH 2/4] ux500: mop500: register eMMC devices
+In-Reply-To: <1281361697-4874-1-git-send-email-rabin.vincent@stericsson.com>
+References: <1281361697-4874-1-git-send-email-rabin.vincent@stericsson.com>
+Message-ID: <1281361697-4874-2-git-send-email-rabin.vincent@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This prepares the driver for v3 support. The v3 controller
-has a completely different register layout, so add a V1_V2_
-namespace to the register defines to avoid confusion with
-the v3 regs.
+From: Hanumath Prasad <hanumath.prasad@stericsson.com>
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+Signed-off-by: Hanumath Prasad <hanumath.prasad@stericsson.com>
+Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
 ---
- drivers/mtd/nand/mxc_nand.c |  141 +++++++++++++++++++------------------------
- 1 files changed, 63 insertions(+), 78 deletions(-)
+ arch/arm/mach-ux500/Makefile           |    2 +-
+ arch/arm/mach-ux500/board-mop500-sdi.c |   91 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-ux500/board-mop500.c     |    3 +
+ arch/arm/mach-ux500/board-mop500.h     |   12 ++++
+ arch/arm/mach-ux500/pins-db8500.h      |   66 ++++++++++++------------
+ 5 files changed, 140 insertions(+), 34 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/board-mop500-sdi.c
+ create mode 100644 arch/arm/mach-ux500/board-mop500.h
 
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 70f64dc..48b6dca 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -41,58 +41,43 @@
- #define nfc_is_v1()		(cpu_is_mx31() || cpu_is_mx27() || cpu_is_mx21())
- 
- /* Addresses for NFC registers */
--#define NFC_BUF_SIZE			0x00
--#define NFC_BUF_ADDR			0x04
--#define NFC_FLASH_ADDR			0x06
--#define NFC_FLASH_CMD			0x08
--#define NFC_CONFIG			0x0a
--#define NFC_ECC_STATUS_RESULT		0x0c
--#define NFC_RSLTMAIN_AREA		0x0e
--#define NFC_RSLTSPARE_AREA		0x10
--#define NFC_WRPROT			0x12
--#define NFC_V1_UNLOCKSTART_BLKADDR	0x14
--#define NFC_V1_UNLOCKEND_BLKADDR	0x16
--#define NFC_V21_UNLOCKSTART_BLKADDR	0x20
--#define NFC_V21_UNLOCKEND_BLKADDR	0x22
--#define NFC_NF_WRPRST			0x18
--#define NFC_CONFIG1			0x1a
--#define NFC_CONFIG2			0x1c
--
--/* Set INT to 0, FCMD to 1, rest to 0 in NFC_CONFIG2 Register
-- * for Command operation */
--#define NFC_CMD            0x1
--
--/* Set INT to 0, FADD to 1, rest to 0 in NFC_CONFIG2 Register
-- * for Address operation */
--#define NFC_ADDR           0x2
--
--/* Set INT to 0, FDI to 1, rest to 0 in NFC_CONFIG2 Register
-- * for Input operation */
--#define NFC_INPUT          0x4
--
--/* Set INT to 0, FDO to 001, rest to 0 in NFC_CONFIG2 Register
-- * for Data Output operation */
--#define NFC_OUTPUT         0x8
--
--/* Set INT to 0, FD0 to 010, rest to 0 in NFC_CONFIG2 Register
-- * for Read ID operation */
--#define NFC_ID             0x10
--
--/* Set INT to 0, FDO to 100, rest to 0 in NFC_CONFIG2 Register
-- * for Read Status operation */
--#define NFC_STATUS         0x20
--
--/* Set INT to 1, rest to 0 in NFC_CONFIG2 Register for Read
-- * Status operation */
--#define NFC_INT            0x8000
--
--#define NFC_SP_EN           (1 << 2)
--#define NFC_ECC_EN          (1 << 3)
--#define NFC_INT_MSK         (1 << 4)
--#define NFC_BIG             (1 << 5)
--#define NFC_RST             (1 << 6)
--#define NFC_CE              (1 << 7)
--#define NFC_ONE_CYCLE       (1 << 8)
-+#define NFC_V1_V2_BUF_SIZE		(host->regs + 0x00)
-+#define NFC_V1_V2_BUF_ADDR		(host->regs + 0x04)
-+#define NFC_V1_V2_FLASH_ADDR		(host->regs + 0x06)
-+#define NFC_V1_V2_FLASH_CMD		(host->regs + 0x08)
-+#define NFC_V1_V2_CONFIG		(host->regs + 0x0a)
-+#define NFC_V1_V2_ECC_STATUS_RESULT	(host->regs + 0x0c)
-+#define NFC_V1_V2_RSLTMAIN_AREA		(host->regs + 0x0e)
-+#define NFC_V1_V2_RSLTSPARE_AREA	(host->regs + 0x10)
-+#define NFC_V1_V2_WRPROT		(host->regs + 0x12)
-+#define NFC_V1_UNLOCKSTART_BLKADDR	(host->regs + 0x14)
-+#define NFC_V1_UNLOCKEND_BLKADDR	(host->regs + 0x16)
-+#define NFC_V21_UNLOCKSTART_BLKADDR	(host->regs + 0x20)
-+#define NFC_V21_UNLOCKEND_BLKADDR	(host->regs + 0x22)
-+#define NFC_V1_V2_NF_WRPRST		(host->regs + 0x18)
-+#define NFC_V1_V2_CONFIG1		(host->regs + 0x1a)
-+#define NFC_V1_V2_CONFIG2		(host->regs + 0x1c)
+diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+index 4556aea..33903af 100644
+--- a/arch/arm/mach-ux500/Makefile
++++ b/arch/arm/mach-ux500/Makefile
+@@ -5,7 +5,7 @@
+ obj-y				:= clock.o cpu.o devices.o
+ obj-$(CONFIG_UX500_SOC_DB5500)	+= cpu-db5500.o devices-db5500.o
+ obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o devices-db8500.o
+-obj-$(CONFIG_MACH_U8500_MOP)	+= board-mop500.o
++obj-$(CONFIG_MACH_U8500_MOP)	+= board-mop500.o board-mop500-sdi.o
+ obj-$(CONFIG_MACH_U5500)	+= board-u5500.o
+ obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+ obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
+diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
+new file mode 100644
+index 0000000..bac9956
+--- /dev/null
++++ b/arch/arm/mach-ux500/board-mop500-sdi.c
+@@ -0,0 +1,91 @@
++/*
++ * Copyright (C) ST-Ericsson SA 2010
++ *
++ * Author: Hanumath Prasad <hanumath.prasad@stericsson.com>
++ * License terms: GNU General Public License (GPL) version 2
++ */
 +
-+#define NFC_V1_V2_CONFIG1_SP_EN		(1 << 2)
-+#define NFC_V1_V2_CONFIG1_ECC_EN	(1 << 3)
-+#define NFC_V1_V2_CONFIG1_INT_MSK	(1 << 4)
-+#define NFC_V1_V2_CONFIG1_BIG		(1 << 5)
-+#define NFC_V1_V2_CONFIG1_RST		(1 << 6)
-+#define NFC_V1_V2_CONFIG1_CE		(1 << 7)
-+#define NFC_V1_V2_CONFIG1_ONE_CYCLE	(1 << 8)
++#include <linux/kernel.h>
++#include <linux/gpio.h>
++#include <linux/amba/bus.h>
++#include <linux/amba/mmci.h>
++#include <linux/mmc/host.h>
++#include <linux/platform_device.h>
 +
-+#define NFC_V1_V2_CONFIG2_INT		(1 << 15)
++#include <plat/pincfg.h>
++#include <mach/devices.h>
++#include <mach/hardware.h>
++
++#include "pins-db8500.h"
++#include "board-mop500.h"
++
++static pin_cfg_t mop500_sdi_pins[] = {
++	/* SDI4 (on-board eMMC) */
++	GPIO197_MC4_DAT3,
++	GPIO198_MC4_DAT2,
++	GPIO199_MC4_DAT1,
++	GPIO200_MC4_DAT0,
++	GPIO201_MC4_CMD,
++	GPIO202_MC4_FBCLK,
++	GPIO203_MC4_CLK,
++	GPIO204_MC4_DAT7,
++	GPIO205_MC4_DAT6,
++	GPIO206_MC4_DAT5,
++	GPIO207_MC4_DAT4,
++};
++
++static pin_cfg_t mop500_sdi2_pins[] = {
++	/* SDI2 (POP eMMC) */
++	GPIO128_MC2_CLK,
++	GPIO129_MC2_CMD,
++	GPIO130_MC2_FBCLK,
++	GPIO131_MC2_DAT0,
++	GPIO132_MC2_DAT1,
++	GPIO133_MC2_DAT2,
++	GPIO134_MC2_DAT3,
++	GPIO135_MC2_DAT4,
++	GPIO136_MC2_DAT5,
++	GPIO137_MC2_DAT6,
++	GPIO138_MC2_DAT7,
++};
 +
 +/*
-+ * Operation modes for the NFC. Valid for v1, v2 and v3
-+ * type controllers.
++ * SDI 2 (POP eMMC, not on DB8500ed)
 + */
-+#define NFC_CMD				(1 << 0)
-+#define NFC_ADDR			(1 << 1)
-+#define NFC_INPUT			(1 << 2)
-+#define NFC_OUTPUT			(1 << 3)
-+#define NFC_ID				(1 << 4)
-+#define NFC_STATUS			(1 << 5)
++
++static struct mmci_platform_data mop500_sdi2_data = {
++	.ocr_mask	= MMC_VDD_165_195,
++	.f_max		= 100000000,
++	.capabilities	= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
++	.gpio_cd	= -1,
++	.gpio_wp	= -1,
++};
++
++/*
++ * SDI 4 (on-board eMMC)
++ */
++
++static struct mmci_platform_data mop500_sdi4_data = {
++	.ocr_mask	= MMC_VDD_29_30,
++	.f_max		= 100000000,
++	.capabilities	= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA |
++			  MMC_CAP_MMC_HIGHSPEED,
++	.gpio_cd	= -1,
++	.gpio_wp	= -1,
++};
++
++void mop500_sdi_init(void)
++{
++	nmk_config_pins(mop500_sdi_pins, ARRAY_SIZE(mop500_sdi_pins));
++
++	u8500_sdi2_device.dev.platform_data = &mop500_sdi2_data;
++	u8500_sdi4_device.dev.platform_data = &mop500_sdi4_data;
++
++	if (!cpu_is_u8500ed()) {
++		nmk_config_pins(mop500_sdi2_pins, ARRAY_SIZE(mop500_sdi2_pins));
++		amba_device_register(&u8500_sdi2_device, &iomem_resource);
++	}
++
++	/* On-board eMMC */
++	amba_device_register(&u8500_sdi4_device, &iomem_resource);
++}
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 0e8fd13..de31032 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -30,6 +30,7 @@
+ #include <mach/devices.h>
  
- struct mxc_nand_host {
- 	struct mtd_info		mtd;
-@@ -186,11 +171,11 @@ static int check_int_v1_v2(struct mxc_nand_host *host)
- {
- 	uint32_t tmp;
+ #include "pins-db8500.h"
++#include "board-mop500.h"
  
--	tmp = readw(host->regs + NFC_CONFIG2);
--	if (!(tmp & NFC_INT))
-+	tmp = readw(NFC_V1_V2_CONFIG2);
-+	if (!(tmp & NFC_V1_V2_CONFIG2_INT))
- 		return 0;
+ static pin_cfg_t mop500_pins[] = {
+ 	/* SSP0 */
+@@ -163,6 +164,8 @@ static void __init u8500_init_machine(void)
  
--	writew(tmp & ~NFC_INT, NFC_CONFIG2);
-+	writew(tmp & ~NFC_V1_V2_CONFIG2_INT, NFC_V1_V2_CONFIG2);
+ 	platform_add_devices(platform_devs, ARRAY_SIZE(platform_devs));
  
- 	return 1;
++	mop500_sdi_init();
++
+ 	spi_register_board_info(u8500_spi_devices,
+ 			ARRAY_SIZE(u8500_spi_devices));
  }
-@@ -228,15 +213,15 @@ static void send_cmd_v1_v2(struct mxc_nand_host *host, uint16_t cmd, int useirq)
- {
- 	DEBUG(MTD_DEBUG_LEVEL3, "send_cmd(host, 0x%x, %d)\n", cmd, useirq);
+diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+new file mode 100644
+index 0000000..2d24032
+--- /dev/null
++++ b/arch/arm/mach-ux500/board-mop500.h
+@@ -0,0 +1,12 @@
++/*
++ * Copyright (C) ST-Ericsson SA 2010
++ *
++ * License terms: GNU General Public License (GPL) version 2
++ */
++
++#ifndef __BOARD_MOP500_H
++#define __BOARD_MOP500_H
++
++extern void mop500_sdi_init(void);
++
++#endif
+diff --git a/arch/arm/mach-ux500/pins-db8500.h b/arch/arm/mach-ux500/pins-db8500.h
+index 9055d5d..66f8761 100644
+--- a/arch/arm/mach-ux500/pins-db8500.h
++++ b/arch/arm/mach-ux500/pins-db8500.h
+@@ -96,57 +96,57 @@
+ #define GPIO17_SLIM0_CLK	PIN_CFG(17, ALT_C)
  
--	writew(cmd, host->regs + NFC_FLASH_CMD);
--	writew(NFC_CMD, host->regs + NFC_CONFIG2);
-+	writew(cmd, NFC_V1_V2_FLASH_CMD);
-+	writew(NFC_CMD, NFC_V1_V2_CONFIG2);
+ #define GPIO18_GPIO		PIN_CFG(18, GPIO)
+-#define GPIO18_MC0_CMDDIR	PIN_CFG(18, ALT_A)
++#define GPIO18_MC0_CMDDIR	PIN_CFG_PULL(18, ALT_A, UP)
+ #define GPIO18_U2_RXD		PIN_CFG(18, ALT_B)
+ #define GPIO18_MS_IEP		PIN_CFG(18, ALT_C)
  
- 	if (cpu_is_mx21() && (cmd == NAND_CMD_RESET)) {
- 		int max_retries = 100;
- 		/* Reset completion is indicated by NFC_CONFIG2 */
- 		/* being set to 0 */
- 		while (max_retries-- > 0) {
--			if (readw(host->regs + NFC_CONFIG2) == 0) {
-+			if (readw(NFC_V1_V2_CONFIG2) == 0) {
- 				break;
- 			}
- 			udelay(1);
-@@ -257,8 +242,8 @@ static void send_addr_v1_v2(struct mxc_nand_host *host, uint16_t addr, int islas
- {
- 	DEBUG(MTD_DEBUG_LEVEL3, "send_addr(host, 0x%x %d)\n", addr, islast);
+ #define GPIO19_GPIO		PIN_CFG(19, GPIO)
+-#define GPIO19_MC0_DAT0DIR	PIN_CFG(19, ALT_A)
++#define GPIO19_MC0_DAT0DIR	PIN_CFG_PULL(19, ALT_A, UP)
+ #define GPIO19_U2_TXD		PIN_CFG(19, ALT_B)
+ #define GPIO19_MS_DAT0DIR	PIN_CFG(19, ALT_C)
  
--	writew(addr, host->regs + NFC_FLASH_ADDR);
--	writew(NFC_ADDR, host->regs + NFC_CONFIG2);
-+	writew(addr, NFC_V1_V2_FLASH_ADDR);
-+	writew(NFC_ADDR, NFC_V1_V2_CONFIG2);
+ #define GPIO20_GPIO		PIN_CFG(20, GPIO)
+-#define GPIO20_MC0_DAT2DIR	PIN_CFG(20, ALT_A)
++#define GPIO20_MC0_DAT2DIR	PIN_CFG_PULL(20, ALT_A, UP)
+ #define GPIO20_UARTMOD_TXD	PIN_CFG(20, ALT_B)
+ #define GPIO20_IP_TRIGOUT	PIN_CFG(20, ALT_C)
  
- 	/* Wait for operation to complete */
- 	wait_op_done(host, islast);
-@@ -278,9 +263,9 @@ static void send_page_v1_v2(struct mtd_info *mtd, unsigned int ops)
- 	for (i = 0; i < bufs; i++) {
+ #define GPIO21_GPIO		PIN_CFG(21, GPIO)
+-#define GPIO21_MC0_DAT31DIR	PIN_CFG(21, ALT_A)
++#define GPIO21_MC0_DAT31DIR	PIN_CFG_PULL(21, ALT_A, UP)
+ #define GPIO21_MSP0_SCK		PIN_CFG(21, ALT_B)
+ #define GPIO21_MS_DAT31DIR	PIN_CFG(21, ALT_C)
  
- 		/* NANDFC buffer 0 is used for page read/write */
--		writew(i, host->regs + NFC_BUF_ADDR);
-+		writew(i, NFC_V1_V2_BUF_ADDR);
+ #define GPIO22_GPIO		PIN_CFG(22, GPIO)
+-#define GPIO22_MC0_FBCLK	PIN_CFG(22, ALT_A)
++#define GPIO22_MC0_FBCLK	PIN_CFG_PULL(22, ALT_A, UP)
+ #define GPIO22_UARTMOD_RXD	PIN_CFG(22, ALT_B)
+ #define GPIO22_MS_FBCLK		PIN_CFG(22, ALT_C)
  
--		writew(ops, host->regs + NFC_CONFIG2);
-+		writew(ops, NFC_V1_V2_CONFIG2);
+ #define GPIO23_GPIO		PIN_CFG(23, GPIO)
+-#define GPIO23_MC0_CLK		PIN_CFG(23, ALT_A)
++#define GPIO23_MC0_CLK		PIN_CFG_PULL(23, ALT_A, UP)
+ #define GPIO23_STMMOD_CLK	PIN_CFG(23, ALT_B)
+ #define GPIO23_MS_CLK		PIN_CFG(23, ALT_C)
  
- 		/* Wait for operation to complete */
- 		wait_op_done(host, true);
-@@ -293,9 +278,9 @@ static void send_read_id_v1_v2(struct mxc_nand_host *host)
- 	struct nand_chip *this = &host->nand;
+ #define GPIO24_GPIO		PIN_CFG(24, GPIO)
+-#define GPIO24_MC0_CMD		PIN_CFG(24, ALT_A)
++#define GPIO24_MC0_CMD		PIN_CFG_PULL(24, ALT_A, UP)
+ #define GPIO24_UARTMOD_RXD	PIN_CFG(24, ALT_B)
+ #define GPIO24_MS_BS		PIN_CFG(24, ALT_C)
  
- 	/* NANDFC buffer 0 is used for device ID output */
--	writew(0x0, host->regs + NFC_BUF_ADDR);
-+	writew(0x0, NFC_V1_V2_BUF_ADDR);
+ #define GPIO25_GPIO		PIN_CFG(25, GPIO)
+-#define GPIO25_MC0_DAT0		PIN_CFG(25, ALT_A)
++#define GPIO25_MC0_DAT0		PIN_CFG_PULL(25, ALT_A, UP)
+ #define GPIO25_STMMOD_DAT0	PIN_CFG(25, ALT_B)
+ #define GPIO25_MS_DAT0		PIN_CFG(25, ALT_C)
  
--	writew(NFC_ID, host->regs + NFC_CONFIG2);
-+	writew(NFC_ID, NFC_V1_V2_CONFIG2);
+ #define GPIO26_GPIO		PIN_CFG(26, GPIO)
+-#define GPIO26_MC0_DAT1		PIN_CFG(26, ALT_A)
++#define GPIO26_MC0_DAT1		PIN_CFG_PULL(26, ALT_A, UP)
+ #define GPIO26_STMMOD_DAT1	PIN_CFG(26, ALT_B)
+ #define GPIO26_MS_DAT1		PIN_CFG(26, ALT_C)
  
- 	/* Wait for operation to complete */
- 	wait_op_done(host, true);
-@@ -329,7 +314,7 @@ static uint16_t get_dev_status_v1_v2(struct mxc_nand_host *host)
- 	 */
- 	store = readl(main_buf);
+ #define GPIO27_GPIO		PIN_CFG(27, GPIO)
+-#define GPIO27_MC0_DAT2		PIN_CFG(27, ALT_A)
++#define GPIO27_MC0_DAT2		PIN_CFG_PULL(27, ALT_A, UP)
+ #define GPIO27_STMMOD_DAT2	PIN_CFG(27, ALT_B)
+ #define GPIO27_MS_DAT2		PIN_CFG(27, ALT_C)
  
--	writew(NFC_STATUS, host->regs + NFC_CONFIG2);
-+	writew(NFC_STATUS, NFC_V1_V2_CONFIG2);
- 	wait_op_done(host, true);
+ #define GPIO28_GPIO		PIN_CFG(28, GPIO)
+-#define GPIO28_MC0_DAT3		PIN_CFG(28, ALT_A)
++#define GPIO28_MC0_DAT3		PIN_CFG_PULL(28, ALT_A, UP)
+ #define GPIO28_STMMOD_DAT3	PIN_CFG(28, ALT_B)
+ #define GPIO28_MS_DAT3		PIN_CFG(28, ALT_C)
  
- 	ret = readw(main_buf);
-@@ -368,7 +353,7 @@ static int mxc_nand_correct_data(struct mtd_info *mtd, u_char *dat,
- 	 * additional correction.  2-Bit errors cannot be corrected by
- 	 * HW ECC, so we need to return failure
- 	 */
--	uint16_t ecc_status = readw(host->regs + NFC_ECC_STATUS_RESULT);
-+	uint16_t ecc_status = readw(NFC_V1_V2_ECC_STATUS_RESULT);
+@@ -357,48 +357,48 @@
+ #define GPIO97_MC5_DAT7		PIN_CFG(97, ALT_C)
  
- 	if (((ecc_status & 0x3) == 2) || ((ecc_status >> 2) == 2)) {
- 		DEBUG(MTD_DEBUG_LEVEL0,
-@@ -568,32 +553,32 @@ static void preset_v1_v2(struct mtd_info *mtd)
- 	uint16_t tmp;
+ #define GPIO128_GPIO		PIN_CFG(128, GPIO)
+-#define GPIO128_MC2_CLK		PIN_CFG(128, ALT_A)
++#define GPIO128_MC2_CLK		PIN_CFG_PULL(128, ALT_A, UP)
+ #define GPIO128_SM_CKO		PIN_CFG(128, ALT_B)
  
- 	/* enable interrupt, disable spare enable */
--	tmp = readw(host->regs + NFC_CONFIG1);
--	tmp &= ~NFC_INT_MSK;
--	tmp &= ~NFC_SP_EN;
-+	tmp = readw(NFC_V1_V2_CONFIG1);
-+	tmp &= ~NFC_V1_V2_CONFIG1_INT_MSK;
-+	tmp &= ~NFC_V1_V2_CONFIG1_SP_EN;
- 	if (nand_chip->ecc.mode == NAND_ECC_HW) {
--		tmp |= NFC_ECC_EN;
-+		tmp |= NFC_V1_V2_CONFIG1_ECC_EN;
- 	} else {
--		tmp &= ~NFC_ECC_EN;
-+		tmp &= ~NFC_V1_V2_CONFIG1_ECC_EN;
- 	}
--	writew(tmp, host->regs + NFC_CONFIG1);
-+	writew(tmp, NFC_V1_V2_CONFIG1);
- 	/* preset operation */
+ #define GPIO129_GPIO		PIN_CFG(129, GPIO)
+-#define GPIO129_MC2_CMD		PIN_CFG(129, ALT_A)
++#define GPIO129_MC2_CMD		PIN_CFG_PULL(129, ALT_A, UP)
+ #define GPIO129_SM_WAIT0n	PIN_CFG(129, ALT_B)
  
- 	/* Unlock the internal RAM Buffer */
--	writew(0x2, host->regs + NFC_CONFIG);
-+	writew(0x2, NFC_V1_V2_CONFIG);
+ #define GPIO130_GPIO		PIN_CFG(130, GPIO)
+-#define GPIO130_MC2_FBCLK	PIN_CFG(130, ALT_A)
++#define GPIO130_MC2_FBCLK	PIN_CFG_PULL(130, ALT_A, UP)
+ #define GPIO130_SM_FBCLK	PIN_CFG(130, ALT_B)
+ #define GPIO130_MC2_RSTN	PIN_CFG(130, ALT_C)
  
- 	/* Blocks to be unlocked */
- 	if (nfc_is_v21()) {
--		writew(0x0, host->regs + NFC_V21_UNLOCKSTART_BLKADDR);
--		writew(0xffff, host->regs + NFC_V21_UNLOCKEND_BLKADDR);
-+		writew(0x0, NFC_V21_UNLOCKSTART_BLKADDR);
-+		writew(0xffff, NFC_V21_UNLOCKEND_BLKADDR);
- 	} else if (nfc_is_v1()) {
--		writew(0x0, host->regs + NFC_V1_UNLOCKSTART_BLKADDR);
--		writew(0x4000, host->regs + NFC_V1_UNLOCKEND_BLKADDR);
-+		writew(0x0, NFC_V1_UNLOCKSTART_BLKADDR);
-+		writew(0x4000, NFC_V1_UNLOCKEND_BLKADDR);
- 	} else
- 		BUG();
+ #define GPIO131_GPIO		PIN_CFG(131, GPIO)
+-#define GPIO131_MC2_DAT0	PIN_CFG(131, ALT_A)
++#define GPIO131_MC2_DAT0	PIN_CFG_PULL(131, ALT_A, UP)
+ #define GPIO131_SM_ADQ8		PIN_CFG(131, ALT_B)
  
- 	/* Unlock Block Command for given address range */
--	writew(0x4, host->regs + NFC_WRPROT);
-+	writew(0x4, NFC_V1_V2_WRPROT);
- }
+ #define GPIO132_GPIO		PIN_CFG(132, GPIO)
+-#define GPIO132_MC2_DAT1	PIN_CFG(132, ALT_A)
++#define GPIO132_MC2_DAT1	PIN_CFG_PULL(132, ALT_A, UP)
+ #define GPIO132_SM_ADQ9		PIN_CFG(132, ALT_B)
  
- /* Used by the upper layer to write command to NAND Flash for
+ #define GPIO133_GPIO		PIN_CFG(133, GPIO)
+-#define GPIO133_MC2_DAT2	PIN_CFG(133, ALT_A)
++#define GPIO133_MC2_DAT2	PIN_CFG_PULL(133, ALT_A, UP)
+ #define GPIO133_SM_ADQ10	PIN_CFG(133, ALT_B)
+ 
+ #define GPIO134_GPIO		PIN_CFG(134, GPIO)
+-#define GPIO134_MC2_DAT3	PIN_CFG(134, ALT_A)
++#define GPIO134_MC2_DAT3	PIN_CFG_PULL(134, ALT_A, UP)
+ #define GPIO134_SM_ADQ11	PIN_CFG(134, ALT_B)
+ 
+ #define GPIO135_GPIO		PIN_CFG(135, GPIO)
+-#define GPIO135_MC2_DAT4	PIN_CFG(135, ALT_A)
++#define GPIO135_MC2_DAT4	PIN_CFG_PULL(135, ALT_A, UP)
+ #define GPIO135_SM_ADQ12	PIN_CFG(135, ALT_B)
+ 
+ #define GPIO136_GPIO		PIN_CFG(136, GPIO)
+-#define GPIO136_MC2_DAT5	PIN_CFG(136, ALT_A)
++#define GPIO136_MC2_DAT5	PIN_CFG_PULL(136, ALT_A, UP)
+ #define GPIO136_SM_ADQ13	PIN_CFG(136, ALT_B)
+ 
+ #define GPIO137_GPIO		PIN_CFG(137, GPIO)
+-#define GPIO137_MC2_DAT6	PIN_CFG(137, ALT_A)
++#define GPIO137_MC2_DAT6	PIN_CFG_PULL(137, ALT_A, UP)
+ #define GPIO137_SM_ADQ14	PIN_CFG(137, ALT_B)
+ 
+ #define GPIO138_GPIO		PIN_CFG(138, GPIO)
+-#define GPIO138_MC2_DAT7	PIN_CFG(138, ALT_A)
++#define GPIO138_MC2_DAT7	PIN_CFG_PULL(138, ALT_A, UP)
+ #define GPIO138_SM_ADQ15	PIN_CFG(138, ALT_B)
+ 
+ #define GPIO139_GPIO		PIN_CFG(139, GPIO)
+@@ -569,39 +569,39 @@
+ #define GPIO196_MSP2_RXD	PIN_CFG(196, ALT_A)
+ 
+ #define GPIO197_GPIO		PIN_CFG(197, GPIO)
+-#define GPIO197_MC4_DAT3	PIN_CFG(197, ALT_A)
++#define GPIO197_MC4_DAT3	PIN_CFG_PULL(197, ALT_A, UP)
+ 
+ #define GPIO198_GPIO		PIN_CFG(198, GPIO)
+-#define GPIO198_MC4_DAT2	PIN_CFG(198, ALT_A)
++#define GPIO198_MC4_DAT2	PIN_CFG_PULL(198, ALT_A, UP)
+ 
+ #define GPIO199_GPIO		PIN_CFG(199, GPIO)
+-#define GPIO199_MC4_DAT1	PIN_CFG(199, ALT_A)
++#define GPIO199_MC4_DAT1	PIN_CFG_PULL(199, ALT_A, UP)
+ 
+ #define GPIO200_GPIO		PIN_CFG(200, GPIO)
+-#define GPIO200_MC4_DAT0	PIN_CFG(200, ALT_A)
++#define GPIO200_MC4_DAT0	PIN_CFG_PULL(200, ALT_A, UP)
+ 
+ #define GPIO201_GPIO		PIN_CFG(201, GPIO)
+-#define GPIO201_MC4_CMD		PIN_CFG(201, ALT_A)
++#define GPIO201_MC4_CMD		PIN_CFG_PULL(201, ALT_A, UP)
+ 
+ #define GPIO202_GPIO		PIN_CFG(202, GPIO)
+-#define GPIO202_MC4_FBCLK	PIN_CFG(202, ALT_A)
++#define GPIO202_MC4_FBCLK	PIN_CFG_PULL(202, ALT_A, UP)
+ #define GPIO202_PWL		PIN_CFG(202, ALT_B)
+ #define GPIO202_MC4_RSTN	PIN_CFG(202, ALT_C)
+ 
+ #define GPIO203_GPIO		PIN_CFG(203, GPIO)
+-#define GPIO203_MC4_CLK		PIN_CFG(203, ALT_A)
++#define GPIO203_MC4_CLK		PIN_CFG_PULL(203, ALT_A, UP)
+ 
+ #define GPIO204_GPIO		PIN_CFG(204, GPIO)
+-#define GPIO204_MC4_DAT7	PIN_CFG(204, ALT_A)
++#define GPIO204_MC4_DAT7	PIN_CFG_PULL(204, ALT_A, UP)
+ 
+ #define GPIO205_GPIO		PIN_CFG(205, GPIO)
+-#define GPIO205_MC4_DAT6	PIN_CFG(205, ALT_A)
++#define GPIO205_MC4_DAT6	PIN_CFG_PULL(205, ALT_A, UP)
+ 
+ #define GPIO206_GPIO		PIN_CFG(206, GPIO)
+-#define GPIO206_MC4_DAT5	PIN_CFG(206, ALT_A)
++#define GPIO206_MC4_DAT5	PIN_CFG_PULL(206, ALT_A, UP)
+ 
+ #define GPIO207_GPIO		PIN_CFG(207, GPIO)
+-#define GPIO207_MC4_DAT4	PIN_CFG(207, ALT_A)
++#define GPIO207_MC4_DAT4	PIN_CFG_PULL(207, ALT_A, UP)
+ 
+ #define GPIO208_GPIO		PIN_CFG(208, GPIO)
+ #define GPIO208_MC1_CLK		PIN_CFG(208, ALT_A)
 -- 
-1.7.1
+1.7.2.dirty
