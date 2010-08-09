@@ -1,29 +1,66 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Mon, 09 Aug 2010 20:51:01 +0200
-Subject: [PATCH 2/8] ARM i.MX dma-mx1-mx2: use wrapper
-In-Reply-To: <1281344743-2029-3-git-send-email-s.hauer@pengutronix.de>
-References: <1281344743-2029-1-git-send-email-s.hauer@pengutronix.de>
-	<1281344743-2029-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <4C604E15.3010808@gmail.com>
+From: justinmattock@gmail.com (Justin P. Mattock)
+Date: Mon, 09 Aug 2010 11:53:17 -0700
+Subject: Query: Patches break with Microsoft exchange server.
+In-Reply-To: <201008092115.25992.mihai.dontu@gmail.com>
+References: <4C5F9B25.8080401@st.com>
+	<201008091735.11105.mihai.dontu@gmail.com>
+	<4C6040FC.2020702@gmail.com>
+	<201008092115.25992.mihai.dontu@gmail.com>
+Message-ID: <4C604E9D.6060500@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On 08/09/2010 11:15 AM, Mihai Don?u wrote:
+> On Monday 09 August 2010 20:55:08 Justin P. Mattock wrote:
+>> On 08/09/2010 07:35 AM, Mihai Don?u wrote:
+>>> On Monday 09 August 2010 12:43:16 Justin P. Mattock wrote:
+>>>> On 08/09/2010 02:35 AM, viresh kumar wrote:
+>>>>> On 8/9/2010 2:31 PM, Matti Aarnio wrote:
+>>>>>> On Mon, Aug 09, 2010 at 12:26:24PM +0530, viresh kumar wrote:
+>>>>>>>> I missed this information in my last mail. We are using git
+>>>>>>>> send-email for sending patches. As patches will go through
+>>>>>>>> Microsoft exchange server only, so they are broken.
+>>>>>>
+>>>>>> Let your boss complain to your IT keepers.
+>>>>>> "These are Machine-to-Machine messages, they must not be modified!"
+>>>>>>
+>>>>>>
+>>>>>> It would probably be "against corporate policy" to use gmail for these
+>>>>>> emails...
+>>>>>
+>>>>> We got one solution: Upgrade Exchange server to SP2.
+>>>>> Lets see if our IT department does this upgradation.
+>>>>
+>>>> that or just blast them with some cryptology..i.e. pretty sure if your
+>>>> message was encapsulated(AH/ESP) they couldn't tweak it.. but then
+>>>> sending such encryption to a public list would require a _key_ on the
+>>>> other side.. wishful thinking...
+>>>> (just a thought)...
+>>>
+>>> Shouldn't just signing the message be enough? The server (normally) would
+>>> not alter it, otherwise it will break the signature (which is a too
+>>> obvious bug even for Microsoft). Or am I missing something here?
+>>>
+>>> PS: A local SMTP with DKIM signing capabilities could be another
+>>> possibility, assuming Exchange does not break such signatures.
+>>
+>> yeah that would probably be just enough to get through without Microsoft
+>> mucking around with the font etc.., but the biggest problem(I see) with
+>> the encryption is having the key on the other end of the line.
+>
+> Wait. I don't think we're on the same page here. I'm talking about message
+> signing (which does not require the receiving end to have any key - it's the
+> same plain text e-mail with a blob after it) while you refer to actually
+> encrypting the message. Mm? Or am I being extremely slow today? :-)
+>
 
-> diff --git a/arch/arm/mach-imx/dma-v1.c b/arch/arm/mach-imx/dma-v1.c
-> index 3e8c47c..d141458 100644
-> --- a/arch/arm/mach-imx/dma-v1.c
-> +++ b/arch/arm/mach-imx/dma-v1.c
-> @@ -35,6 +35,7 @@
-...
-> @@ -503,7 +517,7 @@ void imx_dma_disable(int channel)
->  	struct imx_dma_channel *imxdma = &imx_dma_channels[channel];
->  	unsigned long flags;
->  
-> -	pr_debug("imxdma%d: imx_dma_disable\n", channel);
-> +	pr_info("imxdma%d: imx_dma_disable\n", channel);
+no were on the same page.. keep in mind though I'm not sure how the 
+message signing thing really works, if it's just a signature verifying 
+that it's from you without the other end(recipient) accepting anything, 
+then the question is will microsoft still scan the email and garble it up?
+Now if it's a signature where the other end needs to accept the sender 
+then im guessing there's a little bit of encryption there to keep 
+microsoft database scanner from doing anything(but keep in mind I never 
+really setup the signature thing on e-mails so I could totally be wrong)
 
-With this change imx_dma_enable() uses pr_debug() while imx_dma_disable uses pr_info(). Shouldn't both use the same pr_*() since the functions are paired?
-
-
-Regards, Magnus
+Justin P. Mattock
