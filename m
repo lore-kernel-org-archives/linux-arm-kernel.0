@@ -1,215 +1,273 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon,  9 Aug 2010 06:23:28 +0200
-Subject: [PATCH 1/6] Balloon3: Disperse MFP config
-Message-ID: <1281327813-7264-1-git-send-email-marek.vasut@gmail.com>
+Date: Mon,  9 Aug 2010 06:23:30 +0200
+Subject: [PATCH 3/6] PXA: PalmTC: Modularize Palm Tungsten|C
+In-Reply-To: <1281327813-7264-1-git-send-email-marek.vasut@gmail.com>
+References: <1281327813-7264-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1281327813-7264-3-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move pin config to appropriate places and use it only if needed.
-
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- arch/arm/mach-pxa/balloon3.c |  104 +++++++++++++++++++++++++++--------------
- 1 files changed, 68 insertions(+), 36 deletions(-)
+ arch/arm/mach-pxa/palmtc.c |  147 ++++++++++++++++++++++++++++++++++---------
+ 1 files changed, 116 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
-index 9041340..7f62448 100644
---- a/arch/arm/mach-pxa/balloon3.c
-+++ b/arch/arm/mach-pxa/balloon3.c
-@@ -68,42 +68,6 @@ static unsigned long balloon3_pin_config[] __initdata = {
+diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
+index ce1104d..9887094 100644
+--- a/arch/arm/mach-pxa/palmtc.c
++++ b/arch/arm/mach-pxa/palmtc.c
+@@ -25,6 +25,7 @@
+ #include <linux/power_supply.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/mtd/physmap.h>
++#include <linux/usb/gpio_vbus.h>
  
- 	/* Reset, configured as GPIO wakeup source */
- 	GPIO1_GPIO | WAKEUP_ON_EDGE_BOTH,
--
--	/* LEDs */
--	GPIO9_GPIO,	/* NAND activity LED */
--	GPIO10_GPIO,	/* Heartbeat LED */
--
--	/* AC97 */
--	GPIO28_AC97_BITCLK,
--	GPIO29_AC97_SDATA_IN_0,
--	GPIO30_AC97_SDATA_OUT,
--	GPIO31_AC97_SYNC,
--	GPIO113_AC97_nRESET,
--	GPIO95_GPIO,
--
--	/* MMC */
--	GPIO32_MMC_CLK,
--	GPIO92_MMC_DAT_0,
--	GPIO109_MMC_DAT_1,
--	GPIO110_MMC_DAT_2,
--	GPIO111_MMC_DAT_3,
--	GPIO112_MMC_CMD,
--
--	/* USB Host */
--	GPIO88_USBH1_PWR,
--	GPIO89_USBH1_PEN,
--
--	/* PC Card */
--	GPIO48_nPOE,
--	GPIO49_nPWE,
--	GPIO50_nPIOR,
--	GPIO51_nPIOW,
--	GPIO85_nPCE_1,
--	GPIO54_nPCE_2,
--	GPIO79_PSKTSEL,
--	GPIO55_nPREG,
--	GPIO56_nPWAIT,
--	GPIO57_nIOIS16,
- };
- 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -116,6 +117,7 @@ static unsigned long palmtc_pin_config[] __initdata = {
  /******************************************************************************
-@@ -132,6 +96,34 @@ int __init parse_balloon3_features(char *arg)
- early_param("balloon3_features", parse_balloon3_features);
- 
- /******************************************************************************
-+ * Compact Flash slot
-+ ******************************************************************************/
-+#if	defined(CONFIG_PCMCIA_PXA2XX) || defined(CONFIG_PCMCIA_PXA2XX_MODULE)
-+static unsigned long balloon3_cf_pin_config[] __initdata = {
-+	GPIO48_nPOE,
-+	GPIO49_nPWE,
-+	GPIO50_nPIOR,
-+	GPIO51_nPIOW,
-+	GPIO85_nPCE_1,
-+	GPIO54_nPCE_2,
-+	GPIO79_PSKTSEL,
-+	GPIO55_nPREG,
-+	GPIO56_nPWAIT,
-+	GPIO57_nIOIS16,
-+};
-+
-+static void __init balloon3_cf_init(void)
-+{
-+	if (!balloon3_has(BALLOON3_FEATURE_CF))
-+		return;
-+
-+	pxa2xx_mfp_config(ARRAY_AND_SIZE(balloon3_cf_pin_config));
-+}
-+#else
-+static inline void balloon3_cf_init(void) {}
-+#endif
-+
-+/******************************************************************************
-  * NOR Flash
-  ******************************************************************************/
- #if defined(CONFIG_MTD_PHYSMAP) || defined(CONFIG_MTD_PHYSMAP_MODULE)
-@@ -179,6 +171,15 @@ static inline void balloon3_nor_init(void) {}
-  ******************************************************************************/
- #if	defined(CONFIG_TOUCHSCREEN_UCB1400) || \
- 	defined(CONFIG_TOUCHSCREEN_UCB1400_MODULE)
-+static unsigned long balloon3_ac97_pin_config[] __initdata = {
-+	GPIO28_AC97_BITCLK,
-+	GPIO29_AC97_SDATA_IN_0,
-+	GPIO30_AC97_SDATA_OUT,
-+	GPIO31_AC97_SYNC,
-+	GPIO113_AC97_nRESET,
-+	GPIO95_GPIO,
-+};
-+
- static struct ucb1400_pdata vpac270_ucb1400_pdata = {
- 	.irq		= IRQ_GPIO(BALLOON3_GPIO_CODEC_IRQ),
- };
-@@ -197,6 +198,7 @@ static void __init balloon3_ts_init(void)
- 	if (!balloon3_has(BALLOON3_FEATURE_AUDIO))
- 		return;
- 
-+	pxa2xx_mfp_config(ARRAY_AND_SIZE(balloon3_ac97_pin_config));
- 	pxa_set_ac97_info(NULL);
- 	platform_device_register(&balloon3_ucb1400_device);
- }
-@@ -208,6 +210,11 @@ static inline void balloon3_ts_init(void) {}
-  * Framebuffer
-  ******************************************************************************/
- #if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
-+static unsigned long balloon3_lcd_pin_config[] __initdata = {
-+	GPIOxx_LCD_TFT_16BPP,
-+	GPIO99_GPIO,
-+};
-+
- static struct pxafb_mode_info balloon3_lcd_modes[] = {
- 	{
- 		.pixclock		= 38000,
-@@ -242,6 +249,8 @@ static void __init balloon3_lcd_init(void)
- 	if (!balloon3_has(BALLOON3_FEATURE_TOPPOLY))
- 		return;
- 
-+	pxa2xx_mfp_config(ARRAY_AND_SIZE(balloon3_lcd_pin_config));
-+
- 	ret = gpio_request(BALLOON3_GPIO_RUN_BACKLIGHT, "BKL-ON");
- 	if (ret) {
- 		pr_err("Requesting BKL-ON GPIO failed!\n");
-@@ -271,6 +280,15 @@ static inline void balloon3_lcd_init(void) {}
   * SD/MMC card controller
   ******************************************************************************/
- #if defined(CONFIG_MMC_PXA) || defined(CONFIG_MMC_PXA_MODULE)
-+static unsigned long balloon3_mmc_pin_config[] __initdata = {
-+	GPIO32_MMC_CLK,
-+	GPIO92_MMC_DAT_0,
-+	GPIO109_MMC_DAT_1,
-+	GPIO110_MMC_DAT_2,
-+	GPIO111_MMC_DAT_3,
-+	GPIO112_MMC_CMD,
-+};
-+
- static struct pxamci_platform_data balloon3_mci_platform_data = {
++#if defined(CONFIG_MMC_PXA) || defined(CONFIG_MMC_PXA_MODULE)
+ static struct pxamci_platform_data palmtc_mci_platform_data = {
  	.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34,
- 	.gpio_card_detect	= -1,
-@@ -281,6 +299,7 @@ static struct pxamci_platform_data balloon3_mci_platform_data = {
+ 	.gpio_power		= GPIO_NR_PALMTC_SD_POWER,
+@@ -124,9 +126,18 @@ static struct pxamci_platform_data palmtc_mci_platform_data = {
+ 	.detect_delay_ms	= 200,
+ };
  
- static void __init balloon3_mmc_init(void)
- {
-+	pxa2xx_mfp_config(ARRAY_AND_SIZE(balloon3_mmc_pin_config));
- 	pxa_set_mci_info(&balloon3_mci_platform_data);
- }
- #else
-@@ -339,6 +358,11 @@ static inline void balloon3_irda_init(void) {}
-  * USB Host
++static void __init palmtc_mmc_init(void)
++{
++	pxa_set_mci_info(&palmtc_mci_platform_data);
++}
++#else
++static inline void palmtc_mmc_init(void) {}
++#endif
++
+ /******************************************************************************
+  * GPIO keys
   ******************************************************************************/
- #if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
-+static unsigned long balloon3_uhc_pin_config[] __initdata = {
-+	GPIO88_USBH1_PWR,
-+	GPIO89_USBH1_PEN,
++#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
+ static struct gpio_keys_button palmtc_pxa_buttons[] = {
+ 	{KEY_F8, GPIO_NR_PALMTC_HOTSYNC_BUTTON, 1, "HotSync Button", EV_KEY, 1},
+ };
+@@ -144,9 +155,18 @@ static struct platform_device palmtc_pxa_keys = {
+ 	},
+ };
+ 
++static void __init palmtc_keys_init(void)
++{
++	platform_device_register(&palmtc_pxa_keys);
++}
++#else
++static inline void palmtc_keys_init(void) {}
++#endif
++
+ /******************************************************************************
+  * Backlight
+  ******************************************************************************/
++#if defined(CONFIG_BACKLIGHT_PWM) || defined(CONFIG_BACKLIGHT_PWM_MODULE)
+ static int palmtc_backlight_init(struct device *dev)
+ {
+ 	int ret;
+@@ -196,17 +216,35 @@ static struct platform_device palmtc_backlight = {
+ 	},
+ };
+ 
++static void __init palmtc_pwm_init(void)
++{
++	platform_device_register(&palmtc_backlight);
++}
++#else
++static inline void palmtc_pwm_init(void) {}
++#endif
++
+ /******************************************************************************
+  * IrDA
+  ******************************************************************************/
++#if defined(CONFIG_IRDA) || defined(CONFIG_IRDA_MODULE)
+ static struct pxaficp_platform_data palmtc_ficp_platform_data = {
+ 	.gpio_pwdown		= GPIO_NR_PALMTC_IR_DISABLE,
+ 	.transceiver_cap	= IR_SIRMODE | IR_OFF,
+ };
+ 
++static void __init palmtc_irda_init(void)
++{
++	pxa_set_ficp_info(&palmtc_ficp_platform_data);
++}
++#else
++static inline void palmtc_irda_init(void) {}
++#endif
++
+ /******************************************************************************
+  * Keyboard
+  ******************************************************************************/
++#if defined(CONFIG_KEYBOARD_MATRIX) || defined(CONFIG_KEYBOARD_MATRIX_MODULE)
+ static const uint32_t palmtc_matrix_keys[] = {
+ 	KEY(0, 0, KEY_F1),
+ 	KEY(0, 1, KEY_X),
+@@ -290,27 +328,63 @@ static struct platform_device palmtc_keyboard = {
+ 		.platform_data = &palmtc_keypad_platform_data,
+ 	},
+ };
++static void __init palmtc_mkp_init(void)
++{
++	platform_device_register(&palmtc_keyboard);
++}
++#else
++static inline void palmtc_mkp_init(void) {}
++#endif
+ 
+ /******************************************************************************
+  * UDC
+  ******************************************************************************/
+-static struct pxa2xx_udc_mach_info palmtc_udc_info __initdata = {
++#if defined(CONFIG_USB_GADGET_PXA27X)||defined(CONFIG_USB_GADGET_PXA27X_MODULE)
++static struct gpio_vbus_mach_info palmtc_udc_info = {
+ 	.gpio_vbus		= GPIO_NR_PALMTC_USB_DETECT_N,
+ 	.gpio_vbus_inverted	= 1,
+ 	.gpio_pullup		= GPIO_NR_PALMTC_USB_POWER,
+ };
+ 
++static struct platform_device palmtc_gpio_vbus = {
++	.name	= "gpio-vbus",
++	.id	= -1,
++	.dev	= {
++		.platform_data	= &palmtc_udc_info,
++	},
 +};
 +
- static struct pxaohci_platform_data balloon3_ohci_info = {
- 	.port_mode	= PMM_PERPORT_MODE,
- 	.flags		= ENABLE_PORT_ALL | POWER_CONTROL_LOW | POWER_SENSE_LOW,
-@@ -348,6 +372,7 @@ static void __init balloon3_uhc_init(void)
- {
- 	if (!balloon3_has(BALLOON3_FEATURE_OHCI))
- 		return;
-+	pxa2xx_mfp_config(ARRAY_AND_SIZE(balloon3_uhc_pin_config));
- 	pxa_set_ohci_info(&balloon3_ohci_info);
- }
- #else
-@@ -358,6 +383,11 @@ static inline void balloon3_uhc_init(void) {}
-  * LEDs
-  ******************************************************************************/
- #if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
-+static unsigned long balloon3_led_pin_config[] __initdata = {
-+	GPIO9_GPIO,	/* NAND activity LED */
-+	GPIO10_GPIO,	/* Heartbeat LED */
++static void __init palmtc_udc_init(void)
++{
++	platform_device_register(&palmtc_gpio_vbus);
 +};
++#else
++static inline void palmtc_udc_init(void) {}
++#endif
 +
- struct gpio_led balloon3_gpio_leds[] = {
- 	{
- 		.name			= "balloon3:green:idle",
-@@ -436,6 +466,7 @@ static struct platform_device balloon3_pcf_leds = {
+ /******************************************************************************
+  * Touchscreen / Battery / GPIO-extender
+  ******************************************************************************/
+-static struct platform_device palmtc_ucb1400_core = {
++#if	defined(CONFIG_TOUCHSCREEN_UCB1400) || \
++	defined(CONFIG_TOUCHSCREEN_UCB1400_MODULE)
++static struct platform_device palmtc_ucb1400_device = {
+ 	.name	= "ucb1400_core",
+ 	.id	= -1,
+ };
  
- static void __init balloon3_leds_init(void)
++static void __init palmtc_ts_init(void)
++{
++	pxa_set_ac97_info(NULL);
++	platform_device_register(&palmtc_ucb1400_device);
++}
++#else
++static inline void palmtc_ts_init(void) {}
++#endif
++
+ /******************************************************************************
+  * NOR Flash
+  ******************************************************************************/
++#if defined(CONFIG_MTD_PHYSMAP) || defined(CONFIG_MTD_PHYSMAP_MODULE)
+ static struct resource palmtc_flash_resource = {
+ 	.start	= PXA_CS0_PHYS,
+ 	.end	= PXA_CS0_PHYS + SZ_16M - 1,
+@@ -356,24 +430,33 @@ static struct platform_device palmtc_flash = {
+ 	},
+ };
+ 
++static void __init palmtc_nor_init(void)
++{
++	platform_device_register(&palmtc_flash);
++}
++#else
++static inline void palmtc_nor_init(void) {}
++#endif
++
+ /******************************************************************************
+  * Framebuffer
+  ******************************************************************************/
++#if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
+ static struct pxafb_mode_info palmtc_lcd_modes[] = {
+-{
+-	.pixclock	= 115384,
+-	.xres		= 320,
+-	.yres		= 320,
+-	.bpp		= 16,
+-
+-	.left_margin	= 27,
+-	.right_margin	= 7,
+-	.upper_margin	= 7,
+-	.lower_margin	= 8,
+-
+-	.hsync_len	= 6,
+-	.vsync_len	= 1,
+-},
++	{
++		.pixclock	= 115384,
++		.xres		= 320,
++		.yres		= 320,
++		.bpp		= 16,
++
++		.left_margin	= 27,
++		.right_margin	= 7,
++		.upper_margin	= 7,
++		.lower_margin	= 8,
++
++		.hsync_len	= 6,
++		.vsync_len	= 1,
++	},
+ };
+ 
+ static struct pxafb_mach_info palmtc_lcd_screen = {
+@@ -382,17 +465,17 @@ static struct pxafb_mach_info palmtc_lcd_screen = {
+ 	.lcd_conn		= LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
+ };
+ 
++static void __init palmtc_lcd_init(void)
++{
++	set_pxa_fb_info(&palmtc_lcd_screen);
++}
++#else
++static inline void palmtc_lcd_init(void) {}
++#endif
++
+ /******************************************************************************
+  * Machine init
+  ******************************************************************************/
+-static struct platform_device *devices[] __initdata = {
+-	&palmtc_backlight,
+-	&palmtc_ucb1400_core,
+-	&palmtc_keyboard,
+-	&palmtc_pxa_keys,
+-	&palmtc_flash,
+-};
+-
+ static void __init palmtc_init(void)
  {
-+	pxa2xx_mfp_config(ARRAY_AND_SIZE(balloon3_led_pin_config));
- 	platform_device_register(&balloon3_leds);
- 	platform_device_register(&balloon3_pcf_leds);
- }
-@@ -757,6 +788,7 @@ static void __init balloon3_init(void)
- 	balloon3_ts_init();
- 	balloon3_udc_init();
- 	balloon3_uhc_init();
-+	balloon3_cf_init();
- }
+ 	pxa2xx_mfp_config(ARRAY_AND_SIZE(palmtc_pin_config));
+@@ -402,13 +485,15 @@ static void __init palmtc_init(void)
+ 	pxa_set_stuart_info(NULL);
+ 	pxa_set_hwuart_info(NULL);
  
- static struct map_desc balloon3_io_desc[] __initdata = {
+-	set_pxa_fb_info(&palmtc_lcd_screen);
+-	pxa_set_mci_info(&palmtc_mci_platform_data);
+-	pxa_set_udc_info(&palmtc_udc_info);
+-	pxa_set_ac97_info(NULL);
+-	pxa_set_ficp_info(&palmtc_ficp_platform_data);
+-
+-	platform_add_devices(devices, ARRAY_SIZE(devices));
++	palmtc_mmc_init();
++	palmtc_keys_init();
++	palmtc_pwm_init();
++	palmtc_irda_init();
++	palmtc_mkp_init();
++	palmtc_udc_init();
++	palmtc_ts_init();
++	palmtc_nor_init();
++	palmtc_lcd_init();
+ };
+ 
+ MACHINE_START(PALMTC, "Palm Tungsten|C")
 -- 
 1.7.1
