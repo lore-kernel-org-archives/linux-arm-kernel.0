@@ -1,77 +1,88 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon,  9 Aug 2010 15:20:46 +0200
-Subject: [PATCH 02/12] mxc_nand: rework get_dev_status
+Date: Mon,  9 Aug 2010 15:20:48 +0200
+Subject: [PATCH 04/12] mxc_nand: factor out a check_int function
 In-Reply-To: <1281360053-8386-1-git-send-email-s.hauer@pengutronix.de>
 References: <1281360053-8386-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1281360053-8386-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1281360053-8386-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We save/restore the value in the buffer anyway, so it makes
-no difference whether we use main_area0 or main_area1. So,
-we can use main_area0 and remove main_area1 from the driver
-which is otherwise unused. Also, clean up the comments in
-get_dev_status.
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/mtd/nand/mxc_nand.c |   21 +++++++++------------
- 1 files changed, 9 insertions(+), 12 deletions(-)
+ drivers/mtd/nand/mxc_nand.c |   32 +++++++++++++++++++-------------
+ 1 files changed, 19 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index abec73a..6654446 100644
+index 2d2e2e7..70f64dc 100644
 --- a/drivers/mtd/nand/mxc_nand.c
 +++ b/drivers/mtd/nand/mxc_nand.c
-@@ -102,7 +102,6 @@ struct mxc_nand_host {
+@@ -122,6 +122,7 @@ struct mxc_nand_host {
+ 	void			(*send_page)(struct mtd_info *, unsigned int);
+ 	void			(*send_read_id)(struct mxc_nand_host *);
+ 	uint16_t		(*get_dev_status)(struct mxc_nand_host *);
++	int			(*check_int)(struct mxc_nand_host *);
+ };
  
- 	void			*spare0;
- 	void			*main_area0;
--	void			*main_area1;
+ /* OOB placement block for use with hardware ecc generation */
+@@ -181,34 +182,38 @@ static irqreturn_t mxc_nfc_irq(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
  
- 	void __iomem		*base;
- 	void __iomem		*regs;
-@@ -305,25 +304,24 @@ static void send_read_id(struct mxc_nand_host *host)
-  * NAND device status and returns the current status. */
- static uint16_t get_dev_status(struct mxc_nand_host *host)
++static int check_int_v1_v2(struct mxc_nand_host *host)
++{
++	uint32_t tmp;
++
++	tmp = readw(host->regs + NFC_CONFIG2);
++	if (!(tmp & NFC_INT))
++		return 0;
++
++	writew(tmp & ~NFC_INT, NFC_CONFIG2);
++
++	return 1;
++}
++
+ /* This function polls the NANDFC to wait for the basic operation to
+  * complete by checking the INT bit of config2 register.
+  */
+ static void wait_op_done(struct mxc_nand_host *host, int useirq)
  {
--	void __iomem *main_buf = host->main_area1;
-+	void __iomem *main_buf = host->main_area0;
- 	uint32_t store;
- 	uint16_t ret;
--	/* Issue status request to NAND device */
+-	uint16_t tmp;
+ 	int max_retries = 8000;
  
--	/* store the main area1 first word, later do recovery */
-+	writew(0x0, NFC_V1_V2_BUF_ADDR);
-+
-+	/*
-+	 * The device status is stored in main_area0. To
-+	 * prevent corruption of the buffer save the value
-+	 * and restore it afterwards.
-+	 */
- 	store = readl(main_buf);
--	/* NANDFC buffer 1 is used for device status to prevent
--	 * corruption of read/write buffer on status requests. */
--	writew(1, host->regs + NFC_BUF_ADDR);
+ 	if (useirq) {
+-		if ((readw(host->regs + NFC_CONFIG2) & NFC_INT) == 0) {
++		if (!host->check_int(host)) {
  
- 	writew(NFC_STATUS, host->regs + NFC_CONFIG2);
+ 			enable_irq(host->irq);
+ 
+-			wait_event(host->irq_waitq,
+-				readw(host->regs + NFC_CONFIG2) & NFC_INT);
 -
--	/* Wait for operation to complete */
- 	wait_op_done(host, true);
- 
--	/* Status is placed in first word of main buffer */
--	/* get status, then recovery area 1 data */
- 	ret = readw(main_buf);
+-			tmp = readw(host->regs + NFC_CONFIG2);
+-			tmp  &= ~NFC_INT;
+-			writew(tmp, host->regs + NFC_CONFIG2);
++			wait_event(host->irq_waitq, host->check_int(host));
+ 		}
+ 	} else {
+ 		while (max_retries-- > 0) {
+-			if (readw(host->regs + NFC_CONFIG2) & NFC_INT) {
+-				tmp = readw(host->regs + NFC_CONFIG2);
+-				tmp  &= ~NFC_INT;
+-				writew(tmp, host->regs + NFC_CONFIG2);
++			if (host->check_int(host))
+ 				break;
+-			}
 +
- 	writel(store, main_buf);
- 
- 	return ret;
-@@ -761,7 +759,6 @@ static int __init mxcnd_probe(struct platform_device *pdev)
+ 			udelay(1);
+ 		}
+ 		if (max_retries < 0)
+@@ -774,6 +779,7 @@ static int __init mxcnd_probe(struct platform_device *pdev)
+ 		host->send_page = send_page_v1_v2;
+ 		host->send_read_id = send_read_id_v1_v2;
+ 		host->get_dev_status = get_dev_status_v1_v2;
++		host->check_int = check_int_v1_v2;
  	}
  
- 	host->main_area0 = host->base;
--	host->main_area1 = host->base + 0x200;
- 
  	if (nfc_is_v21()) {
- 		host->regs = host->base + 0x1e00;
 -- 
 1.7.1
