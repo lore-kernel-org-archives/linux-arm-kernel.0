@@ -1,313 +1,370 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon,  9 Aug 2010 11:05:38 +0200
-Subject: [PATCH 3/8] mxcmmc: use new dma api
+Date: Mon,  9 Aug 2010 11:05:43 +0200
+Subject: [PATCH 8/8] ASoC i.MX: switch to new DMA api
 In-Reply-To: <1281344743-2029-1-git-send-email-s.hauer@pengutronix.de>
 References: <1281344743-2029-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1281344743-2029-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1281344743-2029-9-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This switches the mxcmmc driver to use the new DMA API. Unlike
-the old one this one is always present in the tree, even if no DMA
-is implement, hence we can remove all the #ifdefs in from the driver.
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/mmc/host/mxcmmc.c |  129 +++++++++++++++++++++++---------------------
- 1 files changed, 67 insertions(+), 62 deletions(-)
+ sound/soc/imx/Makefile          |    2 -
+ sound/soc/imx/imx-pcm-dma-mx2.c |  177 +++++++++++++++------------------------
+ sound/soc/imx/imx-ssi.c         |    8 +-
+ 3 files changed, 70 insertions(+), 117 deletions(-)
 
-diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-index 350f78e..a71c2a6 100644
---- a/drivers/mmc/host/mxcmmc.c
-+++ b/drivers/mmc/host/mxcmmc.c
-@@ -37,10 +37,7 @@
- #include <asm/sizes.h>
- #include <mach/mmc.h>
+diff --git a/sound/soc/imx/Makefile b/sound/soc/imx/Makefile
+index 2d20363..87cf03c 100644
+--- a/sound/soc/imx/Makefile
++++ b/sound/soc/imx/Makefile
+@@ -1,9 +1,7 @@
+ # i.MX Platform Support
+ snd-soc-imx-objs := imx-ssi.o imx-pcm-fiq.o
  
--#ifdef CONFIG_ARCH_MX2
+-ifdef CONFIG_MACH_MX27
+ snd-soc-imx-objs += imx-pcm-dma-mx2.o
+-endif
+ 
+ obj-$(CONFIG_SND_IMX_SOC) += snd-soc-imx.o
+ 
+diff --git a/sound/soc/imx/imx-pcm-dma-mx2.c b/sound/soc/imx/imx-pcm-dma-mx2.c
+index 05f19c9..c672724 100644
+--- a/sound/soc/imx/imx-pcm-dma-mx2.c
++++ b/sound/soc/imx/imx-pcm-dma-mx2.c
+@@ -27,117 +27,80 @@
+ #include <sound/pcm_params.h>
+ #include <sound/soc.h>
+ 
 -#include <mach/dma-mx1-mx2.h>
--#define HAS_DMA
--#endif
 +#include <mach/dma.h>
  
- #define DRIVER_NAME "mxc-mmc"
+ #include "imx-ssi.h"
  
-@@ -141,6 +138,9 @@ struct mxcmci_host {
- 
- 	struct work_struct	datawork;
- 	spinlock_t		lock;
-+
-+	int			burstlen;
-+	int			dmareq;
+ struct imx_pcm_runtime_data {
+ 	int sg_count;
+ 	struct scatterlist *sg_list;
+-	int period;
++	int period_bytes;
+ 	int periods;
+-	unsigned long dma_addr;
+ 	int dma;
+-	struct snd_pcm_substream *substream;
+ 	unsigned long offset;
+ 	unsigned long size;
+-	unsigned long period_cnt;
+ 	void *buf;
+ 	int period_time;
  };
  
- static void mxcmci_set_clk_rate(struct mxcmci_host *host, unsigned int clk_ios);
-@@ -166,17 +166,17 @@ static void mxcmci_softreset(struct mxcmci_host *host)
- 
- 	writew(0xff, host->base + MMC_REG_RES_TO);
- }
-+static int mxcmci_setup_dma(struct mmc_host *mmc);
- 
- static int mxcmci_setup_data(struct mxcmci_host *host, struct mmc_data *data)
+-/* Called by the DMA framework when a period has elapsed */
+-static void imx_ssi_dma_progression(int channel, void *data,
+-					struct scatterlist *sg)
++static void audio_dma_irq(int channel, void *data, int error)
  {
- 	unsigned int nob = data->blocks;
- 	unsigned int blksz = data->blksz;
- 	unsigned int datasize = nob * blksz;
--#ifdef HAS_DMA
- 	struct scatterlist *sg;
- 	int i;
+-	struct snd_pcm_substream *substream = data;
++	struct snd_pcm_substream *substream = (struct snd_pcm_substream *)data;
+ 	struct snd_pcm_runtime *runtime = substream->runtime;
+ 	struct imx_pcm_runtime_data *iprtd = runtime->private_data;
+ 
+-	if (!sg)
+-		return;
+-
+-	runtime = iprtd->substream->runtime;
+-
+-	iprtd->offset = sg->dma_address - runtime->dma_addr;
+-
+-	snd_pcm_period_elapsed(iprtd->substream);
+-}
++	iprtd->offset += iprtd->period_bytes;
++	iprtd->offset %= iprtd->period_bytes * iprtd->periods;
+ 
+-static void imx_ssi_dma_callback(int channel, void *data)
+-{
+-	pr_err("%s shouldn't be called\n", __func__);
++	snd_pcm_period_elapsed(substream);
+ }
+ 
+-static void snd_imx_dma_err_callback(int channel, void *data, int err)
+-{
+-	struct snd_pcm_substream *substream = data;
+-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+-	struct imx_pcm_dma_params *dma_params = 
+-		snd_soc_dai_get_dma_data(rtd->dai->cpu_dai, substream);
+-	struct snd_pcm_runtime *runtime = substream->runtime;
+-	struct imx_pcm_runtime_data *iprtd = runtime->private_data;
+-	int ret;
+-
+-	pr_err("DMA timeout on channel %d -%s%s%s%s\n",
+-		 channel,
+-		 err & IMX_DMA_ERR_BURST ?    " burst" : "",
+-		 err & IMX_DMA_ERR_REQUEST ?  " request" : "",
+-		 err & IMX_DMA_ERR_TRANSFER ? " transfer" : "",
+-		 err & IMX_DMA_ERR_BUFFER ?   " buffer" : "");
+-
+-	imx_dma_disable(iprtd->dma);
+-	ret = imx_dma_setup_sg(iprtd->dma, iprtd->sg_list, iprtd->sg_count,
+-			IMX_DMA_LENGTH_LOOP, dma_params->dma_addr,
+-			substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
+-			DMA_MODE_WRITE : DMA_MODE_READ);
+-	if (!ret)
+-		imx_dma_enable(iprtd->dma);
+-}
+-
+-static int imx_ssi_dma_alloc(struct snd_pcm_substream *substream)
++static int imx_ssi_dma_alloc(struct snd_pcm_substream *substream,
++				struct snd_pcm_hw_params *params)
+ {
+ 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+ 	struct imx_pcm_dma_params *dma_params;
+ 	struct snd_pcm_runtime *runtime = substream->runtime;
+ 	struct imx_pcm_runtime_data *iprtd = runtime->private_data;
++	struct imx_dma_config p;
  	int ret;
--#endif
-+
- 	if (data->flags & MMC_DATA_STREAM)
- 		nob = 0xffff;
  
-@@ -187,7 +187,9 @@ static int mxcmci_setup_data(struct mxcmci_host *host, struct mmc_data *data)
- 	writew(blksz, host->base + MMC_REG_BLK_LEN);
- 	host->datasize = datasize;
+ 	dma_params = snd_soc_dai_get_dma_data(rtd->dai->cpu_dai, substream);
  
--#ifdef HAS_DMA
-+	if (!mxcmci_use_dma(host))
-+		return 0;
-+
- 	for_each_sg(data->sg, sg, data->sg_len, i) {
- 		if (sg->offset & 3 || sg->length & 3) {
- 			host->do_dma = 0;
-@@ -200,19 +202,15 @@ static int mxcmci_setup_data(struct mxcmci_host *host, struct mmc_data *data)
- 		host->dma_nents = dma_map_sg(mmc_dev(host->mmc), data->sg,
- 					     data->sg_len,  host->dma_dir);
- 
--		ret = imx_dma_setup_sg(host->dma, data->sg, host->dma_nents,
--				datasize,
--				host->res->start + MMC_REG_BUFFER_ACCESS,
--				DMA_MODE_READ);
-+		ret = imxdma_setup_sg(host->dma, data->sg, host->dma_nents,
-+			datasize, DMA_MODE_READ);
- 	} else {
- 		host->dma_dir = DMA_TO_DEVICE;
- 		host->dma_nents = dma_map_sg(mmc_dev(host->mmc), data->sg,
- 					     data->sg_len,  host->dma_dir);
- 
--		ret = imx_dma_setup_sg(host->dma, data->sg, host->dma_nents,
--				datasize,
--				host->res->start + MMC_REG_BUFFER_ACCESS,
--				DMA_MODE_WRITE);
-+		ret = imxdma_setup_sg(host->dma, data->sg, host->dma_nents,
-+			datasize, DMA_MODE_WRITE);
+-	iprtd->dma = imx_dma_request_by_prio(DRV_NAME, DMA_PRIO_HIGH);
++	iprtd->dma = imxdma_request(DMA_PRIO_HIGH);
+ 	if (iprtd->dma < 0) {
+ 		pr_err("Failed to claim the audio DMA\n");
+-		return -ENODEV;
++		return iprtd->dma;
  	}
  
- 	if (ret) {
-@@ -221,8 +219,8 @@ static int mxcmci_setup_data(struct mxcmci_host *host, struct mmc_data *data)
+-	ret = imx_dma_setup_handlers(iprtd->dma,
+-				imx_ssi_dma_callback,
+-				snd_imx_dma_err_callback, substream);
+-	if (ret)
+-		goto out;
+-
+-	ret = imx_dma_setup_progression_handler(iprtd->dma,
+-			imx_ssi_dma_progression);
+-	if (ret) {
+-		pr_err("Failed to setup the DMA handler\n");
+-		goto out;
++	switch (params_format(params)) {
++	case SNDRV_PCM_FORMAT_S16_LE:
++		p.word_size = 2;
++		break;
++	case SNDRV_PCM_FORMAT_S20_3LE:
++	case SNDRV_PCM_FORMAT_S24_LE:
++		p.word_size = 4;
++		break;
  	}
- 	wmb();
  
--	imx_dma_enable(host->dma);
--#endif /* HAS_DMA */
-+	imxdma_enable(host->dma);
+-	ret = imx_dma_config_channel(iprtd->dma,
+-			IMX_DMA_MEMSIZE_16 | IMX_DMA_TYPE_FIFO,
+-			IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR,
+-			dma_params->dma, 1);
+-	if (ret < 0) {
++	p.dma_request = dma_params->dma;
++	p.peripheral_type = IMX_DMATYPE_SSI;
++	p.burstlen = dma_params->burstsize;
++	p.dma_address = dma_params->dma_addr;
++	p.flags = IMX_DMA_SG_LOOP;
++	p.completion_handler = audio_dma_irq;
++	p.driver_data = substream;
 +
++	ret = imxdma_config(iprtd->dma, &p);
++	if (ret) {
+ 		pr_err("Cannot configure DMA channel: %d\n", ret);
+ 		goto out;
+ 	}
+ 
+-	imx_dma_config_burstlen(iprtd->dma, dma_params->burstsize * 2);
+-
+ 	return 0;
+ out:
+-	imx_dma_free(iprtd->dma);
++	imxdma_free(iprtd->dma);
++
+ 	return ret;
+ }
+ 
+@@ -149,11 +112,11 @@ static int snd_imx_pcm_hw_params(struct snd_pcm_substream *substream,
+ 	int i;
+ 	unsigned long dma_addr;
+ 
+-	imx_ssi_dma_alloc(substream);
++	imx_ssi_dma_alloc(substream, params);
+ 
+ 	iprtd->size = params_buffer_bytes(params);
+ 	iprtd->periods = params_periods(params);
+-	iprtd->period = params_period_bytes(params);
++	iprtd->period_bytes = params_period_bytes(params);
+ 	iprtd->offset = 0;
+ 	iprtd->period_time = HZ / (params_rate(params) /
+ 			params_period_size(params));
+@@ -163,30 +126,33 @@ static int snd_imx_pcm_hw_params(struct snd_pcm_substream *substream,
+ 	if (iprtd->sg_count != iprtd->periods) {
+ 		kfree(iprtd->sg_list);
+ 
+-		iprtd->sg_list = kcalloc(iprtd->periods + 1,
++		iprtd->sg_list = kcalloc(iprtd->periods,
+ 				sizeof(struct scatterlist), GFP_KERNEL);
+ 		if (!iprtd->sg_list)
+ 			return -ENOMEM;
+-		iprtd->sg_count = iprtd->periods + 1;
++		iprtd->sg_count = iprtd->periods;
+ 	}
+ 
+ 	sg_init_table(iprtd->sg_list, iprtd->sg_count);
+ 	dma_addr = runtime->dma_addr;
+ 
++	pr_debug("%s: setting up %d sg entries with %d bytes each\n",
++		__func__, iprtd->periods, iprtd->period_bytes);
++
+ 	for (i = 0; i < iprtd->periods; i++) {
+ 		iprtd->sg_list[i].page_link = 0;
+ 		iprtd->sg_list[i].offset = 0;
+ 		iprtd->sg_list[i].dma_address = dma_addr;
+-		iprtd->sg_list[i].length = iprtd->period;
+-		dma_addr += iprtd->period;
++		iprtd->sg_list[i].length = iprtd->period_bytes;
++		dma_addr += iprtd->period_bytes;
+ 	}
+ 
+-	/* close the loop */
+-	iprtd->sg_list[iprtd->sg_count - 1].offset = 0;
+-	iprtd->sg_list[iprtd->sg_count - 1].length = 0;
+-	iprtd->sg_list[iprtd->sg_count - 1].page_link =
+-			((unsigned long) iprtd->sg_list | 0x01) & ~0x02;
+-	return 0;
++	iprtd->buf = (unsigned int *)substream->dma_buffer.area;
++
++	return imxdma_setup_sg(iprtd->dma, iprtd->sg_list, iprtd->sg_count,
++			iprtd->period_bytes * iprtd->periods,
++			substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
++			DMA_MODE_WRITE : DMA_MODE_READ);
+ }
+ 
+ static int snd_imx_pcm_hw_free(struct snd_pcm_substream *substream)
+@@ -195,7 +161,7 @@ static int snd_imx_pcm_hw_free(struct snd_pcm_substream *substream)
+ 	struct imx_pcm_runtime_data *iprtd = runtime->private_data;
+ 
+ 	if (iprtd->dma >= 0) {
+-		imx_dma_free(iprtd->dma);
++		imxdma_free(iprtd->dma);
+ 		iprtd->dma = -EINVAL;
+ 	}
+ 
+@@ -207,28 +173,6 @@ static int snd_imx_pcm_hw_free(struct snd_pcm_substream *substream)
+ 
+ static int snd_imx_pcm_prepare(struct snd_pcm_substream *substream)
+ {
+-	struct snd_pcm_runtime *runtime = substream->runtime;
+-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+-	struct imx_pcm_dma_params *dma_params;
+-	struct imx_pcm_runtime_data *iprtd = runtime->private_data;
+-	int err;
+-
+-	dma_params = snd_soc_dai_get_dma_data(rtd->dai->cpu_dai, substream);
+-
+-	iprtd->substream = substream;
+-	iprtd->buf = (unsigned int *)substream->dma_buffer.area;
+-	iprtd->period_cnt = 0;
+-
+-	pr_debug("%s: buf: %p period: %d periods: %d\n",
+-			__func__, iprtd->buf, iprtd->period, iprtd->periods);
+-
+-	err = imx_dma_setup_sg(iprtd->dma, iprtd->sg_list, iprtd->sg_count,
+-			IMX_DMA_LENGTH_LOOP, dma_params->dma_addr,
+-			substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
+-			DMA_MODE_WRITE : DMA_MODE_READ);
+-	if (err)
+-		return err;
+-
  	return 0;
  }
  
-@@ -297,13 +295,11 @@ static int mxcmci_finish_data(struct mxcmci_host *host, unsigned int stat)
- 	struct mmc_data *data = host->data;
- 	int data_error;
+@@ -241,14 +185,14 @@ static int snd_imx_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
+ 	case SNDRV_PCM_TRIGGER_START:
+ 	case SNDRV_PCM_TRIGGER_RESUME:
+ 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+-		imx_dma_enable(iprtd->dma);
++		imxdma_enable(iprtd->dma);
  
--#ifdef HAS_DMA
- 	if (mxcmci_use_dma(host)) {
--		imx_dma_disable(host->dma);
-+		imxdma_disable(host->dma);
- 		dma_unmap_sg(mmc_dev(host->mmc), data->sg, host->dma_nents,
- 				host->dma_dir);
- 	}
--#endif
+ 		break;
  
- 	if (stat & STATUS_ERR_MASK) {
- 		dev_dbg(mmc_dev(host->mmc), "request failed. status: 0x%08x\n",
-@@ -505,7 +501,6 @@ static void mxcmci_datawork(struct work_struct *work)
- 	}
- }
+ 	case SNDRV_PCM_TRIGGER_STOP:
+ 	case SNDRV_PCM_TRIGGER_SUSPEND:
+ 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+-		imx_dma_disable(iprtd->dma);
++		imxdma_disable(iprtd->dma);
  
--#ifdef HAS_DMA
- static void mxcmci_data_done(struct mxcmci_host *host, unsigned int stat)
- {
- 	struct mmc_data *data = host->data;
-@@ -528,7 +523,6 @@ static void mxcmci_data_done(struct mxcmci_host *host, unsigned int stat)
- 		mxcmci_finish_request(host, host->req);
- 	}
- }
--#endif /* HAS_DMA */
+ 		break;
+ 	default:
+@@ -263,6 +207,9 @@ static snd_pcm_uframes_t snd_imx_pcm_pointer(struct snd_pcm_substream *substream
+ 	struct snd_pcm_runtime *runtime = substream->runtime;
+ 	struct imx_pcm_runtime_data *iprtd = runtime->private_data;
  
- static void mxcmci_cmd_done(struct mxcmci_host *host, unsigned int stat)
- {
-@@ -566,12 +560,10 @@ static irqreturn_t mxcmci_irq(int irq, void *devid)
- 	sdio_irq = (stat & STATUS_SDIO_INT_ACTIVE) && host->use_sdio;
- 	spin_unlock_irqrestore(&host->lock, flags);
- 
--#ifdef HAS_DMA
- 	if (mxcmci_use_dma(host) &&
- 	    (stat & (STATUS_READ_OP_DONE | STATUS_WRITE_OP_DONE)))
- 		writel(STATUS_READ_OP_DONE | STATUS_WRITE_OP_DONE,
- 			host->base + MMC_REG_STATUS);
--#endif
- 
- 	if (sdio_irq) {
- 		writel(STATUS_SDIO_INT_ACTIVE, host->base + MMC_REG_STATUS);
-@@ -581,14 +573,14 @@ static irqreturn_t mxcmci_irq(int irq, void *devid)
- 	if (stat & STATUS_END_CMD_RESP)
- 		mxcmci_cmd_done(host, stat);
- 
--#ifdef HAS_DMA
- 	if (mxcmci_use_dma(host) &&
- 		  (stat & (STATUS_DATA_TRANS_DONE | STATUS_WRITE_OP_DONE)))
- 		mxcmci_data_done(host, stat);
--#endif
++	pr_debug("%s: %ld %ld\n", __func__, iprtd->offset,
++			bytes_to_frames(substream->runtime, iprtd->offset));
 +
- 	if (host->default_irq_mask &&
- 		  (stat & (STATUS_CARD_INSERTION | STATUS_CARD_REMOVAL)))
- 		mmc_detect_change(host->mmc, msecs_to_jiffies(200));
-+
- 	return IRQ_HANDLED;
+ 	return bytes_to_frames(substream->runtime, iprtd->offset);
  }
  
-@@ -602,9 +594,7 @@ static void mxcmci_request(struct mmc_host *mmc, struct mmc_request *req)
- 
- 	host->req = req;
- 	host->cmdat &= ~CMD_DAT_CONT_INIT;
--#ifdef HAS_DMA
--	host->do_dma = 1;
--#endif
-+
- 	if (req->data) {
- 		error = mxcmci_setup_data(host, req->data);
- 		if (error) {
-@@ -658,22 +648,48 @@ static void mxcmci_set_clk_rate(struct mxcmci_host *host, unsigned int clk_ios)
- 			prescaler, divider, clk_in, clk_ios);
+@@ -279,7 +226,7 @@ static struct snd_pcm_hardware snd_imx_hardware = {
+ 	.channels_max = 2,
+ 	.buffer_bytes_max = IMX_SSI_DMABUF_SIZE,
+ 	.period_bytes_min = 128,
+-	.period_bytes_max = 16 * 1024,
++	.period_bytes_max = 65535, /* Limited by SDMA engine */
+ 	.periods_min = 2,
+ 	.periods_max = 255,
+ 	.fifo_size = 0,
+@@ -303,8 +250,19 @@ static int snd_imx_open(struct snd_pcm_substream *substream)
+ 	return 0;
  }
  
-+static int mxcmci_setup_dma(struct mmc_host *mmc)
++static int snd_imx_close(struct snd_pcm_substream *substream)
 +{
-+	struct mxcmci_host *host = mmc_priv(mmc);
-+	struct imx_dma_config cfg;
++	struct snd_pcm_runtime *runtime = substream->runtime;
++	struct imx_pcm_runtime_data *iprtd = runtime->private_data;
 +
-+	cfg.burstlen = host->burstlen;
-+	cfg.dma_address = host->res->start + MMC_REG_BUFFER_ACCESS;
-+	cfg.word_size = 4;
-+	cfg.peripheral_type = IMX_DMATYPE_SDHC;
-+	cfg.dma_request = host->dmareq;
-+	cfg.completion_handler = NULL;
-+	cfg.driver_data = NULL;
-+	cfg.flags = 0;
++	kfree(iprtd);
 +
-+	return imxdma_config(host->dma, &cfg);
++	return 0;
 +}
 +
- static void mxcmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ static struct snd_pcm_ops imx_pcm_ops = {
+ 	.open		= snd_imx_open,
++	.close		= snd_imx_close,
+ 	.ioctl		= snd_pcm_lib_ioctl,
+ 	.hw_params	= snd_imx_pcm_hw_params,
+ 	.hw_free	= snd_imx_pcm_hw_free,
+@@ -324,9 +282,8 @@ static struct snd_soc_platform imx_soc_platform_dma = {
+ struct snd_soc_platform *imx_ssi_dma_mx2_init(struct platform_device *pdev,
+ 		struct imx_ssi *ssi)
  {
- 	struct mxcmci_host *host = mmc_priv(mmc);
--#ifdef HAS_DMA
--	unsigned int blen;
-+	int burstlen, ret;
-+
- 	/*
- 	 * use burstlen of 64 in 4 bit mode (--> reg value  0)
- 	 * use burstlen of 16 in 1 bit mode (--> reg value 16)
- 	 */
- 	if (ios->bus_width == MMC_BUS_WIDTH_4)
--		blen = 0;
-+		burstlen = 64;
- 	else
--		blen = 16;
-+		burstlen = 16;
-+
-+	if (mxcmci_use_dma(host) && burstlen != host->burstlen) {
-+		host->burstlen = burstlen;
-+		ret = mxcmci_setup_dma(mmc);
-+		if (ret) {
-+			dev_err(mmc_dev(host->mmc),
-+				"failed to config DMA channel. Falling back to PIO\n");
-+			imxdma_free(host->dma);
-+			host->do_dma = 0;
-+		}
-+	}
+-	ssi->dma_params_tx.burstsize = DMA_TXFIFO_BURST;
+-	ssi->dma_params_rx.burstsize = DMA_RXFIFO_BURST;
++	ssi->dma_params_tx.burstsize = 4;
++	ssi->dma_params_rx.burstsize = 6;
  
--	imx_dma_config_burstlen(host->dma, blen);
--#endif
- 	if (ios->bus_width == MMC_BUS_WIDTH_4)
- 		host->cmdat |= CMD_DAT_CONT_BUS_WIDTH_4;
- 	else
-@@ -795,7 +811,7 @@ static int mxcmci_probe(struct platform_device *pdev)
- 	mmc->max_blk_size = 2048;
- 	mmc->max_blk_count = 65535;
- 	mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
--	mmc->max_seg_size = mmc->max_req_size;
-+	mmc->max_seg_size = 65535;
+ 	return &imx_soc_platform_dma;
+ }
+-
+diff --git a/sound/soc/imx/imx-ssi.c b/sound/soc/imx/imx-ssi.c
+index 4fd13d0..c187fe4 100644
+--- a/sound/soc/imx/imx-ssi.c
++++ b/sound/soc/imx/imx-ssi.c
+@@ -655,12 +655,10 @@ static int imx_ssi_probe(struct platform_device *pdev)
+ 	dai->name = kasprintf(GFP_KERNEL, "imx-ssi.%d", pdev->id);
+ 	dai->private_data = ssi;
  
- 	host = mmc_priv(mmc);
- 	host->base = ioremap(r->start, resource_size(r));
-@@ -847,29 +863,18 @@ static int mxcmci_probe(struct platform_device *pdev)
+-	if ((cpu_is_mx27() || cpu_is_mx21()) &&
+-			!(ssi->flags & IMX_SSI_USE_AC97) &&
+-			(ssi->flags & IMX_SSI_DMA)) {
+-		ssi->flags |= IMX_SSI_DMA;
++	if (!(ssi->flags & IMX_SSI_USE_AC97) &&
++			(ssi->flags & IMX_SSI_DMA))
+ 		platform = imx_ssi_dma_mx2_init(pdev, ssi);
+-	} else
++	else
+ 		platform = imx_ssi_fiq_init(pdev, ssi);
  
- 	writel(host->default_irq_mask, host->base + MMC_REG_INT_CNTR);
- 
--#ifdef HAS_DMA
--	host->dma = imx_dma_request_by_prio(DRIVER_NAME, DMA_PRIO_LOW);
--	if (host->dma < 0) {
--		dev_err(mmc_dev(host->mmc), "imx_dma_request_by_prio failed\n");
--		ret = -EBUSY;
--		goto out_clk_put;
-+	host->dma = imxdma_request(DMA_PRIO_LOW);
-+	if (host->dma >= 0) {
-+		r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
-+		if (r) {
-+			host->dmareq = r->start;
-+			host->do_dma = 1;
-+		}
- 	}
- 
--	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
--	if (!r) {
--		ret = -EINVAL;
--		goto out_free_dma;
--	}
-+	if (!host->do_dma)
-+		dev_info(mmc_dev(host->mmc), "dma not available. Using PIO\n");
- 
--	ret = imx_dma_config_channel(host->dma,
--				     IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_FIFO,
--				     IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR,
--				     r->start, 0);
--	if (ret) {
--		dev_err(mmc_dev(host->mmc), "failed to config DMA channel\n");
--		goto out_free_dma;
--	}
--#endif
- 	INIT_WORK(&host->datawork, mxcmci_datawork);
- 
- 	ret = request_irq(host->irq, mxcmci_irq, 0, DRIVER_NAME, host);
-@@ -892,9 +897,8 @@ static int mxcmci_probe(struct platform_device *pdev)
- out_free_irq:
- 	free_irq(host->irq, host);
- out_free_dma:
--#ifdef HAS_DMA
--	imx_dma_free(host->dma);
--#endif
-+	if (host->dma >= 0)
-+		imxdma_free(host->dma);
- out_clk_put:
- 	clk_disable(host->clk);
- 	clk_put(host->clk);
-@@ -921,9 +925,10 @@ static int mxcmci_remove(struct platform_device *pdev)
- 
- 	free_irq(host->irq, host);
- 	iounmap(host->base);
--#ifdef HAS_DMA
--	imx_dma_free(host->dma);
--#endif
-+
-+	if (host->dma >= 0)
-+		imxdma_free(host->dma);
-+
- 	clk_disable(host->clk);
- 	clk_put(host->clk);
- 
+ 	imx_soc_platform.pcm_ops = platform->pcm_ops;
 -- 
 1.7.1
