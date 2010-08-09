@@ -1,32 +1,30 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon,  9 Aug 2010 07:20:23 +0300
-Subject: [PATCH] nand: fix .correct callback return value check
-In-Reply-To: <20100808204341.GA20065@pengutronix.de>
-References: <20100808204341.GA20065@pengutronix.de>
-Message-ID: <ca767a0d6cafbea862c307e944c2b800dafb6660.1281327492.git.baruch@tkos.co.il>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon,  9 Aug 2010 06:23:29 +0200
+Subject: [PATCH 2/6] PXA: Vpac270: Fix gpio_power for MMC
+In-Reply-To: <1281327813-7264-1-git-send-email-marek.vasut@gmail.com>
+References: <1281327813-7264-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1281327813-7264-2-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drivers may (and do) return negative errno values other than -1 from the
-.correct callback.
+GPIO 0 is valid, yet this platform doesn't have any power GPIO for MMC.
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- drivers/mtd/nand/nand_base.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-pxa/vpac270.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-index 4a7b864..080f551 100644
---- a/drivers/mtd/nand/nand_base.c
-+++ b/drivers/mtd/nand/nand_base.c
-@@ -1210,7 +1210,7 @@ static int nand_read_subpage(struct mtd_info *mtd, struct nand_chip *chip, uint3
- 		int stat;
- 
- 		stat = chip->ecc.correct(mtd, p, &chip->buffers->ecccode[i], &chip->buffers->ecccalc[i]);
--		if (stat == -1)
-+		if (stat < 0)
- 			mtd->ecc_stats.failed++;
- 		else
- 			mtd->ecc_stats.corrected += stat;
+diff --git a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
+index c9b747c..37d6173 100644
+--- a/arch/arm/mach-pxa/vpac270.c
++++ b/arch/arm/mach-pxa/vpac270.c
+@@ -240,6 +240,7 @@ static void __init vpac270_onenand_init(void) {}
+ #if defined(CONFIG_MMC_PXA) || defined(CONFIG_MMC_PXA_MODULE)
+ static struct pxamci_platform_data vpac270_mci_platform_data = {
+ 	.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34,
++	.gpio_power		= -1,
+ 	.gpio_card_detect	= GPIO53_VPAC270_SD_DETECT_N,
+ 	.gpio_card_ro		= GPIO52_VPAC270_SD_READONLY,
+ 	.detect_delay_ms	= 200,
 -- 
 1.7.1
