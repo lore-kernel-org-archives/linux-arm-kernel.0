@@ -1,30 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 Aug 2010 12:25:40 +0100
-Subject: [PATCH 04/12] mmci: allow the card detect status not to be
-	inverted
-In-Reply-To: <20100809103704.GB5826@bnru01.bnr.st.com>
-References: <1277198267-10860-1-git-send-email-rabin.vincent@stericsson.com>
-	<1277198267-10860-4-git-send-email-rabin.vincent@stericsson.com>
-	<20100729123443.GA18923@n2100.arm.linux.org.uk>
-	<AANLkTikQi+SPpx8Wpvb0siSSsw0ZhusWaaKmqRnfHrnz@mail.gmail.com>
-	<20100729142011.GG18923@n2100.arm.linux.org.uk>
-	<20100805061453.GA7524@bnru02.bnr.st.com>
-	<20100805092531.GA23473@n2100.arm.linux.org.uk>
-	<20100809103704.GB5826@bnru01.bnr.st.com>
-Message-ID: <20100809112540.GC10793@n2100.arm.linux.org.uk>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon,  9 Aug 2010 14:38:14 +0300
+Subject: [PATCH 2/2] mxc_nand: remove unused variables
+In-Reply-To: <cover.1281353601.git.baruch@tkos.co.il>
+References: <1281102791-8089-1-git-send-email-s.hauer@pengutronix.de>
+	<cover.1281353601.git.baruch@tkos.co.il>
+Message-ID: <d4b734ef5662b65466fbe959bd1fc993a7f08398.1281353601.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 09, 2010 at 04:07:05PM +0530, Rabin VINCENT wrote:
-> On Thu, Aug 05, 2010 at 11:25:31 +0200, Russell King - ARM Linux wrote:
-> > On Thu, Aug 05, 2010 at 11:44:54AM +0530, Rabin VINCENT wrote:
-> > > so are you OK with the cd_noinvert addition (for the GPIO case)?
-> > > Or a cd_invert and a patch to existing platforms?
-> > 
-> > I'd much prefer positive logic.  Double negatives (eg, not noinverted)
-> > are always bad news.
-> 
-> Here's the new patch.  I'll rebase the rest of the unapplied patches in
-> the series on top of this.
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ drivers/mtd/nand/mxc_nand.c |    5 +----
+ 1 files changed, 1 insertions(+), 4 deletions(-)
 
-This looks much better, thanks.
+diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+index 3092240..dfa8311 100644
+--- a/drivers/mtd/nand/mxc_nand.c
++++ b/drivers/mtd/nand/mxc_nand.c
+@@ -1210,15 +1210,12 @@ static int mxcnd_suspend(struct platform_device *pdev, pm_message_t state)
+ static int mxcnd_resume(struct platform_device *pdev)
+ {
+ 	struct mtd_info *mtd = platform_get_drvdata(pdev);
+-	struct nand_chip *nand_chip = mtd->priv;
+-	struct mxc_nand_host *host = nand_chip->priv;
+-	int ret = 0;
+ 
+ 	DEBUG(MTD_DEBUG_LEVEL0, "MXC_ND : NAND resume\n");
+ 
+ 	mtd->resume(mtd);
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ #else
+-- 
+1.7.1
