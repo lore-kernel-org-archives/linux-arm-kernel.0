@@ -1,57 +1,92 @@
-From: stepanm@codeaurora.org (stepanm at codeaurora.org)
-Date: Mon, 9 Aug 2010 20:42:13 -0700 (PDT)
-Subject: [PATCH v3] arm: msm: Add MSM IOMMU support.
-In-Reply-To: <1281409689.1954.96.camel@Joe-Laptop.home>
-References: <1281407259-28626-1-git-send-email-stepanm@codeaurora.org>
-	<1281409689.1954.96.camel@Joe-Laptop.home>
-Message-ID: <bf2b5539fdb03a1a9c55ee1122c40b99.squirrel@www.codeaurora.org>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Tue, 10 Aug 2010 10:42:24 +0530
+Subject: [PATCH 2/5] SPEAR3xx: Rename register/irq defines to remove naming
+	conflicts
+In-Reply-To: <1275717955-14545-3-git-send-email-ryan@bluewatersys.com>
+References: <1275717955-14545-1-git-send-email-ryan@bluewatersys.com>
+	<1275717955-14545-3-git-send-email-ryan@bluewatersys.com>
+Message-ID: <4C60DFB8.20608@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Why use both pr_err and printk(KERN_ERR ?
 
-I had been using pr_err for printing badness messages internal to the
-driver, but I guess their functionality is largely paralleled by return
-error codes. I had been using printk(KERN_ERR for messages that have been
-caused by an event that is more external to the driver and its callers
-(like the data for the page fault, which is most likely to be caused by a
-misprogrammed client). pr_err gives other information like function name,
-line number, etc, which would be noise when looking at an iommu page
-fault. And, I guess if the pr_err stuff got turned off, you would want the
-page fault data to still be printed... but that's kind of a minor point.
+Ryan,
 
-I am actually considering doing away with all the pr_err lines entirely
-because they typically also result in returning -Ewhatever and other IOMMU
-drivers don't give this level of error reporting. But, they may be helpful
-to the users of the API. What are people's thoughts on this?
+Sorry for testing this set of patches so late. Patch is working fine.
+I have few comments:
 
-Thanks
-Steve
+On 6/5/2010 11:35 AM, Ryan Mallon wrote:
+> Prefix register and irq defintions to remove naming conflicts between
+> the three SPEAr3xx platforms.
+> 
+> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+> ---
+>  arch/arm/mach-spear3xx/include/mach/generic.h  |    4 +-
+>  arch/arm/mach-spear3xx/include/mach/irqs.h     |  195 ++++++++++++------------
+>  arch/arm/mach-spear3xx/include/mach/spear300.h |   26 ++--
+>  arch/arm/mach-spear3xx/include/mach/spear310.h |   44 +++---
+>  arch/arm/mach-spear3xx/include/mach/spear320.h |   50 +++---
+>  arch/arm/mach-spear3xx/spear300.c              |   65 ++++----
+>  arch/arm/mach-spear3xx/spear310.c              |   92 ++++++------
+>  arch/arm/mach-spear3xx/spear320.c              |  134 ++++++++--------
+>  arch/arm/mach-spear3xx/spear3xx.c              |    4 +-
+>  9 files changed, 308 insertions(+), 306 deletions(-)
+> 
+> diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+> index af7e02c..48dfb9c 100644
+> --- a/arch/arm/mach-spear3xx/include/mach/generic.h
+> +++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+> @@ -27,8 +27,8 @@
+>   * Following GPT channels will be used as clock source and clockevent
+>   */
+>  #define SPEAR_GPT0_BASE		SPEAR3XX_ML1_TMR_BASE
+> -#define SPEAR_GPT0_CHAN0_IRQ	IRQ_CPU_GPT1_1
+> -#define SPEAR_GPT0_CHAN1_IRQ	IRQ_CPU_GPT1_2
+> +#define SPEAR_GPT0_CHAN0_IRQ	SPEAR3XX_IRQ_CPU_GPT1_1
+> +#define SPEAR_GPT0_CHAN1_IRQ	SPEAR3XX_IRQ_CPU_GPT1_2
+>  
+>  /* Add spear3xx family device structure declarations here */
+>  extern struct amba_device gpio_device;
+> diff --git a/arch/arm/mach-spear3xx/include/mach/irqs.h b/arch/arm/mach-spear3xx/include/mach/irqs.h
+> index 7f940b8..668bf72 100644
+> --- a/arch/arm/mach-spear3xx/include/mach/irqs.h
+> +++ b/arch/arm/mach-spear3xx/include/mach/irqs.h
+> @@ -15,138 +15,141 @@
+>  #define __MACH_IRQS_H
+>  
 
->> +#define pr_fmt(fmt) "%s %i " fmt, __func__, __LINE__
->> +		pr_err("bad size: %d\n", len);
->> +		pr_err("null page table\n");
->> +			pr_err("could not allocate second level table\n");
->> +		pr_err("null page table\n");
->> +		pr_err("first level PTE is 0\n");
->> +	printk(KERN_ERR "FAR    = %08x    PAR    = %08x\n",
->> +	printk(KERN_ERR "FSR    = %08x [%s%s%s%s%s%s%s%s%s%s]\n", fsr,
->> +	printk(KERN_ERR "FSYNR0 = %08x    FSYNR1 = %08x\n",
->> +	printk(KERN_ERR "TTBR0  = %08x    TTBR1  = %08x\n",
->> +	printk(KERN_ERR "SCTLR  = %08x    ACTLR  = %08x\n",
->> +	printk(KERN_ERR "PRRR   = %08x    NMRR   = %08x\n",
->> +		pr_err("Invalid device ID in context interrupt handler\n");
->> +	printk(KERN_ERR "===== WOAH! =====\n");
->> +	printk(KERN_ERR "Unexpected IOMMU page fault!\n");
->> +	printk(KERN_ERR "base = %08x\n", (unsigned int) base);
->> +			printk(KERN_ERR "Fault occurred in context %d.\n", i);
->> +			printk(KERN_ERR "Interesting registers:\n");
->> +			printk(KERN_ERR "\n");
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+[snip...]
+
+> -#define SPEAR_GPIO_INT_END			(SPEAR_GPIO1_INT_BASE + 8)
+> +//#define SPEAR_GPIO_INT_END			(SPEAR_GPIO1_INT_BASE + 8)
+
+wrong comment sytle. Also we can move above definition with rest of GPIO
+virtual irq no.s.
+
+>  
+
+[snip...]
+
+>  
+> +/*
+> + * GPIO pins virtual irqs
+> + * Use the lowest number for the GPIO virtual IRQs base on which subarchs
+> + * we have compiled in
+> + */
+> +#if defined(CONFIG_MACH_SPEAR310)
+> +#define SPEAR_GPIO_INT_BASE			(SPEAR3XX_VIRQ_START + 18)
+> +#elif defined(CONFIG_MACH_SPEAR320)
+> +#define SPEAR_GPIO_INT_BASE			(SPEAR3XX_VIRQ_START + 17)
+> +#else
+> +#define SPEAR_GPIO_INT_BASE			(SPEAR3XX_VIRQ_START + 9)
+>  #endif
+
+If we have all three machines enabled, then SPEAR_GPIO_INT_BASE will start from
+VIRQ_START + 18, which will work for spear310 and spear320, but will not be
+correct as we will skip 9 irq no.s.
+
+It would be better to have three different base addresses
+SPEAR300_GPIO_INT_BASE, etc.
+
+
+viresh.
