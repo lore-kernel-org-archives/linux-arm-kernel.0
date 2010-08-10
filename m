@@ -1,52 +1,37 @@
-From: stuart.menefy@st.com (Stuart Menefy)
-Date: Tue, 10 Aug 2010 15:07:09 +0100
-Subject: [regression] in linux-next: sh_mobile_ceu_camera broken by	"ARM:
-	Prohibit ioremap() on kernel managed RAM"
-In-Reply-To: <20100808220035.GD23623@n2100.arm.linux.org.uk>
-References: <4C5ED116.5000002@arndnet.de>
-	<20100808220035.GD23623@n2100.arm.linux.org.uk>
-Message-ID: <4C615D0D.2080600@st.com>
+From: B04825@freescale.com (Tabi Timur-B04825)
+Date: Tue, 10 Aug 2010 10:08:46 -0400
+Subject: [PATCH 4/8] ARM i.MX: add SDMA driver
+In-Reply-To: <19553.23611.216618.916355@ipc1.ka-ro>
+References: <1281344743-2029-1-git-send-email-s.hauer@pengutronix.de>
+	<1281344743-2029-5-git-send-email-s.hauer@pengutronix.de>
+	<m2k4ny3jtn.fsf@ohwell.denx.de>
+	<AANLkTikKFg62x_=BSZ29OaGz9=abk6PWN_u-+BvjB6Kw@mail.gmail.com>
+	<19553.23611.216618.916355@ipc1.ka-ro>
+Message-ID: <E6829185-A81A-4A1D-91AF-6792E44554AE@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/10 23:00, Russell King - ARM Linux wrote:
-> On Sun, Aug 08, 2010 at 05:45:26PM +0200, Arnd Hannemann wrote:
->> Hi Russell,
->>
->> your commit 309caa9cc6ff39d261264ec4ff10e29489afc8f8
->> ARM: Prohibit ioremap() on kernel managed RAM
->>
->> lets drivers/base/dma-coherent.c::dma_declare_coherent_memory()
->> fail for the sh_mobile_ceu_camera driver (see backtrace below).
->> I think, other configurations (i.MX31 users of the mx3_camera driver:
->> pcm037 and mx31moboard) will have the same problem.
->>
->> Since I have no idea how to fix this, I post this regression report here...
-> 
-> Me neither!  However, reverting the commit isn't the answer.
-> 
-> ARM shmobile platforms are ARM architecture V6 or V7, both of which have
-> the architectural restriction that multiple mappings of the same physical
-> address space must have the same memory type and cache attributes.  We
-> know that some ARMv7 systems do bad things when multiple different
-> mappings exist - and as they're using ARM's own Cortex CPU designs, and
-> I doubt shmobile is any different in that...
-> 
-> So, basically going forward with the advent of VIPT caches on ARM, any
-> kernel interface which allows system RAM to be remapped with different
-> attributes from the lowmem mapping is bad news - that means (eg) using
-> vmap() with a non-PGPROT_KERNEL pgprot has become illegal.  Certainly
-> using ioremap() on mapped system RAM on VIPT has become illegal, and
-> that's what has now been prevented.
-> 
-> It's actually a restriction which x86 gained some time ago, which I
-> stupidly continued to permit on ARM.  Now that our hardware has gained
-> the same restriction, we're now going to be into the same learning
-> curve...
 
-Doesn't dma_alloc_coherent() suffer from the same problems? Pages are
-allocated using alloc_pages, and in the non-coherent case will be
-mapped uncached into consistent mapping region, creating a second
-mapping with different attributes.
 
-Stuart
+
+
+On Aug 10, 2010, at 10:04 AM, Lothar Wa?mann <LW@KARO-electronics.de> wrote:
+
+> Hi,
+> 
+> Timur Tabi writes:
+>> On Tuesday, August 10, 2010, Detlev Zundel <dzu@denx.de>
+>>> Apart from this I would also welcome if the whole driver could be
+>>> adapted to the drivers/dma dmaengine API as pointed out by Linus
+>>> Walleij.  The dma controller support for the Power Architecture chips of
+>>> Freescale do implement this API, so this would also be a great step
+>>> towards code unification of drivers here.
+>> 
+>> The Freescale PowerPC and ARM DMA controllers are completely
+>> different, so I don't see how the drivers could be unified.
+>> 
+> The DMA API should abstract away the differences in the hardware
+> so that device drivers could use DMA without having to know on what
+> hardware they are running.
+
+I thought you were talking about unifying the PowerPC DMA driver with the I.MX SDMA driver.
