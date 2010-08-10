@@ -1,84 +1,152 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Tue, 10 Aug 2010 14:44:03 +0900
-Subject: [PATCH v7 0/6] ARM: S5PV210: CPUFREQ Initial Support
-Message-ID: <1281419049-11562-1-git-send-email-myungjoo.ham@samsung.com>
+Date: Tue, 10 Aug 2010 14:44:04 +0900
+Subject: [PATCH v7 1/6] ARM: S5PV210: Allow to probe EVT revision number.
+In-Reply-To: <1281419049-11562-1-git-send-email-myungjoo.ham@samsung.com>
+References: <1281419049-11562-1-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <1281419049-11562-2-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-S5PV210 CPUFREQ Initial Support.
+Early products of S5PV210, EVT0, had several errata that require
+kernel to avoid using some parts/instructions of the CPU or to
+add protection instructions. There are products with such early
+production CPUs; thus, we want to distinguish them in kernel.
+This patch is to distinguish such products.
 
-This is a series of patches to enable CPUFREQ for S5PV210.
+Include <mach/hardware.h> and access s5pv210_evt0
 
-Although this works without PMIC's DVS support, it is not
-as effective without DVS support as supposed. AVS is not
-supported in this version.
+For example,
 
-At the patch revision v7, the following patches are updated from v6.
-- 1/6: ARM: S5PV210: Allow to probe EVT revision number.
-	* Removed revision check function and access EVT info directly.
-- 4/6: ARM: S5PV210: Access for DMCx registers
-	* removed unnecessary comment.
-	* merged the two patches (virtual address + physical address)
-		of previously 4/7 and 5/7
-- 5/6: ARM: S5PV210: clock registers (CLK_DIV/SRC/STAT)
-	* Removed unnecessary defines.
-- 6/6: ARM: S5PV210: Initial CPUFREQ Support
-	* Updated evt0-check method.
-	* Enable CPUFREQ Only for Aquila/Goni
-	* Style patch (inline functions)
+	if (s5pv210_evt0) {
+		... execute code targeted only to EVT0 ...
+	} else {
+		... execute normal code ...
+	}
 
-At the patch revision v6, the following patches are updated from v5.
-- 1/7: ARM: S5PV210: Allow to probe EVT revision number
-	* Removed EVT1-Fused and related functions
-	* Renamed evt related functions.
-- 3/7: ARM: S5P: Added default pll values for APLL 800/100MHz
-	* Corrected style.
-- 7/7: ARM: S5PV210: Initial CPUFREQ Support
-	* Following the renamed evt-related functions at 1/7 patch.
+For Aquila machine. (mach-aquila.c)
 
-At the patch revision v5, the following patches are updated from v4.
-- 1/7: ARM: S5PV210: Allow to probe EVT revision number
-	* Renamed revision check function
-	* Revise revision check function so that it does not access
-	board-specific information
-	* Chip-ID is used to identify some of EVT revisions.
-	* Added "s5pv210_revision_or_later()" function
-- 6/7: ARM: S5PV210: clock registers (CLK_DIV/SRC/STAT)
-	* Added entry infromation for G3D/G2D/MFC of the register
-	S5P_CLK_[DIV|MUX]_STAT[0|1]. These entries are accessed
-	multiple times at /arch/arm/mach-s5pv210/cpufreq.c.
-- 7/7: ARM: S5PV210: Initial CPUFREQ Support
-	* Remove unnecessary USE_FREQ_TABLE
-	* Renamed functions in cpufreq.c
-	* Initialization of s5pv210_cpufreq_target (previously,
-	s5pv210_target) is revised (initilization --> first_run)
-	* "workaround" --> "revision"
-	* CLK_*_STATx register entries use macros: they are used
-	multiple times.
+Part of Aquila machines have the early production CPUs that require
+to address errata issues. Note that we don't do this for GONI machines
+because they have never used early production CPUs with errata. Besides,
+please note that there are other boards that use such early produces
+other than Aquila. However, those boards/machines are not registered at
+the /linux/arch/arm/tools/mach-types, yet; thus, we have omitted them
+in this patch.
 
-MyungJoo Ham (6):
-  ARM: S5PV210: Allow to probe EVT revision number.
-  ARM: Samsung SoC: added hclk/pclk info to s3c_freq for s5pv210
-    cpu-freq
-  ARM: S5P: Added default pll values for APLL 800/1000MHz
-  ARM: S5PV210: Access for DMCx registers
-  ARM: S5PV210: clock registers (CLK_DIV/SRC/STAT)
-  ARM: S5PV210: Initial CPUFREQ Support
+For Goni machine. (mach-goni.c)
 
- arch/arm/Kconfig                                |    1 +
- arch/arm/mach-s5pv210/Kconfig                   |    6 +
- arch/arm/mach-s5pv210/Makefile                  |    2 +
- arch/arm/mach-s5pv210/cpu.c                     |   15 +-
- arch/arm/mach-s5pv210/cpufreq.c                 |  792 +++++++++++++++++++++++
- arch/arm/mach-s5pv210/include/mach/cpu-freq.h   |   38 ++
- arch/arm/mach-s5pv210/include/mach/hardware.h   |   11 +-
- arch/arm/mach-s5pv210/include/mach/map.h        |    3 +
- arch/arm/mach-s5pv210/include/mach/regs-clock.h |   45 ++-
- arch/arm/mach-s5pv210/mach-aquila.c             |    9 +
- arch/arm/mach-s5pv210/mach-goni.c               |    3 +
- arch/arm/plat-s5p/include/plat/map-s5p.h        |    3 +
- arch/arm/plat-s5p/include/plat/pll.h            |    3 +
- arch/arm/plat-samsung/include/plat/cpu-freq.h   |    6 +
- 14 files changed, 932 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/cpufreq.c
- create mode 100644 arch/arm/mach-s5pv210/include/mach/cpu-freq.h
+We do not have Goni machines with EVT0, yet.
+
+Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+--
+v5 updates:
+	- rename revision check function.
+	- revise revision check functions so that it does not access
+	  board-related information.
+	- chipid is used to identify EVT revision.
+	- added "s5pv210_revision_or_later()" function
+v6 updates:
+	- removed consideration for EVT1-FUSED
+v7 updates:
+	- removed revision check function and access EVT info directly.
+
+---
+ arch/arm/mach-s5pv210/cpu.c                   |    3 +++
+ arch/arm/mach-s5pv210/include/mach/hardware.h |   11 ++++++++++-
+ arch/arm/mach-s5pv210/mach-aquila.c           |    9 +++++++++
+ arch/arm/mach-s5pv210/mach-goni.c             |    3 +++
+ 4 files changed, 25 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
+index 94c632b..5d1e46e 100644
+--- a/arch/arm/mach-s5pv210/cpu.c
++++ b/arch/arm/mach-s5pv210/cpu.c
+@@ -27,6 +27,7 @@
+ #include <asm/proc-fns.h>
+ #include <mach/map.h>
+ #include <mach/regs-clock.h>
++#include <mach/hardware.h>
+ 
+ #include <plat/cpu.h>
+ #include <plat/devs.h>
+@@ -128,6 +129,8 @@ static struct sys_device s5pv210_sysdev = {
+ 	.cls	= &s5pv210_sysclass,
+ };
+ 
++bool s5pv210_evt0;
++
+ static int __init s5pv210_core_init(void)
+ {
+ 	return sysdev_class_register(&s5pv210_sysclass);
+diff --git a/arch/arm/mach-s5pv210/include/mach/hardware.h b/arch/arm/mach-s5pv210/include/mach/hardware.h
+index fada7a3..d400ea0 100644
+--- a/arch/arm/mach-s5pv210/include/mach/hardware.h
++++ b/arch/arm/mach-s5pv210/include/mach/hardware.h
+@@ -13,6 +13,15 @@
+ #ifndef __ASM_ARCH_HARDWARE_H
+ #define __ASM_ARCH_HARDWARE_H __FILE__
+ 
+-/* currently nothing here, placeholder */
++extern bool s5pv210_evt0;
++
++/*
++ * get_s5pv210_revision_chipid returns s5pv210_revision if the
++ * EVT revision can be determined by the chipid(PRO_ID) register.
++ * However, note that only EVT1-FUSED can be identified from it and
++ * it cannot distinguish between EVT0 and EVT1. In such case, it
++ * returns EVT_UNKNOWN. In such case use set_s5pv210_revision() to
++ * set the revision number manually.
++ */
+ 
+ #endif /* __ASM_ARCH_HARDWARE_H */
+diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
+index 46d5c7e..234a4e3 100644
+--- a/arch/arm/mach-s5pv210/mach-aquila.c
++++ b/arch/arm/mach-s5pv210/mach-aquila.c
+@@ -30,6 +30,7 @@
+ #include <mach/regs-clock.h>
+ #include <mach/regs-fb.h>
+ #include <mach/gpio.h>
++#include <mach/hardware.h>
+ 
+ #include <plat/gpio-cfg.h>
+ #include <plat/regs-serial.h>
+@@ -536,6 +537,14 @@ static void __init aquila_map_io(void)
+ 
+ static void __init aquila_machine_init(void)
+ {
++	/* CPU Revision (EVTx) */
++	s5pv210_evt0 = false;
++	if (system_rev & 0x0800) {
++		if ((system_rev & 0xF) < 8)
++			s5pv210_evt0 = true;
++	} else if (system_rev & 0x2000)
++		s5pv210_evt0 = true;
++
+ 	/* PMIC */
+ 	aquila_pmic_init();
+ 	i2c_register_board_info(AP_I2C_GPIO_PMIC_BUS_4, i2c_gpio_pmic_devs,
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index 380d2ae..8bdd92c 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -32,6 +32,7 @@
+ #include <mach/regs-clock.h>
+ #include <mach/regs-fb.h>
+ #include <mach/gpio.h>
++#include <mach/hardware.h>
+ 
+ #include <plat/gpio-cfg.h>
+ #include <plat/regs-serial.h>
+@@ -520,6 +521,8 @@ static void __init goni_map_io(void)
+ 
+ static void __init goni_machine_init(void)
+ {
++	s5pv210_evt0 = false;
++
+ 	/* PMIC */
+ 	goni_pmic_init();
+ 	i2c_register_board_info(AP_I2C_GPIO_PMIC_BUS_4, i2c_gpio_pmic_devs,
+-- 
+1.6.3.3
