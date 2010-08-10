@@ -1,32 +1,67 @@
 From: john.ogness@linutronix.de (John Ogness)
-Date: Tue, 10 Aug 2010 13:31:18 +0200
-Subject: [v2] Add i.MX51 support to mxc_nand
-In-Reply-To: <1281360053-8386-1-git-send-email-s.hauer@pengutronix.de> (Sascha
-	Hauer's message of "Mon, 9 Aug 2010 15:20:44 +0200")
-References: <1281360053-8386-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <80aaou4sc9.fsf@merkur.tec.linutronix.de>
+Date: Tue, 10 Aug 2010 13:34:07 +0200
+Subject: [PATCH 1/3] mxc_nand: set spare size and pages per block
+Message-ID: <80r5i63dn4.fsf@merkur.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+This patch sets the NFC registers for spare size and pages per block.
 
-On 2010-08-09, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> In this series I swapped the "fix correct_data function" with the
-> "support 8bit ecc" patch as suggested by Baruch. Also, I integrated
-> the patches sent by John Ogness. John, I hope I addressed all your
-> patches, it would be good if you could test them on 16bit flash as you
-> seem to be the only one having a board with such a flash.
+This patch is against the latest patches from Sascha Hauer.
 
-Not quite. The patch to use interrupt masking instead of interrupt
-disabling is not included. Also the patch to set some register fields is
-not included. I have ported these patches to your latest patchset. There
-will be 3 in all. I will post them shortly.
+Signed-off-by: John Ogness <john.ogness@linutronix.de>
+---
+ drivers/mtd/nand/mxc_nand.c |   32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-I tested your patchset "as is" and it works for the i.MX35 with a 16-bit
-flash chip. I also tested ECC error detection and it is ok.
-
-With an RT-kernel the driver has some interrupt issues, which are
-resolved by the patch to mask instead of disabling interrupts (which I
-will be posting shortly).
-
-John Ogness
+Index: linux-2.6-454a740/drivers/mtd/nand/mxc_nand.c
+===================================================================
+--- linux-2.6-454a740.orig/drivers/mtd/nand/mxc_nand.c
++++ linux-2.6-454a740/drivers/mtd/nand/mxc_nand.c
+@@ -68,6 +68,8 @@
+ #define NFC_V1_V2_CONFIG1_RST		(1 << 6)
+ #define NFC_V1_V2_CONFIG1_CE		(1 << 7)
+ #define NFC_V1_V2_CONFIG1_ONE_CYCLE	(1 << 8)
++#define NFC_V1_V2_CONFIG1_PPB_SHIFT	9
++#define NFC_V1_V2_CONFIG1_PPB_MASK	0x3
+ 
+ #define NFC_V1_V2_CONFIG2_INT		(1 << 15)
+ 
+@@ -749,7 +751,37 @@ static void preset_v1_v2(struct mtd_info
+ 		host->eccsize = 1;
+ 	}
+ 
++	if (nfc_is_v21() && mtd->writesize) {
++		/* setup pages per block */
++		tmp &= ~(NFC_V1_V2_CONFIG1_PPB_MASK <<
++					NFC_V1_V2_CONFIG1_PPB_SHIFT);
++		switch (mtd->erasesize / mtd->writesize) {
++		case 32:
++			/* PPB set to 0 */
++			break;
++		case 64:
++			tmp |= 1 << NFC_V1_V2_CONFIG1_PPB_SHIFT;
++			break;
++		case 256:
++			tmp |= 3 << NFC_V1_V2_CONFIG1_PPB_SHIFT;
++			break;
++		default:
++			/* 128 (reset value) */
++			tmp |= 2 << NFC_V1_V2_CONFIG1_PPB_SHIFT;
++			break;
++		}
++	}
++
+ 	writew(tmp, NFC_V1_V2_CONFIG1);
++
++	if (nfc_is_v21()) {
++		/* configure spare size (in 16-bit units) */
++		tmp = readw(NFC_V1_V2_RSLTSPARE_AREA);
++		tmp &= ~0xff;
++		tmp |= host->spare_len >> 1;
++		writew(tmp, NFC_V1_V2_RSLTSPARE_AREA);
++	}
++
+ 	/* preset operation */
+ 
+ 	/* Unlock the internal RAM Buffer */
