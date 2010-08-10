@@ -1,100 +1,38 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Tue, 10 Aug 2010 09:58:21 +0100
-Subject: [PATCH v2] OpenRD: Enable SD/UART selection for serial port 1
-In-Reply-To: <20100810085643.GE21175@chipmunk>
-References: <1281428973-28957-1-git-send-email-tanmay.upadhyay@einfochips.com>
-	<20100810085643.GE21175@chipmunk>
-Message-ID: <20100810085821.GF21175@chipmunk>
+From: gadiyar@ti.com (Gadiyar, Anand)
+Date: Tue, 10 Aug 2010 14:52:20 +0530
+Subject: Query: Patches break with Microsoft exchange server.
+In-Reply-To: <4C5FCBE1.2080303@st.com>
+References: <4C5F9B25.8080401@st.com>
+	<20100809064957.GB16661@pengutronix.de>	<4C5FA698.90904@st.com>
+	<20100809090137.GP13165@mea-ext.zmailer.org> <4C5FCBE1.2080303@st.com>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB032401D8F0@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Just a quick amendment;
-
-* Alexander Clouter <alex@digriz.org.uk> [2010-08-10 09:56:43+0100]:
->
-> * Tanmay Upadhyay <tanmay.upadhyay@einfochips.com> [2010-08-10 13:59:33+0530]:
-> >
-> > This patch enables user to use serial port 1 of the OpenRD device for SDIO
-> > or UART(RS232/RS485). The selection can be done through kernel parameter.
+viresh kumar wrote:
+> On 8/9/2010 2:31 PM, Matti Aarnio wrote:
+> > On Mon, Aug 09, 2010 at 12:26:24PM +0530, viresh kumar wrote:
+> >> > 
+> >> > I missed this information in my last mail. We are using git send-email for
+> >> > sending patches. As patches will go through Microsoft exchange server only,
+> >> > so they are broken.
+> >> > 
+> > Let your boss complain to your IT keepers.
+> > "These are Machine-to-Machine messages, they must not be modified!"
 > > 
-> > By default the port would be used for SDIO. To select RS232 or RS485 mode,
-> > pass string "uart=232" or "uart=485" respectively in the kernel parameters.
-> > "uart=485" is ignored on OpenRD-Base as it doesn't have RS485 port.
 > > 
-> > Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
-> > ---
-> >  arch/arm/mach-kirkwood/openrd-setup.c |   92 ++++++++++++++++++++++++++++++++-
-> >  1 files changed, 91 insertions(+), 1 deletions(-)
+> > It would probably be "against corporate policy" to use gmail for these emails...
 > > 
-> > diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
-> > index fd06be6..cd061ab 100644
-> > --- a/arch/arm/mach-kirkwood/openrd-setup.c
-> > +++ b/arch/arm/mach-kirkwood/openrd-setup.c
-> > @@ -19,6 +19,7 @@
-> >  #include <asm/mach-types.h>
-> >  #include <asm/mach/arch.h>
-> >  #include <mach/kirkwood.h>
-> > +#include <mach/gpio.h>
-> >  #include <plat/mvsdio.h>
-> >  #include "common.h"
-> >  #include "mpp.h"
-> > @@ -57,7 +58,15 @@ static struct mvsdio_platform_data openrd_mvsdio_data = {
-> >  };
-> >  
-> >  static unsigned int openrd_mpp_config[] __initdata = {
-> > +	MPP12_SD_CLK,
-> > +	MPP13_SD_CMD,
-> > +	MPP14_SD_D0,
-> > +	MPP15_SD_D1,
-> > +	MPP16_SD_D2,
-> > +	MPP17_SD_D3,
-> > +	MPP28_GPIO,
-> >  	MPP29_GPIO,
-> > +	MPP34_GPIO,
-> >  	0
-> >  };
-> >  
-> > @@ -67,6 +76,71 @@ static struct i2c_board_info i2c_board_info[] __initdata = {
-> >  	},
-> >  };
-> >  
-> > +static int __initdata uart1;
->
-static int __initdata uart1 = -EINVAL;
-
-> > +
-> > +static int __init sd_uart_selection(char *str)
-> > +{
-> > +	/* Default is SD. Change if required, for UART */
-> > +	if (!str)
-> > +		return 0;
-> > +
-> > +	if (!strncmp(str, "232", 3)) {
-> > +		uart1 = 232;
-> > +	} else if (!strncmp(str, "485", 3)) {
-> > +		/* OpenRD-Base doesn't have RS485. Treat is as an
-> > +		 * unknown argument & just have default setting -
-> > +		 * which is SD */
-> > +		if (machine_is_openrd_base())
-> > +			return 1;
-> > +
-> >
-> uart1 = -ENODEV;
-> return 1;
 > 
-> > +		uart1 = 485;
-> > +	}
-> > +	return 1;
-> >
-> uart1 = -EINVAL;
-> return 1;
+> We got one solution: Upgrade Exchange server to SP2.
+> Lets see if our IT department does this upgradation.
 > 
-Drop this suggested amendment.
 
-Cheers
+Upgrading the Exchange server worked for us a couple of years ago. At least
+git-send-email works okay now, but Outlook is horribly broken.
 
--- 
-Alexander Clouter
-.sigmonster says: What I need is a MATURE RELATIONSHIP with a FLOPPY DISK ...
+You could use gmail/others and send externally. Adding an explicit
+"From :" line in the patch can still give you credits to your official
+email address.
+
+- Anand
