@@ -1,30 +1,84 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 09 Aug 2010 22:36:37 -0700
-Subject: [PATCH v3] arm: msm: Add MSM IOMMU support.
-In-Reply-To: <bf2b5539fdb03a1a9c55ee1122c40b99.squirrel@www.codeaurora.org>
-References: <1281407259-28626-1-git-send-email-stepanm@codeaurora.org>
-	<1281409689.1954.96.camel@Joe-Laptop.home>
-	<bf2b5539fdb03a1a9c55ee1122c40b99.squirrel@www.codeaurora.org>
-Message-ID: <1281418597.1954.106.camel@Joe-Laptop.home>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Tue, 10 Aug 2010 14:44:03 +0900
+Subject: [PATCH v7 0/6] ARM: S5PV210: CPUFREQ Initial Support
+Message-ID: <1281419049-11562-1-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-08-09 at 20:42 -0700, stepanm at codeaurora.org wrote:
-> I am actually considering doing away with all the pr_err lines entirely
-> because they typically also result in returning -Ewhatever and other IOMMU
-> drivers don't give this level of error reporting. But, they may be helpful
-> to the users of the API. What are people's thoughts on this?
+S5PV210 CPUFREQ Initial Support.
 
-I believe the current uses of pr_err in this module
-are unnecessary or could be converted to pr_debug.
+This is a series of patches to enable CPUFREQ for S5PV210.
 
-I think __func__/line aren't particularly useful.
+Although this works without PMIC's DVS support, it is not
+as effective without DVS support as supposed. AVS is not
+supported in this version.
 
-I prefer log messages prefixed with the module name.
+At the patch revision v7, the following patches are updated from v6.
+- 1/6: ARM: S5PV210: Allow to probe EVT revision number.
+	* Removed revision check function and access EVT info directly.
+- 4/6: ARM: S5PV210: Access for DMCx registers
+	* removed unnecessary comment.
+	* merged the two patches (virtual address + physical address)
+		of previously 4/7 and 5/7
+- 5/6: ARM: S5PV210: clock registers (CLK_DIV/SRC/STAT)
+	* Removed unnecessary defines.
+- 6/6: ARM: S5PV210: Initial CPUFREQ Support
+	* Updated evt0-check method.
+	* Enable CPUFREQ Only for Aquila/Goni
+	* Style patch (inline functions)
 
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+At the patch revision v6, the following patches are updated from v5.
+- 1/7: ARM: S5PV210: Allow to probe EVT revision number
+	* Removed EVT1-Fused and related functions
+	* Renamed evt related functions.
+- 3/7: ARM: S5P: Added default pll values for APLL 800/100MHz
+	* Corrected style.
+- 7/7: ARM: S5PV210: Initial CPUFREQ Support
+	* Following the renamed evt-related functions at 1/7 patch.
 
-and I'd convert all the current pr_err to pr_debug
-and convert the printk(KERN_ERR to pr_err(
+At the patch revision v5, the following patches are updated from v4.
+- 1/7: ARM: S5PV210: Allow to probe EVT revision number
+	* Renamed revision check function
+	* Revise revision check function so that it does not access
+	board-specific information
+	* Chip-ID is used to identify some of EVT revisions.
+	* Added "s5pv210_revision_or_later()" function
+- 6/7: ARM: S5PV210: clock registers (CLK_DIV/SRC/STAT)
+	* Added entry infromation for G3D/G2D/MFC of the register
+	S5P_CLK_[DIV|MUX]_STAT[0|1]. These entries are accessed
+	multiple times at /arch/arm/mach-s5pv210/cpufreq.c.
+- 7/7: ARM: S5PV210: Initial CPUFREQ Support
+	* Remove unnecessary USE_FREQ_TABLE
+	* Renamed functions in cpufreq.c
+	* Initialization of s5pv210_cpufreq_target (previously,
+	s5pv210_target) is revised (initilization --> first_run)
+	* "workaround" --> "revision"
+	* CLK_*_STATx register entries use macros: they are used
+	multiple times.
 
-cheers, Joe
+MyungJoo Ham (6):
+  ARM: S5PV210: Allow to probe EVT revision number.
+  ARM: Samsung SoC: added hclk/pclk info to s3c_freq for s5pv210
+    cpu-freq
+  ARM: S5P: Added default pll values for APLL 800/1000MHz
+  ARM: S5PV210: Access for DMCx registers
+  ARM: S5PV210: clock registers (CLK_DIV/SRC/STAT)
+  ARM: S5PV210: Initial CPUFREQ Support
+
+ arch/arm/Kconfig                                |    1 +
+ arch/arm/mach-s5pv210/Kconfig                   |    6 +
+ arch/arm/mach-s5pv210/Makefile                  |    2 +
+ arch/arm/mach-s5pv210/cpu.c                     |   15 +-
+ arch/arm/mach-s5pv210/cpufreq.c                 |  792 +++++++++++++++++++++++
+ arch/arm/mach-s5pv210/include/mach/cpu-freq.h   |   38 ++
+ arch/arm/mach-s5pv210/include/mach/hardware.h   |   11 +-
+ arch/arm/mach-s5pv210/include/mach/map.h        |    3 +
+ arch/arm/mach-s5pv210/include/mach/regs-clock.h |   45 ++-
+ arch/arm/mach-s5pv210/mach-aquila.c             |    9 +
+ arch/arm/mach-s5pv210/mach-goni.c               |    3 +
+ arch/arm/plat-s5p/include/plat/map-s5p.h        |    3 +
+ arch/arm/plat-s5p/include/plat/pll.h            |    3 +
+ arch/arm/plat-samsung/include/plat/cpu-freq.h   |    6 +
+ 14 files changed, 932 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/mach-s5pv210/cpufreq.c
+ create mode 100644 arch/arm/mach-s5pv210/include/mach/cpu-freq.h
