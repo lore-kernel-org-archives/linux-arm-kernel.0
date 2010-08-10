@@ -1,27 +1,36 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Wed, 11 Aug 2010 01:04:08 +0300
-Subject: Query: Patches break with Microsoft exchange server.
-In-Reply-To: <4C5F9B25.8080401@st.com>
-References: <4C5F9B25.8080401@st.com>
-Message-ID: <AANLkTinxwRFLUibJECm0c3_oL5mYRkmscsw-xXgAHSTe@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Aug 2010 23:06:00 +0100
+Subject: [GIT PULL] Initial Tegra ARM support
+In-Reply-To: <1281476664.9400.36.camel@c-dwalke-linux.qualcomm.com>
+References: <AANLkTi=dcQrik=+5xfwbNo_w7WkTOKZiKAFYFhwzbS=_@mail.gmail.com>
+	<1281476664.9400.36.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <20100810220600.GD7702@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 9, 2010 at 9:07 AM, viresh kumar <viresh.kumar@st.com> wrote:
-> Mail server in ST has recently changed and now we have Microsoft
-> exchange server. We are using thunderbird as mail client.
-> What we observed with this server is that patch are broken now while
-> sending as well as receiving. Tabs are replaced by spaces and may
-> be some other too which we haven't observed.
->
-> Has anybody found a solution to this kind of issues? Are there any
-> workarounds possible?
+On Tue, Aug 10, 2010 at 02:44:24PM -0700, Daniel Walker wrote:
+> On Thu, 2010-08-05 at 14:10 -0700, Erik Gilling wrote:
+> > Hi Linus,
+> > 
+> > The following changes since commit 9fe6206f400646a2322096b56c59891d530e8d51:
+> >   Linus Torvalds (1):
+> >         Linux 2.6.35
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://android.kernel.org/kernel/tegra.git for-linus
+> > 
+> > This code has received review on linux-arm-kernel and has been in
+> > for-next since June 18th.  No subsystems were harmed out side of
+> > mach-tegra.
+> > 
+> > Colin Cross (4):
+> >       [ARM] tegra: Add clock support
+> >       [ARM] tegra: SMP support
+> 
+> 
+> This fixes some typos in the Tegra tree which caused build failures in
+> all ARM compiles.
 
-Same in Nokia. I wrote a script to fix exchange's crap, but I also
-noticed some quoted-printable mails didn't get converted, so the
-easiest would be to tell git to always send quoted-printable.
-
-git folks: any chance of getting that feature to git send-email?
-
--- 
-Felipe Contreras
+Argh, no, not another patch doing this the wrong way.  I've fixed this
+already, just preparing the pull request for this evening.
