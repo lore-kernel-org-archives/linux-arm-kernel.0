@@ -1,31 +1,20 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 10 Aug 2010 18:07:52 +0100
-Subject: [PATCH 05/10] ARM: ftrace: add ENDPROC annotations
-In-Reply-To: <20100421192319.GA16719@debian>
-References: <20100421192319.GA16719@debian>
-Message-ID: <1281460072.16880.47.camel@e102109-lin.cambridge.arm.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 10 Aug 2010 10:45:08 -0700
+Subject: [GIT PULL] Samsung S5P updates for 2.6.36 merge window
+In-Reply-To: <017201cb37ac$9979a5a0$cc6cf0e0$%kim@samsung.com>
+References: <017201cb37ac$9979a5a0$cc6cf0e0$%kim@samsung.com>
+Message-ID: <1281462308.9400.7.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rabin,
+On Mon, 2010-08-09 at 19:21 +0900, Kukjin Kim wrote:
+>  arch/arm/Kconfig                                 |   37 +-
+>  arch/arm/Makefile                                |    1 + 
 
-On Wed, 2010-04-21 at 20:23 +0100, Rabin Vincent wrote:
-> From 87b70ed633da00fe9873a5819c6d24e57368de43 Mon Sep 17 00:00:00 2001
-> From: Rabin Vincent <rabin@rab.in>
-> Date: Sun, 14 Feb 2010 01:18:33 +0530
-> Subject: [PATCH] ARM: ftrace: add ENDPROC annotations
-> 
-> When building as Thumb-2, the ".type foo, %function" annotation in
-> ENDPROC seems to be required in order for the assembly routines to be
-> recognized as Thumb-2 code.  If the ENDPROC annotations are not present,
-> calls to these routines are generated as BLX instead of BL.
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
+In the future could you please send changes to upper level files (like
+the ones above) to Russell.
 
-What's the status of these patches? I haven't seen them in mainline.
-
-Thanks.
-
+Daniel
 -- 
-Catalin
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
