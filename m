@@ -1,50 +1,29 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Tue, 10 Aug 2010 21:08:16 +0200
-Subject: [rtc-linux] [PATCH 1/2] rtc: rtc-lpc32xx: Introduce RTC driver
-	for the LPC32XX SoC
-In-Reply-To: <AANLkTimAJj38R7KCfHusfsq+EXDd3fbAm=Az_Osqdgbz@mail.gmail.com>
-References: <1281370650-29520-1-git-send-email-wellsk40@gmail.com>
-	<1281370650-29520-2-git-send-email-wellsk40@gmail.com>
-	<AANLkTimAJj38R7KCfHusfsq+EXDd3fbAm=Az_Osqdgbz@mail.gmail.com>
-Message-ID: <083DF309106F364B939360100EC290F80AC6E5F76D@eu1rdcrdc1wx030.exi.nxp.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Wed, 11 Aug 2010 00:41:59 +0530
+Subject: [PATCH 05/10] ARM: ftrace: add ENDPROC annotations
+In-Reply-To: <1281460072.16880.47.camel@e102109-lin.cambridge.arm.com>
+References: <20100421192319.GA16719@debian>
+	<1281460072.16880.47.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <AANLkTi=Vf6NPxDqpL8ycpjXDNajTzdYVXFYdLq0CxJZ8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zongshun,
+Hi Catalin,
 
-Thanks for helping review this.
+On Tue, Aug 10, 2010 at 10:37 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Wed, 2010-04-21 at 20:23 +0100, Rabin Vincent wrote:
+>> When building as Thumb-2, the ".type foo, %function" annotation in
+>> ENDPROC seems to be required in order for the assembly routines to be
+>> recognized as Thumb-2 code. ?If the ENDPROC annotations are not present,
+>> calls to these routines are generated as BLX instead of BL.
+>>
+>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>> Signed-off-by: Rabin Vincent <rabin@rab.in>
+>
+> What's the status of these patches? I haven't seen them in mainline.
 
-> Subject: Re: [rtc-linux] [PATCH 1/2] rtc: rtc-lpc32xx: Introduce RTC driver
-> for the LPC32XX SoC
-> 
-> Hi Kevin ,
-> 
-> This is really a natty rtc patch:).
+They're in the patch tracker now.  I'd forgotten about them for a while,
+and there was one patch missing an ack, but that's sorted out now.
 
->From the urban dictionary...
-"natty"
-1) originating from rastafarian culture. meaning 'good','cool' and
-most importantly, 'elite'.
-2) A slang for Natural Light beer, a favorite of poor college students
-the world over.
-
-I hope it's the first one, but I guess the 2nd isn't that bad if
-you?re a college student o)
-I'll merge both patches into a single patch for v2 and repost in a
-few days.
-
-> > + ? ? ? /* Disable alarm during update */
-> > + ? ? ? tmp = rtc_readl(rtc, RTC_CTRL);
-> > + ? ? ? rtc_writel(rtc, RTC_CTRL, tmp & ~RTC_MATCH0_EN);
-> > +
-> > + ? ? ? rtc->alarm_enabled = wkalrm->enabled = 1;
-> > + ? ? ? if (wkalrm->enabled) {
-> > + ? ? ? ? ? ? ? rtc_writel(rtc, RTC_MATCH0, alarmsecs);
-> > + ? ? ? ? ? ? ? rtc_writel(rtc, RTC_INTSTAT, RTC_MATCH0_INT_STS);
-> > + ? ? ? ? ? ? ? rtc_writel(rtc, RTC_CTRL, tmp | RTC_MATCH0_EN);
-> > + ? ? ? }
-> 
-> I think this 'wkalrm->enabled ' will always be set '1', so 'if'
-> condition will be alway true?
-
-Thanks for catching this. The '= 1' assignment shouldn't be there.
+Rabin
