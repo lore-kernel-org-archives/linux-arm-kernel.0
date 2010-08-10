@@ -1,49 +1,51 @@
-From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
-Date: Tue, 10 Aug 2010 11:22:15 -0500
-Subject: [PATCH] mailbox: change full flag per mailbox queue instead of
-	global
-In-Reply-To: <20100810.185803.71555007.Hiroshi.DOYU@nokia.com>
-References: <1276534269-19179-1-git-send-email-x0095840@ti.com>
-	<AANLkTim7s8pX3k7oF7AdZobDRegx17n5gfAze1wAduoT@mail.gmail.com>
-	<20100810.185803.71555007.Hiroshi.DOYU@nokia.com>
-Message-ID: <496565EC904933469F292DDA3F1663E602CC1D0605@dlee06.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Aug 2010 17:36:16 +0100
+Subject: [regression] in linux-next: sh_mobile_ceu_camera broken by
+	"ARM: Prohibit ioremap() on kernel managed RAM"
+In-Reply-To: <4C615D0D.2080600@st.com>
+References: <4C5ED116.5000002@arndnet.de>
+	<20100808220035.GD23623@n2100.arm.linux.org.uk>
+	<4C615D0D.2080600@st.com>
+Message-ID: <20100810163616.GA7702@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Aug 10, 2010 at 03:07:09PM +0100, Stuart Menefy wrote:
+> Doesn't dma_alloc_coherent() suffer from the same problems? Pages are
+> allocated using alloc_pages, and in the non-coherent case will be
+> mapped uncached into consistent mapping region, creating a second
+> mapping with different attributes.
 
+Yes, and it's just waiting to corrupt your data.  It's the next item on
+the list of things to fix for ARMv6/ARMv7 for the next merge window.
 
-> -----Original Message-----
-> From: Hiroshi DOYU [mailto:Hiroshi.DOYU at nokia.com]
-> Sent: Tuesday, August 10, 2010 10:58 AM
-> To: Guzman Lugo, Fernando; ohad at wizery.com
-> Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
-> Subject: Re: [PATCH] mailbox: change full flag per mailbox queue instead
-> of global
-> 
-> From: ext Ohad Ben-Cohen <ohad@wizery.com>
-> Subject: Re: [PATCH] mailbox: change full flag per mailbox queue instead
-> of global
-> Date: Tue, 10 Aug 2010 16:36:42 +0200
-> 
-> > Hi Hiroshi,
-> >
-> > On Mon, Jun 14, 2010 at 7:51 PM, Fernando Guzman Lugo <x0095840@ti.com>
-> wrote:
-> >> As pointed by Ben Ohand, the variable rq_full flag is a global
-> >> variable, so if there are multiple mailbox users there will be
-> >> conflics. Now there is a full flag per mailbox queue.
-> >>
-> >> Reported-by: Ohad Ben-Cohen <ohad@wizery.com>
-> >> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
-> >
-> > It looks like this fix didn't get thru - can you please review and
-> ack/nack ?
-> 
-> Sure.
-> 
-> Fernando, could you rebase this patch against the latest omap/master?
+This merge window contains a small step in that direction by changing
+the way the DMA region allocator works - aligning allocations to their
+natural size.
 
-No problem, I will send it again.
+Potentially, that means people may need a larger DMA region - there
+will be allocation patterns which fail (eg, 1.5MB, 256MB, 16MB, 240MB)
+which used to succeed - though problems due to fragmentation should
+be reduced due to the natural alignment of blocks below 1MB.
 
-Regards,
-Fernando.
+There are two solutions I'm contemplating:
+
+1. We pre-allocate the memory for the DMA region at boot and never free
+   it for other uses.  This means that the DMA coherent region will
+   always be fully populated regardless of how much memory is actually
+   in use.
+
+2. We allocate memory for the DMA region in sections, and unmap that
+   memory from the lowmem pool.
+
+(1) has the problem that people won't like it due to the obvious waste,
+but it is the easy solution.
+
+(2) is rather disgusting to achieve because of the problems of updating
+all page tables in the system, especially on SMP systems.
+
+The option of doing nothing is not realistic - as ARM processors progress,
+the speculative prefetch benaviour is only going to become more aggressive,
+and therefore memory which is mapped multiple times with different
+attributes _will_ fail to behave as expected in random and hard to debug
+ways.
