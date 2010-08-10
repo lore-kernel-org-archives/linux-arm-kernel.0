@@ -1,19 +1,35 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 10 Aug 2010 14:21:29 +0100
-Subject: [PATCH 8/8] ASoC i.MX: switch to new DMA api
-In-Reply-To: <1281344743-2029-9-git-send-email-s.hauer@pengutronix.de>
-References: <1281344743-2029-1-git-send-email-s.hauer@pengutronix.de>
-	<1281344743-2029-9-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20100810132128.GC4020@sirena.org.uk>
+From: a.zummo@towertech.it (Alessandro Zummo)
+Date: Tue, 10 Aug 2010 15:34:48 +0200
+Subject: [rtc-linux] [PATCH 1/2] rtc: rtc-lpc32xx: Introduce RTC driver
+	for  the LPC32XX SoC
+In-Reply-To: <1281370650-29520-2-git-send-email-wellsk40@gmail.com>
+References: <1281370650-29520-1-git-send-email-wellsk40@gmail.com>
+	<1281370650-29520-2-git-send-email-wellsk40@gmail.com>
+Message-ID: <20100810153448.17443314@linux.lan.towertech.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 09, 2010 at 11:05:43AM +0200, Sascha Hauer wrote:
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+On Mon,  9 Aug 2010 09:17:29 -0700
+wellsk40 at gmail.com wrote:
 
-So, this is a little hard to read but overall this looks OK.  The one
-thing I'd expect to see added is an implementation of delay() that
-includes the buffer in the SDMA controller.
+> +
+> +	retval = request_irq(rtc->irq, lpc32xx_rtc_alarm_interrupt,
+> +		IRQF_DISABLED, "rtcalarm", rtc);
+> +	if (retval < 0) {
+> +		dev_err(&pdev->dev, "Can't request interrupt\n");
+> +		goto err_free_irq;
+> +	}
 
-Please always CC maintainers on patches.  Even if you don't want to CC
-the list for some reason CCing the maintainers is still very helpful.
+ if the driver can work without the alarm irq you
+ can convert this to a non fatal warning.
+
+ having an rtc without alarms is much better than having none.
+
+-- 
+
+ Best regards,
+
+ Alessandro Zummo,
+  Tower Technologies - Torino, Italy
+
+  http://www.towertech.it
