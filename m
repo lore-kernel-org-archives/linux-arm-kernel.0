@@ -1,94 +1,19 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 11 Aug 2010 01:12:28 +0300
-Subject: [PATCH v3 9/9] omap: zoom: add mmc3/wl1271 device support
-In-Reply-To: <1281478348-24833-1-git-send-email-ohad@wizery.com>
-References: <1281478348-24833-1-git-send-email-ohad@wizery.com>
-Message-ID: <1281478348-24833-10-git-send-email-ohad@wizery.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Aug 2010 23:14:33 +0100
+Subject: [PATCH] ARM: fix syntax error in main Kconfig file
+In-Reply-To: <1281471252-31424-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20100810200718.GA26031@pengutronix.de>
+	<1281471252-31424-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20100810221433.GE7702@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MMC3 support on ZOOM, which has the wl1271 device hardwired to.
+On Tue, Aug 10, 2010 at 10:14:12PM +0200, Uwe Kleine-K?nig wrote:
+> -	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_VEXPRESS || ARCH_OMAP4 || \\
+> +	select HAVE_ARM_TWD if ARCH_REALVIEW || ARCH_VEXPRESS || ARCH_OMAP4 || \\
 
-The wl1271 is a 4-wire, 1.8V, embedded SDIO WLAN device with an
-external IRQ line, and power-controlled by a GPIO-based fixed regulator.
+This is still crap.  '\\' on the end of the line...
 
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
----
- arch/arm/mach-omap2/board-zoom-peripherals.c |   34 ++++++++++++++++++++++++++
- 1 files changed, 34 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
-index de88635..82776bc 100644
---- a/arch/arm/mach-omap2/board-zoom-peripherals.c
-+++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
-@@ -17,6 +17,8 @@
- #include <linux/i2c/twl.h>
- #include <linux/regulator/machine.h>
- #include <linux/regulator/fixed.h>
-+#include <linux/mmc/host.h>
-+#include <linux/wl12xx.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -29,6 +31,7 @@
- #include "hsmmc.h"
- 
- #define OMAP_ZOOM_WLAN_PMENA_GPIO	(101)
-+#define OMAP_ZOOM_WLAN_IRQ_GPIO		(162)
- 
- /* Zoom2 has Qwerty keyboard*/
- static int board_keymap[] = {
-@@ -185,6 +188,28 @@ static struct platform_device omap_vwlan_device = {
- 	},
- };
- 
-+struct wl12xx_platform_data omap_zoom_wlan_data = {
-+	/* ZOOM ref clock is 26 MHz */
-+	.board_ref_clock = 1,
-+};
-+
-+static struct resource omap_zoom_wl1271_resources[] = {
-+	{
-+		.start = OMAP_GPIO_IRQ(OMAP_ZOOM_WLAN_IRQ_GPIO),
-+		.end = OMAP_GPIO_IRQ(OMAP_ZOOM_WLAN_IRQ_GPIO),
-+		.flags = IORESOURCE_IRQ,
-+	}
-+};
-+static struct platform_device omap_zoom_wl1271 = {
-+	.name		= "wl1271_plat.2",
-+	.id		= -1,
-+	.resource	= omap_zoom_wl1271_resources,
-+	.num_resources	= ARRAY_SIZE(omap_zoom_wl1271_resources),
-+	.dev = {
-+		.platform_data = &omap_zoom_wlan_data,
-+	},
-+};
-+
- static struct omap2_hsmmc_info mmc[] __initdata = {
- 	{
- 		.name		= "external",
-@@ -202,6 +227,14 @@ static struct omap2_hsmmc_info mmc[] __initdata = {
- 		.nonremovable	= true,
- 		.power_saving	= true,
- 	},
-+	{
-+		.name		= "wl1271",
-+		.mmc		= 3,
-+		.wires		= 4,
-+		.gpio_wp	= -EINVAL,
-+		.gpio_cd	= -EINVAL,
-+		.ocr_mask	= MMC_VDD_165_195,
-+	},
- 	{}      /* Terminator */
- };
- 
-@@ -313,6 +346,7 @@ static void enable_board_wakeup_source(void)
- 
- void __init zoom_peripherals_init(void)
- {
-+	platform_device_register(&omap_zoom_wl1271);
- 	omap_i2c_init();
- 	platform_device_register(&omap_vwlan_device);
- 	usb_musb_init(&musb_board_data);
--- 
-1.7.0.4
+And no surprises that I'm getting conflicts when merging my master and
+devel branches here.  Don't bother submitting a new patch, I'll fix it
+in the conflict resolution.
