@@ -1,73 +1,71 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 11 Aug 2010 08:50:13 +1200
-Subject: [PATCH 2/5] SPEAR3xx: Rename register/irq defines to remove naming
-	conflicts
-In-Reply-To: <4C60DFB8.20608@st.com>
-References: <1275717955-14545-1-git-send-email-ryan@bluewatersys.com>
-	<1275717955-14545-3-git-send-email-ryan@bluewatersys.com>
-	<4C60DFB8.20608@st.com>
-Message-ID: <4C61BB85.5050406@bluewatersys.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 11 Aug 2010 00:21:30 +0300
+Subject: [PATCH 11/15] wireless: wl1271: introduce platform device support
+In-Reply-To: <alpine.LFD.2.00.1007061316010.6020@xanadu.home>
+References: <1278376666-3509-1-git-send-email-ohad@wizery.com>
+	<1278376666-3509-12-git-send-email-ohad@wizery.com>
+	<4C32EF19.1000604@nokia.com>
+	<AANLkTintIz-N7MwwtqhVq2LR3Ln5JTNYSbJUBSSClcA-@mail.gmail.com>
+	<4C3306F4.8060907@nokia.com>
+	<AANLkTin5W52fPzWToRrAzm56SLZI-taSuI16rCEhLWqH@mail.gmail.com>
+	<4C333E0D.2070601@nokia.com>
+	<alpine.LFD.2.00.1007061316010.6020@xanadu.home>
+Message-ID: <AANLkTincjpb4_c13AAx-HoZ5xsdunRGkVeO1P5EJegX1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2010 05:12 PM, viresh kumar wrote:
-> 
-> Ryan,
-> 
-> Sorry for testing this set of patches so late. Patch is working fine.
-> I have few comments:
+On Tue, Jul 6, 2010 at 8:42 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> Another function pair would be needed instead, which would do almost
+> like the suspend/resume code is already doing. ?Something like:
+>
+> /*
+> ?* Indicate to the core SDIO layer that we're not requiring that the
+> ?* function remain powered. ?If all functions for the card are in the
+> ?* same "no power" state, then the host controller can remove power from
+> ?* the card. ?Note: the function driver must preserve hardware states if
+> ?* necessary.
+> ?*/
+> int sdio_release_power(struct sdio_func *func);
+>
+> /*
+> ?* Indicate to the core SDIO layer that we want power back for this
+> ?* SDIO function. ?The power may or may not actually have been removed
+> ?* since last call to sdio_release_power(), so the function driver must
+> ?* not assume any preserved state at the hardware level and re-perform
+> ?* all the necessary hardware config. ?This function returns 0 when
+> ?* power is actually restored, or some error code if this cannot be
+> ?* achieved. ?One error reason might be that the card is no longer
+> ?* available on the bus (was removed while powered down and card
+> ?* detection didn't trigger yet).
+> ?*/
+> int sdio_claim_power(struct sdio_func *func);
+>
+> That's it. ?When the network interface is down and the hardware is not
+> needed, you call sdio_release_power(). ?When the request to activate the
+> network interface is received, you call sdio_claim_power() and configure
+> the hardware appropriately. ?If sdio_claim_power() returns an error,
+> then you just return an error to the network request, and eventually the
+> driver's remove method will be called if this is indeed because the card
+> was removed.
+>
 
-Thanks for looking at this.
+After playing with this a little, I am getting convinced that the way
+to go here is to add runtime pm support to MMC/SDIO.
 
-> 
->> -#define SPEAR_GPIO_INT_END			(SPEAR_GPIO1_INT_BASE + 8)
->> +//#define SPEAR_GPIO_INT_END			(SPEAR_GPIO1_INT_BASE + 8)
-> 
-> wrong comment sytle. Also we can move above definition with rest of GPIO
-> virtual irq no.s.
+It just fits perfectly into this model:
 
-Oops, that looks like it should have been removed. Moving the definition
-is fine.
+Runtime PM already takes care of usage count per device (so it would
+tell if an SDIO function is idle), takes into account parent-child
+relationships (so if all SDIO functions are idle, it would
+automatically send an idle request to the card device), doesn't break
+existing drivers (drivers needs to explicitly enable it), play along
+nicely with the system suspend/resume, etc..
 
->>  
-> 
-> [snip...]
-> 
->>  
->> +/*
->> + * GPIO pins virtual irqs
->> + * Use the lowest number for the GPIO virtual IRQs base on which subarchs
->> + * we have compiled in
->> + */
->> +#if defined(CONFIG_MACH_SPEAR310)
->> +#define SPEAR_GPIO_INT_BASE			(SPEAR3XX_VIRQ_START + 18)
->> +#elif defined(CONFIG_MACH_SPEAR320)
->> +#define SPEAR_GPIO_INT_BASE			(SPEAR3XX_VIRQ_START + 17)
->> +#else
->> +#define SPEAR_GPIO_INT_BASE			(SPEAR3XX_VIRQ_START + 9)
->>  #endif
-> 
-> If we have all three machines enabled, then SPEAR_GPIO_INT_BASE will start from
-> VIRQ_START + 18, which will work for spear310 and spear320, but will not be
-> correct as we will skip 9 irq no.s.
+I'm going to split the patches to two:
+- first half would be basic wl1271 support for omap/zoom. it's pretty
+straight forward and can probably already go thru.
+- second half would be adding runtime PM to SDIO/MMC. I'll post some
+initial patches to set off a discussion.
 
-Do the virtual irqs map directly to the hardware in some way? I thought
-that since they were virtual there offset would be somewhat arbitrary?
-
-> It would be better to have three different base addresses
-> SPEAR300_GPIO_INT_BASE, etc.
-
-This is possible. We can either do this by making SPEAR3XX_GPIO_INT_BASE
-a variable, or by having some ifdef/machine_is code in the board
-initialisation.
-
-~Ryan
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Thanks,
+Ohad.
