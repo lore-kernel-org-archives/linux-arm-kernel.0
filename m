@@ -1,58 +1,55 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 10 Aug 2010 17:43:27 +0300
-Subject: [PATCH 09/10] omap: mailbox: convert block api to kfifo
-In-Reply-To: <496565EC904933469F292DDA3F1663E602CA4D88F3@dlee06.ent.ti.com>
-References: <1275546858-29507-1-git-send-email-Hiroshi.DOYU@nokia.com>
-	<1275546858-29507-10-git-send-email-Hiroshi.DOYU@nokia.com>
-	<D2943F03B81C9C458E44DFB213905E02B6325C6A@dlee04.ent.ti.com>
-	<AANLkTik4lW3_xP_e4BStJEYpHlVoNjemEz8zWfIE7gRU@mail.gmail.com>
-	<496565EC904933469F292DDA3F1663E602CA4D88F3@dlee06.ent.ti.com>
-Message-ID: <AANLkTikZ2uDpuK1DjJLk_pSiogQyStwJVG952o79_NjX@mail.gmail.com>
+From: john.ogness@linutronix.de (John Ogness)
+Date: Tue, 10 Aug 2010 16:43:42 +0200
+Subject: [PATCH 1/3] mxc_nand: set spare size and pages per block
+In-Reply-To: <801va635f7.fsf@merkur.tec.linutronix.de> (John Ogness's message
+	of "Tue, 10 Aug 2010 16:31:40 +0200")
+References: <80r5i63dn4.fsf@merkur.tec.linutronix.de>
+	<20100810121912.GG27749@pengutronix.de>
+	<801va635f7.fsf@merkur.tec.linutronix.de>
+Message-ID: <80tyn21qap.fsf@merkur.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rene,
-
-
-On Wed, Jun 9, 2010 at 8:38 AM, Guzman Lugo, Fernando
-<fernando.lugo@ti.com> wrote:
->>On Tue, Jun 8, 2010 at 7:16 PM, Sapiens, Rene <rene.sapiens@ti.com> wrote:
->>> In mbox_rx_work() you are removing the lines that enable back the ?mbox irq for the RX case, but inside ?__mbox_rx_interrupt() this interrupt ?is disabled in the case that the kfifo for Rx >mailbox gets full. So I think that we need to enable it back as soon as there is space in this kfifo.
->>
->>
->>Actually these irq on/off lines are not part of my patch; they are
->>introduced by patch 05/10 on top of which my patches were rebased.
->>
->>Nevertheless I agree with you - the kfifo migration patch should not
->>affect that irq on/off behavior. It's probably just a rebase gotcha.
->>
->>But now that you point me to this irq on/off thing, it looks a bit
->>broken in terms of multiple concurrent mbox support since it relies on
->>a global rq_full state. I guess it'd be better to hold that rq_full
->>state in the relevant mbox queue state itself.
->>
->>Fernando what do you think ?
+On 2010-08-10, John Ogness <john.ogness@linutronix.de> wrote:
+>> For this patch I decided to initialize every bit in NFC_V1_V2_CONFIG1
+>> from scratch so that we do not depend on any reset or bootloader
+>> values.  I think this is cleaner so I propose that we use my version
+>> of the patch.
 >
-> Yes, you are right Ohad. Only should be disable the "new message" interrupt of the mailbox which kfifo is full.
+> I agree that initializing all the bits is better. But you need to set
+> the mask as well. Your latest patches clear the mask when initializing
+> V1_V2_CONFIG1 and V3_CONFIG2. For non-i.MX21 the mask should always be
+> set except when explicitly waiting for an interrupt in wait_op_done().
 
+Sorry, that last patch was crap. It wasn't setting the mask for v1/v2. I
+should have noticed it sooner because without the mask an extra
+interrupt is visible during boot. Here is the correct patch to fix the
+masking issue.
 
+Signed-off-by: John Ogness <john.ogness@linutronix.de>
+---
+ drivers/mtd/nand/mxc_nand.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-Once Fernando's fix will get thru, we will be able to fix the rebase
-error that you pointed out.
-
-Unfortunately I will not have any email access in the next 3 weeks,
-and I was hoping maybe you could submit a fix for this once Fernando's
-fix is accepted ? I would really like us to fix this early in the days
-of 2.6.36, maybe even during the merge window.
-
-Thanks a lot,
-Ohad.
-
->
-> regards,
-> Fernando.
->
->>
->>Thanks,
->>Ohad.
->
+Index: linux-2.6-454a740/drivers/mtd/nand/mxc_nand.c
+===================================================================
+--- linux-2.6-454a740.orig/drivers/mtd/nand/mxc_nand.c
++++ linux-2.6-454a740/drivers/mtd/nand/mxc_nand.c
+@@ -789,6 +789,9 @@ static void preset_v1_v2(struct mtd_info
+ 	if (nfc_is_v21())
+ 		config1 |= NFC_V2_CONFIG1_FP_INT;
+ 
++	if (!cpu_is_mx21())
++		config1 |= NFC_V1_V2_CONFIG1_INT_MSK;
++
+ 	if (nfc_is_v21() && mtd->writesize) {
+ 		uint16_t pages_per_block = mtd->erasesize / mtd->writesize;
+ 
+@@ -846,6 +849,7 @@ static void preset_v3(struct mtd_info *m
+ 		NFC_V3_CONFIG2_2CMD_PHASES |
+ 		NFC_V3_CONFIG2_SPAS(mtd->oobsize >> 1) |
+ 		NFC_V3_CONFIG2_ST_CMD(0x70) |
++		NFC_V3_CONFIG2_INT_MSK |
+ 		NFC_V3_CONFIG2_NUM_ADDR_PHASE0;
+ 
+ 	if (chip->ecc.mode == NAND_ECC_HW)
