@@ -1,40 +1,57 @@
-From: janboe.ye@gmail.com (ye janboe)
-Date: Tue, 10 Aug 2010 11:27:54 +0800
-Subject: [PATCH] arm: show_regs dump stack when ARM_UNWIND enable
-In-Reply-To: <20100722080016.GF6802@n2100.arm.linux.org.uk>
-References: <20100720152431.GA17092@localhost.localdomain>
-	<1279640276.10002.35.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTimbxrdFeA513Y59OX6y9lwfh3OBjqerazKcwIXx@mail.gmail.com>
-	<1279704065.17464.1.camel@e102109-lin.cambridge.arm.com>
-	<20100721172428.GA5881@localhost.localdomain>
-	<20100722080016.GF6802@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimjAp8-WQ2D_-gJkh_wBW0yuDfGs6DaMgwk59e=@mail.gmail.com>
+From: stepanm@codeaurora.org (stepanm at codeaurora.org)
+Date: Mon, 9 Aug 2010 20:42:13 -0700 (PDT)
+Subject: [PATCH v3] arm: msm: Add MSM IOMMU support.
+In-Reply-To: <1281409689.1954.96.camel@Joe-Laptop.home>
+References: <1281407259-28626-1-git-send-email-stepanm@codeaurora.org>
+	<1281409689.1954.96.camel@Joe-Laptop.home>
+Message-ID: <bf2b5539fdb03a1a9c55ee1122c40b99.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi, Russell
+> Why use both pr_err and printk(KERN_ERR ?
 
-I agree with this.
+I had been using pr_err for printing badness messages internal to the
+driver, but I guess their functionality is largely paralleled by return
+error codes. I had been using printk(KERN_ERR for messages that have been
+caused by an event that is more external to the driver and its callers
+(like the data for the page fault, which is most likely to be caused by a
+misprogrammed client). pr_err gives other information like function name,
+line number, etc, which would be noise when looking at an iommu page
+fault. And, I guess if the pr_err stuff got turned off, you would want the
+page fault data to still be printed... but that's kind of a minor point.
 
-But I am confused with c_bactrace in arm_syscall. This function is
-used to dump stack when arm syscall failed.
-regs->ARM_fp should be an userspace address and c_backtrace should
-fail to dump the backtrace.
-
-Do you know what the purpose c_backtrace here?
+I am actually considering doing away with all the pr_err lines entirely
+because they typically also result in returning -Ewhatever and other IOMMU
+drivers don't give this level of error reporting. But, they may be helpful
+to the users of the API. What are people's thoughts on this?
 
 Thanks
+Steve
 
-Janboe
-
-
-2010/7/22 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Thu, Jul 22, 2010 at 01:24:28AM +0800, Janboe Ye wrote:
->> Is there any way for arm unwind to do user space backtrace like
->> c_backtrace in arm_syscall?
+>> +#define pr_fmt(fmt) "%s %i " fmt, __func__, __LINE__
+>> +		pr_err("bad size: %d\n", len);
+>> +		pr_err("null page table\n");
+>> +			pr_err("could not allocate second level table\n");
+>> +		pr_err("null page table\n");
+>> +		pr_err("first level PTE is 0\n");
+>> +	printk(KERN_ERR "FAR    = %08x    PAR    = %08x\n",
+>> +	printk(KERN_ERR "FSR    = %08x [%s%s%s%s%s%s%s%s%s%s]\n", fsr,
+>> +	printk(KERN_ERR "FSYNR0 = %08x    FSYNR1 = %08x\n",
+>> +	printk(KERN_ERR "TTBR0  = %08x    TTBR1  = %08x\n",
+>> +	printk(KERN_ERR "SCTLR  = %08x    ACTLR  = %08x\n",
+>> +	printk(KERN_ERR "PRRR   = %08x    NMRR   = %08x\n",
+>> +		pr_err("Invalid device ID in context interrupt handler\n");
+>> +	printk(KERN_ERR "===== WOAH! =====\n");
+>> +	printk(KERN_ERR "Unexpected IOMMU page fault!\n");
+>> +	printk(KERN_ERR "base = %08x\n", (unsigned int) base);
+>> +			printk(KERN_ERR "Fault occurred in context %d.\n", i);
+>> +			printk(KERN_ERR "Interesting registers:\n");
+>> +			printk(KERN_ERR "\n");
 >
-> That's a job for userspace, which would have access to the program
-> debug information, which is necessary for unwinding EABI programs.
-> The debug information is not loaded into the programs address space
-> when you run it, and therefore would not be available to the kernel.
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >
