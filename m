@@ -1,40 +1,44 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 10 Aug 2010 11:25:09 +0200
-Subject: [rtc-linux] [PATCH 2/2] rtc: Add support in Makefile/Kconfig
-	for the LPC32XX RTC
-In-Reply-To: <AANLkTim5HDRi7+ONM4kxKeKda3gZziUiuuK_ohnrwrAP@mail.gmail.com>
-References: <1281370650-29520-1-git-send-email-wellsk40@gmail.com>
-	<1281370650-29520-3-git-send-email-wellsk40@gmail.com>
-	<AANLkTim5HDRi7+ONM4kxKeKda3gZziUiuuK_ohnrwrAP@mail.gmail.com>
-Message-ID: <20100810092509.GA4268@pengutronix.de>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Tue, 10 Aug 2010 14:56:31 +0530
+Subject: Query: Patches break with Microsoft exchange server.
+In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB032401D8F0@dbde02.ent.ti.com>
+References: <4C5F9B25.8080401@st.com>
+	<20100809064957.GB16661@pengutronix.de>	<4C5FA698.90904@st.com>	<20100809090137.GP13165@mea-ext.zmailer.org>
+	<4C5FCBE1.2080303@st.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB032401D8F0@dbde02.ent.ti.com>
+Message-ID: <4C611B47.4090709@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 10, 2010 at 09:45:49AM +0800, Wan ZongShun wrote:
-> Hi Kevin ,
+On 8/10/2010 2:52 PM, Gadiyar, Anand wrote:
+> viresh kumar wrote:
+>> > On 8/9/2010 2:31 PM, Matti Aarnio wrote:
+>>> > > On Mon, Aug 09, 2010 at 12:26:24PM +0530, viresh kumar wrote:
+>>>>> > >> > 
+>>>>> > >> > I missed this information in my last mail. We are using git send-email for
+>>>>> > >> > sending patches. As patches will go through Microsoft exchange server only,
+>>>>> > >> > so they are broken.
+>>>>> > >> > 
+>>> > > Let your boss complain to your IT keepers.
+>>> > > "These are Machine-to-Machine messages, they must not be modified!"
+>>> > > 
+>>> > > 
+>>> > > It would probably be "against corporate policy" to use gmail for these emails...
+>>> > > 
+>> > 
+>> > We got one solution: Upgrade Exchange server to SP2.
+>> > Lets see if our IT department does this upgradation.
+>> > 
+> Upgrading the Exchange server worked for us a couple of years ago. At least
+> git-send-email works okay now, but Outlook is horribly broken.
 > 
-> 2010/8/10  <wellsk40@gmail.com>:
-> > From: Kevin Wells <wellsk40@gmail.com>
-> >
-> > Enable build RTC support for the LPC32XX in makefile/Kconfig
-> >
+> You could use gmail/others and send externally. Adding an explicit
+> "From :" line in the patch can still give you credits to your official
+> email address.
 > 
-> I think you can intergrate two patches [PATCH 1/2 2/2] into one rtc
-> driver patch.
 
-+1. Also, please make proper use of tabs like the surrounding entries.
+Thanks Anand.
 
-Regards,
+Lets see if our IT support team manages to upgrade to SP2 or not.
 
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100810/5085e801/attachment-0001.sig>
+viresh.
