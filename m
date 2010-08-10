@@ -1,46 +1,61 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Tue, 10 Aug 2010 23:28:02 +0200
-Subject: [PULL REQ] IXP4xx (ARM) for 2.6.36
-Message-ID: <m3bp9a40pp.fsf@intrepid.localdomain>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 10 Aug 2010 14:44:24 -0700
+Subject: [GIT PULL] Initial Tegra ARM support
+In-Reply-To: <AANLkTi=dcQrik=+5xfwbNo_w7WkTOKZiKAFYFhwzbS=_@mail.gmail.com>
+References: <AANLkTi=dcQrik=+5xfwbNo_w7WkTOKZiKAFYFhwzbS=_@mail.gmail.com>
+Message-ID: <1281476664.9400.36.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+On Thu, 2010-08-05 at 14:10 -0700, Erik Gilling wrote:
+> Hi Linus,
+> 
+> The following changes since commit 9fe6206f400646a2322096b56c59891d530e8d51:
+>   Linus Torvalds (1):
+>         Linux 2.6.35
+> 
+> are available in the git repository at:
+> 
+>   git://android.kernel.org/kernel/tegra.git for-linus
+> 
+> This code has received review on linux-arm-kernel and has been in
+> for-next since June 18th.  No subsystems were harmed out side of
+> mach-tegra.
+> 
+> Colin Cross (4):
+>       [ARM] tegra: Add clock support
+>       [ARM] tegra: SMP support
 
-This is the stuff which didn't make it to 2.6.35 for some reason.
-IXP4xx fixes and additional platform support. It's based on 2.6.34-final
-but merges cleanly and works correctly. Please pull, thanks.
 
-The following changes since commit 9fe6206f400646a2322096b56c59891d530e8d51:
+This fixes some typos in the Tegra tree which caused build failures in
+all ARM compiles.
 
-  Linux 2.6.35 (2010-08-01 15:11:14 -0700)
+Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+---
+ arch/arm/Kconfig |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/chris/linux-2.6.git ixp4xx
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 0ca4a94..a5d4dae 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1188,8 +1188,8 @@ config LOCAL_TIMERS
+ 		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
+ 		ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_TEGRA)
+ 	default y
+-	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_VEXPRESS || ARCH_OMAP4 || \\
+-		ARCH_U8500 || ARCH_TEGRA
++	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_VEXPRESS || ARCH_OMAP4 || \
++		ARCH_U8500 || ARCH_TEGRA)
+ 	help
+ 	  Enable support for local timers on SMP platforms, rather then the
+ 	  legacy IPI broadcast method.  Local timers allows the system
+-- 
+1.7.0.4
 
-Krzysztof Ha?asa (5):
-      IXP4xx: Prevent HSS transmitter lockup by disabling FRaMe signals.
-      IXP4xx: Fix ixp4xx_crypto little-endian operation.
-      IXP4xx: Make mdio_bus struct static in the Ethernet driver.
-      IXP4xx: Fix sparse warnings in I/O primitives.
-      IXP4xx: Fix LL debugging on little-endian CPU.
 
-Marc Zyngier (2):
-      ixp4xx: base support for Arcom Vulcan
-      ixp4xx/vulcan: add PCI support
 
- arch/arm/mach-ixp4xx/Kconfig                    |    8 +
- arch/arm/mach-ixp4xx/Makefile                   |    2 +
- arch/arm/mach-ixp4xx/include/mach/debug-macro.S |    2 +
- arch/arm/mach-ixp4xx/include/mach/io.h          |    6 +-
- arch/arm/mach-ixp4xx/vulcan-pci.c               |   73 +++++++
- arch/arm/mach-ixp4xx/vulcan-setup.c             |  246 +++++++++++++++++++++++
- drivers/crypto/ixp4xx_crypto.c                  |   21 ++
- drivers/net/arm/ixp4xx_eth.c                    |    2 +-
- drivers/net/wan/ixp4xx_hss.c                    |    2 +-
- 9 files changed, 357 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/mach-ixp4xx/vulcan-pci.c
- create mode 100644 arch/arm/mach-ixp4xx/vulcan-setup.c
 
 -- 
-Krzysztof Halasa
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
