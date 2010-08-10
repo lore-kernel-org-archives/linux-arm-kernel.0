@@ -1,65 +1,54 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon,  9 Aug 2010 23:46:28 -0700
-Subject: [PATCH] MAINTAINERS: Update ARM/S3C patterns
-Message-ID: <28b93faea32a3f5a3f79a68b92c60ba7dad99425.1281422516.git.joe@perches.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 10 Aug 2010 09:15:38 +0200
+Subject: [PATCH 4/8] ARM i.MX: add SDMA driver
+In-Reply-To: <4C605150.7030403@gmail.com>
+References: <1281344743-2029-1-git-send-email-s.hauer@pengutronix.de>
+	<1281344743-2029-5-git-send-email-s.hauer@pengutronix.de>
+	<4C605150.7030403@gmail.com>
+Message-ID: <20100810071538.GE27749@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for merged SOCs
+On Mon, Aug 09, 2010 at 09:04:48PM +0200, Magnus Lilja wrote:
+> Hi Sascha,
+> 
+> Just some typos that I spotted.
+> 
+> > +struct sdma_state_registers {
+> > +	u32 sf     : 1; /* source falut while loading data */
+>                                   ^^^^^ typo?
+> 
+> > +	u32 unused0: 1;
+> > +	u32 rpc    :14; /* return program counter */
+> > +	u32 t      : 1; /* test bit:status of arithmetic & test instruction*/
+> > +	u32 unused1: 1;
+> > +	u32 pc     :14; /* program counter */
+> > +	u32 lm     : 2; /* loop mode */
+> > +	u32 epc    :14; /* loop end program counter */
+> > +	u32 df     : 1; /* destiantion falut while storing data */
+>                            ^^^^^^^^^^^^^^^^^ typos
+> 
+> > +	u32 unused2: 1;
+> > +	u32 spc    :14; /* loop start program counter */
+> > +};
+> > +#else
+> > +struct sdma_state_registers {
+> > +	u32 pc     :14; /* program counter */
+> > +	u32 unused1: 1;
+> > +	u32 t      : 1; /* test bit: status of arithmetic & test instruction*/
+> > +	u32 rpc    :14; /* return program counter */
+> > +	u32 unused0: 1;
+> > +	u32 sf     : 1; /* source falut while loading data */
+>                                     ^^^ typo?
 
-Signed-off-by: Joe Perches <joe@perches.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
----
- MAINTAINERS |   20 +++-----------------
- 1 files changed, 3 insertions(+), 17 deletions(-)
+I'm glad I copied these typos from the fsl kernel and haven't invented
+them myself. What the heck is a falut? fault?
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 832f904..13a6d02 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -908,20 +908,13 @@ W:	http://www.fluff.org/ben/linux/
- S:	Maintained
- F:	arch/arm/mach-s3c2410/
- 
--ARM/S3C2440 ARM ARCHITECTURE
-+ARM/S3C2440 and S3C2442 ARM ARCHITECTURE
- M:	Ben Dooks <ben-linux@fluff.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- W:	http://www.fluff.org/ben/linux/
- S:	Maintained
- F:	arch/arm/mach-s3c2440/
- 
--ARM/S3C2442 ARM ARCHITECTURE
--M:	Ben Dooks <ben-linux@fluff.org>
--L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--W:	http://www.fluff.org/ben/linux/
--S:	Maintained
--F:	arch/arm/mach-s3c2442/
--
- ARM/S3C2443 ARM ARCHITECTURE
- M:	Ben Dooks <ben-linux@fluff.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-@@ -929,19 +922,12 @@ W:	http://www.fluff.org/ben/linux/
- S:	Maintained
- F:	arch/arm/mach-s3c2443/
- 
--ARM/S3C6400 ARM ARCHITECTURE
--M:	Ben Dooks <ben-linux@fluff.org>
--L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--W:	http://www.fluff.org/ben/linux/
--S:	Maintained
--F:	arch/arm/mach-s3c6400/
--
--ARM/S3C6410 ARM ARCHITECTURE
-+ARM/S3C64xx ARM ARCHITECTURE
- M:	Ben Dooks <ben-linux@fluff.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- W:	http://www.fluff.org/ben/linux/
- S:	Maintained
--F:	arch/arm/mach-s3c6410/
-+F:	arch/arm/mach-s3c64xx/
- 
- ARM/SHMOBILE ARM ARCHITECTURE
- M:	Paul Mundt <lethal@linux-sh.org>
+Sascha
+
+
 -- 
-1.7.2.19.g9a302
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
