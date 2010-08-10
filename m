@@ -1,61 +1,50 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Tue, 10 Aug 2010 14:44:24 -0700
-Subject: [GIT PULL] Initial Tegra ARM support
-In-Reply-To: <AANLkTi=dcQrik=+5xfwbNo_w7WkTOKZiKAFYFhwzbS=_@mail.gmail.com>
-References: <AANLkTi=dcQrik=+5xfwbNo_w7WkTOKZiKAFYFhwzbS=_@mail.gmail.com>
-Message-ID: <1281476664.9400.36.camel@c-dwalke-linux.qualcomm.com>
+From: gregkh@suse.de (Greg Kroah-Hartman)
+Date: Tue, 10 Aug 2010 14:49:41 -0700
+Subject: [PATCH 081/148] USB: otg/ulpi.c : fix register write
+In-Reply-To: <20100810214419.GA17385@kroah.com>
+References: <20100810214419.GA17385@kroah.com>
+Message-ID: <1281477048-17635-81-git-send-email-gregkh@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-08-05 at 14:10 -0700, Erik Gilling wrote:
-> Hi Linus,
-> 
-> The following changes since commit 9fe6206f400646a2322096b56c59891d530e8d51:
->   Linus Torvalds (1):
->         Linux 2.6.35
-> 
-> are available in the git repository at:
-> 
->   git://android.kernel.org/kernel/tegra.git for-linus
-> 
-> This code has received review on linux-arm-kernel and has been in
-> for-next since June 18th.  No subsystems were harmed out side of
-> mach-tegra.
-> 
-> Colin Cross (4):
->       [ARM] tegra: Add clock support
->       [ARM] tegra: SMP support
+From: Eric B?nard <eric@eukrea.com>
 
+ulpi_set_vbus and ulpi_set_flags are using ULPI_SET(register) to write
+to the PHY's registers, which means we can only set bits in the PHY's
+register and not clear them.
+By directly using the address of the register without any offset, we
+now get the expected behaviour for these functions.
 
-This fixes some typos in the Tegra tree which caused build failures in
-all ARM compiles.
-
-Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+Cc: Daniel Mack <daniel@caiaq.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
 ---
- arch/arm/Kconfig |    4 ++--
+ drivers/usb/otg/ulpi.c |    4 ++--
  1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0ca4a94..a5d4dae 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1188,8 +1188,8 @@ config LOCAL_TIMERS
- 		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
- 		ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_TEGRA)
- 	default y
--	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_VEXPRESS || ARCH_OMAP4 || \\
--		ARCH_U8500 || ARCH_TEGRA
-+	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_VEXPRESS || ARCH_OMAP4 || \
-+		ARCH_U8500 || ARCH_TEGRA)
- 	help
- 	  Enable support for local timers on SMP platforms, rather then the
- 	  legacy IPI broadcast method.  Local timers allows the system
+diff --git a/drivers/usb/otg/ulpi.c b/drivers/usb/otg/ulpi.c
+index d331b22..10a1df6 100644
+--- a/drivers/usb/otg/ulpi.c
++++ b/drivers/usb/otg/ulpi.c
+@@ -54,7 +54,7 @@ static int ulpi_set_flags(struct otg_transceiver *otg)
+ 	if (otg->flags & USB_OTG_EXT_VBUS_INDICATOR)
+ 		flags |= ULPI_OTG_CTRL_EXTVBUSIND;
+ 
+-	return otg_io_write(otg, flags, ULPI_SET(ULPI_OTG_CTRL));
++	return otg_io_write(otg, flags, ULPI_OTG_CTRL);
+ }
+ 
+ static int ulpi_init(struct otg_transceiver *otg)
+@@ -95,7 +95,7 @@ static int ulpi_set_vbus(struct otg_transceiver *otg, bool on)
+ 			flags |= ULPI_OTG_CTRL_DRVVBUS_EXT;
+ 	}
+ 
+-	return otg_io_write(otg, flags, ULPI_SET(ULPI_OTG_CTRL));
++	return otg_io_write(otg, flags, ULPI_OTG_CTRL);
+ }
+ 
+ struct otg_transceiver *
 -- 
-1.7.0.4
-
-
-
-
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.2
