@@ -1,42 +1,35 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Tue, 10 Aug 2010 12:53:52 +0100
-Subject: [PATCH v2] OpenRD: Enable SD/UART selection for serial port 1
-In-Reply-To: <4C612EEC.3090409@einfochips.com>
-References: <1281428973-28957-1-git-send-email-tanmay.upadhyay@einfochips.com>
-	<20100810085643.GE21175@chipmunk> <20100810085821.GF21175@chipmunk>
-	<4C612856.6090405@einfochips.com> <20100810102817.GJ21175@chipmunk>
-	<4C612EEC.3090409@einfochips.com>
-Message-ID: <20100810115351.GL21175@chipmunk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 10 Aug 2010 14:00:55 +0200
+Subject: [rtc-linux] [PATCH 1/2] rtc: rtc-lpc32xx: Introduce RTC driver
+	for the LPC32XX SoC
+In-Reply-To: <20100810102507.GB4268@pengutronix.de>
+References: <1281370650-29520-1-git-send-email-wellsk40@gmail.com>
+	<1281370650-29520-2-git-send-email-wellsk40@gmail.com>
+	<20100810102507.GB4268@pengutronix.de>
+Message-ID: <20100810120055.GD11268@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Wolfram,
 
-* Tanmay Upadhyay <tanmay.upadhyay@einfochips.com> [2010-08-10 16:20:20+0530]:
->
-> On 08/10/2010 03:58 PM, Alexander Clouter wrote:
->>
->> * Tanmay Upadhyay<tanmay.upadhyay@einfochips.com>  [2010-08-10 15:52:14+0530]:
->>    
->>> Intention here is to provide SD support by default. It will be switched
->>> to UART mode only if someone asks to do so via kernel parameter. If
->>> someone doesn't give OR gives improper kernel parameter, he/she won't get
->>> UART1. It will simply fall-back to the default setting - which is SD
->>> support.
->>
->> My mis-type, I forgot to put a
->> 'kirkwood_sdio_init(&openrd_mvsdio_data);' after my added printk().
->>
-> If I understood correctly, intention behind this is to inform user that  
-> he/she made a mistake while passing the kernel parameters. Is this 
-> correct?
->
-Exactly, and there is no harm turning on the SD slot rather than UART1 
-at the same time.
-
-Cheers
+> > +	retval = request_irq(rtc->irq, lpc32xx_rtc_alarm_interrupt,
+> > +		IRQF_DISABLED, "rtcalarm", rtc);
+> > +	if (retval < 0) {
+> > +		dev_err(&pdev->dev, "Can't request interrupt\n");
+> > +		goto err_free_irq;
+> > +	}
+> 
+> I saw that a number of rtc-drivers register their irq after they
+> register the device. I wonder if this is OK here? Couldn't it happen
+> that after rtc_device_register() there is a preemption and another
+> process could set the alarm? Then there is a race between interrupts
+> already enabled and no handler available, no?
+If you do it the other way around the irq might trigger and the handler
+reports an irq for a device that doesn't exist yet.
+ 
+Best regards
+Uwe
 
 -- 
-Alexander Clouter
-.sigmonster says: tax office, n.:
-                  	Den of inequity.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
