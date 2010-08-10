@@ -1,79 +1,58 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 10 Aug 2010 17:36:42 +0300
-Subject: [PATCH] mailbox: change full flag per mailbox queue instead of
-	global
-In-Reply-To: <1276534269-19179-1-git-send-email-x0095840@ti.com>
-References: <1276534269-19179-1-git-send-email-x0095840@ti.com>
-Message-ID: <AANLkTim7s8pX3k7oF7AdZobDRegx17n5gfAze1wAduoT@mail.gmail.com>
+Date: Tue, 10 Aug 2010 17:43:27 +0300
+Subject: [PATCH 09/10] omap: mailbox: convert block api to kfifo
+In-Reply-To: <496565EC904933469F292DDA3F1663E602CA4D88F3@dlee06.ent.ti.com>
+References: <1275546858-29507-1-git-send-email-Hiroshi.DOYU@nokia.com>
+	<1275546858-29507-10-git-send-email-Hiroshi.DOYU@nokia.com>
+	<D2943F03B81C9C458E44DFB213905E02B6325C6A@dlee04.ent.ti.com>
+	<AANLkTik4lW3_xP_e4BStJEYpHlVoNjemEz8zWfIE7gRU@mail.gmail.com>
+	<496565EC904933469F292DDA3F1663E602CA4D88F3@dlee06.ent.ti.com>
+Message-ID: <AANLkTikZ2uDpuK1DjJLk_pSiogQyStwJVG952o79_NjX@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hiroshi,
+Hi Rene,
 
-On Mon, Jun 14, 2010 at 7:51 PM, Fernando Guzman Lugo <x0095840@ti.com> wrote:
-> As pointed by Ben Ohand, the variable rq_full flag is a global
-> variable, so if there are multiple mailbox users there will be
-> conflics. Now there is a full flag per mailbox queue.
+
+On Wed, Jun 9, 2010 at 8:38 AM, Guzman Lugo, Fernando
+<fernando.lugo@ti.com> wrote:
+>>On Tue, Jun 8, 2010 at 7:16 PM, Sapiens, Rene <rene.sapiens@ti.com> wrote:
+>>> In mbox_rx_work() you are removing the lines that enable back the ?mbox irq for the RX case, but inside ?__mbox_rx_interrupt() this interrupt ?is disabled in the case that the kfifo for Rx >mailbox gets full. So I think that we need to enable it back as soon as there is space in this kfifo.
+>>
+>>
+>>Actually these irq on/off lines are not part of my patch; they are
+>>introduced by patch 05/10 on top of which my patches were rebased.
+>>
+>>Nevertheless I agree with you - the kfifo migration patch should not
+>>affect that irq on/off behavior. It's probably just a rebase gotcha.
+>>
+>>But now that you point me to this irq on/off thing, it looks a bit
+>>broken in terms of multiple concurrent mbox support since it relies on
+>>a global rq_full state. I guess it'd be better to hold that rq_full
+>>state in the relevant mbox queue state itself.
+>>
+>>Fernando what do you think ?
 >
-> Reported-by: Ohad Ben-Cohen <ohad@wizery.com>
-> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
+> Yes, you are right Ohad. Only should be disable the "new message" interrupt of the mailbox which kfifo is full.
 
-It looks like this fix didn't get thru - can you please review and ack/nack ?
 
-Thanks,
+
+Once Fernando's fix will get thru, we will be able to fix the rebase
+error that you pointed out.
+
+Unfortunately I will not have any email access in the next 3 weeks,
+and I was hoping maybe you could submit a fix for this once Fernando's
+fix is accepted ? I would really like us to fix this early in the days
+of 2.6.36, maybe even during the merge window.
+
+Thanks a lot,
 Ohad.
 
-> ---
-> ?arch/arm/plat-omap/include/plat/mailbox.h | ? ?1 +
-> ?arch/arm/plat-omap/mailbox.c ? ? ? ? ? ? ?| ? ?7 +++----
-> ?2 files changed, 4 insertions(+), 4 deletions(-)
 >
-> diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
-> index 729166b..a6144b8 100644
-> --- a/arch/arm/plat-omap/include/plat/mailbox.h
-> +++ b/arch/arm/plat-omap/include/plat/mailbox.h
-> @@ -47,6 +47,7 @@ struct omap_mbox_queue {
-> ? ? ? ?struct tasklet_struct ? tasklet;
-> ? ? ? ?int ? ? (*callback)(void *);
-> ? ? ? ?struct omap_mbox ? ? ? ?*mbox;
-> + ? ? ? bool ? ?full;
-> ?};
+> regards,
+> Fernando.
 >
-> ?struct omap_mbox {
-> diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-> index 8d86b0b..a1e274e 100644
-> --- a/arch/arm/plat-omap/mailbox.c
-> +++ b/arch/arm/plat-omap/mailbox.c
-> @@ -30,7 +30,6 @@
->
-> ?static struct omap_mbox *mboxes;
-> ?static DEFINE_RWLOCK(mboxes_lock);
-> -static bool rq_full;
->
-> ?static int mbox_configured;
-> ?static DEFINE_MUTEX(mbox_configured_lock);
-> @@ -140,9 +139,9 @@ static void mbox_rx_work(struct work_struct *work)
-> ? ? ? ?while (1) {
-> ? ? ? ? ? ? ? ?spin_lock_irqsave(q->queue_lock, flags);
-> ? ? ? ? ? ? ? ?rq = blk_fetch_request(q);
-> - ? ? ? ? ? ? ? if (rq_full) {
-> + ? ? ? ? ? ? ? if (mbox->rxq->full) {
-> ? ? ? ? ? ? ? ? ? ? ? ?omap_mbox_enable_irq(mbox, IRQ_RX);
-> - ? ? ? ? ? ? ? ? ? ? ? rq_full = false;
-> + ? ? ? ? ? ? ? ? ? ? ? mbox->rxq->full = false;
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ? ? ? ? ?spin_unlock_irqrestore(q->queue_lock, flags);
-> ? ? ? ? ? ? ? ?if (!rq)
-> @@ -183,7 +182,7 @@ static void __mbox_rx_interrupt(struct omap_mbox *mbox)
-> ? ? ? ? ? ? ? ?rq = blk_get_request(q, WRITE, GFP_ATOMIC);
-> ? ? ? ? ? ? ? ?if (unlikely(!rq)) {
-> ? ? ? ? ? ? ? ? ? ? ? ?omap_mbox_disable_irq(mbox, IRQ_RX);
-> - ? ? ? ? ? ? ? ? ? ? ? rq_full = true;
-> + ? ? ? ? ? ? ? ? ? ? ? mbox->rxq->full = true;
-> ? ? ? ? ? ? ? ? ? ? ? ?goto nomem;
-> ? ? ? ? ? ? ? ?}
->
-> --
-> 1.6.3.3
->
+>>
+>>Thanks,
+>>Ohad.
 >
