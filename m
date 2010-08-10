@@ -1,38 +1,69 @@
-From: gadiyar@ti.com (Gadiyar, Anand)
-Date: Tue, 10 Aug 2010 14:52:20 +0530
-Subject: Query: Patches break with Microsoft exchange server.
-In-Reply-To: <4C5FCBE1.2080303@st.com>
-References: <4C5F9B25.8080401@st.com>
-	<20100809064957.GB16661@pengutronix.de>	<4C5FA698.90904@st.com>
-	<20100809090137.GP13165@mea-ext.zmailer.org> <4C5FCBE1.2080303@st.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB032401D8F0@dbde02.ent.ti.com>
+From: dzu@denx.de (Detlev Zundel)
+Date: Tue, 10 Aug 2010 11:20:36 +0200
+Subject: [PATCH 4/8] ARM i.MX: add SDMA driver
+References: <1281344743-2029-1-git-send-email-s.hauer@pengutronix.de>
+	<1281344743-2029-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <m2k4ny3jtn.fsf@ohwell.denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-viresh kumar wrote:
-> On 8/9/2010 2:31 PM, Matti Aarnio wrote:
-> > On Mon, Aug 09, 2010 at 12:26:24PM +0530, viresh kumar wrote:
-> >> > 
-> >> > I missed this information in my last mail. We are using git send-email for
-> >> > sending patches. As patches will go through Microsoft exchange server only,
-> >> > so they are broken.
-> >> > 
-> > Let your boss complain to your IT keepers.
-> > "These are Machine-to-Machine messages, they must not be modified!"
-> > 
-> > 
-> > It would probably be "against corporate policy" to use gmail for these emails...
-> > 
-> 
-> We got one solution: Upgrade Exchange server to SP2.
-> Lets see if our IT department does this upgradation.
-> 
+Hi Sascha,
 
-Upgrading the Exchange server worked for us a couple of years ago. At least
-git-send-email works okay now, but Outlook is horribly broken.
+> This patch adds DMA support for i.MX25/31/35/51 based SoCs.
+> The SDMA engine is a scatter/gather DMA engine which is implemented
+> as a seperate coprocessor. SDMA needs its own firmware which is
+> requested using the standard request_firmware mechanism. The firmware
+> has different entry points for each peripheral type, so drivers
+> have to pass the peripheral type to the DMA engine which in turn
+> picks the correct firmware entry point from a table contained in
+> the firmware image itself.
+> The original Freescale code also supports support for transfering
+> data to the internal SRAM which needs different entry points to
+> the firmware. Support for this is currently not implemented. Also,
+> support for the ASRC (asymmetric sample rate converter) is skipped.
+>
+> This code has been tested with sound on i.MX31/35 and with SD/MMC on
+> i.MX31. It should work on i.MX25/51, but this is currently untested.
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/mach-mx3/Kconfig             |    2 +
+>  arch/arm/plat-mxc/Kconfig             |   10 +
+>  arch/arm/plat-mxc/Makefile            |    1 +
+>  arch/arm/plat-mxc/include/mach/sdma.h |    8 +
+>  arch/arm/plat-mxc/sdma.c              | 1181 +++++++++++++++++++++++++++++++++
+>  5 files changed, 1202 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/plat-mxc/include/mach/sdma.h
+>  create mode 100644 arch/arm/plat-mxc/sdma.c
 
-You could use gmail/others and send externally. Adding an explicit
-"From :" line in the patch can still give you credits to your official
-email address.
+[...]
 
-- Anand
+> +	if (header->magic != SDMA_FIRMWARE_MAGIC)
+> +		goto err_firmware;
+> +	if (header->ram_code_start + header->ram_code_size > fw->size)
+> +		goto err_firmware;
+> +
+> +	addr = (void *)header + header->script_addrs_start;
+> +	ram_code = (void *)header + header->ram_code_start;
+> +	memcpy(&__sdma_script_addrs, addr, sizeof(*addr));
+
+As the firmware file is an external entity, I think it makes sense to
+explicitely specify the endianness of 32-bit values and use endian
+macros i.e. (le32_to_cpu) when accessing it.
+
+Considering that Freescale (re)uses functional blocks in ARM and Power
+Architecture chips, this may save efforts in the future.
+
+Apart from this I would also welcome if the whole driver could be
+adapted to the drivers/dma dmaengine API as pointed out by Linus
+Walleij.  The dma controller support for the Power Architecture chips of
+Freescale do implement this API, so this would also be a great step
+towards code unification of drivers here.
+
+Thanks
+  Detlev
+
+--
+DENX Software Engineering GmbH,      MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich,  Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-40 Fax: (+49)-8142-66989-80 Email: dzu at denx.de
