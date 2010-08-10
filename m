@@ -1,42 +1,73 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Tue, 10 Aug 2010 22:36:21 +0200
-Subject: ARM: 2.6.3[45] PCI regression (IXP4xx and PXA?)
-Message-ID: <m3sk2m433u.fsf@intrepid.localdomain>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Wed, 11 Aug 2010 08:50:13 +1200
+Subject: [PATCH 2/5] SPEAR3xx: Rename register/irq defines to remove naming
+	conflicts
+In-Reply-To: <4C60DFB8.20608@st.com>
+References: <1275717955-14545-1-git-send-email-ryan@bluewatersys.com>
+	<1275717955-14545-3-git-send-email-ryan@bluewatersys.com>
+	<4C60DFB8.20608@st.com>
+Message-ID: <4C61BB85.5050406@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 08/10/2010 05:12 PM, viresh kumar wrote:
+> 
+> Ryan,
+> 
+> Sorry for testing this set of patches so late. Patch is working fine.
+> I have few comments:
 
-Noticed this problem a bit late :-(
+Thanks for looking at this.
 
-6fee48cd330c68332f9712bc968d934a1a84a32a broke
-pci_set_consistent_dma_mask() on IXP4xx and most probably PXA. Affected
-devices are e.g. IDE controller (CS5536-based: disk inaccessible) and
-e1000 ethernet ("Detected Tx Unit Hang").
+> 
+>> -#define SPEAR_GPIO_INT_END			(SPEAR_GPIO1_INT_BASE + 8)
+>> +//#define SPEAR_GPIO_INT_END			(SPEAR_GPIO1_INT_BASE + 8)
+> 
+> wrong comment sytle. Also we can move above definition with rest of GPIO
+> virtual irq no.s.
 
-The attached patch makes it work again, though I'm not sure it's the
-best solution.
+Oops, that looks like it should have been removed. Moving the definition
+is fine.
 
-Ideas?
+>>  
+> 
+> [snip...]
+> 
+>>  
+>> +/*
+>> + * GPIO pins virtual irqs
+>> + * Use the lowest number for the GPIO virtual IRQs base on which subarchs
+>> + * we have compiled in
+>> + */
+>> +#if defined(CONFIG_MACH_SPEAR310)
+>> +#define SPEAR_GPIO_INT_BASE			(SPEAR3XX_VIRQ_START + 18)
+>> +#elif defined(CONFIG_MACH_SPEAR320)
+>> +#define SPEAR_GPIO_INT_BASE			(SPEAR3XX_VIRQ_START + 17)
+>> +#else
+>> +#define SPEAR_GPIO_INT_BASE			(SPEAR3XX_VIRQ_START + 9)
+>>  #endif
+> 
+> If we have all three machines enabled, then SPEAR_GPIO_INT_BASE will start from
+> VIRQ_START + 18, which will work for spear310 and spear320, but will not be
+> correct as we will skip 9 irq no.s.
 
-Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
+Do the virtual irqs map directly to the hardware in some way? I thought
+that since they were virtual there offset would be somewhat arbitrary?
 
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index ca32ed7..bd2a7d3 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -129,6 +129,14 @@ static inline u64 dma_get_mask(struct device *dev)
- 
- static inline int dma_set_coherent_mask(struct device *dev, u64 mask)
- {
-+#ifdef CONFIG_DMABOUNCE
-+	if (dev->archdata.dmabounce) {
-+		if (mask >= ISA_DMA_THRESHOLD)
-+			return 0;
-+		else
-+			return -EIO;
-+	}
-+#endif
- 	if (!dma_supported(dev, mask))
- 		return -EIO;
- 	dev->coherent_dma_mask = mask;
+> It would be better to have three different base addresses
+> SPEAR300_GPIO_INT_BASE, etc.
+
+This is possible. We can either do this by making SPEAR3XX_GPIO_INT_BASE
+a variable, or by having some ifdef/machine_is code in the board
+initialisation.
+
+~Ryan
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
