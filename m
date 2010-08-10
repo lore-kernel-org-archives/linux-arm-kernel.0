@@ -1,47 +1,20 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 10 Aug 2010 21:55:29 +0200 (CEST)
-Subject: [regression] in linux-next: sh_mobile_ceu_camera broken by "ARM:
-	Prohibit ioremap() on kernel managed RAM"
-In-Reply-To: <20100810092759.GB31759@n2100.arm.linux.org.uk>
-References: <4C5ED116.5000002@arndnet.de>
-	<201008101045.03547.philippe.retornaz@epfl.ch>
-	<20100810092759.GB31759@n2100.arm.linux.org.uk>
-Message-ID: <Pine.LNX.4.64.1008102117000.18934@axis700.grange>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Aug 2010 20:56:19 +0100
+Subject: [PATCH]: Fix arm kconfig
+In-Reply-To: <AANLkTikR-JJ9CP0eU3Lq251LPr_JRScBAih-dJdrt5fx@mail.gmail.com>
+References: <AANLkTikR-JJ9CP0eU3Lq251LPr_JRScBAih-dJdrt5fx@mail.gmail.com>
+Message-ID: <20100810195619.GB7702@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell
-
-On Tue, 10 Aug 2010, Russell King - ARM Linux wrote:
-
-> On Tue, Aug 10, 2010 at 10:45:03AM +0200, Philippe R?tornaz wrote:
-> > Le dimanche, 8 ao?t 2010 17.45:26, Arnd Hannemann a ?crit :
-> > > Hi Russell,
-> > > 
-> > > your commit 309caa9cc6ff39d261264ec4ff10e29489afc8f8
-> > > ARM: Prohibit ioremap() on kernel managed RAM
-> > > 
-> > > lets drivers/base/dma-coherent.c::dma_declare_coherent_memory()
-> > > fail for the sh_mobile_ceu_camera driver (see backtrace below).
-> > > I think, other configurations (i.MX31 users of the mx3_camera driver:
-> > > pcm037 and mx31moboard) will have the same problem.
-> > > 
-> > > Since I have no idea how to fix this, I post this regression report here...
-> > 
-> > Have you found a solution to this problem ? As you said, the mx3_camera driver 
-> > doesn't work anymore on mx31moboard.
+On Tue, Aug 10, 2010 at 09:42:12PM +0200, xsecute at googlemail.com wrote:
+> Hi Russell,
 > 
-> MX3 is ARMv6 which has the architectural restriction as well I'm afraid.
+> i get an nerror if i try: make ARCH=arm CROSS_COMPILE=arm-eabi
 
-So, if I understand this right, you cannot call 
-dma_declare_coherent_memory() on already mapped RAM on ARM. So, to use 
-this on physical RAM we have to remove it from the kernel mapping? Would 
-using the "memmap=" kernel parameter suffice? Or is there a better 
-solution for this?
+Yes, Erik Miao reported it yesterday, and I suggested getting rid of the
+paren which isn't actually required.  Unfortuantely, I'm still waiting
+for that to happen... and land in the patch system.
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Instead, the patch system seems to be filling with stuff for the next
+merge window...
