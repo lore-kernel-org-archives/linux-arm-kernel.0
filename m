@@ -1,45 +1,46 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 10 Aug 2010 22:14:12 +0200
-Subject: [PATCH] ARM: fix syntax error in main Kconfig file
-In-Reply-To: <20100810200718.GA26031@pengutronix.de>
-References: <20100810200718.GA26031@pengutronix.de>
-Message-ID: <1281471252-31424-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Tue, 10 Aug 2010 22:18:57 +0200
+Subject: [PATCH] ARM: imx/pca100: Fix name of spi platform data
+In-Reply-To: <1277387397-3467-52-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1277387397-3467-52-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1281471537-802-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes:
+Commit
 
-	scripts/kconfig/mconf arch/arm/Kconfig
-	arch/arm/Kconfig:1187: invalid option
-	make[1]: *** [menuconfig] Error 1
-	make: *** [menuconfig] Error 2
+	7536cf9 (ARM: imx: dynamically register spi_imx devices (imx27))
 
-which was introduced by
+introduced a variable named "pca100_spi0_data" but passed
+"&pca100_spi_0_data" to imx27_add_spi_imx0.  This wasn't noticed earlier
+because both SPI_IMX and MACH_PCA100 are not enabled in mx27_defconfig.
 
-	1cea732 ([ARM] tegra: SMP support)
+This fixes a build failure:
+
+	arch/arm/mach-imx/mach-pca100.c: In function 'pca100_init':
+	arch/arm/mach-imx/mach-pca100.c:411: error: 'pca100_spi_0_data' undeclared (first use in this function)
+	arch/arm/mach-imx/mach-pca100.c:411: error: (Each undeclared identifier is reported only once
+	arch/arm/mach-imx/mach-pca100.c:411: error: for each function it appears in.)
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
-Cc: xsecute at googlemail.com
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Colin Cross <ccross@android.com>
 ---
-KernelVersion: v2.6.35-3374-g1cea732
- arch/arm/Kconfig |    2 +-
+KernelVersion: v2.6.35-rc1-49-g7536cf9
+
+ arch/arm/mach-imx/mach-pca100.c |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 232f0c7..952ded5 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1184,7 +1184,7 @@ config LOCAL_TIMERS
- 		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
- 		ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_TEGRA)
- 	default y
--	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_VEXPRESS || ARCH_OMAP4 || \\
-+	select HAVE_ARM_TWD if ARCH_REALVIEW || ARCH_VEXPRESS || ARCH_OMAP4 || \\
- 		ARCH_U8500 || ARCH_TEGRA
- 	help
- 	  Enable support for local timers on SMP platforms, rather then the
+diff --git a/arch/arm/mach-imx/mach-pca100.c b/arch/arm/mach-imx/mach-pca100.c
+index 6c92dea..a389d11 100644
+--- a/arch/arm/mach-imx/mach-pca100.c
++++ b/arch/arm/mach-imx/mach-pca100.c
+@@ -408,7 +408,7 @@ static void __init pca100_init(void)
+ 	mxc_gpio_mode(GPIO_PORTD | 27 | GPIO_GPIO | GPIO_IN);
+ 	spi_register_board_info(pca100_spi_board_info,
+ 				ARRAY_SIZE(pca100_spi_board_info));
+-	imx27_add_spi_imx0(&pca100_spi_0_data);
++	imx27_add_spi_imx0(&pca100_spi0_data);
+ #endif
+ 
+ 	gpio_request(OTG_PHY_CS_GPIO, "usb-otg-cs");
 -- 
 1.7.1
