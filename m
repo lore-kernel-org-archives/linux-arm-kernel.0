@@ -1,30 +1,84 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 10 Aug 2010 16:48:52 +0200
-Subject: [PATCH] lpc32xx/clock: Use && instead of &
-Message-ID: <1281451732-19294-1-git-send-email-w.sang@pengutronix.de>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Tue, 10 Aug 2010 17:57:45 +0300
+Subject: [PATCH] [ARM] tegra: Add i2c support
+In-Reply-To: <1280450180-25016-1-git-send-email-ccross@google.com>
+References: <1280450180-25016-1-git-send-email-ccross@google.com>
+Message-ID: <4C6168E9.1070405@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because we are connecting two expressions here, not binary values.
+Hi Colin,
+Two more comments.
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Kevin Wells <wellsk40@gmail.com>
----
- arch/arm/mach-lpc32xx/clock.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Colin Cross wrote:
+> From: Colin Cross <ccross@android.com>
+> 
+> CC: linux-i2c at vger.kernel.org
+> Signed-off-by: Colin Cross <ccross@android.com>
+> ---
+>  drivers/i2c/busses/Kconfig     |    7 +
+>  drivers/i2c/busses/Makefile    |    1 +
+>  drivers/i2c/busses/i2c-tegra.c |  665 ++++++++++++++++++++++++++++++++++++++++
+>  include/linux/i2c-tegra.h      |   25 ++
 
-diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
-index 32d6379..9ff1438 100644
---- a/arch/arm/mach-lpc32xx/clock.c
-+++ b/arch/arm/mach-lpc32xx/clock.c
-@@ -397,7 +397,7 @@ static int local_usbpll_enable(struct clk *clk, int enable)
- 		__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
- 
- 		/* Wait for PLL lock */
--		while ((timeout > jiffies) & (ret == -ENODEV)) {
-+		while ((timeout > jiffies) && (ret == -ENODEV)) {
- 			reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
- 			if (reg & LPC32XX_CLKPWR_USBCTRL_PLL_STS)
- 				ret = 0;
+This should probably go to arch/arm/mach-tegra/include/mach/ to minimize the 
+pollution in include/linux
+
+>  4 files changed, 698 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/i2c/busses/i2c-tegra.c
+>  create mode 100644 include/linux/i2c-tegra.h
+> 
+
+[ snip ]
+
+> +
+> +static int __init tegra_i2c_init_driver(void)
+> +{
+> +	return platform_driver_register(&tegra_i2c_driver);
+> +}
+> +module_init(tegra_i2c_init_driver);
+
+subsys_initcall would be better here.
+
+> +
+> +static void __exit tegra_i2c_exit_driver(void)
+> +{
+> +	platform_driver_unregister(&tegra_i2c_driver);
+> +}
+> +module_exit(tegra_i2c_exit_driver);
+> diff --git a/include/linux/i2c-tegra.h b/include/linux/i2c-tegra.h
+> new file mode 100644
+> index 0000000..9c85da4
+> --- /dev/null
+> +++ b/include/linux/i2c-tegra.h
+> @@ -0,0 +1,25 @@
+> +/*
+> + * drivers/i2c/busses/i2c-tegra.c
+> + *
+> + * Copyright (C) 2010 Google, Inc.
+> + * Author: Colin Cross <ccross@android.com>
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#ifndef _LINUX_I2C_TEGRA_H
+> +#define _LINUX_I2C_TEGRA_H
+> +
+> +struct tegra_i2c_platform_data {
+> +	unsigned long bus_clk_rate;
+> +};
+> +
+> +#endif /* _LINUX_I2C_TEGRA_H */
+
+
 -- 
-1.7.1
+Sincerely yours,
+Mike.
