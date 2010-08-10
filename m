@@ -1,29 +1,20 @@
 From: kevin.wells@nxp.com (Kevin Wells)
-Date: Tue, 10 Aug 2010 21:08:10 +0200
+Date: Tue, 10 Aug 2010 21:08:18 +0200
 Subject: [rtc-linux] [PATCH 1/2] rtc: rtc-lpc32xx: Introduce RTC driver
-	for the LPC32XX SoC
-In-Reply-To: <20100810102507.GB4268@pengutronix.de>
+	for  the LPC32XX SoC
+In-Reply-To: <20100810153448.17443314@linux.lan.towertech.it>
 References: <1281370650-29520-1-git-send-email-wellsk40@gmail.com>
 	<1281370650-29520-2-git-send-email-wellsk40@gmail.com>
-	<20100810102507.GB4268@pengutronix.de>
-Message-ID: <083DF309106F364B939360100EC290F80AC6E5F76C@eu1rdcrdc1wx030.exi.nxp.com>
+	<20100810153448.17443314@linux.lan.towertech.it>
+Message-ID: <083DF309106F364B939360100EC290F80AC6E5F76E@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+Hi Alessandro,
 
-Thanks for helping review this.
-I'll get your suggestions installed and an update posted in a few days.
+Thanks for helping to review this.
 
-> > +
-> > +	device_init_wakeup(&pdev->dev, 1);
-> > +	rtc->rtc = rtc_device_register(RTC_NAME, &pdev->dev, &lpc32xx_rtc_ops,
-> > +		THIS_MODULE);
-> > +	if (IS_ERR(rtc->rtc)) {
-> > +		dev_err(&pdev->dev, "Can't get RTC\n");
-> > +		retval = PTR_ERR(rtc->rtc);
-> > +		goto err_noreg;
-> > +	}
+> 
 > > +
 > > +	retval = request_irq(rtc->irq, lpc32xx_rtc_alarm_interrupt,
 > > +		IRQF_DISABLED, "rtcalarm", rtc);
@@ -32,19 +23,20 @@ I'll get your suggestions installed and an update posted in a few days.
 > > +		goto err_free_irq;
 > > +	}
 > 
-> I saw that a number of rtc-drivers register their irq after they register the
-> device. I wonder if this is OK here? Couldn't it happen that after
-> rtc_device_register() there is a preemption and another process could set the
-> alarm? Then there is a race between interrupts already enabled and no handler
-> available, no?
+>  if the driver can work without the alarm irq you
+>  can convert this to a non fatal warning.
+> 
+>  having an rtc without alarms is much better than having none.
 > 
 
-The 32xx RTC registers can save states across power or reset
-cycles and are only initialized if they have never been previously
-initialized. When waking up from suspend, power on, or reset - the
-alarm IRQ may have fired and may be enabled from a previous
-initialization, so the RTC device needs to be registered first.
+Good suggestion. I'll change this.
 
-You bring up a good point though, I wonder if going through probe
-requires that the alarm be disabled (ie, suspend won't go via probe,
-but a hard system reset will). I'll review this a bit more.
+> --
+> 
+>  Best regards,
+> 
+>  Alessandro Zummo,
+>   Tower Technologies - Torino, Italy
+> 
+>   http://www.towertech.it
+> 
