@@ -1,27 +1,50 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Tue, 10 Aug 2010 10:55:11 -0700
-Subject: [GIT PULL] Samsung S5P updates for 2.6.36 merge window
-In-Reply-To: <1281462308.9400.7.camel@c-dwalke-linux.qualcomm.com>
-References: <017201cb37ac$9979a5a0$cc6cf0e0$%kim@samsung.com>
-	<1281462308.9400.7.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <1281462911.9400.10.camel@c-dwalke-linux.qualcomm.com>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Tue, 10 Aug 2010 21:08:10 +0200
+Subject: [rtc-linux] [PATCH 1/2] rtc: rtc-lpc32xx: Introduce RTC driver
+	for the LPC32XX SoC
+In-Reply-To: <20100810102507.GB4268@pengutronix.de>
+References: <1281370650-29520-1-git-send-email-wellsk40@gmail.com>
+	<1281370650-29520-2-git-send-email-wellsk40@gmail.com>
+	<20100810102507.GB4268@pengutronix.de>
+Message-ID: <083DF309106F364B939360100EC290F80AC6E5F76C@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-08-10 at 10:45 -0700, Daniel Walker wrote:
-> On Mon, 2010-08-09 at 19:21 +0900, Kukjin Kim wrote:
-> >  arch/arm/Kconfig                                 |   37 +-
-> >  arch/arm/Makefile                                |    1 + 
+Hi Wolfram,
 
+Thanks for helping review this.
+I'll get your suggestions installed and an update posted in a few days.
 
-Sorry, just realized this is going to Russell .. The reason I commented
-on it is because this code has been in -next for a long time, and it
-sitting in -next will just cause conflicts when Russell accepts other
-mods to Kconfig .. So if you don't care about the conflict I guess it
-doesn't matter ..
+> > +
+> > +	device_init_wakeup(&pdev->dev, 1);
+> > +	rtc->rtc = rtc_device_register(RTC_NAME, &pdev->dev, &lpc32xx_rtc_ops,
+> > +		THIS_MODULE);
+> > +	if (IS_ERR(rtc->rtc)) {
+> > +		dev_err(&pdev->dev, "Can't get RTC\n");
+> > +		retval = PTR_ERR(rtc->rtc);
+> > +		goto err_noreg;
+> > +	}
+> > +
+> > +	retval = request_irq(rtc->irq, lpc32xx_rtc_alarm_interrupt,
+> > +		IRQF_DISABLED, "rtcalarm", rtc);
+> > +	if (retval < 0) {
+> > +		dev_err(&pdev->dev, "Can't request interrupt\n");
+> > +		goto err_free_irq;
+> > +	}
+> 
+> I saw that a number of rtc-drivers register their irq after they register the
+> device. I wonder if this is OK here? Couldn't it happen that after
+> rtc_device_register() there is a preemption and another process could set the
+> alarm? Then there is a race between interrupts already enabled and no handler
+> available, no?
+> 
 
-Daniel
+The 32xx RTC registers can save states across power or reset
+cycles and are only initialized if they have never been previously
+initialized. When waking up from suspend, power on, or reset - the
+alarm IRQ may have fired and may be enabled from a previous
+initialization, so the RTC device needs to be registered first.
 
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+You bring up a good point though, I wonder if going through probe
+requires that the alarm be disabled (ie, suspend won't go via probe,
+but a hard system reset will). I'll review this a bit more.
