@@ -1,35 +1,51 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 10 Aug 2010 19:42:21 +0400
-Subject: [PATCH] lpc32xx/clock: Use && instead of &
-In-Reply-To: <1281451732-19294-1-git-send-email-w.sang@pengutronix.de>
-References: <1281451732-19294-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <4C61735D.40602@ru.mvista.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 10 Aug 2010 08:56:27 -0700
+Subject: [PATCH 0/6] i2c: davinci updates for 2.6.35
+In-Reply-To: <AANLkTikJ6XDywcBA5O0mC85jQEIWxZ9NOALIQOjcGCDJ@mail.gmail.com>
+References: <1270575738-22388-1-git-send-email-khilman@deeprootsystems.com>
+	<20100420000621.GK32401@fluff.org.uk>
+	<AANLkTikJ6XDywcBA5O0mC85jQEIWxZ9NOALIQOjcGCDJ@mail.gmail.com>
+Message-ID: <AANLkTinNXxzCoH+b3=xA92sW8GCqqO4iY+_yVwBFLMqG@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Ben,
 
-Wolfram Sang wrote:
+On Mon, Jun 21, 2010 at 1:16 PM, Kevin Hilman
+<khilman@deeprootsystems.com> wrote:
+> On Mon, Apr 19, 2010 at 5:06 PM, Ben Dooks <ben-linux@fluff.org> wrote:
+>> On Tue, Apr 06, 2010 at 10:42:12AM -0700, Kevin Hilman wrote:
+>>> This series of davinci I2C driver updates and fixes is targetted for
+>>> 2.6.35. ?It has been tested in davinci git on multiple davinci SoCs.
+>>>
+>>> Ben, since these changes are isolated to the davinci driver only, if
+>>> you prefer I can merge them upstream along with my davinci changes for
+>>> 2.6.35.
+>>
+>> I'll get them into -next when I rebase it.
+>
+> Ben, this series never made it in for 2.6.35.
+>
+> I've now rebased this against v2.6.35-rc3 and it's available here:
+>
+> ? git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-davinci.git
+> davinci-i2c
+>
+> Please pull for 2.6.36. ?Thanks.
 
-> Because we are connecting two expressions here, not binary values.
+OK, it's now been two merge windows that these have been
+ignored/forgotten.  Can you let me know what is the plan for these?
 
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Kevin Wells <wellsk40@gmail.com>
-> ---
->  arch/arm/mach-lpc32xx/clock.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+If you're too busy, I'd be happy to merge them via davinci git with
+your ack if that helps take some load off you.  Either way, it would
+be nice to know what to do.
 
-> diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
-> index 32d6379..9ff1438 100644
-> --- a/arch/arm/mach-lpc32xx/clock.c
-> +++ b/arch/arm/mach-lpc32xx/clock.c
-> @@ -397,7 +397,7 @@ static int local_usbpll_enable(struct clk *clk, int enable)
->  		__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
->  
->  		/* Wait for PLL lock */
-> -		while ((timeout > jiffies) & (ret == -ENODEV)) {
-> +		while ((timeout > jiffies) && (ret == -ENODEV)) {
+If you want to pull, the branch has been rebased against v2.6.35 and
+is available here:
 
-    Could also kill unnecessary parens, while at it...
+ git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-davinci.git
+davinci-i2c
 
-WBR, Sergei
+Thanks,
+
+Kevin
