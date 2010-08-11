@@ -1,32 +1,27 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 Aug 2010 21:35:05 +0100
-Subject: Problem with non aligned DMA in usbnet on ARM
-In-Reply-To: <4C62C7B3.2030706@nvidia.com>
-References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
-	<4C627479.4060400@parrot.com>
-	<AANLkTinU2JEkeYJHo4tA+kD9Pd_F3YcUTbK9w6igc7s8@mail.gmail.com>
-	<4C62C7B3.2030706@nvidia.com>
-Message-ID: <20100811203505.GA463@n2100.arm.linux.org.uk>
+Date: Wed, 11 Aug 2010 21:38:20 +0100
+Subject: Memory type used for ioremap
+In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B030E700CCF@dbde02.ent.ti.com>
+References: <1278677464.11895.41.camel@e102109-lin.cambridge.arm.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B030E181CAD@dbde02.ent.ti.com>
+	<20100709141416.GI22845@n2100.arm.linux.org.uk>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B030E5E42A7@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C641DE6B@dbde02.ent.ti.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B030E5E47F6@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C641E31D@dbde02.ent.ti.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B030E700C1E@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C65D750B@dbde02.ent.ti.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B030E700CCF@dbde02.ent.ti.com>
+Message-ID: <20100811203820.GB463@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 11, 2010 at 08:54:27AM -0700, Gary King wrote:
-> On 08/11/2010 04:38 AM, Martin Fuzzey wrote:
-> > It seems to me these fixup functions are not intended to solve
-> > alignment issues but rather implement device specific framing (such as
-> > when the hardware packs multiple ethernet frames into a single urb)
-> >
-> I sent a patch to the list about 2 weeks ago that added support to
-> DMA bounce to bounce for misaligned buffers. We have a similar
-> problem with URB alignment for usbnet on Tegra's HCD:
-> 
-> http://lists.arm.linux.org.uk/lurker/message/20100729.005746.b43fa1d9.en.html
+On Wed, Aug 11, 2010 at 08:28:00PM +0530, Pedanekar, Hemant wrote:
+> Is this patch accepted or under review? I don't see it on omap yet.
 
-We don't want to add support for this to DMA bounce.  DMA bounce is already
-a pain in the backside and causes its own set of problems - please let it
-die a long slow but quite death.
+It's not something that would be accepted as its a local debugging
+measure only.
 
-If you want to see the kind of pain dmabounce causes, look at this long
-standing and as yet unsolved bug:
-
-  http://bugzilla.kernel.org/show_bug.cgi?id=7760
+What you could do is setup a static mapping using MT_UNCACHED instead,
+which is what IOP platforms do for their PCI registers which are
+explicitly stated to be SO.
