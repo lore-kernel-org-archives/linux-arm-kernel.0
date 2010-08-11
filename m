@@ -1,199 +1,173 @@
-From: phdm@macqel.be (Philippe De Muyter)
-Date: Wed, 11 Aug 2010 12:02:12 +0200
-Subject: [PATCH] Documentation about RS485 serial communications
-In-Reply-To: <4C626CBF.9020609@evidence.eu.com>
-References: <4BB1BF49.2000609@evidence.eu.com>
-	<4BB252E3.3030703@bluewatersys.com>
-	<4BBD8C9D.3070401@evidence.eu.com>
-	<20100408111310.524f7354@lxorguk.ukuu.org.uk>
-	<4BBDD71D.1010700@evidence.eu.com> <4BFD1FB6.8050405@atmel.com>
-	<4BFE2F38.8050200@evidence.eu.com> <4BFE41FD.2080804@atmel.com>
-	<20100527102917.GB31253@pengutronix.de>
-	<4C626CBF.9020609@evidence.eu.com>
-Message-ID: <20100811100212.GA4070@frolo.macqel>
+From: adrian.hunter@nokia.com (Adrian Hunter)
+Date: Wed, 11 Aug 2010 13:05:39 +0300
+Subject: [PATCH v3 8/9] omap: hsmmc: split mmc23 power control
+In-Reply-To: <1281478348-24833-9-git-send-email-ohad@wizery.com>
+References: <1281478348-24833-1-git-send-email-ohad@wizery.com>
+	<1281478348-24833-9-git-send-email-ohad@wizery.com>
+Message-ID: <4C6275F3.6030108@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 11, 2010 at 11:26:23AM +0200, Claudio Scordino wrote:
-> Hi all,
-> 
-> 	some time ago I've been asked (by both Wolfram and Philippe) to
-> provide some minimal documentation about the usage of the RS485
-> interface.
-> 
-> Here is the document (updated with the very last changes in the
-> interface).
+Ohad Ben-Cohen wrote:
+> Prepare for mmc3 regulator power control by splitting the power
+> control functions of mmc2 and mmc3, and expecting mmc3 to have
+> a single, dedicated, regulator support.
 
-Thanks
+Why?  Can't the controller be connected to an eMMC with 2 power
+supplies?  At a glance, it is not obvious why this patch is needed.
 
 > 
-> Best regards,
-> 
-> 	Claudio
-> 
-> 
-> Documentation about RS485 serial communications.
-> 
-> Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 > ---
->  Documentation/serial/00-INDEX         |    2 +
->  Documentation/serial/serial-rs485.txt |  123 +++++++++++++++++++++++++++++++++
->  2 files changed, 125 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/serial/serial-rs485.txt
+>  arch/arm/mach-omap2/hsmmc.c   |   10 ++++--
+>  drivers/mmc/host/omap_hsmmc.c |   67 ++++++++++++++++++++++++++++++++++++----
+>  2 files changed, 66 insertions(+), 11 deletions(-)
 > 
-> diff --git a/Documentation/serial/00-INDEX b/Documentation/serial/00-INDEX
-> index 07dcdb0..e09468a 100644
-> --- a/Documentation/serial/00-INDEX
-> +++ b/Documentation/serial/00-INDEX
-> @@ -14,6 +14,8 @@ riscom8.txt
->  	- notes on using the RISCom/8 multi-port serial driver.
->  rocket.txt
->  	- info on the Comtrol RocketPort multiport serial driver.
-> +serial-rs485.txt
-> +	- info about RS485 structures and support in the kernel.
->  specialix.txt
->  	- info on hardware/driver for specialix IO8+ multiport serial card.
->  stallion.txt
-> diff --git a/Documentation/serial/serial-rs485.txt b/Documentation/serial/serial-rs485.txt
-> new file mode 100644
-> index 0000000..f594831
-> --- /dev/null
-> +++ b/Documentation/serial/serial-rs485.txt
-> @@ -0,0 +1,123 @@
-> +                        RS485 SERIAL COMMUNICATIONS
+> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+> index 1ef54b0..5d3d789 100644
+> --- a/arch/arm/mach-omap2/hsmmc.c
+> +++ b/arch/arm/mach-omap2/hsmmc.c
+> @@ -174,7 +174,7 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
+>  	}
+>  }
+>  
+> -static void hsmmc23_before_set_reg(struct device *dev, int slot,
+> +static void hsmmc2_before_set_reg(struct device *dev, int slot,
+>  				   int power_on, int vdd)
+>  {
+>  	struct omap_mmc_platform_data *mmc = dev->platform_data;
+> @@ -325,14 +325,16 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
+>  				c->transceiver = 1;
+>  			if (c->transceiver && c->wires > 4)
+>  				c->wires = 4;
+> -			/* FALLTHROUGH */
+> -		case 3:
+>  			if (mmc->slots[0].features & HSMMC_HAS_PBIAS) {
+>  				/* off-chip level shifting, or none */
+> -				mmc->slots[0].before_set_reg = hsmmc23_before_set_reg;
+> +				mmc->slots[0].before_set_reg = hsmmc2_before_set_reg;
+>  				mmc->slots[0].after_set_reg = NULL;
+>  			}
+>  			break;
+> +		case 3:
+> +			mmc->slots[0].before_set_reg = NULL;
+> +			mmc->slots[0].after_set_reg = NULL;
+> +			break;
+>  		default:
+>  			pr_err("MMC%d configuration not supported!\n", c->mmc);
+>  			kfree(mmc);
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index d50e917..6f5cea0 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -258,7 +258,7 @@ static int omap_hsmmc_1_set_power(struct device *dev, int slot, int power_on,
+>  	return ret;
+>  }
+>  
+> -static int omap_hsmmc_23_set_power(struct device *dev, int slot, int power_on,
+> +static int omap_hsmmc_2_set_power(struct device *dev, int slot, int power_on,
+>  				   int vdd)
+>  {
+>  	struct omap_hsmmc_host *host =
+> @@ -309,6 +309,31 @@ static int omap_hsmmc_23_set_power(struct device *dev, int slot, int power_on,
+>  	return ret;
+>  }
+>  
+> +static int omap_hsmmc_3_set_power(struct device *dev, int slot, int power_on,
+> +				   int vdd)
+> +{
+> +	struct omap_hsmmc_host *host =
+> +		platform_get_drvdata(to_platform_device(dev));
+> +	int ret = 0;
 > +
-> +1. INTRODUCTION
-> +
-> +   EIA-485, also known as TIA/EIA-485 or RS-485, is a standard defining the
-> +   electrical characteristics of drivers and receivers for use in balanced
-> +   digital multipoint systems.
-> +   This standard is widely used for communications in industrial automation
-> +   because it can be used effectively over long distances and in electrically
-> +   noisy environments.
-> +   Even though the data is transmitted over a 2-wire twisted pair bus, all
-> +   EIA-485 transceivers interpret the voltage levels of the differential
-> +   signals with respect to a third common voltage. Without this common
-> +   reference, a set of transceivers may interpret the differential signals
-> +   incorrectly.
-> +   See [1] for more information.
-> +
-> +
-> +2. HARDWARE-RELATED CONSIDERATIONS
-> +
-> +   Some CPUs (e.g., Atmel AT91) contain a transceiver capable of working both
-> +   as RS232 and RS485. For these microcontrollers, the Linux driver should be
-> +   able of working in both modes, and proper ioctls (see later) should be made
-> +   available at user-level to allow switching from one mode to the other, and
-> +   viceversa.
-> +
-> +   On some other CPUs (e.g., Freescale imx25) the RS485 transceiver is not
-> +   integrated inside the microcontroller itself. Therefore, manufacturers who
-> +   use these microcontrollers to produce embedded boards need to connect an
-> +   external transceiver to some pin of the CPU.
-> +   On these architectures, therefore, no assumptions can be done at the
-> +   CPU-level about the presence of a RS485 transceiver, because the connection
-> +   (if any) is done outside the microcontroller. Moreover, even in case of
-> +   RS485 transceiver, the manufacturer is free to choose the CPU pin used for
-> +   the connection.
-> +
-> +
-> +3. DATA STRUCTURES ALREADY AVAILABLE IN THE KERNEL
-> +
-> +   The Linux kernel provides the serial_rs485 structure (see [2]) to handle
-> +   RS485 communications. This data structure is used to set and configure RS485
-> +   parameters in the platform data and in ioctls.
-> +
-> +   Any driver for devices capable of working both as RS232 and RS485 should
-> +   provide at least the following ioctls:
-> +
-> +    - TIOCSRS485 (typically associated with number 0x542F). This ioctl is used
-> +      to enable/disable RS485 mode from user-space
-> +
-> +    - TIOCGRS485 (typically associated with number 0x542E). This ioctl is used
-> +      to get RS485 mode from kernel-space (i.e., driver) to user-space.
-> +
-> +   In other words, the serial driver should contain a code similar to the next
-> +   one:
-> +
-> +	static struct uart_ops atmel_pops = {
-> +		/* ... */
-> +		.ioctl		= handle_ioctl,
-> +	};
-> +
-> +	static int handle_ioctl(struct uart_port *port,
-> +		unsigned int cmd,
-> +		unsigned long arg)
-> +	{
-> +		struct serial_rs485 rs485conf;
-> +
-> +		switch (cmd) {
-> +			case TIOCSRS485:
-> +				if (copy_from_user(&rs485conf,
-> +					(struct serial_rs485 *) arg,
-> +					sizeof(rs485conf)))
-> +						return -EFAULT;
-> +
-> +				/* ... */
-> +				break;
-> +
-> +			case TIOCGRS485:
-> +				if (copy_to_user((struct serial_rs485 *) arg,
-> +					...,
-> +					sizeof(rs485conf)))
-> +						return -EFAULT;
-> +				/* ... */
-> +				break;
-> +
-> +			/* ... */
+> +	if (power_on) {
+> +		ret = mmc_regulator_set_ocr(host->vcc, vdd);
+> +		/* Enable interface voltage rail, if needed */
+> +		if (ret == 0 && host->vcc) {
+> +			ret = regulator_enable(host->vcc);
+> +			if (ret < 0)
+> +				ret = mmc_regulator_set_ocr(host->vcc, 0);
 > +		}
+> +	} else {
+> +		if (host->vcc)
+> +			ret = regulator_disable(host->vcc);
+> +		if (ret == 0)
+> +			ret = mmc_regulator_set_ocr(host->vcc, 0);
 > +	}
 > +
+> +	return ret;
+> +}
 > +
-> +4. USAGE FROM USER-LEVEL
+>  static int omap_hsmmc_1_set_sleep(struct device *dev, int slot, int sleep,
+>  				  int vdd, int cardsleep)
+>  {
+> @@ -319,7 +344,7 @@ static int omap_hsmmc_1_set_sleep(struct device *dev, int slot, int sleep,
+>  	return regulator_set_mode(host->vcc, mode);
+>  }
+>  
+> -static int omap_hsmmc_23_set_sleep(struct device *dev, int slot, int sleep,
+> +static int omap_hsmmc_2_set_sleep(struct device *dev, int slot, int sleep,
+>  				   int vdd, int cardsleep)
+>  {
+>  	struct omap_hsmmc_host *host =
+> @@ -358,6 +383,31 @@ static int omap_hsmmc_23_set_sleep(struct device *dev, int slot, int sleep,
+>  		return regulator_enable(host->vcc_aux);
+>  }
+>  
+> +static int omap_hsmmc_3_set_sleep(struct device *dev, int slot, int sleep,
+> +				   int vdd, int cardsleep)
+> +{
+> +	struct omap_hsmmc_host *host =
+> +		platform_get_drvdata(to_platform_device(dev));
+> +	int err = 0;
 > +
-> +   From user-level, RS485 configuration can be get/set using the previous
-> +   ioctls. For instance, to set RS485 you can use the following code:
+> +	/*
+> +	 * If we don't see a Vcc regulator, assume it's a fixed
+> +	 * voltage always-on regulator.
+> +	 */
+> +	if (!host->vcc)
+> +		return 0;
 > +
-> +	#include <linux/serial.h>
+> +	if (cardsleep) {
+> +		/* VCC can be turned off if card is asleep */
+> +		if (sleep)
+> +			err = mmc_regulator_set_ocr(host->vcc, 0);
+> +		else
+> +			err = mmc_regulator_set_ocr(host->vcc, vdd);
+> +	}
 > +
-> +	/* Driver-specific ioctls: */
-> +	#define TIOCGRS485      0x542E
-> +	#define TIOCSRS485      0x542F
-
-Should those defines not come from a linux header file ?
-
+> +	return err;
+> +}
 > +
-> +	/* Open specific device: */
-> +	int fd = open ("/dev/mydevice", O_RDWR);
-> +	struct serial_rs485 rs485conf;
-> +
-> +	/* Set RS485 mode: */
-> +	rs485conf.flags |= SER_RS485_ENABLED;
-> +
-> +	/* Set rts delay before send, if needed: */
-> +	rs485conf.flags |= SER_RS485_RTS_BEFORE_SEND;
-> +	rs485conf.delay_rts_before_send = ...;
-> +
-> +	/* Set rts delay after send, if needed: */
-> +	rs485conf.flags |= SER_RS485_RTS_AFTER_SEND;
-> +	rs485conf.delay_rts_after_send = ...;
-> +
-> +	ioctl (fd, TIOCSRS485, &rs485conf);
-
-I surmise that all the real work, the read() and write() system calls,
-must come here, before the close() system call.
-
-> +
-> +	close (fd);
-> +
-> +5. REFERENCES
-> +
-> + [1]	http://en.wikipedia.org/wiki/Rs485
-> + [2]	include/linux/serial.h
-> -- 
-> 1.6.0.4
-> 
-
--- 
-Philippe De Muyter  phdm at macqel dot be  Tel +32 27029044
-Macq Electronique SA  rue de l'Aeronef 2  B-1140 Bruxelles  Fax +32 27029077
+>  static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+>  {
+>  	struct regulator *reg;
+> @@ -370,10 +420,13 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+>  		mmc_slot(host).set_sleep = omap_hsmmc_1_set_sleep;
+>  		break;
+>  	case OMAP_MMC2_DEVID:
+> -	case OMAP_MMC3_DEVID:
+>  		/* Off-chip level shifting, or none */
+> -		mmc_slot(host).set_power = omap_hsmmc_23_set_power;
+> -		mmc_slot(host).set_sleep = omap_hsmmc_23_set_sleep;
+> +		mmc_slot(host).set_power = omap_hsmmc_2_set_power;
+> +		mmc_slot(host).set_sleep = omap_hsmmc_2_set_sleep;
+> +		break;
+> +	case OMAP_MMC3_DEVID:
+> +		mmc_slot(host).set_power = omap_hsmmc_3_set_power;
+> +		mmc_slot(host).set_sleep = omap_hsmmc_3_set_sleep;
+>  		break;
+>  	default:
+>  		pr_err("MMC%d configuration not supported!\n", host->id);
+> @@ -386,9 +439,9 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+>  		/*
+>  		* HACK: until fixed.c regulator is usable,
+>  		* we don't require a main regulator
+> -		* for MMC2 or MMC3
+> +		* for MMC2
+>  		*/
+> -		if (host->id == OMAP_MMC1_DEVID) {
+> +		if (host->id != OMAP_MMC2_DEVID) {
+>  			ret = PTR_ERR(reg);
+>  			goto err;
+>  		}
