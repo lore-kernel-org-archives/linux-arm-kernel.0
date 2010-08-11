@@ -1,42 +1,25 @@
-From: jeffrey.hundstad@mnsu.edu (Jeffrey Hundstad)
-Date: Wed, 11 Aug 2010 10:46:05 -0500
-Subject: Query: Patches break with Microsoft exchange server.
-In-Reply-To: <4C624AE1.30504@st.com>
-References: <4C5F9B25.8080401@st.com>
-	<AANLkTinxwRFLUibJECm0c3_oL5mYRkmscsw-xXgAHSTe@mail.gmail.com>
-	<4C624AE1.30504@st.com>
-Message-ID: <4C62C5BD.3020808@mnsu.edu>
+From: GKing@nvidia.com (Gary King)
+Date: Wed, 11 Aug 2010 08:54:27 -0700
+Subject: Problem with non aligned DMA in usbnet on ARM
+In-Reply-To: <AANLkTinU2JEkeYJHo4tA+kD9Pd_F3YcUTbK9w6igc7s8@mail.gmail.com>
+References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
+	<4C627479.4060400@parrot.com>
+	<AANLkTinU2JEkeYJHo4tA+kD9Pd_F3YcUTbK9w6igc7s8@mail.gmail.com>
+Message-ID: <4C62C7B3.2030706@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/2010 02:01 AM, viresh kumar wrote:
- > When i send a mail using git send-email then it receives fine on
- > outlook but on thunderbird, tabs are converted to spaces.
- >
- > This doesn't happen with every patch on thunderbird, but only a few.
- > And observation is that it happens only with big patches.
- > (more than 500 lines)
- >
- > Any idea, how to solve issue now on thunderbird??
+On 08/11/2010 04:38 AM, Martin Fuzzey wrote:
+>
+>
+> It seems to me these fixup functions are not intended to solve
+> alignment issues but rather implement device specific framing (such as
+> when the hardware packs multiple ethernet frames into a single urb)
+>
+I sent a patch to the list about 2 weeks ago that added support to
+DMA bounce to bounce for misaligned buffers. We have a similar
+problem with URB alignment for usbnet on Tegra's HCD:
 
-Hello,
+http://lists.arm.linux.org.uk/lurker/message/20100729.005746.b43fa1d9.en.html
 
-Exchange 2010 does not handle IMAP "chunking" (partial message transfer) 
-correctly.  Any request after about 1 megabyte of total message size 
-will fail.
-
-Thunderbird uses this "chunking" feature to give you a status update 
-while downloading large messages.  The IMAP statements are of this type:
-11 UID fetch 244477 (UID RFC822.SIZE BODY[]<20480.12288>)
-
-When the 20480 is larger than 1MB Exchange "claims" there is no more.  
-Sigh....
-
-Fortunately you can disable this feature.  To disable this in 
-Thunderbird you can go to the Advanced configuration and disable the 
-following feature, by setting it to false:
-mail.server.default.fetch_by_chunks
-
-
--- 
-Jeffrey Hundstad
+- Gary
