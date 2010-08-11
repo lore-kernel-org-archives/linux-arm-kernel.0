@@ -1,86 +1,45 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 11 Aug 2010 18:33:42 +0530
-Subject: Memory type used for ioremap
-In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B030E700C1E@dbde02.ent.ti.com>
-References: <2A3DCF3DA181AD40BDE86A3150B27B6B030E181724@dbde02.ent.ti.com>
-	<1278677464.11895.41.camel@e102109-lin.cambridge.arm.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B030E181CAD@dbde02.ent.ti.com>
-	<20100709141416.GI22845@n2100.arm.linux.org.uk>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B030E5E42A7@dbde02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C641DE6B@dbde02.ent.ti.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B030E5E47F6@dbde02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C641E31D@dbde02.ent.ti.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B030E700C1E@dbde02.ent.ti.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C65D750B@dbde02.ent.ti.com>
+From: john.ogness@linutronix.de (John Ogness)
+Date: Wed, 11 Aug 2010 15:16:34 +0200
+Subject: [PATCH 1/3] mxc_nand: set spare size and pages per block
+In-Reply-To: <20100811125625.GS27749@pengutronix.de> (Sascha Hauer's message
+	of "Wed, 11 Aug 2010 14:56:25 +0200")
+References: <80r5i63dn4.fsf@merkur.tec.linutronix.de>
+	<20100810121912.GG27749@pengutronix.de>
+	<801va635f7.fsf@merkur.tec.linutronix.de>
+	<20100811125625.GS27749@pengutronix.de>
+Message-ID: <80r5i5z3v1.fsf@merkur.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Pedanekar, Hemant
-> Sent: Wednesday, August 11, 2010 6:25 PM
-> To: Shilimkar, Santosh; Russell King - ARM Linux
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: RE: Memory type used for ioremap
-> 
-> Shilimkar, Santosh wrote on Wednesday, August 04, 2010 5:35 PM:
-> 
-> >> -----Original Message-----
-> >> From: Pedanekar, Hemant
-> >> Sent: Wednesday, August 04, 2010 5:31 PM
-> >> To: Shilimkar, Santosh; Russell King - ARM Linux
-> >> Cc: linux-arm-kernel at lists.infradead.org
-> >> Subject: RE: Memory type used for ioremap
-> >>
-> >> Shilimkar, Santosh wrote:
-> >>>> Pedanekar, Hemant wrote:
-> >>>>> Russell King - ARM Linux wrote:
-> >>>>>> On Fri, Jul 09, 2010 at 07:32:46PM +0530, Pedanekar,
-> >>> Hemant wrote:
-> >>>>>>> Catalin,
-> >>>>>>
-> >
-> >> Santosh,
-> >>
-> >> Can you please point me to the patch series you mentioned? I will give
-> it a
-> >> try.
-> > http://www.spinics.net/lists/arm-kernel/msg93218.html
-> >
-> 
-> Thanks for the link. I applied the patches and used writel/readl but no
-> luck.
-> The MT_DEVICE mappings still result into writes not getting through.
-> 
-> >>
-> >> Regarding read-back, the writes themselves are not successful as the
-> >> peripheral has specific requirement for non-posted writes. So reading
-> back
-> >> after write Always returns old value.
-> >>
-> > Are you sure about this behaviour?
-> 
-> Yes. The writes are not going through with MT_DEVICE mappings as the
-> target
-> peripheral has requirement for non-posted writes.
-> 
-> Looks like only strongly ordered mapping is resulting into non-posted
-> writes
-> which works. Is there any specific reason the strongly order mapping patch
-> is
-> not accepted/applied?
+On 2010-08-11, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>> Your version allows a small window between request_irq() and
+>> irq_control() where on the i.MX21 there is a possibility of the
+>> interrupts being disabled twice. Namely, if an interrupt occurs
+>> before irq_control() has had a chance to disable it. IMHO it would be
+>> better to call:
+>> 
+>>     set_irq_flags(host->irq, IRQF_VALID | IRQF_NOAUTOEN);
+>> 
+>> for the i.MX21 before requesting the irq. This closes the window.
+>
+> IIRC it is not allowed to call set_irq_flags before request_irq. We
+> are changing a resource we do not own yet.
 
-Attaching one which is I use for debugging. This is only for OMAP3/4
-Hope this is useful to you.
+Normally, yes. But the only way the IRQF_NOAUTOEN flag can ever be
+useful is if set_irq_flags() is called before request_irq().
 
-I suggest only the device which has non-posted requirement
-you convert it to SO
+> I think the worst thing that could happen without this change is that
+> we get an interrupt after request_irq.
 
-Regards,
-Santosh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-OMAP3-4-Enable-IO-posting.patch
-Type: application/octet-stream
-Size: 7074 bytes
-Desc: 0001-OMAP3-4-Enable-IO-posting.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100811/6b57000a/attachment-0001.obj>
+Yes. And this causes a problem on the i.MX21 because the interrupt
+handler will disable the interrupts. The irq_control() after
+request_irq() will _also_ disable the interrupts. This means the
+interrupts are disabled twice, which causes some issues on an RT kernel.
+
+> Alternatively we could set the interrupt mask bit before requesting
+> the irq.
+
+Yes. This would be best. But for the i.MX21 it is important that the
+interrupts are unmasked after irq_control() has disabled the interrupts.
+
+John Ogness
