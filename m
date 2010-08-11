@@ -1,36 +1,48 @@
-From: janboe.ye@gmail.com (ye janboe)
-Date: Thu, 12 Aug 2010 01:24:29 +0800
-Subject: [PATCH] arm: remove backtrace.s when ARM_UNWIND enable
-In-Reply-To: <1281547117.30665.39.camel@e102109-lin.cambridge.arm.com>
-References: <20100811160810.GA6792@localhost.localdomain>
-	<1281547117.30665.39.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <AANLkTi=6GGehTa93hvjpf=PD=YDjd_DpfUGEPWKG=qn_@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 11 Aug 2010 21:21:45 +0300
+Subject: [PATCH v4 0/8] native support for wl1271 on ZOOM
+Message-ID: <1281550913-17633-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-backtrace.o also need to be linked when FRAME_POINTER is not set.
+This patch series adds native support for wl1271 on ZOOM.
 
-At this situation, __backtrace and c_backtrace are empty functions.
+Changes since v3:
+- slot is marked nonremovable
+- no explicit slot ocr mask
+- dont split hsmmc mmc23 power control
 
-Janboe
+Patches are based on linux-next (as of Aug 7th), and tested
+on ZOOM2.
 
-2010/8/12 Catalin Marinas <catalin.marinas@arm.com>:
-> On Wed, 2010-08-11 at 17:08 +0100, janboe wrote:
->> backtrace.s can only work with FRAME_POINTER, so disable when
->> ARM_UNWIND enabled
->>
->> Signed-off-by: janboe <janboe.ye@gmail.com>
-> [...]
->> +ifneq ($(CONFIG_ARM_UNWIND),y)
->> + ?lib-y ? ? ? ?+= backtrace.o
->> +endif
->
-> Could we use CONFIG_FRAME_POINTER (and negate the conditions in your
-> patch)? The above would be:
->
-> lib-$(CONFIG_FRAME_POINTER) += backtrace.o
->
-> --
-> Catalin
->
->
+Please note that I am going to have a very limited email access
+in the next three weeks, so I might not respond right away.
+
+Thanks,
+
+Ohad Ben-Cohen (8):
+  wireless: wl1271: make wl12xx.h common to both spi and sdio
+  wireless: wl1271: support return value for the set power func
+  wireless: wl1271: add platform driver to get board data
+  wireless: wl1271: take irq info from private board data
+  wireless: wl1271: make ref_clock configurable by board
+  omap: hsmmc: remove unused variable
+  omap: zoom: add fixed regulator device for wlan
+  omap: zoom: add mmc3/wl1271 device support
+
+ arch/arm/mach-omap2/board-zoom-peripherals.c |   69 +++++++++++++++
+ drivers/mmc/host/omap_hsmmc.c                |    1 -
+ drivers/net/wireless/wl12xx/wl1251_sdio.c    |    2 +-
+ drivers/net/wireless/wl12xx/wl1251_spi.c     |    2 +-
+ drivers/net/wireless/wl12xx/wl1271.h         |   15 +++-
+ drivers/net/wireless/wl12xx/wl1271_boot.c    |    9 +-
+ drivers/net/wireless/wl12xx/wl1271_boot.h    |    1 -
+ drivers/net/wireless/wl12xx/wl1271_io.h      |    8 +-
+ drivers/net/wireless/wl12xx/wl1271_main.c    |    4 +-
+ drivers/net/wireless/wl12xx/wl1271_sdio.c    |  120 +++++++++++++++++++++++---
+ drivers/net/wireless/wl12xx/wl1271_spi.c     |    8 ++-
+ include/linux/spi/wl12xx.h                   |   34 -------
+ include/linux/wl12xx.h                       |   35 ++++++++
+ 13 files changed, 245 insertions(+), 63 deletions(-)
+ delete mode 100644 include/linux/spi/wl12xx.h
+ create mode 100644 include/linux/wl12xx.h
