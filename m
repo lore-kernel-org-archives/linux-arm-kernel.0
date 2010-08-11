@@ -1,164 +1,110 @@
-From: tanmay.upadhyay@einfochips.com (Tanmay Upadhyay)
-Date: Wed, 11 Aug 2010 10:51:02 +0530
-Subject: [PATCH v3] OpenRD: Enable SD/UART selection for serial port 1
-In-Reply-To: <yes>
-References: <yes>
-Message-ID: <1281504062-3314-1-git-send-email-tanmay.upadhyay@einfochips.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 11 Aug 2010 07:27:50 +0200
+Subject: [PATCH] mx35: Fix boot ROM hang in internal boot mode
+In-Reply-To: <20100811001931.GA4626@local>
+References: <20100811001931.GA4626@local>
+Message-ID: <20100811052749.GA7803@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables user to use serial port 1 of the OpenRD device for SDIO
-or UART(RS232/RS485). The selection can be done through kernel parameter.
+Hello Hans,
 
-By default the port would be used for SDIO. To select RS232 or RS485 mode,
-pass string "uart=232" or "uart=485" respectively in the kernel parameters.
-"uart=485" is ignored on OpenRD-Base as it doesn't have RS485 port.
+On Wed, Aug 11, 2010 at 02:19:33AM +0200, Hans J. Koch wrote:
+> If a watchdog reset occurs after booting in internal boot mode, the i.MX35
+> won't boot anymore. The boot ROM code seems to assume that some clocks are
+> turned on (they are after a power-on reset). This patch turns on the
+> necessary clocks.
+> 
+> Signed-off-by: Hans J. Koch <hjk@linutronix.de>
+> ---
+>  arch/arm/mach-mx3/clock-imx35.c |   20 +++++++++++++++++---
+>  1 files changed, 17 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
+> index d3af0fd..671acb6 100644
+> --- a/arch/arm/mach-mx3/clock-imx35.c
+> +++ b/arch/arm/mach-mx3/clock-imx35.c
+> @@ -485,7 +485,7 @@ static struct clk_lookup lookups[] = {
+>  
+>  int __init mx35_clocks_init()
+>  {
+> -	unsigned int ll = 0;
+> +	unsigned int ll = 0, cgr2, cgr3;
+>  
+>  #if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
+>  	ll = (3 << 16);
+> @@ -499,8 +499,22 @@ int __init mx35_clocks_init()
+>  	__raw_writel((3 << 18), CCM_BASE + CCM_CGR0);
+>  	__raw_writel((3 << 2) | (3 << 4) | (3 << 6) | (3 << 8) | (3 << 16),
+>  			CCM_BASE + CCM_CGR1);
+> -	__raw_writel((3 << 26) | ll, CCM_BASE + CCM_CGR2);
+> -	__raw_writel(0, CCM_BASE + CCM_CGR3);
+> +
+> +	/* Check if we came up in internal boot mode. If yes, we need some
+<nitpick> /* on an extra line please. </nitpick>
 
-Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
----
- arch/arm/mach-kirkwood/openrd-setup.c |  101 ++++++++++++++++++++++++++++++++-
- 1 files changed, 100 insertions(+), 1 deletions(-)
+> +	 * extra clocks turned on, otherwise the MX35 boot ROM code will
+> +	 * hang after a watchdog reset.
+> +	 */
+Better move the comment into the else branch below.
 
-diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
-index fd06be6..46378c0 100644
---- a/arch/arm/mach-kirkwood/openrd-setup.c
-+++ b/arch/arm/mach-kirkwood/openrd-setup.c
-@@ -19,6 +19,7 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <mach/kirkwood.h>
-+#include <mach/gpio.h>
- #include <plat/mvsdio.h>
- #include "common.h"
- #include "mpp.h"
-@@ -57,7 +58,15 @@ static struct mvsdio_platform_data openrd_mvsdio_data = {
- };
+> +	if (__raw_readl(CCM_BASE + CCM_RCSR) & (3 << 10)) {
+Can you please introduce a symbol for (3 << 10)?.
+
+> +		cgr2 = (3 << 26);
+> +		cgr3 = 0;
+> +	} else {
+> +		/* Additionally turn on UART1, SCC, and IIM clocks */
+really UART1?
+
+> +		cgr2 = (3 << 26) | (3 << 16) | (3 << 4);
+> +		cgr3 = (3 << 2);
+> +	}
+I would prefer having symbolic names here, too, but this affects not
+only your patch.  Will put it on my todo list.
+
+Is it sensible to assume that the machine will boot in internal boot
+mode again iff it came up this time in internal boot mode?  (I assume
+yes, still I would reword the comment.  Something like the following?:
+
+	In internal boot mode the MX35 boot ROM code seems to assume
+	that UART1, SCC, and IIM clocks are on and hangs if they are
+	not.  These are enabled by hardware after a power-on reset, but
+	not after a watchdog reset.  So enable them here.
+)
+
+> +
+> +	__raw_writel(cgr2 | ll, CCM_BASE + CCM_CGR2);
+hmm, can you make this:
+
+-	unsigned int ll = 0;
++	unsigned int cgr2 = 3 << 26, cgr3 = 0;
  
- static unsigned int openrd_mpp_config[] __initdata = {
-+	MPP12_SD_CLK,
-+	MPP13_SD_CMD,
-+	MPP14_SD_D0,
-+	MPP15_SD_D1,
-+	MPP16_SD_D2,
-+	MPP17_SD_D3,
-+	MPP28_GPIO,
- 	MPP29_GPIO,
-+	MPP34_GPIO,
- 	0
- };
- 
-@@ -67,6 +76,75 @@ static struct i2c_board_info i2c_board_info[] __initdata = {
- 	},
- };
- 
-+static int __initdata uart1;
-+
-+static int __init sd_uart_selection(char *str)
-+{
-+	uart1 = -EINVAL;
-+
-+	/* Default is SD. Change if required, for UART */
-+	if (!str)
-+		return 0;
-+
-+	if (!strncmp(str, "232", 3)) {
-+		uart1 = 232;
-+	} else if (!strncmp(str, "485", 3)) {
-+		/* OpenRD-Base doesn't have RS485. Treat is as an
-+		 * unknown argument & just have default setting -
-+		 * which is SD */
-+		if (machine_is_openrd_base()) {
-+			uart1 = -ENODEV;
-+			return 1;
-+		}
-+
-+		uart1 = 485;
-+	}
-+	return 1;
-+}
-+/* Parse boot_command_line string uart=232/485 */
-+__setup("uart=", sd_uart_selection);
-+
-+static int __init uart1_mpp_config(void)
-+{
-+	/* Configure MPP for UART1 */
-+	unsigned int uart1_mpp_config[] = {
-+		MPP13_UART1_TXD,
-+		MPP14_UART1_RXD,
-+		0
-+	};
-+
-+	kirkwood_mpp_conf(uart1_mpp_config);
-+
-+	if (gpio_request(34, "SD_UART1_SEL")) {
-+		printk(KERN_ERR "GPIO request failed for SD/UART1 selection"
-+				", gpio: 34\n");
-+		return -EIO;
+ #if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
+ 	cgr2 |= 3 << 16;
+ #endif
+ ...
+-...
++	if (!__raw_readl(CCM_BASE + CCM_RCSR) & (3 << 10)) {
++		/*
++		 * ...
++		 */
++		cgr2 |= 3 << 16 | 3 << 4;
++		cgr3 |= 3 << 2;
 +	}
 +
-+	if (gpio_request(28, "RS232_RS485_SEL")) {
-+		printk(KERN_ERR "GPIO request failed for RS232/RS485 selection"
-+				", gpio# 28\n");
-+		gpio_free(34);
-+		return -EIO;
-+	}
-+
-+	/* Select UART1
-+	 * Pin # 34: 0 => UART1, 1 => SD */
-+	gpio_direction_output(34, 0);
-+
-+	/* Select RS232 OR RS485
-+	 * Pin # 28: 0 => RS232, 1 => RS485 */
-+	if (uart1 == 232)
-+		gpio_direction_output(28, 0);
-+	else
-+		gpio_direction_output(28, 1);
-+
-+	gpio_free(34);
-+	gpio_free(28);
-+
-+	return 0;
-+}
-+
- static void __init openrd_init(void)
- {
- 	/*
-@@ -90,7 +168,6 @@ static void __init openrd_init(void)
- 		kirkwood_ge01_init(&openrd_ge01_data);
- 
- 	kirkwood_sata_init(&openrd_sata_data);
--	kirkwood_sdio_init(&openrd_mvsdio_data);
- 
- 	kirkwood_i2c_init();
- 
-@@ -99,6 +176,28 @@ static void __init openrd_init(void)
- 			ARRAY_SIZE(i2c_board_info));
- 		kirkwood_audio_init();
- 	}
-+
-+	if (uart1 <= 0) {
-+		if (uart1 < 0)
-+			printk(KERN_ERR "Invalid kernel parameter to select "
-+				"UART1. Defaulting to SD. ERROR CODE: %d\n",
-+				uart1);
-+
-+		/* Select SD
-+		 * Pin # 34: 0 => UART1, 1 => SD */
-+		if (gpio_request(34, "SD_UART1_SEL")) {
-+			printk(KERN_ERR "GPIO request failed for SD/UART1 "
-+					"selection, gpio: 34\n");
-+		} else {
-+
-+			gpio_direction_output(34, 1);
-+			gpio_free(34);
-+			kirkwood_sdio_init(&openrd_mvsdio_data);
-+		}
-+	} else {
-+		if (!uart1_mpp_config())
-+			kirkwood_uart1_init();
-+	}
- }
- 
- static int __init openrd_pci_init(void)
++	__raw_writel(cgr2, CCM_BASE + CCM_CGR2);
++	__raw_writel(cgr3, CCM_BASE + CCM_CGR3);
+
+
+> +	__raw_writel(cgr3, CCM_BASE + CCM_CGR3);
+>  
+>  	mxc_timer_init(&gpt_clk,
+>  			MX35_IO_ADDRESS(MX35_GPT1_BASE_ADDR), MX35_INT_GPT);
+
+Thanks
+Uwe
+
 -- 
-1.6.6.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
