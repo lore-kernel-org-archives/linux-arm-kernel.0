@@ -1,56 +1,83 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 11 Aug 2010 16:19:26 +0300
-Subject: [RFC/PATCH 2/6] sdio: add power_restore support
+Date: Wed, 11 Aug 2010 16:19:27 +0300
+Subject: [RFC/PATCH 3/6] mmc: add general runtime PM support
 In-Reply-To: <1281532770-27545-1-git-send-email-ohad@wizery.com>
 References: <1281532770-27545-1-git-send-email-ohad@wizery.com>
-Message-ID: <1281532770-27545-3-git-send-email-ohad@wizery.com>
+Message-ID: <1281532770-27545-4-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a power_restore handler to the SDIO bus ops,
-in order to support waking up SDIO cards that
-were powered off by runtime pm.
+Add Runtime PM handlers to mmc, which calls mmc_power_save_host
+and mmc_power_restore_host in respond to runtime_suspend and
+runtime_resume events.
 
-Note: this approach would also require changing
-the power_restore/save bus handlers to support
-a return value.
+Runtime PM is still disabled by default, so this patch alone
+has no immediate effect.
 
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 ---
- drivers/mmc/core/sdio.c |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
+ drivers/mmc/core/bus.c |   35 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 35 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mmc/core/sdio.c b/drivers/mmc/core/sdio.c
-index 645f173..ddbb9d3 100644
---- a/drivers/mmc/core/sdio.c
-+++ b/drivers/mmc/core/sdio.c
-@@ -511,11 +511,27 @@ static int mmc_sdio_resume(struct mmc_host *host)
- 	return err;
+diff --git a/drivers/mmc/core/bus.c b/drivers/mmc/core/bus.c
+index 49d9dca..27902b4 100644
+--- a/drivers/mmc/core/bus.c
++++ b/drivers/mmc/core/bus.c
+@@ -14,6 +14,7 @@
+ #include <linux/device.h>
+ #include <linux/err.h>
+ #include <linux/slab.h>
++#include <linux/pm_runtime.h>
+ 
+ #include <linux/mmc/card.h>
+ #include <linux/mmc/host.h>
+@@ -137,6 +138,39 @@ static int mmc_bus_resume(struct device *dev)
+ 	return ret;
  }
  
-+static void mmc_sdio_power_restore(struct mmc_host *host)
++static int mmc_runtime_suspend(struct device *dev)
 +{
-+	int err;
++	int status = 0;
++	struct mmc_card *card = dev_to_mmc_card(dev);
 +
-+	BUG_ON(!host);
-+	BUG_ON(!host->card);
++	mmc_power_save_host(card->host);
 +
-+	mmc_claim_host(host);
-+	err = mmc_sdio_init_card(host, host->ocr, host->card,
-+			(host->pm_flags & MMC_PM_KEEP_POWER));
-+	if (!err && host->sdio_irqs)
-+		mmc_signal_sdio_irq(host);
-+	mmc_release_host(host);
++	return status;
 +}
 +
- static const struct mmc_bus_ops mmc_sdio_ops = {
- 	.remove = mmc_sdio_remove,
- 	.detect = mmc_sdio_detect,
- 	.suspend = mmc_sdio_suspend,
- 	.resume = mmc_sdio_resume,
-+	.power_restore = mmc_sdio_power_restore,
++static int mmc_runtime_resume(struct device *dev)
++{
++	int status = 0;
++	struct mmc_card *card = dev_to_mmc_card(dev);
++
++	mmc_power_restore_host(card->host);
++
++	return status;
++}
++
++static int mmc_runtime_idle(struct device *dev)
++{
++	struct mmc_card *card = dev_to_mmc_card(dev);
++
++	return pm_runtime_suspend(dev);
++}
++
++static const struct dev_pm_ops mmc_bus_pm_ops = {
++	.runtime_suspend	= mmc_runtime_suspend,
++	.runtime_resume		= mmc_runtime_resume,
++	.runtime_idle		= mmc_runtime_idle,
++};
++
+ static struct bus_type mmc_bus_type = {
+ 	.name		= "mmc",
+ 	.dev_attrs	= mmc_dev_attrs,
+@@ -146,6 +180,7 @@ static struct bus_type mmc_bus_type = {
+ 	.remove		= mmc_bus_remove,
+ 	.suspend	= mmc_bus_suspend,
+ 	.resume		= mmc_bus_resume,
++	.pm		= &mmc_bus_pm_ops,
  };
  
- 
+ int mmc_register_bus(void)
 -- 
 1.7.0.4
