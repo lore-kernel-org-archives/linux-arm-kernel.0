@@ -1,184 +1,68 @@
-From: claudio@evidence.eu.com (Claudio Scordino)
-Date: Wed, 11 Aug 2010 11:26:23 +0200
-Subject: [PATCH] Documentation about RS485 serial communications
-In-Reply-To: <20100527102917.GB31253@pengutronix.de>
-References: <4BB053C4.7050700@evidence.eu.com>
-	<4BB10304.6090006@bluewatersys.com>
-	<4BB1BF49.2000609@evidence.eu.com>
-	<4BB252E3.3030703@bluewatersys.com>
-	<4BBD8C9D.3070401@evidence.eu.com>
-	<20100408111310.524f7354@lxorguk.ukuu.org.uk>
-	<4BBDD71D.1010700@evidence.eu.com> <4BFD1FB6.8050405@atmel.com>
-	<4BFE2F38.8050200@evidence.eu.com> <4BFE41FD.2080804@atmel.com>
-	<20100527102917.GB31253@pengutronix.de>
-Message-ID: <4C626CBF.9020609@evidence.eu.com>
+From: mfuzzey@gmail.com (Martin Fuzzey)
+Date: Wed, 11 Aug 2010 11:41:41 +0200
+Subject: Problem with non aligned DMA in usbnet on ARM
+Message-ID: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi all,
 
-	some time ago I've been asked (by both Wolfram and Philippe) to
-provide some minimal documentation about the usage of the RS485
-interface.
+I have a DLINK DUB-E100 USB / Ethernet adapter with using the Asix
+AX88772 chipset.
+This device works fine on linux x86 using the usbnet based asix driver
+however on ARM (iMX21 SoC, kernel 2.6.35) transmit works but receive
+fails with:
+"asix_rx_fixup() Bad Header Length"
 
-Here is the document (updated with the very last changes in the
-interface).
+Digging a bit showed that the driver was submitting a non aligned data
+pointer in the URB.
+This is due to:
+skb_reserve (skb, NET_IP_ALIGN);
 
-Best regards,
+in net/usb/usbnet.c rx_submit()
 
-	Claudio
+NET_IP_ALIGN is defined as 2 in skbuff.h (default value as not defined
+by ARM) hence the data buffer address was offset by 2 whereas the hcd
+requires 4 byte alignment to work at all and cache line (32 byte here)
+alignment to work reliably.
+Note that usbnet uses skb->data as the buffer submitted to USB in the URB.
 
+Removing this call to skb_reserve() fixes the problem for me.
 
-Documentation about RS485 serial communications.
+However the comments in skbuff.h make it clear that this is done
+deliberately knowing that it will cause non aligned DMA but seem to
+suggest that this should work anyway (even if less efficiently).
 
-Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
----
- Documentation/serial/00-INDEX         |    2 +
- Documentation/serial/serial-rs485.txt |  123 +++++++++++++++++++++++++++++++++
- 2 files changed, 125 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/serial/serial-rs485.txt
+My understanding, based on previous discussions on -usb a year back
+while I was working on the usb hcd is that the hcd does _not_ have to
+support unaligned DMA.
 
-diff --git a/Documentation/serial/00-INDEX b/Documentation/serial/00-INDEX
-index 07dcdb0..e09468a 100644
---- a/Documentation/serial/00-INDEX
-+++ b/Documentation/serial/00-INDEX
-@@ -14,6 +14,8 @@ riscom8.txt
- 	- notes on using the RISCom/8 multi-port serial driver.
- rocket.txt
- 	- info on the Comtrol RocketPort multiport serial driver.
-+serial-rs485.txt
-+	- info about RS485 structures and support in the kernel.
- specialix.txt
- 	- info on hardware/driver for specialix IO8+ multiport serial card.
- stallion.txt
-diff --git a/Documentation/serial/serial-rs485.txt b/Documentation/serial/serial-rs485.txt
-new file mode 100644
-index 0000000..f594831
---- /dev/null
-+++ b/Documentation/serial/serial-rs485.txt
-@@ -0,0 +1,123 @@
-+                        RS485 SERIAL COMMUNICATIONS
-+
-+1. INTRODUCTION
-+
-+   EIA-485, also known as TIA/EIA-485 or RS-485, is a standard defining the
-+   electrical characteristics of drivers and receivers for use in balanced
-+   digital multipoint systems.
-+   This standard is widely used for communications in industrial automation
-+   because it can be used effectively over long distances and in electrically
-+   noisy environments.
-+   Even though the data is transmitted over a 2-wire twisted pair bus, all
-+   EIA-485 transceivers interpret the voltage levels of the differential
-+   signals with respect to a third common voltage. Without this common
-+   reference, a set of transceivers may interpret the differential signals
-+   incorrectly.
-+   See [1] for more information.
-+
-+
-+2. HARDWARE-RELATED CONSIDERATIONS
-+
-+   Some CPUs (e.g., Atmel AT91) contain a transceiver capable of working both
-+   as RS232 and RS485. For these microcontrollers, the Linux driver should be
-+   able of working in both modes, and proper ioctls (see later) should be made
-+   available at user-level to allow switching from one mode to the other, and
-+   viceversa.
-+
-+   On some other CPUs (e.g., Freescale imx25) the RS485 transceiver is not
-+   integrated inside the microcontroller itself. Therefore, manufacturers who
-+   use these microcontrollers to produce embedded boards need to connect an
-+   external transceiver to some pin of the CPU.
-+   On these architectures, therefore, no assumptions can be done at the
-+   CPU-level about the presence of a RS485 transceiver, because the connection
-+   (if any) is done outside the microcontroller. Moreover, even in case of
-+   RS485 transceiver, the manufacturer is free to choose the CPU pin used for
-+   the connection.
-+
-+
-+3. DATA STRUCTURES ALREADY AVAILABLE IN THE KERNEL
-+
-+   The Linux kernel provides the serial_rs485 structure (see [2]) to handle
-+   RS485 communications. This data structure is used to set and configure RS485
-+   parameters in the platform data and in ioctls.
-+
-+   Any driver for devices capable of working both as RS232 and RS485 should
-+   provide at least the following ioctls:
-+
-+    - TIOCSRS485 (typically associated with number 0x542F). This ioctl is used
-+      to enable/disable RS485 mode from user-space
-+
-+    - TIOCGRS485 (typically associated with number 0x542E). This ioctl is used
-+      to get RS485 mode from kernel-space (i.e., driver) to user-space.
-+
-+   In other words, the serial driver should contain a code similar to the next
-+   one:
-+
-+	static struct uart_ops atmel_pops = {
-+		/* ... */
-+		.ioctl		= handle_ioctl,
-+	};
-+
-+	static int handle_ioctl(struct uart_port *port,
-+		unsigned int cmd,
-+		unsigned long arg)
-+	{
-+		struct serial_rs485 rs485conf;
-+
-+		switch (cmd) {
-+			case TIOCSRS485:
-+				if (copy_from_user(&rs485conf,
-+					(struct serial_rs485 *) arg,
-+					sizeof(rs485conf)))
-+						return -EFAULT;
-+
-+				/* ... */
-+				break;
-+
-+			case TIOCGRS485:
-+				if (copy_to_user((struct serial_rs485 *) arg,
-+					...,
-+					sizeof(rs485conf)))
-+						return -EFAULT;
-+				/* ... */
-+				break;
-+
-+			/* ... */
-+		}
-+	}
-+
-+
-+4. USAGE FROM USER-LEVEL
-+
-+   From user-level, RS485 configuration can be get/set using the previous
-+   ioctls. For instance, to set RS485 you can use the following code:
-+
-+	#include <linux/serial.h>
-+
-+	/* Driver-specific ioctls: */
-+	#define TIOCGRS485      0x542E
-+	#define TIOCSRS485      0x542F
-+
-+	/* Open specific device: */
-+	int fd = open ("/dev/mydevice", O_RDWR);
-+	struct serial_rs485 rs485conf;
-+
-+	/* Set RS485 mode: */
-+	rs485conf.flags |= SER_RS485_ENABLED;
-+
-+	/* Set rts delay before send, if needed: */
-+	rs485conf.flags |= SER_RS485_RTS_BEFORE_SEND;
-+	rs485conf.delay_rts_before_send = ...;
-+
-+	/* Set rts delay after send, if needed: */
-+	rs485conf.flags |= SER_RS485_RTS_AFTER_SEND;
-+	rs485conf.delay_rts_after_send = ...;
-+
-+	ioctl (fd, TIOCSRS485, &rs485conf);
-+
-+	close (fd);
-+
-+5. REFERENCES
-+
-+ [1]	http://en.wikipedia.org/wiki/Rs485
-+ [2]	include/linux/serial.h
--- 
-1.6.0.4
+So what is the correct fix for this problem?
+The options seem to be:
+1) Remove skb_reserve() from usbnet
+But this will cause the ip header to be non aligned on platforms that
+don't have the DMA alignment requirement.
+
+2) Define NET_IP_ALIGN to 0 for ARM
+Seems a bit intrusive to me.
+
+3) Change the HCD to copy if not aligned
+I'd like to avoid that.
+
+4) Change usbnet to use seperate buffers for the usb side and skb.
+Copy between them so both remain aligned
+Seems unlikely that the gain further up the stack from ensuring the ip
+header is aligned will offset the cost of the copy.
+
+Any ideas?
+
+On a related note, this is the second time I've run into this type of
+problem.It would be much easier to debug if the HCD warned (or
+refused) misaligned URBs. If HCDs provided information on their
+alignment requirements then the USB core could do this in a uniform
+way. For example adding an alignment field to struct hc_driver or
+struct usb_hcd?
+
+Cheers,
+
+Martin
