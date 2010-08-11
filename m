@@ -1,29 +1,36 @@
-From: claudio@evidence.eu.com (Claudio Scordino)
-Date: Wed, 11 Aug 2010 21:58:57 +0200
-Subject: [PATCH] Documentation about RS485 serial communications
-In-Reply-To: <20100811083214.21d2919e.randy.dunlap@oracle.com>
-References: <4BB053C4.7050700@evidence.eu.com>	<4BB10304.6090006@bluewatersys.com>	<4BB1BF49.2000609@evidence.eu.com>	<4BB252E3.3030703@bluewatersys.com>	<4BBD8C9D.3070401@evidence.eu.com>	<20100408111310.524f7354@lxorguk.ukuu.org.uk>	<4BBDD71D.1010700@evidence.eu.com>	<4BFD1FB6.8050405@atmel.com>	<4BFE2F38.8050200@evidence.eu.com>	<4BFE41FD.2080804@atmel.com>	<20100527102917.GB31253@pengutronix.de>	<4C626CBF.9020609@evidence.eu.com>
-	<20100811083214.21d2919e.randy.dunlap@oracle.com>
-Message-ID: <4C630101.50205@evidence.eu.com>
+From: kishorek.kadiyala@gmail.com (kishore kadiyala)
+Date: Thu, 12 Aug 2010 01:39:38 +0530
+Subject: [PATCH v3 9/9] omap: zoom: add mmc3/wl1271 device support
+In-Reply-To: <AANLkTik8yftwy9Toq473134vcdoFN1Z29oTc9MGEUzue@mail.gmail.com>
+References: <1281478348-24833-1-git-send-email-ohad@wizery.com>
+	<1281478348-24833-10-git-send-email-ohad@wizery.com>
+	<4C626140.3080107@nokia.com>
+	<AANLkTik8yftwy9Toq473134vcdoFN1Z29oTc9MGEUzue@mail.gmail.com>
+Message-ID: <AANLkTi=n=uH5ePRf8KzXWTtSdyRabpOCOgLBSD1GfwkJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Randy,
+Ohad,
 
-	thank you for the feedback.
+On Wed, Aug 11, 2010 at 9:08 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> On Wed, Aug 11, 2010 at 11:37 AM, Roger Quadros <roger.quadros@nokia.com> wrote:
+>>> + ? ? ? ? ? ? ? .ocr_mask ? ? ? = MMC_VDD_165_195,
+>>
+>> Do we really need to specify ocr_mask here?
 
-[...]
+Since you specified the voltage source is fixed, and if MMC3 has any
+dedicated regulator as MMC1 & MMC2 you can go with
+Roger's comments.
+If the LDO is fixed voltage source from TWL then since regulator
+framework supports only adjustable LDO's, I think you can
+have ocr_mask defined as above in board file.
 
-> 
-> TIOC[SG]RS485 are #defined in <asm-generic/ioctls.h>, so
-> #include <asm-generic/ioctls.h>
-> here and/or below (in userspace program).
-> 
-
-I noticed that for some architectures (e.g., cris) these ioctls are defined also in arch/cris/include/asm/ioctls.h, and with different values with respect to the values defined on asm-generic/ioctls.h.
-
-Therefore, I wasn't completely sure that the values defined in asm-generic are being used in every driver...
-
-Best regards,
-
-	Claudio
+Regards,
+Kishore
+>
+> Removed, thanks!
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
