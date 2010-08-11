@@ -1,76 +1,62 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 11 Aug 2010 23:26:20 +0200
-Subject: [PATCH] ARM: COLIBRI PXA320: fix UCB1400 irq autoprobing
-In-Reply-To: <20100811143345.GU17833@buzzloop.caiaq.de>
-References: <AANLkTinxeEbZqwdB=bzC=ZZFqk1iR28yv=ECYRFNeUE=@mail.gmail.com>
-	<20100811143345.GU17833@buzzloop.caiaq.de>
-Message-ID: <201008112326.20098.marek.vasut@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 Aug 2010 22:25:13 +0100
+Subject: [PATCH v4 3/8] wireless: wl1271: add platform driver to get
+	board data
+In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB0324110AC7@dbde02.ent.ti.com>
+References: <1281550913-17633-1-git-send-email-ohad@wizery.com>
+	<1281550913-17633-4-git-send-email-ohad@wizery.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0324110ABD@dbde02.ent.ti.com>
+	<20100811184742.GA21778@nokia.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC1@dbde02.ent.ti.com>
+	<20100811185724.GD21778@nokia.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC7@dbde02.ent.ti.com>
+Message-ID: <20100811212513.GC827@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne St 11. srpna 2010 16:33:45 Daniel Mack napsal(a):
-> Hi Yuri,
+On Thu, Aug 12, 2010 at 12:57:18AM +0530, DebBarma, Tarun Kanti wrote:
 > 
-> thanks for the patch.
-> 
-> On Wed, Aug 11, 2010 at 04:54:13PM +0400, Yuri Ludkevich wrote:
-> > Ads properly initialization to GPIO4 ( alt. fn. #1, nCS3; because GPIO4
-> > and GPIO4_2 cannot be
-> > configured as GPIO simultaneously ) so GPIO4_2 which used as irq line
-> > from UCB1400 may be
-> > detected while irq autoprobing routine.
-> 
-> This looks fine to me, but Marek wanted to rework the board support in
-> order to unify the GPIO configs for better readability. Marek, is there
-> any tree which contains your changes already?
-> 
-I hope there will be tomorrow ...
-> 
-> Thanks,
-> Daniel
-> 
-> > Signed-off by: Yuri Ludkevich <urx.forever@gmail.com>
-> > ---
+> > -----Original Message-----
+> > From: Felipe Balbi [mailto:felipe.balbi at nokia.com]
+> > Sent: Thursday, August 12, 2010 12:27 AM
+> > To: DebBarma, Tarun Kanti
+> > Cc: Balbi Felipe (Nokia-MS/Helsinki); Ohad Ben-Cohen; linux-
+> > wireless at vger.kernel.org; linux-mmc at vger.kernel.org; linux-
+> > omap at vger.kernel.org; Ido Yariv; Mark Brown; linux-arm-
+> > kernel at lists.infradead.org; Chikkature Rajashekar, Madhusudhan; Coelho
+> > Luciano (Nokia-MS/Helsinki); akpm at linux-foundation.org; San Mehat; Quadros
+> > Roger (Nokia-MS/Helsinki); Tony Lindgren; Nicolas Pitre; Pandita, Vikram;
+> > Kalle Valo
+> > Subject: Re: [PATCH v4 3/8] wireless: wl1271: add platform driver to get
+> > board data
 > > 
-> > --- linux-next/arch/arm/mach-pxa/colibri-pxa320.c.orig  2010-08-11
-> > 16:01:46.000000000 +0400
-> > +++ linux-next/arch/arm/mach-pxa/colibri-pxa320.c       2010-08-11
-> > 16:23:30.000000000 +0400
-> > @@ -236,6 +236,19 @@ static void __init colibri_pxa320_init_u
+> > Hi,
 > > 
-> >         pxa3xx_mfp_config(ARRAY_AND_SIZE(colibri_pxa320_uart_pin_config))
-> >         ;
-> >  
-> >  }
+> > On Wed, Aug 11, 2010 at 08:52:54PM +0200, ext DebBarma, Tarun Kanti wrote:
+> > >True; however if we go by that argument than we can also assume pdata
+> > >is valid, so that we would not need the below check.
 > > 
-> > +
-> > +static mfp_cfg_t colibri_pxa320_cpld_pin_config[] __initdata = {
-> > +       /* init GPIO4 as nCS3 (AF1). If GPIO4 stay as GPIO
-> > +          touchscreen irq (GPIO4_2 pin) autoprobing will not work.
-> > +          See Marvell PXA320 datasheet for more details */
-> > +       GPIO4_nCS3,
-> > +};
-> > +
-> > +static void __init colibri_pxa320_init_cpld(void)
-> > +{
-> > +      
-> > pxa3xx_mfp_config(ARRAY_AND_SIZE(colibri_pxa320_cpld_pin_config)); +}
-> > +
+> > of course not. You can have devices that just play well with default
+> > values or devices where you don't need the flexibility of platform data.
+> > That's why we check.
 > > 
-> >  void __init colibri_pxa320_init(void)
-> >  {
-> >  
-> >         pxa_set_ffuart_info(NULL);
-> > 
-> > @@ -252,6 +265,7 @@ void __init colibri_pxa320_init(void)
-> > 
-> >                                 mfp_to_gpio(MFP_PIN_GPIO28));
-> >         
-> >         colibri_pxa320_init_uart();
-> >         colibri_pxa320_init_udc();
-> > 
-> > +       colibri_pxa320_init_cpld();
-> > 
-> >  }
-> >  
-> >  MACHINE_START(COLIBRI320, "Toradex Colibri PXA320")
+> > platform_device pointers on the other hand, are guaranteed to be always
+> > true, if it isn't then you should oops, you deserve to oops because
+> > something is really really wrong.
+> >
+> Sounds perfect!
+> What that means is _probe() function makes sense only for cases where we
+> have valid platform data because we are returning right at the top if
+> pdata is not valid. If this is the case I was curious to know why not
+> framework make another check for valid pdata before calling _probe()
+> instead of coming all the way to _probe() and then returning! 
+
+Platform devices are not for passing platform data around - they're for
+declaring platform hardware devices that we want drivers to handle -
+and it depends on the driver whether having platform data is appropriate
+or not.
+
+This proposal is, IMHO, abusing the platform device/driver support to
+achieve its own goals.  I've outlined a far simpler and easiler solution
+which avoids this kind of abuse, and given suggestions on how to extend
+it to support multiple instances.
