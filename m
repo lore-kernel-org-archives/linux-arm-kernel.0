@@ -1,39 +1,49 @@
 From: tanmay.upadhyay@einfochips.com (Tanmay Upadhyay)
-Date: Tue, 10 Aug 2010 10:49:27 -0000
+Date: Wed, 11 Aug 2010 05:21:28 -0000
 Subject: [PATCH v2] OpenRD: Enable SD/UART selection for serial port 1
-In-Reply-To: <20100810102817.GJ21175@chipmunk>
+In-Reply-To: <20100810115351.GL21175@chipmunk>
 References: <1281428973-28957-1-git-send-email-tanmay.upadhyay@einfochips.com>
 	<20100810085643.GE21175@chipmunk> <20100810085821.GF21175@chipmunk>
 	<4C612856.6090405@einfochips.com> <20100810102817.GJ21175@chipmunk>
-Message-ID: <4C612EEC.3090409@einfochips.com>
+	<4C612EEC.3090409@einfochips.com> <20100810115351.GL21175@chipmunk>
+Message-ID: <4C62338F.8080102@einfochips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 08/10/2010 03:58 PM, Alexander Clouter wrote:
+On 08/10/2010 05:23 PM, Alexander Clouter wrote:
 > Hi,
 >
-> * Tanmay Upadhyay<tanmay.upadhyay@einfochips.com>  [2010-08-10 15:52:14+0530]:
+> * Tanmay Upadhyay<tanmay.upadhyay@einfochips.com>  [2010-08-10 16:20:20+0530]:
 >    
->> Intention here is to provide SD support by default. It will be switched
->> to UART mode only if someone asks to do so via kernel parameter. If
->> someone doesn't give OR gives improper kernel parameter, he/she won't get
->> UART1. It will simply fall-back to the default setting - which is SD
->> support.
+>> On 08/10/2010 03:58 PM, Alexander Clouter wrote:
+>>      
+>>> * Tanmay Upadhyay<tanmay.upadhyay@einfochips.com>   [2010-08-10 15:52:14+0530]:
+>>>
+>>>        
+>>>> Intention here is to provide SD support by default. It will be switched
+>>>> to UART mode only if someone asks to do so via kernel parameter. If
+>>>> someone doesn't give OR gives improper kernel parameter, he/she won't get
+>>>> UART1. It will simply fall-back to the default setting - which is SD
+>>>> support.
+>>>>          
+>>> My mis-type, I forgot to put a
+>>> 'kirkwood_sdio_init(&openrd_mvsdio_data);' after my added printk().
+>>>
+>>>        
+>> If I understood correctly, intention behind this is to inform user that
+>> he/she made a mistake while passing the kernel parameters. Is this
+>> correct?
 >>
 >>      
-> My mis-type, I forgot to put a
-> 'kirkwood_sdio_init(&openrd_mvsdio_data);' after my added printk().
+> Exactly, and there is no harm turning on the SD slot rather than UART1
+> at the same time.
 >
 > Cheers
 >
 >    
-If I understood correctly, intention behind this is to inform user that 
-he/she made a mistake while passing the kernel parameters. Is this correct?
+Sent version 3 to the list.
 
-Thanks,
-
-Tanmay
+-- Tanmay
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100810/5e2bfe4c/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100811/844218f3/attachment-0001.html>
