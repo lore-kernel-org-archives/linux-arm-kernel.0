@@ -1,58 +1,55 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 11 Aug 2010 11:07:29 +0200
-Subject: colibri PXA320 and UCB1400 - touch screen troubles
-In-Reply-To: <AANLkTimL7kt0-Do9VQUQvktHfsvdKjm_NJ-eDbxcAu2m@mail.gmail.com>
-References: <AANLkTimZeDeS+44=BfchT0gwK5NDLhzLSX1vua8oFBQp@mail.gmail.com>
-	<201008111042.52631.marek.vasut@gmail.com>
-	<AANLkTimL7kt0-Do9VQUQvktHfsvdKjm_NJ-eDbxcAu2m@mail.gmail.com>
-Message-ID: <201008111107.29839.marek.vasut@gmail.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Wed, 11 Aug 2010 14:44:24 +0530
+Subject: [PATCH 2/5] SPEAR3xx: Rename register/irq defines to remove naming
+	conflicts
+In-Reply-To: <4C61BB85.5050406@bluewatersys.com>
+References: <1275717955-14545-1-git-send-email-ryan@bluewatersys.com>
+	<1275717955-14545-3-git-send-email-ryan@bluewatersys.com>
+	<4C60DFB8.20608@st.com> <4C61BB85.5050406@bluewatersys.com>
+Message-ID: <4C6269F0.8060109@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne St 11. srpna 2010 10:54:08 Yuri Ludkevich napsal(a):
-> 2010/8/11 Marek Vasut <marek.vasut@gmail.com>
-> 
-> > Dne St 11. srpna 2010 09:43:30 Yuri Ludkevich napsal(a):
-> > 
-> > Hi, it looks like the IRQ was misdetected probably. Check the following
-> > two patches (and possibly the vpac270 source file, the "Audio and
-> > Touchscreen" section will give you an idea how to force IRQ line to the
-> > driver).
-> 
-> BTW do you know which GPIO used for UCB1400 interrupt?
+On 8/11/2010 2:20 AM, Ryan Mallon wrote:
+>>> >>  
+>>> >> +/*
+>>> >> + * GPIO pins virtual irqs
+>>> >> + * Use the lowest number for the GPIO virtual IRQs base on which subarchs
+>>> >> + * we have compiled in
+>>> >> + */
+>>> >> +#if defined(CONFIG_MACH_SPEAR310)
+>>> >> +#define SPEAR_GPIO_INT_BASE			(SPEAR3XX_VIRQ_START + 18)
+>>> >> +#elif defined(CONFIG_MACH_SPEAR320)
+>>> >> +#define SPEAR_GPIO_INT_BASE			(SPEAR3XX_VIRQ_START + 17)
+>>> >> +#else
+>>> >> +#define SPEAR_GPIO_INT_BASE			(SPEAR3XX_VIRQ_START + 9)
+>>> >>  #endif
+>> > 
+>> > If we have all three machines enabled, then SPEAR_GPIO_INT_BASE will start from
+>> > VIRQ_START + 18, which will work for spear310 and spear320, but will not be
+>> > correct as we will skip 9 irq no.s.
+> Do the virtual irqs map directly to the hardware in some way? I thought
+> that since they were virtual there offset would be somewhat arbitrary?
 
-Please keep the lists CCed. And no, I have no idea which GPIO it is, but if you 
-check the Colibri 320 datasheet (available from toradex website) and the kernel 
-source for pxa320 colibri, you should be able to get quite a small set of GPIOs 
-and you can try which of these it is (echo "GPIO_NUMBER" > 
-/sys/class/gpio/export ; echo "in" > /sys/class/gpio/gpioGPIO_NUMBER/direction ; 
-cat /sys/class/gpio/gpioGPIO_NUMBER/value ). You can use the thing in braces for 
-multiple GPIOs too ... first export them all and set direction and then read 
-them (in a loop for example). Of course, when you touch the panel, the GPIO will 
-toggle and so it will do when you release the pen.
+No. Virtual irqs are not fixed with hardware. What i wanted to say is
+NR_IRQS will have a higher value, which will make irq_desc[NR_IRQS]
+array have more size.
 
-Cheers
 > 
-> > http://git.kernel.org/?p=linux/kernel/git/marex/pxa-
-> > 
-> > linux-2.6.git;a=commitdiff;h=417eb54b3aba8f9aa1707fa1dae606ccaeb94599;hp=
-> > 94616fcb8d6e5e51391f34463afafaad3bd20da6
-> > 
-> > http://git.kernel.org/?p=linux/kernel/git/marex/pxa-
-> > 
-> > linux-2.6.git;a=commitdiff;h=ced7f2ca8e8d99ec35ff34841c6e6a307a115fa0;hp=
-> > 417eb54b3aba8f9aa1707fa1dae606ccaeb94599
-> > 
-> > Thanks for fast reply!
-> 
-> I  had seen vpac270 couple minuts ago source - as  I understand I need to
-> know which GPIO is used for irq to specify it in ucb1400_data  structure..
-> But Toradex does not provide any schematics...
+>> > It would be better to have three different base addresses
+>> > SPEAR300_GPIO_INT_BASE, etc.
+> This is possible. We can either do this by making SPEAR3XX_GPIO_INT_BASE
+> a variable, or by having some ifdef/machine_is code in the board
+> initialisation.
 
-http://www.toradex.com/Products/Colibri_Modules/Colibri_PXA320 The do, but not 
-the module schematics unfortunatelly. You can use the way outlined above, it 
-should do what you need and should be easy.
+Not sure! We need to have single value of NR_IRQS for all spear3xx variants.
+This will always waste some memory. I don't know if any other solution can
+be there.
 
-Cheers
-> 
-> With best regards, Yuri.
+So SPEAR_GPIO_INT_BASE can be kept common with a single value without
+these #ifdefs, i.e. we can have
+#define SPEAR_GPIO_INT_BASE			(SPEAR3XX_VIRQ_START + 18)
+
+and now we can have different macros per machine, i.e. 300,310,320.
+
+viresh.
