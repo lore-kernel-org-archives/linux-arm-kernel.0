@@ -1,57 +1,45 @@
-From: hjk@linutronix.de (Hans J. Koch)
-Date: Wed, 11 Aug 2010 02:19:33 +0200
-Subject: [PATCH] mx35: Fix boot ROM hang in internal boot mode
-Message-ID: <20100811001931.GA4626@local>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 10 Aug 2010 17:27:01 -0700
+Subject: [PATCH] ARM: uaccess: Implement strict user copy checks
+In-Reply-To: <20100810225519.GF7702@n2100.arm.linux.org.uk>
+References: <1280890950-19174-1-git-send-email-sboyd@codeaurora.org>
+	<4C61D6E3.1030603@codeaurora.org>
+	<20100810225519.GF7702@n2100.arm.linux.org.uk>
+Message-ID: <4C61EE55.5030506@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a watchdog reset occurs after booting in internal boot mode, the i.MX35
-won't boot anymore. The boot ROM code seems to assume that some clocks are
-turned on (they are after a power-on reset). This patch turns on the
-necessary clocks.
+On 08/10/2010 03:55 PM, Russell King - ARM Linux wrote:
+>
+> Unfortunately, there's quite a dearth of information on this patch,
+> so I can't say.  I think it needs some testing before a decision can
+> be made.
 
-Signed-off-by: Hans J. Koch <hjk@linutronix.de>
----
- arch/arm/mach-mx3/clock-imx35.c |   20 +++++++++++++++++---
- 1 files changed, 17 insertions(+), 3 deletions(-)
+Ok. I'll add more info and resend. Do you mind testing ;-)
 
-diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
-index d3af0fd..671acb6 100644
---- a/arch/arm/mach-mx3/clock-imx35.c
-+++ b/arch/arm/mach-mx3/clock-imx35.c
-@@ -485,7 +485,7 @@ static struct clk_lookup lookups[] = {
- 
- int __init mx35_clocks_init()
- {
--	unsigned int ll = 0;
-+	unsigned int ll = 0, cgr2, cgr3;
- 
- #if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
- 	ll = (3 << 16);
-@@ -499,8 +499,22 @@ int __init mx35_clocks_init()
- 	__raw_writel((3 << 18), CCM_BASE + CCM_CGR0);
- 	__raw_writel((3 << 2) | (3 << 4) | (3 << 6) | (3 << 8) | (3 << 16),
- 			CCM_BASE + CCM_CGR1);
--	__raw_writel((3 << 26) | ll, CCM_BASE + CCM_CGR2);
--	__raw_writel(0, CCM_BASE + CCM_CGR3);
-+
-+	/* Check if we came up in internal boot mode. If yes, we need some
-+	 * extra clocks turned on, otherwise the MX35 boot ROM code will
-+	 * hang after a watchdog reset.
-+	 */
-+	if (__raw_readl(CCM_BASE + CCM_RCSR) & (3 << 10)) {
-+		cgr2 = (3 << 26);
-+		cgr3 = 0;
-+	} else {
-+		/* Additionally turn on UART1, SCC, and IIM clocks */
-+		cgr2 = (3 << 26) | (3 << 16) | (3 << 4);
-+		cgr3 = (3 << 2);
-+	}
-+
-+	__raw_writel(cgr2 | ll, CCM_BASE + CCM_CGR2);
-+	__raw_writel(cgr3, CCM_BASE + CCM_CGR3);
- 
- 	mxc_timer_init(&gpt_clk,
- 			MX35_IO_ADDRESS(MX35_GPT1_BASE_ADDR), MX35_INT_GPT);
+>
+> What compilers have been tested with this?
+
+So far I've tested it with gcc-4.4.0 and 4.3.1
+
+>
+> As the help comments intimate that it needs at least gcc 4.4, and
+> you've changed it to produce a compile time warning if the option is
+> disabled, what's the implications for older compilers?
+
+With older compilers (pre 4.4) __compiletime_object_size() will be 
+replaced with -1 causing this code to be optimized away. Also, 
+__compiletime_warning() and __compiletime_error() aren't defined to be 
+anything except in include/linux/compiler-gcc4.h so users of older 
+compilers shouldn't see any warnings or errors regardless of the config 
+option being enabled.
+
+People will start seeing warnings if they use gcc 4.4 or later though.
+It's debatable whether or not to have both the warning and the error 
+when you consider -Werror. I went this way since x86 and parisc opted 
+for warnings and errors. Furthermore, I don't see any warnings or errors 
+with this patch in my builds.
+
 -- 
-1.7.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
