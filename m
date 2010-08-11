@@ -1,31 +1,45 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 11 Aug 2010 14:01:22 +0300
-Subject: [PATCH v3 8/9] omap: hsmmc: split mmc23 power control
-In-Reply-To: <4C6280DA.70205@nokia.com>
-References: <1281478348-24833-1-git-send-email-ohad@wizery.com>
-	<1281478348-24833-9-git-send-email-ohad@wizery.com>
-	<4C6275F3.6030108@nokia.com> <4C6280DA.70205@nokia.com>
-Message-ID: <AANLkTi=MB+021B+TRu6x1frM5=OB9p-wS1G441bhgiWj@mail.gmail.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Wed, 11 Aug 2010 13:24:16 +0200
+Subject: colibri PXA320 and UCB1400 - touch screen troubles
+In-Reply-To: <AANLkTik=sT1wtTJRN--t1Q0+Qna6yX+ycbZ-jO5J=iSR@mail.gmail.com>
+References: <AANLkTimZeDeS+44=BfchT0gwK5NDLhzLSX1vua8oFBQp@mail.gmail.com>
+	<AANLkTimH9xhjRUaoqr-GMy4gj27VTtrafHU=bqfT6oZ-@mail.gmail.com>
+	<20100811105125.GI10432@buzzloop.caiaq.de>
+	<201008111255.24657.marek.vasut@gmail.com>
+	<AANLkTik=sT1wtTJRN--t1Q0+Qna6yX+ycbZ-jO5J=iSR@mail.gmail.com>
+Message-ID: <20100811112416.GJ10432@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 11, 2010 at 1:52 PM, Roger Quadros <roger.quadros@nokia.com> wrote:
-> On 08/11/2010 01:05 PM, Hunter Adrian (Nokia-MS/Helsinki) wrote:
->>
->> Ohad Ben-Cohen wrote:
->>>
->>> Prepare for mmc3 regulator power control by splitting the power
->>> control functions of mmc2 and mmc3, and expecting mmc3 to have
->>> a single, dedicated, regulator support.
->>
->> Why? ?Can't the controller be connected to an eMMC with 2 power
->> supplies? ?At a glance, it is not obvious why this patch is needed.
->>
-> I agree with Adrian. This patch is not required at all.
->
+On Wed, Aug 11, 2010 at 03:10:08PM +0400, Yuri Ludkevich wrote:
+> 2010/8/11 Marek Vasut <marek.vasut@gmail.com>
+> > Dne St 11. srpna 2010 12:51:25 Daniel Mack napsal(a):
+> > > Good. Can you share a patch?
+> >
+> > nCS3 is the chipselect for CPLD space actually (and the EXT chipselects).
+> > If
+> > it's configured as nCS3, you can write to the CPLD, but in case you don't
+> > need
+> > PCMCIA (and ext. chipselects), you should be ok either way.
+> >
+> > And as Dan said, don't mix GPIO4 and GPIO4_2 :)
+> >
+> Yep. I know about CPLD. Our board do not use PCMCIA, only SD/MMC. So for us
+> it should work.
+> 
+> But if someone wants to use both PCMCIA and touchscreen - how to configure
+> this GPIOs properly?
 
-Thanks guys, I'll check it out.
+It won't collide. GPIO4 should be configured to the application function
+nCS3, and GPIO4_2 is used as GPIO and interrupt input. The signals
+aren't shared on the die, and there are two seperate balls (pins) on the
+package.
 
-I'm about to leave until e/o August and I still have to sort out some
-stuff, so I might not respond right away, but please send any comments
-you may still have.
+The only limitation is that you can't use them both as GPIOs, because
+GPIO register accesses for GPIO4_2 would also affect GPIO4, and
+vice-versa.
+
+And in the setup described above, you would just access GPIO4 and be
+fine.
+
+Daniel
