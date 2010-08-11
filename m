@@ -1,72 +1,70 @@
-From: x0095840@ti.com (Fernando Guzman Lugo)
-Date: Tue, 10 Aug 2010 20:12:49 -0500
-Subject: [PATCHv2] mailbox: change full flag per mailbox queue instead of
-	global
-Message-ID: <1281489169-15945-1-git-send-email-x0095840@ti.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Wed, 11 Aug 2010 09:40:55 +0800
+Subject: [rtc-linux] [PATCH 1/2] rtc: rtc-lpc32xx: Introduce RTC driver
+	for the LPC32XX SoC
+In-Reply-To: <083DF309106F364B939360100EC290F80AC6E5F76D@eu1rdcrdc1wx030.exi.nxp.com>
+References: <1281370650-29520-1-git-send-email-wellsk40@gmail.com>
+	<1281370650-29520-2-git-send-email-wellsk40@gmail.com>
+	<AANLkTimAJj38R7KCfHusfsq+EXDd3fbAm=Az_Osqdgbz@mail.gmail.com>
+	<083DF309106F364B939360100EC290F80AC6E5F76D@eu1rdcrdc1wx030.exi.nxp.com>
+Message-ID: <AANLkTinZBhZ8PRswbqUDyYzmDQ6Ccm96QAO8vpeWn+SD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As pointed by Ohad Ben-Cohen, the variable rq_full flag is a
-global variable, so if there are multiple mailbox users
-there will be conflics. Now there is a full flag per
-mailbox queue.
+2010/8/11 Kevin Wells <kevin.wells@nxp.com>:
+> Hi Zongshun,
+>
+> Thanks for helping review this.
+>
+>> Subject: Re: [rtc-linux] [PATCH 1/2] rtc: rtc-lpc32xx: Introduce RTC driver
+>> for the LPC32XX SoC
+>>
+>> Hi Kevin ,
+>>
+>> This is really a natty rtc patch:).
+>
+> From the urban dictionary...
+> "natty"
+> 1) originating from rastafarian culture. meaning 'good','cool' and
+> most importantly, 'elite'.
+> 2) A slang for Natural Light beer, a favorite of poor college students
+> the world over.
+>
 
-Version 2:
-- Rebase to the latest.
+Hmm,I means the first, this patch looks very good to me. :)
 
-Reported-by: Ohad Ben-Cohen <ohad@wizery.com>
-Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
----
- arch/arm/plat-omap/include/plat/mailbox.h |    1 +
- arch/arm/plat-omap/mailbox.c              |   10 +++++++---
- 2 files changed, 8 insertions(+), 3 deletions(-)
+> I hope it's the first one, but I guess the 2nd isn't that bad if
+> you?re a college student o)
+> I'll merge both patches into a single patch for v2 and repost in a
+> few days.
+>
+>> > + ? ? ? /* Disable alarm during update */
+>> > + ? ? ? tmp = rtc_readl(rtc, RTC_CTRL);
+>> > + ? ? ? rtc_writel(rtc, RTC_CTRL, tmp & ~RTC_MATCH0_EN);
+>> > +
+>> > + ? ? ? rtc->alarm_enabled = wkalrm->enabled = 1;
+>> > + ? ? ? if (wkalrm->enabled) {
+>> > + ? ? ? ? ? ? ? rtc_writel(rtc, RTC_MATCH0, alarmsecs);
+>> > + ? ? ? ? ? ? ? rtc_writel(rtc, RTC_INTSTAT, RTC_MATCH0_INT_STS);
+>> > + ? ? ? ? ? ? ? rtc_writel(rtc, RTC_CTRL, tmp | RTC_MATCH0_EN);
+>> > + ? ? ? }
+>>
+>> I think this 'wkalrm->enabled ' will always be set '1', so 'if'
+>> condition will be alway true?
+>
+> Thanks for catching this. The '= 1' assignment shouldn't be there.
+>
 
-diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
-index 9976565..261f6b8 100644
---- a/arch/arm/plat-omap/include/plat/mailbox.h
-+++ b/arch/arm/plat-omap/include/plat/mailbox.h
-@@ -48,6 +48,7 @@ struct omap_mbox_queue {
- 	struct tasklet_struct	tasklet;
- 	int	(*callback)(void *);
- 	struct omap_mbox	*mbox;
-+	bool	full;
- };
- 
- struct omap_mbox {
-diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-index d2fafb8..c59c9c3 100644
---- a/arch/arm/plat-omap/mailbox.c
-+++ b/arch/arm/plat-omap/mailbox.c
-@@ -33,7 +33,6 @@
- 
- static struct workqueue_struct *mboxd;
- static struct omap_mbox **mboxes;
--static bool rq_full;
- 
- static int mbox_configured;
- static DEFINE_MUTEX(mbox_configured_lock);
-@@ -145,7 +144,12 @@ static void mbox_rx_work(struct work_struct *work)
- 	while (kfifo_len(&mq->fifo) >= sizeof(msg)) {
- 		len = kfifo_out(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
- 		WARN_ON(len != sizeof(msg));
--
-+		spin_lock_irq(&mq->lock);
-+		if (mq->full) {
-+			omap_mbox_enable_irq(mq->mbox, IRQ_RX);
-+			mq->full = false;
-+		}
-+		spin_unlock_irq(&mq->lock);
- 		if (mq->callback)
- 			mq->callback((void *)msg);
- 	}
-@@ -170,7 +174,7 @@ static void __mbox_rx_interrupt(struct omap_mbox *mbox)
- 	while (!mbox_fifo_empty(mbox)) {
- 		if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
- 			omap_mbox_disable_irq(mbox, IRQ_RX);
--			rq_full = true;
-+			mq->full = true;
- 			goto nomem;
- 		}
- 
+
+
 -- 
-1.6.3.3
+*linux-arm-kernel mailing list
+mail addr:linux-arm-kernel at lists.infradead.org
+you can subscribe by:
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+* linux-arm-NUC900 mailing list
+mail addr:NUC900 at googlegroups.com
+main web: https://groups.google.com/group/NUC900
+you can subscribe it by sending me mail:
+mcuos.com at gmail.com
