@@ -1,52 +1,68 @@
-From: julia@diku.dk (Julia Lawall)
-Date: Wed, 11 Aug 2010 12:11:07 +0200 (CEST)
-Subject: [PATCH 2/5] drivers/dma: Return -ENOMEM on memory allocation failure
-Message-ID: <Pine.LNX.4.64.1008111210490.8669@ask.diku.dk>
+From: adrian.hunter@nokia.com (Adrian Hunter)
+Date: Wed, 11 Aug 2010 13:28:44 +0300
+Subject: [PATCH v3 6/9] omap: hsmmc: remove unused variable
+In-Reply-To: <AANLkTi=bB++-VU88JQTicJeYf==9qccx0HMDiz5-geyg@mail.gmail.com>
+References: <1281478348-24833-1-git-send-email-ohad@wizery.com>
+	<1281478348-24833-7-git-send-email-ohad@wizery.com>
+	<4C627378.2090304@nokia.com>
+	<AANLkTi=bB++-VU88JQTicJeYf==9qccx0HMDiz5-geyg@mail.gmail.com>
+Message-ID: <4C627B5C.6070803@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <julia@diku.dk>
+Ohad Ben-Cohen wrote:
+> On Wed, Aug 11, 2010 at 12:55 PM, Adrian Hunter <adrian.hunter@nokia.com> wrote:
+>> Ohad Ben-Cohen wrote:
+>>> Make this go away:
+>>>
+>>> drivers/mmc/host/omap_hsmmc.c: In function 'omap_hsmmc_suspend':
+>>> drivers/mmc/host/omap_hsmmc.c:2328: warning: unused variable 'state'
+>> Was done a while ago.
+> 
+> Are you sure ?
 
-In this code, 0 is returned on memory allocation failure, even though other
-failures return -ENOMEM or other similar values.
+Oops sorry =0_o=  It is still there. 
 
-A simplified version of the semantic match that finds this problem is as
-follows: (http://coccinelle.lip6.fr/)
-
-// <smpl>
-@@
-expression ret;
-expression x,e1,e2,e3;
-@@
-
-ret = 0
-... when != ret = e1
-*x = \(kmalloc\|kcalloc\|kzalloc\)(...)
-... when != ret = e2
-if (x == NULL) { ... when != ret = e3
-  return ret;
-}
-// </smpl>
-
-Signed-off-by: Julia Lawall <julia@diku.dk>
-
----
- drivers/dma/coh901318.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
-index 557e227..6dd9488 100644
---- a/drivers/dma/coh901318.c
-+++ b/drivers/dma/coh901318.c
-@@ -1475,8 +1475,10 @@ static int __init coh901318_probe(struct platform_device *pdev)
- 		       pdata->max_channels *
- 		       sizeof(struct coh901318_chan),
- 		       GFP_KERNEL);
--	if (!base)
-+	if (!base) {
-+		err = -ENOMEM;
- 		goto err_alloc_coh_dma_channels;
-+	}
- 
- 	base->chans = ((void *)base) + ALIGN(sizeof(struct coh901318_base), 4);
- 
+> 
+> I can still see the unused state variable in Linus' tree:
+> 
+> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=drivers/mmc/host/omap_hsmmc.c;h=b032828c61263028963bd412a7455546d5e86ce7;hb=HEAD#l2275
+> 
+> 
+>> See 1a13f8fa76c880be41d6b1e6a2b44404bcbfdf9e in linus' tree.
+> 
+> This commit only seem to adapt to the API change (the state variable
+> is not removed):
+> 
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index d25b19b..b032828 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -2292,7 +2292,7 @@ static int omap_hsmmc_suspend(struct device *dev)
+>                 }
+>                 cancel_work_sync(&host->mmc_carddetect_work);
+>                 mmc_host_enable(host->mmc);
+> -               ret = mmc_suspend_host(host->mmc, state);
+> +               ret = mmc_suspend_host(host->mmc);
+>                 if (ret == 0) {
+>                         omap_hsmmc_disable_irq(host);
+>                         OMAP_HSMMC_WRITE(host->base, HCTL,
+> 
+>>> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+>>> ---
+>>>  drivers/mmc/host/omap_hsmmc.c |    1 -
+>>>  1 files changed, 0 insertions(+), 1 deletions(-)
+>>>
+>>> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+>>> index b032828..d50e917 100644
+>>> --- a/drivers/mmc/host/omap_hsmmc.c
+>>> +++ b/drivers/mmc/host/omap_hsmmc.c
+>>> @@ -2272,7 +2272,6 @@ static int omap_hsmmc_suspend(struct device *dev)
+>>>        int ret = 0;
+>>>        struct platform_device *pdev = to_platform_device(dev);
+>>>        struct omap_hsmmc_host *host = platform_get_drvdata(pdev);
+>>> -       pm_message_t state = PMSG_SUSPEND; /* unused by MMC core */
+>>>        if (host && host->suspended)
+>>>                return 0;
+>>
+> 
