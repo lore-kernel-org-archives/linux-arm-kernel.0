@@ -1,41 +1,24 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 11 Aug 2010 14:35:51 +0200
-Subject: colibri PXA320 and UCB1400 - touch screen troubles
-In-Reply-To: <AANLkTik_7bZMuWDv__Md8zGhXzczjGYSVjtoqCxeMn7L@mail.gmail.com>
-References: <AANLkTimZeDeS+44=BfchT0gwK5NDLhzLSX1vua8oFBQp@mail.gmail.com>
-	<AANLkTimH9xhjRUaoqr-GMy4gj27VTtrafHU=bqfT6oZ-@mail.gmail.com>
-	<20100811105125.GI10432@buzzloop.caiaq.de>
-	<201008111255.24657.marek.vasut@gmail.com>
-	<AANLkTik=sT1wtTJRN--t1Q0+Qna6yX+ycbZ-jO5J=iSR@mail.gmail.com>
-	<20100811112416.GJ10432@buzzloop.caiaq.de>
-	<AANLkTik_7bZMuWDv__Md8zGhXzczjGYSVjtoqCxeMn7L@mail.gmail.com>
-Message-ID: <20100811123551.GT17833@buzzloop.caiaq.de>
+From: ameya.palande@nokia.com (Ameya Palande)
+Date: Wed, 11 Aug 2010 15:40:27 +0300
+Subject: [PATCH/RFC] Samsung device-table approach
+In-Reply-To: <1281528238-7298-1-git-send-email-m.szyprowski@samsung.com>
+References: <1281528238-7298-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1281530427.1918.124.camel@chotu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 11, 2010 at 04:32:48PM +0400, Yuri Ludkevich wrote:
-> 2010/8/11 Daniel Mack <daniel@caiaq.de>
-> > It won't collide. GPIO4 should be configured to the application function
-> > nCS3, and GPIO4_2 is used as GPIO and interrupt input. The signals
-> > aren't shared on the die, and there are two seperate balls (pins) on the
-> > package.
-> >
-> > The only limitation is that you can't use them both as GPIOs, because
-> > GPIO register accesses for GPIO4_2 would also affect GPIO4, and
-> > vice-versa.
-> >
-> > And in the setup described above, you would just access GPIO4 and be
-> > fine.
-> >
-> > Daniel
-> >
+Hi Marek,
+
+On Wed, 2010-08-11 at 14:03 +0200, ext Marek Szyprowski wrote:
+> Hello,
 > 
-> Which list i should use to send patch?  linux-arm-kernel at lists.infradead.orgor
-> openpxa-users at lists.sourceforge.net? or both?
+> I would like to start the discussion on the redesign of the way the
+> Samsung platform devices are defined. The current solution has some
+> important disadvantages that blocks the further kernel development.
 
-It will be merged to the kernel source code eventually, so send it to
-linux-arm-kernel, but you can copy openpxa-users as well if you like.
+Forgive me about my ignorance about device tables, but I was wondering
+if there is any similarity between device tables and Simple Firmware
+Interface tables which are already in mainline?
 
-> sorry for dumb question, but it my first expirience of sending patches =)
-
-No problem at all :)
+Cheers,
+Ameya.
