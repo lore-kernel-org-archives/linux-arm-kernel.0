@@ -1,68 +1,74 @@
-From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Wed, 11 Aug 2010 13:28:44 +0300
-Subject: [PATCH v3 6/9] omap: hsmmc: remove unused variable
-In-Reply-To: <AANLkTi=bB++-VU88JQTicJeYf==9qccx0HMDiz5-geyg@mail.gmail.com>
-References: <1281478348-24833-1-git-send-email-ohad@wizery.com>
-	<1281478348-24833-7-git-send-email-ohad@wizery.com>
-	<4C627378.2090304@nokia.com>
-	<AANLkTi=bB++-VU88JQTicJeYf==9qccx0HMDiz5-geyg@mail.gmail.com>
-Message-ID: <4C627B5C.6070803@nokia.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Wed, 11 Aug 2010 12:51:25 +0200
+Subject: colibri PXA320 and UCB1400 - touch screen troubles
+In-Reply-To: <AANLkTimH9xhjRUaoqr-GMy4gj27VTtrafHU=bqfT6oZ-@mail.gmail.com>
+References: <AANLkTimZeDeS+44=BfchT0gwK5NDLhzLSX1vua8oFBQp@mail.gmail.com>
+	<201008111042.52631.marek.vasut@gmail.com>
+	<AANLkTimL7kt0-Do9VQUQvktHfsvdKjm_NJ-eDbxcAu2m@mail.gmail.com>
+	<201008111107.29839.marek.vasut@gmail.com>
+	<20100811094543.GO17833@buzzloop.caiaq.de>
+	<AANLkTim+kNyEL2s0k9wLoctRMKDWoaYy66y=adhog1wc@mail.gmail.com>
+	<20100811100210.GP17833@buzzloop.caiaq.de>
+	<AANLkTik+uUTKhXxarS-7PqyOyT8wuOn4WbBM=fHkBZCM@mail.gmail.com>
+	<20100811101239.GR17833@buzzloop.caiaq.de>
+	<AANLkTimH9xhjRUaoqr-GMy4gj27VTtrafHU=bqfT6oZ-@mail.gmail.com>
+Message-ID: <20100811105125.GI10432@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ohad Ben-Cohen wrote:
-> On Wed, Aug 11, 2010 at 12:55 PM, Adrian Hunter <adrian.hunter@nokia.com> wrote:
->> Ohad Ben-Cohen wrote:
->>> Make this go away:
->>>
->>> drivers/mmc/host/omap_hsmmc.c: In function 'omap_hsmmc_suspend':
->>> drivers/mmc/host/omap_hsmmc.c:2328: warning: unused variable 'state'
->> Was done a while ago.
-> 
-> Are you sure ?
+On Wed, Aug 11, 2010 at 02:46:15PM +0400, Yuri Ludkevich wrote:
+> 2010/8/11 Daniel Mack <daniel@caiaq.de>
+> > On Wed, Aug 11, 2010 at 02:08:10PM +0400, Yuri Ludkevich wrote:
+> > > 2010/8/11 Daniel Mack <daniel@caiaq.de>
+> > > > Yes, they are aliases to the signals without the "_2" suffix. Quoting
+> > > > the PXA reference manual, chapter 5.3:
+> > > >
+> > > > GPIO<6_0>_2:
+> > > >
+> > > > General-Purpose IO Ports, second instantiation. The same signals as
+> > > > GPIO<6:0>, but they are given separate names because they are
+> > configured
+> > > > on separate multi-function pins. The recommended configuration is for
+> > > > both multi-function pin instantiations of these GPIOs not to be
+> > > > configured simultaneously for GPIO functionality. The preferred
+> > > > configuration for dual instantiation GPIO usage (that is, using both
+> > > > GPIO<6:0> and GPIO<6:0>_2 functions) is to configure one multi-function
+> > > > pin as a GPIO and the second multi-function pin instantiation for an
+> > > > alternate function other than a GPIO function. Configuring GPIO<6:0> to
+> > > > be present on two separate multi-function pins is not recommended.
+> > > > However, when GPIO<6:0> is configured as an output and both
+> > > > multi-function pin instantiations are programmed for GPIO function, the
+> > > > primary and secondary instantiation of the multi-function pins are both
+> > > > outputs from the common GGPIO<6:0> signal. However, when GPIO<6:0> is
+> > an
+> > > > input, the inputs from both multi-function pin instantiations are ORed
+> > > > together before the result is sent to the internal GPIO<6:0> input
+> > > > logic.
+> > >
+> > > Hmmm. I found with pxaregs tool what both GPIO4 and GPIO4_2 configured as
+> > > GPIO. May be this cause irq autodetection to fail?
+> >
+> > No - if you don't tell the driver which GPIO the interrupt line is
+> > connected to, it can't know. But as the reference manual says, such
+> > configurations should be avoided.
+> >
+> > You're welcome to come up with a patch :)
+> >
+> > Daniel
+> >
+> I configure GPIO4 pin as nCS3 (alternate function #1) in colibri-pxa320.c
+> and after that irq autoprobing found valid irq for UCB1400. So touchscreen
+> now working just fine.
 
-Oops sorry =0_o=  It is still there. 
+Good. Can you share a patch?
 
-> 
-> I can still see the unused state variable in Linus' tree:
-> 
-> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=drivers/mmc/host/omap_hsmmc.c;h=b032828c61263028963bd412a7455546d5e86ce7;hb=HEAD#l2275
-> 
-> 
->> See 1a13f8fa76c880be41d6b1e6a2b44404bcbfdf9e in linus' tree.
-> 
-> This commit only seem to adapt to the API change (the state variable
-> is not removed):
-> 
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index d25b19b..b032828 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -2292,7 +2292,7 @@ static int omap_hsmmc_suspend(struct device *dev)
->                 }
->                 cancel_work_sync(&host->mmc_carddetect_work);
->                 mmc_host_enable(host->mmc);
-> -               ret = mmc_suspend_host(host->mmc, state);
-> +               ret = mmc_suspend_host(host->mmc);
->                 if (ret == 0) {
->                         omap_hsmmc_disable_irq(host);
->                         OMAP_HSMMC_WRITE(host->base, HCTL,
-> 
->>> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
->>> ---
->>>  drivers/mmc/host/omap_hsmmc.c |    1 -
->>>  1 files changed, 0 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
->>> index b032828..d50e917 100644
->>> --- a/drivers/mmc/host/omap_hsmmc.c
->>> +++ b/drivers/mmc/host/omap_hsmmc.c
->>> @@ -2272,7 +2272,6 @@ static int omap_hsmmc_suspend(struct device *dev)
->>>        int ret = 0;
->>>        struct platform_device *pdev = to_platform_device(dev);
->>>        struct omap_hsmmc_host *host = platform_get_drvdata(pdev);
->>> -       pm_message_t state = PMSG_SUSPEND; /* unused by MMC core */
->>>        if (host && host->suspended)
->>>                return 0;
->>
-> 
+> May be I need to check other second instantiation pins for same thing?
+
+Sure, double-checking can't harm. If you find anything, feel free to fix
+it up.
+
+Just make sure you read Documentation/SubmittingPatches in order to
+avoid the most common pitfalls :)
+
+Thanks,
+Daniel
