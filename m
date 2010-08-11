@@ -1,67 +1,22 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 11 Aug 2010 13:08:28 +0300
-Subject: [PATCH v3 6/9] omap: hsmmc: remove unused variable
-In-Reply-To: <4C627378.2090304@nokia.com>
-References: <1281478348-24833-1-git-send-email-ohad@wizery.com>
-	<1281478348-24833-7-git-send-email-ohad@wizery.com>
-	<4C627378.2090304@nokia.com>
-Message-ID: <AANLkTi=bB++-VU88JQTicJeYf==9qccx0HMDiz5-geyg@mail.gmail.com>
+From: mfuzzey@gmail.com (Martin Fuzzey)
+Date: Wed, 11 Aug 2010 12:11:52 +0200
+Subject: Problem with non aligned DMA in usbnet on ARM
+In-Reply-To: <20100811095454.GA22543@n2100.arm.linux.org.uk>
+References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
+	<20100811095454.GA22543@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimX46QKAGhiyo8AodaXVjuzoxr5-5z2V4gRr1Vu@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 11, 2010 at 12:55 PM, Adrian Hunter <adrian.hunter@nokia.com> wrote:
-> Ohad Ben-Cohen wrote:
->>
->> Make this go away:
->>
->> drivers/mmc/host/omap_hsmmc.c: In function 'omap_hsmmc_suspend':
->> drivers/mmc/host/omap_hsmmc.c:2328: warning: unused variable 'state'
+> You haven't said what HCD you're using.
 >
-> Was done a while ago.
+imx21_hcd  (submitted by me and mainlined in 2.6.34)
 
-Are you sure ?
-
-I can still see the unused state variable in Linus' tree:
-
-http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=drivers/mmc/host/omap_hsmmc.c;h=b032828c61263028963bd412a7455546d5e86ce7;hb=HEAD#l2275
-
-
-> See 1a13f8fa76c880be41d6b1e6a2b44404bcbfdf9e in linus' tree.
-
-This commit only seem to adapt to the API change (the state variable
-is not removed):
-
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index d25b19b..b032828 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -2292,7 +2292,7 @@ static int omap_hsmmc_suspend(struct device *dev)
-                }
-                cancel_work_sync(&host->mmc_carddetect_work);
-                mmc_host_enable(host->mmc);
--               ret = mmc_suspend_host(host->mmc, state);
-+               ret = mmc_suspend_host(host->mmc);
-                if (ret == 0) {
-                        omap_hsmmc_disable_irq(host);
-                        OMAP_HSMMC_WRITE(host->base, HCTL,
-
+> In that case, I'd say the HCD must handle misaligned URBs itself so
+> behaviour is consistent between all implementations on different
+> platforms.
 >
->>
->> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
->> ---
->> ?drivers/mmc/host/omap_hsmmc.c | ? ?1 -
->> ?1 files changed, 0 insertions(+), 1 deletions(-)
->>
->> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
->> index b032828..d50e917 100644
->> --- a/drivers/mmc/host/omap_hsmmc.c
->> +++ b/drivers/mmc/host/omap_hsmmc.c
->> @@ -2272,7 +2272,6 @@ static int omap_hsmmc_suspend(struct device *dev)
->> ? ? ? ?int ret = 0;
->> ? ? ? ?struct platform_device *pdev = to_platform_device(dev);
->> ? ? ? ?struct omap_hsmmc_host *host = platform_get_drvdata(pdev);
->> - ? ? ? pm_message_t state = PMSG_SUSPEND; /* unused by MMC core */
->> ? ? ? ?if (host && host->suspended)
->> ? ? ? ? ? ? ? ?return 0;
->
->
+Here is a pointer to the thread where it was stated that HCD's don't
+have to handle this.
+
+http://kerneltrap.org/mailarchive/linux-usb/2009/4/20/5528164
