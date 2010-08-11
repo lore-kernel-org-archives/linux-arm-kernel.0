@@ -1,42 +1,58 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 11 Aug 2010 23:12:51 +0300
-Subject: [PATCH v3 9/9] omap: zoom: add mmc3/wl1271 device support
-In-Reply-To: <AANLkTi=n=uH5ePRf8KzXWTtSdyRabpOCOgLBSD1GfwkJ@mail.gmail.com>
-References: <1281478348-24833-1-git-send-email-ohad@wizery.com>
-	<1281478348-24833-10-git-send-email-ohad@wizery.com>
-	<4C626140.3080107@nokia.com>
-	<AANLkTik8yftwy9Toq473134vcdoFN1Z29oTc9MGEUzue@mail.gmail.com>
-	<AANLkTi=n=uH5ePRf8KzXWTtSdyRabpOCOgLBSD1GfwkJ@mail.gmail.com>
-Message-ID: <AANLkTin9ABch+_S=gYwD2HKPm8aT8etwfsE_WRRoq=2U@mail.gmail.com>
+From: greg@kroah.com (Greg KH)
+Date: Wed, 11 Aug 2010 13:13:32 -0700
+Subject: Problem with non aligned DMA in usbnet on ARM
+In-Reply-To: <4C62F4EF.1050808@gmail.com>
+References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
+	<20100811095454.GA22543@n2100.arm.linux.org.uk>
+	<AANLkTimX46QKAGhiyo8AodaXVjuzoxr5-5z2V4gRr1Vu@mail.gmail.com>
+	<20100811150443.GB8867@kroah.com>
+	<AANLkTimmJDKbh3_pRY_ASKvjsf4YuuUMh3edh5LvDv-p@mail.gmail.com>
+	<20100811174238.GA12382@kroah.com> <4C62F4EF.1050808@gmail.com>
+Message-ID: <20100811201332.GB10379@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishore,
+On Wed, Aug 11, 2010 at 09:07:27PM +0200, Martin Fuzzey wrote:
+> Greg KH wrote:
+> >> So the question is are hcds expected to accept arbitarilly aligned but
+> >> heap allocated pointers (such as the result of kmalloc() + 1)?
+> >>     
+> >
+> > It sounds like your HCD doesn't like this, so perhaps we should make
+> > that rule :)
+> >
+> > If you allocate the urb with a kmalloc() call with no offset, does it
+> > all work properly? 
+> Yes
+> >  The driver should be calling usb_alloc_urb() which
+> > does this automatically for them, right?  Or is it trying to allocate
+> > things on its own somehow?
+> >
+> >   
+> It's not the URB itself (which is allocated by usb_alloc_urb) but rather
+> the buffer pointer within the URB that causes the problem.
 
-On Wed, Aug 11, 2010 at 11:09 PM, kishore kadiyala
-<kishorek.kadiyala@gmail.com> wrote:
-> Since you specified the voltage source is fixed, and if MMC3 has any
-> dedicated regulator as MMC1 & MMC2 you can go with
-> Roger's comments.
+Doh, you are right, sorry about that.
 
-You are reading an old batch of the patches.
+> It's the asix driver (or more exactly the usbnet core used by that driver).
+> It does (rx_submit() in drivers/net/usb/usbnet.c):
+> 
+> urb = usb_alloc_urb();
+> skb = alloc_skb (...);
+> skb_reserve (skb, NET_IP_ALIGN);
+> usb_fill_bulk_urb (urb,...  skb->data);
+> usb_submit_urb(urb)
+> 
+> skb->data as returned by alloc_skb() is aligned
+> but skb_reserve adds 2.
+> 
+> Thus removing the skb_reserve() call makes it work.
+> BUT if I do that the IP header is no longer aligned so accesses further
+> up the network stack have to be fixed up by exception handlers which is
+> expensive (even with hcds which don't require this)
 
-Scroll down to v4 ;)
+Can you fix this in the host controller driver?
 
-Thanks,
-Ohad.
+thanks,
 
-> If the LDO is fixed voltage source from TWL then since regulator
-> framework supports only adjustable LDO's, I think you can
-> have ocr_mask defined as above in board file.
->
-> Regards,
-> Kishore
->>
->> Removed, thanks!
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->>
->
+greg k-h
