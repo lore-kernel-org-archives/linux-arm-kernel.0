@@ -1,41 +1,48 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 11 Aug 2010 11:46:54 -0700
-Subject: [PATCH] ARM: uaccess: Implement strict user copy checks
-In-Reply-To: <201008110504.59957.arnd@arndb.de>
-References: <1280890950-19174-1-git-send-email-sboyd@codeaurora.org>
-	<201008110504.59957.arnd@arndb.de>
-Message-ID: <4C62F01E.2000708@codeaurora.org>
+From: felipe.balbi@nokia.com (Felipe Balbi)
+Date: Wed, 11 Aug 2010 21:47:42 +0300
+Subject: [PATCH v4 3/8] wireless: wl1271: add platform driver to get
+	board data
+In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB0324110ABD@dbde02.ent.ti.com>
+References: <1281550913-17633-1-git-send-email-ohad@wizery.com>
+	<1281550913-17633-4-git-send-email-ohad@wizery.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0324110ABD@dbde02.ent.ti.com>
+Message-ID: <20100811184742.GA21778@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2010 08:04 PM, Arnd Bergmann wrote:
->
-> Do you actually need to disable this if running an older gcc? AFAICT, it
-> should just have no effect at all in that case, so the comment is slightly
-> misleading.
+hi,
 
-I blindly copied the help text from x86. Will fix to be less misleading.
+On Wed, Aug 11, 2010 at 08:42:18PM +0200, ext DebBarma, Tarun Kanti wrote:
+>> @@ -182,10 +186,84 @@ static struct wl1271_if_operations sdio_ops = {
+>>  	.disable_irq	= wl1271_sdio_disable_interrupts
+>>  };
+>>
+>> +static int wl1271_plat_probe(struct platform_device *pdev)
+>> +{
+>> +	struct wl12xx_platform_data *pdata;
+>> +	struct platform_driver *pdriver;
+>> +	struct wl12xx_plat_instance *pinstance;
+>> +
+>What about checking for pdev here before extracting pdata?
 
->
-> Also, why turn this specific warning into an error but not any of the other
-> warnings? Some architectures (alpha, sparc, mips, powerpc, sh) simply turn
-> on -Werror for architecture specific code in general, which seems very
-> useful. We can also make that a config option (probably arch independent)
-> that we turn on for defconfig files that we know build without warnings.
->
-> Unfortunately, there is a number of device drivers that have never been
-> warning-free, so we can't just enable -Werror for all code.
->
+why ? if probe is called pdev is guaranteed to be valid, no ?
 
-I'm following the x86 implementation. I suppose it's done this way since 
-many drivers aren't warning free (as you mention) and turning on -Werror 
-will make it more annoying to find these types of errors. Since there 
-isn't any -Werror=user-copy this approach allows us to find this type of 
-error easily without having to sift through noise.
+>> +	pdata = pdev->dev.platform_data;
+>> +	if (!pdata) {
+>> +		wl1271_error("no platform data");
+>> +		return -ENODEV;
+>> +	}
+>> +
+>> +	pdriver = container_of(pdev->dev.driver, struct platform_driver,
+>> +								driver);
 
-Enabling -Werror in architecture specific code wouldn't help much here 
-though right since this is going to be inlined into drivers and such?
+but you shouldn't fiddle with the driver structure here. What are you 
+actually trying to achieve here ? What's pinstance supposed to do ? are 
+you trying to handle cases where you might have several wl12xx chips on 
+the same board ? If that's the case you should have several platform 
+devices, one for each chip. They'll only have different ids.
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+balbi
+
+DefectiveByDesign.org
