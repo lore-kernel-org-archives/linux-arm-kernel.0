@@ -1,39 +1,65 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 11 Aug 2010 16:05:40 +0200
-Subject: Query: Patches break with Microsoft exchange server.
-In-Reply-To: <1281389338.7143.32.camel@localhost>
-References: <4C5F9B25.8080401@st.com>
-	<201008091735.11105.mihai.dontu@gmail.com>
-	<4C6040FC.2020702@gmail.com>
-	<201008092115.25992.mihai.dontu@gmail.com>
-	<1281389338.7143.32.camel@localhost>
-Message-ID: <AANLkTikQWj=Vx7T_+SjqRS3GTDgHQ6x2zn_MgcCUTj9M@mail.gmail.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Wed, 11 Aug 2010 16:33:45 +0200
+Subject: [PATCH] ARM: COLIBRI PXA320: fix UCB1400 irq autoprobing
+In-Reply-To: <AANLkTinxeEbZqwdB=bzC=ZZFqk1iR28yv=ECYRFNeUE=@mail.gmail.com>
+References: <AANLkTinxeEbZqwdB=bzC=ZZFqk1iR28yv=ECYRFNeUE=@mail.gmail.com>
+Message-ID: <20100811143345.GU17833@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 9, 2010 at 23:28, David Woodhouse <dwmw2@infradead.org> wrote:
-> On Mon, 2010-08-09 at 21:15 +0300, Mihai Don?u wrote:
->>
->> Wait. I don't think we're on the same page here. I'm talking about message
->> signing (which does not require the receiving end to have any key - it's the
->> same plain text e-mail with a blob after it) while you refer to actually
->> encrypting the message. Mm? Or am I being extremely slow today? :-)
->
-> Only when you assume that Exchange would pass signed messages without
-> corrupting them. It really is that broken.
+Hi Yuri,
 
-Indeed. In my experience Exchange may
-  - corrupt PGP signed email, causing the signature verification to fail,
-  - send/forward all email in BASE64, causing it to be dropped by
-vger.kernel.org.
+thanks for the patch.
 
-Gr{oetje,eeting}s,
+On Wed, Aug 11, 2010 at 04:54:13PM +0400, Yuri Ludkevich wrote:
+> Ads properly initialization to GPIO4 ( alt. fn. #1, nCS3; because GPIO4 and
+> GPIO4_2 cannot be
+> configured as GPIO simultaneously ) so GPIO4_2 which used as irq line from
+> UCB1400 may be
+> detected while irq autoprobing routine.
 
-? ? ? ? ? ? ? ? ? ? ? ? Geert
+This looks fine to me, but Marek wanted to rework the board support in
+order to unify the GPIO configs for better readability. Marek, is there
+any tree which contains your changes already?
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-? ? ? ? ? ? ? ? ? ? ? ? ? ?? ?? -- Linus Torvalds
+Thanks,
+Daniel
+
+
+> 
+> Signed-off by: Yuri Ludkevich <urx.forever@gmail.com>
+> ---
+> 
+> --- linux-next/arch/arm/mach-pxa/colibri-pxa320.c.orig  2010-08-11
+> 16:01:46.000000000 +0400
+> +++ linux-next/arch/arm/mach-pxa/colibri-pxa320.c       2010-08-11
+> 16:23:30.000000000 +0400
+> @@ -236,6 +236,19 @@ static void __init colibri_pxa320_init_u
+>         pxa3xx_mfp_config(ARRAY_AND_SIZE(colibri_pxa320_uart_pin_config));
+>  }
+> 
+> +
+> +static mfp_cfg_t colibri_pxa320_cpld_pin_config[] __initdata = {
+> +       /* init GPIO4 as nCS3 (AF1). If GPIO4 stay as GPIO
+> +          touchscreen irq (GPIO4_2 pin) autoprobing will not work.
+> +          See Marvell PXA320 datasheet for more details */
+> +       GPIO4_nCS3,
+> +};
+> +
+> +static void __init colibri_pxa320_init_cpld(void)
+> +{
+> +       pxa3xx_mfp_config(ARRAY_AND_SIZE(colibri_pxa320_cpld_pin_config));
+> +}
+> +
+>  void __init colibri_pxa320_init(void)
+>  {
+>         pxa_set_ffuart_info(NULL);
+> @@ -252,6 +265,7 @@ void __init colibri_pxa320_init(void)
+>                                 mfp_to_gpio(MFP_PIN_GPIO28));
+>         colibri_pxa320_init_uart();
+>         colibri_pxa320_init_udc();
+> +       colibri_pxa320_init_cpld();
+>  }
+> 
+>  MACHINE_START(COLIBRI320, "Toradex Colibri PXA320")
