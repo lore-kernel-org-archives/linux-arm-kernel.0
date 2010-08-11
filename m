@@ -1,53 +1,199 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 11 Aug 2010 12:02:10 +0200
-Subject: colibri PXA320 and UCB1400 - touch screen troubles
-In-Reply-To: <AANLkTim+kNyEL2s0k9wLoctRMKDWoaYy66y=adhog1wc@mail.gmail.com>
-References: <AANLkTimZeDeS+44=BfchT0gwK5NDLhzLSX1vua8oFBQp@mail.gmail.com>
-	<201008111042.52631.marek.vasut@gmail.com>
-	<AANLkTimL7kt0-Do9VQUQvktHfsvdKjm_NJ-eDbxcAu2m@mail.gmail.com>
-	<201008111107.29839.marek.vasut@gmail.com>
-	<20100811094543.GO17833@buzzloop.caiaq.de>
-	<AANLkTim+kNyEL2s0k9wLoctRMKDWoaYy66y=adhog1wc@mail.gmail.com>
-Message-ID: <20100811100210.GP17833@buzzloop.caiaq.de>
+From: phdm@macqel.be (Philippe De Muyter)
+Date: Wed, 11 Aug 2010 12:02:12 +0200
+Subject: [PATCH] Documentation about RS485 serial communications
+In-Reply-To: <4C626CBF.9020609@evidence.eu.com>
+References: <4BB1BF49.2000609@evidence.eu.com>
+	<4BB252E3.3030703@bluewatersys.com>
+	<4BBD8C9D.3070401@evidence.eu.com>
+	<20100408111310.524f7354@lxorguk.ukuu.org.uk>
+	<4BBDD71D.1010700@evidence.eu.com> <4BFD1FB6.8050405@atmel.com>
+	<4BFE2F38.8050200@evidence.eu.com> <4BFE41FD.2080804@atmel.com>
+	<20100527102917.GB31253@pengutronix.de>
+	<4C626CBF.9020609@evidence.eu.com>
+Message-ID: <20100811100212.GA4070@frolo.macqel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-You dropped all recipients again and only replied to me.
-PLEASE DON'T DO THAT.
-Always keep all people in the loop, always.
-
-On Wed, Aug 11, 2010 at 01:50:43PM +0400, Yuri Ludkevich wrote:
-> 2010/8/11 Daniel Mack <daniel@caiaq.de>
-> > According to my reverse engineering, this should be GPIO4_2.
-> >
+On Wed, Aug 11, 2010 at 11:26:23AM +0200, Claudio Scordino wrote:
+> Hi all,
 > 
-> Thanks a lot.
+> 	some time ago I've been asked (by both Wolfram and Philippe) to
+> provide some minimal documentation about the usage of the RS485
+> interface.
 > 
-> BTW: does /sys/class/gpio/export support GPIOX_2 pins?
+> Here is the document (updated with the very last changes in the
+> interface).
 
-Yes, they are aliases to the signals without the "_2" suffix. Quoting
-the PXA reference manual, chapter 5.3:
+Thanks
 
-GPIO<6_0>_2:
+> 
+> Best regards,
+> 
+> 	Claudio
+> 
+> 
+> Documentation about RS485 serial communications.
+> 
+> Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
+> ---
+>  Documentation/serial/00-INDEX         |    2 +
+>  Documentation/serial/serial-rs485.txt |  123 +++++++++++++++++++++++++++++++++
+>  2 files changed, 125 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/serial/serial-rs485.txt
+> 
+> diff --git a/Documentation/serial/00-INDEX b/Documentation/serial/00-INDEX
+> index 07dcdb0..e09468a 100644
+> --- a/Documentation/serial/00-INDEX
+> +++ b/Documentation/serial/00-INDEX
+> @@ -14,6 +14,8 @@ riscom8.txt
+>  	- notes on using the RISCom/8 multi-port serial driver.
+>  rocket.txt
+>  	- info on the Comtrol RocketPort multiport serial driver.
+> +serial-rs485.txt
+> +	- info about RS485 structures and support in the kernel.
+>  specialix.txt
+>  	- info on hardware/driver for specialix IO8+ multiport serial card.
+>  stallion.txt
+> diff --git a/Documentation/serial/serial-rs485.txt b/Documentation/serial/serial-rs485.txt
+> new file mode 100644
+> index 0000000..f594831
+> --- /dev/null
+> +++ b/Documentation/serial/serial-rs485.txt
+> @@ -0,0 +1,123 @@
+> +                        RS485 SERIAL COMMUNICATIONS
+> +
+> +1. INTRODUCTION
+> +
+> +   EIA-485, also known as TIA/EIA-485 or RS-485, is a standard defining the
+> +   electrical characteristics of drivers and receivers for use in balanced
+> +   digital multipoint systems.
+> +   This standard is widely used for communications in industrial automation
+> +   because it can be used effectively over long distances and in electrically
+> +   noisy environments.
+> +   Even though the data is transmitted over a 2-wire twisted pair bus, all
+> +   EIA-485 transceivers interpret the voltage levels of the differential
+> +   signals with respect to a third common voltage. Without this common
+> +   reference, a set of transceivers may interpret the differential signals
+> +   incorrectly.
+> +   See [1] for more information.
+> +
+> +
+> +2. HARDWARE-RELATED CONSIDERATIONS
+> +
+> +   Some CPUs (e.g., Atmel AT91) contain a transceiver capable of working both
+> +   as RS232 and RS485. For these microcontrollers, the Linux driver should be
+> +   able of working in both modes, and proper ioctls (see later) should be made
+> +   available at user-level to allow switching from one mode to the other, and
+> +   viceversa.
+> +
+> +   On some other CPUs (e.g., Freescale imx25) the RS485 transceiver is not
+> +   integrated inside the microcontroller itself. Therefore, manufacturers who
+> +   use these microcontrollers to produce embedded boards need to connect an
+> +   external transceiver to some pin of the CPU.
+> +   On these architectures, therefore, no assumptions can be done at the
+> +   CPU-level about the presence of a RS485 transceiver, because the connection
+> +   (if any) is done outside the microcontroller. Moreover, even in case of
+> +   RS485 transceiver, the manufacturer is free to choose the CPU pin used for
+> +   the connection.
+> +
+> +
+> +3. DATA STRUCTURES ALREADY AVAILABLE IN THE KERNEL
+> +
+> +   The Linux kernel provides the serial_rs485 structure (see [2]) to handle
+> +   RS485 communications. This data structure is used to set and configure RS485
+> +   parameters in the platform data and in ioctls.
+> +
+> +   Any driver for devices capable of working both as RS232 and RS485 should
+> +   provide at least the following ioctls:
+> +
+> +    - TIOCSRS485 (typically associated with number 0x542F). This ioctl is used
+> +      to enable/disable RS485 mode from user-space
+> +
+> +    - TIOCGRS485 (typically associated with number 0x542E). This ioctl is used
+> +      to get RS485 mode from kernel-space (i.e., driver) to user-space.
+> +
+> +   In other words, the serial driver should contain a code similar to the next
+> +   one:
+> +
+> +	static struct uart_ops atmel_pops = {
+> +		/* ... */
+> +		.ioctl		= handle_ioctl,
+> +	};
+> +
+> +	static int handle_ioctl(struct uart_port *port,
+> +		unsigned int cmd,
+> +		unsigned long arg)
+> +	{
+> +		struct serial_rs485 rs485conf;
+> +
+> +		switch (cmd) {
+> +			case TIOCSRS485:
+> +				if (copy_from_user(&rs485conf,
+> +					(struct serial_rs485 *) arg,
+> +					sizeof(rs485conf)))
+> +						return -EFAULT;
+> +
+> +				/* ... */
+> +				break;
+> +
+> +			case TIOCGRS485:
+> +				if (copy_to_user((struct serial_rs485 *) arg,
+> +					...,
+> +					sizeof(rs485conf)))
+> +						return -EFAULT;
+> +				/* ... */
+> +				break;
+> +
+> +			/* ... */
+> +		}
+> +	}
+> +
+> +
+> +4. USAGE FROM USER-LEVEL
+> +
+> +   From user-level, RS485 configuration can be get/set using the previous
+> +   ioctls. For instance, to set RS485 you can use the following code:
+> +
+> +	#include <linux/serial.h>
+> +
+> +	/* Driver-specific ioctls: */
+> +	#define TIOCGRS485      0x542E
+> +	#define TIOCSRS485      0x542F
 
-General-Purpose IO Ports, second instantiation. The same signals as
-GPIO<6:0>, but they are given separate names because they are configured
-on separate multi-function pins. The recommended configuration is for
-both multi-function pin instantiations of these GPIOs not to be
-configured simultaneously for GPIO functionality. The preferred
-configuration for dual instantiation GPIO usage (that is, using both
-GPIO<6:0> and GPIO<6:0>_2 functions) is to configure one multi-function
-pin as a GPIO and the second multi-function pin instantiation for an
-alternate function other than a GPIO function. Configuring GPIO<6:0> to
-be present on two separate multi-function pins is not recommended.
-However, when GPIO<6:0> is configured as an output and both
-multi-function pin instantiations are programmed for GPIO function, the
-primary and secondary instantiation of the multi-function pins are both
-outputs from the common GGPIO<6:0> signal. However, when GPIO<6:0> is an
-input, the inputs from both multi-function pin instantiations are ORed
-together before the result is sent to the internal GPIO<6:0> input
-logic.
+Should those defines not come from a linux header file ?
 
+> +
+> +	/* Open specific device: */
+> +	int fd = open ("/dev/mydevice", O_RDWR);
+> +	struct serial_rs485 rs485conf;
+> +
+> +	/* Set RS485 mode: */
+> +	rs485conf.flags |= SER_RS485_ENABLED;
+> +
+> +	/* Set rts delay before send, if needed: */
+> +	rs485conf.flags |= SER_RS485_RTS_BEFORE_SEND;
+> +	rs485conf.delay_rts_before_send = ...;
+> +
+> +	/* Set rts delay after send, if needed: */
+> +	rs485conf.flags |= SER_RS485_RTS_AFTER_SEND;
+> +	rs485conf.delay_rts_after_send = ...;
+> +
+> +	ioctl (fd, TIOCSRS485, &rs485conf);
 
-HTH,
-Daniel
+I surmise that all the real work, the read() and write() system calls,
+must come here, before the close() system call.
+
+> +
+> +	close (fd);
+> +
+> +5. REFERENCES
+> +
+> + [1]	http://en.wikipedia.org/wiki/Rs485
+> + [2]	include/linux/serial.h
+> -- 
+> 1.6.0.4
+> 
+
+-- 
+Philippe De Muyter  phdm at macqel dot be  Tel +32 27029044
+Macq Electronique SA  rue de l'Aeronef 2  B-1140 Bruxelles  Fax +32 27029077
