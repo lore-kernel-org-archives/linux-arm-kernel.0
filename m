@@ -1,75 +1,67 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 11 Aug 2010 10:36:26 +0200
-Subject: [PATCH 1/3] ARM: mx27_defconfig: enable switches used in mx27 code
-Message-ID: <1281515788-9989-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 11 Aug 2010 10:42:52 +0200
+Subject: colibri PXA320 and UCB1400 - touch screen troubles
+In-Reply-To: <AANLkTimZeDeS+44=BfchT0gwK5NDLhzLSX1vua8oFBQp@mail.gmail.com>
+References: <AANLkTimZeDeS+44=BfchT0gwK5NDLhzLSX1vua8oFBQp@mail.gmail.com>
+Message-ID: <201008111042.52631.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- enable all mx27 machines (MACH_CPUIMX27, MACH_PCA100, MACH_MXT_TD60)
-  including optional features for CPUIMX27
-- eukrea_mbimx27-baseboard.c uses TOUCHSCREEN_ADS7846
-- mach-cpuimx27.c uses SERIAL_8250
-- several machines make use of SPI_IMX (selects SPI_BITBANG)
-- drop VGA_CONSOLE as this isn't selectable anymore since fb78b51cb11e
-- several machines make use of USB_ULPI (depends on USB, but don't
-  enable USB_DEVICE_CLASS as it's deprecated)
+Dne St 11. srpna 2010 09:43:30 Yuri Ludkevich napsal(a):
+> Hi Marek
+> 
+> I am working on colibri PXA320 so-dimm module and toradex orchid board. I
+> flash it with OBM2 and U-boot - this work just fine. Ather that i compile
+> 2.6.35 kernel and fount what touchscreen do not work =(. I turn on UCB1400
+> support in MFD kernel section and UCB1400 touchscreen support in input
+> device/touchscreen section. While booting ALSA founded UCB1400 sound device
+> and input subsystem found UCB1400 touchscreen interface according to boot
+> log:
+> 
+> [   28.336798] UCB1400: found IRQ
+> 0
+> [   28.356179] UCB1400: x/y =
+> 601/735
+> [   28.363892] input: UCB1400 touchscreen interface as
+> /class/input/input0
+> [   28.379487] ALSA device
+> list:
+> [   28.386389]   #0: pxa2xx-ac97 (Philips UCB1400)
+> 
+> but tapping touchscreen gets no samples from /dev/input/event0. And no
+> interrupts in /proc/interrupts:
+>   0:          0          SC  UCB1400
+>   3:          1          SC  ohci_hcd:usb1
+>  11:          0          SC  pxa27x_udc
+>  14:        460          SC  AC97
+>  17:          1          SC  LCD
+>  21:         19          SC  BTUART
+>  22:         71          SC  FFUART
+>  23:      97011          SC  pxa2xx-mci
+>  25:          0          SC  DMA
+>  26:       9218          SC  ost0
+> 124:          0        GPIO  MMC card detect
+> 132:        107        GPIO  eth0
+> Err:          0
+> 
+> Can you please point me to right way - i do not know where to dig =(.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/configs/mx27_defconfig |   14 +++++++++++---
- 1 files changed, 11 insertions(+), 3 deletions(-)
+Hi, it looks like the IRQ was misdetected probably. Check the following two 
+patches (and possibly the vpac270 source file, the "Audio and Touchscreen" 
+section will give you an idea how to force IRQ line to the driver).
 
-diff --git a/arch/arm/configs/mx27_defconfig b/arch/arm/configs/mx27_defconfig
-index b2038b0..0107a8f 100644
---- a/arch/arm/configs/mx27_defconfig
-+++ b/arch/arm/configs/mx27_defconfig
-@@ -21,8 +21,13 @@ CONFIG_ARCH_MX2=y
- CONFIG_MACH_MX27=y
- CONFIG_MACH_MX27ADS=y
- CONFIG_MACH_PCM038=y
-+CONFIG_MACH_CPUIMX27=y
-+CONFIG_MACH_EUKREA_CPUIMX27_USESDHC2=y
-+CONFIG_MACH_EUKREA_CPUIMX27_USEUART4=y
- CONFIG_MACH_MX27_3DS=y
- CONFIG_MACH_IMX27LITE=y
-+CONFIG_MACH_PCA100=y
-+CONFIG_MACH_MXT_TD60=y
- CONFIG_MXC_IRQ_PRIOR=y
- CONFIG_MXC_PWM=y
- CONFIG_NO_HZ=y
-@@ -76,7 +81,9 @@ CONFIG_INPUT_EVDEV=y
- # CONFIG_INPUT_KEYBOARD is not set
- # CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_ADS7846=m
- # CONFIG_SERIO is not set
-+CONFIG_SERIAL_8250=m
- CONFIG_SERIAL_IMX=y
- CONFIG_SERIAL_IMX_CONSOLE=y
- # CONFIG_LEGACY_PTYS is not set
-@@ -85,19 +92,20 @@ CONFIG_I2C=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_IMX=y
- CONFIG_SPI=y
--CONFIG_SPI_BITBANG=y
-+CONFIG_SPI_IMX=y
- CONFIG_W1=y
- CONFIG_W1_MASTER_MXC=y
- CONFIG_W1_SLAVE_THERM=y
- # CONFIG_HWMON is not set
- CONFIG_FB=y
- CONFIG_FB_IMX=y
--# CONFIG_VGA_CONSOLE is not set
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_FONTS=y
- CONFIG_FONT_8x8=y
- # CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB=m
-+# CONFIG_USB_DEVICE_CLASS is not set
-+CONFIG_USB_ULPI=y
- CONFIG_MMC=y
- CONFIG_MMC_MXC=y
- CONFIG_RTC_CLASS=y
--- 
-1.7.1
+http://git.kernel.org/?p=linux/kernel/git/marex/pxa-
+linux-2.6.git;a=commitdiff;h=417eb54b3aba8f9aa1707fa1dae606ccaeb94599;hp=94616fcb8d6e5e51391f34463afafaad3bd20da6
+
+http://git.kernel.org/?p=linux/kernel/git/marex/pxa-
+linux-2.6.git;a=commitdiff;h=ced7f2ca8e8d99ec35ff34841c6e6a307a115fa0;hp=417eb54b3aba8f9aa1707fa1dae606ccaeb94599
+
+Hope this helps you.
+> 
+> ps: sorry for my poor English.
+
+It's actually quite ok :)
+> 
+> Thanks anyway.
+
+Cheers
