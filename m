@@ -1,70 +1,52 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Wed, 11 Aug 2010 09:40:55 +0800
-Subject: [rtc-linux] [PATCH 1/2] rtc: rtc-lpc32xx: Introduce RTC driver
-	for the LPC32XX SoC
-In-Reply-To: <083DF309106F364B939360100EC290F80AC6E5F76D@eu1rdcrdc1wx030.exi.nxp.com>
-References: <1281370650-29520-1-git-send-email-wellsk40@gmail.com>
-	<1281370650-29520-2-git-send-email-wellsk40@gmail.com>
-	<AANLkTimAJj38R7KCfHusfsq+EXDd3fbAm=Az_Osqdgbz@mail.gmail.com>
-	<083DF309106F364B939360100EC290F80AC6E5F76D@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <AANLkTinZBhZ8PRswbqUDyYzmDQ6Ccm96QAO8vpeWn+SD@mail.gmail.com>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Wed, 11 Aug 2010 11:06:00 +0900
+Subject: ARM: 2.6.3[45] PCI regression (IXP4xx and PXA?)
+In-Reply-To: <m3sk2m433u.fsf@intrepid.localdomain>
+References: <m3sk2m433u.fsf@intrepid.localdomain>
+Message-ID: <20100811110448S.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/8/11 Kevin Wells <kevin.wells@nxp.com>:
-> Hi Zongshun,
->
-> Thanks for helping review this.
->
->> Subject: Re: [rtc-linux] [PATCH 1/2] rtc: rtc-lpc32xx: Introduce RTC driver
->> for the LPC32XX SoC
->>
->> Hi Kevin ,
->>
->> This is really a natty rtc patch:).
->
-> From the urban dictionary...
-> "natty"
-> 1) originating from rastafarian culture. meaning 'good','cool' and
-> most importantly, 'elite'.
-> 2) A slang for Natural Light beer, a favorite of poor college students
-> the world over.
->
+On Tue, 10 Aug 2010 22:36:21 +0200
+Krzysztof Halasa <khc@pm.waw.pl> wrote:
 
-Hmm,I means the first, this patch looks very good to me. :)
+> 6fee48cd330c68332f9712bc968d934a1a84a32a broke
+> pci_set_consistent_dma_mask() on IXP4xx and most probably PXA. Affected
+> devices are e.g. IDE controller (CS5536-based: disk inaccessible) and
+> e1000 ethernet ("Detected Tx Unit Hang").
 
-> I hope it's the first one, but I guess the 2nd isn't that bad if
-> you?re a college student o)
-> I'll merge both patches into a single patch for v2 and repost in a
-> few days.
->
->> > + ? ? ? /* Disable alarm during update */
->> > + ? ? ? tmp = rtc_readl(rtc, RTC_CTRL);
->> > + ? ? ? rtc_writel(rtc, RTC_CTRL, tmp & ~RTC_MATCH0_EN);
->> > +
->> > + ? ? ? rtc->alarm_enabled = wkalrm->enabled = 1;
->> > + ? ? ? if (wkalrm->enabled) {
->> > + ? ? ? ? ? ? ? rtc_writel(rtc, RTC_MATCH0, alarmsecs);
->> > + ? ? ? ? ? ? ? rtc_writel(rtc, RTC_INTSTAT, RTC_MATCH0_INT_STS);
->> > + ? ? ? ? ? ? ? rtc_writel(rtc, RTC_CTRL, tmp | RTC_MATCH0_EN);
->> > + ? ? ? }
->>
->> I think this 'wkalrm->enabled ' will always be set '1', so 'if'
->> condition will be alway true?
->
-> Thanks for catching this. The '= 1' assignment shouldn't be there.
->
+Sorry about that.
+
+> The attached patch makes it work again, though I'm not sure it's the
+> best solution.
+
+I think that we should avoid adding "#ifdef CONFIG_DMABOUNCE" to a
+generic place.
+
+Why the above patch breaks dmabounce.c? We can't set dev->coherent_dma_mask?
 
 
-
--- 
-*linux-arm-kernel mailing list
-mail addr:linux-arm-kernel at lists.infradead.org
-you can subscribe by:
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-* linux-arm-NUC900 mailing list
-mail addr:NUC900 at googlegroups.com
-main web: https://groups.google.com/group/NUC900
-you can subscribe it by sending me mail:
-mcuos.com at gmail.com
+> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> index ca32ed7..bd2a7d3 100644
+> --- a/include/linux/dma-mapping.h
+> +++ b/include/linux/dma-mapping.h
+> @@ -129,6 +129,14 @@ static inline u64 dma_get_mask(struct device *dev)
+>  
+>  static inline int dma_set_coherent_mask(struct device *dev, u64 mask)
+>  {
+> +#ifdef CONFIG_DMABOUNCE
+> +	if (dev->archdata.dmabounce) {
+> +		if (mask >= ISA_DMA_THRESHOLD)
+> +			return 0;
+> +		else
+> +			return -EIO;
+> +	}
+> +#endif
+>  	if (!dma_supported(dev, mask))
+>  		return -EIO;
+>  	dev->coherent_dma_mask = mask;
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
