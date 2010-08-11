@@ -1,31 +1,49 @@
-From: apenwarr@gmail.com (Avery Pennarun)
-Date: Wed, 11 Aug 2010 12:18:02 -0400
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Wed, 11 Aug 2010 17:30:34 +0100
 Subject: Query: Patches break with Microsoft exchange server.
-In-Reply-To: <1281542305.5107.11.camel@localhost>
+In-Reply-To: <AANLkTi=9xVdfXJXpkNPUMahc7AsbxjVbZFSxeBrzvbmS@mail.gmail.com>
 References: <4C5F9B25.8080401@st.com>
 	<AANLkTinxwRFLUibJECm0c3_oL5mYRkmscsw-xXgAHSTe@mail.gmail.com>
 	<4C624AE1.30504@st.com> <4C62C5BD.3020808@mnsu.edu>
 	<1281542305.5107.11.camel@localhost>
-Message-ID: <AANLkTi=9xVdfXJXpkNPUMahc7AsbxjVbZFSxeBrzvbmS@mail.gmail.com>
+	<AANLkTi=9xVdfXJXpkNPUMahc7AsbxjVbZFSxeBrzvbmS@mail.gmail.com>
+Message-ID: <1281544234.5107.25.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 11, 2010 at 11:58 AM, David Woodhouse <dwmw2@infradead.org> wrote:
-> In Evolution we have a workaround -- we don't just stop when we get to
-> the reported RFC822.SIZE; we continue fetching more chunks until the
-> server actually stops giving us any more. It's not as efficient (because
-> we fall back to having only one more chunk outstanding at a time rather
-> than the normal three in parallel), but at least it works around this
-> brokenness of Exchange.
->
-> http://git.gnome.org/browse/evolution-data-server/commit/?id=9714c064
+On Wed, 2010-08-11 at 12:18 -0400, Avery Pennarun wrote:
+> 
+> Out of curiosity, why fall back to one chunk at a time?  It seems to
+> me that IMAP should be able to still support multiple outstanding
+> requests in that case, but you'd just get errors on the latter chunks.
+> 
+> It is just that there was no point optimizing the workaround case?
 
-Out of curiosity, why fall back to one chunk at a time?  It seems to
-me that IMAP should be able to still support multiple outstanding
-requests in that case, but you'd just get errors on the latter chunks.
+There wasn't a lot of point in optimising it.
 
-It is just that there was no point optimizing the workaround case?
+The current logic, shown in the patch I referenced, is to keep fetching
+new chunks while the stream position matches the end of the previous
+chunk we attempted to fetch.
 
-Have fun,
+To handle multiple outstanding requests, especially if they can be
+satisfied out-of-order, would have been more complex because the stream
+position (in the 'really_fetched' variable) wouldn't necessarily match
+anything interesting. We'd have to keep more state, and the whole thing
+would get a lot more intrusive.
 
-Avery
+Also, for the common case where the server isn't broken and the mail
+size happens not to fall on a chunk boundary, the current implementation
+results in no extra fetch requests. Doing otherwise would either mean
+extra fetch requests even for this common case, or would mean even more
+complexity to 'catch up' by issuing additional fetch requests as soon as
+we realise the server lied about RFC822.SIZE (which is when we receive
+the last chunk, and it runs over the size we expected).
+
+It may be that there's a neat and simple way to handle all of the above,
+and if so then patches would be welcome -- but personally, I just
+couldn't be bothered to think too hard about it. There were more
+pressing matters to attend to, like implementing QRESYNC support.
+
+-- 
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
