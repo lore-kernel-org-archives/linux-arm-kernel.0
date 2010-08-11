@@ -1,56 +1,45 @@
-From: mfuzzey@gmail.com (Martin Fuzzey)
-Date: Wed, 11 Aug 2010 18:08:43 +0200
-Subject: Problem with non aligned DMA in usbnet on ARM
-In-Reply-To: <20100811150443.GB8867@kroah.com>
-References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
-	<20100811095454.GA22543@n2100.arm.linux.org.uk>
-	<AANLkTimX46QKAGhiyo8AodaXVjuzoxr5-5z2V4gRr1Vu@mail.gmail.com>
-	<20100811150443.GB8867@kroah.com>
-Message-ID: <AANLkTimmJDKbh3_pRY_ASKvjsf4YuuUMh3edh5LvDv-p@mail.gmail.com>
+From: jeffrey.hundstad@mnsu.edu (Jeffrey Hundstad)
+Date: Wed, 11 Aug 2010 11:16:50 -0500
+Subject: Query: Patches break with Microsoft exchange server.
+In-Reply-To: <1281542305.5107.11.camel@localhost>
+References: <4C5F9B25.8080401@st.com>	
+	<AANLkTinxwRFLUibJECm0c3_oL5mYRkmscsw-xXgAHSTe@mail.gmail.com>	
+	<4C624AE1.30504@st.com> <4C62C5BD.3020808@mnsu.edu>
+	<1281542305.5107.11.camel@localhost>
+Message-ID: <4C62CCF2.5040206@mnsu.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 11, 2010 at 5:04 PM, Greg KH <greg@kroah.com> wrote:
->> Here is a pointer to the thread where it was stated that HCD's don't
->> have to handle this.
->>
->> http://kerneltrap.org/mailarchive/linux-usb/2009/4/20/5528164
->
-> No, that thread is about stack vs. heap allocations, not about alignment
-> issues.
->
+On 08/11/2010 10:58 AM, David Woodhouse wrote:
+ > On Wed, 2010-08-11 at 10:46 -0500, Jeffrey Hundstad wrote:
+ >> Exchange 2010 does not handle IMAP "chunking" (partial message transfer)
+ >> correctly.  Any request after about 1 megabyte of total message size
+ >> will fail.
+ >>
+ >> Thunderbird uses this "chunking" feature to give you a status update
+ >> while downloading large messages.  The IMAP statements are of this type:
+ >> 11 UID fetch 244477 (UID RFC822.SIZE BODY[]<20480.12288>)
+ >>
+ >> When the 20480 is larger than 1MB Exchange "claims" there is no more.
+ >> Sigh....
+ >
+ > I think the problem is not with the fetching -- the problem is that
+ > Exchange lies about RFC822.SIZE before the IMAP client even starts to
+ > fetch the message. It reports a size which is smaller than the actual
+ > size of the message, thus leading to truncated fetches.
+ >
+ > In Evolution we have a workaround -- we don't just stop when we get to
+ > the reported RFC822.SIZE; we continue fetching more chunks until the
+ > server actually stops giving us any more. It's not as efficient (because
+ > we fall back to having only one more chunk outstanding at a time rather
+ > than the normal three in parallel), but at least it works around this
+ > brokenness of Exchange.
+ >
+ > http://git.gnome.org/browse/evolution-data-server/commit/?id=9714c064
+ >
 
-Well although the issue discussed in that thread was caused by a stack
-allocation isn't the issue here the same?
+In either case it can be used successfully by disabling 
+mail.server.default.fetch_by_chunks in Thunderbird.
 
-My understanding is that a heap allocation as returned by kmalloc() will be:
-1) correctly aligned for DMA
-and
-2) in a memory zone accessible to DMA
-
-whereas a stack allocation is not guaranteed to have either of these properties.
-
-The problem I described in that thread was due to case 1
-(misalignment) rather than the stack memory zone not being accessible
-at all to DMA.
-To which was the reply was basically "use a heap allocation".
-
-So the question is are hcds expected to accept arbitarilly aligned but
-heap allocated pointers (such as the result of kmalloc() + 1)?
-
-regards,
-
-Martin
-
-
-
-
-
-
-
-
-
-> thanks,
->
-> greg k-h
->
+-- 
+Jeffrey Hundstad
