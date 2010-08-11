@@ -1,28 +1,41 @@
-From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Wed, 11 Aug 2010 08:43:05 +0300 (EEST)
-Subject: [PATCHv2] mailbox: change full flag per mailbox queue instead
-	of global
-In-Reply-To: <1281489169-15945-1-git-send-email-x0095840@ti.com>
-References: <1281489169-15945-1-git-send-email-x0095840@ti.com>
-Message-ID: <20100811.084305.149819136.Hiroshi.DOYU@nokia.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Wed, 11 Aug 2010 12:31:53 +0530
+Subject: Query: Patches break with Microsoft exchange server.
+In-Reply-To: <AANLkTinxwRFLUibJECm0c3_oL5mYRkmscsw-xXgAHSTe@mail.gmail.com>
+References: <4C5F9B25.8080401@st.com>
+	<AANLkTinxwRFLUibJECm0c3_oL5mYRkmscsw-xXgAHSTe@mail.gmail.com>
+Message-ID: <4C624AE1.30504@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: ext Fernando Guzman Lugo <x0095840@ti.com>
-Subject: [PATCHv2] mailbox: change full flag per mailbox queue instead of global
-Date: Wed, 11 Aug 2010 03:12:49 +0200
-
-> As pointed by Ohad Ben-Cohen, the variable rq_full flag is a
-> global variable, so if there are multiple mailbox users
-> there will be conflics. Now there is a full flag per
-> mailbox queue.
+On 8/11/2010 3:34 AM, Felipe Contreras wrote:
+> On Mon, Aug 9, 2010 at 9:07 AM, viresh kumar <viresh.kumar@st.com> wrote:
+>> > Mail server in ST has recently changed and now we have Microsoft
+>> > exchange server. We are using thunderbird as mail client.
+>> > What we observed with this server is that patch are broken now while
+>> > sending as well as receiving. Tabs are replaced by spaces and may
+>> > be some other too which we haven't observed.
+>> >
+>> > Has anybody found a solution to this kind of issues? Are there any
+>> > workarounds possible?
+> Same in Nokia. I wrote a script to fix exchange's crap, but I also
+> noticed some quoted-printable mails didn't get converted, so the
+> easiest would be to tell git to always send quoted-printable.
 > 
-> Version 2:
-> - Rebase to the latest.
-> 
-> Reported-by: Ohad Ben-Cohen <ohad@wizery.com>
-> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
-Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 
-Ok for me.
-Tony, could you take this in? since it's a single patch for fix.
+Hi Guys
+
+The situation has changed now.
+We are informed that SP2 is already in place in ST and mail client is not
+doing any tampering.
+
+When i send a mail using git send-email then it receives fine on
+outlook but on thunderbird, tabs are converted to spaces.
+
+This doesn't happen with every patch on thunderbird, but only a few.
+And observation is that it happens only with big patches.
+(more than 500 lines)
+
+Any idea, how to solve issue now on thunderbird??
+
+viresh.
