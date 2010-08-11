@@ -1,58 +1,29 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Thu, 12 Aug 2010 00:57:18 +0530
-Subject: [PATCH v4 3/8] wireless: wl1271: add platform driver to get
-	board data
-In-Reply-To: <20100811185724.GD21778@nokia.com>
-References: <1281550913-17633-1-git-send-email-ohad@wizery.com>
-	<1281550913-17633-4-git-send-email-ohad@wizery.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0324110ABD@dbde02.ent.ti.com>
-	<20100811184742.GA21778@nokia.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC1@dbde02.ent.ti.com>
-	<20100811185724.GD21778@nokia.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0324110AC7@dbde02.ent.ti.com>
+From: claudio@evidence.eu.com (Claudio Scordino)
+Date: Wed, 11 Aug 2010 21:58:57 +0200
+Subject: [PATCH] Documentation about RS485 serial communications
+In-Reply-To: <20100811083214.21d2919e.randy.dunlap@oracle.com>
+References: <4BB053C4.7050700@evidence.eu.com>	<4BB10304.6090006@bluewatersys.com>	<4BB1BF49.2000609@evidence.eu.com>	<4BB252E3.3030703@bluewatersys.com>	<4BBD8C9D.3070401@evidence.eu.com>	<20100408111310.524f7354@lxorguk.ukuu.org.uk>	<4BBDD71D.1010700@evidence.eu.com>	<4BFD1FB6.8050405@atmel.com>	<4BFE2F38.8050200@evidence.eu.com>	<4BFE41FD.2080804@atmel.com>	<20100527102917.GB31253@pengutronix.de>	<4C626CBF.9020609@evidence.eu.com>
+	<20100811083214.21d2919e.randy.dunlap@oracle.com>
+Message-ID: <4C630101.50205@evidence.eu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Randy,
 
-> -----Original Message-----
-> From: Felipe Balbi [mailto:felipe.balbi at nokia.com]
-> Sent: Thursday, August 12, 2010 12:27 AM
-> To: DebBarma, Tarun Kanti
-> Cc: Balbi Felipe (Nokia-MS/Helsinki); Ohad Ben-Cohen; linux-
-> wireless at vger.kernel.org; linux-mmc at vger.kernel.org; linux-
-> omap at vger.kernel.org; Ido Yariv; Mark Brown; linux-arm-
-> kernel at lists.infradead.org; Chikkature Rajashekar, Madhusudhan; Coelho
-> Luciano (Nokia-MS/Helsinki); akpm at linux-foundation.org; San Mehat; Quadros
-> Roger (Nokia-MS/Helsinki); Tony Lindgren; Nicolas Pitre; Pandita, Vikram;
-> Kalle Valo
-> Subject: Re: [PATCH v4 3/8] wireless: wl1271: add platform driver to get
-> board data
+	thank you for the feedback.
+
+[...]
+
 > 
-> Hi,
+> TIOC[SG]RS485 are #defined in <asm-generic/ioctls.h>, so
+> #include <asm-generic/ioctls.h>
+> here and/or below (in userspace program).
 > 
-> On Wed, Aug 11, 2010 at 08:52:54PM +0200, ext DebBarma, Tarun Kanti wrote:
-> >True; however if we go by that argument than we can also assume pdata
-> >is valid, so that we would not need the below check.
-> 
-> of course not. You can have devices that just play well with default
-> values or devices where you don't need the flexibility of platform data.
-> That's why we check.
-> 
-> platform_device pointers on the other hand, are guaranteed to be always
-> true, if it isn't then you should oops, you deserve to oops because
-> something is really really wrong.
->
-Sounds perfect!
-What that means is _probe() function makes sense only for cases where we have valid platform data because we are returning right at the top if pdata is not valid. If this is the case I was curious to know why not framework make another check for valid pdata before calling _probe() instead of coming all the way to _probe() and then returning! 
- 
-> >Still, I would go ahead and find out if there is any scenario where
-> >pdev can go wrong during device registration. Thanks.
-> 
-> if that scenario ever happens, it's either a bug on your implementation
-> or driver-core. In both cases you deserve to oops so we catch such
-> problems at early stages.
-> 
-> --
-> balbi
-> 
-> DefectiveByDesign.org
+
+I noticed that for some architectures (e.g., cris) these ioctls are defined also in arch/cris/include/asm/ioctls.h, and with different values with respect to the values defined on asm-generic/ioctls.h.
+
+Therefore, I wasn't completely sure that the values defined in asm-generic are being used in every driver...
+
+Best regards,
+
+	Claudio
