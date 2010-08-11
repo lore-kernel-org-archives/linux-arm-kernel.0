@@ -1,39 +1,52 @@
-From: felipe.balbi@nokia.com (Felipe Balbi)
-Date: Wed, 11 Aug 2010 21:57:25 +0300
-Subject: [PATCH v4 3/8] wireless: wl1271: add platform driver to get
-	board data
-In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB0324110AC1@dbde02.ent.ti.com>
-References: <1281550913-17633-1-git-send-email-ohad@wizery.com>
-	<1281550913-17633-4-git-send-email-ohad@wizery.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0324110ABD@dbde02.ent.ti.com>
-	<20100811184742.GA21778@nokia.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC1@dbde02.ent.ti.com>
-Message-ID: <20100811185724.GD21778@nokia.com>
+From: mfuzzey@gmail.com (Martin Fuzzey)
+Date: Wed, 11 Aug 2010 21:07:27 +0200
+Subject: Problem with non aligned DMA in usbnet on ARM
+In-Reply-To: <20100811174238.GA12382@kroah.com>
+References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
+	<20100811095454.GA22543@n2100.arm.linux.org.uk>
+	<AANLkTimX46QKAGhiyo8AodaXVjuzoxr5-5z2V4gRr1Vu@mail.gmail.com>
+	<20100811150443.GB8867@kroah.com>
+	<AANLkTimmJDKbh3_pRY_ASKvjsf4YuuUMh3edh5LvDv-p@mail.gmail.com>
+	<20100811174238.GA12382@kroah.com>
+Message-ID: <4C62F4EF.1050808@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Greg KH wrote:
+>> So the question is are hcds expected to accept arbitarilly aligned but
+>> heap allocated pointers (such as the result of kmalloc() + 1)?
+>>     
+>
+> It sounds like your HCD doesn't like this, so perhaps we should make
+> that rule :)
+>
+> If you allocate the urb with a kmalloc() call with no offset, does it
+> all work properly? 
+Yes
+>  The driver should be calling usb_alloc_urb() which
+> does this automatically for them, right?  Or is it trying to allocate
+> things on its own somehow?
+>
+>   
+It's not the URB itself (which is allocated by usb_alloc_urb) but rather
+the buffer pointer within the URB that causes the problem.
 
-On Wed, Aug 11, 2010 at 08:52:54PM +0200, ext DebBarma, Tarun Kanti wrote:
->True; however if we go by that argument than we can also assume pdata 
->is valid, so that we would not need the below check.
+It's the asix driver (or more exactly the usbnet core used by that driver).
+It does (rx_submit() in drivers/net/usb/usbnet.c):
 
-of course not. You can have devices that just play well with default 
-values or devices where you don't need the flexibility of platform data. 
-That's why we check.
+urb = usb_alloc_urb();
+skb = alloc_skb (...);
+skb_reserve (skb, NET_IP_ALIGN);
+usb_fill_bulk_urb (urb,...  skb->data);
+usb_submit_urb(urb)
 
-platform_device pointers on the other hand, are guaranteed to be always 
-true, if it isn't then you should oops, you deserve to oops because 
-something is really really wrong.
+skb->data as returned by alloc_skb() is aligned
+but skb_reserve adds 2.
 
->Still, I would go ahead and find out if there is any scenario where 
->pdev can go wrong during device registration. Thanks.
+Thus removing the skb_reserve() call makes it work.
+BUT if I do that the IP header is no longer aligned so accesses further
+up the network stack have to be fixed up by exception handlers which is
+expensive (even with hcds which don't require this)
 
-if that scenario ever happens, it's either a bug on your implementation 
-or driver-core. In both cases you deserve to oops so we catch such 
-problems at early stages.
-
--- 
-balbi
-
-DefectiveByDesign.org
+cheers,
+Martin
