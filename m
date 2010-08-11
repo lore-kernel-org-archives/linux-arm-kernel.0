@@ -1,24 +1,71 @@
-From: ameya.palande@nokia.com (Ameya Palande)
-Date: Wed, 11 Aug 2010 15:40:27 +0300
-Subject: [PATCH/RFC] Samsung device-table approach
-In-Reply-To: <1281528238-7298-1-git-send-email-m.szyprowski@samsung.com>
-References: <1281528238-7298-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1281530427.1918.124.camel@chotu>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 11 Aug 2010 14:46:17 +0200
+Subject: [PATCH 11/12] mxc_nand: do not depend on disabling the irq in
+	the interrupt handler
+In-Reply-To: <1281442473-31428-3-git-send-email-s.hauer@pengutronix.de>
+References: <1281442473-31428-1-git-send-email-s.hauer@pengutronix.de>
+	<1281442473-31428-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20100811124617.GR27749@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-On Wed, 2010-08-11 at 14:03 +0200, ext Marek Szyprowski wrote:
-> Hello,
+On Tue, Aug 10, 2010 at 02:14:32PM +0200, Sascha Hauer wrote:
+> This patch reverts the driver to enabling/disabling the NFC interrupt
+> mask rather than enabling/disabling the system interrupt. This cleans
+> up the driver so that it doesn't rely on interrupts being disabled
+> within the interrupt handler.
+> This patch is based on earlier work by John Ogness.
 > 
-> I would like to start the discussion on the redesign of the way the
-> Samsung platform devices are defined. The current solution has some
-> important disadvantages that blocks the further kernel development.
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/mtd/nand/mxc_nand.c |   78 +++++++++++++++++++++++++++++++++++++------
+>  1 files changed, 67 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> index 3767dcc..0cc4343 100644
+> --- a/drivers/mtd/nand/mxc_nand.c
+> +++ b/drivers/mtd/nand/mxc_nand.c
+> @@ -30,6 +30,8 @@
+>  #include <linux/clk.h>
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+> +#include <linux/irq.h>
+> +#include <linux/completion.h>
+>  
+>  #include <asm/mach/flash.h>
+>  #include <mach/mxc_nand.h>
+> @@ -149,7 +151,7 @@ struct mxc_nand_host {
+>  	int			irq;
+>  	int			eccsize;
+>  
+> -	wait_queue_head_t	irq_waitq;
+> +	struct completion	op_completion;
+>  
+>  	uint8_t			*data_buf;
+>  	unsigned int		buf_start;
+> @@ -162,6 +164,7 @@ struct mxc_nand_host {
+>  	void			(*send_read_id)(struct mxc_nand_host *);
+>  	uint16_t		(*get_dev_status)(struct mxc_nand_host *);
+>  	int			(*check_int)(struct mxc_nand_host *);
+> +	void			(*irq_control)(struct mxc_nand_host *, int);
+>  };
+>  
+>  /* OOB placement block for use with hardware ecc generation */
+> @@ -214,9 +217,14 @@ static irqreturn_t mxc_nfc_irq(int irq, void *dev_id)
+>  {
+>  	struct mxc_nand_host *host = dev_id;
+>  
+> -	disable_irq_nosync(irq);
+> +	if (!host->check_int(host)) {
+> +		printk("none?\n");
 
-Forgive me about my ignorance about device tables, but I was wondering
-if there is any similarity between device tables and Simple Firmware
-Interface tables which are already in mainline?
+Nah, this printk goes away of course.
 
-Cheers,
-Ameya.
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
