@@ -1,166 +1,86 @@
-From: tanmay.upadhyay@einfochips.com (Tanmay Upadhyay)
-Date: Wed, 11 Aug 2010 18:33:19 +0530
-Subject: [PATCH v4] OpenRD: Enable SD/UART selection for serial port 1
-Message-ID: <1281531799-11145-1-git-send-email-tanmay.upadhyay@einfochips.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 11 Aug 2010 18:33:42 +0530
+Subject: Memory type used for ioremap
+In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B030E700C1E@dbde02.ent.ti.com>
+References: <2A3DCF3DA181AD40BDE86A3150B27B6B030E181724@dbde02.ent.ti.com>
+	<1278677464.11895.41.camel@e102109-lin.cambridge.arm.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B030E181CAD@dbde02.ent.ti.com>
+	<20100709141416.GI22845@n2100.arm.linux.org.uk>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B030E5E42A7@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C641DE6B@dbde02.ent.ti.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B030E5E47F6@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C641E31D@dbde02.ent.ti.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B030E700C1E@dbde02.ent.ti.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C65D750B@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables user to use serial port 1 of the OpenRD device for SDIO
-or UART(RS232/RS485). The selection can be done through kernel parameter.
+> -----Original Message-----
+> From: Pedanekar, Hemant
+> Sent: Wednesday, August 11, 2010 6:25 PM
+> To: Shilimkar, Santosh; Russell King - ARM Linux
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: RE: Memory type used for ioremap
+> 
+> Shilimkar, Santosh wrote on Wednesday, August 04, 2010 5:35 PM:
+> 
+> >> -----Original Message-----
+> >> From: Pedanekar, Hemant
+> >> Sent: Wednesday, August 04, 2010 5:31 PM
+> >> To: Shilimkar, Santosh; Russell King - ARM Linux
+> >> Cc: linux-arm-kernel at lists.infradead.org
+> >> Subject: RE: Memory type used for ioremap
+> >>
+> >> Shilimkar, Santosh wrote:
+> >>>> Pedanekar, Hemant wrote:
+> >>>>> Russell King - ARM Linux wrote:
+> >>>>>> On Fri, Jul 09, 2010 at 07:32:46PM +0530, Pedanekar,
+> >>> Hemant wrote:
+> >>>>>>> Catalin,
+> >>>>>>
+> >
+> >> Santosh,
+> >>
+> >> Can you please point me to the patch series you mentioned? I will give
+> it a
+> >> try.
+> > http://www.spinics.net/lists/arm-kernel/msg93218.html
+> >
+> 
+> Thanks for the link. I applied the patches and used writel/readl but no
+> luck.
+> The MT_DEVICE mappings still result into writes not getting through.
+> 
+> >>
+> >> Regarding read-back, the writes themselves are not successful as the
+> >> peripheral has specific requirement for non-posted writes. So reading
+> back
+> >> after write Always returns old value.
+> >>
+> > Are you sure about this behaviour?
+> 
+> Yes. The writes are not going through with MT_DEVICE mappings as the
+> target
+> peripheral has requirement for non-posted writes.
+> 
+> Looks like only strongly ordered mapping is resulting into non-posted
+> writes
+> which works. Is there any specific reason the strongly order mapping patch
+> is
+> not accepted/applied?
 
-By default the port would be used for SDIO. To select RS232 or RS485 mode,
-pass string "uart=232" or "uart=485" respectively in the kernel parameters.
-"uart=485" is ignored on OpenRD-Base as it doesn't have RS485 port.
+Attaching one which is I use for debugging. This is only for OMAP3/4
+Hope this is useful to you.
 
-v2 - use gpio* functions instead of read/write to set/reset GPIO
-v3 - notify user when wrong kernel paramter is passed
-v4 - use linux/gpio.h instead of mach/gpio.h
+I suggest only the device which has non-posted requirement
+you convert it to SO
 
-Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
----
- arch/arm/mach-kirkwood/openrd-setup.c |  101 ++++++++++++++++++++++++++++++++-
- 1 files changed, 100 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
-index fd06be6..95c5917 100644
---- a/arch/arm/mach-kirkwood/openrd-setup.c
-+++ b/arch/arm/mach-kirkwood/openrd-setup.c
-@@ -16,6 +16,7 @@
- #include <linux/ata_platform.h>
- #include <linux/mv643xx_eth.h>
- #include <linux/i2c.h>
-+#include <linux/gpio.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <mach/kirkwood.h>
-@@ -57,7 +58,15 @@ static struct mvsdio_platform_data openrd_mvsdio_data = {
- };
- 
- static unsigned int openrd_mpp_config[] __initdata = {
-+	MPP12_SD_CLK,
-+	MPP13_SD_CMD,
-+	MPP14_SD_D0,
-+	MPP15_SD_D1,
-+	MPP16_SD_D2,
-+	MPP17_SD_D3,
-+	MPP28_GPIO,
- 	MPP29_GPIO,
-+	MPP34_GPIO,
- 	0
- };
- 
-@@ -67,6 +76,75 @@ static struct i2c_board_info i2c_board_info[] __initdata = {
- 	},
- };
- 
-+static int __initdata uart1;
-+
-+static int __init sd_uart_selection(char *str)
-+{
-+	uart1 = -EINVAL;
-+
-+	/* Default is SD. Change if required, for UART */
-+	if (!str)
-+		return 0;
-+
-+	if (!strncmp(str, "232", 3)) {
-+		uart1 = 232;
-+	} else if (!strncmp(str, "485", 3)) {
-+		/* OpenRD-Base doesn't have RS485. Treat is as an
-+		 * unknown argument & just have default setting -
-+		 * which is SD */
-+		if (machine_is_openrd_base()) {
-+			uart1 = -ENODEV;
-+			return 1;
-+		}
-+
-+		uart1 = 485;
-+	}
-+	return 1;
-+}
-+/* Parse boot_command_line string uart=232/485 */
-+__setup("uart=", sd_uart_selection);
-+
-+static int __init uart1_mpp_config(void)
-+{
-+	/* Configure MPP for UART1 */
-+	unsigned int uart1_mpp_config[] = {
-+		MPP13_UART1_TXD,
-+		MPP14_UART1_RXD,
-+		0
-+	};
-+
-+	kirkwood_mpp_conf(uart1_mpp_config);
-+
-+	if (gpio_request(34, "SD_UART1_SEL")) {
-+		printk(KERN_ERR "GPIO request failed for SD/UART1 selection"
-+				", gpio: 34\n");
-+		return -EIO;
-+	}
-+
-+	if (gpio_request(28, "RS232_RS485_SEL")) {
-+		printk(KERN_ERR "GPIO request failed for RS232/RS485 selection"
-+				", gpio# 28\n");
-+		gpio_free(34);
-+		return -EIO;
-+	}
-+
-+	/* Select UART1
-+	 * Pin # 34: 0 => UART1, 1 => SD */
-+	gpio_direction_output(34, 0);
-+
-+	/* Select RS232 OR RS485
-+	 * Pin # 28: 0 => RS232, 1 => RS485 */
-+	if (uart1 == 232)
-+		gpio_direction_output(28, 0);
-+	else
-+		gpio_direction_output(28, 1);
-+
-+	gpio_free(34);
-+	gpio_free(28);
-+
-+	return 0;
-+}
-+
- static void __init openrd_init(void)
- {
- 	/*
-@@ -90,7 +168,6 @@ static void __init openrd_init(void)
- 		kirkwood_ge01_init(&openrd_ge01_data);
- 
- 	kirkwood_sata_init(&openrd_sata_data);
--	kirkwood_sdio_init(&openrd_mvsdio_data);
- 
- 	kirkwood_i2c_init();
- 
-@@ -99,6 +176,28 @@ static void __init openrd_init(void)
- 			ARRAY_SIZE(i2c_board_info));
- 		kirkwood_audio_init();
- 	}
-+
-+	if (uart1 <= 0) {
-+		if (uart1 < 0)
-+			printk(KERN_ERR "Invalid kernel parameter to select "
-+				"UART1. Defaulting to SD. ERROR CODE: %d\n",
-+				uart1);
-+
-+		/* Select SD
-+		 * Pin # 34: 0 => UART1, 1 => SD */
-+		if (gpio_request(34, "SD_UART1_SEL")) {
-+			printk(KERN_ERR "GPIO request failed for SD/UART1 "
-+					"selection, gpio: 34\n");
-+		} else {
-+
-+			gpio_direction_output(34, 1);
-+			gpio_free(34);
-+			kirkwood_sdio_init(&openrd_mvsdio_data);
-+		}
-+	} else {
-+		if (!uart1_mpp_config())
-+			kirkwood_uart1_init();
-+	}
- }
- 
- static int __init openrd_pci_init(void)
--- 
-1.6.6.1
+Regards,
+Santosh
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-OMAP3-4-Enable-IO-posting.patch
+Type: application/octet-stream
+Size: 7074 bytes
+Desc: 0001-OMAP3-4-Enable-IO-posting.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100811/6b57000a/attachment-0001.obj>
