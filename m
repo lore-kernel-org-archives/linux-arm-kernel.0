@@ -1,45 +1,72 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 10 Aug 2010 17:27:01 -0700
-Subject: [PATCH] ARM: uaccess: Implement strict user copy checks
-In-Reply-To: <20100810225519.GF7702@n2100.arm.linux.org.uk>
-References: <1280890950-19174-1-git-send-email-sboyd@codeaurora.org>
-	<4C61D6E3.1030603@codeaurora.org>
-	<20100810225519.GF7702@n2100.arm.linux.org.uk>
-Message-ID: <4C61EE55.5030506@codeaurora.org>
+From: x0095840@ti.com (Fernando Guzman Lugo)
+Date: Tue, 10 Aug 2010 20:12:49 -0500
+Subject: [PATCHv2] mailbox: change full flag per mailbox queue instead of
+	global
+Message-ID: <1281489169-15945-1-git-send-email-x0095840@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2010 03:55 PM, Russell King - ARM Linux wrote:
->
-> Unfortunately, there's quite a dearth of information on this patch,
-> so I can't say.  I think it needs some testing before a decision can
-> be made.
+As pointed by Ohad Ben-Cohen, the variable rq_full flag is a
+global variable, so if there are multiple mailbox users
+there will be conflics. Now there is a full flag per
+mailbox queue.
 
-Ok. I'll add more info and resend. Do you mind testing ;-)
+Version 2:
+- Rebase to the latest.
 
->
-> What compilers have been tested with this?
+Reported-by: Ohad Ben-Cohen <ohad@wizery.com>
+Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
+---
+ arch/arm/plat-omap/include/plat/mailbox.h |    1 +
+ arch/arm/plat-omap/mailbox.c              |   10 +++++++---
+ 2 files changed, 8 insertions(+), 3 deletions(-)
 
-So far I've tested it with gcc-4.4.0 and 4.3.1
-
->
-> As the help comments intimate that it needs at least gcc 4.4, and
-> you've changed it to produce a compile time warning if the option is
-> disabled, what's the implications for older compilers?
-
-With older compilers (pre 4.4) __compiletime_object_size() will be 
-replaced with -1 causing this code to be optimized away. Also, 
-__compiletime_warning() and __compiletime_error() aren't defined to be 
-anything except in include/linux/compiler-gcc4.h so users of older 
-compilers shouldn't see any warnings or errors regardless of the config 
-option being enabled.
-
-People will start seeing warnings if they use gcc 4.4 or later though.
-It's debatable whether or not to have both the warning and the error 
-when you consider -Werror. I went this way since x86 and parisc opted 
-for warnings and errors. Furthermore, I don't see any warnings or errors 
-with this patch in my builds.
-
+diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
+index 9976565..261f6b8 100644
+--- a/arch/arm/plat-omap/include/plat/mailbox.h
++++ b/arch/arm/plat-omap/include/plat/mailbox.h
+@@ -48,6 +48,7 @@ struct omap_mbox_queue {
+ 	struct tasklet_struct	tasklet;
+ 	int	(*callback)(void *);
+ 	struct omap_mbox	*mbox;
++	bool	full;
+ };
+ 
+ struct omap_mbox {
+diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+index d2fafb8..c59c9c3 100644
+--- a/arch/arm/plat-omap/mailbox.c
++++ b/arch/arm/plat-omap/mailbox.c
+@@ -33,7 +33,6 @@
+ 
+ static struct workqueue_struct *mboxd;
+ static struct omap_mbox **mboxes;
+-static bool rq_full;
+ 
+ static int mbox_configured;
+ static DEFINE_MUTEX(mbox_configured_lock);
+@@ -145,7 +144,12 @@ static void mbox_rx_work(struct work_struct *work)
+ 	while (kfifo_len(&mq->fifo) >= sizeof(msg)) {
+ 		len = kfifo_out(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
+ 		WARN_ON(len != sizeof(msg));
+-
++		spin_lock_irq(&mq->lock);
++		if (mq->full) {
++			omap_mbox_enable_irq(mq->mbox, IRQ_RX);
++			mq->full = false;
++		}
++		spin_unlock_irq(&mq->lock);
+ 		if (mq->callback)
+ 			mq->callback((void *)msg);
+ 	}
+@@ -170,7 +174,7 @@ static void __mbox_rx_interrupt(struct omap_mbox *mbox)
+ 	while (!mbox_fifo_empty(mbox)) {
+ 		if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
+ 			omap_mbox_disable_irq(mbox, IRQ_RX);
+-			rq_full = true;
++			mq->full = true;
+ 			goto nomem;
+ 		}
+ 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.6.3.3
