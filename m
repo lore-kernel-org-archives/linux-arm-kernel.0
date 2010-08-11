@@ -1,46 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 Aug 2010 10:54:54 +0100
-Subject: Problem with non aligned DMA in usbnet on ARM
-In-Reply-To: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
-References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
-Message-ID: <20100811095454.GA22543@n2100.arm.linux.org.uk>
+From: adrian.hunter@nokia.com (Adrian Hunter)
+Date: Wed, 11 Aug 2010 12:55:04 +0300
+Subject: [PATCH v3 6/9] omap: hsmmc: remove unused variable
+In-Reply-To: <1281478348-24833-7-git-send-email-ohad@wizery.com>
+References: <1281478348-24833-1-git-send-email-ohad@wizery.com>
+	<1281478348-24833-7-git-send-email-ohad@wizery.com>
+Message-ID: <4C627378.2090304@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 11, 2010 at 11:41:41AM +0200, Martin Fuzzey wrote:
-> Digging a bit showed that the driver was submitting a non aligned data
-> pointer in the URB.
-> This is due to:
-> skb_reserve (skb, NET_IP_ALIGN);
+Ohad Ben-Cohen wrote:
+> Make this go away:
 > 
-> in net/usb/usbnet.c rx_submit()
+> drivers/mmc/host/omap_hsmmc.c: In function 'omap_hsmmc_suspend':
+> drivers/mmc/host/omap_hsmmc.c:2328: warning: unused variable 'state'
+
+Was done a while ago.
+
+See 1a13f8fa76c880be41d6b1e6a2b44404bcbfdf9e in linus' tree.
+
 > 
-> NET_IP_ALIGN is defined as 2 in skbuff.h (default value as not defined
-> by ARM) hence the data buffer address was offset by 2 whereas the hcd
-> requires 4 byte alignment to work at all and cache line (32 byte here)
-> alignment to work reliably.
-
-x86 also has NET_IP_ALIGN as 2, so it will also be IP-header aligned there
-too, so the restriction won't be from the USB stack.
-
-> Removing this call to skb_reserve() fixes the problem for me.
-
-However, that makes parsing and creating IP headers really inefficient,
-especially as we take a trap each time a misaligned access is performed.
-
-> 3) Change the HCD to copy if not aligned
-> I'd like to avoid that.
-
-You haven't said what HCD you're using.
-
-> On a related note, this is the second time I've run into this type of
-> problem.It would be much easier to debug if the HCD warned (or
-> refused) misaligned URBs.
-
-If HCD can't cope with misaligned URBs, it should fail across the board -
-or be made to warn across the board - but I suspect it's a specific HCD
-that you're using which is only applicable to ARM.
-
-In that case, I'd say the HCD must handle misaligned URBs itself so
-behaviour is consistent between all implementations on different
-platforms.
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+> ---
+>  drivers/mmc/host/omap_hsmmc.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index b032828..d50e917 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -2272,7 +2272,6 @@ static int omap_hsmmc_suspend(struct device *dev)
+>  	int ret = 0;
+>  	struct platform_device *pdev = to_platform_device(dev);
+>  	struct omap_hsmmc_host *host = platform_get_drvdata(pdev);
+> -	pm_message_t state = PMSG_SUSPEND; /* unused by MMC core */
+>  
+>  	if (host && host->suspended)
+>  		return 0;
