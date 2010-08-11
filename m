@@ -1,34 +1,65 @@
-From: mfuzzey@gmail.com (Martin Fuzzey)
-Date: Thu, 12 Aug 2010 00:31:14 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 Aug 2010 23:47:29 +0100
 Subject: Problem with non aligned DMA in usbnet on ARM
-In-Reply-To: <20100811201332.GB10379@kroah.com>
+In-Reply-To: <4C632217.9000608@gmail.com>
 References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
-	<20100811095454.GA22543@n2100.arm.linux.org.uk>
-	<AANLkTimX46QKAGhiyo8AodaXVjuzoxr5-5z2V4gRr1Vu@mail.gmail.com>
-	<20100811150443.GB8867@kroah.com>
-	<AANLkTimmJDKbh3_pRY_ASKvjsf4YuuUMh3edh5LvDv-p@mail.gmail.com>
-	<20100811174238.GA12382@kroah.com> <4C62F4EF.1050808@gmail.com>
-	<20100811201332.GB10379@kroah.com>
-Message-ID: <4C6324B2.2080606@gmail.com>
+	<4C627479.4060400@parrot.com>
+	<AANLkTinU2JEkeYJHo4tA+kD9Pd_F3YcUTbK9w6igc7s8@mail.gmail.com>
+	<4C62C7B3.2030706@nvidia.com>
+	<20100811203505.GA463@n2100.arm.linux.org.uk>
+	<4C632217.9000608@gmail.com>
+Message-ID: <20100811224729.GD827@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg KH wrote:
-> Can you fix this in the host controller driver?
+On Thu, Aug 12, 2010 at 12:20:07AM +0200, Martin Fuzzey wrote:
+> [Gary, you forgot to copy -usb and netdev so adding them again to try to
+> keep this thread joined up]
+> 
+> Russell King - ARM Linux wrote:
+> > On Wed, Aug 11, 2010 at 08:54:27AM -0700, Gary King wrote:
+> >   
+> >> I sent a patch to the list about 2 weeks ago that added support to
+> >> DMA bounce to bounce for misaligned buffers. We have a similar
+> >> problem with URB alignment for usbnet on Tegra's HCD:
+> >> http://lists.arm.linux.org.uk/lurker/message/20100729.005746.b43fa1d9.en.html
 >
->   
-Technically yes (by copying the unaligned buffers).
+> Nice to know someone else has the same problem :)
+> What is the Tegra hcd?
+> I can't find it in the kernel sources.
+> 
+> > We don't want to add support for this to DMA bounce.  DMA bounce is already
+> > a pain in the backside and causes its own set of problems - please let it
+> > die a long slow but quite death.
+> >
+> > If you want to see the kind of pain dmabounce causes, look at this long
+> > standing and as yet unsolved bug:
+> >
+> >   http://bugzilla.kernel.org/show_bug.cgi?id=7760
+>
+> Well I don't know the dmabounce code but why is using it likely to cause
+> OOM problems (at least why more so than copying the buffer in the HCD or
+> the usb core).
 
-But if we do decide that USB must support unaligned buffers wouldn't it
-be better to have the HCD indicate it's alignment requirement to the
-core and have the core do the copying?
+The problem in that bug appears to be that there's soo much pressure on
+the first 64MB of memory that we run out of sufficiently large blocks
+of memory to be able to satisfy the requirements to do DMA bouncing via
+the dmabounce code.  I don't think anyone got to the bottom of why the
+DMA zone was exhausted first before the DMA32 zone ran out of pages.
 
-Gary King sent a message to this thread but only to the arm list saying
-he has the same problem with the tegra hcd (which doesn't seem to be in
-the tree yet.)  I don't know if any of the other in tree HCDs have this
-problem.
+However, as something using dma_map_single/dma_map_page has to return a
+contiguous buffer, we do need to use high order allocations for them - a
+driver on the other hand can make a decision about whether its possible
+to break up the buffer into smaller (and therefore easier to allocate)
+buffers.
 
-Also if this is a new requirement for HCDs usbtest probably needs a new
-test...
+> In both cases there will be two copies of the buffer in
+> memory which could I agree be a problem in memory constrained systems.
+> But if we _do_ want to accept unaligned buffers from usb drivers I can't
+> see  a way round that.
 
-Martin
+One thing we have done in the past (eg, SMC91x network driver on PXA) is
+to PIO the first couple of bytes to the device, and DMA the remainder -
+the DMA can't do non-word aligned start addresses.  This gives us the
+benefit of being able to deal with buffers containing IP packets without
+copying them, while preserving the performance of using DMA.
