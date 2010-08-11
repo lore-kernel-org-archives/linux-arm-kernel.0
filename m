@@ -1,146 +1,59 @@
 From: hjk@linutronix.de (Hans J. Koch)
-Date: Thu, 12 Aug 2010 01:20:14 +0200
-Subject: [PATCH] mx35: Fix boot ROM hang in internal boot mode
-In-Reply-To: <20100811052749.GA7803@pengutronix.de>
-References: <20100811001931.GA4626@local>
-	<20100811052749.GA7803@pengutronix.de>
-Message-ID: <20100811232013.GA6411@local>
+Date: Thu, 12 Aug 2010 01:37:21 +0200
+Subject: [PATCH v2] mx35: Fix boot ROM hang in internal boot mode
+Message-ID: <20100811233721.GB6411@local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 11, 2010 at 07:27:50AM +0200, Uwe Kleine-K?nig wrote:
-> Hello Hans,
+If a watchdog reset occurs after booting in internal boot mode, the i.MX35
+won't boot anymore. The boot ROM code seems to assume that some clocks are
+turned on (they are after a power-on reset). This patch turns on the
+necessary clocks.
 
-Hello Uwe,
-thanks for your review. A -v2 patch will follow soon. Some comments below.
+Signed-off-by: Hans J. Koch <hjk@linutronix.de>
+---
+ arch/arm/mach-mx3/clock-imx35.c |   20 ++++++++++++++++----
+ 1 files changed, 16 insertions(+), 4 deletions(-)
 
-Thanks,
-Hans
-
-> 
-> On Wed, Aug 11, 2010 at 02:19:33AM +0200, Hans J. Koch wrote:
-> > If a watchdog reset occurs after booting in internal boot mode, the i.MX35
-> > won't boot anymore. The boot ROM code seems to assume that some clocks are
-> > turned on (they are after a power-on reset). This patch turns on the
-> > necessary clocks.
-> > 
-> > Signed-off-by: Hans J. Koch <hjk@linutronix.de>
-> > ---
-> >  arch/arm/mach-mx3/clock-imx35.c |   20 +++++++++++++++++---
-> >  1 files changed, 17 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
-> > index d3af0fd..671acb6 100644
-> > --- a/arch/arm/mach-mx3/clock-imx35.c
-> > +++ b/arch/arm/mach-mx3/clock-imx35.c
-> > @@ -485,7 +485,7 @@ static struct clk_lookup lookups[] = {
-> >  
-> >  int __init mx35_clocks_init()
-> >  {
-> > -	unsigned int ll = 0;
-> > +	unsigned int ll = 0, cgr2, cgr3;
-> >  
-> >  #if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
-> >  	ll = (3 << 16);
-> > @@ -499,8 +499,22 @@ int __init mx35_clocks_init()
-> >  	__raw_writel((3 << 18), CCM_BASE + CCM_CGR0);
-> >  	__raw_writel((3 << 2) | (3 << 4) | (3 << 6) | (3 << 8) | (3 << 16),
-> >  			CCM_BASE + CCM_CGR1);
-> > -	__raw_writel((3 << 26) | ll, CCM_BASE + CCM_CGR2);
-> > -	__raw_writel(0, CCM_BASE + CCM_CGR3);
-> > +
-> > +	/* Check if we came up in internal boot mode. If yes, we need some
-> <nitpick> /* on an extra line please. </nitpick>
-
-alright, if you like it...
-
-> 
-> > +	 * extra clocks turned on, otherwise the MX35 boot ROM code will
-> > +	 * hang after a watchdog reset.
-> > +	 */
-> Better move the comment into the else branch below.
-
-There's no else branch anymore. Before the "if" the comment says what's
-being checked, and in the if branch the comment says what's being done.
-
-> 
-> > +	if (__raw_readl(CCM_BASE + CCM_RCSR) & (3 << 10)) {
-> Can you please introduce a symbol for (3 << 10)?.
-
-I just wanted to follow the style of the rest of the file ;-)
-Since you say you've got those #defines on your todo list, I better
-leave that to you.
-
-> 
-> > +		cgr2 = (3 << 26);
-> > +		cgr3 = 0;
-> > +	} else {
-> > +		/* Additionally turn on UART1, SCC, and IIM clocks */
-> really UART1?
-
-Well, stupid reference manual. They name the UARTs 1,2,3 instead of 0,1,2.
-That also leads to lines like:
-
-_REGISTER_CLOCK("imx-uart.0", NULL, uart1_clk)
-
-I renamed it UART0 in the comment to make it more clear.
-
-> 
-> > +		cgr2 = (3 << 26) | (3 << 16) | (3 << 4);
-> > +		cgr3 = (3 << 2);
-> > +	}
-> I would prefer having symbolic names here, too, but this affects not
-> only your patch.  Will put it on my todo list.
-
-Good idea, thank you. It's a PITA to need that >3000 pages reference manual
-to read the code...
-
-> 
-> Is it sensible to assume that the machine will boot in internal boot
-> mode again iff it came up this time in internal boot mode?  (I assume
-> yes, still I would reword the comment.  Something like the following?:
-> 
-> 	In internal boot mode the MX35 boot ROM code seems to assume
-> 	that UART1, SCC, and IIM clocks are on and hangs if they are
-> 	not.  These are enabled by hardware after a power-on reset, but
-> 	not after a watchdog reset.  So enable them here.
-> )
-> 
-> > +
-> > +	__raw_writel(cgr2 | ll, CCM_BASE + CCM_CGR2);
-> hmm, can you make this:
-> 
-> -	unsigned int ll = 0;
-> +	unsigned int cgr2 = 3 << 26, cgr3 = 0;
->  
->  #if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
->  	cgr2 |= 3 << 16;
->  #endif
->  ...
-> -...
-> +	if (!__raw_readl(CCM_BASE + CCM_RCSR) & (3 << 10)) {
-> +		/*
-> +		 * ...
-> +		 */
-> +		cgr2 |= 3 << 16 | 3 << 4;
-> +		cgr3 |= 3 << 2;
-> +	}
-
-Well, OK, I like that, too.
-
-> +
-> +	__raw_writel(cgr2, CCM_BASE + CCM_CGR2);
-> +	__raw_writel(cgr3, CCM_BASE + CCM_CGR3);
-> 
-> 
-> > +	__raw_writel(cgr3, CCM_BASE + CCM_CGR3);
-> >  
-> >  	mxc_timer_init(&gpt_clk,
-> >  			MX35_IO_ADDRESS(MX35_GPT1_BASE_ADDR), MX35_INT_GPT);
-> 
-> Thanks
-> Uwe
-> 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
+index d3af0fd..e619bdc 100644
+--- a/arch/arm/mach-mx3/clock-imx35.c
++++ b/arch/arm/mach-mx3/clock-imx35.c
+@@ -485,10 +485,10 @@ static struct clk_lookup lookups[] = {
+ 
+ int __init mx35_clocks_init()
+ {
+-	unsigned int ll = 0;
++	unsigned int cgr2 = 3 << 26, cgr3 = 0;
+ 
+ #if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
+-	ll = (3 << 16);
++	cgr2 |= (3 << 16);
+ #endif
+ 
+ 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+@@ -499,8 +499,20 @@ int __init mx35_clocks_init()
+ 	__raw_writel((3 << 18), CCM_BASE + CCM_CGR0);
+ 	__raw_writel((3 << 2) | (3 << 4) | (3 << 6) | (3 << 8) | (3 << 16),
+ 			CCM_BASE + CCM_CGR1);
+-	__raw_writel((3 << 26) | ll, CCM_BASE + CCM_CGR2);
+-	__raw_writel(0, CCM_BASE + CCM_CGR3);
++
++	/*
++	 * Check if we came up in internal boot mode. If yes, we need some
++	 * extra clocks turned on, otherwise the MX35 boot ROM code will
++	 * hang after a watchdog reset.
++	 */
++	if (!(__raw_readl(CCM_BASE + CCM_RCSR) & (3 << 10))) {
++		/* Additionally turn on UART0, SCC, and IIM clocks */
++		cgr2 |= (3 << 16) | (3 << 4);
++		cgr3 |= (3 << 2);
++	}
++
++	__raw_writel(cgr2, CCM_BASE + CCM_CGR2);
++	__raw_writel(cgr3, CCM_BASE + CCM_CGR3);
+ 
+ 	mxc_timer_init(&gpt_clk,
+ 			MX35_IO_ADDRESS(MX35_GPT1_BASE_ADDR), MX35_INT_GPT);
+-- 
+1.7.1
