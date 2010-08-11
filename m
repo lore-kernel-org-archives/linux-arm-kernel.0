@@ -1,84 +1,46 @@
-From: hemantp@ti.com (Pedanekar, Hemant)
-Date: Wed, 11 Aug 2010 20:28:00 +0530
-Subject: Memory type used for ioremap
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C65D750B@dbde02.ent.ti.com>
-References: <2A3DCF3DA181AD40BDE86A3150B27B6B030E181724@dbde02.ent.ti.com>
-	<1278677464.11895.41.camel@e102109-lin.cambridge.arm.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B030E181CAD@dbde02.ent.ti.com>
-	<20100709141416.GI22845@n2100.arm.linux.org.uk>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B030E5E42A7@dbde02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C641DE6B@dbde02.ent.ti.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B030E5E47F6@dbde02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C641E31D@dbde02.ent.ti.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B030E700C1E@dbde02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C65D750B@dbde02.ent.ti.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B030E700CCF@dbde02.ent.ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 11 Aug 2010 17:02:37 +0200
+Subject: [PATCH/RFC] Samsung device-table approach
+In-Reply-To: <1281530427.1918.124.camel@chotu>
+References: <1281528238-7298-1-git-send-email-m.szyprowski@samsung.com>
+	<1281530427.1918.124.camel@chotu>
+Message-ID: <003101cb3966$3f999bb0$beccd310$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shilimkar, Santosh wrote on Wednesday, August 11, 2010 6:34 PM:
+Hello,
 
->> -----Original Message-----
->> From: Pedanekar, Hemant
->> Sent: Wednesday, August 11, 2010 6:25 PM
->> To: Shilimkar, Santosh; Russell King - ARM Linux
->> Cc: linux-arm-kernel at lists.infradead.org
->> Subject: RE: Memory type used for ioremap
->> 
->> Shilimkar, Santosh wrote on Wednesday, August 04, 2010 5:35 PM:
->> 
->>>> -----Original Message-----
->>>> From: Pedanekar, Hemant
->>>> Sent: Wednesday, August 04, 2010 5:31 PM
->>>> To: Shilimkar, Santosh; Russell King - ARM Linux
->>>> Cc: linux-arm-kernel at lists.infradead.org
->>>> Subject: RE: Memory type used for ioremap
->>>> 
->>>> Shilimkar, Santosh wrote:
->>>>>> Pedanekar, Hemant wrote:
->>>>>>> Russell King - ARM Linux wrote:
->>>>>>>> On Fri, Jul 09, 2010 at 07:32:46PM +0530, Pedanekar,
->>>>> Hemant wrote:
->>>>>>>>> Catalin,
->>>>>>>> 
->>> 
->>>> Santosh,
->>>> 
->>>> Can you please point me to the patch series you mentioned? I will give
->>>> it a try.
->>> http://www.spinics.net/lists/arm-kernel/msg93218.html
->>> 
->> 
->> Thanks for the link. I applied the patches and used writel/readl but no
->> luck. The MT_DEVICE mappings still result into writes not getting through.
->> 
->>>> 
->>>> Regarding read-back, the writes themselves are not successful as the
->>>> peripheral has specific requirement for non-posted writes. So reading
->>>> back after write Always returns old value.
->>>> 
->>> Are you sure about this behaviour?
->> 
->> Yes. The writes are not going through with MT_DEVICE mappings as the target
->> peripheral has requirement for non-posted writes.
->> 
->> Looks like only strongly ordered mapping is resulting into non-posted
->> writes which works. Is there any specific reason the strongly order
->> mapping patch is not accepted/applied?
+On Wednesday, August 11, 2010 2:40 PM Ameya Palande wrote:
+
+> On Wed, 2010-08-11 at 14:03 +0200, ext Marek Szyprowski wrote:
+> > Hello,
+> >
+> > I would like to start the discussion on the redesign of the way the
+> > Samsung platform devices are defined. The current solution has some
+> > important disadvantages that blocks the further kernel development.
 > 
-> Attaching one which is I use for debugging. This is only for OMAP3/4 Hope
-> this is useful to you. 
-> 
-> I suggest only the device which has non-posted requirement
-> you convert it to SO
-> 
-> Regards,
-> Santosh
+> Forgive me about my ignorance about device tables, but I was wondering
+> if there is any similarity between device tables and Simple Firmware
+> Interface tables which are already in mainline?
 
-Thanks again... yes the writes work fine with SO.
+Well, this will be a funny discussion of two ignoramuses, as I know
+almost nothing about Simple Firmware Interface. 
 
-Is this patch accepted or under review? I don't see it on omap yet.
+However I've read briefly about it and I see that SFI device tables are
+something that is being defined at a boot loader level.
 
-Thanks
--
-Hemant
+Current mainline kernel for Samsung SoC already contains definitions
+for many devices (well, they should be called 'integrated peripherals'
+in fact). The boot loader provides only a very basic information to
+kernel (just the machine id, cpu type, amount of memory and kernel
+command line). No other information (especially about any device
+detected in the system) is provided.
+
+The proposed device-table approach for Samsung SoC is just the other
+(imho more convenient and more powerful) way of defining the platform
+devices and their resources for the Samsung integrated peripherals.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
