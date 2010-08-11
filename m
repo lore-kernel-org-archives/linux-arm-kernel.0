@@ -1,29 +1,46 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 11 Aug 2010 11:45:43 +0200
-Subject: colibri PXA320 and UCB1400 - touch screen troubles
-In-Reply-To: <201008111107.29839.marek.vasut@gmail.com>
-References: <AANLkTimZeDeS+44=BfchT0gwK5NDLhzLSX1vua8oFBQp@mail.gmail.com>
-	<201008111042.52631.marek.vasut@gmail.com>
-	<AANLkTimL7kt0-Do9VQUQvktHfsvdKjm_NJ-eDbxcAu2m@mail.gmail.com>
-	<201008111107.29839.marek.vasut@gmail.com>
-Message-ID: <20100811094543.GO17833@buzzloop.caiaq.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 Aug 2010 10:54:54 +0100
+Subject: Problem with non aligned DMA in usbnet on ARM
+In-Reply-To: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
+References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
+Message-ID: <20100811095454.GA22543@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 11, 2010 at 11:07:29AM +0200, Marek Vasut wrote:
-> Dne St 11. srpna 2010 10:54:08 Yuri Ludkevich napsal(a):
-> > 2010/8/11 Marek Vasut <marek.vasut@gmail.com>
-> > 
-> > > Dne St 11. srpna 2010 09:43:30 Yuri Ludkevich napsal(a):
-> > > 
-> > > Hi, it looks like the IRQ was misdetected probably. Check the following
-> > > two patches (and possibly the vpac270 source file, the "Audio and
-> > > Touchscreen" section will give you an idea how to force IRQ line to the
-> > > driver).
-> > 
-> > BTW do you know which GPIO used for UCB1400 interrupt?
+On Wed, Aug 11, 2010 at 11:41:41AM +0200, Martin Fuzzey wrote:
+> Digging a bit showed that the driver was submitting a non aligned data
+> pointer in the URB.
+> This is due to:
+> skb_reserve (skb, NET_IP_ALIGN);
+> 
+> in net/usb/usbnet.c rx_submit()
+> 
+> NET_IP_ALIGN is defined as 2 in skbuff.h (default value as not defined
+> by ARM) hence the data buffer address was offset by 2 whereas the hcd
+> requires 4 byte alignment to work at all and cache line (32 byte here)
+> alignment to work reliably.
 
-According to my reverse engineering, this should be GPIO4_2.
+x86 also has NET_IP_ALIGN as 2, so it will also be IP-header aligned there
+too, so the restriction won't be from the USB stack.
 
+> Removing this call to skb_reserve() fixes the problem for me.
 
-Daniel
+However, that makes parsing and creating IP headers really inefficient,
+especially as we take a trap each time a misaligned access is performed.
+
+> 3) Change the HCD to copy if not aligned
+> I'd like to avoid that.
+
+You haven't said what HCD you're using.
+
+> On a related note, this is the second time I've run into this type of
+> problem.It would be much easier to debug if the HCD warned (or
+> refused) misaligned URBs.
+
+If HCD can't cope with misaligned URBs, it should fail across the board -
+or be made to warn across the board - but I suspect it's a specific HCD
+that you're using which is only applicable to ARM.
+
+In that case, I'd say the HCD must handle misaligned URBs itself so
+behaviour is consistent between all implementations on different
+platforms.
