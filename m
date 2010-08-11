@@ -1,46 +1,31 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 11 Aug 2010 17:02:37 +0200
-Subject: [PATCH/RFC] Samsung device-table approach
-In-Reply-To: <1281530427.1918.124.camel@chotu>
-References: <1281528238-7298-1-git-send-email-m.szyprowski@samsung.com>
-	<1281530427.1918.124.camel@chotu>
-Message-ID: <003101cb3966$3f999bb0$beccd310$%szyprowski@samsung.com>
+From: greg@kroah.com (Greg KH)
+Date: Wed, 11 Aug 2010 08:04:43 -0700
+Subject: Problem with non aligned DMA in usbnet on ARM
+In-Reply-To: <AANLkTimX46QKAGhiyo8AodaXVjuzoxr5-5z2V4gRr1Vu@mail.gmail.com>
+References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
+	<20100811095454.GA22543@n2100.arm.linux.org.uk>
+	<AANLkTimX46QKAGhiyo8AodaXVjuzoxr5-5z2V4gRr1Vu@mail.gmail.com>
+Message-ID: <20100811150443.GB8867@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wednesday, August 11, 2010 2:40 PM Ameya Palande wrote:
-
-> On Wed, 2010-08-11 at 14:03 +0200, ext Marek Szyprowski wrote:
-> > Hello,
+On Wed, Aug 11, 2010 at 12:11:52PM +0200, Martin Fuzzey wrote:
+> > You haven't said what HCD you're using.
 > >
-> > I would like to start the discussion on the redesign of the way the
-> > Samsung platform devices are defined. The current solution has some
-> > important disadvantages that blocks the further kernel development.
+> imx21_hcd  (submitted by me and mainlined in 2.6.34)
 > 
-> Forgive me about my ignorance about device tables, but I was wondering
-> if there is any similarity between device tables and Simple Firmware
-> Interface tables which are already in mainline?
+> > In that case, I'd say the HCD must handle misaligned URBs itself so
+> > behaviour is consistent between all implementations on different
+> > platforms.
+> >
+> Here is a pointer to the thread where it was stated that HCD's don't
+> have to handle this.
+> 
+> http://kerneltrap.org/mailarchive/linux-usb/2009/4/20/5528164
 
-Well, this will be a funny discussion of two ignoramuses, as I know
-almost nothing about Simple Firmware Interface. 
+No, that thread is about stack vs. heap allocations, not about alignment
+issues.
 
-However I've read briefly about it and I see that SFI device tables are
-something that is being defined at a boot loader level.
+thanks,
 
-Current mainline kernel for Samsung SoC already contains definitions
-for many devices (well, they should be called 'integrated peripherals'
-in fact). The boot loader provides only a very basic information to
-kernel (just the machine id, cpu type, amount of memory and kernel
-command line). No other information (especially about any device
-detected in the system) is provided.
-
-The proposed device-table approach for Samsung SoC is just the other
-(imho more convenient and more powerful) way of defining the platform
-devices and their resources for the Samsung integrated peripherals.
-
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+greg k-h
