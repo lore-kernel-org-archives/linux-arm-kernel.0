@@ -1,50 +1,114 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 11 Aug 2010 16:27:15 +0800
-Subject: [PATCH] fix carelessly written Kconfig select statement
-In-Reply-To: <20100811081231.GA21815@n2100.arm.linux.org.uk>
-References: <AANLkTinAn_o7+AQzEk7V1vHzCFPPn6AVv=gMqCq7DDdH@mail.gmail.com>
-	<20100809073923.GA9838@n2100.arm.linux.org.uk>
-	<AANLkTinUq5At6kovGr8jGFOQ9XJJ9+0oXA+b_jsqn_JZ@mail.gmail.com>
-	<20100811081231.GA21815@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi==s7SBLJ5QKBDVnnAy9upZqs7VF-6c0o9Mm8MA@mail.gmail.com>
+From: roger.quadros@nokia.com (Roger Quadros)
+Date: Wed, 11 Aug 2010 11:30:29 +0300
+Subject: [PATCH v3 8/9] omap: hsmmc: split mmc23 power control
+In-Reply-To: <1281478348-24833-9-git-send-email-ohad@wizery.com>
+References: <1281478348-24833-1-git-send-email-ohad@wizery.com>
+	<1281478348-24833-9-git-send-email-ohad@wizery.com>
+Message-ID: <4C625FA5.8070705@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 11, 2010 at 4:12 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Aug 11, 2010 at 04:10:45PM +0800, Eric Miao wrote:
->> On Mon, Aug 9, 2010 at 3:39 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Mon, Aug 09, 2010 at 09:50:04AM +0800, eric.y.miao at gmail.com wrote:
->> >> Any one found this?
->> >>
->> >> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
->> >> ---
->> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> >> index 232f0c7..684c1a1 100644
->> >> --- a/arch/arm/Kconfig
->> >> +++ b/arch/arm/Kconfig
->> >> @@ -1184,8 +1184,8 @@ config LOCAL_TIMERS
->> >> ? ? ? ? ? ? ? REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
->> >> ? ? ? ? ? ? ? ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_TEGRA)
->> >> ? ? ? default y
->> >> - ? ? select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_VEXPRESS || ARCH_OMAP4 || \\
->> >> - ? ? ? ? ? ? ARCH_U8500 || ARCH_TEGRA
->> >> + ? ? select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_VEXPRESS || ARCH_OMAP4 || \
->> >> + ? ? ? ? ? ? ARCH_U8500 || ARCH_TEGRA)
->> >
->> > Just get rid of the open paren - there's no reason for it to exist.
->> >
->>
->> Updated as below. Patch sent to your tracking system from kernel.org,
->> though not sure if it hits there or not.
->
-> 6th patch. :-p
->
-> Already fixed in my tree twice over and I'm waiting for Linus to pull it.
+Hi Ohad,
 
-Good to know. No problem then.
+On 08/11/2010 01:12 AM, ext Ohad Ben-Cohen wrote:
+> Prepare for mmc3 regulator power control by splitting the power
+> control functions of mmc2 and mmc3, and expecting mmc3 to have
+> a single, dedicated, regulator support.
+>
+> Signed-off-by: Ohad Ben-Cohen<ohad@wizery.com>
+> ---
+>   arch/arm/mach-omap2/hsmmc.c   |   10 ++++--
+>   drivers/mmc/host/omap_hsmmc.c |   67 ++++++++++++++++++++++++++++++++++++----
+>   2 files changed, 66 insertions(+), 11 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+> index 1ef54b0..5d3d789 100644
+> --- a/arch/arm/mach-omap2/hsmmc.c
+> +++ b/arch/arm/mach-omap2/hsmmc.c
+> @@ -174,7 +174,7 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
+>   	}
+>   }
+>
+> -static void hsmmc23_before_set_reg(struct device *dev, int slot,
+> +static void hsmmc2_before_set_reg(struct device *dev, int slot,
+>   				   int power_on, int vdd)
+>   {
+>   	struct omap_mmc_platform_data *mmc = dev->platform_data;
+> @@ -325,14 +325,16 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
+>   				c->transceiver = 1;
+>   			if (c->transceiver&&  c->wires>  4)
+>   				c->wires = 4;
+> -			/* FALLTHROUGH */
+> -		case 3:
+>   			if (mmc->slots[0].features&  HSMMC_HAS_PBIAS) {
+>   				/* off-chip level shifting, or none */
+> -				mmc->slots[0].before_set_reg = hsmmc23_before_set_reg;
+> +				mmc->slots[0].before_set_reg = hsmmc2_before_set_reg;
+>   				mmc->slots[0].after_set_reg = NULL;
+>   			}
+>   			break;
+> +		case 3:
+> +			mmc->slots[0].before_set_reg = NULL;
+> +			mmc->slots[0].after_set_reg = NULL;
+> +			break;
+>   		default:
+>   			pr_err("MMC%d configuration not supported!\n", c->mmc);
+>   			kfree(mmc);
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index d50e917..6f5cea0 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -258,7 +258,7 @@ static int omap_hsmmc_1_set_power(struct device *dev, int slot, int power_on,
+>   	return ret;
+>   }
+>
+> -static int omap_hsmmc_23_set_power(struct device *dev, int slot, int power_on,
+> +static int omap_hsmmc_2_set_power(struct device *dev, int slot, int power_on,
+>   				   int vdd)
+>   {
+>   	struct omap_hsmmc_host *host =
+> @@ -309,6 +309,31 @@ static int omap_hsmmc_23_set_power(struct device *dev, int slot, int power_on,
+>   	return ret;
+>   }
+>
+> +static int omap_hsmmc_3_set_power(struct device *dev, int slot, int power_on,
+> +				   int vdd)
+> +{
+> +	struct omap_hsmmc_host *host =
+> +		platform_get_drvdata(to_platform_device(dev));
+> +	int ret = 0;
+> +
+> +	if (power_on) {
+> +		ret = mmc_regulator_set_ocr(host->vcc, vdd);
 
->
-> Thanks anyway.
->
+> +		/* Enable interface voltage rail, if needed */
+Why is this needed? In this case interface voltage rail seems to be the same as 
+card supply.
+
+If you notice mmc_regulator_set_ocr code, it is doing the regulator enable, so 
+don't need to enable it again below.
+
+> +		if (ret == 0&&  host->vcc) {
+> +			ret = regulator_enable(host->vcc);
+> +			if (ret<  0)
+> +				ret = mmc_regulator_set_ocr(host->vcc, 0);
+> +		}
+> +	} else {
+> +		if (host->vcc)
+> +			ret = regulator_disable(host->vcc);
+> +		if (ret == 0)
+> +			ret = mmc_regulator_set_ocr(host->vcc, 0);
+> +	}
+> +
+> +	return ret;
+> +}
+
+All This can be replaced to the following to simply
+
+if (power_on) {
+	return mmc_regulator_set_ocr(host->vcc, vdd);
+else
+	return mmc_regulator_set_ocr(host->vcc, 0);
+
+regards,
+-roger
