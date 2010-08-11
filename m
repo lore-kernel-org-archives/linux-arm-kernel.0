@@ -1,94 +1,53 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 11 Aug 2010 21:21:53 +0300
-Subject: [PATCH v4 8/8] omap: zoom: add mmc3/wl1271 device support
-In-Reply-To: <1281550913-17633-1-git-send-email-ohad@wizery.com>
-References: <1281550913-17633-1-git-send-email-ohad@wizery.com>
-Message-ID: <1281550913-17633-9-git-send-email-ohad@wizery.com>
+From: greg@kroah.com (Greg KH)
+Date: Wed, 11 Aug 2010 10:42:38 -0700
+Subject: Problem with non aligned DMA in usbnet on ARM
+In-Reply-To: <AANLkTimmJDKbh3_pRY_ASKvjsf4YuuUMh3edh5LvDv-p@mail.gmail.com>
+References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
+	<20100811095454.GA22543@n2100.arm.linux.org.uk>
+	<AANLkTimX46QKAGhiyo8AodaXVjuzoxr5-5z2V4gRr1Vu@mail.gmail.com>
+	<20100811150443.GB8867@kroah.com>
+	<AANLkTimmJDKbh3_pRY_ASKvjsf4YuuUMh3edh5LvDv-p@mail.gmail.com>
+Message-ID: <20100811174238.GA12382@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MMC3 support on ZOOM, which has the wl1271 device hardwired to.
+On Wed, Aug 11, 2010 at 06:08:43PM +0200, Martin Fuzzey wrote:
+> On Wed, Aug 11, 2010 at 5:04 PM, Greg KH <greg@kroah.com> wrote:
+> >> Here is a pointer to the thread where it was stated that HCD's don't
+> >> have to handle this.
+> >>
+> >> http://kerneltrap.org/mailarchive/linux-usb/2009/4/20/5528164
+> >
+> > No, that thread is about stack vs. heap allocations, not about alignment
+> > issues.
+> >
+> 
+> Well although the issue discussed in that thread was caused by a stack
+> allocation isn't the issue here the same?
+> 
+> My understanding is that a heap allocation as returned by kmalloc() will be:
+> 1) correctly aligned for DMA
+> and
+> 2) in a memory zone accessible to DMA
+> 
+> whereas a stack allocation is not guaranteed to have either of these properties.
+> 
+> The problem I described in that thread was due to case 1
+> (misalignment) rather than the stack memory zone not being accessible
+> at all to DMA.
+> To which was the reply was basically "use a heap allocation".
+> 
+> So the question is are hcds expected to accept arbitarilly aligned but
+> heap allocated pointers (such as the result of kmalloc() + 1)?
 
-The wl1271 is a 4-wire, 1.8V, embedded SDIO WLAN device with an
-external IRQ line, and power-controlled by a GPIO-based fixed regulator.
+It sounds like your HCD doesn't like this, so perhaps we should make
+that rule :)
 
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
----
- arch/arm/mach-omap2/board-zoom-peripherals.c |   34 ++++++++++++++++++++++++++
- 1 files changed, 34 insertions(+), 0 deletions(-)
+If you allocate the urb with a kmalloc() call with no offset, does it
+all work properly?  The driver should be calling usb_alloc_urb() which
+does this automatically for them, right?  Or is it trying to allocate
+things on its own somehow?
 
-diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
-index de88635..625ae56 100644
---- a/arch/arm/mach-omap2/board-zoom-peripherals.c
-+++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
-@@ -17,6 +17,8 @@
- #include <linux/i2c/twl.h>
- #include <linux/regulator/machine.h>
- #include <linux/regulator/fixed.h>
-+#include <linux/mmc/host.h>
-+#include <linux/wl12xx.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -29,6 +31,7 @@
- #include "hsmmc.h"
- 
- #define OMAP_ZOOM_WLAN_PMENA_GPIO	(101)
-+#define OMAP_ZOOM_WLAN_IRQ_GPIO		(162)
- 
- /* Zoom2 has Qwerty keyboard*/
- static int board_keymap[] = {
-@@ -185,6 +188,28 @@ static struct platform_device omap_vwlan_device = {
- 	},
- };
- 
-+struct wl12xx_platform_data omap_zoom_wlan_data = {
-+	/* ZOOM ref clock is 26 MHz */
-+	.board_ref_clock = 1,
-+};
-+
-+static struct resource omap_zoom_wl1271_resources[] = {
-+	{
-+		.start = OMAP_GPIO_IRQ(OMAP_ZOOM_WLAN_IRQ_GPIO),
-+		.end = OMAP_GPIO_IRQ(OMAP_ZOOM_WLAN_IRQ_GPIO),
-+		.flags = IORESOURCE_IRQ,
-+	}
-+};
-+static struct platform_device omap_zoom_wl1271 = {
-+	.name		= "wl1271_plat.2",
-+	.id		= -1,
-+	.resource	= omap_zoom_wl1271_resources,
-+	.num_resources	= ARRAY_SIZE(omap_zoom_wl1271_resources),
-+	.dev = {
-+		.platform_data = &omap_zoom_wlan_data,
-+	},
-+};
-+
- static struct omap2_hsmmc_info mmc[] __initdata = {
- 	{
- 		.name		= "external",
-@@ -202,6 +227,14 @@ static struct omap2_hsmmc_info mmc[] __initdata = {
- 		.nonremovable	= true,
- 		.power_saving	= true,
- 	},
-+	{
-+		.name		= "wl1271",
-+		.mmc		= 3,
-+		.wires		= 4,
-+		.gpio_wp	= -EINVAL,
-+		.gpio_cd	= -EINVAL,
-+		.nonremovable	= true,
-+	},
- 	{}      /* Terminator */
- };
- 
-@@ -313,6 +346,7 @@ static void enable_board_wakeup_source(void)
- 
- void __init zoom_peripherals_init(void)
- {
-+	platform_device_register(&omap_zoom_wl1271);
- 	omap_i2c_init();
- 	platform_device_register(&omap_vwlan_device);
- 	usb_musb_init(&musb_board_data);
--- 
-1.7.0.4
+thanks,
+
+greg k-h
