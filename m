@@ -1,50 +1,47 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 11 Aug 2010 16:19:24 +0300
-Subject: [RFC 0/6] adding SDIO Runtime PM support
-Message-ID: <1281532770-27545-1-git-send-email-ohad@wizery.com>
+Date: Wed, 11 Aug 2010 16:19:25 +0300
+Subject: [RFC/PATCH 1/6] mmc: sdio: fully reconfigure oldcard on resume
+In-Reply-To: <1281532770-27545-1-git-send-email-ohad@wizery.com>
+References: <1281532770-27545-1-git-send-email-ohad@wizery.com>
+Message-ID: <1281532770-27545-2-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SDIO function drivers should be able to power down/up
-their cards (e.g. a WLAN SDIO driver might want to
-power down its card whenever wlan0 is down).
+On resume, let mmc_sdio_init_card go all the way, instead
+of skipping the reconfiguration of the card's speed and width.
 
-In the past few weeks we've been discussing how this
-could be achieved, and I'd like to present a new approach,
-which is based on runtime pm API.
+This is needed to ensure cards wake up with their clock
+reconfigured (otherwise it's kept low).
 
-The following few patches add runtime pm support for SDIO
-devices, and demonstrate it with the wl1271_sdio driver.
-Basic functionality is provided: The power state of the
-device is now coupled with the state of the wlan0 interface.
+This patch also removes the explicit bus width reconfiguration
+on resume, since now this is part of mmc_sdio_init_card.
 
-The nice thing about this approach is how small it is,
-as the runtime PM core is already taking care of everything
-needed (usage counts, device hierarchy, established set of API,
-synchronization, ...).
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+---
+ drivers/mmc/core/sdio.c |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
 
-Having said that, I'd like to stress that these patches
-are early submitted for RFC purposes only, as they
-are still in a preliminary state and only lightly tested.
-
-Please note that I will soon be leaving for the rest of August and
-am going to have a very limited email access, so it might
-take me some time to respond.
-
-Appreciate your feedback,
-
-Thank you,
-
-Ohad Ben-Cohen (6):
-  mmc: sdio: fully reconfigure oldcard on resume
-  sdio: add power_restore support
-  mmc: add general runtime PM support
-  sdio: add general runtime PM support
-  sdio: enable Runtime PM for SDIO cards
-  wireless: wl1271_sdio: enable Runtime PM
-
- drivers/mmc/core/bus.c                    |   35 +++++++++++++++++++++++++++
- drivers/mmc/core/sdio.c                   |   24 +++++++++++++++---
- drivers/mmc/core/sdio_bus.c               |   10 ++++++++
- drivers/net/wireless/wl12xx/wl1271_sdio.c |   37 ++++++++++++++++++++++++++++-
- 4 files changed, 101 insertions(+), 5 deletions(-)
+diff --git a/drivers/mmc/core/sdio.c b/drivers/mmc/core/sdio.c
+index b9dee28..645f173 100644
+--- a/drivers/mmc/core/sdio.c
++++ b/drivers/mmc/core/sdio.c
+@@ -344,7 +344,6 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
+ 			goto err;
+ 		}
+ 		card = oldcard;
+-		return 0;
+ 	}
+ 
+ 	/*
+@@ -487,9 +486,6 @@ static int mmc_sdio_resume(struct mmc_host *host)
+ 	mmc_claim_host(host);
+ 	err = mmc_sdio_init_card(host, host->ocr, host->card,
+ 				 (host->pm_flags & MMC_PM_KEEP_POWER));
+-	if (!err)
+-		/* We may have switched to 1-bit mode during suspend. */
+-		err = sdio_enable_wide(host->card);
+ 	if (!err && host->sdio_irqs)
+ 		mmc_signal_sdio_irq(host);
+ 	mmc_release_host(host);
+-- 
+1.7.0.4
