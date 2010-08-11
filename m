@@ -1,114 +1,234 @@
-From: roger.quadros@nokia.com (Roger Quadros)
-Date: Wed, 11 Aug 2010 11:30:29 +0300
-Subject: [PATCH v3 8/9] omap: hsmmc: split mmc23 power control
-In-Reply-To: <1281478348-24833-9-git-send-email-ohad@wizery.com>
-References: <1281478348-24833-1-git-send-email-ohad@wizery.com>
-	<1281478348-24833-9-git-send-email-ohad@wizery.com>
-Message-ID: <4C625FA5.8070705@nokia.com>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Wed, 11 Aug 2010 14:01:56 +0530
+Subject: [PATCH v2] ARM: S5P6440: Add External Interrupt support
+In-Reply-To: <1274747055-12276-1-git-send-email-kgene.kim@samsung.com>
+References: <1274747055-12276-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <AANLkTikuhc=z3vfvT9qxyzxYqvycL797FehDLL-Nv3_Z@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+Hi Every one,
 
-On 08/11/2010 01:12 AM, ext Ohad Ben-Cohen wrote:
-> Prepare for mmc3 regulator power control by splitting the power
-> control functions of mmc2 and mmc3, and expecting mmc3 to have
-> a single, dedicated, regulator support.
+On 25 May 2010 05:54, Kukjin Kim <kgene.kim@samsung.com> wrote:
 >
-> Signed-off-by: Ohad Ben-Cohen<ohad@wizery.com>
+> From: Thomas Abraham <thomas.ab@samsung.com>
+>
+> Add external interrupt support for S5P6440. The external interrupts
+> supported as 0 to 15.
+>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 > ---
->   arch/arm/mach-omap2/hsmmc.c   |   10 ++++--
->   drivers/mmc/host/omap_hsmmc.c |   67 ++++++++++++++++++++++++++++++++++++----
->   2 files changed, 66 insertions(+), 11 deletions(-)
+> Changes since v1:
 >
-> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-> index 1ef54b0..5d3d789 100644
-> --- a/arch/arm/mach-omap2/hsmmc.c
-> +++ b/arch/arm/mach-omap2/hsmmc.c
-> @@ -174,7 +174,7 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
->   	}
->   }
+> 1. Removed unused include files.
+> 2. Fix incorrect return values.
 >
-> -static void hsmmc23_before_set_reg(struct device *dev, int slot,
-> +static void hsmmc2_before_set_reg(struct device *dev, int slot,
->   				   int power_on, int vdd)
->   {
->   	struct omap_mmc_platform_data *mmc = dev->platform_data;
-> @@ -325,14 +325,16 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
->   				c->transceiver = 1;
->   			if (c->transceiver&&  c->wires>  4)
->   				c->wires = 4;
-> -			/* FALLTHROUGH */
-> -		case 3:
->   			if (mmc->slots[0].features&  HSMMC_HAS_PBIAS) {
->   				/* off-chip level shifting, or none */
-> -				mmc->slots[0].before_set_reg = hsmmc23_before_set_reg;
-> +				mmc->slots[0].before_set_reg = hsmmc2_before_set_reg;
->   				mmc->slots[0].after_set_reg = NULL;
->   			}
->   			break;
-> +		case 3:
-> +			mmc->slots[0].before_set_reg = NULL;
-> +			mmc->slots[0].after_set_reg = NULL;
-> +			break;
->   		default:
->   			pr_err("MMC%d configuration not supported!\n", c->mmc);
->   			kfree(mmc);
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index d50e917..6f5cea0 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -258,7 +258,7 @@ static int omap_hsmmc_1_set_power(struct device *dev, int slot, int power_on,
->   	return ret;
->   }
+> ?arch/arm/mach-s5p6440/Makefile ? | ? ?2 +-
+> ?arch/arm/mach-s5p6440/irq-eint.c | ?164 ++++++++++++++++++++++++++++++++++++++
+> ?2 files changed, 165 insertions(+), 1 deletions(-)
+> ?create mode 100644 arch/arm/mach-s5p6440/irq-eint.c
 >
-> -static int omap_hsmmc_23_set_power(struct device *dev, int slot, int power_on,
-> +static int omap_hsmmc_2_set_power(struct device *dev, int slot, int power_on,
->   				   int vdd)
->   {
->   	struct omap_hsmmc_host *host =
-> @@ -309,6 +309,31 @@ static int omap_hsmmc_23_set_power(struct device *dev, int slot, int power_on,
->   	return ret;
->   }
+> diff --git a/arch/arm/mach-s5p6440/Makefile b/arch/arm/mach-s5p6440/Makefile
+> index be3c53a..f1bc1e0 100644
+> --- a/arch/arm/mach-s5p6440/Makefile
+> +++ b/arch/arm/mach-s5p6440/Makefile
+> @@ -12,7 +12,7 @@ obj- ? ? ? ? ? ? ? ? ? ? ? ? ?:=
 >
-> +static int omap_hsmmc_3_set_power(struct device *dev, int slot, int power_on,
-> +				   int vdd)
+> ?# Core support for S5P6440 system
+>
+> -obj-$(CONFIG_CPU_S5P6440) ? ? ?+= cpu.o init.o clock.o gpio.o dma.o
+> +obj-$(CONFIG_CPU_S5P6440) ? ? ?+= cpu.o init.o clock.o gpio.o dma.o irq-eint.o
+> ?obj-$(CONFIG_CPU_S5P6440) ? ? ?+= setup-i2c0.o
+>
+> ?# machine support
+> diff --git a/arch/arm/mach-s5p6440/irq-eint.c b/arch/arm/mach-s5p6440/irq-eint.c
+> new file mode 100644
+> index 0000000..93310ae
+> --- /dev/null
+> +++ b/arch/arm/mach-s5p6440/irq-eint.c
+> @@ -0,0 +1,164 @@
+> +/* arch/arm/mach-s5p6440/irq-eint.c
+> + *
+> + * Copyright (c) 2010 Samsung Electronics Co., Ltd
+> + * ? ? ? ? ? ? http://www.samsung.com/
+> + *
+> + * Based on linux/arch/arm/mach-s3c6410/irq-eint.c
+> + *
+> + * S5P6440 - Interrupt handling for External Interrupts.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/gpio.h>
+> +#include <linux/irq.h>
+> +#include <linux/io.h>
+> +
+> +#include <plat/regs-irqtype.h>
+> +#include <mach/regs-gpio.h>
+> +#include <plat/gpio-cfg.h>
+> +
+> +#define eint_offset(irq) ? ? ? ((irq) - IRQ_EINT(0))
+> +#define eint_irq_to_bit(irq) ? (1 << eint_offset(irq))
+> +
+> +static inline void s5p_irq_eint_mask(unsigned int irq)
 > +{
-> +	struct omap_hsmmc_host *host =
-> +		platform_get_drvdata(to_platform_device(dev));
-> +	int ret = 0;
+> + ? ? ? u32 mask = ?__raw_readl(S5P6440_EINT0MASK);
 > +
-> +	if (power_on) {
-> +		ret = mmc_regulator_set_ocr(host->vcc, vdd);
-
-> +		/* Enable interface voltage rail, if needed */
-Why is this needed? In this case interface voltage rail seems to be the same as 
-card supply.
-
-If you notice mmc_regulator_set_ocr code, it is doing the regulator enable, so 
-don't need to enable it again below.
-
-> +		if (ret == 0&&  host->vcc) {
-> +			ret = regulator_enable(host->vcc);
-> +			if (ret<  0)
-> +				ret = mmc_regulator_set_ocr(host->vcc, 0);
-> +		}
-> +	} else {
-> +		if (host->vcc)
-> +			ret = regulator_disable(host->vcc);
-> +		if (ret == 0)
-> +			ret = mmc_regulator_set_ocr(host->vcc, 0);
-> +	}
-> +
-> +	return ret;
+> + ? ? ? mask |= eint_irq_to_bit(irq);
+> + ? ? ? __raw_writel(mask, S5P6440_EINT0MASK);
 > +}
+> +
+> +static void s5p_irq_eint_unmask(unsigned int irq)
+> +{
+> + ? ? ? u32 mask = __raw_readl(S5P6440_EINT0MASK);
+> +
+> + ? ? ? mask &= ~eint_irq_to_bit(irq);
+> + ? ? ? __raw_writel(mask, S5P6440_EINT0MASK);
+> +}
+> +
+> +static inline void s5p_irq_eint_ack(unsigned int irq)
+> +{
+> + ? ? ? __raw_writel(eint_irq_to_bit(irq), S5P6440_EINT0PEND);
+> +}
+> +
+> +static void s5p_irq_eint_maskack(unsigned int irq)
+> +{
+> + ? ? ? s5p_irq_eint_mask(irq);
+> + ? ? ? s5p_irq_eint_ack(irq);
+> +}
+> +
+> +static int s5p_irq_eint_set_type(unsigned int irq, unsigned int type)
+> +{
+> + ? ? ? int offs = eint_offset(irq);
+> + ? ? ? int shift;
+> + ? ? ? u32 ctrl, mask;
+> + ? ? ? u32 newvalue = 0;
+> +
+> + ? ? ? if (offs > 15)
+> + ? ? ? ? ? ? ? return -EINVAL;
+> +
+> + ? ? ? switch (type) {
+> + ? ? ? case IRQ_TYPE_NONE:
+> + ? ? ? ? ? ? ? printk(KERN_WARNING "No edge setting!\n");
+> + ? ? ? ? ? ? ? break;
+> +
+> + ? ? ? case IRQ_TYPE_EDGE_RISING:
+> + ? ? ? ? ? ? ? newvalue = S3C2410_EXTINT_RISEEDGE;
+> + ? ? ? ? ? ? ? break;
+> +
+> + ? ? ? case IRQ_TYPE_EDGE_FALLING:
+> + ? ? ? ? ? ? ? newvalue = S3C2410_EXTINT_FALLEDGE;
+> + ? ? ? ? ? ? ? break;
+> +
+> + ? ? ? case IRQ_TYPE_EDGE_BOTH:
+> + ? ? ? ? ? ? ? newvalue = S3C2410_EXTINT_BOTHEDGE;
+> + ? ? ? ? ? ? ? break;
+> +
+> + ? ? ? case IRQ_TYPE_LEVEL_LOW:
+> + ? ? ? ? ? ? ? newvalue = S3C2410_EXTINT_LOWLEV;
+> + ? ? ? ? ? ? ? break;
+> +
+> + ? ? ? case IRQ_TYPE_LEVEL_HIGH:
+> + ? ? ? ? ? ? ? newvalue = S3C2410_EXTINT_HILEV;
+> + ? ? ? ? ? ? ? break;
+> +
+> + ? ? ? default:
+> + ? ? ? ? ? ? ? printk(KERN_ERR "No such irq type %d", type);
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
+> +
+> + ? ? ? shift = (offs / 2) * 4;
+> + ? ? ? mask = 0x7 << shift;
+> +
+> + ? ? ? ctrl = __raw_readl(S5P6440_EINT0CON0) & ~mask;
+> + ? ? ? ctrl |= newvalue << shift;
+> + ? ? ? __raw_writel(ctrl, S5P6440_EINT0CON0);
+> +
+> + ? ? ? s3c_gpio_cfgpin(S5P6440_GPN(offs), S3C_GPIO_SFN(2));
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static struct irq_chip s5p_irq_eint = {
+> + ? ? ? .name ? ? ? ? ? = "s5p-eint",
+> + ? ? ? .mask ? ? ? ? ? = s5p_irq_eint_mask,
+> + ? ? ? .unmask ? ? ? ? = s5p_irq_eint_unmask,
+> + ? ? ? .mask_ack ? ? ? = s5p_irq_eint_maskack,
+> + ? ? ? .ack ? ? ? ? ? ?= s5p_irq_eint_ack,
+> + ? ? ? .set_type ? ? ? = s5p_irq_eint_set_type,
+> +};
+> +
+> +static inline void s5p_irq_demux_eint(unsigned int start, unsigned int end)
+> +{
+> + ? ? ? u32 status = __raw_readl(S5P6440_EINT0PEND);
+> + ? ? ? u32 mask = __raw_readl(S5P6440_EINT0MASK);
+> + ? ? ? unsigned int irq;
+> +
+> + ? ? ? status &= ~mask;
+> + ? ? ? status >>= start;
+> + ? ? ? status &= (1 << (end - start + 1)) - 1;
+> +
+> + ? ? ? for (irq = IRQ_EINT(start); irq <= IRQ_EINT(end); irq++) {
+> + ? ? ? ? ? ? ? if (status & 1)
+> + ? ? ? ? ? ? ? ? ? ? ? generic_handle_irq(irq);
+> +
+> + ? ? ? ? ? ? ? status >>= 1;
+> + ? ? ? }
+> +}
+> +
+> +static void s5p_irq_demux_eint0_3(unsigned int irq, struct irq_desc *desc)
+> +{
+> + ? ? ? s5p_irq_demux_eint(0, 3);
+> +}
+> +
+> +static void s5p_irq_demux_eint4_11(unsigned int irq, struct irq_desc *desc)
+> +{
+> + ? ? ? s5p_irq_demux_eint(4, 11);
+> +}
+> +
+> +static void s5p_irq_demux_eint12_15(unsigned int irq, struct irq_desc *desc)
+> +{
+> + ? ? ? s5p_irq_demux_eint(12, 15);
+> +}
+> +
+> +static int __init s5p6440_init_irq_eint(void)
+> +{
+> + ? ? ? int irq;
+> +
+> + ? ? ? for (irq = IRQ_EINT(0); irq <= IRQ_EINT(15); irq++) {
+> + ? ? ? ? ? ? ? set_irq_chip(irq, &s5p_irq_eint);
+> + ? ? ? ? ? ? ? set_irq_handler(irq, handle_level_irq);
+> + ? ? ? ? ? ? ? set_irq_flags(irq, IRQF_VALID);
+> + ? ? ? }
+> +
+> + ? ? ? set_irq_chained_handler(IRQ_EINT0_3, s5p_irq_demux_eint0_3);
+> + ? ? ? set_irq_chained_handler(IRQ_EINT4_11, s5p_irq_demux_eint4_11);
+> + ? ? ? set_irq_chained_handler(IRQ_EINT12_15, s5p_irq_demux_eint12_15);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +arch_initcall(s5p6440_init_irq_eint);
+> --
+> 1.6.3.3
 
-All This can be replaced to the following to simply
+This patch would suffice for External interrupt support on SMDK6450 also.
+Any one got any to say on this..
 
-if (power_on) {
-	return mmc_regulator_set_ocr(host->vcc, vdd);
-else
-	return mmc_regulator_set_ocr(host->vcc, 0);
+Thanks,
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 
-regards,
--roger
+
+
+
+
+--
+Shine bright,
+(: Naveen Krishna Ch :)
