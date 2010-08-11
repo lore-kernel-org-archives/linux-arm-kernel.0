@@ -1,35 +1,64 @@
-From: mfuzzey@gmail.com (Martin Fuzzey)
-Date: Wed, 11 Aug 2010 13:38:37 +0200
-Subject: Problem with non aligned DMA in usbnet on ARM
-In-Reply-To: <4C627479.4060400@parrot.com>
-References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
-	<4C627479.4060400@parrot.com>
-Message-ID: <AANLkTinU2JEkeYJHo4tA+kD9Pd_F3YcUTbK9w6igc7s8@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 11 Aug 2010 14:03:53 +0200
+Subject: [PATCH 4/9] ARM: S5PV210: add support for device-table on Aquila&Goni
+In-Reply-To: <1281528238-7298-1-git-send-email-m.szyprowski@samsung.com>
+References: <1281528238-7298-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1281528238-7298-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 11, 2010 at 11:59 AM, Matthieu CASTET
-<matthieu.castet@parrot.com> wrote:
-> It is best to solve in usb driver, because for example in Asix case the
-> driver already do copy (see asix_rx_fixup/asix_tx_fixup).
->
-Yes, however those functions are only called for devices which register them.
-Looking at the driver_info and product id tables shows that it's only
-a subset of the devices that asix supports (88772 and 88178 chips)
+Add initial, empty device-table arrays, they will be populated later.
 
-In fact my hardware _is_ included
-	// DLink DUB-E100 H/W Ver B1 Alternate
-	USB_DEVICE (0x2001, 0x3c05),
-	.driver_info = (unsigned long) &ax88772_info,
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv210/mach-aquila.c |    4 ++++
+ arch/arm/mach-s5pv210/mach-goni.c   |    4 ++++
+ 2 files changed, 8 insertions(+), 0 deletions(-)
 
-but fixing this in asix_rx_fixup wouldn't solve it for the other
-supported devices.
-
-It seems to me these fixup functions are not intended to solve
-alignment issues but rather implement device specific framing (such as
-when the hardware packs multiple ethernet frames into a single urb)
-
-> PS : what hcd driver do you use ?
-imx21_hcd
-
-Martin
+diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
+index e412664..7989932 100644
+--- a/arch/arm/mach-s5pv210/mach-aquila.c
++++ b/arch/arm/mach-s5pv210/mach-aquila.c
+@@ -488,6 +488,9 @@ static struct platform_device *aquila_devices[] __initdata = {
+ 	&s5p_device_fimc2,
+ };
+ 
++static struct s3c_devtable aquila_devtable[] __initdata = {
++};
++
+ static void __init aquila_map_io(void)
+ {
+ 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+@@ -512,6 +515,7 @@ static void __init aquila_machine_init(void)
+ 	s3c_fb_set_platdata(&aquila_lcd_pdata);
+ 
+ 	platform_add_devices(aquila_devices, ARRAY_SIZE(aquila_devices));
++	samsung_add_devices(aquila_devtable, ARRAY_SIZE(aquila_devtable));
+ }
+ 
+ MACHINE_START(AQUILA, "Aquila")
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index 53754d7..6f555cf 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -467,6 +467,9 @@ static struct platform_device *goni_devices[] __initdata = {
+ 	&s3c_device_hsmmc2,
+ };
+ 
++static struct s3c_devtable goni_devtable[] __initdata = {
++};
++
+ static void __init goni_map_io(void)
+ {
+ 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+@@ -487,6 +490,7 @@ static void __init goni_machine_init(void)
+ 	s3c_fb_set_platdata(&goni_lcd_pdata);
+ 
+ 	platform_add_devices(goni_devices, ARRAY_SIZE(goni_devices));
++	samsung_add_devices(goni_devtable, ARRAY_SIZE(goni_devtable));
+ }
+ 
+ MACHINE_START(GONI, "GONI")
+-- 
+1.7.1.569.g6f426
