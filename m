@@ -1,35 +1,48 @@
 From: matthieu.castet@parrot.com (Matthieu CASTET)
-Date: Thu, 12 Aug 2010 19:01:20 +0200
+Date: Thu, 12 Aug 2010 19:08:57 +0200
 Subject: Problem with non aligned DMA in usbnet on ARM
-In-Reply-To: <4C6324B2.2080606@gmail.com>
-References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
-	<20100811095454.GA22543@n2100.arm.linux.org.uk>
-	<AANLkTimX46QKAGhiyo8AodaXVjuzoxr5-5z2V4gRr1Vu@mail.gmail.com>
-	<20100811150443.GB8867@kroah.com>
-	<AANLkTimmJDKbh3_pRY_ASKvjsf4YuuUMh3edh5LvDv-p@mail.gmail.com>
-	<20100811174238.GA12382@kroah.com> <4C62F4EF.1050808@gmail.com>
-	<20100811201332.GB10379@kroah.com> <4C6324B2.2080606@gmail.com>
-Message-ID: <4C6428E0.8040402@parrot.com>
+In-Reply-To: <4C632217.9000608@gmail.com>
+References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>	<4C627479.4060400@parrot.com>	<AANLkTinU2JEkeYJHo4tA+kD9Pd_F3YcUTbK9w6igc7s8@mail.gmail.com>	<4C62C7B3.2030706@nvidia.com>
+	<20100811203505.GA463@n2100.arm.linux.org.uk>
+	<4C632217.9000608@gmail.com>
+Message-ID: <4C642AA9.1060404@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Martin Fuzzey a ?crit :
-> Greg KH wrote:
->> Can you fix this in the host controller driver?
+>> We don't want to add support for this to DMA bounce.  DMA bounce is already
+>> a pain in the backside and causes its own set of problems - please let it
+>> die a long slow but quite death.
+>>
+>> If you want to see the kind of pain dmabounce causes, look at this long
+>> standing and as yet unsolved bug:
+>>
+>>   http://bugzilla.kernel.org/show_bug.cgi?id=7760
 >>
 >>   
-> Technically yes (by copying the unaligned buffers).
+> Well I don't know the dmabounce code but why is using it likely to cause
+> OOM problems (at least why more so than copying the buffer in the HCD or
+> the usb core). In both cases there will be two copies of the buffer in
+> memory which could I agree be a problem in memory constrained systems.
+> But if we _do_ want to accept unaligned buffers from usb drivers I can't
+> see  a way round that.
 > 
-> But if we do decide that USB must support unaligned buffers wouldn't it
-> be better to have the HCD indicate it's alignment requirement to the
-> core and have the core do the copying?
-> 
-> Gary King sent a message to this thread but only to the arm list saying
-> he has the same problem with the tegra hcd (which doesn't seem to be in
-> the tree yet.)  I don't know if any of the other in tree HCDs have this
-> problem.
-dwc otg also got this limitation. I don't know if the version submitted 
-for inclusion handle unaligned buffers.
+memmove is our friend :
+the buffer allocated in usbnet got an offset.
+All you have to do it remove this offset and memmove the data. That what 
+I did [1], and why it is better to do it in usb driver.
 
 
 Matthieu
+
+
+
+
+[1] http://article.gmane.org/gmane.linux.usb.general/28700
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: gadget-align.diff
+Type: text/x-diff
+Size: 2251 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100812/7bf8e096/attachment.bin>
