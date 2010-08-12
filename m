@@ -1,46 +1,35 @@
-From: gbean@codeaurora.org (Gregory Bean)
-Date: Thu, 12 Aug 2010 09:39:29 -0700
-Subject: [RFC] the right way to use gpiolib hooks to automate power management?
-Message-ID: <4C6423C1.9060509@codeaurora.org>
+From: matthieu.castet@parrot.com (Matthieu CASTET)
+Date: Thu, 12 Aug 2010 19:01:20 +0200
+Subject: Problem with non aligned DMA in usbnet on ARM
+In-Reply-To: <4C6324B2.2080606@gmail.com>
+References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
+	<20100811095454.GA22543@n2100.arm.linux.org.uk>
+	<AANLkTimX46QKAGhiyo8AodaXVjuzoxr5-5z2V4gRr1Vu@mail.gmail.com>
+	<20100811150443.GB8867@kroah.com>
+	<AANLkTimmJDKbh3_pRY_ASKvjsf4YuuUMh3edh5LvDv-p@mail.gmail.com>
+	<20100811174238.GA12382@kroah.com> <4C62F4EF.1050808@gmail.com>
+	<20100811201332.GB10379@kroah.com> <4C6324B2.2080606@gmail.com>
+Message-ID: <4C6428E0.8040402@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi folks:
+Martin Fuzzey a ?crit :
+> Greg KH wrote:
+>> Can you fix this in the host controller driver?
+>>
+>>   
+> Technically yes (by copying the unaligned buffers).
+> 
+> But if we do decide that USB must support unaligned buffers wouldn't it
+> be better to have the HCD indicate it's alignment requirement to the
+> core and have the core do the copying?
+> 
+> Gary King sent a message to this thread but only to the arm list saying
+> he has the same problem with the tegra hcd (which doesn't seem to be in
+> the tree yet.)  I don't know if any of the other in tree HCDs have this
+> problem.
+dwc otg also got this limitation. I don't know if the version submitted 
+for inclusion handle unaligned buffers.
 
-On MSM, we have a bank of gpios whose physical characteristics are
-controlled via a 'gpiomux' subsystem, which sets things like drive
-strength, pull-up, pull-down, gpio functional assignment, and the like.
 
-We have a written a software driver which reference-counts these gpio
-lines (via a put()/get() api), putting them in their "high-power" active
-configurations when they're in use, and dropping them down into a
-high-impedance low-power setting when they're not.
-
-We can't use gpiolib for this because many of these gpios are set to
-'non-gpio' mux settings: they get assigned to busses as data or address
-lines (for example) and are not used as gpios after that.
-
-However, for those gpios which are left in 'gpio mode', we DO want
-gpiolib to 'do the right thing' as regards power management.  From the
-following text in Documentation/gpio.txt:
-
-   int gpio_request(unsigned gpio, const char *label);
-   void gpio_free(unsigned gpio);
-
-   ...Some platforms may also use knowledge about what GPIOs are
-   active for power management, such as by powering down unused
-   chip sectors and, more easily, gating off unused clocks...
-
-I interpret from this that it is 'healthy' behavior to put a call to our
-gpiomux get() in our gpio_chip's gpio_request(), and a matching call to
-our gpiomux put() in gpio_free().  It seems to me that this would bring
-lines out of low-power mode when they're first requested, and put them
-back to sleep when they're released, exactly as we want.
-
-Is this the right thing to be doing, or is this going to get us in
-trouble? I want to make sure we're using the system as it was intended.
-
-Thanks!
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Matthieu
