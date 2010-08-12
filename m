@@ -1,34 +1,40 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 12 Aug 2010 09:40:19 +0300
-Subject: [PATCH v4 3/8] wireless: wl1271: add platform driver to get board
-	data
-In-Reply-To: <20100811212513.GC827@n2100.arm.linux.org.uk>
-References: <1281550913-17633-1-git-send-email-ohad@wizery.com>
-	<1281550913-17633-4-git-send-email-ohad@wizery.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0324110ABD@dbde02.ent.ti.com>
-	<20100811184742.GA21778@nokia.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC1@dbde02.ent.ti.com>
-	<20100811185724.GD21778@nokia.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC7@dbde02.ent.ti.com>
-	<20100811212513.GC827@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikDhzGVFZhNJZic9xYX9bL_NhOW=4LS-cTFSG0i@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 12 Aug 2010 16:36:57 +0800
+Subject: [PATCH] ARM: pxa/pwm: Make id const in pwm_probe()
+In-Reply-To: <1281593908-30448-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1281593908-30448-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <AANLkTinQK3pddET6eL=JR2aOY4eXTjgO4NFy63JhZo_o@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 12, 2010 at 12:25 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
->I've outlined a far simpler and easiler solution
-> which avoids this kind of abuse, and given suggestions on how to extend
-> it to support multiple instances.
+2010/8/12 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> This fixes the compiler warning:
 >
+> ? ? ? ?arch/arm/plat-pxa/pwm.c: In function 'pwm_probe':
+> ? ? ? ?arch/arm/plat-pxa/pwm.c:179: warning: initialization discards qualifiers from pointer target type
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Do you mean:
-http://www.spinics.net/lists/arm-kernel/msg95338.html
-?
+Ack.
 
-I was under the impression you eventually discarded that approach in that post.
-
-Please tell me if you still support it,
-
-Thanks,
-Ohad.
+> ---
+> ?arch/arm/plat-pxa/pwm.c | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/plat-pxa/pwm.c b/arch/arm/plat-pxa/pwm.c
+> index 0732c6c..ef32686 100644
+> --- a/arch/arm/plat-pxa/pwm.c
+> +++ b/arch/arm/plat-pxa/pwm.c
+> @@ -176,7 +176,7 @@ static inline void __add_pwm(struct pwm_device *pwm)
+>
+> ?static int __devinit pwm_probe(struct platform_device *pdev)
+> ?{
+> - ? ? ? struct platform_device_id *id = platform_get_device_id(pdev);
+> + ? ? ? const struct platform_device_id *id = platform_get_device_id(pdev);
+> ? ? ? ?struct pwm_device *pwm, *secondary = NULL;
+> ? ? ? ?struct resource *r;
+> ? ? ? ?int ret = 0;
+> --
+> 1.7.1
+>
+>
