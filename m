@@ -1,39 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Aug 2010 16:24:24 +0100
-Subject: [PATCH] spi: add spi_tegra driver
-In-Reply-To: <AANLkTinKNfPtaYYyUMmdTRewSKiRnTEfaf+pKkx_7jME@mail.gmail.com>
-References: <1280450224-25118-1-git-send-email-ccross@google.com>
-	<AANLkTimUm_wj+gyxTa=X+845kLj1sZ9GF+jsmsBwxnLN@mail.gmail.com>
-	<AANLkTinKNfPtaYYyUMmdTRewSKiRnTEfaf+pKkx_7jME@mail.gmail.com>
-Message-ID: <20100812152424.GB31982@n2100.arm.linux.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 12 Aug 2010 23:51:31 +0800
+Subject: [PATCH] tmio_mmc: fix misuse of kunmap_atomic() in tmio_mmc.c
+Message-ID: <1281628291-23802-1-git-send-email-eric.y.miao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 11, 2010 at 05:31:00PM -0700, Erik Gilling wrote:
-> >> + ? ? ? if (!request_mem_region(r->start, (r->end - r->start) + 1,
-> >> + ? ? ? ? ? ? ? ? ? ? ? dev_name(&pdev->dev))) {
-> >> + ? ? ? ? ? ? ? ret = -EBUSY;
-> >> + ? ? ? ? ? ? ? goto err0;
-> >> + ? ? ? }
-> >
-> > I believe the platform bus does this for you already by calling
-> > insert_resource() on all the platform bus ranges. ?See if /proc/iomem
-> > is any different with or without this call to verify.
-> 
-> You're right.  Didn't realize this
+According to commit 597781f3e51f48ef8e67be772196d9e9673752c4
 
-There is a big difference between what the platform bus does and what
-drivers do.
+    kmap_atomic: make kunmap_atomic() harder to misuse
 
-The platform bus adds the resources to the resource tree as they stand
-without marking them _busy_.  This means that they can be sub-divided
-and other resources registered within their range.
+kunmap_atomic() takes a pointer to within the page, instead of a pointer
+to 'struct page'.  So tmio_mmc_kunmap_atomic() should really take the
+pointer what tmio_mmc_kmap_atomic() returns.
 
-request_mem_region() adds resources to the resource tree marking them
-busy, detecting overlapping resources and indicating whether two
-drivers are trying to claim the same resource region.  In other words,
-it's a preventative measure against two device drivers accessing the
-same region.
+Cc: Ian Molton <spyro@f2s.com>
+Cc: Magnus Damm <damm@opensource.se>
+Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+---
+ drivers/mmc/host/tmio_mmc.c |    2 +-
+ drivers/mmc/host/tmio_mmc.h |    5 ++---
+ 2 files changed, 3 insertions(+), 4 deletions(-)
 
-You're absolutely right to do what you're doing above, please continue
-to do so.
+diff --git a/drivers/mmc/host/tmio_mmc.c b/drivers/mmc/host/tmio_mmc.c
+index ee7d0a5..24b9c3e 100644
+--- a/drivers/mmc/host/tmio_mmc.c
++++ b/drivers/mmc/host/tmio_mmc.c
+@@ -191,7 +191,7 @@ static void tmio_mmc_pio_irq(struct tmio_mmc_host *host)
+ 
+ 	host->sg_off += count;
+ 
+-	tmio_mmc_kunmap_atomic(host, &flags);
++	tmio_mmc_kunmap_atomic(buf, &flags);
+ 
+ 	if (host->sg_off == host->sg_ptr->length)
+ 		tmio_mmc_next_sg(host);
+diff --git a/drivers/mmc/host/tmio_mmc.h b/drivers/mmc/host/tmio_mmc.h
+index 64f7d5d..8f308b9 100644
+--- a/drivers/mmc/host/tmio_mmc.h
++++ b/drivers/mmc/host/tmio_mmc.h
+@@ -186,10 +186,9 @@ static inline char *tmio_mmc_kmap_atomic(struct tmio_mmc_host *host,
+ 	return kmap_atomic(sg_page(sg), KM_BIO_SRC_IRQ) + sg->offset;
+ }
+ 
+-static inline void tmio_mmc_kunmap_atomic(struct tmio_mmc_host *host,
+-	unsigned long *flags)
++static inline void tmio_mmc_kunmap_atomic(void *buf, unsigned long *flags)
+ {
+-	kunmap_atomic(sg_page(host->sg_ptr), KM_BIO_SRC_IRQ);
++	kunmap_atomic(buf, KM_BIO_SRC_IRQ);
+ 	local_irq_restore(*flags);
+ }
+ 
+-- 
+1.7.0.4
