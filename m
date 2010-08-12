@@ -1,29 +1,34 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Thu, 12 Aug 2010 12:04:57 +0530
-Subject: Request for holding Ryan's patch set for SPEAr
-Message-ID: <4C639611.8060107@st.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 12 Aug 2010 09:40:19 +0300
+Subject: [PATCH v4 3/8] wireless: wl1271: add platform driver to get board
+	data
+In-Reply-To: <20100811212513.GC827@n2100.arm.linux.org.uk>
+References: <1281550913-17633-1-git-send-email-ohad@wizery.com>
+	<1281550913-17633-4-git-send-email-ohad@wizery.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0324110ABD@dbde02.ent.ti.com>
+	<20100811184742.GA21778@nokia.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC1@dbde02.ent.ti.com>
+	<20100811185724.GD21778@nokia.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC7@dbde02.ent.ti.com>
+	<20100811212513.GC827@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikDhzGVFZhNJZic9xYX9bL_NhOW=4LS-cTFSG0i@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Thu, Aug 12, 2010 at 12:25 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+>I've outlined a far simpler and easiler solution
+> which avoids this kind of abuse, and given suggestions on how to extend
+> it to support multiple instances.
+>
 
-We are facing some problem in organizing patches for spear and need some
-help from you. Actually there are 5 patches for spear sent by Ryan some
-time back, they were related to removing multiple defconfigs and merging
-them for a family of machines. (Ryan did it for spear3xx).
+Do you mean:
+http://www.spinics.net/lists/arm-kernel/msg95338.html
+?
 
-Following is Ryan's patchset:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/017254.html
+I was under the impression you eventually discarded that approach in that post.
 
-We have been working on linux-2.6.32 until now and so didn't sent any further
-patches to mailing list because of other commitments. Now we have over 150 
-patches which we need to add to mainline. 
+Please tell me if you still support it,
 
-Since all our patches are based on multiple defconfig approach, a lot of work
-is required to rebase our patches over ryan's patchset.
-
-We request if you can hold ryan's patches. I would provide those patches over
-and above my patchset. This will make rebasing easier.
-
-Regards,
-viresh
+Thanks,
+Ohad.
