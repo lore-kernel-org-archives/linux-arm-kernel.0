@@ -1,43 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Aug 2010 19:27:44 +0100
-Subject: [RFC] the right way to use gpiolib hooks to automate power
-	management?
-In-Reply-To: <4C6423C1.9060509@codeaurora.org>
-References: <4C6423C1.9060509@codeaurora.org>
-Message-ID: <20100812182744.GC31982@n2100.arm.linux.org.uk>
+From: konkers@android.com (Erik Gilling)
+Date: Thu, 12 Aug 2010 11:44:33 -0700
+Subject: [PATCH] spi: add spi_tegra driver
+In-Reply-To: <20100812152424.GB31982@n2100.arm.linux.org.uk>
+References: <1280450224-25118-1-git-send-email-ccross@google.com>
+	<AANLkTimUm_wj+gyxTa=X+845kLj1sZ9GF+jsmsBwxnLN@mail.gmail.com>
+	<AANLkTinKNfPtaYYyUMmdTRewSKiRnTEfaf+pKkx_7jME@mail.gmail.com>
+	<20100812152424.GB31982@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTik+OyBJ5RYjfsoxEfBLdYO=y1nOVDmec2bpz+Wv@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 12, 2010 at 09:39:29AM -0700, Gregory Bean wrote:
-> On MSM, we have a bank of gpios whose physical characteristics are
-> controlled via a 'gpiomux' subsystem, which sets things like drive
-> strength, pull-up, pull-down, gpio functional assignment, and the like.
+On Thu, Aug 12, 2010 at 8:24 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Aug 11, 2010 at 05:31:00PM -0700, Erik Gilling wrote:
+>> >> + ? ? ? if (!request_mem_region(r->start, (r->end - r->start) + 1,
+>> >> + ? ? ? ? ? ? ? ? ? ? ? dev_name(&pdev->dev))) {
+>> >> + ? ? ? ? ? ? ? ret = -EBUSY;
+>> >> + ? ? ? ? ? ? ? goto err0;
+>> >> + ? ? ? }
+>> >
+>> > I believe the platform bus does this for you already by calling
+>> > insert_resource() on all the platform bus ranges. ?See if /proc/iomem
+>> > is any different with or without this call to verify.
+>>
+>> You're right. ?Didn't realize this
 >
-> We have a written a software driver which reference-counts these gpio
-> lines (via a put()/get() api), putting them in their "high-power" active
-> configurations when they're in use, and dropping them down into a
-> high-impedance low-power setting when they're not.
+> There is a big difference between what the platform bus does and what
+> drivers do.
+>
+> The platform bus adds the resources to the resource tree as they stand
+> without marking them _busy_. ?This means that they can be sub-divided
+> and other resources registered within their range.
+>
+> request_mem_region() adds resources to the resource tree marking them
+> busy, detecting overlapping resources and indicating whether two
+> drivers are trying to claim the same resource region. ?In other words,
+> it's a preventative measure against two device drivers accessing the
+> same region.
+>
+> You're absolutely right to do what you're doing above, please continue
+> to do so.
+>
 
-Beware.  What you're suggesting can lead to an increase in power
-consumption rather than the reduction you're looking for.
+Thanks for the explanation. I'll add it back in.
 
-Inputs don't like to float at mid-rail (mid-rail is absolutely the _worst_
-thing you can do with an unused input.)  Mid-rail means both transistors
-on the input are partially turned on, thereby causing current to flow
-between the supply rail through these transistors down to ground.
-
-This is also exactly the same reason why power consumption is related to
-clock speeds - when an input changes state, there's an overlap between one
-transistor turning on and the other turning off, which causes a pulse of
-current to be taken.
-
-It's far better, not only for power consumption reasons but also ESD
-sensitivity reasons to have unused outputs actively driven to their
-appropriate inactive level.
-
-Consider that output you're about to switch to a high impedance state
-(which makes it appear as an input.)  Have you first checked that there's
-a pull-up or pull-down resistor on the signal, or have you just created
-the situation where the device has become more sensitive to electrical
-noise and increased its (and the connected device) quiescent power
-dissipation?
+Cheers,
+    Erik
