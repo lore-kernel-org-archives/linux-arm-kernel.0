@@ -1,45 +1,32 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 13 Aug 2010 08:42:00 +1200
-Subject: Request for holding Ryan's patch set for SPEAr
-In-Reply-To: <4C639611.8060107@st.com>
-References: <4C639611.8060107@st.com>
-Message-ID: <4C645C98.1020401@bluewatersys.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 12 Aug 2010 13:48:11 -0700
+Subject: [RFC] the right way to use gpiolib hooks to automate power
+	management?
+In-Reply-To: <20100812182744.GC31982@n2100.arm.linux.org.uk>
+References: <4C6423C1.9060509@codeaurora.org>
+	<20100812182744.GC31982@n2100.arm.linux.org.uk>
+Message-ID: <20100812204811.GA31315@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2010 06:34 PM, viresh kumar wrote:
-> Russell,
+On Thu, Aug 12, 2010 at 07:27:44PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Aug 12, 2010 at 09:39:29AM -0700, Gregory Bean wrote:
+> > We have a written a software driver which reference-counts these gpio
+> > lines (via a put()/get() api), putting them in their "high-power" active
+> > configurations when they're in use, and dropping them down into a
+> > high-impedance low-power setting when they're not.
 > 
-> We are facing some problem in organizing patches for spear and need some
-> help from you. Actually there are 5 patches for spear sent by Ryan some
-> time back, they were related to removing multiple defconfigs and merging
-> them for a family of machines. (Ryan did it for spear3xx).
-> 
-> Following is Ryan's patchset:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/017254.html
-> 
-> We have been working on linux-2.6.32 until now and so didn't sent any further
-> patches to mailing list because of other commitments. Now we have over 150 
-> patches which we need to add to mainline. 
-> 
-> Since all our patches are based on multiple defconfig approach, a lot of work
-> is required to rebase our patches over ryan's patchset.
-> 
-> We request if you can hold ryan's patches. I would provide those patches over
-> and above my patchset. This will make rebasing easier.
+> Beware.  What you're suggesting can lead to an increase in power
+> consumption rather than the reduction you're looking for.
 
-Probably the easiest way is if I hold off my patches and rebase them
-after you have posted your patches. The other approach would be for you
-to apply them on top of your tree, make any necessary changes, and just
-keep my From/Signed-off-by tag when you post to the list.
+That probably just got a little obscured, since I think Greg is more
+concerned with the mechanism in software.  Our gpio's are generally
+configured in "low power" to be high-impedance with a pull-up or
+pull-down, depending on what it is hooked to.  They can be configured
+in most of the ways that would make sense to do so.
 
-~Ryan
+It may be the case, though, that what this "low power" mode is might
+need to also be configurable, since it likely depends on how the pin
+is connected.
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+David
