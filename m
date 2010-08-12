@@ -1,34 +1,86 @@
-From: David.Woodhouse@intel.com (David Woodhouse)
-Date: Thu, 12 Aug 2010 12:23:51 +0100
-Subject: [PATCH 1/2 v2] ARM: Fix gen_nand probe structures contents
-In-Reply-To: <1281581635-26213-1-git-send-email-marek.vasut@gmail.com>
-References: <1281581635-26213-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1281612232.12475.71.camel@localhost>
+From: hjk@linutronix.de (Hans J. Koch)
+Date: Thu, 12 Aug 2010 13:29:40 +0200
+Subject: [PATCH v2] mx35: Fix boot ROM hang in internal boot mode
+In-Reply-To: <20100812055753.GB9763@pengutronix.de>
+References: <20100811233721.GB6411@local>
+	<20100812055753.GB9763@pengutronix.de>
+Message-ID: <20100812112938.GB8670@local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-08-12 at 03:53 +0100, Marek Vasut wrote:
-> These three platforms didn't properly fill nr_chips in gen_nand registration and
-> therefore depended on gen_nand bug fixed by the following patch:
+On Thu, Aug 12, 2010 at 07:57:53AM +0200, Uwe Kleine-K?nig wrote:
+> Hello Hans,
 > 
-> "mtd: gen_nand: fix support for multiple chips"
-> 
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> ---
-> v2: Added other broken boards outside arch-arm (mips and bfin)
-> v1: Initial patch
-> 
->  arch/arm/mach-ixp4xx/ixdp425-setup.c      |    1 +
->  arch/arm/mach-mx3/mach-qong.c             |    1 +
->  arch/arm/mach-orion5x/ts78xx-setup.c      |    1 +
->  arch/blackfin/mach-bf537/boards/stamp.c   |    1 +
->  arch/blackfin/mach-bf561/boards/acvilon.c |    1 +
->  arch/mips/nxp/pnx833x/common/platform.c   |    1 +
->  6 files changed, 6 insertions(+), 0 deletions(-)
+> On Thu, Aug 12, 2010 at 01:37:21AM +0200, Hans J. Koch wrote:
+> > If a watchdog reset occurs after booting in internal boot mode, the i.MX35
+> > won't boot anymore. The boot ROM code seems to assume that some clocks are
+> > turned on (they are after a power-on reset). This patch turns on the
+> > necessary clocks.
+> > 
+> > Signed-off-by: Hans J. Koch <hjk@linutronix.de>
+> > ---
+> >  arch/arm/mach-mx3/clock-imx35.c |   20 ++++++++++++++++----
+> >  1 files changed, 16 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
+> > index d3af0fd..e619bdc 100644
+> > --- a/arch/arm/mach-mx3/clock-imx35.c
+> > +++ b/arch/arm/mach-mx3/clock-imx35.c
+> > @@ -485,10 +485,10 @@ static struct clk_lookup lookups[] = {
+> >  
+> >  int __init mx35_clocks_init()
+> >  {
+> > -	unsigned int ll = 0;
+> > +	unsigned int cgr2 = 3 << 26, cgr3 = 0;
+> >  
+> >  #if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
+> > -	ll = (3 << 16);
+> > +	cgr2 |= (3 << 16);
+> Please remove the parentheses here ...
 
-I'd already applied the three in arch/arm. Have now applied the others;
-thanks.
+I left these in to match the coding style of the rest. IMO, it makes
+it easier to read. Since you're going to replace all this with #defines,
+it doesn't matter anyway. But I won't argue. I remove them.
 
--- 
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
+> 
+> >  #endif
+> >  
+> >  	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+> > @@ -499,8 +499,20 @@ int __init mx35_clocks_init()
+> >  	__raw_writel((3 << 18), CCM_BASE + CCM_CGR0);
+> >  	__raw_writel((3 << 2) | (3 << 4) | (3 << 6) | (3 << 8) | (3 << 16),
+> >  			CCM_BASE + CCM_CGR1);
+> > -	__raw_writel((3 << 26) | ll, CCM_BASE + CCM_CGR2);
+> > -	__raw_writel(0, CCM_BASE + CCM_CGR3);
+> > +
+> > +	/*
+> > +	 * Check if we came up in internal boot mode. If yes, we need some
+> > +	 * extra clocks turned on, otherwise the MX35 boot ROM code will
+> > +	 * hang after a watchdog reset.
+> > +	 */
+> > +	if (!(__raw_readl(CCM_BASE + CCM_RCSR) & (3 << 10))) {
+> > +		/* Additionally turn on UART0, SCC, and IIM clocks */
+> > +		cgr2 |= (3 << 16) | (3 << 4);
+> ... and here ...
+> > +		cgr3 |= (3 << 2);
+> ... and here.
+> > +	}
+> > +
+> > +	__raw_writel(cgr2, CCM_BASE + CCM_CGR2);
+> > +	__raw_writel(cgr3, CCM_BASE + CCM_CGR3);
+> Note that my question concerning the UART clock was less about UART1 vs
+> UART0 but more if the ROM really needs a UART clock.
+
+In my tests on an mx35pdk board, I found these three clocks being the
+minimum set of additional clocks that need to be turned on. That means,
+if you turn off any of the three, it won't boot anymore.
+
+> And I prefer using
+> the name used in the manual, so UART1 please.
+
+OK.
+
+-v3 will follow soon.
+
+Thanks,
+Hans
