@@ -1,48 +1,73 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 12 Aug 2010 08:42:38 +0300
-Subject: [PATCH] nand: fix .correct callback return value check
-In-Reply-To: <ca767a0d6cafbea862c307e944c2b800dafb6660.1281327492.git.baruch@tkos.co.il>
-References: <20100808204341.GA20065@pengutronix.de>
-	<ca767a0d6cafbea862c307e944c2b800dafb6660.1281327492.git.baruch@tkos.co.il>
-Message-ID: <20100812054237.GB13166@jasper.tkos.co.il>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 12 Aug 2010 07:57:53 +0200
+Subject: [PATCH v2] mx35: Fix boot ROM hang in internal boot mode
+In-Reply-To: <20100811233721.GB6411@local>
+References: <20100811233721.GB6411@local>
+Message-ID: <20100812055753.GB9763@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi linux-mtd list,
+Hello Hans,
 
-Ping?
-
-At least the atmel_nand and the bf5xx_nand drivers may return -EIO for 
-uncorrectable errors, so this patch fixes a real bug.
-
-baruch
-
-On Mon, Aug 09, 2010 at 07:20:23AM +0300, Baruch Siach wrote:
-> Drivers may (and do) return negative errno values other than -1 from the
-> .correct callback.
+On Thu, Aug 12, 2010 at 01:37:21AM +0200, Hans J. Koch wrote:
+> If a watchdog reset occurs after booting in internal boot mode, the i.MX35
+> won't boot anymore. The boot ROM code seems to assume that some clocks are
+> turned on (they are after a power-on reset). This patch turns on the
+> necessary clocks.
 > 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> Signed-off-by: Hans J. Koch <hjk@linutronix.de>
 > ---
->  drivers/mtd/nand/nand_base.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  arch/arm/mach-mx3/clock-imx35.c |   20 ++++++++++++++++----
+>  1 files changed, 16 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-> index 4a7b864..080f551 100644
-> --- a/drivers/mtd/nand/nand_base.c
-> +++ b/drivers/mtd/nand/nand_base.c
-> @@ -1210,7 +1210,7 @@ static int nand_read_subpage(struct mtd_info *mtd, struct nand_chip *chip, uint3
->  		int stat;
+> diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
+> index d3af0fd..e619bdc 100644
+> --- a/arch/arm/mach-mx3/clock-imx35.c
+> +++ b/arch/arm/mach-mx3/clock-imx35.c
+> @@ -485,10 +485,10 @@ static struct clk_lookup lookups[] = {
 >  
->  		stat = chip->ecc.correct(mtd, p, &chip->buffers->ecccode[i], &chip->buffers->ecccalc[i]);
-> -		if (stat == -1)
-> +		if (stat < 0)
->  			mtd->ecc_stats.failed++;
->  		else
->  			mtd->ecc_stats.corrected += stat;
-> -- 
-> 1.7.1
+>  int __init mx35_clocks_init()
+>  {
+> -	unsigned int ll = 0;
+> +	unsigned int cgr2 = 3 << 26, cgr3 = 0;
+>  
+>  #if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
+> -	ll = (3 << 16);
+> +	cgr2 |= (3 << 16);
+Please remove the parentheses here ...
+
+>  #endif
+>  
+>  	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+> @@ -499,8 +499,20 @@ int __init mx35_clocks_init()
+>  	__raw_writel((3 << 18), CCM_BASE + CCM_CGR0);
+>  	__raw_writel((3 << 2) | (3 << 4) | (3 << 6) | (3 << 8) | (3 << 16),
+>  			CCM_BASE + CCM_CGR1);
+> -	__raw_writel((3 << 26) | ll, CCM_BASE + CCM_CGR2);
+> -	__raw_writel(0, CCM_BASE + CCM_CGR3);
+> +
+> +	/*
+> +	 * Check if we came up in internal boot mode. If yes, we need some
+> +	 * extra clocks turned on, otherwise the MX35 boot ROM code will
+> +	 * hang after a watchdog reset.
+> +	 */
+> +	if (!(__raw_readl(CCM_BASE + CCM_RCSR) & (3 << 10))) {
+> +		/* Additionally turn on UART0, SCC, and IIM clocks */
+> +		cgr2 |= (3 << 16) | (3 << 4);
+... and here ...
+> +		cgr3 |= (3 << 2);
+... and here.
+> +	}
+> +
+> +	__raw_writel(cgr2, CCM_BASE + CCM_CGR2);
+> +	__raw_writel(cgr3, CCM_BASE + CCM_CGR3);
+Note that my question concerning the UART clock was less about UART1 vs
+UART0 but more if the ROM really needs a UART clock.  And I prefer using
+the name used in the manual, so UART1 please.
+
+Thanks
+Uwe
 
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
