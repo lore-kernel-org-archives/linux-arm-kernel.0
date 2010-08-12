@@ -1,34 +1,33 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Thu, 12 Aug 2010 10:11:07 +0530
-Subject: Query: Patches break with Microsoft exchange server.
-In-Reply-To: <4C62C5BD.3020808@mnsu.edu>
-References: <4C5F9B25.8080401@st.com>
-	<AANLkTinxwRFLUibJECm0c3_oL5mYRkmscsw-xXgAHSTe@mail.gmail.com>
-	<4C624AE1.30504@st.com> <4C62C5BD.3020808@mnsu.edu>
-Message-ID: <4C637B63.1060404@st.com>
+From: felipe.balbi@nokia.com (Felipe Balbi)
+Date: Thu, 12 Aug 2010 08:21:26 +0300
+Subject: [PATCH v4 3/8] wireless: wl1271: add platform driver to get
+	board data
+In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB0324110AC7@dbde02.ent.ti.com>
+References: <1281550913-17633-1-git-send-email-ohad@wizery.com>
+	<1281550913-17633-4-git-send-email-ohad@wizery.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0324110ABD@dbde02.ent.ti.com>
+	<20100811184742.GA21778@nokia.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC1@dbde02.ent.ti.com>
+	<20100811185724.GD21778@nokia.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC7@dbde02.ent.ti.com>
+Message-ID: <20100812052126.GA23362@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- On 8/11/2010 9:16 PM, Jeffrey Hundstad wrote:
-> Hello,
->
-> Exchange 2010 does not handle IMAP "chunking" (partial message transfer) 
-> correctly.  Any request after about 1 megabyte of total message size 
-> will fail.
->
-> Thunderbird uses this "chunking" feature to give you a status update 
-> while downloading large messages.  The IMAP statements are of this type:
-> 11 UID fetch 244477 (UID RFC822.SIZE BODY[]<20480.12288>)
->
-> When the 20480 is larger than 1MB Exchange "claims" there is no more.  
-> Sigh....
->
-> Fortunately you can disable this feature.  To disable this in 
-> Thunderbird you can go to the Advanced configuration and disable the 
-> following feature, by setting it to false:
-> mail.server.default.fetch_by_chunks
-Jeffrey,
+Hi,
 
-I tried this but problem is still there.
+On Wed, Aug 11, 2010 at 09:27:18PM +0200, ext DebBarma, Tarun Kanti wrote:
+>Sounds perfect!
+>What that means is _probe() function makes sense only for cases where 
+>we have valid platform data because we are returning right at the top 
+>if pdata is not valid. If this is the case I was curious to know why 
+>not framework make another check for valid pdata before calling 
+>_probe() instead of coming all the way to _probe() and then returning!
 
-viresh.
+because pdata is completely optional. pdev OTOH isn't. Without a matched 
+platform_device, your probe() won't get called.
+
+-- 
+balbi
+
+DefectiveByDesign.org
