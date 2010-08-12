@@ -1,44 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Aug 2010 10:55:46 +0100
-Subject: [PATCH v4 3/8] wireless: wl1271: add platform driver to get
-	board data
-In-Reply-To: <AANLkTikDhzGVFZhNJZic9xYX9bL_NhOW=4LS-cTFSG0i@mail.gmail.com>
-References: <1281550913-17633-1-git-send-email-ohad@wizery.com>
-	<1281550913-17633-4-git-send-email-ohad@wizery.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0324110ABD@dbde02.ent.ti.com>
-	<20100811184742.GA21778@nokia.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC1@dbde02.ent.ti.com>
-	<20100811185724.GD21778@nokia.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC7@dbde02.ent.ti.com>
-	<20100811212513.GC827@n2100.arm.linux.org.uk>
-	<AANLkTikDhzGVFZhNJZic9xYX9bL_NhOW=4LS-cTFSG0i@mail.gmail.com>
-Message-ID: <20100812095546.GA3354@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 12 Aug 2010 13:04:00 +0200
+Subject: [PATCH 1/2 v2] ARM: Fix gen_nand probe structures contents
+In-Reply-To: <AANLkTimuLjGo7O1kWXq0XbTns4EV2e5q5o0esNns1BY9@mail.gmail.com>
+References: <1281581635-26213-1-git-send-email-marek.vasut@gmail.com>
+	<AANLkTimuLjGo7O1kWXq0XbTns4EV2e5q5o0esNns1BY9@mail.gmail.com>
+Message-ID: <201008121304.01178.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 12, 2010 at 09:40:19AM +0300, Ohad Ben-Cohen wrote:
-> On Thu, Aug 12, 2010 at 12:25 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> >I've outlined a far simpler and easiler solution
-> > which avoids this kind of abuse, and given suggestions on how to extend
-> > it to support multiple instances.
-> >
+Dne ?t 12. srpna 2010 05:36:31 Mike Frysinger napsal(a):
+> On Wed, Aug 11, 2010 at 22:53, Marek Vasut wrote:
+> > These three platforms didn't properly fill nr_chips in gen_nand
+> > registration and
 > 
-> Do you mean:
-> http://www.spinics.net/lists/arm-kernel/msg95338.html
-> ?
+> > therefore depended on gen_nand bug fixed by the following patch:
+> the Blackfin arch has a mailing list ... no need to pick out people
+
+Hi, that's true, but there's that "scripts/get_maintainer.pl" thing which gave 
+me this list.
+
+Cheers
 > 
-> I was under the impression you eventually discarded that approach in
-> that post.
-
-Indeed.
-
-I'm talking about my first suggestion:
-
-http://lists.arm.linux.org.uk/lurker/message/20100804.114148.bf961e83.en.html
-
-which was later expanded by Vitaly:
-
-http://lists.arm.linux.org.uk/lurker/message/20100804.140119.f476c29c.en.html
-
-I don't think anyone had any negative comments against that proposal.
+> > "mtd: gen_nand: fix support for multiple chips"
+> > 
+> >  arch/blackfin/mach-bf537/boards/stamp.c   |    1 +
+> >  arch/blackfin/mach-bf561/boards/acvilon.c |    1 +
+> 
+> looks sane enough to me
+> Acked-by: Mike Frysinger <vapier@gentoo.org>
+> -mike
