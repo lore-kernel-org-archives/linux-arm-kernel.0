@@ -1,32 +1,100 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 12 Aug 2010 08:18:28 +0200
-Subject: [PATCH] ARM: pxa/pwm: Make id const in pwm_probe()
-Message-ID: <1281593908-30448-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 12 Aug 2010 11:48:41 +0530
+Subject: Memory type used for ioremap
+In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B030E700CCF@dbde02.ent.ti.com>
+References: <2A3DCF3DA181AD40BDE86A3150B27B6B030E181724@dbde02.ent.ti.com>
+	<1278677464.11895.41.camel@e102109-lin.cambridge.arm.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B030E181CAD@dbde02.ent.ti.com>
+	<20100709141416.GI22845@n2100.arm.linux.org.uk>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B030E5E42A7@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C641DE6B@dbde02.ent.ti.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B030E5E47F6@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C641E31D@dbde02.ent.ti.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B030E700C1E@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C65D750B@dbde02.ent.ti.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B030E700CCF@dbde02.ent.ti.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C65D77D5@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the compiler warning:
+> -----Original Message-----
+> From: Pedanekar, Hemant
+> Sent: Wednesday, August 11, 2010 8:28 PM
+> To: Shilimkar, Santosh; Russell King - ARM Linux
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: RE: Memory type used for ioremap
+> 
+> Shilimkar, Santosh wrote on Wednesday, August 11, 2010 6:34 PM:
+> 
+> >> -----Original Message-----
+> >> From: Pedanekar, Hemant
+> >> Sent: Wednesday, August 11, 2010 6:25 PM
+> >> To: Shilimkar, Santosh; Russell King - ARM Linux
+> >> Cc: linux-arm-kernel at lists.infradead.org
+> >> Subject: RE: Memory type used for ioremap
+> >>
+> >> Shilimkar, Santosh wrote on Wednesday, August 04, 2010 5:35 PM:
+> >>
+> >>>> -----Original Message-----
+> >>>> From: Pedanekar, Hemant
+> >>>> Sent: Wednesday, August 04, 2010 5:31 PM
+> >>>> To: Shilimkar, Santosh; Russell King - ARM Linux
+> >>>> Cc: linux-arm-kernel at lists.infradead.org
+> >>>> Subject: RE: Memory type used for ioremap
+> >>>>
+> >>>> Shilimkar, Santosh wrote:
+> >>>>>> Pedanekar, Hemant wrote:
+> >>>>>>> Russell King - ARM Linux wrote:
+> >>>>>>>> On Fri, Jul 09, 2010 at 07:32:46PM +0530, Pedanekar,
+> >>>>> Hemant wrote:
+> >>>>>>>>> Catalin,
+> >>>>>>>>
+> >>>
+> >>>> Santosh,
+> >>>>
+> >>>> Can you please point me to the patch series you mentioned? I will
+> give
+> >>>> it a try.
+> >>> http://www.spinics.net/lists/arm-kernel/msg93218.html
+> >>>
+> >>
+> >> Thanks for the link. I applied the patches and used writel/readl but no
+> >> luck. The MT_DEVICE mappings still result into writes not getting
+> through.
+> >>
+> >>>>
+> >>>> Regarding read-back, the writes themselves are not successful as the
+> >>>> peripheral has specific requirement for non-posted writes. So reading
+> >>>> back after write Always returns old value.
+> >>>>
+> >>> Are you sure about this behaviour?
+> >>
+> >> Yes. The writes are not going through with MT_DEVICE mappings as the
+> target
+> >> peripheral has requirement for non-posted writes.
+> >>
+> >> Looks like only strongly ordered mapping is resulting into non-posted
+> >> writes which works. Is there any specific reason the strongly order
+> >> mapping patch is not accepted/applied?
+> >
+> > Attaching one which is I use for debugging. This is only for OMAP3/4
+> Hope
+> > this is useful to you.
+> >
+> > I suggest only the device which has non-posted requirement
+> > you convert it to SO
+> >
+> > Regards,
+> > Santosh
+> 
+> Thanks again... yes the writes work fine with SO.
+> 
+> Is this patch accepted or under review? I don't see it on omap yet.
+> 
+Last time this was shot down on the basis that barriers and read backs
+should fix most of the ordering issues. I am surprised that correct 
+barrier + readbacks, didn't work for you.
 
-	arch/arm/plat-pxa/pwm.c: In function 'pwm_probe':
-	arch/arm/plat-pxa/pwm.c:179: warning: initialization discards qualifiers from pointer target type
-
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/plat-pxa/pwm.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/plat-pxa/pwm.c b/arch/arm/plat-pxa/pwm.c
-index 0732c6c..ef32686 100644
---- a/arch/arm/plat-pxa/pwm.c
-+++ b/arch/arm/plat-pxa/pwm.c
-@@ -176,7 +176,7 @@ static inline void __add_pwm(struct pwm_device *pwm)
- 
- static int __devinit pwm_probe(struct platform_device *pdev)
- {
--	struct platform_device_id *id = platform_get_device_id(pdev);
-+	const struct platform_device_id *id = platform_get_device_id(pdev);
- 	struct pwm_device *pwm, *secondary = NULL;
- 	struct resource *r;
- 	int ret = 0;
--- 
-1.7.1
+Can you explain which device has such a requirement with more details.
+Most surprising part is, you are observering that a readback is returning
+to the write-buffer contents which looks really weird to me.
