@@ -1,28 +1,27 @@
 From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Wed, 11 Aug 2010 18:17:56 -0700
-Subject: [PATCH RFC 1/2] msm: Platform initialization for the IOMMU driver
+Date: Wed, 11 Aug 2010 18:17:57 -0700
+Subject: [PATCH RFC 2/2] msm: Platform data for MSM8x60 IOMMU devices
 In-Reply-To: <1281575877-1074-1-git-send-email-stepanm@codeaurora.org>
 References: <1281575877-1074-1-git-send-email-stepanm@codeaurora.org>
-Message-ID: <1281575877-1074-2-git-send-email-stepanm@codeaurora.org>
+Message-ID: <1281575877-1074-3-git-send-email-stepanm@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register a driver for the MSM IOMMU devices and a driver
-for the translation context devices. Set up the global
-IOMMU registers and initialize the context banks.
+Add platform data and resources for the IOMMUs and
+translation contexts found on the Qualcomm MSM8x60 chip.
 
 Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
 ---
- arch/arm/mach-msm/iommu_dev.c |  360 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 360 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-msm/iommu_dev.c
+ arch/arm/mach-msm/devices-msm8x60-iommu.c |  881 +++++++++++++++++++++++++++++
+ 1 files changed, 881 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-msm/devices-msm8x60-iommu.c
 
-diff --git a/arch/arm/mach-msm/iommu_dev.c b/arch/arm/mach-msm/iommu_dev.c
+diff --git a/arch/arm/mach-msm/devices-msm8x60-iommu.c b/arch/arm/mach-msm/devices-msm8x60-iommu.c
 new file mode 100644
-index 0000000..3015936
+index 0000000..cb2dbd6
 --- /dev/null
-+++ b/arch/arm/mach-msm/iommu_dev.c
-@@ -0,0 +1,360 @@
++++ b/arch/arm/mach-msm/devices-msm8x60-iommu.c
+@@ -0,0 +1,881 @@
 +/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -40,349 +39,870 @@ index 0000000..3015936
 + * 02110-1301, USA.
 + */
 +
-+#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
-+
 +#include <linux/kernel.h>
-+#include <linux/module.h>
 +#include <linux/platform_device.h>
-+#include <linux/io.h>
-+#include <linux/clk.h>
-+#include <linux/iommu.h>
-+#include <linux/interrupt.h>
-+#include <linux/err.h>
-+#include <linux/slab.h>
++#include <linux/bootmem.h>
 +
-+#include <mach/iommu_hw-8xxx.h>
++#include <mach/msm_iomap-8x60.h>
++#include <mach/irqs-8x60.h>
 +#include <mach/iommu.h>
 +
-+struct iommu_ctx_iter_data {
-+	/* input */
-+	const char *name;
-+
-+	/* output */
-+	struct device *dev;
-+};
-+
-+static struct platform_device *msm_iommu_root_dev;
-+
-+static int each_iommu_ctx(struct device *dev, void *data)
-+{
-+	struct iommu_ctx_iter_data *res = data;
-+	struct msm_iommu_ctx_dev *c = dev->platform_data;
-+
-+	if (!res || !c || !c->name || !res->name)
-+		return -EINVAL;
-+
-+	if (!strcmp(res->name, c->name)) {
-+		res->dev = dev;
-+		return 1;
-+	}
-+	return 0;
-+}
-+
-+static int each_iommu(struct device *dev, void *data)
-+{
-+	return device_for_each_child(dev, data, each_iommu_ctx);
-+}
-+
-+struct device *msm_iommu_get_ctx(const char *ctx_name)
-+{
-+	struct iommu_ctx_iter_data r;
-+	int found;
-+
-+	if (!msm_iommu_root_dev) {
-+		pr_err("No root IOMMU device.\n");
-+		goto fail;
-+	}
-+
-+	r.name = ctx_name;
-+	found = device_for_each_child(&msm_iommu_root_dev->dev, &r, each_iommu);
-+
-+	if (!found) {
-+		pr_err("Could not find context <%s>\n", ctx_name);
-+		goto fail;
-+	}
-+
-+	return r.dev;
-+fail:
-+	return NULL;
-+}
-+EXPORT_SYMBOL(msm_iommu_get_ctx);
-+
-+static void msm_iommu_reset(void __iomem *base)
-+{
-+	int ctx, ncb;
-+
-+	SET_RPUE(base, 0);
-+	SET_RPUEIE(base, 0);
-+	SET_ESRRESTORE(base, 0);
-+	SET_TBE(base, 0);
-+	SET_CR(base, 0);
-+	SET_SPDMBE(base, 0);
-+	SET_TESTBUSCR(base, 0);
-+	SET_TLBRSW(base, 0);
-+	SET_GLOBAL_TLBIALL(base, 0);
-+	SET_RPU_ACR(base, 0);
-+	SET_TLBLKCRWE(base, 1);
-+	ncb = GET_NCB(base)+1;
-+
-+	for (ctx = 0; ctx < ncb; ctx++) {
-+		SET_BPRCOSH(base, ctx, 0);
-+		SET_BPRCISH(base, ctx, 0);
-+		SET_BPRCNSH(base, ctx, 0);
-+		SET_BPSHCFG(base, ctx, 0);
-+		SET_BPMTCFG(base, ctx, 0);
-+		SET_ACTLR(base, ctx, 0);
-+		SET_SCTLR(base, ctx, 0);
-+		SET_FSRRESTORE(base, ctx, 0);
-+		SET_TTBR0(base, ctx, 0);
-+		SET_TTBR1(base, ctx, 0);
-+		SET_TTBCR(base, ctx, 0);
-+		SET_BFBCR(base, ctx, 0);
-+		SET_PAR(base, ctx, 0);
-+		SET_FAR(base, ctx, 0);
-+		SET_CTX_TLBIALL(base, ctx, 0);
-+		SET_TLBFLPTER(base, ctx, 0);
-+		SET_TLBSLPTER(base, ctx, 0);
-+		SET_TLBLKCR(base, ctx, 0);
-+		SET_PRRR(base, ctx, 0);
-+		SET_NMRR(base, ctx, 0);
-+		SET_CONTEXTIDR(base, ctx, 0);
-+	}
-+}
-+
-+static int msm_iommu_probe(struct platform_device *pdev)
-+{
-+	struct resource *r;
-+	struct clk *iommu_clk;
-+	struct msm_iommu_drvdata *drvdata;
-+	struct msm_iommu_dev *iommu_dev = pdev->dev.platform_data;
-+	void __iomem *regs_base;
-+	resource_size_t	len;
-+	int ret = 0, ncb, nm2v, irq;
-+
-+	if (pdev->id != -1) {
-+		drvdata = kzalloc(sizeof(*drvdata), GFP_KERNEL);
-+
-+		if (!drvdata) {
-+			ret = -ENOMEM;
-+			goto fail;
-+		}
-+
-+		if (!iommu_dev) {
-+			ret = -ENODEV;
-+			goto fail;
-+		}
-+
-+		iommu_clk = clk_get(&pdev->dev, "iommu_clk");
-+
-+		if (!IS_ERR(iommu_clk)) {
-+			if (iommu_dev->clk_rate != 0)
-+				clk_set_rate(iommu_clk, iommu_dev->clk_rate);
-+
-+			clk_enable(iommu_clk);
-+			clk_put(iommu_clk);
-+		}
-+
-+		r = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-+						 "physbase");
-+		if (!r) {
-+			ret = -ENODEV;
-+			goto fail;
-+		}
-+
-+		len = r->end - r->start + 1;
-+
-+		r = request_mem_region(r->start, len, r->name);
-+		if (!r) {
-+			pr_err("Could not request memory region: "
-+			"start=%p, len=%d\n", (void *) r->start, len);
-+			ret = -EBUSY;
-+			goto fail;
-+		}
-+
-+		regs_base = ioremap(r->start, len);
-+
-+		if (!regs_base) {
-+			pr_err("Could not ioremap: start=%p, len=%d\n",
-+				 (void *) r->start, len);
-+			ret = -EBUSY;
-+			goto fail;
-+		}
-+
-+		irq = platform_get_irq_byname(pdev, "secure_irq");
-+		if (irq < 0) {
-+			ret = -ENODEV;
-+			goto fail;
-+		}
-+
-+		mb();
-+
-+		if (GET_IDR(regs_base) == 0) {
-+			pr_err("Invalid IDR value detected\n");
-+			ret = -ENODEV;
-+			goto fail;
-+		}
-+
-+		ret = request_irq(irq, msm_iommu_fault_handler, 0,
-+				"msm_iommu_secure_irpt_handler", drvdata);
-+		if (ret) {
-+			pr_err("Request IRQ %d failed with ret=%d\n", irq, ret);
-+			goto fail;
-+		}
-+
-+		msm_iommu_reset(regs_base);
-+		drvdata->base = regs_base;
-+		drvdata->irq = irq;
-+
-+		nm2v = GET_NM2VCBMT((unsigned long) regs_base);
-+		ncb = GET_NCB((unsigned long) regs_base);
-+
-+		pr_info("Device %s mapped at %p, irq %d (%d cb, %d m2v)\n",
-+			iommu_dev->name, regs_base, irq, ncb+1, nm2v+1);
-+
-+		platform_set_drvdata(pdev, drvdata);
-+	} else
-+		msm_iommu_root_dev = pdev;
-+
-+	return 0;
-+
-+fail:
-+	kfree(drvdata);
-+	return ret;
-+}
-+
-+static int msm_iommu_remove(struct platform_device *pdev)
-+{
-+	struct msm_iommu_drvdata *drv = NULL;
-+
-+	drv = platform_get_drvdata(pdev);
-+	if (drv) {
-+		memset(drv, 0, sizeof(struct msm_iommu_drvdata));
-+		kfree(drv);
-+		platform_set_drvdata(pdev, NULL);
-+	}
-+	return 0;
-+}
-+
-+static int msm_iommu_ctx_probe(struct platform_device *pdev)
-+{
-+	struct msm_iommu_ctx_dev *c = pdev->dev.platform_data;
-+	struct msm_iommu_drvdata *drvdata;
-+	struct msm_iommu_ctx_drvdata *ctx_drvdata = NULL;
-+	int i, ret = 0;
-+	if (!c || !pdev->dev.parent) {
-+		ret = -EINVAL;
-+		goto fail;
-+	}
-+
-+	drvdata = dev_get_drvdata(pdev->dev.parent);
-+
-+	if (!drvdata) {
-+		ret = -EINVAL;
-+		goto fail;
-+	}
-+
-+	ctx_drvdata = kzalloc(sizeof(*ctx_drvdata), GFP_KERNEL);
-+	if (!ctx_drvdata) {
-+		ret = -ENOMEM;
-+		goto fail;
-+	}
-+	ctx_drvdata->num = c->num;
-+	ctx_drvdata->pdev = pdev;
-+
-+	INIT_LIST_HEAD(&ctx_drvdata->attached_elm);
-+	platform_set_drvdata(pdev, ctx_drvdata);
-+
-+	/* Program the M2V tables for this context */
-+	for (i = 0; i < MAX_NUM_MIDS; i++) {
-+		int mid = c->mids[i];
-+		if (mid == -1)
-+			break;
-+
-+		SET_M2VCBR_N(drvdata->base, mid, 0);
-+		SET_CBACR_N(drvdata->base, c->num, 0);
-+
-+		/* Set VMID = MID */
-+		SET_VMID(drvdata->base, mid, mid);
-+
-+		/* Set the context number for that MID to this context */
-+		SET_CBNDX(drvdata->base, mid, c->num);
-+
-+		/* Set MID associated with this context bank */
-+		SET_CBVMID(drvdata->base, c->num, mid);
-+
-+		/* Set security bit override to be Non-secure */
-+		SET_NSCFG(drvdata->base, mid, 3);
-+	}
-+
-+	pr_info("Context device %s (%d)\n", c->name, c->num);
-+
-+	return 0;
-+fail:
-+	kfree(ctx_drvdata);
-+	return ret;
-+}
-+
-+static int msm_iommu_ctx_remove(struct platform_device *pdev)
-+{
-+	struct msm_iommu_ctx_drvdata *drv = NULL;
-+	drv = platform_get_drvdata(pdev);
-+	if (drv) {
-+		memset(drv, 0, sizeof(struct msm_iommu_ctx_drvdata));
-+		kfree(drv);
-+		platform_set_drvdata(pdev, NULL);
-+	}
-+	return 0;
-+}
-+
-+static struct platform_driver msm_iommu_driver = {
-+	.driver = {
-+		.name	= "msm_iommu",
++static struct resource msm_smmu_jpegd_resources[] = {
++	{
++		.start = MSM_SMMU_JPEGD_PHYS,
++		.end   = MSM_SMMU_JPEGD_PHYS + MSM_SMMU_JPEGD_SIZE - 1,
++		.name  = "physbase",
++		.flags = IORESOURCE_MEM,
 +	},
-+	.probe		= msm_iommu_probe,
-+	.remove		= msm_iommu_remove,
-+};
-+
-+static struct platform_driver msm_iommu_ctx_driver = {
-+	.driver = {
-+		.name	= "msm_iommu_ctx",
++	{
++		.name = "nonsecure_irq",
++		.start = SMMU_JPEGD_CB_SC_NON_SECURE_IRQ,
++		.end   = SMMU_JPEGD_CB_SC_NON_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
 +	},
-+	.probe		= msm_iommu_ctx_probe,
-+	.remove		= msm_iommu_ctx_remove,
++	{
++		.name = "secure_irq",
++		.start = SMMU_JPEGD_CB_SC_SECURE_IRQ,
++		.end   = SMMU_JPEGD_CB_SC_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
 +};
 +
-+static int msm_iommu_driver_init(void)
++static struct resource msm_smmu_vpe_resources[] = {
++	{
++		.start = MSM_SMMU_VPE_PHYS,
++		.end   = MSM_SMMU_VPE_PHYS + MSM_SMMU_VPE_SIZE - 1,
++		.name  = "physbase",
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.name = "nonsecure_irq",
++		.start = SMMU_VPE_CB_SC_NON_SECURE_IRQ,
++		.end   = SMMU_VPE_CB_SC_NON_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++	{
++		.name = "secure_irq",
++		.start = SMMU_VPE_CB_SC_SECURE_IRQ,
++		.end   = SMMU_VPE_CB_SC_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct resource msm_smmu_mdp0_resources[] = {
++	{
++		.start = MSM_SMMU_MDP0_PHYS,
++		.end   = MSM_SMMU_MDP0_PHYS + MSM_SMMU_MDP0_SIZE - 1,
++		.name  = "physbase",
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.name = "nonsecure_irq",
++		.start = SMMU_MDP0_CB_SC_NON_SECURE_IRQ,
++		.end   = SMMU_MDP0_CB_SC_NON_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++	{
++		.name = "secure_irq",
++		.start = SMMU_MDP0_CB_SC_SECURE_IRQ,
++		.end   = SMMU_MDP0_CB_SC_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct resource msm_smmu_mdp1_resources[] = {
++	{
++		.start = MSM_SMMU_MDP1_PHYS,
++		.end   = MSM_SMMU_MDP1_PHYS + MSM_SMMU_MDP1_SIZE - 1,
++		.name  = "physbase",
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.name = "nonsecure_irq",
++		.start = SMMU_MDP1_CB_SC_NON_SECURE_IRQ,
++		.end   = SMMU_MDP1_CB_SC_NON_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++	{
++		.name = "secure_irq",
++		.start = SMMU_MDP1_CB_SC_SECURE_IRQ,
++		.end   = SMMU_MDP1_CB_SC_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct resource msm_smmu_rot_resources[] = {
++	{
++		.start = MSM_SMMU_ROT_PHYS,
++		.end   = MSM_SMMU_ROT_PHYS + MSM_SMMU_ROT_SIZE - 1,
++		.name  = "physbase",
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.name = "nonsecure_irq",
++		.start = SMMU_ROT_CB_SC_NON_SECURE_IRQ,
++		.end   = SMMU_ROT_CB_SC_NON_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++	{
++		.name = "secure_irq",
++		.start = SMMU_ROT_CB_SC_SECURE_IRQ,
++		.end   = SMMU_ROT_CB_SC_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct resource msm_smmu_ijpeg_resources[] = {
++	{
++		.start = MSM_SMMU_IJPEG_PHYS,
++		.end   = MSM_SMMU_IJPEG_PHYS + MSM_SMMU_IJPEG_SIZE - 1,
++		.name  = "physbase",
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.name = "nonsecure_irq",
++		.start = SMMU_IJPEG_CB_SC_NON_SECURE_IRQ,
++		.end   = SMMU_IJPEG_CB_SC_NON_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++	{
++		.name = "secure_irq",
++		.start = SMMU_IJPEG_CB_SC_SECURE_IRQ,
++		.end   = SMMU_IJPEG_CB_SC_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct resource msm_smmu_vfe_resources[] = {
++	{
++		.start = MSM_SMMU_VFE_PHYS,
++		.end   = MSM_SMMU_VFE_PHYS + MSM_SMMU_VFE_SIZE - 1,
++		.name  = "physbase",
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.name = "nonsecure_irq",
++		.start = SMMU_VFE_CB_SC_NON_SECURE_IRQ,
++		.end   = SMMU_VFE_CB_SC_NON_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++	{
++		.name = "secure_irq",
++		.start = SMMU_VFE_CB_SC_SECURE_IRQ,
++		.end   = SMMU_VFE_CB_SC_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct resource msm_smmu_vcodec_a_resources[] = {
++	{
++		.start = MSM_SMMU_VCODEC_A_PHYS,
++		.end   = MSM_SMMU_VCODEC_A_PHYS + MSM_SMMU_VCODEC_A_SIZE - 1,
++		.name  = "physbase",
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.name = "nonsecure_irq",
++		.start = SMMU_VCODEC_A_CB_SC_NON_SECURE_IRQ,
++		.end   = SMMU_VCODEC_A_CB_SC_NON_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++	{
++		.name = "secure_irq",
++		.start = SMMU_VCODEC_A_CB_SC_SECURE_IRQ,
++		.end   = SMMU_VCODEC_A_CB_SC_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct resource msm_smmu_vcodec_b_resources[] = {
++	{
++		.start = MSM_SMMU_VCODEC_B_PHYS,
++		.end   = MSM_SMMU_VCODEC_B_PHYS + MSM_SMMU_VCODEC_B_SIZE - 1,
++		.name  = "physbase",
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.name = "nonsecure_irq",
++		.start = SMMU_VCODEC_B_CB_SC_NON_SECURE_IRQ,
++		.end   = SMMU_VCODEC_B_CB_SC_NON_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++	{
++		.name = "secure_irq",
++		.start = SMMU_VCODEC_B_CB_SC_SECURE_IRQ,
++		.end   = SMMU_VCODEC_B_CB_SC_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct resource msm_smmu_gfx3d_resources[] = {
++	{
++		.start = MSM_SMMU_GFX3D_PHYS,
++		.end   = MSM_SMMU_GFX3D_PHYS + MSM_SMMU_GFX3D_SIZE - 1,
++		.name  = "physbase",
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.name = "nonsecure_irq",
++		.start = SMMU_GFX3D_CB_SC_NON_SECURE_IRQ,
++		.end   = SMMU_GFX3D_CB_SC_NON_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++	{
++		.name = "secure_irq",
++		.start = SMMU_GFX3D_CB_SC_SECURE_IRQ,
++		.end   = SMMU_GFX3D_CB_SC_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct resource msm_smmu_gfx2d0_resources[] = {
++	{
++		.start = MSM_SMMU_GFX2D0_PHYS,
++		.end   = MSM_SMMU_GFX2D0_PHYS + MSM_SMMU_GFX2D0_SIZE - 1,
++		.name  = "physbase",
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.name = "nonsecure_irq",
++		.start = SMMU_GFX2D0_CB_SC_NON_SECURE_IRQ,
++		.end   = SMMU_GFX2D0_CB_SC_NON_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++	{
++		.name = "secure_irq",
++		.start = SMMU_GFX2D0_CB_SC_SECURE_IRQ,
++		.end   = SMMU_GFX2D0_CB_SC_SECURE_IRQ,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device msm_root_iommu_dev = {
++	.name = "msm_iommu",
++	.id = -1,
++};
++
++static struct msm_iommu_dev jpegd_smmu = {
++	.name = "jpegd",
++};
++
++static struct msm_iommu_dev vpe_smmu = {
++	.name = "vpe"
++};
++
++static struct msm_iommu_dev mdp0_smmu = {
++	.name = "mdp0"
++};
++
++static struct msm_iommu_dev mdp1_smmu = {
++	.name = "mdp1"
++};
++
++static struct msm_iommu_dev rot_smmu = {
++	.name = "rot"
++};
++
++static struct msm_iommu_dev ijpeg_smmu = {
++	.name = "ijpeg"
++};
++
++static struct msm_iommu_dev vfe_smmu = {
++	.name = "vfe",
++};
++
++static struct msm_iommu_dev vcodec_a_smmu = {
++	.name = "vcodec_a"
++};
++
++static struct msm_iommu_dev vcodec_b_smmu = {
++	.name = "vcodec_b"
++};
++
++static struct msm_iommu_dev gfx3d_smmu = {
++	.name = "gfx3d",
++	.clk_rate = 27000000
++};
++
++static struct msm_iommu_dev gfx2d0_smmu = {
++	.name = "gfx2d0",
++	.clk_rate = 27000000
++};
++
++static struct platform_device msm_device_smmu_jpegd = {
++	.name = "msm_iommu",
++	.id = 0,
++	.dev = {
++		.parent = &msm_root_iommu_dev.dev,
++	},
++	.num_resources = ARRAY_SIZE(msm_smmu_jpegd_resources),
++	.resource = msm_smmu_jpegd_resources,
++};
++
++static struct platform_device msm_device_smmu_vpe = {
++	.name = "msm_iommu",
++	.id = 1,
++	.dev = {
++		.parent = &msm_root_iommu_dev.dev,
++	},
++	.num_resources = ARRAY_SIZE(msm_smmu_vpe_resources),
++	.resource = msm_smmu_vpe_resources,
++};
++
++static struct platform_device msm_device_smmu_mdp0 = {
++	.name = "msm_iommu",
++	.id = 2,
++	.dev = {
++		.parent = &msm_root_iommu_dev.dev,
++	},
++	.num_resources = ARRAY_SIZE(msm_smmu_mdp0_resources),
++	.resource = msm_smmu_mdp0_resources,
++};
++
++static struct platform_device msm_device_smmu_mdp1 = {
++	.name = "msm_iommu",
++	.id = 3,
++	.dev = {
++		.parent = &msm_root_iommu_dev.dev,
++	},
++	.num_resources = ARRAY_SIZE(msm_smmu_mdp1_resources),
++	.resource = msm_smmu_mdp1_resources,
++};
++
++static struct platform_device msm_device_smmu_rot = {
++	.name = "msm_iommu",
++	.id = 4,
++	.dev = {
++		.parent = &msm_root_iommu_dev.dev,
++	},
++	.num_resources = ARRAY_SIZE(msm_smmu_rot_resources),
++	.resource = msm_smmu_rot_resources,
++};
++
++static struct platform_device msm_device_smmu_ijpeg = {
++	.name = "msm_iommu",
++	.id = 5,
++	.dev = {
++		.parent = &msm_root_iommu_dev.dev,
++	},
++	.num_resources = ARRAY_SIZE(msm_smmu_ijpeg_resources),
++	.resource = msm_smmu_ijpeg_resources,
++};
++
++static struct platform_device msm_device_smmu_vfe = {
++	.name = "msm_iommu",
++	.id = 6,
++	.dev = {
++		.parent = &msm_root_iommu_dev.dev,
++	},
++	.num_resources = ARRAY_SIZE(msm_smmu_vfe_resources),
++	.resource = msm_smmu_vfe_resources,
++};
++
++static struct platform_device msm_device_smmu_vcodec_a = {
++	.name = "msm_iommu",
++	.id = 7,
++	.dev = {
++		.parent = &msm_root_iommu_dev.dev,
++	},
++	.num_resources = ARRAY_SIZE(msm_smmu_vcodec_a_resources),
++	.resource = msm_smmu_vcodec_a_resources,
++};
++
++static struct platform_device msm_device_smmu_vcodec_b = {
++	.name = "msm_iommu",
++	.id = 8,
++	.dev = {
++		.parent = &msm_root_iommu_dev.dev,
++	},
++	.num_resources = ARRAY_SIZE(msm_smmu_vcodec_b_resources),
++	.resource = msm_smmu_vcodec_b_resources,
++};
++
++static struct platform_device msm_device_smmu_gfx3d = {
++	.name = "msm_iommu",
++	.id = 9,
++	.dev = {
++		.parent = &msm_root_iommu_dev.dev,
++	},
++	.num_resources = ARRAY_SIZE(msm_smmu_gfx3d_resources),
++	.resource = msm_smmu_gfx3d_resources,
++};
++
++static struct platform_device msm_device_smmu_gfx2d0 = {
++	.name = "msm_iommu",
++	.id = 10,
++	.dev = {
++		.parent = &msm_root_iommu_dev.dev,
++	},
++	.num_resources = ARRAY_SIZE(msm_smmu_gfx2d0_resources),
++	.resource = msm_smmu_gfx2d0_resources,
++};
++
++static struct msm_iommu_ctx_dev jpegd_src_ctx = {
++	.name = "jpegd_src",
++	.num = 0,
++	.mids = {0, -1}
++};
++
++static struct msm_iommu_ctx_dev jpegd_dst_ctx = {
++	.name = "jpegd_dst",
++	.num = 1,
++	.mids = {1, -1}
++};
++
++static struct msm_iommu_ctx_dev vpe_src_ctx = {
++	.name = "vpe_src",
++	.num = 0,
++	.mids = {0, -1}
++};
++
++static struct msm_iommu_ctx_dev vpe_dst_ctx = {
++	.name = "vpe_dst",
++	.num = 1,
++	.mids = {1, -1}
++};
++
++static struct msm_iommu_ctx_dev mdp_vg1_ctx = {
++	.name = "mdp_vg1",
++	.num = 0,
++	.mids = {0, 2, -1}
++};
++
++static struct msm_iommu_ctx_dev mdp_rgb1_ctx = {
++	.name = "mdp_rgb1",
++	.num = 1,
++	.mids = {1, 3, 4, 5, 6, 7, 8, 9, 10, -1}
++};
++
++static struct msm_iommu_ctx_dev mdp_vg2_ctx = {
++	.name = "mdp_vg2",
++	.num = 0,
++	.mids = {0, 2, -1}
++};
++
++static struct msm_iommu_ctx_dev mdp_rgb2_ctx = {
++	.name = "mdp_rgb2",
++	.num = 1,
++	.mids = {1, 3, 4, 5, 6, 7, 8, 9, 10, -1}
++};
++
++static struct msm_iommu_ctx_dev rot_src_ctx = {
++	.name = "rot_src",
++	.num = 0,
++	.mids = {0, -1}
++};
++
++static struct msm_iommu_ctx_dev rot_dst_ctx = {
++	.name = "rot_dst",
++	.num = 1,
++	.mids = {1, -1}
++};
++
++static struct msm_iommu_ctx_dev ijpeg_src_ctx = {
++	.name = "ijpeg_src",
++	.num = 0,
++	.mids = {0, -1}
++};
++
++static struct msm_iommu_ctx_dev ijpeg_dst_ctx = {
++	.name = "ijpeg_dst",
++	.num = 1,
++	.mids = {1, -1}
++};
++
++static struct msm_iommu_ctx_dev vfe_imgwr_ctx = {
++	.name = "vfe_imgwr",
++	.num = 0,
++	.mids = {2, 3, 4, 5, 6, 7, 8, -1}
++};
++
++static struct msm_iommu_ctx_dev vfe_misc_ctx = {
++	.name = "vfe_misc",
++	.num = 1,
++	.mids = {0, 1, 9, -1}
++};
++
++static struct msm_iommu_ctx_dev vcodec_a_stream_ctx = {
++	.name = "vcodec_a_stream",
++	.num = 0,
++	.mids = {2, 5, -1}
++};
++
++static struct msm_iommu_ctx_dev vcodec_a_mm1_ctx = {
++	.name = "vcodec_a_mm1",
++	.num = 1,
++	.mids = {0, 1, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, -1}
++};
++
++static struct msm_iommu_ctx_dev vcodec_b_mm2_ctx = {
++	.name = "vcodec_b_mm2",
++	.num = 0,
++	.mids = {0, 1, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, -1}
++};
++
++static struct msm_iommu_ctx_dev gfx3d_rbpa_ctx = {
++	.name = "gfx3d_rbpa",
++	.num = 0,
++	.mids = {-1}
++};
++
++static struct msm_iommu_ctx_dev gfx3d_cpvgttc_ctx = {
++	.name = "gfx3d_cpvgttc",
++	.num = 1,
++	.mids = {0, 1, 2, 3, 4, 5, 6, 7, -1}
++};
++
++static struct msm_iommu_ctx_dev gfx3d_smmu_ctx = {
++	.name = "gfx3d_smmu",
++	.num = 2,
++	.mids = {8, 9, 10, 11, 12, -1}
++};
++
++static struct msm_iommu_ctx_dev gfx2d0_pixv1_ctx = {
++	.name = "gfx2d0_pixv1_smmu",
++	.num = 0,
++	.mids = {0, 3, 4, -1}
++};
++
++static struct msm_iommu_ctx_dev gfx2d0_texv3_ctx = {
++	.name = "gfx2d0_texv3_smmu",
++	.num = 1,
++	.mids = {1, 6, 7, -1}
++};
++
++static struct platform_device msm_device_jpegd_src_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 0,
++	.dev = {
++		.parent = &msm_device_smmu_jpegd.dev,
++	},
++};
++
++static struct platform_device msm_device_jpegd_dst_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 1,
++	.dev = {
++		.parent = &msm_device_smmu_jpegd.dev,
++	},
++};
++
++static struct platform_device msm_device_vpe_src_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 2,
++	.dev = {
++		.parent = &msm_device_smmu_vpe.dev,
++	},
++};
++
++static struct platform_device msm_device_vpe_dst_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 3,
++	.dev = {
++		.parent = &msm_device_smmu_vpe.dev,
++	},
++};
++
++static struct platform_device msm_device_mdp_vg1_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 4,
++	.dev = {
++		.parent = &msm_device_smmu_mdp0.dev,
++	},
++};
++
++static struct platform_device msm_device_mdp_rgb1_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 5,
++	.dev = {
++		.parent = &msm_device_smmu_mdp0.dev,
++	},
++};
++
++static struct platform_device msm_device_mdp_vg2_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 6,
++	.dev = {
++		.parent = &msm_device_smmu_mdp1.dev,
++	},
++};
++
++static struct platform_device msm_device_mdp_rgb2_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 7,
++	.dev = {
++		.parent = &msm_device_smmu_mdp1.dev,
++	},
++};
++
++static struct platform_device msm_device_rot_src_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 8,
++	.dev = {
++		.parent = &msm_device_smmu_rot.dev,
++	},
++};
++
++static struct platform_device msm_device_rot_dst_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 9,
++	.dev = {
++		.parent = &msm_device_smmu_rot.dev,
++	},
++};
++
++static struct platform_device msm_device_ijpeg_src_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 10,
++	.dev = {
++		.parent = &msm_device_smmu_ijpeg.dev,
++	},
++};
++
++static struct platform_device msm_device_ijpeg_dst_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 11,
++	.dev = {
++		.parent = &msm_device_smmu_ijpeg.dev,
++	},
++};
++
++static struct platform_device msm_device_vfe_imgwr_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 12,
++	.dev = {
++		.parent = &msm_device_smmu_vfe.dev,
++	},
++};
++
++static struct platform_device msm_device_vfe_misc_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 13,
++	.dev = {
++		.parent = &msm_device_smmu_vfe.dev,
++	},
++};
++
++static struct platform_device msm_device_vcodec_a_stream_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 14,
++	.dev = {
++		.parent = &msm_device_smmu_vcodec_a.dev,
++	},
++};
++
++static struct platform_device msm_device_vcodec_a_mm1_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 15,
++	.dev = {
++		.parent = &msm_device_smmu_vcodec_a.dev,
++	},
++};
++
++static struct platform_device msm_device_vcodec_b_mm2_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 16,
++	.dev = {
++		.parent = &msm_device_smmu_vcodec_b.dev,
++	},
++};
++
++static struct platform_device msm_device_gfx3d_rbpa_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 17,
++	.dev = {
++		.parent = &msm_device_smmu_gfx3d.dev,
++	},
++};
++
++static struct platform_device msm_device_gfx3d_cpvgttc_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 18,
++	.dev = {
++		.parent = &msm_device_smmu_gfx3d.dev,
++	},
++};
++
++static struct platform_device msm_device_gfx3d_smmu_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 19,
++	.dev = {
++		.parent = &msm_device_smmu_gfx3d.dev,
++	},
++};
++
++static struct platform_device msm_device_gfx2d0_pixv1_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 20,
++	.dev = {
++		.parent = &msm_device_smmu_gfx2d0.dev,
++	},
++};
++
++static struct platform_device msm_device_gfx2d0_texv3_ctx = {
++	.name = "msm_iommu_ctx",
++	.id = 21,
++	.dev = {
++		.parent = &msm_device_smmu_gfx2d0.dev,
++	},
++};
++
++static struct platform_device *msm_iommu_devs[] = {
++	&msm_device_smmu_jpegd,
++	&msm_device_smmu_vpe,
++	&msm_device_smmu_mdp0,
++	&msm_device_smmu_mdp1,
++	&msm_device_smmu_rot,
++	&msm_device_smmu_ijpeg,
++	&msm_device_smmu_vfe,
++	&msm_device_smmu_vcodec_a,
++	&msm_device_smmu_vcodec_b,
++	&msm_device_smmu_gfx3d,
++	&msm_device_smmu_gfx2d0,
++};
++
++static struct msm_iommu_dev *msm_iommu_data[] = {
++	&jpegd_smmu,
++	&vpe_smmu,
++	&mdp0_smmu,
++	&mdp1_smmu,
++	&rot_smmu,
++	&ijpeg_smmu,
++	&vfe_smmu,
++	&vcodec_a_smmu,
++	&vcodec_b_smmu,
++	&gfx3d_smmu,
++	&gfx2d0_smmu,
++};
++
++static struct platform_device *msm_iommu_ctx_devs[] = {
++	&msm_device_jpegd_src_ctx,
++	&msm_device_jpegd_dst_ctx,
++	&msm_device_vpe_src_ctx,
++	&msm_device_vpe_dst_ctx,
++	&msm_device_mdp_vg1_ctx,
++	&msm_device_mdp_rgb1_ctx,
++	&msm_device_mdp_vg2_ctx,
++	&msm_device_mdp_rgb2_ctx,
++	&msm_device_rot_src_ctx,
++	&msm_device_rot_dst_ctx,
++	&msm_device_ijpeg_src_ctx,
++	&msm_device_ijpeg_dst_ctx,
++	&msm_device_vfe_imgwr_ctx,
++	&msm_device_vfe_misc_ctx,
++	&msm_device_vcodec_a_stream_ctx,
++	&msm_device_vcodec_a_mm1_ctx,
++	&msm_device_vcodec_b_mm2_ctx,
++	&msm_device_gfx3d_rbpa_ctx,
++	&msm_device_gfx3d_cpvgttc_ctx,
++	&msm_device_gfx3d_smmu_ctx,
++	&msm_device_gfx2d0_pixv1_ctx,
++	&msm_device_gfx2d0_texv3_ctx,
++};
++
++static struct msm_iommu_ctx_dev *msm_iommu_ctx_data[] = {
++	&jpegd_src_ctx,
++	&jpegd_dst_ctx,
++	&vpe_src_ctx,
++	&vpe_dst_ctx,
++	&mdp_vg1_ctx,
++	&mdp_rgb1_ctx,
++	&mdp_vg2_ctx,
++	&mdp_rgb2_ctx,
++	&rot_src_ctx,
++	&rot_dst_ctx,
++	&ijpeg_src_ctx,
++	&ijpeg_dst_ctx,
++	&vfe_imgwr_ctx,
++	&vfe_misc_ctx,
++	&vcodec_a_stream_ctx,
++	&vcodec_a_mm1_ctx,
++	&vcodec_b_mm2_ctx,
++	&gfx3d_rbpa_ctx,
++	&gfx3d_cpvgttc_ctx,
++	&gfx3d_smmu_ctx,
++	&gfx2d0_pixv1_ctx,
++	&gfx2d0_texv3_ctx,
++};
++
++static int msm8x60_iommu_init(void)
 +{
-+	int ret;
-+	ret = platform_driver_register(&msm_iommu_driver);
++	int ret, i;
++
++	ret = platform_device_register(&msm_root_iommu_dev);
 +	if (ret != 0) {
-+		pr_err("Failed to register IOMMU driver\n");
-+		goto error;
++		pr_err("Failed to register root IOMMU device!\n");
++		goto failure;
 +	}
 +
-+	ret = platform_driver_register(&msm_iommu_ctx_driver);
-+	if (ret != 0) {
-+		pr_err("Failed to register IOMMU context driver\n");
-+		goto error;
++	for (i = 0; i < ARRAY_SIZE(msm_iommu_devs); i++) {
++		ret = platform_device_add_data(msm_iommu_devs[i],
++					       msm_iommu_data[i],
++					       sizeof(struct msm_iommu_dev));
++		if (ret != 0) {
++			pr_err("platform_device_add_data failed, "
++			       "i = %d\n", i);
++			goto failure_unwind;
++		}
++
++		ret = platform_device_register(msm_iommu_devs[i]);
++
++		if (ret != 0) {
++			pr_err("platform_device_register smmu failed, "
++			       "i = %d\n", i);
++			goto failure_unwind;
++		}
 +	}
 +
-+error:
++	for (i = 0; i < ARRAY_SIZE(msm_iommu_ctx_devs); i++) {
++		ret = platform_device_add_data(msm_iommu_ctx_devs[i],
++					       msm_iommu_ctx_data[i],
++					       sizeof(*msm_iommu_ctx_devs[i]));
++		if (ret != 0) {
++			pr_err("platform_device_add_data smmu failed, "
++			       "i = %d\n", i);
++			goto failure_unwind2;
++		}
++
++		ret = platform_device_register(msm_iommu_ctx_devs[i]);
++		if (ret != 0) {
++			pr_err("platform_device_register ctx failed, "
++			       "i = %d\n", i);
++			goto failure_unwind2;
++		}
++	}
++	return 0;
++
++failure_unwind2:
++	while (--i >= 0)
++		platform_device_unregister(msm_iommu_ctx_devs[i]);
++failure_unwind:
++	while (--i >= 0)
++		platform_device_unregister(msm_iommu_devs[i]);
++
++	platform_device_unregister(&msm_root_iommu_dev);
++failure:
 +	return ret;
 +}
 +
-+static void msm_iommu_driver_exit(void)
++static void msm8x60_iommu_exit(void)
 +{
-+	platform_driver_unregister(&msm_iommu_ctx_driver);
-+	platform_driver_unregister(&msm_iommu_driver);
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(msm_iommu_ctx_devs); i++)
++		platform_device_unregister(msm_iommu_ctx_devs[i]);
++
++	for (i = 0; i < ARRAY_SIZE(msm_iommu_devs); ++i)
++		platform_device_unregister(msm_iommu_devs[i]);
++
++	platform_device_unregister(&msm_root_iommu_dev);
 +}
 +
-+subsys_initcall(msm_iommu_driver_init);
-+module_exit(msm_iommu_driver_exit);
++subsys_initcall(msm8x60_iommu_init);
++module_exit(msm8x60_iommu_exit);
 +
 +MODULE_LICENSE("GPL v2");
 +MODULE_AUTHOR("Stepan Moskovchenko <stepanm@codeaurora.org>");
-+
 --
 1.7.0.2
  Sent by an employee of the Qualcomm Innovation Center, Inc.
