@@ -1,78 +1,99 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 12 Aug 2010 11:48:41 +0900
-Subject: [PATCH/RFC] Samsung device-table approach
-In-Reply-To: <1281528238-7298-1-git-send-email-m.szyprowski@samsung.com>
-References: <1281528238-7298-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <AANLkTinfQporvvWoOmm2xXkPyU=e6w6coV=+K50Wp5TM@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 12 Aug 2010 04:53:54 +0200
+Subject: [PATCH 1/2 v2] ARM: Fix gen_nand probe structures contents
+Message-ID: <1281581635-26213-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 11, 2010 at 9:03 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hello,
->
-> I would like to start the discussion on the redesign of the way the
-> Samsung platform devices are defined. The current solution has some
-> important disadvantages that blocks the further kernel development.
->
-> Samsung SoC family is quite large. Mainline kernel already has support
-> for more than 8 representatives, each having different memory and irq
-> map.
->
-> Currently most of the base address and irq differences are hidden behind
-> the includes and some common defines (usualy named S3C_PA_*). Some
-> devices also have different variants that are specified by changing the
-> device name to include the SoC version in it. Others have SoC specific
-> callbacks (like gpio pin configuration) that are provided thought the
-> platform data.
->
-> There is a lot of code that is needed to handle all these variants and
-> differences. It also differs in term of style and a way how some
-> simmilar things are performed (like changing the device name or
-> providing the default platform data).
->
-> In 2009 Ben Dooks did a research and proposed a solution that is called
-> a device table. This solution solves the most problematic issue.
-> Different base addresses and irqs can be easily provided for the same
-> device on different version SoC systems. This is achieved by having a
-> single table for each SoC that contains all these resources and create
-> all required platform devices dynamically on SoC init.
->
-> The proposed solution was enough for s3c24xx SoC devices and some early
-> s3c64xx devices. However since then some new devices has been merged to
-> mainline, mainly for s5p SoC series. These devices have more than one
-> base address or irq and does not fit well into that framework.
-IMO it is safe to assume such devices have slim chances to become the majority.
-The 'extra' parameters will be present in every instance of the IP
-in the SoCs that have them, only their value may differ. So, why not
-define a new structure with fields for such 'extra' parameters for such
-devices and make them available to drivers from platform_data.
-That will :-
- a) Keep the original and simple design of Ben Dooks intact.
- b) Avoid taking space more than needed for majority of 'simple' devices.
+These three platforms didn't properly fill nr_chips in gen_nand registration and
+therefore depended on gen_nand bug fixed by the following patch:
 
+"mtd: gen_nand: fix support for multiple chips"
 
-> I've extended his approach to handle such more advanced devices. The new
-> version is capable of setting up devices with more than one irq,
-> physical register areas or even a dma channel.
->
-> I've also added support for the default platform data. It has been
-> designed in such a way that it can handle different default data for
-> each device instance for each SoC system. This requires a bit of C
-> preprocessor in the includes but make it much easier to register
-> particular device. With this new solution there is no need for calling a
-> function for setting platform data in machine startup.
->
-> The solution has been designed with the following assumptions:
-> 1. to reduce the number of static structures compiled into the kernel
-> that are not used at all
-> 2. to reduce the memory used by the unused static structures once kernel
-> has booted
-People might later want to build and load drivers for 'unused' device ?
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+v2: Added other broken boards outside arch-arm (mips and bfin)
+v1: Initial patch
 
-Also, since there is already underway a good effort towards unifying
-kernel builds for different platforms at ARM level, it might be worthwile
-to look at the problem from POV vaster than Samsung. And then,
-implement only Samsung specific need to work with that stub.
+ arch/arm/mach-ixp4xx/ixdp425-setup.c      |    1 +
+ arch/arm/mach-mx3/mach-qong.c             |    1 +
+ arch/arm/mach-orion5x/ts78xx-setup.c      |    1 +
+ arch/blackfin/mach-bf537/boards/stamp.c   |    1 +
+ arch/blackfin/mach-bf561/boards/acvilon.c |    1 +
+ arch/mips/nxp/pnx833x/common/platform.c   |    1 +
+ 6 files changed, 6 insertions(+), 0 deletions(-)
 
-my 2 cents.
+diff --git a/arch/arm/mach-ixp4xx/ixdp425-setup.c b/arch/arm/mach-ixp4xx/ixdp425-setup.c
+index 827cbc4..ea9ee4e 100644
+--- a/arch/arm/mach-ixp4xx/ixdp425-setup.c
++++ b/arch/arm/mach-ixp4xx/ixdp425-setup.c
+@@ -100,6 +100,7 @@ ixdp425_flash_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+ 
+ static struct platform_nand_data ixdp425_flash_nand_data = {
+ 	.chip = {
++		.nr_chips		= 1,
+ 		.chip_delay		= 30,
+ 		.options		= NAND_NO_AUTOINCR,
+ #ifdef CONFIG_MTD_PARTITIONS
+diff --git a/arch/arm/mach-mx3/mach-qong.c b/arch/arm/mach-mx3/mach-qong.c
+index e5b5b83..1f9363f 100644
+--- a/arch/arm/mach-mx3/mach-qong.c
++++ b/arch/arm/mach-mx3/mach-qong.c
+@@ -169,6 +169,7 @@ static void qong_nand_select_chip(struct mtd_info *mtd, int chip)
+ 
+ static struct platform_nand_data qong_nand_data = {
+ 	.chip = {
++		.nr_chips		= 1,
+ 		.chip_delay		= 20,
+ 		.options		= 0,
+ 	},
+diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
+index 5041d1b..696b1a9 100644
+--- a/arch/arm/mach-orion5x/ts78xx-setup.c
++++ b/arch/arm/mach-orion5x/ts78xx-setup.c
+@@ -216,6 +216,7 @@ static struct mtd_partition ts78xx_ts_nand_parts[] = {
+ 
+ static struct platform_nand_data ts78xx_ts_nand_data = {
+ 	.chip	= {
++		.nr_chips		= 1,
+ 		.part_probe_types	= ts_nand_part_probes,
+ 		.partitions		= ts78xx_ts_nand_parts,
+ 		.nr_partitions		= ARRAY_SIZE(ts78xx_ts_nand_parts),
+diff --git a/arch/blackfin/mach-bf537/boards/stamp.c b/arch/blackfin/mach-bf537/boards/stamp.c
+index 9eaf5b0..68a27bc 100644
+--- a/arch/blackfin/mach-bf537/boards/stamp.c
++++ b/arch/blackfin/mach-bf537/boards/stamp.c
+@@ -400,6 +400,7 @@ static int bfin_plat_nand_dev_ready(struct mtd_info *mtd)
+ 
+ static struct platform_nand_data bfin_plat_nand_data = {
+ 	.chip = {
++		.nr_chips = 1,
+ 		.chip_delay = 30,
+ #ifdef CONFIG_MTD_PARTITIONS
+ 		.part_probe_types = part_probes,
+diff --git a/arch/blackfin/mach-bf561/boards/acvilon.c b/arch/blackfin/mach-bf561/boards/acvilon.c
+index bfcfa86..35b6d12 100644
+--- a/arch/blackfin/mach-bf561/boards/acvilon.c
++++ b/arch/blackfin/mach-bf561/boards/acvilon.c
+@@ -284,6 +284,7 @@ static int bfin_plat_nand_dev_ready(struct mtd_info *mtd)
+ 
+ static struct platform_nand_data bfin_plat_nand_data = {
+ 	.chip = {
++		 .nr_chips = 1,
+ 		 .chip_delay = 30,
+ #ifdef CONFIG_MTD_PARTITIONS
+ 		 .part_probe_types = part_probes,
+diff --git a/arch/mips/nxp/pnx833x/common/platform.c b/arch/mips/nxp/pnx833x/common/platform.c
+index 01f8345..ce45df1 100644
+--- a/arch/mips/nxp/pnx833x/common/platform.c
++++ b/arch/mips/nxp/pnx833x/common/platform.c
+@@ -266,6 +266,7 @@ pnx833x_flash_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+ 
+ static struct platform_nand_data pnx833x_flash_nand_data = {
+ 	.chip = {
++		.nr_chips		= 1,
+ 		.chip_delay		= 25,
+ 		.part_probe_types 	= part_probes,
+ 	},
+-- 
+1.7.1
