@@ -1,46 +1,28 @@
-From: hjk@linutronix.de (Hans J. Koch)
-Date: Thu, 12 Aug 2010 14:15:04 +0200
-Subject: [PATCH v2] mx35: Fix boot ROM hang in internal boot mode
-In-Reply-To: <20100812112938.GB8670@local>
-References: <20100811233721.GB6411@local>
-	<20100812055753.GB9763@pengutronix.de>
-	<20100812112938.GB8670@local>
-Message-ID: <20100812121504.GC8670@local>
+From: vapier.adi@gmail.com (Mike Frysinger)
+Date: Thu, 12 Aug 2010 08:47:06 -0400
+Subject: [PATCH 1/2 v2] ARM: Fix gen_nand probe structures contents
+In-Reply-To: <201008121304.01178.marek.vasut@gmail.com>
+References: <1281581635-26213-1-git-send-email-marek.vasut@gmail.com>
+	<AANLkTimuLjGo7O1kWXq0XbTns4EV2e5q5o0esNns1BY9@mail.gmail.com>
+	<201008121304.01178.marek.vasut@gmail.com>
+Message-ID: <AANLkTimuyuNGsTAfJXi7TL4HQH-botNcakse5NHj2fc0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 12, 2010 at 01:29:40PM +0200, Hans J. Koch wrote:
-> On Thu, Aug 12, 2010 at 07:57:53AM +0200, Uwe Kleine-K?nig wrote:
-> > > +	}
-> > > +
-> > > +	__raw_writel(cgr2, CCM_BASE + CCM_CGR2);
-> > > +	__raw_writel(cgr3, CCM_BASE + CCM_CGR3);
-> > Note that my question concerning the UART clock was less about UART1 vs
-> > UART0 but more if the ROM really needs a UART clock.
-> 
-> In my tests on an mx35pdk board, I found these three clocks being the
-> minimum set of additional clocks that need to be turned on. That means,
-> if you turn off any of the three, it won't boot anymore.
+On Thu, Aug 12, 2010 at 07:04, Marek Vasut wrote:
+> Dne ?t 12. srpna 2010 05:36:31 Mike Frysinger napsal(a):
+>> On Wed, Aug 11, 2010 at 22:53, Marek Vasut wrote:
+>> > These three platforms didn't properly fill nr_chips in gen_nand
+>> > registration and
+>>
+>> > therefore depended on gen_nand bug fixed by the following patch:
+>> the Blackfin arch has a mailing list ... no need to pick out people
+>
+> Hi, that's true, but there's that "scripts/get_maintainer.pl" thing which gave
+> me this list.
 
-For my tests, I didn't fully boot the kernel but inserted a while(1) after
-the clock init sequence. I had the wachdog already initialized in the
-bootloader, so after a few seconds it would boot again - or not.
-
-If you fully boot the kernel, then the driver will probably switch on
-the UART1 clock, so you don't notice the effect anymore. But the kernel
-can hang _before_ drivers come up, and it should still work. That's
-what hardware watchdogs are for.
-
-As a sidenote, it should be clear that this patch is a workaround for
-a serious chip bug of the MX35. The MX35 promises a watchdog that cannot
-be turned off once triggered. That's true, but of course, in case of a
-kernel crash, the watchdog has to be able to reliably reboot the system.
-That is not the case. Any driver going wild and writing a zero to the
-wrong register can easily turn the CPU into a desperate piece of silicon
-as soon as the watchdog reset occurs.
-
-Also note that this also affects a normal system reboot using arch_reset()
-since that one also uses the hardware watchdog.
-
-Thanks,
-Hans
+yes, but typically that's a shotgun approach that grabs way more
+people and can easily fall out of date (people no longer
+exist/etc...).  personally, i use it as a fallback when MAINTAINERS
+doesnt cover it.
+-mike
