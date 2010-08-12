@@ -1,32 +1,33 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 12 Aug 2010 13:48:11 -0700
-Subject: [RFC] the right way to use gpiolib hooks to automate power
-	management?
-In-Reply-To: <20100812182744.GC31982@n2100.arm.linux.org.uk>
-References: <4C6423C1.9060509@codeaurora.org>
-	<20100812182744.GC31982@n2100.arm.linux.org.uk>
-Message-ID: <20100812204811.GA31315@huya.qualcomm.com>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Thu, 12 Aug 2010 23:54:02 +0200
+Subject: [rtc-linux] [PATCH] rtc: rtc-lpc32xx: Introduce RTC driver for
+	the LPC32XX SoC (v2)
+In-Reply-To: <20100812090727.GA6787@pengutronix.de>
+References: <1281567980-12792-1-git-send-email-wellsk40@gmail.com>
+	<1281567980-12792-2-git-send-email-wellsk40@gmail.com>
+	<20100812090727.GA6787@pengutronix.de>
+Message-ID: <083DF309106F364B939360100EC290F80AC719C808@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 12, 2010 at 07:27:44PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Aug 12, 2010 at 09:39:29AM -0700, Gregory Bean wrote:
-> > We have a written a software driver which reference-counts these gpio
-> > lines (via a put()/get() api), putting them in their "high-power" active
-> > configurations when they're in use, and dropping them down into a
-> > high-impedance low-power setting when they're not.
+> > +
+> > +/*
+> > + * Clock and Power control register offsets  */
+> > +#define RTC_UCOUNT		0x00
+> > +#define RTC_DCOUNT		0x04
+> > +#define RTC_MATCH0		0x08
+> > +#define RTC_MATCH1		0x0C
+> > +#define RTC_CTRL		0x10
+> > +#define RTC_INTSTAT		0x14
+> > +#define RTC_KEY			0x18
+> > +#define RTC_SRAM		0x80
 > 
-> Beware.  What you're suggesting can lead to an increase in power
-> consumption rather than the reduction you're looking for.
+> How about LPC32XX_-prefixes here?
+> 
 
-That probably just got a little obscured, since I think Greg is more
-concerned with the mechanism in software.  Our gpio's are generally
-configured in "low power" to be high-impedance with a pull-up or
-pull-down, depending on what it is hooked to.  They can be configured
-in most of the ways that would make sense to do so.
+Hi Wolfram,
 
-It may be the case, though, that what this "low power" mode is might
-need to also be configurable, since it likely depends on how the pin
-is connected.
+This and all following items are updated in v3
 
-David
+thanks,
+Kevin
