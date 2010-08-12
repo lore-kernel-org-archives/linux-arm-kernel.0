@@ -1,61 +1,84 @@
-From: felipe.balbi@nokia.com (Felipe Balbi)
-Date: Thu, 12 Aug 2010 08:27:33 +0300
-Subject: [PATCH v4 3/8] wireless: wl1271: add platform driver to get
-	board 	data
-In-Reply-To: <AANLkTikLbiJ8PsUbSnmYrfY6oNW4okejf-UdyQyfYbUz@mail.gmail.com>
-References: <1281550913-17633-1-git-send-email-ohad@wizery.com>
-	<1281550913-17633-4-git-send-email-ohad@wizery.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0324110ABD@dbde02.ent.ti.com>
-	<20100811184742.GA21778@nokia.com>
-	<AANLkTikLbiJ8PsUbSnmYrfY6oNW4okejf-UdyQyfYbUz@mail.gmail.com>
-Message-ID: <20100812052733.GB23362@nokia.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 12 Aug 2010 07:39:05 +0200
+Subject: [PATCH] mx35: Fix boot ROM hang in internal boot mode
+In-Reply-To: <20100811232013.GA6411@local>
+References: <20100811001931.GA4626@local>
+	<20100811052749.GA7803@pengutronix.de>
+	<20100811232013.GA6411@local>
+Message-ID: <20100812053905.GA9763@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Hans,
 
-On Wed, Aug 11, 2010 at 10:10:38PM +0200, ext Ohad Ben-Cohen wrote:
->Think of several wl1271 devices, each of which is represented by two
->devices; an SDIO function, and a platform device. The SDIO function
->stands for a specific MMC controller the device is hardwired to, and
->the platform device stands for the external irq line that the device
->is hardwired to.
->
->We must couple the SDIO function with the correct platform device,
->otherwise it will start getting the wrong interrupts. So after the
->SDIO function is probed, it registers a platform driver with the
->unique name that represents the platform device that it is coupled
->with. When the platform device is probed, it needs to deliver its
->platform data info to the specific SDIO function that it is bound
->with.
->
->To avoid using some global data structure in that driver, we allocate
->a unique platform driver per each device, which makes it possible for
->the platform driver probe to find the SDIO function context by means
->of container_of.
->
->Alternatively, we can also use some global structure in that file,
->most probably idr, which would also make it possible to reach the SDIO
->function contexts without going through the driver structure. The idr
->indexes would then be the MMC controller index, which should match
->the platform device id.
->
->I'll try this out, it might actually look nicer.
+On Thu, Aug 12, 2010 at 01:20:14AM +0200, Hans J. Koch wrote:
+> > > diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
+> > > index d3af0fd..671acb6 100644
+> > > --- a/arch/arm/mach-mx3/clock-imx35.c
+> > > +++ b/arch/arm/mach-mx3/clock-imx35.c
+> > > @@ -485,7 +485,7 @@ static struct clk_lookup lookups[] = {
+> > >  
+> > >  int __init mx35_clocks_init()
+> > >  {
+> > > -	unsigned int ll = 0;
+> > > +	unsigned int ll = 0, cgr2, cgr3;
+> > >  
+> > >  #if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
+> > >  	ll = (3 << 16);
+> > > @@ -499,8 +499,22 @@ int __init mx35_clocks_init()
+> > >  	__raw_writel((3 << 18), CCM_BASE + CCM_CGR0);
+> > >  	__raw_writel((3 << 2) | (3 << 4) | (3 << 6) | (3 << 8) | (3 << 16),
+> > >  			CCM_BASE + CCM_CGR1);
+> > > -	__raw_writel((3 << 26) | ll, CCM_BASE + CCM_CGR2);
+> > > -	__raw_writel(0, CCM_BASE + CCM_CGR3);
+> > > +
+> > > +	/* Check if we came up in internal boot mode. If yes, we need some
+> > <nitpick> /* on an extra line please. </nitpick>
+> 
+> alright, if you like it...
+> 
+> > 
+> > > +	 * extra clocks turned on, otherwise the MX35 boot ROM code will
+> > > +	 * hang after a watchdog reset.
+> > > +	 */
+> > Better move the comment into the else branch below.
+> 
+> There's no else branch anymore. Before the "if" the comment says what's
+> being checked, and in the if branch the comment says what's being done.
+> 
+> > 
+> > > +	if (__raw_readl(CCM_BASE + CCM_RCSR) & (3 << 10)) {
+> > Can you please introduce a symbol for (3 << 10)?.
+> 
+> I just wanted to follow the style of the rest of the file ;-)
+:-)
 
-you need no globals and you don't need to fiddle with driver structures 
-either.
+> Since you say you've got those #defines on your todo list, I better
+> leave that to you.
+> 
+> > 
+> > > +		cgr2 = (3 << 26);
+> > > +		cgr3 = 0;
+> > > +	} else {
+> > > +		/* Additionally turn on UART1, SCC, and IIM clocks */
+> > really UART1?
+> 
+> Well, stupid reference manual. They name the UARTs 1,2,3 instead of 0,1,2.
+> That also leads to lines like:
+> 
+> _REGISTER_CLOCK("imx-uart.0", NULL, uart1_clk)
+> 
+> I renamed it UART0 in the comment to make it more clear.
+Actually I already thought about fixing that.  (On the software side
+obviously.)  There are only little problems and one bigger to make them
+match.  The bigger one is that it breaks people's kernel commandlines
+that usually say:
 
-Just make an sdio driver that platform_device_alloc() and pass in a 
-platform_data, builds struct resources etc for each device found on the 
-sdio bus. Similarly for the SPI-connected wifi chip.
+	console=ttymxc0...
 
-You should never fiddle with internal structures. If you want to look at 
-an example implementation, take a look at drivers/mfd/twl-core.c, there 
-we use an i2c driver to instantiate several platform_devices. Nobody 
-fiddles with driver structures and all the drivers are logically 
-separated into their own source files.
+Best regards
+Uwe
 
 -- 
-balbi
-
-DefectiveByDesign.org
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
