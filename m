@@ -1,27 +1,34 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 13 Aug 2010 11:08:49 +0200
-Subject: [PATCH v3] mx35: Fix boot ROM hang in internal boot mode
-In-Reply-To: <20100812131053.GD8670@local>
-References: <20100812131053.GD8670@local>
-Message-ID: <20100813090849.GB27637@pengutronix.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 13 Aug 2010 17:09:33 +0800
+Subject: [PATCH] ARM: pxa/pwm: Make id const in pwm_probe()
+In-Reply-To: <20100813084601.GA27637@pengutronix.de>
+References: <1281593908-30448-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<AANLkTinQK3pddET6eL=JR2aOY4eXTjgO4NFy63JhZo_o@mail.gmail.com>
+	<20100813084601.GA27637@pengutronix.de>
+Message-ID: <AANLkTi=8EODc8vJu4LyDAP8KXx4Hm5AywHdDtxAPcqRK@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 12, 2010 at 03:10:53PM +0200, Hans J. Koch wrote:
-> If a watchdog reset occurs after booting in internal boot mode, the i.MX35
-> won't boot anymore. The boot ROM code seems to assume that some clocks are
-> turned on (they are after a power-on reset). This patch turns on the
-> necessary clocks.
-> 
-> Signed-off-by: Hans J. Koch <hjk@linutronix.de>
-Even if it should be a bootloader issue and not a ROM problem this fix
-is sensible.
+2010/8/13 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> On Thu, Aug 12, 2010 at 04:36:57PM +0800, Eric Miao wrote:
+>> 2010/8/12 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+>> > This fixes the compiler warning:
+>> >
+>> > ? ? ? ?arch/arm/plat-pxa/pwm.c: In function 'pwm_probe':
+>> > ? ? ? ?arch/arm/plat-pxa/pwm.c:179: warning: initialization discards qualifiers from pointer target type
+>> >
+>> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>>
+>> Ack.
+> That means patch system?
+>
 
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Nah, I'll merge it later.
 
-Thanks
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Thanks
+> Uwe
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
