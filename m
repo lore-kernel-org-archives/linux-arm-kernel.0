@@ -1,401 +1,203 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 13 Aug 2010 06:32:42 +0200
-Subject: [PATCH 11/13] PXA: Colibri: Rename Colibri-evalboard
+Date: Fri, 13 Aug 2010 06:32:43 +0200
+Subject: [PATCH 12/13] pxa2xx/pcmcia: Prepare for pxa320
 In-Reply-To: <1281673964-2119-1-git-send-email-marek.vasut@gmail.com>
 References: <1281673964-2119-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1281673964-2119-11-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1281673964-2119-12-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename colibri-pxa270-evalboard to colibri-evalboard as this board is used with
-all Colibri modules.
+PXA320 also supports PCMCIA/CF interface. This patch generalizes register access
+in pxa2xx_pcmcia so the pxa320 is now supported as well.
 
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- arch/arm/mach-pxa/Kconfig                    |    2 +-
- arch/arm/mach-pxa/Makefile                   |    2 +-
- arch/arm/mach-pxa/colibri-evalboard.c        |  121 ++++++++++++++++++++++++++
- arch/arm/mach-pxa/colibri-pxa270-evalboard.c |  121 --------------------------
- arch/arm/mach-pxa/colibri-pxa270.c           |    6 +-
- arch/arm/mach-pxa/colibri-pxa300.c           |    4 +-
- arch/arm/mach-pxa/colibri-pxa320.c           |    4 +-
- arch/arm/mach-pxa/include/mach/colibri.h     |    8 +-
- 8 files changed, 134 insertions(+), 134 deletions(-)
- create mode 100644 arch/arm/mach-pxa/colibri-evalboard.c
- delete mode 100644 arch/arm/mach-pxa/colibri-pxa270-evalboard.c
+ drivers/pcmcia/pxa2xx_base.c |   91 ++++++++++++++++++++++++++++++++----------
+ 1 files changed, 70 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index 636cb79..236ef28 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -256,7 +256,7 @@ config MACH_COLIBRI320
- 	select PXA3xx
- 	select CPU_PXA320
+diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
+index df4532e..2088f91 100644
+--- a/drivers/pcmcia/pxa2xx_base.c
++++ b/drivers/pcmcia/pxa2xx_base.c
+@@ -85,6 +85,16 @@
+ #define MCXX_ASST_SHIFT     (7)
+ #define MCXX_HOLD_SHIFT     (14)
  
--config MACH_COLIBRI_PXA270_EVALBOARD
-+config MACH_COLIBRI_EVALBOARD
- 	bool "Toradex Colibri Evaluation Carrier Board support"
- 	depends on MACH_COLIBRI || MACH_COLIBRI300 || MACH_COLIBRI320
++#define	PXA2XX_SMC_BASE		(0x48000000)
++#define	PXA3XX_SMC_BASE		(0x4a000000)
++#define	MECR_OFFSET		(0x14)
++#define	MCMEM_OFFSET		(0x28)
++#define	MCATT_OFFSET		(0x30)
++#define	MCIO_OFFSET		(0x38)
++#define	MCIO_OFFSET		(0x38)
++
++static void __iomem *base;
++
+ static inline u_int pxa2xx_mcxx_hold(u_int pcmcia_cycle_ns,
+ 				     u_int mem_clk_10khz)
+ {
+@@ -115,39 +125,57 @@ static inline u_int pxa2xx_pcmcia_cmd_time(u_int mem_clk_10khz,
+ 	return (300000 * (pcmcia_mcxx_asst + 1) / mem_clk_10khz);
+ }
  
-diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
-index 85c7fb3..7fee7fb 100644
---- a/arch/arm/mach-pxa/Makefile
-+++ b/arch/arm/mach-pxa/Makefile
-@@ -59,7 +59,7 @@ obj-$(CONFIG_MACH_LOGICPD_PXA270)	+= lpd270.o
- obj-$(CONFIG_MACH_PCM027)		+= pcm027.o
- obj-$(CONFIG_MACH_PCM990_BASEBOARD)	+= pcm990-baseboard.o
- obj-$(CONFIG_MACH_COLIBRI)			+= colibri-pxa270.o
--obj-$(CONFIG_MACH_COLIBRI_PXA270_EVALBOARD)	+= colibri-pxa270-evalboard.o
-+obj-$(CONFIG_MACH_COLIBRI_EVALBOARD)	+= colibri-evalboard.o
- obj-$(CONFIG_MACH_COLIBRI_PXA270_INCOME)	+= colibri-pxa270-income.o
- obj-$(CONFIG_MACH_COLIBRI300)	+= colibri-pxa3xx.o colibri-pxa300.o
- obj-$(CONFIG_MACH_COLIBRI320)	+= colibri-pxa3xx.o colibri-pxa320.o
-diff --git a/arch/arm/mach-pxa/colibri-evalboard.c b/arch/arm/mach-pxa/colibri-evalboard.c
-new file mode 100644
-index 0000000..6b2c800
---- /dev/null
-+++ b/arch/arm/mach-pxa/colibri-evalboard.c
-@@ -0,0 +1,121 @@
-+/*
-+ *  linux/arch/arm/mach-pxa/colibri-evalboard.c
-+ *
-+ *  Support for Toradex Colibri Evaluation Carrier Board
-+ *  Daniel Mack <daniel@caiaq.de>
-+ *  Marek Vasut <marek.vasut@gmail.com>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  published by the Free Software Foundation.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+#include <linux/sysdev.h>
-+#include <linux/interrupt.h>
-+#include <linux/gpio.h>
-+#include <asm/mach-types.h>
-+#include <mach/hardware.h>
-+#include <asm/mach/arch.h>
-+#include <linux/i2c.h>
-+
-+#include <mach/pxa27x.h>
-+#include <mach/colibri.h>
-+#include <mach/mmc.h>
-+#include <mach/ohci.h>
-+#include <mach/pxa27x-udc.h>
-+
-+#include <plat/i2c.h>
-+
-+#include "generic.h"
-+#include "devices.h"
-+
-+/******************************************************************************
-+ * SD/MMC card controller
-+ ******************************************************************************/
-+#if defined(CONFIG_MMC_PXA) || defined(CONFIG_MMC_PXA_MODULE)
-+static struct pxamci_platform_data colibri_mci_platform_data = {
-+	.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34,
-+	.gpio_power		= -1,
-+	.gpio_card_ro		= -1,
-+	.detect_delay_ms	= 200,
-+};
-+
-+static void __init colibri_mmc_init(void)
++static inline void pxa2xx_pcmcia_set_reg( uint32_t reg, uint32_t sock,
++					uint32_t val )
 +{
-+	if (machine_is_colibri())	/* PXA270 Colibri */
-+		colibri_mci_platform_data.gpio_card_detect =
-+			GPIO0_COLIBRI_PXA270_SD_DETECT;
-+	if (machine_is_colibri300())	/* PXA300 Colibri */
-+		colibri_mci_platform_data.gpio_card_detect =
-+			GPIO39_COLIBRI_PXA300_SD_DETECT;
-+	else				/* PXA320 Colibri */
-+		colibri_mci_platform_data.gpio_card_detect =
-+			GPIO28_COLIBRI_PXA320_SD_DETECT;
-+
-+	pxa_set_mci_info(&colibri_mci_platform_data);
++	writel(val, base + reg + (sock << 4));
 +}
-+#else
-+static inline void colibri_mmc_init(void) {}
-+#endif
 +
-+/******************************************************************************
-+ * USB Host
-+ ******************************************************************************/
-+#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
-+static int colibri_ohci_init(struct device *dev)
-+{
-+	UP2OCR = UP2OCR_HXS | UP2OCR_HXOE | UP2OCR_DPPDE | UP2OCR_DMPDE;
+ static int pxa2xx_pcmcia_set_mcmem( int sock, int speed, int clock )
+ {
+-	MCMEM(sock) = ((pxa2xx_mcxx_setup(speed, clock)
++	uint32_t val;
++
++	val = ((pxa2xx_mcxx_setup(speed, clock)
+ 		& MCXX_SETUP_MASK) << MCXX_SETUP_SHIFT)
+ 		| ((pxa2xx_mcxx_asst(speed, clock)
+ 		& MCXX_ASST_MASK) << MCXX_ASST_SHIFT)
+ 		| ((pxa2xx_mcxx_hold(speed, clock)
+ 		& MCXX_HOLD_MASK) << MCXX_HOLD_SHIFT);
+ 
++	pxa2xx_pcmcia_set_reg(MCMEM_OFFSET, sock, val);
++
+ 	return 0;
+ }
+ 
+ static int pxa2xx_pcmcia_set_mcio( int sock, int speed, int clock )
+ {
+-	MCIO(sock) = ((pxa2xx_mcxx_setup(speed, clock)
++	uint32_t val;
++
++	val = ((pxa2xx_mcxx_setup(speed, clock)
+ 		& MCXX_SETUP_MASK) << MCXX_SETUP_SHIFT)
+ 		| ((pxa2xx_mcxx_asst(speed, clock)
+ 		& MCXX_ASST_MASK) << MCXX_ASST_SHIFT)
+ 		| ((pxa2xx_mcxx_hold(speed, clock)
+ 		& MCXX_HOLD_MASK) << MCXX_HOLD_SHIFT);
+ 
++	pxa2xx_pcmcia_set_reg(MCIO_OFFSET, sock, val);
++
+ 	return 0;
+ }
+ 
+ static int pxa2xx_pcmcia_set_mcatt( int sock, int speed, int clock )
+ {
+-	MCATT(sock) = ((pxa2xx_mcxx_setup(speed, clock)
++	uint32_t val;
++
++	val = ((pxa2xx_mcxx_setup(speed, clock)
+ 		& MCXX_SETUP_MASK) << MCXX_SETUP_SHIFT)
+ 		| ((pxa2xx_mcxx_asst(speed, clock)
+ 		& MCXX_ASST_MASK) << MCXX_ASST_SHIFT)
+ 		| ((pxa2xx_mcxx_hold(speed, clock)
+ 		& MCXX_HOLD_MASK) << MCXX_HOLD_SHIFT);
+ 
++	pxa2xx_pcmcia_set_reg(MCATT_OFFSET, sock, val);
++
+ 	return 0;
+ }
+ 
+@@ -207,19 +235,18 @@ pxa2xx_pcmcia_frequency_change(struct soc_pcmcia_socket *skt,
+ static void pxa2xx_configure_sockets(struct device *dev)
+ {
+ 	struct pcmcia_low_level *ops = dev->platform_data;
+-
+ 	/*
+ 	 * We have at least one socket, so set MECR:CIT
+ 	 * (Card Is There)
+ 	 */
+-	MECR |= MECR_CIT;
++	uint32_t mecr = MECR_CIT;
+ 
+ 	/* Set MECR:NOS (Number Of Sockets) */
+ 	if ((ops->first + ops->nr) > 1 ||
+ 	    machine_is_viper() || machine_is_arcom_zeus())
+-		MECR |= MECR_NOS;
+-	else
+-		MECR &= ~MECR_NOS;
++		mecr |= MECR_NOS;
++
++	pxa2xx_pcmcia_set_reg(MECR_OFFSET, 0, mecr);
+ }
+ 
+ static const char *skt_names[] = {
+@@ -272,16 +299,34 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
+ 	struct pcmcia_low_level *ops;
+ 	struct skt_dev_info *sinfo;
+ 	struct soc_pcmcia_socket *skt;
++	uint32_t smc_addr;
+ 
+ 	ops = (struct pcmcia_low_level *)dev->dev.platform_data;
+-	if (!ops)
+-		return -ENODEV;
++	if (!ops) {
++		ret = -ENODEV;
++		goto err0;
++	}
++
++	if (cpu_is_pxa320() && ops->nr > 1) {
++		dev_err(&dev->dev, "pxa320 supports only one pcmcia slot");
++		ret = -EINVAL;
++		goto err0;
++	}
+ 
+ 	pxa2xx_drv_pcmcia_ops(ops);
+ 
++	smc_addr = cpu_is_pxa320() ? PXA3XX_SMC_BASE : PXA2XX_SMC_BASE;
++	base = ioremap(smc_addr, 0x100);
++	if (!base) {
++		ret = -ENOMEM;
++		goto err0;
++	}
++
+ 	sinfo = kzalloc(SKT_DEV_INFO_SIZE(ops->nr), GFP_KERNEL);
+-	if (!sinfo)
+-		return -ENOMEM;
++	if (!sinfo) {
++		ret = -ENOMEM;
++		goto err1;
++	}
+ 
+ 	sinfo->nskt = ops->nr;
+ 
+@@ -297,18 +342,21 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
+ 
+ 		ret = pxa2xx_drv_pcmcia_add_one(skt);
+ 		if (ret)
+-			break;
++			goto err2;
+ 	}
+ 
+-	if (ret) {
+-		while (--i >= 0)
+-			soc_pcmcia_remove_one(&sinfo->skt[i]);
+-		kfree(sinfo);
+-	} else {
+-		pxa2xx_configure_sockets(&dev->dev);
+-		dev_set_drvdata(&dev->dev, sinfo);
+-	}
++	pxa2xx_configure_sockets(&dev->dev);
++	dev_set_drvdata(&dev->dev, sinfo);
++
 +	return 0;
-+}
-+
-+static struct pxaohci_platform_data colibri_ohci_info = {
-+	.port_mode	= PMM_PERPORT_MODE,
-+	.flags		= ENABLE_PORT1 |
-+			  POWER_CONTROL_LOW | POWER_SENSE_LOW,
-+	.init		= colibri_ohci_init,
-+};
-+
-+static void __init colibri_uhc_init(void)
-+{
-+	/* Colibri PXA270 has two usb ports, TBA for 320 */
-+	if (machine_is_colibri())
-+		colibri_ohci_info.flags	|= ENABLE_PORT2;
-+
-+	pxa_set_ohci_info(&colibri_ohci_info);
-+}
-+#else
-+static inline void colibri_uhc_init(void) {}
-+#endif
-+
-+/******************************************************************************
-+ * I2C RTC
-+ ******************************************************************************/
-+#if defined(CONFIG_RTC_DRV_DS1307) || defined(CONFIG_RTC_DRV_DS1307_MODULE)
-+static struct i2c_board_info __initdata colibri_i2c_devs[] = {
-+	{
-+		I2C_BOARD_INFO("m41t00", 0x68),
-+	},
-+};
-+
-+static void __init colibri_rtc_init(void)
-+{
-+	pxa_set_i2c_info(NULL);
-+	i2c_register_board_info(0, ARRAY_AND_SIZE(colibri_i2c_devs));
-+}
-+#else
-+static inline void colibri_rtc_init(void) {}
-+#endif
-+
-+void __init colibri_evalboard_init(void)
-+{
-+	pxa_set_ffuart_info(NULL);
-+	pxa_set_btuart_info(NULL);
-+	pxa_set_stuart_info(NULL);
-+
-+	colibri_mmc_init();
-+	colibri_uhc_init();
-+	colibri_rtc_init();
-+}
-diff --git a/arch/arm/mach-pxa/colibri-pxa270-evalboard.c b/arch/arm/mach-pxa/colibri-pxa270-evalboard.c
-deleted file mode 100644
-index 7f27aec..0000000
---- a/arch/arm/mach-pxa/colibri-pxa270-evalboard.c
-+++ /dev/null
-@@ -1,121 +0,0 @@
--/*
-- *  linux/arch/arm/mach-pxa/colibri-pxa270-evalboard.c
-- *
-- *  Support for Toradex PXA270 based Colibri Evaluation Carrier Board
-- *  Daniel Mack <daniel@caiaq.de>
-- *  Marek Vasut <marek.vasut@gmail.com>
-- *
-- *  This program is free software; you can redistribute it and/or modify
-- *  it under the terms of the GNU General Public License version 2 as
-- *  published by the Free Software Foundation.
-- */
--
--#include <linux/init.h>
--#include <linux/kernel.h>
--#include <linux/platform_device.h>
--#include <linux/sysdev.h>
--#include <linux/interrupt.h>
--#include <linux/gpio.h>
--#include <asm/mach-types.h>
--#include <mach/hardware.h>
--#include <asm/mach/arch.h>
--#include <linux/i2c.h>
--
--#include <mach/pxa27x.h>
--#include <mach/colibri.h>
--#include <mach/mmc.h>
--#include <mach/ohci.h>
--#include <mach/pxa27x-udc.h>
--
--#include <plat/i2c.h>
--
--#include "generic.h"
--#include "devices.h"
--
--/******************************************************************************
-- * SD/MMC card controller
-- ******************************************************************************/
--#if defined(CONFIG_MMC_PXA) || defined(CONFIG_MMC_PXA_MODULE)
--static struct pxamci_platform_data colibri_pxa270_mci_platform_data = {
--	.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34,
--	.gpio_power		= -1,
--	.gpio_card_ro		= -1,
--	.detect_delay_ms	= 200,
--};
--
--static void __init colibri_pxa270_mmc_init(void)
--{
--	if (machine_is_colibri())	/* PXA270 Colibri */
--		colibri_pxa270_mci_platform_data.gpio_card_detect =
--			GPIO0_COLIBRI_PXA270_SD_DETECT;
--	if (machine_is_colibri300())	/* PXA300 Colibri */
--		colibri_pxa270_mci_platform_data.gpio_card_detect =
--			GPIO39_COLIBRI_PXA300_SD_DETECT;
--	else				/* PXA320 Colibri */
--		colibri_pxa270_mci_platform_data.gpio_card_detect =
--			GPIO28_COLIBRI_PXA320_SD_DETECT;
--
--	pxa_set_mci_info(&colibri_pxa270_mci_platform_data);
--}
--#else
--static inline void colibri_pxa270_mmc_init(void) {}
--#endif
--
--/******************************************************************************
-- * USB Host
-- ******************************************************************************/
--#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
--static int colibri_pxa270_ohci_init(struct device *dev)
--{
--	UP2OCR = UP2OCR_HXS | UP2OCR_HXOE | UP2OCR_DPPDE | UP2OCR_DMPDE;
--	return 0;
--}
--
--static struct pxaohci_platform_data colibri_pxa270_ohci_info = {
--	.port_mode	= PMM_PERPORT_MODE,
--	.flags		= ENABLE_PORT1 |
--			  POWER_CONTROL_LOW | POWER_SENSE_LOW,
--	.init		= colibri_pxa270_ohci_init,
--};
--
--static void __init colibri_pxa270_uhc_init(void)
--{
--	/* Colibri PXA270 has two usb ports, TBA for 320 */
--	if (machine_is_colibri())
--		colibri_pxa270_ohci_info.flags	|= ENABLE_PORT2;
--
--	pxa_set_ohci_info(&colibri_pxa270_ohci_info);
--}
--#else
--static inline void colibri_pxa270_uhc_init(void) {}
--#endif
--
--/******************************************************************************
-- * I2C RTC
-- ******************************************************************************/
--#if defined(CONFIG_RTC_DRV_DS1307) || defined(CONFIG_RTC_DRV_DS1307_MODULE)
--static struct i2c_board_info __initdata colibri_pxa270_i2c_devs[] = {
--	{
--		I2C_BOARD_INFO("m41t00", 0x68),
--	},
--};
--
--static void __init colibri_pxa270_rtc_init(void)
--{
--	pxa_set_i2c_info(NULL);
--	i2c_register_board_info(0, ARRAY_AND_SIZE(colibri_pxa270_i2c_devs));
--}
--#else
--static inline void colibri_pxa270_rtc_init(void) {}
--#endif
--
--void __init colibri_pxa270_evalboard_init(void)
--{
--	pxa_set_ffuart_info(NULL);
--	pxa_set_btuart_info(NULL);
--	pxa_set_stuart_info(NULL);
--
--	colibri_pxa270_mmc_init();
--	colibri_pxa270_uhc_init();
--	colibri_pxa270_rtc_init();
--}
-diff --git a/arch/arm/mach-pxa/colibri-pxa270.c b/arch/arm/mach-pxa/colibri-pxa270.c
-index 1024da5..dc05af4 100644
---- a/arch/arm/mach-pxa/colibri-pxa270.c
-+++ b/arch/arm/mach-pxa/colibri-pxa270.c
-@@ -35,7 +35,7 @@
- /******************************************************************************
-  * Evaluation board MFP
-  ******************************************************************************/
--#ifdef	 CONFIG_MACH_COLIBRI_PXA270_EVALBOARD
-+#ifdef	 CONFIG_MACH_COLIBRI_EVALBOARD
- static mfp_cfg_t colibri_pxa270_evalboard_pin_config[] __initdata = {
- 	/* MMC */
- 	GPIO32_MMC_CLK,
-@@ -281,10 +281,10 @@ static void __init colibri_pxa270_init(void)
- 	colibri_pxa270_tsc_init();
  
- 	switch (colibri_pxa270_baseboard) {
--	case COLIBRI_PXA270_EVALBOARD:
-+	case COLIBRI_EVALBOARD:
- 		pxa2xx_mfp_config(ARRAY_AND_SIZE(
- 			colibri_pxa270_evalboard_pin_config));
--		colibri_pxa270_evalboard_init();
-+		colibri_evalboard_init();
- 		break;
- 	case COLIBRI_PXA270_INCOME:
- 		pxa2xx_mfp_config(ARRAY_AND_SIZE(income_pin_config));
-diff --git a/arch/arm/mach-pxa/colibri-pxa300.c b/arch/arm/mach-pxa/colibri-pxa300.c
-index d1cdb98..87e5397 100644
---- a/arch/arm/mach-pxa/colibri-pxa300.c
-+++ b/arch/arm/mach-pxa/colibri-pxa300.c
-@@ -31,7 +31,7 @@
- #include "devices.h"
- 
- 
--#ifdef CONFIG_MACH_COLIBRI_PXA270_EVALBOARD
-+#ifdef CONFIG_MACH_COLIBRI_EVALBOARD
- static mfp_cfg_t colibri_pxa300_evalboard_pin_config[] __initdata = {
- 	/* MMC */
- 	GPIO7_MMC1_CLK,
-@@ -172,7 +172,7 @@ void __init colibri_pxa300_init(void)
- 
- 	/* Evalboard init */
- 	pxa3xx_mfp_config(ARRAY_AND_SIZE(colibri_pxa300_evalboard_pin_config));
--	colibri_pxa270_evalboard_init();
-+	colibri_evalboard_init();
++err2:
++	while (--i >= 0)
++		soc_pcmcia_remove_one(&sinfo->skt[i]);
++	kfree(sinfo);
++err1:
++	iounmap(base);
++err0:
+ 	return ret;
  }
  
- MACHINE_START(COLIBRI300, "Toradex Colibri PXA300")
-diff --git a/arch/arm/mach-pxa/colibri-pxa320.c b/arch/arm/mach-pxa/colibri-pxa320.c
-index 4257382..7c003cd 100644
---- a/arch/arm/mach-pxa/colibri-pxa320.c
-+++ b/arch/arm/mach-pxa/colibri-pxa320.c
-@@ -35,7 +35,7 @@
- #include "generic.h"
- #include "devices.h"
+@@ -323,6 +371,7 @@ static int pxa2xx_drv_pcmcia_remove(struct platform_device *dev)
+ 		soc_pcmcia_remove_one(&sinfo->skt[i]);
  
--#ifdef	CONFIG_MACH_COLIBRI_PXA270_EVALBOARD
-+#ifdef	CONFIG_MACH_COLIBRI_EVALBOARD
- static mfp_cfg_t colibri_pxa320_evalboard_pin_config[] __initdata = {
- 	/* MMC */
- 	GPIO22_MMC1_CLK,
-@@ -229,7 +229,7 @@ void __init colibri_pxa320_init(void)
- 
- 	/* Evalboard init */
- 	pxa3xx_mfp_config(ARRAY_AND_SIZE(colibri_pxa320_evalboard_pin_config));
--	colibri_pxa270_evalboard_init();
-+	colibri_evalboard_init();
+ 	kfree(sinfo);
++	iounmap(base);
+ 	return 0;
  }
  
- MACHINE_START(COLIBRI320, "Toradex Colibri PXA320")
-diff --git a/arch/arm/mach-pxa/include/mach/colibri.h b/arch/arm/mach-pxa/include/mach/colibri.h
-index 63a948a..388a96f 100644
---- a/arch/arm/mach-pxa/include/mach/colibri.h
-+++ b/arch/arm/mach-pxa/include/mach/colibri.h
-@@ -9,14 +9,14 @@
-  */
- 
- enum {
--	COLIBRI_PXA270_EVALBOARD = 0,
-+	COLIBRI_EVALBOARD = 0,
- 	COLIBRI_PXA270_INCOME,
- };
- 
--#if defined(CONFIG_MACH_COLIBRI_PXA270_EVALBOARD)
--extern void colibri_pxa270_evalboard_init(void);
-+#if defined(CONFIG_MACH_COLIBRI_EVALBOARD)
-+extern void colibri_evalboard_init(void);
- #else
--static inline void colibri_pxa270_evalboard_init(void) {}
-+static inline void colibri_evalboard_init(void) {}
- #endif
- 
- #if defined(CONFIG_MACH_COLIBRI_PXA270_INCOME)
 -- 
 1.7.1
