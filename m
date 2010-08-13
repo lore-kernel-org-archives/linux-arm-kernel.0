@@ -1,61 +1,55 @@
-From: hjk@linutronix.de (Hans J. Koch)
-Date: Fri, 13 Aug 2010 12:04:29 +0200
-Subject: [PATCH v2] mx35: Fix boot ROM hang in internal boot mode
-In-Reply-To: <20100813081720.GA23898@pengutronix.de>
-References: <20100811233721.GB6411@local>
-	<20100812055753.GB9763@pengutronix.de>
-	<20100812112938.GB8670@local> <20100812121504.GC8670@local>
-	<20100813081720.GA23898@pengutronix.de>
-Message-ID: <20100813100429.GB22619@local>
+From: mfuzzey@gmail.com (Martin Fuzzey)
+Date: Fri, 13 Aug 2010 12:06:54 +0200
+Subject: Problem with non aligned DMA in usbnet on ARM
+In-Reply-To: <4C642AA9.1060404@parrot.com>
+References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>	<4C627479.4060400@parrot.com>	<AANLkTinU2JEkeYJHo4tA+kD9Pd_F3YcUTbK9w6igc7s8@mail.gmail.com>	<4C62C7B3.2030706@nvidia.com>
+	<20100811203505.GA463@n2100.arm.linux.org.uk>
+	<4C632217.9000608@gmail.com> <4C642AA9.1060404@parrot.com>
+Message-ID: <4C65193E.4090807@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 13, 2010 at 10:17:20AM +0200, Uwe Kleine-K?nig wrote:
-> On Thu, Aug 12, 2010 at 02:15:04PM +0200, Hans J. Koch wrote:
-> > On Thu, Aug 12, 2010 at 01:29:40PM +0200, Hans J. Koch wrote:
-> > > On Thu, Aug 12, 2010 at 07:57:53AM +0200, Uwe Kleine-K?nig wrote:
-> > > > > +	}
-> > > > > +
-> > > > > +	__raw_writel(cgr2, CCM_BASE + CCM_CGR2);
-> > > > > +	__raw_writel(cgr3, CCM_BASE + CCM_CGR3);
-> > > > Note that my question concerning the UART clock was less about UART1 vs
-> > > > UART0 but more if the ROM really needs a UART clock.
-> > > 
-> > > In my tests on an mx35pdk board, I found these three clocks being the
-> > > minimum set of additional clocks that need to be turned on. That means,
-> > > if you turn off any of the three, it won't boot anymore.
-> > 
-> > For my tests, I didn't fully boot the kernel but inserted a while(1) after
-> > the clock init sequence. I had the wachdog already initialized in the
-> > bootloader, so after a few seconds it would boot again - or not.
-> > 
-> > If you fully boot the kernel, then the driver will probably switch on
-> > the UART1 clock, so you don't notice the effect anymore. But the kernel
-> > can hang _before_ drivers come up, and it should still work. That's
-> > what hardware watchdogs are for.
-> > 
-> > As a sidenote, it should be clear that this patch is a workaround for
-> > a serious chip bug of the MX35.
-> From the things you wrote up to now it's possible that this is a
-> bootloader issue, isn't it.
+Matthieu CASTET wrote:
+> memmove is our friend :
+> the buffer allocated in usbnet got an offset.
+> All you have to do it remove this offset and memmove the data. That
+> what I did [1], and why it is better to do it in usb driver.
+>
+>
+> [1] http://article.gmane.org/gmane.linux.usb.general/28700
+The problem I see with this approach is that it requires the usb driver
+to be aware of the device controller's quirks  (hence the
+gadget_dma32()) your patch adds. That appears to be the norm (and maybe
+unavoidable) on the gadget side but on the host side things aren't
+supposed to work like that.
 
-I discussed that with John. It's at least very unlikely. Given the fact
-that it works in external boot mode, a bootloader bug had to be in the
-code path that's different for the two modes. That code path is very
-small, and there's no hint that the clocks in question are used there.
+The expectation for USB hosts is that any properly written usb driver
+will work with any properly written host controller driver. I don't
+think it's reasonable to expect driver developers to test their code
+with all the HCDs, nor expect HCD developers to test their code with all
+the drivers.
 
-> 
-> I don't know exactly what "internal boot mode" means, but assuming the
-> ROM code doesn't make any output to UART1 at least this clock smells
-> like a bootloader problem.
+So I think a policy needs to be defined to ensure this and enforced in
+the code. I can see two possible methods:
 
-No. When the bootloader uses the UART for the first time it is already
-in code that's identical for both boot modes.
+1) Require that usb drivers submit buffers obtained from kmalloc() and
+friends with no extra offsets. If they want some other alignment later
+they can use memmove in the completion handler. Enforce this in the core
+by checking the buffer pointers are aligned to ARCH_KMALLOC_MINALIGN
 
-> If you're conviced this is a chip problem,
-> did you consider to contact FSL about it?
+or
 
-Yes, of course. John does that at the moment.
+2) Require that usb_submit_urb() accept byte aligned buffers. Enforce
+this by a new test in usbtest (which all HCDs are expected to pass).
+Implement it either in individual HCDs that require it or by letting
+HCDs inform the core of their requirements and have the core do the
+alignment (as it already does the dma mapping). Of course HCDs that can
+implement byte aligned transfers (either natively or using tricks such
+as the one Russell suggested) should do so.
 
-Thanks,
-Hans
+I think 2) is the better solution because:
+a) Solution 1 will impose a runtime overhead even on platforms / HCDs
+that don't need it (including the most common cases)
+b) There are more drivers than HCDs
+
+Martin
