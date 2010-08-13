@@ -1,13 +1,7 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 13 Aug 2010 22:27:17 +0800
-Subject: [PATCH 0/6] ARM: pxa: support new platform
-Message-ID: <AANLkTikQfX546=VYtYgV2cBVd0ZdounwxyRi_RE2UyZH@mail.gmail.com>
+Date: Fri, 13 Aug 2010 22:27:28 +0800
+Subject: [PATCH 1/6] pxa: sanitize IRQ registers access based on offset
+Message-ID: <AANLkTin1iM2+bO6wMRQAuRHK_m_evF+XwNQ2KkY9d+pp@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. Add tavorevb3, saarb platform
-2. Update irq of pxa.
-3. add new i2c devices of pxa950
-
-Thanks
-Haojian
