@@ -1,64 +1,28 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 13 Aug 2010 18:54:18 +0900
-Subject: [PATCH] ARM: S3C2410: Fix on build warning about dependency in
-	mach-s3c2440/Kconfig
-In-Reply-To: <20100813083901.GA20285@pengutronix.de>
-References: <1281687307-2421-1-git-send-email-kgene.kim@samsung.com>
-	<20100813083901.GA20285@pengutronix.de>
-Message-ID: <009201cb3acd$820678c0$86136a40$%kim@samsung.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 13 Aug 2010 13:53:57 +0400
+Subject: [PATCH 3/6] OMAP3: PM: ensure IO wakeups are properly disabled
+In-Reply-To: <20100813080200.18750.37791.stgit@baageli.muru.com>
+References: <20100813080034.18750.15410.stgit@baageli.muru.com>
+	<20100813080200.18750.37791.stgit@baageli.muru.com>
+Message-ID: <4C651635.8000201@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe Kleine-K?nig wrote:
-> 
-> On Fri, Aug 13, 2010 at 05:15:07PM +0900, Kukjin Kim wrote:
-> > This patch fixes on following build warnings.
-> >
-> > warning: (CPU_S3C2440 && ARCH_S3C2410 && S3C2410_DMA) selects
-> S3C2440_DMA which
-> >              has unmet direct dependencies (ARCH_S3C2410 &&
-> CPU_S3C24405B)
-> > warning: (CPU_S3C2440 && ARCH_S3C2410 || CPU_S3C2442 &&
-> ARCH_S3C2410) selects
-> >              CPU_S3C244X which has unmet direct dependencies
-> (!ARCH_S3C2410)
-> >
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > Cc: Ben Dooks <ben-linux@fluff.org>
-> > ---
-> >  arch/arm/mach-s3c2440/Kconfig |    4 ++--
-> >  1 files changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-s3c2440/Kconfig
-b/arch/arm/mach-s3c2440/Kconfig
-> > index cd8e7de..f60a370 100644
-> > --- a/arch/arm/mach-s3c2440/Kconfig
-> > +++ b/arch/arm/mach-s3c2440/Kconfig
-> > @@ -30,7 +30,7 @@ config CPU_S3C2442
-> >
-> >  config CPU_S3C244X
-> >  	bool
-> > -	depends on ARCH_S3C2410 && (CPU_S3C2440 || CPU_S3C2442)
-> > +	depends on (CPU_S3C2440 || CPU_S3C2442)
-> >  	help
-> >  	  Support for S3C2440 and S3C2442 Samsung Mobile CPU based
-> systems.
-> >
-> > @@ -72,7 +72,7 @@ config S3C2440_PLL_16934400
-> >
-> >  config S3C2440_DMA
-> >  	bool
-> > -	depends on ARCH_S3C2410 && CPU_S3C24405B
-> > +	depends on (ARCH_S3C2410 || CPU_S3C24405B)
-> >  	help
-> >  	  Support for S3C2440 specific DMA code5A
-> all parenthesis in your +lines are superflous.
-> 
-Yeah, you're right.
-Fixed. Thanks. :-)
+Hello.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Tony Lindgren wrote:
+
+> From: Kevin Hilman <khilman@ti.com>
+
+> Commit 5a5f561 (convert OMAP3 PRCM macros to the _SHIFT/_MASK suffixes)
+> mistakenly removed the check for PER when disabling the IO chain.
+> 
+> During idle, if the PER powerdomain transitions and CORE does not (as
+
+   Does not what?
+
+> is the case with the lower C-states when using CPUidle) the IO pad
+> wakeups are not being disabled in the idle path after they are
+> enabled.
+
+WBR, Sergei
