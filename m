@@ -1,75 +1,36 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 13 Aug 2010 10:13:04 +0200
-Subject: 'error: 'SDHCI_QUIRK_NO_HISPD_BIT' undeclared' and 'undefined
-	reference to `sdhci_card_detect''
-In-Reply-To: <008d01cb3ab9$ae73da60$0b5b8f20$%kim@samsung.com>
-References: <008d01cb3ab9$ae73da60$0b5b8f20$%kim@samsung.com>
-Message-ID: <000901cb3abf$5ef59b30$1ce0d190$%szyprowski@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 13 Aug 2010 10:17:20 +0200
+Subject: [PATCH v2] mx35: Fix boot ROM hang in internal boot mode
+In-Reply-To: <20100812121504.GC8670@local>
+References: <20100811233721.GB6411@local>
+	<20100812055753.GB9763@pengutronix.de>
+	<20100812112938.GB8670@local> <20100812121504.GC8670@local>
+Message-ID: <20100813081720.GA23898@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Friday, August 13, 2010 9:32 AM Kukjin Kim wrote:
-
-> This is just information about Samsung sdmmc stuff building error now.
+On Thu, Aug 12, 2010 at 02:15:04PM +0200, Hans J. Koch wrote:
+> On Thu, Aug 12, 2010 at 01:29:40PM +0200, Hans J. Koch wrote:
+> > On Thu, Aug 12, 2010 at 07:57:53AM +0200, Uwe Kleine-K?nig wrote:
+> > > > +	}
+> > > > +
+> > > > +	__raw_writel(cgr2, CCM_BASE + CCM_CGR2);
+> > > > +	__raw_writel(cgr3, CCM_BASE + CCM_CGR3);
+> > > Note that my question concerning the UART clock was less about UART1 vs
+> > > UART0 but more if the ROM really needs a UART clock.
+> > 
+> > In my tests on an mx35pdk board, I found these three clocks being the
+> > minimum set of additional clocks that need to be turned on. That means,
+> > if you turn off any of the three, it won't boot anymore.
 > 
-> I found Marek's 'sdhci-s3c: enable SDHCI_QUIRK_NO_HISPD_BIT quirk' in the
-> Linus' tree.
-> (commit ID: a1d5646005af1247d6ae78434bb4db15b07a07b2)
+> For my tests, I didn't fully boot the kernel but inserted a while(1) after
+> the clock init sequence. I had the wachdog already initialized in the
+> bootloader, so after a few seconds it would boot again - or not.
 > 
-> But not defined the quirk yet...so following build error happened with
-> s3c6400_defconfig in Linus' latest.
+> If you fully boot the kernel, then the driver will probably switch on
+> the UART1 clock, so you don't notice the effect anymore. But the kernel
+> can hang _before_ drivers come up, and it should still work. That's
+> what hardware watchdogs are for.
 > 
-> drivers/mmc/host/sdhci-s3c.c: In function 'sdhci_s3c_probe':
-> drivers/mmc/host/sdhci-s3c.c:400: error: 'SDHCI_QUIRK_NO_HISPD_BIT'
-> undeclared (first use in this function)
-> drivers/mmc/host/sdhci-s3c.c:400: error: (Each undeclared identifier is
-> reported only once
-> drivers/mmc/host/sdhci-s3c.c:400: error: for each function it appears in.)
-> make[4]: *** [drivers/mmc/host/sdhci-s3c.o] Error 1
-> make[3]: *** [drivers/mmc/host] Error 2
-> make[2]: *** [drivers/mmc] Error 2
-> make[1]: *** [drivers] Error 2
-> 
-> Kyungmin Park's below patch can solve this and it is in mmotm now.
-> (commit ID: 2935b9e7fcc4bea3751b8d039b383b2036a7d36d)
-> 
-> But I think, to update quirk definition should being in Marek's patch for
-> avoiding build error.
-> Of course, I'm not sure whether the commit order changed.
-> Anyway, in this case, will be solved after merging mm tree.
-> 
-> 
-> And second case is same.
-> 
-> Marek's 'sdhci-s3c: add support for new card detection methods' cause
-> following build error.
-> (commit ID:17866e14f3a4f219e94f1374ece7226479418ff8)
-> 
-> drivers/built-in.o: In function `sdhci_s3c_notify_change':
-> /home/kgene/linux/linux-2.6-mainline-dev/drivers/mmc/host/sdhci-s3c.c:255:
-> undefined reference to `sdhci_card_detect'
-> make[1]: *** [.tmp_vmlinux1] Error 1
-> make: *** [sub-make] Error 2
-> 
-> And Andrew's patch(b567e5dd5a34c184e5642100e752cb87e064bb97) can solve this.
-> (of course this needs another patches...)
-> 
-> Anyway...
-> Marek, in future please make sure your patch has no building problem before
-> submitting.
-> (or it can help to add some kind of dependency note in your patch)
-
-My patches submited to Andrew Morton had the description and a note that they
-have been prepared especially for his tree, taking into account all patches
-that are already there (mainly a tasklets to threaded irq conversion). For me
-it was quite obvious that they will be merged after all other sdhci changes
-from that tree. I have no idea why the order of the patches has been reversed
-and my sdhci patches has been submitted to Linus before the other sdhci
-changes.
-
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+> As a sidenote, it should be clear that this patch is a workaround for
+> a serious chip bug of the MX35.
