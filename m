@@ -1,66 +1,44 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 13 Aug 2010 16:32:07 +0900
-Subject: 'error: 'SDHCI_QUIRK_NO_HISPD_BIT' undeclared' and 'undefined
-	reference to `sdhci_card_detect''
-Message-ID: <008d01cb3ab9$ae73da60$0b5b8f20$%kim@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 13 Aug 2010 11:01:38 +0300
+Subject: [PATCH 0/6] omap fixes for upcoming 2.6.36-rc1
+Message-ID: <20100813080034.18750.15410.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
+Hi all,
 
-This is just information about Samsung sdmmc stuff building error now.
+Here are some omap fixes for review.
 
-I found Marek's 'sdhci-s3c: enable SDHCI_QUIRK_NO_HISPD_BIT quirk' in the
-Linus' tree.
-(commit ID: a1d5646005af1247d6ae78434bb4db15b07a07b2)
+Regards,
 
-But not defined the quirk yet...so following build error happened with
-s3c6400_defconfig in Linus' latest.
+Tony
 
-drivers/mmc/host/sdhci-s3c.c: In function 'sdhci_s3c_probe':
-drivers/mmc/host/sdhci-s3c.c:400: error: 'SDHCI_QUIRK_NO_HISPD_BIT'
-undeclared (first use in this function)
-drivers/mmc/host/sdhci-s3c.c:400: error: (Each undeclared identifier is
-reported only once
-drivers/mmc/host/sdhci-s3c.c:400: error: for each function it appears in.)
-make[4]: *** [drivers/mmc/host/sdhci-s3c.o] Error 1
-make[3]: *** [drivers/mmc/host] Error 2
-make[2]: *** [drivers/mmc] Error 2
-make[1]: *** [drivers] Error 2
+---
 
-Kyungmin Park's below patch can solve this and it is in mmotm now.
-(commit ID: 2935b9e7fcc4bea3751b8d039b383b2036a7d36d)
+Kevin Hilman (1):
+      OMAP3: PM: ensure IO wakeups are properly disabled
 
-But I think, to update quirk definition should being in Marek's patch for
-avoiding build error.
-Of course, I'm not sure whether the commit order changed.
-Anyway, in this case, will be solved after merging mm tree.
+Nishanth Menon (1):
+      omap3: id: fix 3630 rev detection
+
+Tony Lindgren (3):
+      omap: Fix sev instruction usage for multi-omap
+      omap: Use CONFIG_SMP for test_for_ipi and test_for_ltirq
+      omap: Fix omap_4430sdp_defconfig for make oldconfig
+
+stanley.miao (1):
+      OMAP3: Fix a cpu type check problem
 
 
-And second case is same.
+ arch/arm/configs/omap_4430sdp_defconfig        |    3 +++
+ arch/arm/mach-omap2/Makefile                   |    1 +
+ arch/arm/mach-omap2/clock3xxx_data.c           |   14 +++++++-------
+ arch/arm/mach-omap2/id.c                       |    2 +-
+ arch/arm/mach-omap2/include/mach/entry-macro.S |    6 ++++--
+ arch/arm/mach-omap2/omap-smp.c                 |    3 +--
+ arch/arm/mach-omap2/pm34xx.c                   |    4 +++-
+ arch/arm/plat-omap/include/plat/smp.h          |    7 -------
+ 8 files changed, 20 insertions(+), 20 deletions(-)
 
-Marek's 'sdhci-s3c: add support for new card detection methods' cause
-following build error.
-(commit ID:17866e14f3a4f219e94f1374ece7226479418ff8)
-
-drivers/built-in.o: In function `sdhci_s3c_notify_change':
-/home/kgene/linux/linux-2.6-mainline-dev/drivers/mmc/host/sdhci-s3c.c:255:
-undefined reference to `sdhci_card_detect'
-make[1]: *** [.tmp_vmlinux1] Error 1
-make: *** [sub-make] Error 2
-
-And Andrew's patch(b567e5dd5a34c184e5642100e752cb87e064bb97) can solve this.
-(of course this needs another patches...)
-
-Anyway...
-Marek, in future please make sure your patch has no building problem before
-submitting.
-(or it can help to add some kind of dependency note in your patch)
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Signature
