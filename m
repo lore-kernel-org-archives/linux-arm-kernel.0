@@ -1,64 +1,48 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 13 Aug 2010 11:02:06 +0300
-Subject: [PATCH 4/6] omap: Fix sev instruction usage for multi-omap
+Date: Fri, 13 Aug 2010 11:02:10 +0300
+Subject: [PATCH 5/6] omap: Use CONFIG_SMP for test_for_ipi and test_for_ltirq
 In-Reply-To: <20100813080034.18750.15410.stgit@baageli.muru.com>
 References: <20100813080034.18750.15410.stgit@baageli.muru.com>
-Message-ID: <20100813080206.18750.89549.stgit@baageli.muru.com>
+Message-ID: <20100813080210.18750.68209.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise we get the following error with omap3_defconfig and CONFIG_SMP:
+Otherwise we get the following error when enabling CONFIG_SMP
+for omap3_defconfig:
 
-Error: selected processor does not support `sev'
+arch/arm/kernel/entry-armv.S: Assembler messages:
+arch/arm/kernel/entry-armv.S:48: Error: bad instruction `test_for_ipi r0,r6,r5,lr'
+arch/arm/kernel/entry-armv.S:48: Error: bad instruction `test_for_ltirq r0,r6,r5,lr'
+arch/arm/kernel/entry-armv.S:48: Error: bad instruction `test_for_ipi r0,r6,r5,lr'
+arch/arm/kernel/entry-armv.S:48: Error: bad instruction `test_for_ltirq r0,r6,r5,lr'
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/Makefile          |    1 +
- arch/arm/mach-omap2/omap-smp.c        |    3 +--
- arch/arm/plat-omap/include/plat/smp.h |    7 -------
- 3 files changed, 2 insertions(+), 9 deletions(-)
+ arch/arm/mach-omap2/include/mach/entry-macro.S |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 63b2d88..88d3a1e 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -25,6 +25,7 @@ obj-$(CONFIG_LOCAL_TIMERS)		+= timer-mpu.o
- obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
- obj-$(CONFIG_ARCH_OMAP4)		+= omap44xx-smc.o omap4-common.o
+diff --git a/arch/arm/mach-omap2/include/mach/entry-macro.S b/arch/arm/mach-omap2/include/mach/entry-macro.S
+index 50fd749..06e64e1 100644
+--- a/arch/arm/mach-omap2/include/mach/entry-macro.S
++++ b/arch/arm/mach-omap2/include/mach/entry-macro.S
+@@ -177,7 +177,10 @@ omap_irq_base:	.word	0
+ 		cmpne   \irqnr, \tmp
+ 		cmpcs   \irqnr, \irqnr
+ 		.endm
++#endif
++#endif	/* MULTI_OMAP2 */
  
-+AFLAGS_omap-headsmp.o			:=-Wa,-march=armv7-a
- AFLAGS_omap44xx-smc.o			:=-Wa,-march=armv7-a
++#ifdef CONFIG_SMP
+ 		/* We assume that irqstat (the raw value of the IRQ acknowledge
+ 		 * register) is preserved from the macro above.
+ 		 * If there is an IPI, we immediately signal end of interrupt
+@@ -205,8 +208,7 @@ omap_irq_base:	.word	0
+ 		streq	\irqstat, [\base, #GIC_CPU_EOI]
+ 		cmp	\tmp, #0
+ 		.endm
+-#endif
+-#endif	/* MULTI_OMAP2 */
++#endif	/* CONFIG_SMP */
  
- # Functions loaded to SRAM
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index af3c20c..9e9f70e 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -102,8 +102,7 @@ static void __init wakeup_secondary(void)
- 	 * Send a 'sev' to wake the secondary core from WFE.
- 	 * Drain the outstanding writes to memory
- 	 */
--	dsb();
--	set_event();
-+	dsb_sev();
- 	mb();
- }
- 
-diff --git a/arch/arm/plat-omap/include/plat/smp.h b/arch/arm/plat-omap/include/plat/smp.h
-index 6a3ff65..5177a9c 100644
---- a/arch/arm/plat-omap/include/plat/smp.h
-+++ b/arch/arm/plat-omap/include/plat/smp.h
-@@ -19,13 +19,6 @@
- 
- #include <asm/hardware/gic.h>
- 
--/*
-- * set_event() is used to wake up secondary core from wfe using sev. ROM
-- * code puts the second core into wfe(standby).
-- *
-- */
--#define set_event()	__asm__ __volatile__ ("sev" : : : "memory")
--
- /* Needed for secondary core boot */
- extern void omap_secondary_startup(void);
- extern u32 omap_modify_auxcoreboot0(u32 set_mask, u32 clear_mask);
+ 		.macro	irq_prio_table
+ 		.endm
