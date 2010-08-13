@@ -1,47 +1,66 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Fri, 13 Aug 2010 15:23:53 +0900
-Subject: ARM: 2.6.3[45] PCI regression (IXP4xx and PXA?)
-In-Reply-To: <20100811072532.GA21511@n2100.arm.linux.org.uk>
-References: <m3sk2m433u.fsf@intrepid.localdomain>
-	<20100811110448S.fujita.tomonori@lab.ntt.co.jp>
-	<20100811072532.GA21511@n2100.arm.linux.org.uk>
-Message-ID: <20100813152224H.fujita.tomonori@lab.ntt.co.jp>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 13 Aug 2010 16:32:07 +0900
+Subject: 'error: 'SDHCI_QUIRK_NO_HISPD_BIT' undeclared' and 'undefined
+	reference to `sdhci_card_detect''
+Message-ID: <008d01cb3ab9$ae73da60$0b5b8f20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Aug 2010 08:25:32 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Hi, 
 
-> On Wed, Aug 11, 2010 at 11:06:00AM +0900, FUJITA Tomonori wrote:
-> > On Tue, 10 Aug 2010 22:36:21 +0200
-> > Krzysztof Halasa <khc@pm.waw.pl> wrote:
-> > 
-> > > 6fee48cd330c68332f9712bc968d934a1a84a32a broke
-> > > pci_set_consistent_dma_mask() on IXP4xx and most probably PXA. Affected
-> > > devices are e.g. IDE controller (CS5536-based: disk inaccessible) and
-> > > e1000 ethernet ("Detected Tx Unit Hang").
-> > 
-> > Sorry about that.
-> > 
-> > > The attached patch makes it work again, though I'm not sure it's the
-> > > best solution.
-> > 
-> > I think that we should avoid adding "#ifdef CONFIG_DMABOUNCE" to a
-> > generic place.
-> > 
-> > Why the above patch breaks dmabounce.c? We can't set dev->coherent_dma_mask?
-> 
-> It doesn't break dmabounce.
-> 
-> What it breaks is the fact that a PCI device which can do 32-bit DMA is
-> connected to a PCI bus which can only access the first 64MB of memory
-> through the host bridge, but the system has more than 64MB available.
-> 
-> Allowing a 32-bit DMA mask means that dmabounce can't detect that memory
-> above 64MB needs to be bounced to memory below the 64MB boundary.
+This is just information about Samsung sdmmc stuff building error now.
 
-But dmabounce doesn't look at dev->coherent_dma_mask.
+I found Marek's 'sdhci-s3c: enable SDHCI_QUIRK_NO_HISPD_BIT quirk' in the
+Linus' tree.
+(commit ID: a1d5646005af1247d6ae78434bb4db15b07a07b2)
 
-The change breaks __dma_alloc_buffer()? If we set dev->coherent_dma_mask
-to DMA_BIT_MASK(32) for ixp4xx's pci devices, __dma_alloc_buffer()
-doesn't use GFP_DMA.
+But not defined the quirk yet...so following build error happened with
+s3c6400_defconfig in Linus' latest.
+
+drivers/mmc/host/sdhci-s3c.c: In function 'sdhci_s3c_probe':
+drivers/mmc/host/sdhci-s3c.c:400: error: 'SDHCI_QUIRK_NO_HISPD_BIT'
+undeclared (first use in this function)
+drivers/mmc/host/sdhci-s3c.c:400: error: (Each undeclared identifier is
+reported only once
+drivers/mmc/host/sdhci-s3c.c:400: error: for each function it appears in.)
+make[4]: *** [drivers/mmc/host/sdhci-s3c.o] Error 1
+make[3]: *** [drivers/mmc/host] Error 2
+make[2]: *** [drivers/mmc] Error 2
+make[1]: *** [drivers] Error 2
+
+Kyungmin Park's below patch can solve this and it is in mmotm now.
+(commit ID: 2935b9e7fcc4bea3751b8d039b383b2036a7d36d)
+
+But I think, to update quirk definition should being in Marek's patch for
+avoiding build error.
+Of course, I'm not sure whether the commit order changed.
+Anyway, in this case, will be solved after merging mm tree.
+
+
+And second case is same.
+
+Marek's 'sdhci-s3c: add support for new card detection methods' cause
+following build error.
+(commit ID:17866e14f3a4f219e94f1374ece7226479418ff8)
+
+drivers/built-in.o: In function `sdhci_s3c_notify_change':
+/home/kgene/linux/linux-2.6-mainline-dev/drivers/mmc/host/sdhci-s3c.c:255:
+undefined reference to `sdhci_card_detect'
+make[1]: *** [.tmp_vmlinux1] Error 1
+make: *** [sub-make] Error 2
+
+And Andrew's patch(b567e5dd5a34c184e5642100e752cb87e064bb97) can solve this.
+(of course this needs another patches...)
+
+Anyway...
+Marek, in future please make sure your patch has no building problem before
+submitting.
+(or it can help to add some kind of dependency note in your patch)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
