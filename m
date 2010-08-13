@@ -1,32 +1,35 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Fri, 13 Aug 2010 13:17:53 +0200
-Subject: [RFC 9/9] crypto: Add Samsung crypto engine driver
-In-Reply-To: <20100812.153208.48514514.davem@davemloft.net>
-References: <4C129341.2060407@gmail.com>	<AANLkTi=FKAdC9AwPR41MUBUjBZ2Zf1qv1DSQ+EnMHu7d@mail.gmail.com>	<4C63DF4C.1020501@gmail.com>
-	<20100812.153208.48514514.davem@davemloft.net>
-Message-ID: <4C6529E1.8020300@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 13 Aug 2010 20:09:48 +0900
+Subject: [PATCH] ARM: Update number of VIC
+Message-ID: <1281697788-18018-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Op 13-08-10 00:32, David Miller schreef:
-> From: Maurus Cuelenaere <mcuelenaere@gmail.com>
-> Date: Thu, 12 Aug 2010 13:47:24 +0200
->
->> The main issues still remain (DMA not working at all and FIFO not
->> working for some (T)DES transfers). Additionally, I couldn't get
->> tcrypt to test the s3c-sss driver for some reason, it always picked
->> the standard AES/TDES/DES driver (even though s3c-sss has a higher
->> priority and succeeded the self-test).
-> I forget the details of your driver, but were your encryption algorithms
-> implemented async?
+Update the number of VIC to handle the 3 or 4 VICs of
+the S5PV210, S5P6442 and S5PC100.
 
-Yes, all are async (also the not-yet-working hash algorithms).
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Russell King <rmk@arm.linux.org.uk>
+---
+ arch/arm/common/Kconfig |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-> tcrypt can validate async crypto algorithms, but cannot performance
-> test them just yet.  I can performance test async hash algorithms,
-> for which I added the code for a few months ago.
-Hmm ok, I suppose implementing support for performance testing async crypto
-algorithms isn't trivial?
-
+diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+index 0a34c81..b7c76a9 100644
+--- a/arch/arm/common/Kconfig
++++ b/arch/arm/common/Kconfig
+@@ -6,8 +6,10 @@ config ARM_VIC
+ 
+ config ARM_VIC_NR
+ 	int
+-	default 2
+ 	depends on ARM_VIC
++	default 4 if ARCH_S5PV210
++	default 3 if ARCH_S5P6442 || ARCH_S5PC100
++	default 2
+ 	help
+ 	  The maximum number of VICs available in the system, for
+ 	  power management.
 -- 
-Maurus Cuelenaere
+1.6.2.5
