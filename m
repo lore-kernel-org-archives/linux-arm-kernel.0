@@ -1,59 +1,30 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Fri, 13 Aug 2010 12:25:44 +0200
-Subject: [PATCH] wire up sys_accept4() on ARM
-In-Reply-To: <19544.10902.127940.970133@pilspetsen.it.uu.se>
-References: <19544.10902.127940.970133@pilspetsen.it.uu.se>
-Message-ID: <19557.7592.825768.377190@pilspetsen.it.uu.se>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 13 Aug 2010 13:29:34 +0300
+Subject: [PATCH 3/6] OMAP3: PM: ensure IO wakeups are properly disabled
+In-Reply-To: <4C651635.8000201@ru.mvista.com>
+References: <20100813080034.18750.15410.stgit@baageli.muru.com>
+	<20100813080200.18750.37791.stgit@baageli.muru.com>
+	<4C651635.8000201@ru.mvista.com>
+Message-ID: <20100813102933.GN12706@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mikael Pettersson writes:
- > sys_accept4() was added in kernel 2.6.28, but ARM was not updated
- > to include it.  The number and types of parameters is such that
- > no ARM-specific processing is needed, so wiring up sys_accept4()
- > just requires defining __NR_accept4 and adding a direct call in
- > the syscall entry table.
- > 
- > Tested with an EABI 2.6.35 kernel and Ulrich Drepper's original
- > accept4() test program, modified to define __NR_accept4 for ARM.
- > 
- > Using the updated unistd.h also eliminates a warning then building
- > glibc (2.10.2 and newer) about accept4() being unimplemented.
- > 
- > Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
+* Sergei Shtylyov <sshtylyov@mvista.com> [100813 12:48]:
+> Hello.
+> 
+> Tony Lindgren wrote:
+> 
+> >From: Kevin Hilman <khilman@ti.com>
+> 
+> >Commit 5a5f561 (convert OMAP3 PRCM macros to the _SHIFT/_MASK suffixes)
+> >mistakenly removed the check for PER when disabling the IO chain.
+> >
+> >During idle, if the PER powerdomain transitions and CORE does not (as
+> 
+>   Does not what?
 
-Ping.  Ok for patch system?
+How about ".. and CORE does not transition"?
 
- > ---
- >  arch/arm/include/asm/unistd.h |    1 +
- >  arch/arm/kernel/calls.S       |    1 +
- > 
- >  2 files changed, 2 insertions(+)
- > diff -rupN linux-2.6.35/arch/arm/include/asm/unistd.h linux-2.6.35.arm-sys_accept4/arch/arm/include/asm/unistd.h
- > --- linux-2.6.35/arch/arm/include/asm/unistd.h	2010-05-17 19:51:29.000000000 +0200
- > +++ linux-2.6.35.arm-sys_accept4/arch/arm/include/asm/unistd.h	2010-08-03 14:34:35.000000000 +0200
- > @@ -392,6 +392,7 @@
- >  #define __NR_rt_tgsigqueueinfo		(__NR_SYSCALL_BASE+363)
- >  #define __NR_perf_event_open		(__NR_SYSCALL_BASE+364)
- >  #define __NR_recvmmsg			(__NR_SYSCALL_BASE+365)
- > +#define __NR_accept4			(__NR_SYSCALL_BASE+366)
- >  
- >  /*
- >   * The following SWIs are ARM private.
- > diff -rupN linux-2.6.35/arch/arm/kernel/calls.S linux-2.6.35.arm-sys_accept4/arch/arm/kernel/calls.S
- > --- linux-2.6.35/arch/arm/kernel/calls.S	2010-05-17 19:51:29.000000000 +0200
- > +++ linux-2.6.35.arm-sys_accept4/arch/arm/kernel/calls.S	2010-08-03 14:34:35.000000000 +0200
- > @@ -375,6 +375,7 @@
- >  		CALL(sys_rt_tgsigqueueinfo)
- >  		CALL(sys_perf_event_open)
- >  /* 365 */	CALL(sys_recvmmsg)
- > +		CALL(sys_accept4)
- >  #ifndef syscalls_counted
- >  .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
- >  #define syscalls_counted
- > 
- > _______________________________________________
- > linux-arm-kernel mailing list
- > linux-arm-kernel at lists.infradead.org
- > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
- > 
+Kevin, care to clarify that?
+
+Tony
