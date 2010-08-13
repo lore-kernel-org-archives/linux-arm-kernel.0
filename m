@@ -1,39 +1,31 @@
-From: hjk@linutronix.de (Hans J. Koch)
-Date: Fri, 13 Aug 2010 11:14:33 +0200
-Subject: [PATCH v3] mx35: Fix boot ROM hang in internal boot mode
-In-Reply-To: <20100813090849.GB27637@pengutronix.de>
-References: <20100812131053.GD8670@local>
-	<20100813090849.GB27637@pengutronix.de>
-Message-ID: <20100813091432.GA22619@local>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Fri, 13 Aug 2010 11:34:38 +0200
+Subject: [PATCH 08/12] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <AANLkTinYjzfChsN0AB5W6kOh6xJYPJtoEq941pG8WbmS@mail.gmail.com>
+References: <cover.1276615626.git.richard.cochran@omicron.at>
+	<4a030d2bace90f089f2f3f61496b918c6f1dfb52.1276615626.git.richard.cochran@omicron.at>
+	<AANLkTinYjzfChsN0AB5W6kOh6xJYPJtoEq941pG8WbmS@mail.gmail.com>
+Message-ID: <20100813093438.GA18112@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 13, 2010 at 11:08:49AM +0200, Uwe Kleine-K?nig wrote:
-> On Thu, Aug 12, 2010 at 03:10:53PM +0200, Hans J. Koch wrote:
-> > If a watchdog reset occurs after booting in internal boot mode, the i.MX35
-> > won't boot anymore. The boot ROM code seems to assume that some clocks are
-> > turned on (they are after a power-on reset). This patch turns on the
-> > necessary clocks.
-> > 
-> > Signed-off-by: Hans J. Koch <hjk@linutronix.de>
-> Even if it should be a bootloader issue and not a ROM problem this fix
-> is sensible.
+On Tue, Jun 15, 2010 at 01:11:30PM -0600, Grant Likely wrote:
+> On Tue, Jun 15, 2010 at 10:09 AM, Richard Cochran
+> > +static DEFINE_SPINLOCK(clocks_lock); /* protects 'clocks' */
 > 
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Doesn't appear that clocks is manipulated at atomic context.  Mutex instead?
+...
+> If the spinlock is changed to a mutex that is held for the entire
+> function call, then the logic here can be simpler.
 
-We should also add:
+Grant,
 
-Reported-by: John Ogness <jogness@linutronix.de>
+I am working on another go at this patch series. Stupid question:
 
-I forgot that.
+The caller of ptp_clock_register(), which takes the clocks_lock, is
+always a module_init() function. Is this always a safe context in
+which to call mutex_lock?
 
 Thanks,
-Hans
 
-> 
-> Thanks
-> Uwe
-> 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Richard
