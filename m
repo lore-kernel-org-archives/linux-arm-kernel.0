@@ -1,33 +1,38 @@
-From: mbizon@freebox.fr (Maxime Bizon)
-Date: Sat, 14 Aug 2010 00:28:00 +0200
-Subject: [PATCH 2/2] set packet size limit for the mv643xx csum offloading
-In-Reply-To: <1275827336-31111-2-git-send-email-saeed@marvell.com>
-References: <1275827336-31111-1-git-send-email-saeed@marvell.com>
-	<1275827336-31111-2-git-send-email-saeed@marvell.com>
-Message-ID: <1281738480.12446.533.camel@sakura.staff.proxad.net>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 13 Aug 2010 17:54:42 -0600
+Subject: [PATCH 08/12] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <20100813093438.GA18112@riccoc20.at.omicron.at>
+References: <cover.1276615626.git.richard.cochran@omicron.at>
+	<4a030d2bace90f089f2f3f61496b918c6f1dfb52.1276615626.git.richard.cochran@omicron.at>
+	<AANLkTinYjzfChsN0AB5W6kOh6xJYPJtoEq941pG8WbmS@mail.gmail.com>
+	<20100813093438.GA18112@riccoc20.at.omicron.at>
+Message-ID: <AANLkTi=f0i7vetMvr4mK1cNJK6TYj1J6iCxjFeka00jc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Aug 13, 2010 at 3:34 AM, Richard Cochran
+<richardcochran@gmail.com> wrote:
+> On Tue, Jun 15, 2010 at 01:11:30PM -0600, Grant Likely wrote:
+>> On Tue, Jun 15, 2010 at 10:09 AM, Richard Cochran
+>> > +static DEFINE_SPINLOCK(clocks_lock); /* protects 'clocks' */
+>>
+>> Doesn't appear that clocks is manipulated at atomic context. ?Mutex instead?
+> ...
+>> If the spinlock is changed to a mutex that is held for the entire
+>> function call, then the logic here can be simpler.
+>
+> Grant,
+>
+> I am working on another go at this patch series. Stupid question:
+>
+> The caller of ptp_clock_register(), which takes the clocks_lock, is
+> always a module_init() function. Is this always a safe context in
+> which to call mutex_lock?
 
-On Sun, 2010-06-06 at 15:28 +0300, Saeed Bishara wrote:
+Yes, you can take mutexes in the module_init context.
 
-> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-> index 4ccfdf9..c4bd8cb 100644
-> --- a/arch/arm/mach-kirkwood/common.c
-> +++ b/arch/arm/mach-kirkwood/common.c
-> @@ -114,6 +114,7 @@ void __init kirkwood_ehci_init(void)
->   ****************************************************************************/
->  struct mv643xx_eth_shared_platform_data kirkwood_ge00_shared_data = {
->  	.dram		= &kirkwood_mbus_dram_info,
-> +	.tx_csum_limit	= 1600,
->  };
->  
->  static struct resource kirkwood_ge00_shared_resources[] = {
-
-Kirkwood (at least) has a second ethernet mac, please add the definition
-for it too.
-
-Thanks,
+g.
 
 -- 
-Maxime
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
