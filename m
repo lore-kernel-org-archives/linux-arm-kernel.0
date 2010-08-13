@@ -1,47 +1,30 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 13 Aug 2010 14:38:52 +0900
-Subject: [PATCH] ARM: SAMSUNG: Fix on build warning about dependency in Kconfig
-Message-ID: <1281677932-6148-1-git-send-email-kgene.kim@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 13 Aug 2010 07:59:39 +0200
+Subject: warning: (CPU_V7 && !ARCH_OMAP2 || CPU_MMP2 && ARCH_MMP)
+In-Reply-To: <007f01cb3aaa$cc469460$64d3bd20$%kim@samsung.com>
+References: <007f01cb3aaa$cc469460$64d3bd20$%kim@samsung.com>
+Message-ID: <20100813055939.GA12781@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes on following build warning.
+Hello,
 
-warning: (PLAT_S5P && (ARCH_S5P6440 || ARCH_S5P6442 || ARCH_S5PC100 ||
-	     ARCH_S5PV210 || ARCH_S5PV310) || ARCH_S3C64XX && <choice>)
-	     selects PLAT_SAMSUNG which has unmet direct dependencies
-	     (ARCH_S3C2410 || ARCH_S3C24A0 || ARCH_S3C64XX)
+On Fri, Aug 13, 2010 at 02:45:30PM +0900, Kukjin Kim wrote:
+> Hi all,
+> 
+> I found build warning in the latest Linus' tree like following.
+> 
+> warning: (CPU_V7 && !ARCH_OMAP2 || CPU_MMP2 && ARCH_MMP) selects CPU_32v6K
+> which has unmet direct dependencies (CPU_V6)
+> 
+> Thanks.
+Can you try out
 
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
----
-Hi, Russell
+	http://article.gmane.org/gmane.linux.ports.arm.kernel/84565
 
-This is for 2.6.36-rc1.
-How can this go to Linus' tree?
+Thanks
+Uwe
 
-Or is it better after rc1?
-
-Thanks.
-
-Best regards,
-Kgene.
-
- arch/arm/plat-samsung/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 4529dd6..7c0bde7 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -6,7 +6,7 @@
- 
- config PLAT_SAMSUNG
- 	bool
--	depends on ARCH_S3C2410 || ARCH_S3C24A0 || ARCH_S3C64XX
-+	depends on PLAT_S3C24XX || ARCH_S3C64XX || PLAT_S5P
- 	select NO_IOPORT
- 	default y
- 	help
 -- 
-1.6.2.5
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
