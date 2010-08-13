@@ -1,52 +1,36 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 13 Aug 2010 03:01:17 +0300
-Subject: [PATCH v4 3/8] wireless: wl1271: add platform driver to get board
-	data
-In-Reply-To: <20100812095546.GA3354@n2100.arm.linux.org.uk>
-References: <1281550913-17633-1-git-send-email-ohad@wizery.com>
-	<1281550913-17633-4-git-send-email-ohad@wizery.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0324110ABD@dbde02.ent.ti.com>
-	<20100811184742.GA21778@nokia.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC1@dbde02.ent.ti.com>
-	<20100811185724.GD21778@nokia.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC7@dbde02.ent.ti.com>
-	<20100811212513.GC827@n2100.arm.linux.org.uk>
-	<AANLkTikDhzGVFZhNJZic9xYX9bL_NhOW=4LS-cTFSG0i@mail.gmail.com>
-	<20100812095546.GA3354@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=f_vghwQZn3HHs_CJKYiMf_pp85JHujsyvRg3J@mail.gmail.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Fri, 13 Aug 2010 11:39:07 +0800
+Subject: [PATCH] pxa: fix CI_HSYNC and CI_VSYNC MFP defines
+Message-ID: <1281670747.13407.2.camel@mola>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 12, 2010, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Aug 12, 2010 at 09:40:19AM +0300, Ohad Ben-Cohen wrote:
->> On Thu, Aug 12, 2010 at 12:25 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> >I've outlined a far simpler and easiler solution
->> > which avoids this kind of abuse, and given suggestions on how to extend
->> > it to support multiple instances.
->> >
->>
->> Do you mean:
->> http://www.spinics.net/lists/arm-kernel/msg95338.html
->> ?
->>
->> I was under the impression you eventually discarded that approach in
->> that post.
->
-> Indeed.
->
-> I'm talking about my first suggestion:
->
-> http://lists.arm.linux.org.uk/lurker/message/20100804.114148.bf961e83.en.html
->
-> which was later expanded by Vitaly:
->
-> http://lists.arm.linux.org.uk/lurker/message/20100804.140119.f476c29c.en.html
->
-> I don't think anyone had any negative comments against that proposal.
+According to PXA3xx Processor Family Developer Manuall Vol1. section
+"Pin Descriptions and Control", PXA30x and PXA31x Processor Alternate Function
+Table shows the Alt FN 0 for GPIO51 is CI_HSYNC and for GPIO52 is CI_VSYNC.
+This patch fixes the MFP defines and also corrects the order of MFD defines.
 
-Thanks, I see what you mean now.
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+ arch/arm/mach-pxa/include/mach/mfp-pxa300.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-I'll give this a spin when I'm back (I'm away until e/o August)
->
+diff --git a/arch/arm/mach-pxa/include/mach/mfp-pxa300.h b/arch/arm/mach-pxa/include/mach/mfp-pxa300.h
+index 7139e0d..4e12870 100644
+--- a/arch/arm/mach-pxa/include/mach/mfp-pxa300.h
++++ b/arch/arm/mach-pxa/include/mach/mfp-pxa300.h
+@@ -71,10 +71,10 @@
+ #define GPIO46_CI_DD_7		MFP_CFG_DRV(GPIO46, AF0, DS04X)
+ #define GPIO47_CI_DD_8		MFP_CFG_DRV(GPIO47, AF1, DS04X)
+ #define GPIO48_CI_DD_9		MFP_CFG_DRV(GPIO48, AF1, DS04X)
+-#define GPIO52_CI_HSYNC		MFP_CFG_DRV(GPIO52, AF0, DS04X)
+-#define GPIO51_CI_VSYNC		MFP_CFG_DRV(GPIO51, AF0, DS04X)
+ #define GPIO49_CI_MCLK		MFP_CFG_DRV(GPIO49, AF0, DS04X)
+ #define GPIO50_CI_PCLK		MFP_CFG_DRV(GPIO50, AF0, DS04X)
++#define GPIO51_CI_HSYNC		MFP_CFG_DRV(GPIO51, AF0, DS04X)
++#define GPIO52_CI_VSYNC		MFP_CFG_DRV(GPIO52, AF0, DS04X)
+ 
+ /* KEYPAD */
+ #define GPIO3_KP_DKIN_6		MFP_CFG_LPM(GPIO3,   AF2, FLOAT)
+-- 
+1.7.2
