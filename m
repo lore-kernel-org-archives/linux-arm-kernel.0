@@ -1,55 +1,72 @@
-From: mfuzzey@gmail.com (Martin Fuzzey)
-Date: Fri, 13 Aug 2010 12:06:54 +0200
-Subject: Problem with non aligned DMA in usbnet on ARM
-In-Reply-To: <4C642AA9.1060404@parrot.com>
-References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>	<4C627479.4060400@parrot.com>	<AANLkTinU2JEkeYJHo4tA+kD9Pd_F3YcUTbK9w6igc7s8@mail.gmail.com>	<4C62C7B3.2030706@nvidia.com>
-	<20100811203505.GA463@n2100.arm.linux.org.uk>
-	<4C632217.9000608@gmail.com> <4C642AA9.1060404@parrot.com>
-Message-ID: <4C65193E.4090807@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 13 Aug 2010 12:13:09 +0200
+Subject: [PATCH 1/3] ARM: mx27_defconfig: enable switches used in mx27 code
+In-Reply-To: <1281515788-9989-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1281515788-9989-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20100813101309.GA9135@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matthieu CASTET wrote:
-> memmove is our friend :
-> the buffer allocated in usbnet got an offset.
-> All you have to do it remove this offset and memmove the data. That
-> what I did [1], and why it is better to do it in usb driver.
->
->
-> [1] http://article.gmane.org/gmane.linux.usb.general/28700
-The problem I see with this approach is that it requires the usb driver
-to be aware of the device controller's quirks  (hence the
-gadget_dma32()) your patch adds. That appears to be the norm (and maybe
-unavoidable) on the gadget side but on the host side things aren't
-supposed to work like that.
+On Wed, Aug 11, 2010 at 10:36:26AM +0200, Uwe Kleine-K?nig wrote:
+> - enable all mx27 machines (MACH_CPUIMX27, MACH_PCA100, MACH_MXT_TD60)
+>   including optional features for CPUIMX27
+> - eukrea_mbimx27-baseboard.c uses TOUCHSCREEN_ADS7846
+> - mach-cpuimx27.c uses SERIAL_8250
+> - several machines make use of SPI_IMX (selects SPI_BITBANG)
+> - drop VGA_CONSOLE as this isn't selectable anymore since fb78b51cb11e
+> - several machines make use of USB_ULPI (depends on USB, but don't
+>   enable USB_DEVICE_CLASS as it's deprecated)
+BTW, this commit breaks cpuimx27 and pca100 on top of linus/master
 
-The expectation for USB hosts is that any properly written usb driver
-will work with any properly written host controller driver. I don't
-think it's reasonable to expect driver developers to test their code
-with all the HCDs, nor expect HCD developers to test their code with all
-the drivers.
+	  CC      arch/arm/mach-imx/mach-cpuimx27.o
+	arch/arm/mach-imx/mach-cpuimx27.c: In function 'eukrea_cpuimx27_init':
+	arch/arm/mach-imx/mach-cpuimx27.c:282: error: 'USB_OTG_DRV_VBUS' undeclared (first use in this function)
+	arch/arm/mach-imx/mach-cpuimx27.c:282: error: (Each undeclared identifier is reported only once
+	arch/arm/mach-imx/mach-cpuimx27.c:282: error: for each function it appears in.)
+	arch/arm/mach-imx/mach-cpuimx27.c:282: error: 'USB_OTG_DRV_VBUS_EXT' undeclared (first use in this function)
+	make[3]: *** [arch/arm/mach-imx/mach-cpuimx27.o] Error 1
+	make[2]: *** [arch/arm/mach-imx/mach-cpuimx27.o] Error 2
+	  CC      arch/arm/mach-imx/mach-pca100.o
+	arch/arm/mach-imx/mach-pca100.c: In function 'pca100_init':
+	arch/arm/mach-imx/mach-pca100.c:422: error: 'USB_OTG_DRV_VBUS' undeclared (first use in this function)
+	arch/arm/mach-imx/mach-pca100.c:422: error: (Each undeclared identifier is reported only once
+	arch/arm/mach-imx/mach-pca100.c:422: error: for each function it appears in.)
+	arch/arm/mach-imx/mach-pca100.c:422: error: 'USB_OTG_DRV_VBUS_EXT' undeclared (first use in this function)
+	make[3]: *** [arch/arm/mach-imx/mach-pca100.o] Error 1
+	make[2]: *** [arch/arm/mach-imx/mach-pca100.o] Error 2
 
-So I think a policy needs to be defined to ensure this and enforced in
-the code. I can see two possible methods:
+Bisecting this problem yields:
+	
+commit 13dd0c9767349b280cf131c34461f85e5effc42a
+Author: Igor Grinberg <grinberg@compulab.co.il>
+Date:   Thu Jul 15 16:00:16 2010 +0300
 
-1) Require that usb drivers submit buffers obtained from kmalloc() and
-friends with no extra offsets. If they want some other alignment later
-they can use memmove in the completion handler. Enforce this in the core
-by checking the buffer pointers are aligned to ARCH_KMALLOC_MINALIGN
+    USB: otg/ulpi: extend the generic ulpi driver.
+    
+    1) Introduce ulpi specific flags for control of the ulpi phy
+    2) Extend the generic ulpi driver with support for Function and
+    Interface control of upli phy
+    3) Update the platforms using the generic ulpi driver with new ulpi
+    flags
+    4) Remove the otg control flags not in use
+    
+    Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+    Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
 
-or
+ arch/arm/mach-mx3/mach-armadillo5x0.c    |    4 +-
+ arch/arm/mach-mx3/mach-mx31lilly.c       |    4 +-
+ arch/arm/mach-mx3/mach-mx31lite.c        |    2 +-
+ arch/arm/mach-mx3/mach-mx31moboard.c     |    2 +-
+ arch/arm/mach-mx3/mach-pcm037.c          |    4 +-
+ arch/arm/mach-mx3/mach-pcm043.c          |    2 +-
+ arch/arm/mach-mx3/mx31moboard-smartbot.c |    2 +-
+ drivers/usb/otg/ulpi.c                   |  127 +++++++++++++++++++++++++++---
+ include/linux/usb/otg.h                  |    7 --
+ include/linux/usb/ulpi.h                 |   39 +++++++++
+ 10 files changed, 166 insertions(+), 27 deletions(-)
 
-2) Require that usb_submit_urb() accept byte aligned buffers. Enforce
-this by a new test in usbtest (which all HCDs are expected to pass).
-Implement it either in individual HCDs that require it or by letting
-HCDs inform the core of their requirements and have the core do the
-alignment (as it already does the dma mapping). Of course HCDs that can
-implement byte aligned transfers (either natively or using tricks such
-as the one Russell suggested) should do so.
 
-I think 2) is the better solution because:
-a) Solution 1 will impose a runtime overhead even on platforms / HCDs
-that don't need it (including the most common cases)
-b) There are more drivers than HCDs
-
-Martin
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
