@@ -1,36 +1,43 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Fri, 13 Aug 2010 11:39:07 +0800
-Subject: [PATCH] pxa: fix CI_HSYNC and CI_VSYNC MFP defines
-Message-ID: <1281670747.13407.2.camel@mola>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Fri, 13 Aug 2010 09:15:59 +0530
+Subject: Request for holding Ryan's patch set for SPEAr
+In-Reply-To: <4C645C98.1020401@bluewatersys.com>
+References: <4C639611.8060107@st.com> <4C645C98.1020401@bluewatersys.com>
+Message-ID: <4C64BFF7.9020500@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to PXA3xx Processor Family Developer Manuall Vol1. section
-"Pin Descriptions and Control", PXA30x and PXA31x Processor Alternate Function
-Table shows the Alt FN 0 for GPIO51 is CI_HSYNC and for GPIO52 is CI_VSYNC.
-This patch fixes the MFP defines and also corrects the order of MFD defines.
+On 8/13/2010 2:12 AM, Ryan Mallon wrote:
+> On 08/12/2010 06:34 PM, viresh kumar wrote:
+>> Russell,
+>>
+>> We are facing some problem in organizing patches for spear and need some
+>> help from you. Actually there are 5 patches for spear sent by Ryan some
+>> time back, they were related to removing multiple defconfigs and merging
+>> them for a family of machines. (Ryan did it for spear3xx).
+>>
+>> Following is Ryan's patchset:
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/017254.html
+>>
+>> We have been working on linux-2.6.32 until now and so didn't sent any further
+>> patches to mailing list because of other commitments. Now we have over 150 
+>> patches which we need to add to mainline. 
+>>
+>> Since all our patches are based on multiple defconfig approach, a lot of work
+>> is required to rebase our patches over ryan's patchset.
+>>
+>> We request if you can hold ryan's patches. I would provide those patches over
+>> and above my patchset. This will make rebasing easier.
+> 
+> Probably the easiest way is if I hold off my patches and rebase them
+> after you have posted your patches. The other approach would be for you
+> to apply them on top of your tree, make any necessary changes, and just
+> keep my From/Signed-off-by tag when you post to the list.
+> 
 
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
- arch/arm/mach-pxa/include/mach/mfp-pxa300.h |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Ryan, I will go with the second approach.
 
-diff --git a/arch/arm/mach-pxa/include/mach/mfp-pxa300.h b/arch/arm/mach-pxa/include/mach/mfp-pxa300.h
-index 7139e0d..4e12870 100644
---- a/arch/arm/mach-pxa/include/mach/mfp-pxa300.h
-+++ b/arch/arm/mach-pxa/include/mach/mfp-pxa300.h
-@@ -71,10 +71,10 @@
- #define GPIO46_CI_DD_7		MFP_CFG_DRV(GPIO46, AF0, DS04X)
- #define GPIO47_CI_DD_8		MFP_CFG_DRV(GPIO47, AF1, DS04X)
- #define GPIO48_CI_DD_9		MFP_CFG_DRV(GPIO48, AF1, DS04X)
--#define GPIO52_CI_HSYNC		MFP_CFG_DRV(GPIO52, AF0, DS04X)
--#define GPIO51_CI_VSYNC		MFP_CFG_DRV(GPIO51, AF0, DS04X)
- #define GPIO49_CI_MCLK		MFP_CFG_DRV(GPIO49, AF0, DS04X)
- #define GPIO50_CI_PCLK		MFP_CFG_DRV(GPIO50, AF0, DS04X)
-+#define GPIO51_CI_HSYNC		MFP_CFG_DRV(GPIO51, AF0, DS04X)
-+#define GPIO52_CI_VSYNC		MFP_CFG_DRV(GPIO52, AF0, DS04X)
- 
- /* KEYPAD */
- #define GPIO3_KP_DKIN_6		MFP_CFG_LPM(GPIO3,   AF2, FLOAT)
--- 
-1.7.2
+Russell, Is this approach fine for you??
+
+Thanks,
+viresh.
