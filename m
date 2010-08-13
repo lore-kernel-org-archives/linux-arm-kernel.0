@@ -1,54 +1,64 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 13 Aug 2010 11:02:00 +0300
-Subject: [PATCH 3/6] OMAP3: PM: ensure IO wakeups are properly disabled
+Date: Fri, 13 Aug 2010 11:02:06 +0300
+Subject: [PATCH 4/6] omap: Fix sev instruction usage for multi-omap
 In-Reply-To: <20100813080034.18750.15410.stgit@baageli.muru.com>
 References: <20100813080034.18750.15410.stgit@baageli.muru.com>
-Message-ID: <20100813080200.18750.37791.stgit@baageli.muru.com>
+Message-ID: <20100813080206.18750.89549.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Hilman <khilman@ti.com>
+Otherwise we get the following error with omap3_defconfig and CONFIG_SMP:
 
-Commit 5a5f561 (convert OMAP3 PRCM macros to the _SHIFT/_MASK suffixes)
-mistakenly removed the check for PER when disabling the IO chain.
+Error: selected processor does not support `sev'
 
-During idle, if the PER powerdomain transitions and CORE does not (as
-is the case with the lower C-states when using CPUidle) the IO pad
-wakeups are not being disabled in the idle path after they are
-enabled.
-
-This patch ensures that the check for disabling IO wakeups also checks
-for PER transitions, matching the check done to enable IO wakeups.
-
-Found when debugging PM/CPUidle related problems reported by Ameya
-Palande <ameya.palande@nokia.com>.  Problems were triggered
-particularily on boards with UART2 consoles (n900, Overo) since UART2
-is in the PER powerdomain.
-
-Tested on l-o master (omap3_defonfig + CONFIG_CPU_IDLE=y) as well
-as with current PM branch.  Boards tested: n900, Overo, omap3evm.
-
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Ameya Palande <ameya.palande@nokia.com>
-Tested-by: Jarkko Nikula <jhnikula@gmail.com>
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/pm34xx.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/Makefile          |    1 +
+ arch/arm/mach-omap2/omap-smp.c        |    3 +--
+ arch/arm/plat-omap/include/plat/smp.h |    7 -------
+ 3 files changed, 2 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index fb4994a..7b03426 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -480,7 +480,9 @@ void omap_sram_idle(void)
- 	}
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 63b2d88..88d3a1e 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -25,6 +25,7 @@ obj-$(CONFIG_LOCAL_TIMERS)		+= timer-mpu.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= omap44xx-smc.o omap4-common.o
  
- 	/* Disable IO-PAD and IO-CHAIN wakeup */
--	if (omap3_has_io_wakeup() && core_next_state < PWRDM_POWER_ON) {
-+	if (omap3_has_io_wakeup() &&
-+	    (per_next_state < PWRDM_POWER_ON ||
-+	     core_next_state < PWRDM_POWER_ON)) {
- 		prm_clear_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD, PM_WKEN);
- 		omap3_disable_io_chain();
- 	}
++AFLAGS_omap-headsmp.o			:=-Wa,-march=armv7-a
+ AFLAGS_omap44xx-smc.o			:=-Wa,-march=armv7-a
+ 
+ # Functions loaded to SRAM
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index af3c20c..9e9f70e 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -102,8 +102,7 @@ static void __init wakeup_secondary(void)
+ 	 * Send a 'sev' to wake the secondary core from WFE.
+ 	 * Drain the outstanding writes to memory
+ 	 */
+-	dsb();
+-	set_event();
++	dsb_sev();
+ 	mb();
+ }
+ 
+diff --git a/arch/arm/plat-omap/include/plat/smp.h b/arch/arm/plat-omap/include/plat/smp.h
+index 6a3ff65..5177a9c 100644
+--- a/arch/arm/plat-omap/include/plat/smp.h
++++ b/arch/arm/plat-omap/include/plat/smp.h
+@@ -19,13 +19,6 @@
+ 
+ #include <asm/hardware/gic.h>
+ 
+-/*
+- * set_event() is used to wake up secondary core from wfe using sev. ROM
+- * code puts the second core into wfe(standby).
+- *
+- */
+-#define set_event()	__asm__ __volatile__ ("sev" : : : "memory")
+-
+ /* Needed for secondary core boot */
+ extern void omap_secondary_startup(void);
+ extern u32 omap_modify_auxcoreboot0(u32 set_mask, u32 clear_mask);
