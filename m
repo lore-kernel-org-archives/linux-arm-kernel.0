@@ -1,39 +1,32 @@
-From: oneukum@suse.de (Oliver Neukum)
-Date: Fri, 13 Aug 2010 12:58:54 +0200
-Subject: Problem with non aligned DMA in usbnet on ARM
-In-Reply-To: <4C65193E.4090807@gmail.com>
-References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
-	<4C642AA9.1060404@parrot.com> <4C65193E.4090807@gmail.com>
-Message-ID: <201008131258.55016.oneukum@suse.de>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Fri, 13 Aug 2010 13:17:53 +0200
+Subject: [RFC 9/9] crypto: Add Samsung crypto engine driver
+In-Reply-To: <20100812.153208.48514514.davem@davemloft.net>
+References: <4C129341.2060407@gmail.com>	<AANLkTi=FKAdC9AwPR41MUBUjBZ2Zf1qv1DSQ+EnMHu7d@mail.gmail.com>	<4C63DF4C.1020501@gmail.com>
+	<20100812.153208.48514514.davem@davemloft.net>
+Message-ID: <4C6529E1.8020300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 13. August 2010, 12:06:54 schrieb Martin Fuzzey:
+ Op 13-08-10 00:32, David Miller schreef:
+> From: Maurus Cuelenaere <mcuelenaere@gmail.com>
+> Date: Thu, 12 Aug 2010 13:47:24 +0200
+>
+>> The main issues still remain (DMA not working at all and FIFO not
+>> working for some (T)DES transfers). Additionally, I couldn't get
+>> tcrypt to test the s3c-sss driver for some reason, it always picked
+>> the standard AES/TDES/DES driver (even though s3c-sss has a higher
+>> priority and succeeded the self-test).
+> I forget the details of your driver, but were your encryption algorithms
+> implemented async?
 
-> So I think a policy needs to be defined to ensure this and enforced in
-> the code. I can see two possible methods:
-> 
-> 1) Require that usb drivers submit buffers obtained from kmalloc() and
-> friends with no extra offsets. If they want some other alignment later
-> they can use memmove in the completion handler. Enforce this in the core
-> by checking the buffer pointers are aligned to ARCH_KMALLOC_MINALIGN
-> 
-> or
-> 
-> 2) Require that usb_submit_urb() accept byte aligned buffers. Enforce
-> this by a new test in usbtest (which all HCDs are expected to pass).
-> Implement it either in individual HCDs that require it or by letting
-> HCDs inform the core of their requirements and have the core do the
-> alignment (as it already does the dma mapping). Of course HCDs that can
-> implement byte aligned transfers (either natively or using tricks such
-> as the one Russell suggested) should do so.
-> 
-> I think 2) is the better solution because:
-> a) Solution 1 will impose a runtime overhead even on platforms / HCDs
-> that don't need it (including the most common cases)
-> b) There are more drivers than HCDs
+Yes, all are async (also the not-yet-working hash algorithms).
 
-Yes. But it doesn't prevent you from publishing this information so
-drivers can help the lower levels.
-	Regards
-		Oliver
+> tcrypt can validate async crypto algorithms, but cannot performance
+> test them just yet.  I can performance test async hash algorithms,
+> for which I added the code for a few months ago.
+Hmm ok, I suppose implementing support for performance testing async crypto
+algorithms isn't trivial?
+
+-- 
+Maurus Cuelenaere
