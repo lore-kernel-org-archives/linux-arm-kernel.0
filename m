@@ -1,91 +1,69 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 13 Aug 2010 12:21:31 +0200
-Subject: [PATCH] ARM: imx: fix build failure concerning otg/ulpi
-In-Reply-To: <1275464450-23003-2-git-send-email-grinberg@compulab.co.il>
-References: <1275464450-23003-2-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1281694891-7527-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 13 Aug 2010 12:25:05 +0200
+Subject: [PATCH v2] mx35: Fix boot ROM hang in internal boot mode
+In-Reply-To: <20100813100429.GB22619@local>
+References: <20100811233721.GB6411@local>
+	<20100812055753.GB9763@pengutronix.de>
+	<20100812112938.GB8670@local> <20100812121504.GC8670@local>
+	<20100813081720.GA23898@pengutronix.de>
+	<20100813100429.GB22619@local>
+Message-ID: <20100813102505.GA10658@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The build failure was introduced by
+Hello Hans,
 
-	13dd0c9 (USB: otg/ulpi: extend the generic ulpi driver.)
+On Fri, Aug 13, 2010 at 12:04:29PM +0200, Hans J. Koch wrote:
+> On Fri, Aug 13, 2010 at 10:17:20AM +0200, Uwe Kleine-K?nig wrote:
+> > On Thu, Aug 12, 2010 at 02:15:04PM +0200, Hans J. Koch wrote:
+> > > On Thu, Aug 12, 2010 at 01:29:40PM +0200, Hans J. Koch wrote:
+> > > > On Thu, Aug 12, 2010 at 07:57:53AM +0200, Uwe Kleine-K?nig wrote:
+> > > > > > +	}
+> > > > > > +
+> > > > > > +	__raw_writel(cgr2, CCM_BASE + CCM_CGR2);
+> > > > > > +	__raw_writel(cgr3, CCM_BASE + CCM_CGR3);
+> > > > > Note that my question concerning the UART clock was less about UART1 vs
+> > > > > UART0 but more if the ROM really needs a UART clock.
+> > > > 
+> > > > In my tests on an mx35pdk board, I found these three clocks being the
+> > > > minimum set of additional clocks that need to be turned on. That means,
+> > > > if you turn off any of the three, it won't boot anymore.
+> > > 
+> > > For my tests, I didn't fully boot the kernel but inserted a while(1) after
+> > > the clock init sequence. I had the wachdog already initialized in the
+> > > bootloader, so after a few seconds it would boot again - or not.
+> > > 
+> > > If you fully boot the kernel, then the driver will probably switch on
+> > > the UART1 clock, so you don't notice the effect anymore. But the kernel
+> > > can hang _before_ drivers come up, and it should still work. That's
+> > > what hardware watchdogs are for.
+> > > 
+> > > As a sidenote, it should be clear that this patch is a workaround for
+> > > a serious chip bug of the MX35.
+> > From the things you wrote up to now it's possible that this is a
+> > bootloader issue, isn't it.
+> 
+> I discussed that with John. It's at least very unlikely. Given the fact
+> that it works in external boot mode, a bootloader bug had to be in the
+> code path that's different for the two modes. That code path is very
+> small, and there's no hint that the clocks in question are used there.
+> 
+> > 
+> > I don't know exactly what "internal boot mode" means, but assuming the
+> > ROM code doesn't make any output to UART1 at least this clock smells
+> > like a bootloader problem.
+> 
+> No. When the bootloader uses the UART for the first time it is already
+> in code that's identical for both boot modes.
+> 
+> > If you're conviced this is a chip problem,
+> > did you consider to contact FSL about it?
+> 
+> Yes, of course. John does that at the moment.
+OK, great.
 
-Cc: Igor Grinberg <grinberg@compulab.co.il>
-Cc: Mike Rapoport <mike@compulab.co.il>
-Cc: Greg Kroah-Hartman <gregkh@suse.de>
----
- arch/arm/mach-imx/mach-cpuimx27.c  |    4 ++--
- arch/arm/mach-imx/mach-pca100.c    |    4 ++--
- arch/arm/mach-mx25/mach-cpuimx25.c |    2 +-
- arch/arm/mach-mx3/mach-cpuimx35.c  |    2 +-
- 4 files changed, 6 insertions(+), 6 deletions(-)
+Uwe
 
-diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
-index 575ff1a..339150a 100644
---- a/arch/arm/mach-imx/mach-cpuimx27.c
-+++ b/arch/arm/mach-imx/mach-cpuimx27.c
-@@ -279,13 +279,13 @@ static void __init eukrea_cpuimx27_init(void)
- #if defined(CONFIG_USB_ULPI)
- 	if (otg_mode_host) {
- 		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
- 
- 		mxc_register_device(&mxc_otg_host, &otg_pdata);
- 	}
- 
- 	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
- 
- 	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
- #endif
-diff --git a/arch/arm/mach-imx/mach-pca100.c b/arch/arm/mach-imx/mach-pca100.c
-index a389d11..23c9e1f 100644
---- a/arch/arm/mach-imx/mach-pca100.c
-+++ b/arch/arm/mach-imx/mach-pca100.c
-@@ -419,13 +419,13 @@ static void __init pca100_init(void)
- #if defined(CONFIG_USB_ULPI)
- 	if (otg_mode_host) {
- 		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
- 
- 		mxc_register_device(&mxc_otg_host, &otg_pdata);
- 	}
- 
- 	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
- 
- 	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
- #endif
-diff --git a/arch/arm/mach-mx25/mach-cpuimx25.c b/arch/arm/mach-mx25/mach-cpuimx25.c
-index 56b2e26..0134fb8 100644
---- a/arch/arm/mach-mx25/mach-cpuimx25.c
-+++ b/arch/arm/mach-mx25/mach-cpuimx25.c
-@@ -138,7 +138,7 @@ static void __init eukrea_cpuimx25_init(void)
- #if defined(CONFIG_USB_ULPI)
- 	if (otg_mode_host) {
- 		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+				USB_OTG_DRV_VBUS | ULPI_OTG_DRVVBUS_EXT);
- 
- 		mxc_register_device(&mxc_otg, &otg_pdata);
- 	}
-diff --git a/arch/arm/mach-mx3/mach-cpuimx35.c b/arch/arm/mach-mx3/mach-cpuimx35.c
-index 63f970f..117f90e 100644
---- a/arch/arm/mach-mx3/mach-cpuimx35.c
-+++ b/arch/arm/mach-mx3/mach-cpuimx35.c
-@@ -192,7 +192,7 @@ static void __init mxc_board_init(void)
- #if defined(CONFIG_USB_ULPI)
- 	if (otg_mode_host) {
- 		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+				USB_OTG_DRV_VBUS | ULPI_OTG_DRVVBUS_EXT);
- 
- 		mxc_register_device(&mxc_otg_host, &otg_pdata);
- 	}
 -- 
-1.7.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
