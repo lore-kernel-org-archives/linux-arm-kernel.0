@@ -1,38 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 13 Aug 2010 11:02:14 +0300
-Subject: [PATCH 6/6] omap: Fix omap_4430sdp_defconfig for make oldconfig
-In-Reply-To: <20100813080034.18750.15410.stgit@baageli.muru.com>
-References: <20100813080034.18750.15410.stgit@baageli.muru.com>
-Message-ID: <20100813080213.18750.41042.stgit@baageli.muru.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 13 Aug 2010 10:13:04 +0200
+Subject: 'error: 'SDHCI_QUIRK_NO_HISPD_BIT' undeclared' and 'undefined
+	reference to `sdhci_card_detect''
+In-Reply-To: <008d01cb3ab9$ae73da60$0b5b8f20$%kim@samsung.com>
+References: <008d01cb3ab9$ae73da60$0b5b8f20$%kim@samsung.com>
+Message-ID: <000901cb3abf$5ef59b30$1ce0d190$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit ffb63e3402849e1b70119ee0c9a81dc9da4dfa97 changed
-Kconfig to select support for omap2, 3 and 4 by default.
+Hello,
 
-However, CONFIG_SMP won't currently work properly on
-uniprocessor ARMs, or if support for earlier ARM cores
-is selected in.
+On Friday, August 13, 2010 9:32 AM Kukjin Kim wrote:
 
-Fix this by updating omap_4430sdp_defconfig to not
-select omap2 or 3 at this point.
+> This is just information about Samsung sdmmc stuff building error now.
+> 
+> I found Marek's 'sdhci-s3c: enable SDHCI_QUIRK_NO_HISPD_BIT quirk' in the
+> Linus' tree.
+> (commit ID: a1d5646005af1247d6ae78434bb4db15b07a07b2)
+> 
+> But not defined the quirk yet...so following build error happened with
+> s3c6400_defconfig in Linus' latest.
+> 
+> drivers/mmc/host/sdhci-s3c.c: In function 'sdhci_s3c_probe':
+> drivers/mmc/host/sdhci-s3c.c:400: error: 'SDHCI_QUIRK_NO_HISPD_BIT'
+> undeclared (first use in this function)
+> drivers/mmc/host/sdhci-s3c.c:400: error: (Each undeclared identifier is
+> reported only once
+> drivers/mmc/host/sdhci-s3c.c:400: error: for each function it appears in.)
+> make[4]: *** [drivers/mmc/host/sdhci-s3c.o] Error 1
+> make[3]: *** [drivers/mmc/host] Error 2
+> make[2]: *** [drivers/mmc] Error 2
+> make[1]: *** [drivers] Error 2
+> 
+> Kyungmin Park's below patch can solve this and it is in mmotm now.
+> (commit ID: 2935b9e7fcc4bea3751b8d039b383b2036a7d36d)
+> 
+> But I think, to update quirk definition should being in Marek's patch for
+> avoiding build error.
+> Of course, I'm not sure whether the commit order changed.
+> Anyway, in this case, will be solved after merging mm tree.
+> 
+> 
+> And second case is same.
+> 
+> Marek's 'sdhci-s3c: add support for new card detection methods' cause
+> following build error.
+> (commit ID:17866e14f3a4f219e94f1374ece7226479418ff8)
+> 
+> drivers/built-in.o: In function `sdhci_s3c_notify_change':
+> /home/kgene/linux/linux-2.6-mainline-dev/drivers/mmc/host/sdhci-s3c.c:255:
+> undefined reference to `sdhci_card_detect'
+> make[1]: *** [.tmp_vmlinux1] Error 1
+> make: *** [sub-make] Error 2
+> 
+> And Andrew's patch(b567e5dd5a34c184e5642100e752cb87e064bb97) can solve this.
+> (of course this needs another patches...)
+> 
+> Anyway...
+> Marek, in future please make sure your patch has no building problem before
+> submitting.
+> (or it can help to add some kind of dependency note in your patch)
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/configs/omap_4430sdp_defconfig |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+My patches submited to Andrew Morton had the description and a note that they
+have been prepared especially for his tree, taking into account all patches
+that are already there (mainly a tasklets to threaded irq conversion). For me
+it was quite obvious that they will be merged after all other sdhci changes
+from that tree. I have no idea why the order of the patches has been reversed
+and my sdhci patches has been submitted to Linus before the other sdhci
+changes.
 
-diff --git a/arch/arm/configs/omap_4430sdp_defconfig b/arch/arm/configs/omap_4430sdp_defconfig
-index 63e0c2d..14c1e18 100644
---- a/arch/arm/configs/omap_4430sdp_defconfig
-+++ b/arch/arm/configs/omap_4430sdp_defconfig
-@@ -13,6 +13,9 @@ CONFIG_MODULE_SRCVERSION_ALL=y
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_ARCH_OMAP=y
- CONFIG_ARCH_OMAP4=y
-+# CONFIG_ARCH_OMAP2PLUS_TYPICAL is not set
-+# CONFIG_ARCH_OMAP2 is not set
-+# CONFIG_ARCH_OMAP3 is not set
- # CONFIG_OMAP_MUX is not set
- CONFIG_OMAP_32K_TIMER=y
- CONFIG_OMAP_DM_TIMER=y
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
