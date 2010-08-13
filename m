@@ -1,92 +1,48 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 13 Aug 2010 14:06:50 +0200
-Subject: [PATCH v2] ARM: imx: fix build failure concerning otg/ulpi
-In-Reply-To: <4C65246E.1000906@ru.mvista.com>
-References: <4C65246E.1000906@ru.mvista.com>
-Message-ID: <1281701210-27776-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 13 Aug 2010 17:14:44 +0400
+Subject: undefined reference to `mmc_pm_notify' when selected MMC without
+	PM.
+In-Reply-To: <009301cb3ad3$77c8a620$6759f260$%kim@samsung.com>
+References: <009301cb3ad3$77c8a620$6759f260$%kim@samsung.com>
+Message-ID: <4C654544.5010002@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The build failure was introduced by
+Hello.
 
-	13dd0c9 (USB: otg/ulpi: extend the generic ulpi driver.)
+Kukjin Kim wrote:
 
-Cc: Igor Grinberg <grinberg@compulab.co.il>
-Cc: Mike Rapoport <mike@compulab.co.il>
-Cc: Greg Kroah-Hartman <gregkh@suse.de>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-imx/mach-cpuimx27.c  |    4 ++--
- arch/arm/mach-imx/mach-pca100.c    |    4 ++--
- arch/arm/mach-mx25/mach-cpuimx25.c |    2 +-
- arch/arm/mach-mx3/mach-cpuimx35.c  |    2 +-
- 4 files changed, 6 insertions(+), 6 deletions(-)
+> Following is build error when selected MMC without PM.
 
-diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
-index 575ff1a..339150a 100644
---- a/arch/arm/mach-imx/mach-cpuimx27.c
-+++ b/arch/arm/mach-imx/mach-cpuimx27.c
-@@ -279,13 +279,13 @@ static void __init eukrea_cpuimx27_init(void)
- #if defined(CONFIG_USB_ULPI)
- 	if (otg_mode_host) {
- 		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
- 
- 		mxc_register_device(&mxc_otg_host, &otg_pdata);
- 	}
- 
- 	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
- 
- 	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
- #endif
-diff --git a/arch/arm/mach-imx/mach-pca100.c b/arch/arm/mach-imx/mach-pca100.c
-index a389d11..23c9e1f 100644
---- a/arch/arm/mach-imx/mach-pca100.c
-+++ b/arch/arm/mach-imx/mach-pca100.c
-@@ -419,13 +419,13 @@ static void __init pca100_init(void)
- #if defined(CONFIG_USB_ULPI)
- 	if (otg_mode_host) {
- 		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
- 
- 		mxc_register_device(&mxc_otg_host, &otg_pdata);
- 	}
- 
- 	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
- 
- 	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
- #endif
-diff --git a/arch/arm/mach-mx25/mach-cpuimx25.c b/arch/arm/mach-mx25/mach-cpuimx25.c
-index 56b2e26..a5f0174 100644
---- a/arch/arm/mach-mx25/mach-cpuimx25.c
-+++ b/arch/arm/mach-mx25/mach-cpuimx25.c
-@@ -138,7 +138,7 @@ static void __init eukrea_cpuimx25_init(void)
- #if defined(CONFIG_USB_ULPI)
- 	if (otg_mode_host) {
- 		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
- 
- 		mxc_register_device(&mxc_otg, &otg_pdata);
- 	}
-diff --git a/arch/arm/mach-mx3/mach-cpuimx35.c b/arch/arm/mach-mx3/mach-cpuimx35.c
-index 63f970f..9770a6a 100644
---- a/arch/arm/mach-mx3/mach-cpuimx35.c
-+++ b/arch/arm/mach-mx3/mach-cpuimx35.c
-@@ -192,7 +192,7 @@ static void __init mxc_board_init(void)
- #if defined(CONFIG_USB_ULPI)
- 	if (otg_mode_host) {
- 		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-+				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
- 
- 		mxc_register_device(&mxc_otg_host, &otg_pdata);
- 	}
--- 
-1.7.1
+> drivers/built-in.o: In function `mmc_alloc_host':
+> drivers/mmc/core/host.c:108: undefined reference to `mmc_pm_notify'
+> make[1]: *** [.tmp_vmlinux1] Error 1
+> make: *** [sub-make] Error 2
+
+> That is added from Maxim's ' mmc: fix all hangs related to mmc/sd card
+> insert/removal during suspend/resume '
+> (commit ID: 4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e)
+
+> Below is temporary patch for avoiding build error.
+> But I'm not sure about this... :-(
+
+> ---
+
+> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+> index 0efe631..d80cfdc 100644
+> --- a/drivers/mmc/core/host.c
+> +++ b/drivers/mmc/core/host.c
+> @@ -86,7 +86,9 @@ struct mmc_host *mmc_alloc_host(int extra, struct device
+> *dev)
+>         init_waitqueue_head(&host->wq);
+>         INIT_DELAYED_WORK(&host->detect, mmc_rescan);
+>         INIT_DELAYED_WORK_DEFERRABLE(&host->disable,
+> mmc_host_deeper_disable);
+
+    Looks like your patch is line-wrapped...
+
+> +#ifdef CONFIG_PM
+>         host->pm_notify.notifier_call = mmc_pm_notify;
+> +#endif
+
+WBR, Sergei
