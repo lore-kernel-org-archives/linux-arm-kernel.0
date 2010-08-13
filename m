@@ -1,193 +1,228 @@
-From: claudio@evidence.eu.com (Claudio Scordino)
-Date: Sat, 14 Aug 2010 14:50:40 +0200
-Subject: [PATCH] Documentation about RS485 serial communications
-In-Reply-To: <20100811083214.21d2919e.randy.dunlap@oracle.com>
-References: <4BB053C4.7050700@evidence.eu.com>	<4BB10304.6090006@bluewatersys.com>	<4BB1BF49.2000609@evidence.eu.com>	<4BB252E3.3030703@bluewatersys.com>	<4BBD8C9D.3070401@evidence.eu.com>	<20100408111310.524f7354@lxorguk.ukuu.org.uk>	<4BBDD71D.1010700@evidence.eu.com>	<4BFD1FB6.8050405@atmel.com>	<4BFE2F38.8050200@evidence.eu.com>	<4BFE41FD.2080804@atmel.com>	<20100527102917.GB31253@pengutronix.de>	<4C626CBF.9020609@evidence.eu.com>
-	<20100811083214.21d2919e.randy.dunlap@oracle.com>
-Message-ID: <4C669120.8080707@evidence.eu.com>
+From: kim.phillips@freescale.com (Kim Phillips)
+Date: Fri, 13 Aug 2010 17:56:24 -0500
+Subject: [RFC 9/9] crypto: Add Samsung crypto engine driver
+In-Reply-To: <20100813.144537.102558594.davem@davemloft.net>
+References: <4C63DF4C.1020501@gmail.com>
+	<20100812.153208.48514514.davem@davemloft.net>
+	<4C6529E1.8020300@gmail.com>
+	<20100813.144537.102558594.davem@davemloft.net>
+Message-ID: <20100813175624.84657c76.kim.phillips@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Randy Dunlap ha scritto:
-> On Wed, 11 Aug 2010 11:26:23 +0200 Claudio Scordino wrote:
-> 
->> Hi all,
->>
->> 	some time ago I've been asked (by both Wolfram and Philippe) to
->> provide some minimal documentation about the usage of the RS485
->> interface.
->>
+On Fri, 13 Aug 2010 14:45:37 -0700
+David Miller <davem@davemloft.net> wrote:
 
-[...]
+> From: Maurus Cuelenaere <mcuelenaere@gmail.com>
+> Date: Fri, 13 Aug 2010 13:17:53 +0200
+> 
+> >  Op 13-08-10 00:32, David Miller schreef:
+> >> From: Maurus Cuelenaere <mcuelenaere@gmail.com>
+> >> Date: Thu, 12 Aug 2010 13:47:24 +0200
+> >>
+> >> tcrypt can validate async crypto algorithms, but cannot performance
+> >> test them just yet.  I can performance test async hash algorithms,
+> >> for which I added the code for a few months ago.
+> > Hmm ok, I suppose implementing support for performance testing async crypto
+> > algorithms isn't trivial?
+> 
+> It shouldn't be that hard, the issue is simply that nobody has put
+> the time in to do the work yet.
+
+I wrote the following a long time ago for a customer, yet didn't have
+the time (and I still don't have the time) to fix it up and submit it:
+
+diff --git a/crypto/tcrypt.c b/crypto/tcrypt.c
+index a890a67..7be35ca 100644
+--- a/crypto/tcrypt.c
++++ b/crypto/tcrypt.c
+@@ -44,6 +44,7 @@
+  * Used by test_cipher_speed()
+  */
+ static unsigned int sec;
++static atomic_t reqs_in_progress;
  
-> 
-> Thanks for the addition.
-> 
-
-Hi all,
-
-	here is the document about RS485 with the requested additions.
-
-If OK, somebody please provide for merging.
-
-Best regards,
-
-	Claudio
-
-
-Documentation about RS485 serial communications.
-
-Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
----
- Documentation/serial/00-INDEX         |    2 +
- Documentation/serial/serial-rs485.txt |  126 +++++++++++++++++++++++++++++++++
- 2 files changed, 128 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/serial/serial-rs485.txt
-
-diff --git a/Documentation/serial/00-INDEX b/Documentation/serial/00-INDEX
-index 07dcdb0..e09468a 100644
---- a/Documentation/serial/00-INDEX
-+++ b/Documentation/serial/00-INDEX
-@@ -14,6 +14,8 @@ riscom8.txt
- 	- notes on using the RISCom/8 multi-port serial driver.
- rocket.txt
- 	- info on the Comtrol RocketPort multiport serial driver.
-+serial-rs485.txt
-+	- info about RS485 structures and support in the kernel.
- specialix.txt
- 	- info on hardware/driver for specialix IO8+ multiport serial card.
- stallion.txt
-diff --git a/Documentation/serial/serial-rs485.txt b/Documentation/serial/serial-rs485.txt
-new file mode 100644
-index 0000000..93b029e
---- /dev/null
-+++ b/Documentation/serial/serial-rs485.txt
-@@ -0,0 +1,126 @@
-+                        RS485 SERIAL COMMUNICATIONS
+ static char *alg = NULL;
+ static u32 type;
+@@ -59,30 +60,55 @@ static char *check[] = {
+ 	"lzo", "cts", "zlib", NULL
+ };
+ 
+-static int test_cipher_jiffies(struct blkcipher_desc *desc, int enc,
++static int test_cipher_jiffies(struct ablkcipher_request *req, int enc,
+ 			       struct scatterlist *sg, int blen, int sec)
+ {
+ 	unsigned long start, end;
+ 	int bcount;
++	unsigned int inprogress_max;
+ 	int ret;
++	int completion_wait;
 +
-+1. INTRODUCTION
-+
-+   EIA-485, also known as TIA/EIA-485 or RS-485, is a standard defining the
-+   electrical characteristics of drivers and receivers for use in balanced
-+   digital multipoint systems.
-+   This standard is widely used for communications in industrial automation
-+   because it can be used effectively over long distances and in electrically
-+   noisy environments.
-+   Even though the data is transmitted over a 2-wire twisted pair bus, all
-+   EIA-485 transceivers interpret the voltage levels of the differential
-+   signals with respect to a third common voltage. Without this common
-+   reference, a set of transceivers may interpret the differential signals
-+   incorrectly.
-+   See [1] for more information.
-+
-+
-+2. HARDWARE-RELATED CONSIDERATIONS
-+
-+   Some CPUs (e.g., Atmel AT91) contain a transceiver capable of working both
-+   as RS232 and RS485. For these microcontrollers, the Linux driver should be
-+   made capable of working in both modes, and proper ioctls (see later) should
-+   be made available at user-level to allow switching from one mode to the
-+   other, and vice versa.
-+
-+   On some other CPUs (e.g., Freescale imx25) the RS485 transceiver is not
-+   integrated inside the microcontroller itself. Therefore, manufacturers who
-+   use these microcontrollers to produce embedded boards need to connect an
-+   external transceiver to some pin of the CPU.
-+   On these architectures, therefore, no assumptions can be done at the
-+   CPU-level about the presence of a RS485 transceiver, because the connection
-+   (if any) is done outside the microcontroller. Moreover, even in case of
-+   RS485 transceiver, the manufacturer is free to choose the CPU pin used for
-+   the connection.
-+
-+
-+3. DATA STRUCTURES ALREADY AVAILABLE IN THE KERNEL
-+
-+   The Linux kernel provides the serial_rs485 structure (see [2]) to handle
-+   RS485 communications. This data structure is used to set and configure RS485
-+   parameters in the platform data and in ioctls.
-+
-+   Any driver for devices capable of working both as RS232 and RS485 should
-+   provide at least the following ioctls:
-+
-+    - TIOCSRS485 (typically associated with number 0x542F). This ioctl is used
-+      to enable/disable RS485 mode from user-space
-+
-+    - TIOCGRS485 (typically associated with number 0x542E). This ioctl is used
-+      to get RS485 mode from kernel-space (i.e., driver) to user-space.
-+
-+   In other words, the serial driver should contain a code similar to the next
-+   one:
-+
-+	static struct uart_ops atmel_pops = {
-+		/* ... */
-+		.ioctl		= handle_ioctl,
-+	};
-+
-+	static int handle_ioctl(struct uart_port *port,
-+		unsigned int cmd,
-+		unsigned long arg)
-+	{
-+		struct serial_rs485 rs485conf;
-+
-+		switch (cmd) {
-+		case TIOCSRS485:
-+			if (copy_from_user(&rs485conf,
-+				(struct serial_rs485 *) arg,
-+				sizeof(rs485conf)))
-+					return -EFAULT;
-+
-+			/* ... */
++	atomic_set(&reqs_in_progress, 0);
++	inprogress_max = 0;
+ 
+ 	for (start = jiffies, end = start + sec * HZ, bcount = 0;
+ 	     time_before(jiffies, end); bcount++) {
+ 		if (enc)
+-			ret = crypto_blkcipher_encrypt(desc, sg, sg, blen);
++			ret = crypto_ablkcipher_encrypt(req);
+ 		else
+-			ret = crypto_blkcipher_decrypt(desc, sg, sg, blen);
++			ret = crypto_ablkcipher_decrypt(req);
+ 
+-		if (ret)
++		switch (ret) {
++		case -EINPROGRESS:
++			atomic_inc(&reqs_in_progress);
++			inprogress_max = max(inprogress_max, (unsigned int)
++					     atomic_read(&reqs_in_progress));
 +			break;
-+
-+		case TIOCGRS485:
-+			if (copy_to_user((struct serial_rs485 *) arg,
-+				...,
-+				sizeof(rs485conf)))
-+					return -EFAULT;
-+			/* ... */
++		case -EAGAIN:
++			bcount--;
 +			break;
-+
-+		/* ... */
++		case 0: break;
++		default:
++			printk("%s %d: bad ret: %d\n", __func__, __LINE__, ret);
+ 			return ret;
 +		}
-+	}
+ 	}
+ 
++	while (atomic_read(&reqs_in_progress) != 0)
++		cpu_relax();
 +
++	completion_wait = jiffies - end;
+ 	printk("%d operations in %d seconds (%ld bytes)\n",
+ 	       bcount, sec, (long)bcount * blen);
++	printk("inprogress_max %d\n", inprogress_max);
++	printk("jiffies waiting for all to finish: %d (%dHZ)\n",
++	       completion_wait, HZ);
 +
-+4. USAGE FROM USER-LEVEL
+ 	return 0;
+ }
+ 
+-static int test_cipher_cycles(struct blkcipher_desc *desc, int enc,
++static int test_cipher_cycles(struct ablkcipher_request *req, int enc,
+ 			      struct scatterlist *sg, int blen)
+ {
+ 	unsigned long cycles = 0;
+@@ -95,9 +121,9 @@ static int test_cipher_cycles(struct blkcipher_desc *desc, int enc,
+ 	/* Warm-up run. */
+ 	for (i = 0; i < 4; i++) {
+ 		if (enc)
+-			ret = crypto_blkcipher_encrypt(desc, sg, sg, blen);
++			ret = crypto_ablkcipher_encrypt(req);
+ 		else
+-			ret = crypto_blkcipher_decrypt(desc, sg, sg, blen);
++			ret = crypto_ablkcipher_decrypt(req);
+ 
+ 		if (ret)
+ 			goto out;
+@@ -109,9 +135,9 @@ static int test_cipher_cycles(struct blkcipher_desc *desc, int enc,
+ 
+ 		start = get_cycles();
+ 		if (enc)
+-			ret = crypto_blkcipher_encrypt(desc, sg, sg, blen);
++			ret = crypto_ablkcipher_encrypt(req);
+ 		else
+-			ret = crypto_blkcipher_decrypt(desc, sg, sg, blen);
++			ret = crypto_ablkcipher_decrypt(req);
+ 		end = get_cycles();
+ 
+ 		if (ret)
+@@ -133,14 +159,19 @@ out:
+ 
+ static u32 block_sizes[] = { 16, 64, 256, 1024, 8192, 0 };
+ 
++static void ablkcipher_done(struct crypto_async_request *req, int err)
++{
++	atomic_dec(&reqs_in_progress);
++}
 +
-+   From user-level, RS485 configuration can be get/set using the previous
-+   ioctls. For instance, to set RS485 you can use the following code:
+ static void test_cipher_speed(const char *algo, int enc, unsigned int sec,
+ 			      struct cipher_speed_template *template,
+ 			      unsigned int tcount, u8 *keysize)
+ {
+ 	unsigned int ret, i, j, iv_len;
+ 	const char *key, iv[128];
+-	struct crypto_blkcipher *tfm;
+-	struct blkcipher_desc desc;
++	struct crypto_ablkcipher *tfm;
++	struct ablkcipher_request req;
+ 	const char *e;
+ 	u32 *b_size;
+ 
+@@ -151,15 +182,17 @@ static void test_cipher_speed(const char *algo, int enc, unsigned int sec,
+ 
+ 	printk("\ntesting speed of %s %s\n", algo, e);
+ 
+-	tfm = crypto_alloc_blkcipher(algo, 0, CRYPTO_ALG_ASYNC);
++	tfm = crypto_alloc_ablkcipher(algo, 0, 0);
+ 
+ 	if (IS_ERR(tfm)) {
+ 		printk("failed to load transform for %s: %ld\n", algo,
+ 		       PTR_ERR(tfm));
+ 		return;
+ 	}
+-	desc.tfm = tfm;
+-	desc.flags = 0;
++	ablkcipher_request_set_tfm(&req, tfm);
++	crypto_ablkcipher_set_flags(tfm, 0);
 +
-+	#include <linux/serial.h>
++	ablkcipher_request_set_callback(&req, 0, ablkcipher_done, NULL);
+ 
+ 	i = 0;
+ 	do {
+@@ -189,10 +222,10 @@ static void test_cipher_speed(const char *algo, int enc, unsigned int sec,
+ 				}
+ 			}
+ 
+-			ret = crypto_blkcipher_setkey(tfm, key, *keysize);
++			ret = crypto_ablkcipher_setkey(tfm, key, *keysize);
+ 			if (ret) {
+ 				printk("setkey() failed flags=%x\n",
+-						crypto_blkcipher_get_flags(tfm));
++						crypto_ablkcipher_get_flags(tfm));
+ 				goto out;
+ 			}
+ 
+@@ -204,21 +237,24 @@ static void test_cipher_speed(const char *algo, int enc, unsigned int sec,
+ 				memset (tvmem[j], 0xff, PAGE_SIZE);
+ 			}
+ 
+-			iv_len = crypto_blkcipher_ivsize(tfm);
+-			if (iv_len) {
++			iv_len = crypto_ablkcipher_ivsize(tfm);
++			if (iv_len)
+ 				memset(&iv, 0xff, iv_len);
+-				crypto_blkcipher_set_iv(tfm, iv, iv_len);
+-			}
 +
-+	/* Driver-specific ioctls: */
-+	#define TIOCGRS485      0x542E
-+	#define TIOCSRS485      0x542F
++			ablkcipher_request_set_crypt(&req, sg, sg, *b_size,
++						     iv_len ? (void *)iv : NULL);
 +
-+	/* Open your specific device (e.g., /dev/mydevice): */
-+	int fd = open ("/dev/mydevice", O_RDWR);
-+	struct serial_rs485 rs485conf;
-+
-+	/* Set RS485 mode: */
-+	rs485conf.flags |= SER_RS485_ENABLED;
-+
-+	/* Set rts delay before send, if needed: */
-+	rs485conf.flags |= SER_RS485_RTS_BEFORE_SEND;
-+	rs485conf.delay_rts_before_send = ...;
-+
-+	/* Set rts delay after send, if needed: */
-+	rs485conf.flags |= SER_RS485_RTS_AFTER_SEND;
-+	rs485conf.delay_rts_after_send = ...;
-+
-+	ioctl (fd, TIOCSRS485, &rs485conf);
-+
-+	/* Use read() and write() syscalls here... */
-+
-+	/* Close the device when finished: */
-+	close (fd);
-+
-+5. REFERENCES
-+
-+ [1]	http://en.wikipedia.org/wiki/Rs485
-+ [2]	include/linux/serial.h
--- 
-1.6.0.4
+ 
+ 			if (sec)
+-				ret = test_cipher_jiffies(&desc, enc, sg,
++				ret = test_cipher_jiffies(&req, enc, sg,
+ 							  *b_size, sec);
+ 			else
+-				ret = test_cipher_cycles(&desc, enc, sg,
++				ret = test_cipher_cycles(&req, enc, sg,
+ 							 *b_size);
+ 
+ 			if (ret) {
+-				printk("%s() failed flags=%x\n", e, desc.flags);
++				printk("%s() failed flags=%x\n", e,
++				       crypto_ablkcipher_get_flags(tfm));
+ 				break;
+ 			}
+ 			b_size++;
+@@ -228,7 +264,7 @@ static void test_cipher_speed(const char *algo, int enc, unsigned int sec,
+ 	} while (*keysize);
+ 
+ out:
+-	crypto_free_blkcipher(tfm);
++	crypto_free_ablkcipher(tfm);
+ }
+ 
+ static int test_hash_jiffies_digest(struct hash_desc *desc,
