@@ -1,203 +1,118 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 13 Aug 2010 06:32:43 +0200
-Subject: [PATCH 12/13] pxa2xx/pcmcia: Prepare for pxa320
+Date: Fri, 13 Aug 2010 06:32:44 +0200
+Subject: [PATCH 13/13] PXA: Colibri PXA320 PCMCIA driver
 In-Reply-To: <1281673964-2119-1-git-send-email-marek.vasut@gmail.com>
 References: <1281673964-2119-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1281673964-2119-12-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1281673964-2119-13-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PXA320 also supports PCMCIA/CF interface. This patch generalizes register access
-in pxa2xx_pcmcia so the pxa320 is now supported as well.
-
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- drivers/pcmcia/pxa2xx_base.c |   91 ++++++++++++++++++++++++++++++++----------
- 1 files changed, 70 insertions(+), 21 deletions(-)
+ arch/arm/mach-pxa/colibri-pxa320.c |   21 +++++++++++++++++++++
+ drivers/pcmcia/Kconfig             |    3 ++-
+ drivers/pcmcia/Makefile            |    1 +
+ drivers/pcmcia/pxa2xx_colibri.c    |   17 ++++++++++++++++-
+ 4 files changed, 40 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
-index df4532e..2088f91 100644
---- a/drivers/pcmcia/pxa2xx_base.c
-+++ b/drivers/pcmcia/pxa2xx_base.c
-@@ -85,6 +85,16 @@
- #define MCXX_ASST_SHIFT     (7)
- #define MCXX_HOLD_SHIFT     (14)
- 
-+#define	PXA2XX_SMC_BASE		(0x48000000)
-+#define	PXA3XX_SMC_BASE		(0x4a000000)
-+#define	MECR_OFFSET		(0x14)
-+#define	MCMEM_OFFSET		(0x28)
-+#define	MCATT_OFFSET		(0x30)
-+#define	MCIO_OFFSET		(0x38)
-+#define	MCIO_OFFSET		(0x38)
+diff --git a/arch/arm/mach-pxa/colibri-pxa320.c b/arch/arm/mach-pxa/colibri-pxa320.c
+index 7c003cd..6cd83fa 100644
+--- a/arch/arm/mach-pxa/colibri-pxa320.c
++++ b/arch/arm/mach-pxa/colibri-pxa320.c
+@@ -73,6 +73,27 @@ static mfp_cfg_t colibri_pxa320_evalboard_pin_config[] __initdata = {
+ 	/* I2C */
+ 	GPIO32_I2C_SCL,
+ 	GPIO33_I2C_SDA,
 +
-+static void __iomem *base;
++	/* PCMCIA */
++	MFP_CFG(GPIO59, AF7),	/* PRST ; AF7 to tristate */
++	MFP_CFG(GPIO61, AF7),	/* PCE1 ; AF7 to tristate */
++	MFP_CFG(GPIO60, AF7),	/* PCE2 ; AF7 to tristate */
++	MFP_CFG(GPIO62, AF7),	/* PCD ; AF7 to tristate */
++	MFP_CFG(GPIO56, AF7),	/* PSKTSEL ; AF7 to tristate */
++	GPIO27_GPIO,		/* RDnWR ; input/tristate */
++	GPIO50_GPIO,		/* PREG ; input/tristate */
++	GPIO2_RDY,
++	GPIO5_NPIOR,
++	GPIO6_NPIOW,
++	GPIO7_NPIOS16,
++	GPIO8_NPWAIT,
++	GPIO29_GPIO,		/* PRDY (READY GPIO) */
++	GPIO57_GPIO,		/* PPEN (POWER GPIO) */
++	GPIO81_GPIO,		/* PCD (DETECT GPIO) */
++	GPIO77_GPIO,		/* PRST (RESET GPIO) */
++	GPIO53_GPIO,		/* PBVD1 */
++	GPIO79_GPIO,		/* PBVD2 */
++	GPIO54_GPIO,		/* POE */
+ };
+ #else
+ static mfp_cfg_t colibri_pxa320_evalboard_pin_config[] __initdata = {};
+diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
+index 883623a..e89e5c3 100644
+--- a/drivers/pcmcia/Kconfig
++++ b/drivers/pcmcia/Kconfig
+@@ -215,7 +215,8 @@ config PCMCIA_PXA2XX
+ 	depends on (ARCH_LUBBOCK || MACH_MAINSTONE || PXA_SHARPSL \
+ 		    || MACH_ARMCORE || ARCH_PXA_PALM || TRIZEPS_PCMCIA \
+ 		    || ARCOM_PCMCIA || ARCH_PXA_ESERIES || MACH_STARGATE2 \
+-		    || MACH_VPAC270 || MACH_BALLOON3 || MACH_COLIBRI)
++		    || MACH_VPAC270 || MACH_BALLOON3 || MACH_COLIBRI \
++		    || MACH_COLIBRI320)
+ 	select PCMCIA_SOC_COMMON
+ 	help
+ 	  Say Y here to include support for the PXA2xx PCMCIA controller
+diff --git a/drivers/pcmcia/Makefile b/drivers/pcmcia/Makefile
+index 0e989a1..f6f582f 100644
+--- a/drivers/pcmcia/Makefile
++++ b/drivers/pcmcia/Makefile
+@@ -72,6 +72,7 @@ pxa2xx-obj-$(CONFIG_MACH_STARGATE2)		+= pxa2xx_stargate2.o
+ pxa2xx-obj-$(CONFIG_MACH_VPAC270)		+= pxa2xx_vpac270.o
+ pxa2xx-obj-$(CONFIG_MACH_BALLOON3)		+= pxa2xx_balloon3.o
+ pxa2xx-obj-$(CONFIG_MACH_COLIBRI)		+= pxa2xx_colibri.o
++pxa2xx-obj-$(CONFIG_MACH_COLIBRI320)		+= pxa2xx_colibri.o
+ 
+ obj-$(CONFIG_PCMCIA_PXA2XX)			+= pxa2xx_base.o $(pxa2xx-obj-y)
+ 
+diff --git a/drivers/pcmcia/pxa2xx_colibri.c b/drivers/pcmcia/pxa2xx_colibri.c
+index 8373816..1c57769 100644
+--- a/drivers/pcmcia/pxa2xx_colibri.c
++++ b/drivers/pcmcia/pxa2xx_colibri.c
+@@ -28,6 +28,13 @@
+ #define	COLIBRI270_DETECT_GPIO	84
+ #define	COLIBRI270_READY_GPIO	1
+ 
++#define	COLIBRI320_RESET_GPIO	77
++#define	COLIBRI320_PPEN_GPIO	57
++#define	COLIBRI320_BVD1_GPIO	53
++#define	COLIBRI320_BVD2_GPIO	79
++#define	COLIBRI320_DETECT_GPIO	81
++#define	COLIBRI320_READY_GPIO	29
 +
- static inline u_int pxa2xx_mcxx_hold(u_int pcmcia_cycle_ns,
- 				     u_int mem_clk_10khz)
- {
-@@ -115,39 +125,57 @@ static inline u_int pxa2xx_pcmcia_cmd_time(u_int mem_clk_10khz,
- 	return (300000 * (pcmcia_mcxx_asst + 1) / mem_clk_10khz);
- }
- 
-+static inline void pxa2xx_pcmcia_set_reg( uint32_t reg, uint32_t sock,
-+					uint32_t val )
-+{
-+	writel(val, base + reg + (sock << 4));
-+}
-+
- static int pxa2xx_pcmcia_set_mcmem( int sock, int speed, int clock )
- {
--	MCMEM(sock) = ((pxa2xx_mcxx_setup(speed, clock)
-+	uint32_t val;
-+
-+	val = ((pxa2xx_mcxx_setup(speed, clock)
- 		& MCXX_SETUP_MASK) << MCXX_SETUP_SHIFT)
- 		| ((pxa2xx_mcxx_asst(speed, clock)
- 		& MCXX_ASST_MASK) << MCXX_ASST_SHIFT)
- 		| ((pxa2xx_mcxx_hold(speed, clock)
- 		& MCXX_HOLD_MASK) << MCXX_HOLD_SHIFT);
- 
-+	pxa2xx_pcmcia_set_reg(MCMEM_OFFSET, sock, val);
-+
- 	return 0;
- }
- 
- static int pxa2xx_pcmcia_set_mcio( int sock, int speed, int clock )
- {
--	MCIO(sock) = ((pxa2xx_mcxx_setup(speed, clock)
-+	uint32_t val;
-+
-+	val = ((pxa2xx_mcxx_setup(speed, clock)
- 		& MCXX_SETUP_MASK) << MCXX_SETUP_SHIFT)
- 		| ((pxa2xx_mcxx_asst(speed, clock)
- 		& MCXX_ASST_MASK) << MCXX_ASST_SHIFT)
- 		| ((pxa2xx_mcxx_hold(speed, clock)
- 		& MCXX_HOLD_MASK) << MCXX_HOLD_SHIFT);
- 
-+	pxa2xx_pcmcia_set_reg(MCIO_OFFSET, sock, val);
-+
- 	return 0;
- }
- 
- static int pxa2xx_pcmcia_set_mcatt( int sock, int speed, int clock )
- {
--	MCATT(sock) = ((pxa2xx_mcxx_setup(speed, clock)
-+	uint32_t val;
-+
-+	val = ((pxa2xx_mcxx_setup(speed, clock)
- 		& MCXX_SETUP_MASK) << MCXX_SETUP_SHIFT)
- 		| ((pxa2xx_mcxx_asst(speed, clock)
- 		& MCXX_ASST_MASK) << MCXX_ASST_SHIFT)
- 		| ((pxa2xx_mcxx_hold(speed, clock)
- 		& MCXX_HOLD_MASK) << MCXX_HOLD_SHIFT);
- 
-+	pxa2xx_pcmcia_set_reg(MCATT_OFFSET, sock, val);
-+
- 	return 0;
- }
- 
-@@ -207,19 +235,18 @@ pxa2xx_pcmcia_frequency_change(struct soc_pcmcia_socket *skt,
- static void pxa2xx_configure_sockets(struct device *dev)
- {
- 	struct pcmcia_low_level *ops = dev->platform_data;
--
- 	/*
- 	 * We have at least one socket, so set MECR:CIT
- 	 * (Card Is There)
- 	 */
--	MECR |= MECR_CIT;
-+	uint32_t mecr = MECR_CIT;
- 
- 	/* Set MECR:NOS (Number Of Sockets) */
- 	if ((ops->first + ops->nr) > 1 ||
- 	    machine_is_viper() || machine_is_arcom_zeus())
--		MECR |= MECR_NOS;
--	else
--		MECR &= ~MECR_NOS;
-+		mecr |= MECR_NOS;
-+
-+	pxa2xx_pcmcia_set_reg(MECR_OFFSET, 0, mecr);
- }
- 
- static const char *skt_names[] = {
-@@ -272,16 +299,34 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
- 	struct pcmcia_low_level *ops;
- 	struct skt_dev_info *sinfo;
- 	struct soc_pcmcia_socket *skt;
-+	uint32_t smc_addr;
- 
- 	ops = (struct pcmcia_low_level *)dev->dev.platform_data;
--	if (!ops)
--		return -ENODEV;
-+	if (!ops) {
-+		ret = -ENODEV;
-+		goto err0;
-+	}
-+
-+	if (cpu_is_pxa320() && ops->nr > 1) {
-+		dev_err(&dev->dev, "pxa320 supports only one pcmcia slot");
-+		ret = -EINVAL;
-+		goto err0;
-+	}
- 
- 	pxa2xx_drv_pcmcia_ops(ops);
- 
-+	smc_addr = cpu_is_pxa320() ? PXA3XX_SMC_BASE : PXA2XX_SMC_BASE;
-+	base = ioremap(smc_addr, 0x100);
-+	if (!base) {
-+		ret = -ENOMEM;
-+		goto err0;
-+	}
-+
- 	sinfo = kzalloc(SKT_DEV_INFO_SIZE(ops->nr), GFP_KERNEL);
--	if (!sinfo)
--		return -ENOMEM;
-+	if (!sinfo) {
-+		ret = -ENOMEM;
-+		goto err1;
-+	}
- 
- 	sinfo->nskt = ops->nr;
- 
-@@ -297,18 +342,21 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
- 
- 		ret = pxa2xx_drv_pcmcia_add_one(skt);
- 		if (ret)
--			break;
-+			goto err2;
+ static struct {
+ 	int	reset_gpio;
+ 	int	ppen_gpio;
+@@ -187,6 +194,14 @@ static int __init colibri_pcmcia_init(void)
+ 		colibri_pcmcia_gpio.bvd2_gpio	= COLIBRI270_BVD2_GPIO;
+ 		colibri_pcmcia_gpio.detect_gpio	= COLIBRI270_DETECT_GPIO;
+ 		colibri_pcmcia_gpio.ready_gpio	= COLIBRI270_READY_GPIO;
++	/* Colibri PXA320 */
++	} else if (machine_is_colibri320()) {
++		colibri_pcmcia_gpio.reset_gpio	= COLIBRI320_RESET_GPIO;
++		colibri_pcmcia_gpio.ppen_gpio	= COLIBRI320_PPEN_GPIO;
++		colibri_pcmcia_gpio.bvd1_gpio	= COLIBRI320_BVD1_GPIO;
++		colibri_pcmcia_gpio.bvd2_gpio	= COLIBRI320_BVD2_GPIO;
++		colibri_pcmcia_gpio.detect_gpio	= COLIBRI320_DETECT_GPIO;
++		colibri_pcmcia_gpio.ready_gpio	= COLIBRI320_READY_GPIO;
  	}
  
--	if (ret) {
--		while (--i >= 0)
--			soc_pcmcia_remove_one(&sinfo->skt[i]);
--		kfree(sinfo);
--	} else {
--		pxa2xx_configure_sockets(&dev->dev);
--		dev_set_drvdata(&dev->dev, sinfo);
--	}
-+	pxa2xx_configure_sockets(&dev->dev);
-+	dev_set_drvdata(&dev->dev, sinfo);
-+
-+	return 0;
+ 	ret = platform_device_add_data(colibri_pcmcia_device,
+@@ -210,6 +225,6 @@ module_init(colibri_pcmcia_init);
+ module_exit(colibri_pcmcia_exit);
  
-+err2:
-+	while (--i >= 0)
-+		soc_pcmcia_remove_one(&sinfo->skt[i]);
-+	kfree(sinfo);
-+err1:
-+	iounmap(base);
-+err0:
- 	return ret;
- }
- 
-@@ -323,6 +371,7 @@ static int pxa2xx_drv_pcmcia_remove(struct platform_device *dev)
- 		soc_pcmcia_remove_one(&sinfo->skt[i]);
- 
- 	kfree(sinfo);
-+	iounmap(base);
- 	return 0;
- }
- 
+ MODULE_AUTHOR("Marek Vasut <marek.vasut@gmail.com>");
+-MODULE_DESCRIPTION("PCMCIA support for Toradex Colibri PXA270");
++MODULE_DESCRIPTION("PCMCIA support for Toradex Colibri PXA270/PXA320");
+ MODULE_ALIAS("platform:pxa2xx-pcmcia");
+ MODULE_LICENSE("GPL");
 -- 
 1.7.1
