@@ -1,49 +1,95 @@
-From: hisao.munakata.vt@renesas.com (hisao munakata)
-Date: Fri, 13 Aug 2010 19:52:47 +0900
-Subject: [regression] in linux-next: sh_mobile_ceu_camera broken by
-	"ARM: Prohibit ioremap() on kernel managed RAM"
-In-Reply-To: <20100810212638.GC7702@n2100.arm.linux.org.uk>
-References: <4C5ED116.5000002@arndnet.de>
-	<201008101045.03547.philippe.retornaz@epfl.ch>
-	<20100810092759.GB31759@n2100.arm.linux.org.uk>
-	<Pine.LNX.4.64.1008102117000.18934@axis700.grange>
-	<20100810212638.GC7702@n2100.arm.linux.org.uk>
-Message-ID: <20100813195247.5ac300c7.hisao.munakata.vt@renesas.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 13 Aug 2010 14:54:38 +0400
+Subject: [PATCH] ARM: imx: fix build failure concerning otg/ulpi
+In-Reply-To: <1281694891-7527-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1275464450-23003-2-git-send-email-grinberg@compulab.co.il>
+	<1281694891-7527-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <4C65246E.1000906@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell
+Hello.
 
-This is Munakata of Renesas. I am a kind of manager and not a kernel 
-developer. So I wonder this message may not include any topic interest for you, 
-Initially I want to express my great appreciation for your help to add Renesas 
-SH-Mobile series kernel support. Actually majority of patches to support 
-SH-Mobile series are written by Renesas Linux development team colleagues 
-like Magnus, Guennadi, Arnd and others those are working in my team.
+Uwe Kleine-K?nig wrote:
 
-As you may know, we used to develop SuperH CPU support with the
-help of SuperH maintainer Paul.  Now he also works inside my team. 
-That means CPU architecture provider, chip vendor and community 
-kernel maintainer are working at the same place.  And luckily or unluckily
-there are not so many relevant party around SuperH.  Now I am getting
-to learn ARM development requires much much tough coordination work
-against various instruction set, each chip implementations and others. 
+> The build failure was introduced by
+> 
+> 	13dd0c9 (USB: otg/ulpi: extend the generic ulpi driver.)
 
-I am not sure how can I make this happen, but Renesas want to
-help your work if possible.  At least I do not want to have our
-private kernel tree out side community master repository. So
-I try to submit all required patches including ARM core part code
-from now on. Is that OK for you ?
+> Cc: Igor Grinberg <grinberg@compulab.co.il>
+> Cc: Mike Rapoport <mike@compulab.co.il>
+> Cc: Greg Kroah-Hartman <gregkh@suse.de>
 
-If you have any request for us as a chip vendor and community
-developer, please kindly tell me your thought. I am planing to
-attend CE Linux Forum ELCE (Embedded Linux conference Europe)
-hold at Cambridge UK this fall ( October 27th and 28th). If we can 
-have a chance to discuss this kind of topic around then, that
-will be really great.
+    Signoff is missing.
 
--- 
-hisao munakata <hisao,munakata.vt@renesas.com>
-Executive manager 
-System Business Div.
-Renesas Solutions Corp.
+
+> diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
+> index 575ff1a..339150a 100644
+> --- a/arch/arm/mach-imx/mach-cpuimx27.c
+> +++ b/arch/arm/mach-imx/mach-cpuimx27.c
+> @@ -279,13 +279,13 @@ static void __init eukrea_cpuimx27_init(void)
+>  #if defined(CONFIG_USB_ULPI)
+>  	if (otg_mode_host) {
+>  		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
+> -				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
+> +				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
+>  
+>  		mxc_register_device(&mxc_otg_host, &otg_pdata);
+>  	}
+>  
+>  	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
+> -				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
+> +				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
+>  
+>  	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
+>  #endif
+> diff --git a/arch/arm/mach-imx/mach-pca100.c b/arch/arm/mach-imx/mach-pca100.c
+> index a389d11..23c9e1f 100644
+> --- a/arch/arm/mach-imx/mach-pca100.c
+> +++ b/arch/arm/mach-imx/mach-pca100.c
+> @@ -419,13 +419,13 @@ static void __init pca100_init(void)
+>  #if defined(CONFIG_USB_ULPI)
+>  	if (otg_mode_host) {
+>  		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
+> -				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
+> +				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
+>  
+>  		mxc_register_device(&mxc_otg_host, &otg_pdata);
+>  	}
+>  
+>  	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
+> -				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
+> +				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
+>  
+>  	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
+>  #endif
+> diff --git a/arch/arm/mach-mx25/mach-cpuimx25.c b/arch/arm/mach-mx25/mach-cpuimx25.c
+> index 56b2e26..0134fb8 100644
+> --- a/arch/arm/mach-mx25/mach-cpuimx25.c
+> +++ b/arch/arm/mach-mx25/mach-cpuimx25.c
+> @@ -138,7 +138,7 @@ static void __init eukrea_cpuimx25_init(void)
+>  #if defined(CONFIG_USB_ULPI)
+>  	if (otg_mode_host) {
+>  		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
+> -				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
+> +				USB_OTG_DRV_VBUS | ULPI_OTG_DRVVBUS_EXT);
+
+    Not ULPI_OTG_DRVVBUS, like in other cases?
+
+>  
+>  		mxc_register_device(&mxc_otg, &otg_pdata);
+>  	}
+> diff --git a/arch/arm/mach-mx3/mach-cpuimx35.c b/arch/arm/mach-mx3/mach-cpuimx35.c
+> index 63f970f..117f90e 100644
+> --- a/arch/arm/mach-mx3/mach-cpuimx35.c
+> +++ b/arch/arm/mach-mx3/mach-cpuimx35.c
+> @@ -192,7 +192,7 @@ static void __init mxc_board_init(void)
+>  #if defined(CONFIG_USB_ULPI)
+>  	if (otg_mode_host) {
+>  		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
+> -				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
+> +				USB_OTG_DRV_VBUS | ULPI_OTG_DRVVBUS_EXT);
+
+    Same question here...
+
+WBR, Sergei
