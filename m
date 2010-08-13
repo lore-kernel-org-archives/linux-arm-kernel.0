@@ -1,16 +1,46 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 13 Aug 2010 19:22:06 +0100
-Subject: [PATCH 3/5] ASoC: update setting for pxa ssp slave mode
-In-Reply-To: <AANLkTim4BHjyC4=NeVVb-+HnLnzmyBrq8vDE4PCuP7d0@mail.gmail.com>
-References: <AANLkTim4BHjyC4=NeVVb-+HnLnzmyBrq8vDE4PCuP7d0@mail.gmail.com>
-Message-ID: <20100813182206.GA559@rakim.wolfsonmicro.main>
+From: wellsk40@gmail.com (Kevin Wells)
+Date: Fri, 13 Aug 2010 12:00:33 -0700
+Subject: [PATCH] input/touch: Introduce the LPC32xx touchscreen controller
+	driver
+In-Reply-To: <20100813083311.GA7824@core.coreip.homeip.net>
+References: <1281568142-12892-1-git-send-email-wellsk40@gmail.com>
+	<1281568142-12892-2-git-send-email-wellsk40@gmail.com>
+	<20100813083311.GA7824@core.coreip.homeip.net>
+Message-ID: <AANLkTik0voaTUHoJuaVGvmhqpUh_tfbk3VUNXyWMh1av@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 13, 2010 at 09:55:35PM +0800, Haojian Zhuang wrote:
+>>
+>> This patch set introduces support for the LPC32xx touchscreen
+>> controller driver. The LPC32xx touchscreen controller supports
+>> automated event detection and X/Y data conversion for resistive
+>> touchscreens.
+>>
+>
+> Overall looks very nice, a few comments below.
+>
 
-> @@ -479,16 +477,16 @@ static int pxa_ssp_set_dai_fmt(struct
-> snd_soc_dai *cpu_dai,
+Thanks for helping review this driver. I'll update and repost once
+the fixes and changes are finalized.
 
-This patch has been word wrapped.  No need to resend since it's simple
-to fix up but please check your mail client configuration.
+>> +
+>> + ? ? if (input_register_device(tsc->dev)) {
+>> + ? ? ? ? ? ? dev_err(&pdev->dev, "failed registering input device\n");
+>> + ? ? ? ? ? ? goto err_stop_clk;
+>
+> retval is garbage here, you need to do:
+>
+> ? ? ? ?error = input_register_device();
+> ? ? ? ?if (error) {
+> ? ? ? ? ? ? ? ?...
+> ? ? ? ? ? ? ? ?goto err_stop_clk;
+> ? ? ? ?}
+>
+> I must say that I do not like mixing devm_* with the standard error path
+> unwinding, if we can rely on devm_xxx() calls to take care of everything
+> we should revert to standard error unsinding practice for everythng.
+>
+
+Would it be preferable to just use standard resource functions and error
+path unwinding (with fixes in _remove too) similar to the other drivers in
+./drivers/input?
