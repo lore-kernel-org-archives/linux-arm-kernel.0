@@ -1,31 +1,51 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Fri, 13 Aug 2010 11:34:38 +0200
-Subject: [PATCH 08/12] ptp: Added a brand new class driver for ptp clocks.
-In-Reply-To: <AANLkTinYjzfChsN0AB5W6kOh6xJYPJtoEq941pG8WbmS@mail.gmail.com>
-References: <cover.1276615626.git.richard.cochran@omicron.at>
-	<4a030d2bace90f089f2f3f61496b918c6f1dfb52.1276615626.git.richard.cochran@omicron.at>
-	<AANLkTinYjzfChsN0AB5W6kOh6xJYPJtoEq941pG8WbmS@mail.gmail.com>
-Message-ID: <20100813093438.GA18112@riccoc20.at.omicron.at>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 13 Aug 2010 18:38:45 +0900
+Subject: [PATCH v2] ARM: S3C2410: Fix on build warning about dependency in
+	mach-s3c2440/Kconfig
+Message-ID: <1281692325-21738-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 15, 2010 at 01:11:30PM -0600, Grant Likely wrote:
-> On Tue, Jun 15, 2010 at 10:09 AM, Richard Cochran
-> > +static DEFINE_SPINLOCK(clocks_lock); /* protects 'clocks' */
-> 
-> Doesn't appear that clocks is manipulated at atomic context.  Mutex instead?
-...
-> If the spinlock is changed to a mutex that is held for the entire
-> function call, then the logic here can be simpler.
+This patch fixes on following build warnings.
 
-Grant,
+warning: (CPU_S3C2440 && ARCH_S3C2410 && S3C2410_DMA) selects S3C2440_DMA which
+             has unmet direct dependencies (ARCH_S3C2410 && CPU_S3C24405B)
+warning: (CPU_S3C2440 && ARCH_S3C2410 || CPU_S3C2442 && ARCH_S3C2410) selects
+             CPU_S3C244X which has unmet direct dependencies (!ARCH_S3C2410)
 
-I am working on another go at this patch series. Stupid question:
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+---
+Changes since v1:
+- Address comments from Uwe :-)
 
-The caller of ptp_clock_register(), which takes the clocks_lock, is
-always a module_init() function. Is this always a safe context in
-which to call mutex_lock?
+Thanks
+Kgene.
 
-Thanks,
+ arch/arm/mach-s3c2440/Kconfig |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Richard
+diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
+index cd8e7de..f60a370 100644
+--- a/arch/arm/mach-s3c2440/Kconfig
++++ b/arch/arm/mach-s3c2440/Kconfig
+@@ -30,7 +30,7 @@ config CPU_S3C2442
+ 
+ config CPU_S3C244X
+ 	bool
+-	depends on ARCH_S3C2410 && (CPU_S3C2440 || CPU_S3C2442)
++	depends on CPU_S3C2440 || CPU_S3C2442
+ 	help
+ 	  Support for S3C2440 and S3C2442 Samsung Mobile CPU based systems.
+ 
+@@ -72,7 +72,7 @@ config S3C2440_PLL_16934400
+ 
+ config S3C2440_DMA
+ 	bool
+-	depends on ARCH_S3C2410 && CPU_S3C24405B
++	depends on ARCH_S3C2410 || CPU_S3C24405B
+ 	help
+ 	  Support for S3C2440 specific DMA code5A
+ 
+-- 
+1.6.2.5
