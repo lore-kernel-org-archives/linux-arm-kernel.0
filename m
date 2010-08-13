@@ -1,95 +1,39 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 13 Aug 2010 14:54:38 +0400
-Subject: [PATCH] ARM: imx: fix build failure concerning otg/ulpi
-In-Reply-To: <1281694891-7527-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1275464450-23003-2-git-send-email-grinberg@compulab.co.il>
-	<1281694891-7527-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <4C65246E.1000906@ru.mvista.com>
+From: oneukum@suse.de (Oliver Neukum)
+Date: Fri, 13 Aug 2010 12:58:54 +0200
+Subject: Problem with non aligned DMA in usbnet on ARM
+In-Reply-To: <4C65193E.4090807@gmail.com>
+References: <AANLkTi=ycg=adcizNWKMCb7EdfDANM=6Es7r_gF1LbhV@mail.gmail.com>
+	<4C642AA9.1060404@parrot.com> <4C65193E.4090807@gmail.com>
+Message-ID: <201008131258.55016.oneukum@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Am Freitag, 13. August 2010, 12:06:54 schrieb Martin Fuzzey:
 
-Uwe Kleine-K?nig wrote:
-
-> The build failure was introduced by
+> So I think a policy needs to be defined to ensure this and enforced in
+> the code. I can see two possible methods:
 > 
-> 	13dd0c9 (USB: otg/ulpi: extend the generic ulpi driver.)
+> 1) Require that usb drivers submit buffers obtained from kmalloc() and
+> friends with no extra offsets. If they want some other alignment later
+> they can use memmove in the completion handler. Enforce this in the core
+> by checking the buffer pointers are aligned to ARCH_KMALLOC_MINALIGN
+> 
+> or
+> 
+> 2) Require that usb_submit_urb() accept byte aligned buffers. Enforce
+> this by a new test in usbtest (which all HCDs are expected to pass).
+> Implement it either in individual HCDs that require it or by letting
+> HCDs inform the core of their requirements and have the core do the
+> alignment (as it already does the dma mapping). Of course HCDs that can
+> implement byte aligned transfers (either natively or using tricks such
+> as the one Russell suggested) should do so.
+> 
+> I think 2) is the better solution because:
+> a) Solution 1 will impose a runtime overhead even on platforms / HCDs
+> that don't need it (including the most common cases)
+> b) There are more drivers than HCDs
 
-> Cc: Igor Grinberg <grinberg@compulab.co.il>
-> Cc: Mike Rapoport <mike@compulab.co.il>
-> Cc: Greg Kroah-Hartman <gregkh@suse.de>
-
-    Signoff is missing.
-
-
-> diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
-> index 575ff1a..339150a 100644
-> --- a/arch/arm/mach-imx/mach-cpuimx27.c
-> +++ b/arch/arm/mach-imx/mach-cpuimx27.c
-> @@ -279,13 +279,13 @@ static void __init eukrea_cpuimx27_init(void)
->  #if defined(CONFIG_USB_ULPI)
->  	if (otg_mode_host) {
->  		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
-> -				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-> +				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
->  
->  		mxc_register_device(&mxc_otg_host, &otg_pdata);
->  	}
->  
->  	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
-> -				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-> +				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
->  
->  	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
->  #endif
-> diff --git a/arch/arm/mach-imx/mach-pca100.c b/arch/arm/mach-imx/mach-pca100.c
-> index a389d11..23c9e1f 100644
-> --- a/arch/arm/mach-imx/mach-pca100.c
-> +++ b/arch/arm/mach-imx/mach-pca100.c
-> @@ -419,13 +419,13 @@ static void __init pca100_init(void)
->  #if defined(CONFIG_USB_ULPI)
->  	if (otg_mode_host) {
->  		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
-> -				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-> +				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
->  
->  		mxc_register_device(&mxc_otg_host, &otg_pdata);
->  	}
->  
->  	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
-> -				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-> +				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
->  
->  	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
->  #endif
-> diff --git a/arch/arm/mach-mx25/mach-cpuimx25.c b/arch/arm/mach-mx25/mach-cpuimx25.c
-> index 56b2e26..0134fb8 100644
-> --- a/arch/arm/mach-mx25/mach-cpuimx25.c
-> +++ b/arch/arm/mach-mx25/mach-cpuimx25.c
-> @@ -138,7 +138,7 @@ static void __init eukrea_cpuimx25_init(void)
->  #if defined(CONFIG_USB_ULPI)
->  	if (otg_mode_host) {
->  		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
-> -				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-> +				USB_OTG_DRV_VBUS | ULPI_OTG_DRVVBUS_EXT);
-
-    Not ULPI_OTG_DRVVBUS, like in other cases?
-
->  
->  		mxc_register_device(&mxc_otg, &otg_pdata);
->  	}
-> diff --git a/arch/arm/mach-mx3/mach-cpuimx35.c b/arch/arm/mach-mx3/mach-cpuimx35.c
-> index 63f970f..117f90e 100644
-> --- a/arch/arm/mach-mx3/mach-cpuimx35.c
-> +++ b/arch/arm/mach-mx3/mach-cpuimx35.c
-> @@ -192,7 +192,7 @@ static void __init mxc_board_init(void)
->  #if defined(CONFIG_USB_ULPI)
->  	if (otg_mode_host) {
->  		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
-> -				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
-> +				USB_OTG_DRV_VBUS | ULPI_OTG_DRVVBUS_EXT);
-
-    Same question here...
-
-WBR, Sergei
+Yes. But it doesn't prevent you from publishing this information so
+drivers can help the lower levels.
+	Regards
+		Oliver
