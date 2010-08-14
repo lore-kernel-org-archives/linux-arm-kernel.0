@@ -1,61 +1,193 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Sat, 14 Aug 2010 14:00:42 +0200
-Subject: [PATCH] ARM: imx: remove #ifdefery for unmerged flexcan driver
-Message-ID: <1281787242-22530-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: claudio@evidence.eu.com (Claudio Scordino)
+Date: Sat, 14 Aug 2010 14:50:40 +0200
+Subject: [PATCH] Documentation about RS485 serial communications
+In-Reply-To: <20100811083214.21d2919e.randy.dunlap@oracle.com>
+References: <4BB053C4.7050700@evidence.eu.com>	<4BB10304.6090006@bluewatersys.com>	<4BB1BF49.2000609@evidence.eu.com>	<4BB252E3.3030703@bluewatersys.com>	<4BBD8C9D.3070401@evidence.eu.com>	<20100408111310.524f7354@lxorguk.ukuu.org.uk>	<4BBDD71D.1010700@evidence.eu.com>	<4BFD1FB6.8050405@atmel.com>	<4BFE2F38.8050200@evidence.eu.com>	<4BFE41FD.2080804@atmel.com>	<20100527102917.GB31253@pengutronix.de>	<4C626CBF.9020609@evidence.eu.com>
+	<20100811083214.21d2919e.randy.dunlap@oracle.com>
+Message-ID: <4C669120.8080707@evidence.eu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flexcan driver was merged as e955cead.
+Randy Dunlap ha scritto:
+> On Wed, 11 Aug 2010 11:26:23 +0200 Claudio Scordino wrote:
+> 
+>> Hi all,
+>>
+>> 	some time ago I've been asked (by both Wolfram and Philippe) to
+>> provide some minimal documentation about the usage of the RS485
+>> interface.
+>>
 
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Marc Kleine-Budde <mkl@pengutronix.de>
-Cc: Wolfgang Grandegger <wg@grandegger.com>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+[...]
+ 
+> 
+> Thanks for the addition.
+> 
+
+Hi all,
+
+	here is the document about RS485 with the requested additions.
+
+If OK, somebody please provide for merging.
+
+Best regards,
+
+	Claudio
+
+
+Documentation about RS485 serial communications.
+
+Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
 ---
- arch/arm/plat-mxc/devices/Makefile              |    5 +----
- arch/arm/plat-mxc/include/mach/devices-common.h |   12 ------------
- 2 files changed, 1 insertions(+), 16 deletions(-)
+ Documentation/serial/00-INDEX         |    2 +
+ Documentation/serial/serial-rs485.txt |  126 +++++++++++++++++++++++++++++++++
+ 2 files changed, 128 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/serial/serial-rs485.txt
 
-diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
-index 347da51..2062ab4 100644
---- a/arch/arm/plat-mxc/devices/Makefile
-+++ b/arch/arm/plat-mxc/devices/Makefile
-@@ -1,7 +1,4 @@
--ifdef CONFIG_CAN_FLEXCAN
--# the ifdef can be removed once the flexcan driver has been merged
--obj-$(CONFIG_IMX_HAVE_PLATFORM_FLEXCAN) +=  platform-flexcan.o
--endif
-+obj-$(CONFIG_IMX_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_I2C) += platform-imx-i2c.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_UART) += platform-imx-uart.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_NAND) += platform-mxc_nand.o
-diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-index 1190016..12bdc7d 100644
---- a/arch/arm/plat-mxc/include/mach/devices-common.h
-+++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-@@ -14,23 +14,11 @@ struct platform_device *imx_add_platform_device(const char *name, int id,
- 		const struct resource *res, unsigned int num_resources,
- 		const void *data, size_t size_data);
- 
--#if defined (CONFIG_CAN_FLEXCAN) || defined (CONFIG_CAN_FLEXCAN_MODULE)
- #include <linux/can/platform/flexcan.h>
- struct platform_device *__init imx_add_flexcan(int id,
- 		resource_size_t iobase, resource_size_t iosize,
- 		resource_size_t irq,
- 		const struct flexcan_platform_data *pdata);
--#else
--/* the ifdef can be removed once the flexcan driver has been merged */
--struct flexcan_platform_data;
--static inline struct platform_device *__init imx_add_flexcan(int id,
--		resource_size_t iobase, resource_size_t iosize,
--		resource_size_t irq,
--		const struct flexcan_platform_data *pdata)
--{
--	return NULL;
--}
--#endif
- 
- #include <mach/i2c.h>
- struct platform_device *__init imx_add_imx_i2c(int id,
+diff --git a/Documentation/serial/00-INDEX b/Documentation/serial/00-INDEX
+index 07dcdb0..e09468a 100644
+--- a/Documentation/serial/00-INDEX
++++ b/Documentation/serial/00-INDEX
+@@ -14,6 +14,8 @@ riscom8.txt
+ 	- notes on using the RISCom/8 multi-port serial driver.
+ rocket.txt
+ 	- info on the Comtrol RocketPort multiport serial driver.
++serial-rs485.txt
++	- info about RS485 structures and support in the kernel.
+ specialix.txt
+ 	- info on hardware/driver for specialix IO8+ multiport serial card.
+ stallion.txt
+diff --git a/Documentation/serial/serial-rs485.txt b/Documentation/serial/serial-rs485.txt
+new file mode 100644
+index 0000000..93b029e
+--- /dev/null
++++ b/Documentation/serial/serial-rs485.txt
+@@ -0,0 +1,126 @@
++                        RS485 SERIAL COMMUNICATIONS
++
++1. INTRODUCTION
++
++   EIA-485, also known as TIA/EIA-485 or RS-485, is a standard defining the
++   electrical characteristics of drivers and receivers for use in balanced
++   digital multipoint systems.
++   This standard is widely used for communications in industrial automation
++   because it can be used effectively over long distances and in electrically
++   noisy environments.
++   Even though the data is transmitted over a 2-wire twisted pair bus, all
++   EIA-485 transceivers interpret the voltage levels of the differential
++   signals with respect to a third common voltage. Without this common
++   reference, a set of transceivers may interpret the differential signals
++   incorrectly.
++   See [1] for more information.
++
++
++2. HARDWARE-RELATED CONSIDERATIONS
++
++   Some CPUs (e.g., Atmel AT91) contain a transceiver capable of working both
++   as RS232 and RS485. For these microcontrollers, the Linux driver should be
++   made capable of working in both modes, and proper ioctls (see later) should
++   be made available at user-level to allow switching from one mode to the
++   other, and vice versa.
++
++   On some other CPUs (e.g., Freescale imx25) the RS485 transceiver is not
++   integrated inside the microcontroller itself. Therefore, manufacturers who
++   use these microcontrollers to produce embedded boards need to connect an
++   external transceiver to some pin of the CPU.
++   On these architectures, therefore, no assumptions can be done at the
++   CPU-level about the presence of a RS485 transceiver, because the connection
++   (if any) is done outside the microcontroller. Moreover, even in case of
++   RS485 transceiver, the manufacturer is free to choose the CPU pin used for
++   the connection.
++
++
++3. DATA STRUCTURES ALREADY AVAILABLE IN THE KERNEL
++
++   The Linux kernel provides the serial_rs485 structure (see [2]) to handle
++   RS485 communications. This data structure is used to set and configure RS485
++   parameters in the platform data and in ioctls.
++
++   Any driver for devices capable of working both as RS232 and RS485 should
++   provide at least the following ioctls:
++
++    - TIOCSRS485 (typically associated with number 0x542F). This ioctl is used
++      to enable/disable RS485 mode from user-space
++
++    - TIOCGRS485 (typically associated with number 0x542E). This ioctl is used
++      to get RS485 mode from kernel-space (i.e., driver) to user-space.
++
++   In other words, the serial driver should contain a code similar to the next
++   one:
++
++	static struct uart_ops atmel_pops = {
++		/* ... */
++		.ioctl		= handle_ioctl,
++	};
++
++	static int handle_ioctl(struct uart_port *port,
++		unsigned int cmd,
++		unsigned long arg)
++	{
++		struct serial_rs485 rs485conf;
++
++		switch (cmd) {
++		case TIOCSRS485:
++			if (copy_from_user(&rs485conf,
++				(struct serial_rs485 *) arg,
++				sizeof(rs485conf)))
++					return -EFAULT;
++
++			/* ... */
++			break;
++
++		case TIOCGRS485:
++			if (copy_to_user((struct serial_rs485 *) arg,
++				...,
++				sizeof(rs485conf)))
++					return -EFAULT;
++			/* ... */
++			break;
++
++		/* ... */
++		}
++	}
++
++
++4. USAGE FROM USER-LEVEL
++
++   From user-level, RS485 configuration can be get/set using the previous
++   ioctls. For instance, to set RS485 you can use the following code:
++
++	#include <linux/serial.h>
++
++	/* Driver-specific ioctls: */
++	#define TIOCGRS485      0x542E
++	#define TIOCSRS485      0x542F
++
++	/* Open your specific device (e.g., /dev/mydevice): */
++	int fd = open ("/dev/mydevice", O_RDWR);
++	struct serial_rs485 rs485conf;
++
++	/* Set RS485 mode: */
++	rs485conf.flags |= SER_RS485_ENABLED;
++
++	/* Set rts delay before send, if needed: */
++	rs485conf.flags |= SER_RS485_RTS_BEFORE_SEND;
++	rs485conf.delay_rts_before_send = ...;
++
++	/* Set rts delay after send, if needed: */
++	rs485conf.flags |= SER_RS485_RTS_AFTER_SEND;
++	rs485conf.delay_rts_after_send = ...;
++
++	ioctl (fd, TIOCSRS485, &rs485conf);
++
++	/* Use read() and write() syscalls here... */
++
++	/* Close the device when finished: */
++	close (fd);
++
++5. REFERENCES
++
++ [1]	http://en.wikipedia.org/wiki/Rs485
++ [2]	include/linux/serial.h
 -- 
-1.7.1
+1.6.0.4
