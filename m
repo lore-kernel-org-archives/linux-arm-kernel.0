@@ -1,34 +1,24 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Sat, 14 Aug 2010 11:47:27 +0100
-Subject: [alsa-devel] [PATCH 2/5] ASoC: fix pxa2xx-pcm.h path
-In-Reply-To: <1281713056.2074.28.camel@Tapajos>
-References: <AANLkTi=_BX_z68p3SGhr08K5JOmudaNRvZMVUAvSGfZV@mail.gmail.com>
-	<1281713056.2074.28.camel@Tapajos>
-Message-ID: <1281782847.3394.121.camel@odin>
+From: tbm@cyrius.com (Martin Michlmayr)
+Date: Sat, 14 Aug 2010 12:44:28 +0100
+Subject: [PATCH] arm: R_ARM_REL32 relocation support
+In-Reply-To: <19546.31437.994840.466509@pilspetsen.it.uu.se>
+References: <34780qy39a4uj093a4y>
+	<1280993763-15254-1-git-send-email-olof@lixom.net>
+	<19546.31437.994840.466509@pilspetsen.it.uu.se>
+Message-ID: <20100814114428.GA25336@jirafa.cyrius.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-08-13 at 16:24 +0100, Ian Lartey wrote:
-> On Fri, 2010-08-13 at 21:55 +0800, Haojian Zhuang wrote:
-> > From b761e3bb374e630011f22ce54963877310a0baca Mon Sep 17 00:00:00 2001
-> > From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> > Date: Fri, 13 Aug 2010 21:14:52 +0800
-> > Subject: [PATCH 2/5] ASoC: fix pxa2xx-pcm.h path
-> > 
-> > Since pxa2xx-pcm.h is removed from sound/soc/pxa, we need to update the
-> > path in related files.
-> > 
-> > Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> > ---
-> >  sound/soc/pxa/pxa-ssp.c    |    2 +-
-> >  sound/soc/pxa/pxa2xx-pcm.c |    1 -
-> >  2 files changed, 1 insertions(+), 2 deletions(-)
+* Mikael Pettersson <mikpe@it.uu.se> [2010-08-05 10:48]:
+> Michal Marek's patch(*) to use -fno-dwarf2-cfi-asm already exists
+> and is IMO the correct solution in that it addresses the cause
+> of the problem rather than its symptoms.
 > 
-> Tested-by: Ian Lartey <ian@opensource.wolfsonmicro.com>
-> 
+> (*) http://lkml.org/lkml/2010/7/26/154
 
-Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
+I cannot find Michal's patch in mainline or in RMK's patch tracker.
+Michal, did you submit your patch to
+http://www.arm.linux.org.uk/developer/patches/ ?
 -- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+Martin Michlmayr
+http://www.cyrius.com/
