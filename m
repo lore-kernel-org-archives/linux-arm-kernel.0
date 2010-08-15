@@ -1,52 +1,68 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 15 Aug 2010 17:16:52 +0800
-Subject: [Openpxa-users] Colibri PXA320 Power management question
-In-Reply-To: <4C67AFD0.4020304@compulab.co.il>
-References: <AANLkTik_6ziPZwV9EuZwE4SMtJoc10JrBZZ_-mmsuy5a@mail.gmail.com>
-	<201008140853.03174.marek.vasut@gmail.com>
-	<AANLkTinifZkdFaCg_Bh1pUMd4+Un0xQ3Wu81jyNf-4MH@mail.gmail.com>
-	<4C67AFD0.4020304@compulab.co.il>
-Message-ID: <AANLkTikGy_J83TCJM+EMVmHG2Ms1s11z_O6Qsj0_d-9f@mail.gmail.com>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Sun, 15 Aug 2010 12:59:52 +0300
+Subject: [PATCH] serial: samsung: fix device name
+In-Reply-To: <008701cb3538$54a12a00$fde37e00$%kim@samsung.com>
+References: <20100805201000.14030.34703.stgit@darius-desktop>
+	<AANLkTikp2ThBqF2jkU4CXS9-iYRoy3AWpeqWXjmLF6Gd@mail.gmail.com>
+	<4C5BAFF6.10606@gmail.com> <4C5BB462.6010409@samsung.com>
+	<008701cb3538$54a12a00$fde37e00$%kim@samsung.com>
+Message-ID: <4C67BA98.8090405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 15, 2010 at 5:13 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
-> On 08/15/10 05:06, Eric Miao wrote:
->> On Sat, Aug 14, 2010 at 2:53 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+On 08/06/2010 10:23 AM, Kukjin Kim wrote:
+> Joonyoung Shim wrote:
 >>
->>> Dne ?t 12. srpna 2010 12:02:17 Yuri Ludkevich napsal(a):
->>>
->>>> Hi there :)
+>> On 8/6/2010 3:47 PM, Paulius Zaleckas wrote:
+>>> On 08/06/2010 03:04 AM, Kyungmin Park wrote:
+>>>> Hi,
 >>>>
->>>> I have a question about power management of Colibri PXA320 module:
->>>> I found that bits PVE and FVE in PVCR register are disabled,
->>>> so at frequency change voltage will not change.
->>>>
->>>> If I turn on PVE and FVE with pxaregs tool - voltage changes just fine.
->>>> Where are suitable place in the kernel for PVCR initialization?
->>>>
->>> I believe kernel should handle all that. Eric CCed.
+>>>> It's already posted by Mr. Shim
+>>>> http://marc.info/?l=linux-arm-kernel&m=127410047306149&w=2
 >>>
+>>> Darius patch is a little bit cleaner.
 >>>
->> Yep. Some of the design doesn't use the built-in power I2C at all,
->> they use some non-standard I2C power management IC. So this
->> should be handled in kernel indeed. The currently problem is that
->> we don't yet have a clean framework, some platforms are writing
->> directly to these registers to configure, which should be avoided.
+>>
+>> OK, it's better.
+>>
+>> Acked-by: Joonyoung Shim<jy0922.shim@samsung.com>
 >>
 >
-> If I recall correctly, the pxa3xx built-in power I2C control is designed
-> for use with 100% compatible PMIC chip and if for some reason
-> the hardware has another PMIC, which is not 100% compatible,
-> then the built-in control can do more harm then good.
-
-Indeed. With some of those incompatible I2C power management ICs,
-some are controlling the Power I2C manually with the bits turned off
-in PVCR.
-
+> Hi all,
 >
-> I think we need a good and configurable DVFS driver to take care
-> of all the power management stuff.
+> I think, this should be handled by Ben Dooks....
+> As Kyungmin Park said, there was his comment about this.
 >
 
-Yes.
+Ben, what's your opinion about that? Are you going to merge that?
+
+> This is just for your information....
+>
+> ===
+>
+> On Tue, May 18, 2010 at 12:52:13PM +0900, Joonyoung Shim wrote:
+>> On 5/18/2010 11:48 AM, Ben Dooks wrote:
+>>> On Mon, May 17, 2010 at 09:46:50PM +0900, Joonyoung Shim wrote:
+>>>> Thd dev_name and driver_name should be switched each other.
+>>>
+>>> Hmm, this doesn't seem to have appeard on the linux-arm-kernel list yet.
+>>>
+>>> Please provide some information about what problem that this is fixing
+>>> and the impact on any existing systems.
+>>>
+>>
+>> The serial device nodes are created to s3c2410_serial* on android
+>> platform instead of ttySAC*.
+>
+> This has been how they've been for ages, surely the android device node
+> creation sytstem supports symlinking /dev/SACx ->  /dev/s3c2410_serialx,
+> like many other operating sysyerms that can already do this.
+>
+> Changing this just because android (something as-yet unmerged into mainline)
+> does not like it. I'm not even happy with an #ifdef around this.
+>
+> If you really feel this is a problem that you absolutely must fix in kernel
+> then please provide a kernel commandline option to change the serial driver
+> name and use that on any platform that needs it. Another way would be to
+> update the serial platform data to have a field for which name to choose.
+>
