@@ -1,25 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 15 Aug 2010 16:38:48 +0100
-Subject: RS485: ioctls defined twice ?
-In-Reply-To: <4C67F815.8020808@evidence.eu.com>
-References: <4C67F815.8020808@evidence.eu.com>
-Message-ID: <20100815153848.GA19113@n2100.arm.linux.org.uk>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Mon, 16 Aug 2010 00:55:42 +0900
+Subject: ARM: 2.6.3[45] PCI regression (IXP4xx and PXA?)
+In-Reply-To: <20100815082328.GA12222@n2100.arm.linux.org.uk>
+References: <20100814184605.GA1999@n2100.arm.linux.org.uk>
+	<20100815144122O.fujita.tomonori@lab.ntt.co.jp>
+	<20100815082328.GA12222@n2100.arm.linux.org.uk>
+Message-ID: <20100816005427V.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 15, 2010 at 04:22:13PM +0200, Claudio Scordino wrote:
-> Hi all,
-> 
-> 	is there any reason why ioctls TIOCGRS485 and TIOCSRS485 are defined
+On Sun, 15 Aug 2010 09:23:28 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-Please wrap your message sensibly so I can see it while replying to you.
-
-> The same happens also for avr32, powerpc and cris (which, however, defines
+> On Sun, Aug 15, 2010 at 02:42:51PM +0900, FUJITA Tomonori wrote:
+> > On Sat, 14 Aug 2010 19:46:05 +0100
+> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > 
+> > > On Sat, Aug 14, 2010 at 06:30:37PM +0900, FUJITA Tomonori wrote:
+> > > > On Fri, 13 Aug 2010 22:54:13 +0100
+> > > > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > > > >  This means that when dmabounce comes to allocate the replacement
+> > > > > buffer, it gets a buffer which won't be accessible to the DMA
+> > > > > controller
+> > > > 
+> > > > Really? looks like dmabounce does nothing for coherent memory that
+> > > > dma_alloc_coherent() allocates.
+> > > > 
+> > > > The following very hacky patch works?
+> > > 
+> > > So what happens if you use a driver which uses dma_alloc_coherent()
+> > > directly?  Should the driver really be passed memory which is
+> > > inaccessible to the device because its outside the host bridge PCI
+> > > window?
+> > 
+> > I'm not sure what you mean.
+> > 
+> > A driver which uses dma_alloc_coherent() directly should
+> > work. dma_alloc_coherent() allocates memory with GFP_DMA with that
+> > patch for dmabounce devices. So the driver gets the access-able
+> > memory.
+> > 
+> > The memory that dma_alloc_coherent() returns should be always
+> > consistent. We can't bounce it. All we can do is returning a memory
+> > that a device (and its bus) can access to.
+> > 
+> > Krzysztof, can you try the patch?
 > 
-> Is it duplicated code ?
+> Why bother when we both agree that the patch is a dirty hack?
 > 
-> Or should these values stay in both asm/ioctls.h and asm-generic/ioctls.h ?
+> Come up with something cleaner first.
 
-As an exercise to help you answer your own question, please research
-how asm-generic/ioctls.h get included on an avr32, powerpc, cris or
-ARM kernel build.
+Because this fix needs to go to stable trees too. A simple patch is
+better even if it's hacky.
+
+For example, we can unify dma_needs_bounce functions in arm with a
+clean solution, I think. But dma_needs_bounce() was changed after
+2.6.35 so it would be difficult to backport a clean solution.
+
+btw, will we have more like this case? If so, I think that it's worth
+having a generic solution for this case instead of having the arch
+(arm and powerpc) specific solution.
