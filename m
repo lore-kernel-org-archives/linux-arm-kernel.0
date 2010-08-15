@@ -1,29 +1,61 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 15 Aug 2010 10:06:25 +0800
-Subject: [Openpxa-users] Colibri PXA320 Power management question
-In-Reply-To: <201008140853.03174.marek.vasut@gmail.com>
-References: <AANLkTik_6ziPZwV9EuZwE4SMtJoc10JrBZZ_-mmsuy5a@mail.gmail.com>
-	<201008140853.03174.marek.vasut@gmail.com>
-Message-ID: <AANLkTinifZkdFaCg_Bh1pUMd4+Un0xQ3Wu81jyNf-4MH@mail.gmail.com>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Sun, 15 Aug 2010 14:42:51 +0900
+Subject: ARM: 2.6.3[45] PCI regression (IXP4xx and PXA?)
+In-Reply-To: <20100814184605.GA1999@n2100.arm.linux.org.uk>
+References: <20100813215413.GA21607@n2100.arm.linux.org.uk>
+	<20100814181306U.fujita.tomonori@lab.ntt.co.jp>
+	<20100814184605.GA1999@n2100.arm.linux.org.uk>
+Message-ID: <20100815144122O.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 14, 2010 at 2:53 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Dne ?t 12. srpna 2010 12:02:17 Yuri Ludkevich napsal(a):
->> Hi there :)
->>
->> I have a question about power management of Colibri PXA320 module:
->> I found that bits PVE and FVE in PVCR register are disabled,
->> so at frequency change voltage will not change.
->>
->> If I turn on PVE and FVE with pxaregs tool - voltage changes just fine.
->> Where are suitable place in the kernel for PVCR initialization?
->
-> I believe kernel should handle all that. Eric CCed.
->
+On Sat, 14 Aug 2010 19:46:05 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-Yep. Some of the design doesn't use the built-in power I2C at all,
-they use some non-standard I2C power management IC. So this
-should be handled in kernel indeed. The currently problem is that
-we don't yet have a clean framework, some platforms are writing
-directly to these registers to configure, which should be avoided.
+> On Sat, Aug 14, 2010 at 06:30:37PM +0900, FUJITA Tomonori wrote:
+> > On Fri, 13 Aug 2010 22:54:13 +0100
+> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > >  This means that when dmabounce comes to allocate the replacement
+> > > buffer, it gets a buffer which won't be accessible to the DMA
+> > > controller
+> > 
+> > Really? looks like dmabounce does nothing for coherent memory that
+> > dma_alloc_coherent() allocates.
+> > 
+> > The following very hacky patch works?
+> 
+> So what happens if you use a driver which uses dma_alloc_coherent()
+> directly?  Should the driver really be passed memory which is
+> inaccessible to the device because its outside the host bridge PCI
+> window?
+
+I'm not sure what you mean.
+
+A driver which uses dma_alloc_coherent() directly should
+work. dma_alloc_coherent() allocates memory with GFP_DMA with that
+patch for dmabounce devices. So the driver gets the access-able
+memory.
+
+The memory that dma_alloc_coherent() returns should be always
+consistent. We can't bounce it. All we can do is returning a memory
+that a device (and its bus) can access to.
+
+Krzysztof, can you try the patch?
+
+
+> No, this is clearly wrong, so this patch doesn't fix anything.  It's
+> a bodge, nothing more.  The real solution is to have _both_ masks
+> both reduced down according to the host bridge, as we used to do.
+> 
+> So I suggest 6fee48c is reverted so that these platforms don't regress
+> for -rc1.
+
+Sorry, the original ARM code is wrong. dev->dma_mask and
+dev->coherent_dma_mask represent the driver of dma restriction. ARM
+tries to use them for both a driver and a bus so ARM needs a
+workaround that doesn't set the driver of dma restriction to
+dev->dma_mask and dev->coherent_dma_mask.
+
+The proper solution is having a separate dma mask for a bus. I think
+that POWERPC already does the similar. It has max_direct_dma_addr in
+struct dev_archdata, which represents the dma restriction of a bus.
