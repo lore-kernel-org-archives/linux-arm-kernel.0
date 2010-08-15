@@ -1,31 +1,90 @@
-From: mmarek@suse.cz (Michal Marek)
-Date: Sun, 15 Aug 2010 00:58:20 +0200
-Subject: [PATCH] arm: R_ARM_REL32 relocation support
-In-Reply-To: <4C671CDB.7070707@suse.cz>
-References: <34780qy39a4uj093a4y>
-	<1280993763-15254-1-git-send-email-olof@lixom.net>
-	<19546.31437.994840.466509@pilspetsen.it.uu.se>
-	<20100814114428.GA25336@jirafa.cyrius.com>
-	<4C671CDB.7070707@suse.cz>
-Message-ID: <4C671F8C.3090203@suse.cz>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sun, 15 Aug 2010 09:53:52 +0800
+Subject: [PATCH] tmio_mmc: fix misuse of kunmap_atomic() in tmio_mmc.c
+In-Reply-To: <Pine.LNX.4.64.1008142230040.16329@axis700.grange>
+References: <1281628291-23802-1-git-send-email-eric.y.miao@gmail.com>
+	<Pine.LNX.4.64.1008142230040.16329@axis700.grange>
+Message-ID: <AANLkTi=gNT53EkVf93hUUxbCa9w54Z1MWuxcpkB8-=cv@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 15.8.2010 00:46, Michal Marek napsal(a):
-> Dne 14.8.2010 13:44, Martin Michlmayr napsal(a):
->> * Mikael Pettersson <mikpe@it.uu.se> [2010-08-05 10:48]:
->>> Michal Marek's patch(*) to use -fno-dwarf2-cfi-asm already exists
->>> and is IMO the correct solution in that it addresses the cause
->>> of the problem rather than its symptoms.
->>>
->>> (*) http://lkml.org/lkml/2010/7/26/154
+On Sun, Aug 15, 2010 at 4:33 AM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
+> Hi Eric
+>
+> On Thu, 12 Aug 2010, Eric Miao wrote:
+>
+>> According to commit 597781f3e51f48ef8e67be772196d9e9673752c4
 >>
->> I cannot find Michal's patch in mainline or in RMK's patch tracker.
->> Michal, did you submit your patch to
->> http://www.arm.linux.org.uk/developer/patches/ ?
-> 
-> No, I didn't. I didn't even know about this site. I'll do it in a minute.
+>> ? ? kmap_atomic: make kunmap_atomic() harder to misuse
+>>
+>> kunmap_atomic() takes a pointer to within the page, instead of a pointer
+>> to 'struct page'. ?So tmio_mmc_kunmap_atomic() should really take the
+>> pointer what tmio_mmc_kmap_atomic() returns.
+>
+> As you have seen, I've also prepared a fix for this problem, just haven't
+> sent it fast enough;) And, I think, your fix isn't quite correct: "buf" is
+> not the returned value from tmio_mmc_kmap_atomic(), so, you cannot use it
+> for unmapping.
+>
 
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6328/1
+Nah, just trying to fix my build here, didn't look into that too much.
+Your patch is of course welcome ;-)
 
-Michal
+> Thanks
+> Guennadi
+>
+>>
+>> Cc: Ian Molton <spyro@f2s.com>
+>> Cc: Magnus Damm <damm@opensource.se>
+>> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+>> ---
+>> ?drivers/mmc/host/tmio_mmc.c | ? ?2 +-
+>> ?drivers/mmc/host/tmio_mmc.h | ? ?5 ++---
+>> ?2 files changed, 3 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/tmio_mmc.c b/drivers/mmc/host/tmio_mmc.c
+>> index ee7d0a5..24b9c3e 100644
+>> --- a/drivers/mmc/host/tmio_mmc.c
+>> +++ b/drivers/mmc/host/tmio_mmc.c
+>> @@ -191,7 +191,7 @@ static void tmio_mmc_pio_irq(struct tmio_mmc_host *host)
+>>
+>> ? ? ? host->sg_off += count;
+>>
+>> - ? ? tmio_mmc_kunmap_atomic(host, &flags);
+>> + ? ? tmio_mmc_kunmap_atomic(buf, &flags);
+>>
+>> ? ? ? if (host->sg_off == host->sg_ptr->length)
+>> ? ? ? ? ? ? ? tmio_mmc_next_sg(host);
+>> diff --git a/drivers/mmc/host/tmio_mmc.h b/drivers/mmc/host/tmio_mmc.h
+>> index 64f7d5d..8f308b9 100644
+>> --- a/drivers/mmc/host/tmio_mmc.h
+>> +++ b/drivers/mmc/host/tmio_mmc.h
+>> @@ -186,10 +186,9 @@ static inline char *tmio_mmc_kmap_atomic(struct tmio_mmc_host *host,
+>> ? ? ? return kmap_atomic(sg_page(sg), KM_BIO_SRC_IRQ) + sg->offset;
+>> ?}
+>>
+>> -static inline void tmio_mmc_kunmap_atomic(struct tmio_mmc_host *host,
+>> - ? ? unsigned long *flags)
+>> +static inline void tmio_mmc_kunmap_atomic(void *buf, unsigned long *flags)
+>> ?{
+>> - ? ? kunmap_atomic(sg_page(host->sg_ptr), KM_BIO_SRC_IRQ);
+>> + ? ? kunmap_atomic(buf, KM_BIO_SRC_IRQ);
+>> ? ? ? local_irq_restore(*flags);
+>> ?}
+>>
+>> --
+>> 1.7.0.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+> ---
+> Guennadi Liakhovetski, Ph.D.
+> Freelance Open-Source Software Developer
+> http://www.open-technology.de/
+>
