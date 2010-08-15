@@ -1,155 +1,49 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 15 Aug 2010 10:29:54 +0300
-Subject: [PATCH 3/3] usb/otg/ulpi: extend the generic ulpi driver.
-In-Reply-To: <20100813132717.GA6986@as23.pp.htv.fi>
-References: <1279198816-30367-1-git-send-email-grinberg@compulab.co.il>
-	<1279198816-30367-4-git-send-email-grinberg@compulab.co.il>
-	<20100813132717.GA6986@as23.pp.htv.fi>
-Message-ID: <4C679772.3090802@compulab.co.il>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 15 Aug 2010 09:23:28 +0100
+Subject: ARM: 2.6.3[45] PCI regression (IXP4xx and PXA?)
+In-Reply-To: <20100815144122O.fujita.tomonori@lab.ntt.co.jp>
+References: <20100813215413.GA21607@n2100.arm.linux.org.uk>
+	<20100814181306U.fujita.tomonori@lab.ntt.co.jp>
+	<20100814184605.GA1999@n2100.arm.linux.org.uk>
+	<20100815144122O.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <20100815082328.GA12222@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/10 16:27, Heikki Krogerus wrote:
-> Hi,
->
-> This patch has already been applied and I have totally missed it,
-> sorry about that, but I have to ask..
->   
+On Sun, Aug 15, 2010 at 02:42:51PM +0900, FUJITA Tomonori wrote:
+> On Sat, 14 Aug 2010 19:46:05 +0100
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+> > On Sat, Aug 14, 2010 at 06:30:37PM +0900, FUJITA Tomonori wrote:
+> > > On Fri, 13 Aug 2010 22:54:13 +0100
+> > > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > > >  This means that when dmabounce comes to allocate the replacement
+> > > > buffer, it gets a buffer which won't be accessible to the DMA
+> > > > controller
+> > > 
+> > > Really? looks like dmabounce does nothing for coherent memory that
+> > > dma_alloc_coherent() allocates.
+> > > 
+> > > The following very hacky patch works?
+> > 
+> > So what happens if you use a driver which uses dma_alloc_coherent()
+> > directly?  Should the driver really be passed memory which is
+> > inaccessible to the device because its outside the host bridge PCI
+> > window?
+> 
+> I'm not sure what you mean.
+> 
+> A driver which uses dma_alloc_coherent() directly should
+> work. dma_alloc_coherent() allocates memory with GFP_DMA with that
+> patch for dmabounce devices. So the driver gets the access-able
+> memory.
+> 
+> The memory that dma_alloc_coherent() returns should be always
+> consistent. We can't bounce it. All we can do is returning a memory
+> that a device (and its bus) can access to.
+> 
+> Krzysztof, can you try the patch?
 
-Hi,
+Why bother when we both agree that the patch is a dirty hack?
 
-It was on the list more then a week, I think, and then in linux-next.
-I really wanted some eyes on it involved, so may be we could design
-something better then what I've done, but it is never too late ;)
-
-> On Thu, Jul 15, 2010 at 04:00:16PM +0300, Igor Grinberg wrote:
->   
->> 1) Introduce ulpi specific flags for control of the ulpi phy
->> 2) Extend the generic ulpi driver with support for Function and
->> Interface control of upli phy
->> 3) Update the platforms using the generic ulpi driver with new ulpi
->> flags
->> 4) Remove the otg control flags not in use
->>
->> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
->> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
->>     
-> <snip>
->
->   
->> diff --git a/include/linux/usb/ulpi.h b/include/linux/usb/ulpi.h
->> index 900d97b..82b1507 100644
->> --- a/include/linux/usb/ulpi.h
->> +++ b/include/linux/usb/ulpi.h
->> @@ -15,6 +15,41 @@
->>  /*-------------------------------------------------------------------------*/
->>  
->>  /*
->> + * ULPI Flags
->> + */
->> +#define ULPI_OTG_ID_PULLUP		(1 << 0)
->> +#define ULPI_OTG_DP_PULLDOWN_DIS	(1 << 1)
->> +#define ULPI_OTG_DM_PULLDOWN_DIS	(1 << 2)
->> +#define ULPI_OTG_DISCHRGVBUS		(1 << 3)
->> +#define ULPI_OTG_CHRGVBUS		(1 << 4)
->> +#define ULPI_OTG_DRVVBUS		(1 << 5)
->> +#define ULPI_OTG_DRVVBUS_EXT		(1 << 6)
->> +#define ULPI_OTG_EXTVBUSIND		(1 << 7)
->>     
-> Why are you redefining these? If you look through the file you'll find
-> the same bits are already there for OTG Control?
->   
-
-Well, trust me I went through the file and more then one time.
-If you overlook the changes in the ulpi.h, you can see that I've added
-the comment before register bits, so it will be clearer.
-
-The idea of the flags is to provide a control of the ulpi phy by the ulpi
-driver only, so whoever wants to use it (any platform, not just imx),
-will only specify the flags different from the default of the ulpi spec.
-and the ulpi driver will take care of the rest (perfect case).
-
-This makes any platform independent from the ulpi registers,
-thus separating the interface from the implementation.
-Makes possible for some changes (if ever) in ulpi spec. be
-transparent to the ulpi driver users.
-Lowers the legitimation for using the ulpi registers directly in
-the platform code (like it is currently done in imx ehci glue).
-Lets ulpi_create() method stay only with one parameter (flags)
-instead of adding two more parameters for IC and FC.
-
-Moreover, the best thing to do is to place the register bits only
-inside ulpi.c and provide functional methods (like the
-ulpi_set_host/peripheral(), etc..) and the flags above to control
-their behavior.
-I wanted to do this in first place, but currently, the ulpi driver
-we have is not ready to deal with all the control of the ulpi phy
-(it will never be, if nobody will contribute to it), I cannot afford
-to myself this amount of work right now and I don't have
-the imx hardware to test the changes in imx-ehci glue.
-
->   
->> +#define ULPI_IC_6PIN_SERIAL		(1 << 8)
->> +#define ULPI_IC_3PIN_SERIAL		(1 << 9)
->> +#define ULPI_IC_CARKIT			(1 << 10)
->> +#define ULPI_IC_CLKSUSPM		(1 << 11)
->> +#define ULPI_IC_AUTORESUME		(1 << 12)
->> +#define ULPI_IC_EXTVBUS_INDINV		(1 << 13)
->> +#define ULPI_IC_IND_PASSTHRU		(1 << 14)
->> +#define ULPI_IC_PROTECT_DIS		(1 << 15)
->>     
-> Why bit offsets starting from (1 << 8)?
-
-This is because they are not bits, but flags, so they can start
-wherever you want. This provides the separation between the
-interface and the implementation (I've already explained it above).
-
->  I took a look at ulpi.c and
-> you are still using ULPI_IFC_CTRL register, so these offsets can't
-> possibly work.
-
-Of course I use the registers, it is the ulpi spec. is what defines
-them, but the right thing is to move the registers and bits into
-the ulpi driver (as I've explained above).
-
->  There are also existing definitions for ULPI Interface
-> Control bits in any case.
->   
-
-I wanted to make the flags somewhat consistent with the
-registers bits and also fit one u32 parameter variable of
-ulpi_create().
-
->   
->> +#define ULPI_FC_HS			(1 << 16)
->> +#define ULPI_FC_FS			(1 << 17)
->> +#define ULPI_FC_LS			(1 << 18)
->> +#define ULPI_FC_FS4LS			(1 << 19)
->> +#define ULPI_FC_TERMSEL			(1 << 20)
->> +#define ULPI_FC_OP_NORM			(1 << 21)
->> +#define ULPI_FC_OP_NODRV		(1 << 22)
->> +#define ULPI_FC_OP_DIS_NRZI		(1 << 23)
->> +#define ULPI_FC_OP_NSYNC_NEOP		(1 << 24)
->> +#define ULPI_FC_RST			(1 << 25)
->> +#define ULPI_FC_SUSPM			(1 << 26)
->>     
-> Same here?
->
-> I'm asking in case I'm missing something and there is a reason the
-> above, before sending any patches.
->   
-
-I hope the reason is clear now :)
-Also, I'm trying to get more attention of the imx guys.
-There is a ulpi driver, please use/develop it where
-possible/appropriate instead of locking the code in
-platforms (e.g. imx-ehci glue).
-This way more platforms can benefit from your contribution.
-
-> br,
->
->   
-
--- 
-Regards,
-Igor.
+Come up with something cleaner first.
