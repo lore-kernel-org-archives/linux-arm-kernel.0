@@ -1,68 +1,118 @@
 From: augulis.darius@gmail.com (Darius Augulis)
-Date: Sun, 15 Aug 2010 12:59:52 +0300
-Subject: [PATCH] serial: samsung: fix device name
-In-Reply-To: <008701cb3538$54a12a00$fde37e00$%kim@samsung.com>
-References: <20100805201000.14030.34703.stgit@darius-desktop>
-	<AANLkTikp2ThBqF2jkU4CXS9-iYRoy3AWpeqWXjmLF6Gd@mail.gmail.com>
-	<4C5BAFF6.10606@gmail.com> <4C5BB462.6010409@samsung.com>
-	<008701cb3538$54a12a00$fde37e00$%kim@samsung.com>
-Message-ID: <4C67BA98.8090405@gmail.com>
+Date: Sun, 15 Aug 2010 13:04:18 +0300
+Subject: [PATCH v2 4/4] s3c: mach-real6410: add nand support
+In-Reply-To: <20100806172259.7695.94667.stgit@darius-desktop>
+References: <20100806172033.7695.62041.stgit@darius-desktop>
+	<20100806172259.7695.94667.stgit@darius-desktop>
+Message-ID: <4C67BBA2.3090204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/2010 10:23 AM, Kukjin Kim wrote:
-> Joonyoung Shim wrote:
->>
->> On 8/6/2010 3:47 PM, Paulius Zaleckas wrote:
->>> On 08/06/2010 03:04 AM, Kyungmin Park wrote:
->>>> Hi,
->>>>
->>>> It's already posted by Mr. Shim
->>>> http://marc.info/?l=linux-arm-kernel&m=127410047306149&w=2
->>>
->>> Darius patch is a little bit cleaner.
->>>
->>
->> OK, it's better.
->>
->> Acked-by: Joonyoung Shim<jy0922.shim@samsung.com>
->>
->
-> Hi all,
->
-> I think, this should be handled by Ben Dooks....
-> As Kyungmin Park said, there was his comment about this.
->
+On 08/06/2010 08:23 PM, Darius Augulis wrote:
+> Add nand device support and mtd partition table
+> for mach-real6410
 
-Ben, what's your opinion about that? Are you going to merge that?
+Ben, I see other three patches are merged, how about this one?
+There where no comments in mailing list, is it ready or not?
 
-> This is just for your information....
 >
-> ===
+> Signed-off-by: Darius Augulis<augulis.darius@gmail.com>
+> ---
 >
-> On Tue, May 18, 2010 at 12:52:13PM +0900, Joonyoung Shim wrote:
->> On 5/18/2010 11:48 AM, Ben Dooks wrote:
->>> On Mon, May 17, 2010 at 09:46:50PM +0900, Joonyoung Shim wrote:
->>>> Thd dev_name and driver_name should be switched each other.
->>>
->>> Hmm, this doesn't seem to have appeard on the linux-arm-kernel list yet.
->>>
->>> Please provide some information about what problem that this is fixing
->>> and the impact on any existing systems.
->>>
->>
->> The serial device nodes are created to s3c2410_serial* on android
->> platform instead of ttySAC*.
+> Changelog since v1:
+>   - Fixed errors reported by checkpatch.pl
+>   - Spaces in indentation replaced by TABs
 >
-> This has been how they've been for ages, surely the android device node
-> creation sytstem supports symlinking /dev/SACx ->  /dev/s3c2410_serialx,
-> like many other operating sysyerms that can already do this.
+>   arch/arm/mach-s3c64xx/Kconfig         |    1 +
+>   arch/arm/mach-s3c64xx/mach-real6410.c |   41 +++++++++++++++++++++++++++++++++
+>   2 files changed, 42 insertions(+), 0 deletions(-)
 >
-> Changing this just because android (something as-yet unmerged into mainline)
-> does not like it. I'm not even happy with an #ifdef around this.
+> diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+> index f5c77e5..7ac93ce 100644
+> --- a/arch/arm/mach-s3c64xx/Kconfig
+> +++ b/arch/arm/mach-s3c64xx/Kconfig
+> @@ -93,6 +93,7 @@ config MACH_REAL6410
+>   	select CPU_S3C6410
+>   	select S3C_DEV_HSMMC
+>   	select S3C_DEV_HSMMC1
+> +	select S3C_DEV_NAND
+>   	select S3C64XX_SETUP_SDHCI
+>   	help
+>   	  Machine support for the CoreWind REAL6410
+> diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
+> index bd52605..7eafb23 100644
+> --- a/arch/arm/mach-s3c64xx/mach-real6410.c
+> +++ b/arch/arm/mach-s3c64xx/mach-real6410.c
+> @@ -18,6 +18,8 @@
+>   #include<linux/list.h>
+>   #include<linux/init.h>
+>   #include<linux/dm9000.h>
+> +#include<linux/mtd/mtd.h>
+> +#include<linux/mtd/partitions.h>
+>   #include<linux/serial_core.h>
+>   #include<linux/platform_device.h>
+>   #include<asm/mach-types.h>
+> @@ -28,6 +30,7 @@
+>   #include<mach/regs-srom.h>
+>   #include<plat/cpu.h>
+>   #include<plat/devs.h>
+> +#include<plat/nand.h>
+>   #include<plat/regs-serial.h>
 >
-> If you really feel this is a problem that you absolutely must fix in kernel
-> then please provide a kernel commandline option to change the serial driver
-> name and use that on any platform that needs it. Another way would be to
-> update the serial platform data to have a field for which name to choose.
+>   #define UCON (S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK)
+> @@ -99,10 +102,46 @@ static struct platform_device real6410_device_eth = {
+>   	},
+>   };
 >
+> +static struct mtd_partition real6410_nand_part[] = {
+> +	[0] = {
+> +		.name	= "uboot",
+> +		.size	= SZ_1M,
+> +		.offset	= 0,
+> +	},
+> +	[1] = {
+> +		.name	= "kernel",
+> +		.size	= SZ_2M,
+> +		.offset	= SZ_1M,
+> +	},
+> +	[2] = {
+> +		.name	= "rootfs",
+> +		.size	= MTDPART_SIZ_FULL,
+> +		.offset	= SZ_1M + SZ_2M,
+> +	},
+> +};
+> +
+> +static struct s3c2410_nand_set real6410_nand_sets[] = {
+> +	[0] = {
+> +		.name		= "nand",
+> +		.nr_chips	= 1,
+> +		.nr_partitions	= ARRAY_SIZE(real6410_nand_part),
+> +		.partitions	= real6410_nand_part,
+> +	},
+> +};
+> +
+> +static struct s3c2410_platform_nand real6410_nand_info = {
+> +	.tacls		= 25,
+> +	.twrph0		= 55,
+> +	.twrph1		= 40,
+> +	.nr_sets	= ARRAY_SIZE(real6410_nand_sets),
+> +	.sets		= real6410_nand_sets,
+> +};
+> +
+>   static struct platform_device *real6410_devices[] __initdata = {
+>   	&real6410_device_eth,
+>   	&s3c_device_hsmmc0,
+>   	&s3c_device_hsmmc1,
+> +	&s3c_device_nand,
+>   };
+>
+>   static void __init real6410_map_io(void)
+> @@ -116,6 +155,8 @@ static void __init real6410_machine_init(void)
+>   {
+>   	u32 cs1;
+>
+> +	s3c_nand_set_platdata(&real6410_nand_info);
+> +
+>   	/* configure nCS1 width to 16 bits */
+>
+>   	cs1 = __raw_readl(S3C64XX_SROM_BW)&
