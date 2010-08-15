@@ -1,62 +1,69 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Mon, 16 Aug 2010 00:55:42 +0900
-Subject: ARM: 2.6.3[45] PCI regression (IXP4xx and PXA?)
-In-Reply-To: <20100815082328.GA12222@n2100.arm.linux.org.uk>
-References: <20100814184605.GA1999@n2100.arm.linux.org.uk>
-	<20100815144122O.fujita.tomonori@lab.ntt.co.jp>
-	<20100815082328.GA12222@n2100.arm.linux.org.uk>
-Message-ID: <20100816005427V.fujita.tomonori@lab.ntt.co.jp>
+From: awg@embtoolkit.org (awg at embtoolkit.org)
+Date: Sun, 15 Aug 2010 21:02:14 +0200
+Subject: [PATCH] ARM: s3c2440: various fixes in Kconfig file
+Message-ID: <1281898934-10920-1-git-send-email-awg@embtoolkit.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 15 Aug 2010 09:23:28 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+From: Abdoulaye Walsimou Gaye <awg@embtoolkit.org>
 
-> On Sun, Aug 15, 2010 at 02:42:51PM +0900, FUJITA Tomonori wrote:
-> > On Sat, 14 Aug 2010 19:46:05 +0100
-> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > 
-> > > On Sat, Aug 14, 2010 at 06:30:37PM +0900, FUJITA Tomonori wrote:
-> > > > On Fri, 13 Aug 2010 22:54:13 +0100
-> > > > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > > > >  This means that when dmabounce comes to allocate the replacement
-> > > > > buffer, it gets a buffer which won't be accessible to the DMA
-> > > > > controller
-> > > > 
-> > > > Really? looks like dmabounce does nothing for coherent memory that
-> > > > dma_alloc_coherent() allocates.
-> > > > 
-> > > > The following very hacky patch works?
-> > > 
-> > > So what happens if you use a driver which uses dma_alloc_coherent()
-> > > directly?  Should the driver really be passed memory which is
-> > > inaccessible to the device because its outside the host bridge PCI
-> > > window?
-> > 
-> > I'm not sure what you mean.
-> > 
-> > A driver which uses dma_alloc_coherent() directly should
-> > work. dma_alloc_coherent() allocates memory with GFP_DMA with that
-> > patch for dmabounce devices. So the driver gets the access-able
-> > memory.
-> > 
-> > The memory that dma_alloc_coherent() returns should be always
-> > consistent. We can't bounce it. All we can do is returning a memory
-> > that a device (and its bus) can access to.
-> > 
-> > Krzysztof, can you try the patch?
-> 
-> Why bother when we both agree that the patch is a dirty hack?
-> 
-> Come up with something cleaner first.
+* kconfig symbols defined in arch/arm/mach-s3c2440/Kconfig are only available
+  when ARCH_S3C2410 is selected, so no need to make some of them depend
+  on ARCH_S3C2410.
+* CPU_S3C24405B is used nowhere in the whole source tree, so remove it from
+  "config S3C2440_DMA".
+* mini2440: select SND_S3C24XX_SOC as it is needed in order be able to select
+  SND_S3C24XX_SOC_S3C24XX_UDA134X.
 
-Because this fix needs to go to stable trees too. A simple patch is
-better even if it's hacky.
+Signed-off-by: Abdoulaye Walsimou Gaye <awg@embtoolkit.org>
+---
+ arch/arm/mach-s3c2440/Kconfig |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
 
-For example, we can unify dma_needs_bounce functions in arm with a
-clean solution, I think. But dma_needs_bounce() was changed after
-2.6.35 so it would be difficult to backport a clean solution.
-
-btw, will we have more like this case? If so, I think that it's worth
-having a generic solution for this case instead of having the arch
-(arm and powerpc) specific solution.
+diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
+index cd8e7de..e84ff1e 100644
+--- a/arch/arm/mach-s3c2440/Kconfig
++++ b/arch/arm/mach-s3c2440/Kconfig
+@@ -4,7 +4,6 @@
+ 
+ config CPU_S3C2440
+ 	bool
+-	depends on ARCH_S3C2410
+ 	select CPU_ARM920T
+ 	select S3C_GPIO_PULL_UP
+ 	select S3C2410_CLOCK
+@@ -18,7 +17,6 @@ config CPU_S3C2440
+ 
+ config CPU_S3C2442
+ 	bool
+-	depends on ARCH_S3C2410
+ 	select CPU_ARM920T
+ 	select S3C2410_CLOCK
+ 	select S3C2410_GPIO
+@@ -30,7 +28,7 @@ config CPU_S3C2442
+ 
+ config CPU_S3C244X
+ 	bool
+-	depends on ARCH_S3C2410 && (CPU_S3C2440 || CPU_S3C2442)
++	depends on CPU_S3C2440 || CPU_S3C2442
+ 	help
+ 	  Support for S3C2440 and S3C2442 Samsung Mobile CPU based systems.
+ 
+@@ -72,7 +70,6 @@ config S3C2440_PLL_16934400
+ 
+ config S3C2440_DMA
+ 	bool
+-	depends on ARCH_S3C2410 && CPU_S3C24405B
+ 	help
+ 	  Support for S3C2440 specific DMA code5A
+ 
+@@ -181,6 +178,7 @@ config MACH_MINI2440
+ 	select CPU_S3C2440
+ 	select EEPROM_AT24
+ 	select LEDS_TRIGGER_BACKLIGHT
++	select SND_S3C24XX_SOC
+ 	select SND_S3C24XX_SOC_S3C24XX_UDA134X
+ 	select S3C_DEV_NAND
+ 	select S3C_DEV_USB_HOST
+-- 
+1.7.0.4
