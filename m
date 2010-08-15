@@ -1,39 +1,21 @@
 From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Sun, 15 Aug 2010 13:08:04 -0000
-Subject: [PATCH 1/3] ARM: S3C64XX: Add SDMA clocks
-Message-ID: <4c67e6ad.887b0e0a.49b7.2837@mx.google.com>
+Date: Sun, 15 Aug 2010 15:02:11 +0200
+Subject: [PATCH 0/3] ARM: S3C64XX: (S)DMA related patches
+Message-ID: <4c67e6ab.887b0e0a.53f9.23bc@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the clock definition bits for SDMA.
+These patches add support for the SDMA channels support in the S3C64XX SoC. The
+main user of this is the not-yet-submitted Samsung crypto driver.
 
-Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
----
- arch/arm/mach-s3c64xx/clock.c |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+Additionally, it fixes an issue with the DMA core not stopping and flushing the
+requests when the channel is freed.
 
-diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
-index 7e03f0a..1362d31 100644
---- a/arch/arm/mach-s3c64xx/clock.c
-+++ b/arch/arm/mach-s3c64xx/clock.c
-@@ -230,6 +230,18 @@ static struct clk init_clocks_disable[] = {
- 		.parent		= &clk_h,
- 		.enable		= s3c64xx_hclk_ctrl,
- 		.ctrlbit	= S3C_CLKCON_HCLK_DMA1,
-+	}, {
-+		.name		= "sdma0",
-+		.id		= -1,
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_SDMA0,
-+	}, {
-+		.name		= "sdma1",
-+		.id		= -1,
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_SDMA1,
- 	},
- };
- 
--- 
-1.7.0.4
+Maurus Cuelenaere (3):
+  ARM: S3C64XX: Add SDMA clocks
+  ARM: S3C64XX: Add SDMA support to DMA core
+  ARM: S3C64XX: Stop and flush requests on freeing
+
+ arch/arm/mach-s3c64xx/clock.c |   12 +++++++++
+ arch/arm/mach-s3c64xx/dma.c   |   54 ++++++++++++++++++++++++++++++++--------
+ 2 files changed, 55 insertions(+), 11 deletions(-)
