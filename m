@@ -1,7 +1,7 @@
 From: awg@embtoolkit.org (awg at embtoolkit.org)
-Date: Sun, 15 Aug 2010 21:02:14 +0200
-Subject: [PATCH] ARM: s3c2440: various fixes in Kconfig file
-Message-ID: <1281898934-10920-1-git-send-email-awg@embtoolkit.org>
+Date: Sun, 15 Aug 2010 21:34:01 +0200
+Subject: [PATCH v2] ARM: s3c2440: various fixes in Kconfig file
+Message-ID: <1281900841-11251-1-git-send-email-awg@embtoolkit.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,9 +14,18 @@ From: Abdoulaye Walsimou Gaye <awg@embtoolkit.org>
   "config S3C2440_DMA".
 * mini2440: select SND_S3C24XX_SOC as it is needed in order be able to select
   SND_S3C24XX_SOC_S3C24XX_UDA134X.
+Those fixes avoid the following warnings at make time:
+scripts/kconfig/qconf arch/arm/Kconfig
+warning: (MACH_MINI2440 && ARCH_S3C2410) selects SND_S3C24XX_SOC_S3C24XX_UDA134X which has unmet direct dependencies (SND_S3C24XX_SOC && ARCH_S3C2410)
+warning: (CPU_S3C2440 && ARCH_S3C2410 && S3C2410_DMA) selects S3C2440_DMA which has unmet direct dependencies (ARCH_S3C2410 && CPU_S3C24405B)
+warning: (CPU_S3C2440 && ARCH_S3C2410 || CPU_S3C2442 && ARCH_S3C2410) selects CPU_S3C244X which has unmet direct dependencies (!ARCH_S3C2410)
 
 Signed-off-by: Abdoulaye Walsimou Gaye <awg@embtoolkit.org>
 ---
+
+changes since v1:
+include warnings observed without this patch
+
  arch/arm/mach-s3c2440/Kconfig |    6 ++----
  1 files changed, 2 insertions(+), 4 deletions(-)
 
