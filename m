@@ -1,39 +1,52 @@
 From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Tue, 17 Aug 2010 01:29:49 +0200
-Subject: ARM: 2.6.3[45] PCI regression (IXP4xx and PXA?)
-In-Reply-To: <20100814181306U.fujita.tomonori@lab.ntt.co.jp> (FUJITA
-	Tomonori's message of "Sat, 14 Aug 2010 18:30:37 +0900")
-References: <20100811072532.GA21511@n2100.arm.linux.org.uk>
-	<20100813152224H.fujita.tomonori@lab.ntt.co.jp>
-	<20100813215413.GA21607@n2100.arm.linux.org.uk>
-	<20100814181306U.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <m3vd7agmqa.fsf@intrepid.localdomain>
+Date: Tue, 17 Aug 2010 01:31:07 +0200
+Subject: E100: another PCI problem on IXP4xx (guess all ARM)
+Message-ID: <m3r5hygmo4.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> writes:
+I also found another PCI issue: e100 driver (to be precise, my own fix
+to e100: 6ff9c2e7fa8ca63a575792534b63c5092099c286) doesn't play nice
+with dma-mapping BIDIRECTIONAL direction checks. How about copying
+42d53b4ff7d61487d18274ebdf1f70c1aef6f122 to ARM?
 
-> A long solution would be having two dma_mask for a device and a
-> bus. We also need something to represent a DMA-capable range instead
-> of the dma mask.
->
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -77,6 +77,11 @@ static struct page *__dma_alloc_buffer(struct device *dev, size_t size, gfp_t gf
->  	if (mask < 0xffffffffULL)
->  		gfp |= GFP_DMA;
->  
-> +#ifdef CONFIG_DMABOUNCE
-> +	if (dev->archdata.dmabounce)
-> +		gfp |= GFP_DMA;
-> +#endif
-> +
->  	page = alloc_pages(gfp, order);
->  	if (!page)
->  		return NULL;
+I know E100 isn't exactly designed as per DMA-API document, but given
+the inner workings of cache management and DMA bouncing code, this is
+the only workable solution (well, maybe using that other descriptor ring
+mode is another).
 
-This patch fixes the problem on my IXP425.
+Comments?
+
+ARM: fix DMA-bounce code to allow sync from_device and to_device with
+bidirectional mappings.
+
+Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
+
+diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
+index cc0a932..7c6ad2b 100644
+--- a/arch/arm/common/dmabounce.c
++++ b/arch/arm/common/dmabounce.c
+@@ -402,7 +402,7 @@ int dmabounce_sync_for_cpu(struct device *dev, dma_addr_t addr,
+ 	if (!buf)
+ 		return 1;
+ 
+-	BUG_ON(buf->direction != dir);
++	BUG_ON(buf->direction != dir && buf->direction != DMA_BIDIRECTIONAL);
+ 
+ 	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x) mapped to %p (dma=%#x)\n",
+ 		__func__, buf->ptr, virt_to_dma(dev, buf->ptr),
+@@ -431,7 +431,7 @@ int dmabounce_sync_for_device(struct device *dev, dma_addr_t addr,
+ 	if (!buf)
+ 		return 1;
+ 
+-	BUG_ON(buf->direction != dir);
++	BUG_ON(buf->direction != dir && buf->direction != DMA_BIDIRECTIONAL);
+ 
+ 	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x) mapped to %p (dma=%#x)\n",
+ 		__func__, buf->ptr, virt_to_dma(dev, buf->ptr),
+
+
 -- 
 Krzysztof Halasa
