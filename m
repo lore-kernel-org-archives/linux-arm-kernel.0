@@ -1,65 +1,65 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Mon, 16 Aug 2010 17:32:06 +0200
-Subject: [PATCH|RESEND 3/4] clock-imx35: correct arm and ahb clock
-	calculation
-In-Reply-To: <1281966847-553-4-git-send-email-m.grzeschik@pengutronix.de>
-References: <1281966847-553-1-git-send-email-m.grzeschik@pengutronix.de>
-	<1281966847-553-4-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <20100816153206.GC1060@pengutronix.de>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Mon, 16 Aug 2010 20:21:45 +0300
+Subject: [PULL] Please pull bjdooks' for-linus/samsung-2636
+In-Reply-To: <20100814153625.GA31271@ben-laptop.fluff.org>
+References: <20100814153625.GA31271@ben-laptop.fluff.org>
+Message-ID: <4C6973A9.2060004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 16, 2010 at 03:54:06PM +0200, Michael Grzeschik wrote:
-> From: Marc Kleine-Budde <mkl@pengutronix.de>
-> 
-> According to the Datasheet:
-> "i.MX35 (MCIMX35) Multimedia Applications Processor Reference Manual,
-> Rev. 2" "Figure 14-24. Clock Control And Gating"
-> change the result of get_rate_ahb based on the frequency returned
-> by get_rate_arm to calculate the proper rate.
-> 
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> ---
->  arch/arm/mach-mx3/clock-imx35.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
-> index f54a82c..009156d 100644
-> --- a/arch/arm/mach-mx3/clock-imx35.c
-> +++ b/arch/arm/mach-mx3/clock-imx35.c
-> @@ -155,7 +155,7 @@ static unsigned long get_rate_arm(void)
->  
->  	aad = &clk_consumer[(pdr0 >> 16) & 0xf];
->  	if (aad->sel)
-> -		fref = fref * 2 / 3;
-> +		fref = fref * 3 / 4;
->  
->  	return fref / aad->arm;
->  }
-> @@ -164,7 +164,7 @@ static unsigned long get_rate_ahb(struct clk *clk)
->  {
->  	unsigned long pdr0 = __raw_readl(CCM_BASE + CCM_PDR0);
->  	struct arm_ahb_div *aad;
-> -	unsigned long fref = get_rate_mpll();
-> +	unsigned long fref = get_rate_arm();
->  
->  	aad = &clk_consumer[(pdr0 >> 16) & 0xf];
->  
-> -- 
-> 1.7.1
+On 08/14/2010 06:36 PM, Ben Dooks wrote:
+> Hi, please pull
+>
+> The following changes since commit 45d7f32c7a43cbb9592886d38190e379e2eb2226:
+>    Linus Torvalds (1):
+>          Merge git://git.kernel.org/.../cmetcalf/linux-tile
+>
+> are available in the git repository at:
+>
+>    git://git.fluff.org/bjdooks/linux.git for-linus/samsung-2635
+>
+> Ben Dooks (3):
+>        ARM: S3C64XX: Update consistent DMA size to 8MiB
+>        ARM: SMDK6410: Make virtual screen twice depth of real
+>        Merge branch 'for-2636/s3c64xx' into for-linus/samsung-2635
+>
+> Darius Augulis (3):
+>        ARM: S3C64XX: Support for Real6410
+>        ARM: mach-real6410: add dm9000 ethernet support for mach-real6410
+>        ARM: mach-real6410: add sdhc device support
 
-This one is probably not needed anymore and conflicts with
-the following patch in this tree [1] in branch imx-for-2.6.36:
+Probably you would like to merge v2 of these patches.
+I sent v2 to ML in 08/06/2010.
+As v1 is already in main line, should I prepare new patch containing 
+fixes which are in v2? These fixes mostly are coding style related also 
+one minor fix in dm9000 pdata.
 
-a4104f4c3e6e24961e4d29f96c0488a7bce8da8d i.MX35: Fix arm/ahb clock calculation
-
-[1] git://git.pengutronix.de/git/imx/linux-2.6.git
-
-Michael
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>
+> Kukjin Kim (1):
+>        ARM: SAMSUNG: Fix on build warning about dependency in Kconfig
+>
+> Linus Walleij (1):
+>        DMAENGINE: correct PL080 register header file
+>
+> Maurus Cuelenaere (3):
+>        ARM: S3C64XX: Move SmartQ LCD control platform definition to shared file
+>        ARM: S3C64XX: Set wifi and iNAND as permanently connected SD devices on SmartQ boards
+>        ARM: S3C64XX: Add audio support to SmartQ
+>
+> Patrick Georgi (1):
+>        ARM: S3C64XX: Framebuffer fix for SmartQ5
+>
+>   arch/arm/include/asm/hardware/pl080.h       |    4 +-
+>   arch/arm/mach-s3c64xx/Kconfig               |    9 ++
+>   arch/arm/mach-s3c64xx/Makefile              |    1 +
+>   arch/arm/mach-s3c64xx/dma.c                 |    2 +-
+>   arch/arm/mach-s3c64xx/include/mach/memory.h |    2 +
+>   arch/arm/mach-s3c64xx/mach-real6410.c       |  152 +++++++++++++++++++++++++++
+>   arch/arm/mach-s3c64xx/mach-smartq.c         |   40 +++++++-
+>   arch/arm/mach-s3c64xx/mach-smartq5.c        |   36 +------
+>   arch/arm/mach-s3c64xx/mach-smartq7.c        |   28 -----
+>   arch/arm/mach-s3c64xx/mach-smdk6410.c       |    2 +
+>   arch/arm/plat-samsung/Kconfig               |    2 +-
+>   11 files changed, 213 insertions(+), 65 deletions(-)
+>   create mode 100644 arch/arm/mach-s3c64xx/mach-real6410.c
+>
