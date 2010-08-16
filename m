@@ -1,70 +1,59 @@
-From: randy.dunlap@oracle.com (Randy Dunlap)
-Date: Mon, 16 Aug 2010 08:12:39 -0700
-Subject: undefined reference to `mmc_pm_notify' when selected MMC
-	without PM.
-In-Reply-To: <20100816051721.GA17903@pengutronix.de>
-References: <009801cb3adb$6550e400$2ff2ac00$%kim@samsung.com>
-	<20100816051721.GA17903@pengutronix.de>
-Message-ID: <20100816081239.c5ae02ef.randy.dunlap@oracle.com>
+From: mgr@pengutronix.de (Michael Grzeschik)
+Date: Mon, 16 Aug 2010 17:25:45 +0200
+Subject: [PATCH|RESEND 1/4] clock-imx35: use get_3_3_div helper for
+	get_rate_ipg_per
+In-Reply-To: <1281966847-553-2-git-send-email-m.grzeschik@pengutronix.de>
+References: <1281966847-553-1-git-send-email-m.grzeschik@pengutronix.de>
+	<1281966847-553-2-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <20100816152545.GB1060@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Aug 2010 07:17:21 +0200 Uwe Kleine-K?nig wrote:
 
-> Hello,
+On Mon, Aug 16, 2010 at 03:54:04PM +0200, Michael Grzeschik wrote:
+> From: Marc Kleine-Budde <mkl@pengutronix.de>
 > 
-> On Fri, Aug 13, 2010 at 08:33:40PM +0900, Kukjin Kim wrote:
-> > Kukjin Kim wrote:
-> > > 
-> > > Hi,
-> > > 
-> > > Following is build error when selected MMC without PM.
-> > > 
-> > > drivers/built-in.o: In function `mmc_alloc_host':
-> > > drivers/mmc/core/host.c:108: undefined reference to `mmc_pm_notify'
-> > > make[1]: *** [.tmp_vmlinux1] Error 1
-> > > make: *** [sub-make] Error 2
-> > > 
-> > > That is added from Maxim's ' mmc: fix all hangs related to mmc/sd card
-> > > insert/removal during suspend/resume '
-> > > (commit ID: 4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e)
-> > > 
-> > > Below is temporary patch for avoiding build error.
-> > > But I'm not sure about this... :-(
-> > > 
-> > > ---
-> > > 
-> > > diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-> > > index 0efe631..d80cfdc 100644
-> > > --- a/drivers/mmc/core/host.c
-> > > +++ b/drivers/mmc/core/host.c
-> > > @@ -86,7 +86,9 @@ struct mmc_host *mmc_alloc_host(int extra, struct device
-> > > *dev)
-> > >         init_waitqueue_head(&host->wq);
-> > >         INIT_DELAYED_WORK(&host->detect, mmc_rescan);
-> > >         INIT_DELAYED_WORK_DEFERRABLE(&host->disable,
-> > > mmc_host_deeper_disable);
-> > > +#ifdef CONFIG_PM
-> > >         host->pm_notify.notifier_call = mmc_pm_notify;
-> > > +#endif
-> > > 
-> > >         /*
-> > >          * By default, hosts do not support SGIO or large requests.
-> > > 
-> > > ---
-> > 
-> > Kindly ignore this stuff because I found Uwe's same patch just now ;-)
-> > Sorry for bothering.
-> For those who care:
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> ---
+>  arch/arm/mach-mx3/clock-imx35.c |    6 ++----
+>  1 files changed, 2 insertions(+), 4 deletions(-)
 > 
-> 	http://mid.gmane.org/1281691473-15481-1-git-send-email-u.kleine-koenig at pengutronix.de
+> diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
+> index d3af0fd..4b10f46 100644
+> --- a/arch/arm/mach-mx3/clock-imx35.c
+> +++ b/arch/arm/mach-mx3/clock-imx35.c
+> @@ -290,12 +290,10 @@ static unsigned long get_rate_ipg_per(struct clk *clk)
+>  {
+>  	unsigned long pdr0 = __raw_readl(CCM_BASE + CCM_PDR0);
+>  	unsigned long pdr4 = __raw_readl(CCM_BASE + CCM_PDR4);
+> -	unsigned long div1, div2;
+> +	unsigned long div1;
+>  
+>  	if (pdr0 & (1 << 26)) {
+> -		div1 = (pdr4 >> 19) & 0x7;
+> -		div2 = (pdr4 >> 16) & 0x7;
+> -		return get_rate_arm() / ((div1 + 1) * (div2 + 1));
+> +		return get_rate_arm() / get_3_3_div(pdr4 >> 16);
+>  	} else {
+>  		div1 = (pdr0 >> 12) & 0x7;
+>  		return get_rate_ahb(NULL) / div1;
+> -- 
+> 1.7.1
 > 
-> Kgene, do you care to ack this change as it may prod akpm in taking the
-> fix a bit earlier?
 
-or this one from earlier:
-http://lkml.org/lkml/2010/8/12/207
+This one is probably not necessary/possible anymore
+when we look into this tree [1] in branch imx-for-2.6.36
+for following patch:
 
----
-~Randy
-*** Remember to use Documentation/SubmitChecklist when testing your code ***
+5e05cb09aede7e3571673b142143f68575590136 i.MX35: remove get_3_3_div helper function
+
+[1] git://git.pengutronix.de/git/imx/linux-2.6.git
+
+Michael
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
