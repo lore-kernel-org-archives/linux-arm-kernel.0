@@ -1,87 +1,39 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Mon, 16 Aug 2010 09:51:04 +0530
-Subject: [PATCH v4 3/8] wireless: wl1271: add platform driver to get
-	board data
-In-Reply-To: <20100811212513.GC827@n2100.arm.linux.org.uk>
-References: <1281550913-17633-1-git-send-email-ohad@wizery.com>
-	<1281550913-17633-4-git-send-email-ohad@wizery.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0324110ABD@dbde02.ent.ti.com>
-	<20100811184742.GA21778@nokia.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC1@dbde02.ent.ti.com>
-	<20100811185724.GD21778@nokia.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC7@dbde02.ent.ti.com>
-	<20100811212513.GC827@n2100.arm.linux.org.uk>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB032419CAAC@dbde02.ent.ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 16 Aug 2010 06:53:40 +0200
+Subject: [PATCH v2] ARM: imx: fix build failure concerning otg/ulpi
+In-Reply-To: <4C6783C7.1030604@compulab.co.il>
+References: <4C65246E.1000906@ru.mvista.com>
+	<1281701210-27776-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<4C6783C7.1030604@compulab.co.il>
+Message-ID: <20100816045340.GA17038@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Igor,
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Thursday, August 12, 2010 2:55 AM
-> To: DebBarma, Tarun Kanti
-> Cc: felipe.balbi at nokia.com; Ohad Ben-Cohen; Kalle Valo; Pandita, Vikram;
-> akpm at linux-foundation.org; Quadros Roger (Nokia-MS/Helsinki); Tony
-> Lindgren; linux-wireless at vger.kernel.org; Mark Brown; linux-
-> mmc at vger.kernel.org; Nicolas Pitre; San Mehat; Chikkature Rajashekar,
-> Madhusudhan; Coelho Luciano (Nokia-MS/Helsinki); linux-
-> omap at vger.kernel.org; Ido Yariv; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v4 3/8] wireless: wl1271: add platform driver to get
-> board data
-> 
-> On Thu, Aug 12, 2010 at 12:57:18AM +0530, DebBarma, Tarun Kanti wrote:
+On Sun, Aug 15, 2010 at 09:05:59AM +0300, Igor Grinberg wrote:
+> On 08/13/10 15:06, Uwe Kleine-K?nig wrote:
+> > The build failure was introduced by
 > >
-> > > -----Original Message-----
-> > > From: Felipe Balbi [mailto:felipe.balbi at nokia.com]
-> > > Sent: Thursday, August 12, 2010 12:27 AM
-> > > To: DebBarma, Tarun Kanti
-> > > Cc: Balbi Felipe (Nokia-MS/Helsinki); Ohad Ben-Cohen; linux-
-> > > wireless at vger.kernel.org; linux-mmc at vger.kernel.org; linux-
-> > > omap at vger.kernel.org; Ido Yariv; Mark Brown; linux-arm-
-> > > kernel at lists.infradead.org; Chikkature Rajashekar, Madhusudhan; Coelho
-> > > Luciano (Nokia-MS/Helsinki); akpm at linux-foundation.org; San Mehat;
-> Quadros
-> > > Roger (Nokia-MS/Helsinki); Tony Lindgren; Nicolas Pitre; Pandita,
-> Vikram;
-> > > Kalle Valo
-> > > Subject: Re: [PATCH v4 3/8] wireless: wl1271: add platform driver to
-> get
-> > > board data
-> > >
-> > > Hi,
-> > >
-> > > On Wed, Aug 11, 2010 at 08:52:54PM +0200, ext DebBarma, Tarun Kanti
-> wrote:
-> > > >True; however if we go by that argument than we can also assume pdata
-> > > >is valid, so that we would not need the below check.
-> > >
-> > > of course not. You can have devices that just play well with default
-> > > values or devices where you don't need the flexibility of platform
-> data.
-> > > That's why we check.
-> > >
-> > > platform_device pointers on the other hand, are guaranteed to be
-> always
-> > > true, if it isn't then you should oops, you deserve to oops because
-> > > something is really really wrong.
-> > >
-> > Sounds perfect!
-> > What that means is _probe() function makes sense only for cases where we
-> > have valid platform data because we are returning right at the top if
-> > pdata is not valid. If this is the case I was curious to know why not
-> > framework make another check for valid pdata before calling _probe()
-> > instead of coming all the way to _probe() and then returning!
+> > 	13dd0c9 (USB: otg/ulpi: extend the generic ulpi driver.)
+> >
+> > Cc: Igor Grinberg <grinberg@compulab.co.il>
+> > Cc: Mike Rapoport <mike@compulab.co.il>
+> > Cc: Greg Kroah-Hartman <gregkh@suse.de>
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> >   
 > 
-> Platform devices are not for passing platform data around - they're for
-> declaring platform hardware devices that we want drivers to handle -
-> and it depends on the driver whether having platform data is appropriate
-> or not.
+> I've based my patches on v2.6.35-rc6, so I could not patch
+> those imx variants, sorry...
+> But I did deal with mach-pca100.c, so I think moving it from
+> mach-mx2 to mach-imx is what made it miss my patch.
 > 
-> This proposal is, IMHO, abusing the platform device/driver support to
-> achieve its own goals.  I've outlined a far simpler and easiler solution
-> which avoids this kind of abuse, and given suggestions on how to extend
-> it to support multiple instances.
+> Anyway, this looks like the right addition.
+I assume this is an Ack?
 
-I guess I have not put my question in the right perspective. As you have said, platform devices are not meant for passing data around, it appeared to me contradictory when in the probe() we are just checking the pdata and proceeding/returning based upon its value, as if platform device has no other functions. So, the question should have been what else we could do in probe() with platform device other than manipulation of pdata, other than modification of the framework in the real sense.
+Best regards
+Uwe
 
-Anyways, I will go through the suggestions you mentioned. Thanks for the clarifications.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
