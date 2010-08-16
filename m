@@ -1,24 +1,56 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 16 Aug 2010 07:55:41 +0200
-Subject: Keyboard for HTC-Dream
-In-Reply-To: <201008071307.40988.david.lanzendoerfer@o2s.ch>
-References: <201008071307.40988.david.lanzendoerfer@o2s.ch>
-Message-ID: <20100816055540.GA1455@ucw.cz>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 16 Aug 2010 09:09:11 +0300
+Subject: [PATCH v2] ARM: imx: fix build failure concerning otg/ulpi
+In-Reply-To: <20100816045340.GA17038@pengutronix.de>
+References: <4C65246E.1000906@ru.mvista.com>
+	<1281701210-27776-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<4C6783C7.1030604@compulab.co.il>
+	<20100816045340.GA17038@pengutronix.de>
+Message-ID: <4C68D607.3090202@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat 2010-08-07 13:07:32, David Lanzend?rfer wrote:
-> heyo
-> how hard would it be to introduce a keyboard driver into for-next from dwalkers kernel branch?
-> https://www.codeaurora.org/gitweb/quic/kernel/?p=dwalker/linux-msm.git;a=shortlog;h=refs/heads/for-next
-> Would be cool, to have such a thing, then we would already have basic functionality needed to debug.
-> (dmesg from terminal and so on)
+On 08/16/10 07:53, Uwe Kleine-K?nig wrote:
+> Hello Igor,
+>
+> On Sun, Aug 15, 2010 at 09:05:59AM +0300, Igor Grinberg wrote:
+>   
+>> On 08/13/10 15:06, Uwe Kleine-K?nig wrote:
+>>     
+>>> The build failure was introduced by
+>>>
+>>> 	13dd0c9 (USB: otg/ulpi: extend the generic ulpi driver.)
+>>>
+>>> Cc: Igor Grinberg <grinberg@compulab.co.il>
+>>> Cc: Mike Rapoport <mike@compulab.co.il>
+>>> Cc: Greg Kroah-Hartman <gregkh@suse.de>
+>>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>>>   
+>>>       
+>> I've based my patches on v2.6.35-rc6, so I could not patch
+>> those imx variants, sorry...
+>> But I did deal with mach-pca100.c, so I think moving it from
+>> mach-mx2 to mach-imx is what made it miss my patch.
+>>
+>> Anyway, this looks like the right addition.
+>>     
+> I assume this is an Ack?
+>   
 
-Matrix driver should be capable of doing that... and look into
-staging, IIRC the driver is there.
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 
 
+Greg,
+
+Can you, please, add this as a fix (maybe urgent) for build failure?
+
+Thanks
+
+> Best regards
+> Uwe
+>
+>   
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Regards,
+Igor.
