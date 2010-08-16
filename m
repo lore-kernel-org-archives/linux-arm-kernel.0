@@ -1,35 +1,63 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 16 Aug 2010 06:53:40 +0200
-Subject: [PATCH v2] ARM: imx: fix build failure concerning otg/ulpi
-In-Reply-To: <4C6783C7.1030604@compulab.co.il>
-References: <4C65246E.1000906@ru.mvista.com>
-	<1281701210-27776-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<4C6783C7.1030604@compulab.co.il>
-Message-ID: <20100816045340.GA17038@pengutronix.de>
+Date: Mon, 16 Aug 2010 07:17:21 +0200
+Subject: undefined reference to `mmc_pm_notify' when selected MMC
+	without PM.
+In-Reply-To: <009801cb3adb$6550e400$2ff2ac00$%kim@samsung.com>
+References: <009801cb3adb$6550e400$2ff2ac00$%kim@samsung.com>
+Message-ID: <20100816051721.GA17903@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Igor,
+Hello,
 
-On Sun, Aug 15, 2010 at 09:05:59AM +0300, Igor Grinberg wrote:
-> On 08/13/10 15:06, Uwe Kleine-K?nig wrote:
-> > The build failure was introduced by
-> >
-> > 	13dd0c9 (USB: otg/ulpi: extend the generic ulpi driver.)
-> >
-> > Cc: Igor Grinberg <grinberg@compulab.co.il>
-> > Cc: Mike Rapoport <mike@compulab.co.il>
-> > Cc: Greg Kroah-Hartman <gregkh@suse.de>
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> >   
+On Fri, Aug 13, 2010 at 08:33:40PM +0900, Kukjin Kim wrote:
+> Kukjin Kim wrote:
+> > 
+> > Hi,
+> > 
+> > Following is build error when selected MMC without PM.
+> > 
+> > drivers/built-in.o: In function `mmc_alloc_host':
+> > drivers/mmc/core/host.c:108: undefined reference to `mmc_pm_notify'
+> > make[1]: *** [.tmp_vmlinux1] Error 1
+> > make: *** [sub-make] Error 2
+> > 
+> > That is added from Maxim's ' mmc: fix all hangs related to mmc/sd card
+> > insert/removal during suspend/resume '
+> > (commit ID: 4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e)
+> > 
+> > Below is temporary patch for avoiding build error.
+> > But I'm not sure about this... :-(
+> > 
+> > ---
+> > 
+> > diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+> > index 0efe631..d80cfdc 100644
+> > --- a/drivers/mmc/core/host.c
+> > +++ b/drivers/mmc/core/host.c
+> > @@ -86,7 +86,9 @@ struct mmc_host *mmc_alloc_host(int extra, struct device
+> > *dev)
+> >         init_waitqueue_head(&host->wq);
+> >         INIT_DELAYED_WORK(&host->detect, mmc_rescan);
+> >         INIT_DELAYED_WORK_DEFERRABLE(&host->disable,
+> > mmc_host_deeper_disable);
+> > +#ifdef CONFIG_PM
+> >         host->pm_notify.notifier_call = mmc_pm_notify;
+> > +#endif
+> > 
+> >         /*
+> >          * By default, hosts do not support SGIO or large requests.
+> > 
+> > ---
 > 
-> I've based my patches on v2.6.35-rc6, so I could not patch
-> those imx variants, sorry...
-> But I did deal with mach-pca100.c, so I think moving it from
-> mach-mx2 to mach-imx is what made it miss my patch.
-> 
-> Anyway, this looks like the right addition.
-I assume this is an Ack?
+> Kindly ignore this stuff because I found Uwe's same patch just now ;-)
+> Sorry for bothering.
+For those who care:
+
+	http://mid.gmane.org/1281691473-15481-1-git-send-email-u.kleine-koenig at pengutronix.de
+
+Kgene, do you care to ack this change as it may prod akpm in taking the
+fix a bit earlier?
 
 Best regards
 Uwe
