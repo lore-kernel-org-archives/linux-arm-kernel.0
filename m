@@ -1,87 +1,70 @@
-From: mattias.wallin@stericsson.com (Mattias Wallin)
-Date: Mon, 16 Aug 2010 17:00:50 +0200
-Subject: [PATCH] ARM: AB8500 I2C platform configration and irq
-Message-ID: <1281970850-6639-1-git-send-email-mattias.wallin@stericsson.com>
+From: randy.dunlap@oracle.com (Randy Dunlap)
+Date: Mon, 16 Aug 2010 08:12:39 -0700
+Subject: undefined reference to `mmc_pm_notify' when selected MMC
+	without PM.
+In-Reply-To: <20100816051721.GA17903@pengutronix.de>
+References: <009801cb3adb$6550e400$2ff2ac00$%kim@samsung.com>
+	<20100816051721.GA17903@pengutronix.de>
+Message-ID: <20100816081239.c5ae02ef.randy.dunlap@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the platform part of the AB8500 PRCMU I2C
-access driver. The old irq name AB4500 is changed to AB8500.
+On Mon, 16 Aug 2010 07:17:21 +0200 Uwe Kleine-K?nig wrote:
 
-Signed-off-by: Mattias Wallin <mattias.wallin@stericsson.com>
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+> Hello,
+> 
+> On Fri, Aug 13, 2010 at 08:33:40PM +0900, Kukjin Kim wrote:
+> > Kukjin Kim wrote:
+> > > 
+> > > Hi,
+> > > 
+> > > Following is build error when selected MMC without PM.
+> > > 
+> > > drivers/built-in.o: In function `mmc_alloc_host':
+> > > drivers/mmc/core/host.c:108: undefined reference to `mmc_pm_notify'
+> > > make[1]: *** [.tmp_vmlinux1] Error 1
+> > > make: *** [sub-make] Error 2
+> > > 
+> > > That is added from Maxim's ' mmc: fix all hangs related to mmc/sd card
+> > > insert/removal during suspend/resume '
+> > > (commit ID: 4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e)
+> > > 
+> > > Below is temporary patch for avoiding build error.
+> > > But I'm not sure about this... :-(
+> > > 
+> > > ---
+> > > 
+> > > diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+> > > index 0efe631..d80cfdc 100644
+> > > --- a/drivers/mmc/core/host.c
+> > > +++ b/drivers/mmc/core/host.c
+> > > @@ -86,7 +86,9 @@ struct mmc_host *mmc_alloc_host(int extra, struct device
+> > > *dev)
+> > >         init_waitqueue_head(&host->wq);
+> > >         INIT_DELAYED_WORK(&host->detect, mmc_rescan);
+> > >         INIT_DELAYED_WORK_DEFERRABLE(&host->disable,
+> > > mmc_host_deeper_disable);
+> > > +#ifdef CONFIG_PM
+> > >         host->pm_notify.notifier_call = mmc_pm_notify;
+> > > +#endif
+> > > 
+> > >         /*
+> > >          * By default, hosts do not support SGIO or large requests.
+> > > 
+> > > ---
+> > 
+> > Kindly ignore this stuff because I found Uwe's same patch just now ;-)
+> > Sorry for bothering.
+> For those who care:
+> 
+> 	http://mid.gmane.org/1281691473-15481-1-git-send-email-u.kleine-koenig at pengutronix.de
+> 
+> Kgene, do you care to ack this change as it may prod akpm in taking the
+> fix a bit earlier?
+
+or this one from earlier:
+http://lkml.org/lkml/2010/8/12/207
+
 ---
- arch/arm/mach-ux500/board-mop500.c      |   27 +++++++++++++++++++++++++--
- arch/arm/mach-ux500/include/mach/irqs.h |    2 +-
- 2 files changed, 26 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index a908824..d62f689 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -31,6 +31,7 @@
- #include <mach/hardware.h>
- #include <mach/setup.h>
- #include <mach/devices.h>
-+#include <mach/irqs.h>
- 
- #include "pins-db8500.h"
- #include "board-mop500.h"
-@@ -105,9 +106,27 @@ static struct ab8500_platform_data ab8500_platdata = {
- 	},
- };
- 
-+static struct resource ab8500_resources[] = {
-+	[0] = {
-+		.start = IRQ_AB8500,
-+		.end = IRQ_AB8500,
-+		.flags = IORESOURCE_IRQ
-+	}
-+};
-+
-+struct platform_device ux500_ab8500_device = {
-+	.name = "ab8500-i2c",
-+	.id = 0,
-+	.dev = {
-+		.platform_data = &ab8500_platdata,
-+	},
-+	.num_resources = 1,
-+	.resource = ab8500_resources,
-+};
-+
- static struct spi_board_info u8500_spi_devices[] = {
- 	{
--		.modalias = "ab8500",
-+		.modalias = "ab8500-spi",
- 		.controller_data = &ab4500_chip_info,
- 		.platform_data = &ab8500_platdata,
- 		.max_speed_hz = 12000000,
-@@ -210,8 +229,12 @@ static void __init u8500_init_machine(void)
- 
- 	mop500_sdi_init();
- 
--	spi_register_board_info(u8500_spi_devices,
-+	/* If HW is early drop(ed) or v1.0 then use spi to access ab8500 */
-+	if (cpu_is_u8500ed() || cpu_is_u8500v10())
-+		spi_register_board_info(u8500_spi_devices,
- 			ARRAY_SIZE(u8500_spi_devices));
-+	else /* If HW is v.1.1 or later use i2c to access ab8500 */
-+		platform_device_register(&ux500_ab8500_device);
- 
- 	i2c_register_board_info(0, mop500_i2c0_devices,
- 				ARRAY_SIZE(mop500_i2c0_devices));
-diff --git a/arch/arm/mach-ux500/include/mach/irqs.h b/arch/arm/mach-ux500/include/mach/irqs.h
-index 0e7a2ce..0d552d9 100644
---- a/arch/arm/mach-ux500/include/mach/irqs.h
-+++ b/arch/arm/mach-ux500/include/mach/irqs.h
-@@ -40,7 +40,7 @@
- #define IRQ_HSIR_CH1_OVRRUN	(IRQ_SHPI_START + 33)
- #define IRQ_HSIR_CH2_OVRRUN	(IRQ_SHPI_START + 34)
- #define IRQ_HSIR_CH3_OVRRUN	(IRQ_SHPI_START + 35)
--#define IRQ_AB4500		(IRQ_SHPI_START + 40)
-+#define IRQ_AB8500		(IRQ_SHPI_START + 40)
- #define IRQ_PRCMU               (IRQ_SHPI_START + 47)
- #define IRQ_DISP		(IRQ_SHPI_START + 48)
- #define IRQ_SiPI3		(IRQ_SHPI_START + 49)
--- 
-1.6.3.3
+~Randy
+*** Remember to use Documentation/SubmitChecklist when testing your code ***
