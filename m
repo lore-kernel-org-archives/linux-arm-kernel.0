@@ -1,28 +1,25 @@
 From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 16 Aug 2010 14:22:16 +0200
+Date: Mon, 16 Aug 2010 14:27:15 +0200
 Subject: [PATCH 1/3] dmaengine: add possibility for cyclic transfers
-In-Reply-To: <1281956870-12463-2-git-send-email-s.hauer@pengutronix.de>
+In-Reply-To: <19561.10098.732048.877464@ipc1.ka-ro>
 References: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
 	<1281956870-12463-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <AANLkTi=3OYmuPUnBGimGTiGUbh32KDPyoXubvXJZAR99@mail.gmail.com>
+	<19561.10098.732048.877464@ipc1.ka-ro>
+Message-ID: <AANLkTi=otwukcL2RM3P=hdAgzY+QDv99abQh4QXtVuqo@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/8/16 Sascha Hauer <s.hauer@pengutronix.de>:
+2010/8/16 Lothar Wa?mann <LW@karo-electronics.de>:
 
-> Cyclic transfers are useful for audio where a single buffer divided
-> in periods has to be transfered endlessly until stopped. After being
-> prepared the transfer is started using the dma_async_descriptor->tx_submit
-> function. dma_async_descriptor->callback is called after each period.
-> The transfer is stopped using the DMA_TERMINATE_ALL callback.
-> While being used for cyclic transfers the channel cannot be used
-> for other transfer types.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Haavard Skinnemoen <haavard.skinnemoen@atmel.com>
+> Why not implement this feature using cyclic SG lists (created with
+> sg_chain())? This would give you endless DMA transfers without any
+> special DMA API extensions.
 
-Looks good to me.
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+That would be elegant...
+
+The driver will have to detect that the sglist is chained like an
+ouroboros to program the DMAC apropriately, is is easy to
+detect if an sglist is chained onto itself?
 
 Yours,
 Linus Walleij
