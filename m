@@ -1,69 +1,36 @@
 From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Mon, 16 Aug 2010 15:14:33 +0200
-Subject: [PATCH 4/4] clock-imx35: Calculate the base clock rate for the IPU
-	unit
+Date: Mon, 16 Aug 2010 15:14:30 +0200
+Subject: [PATCH 1/4] clock-imx35: use get_3_3_div helper for get_rate_ipg_per
 In-Reply-To: <1281964473-27484-1-git-send-email-m.grzeschik@pengutronix.de>
 References: <1281964473-27484-1-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <1281964473-27484-5-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <1281964473-27484-2-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mx3fb driver needs the clock the IPU runs in order to calculate
-the divider for the LCD clock. This patch adds the clock rate calculation
-routine for the i.MX35 CPU.
-
-Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
 ---
- arch/arm/mach-mx3/clock-imx35.c |   29 ++++++++++++++++++++++++++++-
- 1 files changed, 28 insertions(+), 1 deletions(-)
+ arch/arm/mach-mx3/clock-imx35.c |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
-index 009156d..9b7dbcc 100644
+index d3af0fd..4b10f46 100644
 --- a/arch/arm/mach-mx3/clock-imx35.c
 +++ b/arch/arm/mach-mx3/clock-imx35.c
-@@ -300,6 +300,33 @@ static unsigned long get_rate_ipg_per(struct clk *clk)
- 	}
- }
- 
-+static unsigned long get_rate_hsp(struct clk *clk)
-+{
-+	unsigned long hsp_podf = (__raw_readl(CCM_BASE + CCM_PDR0) >> 20) & 0x03;
-+	unsigned long fref = get_rate_mpll();
-+
-+	if (fref > 400 * 1000 * 1000) {
-+		switch (hsp_podf) {
-+		case 0:
-+			return fref >> 2;
-+		case 1:
-+			return fref >> 3;
-+		case 2:
-+			return fref / 3;
-+		}
-+	} else {
-+		switch (hsp_podf) {
-+		case 0:
-+		case 2:
-+			return fref / 3;
-+		case 1:
-+			return fref / 6;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
- static int clk_cgr_enable(struct clk *clk)
+@@ -290,12 +290,10 @@ static unsigned long get_rate_ipg_per(struct clk *clk)
  {
- 	u32 reg;
-@@ -357,7 +384,7 @@ DEFINE_CLOCK(i2c1_clk,   0, CCM_CGR1, 10, get_rate_ipg_per, NULL);
- DEFINE_CLOCK(i2c2_clk,   1, CCM_CGR1, 12, get_rate_ipg_per, NULL);
- DEFINE_CLOCK(i2c3_clk,   2, CCM_CGR1, 14, get_rate_ipg_per, NULL);
- DEFINE_CLOCK(iomuxc_clk, 0, CCM_CGR1, 16, NULL, NULL);
--DEFINE_CLOCK(ipu_clk,    0, CCM_CGR1, 18, get_rate_ahb, NULL);
-+DEFINE_CLOCK(ipu_clk,    0, CCM_CGR1, 18, get_rate_hsp, NULL);
- DEFINE_CLOCK(kpp_clk,    0, CCM_CGR1, 20, get_rate_ipg, NULL);
- DEFINE_CLOCK(mlb_clk,    0, CCM_CGR1, 22, get_rate_ahb, NULL);
- DEFINE_CLOCK(mshc_clk,   0, CCM_CGR1, 24, get_rate_mshc, NULL);
+ 	unsigned long pdr0 = __raw_readl(CCM_BASE + CCM_PDR0);
+ 	unsigned long pdr4 = __raw_readl(CCM_BASE + CCM_PDR4);
+-	unsigned long div1, div2;
++	unsigned long div1;
+ 
+ 	if (pdr0 & (1 << 26)) {
+-		div1 = (pdr4 >> 19) & 0x7;
+-		div2 = (pdr4 >> 16) & 0x7;
+-		return get_rate_arm() / ((div1 + 1) * (div2 + 1));
++		return get_rate_arm() / get_3_3_div(pdr4 >> 16);
+ 	} else {
+ 		div1 = (pdr0 >> 12) & 0x7;
+ 		return get_rate_ahb(NULL) / div1;
 -- 
 1.7.1
