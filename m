@@ -1,39 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 16 Aug 2010 12:00:34 +0100
-Subject: [PATCH] ARM: perf: reword comments relating to
-	perf_event_do_pending
-In-Reply-To: <20100816103526.GB2954@pulham.picochip.com>
-References: <1281954331-5633-1-git-send-email-will.deacon@arm.com>
-	<20100816103526.GB2954@pulham.picochip.com>
-Message-ID: <000501cb3d32$40447b00$c0cd7100$@deacon@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 16 Aug 2010 13:07:47 +0200
+Subject: [RFC] dmaengine: assorted patches and Freescale SDMA support
+Message-ID: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jamie,
+Hi all,
 
-> On Mon, Aug 16, 2010 at 11:25:31AM +0100, Will Deacon wrote:
-> > This is purely a cosmetic change to the ARM perf backend because the current
-> > comments about the relationship between NMIs, interrupt context and
-> > perf_event_do_pending are misleading.
-> >
-> > This patch updates the comments so that they reflect what the code
-> > actually does (which is in line with other architectures).
-> >
-> > Cc: Jamie Iles <jamie.iles@picochip.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> Yep, that makes much more sense!
-> 
-> Acked-by: Jamie Iles <jamie.iles@picochip.com>
+This is the first attempt to implement the Freescale i.MX SDMA engine
+as part of the dmaengine API.
 
-Thanks for that. We could go a step further and remove the call to
-perf_event_do_pending entirely because we don't have NMI and therefore
-never queue up any pending events. I guess the caveat here is that
-we might hit subtle bugs in the future if pending events are used for
-things other than NMI (or if somebody crazy decides to use FIQ as a PMU
-interrupt).
+The first patch adds support for cyclic transfers usable for audio. There
+is a similar approach implemented for the dw_dmac, this patch instead adds
+the cyclic transfers to the dmaengine API.
 
-I'll leave it in for the moment and submit this patch to the system.
+Other patches not posted here are necessary to actually make use of the
+SDMA engine. Please pull the following branch if you want to test these
+patches. The branch includes mxcmmc support for the i.MX31 based on SDMA
+and i.MX35-3stack audio support (sgtl5000 codec):
 
-Cheers,
+http://git.pengutronix.de/git/imx/linux-2.6.git sdma-sdmaengine
 
-Will
+For generating firmware images for the SDMA engine look at
+
+http://git.pengutronix.de/git/imx/sdma-firmware.git
+
+Sascha
