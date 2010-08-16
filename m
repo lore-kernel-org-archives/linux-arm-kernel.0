@@ -1,45 +1,40 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 16 Aug 2010 15:47:01 +0200
-Subject: [PATCH 1/4] clock-imx35: use get_3_3_div helper for
-	get_rate_ipg_per
-In-Reply-To: <4C693F2C.6060605@ru.mvista.com>
-References: <1281964473-27484-1-git-send-email-m.grzeschik@pengutronix.de>
-	<1281964473-27484-2-git-send-email-m.grzeschik@pengutronix.de>
-	<4C693F2C.6060605@ru.mvista.com>
-Message-ID: <4C694155.8070508@pengutronix.de>
+From: m.grzeschik@pengutronix.de (Michael Grzeschik)
+Date: Mon, 16 Aug 2010 15:54:05 +0200
+Subject: [PATCH|RESEND 2/4] clock-imx35: fix divider if ahb is source for
+	ipg_per
+In-Reply-To: <1281966847-553-1-git-send-email-m.grzeschik@pengutronix.de>
+References: <1281966847-553-1-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <1281966847-553-3-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei Shtylyov wrote:
-> Hello.
-> 
-> Michael Grzeschik wrote:
-> 
->> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> 
->    So, who's the author of the patch? In case it's actually Marc, you
-> should have added (at the start of the changelog):
+From: Marc Kleine-Budde <mkl@pengutronix.de>
 
-Yeah, it's me.
+According to the Datasheet:
+"i.MX35 (MCIMX35) Multimedia Applications Processor Reference Manual,
+Rev. 2" "Table 14-6. PDR0 Field Descriptions" the divider is
+CCM_PER_AHB[3:0] + 1.
 
-> From: Marc Kleine-Budde <mkl@pengutronix.de>
-or do a:
-$(git commit --amend --author="Marc Kleine-Budde <mkl@pengutronix.de>")
-on the patches..
+This patch adds the missing + 1.
 
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+---
+ arch/arm/mach-mx3/clock-imx35.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Marc
+diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
+index 4b10f46..f54a82c 100644
+--- a/arch/arm/mach-mx3/clock-imx35.c
++++ b/arch/arm/mach-mx3/clock-imx35.c
+@@ -296,7 +296,7 @@ static unsigned long get_rate_ipg_per(struct clk *clk)
+ 		return get_rate_arm() / get_3_3_div(pdr4 >> 16);
+ 	} else {
+ 		div1 = (pdr0 >> 12) & 0x7;
+-		return get_rate_ahb(NULL) / div1;
++		return get_rate_ahb(NULL) / (div1 + 1);
+ 	}
+ }
+ 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 260 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100816/f135c32a/attachment.sig>
+1.7.1
