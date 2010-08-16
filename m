@@ -1,44 +1,45 @@
-From: gururajakr@sanyo.co.in (Gururaja Hebbar K R)
-Date: Mon, 16 Aug 2010 00:32:23 -0000
-Subject: Query: Patches break with Microsoft exchange server.
-References: <4C5F9B25.8080401@st.com>
-Message-ID: <5BF78BCE8D9BF14A83F836BD9E3916BA515007@blrms.slti.sanyo.co.in>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Mon, 16 Aug 2010 06:48:51 -0000
+Subject: [PATCH] Add support for Vista Silicon Visstrim_m10 board [v6].
+In-Reply-To: <606214.36639.qm@web51004.mail.re2.yahoo.com>
+References: <1280477161-16350-1-git-send-email-javier.martin@vista-silicon.com>
+	<606214.36639.qm@web51004.mail.re2.yahoo.com>
+Message-ID: <AANLkTineSkM=eVYcrH5qM6UvWWrL=BZxH+OzXp9Hdw==@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 30 July 2010 18:49, Fabio Estevam <fabioestevam@yahoo.com> wrote:
 
-Hope this helps
+> Javier,
+>
+> --- On Fri, 7/30/10, Javier Martin <javier.martin@vista-silicon.com>
+> wrote:
+> ...
+>
+> > +/* Visstrim_SM10 has a microSD slot connected to sdhc2 */
+>
+> Isn't it connected to SDHC1?
+>
+> Regards,
+>
+> Fabio Estevam
+>
+>
+>
+> Yes, which is SDHC2 according to Freescale's Reference Manual.
 
-http://support.microsoft.com/?id=823921
+Any reason for not applying this patch yet?
 
-Regards
-Gururaja 
+Thank you.
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org 
-> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On 
-> Behalf Of viresh kumar
-> Sent: Monday, August 09, 2010 3:08 PM
-> To: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Subject: Query: Patches break with Microsoft exchange server.
-> 
-> Hello,
-> 
-> Mail server in ST has recently changed and now we have 
-> Microsoft exchange server. We are using thunderbird as mail client.
-> What we observed with this server is that patch are broken 
-> now while sending as well as receiving. Tabs are replaced by 
-> spaces and may be some other too which we haven't observed.
-> 
-> Has anybody found a solution to this kind of issues? Are 
-> there any workarounds possible?
-> 
-> viresh
-> ST Microelectronics.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100816/7e2102f9/attachment-0001.html>
