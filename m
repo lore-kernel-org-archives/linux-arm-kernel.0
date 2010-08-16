@@ -1,33 +1,16 @@
-From: randy.dunlap@oracle.com (Randy Dunlap)
-Date: Wed, 11 Aug 2010 20:23:09 -0000
-Subject: [PATCH] Documentation about RS485 serial communications
-Message-ID: <77d8ceaa-53b7-4bd2-b3ca-cd825fb61ce8@default>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 16 Aug 2010 22:39:59 -0000
+Subject: [PATCH] MAINTAINERS: Update ARM/S3C patterns
+In-Reply-To: <28b93faea32a3f5a3f79a68b92c60ba7dad99425.1281422516.git.joe@perches.com>
+References: <28b93faea32a3f5a3f79a68b92c60ba7dad99425.1281422516.git.joe@perches.com>
+Message-ID: <4C66B63A.1020509@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ Original Message -----
-From: claudio@evidence.eu.com
-To: randy.dunlap at oracle.com
-Sent: Wednesday, August 11, 2010 12:59:08 PM GMT -08:00 US/Canada Pacific
-Subject: Re: [PATCH] Documentation about RS485 serial communications
-
-Hi Randy,
-
-	thank you for the feedback.
-
-[...]
-
+On 10/08/10 07:46, Joe Perches wrote:
+> for merged SOCs
 > 
-> TIOC[SG]RS485 are #defined in <asm-generic/ioctls.h>, so
-> #include <asm-generic/ioctls.h>
-> here and/or below (in userspace program).
-> 
+> Signed-off-by: Joe Perches <joe@perches.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
 
-I noticed that for some architectures (e.g., cris) these ioctls are defined also in arch/cris/include/asm/ioctls.h, and with different values with respect to the values defined on asm-generic/ioctls.h.
-
-Therefore, I wasn't completely sure that the values defined in asm-generic are being used in every driver...
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Oh, OK, I see.  Thanks for the info.
-
-~Randy
+Acked-by: Ben Dooks <ben-linux@fluff.org>
