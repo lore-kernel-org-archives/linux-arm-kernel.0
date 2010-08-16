@@ -1,55 +1,87 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 16 Aug 2010 10:01:09 +0900
-Subject: [PATCH] ARM: Update number of VIC
-In-Reply-To: <1281697788-18018-1-git-send-email-kgene.kim@samsung.com>
-References: <1281697788-18018-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <AANLkTikyZHX-PmPx8DjyP6ar7wmyiP7Cf9-ttZQJXttZ@mail.gmail.com>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Mon, 16 Aug 2010 09:51:04 +0530
+Subject: [PATCH v4 3/8] wireless: wl1271: add platform driver to get
+	board data
+In-Reply-To: <20100811212513.GC827@n2100.arm.linux.org.uk>
+References: <1281550913-17633-1-git-send-email-ohad@wizery.com>
+	<1281550913-17633-4-git-send-email-ohad@wizery.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0324110ABD@dbde02.ent.ti.com>
+	<20100811184742.GA21778@nokia.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC1@dbde02.ent.ti.com>
+	<20100811185724.GD21778@nokia.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB0324110AC7@dbde02.ent.ti.com>
+	<20100811212513.GC827@n2100.arm.linux.org.uk>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB032419CAAC@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even though it required. I still think ben's patch is better approaches.
-Talk to Ben again.
-And there's no answer from Russell this approaches can be accepted.
 
-And if you want to apply this patch, please apply my previous patch
-and then add other SoCs.
-http://marc.info/?l=linux-arm-kernel&m=127555986709819&w=2
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Thursday, August 12, 2010 2:55 AM
+> To: DebBarma, Tarun Kanti
+> Cc: felipe.balbi at nokia.com; Ohad Ben-Cohen; Kalle Valo; Pandita, Vikram;
+> akpm at linux-foundation.org; Quadros Roger (Nokia-MS/Helsinki); Tony
+> Lindgren; linux-wireless at vger.kernel.org; Mark Brown; linux-
+> mmc at vger.kernel.org; Nicolas Pitre; San Mehat; Chikkature Rajashekar,
+> Madhusudhan; Coelho Luciano (Nokia-MS/Helsinki); linux-
+> omap at vger.kernel.org; Ido Yariv; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v4 3/8] wireless: wl1271: add platform driver to get
+> board data
+> 
+> On Thu, Aug 12, 2010 at 12:57:18AM +0530, DebBarma, Tarun Kanti wrote:
+> >
+> > > -----Original Message-----
+> > > From: Felipe Balbi [mailto:felipe.balbi at nokia.com]
+> > > Sent: Thursday, August 12, 2010 12:27 AM
+> > > To: DebBarma, Tarun Kanti
+> > > Cc: Balbi Felipe (Nokia-MS/Helsinki); Ohad Ben-Cohen; linux-
+> > > wireless at vger.kernel.org; linux-mmc at vger.kernel.org; linux-
+> > > omap at vger.kernel.org; Ido Yariv; Mark Brown; linux-arm-
+> > > kernel at lists.infradead.org; Chikkature Rajashekar, Madhusudhan; Coelho
+> > > Luciano (Nokia-MS/Helsinki); akpm at linux-foundation.org; San Mehat;
+> Quadros
+> > > Roger (Nokia-MS/Helsinki); Tony Lindgren; Nicolas Pitre; Pandita,
+> Vikram;
+> > > Kalle Valo
+> > > Subject: Re: [PATCH v4 3/8] wireless: wl1271: add platform driver to
+> get
+> > > board data
+> > >
+> > > Hi,
+> > >
+> > > On Wed, Aug 11, 2010 at 08:52:54PM +0200, ext DebBarma, Tarun Kanti
+> wrote:
+> > > >True; however if we go by that argument than we can also assume pdata
+> > > >is valid, so that we would not need the below check.
+> > >
+> > > of course not. You can have devices that just play well with default
+> > > values or devices where you don't need the flexibility of platform
+> data.
+> > > That's why we check.
+> > >
+> > > platform_device pointers on the other hand, are guaranteed to be
+> always
+> > > true, if it isn't then you should oops, you deserve to oops because
+> > > something is really really wrong.
+> > >
+> > Sounds perfect!
+> > What that means is _probe() function makes sense only for cases where we
+> > have valid platform data because we are returning right at the top if
+> > pdata is not valid. If this is the case I was curious to know why not
+> > framework make another check for valid pdata before calling _probe()
+> > instead of coming all the way to _probe() and then returning!
+> 
+> Platform devices are not for passing platform data around - they're for
+> declaring platform hardware devices that we want drivers to handle -
+> and it depends on the driver whether having platform data is appropriate
+> or not.
+> 
+> This proposal is, IMHO, abusing the platform device/driver support to
+> achieve its own goals.  I've outlined a far simpler and easiler solution
+> which avoids this kind of abuse, and given suggestions on how to extend
+> it to support multiple instances.
 
-Thank you,
-Kyungmin Park
+I guess I have not put my question in the right perspective. As you have said, platform devices are not meant for passing data around, it appeared to me contradictory when in the probe() we are just checking the pdata and proceeding/returning based upon its value, as if platform device has no other functions. So, the question should have been what else we could do in probe() with platform device other than manipulation of pdata, other than modification of the framework in the real sense.
 
-On Fri, Aug 13, 2010 at 8:09 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Update the number of VIC to handle the 3 or 4 VICs of
-> the S5PV210, S5P6442 and S5PC100.
->
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Russell King <rmk@arm.linux.org.uk>
-> ---
-> ?arch/arm/common/Kconfig | ? ?4 +++-
-> ?1 files changed, 3 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
-> index 0a34c81..b7c76a9 100644
-> --- a/arch/arm/common/Kconfig
-> +++ b/arch/arm/common/Kconfig
-> @@ -6,8 +6,10 @@ config ARM_VIC
->
-> ?config ARM_VIC_NR
-> ? ? ? ?int
-> - ? ? ? default 2
-> ? ? ? ?depends on ARM_VIC
-> + ? ? ? default 4 if ARCH_S5PV210
-> + ? ? ? default 3 if ARCH_S5P6442 || ARCH_S5PC100
-> + ? ? ? default 2
-> ? ? ? ?help
-> ? ? ? ? ?The maximum number of VICs available in the system, for
-> ? ? ? ? ?power management.
-> --
-> 1.6.2.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Anyways, I will go through the suggestions you mentioned. Thanks for the clarifications.
