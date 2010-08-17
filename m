@@ -1,125 +1,39 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Tue, 17 Aug 2010 17:37:47 +0900
-Subject: [PATCH] ARM: S5PC210: Add gpio keys at Universal board
-In-Reply-To: <20100802052846.GA11979@july>
-References: <20100802052846.GA11979@july>
-Message-ID: <AANLkTinF0AuuzYHxsxvtgsVq4=sbX-zRfmXW-ZjmTAA_@mail.gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Tue, 17 Aug 2010 10:53:24 +0200
+Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <AANLkTik_2MKMhOuDGOmu8Kzyq-ipLe+Bxrb3FaD+Tv4U@mail.gmail.com>
+References: <cover.1281956490.git.richard.cochran@omicron.at>
+	<363bd749a38d0b785d8431e591bf54c38db4c2d7.1281956490.git.richard.cochran@omicron.at>
+	<AANLkTik_2MKMhOuDGOmu8Kzyq-ipLe+Bxrb3FaD+Tv4U@mail.gmail.com>
+Message-ID: <20100817085324.GB3330@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kgene,
+On Mon, Aug 16, 2010 at 12:24:48PM -0700, john stultz wrote:
+> 3) I'm not sure I see the benefit of being able to have multiple
+> frequency corrected time domains.  In other words, what benefit would
+> you get from adjusting a PTP clock's frequency instead of just
+> adjusting the system's time freq? Having the PTP time as a reference
+> to correct the system time seems reasonable, but I'm not sure I see
+> why userland would want to adjust the PTP clock's freq.
 
-Can you apply other universal board support?
-gpio-keys and gpio-i2c.
+For PTP enabled hardware, the timestamp on the network packet comes
+from from the PTP clock, not from the system time.
 
-and one more request I sent the new gpio support codes. but no one
-mention it. any comment? or how can we merge it?
+Of course, you can always just leave the PTP clock alone, figure the
+needed correction, and apply it whenever needed. But this has some
+disadvantages. First of all, the (one and only) open source PTPd does
+not do it that way. Also, only one program (the PTPd or equivalent)
+will know the correct time. Other programs will not be able to ask the
+operating system for time services. Instead, they would need to use
+IPC to the PTPd.
 
-Thank you,
-Kyungmin Park
+The PTP protocol (and some PTP hardware) offers a "one step" method,
+where the timestamps are inserted by the hardware on the fly. Here you
+really do need the PTP clock to be correctly adjusted.
 
-On Mon, Aug 2, 2010 at 2:28 PM, Kyungmin Park <kyungmin.park@samsung.com> wrote:
-> Universal board has 5 gpio keys.
->
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> ?arch/arm/mach-s5pv310/mach-universal.c | ? 62 ++++++++++++++++++++++++++++++++
-> ?1 files changed, 62 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-s5pv310/mach-universal.c b/arch/arm/mach-s5pv310/mach-universal.c
-> index b5908d9..d584028 100644
-> --- a/arch/arm/mach-s5pv310/mach-universal.c
-> +++ b/arch/arm/mach-s5pv310/mach-universal.c
-> @@ -7,7 +7,11 @@
-> ?* published by the Free Software Foundation.
-> ?*/
->
-> +#include <linux/platform_device.h>
-> ?#include <linux/serial_core.h>
-> +#include <linux/input.h>
-> +#include <linux/gpio_keys.h>
-> +#include <linux/gpio.h>
->
-> ?#include <asm/mach/arch.h>
-> ?#include <asm/mach-types.h>
-> @@ -60,6 +64,61 @@ static struct s3c2410_uartcfg universal_uartcfgs[] __initdata = {
-> ? ? ? ?},
-> ?};
->
-> +static struct gpio_keys_button universal_gpio_keys_tables[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .code ? ? ? ? ? ? ? ? ? = KEY_VOLUMEUP,
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = S5PV310_GPX2(0), ? ? ?/* XEINT16 */
-> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "gpio-keys: KEY_VOLUMEUP",
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? ? ? ? ? = EV_KEY,
-> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
-> + ? ? ? ? ? ? ? .debounce_interval ? ? ?= 1,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .code ? ? ? ? ? ? ? ? ? = KEY_VOLUMEDOWN,
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = S5PV310_GPX2(1), ? ? ?/* XEINT17 */
-> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "gpio-keys: KEY_VOLUMEDOWN",
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? ? ? ? ? = EV_KEY,
-> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
-> + ? ? ? ? ? ? ? .debounce_interval ? ? ?= 1,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .code ? ? ? ? ? ? ? ? ? = KEY_CONFIG,
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = S5PV310_GPX2(2), ? ? ?/* XEINT18 */
-> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "gpio-keys: KEY_CONFIG",
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? ? ? ? ? = EV_KEY,
-> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
-> + ? ? ? ? ? ? ? .debounce_interval ? ? ?= 1,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .code ? ? ? ? ? ? ? ? ? = KEY_CAMERA,
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = S5PV310_GPX2(3), ? ? ?/* XEINT19 */
-> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "gpio-keys: KEY_CAMERA",
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? ? ? ? ? = EV_KEY,
-> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
-> + ? ? ? ? ? ? ? .debounce_interval ? ? ?= 1,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .code ? ? ? ? ? ? ? ? ? = KEY_OK,
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = S5PV310_GPX3(5), ? ? ?/* XEINT29 */
-> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "gpio-keys: KEY_OK",
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? ? ? ? ? = EV_KEY,
-> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
-> + ? ? ? ? ? ? ? .debounce_interval ? ? ?= 1,
-> + ? ? ? },
-> +};
-> +
-> +static struct gpio_keys_platform_data universal_gpio_keys_data = {
-> + ? ? ? .buttons ? ? ? ?= universal_gpio_keys_tables,
-> + ? ? ? .nbuttons ? ? ? = ARRAY_SIZE(universal_gpio_keys_tables),
-> +};
-> +
-> +static struct platform_device universal_gpio_keys = {
-> + ? ? ? .name ? ? ? ? ? ? ? ? ? = "gpio-keys",
-> + ? ? ? .dev ? ? ? ? ? ? ? ? ? ?= {
-> + ? ? ? ? ? ? ? .platform_data ?= &universal_gpio_keys_data,
-> + ? ? ? },
-> +};
-> +
-> +static struct platform_device *universal_devices[] __initdata = {
-> + ? ? ? &universal_gpio_keys,
-> +};
-> +
-> ?static void __init universal_map_io(void)
-> ?{
-> ? ? ? ?s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-> @@ -72,6 +131,9 @@ static void __init universal_machine_init(void)
-> ?#ifdef CONFIG_CACHE_L2X0
-> ? ? ? ?l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
-> ?#endif
-> +
-> + ? ? ? /* Last */
-> + ? ? ? platform_add_devices(universal_devices, ARRAY_SIZE(universal_devices));
-> ?}
->
-> ?MACHINE_START(UNIVERSAL, "UNIVERSAL")
-> --
-> 1.5.3.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+All of the PTP hardware that I am familiar with provides a clock
+adjustment method, so it simpler and cleaner just to use this facility
+to tune the PTP clock.
+
+Richard
