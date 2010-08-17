@@ -1,65 +1,48 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 17 Aug 2010 14:51:30 +0900
-Subject: [PATCH 3/5] ARM: S5PC110: gpio_to_irq support on external
-	interrupt
-In-Reply-To: <20100805072544.GA22271@july>
-References: <20100805072544.GA22271@july>
-Message-ID: <AANLkTimL2And_8-vBvQUSJerYUhKFyH3ycr761Q3UQEx@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 17 Aug 2010 08:47:34 +0200
+Subject: [PATCH 3/3] dmaengine: Add Freescale i.MX SDMA support
+In-Reply-To: <20100817043612.GA9631@jasper.tkos.co.il>
+References: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
+	<1281956870-12463-4-git-send-email-s.hauer@pengutronix.de>
+	<AANLkTi=pO-ZJ33FrL=4bVRYa2o9HA0_h5tBYG7wdMuwz@mail.gmail.com>
+	<20100816141540.GQ27749@pengutronix.de>
+	<20100817043612.GA9631@jasper.tkos.co.il>
+Message-ID: <20100817064734.GS27749@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I think it's also bug fix since current external IRQ can't support
-'gpio_to_irq' feature.
-I hope it's included at this rc window.
+On Tue, Aug 17, 2010 at 07:36:12AM +0300, Baruch Siach wrote:
+> Hi Sascha,
+> 
+> On Mon, Aug 16, 2010 at 04:15:40PM +0200, Sascha Hauer wrote:
+> > On Mon, Aug 16, 2010 at 02:21:06PM +0200, Linus Walleij wrote:
+> > > 2010/8/16 Sascha Hauer <s.hauer@pengutronix.de>:
+> > > > The SDMA engine is a scatter/gather DMA engine which is implemented
+> > > > as a seperate coprocessor. SDMA needs its own firmware which is
+> > > > requested using the standard request_firmware mechanism. The firmware
+> > > > has different entry points for each peripheral type, so drivers
+> > > > have to pass the peripheral type to the DMA engine which in turn
+> > > > picks the correct firmware entry point from a table contained in
+> > > > the firmware image itself.
+> > > 
+> > > Quite fun, if the spec for the microcode is open this opens up
+> > > for dynamic firmware generation for specific DMA jobs does it
+> > > not?
+> > 
+> > Unfortunately the specs are not open, so we are sticked to the binary
+> > microcode from Freescale. I'm pretty sure though that the SDMA engine
+> > could do at least a device_prep_dma_xor operation.
+> 
+> Chapter 38 in the i.MX25 Reference Manual seems to include almost everything 
+> there is to know about the SDMA. Isn't this enough for writing custom SDMA 
+> microcodes?
 
-On Thu, Aug 5, 2010 at 4:25 PM, Kyungmin Park <kmpark@infradead.org> wrote:
-> From: Kyungmin Park <kyungmin.park@samsung.com>
->
-> Using group field, it can calculate the related irq number easily.
-> Also if don't support gpio_to_irq, it can't use the gpio functionaliy fully.
-> e.g., can't use the gpio-keys and so on
->
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> ?arch/arm/mach-s5pv210/gpiolib.c | ? 12 ++++++++++++
-> ?1 files changed, 12 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-s5pv210/gpiolib.c b/arch/arm/mach-s5pv210/gpiolib.c
-> index f6a32c4..bd24c81 100644
-> --- a/arch/arm/mach-s5pv210/gpiolib.c
-> +++ b/arch/arm/mach-s5pv210/gpiolib.c
-> @@ -246,6 +246,15 @@ static struct s3c_gpio_chip s5pv210_gpio_4bit[] = {
-> ? ? ? ?},
-> ?};
->
-> +static int s5pv210_extint_to_irq(struct gpio_chip *gpio, unsigned int offset)
-> +{
-> + ? ? ? struct s3c_gpio_chip *chip = to_s3c_gpio(gpio);
-> + ? ? ? int irq;
-> +
-> + ? ? ? irq = (chip->group * 8) + offset;
-> + ? ? ? return IRQ_EINT(irq);
-> +}
-> +
-> ?static __init int s5pv210_gpiolib_init(void)
-> ?{
-> ? ? ? ?struct s3c_gpio_chip *chip = s5pv210_gpio_4bit;
-> @@ -257,6 +266,9 @@ static __init int s5pv210_gpiolib_init(void)
-> ? ? ? ? ? ? ? ? ? ? ? ?chip->config = &gpio_cfg;
-> ? ? ? ? ? ? ? ?if (chip->config == &gpio_cfg_extint) {
-> ? ? ? ? ? ? ? ? ? ? ? ?chip->base = S5PV210_BANK_BASE(extint) + EXTINT_OFFSET;
-> + ? ? ? ? ? ? ? ? ? ? ? /* Assign the external GPIO interrupt group number */
-> + ? ? ? ? ? ? ? ? ? ? ? chip->group = extint;
-> + ? ? ? ? ? ? ? ? ? ? ? chip->chip.to_irq = s5pv210_extint_to_irq;
-> ? ? ? ? ? ? ? ? ? ? ? ?extint++;
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ? ? ? ? ?if (chip->base == NULL)
-> --
-> 1.5.3.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Unfortunately not, the assembler is missing.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
