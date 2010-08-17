@@ -1,45 +1,35 @@
-From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Tue, 17 Aug 2010 02:02:44 -0700
-Subject: [PATCH v4] arm: msm: Add MSM IOMMU support.
-In-Reply-To: <20100816183226.GA31512@phenom.dumpdata.com>
-References: <1281469529-23340-1-git-send-email-stepanm@codeaurora.org>
-	<20100816183226.GA31512@phenom.dumpdata.com>
-Message-ID: <4C6A5034.2090406@codeaurora.org>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Tue, 17 Aug 2010 11:06:15 +0200
+Subject: [RFC] new ATAG for NVS?
+In-Reply-To: <AANLkTikMoc+QZnp2SeX2AJMCMF=FYVdWgQOri0cxTvkw@mail.gmail.com>
+References: <AANLkTikMoc+QZnp2SeX2AJMCMF=FYVdWgQOri0cxTvkw@mail.gmail.com>
+Message-ID: <AANLkTi=RhOJTVg8UhMUxkgR-pNJXY4kcjUeE53CM-yFT@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  On 8/16/2010 11:32 AM, Konrad Rzeszutek Wilk wrote:
-> I did a very brief look.
->
->> +	dmac_flush_range(fl_table, fl_table + SZ_16K);
->> +
->> +	for (i = 0; i<  4096; i++)
-> Can you use a #define for the 4096? Will that value ever change?
-I suppose a #define can be used, but this is a HW-specific number that 
-will never ever change.
+2010/8/13 Vitaly Wool <vitalywool@gmail.com>:
 
->> +		if ((fl_table[i]&  0x03) == FL_TYPE_TABLE) {
->> +			void *sl_table = __va(fl_table[i]&  0xFFFFFC00);
-> Does it make sense to define say:
-> #define MASK_XX (x) x&  0xFFFFFC00
-> and
-> #define MASK_XY (x) x&  0xFFFF0000
->
-> and use those instead of these hard-coded values?
-I guess so.. again, HW specific.
+> we're currently thinking over how to pass over the data from
+> non-volatile storage to a kernel driver. I've seen some examples in
+> kernel that actually read out the NV data to userspace and then supply
+> it as firmware to the driver that requests it. However, if NV data is
+> anyway processed by the bootloader, isn't it reasonable to pass it
+> over to kernel via ATAG? I'm eager to come up with a patch that
+> introduces new ATAG for that.
 
+What kind of data is it and where is it stored?
 
->> +	priv->pgtable = (unsigned long *)__get_free_pages(GFP_KERNEL, 2);
-> Ugh.  Can you use get_order(SZ_16K) instead?
->
->> +	/* Invalidate context TLB */
->> +	SET_CTX_TLBIALL(base, ctx, 0);
->> +	SET_V2PPR_VA(base, ctx, va>>  12);
-> Hmm, PAGE_SHIFT can't be used? Or some other #define?
-I guess I can use the IOMMU PA shift. PAGE_SHIFT is not appropriate here 
-because that is MMU-specific.
+I remember seeing some people adding extensions to e.g. the
+RTC drivers to read out the NVRAM found in some RTC chips,
 
-I can put out a v5 early next week.
+Isn't it possible to just export the symbol from e.g. the RTC driver
+and provide it in a header file like include/linux/rtc/foo.h
+int get_foo_nvram_array(char *ramcontents, maxlength);
+or something like that?
 
-Thanks
-Steve
+Or is there some other restriction like reading it is slow or
+in some security context so that only the bootloader can
+access it?
+
+Yours,
+Linus Walleij
