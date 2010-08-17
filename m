@@ -1,136 +1,149 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 17 Aug 2010 13:53:32 +0300
-Subject: [PATCH 4/4] omap: Fix SMP on UP interrupt handling for multi-omap
+Date: Tue, 17 Aug 2010 13:53:25 +0300
+Subject: [PATCH 2/4] ARM: Allow optional UP processor functions for SMP kernels
 In-Reply-To: <20100817104414.19061.38999.stgit@baageli.muru.com>
 References: <20100817104414.19061.38999.stgit@baageli.muru.com>
-Message-ID: <20100817105332.19061.44765.stgit@baageli.muru.com>
+Message-ID: <20100817105325.19061.93324.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix SMP on UP interrupt handling for multi-omap
+Attempt to detect if the hardware is UP hardware, and use the optional
+UP specific processors functions in struct proc_info_list if available.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/include/mach/entry-macro.S |   22 ++++++++++++++++++++++
- arch/arm/mach-omap2/omap-smp.c                 |   16 ++++++++++++----
- arch/arm/mach-omap2/timer-gp.c                 |    7 +++++--
- 3 files changed, 39 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/procinfo.h |    6 +++++
+ arch/arm/include/asm/smp_plat.h |    9 ++++++++
+ arch/arm/kernel/setup.c         |   45 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/mmu.c               |   20 ++++++++++-------
+ 4 files changed, 71 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/include/mach/entry-macro.S b/arch/arm/mach-omap2/include/mach/entry-macro.S
-index 06e64e1..75c67aa 100644
---- a/arch/arm/mach-omap2/include/mach/entry-macro.S
-+++ b/arch/arm/mach-omap2/include/mach/entry-macro.S
-@@ -189,17 +189,38 @@ omap_irq_base:	.word	0
- 		 */
- 
- 		.macro test_for_ipi, irqnr, irqstat, base, tmp
+diff --git a/arch/arm/include/asm/procinfo.h b/arch/arm/include/asm/procinfo.h
+index ca52e58..962d01e 100644
+--- a/arch/arm/include/asm/procinfo.h
++++ b/arch/arm/include/asm/procinfo.h
+@@ -40,6 +40,12 @@ struct proc_info_list {
+ 	struct cpu_tlb_fns	*tlb;
+ 	struct cpu_user_fns	*user;
+ 	struct cpu_cache_fns	*cache;
 +
-+#ifdef MULTI_OMAP2
-+		ldr	\tmp, =OMAP4_IRQ_BASE
-+		cmp	\base, \tmp
-+		beq	9993f
-+		cmpne	\tmp, \tmp
-+		beq	9994f
-+9993:
++#ifdef CONFIG_SMP_ON_UP
++	struct processor	*proc_up;
++	struct cpu_tlb_fns	*tlb_up;
++	struct cpu_cache_fns	*cache_up;
++#endif
+ };
+ 
+ #else	/* __KERNEL__ */
+diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+index e621530..1c2f587 100644
+--- a/arch/arm/include/asm/smp_plat.h
++++ b/arch/arm/include/asm/smp_plat.h
+@@ -18,4 +18,13 @@ static inline int cache_ops_need_broadcast(void)
+ 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 1;
+ }
+ 
++#ifdef CONFIG_SMP_ON_UP
++extern int smp_on_up(void);
++#else
++static inline int smp_on_up(void)
++{
++	return 0;
++}
 +#endif
 +
- 		bic	\irqnr, \irqstat, #0x1c00
- 		cmp	\irqnr, #16
- 		it	cc
- 		strcc	\irqstat, [\base, #GIC_CPU_EOI]
- 		it	cs
- 		cmpcs	\irqnr, \irqnr
-+9994:
- 		.endm
- 
- 		/* As above, this assumes that irqstat and base are preserved */
- 
- 		.macro test_for_ltirq, irqnr, irqstat, base, tmp
-+
-+#ifdef MULTI_OMAP2
-+		ldr	\tmp, =OMAP4_IRQ_BASE
-+		cmp	\base, \tmp
-+		beq	9995f
-+		cmpne	\tmp, \tmp
-+		beq	9996f
-+9995:
-+#endif
-+
- 		bic	\irqnr, \irqstat, #0x1c00
- 		mov 	\tmp, #0
- 		cmp	\irqnr, #29
-@@ -207,6 +228,7 @@ omap_irq_base:	.word	0
- 		moveq	\tmp, #1
- 		streq	\irqstat, [\base, #GIC_CPU_EOI]
- 		cmp	\tmp, #0
-+9996:
- 		.endm
- #endif	/* CONFIG_SMP */
- 
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index 9e9f70e..8ea16de 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -22,6 +22,7 @@
- 
- #include <asm/cacheflush.h>
- #include <asm/localtimer.h>
-+#include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
- #include <mach/hardware.h>
- #include <mach/omap4-common.h>
-@@ -114,11 +115,15 @@ void __init smp_init_cpus(void)
- {
- 	unsigned int i, ncores;
- 
--	/* Never released */
--	scu_base = ioremap(OMAP44XX_SCU_BASE, SZ_256);
--	BUG_ON(!scu_base);
-+	if (smp_on_up()) {
-+		ncores = 1;
-+	} else {
-+		/* Never released */
-+		scu_base = ioremap(OMAP44XX_SCU_BASE, SZ_256);
-+		BUG_ON(!scu_base);
- 
--	ncores = get_core_count();
-+		ncores = get_core_count();
-+	}
- 
- 	for (i = 0; i < ncores; i++)
- 		set_cpu_possible(i, true);
-@@ -146,6 +151,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 	}
- 	smp_store_cpu_info(cpu);
- 
-+	if (smp_on_up())
-+		ncores = 1;
-+
- 	/*
- 	 * are we trying to boot more cores than exist?
- 	 */
-diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-gp.c
-index 74fbed8..badf5f2 100644
---- a/arch/arm/mach-omap2/timer-gp.c
-+++ b/arch/arm/mach-omap2/timer-gp.c
-@@ -37,6 +37,7 @@
- #include <linux/clockchips.h>
- 
- #include <asm/mach/time.h>
-+#include <asm/smp_plat.h>
- #include <plat/dmtimer.h>
- #include <asm/localtimer.h>
- 
-@@ -228,8 +229,10 @@ static void __init omap2_gp_clocksource_init(void)
- static void __init omap2_gp_timer_init(void)
- {
- #ifdef CONFIG_LOCAL_TIMERS
--	twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
--	BUG_ON(!twd_base);
-+	if (smp_on_up()) {
-+		twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
-+		BUG_ON(!twd_base);
-+	}
  #endif
- 	omap_dm_timer_init();
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index d5231ae..5f3606c 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -289,6 +289,50 @@ static void __init feat_v6_fixup(void)
+ 		elf_hwcap &= ~HWCAP_TLS;
+ }
+ 
++#ifdef CONFIG_SMP_ON_UP
++
++static int _smp_on_up;
++
++int smp_on_up(void)
++{
++	return _smp_on_up;
++}
++
++static void __init smp_on_up_fixup(struct proc_info_list *list)
++{
++	int id;
++
++	id = read_cpuid_id() & 0xff0f0000;
++	if ((id == 0x41070000) || (id == 0x410f0000)) {
++		int mpidr;
++
++		asm volatile("mrc p15, 0, %0, c0, c0, 5" : "=r" (mpidr));
++		mpidr >>= 30;
++
++		/* SMP hardware? */
++		if (!((mpidr == 0) || (mpidr == 3)))
++			return;
++	}
++
++	_smp_on_up = 1;
++
++	pr_info("CPU: SMP kernel on UP hardware\n");
++
++	if (list->proc_up)
++		processor = *list->proc_up;
++
++	if (list->tlb_up)
++		cpu_tlb = *list->tlb_up;
++
++	if (list->cache_up)
++		cpu_cache = *list->cache_up;
++}
++#else
++static inline void smp_on_up_fixup(struct proc_info_list *list)
++{
++}
++#endif
++
+ static void __init setup_processor(void)
+ {
+ 	struct proc_info_list *list;
+@@ -331,6 +375,7 @@ static void __init setup_processor(void)
+ 	elf_hwcap &= ~HWCAP_THUMB;
+ #endif
+ 
++	smp_on_up_fixup(list);
+ 	feat_v6_fixup();
+ 
+ 	cacheid_init();
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 6e1c4f6..f320901 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -430,15 +430,17 @@ static void __init build_mem_type_table(void)
+ 		/*
+ 		 * Mark memory with the "shared" attribute for SMP systems
+ 		 */
+-		user_pgprot |= L_PTE_SHARED;
+-		kern_pgprot |= L_PTE_SHARED;
+-		vecs_pgprot |= L_PTE_SHARED;
+-		mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_S;
+-		mem_types[MT_DEVICE_WC].prot_pte |= L_PTE_SHARED;
+-		mem_types[MT_DEVICE_CACHED].prot_sect |= PMD_SECT_S;
+-		mem_types[MT_DEVICE_CACHED].prot_pte |= L_PTE_SHARED;
+-		mem_types[MT_MEMORY].prot_sect |= PMD_SECT_S;
+-		mem_types[MT_MEMORY_NONCACHED].prot_sect |= PMD_SECT_S;
++		if (!smp_on_up()) {
++			user_pgprot |= L_PTE_SHARED;
++			kern_pgprot |= L_PTE_SHARED;
++			vecs_pgprot |= L_PTE_SHARED;
++			mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_S;
++			mem_types[MT_DEVICE_WC].prot_pte |= L_PTE_SHARED;
++			mem_types[MT_DEVICE_CACHED].prot_sect |= PMD_SECT_S;
++			mem_types[MT_DEVICE_CACHED].prot_pte |= L_PTE_SHARED;
++			mem_types[MT_MEMORY].prot_sect |= PMD_SECT_S;
++			mem_types[MT_MEMORY_NONCACHED].prot_sect |= PMD_SECT_S;
++		}
+ #endif
+ 	}
  
