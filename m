@@ -1,31 +1,43 @@
-From: tklauser@distanz.ch (Tobias Klauser)
-Date: Tue, 17 Aug 2010 20:53:56 +0200
-Subject: [PATCH] ether3: Use net_device_stats from struct net_device
-In-Reply-To: <20100817183551.GI645@bicker>
-References: <1282061733-19700-1-git-send-email-tklauser@distanz.ch>
-	<20100817183551.GI645@bicker>
-Message-ID: <20100817185356.GG15670@distanz.ch>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Tue, 17 Aug 2010 21:31:57 +0200
+Subject: [PATCH] watchdog: Enable NXP LPC32XX support in Kconfig
+In-Reply-To: <AANLkTi=AiByTGvvvN_LACKLjW3TG6T2kmwKofpMmRdmz@mail.gmail.com>
+References: <AANLkTi=AiByTGvvvN_LACKLjW3TG6T2kmwKofpMmRdmz@mail.gmail.com>
+Message-ID: <083DF309106F364B939360100EC290F80ACF617DC8@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2010-08-17 at 20:35:52 +0200, Dan Carpenter <error27@gmail.com> wrote:
-> On Tue, Aug 17, 2010 at 06:15:33PM +0200, Tobias Klauser wrote:
-> > struct net_device has its own struct net_device_stats member, so use
-> > this one instead of a private copy in the ether1_priv struct.
-> > 
-> 
-> Two were missed, one from ether3_init_for_open()
-> 
-> 	memset(&priv(dev)->stats, 0, sizeof(struct net_device_stats));
-> 
-> and another from ether3_rx().
-> 
-> 	struct net_device_stats *stats = &priv(dev)->stats;
+It's been a few weeks since I've posted this.
+Have I placed this in the correct mailing list?
 
-Thanks a lot again. I'll send an updated patch. Please disregard this
-one.
-
-(I wasn't able to cross-compile-test the patch here, otherwise these
-would hopefully have been caught by the compiler).
-
-  Tobias
+> 
+> The NXP LPC32XX processor use the same watchdog as the Philips
+> PNX4008 processor.
+> 
+> Signed-off-by: Kevin Wells <wellsk40@gmail.com>
+> ---
+>  drivers/watchdog/Kconfig |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index b04b184..c442b2a 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -206,11 +206,11 @@ config OMAP_WATCHDOG
+>  	  here to enable the OMAP1610/OMAP1710/OMAP2420/OMAP3430/OMAP4430
+> watchdog timer.
+> 
+>  config PNX4008_WATCHDOG
+> -	tristate "PNX4008 Watchdog"
+> -	depends on ARCH_PNX4008
+> +	tristate "PNX4008 and LPC32XX Watchdog"
+> +	depends on ARCH_PNX4008 || ARCH_LPC32XX
+>  	help
+>  	  Say Y here if to include support for the watchdog timer
+> -	  in the PNX4008 processor.
+> +	  in the PNX4008 or LPC32XX processors.
+>  	  This driver can be built as a module by choosing M. The module
+>  	  will be called pnx4008_wdt.
+> 
+> --
+> 1.7.1.1
