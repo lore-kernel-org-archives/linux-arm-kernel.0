@@ -1,62 +1,217 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 18 Aug 2010 00:08:44 +0200
-Subject: [PATCH] SPI: remove superfluous DMA buffer syncs on PL022
-Message-ID: <1282082924-25809-1-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 18 Aug 2010 00:43:46 +0200
+Subject: [PATCH] ARM: ux500 cpu/SoC version macros v2
+Message-ID: <1282085026-3456-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes the superfluous DMA buffer syncs identified by Russell
-in the DMA support for PL022.
+This patch adds support for checking if the digital baseband (DB)
+System-on-Chip (aka "cpu) ASIC hardware version is 1.0, 1.1 or
+2.0. We print the result in the bootlog, the functions are then
+used for runtime decisions based on hardware version.
 
-Cc: yuanyabin1978 at sina.com
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Mattias Wallin <mattias.wallin@stericsson.com>
 Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- drivers/spi/amba-pl022.c |   16 +++++-----------
- 1 files changed, 5 insertions(+), 11 deletions(-)
+Changes v1->v2:
+- Folded in some magic number removals
+- Mapped the ROM as MT_MEMORY rather than device
+- Support v2 all the way through
+---
+ arch/arm/mach-ux500/cpu-db8500.c               |   82 ++++++++++++++++++++++++
+ arch/arm/mach-ux500/include/mach/db8500-regs.h |    2 -
+ arch/arm/mach-ux500/include/mach/hardware.h    |   23 ++++++-
+ arch/arm/mach-ux500/include/mach/setup.h       |    7 ++
+ 4 files changed, 110 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-index 59b3948..521d3d9 100644
---- a/drivers/spi/amba-pl022.c
-+++ b/drivers/spi/amba-pl022.c
-@@ -794,12 +794,7 @@ static void dma_callback(void *data)
- 	struct pl022 *pl022 = data;
- 	struct spi_message *msg = pl022->cur_msg;
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index f21c444..4acab75 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -38,10 +38,12 @@ static struct platform_device *platform_devs[] __initdata = {
+ /* minimum static i/o mapping required to boot U8500 platforms */
+ static struct map_desc u8500_io_desc[] __initdata = {
+ 	__IO_DEV_DESC(U8500_PRCMU_BASE, SZ_4K),
++	__IO_DEV_DESC(U8500_PRCMU_TCDM_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_GPIO0_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_GPIO1_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_GPIO2_BASE, SZ_4K),
+ 	__IO_DEV_DESC(U8500_GPIO3_BASE, SZ_4K),
++	__MEM_DEV_DESC(U8500_BOOT_ROM_BASE, SZ_1M),
+ };
  
--	/* Sync in RX buffer to CPU */
- 	BUG_ON(!pl022->sgt_rx.sgl);
--	dma_sync_sg_for_cpu(&pl022->adev->dev,
--			    pl022->sgt_rx.sgl,
--			    pl022->sgt_rx.nents,
--			    DMA_FROM_DEVICE);
+ static struct map_desc u8500ed_io_desc[] __initdata = {
+@@ -53,6 +55,69 @@ static struct map_desc u8500v1_io_desc[] __initdata = {
+ 	__IO_DEV_DESC(U8500_MTU0_BASE, SZ_4K),
+ };
  
- #ifdef VERBOSE_DEBUG
- 	/*
-@@ -812,6 +807,11 @@ static void dma_callback(void *data)
- 		struct scatterlist *sg;
- 		unsigned int i;
- 
-+		dma_sync_sg_for_cpu(&pl022->adev->dev,
-+				    pl022->sgt_rx.sgl,
-+				    pl022->sgt_rx.nents,
-+				    DMA_FROM_DEVICE);
++/*
++ * Functions to differentiate between later ASICs
++ * We look into the end of the ROM to locate the hardcoded ASIC ID.
++ * This is only needed to differentiate between minor revisions and
++ * process variants of an ASIC, the major revisions are encoded in
++ * the cpuid.
++ */
++#define U8500_ASIC_ID_LOC_ED_V1	(U8500_BOOT_ROM_BASE + 0x1FFF4)
++#define U8500_ASIC_ID_LOC_V2	(U8500_BOOT_ROM_BASE + 0x1DBF4)
++#define U8500_ASIC_REV_ED	0x01
++#define U8500_ASIC_REV_V10	0xA0
++#define U8500_ASIC_REV_V11	0xA1
++#define U8500_ASIC_REV_V20	0xB0
 +
- 		for_each_sg(pl022->sgt_rx.sgl, sg, pl022->sgt_rx.nents, i) {
- 			dev_dbg(&pl022->adev->dev, "SPI RX SG ENTRY: %d", i);
- 			print_hex_dump(KERN_ERR, "SPI RX: ",
-@@ -1001,12 +1001,6 @@ static int configure_dma(struct pl022 *pl022)
- 	if (sglen != pages)
- 		goto err_tx_sgmap;
++/**
++ * struct db8500_asic_id - fields of the ASIC ID
++ * @process: the manufacturing process, 0x40 is 40 nm
++ *  0x00 is "standard"
++ * @partnumber: hithereto 0x8500 for DB8500
++ * @revision: version code in the series
++ * This field definion is not formally defined but makes
++ * sense.
++ */
++struct db8500_asic_id {
++	u8 process;
++	u16 partnumber;
++	u8 revision;
++};
++
++/* This isn't going to change at runtime */
++static struct db8500_asic_id db8500_id;
++
++static void __init get_db8500_asic_id(void)
++{
++	u32 asicid;
++
++	if (cpu_is_u8500v1() || cpu_is_u8500ed())
++		asicid = readl(__io_address(U8500_ASIC_ID_LOC_ED_V1));
++	else if (cpu_is_u8500v2())
++		asicid = readl(__io_address(U8500_ASIC_ID_LOC_V2));
++	else
++		BUG();
++
++	db8500_id.process = (asicid >> 24);
++	db8500_id.partnumber = (asicid >> 16) & 0xFFFFU;
++	db8500_id.revision = asicid & 0xFFU;
++}
++
++bool cpu_is_u8500v10(void)
++{
++	return (db8500_id.revision == U8500_ASIC_REV_V10);
++}
++
++bool cpu_is_u8500v11(void)
++{
++	return (db8500_id.revision == U8500_ASIC_REV_V11);
++}
++
++bool cpu_is_u8500v20(void)
++{
++	return (db8500_id.revision == U8500_ASIC_REV_V20);
++}
++
+ void __init u8500_map_io(void)
+ {
+ 	ux500_map_io();
+@@ -63,6 +128,9 @@ void __init u8500_map_io(void)
+ 		iotable_init(u8500ed_io_desc, ARRAY_SIZE(u8500ed_io_desc));
+ 	else
+ 		iotable_init(u8500v1_io_desc, ARRAY_SIZE(u8500v1_io_desc));
++
++	/* Read out the ASIC ID as early as we can */
++	get_db8500_asic_id();
+ }
  
--	/* Synchronize the TX scatterlist, invalidate buffers, caches etc */
--	dma_sync_sg_for_device(&pl022->adev->dev,
--			       pl022->sgt_tx.sgl,
--			       pl022->sgt_tx.nents,
--			       DMA_TO_DEVICE);
--
- 	/* Send both scatterlists */
- 	rxdesc = rxchan->device->device_prep_slave_sg(rxchan,
- 				      pl022->sgt_rx.sgl,
+ /*
+@@ -70,6 +138,20 @@ void __init u8500_map_io(void)
+  */
+ void __init u8500_init_devices(void)
+ {
++	/* Display some ASIC boilerplate */
++	pr_info("DB8500: process: %02x, revision ID: 0x%02x\n",
++		db8500_id.process, db8500_id.revision);
++	if (cpu_is_u8500ed())
++		pr_info("DB8500: Early Drop (ED)\n");
++	else if (cpu_is_u8500v10())
++		pr_info("DB8500: version 1.0\n");
++	else if (cpu_is_u8500v11())
++		pr_info("DB8500: version 1.1\n");
++	else if (cpu_is_u8500v20())
++		pr_info("DB8500: version 2.0\n");
++	else
++		pr_warning("ASIC: UNKNOWN SILICON VERSION!\n");
++
+ 	ux500_init_devices();
+ 
+ 	if (cpu_is_u8500ed())
+diff --git a/arch/arm/mach-ux500/include/mach/db8500-regs.h b/arch/arm/mach-ux500/include/mach/db8500-regs.h
+index f000218..f07d098 100644
+--- a/arch/arm/mach-ux500/include/mach/db8500-regs.h
++++ b/arch/arm/mach-ux500/include/mach/db8500-regs.h
+@@ -30,8 +30,6 @@
+ #define U8500_ICN_BASE		0x81000000
+ 
+ #define U8500_BOOT_ROM_BASE	0x90000000
+-/* ASIC ID is at 0xff4 offset within this region */
+-#define U8500_ASIC_ID_BASE	0x9001F000
+ 
+ #define U8500_PER6_BASE		0xa03c0000
+ #define U8500_PER5_BASE		0xa03e0000
+diff --git a/arch/arm/mach-ux500/include/mach/hardware.h b/arch/arm/mach-ux500/include/mach/hardware.h
+index 8656379..32e883a 100644
+--- a/arch/arm/mach-ux500/include/mach/hardware.h
++++ b/arch/arm/mach-ux500/include/mach/hardware.h
+@@ -104,16 +104,35 @@ static inline bool cpu_is_u8500(void)
+ #endif
+ }
+ 
++#define CPUID_DB8500ED	0x410fc090
++#define CPUID_DB8500V1	0x411fc091
++#define CPUID_DB8500V2	0x412fc091
++
+ static inline bool cpu_is_u8500ed(void)
+ {
+-	return cpu_is_u8500() && (read_cpuid_id() & 15) == 0;
++	return cpu_is_u8500() && (read_cpuid_id() == CPUID_DB8500ED);
+ }
+ 
+ static inline bool cpu_is_u8500v1(void)
+ {
+-	return cpu_is_u8500() && (read_cpuid_id() & 15) == 1;
++	return cpu_is_u8500() && (read_cpuid_id() == CPUID_DB8500V1);
++}
++
++static inline bool cpu_is_u8500v2(void)
++{
++	return cpu_is_u8500() && (read_cpuid_id() == CPUID_DB8500V2);
+ }
+ 
++#ifdef CONFIG_UX500_SOC_DB8500
++bool cpu_is_u8500v10(void);
++bool cpu_is_u8500v11(void);
++bool cpu_is_u8500v20(void);
++#else
++static inline bool cpu_is_u8500v10(void) { return false; }
++static inline bool cpu_is_u8500v11(void) { return false; }
++static inline bool cpu_is_u8500v20(void) { return false; }
++#endif
++
+ static inline bool cpu_is_u5500(void)
+ {
+ #ifdef CONFIG_UX500_SOC_DB5500
+diff --git a/arch/arm/mach-ux500/include/mach/setup.h b/arch/arm/mach-ux500/include/mach/setup.h
+index e978dbd..54bbe64 100644
+--- a/arch/arm/mach-ux500/include/mach/setup.h
++++ b/arch/arm/mach-ux500/include/mach/setup.h
+@@ -38,4 +38,11 @@ extern struct sys_timer ux500_timer;
+ 	.type		= MT_DEVICE,		\
+ }
+ 
++#define __MEM_DEV_DESC(x, sz)	{		\
++	.virtual	= IO_ADDRESS(x),	\
++	.pfn		= __phys_to_pfn(x),	\
++	.length		= sz,			\
++	.type		= MT_MEMORY,		\
++}
++
+ #endif /*  __ASM_ARCH_SETUP_H */
 -- 
 1.6.3.3
