@@ -1,49 +1,57 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 17 Aug 2010 12:39:37 +0100
-Subject: [PATCH 1/3] ASoC: add 88pm860x codec driver
-In-Reply-To: <AANLkTikCqRFwn5dhVah7D9Cuu7PvUeTV_ywzZzz+DLxV@mail.gmail.com>
-References: <AANLkTi=i5H_oJvXzMv71ofxyw9FFXpiXU=pgzf+rdgk0@mail.gmail.com>
-	<20100817095800.GD18622@rakim.wolfsonmicro.main>
-	<AANLkTi=4vfkpDF=RkTtRTUR=XP9UAmhkJyvFvowV_89O@mail.gmail.com>
-	<20100817110223.GA18179@rakim.wolfsonmicro.main>
-	<AANLkTikCqRFwn5dhVah7D9Cuu7PvUeTV_ywzZzz+DLxV@mail.gmail.com>
-Message-ID: <20100817113937.GB18179@rakim.wolfsonmicro.main>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Aug 2010 13:53:12 +0300
+Subject: [PATCH 0/4] Hacks to allow booting ARM SMP kernel on UP ARMv7
+Message-ID: <20100817104414.19061.38999.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 17, 2010 at 07:37:21PM +0800, Haojian Zhuang wrote:
-> On Tue, Aug 17, 2010 at 7:02 PM, Mark Brown
+Hi all,
 
-> > As I said previously I would expect you to be using a DAPM supply widget
-> > for this.
+Here are some experimental patches to allow booting ARMv7 SMP
+kernel on UP to some extent. Posting these early in case it is
+of any help as I know at least Bryan Wu is working on similar
+issues.
 
-> Supply widget should be always on while DAPM is working. How about
-> only enable left ADC?
+The patches are very much work in progress, and does not quite
+boot to init yet so there's all kinds of things to fix. But at
+least these patches allow booting to the point where the fixing
+issues might be a bit easier.. Currently it boots to the point
+where there are tons of "WARNING: at mm/percpu-vm.c:320 pcpu_alloc"
+prints.
 
-What makes you say this?  A supply widget is only enabled when the
-things it supplies are enabled.
+I've only tested these on omap3 UP systems so far so YMMV. The
+patches are posted on top of v2.6.36-rc1 + omap-fixes branch.
+Also available in devel-smp-on-unicore branch in the linux-omap
+tree.
 
-> > I can't associate your comment there with the code at all. ?The code
-> > does nothing different for the two case statements and there's no other
-> > code I can see.
+Cheers,
 
-> You can find pm860x_pcm_set_dai_fmt() and pm860x_i2s_set_dai_fmt().
-> Both functions called set_dai_fmt(). In set_dai_fmt(), all bit
-> operations are based on variable, not registers. Register operation is
-> implemented in pcm_set_dai_fmt() and i2s_set_dai_fmt().
+Tony
 
-You need to move this code into the individual functions.  What you've
-got now is clearly buggy - it will accept either configuration when it
-sets the variable.
+---
 
-> >> > entirely if you're not going to implement jack detection. ?Right now all
-> >> > the curernt code will do is waste power by enabling the feature but
-> >> > ignoring the result.
+Tony Lindgren (4):
+      ARM: Add SMP_ON_UP Kconfig option for booting SMP kernel on UP
+      ARM: Allow optional UP processor functions for SMP kernels
+      ARM: Set separate proc-v7 functions for SMP
+      omap: Fix SMP on UP interrupt handling for multi-omap
 
-> >> I need a document on illustrating jack on alsa. Could you share one?
 
-> > There's a number of in tree examples - seach for snd_soc_jack.
+ arch/arm/Kconfig                               |    7 ++
+ arch/arm/include/asm/cacheflush.h              |    6 ++
+ arch/arm/include/asm/proc-fns.h                |    8 ++
+ arch/arm/include/asm/procinfo.h                |    6 ++
+ arch/arm/include/asm/smp_plat.h                |    9 +++
+ arch/arm/include/asm/tlbflush.h                |   16 ++++-
+ arch/arm/kernel/setup.c                        |   45 ++++++++++++++
+ arch/arm/mach-omap2/include/mach/entry-macro.S |   22 +++++++
+ arch/arm/mach-omap2/omap-smp.c                 |   16 ++++-
+ arch/arm/mach-omap2/timer-gp.c                 |    7 ++
+ arch/arm/mm/cache-v7.S                         |   60 +++++++++++++++++++
+ arch/arm/mm/mmu.c                              |   20 +++---
+ arch/arm/mm/proc-v7.S                          |   77 ++++++++++++++++++++++--
+ arch/arm/mm/tlb-v7.S                           |   51 ++++++++++++++++
+ 14 files changed, 325 insertions(+), 25 deletions(-)
 
-> OK. How to test it? Still no document?
-
-A standard API input test application such as evtest can be used.
+-- 
+Signature
