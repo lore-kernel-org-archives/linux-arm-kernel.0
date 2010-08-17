@@ -1,40 +1,136 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Tue, 17 Aug 2010 12:52:32 +0200
-Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
-In-Reply-To: <201008170925.55592.arnd@arndb.de>
-References: <cover.1281956490.git.richard.cochran@omicron.at>
-	<201008162159.39734.arnd@arndb.de>
-	<20100817083216.GA3330@riccoc20.at.omicron.at>
-	<201008170925.55592.arnd@arndb.de>
-Message-ID: <20100817105232.GA9079@riccoc20.at.omicron.at>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Aug 2010 13:53:32 +0300
+Subject: [PATCH 4/4] omap: Fix SMP on UP interrupt handling for multi-omap
+In-Reply-To: <20100817104414.19061.38999.stgit@baageli.muru.com>
+References: <20100817104414.19061.38999.stgit@baageli.muru.com>
+Message-ID: <20100817105332.19061.44765.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 17, 2010 at 09:25:55AM +0000, Arnd Bergmann wrote:
-> Another difference is that we generally use ioctl for devices that can
-> be enumerated, while syscalls are for system services that are not tied to
-> a specific device. This argument works both ways for PTP IMHO: On the one
-> hand you want to have a reliable clock that you can use without knowing
-> where it comes from, on the other you might have multiple PTP sources that
-> you need to differentiate.
+Fix SMP on UP interrupt handling for multi-omap
 
-Yes, I agree. In normal use, there will be only one PTP clock in a
-system. However, for research purposes, it would be nice to have more
-than one.
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/include/mach/entry-macro.S |   22 ++++++++++++++++++++++
+ arch/arm/mach-omap2/omap-smp.c                 |   16 ++++++++++++----
+ arch/arm/mach-omap2/timer-gp.c                 |    7 +++++--
+ 3 files changed, 39 insertions(+), 6 deletions(-)
 
-I've been looking at offering the PTP clock as a posix clock, and it
-is not as hard as I first thought. The PTP clock or clocks just have
-to be registered as one of the posix_clocks[MAX_CLOCKS] in
-posix-timers.c.
-
-My suggestion would be to reserve three clock ids in time.h,
-CLOCK_PTP0, CLOCK_PTP1, and CLOCK_PTP2. The first one would be the
-same as CLOCK_REALTIME, for SW timestamping, and the other two would
-allow two different PTP clocks at the same time, for the research use
-case.
-
-Using the clock id will bring another advantage, since it will then be
-possible for user space to specify the desired timestamp source for
-SO_TIMESTAMPING.
-
-Richard
+diff --git a/arch/arm/mach-omap2/include/mach/entry-macro.S b/arch/arm/mach-omap2/include/mach/entry-macro.S
+index 06e64e1..75c67aa 100644
+--- a/arch/arm/mach-omap2/include/mach/entry-macro.S
++++ b/arch/arm/mach-omap2/include/mach/entry-macro.S
+@@ -189,17 +189,38 @@ omap_irq_base:	.word	0
+ 		 */
+ 
+ 		.macro test_for_ipi, irqnr, irqstat, base, tmp
++
++#ifdef MULTI_OMAP2
++		ldr	\tmp, =OMAP4_IRQ_BASE
++		cmp	\base, \tmp
++		beq	9993f
++		cmpne	\tmp, \tmp
++		beq	9994f
++9993:
++#endif
++
+ 		bic	\irqnr, \irqstat, #0x1c00
+ 		cmp	\irqnr, #16
+ 		it	cc
+ 		strcc	\irqstat, [\base, #GIC_CPU_EOI]
+ 		it	cs
+ 		cmpcs	\irqnr, \irqnr
++9994:
+ 		.endm
+ 
+ 		/* As above, this assumes that irqstat and base are preserved */
+ 
+ 		.macro test_for_ltirq, irqnr, irqstat, base, tmp
++
++#ifdef MULTI_OMAP2
++		ldr	\tmp, =OMAP4_IRQ_BASE
++		cmp	\base, \tmp
++		beq	9995f
++		cmpne	\tmp, \tmp
++		beq	9996f
++9995:
++#endif
++
+ 		bic	\irqnr, \irqstat, #0x1c00
+ 		mov 	\tmp, #0
+ 		cmp	\irqnr, #29
+@@ -207,6 +228,7 @@ omap_irq_base:	.word	0
+ 		moveq	\tmp, #1
+ 		streq	\irqstat, [\base, #GIC_CPU_EOI]
+ 		cmp	\tmp, #0
++9996:
+ 		.endm
+ #endif	/* CONFIG_SMP */
+ 
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index 9e9f70e..8ea16de 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -22,6 +22,7 @@
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/localtimer.h>
++#include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
+ #include <mach/hardware.h>
+ #include <mach/omap4-common.h>
+@@ -114,11 +115,15 @@ void __init smp_init_cpus(void)
+ {
+ 	unsigned int i, ncores;
+ 
+-	/* Never released */
+-	scu_base = ioremap(OMAP44XX_SCU_BASE, SZ_256);
+-	BUG_ON(!scu_base);
++	if (smp_on_up()) {
++		ncores = 1;
++	} else {
++		/* Never released */
++		scu_base = ioremap(OMAP44XX_SCU_BASE, SZ_256);
++		BUG_ON(!scu_base);
+ 
+-	ncores = get_core_count();
++		ncores = get_core_count();
++	}
+ 
+ 	for (i = 0; i < ncores; i++)
+ 		set_cpu_possible(i, true);
+@@ -146,6 +151,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 	}
+ 	smp_store_cpu_info(cpu);
+ 
++	if (smp_on_up())
++		ncores = 1;
++
+ 	/*
+ 	 * are we trying to boot more cores than exist?
+ 	 */
+diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-gp.c
+index 74fbed8..badf5f2 100644
+--- a/arch/arm/mach-omap2/timer-gp.c
++++ b/arch/arm/mach-omap2/timer-gp.c
+@@ -37,6 +37,7 @@
+ #include <linux/clockchips.h>
+ 
+ #include <asm/mach/time.h>
++#include <asm/smp_plat.h>
+ #include <plat/dmtimer.h>
+ #include <asm/localtimer.h>
+ 
+@@ -228,8 +229,10 @@ static void __init omap2_gp_clocksource_init(void)
+ static void __init omap2_gp_timer_init(void)
+ {
+ #ifdef CONFIG_LOCAL_TIMERS
+-	twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
+-	BUG_ON(!twd_base);
++	if (smp_on_up()) {
++		twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
++		BUG_ON(!twd_base);
++	}
+ #endif
+ 	omap_dm_timer_init();
+ 
