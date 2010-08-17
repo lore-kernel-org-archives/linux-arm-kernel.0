@@ -1,41 +1,107 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Tue, 17 Aug 2010 16:56:38 +0100
-Subject: [PATCH v5] OpenRD: Enable SD/UART selection for serial port 1
-References: <1282037263-3038-1-git-send-email-tanmay.upadhyay@einfochips.com>
-Message-ID: <m2oqj7-ih8.ln1@chipmunk.wormnet.eu>
+From: tklauser@distanz.ch (Tobias Klauser)
+Date: Tue, 17 Aug 2010 18:15:19 +0200
+Subject: [PATCH] ether1: Use net_device_stats from struct net_device
+Message-ID: <1282061719-19645-1-git-send-email-tklauser@distanz.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tanmay Upadhyay <tanmay.upadhyay@einfochips.com> wrote:
->
-> This patch enables user to use serial port 1 of the OpenRD device for SDIO
-> or UART(RS232/RS485). The selection can be done through kernel parameter.
-> 
-> By default the port would be used for SDIO. To select RS232 or RS485 mode,
-> pass string "uart=232" or "uart=485" respectively in the kernel parameters.
-> "uart=485" is ignored on OpenRD-Base as it doesn't have RS485 port.
-> 
-> v2 - use gpio* functions instead of read/write to set/reset GPIO
-> v3 - notify user when wrong kernel paramter is passed
-> v4 - use linux/gpio.h instead of mach/gpio.h
-> v5 - changed uart1_mpp_config to be static, global & __initdata
-> 
-> +/* Parse boot_command_line string uart=232/485 */
-> +__setup("uart=", sd_uart_selection);
->
-I really think 'uart=' should be changed to something like 
-'kirkwood_openrd_init_uart=' instead; this sort of thing is surely 
-otherwise going to clash and annoy someone?
+struct net_device has its own struct net_device_stats member, so use
+this one instead of a private copy in the ether1_priv struct.
 
-iop13xx chooses a different name:
-----
-alex at berk:/usr/src/linux-2.6-stable$ grep '__setup(' -r arch/arm/ | grep uart
-arch/arm/mach-iop13xx/setup.c:__setup("iop13xx_init_uart", iop13xx_init_uart_setup);
-----
+Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+---
+ drivers/net/arm/ether1.c |   26 +++++++++++++-------------
+ drivers/net/arm/ether1.h |    1 -
+ 2 files changed, 13 insertions(+), 14 deletions(-)
 
-Cheers
-
+diff --git a/drivers/net/arm/ether1.c b/drivers/net/arm/ether1.c
+index b17ab51..430085b 100644
+--- a/drivers/net/arm/ether1.c
++++ b/drivers/net/arm/ether1.c
+@@ -673,7 +673,7 @@ ether1_timeout(struct net_device *dev)
+ 	if (ether1_init_for_open (dev))
+ 		printk (KERN_ERR "%s: unable to restart interface\n", dev->name);
+ 
+-	priv(dev)->stats.tx_errors++;
++	dev->stats.tx_errors++;
+ 	netif_wake_queue(dev);
+ }
+ 
+@@ -802,21 +802,21 @@ again:
+ 
+ 	while (nop.nop_status & STAT_COMPLETE) {
+ 		if (nop.nop_status & STAT_OK) {
+-			priv(dev)->stats.tx_packets ++;
+-			priv(dev)->stats.collisions += (nop.nop_status & STAT_COLLISIONS);
++			dev->stats.tx_packets++;
++			dev->stats.collisions += (nop.nop_status & STAT_COLLISIONS);
+ 		} else {
+-			priv(dev)->stats.tx_errors ++;
++			dev->stats.tx_errors++;
+ 
+ 			if (nop.nop_status & STAT_COLLAFTERTX)
+-				priv(dev)->stats.collisions ++;
++				dev->stats.collisions++;
+ 			if (nop.nop_status & STAT_NOCARRIER)
+-				priv(dev)->stats.tx_carrier_errors ++;
++				dev->stats.tx_carrier_errors++;
+ 			if (nop.nop_status & STAT_TXLOSTCTS)
+ 				printk (KERN_WARNING "%s: cts lost\n", dev->name);
+ 			if (nop.nop_status & STAT_TXSLOWDMA)
+-				priv(dev)->stats.tx_fifo_errors ++;
++				dev->stats.tx_fifo_errors++;
+ 			if (nop.nop_status & STAT_COLLEXCESSIVE)
+-				priv(dev)->stats.collisions += 16;
++				dev->stats.collisions += 16;
+ 		}
+ 
+ 		if (nop.nop_link == caddr) {
+@@ -879,13 +879,13 @@ ether1_recv_done (struct net_device *dev)
+ 
+ 				skb->protocol = eth_type_trans (skb, dev);
+ 				netif_rx (skb);
+-				priv(dev)->stats.rx_packets ++;
++				dev->stats.rx_packets++;
+ 			} else
+-				priv(dev)->stats.rx_dropped ++;
++				dev->stats.rx_dropped++;
+ 		} else {
+ 			printk(KERN_WARNING "%s: %s\n", dev->name,
+ 				(rbd.rbd_status & RBD_EOF) ? "oversized packet" : "acnt not valid");
+-			priv(dev)->stats.rx_dropped ++;
++			dev->stats.rx_dropped++;
+ 		}
+ 
+ 		nexttail = ether1_readw(dev, priv(dev)->rx_tail, rfd_t, rfd_link, NORMALIRQS);
+@@ -939,7 +939,7 @@ ether1_interrupt (int irq, void *dev_id)
+ 				printk (KERN_WARNING "%s: RU went not ready: RU suspended\n", dev->name);
+ 				ether1_writew(dev, SCB_CMDRXRESUME, SCB_ADDR, scb_t, scb_command, NORMALIRQS);
+ 				writeb(CTRL_CA, REG_CONTROL);
+-				priv(dev)->stats.rx_dropped ++;	/* we suspended due to lack of buffer space */
++				dev->stats.rx_dropped++;	/* we suspended due to lack of buffer space */
+ 			} else
+ 				printk(KERN_WARNING "%s: RU went not ready: %04X\n", dev->name,
+ 					ether1_readw(dev, SCB_ADDR, scb_t, scb_status, NORMALIRQS));
+@@ -965,7 +965,7 @@ ether1_close (struct net_device *dev)
+ static struct net_device_stats *
+ ether1_getstats (struct net_device *dev)
+ {
+-	return &priv(dev)->stats;
++	return &dev->stats;
+ }
+ 
+ /*
+diff --git a/drivers/net/arm/ether1.h b/drivers/net/arm/ether1.h
+index c8a4b23..3a5830a 100644
+--- a/drivers/net/arm/ether1.h
++++ b/drivers/net/arm/ether1.h
+@@ -38,7 +38,6 @@
+ 
+ struct ether1_priv {
+ 	void __iomem *base;
+-	struct net_device_stats stats;
+ 	unsigned int tx_link;
+ 	unsigned int tx_head;
+ 	volatile unsigned int tx_tail;
 -- 
-Alexander Clouter
-.sigmonster says: If you want to be ruined, marry a rich woman.
-                  		-- Michelet
+1.7.0.4
