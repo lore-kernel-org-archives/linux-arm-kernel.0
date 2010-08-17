@@ -1,149 +1,136 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 17 Aug 2010 13:53:25 +0300
-Subject: [PATCH 2/4] ARM: Allow optional UP processor functions for SMP kernels
-In-Reply-To: <20100817104414.19061.38999.stgit@baageli.muru.com>
-References: <20100817104414.19061.38999.stgit@baageli.muru.com>
-Message-ID: <20100817105325.19061.93324.stgit@baageli.muru.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 17 Aug 2010 12:02:24 +0100
+Subject: [PATCH 1/3] ASoC: add 88pm860x codec driver
+In-Reply-To: <AANLkTi=4vfkpDF=RkTtRTUR=XP9UAmhkJyvFvowV_89O@mail.gmail.com>
+References: <AANLkTi=i5H_oJvXzMv71ofxyw9FFXpiXU=pgzf+rdgk0@mail.gmail.com>
+	<20100817095800.GD18622@rakim.wolfsonmicro.main>
+	<AANLkTi=4vfkpDF=RkTtRTUR=XP9UAmhkJyvFvowV_89O@mail.gmail.com>
+Message-ID: <20100817110223.GA18179@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Attempt to detect if the hardware is UP hardware, and use the optional
-UP specific processors functions in struct proc_info_list if available.
+On Tue, Aug 17, 2010 at 06:44:44PM +0800, Haojian Zhuang wrote:
+> On Tue, Aug 17, 2010 at 5:58 PM, Mark Brown
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/include/asm/procinfo.h |    6 +++++
- arch/arm/include/asm/smp_plat.h |    9 ++++++++
- arch/arm/kernel/setup.c         |   45 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mm/mmu.c               |   20 ++++++++++-------
- 4 files changed, 71 insertions(+), 9 deletions(-)
+> >> + ? ? /* unmute DAC */
+> >> + ? ? snd_soc_update_bits(codec, PM860X_DAC_OFFSET, DAC_MUTE, 0);
 
-diff --git a/arch/arm/include/asm/procinfo.h b/arch/arm/include/asm/procinfo.h
-index ca52e58..962d01e 100644
---- a/arch/arm/include/asm/procinfo.h
-+++ b/arch/arm/include/asm/procinfo.h
-@@ -40,6 +40,12 @@ struct proc_info_list {
- 	struct cpu_tlb_fns	*tlb;
- 	struct cpu_user_fns	*user;
- 	struct cpu_cache_fns	*cache;
-+
-+#ifdef CONFIG_SMP_ON_UP
-+	struct processor	*proc_up;
-+	struct cpu_tlb_fns	*tlb_up;
-+	struct cpu_cache_fns	*cache_up;
-+#endif
- };
- 
- #else	/* __KERNEL__ */
-diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index e621530..1c2f587 100644
---- a/arch/arm/include/asm/smp_plat.h
-+++ b/arch/arm/include/asm/smp_plat.h
-@@ -18,4 +18,13 @@ static inline int cache_ops_need_broadcast(void)
- 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 1;
- }
- 
-+#ifdef CONFIG_SMP_ON_UP
-+extern int smp_on_up(void);
-+#else
-+static inline int smp_on_up(void)
-+{
-+	return 0;
-+}
-+#endif
-+
- #endif
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index d5231ae..5f3606c 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -289,6 +289,50 @@ static void __init feat_v6_fixup(void)
- 		elf_hwcap &= ~HWCAP_TLS;
- }
- 
-+#ifdef CONFIG_SMP_ON_UP
-+
-+static int _smp_on_up;
-+
-+int smp_on_up(void)
-+{
-+	return _smp_on_up;
-+}
-+
-+static void __init smp_on_up_fixup(struct proc_info_list *list)
-+{
-+	int id;
-+
-+	id = read_cpuid_id() & 0xff0f0000;
-+	if ((id == 0x41070000) || (id == 0x410f0000)) {
-+		int mpidr;
-+
-+		asm volatile("mrc p15, 0, %0, c0, c0, 5" : "=r" (mpidr));
-+		mpidr >>= 30;
-+
-+		/* SMP hardware? */
-+		if (!((mpidr == 0) || (mpidr == 3)))
-+			return;
-+	}
-+
-+	_smp_on_up = 1;
-+
-+	pr_info("CPU: SMP kernel on UP hardware\n");
-+
-+	if (list->proc_up)
-+		processor = *list->proc_up;
-+
-+	if (list->tlb_up)
-+		cpu_tlb = *list->tlb_up;
-+
-+	if (list->cache_up)
-+		cpu_cache = *list->cache_up;
-+}
-+#else
-+static inline void smp_on_up_fixup(struct proc_info_list *list)
-+{
-+}
-+#endif
-+
- static void __init setup_processor(void)
- {
- 	struct proc_info_list *list;
-@@ -331,6 +375,7 @@ static void __init setup_processor(void)
- 	elf_hwcap &= ~HWCAP_THUMB;
- #endif
- 
-+	smp_on_up_fixup(list);
- 	feat_v6_fixup();
- 
- 	cacheid_init();
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 6e1c4f6..f320901 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -430,15 +430,17 @@ static void __init build_mem_type_table(void)
- 		/*
- 		 * Mark memory with the "shared" attribute for SMP systems
- 		 */
--		user_pgprot |= L_PTE_SHARED;
--		kern_pgprot |= L_PTE_SHARED;
--		vecs_pgprot |= L_PTE_SHARED;
--		mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_S;
--		mem_types[MT_DEVICE_WC].prot_pte |= L_PTE_SHARED;
--		mem_types[MT_DEVICE_CACHED].prot_sect |= PMD_SECT_S;
--		mem_types[MT_DEVICE_CACHED].prot_pte |= L_PTE_SHARED;
--		mem_types[MT_MEMORY].prot_sect |= PMD_SECT_S;
--		mem_types[MT_MEMORY_NONCACHED].prot_sect |= PMD_SECT_S;
-+		if (!smp_on_up()) {
-+			user_pgprot |= L_PTE_SHARED;
-+			kern_pgprot |= L_PTE_SHARED;
-+			vecs_pgprot |= L_PTE_SHARED;
-+			mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_S;
-+			mem_types[MT_DEVICE_WC].prot_pte |= L_PTE_SHARED;
-+			mem_types[MT_DEVICE_CACHED].prot_sect |= PMD_SECT_S;
-+			mem_types[MT_DEVICE_CACHED].prot_pte |= L_PTE_SHARED;
-+			mem_types[MT_MEMORY].prot_sect |= PMD_SECT_S;
-+			mem_types[MT_MEMORY_NONCACHED].prot_sect |= PMD_SECT_S;
-+		}
- #endif
- 	}
- 
+> > Can you explain what's going on with this mute handling please?
+
+> Em. Actually there should be automute variable. I shouldn't delete
+> that variable.  In order to anti-pop, mute DAC before enabling DAC.
+> Unmute it after enabling DAC. It's required by silicon.
+
+As requested in the previous review comments you need to provide better
+documentation of this in the driver.  I'd also expect to see a custom
+mute control somewhere which implements this by keeping the DAC muted
+unless it has been enabled rather than some sort of automute handling.
+
+> >> + ? ? switch (event) {
+> >> + ? ? case SND_SOC_DAPM_PRE_PMU:
+> >> + ? ? ? ? ? ? snd_soc_update_bits(codec, PM860X_ADC_EN_1, en1, en1);
+> >> + ? ? ? ? ? ? snd_soc_update_bits(codec, PM860X_ADC_EN_2, en2, en2);
+
+> > I still don't follow why you need a custom event for this.
+
+> Enabling both bit 0 of ADC_EN_1 and bit 5 of ADC_EN_2 can enable left
+> ADC. Enabling both bit 1 of ADC_EN_1 and bit 4 of ADC_EN_2 can enable
+> right ADC. I can't find any DAPM API can handle this. So I implement
+> the custom event.
+
+As I said previously I would expect you to be using a DAPM supply widget
+for this.
+
+> >> +static int pm860x_mic1_event(struct snd_soc_dapm_widget *w,
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ?struct snd_kcontrol *kcontrol, int event)
+> >> +{
+> >> + ? ? struct snd_soc_codec *codec = w->codec;
+> >> +
+> >> + ? ? switch (event) {
+> >> + ? ? case SND_SOC_DAPM_POST_PMU:
+> >> + ? ? ? ? ? ? /* Enable Mic1 Bias & MICDET, HSDET */
+> >> + ? ? ? ? ? ? snd_soc_update_bits(codec, PM860X_ADC_ANA_1, MIC1BIAS_MASK,
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? MIC1BIAS_MASK);
+
+> > As I said last time you should handle this via DAPM.
+
+> I registered it as DAPM widget. Why do you say it's not handled via DAPM?
+
+I say this because this code is manually going in and enabling the
+microphone bias here.  If the microphone bias is being handled using
+DAPM you shouldn't be going around explicitly writing to the power
+control bit like this.
+
+> >> + ? ? ? ? ? ? pm860x_set_bits(codec->control_data, REG_MIC_DET,
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? MICDET_MASK, MICDET_MASK);
+> >> + ? ? ? ? ? ? pm860x_set_bits(codec->control_data, REG_HS_DET,
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? EN_HS_DET, EN_HS_DET);
+
+> > This should be associated with enabling microphone detection.
+
+> Yes, but you said that it could be controlled by enable_pin(). I
+> forced to enable microphone pins in machine driver.
+
+I don't follow what you're saying at all.  This code will unconditonally
+enable headset and microphone detection while the microphone is enabled,
+regardless of the user deciding if they want to use that feature or not.
+The use of enable_pin() was for the microphone bias which is a separate
+thing.
+
+> >> + ? ? /* set master/slave audio interface */
+> >> + ? ? switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
+> >> + ? ? case SND_SOC_DAIFMT_CBM_CFM:
+> >> + ? ? case SND_SOC_DAIFMT_CBM_CFS:
+> >> + ? ? ? ? ? ? if (pm860x->dir == PM860X_CLK_DIR_OUT)
+> >> + ? ? ? ? ? ? ? ? ? ? *inf |= PCM_INF2_MASTER;
+> >> + ? ? ? ? ? ? else
+> >> + ? ? ? ? ? ? ? ? ? ? return -EINVAL;
+> >> + ? ? ? ? ? ? break;
+
+> > You're setting the same register configuration for two different DAI
+> > clock master configurations here. ?Presumably one of the settings is
+> > inaccurate?
+
+> No, they're different registers. But offsets are same. So I just return pointer.
+
+I can't associate your comment there with the code at all.  The code
+does nothing different for the two case statements and there's no other
+code I can see.
+
+> >> +static int pm860x_set_dai_sysclk(struct snd_soc_dai *codec_dai,
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int clk_id, unsigned int freq, int dir)
+> >> +{
+> >> + ? ? struct snd_soc_codec *codec = codec_dai->codec;
+> >> + ? ? struct pm860x_priv *pm860x = snd_soc_codec_get_drvdata(codec);
+> >> +
+> >> + ? ? if (dir == PM860X_CLK_DIR_OUT)
+> >> + ? ? ? ? ? ? pm860x->dir = PM860X_CLK_DIR_OUT;
+> >> + ? ? else
+> >> + ? ? ? ? ? ? pm860x->dir = PM860X_CLK_DIR_IN;
+> >> +
+> >> + ? ? return 0;
+> >> +}
+
+> > What is this actually setting - which clock is being configured here?
+
+> While codec is master, the clock is fixed. I needn't set detail clock.
+> While codec is slave, it's not supported in this patch yet.
+
+What is "the clock", and if slave mode is not supported surely an error
+should be returned?
+
+> >> + ? ? if (shrt & (SHORT_LO1 | SHORT_LO2))
+> >> + ? ? ? ? ? ? report |= PM860X_SHORT_LINEOUT;
+> >> + ? ? if (shrt & (SHORT_HS1 | SHORT_HS2))
+> >> + ? ? ? ? ? ? report |= PM860X_SHORT_HEADSET;
+> >> + ? ? dev_dbg(pm860x->codec->dev, "report:0x%x\n", report);
+> >> + ? ? return IRQ_HANDLED;
+
+> > It would seem better to just remove the interrupt handling support
+> > entirely if you're not going to implement jack detection. ?Right now all
+> > the curernt code will do is waste power by enabling the feature but
+> > ignoring the result.
+
+> I need a document on illustrating jack on alsa. Could you share one?
+
+There's a number of in tree examples - seach for snd_soc_jack.
