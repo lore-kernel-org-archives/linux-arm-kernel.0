@@ -1,39 +1,76 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Tue, 17 Aug 2010 10:53:24 +0200
-Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
-In-Reply-To: <AANLkTik_2MKMhOuDGOmu8Kzyq-ipLe+Bxrb3FaD+Tv4U@mail.gmail.com>
-References: <cover.1281956490.git.richard.cochran@omicron.at>
-	<363bd749a38d0b785d8431e591bf54c38db4c2d7.1281956490.git.richard.cochran@omicron.at>
-	<AANLkTik_2MKMhOuDGOmu8Kzyq-ipLe+Bxrb3FaD+Tv4U@mail.gmail.com>
-Message-ID: <20100817085324.GB3330@riccoc20.at.omicron.at>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 17 Aug 2010 10:54:06 +0200
+Subject: [PATCH 1/3] mxc_nand: set spare size and pages per block
+In-Reply-To: <80zkwm69uv.fsf@merkur.tec.linutronix.de>
+References: <80r5i63dn4.fsf@merkur.tec.linutronix.de>
+	<20100810121912.GG27749@pengutronix.de>
+	<801va635f7.fsf@merkur.tec.linutronix.de>
+	<20100811125625.GS27749@pengutronix.de>
+	<80r5i5z3v1.fsf@merkur.tec.linutronix.de>
+	<20100816112837.GO27749@pengutronix.de>
+	<80zkwm69uv.fsf@merkur.tec.linutronix.de>
+Message-ID: <20100817085406.GW27749@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 16, 2010 at 12:24:48PM -0700, john stultz wrote:
-> 3) I'm not sure I see the benefit of being able to have multiple
-> frequency corrected time domains.  In other words, what benefit would
-> you get from adjusting a PTP clock's frequency instead of just
-> adjusting the system's time freq? Having the PTP time as a reference
-> to correct the system time seems reasonable, but I'm not sure I see
-> why userland would want to adjust the PTP clock's freq.
+On Mon, Aug 16, 2010 at 02:05:44PM +0200, John Ogness wrote:
+> On 2010-08-16, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > Ok, here is an updated version of this patch
+> >
+> > Sascha
+> >
+> > commit 3a411e6c690654f78bea93dd8cdb14c27ba418a5
+> > Author: Sascha Hauer <s.hauer@pengutronix.de>
+> > Date:   Mon Aug 9 14:21:00 2010 +0200
+> >
+> >     mxc_nand: do not depend on disabling the irq in the interrupt handler
+> >     
+> >     This patch reverts the driver to enabling/disabling the NFC interrupt
+> >     mask rather than enabling/disabling the system interrupt. This cleans
+> >     up the driver so that it doesn't rely on interrupts being disabled
+> >     within the interrupt handler.
+> >     For i.MX21 we keep the current behaviour, that is calling
+> >     enable_irq/disable_irq_nosync to enable/disable interrupts.
+> >     This patch is based on earlier work by John Ogness.
+> 
+> Acked-by: John Ogness <john.ogness@linutronix.de>    
 
-For PTP enabled hardware, the timestamp on the network packet comes
-from from the PTP clock, not from the system time.
+Can I consider this as an Acked-by for the whole series? And since you
+tested it I would also add a tested-by. Here is a summary of the series
+again:
 
-Of course, you can always just leave the PTP clock alone, figure the
-needed correction, and apply it whenever needed. But this has some
-disadvantages. First of all, the (one and only) open source PTPd does
-not do it that way. Also, only one program (the PTPd or equivalent)
-will know the correct time. Other programs will not be able to ask the
-operating system for time services. Instead, they would need to use
-IPC to the PTPd.
 
-The PTP protocol (and some PTP hardware) offers a "one step" method,
-where the timestamps are inserted by the hardware on the fly. Here you
-really do need the PTP clock to be correctly adjusted.
+The following changes since commit da5cabf80e2433131bf0ed8993abc0f7ea618c73:
 
-All of the PTP hardware that I am familiar with provides a clock
-adjustment method, so it simpler and cleaner just to use this facility
-to tune the PTP clock.
+  Linux 2.6.36-rc1 (2010-08-15 17:41:37 -0700)
 
-Richard
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git mxc-nand-pu
+
+John Ogness (2):
+      mxc_nand: Do not do byte accesses to the NFC buffer.
+      mxc_nand: remove unused variables.
+
+Sascha Hauer (10):
+      mxc_nand: remove 0xe00 offset from registers
+      mxc_nand: rework get_dev_status
+      mxc_nand: make some internally used functions overwriteable
+      mxc_nand: factor out a check_int function
+      mxc_nand: add V1_V2 namespace to registers
+      mxc_nand: support 8bit ecc
+      mxc_nand: fix correct_data function
+      mxc_nand: Add v3 (i.MX51) Support
+      mxc_nand: do not depend on disabling the irq in the interrupt handler
+      mxc_nand: configure pages per block for v2 controller
+
+ drivers/mtd/nand/Kconfig    |    2 +-
+ drivers/mtd/nand/mxc_nand.c |  671 +++++++++++++++++++++++++++++++++----------
+ 2 files changed, 521 insertions(+), 152 deletions(-)
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
