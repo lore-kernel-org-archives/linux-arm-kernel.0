@@ -1,167 +1,54 @@
-From: tanmay.upadhyay@einfochips.com (Tanmay Upadhyay)
-Date: Tue, 17 Aug 2010 14:57:43 +0530
-Subject: [PATCH v5] OpenRD: Enable SD/UART selection for serial port 1
-Message-ID: <1282037263-3038-1-git-send-email-tanmay.upadhyay@einfochips.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Aug 2010 09:25:55 +0000
+Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <20100817083216.GA3330@riccoc20.at.omicron.at>
+References: <cover.1281956490.git.richard.cochran@omicron.at>
+	<201008162159.39734.arnd@arndb.de>
+	<20100817083216.GA3330@riccoc20.at.omicron.at>
+Message-ID: <201008170925.55592.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables user to use serial port 1 of the OpenRD device for SDIO
-or UART(RS232/RS485). The selection can be done through kernel parameter.
+On Tuesday 17 August 2010, Richard Cochran wrote:
+> > Why did you not want to add syscalls? Adding ioctls instead of syscalls
+> > does not make the interface better, just less visible.
+> 
+> I bet that, had I posted patch set with new syscalls, someone would
+> have said, "You are adding new syscalls. Can't you just use a char
+> device instead!"
 
-By default the port would be used for SDIO. To select RS232 or RS485 mode,
-pass string "uart=232" or "uart=485" respectively in the kernel parameters.
-"uart=485" is ignored on OpenRD-Base as it doesn't have RS485 port.
+Very possible, but after considering both options, I think we would
+still end up with the same conclusion.
+ 
+> If you add syscalls and introduce CLOCK_PTP, then you add it to
+> everyone's kernel, even those people who never heard of PTP. A char
+> device has the advantage that can it be simply ignored.
 
-v2 - use gpio* functions instead of read/write to set/reset GPIO
-v3 - notify user when wrong kernel paramter is passed
-v4 - use linux/gpio.h instead of mach/gpio.h
-v5 - changed uart1_mpp_config to be static, global & __initdata
+It's a matter of perspective whether you consider this an advantage
+or disadvantage. I would expect that since you are trying to get support
+for PTP into the kernel, you'd be happy for people to know about it and
+use your code ;-).
 
-Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
----
- arch/arm/mach-kirkwood/openrd-setup.c |  101 ++++++++++++++++++++++++++++++++-
- 1 files changed, 100 insertions(+), 1 deletions(-)
+> Also, a syscall has got to have the right form from the very beginning.
+> If the next generation of PTP hardware looks very different, then it is not
+> that much of a crime to change an ioctl interface, provided it has
+> versioning.
 
-diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
-index fd06be6..47980b6 100644
---- a/arch/arm/mach-kirkwood/openrd-setup.c
-+++ b/arch/arm/mach-kirkwood/openrd-setup.c
-@@ -16,6 +16,7 @@
- #include <linux/ata_platform.h>
- #include <linux/mv643xx_eth.h>
- #include <linux/i2c.h>
-+#include <linux/gpio.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <mach/kirkwood.h>
-@@ -57,7 +58,22 @@ static struct mvsdio_platform_data openrd_mvsdio_data = {
- };
- 
- static unsigned int openrd_mpp_config[] __initdata = {
-+	MPP12_SD_CLK,
-+	MPP13_SD_CMD,
-+	MPP14_SD_D0,
-+	MPP15_SD_D1,
-+	MPP16_SD_D2,
-+	MPP17_SD_D3,
-+	MPP28_GPIO,
- 	MPP29_GPIO,
-+	MPP34_GPIO,
-+	0
-+};
-+
-+/* Configure MPP for UART1 */
-+static unsigned int uart1_mpp_config[] __initdata = {
-+	MPP13_UART1_TXD,
-+	MPP14_UART1_RXD,
- 	0
- };
- 
-@@ -67,6 +83,68 @@ static struct i2c_board_info i2c_board_info[] __initdata = {
- 	},
- };
- 
-+static int __initdata uart1;
-+
-+static int __init sd_uart_selection(char *str)
-+{
-+	uart1 = -EINVAL;
-+
-+	/* Default is SD. Change if required, for UART */
-+	if (!str)
-+		return 0;
-+
-+	if (!strncmp(str, "232", 3)) {
-+		uart1 = 232;
-+	} else if (!strncmp(str, "485", 3)) {
-+		/* OpenRD-Base doesn't have RS485. Treat is as an
-+		 * unknown argument & just have default setting -
-+		 * which is SD */
-+		if (machine_is_openrd_base()) {
-+			uart1 = -ENODEV;
-+			return 1;
-+		}
-+
-+		uart1 = 485;
-+	}
-+	return 1;
-+}
-+/* Parse boot_command_line string uart=232/485 */
-+__setup("uart=", sd_uart_selection);
-+
-+static int __init uart1_mpp_config(void)
-+{
-+	kirkwood_mpp_conf(uart1_mpp_config);
-+
-+	if (gpio_request(34, "SD_UART1_SEL")) {
-+		printk(KERN_ERR "GPIO request failed for SD/UART1 selection"
-+				", gpio: 34\n");
-+		return -EIO;
-+	}
-+
-+	if (gpio_request(28, "RS232_RS485_SEL")) {
-+		printk(KERN_ERR "GPIO request failed for RS232/RS485 selection"
-+				", gpio# 28\n");
-+		gpio_free(34);
-+		return -EIO;
-+	}
-+
-+	/* Select UART1
-+	 * Pin # 34: 0 => UART1, 1 => SD */
-+	gpio_direction_output(34, 0);
-+
-+	/* Select RS232 OR RS485
-+	 * Pin # 28: 0 => RS232, 1 => RS485 */
-+	if (uart1 == 232)
-+		gpio_direction_output(28, 0);
-+	else
-+		gpio_direction_output(28, 1);
-+
-+	gpio_free(34);
-+	gpio_free(28);
-+
-+	return 0;
-+}
-+
- static void __init openrd_init(void)
- {
- 	/*
-@@ -90,7 +168,6 @@ static void __init openrd_init(void)
- 		kirkwood_ge01_init(&openrd_ge01_data);
- 
- 	kirkwood_sata_init(&openrd_sata_data);
--	kirkwood_sdio_init(&openrd_mvsdio_data);
- 
- 	kirkwood_i2c_init();
- 
-@@ -99,6 +176,28 @@ static void __init openrd_init(void)
- 			ARRAY_SIZE(i2c_board_info));
- 		kirkwood_audio_init();
- 	}
-+
-+	if (uart1 <= 0) {
-+		if (uart1 < 0)
-+			printk(KERN_ERR "Invalid kernel parameter to select "
-+				"UART1. Defaulting to SD. ERROR CODE: %d\n",
-+				uart1);
-+
-+		/* Select SD
-+		 * Pin # 34: 0 => UART1, 1 => SD */
-+		if (gpio_request(34, "SD_UART1_SEL")) {
-+			printk(KERN_ERR "GPIO request failed for SD/UART1 "
-+					"selection, gpio: 34\n");
-+		} else {
-+
-+			gpio_direction_output(34, 1);
-+			gpio_free(34);
-+			kirkwood_sdio_init(&openrd_mvsdio_data);
-+		}
-+	} else {
-+		if (!uart1_mpp_config())
-+			kirkwood_uart1_init();
-+	}
- }
- 
- static int __init openrd_pci_init(void)
--- 
-1.6.6.1
+No, that's just a myth. The rules for ABI stability are pretty much the
+same. We try hard to avoid ever changing an existing ABI, for both
+syscalls and ioctl. In either case, if you get it wrong, you have to support
+the old interface and create a new syscall or ioctl command.
+As mentioned, versioning does not solve this, it just adds another
+indirection (which we try to avoid).
+
+One difference is that more people take a look at your code when you suggest
+a new syscall, so the chances of getting it right in the first upstream
+version are higher.
+Another difference is that we generally use ioctl for devices that can
+be enumerated, while syscalls are for system services that are not tied to
+a specific device. This argument works both ways for PTP IMHO: On the one
+hand you want to have a reliable clock that you can use without knowing
+where it comes from, on the other you might have multiple PTP sources that
+you need to differentiate.
+
+	Arnd
