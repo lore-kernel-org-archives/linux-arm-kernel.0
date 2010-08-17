@@ -1,42 +1,125 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Tue, 17 Aug 2010 10:32:16 +0200
-Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
-In-Reply-To: <201008162159.39734.arnd@arndb.de>
-References: <cover.1281956490.git.richard.cochran@omicron.at>
-	<201008161626.24083.arnd@arndb.de>
-	<20100816190003.GB4166@riccoc20.at.omicron.at>
-	<201008162159.39734.arnd@arndb.de>
-Message-ID: <20100817083216.GA3330@riccoc20.at.omicron.at>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Tue, 17 Aug 2010 17:37:47 +0900
+Subject: [PATCH] ARM: S5PC210: Add gpio keys at Universal board
+In-Reply-To: <20100802052846.GA11979@july>
+References: <20100802052846.GA11979@july>
+Message-ID: <AANLkTinF0AuuzYHxsxvtgsVq4=sbX-zRfmXW-ZjmTAA_@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 16, 2010 at 09:59:39PM +0200, Arnd Bergmann wrote:
-> Why does it matter how long it takes to read the clock? I wasn't thinking
-> of replacing the system clock with this, just exposing the additional
-> clock as a new clockid_t value that can be accessed using the existing
-> syscalls.
+Hi Kgene,
 
-Okay, now I see. You are suggesting this:
+Can you apply other universal board support?
+gpio-keys and gpio-i2c.
 
-      clock_gettime(CLOCK_PTP, &ts);
-      clock_settime(CLOCK_PTP, &ts);
+and one more request I sent the new gpio support codes. but no one
+mention it. any comment? or how can we merge it?
 
-I like this. If there is agreement about it, I am happy to implement
-the PTP stuff that way.
+Thank you,
+Kyungmin Park
 
-> Why did you not want to add syscalls? Adding ioctls instead of syscalls
-> does not make the interface better, just less visible.
-
-I bet that, had I posted patch set with new syscalls, someone would
-have said, "You are adding new syscalls. Can't you just use a char
-device instead!"
-
-If you add syscalls and introduce CLOCK_PTP, then you add it to
-everyone's kernel, even those people who never heard of PTP. A char
-device has the advantage that can it be simply ignored. Also, a
-syscall has got to have the right form from the very beginning. If the
-next generation of PTP hardware looks very different, then it is not
-that much of a crime to change an ioctl interface, provided it has
-versioning.
-
-Richard
+On Mon, Aug 2, 2010 at 2:28 PM, Kyungmin Park <kyungmin.park@samsung.com> wrote:
+> Universal board has 5 gpio keys.
+>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> ?arch/arm/mach-s5pv310/mach-universal.c | ? 62 ++++++++++++++++++++++++++++++++
+> ?1 files changed, 62 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-s5pv310/mach-universal.c b/arch/arm/mach-s5pv310/mach-universal.c
+> index b5908d9..d584028 100644
+> --- a/arch/arm/mach-s5pv310/mach-universal.c
+> +++ b/arch/arm/mach-s5pv310/mach-universal.c
+> @@ -7,7 +7,11 @@
+> ?* published by the Free Software Foundation.
+> ?*/
+>
+> +#include <linux/platform_device.h>
+> ?#include <linux/serial_core.h>
+> +#include <linux/input.h>
+> +#include <linux/gpio_keys.h>
+> +#include <linux/gpio.h>
+>
+> ?#include <asm/mach/arch.h>
+> ?#include <asm/mach-types.h>
+> @@ -60,6 +64,61 @@ static struct s3c2410_uartcfg universal_uartcfgs[] __initdata = {
+> ? ? ? ?},
+> ?};
+>
+> +static struct gpio_keys_button universal_gpio_keys_tables[] = {
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .code ? ? ? ? ? ? ? ? ? = KEY_VOLUMEUP,
+> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = S5PV310_GPX2(0), ? ? ?/* XEINT16 */
+> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "gpio-keys: KEY_VOLUMEUP",
+> + ? ? ? ? ? ? ? .type ? ? ? ? ? ? ? ? ? = EV_KEY,
+> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
+> + ? ? ? ? ? ? ? .debounce_interval ? ? ?= 1,
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .code ? ? ? ? ? ? ? ? ? = KEY_VOLUMEDOWN,
+> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = S5PV310_GPX2(1), ? ? ?/* XEINT17 */
+> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "gpio-keys: KEY_VOLUMEDOWN",
+> + ? ? ? ? ? ? ? .type ? ? ? ? ? ? ? ? ? = EV_KEY,
+> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
+> + ? ? ? ? ? ? ? .debounce_interval ? ? ?= 1,
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .code ? ? ? ? ? ? ? ? ? = KEY_CONFIG,
+> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = S5PV310_GPX2(2), ? ? ?/* XEINT18 */
+> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "gpio-keys: KEY_CONFIG",
+> + ? ? ? ? ? ? ? .type ? ? ? ? ? ? ? ? ? = EV_KEY,
+> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
+> + ? ? ? ? ? ? ? .debounce_interval ? ? ?= 1,
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .code ? ? ? ? ? ? ? ? ? = KEY_CAMERA,
+> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = S5PV310_GPX2(3), ? ? ?/* XEINT19 */
+> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "gpio-keys: KEY_CAMERA",
+> + ? ? ? ? ? ? ? .type ? ? ? ? ? ? ? ? ? = EV_KEY,
+> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
+> + ? ? ? ? ? ? ? .debounce_interval ? ? ?= 1,
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .code ? ? ? ? ? ? ? ? ? = KEY_OK,
+> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = S5PV310_GPX3(5), ? ? ?/* XEINT29 */
+> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "gpio-keys: KEY_OK",
+> + ? ? ? ? ? ? ? .type ? ? ? ? ? ? ? ? ? = EV_KEY,
+> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
+> + ? ? ? ? ? ? ? .debounce_interval ? ? ?= 1,
+> + ? ? ? },
+> +};
+> +
+> +static struct gpio_keys_platform_data universal_gpio_keys_data = {
+> + ? ? ? .buttons ? ? ? ?= universal_gpio_keys_tables,
+> + ? ? ? .nbuttons ? ? ? = ARRAY_SIZE(universal_gpio_keys_tables),
+> +};
+> +
+> +static struct platform_device universal_gpio_keys = {
+> + ? ? ? .name ? ? ? ? ? ? ? ? ? = "gpio-keys",
+> + ? ? ? .dev ? ? ? ? ? ? ? ? ? ?= {
+> + ? ? ? ? ? ? ? .platform_data ?= &universal_gpio_keys_data,
+> + ? ? ? },
+> +};
+> +
+> +static struct platform_device *universal_devices[] __initdata = {
+> + ? ? ? &universal_gpio_keys,
+> +};
+> +
+> ?static void __init universal_map_io(void)
+> ?{
+> ? ? ? ?s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+> @@ -72,6 +131,9 @@ static void __init universal_machine_init(void)
+> ?#ifdef CONFIG_CACHE_L2X0
+> ? ? ? ?l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
+> ?#endif
+> +
+> + ? ? ? /* Last */
+> + ? ? ? platform_add_devices(universal_devices, ARRAY_SIZE(universal_devices));
+> ?}
+>
+> ?MACHINE_START(UNIVERSAL, "UNIVERSAL")
+> --
+> 1.5.3.3
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
