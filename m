@@ -1,48 +1,19 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 17 Aug 2010 09:06:27 +0200
-Subject: [PATCH|RESEND 1/4] clock-imx35: use get_3_3_div helper for
-	get_rate_ipg_per
-In-Reply-To: <1281966847-553-2-git-send-email-m.grzeschik@pengutronix.de>
-References: <1281966847-553-1-git-send-email-m.grzeschik@pengutronix.de>
-	<1281966847-553-2-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <20100817070627.GV27749@pengutronix.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 17 Aug 2010 15:47:38 +0800
+Subject: [PATCH 0/3] ASoC: add 88pm860x codec driver and machine driver
+Message-ID: <AANLkTikXSipjpx51PGNz1SUf=FqtEVSeWONTRTt7dMtx@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 16, 2010 at 03:54:04PM +0200, Michael Grzeschik wrote:
-> From: Marc Kleine-Budde <mkl@pengutronix.de>
-> 
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> ---
->  arch/arm/mach-mx3/clock-imx35.c |    6 ++----
->  1 files changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
-> index d3af0fd..4b10f46 100644
-> --- a/arch/arm/mach-mx3/clock-imx35.c
-> +++ b/arch/arm/mach-mx3/clock-imx35.c
-> @@ -290,12 +290,10 @@ static unsigned long get_rate_ipg_per(struct clk *clk)
->  {
->  	unsigned long pdr0 = __raw_readl(CCM_BASE + CCM_PDR0);
->  	unsigned long pdr4 = __raw_readl(CCM_BASE + CCM_PDR4);
-> -	unsigned long div1, div2;
-> +	unsigned long div1;
->  
->  	if (pdr0 & (1 << 26)) {
-> -		div1 = (pdr4 >> 19) & 0x7;
-> -		div2 = (pdr4 >> 16) & 0x7;
-> -		return get_rate_arm() / ((div1 + 1) * (div2 + 1));
-> +		return get_rate_arm() / get_3_3_div(pdr4 >> 16);
+Functions:
+1. append 88pm860x codec driver
+2. add tavorevb3 machine driver
+3. add saarb machine driver
 
-This is wrong. According to newer Datasheets this field contains a plain
-6bit divider not to cascaded 3bit dividers.
+Updates from v1 patches
+1. Remove jack support. These will be append in later patches.
+2. Remove EQ support. These will be append in later patches.
+3. Update patches according to comments.
 
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks
+Haojian
