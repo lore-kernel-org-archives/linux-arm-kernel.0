@@ -1,197 +1,32 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Aug 2010 16:58:03 +0100
-Subject: [PATCH 2/3] ARM: plat-versatile: factor out common hotplug code
-In-Reply-To: <1282060684-27761-2-git-send-email-will.deacon@arm.com>
-References: <1282060684-27761-1-git-send-email-will.deacon@arm.com>
-	<1282060684-27761-2-git-send-email-will.deacon@arm.com>
-Message-ID: <1282060684-27761-3-git-send-email-will.deacon@arm.com>
+Date: Tue, 17 Aug 2010 16:58:01 +0100
+Subject: [PATCH 0/3] CPU hotplug support for Versatile platforms
+Message-ID: <1282060684-27761-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Common hotplug routines for the Versatile Platforms can be factored
-out under plat-versatile leaving only the platform_do_lowpower function
-to be implemented by the BSP code.
+This patch series fixes some issues with the RealView CPU hotplug code and then
+factors out the common code into plat-versatile. Finally, hotplug support is
+added to mach-vexpress using the new platform code.
 
-This patch factors out the hotplug code and changes the RealView hotplug
-implementation to use the new framework.
+Taken against 2.6.35 and tested on RealView PB11MPCore and Versatile Express
+[ct-ca9x4] boards.
 
 Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mach-realview/hotplug.c               |   52 +--------------------
+
+Will Deacon (3):
+  ARM: realview: fix CPU hotplug support for SMP platforms
+  ARM: plat-versatile: factor out common hotplug code
+  ARM: vexpress: add support for CPU hotplug to ct-ca9x4 tile
+
+ arch/arm/mach-realview/hotplug.c               |   89 +++++++-----------------
+ arch/arm/mach-vexpress/Makefile                |    1 +
+ arch/arm/mach-vexpress/ct-ca9x4.c              |   43 +++++++++++
+ arch/arm/mach-vexpress/hotplug.c               |   58 +++++++++++++++
  arch/arm/plat-versatile/Makefile               |    1 +
- arch/arm/plat-versatile/hotplug.c              |   57 ++++++++++++++++++++++++
- arch/arm/plat-versatile/include/plat/hotplug.h |    6 +++
- 4 files changed, 67 insertions(+), 49 deletions(-)
+ arch/arm/plat-versatile/hotplug.c              |   57 +++++++++++++++
+ arch/arm/plat-versatile/include/plat/hotplug.h |    6 ++
+ 7 files changed, 192 insertions(+), 63 deletions(-)
+ create mode 100644 arch/arm/mach-vexpress/hotplug.c
  create mode 100644 arch/arm/plat-versatile/hotplug.c
  create mode 100644 arch/arm/plat-versatile/include/plat/hotplug.h
-
-diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
-index fdb79dd..f80b933 100644
---- a/arch/arm/mach-realview/hotplug.c
-+++ b/arch/arm/mach-realview/hotplug.c
-@@ -16,13 +16,12 @@
- 
- #include <mach/board-eb.h>
- #include <mach/board-pbx.h>
-+#include <plat/hotplug.h>
- 
- #include <asm/cacheflush.h>
- 
- extern volatile int pen_release;
- 
--static DECLARE_COMPLETION(cpu_killed);
--
- static inline void cpu_enter_lowpower(void)
- {
- 	unsigned int v, smp_ctrl;
-@@ -68,8 +67,9 @@ static inline void cpu_leave_lowpower(void)
- 	  : "memory");
- }
- 
--static void __ref platform_do_lowpower(unsigned int cpu)
-+void __ref platform_do_lowpower(unsigned int cpu)
- {
-+	cpu_enter_lowpower();
- 	/*
- 	 * there is no power-control hardware on this platform, so all
- 	 * we can do is put the core into WFI; this is safe as the calling
-@@ -100,51 +100,5 @@ static void __ref platform_do_lowpower(unsigned int cpu)
- 		printk("CPU%u: spurious wakeup call\n", cpu);
- #endif
- 	}
--}
--
--int platform_cpu_kill(unsigned int cpu)
--{
--	return wait_for_completion_timeout(&cpu_killed, 5000);
--}
--
--/*
-- * platform-specific code to shutdown a CPU
-- *
-- * Called with IRQs disabled
-- */
--void platform_cpu_die(unsigned int cpu)
--{
--#ifdef DEBUG
--	unsigned int this_cpu = hard_smp_processor_id();
--
--	if (cpu != this_cpu) {
--		printk(KERN_CRIT "Eek! platform_cpu_die running on %u, should be %u\n",
--			   this_cpu, cpu);
--		BUG();
--	}
--#endif
--
--	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
--	complete(&cpu_killed);
--
--	/*
--	 * we're ready for shutdown now, so do it
--	 */
--	cpu_enter_lowpower();
--	platform_do_lowpower(cpu);
--
--	/*
--	 * bring this CPU back into the world of cache
--	 * coherency, and then restore interrupts
--	 */
- 	cpu_leave_lowpower();
- }
--
--int platform_cpu_disable(unsigned int cpu)
--{
--	/*
--	 * we don't allow CPU 0 to be shutdown (it is still too special
--	 * e.g. clock tick interrupts)
--	 */
--	return cpu == 0 ? -EPERM : 0;
--}
-diff --git a/arch/arm/plat-versatile/Makefile b/arch/arm/plat-versatile/Makefile
-index 9b1a668..e4f043b 100644
---- a/arch/arm/plat-versatile/Makefile
-+++ b/arch/arm/plat-versatile/Makefile
-@@ -2,3 +2,4 @@ obj-y	:= clock.o
- obj-$(CONFIG_ARM_TIMER_SP804) += timer-sp.o
- obj-$(CONFIG_ARCH_REALVIEW) += sched-clock.o
- obj-$(CONFIG_ARCH_VERSATILE) += sched-clock.o
-+obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
-diff --git a/arch/arm/plat-versatile/hotplug.c b/arch/arm/plat-versatile/hotplug.c
-new file mode 100644
-index 0000000..15ed6bd
---- /dev/null
-+++ b/arch/arm/plat-versatile/hotplug.c
-@@ -0,0 +1,57 @@
-+/*
-+ *  linux/arch/arm/plat-versatile/hotplug.c
-+ *
-+ *  Copyright (C) 2010 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/smp.h>
-+#include <linux/completion.h>
-+
-+#include <plat/hotplug.h>
-+
-+static DECLARE_COMPLETION(cpu_killed);
-+
-+int platform_cpu_kill(unsigned int cpu)
-+{
-+	return wait_for_completion_timeout(&cpu_killed, 5000);
-+}
-+
-+/*
-+ * platform-specific code to shutdown a CPU
-+ *
-+ * Called with IRQs disabled
-+ */
-+void platform_cpu_die(unsigned int cpu)
-+{
-+#ifdef DEBUG
-+	unsigned int this_cpu = hard_smp_processor_id();
-+
-+	if (cpu != this_cpu) {
-+		printk(KERN_CRIT "Eek! platform_cpu_die running on %u, should be %u\n",
-+			   this_cpu, cpu);
-+		BUG();
-+	}
-+#endif
-+
-+	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
-+	complete(&cpu_killed);
-+
-+	/*
-+	 * Call the CPU-specific low-power routine.
-+	 */
-+	platform_do_lowpower(cpu);
-+}
-+
-+int platform_cpu_disable(unsigned int cpu)
-+{
-+	/*
-+	 * we don't allow CPU 0 to be shutdown (it is still too special
-+	 * e.g. clock tick interrupts)
-+	 */
-+	return cpu == 0 ? -EPERM : 0;
-+}
-diff --git a/arch/arm/plat-versatile/include/plat/hotplug.h b/arch/arm/plat-versatile/include/plat/hotplug.h
-new file mode 100644
-index 0000000..f36df1c
---- /dev/null
-+++ b/arch/arm/plat-versatile/include/plat/hotplug.h
-@@ -0,0 +1,6 @@
-+#ifndef PLAT_HOTPLUG_H
-+#define PLAT_HOTPLUG_H
-+
-+void platform_do_lowpower(unsigned int cpu);
-+
-+#endif
--- 
-1.6.3.3
