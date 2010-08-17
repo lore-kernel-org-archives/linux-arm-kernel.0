@@ -1,96 +1,35 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 17 Aug 2010 13:53:19 +0300
-Subject: [PATCH 1/4] ARM: Add SMP_ON_UP Kconfig option for booting SMP kernel
-	on UP
-In-Reply-To: <20100817104414.19061.38999.stgit@baageli.muru.com>
+Date: Tue, 17 Aug 2010 14:20:11 +0300
+Subject: [PATCH 2/4] ARM: Allow optional UP processor functions for SMP
+	kernels
+In-Reply-To: <20100817110857.GB20325@n2100.arm.linux.org.uk>
 References: <20100817104414.19061.38999.stgit@baageli.muru.com>
-Message-ID: <20100817105319.19061.6095.stgit@baageli.muru.com>
+	<20100817105325.19061.93324.stgit@baageli.muru.com>
+	<20100817110857.GB20325@n2100.arm.linux.org.uk>
+Message-ID: <20100817112011.GG12184@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Kconfig option to boot SMP kernel on uniprocessor systems,
-and define MULTI_CPU, MULTI_TLB and MULTI_CACHE when SMP_ON_UP
-option is set.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [100817 14:01]:
+> On Tue, Aug 17, 2010 at 01:53:25PM +0300, Tony Lindgren wrote:
+> 
+> > +	if (list->proc_up)
+> > +		processor = *list->proc_up;
+> > +
+> > +	if (list->tlb_up)
+> > +		cpu_tlb = *list->tlb_up;
+> > +
+> > +	if (list->cache_up)
+> > +		cpu_cache = *list->cache_up;
+> 
+> I don't think this is a good approach at all - most of the assembly
+> is identical and I'm sure there's a much better approach to fixing
+> these things up.
 
-This will allow us to dynamically set the uniprocessor functions
-during the boot in a way that should also work with ZBOOT_ROM.
+We could simplify it if we tried to detect SMP kernel running
+on UP hardware early on and then select the UP vs SMP code as
+needed.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/Kconfig                  |    7 +++++++
- arch/arm/include/asm/cacheflush.h |    6 ++++++
- arch/arm/include/asm/proc-fns.h   |    8 ++++++++
- arch/arm/include/asm/tlbflush.h   |    6 ++++++
- 4 files changed, 27 insertions(+), 0 deletions(-)
+Regards,
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9295110..1e9df6d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1166,6 +1166,13 @@ config SMP
- 
- 	  If you don't know what to do here, say N.
- 
-+config SMP_ON_UP
-+	bool "Allow booting SMP kernel on uniprocessor systems (EXPERIMENTAL)"
-+	depends on SMP
-+	default y
-+	help
-+          Allows booting SMP kernel on uniprocessor systems.
-+
- config HAVE_ARM_SCU
- 	bool
- 	depends on SMP
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index 4656a24..e0ed5b4 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -26,6 +26,12 @@
- #undef _CACHE
- #undef MULTI_CACHE
- 
-+/* Force multiple cache support to boot SMP kernel on uniprocessor systems */
-+#ifdef CONFIG_SMP_ON_UP
-+# undef  MULTI_CACHE
-+# define MULTI_CACHE 1
-+#endif
-+
- #if defined(CONFIG_CPU_CACHE_V3)
- # ifdef _CACHE
- #  define MULTI_CACHE 1
-diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
-index 8fdae9b..87a558b 100644
---- a/arch/arm/include/asm/proc-fns.h
-+++ b/arch/arm/include/asm/proc-fns.h
-@@ -20,6 +20,14 @@
- #undef MULTI_CPU
- #undef CPU_NAME
- 
-+/* Force multiple CPU support to boot SMP kernel on uniprocessor systems */
-+#ifdef CONFIG_SMP_ON_UP
-+# undef  MULTI_CPU
-+# undef  CPU_NAME
-+# define MULTI_CPU
-+# define CPU_NAME
-+#endif
-+
- /*
-  * CPU_NAME - the prefix for CPU related functions
-  */
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index 33b546a..9b310bd 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -70,6 +70,12 @@
- #undef _TLB
- #undef MULTI_TLB
- 
-+/* Force multiple TLB support to boot SMP kernel on uniprocessor systems */
-+#ifdef CONFIG_SMP_ON_UP
-+# undef  MULTI_TLB
-+# define MULTI_TLB 1
-+#endif
-+
- #define v3_tlb_flags	(TLB_V3_FULL | TLB_V3_PAGE)
- 
- #ifdef CONFIG_CPU_TLB_V3
+Tony
