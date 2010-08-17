@@ -1,23 +1,24 @@
-From: tklauser@distanz.ch (Tobias Klauser)
-Date: Tue, 17 Aug 2010 20:34:09 +0200
-Subject: [PATCH] ether1: Use net_device_stats from struct net_device
-In-Reply-To: <20100817183205.GH645@bicker>
-References: <1282061719-19645-1-git-send-email-tklauser@distanz.ch>
-	<20100817183205.GH645@bicker>
-Message-ID: <20100817183409.GF15670@distanz.ch>
+From: error27@gmail.com (Dan Carpenter)
+Date: Tue, 17 Aug 2010 20:35:52 +0200
+Subject: [PATCH] ether3: Use net_device_stats from struct net_device
+In-Reply-To: <1282061733-19700-1-git-send-email-tklauser@distanz.ch>
+References: <1282061733-19700-1-git-send-email-tklauser@distanz.ch>
+Message-ID: <20100817183551.GI645@bicker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2010-08-17 at 20:32:05 +0200, Dan Carpenter <error27@gmail.com> wrote:
-> On Tue, Aug 17, 2010 at 06:15:19PM +0200, Tobias Klauser wrote:
-> > struct net_device has its own struct net_device_stats member, so use
-> > this one instead of a private copy in the ether1_priv struct.
-> > 
+On Tue, Aug 17, 2010 at 06:15:33PM +0200, Tobias Klauser wrote:
+> struct net_device has its own struct net_device_stats member, so use
+> this one instead of a private copy in the ether1_priv struct.
 > 
-> You missed one in ether1_open().
-> 
->         memset (&priv(dev)->stats, 0, sizeof (struct net_device_stats));
 
-Thanks. I'll send an updated patch.
+Two were missed, one from ether3_init_for_open()
 
-Tobias
+	memset(&priv(dev)->stats, 0, sizeof(struct net_device_stats));
+
+and another from ether3_rx().
+
+	struct net_device_stats *stats = &priv(dev)->stats;
+
+regards,
+dan carpenter
