@@ -1,124 +1,167 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 17 Aug 2010 10:58:00 +0100
-Subject: [PATCH 1/3] ASoC: add 88pm860x codec driver
-In-Reply-To: <AANLkTi=i5H_oJvXzMv71ofxyw9FFXpiXU=pgzf+rdgk0@mail.gmail.com>
-References: <AANLkTi=i5H_oJvXzMv71ofxyw9FFXpiXU=pgzf+rdgk0@mail.gmail.com>
-Message-ID: <20100817095800.GD18622@rakim.wolfsonmicro.main>
+From: tanmay.upadhyay@einfochips.com (Tanmay Upadhyay)
+Date: Tue, 17 Aug 2010 14:57:43 +0530
+Subject: [PATCH v5] OpenRD: Enable SD/UART selection for serial port 1
+Message-ID: <1282037263-3038-1-git-send-email-tanmay.upadhyay@einfochips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 17, 2010 at 03:47:59PM +0800, Haojian Zhuang wrote:
+This patch enables user to use serial port 1 of the OpenRD device for SDIO
+or UART(RS232/RS485). The selection can be done through kernel parameter.
 
-> +enum {
-> +	FILTER_BYPASS = 0,
-> +	FILTER_LOW_PASS_1,
-> +	FILTER_LOW_PASS_2,
-> +	FILTER_HIGH_PASS_3,
-> +	FILTER_MAX,
-> +};
+By default the port would be used for SDIO. To select RS232 or RS485 mode,
+pass string "uart=232" or "uart=485" respectively in the kernel parameters.
+"uart=485" is ignored on OpenRD-Base as it doesn't have RS485 port.
 
-This looks to be unused.
+v2 - use gpio* functions instead of read/write to set/reset GPIO
+v3 - notify user when wrong kernel paramter is passed
+v4 - use linux/gpio.h instead of mach/gpio.h
+v5 - changed uart1_mpp_config to be static, global & __initdata
 
-> +/* DAPM Widget Events */
-> +static int pm860x_rsync_event(struct snd_soc_dapm_widget *w,
-> +			      struct snd_kcontrol *kcontrol, int event)
-> +{
-> +	struct snd_soc_codec *codec = w->codec;
-> +
-> +	/* unmute DAC */
-> +	snd_soc_update_bits(codec, PM860X_DAC_OFFSET, DAC_MUTE, 0);
+Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
+---
+ arch/arm/mach-kirkwood/openrd-setup.c |  101 ++++++++++++++++++++++++++++++++-
+ 1 files changed, 100 insertions(+), 1 deletions(-)
 
-Can you explain what's going on with this mute handling please?
-
-> +	switch (event) {
-> +	case SND_SOC_DAPM_PRE_PMU:
-> +		snd_soc_update_bits(codec, PM860X_ADC_EN_1, en1, en1);
-> +		snd_soc_update_bits(codec, PM860X_ADC_EN_2, en2, en2);
-
-I still don't follow why you need a custom event for this.
-
-> +	switch (event) {
-> +	case SND_SOC_DAPM_PRE_PMU:
-> +		if (dac) {
-> +			dac |= MODULATOR;
-> +			/* mute */
-> +			snd_soc_update_bits(codec, PM860X_DAC_OFFSET,
-> +					    DAC_MUTE, DAC_MUTE);
-
-This mute handling looks very suspicious.
-
-> +static int pm860x_mic1_event(struct snd_soc_dapm_widget *w,
-> +			     struct snd_kcontrol *kcontrol, int event)
-> +{
-> +	struct snd_soc_codec *codec = w->codec;
-> +
-> +	switch (event) {
-> +	case SND_SOC_DAPM_POST_PMU:
-> +		/* Enable Mic1 Bias & MICDET, HSDET */
-> +		snd_soc_update_bits(codec, PM860X_ADC_ANA_1, MIC1BIAS_MASK,
-> +				    MIC1BIAS_MASK);
-
-As I said last time you should handle this via DAPM.
-
-> +		pm860x_set_bits(codec->control_data, REG_MIC_DET,
-> +				MICDET_MASK, MICDET_MASK);
-> +		pm860x_set_bits(codec->control_data, REG_HS_DET,
-> +				EN_HS_DET, EN_HS_DET);
-
-This should be associated with enabling microphone detection.
-
-> +	/* set master/slave audio interface */
-> +	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
-> +	case SND_SOC_DAIFMT_CBM_CFM:
-> +	case SND_SOC_DAIFMT_CBM_CFS:
-> +		if (pm860x->dir == PM860X_CLK_DIR_OUT)
-> +			*inf |= PCM_INF2_MASTER;
-> +		else
-> +			return -EINVAL;
-> +		break;
-
-You're setting the same register configuration for two different DAI
-clock master configurations here.  Presumably one of the settings is
-inaccurate?
-
-> +static int pm860x_set_dai_sysclk(struct snd_soc_dai *codec_dai,
-> +				 int clk_id, unsigned int freq, int dir)
-> +{
-> +	struct snd_soc_codec *codec = codec_dai->codec;
-> +	struct pm860x_priv *pm860x = snd_soc_codec_get_drvdata(codec);
-> +
-> +	if (dir == PM860X_CLK_DIR_OUT)
-> +		pm860x->dir = PM860X_CLK_DIR_OUT;
-> +	else
-> +		pm860x->dir = PM860X_CLK_DIR_IN;
-> +
-> +	return 0;
-> +}
-
-What is this actually setting - which clock is being configured here?
-
-> +static irqreturn_t pm860x_codec_handler(int irq, void *data)
-> +{
-> +	struct pm860x_priv *pm860x = data;
-> +	int status, shrt, report = 0;
-> +
-> +	status = pm860x_reg_read(pm860x->i2c, REG_STATUS_1);
-> +	shrt = pm860x_reg_read(pm860x->i2c, REG_SHORTS);
-> +
-> +	if (status & HEADSET_STATUS)
-> +		report |= PM860X_DET_HEADSET;
-> +	if (status & MIC_STATUS)
-> +		report |= PM860X_DET_MIC;
-> +	if (status & HOOK_STATUS)
-> +		report |= PM860X_DET_HOOK;
-> +	if (shrt & (SHORT_LO1 | SHORT_LO2))
-> +		report |= PM860X_SHORT_LINEOUT;
-> +	if (shrt & (SHORT_HS1 | SHORT_HS2))
-> +		report |= PM860X_SHORT_HEADSET;
-> +	dev_dbg(pm860x->codec->dev, "report:0x%x\n", report);
-> +	return IRQ_HANDLED;
-
-It would seem better to just remove the interrupt handling support
-entirely if you're not going to implement jack detection.  Right now all
-the curernt code will do is waste power by enabling the feature but
-ignoring the result.
+diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
+index fd06be6..47980b6 100644
+--- a/arch/arm/mach-kirkwood/openrd-setup.c
++++ b/arch/arm/mach-kirkwood/openrd-setup.c
+@@ -16,6 +16,7 @@
+ #include <linux/ata_platform.h>
+ #include <linux/mv643xx_eth.h>
+ #include <linux/i2c.h>
++#include <linux/gpio.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <mach/kirkwood.h>
+@@ -57,7 +58,22 @@ static struct mvsdio_platform_data openrd_mvsdio_data = {
+ };
+ 
+ static unsigned int openrd_mpp_config[] __initdata = {
++	MPP12_SD_CLK,
++	MPP13_SD_CMD,
++	MPP14_SD_D0,
++	MPP15_SD_D1,
++	MPP16_SD_D2,
++	MPP17_SD_D3,
++	MPP28_GPIO,
+ 	MPP29_GPIO,
++	MPP34_GPIO,
++	0
++};
++
++/* Configure MPP for UART1 */
++static unsigned int uart1_mpp_config[] __initdata = {
++	MPP13_UART1_TXD,
++	MPP14_UART1_RXD,
+ 	0
+ };
+ 
+@@ -67,6 +83,68 @@ static struct i2c_board_info i2c_board_info[] __initdata = {
+ 	},
+ };
+ 
++static int __initdata uart1;
++
++static int __init sd_uart_selection(char *str)
++{
++	uart1 = -EINVAL;
++
++	/* Default is SD. Change if required, for UART */
++	if (!str)
++		return 0;
++
++	if (!strncmp(str, "232", 3)) {
++		uart1 = 232;
++	} else if (!strncmp(str, "485", 3)) {
++		/* OpenRD-Base doesn't have RS485. Treat is as an
++		 * unknown argument & just have default setting -
++		 * which is SD */
++		if (machine_is_openrd_base()) {
++			uart1 = -ENODEV;
++			return 1;
++		}
++
++		uart1 = 485;
++	}
++	return 1;
++}
++/* Parse boot_command_line string uart=232/485 */
++__setup("uart=", sd_uart_selection);
++
++static int __init uart1_mpp_config(void)
++{
++	kirkwood_mpp_conf(uart1_mpp_config);
++
++	if (gpio_request(34, "SD_UART1_SEL")) {
++		printk(KERN_ERR "GPIO request failed for SD/UART1 selection"
++				", gpio: 34\n");
++		return -EIO;
++	}
++
++	if (gpio_request(28, "RS232_RS485_SEL")) {
++		printk(KERN_ERR "GPIO request failed for RS232/RS485 selection"
++				", gpio# 28\n");
++		gpio_free(34);
++		return -EIO;
++	}
++
++	/* Select UART1
++	 * Pin # 34: 0 => UART1, 1 => SD */
++	gpio_direction_output(34, 0);
++
++	/* Select RS232 OR RS485
++	 * Pin # 28: 0 => RS232, 1 => RS485 */
++	if (uart1 == 232)
++		gpio_direction_output(28, 0);
++	else
++		gpio_direction_output(28, 1);
++
++	gpio_free(34);
++	gpio_free(28);
++
++	return 0;
++}
++
+ static void __init openrd_init(void)
+ {
+ 	/*
+@@ -90,7 +168,6 @@ static void __init openrd_init(void)
+ 		kirkwood_ge01_init(&openrd_ge01_data);
+ 
+ 	kirkwood_sata_init(&openrd_sata_data);
+-	kirkwood_sdio_init(&openrd_mvsdio_data);
+ 
+ 	kirkwood_i2c_init();
+ 
+@@ -99,6 +176,28 @@ static void __init openrd_init(void)
+ 			ARRAY_SIZE(i2c_board_info));
+ 		kirkwood_audio_init();
+ 	}
++
++	if (uart1 <= 0) {
++		if (uart1 < 0)
++			printk(KERN_ERR "Invalid kernel parameter to select "
++				"UART1. Defaulting to SD. ERROR CODE: %d\n",
++				uart1);
++
++		/* Select SD
++		 * Pin # 34: 0 => UART1, 1 => SD */
++		if (gpio_request(34, "SD_UART1_SEL")) {
++			printk(KERN_ERR "GPIO request failed for SD/UART1 "
++					"selection, gpio: 34\n");
++		} else {
++
++			gpio_direction_output(34, 1);
++			gpio_free(34);
++			kirkwood_sdio_init(&openrd_mvsdio_data);
++		}
++	} else {
++		if (!uart1_mpp_config())
++			kirkwood_uart1_init();
++	}
+ }
+ 
+ static int __init openrd_pci_init(void)
+-- 
+1.6.6.1
