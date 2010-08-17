@@ -1,20 +1,16 @@
 From: tony@atomide.com (Tony Lindgren)
 Date: Tue, 17 Aug 2010 13:33:23 +0300
-Subject: [PATCH 6/6] omap: Fix SMP on UP interrupt handling for multi-omap
-Message-ID: <mailman.225.1283444633.27306.linux-arm-kernel@lists.infradead.org>
+Subject: [PATCH] omap: Fix SMP on UP initialization for multi-omap
+Message-ID: <mailman.227.1283455814.27306.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix SMP on UP interrupt handling for multi-omap
+Fix SMP on UP initialization for multi-omap.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/omap-smp.c |   13 +++++++++----
- arch/arm/mach-omap2/timer-gp.c |    7 +++++--
- 2 files changed, 14 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index 9e9f70e..a8bb49c 100644
+index 9e9f70e..3695232 100644
 --- a/arch/arm/mach-omap2/omap-smp.c
 +++ b/arch/arm/mach-omap2/omap-smp.c
 @@ -22,6 +22,7 @@
@@ -32,7 +28,7 @@ index 9e9f70e..a8bb49c 100644
 -	/* Never released */
 -	scu_base = ioremap(OMAP44XX_SCU_BASE, SZ_256);
 -	BUG_ON(!scu_base);
-+	if (smp_on_up()) {
++	if (!smp_cpu()) {
 +		ncores = 1;
 +	} else {
 +		/* Never released */
@@ -46,7 +42,7 @@ index 9e9f70e..a8bb49c 100644
  	for (i = 0; i < ncores; i++)
  		set_cpu_possible(i, true);
 diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-gp.c
-index 74fbed8..badf5f2 100644
+index 74fbed8..a21b4a4 100644
 --- a/arch/arm/mach-omap2/timer-gp.c
 +++ b/arch/arm/mach-omap2/timer-gp.c
 @@ -37,6 +37,7 @@
@@ -63,12 +59,12 @@ index 74fbed8..badf5f2 100644
  #ifdef CONFIG_LOCAL_TIMERS
 -	twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
 -	BUG_ON(!twd_base);
-+	if (smp_on_up()) {
++	if (!smp_cpu()) {
 +		twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
 +		BUG_ON(!twd_base);
 +	}
  #endif
  	omap_dm_timer_init();
  
--- 
-1.7.1
+
+--SWTRyWv/ijrBap1m--
