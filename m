@@ -1,32 +1,28 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 17 Aug 2010 22:41:07 +0200
-Subject: [PATCH] watchdog: Enable NXP LPC32XX support in Kconfig
-In-Reply-To: <083DF309106F364B939360100EC290F80ACF617DC8@eu1rdcrdc1wx030.exi.nxp.com>
-References: <AANLkTi=AiByTGvvvN_LACKLjW3TG6T2kmwKofpMmRdmz@mail.gmail.com>
-	<083DF309106F364B939360100EC290F80ACF617DC8@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <20100817204107.GA19076@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 17 Aug 2010 22:17:40 +0100
+Subject: [PATCH 1/2] video: amba_clcd: Fix driver clock enable/disable
+	balance issues
+In-Reply-To: <1281567784-12684-2-git-send-email-wellsk40@gmail.com>
+References: <1281567784-12684-1-git-send-email-wellsk40@gmail.com>
+	<1281567784-12684-2-git-send-email-wellsk40@gmail.com>
+Message-ID: <20100817211740.GE20325@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 17, 2010 at 09:31:57PM +0200, Kevin Wells wrote:
-> It's been a few weeks since I've posted this.
-> Have I placed this in the correct mailing list?
+On Wed, Aug 11, 2010 at 04:03:03PM -0700, wellsk40 at gmail.com wrote:
+> From: Kevin Wells <wellsk40@gmail.com>
+> 
+> The amba clcd clock enable and disable calls can become unbalanced.
+> This usually occurs on the first call to clcdfb_set_par() during
+> LCD init, but can also occur when the LCD enters and exits blank
+> state. This fix prevents clk_disable() from being called until
+> clk_enable() has been called first.
+> 
+> Signed-off-by: Kevin Wells <wellsk40@gmail.com>
 
-Oops, I just noticed, Wim (watchdog maintainer) is not on CC. Maybe you should
-resend it with my ack and Wim in CC. You might also check the
-get_maintainers.pl-script to assist you in who to cc.
+Not quite the right way to do things, because this makes yourself the
+author of the patch which is obviously wrong.
 
-Kind regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100817/15b52878/attachment.sig>
+I'll commit it myself now, as I'm about to send stuff to Linus.  I'm
+going to assume you've tested it, but as I don't know positively I
+can't add an attributation for it.
