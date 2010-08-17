@@ -1,32 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 17 Aug 2010 09:57:32 +0100
-Subject: warning: (CPU_V7 && !ARCH_OMAP2 || CPU_MMP2 && ARCH_MMP)
-In-Reply-To: <008101cb3aaf$008009b0$01801d10$%kim@samsung.com>
-References: <007f01cb3aaa$cc469460$64d3bd20$%kim@samsung.com>
-	<20100813055939.GA12781@pengutronix.de>
-	<008101cb3aaf$008009b0$01801d10$%kim@samsung.com>
-Message-ID: <1282035452.406.3.camel@e102109-lin.cambridge.arm.com>
+From: stepanm@codeaurora.org (Stepan Moskovchenko)
+Date: Tue, 17 Aug 2010 02:02:44 -0700
+Subject: [PATCH v4] arm: msm: Add MSM IOMMU support.
+In-Reply-To: <20100816183226.GA31512@phenom.dumpdata.com>
+References: <1281469529-23340-1-git-send-email-stepanm@codeaurora.org>
+	<20100816183226.GA31512@phenom.dumpdata.com>
+Message-ID: <4C6A5034.2090406@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-08-13 at 07:15 +0100, Kukjin Kim wrote:
-> Uwe Kleine-K?nig wrote:
-> > On Fri, Aug 13, 2010 at 02:45:30PM +0900, Kukjin Kim wrote:
-> > > I found build warning in the latest Linus' tree like following.
-> > >
-> > > warning: (CPU_V7 && !ARCH_OMAP2 || CPU_MMP2 && ARCH_MMP) selects CPU_32v6K
-> > > which has unmet direct dependencies (CPU_V6)
-> > 
-> >       http://article.gmane.org/gmane.linux.ports.arm.kernel/84565
-> >
-> 
-> There is no above 'warning' with Catalin's patch.
-> 
-> Is this going to Linus' tree in this merge window?
+  On 8/16/2010 11:32 AM, Konrad Rzeszutek Wilk wrote:
+> I did a very brief look.
+>
+>> +	dmac_flush_range(fl_table, fl_table + SZ_16K);
+>> +
+>> +	for (i = 0; i<  4096; i++)
+> Can you use a #define for the 4096? Will that value ever change?
+I suppose a #define can be used, but this is a HW-specific number that 
+will never ever change.
 
-I'll post it to the list and Russell's patch system and it should
-hopefully go in 2.6.36. The kbuild feature that shows such warnings only
-appeared in 2.6.36-rc1.
+>> +		if ((fl_table[i]&  0x03) == FL_TYPE_TABLE) {
+>> +			void *sl_table = __va(fl_table[i]&  0xFFFFFC00);
+> Does it make sense to define say:
+> #define MASK_XX (x) x&  0xFFFFFC00
+> and
+> #define MASK_XY (x) x&  0xFFFF0000
+>
+> and use those instead of these hard-coded values?
+I guess so.. again, HW specific.
 
--- 
-Catalin
+
+>> +	priv->pgtable = (unsigned long *)__get_free_pages(GFP_KERNEL, 2);
+> Ugh.  Can you use get_order(SZ_16K) instead?
+>
+>> +	/* Invalidate context TLB */
+>> +	SET_CTX_TLBIALL(base, ctx, 0);
+>> +	SET_V2PPR_VA(base, ctx, va>>  12);
+> Hmm, PAGE_SHIFT can't be used? Or some other #define?
+I guess I can use the IOMMU PA shift. PAGE_SHIFT is not appropriate here 
+because that is MMU-specific.
+
+I can put out a v5 early next week.
+
+Thanks
+Steve
