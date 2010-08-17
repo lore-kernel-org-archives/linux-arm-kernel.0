@@ -1,49 +1,87 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Tue, 17 Aug 2010 14:37:57 +0200
-Subject: [PATCH 2/2] i.MX35: Add EPIT support
-In-Reply-To: <20100817120152.GD9631@jasper.tkos.co.il>
-References: <1282044218-14809-1-git-send-email-m.grzeschik@pengutronix.de>
-	<1282044218-14809-3-git-send-email-m.grzeschik@pengutronix.de>
-	<20100817120152.GD9631@jasper.tkos.co.il>
-Message-ID: <20100817123757.GA16061@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Aug 2010 14:31:43 +0100
+Subject: [PATCH] ARM: tegra: register PMU IRQs with PMU framework
+Message-ID: <1282051903-366-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 17, 2010 at 03:01:52PM +0300, Baruch Siach wrote:
-> Hi Michael, Sascha,
-> 
-> On Tue, Aug 17, 2010 at 01:23:38PM +0200, Michael Grzeschik wrote:
-> > From: Sascha Hauer <s.hauer@pengutronix.de>
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> > ---
-> 
-> [snip]
-> 
-> > diff --git a/arch/arm/plat-mxc/include/mach/common.h 
-> > b/arch/arm/plat-mxc/include/mach/common.h
-> > index 2941472..7a1e1f8 100644
-> > --- a/arch/arm/plat-mxc/include/mach/common.h
-> > +++ b/arch/arm/plat-mxc/include/mach/common.h
-> > @@ -32,6 +32,7 @@ extern void mx31_init_irq(void);
-> >  extern void mx35_init_irq(void);
-> >  extern void mx51_init_irq(void);
-> >  extern void mxc91231_init_irq(void);
-> > +extern void epit_timer_init(struct clk *timer_clk, void __iomem *base, int irq);
-> >  extern void mxc_timer_init(struct clk *timer_clk, void __iomem *, int);
-> >  extern int mx1_clocks_init(unsigned long fref);
-> >  extern int mx21_clocks_init(unsigned long lref, unsigned long fref);
-> 
-> This hunk should probably be moved to the previous patch, where 
-> epit_timer_init is defined.
-Yes, this should move. I will wait some more time
-for more feedback and post v2 Version afterwards.
+The Tegra Harmony board contains a dual-core Cortex-A9 and can therefore
+make use of the hardware performance counters on the CPU.
 
-Michael
+This patch fixes a typo in the PMU IRQ definitions and registers the
+interrupts as a platform_device with the PMU framework.
 
+Cc: Colin Cross <ccross@android.com>
+Cc: Linux Tegra Mailing List <linux-tegra@vger.kernel.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+
+This patch was taken against 2.6.36-rc1 but has not even been compile-tested
+because of the following errors:
+
+arch/arm/mach-tegra/board-harmony.c: In function 'tegra_harmony_fixup':
+arch/arm/mach-tegra/board-harmony.c:116: error: 'struct membank' has no member named 'node'
+arch/arm/mach-tegra/board-harmony.c:116: error: implicit declaration of function 'PHYS_TO_NID'
+arch/arm/mach-tegra/board-harmony.c:119: error: 'struct membank' has no member named 'node'
+
+ arch/arm/mach-tegra/board-harmony.c     |   22 ++++++++++++++++++++++
+ arch/arm/mach-tegra/include/mach/irqs.h |    2 +-
+ 2 files changed, 23 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
+index 05e78dd..6c6a02b 100644
+--- a/arch/arm/mach-tegra/board-harmony.c
++++ b/arch/arm/mach-tegra/board-harmony.c
+@@ -26,6 +26,7 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
++#include <asm/pmu.h>
+ #include <asm/setup.h>
+ 
+ #include <mach/iomap.h>
+@@ -82,8 +83,29 @@ static struct platform_device debug_uart = {
+ 	},
+ };
+ 
++static struct resource pmu_resources[] = {
++	[0] = {
++		.start	= INT_CPU0_PMU_INTR,
++		.end	= INT_CPU0_PMU_INTR,
++		.flags	= IORESOURCE_IRQ,
++	},
++	[1] = {
++		.start	= INT_CPU1_PMU_INTR,
++		.end	= INT_CPU1_PMU_INTR,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device pmu_device = {
++	.name		= "arm-pmu",
++	.id		= ARM_PMU_DEVICE_CPU,
++	.num_resources	= ARRAY_SIZE(pmu_resources),
++	.resource	= pmu_resources,
++};
++
+ static struct platform_device *harmony_devices[] __initdata = {
+ 	&debug_uart,
++	&pmu_device,
+ };
+ 
+ static void __init tegra_harmony_fixup(struct machine_desc *desc,
+diff --git a/arch/arm/mach-tegra/include/mach/irqs.h b/arch/arm/mach-tegra/include/mach/irqs.h
+index 20f640e..0a4ddc8 100644
+--- a/arch/arm/mach-tegra/include/mach/irqs.h
++++ b/arch/arm/mach-tegra/include/mach/irqs.h
+@@ -87,7 +87,7 @@
+ #define INT_SYS_STATS_MON		(INT_SEC_BASE + 22)
+ #define INT_GPIO5			(INT_SEC_BASE + 23)
+ #define INT_CPU0_PMU_INTR		(INT_SEC_BASE + 24)
+-#define INT_CPU2_PMU_INTR		(INT_SEC_BASE + 25)
++#define INT_CPU1_PMU_INTR		(INT_SEC_BASE + 25)
+ #define INT_SEC_RES_26			(INT_SEC_BASE + 26)
+ #define INT_S_LINK1			(INT_SEC_BASE + 27)
+ #define INT_APB_DMA_COP			(INT_SEC_BASE + 28)
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.6.3.3
