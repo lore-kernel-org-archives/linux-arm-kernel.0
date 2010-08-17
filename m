@@ -1,28 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Aug 2010 22:17:40 +0100
-Subject: [PATCH 1/2] video: amba_clcd: Fix driver clock enable/disable
-	balance issues
-In-Reply-To: <1281567784-12684-2-git-send-email-wellsk40@gmail.com>
-References: <1281567784-12684-1-git-send-email-wellsk40@gmail.com>
-	<1281567784-12684-2-git-send-email-wellsk40@gmail.com>
-Message-ID: <20100817211740.GE20325@n2100.arm.linux.org.uk>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 18 Aug 2010 00:08:44 +0200
+Subject: [PATCH] SPI: remove superfluous DMA buffer syncs on PL022
+Message-ID: <1282082924-25809-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 11, 2010 at 04:03:03PM -0700, wellsk40 at gmail.com wrote:
-> From: Kevin Wells <wellsk40@gmail.com>
-> 
-> The amba clcd clock enable and disable calls can become unbalanced.
-> This usually occurs on the first call to clcdfb_set_par() during
-> LCD init, but can also occur when the LCD enters and exits blank
-> state. This fix prevents clk_disable() from being called until
-> clk_enable() has been called first.
-> 
-> Signed-off-by: Kevin Wells <wellsk40@gmail.com>
+This removes the superfluous DMA buffer syncs identified by Russell
+in the DMA support for PL022.
 
-Not quite the right way to do things, because this makes yourself the
-author of the patch which is obviously wrong.
+Cc: yuanyabin1978 at sina.com
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ drivers/spi/amba-pl022.c |   16 +++++-----------
+ 1 files changed, 5 insertions(+), 11 deletions(-)
 
-I'll commit it myself now, as I'm about to send stuff to Linus.  I'm
-going to assume you've tested it, but as I don't know positively I
-can't add an attributation for it.
+diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
+index 59b3948..521d3d9 100644
+--- a/drivers/spi/amba-pl022.c
++++ b/drivers/spi/amba-pl022.c
+@@ -794,12 +794,7 @@ static void dma_callback(void *data)
+ 	struct pl022 *pl022 = data;
+ 	struct spi_message *msg = pl022->cur_msg;
+ 
+-	/* Sync in RX buffer to CPU */
+ 	BUG_ON(!pl022->sgt_rx.sgl);
+-	dma_sync_sg_for_cpu(&pl022->adev->dev,
+-			    pl022->sgt_rx.sgl,
+-			    pl022->sgt_rx.nents,
+-			    DMA_FROM_DEVICE);
+ 
+ #ifdef VERBOSE_DEBUG
+ 	/*
+@@ -812,6 +807,11 @@ static void dma_callback(void *data)
+ 		struct scatterlist *sg;
+ 		unsigned int i;
+ 
++		dma_sync_sg_for_cpu(&pl022->adev->dev,
++				    pl022->sgt_rx.sgl,
++				    pl022->sgt_rx.nents,
++				    DMA_FROM_DEVICE);
++
+ 		for_each_sg(pl022->sgt_rx.sgl, sg, pl022->sgt_rx.nents, i) {
+ 			dev_dbg(&pl022->adev->dev, "SPI RX SG ENTRY: %d", i);
+ 			print_hex_dump(KERN_ERR, "SPI RX: ",
+@@ -1001,12 +1001,6 @@ static int configure_dma(struct pl022 *pl022)
+ 	if (sglen != pages)
+ 		goto err_tx_sgmap;
+ 
+-	/* Synchronize the TX scatterlist, invalidate buffers, caches etc */
+-	dma_sync_sg_for_device(&pl022->adev->dev,
+-			       pl022->sgt_tx.sgl,
+-			       pl022->sgt_tx.nents,
+-			       DMA_TO_DEVICE);
+-
+ 	/* Send both scatterlists */
+ 	rxdesc = rxchan->device->device_prep_slave_sg(rxchan,
+ 				      pl022->sgt_rx.sgl,
+-- 
+1.6.3.3
