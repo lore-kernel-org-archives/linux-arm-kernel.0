@@ -1,41 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 17 Aug 2010 14:30:45 +0300
-Subject: [PATCH 4/4] omap: Fix SMP on UP interrupt handling for multi-omap
-In-Reply-To: <1282043269.32205.13.camel@bnru01>
-References: <20100817104414.19061.38999.stgit@baageli.muru.com>
-	<20100817105332.19061.44765.stgit@baageli.muru.com>
-	<1282043269.32205.13.camel@bnru01>
-Message-ID: <20100817113045.GH12184@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Aug 2010 13:36:29 +0200
+Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <20100817105232.GA9079@riccoc20.at.omicron.at>
+References: <cover.1281956490.git.richard.cochran@omicron.at>
+	<201008170925.55592.arnd@arndb.de>
+	<20100817105232.GA9079@riccoc20.at.omicron.at>
+Message-ID: <201008171336.29375.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* srinidhi <srinidhi.kasagar@stericsson.com> [100817 14:00]:
-> On Tue, 2010-08-17 at 12:53 +0200, Tony Lindgren wrote:
-> > Fix SMP on UP interrupt handling for multi-omap
-> > 
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > ---
-> >  arch/arm/mach-omap2/include/mach/entry-macro.S |   22 ++++++++++++++++++++++
-> >  arch/arm/mach-omap2/omap-smp.c                 |   16 ++++++++++++----
-> >  arch/arm/mach-omap2/timer-gp.c                 |    7 +++++--
-> >  3 files changed, 39 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/include/mach/entry-macro.S b/arch/arm/mach-omap2/include/mach/entry-macro.S
-> > index 06e64e1..75c67aa 100644
-> > --- a/arch/arm/mach-omap2/include/mach/entry-macro.S
-> > +++ b/arch/arm/mach-omap2/include/mach/entry-macro.S
+On Tuesday 17 August 2010, Richard Cochran wrote:
+> On Tue, Aug 17, 2010 at 09:25:55AM +0000, Arnd Bergmann wrote:
+> > Another difference is that we generally use ioctl for devices that can
+> > be enumerated, while syscalls are for system services that are not tied to
+> > a specific device. This argument works both ways for PTP IMHO: On the one
+> > hand you want to have a reliable clock that you can use without knowing
+> > where it comes from, on the other you might have multiple PTP sources that
+> > you need to differentiate.
 > 
-> There is one patch lying in Russell's tracker (6284/1) which attempts to
-> use the common IRQ helper macros instead of platforms duplicating this
-> file. Perhaps you may need to re-base to that if Russell is ok with that
-> patch, of course.
+> Yes, I agree. In normal use, there will be only one PTP clock in a
+> system. However, for research purposes, it would be nice to have more
+> than one.
+> 
+> I've been looking at offering the PTP clock as a posix clock, and it
+> is not as hard as I first thought. The PTP clock or clocks just have
+> to be registered as one of the posix_clocks[MAX_CLOCKS] in
+> posix-timers.c.
 
-Nice to see. Ideally test_for_ipi and test_for_ltirq would return
-early automatically when running SMP kernel on UP.
+Ok sounds good.
 
-BTW, did you test patch 6284/1 with omap3_defconfig to make sure
-that still boots on omap3 & 4?
+> My suggestion would be to reserve three clock ids in time.h,
+> CLOCK_PTP0, CLOCK_PTP1, and CLOCK_PTP2. The first one would be the
+> same as CLOCK_REALTIME, for SW timestamping, and the other two would
+> allow two different PTP clocks at the same time, for the research use
+> case.
 
-Regards,
+I don't think there is a point in making exactly two independent sources
+available. The clockid_t space is not really limited, so we could define
+an arbitrary range of ids for ptp sources that could be used simultaneously,
+as long as we have space more more ids with a fixed number.
 
-Tony
+Would it be reasonable to assume that on a machine with a large number
+of NICs, you'd want a separate ptp source for each of them for timestamping?
+Or would you preferably define just one source in such a setup?
+
+I think both could be done with the use of class device attributes in
+sysfs for configuration. Maybe you can have one CLOCK_PTP value for one
+global PTP source and use sysfs to configure which device that is.
+
+If you also need simultaneous access to the specific clocks, you could
+have run-time configured clockid numbers in a sysfs attribute for each
+ptp class device.
+
+> Using the clock id will bring another advantage, since it will then be
+> possible for user space to specify the desired timestamp source for
+> SO_TIMESTAMPING.
+
+God point.
+
+	Arnd
