@@ -1,113 +1,43 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 17 Aug 2010 13:26:41 +0900
-Subject: 'error: 'SDHCI_QUIRK_NO_HISPD_BIT' undeclared' and 'undefined
-	reference to `sdhci_card_detect''
-In-Reply-To: <000901cb3abf$5ef59b30$1ce0d190$%szyprowski@samsung.com>
-References: <008d01cb3ab9$ae73da60$0b5b8f20$%kim@samsung.com>
-	<000901cb3abf$5ef59b30$1ce0d190$%szyprowski@samsung.com>
-Message-ID: <00a101cb3dc4$675e51b0$361af510$%kim@samsung.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 17 Aug 2010 07:36:12 +0300
+Subject: [PATCH 3/3] dmaengine: Add Freescale i.MX SDMA support
+In-Reply-To: <20100816141540.GQ27749@pengutronix.de>
+References: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
+	<1281956870-12463-4-git-send-email-s.hauer@pengutronix.de>
+	<AANLkTi=pO-ZJ33FrL=4bVRYa2o9HA0_h5tBYG7wdMuwz@mail.gmail.com>
+	<20100816141540.GQ27749@pengutronix.de>
+Message-ID: <20100817043612.GA9631@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
+Hi Sascha,
+
+On Mon, Aug 16, 2010 at 04:15:40PM +0200, Sascha Hauer wrote:
+> On Mon, Aug 16, 2010 at 02:21:06PM +0200, Linus Walleij wrote:
+> > 2010/8/16 Sascha Hauer <s.hauer@pengutronix.de>:
+> > > The SDMA engine is a scatter/gather DMA engine which is implemented
+> > > as a seperate coprocessor. SDMA needs its own firmware which is
+> > > requested using the standard request_firmware mechanism. The firmware
+> > > has different entry points for each peripheral type, so drivers
+> > > have to pass the peripheral type to the DMA engine which in turn
+> > > picks the correct firmware entry point from a table contained in
+> > > the firmware image itself.
+> > 
+> > Quite fun, if the spec for the microcode is open this opens up
+> > for dynamic firmware generation for specific DMA jobs does it
+> > not?
 > 
-> Hello,
-> 
-Hi Marek :-)
+> Unfortunately the specs are not open, so we are sticked to the binary
+> microcode from Freescale. I'm pretty sure though that the SDMA engine
+> could do at least a device_prep_dma_xor operation.
 
-> On Friday, August 13, 2010 9:32 AM Kukjin Kim wrote:
-> 
-> > This is just information about Samsung sdmmc stuff building error now.
-> >
-> > I found Marek's 'sdhci-s3c: enable SDHCI_QUIRK_NO_HISPD_BIT quirk' in
-the
-> > Linus' tree.
-> > (commit ID: a1d5646005af1247d6ae78434bb4db15b07a07b2)
-> >
-> > But not defined the quirk yet...so following build error happened with
-> > s3c6400_defconfig in Linus' latest.
-> >
-> > drivers/mmc/host/sdhci-s3c.c: In function 'sdhci_s3c_probe':
-> > drivers/mmc/host/sdhci-s3c.c:400: error: 'SDHCI_QUIRK_NO_HISPD_BIT'
-> > undeclared (first use in this function)
-> > drivers/mmc/host/sdhci-s3c.c:400: error: (Each undeclared identifier is
-> > reported only once
-> > drivers/mmc/host/sdhci-s3c.c:400: error: for each function it appears
-in.)
-> > make[4]: *** [drivers/mmc/host/sdhci-s3c.o] Error 1
-> > make[3]: *** [drivers/mmc/host] Error 2
-> > make[2]: *** [drivers/mmc] Error 2
-> > make[1]: *** [drivers] Error 2
-> >
-> > Kyungmin Park's below patch can solve this and it is in mmotm now.
-> > (commit ID: 2935b9e7fcc4bea3751b8d039b383b2036a7d36d)
-> >
-> > But I think, to update quirk definition should being in Marek's patch
-for
-> > avoiding build error.
-> > Of course, I'm not sure whether the commit order changed.
-> > Anyway, in this case, will be solved after merging mm tree.
-> >
-Hmm...not merged yet :-( so happened build error at 36-rc1.
+Chapter 38 in the i.MX25 Reference Manual seems to include almost everything 
+there is to know about the SDMA. Isn't this enough for writing custom SDMA 
+microcodes?
 
-> >
-> > And second case is same.
-> >
-> > Marek's 'sdhci-s3c: add support for new card detection methods' cause
-> > following build error.
-> > (commit ID:17866e14f3a4f219e94f1374ece7226479418ff8)
-> >
-> > drivers/built-in.o: In function `sdhci_s3c_notify_change':
-> >
-/home/kgene/linux/linux-2.6-mainline-dev/drivers/mmc/host/sdhci-s3c.c:255:
-> > undefined reference to `sdhci_card_detect'
-> > make[1]: *** [.tmp_vmlinux1] Error 1
-> > make: *** [sub-make] Error 2
-> >
-> > And Andrew's patch(b567e5dd5a34c184e5642100e752cb87e064bb97) can solve
-> this.
-> > (of course this needs another patches...)
-> >
-Same...
+baruch
 
-
-This is just information...
-
-The build error of drivers/mmc/host/sdhci-s3c.c can be disappeared with the
-Kyungmin's commit 2935b9e7fcc4bea3751b8d039b383b2036a7d36d and Andrew's
-commit b567e5dd5a34c184e5642100e752cb87e064bb97 which are in mm tree now.
-
-And will be merged soon...Andrew, right?
-
-> > Anyway...
-> > Marek, in future please make sure your patch has no building problem
-before
-> > submitting.
-> > (or it can help to add some kind of dependency note in your patch)
-> 
-> My patches submited to Andrew Morton had the description and a note that
-they
-> have been prepared especially for his tree, taking into account all
-patches
-> that are already there (mainly a tasklets to threaded irq conversion). For
-me
-> it was quite obvious that they will be merged after all other sdhci
-changes
-> from that tree. I have no idea why the order of the patches has been
-reversed
-> and my sdhci patches has been submitted to Linus before the other sdhci
-> changes.
-> 
-> Best regards
-> --
-> Marek Szyprowski
-> Samsung Poland R&D Center
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
