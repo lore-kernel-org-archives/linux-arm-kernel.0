@@ -1,20 +1,16 @@
 From: roundrobinjp@yahoo.co.jp (Round Robinjp)
-Date: Wed, 18 Aug 2010 21:12:50 +0900 (JST)
-Subject: DMA memory: can it be returned back to the system
-Message-ID: <856809.71230.qm@web4203.mail.ogk.yahoo.co.jp>
+Date: Wed, 18 Aug 2010 21:21:09 +0900 (JST)
+Subject: scatter gather
+Message-ID: <20100818122109.7596.qmail@web4209.mail.ogk.yahoo.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Our device requires 10M of physically contiguous RAM.
-The memory is needed for short time and then can be
-returned back to the system.
-
-My question is: if I use DMA for this purpose is there
-any way to return the memory back to the system so that
-the system can use that memory for other purposes such as
-for application mallocs.
+Is scatter gather supported on ARM linux?
+I am trying to find out how to use it, but can find
+only old info. Can I find uptodate info anywhere
+which can be used with newer kernels?
 
 Thanks
 RR
