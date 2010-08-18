@@ -1,156 +1,56 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Wed, 18 Aug 2010 12:01:35 +0900
-Subject: [PATCH/RFCv3 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <cover.1281100495.git.m.nazarewicz@samsung.com>
-References: <cover.1281100495.git.m.nazarewicz@samsung.com>
-Message-ID: <AANLkTikp49oOny-vrtRTsJvA3Sps08=w7__JjdA3FE8t@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 18 Aug 2010 11:54:58 +0800
+Subject: several section mismatches
+In-Reply-To: <op.vgyj74zp7p4s8u@pikus>
+References: <201008021121.23860.sleep_walker@suse.cz> <op.vgyj74zp7p4s8u@pikus>
+Message-ID: <AANLkTimhT0FW17Xf0avwAZUee6EQ0N=v86xAoAC7YBae@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Are there any comments or ack?
+A simple fix to cpufreq for pxa would be as below:
 
-We hope this method included at mainline kernel if possible.
-It's really needed feature for our multimedia frameworks.
+diff --git a/arch/arm/mach-pxa/cpufreq-pxa2xx.c
+b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
+index 268a9bc..50d5939 100644
+--- a/arch/arm/mach-pxa/cpufreq-pxa2xx.c
++++ b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
+@@ -398,7 +398,7 @@ static int pxa_set_target(struct cpufreq_policy *policy,
+ 	return 0;
+ }
 
-Thank you,
-Kyungmin Park
+-static __init int pxa_cpufreq_init(struct cpufreq_policy *policy)
++static int pxa_cpufreq_init(struct cpufreq_policy *policy)
+ {
+ 	int i;
+ 	unsigned int freq;
+diff --git a/arch/arm/mach-pxa/cpufreq-pxa3xx.c
+b/arch/arm/mach-pxa/cpufreq-pxa3xx.c
+index 27fa329..0a0d0fe 100644
+--- a/arch/arm/mach-pxa/cpufreq-pxa3xx.c
++++ b/arch/arm/mach-pxa/cpufreq-pxa3xx.c
+@@ -204,7 +204,7 @@ static int pxa3xx_cpufreq_set(struct cpufreq_policy *policy,
+ 	return 0;
+ }
 
-On Fri, Aug 6, 2010 at 10:22 PM, Michal Nazarewicz
+-static __init int pxa3xx_cpufreq_init(struct cpufreq_policy *policy)
++static int pxa3xx_cpufreq_init(struct cpufreq_policy *policy)
+ {
+ 	int ret = -EINVAL;
+
+
+On Thu, Aug 5, 2010 at 5:20 PM, Micha? Nazarewicz
 <m.nazarewicz@samsung.com> wrote:
-> Hello everyone,
+> On Mon, 02 Aug 2010 11:21:23 +0200, Tom?? 'Sleep_Walker' ??ech
+> <sleep_walker@suse.cz> wrote:
+>>
+>> It seems that we have some problems with g_ether and pxa cpufreq.
+>> This is problematic output of `make CONFIG_DEBUG_SECTION_MISMATCH=y':
 >
-> The following patchset implements a Contiguous Memory Allocator. ?For
-> those who have not yet stumbled across CMA an excerpt from
-> documentation:
+> Problems with g_ether should be fixed in -next.
 >
-> ? The Contiguous Memory Allocator (CMA) is a framework, which allows
-> ? setting up a machine-specific configuration for physically-contiguous
-> ? memory management. Memory for devices is then allocated according
-> ? to that configuration.
->
-> ? The main role of the framework is not to allocate memory, but to
-> ? parse and manage memory configurations, as well as to act as an
-> ? in-between between device drivers and pluggable allocators. It is
-> ? thus not tied to any memory allocation method or strategy.
->
-> For more information please refer to the second patch from the
-> patchset which contains the documentation.
->
->
-> Links to the previous versions of the patchsets:
-> v2: <http://article.gmane.org/gmane.linux.kernel.mm/50986/>
-> v1: <http://article.gmane.org/gmane.linux.kernel.mm/50669/>
->
->
-> This is the third version of the patchset. ?All of the changes are
-> concentrated in the second, the third and the fourth patch -- the
-> other patches are almost identical.
->
->
-> Major observable changes between the second (the previous) and the
-> third (this) versions are:
->
-> 1. The command line parameters have been removed (and moved to
-> ? a separate patch, the fourth one). ?As a consequence, the
-> ? cma_set_defaults() function has been changed -- it no longer
-> ? accepts a string with list of regions but an array of regions.
->
-> 2. The "asterisk" attribute has been removed. ?Now, each region has an
-> ? "asterisk" flag which lets one specify whether this region should
-> ? by considered "asterisk" region.
->
-> 3. SysFS support has been moved to a separate patch (the third one in
-> ? the series) and now also includes list of regions.
->
->
-> Major observable changes between the first and the second versions
-> are:
->
-> 1. The "cma_map" command line have been removed. ?In exchange, a SysFS
-> ? entry has been created under kernel/mm/contiguous.
->
-> ? The intended way of specifying the attributes is
-> ? a cma_set_defaults() function called by platform initialisation
-> ? code. ?"regions" attribute (the string specified by "cma" command
-> ? line parameter) can be overwritten with command line parameter; the
-> ? other attributes can be changed during run-time using the SysFS
-> ? entries.
->
-> 2. The behaviour of the "map" attribute has been modified slightly.
-> ? Currently, if no rule matches given device it is assigned regions
-> ? specified by the "asterisk" attribute. ?It is by default built from
-> ? the region names given in "regions" attribute.
->
-> 3. Devices can register private regions as well as regions that can be
-> ? shared but are not reserved using standard CMA mechanisms.
-> ? A private region has no name and can be accessed only by devices
-> ? that have the pointer to it.
->
-> 4. The way allocators are registered has changed. ?Currently,
-> ? a cma_allocator_register() function is used for that purpose.
-> ? Moreover, allocators are attached to regions the first time memory
-> ? is registered from the region or when allocator is registered which
-> ? means that allocators can be dynamic modules that are loaded after
-> ? the kernel booted (of course, it won't be possible to allocate
-> ? a chunk of memory from a region if allocator is not loaded).
->
-> 5. Index of new functions:
->
-> +static inline dma_addr_t __must_check
-> +cma_alloc_from(const char *regions, size_t size, dma_addr_t alignment)
->
-> +static inline int
-> +cma_info_about(struct cma_info *info, const const char *regions)
->
-> +int __must_check cma_region_register(struct cma_region *reg);
->
-> +dma_addr_t __must_check
-> +cma_alloc_from_region(struct cma_region *reg,
-> + ? ? ? ? ? ? ? ? ? ? size_t size, dma_addr_t alignment);
->
-> +static inline dma_addr_t __must_check
-> +cma_alloc_from(const char *regions,
-> + ? ? ? ? ? ? ? size_t size, dma_addr_t alignment);
->
-> +int cma_allocator_register(struct cma_allocator *alloc);
->
->
-> Michal Nazarewicz (6):
-> ?lib: rbtree: rb_root_init() function added
-> ?mm: cma: Contiguous Memory Allocator added
-> ?mm: cma: Added SysFS support
-> ?mm: cma: Added command line parameters support
-> ?mm: cma: Test device and application added
-> ?arm: Added CMA to Aquila and Goni
->
-> ?Documentation/00-INDEX ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?2 +
-> ?.../ABI/testing/sysfs-kernel-mm-contiguous ? ? ? ? | ? 58 +
-> ?Documentation/contiguous-memory.txt ? ? ? ? ? ? ? ?| ?651 +++++++++
-> ?Documentation/kernel-parameters.txt ? ? ? ? ? ? ? ?| ? ?4 +
-> ?arch/arm/mach-s5pv210/mach-aquila.c ? ? ? ? ? ? ? ?| ? 31 +
-> ?arch/arm/mach-s5pv210/mach-goni.c ? ? ? ? ? ? ? ? ?| ? 31 +
-> ?drivers/misc/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?8 +
-> ?drivers/misc/Makefile ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?1 +
-> ?drivers/misc/cma-dev.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ?184 +++
-> ?include/linux/cma.h ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ?475 +++++++
-> ?include/linux/rbtree.h ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 11 +
-> ?mm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 54 +
-> ?mm/Makefile ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
-> ?mm/cma-best-fit.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ?407 ++++++
-> ?mm/cma.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | 1446 ++++++++++++++++++++
-> ?tools/cma/cma-test.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ?373 +++++
-> ?16 files changed, 3738 insertions(+), 0 deletions(-)
-> ?create mode 100644 Documentation/ABI/testing/sysfs-kernel-mm-contiguous
-> ?create mode 100644 Documentation/contiguous-memory.txt
-> ?create mode 100644 drivers/misc/cma-dev.c
-> ?create mode 100644 include/linux/cma.h
-> ?create mode 100644 mm/cma-best-fit.c
-> ?create mode 100644 mm/cma.c
-> ?create mode 100644 tools/cma/cma-test.c
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> Best regards, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_ ? ? _
+> | Humble Liege of Serenely Enlightened Majesty of ?o' \,=./ `o
+> | Computer Science, ?Micha? "mina86" Nazarewicz ? ? ? (o o)
+> +----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
 >
