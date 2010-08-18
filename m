@@ -1,20 +1,24 @@
-From: roundrobinjp@yahoo.co.jp (Round Robinjp)
-Date: Wed, 18 Aug 2010 21:21:09 +0900 (JST)
-Subject: scatter gather
-Message-ID: <20100818122109.7596.qmail@web4209.mail.ogk.yahoo.co.jp>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Aug 2010 14:28:44 +0200
+Subject: [PATCH v2] ARM: uaccess: Implement strict user copy checks
+In-Reply-To: <1282094950-6184-1-git-send-email-sboyd@codeaurora.org>
+References: <4C61EE55.5030506@codeaurora.org>
+	<1282094950-6184-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <201008181428.45029.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday 18 August 2010, Stephen Boyd wrote:
+> 
+> I'm unsure what needs to be done for the follow up patch. Shouldn't
+> it be multiple patches sent to each arch maintainer to fix the
+> wording?
 
-Is scatter gather supported on ARM linux?
-I am trying to find out how to use it, but can find
-only old info. Can I find uptodate info anywhere
-which can be used with newer kernels?
+No, that will just result in half of them applying it, best make 
+a single patch and send it to linux-arch at vger.kernel.org for review.
 
-Thanks
-RR
+It's probably best to move the config option to lib/Kconfig.debug
+so it only appears once, and make it depend on DEBUG_USER_COPY_CHECKS,
+which is then unconditionally defined by the architectures that want it.
 
---------------------------------------
-GyaO! - Anime, Dramas, Movies, and Music videos [FREE]
-http://pr.mail.yahoo.co.jp/gyao/
+	Arnd
