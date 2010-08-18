@@ -1,21 +1,23 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 18 Aug 2010 16:24:34 +0100
-Subject: [alsa-devel] [PATCH 1/3] ASoC: add 88pm860x codec driver
-In-Reply-To: <AANLkTikc+=-3Zt+iaD+UatWR-fgv4zL=xkhQH=_0Z4m8@mail.gmail.com>
-References: <AANLkTimBPhvukwqDGY8iORhY+wg8OnHi9+eOedJB2E8k@mail.gmail.com>
-	<20100818141914.GC15536@sirena.org.uk>
-	<AANLkTi=2FboP+xhSHjgyoM6LfmKw1khV62gTVrkxxUHF@mail.gmail.com>
-	<20100818144027.GB4588@rakim.wolfsonmicro.main>
-	<AANLkTikc+=-3Zt+iaD+UatWR-fgv4zL=xkhQH=_0Z4m8@mail.gmail.com>
-Message-ID: <20100818152433.GA32499@opensource.wolfsonmicro.com>
+From: shemminger@vyatta.com (Stephen Hemminger)
+Date: Wed, 18 Aug 2010 08:33:04 -0700
+Subject: [PATCH v2] ether1: Use net_device_stats from struct net_device
+In-Reply-To: <1282115064-3701-1-git-send-email-tklauser@distanz.ch>
+References: <1282061719-19645-1-git-send-email-tklauser@distanz.ch>
+	<1282115064-3701-1-git-send-email-tklauser@distanz.ch>
+Message-ID: <20100818083304.2ef2eea4@nehalam>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 18, 2010 at 11:23:10PM +0800, Haojian Zhuang wrote:
+On Wed, 18 Aug 2010 09:04:24 +0200
+Tobias Klauser <tklauser@distanz.ch> wrote:
 
-> In my system, there's only one physical jacks. It's four phased plug
-> (mic,left,right,gnd). So I needn't split them into two different
-> jacks.
+>  
+> -	memset (&priv(dev)->stats, 0, sizeof (struct net_device_stats));
+> +	memset(&dev->stats, 0, sizeof(struct net_device_stats));
 
-Right, but the CODEC driver (which will be used by all systems with this
-CODEC) should allow the user that option.
+This is incorrect, just remove the memset.  The stats are initialized
+when device is created.  The Linux device driver convention is to
+keep stats when device is set down and brought back up; that is what
+the majority of other drivers do.
+
+-- 
