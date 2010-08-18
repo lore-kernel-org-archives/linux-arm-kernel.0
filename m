@@ -1,76 +1,156 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Tue, 17 Aug 2010 22:09:53 -0400
-Subject: [RFC PATCH 01/20] Create generic alignment API (v8)
-In-Reply-To: <1282094726.3268.2197.camel@gandalf.stny.rr.com>
-References: <20100817231619.277457797@efficios.com>
-	<20100817232150.251244768@efficios.com>
-	<1282094726.3268.2197.camel@gandalf.stny.rr.com>
-Message-ID: <20100818020953.GA10401@Krystal>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Wed, 18 Aug 2010 12:01:35 +0900
+Subject: [PATCH/RFCv3 0/6] The Contiguous Memory Allocator framework
+In-Reply-To: <cover.1281100495.git.m.nazarewicz@samsung.com>
+References: <cover.1281100495.git.m.nazarewicz@samsung.com>
+Message-ID: <AANLkTikp49oOny-vrtRTsJvA3Sps08=w7__JjdA3FE8t@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Steven Rostedt (rostedt at goodmis.org) wrote:
-> On Tue, 2010-08-17 at 19:16 -0400, Mathieu Desnoyers wrote:
-> 
-> > +/*
-> > + * Align pointer on natural object alignment. Object size must be power of two.
-> > + */
-> 
-> Hmm, I wonder if we should add a compiler bug here too.
-> 
-> extern void __bug_obj_not_power_of_two(void);
-> 
-> ({
-> 	if ((sizeof(*obj) - 1) & sizeof(*obj))
-> 		__bug_obj_not_power_of_two();
-> 	PTR_ALIGN((obj), __alignof__(*(obj)));
-> })
+Are there any comments or ack?
 
-[...]
+We hope this method included at mainline kernel if possible.
+It's really needed feature for our multimedia frameworks.
 
-Nevermind the "Object size must be power of two." part of the comment. That was
-true when I first implemented the patch, where I used sizeof(), e.g.:
+Thank you,
+Kyungmin Park
 
-#define object_align(obj)       PTR_ALIGN(obj, sizeof(*(obj)))
-#define object_align_floor(obj) PTR_ALIGN_FLOOR(obj, sizeof(*(obj)))
-
-But given that we can expect structures and various objects to be passed as
-parameters, __alignof__ is more appropriate. This is what this patch now
-implements:
-
-#define object_align(obj)       PTR_ALIGN(obj, __alignof__(*(obj)))
-#define object_align_floor(obj) PTR_ALIGN_FLOOR(obj, __alignof__(*(obj)))
-
-so we let gcc determine the appropriate alignment. It will automatically be a
-power of two. I'll just update the comment.
-
-[...]
-
-> I take it that theses functions can have variables passed to it for
-> alignment, thus a check wont help. Although, we could add a test for the
-> constant case.
-
-That's right. I could add something like:
-
-  MAYBE_BUILD_BUG_ON_NOT_POWER_OF_2(alignment);
-
-which will add a dependency on kernel.h (for MAYBE_BUILD_BUG_ON) and log2.h (for
-is_power_of_2). I'll move the #include <linux/align.h> further down in kernel.h,
-keeping it outside of #ifdef __KERNEL__.
-
-To make sure this build test works when a constant is passed to offset_align or
-offset_align_floor, I'll have to turn them into macros instead of static
-inlines.
-
-The next round will have a patch that adds "MAYBE_BUILD_BUG_ON_NOT_POWER_OF_2"
-to kernel.h.
-
-Thanks,
-
-Mathieu
-
--- 
-Mathieu Desnoyers
-Operating System Efficiency R&D Consultant
-EfficiOS Inc.
-http://www.efficios.com
+On Fri, Aug 6, 2010 at 10:22 PM, Michal Nazarewicz
+<m.nazarewicz@samsung.com> wrote:
+> Hello everyone,
+>
+> The following patchset implements a Contiguous Memory Allocator. ?For
+> those who have not yet stumbled across CMA an excerpt from
+> documentation:
+>
+> ? The Contiguous Memory Allocator (CMA) is a framework, which allows
+> ? setting up a machine-specific configuration for physically-contiguous
+> ? memory management. Memory for devices is then allocated according
+> ? to that configuration.
+>
+> ? The main role of the framework is not to allocate memory, but to
+> ? parse and manage memory configurations, as well as to act as an
+> ? in-between between device drivers and pluggable allocators. It is
+> ? thus not tied to any memory allocation method or strategy.
+>
+> For more information please refer to the second patch from the
+> patchset which contains the documentation.
+>
+>
+> Links to the previous versions of the patchsets:
+> v2: <http://article.gmane.org/gmane.linux.kernel.mm/50986/>
+> v1: <http://article.gmane.org/gmane.linux.kernel.mm/50669/>
+>
+>
+> This is the third version of the patchset. ?All of the changes are
+> concentrated in the second, the third and the fourth patch -- the
+> other patches are almost identical.
+>
+>
+> Major observable changes between the second (the previous) and the
+> third (this) versions are:
+>
+> 1. The command line parameters have been removed (and moved to
+> ? a separate patch, the fourth one). ?As a consequence, the
+> ? cma_set_defaults() function has been changed -- it no longer
+> ? accepts a string with list of regions but an array of regions.
+>
+> 2. The "asterisk" attribute has been removed. ?Now, each region has an
+> ? "asterisk" flag which lets one specify whether this region should
+> ? by considered "asterisk" region.
+>
+> 3. SysFS support has been moved to a separate patch (the third one in
+> ? the series) and now also includes list of regions.
+>
+>
+> Major observable changes between the first and the second versions
+> are:
+>
+> 1. The "cma_map" command line have been removed. ?In exchange, a SysFS
+> ? entry has been created under kernel/mm/contiguous.
+>
+> ? The intended way of specifying the attributes is
+> ? a cma_set_defaults() function called by platform initialisation
+> ? code. ?"regions" attribute (the string specified by "cma" command
+> ? line parameter) can be overwritten with command line parameter; the
+> ? other attributes can be changed during run-time using the SysFS
+> ? entries.
+>
+> 2. The behaviour of the "map" attribute has been modified slightly.
+> ? Currently, if no rule matches given device it is assigned regions
+> ? specified by the "asterisk" attribute. ?It is by default built from
+> ? the region names given in "regions" attribute.
+>
+> 3. Devices can register private regions as well as regions that can be
+> ? shared but are not reserved using standard CMA mechanisms.
+> ? A private region has no name and can be accessed only by devices
+> ? that have the pointer to it.
+>
+> 4. The way allocators are registered has changed. ?Currently,
+> ? a cma_allocator_register() function is used for that purpose.
+> ? Moreover, allocators are attached to regions the first time memory
+> ? is registered from the region or when allocator is registered which
+> ? means that allocators can be dynamic modules that are loaded after
+> ? the kernel booted (of course, it won't be possible to allocate
+> ? a chunk of memory from a region if allocator is not loaded).
+>
+> 5. Index of new functions:
+>
+> +static inline dma_addr_t __must_check
+> +cma_alloc_from(const char *regions, size_t size, dma_addr_t alignment)
+>
+> +static inline int
+> +cma_info_about(struct cma_info *info, const const char *regions)
+>
+> +int __must_check cma_region_register(struct cma_region *reg);
+>
+> +dma_addr_t __must_check
+> +cma_alloc_from_region(struct cma_region *reg,
+> + ? ? ? ? ? ? ? ? ? ? size_t size, dma_addr_t alignment);
+>
+> +static inline dma_addr_t __must_check
+> +cma_alloc_from(const char *regions,
+> + ? ? ? ? ? ? ? size_t size, dma_addr_t alignment);
+>
+> +int cma_allocator_register(struct cma_allocator *alloc);
+>
+>
+> Michal Nazarewicz (6):
+> ?lib: rbtree: rb_root_init() function added
+> ?mm: cma: Contiguous Memory Allocator added
+> ?mm: cma: Added SysFS support
+> ?mm: cma: Added command line parameters support
+> ?mm: cma: Test device and application added
+> ?arm: Added CMA to Aquila and Goni
+>
+> ?Documentation/00-INDEX ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?2 +
+> ?.../ABI/testing/sysfs-kernel-mm-contiguous ? ? ? ? | ? 58 +
+> ?Documentation/contiguous-memory.txt ? ? ? ? ? ? ? ?| ?651 +++++++++
+> ?Documentation/kernel-parameters.txt ? ? ? ? ? ? ? ?| ? ?4 +
+> ?arch/arm/mach-s5pv210/mach-aquila.c ? ? ? ? ? ? ? ?| ? 31 +
+> ?arch/arm/mach-s5pv210/mach-goni.c ? ? ? ? ? ? ? ? ?| ? 31 +
+> ?drivers/misc/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?8 +
+> ?drivers/misc/Makefile ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?1 +
+> ?drivers/misc/cma-dev.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ?184 +++
+> ?include/linux/cma.h ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ?475 +++++++
+> ?include/linux/rbtree.h ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 11 +
+> ?mm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 54 +
+> ?mm/Makefile ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
+> ?mm/cma-best-fit.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ?407 ++++++
+> ?mm/cma.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | 1446 ++++++++++++++++++++
+> ?tools/cma/cma-test.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ?373 +++++
+> ?16 files changed, 3738 insertions(+), 0 deletions(-)
+> ?create mode 100644 Documentation/ABI/testing/sysfs-kernel-mm-contiguous
+> ?create mode 100644 Documentation/contiguous-memory.txt
+> ?create mode 100644 drivers/misc/cma-dev.c
+> ?create mode 100644 include/linux/cma.h
+> ?create mode 100644 mm/cma-best-fit.c
+> ?create mode 100644 mm/cma.c
+> ?create mode 100644 tools/cma/cma-test.c
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
