@@ -1,193 +1,93 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Wed, 18 Aug 2010 03:00:56 +0300
-Subject: [RFC PATCH 01/20] Create generic alignment API (v8)
-In-Reply-To: <20100817232150.251244768@efficios.com>
-References: <20100817231619.277457797@efficios.com>
-	<20100817232150.251244768@efficios.com>
-Message-ID: <20100818000056.GA5874@shutemov.name>
+From: johnstul@us.ibm.com (john stultz)
+Date: Tue, 17 Aug 2010 17:22:43 -0700
+Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <20100817085324.GB3330@riccoc20.at.omicron.at>
+References: <cover.1281956490.git.richard.cochran@omicron.at>
+	<363bd749a38d0b785d8431e591bf54c38db4c2d7.1281956490.git.richard.cochran@omicron.at>
+	<AANLkTik_2MKMhOuDGOmu8Kzyq-ipLe+Bxrb3FaD+Tv4U@mail.gmail.com>
+	<20100817085324.GB3330@riccoc20.at.omicron.at>
+Message-ID: <1282090963.1734.97.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 17, 2010 at 07:16:20PM -0400, Mathieu Desnoyers wrote:
-> Rather than re-doing the "alignment on a type size" trick all over again at
-> different levels, import the "ltt_align" from LTTng into kernel.h and make this
-> available to everyone. Renaming to:
+On Tue, 2010-08-17 at 10:53 +0200, Richard Cochran wrote:
+> On Mon, Aug 16, 2010 at 12:24:48PM -0700, john stultz wrote:
+> > 3) I'm not sure I see the benefit of being able to have multiple
+> > frequency corrected time domains.  In other words, what benefit would
+> > you get from adjusting a PTP clock's frequency instead of just
+> > adjusting the system's time freq? Having the PTP time as a reference
+> > to correct the system time seems reasonable, but I'm not sure I see
+> > why userland would want to adjust the PTP clock's freq.
 > 
-> - object_align()
-> - object_align_floor()
-> - offset_align()
-> - offset_align_floor()
+> For PTP enabled hardware, the timestamp on the network packet comes
+> from from the PTP clock, not from the system time.
 > 
-> Changelog since v7:
-> - Add missing include/linux/Kconfig header-y.
-> 
-> Changelog since v6:
-> - Adapt to changes introduced by
->   commit a79ff731a1b277d0e92d9453bdf374e04cec717a
-> - Use __alignof__() instead of sizeof() to support compound types.
-> 
-> Changelog since v5:
-> - moved alignment apis to a separate header file so that it is possible
->   to use them from other header files which are, for example, included
->   from kernel.h.
-> 
-> Changelog since v4:
-> - add missing ( ) around parameters within object_align() and
->   object_align_floor().
-> - More coding style cleanups to ALIGN() (checkpatch.pl is happy now).
-> 
-> Changelog since v3:
-> - optimize object_align*() so fewer instructions are needed for alignment of
->   addresses known dynamically. Use the (already existing) "ALIGN()", and create
->   the "ALIGN_FLOOR()" macro.
-> - While we are there, let's clean up the ALIGN() macros wrt coding style. e.g.
->   missing parenthesis around the first use of the "x" parameter in ALIGN().
-> 
-> Changelog since v2:
-> - Fix object_align*(): should use object size alignment, not pointer alignment.
-> 
-> Changelog since v1:
-> - Align on the object natural alignment
->     (rather than min(arch word alignment, natural alignment))
-> 
-> The advantage of separating the API in "object alignment" and "offset alignment"
-> is that it gives more freedom to play with offset alignment. Very useful to
-> implement a tracer ring-buffer alignment. (hint hint)
-> 
-> Typical users will use "object alignment", but infrastructures like tracers
-> which need to perform alignment of statically known base+offsets will typically
-> use "offset alignment", because it allows to align with respect to a base rather
-> than to pass an absolute address.
-> 
-> We use "sizeof(object)" rather than "__alignof__()" object because alignof
-> returns "recommended" object alignment for the architecture, which can be
-> sub-optimal on some architectures. By ensuring alignment on the object size, we
-> are sure to make the right choice.
-> 
-> Signed-off-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
-> Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
-> CC: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: Imre Deak <imre.deak@nokia.com>
-> CC: Jamie Lokier <jamie@shareable.org>
-> CC: rostedt at goodmis.org
-> CC: mingo at elte.hu
-> CC: Alexey Dobriyan <adobriyan@gmail.com>
-> ---
->  include/linux/Kbuild   |    1 
->  include/linux/align.h  |   56 +++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/kernel.h |    8 -------
->  3 files changed, 58 insertions(+), 7 deletions(-)
->  create mode 100644 include/linux/align.h
-> 
-> Index: linux.trees.git/include/linux/align.h
-> ===================================================================
-> --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-> +++ linux.trees.git/include/linux/align.h	2010-08-17 16:31:50.000000000 -0400
-> @@ -0,0 +1,56 @@
-> +#ifndef _LINUX_ALIGN_H
-> +#define _LINUX_ALIGN_H
-> +
-> +#define __ALIGN_KERNEL(x, a)	__ALIGN_KERNEL_MASK((x), (typeof(x))(a) - 1)
-                                                    ^^^
-Unnecessary braces. And many below.
+> Of course, you can always just leave the PTP clock alone, figure the
+> needed correction, and apply it whenever needed. But this has some
+> disadvantages. First of all, the (one and only) open source PTPd does
+> not do it that way. Also, only one program (the PTPd or equivalent)
+> will know the correct time. Other programs will not be able to ask the
+> operating system for time services. Instead, they would need to use
+> IPC to the PTPd.
 
-> +#define __ALIGN_KERNEL_MASK(x, mask) \
-> +				(((x) + (mask)) & ~(mask))
-> +
-> +#ifdef __KERNEL__
-> +
-> +#include <linux/types.h>
-> +
-> +#define ALIGN(x, a)		__ALIGN_KERNEL((x), (a))
-> +#define __ALIGN_MASK(x, mask)	__ALIGN_KERNEL_MASK((x), (mask))
-> +#define PTR_ALIGN(p, a)		((typeof(p)) ALIGN((unsigned long) (p), (a)))
-> +#define ALIGN_FLOOR(x, a)	__ALIGN_FLOOR_MASK((x), (typeof(x)) (a) - 1)
-> +#define __ALIGN_FLOOR_MASK(x, mask)	((x) & ~(mask))
-> +#define PTR_ALIGN_FLOOR(p, a) \
-> +			((typeof(p)) ALIGN_FLOOR((unsigned long) (p), (a)))
-> +#define IS_ALIGNED(x, a)	(((x) & ((typeof(x)) (a) - 1)) == 0)
-> +
-> +/*
-> + * Align pointer on natural object alignment. Object size must be power of two.
-> + */
-> +#define object_align(obj)	PTR_ALIGN((obj), __alignof__(*(obj)))
-> +#define object_align_floor(obj)	PTR_ALIGN_FLOOR((obj), __alignof__(*(obj)))
-> +
-> +/**
-> + * offset_align - Calculate the offset needed to align an object on its natural
-> + *                alignment towards higher addresses.
-> + * @align_drift:  object offset from an "alignment"-aligned address.
-> + * @alignment:    natural object alignment. Must be non-zero, power of 2.
-> + *
-> + * Returns the offset that must be added to align towards higher
-> + * addresses.
-> + */
-> +static inline size_t offset_align(size_t align_drift, size_t alignment)
-> +{
-> +	return (alignment - align_drift) & (alignment - 1);
-> +}
-> +
-> +/**
-> + * offset_align_floor - Calculate the offset needed to align an object
-> + *                      on its natural alignment towards lower addresses.
-> + * @align_drift:  object offset from an "alignment"-aligned address.
-> + * @alignment:    natural object alignment. Must be non-zero, power of 2.
-> + *
-> + * Returns the offset that must be substracted to align towards lower addresses.
-> + */
-> +static inline size_t offset_align_floor(size_t align_drift, size_t alignment)
-> +{
-> +	return (align_drift - alignment) & (alignment - 1);
-> +}
-> +
-> +#endif /* __KERNEL__ */
-> +
-> +#endif
-> Index: linux.trees.git/include/linux/kernel.h
-> ===================================================================
-> --- linux.trees.git.orig/include/linux/kernel.h	2010-08-17 16:28:25.000000000 -0400
-> +++ linux.trees.git/include/linux/kernel.h	2010-08-17 16:31:50.000000000 -0400
-> @@ -4,8 +4,7 @@
->  /*
->   * 'kernel.h' contains some often-used function prototypes etc
->   */
-> -#define __ALIGN_KERNEL(x, a)		__ALIGN_KERNEL_MASK(x, (typeof(x))(a) - 1)
-> -#define __ALIGN_KERNEL_MASK(x, mask)	(((x) + (mask)) & ~(mask))
-> +#include <linux/align.h>
->  
->  #ifdef __KERNEL__
->  
-> @@ -39,11 +38,6 @@ extern const char linux_proc_banner[];
->  
->  #define STACK_MAGIC	0xdeadbeef
->  
-> -#define ALIGN(x, a)		__ALIGN_KERNEL((x), (a))
-> -#define __ALIGN_MASK(x, mask)	__ALIGN_KERNEL_MASK((x), (mask))
-> -#define PTR_ALIGN(p, a)		((typeof(p))ALIGN((unsigned long)(p), (a)))
-> -#define IS_ALIGNED(x, a)		(((x) & ((typeof(x))(a) - 1)) == 0)
-> -
->  #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
->  
->  /*
-> Index: linux.trees.git/include/linux/Kbuild
-> ===================================================================
-> --- linux.trees.git.orig/include/linux/Kbuild	2010-08-17 16:28:25.000000000 -0400
-> +++ linux.trees.git/include/linux/Kbuild	2010-08-17 16:32:30.000000000 -0400
-> @@ -38,6 +38,7 @@ header-y += adfs_fs.h
->  header-y += affs_hardblocks.h
->  header-y += agpgart.h
->  header-y += aio_abi.h
-> +header-y += align.h
->  header-y += apm_bios.h
->  header-y += arcfb.h
->  header-y += atalk.h
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Why would system time not be adjusted to the PTP time?
 
--- 
- Kirill A. Shutemov
+This is my main concern, that we're presenting a fractured API to
+userland. Suddenly there isn't just system time, but ptp time as well,
+and possibly multiple different ptp times.
+
+Forgive me, as I suspect I'm missing something key here.
+
+> The PTP protocol (and some PTP hardware) offers a "one step" method,
+> where the timestamps are inserted by the hardware on the fly. Here you
+> really do need the PTP clock to be correctly adjusted.
+> 
+> All of the PTP hardware that I am familiar with provides a clock
+> adjustment method, so it simpler and cleaner just to use this facility
+> to tune the PTP clock.
+
+Hmm. So trying to recap here to see if I'm understanding properly:
+
+The PTP clock is a bit of hardware (usually on the NIC) that can put
+timestamps on packets (both incoming or outgoing?).
+
+The need to offset/freq correct the PTP clock is important so that the
+timestamps (incoming and outgoing) are correct, which makes future
+offset calculations simpler.
+
+Hmm. So I'm actually starting to come around to the chardev interface.
+
+In a way, it seems it has some similarities to how the RTC device is
+used in NTPd. Granted, NTPd doesn't correct the RTC (the kernel does
+when we're synced, but its not a perfect parallel), but it can be used
+as an input the steer the clock.
+
+So while to me, it think it would be more ideal (or maybe just less
+different) to have a read-only interface (like the RTC), leaving PTPd to
+manage offset calculations and use that to steer the system time. I can
+acknowledge the need to have some way to correct the freq so the packet
+timestamps are corrected.
+
+I still feel a little concerned over the timer/alarm related interfaces.
+Could you explain why the alarm interface is necessary? 
+
+So really I think my initial negative gut reaction to this was mostly
+out of the fact that you introduced a char dev that provides almost 100%
+coverage of the posix-time interface. That is duplication we definitely
+don't want. 
+
+Also I think the documentation I've read about PTP (likely just due to
+the engineering focus) has an odd inverted sense of priority, focusing
+on keeping obscure hardware clocks on NIC cards in sync, rather then the
+the more tangible feature of keeping the system time in sync.
+
+This could be comically interpreted as trying to create a shadow-time on
+the system that is the "real time" and "yea, maybe we'll let the system
+know what time it is, but user-apps who want to know the score can send
+a magic ioctl to /dev/something and get the real deal". ;)  I'm sure
+that's not the case, but I'd like to keep any confusion in userland
+about which time is the best time to a minimum (ie: use the system
+time).
+
+thanks
+-john
