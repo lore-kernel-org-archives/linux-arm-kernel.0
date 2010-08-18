@@ -1,190 +1,202 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 18 Aug 2010 23:01:12 +0900
-Subject: [PATCH 02/14] ARM: S5PV310: Removed unused clock
+Date: Wed, 18 Aug 2010 23:01:19 +0900
+Subject: [PATCH 09/14] ARM: S5PV310: Adds SDMMC clock for S5PV310
 In-Reply-To: <1282140084-10265-1-git-send-email-kgene.kim@samsung.com>
 References: <1282140084-10265-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1282140084-10265-3-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1282140084-10265-10-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This pach removed unused clock on S5PV310/S5PC210.
+From: Jongpill Lee <boyko.lee@samsung.com>
 
+This patch adds SDMMC clocks for S5PV310/S5PC210.
+
+Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5pv310/clock.c |  126 +----------------------------------------
- 1 files changed, 2 insertions(+), 124 deletions(-)
+ arch/arm/mach-s5pv310/clock.c |  142 ++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 141 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-s5pv310/clock.c b/arch/arm/mach-s5pv310/clock.c
-index 77f2b4d..e3098d5 100644
+index c3ee742..8728504 100644
 --- a/arch/arm/mach-s5pv310/clock.c
 +++ b/arch/arm/mach-s5pv310/clock.c
-@@ -96,60 +96,6 @@ static struct clksrc_clk clk_armclk = {
- 	},
- };
+@@ -51,6 +51,16 @@ static int s5pv310_clksrc_mask_top_ctrl(struct clk *clk, int enable)
+ 	return s5p_gatectrl(S5P_CLKSRC_MASK_TOP, clk, enable);
+ }
  
--static struct clksrc_clk clk_aclk_corem0 = {
--	.clk	= {
--		.name		= "aclk_corem0",
--		.id		= -1,
--		.parent		= &clk_coreclk.clk,
--	},
--	.reg_div	= { .reg = S5P_CLKDIV_CPU, .shift = 4, .size = 3 },
--};
--
--static struct clksrc_clk clk_aclk_cores = {
--	.clk	= {
--		.name		= "aclk_cores",
--		.id		= -1,
--		.parent		= &clk_coreclk.clk,
--	},
--	.reg_div	= { .reg = S5P_CLKDIV_CPU, .shift = 4, .size = 3 },
--};
--
--static struct clksrc_clk clk_aclk_corem1 = {
--	.clk	= {
--		.name		= "aclk_corem1",
--		.id		= -1,
--		.parent		= &clk_coreclk.clk,
--	},
--	.reg_div	= { .reg = S5P_CLKDIV_CPU, .shift = 8, .size = 3 },
--};
--
--static struct clksrc_clk clk_periphclk = {
--	.clk	= {
--		.name		= "periphclk",
--		.id		= -1,
--		.parent		= &clk_coreclk.clk,
--	},
--	.reg_div	= { .reg = S5P_CLKDIV_CPU, .shift = 12, .size = 3 },
--};
--
--static struct clksrc_clk clk_atclk = {
--	.clk	= {
--		.name		= "atclk",
--		.id		= -1,
--		.parent		= &clk_moutcore.clk,
--	},
--	.reg_div	= { .reg = S5P_CLKDIV_CPU, .shift = 16, .size = 3 },
--};
--
--static struct clksrc_clk clk_pclk_dbg = {
--	.clk	= {
--		.name		= "pclk_dbg",
--		.id		= -1,
--		.parent		= &clk_atclk.clk,
--	},
--	.reg_div	= { .reg = S5P_CLKDIV_CPU, .shift = 20, .size = 3 },
--};
--
- /* Core list of CMU_CORE side */
- 
- static struct clk *clkset_corebus_list[] = {
-@@ -180,42 +126,6 @@ static struct clksrc_clk clk_sclk_dmc = {
- 	.reg_div	= { .reg = S5P_CLKDIV_CORE0, .shift = 12, .size = 3 },
- };
- 
--static struct clksrc_clk clk_aclk_cored = {
--	.clk	= {
--		.name		= "aclk_cored",
--		.id		= -1,
--		.parent		= &clk_sclk_dmc.clk,
--	},
--	.reg_div	= { .reg = S5P_CLKDIV_CORE0, .shift = 16, .size = 3 },
--};
--
--static struct clksrc_clk clk_aclk_corep = {
--	.clk	= {
--		.name		= "aclk_corep",
--		.id		= -1,
--		.parent		= &clk_aclk_cored.clk,
--	},
--	.reg_div	= { .reg = S5P_CLKDIV_CORE0, .shift = 20, .size = 3 },
--};
--
--static struct clksrc_clk clk_aclk_acp = {
--	.clk	= {
--		.name		= "aclk_acp",
--		.id		= -1,
--		.parent		= &clk_mout_corebus.clk,
--	},
--	.reg_div	= { .reg = S5P_CLKDIV_CORE0, .shift = 0, .size = 3 },
--};
--
--static struct clksrc_clk clk_pclk_acp = {
--	.clk	= {
--		.name		= "pclk_acp",
--		.id		= -1,
--		.parent		= &clk_aclk_acp.clk,
--	},
--	.reg_div	= { .reg = S5P_CLKDIV_CORE0, .shift = 4, .size = 3 },
--};
--
- /* Core list of CMU_TOP side */
- 
- static struct clk *clkset_aclk_top_list[] = {
-@@ -416,18 +326,8 @@ static struct clksrc_clk *sysclks[] = {
- 	&clk_moutcore,
- 	&clk_coreclk,
- 	&clk_armclk,
--	&clk_aclk_corem0,
--	&clk_aclk_cores,
--	&clk_aclk_corem1,
--	&clk_periphclk,
--	&clk_atclk,
--	&clk_pclk_dbg,
- 	&clk_mout_corebus,
- 	&clk_sclk_dmc,
--	&clk_aclk_cored,
--	&clk_aclk_corep,
--	&clk_aclk_acp,
--	&clk_pclk_acp,
- 	&clk_vpllsrc,
- 	&clk_sclk_vpll,
- 	&clk_aclk_200,
-@@ -446,15 +346,7 @@ void __init_or_cpufreq s5pv310_setup_clocks(void)
- 	unsigned long vpllsrc;
- 	unsigned long xtal;
- 	unsigned long armclk;
--	unsigned long aclk_corem0;
--	unsigned long aclk_cores;
--	unsigned long aclk_corem1;
--	unsigned long periphclk;
- 	unsigned long sclk_dmc;
--	unsigned long aclk_cored;
--	unsigned long aclk_corep;
--	unsigned long aclk_acp;
--	unsigned long pclk_acp;
- 	unsigned int ptr;
- 
- 	printk(KERN_DEBUG "%s: registering clocks\n", __func__);
-@@ -485,26 +377,12 @@ void __init_or_cpufreq s5pv310_setup_clocks(void)
- 			apll, mpll, epll, vpll);
- 
- 	armclk = clk_get_rate(&clk_armclk.clk);
--	aclk_corem0 = clk_get_rate(&clk_aclk_corem0.clk);
--	aclk_cores = clk_get_rate(&clk_aclk_cores.clk);
--	aclk_corem1 = clk_get_rate(&clk_aclk_corem1.clk);
--	periphclk = clk_get_rate(&clk_periphclk.clk);
- 	sclk_dmc = clk_get_rate(&clk_sclk_dmc.clk);
--	aclk_cored = clk_get_rate(&clk_aclk_cored.clk);
--	aclk_corep = clk_get_rate(&clk_aclk_corep.clk);
--	aclk_acp = clk_get_rate(&clk_aclk_acp.clk);
--	pclk_acp = clk_get_rate(&clk_pclk_acp.clk);
--
--	printk(KERN_INFO "S5PV310: ARMCLK=%ld, COREM0=%ld, CORES=%ld\n"
--			 "COREM1=%ld, PERI=%ld, DMC=%ld, CORED=%ld\n"
--			 "COREP=%ld, ACLK_ACP=%ld, PCLK_ACP=%ld",
--			armclk, aclk_corem0, aclk_cores, aclk_corem1,
--			periphclk, sclk_dmc, aclk_cored, aclk_corep,
--			aclk_acp, pclk_acp);
++static int s5pv310_clksrc_mask_fsys_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(S5P_CLKSRC_MASK_FSYS, clk, enable);
++}
 +
-+	printk(KERN_INFO "S5PV310: ARMCLK=%ld, DMC=%ld\n", armclk, sclk_dmc);
++static int s5pv310_clk_ip_fsys_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(S5P_CLKGATE_IP_FSYS, clk, enable);
++}
++
+ /* Core list of CMU_CPU side */
  
- 	clk_f.rate = armclk;
- 	clk_h.rate = sclk_dmc;
--	clk_p.rate = periphclk;
+ static struct clksrc_clk clk_mout_apll = {
+@@ -259,6 +269,36 @@ static struct clk init_clocks_disable[] = {
+ 		.parent		= &clk_aclk_100.clk,
+ 		.enable		= s5pv310_clk_ip_peril_ctrl,
+ 		.ctrlbit	= (1<<24),
++	}, {
++		.name		= "hsmmc",
++		.id		= 0,
++		.parent		= &clk_aclk_133.clk,
++		.enable		= s5pv310_clk_ip_fsys_ctrl,
++		.ctrlbit	= (1 << 5),
++	}, {
++		.name		= "hsmmc",
++		.id		= 1,
++		.parent		= &clk_aclk_133.clk,
++		.enable		= s5pv310_clk_ip_fsys_ctrl,
++		.ctrlbit	= (1 << 6),
++	}, {
++		.name		= "hsmmc",
++		.id		= 2,
++		.parent		= &clk_aclk_133.clk,
++		.enable		= s5pv310_clk_ip_fsys_ctrl,
++		.ctrlbit	= (1 << 7),
++	}, {
++		.name		= "hsmmc",
++		.id		= 3,
++		.parent		= &clk_aclk_133.clk,
++		.enable		= s5pv310_clk_ip_fsys_ctrl,
++		.ctrlbit	= (1 << 8),
++	}, {
++		.name		= "hsmmc",
++		.id		= 4,
++		.parent		= &clk_aclk_133.clk,
++		.enable		= s5pv310_clk_ip_fsys_ctrl,
++		.ctrlbit	= (1 << 9),
+ 	}
+ };
  
- 	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
- 		s3c_set_clksrc(&clksrcs[ptr], true);
+@@ -283,6 +323,56 @@ static struct clksrc_sources clkset_group = {
+ 	.nr_sources	= ARRAY_SIZE(clkset_group_list),
+ };
+ 
++static struct clksrc_clk clk_dout_mmc0 = {
++	.clk		= {
++		.name		= "dout_mmc0",
++		.id		= -1,
++	},
++	.sources = &clkset_group,
++	.reg_src = { .reg = S5P_CLKSRC_FSYS, .shift = 0, .size = 4 },
++	.reg_div = { .reg = S5P_CLKDIV_FSYS1, .shift = 0, .size = 4 },
++};
++
++static struct clksrc_clk clk_dout_mmc1 = {
++	.clk		= {
++		.name		= "dout_mmc1",
++		.id		= -1,
++	},
++	.sources = &clkset_group,
++	.reg_src = { .reg = S5P_CLKSRC_FSYS, .shift = 4, .size = 4 },
++	.reg_div = { .reg = S5P_CLKDIV_FSYS1, .shift = 16, .size = 4 },
++};
++
++static struct clksrc_clk clk_dout_mmc2 = {
++	.clk		= {
++		.name		= "dout_mmc2",
++		.id		= -1,
++	},
++	.sources = &clkset_group,
++	.reg_src = { .reg = S5P_CLKSRC_FSYS, .shift = 8, .size = 4 },
++	.reg_div = { .reg = S5P_CLKDIV_FSYS2, .shift = 0, .size = 4 },
++};
++
++static struct clksrc_clk clk_dout_mmc3 = {
++	.clk		= {
++		.name		= "dout_mmc3",
++		.id		= -1,
++	},
++	.sources = &clkset_group,
++	.reg_src = { .reg = S5P_CLKSRC_FSYS, .shift = 12, .size = 4 },
++	.reg_div = { .reg = S5P_CLKDIV_FSYS2, .shift = 16, .size = 4 },
++};
++
++static struct clksrc_clk clk_dout_mmc4 = {
++	.clk		= {
++		.name		= "dout_mmc4",
++		.id		= -1,
++	},
++	.sources = &clkset_group,
++	.reg_src = { .reg = S5P_CLKSRC_FSYS, .shift = 16, .size = 4 },
++	.reg_div = { .reg = S5P_CLKDIV_FSYS3, .shift = 0, .size = 4 },
++};
++
+ static struct clksrc_clk clksrcs[] = {
+ 	{
+ 		.clk	= {
+@@ -334,7 +424,52 @@ static struct clksrc_clk clksrcs[] = {
+ 		.sources = &clkset_group,
+ 		.reg_src = { .reg = S5P_CLKSRC_PERIL0, .shift = 24, .size = 4 },
+ 		.reg_div = { .reg = S5P_CLKDIV_PERIL3, .shift = 0, .size = 4 },
+-	},
++	}, {
++		.clk		= {
++			.name		= "sclk_mmc",
++			.id		= 0,
++			.parent		= &clk_dout_mmc0.clk,
++			.enable		= s5pv310_clksrc_mask_fsys_ctrl,
++			.ctrlbit	= (1 << 0),
++		},
++		.reg_div = { .reg = S5P_CLKDIV_FSYS1, .shift = 8, .size = 8 },
++	}, {
++		.clk		= {
++			.name		= "sclk_mmc",
++			.id		= 1,
++			.parent         = &clk_dout_mmc1.clk,
++			.enable		= s5pv310_clksrc_mask_fsys_ctrl,
++			.ctrlbit	= (1 << 4),
++		},
++		.reg_div = { .reg = S5P_CLKDIV_FSYS1, .shift = 24, .size = 8 },
++	}, {
++		.clk		= {
++			.name		= "sclk_mmc",
++			.id		= 2,
++			.parent         = &clk_dout_mmc2.clk,
++			.enable		= s5pv310_clksrc_mask_fsys_ctrl,
++			.ctrlbit	= (1 << 8),
++		},
++		.reg_div = { .reg = S5P_CLKDIV_FSYS2, .shift = 8, .size = 8 },
++	}, {
++		.clk		= {
++			.name		= "sclk_mmc",
++			.id		= 3,
++			.parent         = &clk_dout_mmc3.clk,
++			.enable		= s5pv310_clksrc_mask_fsys_ctrl,
++			.ctrlbit	= (1 << 12),
++		},
++		.reg_div = { .reg = S5P_CLKDIV_FSYS2, .shift = 24, .size = 8 },
++	}, {
++		.clk		= {
++			.name		= "sclk_mmc",
++			.id		= 4,
++			.parent         = &clk_dout_mmc4.clk,
++			.enable		= s5pv310_clksrc_mask_fsys_ctrl,
++			.ctrlbit	= (1 << 16),
++		},
++		.reg_div = { .reg = S5P_CLKDIV_FSYS3, .shift = 8, .size = 8 },
++	}
+ };
+ 
+ /* Clock initialization code */
+@@ -354,6 +489,11 @@ static struct clksrc_clk *sysclks[] = {
+ 	&clk_aclk_100,
+ 	&clk_aclk_160,
+ 	&clk_aclk_133,
++	&clk_dout_mmc0,
++	&clk_dout_mmc1,
++	&clk_dout_mmc2,
++	&clk_dout_mmc3,
++	&clk_dout_mmc4,
+ };
+ 
+ void __init_or_cpufreq s5pv310_setup_clocks(void)
 -- 
 1.6.2.5
