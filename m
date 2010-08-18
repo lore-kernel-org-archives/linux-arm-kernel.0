@@ -1,103 +1,89 @@
-From: leiwen@marvell.com (Lei Wen)
-Date: Tue, 17 Aug 2010 14:09:30 +0800
-Subject: [PATCH 5/5] pxa3xx_nand: set oob length in the runtime
-Message-ID: <mailman.205.1282142196.27306.linux-arm-kernel@lists.infradead.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 18 Aug 2010 23:01:21 +0900
+Subject: [PATCH 11/14] ARM: S5PV310: Bug fix on uclk1 and sclk_pwm
+In-Reply-To: <1282140084-10265-1-git-send-email-kgene.kim@samsung.com>
+References: <1282140084-10265-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1282140084-10265-12-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For different command need different oob requirement, set the proper
-oob length by different cmd.
+From: Jongpill Lee <boyko.lee@samsung.com>
 
-Signed-off-by: Lei Wen <leiwen@marvell.com>
+This patch fixes on enable and ctrlbit of uclk1 and sclk_pwm.
+
+Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c |   25 ++++++++++++++++++-------
- 1 files changed, 18 insertions(+), 7 deletions(-)
+ arch/arm/mach-s5pv310/clock.c |   21 +++++++++++++--------
+ 1 files changed, 13 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index dce9407..5d24968 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -273,13 +273,20 @@ static int wait_for_event(struct
-pxa3xx_nand_info *info, uint32_t event)
-
- static void pxa3xx_set_datasize(struct pxa3xx_nand_info *info)
- {
--	/* calculate data size */
-+	int oob_enable = info->reg_ndcr & NDCR_SPARE_EN;
-+
-+	info->data_size = info->page_size;
-+	if (!oob_enable) {
-+		info->oob_size = 0;
-+		return;
-+	}
-+
- 	switch (info->page_size) {
- 	case 2048:
--		info->data_size = (info->use_ecc) ? 2088 : 2112;
-+		info->oob_size = (info->use_ecc) ? 40 : 64;
- 		break;
- 	case 512:
--		info->data_size = (info->use_ecc) ? 520 : 528;
-+		info->oob_size = (info->use_ecc) ? 8 : 16;
- 		break;
- 	}
+diff --git a/arch/arm/mach-s5pv310/clock.c b/arch/arm/mach-s5pv310/clock.c
+index 843f4d0..ec69edc 100644
+--- a/arch/arm/mach-s5pv310/clock.c
++++ b/arch/arm/mach-s5pv310/clock.c
+@@ -56,6 +56,11 @@ static int s5pv310_clksrc_mask_fsys_ctrl(struct clk *clk, int enable)
+ 	return s5p_gatectrl(S5P_CLKSRC_MASK_FSYS, clk, enable);
  }
-@@ -333,6 +340,7 @@ static int prepare_other_cmd(struct
-pxa3xx_nand_info *info, uint16_t cmd)
- 	info->ndcb1 = 0;
- 	info->ndcb2 = 0;
-
-+	info->oob_size = 0;
- 	if (cmd == cmdset->read_id) {
- 		info->ndcb0 |= NDCB0_CMD_TYPE(3);
- 		info->data_size = 8;
-@@ -401,6 +409,9 @@ static int handle_data_pio(struct pxa3xx_nand_info *info)
- 	case STATE_PIO_WRITING:
- 		__raw_writesl(info->mmio_base + NDDB, info->data_buff,
- 				DIV_ROUND_UP(info->data_size, 4));
-+		if (info->oob_size > 0)
-+			__raw_writesl(info->mmio_base + NDDB, info->oob_buff,
-+					DIV_ROUND_UP(info->oob_size, 4));
-
- 		enable_int(info, NDSR_CS0_BBD | NDSR_CS0_CMDD);
-
-@@ -413,6 +424,9 @@ static int handle_data_pio(struct pxa3xx_nand_info *info)
- 	case STATE_PIO_READING:
- 		__raw_readsl(info->mmio_base + NDDB, info->data_buff,
- 				DIV_ROUND_UP(info->data_size, 4));
-+		if (info->oob_size > 0)
-+			__raw_readsl(info->mmio_base + NDDB, info->oob_buff,
-+					DIV_ROUND_UP(info->oob_size, 4));
- 		break;
- 	default:
- 		printk(KERN_ERR "%s: invalid state %d\n", __func__,
-@@ -427,7 +441,7 @@ static int handle_data_pio(struct pxa3xx_nand_info *info)
- static void start_data_dma(struct pxa3xx_nand_info *info, int dir_out)
+ 
++static int s5pv310_clksrc_mask_peril0_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(S5P_CLKSRC_MASK_PERIL0, clk, enable);
++}
++
+ static int s5pv310_clk_ip_fsys_ctrl(struct clk *clk, int enable)
  {
- 	struct pxa_dma_desc *desc = info->data_desc;
--	int dma_len = ALIGN(info->data_size, 32);
-+	int dma_len = ALIGN(info->data_size + info->oob_size, 32);
-
- 	desc->ddadr = DDADR_STOP;
- 	desc->dcmd = DCMD_ENDIRQEN | DCMD_WIDTH4 | DCMD_BURST32 | dma_len;
-@@ -833,7 +847,6 @@ static int pxa3xx_nand_config_flash(struct
-pxa3xx_nand_info *info,
- 	info->cmdset = f->cmdset;
- 	info->page_size = f->page_size;
- 	info->oob_buff = info->data_buff + f->page_size;
--	info->oob_size = (f->page_size == 2048) ? 64 : 16;
- 	info->read_id_bytes = (f->page_size == 2048) ? 4 : 2;
-
- 	/* calculate addressing information */
-@@ -892,8 +905,6 @@ static int pxa3xx_nand_detect_config(struct
-pxa3xx_nand_info *info)
- 	i = __ffs(page_per_block * info->page_size);
- 	num_blocks = type->chipsize << (20 - i);
-
--	info->oob_size = (info->page_size == 2048) ? 64 : 16;
--
- 	/* calculate addressing information */
- 	info->col_addr_cycles = (info->page_size == 2048) ? 2 : 1;
-
+ 	return s5p_gatectrl(S5P_CLKGATE_IP_FSYS, clk, enable);
+@@ -403,8 +408,8 @@ static struct clksrc_clk clksrcs[] = {
+ 		.clk	= {
+ 			.name		= "uclk1",
+ 			.id		= 0,
++			.enable		= s5pv310_clksrc_mask_peril0_ctrl,
+ 			.ctrlbit	= (1 << 0),
+-			.enable		= s5pv310_clk_ip_peril_ctrl,
+ 		},
+ 		.sources = &clkset_group,
+ 		.reg_src = { .reg = S5P_CLKSRC_PERIL0, .shift = 0, .size = 4 },
+@@ -413,8 +418,8 @@ static struct clksrc_clk clksrcs[] = {
+ 		.clk		= {
+ 			.name		= "uclk1",
+ 			.id		= 1,
+-			.enable		= s5pv310_clk_ip_peril_ctrl,
+-			.ctrlbit	= (1 << 1),
++			.enable		= s5pv310_clksrc_mask_peril0_ctrl,
++			.ctrlbit	= (1 << 4),
+ 		},
+ 		.sources = &clkset_group,
+ 		.reg_src = { .reg = S5P_CLKSRC_PERIL0, .shift = 4, .size = 4 },
+@@ -423,8 +428,8 @@ static struct clksrc_clk clksrcs[] = {
+ 		.clk		= {
+ 			.name		= "uclk1",
+ 			.id		= 2,
+-			.enable		= s5pv310_clk_ip_peril_ctrl,
+-			.ctrlbit	= (1 << 2),
++			.enable		= s5pv310_clksrc_mask_peril0_ctrl,
++			.ctrlbit	= (1 << 8),
+ 		},
+ 		.sources = &clkset_group,
+ 		.reg_src = { .reg = S5P_CLKSRC_PERIL0, .shift = 8, .size = 4 },
+@@ -433,8 +438,8 @@ static struct clksrc_clk clksrcs[] = {
+ 		.clk		= {
+ 			.name		= "uclk1",
+ 			.id		= 3,
+-			.enable		= s5pv310_clk_ip_peril_ctrl,
+-			.ctrlbit	= (1 << 3),
++			.enable		= s5pv310_clksrc_mask_peril0_ctrl,
++			.ctrlbit	= (1 << 12),
+ 		},
+ 		.sources = &clkset_group,
+ 		.reg_src = { .reg = S5P_CLKSRC_PERIL0, .shift = 12, .size = 4 },
+@@ -443,7 +448,7 @@ static struct clksrc_clk clksrcs[] = {
+ 		.clk		= {
+ 			.name		= "sclk_pwm",
+ 			.id		= -1,
+-			.enable		= s5pv310_clk_ip_peril_ctrl,
++			.enable		= s5pv310_clksrc_mask_peril0_ctrl,
+ 			.ctrlbit	= (1 << 24),
+ 		},
+ 		.sources = &clkset_group,
 -- 
-1.7.0.4
+1.6.2.5
