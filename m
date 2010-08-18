@@ -1,88 +1,60 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 17 Aug 2010 22:39:31 -0700
-Subject: RFC: A better clock rounding API?
-Message-ID: <4C6B7213.3030808@codeaurora.org>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 18 Aug 2010 14:15:52 +0800
+Subject: [PATCH] PXA: Fix wakealarm capability for pxa-rtc
+In-Reply-To: <201008180704.49612.marek.vasut@gmail.com>
+References: <1280550147-12380-1-git-send-email-marek.vasut@gmail.com>
+	<871vaaycz0.fsf@free.fr>
+	<AANLkTikkfq_Wd=XKqVREG50q=+2pbPij3EhtnJ7nsfRM@mail.gmail.com>
+	<201008180704.49612.marek.vasut@gmail.com>
+Message-ID: <AANLkTiky9zdHwhpPevBUvRNMoCz3qabmoDMVeFz8K0fE@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm mostly familiar with ARM.  So I will limit the discussion to ARM 
-boards/machines.  But I think the points raised in this email would 
-apply for most architectures.
+On Wed, Aug 18, 2010 at 1:04 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Dne St 18. srpna 2010 06:08:44 Eric Miao napsal(a):
+>> On Sat, Aug 7, 2010 at 5:43 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>> > Alessandro Zummo <a.zummo@towertech.it> writes:
+>> >> On Tue, 3 Aug 2010 05:10:03 +0200
+>> >>
+>> >> Marek Vasut <marek.vasut@gmail.com> wrote:
+>> >>> > ?may I see the latest version of your patch, Marek?
+>> >>> >
+>> >>> > ?ty
+>> >>>
+>> >>> ---
+>> >>> ?drivers/rtc/rtc-pxa.c | ? ?4 ++--
+>> >>> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>> >>
+>> >> ?well, if it's ok for Robert...
+>> >
+>> > Yes, I already gave my ack in [1].
+>> >
+>> > As I'm still on holidays, I won't be available for a couple of days
+>> > again, so take it granted that IMO Marek's patch can go in your tree and
+>> > that it has my full aggreement. Thanks.
+>>
+>> Hi Alessandro,
+>>
+>> Cann't find this in -next so far, the patch looks correct to me. We did
+>> the same thing for rtc-sa1100.c before. So you also have my Ack on
+>> this if it's not yet in your tree.
+>
+> If you want, I can put this patch it into next pull rq for pxa-linux-2.6 towards
+> you, Eric ? Maybe it should go through fix though.
+>
 
-I'm sending this to the ARM mailing list first to see if I can get a 
-consensus within the ARM community before I propose this to the wider 
-audience in LKML.
+I'd prefer Alessandro merge this.
 
-The meaning of clk_round_rate() is very ambiguous since the nature of 
-the rounding is architecture and platform specific.  In the case of ARM, 
-it's up to each ARM mach's clock driver to determine how it wants to 
-round the rate.
+> Btw. Eric, could you please sync devel with mainline? Also, did you push your -
+> fix?
 
-To quote Russel King from an email about a month ago:
-"clk_round_rate() returns the clock rate which will be set if you ask
-clk_set_rate() to set that rate.  It provides a way to query from the 
-implementation exactly what rate you'll get if you use clk_set_rate() 
-with that same argument."
+I'll do it soon.
 
-So when someone writes a device driver for a device that's external to 
-the SoC or is integrated into more than one SoC, they currently have the 
-following options to deal with clock rates differences:
-
-1. Use clk_round_rate() to get clock rates and test their driver on the 
-one/few board(s) they have at hand and hope it works on boards using 
-different SoCs.
-
-2. Add each and every needed clock rate (low power rate, high 
-performance rate, handshake rate, etc) as fields to their platform data 
-and have it populated in every board file that uses the device.
-
-3. Do a search of the frequency space of the clock by making several 
-clk_round_rate() calls at various intervals between their minimum and 
-maximum acceptable rates and hope to find one of the supported rates. 
-If clk_round_rate() does a +/- N percentage rounding and the interval is 
-larger, even this searching might not find an existing rate that's 
-supported between the driver's min and max acceptable rates.
-
-IMHO, each of these options have short comings that could be alleviated 
-by adding a more definitive "rounding" API.  Also, considering that it's 
-the consumer of each clock that knows best what amount of rounding and 
-in which direction is acceptable, IMHO the current approach of hiding 
-the rounding inside the clock drivers seems counter intuitive.
-
-I would like to propose the addition of either:
-
-long clk_find_rate(struct clk *clk,
-			unsigned long min_rate,
-			long max_rate);
-
-or
-
-long clk_find_rate(struct clk *clk,
-			unsigned long start_rate,
-			long end_rate);
-
-The advantage of the 2nd suggestion is that it allows a driver to 
-specify which end of a frequency range it prefers.  But I'm not sure how 
-important of an advantage that is.  So, proposing both and having the 
-community decide which one, if any, is acceptable.
-
-If the clk_find_rate() API is available, the driver developer wouldn't 
-have to worry about figuring out a way for the clk_set_rate() to work on 
-different platforms/machs/SoCs. If a platform/mach/SoC can provide a 
-clock rate that's acceptable to their hardware and software 
-requirements, then they can be assured to find it without having to jump 
-through hoops or having a driver not work when it could have.
-
-Does the addition of one of the suggested APIs sound reasonable? If not, 
-can someone explain what the right/better solution is? If the addition 
-of a new API is reasonable, what's the community preference between the 
-two suggestion? If I submit a patch that will add one of the APIs is it 
-likely to be accepted?
-
-Thanks for your time.
-
--Sarav
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
+> Thanks, Cheers!
+>>
+>> > --
+>> > Robert
+>> >
+>> > [1] http://www.spinics.net/lists/arm-kernel/msg94818.html
+>
