@@ -1,24 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Aug 2010 14:28:44 +0200
-Subject: [PATCH v2] ARM: uaccess: Implement strict user copy checks
-In-Reply-To: <1282094950-6184-1-git-send-email-sboyd@codeaurora.org>
-References: <4C61EE55.5030506@codeaurora.org>
-	<1282094950-6184-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <201008181428.45029.arnd@arndb.de>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Wed, 18 Aug 2010 13:30:53 +0100
+Subject: [PATCH 01/06] pxa3xx_nand: update ns2cycle calculation method
+In-Reply-To: <AANLkTikzdVAwOZcLhgHsDQGNhW4_-420XodbxSUmfDRW@mail.gmail.com>
+References: <AANLkTikzdVAwOZcLhgHsDQGNhW4_-420XodbxSUmfDRW@mail.gmail.com>
+Message-ID: <1282134653.13405.15.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 August 2010, Stephen Boyd wrote:
+On Tue, 2010-08-17 at 13:29 +0100, Haojian Zhuang wrote:
+> From 9064b2c877cad560fda7577564b3369c0025b7df Mon Sep 17 00:00:00 2001
+> From: Lei Wen <leiwen@marvell.com>
+> Date: Tue, 17 Aug 2010 17:24:06 +0800
+> Subject: [PATCH 01/06] pxa3xx_nand: update ns2cycle calculation method
 > 
-> I'm unsure what needs to be done for the follow up patch. Shouldn't
-> it be multiple patches sent to each arch maintainer to fix the
-> wording?
+> For the original method change from plus 1 to minus 1,
+> this way make the default timing like tCS become 0 after calculation,
+> although we set the timing as 0xa...
+> 
+> Change the method to no plus and minus, and make the result
+> closer to what the timing specified in the NAND chip spec.
+> 
+> Signed-off-by: Lei Wen <leiwen@marvell.com>
 
-No, that will just result in half of them applying it, best make 
-a single patch and send it to linux-arch at vger.kernel.org for review.
+I have an identical patch queued for -stable and 2.6.36 already, from
+Axel Lin (but with a slightly better changelog).
 
-It's probably best to move the config option to lib/Kconfig.debug
-so it only appears once, and make it depend on DEBUG_USER_COPY_CHECKS,
-which is then unconditionally defined by the architectures that want it.
+I'll add your signed-off-by to that and send it on today.
 
-	Arnd
+The other five I'll apply to the mtd-2.6.git on top, once I have Eric's
+ack.
+
+Thanks.
+
+By the way, please could you use my dwmw2 at infradead.org address instead
+of @intel.com -- the latter has taken to corrupting incoming mail again,
+and they're being extremely slow to fix it.
+
+-- 
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
