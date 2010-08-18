@@ -1,54 +1,57 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 18 Aug 2010 22:31:10 +0200 (CEST)
-Subject: [regression] in linux-next: sh_mobile_ceu_camera broken by "ARM:
-	Prohibit ioremap() on kernel managed RAM"
-In-Reply-To: <20100818194109.GA19126@n2100.arm.linux.org.uk>
-References: <4C5ED116.5000002@arndnet.de>
-	<201008101045.03547.philippe.retornaz@epfl.ch>
-	<20100810092759.GB31759@n2100.arm.linux.org.uk>
-	<Pine.LNX.4.64.1008102117000.18934@axis700.grange>
-	<20100810212638.GC7702@n2100.arm.linux.org.uk>
-	<Pine.LNX.4.64.1008182107210.17895@axis700.grange>
-	<20100818194109.GA19126@n2100.arm.linux.org.uk>
-Message-ID: <Pine.LNX.4.64.1008182218150.17895@axis700.grange>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 18 Aug 2010 21:33:52 +0100
+Subject: [PATCH v3] ARM: i.MX27 pcm970: Add camera support
+In-Reply-To: <Pine.LNX.4.64.1008160018060.27810@axis700.grange>
+References: <Pine.LNX.4.64.1008122224070.17224@axis700.grange>
+	<1281863312-16264-1-git-send-email-m.grzeschik@pengutronix.de>
+	<Pine.LNX.4.64.1008160018060.27810@axis700.grange>
+Message-ID: <20100818203352.GF15536@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Aug 2010, Russell King - ARM Linux wrote:
+On Wed, Aug 18, 2010 at 10:05:25PM +0200, Guennadi Liakhovetski wrote:
 
-> On Wed, Aug 18, 2010 at 09:23:25PM +0200, Guennadi Liakhovetski wrote:
+> 1. unbalanced regulator enable. IMHO, this is no exception to the general 
+> enable / disable, alloc / free, lock / unlock etc. call balancing rule. If 
+> your regulator has to stay enabled for the whole system run-time, you 
+> don't have to (even try to) enable it multiple times. Please, either make 
+> enabling / disabling symmetric, or leave only one enable in the 
+> initialisation call.
 
-[snip]
+If the regulator needs to be on all the time on a given board then
+forcing this with always_on in the constraints is much more idiomatic
+and straightforward.
 
-> > The sole purpose of the preallocation in the platform code is to avoid 
-> > memory fragmentation. Sorry, if I'm repeating obvious things. So, we are 
-> > already allocating DMA coherent memory. The ioremap() problem in this case 
-> > is actually bogus - we do not need that ioremap(). The problem would be 
-> > solved, if ioremap() would just not be called in these cases. This is what 
-> > the drivers/staging/dt3155v4l/dt3155vfl.c driver is open-coding in its 
-> > dt3155_alloc_coherent() function, as pointed out by Marin Mitov (CCed) in 
-> > another thread. So, would it be acceptable to provide a second function, 
-> > doing exactly the same as dma_declare_coherent_memory() but without an 
-> > ioremap(), or add a new DMA_MEMORY_... flag to skip ioremap() in 
-> > dma_declare_coherent_memory(), as suggested by Uwe (CCed too)?
-> 
-> Sounds like a sane approach to fixing this to me.
+> > +static int pcm970_camera_power_bus(struct device *dev, int toggle)
+> > +{
+> > +	struct regulator *regulator;
+> > +
+> > +	regulator = regulator_get(NULL, "imx_cam_vcc");
+> > +	if (IS_ERR(regulator)) {
+> > +		pr_err("unable to get regulator: %ld\n", PTR_ERR(regulator));
+> > +		return -ENODEV;
+> > +	} else {
+> > +		if (!regulator_is_enabled(regulator) && toggle)
+> > +			regulator_enable(regulator);
+> > +	}
+> > +	return 0;
+> > +}
 
-I assume, you mean adding a new flag to skip ioremap(). But then we have 
-to pass the virtual address to the function. Its prototype is
+This is all very suspicious - your regulator_get() should be using the
+struct device it was passed to look up the regulator by supply name
+(probably "cam_vcc").  The regulator_is_enabled() call is going to break
+if the supply is shared, too.
 
-int dma_declare_coherent_memory(struct device *dev, dma_addr_t bus_addr,
-				dma_addr_t device_addr, size_t size, int flags);
+It all looks like something that I'd expect the camera driver to be
+taking care of for itself, there's nothing board specific in here.
 
-bus_addr is unused in this case, but I don't think abusing it to pass a 
-"void *" would be an acceptable solution - apart from all the ugly 
-type-casting, if we ever get 64-bit virtual addresses on ARM with 32-bit 
-DMA addresses, we've got a problem. Or is this never going to happen? Or 
-whould I rather add a new function?
+> > +	regulator = regulator_get(NULL, "imx_cam_vcc");
+> > +	if (IS_ERR(regulator)) {
+> > +		pr_err("unable to get regulator: %ld\n", PTR_ERR(regulator));
+> > +		return -ENODEV;
+> > +	} else if (!regulator_is_enabled(regulator)) {
+> > +		regulator_enable(regulator);
+> > +	}
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Again, this looks like you need to add regulator support to the camera
+driver.
