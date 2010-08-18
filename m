@@ -1,69 +1,75 @@
 From: wellsk40@gmail.com (wellsk40 at gmail.com)
-Date: Wed, 18 Aug 2010 16:40:57 -0700
-Subject: [PATCH 4/6] ARM: LPC32xx: Remove MMC peripheral clock enable/disable
-	code
+Date: Wed, 18 Aug 2010 16:40:59 -0700
+Subject: [PATCH 6/6] ARM: LPC32XX: Add board.h for platform_data structures
 In-Reply-To: <1282174859-8780-1-git-send-email-wellsk40@gmail.com>
 References: <1282174859-8780-1-git-send-email-wellsk40@gmail.com>
-Message-ID: <1282174859-8780-5-git-send-email-wellsk40@gmail.com>
+Message-ID: <1282174859-8780-7-git-send-email-wellsk40@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Wells <wellsk40@gmail.com>
 
-The MMC clock rate set and get functions had extra code to force
-the high level peripheral clock to enable prior to register
-accesses. This isn't needed.
+Add the initial board.h file to support platform data for
+some drivers.
 
 Signed-off-by: Kevin Wells <wellsk40@gmail.com>
 ---
- arch/arm/mach-lpc32xx/clock.c |   14 ++------------
- 1 files changed, 2 insertions(+), 12 deletions(-)
+ arch/arm/mach-lpc32xx/include/mach/board.h |   47 ++++++++++++++++++++++++++++
+ 1 files changed, 47 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-lpc32xx/include/mach/board.h
 
-diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
-index 1659b3f..dd34a64 100644
---- a/arch/arm/mach-lpc32xx/clock.c
-+++ b/arch/arm/mach-lpc32xx/clock.c
-@@ -738,14 +738,9 @@ static int mmc_onoff_enable(struct clk *clk, int enable)
- 
- static unsigned long mmc_get_rate(struct clk *clk)
- {
--	u32 div, rate, oldclk;
-+	u32 div, rate;
- 
--	/* The MMC clock must be on when accessing an MMC register */
--	oldclk = __raw_readl(LPC32XX_CLKPWR_MS_CTRL);
--	__raw_writel(oldclk | LPC32XX_CLKPWR_MSCARD_SDCARD_EN,
--		LPC32XX_CLKPWR_MS_CTRL);
- 	div = __raw_readl(LPC32XX_CLKPWR_MS_CTRL);
--	__raw_writel(oldclk, LPC32XX_CLKPWR_MS_CTRL);
- 
- 	/* Get the parent clock rate */
- 	rate = clk->parent->get_rate(clk->parent);
-@@ -778,7 +773,7 @@ static unsigned long mmc_round_rate(struct clk *clk, unsigned long rate)
- 
- static int mmc_set_rate(struct clk *clk, unsigned long rate)
- {
--	u32 oldclk, tmp;
-+	u32 tmp;
- 	unsigned long prate, div, crate = mmc_round_rate(clk, rate);
- 
- 	prate = clk->parent->get_rate(clk->parent);
-@@ -786,16 +781,11 @@ static int mmc_set_rate(struct clk *clk, unsigned long rate)
- 	div = prate / crate;
- 
- 	/* The MMC clock must be on when accessing an MMC register */
--	oldclk = __raw_readl(LPC32XX_CLKPWR_MS_CTRL);
--	__raw_writel(oldclk | LPC32XX_CLKPWR_MSCARD_SDCARD_EN,
--		LPC32XX_CLKPWR_MS_CTRL);
- 	tmp = __raw_readl(LPC32XX_CLKPWR_MS_CTRL) &
- 		~LPC32XX_CLKPWR_MSCARD_SDCARD_DIV(0xf);
- 	tmp |= LPC32XX_CLKPWR_MSCARD_SDCARD_DIV(div);
- 	__raw_writel(tmp, LPC32XX_CLKPWR_MS_CTRL);
- 
--	__raw_writel(oldclk, LPC32XX_CLKPWR_MS_CTRL);
--
- 	return 0;
- }
- 
+diff --git a/arch/arm/mach-lpc32xx/include/mach/board.h b/arch/arm/mach-lpc32xx/include/mach/board.h
+new file mode 100644
+index 0000000..a810c78
+--- /dev/null
++++ b/arch/arm/mach-lpc32xx/include/mach/board.h
+@@ -0,0 +1,47 @@
++/*
++ * arch/arm/mach-lpc32xx/include/mach/board.h
++ *
++ * Author: Kevin Wells <kevin.wells@nxp.com>
++ *
++ * Copyright (C) 2010 NXP Semiconductors
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __ASM_ARCH_BOARD_H
++#define __ASM_ARCH_BOARD_H
++
++#include <linux/types.h>
++
++/*
++ * lpc32xx touchscreen controller timing platform data.
++ * All timing values are based on a 32KHz clock.
++ */
++struct lpc32xx_tsc_data {
++	u32	dtr_clocks;	/* Clocks to delay start after pen detect */
++	u32	rtr_clocks;	/* Number of settling clocks after mux */
++	u32	dxp_clocks;	/* Number of drain plate discharge clocks */
++	u32	ttr_clocks;	/* Clocks to delay next pen status check */
++	u32	utr_clocks;	/* Interval clocks between scans */
++};
++
++/*
++ * lpc32xx key scanner timing platform data.
++ * All timing values are based on a 32KHz clock.
++ */
++struct lpc32XX_kscan_data {
++	const u32 *keymap_data;	/* Mapped key data to scanner */
++	u8	matrix_sz;	/* Size of matrix in XxY, ie. 3 = 3x3 */
++	u32	deb_clks;	/* Number of debounce clocks */
++	u32	scan_delay;	/* Number of scan delay clocks */
++};
++
++#endif /* __ASM_ARCH_BOARD_H */
 -- 
 1.7.1.1
