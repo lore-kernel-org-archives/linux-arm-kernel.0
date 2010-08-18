@@ -1,81 +1,130 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 18 Aug 2010 15:40:27 +0100
-Subject: [alsa-devel] [PATCH 1/3] ASoC: add 88pm860x codec driver
-In-Reply-To: <AANLkTi=2FboP+xhSHjgyoM6LfmKw1khV62gTVrkxxUHF@mail.gmail.com>
-References: <AANLkTimBPhvukwqDGY8iORhY+wg8OnHi9+eOedJB2E8k@mail.gmail.com>
-	<20100818141914.GC15536@sirena.org.uk>
-	<AANLkTi=2FboP+xhSHjgyoM6LfmKw1khV62gTVrkxxUHF@mail.gmail.com>
-Message-ID: <20100818144027.GB4588@rakim.wolfsonmicro.main>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Wed, 18 Aug 2010 17:50:51 +0300
+Subject: [PATCH 3/3] usb/otg/ulpi: extend the generic ulpi driver.
+In-Reply-To: <20100818094939.GB9876@esdhcp041123.research.nokia.com>
+References: <1279198816-30367-1-git-send-email-grinberg@compulab.co.il>
+	<1279198816-30367-4-git-send-email-grinberg@compulab.co.il>
+	<20100813132717.GA6986@as23.pp.htv.fi>
+	<4C679772.3090802@compulab.co.il>
+	<20100816093724.GA2916@esdhcp041123.research.nokia.com>
+	<4C6AB605.1050305@compulab.co.il>
+	<20100818094939.GB9876@esdhcp041123.research.nokia.com>
+Message-ID: <4C6BF34B.4010507@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 18, 2010 at 10:33:19PM +0800, Haojian Zhuang wrote:
-> On Wed, Aug 18, 2010 at 10:19 PM, Mark Brown
+ On 08/18/10 12:49, Heikki Krogerus wrote:
+> On Tue, Aug 17, 2010 at 06:17:09PM +0200, ext Igor Grinberg wrote:
+>> On 08/16/10 12:37, Heikki Krogerus wrote:
+>>> OK, I get your idea now with the flags now. Should have read the code
+>>> more carefully. I'm not sure if it's the right way though, but if you
+>>> can show that they are beneficial in more then one case, then I'm sure
+>>> there is no problem with them.
+>> Indeed, this can be not the best way, but at least it is better then letting
+>> everyone around access the ulpi defined registers in a way they like.
+>> There is a ulpi standard and kernel should provide a framework/driver
+>> that follows the standard (at least for the ulpi defined registers).
+>>
+>>>  Please consider the following.
+>>>
+>>> It seems that many ulpi transceivers are autonomous as they say.
+>>> There is little if any need to access ulpi registers expect the
+>>> vendor specific ones. The vendor specific stuff will require register
+>>> access in any case and in some cases they need the transceivers to be
+>>> programmed in a specific way. Right now to me using the flags for the
+>>> common parts and then separately programming the vendor specific stuff
+>>> does not seem very efficient. 
+>> Well, vendor specific registers are very important issue.
+>> This is how I see it:
+>>
+>> platform core   <-------wired-------->   ulpi    phy
+>>       /                                 /           \
+>>      /                     ulpi generic regs  |  vendor specific regs
+>>     /                                 /               \
+>> ulpi access ops <-----> ulpi generic driver <---> ulpi phy specific driver(s)
+>>                           /           \
+>>                   otg framework        \
+>>                           \            /
+>>                  usb subsystems e.g. musb, ehci...
+>>
+>>
+>> If the ulpi transceiver is autonomous and platform does not need to
+>> do any setup of the transceiver, then I think you don't need to
+>> access the transceiver in any way, just setup the platform core,
+>> which can be done in platform specific code.
+>>
+>> If there is a need to access the ulpi transceiver, then it should be done
+>> by using the ulpi driver. ulpi transceiver usually is a chip, so if it needs
+>> to be setup, then it deserves a driver, I think.
+>>
+>> Anyway, we need a good generic ulpi driver, which will provide some
+>> kind of interface for the ulpi specific drivers that are aware of the
+>> vendor specific registers and setup. This interface should make the
+>> task of developing ulpi specific driver easy.
+> I'm totally _not_ against a generic ulpi driver, and see it can be
+> something very useful.
+>
+>> The driver does not have to end up with flags. The intension of those
+>> flags is to give a start for something bigger... otherwise people will
+>> continue to setup the hardware specific stuff in the generic drivers
+>> (like the recent ulpi phy reset code in omap-ehci glue) instead of
+>> contributing to the ulpi driver, so other platforms could reuse it.
+> Unfortunately this is not generating enough interest in people. I
+> guess this is one of those cases where people prefer to wait for
+> someone else to make the ulpi driver more mature instead of
+> contributing themselves, and in the meantime, hack their existing or
+> new driver (like me) :(. Someone simply needs to put effort in
+> developing it, but as I understood, you are too busy at the moment,
+> and so am I.
 
-> >
-> > I still can't follow what this automute variable is supposed to be
-> > doing. ?In both the PMU and the PMD cases you set automute, and the fact
-> > that you forcibly clear it when you apply the change means that it
-> > doesn't look like it's doing anything I'd recognise as automute,
-> > suggesting that the variable is misnamed. ?It's very difficult to follow
-> > what all this is supposed to be doing.
+Well, it's a pity, but that is the reality...
+I think even small contributions could make a difference.
+Lets say, a reset or the pm, are not so time consuming and are very
+reusable.
 
-> Mute while DAC is enabled and PGA is updated. It's the purpose of
-> anti-pop by silicon.
+>>> I need to re-send the charger driver for isp170x. These transceivers
+>>> are fairly commonly used with musb, and most platform probable only
+>>> need nop-usb-xceiv.c with them. However, the charger detection needs
+>>> access to the common ulpi registers as well as the vendor specific
+>>> ones. If you see that you can make this kind of functions work with
+>>> the flags, then I'm OK with them. 
+>> Is this series (part of it) you need to resend:
+>> http://www.spinics.net/lists/linux-usb/msg29643.html
+>>
+>> isp1704_test_ulpi() - can be done fully by the generic ulpi driver,
+>> in fact it is already reads the id. May be we should think of a way to export
+>> it, so drivers like this one can do the matching.
+> Yes it would make sense for now.
+>
+>> isp1704_charger_detect() - isp170x specific ulpi registers accesses.
+>>
+>> isp1704_charger_verify() - I don't fully understand the purpose of this,
+>> I see the reset (can be done by the generic driver) and then some
+>> ulpi generic and specific accesses to the transceiver.
+>> I think it can be handled by the ulpi generic and specific driver
+>> and with help of the flags.
+> This transceiver is a bit difficult as RX51 platform uses it as it's
+> second transceiver. So the primary transceiver provides the struct
+> otg_transceiver, and from software's point of view only charger
+> detection is done with isp170x, so I was unable to take advantage of
+> the ulpi driver.
+>
+> This kind of oddities make things even more complicated. The otg
+> framework is not suited for multiple transceivers (maybe it newer
+> will), but the platform needs to be considered in any case :(.
 
-This behaviour is entirely non-obvious from the code.  Please improve
-the documentation within the code so that someone reading the code can
-tell what it's supposed to do.  This will allow the code to be reviewed,
-it certainly seems buggy in relation to the DAI mute operation at the
-minute.
+As far as I know, the OTG standard does not permit more then one
+OTG port (and thus transceiver) on the system, but we can have
+multiple ulpi transceivers, which are not necessarily used for OTG.
 
-> > As I said last time what I'd expect to see is a user visible mute
-> > control which sets a variable in the driver which is then updated in the
-> > chip only while the DAC is powered. ?The other option is to tie the
-> > control to the DAC power, in which case things should be handleable in
-> > the widget event without the variable.
+> Unfortunately I have to send the driver as it is, and can't spend any
+> time with it right now. I need to put more though into this at one
+> point.
 
-> Why should I move the work to invoking amixer by user? Why shouldn't
-> it be taken by driver automatically?
+Yeah, I see that. Hope that point in time will come...
 
-Either of my suggestions would leave the workaround transparent to the
-user.  The first suggestion will provide additional control to the user
-but will still hide the workaround from them.
+> br,
 
-> >> + ? ? switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
-> >> + ? ? case SND_SOC_DAIFMT_CBM_CFM:
-> >> + ? ? case SND_SOC_DAIFMT_CBM_CFS:
-> >> + ? ? ? ? ? ? if (pm860x->dir == PM860X_CLK_DIR_OUT) {
-> >> + ? ? ? ? ? ? ? ? ? ? inf |= PCM_INF2_MASTER;
-> >> + ? ? ? ? ? ? ? ? ? ? ret = 0;
-
-> > This is still setting the same register value for two different DAI
-> > formats. ?You need to fix this, and in the other set_fmt() function.
-
-> These two registers are EXACTLY same. Why do I need to define two same
-> bit macro?
-
-You need to validate the arguments you're being passed.  If your driver
-reports that it successfully set _CFS and really it set the hardware
-into _CFM then the system isn't going to work as expected.  
-
-> > You're also missing a default: case.
-
-> Please check the code. If it's default case, it'll return -EINVAL. I
-> didn't miss it.
-
-No, that's not the case.  Your error handling strategy here is
-problematic - if any one of the parameters set is correct (eg, the
-format mask sets I2S) then ret will be reset to zero and you'll return
-success.
-
-> > One other thing you should do is split the jack configuration for
-> > headphone and microphone - a system may have two physical jacks, one for
-> > each, so you should allow the user to configure the detection onto
-> > separate jacks if they want to.
-
-> Up to now, I can't split it to two different jacks. Since there's some
-> issue on mic detection.
-
-You can do this in software even if the individual board designs you're
-using don't have any separation.
+-- 
+Regards,
+Igor.
