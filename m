@@ -1,46 +1,40 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 18 Aug 2010 12:20:27 +0800
-Subject: [PATCH] pxa: fix CI_HSYNC and CI_VSYNC MFP defines
-In-Reply-To: <1281670747.13407.2.camel@mola>
-References: <1281670747.13407.2.camel@mola>
-Message-ID: <AANLkTimUqRMjZ735CuwAHWGrkAakQG+JPiX6Rc=9gS1R@mail.gmail.com>
+Date: Wed, 18 Aug 2010 12:23:52 +0800
+Subject: [PATCH] ARM: pxa/pwm: Make id const in pwm_probe()
+In-Reply-To: <1281593908-30448-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1281593908-30448-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <AANLkTin8DKw9q2mQfOWQAi77Ur5OWj+-CLHydBvkb6mz@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 13, 2010 at 11:39 AM, Axel Lin <axel.lin@gmail.com> wrote:
-> According to PXA3xx Processor Family Developer Manuall Vol1. section
-> "Pin Descriptions and Control", PXA30x and PXA31x Processor Alternate Function
-> Table shows the Alt FN 0 for GPIO51 is CI_HSYNC and for GPIO52 is CI_VSYNC.
-> This patch fixes the MFP defines and also corrects the order of MFD defines.
+2010/8/12 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> This fixes the compiler warning:
 >
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+> ? ? ? ?arch/arm/plat-pxa/pwm.c: In function 'pwm_probe':
+> ? ? ? ?arch/arm/plat-pxa/pwm.c:179: warning: initialization discards qualifiers from pointer target type
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Applied to 'fix'.
+Applied.
 
 > ---
-> ?arch/arm/mach-pxa/include/mach/mfp-pxa300.h | ? ?4 ++--
-> ?1 files changed, 2 insertions(+), 2 deletions(-)
+> ?arch/arm/plat-pxa/pwm.c | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
 >
-> diff --git a/arch/arm/mach-pxa/include/mach/mfp-pxa300.h b/arch/arm/mach-pxa/include/mach/mfp-pxa300.h
-> index 7139e0d..4e12870 100644
-> --- a/arch/arm/mach-pxa/include/mach/mfp-pxa300.h
-> +++ b/arch/arm/mach-pxa/include/mach/mfp-pxa300.h
-> @@ -71,10 +71,10 @@
-> ?#define GPIO46_CI_DD_7 ? ? ? ? MFP_CFG_DRV(GPIO46, AF0, DS04X)
-> ?#define GPIO47_CI_DD_8 ? ? ? ? MFP_CFG_DRV(GPIO47, AF1, DS04X)
-> ?#define GPIO48_CI_DD_9 ? ? ? ? MFP_CFG_DRV(GPIO48, AF1, DS04X)
-> -#define GPIO52_CI_HSYNC ? ? ? ? ? ? ? ?MFP_CFG_DRV(GPIO52, AF0, DS04X)
-> -#define GPIO51_CI_VSYNC ? ? ? ? ? ? ? ?MFP_CFG_DRV(GPIO51, AF0, DS04X)
-> ?#define GPIO49_CI_MCLK ? ? ? ? MFP_CFG_DRV(GPIO49, AF0, DS04X)
-> ?#define GPIO50_CI_PCLK ? ? ? ? MFP_CFG_DRV(GPIO50, AF0, DS04X)
-> +#define GPIO51_CI_HSYNC ? ? ? ? ? ? ? ?MFP_CFG_DRV(GPIO51, AF0, DS04X)
-> +#define GPIO52_CI_VSYNC ? ? ? ? ? ? ? ?MFP_CFG_DRV(GPIO52, AF0, DS04X)
+> diff --git a/arch/arm/plat-pxa/pwm.c b/arch/arm/plat-pxa/pwm.c
+> index 0732c6c..ef32686 100644
+> --- a/arch/arm/plat-pxa/pwm.c
+> +++ b/arch/arm/plat-pxa/pwm.c
+> @@ -176,7 +176,7 @@ static inline void __add_pwm(struct pwm_device *pwm)
 >
-> ?/* KEYPAD */
-> ?#define GPIO3_KP_DKIN_6 ? ? ? ? ? ? ? ?MFP_CFG_LPM(GPIO3, ? AF2, FLOAT)
+> ?static int __devinit pwm_probe(struct platform_device *pdev)
+> ?{
+> - ? ? ? struct platform_device_id *id = platform_get_device_id(pdev);
+> + ? ? ? const struct platform_device_id *id = platform_get_device_id(pdev);
+> ? ? ? ?struct pwm_device *pwm, *secondary = NULL;
+> ? ? ? ?struct resource *r;
+> ? ? ? ?int ret = 0;
 > --
-> 1.7.2
->
->
+> 1.7.1
 >
 >
