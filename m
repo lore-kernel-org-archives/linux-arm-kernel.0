@@ -1,71 +1,34 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 18 Aug 2010 23:13:15 +0200 (CEST)
-Subject: [PATCH v3] ARM: i.MX27 pcm970: Add camera support
-In-Reply-To: <20100818203352.GF15536@sirena.org.uk>
-References: <Pine.LNX.4.64.1008122224070.17224@axis700.grange>
-	<1281863312-16264-1-git-send-email-m.grzeschik@pengutronix.de>
-	<Pine.LNX.4.64.1008160018060.27810@axis700.grange>
-	<20100818203352.GF15536@sirena.org.uk>
-Message-ID: <Pine.LNX.4.64.1008182311530.17895@axis700.grange>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Aug 2010 22:44:40 +0100
+Subject: [regression] in linux-next: sh_mobile_ceu_camera broken by
+	"ARM: Prohibit ioremap() on kernel managed RAM"
+In-Reply-To: <Pine.LNX.4.64.1008182218150.17895@axis700.grange>
+References: <4C5ED116.5000002@arndnet.de>
+	<201008101045.03547.philippe.retornaz@epfl.ch>
+	<20100810092759.GB31759@n2100.arm.linux.org.uk>
+	<Pine.LNX.4.64.1008102117000.18934@axis700.grange>
+	<20100810212638.GC7702@n2100.arm.linux.org.uk>
+	<Pine.LNX.4.64.1008182107210.17895@axis700.grange>
+	<20100818194109.GA19126@n2100.arm.linux.org.uk>
+	<Pine.LNX.4.64.1008182218150.17895@axis700.grange>
+Message-ID: <20100818214440.GA22254@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Aug 2010, Mark Brown wrote:
+On Wed, Aug 18, 2010 at 10:31:10PM +0200, Guennadi Liakhovetski wrote:
+> On Wed, 18 Aug 2010, Russell King - ARM Linux wrote:
+> > Sounds like a sane approach to fixing this to me.
+> 
+> I assume, you mean adding a new flag to skip ioremap(). But then we have 
+> to pass the virtual address to the function. Its prototype is
+> 
+> int dma_declare_coherent_memory(struct device *dev, dma_addr_t bus_addr,
+> 				dma_addr_t device_addr, size_t size, int flags);
+> 
+> bus_addr is unused in this case, but I don't think abusing it to pass a 
+> "void *" would be an acceptable solution - apart from all the ugly 
+> type-casting, if we ever get 64-bit virtual addresses on ARM with 32-bit 
+> DMA addresses, we've got a problem. Or is this never going to happen? Or 
+> whould I rather add a new function?
 
-> On Wed, Aug 18, 2010 at 10:05:25PM +0200, Guennadi Liakhovetski wrote:
-> 
-> > 1. unbalanced regulator enable. IMHO, this is no exception to the general 
-> > enable / disable, alloc / free, lock / unlock etc. call balancing rule. If 
-> > your regulator has to stay enabled for the whole system run-time, you 
-> > don't have to (even try to) enable it multiple times. Please, either make 
-> > enabling / disabling symmetric, or leave only one enable in the 
-> > initialisation call.
-> 
-> If the regulator needs to be on all the time on a given board then
-> forcing this with always_on in the constraints is much more idiomatic
-> and straightforward.
-> 
-> > > +static int pcm970_camera_power_bus(struct device *dev, int toggle)
-> > > +{
-> > > +	struct regulator *regulator;
-> > > +
-> > > +	regulator = regulator_get(NULL, "imx_cam_vcc");
-> > > +	if (IS_ERR(regulator)) {
-> > > +		pr_err("unable to get regulator: %ld\n", PTR_ERR(regulator));
-> > > +		return -ENODEV;
-> > > +	} else {
-> > > +		if (!regulator_is_enabled(regulator) && toggle)
-> > > +			regulator_enable(regulator);
-> > > +	}
-> > > +	return 0;
-> > > +}
-> 
-> This is all very suspicious - your regulator_get() should be using the
-> struct device it was passed to look up the regulator by supply name
-> (probably "cam_vcc").  The regulator_is_enabled() call is going to break
-> if the supply is shared, too.
-> 
-> It all looks like something that I'd expect the camera driver to be
-> taking care of for itself, there's nothing board specific in here.
-> 
-> > > +	regulator = regulator_get(NULL, "imx_cam_vcc");
-> > > +	if (IS_ERR(regulator)) {
-> > > +		pr_err("unable to get regulator: %ld\n", PTR_ERR(regulator));
-> > > +		return -ENODEV;
-> > > +	} else if (!regulator_is_enabled(regulator)) {
-> > > +		regulator_enable(regulator);
-> > > +	}
-> 
-> Again, this looks like you need to add regulator support to the camera
-> driver.
-
-No, don't think so. This is a generic camera sensor, that can be attached 
-to any video-capable SoC or built into a USB webcam. It knows nothing 
-about where it's getting its power from.
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+A new function sounds saner.
