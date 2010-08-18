@@ -1,84 +1,46 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 18 Aug 2010 15:19:15 +0100
-Subject: [alsa-devel] [PATCH 1/3] ASoC: add 88pm860x codec driver
-In-Reply-To: <AANLkTimBPhvukwqDGY8iORhY+wg8OnHi9+eOedJB2E8k@mail.gmail.com>
-References: <AANLkTimBPhvukwqDGY8iORhY+wg8OnHi9+eOedJB2E8k@mail.gmail.com>
-Message-ID: <20100818141914.GC15536@sirena.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 18 Aug 2010 23:01:18 +0900
+Subject: [PATCH 08/14] ARM: S5PV310: Adds enable and ctrlbit for clk_vpllsrc
+In-Reply-To: <1282140084-10265-1-git-send-email-kgene.kim@samsung.com>
+References: <1282140084-10265-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1282140084-10265-9-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 18, 2010 at 09:49:26PM +0800, Haojian Zhuang wrote:
+From: Jongpill Lee <boyko.lee@samsung.com>
 
-> +		if (dac) {
-> +			/* automute is set before operating DAC. Anti-pop */
-> +			mutex_lock(&pm860x->mutex);
-> +			pm860x->automute = 1;
-> +			dac |= MODULATOR;
-> +			/* mute */
-> +			snd_soc_update_bits(codec, PM860X_DAC_OFFSET,
-> +					    DAC_MUTE, DAC_MUTE);
-> +			snd_soc_update_bits(codec, PM860X_EAR_CTRL_2,
-> +					    RSYNC_CHANGE, RSYNC_CHANGE);
-> +			mutex_unlock(&pm860x->mutex);
-> +			/* update dac */
-> +			snd_soc_update_bits(codec, PM860X_DAC_EN_2,
-> +					    dac, dac);
-> +		}
+This patch adds enable and ctrlbit for struct clksrc_clk clk_vpllsrc
 
+Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-s5pv310/clock.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-I still can't follow what this automute variable is supposed to be
-doing.  In both the PMU and the PMD cases you set automute, and the fact
-that you forcibly clear it when you apply the change means that it
-doesn't look like it's doing anything I'd recognise as automute,
-suggesting that the variable is misnamed.  It's very difficult to follow
-what all this is supposed to be doing.
-
-As I said last time what I'd expect to see is a user visible mute
-control which sets a variable in the driver which is then updated in the
-chip only while the DAC is powered.  The other option is to tie the
-control to the DAC power, in which case things should be handleable in
-the widget event without the variable.
-
-> +static int pm860x_digital_mute(struct snd_soc_dai *codec_dai, int mute)
-> +{
-> +	struct snd_soc_codec *codec = codec_dai->codec;
-> +	int data = 0;
-> +
-> +	if (mute)
-> +		data = DAC_MUTE;
-> +	snd_soc_update_bits(codec, PM860X_DAC_OFFSET, DAC_MUTE, data);
-
-This isn't joined up at all with the automute code above...
-
-> +	/* set master/slave audio interface */
-> +	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
-> +	case SND_SOC_DAIFMT_CBM_CFM:
-> +	case SND_SOC_DAIFMT_CBM_CFS:
-> +		if (pm860x->dir == PM860X_CLK_DIR_OUT) {
-> +			inf |= PCM_INF2_MASTER;
-> +			ret = 0;
-
-This is still setting the same register value for two different DAI
-formats.  You need to fix this, and in the other set_fmt() function.
-
-You're also missing a default: case.
-
-> +	if ((pm860x->det.hs_shrt & SND_JACK_BTN_0)
-> +		&& (shrt & (SHORT_HS1 | SHORT_HS2)))
-> +		report |= SND_JACK_BTN_0;
-> +
-> +	if ((pm860x->det.hook_det & SND_JACK_BTN_1)
-> +		&& (status & HOOK_STATUS))
-> +		report |= SND_JACK_BTN_1;
-> +
-> +	if ((pm860x->det.lo_shrt & SND_JACK_BTN_2)
-> +		&& (shrt & (SHORT_LO1 | SHORT_LO2)))
-> +		report |= SND_JACK_BTN_2;
-
-You should ideally allow the user to override these via platform data if
-the buttons have specific functions.
-
-One other thing you should do is split the jack configuration for
-headphone and microphone - a system may have two physical jacks, one for
-each, so you should allow the user to configure the detection onto
-separate jacks if they want to.
+diff --git a/arch/arm/mach-s5pv310/clock.c b/arch/arm/mach-s5pv310/clock.c
+index cc583c1..c3ee742 100644
+--- a/arch/arm/mach-s5pv310/clock.c
++++ b/arch/arm/mach-s5pv310/clock.c
+@@ -46,6 +46,11 @@ static struct clk clk_sclk_usbphy1 = {
+ 	.id		= -1,
+ };
+ 
++static int s5pv310_clksrc_mask_top_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(S5P_CLKSRC_MASK_TOP, clk, enable);
++}
++
+ /* Core list of CMU_CPU side */
+ 
+ static struct clksrc_clk clk_mout_apll = {
+@@ -216,6 +221,8 @@ static struct clksrc_clk clk_vpllsrc = {
+ 	.clk	= {
+ 		.name		= "vpll_src",
+ 		.id		= -1,
++		.enable		= s5pv310_clksrc_mask_top_ctrl,
++		.ctrlbit	= (1 << 0),
+ 	},
+ 	.sources	= &clkset_vpllsrc,
+ 	.reg_src	= { .reg = S5P_CLKSRC_TOP1, .shift = 0, .size = 1 },
+-- 
+1.6.2.5
