@@ -1,39 +1,68 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 18 Aug 2010 23:01:14 +0900
-Subject: [PATCH 04/14] ARM: S5PV310: Fix on PLL setting for S5PV310
+Date: Wed, 18 Aug 2010 23:01:11 +0900
+Subject: [PATCH 01/14] ARM: S5PV310: Adds clock addresses for S5PV310
 In-Reply-To: <1282140084-10265-1-git-send-email-kgene.kim@samsung.com>
 References: <1282140084-10265-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1282140084-10265-5-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1282140084-10265-2-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jongpill Lee <boyko.lee@samsung.com>
+This patch adds definition of clock address.
 
-This patch fixes on PLL setting for S5PV310/S5PC210.
-
-Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5pv310/clock.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-s5pv310/include/mach/regs-clock.h |   29 +++++++++++++++++++++-
+ 1 files changed, 27 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv310/clock.c b/arch/arm/mach-s5pv310/clock.c
-index d909515..c60d3b0 100644
---- a/arch/arm/mach-s5pv310/clock.c
-+++ b/arch/arm/mach-s5pv310/clock.c
-@@ -347,11 +347,11 @@ void __init_or_cpufreq s5pv310_setup_clocks(void)
- 	apll = s5p_get_pll45xx(xtal, __raw_readl(S5P_APLL_CON0), pll_4508);
- 	mpll = s5p_get_pll45xx(xtal, __raw_readl(S5P_MPLL_CON0), pll_4508);
- 	epll = s5p_get_pll46xx(xtal, __raw_readl(S5P_EPLL_CON0),
--				__raw_readl(S5P_EPLL_CON1), pll_4500);
-+				__raw_readl(S5P_EPLL_CON1), pll_4600);
+diff --git a/arch/arm/mach-s5pv310/include/mach/regs-clock.h b/arch/arm/mach-s5pv310/include/mach/regs-clock.h
+index 7727b45..eda07fd 100644
+--- a/arch/arm/mach-s5pv310/include/mach/regs-clock.h
++++ b/arch/arm/mach-s5pv310/include/mach/regs-clock.h
+@@ -26,11 +26,23 @@
  
- 	vpllsrc = clk_get_rate(&clk_vpllsrc.clk);
- 	vpll = s5p_get_pll46xx(vpllsrc, __raw_readl(S5P_VPLL_CON0),
--				__raw_readl(S5P_VPLL_CON1), pll_4502);
-+				__raw_readl(S5P_VPLL_CON1), pll_4650);
+ #define S5P_CLKSRC_TOP0			S5P_CLKREG(0x0C210)
+ #define S5P_CLKSRC_TOP1			S5P_CLKREG(0x0C214)
+-
++#define S5P_CLKSRC_CAM			S5P_CLKREG(0x0C220)
++#define S5P_CLKSRC_IMAGE		S5P_CLKREG(0x0C230)
++#define S5P_CLKSRC_LCD0			S5P_CLKREG(0x0C234)
++#define S5P_CLKSRC_LCD1			S5P_CLKREG(0x0C238)
++#define S5P_CLKSRC_FSYS			S5P_CLKREG(0x0C240)
+ #define S5P_CLKSRC_PERIL0		S5P_CLKREG(0x0C250)
++#define S5P_CLKSRC_PERIL1		S5P_CLKREG(0x0C254)
  
- 	clk_fout_apll.rate = apll;
- 	clk_fout_mpll.rate = mpll;
+ #define S5P_CLKDIV_TOP			S5P_CLKREG(0x0C510)
+-
++#define S5P_CLKDIV_CAM			S5P_CLKREG(0x0C520)
++#define S5P_CLKDIV_IMAGE		S5P_CLKREG(0x0C530)
++#define S5P_CLKDIV_LCD0			S5P_CLKREG(0x0C534)
++#define S5P_CLKDIV_LCD1			S5P_CLKREG(0x0C538)
++#define S5P_CLKDIV_FSYS0		S5P_CLKREG(0x0C540)
++#define S5P_CLKDIV_FSYS1		S5P_CLKREG(0x0C544)
++#define S5P_CLKDIV_FSYS2		S5P_CLKREG(0x0C548)
++#define S5P_CLKDIV_FSYS3		S5P_CLKREG(0x0C54C)
+ #define S5P_CLKDIV_PERIL0		S5P_CLKREG(0x0C550)
+ #define S5P_CLKDIV_PERIL1		S5P_CLKREG(0x0C554)
+ #define S5P_CLKDIV_PERIL2		S5P_CLKREG(0x0C558)
+@@ -38,6 +50,19 @@
+ #define S5P_CLKDIV_PERIL4		S5P_CLKREG(0x0C560)
+ #define S5P_CLKDIV_PERIL5		S5P_CLKREG(0x0C564)
+ 
++#define S5P_CLKSRC_MASK_TOP		S5P_CLKREG(0x0C310)
++#define S5P_CLKSRC_MASK_CAM		S5P_CLKREG(0x0C320)
++#define S5P_CLKSRC_MASK_LCD0		S5P_CLKREG(0x0C334)
++#define S5P_CLKSRC_MASK_LCD1		S5P_CLKREG(0x0C338)
++#define S5P_CLKSRC_MASK_FSYS		S5P_CLKREG(0x0C340)
++#define S5P_CLKSRC_MASK_PERIL0		S5P_CLKREG(0x0C350)
++#define S5P_CLKSRC_MASK_PERIL1		S5P_CLKREG(0x0C354)
++
++#define S5P_CLKGATE_IP_CAM		S5P_CLKREG(0x0C920)
++#define S5P_CLKGATE_IP_IMAGE		S5P_CLKREG(0x0C930)
++#define S5P_CLKGATE_IP_LCD0		S5P_CLKREG(0x0C934)
++#define S5P_CLKGATE_IP_LCD1		S5P_CLKREG(0x0C938)
++#define S5P_CLKGATE_IP_FSYS		S5P_CLKREG(0x0C940)
+ #define S5P_CLKGATE_IP_PERIL		S5P_CLKREG(0x0C950)
+ 
+ #define S5P_CLKSRC_CORE			S5P_CLKREG(0x10200)
 -- 
 1.6.2.5
