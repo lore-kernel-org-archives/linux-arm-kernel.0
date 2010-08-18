@@ -1,201 +1,81 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 18 Aug 2010 23:01:22 +0900
-Subject: [PATCH 12/14] ARM: S5PV310: Add various clocks
-In-Reply-To: <1282140084-10265-1-git-send-email-kgene.kim@samsung.com>
-References: <1282140084-10265-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1282140084-10265-13-git-send-email-kgene.kim@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 18 Aug 2010 15:40:27 +0100
+Subject: [alsa-devel] [PATCH 1/3] ASoC: add 88pm860x codec driver
+In-Reply-To: <AANLkTi=2FboP+xhSHjgyoM6LfmKw1khV62gTVrkxxUHF@mail.gmail.com>
+References: <AANLkTimBPhvukwqDGY8iORhY+wg8OnHi9+eOedJB2E8k@mail.gmail.com>
+	<20100818141914.GC15536@sirena.org.uk>
+	<AANLkTi=2FboP+xhSHjgyoM6LfmKw1khV62gTVrkxxUHF@mail.gmail.com>
+Message-ID: <20100818144027.GB4588@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jongpill Lee <boyko.lee@samsung.com>
+On Wed, Aug 18, 2010 at 10:33:19PM +0800, Haojian Zhuang wrote:
+> On Wed, Aug 18, 2010 at 10:19 PM, Mark Brown
 
-This patch adds clocks for S5PV310/S5PC210.
+> >
+> > I still can't follow what this automute variable is supposed to be
+> > doing. ?In both the PMU and the PMD cases you set automute, and the fact
+> > that you forcibly clear it when you apply the change means that it
+> > doesn't look like it's doing anything I'd recognise as automute,
+> > suggesting that the variable is misnamed. ?It's very difficult to follow
+> > what all this is supposed to be doing.
 
-Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-s5pv310/clock.c |  155 ++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 154 insertions(+), 1 deletions(-)
+> Mute while DAC is enabled and PGA is updated. It's the purpose of
+> anti-pop by silicon.
 
-diff --git a/arch/arm/mach-s5pv310/clock.c b/arch/arm/mach-s5pv310/clock.c
-index ec69edc..14c9707 100644
---- a/arch/arm/mach-s5pv310/clock.c
-+++ b/arch/arm/mach-s5pv310/clock.c
-@@ -61,6 +61,26 @@ static int s5pv310_clksrc_mask_peril0_ctrl(struct clk *clk, int enable)
- 	return s5p_gatectrl(S5P_CLKSRC_MASK_PERIL0, clk, enable);
- }
- 
-+static int s5pv310_clk_ip_cam_ctrl(struct clk *clk, int enable)
-+{
-+	return s5p_gatectrl(S5P_CLKGATE_IP_CAM, clk, enable);
-+}
-+
-+static int s5pv310_clk_ip_image_ctrl(struct clk *clk, int enable)
-+{
-+	return s5p_gatectrl(S5P_CLKGATE_IP_IMAGE, clk, enable);
-+}
-+
-+static int s5pv310_clk_ip_lcd0_ctrl(struct clk *clk, int enable)
-+{
-+	return s5p_gatectrl(S5P_CLKGATE_IP_LCD0, clk, enable);
-+}
-+
-+static int s5pv310_clk_ip_lcd1_ctrl(struct clk *clk, int enable)
-+{
-+	return s5p_gatectrl(S5P_CLKGATE_IP_LCD1, clk, enable);
-+}
-+
- static int s5pv310_clk_ip_fsys_ctrl(struct clk *clk, int enable)
- {
- 	return s5p_gatectrl(S5P_CLKGATE_IP_FSYS, clk, enable);
-@@ -275,6 +295,46 @@ static struct clk init_clocks_disable[] = {
- 		.enable		= s5pv310_clk_ip_peril_ctrl,
- 		.ctrlbit	= (1<<24),
- 	}, {
-+		.name		= "csis",
-+		.id		= 0,
-+		.enable		= s5pv310_clk_ip_cam_ctrl,
-+		.ctrlbit	= (1 << 4),
-+	}, {
-+		.name		= "csis",
-+		.id		= 1,
-+		.enable		= s5pv310_clk_ip_cam_ctrl,
-+		.ctrlbit	= (1 << 5),
-+	}, {
-+		.name		= "fimc",
-+		.id		= 0,
-+		.enable		= s5pv310_clk_ip_cam_ctrl,
-+		.ctrlbit	= (1 << 0),
-+	}, {
-+		.name		= "fimc",
-+		.id		= 1,
-+		.enable		= s5pv310_clk_ip_cam_ctrl,
-+		.ctrlbit	= (1 << 1),
-+	}, {
-+		.name		= "fimc",
-+		.id		= 2,
-+		.enable		= s5pv310_clk_ip_cam_ctrl,
-+		.ctrlbit	= (1 << 2),
-+	}, {
-+		.name		= "fimc",
-+		.id		= 3,
-+		.enable		= s5pv310_clk_ip_cam_ctrl,
-+		.ctrlbit	= (1 << 3),
-+	}, {
-+		.name		= "fimd",
-+		.id		= 0,
-+		.enable		= s5pv310_clk_ip_lcd0_ctrl,
-+		.ctrlbit	= (1 << 0),
-+	}, {
-+		.name		= "fimd",
-+		.id		= 1,
-+		.enable		= s5pv310_clk_ip_lcd1_ctrl,
-+		.ctrlbit	= (1 << 0),
-+	}, {
- 		.name		= "hsmmc",
- 		.id		= 0,
- 		.parent		= &clk_aclk_133.clk,
-@@ -304,7 +364,100 @@ static struct clk init_clocks_disable[] = {
- 		.parent		= &clk_aclk_133.clk,
- 		.enable		= s5pv310_clk_ip_fsys_ctrl,
- 		.ctrlbit	= (1 << 9),
--	}
-+	}, {
-+		.name		= "sata",
-+		.id		= -1,
-+		.enable		= s5pv310_clk_ip_fsys_ctrl,
-+		.ctrlbit	= (1 << 10),
-+	}, {
-+		.name		= "adc",
-+		.id		= -1,
-+		.enable		= s5pv310_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1 << 15),
-+	}, {
-+		.name		= "watchdog",
-+		.id		= -1,
-+		.enable		= s5pv310_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1 << 14),
-+	}, {
-+		.name		= "usbhost",
-+		.id		= -1,
-+		.enable		= s5pv310_clk_ip_fsys_ctrl ,
-+		.ctrlbit	= (1 << 12),
-+	}, {
-+		.name		= "otg",
-+		.id		= -1,
-+		.enable		= s5pv310_clk_ip_fsys_ctrl,
-+		.ctrlbit	= (1 << 13),
-+	}, {
-+		.name		= "spi",
-+		.id		= 0,
-+		.enable		= s5pv310_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1 << 16),
-+	}, {
-+		.name		= "spi",
-+		.id		= 1,
-+		.enable		= s5pv310_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1 << 17),
-+	}, {
-+		.name		= "spi",
-+		.id		= 2,
-+		.enable		= s5pv310_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1 << 18),
-+	}, {
-+		.name		= "fimg2d",
-+		.id		= -1,
-+		.enable		= s5pv310_clk_ip_image_ctrl,
-+		.ctrlbit	= (1 << 0),
-+	}, {
-+		.name		= "i2c",
-+		.id		= 0,
-+		.parent		= &clk_aclk_100.clk,
-+		.enable		= s5pv310_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1 << 6),
-+	}, {
-+		.name		= "i2c",
-+		.id		= 1,
-+		.parent		= &clk_aclk_100.clk,
-+		.enable		= s5pv310_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1 << 7),
-+	}, {
-+		.name		= "i2c",
-+		.id		= 2,
-+		.parent		= &clk_aclk_100.clk,
-+		.enable		= s5pv310_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1 << 8),
-+	}, {
-+		.name		= "i2c",
-+		.id		= 3,
-+		.parent		= &clk_aclk_100.clk,
-+		.enable		= s5pv310_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1 << 9),
-+	}, {
-+		.name		= "i2c",
-+		.id		= 4,
-+		.parent		= &clk_aclk_100.clk,
-+		.enable		= s5pv310_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1 << 10),
-+	}, {
-+		.name		= "i2c",
-+		.id		= 5,
-+		.parent		= &clk_aclk_100.clk,
-+		.enable		= s5pv310_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1 << 11),
-+	}, {
-+		.name		= "i2c",
-+		.id		= 6,
-+		.parent		= &clk_aclk_100.clk,
-+		.enable		= s5pv310_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1 << 12),
-+	}, {
-+		.name		= "i2c",
-+		.id		= 7,
-+		.parent		= &clk_aclk_100.clk,
-+		.enable		= s5pv310_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1 << 13),
-+	},
- };
- 
- static struct clk init_clocks[] = {
--- 
-1.6.2.5
+This behaviour is entirely non-obvious from the code.  Please improve
+the documentation within the code so that someone reading the code can
+tell what it's supposed to do.  This will allow the code to be reviewed,
+it certainly seems buggy in relation to the DAI mute operation at the
+minute.
+
+> > As I said last time what I'd expect to see is a user visible mute
+> > control which sets a variable in the driver which is then updated in the
+> > chip only while the DAC is powered. ?The other option is to tie the
+> > control to the DAC power, in which case things should be handleable in
+> > the widget event without the variable.
+
+> Why should I move the work to invoking amixer by user? Why shouldn't
+> it be taken by driver automatically?
+
+Either of my suggestions would leave the workaround transparent to the
+user.  The first suggestion will provide additional control to the user
+but will still hide the workaround from them.
+
+> >> + ? ? switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
+> >> + ? ? case SND_SOC_DAIFMT_CBM_CFM:
+> >> + ? ? case SND_SOC_DAIFMT_CBM_CFS:
+> >> + ? ? ? ? ? ? if (pm860x->dir == PM860X_CLK_DIR_OUT) {
+> >> + ? ? ? ? ? ? ? ? ? ? inf |= PCM_INF2_MASTER;
+> >> + ? ? ? ? ? ? ? ? ? ? ret = 0;
+
+> > This is still setting the same register value for two different DAI
+> > formats. ?You need to fix this, and in the other set_fmt() function.
+
+> These two registers are EXACTLY same. Why do I need to define two same
+> bit macro?
+
+You need to validate the arguments you're being passed.  If your driver
+reports that it successfully set _CFS and really it set the hardware
+into _CFM then the system isn't going to work as expected.  
+
+> > You're also missing a default: case.
+
+> Please check the code. If it's default case, it'll return -EINVAL. I
+> didn't miss it.
+
+No, that's not the case.  Your error handling strategy here is
+problematic - if any one of the parameters set is correct (eg, the
+format mask sets I2S) then ret will be reset to zero and you'll return
+success.
+
+> > One other thing you should do is split the jack configuration for
+> > headphone and microphone - a system may have two physical jacks, one for
+> > each, so you should allow the user to configure the detection onto
+> > separate jacks if they want to.
+
+> Up to now, I can't split it to two different jacks. Since there's some
+> issue on mic detection.
+
+You can do this in software even if the individual board designs you're
+using don't have any separation.
