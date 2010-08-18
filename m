@@ -1,74 +1,72 @@
 From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Wed, 18 Aug 2010 17:56:45 +0200
-Subject: [PATCH 2/2] mx35_3ds: add usb host2 support
-In-Reply-To: <1282147005-4358-1-git-send-email-m.grzeschik@pengutronix.de>
-References: <1282147005-4358-1-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <1282147005-4358-3-git-send-email-m.grzeschik@pengutronix.de>
+Date: Wed, 18 Aug 2010 18:20:24 +0200
+Subject: [PATCH|RESEND 1/2] mx35_3ds: add physmap-flash NOR at CS0
+In-Reply-To: <1282146406-2901-2-git-send-email-m.grzeschik@pengutronix.de>
+References: <1282146406-2901-2-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <1282148424-8769-1-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Kleine-Budde <mkl@pengutronix.de>
 
-we still have to toggle two pins on the mc9sdz60:
-
-/* MUX3_CTR to be low for USB Host2 DP&DM */
-pmic_gpio_set_bit_val(MCU_GPIO_REG_GPIO_CONTROL_2, 6, 0);
-
-/* CAN_PWDN to be high for USB Host2 Power&OC */
-pmic_gpio_set_bit_val(MCU_GPIO_REG_GPIO_CONTROL_2, 1, 1);
-
-until we've a proper driver for the mx9sdz60 in linux we'll do this in
-barebox (a.k.a. u-boot-v2)
+The mx35_3ds comes with 64 MiByte for NOR flash at CS0, add physmap-flash
+platform device for it.
 
 Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
 ---
- arch/arm/mach-mx3/mach-mx35_3ds.c |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx3/mach-mx35_3ds.c |   24 ++++++++++++++++++++++++
+ 1 files changed, 24 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-mx3/mach-mx35_3ds.c b/arch/arm/mach-mx3/mach-mx35_3ds.c
-index ae0f17c..1dd7baa 100644
+index 1c30d72..73149b8 100644
 --- a/arch/arm/mach-mx3/mach-mx35_3ds.c
 +++ b/arch/arm/mach-mx3/mach-mx35_3ds.c
-@@ -38,6 +38,7 @@
- #include <mach/hardware.h>
- #include <mach/common.h>
- #include <mach/iomux-mx35.h>
-+#include <mach/mxc_ehci.h>
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright 2009 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright (C) 2009 Marc Kleine-Budde, Pengutronix
+  *
+  * Author: Fabio Estevam <fabio.estevam@freescale.com>
+  *
+@@ -27,6 +28,8 @@
+ #include <linux/gpio.h>
+ #include <linux/fsl_devices.h>
  
- #include "devices-imx35.h"
- #include "devices.h"
-@@ -105,6 +106,9 @@ static struct pad_desc mx35pdk_pads[] = {
- 	/* USBOTG */
- 	MX35_PAD_USBOTG_PWR__USB_TOP_USBOTG_PWR,
- 	MX35_PAD_USBOTG_OC__USB_TOP_USBOTG_OC,
-+	/* USBH1 */
-+	MX35_PAD_I2C2_CLK__USB_TOP_USBH2_PWR,
-+	MX35_PAD_I2C2_DAT__USB_TOP_USBH2_OC,
++#include <linux/mtd/physmap.h>
++
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+@@ -43,8 +46,29 @@ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
  };
  
- /* OTG config */
-@@ -113,6 +117,13 @@ static struct fsl_usb2_platform_data usb_otg_pdata = {
- 	.phy_mode	= FSL_USB2_PHY_UTMI_WIDE,
- };
- 
-+/* USB HOST config */
-+static struct mxc_usbh_platform_data usb_host_pdata = {
-+	.portsc		= MXC_EHCI_MODE_SERIAL,
-+	.flags		= MXC_EHCI_INTERFACE_SINGLE_UNI |
-+			  MXC_EHCI_INTERNAL_PHY,
++static struct physmap_flash_data mx35pdk_flash_data = {
++	.width  = 2,
 +};
 +
- /*
-  * Board specific initialization.
-  */
-@@ -126,6 +137,8 @@ static void __init mxc_board_init(void)
- 
- 	mxc_register_device(&mxc_otg_udc_device, &usb_otg_pdata);
- 
-+	mxc_register_device(&mxc_usbh1, &usb_host_pdata);
++static struct resource mx35pdk_flash_resource = {
++	.start	= MX35_CS0_BASE_ADDR,
++	.end	= MX35_CS0_BASE_ADDR + SZ_64M - 1,
++	.flags	= IORESOURCE_MEM,
++};
 +
- 	imx35_add_mxc_nand(&mx35pdk_nand_board_info);
- }
++static struct platform_device mx35pdk_flash = {
++	.name	= "physmap-flash",
++	.id	= 0,
++	.dev	= {
++		.platform_data  = &mx35pdk_flash_data,
++	},
++	.resource = &mx35pdk_flash_resource,
++	.num_resources = 1,
++};
++
+ static struct platform_device *devices[] __initdata = {
+ 	&mxc_fec_device,
++	&mx35pdk_flash,
+ };
  
+ static struct pad_desc mx35pdk_pads[] = {
 -- 
 1.7.1
