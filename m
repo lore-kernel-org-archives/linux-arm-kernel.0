@@ -1,33 +1,32 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Wed, 18 Aug 2010 16:04:40 +0200
-Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
-In-Reply-To: <201008171336.29375.arnd@arndb.de>
-References: <cover.1281956490.git.richard.cochran@omicron.at>
-	<201008170925.55592.arnd@arndb.de>
-	<20100817105232.GA9079@riccoc20.at.omicron.at>
-	<201008171336.29375.arnd@arndb.de>
-Message-ID: <20100818140440.GA22655@riccoc20.at.omicron.at>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Wed, 18 Aug 2010 15:06:59 +0100
+Subject: [PATCH 2/3] ASoC: add tavorevb3 machine driver for 88pm860x
+In-Reply-To: <AANLkTi=o7+GtXz1ZxuLJiYkREpMB=RPckig95FQrSqLd@mail.gmail.com>
+References: <AANLkTi=o7+GtXz1ZxuLJiYkREpMB=RPckig95FQrSqLd@mail.gmail.com>
+Message-ID: <1282140419.3117.465.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 17, 2010 at 01:36:29PM +0200, Arnd Bergmann wrote:
-> On Tuesday 17 August 2010, Richard Cochran wrote:
-> > I've been looking at offering the PTP clock as a posix clock, and it
-> > is not as hard as I first thought. The PTP clock or clocks just have
-> > to be registered as one of the posix_clocks[MAX_CLOCKS] in
-> > posix-timers.c.
+On Wed, 2010-08-18 at 21:49 +0800, Haojian Zhuang wrote:
+> >From 114a6f2d4629b0bbff4c4ce9b4a633ddf7e25498 Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Tue, 17 Aug 2010 13:24:35 +0800
+> Subject: [PATCH 2/3] ASoC: add tavorevb3 machine driver for 88pm860x
 > 
-> Ok sounds good.
+> 88PM860x codec is used in Marvell tavorevb3 development board. 88PM860x
+> codec is used as master mode of SSP communication. Only I2S format is
+> supported.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> ---
+>  sound/soc/pxa/Kconfig      |    9 +
+>  sound/soc/pxa/Makefile     |    2 +
+>  sound/soc/pxa/pxa2xx-ssp.c |  532 ++++++++++++++++++++++++++++++++++++++++++++
+>  sound/soc/pxa/pxa2xx-ssp.h |   59 +++++
+>  sound/soc/pxa/ssp.c        |  298 +++++++++++++++++++++++++
 
-I've been working turning the PTP stuff into syscalls, but here is a
-little issue I ran into. The PTP clock layer wants to call the PPS
-code via pps_register_source(), but the PPS can be compiled as a
-module. Since the PTP layer is now offering syscalls, it must always
-be present in the kernel. So I need to make sure that the PPS is
-either absent entirely or staticly linked in.
+I dont think you meant to include the SSP driver.
 
-How can I do this?
+Thanks
 
-Thanks,
-
-Richard
+Liam
