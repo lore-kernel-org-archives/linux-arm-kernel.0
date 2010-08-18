@@ -1,57 +1,54 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 18 Aug 2010 21:33:52 +0100
-Subject: [PATCH v3] ARM: i.MX27 pcm970: Add camera support
-In-Reply-To: <Pine.LNX.4.64.1008160018060.27810@axis700.grange>
-References: <Pine.LNX.4.64.1008122224070.17224@axis700.grange>
-	<1281863312-16264-1-git-send-email-m.grzeschik@pengutronix.de>
-	<Pine.LNX.4.64.1008160018060.27810@axis700.grange>
-Message-ID: <20100818203352.GF15536@sirena.org.uk>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Wed, 18 Aug 2010 22:44:34 +0200
+Subject: [PATCH net-next-2.6] atm: remove a net_device_stats clear
+In-Reply-To: <20100818.131043.226780154.davem@davemloft.net>
+References: <1282061719-19645-1-git-send-email-tklauser@distanz.ch>
+	<1282115064-3701-1-git-send-email-tklauser@distanz.ch>
+	<20100818083304.2ef2eea4@nehalam>
+	<20100818.131043.226780154.davem@davemloft.net>
+Message-ID: <1282164274.2328.2.camel@edumazet-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 18, 2010 at 10:05:25PM +0200, Guennadi Liakhovetski wrote:
+Le mercredi 18 ao?t 2010 ? 13:10 -0700, David Miller a ?crit :
+> From: Stephen Hemminger <shemminger@vyatta.com>
+> Date: Wed, 18 Aug 2010 08:33:04 -0700
+> 
+> > On Wed, 18 Aug 2010 09:04:24 +0200
+> > Tobias Klauser <tklauser@distanz.ch> wrote:
+> > 
+> >>  
+> >> -	memset (&priv(dev)->stats, 0, sizeof (struct net_device_stats));
+> >> +	memset(&dev->stats, 0, sizeof(struct net_device_stats));
+> > 
+> > This is incorrect, just remove the memset.  The stats are initialized
+> > when device is created.  The Linux device driver convention is to
+> > keep stats when device is set down and brought back up; that is what
+> > the majority of other drivers do.
+> 
+> Yep, both the ether1 and ether3 patch have this problem.  Looks
+> like we'll see v4 coming some :-)
 
-> 1. unbalanced regulator enable. IMHO, this is no exception to the general 
-> enable / disable, alloc / free, lock / unlock etc. call balancing rule. If 
-> your regulator has to stay enabled for the whole system run-time, you 
-> don't have to (even try to) enable it multiple times. Please, either make 
-> enabling / disabling symmetric, or leave only one enable in the 
-> initialisation call.
+To be fair, we accepted some bits like that in the past ;)
 
-If the regulator needs to be on all the time on a given board then
-forcing this with always_on in the constraints is much more idiomatic
-and straightforward.
+[PATCH net-next-2.6] atm: remove a net_device_stats clear
 
-> > +static int pcm970_camera_power_bus(struct device *dev, int toggle)
-> > +{
-> > +	struct regulator *regulator;
-> > +
-> > +	regulator = regulator_get(NULL, "imx_cam_vcc");
-> > +	if (IS_ERR(regulator)) {
-> > +		pr_err("unable to get regulator: %ld\n", PTR_ERR(regulator));
-> > +		return -ENODEV;
-> > +	} else {
-> > +		if (!regulator_is_enabled(regulator) && toggle)
-> > +			regulator_enable(regulator);
-> > +	}
-> > +	return 0;
-> > +}
+No need to clear device stats in lec_open()
 
-This is all very suspicious - your regulator_get() should be using the
-struct device it was passed to look up the regulator by supply name
-(probably "cam_vcc").  The regulator_is_enabled() call is going to break
-if the supply is shared, too.
+Signed-off-by: Eric Dumazet <eric.dumazet@gmail.com>
+---
+net/atm/lec.c |    1 -
+1 file changed, 1 deletion(-)
 
-It all looks like something that I'd expect the camera driver to be
-taking care of for itself, there's nothing board specific in here.
-
-> > +	regulator = regulator_get(NULL, "imx_cam_vcc");
-> > +	if (IS_ERR(regulator)) {
-> > +		pr_err("unable to get regulator: %ld\n", PTR_ERR(regulator));
-> > +		return -ENODEV;
-> > +	} else if (!regulator_is_enabled(regulator)) {
-> > +		regulator_enable(regulator);
-> > +	}
-
-Again, this looks like you need to add regulator support to the camera
-driver.
+diff --git a/net/atm/lec.c b/net/atm/lec.c
+index d98bde1..181d70c 100644
+--- a/net/atm/lec.c
++++ b/net/atm/lec.c
+@@ -220,7 +220,6 @@ static unsigned char *get_tr_dst(unsigned char *packet, unsigned char *rdesc)
+ static int lec_open(struct net_device *dev)
+ {
+ 	netif_start_queue(dev);
+-	memset(&dev->stats, 0, sizeof(struct net_device_stats));
+ 
+ 	return 0;
+ }
