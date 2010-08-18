@@ -1,60 +1,37 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 18 Aug 2010 14:15:52 +0800
-Subject: [PATCH] PXA: Fix wakealarm capability for pxa-rtc
-In-Reply-To: <201008180704.49612.marek.vasut@gmail.com>
-References: <1280550147-12380-1-git-send-email-marek.vasut@gmail.com>
-	<871vaaycz0.fsf@free.fr>
-	<AANLkTikkfq_Wd=XKqVREG50q=+2pbPij3EhtnJ7nsfRM@mail.gmail.com>
-	<201008180704.49612.marek.vasut@gmail.com>
-Message-ID: <AANLkTiky9zdHwhpPevBUvRNMoCz3qabmoDMVeFz8K0fE@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 18 Aug 2010 01:18:43 -0500
+Subject: [PATCH] arm: tegra: fix compilation of board-harmony.c
+Message-ID: <20100818061843.GA32043@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 18, 2010 at 1:04 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Dne St 18. srpna 2010 06:08:44 Eric Miao napsal(a):
->> On Sat, Aug 7, 2010 at 5:43 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
->> > Alessandro Zummo <a.zummo@towertech.it> writes:
->> >> On Tue, 3 Aug 2010 05:10:03 +0200
->> >>
->> >> Marek Vasut <marek.vasut@gmail.com> wrote:
->> >>> > ?may I see the latest version of your patch, Marek?
->> >>> >
->> >>> > ?ty
->> >>>
->> >>> ---
->> >>> ?drivers/rtc/rtc-pxa.c | ? ?4 ++--
->> >>> ?1 files changed, 2 insertions(+), 2 deletions(-)
->> >>
->> >> ?well, if it's ok for Robert...
->> >
->> > Yes, I already gave my ack in [1].
->> >
->> > As I'm still on holidays, I won't be available for a couple of days
->> > again, so take it granted that IMO Marek's patch can go in your tree and
->> > that it has my full aggreement. Thanks.
->>
->> Hi Alessandro,
->>
->> Cann't find this in -next so far, the patch looks correct to me. We did
->> the same thing for rtc-sa1100.c before. So you also have my Ack on
->> this if it's not yet in your tree.
->
-> If you want, I can put this patch it into next pull rq for pxa-linux-2.6 towards
-> you, Eric ? Maybe it should go through fix though.
->
+The patch "ARM: Remove DISCONTIGMEM support" removed the node id from
+the meminfo struct and the PHYS_TO_NID macro, causing compilation errors:
 
-I'd prefer Alessandro merge this.
+arch/arm/mach-tegra/board-harmony.c: In function 'tegra_harmony_fixup':
+arch/arm/mach-tegra/board-harmony.c:94: error: 'struct membank' has no member named 'node'
+arch/arm/mach-tegra/board-harmony.c:94: error: implicit declaration of function 'PHYS_TO_NID'
+arch/arm/mach-tegra/board-harmony.c:97: error: 'struct membank' has no member named 'node'
 
-> Btw. Eric, could you please sync devel with mainline? Also, did you push your -
-> fix?
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/mach-tegra/board-harmony.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-I'll do it soon.
-
->
-> Thanks, Cheers!
->>
->> > --
->> > Robert
->> >
->> > [1] http://www.spinics.net/lists/arm-kernel/msg94818.html
->
+diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
+index 05e78dd..9e305de 100644
+--- a/arch/arm/mach-tegra/board-harmony.c
++++ b/arch/arm/mach-tegra/board-harmony.c
+@@ -91,10 +91,8 @@ static void __init tegra_harmony_fixup(struct machine_desc *desc,
+ {
+ 	mi->nr_banks = 2;
+ 	mi->bank[0].start = PHYS_OFFSET;
+-	mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
+ 	mi->bank[0].size = 448 * SZ_1M;
+ 	mi->bank[1].start = SZ_512M;
+-	mi->bank[1].node = PHYS_TO_NID(SZ_512M);
+ 	mi->bank[1].size = SZ_512M;
+ }
+ 
+-- 
+1.5.6.5
