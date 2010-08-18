@@ -1,33 +1,139 @@
 From: tklauser@distanz.ch (Tobias Klauser)
-Date: Wed, 18 Aug 2010 10:33:35 +0200
-Subject: [PATCH v2] ether1: Use net_device_stats from struct net_device
-In-Reply-To: <1282120073.2194.40.camel@edumazet-laptop>
+Date: Wed, 18 Aug 2010 10:45:51 +0200
+Subject: [PATCH v3] ether1: Use net_device_stats from struct net_device
+In-Reply-To: <1282061719-19645-1-git-send-email-tklauser@distanz.ch>
 References: <1282061719-19645-1-git-send-email-tklauser@distanz.ch>
-	<1282115064-3701-1-git-send-email-tklauser@distanz.ch>
-	<20100818081306.GA9149@n2100.arm.linux.org.uk>
-	<1282120073.2194.40.camel@edumazet-laptop>
-Message-ID: <20100818083335.GH15670@distanz.ch>
+Message-ID: <1282121151-7481-1-git-send-email-tklauser@distanz.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2010-08-18 at 10:27:53 +0200, Eric Dumazet <eric.dumazet@gmail.com> wrote:
-> Le mercredi 18 ao?t 2010 ? 09:13 +0100, Russell King - ARM Linux a
-> ?crit :
-> > On Wed, Aug 18, 2010 at 09:04:24AM +0200, Tobias Klauser wrote:
-> > > @@ -965,7 +965,7 @@ ether1_close (struct net_device *dev)
-> > >  static struct net_device_stats *
-> > >  ether1_getstats (struct net_device *dev)
-> > >  {
-> > > -	return &priv(dev)->stats;
-> > > +	return &dev->stats;
-> > >  }
-> > 
-> > Doesn't the core do this for you already if you omit this function?
-> > 
-> > Same comment for ether3.c
-> 
-> Yes, thats right, no need to declare ndo_get_stats() methods that only
-> returns &dev->stats
+struct net_device has its own struct net_device_stats member, so use
+this one instead of a private copy in the ether1_priv struct. As the new
+ndo_get_stats function would just return dev->stats we can omit it.
 
-Thanks. I'll send another updated patch, omitting the ether1_getstats
-(same for ether3). Sorry for the mess.
+Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+---
+ drivers/net/arm/ether1.c |   34 +++++++++++++---------------------
+ drivers/net/arm/ether1.h |    1 -
+ 2 files changed, 13 insertions(+), 22 deletions(-)
+
+diff --git a/drivers/net/arm/ether1.c b/drivers/net/arm/ether1.c
+index b17ab51..ad90447 100644
+--- a/drivers/net/arm/ether1.c
++++ b/drivers/net/arm/ether1.c
+@@ -68,7 +68,6 @@ static int ether1_open(struct net_device *dev);
+ static int ether1_sendpacket(struct sk_buff *skb, struct net_device *dev);
+ static irqreturn_t ether1_interrupt(int irq, void *dev_id);
+ static int ether1_close(struct net_device *dev);
+-static struct net_device_stats *ether1_getstats(struct net_device *dev);
+ static void ether1_setmulticastlist(struct net_device *dev);
+ static void ether1_timeout(struct net_device *dev);
+ 
+@@ -649,7 +648,7 @@ ether1_open (struct net_device *dev)
+ 	if (request_irq(dev->irq, ether1_interrupt, 0, "ether1", dev))
+ 		return -EAGAIN;
+ 
+-	memset (&priv(dev)->stats, 0, sizeof (struct net_device_stats));
++	memset(&dev->stats, 0, sizeof(struct net_device_stats));
+ 
+ 	if (ether1_init_for_open (dev)) {
+ 		free_irq (dev->irq, dev);
+@@ -673,7 +672,7 @@ ether1_timeout(struct net_device *dev)
+ 	if (ether1_init_for_open (dev))
+ 		printk (KERN_ERR "%s: unable to restart interface\n", dev->name);
+ 
+-	priv(dev)->stats.tx_errors++;
++	dev->stats.tx_errors++;
+ 	netif_wake_queue(dev);
+ }
+ 
+@@ -802,21 +801,21 @@ again:
+ 
+ 	while (nop.nop_status & STAT_COMPLETE) {
+ 		if (nop.nop_status & STAT_OK) {
+-			priv(dev)->stats.tx_packets ++;
+-			priv(dev)->stats.collisions += (nop.nop_status & STAT_COLLISIONS);
++			dev->stats.tx_packets++;
++			dev->stats.collisions += (nop.nop_status & STAT_COLLISIONS);
+ 		} else {
+-			priv(dev)->stats.tx_errors ++;
++			dev->stats.tx_errors++;
+ 
+ 			if (nop.nop_status & STAT_COLLAFTERTX)
+-				priv(dev)->stats.collisions ++;
++				dev->stats.collisions++;
+ 			if (nop.nop_status & STAT_NOCARRIER)
+-				priv(dev)->stats.tx_carrier_errors ++;
++				dev->stats.tx_carrier_errors++;
+ 			if (nop.nop_status & STAT_TXLOSTCTS)
+ 				printk (KERN_WARNING "%s: cts lost\n", dev->name);
+ 			if (nop.nop_status & STAT_TXSLOWDMA)
+-				priv(dev)->stats.tx_fifo_errors ++;
++				dev->stats.tx_fifo_errors++;
+ 			if (nop.nop_status & STAT_COLLEXCESSIVE)
+-				priv(dev)->stats.collisions += 16;
++				dev->stats.collisions += 16;
+ 		}
+ 
+ 		if (nop.nop_link == caddr) {
+@@ -879,13 +878,13 @@ ether1_recv_done (struct net_device *dev)
+ 
+ 				skb->protocol = eth_type_trans (skb, dev);
+ 				netif_rx (skb);
+-				priv(dev)->stats.rx_packets ++;
++				dev->stats.rx_packets++;
+ 			} else
+-				priv(dev)->stats.rx_dropped ++;
++				dev->stats.rx_dropped++;
+ 		} else {
+ 			printk(KERN_WARNING "%s: %s\n", dev->name,
+ 				(rbd.rbd_status & RBD_EOF) ? "oversized packet" : "acnt not valid");
+-			priv(dev)->stats.rx_dropped ++;
++			dev->stats.rx_dropped++;
+ 		}
+ 
+ 		nexttail = ether1_readw(dev, priv(dev)->rx_tail, rfd_t, rfd_link, NORMALIRQS);
+@@ -939,7 +938,7 @@ ether1_interrupt (int irq, void *dev_id)
+ 				printk (KERN_WARNING "%s: RU went not ready: RU suspended\n", dev->name);
+ 				ether1_writew(dev, SCB_CMDRXRESUME, SCB_ADDR, scb_t, scb_command, NORMALIRQS);
+ 				writeb(CTRL_CA, REG_CONTROL);
+-				priv(dev)->stats.rx_dropped ++;	/* we suspended due to lack of buffer space */
++				dev->stats.rx_dropped++;	/* we suspended due to lack of buffer space */
+ 			} else
+ 				printk(KERN_WARNING "%s: RU went not ready: %04X\n", dev->name,
+ 					ether1_readw(dev, SCB_ADDR, scb_t, scb_status, NORMALIRQS));
+@@ -962,12 +961,6 @@ ether1_close (struct net_device *dev)
+ 	return 0;
+ }
+ 
+-static struct net_device_stats *
+-ether1_getstats (struct net_device *dev)
+-{
+-	return &priv(dev)->stats;
+-}
+-
+ /*
+  * Set or clear the multicast filter for this adaptor.
+  * num_addrs == -1	Promiscuous mode, receive all packets.
+@@ -994,7 +987,6 @@ static const struct net_device_ops ether1_netdev_ops = {
+ 	.ndo_open		= ether1_open,
+ 	.ndo_stop		= ether1_close,
+ 	.ndo_start_xmit		= ether1_sendpacket,
+-	.ndo_get_stats		= ether1_getstats,
+ 	.ndo_set_multicast_list	= ether1_setmulticastlist,
+ 	.ndo_tx_timeout		= ether1_timeout,
+ 	.ndo_validate_addr	= eth_validate_addr,
+diff --git a/drivers/net/arm/ether1.h b/drivers/net/arm/ether1.h
+index c8a4b23..3a5830a 100644
+--- a/drivers/net/arm/ether1.h
++++ b/drivers/net/arm/ether1.h
+@@ -38,7 +38,6 @@
+ 
+ struct ether1_priv {
+ 	void __iomem *base;
+-	struct net_device_stats stats;
+ 	unsigned int tx_link;
+ 	unsigned int tx_head;
+ 	volatile unsigned int tx_tail;
+-- 
+1.7.0.4
