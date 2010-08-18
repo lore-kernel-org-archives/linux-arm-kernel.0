@@ -1,33 +1,42 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Wed, 18 Aug 2010 02:47:37 +0200
-Subject: [PATCH] watchdog: Enable NXP LPC32XX support in Kconfig
-In-Reply-To: <20100817204107.GA19076@pengutronix.de>
-References: <AANLkTi=AiByTGvvvN_LACKLjW3TG6T2kmwKofpMmRdmz@mail.gmail.com>
-	<083DF309106F364B939360100EC290F80ACF617DC8@eu1rdcrdc1wx030.exi.nxp.com>
-	<20100817204107.GA19076@pengutronix.de>
-Message-ID: <083DF309106F364B939360100EC290F80ACF617DFC@eu1rdcrdc1wx030.exi.nxp.com>
+From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
+Date: Tue, 17 Aug 2010 21:05:00 -0400
+Subject: [RFC PATCH 01/20] Create generic alignment API (v8)
+In-Reply-To: <20100818000056.GA5874@shutemov.name>
+References: <20100817231619.277457797@efficios.com>
+	<20100817232150.251244768@efficios.com>
+	<20100818000056.GA5874@shutemov.name>
+Message-ID: <20100818010500.GA2116@Krystal>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Kirill A. Shutemov (kirill at shutemov.name) wrote:
+> > Index: linux.trees.git/include/linux/align.h
+> > ===================================================================
+> > --- /dev/null	1970-01-01 00:00:00.000000000 +0000
+> > +++ linux.trees.git/include/linux/align.h	2010-08-17 16:31:50.000000000 -0400
+> > @@ -0,0 +1,56 @@
+> > +#ifndef _LINUX_ALIGN_H
+> > +#define _LINUX_ALIGN_H
+> > +
+> > +#define __ALIGN_KERNEL(x, a)	__ALIGN_KERNEL_MASK((x), (typeof(x))(a) - 1)
+>                                                     ^^^
+> Unnecessary braces. And many below.
 
-> 
-> On Tue, Aug 17, 2010 at 09:31:57PM +0200, Kevin Wells wrote:
-> > It's been a few weeks since I've posted this.
-> > Have I placed this in the correct mailing list?
-> 
-> Oops, I just noticed, Wim (watchdog maintainer) is not on CC. Maybe you
-> should resend it with my ack and Wim in CC. You might also check the
-> get_maintainers.pl-script to assist you in who to cc.
-> 
+Good catch, thanks !
 
-Thanks for that great tip. It's re-sent with the correct list now.
+I also found some in:
 
-> Kind regards,
-> 
->    Wolfram
-> 
-> --
-> Pengutronix e.K.                           | Wolfram Sang
-> |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/
-> |
+Ring buffer backend
+Ring buffer frontend
+
+patches. I fixed them already, they should be OK in the next round.
+
+Thanks,
+
+Mathieu
+
+-- 
+Mathieu Desnoyers
+Operating System Efficiency R&D Consultant
+EfficiOS Inc.
+http://www.efficios.com
