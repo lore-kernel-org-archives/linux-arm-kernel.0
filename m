@@ -1,80 +1,46 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 17 Aug 2010 22:15:29 -0600
-Subject: [PATCH] SPI: remove superfluous DMA buffer syncs on PL022
-In-Reply-To: <1282082924-25809-1-git-send-email-linus.walleij@stericsson.com>
-References: <1282082924-25809-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <AANLkTi=T89ZZo0m2hYaW9dJ7MKd9GLEDVZpcqZ-3RcNq@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 18 Aug 2010 12:20:27 +0800
+Subject: [PATCH] pxa: fix CI_HSYNC and CI_VSYNC MFP defines
+In-Reply-To: <1281670747.13407.2.camel@mola>
+References: <1281670747.13407.2.camel@mola>
+Message-ID: <AANLkTimUqRMjZ735CuwAHWGrkAakQG+JPiX6Rc=9gS1R@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 17, 2010 at 4:08 PM, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
-> This removes the superfluous DMA buffer syncs identified by Russell
-> in the DMA support for PL022.
+On Fri, Aug 13, 2010 at 11:39 AM, Axel Lin <axel.lin@gmail.com> wrote:
+> According to PXA3xx Processor Family Developer Manuall Vol1. section
+> "Pin Descriptions and Control", PXA30x and PXA31x Processor Alternate Function
+> Table shows the Alt FN 0 for GPIO51 is CI_HSYNC and for GPIO52 is CI_VSYNC.
+> This patch fixes the MFP defines and also corrects the order of MFD defines.
 >
-> Cc: yuanyabin1978 at sina.com
-> Cc: Dan Williams <dan.j.williams@intel.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
 
-I haven't actually pushed out the spi-test branch yet.  Shall I squash
-this patch into the previous one?
-
-g.
+Applied to 'fix'.
 
 > ---
-> ?drivers/spi/amba-pl022.c | ? 16 +++++-----------
-> ?1 files changed, 5 insertions(+), 11 deletions(-)
+> ?arch/arm/mach-pxa/include/mach/mfp-pxa300.h | ? ?4 ++--
+> ?1 files changed, 2 insertions(+), 2 deletions(-)
 >
-> diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-> index 59b3948..521d3d9 100644
-> --- a/drivers/spi/amba-pl022.c
-> +++ b/drivers/spi/amba-pl022.c
-> @@ -794,12 +794,7 @@ static void dma_callback(void *data)
-> ? ? ? ?struct pl022 *pl022 = data;
-> ? ? ? ?struct spi_message *msg = pl022->cur_msg;
+> diff --git a/arch/arm/mach-pxa/include/mach/mfp-pxa300.h b/arch/arm/mach-pxa/include/mach/mfp-pxa300.h
+> index 7139e0d..4e12870 100644
+> --- a/arch/arm/mach-pxa/include/mach/mfp-pxa300.h
+> +++ b/arch/arm/mach-pxa/include/mach/mfp-pxa300.h
+> @@ -71,10 +71,10 @@
+> ?#define GPIO46_CI_DD_7 ? ? ? ? MFP_CFG_DRV(GPIO46, AF0, DS04X)
+> ?#define GPIO47_CI_DD_8 ? ? ? ? MFP_CFG_DRV(GPIO47, AF1, DS04X)
+> ?#define GPIO48_CI_DD_9 ? ? ? ? MFP_CFG_DRV(GPIO48, AF1, DS04X)
+> -#define GPIO52_CI_HSYNC ? ? ? ? ? ? ? ?MFP_CFG_DRV(GPIO52, AF0, DS04X)
+> -#define GPIO51_CI_VSYNC ? ? ? ? ? ? ? ?MFP_CFG_DRV(GPIO51, AF0, DS04X)
+> ?#define GPIO49_CI_MCLK ? ? ? ? MFP_CFG_DRV(GPIO49, AF0, DS04X)
+> ?#define GPIO50_CI_PCLK ? ? ? ? MFP_CFG_DRV(GPIO50, AF0, DS04X)
+> +#define GPIO51_CI_HSYNC ? ? ? ? ? ? ? ?MFP_CFG_DRV(GPIO51, AF0, DS04X)
+> +#define GPIO52_CI_VSYNC ? ? ? ? ? ? ? ?MFP_CFG_DRV(GPIO52, AF0, DS04X)
 >
-> - ? ? ? /* Sync in RX buffer to CPU */
-> ? ? ? ?BUG_ON(!pl022->sgt_rx.sgl);
-> - ? ? ? dma_sync_sg_for_cpu(&pl022->adev->dev,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? pl022->sgt_rx.sgl,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? pl022->sgt_rx.nents,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? DMA_FROM_DEVICE);
->
-> ?#ifdef VERBOSE_DEBUG
-> ? ? ? ?/*
-> @@ -812,6 +807,11 @@ static void dma_callback(void *data)
-> ? ? ? ? ? ? ? ?struct scatterlist *sg;
-> ? ? ? ? ? ? ? ?unsigned int i;
->
-> + ? ? ? ? ? ? ? dma_sync_sg_for_cpu(&pl022->adev->dev,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl022->sgt_rx.sgl,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl022->sgt_rx.nents,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? DMA_FROM_DEVICE);
-> +
-> ? ? ? ? ? ? ? ?for_each_sg(pl022->sgt_rx.sgl, sg, pl022->sgt_rx.nents, i) {
-> ? ? ? ? ? ? ? ? ? ? ? ?dev_dbg(&pl022->adev->dev, "SPI RX SG ENTRY: %d", i);
-> ? ? ? ? ? ? ? ? ? ? ? ?print_hex_dump(KERN_ERR, "SPI RX: ",
-> @@ -1001,12 +1001,6 @@ static int configure_dma(struct pl022 *pl022)
-> ? ? ? ?if (sglen != pages)
-> ? ? ? ? ? ? ? ?goto err_tx_sgmap;
->
-> - ? ? ? /* Synchronize the TX scatterlist, invalidate buffers, caches etc */
-> - ? ? ? dma_sync_sg_for_device(&pl022->adev->dev,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?pl022->sgt_tx.sgl,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?pl022->sgt_tx.nents,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?DMA_TO_DEVICE);
-> -
-> ? ? ? ?/* Send both scatterlists */
-> ? ? ? ?rxdesc = rxchan->device->device_prep_slave_sg(rxchan,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?pl022->sgt_rx.sgl,
+> ?/* KEYPAD */
+> ?#define GPIO3_KP_DKIN_6 ? ? ? ? ? ? ? ?MFP_CFG_LPM(GPIO3, ? AF2, FLOAT)
 > --
-> 1.6.3.3
+> 1.7.2
 >
 >
-
-
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+>
+>
