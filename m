@@ -1,63 +1,147 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 17 Aug 2010 21:25:26 -0400
-Subject: [RFC PATCH 01/20] Create generic alignment API (v8)
-In-Reply-To: <20100817232150.251244768@efficios.com>
-References: <20100817231619.277457797@efficios.com>
-	<20100817232150.251244768@efficios.com>
-Message-ID: <1282094726.3268.2197.camel@gandalf.stny.rr.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 17 Aug 2010 18:29:10 -0700
+Subject: [PATCH v2] ARM: uaccess: Implement strict user copy checks
+In-Reply-To: <4C61EE55.5030506@codeaurora.org>
+References: <4C61EE55.5030506@codeaurora.org>
+Message-ID: <1282094950-6184-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-08-17 at 19:16 -0400, Mathieu Desnoyers wrote:
+Programmers can easily forget to ensure their buffer size is
+large enough to receive all the user data when calling
+copy_from_user(). Add some sanity checking to copy_from_user() by
+using the builtin __builtin_object_size() provided by newer GCC's
+(4.4 and greater) to prove at compile time that the kernel buffer
+won't overflow. This should catch some security holes earlier
+since at compile time we'll either see a warning stating that
+GCC can't prove the buffer size is large enough, or an error to
+the same effect if CONFIG_DEBUG_STRICT_USER_COPY_CHECKS=y.
 
-> +/*
-> + * Align pointer on natural object alignment. Object size must be power of two.
-> + */
+These checks are optimized away when GCC can't prove the buffer
+will overflow and when it can prove the buffer won't overflow.
 
-Hmm, I wonder if we should add a compiler bug here too.
+This patch is inspired by 9f0cf4a (x86: Use
+__builtin_object_size() to validate the buffer size for
+copy_from_user(), 2009-09-26).
 
-extern void __bug_obj_not_power_of_two(void);
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+---
 
-({
-	if ((sizeof(*obj) - 1) & sizeof(*obj))
-		__bug_obj_not_power_of_two();
-	PTR_ALIGN((obj), __alignof__(*(obj)));
-})
+Arnd,
 
-> +#define object_align(obj)	PTR_ALIGN((obj), __alignof__(*(obj)))
-> +#define object_align_floor(obj)	PTR_ALIGN_FLOOR((obj), __alignof__(*(obj)))
-> +
-> +/**
-> + * offset_align - Calculate the offset needed to align an object on its natural
-> + *                alignment towards higher addresses.
-> + * @align_drift:  object offset from an "alignment"-aligned address.
-> + * @alignment:    natural object alignment. Must be non-zero, power of 2.
-> + *
-> + * Returns the offset that must be added to align towards higher
-> + * addresses.
-> + */
-> +static inline size_t offset_align(size_t align_drift, size_t alignment)
-> +{
-> +	return (alignment - align_drift) & (alignment - 1);
-> +}
-> +
-> +/**
-> + * offset_align_floor - Calculate the offset needed to align an object
-> + *                      on its natural alignment towards lower addresses.
-> + * @align_drift:  object offset from an "alignment"-aligned address.
-> + * @alignment:    natural object alignment. Must be non-zero, power of 2.
-> + *
-> + * Returns the offset that must be substracted to align towards lower addresses.
-> + */
-> +static inline size_t offset_align_floor(size_t align_drift, size_t alignment)
-> +{
-> +	return (align_drift - alignment) & (alignment - 1);
-> +}
+I'm unsure what needs to be done for the follow up patch. Shouldn't
+it be multiple patches sent to each arch maintainer to fix the
+wording?
 
-I take it that theses functions can have variables passed to it for
-alignment, thus a check wont help. Although, we could add a test for the
-constant case.
+v2:
+ * More descriptive commit text
+ * dependency on !TRACE_BRANCH_PROFILING (see ad8f435 (x86: Don't use
+ 	the strict copy checks when branch profiling is in use, 2009-10-06))
 
--- Steve
+ arch/arm/Kconfig.debug         |   14 ++++++++++++++
+ arch/arm/include/asm/uaccess.h |   14 ++++++++++++++
+ arch/arm/lib/Makefile          |    3 ++-
+ arch/arm/lib/usercopy.c        |   25 +++++++++++++++++++++++++
+ 4 files changed, 55 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/lib/usercopy.c
 
-> +
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 91344af..64e33b8 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -128,4 +128,18 @@ config DEBUG_S3C_UART
+ 	  The uncompressor code port configuration is now handled
+ 	  by CONFIG_S3C_LOWLEVEL_UART_PORT.
+ 
++config DEBUG_STRICT_USER_COPY_CHECKS
++	bool "Strict user copy size checks"
++	depends on DEBUG_KERNEL && !TRACE_BRANCH_PROFILING
++	help
++	  Enabling this option turns a certain set of sanity checks for user
++	  copy operations into compile time errors.
++
++	  The copy_from_user() etc checks are there to help test if there
++	  are sufficient security checks on the length argument of
++	  the copy operation, by having gcc prove that the argument is
++	  within bounds.
++
++	  If unsure, or if you run an older (pre 4.4) gcc, say N.
++
+ endmenu
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index 33e4a48..3153e1a 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -401,8 +401,22 @@ extern unsigned long __must_check __clear_user_std(void __user *addr, unsigned l
+ extern unsigned long __must_check __strncpy_from_user(char *to, const char __user *from, unsigned long count);
+ extern unsigned long __must_check __strnlen_user(const char __user *s, long n);
+ 
++extern void copy_from_user_overflow(void)
++#ifdef CONFIG_DEBUG_STRICT_USER_COPY_CHECKS
++	__compiletime_error("copy_from_user() buffer size is not provably correct")
++#else
++	__compiletime_warning("copy_from_user() buffer size is not provably correct")
++#endif
++;
++
+ static inline unsigned long __must_check copy_from_user(void *to, const void __user *from, unsigned long n)
+ {
++	unsigned int sz = __compiletime_object_size(to);
++
++	if (unlikely(sz != -1 && sz < n)) {
++		copy_from_user_overflow();
++		return n;
++	}
+ 	if (access_ok(VERIFY_READ, from, n))
+ 		n = __copy_from_user(to, from, n);
+ 	else /* security hole - plug it */
+diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
+index 59ff42d..561cf3d 100644
+--- a/arch/arm/lib/Makefile
++++ b/arch/arm/lib/Makefile
+@@ -13,7 +13,8 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
+ 		   testchangebit.o testclearbit.o testsetbit.o        \
+ 		   ashldi3.o ashrdi3.o lshrdi3.o muldi3.o             \
+ 		   ucmpdi2.o lib1funcs.o div64.o sha1.o               \
+-		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o
++		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o \
++		   usercopy.o
+ 
+ mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
+ 
+diff --git a/arch/arm/lib/usercopy.c b/arch/arm/lib/usercopy.c
+new file mode 100644
+index 0000000..e57e6e2
+--- /dev/null
++++ b/arch/arm/lib/usercopy.c
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
++ * 02110-1301, USA.
++ */
++#include <linux/module.h>
++#include <linux/bug.h>
++
++void copy_from_user_overflow(void)
++{
++	WARN(1, "Buffer overflow detected!\n");
++}
++EXPORT_SYMBOL(copy_from_user_overflow);
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
