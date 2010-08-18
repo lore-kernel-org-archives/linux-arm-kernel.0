@@ -1,56 +1,19 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 18 Aug 2010 11:54:58 +0800
-Subject: several section mismatches
-In-Reply-To: <op.vgyj74zp7p4s8u@pikus>
-References: <201008021121.23860.sleep_walker@suse.cz> <op.vgyj74zp7p4s8u@pikus>
-Message-ID: <AANLkTimhT0FW17Xf0avwAZUee6EQ0N=v86xAoAC7YBae@mail.gmail.com>
+From: a.babich@rez.ru (Alexei Babich)
+Date: Wed, 18 Aug 2010 09:49:11 +0600
+Subject: [PATCH 3/3] dmaengine: Add Freescale i.MX SDMA support
+In-Reply-To: <20100817064734.GS27749@pengutronix.de>
+References: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
+	<20100817043612.GA9631@jasper.tkos.co.il>
+	<20100817064734.GS27749@pengutronix.de>
+Message-ID: <201008180949.12364.a.babich@rez.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A simple fix to cpufreq for pxa would be as below:
+> Unfortunately not, the assembler is missing.
+The instruction set, if I'm not mistaken, is similar to the M-core
 
-diff --git a/arch/arm/mach-pxa/cpufreq-pxa2xx.c
-b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
-index 268a9bc..50d5939 100644
---- a/arch/arm/mach-pxa/cpufreq-pxa2xx.c
-+++ b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
-@@ -398,7 +398,7 @@ static int pxa_set_target(struct cpufreq_policy *policy,
- 	return 0;
- }
-
--static __init int pxa_cpufreq_init(struct cpufreq_policy *policy)
-+static int pxa_cpufreq_init(struct cpufreq_policy *policy)
- {
- 	int i;
- 	unsigned int freq;
-diff --git a/arch/arm/mach-pxa/cpufreq-pxa3xx.c
-b/arch/arm/mach-pxa/cpufreq-pxa3xx.c
-index 27fa329..0a0d0fe 100644
---- a/arch/arm/mach-pxa/cpufreq-pxa3xx.c
-+++ b/arch/arm/mach-pxa/cpufreq-pxa3xx.c
-@@ -204,7 +204,7 @@ static int pxa3xx_cpufreq_set(struct cpufreq_policy *policy,
- 	return 0;
- }
-
--static __init int pxa3xx_cpufreq_init(struct cpufreq_policy *policy)
-+static int pxa3xx_cpufreq_init(struct cpufreq_policy *policy)
- {
- 	int ret = -EINVAL;
-
-
-On Thu, Aug 5, 2010 at 5:20 PM, Micha? Nazarewicz
-<m.nazarewicz@samsung.com> wrote:
-> On Mon, 02 Aug 2010 11:21:23 +0200, Tom?? 'Sleep_Walker' ??ech
-> <sleep_walker@suse.cz> wrote:
->>
->> It seems that we have some problems with g_ether and pxa cpufreq.
->> This is problematic output of `make CONFIG_DEBUG_SECTION_MISMATCH=y':
->
-> Problems with g_ether should be fixed in -next.
->
-> --
-> Best regards, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_ ? ? _
-> | Humble Liege of Serenely Enlightened Majesty of ?o' \,=./ `o
-> | Computer Science, ?Micha? "mina86" Nazarewicz ? ? ? (o o)
-> +----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
->
+-- 
+Regards,
+Alexei Babich, circuit design engineer, Rezonans plc., Chelyabinsk, Russia
+http://www.rez.ru
+Jabber ID: impatt at jabber.ru
