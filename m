@@ -1,50 +1,69 @@
 From: wellsk40@gmail.com (wellsk40 at gmail.com)
-Date: Wed, 18 Aug 2010 16:40:58 -0700
-Subject: [PATCH 5/6] ARM: LPC32XX: Remove clock enable code for AMBA driver
+Date: Wed, 18 Aug 2010 16:40:57 -0700
+Subject: [PATCH 4/6] ARM: LPC32xx: Remove MMC peripheral clock enable/disable
+	code
 In-Reply-To: <1282174859-8780-1-git-send-email-wellsk40@gmail.com>
 References: <1282174859-8780-1-git-send-email-wellsk40@gmail.com>
-Message-ID: <1282174859-8780-6-git-send-email-wellsk40@gmail.com>
+Message-ID: <1282174859-8780-5-git-send-email-wellsk40@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Wells <wellsk40@gmail.com>
 
-These clock enables were just for the AMBA driver's peripheral
-ID check and are no longer needed with the AMBA bus clock
-changes.
+The MMC clock rate set and get functions had extra code to force
+the high level peripheral clock to enable prior to register
+accesses. This isn't needed.
 
 Signed-off-by: Kevin Wells <wellsk40@gmail.com>
 ---
- arch/arm/mach-lpc32xx/phy3250.c |   17 -----------------
- 1 files changed, 0 insertions(+), 17 deletions(-)
+ arch/arm/mach-lpc32xx/clock.c |   14 ++------------
+ 1 files changed, 2 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
-index bc9a42d..3ef69cb 100644
---- a/arch/arm/mach-lpc32xx/phy3250.c
-+++ b/arch/arm/mach-lpc32xx/phy3250.c
-@@ -340,23 +340,6 @@ static void __init phy3250_board_init(void)
+diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
+index 1659b3f..dd34a64 100644
+--- a/arch/arm/mach-lpc32xx/clock.c
++++ b/arch/arm/mach-lpc32xx/clock.c
+@@ -738,14 +738,9 @@ static int mmc_onoff_enable(struct clk *clk, int enable)
  
- 	lpc32xx_serial_init();
+ static unsigned long mmc_get_rate(struct clk *clk)
+ {
+-	u32 div, rate, oldclk;
++	u32 div, rate;
  
--	/*
--	 * AMBA peripheral clocks need to be enabled prior to AMBA device
--	 * detection or a data fault will occur, so enable the clocks
--	 * here. However, we don't want to enable them if the peripheral
--	 * isn't included in the image
--	 */
--#ifdef CONFIG_FB_ARMCLCD
--	tmp = __raw_readl(LPC32XX_CLKPWR_LCDCLK_CTRL);
--	__raw_writel((tmp | LPC32XX_CLKPWR_LCDCTRL_CLK_EN),
--		LPC32XX_CLKPWR_LCDCLK_CTRL);
--#endif
--#ifdef CONFIG_SPI_PL022
--	tmp = __raw_readl(LPC32XX_CLKPWR_SSP_CLK_CTRL);
--	__raw_writel((tmp | LPC32XX_CLKPWR_SSPCTRL_SSPCLK0_EN),
--		LPC32XX_CLKPWR_SSP_CLK_CTRL);
--#endif
+-	/* The MMC clock must be on when accessing an MMC register */
+-	oldclk = __raw_readl(LPC32XX_CLKPWR_MS_CTRL);
+-	__raw_writel(oldclk | LPC32XX_CLKPWR_MSCARD_SDCARD_EN,
+-		LPC32XX_CLKPWR_MS_CTRL);
+ 	div = __raw_readl(LPC32XX_CLKPWR_MS_CTRL);
+-	__raw_writel(oldclk, LPC32XX_CLKPWR_MS_CTRL);
+ 
+ 	/* Get the parent clock rate */
+ 	rate = clk->parent->get_rate(clk->parent);
+@@ -778,7 +773,7 @@ static unsigned long mmc_round_rate(struct clk *clk, unsigned long rate)
+ 
+ static int mmc_set_rate(struct clk *clk, unsigned long rate)
+ {
+-	u32 oldclk, tmp;
++	u32 tmp;
+ 	unsigned long prate, div, crate = mmc_round_rate(clk, rate);
+ 
+ 	prate = clk->parent->get_rate(clk->parent);
+@@ -786,16 +781,11 @@ static int mmc_set_rate(struct clk *clk, unsigned long rate)
+ 	div = prate / crate;
+ 
+ 	/* The MMC clock must be on when accessing an MMC register */
+-	oldclk = __raw_readl(LPC32XX_CLKPWR_MS_CTRL);
+-	__raw_writel(oldclk | LPC32XX_CLKPWR_MSCARD_SDCARD_EN,
+-		LPC32XX_CLKPWR_MS_CTRL);
+ 	tmp = __raw_readl(LPC32XX_CLKPWR_MS_CTRL) &
+ 		~LPC32XX_CLKPWR_MSCARD_SDCARD_DIV(0xf);
+ 	tmp |= LPC32XX_CLKPWR_MSCARD_SDCARD_DIV(div);
+ 	__raw_writel(tmp, LPC32XX_CLKPWR_MS_CTRL);
+ 
+-	__raw_writel(oldclk, LPC32XX_CLKPWR_MS_CTRL);
 -
- 	platform_add_devices(phy3250_devs, ARRAY_SIZE(phy3250_devs));
- 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
- 		struct amba_device *d = amba_devs[i];
+ 	return 0;
+ }
+ 
 -- 
 1.7.1.1
