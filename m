@@ -1,235 +1,88 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 18 Aug 2010 07:05:46 +0200
-Subject: [PATCH 01/13] Balloon3: Disperse MFP config
-In-Reply-To: <AANLkTi=3AQ6RAYSvnJ9_PYyy7mtseXGyoFaz+Km_4vd8@mail.gmail.com>
-References: <1281673964-2119-1-git-send-email-marek.vasut@gmail.com>
-	<AANLkTi=3AQ6RAYSvnJ9_PYyy7mtseXGyoFaz+Km_4vd8@mail.gmail.com>
-Message-ID: <201008180705.46427.marek.vasut@gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 17 Aug 2010 22:39:31 -0700
+Subject: RFC: A better clock rounding API?
+Message-ID: <4C6B7213.3030808@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne St 18. srpna 2010 06:11:51 Eric Miao napsal(a):
-> On Fri, Aug 13, 2010 at 12:32 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> > Move pin config to appropriate places and use it only if needed.
-> > 
-> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> 
-> So I suppose this is the successor patch series of the previous
-> balloon3 one? Better to keep Jonathan's Ack then?
+I'm mostly familiar with ARM.  So I will limit the discussion to ARM 
+boards/machines.  But I think the points raised in this email would 
+apply for most architectures.
 
-It's in the mail from 10th aug. I'll add hist ack to the patch when sending pull 
-rq.
-> 
-> > ---
-> >  arch/arm/mach-pxa/balloon3.c |  104
-> > +++++++++++++++++++++++++++-------------- 1 files changed, 68
-> > insertions(+), 36 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
-> > index 9041340..7f62448 100644
-> > --- a/arch/arm/mach-pxa/balloon3.c
-> > +++ b/arch/arm/mach-pxa/balloon3.c
-> > @@ -68,42 +68,6 @@ static unsigned long balloon3_pin_config[] __initdata
-> > = {
-> > 
-> >        /* Reset, configured as GPIO wakeup source */
-> >        GPIO1_GPIO | WAKEUP_ON_EDGE_BOTH,
-> > -
-> > -       /* LEDs */
-> > -       GPIO9_GPIO,     /* NAND activity LED */
-> > -       GPIO10_GPIO,    /* Heartbeat LED */
-> > -
-> > -       /* AC97 */
-> > -       GPIO28_AC97_BITCLK,
-> > -       GPIO29_AC97_SDATA_IN_0,
-> > -       GPIO30_AC97_SDATA_OUT,
-> > -       GPIO31_AC97_SYNC,
-> > -       GPIO113_AC97_nRESET,
-> > -       GPIO95_GPIO,
-> > -
-> > -       /* MMC */
-> > -       GPIO32_MMC_CLK,
-> > -       GPIO92_MMC_DAT_0,
-> > -       GPIO109_MMC_DAT_1,
-> > -       GPIO110_MMC_DAT_2,
-> > -       GPIO111_MMC_DAT_3,
-> > -       GPIO112_MMC_CMD,
-> > -
-> > -       /* USB Host */
-> > -       GPIO88_USBH1_PWR,
-> > -       GPIO89_USBH1_PEN,
-> > -
-> > -       /* PC Card */
-> > -       GPIO48_nPOE,
-> > -       GPIO49_nPWE,
-> > -       GPIO50_nPIOR,
-> > -       GPIO51_nPIOW,
-> > -       GPIO85_nPCE_1,
-> > -       GPIO54_nPCE_2,
-> > -       GPIO79_PSKTSEL,
-> > -       GPIO55_nPREG,
-> > -       GPIO56_nPWAIT,
-> > -       GPIO57_nIOIS16,
-> >  };
-> > 
-> >  /***********************************************************************
-> > ******* @@ -132,6 +96,34 @@ int __init parse_balloon3_features(char *arg)
-> > early_param("balloon3_features", parse_balloon3_features);
-> > 
-> >  /***********************************************************************
-> > ******* + * Compact Flash slot
-> > +
-> > ************************************************************************
-> > ******/ +#if    defined(CONFIG_PCMCIA_PXA2XX) ||
-> > defined(CONFIG_PCMCIA_PXA2XX_MODULE) +static unsigned long
-> > balloon3_cf_pin_config[] __initdata = {
-> > +       GPIO48_nPOE,
-> > +       GPIO49_nPWE,
-> > +       GPIO50_nPIOR,
-> > +       GPIO51_nPIOW,
-> > +       GPIO85_nPCE_1,
-> > +       GPIO54_nPCE_2,
-> > +       GPIO79_PSKTSEL,
-> > +       GPIO55_nPREG,
-> > +       GPIO56_nPWAIT,
-> > +       GPIO57_nIOIS16,
-> > +};
-> > +
-> > +static void __init balloon3_cf_init(void)
-> > +{
-> > +       if (!balloon3_has(BALLOON3_FEATURE_CF))
-> > +               return;
-> > +
-> > +       pxa2xx_mfp_config(ARRAY_AND_SIZE(balloon3_cf_pin_config));
-> > +}
-> > +#else
-> > +static inline void balloon3_cf_init(void) {}
-> > +#endif
-> > +
-> > +/***********************************************************************
-> > ******* * NOR Flash
-> >  ************************************************************************
-> > ******/ #if defined(CONFIG_MTD_PHYSMAP) ||
-> > defined(CONFIG_MTD_PHYSMAP_MODULE) @@ -179,6 +171,15 @@ static inline
-> > void balloon3_nor_init(void) {}
-> > ************************************************************************
-> > ******/ #if    defined(CONFIG_TOUCHSCREEN_UCB1400) || \
-> >        defined(CONFIG_TOUCHSCREEN_UCB1400_MODULE)
-> > +static unsigned long balloon3_ac97_pin_config[] __initdata = {
-> > +       GPIO28_AC97_BITCLK,
-> > +       GPIO29_AC97_SDATA_IN_0,
-> > +       GPIO30_AC97_SDATA_OUT,
-> > +       GPIO31_AC97_SYNC,
-> > +       GPIO113_AC97_nRESET,
-> > +       GPIO95_GPIO,
-> > +};
-> > +
-> >  static struct ucb1400_pdata vpac270_ucb1400_pdata = {
-> >        .irq            = IRQ_GPIO(BALLOON3_GPIO_CODEC_IRQ),
-> >  };
-> > @@ -197,6 +198,7 @@ static void __init balloon3_ts_init(void)
-> >        if (!balloon3_has(BALLOON3_FEATURE_AUDIO))
-> >                return;
-> > 
-> > +       pxa2xx_mfp_config(ARRAY_AND_SIZE(balloon3_ac97_pin_config));
-> >        pxa_set_ac97_info(NULL);
-> >        platform_device_register(&balloon3_ucb1400_device);
-> >  }
-> > @@ -208,6 +210,11 @@ static inline void balloon3_ts_init(void) {}
-> >  * Framebuffer
-> >  ************************************************************************
-> > ******/ #if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
-> > +static unsigned long balloon3_lcd_pin_config[] __initdata = {
-> > +       GPIOxx_LCD_TFT_16BPP,
-> > +       GPIO99_GPIO,
-> > +};
-> > +
-> >  static struct pxafb_mode_info balloon3_lcd_modes[] = {
-> >        {
-> >                .pixclock               = 38000,
-> > @@ -242,6 +249,8 @@ static void __init balloon3_lcd_init(void)
-> >        if (!balloon3_has(BALLOON3_FEATURE_TOPPOLY))
-> >                return;
-> > 
-> > +       pxa2xx_mfp_config(ARRAY_AND_SIZE(balloon3_lcd_pin_config));
-> > +
-> >        ret = gpio_request(BALLOON3_GPIO_RUN_BACKLIGHT, "BKL-ON");
-> >        if (ret) {
-> >                pr_err("Requesting BKL-ON GPIO failed!\n");
-> > @@ -271,6 +280,15 @@ static inline void balloon3_lcd_init(void) {}
-> >  * SD/MMC card controller
-> >  ************************************************************************
-> > ******/ #if defined(CONFIG_MMC_PXA) || defined(CONFIG_MMC_PXA_MODULE)
-> > +static unsigned long balloon3_mmc_pin_config[] __initdata = {
-> > +       GPIO32_MMC_CLK,
-> > +       GPIO92_MMC_DAT_0,
-> > +       GPIO109_MMC_DAT_1,
-> > +       GPIO110_MMC_DAT_2,
-> > +       GPIO111_MMC_DAT_3,
-> > +       GPIO112_MMC_CMD,
-> > +};
-> > +
-> >  static struct pxamci_platform_data balloon3_mci_platform_data = {
-> >        .ocr_mask               = MMC_VDD_32_33 | MMC_VDD_33_34,
-> >        .gpio_card_detect       = -1,
-> > @@ -281,6 +299,7 @@ static struct pxamci_platform_data
-> > balloon3_mci_platform_data = {
-> > 
-> >  static void __init balloon3_mmc_init(void)
-> >  {
-> > +       pxa2xx_mfp_config(ARRAY_AND_SIZE(balloon3_mmc_pin_config));
-> >        pxa_set_mci_info(&balloon3_mci_platform_data);
-> >  }
-> >  #else
-> > @@ -339,6 +358,11 @@ static inline void balloon3_irda_init(void) {}
-> >  * USB Host
-> >  ************************************************************************
-> > ******/ #if defined(CONFIG_USB_OHCI_HCD) ||
-> > defined(CONFIG_USB_OHCI_HCD_MODULE) +static unsigned long
-> > balloon3_uhc_pin_config[] __initdata = {
-> > +       GPIO88_USBH1_PWR,
-> > +       GPIO89_USBH1_PEN,
-> > +};
-> > +
-> >  static struct pxaohci_platform_data balloon3_ohci_info = {
-> >        .port_mode      = PMM_PERPORT_MODE,
-> >        .flags          = ENABLE_PORT_ALL | POWER_CONTROL_LOW |
-> > POWER_SENSE_LOW, @@ -348,6 +372,7 @@ static void __init
-> > balloon3_uhc_init(void)
-> >  {
-> >        if (!balloon3_has(BALLOON3_FEATURE_OHCI))
-> >                return;
-> > +       pxa2xx_mfp_config(ARRAY_AND_SIZE(balloon3_uhc_pin_config));
-> >        pxa_set_ohci_info(&balloon3_ohci_info);
-> >  }
-> >  #else
-> > @@ -358,6 +383,11 @@ static inline void balloon3_uhc_init(void) {}
-> >  * LEDs
-> >  ************************************************************************
-> > ******/ #if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
-> > +static unsigned long balloon3_led_pin_config[] __initdata = {
-> > +       GPIO9_GPIO,     /* NAND activity LED */
-> > +       GPIO10_GPIO,    /* Heartbeat LED */
-> > +};
-> > +
-> >  struct gpio_led balloon3_gpio_leds[] = {
-> >        {
-> >                .name                   = "balloon3:green:idle",
-> > @@ -436,6 +466,7 @@ static struct platform_device balloon3_pcf_leds = {
-> > 
-> >  static void __init balloon3_leds_init(void)
-> >  {
-> > +       pxa2xx_mfp_config(ARRAY_AND_SIZE(balloon3_led_pin_config));
-> >        platform_device_register(&balloon3_leds);
-> >        platform_device_register(&balloon3_pcf_leds);
-> >  }
-> > @@ -757,6 +788,7 @@ static void __init balloon3_init(void)
-> >        balloon3_ts_init();
-> >        balloon3_udc_init();
-> >        balloon3_uhc_init();
-> > +       balloon3_cf_init();
-> >  }
-> > 
-> >  static struct map_desc balloon3_io_desc[] __initdata = {
-> > --
-> > 1.7.1
+I'm sending this to the ARM mailing list first to see if I can get a 
+consensus within the ARM community before I propose this to the wider 
+audience in LKML.
+
+The meaning of clk_round_rate() is very ambiguous since the nature of 
+the rounding is architecture and platform specific.  In the case of ARM, 
+it's up to each ARM mach's clock driver to determine how it wants to 
+round the rate.
+
+To quote Russel King from an email about a month ago:
+"clk_round_rate() returns the clock rate which will be set if you ask
+clk_set_rate() to set that rate.  It provides a way to query from the 
+implementation exactly what rate you'll get if you use clk_set_rate() 
+with that same argument."
+
+So when someone writes a device driver for a device that's external to 
+the SoC or is integrated into more than one SoC, they currently have the 
+following options to deal with clock rates differences:
+
+1. Use clk_round_rate() to get clock rates and test their driver on the 
+one/few board(s) they have at hand and hope it works on boards using 
+different SoCs.
+
+2. Add each and every needed clock rate (low power rate, high 
+performance rate, handshake rate, etc) as fields to their platform data 
+and have it populated in every board file that uses the device.
+
+3. Do a search of the frequency space of the clock by making several 
+clk_round_rate() calls at various intervals between their minimum and 
+maximum acceptable rates and hope to find one of the supported rates. 
+If clk_round_rate() does a +/- N percentage rounding and the interval is 
+larger, even this searching might not find an existing rate that's 
+supported between the driver's min and max acceptable rates.
+
+IMHO, each of these options have short comings that could be alleviated 
+by adding a more definitive "rounding" API.  Also, considering that it's 
+the consumer of each clock that knows best what amount of rounding and 
+in which direction is acceptable, IMHO the current approach of hiding 
+the rounding inside the clock drivers seems counter intuitive.
+
+I would like to propose the addition of either:
+
+long clk_find_rate(struct clk *clk,
+			unsigned long min_rate,
+			long max_rate);
+
+or
+
+long clk_find_rate(struct clk *clk,
+			unsigned long start_rate,
+			long end_rate);
+
+The advantage of the 2nd suggestion is that it allows a driver to 
+specify which end of a frequency range it prefers.  But I'm not sure how 
+important of an advantage that is.  So, proposing both and having the 
+community decide which one, if any, is acceptable.
+
+If the clk_find_rate() API is available, the driver developer wouldn't 
+have to worry about figuring out a way for the clk_set_rate() to work on 
+different platforms/machs/SoCs. If a platform/mach/SoC can provide a 
+clock rate that's acceptable to their hardware and software 
+requirements, then they can be assured to find it without having to jump 
+through hoops or having a driver not work when it could have.
+
+Does the addition of one of the suggested APIs sound reasonable? If not, 
+can someone explain what the right/better solution is? If the addition 
+of a new API is reasonable, what's the community preference between the 
+two suggestion? If I submit a patch that will add one of the APIs is it 
+likely to be accepted?
+
+Thanks for your time.
+
+-Sarav
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
