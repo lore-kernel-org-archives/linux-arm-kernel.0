@@ -1,41 +1,26 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Wed, 18 Aug 2010 13:30:53 +0100
-Subject: [PATCH 01/06] pxa3xx_nand: update ns2cycle calculation method
-In-Reply-To: <AANLkTikzdVAwOZcLhgHsDQGNhW4_-420XodbxSUmfDRW@mail.gmail.com>
-References: <AANLkTikzdVAwOZcLhgHsDQGNhW4_-420XodbxSUmfDRW@mail.gmail.com>
-Message-ID: <1282134653.13405.15.camel@localhost>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Wed, 18 Aug 2010 15:39:40 +0200
+Subject: [PATCH 1/5] ARM: add PrimeCell generic DMA to PL022 v9
+In-Reply-To: <AANLkTi=vCb8rQu3KPcCv7cP94ovQ_ZFrs7aBjGYtPQmy@mail.gmail.com>
+References: <1281095419-15600-1-git-send-email-linus.walleij@stericsson.com>
+	<20100817044834.GA27060@angua.secretlab.ca>
+	<AANLkTi=vCb8rQu3KPcCv7cP94ovQ_ZFrs7aBjGYtPQmy@mail.gmail.com>
+Message-ID: <AANLkTinmYR_N2jv1q7rNR1FWvemXbemkhJBL=_f9eFP0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-08-17 at 13:29 +0100, Haojian Zhuang wrote:
-> From 9064b2c877cad560fda7577564b3369c0025b7df Mon Sep 17 00:00:00 2001
-> From: Lei Wen <leiwen@marvell.com>
-> Date: Tue, 17 Aug 2010 17:24:06 +0800
-> Subject: [PATCH 01/06] pxa3xx_nand: update ns2cycle calculation method
-> 
-> For the original method change from plus 1 to minus 1,
-> this way make the default timing like tCS become 0 after calculation,
-> although we set the timing as 0xa...
-> 
-> Change the method to no plus and minus, and make the result
-> closer to what the timing specified in the NAND chip spec.
-> 
-> Signed-off-by: Lei Wen <leiwen@marvell.com>
+2010/8/18 Grant Likely <grant.likely@secretlab.ca>:
 
-I have an identical patch queued for -stable and 2.6.36 already, from
-Axel Lin (but with a slightly better changelog).
+> This patch causes the following build error and warnings. ?The
+> warnings are simple init annotation mismatches. ?I haven't dug into
+> the error, but I suspect the driver needs to depend on or select
+> another config symbol. ?I'm dropping it from my tree.
 
-I'll add your signed-off-by to that and send it on today.
+I'm unable to reproduce this problem in Torvalds' tree and
+-next. I'm using the realview, U8500 and U300 defconfigs with and
+without the DMAengine, no difference, totally silent.
 
-The other five I'll apply to the mtd-2.6.git on top, once I have Eric's
-ack.
+What kind of configuration are you building this on?
 
-Thanks.
-
-By the way, please could you use my dwmw2 at infradead.org address instead
-of @intel.com -- the latter has taken to corrupting incoming mail again,
-and they're being extremely slow to fix it.
-
--- 
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
+Yours
+Linus Walleij
