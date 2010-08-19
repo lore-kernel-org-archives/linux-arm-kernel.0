@@ -1,35 +1,27 @@
 From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Thu, 19 Aug 2010 18:56:53 +0200
-Subject: ARM: 2.6.3[45] PCI regression (IXP4xx and PXA?)
-In-Reply-To: <20100819175024W.fujita.tomonori@lab.ntt.co.jp> (FUJITA
-	Tomonori's message of "Thu, 19 Aug 2010 17:51:51 +0900")
-References: <20100813215413.GA21607@n2100.arm.linux.org.uk>
-	<20100814181306U.fujita.tomonori@lab.ntt.co.jp>
-	<m3vd7agmqa.fsf@intrepid.localdomain>
-	<20100819175024W.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <m34oeqsfqi.fsf@intrepid.localdomain>
+Date: Thu, 19 Aug 2010 19:04:32 +0200
+Subject: ixp4xx support in newer kernels
+In-Reply-To: <AANLkTin-A2ubhzsn0DGD2vWn1RxougLV=4V-CS3VcNWe@mail.gmail.com>
+	(y. bhanu's message of "Wed, 18 Aug 2010 00:48:34 -0700")
+References: <AANLkTin-A2ubhzsn0DGD2vWn1RxougLV=4V-CS3VcNWe@mail.gmail.com>
+Message-ID: <m3wrrmr0tb.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> writes:
+Hi,
 
->> > +++ b/arch/arm/mm/dma-mapping.c
->> > @@ -77,6 +77,11 @@ static struct page *__dma_alloc_buffer(struct device *dev, size_t size, gfp_t gf
->> >  	if (mask < 0xffffffffULL)
->> >  		gfp |= GFP_DMA;
->> >  
->> > +#ifdef CONFIG_DMABOUNCE
->> > +	if (dev->archdata.dmabounce)
->> > +		gfp |= GFP_DMA;
->> > +#endif
->> > +
->> >  	page = alloc_pages(gfp, order);
->> >  	if (!page)
->> >  		return NULL;
+y bhanu <kernelccrazy@gmail.com> writes:
 
-> I'll re-send the patch in the proper format. Can you send it to
-> mainline for 2.6.36?
+> I am starting off on a new project with ixp4xx based chip.
+> I already have it working in 2.6.19 kernel.
+> How well are ixp432/ixp435 chips supported in new kernels.
+> I would like to move it to 2.6.35 kernel.
+>
+> If I want to look at the latest patched for IXP4xx, is there good spot
+> to look at ( gitweb or URL).
 
-Guess that's a question for Russell.
+They should work fine, except possibly a problem with "coherent" memory
+allocations, which is being worked on, and for which a usable patch is
+available.
 -- 
 Krzysztof Halasa
