@@ -1,86 +1,102 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 19 Aug 2010 15:54:47 +0900
-Subject: [PATCH] ARM: S5PC110: GONI: Add TSP driver
-Message-ID: <20100819065447.GA29760@july>
+Date: Thu, 19 Aug 2010 15:54:56 +0900
+Subject: [PATCH] ARM: S5PC110: GONI: Fixed voltage support for eMMC
+Message-ID: <20100819065456.GA29764@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Use the TSP on I2C2.
+Add the fixed voltage regulator for eMMC (connected with mmc0)
+Also add the 8-bit mmc support when use the board revision 6
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s5pv210/mach-goni.c |   43 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 43 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pv210/mach-goni.c |   46 +++++++++++++++++++++++++++++++++++++
+ 1 files changed, 46 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index 53754d7..48b455e 100644
+index 48b455e..c1f0e21 100644
 --- a/arch/arm/mach-s5pv210/mach-goni.c
 +++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -15,6 +15,7 @@
- #include <linux/fb.h>
- #include <linux/i2c.h>
- #include <linux/i2c-gpio.h>
-+#include <linux/i2c/qt602240_ts.h>
- #include <linux/mfd/max8998.h>
+@@ -20,6 +20,8 @@
  #include <linux/gpio_keys.h>
  #include <linux/input.h>
-@@ -410,6 +411,42 @@ static struct platform_device goni_device_gpiokeys = {
- 	},
+ #include <linux/gpio.h>
++#include <linux/mmc/host.h>
++#include <linux/regulator/fixed.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -38,6 +40,11 @@
+ #include <plat/fb.h>
+ #include <plat/sdhci.h>
+ 
++static inline int hwrevision(int hwrev)
++{
++	return (system_rev & 0xff) == hwrev;
++}
++
+ /* Following are default values for UCON, ULCON and UFCON UART registers */
+ #define GONI_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+ 				 S3C2410_UCON_RXILEVEL |	\
+@@ -481,11 +488,49 @@ static struct s3c_sdhci_platdata goni_hsmmc2_data __initdata = {
+ 	.ext_cd_gpio_invert	= 1,
  };
  
-+/* TSP */
-+static struct qt602240_platform_data qt602240_platform_data = {
-+	.x_line		= 17,
-+	.y_line		= 11,
-+	.x_size		= 800,
-+	.y_size		= 480,
-+	.blen		= 0x21,
-+	.threshold	= 0x28,
-+	.voltage	= 2800000,              /* 2.8V */
-+	.orient		= QT602240_DIAGONAL,
-+};
-+
-+static struct i2c_board_info i2c2_devs[] __initdata = {
++static struct regulator_consumer_supply eMMC_supplies[] = {
 +	{
-+		I2C_BOARD_INFO("qt602240_ts", 0x4a),
-+		.platform_data = &qt602240_platform_data,
++		.dev		= &s3c_device_hsmmc0.dev,
++		.supply		= "vmmc",
 +	},
 +};
 +
-+static void __init goni_tsp_init(void)
-+{
-+	int gpio, irq;
++static struct regulator_init_data mmc0_fixed_voltage_init_data = {
++	.constraints		= {
++		.name		= "VMEM_2.8V",
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(eMMC_supplies),
++	.consumer_supplies	= eMMC_supplies,
++};
 +
-+	gpio = S5PV210_GPJ1(3);                 /* XMSMADDR_11 */
-+	gpio_request(gpio, "TSP_LDO_ON");
-+	gpio_direction_output(gpio, 1);
-+	gpio_export(gpio, 0);
++static struct fixed_voltage_config mmc0_fixed_voltage_config = {
++	.supply_name		= "eMMC",
++	.microvolts		= 2800000,
++	.gpio			= S5PV210_GPJ2(7),      /* XMSMDATA_7 */
++	.enable_high		= true,
++	.enabled_at_boot	= true,
++	.init_data		= &mmc0_fixed_voltage_init_data,
++};
 +
-+	gpio = S5PV210_GPJ0(5);                 /* XMSMADDR_5 */
-+	gpio_request(gpio, "TSP_INT");
-+	s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
-+	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-+	irq = gpio_to_irq(gpio);
-+	i2c2_devs[0].irq = irq;
-+}
++static struct platform_device mmc0_fixed_voltage = {
++	.name			= "reg-fixed-voltage",
++	.id			= 2,
++	.dev			= {
++		.platform_data	= &mmc0_fixed_voltage_config,
++	},
++};
 +
- static void __init goni_pmic_init(void)
+ static void goni_setup_sdhci(void)
  {
- 	/* AP_PMIC_IRQ: EINT7 */
-@@ -476,6 +513,12 @@ static void __init goni_map_io(void)
+ 	gpio_request(GONI_EXT_FLASH_EN, "FLASH_EN");
+ 	gpio_direction_output(GONI_EXT_FLASH_EN, 1);
  
- static void __init goni_machine_init(void)
- {
-+	/* TSP: call before I2C 2 registeration */
-+	goni_tsp_init();
++	if (hwrevision(6)) {
++		goni_hsmmc0_data.max_width = 8;
++		goni_hsmmc0_data.host_caps |= MMC_CAP_8_BIT_DATA;
++	}
 +
-+	/* I2C2 */
-+	i2c_register_board_info(2, i2c2_devs, ARRAY_SIZE(i2c2_devs));
-+
- 	/* PMIC */
- 	goni_pmic_init();
- 	i2c_register_board_info(AP_I2C_GPIO_PMIC_BUS_4, i2c_gpio_pmic_devs,
+ 	s3c_sdhci0_set_platdata(&goni_hsmmc0_data);
+ 	s3c_sdhci1_set_platdata(&goni_hsmmc1_data);
+ 	s3c_sdhci2_set_platdata(&goni_hsmmc2_data);
+@@ -499,6 +544,7 @@ static struct platform_device *goni_devices[] __initdata = {
+ 	&s5p_device_fimc0,
+ 	&s5p_device_fimc1,
+ 	&s5p_device_fimc2,
++	&mmc0_fixed_voltage,
+ 	&s3c_device_hsmmc0,
+ 	&s3c_device_hsmmc1,
+ 	&s3c_device_hsmmc2,
 -- 
 1.5.3.3
