@@ -1,123 +1,104 @@
 From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Thu, 19 Aug 2010 17:50:45 +0900
-Subject: [PATCH 3/4] ARM: S5PC110: GONI: Add TSP driver
+Date: Thu, 19 Aug 2010 17:50:46 +0900
+Subject: [PATCH 4/4] ARM: S5PC110: GONI: Fixed voltage support for eMMC
 In-Reply-To: <1282207846-4578-1-git-send-email-jy0922.shim@samsung.com>
 References: <1282207846-4578-1-git-send-email-jy0922.shim@samsung.com>
-Message-ID: <1282207846-4578-3-git-send-email-jy0922.shim@samsung.com>
+Message-ID: <1282207846-4578-4-git-send-email-jy0922.shim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Use the TSP on I2C2.
+Add the fixed voltage regulator for eMMC (connected with mmc0)
+Also add the 8-bit mmc support when use the board revision 6
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s5pv210/Kconfig     |    2 +
- arch/arm/mach-s5pv210/mach-goni.c |   53 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 55 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pv210/mach-goni.c |   46 +++++++++++++++++++++++++++++++++++++
+ 1 files changed, 46 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 303c8a6..1538dad 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -89,10 +89,12 @@ config MACH_GONI
- 	select S3C_DEV_HSMMC1
- 	select S3C_DEV_HSMMC2
- 	select S3C_DEV_I2C1
-+	select S3C_DEV_I2C2
- 	select S5PC110_DEV_ONENAND
- 	select SAMSUNG_DEV_KEYPAD
- 	select S5PV210_SETUP_FB_24BPP
- 	select S5PV210_SETUP_I2C1
-+	select S5PV210_SETUP_I2C2
- 	select S5PV210_SETUP_KEYPAD
- 	select S5PV210_SETUP_SDHCI
- 	help
 diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index c4f10c8..21a1bfc 100644
+index 21a1bfc..25cee00 100644
 --- a/arch/arm/mach-s5pv210/mach-goni.c
 +++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -15,6 +15,7 @@
- #include <linux/fb.h>
- #include <linux/i2c.h>
- #include <linux/i2c-gpio.h>
-+#include <linux/i2c/qt602240_ts.h>
- #include <linux/mfd/max8998.h>
+@@ -20,6 +20,8 @@
  #include <linux/gpio_keys.h>
  #include <linux/input.h>
-@@ -156,6 +157,50 @@ static void __init goni_radio_init(void)
- 	gpio_direction_output(gpio, 1);
- }
+ #include <linux/gpio.h>
++#include <linux/mmc/host.h>
++#include <linux/regulator/fixed.h>
  
-+/* TSP */
-+static struct qt602240_platform_data qt602240_platform_data = {
-+	.x_line		= 17,
-+	.y_line		= 11,
-+	.x_size		= 800,
-+	.y_size		= 480,
-+	.blen		= 0x21,
-+	.threshold	= 0x28,
-+	.voltage	= 2800000,              /* 2.8V */
-+	.orient		= QT602240_DIAGONAL,
-+};
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -40,6 +42,11 @@
+ #include <plat/keypad.h>
+ #include <plat/sdhci.h>
+ 
++static inline int hwrevision(int hwrev)
++{
++	return (system_rev & 0xff) == hwrev;
++}
 +
-+static struct s3c2410_platform_i2c i2c2_data __initdata = {
-+	.flags		= 0,
-+	.bus_num	= 2,
-+	.slave_addr	= 0x10,
-+	.frequency	= 400 * 1000,
-+	.sda_delay	= 100,
-+};
-+
-+static struct i2c_board_info i2c2_devs[] __initdata = {
+ /* Following are default values for UCON, ULCON and UFCON UART registers */
+ #define GONI_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+ 				 S3C2410_UCON_RXILEVEL |	\
+@@ -534,11 +541,49 @@ static struct s3c_sdhci_platdata goni_hsmmc2_data __initdata = {
+ 	.ext_cd_gpio_invert	= 1,
+ };
+ 
++static struct regulator_consumer_supply eMMC_supplies[] = {
 +	{
-+		I2C_BOARD_INFO("qt602240_ts", 0x4a),
-+		.platform_data = &qt602240_platform_data,
++		.dev		= &s3c_device_hsmmc0.dev,
++		.supply		= "vmmc",
 +	},
 +};
 +
-+static void __init goni_tsp_init(void)
-+{
-+	int gpio, irq;
++static struct regulator_init_data mmc0_fixed_voltage_init_data = {
++	.constraints		= {
++		.name		= "VMEM_2.8V",
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(eMMC_supplies),
++	.consumer_supplies	= eMMC_supplies,
++};
 +
-+	gpio = S5PV210_GPJ1(3);                 /* XMSMADDR_11 */
-+	gpio_request(gpio, "TSP_LDO_ON");
-+	gpio_direction_output(gpio, 1);
-+	gpio_export(gpio, 0);
++static struct fixed_voltage_config mmc0_fixed_voltage_config = {
++	.supply_name		= "eMMC",
++	.microvolts		= 2800000,
++	.gpio			= S5PV210_GPJ2(7),      /* XMSMDATA_7 */
++	.enable_high		= true,
++	.enabled_at_boot	= true,
++	.init_data		= &mmc0_fixed_voltage_init_data,
++};
 +
-+	gpio = S5PV210_GPJ0(5);                 /* XMSMADDR_5 */
-+	gpio_request(gpio, "TSP_INT");
-+	s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
-+	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-+	irq = gpio_to_irq(gpio);
-+	i2c2_devs[0].irq = irq;
-+}
++static struct platform_device mmc0_fixed_voltage = {
++	.name			= "reg-fixed-voltage",
++	.id			= 2,
++	.dev			= {
++		.platform_data	= &mmc0_fixed_voltage_config,
++	},
++};
 +
- /* MAX8998 regulators */
- #if defined(CONFIG_REGULATOR_MAX8998) || defined(CONFIG_REGULATOR_MAX8998_MODULE)
+ static void goni_setup_sdhci(void)
+ {
+ 	gpio_request(GONI_EXT_FLASH_EN, "FLASH_EN");
+ 	gpio_direction_output(GONI_EXT_FLASH_EN, 1);
  
-@@ -511,6 +556,7 @@ static struct platform_device *goni_devices[] __initdata = {
++	if (hwrevision(6)) {
++		goni_hsmmc0_data.max_width = 8;
++		goni_hsmmc0_data.host_caps |= MMC_CAP_8_BIT_DATA;
++	}
++
+ 	s3c_sdhci0_set_platdata(&goni_hsmmc0_data);
+ 	s3c_sdhci1_set_platdata(&goni_hsmmc1_data);
+ 	s3c_sdhci2_set_platdata(&goni_hsmmc2_data);
+@@ -552,6 +597,7 @@ static struct platform_device *goni_devices[] __initdata = {
+ 	&s5p_device_fimc0,
+ 	&s5p_device_fimc1,
+ 	&s5p_device_fimc2,
++	&mmc0_fixed_voltage,
+ 	&s3c_device_hsmmc0,
  	&s3c_device_hsmmc1,
  	&s3c_device_hsmmc2,
- 	&s3c_device_i2c1,
-+	&s3c_device_i2c2,
- 	&samsung_device_keypad,
- };
- 
-@@ -530,6 +576,13 @@ static void __init goni_machine_init(void)
- 	s3c_i2c1_set_platdata(NULL);
- 	i2c_register_board_info(1, i2c1_devs, ARRAY_SIZE(i2c1_devs));
- 
-+	/* TSP: call before I2C 2 registeration */
-+	goni_tsp_init();
-+
-+	/* I2C2 */
-+	s3c_i2c2_set_platdata(&i2c2_data);
-+	i2c_register_board_info(2, i2c2_devs, ARRAY_SIZE(i2c2_devs));
-+
- 	/* PMIC */
- 	goni_pmic_init();
- 	i2c_register_board_info(AP_I2C_GPIO_PMIC_BUS_4, i2c_gpio_pmic_devs,
 -- 
 1.7.0.4
