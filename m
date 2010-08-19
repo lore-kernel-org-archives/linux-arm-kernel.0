@@ -1,124 +1,110 @@
 From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 19 Aug 2010 16:40:22 +0200 (CEST)
-Subject: [PATCH 4/5] DMA: Add functions to preallocate DMA memory dor devices
+Date: Thu, 19 Aug 2010 16:40:30 +0200 (CEST)
+Subject: [PATCH 5/5] SH: use dma_preallocate_coherent_memory() for platform
+	device memory
 In-Reply-To: <Pine.LNX.4.64.1008191623580.26145@axis700.grange>
 References: <Pine.LNX.4.64.1008191623580.26145@axis700.grange>
-Message-ID: <Pine.LNX.4.64.1008191636590.26145@axis700.grange>
+Message-ID: <Pine.LNX.4.64.1008191637490.26145@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently dma_declare_coherent_memory() and dma_release_declared_memory() are
-provided to assign DMA memory to a device and to release it. These functions
-can be use with device local memory, like on-chip SRAM. However, they are
-unsuitable for assigning of generic system RAM to devices, because such system
-memory should not be ioremapped, and ioremap() is used internally in the former
-of these functions to map the memory.
-
-This patch solves this problem by adding two more functions:
-dma_preallocate_coherent_memory() and dma_release_preallocated_memory(), which
-allocate DMA coherent memory and assign it to the device, and release it back
-respectively.
+platform_resource_setup_memory() is used on SuperH to allocate large chunks
+of memory at system initialisation time for platform devices. Many of those
+devices are then handled by the UIO subsystem, and only one of them - the CEU
+has an in-kernel driver. This patch switches platform_resource_setup_memory()
+to use dma_preallocate_coherent_memory() and removes now unneeded call to
+dma_declare_coherent_memory() from the CEU driver.
 
 Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 ---
- drivers/base/dma-coherent.c        |   50 ++++++++++++++++++++++++++++++++++++
- include/asm-generic/dma-coherent.h |    2 +
- include/linux/dma-mapping.h        |   12 ++++++++
- 3 files changed, 64 insertions(+), 0 deletions(-)
+ arch/sh/mm/consistent.c                    |   19 +++++++++----------
+ drivers/media/video/sh_mobile_ceu_camera.c |   19 +------------------
+ 2 files changed, 10 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-index 8efdfd4..9eb2856 100644
---- a/drivers/base/dma-coherent.c
-+++ b/drivers/base/dma-coherent.c
-@@ -170,3 +170,53 @@ int dma_release_from_coherent(struct device *dev, int order, void *vaddr)
+diff --git a/arch/sh/mm/consistent.c b/arch/sh/mm/consistent.c
+index c86a085..c617b99 100644
+--- a/arch/sh/mm/consistent.c
++++ b/arch/sh/mm/consistent.c
+@@ -127,8 +127,7 @@ int __init platform_resource_setup_memory(struct platform_device *pdev,
+ 					  char *name, unsigned long memsize)
+ {
+ 	struct resource *r;
+-	dma_addr_t dma_handle;
+-	void *buf;
++	int ret;
+ 
+ 	r = pdev->resource + pdev->num_resources - 1;
+ 	if (r->flags) {
+@@ -141,17 +140,17 @@ int __init platform_resource_setup_memory(struct platform_device *pdev,
+ 	if (!memsize)
+ 		return 0;
+ 
+-	buf = dma_alloc_coherent(NULL, memsize, &dma_handle, GFP_KERNEL);
+-	if (!buf) {
+-		pr_warning("%s: unable to allocate memory\n", name);
+-		return -ENOMEM;
++	ret = dma_preallocate_coherent_memory(&pdev->dev, memsize, GFP_KERNEL,
++					      DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
++	if (ret < 0) {
++		pr_warning("%s: unable to allocate memory: %d\n", name, ret);
++		return ret;
+ 	}
+ 
+-	memset(buf, 0, memsize);
+-
+ 	r->flags = IORESOURCE_MEM;
+-	r->start = dma_handle;
+-	r->end = r->start + memsize - 1;
++	/* Only the size is needed */
++	r->start = 0;
++	r->end = memsize - 1;
+ 	r->name = name;
  	return 0;
  }
- EXPORT_SYMBOL(dma_release_from_coherent);
-+
-+int dma_preallocate_coherent_memory(struct device *dev, size_t size, gfp_t gfp,
-+				    int flags)
-+{
-+	int pages = size >> PAGE_SHIFT;
-+	int bitmap_size = BITS_TO_LONGS(pages) * sizeof(long);
-+	dma_addr_t dma_handle;
-+	void *buf;
-+
-+	if (!(flags & (DMA_MEMORY_MAP | DMA_MEMORY_IO)) || !dev)
-+		return -EINVAL;
-+
-+	if (!size)
-+		return 0;
-+
-+	buf = dma_alloc_coherent(NULL, size, &dma_handle, gfp);
-+	if (!buf)
-+		return -ENOMEM;
-+
-+	dev->dma_mem = kzalloc(sizeof(struct dma_coherent_mem) + bitmap_size, gfp);
-+	if (!dev->dma_mem)
-+		goto ealloc;
-+
-+	dev->dma_mem->virt_base = buf;
-+	dev->dma_mem->device_base = dma_handle;
-+	dev->dma_mem->size = pages;
-+	dev->dma_mem->flags = flags;
-+
-+	return 0;
-+
-+ealloc:
-+	dma_free_coherent(dev, size, buf, dma_handle);
-+
-+	return -ENOMEM;
-+}
-+EXPORT_SYMBOL(dma_preallocate_coherent_memory);
-+
-+void dma_release_preallocated_memory(struct device *dev)
-+{
-+	struct dma_coherent_mem *mem = dev->dma_mem;
-+
-+	if (!mem)
-+		return;
-+
-+	dev->dma_mem = NULL;
-+	dma_free_coherent(dev, mem->size << PAGE_SHIFT, mem->virt_base,
-+			  mem->device_base);
-+	kfree(mem);
-+}
-+EXPORT_SYMBOL(dma_release_preallocated_memory);
-diff --git a/include/asm-generic/dma-coherent.h b/include/asm-generic/dma-coherent.h
-index a92bc09..08a66a1 100644
---- a/include/asm-generic/dma-coherent.h
-+++ b/include/asm-generic/dma-coherent.h
-@@ -21,6 +21,8 @@ void dma_release_declared_memory(struct device *dev);
+diff --git a/drivers/media/video/sh_mobile_ceu_camera.c b/drivers/media/video/sh_mobile_ceu_camera.c
+index bfddad8..325671e 100644
+--- a/drivers/media/video/sh_mobile_ceu_camera.c
++++ b/drivers/media/video/sh_mobile_ceu_camera.c
+@@ -1951,20 +1951,8 @@ static int __devinit sh_mobile_ceu_probe(struct platform_device *pdev)
+ 	pcdev->video_limit = 0; /* only enabled if second resource exists */
  
- void *dma_mark_declared_memory_occupied(struct device *dev,
- 				  dma_addr_t device_addr, size_t size);
-+int dma_preallocate_coherent_memory(struct device *dev, size_t size, gfp_t gfp, int flags);
-+void dma_release_preallocated_memory(struct device *dev);
- #else
- #define dma_alloc_from_coherent(dev, size, handle, ret) (0)
- #define dma_release_from_coherent(dev, order, vaddr) (0)
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index 77ce97f..0912abf 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -177,6 +177,18 @@ dma_mark_declared_memory_occupied(struct device *dev,
- {
- 	return ERR_PTR(-EBUSY);
- }
-+
-+static inline int
-+dma_preallocate_coherent_memory(struct device *dev, size_t size, gfp_t gfp, int flags)
-+{
-+	return -EINVAL;
-+}
-+
-+static inline void
-+dma_release_preallocated_memory(struct device *dev)
-+{
-+}
-+
- #endif
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-	if (res) {
+-		err = dma_declare_coherent_memory(&pdev->dev, res->start,
+-						  res->start,
+-						  resource_size(res),
+-						  DMA_MEMORY_MAP |
+-						  DMA_MEMORY_EXCLUSIVE);
+-		if (!err) {
+-			dev_err(&pdev->dev, "Unable to declare CEU memory.\n");
+-			err = -ENXIO;
+-			goto exit_iounmap;
+-		}
+-
++	if (res)
+ 		pcdev->video_limit = resource_size(res);
+-	}
  
- /*
+ 	/* request irq */
+ 	err = request_irq(pcdev->irq, sh_mobile_ceu_irq, IRQF_DISABLED,
+@@ -2036,9 +2024,6 @@ exit_free_clk:
+ 	pm_runtime_disable(&pdev->dev);
+ 	free_irq(pcdev->irq, pcdev);
+ exit_release_mem:
+-	if (platform_get_resource(pdev, IORESOURCE_MEM, 1))
+-		dma_release_declared_memory(&pdev->dev);
+-exit_iounmap:
+ 	iounmap(base);
+ exit_kfree:
+ 	kfree(pcdev);
+@@ -2056,8 +2041,6 @@ static int __devexit sh_mobile_ceu_remove(struct platform_device *pdev)
+ 	soc_camera_host_unregister(soc_host);
+ 	pm_runtime_disable(&pdev->dev);
+ 	free_irq(pcdev->irq, pcdev);
+-	if (platform_get_resource(pdev, IORESOURCE_MEM, 1))
+-		dma_release_declared_memory(&pdev->dev);
+ 	iounmap(pcdev->base);
+ 	if (csi2 && csi2->driver)
+ 		module_put(csi2->driver->owner);
 -- 
 1.7.2
