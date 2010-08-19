@@ -1,171 +1,230 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 18 Aug 2010 19:28:18 -0700
-Subject: [PATCHv2 2/1] Consolidate CONFIG_DEBUG_STRICT_USER_COPY_CHECKS
-In-Reply-To: <201008181428.45029.arnd@arndb.de>
-References: <201008181428.45029.arnd@arndb.de>
-Message-ID: <1282184898-30599-1-git-send-email-sboyd@codeaurora.org>
+From: myungjoo.ham@gmail.com (MyungJoo Ham)
+Date: Thu, 19 Aug 2010 11:57:14 +0900
+Subject: [PATCH 02/14] ARM: S5PV310: Removed unused clock
+In-Reply-To: <1282140084-10265-3-git-send-email-kgene.kim@samsung.com>
+References: <1282140084-10265-1-git-send-email-kgene.kim@samsung.com>
+	<1282140084-10265-3-git-send-email-kgene.kim@samsung.com>
+Message-ID: <AANLkTinjDBxahumErXmXXDW2FLxFi6oXpu-jZa+xzYhF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The help text for this config is duplicated across the x86,
-parisc, s390, and arm Kconfig.debug files. Arnd Bergman noted
-that the help text was slightly misleading and should be fixed to
-state that enabling this option isn't a problem when using pre 4.4
-gcc.
+Hello,
 
-To simplify the rewording, consolidate the text into
-lib/Kconfig.debug and modify it there to be more explicit about
-when you should say N to this config.
+On Wed, Aug 18, 2010 at 11:01 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> This pach removed unused clock on S5PV310/S5PC210.
+>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: x86 at kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-s390 at vger.kernel.org
-Cc: linux-parisc at vger.kernel.org
-Cc: Arjan van de Ven <arjan@linux.intel.com>
-Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-Cc: Helge Deller <deller@gmx.de>
----
+In this patch, you've removed corem0, corem1, cores, periph, atclk,
+and pclk_dbg, which are directly affected by cpu-freq drivers. As long
+as CPUFREQ uses clocks under 800MHz, corem0, corem1, cores, and
+periph's dividers should be updated and as long as CPUFREQ uses clocks
+over 800MHz, atclk and pclk_dbg's dividers should also be updated.
+Although in the cpu-freq patches of S5PV210, the cpu-freq driver did
+not use the clock framework and accessed clock registers directly, I
+thought cpu-freq should consider using the clock framework later as,
+sometimes, other drivers and modules are interested in the values
+related with this domain (e.g., for the stability issues,
+suspend-to-mem/disk may want to read and save the clock rates of CPU).
 
-This depends on a patch sent to the arm mailing list adding
-CONFIG_DEBUG_STRICT_USER_COPY_CHECKS to ARM.
+Do you think CPUFREQ should keep accessing the clock registers
+directly? or should start using clock frameworks later?
 
-LKML: http://lkml.org/lkml/2010/8/17/535
+ps. If we are going to change the bus speed as well (as in S5PV210's
+100MHz mode), we may need to access aclk_cored, aclk_corep, and
+aclk_acp as well.
 
- arch/arm/Kconfig.debug    |   15 ++-------------
- arch/parisc/Kconfig.debug |   15 ++-------------
- arch/s390/Kconfig.debug   |   14 ++------------
- arch/x86/Kconfig.debug    |   15 ++-------------
- lib/Kconfig.debug         |   16 ++++++++++++++++
- 5 files changed, 24 insertions(+), 51 deletions(-)
+> ---
+> ?arch/arm/mach-s5pv310/clock.c | ?126 +----------------------------------------
+> ?1 files changed, 2 insertions(+), 124 deletions(-)
+>
+> diff --git a/arch/arm/mach-s5pv310/clock.c b/arch/arm/mach-s5pv310/clock.c
+> index 77f2b4d..e3098d5 100644
+> --- a/arch/arm/mach-s5pv310/clock.c
+> +++ b/arch/arm/mach-s5pv310/clock.c
+> @@ -96,60 +96,6 @@ static struct clksrc_clk clk_armclk = {
+> ? ? ? ?},
+> ?};
+>
+> -static struct clksrc_clk clk_aclk_corem0 = {
+> - ? ? ? .clk ? ?= {
+> - ? ? ? ? ? ? ? .name ? ? ? ? ? = "aclk_corem0",
+> - ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+> - ? ? ? ? ? ? ? .parent ? ? ? ? = &clk_coreclk.clk,
+> - ? ? ? },
+> - ? ? ? .reg_div ? ? ? ?= { .reg = S5P_CLKDIV_CPU, .shift = 4, .size = 3 },
+> -};
+> -
+> -static struct clksrc_clk clk_aclk_cores = {
+> - ? ? ? .clk ? ?= {
+> - ? ? ? ? ? ? ? .name ? ? ? ? ? = "aclk_cores",
+> - ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+> - ? ? ? ? ? ? ? .parent ? ? ? ? = &clk_coreclk.clk,
+> - ? ? ? },
+> - ? ? ? .reg_div ? ? ? ?= { .reg = S5P_CLKDIV_CPU, .shift = 4, .size = 3 },
+> -};
+> -
+> -static struct clksrc_clk clk_aclk_corem1 = {
+> - ? ? ? .clk ? ?= {
+> - ? ? ? ? ? ? ? .name ? ? ? ? ? = "aclk_corem1",
+> - ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+> - ? ? ? ? ? ? ? .parent ? ? ? ? = &clk_coreclk.clk,
+> - ? ? ? },
+> - ? ? ? .reg_div ? ? ? ?= { .reg = S5P_CLKDIV_CPU, .shift = 8, .size = 3 },
+> -};
+> -
+> -static struct clksrc_clk clk_periphclk = {
+> - ? ? ? .clk ? ?= {
+> - ? ? ? ? ? ? ? .name ? ? ? ? ? = "periphclk",
+> - ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+> - ? ? ? ? ? ? ? .parent ? ? ? ? = &clk_coreclk.clk,
+> - ? ? ? },
+> - ? ? ? .reg_div ? ? ? ?= { .reg = S5P_CLKDIV_CPU, .shift = 12, .size = 3 },
+> -};
+> -
+> -static struct clksrc_clk clk_atclk = {
+> - ? ? ? .clk ? ?= {
+> - ? ? ? ? ? ? ? .name ? ? ? ? ? = "atclk",
+> - ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+> - ? ? ? ? ? ? ? .parent ? ? ? ? = &clk_moutcore.clk,
+> - ? ? ? },
+> - ? ? ? .reg_div ? ? ? ?= { .reg = S5P_CLKDIV_CPU, .shift = 16, .size = 3 },
+> -};
+> -
+> -static struct clksrc_clk clk_pclk_dbg = {
+> - ? ? ? .clk ? ?= {
+> - ? ? ? ? ? ? ? .name ? ? ? ? ? = "pclk_dbg",
+> - ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+> - ? ? ? ? ? ? ? .parent ? ? ? ? = &clk_atclk.clk,
+> - ? ? ? },
+> - ? ? ? .reg_div ? ? ? ?= { .reg = S5P_CLKDIV_CPU, .shift = 20, .size = 3 },
+> -};
+> -
+> ?/* Core list of CMU_CORE side */
+>
+> ?static struct clk *clkset_corebus_list[] = {
+> @@ -180,42 +126,6 @@ static struct clksrc_clk clk_sclk_dmc = {
+> ? ? ? ?.reg_div ? ? ? ?= { .reg = S5P_CLKDIV_CORE0, .shift = 12, .size = 3 },
+> ?};
+>
+> -static struct clksrc_clk clk_aclk_cored = {
+> - ? ? ? .clk ? ?= {
+> - ? ? ? ? ? ? ? .name ? ? ? ? ? = "aclk_cored",
+> - ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+> - ? ? ? ? ? ? ? .parent ? ? ? ? = &clk_sclk_dmc.clk,
+> - ? ? ? },
+> - ? ? ? .reg_div ? ? ? ?= { .reg = S5P_CLKDIV_CORE0, .shift = 16, .size = 3 },
+> -};
+> -
+> -static struct clksrc_clk clk_aclk_corep = {
+> - ? ? ? .clk ? ?= {
+> - ? ? ? ? ? ? ? .name ? ? ? ? ? = "aclk_corep",
+> - ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+> - ? ? ? ? ? ? ? .parent ? ? ? ? = &clk_aclk_cored.clk,
+> - ? ? ? },
+> - ? ? ? .reg_div ? ? ? ?= { .reg = S5P_CLKDIV_CORE0, .shift = 20, .size = 3 },
+> -};
+> -
+> -static struct clksrc_clk clk_aclk_acp = {
+> - ? ? ? .clk ? ?= {
+> - ? ? ? ? ? ? ? .name ? ? ? ? ? = "aclk_acp",
+> - ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+> - ? ? ? ? ? ? ? .parent ? ? ? ? = &clk_mout_corebus.clk,
+> - ? ? ? },
+> - ? ? ? .reg_div ? ? ? ?= { .reg = S5P_CLKDIV_CORE0, .shift = 0, .size = 3 },
+> -};
+> -
+> -static struct clksrc_clk clk_pclk_acp = {
+> - ? ? ? .clk ? ?= {
+> - ? ? ? ? ? ? ? .name ? ? ? ? ? = "pclk_acp",
+> - ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+> - ? ? ? ? ? ? ? .parent ? ? ? ? = &clk_aclk_acp.clk,
+> - ? ? ? },
+> - ? ? ? .reg_div ? ? ? ?= { .reg = S5P_CLKDIV_CORE0, .shift = 4, .size = 3 },
+> -};
+> -
+> ?/* Core list of CMU_TOP side */
+>
+> ?static struct clk *clkset_aclk_top_list[] = {
+> @@ -416,18 +326,8 @@ static struct clksrc_clk *sysclks[] = {
+> ? ? ? ?&clk_moutcore,
+> ? ? ? ?&clk_coreclk,
+> ? ? ? ?&clk_armclk,
+> - ? ? ? &clk_aclk_corem0,
+> - ? ? ? &clk_aclk_cores,
+> - ? ? ? &clk_aclk_corem1,
+> - ? ? ? &clk_periphclk,
+> - ? ? ? &clk_atclk,
+> - ? ? ? &clk_pclk_dbg,
+> ? ? ? ?&clk_mout_corebus,
+> ? ? ? ?&clk_sclk_dmc,
+> - ? ? ? &clk_aclk_cored,
+> - ? ? ? &clk_aclk_corep,
+> - ? ? ? &clk_aclk_acp,
+> - ? ? ? &clk_pclk_acp,
+> ? ? ? ?&clk_vpllsrc,
+> ? ? ? ?&clk_sclk_vpll,
+> ? ? ? ?&clk_aclk_200,
+> @@ -446,15 +346,7 @@ void __init_or_cpufreq s5pv310_setup_clocks(void)
+> ? ? ? ?unsigned long vpllsrc;
+> ? ? ? ?unsigned long xtal;
+> ? ? ? ?unsigned long armclk;
+> - ? ? ? unsigned long aclk_corem0;
+> - ? ? ? unsigned long aclk_cores;
+> - ? ? ? unsigned long aclk_corem1;
+> - ? ? ? unsigned long periphclk;
+> ? ? ? ?unsigned long sclk_dmc;
+> - ? ? ? unsigned long aclk_cored;
+> - ? ? ? unsigned long aclk_corep;
+> - ? ? ? unsigned long aclk_acp;
+> - ? ? ? unsigned long pclk_acp;
+> ? ? ? ?unsigned int ptr;
+>
+> ? ? ? ?printk(KERN_DEBUG "%s: registering clocks\n", __func__);
+> @@ -485,26 +377,12 @@ void __init_or_cpufreq s5pv310_setup_clocks(void)
+> ? ? ? ? ? ? ? ? ? ? ? ?apll, mpll, epll, vpll);
+>
+> ? ? ? ?armclk = clk_get_rate(&clk_armclk.clk);
+> - ? ? ? aclk_corem0 = clk_get_rate(&clk_aclk_corem0.clk);
+> - ? ? ? aclk_cores = clk_get_rate(&clk_aclk_cores.clk);
+> - ? ? ? aclk_corem1 = clk_get_rate(&clk_aclk_corem1.clk);
+> - ? ? ? periphclk = clk_get_rate(&clk_periphclk.clk);
+> ? ? ? ?sclk_dmc = clk_get_rate(&clk_sclk_dmc.clk);
+> - ? ? ? aclk_cored = clk_get_rate(&clk_aclk_cored.clk);
+> - ? ? ? aclk_corep = clk_get_rate(&clk_aclk_corep.clk);
+> - ? ? ? aclk_acp = clk_get_rate(&clk_aclk_acp.clk);
+> - ? ? ? pclk_acp = clk_get_rate(&clk_pclk_acp.clk);
+> -
+> - ? ? ? printk(KERN_INFO "S5PV310: ARMCLK=%ld, COREM0=%ld, CORES=%ld\n"
+> - ? ? ? ? ? ? ? ? ? ? ? ?"COREM1=%ld, PERI=%ld, DMC=%ld, CORED=%ld\n"
+> - ? ? ? ? ? ? ? ? ? ? ? ?"COREP=%ld, ACLK_ACP=%ld, PCLK_ACP=%ld",
+> - ? ? ? ? ? ? ? ? ? ? ? armclk, aclk_corem0, aclk_cores, aclk_corem1,
+> - ? ? ? ? ? ? ? ? ? ? ? periphclk, sclk_dmc, aclk_cored, aclk_corep,
+> - ? ? ? ? ? ? ? ? ? ? ? aclk_acp, pclk_acp);
+> +
+> + ? ? ? printk(KERN_INFO "S5PV310: ARMCLK=%ld, DMC=%ld\n", armclk, sclk_dmc);
+>
+> ? ? ? ?clk_f.rate = armclk;
+> ? ? ? ?clk_h.rate = sclk_dmc;
+> - ? ? ? clk_p.rate = periphclk;
+>
+> ? ? ? ?for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
+> ? ? ? ? ? ? ? ?s3c_set_clksrc(&clksrcs[ptr], true);
+> --
+> 1.6.2.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 64e33b8..326c7f1 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -128,18 +128,7 @@ config DEBUG_S3C_UART
- 	  The uncompressor code port configuration is now handled
- 	  by CONFIG_S3C_LOWLEVEL_UART_PORT.
- 
--config DEBUG_STRICT_USER_COPY_CHECKS
--	bool "Strict user copy size checks"
--	depends on DEBUG_KERNEL && !TRACE_BRANCH_PROFILING
--	help
--	  Enabling this option turns a certain set of sanity checks for user
--	  copy operations into compile time errors.
--
--	  The copy_from_user() etc checks are there to help test if there
--	  are sufficient security checks on the length argument of
--	  the copy operation, by having gcc prove that the argument is
--	  within bounds.
--
--	  If unsure, or if you run an older (pre 4.4) gcc, say N.
-+config ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
-+	def_bool y
- 
- endmenu
-diff --git a/arch/parisc/Kconfig.debug b/arch/parisc/Kconfig.debug
-index 7305ac8..b13e8d0 100644
---- a/arch/parisc/Kconfig.debug
-+++ b/arch/parisc/Kconfig.debug
-@@ -12,18 +12,7 @@ config DEBUG_RODATA
-          portion of the kernel code won't be covered by a TLB anymore.
-          If in doubt, say "N".
- 
--config DEBUG_STRICT_USER_COPY_CHECKS
--	bool "Strict copy size checks"
--	depends on DEBUG_KERNEL && !TRACE_BRANCH_PROFILING
--	---help---
--	  Enabling this option turns a certain set of sanity checks for user
--	  copy operations into compile time failures.
--
--	  The copy_from_user() etc checks are there to help test if there
--	  are sufficient security checks on the length argument of
--	  the copy operation, by having gcc prove that the argument is
--	  within bounds.
--
--	  If unsure, or if you run an older (pre 4.4) gcc, say N.
-+config ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
-+	def_bool y
- 
- endmenu
-diff --git a/arch/s390/Kconfig.debug b/arch/s390/Kconfig.debug
-index 45e0c61..6df8e30 100644
---- a/arch/s390/Kconfig.debug
-+++ b/arch/s390/Kconfig.debug
-@@ -6,17 +6,7 @@ config TRACE_IRQFLAGS_SUPPORT
- 
- source "lib/Kconfig.debug"
- 
--config DEBUG_STRICT_USER_COPY_CHECKS
--	bool "Strict user copy size checks"
--	---help---
--	  Enabling this option turns a certain set of sanity checks for user
--	  copy operations into compile time warnings.
--
--	  The copy_from_user() etc checks are there to help test if there
--	  are sufficient security checks on the length argument of
--	  the copy operation, by having gcc prove that the argument is
--	  within bounds.
--
--	  If unsure, or if you run an older (pre 4.4) gcc, say N.
-+config ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
-+	def_bool y
- 
- endmenu
-diff --git a/arch/x86/Kconfig.debug b/arch/x86/Kconfig.debug
-index 7508508..d24afa3 100644
---- a/arch/x86/Kconfig.debug
-+++ b/arch/x86/Kconfig.debug
-@@ -285,18 +285,7 @@ config OPTIMIZE_INLINING
- 
- 	  If unsure, say N.
- 
--config DEBUG_STRICT_USER_COPY_CHECKS
--	bool "Strict copy size checks"
--	depends on DEBUG_KERNEL && !TRACE_BRANCH_PROFILING
--	---help---
--	  Enabling this option turns a certain set of sanity checks for user
--	  copy operations into compile time failures.
--
--	  The copy_from_user() etc checks are there to help test if there
--	  are sufficient security checks on the length argument of
--	  the copy operation, by having gcc prove that the argument is
--	  within bounds.
--
--	  If unsure, or if you run an older (pre 4.4) gcc, say N.
-+config ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
-+	def_bool y
- 
- endmenu
-diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-index 9e06b7f..bbb1ac5 100644
---- a/lib/Kconfig.debug
-+++ b/lib/Kconfig.debug
-@@ -1013,6 +1013,22 @@ config SYSCTL_SYSCALL_CHECK
- 	  to properly maintain and use. This enables checks that help
- 	  you to keep things correct.
- 
-+config DEBUG_STRICT_USER_COPY_CHECKS
-+	bool "Strict user copy size checks"
-+	depends on ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
-+	depends on DEBUG_KERNEL && !TRACE_BRANCH_PROFILING
-+	help
-+	  Enabling this option turns a certain set of sanity checks for user
-+	  copy operations into compile time warnings/errors.
-+
-+	  The copy_from_user() etc checks are there to help test if there
-+	  are sufficient security checks on the length argument of
-+	  the copy operation, by having gcc prove that the argument is
-+	  within bounds.
-+
-+	  If unsure, or if you run an older (pre 4.4) gcc where this option
-+	  is a no-op, say N.
-+
- source mm/Kconfig.debug
- source kernel/trace/Kconfig
- 
+
+
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+MyungJoo Ham, Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
