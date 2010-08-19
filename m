@@ -1,163 +1,28 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Thu, 19 Aug 2010 19:28:42 +0900
-Subject: [PATCH 13/14] ARM: S5PV310: Add video clocks
-In-Reply-To: <AANLkTincrZWhrb8fcrdL2QNtZTbgBB-pAYzTf8cq6Zn7@mail.gmail.com>
-References: <1282140084-10265-1-git-send-email-kgene.kim@samsung.com>
-	<1282140084-10265-14-git-send-email-kgene.kim@samsung.com>
-	<AANLkTincrZWhrb8fcrdL2QNtZTbgBB-pAYzTf8cq6Zn7@mail.gmail.com>
-Message-ID: <AANLkTikreMifRgd8kkvcmjZoRZ0fEAcHqWExaOikzE6v@mail.gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Thu, 19 Aug 2010 20:31:22 +1000
+Subject: ARM: 2.6.3[45] PCI regression (IXP4xx and PXA?)
+In-Reply-To: <20100814181306U.fujita.tomonori@lab.ntt.co.jp>
+References: <20100811072532.GA21511@n2100.arm.linux.org.uk>
+	<20100813152224H.fujita.tomonori@lab.ntt.co.jp>
+	<20100813215413.GA21607@n2100.arm.linux.org.uk>
+	<20100814181306U.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <1282213882.22370.360.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 19, 2010 at 7:04 PM, MyungJoo Ham <myungjoo.ham@samsung.com> wrote:
-> On Wed, Aug 18, 2010 at 11:01 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> From: Jongpill Lee <boyko.lee@samsung.com>
->>
->> This patch adds video clocks for S5PV310/S5PC210.
->>
->> Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
->> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
->> ---
->> ?arch/arm/mach-s5pv310/clock.c | ? 74 +++++++++++++++++++++++++++++++++++++++++
->> ?1 files changed, 74 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-s5pv310/clock.c b/arch/arm/mach-s5pv310/clock.c
->> index 14c9707..04bde94 100644
->> --- a/arch/arm/mach-s5pv310/clock.c
->> +++ b/arch/arm/mach-s5pv310/clock.c
->> @@ -506,6 +506,78 @@ static struct clksrc_sources clkset_group = {
->> ? ? ? ?.nr_sources ? ? = ARRAY_SIZE(clkset_group_list),
->> ?};
->>
->> +static struct clksrc_clk clk_sclk_mipidphy4l = {
->> + ? ? ? .clk ? ?= {
->> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "sclk_mipidphy4l",
->> + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
->> + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_lcd0_ctrl,
->> + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 4),
->> + ? ? ? },
->> + ? ? ? .sources ? ? ? ?= &clkset_group,
->> + ? ? ? .reg_src ? ? ? ?= { .reg = S5P_CLKSRC_LCD0, .shift = 12, .size = 4 },
->> + ? ? ? .reg_div ? ? ? ?= { .reg = S5P_CLKDIV_LCD0, .shift = 16, .size = 4 },
->> +};
->
-> It appears that clk_ip_lcd0[4](CLK_SMMUFIMD0) is not for this clock
-> source. This SCLK_MIPIDPHY4L seems to be masked by
-> CLK_SRC_MASK_LCD0[12] (MIPI0_MASK)
+On Sat, 2010-08-14 at 18:30 +0900, FUJITA Tomonori wrote:
+> 
+> A long solution would be having two dma_mask for a device and a
+> bus. We also need something to represent a DMA-capable range instead
+> of the dma mask.
 
-Um... As CLK_SRC_MASK_LCD0[12] (MIPI0_MASK) controls MUX_MIPI0, it
-masks both SCLK_MIPIDPHY4L and SCLK_MIPI0. Then, it seems that we
-cannot mask SCLK_MIPIDPHY4L and SCLK_MIPI0 independently.
+I'd rather have the arch (aka the bus) be able to filter the mask,
+better than having to deal with multiple masks in the generic code.
+Besides, in embedded-land, you never know how many busses are stacked
+before you reach the device, ie, you'd end up having to AND quite a few
+masks before getting there in some cases.
 
-Then, what about not adding .enable entry for both "sclk_mipidphy4l"
-and "sclk_mipi" (which is added in the PATCH 14/14)? Affecting another
-clock source with one does not look good.
+Sounds better to establish that once, at set_coherent_dma_mask() time.
 
->
->> +
->> +static struct clksrc_clk clk_sclk_mipidphy2l = {
->> + ? ? ? .clk ? ?= {
->> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "sclk_mipidphy2l",
->> + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
->> + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_lcd1_ctrl,
->> + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 4),
->> + ? ? ? },
->> + ? ? ? .sources ? ? ? ?= &clkset_group,
->> + ? ? ? .reg_src ? ? ? ?= { .reg = S5P_CLKSRC_LCD1, .shift = 12, .size = 4 },
->> + ? ? ? .reg_div ? ? ? ?= { .reg = S5P_CLKDIV_LCD1, .shift = 16, .size = 4 },
->> +};
->
-> Appears to have the similar issue with the previous clock source
-
-Same with above.
-
->
->> +
->> +static struct clk *clkset_mout_g2d0_list[] = {
->> + ? ? ? [0] = &clk_mout_mpll.clk,
->> + ? ? ? [1] = &clk_sclk_apll.clk,
->> +};
->> +
->> +static struct clksrc_sources clkset_mout_g2d0 = {
->> + ? ? ? .sources ? ? ? ?= clkset_mout_g2d0_list,
->> + ? ? ? .nr_sources ? ? = ARRAY_SIZE(clkset_mout_g2d0_list),
->> +};
->> +
->> +static struct clksrc_clk clk_mout_g2d0 = {
->> + ? ? ? .clk ? ?= {
->> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "mout_g2d0",
->> + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
->> + ? ? ? },
->> + ? ? ? .sources ? ? ? ?= &clkset_mout_g2d0,
->> + ? ? ? .reg_src ? ? ? ?= { .reg = S5P_CLKSRC_IMAGE, .shift = 0, .size = 1 },
->> +};
->> +
->> +static struct clk *clkset_mout_g2d1_list[] = {
->> + ? ? ? [0] = &clk_mout_epll.clk,
->> + ? ? ? [1] = &clk_sclk_vpll.clk,
->> +};
->> +
->> +static struct clksrc_sources clkset_mout_g2d1 = {
->> + ? ? ? .sources ? ? ? ?= clkset_mout_g2d1_list,
->> + ? ? ? .nr_sources ? ? = ARRAY_SIZE(clkset_mout_g2d1_list),
->> +};
->> +
->> +static struct clksrc_clk clk_mout_g2d1 = {
->> + ? ? ? .clk ? ?= {
->> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "mout_g2d1",
->> + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
->> + ? ? ? },
->> + ? ? ? .sources ? ? ? ?= &clkset_mout_g2d1,
->> + ? ? ? .reg_src ? ? ? ?= { .reg = S5P_CLKSRC_IMAGE, .shift = 4, .size = 1 },
->> +};
->> +
->> +static struct clk *clkset_mout_g2d_list[] = {
->> + ? ? ? [0] = &clk_mout_g2d0.clk,
->> + ? ? ? [1] = &clk_mout_g2d1.clk,
->> +};
->> +
->> +static struct clksrc_sources clkset_mout_g2d = {
->> + ? ? ? .sources ? ? ? ?= clkset_mout_g2d_list,
->> + ? ? ? .nr_sources ? ? = ARRAY_SIZE(clkset_mout_g2d_list),
->> +};
->> +
->> ?static struct clksrc_clk clk_dout_mmc0 = {
->> ? ? ? ?.clk ? ? ? ? ? ?= {
->> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "dout_mmc0",
->> @@ -672,6 +744,8 @@ static struct clksrc_clk *sysclks[] = {
->> ? ? ? ?&clk_aclk_100,
->> ? ? ? ?&clk_aclk_160,
->> ? ? ? ?&clk_aclk_133,
->> + ? ? ? &clk_sclk_mipidphy4l,
->> + ? ? ? &clk_sclk_mipidphy2l,
->> ? ? ? ?&clk_dout_mmc0,
->> ? ? ? ?&clk_dout_mmc1,
->> ? ? ? ?&clk_dout_mmc2,
->> --
->> 1.6.2.5
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
->
->
-> --
-> MyungJoo Ham, Ph.D.
-> Mobile Software Platform Lab,
-> Digital Media and Communications (DMC) Business
-> Samsung Electronics
-> cell: 82-10-6714-2858
->
-
-
-
--- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+Cheers,
+Ben.
