@@ -1,22 +1,30 @@
 From: davem@davemloft.net (David Miller)
-Date: Thu, 19 Aug 2010 00:13:03 -0700 (PDT)
-Subject: [PATCH v4] ether3: Use net_device_stats from struct net_device
-In-Reply-To: <1282198531-4157-1-git-send-email-tklauser@distanz.ch>
-References: <1282061733-19700-1-git-send-email-tklauser@distanz.ch>
-	<1282198531-4157-1-git-send-email-tklauser@distanz.ch>
-Message-ID: <20100819.001303.235703853.davem@davemloft.net>
+Date: Thu, 19 Aug 2010 00:15:13 -0700 (PDT)
+Subject: [PATCH net-next-2.6] atm: remove a net_device_stats clear
+In-Reply-To: <1282164274.2328.2.camel@edumazet-laptop>
+References: <20100818083304.2ef2eea4@nehalam>
+	<20100818.131043.226780154.davem@davemloft.net>
+	<1282164274.2328.2.camel@edumazet-laptop>
+Message-ID: <20100819.001513.212394625.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tobias Klauser <tklauser@distanz.ch>
-Date: Thu, 19 Aug 2010 08:15:31 +0200
+From: Eric Dumazet <eric.dumazet@gmail.com>
+Date: Wed, 18 Aug 2010 22:44:34 +0200
 
-> struct net_device has its own struct net_device_stats member, so use
-> this one instead of a private copy in the ether1_priv struct. As the new
-> ndo_get_stats function would just return dev->stats we can omit it. This
-> patch also removes an incorrect memset of the stats on open.
+> Le mercredi 18 ao?t 2010 ? 13:10 -0700, David Miller a ?crit :
+>> Yep, both the ether1 and ether3 patch have this problem.  Looks
+>> like we'll see v4 coming some :-)
 > 
-> Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
-> ---
+> To be fair, we accepted some bits like that in the past ;)
 
-Applied, thanks.
+Yes, but let's nip it in the butt immediately when we do
+notice it :-)
+
+> [PATCH net-next-2.6] atm: remove a net_device_stats clear
+> 
+> No need to clear device stats in lec_open()
+> 
+> Signed-off-by: Eric Dumazet <eric.dumazet@gmail.com>
+
+Applied, thanks!
