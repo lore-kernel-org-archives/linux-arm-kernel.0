@@ -1,78 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 19 Aug 2010 12:35:49 +0300
-Subject: [PATCH 12/14] omap2/3: Fix initcalls for multi-omap
-In-Reply-To: <20100819090313.GC3003@shisha.kicks-ass.net>
-References: <20100126200646.15382.52167.stgit@baageli.muru.com>
-	<20100126201304.15382.73756.stgit@baageli.muru.com>
-	<20100819090313.GC3003@shisha.kicks-ass.net>
-Message-ID: <20100819093548.GT12184@atomide.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Thu, 19 Aug 2010 17:38:55 +0800
+Subject: [PATCH 0/4] Hacks to allow booting ARM SMP kernel on UP ARMv7
+In-Reply-To: <20100819073810.GR12184@atomide.com>
+References: <20100817104414.19061.38999.stgit@baageli.muru.com>
+	<20100817135205.GC20325@n2100.arm.linux.org.uk>
+	<20100817141210.GJ12184@atomide.com>
+	<20100817154035.GD20325@n2100.arm.linux.org.uk>
+	<20100819073810.GR12184@atomide.com>
+Message-ID: <4C6CFBAF.6020407@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alexander Shishkin <virtuoso@slind.org> [100819 12:04]:
-> On Tue, Jan 26, 2010 at 12:13:04 -0800, Tony Lindgren wrote:
-> > Otherwise the wrong initcalls can run.
-> > 
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > ---
-> >  arch/arm/mach-omap2/clock2xxx.c |    2 +-
-> >  arch/arm/mach-omap2/clock34xx.c |    2 +-
-> >  arch/arm/mach-omap2/emu.c       |    3 +++
+On 08/19/2010 03:38 PM, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [100817 18:33]:
+>> On Tue, Aug 17, 2010 at 05:12:11PM +0300, Tony Lindgren wrote:
+>>> Great, will give it a try hopefully tomorrow. Sounds like that's the way
+>>> to deal with fixing up things when booting up older UP ARMv6 without the
+>>> 32v6 support :)
+>>
+>> What I've also been debating about is adding another word to the
+>> smpalt structure, that being a set of flags which denote the situation
+>> where the alternative should be used.
+>>
+>> That means we can use it to do individual word replacements for SMP vs
+>> UP, ARMv6 vs ARMv6k etc.
 > 
-> May I ask what stopped you from CCing me on this patch?
-
-Hmm, sorry I don't follow you. Did I accidentally leave out something?
-
-Regards,
-
-Tony
-
- 
-> >  3 files changed, 5 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/clock2xxx.c b/arch/arm/mach-omap2/clock2xxx.c
-> > index 43e7404..1a31b72 100644
-> > --- a/arch/arm/mach-omap2/clock2xxx.c
-> > +++ b/arch/arm/mach-omap2/clock2xxx.c
-> > @@ -598,7 +598,7 @@ static int __init omap2_clk_arch_init(void)
-> >  	struct clk *virt_prcm_set, *sys_ck, *dpll_ck, *mpu_ck;
-> >  	unsigned long sys_ck_rate;
-> >  
-> > -	if (!mpurate)
-> > +	if (!(cpu_is_omap24xx() && mpurate))
-> >  		return -EINVAL;
-> >  
-> >  	virt_prcm_set = clk_get(NULL, "virt_prcm_set");
-> > diff --git a/arch/arm/mach-omap2/clock34xx.c b/arch/arm/mach-omap2/clock34xx.c
-> > index f485a89..03720bc 100644
-> > --- a/arch/arm/mach-omap2/clock34xx.c
-> > +++ b/arch/arm/mach-omap2/clock34xx.c
-> > @@ -317,7 +317,7 @@ static int __init omap2_clk_arch_init(void)
-> >  	struct clk *osc_sys_ck, *dpll1_ck, *arm_fck, *core_ck;
-> >  	unsigned long osc_sys_rate;
-> >  
-> > -	if (!mpurate)
-> > +	if (!(cpu_is_omap34xx() && mpurate))
-> >  		return -EINVAL;
-> >  
-> >  	/* XXX test these for success */
-> > diff --git a/arch/arm/mach-omap2/emu.c b/arch/arm/mach-omap2/emu.c
-> > index ec0d984..9c442e2 100644
-> > --- a/arch/arm/mach-omap2/emu.c
-> > +++ b/arch/arm/mach-omap2/emu.c
-> > @@ -56,6 +56,9 @@ static struct amba_device omap3_etm_device = {
-> >  
-> >  static int __init emu_init(void)
-> >  {
-> > +	if (!cpu_is_omap34xx())
-> > +		return -ENODEV;
-> > +
-> >  	amba_device_register(&omap3_etb_device, &iomem_resource);
-> >  	amba_device_register(&omap3_etm_device, &iomem_resource);
-> >  
-> > 
-> > 
+> Sounds good to me. Maybe it should then be called cpualt instead of smpalt?
 > 
-> Regards,
-> --
-> Alex
+> Tried booting your patch and needed the following fix for Cortex-A8 UP.
+> 
+> Now it boots to the following error:
+> 
+> Machine configuration botched (nr -1073741824), unable to continue.
+> 
+> Does some struct size need to be changed or something?
+> 
+
+I also tested these 2 patches on my beagle board based on -for-next branch for
+linux-omap tree. I don't have debug hardware to find the kernel boot failure. It
+looks like it stops at very early stage.
+
+Do you know where is the message (nr -1073741824) coming from?
+
+Thanks,
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer    +86.138-1617-6545 Mobile
+Ubuntu Kernel Team | Hardware Enablement Team
+Canonical Ltd.      www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
