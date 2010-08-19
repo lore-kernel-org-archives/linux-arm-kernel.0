@@ -1,74 +1,99 @@
-From: iws@ovro.caltech.edu (Ira W. Snyder)
-Date: Thu, 19 Aug 2010 08:23:01 -0700
-Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
-In-Reply-To: <201008191429.50008.arnd@arndb.de>
-References: <cover.1281956490.git.richard.cochran@omicron.at>
-	<201008181702.03384.arnd@arndb.de>
-	<20100819092246.GA8484@riccoc20.at.omicron.at>
-	<201008191429.50008.arnd@arndb.de>
-Message-ID: <20100819152301.GB25193@ovro.caltech.edu>
+From: rene.sapiens@ti.com (Sapiens, Rene)
+Date: Thu, 19 Aug 2010 11:09:34 -0500
+Subject: [PATCHv2] mailbox: change full flag per mailbox queue instead
+	of global
+In-Reply-To: <1281489169-15945-1-git-send-email-x0095840@ti.com>
+References: <1281489169-15945-1-git-send-email-x0095840@ti.com>
+Message-ID: <D2943F03B81C9C458E44DFB213905E02B7637B6D@dlee04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 19, 2010 at 02:29:49PM +0200, Arnd Bergmann wrote:
-> On Thursday 19 August 2010, Richard Cochran wrote:
-> > 
-> > On Wed, Aug 18, 2010 at 05:02:03PM +0200, Arnd Bergmann wrote:
-> > > You might want to use callbacks for these system calls that you
-> > > can register to at module load time, like it is done for the
-> > > existing syscalls.
-> > 
-> > Can you point me to a specific example?
-> 
-> The struct k_clock contains callback functions to clock source
-> specific implementations of the syscalls and other functions.
-> Adding a new clock source that is (potentially) implemented
-> as a module means you have to define a new k_clock in that module
-> that you register using register_posix_clock.
-> 
-> If you need additional syscalls to be implemented by the same
-> module, you can put more callback functions into struct k_clock
-> that would then only be implemented by the new module.
-> 
-> > > The simpler way (e.g. for testing) is using Kconfig dependencies, like
-> > > 
-> > > config PTP
-> > >       bool "IEEE 1588 Precision Time Protocol"
-> > > 
-> > > config PPS
-> > >       tristate "Pulse per Second"
-> > >       depends on PTP || !PTP
-> > > 
-> > > The depends statement is a way of expressing that when PTP is enabled,
-> > > PPS cannot be a module, while it may be a module if PTP is disabled.
-> > 
-> > THis did not work for me.
-> > 
-> > What I got was, in effect, two independent booleans.
-> 
-> Hmm, right. I wonder what I was thinking of then.
-> 
-> You can certainly do
-> 
-> config PTP
-> 	bool "IEEE 1588 Precision Time Protocol"
-> 	depends on PPS != m
-> 
-> but that will hide the PTP option if PPS is set to 'm', which is normally
-> not what you want.
-> 
+Hi Ohad,
 
-Arnd,
+This patch already contains the missed changes due to previous rebases.
+Thanks.
 
-Perhaps you were thinking of the vhost example (taken from
-drivers/vhost/Kconfig):
+Regards,
+Rene
 
-config VHOST_NET
-	tristate "Host kernel accelerator for virtio net (EXPERIMENTAL)"
-	depends on NET && EVENTFD && (TUN || !TUN) && (MACVTAP || !MACVTAP) && EXPERIMENTAL
-
-They have a similar construct with both TUN and MACVTAP there. Perhaps
-the parens are a necessary part of the "X || !X" syntax? Just a random
-guess.
-
-Ira
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Guzman Lugo, Fernando
+> Sent: Tuesday, August 10, 2010 8:13 PM
+> To: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
+> Cc: hiroshi.doyu at nokia.com; ohad at wizery.com; Guzman Lugo, Fernando
+> Subject: [PATCHv2] mailbox: change full flag per mailbox queue instead of
+> global
+> 
+> As pointed by Ohad Ben-Cohen, the variable rq_full flag is a
+> global variable, so if there are multiple mailbox users
+> there will be conflics. Now there is a full flag per
+> mailbox queue.
+> 
+> Version 2:
+> - Rebase to the latest.
+> 
+> Reported-by: Ohad Ben-Cohen <ohad@wizery.com>
+> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
+> ---
+>  arch/arm/plat-omap/include/plat/mailbox.h |    1 +
+>  arch/arm/plat-omap/mailbox.c              |   10 +++++++---
+>  2 files changed, 8 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-
+> omap/include/plat/mailbox.h
+> index 9976565..261f6b8 100644
+> --- a/arch/arm/plat-omap/include/plat/mailbox.h
+> +++ b/arch/arm/plat-omap/include/plat/mailbox.h
+> @@ -48,6 +48,7 @@ struct omap_mbox_queue {
+>  	struct tasklet_struct	tasklet;
+>  	int	(*callback)(void *);
+>  	struct omap_mbox	*mbox;
+> +	bool	full;
+>  };
+> 
+>  struct omap_mbox {
+> diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+> index d2fafb8..c59c9c3 100644
+> --- a/arch/arm/plat-omap/mailbox.c
+> +++ b/arch/arm/plat-omap/mailbox.c
+> @@ -33,7 +33,6 @@
+> 
+>  static struct workqueue_struct *mboxd;
+>  static struct omap_mbox **mboxes;
+> -static bool rq_full;
+> 
+>  static int mbox_configured;
+>  static DEFINE_MUTEX(mbox_configured_lock);
+> @@ -145,7 +144,12 @@ static void mbox_rx_work(struct work_struct *work)
+>  	while (kfifo_len(&mq->fifo) >= sizeof(msg)) {
+>  		len = kfifo_out(&mq->fifo, (unsigned char *)&msg,
+> sizeof(msg));
+>  		WARN_ON(len != sizeof(msg));
+> -
+> +		spin_lock_irq(&mq->lock);
+> +		if (mq->full) {
+> +			omap_mbox_enable_irq(mq->mbox, IRQ_RX);
+> +			mq->full = false;
+> +		}
+> +		spin_unlock_irq(&mq->lock);
+>  		if (mq->callback)
+>  			mq->callback((void *)msg);
+>  	}
+> @@ -170,7 +174,7 @@ static void __mbox_rx_interrupt(struct omap_mbox
+> *mbox)
+>  	while (!mbox_fifo_empty(mbox)) {
+>  		if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
+>  			omap_mbox_disable_irq(mbox, IRQ_RX);
+> -			rq_full = true;
+> +			mq->full = true;
+>  			goto nomem;
+>  		}
+> 
+> --
+> 1.6.3.3
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
