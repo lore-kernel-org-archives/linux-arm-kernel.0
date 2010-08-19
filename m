@@ -1,24 +1,35 @@
-From: arjan@linux.intel.com (Arjan van de Ven)
-Date: Wed, 18 Aug 2010 21:38:34 -0700
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 19 Aug 2010 14:47:19 +1000
 Subject: [PATCHv2 2/1] Consolidate CONFIG_DEBUG_STRICT_USER_COPY_CHECKS
 In-Reply-To: <1282184898-30599-1-git-send-email-sboyd@codeaurora.org>
 References: <201008181428.45029.arnd@arndb.de>
 	<1282184898-30599-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <4C6CB54A.4090605@linux.intel.com>
+Message-ID: <20100819144719.e690c674.sfr@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/18/2010 7:28 PM, Stephen Boyd wrote:
-> The help text for this config is duplicated across the x86,
-> parisc, s390, and arm Kconfig.debug files. Arnd Bergman noted
-> that the help text was slightly misleading and should be fixed to
-> state that enabling this option isn't a problem when using pre 4.4
-> gcc.
+On Wed, 18 Aug 2010 19:28:18 -0700 Stephen Boyd <sboyd@codeaurora.org> wrote:
 >
-> To simplify the rewording, consolidate the text into
-> lib/Kconfig.debug and modify it there to be more explicit about
-> when you should say N to this config.
->    
+> +config ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
+> +	def_bool y
 
+Why not just have
 
-Acked-by: Arjan van de Ven <arjan@linux.intel.com>
+config ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
+	bool
+
+in lib/Kconfig.debug
+
+and select that in each arch that want it?
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+http://www.canb.auug.org.au/~sfr/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100819/56db0070/attachment.sig>
