@@ -1,99 +1,30 @@
-From: rene.sapiens@ti.com (Sapiens, Rene)
-Date: Thu, 19 Aug 2010 11:09:34 -0500
-Subject: [PATCHv2] mailbox: change full flag per mailbox queue instead
-	of global
-In-Reply-To: <1281489169-15945-1-git-send-email-x0095840@ti.com>
-References: <1281489169-15945-1-git-send-email-x0095840@ti.com>
-Message-ID: <D2943F03B81C9C458E44DFB213905E02B7637B6D@dlee04.ent.ti.com>
+From: gregkh@suse.de (Greg KH)
+Date: Thu, 19 Aug 2010 09:02:55 -0700
+Subject: [PATCH 3/5] DMA: reduce the number of memory allocations
+In-Reply-To: <Pine.LNX.4.64.1008191744560.26145@axis700.grange>
+References: <Pine.LNX.4.64.1008191623580.26145@axis700.grange>
+	<Pine.LNX.4.64.1008191634160.26145@axis700.grange>
+	<20100819153527.GE2985@suse.de>
+	<Pine.LNX.4.64.1008191744560.26145@axis700.grange>
+Message-ID: <20100819160255.GA3948@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+On Thu, Aug 19, 2010 at 05:46:38PM +0200, Guennadi Liakhovetski wrote:
+> On Thu, 19 Aug 2010, Greg KH wrote:
+> 
+> > On Thu, Aug 19, 2010 at 04:40:15PM +0200, Guennadi Liakhovetski wrote:
+> > > Allocate the bitmap in dma_declare_coherent_memory() together with the struct
+> > > dma_coherent_mem object.
+> > 
+> > You describe what you did, but _why_ are you doing it?
+> 
+> Well, to me the subject "_reduce_ the number..." is already a reason 
+> enough - the fewer kmalloc's of 20 bytes - the better, I think. But if you 
+> like, I can update the description too.
 
-This patch already contains the missed changes due to previous rebases.
-Thanks.
+Yes, as I missed that, others might as well :)
 
-Regards,
-Rene
+thanks,
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Guzman Lugo, Fernando
-> Sent: Tuesday, August 10, 2010 8:13 PM
-> To: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
-> Cc: hiroshi.doyu at nokia.com; ohad at wizery.com; Guzman Lugo, Fernando
-> Subject: [PATCHv2] mailbox: change full flag per mailbox queue instead of
-> global
-> 
-> As pointed by Ohad Ben-Cohen, the variable rq_full flag is a
-> global variable, so if there are multiple mailbox users
-> there will be conflics. Now there is a full flag per
-> mailbox queue.
-> 
-> Version 2:
-> - Rebase to the latest.
-> 
-> Reported-by: Ohad Ben-Cohen <ohad@wizery.com>
-> Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
-> ---
->  arch/arm/plat-omap/include/plat/mailbox.h |    1 +
->  arch/arm/plat-omap/mailbox.c              |   10 +++++++---
->  2 files changed, 8 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-
-> omap/include/plat/mailbox.h
-> index 9976565..261f6b8 100644
-> --- a/arch/arm/plat-omap/include/plat/mailbox.h
-> +++ b/arch/arm/plat-omap/include/plat/mailbox.h
-> @@ -48,6 +48,7 @@ struct omap_mbox_queue {
->  	struct tasklet_struct	tasklet;
->  	int	(*callback)(void *);
->  	struct omap_mbox	*mbox;
-> +	bool	full;
->  };
-> 
->  struct omap_mbox {
-> diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-> index d2fafb8..c59c9c3 100644
-> --- a/arch/arm/plat-omap/mailbox.c
-> +++ b/arch/arm/plat-omap/mailbox.c
-> @@ -33,7 +33,6 @@
-> 
->  static struct workqueue_struct *mboxd;
->  static struct omap_mbox **mboxes;
-> -static bool rq_full;
-> 
->  static int mbox_configured;
->  static DEFINE_MUTEX(mbox_configured_lock);
-> @@ -145,7 +144,12 @@ static void mbox_rx_work(struct work_struct *work)
->  	while (kfifo_len(&mq->fifo) >= sizeof(msg)) {
->  		len = kfifo_out(&mq->fifo, (unsigned char *)&msg,
-> sizeof(msg));
->  		WARN_ON(len != sizeof(msg));
-> -
-> +		spin_lock_irq(&mq->lock);
-> +		if (mq->full) {
-> +			omap_mbox_enable_irq(mq->mbox, IRQ_RX);
-> +			mq->full = false;
-> +		}
-> +		spin_unlock_irq(&mq->lock);
->  		if (mq->callback)
->  			mq->callback((void *)msg);
->  	}
-> @@ -170,7 +174,7 @@ static void __mbox_rx_interrupt(struct omap_mbox
-> *mbox)
->  	while (!mbox_fifo_empty(mbox)) {
->  		if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
->  			omap_mbox_disable_irq(mbox, IRQ_RX);
-> -			rq_full = true;
-> +			mq->full = true;
->  			goto nomem;
->  		}
-> 
-> --
-> 1.6.3.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+greg k-h
