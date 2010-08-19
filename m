@@ -1,94 +1,42 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 19 Aug 2010 11:29:27 -0700
-Subject: [PATCH 3/3] davinci: Map sram using MT_MEMORY_NONCACHED instead
-	of MT_DEVICE
-In-Reply-To: <1281262702-27732-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1281262702-27732-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <AANLkTi=9k19RUmfnNBO8AfFj_LtyNtsPPVYC_=-AW5yE@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 19 Aug 2010 22:34:30 +0400
+Subject: [PATCH 3/6] OMAP3: PM: ensure IO wakeups are properly disabled
+In-Reply-To: <87sk2ao4fr.fsf@deeprootsystems.com>
+References: <20100813080034.18750.15410.stgit@baageli.muru.com>	<20100813080200.18750.37791.stgit@baageli.muru.com>	<4C651635.8000201@ru.mvista.com>
+	<20100813102933.GN12706@atomide.com>	<4C65238D.9080105@ru.mvista.com>
+	<87sk2ao4fr.fsf@deeprootsystems.com>
+Message-ID: <4C6D7936.3090201@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 8, 2010 at 3:18 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On Davinci SRAM is mapped as MT_DEVICE becasue of the section
-> mapping pre-requisite instead of intended MT_MEMORY_NONCACHED
->
-> Since the section mapping limitation gets fixed with first
-> patch in this series, the MT_MEMORY_NONCACHED can be used now.
->
-> Have not tested this, so somebody with Davinci hardware can
-> try this out
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: davinci-linux-open-source at linux.davincidsp.com
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Hello.
 
-Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+Kevin Hilman wrote:
 
-> ---
-> ?arch/arm/mach-davinci/dm355.c ?| ? ?3 +--
-> ?arch/arm/mach-davinci/dm365.c ?| ? ?3 +--
-> ?arch/arm/mach-davinci/dm644x.c | ? ?3 +--
-> ?arch/arm/mach-davinci/dm646x.c | ? ?3 +--
-> ?4 files changed, 4 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
-> index 3834781..e7bd2ad 100644
-> --- a/arch/arm/mach-davinci/dm355.c
-> +++ b/arch/arm/mach-davinci/dm355.c
-> @@ -767,8 +767,7 @@ static struct map_desc dm355_io_desc[] = {
-> ? ? ? ? ? ? ? ?.virtual ? ? ? ?= SRAM_VIRT,
-> ? ? ? ? ? ? ? ?.pfn ? ? ? ? ? ?= __phys_to_pfn(0x00010000),
-> ? ? ? ? ? ? ? ?.length ? ? ? ? = SZ_32K,
-> - ? ? ? ? ? ? ? /* MT_MEMORY_NONCACHED requires supersection alignment */
-> - ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_MEMORY_NONCACHED,
-> ? ? ? ?},
-> ?};
->
-> diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-> index a146849..5dee032 100644
-> --- a/arch/arm/mach-davinci/dm365.c
-> +++ b/arch/arm/mach-davinci/dm365.c
-> @@ -967,8 +967,7 @@ static struct map_desc dm365_io_desc[] = {
-> ? ? ? ? ? ? ? ?.virtual ? ? ? ?= SRAM_VIRT,
-> ? ? ? ? ? ? ? ?.pfn ? ? ? ? ? ?= __phys_to_pfn(0x00010000),
-> ? ? ? ? ? ? ? ?.length ? ? ? ? = SZ_32K,
-> - ? ? ? ? ? ? ? /* MT_MEMORY_NONCACHED requires supersection alignment */
-> - ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_MEMORY_NONCACHED,
-> ? ? ? ?},
-> ?};
->
-> diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-> index 7ad1520..5112d51 100644
-> --- a/arch/arm/mach-davinci/dm644x.c
-> +++ b/arch/arm/mach-davinci/dm644x.c
-> @@ -651,8 +651,7 @@ static struct map_desc dm644x_io_desc[] = {
-> ? ? ? ? ? ? ? ?.virtual ? ? ? ?= SRAM_VIRT,
-> ? ? ? ? ? ? ? ?.pfn ? ? ? ? ? ?= __phys_to_pfn(0x00008000),
-> ? ? ? ? ? ? ? ?.length ? ? ? ? = SZ_16K,
-> - ? ? ? ? ? ? ? /* MT_MEMORY_NONCACHED requires supersection alignment */
-> - ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_MEMORY_NONCACHED,
-> ? ? ? ?},
-> ?};
->
-> diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-> index 9404565..97078f4 100644
-> --- a/arch/arm/mach-davinci/dm646x.c
-> +++ b/arch/arm/mach-davinci/dm646x.c
-> @@ -735,8 +735,7 @@ static struct map_desc dm646x_io_desc[] = {
-> ? ? ? ? ? ? ? ?.virtual ? ? ? ?= SRAM_VIRT,
-> ? ? ? ? ? ? ? ?.pfn ? ? ? ? ? ?= __phys_to_pfn(0x00010000),
-> ? ? ? ? ? ? ? ?.length ? ? ? ? = SZ_32K,
-> - ? ? ? ? ? ? ? /* MT_MEMORY_NONCACHED requires supersection alignment */
-> - ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_MEMORY_NONCACHED,
-> ? ? ? ?},
-> ?};
->
-> --
-> 1.6.0.4
->
->
+>>>>> From: Kevin Hilman <khilman@ti.com>
+>>>>> Commit 5a5f561 (convert OMAP3 PRCM macros to the _SHIFT/_MASK suffixes)
+>>>>> mistakenly removed the check for PER when disabling the IO chain.
+>>>>> During idle, if the PER powerdomain transitions and CORE does not (as
+
+>>>>   Does not what?
+
+>>> How about ".. and CORE does not transition"?
+
+>>    Transition to what then? Sentense till won't parse right...
+
+>>> Kevin, care to clarify that?
+>>    Yeah, looks like a considerable partt of that sentense got omitted...
+
+> No.  Nothing was omitted.  
+
+> It's like saying "Tony drinks Fernet and Kevin does not."  Adding an
+> additional "drinks Fernet" at the end is redundant.
+
+    Sorry, the sentence still doesn't parse for me. You don't say "Fernet" 
+there BTW, so it's not clear where the PER powerdomain transitions to. What 
+goes after the closing parenthesis doesn't clear things up either, it just 
+describes what happens if...
+
+> Kevin
+
+WBR, Sergei
