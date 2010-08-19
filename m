@@ -1,76 +1,166 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Fri, 20 Aug 2010 02:20:33 +0900
-Subject: ARM: 2.6.3[45] PCI regression (IXP4xx and PXA?)
-In-Reply-To: <m38w42sfvx.fsf@intrepid.localdomain>
-References: <1282213882.22370.360.camel@pasglop>
-	<20100819234835Y.fujita.tomonori@lab.ntt.co.jp>
-	<m38w42sfvx.fsf@intrepid.localdomain>
-Message-ID: <20100820021915C.fujita.tomonori@lab.ntt.co.jp>
+From: ppannuto@codeaurora.org (Patrick Pannuto)
+Date: Thu, 19 Aug 2010 11:12:10 -0700
+Subject: [PATCH 3/4] msm-bus: Define the msm-bus skeleton
+In-Reply-To: <AANLkTim2u7F47J5rn_SHZHWCV27Nk-j6bKoJx92dK9jH@mail.gmail.com>
+References: <1282158943-11902-1-git-send-email-ppannuto@codeaurora.org>	<1282158943-11902-4-git-send-email-ppannuto@codeaurora.org>
+	<AANLkTim2u7F47J5rn_SHZHWCV27Nk-j6bKoJx92dK9jH@mail.gmail.com>
+Message-ID: <4C6D73FA.1060809@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Aug 2010 18:53:38 +0200
-Krzysztof Halasa <khc@pm.waw.pl> wrote:
-
-> FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> writes:
+>> QUICK COMMENT
+>>
+>> It is worth noting that this patch is a fairly minimal implementation,
+>> that is, it does not yet have any functionality that makes it differ
+>> from the platform bus - it just shows how it would be done.
 > 
-> >> I'd rather have the arch (aka the bus) be able to filter the mask,
-> >> better than having to deal with multiple masks in the generic code.
-> >> Besides, in embedded-land, you never know how many busses are stacked
-> >> before you reach the device, ie, you'd end up having to AND quite a few
-> >> masks before getting there in some cases.
-> >
-> > You mean that you like to permit architectures to modify
-> > dev->coherent_dma_mask behind a device? If so, I'm against it because
-> > it means dev->coherent_dma_mask has two meanings. That's confusing.
+> Okay, so that's the core point.  without the differentiated behaviour,
+> you can do exactly the same thing, with the same topology, without the
+> new bus types.
 > 
-> Well, I think it may be the only really correct solution, and in fact
-> it's arch-independent.
+> So, the question remains, what is the new functionality that needs to
+> be supported that platform_bus_type doesn't implement?  That is the
+> example that I'm really keen to see!  :-)
 > 
-> The coherent_dma_mask would mean one thing: address space shared between
-> the CPU(s) and the device.
-
-linux/device.h defines that it's the device dma mask.
-
-Except for ARM, coherent_dma_mask represents the device dma mask.
-
-We sometimes want to know the device dma mask. Moving to your
-definition means that we lose that information.
-
-
-> This usually equals device's address space - only because CPU and
-> bridges next to it have wide (logical) address busses. It's not always
-> the case, though, and may be not the case on any arch.
+> Cheers,
+> g.
 > 
-> We should make sure we got it right (including drivers), since any
-> reduction of the dma*mask would be irreversible (new masks would be
-> ANDed with the existing masks).
-> 
-> > I think that having the generic place for bus'
-> > dma mask would be better rather than architecture specific
-> > places.
-> 
-> Definitely, if possible. BTW the dmabounce (and equivalent code on other
-> archs, including probably swiotlb on x86-64) could probably be merged as
-> well. I don't know the internals very well, though. At least it may be
-> worth it looking at them.
 
-btw, swiotlb is used by x86_64, ia64, and powerpc.
-
-I'm sure that I can convert ARM to use it instead of dmabounce. But
-well, even a bug fix patch for dmabounce haven't been merged so I'm
-not sure that ARM people would accept such change.
-
-http://marc.info/?l=linux-arm-kernel&m=128047064008554&w=2
+Ahhh... I was afraid you'd say that.
 
 
-> > Adding a new API to set bus' dma mask would make sense too.
-> 
-> Not sure. Which bus? There could be many :-)
-> In practice - 64-bit PCIe -> 32-bit PCI -> 24-bit ISA - etc.
-> Or, like with IXP/PXA - 26-bit PCI -> 32-bit device.
+>> +static struct platform_device msm_apps_bus = {
+>> +       .name                   = "root-fabric-apps",
+>> +       .id                     = -1,
+>> +};
+>> +
+>> +static struct platform_device msm_system_bus = {
+>> +       .name                   = "root-fabric-system",
+>> +       .id                     = -1,
+>> +};
+>> +
+>> +static struct platform_device msm_mmss_bus = {
+>> +       .name                   = "fabric-mmss",
+>> +       .id                     = -1,
+>> +};
+>> +
+>> +int msm_device_register(struct platform_device *pdev)
+>> +{
+>> +       pdev->dev.bus = &msm_bus_type;
+>> +       /* XXX: Use platform_data to assign pdev->dev.parent */
+>> +
+>> +       device_initialize(&pdev->dev);
+>> +       return __platform_device_add(pdev);
+>> +}
+>> +
 
-Seems that we are not on the same page. As I said before, have you
-seen how POWERPC uses max_direct_dma_addr in dev_archdata struct? I
-was talking about moving it to the generic place and the API to set
-it.
+With the understanding that I do not own the code that would be actually
+doing this, hopefully some pseduo-code can help?
+
+int msm_device_register(struct platform_device *pdev)
+{
+	pdev->dev.bus = &msm_bus_type;
+
+	if (!strncmp(pdev->name, "root", strlen("root"))) {
+		/* We are a root fabric (physical bus), no parent */
+		pdev->dev.parent = NULL;
+	}
+	else {
+		struct msm_dev_info* info = pdev->dev.platform_data;
+		switch(info->magic) {
+		case APPS_MAGIC:
+			pdev->dev.parent = &msm_apps_bus;
+			break;
+		case SYSTEM_MAGIC:
+			pdev->dev.parent = &msm_system_bus;
+			break;
+		case MMSS_MAGIC:
+			pdev->dev.parent = &msm_mmss_bus;
+			break;
+		}
+	}
+
+	device_initailize(&pdev->dev);
+	return __platform_device_add(pdev);
+}
+
+int msm_bus_probe(struct device* dev)
+{
+	int error;
+	struct msm_dev_info* info = dev->platform_data;
+	struct sibling_device* sib;
+
+	list_for_each_entry(sib, &info->sib_list, list) {
+		error = build_path(dev, sib->dev, sib->requirements);
+		if (error)
+			return error;
+	}
+
+	if (dev->driver->probe)
+		error = dev->driver->probe(dev);
+
+	return error;
+}
+
+What you see here is handling the fact that "fabrics" are actually separate
+buses, so we must be intelligent in adding devices so they attach to the
+right parent.  When probing devices, they may have other devices they need
+to talk to, which may be on a different fabric (physical bus), so we need
+to prove that we can build a path from the first device to its sibling,
+meeting all of the requirements (clock speed, bandwidth, etc) along all
+the physical buses along the way.
+
+
+AND NOW, for a completely different argument:
+
+If nothing else, this would greatly help to clean up the current state of
+/sys on embedded devices. From my understanding, the platform bus is a
+"legacy" bus, where things that have no other home go to roost. Let us
+look at my dev box:
+
+	$ ppannuto at ppannuto-linux:~$ ls /sys/bus
+	acpi  i2c       mmc  pci_express  pnp   sdio   spi
+	hid   mdio_bus  pci  platform     scsi  serio  usb
+
+	ppannuto at ppannuto-linux:~$ ls /sys/bus/platform/devices/
+	Fixed MDIO bus.0  i8042  pcspkr  serial8250
+
+And now my droid:
+
+	$ ls /sys/bus
+	platform omapdss i2c spi usb mmc sdio usb-serial w1 hid
+
+	$ ls /sys/bus/platform/devices
+	power.0 ram_console.0 omap_mdm_ctrl omap2-nand.0 omapdss sfh7743
+	bu52014hfv vib-gpio musb_hdrc ehci-omap.0 ohci.0 sholes_bpwake
+	omap_hdq.0 wl127x-rfkill.0 wl127x-test.0 mmci-omap-hs.0 TIWLAN_SDIO.1
+	omapvout pvrsrvkm omaplfb android_usb usb_mass_storage omap34xxcam
+	omap2_mcspi.1 omap2_mcspi.2  omap2_mcspi.3 omap2_mcspi.4 omap-uart.1
+	omap-uart.2 omap-uart.3 omap-mcbsp.1 omap-mcbsp.2 omap-mcbsp.3 omap-mcbsp.4
+	omap-mcbsp.5 i2c_omap.1 i2c_omap.2 i2c_omap.3 omap_wdt omapfb cpcap-regltr.0
+	cpcap-regltr.17 cpcap-regltr.1 cpcap-regltr.2 cpcap-regltr.3 cpcap-regltr.4
+	cpcap-regltr.5 cpcap-regltr.6 cpcap-regltr.7 cpcap-regltr.8 cpcap-regltr.9
+	cpcap-regltr.10 cpcap-regltr.11 cpcap-regltr.12 cpcap-regltr.13 cpcap-regltr.14
+	cpcap-regltr.15 cpcap-regltr.16 cpcap-regltr.18 cpcap_adc cpcap_key cpcap_battery
+	button-backlight notification-led keyboard-backlight flash-torch cpcap_usb
+	cpcap_usb_det cpcap_audio cpcap_3mm5 cpcap_rtc cpcap_uc C6410 keyreset.0
+	gpio-event.0 device_wifi.1 hp3a omap-previewer omap-resizer.2 alarm
+	cpcap_usb_charger cpcap_usb_connected
+
+	$ ls /sys/bus/omapdss/devices
+	display0
+
+	$ ls /sys/bus/w1/devices
+	89-000000000000
+
+This is a fairly ugly mess.  IMHO, it would reflect the view of the world much
+better if most of that lived under /sys/bus/omap (or something similar); such a
+scheme also gives omap (and msm, and others) a home for all of the custom power
+code that is sure to go with their SOCs.
+
+
+-Pat
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum
