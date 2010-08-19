@@ -1,150 +1,32 @@
-From: tklauser@distanz.ch (Tobias Klauser)
-Date: Thu, 19 Aug 2010 08:15:31 +0200
-Subject: [PATCH v4] ether3: Use net_device_stats from struct net_device
-In-Reply-To: <1282061733-19700-1-git-send-email-tklauser@distanz.ch>
-References: <1282061733-19700-1-git-send-email-tklauser@distanz.ch>
-Message-ID: <1282198531-4157-1-git-send-email-tklauser@distanz.ch>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Thu, 19 Aug 2010 08:28:02 +0200
+Subject: Some benchmarks on ARM
+In-Reply-To: <AANLkTimwROLXkk7O-uyQ+soR38CjMPBFJu56r20HVzjO@mail.gmail.com>
+References: <20100702180257.GA8767@pengutronix.de>
+	<AANLkTimwROLXkk7O-uyQ+soR38CjMPBFJu56r20HVzjO@mail.gmail.com>
+Message-ID: <20100819062802.GG30096@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct net_device has its own struct net_device_stats member, so use
-this one instead of a private copy in the ether1_priv struct. As the new
-ndo_get_stats function would just return dev->stats we can omit it. This
-patch also removes an incorrect memset of the stats on open.
+Hi,
 
-Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
----
- drivers/net/arm/ether3.c |   33 ++++++++++-----------------------
- drivers/net/arm/ether3.h |    1 -
- 2 files changed, 10 insertions(+), 24 deletions(-)
+On Thu, Aug 19, 2010 at 11:06:04AM +0530, shiraz hashim wrote:
+> > Here is a little article:
+> > http://www.pengutronix.de/development/kernel/arm-benchmarks-20100702_en.html
+>
+> Thanks for this link, it was quite informative. Can you also please
+> share the detailed report of lmbench tests which you run on these
+> platforms. For example, average cpu bandwidth figures (as in bw_mem
+> test) are not giving information on significant impact of caches and
+> DDR.
 
-diff --git a/drivers/net/arm/ether3.c b/drivers/net/arm/ether3.c
-index 1361b73..44a8746 100644
---- a/drivers/net/arm/ether3.c
-+++ b/drivers/net/arm/ether3.c
-@@ -81,7 +81,6 @@ static int	ether3_open (struct net_device *dev);
- static int	ether3_sendpacket (struct sk_buff *skb, struct net_device *dev);
- static irqreturn_t ether3_interrupt (int irq, void *dev_id);
- static int	ether3_close (struct net_device *dev);
--static struct net_device_stats *ether3_getstats (struct net_device *dev);
- static void	ether3_setmulticastlist (struct net_device *dev);
- static void	ether3_timeout(struct net_device *dev);
- 
-@@ -323,8 +322,6 @@ ether3_init_for_open(struct net_device *dev)
- {
- 	int i;
- 
--	memset(&priv(dev)->stats, 0, sizeof(struct net_device_stats));
--
- 	/* Reset the chip */
- 	ether3_outw(CFG2_RESET, REG_CONFIG2);
- 	udelay(4);
-@@ -442,15 +439,6 @@ ether3_close(struct net_device *dev)
- }
- 
- /*
-- * Get the current statistics.	This may be called with the card open or
-- * closed.
-- */
--static struct net_device_stats *ether3_getstats(struct net_device *dev)
--{
--	return &priv(dev)->stats;
--}
--
--/*
-  * Set or clear promiscuous/multicast mode filter for this adaptor.
-  *
-  * We don't attempt any packet filtering.  The card may have a SEEQ 8004
-@@ -490,7 +478,7 @@ static void ether3_timeout(struct net_device *dev)
- 	local_irq_restore(flags);
- 
- 	priv(dev)->regs.config2 |= CFG2_CTRLO;
--	priv(dev)->stats.tx_errors += 1;
-+	dev->stats.tx_errors += 1;
- 	ether3_outw(priv(dev)->regs.config2, REG_CONFIG2);
- 	priv(dev)->tx_head = priv(dev)->tx_tail = 0;
- 
-@@ -509,7 +497,7 @@ ether3_sendpacket(struct sk_buff *skb, struct net_device *dev)
- 
- 	if (priv(dev)->broken) {
- 		dev_kfree_skb(skb);
--		priv(dev)->stats.tx_dropped ++;
-+		dev->stats.tx_dropped++;
- 		netif_start_queue(dev);
- 		return NETDEV_TX_OK;
- 	}
-@@ -673,7 +661,7 @@ if (next_ptr < RX_START || next_ptr >= RX_END) {
- 			} else
- 				goto dropping;
- 		} else {
--			struct net_device_stats *stats = &priv(dev)->stats;
-+			struct net_device_stats *stats = &dev->stats;
- 			ether3_outw(next_ptr >> 8, REG_RECVEND);
- 			if (status & RXSTAT_OVERSIZE)	  stats->rx_over_errors ++;
- 			if (status & RXSTAT_CRCERROR)	  stats->rx_crc_errors ++;
-@@ -685,14 +673,14 @@ if (next_ptr < RX_START || next_ptr >= RX_END) {
- 	while (-- maxcnt);
- 
- done:
--	priv(dev)->stats.rx_packets += received;
-+	dev->stats.rx_packets += received;
- 	priv(dev)->rx_head = next_ptr;
- 	/*
- 	 * If rx went off line, then that means that the buffer may be full.  We
- 	 * have dropped at least one packet.
- 	 */
- 	if (!(ether3_inw(REG_STATUS) & STAT_RXON)) {
--		priv(dev)->stats.rx_dropped ++;
-+		dev->stats.rx_dropped++;
-     		ether3_outw(next_ptr, REG_RECVPTR);
- 		ether3_outw(priv(dev)->regs.command | CMD_RXON, REG_COMMAND);
- 	}
-@@ -710,7 +698,7 @@ dropping:{
- 		last_warned = jiffies;
- 		printk("%s: memory squeeze, dropping packet.\n", dev->name);
- 	}
--	priv(dev)->stats.rx_dropped ++;
-+	dev->stats.rx_dropped++;
- 	goto done;
- 	}
- }
-@@ -743,13 +731,13 @@ static void ether3_tx(struct net_device *dev)
- 		 * Update errors
- 		 */
- 		if (!(status & (TXSTAT_BABBLED | TXSTAT_16COLLISIONS)))
--			priv(dev)->stats.tx_packets++;
-+			dev->stats.tx_packets++;
- 		else {
--			priv(dev)->stats.tx_errors ++;
-+			dev->stats.tx_errors++;
- 			if (status & TXSTAT_16COLLISIONS)
--				priv(dev)->stats.collisions += 16;
-+				dev->stats.collisions += 16;
- 			if (status & TXSTAT_BABBLED)
--				priv(dev)->stats.tx_fifo_errors ++;
-+				dev->stats.tx_fifo_errors++;
- 		}
- 
- 		tx_tail = (tx_tail + 1) & 15;
-@@ -773,7 +761,6 @@ static const struct net_device_ops ether3_netdev_ops = {
- 	.ndo_open		= ether3_open,
- 	.ndo_stop		= ether3_close,
- 	.ndo_start_xmit		= ether3_sendpacket,
--	.ndo_get_stats		= ether3_getstats,
- 	.ndo_set_multicast_list	= ether3_setmulticastlist,
- 	.ndo_tx_timeout		= ether3_timeout,
- 	.ndo_validate_addr	= eth_validate_addr,
-diff --git a/drivers/net/arm/ether3.h b/drivers/net/arm/ether3.h
-index 1921a3a..2db63b0 100644
---- a/drivers/net/arm/ether3.h
-+++ b/drivers/net/arm/ether3.h
-@@ -164,7 +164,6 @@ struct dev_priv {
-     unsigned char tx_head;		/* buffer nr to insert next packet	 */
-     unsigned char tx_tail;		/* buffer nr of transmitting packet	 */
-     unsigned int rx_head;		/* address to fetch next packet from	 */
--    struct net_device_stats stats;
-     struct timer_list timer;
-     int broken;				/* 0 = ok, 1 = something went wrong	 */
- };
+Please check the updated version of the article - the page you've linked
+above contains a link at the top. The new version contains all the
+commands which have been used.
+
+rsc
 -- 
-1.7.0.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
