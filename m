@@ -1,30 +1,60 @@
-From: gregkh@suse.de (Greg KH)
-Date: Thu, 19 Aug 2010 09:02:55 -0700
-Subject: [PATCH 3/5] DMA: reduce the number of memory allocations
-In-Reply-To: <Pine.LNX.4.64.1008191744560.26145@axis700.grange>
-References: <Pine.LNX.4.64.1008191623580.26145@axis700.grange>
-	<Pine.LNX.4.64.1008191634160.26145@axis700.grange>
-	<20100819153527.GE2985@suse.de>
-	<Pine.LNX.4.64.1008191744560.26145@axis700.grange>
-Message-ID: <20100819160255.GA3948@suse.de>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Thu, 19 Aug 2010 18:53:38 +0200
+Subject: ARM: 2.6.3[45] PCI regression (IXP4xx and PXA?)
+In-Reply-To: <20100819234835Y.fujita.tomonori@lab.ntt.co.jp> (FUJITA
+	Tomonori's message of "Thu, 19 Aug 2010 23:50:04 +0900")
+References: <20100813215413.GA21607@n2100.arm.linux.org.uk>
+	<20100814181306U.fujita.tomonori@lab.ntt.co.jp>
+	<1282213882.22370.360.camel@pasglop>
+	<20100819234835Y.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <m38w42sfvx.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 19, 2010 at 05:46:38PM +0200, Guennadi Liakhovetski wrote:
-> On Thu, 19 Aug 2010, Greg KH wrote:
-> 
-> > On Thu, Aug 19, 2010 at 04:40:15PM +0200, Guennadi Liakhovetski wrote:
-> > > Allocate the bitmap in dma_declare_coherent_memory() together with the struct
-> > > dma_coherent_mem object.
-> > 
-> > You describe what you did, but _why_ are you doing it?
-> 
-> Well, to me the subject "_reduce_ the number..." is already a reason 
-> enough - the fewer kmalloc's of 20 bytes - the better, I think. But if you 
-> like, I can update the description too.
+FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> writes:
 
-Yes, as I missed that, others might as well :)
+>> I'd rather have the arch (aka the bus) be able to filter the mask,
+>> better than having to deal with multiple masks in the generic code.
+>> Besides, in embedded-land, you never know how many busses are stacked
+>> before you reach the device, ie, you'd end up having to AND quite a few
+>> masks before getting there in some cases.
+>
+> You mean that you like to permit architectures to modify
+> dev->coherent_dma_mask behind a device? If so, I'm against it because
+> it means dev->coherent_dma_mask has two meanings. That's confusing.
 
-thanks,
+Well, I think it may be the only really correct solution, and in fact
+it's arch-independent.
 
-greg k-h
+The coherent_dma_mask would mean one thing: address space shared between
+the CPU(s) and the device.
+This usually equals device's address space - only because CPU and
+bridges next to it have wide (logical) address busses. It's not always
+the case, though, and may be not the case on any arch.
+
+We should make sure we got it right (including drivers), since any
+reduction of the dma*mask would be irreversible (new masks would be
+ANDed with the existing masks).
+
+> I think that having the generic place for bus'
+> dma mask would be better rather than architecture specific
+> places.
+
+Definitely, if possible. BTW the dmabounce (and equivalent code on other
+archs, including probably swiotlb on x86-64) could probably be merged as
+well. I don't know the internals very well, though. At least it may be
+worth it looking at them.
+
+> Adding a new API to set bus' dma mask would make sense too.
+
+Not sure. Which bus? There could be many :-)
+In practice - 64-bit PCIe -> 32-bit PCI -> 24-bit ISA - etc.
+Or, like with IXP/PXA - 26-bit PCI -> 32-bit device.
+
+> As long as dev->coherent_dma_mask represents the same thing on every
+> architecture, permitting architectures to have the own
+> dma_set_coherent_mask() is fine by me.
+
+That would be ideal. Buses work on all archs the same after all.
+-- 
+Krzysztof Halasa
