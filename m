@@ -1,142 +1,108 @@
-From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Wed, 18 Aug 2010 17:54:36 -0700 (PDT)
-Subject: [PATCH] mx51_babbage: Add FEC support
-Message-ID: <620138.80679.qm@web51004.mail.re2.yahoo.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Thu, 19 Aug 2010 10:10:40 +0900
+Subject: 'error: 'SDHCI_QUIRK_NO_HISPD_BIT' undeclared' and 'undefined
+	reference to `sdhci_card_detect''
+In-Reply-To: <20100818113314.20c174f1.akpm@linux-foundation.org>
+References: <008d01cb3ab9$ae73da60$0b5b8f20$%kim@samsung.com>
+	<000901cb3abf$5ef59b30$1ce0d190$%szyprowski@samsung.com>
+	<20100818113314.20c174f1.akpm@linux-foundation.org>
+Message-ID: <AANLkTikkUcyGv25FM2Nns29VxikJXk3pLVsjM5xdNwZi@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add FEC support on MX51 Babbage board.
+On Thu, Aug 19, 2010 at 3:33 AM, Andrew Morton
+<akpm@linux-foundation.org> wrote:
+> On Fri, 13 Aug 2010 10:13:04 +0200
+> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>
+>> Hello,
+>>
+>> On Friday, August 13, 2010 9:32 AM Kukjin Kim wrote:
+>>
+>> > This is just information about Samsung sdmmc stuff building error now.
+>> >
+>> > I found Marek's 'sdhci-s3c: enable SDHCI_QUIRK_NO_HISPD_BIT quirk' in the
+>> > Linus' tree.
+>> > (commit ID: a1d5646005af1247d6ae78434bb4db15b07a07b2)
+>> >
+>> > But not defined the quirk yet...so following build error happened with
+>> > s3c6400_defconfig in Linus' latest.
+>> >
+>> > drivers/mmc/host/sdhci-s3c.c: In function 'sdhci_s3c_probe':
+>> > drivers/mmc/host/sdhci-s3c.c:400: error: 'SDHCI_QUIRK_NO_HISPD_BIT'
+>> > undeclared (first use in this function)
+>> > drivers/mmc/host/sdhci-s3c.c:400: error: (Each undeclared identifier is
+>> > reported only once
+>> > drivers/mmc/host/sdhci-s3c.c:400: error: for each function it appears in.)
+>> > make[4]: *** [drivers/mmc/host/sdhci-s3c.o] Error 1
+>> > make[3]: *** [drivers/mmc/host] Error 2
+>> > make[2]: *** [drivers/mmc] Error 2
+>> > make[1]: *** [drivers] Error 2
+>> >
+>> > Kyungmin Park's below patch can solve this and it is in mmotm now.
+>> > (commit ID: 2935b9e7fcc4bea3751b8d039b383b2036a7d36d)
+>> >
+>> > But I think, to update quirk definition should being in Marek's patch for
+>> > avoiding build error.
+>> > Of course, I'm not sure whether the commit order changed.
+>> > Anyway, in this case, will be solved after merging mm tree.
+>> >
+>> >
+>> > And second case is same.
+>> >
+>> > Marek's 'sdhci-s3c: add support for new card detection methods' cause
+>> > following build error.
+>> > (commit ID:17866e14f3a4f219e94f1374ece7226479418ff8)
+>> >
+>> > drivers/built-in.o: In function `sdhci_s3c_notify_change':
+>> > /home/kgene/linux/linux-2.6-mainline-dev/drivers/mmc/host/sdhci-s3c.c:255:
+>> > undefined reference to `sdhci_card_detect'
+>> > make[1]: *** [.tmp_vmlinux1] Error 1
+>> > make: *** [sub-make] Error 2
+>> >
+>> > And Andrew's patch(b567e5dd5a34c184e5642100e752cb87e064bb97) can solve this.
+>> > (of course this needs another patches...)
+>> >
+>> > Anyway...
+>> > Marek, in future please make sure your patch has no building problem before
+>> > submitting.
+>> > (or it can help to add some kind of dependency note in your patch)
+>>
+>> My patches submited to Andrew Morton had the description and a note that they
+>> have been prepared especially for his tree, taking into account all patches
+>> that are already there (mainly a tasklets to threaded irq conversion). For me
+>> it was quite obvious that they will be merged after all other sdhci changes
+>> from that tree. I have no idea why the order of the patches has been reversed
+>> and my sdhci patches has been submitted to Linus before the other sdhci
+>> changes.
+>
+> We're talking about these:
+>
+> s5pc110-sdhci-s3c-can-override-host-capabilities.patch
+> s5pc110-sdhci-s3c-support-on-s5pc110.patch
+> sdhci-add-no-hi-speed-bit-quirk-support.patch
+>
+> I have a note that these await an ack from Ben Dooks so I held them
+> back for a closer look after -rc1. ?I was unaware of this dependency.
+>
+> Ben, are you OK with those patches?
 
-Tested it by booting a rootfs via NFS.
+These are required for support s5pc110 & s5pc210.
 
- Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Current sdhci on s5p has some wrong assumption. only support 4-bit
+bandwidth. and don't consider the embedded mmc like eMMC.
 
----
- arch/arm/mach-mx5/board-mx51_babbage.c      |   39 ++++++++++++++++++++++++++-
- arch/arm/plat-mxc/include/mach/iomux-mx51.h |   25 +++++++++++++++++
- 2 files changed, 63 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index 6e384d9..e3963e5 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -17,6 +17,7 @@
- #include <linux/delay.h>
- #include <linux/io.h>
- #include <linux/fsl_devices.h>
-+#include <linux/fec.h>
- 
- #include <mach/common.h>
- #include <mach/hardware.h>
-@@ -35,7 +36,8 @@
- 
- #define BABBAGE_USB_HUB_RESET	(0*32 + 7)	/* GPIO_1_7 */
- #define BABBAGE_USBH1_STP	(0*32 + 27)	/* GPIO_1_27 */
--#define BABBAGE_PHY_RESET (1*32 +5)	/* GPIO_2_5 */
-+#define BABBAGE_PHY_RESET 	(1*32 + 5)	/* GPIO_2_5 */
-+#define BABBAGE_FEC_PHY_RESET	(1*32 + 14)	/* GPIO_2_14 */
- 
- /* USB_CTRL_1 */
- #define MX51_USB_CTRL_1_OFFSET			0x10
-@@ -93,6 +95,25 @@ static struct pad_desc mx51babbage_pads[] = {
- 
- 	/* USB HUB reset line*/
- 	MX51_PAD_GPIO_1_7__GPIO_1_7,
-+
-+	/* FEC */
-+	MX51_PAD_EIM_EB2__FEC_MDIO,
-+	MX51_PAD_EIM_EB3__FEC_RDAT1,
-+	MX51_PAD_EIM_CS2__FEC_RDAT2,
-+	MX51_PAD_EIM_CS3__FEC_RDAT3,
-+	MX51_PAD_EIM_CS4__FEC_RX_ER,
-+	MX51_PAD_EIM_CS5__FEC_CRS,
-+	MX51_PAD_NANDF_RB2__FEC_COL,
-+	MX51_PAD_NANDF_RB3__FEC_RXCLK,
-+	MX51_PAD_NANDF_RB6__FEC_RDAT0,
-+	MX51_PAD_NANDF_RB7__FEC_TDAT0,
-+	MX51_PAD_NANDF_CS2__FEC_TX_ER,
-+	MX51_PAD_NANDF_CS3__FEC_MDC,
-+	MX51_PAD_NANDF_CS4__FEC_TDAT1,
-+	MX51_PAD_NANDF_CS5__FEC_TDAT2,
-+	MX51_PAD_NANDF_CS6__FEC_TDAT3,
-+	MX51_PAD_NANDF_CS7__FEC_TX_EN,
-+	MX51_PAD_NANDF_RDY_INT__FEC_TX_CLK,
- };
- 
- /* Serial ports */
-@@ -171,6 +192,21 @@ static inline void babbage_usbhub_reset(void)
- 	gpio_set_value(BABBAGE_USB_HUB_RESET, 1);
- }
- 
-+static inline void babbage_fec_reset(void)
-+{
-+	int ret;
-+
-+	/* reset FEC PHY */
-+	ret = gpio_request(BABBAGE_FEC_PHY_RESET, "fec-phy-reset");
-+	if (ret) {
-+		printk(KERN_ERR"failed to get GPIO_FEC_PHY_RESET: %d\n", ret);
-+		return;
-+	}
-+	gpio_direction_output(BABBAGE_FEC_PHY_RESET, 0);
-+	udelay(200);
-+	gpio_set_value(BABBAGE_FEC_PHY_RESET, 1);
-+}
-+
- /* This function is board specific as the bit mask for the plldiv will also
- be different for other Freescale SoCs, thus a common bitmask is not
- possible and cannot get place in /plat-mxc/ehci.c.*/
-@@ -250,6 +286,7 @@ static void __init mxc_board_init(void)
- 	mxc_iomux_v3_setup_multiple_pads(mx51babbage_pads,
- 					ARRAY_SIZE(mx51babbage_pads));
- 	mxc_init_imx_uart();
-+	babbage_fec_reset();
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
- 
- 	mxc_register_device(&mxc_i2c_device0, &babbage_i2c_data);
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-index 21bfa46..5275713 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-@@ -46,6 +46,13 @@ typedef enum iomux_config {
- #define MX51_GPIO_PAD_CTRL		(PAD_CTL_DSE_HIGH | PAD_CTL_PKE | \
- 				PAD_CTL_SRE_FAST)
- 
-+#define MX51_PAD_CTRL_1	(PAD_CTL_SRE_FAST | PAD_CTL_DSE_HIGH | \
-+					PAD_CTL_PUE | PAD_CTL_PKE | PAD_CTL_HYS)
-+#define MX51_PAD_CTRL_2	(PAD_CTL_HYS | PAD_CTL_PKE)
-+#define MX51_PAD_CTRL_3	(PAD_CTL_PKE | PAD_CTL_PUS_100K_UP)
-+#define MX51_PAD_CTRL_4	(PAD_CTL_DVS | PAD_CTL_HYS | PAD_CTL_PKE)
-+#define MX51_PAD_CTRL_5	(PAD_CTL_DVS | PAD_CTL_DSE_HIGH)
-+
- /*
-  * The naming convention for the pad modes is MX51_PAD_<padname>__<padmode>
-  * If <padname> or <padmode> refers to a GPIO, it is named GPIO_<unit>_<num>
-@@ -322,4 +329,22 @@ typedef enum iomux_config {
- #define MX51_PAD_GPIO_1_8__GPIO_1_8		IOMUX_PAD(0x814, 0x3E8, 0, 0x0,   1, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO_1_9__GPIO_1_9		IOMUX_PAD(0x818, 0x3EC, 0, 0x0,   0, NO_PAD_CTRL)
- 
-+#define MX51_PAD_EIM_EB2__FEC_MDIO		IOMUX_PAD(0x468, 0x0d4, 3, 0x0,   0, MX51_PAD_CTRL_1 | PAD_CTL_PUS_22K_UP)
-+#define MX51_PAD_EIM_EB3__FEC_RDAT1		IOMUX_PAD(0x46c, 0x0d8, 3, 0x0,   0, MX51_PAD_CTRL_2)
-+#define MX51_PAD_EIM_CS2__FEC_RDAT2		IOMUX_PAD(0x47c, 0x0e8, 3, 0x0,   0, MX51_PAD_CTRL_2)
-+#define MX51_PAD_EIM_CS3__FEC_RDAT3		IOMUX_PAD(0x480, 0x0ec, 3, 0x0,   0, MX51_PAD_CTRL_2)
-+#define MX51_PAD_EIM_CS4__FEC_RX_ER		IOMUX_PAD(0x484, 0x0f0, 3, 0x0,   0, MX51_PAD_CTRL_2)
-+#define MX51_PAD_EIM_CS5__FEC_CRS		IOMUX_PAD(0x488, 0x0f4, 3, 0x0,   0, MX51_PAD_CTRL_2)
-+#define MX51_PAD_NANDF_RB2__FEC_COL		IOMUX_PAD(0x500, 0x124, 1, 0x0, 0, MX51_PAD_CTRL_2)
-+#define MX51_PAD_NANDF_RB3__FEC_RXCLK		IOMUX_PAD(0x504, 0x128, 1, 0x0, 0, MX51_PAD_CTRL_2)
-+#define MX51_PAD_NANDF_RB7__FEC_TDAT0		IOMUX_PAD(0x5E0, 0x138, 1, 0x0, 0, MX51_PAD_CTRL_5)
-+#define MX51_PAD_NANDF_RB6__FEC_RDAT0		IOMUX_PAD(0x5DC, 0x134, 1, 0x0, 0, MX51_PAD_CTRL_4)
-+#define MX51_PAD_NANDF_CS2__FEC_TX_ER		IOMUX_PAD(0x520, 0x138, 2, 0x0, 0, MX51_PAD_CTRL_5)
-+#define MX51_PAD_NANDF_CS3__FEC_MDC		IOMUX_PAD(0x524, 0x13C, 2, 0x0, 0, MX51_PAD_CTRL_5)
-+#define MX51_PAD_NANDF_CS4__FEC_TDAT1		IOMUX_PAD(0x528, 0x140, 2, 0x0, 0, MX51_PAD_CTRL_5)
-+#define MX51_PAD_NANDF_CS5__FEC_TDAT2		IOMUX_PAD(0x52C, 0x144, 2, 0x0, 0, MX51_PAD_CTRL_5)
-+#define MX51_PAD_NANDF_CS6__FEC_TDAT3		IOMUX_PAD(0x530, 0x148, 2, 0x0, 0, MX51_PAD_CTRL_5)
-+#define MX51_PAD_NANDF_CS7__FEC_TX_EN		IOMUX_PAD(0x534, 0x14C, 1, 0x0, 0, MX51_PAD_CTRL_5)
-+#define MX51_PAD_NANDF_RDY_INT__FEC_TX_CLK	IOMUX_PAD(0x538, 0x150, 1, 0x0, 0, MX51_PAD_CTRL_4)
-+
- #endif /* __MACH_IOMUX_MX51_H__ */
--- 
-1.6.0.4
-
-
-      
+>
+> http://userweb.kernel.org/~akpm/mmotm/broken-out/s5pc110-sdhci-s3c-can-override-host-capabilities.patch
+It required for override the host caps and pass to the mmc with correct caps
+> http://userweb.kernel.org/~akpm/mmotm/broken-out/s5pc110-sdhci-s3c-support-on-s5pc110.patch
+required for support s5pc110 and also s5pc210
+> http://userweb.kernel.org/~akpm/mmotm/broken-out/sdhci-add-no-hi-speed-bit-quirk-support.patch
+As SDHCI on s5p don't has HISPD bit in controller register. need to quirks.
+>
+> Thanks.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
