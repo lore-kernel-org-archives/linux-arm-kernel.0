@@ -1,58 +1,94 @@
-From: wellsk40@gmail.com (Kevin Wells)
-Date: Thu, 19 Aug 2010 11:30:47 -0700
-Subject: ARM: LPC32XX: Various minor fixes and updates
-In-Reply-To: <20100819085855.GA2747@pengutronix.de>
-References: <1282174859-8780-1-git-send-email-wellsk40@gmail.com>
-	<20100819085855.GA2747@pengutronix.de>
-Message-ID: <AANLkTinJ6MWFEAE8cMFWM9L7jJjOqb=Wj_ganrEUX96Z@mail.gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 19 Aug 2010 11:29:27 -0700
+Subject: [PATCH 3/3] davinci: Map sram using MT_MEMORY_NONCACHED instead
+	of MT_DEVICE
+In-Reply-To: <1281262702-27732-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1281262702-27732-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <AANLkTi=9k19RUmfnNBO8AfFj_LtyNtsPPVYC_=-AW5yE@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> This patch set updates and fixes some minor LPC32xx issues.
->>
->> [PATCH 1/6] ARM: LPC32XX: Fix several clock device ID strings
->> [PATCH 2/6] ARM: LPC32XX: Fix naming convention issues with some defines
->> [PATCH 3/6] ARM: LPC32xx: Fix gpiolib bit mask macro
->> [PATCH 4/6] ARM: LPC32xx: Remove MMC peripheral clock enable/disable code
->> [PATCH 5/6] ARM: LPC32XX: Remove clock enable code for AMBA driver
->> [PATCH 6/6] ARM: LPC32XX: Add board.h for platform_data structures
+On Sun, Aug 8, 2010 at 3:18 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> On Davinci SRAM is mapped as MT_DEVICE becasue of the section
+> mapping pre-requisite instead of intended MT_MEMORY_NONCACHED
 >
-> This looks confusing for me. Those patches come from your branch
-> 'lpc32xx_up1' but some of them are also contained in
-> 'wells/lpc32xx-arch_up1' which you already posted. So, this looks like a
-> V2 of the series to me or am I wrong? If so, what has changed and why?
+> Since the section mapping limitation gets fixed with first
+> patch in this series, the MT_MEMORY_NONCACHED can be used now.
 >
-
-Hi Wolfram,
-Thanks for the feedback. This is a v2 patch. I'll post a changelog in a bit.
-
-> If I might add, the increasing number of branches makes it hard to
-> decide what is currently needed for a board-support; maybe a
-> "for-mainline"-branch or something similar with all
-> "state-of-the-art"-branches merged might help here?
+> Have not tested this, so somebody with Davinci hardware can
+> try this out
 >
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
 
-I'm going to post future patch sets for review without providing a GIT link
-on our server until it's ready for mainline. This makes it a bit easier for me
-too and this seems to be more the standard approach.
+Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
 
-thanks,
-Kevin
-
-> Kind regards,
+> ---
+> ?arch/arm/mach-davinci/dm355.c ?| ? ?3 +--
+> ?arch/arm/mach-davinci/dm365.c ?| ? ?3 +--
+> ?arch/arm/mach-davinci/dm644x.c | ? ?3 +--
+> ?arch/arm/mach-davinci/dm646x.c | ? ?3 +--
+> ?4 files changed, 4 insertions(+), 8 deletions(-)
 >
-> ? Wolfram
+> diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+> index 3834781..e7bd2ad 100644
+> --- a/arch/arm/mach-davinci/dm355.c
+> +++ b/arch/arm/mach-davinci/dm355.c
+> @@ -767,8 +767,7 @@ static struct map_desc dm355_io_desc[] = {
+> ? ? ? ? ? ? ? ?.virtual ? ? ? ?= SRAM_VIRT,
+> ? ? ? ? ? ? ? ?.pfn ? ? ? ? ? ?= __phys_to_pfn(0x00010000),
+> ? ? ? ? ? ? ? ?.length ? ? ? ? = SZ_32K,
+> - ? ? ? ? ? ? ? /* MT_MEMORY_NONCACHED requires supersection alignment */
+> - ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
+> + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_MEMORY_NONCACHED,
+> ? ? ? ?},
+> ?};
+>
+> diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+> index a146849..5dee032 100644
+> --- a/arch/arm/mach-davinci/dm365.c
+> +++ b/arch/arm/mach-davinci/dm365.c
+> @@ -967,8 +967,7 @@ static struct map_desc dm365_io_desc[] = {
+> ? ? ? ? ? ? ? ?.virtual ? ? ? ?= SRAM_VIRT,
+> ? ? ? ? ? ? ? ?.pfn ? ? ? ? ? ?= __phys_to_pfn(0x00010000),
+> ? ? ? ? ? ? ? ?.length ? ? ? ? = SZ_32K,
+> - ? ? ? ? ? ? ? /* MT_MEMORY_NONCACHED requires supersection alignment */
+> - ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
+> + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_MEMORY_NONCACHED,
+> ? ? ? ?},
+> ?};
+>
+> diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+> index 7ad1520..5112d51 100644
+> --- a/arch/arm/mach-davinci/dm644x.c
+> +++ b/arch/arm/mach-davinci/dm644x.c
+> @@ -651,8 +651,7 @@ static struct map_desc dm644x_io_desc[] = {
+> ? ? ? ? ? ? ? ?.virtual ? ? ? ?= SRAM_VIRT,
+> ? ? ? ? ? ? ? ?.pfn ? ? ? ? ? ?= __phys_to_pfn(0x00008000),
+> ? ? ? ? ? ? ? ?.length ? ? ? ? = SZ_16K,
+> - ? ? ? ? ? ? ? /* MT_MEMORY_NONCACHED requires supersection alignment */
+> - ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
+> + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_MEMORY_NONCACHED,
+> ? ? ? ?},
+> ?};
+>
+> diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+> index 9404565..97078f4 100644
+> --- a/arch/arm/mach-davinci/dm646x.c
+> +++ b/arch/arm/mach-davinci/dm646x.c
+> @@ -735,8 +735,7 @@ static struct map_desc dm646x_io_desc[] = {
+> ? ? ? ? ? ? ? ?.virtual ? ? ? ?= SRAM_VIRT,
+> ? ? ? ? ? ? ? ?.pfn ? ? ? ? ? ?= __phys_to_pfn(0x00010000),
+> ? ? ? ? ? ? ? ?.length ? ? ? ? = SZ_32K,
+> - ? ? ? ? ? ? ? /* MT_MEMORY_NONCACHED requires supersection alignment */
+> - ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
+> + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_MEMORY_NONCACHED,
+> ? ? ? ?},
+> ?};
 >
 > --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Wolfram Sang ? ? ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->
-> -----BEGIN PGP SIGNATURE-----
-> Version: GnuPG v1.4.10 (GNU/Linux)
->
-> iEYEARECAAYFAkxs8k8ACgkQD27XaX1/VRs9fgCfezrJWYfKdfZOiQaQwsETzQSl
-> F3IAnRoykTiPrA2hke4I59gcAYyWFxRL
-> =iApV
-> -----END PGP SIGNATURE-----
+> 1.6.0.4
 >
 >
