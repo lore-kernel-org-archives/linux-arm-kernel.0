@@ -1,58 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Aug 2010 14:29:49 +0200
-Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
-In-Reply-To: <20100819092246.GA8484@riccoc20.at.omicron.at>
-References: <cover.1281956490.git.richard.cochran@omicron.at>
-	<201008181702.03384.arnd@arndb.de>
-	<20100819092246.GA8484@riccoc20.at.omicron.at>
-Message-ID: <201008191429.50008.arnd@arndb.de>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 19 Aug 2010 16:56:27 +0300
+Subject: [PATCH RFC] h1940: use gpiolib for latch access
+In-Reply-To: <4C5986AB.40103@simtec.co.uk>
+References: <1280076072-1049-1-git-send-email-anarsoul@gmail.com>
+	<4C5986AB.40103@simtec.co.uk>
+Message-ID: <201008191656.36727.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 August 2010, Richard Cochran wrote:
-> 
-> On Wed, Aug 18, 2010 at 05:02:03PM +0200, Arnd Bergmann wrote:
-> > You might want to use callbacks for these system calls that you
-> > can register to at module load time, like it is done for the
-> > existing syscalls.
-> 
-> Can you point me to a specific example?
-
-The struct k_clock contains callback functions to clock source
-specific implementations of the syscalls and other functions.
-Adding a new clock source that is (potentially) implemented
-as a module means you have to define a new k_clock in that module
-that you register using register_posix_clock.
-
-If you need additional syscalls to be implemented by the same
-module, you can put more callback functions into struct k_clock
-that would then only be implemented by the new module.
-
-> > The simpler way (e.g. for testing) is using Kconfig dependencies, like
+? ????????? ?? 4 ??????? 2010 18:26:35 ????? Ben Dooks ???????:
+> >  	/* Configures BT serial port GPIOs */
+> >  	s3c_gpio_cfgpin(S3C2410_GPH(0), S3C2410_GPH0_nCTS0);
 > > 
-> > config PTP
-> >       bool "IEEE 1588 Precision Time Protocol"
+> > -	s3c_gpio_cfgpull(S3C2410_GPH(0), S3C_GPIO_PULL_NONE);
+> > +	s3c_gpio_setpull(S3C2410_GPH(0), S3C_GPIO_PULL_NONE);
 > > 
-> > config PPS
-> >       tristate "Pulse per Second"
-> >       depends on PTP || !PTP
+> >  	s3c_gpio_cfgpin(S3C2410_GPH(1), S3C2410_GPIO_OUTPUT);
 > > 
-> > The depends statement is a way of expressing that when PTP is enabled,
-> > PPS cannot be a module, while it may be a module if PTP is disabled.
+> > -	s3c_gpio_cfgpull(S3C2410_GPH(1), S3C_GPIO_PULL_NONE);
+> > +	s3c_gpio_setpull(S3C2410_GPH(1), S3C_GPIO_PULL_NONE);
+> > 
+> >  	s3c_gpio_cfgpin(S3C2410_GPH(2), S3C2410_GPH2_TXD0);
+> > 
+> > -	s3c_gpio_cfgpull(S3C2410_GPH(2), S3C_GPIO_PULL_NONE);
+> > +	s3c_gpio_setpull(S3C2410_GPH(2), S3C_GPIO_PULL_NONE);
+> > 
+> >  	s3c_gpio_cfgpin(S3C2410_GPH(3), S3C2410_GPH3_RXD0);
+> > 
+> > -	s3c_gpio_cfgpull(S3C2410_GPH(3), S3C_GPIO_PULL_NONE);
+> > +	s3c_gpio_setpull(S3C2410_GPH(3), S3C_GPIO_PULL_NONE);
 > 
-> THis did not work for me.
+> Is this an error, or have you merged a part of a different patch
+> into this one?
+
+Will move into separate patch
+ 
+> > +#define H1940_PA_LATCH		(S3C2410_CS2)
+> > +
+> > +#define H1940_LATCH_GPIO(x)		(S3C_GPIO_END + x)
+> > +
+> > +#define H1940_LATCH_BIT(x)		(1 << (x + 16 - S3C_GPIO_END))
 > 
-> What I got was, in effect, two independent booleans.
+> you probably want an () around the 'x's in the above defines.
 
-Hmm, right. I wonder what I was thinking of then.
+Yep
+ 
+> computing the bit seperately to the call to h1940_latch_control
+> would have made the code easier to read.
+> 
+> > +	h1940_latch_control(value ? 0 : (1 << (offset + 16)),
+> > +		value ? (1 << (offset + 16)) : 0);
 
-You can certainly do
+Ok
 
-config PTP
-	bool "IEEE 1588 Precision Time Protocol"
-	depends on PPS != m
-
-but that will hide the PTP option if PPS is set to 'm', which is normally
-not what you want.
-
-	Arnd
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100819/9c1b9448/attachment.sig>
