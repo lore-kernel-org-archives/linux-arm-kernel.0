@@ -1,29 +1,30 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 19 Aug 2010 17:46:38 +0200 (CEST)
-Subject: [PATCH 3/5] DMA: reduce the number of memory allocations
-In-Reply-To: <20100819153527.GE2985@suse.de>
-References: <Pine.LNX.4.64.1008191623580.26145@axis700.grange>
-	<Pine.LNX.4.64.1008191634160.26145@axis700.grange>
-	<20100819153527.GE2985@suse.de>
-Message-ID: <Pine.LNX.4.64.1008191744560.26145@axis700.grange>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Aug 2010 17:48:51 +0200
+Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <20100819152301.GB25193@ovro.caltech.edu>
+References: <cover.1281956490.git.richard.cochran@omicron.at>
+	<201008191429.50008.arnd@arndb.de>
+	<20100819152301.GB25193@ovro.caltech.edu>
+Message-ID: <201008191748.51819.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Aug 2010, Greg KH wrote:
-
-> On Thu, Aug 19, 2010 at 04:40:15PM +0200, Guennadi Liakhovetski wrote:
-> > Allocate the bitmap in dma_declare_coherent_memory() together with the struct
-> > dma_coherent_mem object.
+On Thursday 19 August 2010, Ira W. Snyder wrote:
+> Perhaps you were thinking of the vhost example (taken from
+> drivers/vhost/Kconfig):
 > 
-> You describe what you did, but _why_ are you doing it?
+> config VHOST_NET
+>         tristate "Host kernel accelerator for virtio net (EXPERIMENTAL)"
+>         depends on NET && EVENTFD && (TUN || !TUN) && (MACVTAP || !MACVTAP) && EXPERIMENTAL
+> 
+> They have a similar construct with both TUN and MACVTAP there. Perhaps
+> the parens are a necessary part of the "X || !X" syntax? Just a random
+> guess.
 
-Well, to me the subject "_reduce_ the number..." is already a reason 
-enough - the fewer kmalloc's of 20 bytes - the better, I think. But if you 
-like, I can update the description too.
+Yes, that's the one I was thinking of.
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+My mistake was that the effect is slightly different here. VHOST and TUN are
+both tristate. What we guarantee here is that if TUN is "m", VHOST cannot be "y",
+because its dependency cannot be fulfilled for y.
+
+	Arnd
