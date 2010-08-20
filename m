@@ -1,58 +1,37 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Fri, 20 Aug 2010 12:12:50 +0900
-Subject: [PATCH/RFCv3 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <op.vhppgaxq7p4s8u@localhost>
-References: <AANLkTikp49oOny-vrtRTsJvA3Sps08=w7__JjdA3FE8t@mail.gmail.com>
-	<20100820001339N.fujita.tomonori@lab.ntt.co.jp>
-	<op.vhppgaxq7p4s8u@localhost>
-Message-ID: <20100820121124Z.fujita.tomonori@lab.ntt.co.jp>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Fri, 20 Aug 2010 14:24:22 +0900
+Subject: [PATCH] MAX8952 PMIC Driver Initial Release
+In-Reply-To: <20100819104654.GA23404@rakim.wolfsonmicro.main>
+References: <1282201515-11385-1-git-send-email-myungjoo.ham@samsung.com>
+	<20100819104654.GA23404@rakim.wolfsonmicro.main>
+Message-ID: <AANLkTimO7u1846M_D8E+GLvyRqyrcQh_G0TJ9mx5vu2f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> We hope this method included at mainline kernel if possible.
-> >> It's really needed feature for our multimedia frameworks.
-> >
-> > You got any comments from mm people?
-> >
-> > Virtually, this adds a new memory allocator implementation that steals
-> > some memory from memory allocator during boot process. Its API looks
-> > completely different from the API for memory allocator. That doesn't
-> > sound appealing to me much. This stuff couldn't be integrated well
-> > into memory allocator?
-> 
-> What kind of integration do you mean?  I see three levels:
-> 
-> 1. Integration on API level meaning that some kind of existing API is used
->     instead of new cma_*() calls.  CMA adds notion of devices and memory
->     types which is new to all the other APIs (coherent has notion of devices
->     but that's not enough).  This basically means that no existing API can be
->     used for CMA.  On the other hand, removing notion of devices and memory
->     types would defeat the whole purpose of CMA thus destroying the solution
->     that CMA provides.
+Thank you for the comments. They will be applied to the next patch
+revision releasing soon.
 
-You can create something similar to the existing API for memory
-allocator.
+On Thu, Aug 19, 2010 at 7:46 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Thu, Aug 19, 2010 at 04:05:15PM +0900, MyungJoo Ham wrote:
+>
+(snip)
+>
+>> + ? ? max8952_write_reg(max8952, MAX8952_REG_SYNC,
+>> + ? ? ? ? ? ? ? ? ? ? (max8952_read_reg(max8952, MAX8952_REG_SYNC) & 0x3F) |
+>> + ? ? ? ? ? ? ? ? ? ? ((pdata->sync_freq & 0x3) << 6));
+>> + ? ? max8952_write_reg(max8952, MAX8952_REG_RAMP,
+>> + ? ? ? ? ? ? ? ? ? ? (max8952_read_reg(max8952, MAX8952_REG_RAMP) & 0x1F) |
+>> + ? ? ? ? ? ? ? ? ? ? ((pdata->ramp_speed & 0x7) << 5));
+>
+> This looks like it should be platform data.
 
-For example, blk_kmalloc/blk_alloc_pages was proposed as memory
-allocator API with notion of an address range for allocated memory. It
-wasn't merged for other reasons though.
+However, could you please clarify more about this? They are already
+from platform data (pdata->ramp_speed and pdata->sync_freq).
 
-I don't mean that this is necessary for the inclusion (I'm not the
-person to ack or nack this). I just expect the similarity of memory
-allocator API.
-
-
-> 2. Reuse of memory pools meaning that memory reserved by CMA can then be
->     used by other allocation mechanisms.  This is of course possible.  For
->     instance coherent could easily be implemented as a wrapper to CMA.
->     This is doable and can be done in the future after CMA gets more
->     recognition.
-> 
-> 3. Reuse of algorithms meaning that allocation algorithms used by other
->     allocators will be used with CMA regions.  This is doable as well and
->     can be done in the future.
-
-Well, why can't we do the above before the inclusion?
-
-Anyway, I think that comments from mm people would be helpful to merge
-this.
+-- 
+MyungJoo Ham (???), Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
