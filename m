@@ -1,51 +1,37 @@
 From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
-Date: Fri, 20 Aug 2010 03:08:24 +0200
-Subject: [PATCH/RFCv3 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <20100820001339N.fujita.tomonori@lab.ntt.co.jp>
-References: <cover.1281100495.git.m.nazarewicz@samsung.com>
-	<AANLkTikp49oOny-vrtRTsJvA3Sps08=w7__JjdA3FE8t@mail.gmail.com>
-	<20100820001339N.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <op.vhppgaxq7p4s8u@localhost>
+Date: Fri, 20 Aug 2010 03:15:22 +0200
+Subject: [PATCH 3/5] DMA: reduce the number of memory allocations
+In-Reply-To: <Pine.LNX.4.64.1008191634160.26145@axis700.grange>
+References: <Pine.LNX.4.64.1008191623580.26145@axis700.grange>
+	<Pine.LNX.4.64.1008191634160.26145@axis700.grange>
+Message-ID: <op.vhpprwkr7p4s8u@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Aug 2010 17:15:12 +0200, FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> wrote:
+On Thu, 19 Aug 2010 16:40:15 +0200, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
 
-> On Wed, 18 Aug 2010 12:01:35 +0900
-> Kyungmin Park <kyungmin.park@samsung.com> wrote:
+> Allocate the bitmap in dma_declare_coherent_memory() together with the struct
+> dma_coherent_mem object.
 >
->> Are there any comments or ack?
->>
->> We hope this method included at mainline kernel if possible.
->> It's really needed feature for our multimedia frameworks.
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> ---
+>  drivers/base/dma-coherent.c |   11 +++--------
+>  1 files changed, 3 insertions(+), 8 deletions(-)
 >
-> You got any comments from mm people?
->
-> Virtually, this adds a new memory allocator implementation that steals
-> some memory from memory allocator during boot process. Its API looks
-> completely different from the API for memory allocator. That doesn't
-> sound appealing to me much. This stuff couldn't be integrated well
-> into memory allocator?
+> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+> index f369e27..8efdfd4 100644
+> --- a/drivers/base/dma-coherent.c
+> +++ b/drivers/base/dma-coherent.c
+> @@ -11,7 +11,7 @@ struct dma_coherent_mem {
+>  	dma_addr_t	device_base;
+>  	int		size;
+>  	int		flags;
+> -	unsigned long	*bitmap;
+> +	unsigned long	bitmap[0];
+>  };
 
-What kind of integration do you mean?  I see three levels:
-
-1. Integration on API level meaning that some kind of existing API is used
-    instead of new cma_*() calls.  CMA adds notion of devices and memory
-    types which is new to all the other APIs (coherent has notion of devices
-    but that's not enough).  This basically means that no existing API can be
-    used for CMA.  On the other hand, removing notion of devices and memory
-    types would defeat the whole purpose of CMA thus destroying the solution
-    that CMA provides.
-
-2. Reuse of memory pools meaning that memory reserved by CMA can then be
-    used by other allocation mechanisms.  This is of course possible.  For
-    instance coherent could easily be implemented as a wrapper to CMA.
-    This is doable and can be done in the future after CMA gets more
-    recognition.
-
-3. Reuse of algorithms meaning that allocation algorithms used by other
-    allocators will be used with CMA regions.  This is doable as well and
-    can be done in the future.
+Wouldn't "bitmap[]" be better? AFAIR "bitmap[0]" is really a GCC extension and
+C99 has introduced "bitmap[]" for exactly the above purpose.
 
 -- 
 Best regards,                                        _     _
