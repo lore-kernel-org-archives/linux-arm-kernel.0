@@ -1,138 +1,47 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 20 Aug 2010 16:00:05 +0900
-Subject: [PATCH 12/14] ARM: S5PV310: Add various clocks
-In-Reply-To: <AANLkTim_rJu0RicETYqsdKArSKtzSMdGBfm96dSFWauw@mail.gmail.com>
+Date: Fri, 20 Aug 2010 16:10:01 +0900
+Subject: [PATCH 02/14] ARM: S5PV310: Removed unused clock
+In-Reply-To: <AANLkTinjDBxahumErXmXXDW2FLxFi6oXpu-jZa+xzYhF@mail.gmail.com>
 References: <1282140084-10265-1-git-send-email-kgene.kim@samsung.com>
-	<1282140084-10265-13-git-send-email-kgene.kim@samsung.com>
-	<AANLkTim_rJu0RicETYqsdKArSKtzSMdGBfm96dSFWauw@mail.gmail.com>
-Message-ID: <00ab01cb4035$5486b5f0$fd9421d0$%kim@samsung.com>
+	<1282140084-10265-3-git-send-email-kgene.kim@samsung.com>
+	<AANLkTinjDBxahumErXmXXDW2FLxFi6oXpu-jZa+xzYhF@mail.gmail.com>
+Message-ID: <00b201cb4036$b7e1c7b0$27a55710$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 MyungJoo Ham wrote:
 > 
-> On Wed, Aug 18, 2010 at 11:01 PM, Kukjin Kim <kgene.kim@samsung.com>
-wrote:
-> > From: Jongpill Lee <boyko.lee@samsung.com>
-> >
-> > This patch adds clocks for S5PV310/S5PC210.
-> >
-> > Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> > ?arch/arm/mach-s5pv310/clock.c | ?155
-> ++++++++++++++++++++++++++++++++++++++++-
-> > ?1 files changed, 154 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-s5pv310/clock.c
-b/arch/arm/mach-s5pv310/clock.c
-> > index ec69edc..14c9707 100644
-> > --- a/arch/arm/mach-s5pv310/clock.c
-> > +++ b/arch/arm/mach-s5pv310/clock.c
-> > @@ -61,6 +61,26 @@ static int s5pv310_clksrc_mask_peril0_ctrl(struct clk
-*clk,
-> int enable)
-> > ? ? ? ?return s5p_gatectrl(S5P_CLKSRC_MASK_PERIL0, clk, enable);
-> > ?}
-> >
-> > +static int s5pv310_clk_ip_cam_ctrl(struct clk *clk, int enable)
-> > +{
-> > + ? ? ? return s5p_gatectrl(S5P_CLKGATE_IP_CAM, clk, enable);
-> > +}
-> > +
-> > +static int s5pv310_clk_ip_image_ctrl(struct clk *clk, int enable)
-> > +{
-> > + ? ? ? return s5p_gatectrl(S5P_CLKGATE_IP_IMAGE, clk, enable);
-> > +}
-> > +
-> > +static int s5pv310_clk_ip_lcd0_ctrl(struct clk *clk, int enable)
-> > +{
-> > + ? ? ? return s5p_gatectrl(S5P_CLKGATE_IP_LCD0, clk, enable);
-> > +}
-> > +
-> > +static int s5pv310_clk_ip_lcd1_ctrl(struct clk *clk, int enable)
-> > +{
-> > + ? ? ? return s5p_gatectrl(S5P_CLKGATE_IP_LCD1, clk, enable);
-> > +}
-> > +
-> > ?static int s5pv310_clk_ip_fsys_ctrl(struct clk *clk, int enable)
-> > ?{
-> > ? ? ? ?return s5p_gatectrl(S5P_CLKGATE_IP_FSYS, clk, enable);
-> > @@ -275,6 +295,46 @@ static struct clk init_clocks_disable[] = {
-> > ? ? ? ? ? ? ? ?.enable ? ? ? ? = s5pv310_clk_ip_peril_ctrl,
-> > ? ? ? ? ? ? ? ?.ctrlbit ? ? ? ?= (1<<24),
-> > ? ? ? ?}, {
-> > + ? ? ? ? ? ? ? .name ? ? ? ? ? = "csis",
-> > + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 0,
-> > + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_cam_ctrl,
-> > + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 4),
-> > + ? ? ? }, {
-> > + ? ? ? ? ? ? ? .name ? ? ? ? ? = "csis",
-> > + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 1,
-> > + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_cam_ctrl,
-> > + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 5),
-> > + ? ? ? }, {
-> > + ? ? ? ? ? ? ? .name ? ? ? ? ? = "fimc",
-> > + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 0,
-> > + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_cam_ctrl,
-> > + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 0),
-> > + ? ? ? }, {
-> > + ? ? ? ? ? ? ? .name ? ? ? ? ? = "fimc",
-> > + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 1,
-> > + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_cam_ctrl,
-> > + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 1),
-> > + ? ? ? }, {
-> > + ? ? ? ? ? ? ? .name ? ? ? ? ? = "fimc",
-> > + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 2,
-> > + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_cam_ctrl,
-> > + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 2),
-> > + ? ? ? }, {
-> > + ? ? ? ? ? ? ? .name ? ? ? ? ? = "fimc",
-> > + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 3,
-> > + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_cam_ctrl,
-> > + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 3),
-> > + ? ? ? }, {
-> > + ? ? ? ? ? ? ? .name ? ? ? ? ? = "fimd",
-> > + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 0,
-> > + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_lcd0_ctrl,
-> > + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 0),
-> > + ? ? ? }, {
-> > + ? ? ? ? ? ? ? .name ? ? ? ? ? = "fimd",
-> > + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 1,
-> > + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_lcd1_ctrl,
-> > + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 0),
-> > + ? ? ? }, {
-> > ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "hsmmc",
-> > ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = 0,
-> > ? ? ? ? ? ? ? ?.parent ? ? ? ? = &clk_aclk_133.clk,
-> > @@ -304,7 +364,100 @@ static struct clk init_clocks_disable[] = {
-> > ? ? ? ? ? ? ? ?.parent ? ? ? ? = &clk_aclk_133.clk,
-> > ? ? ? ? ? ? ? ?.enable ? ? ? ? = s5pv310_clk_ip_fsys_ctrl,
-> > ? ? ? ? ? ? ? ?.ctrlbit ? ? ? ?= (1 << 9),
-> > - ? ? ? }
-> > + ? ? ? }, {
-> > + ? ? ? ? ? ? ? .name ? ? ? ? ? = "sata",
-> > + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
-> > + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_fsys_ctrl,
-> > + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 10),
-> > + ? ? ? }, {
-> > + ? ? ? ? ? ? ? .name ? ? ? ? ? = "adc",
-> > + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
-> > + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_peril_ctrl,
-> > + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 15),
-> > + ? ? ? }, {
-> > + ? ? ? ? ? ? ? .name ? ? ? ? ? = "watchdog",
-> > + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
-> > + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_peril_ctrl,
+> Hello,
 > 
-> s5pv310_clk_ip_perir_ctrl (R, not L) appears to be correct for this entry.
-> 
-> Probably, we may need to sort these according to .enable entry (and
-> then .ctrlbit entry) later.
-> 
-You're right. will fix it.
+Hi :-)
 
-(snip)
+> On Wed, Aug 18, 2010 at 11:01 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > This pach removed unused clock on S5PV310/S5PC210.
+> >
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> 
+> In this patch, you've removed corem0, corem1, cores, periph, atclk,
+> and pclk_dbg, which are directly affected by cpu-freq drivers. As long
+> as CPUFREQ uses clocks under 800MHz, corem0, corem1, cores, and
+> periph's dividers should be updated and as long as CPUFREQ uses clocks
+> over 800MHz, atclk and pclk_dbg's dividers should also be updated.
+> Although in the cpu-freq patches of S5PV210, the cpu-freq driver did
+> not use the clock framework and accessed clock registers directly, I
+> thought cpu-freq should consider using the clock framework later as,
+> sometimes, other drivers and modules are interested in the values
+> related with this domain (e.g., for the stability issues,
+> suspend-to-mem/disk may want to read and save the clock rates of CPU).
+> 
+> Do you think CPUFREQ should keep accessing the clock registers
+> directly? or should start using clock frameworks later?
+> 
+> ps. If we are going to change the bus speed as well (as in S5PV210's
+> 100MHz mode), we may need to access aclk_cored, aclk_corep, and
+> aclk_acp as well.
+> 
+
+Basically, no need to control them when changed frequency because can be restored original value.
+But I think need to check it again.
 
 Thanks.
 
