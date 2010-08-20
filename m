@@ -1,89 +1,53 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 20 Aug 2010 19:08:18 +0900
-Subject: [PATCH 2/3] ARM: S5PC210: Add missing GPIO MP0_0 definition
-In-Reply-To: <00d801cb404f$61455980$23d00c80$%kim@samsung.com>
-References: <20100806042351.GA19437@july>
-	<00d801cb404f$61455980$23d00c80$%kim@samsung.com>
-Message-ID: <AANLkTinx-6rB5GW0fdf=yWhj5BHxDojjzLf41rY+gtY2@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 20 Aug 2010 19:31:29 +0900
+Subject: [PATCH] ARM: S5PV210: Update I2C-1 Clock Register Property.
+In-Reply-To: <1282199919-32523-1-git-send-email-myungjoo.ham@samsung.com>
+References: <1282199919-32523-1-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <00da01cb4052$dcb20020$96160060$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forget it.
+MyungJoo Ham wrote:
+> 
+> CLK_GATE_IP3[8] is RESERVED. The port "I2C_HDMI_DDY" of
+> CLK_GATE_IP3[10] is used as another I2C port (but not dedicated to HDMI
+> as if it is a general I2C port)
+> 
+> Therefore, we define the unused I2C-1 (IP3[8] is not used) as another
+> I2C there was left undefined but used.
+> 
 
-It's out-dated document error. there's no MP0* series GPIOs at
-up-to-dated documents.
+Your patch file is right, but your comment is not.
+Because actually, I2C1 is dedicated to I2C_HDMI_DDC...
 
-others are same.
+Anyway, will apply.
 
-Thank you,
-Kyungmin Park
-
-On Fri, Aug 20, 2010 at 7:06 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Kukjin Kim wrote:
->>
->> Kyungmin Park wrote:
->> >
->> > From: Kyungmin Park <kyungmin.park@samsung.com>
->> >
->> > Some board uses the MP0_0 for GPIO.
->> >
->> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> > ---
->> > ?arch/arm/mach-s5pv310/include/mach/gpio.h | ? ?5 ++++-
->> > ?1 files changed, 4 insertions(+), 1 deletions(-)
->> >
->> > diff --git a/arch/arm/mach-s5pv310/include/mach/gpio.h b/arch/arm/mach-
->> > s5pv310/include/mach/gpio.h
->> > index a840d83..4ab4e23 100644
->> > --- a/arch/arm/mach-s5pv310/include/mach/gpio.h
->> > +++ b/arch/arm/mach-s5pv310/include/mach/gpio.h
->> > @@ -55,6 +55,7 @@
->> > ?#define S5PV310_GPIO_X2_NR (8)
->> > ?#define S5PV310_GPIO_X3_NR (8)
->> > ?#define S5PV310_GPIO_Z_NR ?(7)
->> > +#define S5PV310_GPIO_MP00_NR ? ? ? (8)
->> > ?#define S5PV310_GPIO_MP01_NR ? ? ? (8)
->> > ?#define S5PV310_GPIO_MP02_NR ? ? ? (4)
->> > ?#define S5PV310_GPIO_MP03_NR ? ? ? (8)
->> > @@ -96,7 +97,8 @@ enum s5p_gpio_number {
->> > ? ? S5PV310_GPIO_X2_START ? =
->> > S5PV310_GPIO_NEXT(S5PV310_GPIO_X1),
->> > ? ? S5PV310_GPIO_X3_START ? =
->> > S5PV310_GPIO_NEXT(S5PV310_GPIO_X2),
->> > ? ? S5PV310_GPIO_Z_START ? ?= S5PV310_GPIO_NEXT(S5PV310_GPIO_X3),
->> > - ? S5PV310_GPIO_MP01_START =
->> > S5PV310_GPIO_NEXT(S5PV310_GPIO_Z),
->> > + ? S5PV310_GPIO_MP00_START =
->> > S5PV310_GPIO_NEXT(S5PV310_GPIO_Z),
->> > + ? S5PV310_GPIO_MP01_START =
->> > S5PV310_GPIO_NEXT(S5PV310_GPIO_MP00),
->> > ? ? S5PV310_GPIO_MP02_START =
->> > S5PV310_GPIO_NEXT(S5PV310_GPIO_MP01),
->> > ? ? S5PV310_GPIO_MP03_START =
->> > S5PV310_GPIO_NEXT(S5PV310_GPIO_MP02),
->> > ? ? S5PV310_GPIO_MP04_START =
->> > S5PV310_GPIO_NEXT(S5PV310_GPIO_MP03),
->> > @@ -133,6 +135,7 @@ enum s5p_gpio_number {
->> > ?#define S5PV310_GPX2(_nr) ?(S5PV310_GPIO_X2_START + (_nr))
->> > ?#define S5PV310_GPX3(_nr) ?(S5PV310_GPIO_X3_START + (_nr))
->> > ?#define S5PV310_GPZ(_nr) ? (S5PV310_GPIO_Z_START + (_nr))
->> > +#define S5PV310_MP00(_nr) ?(S5PV310_GPIO_MP00_START + (_nr))
->> > ?#define S5PV310_MP01(_nr) ?(S5PV310_GPIO_MP01_START + (_nr))
->> > ?#define S5PV310_MP02(_nr) ?(S5PV310_GPIO_MP02_START + (_nr))
->> > ?#define S5PV310_MP03(_nr) ?(S5PV310_GPIO_MP03_START + (_nr))
->> > --
->>
->> Should be merged previous '[PATCH] ARM: S5PC210: Define more GPIOs to use
->> the MP pins' and this.
->>
-> I didn't get updated patch...could you please re-submit updated one?
->
-> Thanks.
->
-> Best regards,
-> Kgene.
+> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pv210/clock.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+> index af91fef..825b868 100644
+> --- a/arch/arm/mach-s5pv210/clock.c
+> +++ b/arch/arm/mach-s5pv210/clock.c
+> @@ -357,7 +357,7 @@ static struct clk init_clocks_disable[] = {
+>  		.id		= 1,
+>  		.parent		= &clk_pclk_psys.clk,
+>  		.enable		= s5pv210_clk_ip3_ctrl,
+> -		.ctrlbit	= (1<<8),
+> +		.ctrlbit	= (1 << 10),
+>  	}, {
+>  		.name		= "i2c",
+>  		.id		= 2,
 > --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
+
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
