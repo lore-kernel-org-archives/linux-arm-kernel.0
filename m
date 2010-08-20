@@ -1,41 +1,28 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Fri, 20 Aug 2010 20:45:05 +0900
-Subject: [GIT PULL] genesis updates for 2.6.36-rc2
-Message-ID: <20100820114505.GB30659@linux-sh.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 20 Aug 2010 15:06:23 +0300
+Subject: [PATCH 0/4] Hacks to allow booting ARM SMP kernel on UP ARMv7
+In-Reply-To: <20100819102025.GA32151@n2100.arm.linux.org.uk>
+References: <20100817104414.19061.38999.stgit@baageli.muru.com>
+	<20100817135205.GC20325@n2100.arm.linux.org.uk>
+	<20100817141210.GJ12184@atomide.com>
+	<20100817154035.GD20325@n2100.arm.linux.org.uk>
+	<20100819073810.GR12184@atomide.com>
+	<4C6CFBAF.6020407@canonical.com>
+	<20100819095705.GU12184@atomide.com>
+	<20100819102025.GA32151@n2100.arm.linux.org.uk>
+Message-ID: <20100820120622.GL25742@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only noteworthy thing here are the runtime PM bits, which were
-blocked on the driver core tree merge.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [100819 13:13]:
+> On Thu, Aug 19, 2010 at 12:57:06PM +0300, Tony Lindgren wrote:
+> > Looks like something is not quite right with smp_on_up part of __fixup_smp,
+> > returning early before smp_on_up does not produce that.
+> 
+> It's probably overwriting some register it shouldn't be.  I might be
+> able to look at this sometime during the coming week... assuming that
+> the weather is as bad as they forecast and I have 'net connectivity.
 
-Please pull from:
+OK, I'll be offline too probably until late next week.
 
-	master.kernel.org:/pub/scm/linux/kernel/git/lethal/genesis-2.6.git
-
-Which contains:
-
-Arnd Hannemann (2):
-      ARM: mach-shmobile: AP4EVB: use gpio-leds for leds.
-      ARM: mach-shmobile: ap4evb: fix write protect for SDHI1
-
-Guennadi Liakhovetski (2):
-      ARM: mach-shmobile: add clock definitions for CEU and CSI2
-      ARM: mach-shmobile: do not enable the PLLC2 clock on init
-
-Kuninori Morimoto (1):
-      ARM: mach-shmobile: ap4evb: modify FSI2 ID
-
-Magnus Damm (2):
-      ARM: mach-shmobile: Runtime PM V3
-      ARM: mach-shmobile: Clock framework comment fix
-
-Paul Mundt (1):
-      ARM: mach-shmobile: Fix up gpio-leds pdata definition.
-
- arch/arm/mach-shmobile/Makefile       |    2 +-
- arch/arm/mach-shmobile/board-ap4evb.c |   56 ++++++++---
- arch/arm/mach-shmobile/clock-sh7372.c |    9 +-
- arch/arm/mach-shmobile/clock.c        |    4 +-
- arch/arm/mach-shmobile/pm_runtime.c   |  169 +++++++++++++++++++++++++++++++++
- 5 files changed, 220 insertions(+), 20 deletions(-)
- create mode 100644 arch/arm/mach-shmobile/pm_runtime.c
+Tony
