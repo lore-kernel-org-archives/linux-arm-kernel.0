@@ -1,93 +1,93 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 20 Aug 2010 16:35:46 +0900
-Subject: [PATCH 13/14] ARM: S5PV310: Add video clocks
-In-Reply-To: <AANLkTikreMifRgd8kkvcmjZoRZ0fEAcHqWExaOikzE6v@mail.gmail.com>
-References: <1282140084-10265-1-git-send-email-kgene.kim@samsung.com>
-	<1282140084-10265-14-git-send-email-kgene.kim@samsung.com>
-	<AANLkTincrZWhrb8fcrdL2QNtZTbgBB-pAYzTf8cq6Zn7@mail.gmail.com>
-	<AANLkTikreMifRgd8kkvcmjZoRZ0fEAcHqWExaOikzE6v@mail.gmail.com>
-Message-ID: <00b901cb403a$52c69d20$f853d760$%kim@samsung.com>
+From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
+Date: Fri, 20 Aug 2010 10:10:45 +0200
+Subject: [PATCH/RFCv3 0/6] The Contiguous Memory Allocator framework
+In-Reply-To: <20100820155617S.fujita.tomonori@lab.ntt.co.jp>
+References: <op.vhppgaxq7p4s8u@localhost>
+	<20100820121124Z.fujita.tomonori@lab.ntt.co.jp>
+	<op.vhp4pws27p4s8u@localhost>
+	<20100820155617S.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <op.vhp7rxz77p4s8u@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
-> 
-> On Thu, Aug 19, 2010 at 7:04 PM, MyungJoo Ham
-> <myungjoo.ham@samsung.com> wrote:
-> > On Wed, Aug 18, 2010 at 11:01 PM, Kukjin Kim <kgene.kim@samsung.com>
-> wrote:
-> >> From: Jongpill Lee <boyko.lee@samsung.com>
-> >>
-> >> This patch adds video clocks for S5PV310/S5PC210.
-> >>
-> >> Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
-> >> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> >> ---
-> >>  arch/arm/mach-s5pv310/clock.c |   74
-> +++++++++++++++++++++++++++++++++++++++++
-> >>  1 files changed, 74 insertions(+), 0 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-s5pv310/clock.c b/arch/arm/mach-s5pv310/clock.c
-> >> index 14c9707..04bde94 100644
-> >> --- a/arch/arm/mach-s5pv310/clock.c
-> >> +++ b/arch/arm/mach-s5pv310/clock.c
-> >> @@ -506,6 +506,78 @@ static struct clksrc_sources clkset_group = {
-> >>        .nr_sources     = ARRAY_SIZE(clkset_group_list),
-> >>  };
-> >>
-> >> +static struct clksrc_clk clk_sclk_mipidphy4l = {
-> >> +       .clk    = {
-> >> +               .name           = "sclk_mipidphy4l",
-> >> +               .id             = -1,
-> >> +               .enable         = s5pv310_clk_ip_lcd0_ctrl,
-> >> +               .ctrlbit        = (1 << 4),
-> >> +       },
-> >> +       .sources        = &clkset_group,
-> >> +       .reg_src        = { .reg = S5P_CLKSRC_LCD0, .shift = 12, .size = 4 },
-> >> +       .reg_div        = { .reg = S5P_CLKDIV_LCD0, .shift = 16, .size = 4 },
-> >> +};
-> >
-> > It appears that clk_ip_lcd0[4](CLK_SMMUFIMD0) is not for this clock
-> > source. This SCLK_MIPIDPHY4L seems to be masked by
-> > CLK_SRC_MASK_LCD0[12] (MIPI0_MASK)
-> 
-Ok...you're right.
+On Fri, 20 Aug 2010 08:57:51 +0200, FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> wrote:
 
-> Um... As CLK_SRC_MASK_LCD0[12] (MIPI0_MASK) controls MUX_MIPI0, it
-> masks both SCLK_MIPIDPHY4L and SCLK_MIPI0. Then, it seems that we
-> cannot mask SCLK_MIPIDPHY4L and SCLK_MIPI0 independently.
-> 
-> Then, what about not adding .enable entry for both "sclk_mipidphy4l"
-> and "sclk_mipi" (which is added in the PATCH 14/14)? Affecting another
-> clock source with one does not look good.
-> 
-Hmm...yeah, I agree with you. I will think about that again.
+> On Fri, 20 Aug 2010 08:38:10 +0200
+> **UNKNOWN CHARSET** <m.nazarewicz@samsung.com> wrote:
+>
+>> On Fri, 20 Aug 2010 05:12:50 +0200, FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> wrote:
+>> >> 1. Integration on API level meaning that some kind of existing API is used
+>> >>     instead of new cma_*() calls.  CMA adds notion of devices and memory
+>> >>     types which is new to all the other APIs (coherent has notion of devices
+>> >>     but that's not enough).  This basically means that no existing API can be
+>> >>     used for CMA.  On the other hand, removing notion of devices and memory
+>> >>     types would defeat the whole purpose of CMA thus destroying the solution
+>> >>     that CMA provides.
+>> >
+>> > You can create something similar to the existing API for memory
+>> > allocator.
+>>
+>> That may be tricky.  cma_alloc() takes four parameters each of which is
+>> required for CMA.  No other existing set of API uses all those arguments.
+>> This means, CMA needs it's own, somehow unique API.  I don't quite see
+>> how the APIs may be unified or "made similar".  Of course, I'm gladly
+>> accepting suggestions.
+>
+> Have you even tried to search 'blk_kmalloc' on google?
 
-Thank you for your pointing out.
+I have and I haven't seen any way how
 
-> >
-> >> +
-> >> +static struct clksrc_clk clk_sclk_mipidphy2l = {
-> >> +       .clk    = {
-> >> +               .name           = "sclk_mipidphy2l",
-> >> +               .id             = -1,
-> >> +               .enable         = s5pv310_clk_ip_lcd1_ctrl,
-> >> +               .ctrlbit        = (1 << 4),
-> >> +       },
-> >> +       .sources        = &clkset_group,
-> >> +       .reg_src        = { .reg = S5P_CLKSRC_LCD1, .shift = 12, .size = 4 },
-> >> +       .reg_div        = { .reg = S5P_CLKDIV_LCD1, .shift = 16, .size = 4 },
-> >> +};
-> >
-> > Appears to have the similar issue with the previous clock source
-> 
-> Same with above.
-> 
+   void *()(struct request_queue *q, unsigned size, gfp_t gfp);
 
-Thanks.
+prototype could be applied to CMA.  I admit that I haven't read the whole
+discussion of the patch and maybe I'm missing something about Andi's patches
+but I don't see how CMA could but from what I've understood blk_kmalloc() is
+dissimilar to CMA.  I'll be glad if you could show me where I'm wrong.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> I wrote "similar to the existing API', not "reuse the existing API".
+
+Yes, but I don't really know what you have in mind.  CMA is similar to various
+APIs in various ways: it's similar to any allocator since it takes size in bytes,
+it's similar to coherent since it takes device, it's similar to bootmem/memblock/etc
+since it takes alignment.  I would appreciate if you could give some examples of what
+you mean by similar and ideas haw CMA's API may be improved.
+
+>> >> 2. Reuse of memory pools meaning that memory reserved by CMA can then be
+>> >>     used by other allocation mechanisms.  This is of course possible.  For
+>> >>     instance coherent could easily be implemented as a wrapper to CMA.
+>> >>     This is doable and can be done in the future after CMA gets more
+>> >>     recognition.
+>> >>
+>> >> 3. Reuse of algorithms meaning that allocation algorithms used by other
+>> >>     allocators will be used with CMA regions.  This is doable as well and
+>> >>     can be done in the future.
+>> >
+>> > Well, why can't we do the above before the inclusion?
+>>
+>> Because it's quite a bit of work and instead of diverting my attention I'd
+>> prefer to make CMA as good as possible and then integrate it with other
+>> subsystems.  Also, adding the integration would change the patch from being
+>> 4k lines to being like 40k lines.
+>
+> 4k to 40k? I'm not sure. But If I see something like the following, I
+> suspect that there is a better way to integrate this into the existing
+> infrastructure.
+>
+> mm/cma-best-fit.c                   |  407 +++++++++++++++
+
+Ah, sorry.  I misunderstood you.  I thought you were replying to both 2. and 3.
+above.
+
+If we only take allocating algorithm then you're right.  Reusing existing one
+should not increase the patch size plus it would be probably a better solution.
+
+No matter, I would rather first work and core CMA without worrying about reusing
+kmalloc()/coherent/etc. code especially since providing a plugable allocator API
+integration with existing allocating algorithms can be made later on.  To put it
+short I want first to make it work and then improve it.
+
+-- 
+Best regards,                                        _     _
+| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
+| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
++----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
