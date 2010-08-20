@@ -1,52 +1,41 @@
-From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
-Date: Fri, 20 Aug 2010 12:54:02 +0200
-Subject: [PATCH/RFCv3 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <20100820193328P.fujita.tomonori@lab.ntt.co.jp>
-References: <op.vhp4pws27p4s8u@localhost>
-	<20100820155617S.fujita.tomonori@lab.ntt.co.jp>
-	<op.vhp7rxz77p4s8u@localhost>
-	<20100820193328P.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <op.vhqgkcgj7p4s8u@localhost>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Fri, 20 Aug 2010 20:45:05 +0900
+Subject: [GIT PULL] genesis updates for 2.6.36-rc2
+Message-ID: <20100820114505.GB30659@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Aug 2010 12:35:01 +0200, FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> wrote:
+The only noteworthy thing here are the runtime PM bits, which were
+blocked on the driver core tree merge.
 
-> On Fri, 20 Aug 2010 10:10:45 +0200
-> **UNKNOWN CHARSET** <m.nazarewicz@samsung.com> wrote:
->
->> > I wrote "similar to the existing API', not "reuse the existing API".
->>
->> Yes, but I don't really know what you have in mind.  CMA is similar to various
->> APIs in various ways: it's similar to any allocator since it takes
->> size in bytes,
->
-> why don't take gfp_t flags?
+Please pull from:
 
-Because they are insufficient.  Either that or I don't understand gfp_t.
+	master.kernel.org:/pub/scm/linux/kernel/git/lethal/genesis-2.6.git
 
-With CMA, platform can define many memory types.  For instance, if there are
-two memory bans there can be two memory types for the two banks.  For at least one
-of the device I'm in contact with, another type for it's firmware is also needed.
-Bottom line is that there may be possibly many types which won't map to gfp_t.
+Which contains:
 
-> Something like dev_alloc_page is more appropriate name?
+Arnd Hannemann (2):
+      ARM: mach-shmobile: AP4EVB: use gpio-leds for leds.
+      ARM: mach-shmobile: ap4evb: fix write protect for SDHI1
 
-Two things: I'd prefer a "cma" prefix rather then "dev" and I think it should
-be "pages", right? Then, size should be given in pages rather then bytes.
+Guennadi Liakhovetski (2):
+      ARM: mach-shmobile: add clock definitions for CEU and CSI2
+      ARM: mach-shmobile: do not enable the PLLC2 clock on init
 
-Nonetheless, I don't really see at the moment why this should be better.
+Kuninori Morimoto (1):
+      ARM: mach-shmobile: ap4evb: modify FSI2 ID
 
-> Or something similar to dmapool API (mm/dmapool.c) might work
-> better. The purpose of dmapool API is creating a pool for consistent
-> memory per device. It's similar to yours, creating a pool for
-> contiguous memory per device(s)?
+Magnus Damm (2):
+      ARM: mach-shmobile: Runtime PM V3
+      ARM: mach-shmobile: Clock framework comment fix
 
-I'll try to look at it later on and think about it.  I'm still somehow reluctant
-to change the names but still, thank you for suggestions.
+Paul Mundt (1):
+      ARM: mach-shmobile: Fix up gpio-leds pdata definition.
 
--- 
-Best regards,                                        _     _
-| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
-| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
-+----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
+ arch/arm/mach-shmobile/Makefile       |    2 +-
+ arch/arm/mach-shmobile/board-ap4evb.c |   56 ++++++++---
+ arch/arm/mach-shmobile/clock-sh7372.c |    9 +-
+ arch/arm/mach-shmobile/clock.c        |    4 +-
+ arch/arm/mach-shmobile/pm_runtime.c   |  169 +++++++++++++++++++++++++++++++++
+ 5 files changed, 220 insertions(+), 20 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/pm_runtime.c
