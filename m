@@ -1,40 +1,147 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 20 Aug 2010 19:10:12 +0200
-Subject: [PATCH 1/2] mx35_3ds: add physmap-flash NOR at CS0
-In-Reply-To: <4C6D0BEB.7080002@ru.mvista.com>
-References: <1282146406-2901-1-git-send-email-m.grzeschik@pengutronix.de>
-	<1282146406-2901-2-git-send-email-m.grzeschik@pengutronix.de>
-	<4C6D0BEB.7080002@ru.mvista.com>
-Message-ID: <20100820171012.GM27749@pengutronix.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 20 Aug 2010 22:05:30 +0200 (CEST)
+Subject: [RFC][PATCH] add
+	dma_reserve_coherent_memory()/dma_free_reserved_memory() API
+In-Reply-To: <201008191818.36068.mitov@issp.bas.bg>
+References: <201008191818.36068.mitov@issp.bas.bg>
+Message-ID: <Pine.LNX.4.64.1008202148110.6103@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Thu, 19 Aug 2010, Marin Mitov wrote:
 
-On Thu, Aug 19, 2010 at 02:48:11PM +0400, Sergei Shtylyov wrote:
->> +	.width  = 2,
->> +};
->> +
->> +static struct resource mx35pdk_flash_resource = {
->> +	.start	= MX35_CS0_BASE_ADDR,
->> +	.end	= MX35_CS0_BASE_ADDR + SZ_64M - 1,
->> +	.flags	= IORESOURCE_MEM,
->> +};
->> +
->> +static struct platform_device mx35pdk_flash = {
->> +	.name	= "physmap-flash",
->> +	.id	= 0,
->
->    -1 perhaps as that is probably a single physmap devie on your board?
+> Hi all,
+> 
+> struct device contains a member: struct dma_coherent_mem *dma_mem;
+> to hold information for a piece of memory declared dma-coherent.
+> Alternatively the same member could also be used to hold preallocated
+> dma-coherent memory for latter per-device use.
+> 
+> This tric is already used in drivers/staging/dt3155v4l.c
+> dt3155_alloc_coherent()/dt3155_free_coherent()
+> 
+> Here proposed for general use by popular demand from video4linux folks.
+> Helps for videobuf-dma-contig framework.
 
-Generally yes, but we are using command line partition tables and all
-our bootloader environments pass physmap-flash.0 as identifier, so it's
-better to keep 0.
+Ok, so, we've got two solutions to this problem submitted on the same 
+day;) Following this thread:
 
-Sascha
+http://marc.info/?t=128128236400002&r=1&w=2
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+on the ARM Linux kernel ML, I submitted a patch series
+
+http://thread.gmane.org/gmane.linux.ports.sh.devel/8595
+
+with a couple of fixes and improvements, the actual new API and a use 
+example. My approach is slightly different, in that instead of requiring 
+drivers to issue two calls - one to reserve RAM (usually 
+dma_alloc_coherent()) and one to assign it to a device, my patch follows 
+the suggestion from Russell King from the first thread and unites these 
+two operations. So, now we have a choice;) Unfortunately, these two patch 
+series went to orthogonal sets of recepients, I'm trying to fix this by 
+adding a couple of CC entries.
+
+Thanks
+Guennadi
+
+> 
+> Signed-off-by: Marin Mitov <mitov@issp.bas.bg>
+> 
+> ======================================================================
+> --- a/drivers/base/dma-coherent.c	2010-08-19 15:50:42.000000000 +0300
+> +++ b/drivers/base/dma-coherent.c	2010-08-19 17:27:56.000000000 +0300
+> @@ -93,6 +93,83 @@ void *dma_mark_declared_memory_occupied(
+>  EXPORT_SYMBOL(dma_mark_declared_memory_occupied);
+>  
+>  /**
+> + * dma_reserve_coherent_memory() - reserve coherent memory for per-device use
+> + *
+> + * @dev:	device from which we allocate memory
+> + * @size:	size of requested memory area in bytes
+> + * @flags:	same as in dma_declare_coherent_memory()
+> + *
+> + * This function reserves coherent memory allocating it early (during probe())
+> + * to support latter allocations from per-device coherent memory pools.
+> + * For a given device one could use either dma_declare_coherent_memory() or
+> + * dma_reserve_coherent_memory(), but not both, becase the result of these
+> + * functions is stored in a single struct device member - dma_mem
+> + *
+> + * Returns DMA_MEMORY_MAP on success, or 0 if failed.
+> + * (same as dma_declare_coherent_memory()
+> + */
+> +int dma_reserve_coherent_memory(struct device *dev, size_t size, int flags)
+> +{
+> +	struct dma_coherent_mem *mem;
+> +	dma_addr_t dev_base;
+> +	int pages = size >> PAGE_SHIFT;
+> +	int bitmap_size = BITS_TO_LONGS(pages) * sizeof(long);
+> +
+> +	if ((flags & DMA_MEMORY_MAP) == 0)
+> +		goto out;
+> +	if (!size)
+> +		goto out;
+> +	if (dev->dma_mem)
+> +		goto out;
+> +
+> +	mem = kzalloc(sizeof(*mem), GFP_KERNEL);
+> +	if (!mem)
+> +		goto out;
+> +	mem->virt_base = dma_alloc_coherent(dev, size, &dev_base,
+> +							DT3155_COH_FLAGS);
+> +	if (!mem->virt_base)
+> +		goto err_alloc_coherent;
+> +	mem->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+> +	if (!mem->bitmap)
+> +		goto err_bitmap;
+> +
+> +	mem->device_base = dev_base;
+> +	mem->size = pages;
+> +	mem->flags = flags;
+> +	dev->dma_mem = mem;
+> +	return DMA_MEMORY_MAP;
+> +
+> +err_bitmap:
+> +	dma_free_coherent(dev, size, mem->virt_base, dev_base);
+> +err_alloc_coherent:
+> +	kfree(mem);
+> +out:
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(dma_reserve_coherent_memory);
+> +
+> +/**
+> + * dma_free_reserved_memory() - free the reserved dma-coherent memoty
+> + *
+> + * @dev:	device for which we free the dma-coherent memory
+> + *
+> + * same as dma_release_declared_memory()
+> + */
+> +void dma_free_reserved_memory(struct device *dev)
+> +{
+> +	struct dma_coherent_mem *mem = dev->dma_mem;
+> +
+> +	if (!mem)
+> +		return;
+> +	dev->dma_mem = NULL;
+> +	dma_free_coherent(dev, mem->size << PAGE_SHIFT,
+> +					mem->virt_base, mem->device_base);
+> +	kfree(mem->bitmap);
+> +	kfree(mem);
+> +}
+> +EXPORT_SYMBOL(dma_free_reserved_memory);
+> +
+> +/**
+>   * dma_alloc_from_coherent() - try to allocate memory from the per-device coherent area
+>   *
+>   * @dev:	device from which we allocate memory
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
