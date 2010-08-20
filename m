@@ -1,27 +1,92 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 20 Aug 2010 10:53:51 +0100
-Subject: [PATCH v2] MAX8952 PMIC Driver Initial Release
-In-Reply-To: <1282283036-12641-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1282283036-12641-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <20100820095351.GD13668@rakim.wolfsonmicro.main>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 20 Aug 2010 18:59:01 +0900
+Subject: [PATCH] ARM: S5PC210: Define more GPIOs to use the MP pins
+In-Reply-To: <20100802113521.GA1107@july>
+References: <20100802113521.GA1107@july>
+Message-ID: <00d601cb404e$55dc2a70$01947f50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 20, 2010 at 02:43:56PM +0900, MyungJoo Ham wrote:
-> MAX8952 PMIC is used to provide voltage output between 770mV - 1400mV
-> with DVS support. In this initial release, users can set voltages for
-> four DVS modes, RAMP delay values, and SYNC frequency.
-> Controlling FPWM/SYNC_MODE/Pull-Down/Ramp Modes and reading CHIP_ID
-> is not supported in this release.
+Kyungmin Park wrote:
 > 
-> If GPIO of EN is not valid in platform data, the driver assumes that it
-> is always-on. If GPIO of VID0 or VID1 is invalid, the driver pulls down
-> VID0 and VID1 to fix DVS mode as 0 and disables DVS support.
+> From: Kyungmin Park <kyungmin.park@samsung.com>
 > 
-> We assume that V_OUT is capable to provide every voltage from 770mV to
-> 1.40V in 10mV steps although the data sheet has some ambiguity on it.
-> 
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Hi ;-)
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Note that these pins can't support the interrupt. Only use to
+input/output.
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pv310/include/mach/gpio.h |   14 +++++++++++++-
+>  1 files changed, 13 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv310/include/mach/gpio.h b/arch/arm/mach-
+> s5pv310/include/mach/gpio.h
+> index 3f751f2..a840d83 100644
+> --- a/arch/arm/mach-s5pv310/include/mach/gpio.h
+> +++ b/arch/arm/mach-s5pv310/include/mach/gpio.h
+> @@ -55,6 +55,10 @@
+>  #define S5PV310_GPIO_X2_NR	(8)
+>  #define S5PV310_GPIO_X3_NR	(8)
+>  #define S5PV310_GPIO_Z_NR	(7)
+
+MP00 ?
+
+> +#define S5PV310_GPIO_MP01_NR	(8)
+
+Should be 4.
+
+> +#define S5PV310_GPIO_MP02_NR	(4)
+
+Should be 6.
+
+> +#define S5PV310_GPIO_MP03_NR	(8)
+> +#define S5PV310_GPIO_MP04_NR	(8)
+> 
+>  /* GPIO bank numbers */
+> 
+> @@ -92,6 +96,10 @@ enum s5p_gpio_number {
+>  	S5PV310_GPIO_X2_START	=
+> S5PV310_GPIO_NEXT(S5PV310_GPIO_X1),
+>  	S5PV310_GPIO_X3_START	=
+> S5PV310_GPIO_NEXT(S5PV310_GPIO_X2),
+>  	S5PV310_GPIO_Z_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_X3),
+> +	S5PV310_GPIO_MP01_START	=
+> S5PV310_GPIO_NEXT(S5PV310_GPIO_Z),
+> +	S5PV310_GPIO_MP02_START	=
+> S5PV310_GPIO_NEXT(S5PV310_GPIO_MP01),
+> +	S5PV310_GPIO_MP03_START	=
+> S5PV310_GPIO_NEXT(S5PV310_GPIO_MP02),
+> +	S5PV310_GPIO_MP04_START	=
+> S5PV310_GPIO_NEXT(S5PV310_GPIO_MP03),
+>  };
+> 
+>  /* S5PV310 GPIO number definitions */
+> @@ -125,9 +133,13 @@ enum s5p_gpio_number {
+>  #define S5PV310_GPX2(_nr)	(S5PV310_GPIO_X2_START + (_nr))
+>  #define S5PV310_GPX3(_nr)	(S5PV310_GPIO_X3_START + (_nr))
+>  #define S5PV310_GPZ(_nr)	(S5PV310_GPIO_Z_START + (_nr))
+> +#define S5PV310_MP01(_nr)	(S5PV310_GPIO_MP01_START + (_nr))
+> +#define S5PV310_MP02(_nr)	(S5PV310_GPIO_MP02_START + (_nr))
+> +#define S5PV310_MP03(_nr)	(S5PV310_GPIO_MP03_START + (_nr))
+> +#define S5PV310_MP04(_nr)	(S5PV310_GPIO_MP04_START + (_nr))
+> 
+>  /* the end of the S5PV310 specific gpios */
+> -#define S5PV310_GPIO_END	(S5PV310_GPZ(S5PV310_GPIO_Z_NR) + 1)
+> +#define S5PV310_GPIO_END	(S5PV310_MP04(S5PV310_GPIO_MP04_NR) +
+> 1)
+>  #define S3C_GPIO_END		S5PV310_GPIO_END
+> 
+>  /* define the number of gpios we need to the one after the GPZ() range */
+
+Should be MP04() in comment.
+And...ARCH_NR_GPIOS should be changed together.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
