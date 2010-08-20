@@ -1,37 +1,39 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 20 Aug 2010 18:42:26 +0800
-Subject: [PATCH 1/1] [ARM] pxa: encode IRQ number into .nr_irqs
-In-Reply-To: <AANLkTimAgV9USBf4ojoNSuNXL5jogTr0vRy3NfLUyR0_@mail.gmail.com>
-References: <AANLkTimAgV9USBf4ojoNSuNXL5jogTr0vRy3NfLUyR0_@mail.gmail.com>
-Message-ID: <AANLkTinSumMxHLWt_xp6Kb3ymMkU2d28bZZZFdFM60vd@mail.gmail.com>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Fri, 20 Aug 2010 11:47:09 +0100
+Subject: [PATCH v2] MAX8952 PMIC Driver Initial Release
+In-Reply-To: <20100820095351.GD13668@rakim.wolfsonmicro.main>
+References: <1282283036-12641-1-git-send-email-myungjoo.ham@samsung.com>
+	<20100820095351.GD13668@rakim.wolfsonmicro.main>
+Message-ID: <1282301229.3084.152.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 20, 2010 at 6:40 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> From fabb050a825825b55099766167fa9bb47d4b6941 Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Fri, 20 Aug 2010 15:23:59 +0800
-> Subject: [PATCH 1/1] [ARM] pxa: encode IRQ number into .nr_irqs
->
-> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> ---
+On Fri, 2010-08-20 at 10:53 +0100, Mark Brown wrote:
+> On Fri, Aug 20, 2010 at 02:43:56PM +0900, MyungJoo Ham wrote:
+> > MAX8952 PMIC is used to provide voltage output between 770mV - 1400mV
+> > with DVS support. In this initial release, users can set voltages for
+> > four DVS modes, RAMP delay values, and SYNC frequency.
+> > Controlling FPWM/SYNC_MODE/Pull-Down/Ramp Modes and reading CHIP_ID
+> > is not supported in this release.
+> > 
+> > If GPIO of EN is not valid in platform data, the driver assumes that it
+> > is always-on. If GPIO of VID0 or VID1 is invalid, the driver pulls down
+> > VID0 and VID1 to fix DVS mode as 0 and disables DVS support.
+> > 
+> > We assume that V_OUT is capable to provide every voltage from 770mV to
+> > 1.40V in 10mV steps although the data sheet has some ambiguity on it.
+> > 
+> > Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-Changelog:
-
-1. Append .nr_irqs for all 6 EZX platform
-
-2. clean unnecessary PXA_HAVE_BOARD_IRQ in arch/arm/mach-pxa/Kconfig.
-
-And attach this patch.
+Applied.
 
 Thanks
-Haojian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001--ARM-pxa-encode-IRQ-number-into-.nr_irqs.patch
-Type: text/x-patch
-Size: 25367 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100820/e34938b9/attachment-0001.bin>
+
+Liam
+-- 
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
